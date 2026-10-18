@@ -1,5 +1,7 @@
 # 依赖
 node_modules/
+# lock 不入库：npm/cli#4828 会在解析阶段按当前平台裁剪可选依赖，跨平台复用会缺 rollup 原生二进制，CI 按平台全新安装
+package-lock.json
 
 # 构建产物
 dist/

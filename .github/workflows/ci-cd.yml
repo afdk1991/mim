@@ -26,9 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      # npm install（非 npm ci）：规避 npm/cli#4828 —— Windows 生成的 lock 在 Linux 上缺 rollup 平台可选依赖
+      # npm install（非 npm ci，lock 不入库）：规避 npm/cli#4828 —— 按运行平台全新解析可选依赖
       - name: 安装依赖
         run: npm install --no-fund --no-audit
 
