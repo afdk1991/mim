@@ -7,7 +7,7 @@
 | 事件 | 动作 |
 | --- | --- |
 | Push 到 `main` | 类型检查 → 构建 → 自动部署 **GitHub Pages** + **EdgeOne Pages** |
-| Push tag `v*`（如 `v1.0.0`） | 上述全部 + 发布 npm 包到 **GitHub Packages** |
+| Push tag `v*`（如 `v1.0.0`） | 类型检查 → 构建 → 发布 npm 包到 **GitHub Packages**（站点与 main 同提交，无需重复部署） |
 | Pull Request | 只跑质量门禁（typecheck + build），不部署 |
 | 手动触发 | 在仓库 Actions 页点 `Run workflow` 随时部署 |
 
