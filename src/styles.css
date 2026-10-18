@@ -1293,6 +1293,29 @@ mark.hl {
   flex: 1;
 }
 
+/* ---------- 深色模式 ---------- */
+
+html[data-theme='dark'] {
+  --primary-weak: #3b2a16;
+  --bg: #131519;
+  --card: #1c1f24;
+  --text: #e8eaed;
+  --text-2: #a4a9b1;
+  --text-3: #6e747d;
+  --border: #2c3037;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+html[data-theme='dark'] .topbar {
+  background: rgba(20, 22, 26, 0.92);
+}
+
+html[data-theme='dark'] .hist-chip .hist-del:hover {
+  color: #ff6b60;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 860px) {

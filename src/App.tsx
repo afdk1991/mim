@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
 import { Avatar, Empty, ToastProvider } from './components'
@@ -41,15 +41,46 @@ const NAV: NavItem[] = [
   { href: '#/my', match: '/my', label: '我的主页' },
 ]
 
+/* ---------- 深色模式 ---------- */
+
+const THEME_KEY = 'mim-theme'
+
+function loadTheme(): 'light' | 'dark' {
+  try {
+    const v = localStorage.getItem(THEME_KEY)
+    if (v === 'light' || v === 'dark') return v
+  } catch {
+    /* ignore */
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 function TopNav() {
   const api = useApp()
   const { path } = useRouter()
+  const [theme, setTheme] = useState<'light' | 'dark'>(loadTheme)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem(THEME_KEY, theme)
+    } catch {
+      /* ignore */
+    }
+  }, [theme])
 
   return (
     <header className="topbar">
       <div className="topbar-inner">
         <a className="brand" href="#/feed">Mim</a>
         <div className="topbar-right">
+          <button
+            className="icon-btn"
+            title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           <button
             className="icon-btn"
             title="重置演示数据"
