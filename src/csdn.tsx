@@ -591,23 +591,85 @@ export function ResourcesPage() {
 
 /* ================= 7. SearchPage 搜索 ================= */
 
+const HISTORY_KEY = 'mim-search-history'
+
+function loadHistory(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 关键词高亮：所有匹配处包一层 mark.hl */
+function Highlight({ text, kw }: { text: string; kw: string }) {
+  if (!kw) return <>{text}</>
+  const parts = text.split(new RegExp(`(${escapeRegExp(kw)})`, 'gi'))
+  const lower = kw.toLowerCase()
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.toLowerCase() === lower ? (
+          <mark key={i} className="hl">{p}</mark>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  )
+}
+
 export function SearchPage() {
   const api = useApp()
   const { query: routeQuery, navigate } = useRouter()
   const [q, setQ] = useState(routeQuery.get('q') ?? '')
   const [tab, setTab] = useState('all')
+  const [history, setHistory] = useState<string[]>(loadHistory)
 
   useEffect(() => {
     setQ(routeQuery.get('q') ?? '')
   }, [routeQuery])
 
+  const saveHistory = (t: string) => {
+    setHistory((h) => {
+      const next = [t, ...h.filter((x) => x !== t)].slice(0, 8)
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+  const removeHistory = (t: string) => {
+    setHistory((h) => {
+      const next = h.filter((x) => x !== t)
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+  const clearHistory = () => {
+    setHistory([])
+    localStorage.removeItem(HISTORY_KEY)
+  }
+
   const kw = q.trim().toLowerCase()
   const results = useMemo(() => {
     if (!kw) return { posts: [], articles: [], users: [], snippets: [] }
     return {
-      posts: api.state.posts.filter((p) => p.content.toLowerCase().includes(kw) || (p.topic ?? '').includes(kw)),
+      posts: api.state.posts.filter(
+        (p) =>
+          p.content.toLowerCase().includes(kw) ||
+          (p.topic ?? '').includes(kw) ||
+          (p.comments ?? []).some((c) => c.content.toLowerCase().includes(kw)),
+      ),
       articles: api.state.articles.filter(
-        (a) => a.title.toLowerCase().includes(kw) || a.summary.includes(kw) || a.content.toLowerCase().includes(kw),
+        (a) =>
+          a.title.toLowerCase().includes(kw) ||
+          a.summary.includes(kw) ||
+          a.content.toLowerCase().includes(kw) ||
+          a.comments.some((c) => c.content.toLowerCase().includes(kw)),
       ),
       users: Object.values(api.state.users).filter(
         (u) => u.name.toLowerCase().includes(kw) || u.bio.includes(kw),
@@ -620,7 +682,17 @@ export function SearchPage() {
   }, [kw, api.state.posts, api.state.articles, api.state.users, api.state.snippets])
 
   const doSearch = () => {
-    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
+    const t = q.trim()
+    if (!t) return
+    saveHistory(t)
+    navigate(`/search?q=${encodeURIComponent(t)}`)
+  }
+
+  /** 从历史/热搜词直接发起搜索 */
+  const go = (text: string) => {
+    setQ(text)
+    saveHistory(text)
+    navigate(`/search?q=${encodeURIComponent(text)}`)
   }
 
   const hasAny = results.posts.length + results.articles.length + results.users.length + results.snippets.length > 0
@@ -638,6 +710,45 @@ export function SearchPage() {
           />
           <button className="btn btn-primary" onClick={doSearch}>🔍 搜索</button>
         </div>
+
+        {!kw && (
+          <div className="card" style={{ padding: 14 }}>
+            {history.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div className="search-hist-head">
+                  <b style={{ fontSize: 14 }}>🕘 搜索历史</b>
+                  <button className="icon-btn" style={{ fontSize: 12 }} onClick={clearHistory}>清空</button>
+                </div>
+                <div className="chip-row">
+                  {history.map((h) => (
+                    <span key={h} className="chip hist-chip" onClick={() => go(h)}>
+                      {h}
+                      <button
+                        type="button"
+                        className="hist-del"
+                        aria-label={`删除历史 ${h}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeHistory(h)
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <b style={{ fontSize: 14 }}>🔥 热门搜索</b>
+              <div className="chip-row" style={{ marginTop: 10 }}>
+                {api.state.hotSearches.slice(0, 8).map((h) => (
+                  <span key={h.id} className="chip" onClick={() => go(h.text)}>{h.text}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="tabs">
           {[
@@ -672,8 +783,10 @@ export function SearchPage() {
                 {tab === 'all' && <h3 className="page-title">📄 文章</h3>}
                 {results.articles.slice(0, tab === 'all' ? 3 : undefined).map((a) => (
                   <a key={a.id} href={`#/article/${a.id}`} className="card" style={{ display: 'block' }}>
-                    <b style={{ fontSize: 15 }}>{a.title}</b>
-                    <p style={{ color: 'var(--text-2)', fontSize: 13, margin: '4px 0 0' }}>{a.summary}</p>
+                    <b style={{ fontSize: 15 }}><Highlight text={a.title} kw={kw} /></b>
+                    <p style={{ color: 'var(--text-2)', fontSize: 13, margin: '4px 0 0' }}>
+                      <Highlight text={a.summary} kw={kw} />
+                    </p>
                   </a>
                 ))}
               </>
@@ -699,7 +812,7 @@ export function SearchPage() {
                   <div key={s.id} className="card">
                     <div className="snippet-head">
                       <span className="lang-badge">{s.language}</span>
-                      <b style={{ fontSize: 14 }}>{s.title}</b>
+                      <b style={{ fontSize: 14 }}><Highlight text={s.title} kw={kw} /></b>
                     </div>
                     <pre className="snippet-code"><code>{s.code}</code></pre>
                   </div>
