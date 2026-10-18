@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
-import { Avatar, Empty, ToastProvider } from './components'
+import { Avatar, Empty, TimeAgo, ToastProvider } from './components'
 import {
   FavoritesPage,
   FeedPage,
@@ -22,7 +22,7 @@ import {
   SearchPage,
   SnippetsPage,
 } from './csdn'
-import { cx } from './utils'
+import { clearHistory, cx, loadHistory } from './utils'
 
 type NavItem = { href: string; match: string; label: string; badgeKey?: 'notif' | 'msg' }
 
@@ -38,6 +38,7 @@ const NAV: NavItem[] = [
   { href: '#/notifications', match: '/notifications', label: '通知', badgeKey: 'notif' },
   { href: '#/messages', match: '/messages', label: '私信', badgeKey: 'msg' },
   { href: '#/favorites', match: '/favorites', label: '收藏' },
+  { href: '#/history', match: '/history', label: '足迹' },
   { href: '#/my', match: '/my', label: '我的主页' },
 ]
 
@@ -134,6 +135,8 @@ function Page() {
       return <MessagesPage />
     case 'favorites':
       return <FavoritesPage />
+    case 'history':
+      return <HistoryPage />
     case 'my':
       return <MyProfilePage />
     case 'following':
@@ -160,6 +163,91 @@ function Page() {
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
   }
+}
+
+/* ---------- 浏览历史（足迹） ---------- */
+
+interface HistoryRow {
+  key: string
+  at: number
+  icon: string
+  label: string
+  title: string
+  author: string
+  href: string
+}
+
+function HistoryPage() {
+  const api = useApp()
+  const { navigate } = useRouter()
+  const [items, setItems] = useState(loadHistory)
+
+  const rows: HistoryRow[] = []
+  for (const h of items) {
+    if (h.kind === 'post') {
+      const p = api.state.posts.find((x) => x.id === h.id)
+      if (!p) continue
+      const first = p.content.split('\n')[0]
+      rows.push({
+        key: 'post-' + p.id,
+        at: h.at,
+        icon: '📝',
+        label: '微博',
+        title: first.length > 60 ? first.slice(0, 60) + '…' : first || '查看微博',
+        author: api.user(p.authorId).name,
+        href: '#/post/' + p.id,
+      })
+    } else {
+      const a = api.state.articles.find((x) => x.id === h.id)
+      if (!a) continue
+      rows.push({
+        key: 'article-' + a.id,
+        at: h.at,
+        icon: '📄',
+        label: '文章',
+        title: a.title,
+        author: api.user(a.authorId).name,
+        href: '#/article/' + a.id,
+      })
+    }
+  }
+
+  return (
+    <div className="page-grid single">
+      <div>
+        <h2 className="page-title">👣 浏览足迹</h2>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={rows.length === 0}
+            onClick={() => {
+              clearHistory()
+              setItems([])
+            }}
+          >
+            清空足迹
+          </button>
+        </div>
+        <div className="card">
+          {rows.length === 0 && <Empty emoji="👣" text="还没有足迹，去看看微博和文章吧" />}
+          {rows.map((r) => (
+            <div key={r.key} className="notif-row" onClick={() => navigate(r.href)}>
+              <span className="notif-icon">{r.icon}</span>
+              <div className="notif-body">
+                <p>
+                  <span className="tag">{r.label}</span>
+                  {r.title}
+                </p>
+                <small>
+                  @{r.author} · <TimeAgo ts={r.at} />
+                </small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function Shell() {

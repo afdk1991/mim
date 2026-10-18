@@ -45,3 +45,47 @@ export function formatCount(n: number): string {
   }
   return String(n)
 }
+
+/* ---------- 浏览历史（足迹） ---------- */
+
+export type ViewKind = 'post' | 'article'
+
+export interface HistoryEntry {
+  kind: ViewKind
+  id: string
+  at: number
+}
+
+const HISTORY_KEY = 'mim-history'
+const HISTORY_MAX = 50
+
+export function loadHistory(): HistoryEntry[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
+    if (!Array.isArray(arr)) return []
+    return arr.filter((e) => e && (e.kind === 'post' || e.kind === 'article') && typeof e.id === 'string')
+  } catch {
+    return []
+  }
+}
+
+/** 记录一次浏览：同一条目去重置顶，上限 HISTORY_MAX 条 */
+export function recordView(kind: ViewKind, id: string) {
+  const next = [{ kind, id, at: Date.now() }, ...loadHistory().filter((e) => !(e.kind === kind && e.id === id))].slice(
+    0,
+    HISTORY_MAX,
+  )
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearHistory() {
+  try {
+    localStorage.removeItem(HISTORY_KEY)
+  } catch {
+    /* ignore */
+  }
+}

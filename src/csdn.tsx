@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from './store'
 import { useRouter } from './router'
-import { cx, formatCount, formatDate } from './utils'
+import { cx, formatCount, formatDate, recordView } from './utils'
 import { Avatar, Empty, Modal, RichText, Tag, TimeAgo, UserLink, useToast } from './components'
 import type { Article } from './types'
 
@@ -168,6 +168,11 @@ export function ArticleDetailPage({ id }: { id: string }) {
   const toast = useToast()
   const article = api.state.articles.find((a) => a.id === id)
   const [input, setInput] = useState('')
+
+  useEffect(() => {
+    if (article) recordView('article', article.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   if (!article) return <Empty emoji="🔍" text="文章不存在或已被删除" />
   const author = api.user(article.authorId)

@@ -612,6 +612,24 @@ select {
   font-size: 13px;
 }
 
+/* ---------- 话题页参与者头像墙 ---------- */
+
+.avatar-wall {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.avatar-wall a {
+  display: inline-flex;
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+
+.avatar-wall a:hover {
+  transform: translateY(-2px);
+}
+
 /* ---------- 通知 ---------- */
 
 .notif-row {

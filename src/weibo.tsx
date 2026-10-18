@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from './store'
 import { useRouter } from './router'
-import { cx, formatCount, timeAgo } from './utils'
+import { cx, formatCount, recordView, timeAgo } from './utils'
 import {
   ArticleCard,
   Avatar,
@@ -204,6 +204,11 @@ export function PostDetailPage({ id }: { id: string }) {
   const post = api.state.posts.find((p) => p.id === id)
   const [input, setInput] = useState('')
 
+  useEffect(() => {
+    if (post) recordView('post', post.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
   if (!post) return <Empty emoji="🔍" text="微博不存在或已被删除" />
 
   const submit = () => {
@@ -270,8 +275,15 @@ function u_name(authorId: string, api: ReturnType<typeof useApp>) {
 
 export function TopicPage({ name }: { name: string }) {
   const api = useApp()
+  const [sort, setSort] = useState<'new' | 'hot'>('new')
   const topic = api.state.topics.find((t) => t.name === name)
   const posts = api.state.posts.filter((p) => p.topic === name)
+  const sorted = useMemo(
+    () => [...posts].sort((a, b) => (sort === 'new' ? b.createdAt - a.createdAt : b.likes - a.likes)),
+    [posts, sort],
+  )
+  const authors = [...new Set(posts.map((p) => p.authorId))]
+  const related = api.state.topics.filter((t) => t.name !== name).slice(0, 8)
 
   return (
     <div className="page-grid single">
@@ -282,10 +294,53 @@ export function TopicPage({ name }: { name: string }) {
             {topic?.desc ?? '大家都在聊这个话题'} · {formatCount(topic?.heat ?? 0)} 阅读 · {posts.length} 条讨论
           </p>
         </div>
-        {posts.length === 0 && <Empty emoji="💭" text="这个话题下还没有讨论" />}
-        {posts.map((p) => (
+
+        {authors.length > 0 && (
+          <div className="card">
+            <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>👥 {authors.length} 人参与讨论</h3>
+            <div className="avatar-wall">
+              {authors.map((id) => {
+                const u = api.user(id)
+                return (
+                  <a
+                    key={id}
+                    href={id === api.me.id ? '#/my' : `#/user/${id}`}
+                    title={`${u.name} · ${formatCount(u.followers)} 粉丝`}
+                  >
+                    <Avatar emoji={u.emoji} color={u.color} size={40} />
+                  </a>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="tabs">
+          <button className={cx('tab-btn', sort === 'new' && 'active')} onClick={() => setSort('new')}>
+            🕐 最新
+          </button>
+          <button className={cx('tab-btn', sort === 'hot' && 'active')} onClick={() => setSort('hot')}>
+            🔥 最热
+          </button>
+        </div>
+
+        {sorted.length === 0 && <Empty emoji="💭" text="这个话题下还没有讨论" />}
+        {sorted.map((p) => (
           <PostCard key={p.id} post={p} />
         ))}
+
+        {related.length > 0 && (
+          <div className="card">
+            <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>🔀 相关话题</h3>
+            <div className="chip-row">
+              {related.map((t) => (
+                <a key={t.id} className="chip" href={`#/topic/${encodeURIComponent(t.name)}`}>
+                  #{t.name}# · {formatCount(t.heat)} 阅读
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
