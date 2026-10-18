@@ -7,6 +7,7 @@ import {
   Avatar,
   Empty,
   FollowButton,
+  Modal,
   PostCard,
   RichText,
   Tag,
@@ -489,10 +490,93 @@ export function FavoritesPage() {
 
 /* ================= 7. MyProfilePage 我的主页 ================= */
 
+const AVATAR_EMOJIS = ['😀', '😎', '🤓', '🐱', '🦊', '🐼', '🚀', '🌸', '💻', '🔥', '🎯', '⭐']
+const AVATAR_COLORS = ['#ff8200', '#e74c3c', '#8e44ad', '#2980b9', '#16a085', '#f39c12', '#2c3e50', '#c0392b']
+
+function EditProfileModal({ onClose }: { onClose: () => void }) {
+  const api = useApp()
+  const toast = useToast()
+  const [name, setName] = useState(api.me.name)
+  const [emoji, setEmoji] = useState(api.me.emoji)
+  const [color, setColor] = useState(api.me.color)
+  const [bio, setBio] = useState(api.me.bio)
+
+  const save = () => {
+    if (!name.trim()) {
+      toast('昵称不能为空')
+      return
+    }
+    api.updateProfile({ name: name.trim(), emoji, color, bio: bio.trim() })
+    toast('资料已更新 ✅')
+    onClose()
+  }
+
+  return (
+    <Modal title="编辑个人资料" onClose={onClose}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        <div>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>昵称</div>
+          <input className="input" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>头像 emoji</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {AVATAR_EMOJIS.map((e) => (
+              <button
+                key={e}
+                className={cx('btn btn-ghost btn-sm', emoji === e && 'active')}
+                style={emoji === e ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : undefined}
+                onClick={() => setEmoji(e)}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>头像背景色</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {AVATAR_COLORS.map((c) => (
+              <button
+                key={c}
+                aria-label={`选择颜色 ${c}`}
+                onClick={() => setColor(c)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: c,
+                  border: color === c ? '2px solid var(--text-1)' : '2px solid transparent',
+                  cursor: 'pointer',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>个性签名</div>
+          <textarea
+            className="input"
+            style={{ minHeight: 72 }}
+            maxLength={80}
+            placeholder="介绍一下自己…"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+          />
+        </div>
+        <button className="btn btn-primary" onClick={save}>
+          保存资料
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 export function MyProfilePage() {
   const api = useApp()
   const toast = useToast()
   const [tab, setTab] = useState<'posts' | 'drafts'>('posts')
+  const [editOpen, setEditOpen] = useState(false)
   const myPosts = api.state.posts.filter((p) => p.authorId === api.me.id)
   const drafts = api.state.postDrafts
 
@@ -505,7 +589,23 @@ export function MyProfilePage() {
             { label: '微博', value: myPosts.length },
             { label: '草稿', value: drafts.length },
           ]}
-          actions={<a className="btn btn-ghost btn-sm" href="#/write" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.5)' }}>✍️ 写文章</a>}
+          actions={
+            <>
+              <a className="btn btn-ghost btn-sm" href="#/following" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.5)' }}>
+                👥 关注列表
+              </a>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.5)' }}
+                onClick={() => setEditOpen(true)}
+              >
+                ✏️ 编辑资料
+              </button>
+              <a className="btn btn-ghost btn-sm" href="#/write" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.5)' }}>
+                ✍️ 写文章
+              </a>
+            </>
+          }
         />
         <div className="tabs">
           <button className={cx('tab-btn', tab === 'posts' && 'active')} onClick={() => setTab('posts')}>
@@ -555,11 +655,44 @@ export function MyProfilePage() {
           </>
         )}
       </div>
+      {editOpen && <EditProfileModal onClose={() => setEditOpen(false)} />}
     </div>
   )
 }
 
-/* ================= 8. ProfilePage 他人主页 ================= */
+/* ================= 8. FollowingPage 关注列表 ================= */
+
+export function FollowingPage() {
+  const api = useApp()
+  const users = api.state.followingIds.map((id) => api.user(id))
+
+  return (
+    <div className="page-grid single">
+      <div>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <a className="btn btn-ghost btn-sm" href="#/my">← 返回</a>
+          <b>关注列表（{users.length}）</b>
+        </div>
+        {users.length === 0 && <Empty emoji="👥" text="还没有关注任何人，去别人的主页逛逛吧" />}
+        {users.map((u) => (
+          <div key={u.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <UserLink userId={u.id} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>
+                {u.name}
+                {u.verified && <span className="v-badge">V</span>}
+              </div>
+              <small style={{ color: 'var(--text-3)' }}>{u.bio}</small>
+            </div>
+            <FollowButton userId={u.id} small />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ================= 9. ProfilePage 他人主页 ================= */
 
 export function ProfilePage({ id }: { id: string }) {
   const api = useApp()

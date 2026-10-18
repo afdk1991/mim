@@ -128,7 +128,7 @@ export function ArticlesPage() {
   )
 }
 
-function ArticleRow({ article }: { article: Article }) {
+function ArticleRow({ article, manage }: { article: Article; manage?: React.ReactNode }) {
   const api = useApp()
   const author = api.user(article.authorId)
   const fav = api.isFavorited('article', article.id)
@@ -147,6 +147,7 @@ function ArticleRow({ article }: { article: Article }) {
           <span>👍 {formatCount(article.likes)}</span>
           <span>💬 {article.comments.length}</span>
           <div className="article-tags">{article.tags.slice(0, 3).map((t) => <Tag key={t}>{t}</Tag>)}</div>
+          {manage && <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>{manage}</div>}
         </div>
       </div>
       <button
@@ -267,14 +268,16 @@ export function ArticleDetailPage({ id }: { id: string }) {
 
 /* ================= 3. ArticleEditorPage 写文章 ================= */
 
-export function ArticleEditorPage({ draftId }: { draftId?: string }) {
+export function ArticleEditorPage({ draftId, editId }: { draftId?: string; editId?: string }) {
   const api = useApp()
   const toast = useToast()
   const { navigate } = useRouter()
+  // 编辑模式：仅允许编辑自己发布的文章；草稿模式：续写草稿箱内容
+  const editing = editId ? api.state.articles.find((a) => a.id === editId && a.authorId === api.me.id) : undefined
   const existing = draftId ? api.state.articleDrafts.find((d) => d.id === draftId) : undefined
-  const [title, setTitle] = useState(existing?.title ?? '')
-  const [tags, setTags] = useState((existing?.tags ?? []).join(', '))
-  const [content, setContent] = useState(existing?.content ?? '')
+  const [title, setTitle] = useState(existing?.title ?? editing?.title ?? '')
+  const [tags, setTags] = useState((existing?.tags ?? editing?.tags ?? []).join(', '))
+  const [content, setContent] = useState(existing?.content ?? editing?.content ?? '')
   const [currentId, setCurrentId] = useState(draftId)
 
   const publish = () => {
@@ -283,6 +286,12 @@ export function ArticleEditorPage({ draftId }: { draftId?: string }) {
       return
     }
     const tagList = tags.split(/[,，、\s]+/).map((t) => t.trim()).filter(Boolean)
+    if (editing) {
+      api.editArticle(editing.id, { title, content, tags: tagList })
+      toast('文章已更新 ✅')
+      navigate(`/article/${editing.id}`)
+      return
+    }
     const id = api.publishArticle({ title, content, tags: tagList, draftId: currentId ?? null })
     toast('文章已发布 🎉')
     navigate(`/article/${id}`)
@@ -324,10 +333,10 @@ export function ArticleEditorPage({ draftId }: { draftId?: string }) {
           onChange={(e) => setContent(e.target.value)}
         />
         <div className="compose-tools" style={{ marginTop: 12 }}>
-          <small style={{ color: 'var(--text-3)' }}>字数：{content.length}</small>
+          <small style={{ color: 'var(--text-3)' }}>字数：{content.length}{editing ? '（编辑模式，保存后立即生效）' : ''}</small>
           <span className="spacer" />
-          <button className="btn btn-ghost" onClick={save}>保存草稿</button>
-          <button className="btn btn-primary" onClick={publish}>发布文章</button>
+          {!editing && <button className="btn btn-ghost" onClick={save}>保存草稿</button>}
+          <button className="btn btn-primary" onClick={publish}>{editing ? '保存修改' : '发布文章'}</button>
         </div>
       </div>
     </div>
@@ -377,7 +386,32 @@ export function BlogHomePage() {
         </div>
 
         {tab === 'published' &&
-          (mine.length === 0 ? <Empty emoji="📄" text="还没有发布过文章" /> : mine.map((a) => <ArticleRow key={a.id} article={a} />))}
+          (mine.length === 0 ? (
+            <Empty emoji="📄" text="还没有发布过文章" />
+          ) : (
+            mine.map((a) => (
+              <ArticleRow
+                key={a.id}
+                article={a}
+                manage={
+                  <>
+                    <a style={{ color: 'var(--primary)', fontSize: 13 }} href={`#/write?edit=${a.id}`}>✏️ 编辑</a>
+                    <button
+                      style={{ background: 'none', border: 'none', padding: 0, color: '#e74c3c', fontSize: 13, cursor: 'pointer' }}
+                      onClick={() => {
+                        if (window.confirm(`确认删除《${a.title}》？删除后不可恢复。`)) {
+                          api.deleteArticle(a.id)
+                          toast('文章已删除 🗑')
+                        }
+                      }}
+                    >
+                      🗑 删除
+                    </button>
+                  </>
+                }
+              />
+            ))
+          ))}
 
         {tab === 'drafts' && (
           <>

@@ -21,3 +21,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# EdgeOne CLI 本地状态
+.edgeone/

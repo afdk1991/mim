@@ -5,6 +5,7 @@ import { Avatar, Empty, ToastProvider } from './components'
 import {
   FavoritesPage,
   FeedPage,
+  FollowingPage,
   MessagesPage,
   MyProfilePage,
   NotificationsPage,
@@ -104,6 +105,8 @@ function Page() {
       return <FavoritesPage />
     case 'my':
       return <MyProfilePage />
+    case 'following':
+      return <FollowingPage />
     case 'user':
       return param ? <ProfilePage id={param} /> : <Empty text="缺少用户 id" />
 
@@ -113,7 +116,7 @@ function Page() {
     case 'article':
       return param ? <ArticleDetailPage id={param} /> : <Empty text="缺少文章 id" />
     case 'write':
-      return <ArticleEditorPage draftId={param} />
+      return <ArticleEditorPage draftId={param} editId={query.get('edit') ?? undefined} />
     case 'blog':
       return <BlogHomePage />
     case 'snippets':

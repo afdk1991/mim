@@ -42,6 +42,9 @@ type Action =
   | { type: 'toggleSnippetLike'; payload: string }
   | { type: 'addSnippet'; payload: { id: string; title: string; language: string; code: string } }
   | { type: 'downloadResource'; payload: string }
+  | { type: 'updateProfile'; payload: { name: string; emoji: string; color: string; bio: string } }
+  | { type: 'editArticle'; payload: { id: string; title: string; content: string; tags: string[] } }
+  | { type: 'deleteArticle'; payload: string }
   | { type: 'reset' }
 
 function makeSummary(content: string): string {
@@ -253,6 +256,35 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
+    case 'editArticle':
+      return {
+        ...state,
+        articles: state.articles.map((a) =>
+          a.id === action.payload.id
+            ? {
+                ...a,
+                title: action.payload.title,
+                summary: makeSummary(action.payload.content),
+                content: action.payload.content,
+                tags: action.payload.tags,
+              }
+            : a,
+        ),
+      }
+
+    case 'deleteArticle':
+      return {
+        ...state,
+        articles: state.articles.filter((a) => a.id !== action.payload),
+        favorites: state.favorites.filter((f) => !(f.type === 'article' && f.targetId === action.payload)),
+      }
+
+    case 'updateProfile':
+      return {
+        ...state,
+        users: { ...state.users, [state.meId]: { ...state.users[state.meId], ...action.payload } },
+      }
+
     case 'saveArticleDraft': {
       const { id, title, content, tags } = action.payload
       const exists = state.articleDrafts.some((d) => d.id === id)
@@ -371,6 +403,9 @@ interface AppApi {
   publishArticle: (data: { title: string; content: string; tags: string[]; draftId?: string | null }) => string
   saveArticleDraft: (data: { id?: string; title: string; content: string; tags: string[] }) => string
   deleteArticleDraft: (id: string) => void
+  updateProfile: (data: { name: string; emoji: string; color: string; bio: string }) => void
+  editArticle: (id: string, data: { title: string; content: string; tags: string[] }) => void
+  deleteArticle: (id: string) => void
   toggleArticleLike: (id: string) => void
   addArticleComment: (articleId: string, content: string) => void
   toggleSnippetLike: (id: string) => void
@@ -446,6 +481,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return finalId
       },
       deleteArticleDraft: (id) => dispatch({ type: 'deleteArticleDraft', payload: id }),
+      updateProfile: (data) => dispatch({ type: 'updateProfile', payload: data }),
+      editArticle: (id, data) => dispatch({ type: 'editArticle', payload: { id, ...data } }),
+      deleteArticle: (id) => dispatch({ type: 'deleteArticle', payload: id }),
       toggleArticleLike: (id) => dispatch({ type: 'toggleArticleLike', payload: id }),
       addArticleComment: (articleId, content) =>
         dispatch({ type: 'addArticleComment', payload: { id: uid('ac'), articleId, content } }),
