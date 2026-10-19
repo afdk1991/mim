@@ -605,24 +605,48 @@ export function ResourcesPage() {
   const toast = useToast()
   const categories = [...new Set(api.state.resources.map((r) => r.category))]
   const [cat, setCat] = useState<string | null>(null)
-  const list = cat ? api.state.resources.filter((r) => r.category === cat) : api.state.resources
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState<'default' | 'downloads' | 'name'>('default')
+  const kw = q.trim().toLowerCase()
+  let list = api.state.resources.filter(
+    (r) =>
+      (!cat || r.category === cat) &&
+      (!kw ||
+        r.title.toLowerCase().includes(kw) ||
+        r.description.toLowerCase().includes(kw) ||
+        r.uploader.toLowerCase().includes(kw)),
+  )
+  if (sort === 'downloads') list = [...list].sort((a, b) => b.downloads - a.downloads)
+  else if (sort === 'name') list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'zh'))
 
   return (
     <div className="page-grid single">
       <div>
+        <input
+          className="input"
+          style={{ marginBottom: 12 }}
+          placeholder="搜索资源标题、描述或上传者…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <div className="card tag-chips" style={{ marginBottom: 12 }}>
           <span className={cx('chip', !cat && 'active')} onClick={() => setCat(null)}>全部</span>
           {categories.map((c) => (
             <span key={c} className={cx('chip', cat === c && 'active')} onClick={() => setCat(c)}>{c}</span>
           ))}
         </div>
-        {list.length === 0 && <Empty emoji="📦" text="该分类下暂无资源" />}
+        <div className="tabs">
+          <button className={cx('tab-btn', sort === 'default' && 'active')} onClick={() => setSort('default')}>📦 默认</button>
+          <button className={cx('tab-btn', sort === 'downloads' && 'active')} onClick={() => setSort('downloads')}>🔥 下载最多</button>
+          <button className={cx('tab-btn', sort === 'name' && 'active')} onClick={() => setSort('name')}>🔤 名称</button>
+        </div>
+        {list.length === 0 && <Empty emoji="📦" text={kw ? '没有匹配的资源，换个关键词试试' : '该分类下暂无资源'} />}
         {list.map((r) => (
           <div key={r.id} className="card res-row">
             <span className={`res-icon t-${r.type}`}>{RES_ICONS[r.type] ?? '📦'}</span>
             <div className="res-main">
-              <b>{r.title}</b>
-              <p>{r.description}</p>
+              <b><Highlight text={r.title} kw={q.trim()} /></b>
+              <p><Highlight text={r.description} kw={q.trim()} /></p>
               <p>上传者：{r.uploader}</p>
             </div>
             <div className="res-meta">
