@@ -19,7 +19,7 @@ React + Vite + TypeScript 实现的社交内容平台 Demo（微博 / CSDN 风�
 
 ## 版本与 OTA 协议
 
-- 版本号统一四段式 `V0.0.0.0`（tag 与 `src/version.ts` / `package.json` / `android versionName` 同步演进）
+- 版本号统一四段式 `V0.0.0.0`（tag 与 `src/version.ts` / `android versionName` 同步演进；`package.json` / `tauri.conf.json` 为三段 semver，第 4 段 build 号不进 npm/tauri）
 - OTA 清单：`https://github.com/afdk1991/mim/releases/latest/download/manifest.json`
   ```json
   {
