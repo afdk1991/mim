@@ -2639,3 +2639,89 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   font-weight: 600;
   flex-shrink: 0;
 }
+
+/* ---------- 导航下拉（我的 / 工具箱） ---------- */
+
+.nav-drop {
+  position: relative;
+}
+
+.nav-drop-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.nav-drop-btn:hover {
+  background: var(--primary-weak);
+  color: var(--primary);
+}
+
+.nav-drop-btn.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-caret {
+  font-style: normal;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.nav-drop-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: transparent;
+}
+
+.nav-drop-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  min-width: 140px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  display: grid;
+  gap: 2px;
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+}
+
+.nav-drop-panel a {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.nav-drop-panel a:hover {
+  background: var(--primary-weak);
+  color: var(--primary);
+}
+
+.nav-drop-panel a.active {
+  color: var(--primary);
+  font-weight: 600;
+  background: var(--primary-weak);
+}
+
+.nav-drop-group-title {
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 6px 12px 2px;
+}

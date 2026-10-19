@@ -40,38 +40,70 @@ import { GexmPage } from './gexm'
 import { ArdotPage } from './ardot'
 import { clearHistory, cx, loadHistory } from './utils'
 
-type NavItem = { href: string; match: string; label: string; badgeKey?: 'notif' | 'msg' }
+type NavGroup = { title: string; items: NavItem[] }
 
-/** 单一导航：微博与 CSDN 全部功能模块平铺为入口 */
+type NavItem = {
+  href: string
+  match: string
+  label: string
+  badgeKey?: 'notif' | 'msg'
+  children?: NavItem[]
+  groups?: NavGroup[]
+}
+
+/* 低频内容页 + 14 个工具台：收敛进「工具箱」下拉，避免一级导航平铺 26 项 */
+const TOOLBOX_GROUPS: NavGroup[] = [
+  {
+    title: '内容',
+    items: [
+      { href: '#/snippets', match: '/snippets', label: '代码片段' },
+      { href: '#/resources', match: '/resources', label: '资源下载' },
+      { href: '#/tags', match: '/tags', label: '标签' },
+    ],
+  },
+  {
+    title: '工具台',
+    items: [
+      { href: '#/delivery', match: '/delivery', label: '配送台' },
+      { href: '#/price', match: '/price', label: '价格监控' },
+      { href: '#/nav', match: '/nav', label: '路线导航' },
+      { href: '#/mail', match: '/mail', label: '邮箱' },
+      { href: '#/bom', match: '/bom', label: 'BOM' },
+      { href: '#/coze', match: '/coze', label: '智能体' },
+      { href: '#/youxuan', match: '/youxuan', label: '优选' },
+      { href: '#/live', match: '/live', label: '直播' },
+      { href: '#/ai', match: '/ai', label: 'AI资源' },
+      { href: '#/manju', match: '/manju', label: '漫剧' },
+      { href: '#/mix', match: '/mix', label: '本地生活' },
+      { href: '#/laal', match: '/laal', label: '代驾' },
+      { href: '#/gexm', match: '/gexm', label: '多端商城' },
+      { href: '#/ardot', match: '/ardot', label: '聚合监控' },
+    ],
+  },
+]
+
+/** 单一导航：一级只保留高频入口，个人空间与工具箱收进下拉 */
 const NAV: NavItem[] = [
   { href: '#/feed', match: '/feed', label: '首页' },
   { href: '#/articles', match: '/article', label: '文章' },
   { href: '#/write', match: '/write', label: '写文章' },
-  { href: '#/blog', match: '/blog', label: '我的博客' },
-  { href: '#/snippets', match: '/snippets', label: '代码片段' },
-  { href: '#/resources', match: '/resources', label: '资源下载' },
-  { href: '#/search', match: '/search', label: '搜索' },
   { href: '#/topics', match: '/topics', label: '超话' },
-  { href: '#/tags', match: '/tags', label: '标签' },
+  { href: '#/search', match: '/search', label: '搜索' },
   { href: '#/notifications', match: '/notifications', label: '通知', badgeKey: 'notif' },
   { href: '#/messages', match: '/messages', label: '私信', badgeKey: 'msg' },
-  { href: '#/favorites', match: '/favorites', label: '收藏' },
-  { href: '#/history', match: '/history', label: '足迹' },
-  { href: '#/my', match: '/my', label: '我的主页' },
-  { href: '#/delivery', match: '/delivery', label: '配送台' },
-  { href: '#/price', match: '/price', label: '价格监控' },
-  { href: '#/nav', match: '/nav', label: '导航' },
-  { href: '#/mail', match: '/mail', label: '邮箱' },
-  { href: '#/bom', match: '/bom', label: 'BOM' },
-  { href: '#/coze', match: '/coze', label: '智能体' },
-  { href: '#/youxuan', match: '/youxuan', label: '优选' },
-  { href: '#/live', match: '/live', label: '直播' },
-  { href: '#/ai', match: '/ai', label: 'AI资源' },
-  { href: '#/manju', match: '/manju', label: '漫剧' },
-  { href: '#/mix', match: '/mix', label: '本地生活' },
-  { href: '#/laal', match: '/laal', label: '代驾' },
-  { href: '#/gexm', match: '/gexm', label: '多端商城' },
-  { href: '#/ardot', match: '/ardot', label: '聚合监控' },
+  {
+    href: '#/my',
+    match: '/my',
+    label: '我的',
+    children: [
+      { href: '#/my', match: '/my', label: '我的主页' },
+      { href: '#/blog', match: '/blog', label: '我的博客' },
+      { href: '#/favorites', match: '/favorites', label: '收藏' },
+      { href: '#/history', match: '/history', label: '足迹' },
+      { href: '#/following', match: '/following', label: '关注列表' },
+    ],
+  },
+  { href: '#', match: '/__toolbox__', label: '工具箱', groups: TOOLBOX_GROUPS },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -92,6 +124,7 @@ function TopNav() {
   const api = useApp()
   const { path } = useRouter()
   const [theme, setTheme] = useState<'light' | 'dark'>(loadTheme)
+  const [drop, setDrop] = useState<string | null>(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -101,6 +134,11 @@ function TopNav() {
       /* ignore */
     }
   }, [theme])
+
+  /* 路由变化后自动收起下拉 */
+  useEffect(() => {
+    setDrop(null)
+  }, [path])
 
   return (
     <header className="topbar">
@@ -131,14 +169,60 @@ function TopNav() {
       <nav className="topbar-inner" style={{ height: 40, paddingTop: 8 }}>
         <div className="subnav">
           {NAV.map((item) => {
-            const active = path.startsWith(item.match)
             const badge =
               item.badgeKey === 'notif' ? api.unreadNotifications : item.badgeKey === 'msg' ? api.unreadMessages : 0
+
+            /* 无子项：普通链接 */
+            if (!item.children && !item.groups) {
+              return (
+                <a key={item.label} href={item.href} className={cx(path.startsWith(item.match) && 'active')}>
+                  {item.label}
+                  {badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}
+                </a>
+              )
+            }
+
+            /* 有子项：下拉入口 */
+            const kids = item.groups ? item.groups.flatMap((g) => g.items) : (item.children ?? [])
+            const active = path.startsWith(item.match) || kids.some((k) => path.startsWith(k.match))
+            const open = drop === item.label
             return (
-              <a key={item.match} href={item.href} className={cx(active && 'active')}>
-                {item.label}
-                {badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}
-              </a>
+              <div key={item.label} className="nav-drop">
+                <button
+                  className={cx('nav-drop-btn', active && 'active')}
+                  onClick={() => setDrop(open ? null : item.label)}
+                >
+                  {item.label}
+                  <i className="nav-caret">▾</i>
+                </button>
+                {open && (
+                  <>
+                    <div className="nav-drop-mask" onClick={() => setDrop(null)} />
+                    <div className="nav-drop-panel">
+                      {item.groups
+                        ? item.groups.map((g) => (
+                            <div key={g.title} className="nav-drop-group">
+                              <div className="nav-drop-group-title">{g.title}</div>
+                              {g.items.map((k) => (
+                                <a
+                                  key={k.match}
+                                  href={k.href}
+                                  className={cx(path.startsWith(k.match) && 'active')}
+                                >
+                                  {k.label}
+                                </a>
+                              ))}
+                            </div>
+                          ))
+                        : item.children?.map((k) => (
+                            <a key={k.match} href={k.href} className={cx(path.startsWith(k.match) && 'active')}>
+                              {k.label}
+                            </a>
+                          ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )
           })}
         </div>
