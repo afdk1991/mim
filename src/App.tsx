@@ -30,6 +30,7 @@ import { RouteNavPage } from './nav'
 import { EmailHubPage } from './email'
 import { BomToolPage } from './bom'
 import { CozePanelPage } from './coze'
+import { YouXuanPage } from './youxuan'
 import { clearHistory, cx, loadHistory } from './utils'
 
 type NavItem = { href: string; match: string; label: string; badgeKey?: 'notif' | 'msg' }
@@ -56,6 +57,7 @@ const NAV: NavItem[] = [
   { href: '#/mail', match: '/mail', label: '邮箱' },
   { href: '#/bom', match: '/bom', label: 'BOM' },
   { href: '#/coze', match: '/coze', label: '智能体' },
+  { href: '#/youxuan', match: '/youxuan', label: '优选' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -193,6 +195,8 @@ function Page() {
       return <BomToolPage />
     case 'coze':
       return <CozePanelPage />
+    case 'youxuan':
+      return <YouXuanPage />
 
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
