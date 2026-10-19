@@ -1393,3 +1393,76 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     max-height: 200px;
   }
 }
+
+/* ---------- 超话排行榜 ---------- */
+
+.topic-rank-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.topic-rank-item:last-child {
+  border-bottom: none;
+}
+
+.topic-rank-item:hover {
+  background: var(--primary-weak);
+}
+
+.topic-rank-no {
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  text-align: center;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-3);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.topic-rank-item.top .topic-rank-no {
+  background: var(--primary);
+  color: #fff;
+}
+
+.topic-rank-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.topic-rank-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.topic-rank-desc {
+  color: var(--text-3);
+  font-size: 12px;
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic-rank-meta {
+  text-align: right;
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.topic-rank-meta b {
+  display: block;
+  color: var(--primary);
+  font-size: 14px;
+}

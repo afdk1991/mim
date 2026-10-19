@@ -346,6 +346,43 @@ export function TopicPage({ name }: { name: string }) {
   )
 }
 
+/* ================= 3.5 TopicRankPage 超话排行榜 ================= */
+
+export function TopicRankPage() {
+  const api = useApp()
+  const topics = [...api.state.topics].sort((a, b) => b.heat - a.heat)
+
+  return (
+    <div className="page-grid single">
+      <div>
+        <h2 className="page-title">🔥 超话排行榜</h2>
+        <div className="card">
+          {topics.map((t, i) => {
+            const posts = api.state.posts.filter((p) => p.topic === t.name).length
+            return (
+              <a
+                key={t.id}
+                className={cx('topic-rank-item', i < 3 && 'top')}
+                href={`#/topic/${encodeURIComponent(t.name)}`}
+              >
+                <span className="topic-rank-no">{i + 1}</span>
+                <div className="topic-rank-main">
+                  <div className="topic-rank-name">#{t.name}#</div>
+                  <p className="topic-rank-desc">{t.desc}</p>
+                </div>
+                <div className="topic-rank-meta">
+                  <b>{formatCount(t.heat)}</b>
+                  阅读 · {posts} 条讨论
+                </div>
+              </a>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ================= 4. NotificationsPage 通知 ================= */
 
 const NOTIF_TABS: Array<{ key: string; label: string; icon: string }> = [

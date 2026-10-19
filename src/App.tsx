@@ -12,6 +12,7 @@ import {
   PostDetailPage,
   ProfilePage,
   TopicPage,
+  TopicRankPage,
 } from './weibo'
 import {
   ArticleDetailPage,
@@ -35,6 +36,7 @@ const NAV: NavItem[] = [
   { href: '#/snippets', match: '/snippets', label: '代码片段' },
   { href: '#/resources', match: '/resources', label: '资源下载' },
   { href: '#/search', match: '/search', label: '搜索' },
+  { href: '#/topics', match: '/topics', label: '超话' },
   { href: '#/notifications', match: '/notifications', label: '通知', badgeKey: 'notif' },
   { href: '#/messages', match: '/messages', label: '私信', badgeKey: 'msg' },
   { href: '#/favorites', match: '/favorites', label: '收藏' },
@@ -129,6 +131,8 @@ function Page() {
       return param ? <PostDetailPage id={param} /> : <Empty text="缺少微博 id" />
     case 'topic':
       return param ? <TopicPage name={decodeURIComponent(param)} /> : <Empty text="缺少话题名" />
+    case 'topics':
+      return <TopicRankPage />
     case 'notifications':
       return <NotificationsPage />
     case 'messages':
