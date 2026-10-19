@@ -1,0 +1,11 @@
+# HarmonyOS 壳工程构建产物（DevEco Studio / hvigor 生成）
+build/
+.hvigor/
+oh_modules/
+local.properties
+**/build/
+**/.hvigor/
+**/oh_modules/
+# rawfile 中的 Web 资源由 scripts/sync-harmony.mjs 从 dist 同步生成，不入库
+entry/src/main/resources/rawfile/*
+!entry/src/main/resources/rawfile/.gitkeep

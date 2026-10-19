@@ -1,0 +1,10 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "mim",
+  "version": "1.0.0",
+  "description": "Mim HarmonyOS 壳工程（ArkTS Web 容器 + OTA 检测）",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.21"
+  }
+}

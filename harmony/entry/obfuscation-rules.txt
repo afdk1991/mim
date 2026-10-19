@@ -1,0 +1,2 @@
+# 混淆规则（当前 release 未启用混淆，enable: false）
+# 如需启用，参考 DevEco Studio 文档配置 -enable-property-obfuscation 等

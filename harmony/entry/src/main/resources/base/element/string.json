@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Mim 跨平台应用主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Mim 应用入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Mim"
+    }
+  ]
+}
