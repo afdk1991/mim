@@ -32,6 +32,12 @@ import { BomToolPage } from './bom'
 import { CozePanelPage } from './coze'
 import { YouXuanPage } from './youxuan'
 import { MypLivePage } from './myp'
+import { AiResPage } from './ai'
+import { ManjuPage } from './manju'
+import { MixPage } from './mix'
+import { LaalPage } from './laal'
+import { GexmPage } from './gexm'
+import { ArdotPage } from './ardot'
 import { clearHistory, cx, loadHistory } from './utils'
 
 type NavItem = { href: string; match: string; label: string; badgeKey?: 'notif' | 'msg' }
@@ -60,6 +66,12 @@ const NAV: NavItem[] = [
   { href: '#/coze', match: '/coze', label: '智能体' },
   { href: '#/youxuan', match: '/youxuan', label: '优选' },
   { href: '#/live', match: '/live', label: '直播' },
+  { href: '#/ai', match: '/ai', label: 'AI资源' },
+  { href: '#/manju', match: '/manju', label: '漫剧' },
+  { href: '#/mix', match: '/mix', label: '本地生活' },
+  { href: '#/laal', match: '/laal', label: '代驾' },
+  { href: '#/gexm', match: '/gexm', label: '多端商城' },
+  { href: '#/ardot', match: '/ardot', label: '聚合监控' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -201,6 +213,18 @@ function Page() {
       return <YouXuanPage />
     case 'live':
       return <MypLivePage />
+    case 'ai':
+      return <AiResPage />
+    case 'manju':
+      return <ManjuPage />
+    case 'mix':
+      return <MixPage />
+    case 'laal':
+      return <LaalPage />
+    case 'gexm':
+      return <GexmPage />
+    case 'ardot':
+      return <ArdotPage />
 
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />

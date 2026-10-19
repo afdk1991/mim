@@ -1,0 +1,479 @@
+/* ============================================================
+ * laal.css —— 代驾出行台（LaalPage 专属样式）
+ * 重新开发自合并源码 laal-platform「安行代驾（daijia）」出行平台
+ * 类名统一前缀 laal-，复用全局设计系统变量，不写 styles.css
+ * ============================================================ */
+
+/* ---------- 叫车面板 ---------- */
+
+.laal-form {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.laal-place-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.laal-place-row + .laal-place-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.laal-place-emoji {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--primary-weak);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.laal-place-emoji.dest {
+  background: rgba(255, 130, 0, 0.22);
+}
+
+.laal-select {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  outline: none;
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.15s;
+}
+
+.laal-select:focus {
+  border-color: var(--primary);
+}
+
+.laal-swap {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  color: var(--text-2);
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.laal-swap:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: rotate(180deg);
+}
+
+.laal-est {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.laal-est b {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.laal-cut-tag {
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.laal-call {
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.laal-hint {
+  margin: 9px 2px 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ---------- 行程地图 ---------- */
+
+.laal-map {
+  position: relative;
+  height: 220px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+  background:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px),
+    var(--bg);
+  background-size: 36px 36px, 36px 36px, auto;
+}
+
+.laal-map-route {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.laal-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.laal-pin i {
+  font-style: normal;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.laal-pin em {
+  font-style: normal;
+  font-size: 11px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+  color: var(--text-2);
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laal-pin.dest i {
+  border-color: var(--primary);
+  background: var(--primary-weak);
+}
+
+.laal-pin.driver i {
+  border-color: var(--primary);
+  font-size: 18px;
+  animation: laal-bump 1.2s ease-in-out infinite;
+}
+
+@keyframes laal-bump {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ---------- 当前行程卡 ---------- */
+
+.laal-trip {
+  margin-bottom: 14px;
+}
+
+.laal-trip-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.laal-trip-head b {
+  font-size: 14px;
+}
+
+.laal-st {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.laal-st.run {
+  background: var(--primary-weak);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.laal-st.warn {
+  background: #fdecec;
+  color: #d93025;
+  font-weight: 600;
+}
+
+.laal-st.ok {
+  background: #e7f7ec;
+  color: #16a34a;
+}
+
+.laal-radar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.laal-radar::before {
+  content: '📡';
+  animation: laal-bump 1.2s ease-in-out infinite;
+}
+
+.laal-driver {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.laal-driver-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.laal-driver-info {
+  min-width: 0;
+}
+
+.laal-driver-info b {
+  display: block;
+  font-size: 14px;
+}
+
+.laal-driver-info small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.laal-driver-rate {
+  margin-left: auto;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.laal-driver-rate b {
+  color: var(--primary);
+  font-size: 17px;
+}
+
+.laal-driver-rate small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.laal-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+
+.laal-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), #ffb066);
+  transition: width 1s linear;
+}
+
+.laal-trip-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ---------- 历史订单 ---------- */
+
+.laal-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.laal-order {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--card);
+}
+
+.laal-order-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.laal-order-price {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.laal-order-price b {
+  color: var(--primary);
+  font-size: 15px;
+}
+
+.laal-order-route {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 6px 0 4px;
+  word-break: break-all;
+}
+
+.laal-order-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.laal-stars {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.laal-star {
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+  color: var(--border);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+span.laal-star {
+  cursor: default;
+}
+
+.laal-star.on {
+  color: #f5a623;
+}
+
+button.laal-star:hover {
+  transform: scale(1.2);
+  color: #f5a623;
+}
+
+/* ---------- 优惠券 ---------- */
+
+.laal-coupon {
+  display: flex;
+  align-items: center;
+  border: 1px dashed var(--primary);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  background: var(--card);
+}
+
+.laal-coupon.used {
+  border-color: var(--border);
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.laal-coupon-amt {
+  background: var(--primary-weak);
+  color: var(--primary);
+  padding: 10px 12px;
+  text-align: center;
+  min-width: 74px;
+  flex-shrink: 0;
+}
+
+.laal-coupon-amt b {
+  font-size: 20px;
+  display: block;
+}
+
+.laal-coupon-amt small {
+  display: block;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.laal-coupon-body {
+  flex: 1;
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.laal-coupon-body b {
+  display: block;
+  font-size: 13px;
+}
+
+.laal-coupon-body small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.laal-claim {
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+/* ---------- 余额 ---------- */
+
+.laal-balance {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 4px 0 6px;
+}
+
+.laal-recharge {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.laal-recharge .btn {
+  flex: 1;
+}

@@ -1,0 +1,533 @@
+/* ============ 漫剧 Manju demo（manju- 前缀，复用全局设计系统） ============ */
+
+.manju-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.manju-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manju-top-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: 0.5px;
+}
+
+.manju-top-spacer {
+  flex: 1;
+}
+
+/* ---------- Hero / 搜索 ---------- */
+
+.manju-hero {
+  background: linear-gradient(135deg, #ff8200 0%, #ffb066 100%);
+  border-radius: var(--radius);
+  color: #fff;
+  padding: 24px 22px;
+  box-shadow: var(--shadow);
+}
+
+.manju-hero h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+.manju-hero p {
+  margin: 0;
+  opacity: 0.92;
+  font-size: 14px;
+}
+
+.manju-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.manju-search {
+  flex: 1;
+}
+
+/* ---------- 分区 ---------- */
+
+.manju-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 10px;
+}
+
+.manju-section-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* ---------- 剧集卡片网格 ---------- */
+
+.manju-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.manju-card {
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.manju-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.manju-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+}
+
+.manju-cover-emoji {
+  font-size: 44px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.manju-cover-lg .manju-cover-emoji {
+  font-size: 56px;
+}
+
+.manju-cover-lg {
+  width: 132px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  aspect-ratio: 3 / 4;
+}
+
+.manju-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.manju-vip {
+  background: linear-gradient(135deg, #f7b500, #ff8c00);
+}
+
+.manju-seen {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.manju-custom {
+  position: static;
+  margin-left: 6px;
+  background: var(--primary-weak);
+  color: var(--primary);
+}
+
+.manju-card-body {
+  padding: 10px 12px 12px;
+}
+
+.manju-card-title {
+  font-weight: 700;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manju-card-meta {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* 封面色调（纯 CSS 渐变，零图片） */
+
+.manju-tone1 { background: linear-gradient(160deg, #ffb066, #ff8200); }
+.manju-tone2 { background: linear-gradient(160deg, #7ec8ff, #3f8cff); }
+.manju-tone3 { background: linear-gradient(160deg, #c9a7ff, #8a5cff); }
+.manju-tone4 { background: linear-gradient(160deg, #7be3c0, #22b07d); }
+.manju-tone5 { background: linear-gradient(160deg, #ff9db1, #ff5c7a); }
+
+/* ---------- 继续观看 ---------- */
+
+.manju-cont-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.manju-cont {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.manju-cont-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.manju-cont-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.manju-ext-arrow {
+  font-size: 22px;
+  color: var(--text-3);
+}
+
+/* ---------- 详情页 ---------- */
+
+.manju-detail {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+.manju-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.manju-detail-info h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.manju-tags {
+  margin: 8px 0;
+}
+
+.manju-synopsis {
+  margin: 4px 0 12px;
+  font-size: 13px;
+}
+
+/* ---------- 选集 ---------- */
+
+.manju-eps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.manju-ep {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  transition: all 0.15s;
+}
+
+.manju-ep:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.manju-ep-vip {
+  background: var(--bg);
+  color: var(--text-3);
+}
+
+.manju-ep-done {
+  border-color: var(--primary);
+  background: var(--primary-weak);
+}
+
+.manju-ep-tag {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.manju-ep-check {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+/* ---------- 模拟播放器（竖屏 9:16） ---------- */
+
+.manju-player {
+  max-width: 360px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.manju-screen {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.manju-screen-emoji {
+  font-size: 64px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
+}
+
+.manju-playing .manju-screen-emoji {
+  animation: manju-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes manju-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.manju-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 46px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.manju-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  text-align: center;
+  color: #fff;
+  font-size: 12px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.manju-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.manju-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.4s linear;
+}
+
+.manju-ctrls {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.manju-now {
+  margin-bottom: 0;
+}
+
+.manju-now-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--primary);
+  background: var(--primary-weak);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+/* ---------- 外部片单 ---------- */
+
+.manju-ext-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.manju-tab {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 14px;
+  color: var(--text-2);
+  transition: all 0.15s;
+}
+
+.manju-tab:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.manju-tab-on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.manju-ext-note {
+  font-size: 13px;
+}
+
+.manju-ext-item {
+  margin-bottom: 0;
+}
+
+.manju-ext-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manju-ext-cover {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: var(--primary-weak);
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.manju-ext-res {
+  margin-top: 12px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.manju-res-direct {
+  background: #eefbf2;
+  border: 1px solid #bfe8cd;
+  color: #1c7c3d;
+}
+
+.manju-res-embed {
+  background: #eef5ff;
+  border: 1px solid #c4dcff;
+  color: #1f5fbf;
+}
+
+.manju-res-blocked {
+  background: #fdeeee;
+  border: 1px solid #f5c9c8;
+  color: #b03430;
+}
+
+.manju-ext-res-text {
+  line-height: 1.5;
+}
+
+.manju-iframe {
+  margin-top: 8px;
+  border: 1px dashed currentColor;
+  border-radius: 8px;
+  padding: 22px 10px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.manju-reason {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.manju-ext-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin-bottom: 0;
+  transition: transform 0.15s;
+}
+
+.manju-ext-entry:hover {
+  transform: translateY(-2px);
+}
+
+.manju-ext-entry-emoji {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--primary-weak);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+/* ---------- 自定义片源表单 ---------- */
+
+.manju-addform {
+  margin-bottom: 0;
+}
+
+.manju-addform-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.manju-addform-row .input {
+  flex: 1;
+  min-width: 160px;
+  width: auto;
+}
+
+/* ---------- 空态 / 加载 / 页脚 ---------- */
+
+.manju-empty {
+  text-align: center;
+  padding: 34px 16px;
+  color: var(--text-2);
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.manju-empty-soft {
+  padding: 18px 16px;
+}
+
+.manju-loading {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.manju-foot {
+  text-align: center;
+  font-size: 12px;
+  padding: 6px 0 2px;
+}
