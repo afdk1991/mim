@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from './store'
+import { MyAppHub } from './myhub'
 import { useRouter } from './router'
 import { cx, formatCount, recordView, timeAgo } from './utils'
 import {
@@ -720,6 +721,7 @@ export function MyProfilePage() {
             </>
           }
         />
+        <MyAppHub />
         <div className="tabs">
           <button className={cx('tab-btn', tab === 'posts' && 'active')} onClick={() => setTab('posts')}>
             我的微博（{myPosts.length}）
