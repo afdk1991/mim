@@ -120,11 +120,12 @@ function loadTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-function TopNav() {
+function SideNav() {
   const api = useApp()
-  const { path } = useRouter()
+  const { path, navigate } = useRouter()
   const [theme, setTheme] = useState<'light' | 'dark'>(loadTheme)
-  const [drop, setDrop] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
+  const [q, setQ] = useState('')
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -135,99 +136,117 @@ function TopNav() {
     }
   }, [theme])
 
-  /* 路由变化后自动收起下拉 */
+  /* 路由变化后自动展开包含当前页的分组 */
   useEffect(() => {
-    setDrop(null)
+    for (const item of NAV) {
+      if (!item.children && !item.groups) continue
+      const kids = item.groups ? item.groups.flatMap((g) => g.items) : (item.children ?? [])
+      if (path.startsWith(item.match) || kids.some((k) => path.startsWith(k.match))) {
+        setOpen(item.label)
+        return
+      }
+    }
   }, [path])
 
   return (
-    <header className="topbar">
-      <div className="topbar-inner">
-        <a className="brand" href="#/feed">Mim</a>
-        <div className="topbar-right">
-          <button
-            className="icon-btn"
-            title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <button
-            className="icon-btn"
-            title="重置演示数据"
-            onClick={() => {
-              if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
-            }}
-          >
-            ♻️
-          </button>
-          <a href="#/my" title="进入个人空间">
-            <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
-          </a>
-        </div>
-      </div>
-      <nav className="topbar-inner" style={{ height: 40, paddingTop: 8 }}>
-        <div className="subnav">
-          {NAV.map((item) => {
-            const badge =
-              item.badgeKey === 'notif' ? api.unreadNotifications : item.badgeKey === 'msg' ? api.unreadMessages : 0
+    <aside className="sidenav">
+      <a className="brand" href="#/feed">Mim</a>
+      <input
+        className="input sidenav-search"
+        type="search"
+        placeholder="🔍 搜索…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
+        }}
+      />
+      <nav className="sidenav-nav">
+        {NAV.map((item) => {
+          const badge =
+            item.badgeKey === 'notif' ? api.unreadNotifications : item.badgeKey === 'msg' ? api.unreadMessages : 0
 
-            /* 无子项：普通链接 */
-            if (!item.children && !item.groups) {
-              return (
-                <a key={item.label} href={item.href} className={cx(path.startsWith(item.match) && 'active')}>
-                  {item.label}
-                  {badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}
-                </a>
-              )
-            }
-
-            /* 有子项：下拉入口 */
-            const kids = item.groups ? item.groups.flatMap((g) => g.items) : (item.children ?? [])
-            const active = path.startsWith(item.match) || kids.some((k) => path.startsWith(k.match))
-            const open = drop === item.label
+          /* 无子项：普通链接 */
+          if (!item.children && !item.groups) {
             return (
-              <div key={item.label} className="nav-drop">
-                <button
-                  className={cx('nav-drop-btn', active && 'active')}
-                  onClick={() => setDrop(open ? null : item.label)}
-                >
-                  {item.label}
-                  <i className="nav-caret">▾</i>
-                </button>
-                {open && (
-                  <>
-                    <div className="nav-drop-mask" onClick={() => setDrop(null)} />
-                    <div className="nav-drop-panel">
-                      {item.groups
-                        ? item.groups.map((g) => (
-                            <div key={g.title} className="nav-drop-group">
-                              <div className="nav-drop-group-title">{g.title}</div>
-                              {g.items.map((k) => (
-                                <a
-                                  key={k.match}
-                                  href={k.href}
-                                  className={cx(path.startsWith(k.match) && 'active')}
-                                >
-                                  {k.label}
-                                </a>
-                              ))}
-                            </div>
-                          ))
-                        : item.children?.map((k) => (
-                            <a key={k.match} href={k.href} className={cx(path.startsWith(k.match) && 'active')}>
+              <a
+                key={item.label}
+                href={item.href}
+                className={cx('sidenav-link', path.startsWith(item.match) && 'active')}
+              >
+                {item.label}
+                {badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}
+              </a>
+            )
+          }
+
+          /* 有子项：手风琴分组 */
+          const kids = item.groups ? item.groups.flatMap((g) => g.items) : (item.children ?? [])
+          const active = path.startsWith(item.match) || kids.some((k) => path.startsWith(k.match))
+          const expanded = open === item.label
+          return (
+            <div key={item.label} className="sidenav-group">
+              <button
+                className={cx('sidenav-link sidenav-group-btn', active && 'active')}
+                onClick={() => setOpen(expanded ? null : item.label)}
+              >
+                {item.label}
+                <i className="sidenav-caret">{expanded ? '▴' : '▾'}</i>
+              </button>
+              {expanded && (
+                <div className="sidenav-sub">
+                  {item.groups
+                    ? item.groups.map((g) => (
+                        <div key={g.title}>
+                          <div className="sidenav-sub-title">{g.title}</div>
+                          {g.items.map((k) => (
+                            <a
+                              key={k.match}
+                              href={k.href}
+                              className={cx('sidenav-link sidenav-sub-link', path.startsWith(k.match) && 'active')}
+                            >
                               {k.label}
                             </a>
                           ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                        </div>
+                      ))
+                    : item.children?.map((k) => (
+                        <a
+                          key={k.match}
+                          href={k.href}
+                          className={cx('sidenav-link sidenav-sub-link', path.startsWith(k.match) && 'active')}
+                        >
+                          {k.label}
+                        </a>
+                      ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
-    </header>
+      <div className="sidenav-foot">
+        <button
+          className="icon-btn"
+          title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+        <button
+          className="icon-btn"
+          title="重置演示数据"
+          onClick={() => {
+            if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
+          }}
+        >
+          ♻️
+        </button>
+        <a href="#/my" title="进入个人空间">
+          <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
+        </a>
+      </div>
+    </aside>
   )
 }
 
@@ -406,12 +425,12 @@ function Shell() {
   }, [])
 
   return (
-    <>
-      <TopNav />
+    <div className="shell">
+      <SideNav />
       <main className="app-shell">
         <Page />
       </main>
-    </>
+    </div>
   )
 }
 
