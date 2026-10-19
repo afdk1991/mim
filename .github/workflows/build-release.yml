@@ -78,7 +78,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: 安装前端依赖
-        run: npm install --no-fund --no-audit
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
       - name: 构建 Web 资产
         run: npm run build
       - name: 还原签名 keystore
@@ -111,7 +113,9 @@ jobs:
         with:
           node-version: 20
       - name: 安装前端依赖
-        run: npm install --no-fund --no-audit
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
       - name: 构建 Web 资产
         run: npm run build
       - name: 同步 Capacitor iOS 工程
