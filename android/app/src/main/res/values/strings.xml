@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mim</string>
+    <string name="title_activity_main">Mim</string>
+    <string name="package_name">com.afdk1991.mim</string>
+    <string name="custom_url_scheme">com.afdk1991.mim</string>
+</resources>

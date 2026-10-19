@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
-import { Avatar, Empty, TimeAgo, ToastProvider } from './components'
+import { Avatar, Empty, TimeAgo, ToastProvider, useToast } from './components'
 import {
   FavoritesPage,
   FeedPage,
@@ -40,6 +40,7 @@ import { LaalPage } from './laal'
 import { GexmPage } from './gexm'
 import { ArdotPage } from './ardot'
 import { clearHistory, cx, loadHistory } from './utils'
+import { scheduleOtaCheck } from './ota'
 
 type NavGroup = { title: string; items: NavItem[] }
 
@@ -424,8 +425,13 @@ function HistoryPage() {
 }
 
 function Shell() {
+  const toast = useToast()
+
   useEffect(() => {
     if (!window.location.hash) window.location.hash = '#/feed'
+    /* 移动端 OTA 自动更新（web/桌面 no-op：桌面由 Tauri updater 静默处理） */
+    scheduleOtaCheck((msg) => toast(msg))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
