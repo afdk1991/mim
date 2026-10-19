@@ -28,8 +28,9 @@ jobs:
           node-version: 20
 
       # npm install（非 npm ci，lock 不入库）：规避 npm/cli#4828 —— 按运行平台全新解析可选依赖
+      # --legacy-peer-deps：规避 arborist "Cannot read properties of null (reading 'edgesOut')"（npm/cli#7678，vite 8 optional peers 触发）
       - name: 安装依赖
-        run: npm install --no-fund --no-audit
+        run: npm install --no-fund --no-audit --legacy-peer-deps
 
       - name: 类型检查
         run: npm run typecheck
@@ -122,7 +123,7 @@ jobs:
         run: node scripts/prepare-package.mjs "${{ github.repository_owner }}"
 
       - name: 安装依赖
-        run: npm install --no-fund --no-audit
+        run: npm install --no-fund --no-audit --legacy-peer-deps
 
       - name: 构建
         run: npm run build
