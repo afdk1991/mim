@@ -2053,3 +2053,145 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     height: 220px;
   }
 }
+
+/* ============ BOM 工具台 ============ */
+
+.bom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bom-table th,
+.bom-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.bom-table th {
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+  white-space: nowrap;
+  background: #fafafa;
+}
+
+.bom-table td:nth-child(n + 4),
+.bom-table th:nth-child(n + 4) {
+  text-align: right;
+}
+
+.bom-cat td {
+  background: var(--primary-weak);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.bom-code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.bom-spec {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.bom-sub {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bom-sub-row td {
+  background: #fafafa;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.bom-sub-row td:last-child {
+  color: var(--text);
+}
+
+.bom-grand td {
+  background: var(--primary-weak);
+  font-weight: 700;
+  border-bottom: none;
+}
+
+.bom-grand td:last-child {
+  color: var(--primary);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.qty-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.qty-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s;
+}
+
+.qty-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.qty-btn:active {
+  background: var(--primary-weak);
+}
+
+.comp-cur {
+  background: var(--primary-weak);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.comp-idx {
+  position: relative;
+  min-width: 90px;
+}
+
+.comp-bar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--primary);
+  min-width: 4px;
+}
+
+@media (max-width: 560px) {
+  .bom-table {
+    font-size: 12px;
+  }
+
+  .bom-table th,
+  .bom-table td {
+    padding: 5px 4px;
+  }
+
+  .bom-spec {
+    display: none;
+  }
+}

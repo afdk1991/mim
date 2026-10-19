@@ -28,6 +28,7 @@ import { DeliveryBoardPage } from './delivery'
 import { PriceMonitorPage } from './price'
 import { RouteNavPage } from './nav'
 import { EmailHubPage } from './email'
+import { BomToolPage } from './bom'
 import { clearHistory, cx, loadHistory } from './utils'
 
 type NavItem = { href: string; match: string; label: string; badgeKey?: 'notif' | 'msg' }
@@ -52,6 +53,7 @@ const NAV: NavItem[] = [
   { href: '#/price', match: '/price', label: '价格监控' },
   { href: '#/nav', match: '/nav', label: '导航' },
   { href: '#/mail', match: '/mail', label: '邮箱' },
+  { href: '#/bom', match: '/bom', label: 'BOM' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -185,6 +187,8 @@ function Page() {
       return <RouteNavPage />
     case 'mail':
       return <EmailHubPage />
+    case 'bom':
+      return <BomToolPage />
 
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
