@@ -900,3 +900,56 @@ function PostCardLite({ pid }: { pid: string }) {
     </a>
   )
 }
+
+/* ================= 8. TagsPage 标签聚合 ================= */
+
+export function TagsPage() {
+  const api = useApp()
+  const { query, navigate } = useRouter()
+  const activeTag = query.get('tag')
+
+  const counts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const a of api.state.articles) {
+      for (const t of a.tags) map.set(t, (map.get(t) ?? 0) + 1)
+    }
+    return [...map.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+  }, [api.state.articles])
+
+  const list = activeTag
+    ? api.state.articles
+        .filter((a) => a.tags.includes(activeTag))
+        .sort((a, b) => b.createdAt - a.createdAt)
+    : []
+
+  return (
+    <div className="page-grid single">
+      <div>
+        <h2 className="page-title">🏷 标签聚合</h2>
+        <div className="card tag-chips">
+          {counts.map(([t, n]) => (
+            <span
+              key={t}
+              className={cx('chip', activeTag === t && 'active')}
+              onClick={() => navigate(activeTag === t ? '/tags' : `/tags?tag=${encodeURIComponent(t)}`)}
+            >
+              {t} · {n}
+            </span>
+          ))}
+        </div>
+        {activeTag ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 12px' }}>
+              <b>「{activeTag}」下的文章（{list.length}）</b>
+              <a className="btn btn-ghost btn-sm" href="#/tags">查看全部标签</a>
+            </div>
+            {list.length === 0 && <Empty emoji="📄" text="该标签下暂无文章" />}
+            {list.map((a) => <ArticleRow key={a.id} article={a} />)}
+          </>
+        ) : (
+          <Empty emoji="🏷" text="点击上方标签，查看该主题下的全部文章" />
+        )}
+      </div>
+    </div>
+  )
+}

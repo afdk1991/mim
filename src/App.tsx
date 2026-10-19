@@ -22,6 +22,7 @@ import {
   ResourcesPage,
   SearchPage,
   SnippetsPage,
+  TagsPage,
 } from './csdn'
 import { clearHistory, cx, loadHistory } from './utils'
 
@@ -37,6 +38,7 @@ const NAV: NavItem[] = [
   { href: '#/resources', match: '/resources', label: '资源下载' },
   { href: '#/search', match: '/search', label: '搜索' },
   { href: '#/topics', match: '/topics', label: '超话' },
+  { href: '#/tags', match: '/tags', label: '标签' },
   { href: '#/notifications', match: '/notifications', label: '通知', badgeKey: 'notif' },
   { href: '#/messages', match: '/messages', label: '私信', badgeKey: 'msg' },
   { href: '#/favorites', match: '/favorites', label: '收藏' },
@@ -163,6 +165,8 @@ function Page() {
       return <ResourcesPage />
     case 'search':
       return <SearchPage key={query.get('q') ?? ''} />
+    case 'tags':
+      return <TagsPage />
 
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
