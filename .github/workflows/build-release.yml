@@ -37,8 +37,11 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       # npm install（非 npm ci，lock 不入库）：规避 npm/cli#4828 —— 按运行平台全新解析可选依赖
+      # 先升级 npm 到 10.9.9+：npm/cli#7678 arborist edgesOut 崩溃（vite 8 optional peers，旧版 npm 未修复）
       - name: 安装前端依赖
-        run: npm install --no-fund --no-audit
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
 
       # 签名私钥以 base64 形式存放（TAURI_SIGNING_PRIVATE_KEY_B64），此处还原为文件，
       # 规避 PowerShell 管道/多行文本在 secret 写入时的换行损坏问题

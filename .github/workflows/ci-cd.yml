@@ -28,9 +28,12 @@ jobs:
           node-version: 20
 
       # npm install（非 npm ci，lock 不入库）：规避 npm/cli#4828 —— 按运行平台全新解析可选依赖
-      # --legacy-peer-deps：规避 arborist "Cannot read properties of null (reading 'edgesOut')"（npm/cli#7678，vite 8 optional peers 触发）
+      # 先升级 npm 到 10.9.9+：npm/cli#7678 arborist "Cannot read properties of null (reading 'edgesOut')"
+      # 崩溃由 vite 8 optional peers 触发，node 20 自带的旧版 npm 未修复；--legacy-peer-deps 双保险
       - name: 安装依赖
-        run: npm install --no-fund --no-audit --legacy-peer-deps
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
 
       - name: 类型检查
         run: npm run typecheck
@@ -122,8 +125,11 @@ jobs:
       - name: 准备发布配置
         run: node scripts/prepare-package.mjs "${{ github.repository_owner }}"
 
+      # 先升级 npm（npm/cli#7678 arborist edgesOut 崩溃，同 build job）
       - name: 安装依赖
-        run: npm install --no-fund --no-audit --legacy-peer-deps
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
 
       - name: 构建
         run: npm run build
