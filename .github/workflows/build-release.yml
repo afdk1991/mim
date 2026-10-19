@@ -1,0 +1,60 @@
+name: Release · 桌面端构建与发布
+
+# 桌面三平台（Windows / macOS / Linux）发布流水线：
+# - 仅大写 V 四段式 tag（如 V0.0.0.0）触发，与 ci-cd.yml 的小写 v* tag 互不干扰
+# - matrix 并行构建三平台安装包，tauri-action 自动创建 GitHub Release 并上传产物
+# - 配置签名密钥后同步生成 OTA 更新清单 latest.json（Tauri updater 格式）
+#   客户端经 https://github.com/afdk1991/mim/releases/latest/download/latest.json 检测更新
+
+on:
+  push:
+    tags: ['V0.0.0.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: 安装 Linux 系统依赖
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      # npm install（非 npm ci，lock 不入库）：规避 npm/cli#4828 —— 按运行平台全新解析可选依赖
+      - name: 安装前端依赖
+        run: npm install --no-fund --no-audit
+
+      # 签名私钥以 base64 形式存放（TAURI_SIGNING_PRIVATE_KEY_B64），此处还原为文件，
+      # 规避 PowerShell 管道/多行文本在 secret 写入时的换行损坏问题
+      - name: 还原签名私钥
+        shell: bash
+        run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}" | base64 -d > "$RUNNER_TEMP/mim.key"
+
+      - name: 构建 & 发布（tauri-action）
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ runner.temp }}/mim.key
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Mim ${{ github.ref_name }}'
+          releaseBody: 'Mim 桌面端安装包（Windows / macOS / Linux），内含 OTA 自动更新。'
+          releaseDraft: false
+          prerelease: false
