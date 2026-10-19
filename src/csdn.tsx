@@ -459,12 +459,48 @@ export function SnippetsPage() {
   const api = useApp()
   const toast = useToast()
   const [lang, setLang] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [language, setLanguage] = useState('TypeScript')
   const [code, setCode] = useState('')
 
-  const list = lang ? api.state.snippets.filter((s) => s.language === lang) : api.state.snippets
+  const kw = q.trim().toLowerCase()
+  const list = api.state.snippets.filter(
+    (s) =>
+      (!lang || s.language === lang) &&
+      (!kw ||
+        s.title.toLowerCase().includes(kw) ||
+        s.code.toLowerCase().includes(kw) ||
+        s.language.toLowerCase().includes(kw)),
+  )
+
+  const copyCode = (id: string, code: string) => {
+    const done = () => {
+      setCopiedId(id)
+      toast('代码已复制 📋')
+      window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500)
+    }
+    // 兜底：Clipboard API 被拒（文档未聚焦/权限受限）时用 execCommand 复制
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = code
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (ok) done()
+        else toast('复制失败，请手动选择复制')
+      } catch {
+        toast('复制失败，请手动选择复制')
+      }
+    }
+    navigator.clipboard.writeText(code).then(done, fallback)
+  }
 
   const create = () => {
     if (!title.trim() || !code.trim()) {
@@ -486,6 +522,13 @@ export function SnippetsPage() {
           <span style={{ flex: 1 }} />
           <button className="btn btn-primary btn-sm" onClick={() => setOpen(true)}>+ 新建片段</button>
         </div>
+        <input
+          className="input"
+          style={{ marginBottom: 12 }}
+          placeholder="搜索片段标题、代码或语言…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <div className="card tag-chips" style={{ marginBottom: 12 }}>
           <span className={cx('chip', !lang && 'active')} onClick={() => setLang(null)}>全部</span>
           {[...new Set(api.state.snippets.map((s) => s.language))].map((l) => (
@@ -503,7 +546,15 @@ export function SnippetsPage() {
                   <span className="lang-badge">{s.language}</span>
                   <b style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</b>
                 </div>
-                <pre className="snippet-code"><code>{s.code}</code></pre>
+                <div className="snippet-code-wrap">
+                  <pre className="snippet-code"><code>{s.code}</code></pre>
+                  <button
+                    className={cx('copy-btn', copiedId === s.id && 'done')}
+                    onClick={() => copyCode(s.id, s.code)}
+                  >
+                    {copiedId === s.id ? '已复制 ✓' : '复制'}
+                  </button>
+                </div>
                 <div className="snippet-foot">
                   <span>{u.emoji} {u.name}</span>
                   <span><TimeAgo ts={s.createdAt} /></span>
