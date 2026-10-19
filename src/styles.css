@@ -1801,3 +1801,255 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- 路线导航 ---------- */
+
+.nav-map {
+  position: relative;
+  height: 340px;
+  background:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px),
+    var(--bg);
+  background-size: 40px 40px, 40px 40px, auto;
+}
+
+.nav-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.map-place {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.map-place i {
+  font-style: normal;
+  font-size: 18px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+
+.map-place em {
+  font-style: normal;
+  font-size: 11px;
+  background: var(--card);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.map-place.dest i {
+  border-color: var(--primary);
+  background: var(--primary-weak);
+}
+
+.map-place.dest em {
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.map-place.start i {
+  border-color: var(--text-3);
+}
+
+.rider-chip.via {
+  border-style: dashed;
+  border-color: var(--primary);
+  color: var(--primary);
+  background: transparent;
+}
+
+.step-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 4px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.step.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.step.done {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.step-no {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.step.active .step-no {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.step.done .step-no {
+  background: transparent;
+}
+
+/* ---------- 邮箱聚合 ---------- */
+
+.acct-badge {
+  font-style: normal;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  min-width: 17px;
+  height: 17px;
+  line-height: 17px;
+  text-align: center;
+  padding: 0 4px;
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.mail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.mail-row:last-child {
+  border-bottom: none;
+}
+
+.mail-row:hover {
+  background: var(--bg);
+}
+
+.mail-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: 7px;
+}
+
+.mail-dot.read {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.mail-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mail-main p {
+  margin: 0;
+}
+
+.mail-subject {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.mail-row.unread .mail-subject {
+  color: var(--text);
+}
+
+.mail-star {
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+.mail-from {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.mail-prev {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-box {
+  background: var(--primary-weak);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ai-box b {
+  color: var(--primary);
+}
+
+.mail-body {
+  margin-top: 12px;
+}
+
+.mail-body p {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .nav-map {
+    height: 260px;
+  }
+}
+
+@media (max-width: 560px) {
+  .map-place em {
+    display: none;
+  }
+
+  .nav-map {
+    height: 220px;
+  }
+}
