@@ -545,6 +545,20 @@ export function SnippetsPage() {
                 <div className="snippet-head">
                   <span className="lang-badge">{s.language}</span>
                   <b style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</b>
+                  {s.authorId === api.me.id && (
+                    <button
+                      title="删除片段"
+                      style={{ background: 'none', border: 'none', padding: '0 2px', color: 'var(--text-3)', fontSize: 14, cursor: 'pointer', lineHeight: 1 }}
+                      onClick={() => {
+                        if (window.confirm(`确认删除片段《${s.title}》？删除后不可恢复。`)) {
+                          api.deleteSnippet(s.id)
+                          toast('片段已删除 🗑')
+                        }
+                      }}
+                    >
+                      🗑
+                    </button>
+                  )}
                 </div>
                 <div className="snippet-code-wrap">
                   <pre className="snippet-code"><code>{s.code}</code></pre>

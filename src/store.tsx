@@ -41,6 +41,7 @@ type Action =
   | { type: 'addArticleComment'; payload: { id: string; articleId: string; content: string } }
   | { type: 'toggleSnippetLike'; payload: string }
   | { type: 'addSnippet'; payload: { id: string; title: string; language: string; code: string } }
+  | { type: 'deleteSnippet'; payload: string }
   | { type: 'downloadResource'; payload: string }
   | { type: 'updateProfile'; payload: { name: string; emoji: string; color: string; bio: string } }
   | { type: 'editArticle'; payload: { id: string; title: string; content: string; tags: string[] } }
@@ -342,6 +343,9 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
+    case 'deleteSnippet':
+      return { ...state, snippets: state.snippets.filter((s) => s.id !== action.payload) }
+
     case 'downloadResource':
       return {
         ...state,
@@ -410,6 +414,7 @@ interface AppApi {
   addArticleComment: (articleId: string, content: string) => void
   toggleSnippetLike: (id: string) => void
   addSnippet: (title: string, language: string, code: string) => void
+  deleteSnippet: (id: string) => void
   downloadResource: (id: string) => void
   resetDemo: () => void
 }
@@ -490,6 +495,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleSnippetLike: (id) => dispatch({ type: 'toggleSnippetLike', payload: id }),
       addSnippet: (title, language, code) =>
         dispatch({ type: 'addSnippet', payload: { id: uid('s'), title, language, code } }),
+      deleteSnippet: (id) => dispatch({ type: 'deleteSnippet', payload: id }),
       downloadResource: (id) => dispatch({ type: 'downloadResource', payload: id }),
       resetDemo: () => dispatch({ type: 'reset' }),
     }
