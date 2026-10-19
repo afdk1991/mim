@@ -1431,6 +1431,14 @@ html[data-theme='dark'] .sidenav {
   background: rgba(20, 22, 26, 0.92);
 }
 
+html[data-theme='dark'] .sidenav-search {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme='dark'] .sidenav-search:focus {
+  background: var(--card);
+}
+
 html[data-theme='dark'] .hist-chip .hist-del:hover {
   color: #ff6b60;
   background: rgba(255, 255, 255, 0.08);
