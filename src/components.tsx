@@ -172,7 +172,6 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
   const { navigate } = useRouter()
   const [repostOpen, setRepostOpen] = useState(false)
   const [repostText, setRepostText] = useState('')
-  const author = api.user(post.authorId)
   const quoted = post.repostOfId ? api.state.posts.find((p) => p.id === post.repostOfId) : null
   const quotedAuthor = quoted ? api.user(quoted.authorId) : null
   const mine = post.authorId === api.me.id

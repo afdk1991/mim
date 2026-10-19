@@ -10,7 +10,31 @@ function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as AppState
-      if (parsed && parsed.users && parsed.posts) return parsed
+      const valid =
+        parsed &&
+        typeof parsed.meId === 'string' &&
+        parsed.users &&
+        typeof parsed.users === 'object' &&
+        [
+          parsed.posts,
+          parsed.articles,
+          parsed.snippets,
+          parsed.resources,
+          parsed.notifications,
+          parsed.topics,
+          parsed.hotSearches,
+          parsed.messages,
+          parsed.favorites,
+          parsed.postDrafts,
+          parsed.articleDrafts,
+          parsed.followingIds,
+        ].every(Array.isArray)
+      if (valid) {
+        // 兼容旧存档：确保评论数组存在，避免缺字段导致页面崩溃
+        parsed.posts = parsed.posts.map((p) => ({ ...p, comments: p.comments ?? [] }))
+        parsed.articles = parsed.articles.map((a) => ({ ...a, comments: a.comments ?? [] }))
+        return parsed
+      }
     }
   } catch {
     /* 忽略损坏的本地数据，重新播种 */
