@@ -1466,3 +1466,338 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   color: var(--primary);
   font-size: 14px;
 }
+
+/* ============ 配送调度台 / 价格监控 共用 ============ */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stat-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+
+.stat-box b {
+  display: block;
+  font-size: 22px;
+  color: var(--primary);
+  line-height: 1.3;
+}
+
+.stat-box span {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.board-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.board-toolbar b {
+  font-size: 15px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.task-row:last-child {
+  border-bottom: none;
+}
+
+/* ---------- 配送调度台 ---------- */
+
+.rider-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.rider-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px 4px 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  background: var(--bg);
+}
+
+.rider-chip i {
+  font-style: normal;
+  font-size: 16px;
+}
+
+.rider-chip.busy {
+  background: var(--primary-weak);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.kanban-col {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-height: 160px;
+}
+
+.kanban-col-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.kanban-count {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-width: 22px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 0 6px;
+}
+
+.kanban-empty {
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: center;
+  margin: 24px 0;
+}
+
+.kanban-order {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+}
+
+.kanban-order:last-child {
+  margin-bottom: 0;
+}
+
+.ko-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.ko-amount {
+  color: var(--primary);
+}
+
+.ko-line {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+  word-break: break-word;
+}
+
+.ko-line.muted {
+  color: var(--text-3);
+}
+
+.ko-btn {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.progress-track {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.progress-seg {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.progress-seg.done {
+  background: var(--primary);
+}
+
+.rider-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.rider-pick:hover {
+  border-color: var(--primary);
+  background: var(--primary-weak);
+}
+
+/* ---------- 价格监控 ---------- */
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.price-grid .card {
+  margin-bottom: 0;
+}
+
+.price-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.price-emoji {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.price-card-name {
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.price-card-name b {
+  display: block;
+  font-size: 15px;
+}
+
+.price-now-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.price-now {
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.price-drop {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.price-up {
+  color: #2b9cf4;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 56px;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.spark i {
+  flex: 1;
+  max-width: 18px;
+  background: var(--primary);
+  opacity: 0.55;
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+}
+
+.spark i.down {
+  background: var(--danger);
+  opacity: 0.85;
+}
+
+.spark i.last {
+  opacity: 1;
+}
+
+.price-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tag-off {
+  background: var(--bg);
+  color: var(--text-3);
+}
+
+/* ---------- 响应式（工具台） ---------- */
+
+@media (max-width: 860px) {
+  .stat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kanban {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .kanban {
+    grid-template-columns: 1fr;
+  }
+
+  .price-grid {
+    grid-template-columns: 1fr;
+  }
+}

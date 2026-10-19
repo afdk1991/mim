@@ -24,6 +24,8 @@ import {
   SnippetsPage,
   TagsPage,
 } from './csdn'
+import { DeliveryBoardPage } from './delivery'
+import { PriceMonitorPage } from './price'
 import { clearHistory, cx, loadHistory } from './utils'
 
 type NavItem = { href: string; match: string; label: string; badgeKey?: 'notif' | 'msg' }
@@ -44,6 +46,8 @@ const NAV: NavItem[] = [
   { href: '#/favorites', match: '/favorites', label: '收藏' },
   { href: '#/history', match: '/history', label: '足迹' },
   { href: '#/my', match: '/my', label: '我的主页' },
+  { href: '#/delivery', match: '/delivery', label: '配送台' },
+  { href: '#/price', match: '/price', label: '价格监控' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -167,6 +171,12 @@ function Page() {
       return <SearchPage key={query.get('q') ?? ''} />
     case 'tags':
       return <TagsPage />
+
+    /* ---------- 工具台 ---------- */
+    case 'delivery':
+      return <DeliveryBoardPage />
+    case 'price':
+      return <PriceMonitorPage />
 
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
