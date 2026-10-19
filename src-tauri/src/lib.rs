@@ -9,7 +9,8 @@ async fn run_ota(app: tauri::AppHandle) {
     let Ok(updater) = app.updater() else {
         return;
     };
-    let Ok(update) = updater.check().await else {
+    /* check() 返回 Result<Option<Update>>：无更新时为 None，静默返回 */
+    let Ok(Some(update)) = updater.check().await else {
         return;
     };
 
