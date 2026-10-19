@@ -117,7 +117,7 @@ select {
 .sidenav-link {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
   padding: 8px 12px;
   border-radius: 10px;
@@ -146,8 +146,13 @@ button.sidenav-link {
   font-weight: 600;
 }
 
-.sidenav-group-btn {
-  justify-content: space-between;
+/* 微博风导航图标：定宽居中，文字纵向对齐 */
+.sidenav-ico {
+  font-style: normal;
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 15px;
 }
 
 .sidenav-sub {

@@ -48,6 +48,7 @@ type NavItem = {
   href: string
   match: string
   label: string
+  icon?: string
   badgeKey?: 'notif' | 'msg'
   children?: NavItem[]
   groups?: NavGroup[]
@@ -86,17 +87,18 @@ const TOOLBOX_GROUPS: NavGroup[] = [
 
 /** 单一导航：一级只保留高频入口，个人空间与工具箱收进下拉 */
 const NAV: NavItem[] = [
-  { href: '#/feed', match: '/feed', label: '首页' },
-  { href: '#/articles', match: '/article', label: '文章' },
-  { href: '#/write', match: '/write', label: '写文章' },
-  { href: '#/topics', match: '/topics', label: '超话' },
-  { href: '#/search', match: '/search', label: '搜索' },
-  { href: '#/notifications', match: '/notifications', label: '通知', badgeKey: 'notif' },
-  { href: '#/messages', match: '/messages', label: '私信', badgeKey: 'msg' },
+  { href: '#/feed', match: '/feed', label: '首页', icon: '🏠' },
+  { href: '#/articles', match: '/article', label: '文章', icon: '📝' },
+  { href: '#/write', match: '/write', label: '写文章', icon: '✍️' },
+  { href: '#/topics', match: '/topics', label: '超话', icon: '🔥' },
+  { href: '#/search', match: '/search', label: '搜索', icon: '🔍' },
+  { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif' },
+  { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg' },
   {
     href: '#/my',
     match: '/my',
     label: '我的',
+    icon: '👤',
     children: [
       { href: '#/my', match: '/my', label: '我的主页' },
       { href: '#/blog', match: '/blog', label: '我的博客' },
@@ -105,7 +107,7 @@ const NAV: NavItem[] = [
       { href: '#/following', match: '/following', label: '关注列表' },
     ],
   },
-  { href: '#', match: '/__toolbox__', label: '工具箱', groups: TOOLBOX_GROUPS },
+  { href: '#', match: '/__toolbox__', label: '工具箱', icon: '🧰', groups: TOOLBOX_GROUPS },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -176,6 +178,7 @@ function SideNav() {
                 href={item.href}
                 className={cx('sidenav-link', path.startsWith(item.match) && 'active')}
               >
+                {item.icon && <i className="sidenav-ico">{item.icon}</i>}
                 {item.label}
                 {badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}
               </a>
@@ -192,6 +195,7 @@ function SideNav() {
                 className={cx('sidenav-link sidenav-group-btn', active && 'active')}
                 onClick={() => setOpen(expanded ? null : item.label)}
               >
+                {item.icon && <i className="sidenav-ico">{item.icon}</i>}
                 {item.label}
                 <i className="sidenav-caret">{expanded ? '▴' : '▾'}</i>
               </button>
