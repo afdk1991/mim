@@ -1,7 +1,7 @@
 {
   "name": "mim",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Mim · 微博 & CSDN 风格内容聚合 Web 应用",
   "license": "UNLICENSED",
   "type": "module",

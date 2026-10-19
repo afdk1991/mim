@@ -199,6 +199,13 @@ button.sidenav-link {
   border-top: 1px solid var(--border);
 }
 
+.sidenav-version {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  user-select: text;
+}
+
 .page-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;

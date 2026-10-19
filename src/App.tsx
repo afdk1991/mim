@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
 import { Avatar, Empty, TimeAgo, ToastProvider } from './components'
@@ -226,6 +227,9 @@ function SideNav() {
         })}
       </nav>
       <div className="sidenav-foot">
+        <span className="sidenav-version" title="Mim 版本号">
+          V{APP_VERSION}
+        </span>
         <button
           className="icon-btn"
           title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
