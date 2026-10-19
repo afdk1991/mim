@@ -99,3 +99,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" android/app/build/outputs/apk/release/app-release.apk manifest.json --clobber --repo "$GITHUB_REPOSITORY"
+
+  ios:
+    name: iOS 模拟器构建（免签名冒烟）
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/V')
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 安装前端依赖
+        run: npm install --no-fund --no-audit
+      - name: 构建 Web 资产
+        run: npm run build
+      - name: 同步 Capacitor iOS 工程
+        run: npx cap sync ios
+      - name: 模拟器构建（CODE_SIGNING_ALLOWED=NO）
+        run: |
+          cd ios/App
+          xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator -configuration Release -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
