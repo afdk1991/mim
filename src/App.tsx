@@ -36,6 +36,7 @@ import { ManjuPage } from './manju'
 import { ArdotPage } from './ardot'
 import { MallProvider } from './mall/store'
 import { AuthProvider, useAuth } from './auth'
+import { matchSearchPages } from './search-index'
 import { LoginPage } from './login'
 import { MallHomePage } from './mall/MallHome'
 import { MallGoodsPage } from './mall/MallGoods'
@@ -564,8 +565,9 @@ function WbHero() {
     navigate(`/search?q=${encodeURIComponent(kw)}`)
   }
 
-  /* 输入联想：话题 + 用户 */
+  /* 输入联想：功能入口 + 话题 + 用户 + 文章（全站搜索） */
   const kw = q.trim().toLowerCase()
+  const pageHints = kw ? matchSearchPages(q).slice(0, 3) : []
   const topicHints = kw
     ? api.state.topics.filter((t) => t.name.toLowerCase().includes(kw)).slice(0, 4)
     : []
@@ -574,7 +576,15 @@ function WbHero() {
         .filter((u) => u.name.toLowerCase().includes(kw) || u.bio.toLowerCase().includes(kw))
         .slice(0, 4)
     : []
-  const noHint = kw.length > 0 && topicHints.length === 0 && userHints.length === 0
+  const articleHints = kw
+    ? api.state.articles.filter((a) => a.title.toLowerCase().includes(kw)).slice(0, 3)
+    : []
+  const noHint =
+    kw.length > 0 &&
+    pageHints.length === 0 &&
+    topicHints.length === 0 &&
+    userHints.length === 0 &&
+    articleHints.length === 0
 
   return (
     <header className="wb-hero">
@@ -607,7 +617,7 @@ function WbHero() {
           <span aria-hidden>🔍</span>
           <input
             type="search"
-            placeholder="搜索 Mim 内容"
+            placeholder="搜索全站内容与功能"
             value={q}
             onFocus={() => setOpen(true)}
             onChange={(e) => {
@@ -688,6 +698,32 @@ function WbHero() {
             )}
             {kw && (
               <>
+                {pageHints.length > 0 && (
+                  <>
+                    <div className="wb-hero-drop-title">🧭 功能入口</div>
+                    <div className="wb-hero-drop-list">
+                      {pageHints.map((p) => (
+                        <button
+                          key={p.href}
+                          className="wb-hero-drop-item"
+                          onClick={() => {
+                            saveHist(q.trim())
+                            setOpen(false)
+                            navigate(p.href.slice(1))
+                          }}
+                        >
+                          <i className="wb-hero-ico" aria-hidden>
+                            {p.icon}
+                          </i>
+                          <span className="wb-hero-drop-text">
+                            {p.name}
+                            <small>{p.group}</small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
                 {topicHints.length > 0 && (
                   <>
                     <div className="wb-hero-drop-title">相关话题</div>
@@ -715,6 +751,29 @@ function WbHero() {
                             {u.name}
                             <small>{u.bio}</small>
                           </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {articleHints.length > 0 && (
+                  <>
+                    <div className="wb-hero-drop-title">📝 相关文章</div>
+                    <div className="wb-hero-drop-list">
+                      {articleHints.map((a) => (
+                        <button
+                          key={a.id}
+                          className="wb-hero-drop-item"
+                          onClick={() => {
+                            saveHist(q.trim())
+                            setOpen(false)
+                            navigate(`/article/${a.id}`)
+                          }}
+                        >
+                          <i className="wb-hero-ico" aria-hidden>
+                            📝
+                          </i>
+                          <span className="wb-hero-drop-text">{a.title}</span>
                         </button>
                       ))}
                     </div>

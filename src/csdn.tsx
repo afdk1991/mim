@@ -5,6 +5,7 @@ import { cx, formatCount, formatDate, recordView } from './utils'
 import { Avatar, Empty, Modal, RichText, Tag, TimeAgo, UserLink, useToast } from './components'
 import { useAuth } from './auth'
 import { can } from './permissions'
+import { matchSearchPages } from './search-index'
 import type { Article } from './types'
 
 /* ================= 文章正文块级解析 ================= */
@@ -685,7 +686,7 @@ export function SearchPage() {
   const raw = routeQuery.get('q') ?? ''
   const kw = raw.trim().toLowerCase()
   const results = useMemo(() => {
-    if (!kw) return { posts: [], articles: [], users: [], snippets: [] }
+    if (!kw) return { posts: [], articles: [], users: [], snippets: [], topics: [], pages: [] }
     return {
       posts: api.state.posts.filter(
         (p) =>
@@ -706,11 +707,20 @@ export function SearchPage() {
       snippets: api.state.snippets.filter(
         (s) => s.title.toLowerCase().includes(kw) || s.code.toLowerCase().includes(kw),
       ),
+      topics: api.state.topics.filter((t) => t.name.toLowerCase().includes(kw) || t.desc.includes(kw)),
+      pages: matchSearchPages(raw),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kw, api.state.posts, api.state.articles, api.state.users, api.state.snippets])
+  }, [kw, api.state.posts, api.state.articles, api.state.users, api.state.snippets, api.state.topics])
 
-  const hasAny = results.posts.length + results.articles.length + results.users.length + results.snippets.length > 0
+  const hasAny =
+    results.posts.length +
+      results.articles.length +
+      results.users.length +
+      results.snippets.length +
+      results.topics.length +
+      results.pages.length >
+    0
 
   return (
     <div className="page-grid single">
@@ -718,6 +728,8 @@ export function SearchPage() {
         <div className="tabs">
           {[
             { key: 'all', label: `综合` },
+            { key: 'page', label: `功能 (${results.pages.length})` },
+            { key: 'topic', label: `超话 (${results.topics.length})` },
             { key: 'post', label: `动态 (${results.posts.length})` },
             { key: 'article', label: `文章 (${results.articles.length})` },
             { key: 'user', label: `用户 (${results.users.length})` },
@@ -735,6 +747,51 @@ export function SearchPage() {
 
         {kw && hasAny && (
           <>
+            {(tab === 'all' || tab === 'page') && results.pages.length > 0 && (
+              <>
+                {tab === 'all' && <h3 className="page-title">🧭 功能入口</h3>}
+                <div className="card">
+                  {results.pages.slice(0, tab === 'all' ? 6 : undefined).map((p) => (
+                    <a key={p.href} href={p.href} className="user-row" style={{ padding: '8px 0' }}>
+                      <span style={{ fontSize: 20 }}>{p.icon}</span>
+                      <span style={{ fontSize: 14 }}>
+                        <Highlight text={p.name} kw={kw} />
+                        <small style={{ display: 'block', color: 'var(--text-3)' }}>
+                          {p.group} · {p.href}
+                        </small>
+                      </span>
+                      <span style={{ flex: 1 }} />
+                      <span className="tag">{p.group}</span>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+            {(tab === 'all' || tab === 'topic') && results.topics.length > 0 && (
+              <>
+                {tab === 'all' && <h3 className="page-title">🔥 超话</h3>}
+                <div className="card">
+                  {results.topics.slice(0, tab === 'all' ? 4 : undefined).map((t) => (
+                    <a
+                      key={t.id}
+                      href={`#/topic/${encodeURIComponent(t.name)}`}
+                      className="user-row"
+                      style={{ padding: '8px 0' }}
+                    >
+                      <span style={{ fontSize: 20 }}>💬</span>
+                      <span style={{ fontSize: 14 }}>
+                        <b>#{t.name}#</b>
+                        <small style={{ display: 'block', color: 'var(--text-3)' }}>
+                          <Highlight text={t.desc} kw={kw} />
+                        </small>
+                      </span>
+                      <span style={{ flex: 1 }} />
+                      <small style={{ color: 'var(--text-3)' }}>{formatCount(t.heat)} 热度</small>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
             {(tab === 'all' || tab === 'post') && results.posts.length > 0 && (
               <>
                 {tab === 'all' && <h3 className="page-title">🕊 动态</h3>}
