@@ -2,12 +2,15 @@
 
 :root {
   --primary: #ff8200;
+  /* 深橙：白字/白底场景达标 WCAG AA（4.80:1），纯 #ff8200 仅 2.49:1 */
+  --primary-deep: #b35a00;
   --primary-weak: #fff3e6;
   --bg: #f5f6f7;
   --card: #ffffff;
   --text: #1f1f1f;
   --text-2: #6b6b6b;
-  --text-3: #9a9a9a;
+  /* 4.93:1 白底 / 4.58:1 灰底（--bg #f5f6f7）双达标；dark 主题有独立覆盖不受影响 */
+  --text-3: #707070;
   --border: #e8e8e8;
   --danger: #e64340;
   --radius: 12px;
@@ -82,7 +85,7 @@ select {
 .sidenav .brand {
   font-size: 20px;
   font-weight: 800;
-  color: var(--primary);
+  color: var(--primary-deep);
   letter-spacing: 0.5px;
   padding: 0 10px;
 }
@@ -122,7 +125,7 @@ button.sidenav-link {
 }
 
 .sidenav-link.active {
-  background: var(--primary);
+  background: var(--primary-deep);
   color: #fff;
   font-weight: 600;
 }
@@ -294,7 +297,7 @@ button.sidenav-link {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--primary-deep);
   color: #fff;
 }
 
@@ -486,7 +489,7 @@ button.sidenav-link {
 
 .quote-author {
   font-size: 13px;
-  color: var(--primary);
+  color: var(--primary-deep);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -525,11 +528,11 @@ button.sidenav-link {
 
 .pa-btn:hover {
   background: var(--primary-weak);
-  color: var(--primary);
+  color: var(--primary-deep);
 }
 
 .pa-btn.active {
-  color: var(--primary);
+  color: var(--primary-deep);
   font-weight: 600;
 }
 
@@ -615,7 +618,7 @@ button.sidenav-link {
 }
 
 .hot-item:nth-child(-n + 4) .hot-rank {
-  color: var(--primary);
+  color: var(--primary-deep);
 }
 
 .hot-text {
@@ -2542,7 +2545,7 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
 .wb-hero-btn {
   flex-shrink: 0;
   border: none;
-  background: var(--primary);
+  background: var(--primary-deep);
   color: #fff;
   font-size: 15px;
   font-weight: 600;

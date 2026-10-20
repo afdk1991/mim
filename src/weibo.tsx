@@ -141,7 +141,7 @@ export function FeedPage() {
               🖼
             </button>
             {images.length > 0 && <small style={{ color: 'var(--text-3)' }}>已选 {images.length} 张配图</small>}
-            <select value={topic} onChange={(e) => setTopic(e.target.value)}>
+            <select aria-label="选择话题" value={topic} onChange={(e) => setTopic(e.target.value)}>
               <option value="">不参与话题</option>
               {api.state.topics.map((t) => (
                 <option key={t.id} value={t.name}>#{t.name}#</option>

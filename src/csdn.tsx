@@ -589,7 +589,7 @@ export function SnippetsPage() {
       {open && (
         <Modal title="新建代码片段" onClose={() => setOpen(false)}>
           <input className="input" placeholder="片段标题" value={title} onChange={(e) => setTitle(e.target.value)} style={{ marginBottom: 10 }} />
-          <select className="input" value={language} onChange={(e) => setLanguage(e.target.value)} style={{ marginBottom: 10 }}>
+          <select className="input" aria-label="选择语言" value={language} onChange={(e) => setLanguage(e.target.value)} style={{ marginBottom: 10 }}>
             {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
           <textarea
