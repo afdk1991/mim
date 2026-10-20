@@ -132,6 +132,13 @@
   background: rgba(0, 0, 0, 0.55);
 }
 
+/* AI 原创徽标：置左上角，避免与右上角 VIP / 已看 徽标重叠 */
+.manju-ai {
+  left: 8px;
+  right: auto;
+  background: linear-gradient(135deg, #7c4dff, #448aff);
+}
+
 .manju-custom {
   position: static;
   margin-left: 6px;

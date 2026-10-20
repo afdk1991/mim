@@ -81,6 +81,13 @@ const mkEps = (sid: string, n: number, freeN: number): MjEpisode[] =>
 
 const SEED: MjSeries[] = [
   {
+    id: 's_airebirth', title: '重生：我成了漫画主角', cover: '🖋️', tone: 3,
+    tags: ['漫剧', 'AI剧', '原创', '玄幻'], score: 9.1, year: 2026, status: '连载中', vip: false,
+    synopsis:
+      '落魄漫画家深夜伏案沉睡，笔下世界竟在台灯光中复苏。他穿越进自己未完的漫画，双手开始化作墨线——一场关于「重生」的黑白漫剧由此展开。本站自有 AI 生成内容，纯原创，全程站内播放。',
+    episodes: [{ id: 's_airebirth_e01', index: 1, durationSec: 36, free: true }],
+  },
+  {
     id: 's_demo1', title: '赘婿逆袭指南', cover: '🗡️', tone: 1,
     tags: ['逆袭', '都市'], score: 8.7, year: 2025, status: '已完结', vip: false,
     synopsis: '入赘三年受尽白眼，一夜觉醒神秘血脉，从此商界纵横、打脸不停。',
@@ -122,9 +129,16 @@ const EXT_SEED: MjExtItem[] = [
   { id: 'x_c1', title: '魔尊也想知道', cat: 'comic', cover: '🌀', source: '源站 A · 漫剧频道', episodesText: '免费 3 集 / 全 227 集', playMode: 'direct' },
   { id: 'x_c2', title: '我家徒弟又挂了', cat: 'comic', cover: '🧧', source: '源站 B · 漫剧频道', episodesText: '免费 1 集 / 全 96 集', playMode: 'embed' },
   { id: 'x_c3', title: '万古神话', cat: 'comic', cover: '⛰️', source: '源站 B · 漫剧频道', episodesText: '免费 5 集 / 全 312 集', playMode: 'blocked', reason: 'frame_blocked' },
-  { id: 'x_a1', title: 'AI 重生之都市仙尊', cat: 'ai', cover: '⚡', source: '源站 C · AI 剧场', episodesText: '免费 2 集 / 全 80 集', playMode: 'direct' },
-  { id: 'x_a2', title: '赛博修仙传', cat: 'ai', cover: '🛰️', source: '源站 C · AI 剧场', episodesText: '免费 1 集 / 全 64 集', playMode: 'blocked', reason: 'stream_expired' },
-  { id: 'x_a3', title: '像素恋人', cat: 'ai', cover: '💾', source: '源站 A · AI 剧场', episodesText: '免费 2 集 / 全 45 集', playMode: 'embed' },
+  /* AI 剧：引入自母本「红果短剧 AI 剧场」片单（真实剧名与集数，仅公开元数据，不提供播放） */
+  { id: 'x_a1', title: '穿越60我有空间不愁吃喝', cat: 'ai', cover: '🌾', source: '红果短剧 · AI 剧场', episodesText: '全1000集', playMode: 'direct' },
+  { id: 'x_a2', title: '山货换万金，挣起一个家AI真人版', cat: 'ai', cover: '⛰️', source: '红果短剧 · AI 剧场', episodesText: '全621集', playMode: 'embed' },
+  { id: 'x_a3', title: '穿成农女：带着八个弟弟发家致富传', cat: 'ai', cover: '🧵', source: '红果短剧 · AI 剧场', episodesText: '全608集', playMode: 'blocked', reason: 'frame_blocked' },
+  { id: 'x_a4', title: '看我赶山养家第三季两情相悦', cat: 'ai', cover: '🏕️', source: '红果短剧 · AI 剧场', episodesText: '全600集', playMode: 'direct' },
+  { id: 'x_a5', title: '微光里的炽热2', cat: 'ai', cover: '🕯️', source: '红果短剧 · AI 剧场', episodesText: '全586集', playMode: 'embed' },
+  { id: 'x_a6', title: '夫君战死五年归来：我携婆家出族', cat: 'ai', cover: '⚔️', source: '红果短剧 · AI 剧场', episodesText: '全453集', playMode: 'blocked', reason: 'stream_expired' },
+  { id: 'x_a7', title: '全球躲猫猫：我是林岁安第二季', cat: 'ai', cover: '🙈', source: '红果短剧 · AI 剧场', episodesText: '全436集', playMode: 'direct' },
+  { id: 'x_a8', title: '全球躲猫猫：到底谁才是诡异啊！', cat: 'ai', cover: '👻', source: '红果短剧 · AI 剧场', episodesText: '全424集', playMode: 'blocked', reason: 'frame_blocked' },
+  { id: 'x_a9', title: '大明，李景隆的别样人生第七季', cat: 'ai', cover: '📜', source: '红果短剧 · AI 剧场', episodesText: '全400集', playMode: 'embed' },
 ];
 
 const PLAY_MSG: Record<string, string> = {
@@ -218,6 +232,7 @@ function MjCard({ s, seen, onOpen }: { s: MjSeries; seen: boolean; onOpen: () =>
     >
       <div className={cx('manju-cover', `manju-tone${s.tone}`)}>
         <span className="manju-cover-emoji">{s.cover}</span>
+        {s.tags.includes('AI剧') && <span className="manju-badge manju-ai">AI 原创</span>}
         {s.vip && <span className="manju-badge manju-vip">VIP</span>}
         {seen && <span className="manju-badge manju-seen">已看</span>}
       </div>
@@ -258,7 +273,7 @@ function HomeView(props: {
     <>
       <div className="manju-hero">
         <h1>漫剧 Manju</h1>
-        <p>竖屏漫剧在线观影 · 站内片库 + 外部片单解析（演示数据）</p>
+        <p>竖屏漫剧在线观影 · 站内片库（含原创 AI 剧）+ 外部片单解析（演示数据）</p>
       </div>
 
       <div className="manju-search-row">
@@ -385,6 +400,7 @@ function DetailView(props: {
       <div className="manju-detail card">
         <div className={cx('manju-cover', 'manju-cover-lg', `manju-tone${series.tone}`)}>
           <span className="manju-cover-emoji">{series.cover}</span>
+          {series.tags.includes('AI剧') && <span className="manju-badge manju-ai">AI 原创</span>}
           {series.vip && <span className="manju-badge manju-vip">VIP</span>}
         </div>
         <div className="manju-detail-info">
@@ -500,7 +516,10 @@ function WatchView(props: {
         <div className="manju-card-title">
           {series.title} · 第 {ep.index} 集
         </div>
-        <div className="muted">约 {Math.round(ep.durationSec / 60)} 分钟 · 站内片库（模拟数据，非真实视频流）</div>
+        <div className="muted">
+          {ep.durationSec < 60 ? `时长 ${ep.durationSec} 秒` : `约 ${Math.round(ep.durationSec / 60)} 分钟`} ·
+          站内片库（模拟数据，非真实视频流）
+        </div>
         {pct >= 90 && <div className="manju-now-hint">✅ 本集已看完，进度已保存，可返回选集或看下一集</div>}
       </div>
     </>
@@ -555,6 +574,7 @@ function ExtView(props: {
 
       <div className="muted manju-ext-note">
         外部片单仅提供发现与播放源解析演示：直链可播 → 站内嵌入 → 不可播（降级）。
+        「AI 剧」分类数据来源：红果短剧 AI 剧场（公开元数据，不提供播放）。
       </div>
 
       {props.items.map((it) => {
@@ -809,7 +829,8 @@ export function ManjuPage() {
       </div>
       {renderBody()}
       <div className="manju-foot muted">
-        站内剧集为演示数据；外部片单仅提供发现与解析演示，版权归原平台所有。
+        站内剧集为演示数据，原创 AI 剧《重生：我成了漫画主角》为本站 AI 生成演示内容；
+        「AI 剧」片单数据来源：红果短剧（仅收录公开元数据与来源，不提供播放），作品版权归原权利人所有。
       </div>
     </div>
   );
