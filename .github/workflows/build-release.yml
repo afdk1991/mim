@@ -1,14 +1,15 @@
 name: Release · 桌面端构建与发布
 
 # 桌面三平台（Windows / macOS / Linux）发布流水线：
-# - 仅大写 V 四段式 tag（如 V0.0.0.0）触发，与 ci-cd.yml 的小写 v* tag 互不干扰
+# - 大写 V 四段式 tag（如 V0.0.1.0）触发，与 ci-cd.yml 的小写 v* tag 互不干扰
+# - tag 前三段注入 tauri.conf.json version（桌面 OTA 依赖三段 semver 递增触发更新）
 # - matrix 并行构建三平台安装包，tauri-action 自动创建 GitHub Release 并上传产物
 # - 配置签名密钥后同步生成 OTA 更新清单 latest.json（Tauri updater 格式）
 #   客户端经 https://github.com/afdk1991/mim/releases/latest/download/latest.json 检测更新
 
 on:
   push:
-    tags: ['V0.0.0.*']
+    tags: ['V*.*.*.*']
   workflow_dispatch:
 
 permissions:
@@ -48,6 +49,18 @@ jobs:
       - name: 还原签名私钥
         shell: bash
         run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}" | base64 -d > "$RUNNER_TEMP/mim.key"
+
+      # 桌面 OTA 版本注入：tag 前三段（V0.0.1.0 → 0.0.1）写入 tauri.conf.json version，
+      # tauri-action 以此生成 latest.json 的 version 字段；客户端 updater 按 semver 比较，
+      # 三段必须高于已安装版本才触发更新。workflow_dispatch 无 tag 时跳过，保持 0.0.0
+      - name: 注入版本号（tag 前三段 → tauri.conf.json）
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#V}"; VER="${VER%.*}"
+          echo "tag=$GITHUB_REF_NAME -> tauri version=$VER"
+          node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');" "$VER"
+          grep -n '"version"' src-tauri/tauri.conf.json
 
       - name: 构建 & 发布（tauri-action）
         uses: tauri-apps/tauri-action@v0
