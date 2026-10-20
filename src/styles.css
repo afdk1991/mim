@@ -2,8 +2,8 @@
 
 :root {
   --primary: #ff8200;
-  /* 深橙：白字/白底场景达标 WCAG AA（4.80:1），纯 #ff8200 仅 2.49:1 */
-  --primary-deep: #b35a00;
+  /* 深橙：白字/白底场景达标 WCAG AA（白底 5.38 / 灰底 #f5f6f7 4.97 / 橙弱底 4.92），纯 #ff8200 仅 2.49:1 */
+  --primary-deep: #a85300;
   --primary-weak: #fff3e6;
   --bg: #f5f6f7;
   --card: #ffffff;
