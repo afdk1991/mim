@@ -12,7 +12,7 @@ export interface SearchPageItem {
 
 export const SEARCH_PAGES: SearchPageItem[] = [
   /* ---- 内容 ---- */
-  { href: '#/feed', name: '首页 / 动态', icon: '🏠', keywords: ['动态', 'feed', '首页', '微博'], group: '内容' },
+  { href: '#/feed', name: '首页 / 动态', icon: '🏠', keywords: ['动态', 'feed', '首页'], group: '内容' },
   { href: '#/articles', name: '文章', icon: '📝', keywords: ['文章', '博客', 'blog'], group: '内容' },
   { href: '#/write', name: '写文章', icon: '✍️', keywords: ['写作', '投稿', '编辑器'], group: '内容' },
   { href: '#/topics', name: '超话广场', icon: '🔥', keywords: ['超话', '话题', '排行榜'], group: '内容' },

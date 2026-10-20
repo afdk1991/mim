@@ -29,7 +29,7 @@ export function WelcomeModal() {
         <h2 id="welcome-title">欢迎使用 Mim</h2>
         <span className="welcome-ver" title="当前版本号">V{APP_VERSION}</span>
         <ul className="welcome-points">
-          <li>微博与 CSDN 风格的内容社区，内置商城中台与 9 个工具台演示模块</li>
+          <li>动态流与技术文章构成的内容社区，内置商城中台与 9 个工具台演示模块</li>
           <li>数据默认保存在本机浏览器，可随时清除；登录后部分内容支持云端同步</li>
           <li>本应用不收集任何个人信息，版本更新检查仅传输版本号</li>
         </ul>

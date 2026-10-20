@@ -22,7 +22,7 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
--- ---------- 2. posts 微博 ----------
+-- ---------- 2. posts 动态 ----------
 create table if not exists public.posts (
   id             text primary key default gen_random_uuid()::text,
   author_id      uuid not null references auth.users(id) on delete cascade,
@@ -37,7 +37,7 @@ create table if not exists public.posts (
   likes          int not null default 0
 );
 
--- ---------- 3. post_comments 微博评论 ----------
+-- ---------- 3. post_comments 动态评论 ----------
 create table if not exists public.post_comments (
   id         text primary key default gen_random_uuid()::text,
   post_id    text not null references public.posts(id) on delete cascade,

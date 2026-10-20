@@ -130,7 +130,7 @@ button.sidenav-link {
   font-weight: 600;
 }
 
-/* 微博风导航图标：定宽居中，文字纵向对齐 */
+/* 导航图标：定宽居中，文字纵向对齐 */
 .sidenav-ico {
   font-style: normal;
   width: 22px;
@@ -392,7 +392,7 @@ button.sidenav-link {
   border-color: var(--primary);
 }
 
-/* ---------- 微博卡片 ---------- */
+/* ---------- 动态卡片 ---------- */
 
 .post-card {
   position: relative;
@@ -936,7 +936,7 @@ button.sidenav-link {
   border-bottom-color: var(--primary);
 }
 
-/* ---------- CSDN 文章 ---------- */
+/* ---------- 文章 ---------- */
 
 .article-card {
   display: flex;
@@ -2460,7 +2460,7 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   }
 }
 
-/* ---------- 仿微博顶部 hero ---------- */
+/* ---------- 顶部 hero ---------- */
 
 .wb-hero {
   /* 深蓝黑星空底 + 底部橙色地平线光晕 + 右上蓝光（纯 CSS 渐变模拟截图） */

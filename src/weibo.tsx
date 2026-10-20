@@ -197,7 +197,7 @@ export function FeedPage() {
   )
 }
 
-/* ================= 2. PostDetailPage 微博详情 ================= */
+/* ================= 2. PostDetailPage 动态详情 ================= */
 
 export function PostDetailPage({ id }: { id: string }) {
   const api = useApp()

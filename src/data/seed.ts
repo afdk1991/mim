@@ -149,7 +149,7 @@ export function createSeedState(): AppState {
       {
         id: 'p1',
         authorId: 'u1',
-        content: 'React 19 正式版用了两周，最大的感受是表单场景代码量少了一半。Server Components + Actions 的组合真的改变了写法，整理了一篇长文放在 CSDN，欢迎讨论。',
+        content: 'React 19 正式版用了两周，最大的感受是表单场景代码量少了一半。Server Components + Actions 的组合真的改变了写法，整理了一篇长文放在专栏，欢迎讨论。',
         images: ['⚛️', '🚀'],
         createdAt: hr(2),
         repostOfId: null,
