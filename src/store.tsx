@@ -23,9 +23,16 @@ import {
   cloudSetFollow,
   cloudSetFavorite,
   cloudWriteProfile,
+  cloudUpsertPostDraft,
+  cloudDeletePostDraft,
+  cloudUpsertArticleDraft,
+  cloudDeleteArticleDraft,
+  cloudReadConversation,
+  cloudReadNotifications,
   type CloudResult,
 } from './lib/cloud-write'
 import { pullCloudContent, type CloudPayload } from './lib/cloud-read'
+import { cloudSendMessage, subscribeMessages } from './lib/cloud-msg'
 import { supabase, cloudEnabled } from './lib/supabase'
 
 const STORAGE_KEY = 'mim-state-v1'
@@ -83,9 +90,10 @@ type Action =
   | { type: 'toggleFollow'; payload: string }
   | { type: 'readNotification'; payload: string }
   | { type: 'readAllNotifications' }
-  | { type: 'sendMessage'; payload: { id: string; userId: string; content: string } }
-  | { type: 'receiveMessage'; payload: { id: string; userId: string; content: string } }
+  | { type: 'sendMessage'; payload: { id: string; userId: string; content: string; createdAt?: number } }
+  | { type: 'receiveMessage'; payload: { id: string; userId: string; content: string; createdAt?: number } }
   | { type: 'readConversation'; payload: string }
+  | { type: 'cloudRollbackMessage'; payload: string }
   | { type: 'toggleFavorite'; payload: { kind: 'post' | 'article'; targetId: string } }
   | { type: 'savePostDraft'; payload: { content: string; topic: string | null; images: string[] } }
   | { type: 'deletePostDraft'; payload: string }
@@ -261,10 +269,10 @@ function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'receiveMessage': {
-      const { id, userId, content } = action.payload
+      const { id, userId, content, createdAt } = action.payload
       return {
         ...state,
-        messages: [...state.messages, { id, userId, fromMe: false, content, createdAt: Date.now(), read: false }],
+        messages: [...state.messages, { id, userId, fromMe: false, content, createdAt: createdAt ?? Date.now(), read: false }],
       }
     }
 
@@ -275,6 +283,10 @@ function reducer(state: AppState, action: Action): AppState {
           m.userId === action.payload && !m.fromMe ? { ...m, read: true } : m,
         ),
       }
+
+    /* 私信云端写失败回滚：按 id 移除乐观行 */
+    case 'cloudRollbackMessage':
+      return { ...state, messages: state.messages.filter((m) => m.id !== action.payload) }
 
     case 'toggleFavorite': {
       const { kind, targetId } = action.payload
@@ -512,6 +524,11 @@ function reducer(state: AppState, action: Action): AppState {
       ].sort((a, b) => b.createdAt - a.createdAt)
       const favKeys = new Set(c.favorites.map((f) => `${f.type}:${f.targetId}`))
       const favorites = [...c.favorites, ...state.favorites.filter((f) => !favKeys.has(`${f.type}:${f.targetId}`))]
+      // 私信合并：云端行（owner 侧全集）替换同 id 乐观行，其余本地行保留，按时间正序
+      const msgSet = new Set(c.messages.map((m) => m.id))
+      const messages = [...c.messages, ...state.messages.filter((m) => !msgSet.has(m.id))].sort(
+        (a, b) => a.createdAt - b.createdAt,
+      )
       const prev = state.cloudIds ?? { users: [], posts: [], articles: [], snippets: [] }
       return {
         ...state,
@@ -520,6 +537,7 @@ function reducer(state: AppState, action: Action): AppState {
         articles,
         snippets,
         favorites,
+        messages,
         followingIds: Array.from(new Set([...state.followingIds, ...c.followingIds])),
         cloudIds: {
           users: Array.from(new Set([...prev.users, ...Object.keys(c.users)])),
@@ -649,21 +667,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state])
 
-  /* 轮 4 读路径：启动拉取云端内容合并本地；SIGNED_IN（登录成功/会话恢复）时重拉 */
+  /* 轮 4 读路径：启动拉取云端内容合并本地；SIGNED_IN（登录成功/会话恢复）时重拉。
+     轮 5：登录态下订阅 messages Realtime（对方来信实时推送），登出/卸载退订。 */
   useEffect(() => {
     if (!cloudEnabled || !supabase) return
+    const sb = supabase // 闭包内不可依赖模块导入的窄化，捕获局部引用
     let alive = true
+    let unsubMsg: (() => void) | null = null
     const pull = () => {
       void pullCloudContent().then((payload) => {
         if (payload && alive) dispatch({ type: 'cloudMerge', payload })
       })
     }
+    const startRealtime = () => {
+      void sb.auth.getSession().then(({ data: s }) => {
+        const meId = s.session?.user?.id
+        if (!meId || !alive) return
+        unsubMsg?.()
+        unsubMsg = subscribeMessages(meId, (m) => dispatch({ type: 'receiveMessage', payload: m }))
+      })
+    }
     pull()
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') pull()
+    startRealtime()
+    const { data } = sb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        pull()
+        startRealtime()
+      }
+      if (event === 'SIGNED_OUT' && unsubMsg) {
+        unsubMsg()
+        unsubMsg = null
+      }
     })
     return () => {
       alive = false
+      unsubMsg?.()
       data.subscription.unsubscribe()
     }
   }, [])
@@ -755,7 +793,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       readNotification: (id) => dispatch({ type: 'readNotification', payload: id }),
       readAllNotifications: () => dispatch({ type: 'readAllNotifications' }),
       sendMessage: (userId, content) => {
-        dispatch({ type: 'sendMessage', payload: { id: uid('m'), userId, content } })
+        const msgId = uid('m')
+        dispatch({ type: 'sendMessage', payload: { id: msgId, userId, content } })
+        // 云端真实用户走 send_message RPC（失败回滚乐观行）；seed 演示用户保持模拟回复
+        if (state.cloudIds?.users.includes(userId)) {
+          void cloudSendMessage(userId, content).then((r) => {
+            if (r === 'fail') dispatch({ type: 'cloudRollbackMessage', payload: msgId })
+          })
+          return
+        }
         const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)]
         window.setTimeout(() => {
           dispatch({ type: 'receiveMessage', payload: { id: uid('m'), userId, content: reply } })

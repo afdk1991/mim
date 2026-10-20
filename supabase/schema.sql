@@ -488,3 +488,18 @@ drop policy if exists topics_select on public.topics;
 create policy topics_select on public.topics for select using (true);
 drop policy if exists hot_searches_select on public.hot_searches;
 create policy hot_searches_select on public.hot_searches for select using (true);
+
+-- ============================================================================
+-- Realtime（轮 5）：把 messages 表加入 supabase_realtime publication，
+-- 使 RLS 过滤后的 INSERT 事件可推送给登录客户端（私信实时收发）。
+-- 幂等：已存在则跳过，可重复执行。
+-- ============================================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+end $$;

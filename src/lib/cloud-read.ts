@@ -4,7 +4,20 @@
    cloudMerge 合并（云端行覆盖同 id 本地乐观行，其余混排插入）。
    任一查询失败或无登录会话返回 null，调用方保持纯本地状态（静默降级）。 */
 import { supabase } from './supabase'
-import type { Article, ArticleComment, FavoriteItem, Post, PostComment, Snippet, User } from '../types'
+import type {
+  AppNotification,
+  Article,
+  ArticleComment,
+  ArticleDraft,
+  FavoriteItem,
+  Message,
+  NotificationType,
+  Post,
+  PostComment,
+  PostDraft,
+  Snippet,
+  User,
+} from '../types'
 
 export interface CloudPayload {
   /** 云端 profiles（仅真实登录用户，key 为 uuid，与 seed 用户 id 无交集） */
@@ -16,6 +29,14 @@ export interface CloudPayload {
   followingIds: string[]
   /** 我的云端收藏（favorites where user = me） */
   favorites: FavoriteItem[]
+  /** 我的云端私信（双行模型 owner 侧：我发的 from_me=true + 我收的 from_me=false，RLS 均按 owner_id 放行） */
+  messages: Message[]
+  /** 我的云端通知（notifications where user = me，倒序） */
+  notifications: AppNotification[]
+  /** 我的动态草稿（跨设备续写） */
+  postDrafts: PostDraft[]
+  /** 我的文章草稿（跨设备续写） */
+  articleDrafts: ArticleDraft[]
 }
 
 /** 单查询解包：失败抛错由外层 catch 统一降级 */
@@ -31,7 +52,8 @@ export async function pullCloudContent(): Promise<CloudPayload | null> {
     const meId = data.session?.user?.id
     if (!meId) return null
 
-    const [postsR, postCommentsR, articlesR, articleCommentsR, snippetsR, profilesR,
+    const [postsR, postCommentsR, articlesR, articleCommentsR, snippetsR, profilesR, messagesR,
+      notifsR, postDraftsR, articleDraftsR,
       likePostR, likeCommentR, likeArticleR, likeSnippetR, followsR, favsR] = await Promise.all([
       supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('post_comments').select('*').order('created_at', { ascending: true }).limit(500),
@@ -39,6 +61,10 @@ export async function pullCloudContent(): Promise<CloudPayload | null> {
       supabase.from('article_comments').select('*').order('created_at', { ascending: true }).limit(500),
       supabase.from('snippets').select('*').order('created_at', { ascending: false }).limit(50),
       supabase.from('profiles').select('*'),
+      supabase.from('messages').select('*').eq('owner_id', meId).order('created_at', { ascending: true }).limit(500),
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('post_drafts').select('*').order('saved_at', { ascending: false }),
+      supabase.from('article_drafts').select('*').order('saved_at', { ascending: false }),
       supabase.from('post_likes').select('post_id').eq('user_id', meId),
       supabase.from('comment_likes').select('comment_id').eq('user_id', meId),
       supabase.from('article_likes').select('article_id').eq('user_id', meId),
@@ -141,6 +167,42 @@ export async function pullCloudContent(): Promise<CloudPayload | null> {
       createdAt: Date.parse(f.created_at),
     }))
 
+    // 私信双行模型 owner 侧：peer_id = 对话对象，from_me 区分收发方向
+    const messages: Message[] = unwrap(messagesR, 'messages').map((m) => ({
+      id: m.id,
+      userId: m.peer_id as string,
+      fromMe: m.from_me === true,
+      content: m.content,
+      createdAt: Date.parse(m.created_at),
+      read: m.read ?? false,
+    }))
+
+    const notifications: AppNotification[] = unwrap(notifsR, 'notifications').map((n) => ({
+      id: n.id,
+      type: n.type as NotificationType,
+      fromUserId: n.from_user_id as string,
+      content: n.content,
+      postId: n.post_id ?? null,
+      read: n.read ?? false,
+      createdAt: Date.parse(n.created_at),
+    }))
+
+    const postDrafts: PostDraft[] = unwrap(postDraftsR, 'post_drafts').map((d) => ({
+      id: d.id,
+      content: d.content,
+      topic: d.topic ?? null,
+      images: d.images ?? [],
+      savedAt: Date.parse(d.saved_at),
+    }))
+
+    const articleDrafts: ArticleDraft[] = unwrap(articleDraftsR, 'article_drafts').map((d) => ({
+      id: d.id,
+      title: d.title,
+      content: d.content,
+      tags: d.tags ?? [],
+      savedAt: Date.parse(d.saved_at),
+    }))
+
     return {
       users,
       posts,
@@ -148,6 +210,10 @@ export async function pullCloudContent(): Promise<CloudPayload | null> {
       snippets,
       followingIds: unwrap(followsR, 'follows').map((r) => r.followee_id),
       favorites,
+      messages,
+      notifications,
+      postDrafts,
+      articleDrafts,
     }
   } catch (err) {
     console.warn('[cloud-read] 云端拉取失败，回退纯本地：', err)
