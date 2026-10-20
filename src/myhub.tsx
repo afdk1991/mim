@@ -44,7 +44,7 @@ type AppEntry = {
 
 /* 各工具台状态摘要（字段与各模块 interface 对齐） */
 const APPS: AppEntry[] = [
-  { href: '#/youxuan', key: 'mim-youxuan-v1', emoji: '🎁', label: '优选商城', stat: (s) => ({ label: '订单', value: fmt(len(s, 'orders')) }) },
+  { href: '#/mall', key: 'mim-mall-v1', emoji: '🛒', label: '商城', stat: (s) => ({ label: '订单', value: fmt(len(s, 'orders')) }) },
   { href: '#/price', key: 'mim-price-v1', emoji: '📉', label: '价格监控', stat: (s) => ({ label: '降价预警', value: fmt(len(s, 'alerts')) }) },
   { href: '#/delivery', key: 'mim-delivery-v1', emoji: '🛵', label: '配送调度', stat: (s) => ({ label: '订单', value: fmt(len(s, 'orders')) }) },
   { href: '#/bom', key: 'mim-bom-v1', emoji: '🧰', label: 'BOM 工具台', stat: (s) => ({ label: '部件用量', value: fmt(keys(s, 'qtys')) }) },
@@ -56,12 +56,10 @@ const APPS: AppEntry[] = [
   { href: '#/ardot', key: 'mim-ardot-v1', emoji: '📡', label: '聚合监控', stat: (s) => ({ label: '审计日志', value: fmt(len(s, 'logs')) }) },
 ]
 
-/* 虚拟资产：分散在四个模块里的数字资产汇总 */
+/* 虚拟资产：读自商城中台（mim-mall-v1）的钱包与积分 */
 const ASSETS: { href: string; emoji: string; label: string; read: () => number | null; prefix?: string }[] = [
-  { href: '#/live', emoji: '📺', label: '直播积分', read: () => num(readStore('mim-myp-v1'), 'points') },
-  { href: '#/laal', emoji: '🚗', label: '代驾余额', read: () => num(readStore('mim-laal-v1'), 'balance'), prefix: '¥' },
-  { href: '#/mix', emoji: '🍜', label: '生活钱包', read: () => num(readStore('mim-mix-v1'), 'wallet'), prefix: '¥' },
-  { href: '#/gexm', emoji: '🪙', label: '商城金币', read: () => num(readStore('mim-gexm-v1'), 'points') },
+  { href: '#/mall/wallet', emoji: '�', label: '商城余额', read: () => num(readStore('mim-mall-v1'), 'wallet'), prefix: '¥' },
+  { href: '#/mall/wallet', emoji: '🪙', label: '商城积分', read: () => num(readStore('mim-mall-v1'), 'points') },
 ]
 
 export function MyAppHub() {
@@ -70,7 +68,7 @@ export function MyAppHub() {
       <div className="card myhub-card">
         <div className="myhub-head">
           <b>💰 我的资产</b>
-          <small className="myhub-hint">实时读自各模块本地存档</small>
+          <small className="myhub-hint">实时读自商城中台本地存档</small>
         </div>
         <div className="myhub-assets">
           {ASSETS.map((a) => (
