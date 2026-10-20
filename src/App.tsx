@@ -445,7 +445,7 @@ function WbHero() {
           <span aria-hidden>🔍</span>
           <input
             type="search"
-            placeholder="搜索微博"
+            placeholder="搜索 Mim 内容"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
