@@ -545,3 +545,91 @@
   font-size: 12px;
   padding: 6px 0 2px;
 }
+
+/* ---------- 外部片单：红果目录（分类索引 / 分批列表 / 播放页） ---------- */
+
+.manju-ext-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.manju-ext-cat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin-bottom: 0;
+  transition: transform 0.15s;
+}
+
+.manju-ext-cat:hover {
+  transform: translateY(-2px);
+}
+
+.manju-attrib {
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.manju-hg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.manju-hg-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: var(--bg);
+}
+
+.manju-hg-cover-emoji {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  font-size: 40px;
+  background: var(--bg);
+}
+
+.manju-hg-cover-lg {
+  border-radius: 10px;
+}
+
+.manju-extwatch {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+.manju-extwatch-cover {
+  width: 132px;
+  flex-shrink: 0;
+}
+
+.manju-extwatch-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.manju-extwatch-info h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+@media (max-width: 560px) {
+  .manju-extwatch {
+    flex-direction: column;
+  }
+  .manju-extwatch-cover {
+    width: 100%;
+    max-width: 220px;
+  }
+}
