@@ -18,3 +18,12 @@ export const supabase: SupabaseClient | null =
 
 /** 是否已接入云端（true 时读路径/写路径走 Supabase） */
 export const cloudEnabled = supabase !== null
+
+/** GoTrue 设置端点（/auth/v1/settings，公开列出已启用的第三方登录 provider）；
+   未配置云端时为 null。 */
+export const authSettingsUrl: string | null = url
+  ? `${url.replace(/\/+$/, '')}/auth/v1/settings`
+  : null
+
+/** 匿名 key（公开凭据，供 settings 端点请求头使用） */
+export const anonKeyExport = anonKey ?? null

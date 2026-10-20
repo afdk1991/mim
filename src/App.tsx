@@ -916,6 +916,30 @@ function SiteFooter() {
   )
 }
 
+/* ---------- 移动端精简页脚（桌面隐藏，≤860px 顶栏模式时显示于页面底部） ---------- */
+
+function SiteFooterMini() {
+  return (
+    <footer className="site-footer-mini">
+      <div className="site-footer-mini-links">
+        <a href="#/info/about">关于我们</a>
+        <i className="site-footer-sep">|</i>
+        <a href="#/info/disclaimer">版权与免责声明</a>
+        <i className="site-footer-sep">|</i>
+        <a href="#/info/account-rules">账号管理规范</a>
+        <i className="site-footer-sep">|</i>
+        <a href="tel:4006600108">客服电话</a>
+      </div>
+      <p className="site-footer-mini-beian">
+        <a href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">京ICP备19004658号</a>
+        <i className="site-footer-sep">|</i>
+        <a href="https://beian.mps.gov.cn" target="_blank" rel="noreferrer">公安备案号11010502030143</a>
+      </p>
+      <p className="site-footer-mini-copy">©1999-2026 北京创新乐知网络技术有限公司</p>
+    </footer>
+  )
+}
+
 function Shell() {
   const toast = useToast()
 
@@ -935,6 +959,7 @@ function Shell() {
           <Page />
         </main>
       </div>
+      <SiteFooterMini />
       <WelcomeModal />
     </>
   )
