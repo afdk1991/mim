@@ -428,6 +428,43 @@ function HistoryPage() {
   )
 }
 
+/* 仿微博顶部 hero：深色星空横幅 + 居中 logo + 白胶囊搜索框（拼接橙色按钮） */
+function WbHero() {
+  const { navigate } = useRouter()
+  const [q, setQ] = useState('')
+
+  const go = () => {
+    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
+  }
+
+  return (
+    <header className="wb-hero">
+      <a className="wb-hero-logo" href="#/feed">
+        <i>👁️</i>
+        <b>Mim</b>
+        <small>mim.com</small>
+      </a>
+      <div className="wb-hero-search">
+        <div className="wb-hero-bar">
+          <span aria-hidden>🔍</span>
+          <input
+            type="search"
+            placeholder="搜索微博"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') go()
+            }}
+          />
+        </div>
+        <button className="wb-hero-btn" onClick={go}>
+          搜索
+        </button>
+      </div>
+    </header>
+  )
+}
+
 function Shell() {
   const toast = useToast()
 
@@ -439,12 +476,15 @@ function Shell() {
   }, [])
 
   return (
-    <div className="shell">
-      <SideNav />
-      <main className="app-shell">
-        <Page />
-      </main>
-    </div>
+    <>
+      <WbHero />
+      <div className="shell">
+        <SideNav />
+        <main className="app-shell">
+          <Page />
+        </main>
+      </div>
+    </>
   )
 }
 

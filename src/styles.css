@@ -2881,3 +2881,119 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---------- 仿微博顶部 hero ---------- */
+
+.wb-hero {
+  /* 深蓝黑星空底 + 底部橙色地平线光晕 + 右上蓝光（纯 CSS 渐变模拟截图） */
+  background:
+    radial-gradient(120% 90% at 50% 118%, rgba(255, 130, 0, 0.4), transparent 62%),
+    radial-gradient(60% 70% at 78% 0%, rgba(59, 108, 255, 0.22), transparent 65%),
+    radial-gradient(45% 55% at 18% 20%, rgba(90, 140, 255, 0.12), transparent 60%),
+    linear-gradient(180deg, #070b1d 0%, #0e1533 58%, #1a2450 100%);
+  padding: 30px 16px 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.wb-hero-logo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #fff;
+}
+
+.wb-hero-logo i {
+  font-style: normal;
+  font-size: 30px;
+  align-self: center;
+}
+
+.wb-hero-logo b {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.wb-hero-logo small {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.wb-hero-search {
+  display: flex;
+  width: min(480px, 94%);
+  margin-top: 18px;
+}
+
+.wb-hero-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border-radius: 999px 0 0 999px;
+  padding: 0 6px 0 16px;
+}
+
+.wb-hero-bar span {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.wb-hero-bar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  padding: 10px 0;
+  color: var(--text);
+}
+
+.wb-hero-bar input::placeholder {
+  color: var(--text-3);
+}
+
+/* 去掉 webkit 搜索框自带样式，保持胶囊纯净 */
+.wb-hero-bar input[type='search']::-webkit-search-decoration,
+.wb-hero-bar input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.wb-hero-btn {
+  flex-shrink: 0;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 24px;
+  border-radius: 0 999px 999px 0;
+  transition: filter 0.15s;
+}
+
+.wb-hero-btn:hover {
+  filter: brightness(1.06);
+}
+
+@media (max-width: 640px) {
+  .wb-hero {
+    padding: 22px 12px 26px;
+  }
+
+  .wb-hero-logo b {
+    font-size: 22px;
+  }
+
+  .wb-hero-logo i {
+    font-size: 24px;
+  }
+
+  .wb-hero-btn {
+    padding: 0 16px;
+  }
+}
