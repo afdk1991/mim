@@ -1,10 +1,12 @@
 /* 商城中台：统一钱包 / 积分 / 购物车 / 订单状态。
    全局通用电商流程——五个旧商城（优选/秒杀/本地生活/直播/代驾）
    在这里收敛为「频道」分类标签，不保留各自独特交互。
-   自包含状态模式：独立 localStorage（mim-mall-v1）+ loadMall 校验兜底。 */
+   数据归属：钱类数据按真实登录身份隔离（mim-mall-v1:<userId>），
+   切换演示身份不清钱包；老共享 key（mim-mall-v1）一次性幂等迁移。 */
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useAuth } from '../auth'
 
 export type MallChannel = 'youxuan' | 'gexm' | 'mix' | 'live' | 'laal'
 
@@ -66,7 +68,9 @@ export const MALL_GOODS: MallGoods[] = [
   { id: 'a2', channel: 'laal', title: '代驾畅行卡', emoji: '🚗', price: 98, desc: '10次抵扣 全国可用' },
 ]
 
-const STORAGE_KEY = 'mim-mall-v1'
+/* 旧共享 key（迁移源）与按真实身份隔离的存储 key */
+const LEGACY_KEY = 'mim-mall-v1'
+const mallKeyFor = (userId: string) => `mim-mall-v1:${userId}`
 
 function seedState(): MallState {
   const now = Date.now()
@@ -127,10 +131,20 @@ const isOrder = (it: unknown): it is MallOrder => {
 }
 
 /* 逐字段校验：任一异常回退对应字段的 seed 值（参照 store.tsx loadState 先例） */
-function loadMall(): MallState {
+function loadMallFor(userId: string): MallState {
   const base = seedState()
+  const key = mallKeyFor(userId)
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    // 一次性迁移：老共享存档复制到当前用户专属 key（幂等；失败不阻塞，按 seed 兜底）
+    const legacy = localStorage.getItem(LEGACY_KEY)
+    if (legacy && !localStorage.getItem(key)) {
+      try {
+        localStorage.setItem(key, legacy)
+      } catch {
+        /* ignore */
+      }
+    }
+    const raw = localStorage.getItem(key)
     if (!raw) return base
     const v: unknown = JSON.parse(raw)
     if (!v || typeof v !== 'object') return base
@@ -155,6 +169,8 @@ type MallApi = {
   checkout: () => MallOrder | null
   /** 校验 unpaid + 余额充足 → 扣钱包、返 5% 积分 → paid；失败返回 false */
   payOrder: (id: string) => boolean
+  /** 取消 unpaid 订单（演示简化：直接从订单列表移除） */
+  cancelOrder: (id: string) => void
   confirmOrder: (id: string) => void
   recharge: (amount: number) => void
 }
@@ -162,15 +178,23 @@ type MallApi = {
 const MallContext = createContext<MallApi | null>(null)
 
 export function MallProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<MallState>(loadMall)
+  const { auth } = useAuth()
+  const userId = auth.userId
+  const storageKey = mallKeyFor(userId)
+  const [state, setState] = useState<MallState>(() => loadMallFor(userId))
+
+  // 真实身份变化（登录/退出/云端会话切换）时重载该身份的钱包数据
+  useEffect(() => {
+    setState(loadMallFor(userId))
+  }, [userId])
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      localStorage.setItem(storageKey, JSON.stringify(state))
     } catch {
       /* ignore */
     }
-  }, [state])
+  }, [state, storageKey])
 
   const api: MallApi = {
     state,
@@ -234,6 +258,9 @@ export function MallProvider({ children }: { children: ReactNode }) {
         orders: s.orders.map((o) => (o.id === id ? { ...o, status: 'paid' } : o)),
       }))
       return true
+    },
+    cancelOrder(id) {
+      setState((s) => ({ ...s, orders: s.orders.filter((o) => !(o.id === id && o.status === 'unpaid')) }))
     },
     confirmOrder(id) {
       setState((s) => ({

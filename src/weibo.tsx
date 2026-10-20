@@ -819,6 +819,7 @@ export function ProfilePage({ id }: { id: string }) {
   }, [id])
 
   if (id === api.me.id) return null
+  if (!api.state.users[id]) return <Empty emoji="👻" text="用户不存在或已注销" />
   const u = api.user(id)
   const posts = api.state.posts.filter((p) => p.authorId === id)
   const articles = api.state.articles.filter((a) => a.authorId === id)

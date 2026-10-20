@@ -4,6 +4,8 @@ import type { Article, Post } from './types'
 import { cx, formatCount, timeAgo } from './utils'
 import { useApp } from './store'
 import { useRouter } from './router'
+import { useAuth } from './auth'
+import { can } from './permissions'
 
 /* ---------- Avatar ---------- */
 
@@ -129,7 +131,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
   const push = useCallback((text: string) => {
     const id = Date.now() + Math.random()
-    setItems((s) => [...s, { id, text }])
+    /* 连续相同文案去重：避免连点叠加重复提示 */
+    setItems((s) => (s[s.length - 1]?.text === text ? s : [...s, { id, text }]))
     setTimeout(() => setItems((s) => s.filter((t) => t.id !== id)), 1800)
   }, [])
   return (
@@ -174,7 +177,9 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
   const [repostText, setRepostText] = useState('')
   const quoted = post.repostOfId ? api.state.posts.find((p) => p.id === post.repostOfId) : null
   const quotedAuthor = quoted ? api.user(quoted.authorId) : null
-  const mine = post.authorId === api.me.id
+  const { auth } = useAuth()
+  // 能力守卫：统一走 can()（guest 模式自动隐藏删除入口），reducer ownership 静默兜底
+  const mine = can(auth.mode, api.state.meId, 'post:delete', post)
 
   return (
     <article className="card post-card">

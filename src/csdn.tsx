@@ -3,6 +3,8 @@ import { useApp } from './store'
 import { useRouter } from './router'
 import { cx, formatCount, formatDate, recordView } from './utils'
 import { Avatar, Empty, Modal, RichText, Tag, TimeAgo, UserLink, useToast } from './components'
+import { useAuth } from './auth'
+import { can } from './permissions'
 import type { Article } from './types'
 
 /* ================= 文章正文块级解析 ================= */
@@ -458,6 +460,7 @@ const LANGUAGES = ['TypeScript', 'JavaScript', 'Python', 'Go', 'Rust', 'CSS', 'S
 export function SnippetsPage() {
   const api = useApp()
   const toast = useToast()
+  const { auth } = useAuth()
   const [lang, setLang] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -545,7 +548,7 @@ export function SnippetsPage() {
                 <div className="snippet-head">
                   <span className="lang-badge">{s.language}</span>
                   <b style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</b>
-                  {s.authorId === api.me.id && (
+                  {can(auth.mode, api.state.meId, 'snippet:delete', s) && (
                     <button
                       title="删除片段"
                       style={{ background: 'none', border: 'none', padding: '0 2px', color: 'var(--text-3)', fontSize: 14, cursor: 'pointer', lineHeight: 1 }}

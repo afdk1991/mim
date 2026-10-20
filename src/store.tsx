@@ -1,3 +1,7 @@
+/* 全局状态中台。
+   身份模型：state.meId = 当前扮演的演示身份（seed 用户 me/u1..u9，内容 authorId 域）；
+   真实登录身份（AuthState.userId，见 auth.tsx）不进此 store——
+   钱包/订单等钱类数据在 mall 中台按真实身份隔离，内容权限由 can()（permissions.ts）+ reducer ownership 守卫双层兜底。 */
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { createSeedState } from './data/seed'
 import type { AppState, Post, PostComment, Article, User } from './types'
@@ -30,6 +34,11 @@ function loadState(): AppState {
           parsed.followingIds,
         ].every(Array.isArray)
       if (valid) {
+        // 兜底：meId 必须存在于 users，否则整站头像/昵称落 FALLBACK_USER
+        if (!parsed.users[parsed.meId]) {
+          if (parsed.users['me']) parsed.meId = 'me'
+          else return createSeedState()
+        }
         // 兼容旧存档：确保评论数组存在，避免缺字段导致页面崩溃
         parsed.posts = parsed.posts.map((p) => ({ ...p, comments: p.comments ?? [] }))
         parsed.articles = parsed.articles.map((a) => ({ ...a, comments: a.comments ?? [] }))
@@ -70,6 +79,7 @@ type Action =
   | { type: 'updateProfile'; payload: { name: string; emoji: string; color: string; bio: string } }
   | { type: 'editArticle'; payload: { id: string; title: string; content: string; tags: string[] } }
   | { type: 'deleteArticle'; payload: string }
+  | { type: 'setIdentity'; payload: { meId: string; user?: User } }
   | { type: 'reset' }
 
 function makeSummary(content: string): string {
@@ -105,12 +115,15 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, posts: [post, ...posts] }
     }
 
-    case 'deletePost':
+    case 'deletePost': {
+      const post = state.posts.find((p) => p.id === action.payload)
+      if (!post || post.authorId !== state.meId) return state
       return {
         ...state,
         posts: state.posts.filter((p) => p.id !== action.payload),
         favorites: state.favorites.filter((f) => !(f.type === 'post' && f.targetId === action.payload)),
       }
+    }
 
     case 'togglePostLike':
       return {
@@ -281,7 +294,9 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
-    case 'editArticle':
+    case 'editArticle': {
+      const target = state.articles.find((a) => a.id === action.payload.id)
+      if (!target || target.authorId !== state.meId) return state
       return {
         ...state,
         articles: state.articles.map((a) =>
@@ -296,13 +311,17 @@ function reducer(state: AppState, action: Action): AppState {
             : a,
         ),
       }
+    }
 
-    case 'deleteArticle':
+    case 'deleteArticle': {
+      const target = state.articles.find((a) => a.id === action.payload)
+      if (!target || target.authorId !== state.meId) return state
       return {
         ...state,
         articles: state.articles.filter((a) => a.id !== action.payload),
         favorites: state.favorites.filter((f) => !(f.type === 'article' && f.targetId === action.payload)),
       }
+    }
 
     case 'updateProfile':
       return {
@@ -367,8 +386,11 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
-    case 'deleteSnippet':
+    case 'deleteSnippet': {
+      const target = state.snippets.find((s) => s.id === action.payload)
+      if (!target || target.authorId !== state.meId) return state
       return { ...state, snippets: state.snippets.filter((s) => s.id !== action.payload) }
+    }
 
     case 'downloadResource':
       return {
@@ -377,6 +399,13 @@ function reducer(state: AppState, action: Action): AppState {
           r.id === action.payload ? { ...r, downloads: r.downloads + 1 } : r,
         ),
       }
+
+    case 'setIdentity': {
+      const { meId, user } = action.payload
+      if (!user && !state.users[meId]) return state
+      const users = user ? { ...state.users, [meId]: user } : state.users
+      return { ...state, meId, users }
+    }
 
     case 'reset':
       return createSeedState()
@@ -440,6 +469,7 @@ interface AppApi {
   addSnippet: (title: string, language: string, code: string) => void
   deleteSnippet: (id: string) => void
   downloadResource: (id: string) => void
+  switchDemoUser: (id: string) => void
   resetDemo: () => void
 }
 
@@ -521,6 +551,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'addSnippet', payload: { id: uid('s'), title, language, code } }),
       deleteSnippet: (id) => dispatch({ type: 'deleteSnippet', payload: id }),
       downloadResource: (id) => dispatch({ type: 'downloadResource', payload: id }),
+      switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
       resetDemo: () => dispatch({ type: 'reset' }),
     }
   }, [state])

@@ -35,6 +35,8 @@ import { AiResPage } from './ai'
 import { ManjuPage } from './manju'
 import { ArdotPage } from './ardot'
 import { MallProvider } from './mall/store'
+import { AuthProvider, useAuth } from './auth'
+import { LoginPage } from './login'
 import { MallHomePage } from './mall/MallHome'
 import { MallGoodsPage } from './mall/MallGoods'
 import { MallCartPage } from './mall/MallCart'
@@ -55,7 +57,7 @@ type NavItem = {
   groups?: NavGroup[]
 }
 
-/* 低频内容页 + 14 个工具台：收敛进「工具箱」下拉，避免一级导航平铺 26 项 */
+/* 低频内容页 + 9 个工具台：收敛进「工具箱」下拉，避免一级导航平铺 20+ 项 */
 const TOOLBOX_GROUPS: NavGroup[] = [
   {
     title: '内容',
@@ -288,6 +290,8 @@ function Page() {
       return <SearchPage key={query.get('q') ?? ''} />
     case 'tags':
       return <TagsPage />
+    case 'login':
+      return <LoginPage />
 
     /* ---------- 商城中台 ---------- */
     case 'mall': {
@@ -427,6 +431,79 @@ const HERO_TAG_BG: Record<string, string> = {
   新: '#2b9cf4',
 }
 
+/* 顶部 hero 右侧用户菜单：演示身份切换 + 账号登录态入口。
+   演示身份（meId）决定内容作者视角；账号（cloud/local）决定云端数据边界，见 auth.tsx。 */
+function UserMenu() {
+  const api = useApp()
+  const { auth, cloudEnabled, signOut } = useAuth()
+  const [open, setOpen] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+
+  /* 点击面板外部关闭 */
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  return (
+    <div className="usermenu" ref={boxRef}>
+      <button className="usermenu-trigger" title="账号与身份" onClick={() => setOpen((v) => !v)}>
+        <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
+      </button>
+      {open && (
+        <div className="usermenu-drop">
+          <div className="usermenu-head">
+            <Avatar emoji={api.me.emoji} color={api.me.color} size={38} />
+            <div>
+              <b>{api.me.name}</b>
+              <small>{auth.mode === 'cloud' ? (auth.email ?? '云端账号') : '本地演示模式'}</small>
+            </div>
+          </div>
+          <div className="usermenu-sec">演示身份</div>
+          {Object.values(api.state.users).map((u) => (
+            <button
+              key={u.id}
+              className={cx('usermenu-item', u.id === api.state.meId && 'active')}
+              onClick={() => {
+                api.switchDemoUser(u.id)
+                setOpen(false)
+              }}
+            >
+              <Avatar emoji={u.emoji} color={u.color} size={22} />
+              {u.name}
+              {u.id === api.state.meId && <em className="usermenu-check">✓</em>}
+            </button>
+          ))}
+          <div className="usermenu-sec">账号</div>
+          {auth.mode === 'cloud' ? (
+            <button
+              className="usermenu-item"
+              onClick={() => {
+                void signOut()
+                setOpen(false)
+              }}
+            >
+              <span className="usermenu-ico">🚪</span> 退出登录
+            </button>
+          ) : (
+            <a className="usermenu-item" href="#/login" onClick={() => setOpen(false)}>
+              <span className="usermenu-ico">🔑</span>
+              {cloudEnabled ? '登录 / 注册' : '登录（本地演示）'}
+            </a>
+          )}
+          <a className="usermenu-item" href="#/my" onClick={() => setOpen(false)}>
+            <span className="usermenu-ico">👤</span> 个人空间
+          </a>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* 仿微博顶部 hero：深色星空横幅 + 右上工具区 + 居中 logo + 完整搜索模块（下拉：历史/热搜/联想/清空） */
 function WbHero() {
   const api = useApp()
@@ -517,9 +594,7 @@ function WbHero() {
         >
           ♻️
         </button>
-        <a href="#/my" title="进入个人空间">
-          <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
-        </a>
+        <UserMenu />
       </div>
       <a className="wb-hero-logo" href="#/feed">
         <i>👁️</i>
@@ -683,11 +758,13 @@ export default function App() {
   return (
     <AppProvider>
       <ToastProvider>
-        <MallProvider>
-          <RouterProvider>
-            <Shell />
-          </RouterProvider>
-        </MallProvider>
+        <AuthProvider>
+          <MallProvider>
+            <RouterProvider>
+              <Shell />
+            </RouterProvider>
+          </MallProvider>
+        </AuthProvider>
       </ToastProvider>
     </AppProvider>
   )

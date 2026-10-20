@@ -50,14 +50,17 @@ jobs:
         shell: bash
         run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}" | base64 -d > "$RUNNER_TEMP/mim.key"
 
-      # 桌面 OTA 版本注入：tag 前三段（V0.0.1.0 → 0.0.1）写入 tauri.conf.json version，
+      # 桌面 OTA 版本注入：tauri/npm 只认三段 semver，而版本策略只递增第 4 段（前三段恒 0.0.0），
+      # 故映射取「第1.第2.第4段」（V0.0.0.2 → 0.0.2）写入 tauri.conf.json version，
       # tauri-action 以此生成 latest.json 的 version 字段；客户端 updater 按 semver 比较，
       # 三段必须高于已安装版本才触发更新。workflow_dispatch 无 tag 时跳过，保持 0.0.0
-      - name: 注入版本号（tag 前三段 → tauri.conf.json）
+      - name: 注入版本号（tag 第 1.2.4 段 → tauri.conf.json）
         if: startsWith(github.ref, 'refs/tags/V')
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#V}"; VER="${VER%.*}"
+          VER="${GITHUB_REF_NAME#V}"
+          MAJMIN="${VER%.*}"; MAJMIN="${MAJMIN%.*}"
+          VER="$MAJMIN.${VER##*.}"
           echo "tag=$GITHUB_REF_NAME -> tauri version=$VER"
           node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');" "$VER"
           grep -n '"version"' src-tauri/tauri.conf.json

@@ -1,6 +1,9 @@
 /* 我的应用面板：聚合 14 个工具台的本地状态摘要与虚拟资产。
    只读各模块独立 localStorage（松耦合），不改任何工具台代码；
-   任一存档缺失或字段异常时指标显示「—」，不影响页面渲染。 */
+   任一存档缺失或字段异常时指标显示「—」，不影响页面渲染。
+   商城中台数据按真实登录身份隔离（mim-mall-v1:<userId>，见 mall/store.tsx）。 */
+
+import { useAuth } from './auth'
 
 type Store = Record<string, unknown>
 
@@ -57,12 +60,15 @@ const APPS: AppEntry[] = [
 ]
 
 /* 虚拟资产：读自商城中台（mim-mall-v1）的钱包与积分 */
-const ASSETS: { href: string; emoji: string; label: string; read: () => number | null; prefix?: string }[] = [
-  { href: '#/mall/wallet', emoji: '�', label: '商城余额', read: () => num(readStore('mim-mall-v1'), 'wallet'), prefix: '¥' },
-  { href: '#/mall/wallet', emoji: '🪙', label: '商城积分', read: () => num(readStore('mim-mall-v1'), 'points') },
+const ASSETS: { href: string; emoji: string; label: string; read: (mallKey: string) => number | null; prefix?: string }[] = [
+  { href: '#/mall/wallet', emoji: '💰', label: '商城余额', read: (k) => num(readStore(k), 'wallet'), prefix: '¥' },
+  { href: '#/mall/wallet', emoji: '🪙', label: '商城积分', read: (k) => num(readStore(k), 'points') },
 ]
 
 export function MyAppHub() {
+  const { auth } = useAuth()
+  // 商城资产绑真实身份（切换演示身份不清钱包）；其余工具台保持共享沙盒
+  const mallKey = `mim-mall-v1:${auth.userId}`
   return (
     <>
       <div className="card myhub-card">
@@ -74,7 +80,7 @@ export function MyAppHub() {
           {ASSETS.map((a) => (
             <a key={a.label} className="myhub-asset" href={a.href}>
               <span className="myhub-asset-emoji">{a.emoji}</span>
-              <b className="myhub-asset-value">{fmt(a.read(), a.prefix ?? '')}</b>
+              <b className="myhub-asset-value">{fmt(a.read(mallKey), a.prefix ?? '')}</b>
               <small>{a.label}</small>
             </a>
           ))}
@@ -87,7 +93,7 @@ export function MyAppHub() {
         </div>
         <div className="myhub-grid">
           {APPS.map((app) => {
-            const st = app.stat(readStore(app.key))
+            const st = app.stat(readStore(app.key === 'mim-mall-v1' ? mallKey : app.key))
             return (
               <a key={app.href} className="myhub-app" href={app.href}>
                 <span className="myhub-app-emoji">{app.emoji}</span>

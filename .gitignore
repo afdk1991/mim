@@ -24,3 +24,8 @@ Thumbs.db
 
 # EdgeOne CLI 本地状态
 .edgeone/
+
+# IDE 会话目录与本地产物（不留备份）
+.trae/
+.trae-html-share-packages/
+质量报告-*.html

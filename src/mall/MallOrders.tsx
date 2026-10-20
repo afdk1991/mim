@@ -29,7 +29,7 @@ const fmtTime = (at: number) => {
 }
 
 export function MallOrdersPage() {
-  const { state, payOrder, confirmOrder } = useMall()
+  const { state, payOrder, cancelOrder, confirmOrder } = useMall()
   const toast = useToast()
   const [filter, setFilter] = useState<Filter>('all')
   const orders = filter === 'all' ? state.orders : state.orders.filter((o) => o.status === filter)
@@ -72,9 +72,20 @@ export function MallOrdersPage() {
               <div className="mall-order-side">
                 <span className={`mall-order-status ${STATUS_META[o.status].cls}`}>{STATUS_META[o.status].label}</span>
                 {o.status === 'unpaid' && (
-                  <button className="btn btn-primary btn-sm" onClick={() => pay(o.id)}>
-                    去支付
-                  </button>
+                  <>
+                    <button className="btn btn-primary btn-sm" onClick={() => pay(o.id)}>
+                      去支付
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        cancelOrder(o.id)
+                        toast('已取消订单')
+                      }}
+                    >
+                      取消订单
+                    </button>
+                  </>
                 )}
                 {o.status === 'paid' && (
                   <button
