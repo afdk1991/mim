@@ -1,0 +1,333 @@
+/* ================= VIP 会员中心（vip- 前缀，独立文件避免并行冲突） ================= */
+
+.vip-wrap {
+  --vip-card: #ffffff;
+  --vip-line: #f0e8dd;
+  --vip-text: #333333;
+  --vip-sub: #707070;
+  --vip-gold: #c8860a;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+[data-theme='dark'] .vip-wrap {
+  --vip-card: #1d1d1f;
+  --vip-line: #3a3428;
+  --vip-text: #e8e8e8;
+  --vip-sub: #9a9a9a;
+  --vip-gold: #e8b34b;
+}
+
+.vip-wrap .page-title {
+  margin-bottom: 0;
+}
+
+/* 状态卡 */
+.vip-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff7ec, #ffefd8);
+  border: 1px solid #ffe2b8;
+}
+
+.vip-status.vip-on {
+  background: linear-gradient(135deg, #3a2c14, #6b4a15 55%, #a8741c);
+  border-color: #8a5f16;
+  color: #fff;
+}
+
+[data-theme='dark'] .vip-status:not(.vip-on) {
+  background: linear-gradient(135deg, #2a2113, #3a2c14);
+  border-color: #4d3c1c;
+}
+
+.vip-status-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vip-status-main small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--vip-sub);
+}
+
+.vip-status.vip-on .vip-status-main small {
+  color: #f2ddb0;
+}
+
+.vip-crown {
+  font-size: 34px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.vip-status-main b {
+  font-size: 16px;
+}
+
+.vip-ghost {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vip-ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 套餐卡 */
+.vip-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.vip-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 12px 16px;
+  border-radius: 14px;
+  background: var(--vip-card);
+  border: 2px solid var(--vip-line);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  color: var(--vip-text);
+}
+
+.vip-plan:hover {
+  transform: translateY(-2px);
+  border-color: #ff8200;
+  box-shadow: 0 6px 18px rgba(255, 130, 0, 0.16);
+}
+
+.vip-plan.vip-hot {
+  border-color: #ff8200;
+}
+
+.vip-plan-tag {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  font-style: normal;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ff8200;
+  color: #fff;
+}
+
+.vip-plan-name {
+  font-size: 15px;
+}
+
+.vip-plan-price {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--vip-gold);
+  line-height: 1.1;
+}
+
+.vip-plan-price i {
+  font-style: normal;
+  font-size: 15px;
+  margin-right: 2px;
+}
+
+.vip-plan-per {
+  font-size: 12px;
+  color: var(--vip-sub);
+}
+
+.vip-plan-cta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #ff8200;
+  font-weight: 600;
+}
+
+.vip-plan.vip-hot .vip-plan-cta {
+  background: #ff8200;
+  color: #fff;
+  padding: 5px 16px;
+  border-radius: 999px;
+}
+
+/* 权益 */
+.vip-sec-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.vip-benefits {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.vip-benefit {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.vip-benefit i {
+  font-style: normal;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.vip-benefit b {
+  display: block;
+  font-size: 13px;
+}
+
+.vip-benefit small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--vip-sub);
+}
+
+/* 订单 */
+.vip-empty {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--vip-sub);
+}
+
+.vip-orders {
+  display: flex;
+  flex-direction: column;
+}
+
+.vip-order {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--vip-line);
+  font-size: 13px;
+}
+
+.vip-order:last-child {
+  border-bottom: none;
+}
+
+.vip-order-plan {
+  font-weight: 600;
+}
+
+.vip-order small {
+  flex: 1;
+  color: var(--vip-sub);
+}
+
+.vip-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--vip-sub);
+  line-height: 1.6;
+}
+
+/* 支付弹层 */
+.vip-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.vip-pay {
+  width: min(360px, calc(100vw - 32px));
+  background: var(--vip-card);
+  border-radius: 16px;
+  padding: 20px;
+  color: var(--vip-text);
+}
+
+.vip-pay h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.vip-pay-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+  font-size: 13px;
+  border-bottom: 1px dashed var(--vip-line);
+}
+
+.vip-pay-row span {
+  color: var(--vip-sub);
+}
+
+.vip-pay-amount {
+  text-align: right;
+  padding: 12px 0;
+  font-size: 13px;
+}
+
+.vip-pay-amount b {
+  font-size: 22px;
+  color: var(--vip-gold);
+  margin-left: 4px;
+}
+
+.vip-pay-btn {
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  padding: 11px 0;
+  font-size: 14px;
+  font-weight: 600;
+  background: #ff8200;
+  color: #fff;
+  cursor: pointer;
+}
+
+.vip-pay-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vip-pay-cancel {
+  width: 100%;
+  margin-top: 8px;
+  border: none;
+  background: transparent;
+  color: var(--vip-sub);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+/* 小屏适配 */
+@media (max-width: 640px) {
+  .vip-plans {
+    grid-template-columns: 1fr;
+  }
+
+  .vip-benefits {
+    grid-template-columns: 1fr;
+  }
+}

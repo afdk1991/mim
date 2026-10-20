@@ -37,6 +37,7 @@ import { ArdotPage } from './ardot'
 import { MallProvider } from './mall/store'
 import { AuthProvider, useAuth } from './auth'
 import { matchSearchPages } from './search-index'
+import { VipCenterPage } from './vip'
 import { LoginPage } from './login'
 import { MallHomePage } from './mall/MallHome'
 import { MallGoodsPage } from './mall/MallGoods'
@@ -47,8 +48,6 @@ import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
 
-type NavGroup = { title: string; items: NavItem[] }
-
 type NavItem = {
   href: string
   match: string
@@ -56,36 +55,9 @@ type NavItem = {
   icon?: string
   badgeKey?: 'notif' | 'msg'
   children?: NavItem[]
-  groups?: NavGroup[]
 }
 
-/* 低频内容页 + 9 个工具台：收敛进「工具箱」下拉，避免一级导航平铺 20+ 项 */
-const TOOLBOX_GROUPS: NavGroup[] = [
-  {
-    title: '内容',
-    items: [
-      { href: '#/snippets', match: '/snippets', label: '代码片段' },
-      { href: '#/resources', match: '/resources', label: '资源下载' },
-      { href: '#/tags', match: '/tags', label: '标签' },
-    ],
-  },
-  {
-    title: '工具台',
-    items: [
-      { href: '#/delivery', match: '/delivery', label: '配送台' },
-      { href: '#/price', match: '/price', label: '价格监控' },
-      { href: '#/nav', match: '/nav', label: '路线导航' },
-      { href: '#/mail', match: '/mail', label: '邮箱' },
-      { href: '#/bom', match: '/bom', label: 'BOM' },
-      { href: '#/coze', match: '/coze', label: '智能体' },
-      { href: '#/ai', match: '/ai', label: 'AI资源' },
-      { href: '#/manju', match: '/manju', label: '漫剧' },
-      { href: '#/ardot', match: '/ardot', label: '聚合监控' },
-    ],
-  },
-]
-
-/** 单一导航：一级只保留高频入口，个人空间与工具箱收进下拉 */
+/** 单一导航：全量一级平铺（低频入口不再收纳进「工具箱」，直接可见，搜索/导航双闭环） */
 const NAV: NavItem[] = [
   { href: '#/feed', match: '/feed', label: '首页', icon: '🏠' },
   { href: '#/articles', match: '/article', label: '文章', icon: '📝' },
@@ -118,7 +90,19 @@ const NAV: NavItem[] = [
       { href: '#/mall/wallet', match: '/mall/wallet', label: '钱包' },
     ],
   },
-  { href: '#', match: '/__toolbox__', label: '工具箱', icon: '🧰', groups: TOOLBOX_GROUPS },
+  { href: '#/vip', match: '/vip', label: 'VIP 会员', icon: '👑' },
+  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻' },
+  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦' },
+  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️' },
+  { href: '#/delivery', match: '/delivery', label: '配送台', icon: '🚚' },
+  { href: '#/price', match: '/price', label: '价格监控', icon: '📈' },
+  { href: '#/nav', match: '/nav', label: '路线导航', icon: '🗺️' },
+  { href: '#/mail', match: '/mail', label: '邮箱', icon: '📬' },
+  { href: '#/bom', match: '/bom', label: 'BOM 工具台', icon: '🖥️' },
+  { href: '#/coze', match: '/coze', label: '智能体', icon: '🤖' },
+  { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚' },
+  { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬' },
+  { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -156,9 +140,8 @@ function SideNav() {
   /* 路由变化后自动展开包含当前页的分组 */
   useEffect(() => {
     for (const item of NAV) {
-      if (!item.children && !item.groups) continue
-      const kids = item.groups ? item.groups.flatMap((g) => g.items) : (item.children ?? [])
-      if (path.startsWith(item.match) || kids.some((k) => path.startsWith(k.match))) {
+      if (!item.children) continue
+      if (path.startsWith(item.match) || item.children.some((k) => path.startsWith(k.match))) {
         setOpen(item.label)
         return
       }
@@ -174,7 +157,7 @@ function SideNav() {
             item.badgeKey === 'notif' ? api.unreadNotifications : item.badgeKey === 'msg' ? api.unreadMessages : 0
 
           /* 无子项：普通链接 */
-          if (!item.children && !item.groups) {
+          if (!item.children) {
             return (
               <a
                 key={item.label}
@@ -189,8 +172,7 @@ function SideNav() {
           }
 
           /* 有子项：手风琴分组 */
-          const kids = item.groups ? item.groups.flatMap((g) => g.items) : (item.children ?? [])
-          const active = path.startsWith(item.match) || kids.some((k) => path.startsWith(k.match))
+          const active = path.startsWith(item.match) || item.children.some((k) => path.startsWith(k.match))
           const expanded = open === item.label
           return (
             <div key={item.label} className="sidenav-group">
@@ -204,30 +186,15 @@ function SideNav() {
               </button>
               {expanded && (
                 <div className="sidenav-sub">
-                  {item.groups
-                    ? item.groups.map((g) => (
-                        <div key={g.title}>
-                          <div className="sidenav-sub-title">{g.title}</div>
-                          {g.items.map((k) => (
-                            <a
-                              key={k.match}
-                              href={k.href}
-                              className={cx('sidenav-link sidenav-sub-link', path.startsWith(k.match) && 'active')}
-                            >
-                              {k.label}
-                            </a>
-                          ))}
-                        </div>
-                      ))
-                    : item.children?.map((k) => (
-                        <a
-                          key={k.match}
-                          href={k.href}
-                          className={cx('sidenav-link sidenav-sub-link', path.startsWith(k.match) && 'active')}
-                        >
-                          {k.label}
-                        </a>
-                      ))}
+                  {item.children.map((k) => (
+                    <a
+                      key={k.match}
+                      href={k.href}
+                      className={cx('sidenav-link sidenav-sub-link', path.startsWith(k.match) && 'active')}
+                    >
+                      {k.label}
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
@@ -302,6 +269,10 @@ function Page() {
       if (param === 'wallet') return <MallWalletPage />
       return <MallHomePage />
     }
+
+    /* ---------- 商业化 ---------- */
+    case 'vip':
+      return <VipCenterPage />
 
     /* ---------- 工具台 ---------- */
     case 'delivery':

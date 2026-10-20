@@ -28,6 +28,7 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/mall/cart', name: '购物车', icon: '🛒', keywords: ['购物车', 'cart'], group: '商城' },
   { href: '#/mall/orders', name: '我的订单', icon: '📋', keywords: ['订单', '物流'], group: '商城' },
   { href: '#/mall/wallet', name: '钱包', icon: '💰', keywords: ['钱包', '余额', '账单'], group: '商城' },
+  { href: '#/vip', name: 'VIP 会员', icon: '👑', keywords: ['vip', '会员', '订阅', '权益'], group: '商城' },
   /* ---- 工具台 ---- */
   { href: '#/delivery', name: '配送调度台', icon: '🚚', keywords: ['配送', '调度', '物流', '快递'], group: '工具台' },
   { href: '#/price', name: '价格监控', icon: '📈', keywords: ['价格', '监控', '比价'], group: '工具台' },
