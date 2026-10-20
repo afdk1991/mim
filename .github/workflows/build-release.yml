@@ -68,6 +68,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ runner.temp }}/mim.key
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          # vite build 由 beforeBuildCommand 触发，env 经此透传进前端产物
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Mim ${{ github.ref_name }}'
@@ -97,6 +100,9 @@ jobs:
           npm install --no-fund --no-audit --legacy-peer-deps
       - name: 构建 Web 资产
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - name: 还原签名 keystore
         shell: bash
         run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/mim.keystore"
@@ -133,6 +139,9 @@ jobs:
           npm install --no-fund --no-audit --legacy-peer-deps
       - name: 构建 Web 资产
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - name: 同步 Capacitor iOS 工程
         run: npx cap sync ios
       - name: 模拟器构建（CODE_SIGNING_ALLOWED=NO）

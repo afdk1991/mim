@@ -126,7 +126,7 @@ create table if not exists public.topics (
   id   text primary key default gen_random_uuid()::text,
   name text not null unique,
   heat int not null default 0,
-  desc text not null default ''
+  "desc" text not null default ''
 );
 
 create table if not exists public.hot_searches (

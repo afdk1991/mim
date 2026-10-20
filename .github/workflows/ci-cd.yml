@@ -40,6 +40,10 @@ jobs:
 
       - name: 构建
         run: npm run build
+        env:
+          # Supabase 云凭证（未配置时 supabase client 为 null，回退纯本地）
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -133,6 +137,10 @@ jobs:
 
       - name: 构建
         run: npm run build
+        env:
+          # Supabase 云凭证（未配置时 supabase client 为 null，回退纯本地）
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: 发布
         run: npm publish
