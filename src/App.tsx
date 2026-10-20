@@ -41,6 +41,8 @@ import { GexmPage } from './gexm'
 import { ArdotPage } from './ardot'
 import { MallProvider } from './mall/store'
 import { MallHomePage } from './mall/MallHome'
+import { MallGoodsPage } from './mall/MallGoods'
+import { MallCartPage } from './mall/MallCart'
 import { clearHistory, cx, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 
@@ -114,7 +116,10 @@ const NAV: NavItem[] = [
     match: '/mall',
     label: '商城',
     icon: '🛒',
-    children: [{ href: '#/mall', match: '/mall', label: '商城中心' }],
+    children: [
+      { href: '#/mall', match: '/mall', label: '商城中心' },
+      { href: '#/mall/cart', match: '/mall/cart', label: '购物车' },
+    ],
   },
   { href: '#', match: '/__toolbox__', label: '工具箱', icon: '🧰', groups: TOOLBOX_GROUPS },
 ]
@@ -318,8 +323,11 @@ function Page() {
       return <TagsPage />
 
     /* ---------- 商城中台 ---------- */
-    case 'mall':
+    case 'mall': {
+      if (param === 'goods') return <MallGoodsPage id={segs[2] ?? ''} />
+      if (param === 'cart') return <MallCartPage />
       return <MallHomePage />
+    }
 
     /* ---------- 工具台 ---------- */
     case 'delivery':

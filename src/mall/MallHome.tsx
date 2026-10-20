@@ -32,7 +32,7 @@ export function MallHomePage() {
               <b className="myhub-asset-value">{state.points}</b>
               <small>积分</small>
             </a>
-            <a className="myhub-asset" href="#/mall">
+            <a className="myhub-asset" href="#/mall/cart">
               <span className="myhub-asset-emoji">🧺</span>
               <b className="myhub-asset-value">{cartCount}</b>
               <small>购物车</small>
@@ -56,7 +56,7 @@ export function MallHomePage() {
         ) : (
           <div className="mall-grid">
             {goods.map((g) => (
-              <div key={g.id} className="card mall-goods">
+              <a key={g.id} className="card mall-goods" href={`#/mall/goods/${g.id}`}>
                 <div className="mall-goods-emoji">{g.emoji}</div>
                 <b className="mall-goods-title">{g.title}</b>
                 <div className="mall-goods-desc">{g.desc}</div>
@@ -67,7 +67,7 @@ export function MallHomePage() {
                 <span className="tag mall-goods-cat">
                   {MALL_CHANNEL_META[g.channel].emoji} {MALL_CHANNEL_META[g.channel].label}
                 </span>
-              </div>
+              </a>
             ))}
           </div>
         )}

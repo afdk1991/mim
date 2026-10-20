@@ -3061,3 +3061,165 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   margin-right: 0;
   align-self: flex-start;
 }
+
+/* ---------- 商城详情 / 购物车 ---------- */
+
+.mall-back {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 4px 0 10px;
+}
+
+.mall-back:hover {
+  color: var(--primary);
+}
+
+.mall-detail {
+  display: flex;
+  gap: 18px;
+}
+
+.mall-detail-emoji {
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  background: linear-gradient(135deg, var(--primary-weak), var(--bg));
+  border-radius: 12px;
+  user-select: none;
+}
+
+.mall-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mall-detail-info h2 {
+  margin: 8px 0 4px;
+  font-size: 18px;
+}
+
+.mall-detail-info .mall-goods-price {
+  margin: 8px 0;
+}
+
+.mall-detail-info .mall-goods-price b {
+  font-size: 20px;
+}
+
+.mall-qty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.mall-qty b {
+  min-width: 28px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.mall-detail-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mall-cart-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mall-cart-row:last-child {
+  border-bottom: none;
+}
+
+.mall-cart-emoji {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  background: linear-gradient(135deg, var(--primary-weak), var(--bg));
+  border-radius: 10px;
+  user-select: none;
+}
+
+.mall-cart-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mall-cart-info small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.mall-cart-sub {
+  color: var(--danger);
+}
+
+.mall-cart-ops {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mall-cart-ops b {
+  min-width: 24px;
+  text-align: center;
+}
+
+.mall-cart-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mall-cart-bar .muted {
+  flex: 1;
+}
+
+.mall-cart-total {
+  color: var(--danger);
+  font-size: 16px;
+}
+
+.mall-cart-warn {
+  color: var(--danger);
+  font-size: 12px;
+  width: 100%;
+}
+
+.mall-cart-empty-go {
+  text-align: center;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .mall-detail {
+    flex-direction: column;
+  }
+
+  .mall-detail-emoji {
+    width: 100%;
+    height: 160px;
+  }
+}
