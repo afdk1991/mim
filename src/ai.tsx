@@ -5,7 +5,7 @@ import { cx, uid } from './utils'
 
 /* ============================================================
  * AI 可转载资源库 —— 重新开发自合并源码 ai-server-resources（可转载资源清单站）
- * 纯前端 mock：资源库（分类/许可筛选+搜索）/ 资源详情 / 转载合规自查 / 收藏与 Markdown 导出
+ * 纯前端 mock：资源库（分类/许可筛选）/ 资源详情 / 转载合规自查 / 收藏与 Markdown 导出
  * 母本为纯静态多页站点，此处重实现为单页内视图切换；母本「精选 21 项与全量库数据割裂」
  * 的缺陷在此收敛为单一数据源，署名模板改为按许可等级自动生成。
  * ============================================================ */
@@ -528,7 +528,6 @@ export function AiResPage() {
   const [view, setView] = useState<View>('lib')
   const [from, setFrom] = useState<View>('lib')
   const [selId, setSelId] = useState('')
-  const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')
   const [level, setLevel] = useState<Level | 'all'>('all')
 
@@ -547,16 +546,10 @@ export function AiResPage() {
 
   const list = useMemo(
     () =>
-      RESOURCES.filter((r) => {
-        if (cat !== 'all' && r.cat !== cat) return false
-        if (level !== 'all' && r.level !== level) return false
-        if (q.trim()) {
-          const kw = q.trim().toLowerCase()
-          if (!(r.name + r.desc + r.type + r.who).toLowerCase().includes(kw)) return false
-        }
-        return true
-      }),
-    [q, cat, level],
+      RESOURCES.filter(
+        (r) => (cat === 'all' || r.cat === cat) && (level === 'all' || r.level === level),
+      ),
+    [cat, level],
   )
 
   const favList = useMemo(() => state.favs.map((id) => RESOURCES.find((r) => r.id === id)).filter((r): r is ResItem => !!r), [state.favs])
@@ -617,7 +610,6 @@ export function AiResPage() {
     }
     setState(seedState())
     setView('lib')
-    setQ('')
     setCat('all')
     setLevel('all')
     toast('♻️ 演示数据已重置')
@@ -734,13 +726,6 @@ export function AiResPage() {
             </div>
 
             <div className="card ai-toolbar">
-              <input
-                className="input"
-                type="search"
-                value={q}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-                placeholder="搜索资源名称、类型、内容或适合人群…"
-              />
               <div className="ai-chips">
                 {['all'].concat(CATEGORIES.map((c) => c.key)).map((key) => (
                   <button className={cx('ai-chip', cat === key && 'on')} key={key} onClick={() => setCat(key)}>
@@ -763,11 +748,10 @@ export function AiResPage() {
               <div className="card">
                 <div className="empty">
                   <div className="empty-emoji">🔍</div>
-                  <p>没有匹配的资源，换个关键词或筛选条件试试</p>
+                  <p>当前筛选条件下没有资源</p>
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
-                      setQ('')
                       setCat('all')
                       setLevel('all')
                     }}

@@ -451,7 +451,6 @@ export function MessagesPage() {
   const api = useApp()
   const { query, navigate } = useRouter()
   const [input, setInput] = useState('')
-  const [kw, setKw] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const conversations = useMemo(() => {
@@ -470,18 +469,6 @@ export function MessagesPage() {
       }))
       .sort((a, b) => b.last.createdAt - a.last.createdAt)
   }, [api.state.messages])
-
-  const kws = kw.trim().toLowerCase()
-  const shown = kws
-    ? conversations.filter((c) => {
-        const u = api.user(c.userId)
-        return (
-          u.name.toLowerCase().includes(kws) ||
-          c.userId.toLowerCase().includes(kws) ||
-          c.msgs.some((m) => m.content.toLowerCase().includes(kws))
-        )
-      })
-    : conversations
 
   const activeId = query.get('with') ?? conversations[0]?.userId
   const active = conversations.find((c) => c.userId === activeId)
@@ -506,15 +493,7 @@ export function MessagesPage() {
     <div className="page-grid single">
       <div className="msg-layout">
         <div className="msg-list">
-          <input
-            className="input"
-            style={{ marginBottom: 8 }}
-            placeholder="🔍 搜索会话或消息内容…"
-            value={kw}
-            onChange={(e) => setKw(e.target.value)}
-          />
-          {shown.length === 0 && <Empty emoji="🔍" text="没有匹配的会话" />}
-          {shown.map((c) => {
+          {conversations.map((c) => {
             const u = api.user(c.userId)
             return (
               <div

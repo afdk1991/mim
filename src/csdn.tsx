@@ -462,22 +462,13 @@ export function SnippetsPage() {
   const toast = useToast()
   const { auth } = useAuth()
   const [lang, setLang] = useState<string | null>(null)
-  const [q, setQ] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [language, setLanguage] = useState('TypeScript')
   const [code, setCode] = useState('')
 
-  const kw = q.trim().toLowerCase()
-  const list = api.state.snippets.filter(
-    (s) =>
-      (!lang || s.language === lang) &&
-      (!kw ||
-        s.title.toLowerCase().includes(kw) ||
-        s.code.toLowerCase().includes(kw) ||
-        s.language.toLowerCase().includes(kw)),
-  )
+  const list = api.state.snippets.filter((s) => !lang || s.language === lang)
 
   const copyCode = (id: string, code: string) => {
     const done = () => {
@@ -525,13 +516,6 @@ export function SnippetsPage() {
           <span style={{ flex: 1 }} />
           <button className="btn btn-primary btn-sm" onClick={() => setOpen(true)}>+ 新建片段</button>
         </div>
-        <input
-          className="input"
-          style={{ marginBottom: 12 }}
-          placeholder="搜索片段标题、代码或语言…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
         <div className="card tag-chips" style={{ marginBottom: 12 }}>
           <span className={cx('chip', !lang && 'active')} onClick={() => setLang(null)}>全部</span>
           {[...new Set(api.state.snippets.map((s) => s.language))].map((l) => (
@@ -622,30 +606,14 @@ export function ResourcesPage() {
   const toast = useToast()
   const categories = [...new Set(api.state.resources.map((r) => r.category))]
   const [cat, setCat] = useState<string | null>(null)
-  const [q, setQ] = useState('')
   const [sort, setSort] = useState<'default' | 'downloads' | 'name'>('default')
-  const kw = q.trim().toLowerCase()
-  let list = api.state.resources.filter(
-    (r) =>
-      (!cat || r.category === cat) &&
-      (!kw ||
-        r.title.toLowerCase().includes(kw) ||
-        r.description.toLowerCase().includes(kw) ||
-        r.uploader.toLowerCase().includes(kw)),
-  )
+  let list = api.state.resources.filter((r) => !cat || r.category === cat)
   if (sort === 'downloads') list = [...list].sort((a, b) => b.downloads - a.downloads)
   else if (sort === 'name') list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'zh'))
 
   return (
     <div className="page-grid single">
       <div>
-        <input
-          className="input"
-          style={{ marginBottom: 12 }}
-          placeholder="搜索资源标题、描述或上传者…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
         <div className="card tag-chips" style={{ marginBottom: 12 }}>
           <span className={cx('chip', !cat && 'active')} onClick={() => setCat(null)}>全部</span>
           {categories.map((c) => (
@@ -657,13 +625,13 @@ export function ResourcesPage() {
           <button className={cx('tab-btn', sort === 'downloads' && 'active')} onClick={() => setSort('downloads')}>🔥 下载最多</button>
           <button className={cx('tab-btn', sort === 'name' && 'active')} onClick={() => setSort('name')}>🔤 名称</button>
         </div>
-        {list.length === 0 && <Empty emoji="📦" text={kw ? '没有匹配的资源，换个关键词试试' : '该分类下暂无资源'} />}
+        {list.length === 0 && <Empty emoji="📦" text="该分类下暂无资源" />}
         {list.map((r) => (
           <div key={r.id} className="card res-row">
             <span className={`res-icon t-${r.type}`}>{RES_ICONS[r.type] ?? '📦'}</span>
             <div className="res-main">
-              <b><Highlight text={r.title} kw={q.trim()} /></b>
-              <p><Highlight text={r.description} kw={q.trim()} /></p>
+              <b>{r.title}</b>
+              <p>{r.description}</p>
               <p>上传者：{r.uploader}</p>
             </div>
             <div className="res-meta">
@@ -687,17 +655,6 @@ export function ResourcesPage() {
 }
 
 /* ================= 7. SearchPage 搜索 ================= */
-
-const HISTORY_KEY = 'mim-search-history'
-
-function loadHistory(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
-    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
-  } catch {
-    return []
-  }
-}
 
 function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -723,35 +680,10 @@ function Highlight({ text, kw }: { text: string; kw: string }) {
 
 export function SearchPage() {
   const api = useApp()
-  const { query: routeQuery, navigate } = useRouter()
-  const [q, setQ] = useState(routeQuery.get('q') ?? '')
+  const { query: routeQuery } = useRouter()
   const [tab, setTab] = useState('all')
-  const [history, setHistory] = useState<string[]>(loadHistory)
-
-  useEffect(() => {
-    setQ(routeQuery.get('q') ?? '')
-  }, [routeQuery])
-
-  const saveHistory = (t: string) => {
-    setHistory((h) => {
-      const next = [t, ...h.filter((x) => x !== t)].slice(0, 8)
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
-      return next
-    })
-  }
-  const removeHistory = (t: string) => {
-    setHistory((h) => {
-      const next = h.filter((x) => x !== t)
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
-      return next
-    })
-  }
-  const clearHistory = () => {
-    setHistory([])
-    localStorage.removeItem(HISTORY_KEY)
-  }
-
-  const kw = q.trim().toLowerCase()
+  const raw = routeQuery.get('q') ?? ''
+  const kw = raw.trim().toLowerCase()
   const results = useMemo(() => {
     if (!kw) return { posts: [], articles: [], users: [], snippets: [] }
     return {
@@ -778,75 +710,11 @@ export function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kw, api.state.posts, api.state.articles, api.state.users, api.state.snippets])
 
-  const doSearch = () => {
-    const t = q.trim()
-    if (!t) return
-    saveHistory(t)
-    navigate(`/search?q=${encodeURIComponent(t)}`)
-  }
-
-  /** 从历史/热搜词直接发起搜索 */
-  const go = (text: string) => {
-    setQ(text)
-    saveHistory(text)
-    navigate(`/search?q=${encodeURIComponent(text)}`)
-  }
-
   const hasAny = results.posts.length + results.articles.length + results.users.length + results.snippets.length > 0
 
   return (
     <div className="page-grid single">
       <div>
-        <div className="search-bar">
-          <input
-            className="input"
-            placeholder="搜索动态 / 文章 / 用户 / 代码片段…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-          />
-          <button className="btn btn-primary" onClick={doSearch}>🔍 搜索</button>
-        </div>
-
-        {!kw && (
-          <div className="card" style={{ padding: 14 }}>
-            {history.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="search-hist-head">
-                  <b style={{ fontSize: 14 }}>🕘 搜索历史</b>
-                  <button className="icon-btn" style={{ fontSize: 12 }} onClick={clearHistory}>清空</button>
-                </div>
-                <div className="chip-row">
-                  {history.map((h) => (
-                    <span key={h} className="chip hist-chip" onClick={() => go(h)}>
-                      {h}
-                      <button
-                        type="button"
-                        className="hist-del"
-                        aria-label={`删除历史 ${h}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeHistory(h)
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div>
-              <b style={{ fontSize: 14 }}>🔥 热门搜索</b>
-              <div className="chip-row" style={{ marginTop: 10 }}>
-                {api.state.hotSearches.slice(0, 8).map((h) => (
-                  <span key={h.id} className="chip" onClick={() => go(h.text)}>{h.text}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="tabs">
           {[
             { key: 'all', label: `综合` },
@@ -863,7 +731,7 @@ export function SearchPage() {
 
         {!kw && <Empty emoji="🔎" text="输入关键词开始搜索" />}
 
-        {kw && !hasAny && <Empty emoji="🕳" text={`没有找到与「${q}」相关的内容`} />}
+        {kw && !hasAny && <Empty emoji="🕳" text={`没有找到与「${raw}」相关的内容`} />}
 
         {kw && hasAny && (
           <>

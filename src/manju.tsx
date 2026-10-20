@@ -254,8 +254,6 @@ function MjLoading({ text = '加载中…' }: { text?: string }) {
 /* ================= 首页 ================= */
 
 function HomeView(props: {
-  query: string;
-  onQuery: (q: string) => void;
   cont: MjContRow[];
   favorites: MjSeries[];
   seenList: string[];
@@ -264,12 +262,6 @@ function HomeView(props: {
   onContinue: (sid: string, eid: string) => void;
   onOpenExt: () => void;
 }) {
-  const q = props.query.trim();
-  const results = useMemo(
-    () => (q ? SEED.filter((s) => s.title.includes(q) || s.tags.some((t) => t.includes(q))) : []),
-    [q],
-  );
-
   return (
     <>
       <div className="manju-hero">
@@ -277,34 +269,7 @@ function HomeView(props: {
         <p>竖屏漫剧在线观影 · 站内片库（含原创 AI 剧）+ 外部片单解析（演示数据）</p>
       </div>
 
-      <div className="manju-search-row">
-        <input
-          className="input manju-search"
-          placeholder="搜索剧名或题材，如「逆袭」「古装」"
-          value={props.query}
-          onChange={(e) => props.onQuery(e.target.value)}
-        />
-      </div>
-
-      {q ? (
-        <>
-          <div className="manju-section-head">
-            <h3>搜索结果</h3>
-            <span className="muted">{results.length} 部</span>
-          </div>
-          {results.length === 0 ? (
-            <div className="manju-empty">🔍 没有找到与「{q}」相关的剧集，换个关键词试试</div>
-          ) : (
-            <div className="manju-grid">
-              {results.map((s) => (
-                <MjCard key={s.id} s={s} seen={props.seenList.includes(s.id)} onOpen={() => props.onOpen(s.id)} />
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          {props.cont.length > 0 && (
+      {props.cont.length > 0 && (
             <>
               <div className="manju-section-head">
                 <h3>继续观看</h3>
@@ -379,8 +344,6 @@ function HomeView(props: {
             </div>
             <span className="manju-ext-arrow">›</span>
           </div>
-        </>
-      )}
     </>
   );
 }
@@ -643,7 +606,6 @@ export function ManjuPage() {
   const toast = useToast();
   const [state, setState] = useState<MjState>(loadManju);
   const [view, setView] = useState<MjView>({ kind: 'home' });
-  const [query, setQuery] = useState('');
   const [results, setResults] = useState<Record<string, MjPlayResult>>({});
   const [resolving, setResolving] = useState<Record<string, boolean>>({});
 
@@ -735,7 +697,6 @@ export function ManjuPage() {
     }
     setState(seedState());
     setView({ kind: 'home' });
-    setQuery('');
     setResults({});
     setResolving({});
     toast('已恢复演示种子数据');
@@ -803,8 +764,6 @@ export function ManjuPage() {
     }
     return (
       <HomeView
-        query={query}
-        onQuery={setQuery}
         cont={cont}
         favorites={favSeries}
         seenList={state.seen}

@@ -86,7 +86,6 @@ export function EmailHubPage() {
   const toast = useToast()
   const [state, setState] = useState<EmailState>(loadEmail)
   const [filter, setFilter] = useState<string>('all')
-  const [q, setQ] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
 
@@ -100,13 +99,13 @@ export function EmailHubPage() {
   const totalUnread = mails.filter((m) => !m.read).length
   const starredCount = mails.filter((m) => m.starred).length
 
-  const list = useMemo(() => {
-    const kw = q.trim().toLowerCase()
-    return mails
-      .filter((m) => filter === 'all' || m.accountId === filter)
-      .filter((m) => !kw || m.subject.toLowerCase().includes(kw) || m.from.toLowerCase().includes(kw) || m.body.join('\n').toLowerCase().includes(kw))
-      .sort((a, b) => b.at - a.at)
-  }, [mails, filter, q])
+  const list = useMemo(
+    () =>
+      mails
+        .filter((m) => filter === 'all' || m.accountId === filter)
+        .sort((a, b) => b.at - a.at),
+    [mails, filter],
+  )
 
   const selected = selectedId ? mails.find((m) => m.id === selectedId) ?? null : null
 
@@ -169,7 +168,6 @@ export function EmailHubPage() {
             ))}
           </div>
           <div className="board-toolbar" style={{ marginTop: 10 }}>
-            <input className="input" style={{ flex: 1, minWidth: 180 }} placeholder="搜索主题、发件人或正文…" value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="toolbar-actions">
               <button className="btn btn-primary btn-sm" onClick={recvNew}>📮 模拟新邮件</button>
             </div>
