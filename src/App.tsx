@@ -43,6 +43,8 @@ import { MallProvider } from './mall/store'
 import { MallHomePage } from './mall/MallHome'
 import { MallGoodsPage } from './mall/MallGoods'
 import { MallCartPage } from './mall/MallCart'
+import { MallOrdersPage } from './mall/MallOrders'
+import { MallWalletPage } from './mall/MallWallet'
 import { clearHistory, cx, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 
@@ -119,6 +121,8 @@ const NAV: NavItem[] = [
     children: [
       { href: '#/mall', match: '/mall', label: '商城中心' },
       { href: '#/mall/cart', match: '/mall/cart', label: '购物车' },
+      { href: '#/mall/orders', match: '/mall/orders', label: '订单' },
+      { href: '#/mall/wallet', match: '/mall/wallet', label: '钱包' },
     ],
   },
   { href: '#', match: '/__toolbox__', label: '工具箱', icon: '🧰', groups: TOOLBOX_GROUPS },
@@ -326,6 +330,8 @@ function Page() {
     case 'mall': {
       if (param === 'goods') return <MallGoodsPage id={segs[2] ?? ''} />
       if (param === 'cart') return <MallCartPage />
+      if (param === 'orders') return <MallOrdersPage />
+      if (param === 'wallet') return <MallWalletPage />
       return <MallHomePage />
     }
 

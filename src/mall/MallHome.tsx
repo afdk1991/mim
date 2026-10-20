@@ -22,12 +22,12 @@ export function MallHomePage() {
 
         <div className="card myhub-card">
           <div className="myhub-assets">
-            <a className="myhub-asset" href="#/mall">
+            <a className="myhub-asset" href="#/mall/wallet">
               <span className="myhub-asset-emoji">💰</span>
               <b className="myhub-asset-value">¥{state.wallet}</b>
               <small>钱包余额</small>
             </a>
-            <a className="myhub-asset" href="#/mall">
+            <a className="myhub-asset" href="#/mall/wallet">
               <span className="myhub-asset-emoji">🪙</span>
               <b className="myhub-asset-value">{state.points}</b>
               <small>积分</small>

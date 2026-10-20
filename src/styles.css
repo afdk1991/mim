@@ -3223,3 +3223,105 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     height: 160px;
   }
 }
+
+/* ---------- 订单中心 / 钱包 ---------- */
+
+.mall-order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mall-order-emoji {
+  font-size: 30px;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-weak), var(--bg));
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.mall-order-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mall-order-info small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.mall-order-amount {
+  color: var(--primary);
+}
+
+.mall-order-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.mall-order-status {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 4px;
+}
+
+.mall-order-unpaid {
+  background: rgba(230, 67, 64, 0.12);
+  color: var(--danger);
+}
+
+.mall-order-paid {
+  background: var(--primary-weak);
+  color: var(--primary);
+}
+
+.mall-order-done {
+  background: var(--bg);
+  color: var(--text-3);
+}
+
+.mall-wallet-card {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.mall-wallet-balance small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.mall-wallet-balance b {
+  font-size: 30px;
+  color: var(--primary);
+}
+
+.mall-wallet-points {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mall-wallet-points small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.mall-wallet-amounts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
