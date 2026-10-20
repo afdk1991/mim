@@ -29,6 +29,11 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/mall/orders', name: '我的订单', icon: '📋', keywords: ['订单', '物流'], group: '商城' },
   { href: '#/mall/wallet', name: '钱包', icon: '💰', keywords: ['钱包', '余额', '账单'], group: '商城' },
   { href: '#/vip', name: 'VIP 会员', icon: '👑', keywords: ['vip', '会员', '订阅', '权益'], group: '商城' },
+  { href: '#/mall/youxuan', name: '优选商城', icon: '🎁', keywords: ['优选', '好物', 'youxuan'], group: '商城' },
+  { href: '#/mall/live', name: '直播带货', icon: '📺', keywords: ['直播', '带货', '尖货'], group: '商城' },
+  { href: '#/mall/mix', name: '本地生活', icon: '🍜', keywords: ['本地生活', '火锅', '洗车', '电影票'], group: '商城' },
+  { href: '#/mall/laal', name: '出行服务', icon: '🚗', keywords: ['代驾', '接送', '出行', '机场'], group: '商城' },
+  { href: '#/mall/gexm', name: '秒杀特惠', icon: '⚡', keywords: ['秒杀', '特惠', '折扣', 'gexm'], group: '商城' },
   /* ---- 工具台 ---- */
   { href: '#/delivery', name: '配送调度台', icon: '🚚', keywords: ['配送', '调度', '物流', '快递'], group: '工具台' },
   { href: '#/price', name: '价格监控', icon: '📈', keywords: ['价格', '监控', '比价'], group: '工具台' },

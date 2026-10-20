@@ -35,11 +35,12 @@ import { CozePanelPage } from './coze'
 import { AiResPage } from './ai'
 import { ManjuPage } from './manju'
 import { ArdotPage } from './ardot'
-import { MallProvider } from './mall/store'
+import { MallProvider, MALL_CHANNEL_META, type MallChannel } from './mall/store'
 import { AuthProvider, useAuth } from './auth'
 import { matchSearchPages } from './search-index'
 import { VipCenterPage } from './vip'
 import { LoginPage } from './login'
+import { InfoPage } from './info'
 import { MallHomePage } from './mall/MallHome'
 import { MallGoodsPage } from './mall/MallGoods'
 import { MallCartPage } from './mall/MallCart'
@@ -104,6 +105,11 @@ const NAV: NavItem[] = [
   { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚' },
   { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬' },
   { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊' },
+  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️' },
+  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺' },
+  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜' },
+  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗' },
+  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -266,6 +272,7 @@ function SideNav() {
             </div>
           )
         })}
+        <SiteFooter />
       </nav>
       <div className="sidenav-foot">
         <span className="sidenav-version" title="Mim 版本号">
@@ -327,9 +334,15 @@ function Page() {
     case 'login':
       return <LoginPage />
 
+    /* ---------- 站点信息落地页 ---------- */
+    case 'info':
+      return param ? <InfoPage slug={param} /> : <Empty emoji="📄" text="请从页脚选择要查看的信息" />
+
     /* ---------- 商城中台 ---------- */
     case 'mall': {
       if (param === 'goods') return <MallGoodsPage id={segs[2] ?? ''} />
+      /* 频道直达：#/mall/youxuan 等五个频道子路径 → 商城中心预选频道 */
+      if (param && param in MALL_CHANNEL_META) return <MallHomePage initial={param as MallChannel} />
       if (param === 'cart') return <MallCartPage />
       if (param === 'orders') return <MallOrdersPage />
       if (param === 'wallet') return <MallWalletPage />
@@ -824,6 +837,82 @@ function WbHero() {
         )}
       </div>
     </header>
+  )
+}
+
+/* ---------- 全站页脚（联系我们 / 站点链接 / 友情链接 / 备案资质 / 版权） ---------- */
+
+function SiteFooter() {
+  return (
+    <footer className="site-footer">
+      <div className="site-footer-in">
+        <div className="site-footer-contact">
+          <b>联系我们</b>
+          <p>工作时间：8:30 - 22:00</p>
+          <p>
+            客服电话：<a href="tel:4006600108">400-660-0108</a>
+          </p>
+          <p>
+            <a href="mailto:kefu@csdn.net">kefu@csdn.net</a> · <a href="#/mail">在线客服</a>
+          </p>
+        </div>
+
+        <div className="site-footer-links">
+          <a href="#/info/about">关于我们</a>
+          <a href="#/info/join">招贤纳士</a>
+          <a href="#/info/coop">商务合作</a>
+          <a href="#/info/media">寻求报道</a>
+          <a href="#/info/terms">协议专区</a>
+        </div>
+
+        <div className="site-footer-block">
+          <b className="site-footer-title">友情链接</b>
+          <div className="site-footer-links">
+            <a href="https://www.vcg.com" target="_blank" rel="noreferrer">视觉中国</a>
+            <a href="https://500px.com.cn" target="_blank" rel="noreferrer">500px</a>
+            <a href="https://www.zhipin.com" target="_blank" rel="noreferrer">直聘网</a>
+            <a href="https://www.uisdc.com" target="_blank" rel="noreferrer">优设网</a>
+            <a href="https://wenku.csdn.net" target="_blank" rel="noreferrer">CSDN文库</a>
+            <a href="https://download.csdn.net" target="_blank" rel="noreferrer">CSDN下载</a>
+            <a href="https://ask.csdn.net" target="_blank" rel="noreferrer">CSDN问答</a>
+          </div>
+        </div>
+
+        <div className="site-footer-beian">
+          <p>
+            <a href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">京ICP备19004658号</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/op-beian">经营性网站备案信息</a>
+            <i className="site-footer-sep">|</i>
+            <a href="https://beian.mps.gov.cn" target="_blank" rel="noreferrer">公安备案号11010502030143</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/license">营业执照</a>
+          </p>
+          <p>
+            <a href="#/info/bj-report">北京互联网违法和不良信息举报中心</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/parent">家长监护</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/cn-report">中国互联网举报中心</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/police110">网络110报警服务</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/chrome">Chrome商店下载</a>
+          </p>
+          <p>
+            <a href="#/info/account-rules">账号管理规范</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/disclaimer">版权与免责声明</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/appeal">版权申诉</a>
+            <i className="site-footer-sep">|</i>
+            <a href="#/info/publish-license">出版物许可证</a>
+          </p>
+        </div>
+
+        <p className="site-footer-copy">©1999-2026 北京创新乐知网络技术有限公司</p>
+      </div>
+    </footer>
   )
 }
 

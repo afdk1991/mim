@@ -9,9 +9,9 @@ import type { MallChannel } from './store'
 
 type Cat = MallChannel | 'all'
 
-export function MallHomePage() {
+export function MallHomePage({ initial }: { initial?: MallChannel }) {
   const { state } = useMall()
-  const [cat, setCat] = useState<Cat>('all')
+  const [cat, setCat] = useState<Cat>(initial ?? 'all')
   const goods = cat === 'all' ? MALL_GOODS : MALL_GOODS.filter((g) => g.channel === cat)
   const cartCount = state.cart.reduce((n, c) => n + c.qty, 0)
 
