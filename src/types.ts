@@ -140,6 +140,15 @@ export interface ArticleDraft {
   savedAt: number
 }
 
+/** 云端真源 id 集合（轮 4）：写操作仅对这些 id 落云端，seed 演示内容保持纯本地 */
+export interface CloudIds {
+  /** 云端 profiles 的用户 id（关注分流依据） */
+  users: string[]
+  posts: string[]
+  articles: string[]
+  snippets: string[]
+}
+
 export interface AppState {
   meId: string
   users: Record<string, User>
@@ -155,4 +164,6 @@ export interface AppState {
   postDrafts: PostDraft[]
   articleDrafts: ArticleDraft[]
   followingIds: string[]
+  /** 云端真源内容 id 集合（可选字段：旧存档缺失时视为空集，全部走纯本地） */
+  cloudIds?: CloudIds
 }

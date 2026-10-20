@@ -4,9 +4,29 @@
    钱包/订单等钱类数据在 mall 中台按真实身份隔离，内容权限由 can()（permissions.ts）+ reducer ownership 守卫双层兜底。 */
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { createSeedState } from './data/seed'
-import type { AppState, Post, PostComment, Article, User } from './types'
+import type { AppState, Post, PostComment, Article, Snippet, User } from './types'
 import { uid } from './utils'
-import { cloudWritePost, cloudWriteArticle, cloudWriteSnippet } from './lib/cloud-write'
+import {
+  cloudWritePost,
+  cloudWriteArticle,
+  cloudWriteSnippet,
+  cloudWritePostComment,
+  cloudWriteArticleComment,
+  cloudLikePost,
+  cloudLikeComment,
+  cloudLikeArticle,
+  cloudLikeSnippet,
+  cloudDeletePost,
+  cloudDeleteArticle,
+  cloudDeleteSnippet,
+  cloudUpdateArticle,
+  cloudSetFollow,
+  cloudSetFavorite,
+  cloudWriteProfile,
+  type CloudResult,
+} from './lib/cloud-write'
+import { pullCloudContent, type CloudPayload } from './lib/cloud-read'
+import { supabase, cloudEnabled } from './lib/supabase'
 
 const STORAGE_KEY = 'mim-state-v1'
 
@@ -43,6 +63,8 @@ function loadState(): AppState {
         // 兼容旧存档：确保评论数组存在，避免缺字段导致页面崩溃
         parsed.posts = parsed.posts.map((p) => ({ ...p, comments: p.comments ?? [] }))
         parsed.articles = parsed.articles.map((a) => ({ ...a, comments: a.comments ?? [] }))
+        // 兜底：cloudIds 为轮 4 新增可选字段，旧存档缺失时补空集
+        if (!parsed.cloudIds) parsed.cloudIds = { users: [], posts: [], articles: [], snippets: [] }
         return parsed
       }
     }
@@ -56,7 +78,7 @@ type Action =
   | { type: 'publishPost'; payload: { id: string; content: string; topic: string | null; images: string[]; repostOfId: string | null; repostComment: string } }
   | { type: 'deletePost'; payload: string }
   | { type: 'togglePostLike'; payload: string }
-  | { type: 'addPostComment'; payload: { postId: string; content: string } }
+  | { type: 'addPostComment'; payload: { id: string; postId: string; content: string } }
   | { type: 'toggleCommentLike'; payload: { postId: string; commentId: string } }
   | { type: 'toggleFollow'; payload: string }
   | { type: 'readNotification'; payload: string }
@@ -84,6 +106,13 @@ type Action =
   | { type: 'cloudRollbackPost'; payload: string }
   | { type: 'cloudRollbackArticle'; payload: string }
   | { type: 'cloudRollbackSnippet'; payload: string }
+  | { type: 'cloudMark'; payload: { kind: 'posts' | 'articles' | 'snippets'; id: string } }
+  | { type: 'cloudMerge'; payload: CloudPayload }
+  | { type: 'cloudRollbackPostComment'; payload: { postId: string; commentId: string } }
+  | { type: 'cloudRollbackArticleComment'; payload: { articleId: string; commentId: string } }
+  | { type: 'cloudRestorePost'; payload: Post }
+  | { type: 'cloudRestoreArticle'; payload: Article }
+  | { type: 'cloudRestoreSnippet'; payload: Snippet }
   | { type: 'reset' }
 
 function makeSummary(content: string): string {
@@ -95,15 +124,17 @@ function makeSummary(content: string): string {
   return text.slice(0, 72) + (text.length > 72 ? '…' : '')
 }
 
-/* 云端写火后不管（轮 3 写路径）：本地已乐观更新，insert 成功或跳过（未登录/未配置）静默；
-   失败由 cloud-write 层弹提示，此处 dispatch 回滚撤销乐观结果。 */
+/* 云端写火后不管：本地已乐观更新。'ok' → onOk（注册 cloudIds，标记内容此后走云端）；
+   'skip'（未登录/未配置）→ 静默；'fail' → rollback（cloud-write 层已 toast）。 */
 function fireCloudWrite<T>(
-  write: (entity: T) => Promise<boolean>,
+  write: (entity: T) => Promise<CloudResult>,
   entity: T,
+  onOk: () => void,
   rollback: () => void,
 ): void {
-  void write(entity).then((ok) => {
-    if (!ok) rollback()
+  void write(entity).then((r) => {
+    if (r === 'ok') onOk()
+    else if (r === 'fail') rollback()
   })
 }
 
@@ -153,7 +184,7 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'addPostComment': {
       const comment: PostComment = {
-        id: uid('c'),
+        id: action.payload.id,
         authorId: state.meId,
         content: action.payload.content,
         createdAt: Date.now(),
@@ -443,6 +474,102 @@ function reducer(state: AppState, action: Action): AppState {
         snippets: state.snippets.filter((s) => !(s.id === action.payload && s.authorId === state.meId)),
       }
 
+    /* ---- 轮 4 云端读写路径 ---- */
+
+    /* 写成功注册：该 id 此后的写操作分流到云端 */
+    case 'cloudMark': {
+      const { kind, id } = action.payload
+      const prev = state.cloudIds ?? { users: [], posts: [], articles: [], snippets: [] }
+      if (prev[kind].includes(id)) return state
+      return { ...state, cloudIds: { ...prev, [kind]: [id, ...prev[kind]] } }
+    }
+
+    /* 云端读路径合并：云端行覆盖同 id 本地行（乐观行 authorId 矫正为真实档案 id），
+       其余云端行按 createdAt 混排；关注/收藏取并集；cloudIds 并入拉取到的云端 id 全集。 */
+    case 'cloudMerge': {
+      const c = action.payload
+      const postSet = new Set(c.posts.map((p) => p.id))
+      const articleSet = new Set(c.articles.map((a) => a.id))
+      const snippetSet = new Set(c.snippets.map((s) => s.id))
+      // 乐观窗口保护：云端行无评论而本地同 id 行已有评论时保留本地评论
+      const posts = [
+        ...c.posts.map((cp) => {
+          const local = state.posts.find((p) => p.id === cp.id)
+          return local?.comments?.length && !cp.comments?.length ? { ...cp, comments: local.comments } : cp
+        }),
+        ...state.posts.filter((p) => !postSet.has(p.id)),
+      ].sort((a, b) => b.createdAt - a.createdAt)
+      const articles = [
+        ...c.articles.map((ca) => {
+          const local = state.articles.find((a) => a.id === ca.id)
+          return local?.comments.length && !ca.comments.length ? { ...ca, comments: local.comments } : ca
+        }),
+        ...state.articles.filter((a) => !articleSet.has(a.id)),
+      ].sort((a, b) => b.createdAt - a.createdAt)
+      const snippets = [
+        ...c.snippets,
+        ...state.snippets.filter((s) => !snippetSet.has(s.id)),
+      ].sort((a, b) => b.createdAt - a.createdAt)
+      const favKeys = new Set(c.favorites.map((f) => `${f.type}:${f.targetId}`))
+      const favorites = [...c.favorites, ...state.favorites.filter((f) => !favKeys.has(`${f.type}:${f.targetId}`))]
+      const prev = state.cloudIds ?? { users: [], posts: [], articles: [], snippets: [] }
+      return {
+        ...state,
+        users: { ...state.users, ...c.users },
+        posts,
+        articles,
+        snippets,
+        favorites,
+        followingIds: Array.from(new Set([...state.followingIds, ...c.followingIds])),
+        cloudIds: {
+          users: Array.from(new Set([...prev.users, ...Object.keys(c.users)])),
+          posts: Array.from(new Set([...prev.posts, ...postSet])),
+          articles: Array.from(new Set([...prev.articles, ...articleSet])),
+          snippets: Array.from(new Set([...prev.snippets, ...snippetSet])),
+        },
+      }
+    }
+
+    /* 评论写失败回滚：仅移除当前身份刚插入的乐观评论 */
+    case 'cloudRollbackPostComment':
+      return {
+        ...state,
+        posts: state.posts.map((p) =>
+          p.id === action.payload.postId
+            ? { ...p, comments: (p.comments ?? []).filter((cm) => !(cm.id === action.payload.commentId && cm.authorId === state.meId)) }
+            : p,
+        ),
+      }
+
+    case 'cloudRollbackArticleComment':
+      return {
+        ...state,
+        articles: state.articles.map((a) =>
+          a.id === action.payload.articleId
+            ? { ...a, comments: a.comments.filter((cm) => !(cm.id === action.payload.commentId && cm.authorId === state.meId)) }
+            : a,
+        ),
+      }
+
+    /* 删除/编辑云端失败恢复：把操作前快照放回列表 */
+    case 'cloudRestorePost': {
+      const p = action.payload
+      const exists = state.posts.some((x) => x.id === p.id)
+      return { ...state, posts: exists ? state.posts.map((x) => (x.id === p.id ? p : x)) : [p, ...state.posts] }
+    }
+
+    case 'cloudRestoreArticle': {
+      const a = action.payload
+      const exists = state.articles.some((x) => x.id === a.id)
+      return { ...state, articles: exists ? state.articles.map((x) => (x.id === a.id ? a : x)) : [a, ...state.articles] }
+    }
+
+    case 'cloudRestoreSnippet': {
+      const s = action.payload
+      const exists = state.snippets.some((x) => x.id === s.id)
+      return { ...state, snippets: exists ? state.snippets.map((x) => (x.id === s.id ? s : x)) : [s, ...state.snippets] }
+    }
+
     case 'reset':
       return createSeedState()
 
@@ -522,6 +649,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state])
 
+  /* 轮 4 读路径：启动拉取云端内容合并本地；SIGNED_IN（登录成功/会话恢复）时重拉 */
+  useEffect(() => {
+    if (!cloudEnabled || !supabase) return
+    let alive = true
+    const pull = () => {
+      void pullCloudContent().then((payload) => {
+        if (payload && alive) dispatch({ type: 'cloudMerge', payload })
+      })
+    }
+    pull()
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') pull()
+    })
+    return () => {
+      alive = false
+      data.subscription.unsubscribe()
+    }
+  }, [])
+
   const api = useMemo<AppApi>(() => {
     const user = (id: string): User => state.users[id] ?? { ...FALLBACK_USER, id }
     return {
@@ -544,6 +690,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fireCloudWrite(
           cloudWritePost,
           { id, authorId: state.meId, content, images, createdAt: Date.now(), repostOfId: null, repostComment: '', likes: 0, likedByMe: false, reposts: 0, topic, source: '来自 网页版' },
+          () => dispatch({ type: 'cloudMark', payload: { kind: 'posts', id } }),
           () => dispatch({ type: 'cloudRollbackPost', payload: id }),
         )
         return id
@@ -554,15 +701,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fireCloudWrite(
           cloudWritePost,
           { id, authorId: state.meId, content: '', images: [], createdAt: Date.now(), repostOfId: postId, repostComment: comment, likes: 0, likedByMe: false, reposts: 0, topic: null, source: '来自 网页版' },
+          () => dispatch({ type: 'cloudMark', payload: { kind: 'posts', id } }),
           () => dispatch({ type: 'cloudRollbackPost', payload: id }),
         )
         return id
       },
-      deletePost: (id) => dispatch({ type: 'deletePost', payload: id }),
-      togglePostLike: (id) => dispatch({ type: 'togglePostLike', payload: id }),
-      addPostComment: (postId, content) => dispatch({ type: 'addPostComment', payload: { postId, content } }),
-      toggleCommentLike: (postId, commentId) => dispatch({ type: 'toggleCommentLike', payload: { postId, commentId } }),
-      toggleFollow: (id) => dispatch({ type: 'toggleFollow', payload: id }),
+      deletePost: (id) => {
+        const snap = state.posts.find((p) => p.id === id)
+        dispatch({ type: 'deletePost', payload: id })
+        if (snap && state.cloudIds?.posts.includes(id)) {
+          void cloudDeletePost(id).then((ok) => {
+            if (!ok) dispatch({ type: 'cloudRestorePost', payload: snap })
+          })
+        }
+      },
+      togglePostLike: (id) => {
+        const p = state.posts.find((x) => x.id === id)
+        dispatch({ type: 'togglePostLike', payload: id })
+        if (p && state.cloudIds?.posts.includes(id)) {
+          void cloudLikePost(id, !p.likedByMe).then((ok) => {
+            if (!ok) dispatch({ type: 'togglePostLike', payload: id })
+          })
+        }
+      },
+      addPostComment: (postId, content) => {
+        const id = uid('c')
+        dispatch({ type: 'addPostComment', payload: { id, postId, content } })
+        if (state.cloudIds?.posts.includes(postId)) {
+          void cloudWritePostComment(id, postId, content).then((r) => {
+            if (r === 'fail') dispatch({ type: 'cloudRollbackPostComment', payload: { postId, commentId: id } })
+          })
+        }
+      },
+      toggleCommentLike: (postId, commentId) => {
+        const c = state.posts.find((x) => x.id === postId)?.comments?.find((x) => x.id === commentId)
+        dispatch({ type: 'toggleCommentLike', payload: { postId, commentId } })
+        if (c && state.cloudIds?.posts.includes(postId)) {
+          void cloudLikeComment(commentId, !c.likedByMe).then((ok) => {
+            if (!ok) dispatch({ type: 'toggleCommentLike', payload: { postId, commentId } })
+          })
+        }
+      },
+      toggleFollow: (id) => {
+        const wasFollowing = state.followingIds.includes(id)
+        dispatch({ type: 'toggleFollow', payload: id })
+        // 仅云端 profile 用户走云端关注表；seed 演示用户保持纯本地
+        if (state.cloudIds?.users.includes(id)) {
+          void cloudSetFollow(id, !wasFollowing).then((ok) => {
+            if (!ok) dispatch({ type: 'toggleFollow', payload: id })
+          })
+        }
+      },
       readNotification: (id) => dispatch({ type: 'readNotification', payload: id }),
       readAllNotifications: () => dispatch({ type: 'readAllNotifications' }),
       sendMessage: (userId, content) => {
@@ -573,7 +762,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }, 900)
       },
       readConversation: (userId) => dispatch({ type: 'readConversation', payload: userId }),
-      toggleFavorite: (kind, targetId) => dispatch({ type: 'toggleFavorite', payload: { kind, targetId } }),
+      toggleFavorite: (kind, targetId) => {
+        const exists = state.favorites.some((f) => f.type === kind && f.targetId === targetId)
+        dispatch({ type: 'toggleFavorite', payload: { kind, targetId } })
+        const cloud = kind === 'post'
+          ? state.cloudIds?.posts.includes(targetId)
+          : state.cloudIds?.articles.includes(targetId)
+        if (cloud) {
+          void cloudSetFavorite(kind, targetId, !exists).then((ok) => {
+            if (!ok) dispatch({ type: 'toggleFavorite', payload: { kind, targetId } })
+          })
+        }
+      },
       savePostDraft: (content, topic, images) => dispatch({ type: 'savePostDraft', payload: { content, topic, images } }),
       deletePostDraft: (id) => dispatch({ type: 'deletePostDraft', payload: id }),
       publishPostDraft: (draftId) => {
@@ -584,6 +784,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           fireCloudWrite(
             cloudWritePost,
             { id: postId, authorId: state.meId, content: draft.content, images: draft.images, createdAt: Date.now(), repostOfId: null, repostComment: '', likes: 0, likedByMe: false, reposts: 0, topic: draft.topic, source: '来自 网页版' },
+            () => dispatch({ type: 'cloudMark', payload: { kind: 'posts', id: postId } }),
             () => dispatch({ type: 'cloudRollbackPost', payload: postId }),
           )
         }
@@ -594,6 +795,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fireCloudWrite(
           cloudWriteArticle,
           { id, authorId: state.meId, title, summary: makeSummary(content), content, tags, createdAt: Date.now(), views: 0, likes: 0, likedByMe: false, comments: [] },
+          () => dispatch({ type: 'cloudMark', payload: { kind: 'articles', id } }),
           () => dispatch({ type: 'cloudRollbackArticle', payload: id }),
         )
         return id
@@ -604,23 +806,80 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return finalId
       },
       deleteArticleDraft: (id) => dispatch({ type: 'deleteArticleDraft', payload: id }),
-      updateProfile: (data) => dispatch({ type: 'updateProfile', payload: data }),
-      editArticle: (id, data) => dispatch({ type: 'editArticle', payload: { id, ...data } }),
-      deleteArticle: (id) => dispatch({ type: 'deleteArticle', payload: id }),
-      toggleArticleLike: (id) => dispatch({ type: 'toggleArticleLike', payload: id }),
-      addArticleComment: (articleId, content) =>
-        dispatch({ type: 'addArticleComment', payload: { id: uid('ac'), articleId, content } }),
-      toggleSnippetLike: (id) => dispatch({ type: 'toggleSnippetLike', payload: id }),
+      updateProfile: (data) => {
+        dispatch({ type: 'updateProfile', payload: data })
+        // 真实档案始终尝试云端同步（未登录时 skip）；失败仅 toast，本地档案保留
+        void cloudWriteProfile(data)
+      },
+      editArticle: (id, data) => {
+        const snap = state.articles.find((a) => a.id === id)
+        dispatch({ type: 'editArticle', payload: { id, ...data } })
+        if (snap && state.cloudIds?.articles.includes(id)) {
+          void cloudUpdateArticle(id, {
+            title: data.title,
+            summary: makeSummary(data.content),
+            content: data.content,
+            tags: data.tags,
+          }).then((ok) => {
+            if (!ok) dispatch({ type: 'cloudRestoreArticle', payload: snap })
+          })
+        }
+      },
+      deleteArticle: (id) => {
+        const snap = state.articles.find((a) => a.id === id)
+        dispatch({ type: 'deleteArticle', payload: id })
+        if (snap && state.cloudIds?.articles.includes(id)) {
+          void cloudDeleteArticle(id).then((ok) => {
+            if (!ok) dispatch({ type: 'cloudRestoreArticle', payload: snap })
+          })
+        }
+      },
+      toggleArticleLike: (id) => {
+        const a = state.articles.find((x) => x.id === id)
+        dispatch({ type: 'toggleArticleLike', payload: id })
+        if (a && state.cloudIds?.articles.includes(id)) {
+          void cloudLikeArticle(id, !a.likedByMe).then((ok) => {
+            if (!ok) dispatch({ type: 'toggleArticleLike', payload: id })
+          })
+        }
+      },
+      addArticleComment: (articleId, content) => {
+        const id = uid('ac')
+        dispatch({ type: 'addArticleComment', payload: { id, articleId, content } })
+        if (state.cloudIds?.articles.includes(articleId)) {
+          void cloudWriteArticleComment(id, articleId, content).then((r) => {
+            if (r === 'fail') dispatch({ type: 'cloudRollbackArticleComment', payload: { articleId, commentId: id } })
+          })
+        }
+      },
+      toggleSnippetLike: (id) => {
+        const s = state.snippets.find((x) => x.id === id)
+        dispatch({ type: 'toggleSnippetLike', payload: id })
+        if (s && state.cloudIds?.snippets.includes(id)) {
+          void cloudLikeSnippet(id, !s.likedByMe).then((ok) => {
+            if (!ok) dispatch({ type: 'toggleSnippetLike', payload: id })
+          })
+        }
+      },
       addSnippet: (title, language, code) => {
         const id = uid('s')
         dispatch({ type: 'addSnippet', payload: { id, title, language, code } })
         fireCloudWrite(
           cloudWriteSnippet,
           { id, authorId: state.meId, title, language, code, createdAt: Date.now(), likes: 0, likedByMe: false },
+          () => dispatch({ type: 'cloudMark', payload: { kind: 'snippets', id } }),
           () => dispatch({ type: 'cloudRollbackSnippet', payload: id }),
         )
       },
-      deleteSnippet: (id) => dispatch({ type: 'deleteSnippet', payload: id }),
+      deleteSnippet: (id) => {
+        const snap = state.snippets.find((s) => s.id === id)
+        dispatch({ type: 'deleteSnippet', payload: id })
+        if (snap && state.cloudIds?.snippets.includes(id)) {
+          void cloudDeleteSnippet(id).then((ok) => {
+            if (!ok) dispatch({ type: 'cloudRestoreSnippet', payload: snap })
+          })
+        }
+      },
       downloadResource: (id) => dispatch({ type: 'downloadResource', payload: id }),
       switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
       resetDemo: () => dispatch({ type: 'reset' }),

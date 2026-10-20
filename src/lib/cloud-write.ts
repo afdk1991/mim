@@ -1,14 +1,17 @@
-/* 云端写适配层（轮 3 写路径·内容）。
-   职责：已登录云端会话时，把发布类写操作（动态/文章/代码片段）insert 到 Supabase，
-   本地状态由 store.tsx 先行乐观更新；insert 失败时本层弹极简 DOM toast 报错，
-   并返回 false，由 store.tsx dispatch 回滚 action 撤销乐观结果。
-   - 身份取自 supabase.auth.getSession()（内存缓存，无网络开销），不依赖 React context，
-     因此 AppProvider/ToastProvider/AuthProvider 的嵌套顺序无关紧要。
-   - 未配置云端或无登录会话：跳过（返回 true），行为与纯本地演示完全一致。
-   - 转发动态云端行不写 repost_of_id（seed 父帖在云端无对应行，外键必炸），
-     评论文案落到 content 列，本地仍保留转发链展示。 */
+/* 云端写适配层（轮 3 内容发布 + 轮 4 点赞/评论/删除/编辑/关注/收藏/档案）。
+   职责：已登录云端会话时把写操作同步到 Supabase，本地状态由 store.tsx 先行乐观更新；
+   失败时本层弹极简 DOM toast 报错并返回失败态，由 store.tsx 回滚乐观结果或恢复快照。
+   返回三态 CloudResult（发布/评论类）：
+   - 'ok'   写成功（store 据此 dispatch cloudMark 注册 cloudIds，标记内容此后走云端）
+   - 'skip' 未配置云端或无登录会话（静默跳过，行为与纯本地演示一致）
+   - 'fail' 写失败（已 toast，调用方须回滚）
+   点赞/关注/收藏/删除/编辑类返回 Promise<boolean>：true = 成功或跳过，false = 失败（已 toast）。
+   身份取自 supabase.auth.getSession()（内存缓存），不依赖 React context。
+   转发动态云端行不写 repost_of_id（seed 父帖云端无对应行，外键必炸），评论文案落 content 列。 */
 import { supabase } from './supabase'
 import type { Post, Article, Snippet } from '../types'
+
+export type CloudResult = 'ok' | 'skip' | 'fail'
 
 /** 极简 DOM toast（内联样式，零 css 依赖）：云端写失败时提示用户结果已回滚 */
 function cloudToast(msg: string): void {
@@ -33,25 +36,29 @@ async function cloudUserId(): Promise<string | null> {
   return data.session?.user?.id ?? null
 }
 
-/** 统一入口：返回 true = 云端写成功或已跳过；false = 失败（调用方须回滚乐观结果） */
+type ContentTable = 'posts' | 'articles' | 'snippets' | 'post_comments' | 'article_comments'
+
+/** 发布/评论类 insert 统一入口：返回三态 CloudResult */
 async function insertRow(
-  table: 'posts' | 'articles' | 'snippets',
+  table: ContentTable,
   row: Record<string, unknown>,
   label: string,
-): Promise<boolean> {
+): Promise<CloudResult> {
   const userId = await cloudUserId()
-  if (!userId) return true // 未登录/未配置云端：跳过，保持本地演示行为
+  if (!userId) return 'skip' // 未登录/未配置云端：跳过，保持本地演示行为
   const { error } = await supabase!
     .from(table)
     .insert({ ...row, author_id: userId })
   if (error) {
     cloudToast(`⚠ ${label}云端保存失败，已回滚：${error.message}`)
-    return false
+    return 'fail'
   }
-  return true
+  return 'ok'
 }
 
-export function cloudWritePost(p: Post): Promise<boolean> {
+/* ---------- 发布（轮 3） ---------- */
+
+export function cloudWritePost(p: Post): Promise<CloudResult> {
   return insertRow(
     'posts',
     {
@@ -68,7 +75,7 @@ export function cloudWritePost(p: Post): Promise<boolean> {
   )
 }
 
-export function cloudWriteArticle(a: Article): Promise<boolean> {
+export function cloudWriteArticle(a: Article): Promise<CloudResult> {
   return insertRow(
     'articles',
     {
@@ -83,7 +90,7 @@ export function cloudWriteArticle(a: Article): Promise<boolean> {
   )
 }
 
-export function cloudWriteSnippet(s: Snippet): Promise<boolean> {
+export function cloudWriteSnippet(s: Snippet): Promise<CloudResult> {
   return insertRow(
     'snippets',
     {
@@ -95,4 +102,162 @@ export function cloudWriteSnippet(s: Snippet): Promise<boolean> {
     },
     '代码片段',
   )
+}
+
+/* ---------- 评论（轮 4） ---------- */
+
+export function cloudWritePostComment(id: string, postId: string, content: string): Promise<CloudResult> {
+  return insertRow('post_comments', { id, post_id: postId, content }, '评论')
+}
+
+export function cloudWriteArticleComment(id: string, articleId: string, content: string): Promise<CloudResult> {
+  return insertRow('article_comments', { id, article_id: articleId, content }, '评论')
+}
+
+/* ---------- 点赞（轮 4）：like=true 插关联行 / false 删，父表计数由 schema 触发器维护 ---------- */
+
+type LikeTable = 'post_likes' | 'comment_likes' | 'article_likes' | 'snippet_likes'
+
+async function likeRow(
+  table: LikeTable,
+  col: string,
+  id: string,
+  like: boolean,
+  label: string,
+  silent = false,
+): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const q = supabase!.from(table)
+  const { error } = like
+    ? await q.insert({ user_id: userId, [col]: id })
+    : await q.delete().eq('user_id', userId).eq(col, id)
+  if (error) {
+    if (!silent) cloudToast(`⚠ ${label}云端同步失败，已回滚：${error.message}`)
+    return false
+  }
+  return true
+}
+
+export function cloudLikePost(id: string, like: boolean): Promise<boolean> {
+  return likeRow('post_likes', 'post_id', id, like, '动态点赞')
+}
+
+// 评论点赞静默：乐观评论 insert 竞态窗口内失败不打扰用户（仅回滚本地点赞态）
+export function cloudLikeComment(id: string, like: boolean): Promise<boolean> {
+  return likeRow('comment_likes', 'comment_id', id, like, '', true)
+}
+
+export function cloudLikeArticle(id: string, like: boolean): Promise<boolean> {
+  return likeRow('article_likes', 'article_id', id, like, '文章点赞')
+}
+
+export function cloudLikeSnippet(id: string, like: boolean): Promise<boolean> {
+  return likeRow('snippet_likes', 'snippet_id', id, like, '片段点赞')
+}
+
+/* ---------- 删除（轮 4）：关联评论/点赞行随外键级联删除 ---------- */
+
+async function deleteRow(table: 'posts' | 'articles' | 'snippets', id: string, label: string): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from(table).delete().eq('id', id).eq('author_id', userId)
+  if (error) {
+    cloudToast(`⚠ ${label}云端删除失败，已恢复：${error.message}`)
+    return false
+  }
+  return true
+}
+
+export function cloudDeletePost(id: string): Promise<boolean> {
+  return deleteRow('posts', id, '动态')
+}
+
+export function cloudDeleteArticle(id: string): Promise<boolean> {
+  return deleteRow('articles', id, '文章')
+}
+
+export function cloudDeleteSnippet(id: string): Promise<boolean> {
+  return deleteRow('snippets', id, '代码片段')
+}
+
+/* ---------- 编辑（轮 4） ---------- */
+
+export async function cloudUpdateArticle(
+  id: string,
+  d: { title: string; summary: string; content: string; tags: string[] },
+): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from('articles').update(d).eq('id', id).eq('author_id', userId)
+  if (error) {
+    cloudToast(`⚠ 文章云端更新失败，已恢复：${error.message}`)
+    return false
+  }
+  return true
+}
+
+/* ---------- 关注 / 收藏 / 档案（轮 4） ---------- */
+
+export async function cloudSetFollow(followeeId: string, follow: boolean): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  if (follow) {
+    const { error } = await supabase!
+      .from('follows')
+      .insert({ follower_id: userId, followee_id: followeeId })
+    if (error && error.code !== '23505') {
+      // 23505 重复关注视为成功
+      cloudToast(`⚠ 关注云端同步失败，已回滚：${error.message}`)
+      return false
+    }
+  } else {
+    const { error } = await supabase!
+      .from('follows')
+      .delete()
+      .eq('follower_id', userId)
+      .eq('followee_id', followeeId)
+    if (error) {
+      cloudToast(`⚠ 取消关注云端同步失败，已回滚：${error.message}`)
+      return false
+    }
+  }
+  return true
+}
+
+export async function cloudSetFavorite(kind: 'post' | 'article', targetId: string, fav: boolean): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  if (fav) {
+    const { error } = await supabase!
+      .from('favorites')
+      .insert({ user_id: userId, type: kind, target_id: targetId })
+    if (error && error.code !== '23505') {
+      cloudToast(`⚠ 收藏云端同步失败，已回滚：${error.message}`)
+      return false
+    }
+  } else {
+    const { error } = await supabase!
+      .from('favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('type', kind)
+      .eq('target_id', targetId)
+    if (error) {
+      cloudToast(`⚠ 取消收藏云端同步失败，已回滚：${error.message}`)
+      return false
+    }
+  }
+  return true
+}
+
+export async function cloudWriteProfile(d: { name: string; emoji: string; color: string; bio: string }): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from('profiles').update(d).eq('id', userId)
+  if (error) {
+    cloudToast(`⚠ 档案云端保存失败：${error.message}`)
+    return false
+  }
+  return true
 }

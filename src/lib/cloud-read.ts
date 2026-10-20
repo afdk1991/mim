@@ -1,0 +1,156 @@
+/* 云端读路径（轮 4）：启动/登录时拉取云端内容与个人数据，转换为本地域模型。
+   双真源共存设计：云端行 = 真实登录用户写入的内容；seed 演示内容（作者 me/u1..u9
+   无 auth.users 行）= 本地真源。pullCloudContent 返回的载荷由 store.tsx dispatch
+   cloudMerge 合并（云端行覆盖同 id 本地乐观行，其余混排插入）。
+   任一查询失败或无登录会话返回 null，调用方保持纯本地状态（静默降级）。 */
+import { supabase } from './supabase'
+import type { Article, ArticleComment, FavoriteItem, Post, PostComment, Snippet, User } from '../types'
+
+export interface CloudPayload {
+  /** 云端 profiles（仅真实登录用户，key 为 uuid，与 seed 用户 id 无交集） */
+  users: Record<string, User>
+  posts: Post[]
+  articles: Article[]
+  snippets: Snippet[]
+  /** 我关注的云端用户 id（follows where follower = me） */
+  followingIds: string[]
+  /** 我的云端收藏（favorites where user = me） */
+  favorites: FavoriteItem[]
+}
+
+/** 单查询解包：失败抛错由外层 catch 统一降级 */
+function unwrap<T>(r: { error: { message: string } | null; data: T[] | null }, name: string): T[] {
+  if (r.error || !r.data) throw new Error(`${name}: ${r.error?.message ?? 'empty'}`)
+  return r.data
+}
+
+export async function pullCloudContent(): Promise<CloudPayload | null> {
+  if (!supabase) return null
+  try {
+    const { data } = await supabase.auth.getSession()
+    const meId = data.session?.user?.id
+    if (!meId) return null
+
+    const [postsR, postCommentsR, articlesR, articleCommentsR, snippetsR, profilesR,
+      likePostR, likeCommentR, likeArticleR, likeSnippetR, followsR, favsR] = await Promise.all([
+      supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('post_comments').select('*').order('created_at', { ascending: true }).limit(500),
+      supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('article_comments').select('*').order('created_at', { ascending: true }).limit(500),
+      supabase.from('snippets').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('profiles').select('*'),
+      supabase.from('post_likes').select('post_id').eq('user_id', meId),
+      supabase.from('comment_likes').select('comment_id').eq('user_id', meId),
+      supabase.from('article_likes').select('article_id').eq('user_id', meId),
+      supabase.from('snippet_likes').select('snippet_id').eq('user_id', meId),
+      supabase.from('follows').select('followee_id').eq('follower_id', meId),
+      supabase.from('favorites').select('*').eq('user_id', meId),
+    ])
+
+    const likedPosts = new Set(unwrap(likePostR, 'post_likes').map((r) => r.post_id))
+    const likedComments = new Set(unwrap(likeCommentR, 'comment_likes').map((r) => r.comment_id))
+    const likedArticles = new Set(unwrap(likeArticleR, 'article_likes').map((r) => r.article_id))
+    const likedSnippets = new Set(unwrap(likeSnippetR, 'snippet_likes').map((r) => r.snippet_id))
+
+    // profiles → User（emoji/color 空值兜底，与 schema default 对齐）
+    const users: Record<string, User> = {}
+    for (const p of unwrap(profilesR, 'profiles')) {
+      users[p.id] = {
+        id: p.id,
+        name: p.name,
+        emoji: p.emoji || '🙂',
+        color: p.color || '#ff8200',
+        bio: p.bio ?? '',
+        followers: p.followers ?? 0,
+        following: p.following ?? 0,
+        verified: p.verified ?? false,
+      }
+    }
+
+    // 评论按父帖/父文章分组内嵌，按时间正序（本地 append 顺序 = 时间顺序）
+    const commentsByPost = new Map<string, PostComment[]>()
+    for (const c of unwrap(postCommentsR, 'post_comments')) {
+      const list = commentsByPost.get(c.post_id) ?? []
+      list.push({
+        id: c.id,
+        authorId: c.author_id,
+        content: c.content,
+        createdAt: Date.parse(c.created_at),
+        likes: c.likes ?? 0,
+        likedByMe: likedComments.has(c.id),
+      })
+      commentsByPost.set(c.post_id, list)
+    }
+    const commentsByArticle = new Map<string, ArticleComment[]>()
+    for (const c of unwrap(articleCommentsR, 'article_comments')) {
+      const list = commentsByArticle.get(c.article_id) ?? []
+      list.push({
+        id: c.id,
+        authorId: c.author_id,
+        content: c.content,
+        createdAt: Date.parse(c.created_at),
+      })
+      commentsByArticle.set(c.article_id, list)
+    }
+
+    const posts: Post[] = unwrap(postsR, 'posts').map((p) => ({
+      id: p.id,
+      authorId: p.author_id,
+      content: p.content,
+      images: p.images ?? [],
+      createdAt: Date.parse(p.created_at),
+      repostOfId: p.repost_of_id ?? null,
+      repostComment: p.repost_comment ?? '',
+      likes: p.likes ?? 0,
+      likedByMe: likedPosts.has(p.id),
+      reposts: p.reposts ?? 0,
+      topic: p.topic ?? null,
+      source: p.source ?? '来自 网页版',
+      comments: commentsByPost.get(p.id) ?? [],
+    }))
+
+    const articles: Article[] = unwrap(articlesR, 'articles').map((a) => ({
+      id: a.id,
+      authorId: a.author_id,
+      title: a.title,
+      summary: a.summary ?? '',
+      content: a.content,
+      tags: a.tags ?? [],
+      createdAt: Date.parse(a.created_at),
+      views: a.views ?? 0,
+      likes: a.likes ?? 0,
+      likedByMe: likedArticles.has(a.id),
+      comments: commentsByArticle.get(a.id) ?? [],
+    }))
+
+    const snippets: Snippet[] = unwrap(snippetsR, 'snippets').map((s) => ({
+      id: s.id,
+      authorId: s.author_id,
+      title: s.title,
+      language: s.language ?? 'text',
+      code: s.code,
+      createdAt: Date.parse(s.created_at),
+      likes: s.likes ?? 0,
+      likedByMe: likedSnippets.has(s.id),
+    }))
+
+    const favorites: FavoriteItem[] = unwrap(favsR, 'favorites').map((f) => ({
+      id: f.id,
+      type: f.type as 'post' | 'article',
+      targetId: f.target_id,
+      createdAt: Date.parse(f.created_at),
+    }))
+
+    return {
+      users,
+      posts,
+      articles,
+      snippets,
+      followingIds: unwrap(followsR, 'follows').map((r) => r.followee_id),
+      favorites,
+    }
+  } catch (err) {
+    console.warn('[cloud-read] 云端拉取失败，回退纯本地：', err)
+    return null
+  }
+}
