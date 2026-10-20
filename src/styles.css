@@ -2469,10 +2469,34 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     radial-gradient(60% 70% at 78% 0%, rgba(59, 108, 255, 0.22), transparent 65%),
     radial-gradient(45% 55% at 18% 20%, rgba(90, 140, 255, 0.12), transparent 60%),
     linear-gradient(180deg, #070b1d 0%, #0e1533 58%, #1a2450 100%);
-  padding: 30px 16px 34px;
+  padding: 14px 16px 34px;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* 右上角工具区：主题切换 / 重置数据 / 头像（原侧边栏底部迁移而来） */
+.wb-hero-top {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.wb-hero-top .icon-btn {
+  font-size: 18px;
+  padding: 6px 8px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.wb-hero-top .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wb-hero-top .avatar {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
 
 .wb-hero-logo {
@@ -2500,6 +2524,7 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
 }
 
 .wb-hero-search {
+  position: relative;
   display: flex;
   width: min(480px, 94%);
   margin-top: 18px;
@@ -2558,6 +2583,196 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   filter: brightness(1.06);
 }
 
+/* ---------- hero 搜索下拉面板 ---------- */
+
+.wb-hero-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 15px;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.wb-hero-clear:hover {
+  background: var(--bg);
+  color: var(--text-2);
+}
+
+.wb-hero-drop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.14);
+  padding: 10px 14px 12px;
+  z-index: 60;
+  max-height: 62vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.wb-hero-drop-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  padding: 6px 2px;
+}
+
+.wb-hero-clear-all {
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.wb-hero-clear-all:hover {
+  background: var(--bg);
+  color: var(--text-2);
+}
+
+.wb-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px 0 8px;
+}
+
+.wb-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  background: var(--bg);
+  border-radius: 999px;
+  padding-left: 12px;
+  overflow: hidden;
+}
+
+.wb-hero-chip-word {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  padding: 5px 2px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-hero-chip-word:hover {
+  color: var(--primary);
+}
+
+.wb-hero-chip-del {
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1;
+  padding: 6px 9px;
+}
+
+.wb-hero-chip-del:hover {
+  color: var(--danger);
+}
+
+.wb-hero-drop-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.wb-hero-drop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 6px;
+  border-radius: 8px;
+  text-align: left;
+  min-width: 0;
+}
+
+.wb-hero-drop-item:hover {
+  background: var(--bg);
+}
+
+.wb-hero-drop-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.wb-hero-drop-text small {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-hero-drop-item > small {
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.wb-hero-rank {
+  font-style: normal;
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.wb-hero-rank.top {
+  color: var(--danger);
+}
+
+.wb-hero-tag {
+  flex-shrink: 0;
+  font-style: normal;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.wb-hero-ico {
+  font-style: normal;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.wb-hero-drop-empty {
+  padding: 16px 6px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
 @media (max-width: 640px) {
   .wb-hero {
     padding: 22px 12px 26px;
@@ -2573,6 +2788,10 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
 
   .wb-hero-btn {
     padding: 0 16px;
+  }
+
+  .wb-hero-drop {
+    max-height: 52vh;
   }
 }
 

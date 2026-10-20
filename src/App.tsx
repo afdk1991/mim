@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
@@ -40,7 +40,7 @@ import { MallGoodsPage } from './mall/MallGoods'
 import { MallCartPage } from './mall/MallCart'
 import { MallOrdersPage } from './mall/MallOrders'
 import { MallWalletPage } from './mall/MallWallet'
-import { clearHistory, cx, loadHistory } from './utils'
+import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 
 type NavGroup = { title: string; items: NavItem[] }
@@ -132,12 +132,8 @@ function loadTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-function SideNav() {
-  const api = useApp()
-  const { path } = useRouter()
+function useTheme() {
   const [theme, setTheme] = useState<'light' | 'dark'>(loadTheme)
-  const [open, setOpen] = useState<string | null>(null)
-
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     try {
@@ -146,6 +142,13 @@ function SideNav() {
       /* ignore */
     }
   }, [theme])
+  return [theme, setTheme] as const
+}
+
+function SideNav() {
+  const api = useApp()
+  const { path } = useRouter()
+  const [open, setOpen] = useState<string | null>(null)
 
   /* 路由变化后自动展开包含当前页的分组 */
   useEffect(() => {
@@ -232,25 +235,6 @@ function SideNav() {
         <span className="sidenav-version" title="Mim 版本号">
           V{APP_VERSION}
         </span>
-        <button
-          className="icon-btn"
-          title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        >
-          {theme === 'dark' ? '☀️' : '🌙'}
-        </button>
-        <button
-          className="icon-btn"
-          title="重置演示数据"
-          onClick={() => {
-            if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
-          }}
-        >
-          ♻️
-        </button>
-        <a href="#/my" title="进入个人空间">
-          <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
-        </a>
       </div>
     </aside>
   )
@@ -424,38 +408,249 @@ function HistoryPage() {
   )
 }
 
-/* 仿微博顶部 hero：深色星空横幅 + 居中 logo + 白胶囊搜索框（拼接橙色按钮） */
-function WbHero() {
-  const { navigate } = useRouter()
-  const [q, setQ] = useState('')
+const HERO_HISTORY_KEY = 'mim-search-history'
 
-  const go = () => {
-    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
+function loadHeroHistory(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(HERO_HISTORY_KEY) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
   }
+}
+
+/* 热搜标签底色：沸红 / 热橙 / 爆黄 / 新蓝 */
+const HERO_TAG_BG: Record<string, string> = {
+  沸: '#e64340',
+  热: '#ff8200',
+  爆: '#f59e0b',
+  新: '#2b9cf4',
+}
+
+/* 仿微博顶部 hero：深色星空横幅 + 右上工具区 + 居中 logo + 完整搜索模块（下拉：历史/热搜/联想/清空） */
+function WbHero() {
+  const api = useApp()
+  const { navigate } = useRouter()
+  const [theme, setTheme] = useTheme()
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const [hist, setHist] = useState<string[]>(loadHeroHistory)
+  const boxRef = useRef<HTMLDivElement>(null)
+
+  /* 点击面板外部关闭 */
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const saveHist = (t: string) => {
+    setHist((h) => {
+      const next = [t, ...h.filter((x) => x !== t)].slice(0, 8)
+      try {
+        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+  const removeHist = (t: string) => {
+    setHist((h) => {
+      const next = h.filter((x) => x !== t)
+      try {
+        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+  const clearHist = () => {
+    setHist([])
+    try {
+      localStorage.removeItem(HERO_HISTORY_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const go = (word?: string) => {
+    const kw = (word ?? q).trim()
+    if (!kw) return
+    saveHist(kw)
+    setOpen(false)
+    navigate(`/search?q=${encodeURIComponent(kw)}`)
+  }
+
+  /* 输入联想：话题 + 用户 */
+  const kw = q.trim().toLowerCase()
+  const topicHints = kw
+    ? api.state.topics.filter((t) => t.name.toLowerCase().includes(kw)).slice(0, 4)
+    : []
+  const userHints = kw
+    ? Object.values(api.state.users)
+        .filter((u) => u.name.toLowerCase().includes(kw) || u.bio.toLowerCase().includes(kw))
+        .slice(0, 4)
+    : []
+  const noHint = kw.length > 0 && topicHints.length === 0 && userHints.length === 0
 
   return (
     <header className="wb-hero">
+      <div className="wb-hero-top">
+        <button
+          className="icon-btn"
+          title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+        <button
+          className="icon-btn"
+          title="重置演示数据"
+          onClick={() => {
+            if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
+          }}
+        >
+          ♻️
+        </button>
+        <a href="#/my" title="进入个人空间">
+          <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
+        </a>
+      </div>
       <a className="wb-hero-logo" href="#/feed">
         <i>👁️</i>
         <b>Mim</b>
         <small>mim.com</small>
       </a>
-      <div className="wb-hero-search">
+      <div className="wb-hero-search" ref={boxRef}>
         <div className="wb-hero-bar">
           <span aria-hidden>🔍</span>
           <input
             type="search"
             placeholder="搜索 Mim 内容"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setOpen(true)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') go()
+              if (e.key === 'Escape') setOpen(false)
             }}
           />
+          {q && (
+            <button
+              className="wb-hero-clear"
+              aria-label="清空"
+              onClick={() => {
+                setQ('')
+                setOpen(true)
+              }}
+            >
+              ×
+            </button>
+          )}
         </div>
-        <button className="wb-hero-btn" onClick={go}>
+        <button className="wb-hero-btn" onClick={() => go()}>
           搜索
         </button>
+
+        {open && (
+          <div className="wb-hero-drop">
+            {!kw && (
+              <>
+                {hist.length > 0 && (
+                  <>
+                    <div className="wb-hero-drop-title">
+                      搜索历史
+                      <button className="wb-hero-clear-all" onClick={clearHist}>
+                        清空
+                      </button>
+                    </div>
+                    <div className="wb-hero-chips">
+                      {hist.map((h) => (
+                        <span key={h} className="wb-hero-chip">
+                          <button className="wb-hero-chip-word" onClick={() => go(h)}>
+                            {h}
+                          </button>
+                          <button
+                            className="wb-hero-chip-del"
+                            aria-label="删除"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeHist(h)
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <div className="wb-hero-drop-title">🔥 Mim 热搜</div>
+                <div className="wb-hero-drop-list">
+                  {api.state.hotSearches.slice(0, 8).map((s) => (
+                    <button key={s.id} className="wb-hero-drop-item" onClick={() => go(s.text)}>
+                      <i className={cx('wb-hero-rank', s.rank <= 3 && 'top')}>{s.rank}</i>
+                      <span className="wb-hero-drop-text">{s.text}</span>
+                      {s.tag && (
+                        <em className="wb-hero-tag" style={{ background: HERO_TAG_BG[s.tag] }}>
+                          {s.tag}
+                        </em>
+                      )}
+                      <small>{formatCount(s.heat)}</small>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {kw && (
+              <>
+                {topicHints.length > 0 && (
+                  <>
+                    <div className="wb-hero-drop-title">相关话题</div>
+                    <div className="wb-hero-drop-list">
+                      {topicHints.map((t) => (
+                        <button key={t.id} className="wb-hero-drop-item" onClick={() => go(t.name)}>
+                          <i className="wb-hero-ico" aria-hidden>
+                            💬
+                          </i>
+                          <span className="wb-hero-drop-text">#{t.name}#</span>
+                          <small>{formatCount(t.heat)}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {userHints.length > 0 && (
+                  <>
+                    <div className="wb-hero-drop-title">相关用户</div>
+                    <div className="wb-hero-drop-list">
+                      {userHints.map((u) => (
+                        <button key={u.id} className="wb-hero-drop-item" onClick={() => go(u.name)}>
+                          <Avatar emoji={u.emoji} color={u.color} size={28} />
+                          <span className="wb-hero-drop-text">
+                            {u.name}
+                            <small>{u.bio}</small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {noHint && (
+                  <div className="wb-hero-drop-empty">没有找到相关内容，按回车直接搜索「{q.trim()}」</div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )
