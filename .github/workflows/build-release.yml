@@ -2,7 +2,7 @@ name: Release · 桌面端构建与发布
 
 # 桌面三平台（Windows / macOS / Linux）发布流水线：
 # - 大写 V 四段式 tag（如 V0.0.1.0）触发，与 ci-cd.yml 的小写 v* tag 互不干扰
-# - tag 前三段注入 tauri.conf.json version（桌面 OTA 依赖三段 semver 递增触发更新）
+# - tag 第 1.2.4 段注入 tauri.conf.json version（V0.0.0.2 → 0.0.2，桌面 OTA 依赖三段 semver 递增触发更新）
 # - matrix 并行构建三平台安装包，tauri-action 自动创建 GitHub Release 并上传产物
 # - 配置签名密钥后同步生成 OTA 更新清单 latest.json（Tauri updater 格式）
 #   客户端经 https://github.com/afdk1991/mim/releases/latest/download/latest.json 检测更新
