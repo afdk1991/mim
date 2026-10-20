@@ -9,7 +9,7 @@
    身份取自 supabase.auth.getSession()（内存缓存），不依赖 React context。
    转发动态云端行不写 repost_of_id（seed 父帖云端无对应行，外键必炸），评论文案落 content 列。 */
 import { supabase } from './supabase'
-import type { Post, Article, Snippet } from '../types'
+import type { Post, PostDraft, Article, ArticleDraft, Snippet } from '../types'
 
 export type CloudResult = 'ok' | 'skip' | 'fail'
 
@@ -257,6 +257,115 @@ export async function cloudWriteProfile(d: { name: string; emoji: string; color:
   const { error } = await supabase!.from('profiles').update(d).eq('id', userId)
   if (error) {
     cloudToast(`⚠ 档案云端保存失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+/* ---------- 草稿（轮 4）：upsert onConflict id 实现新建/更新二合一 ---------- */
+
+export async function cloudUpsertPostDraft(d: PostDraft): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from('post_drafts').upsert(
+    {
+      id: d.id,
+      user_id: userId,
+      content: d.content,
+      topic: d.topic,
+      images: d.images,
+      saved_at: new Date(d.savedAt).toISOString(),
+    },
+    { onConflict: 'id' },
+  )
+  if (error) {
+    cloudToast(`⚠ 动态草稿云端保存失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+export async function cloudDeletePostDraft(id: string): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from('post_drafts').delete().eq('id', id).eq('user_id', userId)
+  if (error) {
+    cloudToast(`⚠ 动态草稿云端删除失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+export async function cloudUpsertArticleDraft(d: ArticleDraft): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from('article_drafts').upsert(
+    {
+      id: d.id,
+      user_id: userId,
+      title: d.title,
+      content: d.content,
+      tags: d.tags,
+      saved_at: new Date(d.savedAt).toISOString(),
+    },
+    { onConflict: 'id' },
+  )
+  if (error) {
+    cloudToast(`⚠ 文章草稿云端保存失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+export async function cloudDeleteArticleDraft(id: string): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.from('article_drafts').delete().eq('id', id).eq('user_id', userId)
+  if (error) {
+    cloudToast(`⚠ 文章草稿云端删除失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+/* ---------- 私信（轮 5）：send_message RPC 一次写双方两行（msg_id 由 RPC 生成） ---------- */
+
+export async function cloudSendMessage(peerId: string, content: string): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!.rpc('send_message', { p_peer: peerId, p_content: content })
+  if (error) {
+    cloudToast(`⚠ 私信云端发送失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+/* ---------- 已读同步（轮 4/5）：调用方须保证 id 为云端域（seed id 更新 0 行无害，但私信 peer 必须 uuid） ---------- */
+
+export async function cloudReadConversation(peerId: string): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!
+    .from('messages')
+    .update({ read: true })
+    .eq('owner_id', userId)
+    .eq('peer_id', peerId)
+  if (error) {
+    cloudToast(`⚠ 私信已读状态云端同步失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
+export async function cloudReadNotifications(id?: string): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  let q = supabase!.from('notifications').update({ read: true }).eq('user_id', userId)
+  if (id) q = q.eq('id', id)
+  const { error } = await q
+  if (error) {
+    cloudToast(`⚠ 通知已读状态云端同步失败：${error.message}`)
     return false
   }
   return true
