@@ -34,7 +34,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
     title: '关于我们',
     updated: '2026-10-21',
     intro:
-      'Mim（mim.com）是北京创新乐知网络技术有限公司旗下的一站式技术内容与开发者社区，致力于让技术交流更简单、让知识传递更高效。',
+      'Mim（mim.com）是一站式技术内容与开发者社区，致力于让技术交流更简单、让知识传递更高效。',
     sections: [
       {
         h: '我们是谁',
@@ -55,7 +55,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
         h: '联系我们',
         list: [
           '客服电话：400-660-0108（工作时间 8:30 - 22:00）',
-          '客服邮箱：kefu@csdn.net',
+          '客服邮箱：kefu@mim.com',
           '公司地址：北京市朝阳区（演示数据）',
         ],
       },
@@ -177,7 +177,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
       },
       {
         h: '违规处理',
-        p: ['视情节采取内容删除、禁言、降权、封禁等措施；对处理结果有异议的，可通过 kefu@csdn.net 提交申诉。'],
+        p: ['视情节采取内容删除、禁言、降权、封禁等措施；对处理结果有异议的，可通过 kefu@mim.com 提交申诉。'],
       },
     ],
   },
@@ -246,7 +246,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
       },
       {
         h: '公示说明',
-        p: ['证照原件备存于公司注册地址，可供监管部门查验；如有疑问请联系 kefu@csdn.net。'],
+        p: ['证照原件备存于公司注册地址，可供监管部门查验；如有疑问请联系 kefu@mim.com。'],
       },
     ],
   },
@@ -261,7 +261,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
       {
         h: '登记信息',
         list: [
-          '公司名称：北京创新乐知网络技术有限公司',
+          '公司名称：Mim 网络技术有限公司',
           '统一社会信用代码：91110105MA00XXXXXX（示例）',
           '法定代表人：XXX',
           '注册资本：XXX 万元人民币',
@@ -284,7 +284,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
           '网站名称：Mim',
           '网站域名：mim.com',
           '经营性网站备案编号：京ICP证xxxxxx号（示例）',
-          '备案单位：北京创新乐知网络技术有限公司',
+          '备案单位：Mim 网络技术有限公司',
         ],
       },
       {
@@ -329,7 +329,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
       },
       {
         h: '联系我们',
-        p: ['如需协助处理未成年人账号问题，请联系 kefu@csdn.net 或拨打 400-660-0108。'],
+        p: ['如需协助处理未成年人账号问题，请联系 kefu@mim.com 或拨打 400-660-0108。'],
       },
     ],
   },
