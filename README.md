@@ -21,11 +21,11 @@ React + Vite + TypeScript 实现的社交内容平台 Demo（微博 / CSDN 风�
 
 ## 版本与 OTA 协议
 
-- 版本号统一四段式 `V0.0.0.0`，**只递增第 4 段**（V0.0.0.0 → V0.0.0.1 → V0.0.0.2，前三段恒为 0.0.0；tag 与 `src/version.ts` / `android versionName` 同步演进，`android versionCode` 独立单调递增不与 tag 绑定；`package.json` 固定三段；`tauri.conf.json` 三段 semver 由 Release CI 注入「第1.第2.第4段」（V0.0.0.2 → 0.0.2）——桌面 OTA 靠该三段递增触发）
+- 版本号统一四段式，**初始 `0.0.0.0`，每次递增 `0.0.0.1`**（V0.0.0.0 → V0.0.0.1 → V0.0.0.2，前三段恒为 0.0.0；tag 与 `src/version.ts` / `android versionName` 同步演进，`android versionCode` 随版本重置从 1 起单调递增；`package.json` 固定三段；`tauri.conf.json` 三段 semver 由 Release CI 注入「第1.第2.第4段」（V0.0.0.0 → 0.0.0）——桌面 OTA 靠该三段递增触发）
 - OTA 清单：`https://github.com/afdk1991/mim/releases/latest/download/manifest.json`
   ```json
   {
-    "version": "0.0.0.2",
+    "version": "0.0.0.1",
     "android": { "url": "https://…/app-release.apk", "sha256": "…" }
   }
   ```
