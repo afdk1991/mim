@@ -1,0 +1,34 @@
+name: Release Notes
+
+# Release Notes 自动化：
+# Release 发布（published）后，基于 PR / commit 自动归纳变更说明，
+# 追加到 Release 正文顶部（幂等：已有自动变更段则跳过）。
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  generate-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 生成并写入 Release Notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+          RELEASE_ID: ${{ github.event.release.id }}
+        run: |
+          set -e
+          GEN=$(gh api "repos/$REPO/releases/generate-notes" -f tag_name="$TAG" --jq '.body')
+          EXISTING=$(gh api "repos/$REPO/releases/$RELEASE_ID" --jq '.body')
+          if printf '%s' "$EXISTING" | grep -q "自动变更说明"; then
+            echo "已有自动变更说明，跳过"
+            exit 0
+          fi
+          BODY=$(printf '%s\n\n---\n\n🤖 自动变更说明\n\n%s' "$GEN" "$EXISTING")
+          jq -n --arg body "$BODY" '{body: $body}' > payload.json
+          gh api -X PATCH "repos/$REPO/releases/$RELEASE_ID" --input payload.json --jq '.html_url'
