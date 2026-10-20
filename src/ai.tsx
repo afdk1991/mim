@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './ai.css'
 import { useToast } from './components'
 import { cx, uid } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ============================================================
  * AI 可转载资源库 —— 重新开发自合并源码 ai-server-resources（可转载资源清单站）
@@ -542,7 +543,17 @@ export function AiResPage() {
     } catch {
       /* 忽略写入失败 */
     }
+    pushToolState(STORAGE_KEY, state) // 云端整包快照（未登录/未配置时静默跳过）
   }, [state])
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存钩子回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadAi())
+    })
+  }, [])
 
   const list = useMemo(
     () =>

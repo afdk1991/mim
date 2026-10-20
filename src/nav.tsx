@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* 路线导航：地址簿选择 → 路线规划（伪优化）→ turn-by-turn 导航推进。
    地图零图片依赖：CSS 网格 + SVG 连线 + emoji 地标，坐标为百分比网格。 */
@@ -100,7 +101,17 @@ export function RouteNavPage() {
   const save = (next: NavState) => {
     setState(next)
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    pushToolState(STORAGE_KEY, next) // 云端整包快照（未登录/未配置时静默跳过）
   }
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadNav())
+    })
+  }, [])
 
   const current = state.current ? state.routes.find((r) => r.id === state.current?.routeId) ?? null : null
   const curStep = state.current?.stepIndex ?? 0

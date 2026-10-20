@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './vip.css'
 import { useToast } from './components'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ================= VIP 会员中心（盈利点：订阅收入 demo） =================
    自包含模式：独立 localStorage（mim-vip-v1），不依赖 AppState/store/seed。
@@ -107,8 +108,18 @@ export function VipCenterPage() {
 
   const update = (s: VipState) => {
     saveVip(s)
+    pushToolState(KEY, s) // 云端整包快照（未登录/未配置时静默跳过）
     setState(s)
   }
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  useEffect(() => {
+    void pullToolState(KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadVip())
+    })
+  }, [])
 
   const confirmPay = () => {
     if (!payPlan || paying) return

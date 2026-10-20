@@ -7,6 +7,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth'
+import { pullToolState, pushToolState } from '../lib/tool-cloud'
 
 export type MallChannel = 'youxuan' | 'gexm' | 'mix' | 'live' | 'laal'
 
@@ -186,6 +187,12 @@ export function MallProvider({ children }: { children: ReactNode }) {
   // 真实身份变化（登录/退出/云端会话切换）时重载该身份的钱包数据
   useEffect(() => {
     setState(loadMallFor(userId))
+    // 云端恢复（轮 6）：拉取该身份快照 → 写回本地 → 重载（云 key 统一 mim-mall-v1，表按 user_id 隔离）
+    void pullToolState('mim-mall-v1').then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(mallKeyFor(userId), JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadMallFor(userId))
+    })
   }, [userId])
 
   useEffect(() => {
@@ -194,6 +201,7 @@ export function MallProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    pushToolState('mim-mall-v1', state) // 云端整包快照（未登录/未配置时静默跳过）
   }, [state, storageKey])
 
   const api: MallApi = {

@@ -2,6 +2,7 @@ import './ardot.css'
 import { useEffect, useRef, useState } from 'react'
 import { useToast } from './components'
 import { cx, uid, timeAgo } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* 多源聚合监控台：重实现自母本 ardot-audit（WordPress 项目004）的 saas-aggregator 聚合看板主链路——
    6 个微服务数据源（网关状态/业务核心/AI 洞察/决策分析/合规审计/电商商品）→ TTL 缓存与强制回源 →
@@ -210,7 +211,17 @@ export function ArdotPage() {
   const save = (next: ArdotState) => {
     setState(next)
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    pushToolState(STORAGE_KEY, next) // 云端整包快照（未登录/未配置时静默跳过）
   }
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadArdot())
+    })
+  }, [])
 
   const pushLog = (entry: Omit<LogEntry, 'id' | 'at' | 'tenant'>) => {
     setState((prev) => ({

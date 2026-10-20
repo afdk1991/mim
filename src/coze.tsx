@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Empty, TimeAgo, useToast } from './components'
 import { cx } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* 智能体小程序面板：重实现自母本 coze-miniprogram（Taro 4 小程序 + NestJS 服务端）
    的服务连接状态页。纯前端模拟 /api/health、/api/hello 两个接口（{status,data} 契约
@@ -64,7 +65,17 @@ export function CozePanelPage() {
   const save = (next: CozeState) => {
     setState(next)
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    pushToolState(STORAGE_KEY, next) // 云端整包快照（未登录/未配置时静默跳过）
   }
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadCoze())
+    })
+  }, [])
 
   const runCheck = () => {
     setStatus('loading')

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* 邮箱聚合：多账户统一收件箱（mock）。
    覆盖：账户切换、搜索、已读、标星、AI 摘要、模拟新邮件推送。 */
@@ -93,7 +94,17 @@ export function EmailHubPage() {
   const save = (next: EmailState) => {
     setState(next)
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+    pushToolState(STORAGE_KEY, next) // 云端整包快照（未登录/未配置时静默跳过）
   }
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadEmail())
+    })
+  }, [])
 
   const unreadOf = (acct: string) => mails.filter((m) => m.accountId === acct && !m.read).length
   const totalUnread = mails.filter((m) => !m.read).length
@@ -128,6 +139,7 @@ export function EmailHubPage() {
       setState((prev) => {
         const next = { ...prev, mails: prev.mails.map((x) => (x.id === m.id ? { ...x, aiSummary: summary } : x)) }
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+        pushToolState(STORAGE_KEY, next) // AI 摘要异步回写第二写点，同样推云端
         return next
       })
     }, 1000)

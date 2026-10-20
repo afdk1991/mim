@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useToast } from './components';
 import { cx, uid } from './utils';
+import { pullToolState, pushToolState } from './lib/tool-cloud';
 
 /* ================= 数据模型 ================= */
 
@@ -976,7 +977,17 @@ export function ManjuPage() {
 
   useEffect(() => {
     saveManju(state);
+    pushToolState(KEY, state); // 云端整包快照（不动 saveManju 本体，测试契约不受影响）
   }, [state]);
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  useEffect(() => {
+    void pullToolState(KEY).then((d) => {
+      if (!d || typeof d !== 'object') return;
+      try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* ignore */ }
+      setState(loadManju());
+    });
+  }, []);
 
   /* 红果目录索引：挂载时加载一次，失败可重试 */
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ============================================================
  * 价格监控 —— 行情数据来自 CoinGecko 公开 API（真实数据源，无需密钥）
@@ -177,7 +178,17 @@ export function PriceMonitorPage() {
     } catch {
       /* ignore */
     }
+    pushToolState(STORAGE_KEY, board) // 云端整包快照（未登录/未配置时静默跳过）
   }, [board])
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存钩子回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setBoard(loadBoard())
+    })
+  }, [])
 
   const { products, tasks, alerts } = board
 

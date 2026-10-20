@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { cx } from './utils'
+import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ============================================================
  * BOM 工具台 —— 重新开发自合并源码 chassis-bom-tool（机箱 BOM 清单）
@@ -247,7 +248,17 @@ export function BomToolPage() {
     } catch {
       /* ignore */
     }
+    pushToolState(STORAGE_KEY, state) // 云端整包快照（未登录/未配置时静默跳过）
   }, [state])
+
+  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存钩子回推） */
+  useEffect(() => {
+    void pullToolState(STORAGE_KEY).then((d) => {
+      if (!d || typeof d !== 'object') return
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      setState(loadBom())
+    })
+  }, [])
 
   const version = VERSIONS.find((v) => v.key === state.ver) ?? DEFAULT_VERSION
   const dirty = Object.keys(state.qtys).length > 0
