@@ -274,11 +274,6 @@ function SideNav() {
         })}
         <SiteFooter />
       </nav>
-      <div className="sidenav-foot">
-        <span className="sidenav-version" title="Mim 版本号">
-          V{APP_VERSION}
-        </span>
-      </div>
     </aside>
   )
 }
@@ -853,7 +848,7 @@ function SiteFooter() {
             客服电话：<a href="tel:4006600108">400-660-0108</a>
           </p>
           <p>
-            <a href="mailto:kefu@csdn.net">kefu@csdn.net</a> · <a href="#/mail">在线客服</a>
+            <a href="mailto:kefu@mim.com">kefu@mim.com</a> · <a href="#/mail">在线客服</a>
           </p>
         </div>
 
@@ -872,9 +867,9 @@ function SiteFooter() {
             <a href="https://500px.com.cn" target="_blank" rel="noreferrer">500px</a>
             <a href="https://www.zhipin.com" target="_blank" rel="noreferrer">直聘网</a>
             <a href="https://www.uisdc.com" target="_blank" rel="noreferrer">优设网</a>
-            <a href="https://wenku.csdn.net" target="_blank" rel="noreferrer">CSDN文库</a>
-            <a href="https://download.csdn.net" target="_blank" rel="noreferrer">CSDN下载</a>
-            <a href="https://ask.csdn.net" target="_blank" rel="noreferrer">CSDN问答</a>
+            <a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a>
+            <a href="https://stackoverflow.com" target="_blank" rel="noreferrer">Stack Overflow</a>
+            <a href="https://developer.mozilla.org" target="_blank" rel="noreferrer">MDN</a>
           </div>
         </div>
 
@@ -910,7 +905,7 @@ function SiteFooter() {
           </p>
         </div>
 
-        <p className="site-footer-copy">©1999-2026 北京创新乐知网络技术有限公司</p>
+        <p className="site-footer-copy">©2026 Mim · 内容聚合社区 · V{APP_VERSION}</p>
       </div>
     </footer>
   )
@@ -935,7 +930,7 @@ function SiteFooterMini() {
         <i className="site-footer-sep">|</i>
         <a href="https://beian.mps.gov.cn" target="_blank" rel="noreferrer">公安备案号11010502030143</a>
       </p>
-      <p className="site-footer-mini-copy">©1999-2026 北京创新乐知网络技术有限公司</p>
+      <p className="site-footer-mini-copy">©2026 Mim · 内容聚合社区 · V{APP_VERSION}</p>
     </footer>
   )
 }
