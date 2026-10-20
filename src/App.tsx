@@ -44,6 +44,7 @@ import { MallOrdersPage } from './mall/MallOrders'
 import { MallWalletPage } from './mall/MallWallet'
 import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
+import { WelcomeModal } from './welcome'
 
 type NavGroup = { title: string; items: NavItem[] }
 
@@ -750,6 +751,7 @@ function Shell() {
           <Page />
         </main>
       </div>
+      <WelcomeModal />
     </>
   )
 }
