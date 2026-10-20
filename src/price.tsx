@@ -76,7 +76,37 @@ function loadBoard(): PriceBoard {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as PriceBoard
-      if (parsed && Array.isArray(parsed.products) && Array.isArray(parsed.tasks)) return parsed
+      if (parsed && Array.isArray(parsed.products) && Array.isArray(parsed.tasks) && Array.isArray(parsed.alerts)) {
+        // 元素级校验：剔除脏数据，避免损坏存档导致看板/曲线渲染异常
+        const products = parsed.products.filter(
+          (p): p is WatchProduct =>
+            !!p && typeof p === 'object' &&
+            typeof p.id === 'string' && typeof p.name === 'string' &&
+            typeof p.emoji === 'string' && typeof p.platform === 'string' &&
+            typeof p.threshold === 'number' && Number.isFinite(p.threshold) &&
+            Array.isArray(p.prices) && p.prices.every(
+              (pt): pt is PricePoint => !!pt && typeof pt === 'object' &&
+                typeof pt.at === 'number' && Number.isFinite(pt.at) &&
+                typeof pt.price === 'number' && Number.isFinite(pt.price),
+            ),
+        )
+        const tasks = parsed.tasks.filter(
+          (t): t is CrawlTask =>
+            !!t && typeof t === 'object' &&
+            typeof t.productId === 'string' && typeof t.freq === 'string' &&
+            typeof t.enabled === 'boolean' &&
+            typeof t.lastRunAt === 'number' && Number.isFinite(t.lastRunAt),
+        )
+        const alerts = parsed.alerts.filter(
+          (a): a is PriceAlert =>
+            !!a && typeof a === 'object' &&
+            typeof a.id === 'string' && typeof a.productId === 'string' &&
+            typeof a.from === 'number' && Number.isFinite(a.from) &&
+            typeof a.to === 'number' && Number.isFinite(a.to) &&
+            typeof a.at === 'number' && Number.isFinite(a.at),
+        )
+        return { products, tasks, alerts }
+      }
     }
   } catch {
     /* 忽略损坏的本地数据，重新播种 */

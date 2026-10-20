@@ -33,7 +33,30 @@ function loadNav(): NavState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as NavState
-      if (parsed && Array.isArray(parsed.routes)) return parsed
+      if (parsed && Array.isArray(parsed.routes)) {
+        // 元素级校验：剔除脏数据，避免损坏存档导致路线列表/导航渲染异常
+        const routes = parsed.routes.filter(
+          (r): r is PlannedRoute =>
+            !!r && typeof r === 'object' &&
+            typeof r.id === 'string' && typeof r.fromId === 'string' && typeof r.toId === 'string' &&
+            Array.isArray(r.viaIds) && r.viaIds.every((v): v is string => typeof v === 'string') &&
+            Array.isArray(r.steps) && r.steps.every(
+              (s): s is RouteStep => !!s && typeof s === 'object' &&
+                typeof s.text === 'string' && typeof s.distKm === 'number' && Number.isFinite(s.distKm),
+            ) &&
+            typeof r.distKm === 'number' && Number.isFinite(r.distKm) &&
+            typeof r.mins === 'number' && Number.isFinite(r.mins) &&
+            typeof r.done === 'boolean' &&
+            typeof r.createdAt === 'number' && Number.isFinite(r.createdAt),
+        )
+        const current =
+          parsed.current && typeof parsed.current === 'object' &&
+          typeof parsed.current.routeId === 'string' &&
+          typeof parsed.current.stepIndex === 'number' && Number.isInteger(parsed.current.stepIndex)
+            ? parsed.current
+            : null
+        return { routes, current }
+      }
     }
   } catch { /* 忽略损坏数据 */ }
   return { routes: [], current: null }
