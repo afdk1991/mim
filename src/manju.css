@@ -139,6 +139,13 @@
   background: linear-gradient(135deg, #7c4dff, #448aff);
 }
 
+.manju-license {
+  position: static;
+  margin-left: 6px;
+  background: rgba(34, 176, 125, 0.16);
+  color: #22b07d;
+}
+
 .manju-custom {
   position: static;
   margin-left: 6px;

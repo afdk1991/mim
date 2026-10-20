@@ -40,6 +40,8 @@ interface MjExtItem {
   playMode: MjExtMode;
   reason?: MjExtReason;
   custom?: boolean;
+  /** 授权标识：仅收录可验证无版权争议的内容（公版 / CC-BY） */
+  license?: string;
 }
 
 interface MjPlayResult {
@@ -126,19 +128,18 @@ const SEED: MjSeries[] = [
 ];
 
 const EXT_SEED: MjExtItem[] = [
-  { id: 'x_c1', title: '魔尊也想知道', cat: 'comic', cover: '🌀', source: '源站 A · 漫剧频道', episodesText: '免费 3 集 / 全 227 集', playMode: 'direct' },
-  { id: 'x_c2', title: '我家徒弟又挂了', cat: 'comic', cover: '🧧', source: '源站 B · 漫剧频道', episodesText: '免费 1 集 / 全 96 集', playMode: 'embed' },
-  { id: 'x_c3', title: '万古神话', cat: 'comic', cover: '⛰️', source: '源站 B · 漫剧频道', episodesText: '免费 5 集 / 全 312 集', playMode: 'blocked', reason: 'frame_blocked' },
-  /* AI 剧：引入自母本「红果短剧 AI 剧场」片单（真实剧名与集数，仅公开元数据，不提供播放） */
-  { id: 'x_a1', title: '穿越60我有空间不愁吃喝', cat: 'ai', cover: '🌾', source: '红果短剧 · AI 剧场', episodesText: '全1000集', playMode: 'direct' },
-  { id: 'x_a2', title: '山货换万金，挣起一个家AI真人版', cat: 'ai', cover: '⛰️', source: '红果短剧 · AI 剧场', episodesText: '全621集', playMode: 'embed' },
-  { id: 'x_a3', title: '穿成农女：带着八个弟弟发家致富传', cat: 'ai', cover: '🧵', source: '红果短剧 · AI 剧场', episodesText: '全608集', playMode: 'blocked', reason: 'frame_blocked' },
-  { id: 'x_a4', title: '看我赶山养家第三季两情相悦', cat: 'ai', cover: '🏕️', source: '红果短剧 · AI 剧场', episodesText: '全600集', playMode: 'direct' },
-  { id: 'x_a5', title: '微光里的炽热2', cat: 'ai', cover: '🕯️', source: '红果短剧 · AI 剧场', episodesText: '全586集', playMode: 'embed' },
-  { id: 'x_a6', title: '夫君战死五年归来：我携婆家出族', cat: 'ai', cover: '⚔️', source: '红果短剧 · AI 剧场', episodesText: '全453集', playMode: 'blocked', reason: 'stream_expired' },
-  { id: 'x_a7', title: '全球躲猫猫：我是林岁安第二季', cat: 'ai', cover: '🙈', source: '红果短剧 · AI 剧场', episodesText: '全436集', playMode: 'direct' },
-  { id: 'x_a8', title: '全球躲猫猫：到底谁才是诡异啊！', cat: 'ai', cover: '👻', source: '红果短剧 · AI 剧场', episodesText: '全424集', playMode: 'blocked', reason: 'frame_blocked' },
-  { id: 'x_a9', title: '大明，李景隆的别样人生第七季', cat: 'ai', cover: '📜', source: '红果短剧 · AI 剧场', episodesText: '全400集', playMode: 'embed' },
+  /* 漫剧分类：公有领域经典动画（Public Domain，Internet Archive 免费托管，授权链路可验证） */
+  { id: 'x_c1', title: '超人：疯狂科学家（1941）', cat: 'comic', cover: '🦸', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '首部超人动画 · 全片约 10 分钟', playMode: 'direct', license: '公版 PD' },
+  { id: 'x_c2', title: '超人：机械怪物（1941）', cat: 'comic', cover: '🤖', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '超人系列第 2 部 · 全片约 10 分钟', playMode: 'embed', license: '公版 PD' },
+  { id: 'x_c3', title: '贝蒂娃娃：Minnie the Moocher（1932）', cat: 'comic', cover: '💃', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '贝蒂娃娃早期短片 · 全片约 8 分钟', playMode: 'direct', license: '公版 PD' },
+  { id: 'x_c4', title: '大力水手公版短剧合集', cat: 'comic', cover: '🥬', source: 'Fleischer / Famous Studios · 公版 Public Domain', episodesText: '多部公版短剧 · 1930s-1950s', playMode: 'blocked', reason: 'frame_blocked', license: '公版 PD' },
+  /* AI 剧 / 开源分类：Blender 开源电影（CC-BY 署名授权，studio.blender.org 可验证） */
+  { id: 'x_a1', title: 'Big Buck Bunny（2008）', cat: 'ai', cover: '🐰', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '全片约 10 分钟 · 公开直链可用', playMode: 'direct', license: 'CC-BY' },
+  { id: 'x_a2', title: 'Elephants Dream（2006）', cat: 'ai', cover: '🐘', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '首部开源电影 · 全片约 11 分钟', playMode: 'embed', license: 'CC-BY' },
+  { id: 'x_a3', title: 'Sintel（2010）', cat: 'ai', cover: '🐉', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '奇幻短片 · 全片约 15 分钟', playMode: 'direct', license: 'CC-BY' },
+  { id: 'x_a4', title: 'Tears of Steel（2012）', cat: 'ai', cover: '🦾', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '真人+CG 科幻 · 全片约 12 分钟', playMode: 'direct', license: 'CC-BY' },
+  { id: 'x_a5', title: 'Cosmos Laundromat: First Cycle（2015）', cat: 'ai', cover: '🐑', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '首集正式片 · 全片约 12 分钟', playMode: 'embed', license: 'CC-BY' },
+  { id: 'x_a6', title: 'Sprite Fright（2021）', cat: 'ai', cover: '🧚', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '喜剧恐怖短片 · 全片约 10 分钟', playMode: 'blocked', reason: 'stream_expired', license: 'CC-BY' },
 ];
 
 const PLAY_MSG: Record<string, string> = {
@@ -374,7 +375,7 @@ function HomeView(props: {
             <span className="manju-ext-entry-emoji">🧭</span>
             <div className="manju-cont-info">
               <div className="manju-card-title">外部片单索引</div>
-              <div className="muted">共 {props.extTotal} 条 · 漫剧 / AI 剧 · 播放源解析演示</div>
+              <div className="muted">共 {props.extTotal} 条 · 公版漫剧 / CC-BY 开源剧 · 无版权争议</div>
             </div>
             <span className="manju-ext-arrow">›</span>
           </div>
@@ -530,7 +531,7 @@ function WatchView(props: {
 
 const EXT_TABS: Array<{ id: 'comic' | 'ai'; label: string }> = [
   { id: 'comic', label: '漫剧' },
-  { id: 'ai', label: 'AI 剧' },
+  { id: 'ai', label: '开源 · AI 剧' },
 ];
 
 function ExtView(props: {
@@ -574,7 +575,8 @@ function ExtView(props: {
 
       <div className="muted manju-ext-note">
         外部片单仅提供发现与播放源解析演示：直链可播 → 站内嵌入 → 不可播（降级）。
-        「AI 剧」分类数据来源：红果短剧 AI 剧场（公开元数据，不提供播放）。
+        收录标准：全部为公有领域（Public Domain）或 CC-BY 署名授权内容，授权可验证、无版权争议；
+        「开源 · AI 剧」分类以 Blender 开源电影为主，真正 AI 生成剧集普遍保留创作者版权，站内自有 AI 原创剧见首页。
       </div>
 
       {props.items.map((it) => {
@@ -586,6 +588,7 @@ function ExtView(props: {
               <div className="manju-cont-info">
                 <div className="manju-card-title">
                   {it.title}
+                  {it.license && <span className="manju-badge manju-license">{it.license}</span>}
                   {it.custom && <span className="manju-badge manju-custom">自定义</span>}
                 </div>
                 <div className="muted">{it.source}</div>
@@ -830,7 +833,7 @@ export function ManjuPage() {
       {renderBody()}
       <div className="manju-foot muted">
         站内剧集为演示数据，原创 AI 剧《重生：我成了漫画主角》为本站 AI 生成演示内容；
-        「AI 剧」片单数据来源：红果短剧（仅收录公开元数据与来源，不提供播放），作品版权归原权利人所有。
+        外部片单均为公有领域（Public Domain）或 CC-BY 署名授权内容，授权可验证、无版权争议；「解析播放源」为演示行为，不实际拉流。
       </div>
     </div>
   );
