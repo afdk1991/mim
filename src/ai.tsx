@@ -5,7 +5,7 @@ import { cx, uid } from './utils'
 
 /* ============================================================
  * AI 可转载资源库 —— 重新开发自合并源码 ai-server-resources（可转载资源清单站）
- * 纯前端 mock：资源库（分类/许可筛选）/ 资源详情 / 转载合规自查 / 收藏与 Markdown 导出
+ * 资源库（分类/许可筛选）/ 资源详情 / 转载合规自查 / 收藏与 Markdown 导出；资源链接均为真实可访问地址
  * 母本为纯静态多页站点，此处重实现为单页内视图切换；母本「精选 21 项与全量库数据割裂」
  * 的缺陷在此收敛为单一数据源，署名模板改为按许可等级自动生成。
  * ============================================================ */
@@ -602,7 +602,7 @@ export function AiResPage() {
   }
 
   const resetAll = () => {
-    if (!window.confirm('重置演示数据？收藏与自查进度将恢复为初始样例。')) return
+    if (!window.confirm('重置收藏与自查进度？将恢复为初始样例。')) return
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -612,7 +612,7 @@ export function AiResPage() {
     setView('lib')
     setCat('all')
     setLevel('all')
-    toast('♻️ 演示数据已重置')
+    toast('♻️ 收藏与自查进度已重置')
   }
 
   const cur = RESOURCES.find((r) => r.id === selId)
@@ -622,7 +622,7 @@ export function AiResPage() {
       <div>
         <h2 className="page-title">📚 AI 可转载资源库</h2>
         <p className="muted" style={{ margin: '0 0 12px' }}>
-          大模型与服务器技术领域的公开可转载资源索引 · 8 大类，逐项标注许可等级与署名方式（演示数据）
+          大模型与服务器技术领域的公开可转载资源索引 · 8 大类，逐项标注许可等级与署名方式
         </p>
 
         <div className="ai-actions">
@@ -639,7 +639,7 @@ export function AiResPage() {
             📤 导出
           </button>
           <button className="btn btn-ghost btn-sm" onClick={resetAll}>
-            ♻️ 重置演示数据
+            ♻️ 重置进度
           </button>
         </div>
 

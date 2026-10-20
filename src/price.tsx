@@ -3,8 +3,9 @@ import { useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
 
 /* ============================================================
- * 价格监控 —— 重新开发自合并源码 services/price-crawler（价格采集服务）
- * 纯前端 mock：商品价格曲线 / 采集任务 / 降价预警，localStorage 持久化
+ * 价格监控 —— 行情数据来自 CoinGecko 公开 API（真实数据源，无需密钥）
+ * 监控标的：加密资产人民币计价实时价；打开页面自动同步一次，
+ * 「立即采集」重新拉取；降价预警基于真实价格与预警线判定，localStorage 持久化。
  * ============================================================ */
 
 interface PricePoint {
@@ -42,32 +43,55 @@ interface PriceBoard {
   alerts: PriceAlert[]
 }
 
-const STORAGE_KEY = 'mim-price-v1'
+const STORAGE_KEY = 'mim-price-v2'
+
+/* CoinGecko 实时行情：一次批量请求全部监控标的，CNY 计价 + 24h 涨跌 */
+const CG_IDS = 'bitcoin,ethereum,solana,binancecoin,dogecoin'
+
+interface CgQuote {
+  price: number
+  change: number
+}
+
+async function fetchCnyQuotes(): Promise<Record<string, CgQuote>> {
+  const ctl = new AbortController()
+  const timer = window.setTimeout(() => ctl.abort(), 10000)
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${CG_IDS}&vs_currencies=cny&include_24hr_change=true`,
+      { signal: ctl.signal },
+    )
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const raw = (await res.json()) as Record<string, { cny?: number; cny_24h_change?: number }>
+    const out: Record<string, CgQuote> = {}
+    for (const [id, v] of Object.entries(raw)) {
+      if (v && typeof v.cny === 'number' && Number.isFinite(v.cny) && v.cny > 0) {
+        out[id] = { price: v.cny, change: typeof v.cny_24h_change === 'number' ? v.cny_24h_change : 0 }
+      }
+    }
+    if (!Object.keys(out).length) throw new Error('empty quotes')
+    return out
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
 
 function seedData(): PriceBoard {
-  const day = (n: number) => Date.now() - n * 86_400_000
-  const hr = (n: number) => Date.now() - n * 3_600_000
-  const min = (n: number) => Date.now() - n * 60_000
-  const hist = (start: number, step: number, n: number): PricePoint[] => {
-    const arr: PricePoint[] = []
-    for (let i = n - 1; i >= 0; i--) arr.push({ at: day(i), price: start - (n - 1 - i) * step })
-    return arr
-  }
+  const mk = (id: string, name: string, emoji: string): WatchProduct => ({
+    id, name, emoji, platform: 'CoinGecko 实时', threshold: 0, prices: [],
+  })
   return {
     products: [
-      { id: 'p1', name: 'AirPods Pro 2', emoji: '🎧', platform: '京东', threshold: 1800, prices: hist(2099, 30, 8) },
-      { id: 'p2', name: '小米手环 9', emoji: '📿', platform: '拼多多', threshold: 200, prices: hist(249, 4, 8) },
-      { id: 'p3', name: '乌龙茶礼盒', emoji: '🍵', platform: '天猫', threshold: 80, prices: hist(99, 2, 8) },
-      { id: 'p4', name: 'K87 机械键盘', emoji: '⌨️', platform: '淘宝', threshold: 280, prices: hist(349, 7, 8) },
-      { id: 'p5', name: '健身环大冒险', emoji: '🎮', platform: '京东', threshold: 350, prices: hist(459, 10, 8) },
+      mk('bitcoin', '比特币 BTC', '₿'),
+      mk('ethereum', '以太坊 ETH', 'Ξ'),
+      mk('solana', 'Solana SOL', '◎'),
+      mk('binancecoin', 'BNB 币安币', '🔶'),
+      mk('dogecoin', '狗狗币 DOGE', '🐕'),
     ],
-    tasks: [
-      { productId: 'p1', freq: '每 30 分钟', enabled: true, lastRunAt: min(12) },
-      { productId: 'p2', freq: '每小时', enabled: true, lastRunAt: min(47) },
-      { productId: 'p4', freq: '每天 08:00', enabled: false, lastRunAt: day(1) },
-      { productId: 'p5', freq: '每 30 分钟', enabled: true, lastRunAt: min(18) },
-    ],
-    alerts: [{ id: 'al0', productId: 'p5', from: 399, to: 389, at: hr(2) }],
+    tasks: ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'dogecoin'].map((productId) => ({
+      productId, freq: '打开页面 / 手动同步', enabled: true, lastRunAt: 0,
+    })),
+    alerts: [],
   }
 }
 
@@ -144,6 +168,7 @@ function Spark({ prices }: { prices: PricePoint[] }) {
 
 export function PriceMonitorPage() {
   const [board, setBoard] = useState<PriceBoard>(loadBoard)
+  const [syncing, setSyncing] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -156,30 +181,50 @@ export function PriceMonitorPage() {
 
   const { products, tasks, alerts } = board
 
-  function crawl(pid: string) {
-    const product = board.products.find((p) => p.id === pid)
-    if (!product) return
-    const last = product.prices[product.prices.length - 1].price
-    let next: number
-    if (Math.random() < 0.12) {
-      next = Math.round(last * (0.85 + Math.random() * 0.07)) // 偶发大降价
-    } else {
-      next = Math.round(last * (1 + (Math.random() * 0.08 - 0.045)))
-    }
-    next = Math.max(1, next)
-    const now = Date.now()
-    setBoard((b) => ({
-      products: b.products.map((p) =>
-        p.id === pid ? { ...p, prices: [...p.prices, { at: now, price: next }].slice(-30) } : p,
-      ),
-      tasks: b.tasks.map((t) => (t.productId === pid ? { ...t, lastRunAt: now } : t)),
-      alerts:
-        next < last && (next <= product.threshold || (last - next) / last >= 0.05)
-          ? [{ id: uid('al'), productId: pid, from: last, to: next, at: now }, ...b.alerts]
-          : b.alerts,
-    }))
-    toast(next < last ? `📉 采集完成：¥${last} → ¥${next}` : `📊 采集完成：¥${next}`)
+  /* 从 CoinGecko 拉取全部监控标的实时价（CNY），更新价格曲线并按预警线判定降价 */
+  function syncAll() {
+    if (syncing) return
+    setSyncing(true)
+    void fetchCnyQuotes()
+      .then((quotes) => {
+        const now = Date.now()
+        let fetched = 0
+        setBoard((b) => {
+          const newAlerts: PriceAlert[] = []
+          const products = b.products.map((p) => {
+            const q = quotes[p.id]
+            if (!q) return p
+            fetched++
+            const last = p.prices.length ? p.prices[p.prices.length - 1].price : null
+            const threshold = p.threshold > 0 ? p.threshold : Math.round(q.price * 0.9)
+            const dropped = last !== null && q.price < last
+            const pct = last ? (q.price - last) / last : 0
+            if (last !== null && dropped && (q.price <= threshold || -pct >= 0.05)) {
+              newAlerts.push({ id: uid('al'), productId: p.id, from: last, to: q.price, at: now })
+            }
+            return { ...p, threshold, prices: [...p.prices, { at: now, price: q.price }].slice(-30) }
+          })
+          return {
+            products,
+            tasks: b.tasks.map((t) => (quotes[t.productId] ? { ...t, lastRunAt: now } : t)),
+            alerts: [...newAlerts, ...b.alerts],
+          }
+        })
+        toast(fetched ? `📊 已同步 ${fetched} 项实时价格（CNY）` : '未获取到行情数据')
+      })
+      .catch((e) => {
+        console.warn('[price] CoinGecko 请求失败', e)
+        toast('⚠️ 行情获取失败，请稍后重试')
+      })
+      .finally(() => setSyncing(false))
   }
+
+  /* 首次进入（或迁移到 v2 存档）时自动同步一次实时行情 */
+  const needsFetch = products.some((p) => p.prices.length === 0)
+  useEffect(() => {
+    if (needsFetch) void syncAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function toggleTask(pid: string) {
     setBoard((b) => ({
@@ -197,6 +242,9 @@ export function PriceMonitorPage() {
     <div className="page-grid single">
       <div>
         <h2 className="page-title">📉 价格监控</h2>
+        <p className="muted" style={{ marginTop: -6, marginBottom: 12 }}>
+          行情来自 CoinGecko 公开 API · 加密资产人民币实时价 · 首次打开自动同步
+        </p>
 
         <div className="stat-row">
           <div className="stat-box"><b>{products.length}</b><span>监控商品</span></div>
@@ -207,10 +255,10 @@ export function PriceMonitorPage() {
 
         <div className="price-grid">
           {products.map((p) => {
-            const last = p.prices[p.prices.length - 1]
+            const last = p.prices.length ? p.prices[p.prices.length - 1] : null
             const prev = p.prices.length > 1 ? p.prices[p.prices.length - 2] : null
-            const delta = prev ? last.price - prev.price : 0
-            const pct = prev && prev.price > 0 ? ((last.price - prev.price) / prev.price) * 100 : 0
+            const delta = last && prev ? last.price - prev.price : 0
+            const pct = last && prev && prev.price > 0 ? ((last.price - prev.price) / prev.price) * 100 : 0
             const task = tasks.find((t) => t.productId === p.id)
             return (
               <div key={p.id} className="card">
@@ -218,7 +266,7 @@ export function PriceMonitorPage() {
                   <span className="price-emoji">{p.emoji}</span>
                   <div className="price-card-name">
                     <b>{p.name}</b>
-                    <small>{p.platform} · 预警线 {fmtPrice(p.threshold)}</small>
+                    <small>{p.platform} · 预警线 {p.threshold > 0 ? fmtPrice(p.threshold) : '待采集'}</small>
                   </div>
                   {task && (
                     <span className={cx('tag', !task.enabled && 'tag-off')}>
@@ -227,18 +275,25 @@ export function PriceMonitorPage() {
                   )}
                 </div>
                 <div className="price-now-row">
-                  <b className="price-now">{fmtPrice(last.price)}</b>
-                  {prev && (
+                  {last ? (
+                    <b className="price-now">{fmtPrice(last.price)}</b>
+                  ) : (
+                    <b className="price-now muted">—</b>
+                  )}
+                  {last && prev && (
                     <span className={delta < 0 ? 'price-drop' : delta > 0 ? 'price-up' : 'muted'}>
                       {delta < 0 ? '↓' : delta > 0 ? '↑' : '—'} {Math.abs(delta).toFixed(0)}
                       （{pct > 0 ? '+' : ''}{pct.toFixed(1)}%）
                     </span>
                   )}
                 </div>
+                {!last && <p className="muted" style={{ margin: '8px 0' }}>暂无数据，点击「立即采集」获取实时价</p>}
                 <Spark prices={p.prices} />
                 <div className="price-foot">
-                  <small>上次采集 {timeAgo(task?.lastRunAt ?? last.at)}</small>
-                  <button className="btn btn-primary btn-sm" onClick={() => crawl(p.id)}>立即采集</button>
+                  <small>上次同步 {last ? timeAgo(last.at) : '—'}</small>
+                  <button className="btn btn-primary btn-sm" onClick={() => syncAll()} disabled={syncing}>
+                    {syncing ? '同步中…' : '立即采集'}
+                  </button>
                 </div>
               </div>
             )
@@ -255,7 +310,7 @@ export function PriceMonitorPage() {
                 <span className="price-emoji">{p.emoji}</span>
                 <div className="res-main">
                   <b>{p.name} · {p.platform}</b>
-                  <p>频率 {t.freq} · 上次运行 {timeAgo(t.lastRunAt)}</p>
+                  <p>频率 {t.freq} · 上次运行 {t.lastRunAt ? timeAgo(t.lastRunAt) : '—'}</p>
                 </div>
                 <button
                   className={cx('btn btn-sm', t.enabled ? 'btn-ghost' : 'btn-primary')}
