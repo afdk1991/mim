@@ -20,7 +20,18 @@ function loadCoze(): CozeState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as CozeState
-      if (parsed && typeof parsed.offline === 'boolean' && Array.isArray(parsed.history)) return parsed
+      if (
+        parsed &&
+        typeof parsed.offline === 'boolean' &&
+        Array.isArray(parsed.history) &&
+        parsed.history.every(
+          (h): h is HealthRecord =>
+            !!h && typeof h === 'object' &&
+            typeof h.at === 'number' && Number.isFinite(h.at) &&
+            typeof h.ok === 'boolean' &&
+            typeof h.latency === 'number' && Number.isFinite(h.latency),
+        )
+      ) return parsed
     }
   } catch { /* 忽略损坏数据 */ }
   return { offline: false, history: [] }

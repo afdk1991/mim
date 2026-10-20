@@ -54,7 +54,19 @@ function loadEmail(): EmailState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as EmailState
-      if (parsed && Array.isArray(parsed.mails)) return parsed
+      if (parsed && Array.isArray(parsed.mails)) {
+        // 元素级校验：剔除脏数据，避免损坏存档导致列表/详情渲染异常
+        const mails = parsed.mails.filter(
+          (m): m is Mail =>
+            !!m && typeof m === 'object' &&
+            typeof m.id === 'string' && typeof m.accountId === 'string' &&
+            typeof m.from === 'string' && typeof m.subject === 'string' &&
+            Array.isArray(m.body) && m.body.every((b): b is string => typeof b === 'string') &&
+            typeof m.at === 'number' && Number.isFinite(m.at) &&
+            typeof m.read === 'boolean' && typeof m.starred === 'boolean',
+        )
+        return { mails }
+      }
     }
   } catch { /* 忽略损坏数据 */ }
   return { mails: seedMails() }

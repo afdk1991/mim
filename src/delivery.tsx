@@ -72,7 +72,28 @@ function loadBoard(): BoardData {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as BoardData
-      if (parsed && Array.isArray(parsed.riders) && Array.isArray(parsed.orders)) return parsed
+      if (parsed && Array.isArray(parsed.riders) && Array.isArray(parsed.orders)) {
+        // 元素级校验：剔除脏数据，避免损坏存档导致看板渲染异常
+        const riders = parsed.riders.filter(
+          (r): r is Rider =>
+            !!r && typeof r === 'object' &&
+            typeof r.id === 'string' && typeof r.name === 'string' &&
+            typeof r.emoji === 'string' && typeof r.vehicle === 'string' &&
+            (typeof r.orderId === 'string' || r.orderId === null),
+        )
+        const orders = parsed.orders.filter(
+          (o): o is DeliveryOrder =>
+            !!o && typeof o === 'object' &&
+            typeof o.id === 'string' && typeof o.code === 'string' &&
+            typeof o.customer === 'string' && typeof o.address === 'string' &&
+            typeof o.items === 'string' &&
+            typeof o.amount === 'number' && Number.isFinite(o.amount) &&
+            STATUS_ORDER.includes(o.status) &&
+            (typeof o.riderId === 'string' || o.riderId === null) &&
+            typeof o.createdAt === 'number' && Number.isFinite(o.createdAt),
+        )
+        return { riders, orders }
+      }
     }
   } catch {
     /* 忽略损坏的本地数据，重新播种 */
