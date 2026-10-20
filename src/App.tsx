@@ -1,3 +1,4 @@
+import './search-box.css'
 import { useEffect, useRef, useState } from 'react'
 import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
@@ -134,8 +135,10 @@ function useTheme() {
 
 function SideNav() {
   const api = useApp()
-  const { path } = useRouter()
+  const { path, navigate } = useRouter()
   const [open, setOpen] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const [dropOpen, setDropOpen] = useState(false)
 
   /* 路由变化后自动展开包含当前页的分组 */
   useEffect(() => {
@@ -148,9 +151,72 @@ function SideNav() {
     }
   }, [path])
 
+  const hits = matchSearchPages(q)
+
+  const goSearch = () => {
+    const kw = q.trim()
+    if (!kw) return
+    navigate(`#/search?q=${encodeURIComponent(kw)}`)
+    setDropOpen(false)
+  }
+
   return (
     <aside className="sidenav">
       <a className="brand" href="#/feed">Mim</a>
+      <div
+        className="sidenav-search"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOpen(false)
+        }}
+      >
+        <i className="sidenav-search-ico" aria-hidden="true">🔍</i>
+        <input
+          className="sidenav-search-input"
+          type="search"
+          placeholder="全站搜索"
+          aria-label="全站搜索"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setDropOpen(true)
+          }}
+          onFocus={() => setDropOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') goSearch()
+            if (e.key === 'Escape') setDropOpen(false)
+          }}
+        />
+        {dropOpen && q.trim() !== '' && (
+          <div className="sidenav-search-drop">
+            {hits.length === 0 ? (
+              <button className="sidenav-search-item" onClick={goSearch}>
+                没有匹配的功能页，回车搜索「{q.trim()}」
+              </button>
+            ) : (
+              <>
+                {hits.slice(0, 8).map((p) => (
+                  <button
+                    key={p.href}
+                    className="sidenav-search-item"
+                    onClick={() => {
+                      navigate(p.href)
+                      setDropOpen(false)
+                      setQ('')
+                    }}
+                  >
+                    <i aria-hidden="true">{p.icon}</i>
+                    <span className="sidenav-search-name">{p.name}</span>
+                    <em>{p.group}</em>
+                  </button>
+                ))}
+                <button className="sidenav-search-item sidenav-search-all" onClick={goSearch}>
+                  查看全部搜索结果
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       <nav className="sidenav-nav">
         {NAV.map((item) => {
           const badge =
@@ -216,7 +282,7 @@ function Page() {
   const [root, param] = segs
 
   switch (root) {
-    /* ---------- 微博 ---------- */
+    /* ---------- 动态 ---------- */
     case undefined:
     case 'feed':
       return <FeedPage />
@@ -241,7 +307,7 @@ function Page() {
     case 'user':
       return param ? <ProfilePage id={param} /> : <Empty text="缺少用户 id" />
 
-    /* ---------- CSDN ---------- */
+    /* ---------- 文章 ---------- */
     case 'articles':
       return <ArticlesPage />
     case 'article':
@@ -476,7 +542,7 @@ function UserMenu() {
   )
 }
 
-/* 仿微博顶部 hero：深色星空横幅 + 右上工具区 + 居中 logo + 完整搜索模块（下拉：历史/热搜/联想/清空） */
+/* 顶部 hero：深色星空横幅 + 右上工具区 + 居中 logo + 完整搜索模块（下拉：历史/热搜/联想/清空） */
 function WbHero() {
   const api = useApp()
   const { navigate } = useRouter()

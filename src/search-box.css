@@ -1,0 +1,105 @@
+/* ============ 侧边栏全局搜索（brand 下方胶囊输入 + 功能页联想下拉） ============ */
+
+.sidenav-search {
+  position: relative;
+  margin: 0 10px;
+}
+
+.sidenav-search-ico {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-style: normal;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.sidenav-search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 7px 12px 7px 32px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: all 0.15s;
+}
+
+.sidenav-search-input:focus {
+  background: var(--card);
+  border-color: var(--primary);
+}
+
+.sidenav-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.sidenav-search-drop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  z-index: 60;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sidenav-search-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sidenav-search-item:hover {
+  background: var(--primary-weak);
+  color: var(--primary-deep);
+}
+
+.sidenav-search-item i {
+  font-style: normal;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidenav-search-item em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.sidenav-search-all {
+  color: var(--primary-deep);
+  font-weight: 600;
+  justify-content: center;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+}
+
+/* 小屏：侧边栏折回顶部条，搜索固定宽度 */
+@media (max-width: 860px) {
+  .sidenav-search {
+    width: 150px;
+    flex-shrink: 0;
+    margin: 0;
+  }
+}
