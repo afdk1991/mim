@@ -91,7 +91,6 @@ const NAV: NavItem[] = [
   { href: '#/articles', match: '/article', label: '文章', icon: '📝' },
   { href: '#/write', match: '/write', label: '写文章', icon: '✍️' },
   { href: '#/topics', match: '/topics', label: '超话', icon: '🔥' },
-  { href: '#/search', match: '/search', label: '搜索', icon: '🔍' },
   { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif' },
   { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg' },
   {
