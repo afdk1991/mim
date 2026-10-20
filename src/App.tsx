@@ -39,6 +39,8 @@ import { MixPage } from './mix'
 import { LaalPage } from './laal'
 import { GexmPage } from './gexm'
 import { ArdotPage } from './ardot'
+import { MallProvider } from './mall/store'
+import { MallHomePage } from './mall/MallHome'
 import { clearHistory, cx, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 
@@ -106,6 +108,13 @@ const NAV: NavItem[] = [
       { href: '#/history', match: '/history', label: '足迹' },
       { href: '#/following', match: '/following', label: '关注列表' },
     ],
+  },
+  {
+    href: '#/mall',
+    match: '/mall',
+    label: '商城',
+    icon: '🛒',
+    children: [{ href: '#/mall', match: '/mall', label: '商城中心' }],
   },
   { href: '#', match: '/__toolbox__', label: '工具箱', icon: '🧰', groups: TOOLBOX_GROUPS },
 ]
@@ -308,6 +317,10 @@ function Page() {
     case 'tags':
       return <TagsPage />
 
+    /* ---------- 商城中台 ---------- */
+    case 'mall':
+      return <MallHomePage />
+
     /* ---------- 工具台 ---------- */
     case 'delivery':
       return <DeliveryBoardPage />
@@ -492,9 +505,11 @@ export default function App() {
   return (
     <AppProvider>
       <ToastProvider>
-        <RouterProvider>
-          <Shell />
-        </RouterProvider>
+        <MallProvider>
+          <RouterProvider>
+            <Shell />
+          </RouterProvider>
+        </MallProvider>
       </ToastProvider>
     </AppProvider>
   )
