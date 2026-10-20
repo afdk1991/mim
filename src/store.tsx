@@ -6,6 +6,7 @@ import React, { createContext, useContext, useEffect, useMemo, useReducer } from
 import { createSeedState } from './data/seed'
 import type { AppState, Post, PostComment, Article, User } from './types'
 import { uid } from './utils'
+import { cloudWritePost, cloudWriteArticle, cloudWriteSnippet } from './lib/cloud-write'
 
 const STORAGE_KEY = 'mim-state-v1'
 
@@ -66,7 +67,7 @@ type Action =
   | { type: 'toggleFavorite'; payload: { kind: 'post' | 'article'; targetId: string } }
   | { type: 'savePostDraft'; payload: { content: string; topic: string | null; images: string[] } }
   | { type: 'deletePostDraft'; payload: string }
-  | { type: 'publishPostDraft'; payload: string }
+  | { type: 'publishPostDraft'; payload: { draftId: string; postId: string } }
   | { type: 'publishArticle'; payload: { id: string; draftId: string | null; title: string; content: string; tags: string[] } }
   | { type: 'saveArticleDraft'; payload: { id: string; title: string; content: string; tags: string[] } }
   | { type: 'deleteArticleDraft'; payload: string }
@@ -80,6 +81,9 @@ type Action =
   | { type: 'editArticle'; payload: { id: string; title: string; content: string; tags: string[] } }
   | { type: 'deleteArticle'; payload: string }
   | { type: 'setIdentity'; payload: { meId: string; user?: User } }
+  | { type: 'cloudRollbackPost'; payload: string }
+  | { type: 'cloudRollbackArticle'; payload: string }
+  | { type: 'cloudRollbackSnippet'; payload: string }
   | { type: 'reset' }
 
 function makeSummary(content: string): string {
@@ -89,6 +93,18 @@ function makeSummary(content: string): string {
     .replace(/\s+/g, ' ')
     .trim()
   return text.slice(0, 72) + (text.length > 72 ? '…' : '')
+}
+
+/* 云端写火后不管（轮 3 写路径）：本地已乐观更新，insert 成功或跳过（未登录/未配置）静默；
+   失败由 cloud-write 层弹提示，此处 dispatch 回滚撤销乐观结果。 */
+function fireCloudWrite<T>(
+  write: (entity: T) => Promise<boolean>,
+  entity: T,
+  rollback: () => void,
+): void {
+  void write(entity).then((ok) => {
+    if (!ok) rollback()
+  })
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -253,10 +269,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, postDrafts: state.postDrafts.filter((d) => d.id !== action.payload) }
 
     case 'publishPostDraft': {
-      const draft = state.postDrafts.find((d) => d.id === action.payload)
+      const draft = state.postDrafts.find((d) => d.id === action.payload.draftId)
       if (!draft) return state
       const post: Post = {
-        id: uid('p'),
+        id: action.payload.postId,
         authorId: state.meId,
         content: draft.content,
         images: draft.images,
@@ -407,6 +423,26 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, meId, users }
     }
 
+    /* 云端写失败回滚：仅移除当前身份新建的乐观条目，防误删他人/旧数据 */
+    case 'cloudRollbackPost':
+      return {
+        ...state,
+        posts: state.posts.filter((p) => !(p.id === action.payload && p.authorId === state.meId)),
+        favorites: state.favorites.filter((f) => !(f.type === 'post' && f.targetId === action.payload)),
+      }
+
+    case 'cloudRollbackArticle':
+      return {
+        ...state,
+        articles: state.articles.filter((a) => !(a.id === action.payload && a.authorId === state.meId)),
+      }
+
+    case 'cloudRollbackSnippet':
+      return {
+        ...state,
+        snippets: state.snippets.filter((s) => !(s.id === action.payload && s.authorId === state.meId)),
+      }
+
     case 'reset':
       return createSeedState()
 
@@ -499,15 +535,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       publishPost: (content, opts) => {
         const id = uid('p')
+        const images = opts?.images ?? []
+        const topic = opts?.topic ?? null
         dispatch({
           type: 'publishPost',
-          payload: { id, content, topic: opts?.topic ?? null, images: opts?.images ?? [], repostOfId: null, repostComment: '' },
+          payload: { id, content, topic, images, repostOfId: null, repostComment: '' },
         })
+        fireCloudWrite(
+          cloudWritePost,
+          { id, authorId: state.meId, content, images, createdAt: Date.now(), repostOfId: null, repostComment: '', likes: 0, likedByMe: false, reposts: 0, topic, source: '来自 网页版' },
+          () => dispatch({ type: 'cloudRollbackPost', payload: id }),
+        )
         return id
       },
       repostPost: (postId, comment) => {
         const id = uid('p')
         dispatch({ type: 'publishPost', payload: { id, content: '', topic: null, images: [], repostOfId: postId, repostComment: comment } })
+        fireCloudWrite(
+          cloudWritePost,
+          { id, authorId: state.meId, content: '', images: [], createdAt: Date.now(), repostOfId: postId, repostComment: comment, likes: 0, likedByMe: false, reposts: 0, topic: null, source: '来自 网页版' },
+          () => dispatch({ type: 'cloudRollbackPost', payload: id }),
+        )
         return id
       },
       deletePost: (id) => dispatch({ type: 'deletePost', payload: id }),
@@ -528,10 +576,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleFavorite: (kind, targetId) => dispatch({ type: 'toggleFavorite', payload: { kind, targetId } }),
       savePostDraft: (content, topic, images) => dispatch({ type: 'savePostDraft', payload: { content, topic, images } }),
       deletePostDraft: (id) => dispatch({ type: 'deletePostDraft', payload: id }),
-      publishPostDraft: (id) => dispatch({ type: 'publishPostDraft', payload: id }),
+      publishPostDraft: (draftId) => {
+        const postId = uid('p')
+        dispatch({ type: 'publishPostDraft', payload: { draftId, postId } })
+        const draft = state.postDrafts.find((d) => d.id === draftId)
+        if (draft) {
+          fireCloudWrite(
+            cloudWritePost,
+            { id: postId, authorId: state.meId, content: draft.content, images: draft.images, createdAt: Date.now(), repostOfId: null, repostComment: '', likes: 0, likedByMe: false, reposts: 0, topic: draft.topic, source: '来自 网页版' },
+            () => dispatch({ type: 'cloudRollbackPost', payload: postId }),
+          )
+        }
+      },
       publishArticle: ({ title, content, tags, draftId }) => {
         const id = uid('a')
         dispatch({ type: 'publishArticle', payload: { id, draftId: draftId ?? null, title, content, tags } })
+        fireCloudWrite(
+          cloudWriteArticle,
+          { id, authorId: state.meId, title, summary: makeSummary(content), content, tags, createdAt: Date.now(), views: 0, likes: 0, likedByMe: false, comments: [] },
+          () => dispatch({ type: 'cloudRollbackArticle', payload: id }),
+        )
         return id
       },
       saveArticleDraft: ({ id, title, content, tags }) => {
@@ -547,8 +611,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addArticleComment: (articleId, content) =>
         dispatch({ type: 'addArticleComment', payload: { id: uid('ac'), articleId, content } }),
       toggleSnippetLike: (id) => dispatch({ type: 'toggleSnippetLike', payload: id }),
-      addSnippet: (title, language, code) =>
-        dispatch({ type: 'addSnippet', payload: { id: uid('s'), title, language, code } }),
+      addSnippet: (title, language, code) => {
+        const id = uid('s')
+        dispatch({ type: 'addSnippet', payload: { id, title, language, code } })
+        fireCloudWrite(
+          cloudWriteSnippet,
+          { id, authorId: state.meId, title, language, code, createdAt: Date.now(), likes: 0, likedByMe: false },
+          () => dispatch({ type: 'cloudRollbackSnippet', payload: id }),
+        )
+      },
       deleteSnippet: (id) => dispatch({ type: 'deleteSnippet', payload: id }),
       downloadResource: (id) => dispatch({ type: 'downloadResource', payload: id }),
       switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
