@@ -92,7 +92,7 @@ interface MjContRow {
 
 /* ================= 种子数据（全部内置，无网络请求） ================= */
 
-const mkEps = (sid: string, n: number, freeN: number): MjEpisode[] =>
+export const mkEps = (sid: string, n: number, freeN: number): MjEpisode[] =>
   Array.from({ length: n }, (_, i) => ({
     id: `${sid}_e${String(i + 1).padStart(2, '0')}`,
     index: i + 1,
@@ -186,17 +186,17 @@ const REASON_LABEL: Record<string, string> = {
 
 const KEY = 'mim-manju-v1';
 
-function isExtItem(v: unknown): v is MjExtItem {
+export function isExtItem(v: unknown): v is MjExtItem {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
   return typeof o.id === 'string' && typeof o.title === 'string' && (o.cat === 'comic' || o.cat === 'ai');
 }
 
-function seedState(): MjState {
+export function seedState(): MjState {
   return { favorites: [], seen: [], progress: {}, customExt: [] };
 }
 
-function loadManju(): MjState {
+export function loadManju(): MjState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return seedState();
@@ -227,7 +227,7 @@ function loadManju(): MjState {
   }
 }
 
-function saveManju(s: MjState): void {
+export function saveManju(s: MjState): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
@@ -243,7 +243,7 @@ const HG_STEP = 60;
 /** 模块级内存缓存：同一会话内避免重复拉取 500KB 级目录 */
 const hgCache = new Map<string, HgItem[]>();
 
-function extUrl(file: string): string {
+export function extUrl(file: string): string {
   return `${import.meta.env.BASE_URL}external/${file}`;
 }
 
@@ -253,7 +253,7 @@ function isHgItemRaw(v: unknown): boolean {
   return typeof o.id === 'string' && typeof o.title === 'string' && typeof o.cover_url === 'string';
 }
 
-async function loadHgIndex(sig: AbortSignal): Promise<HgIndex> {
+export async function loadHgIndex(sig: AbortSignal): Promise<HgIndex> {
   const res = await fetch(extUrl('index.json'), { signal: sig });
   if (!res.ok) throw new Error(`目录加载失败（HTTP ${res.status}）`);
   const raw: unknown = await res.json();
@@ -279,7 +279,7 @@ async function loadHgIndex(sig: AbortSignal): Promise<HgIndex> {
   };
 }
 
-async function loadHgItems(cat: 'comic' | 'ai', sig: AbortSignal): Promise<HgItem[]> {
+export async function loadHgItems(cat: 'comic' | 'ai', sig: AbortSignal): Promise<HgItem[]> {
   const hit = hgCache.get(cat);
   if (hit) return hit;
   const res = await fetch(extUrl(EXT_FILES[cat]), { signal: sig });
