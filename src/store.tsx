@@ -95,7 +95,7 @@ type Action =
   | { type: 'readConversation'; payload: string }
   | { type: 'cloudRollbackMessage'; payload: string }
   | { type: 'toggleFavorite'; payload: { kind: 'post' | 'article'; targetId: string } }
-  | { type: 'savePostDraft'; payload: { content: string; topic: string | null; images: string[] } }
+  | { type: 'savePostDraft'; payload: { id?: string; content: string; topic: string | null; images: string[] } }
   | { type: 'deletePostDraft'; payload: string }
   | { type: 'publishPostDraft'; payload: { draftId: string; postId: string } }
   | { type: 'publishArticle'; payload: { id: string; draftId: string | null; title: string; content: string; tags: string[] } }
@@ -270,6 +270,8 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'receiveMessage': {
       const { id, userId, content, createdAt } = action.payload
+      // 按 id 去重：Realtime 推送与云端 pull 竞态时避免同一条消息重复入列
+      if (state.messages.some((m) => m.id === id)) return state
       return {
         ...state,
         messages: [...state.messages, { id, userId, fromMe: false, content, createdAt: createdAt ?? Date.now(), read: false }],
@@ -303,7 +305,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         postDrafts: [
-          { id: uid('pd'), content: action.payload.content, topic: action.payload.topic, images: action.payload.images, savedAt: Date.now() },
+          { id: action.payload.id ?? uid('pd'), content: action.payload.content, topic: action.payload.topic, images: action.payload.images, savedAt: Date.now() },
           ...state.postDrafts,
         ],
       }
@@ -529,6 +531,23 @@ function reducer(state: AppState, action: Action): AppState {
       const messages = [...c.messages, ...state.messages.filter((m) => !msgSet.has(m.id))].sort(
         (a, b) => a.createdAt - b.createdAt,
       )
+      // 通知合并：云端行替换同 id 本地行（云端为真实用户通知真源），按时间倒序
+      const notifSet = new Set(c.notifications.map((n) => n.id))
+      const notifications = [
+        ...c.notifications,
+        ...state.notifications.filter((n) => !notifSet.has(n.id)),
+      ].sort((a, b) => b.createdAt - a.createdAt)
+      // 草稿合并：云端行替换同 id 本地行（跨设备续写，云端为真源），按保存时间倒序
+      const pdSet = new Set(c.postDrafts.map((d) => d.id))
+      const postDrafts = [
+        ...c.postDrafts,
+        ...state.postDrafts.filter((d) => !pdSet.has(d.id)),
+      ].sort((a, b) => b.savedAt - a.savedAt)
+      const adSet = new Set(c.articleDrafts.map((d) => d.id))
+      const articleDrafts = [
+        ...c.articleDrafts,
+        ...state.articleDrafts.filter((d) => !adSet.has(d.id)),
+      ].sort((a, b) => b.savedAt - a.savedAt)
       const prev = state.cloudIds ?? { users: [], posts: [], articles: [], snippets: [] }
       return {
         ...state,
@@ -538,6 +557,9 @@ function reducer(state: AppState, action: Action): AppState {
         snippets,
         favorites,
         messages,
+        notifications,
+        postDrafts,
+        articleDrafts,
         followingIds: Array.from(new Set([...state.followingIds, ...c.followingIds])),
         cloudIds: {
           users: Array.from(new Set([...prev.users, ...Object.keys(c.users)])),
@@ -790,8 +812,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
       },
-      readNotification: (id) => dispatch({ type: 'readNotification', payload: id }),
-      readAllNotifications: () => dispatch({ type: 'readAllNotifications' }),
+      readNotification: (id) => {
+        dispatch({ type: 'readNotification', payload: id })
+        // 云端已读回写（未登录时内部自动 skip）；通知 id 为 text 列，无需 uuid 守卫
+        void cloudReadNotifications(id)
+      },
+      readAllNotifications: () => {
+        dispatch({ type: 'readAllNotifications' })
+        void cloudReadNotifications()
+      },
       sendMessage: (userId, content) => {
         const msgId = uid('m')
         dispatch({ type: 'sendMessage', payload: { id: msgId, userId, content } })
@@ -807,7 +836,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: 'receiveMessage', payload: { id: uid('m'), userId, content: reply } })
         }, 900)
       },
-      readConversation: (userId) => dispatch({ type: 'readConversation', payload: userId }),
+      readConversation: (userId) => {
+        dispatch({ type: 'readConversation', payload: userId })
+        // 云端真实用户（uuid）才可回写已读；seed id 不是 uuid 会 22P02，须守卫
+        if (state.cloudIds?.users.includes(userId)) void cloudReadConversation(userId)
+      },
       toggleFavorite: (kind, targetId) => {
         const exists = state.favorites.some((f) => f.type === kind && f.targetId === targetId)
         dispatch({ type: 'toggleFavorite', payload: { kind, targetId } })
@@ -820,8 +853,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
       },
-      savePostDraft: (content, topic, images) => dispatch({ type: 'savePostDraft', payload: { content, topic, images } }),
-      deletePostDraft: (id) => dispatch({ type: 'deletePostDraft', payload: id }),
+      savePostDraft: (content, topic, images) => {
+        const draftId = uid('pd')
+        dispatch({ type: 'savePostDraft', payload: { id: draftId, content, topic, images } })
+        // 草稿云端同步（未登录时内部自动 skip），跨设备续写
+        void cloudUpsertPostDraft({ id: draftId, content, topic, images, savedAt: Date.now() })
+      },
+      deletePostDraft: (id) => {
+        dispatch({ type: 'deletePostDraft', payload: id })
+        void cloudDeletePostDraft(id)
+      },
       publishPostDraft: (draftId) => {
         const postId = uid('p')
         dispatch({ type: 'publishPostDraft', payload: { draftId, postId } })
@@ -834,6 +875,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             () => dispatch({ type: 'cloudRollbackPost', payload: postId }),
           )
         }
+        // 草稿已发布，同步删除云端草稿（未同步过时为幂等空操作）
+        void cloudDeletePostDraft(draftId)
       },
       publishArticle: ({ title, content, tags, draftId }) => {
         const id = uid('a')
@@ -844,14 +887,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           () => dispatch({ type: 'cloudMark', payload: { kind: 'articles', id } }),
           () => dispatch({ type: 'cloudRollbackArticle', payload: id }),
         )
+        if (draftId) void cloudDeleteArticleDraft(draftId)
         return id
       },
       saveArticleDraft: ({ id, title, content, tags }) => {
         const finalId = id ?? uid('ad')
         dispatch({ type: 'saveArticleDraft', payload: { id: finalId, title, content, tags } })
+        void cloudUpsertArticleDraft({ id: finalId, title, content, tags, savedAt: Date.now() })
         return finalId
       },
-      deleteArticleDraft: (id) => dispatch({ type: 'deleteArticleDraft', payload: id }),
+      deleteArticleDraft: (id) => {
+        dispatch({ type: 'deleteArticleDraft', payload: id })
+        void cloudDeleteArticleDraft(id)
+      },
       updateProfile: (data) => {
         dispatch({ type: 'updateProfile', payload: data })
         // 真实档案始终尝试云端同步（未登录时 skip）；失败仅 toast，本地档案保留
