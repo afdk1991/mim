@@ -134,10 +134,9 @@ function loadTheme(): 'light' | 'dark' {
 
 function SideNav() {
   const api = useApp()
-  const { path, navigate } = useRouter()
+  const { path } = useRouter()
   const [theme, setTheme] = useState<'light' | 'dark'>(loadTheme)
   const [open, setOpen] = useState<string | null>(null)
-  const [q, setQ] = useState('')
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -163,16 +162,6 @@ function SideNav() {
   return (
     <aside className="sidenav">
       <a className="brand" href="#/feed">Mim</a>
-      <input
-        className="input sidenav-search"
-        type="search"
-        placeholder="🔍 搜索…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
-        }}
-      />
       <nav className="sidenav-nav">
         {NAV.map((item) => {
           const badge =
