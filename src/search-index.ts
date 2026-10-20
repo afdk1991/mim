@@ -39,11 +39,6 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/ai', name: 'AI 可转载资源库', icon: '📚', keywords: ['ai', '转载', '许可', '署名'], group: '工具台' },
   { href: '#/manju', name: '漫剧', icon: '🎬', keywords: ['漫剧', '短剧', '动画', '追剧'], group: '工具台' },
   { href: '#/ardot', name: '聚合监控', icon: '📡', keywords: ['探针', '审计', '健康'], group: '工具台' },
-  { href: '#/youxuan', name: '优选商城', icon: '🛍️', keywords: ['优选', '好物'], group: '工具台' },
-  { href: '#/live', name: '直播带货台', icon: '📺', keywords: ['直播', '带货', '礼物', '弹幕'], group: '工具台' },
-  { href: '#/mix', name: '本地生活', icon: '🍜', keywords: ['外卖', '跑腿', '打车'], group: '工具台' },
-  { href: '#/laal', name: '代驾平台', icon: '🚗', keywords: ['代驾', '司机', '行程', '叫车'], group: '工具台' },
-  { href: '#/gexm', name: '多端商城', icon: '🏬', keywords: ['多端', '秒杀', '签到'], group: '工具台' },
 ]
 
 /** 全站功能页匹配：名称或关键词双向 includes（兼容「机箱」搜 BOM、「bom工具」搜 BOM） */

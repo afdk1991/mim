@@ -104,11 +104,6 @@ const NAV: NavItem[] = [
   { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚' },
   { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬' },
   { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊' },
-  { href: '#/youxuan', match: '/youxuan', label: '优选商城', icon: '🛍️' },
-  { href: '#/live', match: '/live', label: '直播带货', icon: '📺' },
-  { href: '#/mix', match: '/mix', label: '本地生活', icon: '🍜' },
-  { href: '#/laal', match: '/laal', label: '代驾平台', icon: '🚗' },
-  { href: '#/gexm', match: '/gexm', label: '多端商城', icon: '🏬' },
 ]
 
 /* ---------- 深色模式 ---------- */
