@@ -3122,3 +3122,201 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   flex-wrap: wrap;
   margin: 10px 0;
 }
+
+/* ============ 用户菜单（hero 右上） & 登录页 ============ */
+
+.usermenu {
+  position: relative;
+}
+
+.usermenu-trigger {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+}
+
+.usermenu-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+}
+
+.usermenu-drop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 80;
+  width: 232px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.usermenu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.usermenu-head b {
+  display: block;
+  font-size: 14px;
+}
+
+.usermenu-head small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.usermenu-sec {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 6px 8px 2px;
+}
+
+.usermenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.usermenu-item:hover {
+  background: var(--primary-weak);
+}
+
+.usermenu-item.active {
+  color: var(--primary-deep);
+  font-weight: 600;
+}
+
+.usermenu-check {
+  margin-left: auto;
+  font-style: normal;
+  color: var(--primary);
+}
+
+.usermenu-ico {
+  width: 22px;
+  text-align: center;
+}
+
+/* ---------- 登录页 ---------- */
+
+.auth-wrap {
+  max-width: 460px;
+  margin: 24px auto 0;
+}
+
+.auth-card {
+  padding: 24px;
+}
+
+.auth-sec {
+  padding: 10px 0 2px;
+}
+
+.auth-head {
+  border-bottom: none;
+  padding: 8px 0;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.auth-tab.active {
+  background: var(--primary-weak);
+  border-color: var(--primary);
+  color: var(--primary-deep);
+  font-weight: 600;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-form input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.auth-err {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.auth-ok {
+  margin: 0;
+  color: var(--primary-deep);
+  font-size: 13px;
+}
+
+.auth-hint {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.auth-users {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.auth-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.auth-user.active {
+  border-color: var(--primary);
+  background: var(--primary-weak);
+  color: var(--primary-deep);
+  font-weight: 600;
+}
