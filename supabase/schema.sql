@@ -199,6 +199,16 @@ create table if not exists public.article_drafts (
   saved_at timestamptz not null default now()
 );
 
+-- documents（轮 6）：通用键值文档层——工具台等本地状态整体迁移云端的通用存储。
+-- 每用户每 key 一行，data 为任意 jsonb 快照（各模块整存整取，无需按模块建表）。
+create table if not exists public.documents (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  key        text not null,
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, key)
+);
+
 -- ============================================================================
 -- 索引
 -- ============================================================================
@@ -392,6 +402,7 @@ alter table public.favorites        enable row level security;
 alter table public.follows          enable row level security;
 alter table public.post_drafts      enable row level security;
 alter table public.article_drafts   enable row level security;
+alter table public.documents        enable row level security;
 
 -- ---------- profiles：公开读，本人改 ----------
 drop policy if exists profiles_select on public.profiles;
@@ -480,6 +491,10 @@ drop policy if exists post_drafts_all on public.post_drafts;
 create policy post_drafts_all on public.post_drafts for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy if exists article_drafts_all on public.article_drafts;
 create policy article_drafts_all on public.article_drafts for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------- documents（轮 6）：全私有（通用键值文档层） ----------
+drop policy if exists documents_all on public.documents;
+create policy documents_all on public.documents for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ---------- resources / topics / hot_searches：公开读，写入仅 service role（不建写策略） ----------
 drop policy if exists resources_select on public.resources;
