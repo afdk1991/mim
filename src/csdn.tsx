@@ -797,7 +797,7 @@ export function SearchPage() {
         <div className="search-bar">
           <input
             className="input"
-            placeholder="搜索微博 / 文章 / 用户 / 代码片段…"
+            placeholder="搜索动态 / 文章 / 用户 / 代码片段…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && doSearch()}
@@ -847,7 +847,7 @@ export function SearchPage() {
         <div className="tabs">
           {[
             { key: 'all', label: `综合` },
-            { key: 'post', label: `微博 (${results.posts.length})` },
+            { key: 'post', label: `动态 (${results.posts.length})` },
             { key: 'article', label: `文章 (${results.articles.length})` },
             { key: 'user', label: `用户 (${results.users.length})` },
             { key: 'snippet', label: `片段 (${results.snippets.length})` },
@@ -866,7 +866,7 @@ export function SearchPage() {
           <>
             {(tab === 'all' || tab === 'post') && results.posts.length > 0 && (
               <>
-                {tab === 'all' && <h3 className="page-title">🕊 微博</h3>}
+                {tab === 'all' && <h3 className="page-title">🕊 动态</h3>}
                 {results.posts.slice(0, tab === 'all' ? 3 : undefined).map((p) => (
                   <PostCardLite key={p.id} pid={p.id} />
                 ))}

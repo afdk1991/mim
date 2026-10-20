@@ -267,7 +267,7 @@ function Page() {
     case 'feed':
       return <FeedPage />
     case 'post':
-      return param ? <PostDetailPage id={param} /> : <Empty text="缺少微博 id" />
+      return param ? <PostDetailPage id={param} /> : <Empty text="缺少动态 id" />
     case 'topic':
       return param ? <TopicPage name={decodeURIComponent(param)} /> : <Empty text="缺少话题名" />
     case 'topics':
@@ -366,8 +366,8 @@ function HistoryPage() {
         key: 'post-' + p.id,
         at: h.at,
         icon: '📝',
-        label: '微博',
-        title: first.length > 60 ? first.slice(0, 60) + '…' : first || '查看微博',
+        label: '动态',
+        title: first.length > 60 ? first.slice(0, 60) + '…' : first || '查看动态',
         author: api.user(p.authorId).name,
         href: '#/post/' + p.id,
       })
@@ -403,7 +403,7 @@ function HistoryPage() {
           </button>
         </div>
         <div className="card">
-          {rows.length === 0 && <Empty emoji="👣" text="还没有足迹，去看看微博和文章吧" />}
+          {rows.length === 0 && <Empty emoji="👣" text="还没有足迹，去看看动态和文章吧" />}
           {rows.map((r) => (
             <div key={r.key} className="notif-row" onClick={() => navigate(r.href)}>
               <span className="notif-icon">{r.icon}</span>

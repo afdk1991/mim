@@ -91,7 +91,7 @@ function reducer(state: AppState, action: Action): AppState {
       const post: Post = {
         id: p.id,
         authorId: state.meId,
-        content: p.repostOfId ? p.repostComment || '转发微博' : p.content,
+        content: p.repostOfId ? p.repostComment || '转发动态' : p.content,
         images: p.repostOfId ? [] : p.images,
         createdAt: Date.now(),
         repostOfId: p.repostOfId,

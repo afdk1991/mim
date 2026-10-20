@@ -210,7 +210,7 @@ export function PostDetailPage({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  if (!post) return <Empty emoji="🔍" text="微博不存在或已被删除" />
+  if (!post) return <Empty emoji="🔍" text="动态不存在或已被删除" />
 
   const submit = () => {
     if (!input.trim()) return
@@ -588,13 +588,13 @@ export function FavoritesPage() {
       <div>
         <div className="tabs">
           <button className={cx('tab-btn', tab === 'post' && 'active')} onClick={() => setTab('post')}>
-            ⭐ 收藏的微博（{api.state.favorites.filter((f) => f.type === 'post').length}）
+            ⭐ 收藏的动态（{api.state.favorites.filter((f) => f.type === 'post').length}）
           </button>
           <button className={cx('tab-btn', tab === 'article' && 'active')} onClick={() => setTab('article')}>
             📄 收藏的文章（{api.state.favorites.filter((f) => f.type === 'article').length}）
           </button>
         </div>
-        {tab === 'post' && (posts.length === 0 ? <Empty emoji="⭐" text="还没有收藏微博" /> : posts.map((p) => <PostCard key={p.id} post={p} />))}
+        {tab === 'post' && (posts.length === 0 ? <Empty emoji="⭐" text="还没有收藏动态" /> : posts.map((p) => <PostCard key={p.id} post={p} />))}
         {tab === 'article' &&
           (articles.length === 0 ? <Empty emoji="📄" text="还没有收藏文章" /> : articles.map((a) => <ArticleCard key={a.id} article={a} />))}
       </div>
@@ -700,7 +700,7 @@ export function MyProfilePage() {
         <ProfileHead
           u={api.me}
           extraStats={[
-            { label: '微博', value: myPosts.length },
+            { label: '动态', value: myPosts.length },
             { label: '草稿', value: drafts.length },
           ]}
           actions={
@@ -724,7 +724,7 @@ export function MyProfilePage() {
         <MyAppHub />
         <div className="tabs">
           <button className={cx('tab-btn', tab === 'posts' && 'active')} onClick={() => setTab('posts')}>
-            我的微博（{myPosts.length}）
+            我的动态（{myPosts.length}）
           </button>
           <button className={cx('tab-btn', tab === 'drafts' && 'active')} onClick={() => setTab('drafts')}>
             草稿箱（{drafts.length}）
@@ -732,7 +732,7 @@ export function MyProfilePage() {
         </div>
 
         {tab === 'posts' &&
-          (myPosts.length === 0 ? <Empty emoji="✍️" text="你还没有发布过微博" /> : myPosts.map((p) => <PostCard key={p.id} post={p} />))}
+          (myPosts.length === 0 ? <Empty emoji="✍️" text="你还没有发布过动态" /> : myPosts.map((p) => <PostCard key={p.id} post={p} />))}
 
         {tab === 'drafts' && (
           <>
@@ -828,7 +828,7 @@ export function ProfilePage({ id }: { id: string }) {
       <div>
         <ProfileHead
           u={u}
-          extraStats={[{ label: '微博', value: posts.length }, { label: '文章', value: articles.length }]}
+          extraStats={[{ label: '动态', value: posts.length }, { label: '文章', value: articles.length }]}
           actions={
             <>
               <FollowButton userId={id} />
@@ -838,7 +838,7 @@ export function ProfilePage({ id }: { id: string }) {
             </>
           }
         />
-        {posts.length === 0 && <Empty emoji="🕊" text="TA 还没有发布过微博" />}
+        {posts.length === 0 && <Empty emoji="🕊" text="TA 还没有发布过动态" />}
         {posts.map((p) => (
           <PostCard key={p.id} post={p} />
         ))}

@@ -192,10 +192,10 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         {mine && (
           <button
             className="icon-btn post-del"
-            aria-label="删除微博"
+            aria-label="删除动态"
             onClick={() => {
               api.deletePost(post.id)
-              toast('微博已删除')
+              toast('动态已删除')
             }}
           >
             🗑
@@ -253,7 +253,7 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
       </div>
 
       {repostOpen && (
-        <Modal title="转发微博" onClose={() => setRepostOpen(false)}>
+        <Modal title="转发动态" onClose={() => setRepostOpen(false)}>
           <textarea
             className="input repost-input"
             rows={3}
@@ -266,7 +266,7 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
             <button
               className="btn btn-primary"
               onClick={() => {
-                api.repostPost(post.id, repostText || '转发微博')
+                api.repostPost(post.id, repostText || '转发动态')
                 setRepostOpen(false)
                 setRepostText('')
                 toast('转发成功')

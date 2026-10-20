@@ -858,13 +858,13 @@ export function createSeedState(): AppState {
     ],
 
     notifications: [
-      { id: 'n1', type: 'like', fromUserId: 'u1', content: '赞了你的微博', postId: 'p5', createdAt: hr(1), read: false },
-      { id: 'n2', type: 'comment', fromUserId: 'u3', content: '评论了你的微博：恭喜！灰度全量顺利吗？', postId: 'p5', createdAt: hr(2), read: false },
+      { id: 'n1', type: 'like', fromUserId: 'u1', content: '赞了你的动态', postId: 'p5', createdAt: hr(1), read: false },
+      { id: 'n2', type: 'comment', fromUserId: 'u3', content: '评论了你的动态：恭喜！灰度全量顺利吗？', postId: 'p5', createdAt: hr(2), read: false },
       { id: 'n3', type: 'follow', fromUserId: 'u4', content: '关注了你', postId: null, createdAt: hr(3), read: false },
-      { id: 'n4', type: 'repost', fromUserId: 'u5', content: '转发了你的微博', postId: 'p5', createdAt: hr(8), read: true },
+      { id: 'n4', type: 'repost', fromUserId: 'u5', content: '转发了你的动态', postId: 'p5', createdAt: hr(8), read: true },
       { id: 'n5', type: 'mention', fromUserId: 'u2', content: '在评论中提到了你：@小码 这个方案你觉得可行吗', postId: 'p2', createdAt: hr(14), read: true },
-      { id: 'n6', type: 'like', fromUserId: 'u7', content: '赞了你的微博', postId: 'p5', createdAt: hr(22), read: true },
-      { id: 'n7', type: 'comment', fromUserId: 'u8', content: '评论了你的微博：界面很好看，求设计稿', postId: 'p5', createdAt: day(2), read: true },
+      { id: 'n6', type: 'like', fromUserId: 'u7', content: '赞了你的动态', postId: 'p5', createdAt: hr(22), read: true },
+      { id: 'n7', type: 'comment', fromUserId: 'u8', content: '评论了你的动态：界面很好看，求设计稿', postId: 'p5', createdAt: day(2), read: true },
       { id: 'n8', type: 'follow', fromUserId: 'u9', content: '关注了你', postId: null, createdAt: day(3), read: true },
     ],
 
