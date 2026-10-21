@@ -1,7 +1,45 @@
 import type { AppState } from '../types'
+import { cloudEnabled } from '../lib/supabase'
 
-/** 生成一份全新的演示数据（每次 reset 重新计算时间戳） */
+/**
+ * 云端真实模式种子（Supabase 已配置时使用）：不生成任何演示内容。
+ * 游客看到空态 + 登录引导，登录用户由 cloud-read 拉取真实云端数据；
+ * 仅保留 me 本地乐观身份（发帖/评论的作者占位，登录后内容归属真实 uuid 档案）。
+ */
+function createCloudSeedState(): AppState {
+  return {
+    meId: 'me',
+    followingIds: [],
+    users: {
+      me: {
+        id: 'me',
+        name: '新用户',
+        emoji: '🙂',
+        color: '#4f7cff',
+        bio: '',
+        followers: 0,
+        following: 0,
+        verified: false,
+      },
+    },
+    topics: [],
+    hotSearches: [],
+    posts: [],
+    articles: [],
+    snippets: [],
+    resources: [],
+    notifications: [],
+    messages: [],
+    favorites: [],
+    postDrafts: [],
+    articleDrafts: [],
+  }
+}
+
+/** 生成一份全新的演示数据（每次 reset 重新计算时间戳）。
+    云端真实模式（已配置 Supabase）下不播种演示内容，见 createCloudSeedState。 */
 export function createSeedState(): AppState {
+  if (cloudEnabled) return createCloudSeedState()
   const T = Date.now()
   const min = (n: number) => T - n * 60_000
   const hr = (n: number) => T - n * 3_600_000
