@@ -19,7 +19,8 @@ export function MallCartPage() {
   const total = rows.reduce((sum, r) => sum + r.g.price * r.c.qty, 0)
   const count = rows.reduce((n, r) => n + r.c.qty, 0)
 
-  if (state.cart.length === 0) {
+  // 以可解析到商品库的条目为准（云端模式演示商品下架后，孤儿条目不阻塞空态判断）
+  if (rows.length === 0) {
     return (
       <div className="page-grid single">
         <div>

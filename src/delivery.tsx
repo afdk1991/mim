@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Modal, useToast } from './components'
+import { Empty, Modal, useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ============================================================
  * 配送调度台 —— 重新开发自合并源码 delivery-router（配送调度应用）
- * 纯前端 mock：订单看板 / 骑手分配 / 配送进度，localStorage 持久化
+ * 纯本地工具：订单看板 / 骑手分配 / 配送进度，全部数据由用户真实输入创建，
+ * localStorage 持久化，不预置任何演示数据（v2 存档，旧演示数据作废）。
  * ============================================================ */
 
 export type OrderStatus = 'pending' | 'picking' | 'delivering' | 'delivered'
@@ -44,28 +45,18 @@ const STATUS_META: Record<OrderStatus, { label: string; emoji: string }> = {
 
 const STATUS_ORDER: OrderStatus[] = ['pending', 'picking', 'delivering', 'delivered']
 
-const STORAGE_KEY = 'mim-delivery-v1'
+const STORAGE_KEY = 'mim-delivery-v2'
 
-function seedData(): BoardData {
-  const min = (n: number) => Date.now() - n * 60_000
-  const hr = (n: number) => Date.now() - n * 3_600_000
-  return {
-    riders: [
-      { id: 'r1', name: '小飞哥', emoji: '🦸', vehicle: '🛵 电动车', orderId: 'o3' },
-      { id: 'r2', name: '闪电侠', emoji: '⚡', vehicle: '🚴 单车', orderId: 'o4' },
-      { id: 'r3', name: '王师傅', emoji: '👨‍🔧', vehicle: '🚗 汽车', orderId: 'o5' },
-      { id: 'r4', name: '阿疾', emoji: '🐱', vehicle: '🛵 电动车', orderId: null },
-      { id: 'r5', name: '大鹏', emoji: '🕊️', vehicle: '🚴 单车', orderId: null },
-    ],
-    orders: [
-      { id: 'o1', code: 'D-2041', customer: '陈小姐', address: '桂花园小区 3 栋', items: '杨枝甘露 ×2', amount: 32.5, status: 'pending', riderId: null, createdAt: min(6) },
-      { id: 'o2', code: 'D-2042', customer: '李先生', address: '科技园 B 座 12F', items: '黄焖鸡米饭套餐', amount: 26, status: 'pending', riderId: null, createdAt: min(14) },
-      { id: 'o3', code: 'D-2043', customer: '周女士', address: '幸福里 7-201', items: '向日葵花束', amount: 58, status: 'picking', riderId: 'r1', createdAt: min(25) },
-      { id: 'o4', code: 'D-2044', customer: '赵同学', address: '大学城公寓 2-508', items: 'Switch 游戏卡带', amount: 299, status: 'delivering', riderId: 'r2', createdAt: min(52) },
-      { id: 'o5', code: 'D-2045', customer: '吴先生', address: '中央公园 9 栋', items: '6 寸生日蛋糕', amount: 128, status: 'delivering', riderId: 'r3', createdAt: hr(1.5) },
-      { id: 'o6', code: 'D-2039', customer: '郑阿姨', address: '老街 38 号', items: '常备药箱补货', amount: 46.8, status: 'delivered', riderId: 'r4', createdAt: hr(3) },
-    ],
-  }
+/* 新增骑手时的交通工具选项 */
+const VEHICLE_OPTIONS = [
+  { emoji: '🛵', label: '电动车' },
+  { emoji: '🚴', label: '单车' },
+  { emoji: '�', label: '汽车' },
+  { emoji: '�', label: '步行' },
+]
+
+function emptyBoard(): BoardData {
+  return { riders: [], orders: [] }
 }
 
 function loadBoard(): BoardData {
@@ -97,22 +88,26 @@ function loadBoard(): BoardData {
       }
     }
   } catch {
-    /* 忽略损坏的本地数据，重新播种 */
+    /* 忽略损坏的本地数据，从空看板开始 */
   }
-  return seedData()
+  return emptyBoard()
 }
 
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+/* 按现有单号递增生成下一个订单号（D-xxxx） */
+function nextCode(existing: DeliveryOrder[]): string {
+  let max = 2000
+  for (const o of existing) {
+    const n = parseInt(o.code.replace(/[^0-9]/g, ''), 10)
+    if (Number.isFinite(n) && n > max) max = n
+  }
+  return 'D-' + (max + 1)
 }
-
-const SPAWN_CUSTOMERS = ['孙同学', '钱经理', '冯阿姨', '褚先生', '卫女士', '蒋同学']
-const SPAWN_ITEMS = ['冰美式 ×2', '榴莲披萨 9 寸', '猫粮 5kg', '数据线 ×3', '水果捞大份', '打印纸一箱']
-const SPAWN_ADDRESSES = ['枫林路 21 号', '云端大厦 8F', '翡翠湾 5-301', '南门宿舍 402', '滨河花园 12 栋']
 
 export function DeliveryBoardPage() {
   const [board, setBoard] = useState<BoardData>(loadBoard)
   const [assignFor, setAssignFor] = useState<string | null>(null)
+  const [riderDraft, setRiderDraft] = useState<null | { name: string; vehicle: string }>(null)
+  const [orderDraft, setOrderDraft] = useState<null | { customer: string; address: string; items: string; amount: string }>(null)
   const toast = useToast()
 
   useEffect(() => {
@@ -168,26 +163,51 @@ export function DeliveryBoardPage() {
     }
   }
 
-  function spawn() {
+  /* 新增骑手：名称必填，交通工具从选项中选取 */
+  function addRider() {
+    const name = riderDraft!.name.trim()
+    if (!name) {
+      toast('请填写骑手名称')
+      return
+    }
+    const opt = VEHICLE_OPTIONS.find((v) => v.label === riderDraft!.vehicle)
+    setBoard((b) => ({
+      ...b,
+      riders: [...b.riders, { id: uid('r'), name, emoji: opt?.emoji ?? '🛵', vehicle: riderDraft!.vehicle, orderId: null }],
+    }))
+    setRiderDraft(null)
+    toast('骑手已加入队列')
+  }
+
+  /* 新增订单：收件人与物品必填，金额可选 */
+  function addOrder() {
+    const customer = orderDraft!.customer.trim()
+    const items = orderDraft!.items.trim()
+    if (!customer || !items) {
+      toast('请填写收件人与物品明细')
+      return
+    }
+    const amount = Math.round(Number(orderDraft!.amount) * 10) / 10
     const order: DeliveryOrder = {
       id: uid('o'),
-      code: 'D-' + Math.floor(2100 + Math.random() * 800),
-      customer: pick(SPAWN_CUSTOMERS),
-      address: pick(SPAWN_ADDRESSES),
-      items: pick(SPAWN_ITEMS),
-      amount: Math.round((15 + Math.random() * 280) * 10) / 10,
+      code: nextCode(orders),
+      customer,
+      address: orderDraft!.address.trim() || '—',
+      items,
+      amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
       status: 'pending',
       riderId: null,
       createdAt: Date.now(),
     }
     setBoard((b) => ({ ...b, orders: [order, ...b.orders] }))
-    toast('新订单已进入待分配队列')
+    setOrderDraft(null)
+    toast('订单已进入待分配队列')
   }
 
-  function resetBoard() {
-    if (!window.confirm('确定要重置配送看板的演示数据吗？')) return
-    setBoard(seedData())
-    toast('看板已重置')
+  function clearBoard() {
+    if (!window.confirm('确定清空全部骑手与订单数据吗？')) return
+    setBoard(emptyBoard())
+    toast('看板已清空')
   }
 
   return (
@@ -198,16 +218,19 @@ export function DeliveryBoardPage() {
         <div className="stat-row">
           <div className="stat-box"><b>{stats.pending}</b><span>待分配订单</span></div>
           <div className="stat-box"><b>{stats.active}</b><span>配送进行中</span></div>
-          <div className="stat-box"><b>{stats.done}</b><span>今日已送达</span></div>
-          <div className="stat-box"><b>¥{stats.revenue.toFixed(1)}</b><span>今日营收</span></div>
+          <div className="stat-box"><b>{stats.done}</b><span>已送达</span></div>
+          <div className="stat-box"><b>¥{stats.revenue.toFixed(1)}</b><span>累计营收</span></div>
         </div>
 
         <div className="card">
           <div className="board-toolbar">
             <b>骑手队列</b>
             <div className="toolbar-actions">
-              <button className="btn btn-primary btn-sm" onClick={spawn}>+ 模拟新订单</button>
-              <button className="btn btn-ghost btn-sm" onClick={resetBoard}>重置看板</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setRiderDraft({ name: '', vehicle: VEHICLE_OPTIONS[0].label })}>+ 新增骑手</button>
+              <button className="btn btn-primary btn-sm" onClick={() => setOrderDraft({ customer: '', address: '', items: '', amount: '' })}>+ 新增订单</button>
+              {(riders.length > 0 || orders.length > 0) && (
+                <button className="btn btn-ghost btn-sm" onClick={clearBoard}>清空数据</button>
+              )}
             </div>
           </div>
           <div className="rider-strip">
@@ -224,7 +247,14 @@ export function DeliveryBoardPage() {
               )
             })}
           </div>
+          {riders.length === 0 && (
+            <p className="muted" style={{ margin: '8px 0' }}>还没有骑手，点击「+ 新增骑手」添加。</p>
+          )}
         </div>
+
+        {orders.length === 0 && riders.length === 0 && (
+          <Empty emoji="🚚" text="看板为空：先添加骑手，再新增订单开始调度" />
+        )}
 
         <div className="kanban">
           {STATUS_ORDER.map((st) => {
@@ -297,6 +327,65 @@ export function DeliveryBoardPage() {
               </span>
             </button>
           ))}
+        </Modal>
+      )}
+
+      {riderDraft && (
+        <Modal title="新增骑手" onClose={() => setRiderDraft(null)}>
+          <input
+            className="input"
+            placeholder="骑手名称"
+            value={riderDraft.name}
+            onChange={(e) => setRiderDraft({ ...riderDraft, name: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <select
+            className="input"
+            aria-label="交通工具"
+            value={riderDraft.vehicle}
+            onChange={(e) => setRiderDraft({ ...riderDraft, vehicle: e.target.value })}
+            style={{ marginBottom: 10 }}
+          >
+            {VEHICLE_OPTIONS.map((v) => (
+              <option key={v.label} value={v.label}>{v.emoji} {v.label}</option>
+            ))}
+          </select>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={addRider}>添加</button>
+        </Modal>
+      )}
+
+      {orderDraft && (
+        <Modal title="新增订单" onClose={() => setOrderDraft(null)}>
+          <input
+            className="input"
+            placeholder="收件人"
+            value={orderDraft.customer}
+            onChange={(e) => setOrderDraft({ ...orderDraft, customer: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            placeholder="配送地址（可选）"
+            value={orderDraft.address}
+            onChange={(e) => setOrderDraft({ ...orderDraft, address: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            placeholder="物品明细"
+            value={orderDraft.items}
+            onChange={(e) => setOrderDraft({ ...orderDraft, items: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            type="number"
+            placeholder="订单金额（元，可选）"
+            value={orderDraft.amount}
+            onChange={(e) => setOrderDraft({ ...orderDraft, amount: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={addOrder}>创建订单</button>
         </Modal>
       )}
     </div>

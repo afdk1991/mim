@@ -71,7 +71,7 @@ const LEVELS: Record<Level, { emoji: string; label: string }> = {
   r: { emoji: '🔴', label: '需授权 / 仅可引用' },
 }
 
-/* ---------- 资源种子数据（每类 2-3 项示例） ---------- */
+/* ---------- 资源库数据（真实公开资源目录，逐项附可验证许可说明与官方链接） ---------- */
 
 const RESOURCES: ResItem[] = [
   {
@@ -251,7 +251,8 @@ const TEMPLATES: { name: string; text: string }[] = [
 /* ---------- 持久化 ---------- */
 
 function seedState(): AiState {
-  return { favs: ['A2', 'C1'], checks: ['s1-1', 's1-2'], customChecks: [], updatedAt: Date.now() }
+  // 初始不预填任何收藏/勾选，全部由用户操作产生
+  return { favs: [], checks: [], customChecks: [], updatedAt: Date.now() }
 }
 
 function loadAi(): AiState {
@@ -525,17 +526,11 @@ function FavsView({ items, onOpen, onFav, onExport, onGoLib }: FavsProps) {
 export function AiResPage() {
   const toast = useToast()
   const [state, setState] = useState<AiState>(loadAi)
-  const [loading, setLoading] = useState(true)
   const [view, setView] = useState<View>('lib')
   const [from, setFrom] = useState<View>('lib')
   const [selId, setSelId] = useState('')
   const [cat, setCat] = useState('all')
   const [level, setLevel] = useState<Level | 'all'>('all')
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setLoading(false), 400)
-    return () => window.clearTimeout(t)
-  }, [])
 
   useEffect(() => {
     try {
@@ -613,7 +608,7 @@ export function AiResPage() {
   }
 
   const resetAll = () => {
-    if (!window.confirm('重置收藏与自查进度？将恢复为初始样例。')) return
+    if (!window.confirm('重置收藏与自查进度？将清空为初始状态。')) return
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -623,7 +618,7 @@ export function AiResPage() {
     setView('lib')
     setCat('all')
     setLevel('all')
-    toast('♻️ 收藏与自查进度已重置')
+    toast('♻️ 收藏与自查进度已清空')
   }
 
   const cur = RESOURCES.find((r) => r.id === selId)
@@ -654,13 +649,7 @@ export function AiResPage() {
           </button>
         </div>
 
-        {loading ? (
-          <div className="card">
-            <p className="muted" style={{ margin: 0 }}>
-              ⏳ 正在加载资源库…
-            </p>
-          </div>
-        ) : view === 'detail' && cur ? (
+        {view === 'detail' && cur ? (
           <div>
             <button className="btn btn-ghost btn-sm" onClick={() => setView(from)}>
               ← 返回{from === 'favs' ? '收藏' : '资源库'}

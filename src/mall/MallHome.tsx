@@ -51,8 +51,9 @@ export function MallHomePage({ initial }: { initial?: MallChannel }) {
           ))}
         </div>
 
+        {/* 云端真实模式下商品库为空：空态 + 「发布自己的商品」引导（商城暂无独立发布流程，仅作文案引导） */}
         {goods.length === 0 ? (
-          <Empty text="该频道暂无商品" />
+          <Empty text={MALL_GOODS.length === 0 ? '商城暂无商品，欢迎发布自己的商品' : '该频道暂无商品'} />
         ) : (
           <div className="mall-grid">
             {goods.map((g) => (
