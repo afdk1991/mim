@@ -1,6 +1,8 @@
 import './wallet.css'
 import { useEffect, useState } from 'react'
 import { Empty, TimeAgo, emitToast, useToast } from './components'
+import { getCurrentUserId, useAuth } from './auth'
+import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
 
 /** 统一钱包 + 权益矩阵（开发吧.md 4.2 entitlement_matrix / 4.3 revenue_rule）
@@ -11,7 +13,9 @@ import { cx } from './utils'
  *  VIP 购买、内容分成等跨模块链路统一走 mim-wallet-v1 入账/扣费，
  *  钱包页监听更新事件实时同步外部变更。
  *  轮 15 打通：新增 walletRecharge（充值通道，kind=recharge 非收益），
- *  商城钱包充值并轨到统一钱包，全站余额唯一源。 */
+ *  商城钱包充值并轨到统一钱包，全站余额唯一源。
+ *  轮 16 打通：存档按真实登录身份隔离（mim-wallet-v1:<userId>），
+ *  本地模式一次性幂等迁移旧全局 key；模块级 API 自动跟随当前身份。 */
 
 type Domain = 1 | 2
 type PlanCode = 'BASIC' | 'SUPER' | 'DOWNLOAD_PACK' | 'ENTERPRISE'
@@ -96,12 +100,14 @@ interface WalletState {
   txs: Tx[]
 }
 
-const WL_KEY = 'mim-wallet-v1'
+/* 轮 16 打通：旧全局 key 仅作一次性迁移源；真实数据按登录身份分 key 隔离 */
+const WL_LEGACY = 'mim-wallet-v1'
+const walletKeyFor = (userId: string) => `mim-wallet-v1:${userId}`
 
-function loadWallet(): WalletState {
+/** 校验并解析钱包快照（缺失/非法返回 null） */
+function parseWallet(raw: string | null): WalletState | null {
   try {
-    const raw = localStorage.getItem(WL_KEY)
-    if (!raw) throw new Error('empty')
+    if (!raw) return null
     const p = JSON.parse(raw) as Partial<WalletState>
     if (
       typeof p.balanceFen === 'number' && p.balanceFen >= 0 &&
@@ -110,10 +116,31 @@ function loadWallet(): WalletState {
     ) {
       return { balanceFen: p.balanceFen, plan: p.plan as PlanCode, txs: p.txs }
     }
-    throw new Error('bad')
   } catch {
-    return { balanceFen: 0, plan: 'BASIC', txs: [] }
+    /* ignore */
   }
+  return null
+}
+
+/** 读取当前身份的钱包（页面重载场景显式传 userId，避免与身份单例同步竞态） */
+function loadWallet(userId: string = getCurrentUserId()): WalletState {
+  const key = walletKeyFor(userId)
+  const own = parseWallet(localStorage.getItem(key))
+  if (own) return own
+  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
+     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与商城一致） */
+  if (!cloudEnabled) {
+    const legacy = parseWallet(localStorage.getItem(WL_LEGACY))
+    if (legacy) {
+      try {
+        localStorage.setItem(key, JSON.stringify(legacy))
+      } catch {
+        /* ignore */
+      }
+      return legacy
+    }
+  }
+  return { balanceFen: 0, plan: 'BASIC', txs: [] }
 }
 
 /** 分 → 元展示（仅展示层转换，存储永远是分） */
@@ -127,7 +154,7 @@ export const WALLET_UPDATE_EVT = 'mim-wallet-update'
 /** 落盘并广播（外部链路写 localStorage 后通知钱包页重读） */
 function persistWallet(next: WalletState): void {
   try {
-    localStorage.setItem(WL_KEY, JSON.stringify(next))
+    localStorage.setItem(walletKeyFor(getCurrentUserId()), JSON.stringify(next))
   } catch {
     /* ignore */
   }
@@ -208,6 +235,8 @@ const KIND_META: Record<Tx['kind'], { icon: string; label: string }> = {
 
 export function WalletPage() {
   const toast = useToast()
+  /* 轮 16 打通：登录身份切换时重载对应身份的钱包存档（显式传 userId 防竞态） */
+  const { auth } = useAuth()
   const [state, setState] = useState<WalletState>(loadWallet)
   const { balanceFen, plan, txs } = state
 
@@ -218,13 +247,16 @@ export function WalletPage() {
     return () => window.removeEventListener(WALLET_UPDATE_EVT, sync)
   }, [])
 
+  /* 轮 16 打通：切号（登录/登出）即重载对应身份的钱包 */
+  useEffect(() => {
+    setState(loadWallet(auth.userId))
+  }, [auth.userId])
+
   const save = (next: WalletState) => {
     setState(next)
-    try {
-      localStorage.setItem(WL_KEY, JSON.stringify(next))
-    } catch {
-      /* ignore */
-    }
+    /* 轮 16 打通：统一走 persistWallet 落盘（按当前身份 key 写入并广播，
+       商城等外部镜像随之同步；页内监听事件后重读同一份数据，幂等） */
+    persistWallet(next)
   }
 
   /* 追加一条流水（金额校验 > 0） */

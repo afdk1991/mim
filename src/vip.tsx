@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import './vip.css'
 import { useToast } from './components'
+import { getCurrentUserId, useAuth } from './auth'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
+import { cloudEnabled } from './lib/supabase'
 import { walletConsume } from './wallet'
 
 /* ================= VIP 会员中心（盈利点：订阅收入 demo） =================
-   自包含模式：独立 localStorage（mim-vip-v1），不依赖 AppState/store/seed。
+   自包含模式：本地存档按登录身份隔离（mim-vip-v1:<userId>），云端快照 key 不变。
    闭环链路：选档 → 统一钱包真实扣费 → 权益生效 → 到期续费叠加 → 订单留痕 → 可模拟退订。
-   轮 14 打通：购买不再「假支付」，扣费走 mim-wallet-v1（余额不足自动中止订单）。 */
+   轮 14 打通：购买不再「假支付」，扣费走 mim-wallet-v1（余额不足自动中止订单）。
+   轮 16 打通：本地存档按真实登录身份隔离 + 一次性迁移旧全局 key；切号即重载。 */
 
 type PlanId = 'monthly' | 'quarterly' | 'yearly'
 
@@ -49,14 +52,19 @@ interface VipState {
   orders: VipOrder[]
 }
 
+/** 云端快照 key（轮 6 语义不变：云表按 RLS user_id 隔离，跨身份共用同一 key） */
 const KEY = 'mim-vip-v1'
+/* 轮 16 打通：旧全局 key 仅作一次性迁移源；本地存档按登录身份分 key 隔离 */
+const LEGACY_KEY = 'mim-vip-v1'
+const vipKeyFor = (userId: string) => `mim-vip-v1:${userId}`
 const DAY = 24 * 60 * 60 * 1000
 
-function loadVip(): VipState {
+/** 校验并解析 VIP 存档（缺失/非法返回 null） */
+function parseVip(raw: string | null): VipState | null {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null')
-    if (!raw || typeof raw !== 'object') return { plan: null, expireAt: 0, orders: [] }
-    const o = raw as Record<string, unknown>
+    const parsed: unknown = JSON.parse(raw ?? 'null')
+    if (!parsed || typeof parsed !== 'object') return null
+    const o = parsed as Record<string, unknown>
     const plan = o.plan === 'monthly' || o.plan === 'quarterly' || o.plan === 'yearly' ? o.plan : null
     const expireAt = typeof o.expireAt === 'number' ? o.expireAt : 0
     const orders: VipOrder[] = Array.isArray(o.orders)
@@ -70,13 +78,34 @@ function loadVip(): VipState {
       : []
     return { plan, expireAt, orders }
   } catch {
-    return { plan: null, expireAt: 0, orders: [] }
+    return null
   }
+}
+
+/** 读取当前身份的 VIP 存档（页面重载场景显式传 userId，避免与身份单例同步竞态） */
+function loadVip(userId: string = getCurrentUserId()): VipState {
+  const localKey = vipKeyFor(userId)
+  const own = parseVip(localStorage.getItem(localKey))
+  if (own) return own
+  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
+     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与商城一致） */
+  if (!cloudEnabled) {
+    const legacy = parseVip(localStorage.getItem(LEGACY_KEY))
+    if (legacy) {
+      try {
+        localStorage.setItem(localKey, JSON.stringify(legacy))
+      } catch {
+        /* ignore */
+      }
+      return legacy
+    }
+  }
+  return { plan: null, expireAt: 0, orders: [] }
 }
 
 function saveVip(s: VipState): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s))
+    localStorage.setItem(vipKeyFor(getCurrentUserId()), JSON.stringify(s))
   } catch {
     /* 隐私模式下忽略 */
   }
@@ -100,6 +129,8 @@ function uid(): string {
 
 export function VipCenterPage() {
   const toast = useToast()
+  /* 轮 16 打通：登录身份切换时重载对应身份的本地存档（显式传 userId 防竞态） */
+  const { auth } = useAuth()
   const [state, setState] = useState<VipState>(loadVip)
   const [payPlan, setPayPlan] = useState<VipPlan | null>(null)
   const [paying, setPaying] = useState(false)
@@ -114,14 +145,20 @@ export function VipCenterPage() {
     setState(s)
   }
 
-  /* 云端恢复（轮 6）：mount 拉取快照 → 写回本地 → 重载（幂等触发上方保存回推） */
+  /* 轮 16 打通：切号（登录/登出）即重载对应身份的 VIP 状态 */
+  useEffect(() => {
+    setState(loadVip(auth.userId))
+  }, [auth.userId])
+
+  /* 云端恢复（轮 6）：mount/切身份后拉取快照 → 写回当前身份本地档 → 重载
+     （幂等触发上方保存回推；云端快照 key 不变，云表按 RLS user_id 隔离） */
   useEffect(() => {
     void pullToolState(KEY).then((d) => {
       if (!d || typeof d !== 'object') return
-      try { localStorage.setItem(KEY, JSON.stringify(d)) } catch { /* ignore */ }
+      try { localStorage.setItem(vipKeyFor(getCurrentUserId()), JSON.stringify(d)) } catch { /* ignore */ }
       setState(loadVip())
     })
-  }, [])
+  }, [auth.userId])
 
   const confirmPay = () => {
     if (!payPlan || paying) return

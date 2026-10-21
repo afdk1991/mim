@@ -22,6 +22,16 @@ export type AuthState = {
 
 const LOCAL_AUTH: AuthState = { mode: 'local', userId: 'local', email: null }
 
+/* ---------- 模块级身份单例（轮 16 打通：非 hook 场景）----------
+   wallet/vip 等模块级 API 与 localStorage 读写无法使用 useAuth，
+   这里维护一份与 AuthProvider 实时同步的当前真实身份锚点。 */
+let currentUserId = LOCAL_AUTH.userId
+
+/** 非 hook 场景获取当前真实身份（未登录恒为 'local'，登录后为云端 user.id） */
+export function getCurrentUserId(): string {
+  return currentUserId
+}
+
 export type AuthApi = {
   auth: AuthState
   cloudEnabled: boolean
@@ -38,6 +48,11 @@ const AuthContext = createContext<AuthApi | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>(LOCAL_AUTH)
   const [oauthProviders, setOauthProviders] = useState<string[]>([])
+
+  /* 轮 16 打通：同步模块级身份单例（getCurrentUserId 的数据源） */
+  useEffect(() => {
+    currentUserId = auth.userId
+  }, [auth.userId])
 
   useEffect(() => {
     if (!supabase) return
