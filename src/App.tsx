@@ -855,6 +855,7 @@ function WbFixedBar() {
   const { navigate } = useRouter()
   const [q, setQ] = useState('')
   const [dropOpen, setDropOpen] = useState(false)
+  const [hist, setHist] = useState<string[]>(loadHeroHistory)
   const boxRef = useRef<HTMLDivElement>(null)
 
   /* 点击面板外部关闭 */
@@ -867,9 +868,41 @@ function WbFixedBar() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [dropOpen])
 
+  const saveHist = (t: string) => {
+    setHist((h) => {
+      const next = [t, ...h.filter((x) => x !== t)].slice(0, 8)
+      try {
+        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+  const removeHist = (t: string) => {
+    setHist((h) => {
+      const next = h.filter((x) => x !== t)
+      try {
+        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+  const clearHist = () => {
+    setHist([])
+    try {
+      localStorage.removeItem(HERO_HISTORY_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const go = (word?: string) => {
     const kw = (word ?? q).trim()
     if (!kw) return
+    saveHist(kw)
     setQ('')
     setDropOpen(false)
     navigate(`/search?q=${encodeURIComponent(kw)}`)
@@ -910,6 +943,35 @@ function WbFixedBar() {
             if (e.key === 'Escape') setDropOpen(false)
           }}
         />
+        {dropOpen && !kw && hist.length > 0 && (
+          <div className="sidenav-search-drop wb-fixedbar-drop">
+            <div className="wb-hero-drop-title">
+              搜索历史
+              <button className="wb-hero-clear-all" onClick={clearHist}>
+                清空
+              </button>
+            </div>
+            <div className="wb-hero-chips">
+              {hist.map((h) => (
+                <span key={h} className="wb-hero-chip">
+                  <button className="wb-hero-chip-word" onClick={() => go(h)}>
+                    {h}
+                  </button>
+                  <button
+                    className="wb-hero-chip-del"
+                    aria-label="删除"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeHist(h)
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {dropOpen && kw && (
           <div className="sidenav-search-drop">
             {noHint ? (

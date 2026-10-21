@@ -147,3 +147,8 @@
   font-size: 13px;
   color: var(--text);
 }
+
+/* 固定栏下拉内的历史 chips：比默认 sidenav-drop 内边距更宽松 */
+.wb-fixedbar-drop {
+  padding: 10px;
+}
