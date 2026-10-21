@@ -1,5 +1,5 @@
 import './growth.css'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Empty, TimeAgo, useToast } from './components'
 import { cx } from './utils'
 
@@ -86,17 +86,48 @@ function kbLevel(point: number): number {
   return Math.floor(Math.sqrt(Math.max(0, point)) / 8) + 1
 }
 
-/** 徽章定义：cond 基于双线数值与签到 streak 派生 */
-const BADGES: { code: string; icon: string; label: string; desc: string; cond: (s: { exp: number; point: number; streak: number }) => boolean }[] = [
-  { code: 'seed', icon: '🌱', label: '初来乍到', desc: '广场 EXP ≥ 10', cond: (s) => s.exp >= 10 },
-  { code: 'regular', icon: '🔥', label: '广场常客', desc: '广场 EXP ≥ 100', cond: (s) => s.exp >= 100 },
-  { code: 'star', icon: '📣', label: '广场红人', desc: '广场 EXP ≥ 500', cond: (s) => s.exp >= 500 },
-  { code: 'first', icon: '✍️', label: '首篇博文', desc: '知识 POINT ≥ 10', cond: (s) => s.point >= 10 },
-  { code: 'scholar', icon: '📚', label: '知识达人', desc: '知识 POINT ≥ 200', cond: (s) => s.point >= 200 },
-  { code: 'expert', icon: '🎓', label: '领域专家', desc: '知识 POINT ≥ 1000', cond: (s) => s.point >= 1000 },
-  { code: 'week', icon: '📅', label: '七日之约', desc: '连续签到 7 天', cond: (s) => s.streak >= 7 },
-  { code: 'dual', icon: '🏆', label: '双线开花', desc: '两条线同时 ≥ 50', cond: (s) => s.exp >= 50 && s.point >= 50 },
+/** 徽章定义：cond 基于双线数值与签到 streak 派生；metric/target 供锁定态推导进度提示 */
+const BADGES: {
+  code: string
+  icon: string
+  label: string
+  desc: string
+  /** 进度度量：exp/point/streak 单线达标；both = 双线同时达标（取短板） */
+  metric: 'exp' | 'point' | 'streak' | 'both'
+  target: number
+  cond: (s: { exp: number; point: number; streak: number }) => boolean
+}[] = [
+  { code: 'seed', icon: '🌱', label: '初来乍到', desc: '广场 EXP ≥ 10', metric: 'exp', target: 10, cond: (s) => s.exp >= 10 },
+  { code: 'regular', icon: '🔥', label: '广场常客', desc: '广场 EXP ≥ 100', metric: 'exp', target: 100, cond: (s) => s.exp >= 100 },
+  { code: 'star', icon: '📣', label: '广场红人', desc: '广场 EXP ≥ 500', metric: 'exp', target: 500, cond: (s) => s.exp >= 500 },
+  { code: 'first', icon: '✍️', label: '首篇博文', desc: '知识 POINT ≥ 10', metric: 'point', target: 10, cond: (s) => s.point >= 10 },
+  { code: 'scholar', icon: '📚', label: '知识达人', desc: '知识 POINT ≥ 200', metric: 'point', target: 200, cond: (s) => s.point >= 200 },
+  { code: 'expert', icon: '🎓', label: '领域专家', desc: '知识 POINT ≥ 1000', metric: 'point', target: 1000, cond: (s) => s.point >= 1000 },
+  { code: 'week', icon: '📅', label: '七日之约', desc: '连续签到 7 天', metric: 'streak', target: 7, cond: (s) => s.streak >= 7 },
+  { code: 'dual', icon: '🏆', label: '双线开花', desc: '两条线同时 ≥ 50', metric: 'both', target: 50, cond: (s) => s.exp >= 50 && s.point >= 50 },
 ]
+
+/** 锁定徽章进度：由 metric/target 推导当前值与达成百分比；dual 取双线短板 */
+function badgeProgress(
+  b: (typeof BADGES)[number],
+  s: { exp: number; point: number; streak: number },
+): { cur: number; pct: number; text: string } {
+  const pos = (n: number) => Math.max(0, n) // 负分钳 0（惩罚事件会让 point 为负）
+  if (b.metric === 'both') {
+    const exp = pos(s.exp)
+    const point = pos(s.point)
+    const short = Math.min(exp, point) // 双线短板决定整体进度
+    return {
+      cur: short,
+      pct: Math.min(100, Math.round((short / b.target) * 100)),
+      text: `EXP ${exp}/${b.target} · POINT ${point}/${b.target}`,
+    }
+  }
+  const cur = b.metric === 'exp' ? pos(s.exp) : b.metric === 'point' ? pos(s.point) : pos(s.streak)
+  const unit = b.metric === 'streak' ? ' 天' : ''
+  const name = b.metric === 'exp' ? 'EXP' : b.metric === 'point' ? 'POINT' : '连续'
+  return { cur, pct: Math.min(100, Math.round((cur / b.target) * 100)), text: `${name} ${cur}/${b.target}${unit}` }
+}
 
 /** 等级进度：返回 [当前级, 下一级, 进度 0-100] */
 function levelProgress(kind: 'feed' | 'kb', num: number): [number, number, number] {
@@ -174,6 +205,25 @@ export function GrowthPage() {
   const badgeCtx = { exp, point, streak: state.checkin.streak }
   const flows = [...state.events].reverse().slice(0, 10)
 
+  /* 徽章派生：已解锁集合 + 计数（徽章墙「已解锁 X/8」摘要） */
+  const unlockedCodes = useMemo(() => BADGES.filter((b) => b.cond(badgeCtx)).map((b) => b.code), [exp, point, state.checkin.streak])
+  const unlockedCount = unlockedCodes.length
+
+  /* 解锁瞬间提示：对比上次解锁集合，新增徽章即 toast（首次挂载只记录不提示） */
+  const unlockedKey = unlockedCodes.join(',')
+  const prevUnlockedRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevUnlockedRef.current
+    prevUnlockedRef.current = unlockedKey
+    if (prev === null) return
+    const prevSet = new Set(prev ? prev.split(',') : [])
+    const newly = unlockedCodes.filter((c) => !prevSet.has(c))
+    if (newly.length > 0) {
+      const metas = BADGES.filter((b) => newly.includes(b.code))
+      toast(`🏅 解锁新徽章：${metas.map((b) => `${b.icon} ${b.label}`).join('、')}`)
+    }
+  }, [unlockedKey, unlockedCodes, toast])
+
   return (
     <div className="page-grid single">
       <div>
@@ -219,15 +269,31 @@ export function GrowthPage() {
             <small className="gr-hint">断签重新计数，连续 7 天解锁「七日之约」徽章</small>
           </div>
           <div className="card">
-            <b>🏅 徽章墙</b>
+            <div className="gr-badge-head">
+              <b>🏅 徽章墙</b>
+              <span className="gr-badge-count">已解锁 {unlockedCount}/{BADGES.length}</span>
+            </div>
             <div className="gr-badges">
-              {BADGES.map((b) => (
-                <div key={b.code} className={cx('gr-badge', !b.cond(badgeCtx) && 'locked')} title={b.desc}>
-                  <i aria-hidden>{b.icon}</i>
-                  <span>{b.label}</span>
-                  <small>{b.desc}</small>
-                </div>
-              ))}
+              {BADGES.map((b) => {
+                const unlocked = b.cond(badgeCtx)
+                const prog = unlocked ? null : badgeProgress(b, badgeCtx)
+                return (
+                  <div key={b.code} className={cx('gr-badge', !unlocked && 'locked')} title={b.desc}>
+                    <i aria-hidden>{b.icon}</i>
+                    <span>{b.label}</span>
+                    <small>{b.desc}</small>
+                    {/* 锁定态进度提示：当前值/目标值 + 细进度条，解锁后自动隐藏 */}
+                    {prog && (
+                      <>
+                        <small className="gr-badge-prog">{prog.text}</small>
+                        <div className="gr-badge-bar" role="progressbar" aria-valuenow={prog.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${b.label}达成进度`}>
+                          <i style={{ width: `${prog.pct}%` }} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
