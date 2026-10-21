@@ -49,6 +49,10 @@ import { MallWalletPage } from './mall/MallWallet'
 import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
+import './viewswitch.css'
+
+/** 视图模式：广场态（消费/社交/交易）与知识态（生产/学习/开发工具） */
+type ViewMode = 'feed' | 'kb'
 
 type NavItem = {
   href: string
@@ -57,16 +61,20 @@ type NavItem = {
   icon?: string
   badgeKey?: 'notif' | 'msg'
   children?: NavItem[]
+  /** 视图归属（开发吧.md 文档三「一个平台三种视图」）：缺省 = 广场/知识双视图可见 */
+  views?: ViewMode[]
 }
 
-/** 单一导航：全量一级平铺（低频入口不再收纳进「工具箱」，直接可见，搜索/导航双闭环） */
+/** 单一导航：全量一级平铺（低频入口不再收纳进「工具箱」，直接可见，搜索/导航双闭环）。
+    views 按《开发吧.md》合并矩阵标注视图归属：生活/社交/交易域 → 广场态；
+    生产/学习/开发工具域 → 知识态；不标 = 双视图共用（我的/会员）。 */
 const NAV: NavItem[] = [
-  { href: '#/feed', match: '/feed', label: '首页', icon: '🏠' },
-  { href: '#/articles', match: '/article', label: '文章', icon: '📝' },
-  { href: '#/write', match: '/write', label: '写文章', icon: '✍️' },
-  { href: '#/topics', match: '/topics', label: '超话', icon: '🔥' },
-  { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif' },
-  { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg' },
+  { href: '#/feed', match: '/feed', label: '首页', icon: '🏠', views: ['feed'] },
+  { href: '#/articles', match: '/article', label: '文章', icon: '📝', views: ['kb'] },
+  { href: '#/write', match: '/write', label: '写文章', icon: '✍️', views: ['kb'] },
+  { href: '#/topics', match: '/topics', label: '超话', icon: '🔥', views: ['feed'] },
+  { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif', views: ['feed'] },
+  { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg', views: ['feed'] },
   {
     href: '#/my',
     match: '/my',
@@ -85,6 +93,7 @@ const NAV: NavItem[] = [
     match: '/mall',
     label: '商城',
     icon: '🛒',
+    views: ['feed'],
     children: [
       { href: '#/mall', match: '/mall', label: '商城中心' },
       { href: '#/mall/cart', match: '/mall/cart', label: '购物车' },
@@ -93,23 +102,23 @@ const NAV: NavItem[] = [
     ],
   },
   { href: '#/vip', match: '/vip', label: 'VIP 会员', icon: '👑' },
-  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻' },
-  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦' },
-  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️' },
-  { href: '#/delivery', match: '/delivery', label: '配送台', icon: '🚚' },
-  { href: '#/price', match: '/price', label: '价格监控', icon: '📈' },
-  { href: '#/nav', match: '/nav', label: '路线导航', icon: '🗺️' },
-  { href: '#/mail', match: '/mail', label: '邮箱', icon: '📬' },
-  { href: '#/bom', match: '/bom', label: 'BOM 工具台', icon: '🖥️' },
-  { href: '#/coze', match: '/coze', label: '智能体', icon: '🤖' },
-  { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚' },
-  { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬' },
-  { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊' },
-  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️' },
-  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺' },
-  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜' },
-  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗' },
-  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡' },
+  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻', views: ['kb'] },
+  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦', views: ['kb'] },
+  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️', views: ['kb'] },
+  { href: '#/delivery', match: '/delivery', label: '配送台', icon: '🚚', views: ['feed'] },
+  { href: '#/price', match: '/price', label: '价格监控', icon: '📈', views: ['feed'] },
+  { href: '#/nav', match: '/nav', label: '路线导航', icon: '🗺️', views: ['feed'] },
+  { href: '#/mail', match: '/mail', label: '邮箱', icon: '📬', views: ['feed'] },
+  { href: '#/bom', match: '/bom', label: 'BOM 工具台', icon: '🖥️', views: ['kb'] },
+  { href: '#/coze', match: '/coze', label: '智能体', icon: '🤖', views: ['kb'] },
+  { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚', views: ['kb'] },
+  { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬', views: ['feed'] },
+  { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊', views: ['kb'] },
+  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️', views: ['feed'] },
+  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺', views: ['feed'] },
+  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜', views: ['feed'] },
+  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗', views: ['feed'] },
+  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡', views: ['feed'] },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -139,23 +148,67 @@ function useTheme() {
   return [theme, setTheme] as const
 }
 
+/* ---------- 三视图（开发吧.md 文档三：广场态/知识态模式开关） ---------- */
+
+const VIEW_KEY = 'mim-view-mode'
+
+function loadView(): ViewMode {
+  try {
+    const v = localStorage.getItem(VIEW_KEY)
+    if (v === 'feed' || v === 'kb') return v
+  } catch {
+    /* ignore */
+  }
+  return 'feed'
+}
+
+function useViewMode() {
+  const [view, setView] = useState<ViewMode>(loadView)
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view)
+    } catch {
+      /* ignore */
+    }
+  }, [view])
+  return [view, setView] as const
+}
+
+/** 当前视图下可见的导航项：未标注 views 的条目（我的/会员）双视图常驻 */
+function navInView(items: NavItem[], view: ViewMode): NavItem[] {
+  return items.filter((it) => !it.views || it.views.includes(view))
+}
+
 function SideNav() {
   const api = useApp()
   const { path, navigate } = useRouter()
+  const [view, setView] = useViewMode()
   const [open, setOpen] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [dropOpen, setDropOpen] = useState(false)
 
+  const visible = navInView(NAV, view)
+
   /* 路由变化后自动展开包含当前页的分组 */
   useEffect(() => {
-    for (const item of NAV) {
+    for (const item of visible) {
       if (!item.children) continue
       if (path.startsWith(item.match) || item.children.some((k) => path.startsWith(k.match))) {
         setOpen(item.label)
         return
       }
     }
-  }, [path])
+  }, [path, view])
+
+  /* 切换视图：若当前页不属于新视图可见范围，则跳到该视图的默认首页 */
+  const switchView = (v: ViewMode) => {
+    if (v === view) return
+    setView(v)
+    const hit = navInView(NAV, v).some(
+      (item) => path.startsWith(item.match) || item.children?.some((k) => path.startsWith(k.match)),
+    )
+    if (!hit) navigate(v === 'kb' ? '#/articles' : '#/feed')
+  }
 
   const hits = matchSearchPages(q)
 
@@ -169,6 +222,27 @@ function SideNav() {
   return (
     <aside className="sidenav">
       <a className="brand" href="#/feed">Mim</a>
+      {/* 三视图切换器：广场态/知识态（开发吧.md 文档三「一个平台三种视图」） */}
+      <div className="vw-switch" role="tablist" aria-label="视图切换">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'feed'}
+          className={cx('vw-btn', view === 'feed' && 'active')}
+          onClick={() => switchView('feed')}
+        >
+          🎬 广场
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'kb'}
+          className={cx('vw-btn', view === 'kb' && 'active')}
+          onClick={() => switchView('kb')}
+        >
+          📚 知识
+        </button>
+      </div>
       <div
         className="sidenav-search"
         onBlur={(e) => {
@@ -224,7 +298,7 @@ function SideNav() {
         )}
       </div>
       <nav className="sidenav-nav">
-        {NAV.map((item) => {
+        {visible.map((item) => {
           const badge =
             item.badgeKey === 'notif' ? api.unreadNotifications : item.badgeKey === 'msg' ? api.unreadMessages : 0
 

@@ -1,0 +1,37 @@
+/* 三视图切换器（开发吧.md 文档三：一个平台三种视图——广场态/知识态）。
+   独立样式段 + vw- 前缀：并行会话开发惯例，避免与 styles.css 共用段冲突；
+   颜色全部走全局 CSS 变量，深色主题自动适配。 */
+
+.vw-switch {
+  display: flex;
+  gap: 4px;
+  margin: 10px 12px 2px;
+  padding: 3px;
+  background: var(--border);
+  border-radius: 999px;
+}
+
+.vw-btn {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1;
+  padding: 7px 0;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vw-btn:hover {
+  color: var(--text);
+}
+
+.vw-btn.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
