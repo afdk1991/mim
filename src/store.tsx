@@ -34,6 +34,7 @@ import {
 import { pullCloudContent, type CloudPayload } from './lib/cloud-read'
 import { cloudSendMessage, subscribeMessages } from './lib/cloud-msg'
 import { supabase, cloudEnabled } from './lib/supabase'
+import { recordGrowth } from './growth'
 
 const STORAGE_KEY = 'mim-state-v1'
 
@@ -747,6 +748,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           type: 'publishPost',
           payload: { id, content, topic, images, repostOfId: null, repostComment: '' },
         })
+        // 轮 13 打通：发布动态 → 成长引擎广场线记分（publish_dynamic +2 EXP，受日上限约束）
+        recordGrowth('publish_dynamic')
         fireCloudWrite(
           cloudWritePost,
           { id, authorId: state.meId, content, images, createdAt: Date.now(), repostOfId: null, repostComment: '', likes: 0, likedByMe: false, reposts: 0, topic, source: '来自 网页版' },
@@ -778,6 +781,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       togglePostLike: (id) => {
         const p = state.posts.find((x) => x.id === id)
         dispatch({ type: 'togglePostLike', payload: id })
+        // 轮 13 打通：自己的动态获赞 → 广场线 dynamic_liked（点赞且此前未赞才计）
+        if (p && p.authorId === state.meId && !p.likedByMe) recordGrowth('dynamic_liked')
         if (p && state.cloudIds?.posts.includes(id)) {
           void cloudLikePost(id, !p.likedByMe).then((ok) => {
             if (!ok) dispatch({ type: 'togglePostLike', payload: id })
@@ -844,6 +849,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleFavorite: (kind, targetId) => {
         const exists = state.favorites.some((f) => f.type === kind && f.targetId === targetId)
         dispatch({ type: 'toggleFavorite', payload: { kind, targetId } })
+        // 轮 13 打通：新增博文收藏 → 知识线 article_collected（取消收藏不计分）
+        if (kind === 'article' && !exists) recordGrowth('article_collected')
         const cloud = kind === 'post'
           ? state.cloudIds?.posts.includes(targetId)
           : state.cloudIds?.articles.includes(targetId)
@@ -866,6 +873,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       publishPostDraft: (draftId) => {
         const postId = uid('p')
         dispatch({ type: 'publishPostDraft', payload: { draftId, postId } })
+        // 轮 13 打通：草稿发布与直接发布同口径记分（publish_dynamic）
+        recordGrowth('publish_dynamic')
         const draft = state.postDrafts.find((d) => d.id === draftId)
         if (draft) {
           fireCloudWrite(
@@ -881,6 +890,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       publishArticle: ({ title, content, tags, draftId }) => {
         const id = uid('a')
         dispatch({ type: 'publishArticle', payload: { id, draftId: draftId ?? null, title, content, tags } })
+        // 轮 13 打通：发布博文 → 知识线记分（publish_article +10 POINT）。
+        // 质量门 demo 口径：正文去空白 ≥ 50 字视为过门，未过则引擎拒记并 toast。
+        recordGrowth('publish_article', { quality: content.replace(/\s/g, '').length >= 50 })
         fireCloudWrite(
           cloudWriteArticle,
           { id, authorId: state.meId, title, summary: makeSummary(content), content, tags, createdAt: Date.now(), views: 0, likes: 0, likedByMe: false, comments: [] },
@@ -974,7 +986,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
       },
-      downloadResource: (id) => dispatch({ type: 'downloadResource', payload: id }),
+      downloadResource: (id) => {
+        dispatch({ type: 'downloadResource', payload: id })
+        // 轮 13 打通：资源被下载 → 知识线 resource_downloaded
+        recordGrowth('resource_downloaded')
+      },
       switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
       resetDemo: () => dispatch({ type: 'reset' }),
     }

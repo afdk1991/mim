@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Article, Post } from './types'
 import { cx, formatCount, timeAgo } from './utils'
@@ -127,6 +127,14 @@ interface ToastItem {
 
 const ToastCtx = createContext<(text: string) => void>(() => {})
 
+/* 轮 13 打通：模块级 toast 出口。store api 层/成长引擎等非 React 调用链
+   （在 ToastProvider 之外）通过 emitToast 派发提示；Provider 未挂载时静默丢弃。 */
+let toastPush: ((text: string) => void) | null = null
+
+export function emitToast(text: string): void {
+  toastPush?.(text)
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
   const push = useCallback((text: string) => {
@@ -135,6 +143,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setItems((s) => (s[s.length - 1]?.text === text ? s : [...s, { id, text }]))
     setTimeout(() => setItems((s) => s.filter((t) => t.id !== id)), 1800)
   }, [])
+  /* 注册模块级出口：供 React 树外的跨模块链路（成长记分/钱包入账）复用同一 toast 队列 */
+  useEffect(() => {
+    toastPush = push
+    return () => {
+      toastPush = null
+    }
+  }, [push])
   return (
     <ToastCtx.Provider value={push}>
       {children}

@@ -1,15 +1,18 @@
 import './growth.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Empty, TimeAgo, useToast } from './components'
+import { Empty, TimeAgo, emitToast, useToast } from './components'
 import { cx } from './utils'
 
-/* ================= 统一成长引擎 demo =================
+/* ================= 统一成长引擎 =================
    蓝本：开发吧.md 4.1 growth_rule ——「一条引擎，两条线」。
    - 广场线 EXP：时效活跃，decay_days=30（demo 不模拟时间衰减，仅展示规则）；
    - 知识线 POINT：长尾资产，decay_days=0 永久累积；
    - 两条等级曲线量纲不同，数学上不可互换：
      广场 level = floor(exp^0.45 / 20)；知识 Lv = floor(point^0.5 / 8) + 1。
-   自包含模块：独立 localStorage（mim-growth-v1），不动 AppState/store/seed。 */
+   独立存储：localStorage mim-growth-v1，不动 AppState/store/seed。
+   轮 13 打通：对外暴露 recordGrowth 上报入口，广场/知识各端真实行为
+   （发布/获赞/收藏/下载）经 store api 层流入本引擎；页内模拟按钮与
+   外部上报共用同一份规则表、daily_cap 与徽章结算。 */
 
 /** 域：1=广场态 2=知识态（开发吧.md content.domain 同源） */
 type Domain = 1 | 2
@@ -154,6 +157,49 @@ function withBadgeTimes(next: GrowthState): GrowthState {
   return changed ? { ...next, badges } : next
 }
 
+/* ---------- 跨模块上报入口（轮 13 打通）----------
+   store api 层在真实行为发生时调用；与页内 trigger() 共用规则表/daily_cap/徽章结算，
+   落盘后派发 GROWTH_UPDATE_EVT 让成长页实时刷新。 */
+
+/** 成长数据变更事件名：GrowthPage 监听以同步外部上报 */
+export const GROWTH_UPDATE_EVT = 'mim-growth-update'
+
+/** 记分结果：ok=已入账；否则给出原因（无规则/达上限/未过质量门），供调用方联动 */
+export type GrowthFeedback =
+  | { ok: true; label: string; value: number; reward: 'EXP' | 'POINT' }
+  | { ok: false; reason: 'no-rule' | 'cap' | 'quality' }
+
+/** 外部行为记分：规则校验 → 质量门 → daily_cap → 落盘（含徽章合并）→ 派发刷新事件 → toast */
+export function recordGrowth(action: string, opts?: { quality?: boolean }): GrowthFeedback {
+  const rule = GROWTH_RULES.find((r) => r.action === action)
+  if (!rule) return { ok: false, reason: 'no-rule' }
+  if (rule.qualityGate && !(opts?.quality ?? false)) {
+    emitToast(`「${rule.label}」未过质量门，本次不计分`)
+    return { ok: false, reason: 'quality' }
+  }
+  const cur = loadGrowth()
+  const today = localDate(Date.now())
+  if (rule.dailyCap !== null && rule.value > 0) {
+    const used = cur.events.filter((e) => e.action === action && localDate(e.at) === today).length
+    if (used >= rule.dailyCap) {
+      emitToast(`「${rule.label}」已达今日上限 ${rule.dailyCap} 次`)
+      return { ok: false, reason: 'cap' }
+    }
+  }
+  const merged = withBadgeTimes({
+    ...cur,
+    events: [...cur.events, { id: Date.now(), action, at: Date.now() }],
+  })
+  try {
+    localStorage.setItem(GROWTH_KEY, JSON.stringify(merged))
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(GROWTH_UPDATE_EVT))
+  emitToast(`🚀 已记分「${rule.label}」 ${rule.value > 0 ? '+' : ''}${rule.value} ${rule.reward}`)
+  return { ok: true, label: rule.label, value: rule.value, reward: rule.reward }
+}
+
 /** 等级进度：返回 [当前级, 下一级, 进度 0-100] */
 function levelProgress(kind: 'feed' | 'kb', num: number): [number, number, number] {
   if (kind === 'feed') {
@@ -177,6 +223,14 @@ export function GrowthPage() {
   const [state, setState] = useState<GrowthState>(loadGrowth)
   const today = localDate(Date.now())
   const yesterday = localDate(Date.now() - 86_400_000)
+
+  /* 轮 13 打通：外部上报（store api 层的发布/获赞/收藏/下载）实时同步——
+     recordGrowth 落盘后派发统一事件，本页重读 localStorage 保持视图一致 */
+  useEffect(() => {
+    const sync = () => setState(loadGrowth())
+    window.addEventListener(GROWTH_UPDATE_EVT, sync)
+    return () => window.removeEventListener(GROWTH_UPDATE_EVT, sync)
+  }, [])
 
   const checkedToday = state.checkin.last === today
 
