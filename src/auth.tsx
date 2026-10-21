@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /* 探测后台已启用的第三方登录 provider：GoTrue settings 端点公开列出全部
-     支持平台及启用状态（external.<provider>.enabled），仅需公开 anon key。 */
+     支持平台及启用状态（external.<provider> 为布尔值），仅需公开 anon key。 */
   useEffect(() => {
     if (!supabase || !authSettingsUrl || !anonKeyExport) return
     const ctrl = new AbortController()
@@ -62,11 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => {
-        const ext = s?.external as Record<string, { enabled?: boolean }> | undefined
+        const ext = s?.external as Record<string, boolean | { enabled?: boolean }> | undefined
         if (!ext) return
         setOauthProviders(
           Object.entries(ext)
-            .filter(([, v]) => v?.enabled === true)
+            // 端点实际返回 provider → boolean（如 "github": true），兼容对象形态
+            .filter(([, v]) => (typeof v === 'boolean' ? v : v?.enabled === true))
             .map(([k]) => k),
         )
       })
@@ -91,9 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signInWithOAuth(provider) {
         if (!supabase) return '云端未配置，当前为本地演示模式'
+        // origin + pathname：GitHub Pages 等子路径部署下回跳必须落在应用自身路径
+        // （origin 不含 /mim/，会落到域名根且不匹配白名单）；hash 路由下 pathname 恒定。
         const { error } = await supabase.auth.signInWithOAuth({
           provider: provider as Provider,
-          options: { redirectTo: window.location.origin },
+          options: { redirectTo: window.location.origin + window.location.pathname },
         })
         return error ? error.message : null
       },
