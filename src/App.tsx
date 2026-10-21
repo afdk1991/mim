@@ -48,6 +48,7 @@ import { MallOrdersPage } from './mall/MallOrders'
 import { MallWalletPage } from './mall/MallWallet'
 import { GrowthPage } from './growth'
 import { PublishPage } from './publish'
+import { WalletPage } from './wallet'
 import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
@@ -106,6 +107,7 @@ const NAV: NavItem[] = [
   { href: '#/vip', match: '/vip', label: 'VIP 会员', icon: '👑' },
   { href: '#/growth', match: '/growth', label: '成长引擎', icon: '🚀' },
   { href: '#/publish', match: '/publish', label: '发布器', icon: '📤' },
+  { href: '#/wallet', match: '/wallet', label: '统一钱包', icon: '💰' },
   { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻', views: ['kb'] },
   { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦', views: ['kb'] },
   { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️', views: ['kb'] },
@@ -431,6 +433,8 @@ function Page() {
       return <GrowthPage />
     case 'publish':
       return <PublishPage />
+    case 'wallet':
+      return <WalletPage />
 
     /* ---------- 工具台 ---------- */
     case 'delivery':
