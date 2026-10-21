@@ -15,6 +15,7 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/feed', name: '首页 / 动态', icon: '🏠', keywords: ['动态', 'feed', '首页'], group: '内容' },
   { href: '#/articles', name: '文章', icon: '📝', keywords: ['文章', '博客', 'blog'], group: '内容' },
   { href: '#/write', name: '写文章', icon: '✍️', keywords: ['写作', '投稿', '编辑器'], group: '内容' },
+  { href: '#/publish', name: '统一内容发布器', icon: '📤', keywords: ['发布器', '发布', '投稿', 'publish'], group: '内容' },
   { href: '#/topics', name: '超话广场', icon: '🔥', keywords: ['超话', '话题', '排行榜'], group: '内容' },
   { href: '#/snippets', name: '代码片段', icon: '💾', keywords: ['代码', '片段', 'snippet'], group: '内容' },
   { href: '#/resources', name: '资源下载', icon: '📦', keywords: ['资源', '下载'], group: '内容' },
@@ -27,6 +28,8 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/messages', name: '私信', icon: '✉️', keywords: ['私信', '聊天', '消息'], group: '个人' },
   { href: '#/blog', name: '我的博客', icon: '📰', keywords: ['博文', 'blog'], group: '个人' },
   { href: '#/following', name: '关注列表', icon: '👥', keywords: ['关注', 'following'], group: '个人' },
+  { href: '#/growth', name: '成长引擎', icon: '🚀', keywords: ['成长', '等级', '积分', '签到', '徽章', 'growth'], group: '个人' },
+  { href: '#/wallet', name: '统一钱包', icon: '💰', keywords: ['统一钱包', '权益', 'wallet'], group: '个人' },
   /* ---- 商城 ---- */
   { href: '#/mall', name: '商城中心', icon: '🛒', keywords: ['商城', '购物', '商品'], group: '商城' },
   { href: '#/mall/cart', name: '购物车', icon: '🛒', keywords: ['购物车', 'cart'], group: '商城' },
