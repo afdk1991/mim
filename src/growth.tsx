@@ -1,6 +1,8 @@
 import './growth.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Empty, TimeAgo, emitToast, useToast } from './components'
+import { getCurrentUserId, useAuth } from './auth'
+import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
 
 /* ================= 统一成长引擎 =================
@@ -12,7 +14,9 @@ import { cx } from './utils'
    独立存储：localStorage mim-growth-v1，不动 AppState/store/seed。
    轮 13 打通：对外暴露 recordGrowth 上报入口，广场/知识各端真实行为
    （发布/获赞/收藏/下载）经 store api 层流入本引擎；页内模拟按钮与
-   外部上报共用同一份规则表、daily_cap 与徽章结算。 */
+   外部上报共用同一份规则表、daily_cap 与徽章结算。
+   轮 17 打通：成长数据按真实登录身份隔离（mim-growth-v1:<userId>），
+   本地模式一次性迁移旧全局 key；recordGrowth 自动跟随当前身份。 */
 
 /** 域：1=广场态 2=知识态（开发吧.md content.domain 同源） */
 type Domain = 1 | 2
@@ -59,16 +63,19 @@ interface GrowthState {
   badges: Record<string, number>
 }
 
-const GROWTH_KEY = 'mim-growth-v1'
+/* 轮 17 打通：旧全局 key 仅作一次性迁移源；成长数据按登录身份分 key 隔离 */
+const GROWTH_LEGACY = 'mim-growth-v1'
+const growthKeyFor = (userId: string) => `mim-growth-v1:${userId}`
 
 function localDate(ts: number | Date): string {
   const d = ts instanceof Date ? ts : new Date(ts)
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 }
 
-function loadGrowth(): GrowthState {
+/** 校验并解析成长存档（缺失/非法返回 null） */
+function parseGrowth(raw: string | null): GrowthState | null {
   try {
-    const v = JSON.parse(localStorage.getItem(GROWTH_KEY) ?? 'null') as GrowthState | null
+    const v = JSON.parse(raw ?? 'null') as GrowthState | null
     if (v && Array.isArray(v.events) && v.checkin && typeof v.checkin.last === 'string' && typeof v.checkin.streak === 'number') {
       return {
         events: v.events.filter((e) => e && typeof e.id === 'number' && typeof e.action === 'string' && typeof e.at === 'number'),
@@ -78,6 +85,27 @@ function loadGrowth(): GrowthState {
     }
   } catch {
     /* ignore */
+  }
+  return null
+}
+
+/** 读取当前身份的成长数据（页面重载场景显式传 userId，避免与身份单例同步竞态） */
+function loadGrowth(userId: string = getCurrentUserId()): GrowthState {
+  const key = growthKeyFor(userId)
+  const own = parseGrowth(localStorage.getItem(key))
+  if (own) return own
+  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
+     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与钱包/商城一致） */
+  if (!cloudEnabled) {
+    const legacy = parseGrowth(localStorage.getItem(GROWTH_LEGACY))
+    if (legacy) {
+      try {
+        localStorage.setItem(key, JSON.stringify(legacy))
+      } catch {
+        /* ignore */
+      }
+      return legacy
+    }
   }
   return { events: [], checkin: { last: '', streak: 0 }, badges: {} }
 }
@@ -191,7 +219,7 @@ export function recordGrowth(action: string, opts?: { quality?: boolean }): Grow
     events: [...cur.events, { id: Date.now(), action, at: Date.now() }],
   })
   try {
-    localStorage.setItem(GROWTH_KEY, JSON.stringify(merged))
+    localStorage.setItem(growthKeyFor(getCurrentUserId()), JSON.stringify(merged))
   } catch {
     /* ignore */
   }
@@ -220,6 +248,8 @@ function levelProgress(kind: 'feed' | 'kb', num: number): [number, number, numbe
 
 export function GrowthPage() {
   const toast = useToast()
+  /* 轮 17 打通：登录身份切换时重载对应身份的成长数据（显式传 userId 防竞态） */
+  const { auth } = useAuth()
   const [state, setState] = useState<GrowthState>(loadGrowth)
   const today = localDate(Date.now())
   const yesterday = localDate(Date.now() - 86_400_000)
@@ -231,6 +261,11 @@ export function GrowthPage() {
     window.addEventListener(GROWTH_UPDATE_EVT, sync)
     return () => window.removeEventListener(GROWTH_UPDATE_EVT, sync)
   }, [])
+
+  /* 轮 17 打通：切号（登录/登出）即重载对应身份的成长数据 */
+  useEffect(() => {
+    setState(loadGrowth(auth.userId))
+  }, [auth.userId])
 
   const checkedToday = state.checkin.last === today
 
@@ -253,7 +288,7 @@ export function GrowthPage() {
     const merged = withBadgeTimes(next) // 落盘前合并新解锁徽章的首次达成时刻
     setState(merged)
     try {
-      localStorage.setItem(GROWTH_KEY, JSON.stringify(merged))
+      localStorage.setItem(growthKeyFor(getCurrentUserId()), JSON.stringify(merged))
     } catch {
       /* ignore */
     }

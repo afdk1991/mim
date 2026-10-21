@@ -1,15 +1,18 @@
 import './publish.css'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Empty, TimeAgo, useToast } from './components'
-import { useAuth } from './auth'
+import { getCurrentUserId, useAuth } from './auth'
 import { useApp } from './store'
+import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
 
 /** 统一内容发布器（开发吧.md「内容统一模型：基表 + 扩展表」）
  *  基表 content：domain 是权限边界（1=广场 2=知识），分发/审核/计费全靠它路由；
  *  扩展表只存差异化字段：content_ext_dynamic / content_ext_article。
  *  轮 15 打通：提交不再只落本地预览——按 domain/content_type 真发布进 store
- *  （动态/图文→广场 Feed，博文→知识库），并触发成长引擎记分；落库预览保留作 JSON 展示。 */
+ *  （动态/图文→广场 Feed，博文→知识库），并触发成长引擎记分；落库预览保留作 JSON 展示。
+ *  轮 17 打通：发布记录按真实登录身份隔离（mim-publish-v1:<userId>），
+ *  本地模式一次性迁移旧全局 key；切号即重载。 */
 
 type Domain = 1 | 2
 
@@ -46,21 +49,43 @@ interface PublishedItem {
   preview: Record<string, unknown>
 }
 
-const PUB_KEY = 'mim-publish-v1'
+/* 轮 17 打通：旧全局 key 仅作一次性迁移源；发布记录按登录身份分 key 隔离 */
+const PUB_LEGACY = 'mim-publish-v1'
+const publishKeyFor = (userId: string) => `mim-publish-v1:${userId}`
 
-function loadPublish(): PublishedItem[] {
+/** 校验并解析发布记录（缺失/非法返回 null） */
+function parsePublish(raw: string | null): PublishedItem[] | null {
   try {
-    const raw = localStorage.getItem(PUB_KEY)
-    if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
+    const parsed: unknown = JSON.parse(raw ?? 'null')
+    if (!Array.isArray(parsed)) return null
     return parsed.filter(
       (x): x is PublishedItem =>
         typeof x === 'object' && x !== null && typeof (x as PublishedItem).id === 'number',
     )
   } catch {
-    return []
+    return null
   }
+}
+
+/** 读取当前身份的发布记录（页面重载场景显式传 userId，避免与身份单例同步竞态） */
+function loadPublish(userId: string = getCurrentUserId()): PublishedItem[] {
+  const key = publishKeyFor(userId)
+  const own = parsePublish(localStorage.getItem(key))
+  if (own) return own
+  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
+     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与钱包/商城一致） */
+  if (!cloudEnabled) {
+    const legacy = parsePublish(localStorage.getItem(PUB_LEGACY))
+    if (legacy) {
+      try {
+        localStorage.setItem(key, JSON.stringify(legacy))
+      } catch {
+        /* ignore */
+      }
+      return legacy
+    }
+  }
+  return []
 }
 
 /** seo_slug 自动生成（知识态专用；广场态 NULL） */
@@ -103,6 +128,11 @@ export function PublishPage() {
   /* ---------- 已发布列表 ---------- */
   const [published, setPublished] = useState<PublishedItem[]>(loadPublish)
   const [openId, setOpenId] = useState<number | null>(null)
+
+  /* 轮 17 打通：切号（登录/登出）即重载对应身份的发布记录（显式传 userId 防竞态） */
+  useEffect(() => {
+    setPublished(loadPublish(auth.userId))
+  }, [auth.userId])
 
   const isPlaza = domain === 1
   const types: ContentType[] = isPlaza ? [10, 11] : [20, 22]
@@ -197,7 +227,7 @@ export function PublishPage() {
     const next = [item, ...published]
     setPublished(next)
     try {
-      localStorage.setItem(PUB_KEY, JSON.stringify(next))
+      localStorage.setItem(publishKeyFor(getCurrentUserId()), JSON.stringify(next))
     } catch {
       /* ignore */
     }
@@ -210,7 +240,7 @@ export function PublishPage() {
     setPublished([])
     setOpenId(null)
     try {
-      localStorage.removeItem(PUB_KEY)
+      localStorage.removeItem(publishKeyFor(getCurrentUserId()))
     } catch {
       /* ignore */
     }
