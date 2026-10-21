@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import './vip.css'
 import { useToast } from './components'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
+import { walletConsume } from './wallet'
 
 /* ================= VIP 会员中心（盈利点：订阅收入 demo） =================
    自包含模式：独立 localStorage（mim-vip-v1），不依赖 AppState/store/seed。
-   闭环链路：选档 → 模拟支付 → 权益生效 → 到期续费叠加 → 订单留痕 → 可模拟退订。 */
+   闭环链路：选档 → 统一钱包真实扣费 → 权益生效 → 到期续费叠加 → 订单留痕 → 可模拟退订。
+   轮 14 打通：购买不再「假支付」，扣费走 mim-wallet-v1（余额不足自动中止订单）。 */
 
 type PlanId = 'monthly' | 'quarterly' | 'yearly'
 
@@ -124,6 +126,12 @@ export function VipCenterPage() {
   const confirmPay = () => {
     if (!payPlan || paying) return
     setPaying(true)
+    /* 轮 14 打通：先走统一钱包真实扣费（余额不足内部已 toast 并中止订单） */
+    const fen = payPlan.price * 100
+    if (!walletConsume(fen, `VIP 会员 · ${payPlan.label}（${payPlan.days} 天）`)) {
+      setPaying(false)
+      return
+    }
     /* 模拟支付通道耗时 */
     window.setTimeout(() => {
       const base = state.plan !== null && state.expireAt > Date.now() ? state.expireAt : Date.now()
@@ -223,7 +231,7 @@ export function VipCenterPage() {
           )}
         </section>
 
-        <p className="vip-note">本页为商业化方向演示：订阅收入模型（月/季/年卡 + 到期续费叠加），支付为模拟通道，不产生真实扣费。</p>
+        <p className="vip-note">本页为商业化方向演示：订阅收入模型（月/季/年卡 + 到期续费叠加），扣费走统一钱包（mim-wallet-v1），余额不足时订单中止，可在钱包页充值后重试。</p>
       </div>
 
       {/* 模拟支付弹层 */}
@@ -241,7 +249,7 @@ export function VipCenterPage() {
             </div>
             <div className="vip-pay-row">
               <span>支付方式</span>
-              <b>模拟通道（不扣费）</b>
+              <b>统一钱包扣费（mim-wallet-v1）</b>
             </div>
             <div className="vip-pay-amount">
               应付 <b>¥{payPlan.price}</b>

@@ -1,12 +1,15 @@
 import './wallet.css'
-import { useState } from 'react'
-import { Empty, TimeAgo, useToast } from './components'
+import { useEffect, useState } from 'react'
+import { Empty, TimeAgo, emitToast, useToast } from './components'
 import { cx } from './utils'
 
 /** 统一钱包 + 权益矩阵（开发吧.md 4.2 entitlement_matrix / 4.3 revenue_rule）
  *  金额一律存「分」整数（结算铁律）；收益入账携带 revenue_rule 下单时刻快照，
  *  且永久保留 domain + content_type（广场靠广告 / 知识靠订阅，分部核算必需）；
- *  权益按域打标，两条禁止红线防「会员通兑破墙」。 */
+ *  权益按域打标，两条禁止红线防「会员通兑破墙」。
+ *  轮 14 打通：对外暴露模块级钱包 API（walletConsume/walletIncome/revenueSnapshot），
+ *  VIP 购买、内容分成等跨模块链路统一走 mim-wallet-v1 入账/扣费，
+ *  钱包页监听更新事件实时同步外部变更。 */
 
 type Domain = 1 | 2
 type PlanCode = 'BASIC' | 'SUPER' | 'DOWNLOAD_PACK' | 'ENTERPRISE'
@@ -114,6 +117,74 @@ function loadWallet(): WalletState {
 /** 分 → 元展示（仅展示层转换，存储永远是分） */
 const yuan = (fen: number) => (fen / 100).toFixed(2)
 
+/* ---------- 轮 14 打通：模块级统一钱包 API ---------- */
+
+/** 钱包更新事件：外部模块入账/扣费后派发，钱包页监听同步 */
+export const WALLET_UPDATE_EVT = 'mim-wallet-update'
+
+/** 落盘并广播（外部链路写 localStorage 后通知钱包页重读） */
+function persistWallet(next: WalletState): void {
+  try {
+    localStorage.setItem(WL_KEY, JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(WALLET_UPDATE_EVT))
+}
+
+/** 外部模块查询钱包快照（余额/当前套餐） */
+export function getWalletState(): WalletState {
+  return loadWallet()
+}
+
+/** 统一扣费入口：余额不足返回 false（内部已 toast，调用方应中止订单） */
+export function walletConsume(fen: number, note: string): boolean {
+  if (!Number.isFinite(fen) || fen <= 0) return false
+  const s = loadWallet()
+  if (s.balanceFen < fen) {
+    emitToast(`余额不足：需 ¥${yuan(fen)}，当前 ¥${yuan(s.balanceFen)}，请先到钱包页充值`)
+    return false
+  }
+  const tx: Tx = { id: Date.now(), kind: 'consume', fen, note, at: Date.now() }
+  persistWallet({
+    ...s,
+    balanceFen: s.balanceFen - fen,
+    txs: [tx, ...s.txs].slice(0, 50),
+  })
+  emitToast(`已扣费 ¥${yuan(fen)}：${note}`)
+  return true
+}
+
+/** 统一收益入账入口：携带 revenue_rule 下单时刻快照（域/类型/sku/费率/结算周期） */
+export function walletIncome(
+  fen: number,
+  note: string,
+  snap: NonNullable<Tx['snapshot']>,
+): void {
+  if (!Number.isFinite(fen) || fen <= 0) return
+  const s = loadWallet()
+  const tx: Tx = { id: Date.now(), kind: 'income', fen, note, at: Date.now(), snapshot: snap }
+  persistWallet({
+    ...s,
+    balanceFen: s.balanceFen + fen,
+    txs: [tx, ...s.txs].slice(0, 50),
+  })
+  emitToast(`收益到账 +¥${yuan(fen)}：${note}`)
+}
+
+/** 按 sku 取 revenue_rule 快照（运营改表后新订单生效，历史流水快照不变） */
+export function revenueSnapshot(sku: string): NonNullable<Tx['snapshot']> | null {
+  const r = REVENUE_RULES.find((x) => x.sku === sku)
+  if (!r) return null
+  return {
+    domain: r.domain,
+    content_type: Number.parseInt(r.contentType, 10),
+    sku_type: r.sku,
+    rate_pct: r.rate,
+    settle_tn: r.settle,
+  }
+}
+
 const KIND_META: Record<Tx['kind'], { icon: string; label: string }> = {
   recharge: { icon: '🪙', label: '充值' },
   consume: { icon: '💳', label: '消费' },
@@ -124,6 +195,13 @@ export function WalletPage() {
   const toast = useToast()
   const [state, setState] = useState<WalletState>(loadWallet)
   const { balanceFen, plan, txs } = state
+
+  /* 轮 14 打通：外部链路（VIP 扣费/资源分成）写入钱包后，本页实时同步 */
+  useEffect(() => {
+    const sync = () => setState(loadWallet())
+    window.addEventListener(WALLET_UPDATE_EVT, sync)
+    return () => window.removeEventListener(WALLET_UPDATE_EVT, sync)
+  }, [])
 
   const save = (next: WalletState) => {
     setState(next)

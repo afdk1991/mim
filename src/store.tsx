@@ -35,8 +35,40 @@ import { pullCloudContent, type CloudPayload } from './lib/cloud-read'
 import { cloudSendMessage, subscribeMessages } from './lib/cloud-msg'
 import { supabase, cloudEnabled } from './lib/supabase'
 import { recordGrowth } from './growth'
+import { revenueSnapshot, walletIncome } from './wallet'
 
 const STORAGE_KEY = 'mim-state-v1'
+
+/**
+ * 云端真实模式迁移（Supabase 已配置时对历史 localStorage 存档执行）：
+ * 演示域数据（u1..u9 的内容/关注/通知/私信，演示超话/热搜/资源库）全部剔除，
+ * 仅保留「我」自产的帖子/文章/片段、其收藏与草稿——这些是用户真实创作，
+ * 上云前不丢失；登录并拉取云端后与云端行同 id 合并。
+ */
+function migrateLegacyForCloud(s: AppState): AppState {
+  if (!s.users['me']) return createSeedState()
+  const keepPostIds = new Set(s.posts.filter((p) => p.authorId === 'me').map((p) => p.id))
+  const keepArticleIds = new Set(s.articles.filter((a) => a.authorId === 'me').map((a) => a.id))
+  return {
+    ...s,
+    meId: 'me',
+    users: { me: s.users['me'] },
+    posts: s.posts.filter((p) => p.authorId === 'me'),
+    articles: s.articles.filter((a) => a.authorId === 'me'),
+    snippets: s.snippets.filter((x) => x.authorId === 'me'),
+    resources: [],
+    topics: [],
+    hotSearches: [],
+    notifications: [],
+    messages: [],
+    followingIds: [],
+    favorites: s.favorites.filter(
+      (f) =>
+        (f.type === 'post' && keepPostIds.has(f.targetId)) ||
+        (f.type === 'article' && keepArticleIds.has(f.targetId)),
+    ),
+  }
+}
 
 function loadState(): AppState {
   try {
@@ -73,6 +105,8 @@ function loadState(): AppState {
         parsed.articles = parsed.articles.map((a) => ({ ...a, comments: a.comments ?? [] }))
         // 兜底：cloudIds 为轮 4 新增可选字段，旧存档缺失时补空集
         if (!parsed.cloudIds) parsed.cloudIds = { users: [], posts: [], articles: [], snippets: [] }
+        // 云端真实模式：历史存档剔除演示域数据（见 migrateLegacyForCloud），纯本地模式不受影响
+        if (cloudEnabled) return migrateLegacyForCloud(parsed)
         return parsed
       }
     }
@@ -990,6 +1024,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'downloadResource', payload: id })
         // 轮 13 打通：资源被下载 → 知识线 resource_downloaded
         recordGrowth('resource_downloaded')
+        // 轮 14 打通：资源被下载 → 作者按 revenue_rule(resource_buy 80%) 分成入账
+        // demo 单身份模拟：uploader 为当前身份名时，视为自己的资源被他人下载；
+        // 演示定价 ¥5.00（500 分）× 80% = 400 分，快照冻结下单时刻费率
+        const res = state.resources.find((r) => r.id === id)
+        if (res && res.uploader === state.users[state.meId]?.name) {
+          const snap = revenueSnapshot('resource_buy')
+          if (snap) walletIncome(400, `资源下载分成（${res.title}）`, snap)
+        }
       },
       switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
       resetDemo: () => dispatch({ type: 'reset' }),
