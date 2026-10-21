@@ -37,6 +37,18 @@
 .gr-badge-bar i { display: block; height: 100%; background: var(--primary); border-radius: 999px; transition: width 0.3s; }
 .gr-badge.locked { opacity: 0.55; filter: grayscale(1); }
 
+/* 徽章增强：解锁时间 / 全解锁庆祝 / 新解锁发光动画 */
+.gr-badge-time { color: var(--text-3); }
+.gr-badge-all { font-style: normal; color: #b8860b; font-weight: 600; margin-left: 6px; }
+.gr-badge.fresh { border-color: var(--primary); animation: gr-badge-glow 1.8s ease-in-out 3; }
+@keyframes gr-badge-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 12px 2px color-mix(in srgb, var(--primary) 55%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-badge.fresh { animation: none; }
+}
+
 /* 行为模拟触发 */
 .gr-act-tip { font-size: 12px; margin: 4px 0 10px; }
 .gr-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

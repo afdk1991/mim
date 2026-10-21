@@ -52,6 +52,8 @@ interface GrowthState {
   events: GrowthEvent[]
   /** 签到：last = 最近签到日（本地 YYYY-M-D），streak = 连续天数 */
   checkin: { last: string; streak: number }
+  /** 徽章解锁时间：code → 首次达成时刻（旧数据无此字段时 loadGrowth 自动补空对象） */
+  badges: Record<string, number>
 }
 
 const GROWTH_KEY = 'mim-growth-v1'
@@ -68,12 +70,13 @@ function loadGrowth(): GrowthState {
       return {
         events: v.events.filter((e) => e && typeof e.id === 'number' && typeof e.action === 'string' && typeof e.at === 'number'),
         checkin: { last: v.checkin.last, streak: v.checkin.streak },
+        badges: v.badges && typeof v.badges === 'object' ? v.badges : {},
       }
     }
   } catch {
     /* ignore */
   }
-  return { events: [], checkin: { last: '', streak: 0 } }
+  return { events: [], checkin: { last: '', streak: 0 }, badges: {} }
 }
 
 /** 广场等级曲线：level = floor(exp^0.45 / 20)（point 可能为负，钳 0） */
@@ -129,6 +132,28 @@ function badgeProgress(
   return { cur, pct: Math.min(100, Math.round((cur / b.target) * 100)), text: `${name} ${cur}/${b.target}${unit}` }
 }
 
+/** 合并徽章解锁时间：next 状态下新解锁的 code 记录首次达成时刻（以 next.badges 为基底，清空后可重新计时） */
+function withBadgeTimes(next: GrowthState): GrowthState {
+  let exp = 0
+  let point = 0
+  for (const e of next.events) {
+    const rule = GROWTH_RULES.find((r) => r.action === e.action)
+    if (!rule) continue
+    if (rule.reward === 'EXP') exp += rule.value
+    else point += rule.value
+  }
+  const ctx = { exp, point, streak: next.checkin.streak }
+  const badges = { ...next.badges }
+  let changed = false
+  for (const code of BADGES.filter((b) => b.cond(ctx)).map((b) => b.code)) {
+    if (!(code in badges)) {
+      badges[code] = Date.now()
+      changed = true
+    }
+  }
+  return changed ? { ...next, badges } : next
+}
+
 /** 等级进度：返回 [当前级, 下一级, 进度 0-100] */
 function levelProgress(kind: 'feed' | 'kb', num: number): [number, number, number] {
   if (kind === 'feed') {
@@ -171,9 +196,10 @@ export function GrowthPage() {
   }, [state, today])
 
   const persist = (next: GrowthState) => {
-    setState(next)
+    const merged = withBadgeTimes(next) // 落盘前合并新解锁徽章的首次达成时刻
+    setState(merged)
     try {
-      localStorage.setItem(GROWTH_KEY, JSON.stringify(next))
+      localStorage.setItem(GROWTH_KEY, JSON.stringify(merged))
     } catch {
       /* ignore */
     }
@@ -209,6 +235,8 @@ export function GrowthPage() {
   const unlockedCodes = useMemo(() => BADGES.filter((b) => b.cond(badgeCtx)).map((b) => b.code), [exp, point, state.checkin.streak])
   const unlockedCount = unlockedCodes.length
 
+  /* 新解锁高亮：会话内记录新达成徽章 code，卡片播放发光动画（刷新后消失） */
+  const [freshCodes, setFreshCodes] = useState<string[]>([])
   /* 解锁瞬间提示：对比上次解锁集合，新增徽章即 toast（首次挂载只记录不提示） */
   const unlockedKey = unlockedCodes.join(',')
   const prevUnlockedRef = useRef<string | null>(null)
@@ -220,7 +248,9 @@ export function GrowthPage() {
     const newly = unlockedCodes.filter((c) => !prevSet.has(c))
     if (newly.length > 0) {
       const metas = BADGES.filter((b) => newly.includes(b.code))
-      toast(`🏅 解锁新徽章：${metas.map((b) => `${b.icon} ${b.label}`).join('、')}`)
+      const allDone = unlockedCodes.length === BADGES.length
+      toast(`🏅 解锁新徽章：${metas.map((b) => `${b.icon} ${b.label}`).join('、')}${allDone ? ' · 🎉 全部徽章达成！' : ''}`)
+      setFreshCodes((f) => [...new Set([...f, ...newly])])
     }
   }, [unlockedKey, unlockedCodes, toast])
 
@@ -271,17 +301,23 @@ export function GrowthPage() {
           <div className="card">
             <div className="gr-badge-head">
               <b>🏅 徽章墙</b>
-              <span className="gr-badge-count">已解锁 {unlockedCount}/{BADGES.length}</span>
+              <span className="gr-badge-count">
+                已解锁 {unlockedCount}/{BADGES.length}
+                {unlockedCount === BADGES.length && <em className="gr-badge-all">🎉 全徽章达成</em>}
+              </span>
             </div>
             <div className="gr-badges">
               {BADGES.map((b) => {
                 const unlocked = b.cond(badgeCtx)
                 const prog = unlocked ? null : badgeProgress(b, badgeCtx)
+                const fresh = unlocked && freshCodes.includes(b.code)
                 return (
-                  <div key={b.code} className={cx('gr-badge', !unlocked && 'locked')} title={b.desc}>
+                  <div key={b.code} className={cx('gr-badge', !unlocked && 'locked', fresh && 'fresh')} title={b.desc}>
                     <i aria-hidden>{b.icon}</i>
                     <span>{b.label}</span>
                     <small>{b.desc}</small>
+                    {/* 已解锁：显示首次达成日期（旧数据无时间戳则仅显示「已解锁」） */}
+                    {unlocked && <small className="gr-badge-time">{state.badges[b.code] ? `${localDate(state.badges[b.code])} 解锁` : '已解锁'}</small>}
                     {/* 锁定态进度提示：当前值/目标值 + 细进度条，解锁后自动隐藏 */}
                     {prog && (
                       <>
@@ -397,7 +433,7 @@ export function GrowthPage() {
               className="btn btn-ghost btn-sm"
               onClick={() => {
                 if (!window.confirm('确定清空全部成长数据（含签到与徽章进度）吗？')) return
-                persist({ events: [], checkin: { last: '', streak: 0 } })
+                persist({ events: [], checkin: { last: '', streak: 0 }, badges: {} })
                 toast('成长数据已清空')
               }}
             >
