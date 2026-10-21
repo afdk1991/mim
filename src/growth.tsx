@@ -1,0 +1,345 @@
+import './growth.css'
+import { useMemo, useState } from 'react'
+import { Empty, TimeAgo, useToast } from './components'
+import { cx } from './utils'
+
+/* ================= 统一成长引擎 demo =================
+   蓝本：开发吧.md 4.1 growth_rule ——「一条引擎，两条线」。
+   - 广场线 EXP：时效活跃，decay_days=30（demo 不模拟时间衰减，仅展示规则）；
+   - 知识线 POINT：长尾资产，decay_days=0 永久累积；
+   - 两条等级曲线量纲不同，数学上不可互换：
+     广场 level = floor(exp^0.45 / 20)；知识 Lv = floor(point^0.5 / 8) + 1。
+   自包含模块：独立 localStorage（mim-growth-v1），不动 AppState/store/seed。 */
+
+/** 域：1=广场态 2=知识态（开发吧.md content.domain 同源） */
+type Domain = 1 | 2
+
+/** growth_rule 单条规则（数值直接取自开发吧.md 配置表，改表不发版） */
+interface GrowthRule {
+  action: string
+  domain: Domain | 0 // 0 = 双域通用
+  reward: 'EXP' | 'POINT'
+  value: number
+  /** 每日上限次数；null = 无上限 */
+  dailyCap: number | null
+  decayDays: number
+  qualityGate: boolean
+  label: string
+  icon: string
+}
+
+const GROWTH_RULES: GrowthRule[] = [
+  { action: 'publish_dynamic', domain: 1, reward: 'EXP', value: 2, dailyCap: 10, decayDays: 30, qualityGate: false, label: '发动态', icon: '📝' },
+  { action: 'dynamic_liked', domain: 1, reward: 'EXP', value: 1, dailyCap: 200, decayDays: 30, qualityGate: false, label: '动态获赞', icon: '⭐' },
+  { action: 'live_open', domain: 1, reward: 'EXP', value: 50, dailyCap: 1, decayDays: 7, qualityGate: false, label: '开直播', icon: '📺' },
+  { action: 'follow_gained', domain: 1, reward: 'EXP', value: 1, dailyCap: 50, decayDays: 30, qualityGate: false, label: '涨粉', icon: '👥' },
+  { action: 'publish_article', domain: 2, reward: 'POINT', value: 10, dailyCap: 5, decayDays: 0, qualityGate: true, label: '发博文', icon: '✍️' },
+  { action: 'article_collected', domain: 2, reward: 'POINT', value: 3, dailyCap: null, decayDays: 0, qualityGate: false, label: '博文被藏', icon: '📌' },
+  { action: 'answer_adopted', domain: 2, reward: 'POINT', value: 20, dailyCap: null, decayDays: 0, qualityGate: false, label: '回答被采纳', icon: '🏅' },
+  { action: 'resource_downloaded', domain: 2, reward: 'POINT', value: 5, dailyCap: null, decayDays: 0, qualityGate: false, label: '资源被下载', icon: '📦' },
+  { action: 'column_finished', domain: 2, reward: 'POINT', value: 30, dailyCap: null, decayDays: 0, qualityGate: false, label: '专栏学完', icon: '🎓' },
+  { action: 'course_review_good', domain: 2, reward: 'POINT', value: 5, dailyCap: null, decayDays: 0, qualityGate: false, label: '课程好评', icon: '💬' },
+  { action: 'anti_spam_penalty', domain: 0, reward: 'POINT', value: -50, dailyCap: null, decayDays: 0, qualityGate: false, label: '反垃圾惩罚', icon: '🚫' },
+]
+
+interface GrowthEvent {
+  id: number
+  action: string
+  at: number
+}
+
+interface GrowthState {
+  events: GrowthEvent[]
+  /** 签到：last = 最近签到日（本地 YYYY-M-D），streak = 连续天数 */
+  checkin: { last: string; streak: number }
+}
+
+const GROWTH_KEY = 'mim-growth-v1'
+
+function localDate(ts: number | Date): string {
+  const d = ts instanceof Date ? ts : new Date(ts)
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+
+function loadGrowth(): GrowthState {
+  try {
+    const v = JSON.parse(localStorage.getItem(GROWTH_KEY) ?? 'null') as GrowthState | null
+    if (v && Array.isArray(v.events) && v.checkin && typeof v.checkin.last === 'string' && typeof v.checkin.streak === 'number') {
+      return {
+        events: v.events.filter((e) => e && typeof e.id === 'number' && typeof e.action === 'string' && typeof e.at === 'number'),
+        checkin: { last: v.checkin.last, streak: v.checkin.streak },
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { events: [], checkin: { last: '', streak: 0 } }
+}
+
+/** 广场等级曲线：level = floor(exp^0.45 / 20)（point 可能为负，钳 0） */
+function feedLevel(exp: number): number {
+  return Math.floor(Math.pow(Math.max(0, exp), 0.45) / 20)
+}
+
+/** 知识等级曲线：Lv = floor(point^0.5 / 8) + 1（point 可能为负，钳 0） */
+function kbLevel(point: number): number {
+  return Math.floor(Math.sqrt(Math.max(0, point)) / 8) + 1
+}
+
+/** 徽章定义：cond 基于双线数值与签到 streak 派生 */
+const BADGES: { code: string; icon: string; label: string; desc: string; cond: (s: { exp: number; point: number; streak: number }) => boolean }[] = [
+  { code: 'seed', icon: '🌱', label: '初来乍到', desc: '广场 EXP ≥ 10', cond: (s) => s.exp >= 10 },
+  { code: 'regular', icon: '🔥', label: '广场常客', desc: '广场 EXP ≥ 100', cond: (s) => s.exp >= 100 },
+  { code: 'star', icon: '📣', label: '广场红人', desc: '广场 EXP ≥ 500', cond: (s) => s.exp >= 500 },
+  { code: 'first', icon: '✍️', label: '首篇博文', desc: '知识 POINT ≥ 10', cond: (s) => s.point >= 10 },
+  { code: 'scholar', icon: '📚', label: '知识达人', desc: '知识 POINT ≥ 200', cond: (s) => s.point >= 200 },
+  { code: 'expert', icon: '🎓', label: '领域专家', desc: '知识 POINT ≥ 1000', cond: (s) => s.point >= 1000 },
+  { code: 'week', icon: '📅', label: '七日之约', desc: '连续签到 7 天', cond: (s) => s.streak >= 7 },
+  { code: 'dual', icon: '🏆', label: '双线开花', desc: '两条线同时 ≥ 50', cond: (s) => s.exp >= 50 && s.point >= 50 },
+]
+
+/** 等级进度：返回 [当前级, 下一级, 进度 0-100] */
+function levelProgress(kind: 'feed' | 'kb', num: number): [number, number, number] {
+  if (kind === 'feed') {
+    const cur = feedLevel(num)
+    const pow = 1 / 0.45
+    const prev = cur === 0 ? 0 : Math.pow(20 * cur, pow)
+    const next = Math.pow(20 * (cur + 1), pow)
+    const pct = next === prev ? 100 : ((num - prev) / (next - prev)) * 100
+    return [cur, cur + 1, Math.min(100, Math.max(0, pct))]
+  }
+  const cur = kbLevel(num)
+  const prev = 64 * (cur - 1) * (cur - 1)
+  const next = 64 * cur * cur
+  const safe = Math.max(0, num)
+  const pct = next === prev ? 100 : ((safe - prev) / (next - prev)) * 100
+  return [cur, cur + 1, Math.min(100, Math.max(0, pct))]
+}
+
+export function GrowthPage() {
+  const toast = useToast()
+  const [state, setState] = useState<GrowthState>(loadGrowth)
+  const today = localDate(Date.now())
+  const yesterday = localDate(Date.now() - 86_400_000)
+
+  const checkedToday = state.checkin.last === today
+
+  /* 派生：双线累计值 + 今日各行为计数（daily_cap 依据） */
+  const { exp, point, todayCount } = useMemo(() => {
+    let exp = 0
+    let point = 0
+    const todayCount: Record<string, number> = {}
+    for (const e of state.events) {
+      const rule = GROWTH_RULES.find((r) => r.action === e.action)
+      if (!rule) continue
+      if (rule.reward === 'EXP') exp += rule.value
+      else point += rule.value
+      if (localDate(e.at) === today) todayCount[e.action] = (todayCount[e.action] ?? 0) + 1
+    }
+    return { exp, point, todayCount }
+  }, [state, today])
+
+  const persist = (next: GrowthState) => {
+    setState(next)
+    try {
+      localStorage.setItem(GROWTH_KEY, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** 触发行为：尊重 daily_cap；负值行为（惩罚）不受上限约束 */
+  const trigger = (rule: GrowthRule) => {
+    if (rule.dailyCap !== null && rule.value > 0 && (todayCount[rule.action] ?? 0) >= rule.dailyCap) {
+      toast(`「${rule.label}」已达今日上限 ${rule.dailyCap} 次`)
+      return
+    }
+    persist({
+      ...state,
+      events: [...state.events, { id: Date.now(), action: rule.action, at: Date.now() }],
+    })
+    toast(`已记录「${rule.label}」 ${rule.value > 0 ? '+' : ''}${rule.value} ${rule.reward}`)
+  }
+
+  /** 签到：断签即重置（昨天没签则从 1 重新计） */
+  const checkin = () => {
+    if (checkedToday) return
+    const streak = state.checkin.last === yesterday ? state.checkin.streak + 1 : 1
+    persist({ ...state, checkin: { last: today, streak } })
+    toast(streak >= 7 ? `已签到，连续 ${streak} 天，徽章「七日之约」到手！` : `已签到，连续 ${streak} 天`)
+  }
+
+  const feed = levelProgress('feed', exp)
+  const kb = levelProgress('kb', point)
+  const badgeCtx = { exp, point, streak: state.checkin.streak }
+  const flows = [...state.events].reverse().slice(0, 10)
+
+  return (
+    <div className="page-grid single">
+      <div>
+        <h2 className="page-title">🚀 统一成长引擎</h2>
+        <p className="muted" style={{ marginTop: -6, marginBottom: 14 }}>
+          一条引擎两条线（开发吧.md growth_rule）：广场互动分有时效、知识贡献分永久累积，两条等级曲线量纲不同、数学上不可互换。
+        </p>
+
+        {/* 双线等级 */}
+        <div className="gr-duo">
+          <div className="card gr-line">
+            <div className="gr-line-head">
+              <b>🎬 广场互动分</b>
+              <span className="gr-reward gr-reward-exp">EXP {exp}</span>
+            </div>
+            <div className="gr-level-num">Lv.{feed[0]}</div>
+            <div className="gr-bar" role="progressbar" aria-valuenow={Math.round(feed[2])} aria-valuemin={0} aria-valuemax={100} aria-label="广场等级进度">
+              <div className="gr-bar-fill" style={{ width: `${feed[2]}%` }} />
+            </div>
+            <small className="gr-hint">成长至 Lv.{feed[1]} · 曲线 floor(exp^0.45/20) · 30 天衰减</small>
+          </div>
+          <div className="card gr-line">
+            <div className="gr-line-head">
+              <b>📚 知识贡献分</b>
+              <span className="gr-reward gr-reward-point">POINT {point}</span>
+            </div>
+            <div className="gr-level-num">Lv.{kb[0]}</div>
+            <div className="gr-bar" role="progressbar" aria-valuenow={Math.round(kb[2])} aria-valuemin={0} aria-valuemax={100} aria-label="知识等级进度">
+              <div className="gr-bar-fill gr-bar-kb" style={{ width: `${kb[2]}%` }} />
+            </div>
+            <small className="gr-hint">成长至 Lv.{kb[1]} · 曲线 floor(point^0.5/8)+1 · 零衰减永久累积</small>
+          </div>
+        </div>
+
+        {/* 签到 + 徽章 */}
+        <div className="gr-duo">
+          <div className="card gr-checkin">
+            <b>📅 每日签到</b>
+            <div className="gr-streak">连续 <em>{state.checkin.streak}</em> 天</div>
+            <button className="btn btn-primary gr-checkin-btn" disabled={checkedToday} onClick={checkin}>
+              {checkedToday ? '今日已签到 ✓' : '签到'}
+            </button>
+            <small className="gr-hint">断签重新计数，连续 7 天解锁「七日之约」徽章</small>
+          </div>
+          <div className="card">
+            <b>🏅 徽章墙</b>
+            <div className="gr-badges">
+              {BADGES.map((b) => (
+                <div key={b.code} className={cx('gr-badge', !b.cond(badgeCtx) && 'locked')} title={b.desc}>
+                  <i aria-hidden>{b.icon}</i>
+                  <span>{b.label}</span>
+                  <small>{b.desc}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 行为模拟触发（demo） */}
+        <div className="card">
+          <b>⚡ 模拟行为触发</b>
+          <p className="muted gr-act-tip">demo 直接记事件；真实链路由广场/知识各端行为上报统一引擎结算，逐日受 daily_cap 约束。</p>
+          <div className="gr-actions">
+            {GROWTH_RULES.map((r) => {
+              const used = todayCount[r.action] ?? 0
+              const capped = r.dailyCap !== null && r.value > 0 && used >= r.dailyCap
+              return (
+                <button
+                  key={r.action}
+                  className={cx('gr-act-btn', capped && 'capped')}
+                  disabled={capped}
+                  onClick={() => trigger(r)}
+                  title={capped ? '已达今日上限' : r.label}
+                >
+                  <i aria-hidden>{r.icon}</i>
+                  <span>{r.label}</span>
+                  <em className={r.value < 0 ? 'neg' : ''}>
+                    {r.value > 0 ? '+' : ''}
+                    {r.value} {r.reward}
+                  </em>
+                  <small>
+                    今日 {used}/{r.dailyCap ?? '∞'}
+                    {r.qualityGate ? ' · 需质量门' : ''}
+                  </small>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 成长流水 */}
+        <div className="card">
+          <b>🧾 成长流水</b>
+          {flows.length === 0 ? (
+            <Empty emoji="🌱" text="还没有成长记录，点上面的行为按钮试试" />
+          ) : (
+            <div className="gr-flow">
+              {flows.map((e) => {
+                const rule = GROWTH_RULES.find((r) => r.action === e.action)
+                return (
+                  <div key={e.id} className="gr-flow-row">
+                    <span className="gr-flow-ico" aria-hidden>{rule?.icon ?? '•'}</span>
+                    <span className="gr-flow-label">{rule?.label ?? e.action}</span>
+                    {rule && <span className={cx('tag', rule.domain === 1 && 'gr-tag-feed', rule.domain === 2 && 'gr-tag-kb')}>{rule.domain === 1 ? '广场' : rule.domain === 2 ? '知识' : '通用'}</span>}
+                    <em className={cx('gr-flow-val', (rule?.value ?? 0) < 0 && 'neg')}>
+                      {(rule?.value ?? 0) > 0 ? '+' : ''}
+                      {rule?.value ?? 0} {rule?.reward}
+                    </em>
+                    <small className="gr-flow-time">
+                      <TimeAgo ts={e.at} />
+                    </small>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* growth_rule 配置表（可直接导入的运营配置） */}
+        <div className="card">
+          <b>📋 growth_rule 配置表</b>
+          <div className="gr-table-wrap">
+            <table className="gr-table">
+              <thead>
+                <tr>
+                  <th>行为</th>
+                  <th>域</th>
+                  <th>奖励</th>
+                  <th>数值</th>
+                  <th>日上限</th>
+                  <th>衰减</th>
+                  <th>质量门</th>
+                </tr>
+              </thead>
+              <tbody>
+                {GROWTH_RULES.map((r) => (
+                  <tr key={r.action}>
+                    <td>{r.icon} {r.label}</td>
+                    <td>{r.domain === 1 ? '广场' : r.domain === 2 ? '知识' : '通用'}</td>
+                    <td>{r.reward}</td>
+                    <td className={r.value < 0 ? 'gr-neg' : ''}>{r.value}</td>
+                    <td>{r.dailyCap === null ? '无' : `${r.dailyCap} 次`}</td>
+                    <td>{r.decayDays === 0 ? '不衰减' : `${r.decayDays} 天`}</td>
+                    <td>{r.qualityGate ? '需' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="gr-warn">
+            ⚠️ 红线：广场 EXP 与知识 POINT 数值不等价、衰减不同（30 天 vs 0）、等级曲线量纲互斥，严禁互相兑换或合并展示；demo 不模拟时间衰减，仅做规则展示。
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                if (!window.confirm('确定清空全部成长数据（含签到与徽章进度）吗？')) return
+                persist({ events: [], checkin: { last: '', streak: 0 } })
+                toast('成长数据已清空')
+              }}
+            >
+              清空成长数据
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
