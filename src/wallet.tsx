@@ -9,7 +9,9 @@ import { cx } from './utils'
  *  权益按域打标，两条禁止红线防「会员通兑破墙」。
  *  轮 14 打通：对外暴露模块级钱包 API（walletConsume/walletIncome/revenueSnapshot），
  *  VIP 购买、内容分成等跨模块链路统一走 mim-wallet-v1 入账/扣费，
- *  钱包页监听更新事件实时同步外部变更。 */
+ *  钱包页监听更新事件实时同步外部变更。
+ *  轮 15 打通：新增 walletRecharge（充值通道，kind=recharge 非收益），
+ *  商城钱包充值并轨到统一钱包，全站余额唯一源。 */
 
 type Domain = 1 | 2
 type PlanCode = 'BASIC' | 'SUPER' | 'DOWNLOAD_PACK' | 'ENTERPRISE'
@@ -153,6 +155,19 @@ export function walletConsume(fen: number, note: string): boolean {
   })
   emitToast(`已扣费 ¥${yuan(fen)}：${note}`)
   return true
+}
+
+/** 统一充值入口：外部模块（商城等）模拟渠道到账（kind=recharge，非收益，不携快照） */
+export function walletRecharge(fen: number, note: string): void {
+  if (!Number.isFinite(fen) || fen <= 0) return
+  const s = loadWallet()
+  const tx: Tx = { id: Date.now(), kind: 'recharge', fen, note, at: Date.now() }
+  persistWallet({
+    ...s,
+    balanceFen: s.balanceFen + fen,
+    txs: [tx, ...s.txs].slice(0, 50),
+  })
+  emitToast(`充值到账 +¥${yuan(fen)}`)
 }
 
 /** 统一收益入账入口：携带 revenue_rule 下单时刻快照（域/类型/sku/费率/结算周期） */

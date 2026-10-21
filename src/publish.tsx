@@ -1,12 +1,15 @@
 import './publish.css'
 import { useState } from 'react'
 import { Empty, TimeAgo, useToast } from './components'
+import { useAuth } from './auth'
+import { useApp } from './store'
 import { cx } from './utils'
 
 /** 统一内容发布器（开发吧.md「内容统一模型：基表 + 扩展表」）
  *  基表 content：domain 是权限边界（1=广场 2=知识），分发/审核/计费全靠它路由；
  *  扩展表只存差异化字段：content_ext_dynamic / content_ext_article。
- *  本页为 demo：收集表单 → 构造「落库预览」JSON（基表 + 扩展表 INSERT 模拟）→ 存本地已发布列表。 */
+ *  轮 15 打通：提交不再只落本地预览——按 domain/content_type 真发布进 store
+ *  （动态/图文→广场 Feed，博文→知识库），并触发成长引擎记分；落库预览保留作 JSON 展示。 */
 
 type Domain = 1 | 2
 
@@ -30,9 +33,9 @@ const VISIBLE_SCOPE: { code: 'public' | 'fans' | 'self'; label: string }[] = [
 /** content_type 元信息：编码 / 名称 / 建议提示 */
 const TYPE_META: Record<ContentType, { name: string; hint: string }> = {
   10: { name: '动态短文', hint: '纯文字动态，进广场 Feed' },
-  11: { name: '图文', hint: '带图动态（demo 模拟 media_ids）' },
+  11: { name: '图文', hint: '带图动态（媒体上传后续接入）' },
   20: { name: '博文', hint: 'Markdown 长文，进知识库与 RAG 索引' },
-  22: { name: '资源', hint: '可下载附件（demo 模拟 download_quota）' },
+  22: { name: '资源', hint: '可下载附件（配额设置后续接入）' },
 }
 
 /** 落库预览：一条记录 = 基表行 + 扩展表行 */
@@ -65,8 +68,17 @@ function genSlug(): string {
   return `mim-${Date.now().toString(36)}`
 }
 
+/** 表单分隔输入 → 数组（话题/标签/@ 用户共用；轮 15 提为模块级供 submit 发布使用） */
+function splitList(s: string, extra?: RegExp): string[] {
+  return s.split(extra ?? /[,，\s#]+/).map((x) => x.trim()).filter(Boolean)
+}
+
 export function PublishPage() {
   const toast = useToast()
+  /* 轮 15 打通：接入全局 store——真发布进广场 Feed / 知识库 */
+  const { publishPost, publishArticle } = useApp()
+  /* 作者锚点绑真实登录身份（本地未登录为 'local'），不再写死演示 user_id */
+  const { auth } = useAuth()
 
   /* ---------- 表单状态 ---------- */
   const [domain, setDomain] = useState<Domain>(1)
@@ -115,12 +127,12 @@ export function PublishPage() {
     /* 金额一律存「分」整数（结算铁律）；广场态标题为 NULL、seo_slug 为 NULL */
     const base: Record<string, unknown> = {
       id,
-      user_id: 1001, // 演示身份
+      user_id: auth.userId, // 真实登录身份（本地未登录为 'local'）
       domain,
       content_type: contentType,
       title: isPlaza ? null : title.trim(),
       body_draft: body,
-      body_render: '[MD 渲染缓存：读零计算]',
+      body_render: null, // 渲染缓存由服务端生成，本地预览留空不伪造
       pay_policy: payPolicy,
       price: priceFen,
       status: 2, // 已发布
@@ -137,9 +149,6 @@ export function PublishPage() {
       created_at: now,
       updated_at: now,
     }
-    const splitList = (s: string, extra?: RegExp) =>
-      s.split(extra ?? /[,，\s#]+/).map((x) => x.trim()).filter(Boolean)
-
     /* 扩展表只存差异化字段 */
     const extTable = isPlaza ? 'content_ext_dynamic' : 'content_ext_article'
     const ext: Record<string, unknown> = isPlaza
@@ -148,7 +157,7 @@ export function PublishPage() {
           topic_ids: splitList(topics),
           at_user_ids: splitList(atUsers, /[,，\s@]+/),
           visible_scope: visibleScope,
-          media_ids: contentType === 11 ? [`demo-media-${id}`] : [],
+          media_ids: [], // 媒体上传未接入，不伪造 media_id
           is_vote: false,
           is_lottery: false,
           story_expire_at: null,
@@ -160,7 +169,7 @@ export function PublishPage() {
           code_langs: splitList(codeLangs),
           read_time: Math.max(1, Math.ceil(body.length / 400)), // 按 400 字/分钟估
           vip_visible: vipVisible,
-          download_quota: contentType === 22 ? 10 : null,
+          download_quota: null, // 配额设置未接入，不伪造默认值
           version_no: 1,
         }
     return { id, at: Date.now(), extTable, preview: { base, ext } }
@@ -172,6 +181,19 @@ export function PublishPage() {
       toast(item.error)
       return
     }
+    /* 轮 15 打通：按 domain/content_type 真发布进 store（触发成长引擎记分），落库预览保留作 JSON 展示 */
+    if (isPlaza && (contentType === 10 || contentType === 11)) {
+      /* 广场态：动态短文/图文 → publishPost 进 Feed（topic 取首个话题；媒体上传未接入，images 留空不伪造） */
+      publishPost(body.trim(), { topic: splitList(topics)[0] ?? null, images: [] })
+      toast(`已发布进广场动态流（${TYPE_META[contentType].name} · 记分 publish_dynamic）`)
+    } else if (!isPlaza && contentType === 20) {
+      /* 知识态博文 → publishArticle 进知识库（≥50 字触发 publish_article 质量记分） */
+      publishArticle({ title: title.trim(), content: body, tags: splitList(tags) })
+      toast('已发布进知识库（博文 · 记分 publish_article）')
+    } else {
+      /* 资源（22）暂无 store 创建路径：仅保留落库预览 */
+      toast('资源类型暂无 store 创建路径：仅保留落库预览（后续轮次扩展）')
+    }
     const next = [item, ...published]
     setPublished(next)
     try {
@@ -182,7 +204,6 @@ export function PublishPage() {
     setOpenId(item.id)
     setBody('')
     setTitle('')
-    toast(`已发布 → ${item.extTable}（INSERT 模拟）`)
   }
 
   const clearAll = () => {
