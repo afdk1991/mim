@@ -228,27 +228,18 @@ function SideNav() {
   return (
     <aside className="sidenav">
       <a className="brand" href="#/feed">Mim</a>
-      {/* 三视图切换器：广场态/知识态（开发吧.md 文档三「一个平台三种视图」） */}
-      <div className="vw-switch" role="tablist" aria-label="视图切换">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'feed'}
-          className={cx('vw-btn', view === 'feed' && 'active')}
-          onClick={() => switchView('feed')}
-        >
-          🎬 广场
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'kb'}
-          className={cx('vw-btn', view === 'kb' && 'active')}
-          onClick={() => switchView('kb')}
-        >
-          📚 知识
-        </button>
-      </div>
+      {/* 三视图切换器：广场态/知识态合并为单按钮，点击在两视图间切换（开发吧.md 文档三「一个平台三种视图」） */}
+      <button
+        type="button"
+        key={view}
+        className="vw-toggle"
+        title={`切换到${view === 'feed' ? '知识态' : '广场态'}`}
+        onClick={() => switchView(view === 'feed' ? 'kb' : 'feed')}
+      >
+        <span aria-hidden="true">{view === 'feed' ? '🎬' : '📚'}</span>
+        <span className="vw-toggle-label">{view === 'feed' ? '广场态' : '知识态'}</span>
+        <span className="vw-toggle-swap" aria-hidden="true">⇄</span>
+      </button>
       <div
         className="sidenav-search"
         onBlur={(e) => {

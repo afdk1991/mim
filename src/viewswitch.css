@@ -1,37 +1,67 @@
 /* 三视图切换器（开发吧.md 文档三：一个平台三种视图——广场态/知识态）。
+   广场/知识合并为单个切换按钮，点击在两视图间往返；
    独立样式段 + vw- 前缀：并行会话开发惯例，避免与 styles.css 共用段冲突；
    颜色全部走全局 CSS 变量，深色主题自动适配。 */
 
-.vw-switch {
+.vw-toggle {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   margin: 10px 12px 2px;
-  padding: 3px;
-  background: var(--border);
-  border-radius: 999px;
-}
-
-.vw-btn {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-  line-height: 1;
-  padding: 7px 0;
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
-}
-
-.vw-btn:hover {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 10px;
   color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  /* 切换视图时重挂载（key=view）触发一次弹入动画 */
+  animation: vw-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.vw-btn.active {
-  background: var(--primary);
-  color: #fff;
+/* 点击按压反馈 */
+.vw-toggle:active {
+  transform: scale(0.96);
+}
+
+/* 弹入：轻微缩放脉冲 */
+@keyframes vw-pop {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.vw-toggle:hover {
+  border-color: var(--primary);
+}
+
+.vw-toggle-label {
+  flex: 1;
+  text-align: left;
   font-weight: 600;
+}
+
+.vw-toggle-swap {
+  color: var(--text-3);
+  font-size: 12px;
+  transition: transform 0.3s;
+}
+
+/* 悬停时 ⇄ 标记轻转，暗示可切换 */
+.vw-toggle:hover .vw-toggle-swap {
+  transform: rotate(180deg);
+}
+
+/* 深色/减弱动效偏好：跳过动画 */
+@media (prefers-reduced-motion: reduce) {
+  .vw-toggle {
+    animation: none;
+    transition: none;
+  }
 }
