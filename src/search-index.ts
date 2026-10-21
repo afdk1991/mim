@@ -23,6 +23,10 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/my', name: '我的主页', icon: '👤', keywords: ['个人', '主页', '我的'], group: '个人' },
   { href: '#/favorites', name: '我的收藏', icon: '⭐', keywords: ['收藏', 'favorite'], group: '个人' },
   { href: '#/history', name: '浏览足迹', icon: '🕐', keywords: ['历史', '足迹', '浏览'], group: '个人' },
+  { href: '#/notifications', name: '通知', icon: '🔔', keywords: ['通知', '提醒', '消息'], group: '个人' },
+  { href: '#/messages', name: '私信', icon: '✉️', keywords: ['私信', '聊天', '消息'], group: '个人' },
+  { href: '#/blog', name: '我的博客', icon: '📰', keywords: ['博文', 'blog'], group: '个人' },
+  { href: '#/following', name: '关注列表', icon: '👥', keywords: ['关注', 'following'], group: '个人' },
   /* ---- 商城 ---- */
   { href: '#/mall', name: '商城中心', icon: '🛒', keywords: ['商城', '购物', '商品'], group: '商城' },
   { href: '#/mall/cart', name: '购物车', icon: '🛒', keywords: ['购物车', 'cart'], group: '商城' },
