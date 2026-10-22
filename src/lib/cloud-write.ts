@@ -328,6 +328,26 @@ export async function cloudDeleteArticleDraft(id: string): Promise<boolean> {
   return true
 }
 
+/* ---------- 文章编辑（轮 7）：UPDATE articles WHERE id AND author_id = auth.uid() ---------- */
+
+export async function cloudEditArticle(
+  id: string,
+  data: { title: string; content: string; tags: string[] },
+): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const { error } = await supabase!
+    .from('articles')
+    .update({ title: data.title, content: data.content, tags: data.tags })
+    .eq('id', id)
+    .eq('author_id', userId)
+  if (error) {
+    cloudToast(`⚠ 文章云端编辑失败：${error.message}`)
+    return false
+  }
+  return true
+}
+
 /* ---------- 私信（轮 5）：send_message RPC 一次写双方两行（msg_id 由 RPC 生成） ---------- */
 
 export async function cloudSendMessage(peerId: string, content: string): Promise<boolean> {

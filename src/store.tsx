@@ -393,6 +393,14 @@ function reducer(state: AppState, action: Action): AppState {
     case 'editArticle': {
       const target = state.articles.find((a) => a.id === action.payload.id)
       if (!target || target.authorId !== state.meId) return state
+      // 云端异步同步（失败不回滚，本地已是最新）
+      import('./lib/cloud-write').then(({ cloudEditArticle }) => {
+        cloudEditArticle(action.payload.id, {
+          title: action.payload.title,
+          content: action.payload.content,
+          tags: action.payload.tags,
+        })
+      })
       return {
         ...state,
         articles: state.articles.map((a) =>
