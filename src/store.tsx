@@ -4,7 +4,7 @@
    钱包/订单等钱类数据在 mall 中台按真实身份隔离，内容权限由 can()（permissions.ts）+ reducer ownership 守卫双层兜底。 */
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { createSeedState } from './data/seed'
-import type { AppState, Post, PostComment, Article, Snippet, User } from './types'
+import type { AppState, Post, PostComment, Article, Snippet, User, PostMedia, PostVote, PostLottery } from './types'
 import { uid } from './utils'
 import {
   cloudWritePost,
@@ -117,11 +117,32 @@ function loadState(): AppState {
 }
 
 type Action =
-  | { type: 'publishPost'; payload: { id: string; content: string; topic: string | null; images: string[]; repostOfId: string | null; repostComment: string } }
+  /* 轮 21 打通：发布动态扩参——视频/GIF、投票、抽奖、位置、可见性、24h 快拍（全部可选，旧调用兼容） */
+  | {
+      type: 'publishPost'
+      payload: {
+        id: string
+        content: string
+        topic: string | null
+        images: string[]
+        repostOfId: string | null
+        repostComment: string
+        media?: PostMedia
+        vote?: PostVote
+        lottery?: PostLottery
+        location?: string
+        visibility?: 'public' | 'self'
+        story?: boolean
+        expiresAt?: number
+      }
+    }
   | { type: 'deletePost'; payload: string }
   | { type: 'togglePostLike'; payload: string }
-  | { type: 'addPostComment'; payload: { id: string; postId: string; content: string } }
+  | { type: 'addPostComment'; payload: { id: string; postId: string; content: string; replyTo?: string } }
   | { type: 'toggleCommentLike'; payload: { postId: string; commentId: string } }
+  | { type: 'castVote'; payload: { postId: string; option: string } }
+  | { type: 'joinLottery'; payload: string }
+  | { type: 'drawLottery'; payload: { postId: string; winners: string[] } }
   | { type: 'toggleFollow'; payload: string }
   | { type: 'readNotification'; payload: string }
   | { type: 'readAllNotifications' }
@@ -201,6 +222,14 @@ function reducer(state: AppState, action: Action): AppState {
         reposts: 0,
         topic: p.repostOfId ? null : p.topic,
         source: '来自 网页版',
+        /* 轮 21 打通：B2 扩展字段直通入库（缺省字段不写，seed/旧存档兼容） */
+        media: p.repostOfId ? undefined : p.media,
+        vote: p.repostOfId ? undefined : p.vote,
+        lottery: p.repostOfId ? undefined : p.lottery,
+        location: p.repostOfId ? undefined : p.location,
+        visibility: p.visibility ?? 'public',
+        story: p.repostOfId ? undefined : p.story,
+        expiresAt: p.repostOfId ? undefined : p.expiresAt,
       }
       return { ...state, posts: [post, ...posts] }
     }
@@ -233,11 +262,67 @@ function reducer(state: AppState, action: Action): AppState {
         createdAt: Date.now(),
         likes: 0,
         likedByMe: false,
+        /* 轮 21 打通：楼中楼——记录被回复评论 id */
+        replyTo: action.payload.replyTo,
       }
       return {
         ...state,
         posts: state.posts.map((p) =>
           p.id === action.payload.postId ? { ...p, comments: [...(p.comments ?? []), comment] } : p,
+        ),
+      }
+    }
+
+    /* 轮 21 打通：投票——一人一票（voters 按身份 key 判重），截止后锁定 */
+    case 'castVote': {
+      const target = state.posts.find((p) => p.id === action.payload.postId)
+      const vote = target?.vote
+      if (!vote || Date.now() > vote.endsAt) return state
+      if (vote.voters[state.meId] || !vote.options.includes(action.payload.option)) return state
+      return {
+        ...state,
+        posts: state.posts.map((p) =>
+          p.id === action.payload.postId && p.vote
+            ? {
+                ...p,
+                vote: {
+                  ...p.vote,
+                  votes: { ...p.vote.votes, [action.payload.option]: (p.vote.votes[action.payload.option] ?? 0) + 1 },
+                  voters: { ...p.vote.voters, [state.meId]: action.payload.option },
+                },
+              }
+            : p,
+        ),
+      }
+    }
+
+    /* 轮 21 打通：抽奖参与——按身份 key 去重 */
+    case 'joinLottery': {
+      const target = state.posts.find((p) => p.id === action.payload)
+      if (!target?.lottery || target.lottery.winners) return state
+      if (target.lottery.participants.includes(state.meId)) return state
+      return {
+        ...state,
+        posts: state.posts.map((p) =>
+          p.id === action.payload && p.lottery
+            ? { ...p, lottery: { ...p.lottery, participants: [...p.lottery.participants, state.meId] } }
+            : p,
+        ),
+      }
+    }
+
+    /* 轮 21 打通：抽奖开奖——调用方随机抽好 winners（≤份数且 ⊆ 参与者），此处落库公示 */
+    case 'drawLottery': {
+      const { postId, winners } = action.payload
+      const target = state.posts.find((p) => p.id === postId)
+      const lot = target?.lottery
+      if (!lot || lot.winners) return state
+      const valid = winners.every((w) => lot.participants.includes(w)) && winners.length <= lot.count
+      if (!valid) return state
+      return {
+        ...state,
+        posts: state.posts.map((p) =>
+          p.id === postId && p.lottery ? { ...p, lottery: { ...p.lottery, winners } } : p,
         ),
       }
     }
@@ -696,12 +781,30 @@ interface AppApi {
   isFavorited: (kind: 'post' | 'article', targetId: string) => boolean
   unreadNotifications: number
   unreadMessages: number
-  publishPost: (content: string, opts?: { topic?: string | null; images?: string[] }) => string
+  publishPost: (
+    content: string,
+    /* 轮 21 打通：发布扩参——媒体/投票/抽奖/位置/可见性/快拍全部可选 */
+    opts?: {
+      topic?: string | null
+      images?: string[]
+      media?: PostMedia
+      vote?: PostVote
+      lottery?: PostLottery
+      location?: string
+      visibility?: 'public' | 'self'
+      story?: boolean
+      expiresAt?: number
+    },
+  ) => string
   repostPost: (postId: string, comment: string) => string
   deletePost: (id: string) => void
   togglePostLike: (id: string) => void
-  addPostComment: (postId: string, content: string) => void
+  addPostComment: (postId: string, content: string, replyTo?: string) => void
   toggleCommentLike: (postId: string, commentId: string) => void
+  /* 轮 21 打通：投票 / 抽奖（开奖 winners 由调用方随机抽出后传入） */
+  castVote: (postId: string, option: string) => void
+  joinLottery: (postId: string) => void
+  drawLottery: (postId: string, winners: string[]) => void
   toggleFollow: (id: string) => void
   readNotification: (id: string) => void
   readAllNotifications: () => void
@@ -800,7 +903,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const topic = opts?.topic ?? null
         dispatch({
           type: 'publishPost',
-          payload: { id, content, topic, images, repostOfId: null, repostComment: '' },
+          payload: {
+            id,
+            content,
+            topic,
+            images,
+            repostOfId: null,
+            repostComment: '',
+            /* 轮 21 打通：B2 扩展字段直通 reducer（云端行仅映射基础字段，扩展能力为本地 demo 域） */
+            media: opts?.media,
+            vote: opts?.vote,
+            lottery: opts?.lottery,
+            location: opts?.location,
+            visibility: opts?.visibility,
+            story: opts?.story,
+            expiresAt: opts?.expiresAt,
+          },
         })
         // 轮 13 打通：发布动态 → 成长引擎广场线记分（publish_dynamic +2 EXP，受日上限约束）
         recordGrowth('publish_dynamic')
@@ -843,15 +961,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
       },
-      addPostComment: (postId, content) => {
+      addPostComment: (postId, content, replyTo) => {
         const id = uid('c')
-        dispatch({ type: 'addPostComment', payload: { id, postId, content } })
+        dispatch({ type: 'addPostComment', payload: { id, postId, content, replyTo } })
         if (state.cloudIds?.posts.includes(postId)) {
           void cloudWritePostComment(id, postId, content).then((r) => {
             if (r === 'fail') dispatch({ type: 'cloudRollbackPostComment', payload: { postId, commentId: id } })
           })
         }
       },
+      /* 轮 21 打通：投票 / 抽奖走本地 reducer（投票与开奖均为 demo 域，不落云端） */
+      castVote: (postId, option) => dispatch({ type: 'castVote', payload: { postId, option } }),
+      joinLottery: (postId) => dispatch({ type: 'joinLottery', payload: postId }),
+      drawLottery: (postId, winners) => dispatch({ type: 'drawLottery', payload: { postId, winners } }),
       toggleCommentLike: (postId, commentId) => {
         const c = state.posts.find((x) => x.id === postId)?.comments?.find((x) => x.id === commentId)
         dispatch({ type: 'toggleCommentLike', payload: { postId, commentId } })

@@ -1,10 +1,24 @@
 import './publish.css'
+import './content-domain.css'
 import { useEffect, useState } from 'react'
-import { Empty, TimeAgo, useToast } from './components'
+import { Empty, Modal, TimeAgo, useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
 import { useApp } from './store'
 import { cloudEnabled } from './lib/supabase'
-import { cx } from './utils'
+import { readPrivacy } from './user-domain'
+import {
+  SCHED_EVT,
+  STORY_TTL,
+  LOCATION_PRESETS,
+  VIDEO_POSTERS,
+  cancelSchedule,
+  enqueueSchedule,
+  findSensitiveHits,
+  loadSchedule,
+  type ScheduleItem,
+} from './content-domain'
+import { cx, formatDate } from './utils'
+import type { PostLottery, PostMedia, PostVote } from './types'
 
 /** 统一内容发布器（开发吧.md「内容统一模型：基表 + 扩展表」）
  *  基表 content：domain 是权限边界（1=广场 2=知识），分发/审核/计费全靠它路由；
@@ -16,8 +30,9 @@ import { cx } from './utils'
 
 type Domain = 1 | 2
 
-/** content_type：域1=10动态短文/11图文；域2=20博文/22资源（12视频等类型后续轮次扩展） */
-type ContentType = 10 | 11 | 20 | 22
+/** content_type：域1=10动态短文/11图文/12视频GIF/13投票/14抽奖/15快拍；域2=20博文/22资源
+ *  轮 21 打通：广场态扩展 B2 内容类型 12-15 */
+type ContentType = 10 | 11 | 12 | 13 | 14 | 15 | 20 | 22
 
 /** pay_policy：0免费 1单买 2订阅专栏 3VIP可见（demo 提供 0/1/3） */
 const PAY_POLICY: { code: 0 | 1 | 3; label: string }[] = [
@@ -26,10 +41,10 @@ const PAY_POLICY: { code: 0 | 1 | 3; label: string }[] = [
   { code: 3, label: 'VIP 可见' },
 ]
 
-/** 可见范围（content_ext_dynamic.visible_scope） */
-const VISIBLE_SCOPE: { code: 'public' | 'fans' | 'self'; label: string }[] = [
+/** 轮 21 打通：B2 可见范围（visible_scope 收敛为 公开/仅自己，与 Post.visibility 对齐） */
+type VisCode = 'public' | 'self'
+const VISIBLE_SCOPE: { code: VisCode; label: string }[] = [
   { code: 'public', label: '公开' },
-  { code: 'fans', label: '仅粉丝' },
   { code: 'self', label: '仅自己' },
 ]
 
@@ -37,8 +52,25 @@ const VISIBLE_SCOPE: { code: 'public' | 'fans' | 'self'; label: string }[] = [
 const TYPE_META: Record<ContentType, { name: string; hint: string }> = {
   10: { name: '动态短文', hint: '纯文字动态，进广场 Feed' },
   11: { name: '图文', hint: '带图动态（媒体上传后续接入）' },
+  12: { name: '视频 / GIF', hint: 'emoji 海报占位视频或 GIF 动图' },
+  13: { name: '投票', hint: '2-4 选项，一人一票，截止锁定' },
+  14: { name: '抽奖', hint: '奖品 + 份数，可立即开奖' },
+  15: { name: '快拍', hint: '24 小时故事，过期自动消失' },
   20: { name: '博文', hint: 'Markdown 长文，进知识库与 RAG 索引' },
   22: { name: '资源', hint: '可下载附件（配额设置后续接入）' },
+}
+
+/** 轮 21 打通：B2 发布扩展参数（随发布/定时队列透传给 publishPost api） */
+type B2Fields = {
+  topic: string | null
+  images: string[]
+  media?: PostMedia
+  vote?: PostVote
+  lottery?: PostLottery
+  location?: string
+  visibility: VisCode
+  story?: boolean
+  expiresAt?: number
 }
 
 /** 落库预览：一条记录 = 基表行 + 扩展表行 */
@@ -100,8 +132,9 @@ function splitList(s: string, extra?: RegExp): string[] {
 
 export function PublishPage() {
   const toast = useToast()
-  /* 轮 15 打通：接入全局 store——真发布进广场 Feed / 知识库 */
-  const { publishPost, publishArticle } = useApp()
+  /* 轮 15 打通：接入全局 store——真发布进广场 Feed / 知识库
+     轮 21 打通：取全量 api（state/me/deletePost 供批量管理使用） */
+  const api = useApp()
   /* 作者锚点绑真实登录身份（本地未登录为 'local'），不再写死演示 user_id */
   const { auth } = useAuth()
 
@@ -118,36 +151,120 @@ export function PublishPage() {
   /* 动态扩展字段 */
   const [topics, setTopics] = useState('')
   const [atUsers, setAtUsers] = useState('')
-  const [visibleScope, setVisibleScope] = useState<'public' | 'fans' | 'self'>('public')
+  const [visibleScope, setVisibleScope] = useState<VisCode>('public')
   /* 文章扩展字段 */
   const [columnId, setColumnId] = useState('')
   const [tags, setTags] = useState('')
   const [codeLangs, setCodeLangs] = useState('')
   const [vipVisible, setVipVisible] = useState(false)
 
+  /* ---------- 轮 21 打通：B2 内容域表单状态 ---------- */
+  /* 4. 位置 / 8. 可见性 / 5. 定时 */
+  const [location, setLocation] = useState('')
+  const [scheduleOn, setScheduleOn] = useState(false)
+  const [scheduleAt, setScheduleAt] = useState('')
+  /* 1. 视频/GIF */
+  const [mediaType, setMediaType] = useState<'video' | 'gif'>('video')
+  const [mediaPoster, setMediaPoster] = useState(VIDEO_POSTERS[0])
+  const [mediaDur, setMediaDur] = useState('15')
+  /* 2. 投票 */
+  const [voteOpts, setVoteOpts] = useState<string[]>(['', '', '', ''])
+  const [voteHours, setVoteHours] = useState(24)
+  /* 3. 抽奖 */
+  const [lotteryPrize, setLotteryPrize] = useState('')
+  const [lotteryCount, setLotteryCount] = useState('3')
+  const [lotteryHours, setLotteryHours] = useState(24)
+
   /* ---------- 已发布列表 ---------- */
   const [published, setPublished] = useState<PublishedItem[]>(loadPublish)
   const [openId, setOpenId] = useState<number | null>(null)
+
+  /* ---------- 轮 21 打通：定时队列（按身份分 key）+ 批量管理 ---------- */
+  const [sched, setSched] = useState<ScheduleItem[]>(() => loadSchedule())
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
 
   /* 轮 17 打通：切号（登录/登出）即重载对应身份的发布记录（显式传 userId 防竞态） */
   useEffect(() => {
     setPublished(loadPublish(auth.userId))
   }, [auth.userId])
 
+  /* 轮 21 打通：切号重载定时队列；任何队列写入（含 App 级轮询发出）经 SCHED_EVT 实时同步 */
+  useEffect(() => {
+    setSched(loadSchedule(auth.userId))
+  }, [auth.userId])
+  useEffect(() => {
+    const sync = () => setSched(loadSchedule(getCurrentUserId()))
+    window.addEventListener(SCHED_EVT, sync)
+    return () => window.removeEventListener(SCHED_EVT, sync)
+  }, [])
+
   const isPlaza = domain === 1
-  const types: ContentType[] = isPlaza ? [10, 11] : [20, 22]
+  const types: ContentType[] = isPlaza ? [10, 11, 12, 13, 14, 15] : [20, 22]
   const priceFen = Math.round((parseFloat(priceYuan) || 0) * 100)
 
-  /* 切域：content_type 跟随切换（domain 路由一切） */
+  /* 轮 21 打通：9. 敏感词前置——输入过程实时检测（纯前端词库，渲染期计算即可） */
+  const sensHits = findSensitiveHits(body)
+  /* 轮 21 打通：8. 与 B1 账号级隐私叠加取更严者——账号级为「仅自己」时本条强制 self */
+  const acctSelf = readPrivacy(auth.userId).posts === 'self'
+  const effVisibility: VisCode = acctSelf ? 'self' : visibleScope
+
+  /* 切域：content_type 跟随切换（domain 路由一切）；定时开关仅广场态有意义，切域时复位 */
   const switchDomain = (d: Domain) => {
     if (d === domain) return
     setDomain(d)
     setContentType(d === 1 ? 10 : 20)
     setIndexFlag(false)
+    setScheduleOn(false)
   }
 
-  /* ---------- 构造落库预览（基表 content + 扩展表） ---------- */
-  const buildPreview = (): PublishedItem | { error: string } => {
+  /* ---------- 轮 21 打通：按广场 content_type 构造 B2 扩展发布参数（校验失败 toast 并返回 null） ---------- */
+  const buildB2 = (): B2Fields | null => {
+    const common: B2Fields = {
+      topic: splitList(topics)[0] ?? null,
+      images: [],
+      location: location.trim() || undefined,
+      visibility: effVisibility,
+    }
+    if (contentType === 12) {
+      /* 视频/GIF：emoji 海报占位，视频附时长（秒） */
+      const dur = Math.max(1, Math.round(parseFloat(mediaDur) || 0))
+      return {
+        ...common,
+        media: { type: mediaType, poster: mediaPoster, ...(mediaType === 'video' ? { duration: dur } : {}) },
+      }
+    }
+    if (contentType === 13) {
+      /* 投票：2-4 个不重复选项；随机铺少量底票让百分比条可信 */
+      const options = voteOpts.map((x) => x.trim()).filter(Boolean)
+      if (options.length < 2 || options.length > 4 || new Set(options).size !== options.length) {
+        toast('投票需要 2-4 个不重复的选项')
+        return null
+      }
+      const votes = Object.fromEntries(options.map((o) => [o, 3 + Math.floor(Math.random() * 28)] as const))
+      return { ...common, vote: { options, votes, endsAt: Date.now() + voteHours * 3_600_000, voters: {} } }
+    }
+    if (contentType === 14) {
+      /* 抽奖：奖品名 + 份数 + 截止时间 */
+      if (!lotteryPrize.trim()) {
+        toast('请填写奖品名称')
+        return null
+      }
+      const count = Math.max(1, Math.round(parseFloat(lotteryCount) || 0))
+      return {
+        ...common,
+        lottery: { prize: lotteryPrize.trim(), count, endsAt: Date.now() + lotteryHours * 3_600_000, participants: [] },
+      }
+    }
+    if (contentType === 15) {
+      /* 快拍：24h 过期 */
+      return { ...common, story: true, expiresAt: Date.now() + STORY_TTL }
+    }
+    return common
+  }
+
+  /* ---------- 构造落库预览（基表 content + 扩展表；b2 为轮 21 扩展参数，可选） ---------- */
+  const buildPreview = (b2?: B2Fields): PublishedItem | { error: string } => {
     if (!body.trim()) return { error: '正文不能为空' }
     if (!isPlaza && !title.trim()) return { error: '知识态内容标题必填（广场态 title 为 NULL）' }
     if (payPolicy === 1 && priceFen <= 0) return { error: '单买策略必须填写大于 0 的价格' }
@@ -179,18 +296,20 @@ export function PublishPage() {
       created_at: now,
       updated_at: now,
     }
-    /* 扩展表只存差异化字段 */
+    /* 扩展表只存差异化字段（轮 21 打通：is_vote / is_lottery / story_expire_at 随 B2 类型如实填充） */
     const extTable = isPlaza ? 'content_ext_dynamic' : 'content_ext_article'
     const ext: Record<string, unknown> = isPlaza
       ? {
           content_id: id,
           topic_ids: splitList(topics),
           at_user_ids: splitList(atUsers, /[,，\s@]+/),
-          visible_scope: visibleScope,
-          media_ids: [], // 媒体上传未接入，不伪造 media_id
-          is_vote: false,
-          is_lottery: false,
-          story_expire_at: null,
+          visible_scope: b2?.visibility ?? effVisibility,
+          location: b2?.location ?? null,
+          media_ids: b2?.media ? [`poster:${b2.media.poster}`] : [], // 媒体上传未接入，海报占位不入 media_id
+          is_vote: !!b2?.vote,
+          is_lottery: !!b2?.lottery,
+          story_expire_at: b2?.story && b2.expiresAt ? new Date(b2.expiresAt).toISOString() : null,
+          b2: b2 ?? null,
         }
       : {
           content_id: id,
@@ -206,6 +325,28 @@ export function PublishPage() {
   }
 
   const submit = () => {
+    /* 轮 21 打通：9. 敏感词前置——命中即阻断（即时发布与定时入库一体拦截） */
+    if (sensHits.length > 0) {
+      toast(`命中敏感词：${sensHits.join('、')}，发布已阻断`)
+      return
+    }
+    if (!body.trim()) {
+      toast('正文不能为空')
+      return
+    }
+    /* 轮 21 打通：5. 定时发布——不立即入库，进按身份分 key 的定时队列，由 App 级 30s 轮询到点经 publishPost api 发出 */
+    if (isPlaza && scheduleOn) {
+      const at = new Date(scheduleAt).getTime()
+      if (!scheduleAt || Number.isNaN(at) || at <= Date.now()) {
+        toast('请选择一个未来的定时时间')
+        return
+      }
+      const b2 = buildB2()
+      if (!b2) return
+      enqueueSchedule({ at, content: body.trim(), ...b2 })
+      toast('已加入定时队列，到点自动发出 ⏰')
+      return
+    }
     const item = buildPreview()
     if ('error' in item) {
       toast(item.error)
@@ -213,27 +354,72 @@ export function PublishPage() {
     }
     /* 轮 15 打通：按 domain/content_type 真发布进 store（触发成长引擎记分），落库预览保留作 JSON 展示 */
     if (isPlaza && (contentType === 10 || contentType === 11)) {
-      /* 广场态：动态短文/图文 → publishPost 进 Feed（topic 取首个话题；媒体上传未接入，images 留空不伪造） */
-      publishPost(body.trim(), { topic: splitList(topics)[0] ?? null, images: [] })
+      /* 广场态：动态短文/图文 → publishPost 进 Feed（轮 21：附带位置/可见性） */
+      const b2 = buildB2()
+      if (!b2) return
+      api.publishPost(body.trim(), b2)
       toast(`已发布进广场动态流（${TYPE_META[contentType].name} · 记分 publish_dynamic）`)
+    } else if (isPlaza && contentType >= 12 && contentType <= 15) {
+      /* 轮 21 打通：视频/GIF / 投票 / 抽奖 / 快拍 → publishPost 带 B2 扩展参数进 Feed */
+      const b2 = buildB2()
+      if (!b2) return
+      const item2 = buildPreview(b2)
+      if ('error' in item2) {
+        toast(item2.error)
+        return
+      }
+      api.publishPost(body.trim(), b2)
+      toast(`已发布进广场动态流（${TYPE_META[contentType].name} · 记分 publish_dynamic）`)
+      persistPublished(item2)
+      setOpenId(item2.id)
+      setBody('')
+      return
     } else if (!isPlaza && contentType === 20) {
       /* 知识态博文 → publishArticle 进知识库（≥50 字触发 publish_article 质量记分） */
-      publishArticle({ title: title.trim(), content: body, tags: splitList(tags) })
+      api.publishArticle({ title: title.trim(), content: body, tags: splitList(tags) })
       toast('已发布进知识库（博文 · 记分 publish_article）')
     } else {
       /* 资源（22）暂无 store 创建路径：仅保留落库预览 */
       toast('资源类型暂无 store 创建路径：仅保留落库预览（后续轮次扩展）')
     }
-    const next = [item, ...published]
-    setPublished(next)
-    try {
-      localStorage.setItem(publishKeyFor(getCurrentUserId()), JSON.stringify(next))
-    } catch {
-      /* ignore */
-    }
+    persistPublished(item)
     setOpenId(item.id)
     setBody('')
     setTitle('')
+  }
+
+  /* 轮 21 打通：发布记录持久化抽函数（批量删除/清空共用存储 key） */
+  const persistPublished = (item: PublishedItem) => {
+    setPublished((prev) => {
+      const next = [item, ...prev]
+      try {
+        localStorage.setItem(publishKeyFor(getCurrentUserId()), JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+
+  /* 轮 21 打通：10. 批量管理——勾选后循环走现有 deletePost api */
+  const myPosts = api.state.posts.filter((p) => p.authorId === api.me.id)
+  const toggleAll = () => {
+    setChecked(checked.size === myPosts.length ? new Set() : new Set(myPosts.map((p) => p.id)))
+  }
+  const toggleOne = (id: string) => {
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const batchDelete = () => {
+    if (checked.size === 0) return
+    const n = checked.size
+    for (const id of checked) api.deletePost(id)
+    setChecked(new Set())
+    toast(`已批量删除 ${n} 条动态 🗑️`)
   }
 
   const clearAll = () => {
@@ -314,8 +500,21 @@ export function PublishPage() {
             />
           </label>
 
+          {/* 轮 21 打通：9. 敏感词前置——输入过程实时提示（命中高亮），发布时阻断 */}
+          {sensHits.length > 0 && (
+            <div className="wt-sens" role="alert">
+              ⚠️ 命中敏感词：
+              {sensHits.map((w) => (
+                <i key={w} className="wt-hit">
+                  {w}
+                </i>
+              ))}
+              ，发布将被阻断，请修改正文
+            </div>
+          )}
+
           {isPlaza ? (
-            /* ---- 动态扩展字段 ---- */
+            /* ---- 动态扩展字段（轮 21 打通：B2 内容域 12-15 表单） ---- */
             <>
               <div className="pb-grid2">
                 <label className="pb-field">
@@ -327,14 +526,95 @@ export function PublishPage() {
                   <input value={atUsers} onChange={(e) => setAtUsers(e.target.value)} placeholder="@alice, @bob" />
                 </label>
               </div>
+
+              {/* 1. 视频/GIF：海报占位 + 时长 */}
+              {contentType === 12 && (
+                <fieldset className="pb-field">
+                  <span>🎬 视频 / GIF（emoji 海报占位）</span>
+                  <div className="pb-chips">
+                    <button type="button" className={cx('pb-chip', mediaType === 'video' && 'active')} onClick={() => setMediaType('video')}>
+                      视频（含时长）
+                    </button>
+                    <button type="button" className={cx('pb-chip', mediaType === 'gif' && 'active')} onClick={() => setMediaType('gif')}>
+                      GIF 动图
+                    </button>
+                  </div>
+                  <div className="pb-chips">
+                    {VIDEO_POSTERS.map((p) => (
+                      <button key={p} type="button" className={cx('pb-chip', mediaPoster === p && 'active')} onClick={() => setMediaPoster(p)}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  {mediaType === 'video' && (
+                    <input inputMode="numeric" value={mediaDur} onChange={(e) => setMediaDur(e.target.value)} placeholder="时长（秒），如 15" />
+                  )}
+                </fieldset>
+              )}
+
+              {/* 2. 投票：2-4 选项 + 截止时长 */}
+              {contentType === 13 && (
+                <fieldset className="pb-field">
+                  <span>📊 投票选项（填 2-4 个，留空的忽略）</span>
+                  {voteOpts.map((o, i) => (
+                    <input
+                      key={i}
+                      value={o}
+                      onChange={(e) => setVoteOpts(voteOpts.map((x, j) => (j === i ? e.target.value : x)))}
+                      placeholder={`选项 ${i + 1}`}
+                    />
+                  ))}
+                  <span className="pb-muted">截止时长：{voteHours} 小时后自动锁定</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={72}
+                    value={voteHours}
+                    onChange={(e) => setVoteHours(Number(e.target.value))}
+                  />
+                </fieldset>
+              )}
+
+              {/* 3. 抽奖：奖品 + 份数 + 截止 */}
+              {contentType === 14 && (
+                <fieldset className="pb-field">
+                  <span>🎁 抽奖设置</span>
+                  <input value={lotteryPrize} onChange={(e) => setLotteryPrize(e.target.value)} placeholder="奖品名称，如：Mim 定制周边礼盒" />
+                  <div className="pb-grid2">
+                    <label className="pb-field">
+                      <span>中奖份数</span>
+                      <input inputMode="numeric" value={lotteryCount} onChange={(e) => setLotteryCount(e.target.value)} />
+                    </label>
+                    <label className="pb-field">
+                      <span>开奖时间（小时后）</span>
+                      <input inputMode="numeric" value={lotteryHours} onChange={(e) => setLotteryHours(Number(e.target.value) || 1)} />
+                    </label>
+                  </div>
+                </fieldset>
+              )}
+
+              {/* 4. 位置 */}
               <label className="pb-field">
-                <span>可见范围 visible_scope</span>
+                <span>📍 位置（可选）</span>
+                <select value={location} onChange={(e) => setLocation(e.target.value)}>
+                  <option value="">不显示位置</option>
+                  {LOCATION_PRESETS.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {/* 8. 可见范围（轮 21 打通：收敛为 公开/仅自己，与账号级隐私取更严者） */}
+              <label className="pb-field">
+                <span>可见范围 visible_scope{acctSelf ? '（账号级隐私=仅自己，本条强制仅自己）' : ''}</span>
                 <div className="pb-chips">
                   {VISIBLE_SCOPE.map((v) => (
                     <button
                       key={v.code}
                       type="button"
-                      className={cx('pb-chip', visibleScope === v.code && 'active')}
+                      className={cx('pb-chip', effVisibility === v.code && 'active')}
                       onClick={() => setVisibleScope(v.code)}
                     >
                       {v.label}
@@ -342,6 +622,19 @@ export function PublishPage() {
                   ))}
                 </div>
               </label>
+
+              {/* 5. 定时发布 */}
+              <label className="pb-check">
+                <input type="checkbox" checked={scheduleOn} onChange={(e) => setScheduleOn(e.target.checked)} />
+                <span>⏰ 定时发布（进按身份隔离的定时队列，App 每 30s 轮询到点自动发出）</span>
+              </label>
+              {scheduleOn && (
+                <label className="pb-field">
+                  <span>计划发出时间</span>
+                  <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} />
+                </label>
+              )}
+
               <label className="pb-check">
                 <input type="checkbox" checked={indexFlag} onChange={(e) => setIndexFlag(e.target.checked)} />
                 <span>
@@ -407,9 +700,10 @@ export function PublishPage() {
             </label>
           )}
 
-          <button type="button" className="pb-submit" onClick={submit}>
-            发布（构造落库预览 JSON）
+          <button type="button" className="pb-submit" onClick={submit} disabled={sensHits.length > 0}>
+            {scheduleOn && isPlaza ? '加入定时队列（构造落库预览 JSON）' : '发布（构造落库预览 JSON）'}
           </button>
+          {sensHits.length > 0 && <i className="pb-muted">命中敏感词，发布按钮已禁用</i>}
         </div>
 
         {/* 已发布列表 */}
@@ -443,6 +737,73 @@ export function PublishPage() {
           <button type="button" className="pb-clear" onClick={clearAll}>
             清空发布记录
           </button>
+        )}
+
+        {/* 轮 21 打通：5. 定时队列——展示 / 取消（App 级 30s 轮询负责到点发出） */}
+        <h3 className="pb-sec-title">⏰ 定时队列（{sched.length}）</h3>
+        {sched.length === 0 ? (
+          <Empty text="暂无定时发布，勾选「定时发布」并选时间即可加入队列" />
+        ) : (
+          <div className="wt-sched-list">
+            {sched.map((s) => (
+              <div key={s.id} className="wt-sched-item">
+                <span className="wt-sched-time">{formatDate(s.at)}</span>
+                <span className="wt-sched-text">
+                  {s.content}
+                  {s.story ? ' · 快拍' : ''}
+                  {s.media ? ` · ${s.media.type === 'gif' ? 'GIF' : '视频'}` : ''}
+                  {s.vote ? ' · 投票' : ''}
+                  {s.lottery ? ' · 抽奖' : ''}
+                  {s.visibility === 'self' ? ' · 仅自己' : ''}
+                </span>
+                <button
+                  type="button"
+                  className="pb-clear"
+                  onClick={() => {
+                    cancelSchedule(s.id)
+                    toast('已取消该条定时发布')
+                  }}
+                >
+                  取消
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 轮 21 打通：10. 批量管理我的动态——Modal 勾选 + 全选 + 批量删除 */}
+        <button type="button" className="pb-clear" onClick={() => setBatchOpen(true)}>
+          批量管理我的动态（{myPosts.length}）
+        </button>
+        {batchOpen && (
+        <Modal onClose={() => setBatchOpen(false)} title="批量管理我的动态">
+          <div className="wt-batch-bar">
+            <label className="pb-check">
+              <input
+                type="checkbox"
+                checked={myPosts.length > 0 && checked.size === myPosts.length}
+                onChange={toggleAll}
+              />
+              <span>全选（{checked.size}/{myPosts.length}）</span>
+            </label>
+            <button type="button" className="btn-danger" disabled={checked.size === 0} onClick={batchDelete}>
+              删除选中（{checked.size}）
+            </button>
+          </div>
+          {myPosts.length === 0 ? (
+            <Empty text="你还没有发布过动态" />
+          ) : (
+            <div className="wt-batch-list">
+              {myPosts.map((p) => (
+                <label key={p.id} className="wt-batch-item">
+                  <input type="checkbox" checked={checked.has(p.id)} onChange={() => toggleOne(p.id)} />
+                  <span className="wt-batch-text">{p.content || '（无文字）'}</span>
+                  <small>{formatDate(p.createdAt)}</small>
+                </label>
+              ))}
+            </div>
+          )}
+        </Modal>
         )}
 
         {/* 红线声明 */}

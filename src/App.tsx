@@ -54,6 +54,7 @@ import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
 import { SettingsPage } from './settings'
 import { TeenBanner } from './user-domain'
+import { ScheduledTicker } from './content-domain'
 import './viewswitch.css'
 
 /** 视图模式：广场态（消费/社交/交易）与知识态（生产/学习/开发工具） */
@@ -1246,6 +1247,8 @@ function Shell() {
     <>
       {/* 轮 20 打通：青少年模式全站顶部横幅（开启期间常驻） */}
       <TeenBanner />
+      {/* 轮 21 打通：定时发布 App 级轮询（挂载即检 + 每 30s 一轮，到点经现有发布 api 入库） */}
+      <ScheduledTicker />
       <WbHero />
       <div className="shell">
         <SideNav />

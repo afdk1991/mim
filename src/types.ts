@@ -16,6 +16,37 @@ export interface PostComment {
   createdAt: number
   likes: number
   likedByMe: boolean
+  /** 轮 21 打通：楼中楼——被回复评论 id（缺省为顶级评论，渲染二级缩进，不做无限层级） */
+  replyTo?: string
+}
+
+/* 轮 21 打通：B2 内容域扩展类型（旧 Post/seed 缺省全部可选，兼容旧存档不炸） */
+
+/** 视频/GIF 占位媒体：demo 用 emoji 海报 + 时长占位（真实媒体上传后续接入） */
+export interface PostMedia {
+  type: 'video' | 'gif'
+  /** emoji 海报占位 */
+  poster: string
+  /** 视频时长（秒）；GIF 无 */
+  duration?: number
+}
+
+/** 投票：votes 记「选项→票数」；voters 按身份 key（meId→选项）记一人一票的判定真源 */
+export interface PostVote {
+  options: string[]
+  votes: Record<string, number>
+  endsAt: number
+  /** voterKey → 所选选项（一人一票） */
+  voters: Record<string, string>
+}
+
+/** 抽奖：参与者按身份 key 去重，开奖后写入 winners 公示 */
+export interface PostLottery {
+  prize: string
+  count: number
+  endsAt: number
+  participants: string[]
+  winners?: string[]
 }
 
 export interface Post {
@@ -32,6 +63,20 @@ export interface Post {
   topic: string | null
   source: string
   comments?: PostComment[]
+  /** 轮 21 打通：视频/GIF 媒体卡 */
+  media?: PostMedia
+  /** 轮 21 打通：投票 */
+  vote?: PostVote
+  /** 轮 21 打通：抽奖 */
+  lottery?: PostLottery
+  /** 轮 21 打通：发布位置（📍 显示在卡片底部） */
+  location?: string
+  /** 轮 21 打通：可见性——public 公开 / self 仅自己（缺省视为 public） */
+  visibility?: 'public' | 'self'
+  /** 轮 21 打通：24h 快拍标记 */
+  story?: boolean
+  /** 轮 21 打通：过期时间戳（快拍 24h；过期自动从各流消失） */
+  expiresAt?: number
 }
 
 export interface ArticleComment {

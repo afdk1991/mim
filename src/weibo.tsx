@@ -8,6 +8,7 @@ import {
   Avatar,
   Empty,
   FollowButton,
+  MediaCard,
   Modal,
   PostCard,
   RichText,
@@ -17,7 +18,8 @@ import {
   useToast,
 } from './components'
 import { matchesTeenWords, toggleBlacklistUser, useUserDomain, VBadge } from './user-domain'
-import type { AppNotification, User } from './types'
+import { postVisibleTo } from './content-domain'
+import type { AppNotification, PostComment, User } from './types'
 
 /* ================= ProfileHead（个人主页头部） ================= */
 
@@ -59,6 +61,52 @@ function ProfileHead({
         ))}
       </div>
     </div>
+  )
+}
+
+/* ================= 轮 21 打通：7. 24h 快拍栏（圆圈头像 + 弹窗查看，过期自动消失） ================= */
+
+export function StoryBar() {
+  const api = useApp()
+  const [open, setOpen] = useState<string | null>(null)
+  /* 渲染期按 expiresAt 过滤：过期快拍不出现在栏内 */
+  const stories = api.state.posts.filter(
+    (p) => p.story && postVisibleTo(p, api.me.id) && (!p.expiresAt || Date.now() < p.expiresAt),
+  )
+  if (stories.length === 0) return null
+  return (
+    <>
+      <div className="card wt-story-bar" aria-label="快拍栏">
+        {stories.map((s) => {
+          const u = api.user(s.authorId)
+          return (
+            <button key={s.id} type="button" className="wt-story-item" onClick={() => setOpen(s.id)}>
+              <span className="wt-story-ring">
+                <Avatar emoji={u.emoji} color={u.color} size={44} />
+              </span>
+              <small>{u.name}</small>
+            </button>
+          )
+        })}
+      </div>
+      {open &&
+        (() => {
+          const s = api.state.posts.find((p) => p.id === open)
+          if (!s) return null
+          const u = api.user(s.authorId)
+          return (
+            <Modal title={`${u.name} 的快拍 · 24h 可见`} onClose={() => setOpen(null)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Avatar emoji={u.emoji} color={u.color} size={28} />
+                <b>{u.name}</b>
+                <TimeAgo ts={s.createdAt} />
+              </div>
+              <p className="wt-story-text">{s.content}</p>
+              {s.media && <MediaCard media={s.media} />}
+            </Modal>
+          )
+        })()}
+    </>
   )
 }
 
@@ -106,15 +154,22 @@ export function FeedPage() {
     (u) => u.id !== api.me.id && !api.isFollowing(u.id),
   )
 
-  /* 轮 20 打通：feed 流过滤——黑名单用户动态不展示；青少年模式开启时简单关键词过滤敏感占位内容 */
+  /* 轮 20 打通：feed 流过滤——黑名单用户动态不展示；青少年模式开启时简单关键词过滤敏感占位内容
+     轮 21 打通：叠加 B2 过滤——快拍只进快拍栏不进常规流；「仅自己」动态非本人不可见 */
   const { blacklist, teen } = useUserDomain()
   const feedPosts = api.state.posts.filter(
-    (p) => !blacklist.includes(p.authorId) && !(teen.enabled && matchesTeenWords(p.content)),
+    (p) =>
+      !p.story &&
+      postVisibleTo(p, api.me.id) &&
+      !blacklist.includes(p.authorId) &&
+      !(teen.enabled && matchesTeenWords(p.content)),
   )
 
   return (
     <div className="page-grid">
       <div>
+        {/* 轮 21 打通：feed 顶部快拍栏 */}
+        <StoryBar />
         <div className="card compose">
           <div className="compose-top">
             <Avatar emoji={api.me.emoji} color={api.me.color} size={40} />
@@ -215,22 +270,33 @@ export function PostDetailPage({ id }: { id: string }) {
   const toast = useToast()
   const post = api.state.posts.find((p) => p.id === id)
   const [input, setInput] = useState('')
+  /* 轮 21 打通：楼中楼——当前正在回复的评论（null = 发顶级评论） */
+  const [replyTo, setReplyTo] = useState<PostComment | null>(null)
 
   useEffect(() => {
     if (post) recordView('post', post.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  if (!post) return <Empty emoji="🔍" text="动态不存在或已被删除" />
+  /* 轮 21 打通：详情页守卫——仅自己可见的非本人访问 / 已过期快拍，一律视为不存在 */
+  const hidden =
+    post != null &&
+    (!postVisibleTo(post, api.me.id) ||
+      (post.story && post.expiresAt != null && Date.now() > post.expiresAt))
+  if (!post || hidden) return <Empty emoji="🔍" text="动态不存在或已被删除" />
 
   const submit = () => {
     if (!input.trim()) return
-    api.addPostComment(post.id, input)
+    api.addPostComment(post.id, input, replyTo?.id)
+    toast(replyTo ? '回复成功' : '评论成功')
     setInput('')
-    toast('评论成功')
+    setReplyTo(null)
   }
 
   const comments = post.comments ?? []
+  /* 轮 21 打通：楼中楼——顶级评论在前，回复挂在其父评论下（二级缩进，不做无限层级） */
+  const tops = comments.filter((c) => !c.replyTo)
+  const repliesOf = (cid: string) => comments.filter((c) => c.replyTo === cid)
 
   return (
     <div className="page-grid single">
@@ -240,25 +306,52 @@ export function PostDetailPage({ id }: { id: string }) {
         <div className="card">
           <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>💬 全部评论（{comments.length}）</h3>
           {comments.length === 0 && <Empty emoji="💬" text="还没有评论，来抢沙发" />}
-          {comments.map((c) => {
-            const u = api.user(c.authorId)
+          {tops.map((c) => {
             return (
-              <div key={c.id} className="notif-row" style={{ cursor: 'default' }}>
-                <UserLink userId={c.authorId} size={36} />
-                <div className="notif-body">
-                  <p>
-                    <RichText text={c.content} />
-                  </p>
-                  <small>
-                    <TimeAgo ts={c.createdAt} />
-                  </small>
+              <div key={c.id}>
+                <div className="notif-row" style={{ cursor: 'default' }}>
+                  <UserLink userId={c.authorId} size={36} />
+                  <div className="notif-body">
+                    <p>
+                      <RichText text={c.content} />
+                    </p>
+                    <small>
+                      <TimeAgo ts={c.createdAt} />
+                    </small>
+                  </div>
+                  {/* 轮 21 打通：楼中楼——对某条评论「回复」 */}
+                  <button type="button" className="wt-reply-chip" onClick={() => setReplyTo(c)}>
+                    ↳ 回复
+                  </button>
+                  <button
+                    className={cx('like-btn', c.likedByMe && 'active')}
+                    onClick={() => api.toggleCommentLike(post.id, c.id)}
+                  >
+                    {c.likedByMe ? '❤️' : '🤍'} {c.likes}
+                  </button>
                 </div>
-                <button
-                  className={cx('like-btn', c.likedByMe && 'active')}
-                  onClick={() => api.toggleCommentLike(post.id, c.id)}
-                >
-                  {c.likedByMe ? '❤️' : '🤍'} {c.likes}
-                </button>
+                {repliesOf(c.id).map((r) => (
+                  <div key={r.id} className="notif-row wt-reply" style={{ cursor: 'default' }}>
+                    <UserLink userId={r.authorId} size={28} />
+                    <div className="notif-body">
+                      <p>
+                        <span className="wt-reply-prefix">
+                          ↳ 回复 @{api.user(c.authorId).name}：
+                        </span>
+                        <RichText text={r.content} />
+                      </p>
+                      <small>
+                        <TimeAgo ts={r.createdAt} />
+                      </small>
+                    </div>
+                    <button
+                      className={cx('like-btn', r.likedByMe && 'active')}
+                      onClick={() => api.toggleCommentLike(post.id, r.id)}
+                    >
+                      {r.likedByMe ? '❤️' : '🤍'} {r.likes}
+                    </button>
+                  </div>
+                ))}
               </div>
             )
           })}
@@ -266,11 +359,16 @@ export function PostDetailPage({ id }: { id: string }) {
             <Avatar emoji={api.me.emoji} color={api.me.color} size={32} />
             <input
               className="input"
-              placeholder={`回复 @${u_name(post.authorId, api)}`}
+              placeholder={replyTo ? `回复 @${api.user(replyTo.authorId).name}…` : `回复 @${u_name(post.authorId, api)}`}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
             />
+            {replyTo && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setReplyTo(null)}>
+                取消回复
+              </button>
+            )}
             <button className="btn btn-primary btn-sm" onClick={submit}>评论</button>
           </div>
         </div>
@@ -289,7 +387,8 @@ export function TopicPage({ name }: { name: string }) {
   const api = useApp()
   const [sort, setSort] = useState<'new' | 'hot'>('new')
   const topic = api.state.topics.find((t) => t.name === name)
-  const posts = api.state.posts.filter((p) => p.topic === name)
+  /* 轮 21 打通：话题流同样排除快拍与「仅自己」动态 */
+  const posts = api.state.posts.filter((p) => p.topic === name && !p.story && postVisibleTo(p, api.me.id))
   const sorted = useMemo(
     () => [...posts].sort((a, b) => (sort === 'new' ? b.createdAt - a.createdAt : b.likes - a.likes)),
     [posts, sort],
@@ -698,7 +797,8 @@ export function MyProfilePage() {
   const toast = useToast()
   const [tab, setTab] = useState<'posts' | 'drafts'>('posts')
   const [editOpen, setEditOpen] = useState(false)
-  const myPosts = api.state.posts.filter((p) => p.authorId === api.me.id)
+  /* 轮 21 打通：主页动态列表排除快拍（快拍只在快拍栏/弹窗展示） */
+  const myPosts = api.state.posts.filter((p) => p.authorId === api.me.id && !p.story)
   const drafts = api.state.postDrafts
 
   return (
@@ -830,7 +930,8 @@ export function ProfilePage({ id }: { id: string }) {
   if (id === api.me.id) return null
   if (!api.state.users[id]) return <Empty emoji="👻" text="用户不存在或已注销" />
   const u = api.user(id)
-  const posts = api.state.posts.filter((p) => p.authorId === id)
+  /* 轮 21 打通：他人主页只展示可见的非快拍动态（仅自己可见的他人看不到） */
+  const posts = api.state.posts.filter((p) => p.authorId === id && !p.story && postVisibleTo(p, api.me.id))
   const articles = api.state.articles.filter((a) => a.authorId === id)
 
   return (

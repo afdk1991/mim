@@ -1,0 +1,363 @@
+/* 轮 21 打通：B2 内容域样式（媒体卡 / 投票 / 抽奖 / 快拍栏 / 楼中楼 / 定时队列 / 批量管理 / 敏感词提示）
+   颜色一律取全局 CSS 变量，兼容暗色主题。 */
+
+/* ---------- 1. 视频/GIF 媒体卡 + 占位播放器 ---------- */
+.wt-media-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 16 / 9;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--primary-weak);
+  overflow: hidden;
+  cursor: pointer;
+}
+.wt-media-poster {
+  font-size: 64px;
+  line-height: 1;
+}
+.wt-media-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 22px;
+}
+.wt-media-card.wt-gif .wt-media-play {
+  width: auto;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.wt-media-dur {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+}
+.wt-player-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 96px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius);
+}
+.wt-player-screen.wt-gif {
+  animation: wt-gif-jitter 0.6s steps(2) infinite;
+}
+@keyframes wt-gif-jitter {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+.wt-player-bar {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.wt-player-bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.16s linear;
+}
+.wt-player-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ---------- 2. 投票块 ---------- */
+.wt-vote {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+.wt-vote-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.wt-vote-opt:disabled {
+  cursor: default;
+}
+.wt-vote-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--primary-weak);
+  z-index: 0;
+  transition: width 0.3s;
+}
+.wt-vote-label,
+.wt-vote-pct {
+  position: relative;
+  z-index: 1;
+  font-size: 14px;
+}
+.wt-vote-pct {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.wt-vote-opt.picked {
+  border-color: var(--primary);
+}
+.wt-vote-meta {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ---------- 3. 抽奖块 ---------- */
+.wt-lottery {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px dashed var(--primary);
+  border-radius: var(--radius);
+  background: var(--primary-weak);
+}
+.wt-lottery-head {
+  font-weight: 700;
+}
+.wt-lottery-meta {
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.wt-lottery-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.wt-lottery-joined {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.wt-lottery-winners {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.wt-winner-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+/* ---------- 4. 位置 / 8. 可见性角标 ---------- */
+.wt-loc {
+  margin-top: 8px;
+  color: var(--primary);
+  font-size: 13px;
+}
+.wt-vis-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 11px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+/* ---------- 7. 24h 快拍栏 ---------- */
+.wt-story-bar {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 12px 16px;
+}
+.wt-story-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  min-width: 56px;
+}
+.wt-story-ring {
+  padding: 3px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  display: inline-flex;
+}
+.wt-story-item small {
+  color: var(--text-2);
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wt-story-text {
+  font-size: 20px;
+  line-height: 1.6;
+  margin: 0 0 10px;
+  word-break: break-word;
+}
+
+/* ---------- 6. 楼中楼（二级缩进） ---------- */
+.wt-reply {
+  margin-left: 40px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+.wt-reply-prefix {
+  color: var(--primary);
+  font-size: 13px;
+}
+.wt-reply-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--primary-weak);
+  color: var(--primary);
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+}
+
+/* ---------- 9. 敏感词提示 ---------- */
+.wt-sens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(230, 67, 64, 0.08);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 13px;
+}
+.wt-hit {
+  background: var(--danger);
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ---------- 5/10. 定时队列 + 批量管理 ---------- */
+.wt-sched-list,
+.wt-batch-list {
+  display: grid;
+  gap: 8px;
+}
+.wt-sched-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.wt-sched-time {
+  color: var(--primary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.wt-sched-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.wt-batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.wt-batch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.wt-batch-item small {
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.wt-batch-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 发布器新控件补充：select / 提示行 ---------- */
+.pb-field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+}
+.pb-field select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.pb-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

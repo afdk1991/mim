@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Article, Post } from './types'
+import type { Article, Post, PostComment, PostLottery, PostMedia, PostVote, User } from './types'
 import { cx, formatCount, timeAgo } from './utils'
 import { useApp } from './store'
 import { useRouter } from './router'
@@ -184,6 +184,157 @@ export function FollowButton({ userId, small = false }: { userId: string; small?
   )
 }
 
+/* ---------- 轮 21 打通：B2 内容域卡片扩展（视频/GIF / 投票 / 抽奖 / 位置 / 可见性角标） ---------- */
+
+/** 1. 视频/GIF 媒体卡：海报 + 播放按钮 + 时长角标；点击弹占位播放器 */
+export function MediaCard({ media }: { media: PostMedia }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        className={cx('wt-media-card', media.type === 'gif' && 'wt-gif')}
+        onClick={() => setOpen(true)}
+        aria-label={media.type === 'gif' ? '播放GIF' : '播放视频'}
+      >
+        <span className="wt-media-poster">{media.poster}</span>
+        <span className="wt-media-play">{media.type === 'gif' ? 'GIF · 动图' : '▶'}</span>
+        {media.type === 'video' && media.duration != null && (
+          <span className="wt-media-dur">{formatCount(media.duration)}s</span>
+        )}
+      </button>
+      {open && (
+        <Modal title={media.type === 'gif' ? 'GIF 动图（占位播放器）' : '视频播放（占位播放器）'} onClose={() => setOpen(false)}>
+          <VideoPlayerScreen media={media} />
+        </Modal>
+      )}
+    </>
+  )
+}
+
+/** 占位播放器画面：假进度条（useEffect 计时推进），视频/GIF 均可复用 */
+export function VideoPlayerScreen({ media }: { media: PostMedia }) {
+  const total = media.type === 'video' ? (media.duration ?? 15) : 5
+  const [sec, setSec] = useState(0)
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSec((s) => (s >= total ? total : s + 0.2))
+    }, 200)
+    return () => window.clearInterval(timer)
+  }, [total])
+  const done = sec >= total
+  return (
+    <>
+      <div className={cx('wt-player-screen', media.type === 'gif' && 'wt-gif')}>{media.poster}</div>
+      <div className="wt-player-bar">
+        <span style={{ width: `${Math.min(100, (sec / total) * 100)}%` }} />
+      </div>
+      <div className="wt-player-meta">
+        <span>{done ? '播放完毕' : '播放中…'}</span>
+        <span>
+          {sec.toFixed(1)}s / {total}s
+        </span>
+      </div>
+    </>
+  )
+}
+
+/** 2. 投票块：一人一票（按身份 key），百分比条 + 总票数，截止锁定 */
+export function VoteBlock({ postId, vote }: { postId: string; vote: PostVote }) {
+  const api = useApp()
+  const toast = useToast()
+  const ended = Date.now() > vote.endsAt
+  const mine = vote.voters[api.me.id]
+  const total = Object.values(vote.votes).reduce((a, b) => a + b, 0)
+  return (
+    <div className="wt-vote">
+      {vote.options.map((opt) => {
+        const n = vote.votes[opt] ?? 0
+        const pct = total > 0 ? Math.round((n / total) * 100) : 0
+        return (
+          <button
+            key={opt}
+            type="button"
+            className={cx('wt-vote-opt', mine === opt && 'picked')}
+            disabled={ended || !!mine}
+            onClick={() => {
+              api.castVote(postId, opt)
+              toast('投票成功，一人一票 🗳️')
+            }}
+          >
+            <span className="wt-vote-fill" style={{ width: `${pct}%` }} />
+            <span className="wt-vote-label">
+              {opt}
+              {mine === opt ? '（已投）' : ''}
+            </span>
+            <span className="wt-vote-pct">
+              {pct}% · {formatCount(n)}票
+            </span>
+          </button>
+        )
+      })}
+      <span className="wt-vote-meta">
+        {formatCount(total)} 人投票 · {ended ? '已截止' : `${Math.max(1, Math.ceil((vote.endsAt - Date.now()) / 3_600_000))} 小时后截止`}
+        {ended ? ' · 已锁定' : ''}
+      </span>
+    </div>
+  )
+}
+
+/** 3. 抽奖块：参与去重 → 倒计时/立即开奖 → emoji 名单公示 */
+export function LotteryBlock({ postId, lottery }: { postId: string; lottery: PostLottery }) {
+  const api = useApp()
+  const toast = useToast()
+  const joined = lottery.participants.includes(api.me.id)
+  const ended = lottery.winners || Date.now() > lottery.endsAt
+  const hoursLeft = Math.max(0, Math.ceil((lottery.endsAt - Date.now()) / 3_600_000))
+
+  const draw = () => {
+    if (lottery.participants.length === 0) {
+      toast('还没有人参与，无法开奖')
+      return
+    }
+    const shuffled = [...lottery.participants].sort(() => Math.random() - 0.5)
+    const winners = shuffled.slice(0, Math.min(lottery.count, lottery.participants.length))
+    api.drawLottery(postId, winners)
+    emitToast(`🎉 中奖名单：${winners.map((id) => api.user(id)?.emoji ?? '😀').join(' ')} 恭喜！`)
+  }
+
+  return (
+    <div className="wt-lottery">
+      <div className="wt-lottery-head">🎁 {lottery.prize}</div>
+      <div className="wt-lottery-meta">
+        共 {lottery.count} 份 · {formatCount(lottery.participants.length)} 人参与 ·{' '}
+        {lottery.winners ? '已开奖' : ended ? '已到开奖时间' : `${hoursLeft} 小时后开奖`}
+      </div>
+      {!lottery.winners && (
+        <div className="wt-lottery-actions">
+          {!joined ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => api.joinLottery(postId)}>
+              参与抽奖
+            </button>
+          ) : (
+            <span className="wt-lottery-joined">✅ 已参与，坐等开奖</span>
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={draw}>
+            立即开奖
+          </button>
+        </div>
+      )}
+      {lottery.winners && (
+        <div className="wt-lottery-winners">
+          <span>🎉 中奖：</span>
+          {lottery.winners.map((id) => (
+            <span key={id} className="wt-winner-chip">
+              {api.user(id)?.emoji ?? '😀'} {api.user(id)?.name ?? '神秘用户'}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ---------- PostCard ---------- */
 
 export function PostCard({ post, compact = false }: { post: Post; compact?: boolean }) {
@@ -210,6 +361,8 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         <div className="post-head-meta">
           <TimeAgo ts={post.createdAt} />
           <span className="post-source">来自{post.source}</span>
+          {/* 轮 21 打通：8. 仅自己可见角标 */}
+          {post.visibility === 'self' && <span className="wt-vis-tag">🔒 仅自己</span>}
         </div>
         {mine && (
           <button
@@ -241,6 +394,13 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         </div>
       )}
 
+      {/* 轮 21 打通：1. 视频/GIF 媒体卡（海报 + 播放按钮 + 时长角标） */}
+      {post.media && <MediaCard media={post.media} />}
+      {/* 轮 21 打通：2. 投票块（一人一票，截止锁定） */}
+      {post.vote && <VoteBlock postId={post.id} vote={post.vote} />}
+      {/* 轮 21 打通：3. 抽奖块（参与去重 / 开奖公示） */}
+      {post.lottery && <LotteryBlock postId={post.id} lottery={post.lottery} />}
+
       {quoted && quotedAuthor && (
         <a className="quote-card" href={`#/post/${quoted.id}`}>
           <div className="quote-author">
@@ -252,6 +412,9 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
           )}
         </a>
       )}
+
+      {/* 轮 21 打通：4. 位置显示在卡片底部操作区上方 */}
+      {post.location && <div className="wt-loc">📍 {post.location}</div>}
 
       <div className="post-actions">
         <button className={cx('pa-btn', post.likedByMe && 'active')} onClick={() => api.togglePostLike(post.id)}>
