@@ -10,6 +10,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useApp } from './store'
 import { useAuth } from './auth'
+import { useRouter } from './router'
 import { Avatar } from './components'
 import { cx } from './utils'
 
@@ -61,6 +62,10 @@ function DemoUsers() {
 export function LoginPage() {
   const api = useApp()
   const { auth, cloudEnabled, oauthProviders, signIn, signUp, signInWithOAuth, signOut } = useAuth()
+  const { navigate, query } = useRouter()
+  /* 微博 newlogin 模式：?url= 携带来源页路径，登录成功后回跳；仅接受站内路径，防外链跳转 */
+  const rawUrl = query.get('url') ?? ''
+  const returnTo = rawUrl.startsWith('/') || rawUrl.startsWith('#/') ? rawUrl : ''
   const [tab, setTab] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [pwd, setPwd] = useState('')
@@ -128,6 +133,7 @@ export function LoginPage() {
     const r = tab === 'login' ? await signIn(email.trim(), pwd) : await signUp(email.trim(), pwd)
     setBusy(false)
     if (r) setErr(r)
+    else if (tab === 'login') navigate(returnTo || '#/feed')
     else if (tab === 'register') setOk('注册成功。如未自动登录，请先到邮箱完成确认后再登录')
   }
 

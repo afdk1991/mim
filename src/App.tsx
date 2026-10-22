@@ -632,7 +632,8 @@ function UserMenu() {
 /* 顶部 hero：深色星空横幅 + 右上工具区 + 居中 logo + 完整搜索模块（下拉：历史/热搜/联想/清空） */
 function WbHero() {
   const api = useApp()
-  const { navigate } = useRouter()
+  const { navigate, path } = useRouter()
+  const { auth } = useAuth()
   const [theme, setTheme] = useTheme()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
@@ -740,6 +741,12 @@ function WbHero() {
         >
           ♻️
         </button>
+        {/* 统一登录入口（微博 newlogin 模式）：未登录时显性呈现，携带当前页路径，登录后回跳来源页 */}
+        {auth.mode !== 'cloud' && (
+          <a className="btn btn-primary btn-sm" href={`#/login?url=${encodeURIComponent(path)}`}>
+            登录 / 注册
+          </a>
+        )}
         <UserMenu />
       </div>
       <a className="wb-hero-logo" href="#/feed">
