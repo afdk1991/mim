@@ -7,7 +7,7 @@ export interface SearchPageItem {
   name: string // 展示名称
   icon: string
   keywords: string[] // 命中任一即匹配
-  group: '内容' | '商城' | '工具台' | '个人'
+  group: '内容' | '商城' | '工具台' | '个人' | '站点'
 }
 
 export const SEARCH_PAGES: SearchPageItem[] = [
@@ -51,6 +51,12 @@ export const SEARCH_PAGES: SearchPageItem[] = [
   { href: '#/ai', name: 'AI 可转载资源库', icon: '📚', keywords: ['ai', '转载', '许可', '署名'], group: '工具台' },
   { href: '#/manju', name: '漫剧', icon: '🎬', keywords: ['漫剧', '短剧', '动画', '追剧'], group: '工具台' },
   { href: '#/ardot', name: '聚合监控', icon: '📡', keywords: ['探针', '审计', '健康'], group: '工具台' },
+  /* ---- 站点（页脚信息区 5 入口，路由 #/info/:slug） ---- */
+  { href: '#/info/about', name: '关于我们', icon: '🏢', keywords: ['关于', '我们', '介绍', 'about'], group: '站点' },
+  { href: '#/info/join', name: '招贤纳士', icon: '💼', keywords: ['招聘', '加入', '求职', 'join', '岗位'], group: '站点' },
+  { href: '#/info/coop', name: '商务合作', icon: '🤝', keywords: ['商务', '合作', '洽谈', 'coop'], group: '站点' },
+  { href: '#/info/media', name: '寻求报道', icon: '📰', keywords: ['报道', '媒体', '投稿', 'media'], group: '站点' },
+  { href: '#/info/terms', name: '协议专区', icon: '📜', keywords: ['协议', '条款', 'terms', '隐私'], group: '站点' },
 ]
 
 /** 全站功能页匹配：名称或关键词双向 includes（兼容「机箱」搜 BOM、「bom工具」搜 BOM） */
