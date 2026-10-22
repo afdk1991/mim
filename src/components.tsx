@@ -7,6 +7,7 @@ import { useRouter } from './router'
 import { useAuth } from './auth'
 import { can } from './permissions'
 import { VBadge } from './user-domain'
+import { recordNotInterested } from './lib/feed-core'
 
 /* ---------- Avatar ---------- */
 
@@ -343,6 +344,7 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
   const { navigate } = useRouter()
   const [repostOpen, setRepostOpen] = useState(false)
   const [repostText, setRepostText] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
   const quoted = post.repostOfId ? api.state.posts.find((p) => p.id === post.repostOfId) : null
   const quotedAuthor = quoted ? api.user(quoted.authorId) : null
   const { auth } = useAuth()
@@ -435,6 +437,25 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         >
           {api.isFavorited('post', post.id) ? '⭐' : '☆'} 收藏
         </button>
+        {/* 轮 23 打通：B4 负反馈入口 —— 「···」菜单收起「不感兴趣」；点击后按登录身份记录作者级+话题级，
+            各流监听 RF_EVT 即时消失并 toast 提示 */}
+        <button className="pa-btn" aria-label="更多操作" onClick={() => setMenuOpen((v) => !v)}>
+          ···
+        </button>
+        {menuOpen && (
+          <div className="rf-post-menu">
+            <button
+              type="button"
+              onClick={() => {
+                recordNotInterested(post)
+                setMenuOpen(false)
+                toast('将减少此类内容推荐')
+              }}
+            >
+              🚫 不感兴趣
+            </button>
+          </div>
+        )}
       </div>
 
       {repostOpen && (

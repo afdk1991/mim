@@ -19,6 +19,10 @@ import {
 } from './components'
 import { matchesTeenWords, toggleBlacklistUser, useUserDomain, VBadge } from './user-domain'
 import { postVisibleTo } from './content-domain'
+/* 轮 23 打通：B4 发现与分发 —— 负反馈/同城 hooks 与核心打分逻辑、AB 实验取桶 */
+import { useCity, useNegFeedback } from './feed-domain'
+import { buildRecFeed, CITY_PRESETS, clearNeg, negCount } from './lib/feed-core'
+import { abVariant } from './lib/ab'
 import {
   GroupCreateModal,
   PEER_READ_DELAY,
@@ -181,19 +185,78 @@ export function FeedPage() {
   /* 轮 20 打通：feed 流过滤——黑名单用户动态不展示；青少年模式开启时简单关键词过滤敏感占位内容
      轮 21 打通：叠加 B2 过滤——快拍只进快拍栏不进常规流；「仅自己」动态非本人不可见 */
   const { blacklist, teen } = useUserDomain()
-  const feedPosts = api.state.posts.filter(
+  /* 轮 23 打通：B4 负反馈 —— 作者级命中整卡即时消失（作者+话题按登录身份分 key 记录） */
+  const neg = useNegFeedback()
+  /* 轮 23 打通：B4 同城 —— 我设置的定位（未设置时默认城市走 AB 实验 city_default） */
+  const [city, setCity] = useCity()
+  /* 轮 23 打通：B4 feed 顶部 Tab —— 关注 / 推荐 / 同城
+     轮 20/21/22 口径保持：黑名单 / 青少年敏感词 / 快拍不进流 / 仅自己可见过滤不变 */
+  const [tab, setTab] = useState<'follow' | 'reco' | 'city'>('follow')
+  const basePosts = api.state.posts.filter(
     (p) =>
       !p.story &&
       postVisibleTo(p, api.me.id) &&
       !blacklist.includes(p.authorId) &&
-      !(teen.enabled && matchesTeenWords(p.content)),
+      !(teen.enabled && matchesTeenWords(p.content)) &&
+      !neg.authors.includes(p.authorId),
   )
+  /* 关注流：自己 + 已关注作者 */
+  const followPosts = basePosts.filter((p) => p.authorId === api.me.id || api.isFollowing(p.authorId))
+  /* 推荐流：非自己、未关注作者的公开动态，按兴趣权重本地排序（互动统计见 lib/feed-core） */
+  const recoItems = buildRecFeed({
+    candidates: basePosts.filter((p) => p.authorId !== api.me.id && !api.isFollowing(p.authorId)),
+    meId: api.me.id,
+    posts: api.state.posts,
+    favorites: api.state.favorites,
+    users: api.state.users,
+    negTopics: neg.topics,
+  })
+  /* 同城流：按动态位置归属城市过滤（用户无城市字段，位置即地理信号） */
+  const cityPosts = basePosts.filter((p) => (p.location ?? '').startsWith(city))
+  const cities = [
+    ...new Set([
+      ...CITY_PRESETS,
+      ...api.state.posts.map((p) => p.location?.split(' · ')[0] ?? '').filter((c): c is string => !!c),
+    ]),
+  ]
+  const reasonStyle = abVariant('reco_reason_style')
 
   return (
     <div className="page-grid">
       <div>
         {/* 轮 21 打通：feed 顶部快拍栏 */}
         <StoryBar />
+        {/* 轮 23 打通：B4 feed 顶部分发 Tab —— 关注 / 推荐 / 同城 + 视频沉浸流入口 */}
+        <div className="tabs rf-feed-tabs">
+          <button className={cx('tab-btn', tab === 'follow' && 'active')} onClick={() => setTab('follow')}>
+            👥 关注
+          </button>
+          <button className={cx('tab-btn', tab === 'reco' && 'active')} onClick={() => setTab('reco')}>
+            ✨ 推荐
+          </button>
+          <button className={cx('tab-btn', tab === 'city' && 'active')} onClick={() => setTab('city')}>
+            📍 同城
+          </button>
+          <span style={{ flex: 1 }} />
+          {tab === 'city' && (
+            <select
+              className="rf-city-select"
+              aria-label="切换城市"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+            >
+              {cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
+          <a className="rf-tab-link" href="#/videos">
+            🎬 视频
+          </a>
+        </div>
+
         <div className="card compose">
           <div className="compose-top">
             <Avatar emoji={api.me.emoji} color={api.me.color} size={40} />
@@ -240,17 +303,73 @@ export function FeedPage() {
           </div>
         </div>
 
-        {api.state.posts.length > 0 && feedPosts.length === 0 && (
+        {/* 轮 23 打通：B4 负反馈恢复条 —— 已屏蔽 N 条推荐，可一键恢复 */}
+        {negCount(neg) > 0 && (
+          <div className="rf-neg-bar">
+            <span>🚫 已屏蔽 {negCount(neg)} 条推荐（不感兴趣的作者 / 话题）</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                clearNeg()
+                toast('已恢复相关内容推荐')
+              }}
+            >
+              恢复
+            </button>
+          </div>
+        )}
+
+        {api.state.posts.length > 0 && basePosts.length === 0 && (
           <Empty emoji="🛡" text="当前内容已按黑名单 / 青少年模式过滤" />
         )}
-        {feedPosts.map((p) => (
-          <PostCard key={p.id} post={p} />
-        ))}
+
+        {tab === 'follow' && (
+          <>
+            {followPosts.length === 0 && <Empty emoji="👥" text="关注的人还没有新动态，去推荐页逛逛吧" />}
+            {followPosts.map((p) => (
+              <PostCard key={p.id} post={p} />
+            ))}
+          </>
+        )}
+
+        {tab === 'reco' && (
+          <>
+            {recoItems.length === 0 && <Empty emoji="✨" text="暂无推荐内容，发布或互动越多推荐越准" />}
+            {/* 轮 23 打通：B4 推荐理由小标 —— AB 实验 reco_reason_style 控制样式 A/B */}
+            {recoItems.map(({ post, reason }) => (
+              <div key={post.id} className="rf-reco-item">
+                {reasonStyle === 'b' ? (
+                  <span className="rf-reason rf-reason-b">✨ {reason}</span>
+                ) : (
+                  <span className="rf-reason">{reason}</span>
+                )}
+                <PostCard post={post} />
+              </div>
+            ))}
+          </>
+        )}
+
+        {tab === 'city' && (
+          <>
+            {cityPosts.length === 0 && (
+              <Empty emoji="📍" text={`暂无「${city}」的同城动态，发布时选择位置即可现身同城`} />
+            )}
+            {cityPosts.map((p) => (
+              <PostCard key={p.id} post={p} />
+            ))}
+          </>
+        )}
       </div>
 
       <div className="side-col">
         <div className="side-card">
-          <h3>🔥 热搜榜</h3>
+          {/* 轮 23 打通：B4 榜单体系入口 —— 话题榜/明星榜/影响力榜聚合页 */}
+          <h3>
+            🔥 热搜榜
+            <a className="rk-more" href="#/ranks">
+              榜单 »
+            </a>
+          </h3>
           {api.state.hotSearches.slice(0, 10).map((h) => (
             <a key={h.id} className="hot-item" href={`#/search?q=${encodeURIComponent(h.text)}`}>
               <span className="hot-rank">{h.rank}</span>

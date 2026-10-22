@@ -1,0 +1,297 @@
+/* 轮 23 打通：B4 发现与分发样式（rf- 负反馈/推荐 · rk- 榜单 · ab- 实验调试），
+   颜色全部走全局 CSS 变量（榜单金属色为装饰性固定色）。 */
+
+/* ---------- feed 顶部 Tab 行 / 同城城市切换 ---------- */
+.rf-feed-tabs {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.rf-city-select {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.rf-tab-link {
+  font-size: 14px;
+  color: var(--text-2);
+  text-decoration: none;
+  padding: 10px 12px;
+}
+.rf-tab-link:hover {
+  color: var(--primary);
+}
+
+/* ---------- 负反馈恢复条 ---------- */
+.rf-neg-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.rf-neg-bar button {
+  margin-left: auto;
+}
+
+/* ---------- 推荐理由小标（A=轻角标 / B=高亮气泡，AB 实验 reco_reason_style） ---------- */
+.rf-reco-item {
+  position: relative;
+}
+.rf-reason {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  font-size: 12px;
+  color: var(--text-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 8px;
+  pointer-events: none;
+}
+.rf-reason-b {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- PostCard「···」不感兴趣菜单 ---------- */
+.post-actions {
+  position: relative;
+}
+.rf-post-menu {
+  position: absolute;
+  right: 8px;
+  bottom: 34px;
+  z-index: 5;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.rf-post-menu button {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rf-post-menu button:hover {
+  background: var(--bg);
+}
+
+/* ---------- 视频沉浸流 ---------- */
+.rf-video-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.rf-video-head .page-title {
+  margin: 0;
+}
+.rf-video-scroll {
+  height: calc(100vh - 150px);
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  border-radius: 12px;
+}
+.rf-video-card {
+  position: relative;
+  scroll-snap-align: start;
+  height: 100%;
+  min-height: 420px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #10131a;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.rf-video-screen {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rf-video-poster {
+  font-size: 120px;
+  filter: blur(2px) brightness(0.8);
+}
+.rf-video-play {
+  position: absolute;
+  font-size: 22px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  line-height: 60px;
+  text-align: center;
+}
+.rf-video-dur {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: #fff;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.rf-video-info {
+  position: relative;
+  z-index: 2;
+  padding: 14px 88px 16px 16px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  color: #fff;
+}
+.rf-video-info b {
+  font-size: 14px;
+}
+.rf-video-info p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.92;
+}
+.rf-video-float {
+  position: absolute;
+  right: 14px;
+  bottom: 70px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rf-vf-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 22px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.rf-vf-btn small {
+  font-size: 11px;
+  opacity: 0.9;
+}
+.rf-vf-btn.active {
+  color: var(--danger);
+}
+
+/* ---------- 榜单 ---------- */
+.rk-more {
+  float: right;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+  text-decoration: none;
+}
+.rk-more:hover {
+  color: var(--primary);
+}
+.rk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+.rk-row:last-child {
+  border-bottom: none;
+}
+.rk-row:hover {
+  background: var(--bg);
+}
+.rk-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rk-main small {
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rk-meta {
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rk-meta b {
+  color: var(--text-2);
+  font-size: 14px;
+}
+.rk-no {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-3);
+  background: var(--bg);
+  flex: none;
+}
+.rk-top-1 {
+  color: #7a4d00;
+  background: #ffd66b;
+}
+.rk-top-2 {
+  color: #4a4a4a;
+  background: #d9dde3;
+}
+.rk-top-3 {
+  color: #6b3410;
+  background: #eab188;
+}
+
+/* ---------- AB Debug 面板 ---------- */
+.ab-debug {
+  margin-top: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.ab-debug-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+.ab-debug-row code {
+  color: var(--primary-deep);
+}

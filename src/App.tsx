@@ -55,6 +55,7 @@ import { WelcomeModal } from './welcome'
 import { SettingsPage } from './settings'
 import { TeenBanner } from './user-domain'
 import { ScheduledTicker } from './content-domain'
+import { RanksPage, VideosPage } from './feed-domain' /* 轮 23 打通：B4 视频沉浸流 / 榜单体系路由 */
 import './viewswitch.css'
 
 /** 视图模式：广场态（消费/社交/交易）与知识态（生产/学习/开发工具） */
@@ -369,6 +370,11 @@ function Page() {
       return param ? <TopicPage name={decodeURIComponent(param)} /> : <Empty text="缺少话题名" />
     case 'topics':
       return <TopicRankPage />
+    /* 轮 23 打通：B4 视频沉浸流 / 榜单体系 */
+    case 'videos':
+      return <VideosPage />
+    case 'ranks':
+      return <RanksPage />
     case 'notifications':
       return <NotificationsPage />
     case 'messages':
