@@ -852,11 +852,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let unsubMsg: (() => void) | null = null
     const pull = () => {
       void pullCloudContent().then((payload) => {
-        if (payload && alive) {
-          dispatch({ type: 'cloudMerge', payload })
-          // 云端历史同步到本地 localStorage（loadHistory 同步读本地）
-          import('./lib/cloud-history').then((m) => m.cloudSyncHistoryToLocal())
-        }
+        if (!payload || !alive) return
+        dispatch({ type: 'cloudMerge', payload })
+        // 身份对齐：登录后 meId 切到 auth uuid。否则云端行的 authorId 是 uuid、
+        // 本地 meId 仍为 'me'，个人主页/删除/编辑会认不出自己发布的内容。
+        void sb.auth.getSession().then(({ data }) => {
+          const uid = data.session?.user?.id
+          if (!uid || !alive) return
+          const me = payload.users[uid] ?? {
+            id: uid,
+            name: '新用户',
+            emoji: '🙂',
+            color: '#4f7cff',
+            bio: '',
+            followers: 0,
+            following: 0,
+            verified: false,
+          }
+          dispatch({ type: 'setIdentity', payload: { meId: uid, user: me } })
+        })
+        // 云端历史同步到本地 localStorage（loadHistory 同步读本地）
+        import('./lib/cloud-history').then((m) => m.cloudSyncHistoryToLocal())
       })
     }
     const startRealtime = () => {
@@ -874,9 +890,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         pull()
         startRealtime()
       }
-      if (event === 'SIGNED_OUT' && unsubMsg) {
-        unsubMsg()
-        unsubMsg = null
+      if (event === 'SIGNED_OUT') {
+        if (unsubMsg) {
+          unsubMsg()
+          unsubMsg = null
+        }
+        // 登出回落本地占位身份，保持 users['me'] 兜底，避免整站头像/昵称落 FALLBACK_USER
+        dispatch({ type: 'setIdentity', payload: { meId: 'me' } })
       }
     })
     return () => {
