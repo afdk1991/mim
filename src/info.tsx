@@ -2,9 +2,10 @@
  * 服务于全站页脚的「关于我们 / 招贤纳士 / 商务合作 / 寻求报道 / 协议专区」
  * 以及备案资质类占位链接，路由：#/info/:slug。
  * 仅保留真实、通用的内容；站点相关的事实信息（联系方式、备案号、证照编号、
- * 企业主体等）一律留空待运营方配置，不预置任何演示数据。 */
+ * 企业主体等）一律由 src/site-config.ts 统一配置，此处不预置任何演示数据。 */
 
 import { Empty } from './components'
+import { SITE_CONFIG, isSet } from './site-config'
 
 interface InfoSection {
   h?: string
@@ -31,6 +32,37 @@ interface InfoDoc {
 /* 待运营方配置时的统一提示文案 */
 const TODO_NOTICE = '本项内容由站点运营方配置后展示。'
 
+/* ---------- 由 SITE_CONFIG 生成的事实数据片段（未配置统一回退占位） ---------- */
+const contactText = (): string => {
+  const lines: string[] = []
+  if (isSet(SITE_CONFIG.contactEmail)) lines.push(`联系邮箱：${SITE_CONFIG.contactEmail}`)
+  if (isSet(SITE_CONFIG.address)) lines.push(`联系地址：${SITE_CONFIG.address}`)
+  return lines.join('；') || TODO_NOTICE
+}
+
+const beianText = (): string => {
+  if (!isSet(SITE_CONFIG.icp) && !isSet(SITE_CONFIG.policeBeian)) return TODO_NOTICE
+  const parts: string[] = []
+  if (isSet(SITE_CONFIG.owner)) parts.push(`主办单位：${SITE_CONFIG.owner}`)
+  if (isSet(SITE_CONFIG.icp)) parts.push(`ICP 备案号：${SITE_CONFIG.icp}`)
+  if (isSet(SITE_CONFIG.policeBeian)) parts.push(`公安联网备案号：${SITE_CONFIG.policeBeian}`)
+  return parts.join('；')
+}
+
+const licenseText = (): string => {
+  if (!isSet(SITE_CONFIG.owner) && !isSet(SITE_CONFIG.creditCode)) return TODO_NOTICE
+  const parts: string[] = []
+  if (isSet(SITE_CONFIG.owner)) parts.push(`企业名称：${SITE_CONFIG.owner}`)
+  if (isSet(SITE_CONFIG.creditCode)) parts.push(`统一社会信用代码：${SITE_CONFIG.creditCode}`)
+  return parts.join('；')
+}
+
+const publishLicenseText = (): string =>
+  isSet(SITE_CONFIG.publishLicense) ? `出版物许可证编号：${SITE_CONFIG.publishLicense}` : TODO_NOTICE
+
+const opBeianText = (): string =>
+  isSet(SITE_CONFIG.opBeian) ? `经营性网站备案编号：${SITE_CONFIG.opBeian}` : TODO_NOTICE
+
 export const INFO_PAGES: Record<string, InfoDoc> = {
   /* ---------- 关于类 ---------- */
   about: {
@@ -48,7 +80,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
       },
       {
         h: '联系我们',
-        p: [TODO_NOTICE],
+        p: [contactText()],
       },
     ],
   },
@@ -86,7 +118,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
     sections: [
       {
         h: '备案信息',
-        p: ['ICP 备案与公安备案信息由站点运营方配置后展示。'],
+        p: [beianText()],
       },
     ],
   },
@@ -156,7 +188,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
           '材料齐全后将进行初审；确认侵权的，将删除或断开链接并通知被投诉方；被投诉方可提交不侵权声明（反通知）。',
         ],
       },
-      { h: '投诉渠道', p: [TODO_NOTICE] },
+      { h: '投诉渠道', p: [contactText()] },
     ],
   },
   'publish-license': {
@@ -166,7 +198,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
     sections: [
       {
         h: '证照信息',
-        p: [TODO_NOTICE],
+        p: [publishLicenseText()],
       },
     ],
   },
@@ -179,7 +211,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
     sections: [
       {
         h: '登记信息',
-        p: [TODO_NOTICE],
+        p: [licenseText()],
       },
     ],
   },
@@ -190,7 +222,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
     sections: [
       {
         h: '备案信息',
-        p: [TODO_NOTICE],
+        p: [opBeianText()],
       },
     ],
   },
@@ -201,7 +233,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
     sections: [
       {
         h: '站内举报',
-        p: ['站内举报渠道由站点运营方配置后展示。'],
+        p: [isSet(SITE_CONFIG.contactEmail) ? `举报邮箱：${SITE_CONFIG.contactEmail}` : '站内举报渠道由站点运营方配置后展示。'],
       },
       {
         h: '官方渠道',
@@ -224,7 +256,7 @@ export const INFO_PAGES: Record<string, InfoDoc> = {
       },
       {
         h: '联系我们',
-        p: ['如需协助处理未成年人账号问题，请通过站点运营方配置的渠道联系。'],
+        p: [isSet(SITE_CONFIG.contactEmail) ? `联系邮箱：${SITE_CONFIG.contactEmail}` : '如需协助处理未成年人账号问题，请通过站点运营方配置的渠道联系。'],
       },
     ],
   },
