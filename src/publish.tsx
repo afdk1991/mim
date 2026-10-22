@@ -2,6 +2,7 @@ import './publish.css'
 import './content-domain.css'
 import { useEffect, useState } from 'react'
 import { Empty, Modal, TimeAgo, useToast } from './components'
+import { MediaTranscodeWorkbench } from './media-domain' /* 轮 24 打通：B5 上传/转码工作台 */
 import { getCurrentUserId, useAuth } from './auth'
 import { useApp } from './store'
 import { cloudEnabled } from './lib/supabase'
@@ -549,6 +550,8 @@ export function PublishPage() {
                   {mediaType === 'video' && (
                     <input inputMode="numeric" value={mediaDur} onChange={(e) => setMediaDur(e.target.value)} placeholder="时长（秒），如 15" />
                   )}
+                  {/* 轮 24 打通：B5 上传/转码工作台（文件选择 → URL.createObjectURL 本地预览 → 模拟转码进度 → 完成标记） */}
+                  <MediaTranscodeWorkbench />
                 </fieldset>
               )}
 

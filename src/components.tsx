@@ -8,6 +8,7 @@ import { useAuth } from './auth'
 import { can } from './permissions'
 import { VBadge } from './user-domain'
 import { recordNotInterested } from './lib/feed-core'
+import { DanmakuLayer } from './media-domain' /* 轮 24 打通：B5 视频弹幕层 */
 
 /* ---------- Avatar ---------- */
 
@@ -187,8 +188,8 @@ export function FollowButton({ userId, small = false }: { userId: string; small?
 
 /* ---------- 轮 21 打通：B2 内容域卡片扩展（视频/GIF / 投票 / 抽奖 / 位置 / 可见性角标） ---------- */
 
-/** 1. 视频/GIF 媒体卡：海报 + 播放按钮 + 时长角标；点击弹占位播放器 */
-export function MediaCard({ media }: { media: PostMedia }) {
+/** 1. 视频/GIF 媒体卡：海报 + 播放按钮 + 时长角标；点击弹占位播放器（postId 供弹幕分 key） */
+export function MediaCard({ media, postId }: { media: PostMedia; postId?: string }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -206,15 +207,15 @@ export function MediaCard({ media }: { media: PostMedia }) {
       </button>
       {open && (
         <Modal title={media.type === 'gif' ? 'GIF 动图（占位播放器）' : '视频播放（占位播放器）'} onClose={() => setOpen(false)}>
-          <VideoPlayerScreen media={media} />
+          <VideoPlayerScreen media={media} postId={postId} />
         </Modal>
       )}
     </>
   )
 }
 
-/** 占位播放器画面：假进度条（useEffect 计时推进），视频/GIF 均可复用 */
-export function VideoPlayerScreen({ media }: { media: PostMedia }) {
+/** 占位播放器画面：假进度条（useEffect 计时推进），视频/GIF 均可复用；轮 24 打通：挂 B5 弹幕层 */
+export function VideoPlayerScreen({ media, postId }: { media: PostMedia; postId?: string }) {
   const total = media.type === 'video' ? (media.duration ?? 15) : 5
   const [sec, setSec] = useState(0)
   useEffect(() => {
@@ -226,7 +227,11 @@ export function VideoPlayerScreen({ media }: { media: PostMedia }) {
   const done = sec >= total
   return (
     <>
-      <div className={cx('wt-player-screen', media.type === 'gif' && 'wt-gif')}>{media.poster}</div>
+      {/* 轮 24 打通：B5 弹幕层挂载（按 post id 分 key，无 post id 退化为海报 key） */}
+      <div className="md-player-host">
+        <div className={cx('wt-player-screen', media.type === 'gif' && 'wt-gif')}>{media.poster}</div>
+        <DanmakuLayer postId={postId} posterKey={media.poster} />
+      </div>
       <div className="wt-player-bar">
         <span style={{ width: `${Math.min(100, (sec / total) * 100)}%` }} />
       </div>
@@ -396,8 +401,8 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         </div>
       )}
 
-      {/* 轮 21 打通：1. 视频/GIF 媒体卡（海报 + 播放按钮 + 时长角标） */}
-      {post.media && <MediaCard media={post.media} />}
+      {/* 轮 21 打通：1. 视频/GIF 媒体卡（海报 + 播放按钮 + 时长角标）；轮 24 打通：透传 post id 供弹幕分 key */}
+      {post.media && <MediaCard media={post.media} postId={post.id} />}
       {/* 轮 21 打通：2. 投票块（一人一票，截止锁定） */}
       {post.vote && <VoteBlock postId={post.id} vote={post.vote} />}
       {/* 轮 21 打通：3. 抽奖块（参与去重 / 开奖公示） */}

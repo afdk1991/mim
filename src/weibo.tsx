@@ -19,6 +19,7 @@ import {
 } from './components'
 import { matchesTeenWords, toggleBlacklistUser, useUserDomain, VBadge } from './user-domain'
 import { postVisibleTo } from './content-domain'
+import { VoiceBubbleThread, VoiceRecordButton } from './media-domain' /* 轮 24 打通：B5 私信语音条 */
 /* 轮 23 打通：B4 发现与分发 —— 负反馈/同城 hooks 与核心打分逻辑、AB 实验取桶 */
 import { useCity, useNegFeedback } from './feed-domain'
 import { buildRecFeed, CITY_PRESETS, clearNeg, negCount } from './lib/feed-core'
@@ -1035,9 +1036,13 @@ export function MessagesPage() {
                     </span>
                   </div>
                 ))}
+                {/* 轮 24 打通：B5 语音条气泡（仅单聊会话，按登录身份+会话 id 分 key 存取） */}
+                <VoiceBubbleThread convId={active.userId} />
                 <div ref={bottomRef} />
               </div>
               <div className="msg-input-bar">
+                {/* 轮 24 打通：B5 语音条——按住说话（模拟录音 0.5s 起，松开停止并发送） */}
+                <VoiceRecordButton convId={active.userId} />
                 <input
                   className="input"
                   placeholder={`给 ${activeUser.name} 发送消息…`}

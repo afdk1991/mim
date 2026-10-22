@@ -53,6 +53,7 @@ import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
 import { SettingsPage } from './settings'
+import { LivePage } from './media-domain' /* 轮 24 打通：B5 直播推拉流/连麦（模拟） */
 import { TeenBanner } from './user-domain'
 import { ScheduledTicker } from './content-domain'
 import { RanksPage, VideosPage } from './feed-domain' /* 轮 23 打通：B4 视频沉浸流 / 榜单体系路由 */
@@ -112,6 +113,7 @@ const NAV: NavItem[] = [
   { href: '#/vip', match: '/vip', label: 'VIP 会员', icon: '👑' },
   { href: '#/growth', match: '/growth', label: '成长引擎', icon: '🚀' },
   { href: '#/publish', match: '/publish', label: '发布器', icon: '📤' },
+  { href: '#/live', match: '/live', label: '直播开播', icon: '📡', views: ['feed'] }, /* 轮 24 打通：B5 直播开播台入口 */
   { href: '#/wallet', match: '/wallet', label: '统一钱包', icon: '💰' },
   { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻', views: ['kb'] },
   { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦', views: ['kb'] },
@@ -434,6 +436,9 @@ function Page() {
       return <GrowthPage />
     case 'publish':
       return <PublishPage />
+    /* 轮 24 打通：B5 多媒体——直播推拉流/连麦（模拟开播台） */
+    case 'live':
+      return <LivePage />
     case 'wallet':
       return <WalletPage />
 
