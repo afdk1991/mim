@@ -19,6 +19,30 @@ import {
 } from './components'
 import { matchesTeenWords, toggleBlacklistUser, useUserDomain, VBadge } from './user-domain'
 import { postVisibleTo } from './content-domain'
+import {
+  GroupCreateModal,
+  PEER_READ_DELAY,
+  RoamModal,
+  SuggestCard,
+  checkinOf,
+  checkinTopic,
+  dayKey,
+  groupMsgsOf,
+  hallOfFame,
+  leaveGroup,
+  loadGroupReads,
+  loadGroups,
+  loadPeerRead,
+  loadPins,
+  markGroupRead,
+  markPeerRead,
+  sendGroupMessage,
+  togglePin,
+  topicHostOf,
+  topicLevel,
+  useSd,
+} from './social-domain'
+import type { ChatGroup } from './social-domain'
 import type { AppNotification, PostComment, User } from './types'
 
 /* ================= ProfileHead（个人主页头部） ================= */
@@ -258,6 +282,9 @@ export function FeedPage() {
             ))}
           </div>
         )}
+
+        {/* 轮 22 打通：可能感兴趣的人 —— 好友的好友推导（排除已关注/黑名单/自己），无候选时 seed 兜底 */}
+        <SuggestCard />
       </div>
     </div>
   )
@@ -385,15 +412,24 @@ function u_name(authorId: string, api: ReturnType<typeof useApp>) {
 
 export function TopicPage({ name }: { name: string }) {
   const api = useApp()
-  const [sort, setSort] = useState<'new' | 'hot'>('new')
+  const toast = useToast()
+  const [sort, setSort] = useState<'new' | 'hot' | 'hall'>('new')
   const topic = api.state.topics.find((t) => t.name === name)
   /* 轮 21 打通：话题流同样排除快拍与「仅自己」动态 */
   const posts = api.state.posts.filter((p) => p.topic === name && !p.story && postVisibleTo(p, api.me.id))
-  const sorted = useMemo(
-    () => [...posts].sort((a, b) => (sort === 'new' ? b.createdAt - a.createdAt : b.likes - a.likes)),
-    [posts, sort],
-  )
+  /* 轮 22 打通：超话签到状态与等级（连续天数 + 累计签到 → Lv1 铁粉…Lv5 老粉） */
+  const ck = checkinOf(name)
+  const level = ck ? topicLevel(ck.streak, ck.total) : null
+  const checkedToday = ck?.lastDate === dayKey()
+  /* 轮 22 打通：主持人判定（keyed 指定优先，demo 以超话最早发帖作者兜底）+ 主持人可置顶帖子 */
+  const hostId = topicHostOf(name, posts)
+  const isHost = hostId === api.me.id
+  const pins = loadPins()[name] ?? []
+  const base = [...posts].sort((a, b) => (sort === 'new' ? b.createdAt - a.createdAt : b.likes - a.likes))
+  const sorted = [...base.filter((p) => pins.includes(p.id)), ...base.filter((p) => !pins.includes(p.id))]
   const authors = [...new Set(posts.map((p) => p.authorId))]
+  /* 轮 22 打通：名人堂 —— 连续签到 Top5（本机真实签到 + 成员模拟兜底） */
+  const hall = hallOfFame(name, api.me.id, authors)
   const related = api.state.topics.filter((t) => t.name !== name).slice(0, 8)
 
   return (
@@ -404,6 +440,37 @@ export function TopicPage({ name }: { name: string }) {
           <p>
             {topic?.desc ?? '大家都在聊这个话题'} · {formatCount(topic?.heat ?? 0)} 阅读 · {posts.length} 条讨论
           </p>
+          {/* 轮 22 打通：签到按钮 + 超话等级 + 连续/累计天数 + 主持人标识 */}
+          <div className="sg-topic-meta">
+            <button
+              className={cx('btn btn-sm', checkedToday ? 'btn-ghost' : 'btn-primary')}
+              disabled={checkedToday}
+              onClick={() => {
+                if (checkedToday) return
+                const st = checkinTopic(name)
+                const lv = topicLevel(st.streak, st.total)
+                toast(`签到成功 · Lv${lv.lv} ${lv.name}${lv.nextGap != null ? `（再签 ${lv.nextGap} 天升级）` : ''}`)
+              }}
+            >
+              {checkedToday ? '✅ 今日已签到' : '📅 签到'}
+            </button>
+            {level && (
+              <span className="sg-lv-chip">
+                Lv{level.lv} {level.name}
+              </span>
+            )}
+            {ck && (
+              <small>
+                连续 {ck.streak} 天 · 累计 {ck.total} 天
+              </small>
+            )}
+            {hostId && (
+              <span className="sg-host-chip">
+                👑 主持人：{api.user(hostId).name}
+                {isHost ? '（你）' : ''}
+              </span>
+            )}
+          </div>
         </div>
 
         {authors.length > 0 && (
@@ -433,12 +500,65 @@ export function TopicPage({ name }: { name: string }) {
           <button className={cx('tab-btn', sort === 'hot' && 'active')} onClick={() => setSort('hot')}>
             🔥 最热
           </button>
+          <button className={cx('tab-btn', sort === 'hall' && 'active')} onClick={() => setSort('hall')}>
+            🏅 名人堂
+          </button>
         </div>
 
-        {sorted.length === 0 && <Empty emoji="💭" text="这个话题下还没有讨论" />}
-        {sorted.map((p) => (
-          <PostCard key={p.id} post={p} />
-        ))}
+        {sort === 'hall' ? (
+          /* 轮 22 打通：名人堂 Tab —— 按连续签到天数 Top5 榜单 */
+          <div className="card">
+            <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>🏅 名人堂 · 连续签到 Top5</h3>
+            {hall.length === 0 ? (
+              <Empty emoji="🏅" text="还没有成员签到，点上方「签到」抢占榜首" />
+            ) : (
+              hall.map((e, i) => {
+                const lv = topicLevel(e.streak, e.total)
+                return (
+                  <div key={e.userId} className="sg-hall-row">
+                    <span className={cx('sg-hall-rank', i < 3 && 'top')}>{i + 1}</span>
+                    <UserLink userId={e.userId} size={36} />
+                    <div className="sg-hall-meta">
+                      <span className="sg-lv-chip">
+                        Lv{lv.lv} {lv.name}
+                      </span>
+                      <small>
+                        连续 {e.streak} 天 · 累计 {e.total} 天{e.simulated ? ' · 示例' : ''}
+                      </small>
+                    </div>
+                    {hostId === e.userId && <span className="sg-host-chip sg-hall-right">主持人</span>}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        ) : (
+          <>
+            {sorted.length === 0 && <Empty emoji="💭" text="这个话题下还没有讨论" />}
+            {sorted.map((p) => (
+              <div key={p.id}>
+                {(pins.includes(p.id) || isHost) && (
+                  /* 轮 22 打通：主持人置顶 —— 置顶帖排序最前，带 📌 标识 */
+                  <div className="sg-pin-bar">
+                    {pins.includes(p.id) && <span className="sg-pin-tag">📌 置顶</span>}
+                    {isHost && (
+                      <button
+                        className="sg-pin-btn"
+                        onClick={() => {
+                          const on = togglePin(name, p.id)
+                          toast(on ? '已置顶该帖' : '已取消置顶')
+                        }}
+                      >
+                        {pins.includes(p.id) ? '取消置顶' : '置顶'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                <PostCard post={p} />
+              </div>
+            ))}
+          </>
+        )}
 
         {related.length > 0 && (
           <div className="card">
@@ -562,9 +682,13 @@ export function MessagesPage() {
   const { query, navigate } = useRouter()
   const toast = useToast()
   const [input, setInput] = useState('')
+  const [groupOpen, setGroupOpen] = useState(false)
+  const [roamOpen, setRoamOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   /* 轮 20 打通：隐私开关 + 黑名单在私信读/写路径的真实约束 */
   const { privacy, blacklist } = useUserDomain()
+  /* 轮 22 打通：群聊 / 已读回执 / 消息漫游 数据按登录身份分 key 存储（mim-sd-<uid>:*），变更即刷新 */
+  useSd()
 
   const conversations = useMemo(() => {
     const map = new Map<string, typeof api.state.messages>()
@@ -584,21 +708,71 @@ export function MessagesPage() {
       .sort((a, b) => b.last.createdAt - a.last.createdAt)
   }, [api.state.messages, blacklist])
 
-  const activeId = query.get('with') ?? conversations[0]?.userId
-  const active = conversations.find((c) => c.userId === activeId)
-  const activeUser = active ? api.user(active.userId) : null
+  /* 轮 22 打通：会话列表合并群聊 —— 单聊/群聊统一按最近消息排序，群聊以 👥 头像 + 成员数角标区分 */
+  const groups = loadGroups()
+  const greads = loadGroupReads()
+  const items: Array<{
+    kind: 'dm' | 'group'
+    id: string
+    group: ChatGroup | null
+    lastTs: number
+    lastText: string
+    unread: number
+  }> = [
+    ...groups.map((g) => {
+      const msgs = groupMsgsOf(g.id)
+      const last = msgs[msgs.length - 1]
+      const upto = greads[g.id] ?? 0
+      return {
+        kind: 'group' as const,
+        id: g.id,
+        group: g,
+        lastTs: last?.createdAt ?? g.createdAt,
+        lastText: last ? `${api.user(last.authorId).name}：${last.content}` : '群聊已创建，打个招呼吧',
+        unread: msgs.filter((m) => m.authorId !== api.me.id && m.createdAt > upto).length,
+      }
+    }),
+    ...conversations.map((c) => ({
+      kind: 'dm' as const,
+      id: c.userId,
+      group: null as ChatGroup | null,
+      lastTs: c.last.createdAt,
+      lastText: c.last.content,
+      unread: c.unread,
+    })),
+  ].sort((a, b) => b.lastTs - a.lastTs)
 
+  const activeId = query.get('with') ?? items[0]?.id
+  const activeGroup = activeId ? (groups.find((g) => g.id === activeId) ?? null) : null
+  const active = activeGroup ? null : conversations.find((c) => c.userId === activeId)
+  const activeUser = active ? api.user(active.userId) : null
+  const gMsgs = activeGroup ? groupMsgsOf(activeGroup.id) : []
+  const activeCount = activeGroup ? gMsgs.length : (active?.msgs.length ?? 0)
+
+  /* 轮 22 打通：打开会话即清未读（对接现有导航 badge）—— 单聊走 readConversation，群聊走分组已读 */
   useEffect(() => {
-    if (activeId) api.readConversation(activeId)
+    if (!activeId) return
+    if (activeGroup) markGroupRead(activeId)
+    else api.readConversation(activeId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId])
+  }, [activeId, activeGroup?.id, activeCount])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [active?.msgs.length, api.state.messages.length])
+  }, [activeCount, activeId])
+
+  /* 轮 22 打通：已读回执 —— 单聊打开 3 秒后模拟对方（seed 机器人）读走我的全部消息 */
+  const peerReads = loadPeerRead()
+  const mySentCount = active && !activeGroup ? active.msgs.filter((m) => m.fromMe).length : 0
+  useEffect(() => {
+    if (!activeId || activeGroup || mySentCount === 0) return
+    const t = window.setTimeout(() => markPeerRead(activeId), PEER_READ_DELAY)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, activeGroup?.id, mySentCount])
 
   const send = () => {
-    if (!input.trim() || !activeId) return
+    if (!input.trim() || !activeId || activeGroup) return
     /* 轮 20 打通：账号级隐私约束——黑名单 / 关闭私信 / 仅限关注的人，命中即拦截并 toast */
     if (blacklist.includes(activeId)) {
       toast('已拉黑该用户，无法发送私信')
@@ -616,31 +790,102 @@ export function MessagesPage() {
     setInput('')
   }
 
+  /* 轮 22 打通：群聊发送 —— 成员发言写入分 key 存储（本地单视角），随后模拟一位成员回复 */
+  const sendToGroup = () => {
+    const text = input.trim()
+    if (!text || !activeGroup) return
+    sendGroupMessage(activeGroup, api.me.id, text)
+    setInput('')
+  }
+
+  /* 轮 22 打通：退群 */
+  const leave = () => {
+    if (!activeGroup) return
+    if (!window.confirm(`确定退出「${activeGroup.name}」并清空本机群消息吗？`)) return
+    leaveGroup(activeGroup.id)
+    toast('已退出群聊')
+    navigate('/messages')
+  }
+
   return (
     <div className="page-grid single">
       <div className="msg-layout">
         <div className="msg-list">
-          {conversations.map((c) => {
-            const u = api.user(c.userId)
-            return (
-              <div
-                key={c.userId}
-                className={cx('msg-item', c.userId === activeId && 'active')}
-                onClick={() => navigate(`/messages?with=${c.userId}`)}
-              >
-                <Avatar emoji={u.emoji} color={u.color} size={40} />
-                <div className="msg-item-main">
-                  <b>{u.name}</b>
-                  <p>{c.last.content}</p>
-                </div>
-                {c.unread > 0 && <span className="msg-unread" />}
+          {/* 轮 22 打通：发起群聊 / 消息漫游入口 */}
+          <div className="sg-msg-tools">
+            <button className="btn btn-ghost btn-sm" onClick={() => setGroupOpen(true)}>
+              👥 发起群聊
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setRoamOpen(true)}>
+              ☁️ 消息漫游
+            </button>
+          </div>
+          {items.length === 0 && <Empty emoji="💬" text="暂无会话，点上方「发起群聊」开聊" />}
+          {items.map((c) => (
+            <div
+              key={c.kind + c.id}
+              className={cx('msg-item', c.id === activeId && 'active')}
+              onClick={() => navigate(`/messages?with=${c.id}`)}
+            >
+              {c.group ? (
+                <span className="sg-group-avatar">
+                  <Avatar emoji="👥" color="var(--primary-weak)" size={40} />
+                  <em className="sg-group-badge">{c.group.memberIds.length}</em>
+                </span>
+              ) : (
+                <Avatar emoji={api.user(c.id).emoji} color={api.user(c.id).color} size={40} />
+              )}
+              <div className="msg-item-main">
+                <b>{c.group ? c.group.name : api.user(c.id).name}</b>
+                <p>{c.lastText}</p>
               </div>
-            )
-          })}
+              {c.unread > 0 && <span className="msg-unread" />}
+            </div>
+          ))}
         </div>
 
         <div className="msg-thread">
-          {activeUser && active ? (
+          {activeGroup ? (
+            <>
+              {/* 轮 22 打通：群聊会话 —— 头部展示成员数，可退群 */}
+              <div className="sg-thread-head">
+                👥 {activeGroup.name}
+                <small>共 {activeGroup.memberIds.length} 人 · 群聊</small>
+                <button className="btn btn-ghost btn-sm sg-leave" onClick={leave}>
+                  🚪 退群
+                </button>
+              </div>
+              <div className="msg-bubbles">
+                {gMsgs.map((m) => {
+                  const mine = m.authorId === api.me.id
+                  const author = mine ? api.me : api.user(m.authorId)
+                  return (
+                    <div key={m.id} className={cx('bubble-row', mine && 'me')}>
+                      <Avatar emoji={author.emoji} color={author.color} size={30} />
+                      <div>
+                        {!mine && <small className="sg-bubble-name">{author.name}</small>}
+                        <div className="bubble">{m.content}</div>
+                      </div>
+                      <span className="bubble-time">{timeAgo(m.createdAt)}</span>
+                    </div>
+                  )
+                })}
+                <div ref={bottomRef} />
+              </div>
+              <div className="msg-input-bar">
+                <input
+                  className="input"
+                  placeholder={`在「${activeGroup.name}」发言…`}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendToGroup()}
+                />
+                <button className="btn btn-primary btn-sm" disabled={!input.trim()} onClick={sendToGroup}>
+                  发送
+                </button>
+              </div>
+            </>
+          ) : activeUser && active ? (
             <>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700 }}>
                 {activeUser.name}
@@ -649,9 +894,26 @@ export function MessagesPage() {
               <div className="msg-bubbles">
                 {active.msgs.map((m) => (
                   <div key={m.id} className={cx('bubble-row', m.fromMe && 'me')}>
-                    <Avatar emoji={m.fromMe ? api.me.emoji : activeUser.emoji} color={m.fromMe ? api.me.color : activeUser.color} size={30} />
+                    <Avatar
+                      emoji={m.fromMe ? api.me.emoji : activeUser.emoji}
+                      color={m.fromMe ? api.me.color : activeUser.color}
+                      size={30}
+                    />
                     <div className="bubble">{m.content}</div>
-                    <span className="bubble-time">{timeAgo(m.createdAt)}</span>
+                    <span className="bubble-time">
+                      {timeAgo(m.createdAt)}
+                      {/* 轮 22 打通：已读回执角标 —— 对方（机器人）读取后我的消息由「未读」变「已读」 */}
+                      {m.fromMe && (
+                        <em
+                          className={cx(
+                            'sg-receipt',
+                            m.createdAt <= (peerReads[active.userId] ?? 0) && 'sg-read',
+                          )}
+                        >
+                          {m.createdAt <= (peerReads[active.userId] ?? 0) ? '已读' : '未读'}
+                        </em>
+                      )}
+                    </span>
                   </div>
                 ))}
                 <div ref={bottomRef} />
@@ -672,6 +934,10 @@ export function MessagesPage() {
           )}
         </div>
       </div>
+
+      {/* 轮 22 打通：建群 / 消息漫游弹窗 */}
+      {groupOpen && <GroupCreateModal onClose={() => setGroupOpen(false)} />}
+      {roamOpen && <RoamModal messages={api.state.messages} onClose={() => setRoamOpen(false)} />}
     </div>
   )
 }
