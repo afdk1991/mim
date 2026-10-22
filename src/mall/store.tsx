@@ -4,7 +4,9 @@
    数据归属：积分/购物车/订单按真实登录身份隔离（mim-mall-v1:<userId>），
    切换演示身份不清数据；老共享 key（mim-mall-v1）一次性幂等迁移。
    轮 15 打通：余额不再独立存储，统一镜像 mim-wallet-v1（getWalletState），
-   支付走 walletConsume 真实扣费，充值走 walletRecharge 进统一钱包流水。 */
+   支付走 walletConsume 真实扣费，充值走 walletRecharge 进统一钱包流水。
+   轮 17：支付通道适配（src/mall/payment.ts）——钱包余额 + 收款码扫码人工确认
+   （付款凭证 → awaiting_confirm → 管理员口令核销），为后续聚合支付预留通道位。 */
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -12,6 +14,8 @@ import { useAuth } from '../auth'
 import { cloudEnabled } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
 import { WALLET_UPDATE_EVT, getWalletState, walletConsume, walletRecharge } from '../wallet'
+import { checkOperatorKey } from './payment'
+import type { PayChannelId, PayProof } from './payment'
 
 export type MallChannel = 'youxuan' | 'gexm' | 'mix' | 'live' | 'laal'
 
@@ -35,8 +39,11 @@ export type MallOrder = {
   amount: number
   qty: number
   channel: MallChannel
-  status: 'unpaid' | 'paid' | 'done'
+  /* awaiting_confirm：扫码人工确认通道已提交付款凭证，等待管理员核销（必有 proof） */
+  status: 'unpaid' | 'awaiting_confirm' | 'paid' | 'done'
   at: number
+  payChannel?: PayChannelId
+  proof?: PayProof
 }
 
 export type MallState = {
@@ -136,7 +143,7 @@ const isOrder = (it: unknown): it is MallOrder => {
     typeof r.amount === 'number' &&
     typeof r.qty === 'number' &&
     isChannel(r.channel) &&
-    (r.status === 'unpaid' || r.status === 'paid' || r.status === 'done') &&
+    (r.status === 'unpaid' || r.status === 'awaiting_confirm' || r.status === 'paid' || r.status === 'done') &&
     typeof r.at === 'number'
   )
 }
@@ -186,6 +193,10 @@ type MallApi = {
   checkout: () => MallOrder | null
   /** 校验 unpaid + 统一钱包扣费成功 → 返 5% 积分 → paid；失败返回 false */
   payOrder: (id: string) => boolean
+  /** 扫码人工确认通道：提交付款凭证（unpaid → awaiting_confirm，等待管理员核销） */
+  submitPayProof: (id: string, method: string, ref: string) => void
+  /** 管理员凭口令确认收款（awaiting_confirm → paid，返 5% 积分）；口令错误返回 false */
+  confirmManualPay: (id: string, key: string) => boolean
   /** 取消 unpaid 订单（演示简化：直接从订单列表移除） */
   cancelOrder: (id: string) => void
   confirmOrder: (id: string) => void
@@ -289,6 +300,34 @@ export function MallProvider({ children }: { children: ReactNode }) {
         ...s,
         points: s.points + Math.floor(order.amount * 0.05),
         orders: s.orders.map((o) => (o.id === id ? { ...o, status: 'paid' } : o)),
+      }))
+      return true
+    },
+    submitPayProof(id, method, ref) {
+      setState((s) => ({
+        ...s,
+        orders: s.orders.map((o) =>
+          o.id === id && o.status === 'unpaid'
+            ? {
+                ...o,
+                status: 'awaiting_confirm',
+                payChannel: 'qrcode-manual' as PayChannelId,
+                proof: { method, ref, at: Date.now() },
+              }
+            : o,
+        ),
+      }))
+    },
+    confirmManualPay(id, key) {
+      if (!checkOperatorKey(key)) return false
+      const order = state.orders.find((o) => o.id === id && o.status === 'awaiting_confirm')
+      if (!order) return false
+      setState((s) => ({
+        ...s,
+        points: s.points + Math.floor(order.amount * 0.05),
+        orders: s.orders.map((o) =>
+          o.id === id && o.status === 'awaiting_confirm' ? { ...o, status: 'paid' } : o,
+        ),
       }))
       return true
     },

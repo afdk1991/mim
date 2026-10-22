@@ -23,6 +23,14 @@ export const SITE_CONFIG = {
   contactEmail: 'afdk1991@users.noreply.github.com',
   /** 联系地址（可只到城市） */
   address: '',
+  /** 邮箱聚合代理 Worker 地址（部署 worker/mail-proxy 后填写，如 https://mim-mail-proxy.<子域>.workers.dev） */
+  mailProxyUrl: '',
+  /** 商城扫码收款码图片直链（未配置时商城「扫码支付」通道不可用） */
+  payQrCodeUrl: '',
+  /** 收款账户备注（展示给付款方核对，如昵称/账号） */
+  payQrNote: '',
+  /** 人工确认收款口令（仅站点运营方知晓；留空则商城订单「管理员核销」入口关闭） */
+  payConfirmKey: '',
   /** 未备案时的如实说明（配置了 ICP/公安备案号后本字段不再展示） */
   filingNote:
     '本站为个人开发学习项目，由 afdk1991 维护，托管于 GitHub Pages（境外托管），暂未办理 ICP 备案与公安联网备案。',
