@@ -24,7 +24,7 @@ export const SITE_CONFIG = {
   /** 联系地址（可只到城市） */
   address: '',
   /** 邮箱聚合代理 Worker 地址（部署 worker/mail-proxy 后填写，如 https://mim-mail-proxy.<子域>.workers.dev） */
-  mailProxyUrl: '',
+  mailProxyUrl: 'https://mim-mail-proxy.15726833367.workers.dev',
   /** 商城扫码收款码图片直链（未配置时商城「扫码支付」通道不可用） */
   payQrCodeUrl: '',
   /** 收款账户备注（展示给付款方核对，如昵称/账号） */

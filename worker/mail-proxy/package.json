@@ -1,0 +1,16 @@
+{
+  "name": "mim-mail-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mim 邮箱 IMAP/SMTP 中转（Cloudflare Workers）",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "wrangler": "^4.42.0"
+  }
+}
