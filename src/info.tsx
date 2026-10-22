@@ -41,19 +41,23 @@ const contactText = (): string => {
 }
 
 const beianText = (): string => {
-  if (!isSet(SITE_CONFIG.icp) && !isSet(SITE_CONFIG.policeBeian)) return TODO_NOTICE
   const parts: string[] = []
-  if (isSet(SITE_CONFIG.owner)) parts.push(`主办单位：${SITE_CONFIG.owner}`)
   if (isSet(SITE_CONFIG.icp)) parts.push(`ICP 备案号：${SITE_CONFIG.icp}`)
   if (isSet(SITE_CONFIG.policeBeian)) parts.push(`公安联网备案号：${SITE_CONFIG.policeBeian}`)
-  return parts.join('；')
+  if (parts.length > 0) {
+    if (isSet(SITE_CONFIG.owner)) parts.unshift(`主办单位：${SITE_CONFIG.owner}`)
+    return parts.join('；')
+  }
+  /* 未备案：如实展示 filingNote 说明，不再用「待配置」占位 */
+  return isSet(SITE_CONFIG.filingNote) ? SITE_CONFIG.filingNote : TODO_NOTICE
 }
 
 const licenseText = (): string => {
-  if (!isSet(SITE_CONFIG.owner) && !isSet(SITE_CONFIG.creditCode)) return TODO_NOTICE
+  /* 营业执照页必须以统一社会信用代码为准（个人无主体登记时保持占位，避免误导） */
+  if (!isSet(SITE_CONFIG.creditCode)) return TODO_NOTICE
   const parts: string[] = []
   if (isSet(SITE_CONFIG.owner)) parts.push(`企业名称：${SITE_CONFIG.owner}`)
-  if (isSet(SITE_CONFIG.creditCode)) parts.push(`统一社会信用代码：${SITE_CONFIG.creditCode}`)
+  parts.push(`统一社会信用代码：${SITE_CONFIG.creditCode}`)
   return parts.join('；')
 }
 

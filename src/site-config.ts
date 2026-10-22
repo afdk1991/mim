@@ -6,12 +6,12 @@
 
 export const SITE_CONFIG = {
   /** 主办单位/公司名称（营业执照全称；个人主体填姓名） */
-  owner: '',
+  owner: '个人开发者 afdk1991',
   /** ICP 备案号，如「粤ICP备12345678号」（未备案留空） */
   icp: '',
   /** 公安联网备案号，如「粤公网安备 44030002000001号」（未备案留空） */
   policeBeian: '',
-  /** 统一社会信用代码 */
+  /** 统一社会信用代码（个人无主体登记留空） */
   creditCode: '',
   /** 站点正式访问域名（当前为 GitHub Pages 路径） */
   domain: 'afdk1991.github.io/mim',
@@ -20,9 +20,12 @@ export const SITE_CONFIG = {
   /** 经营性网站备案编号（无则留空） */
   opBeian: '',
   /** 客服/联系邮箱 */
-  contactEmail: '',
+  contactEmail: 'afdk1991@users.noreply.github.com',
   /** 联系地址（可只到城市） */
   address: '',
+  /** 未备案时的如实说明（配置了 ICP/公安备案号后本字段不再展示） */
+  filingNote:
+    '本站为个人开发学习项目，由 afdk1991 维护，托管于 GitHub Pages（境外托管），暂未办理 ICP 备案与公安联网备案。',
 } as const
 
 /** 是否已配置（空串/空白视为未配置） */
