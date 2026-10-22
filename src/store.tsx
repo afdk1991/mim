@@ -394,12 +394,11 @@ function reducer(state: AppState, action: Action): AppState {
       const target = state.articles.find((a) => a.id === action.payload.id)
       if (!target || target.authorId !== state.meId) return state
       // 云端异步同步（失败不回滚，本地已是最新）
-      import('./lib/cloud-write').then(({ cloudEditArticle }) => {
-        cloudEditArticle(action.payload.id, {
-          title: action.payload.title,
-          content: action.payload.content,
-          tags: action.payload.tags,
-        })
+      cloudUpdateArticle(action.payload.id, {
+        title: action.payload.title,
+        summary: makeSummary(action.payload.content),
+        content: action.payload.content,
+        tags: action.payload.tags,
       })
       return {
         ...state,
@@ -427,11 +426,20 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
-    case 'updateProfile':
+    case 'updateProfile': {
+      const me = state.users[state.meId]
+      // 云端异步同步（失败不回滚，本地已是最新）
+      cloudWriteProfile({
+        name: action.payload.name ?? me.name,
+        emoji: action.payload.emoji ?? me.emoji,
+        color: action.payload.color ?? me.color,
+        bio: action.payload.bio ?? me.bio,
+      })
       return {
         ...state,
-        users: { ...state.users, [state.meId]: { ...state.users[state.meId], ...action.payload } },
+        users: { ...state.users, [state.meId]: { ...me, ...action.payload } },
       }
+    }
 
     case 'saveArticleDraft': {
       const { id, title, content, tags } = action.payload
