@@ -733,7 +733,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let unsubMsg: (() => void) | null = null
     const pull = () => {
       void pullCloudContent().then((payload) => {
-        if (payload && alive) dispatch({ type: 'cloudMerge', payload })
+        if (payload && alive) {
+          dispatch({ type: 'cloudMerge', payload })
+          // 云端历史同步到本地 localStorage（loadHistory 同步读本地）
+          import('./lib/cloud-history').then((m) => m.cloudSyncHistoryToLocal())
+        }
       })
     }
     const startRealtime = () => {

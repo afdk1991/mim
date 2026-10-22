@@ -69,7 +69,8 @@ export function loadHistory(): HistoryEntry[] {
   }
 }
 
-/** 记录一次浏览：同一条目去重置顶，上限 HISTORY_MAX 条 */
+/** 记录一次浏览：同一条目去重置顶，上限 HISTORY_MAX 条；
+    本地立即写 + 云端异步同步（动态 import 解耦循环依赖） */
 export function recordView(kind: ViewKind, id: string) {
   const next = [{ kind, id, at: Date.now() }, ...loadHistory().filter((e) => !(e.kind === kind && e.id === id))].slice(
     0,
@@ -80,12 +81,22 @@ export function recordView(kind: ViewKind, id: string) {
   } catch {
     /* ignore */
   }
+  // 云端异步同步（不阻塞 UI，失败不影响本地）
+  import('./lib/cloud-history')
+    .then((m) => m.cloudSaveHistory(next))
+    .catch(() => {
+      /* 云端不可用时静默降级 */
+    })
 }
 
+/** 清空历史：本地立即删 + 云端异步同步 */
 export function clearHistory() {
   try {
     localStorage.removeItem(HISTORY_KEY)
   } catch {
     /* ignore */
   }
+  import('./lib/cloud-history')
+    .then((m) => m.cloudClearHistory())
+    .catch(() => {})
 }
