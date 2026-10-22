@@ -1,5 +1,6 @@
 import './search-box.css'
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
@@ -192,17 +193,30 @@ function navInView(items: NavItem[], view: ViewMode): NavItem[] {
   return items.filter((it) => !it.views || it.views.includes(view))
 }
 
+/** Phase1 L1 IAM：管理后台入口（菜单级 RBAC，仅 admin 角色可见） */
+const ADMIN_NAV: NavItem = {
+  href: '#/admin',
+  match: '/admin',
+  label: '管理后台',
+  icon: '🛡️',
+  children: [
+    { href: '#/admin/audit', match: '/admin/audit', label: '审计日志' },
+    { href: '#/admin/roles', match: '/admin/roles', label: '角色管理' },
+  ],
+}
+
 function SideNav() {
   const api = useApp()
   const { path, navigate } = useRouter()
+  const { hasRole } = useAuth()
   const [view, setView] = useViewMode()
   const [open, setOpen] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [dropOpen, setDropOpen] = useState(false)
 
-  const visible = navInView(NAV, view)
+  const visible = hasRole('admin') ? [...navInView(NAV, view), ADMIN_NAV] : navInView(NAV, view)
 
-  /* 路由变化后自动展开包含当前页的分组 */
+  /* 路由变化后自动展开包含当前页的分组（admin 角色异步到位后同样触发一次） */
   useEffect(() => {
     for (const item of visible) {
       if (!item.children) continue
@@ -211,7 +225,8 @@ function SideNav() {
         return
       }
     }
-  }, [path, view])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, view, hasRole])
 
   /* 切换视图：若当前页不属于新视图可见范围，则跳到该视图的默认首页 */
   const switchView = (v: ViewMode) => {
@@ -466,6 +481,12 @@ function Page() {
     case 'ardot':
       return <ArdotPage />
 
+    /* ---------- Phase1 L1 IAM：管理后台（RBAC 菜单级守卫，页内再做权限点校验） ---------- */
+    case 'admin':
+      if (param === 'audit') return <AdminAuditPage />
+      if (param === 'roles') return <AdminRolesPage />
+      return <AdminHomePage />
+
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
   }
@@ -553,6 +574,78 @@ function HistoryPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/* ---------- Phase1 L1 IAM：管理后台骨架页 ----------
+   双保险：菜单级（SideNav 仅 admin 可见）+ 页内角色守卫；真实数据在下一轮接入
+   （audit 页读 audit_logs，roles 页读 roles/permissions/user_roles）。 */
+
+function AdminGate({ children }: { children: ReactNode }) {
+  const { auth, hasRole } = useAuth()
+  if (auth.mode !== 'cloud') return <Empty emoji="🔐" text="管理后台需要云端账号登录" />
+  if (!hasRole('admin')) return <Empty emoji="🛡️" text="没有管理后台访问权限" />
+  return <>{children}</>
+}
+
+function AdminHomePage() {
+  const { auth } = useAuth()
+  return (
+    <AdminGate>
+      <div className="page-grid single">
+        <div>
+          <h2 className="page-title">🛡️ 管理后台</h2>
+          <div className="card" style={{ padding: 16 }}>
+            <p>
+              当前账号：{auth.email ?? auth.userId} · 角色：{auth.roles.join(' / ') || '—'}
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <a href="#/admin/audit">📜 审计日志</a> · <a href="#/admin/roles">👥 角色管理</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </AdminGate>
+  )
+}
+
+function AdminAuditPage() {
+  const { hasPerm } = useAuth()
+  return (
+    <AdminGate>
+      <div className="page-grid single">
+        <div>
+          <h2 className="page-title">📜 审计日志</h2>
+          <div className="card" style={{ padding: 16 }}>
+            {hasPerm('audit:view') ? (
+              <Empty emoji="📜" text="审计流水将在下一轮接入（audit_logs 表已就绪）" />
+            ) : (
+              <Empty emoji="🛡️" text="缺少 audit:view 权限" />
+            )}
+          </div>
+        </div>
+      </div>
+    </AdminGate>
+  )
+}
+
+function AdminRolesPage() {
+  const { hasPerm } = useAuth()
+  return (
+    <AdminGate>
+      <div className="page-grid single">
+        <div>
+          <h2 className="page-title">👥 角色管理</h2>
+          <div className="card" style={{ padding: 16 }}>
+            {hasPerm('role:manage') ? (
+              <Empty emoji="👥" text="角色/权限管理将在下一轮接入（roles + user_roles 表）" />
+            ) : (
+              <Empty emoji="🛡️" text="缺少 role:manage 权限" />
+            )}
+          </div>
+        </div>
+      </div>
+    </AdminGate>
   )
 }
 
