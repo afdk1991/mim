@@ -264,14 +264,14 @@ export function WalletPage() {
     const delta = tx.kind === 'consume' ? -tx.fen : tx.fen
     const nextFen = balanceFen + delta
     if (nextFen < 0) {
-      toast('余额不足（demo 不透支）')
+      toast('余额不足')
       return
     }
     save({ ...state, balanceFen: nextFen, txs: [tx, ...state.txs].slice(0, 50) })
   }
 
   const recharge = (fen: number) =>
-    push({ id: Date.now(), kind: 'recharge', fen, note: `充值 ¥${yuan(fen)}（模拟渠道到账）`, at: Date.now() })
+    push({ id: Date.now(), kind: 'recharge', fen, note: `充值 ¥${yuan(fen)}（未接入真实支付）`, at: Date.now() })
 
   const consume = (fen: number, note: string) =>
     push({ id: Date.now(), kind: 'consume', fen, note, at: Date.now() })

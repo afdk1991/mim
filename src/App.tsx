@@ -732,15 +732,18 @@ function WbHero() {
         >
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>
-        <button
-          className="icon-btn"
-          title="重置演示数据"
-          onClick={() => {
-            if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
-          }}
-        >
-          ♻️
-        </button>
+        {/* 重置的是本地演示种子（seed.ts），云端模式下数据在云端、无演示概念，隐藏入口 */}
+        {auth.mode !== 'cloud' && (
+          <button
+            className="icon-btn"
+            title="重置演示数据"
+            onClick={() => {
+              if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
+            }}
+          >
+            ♻️
+          </button>
+        )}
         {/* 统一登录入口（微博 newlogin 模式）：未登录时显性呈现，携带当前页路径，登录后回跳来源页 */}
         {auth.mode !== 'cloud' && (
           <a className="btn btn-primary btn-sm" href={`#/login?url=${encodeURIComponent(path)}`}>
