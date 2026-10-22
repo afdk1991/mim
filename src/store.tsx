@@ -37,7 +37,7 @@ import { supabase, cloudEnabled } from './lib/supabase'
 import { recordGrowth } from './growth'
 import { revenueSnapshot, walletIncome } from './wallet'
 
-const STORAGE_KEY = 'mim-state-v1'
+const STORAGE_KEY = 'mim-state-v2'
 
 /**
  * 云端真实模式迁移（Supabase 已配置时对历史 localStorage 存档执行）：
