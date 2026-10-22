@@ -303,7 +303,7 @@ export function MallProvider({ children }: { children: ReactNode }) {
     },
     recharge(amount) {
       /* 轮 15 并轨：充值进统一钱包（元→分），余额镜像由 WALLET_UPDATE_EVT 事件同步刷新 */
-      walletRecharge(amount * 100, `商城充值 ¥${amount}（模拟渠道到账）`)
+      walletRecharge(amount * 100, `商城充值 ¥${amount}（未接入真实支付）`)
     },
   }
 
