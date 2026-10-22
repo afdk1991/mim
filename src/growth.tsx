@@ -324,6 +324,20 @@ export function GrowthPage() {
   const unlockedCodes = useMemo(() => BADGES.filter((b) => b.cond(badgeCtx)).map((b) => b.code), [exp, point, state.checkin.streak])
   const unlockedCount = unlockedCodes.length
 
+  /* 展示补充①：距下一枚徽章提示——锁定徽章中进度（pct）最高者，全部解锁后为 null */
+  const nextBadge = useMemo(() => {
+    let best: { b: (typeof BADGES)[number]; prog: ReturnType<typeof badgeProgress> } | null = null
+    for (const b of BADGES) {
+      if (b.cond(badgeCtx)) continue
+      const prog = badgeProgress(b, badgeCtx)
+      if (!best || prog.pct > best.prog.pct) best = { b, prog }
+    }
+    return best
+  }, [exp, point, state.checkin.streak])
+
+  /* 展示补充②：徽章筛选 Tab——全部 / 已解锁 / 未解锁 */
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'unlocked' | 'locked'>('all')
+
   /* 新解锁高亮：会话内记录新达成徽章 code，卡片播放发光动画（刷新后消失） */
   const [freshCodes, setFreshCodes] = useState<string[]>([])
   /* 解锁瞬间提示：对比上次解锁集合，新增徽章即 toast（首次挂载只记录不提示） */
@@ -342,6 +356,16 @@ export function GrowthPage() {
       setFreshCodes((f) => [...new Set([...f, ...newly])])
     }
   }, [unlockedKey, unlockedCodes, toast])
+
+  /* 展示补充②（续）：筛选后的徽章列表与 Tab 文案（计数实时联动） */
+  const shownBadges = BADGES.filter((b) =>
+    badgeFilter === 'all' ? true : badgeFilter === 'unlocked' ? b.cond(badgeCtx) : !b.cond(badgeCtx),
+  )
+  const badgeTabs: { key: 'all' | 'unlocked' | 'locked'; label: string }[] = [
+    { key: 'all', label: `全部 ${BADGES.length}` },
+    { key: 'unlocked', label: `已解锁 ${unlockedCount}` },
+    { key: 'locked', label: `未解锁 ${BADGES.length - unlockedCount}` },
+  ]
 
   return (
     <div className="page-grid single">
@@ -395,31 +419,56 @@ export function GrowthPage() {
                 {unlockedCount === BADGES.length && <em className="gr-badge-all">🎉 全徽章达成</em>}
               </span>
             </div>
-            <div className="gr-badges">
-              {BADGES.map((b) => {
-                const unlocked = b.cond(badgeCtx)
-                const prog = unlocked ? null : badgeProgress(b, badgeCtx)
-                const fresh = unlocked && freshCodes.includes(b.code)
-                return (
-                  <div key={b.code} className={cx('gr-badge', !unlocked && 'locked', fresh && 'fresh')} title={b.desc}>
-                    <i aria-hidden>{b.icon}</i>
-                    <span>{b.label}</span>
-                    <small>{b.desc}</small>
-                    {/* 已解锁：显示首次达成日期（旧数据无时间戳则仅显示「已解锁」） */}
-                    {unlocked && <small className="gr-badge-time">{state.badges[b.code] ? `${localDate(state.badges[b.code])} 解锁` : '已解锁'}</small>}
-                    {/* 锁定态进度提示：当前值/目标值 + 细进度条，解锁后自动隐藏 */}
-                    {prog && (
-                      <>
-                        <small className="gr-badge-prog">{prog.text}</small>
-                        <div className="gr-badge-bar" role="progressbar" aria-valuenow={prog.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${b.label}达成进度`}>
-                          <i style={{ width: `${prog.pct}%` }} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )
-              })}
+            {/* 展示补充②：筛选 Tab（全部 / 已解锁 / 未解锁），计数实时联动 */}
+            <div className="gr-badge-tabs" role="tablist" aria-label="徽章筛选">
+              {badgeTabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={badgeFilter === t.key}
+                  className={cx('gr-badge-tab', badgeFilter === t.key && 'active')}
+                  onClick={() => setBadgeFilter(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
+            {/* 展示补充①：距下一枚徽章提示（锁定徽章中进度最高者），全部解锁后隐藏 */}
+            {nextBadge && (
+              <p className="gr-badge-next">
+                🎯 距下一枚「{nextBadge.b.label}」：{nextBadge.prog.text} · 进度 {nextBadge.prog.pct}%
+              </p>
+            )}
+            {shownBadges.length === 0 ? (
+              <Empty emoji="🏅" text={badgeFilter === 'unlocked' ? '还没有解锁任何徽章，去下面的行为按钮攒进度吧' : '所有徽章均已解锁！'} />
+            ) : (
+              <div className="gr-badges">
+                {shownBadges.map((b) => {
+                  const unlocked = b.cond(badgeCtx)
+                  const prog = unlocked ? null : badgeProgress(b, badgeCtx)
+                  const fresh = unlocked && freshCodes.includes(b.code)
+                  return (
+                    <div key={b.code} className={cx('gr-badge', !unlocked && 'locked', fresh && 'fresh')} title={b.desc}>
+                      <i aria-hidden>{b.icon}</i>
+                      <span>{b.label}</span>
+                      <small>{b.desc}</small>
+                      {/* 已解锁：显示首次达成日期（旧数据无时间戳则仅显示「已解锁」） */}
+                      {unlocked && <small className="gr-badge-time">{state.badges[b.code] ? `${localDate(state.badges[b.code])} 解锁` : '已解锁'}</small>}
+                      {/* 锁定态进度提示：当前值/目标值 + 细进度条，解锁后自动隐藏 */}
+                      {prog && (
+                        <>
+                          <small className="gr-badge-prog">{prog.text}</small>
+                          <div className="gr-badge-bar" role="progressbar" aria-valuenow={prog.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${b.label}达成进度`}>
+                            <i style={{ width: `${prog.pct}%` }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 

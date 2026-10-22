@@ -49,6 +49,13 @@
   .gr-badge.fresh { animation: none; }
 }
 
+/* 展示补充：筛选 Tab + 距下一枚徽章提示 */
+.gr-badge-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.gr-badge-tab { padding: 3px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-2); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.gr-badge-tab:hover { border-color: var(--primary); }
+.gr-badge-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.gr-badge-next { margin: 8px 0 0; padding: 6px 10px; font-size: 12px; color: var(--text-2); background: color-mix(in srgb, var(--primary) 8%, transparent); border-radius: 8px; }
+
 /* 行为模拟触发 */
 .gr-act-tip { font-size: 12px; margin: 4px 0 10px; }
 .gr-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
