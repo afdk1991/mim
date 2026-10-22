@@ -532,6 +532,8 @@ function u_name(authorId: string, api: ReturnType<typeof useApp>) {
 
 export function TopicPage({ name }: { name: string }) {
   const api = useApp()
+  /* 轮 22 修复：订阅社交域事件——签到走 sdSet 广播 SD_EVT，此处不订阅则签到后按钮/等级不刷新 */
+  useSd()
   const toast = useToast()
   const [sort, setSort] = useState<'new' | 'hot' | 'hall'>('new')
   const topic = api.state.topics.find((t) => t.name === name)
