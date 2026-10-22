@@ -28,7 +28,7 @@
 .gr-badge-head { display: flex; align-items: center; justify-content: space-between; }
 .gr-badge-count { font-size: 12px; color: var(--text-3); }
 .gr-badges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-.gr-badge { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px; border: 1px solid var(--border); border-radius: 10px; text-align: center; }
+.gr-badge { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px; border: 1px solid var(--border); border-radius: 10px; text-align: center; cursor: pointer; }
 .gr-badge i { font-size: 22px; font-style: normal; }
 .gr-badge span { font-size: 12px; font-weight: 600; }
 .gr-badge small { font-size: 11px; color: var(--text-3); }
@@ -55,6 +55,14 @@
 .gr-badge-tab:hover { border-color: var(--primary); }
 .gr-badge-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .gr-badge-next { margin: 8px 0 0; padding: 6px 10px; font-size: 12px; color: var(--text-2); background: color-mix(in srgb, var(--primary) 8%, transparent); border-radius: 8px; }
+.gr-badge:hover { border-color: var(--primary); }
+
+/* 轮 19 打通：徽章详情弹窗 */
+.gr-bdetail-cond { margin: 0 0 8px; font-size: 13.5px; font-weight: 600; }
+.gr-bdetail-howto { margin: 0 0 10px; font-size: 12.5px; color: var(--text-2); }
+.gr-bdetail-status { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
+.gr-bdetail-status.ok { color: #1a7f4b; font-weight: 600; }
+.gr-bdetail .gr-badge-bar { height: 8px; margin-top: 4px; }
 
 /* 行为模拟触发 */
 .gr-act-tip { font-size: 12px; margin: 4px 0 10px; }

@@ -1,6 +1,6 @@
 import './growth.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Empty, TimeAgo, emitToast, useToast } from './components'
+import { Empty, Modal, TimeAgo, emitToast, useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
 import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
@@ -16,7 +16,8 @@ import { cx } from './utils'
    （发布/获赞/收藏/下载）经 store api 层流入本引擎；页内模拟按钮与
    外部上报共用同一份规则表、daily_cap 与徽章结算。
    轮 17 打通：成长数据按真实登录身份隔离（mim-growth-v1:<userId>），
-   本地模式一次性迁移旧全局 key；recordGrowth 自动跟随当前身份。 */
+   本地模式一次性迁移旧全局 key；recordGrowth 自动跟随当前身份。
+   轮 18/19 打通：徽章墙展示增强——筛选 Tab / 距下一枚徽章提示 / 点击详情弹窗。 */
 
 /** 域：1=广场态 2=知识态（开发吧.md content.domain 同源） */
 type Domain = 1 | 2
@@ -140,6 +141,14 @@ const BADGES: {
   { code: 'week', icon: '📅', label: '七日之约', desc: '连续签到 7 天', metric: 'streak', target: 7, cond: (s) => s.streak >= 7 },
   { code: 'dual', icon: '🏆', label: '双线开花', desc: '两条线同时 ≥ 50', metric: 'both', target: 50, cond: (s) => s.exp >= 50 && s.point >= 50 },
 ]
+
+/** 徽章详情弹窗：获取途径提示（按 metric 路由到对应成长线说明，口径与配置表红线一致） */
+const BADGE_HOWTO: Record<'exp' | 'point' | 'streak' | 'both', string> = {
+  exp: '通过广场行为获取 EXP：发动态、获赞、涨粉、开直播（30 天衰减，时效活跃）',
+  point: '通过知识行为获取 POINT：发博文、被收藏、被采纳、资源被下载（永久累积）',
+  streak: '每日签到保持连续，断签后重新计数',
+  both: '双线同时提升：EXP 与 POINT 需同时达标（两条线量纲互斥，严禁互换）',
+}
 
 /** 锁定徽章进度：由 metric/target 推导当前值与达成百分比；dual 取双线短板 */
 function badgeProgress(
@@ -367,6 +376,20 @@ export function GrowthPage() {
     { key: 'locked', label: `未解锁 ${BADGES.length - unlockedCount}` },
   ]
 
+  /* 轮 19 打通：徽章点击详情弹窗——点击任意徽章卡查看达成条件/获取途径/进度/解锁时间 */
+  const [detailCode, setDetailCode] = useState<string | null>(null)
+  const detailBadge = detailCode ? BADGES.find((b) => b.code === detailCode) ?? null : null
+  const detailProg = detailBadge && !detailBadge.cond(badgeCtx) ? badgeProgress(detailBadge, badgeCtx) : null
+  /* Esc 快捷关闭（点遮罩 / ✕ 由共享 Modal 组件承担） */
+  useEffect(() => {
+    if (!detailCode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDetailCode(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [detailCode])
+
   return (
     <div className="page-grid single">
       <div>
@@ -449,7 +472,20 @@ export function GrowthPage() {
                   const prog = unlocked ? null : badgeProgress(b, badgeCtx)
                   const fresh = unlocked && freshCodes.includes(b.code)
                   return (
-                    <div key={b.code} className={cx('gr-badge', !unlocked && 'locked', fresh && 'fresh')} title={b.desc}>
+                    <div
+                      key={b.code}
+                      className={cx('gr-badge', !unlocked && 'locked', fresh && 'fresh')}
+                      title={b.desc}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setDetailCode(b.code)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setDetailCode(b.code)
+                        }
+                      }}
+                    >
                       <i aria-hidden>{b.icon}</i>
                       <span>{b.label}</span>
                       <small>{b.desc}</small>
@@ -579,6 +615,28 @@ export function GrowthPage() {
             </button>
           </div>
         </div>
+
+        {/* 轮 19 打通：徽章详情弹窗（点击徽章卡触发，Esc / 点遮罩 / ✕ 关闭） */}
+        {detailBadge && (
+          <Modal title={`${detailBadge.icon} ${detailBadge.label}`} onClose={() => setDetailCode(null)}>
+            <div className="gr-bdetail">
+              <p className="gr-bdetail-cond">{detailBadge.desc}</p>
+              <p className="gr-bdetail-howto">💡 {BADGE_HOWTO[detailBadge.metric]}</p>
+              {detailProg ? (
+                <>
+                  <p className="gr-bdetail-status">🔒 未解锁 · {detailProg.text}</p>
+                  <div className="gr-badge-bar" role="progressbar" aria-valuenow={detailProg.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${detailBadge.label}达成进度`}>
+                    <i style={{ width: `${detailProg.pct}%` }} />
+                  </div>
+                </>
+              ) : (
+                <p className="gr-bdetail-status ok">
+                  ✅ 已解锁{state.badges[detailBadge.code] ? ` · ${localDate(state.badges[detailBadge.code])}` : ''}
+                </p>
+              )}
+            </div>
+          </Modal>
+        )}
       </div>
     </div>
   )
