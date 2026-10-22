@@ -1,0 +1,214 @@
+/* 轮 20 打通：用户域设置页样式。
+   类名统一 set-（设置页）/ ud-（用户域跨页组件：青少年横幅、V 徽章配色）前缀，避免与全局冲突；
+   颜色全部引用全局 CSS 变量（--primary/--border/--card/--danger 等），深浅主题自动适配。 */
+
+/* ---------- 青少年模式全站横幅（ud-） ---------- */
+
+.ud-teen-banner {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 7px 16px;
+  font-size: 13px;
+  color: #fff;
+  background: linear-gradient(90deg, #1f7a4d, #2aa06a);
+}
+
+.ud-teen-banner a {
+  color: #fff;
+  font-size: 12px;
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+/* ---------- V 徽章配色扩展（ud-） ---------- */
+
+.v-badge-orange {
+  background: var(--primary);
+}
+
+.v-badge-blue {
+  background: #2b9cf4;
+}
+
+/* ---------- 设置页卡片骨架（set-） ---------- */
+
+.set-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
+.set-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.set-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.set-card.set-danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+/* 行布局：左标题/说明，右控件 */
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0 4px;
+  border-top: 1px dashed var(--border);
+  margin-top: 8px;
+}
+
+.set-row:first-of-type {
+  border-top: 0;
+  margin-top: 0;
+}
+
+/* 分段选择器 */
+.set-seg {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.set-seg button {
+  border: 0;
+  background: transparent;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.set-seg button + button {
+  border-left: 1px solid var(--border);
+}
+
+.set-seg button.active {
+  background: var(--primary-weak);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 表单区 */
+.set-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* 状态小徽标 */
+.set-chip {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--primary-weak);
+  white-space: nowrap;
+}
+
+.set-chip.ok {
+  color: #1f7a4d;
+  background: #e6f6ee;
+}
+
+.set-chip.wait {
+  color: #9a6b00;
+  background: #fff4d6;
+}
+
+/* 危险区按钮 */
+.set-danger-btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  color: #fff;
+  background: var(--danger);
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.set-danger-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 多账号清单 / 黑名单行 */
+.set-acct,
+.set-bl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  cursor: default;
+}
+
+.set-acct {
+  cursor: pointer;
+}
+
+.set-acct:hover {
+  background: var(--primary-weak);
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 8px;
+}
+
+.set-acct-mode {
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  border-radius: 8px;
+  text-align: center;
+  background: var(--primary-weak);
+  flex-shrink: 0;
+}
+
+.set-acct-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-acct-main b {
+  display: block;
+  font-size: 13px;
+}
+
+.set-acct-main small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+/* 黑名单头像占位 */
+.set-bl-avatar {
+  width: 34px;
+  height: 34px;
+  line-height: 34px;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}

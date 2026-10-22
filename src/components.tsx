@@ -6,6 +6,7 @@ import { useApp } from './store'
 import { useRouter } from './router'
 import { useAuth } from './auth'
 import { can } from './permissions'
+import { VBadge } from './user-domain'
 
 /* ---------- Avatar ---------- */
 
@@ -31,7 +32,8 @@ export function UserLink({ userId, size = 44 }: { userId: string; size?: number 
       <span className="user-link-info">
         <b>
           {u.name}
-          {u.verified && <span className="v-badge" title="认证用户">V</span>}
+          {/* 轮 20 打通：V 徽章统一走 VBadge（本人按用户域认证状态区分橙V/蓝V） */}
+          <VBadge u={u} />
         </b>
         <small>{formatCount(u.followers)} 粉丝</small>
       </span>

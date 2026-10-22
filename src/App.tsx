@@ -52,6 +52,8 @@ import { WalletPage } from './wallet'
 import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
+import { SettingsPage } from './settings'
+import { TeenBanner } from './user-domain'
 import './viewswitch.css'
 
 /** 视图模式：广场态（消费/社交/交易）与知识态（生产/学习/开发工具） */
@@ -89,6 +91,7 @@ const NAV: NavItem[] = [
       { href: '#/favorites', match: '/favorites', label: '收藏' },
       { href: '#/history', match: '/history', label: '足迹' },
       { href: '#/following', match: '/following', label: '关注列表' },
+      { href: '#/settings', match: '/settings', label: '设置' },
     ],
   },
   {
@@ -426,6 +429,10 @@ function Page() {
       return <PublishPage />
     case 'wallet':
       return <WalletPage />
+
+    /* ---------- 用户域（B1：认证/实名/隐私/黑名单/青少年/注销/切换） ---------- */
+    case 'settings':
+      return <SettingsPage />
 
     /* ---------- 工具台 ---------- */
     case 'delivery':
@@ -1237,6 +1244,8 @@ function Shell() {
 
   return (
     <>
+      {/* 轮 20 打通：青少年模式全站顶部横幅（开启期间常驻） */}
+      <TeenBanner />
       <WbHero />
       <div className="shell">
         <SideNav />

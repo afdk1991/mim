@@ -16,6 +16,7 @@ import {
   UserLink,
   useToast,
 } from './components'
+import { matchesTeenWords, toggleBlacklistUser, useUserDomain, VBadge } from './user-domain'
 import type { AppNotification, User } from './types'
 
 /* ================= ProfileHead（个人主页头部） ================= */
@@ -36,7 +37,8 @@ function ProfileHead({
         <div>
           <div className="profile-name">
             {u.name}
-            {u.verified && <span className="v-badge">V</span>}
+            {/* 轮 20 打通：V 徽章统一走 VBadge（本人按用户域认证状态区分橙V/蓝V） */}
+            <VBadge u={u} />
           </div>
           <small style={{ opacity: 0.85 }}>@{u.id}</small>
         </div>
@@ -104,6 +106,12 @@ export function FeedPage() {
     (u) => u.id !== api.me.id && !api.isFollowing(u.id),
   )
 
+  /* 轮 20 打通：feed 流过滤——黑名单用户动态不展示；青少年模式开启时简单关键词过滤敏感占位内容 */
+  const { blacklist, teen } = useUserDomain()
+  const feedPosts = api.state.posts.filter(
+    (p) => !blacklist.includes(p.authorId) && !(teen.enabled && matchesTeenWords(p.content)),
+  )
+
   return (
     <div className="page-grid">
       <div>
@@ -153,7 +161,10 @@ export function FeedPage() {
           </div>
         </div>
 
-        {api.state.posts.map((p) => (
+        {api.state.posts.length > 0 && feedPosts.length === 0 && (
+          <Empty emoji="🛡" text="当前内容已按黑名单 / 青少年模式过滤" />
+        )}
+        {feedPosts.map((p) => (
           <PostCard key={p.id} post={p} />
         ))}
       </div>
@@ -450,8 +461,11 @@ export function NotificationsPage() {
 export function MessagesPage() {
   const api = useApp()
   const { query, navigate } = useRouter()
+  const toast = useToast()
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  /* 轮 20 打通：隐私开关 + 黑名单在私信读/写路径的真实约束 */
+  const { privacy, blacklist } = useUserDomain()
 
   const conversations = useMemo(() => {
     const map = new Map<string, typeof api.state.messages>()
@@ -461,6 +475,7 @@ export function MessagesPage() {
       map.set(m.userId, arr)
     }
     return [...map.entries()]
+      .filter(([userId]) => !blacklist.includes(userId)) // 拉黑用户的会话不再展示（其私信被拦截）
       .map(([userId, msgs]) => ({
         userId,
         msgs: [...msgs].sort((a, b) => a.createdAt - b.createdAt),
@@ -468,7 +483,7 @@ export function MessagesPage() {
         unread: msgs.filter((m) => !m.fromMe && !m.read).length,
       }))
       .sort((a, b) => b.last.createdAt - a.last.createdAt)
-  }, [api.state.messages])
+  }, [api.state.messages, blacklist])
 
   const activeId = query.get('with') ?? conversations[0]?.userId
   const active = conversations.find((c) => c.userId === activeId)
@@ -485,6 +500,19 @@ export function MessagesPage() {
 
   const send = () => {
     if (!input.trim() || !activeId) return
+    /* 轮 20 打通：账号级隐私约束——黑名单 / 关闭私信 / 仅限关注的人，命中即拦截并 toast */
+    if (blacklist.includes(activeId)) {
+      toast('已拉黑该用户，无法发送私信')
+      return
+    }
+    if (privacy.dm === 'off') {
+      toast('你已关闭私信功能，可在「设置 → 隐私设置」重新开启')
+      return
+    }
+    if (privacy.dm === 'following' && !api.isFollowing(activeId)) {
+      toast('你的私信仅允许「我关注的人」，请先关注对方')
+      return
+    }
     api.sendMessage(activeId, input)
     setInput('')
   }
@@ -774,7 +802,7 @@ export function FollowingPage() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600 }}>
                 {u.name}
-                {u.verified && <span className="v-badge">V</span>}
+                <VBadge u={u} />
               </div>
               <small style={{ color: 'var(--text-3)' }}>{u.bio}</small>
             </div>
@@ -791,6 +819,8 @@ export function FollowingPage() {
 export function ProfilePage({ id }: { id: string }) {
   const api = useApp()
   const { navigate } = useRouter()
+  const toast = useToast()
+  const { blacklist } = useUserDomain()
 
   useEffect(() => {
     if (id === api.me.id) navigate('/my')
@@ -814,6 +844,16 @@ export function ProfilePage({ id }: { id: string }) {
               <FollowButton userId={id} />
               <button className="btn btn-ghost" onClick={() => navigate(`/messages?with=${id}`)}>
                 ✉️ 私信
+              </button>
+              {/* 轮 20 打通：用户页加入/移出黑名单（按当前身份分 key 存储，feed 与私信同步生效） */}
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  const blocked = toggleBlacklistUser(id)
+                  toast(blocked ? `已将 ${u.name} 加入黑名单，TA 的动态与私信将被拦截` : `已将 ${u.name} 移出黑名单`)
+                }}
+              >
+                {blacklist.includes(id) ? '✅ 移出黑名单' : '🚫 拉黑'}
               </button>
             </>
           }
