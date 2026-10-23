@@ -14,7 +14,12 @@ on:
 
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  # 必须为 false：本 workflow 含真实部署步骤。
+  # 设为 true 时，连续 push 会让新 run 掐断正在进行的旧 run——
+  # 实测 EdgeOne 已输出 "Deploy Success" 后仍被 cancel，job 报
+  # "The operation was canceled" 假失败，且部署状态难以判断。
+  # false = 排队依次跑完，牺牲少量 runner 分钟换取部署完整性与结果可信。
+  cancel-in-progress: false
 
 jobs:
   build:
