@@ -1,6 +1,8 @@
 import './search-box.css'
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
+import { SearchField } from './SearchBox'
+import { useStickyBar } from './scroll-reveal'
 import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
@@ -818,24 +820,9 @@ function AdminRolesPage() {
   )
 }
 
-const HERO_HISTORY_KEY = 'mim-search-history'
-
-function loadHeroHistory(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(HERO_HISTORY_KEY) ?? '[]')
-    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-/* 热搜标签底色：沸红 / 热橙 / 爆黄 / 新蓝 */
-const HERO_TAG_BG: Record<string, string> = {
-  沸: '#e64340',
-  热: '#ff8200',
-  爆: '#f59e0b',
-  新: '#2b9cf4',
-}
+/* 搜索历史键 / 读取 / 热搜标签底色已统一收至 src/SearchBox.tsx
+   （原三处副本：App.tsx / PullSearchBar.tsx 各自维护一份，改动易漏。）
+   本文件如需请从 './SearchBox' 引入 loadHeroHistory / HERO_HISTORY_KEY / HERO_TAG_BG。 */
 
 /* 顶部 hero 右侧用户菜单：演示身份切换 + 账号登录态入口。
    演示身份（meId）决定内容作者视角；账号（cloud/local）决定云端数据边界，见 auth.tsx。 */
@@ -912,98 +899,17 @@ function UserMenu() {
 
 /* 顶部 hero：深色星空横幅 + 右上工具区 + 居中 logo + 完整搜索模块（下拉：历史/热搜/联想/清空） */
 function WbHero() {
-  const api = useApp()
-  const { navigate, path } = useRouter()
+  const { path } = useRouter()
   const { auth } = useAuth()
+  const api = useApp()
   const [theme, setTheme] = useTheme()
-  const [q, setQ] = useState('')
-  const [open, setOpen] = useState(false)
-  const [hist, setHist] = useState<string[]>(loadHeroHistory)
-  const boxRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLElement>(null)
-  /* 复刻微博机制：滚动超过 hero 高度后条件渲染 fixed 顶栏（硬切换，无动画） */
-  const [fixedBar, setFixedBar] = useState(false)
 
-  useEffect(() => {
-    const onScroll = () => setFixedBar(window.scrollY > (heroRef.current?.offsetHeight ?? 0))
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  /* 点击面板外部关闭 */
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
-
-  const saveHist = (t: string) => {
-    setHist((h) => {
-      const next = [t, ...h.filter((x) => x !== t)].slice(0, 8)
-      try {
-        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
-  }
-  const removeHist = (t: string) => {
-    setHist((h) => {
-      const next = h.filter((x) => x !== t)
-      try {
-        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
-  }
-  const clearHist = () => {
-    setHist([])
-    try {
-      localStorage.removeItem(HERO_HISTORY_KEY)
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const go = (word?: string) => {
-    const kw = (word ?? q).trim()
-    if (!kw) return
-    saveHist(kw)
-    setOpen(false)
-    navigate(`/search?q=${encodeURIComponent(kw)}`)
-  }
-
-  /* 输入联想：功能入口 + 话题 + 用户 + 文章（全站搜索） */
-  const kw = q.trim().toLowerCase()
-  const pageHints = kw ? matchSearchPages(q).slice(0, 3) : []
-  const topicHints = kw
-    ? api.state.topics.filter((t) => t.name.toLowerCase().includes(kw)).slice(0, 4)
-    : []
-  const userHints = kw
-    ? Object.values(api.state.users)
-        .filter((u) => u.name.toLowerCase().includes(kw) || u.bio.toLowerCase().includes(kw))
-        .slice(0, 4)
-    : []
-  const articleHints = kw
-    ? api.state.articles.filter((a) => a.title.toLowerCase().includes(kw)).slice(0, 3)
-    : []
-  const noHint =
-    kw.length > 0 &&
-    pageHints.length === 0 &&
-    topicHints.length === 0 &&
-    userHints.length === 0 &&
-    articleHints.length === 0
-
+  /* 搜索模块的词/历史/联想/失焦状态已统一收至 <SearchField>（v3 三处合并）；
+     顶部细搜索栏改为常驻组件自行做「下滑隐藏 / 上滑滑入」的滚动联动，见 StickySearchBar。 */
   return (
     <>
-      {fixedBar && <WbFixedBar />}
+      <StickySearchBar heroRef={heroRef} />
       <header className="wb-hero" ref={heroRef}>
       <div className="wb-hero-top">
         <button
@@ -1038,181 +944,7 @@ function WbHero() {
         <b>Mim</b>
         <small>mim.com</small>
       </a>
-      <div className="wb-hero-search" ref={boxRef}>
-        <div className="wb-hero-bar">
-          <span aria-hidden>🔍</span>
-          <input
-            type="search"
-            placeholder="搜索全站内容与功能"
-            value={q}
-            onFocus={() => setOpen(true)}
-            onChange={(e) => {
-              setQ(e.target.value)
-              setOpen(true)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') go()
-              if (e.key === 'Escape') setOpen(false)
-            }}
-          />
-          {q && (
-            <button
-              className="wb-hero-clear"
-              aria-label="清空"
-              onClick={() => {
-                setQ('')
-                setOpen(true)
-              }}
-            >
-              ×
-            </button>
-          )}
-        </div>
-        <button className="wb-hero-btn" onClick={() => go()}>
-          搜索
-        </button>
-
-        {open && (
-          <div className="wb-hero-drop">
-            {!kw && (
-              <>
-                {hist.length > 0 && (
-                  <>
-                    <div className="wb-hero-drop-title">
-                      搜索历史
-                      <button className="wb-hero-clear-all" onClick={clearHist}>
-                        清空
-                      </button>
-                    </div>
-                    <div className="wb-hero-chips">
-                      {hist.map((h) => (
-                        <span key={h} className="wb-hero-chip">
-                          <button className="wb-hero-chip-word" onClick={() => go(h)}>
-                            {h}
-                          </button>
-                          <button
-                            className="wb-hero-chip-del"
-                            aria-label="删除"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeHist(h)
-                            }}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-                <div className="wb-hero-drop-title">🔥 Mim 热搜</div>
-                <div className="wb-hero-drop-list">
-                  {api.state.hotSearches.slice(0, 8).map((s) => (
-                    <button key={s.id} className="wb-hero-drop-item" onClick={() => go(s.text)}>
-                      <i className={cx('wb-hero-rank', s.rank <= 3 && 'top')}>{s.rank}</i>
-                      <span className="wb-hero-drop-text">{s.text}</span>
-                      {s.tag && (
-                        <em className="wb-hero-tag" style={{ background: HERO_TAG_BG[s.tag] }}>
-                          {s.tag}
-                        </em>
-                      )}
-                      <small>{formatCount(s.heat)}</small>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            {kw && (
-              <>
-                {pageHints.length > 0 && (
-                  <>
-                    <div className="wb-hero-drop-title">🧭 功能入口</div>
-                    <div className="wb-hero-drop-list">
-                      {pageHints.map((p) => (
-                        <button
-                          key={p.href}
-                          className="wb-hero-drop-item"
-                          onClick={() => {
-                            saveHist(q.trim())
-                            setOpen(false)
-                            navigate(p.href.slice(1))
-                          }}
-                        >
-                          <i className="wb-hero-ico" aria-hidden>
-                            {p.icon}
-                          </i>
-                          <span className="wb-hero-drop-text">
-                            {p.name}
-                            <small>{p.group}</small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {topicHints.length > 0 && (
-                  <>
-                    <div className="wb-hero-drop-title">相关话题</div>
-                    <div className="wb-hero-drop-list">
-                      {topicHints.map((t) => (
-                        <button key={t.id} className="wb-hero-drop-item" onClick={() => go(t.name)}>
-                          <i className="wb-hero-ico" aria-hidden>
-                            💬
-                          </i>
-                          <span className="wb-hero-drop-text">#{t.name}#</span>
-                          <small>{formatCount(t.heat)}</small>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {userHints.length > 0 && (
-                  <>
-                    <div className="wb-hero-drop-title">相关用户</div>
-                    <div className="wb-hero-drop-list">
-                      {userHints.map((u) => (
-                        <button key={u.id} className="wb-hero-drop-item" onClick={() => go(u.name)}>
-                          <Avatar emoji={u.emoji} color={u.color} size={28} />
-                          <span className="wb-hero-drop-text">
-                            {u.name}
-                            <small>{u.bio}</small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {articleHints.length > 0 && (
-                  <>
-                    <div className="wb-hero-drop-title">📝 相关文章</div>
-                    <div className="wb-hero-drop-list">
-                      {articleHints.map((a) => (
-                        <button
-                          key={a.id}
-                          className="wb-hero-drop-item"
-                          onClick={() => {
-                            saveHist(q.trim())
-                            setOpen(false)
-                            navigate(`/article/${a.id}`)
-                          }}
-                        >
-                          <i className="wb-hero-ico" aria-hidden>
-                            📝
-                          </i>
-                          <span className="wb-hero-drop-text">{a.title}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {noHint && (
-                  <div className="wb-hero-drop-empty">没有找到相关内容，按回车直接搜索「{q.trim()}」</div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      <SearchField variant="hero" />
     </header>
     </>
   )
@@ -1220,188 +952,13 @@ function WbHero() {
 
 /* ---------- 固定顶栏（滚动过 hero 后出现，复刻微博机制：条件渲染硬切换） ---------- */
 
-function WbFixedBar() {
-  const api = useApp()
-  const { navigate } = useRouter()
-  const [q, setQ] = useState('')
-  const [dropOpen, setDropOpen] = useState(false)
-  const [hist, setHist] = useState<string[]>(loadHeroHistory)
-  const boxRef = useRef<HTMLDivElement>(null)
+/* ---------- 顶部细搜索栏：滚动联动（下滑隐藏 / 上滑滑入），替代原来的条件渲染硬切换 ---------- */
 
-  /* 点击面板外部关闭 */
-  useEffect(() => {
-    if (!dropOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setDropOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [dropOpen])
-
-  const saveHist = (t: string) => {
-    setHist((h) => {
-      const next = [t, ...h.filter((x) => x !== t)].slice(0, 8)
-      try {
-        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
-  }
-  const removeHist = (t: string) => {
-    setHist((h) => {
-      const next = h.filter((x) => x !== t)
-      try {
-        localStorage.setItem(HERO_HISTORY_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
-  }
-  const clearHist = () => {
-    setHist([])
-    try {
-      localStorage.removeItem(HERO_HISTORY_KEY)
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const go = (word?: string) => {
-    const kw = (word ?? q).trim()
-    if (!kw) return
-    saveHist(kw)
-    setQ('')
-    setDropOpen(false)
-    navigate(`/search?q=${encodeURIComponent(kw)}`)
-  }
-
-  /* 输入联想：功能入口 + 话题 + 用户 + 文章（与 hero 搜索模块同源） */
-  const kw = q.trim().toLowerCase()
-  const pageHints = kw ? matchSearchPages(q).slice(0, 3) : []
-  const topicHints = kw ? api.state.topics.filter((t) => t.name.toLowerCase().includes(kw)).slice(0, 3) : []
-  const userHints = kw
-    ? Object.values(api.state.users)
-        .filter((u) => u.name.toLowerCase().includes(kw) || u.bio.toLowerCase().includes(kw))
-        .slice(0, 3)
-    : []
-  const articleHints = kw ? api.state.articles.filter((a) => a.title.toLowerCase().includes(kw)).slice(0, 3) : []
-  const noHint =
-    kw.length > 0 &&
-    pageHints.length === 0 &&
-    topicHints.length === 0 &&
-    userHints.length === 0 &&
-    articleHints.length === 0
-
+function StickySearchBar({ heroRef }: { heroRef: RefObject<HTMLElement | null> }) {
+  const visible = useStickyBar(heroRef)
   return (
-    <div className="wb-fixedbar">
-      <div className="wb-fixedbar-inner" ref={boxRef}>
-        <span aria-hidden>🔍</span>
-        <input
-          type="search"
-          placeholder="搜索全站内容与功能"
-          value={q}
-          onFocus={() => setDropOpen(true)}
-          onChange={(e) => {
-            setQ(e.target.value)
-            setDropOpen(true)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') go()
-            if (e.key === 'Escape') setDropOpen(false)
-          }}
-        />
-        {dropOpen && !kw && hist.length > 0 && (
-          <div className="sidenav-search-drop wb-fixedbar-drop">
-            <div className="wb-hero-drop-title">
-              搜索历史
-              <button className="wb-hero-clear-all" onClick={clearHist}>
-                清空
-              </button>
-            </div>
-            <div className="wb-hero-chips">
-              {hist.map((h) => (
-                <span key={h} className="wb-hero-chip">
-                  <button className="wb-hero-chip-word" onClick={() => go(h)}>
-                    {h}
-                  </button>
-                  <button
-                    className="wb-hero-chip-del"
-                    aria-label="删除"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeHist(h)
-                    }}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        {dropOpen && kw && (
-          <div className="sidenav-search-drop">
-            {noHint ? (
-              <button className="sidenav-search-item" onClick={() => go()}>
-                没有匹配的内容，回车搜索「{q.trim()}」
-              </button>
-            ) : (
-              <>
-                {pageHints.map((p) => (
-                  <button
-                    key={p.href}
-                    className="sidenav-search-item"
-                    onClick={() => {
-                      setQ('')
-                      setDropOpen(false)
-                      navigate(p.href.slice(1))
-                    }}
-                  >
-                    <i aria-hidden="true">{p.icon}</i>
-                    <span className="sidenav-search-name">{p.name}</span>
-                    <em>{p.group}</em>
-                  </button>
-                ))}
-                {topicHints.map((t) => (
-                  <button key={t.id} className="sidenav-search-item" onClick={() => go(t.name)}>
-                    <i aria-hidden="true">💬</i>
-                    <span>#{t.name}#</span>
-                    <em>话题</em>
-                  </button>
-                ))}
-                {userHints.map((u) => (
-                  <button key={u.id} className="sidenav-search-item" onClick={() => go(u.name)}>
-                    <i aria-hidden="true">{u.emoji}</i>
-                    <span className="sidenav-search-name">{u.name}</span>
-                    <em>{u.bio}</em>
-                  </button>
-                ))}
-                {articleHints.map((a) => (
-                  <button
-                    key={a.id}
-                    className="sidenav-search-item"
-                    onClick={() => {
-                      setQ('')
-                      setDropOpen(false)
-                      navigate(`/article/${a.id}`)
-                    }}
-                  >
-                    <i aria-hidden="true">📝</i>
-                    <span>{a.title}</span>
-                    <em>文章</em>
-                  </button>
-                ))}
-                <button className="sidenav-search-item sidenav-search-all" onClick={() => go()}>
-                  查看全部搜索结果
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+    <div className={cx('wb-fixedbar', 'is-linked', visible && 'is-shown')}>
+      <SearchField variant="fixed" />
     </div>
   )
 }

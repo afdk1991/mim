@@ -33,7 +33,16 @@ export interface CloudChannel {
   unsubscribe: () => void
 }
 
-const API_BASE = (import.meta.env.VITE_MIM_API_BASE ?? '').replace(/\/+$/, '')
+/** 生产云端后端（CloudBase 云函数 mim-api）的固定入口。
+
+    为何内置兜底：EdgeOne Makers 走 .edgeone 目录自动构建，构建环境读不到
+    仓库环境变量（CI 日志：`No environment variables found`），若仅依赖
+    VITE_MIM_API_BASE 会导致线上产物缺失云端地址、回退本地演示模式。
+    该地址是公开 HTTP 端点（不含任何密钥，权限由云函数服务端强制校验），
+    因此内置安全；需要用自建后端时仍可用 VITE_MIM_API_BASE 覆盖。 */
+const PROD_API_BASE = 'https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api'
+
+const API_BASE = ((import.meta.env.VITE_MIM_API_BASE ?? '').trim() || PROD_API_BASE).replace(/\/+$/, '')
 
 const TOKEN_KEY = 'mim.cloud.token'
 const USER_KEY = 'mim.cloud.user'
