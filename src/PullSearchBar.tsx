@@ -1,5 +1,5 @@
 import './search-box.css'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useApp } from './store'
 import { useRouter } from './router'
@@ -49,11 +49,35 @@ export function PullSearchBar() {
   const [hist, setHist] = useState<string[]>(loadHeroHistory)
   const boxRef = useRef<HTMLDivElement>(null)
 
-  const { state, reveal, bindGrip, expand, collapse, attach } = usePullReveal({
-    threshold: 80,
-    maxPull: 240,
-    damping: 0.55,
-  })
+  /* 下拉刷新：用 ref 持有最新引用，保证 onRefresh 稳定，避免手势监听反复重挂 */
+  const apiRef = useRef(api)
+  apiRef.current = api
+  const toastRef = useRef(toast)
+  toastRef.current = toast
+  const finishRef = useRef<() => void>(() => {})
+
+  const onRefresh = useCallback(() => {
+    void (async () => {
+      await new Promise((r) => setTimeout(r, 700)) // 模拟网络往返
+      const n = apiRef.current.refreshFeed()
+      toastRef.current(n > 0 ? `已更新 ${n} 条新动态` : '暂无新内容')
+      finishRef.current()
+    })()
+  }, [])
+
+  const { state, reveal, refreshArmed, bindGrip, expand, collapse, attach, finishRefresh } =
+    usePullReveal({
+      threshold: 80,
+      refreshThreshold: 170,
+      maxPull: 240,
+      damping: 0.55,
+      onRefresh,
+    })
+
+  /* finishRefresh 由 hook 提供，用 ref 交给 onRefresh 回调（解开循环依赖） */
+  useEffect(() => {
+    finishRef.current = finishRefresh
+  }, [finishRefresh])
 
   /* 挂载全局 touch 监听（移动端下拉手势） */
   useEffect(() => attach(), [attach])
@@ -139,7 +163,7 @@ export function PullSearchBar() {
   return (
     <>
       {/* 常驻入口：桌面/不便下拉的用户点此（或拖拽）展开；移动端靠顶部下拉手势 */}
-      {state !== 'expanded' && (
+      {state !== 'expanded' && state !== 'refreshing' && (
         <button
           type="button"
           className="pull-fab"
@@ -151,7 +175,13 @@ export function PullSearchBar() {
       )}
 
       <section
-        className={cx('pull-search', state === 'pulling' && 'is-pulling', state === 'expanded' && 'is-open')}
+        className={cx(
+          'pull-search',
+          state === 'pulling' && 'is-pulling',
+          refreshArmed && 'is-armed',
+          state === 'expanded' && 'is-open',
+          state === 'refreshing' && 'is-refreshing',
+        )}
         style={revealStyle}
         role="search"
         aria-label="下拉搜索栏"
@@ -164,8 +194,15 @@ export function PullSearchBar() {
         >
           <span className="pull-grip-bar" />
           <span className="pull-grip-label">
-            {state === 'expanded' ? '收起搜索 ⌃' : '下拉展开搜索 ⌄'}
+            {state === 'refreshing'
+              ? '正在刷新…'
+              : refreshArmed
+                ? '松开刷新 ↻'
+                : state === 'expanded'
+                  ? '收起搜索 ⌃'
+                  : '下拉展开搜索 ⌄'}
           </span>
+          {state === 'refreshing' && <span className="pull-spin" aria-hidden="true" />}
         </div>
 
         <div className="pull-search-body" ref={boxRef}>
@@ -204,7 +241,7 @@ export function PullSearchBar() {
           </button>
 
           {/* 展开态强制显示下拉（历史/热搜），避免 open 状态时序导致下拉延迟出现 */}
-          {(open || state === 'expanded') && (
+          {(open || state === 'expanded' || state === 'settling') && (
             <div className="wb-hero-drop pull-drop">
               {!kw && (
                 <>

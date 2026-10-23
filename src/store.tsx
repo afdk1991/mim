@@ -3,7 +3,7 @@
    真实登录身份（AuthState.userId，见 auth.tsx）不进此 store——
    钱包/订单等钱类数据在 mall 中台按真实身份隔离，内容权限由 can()（permissions.ts）+ reducer ownership 守卫双层兜底。 */
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
-import { createSeedState } from './data/seed'
+import { createSeedState, DEMO_HOT_SEARCHES } from './data/seed'
 import type { AppState, Post, PostComment, Article, Snippet, User, PostMedia, PostVote, PostLottery } from './types'
 import { uid } from './utils'
 import {
@@ -40,6 +40,18 @@ import { revenueSnapshot, walletIncome } from './wallet'
 
 const STORAGE_KEY = 'mim-state-v2'
 
+/** 下拉刷新时模拟「新到达」的演示动态文案池（发现域演示数据，非用户自产内容） */
+const FEED_REFRESH_TEMPLATES: string[] = [
+  '刚整理完这一版的硬件清单，BOM 直接导出就能用 🧾',
+  '疾风引擎这波更新把冷启动压下去不少，实测省心 ⚡',
+  '把服务器资源按算力/带宽分了个类，找起来快多了 🗂️',
+  '配送路线加了货车模式，绕开限行后里程少了好几公里 🚚',
+  '漫剧片单又补了一批，周末够看了 🎬',
+  '邮箱聚合把几个号的通知收拢到一个时间线，清爽 ✉️',
+  '超话签到连续第 7 天，等级终于动了一下 🔥',
+  '比价探针抓到的价差比想象中明显，值得蹲一波 📉',
+]
+
 /**
  * 云端真实模式迁移（Supabase 已配置时对历史 localStorage 存档执行）：
  * 演示域数据（u1..u9 的内容/关注/通知/私信，演示超话/热搜/资源库）全部剔除，
@@ -69,6 +81,15 @@ function migrateLegacyForCloud(s: AppState): AppState {
         (f.type === 'article' && keepArticleIds.has(f.targetId)),
     ),
   }
+}
+
+/**
+ * 热搜兜底：热搜属发现/运营位，本地模式没有云端来源，历史存档（或云端未下发）可能为空数组，
+ * 此时回填默认演示榜，避免下拉揭示的搜索面板恒为空白。已有真实热搜（非空）时不覆盖。
+ */
+function ensureHotSearches(s: AppState): AppState {
+  if (Array.isArray(s.hotSearches) && s.hotSearches.length > 0) return s
+  return { ...s, hotSearches: DEMO_HOT_SEARCHES }
 }
 
 function loadState(): AppState {
@@ -107,8 +128,8 @@ function loadState(): AppState {
         // 兜底：cloudIds 为轮 4 新增可选字段，旧存档缺失时补空集
         if (!parsed.cloudIds) parsed.cloudIds = { users: [], posts: [], articles: [], snippets: [] }
         // 云端真实模式：历史存档剔除演示域数据（见 migrateLegacyForCloud），纯本地模式不受影响
-        if (cloudEnabled) return migrateLegacyForCloud(parsed)
-        return parsed
+        if (cloudEnabled) return ensureHotSearches(migrateLegacyForCloud(parsed))
+        return ensureHotSearches(parsed)
       }
     }
   } catch {
@@ -138,6 +159,8 @@ type Action =
       }
     }
   | { type: 'deletePost'; payload: string }
+  /* 下拉刷新：把新拉取到的动态置顶 */
+  | { type: 'refreshFeed'; payload: Post[] }
   | { type: 'togglePostLike'; payload: string }
   | { type: 'addPostComment'; payload: { id: string; postId: string; content: string; replyTo?: string } }
   | { type: 'toggleCommentLike'; payload: { postId: string; commentId: string } }
@@ -244,6 +267,14 @@ function reducer(state: AppState, action: Action): AppState {
         posts: state.posts.filter((p) => p.id !== action.payload),
         favorites: state.favorites.filter((f) => !(f.type === 'post' && f.targetId === action.payload)),
       }
+    }
+
+    case 'refreshFeed': {
+      if (action.payload.length === 0) return state
+      const known = new Set(state.posts.map((p) => p.id))
+      const fresh = action.payload.filter((p) => !known.has(p.id))
+      if (fresh.length === 0) return state
+      return { ...state, posts: [...fresh, ...state.posts] }
     }
 
     case 'togglePostLike':
@@ -847,6 +878,8 @@ interface AppApi {
   addSnippet: (title: string, language: string, code: string) => void
   deleteSnippet: (id: string) => void
   downloadResource: (id: string) => void
+  /** 下拉刷新：模拟「拉取到 N 条新动态」并置顶，返回新增条数 */
+  refreshFeed: () => number
   switchDemoUser: (id: string) => void
   resetDemo: () => void
 }
@@ -1224,6 +1257,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const snap = revenueSnapshot('resource_buy')
           if (snap) walletIncome(400, `资源下载分成（${res.title}）`, snap)
         }
+      },
+      /* 下拉刷新：生成 1~2 条「新到达」演示动态并置顶（发现域演示数据，作者取自现有用户） */
+      refreshFeed: () => {
+        const pickOne = <T,>(arr: T[]): T | undefined =>
+          arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined
+        const authorIds = Object.keys(state.users)
+        const topicNames = state.topics.map((t) => t.name)
+        const count = 1 + Math.floor(Math.random() * 2)
+        const fresh: Post[] = Array.from({ length: count }, () => ({
+          id: uid('p'),
+          authorId: pickOne(authorIds) ?? state.meId,
+          content: pickOne(FEED_REFRESH_TEMPLATES) ?? FEED_REFRESH_TEMPLATES[0],
+          images: [],
+          createdAt: Date.now(),
+          repostOfId: null,
+          repostComment: '',
+          likes: Math.floor(Math.random() * 30),
+          likedByMe: false,
+          reposts: Math.floor(Math.random() * 6),
+          topic: pickOne(topicNames) ?? null,
+          source: '来自 网页版',
+          comments: [],
+        }))
+        dispatch({ type: 'refreshFeed', payload: fresh })
+        return fresh.length
       },
       switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
       resetDemo: () => dispatch({ type: 'reset' }),

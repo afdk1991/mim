@@ -254,15 +254,24 @@
   font-family: inherit;
 }
 
-/* 面板内的下拉：复用 .wb-hero-drop 视觉，但改为静态满宽（面板本身已固定） */
-.pull-drop {
+/* 面板内的下拉：复用 .wb-hero-drop 视觉，但必须回到文档流。
+   注意 .wb-hero-drop 定义在 styles.css 且加载更晚（同特异性会压过本文件），其
+   position:absolute + top:calc(100% + 8px) 会把面板顶到 .pull-search 盒子之外，
+   而 .pull-search 有 max-height + overflow-y:auto，溢出部分会被裁切 → 面板不可见也不可点。
+   故用双类选择器提高特异性，强制静态定位，让面板随容器一起展开/滚动。 */
+.pull-search .pull-drop {
   position: static;
+  top: auto;
+  left: auto;
+  right: auto;
   box-shadow: none;
   border: none;
   border-radius: 12px;
   max-height: none;
   width: 100%;
   margin-top: 10px;
+  padding: 10px 4px 12px;
+  background: transparent;
 }
 
 /* 展开态背景遮罩：点击收起，并拦截背景误触 */
@@ -271,6 +280,34 @@
   inset: 0;
   z-index: 9995;
   background: rgba(0, 0, 0, 0.28);
+}
+
+/* ============ 下拉刷新（重拉触发；与搜索栏揭示共用同一手势，以双阈值分流） ============ */
+
+/* 刷新中：搜索栏停在展开位，把手区显示旋转指示器 */
+.pull-search.is-refreshing {
+  transform: translateY(0);
+}
+
+/* 已越过刷新阈值：提示文案高亮，明确「松手即刷新」而非展开搜索 */
+.pull-search.is-armed .pull-grip-label {
+  color: var(--primary);
+}
+
+.pull-spin {
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  animation: pull-spin 0.7s linear infinite;
+}
+
+@keyframes pull-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 小屏：fab 稍小，避免遮挡底部导航操作 */
