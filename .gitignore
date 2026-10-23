@@ -30,3 +30,8 @@ Thumbs.db
 .trae/
 .trae-html-share-packages/
 质量报告-*.html
+
+# WorkBuddy 工作区数据：仅记忆日志入库，其余（缓存/临时产物）忽略
+.workbuddy/*
+!.workbuddy/memory/
+.workbuddy/memory/tmp/
