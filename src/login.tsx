@@ -11,6 +11,7 @@ import type { FormEvent } from 'react'
 import { useApp } from './store'
 import { useAuth } from './auth'
 import { useRouter } from './router'
+import { cloudBackend } from './lib/supabase'
 import { Avatar } from './components'
 import { cx } from './utils'
 
@@ -81,8 +82,8 @@ export function LoginPage() {
           <div className="card auth-card">
             <h2 className="page-title">🔐 账号与身份</h2>
             <p className="auth-hint">
-              当前为<b>本地演示模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置 CloudBase
-              后即可注册登录，由云端按账号隔离数据边界。
+              当前为<b>本地演示模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置云端后端
+              （Supabase / CloudBase）后即可注册登录，由云端按账号隔离数据边界。
             </p>
             <div className="usermenu-sec auth-sec">切换演示身份（影响内容的作者视角）</div>
             <DemoUsers />
@@ -202,8 +203,11 @@ export function LoginPage() {
             <div className="auth-oauth-title">第三方登录</div>
             {oauthProviders.length === 0 ? (
               <p className="auth-hint" style={{ margin: 0 }}>
-                后台暂未启用第三方登录；在 CloudBase 控制台
-                身份认证 → 登录方式 中开启后，对应按钮会自动出现在这里。
+                后台暂未启用第三方登录；在{' '}
+                {cloudBackend === 'cloudbase'
+                  ? 'CloudBase 控制台 → 身份认证 → 登录方式'
+                  : 'Supabase 控制台 → Authentication → Providers'}{' '}
+                中开启后，对应按钮会自动出现在这里。
               </p>
             ) : (
               <div className="auth-oauth-grid">

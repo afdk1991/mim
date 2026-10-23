@@ -3,6 +3,7 @@ name: CI/CD · 构建 & 部署
 # 边开发边上线：
 # - push main / 手动触发 → 构建 → 同步部署到 GitHub Pages + EdgeOne Makers
 # - cloudfunctions/ 有变更 + 已配 CloudBase 密钥 → 额外部署云函数 mim-api
+# - supabase/functions/ 有变更 + 已配 Supabase 密钥 → 额外部署 Edge Function mim-api
 # - 打 tag v* → 构建 + 发布 npm 包到 GitHub Packages（需配 NPM_TOKEN，见 publish-package 内注释；
 #   Pages/Makers 与 main 同提交，无需重复部署）
 # - pull_request → 只跑质量门禁（typecheck + build），不部署
@@ -10,6 +11,12 @@ name: CI/CD · 构建 & 部署
 # 云函数部署需先在仓库 Settings → Secrets 配三项（未配则整 job 跳过，不影响其他部署）：
 #   CLOUDBASE_SECRET_ID / CLOUDBASE_SECRET_KEY（腾讯云 API 密钥）
 #   CLOUDBASE_ENV_ID（CloudBase 环境 ID）
+# Edge Function 部署需配四项（未配则整 job 跳过）：
+#   SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF / SUPABASE_SERVICE_ROLE_KEY / MIM_TOKEN_SECRET
+#
+# 前端后端优先级（src/lib/supabase.ts）：Supabase（直连，主）→ CloudBase mim-api（备）→ 本地演示。
+# 两个云端入口均为公开值（publishable key 的安全由 RLS 保证），故与 VITE_MIM_API_BASE
+# 一样直接内联注入，杜绝「仓库未配 secret → 构建产物缺配置 → 回退本地演示模式」。
 
 on:
   push:
@@ -59,6 +66,12 @@ jobs:
           # 直接内联而非走 secrets —— 根治「仓库未配 secret → 构建产物缺配置
           # → 永远回退本地演示模式」。
           VITE_MIM_API_BASE: https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api
+          # Supabase（主后端）公开配置：URL + publishable key。
+          # publishable key 按设计可暴露于客户端（数据安全由 RLS 全表策略保证），
+          # 与 CloudBase 入口同理内联；EdgeOne Makers 构建读不到仓库变量，
+          # 缺此内联会导致线上产物回退本地演示模式（源码内亦有同值兜底常量）。
+          VITE_SUPABASE_URL: https://sepfobukokrrivwyvhnd.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -182,6 +195,67 @@ jobs:
         if: steps.changed.outputs.changed != 'true'
         run: echo "cloudfunctions/ 本轮无变更，跳过云函数部署"
 
+  deploy-supabase-function:
+    name: 部署 Supabase Edge Function mim-api
+    needs: build
+    # 仅 main 分支。
+    # ⚠️ 同 deploy-function：secrets 不可用于 job 级 if（ workflow 解析失败、
+    #    0 job 启动的坑见 DEPLOY.md 坑 ①），必须 job 级 env + step 级 if。
+    # 未配密钥时整段跳过：前端主路径是浏览器直连 Supabase（anon key + RLS），
+    # 本函数只是「同契约后端 API」备选，缺它不影响任何现有部署。
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      HAS_SUPABASE: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && secrets.SUPABASE_PROJECT_REF != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.MIM_TOKEN_SECRET != '' }}
+    steps:
+      - name: 未配置 Supabase 密钥时跳过
+        if: env.HAS_SUPABASE != 'true'
+        run: echo "未配置 SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF / SUPABASE_SERVICE_ROLE_KEY / MIM_TOKEN_SECRET，跳过 Edge Function 部署（不影响前端直连 Supabase 与其他部署）"
+
+      - uses: actions/checkout@v4
+        if: env.HAS_SUPABASE == 'true'
+        with:
+          # 需要与上一个 commit 比对才能判断 supabase/functions/ 是否变更
+          fetch-depth: 0
+
+      - name: 判断 supabase/functions 是否变更
+        id: changed
+        if: env.HAS_SUPABASE == 'true'
+        run: |
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --name-only "$before" "${{ github.sha }}" -- supabase/functions/ | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_SUPABASE == 'true' && steps.changed.outputs.changed == 'true'
+        with:
+          node-version: 22
+
+      - name: 部署 Edge Function 并同步运行密钥
+        if: env.HAS_SUPABASE == 'true' && steps.changed.outputs.changed == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          npm install -g supabase
+          supabase functions deploy mim-api --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          # 运行密钥：URL 为公开值内联；service_role 与令牌密钥走 secrets。
+          # MIM_TOKEN_SECRET 轮换会使全部已签发令牌失效（30 天 TTL），勿频繁更换。
+          supabase secrets set \
+            "SUPABASE_URL=https://sepfobukokrrivwyvhnd.supabase.co" \
+            "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "MIM_TOKEN_SECRET=${{ secrets.MIM_TOKEN_SECRET }}" \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: 未变更时跳过
+        if: env.HAS_SUPABASE == 'true' && steps.changed.outputs.changed != 'true'
+        run: echo "supabase/functions/ 本轮无变更，跳过 Edge Function 部署"
+
   publish-package:
     name: 发布 npm 包到 GitHub Packages
     needs: build
@@ -214,6 +288,9 @@ jobs:
           # 直接内联而非走 secrets —— 根治「仓库未配 secret → 构建产物缺配置
           # → 永远回退本地演示模式」。
           VITE_MIM_API_BASE: https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api
+          # Supabase（主后端）公开配置，同 build job（发布产物与站点一致）
+          VITE_SUPABASE_URL: https://sepfobukokrrivwyvhnd.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 
       - name: 发布
         # 作用域包（@afdk1991/mim）默认按 private 发布，GitHub Packages 免费套餐仅允许 public → 必须 --access public

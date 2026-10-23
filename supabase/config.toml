@@ -1,0 +1,12 @@
+# Supabase 项目配置（Edge Functions 部署用）
+#
+# 部署命令（需 SUPABASE_ACCESS_TOKEN，见 DEPLOY.md「Supabase」一节）：
+#   supabase functions deploy mim-api --project-ref <项目ref>
+#   supabase secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... MIM_TOKEN_SECRET=...
+
+project_id = "mim"
+
+[functions.mim-api]
+# 本函数自带 HMAC 令牌鉴权（与 CloudBase 云函数 mim-api 同契约），
+# 匿名放行 / 登录校验均由函数内部完成 ⇒ 关闭网关的 JWT 预校验。
+verify_jwt = false

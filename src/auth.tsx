@@ -10,7 +10,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { supabase, cloudEnabled, authSettingsUrl, anonKeyExport } from './lib/supabase'
+import { supabase, cloudEnabled, cloudBackend, authSettingsUrl, anonKeyExport } from './lib/supabase'
 import type { AuthMode } from './permissions'
 
 export type AuthState = {
@@ -153,15 +153,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       auth,
       cloudEnabled,
       oauthProviders,
-      /* CloudBase 本环境仅启用 usernamePassword（email / phone / anonymous 均关闭），
-         注册与登录统一走用户名；注册成功后由应用层补写 profiles（CloudBase 无
-         auth.users 触发器，不会自动建档）。 */
+      /* 注册与登录统一走「用户名」：
+         · Supabase 模式：用户名映射为合成邮箱 <username>@mim.app（适配层内转换），
+           注册成功即自动登录（mailer_autoconfirm 已开启），档案由 auth.users
+           触发器自动创建，无需应用层补写。
+         · CloudBase 模式：仅启用 usernamePassword（email / phone / anonymous 均关闭），
+           注册成功后由应用层补写 profiles（无 auth.users 触发器）。 */
       async signUp(username, password) {
         if (!supabase) return '云端未配置，当前为本地演示模式'
         const { data, error } = await supabase.auth.signUp({ username, password })
         if (error) return error.message
         const uid = data?.user?.id ?? data?.session?.user?.id
-        if (uid) {
+        /* 建档策略：
+           · Supabase 模式：auth.users 触发器 on_auth_user_created 已自动建档
+             （name 取自注册时传入的 user_metadata）；且 profiles 未建 insert 策略，
+             upsert 会被 RLS 拒为 403 —— 故跳过，避免无谓的失败请求。
+           · CloudBase 模式：无 auth.users 触发器，保留 upsert 兜底建档。 */
+        if (uid && cloudBackend !== 'supabase') {
           try {
             await supabase.from('profiles').upsert({ id: uid, name: username })
           } catch {

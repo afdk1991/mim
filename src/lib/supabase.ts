@@ -1,22 +1,47 @@
-/* 云端客户端适配层（后端：CloudBase 云函数 mim-api → CloudBase PostgreSQL）。
+/* ============================================================================
+   云端客户端适配层（三态后端，按优先级自动选择）
 
-   2026-10-23 架构说明（为什么要绕一圈）：
-   1) CloudBase 不允许「用户名 + 密码」自助注册（/auth/v1/signup 恒返回 501，
-      即使使用 service_role Key 也一样），邮箱与自定义登录 provider 均无法启用，
-      因此账号体系改为自建：mim-api 持有 service_role Key，在服务端完成
-      注册（PBKDF2 密码哈希）与登录（HMAC 签名令牌）。
-   2) CloudBase 网关 CORS 只放行安全域名白名单，而体验版套餐不允许添加域名，
-      导致 GitHub Pages / EdgeOne Pages 等线上域名一律 403。mim-api 自行回写
-      Access-Control-Allow-Origin: *，使任意部署域名都能访问云端。
+   ① Supabase（主后端，2026-10-24 接入）
+      配置 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY 时启用，
+      使用 @supabase/supabase-js 真实客户端，直接消费平台原生能力：
+        · Auth：GoTrue 账号体系。应用账号用「用户名」，GoTrue 只认邮箱，
+          故用户名映射为合成邮箱 <username>@mim.app（mailer_autoconfirm
+          已开启，不会真发邮件）；含 @ 的输入按邮箱直通（兼容邮箱老账号）。
+          真实姓名经 user_metadata 传给 auth.users 触发器自动建档 profiles。
+        · OAuth：GitHub 等 provider 在后台开启即自动出现在登录页
+          （authSettingsUrl / anonKeyExport 驱动探测）。
+        · 数据库：PostgREST + RLS 行级安全（schema.sql 全表启用），
+          权限由数据库策略承担，无需服务端注入 owner 过滤。
+        · 存储：Storage 私有桶 mim-media，RLS 限定 <uid>/ 前缀（见迁移 0002）。
+        · Realtime：messages 表已加入 publication，私信实时推送开箱即用。
+      publishable key 按设计可暴露于客户端（安全由 RLS 保证，与
+      auth-oauth.test.ts 中的用法一致），故与 CloudBase 入口一样内置兜底，
+      保证 EdgeOne Makers 等读不到仓库环境变量的构建也能带上云端配置。
 
-   由于 service_role 会绕过数据库 RLS，权限由 mim-api 强制注入：
-   读私有表自动追加 owner 过滤，写入自动改写 owner 列为当前 uid，
-   改删自动按 owner 过滤，app_users / audit_logs 永不代理。
+   ② CloudBase（备后端）
+      仅配 VITE_MIM_API_BASE 时走原 HTTP 适配器（自建 PBKDF2 账号 +
+      mim-api 云函数代理）。存在原因（平台硬限制）：
+        1) CloudBase 不允许「用户名 + 密码」自助注册（signup 恒返回 501），
+           邮箱与自定义登录 provider 均无法启用，因此账号体系改为自建：
+           mim-api 持有 service_role Key，在服务端完成注册与登录。
+        2) CloudBase 网关 CORS 只放行安全域名白名单，而体验版套餐不允许
+           添加域名，导致 GitHub Pages / EdgeOne Pages 等线上域名一律 403。
+           mim-api 自行回写 Access-Control-Allow-Origin: *。
+      由于 service_role 会绕过数据库 RLS，权限由 mim-api 强制注入：
+      读私有表自动追加 owner 过滤，写入自动改写 owner 列为当前 uid，
+      改删自动按 owner 过滤，app_users / audit_logs 永不代理。
 
-   本文件把上述 HTTP 接口包装成与 Supabase 同形的链式查询，
+   ③ 两者都未配置（或被 VITE_MIM_BACKEND 显式指定为 local）→ null，
+      应用整体回退纯本地模式（localStorage）。
+
+   选择逻辑：VITE_MIM_BACKEND 可强制指定 'supabase' / 'cloudbase' / 'local'；
+   默认 'auto' = Supabase 优先，其次 CloudBase。
+   本文件把两种后端都包装成与 Supabase 同形的链式客户端，
    使 cloud-read / cloud-write / cloud-iam / cloud-msg / auth.tsx 无需改动。
+   ============================================================================ */
 
-   未配置 VITE_MIM_API_BASE 时为 null，应用整体回退纯本地模式（localStorage）。 */
+import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient, Session, User as SupabaseUser } from '@supabase/supabase-js'
 
 /** 云端会话中的用户标识 */
 export interface CloudUser {
@@ -33,16 +58,205 @@ export interface CloudChannel {
   unsubscribe: () => void
 }
 
-/** 生产云端后端（CloudBase 云函数 mim-api）的固定入口。
+/** 两个后端共用的客户端形态（与 Supabase 同形，cloud-* 各模块只依赖此接口） */
+export interface CloudClient {
+  from: (table: string) => any
+  rpc: (fn: string, params?: Record<string, unknown>) => any
+  channel: (name: string) => CloudChannel
+  removeChannel: (channel: CloudChannel) => void
+  auth: {
+    getSession: () => Promise<{
+      data: { session: { user?: CloudUser | null } | null }
+      error: { message: string } | null
+    }>
+    signUp: (params: { username?: string; email?: string; password: string }) => Promise<{
+      data: { user?: CloudUser | null; session?: { user?: CloudUser | null } | null } | null
+      error: { message: string } | null
+    }>
+    signInWithPassword: (params: {
+      username?: string
+      email?: string
+      password: string
+    }) => Promise<{
+      data: { user?: CloudUser | null; session?: { user?: CloudUser | null } | null } | null
+      error: { message: string } | null
+    }>
+    signInWithOAuth: (params: { provider: string; options?: Record<string, unknown> }) => Promise<{
+      error: { message: string } | null
+    }>
+    signOut: () => Promise<{ error: { message: string } | null }>
+    onAuthStateChange: (
+      callback: (event: string, session: { user?: CloudUser | null } | null) => void,
+    ) => { data: { subscription: { unsubscribe: () => void } } }
+  }
+}
 
-    为何内置兜底：EdgeOne Makers 走 .edgeone 目录自动构建，构建环境读不到
-    仓库环境变量（CI 日志：`No environment variables found`），若仅依赖
-    VITE_MIM_API_BASE 会导致线上产物缺失云端地址、回退本地演示模式。
-    该地址是公开 HTTP 端点（不含任何密钥，权限由云函数服务端强制校验），
-    因此内置安全；需要用自建后端时仍可用 VITE_MIM_API_BASE 覆盖。 */
+/* ---------------------------------------------------------------------------
+ * 后端选择
+ * ------------------------------------------------------------------------- */
+
+/** 当前生效的后端模式（供存储适配层等分支使用） */
+export type CloudBackend = 'supabase' | 'cloudbase' | 'local'
+
+/** 生产 Supabase 项目（公开信息：publishable key 按设计可暴露，安全由 RLS 保证） */
+const PROD_SUPABASE_URL = 'https://sepfobukokrrivwyvhnd.supabase.co'
+const PROD_SUPABASE_ANON_KEY = 'sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg'
+
+/** 用户名 ↔ 合成邮箱 的映射域名（GoTrue 只认邮箱；mailer_autoconfirm 已开启） */
+const SYNTHETIC_DOMAIN = 'mim.app'
+
+const env = (k: string): string => {
+  const v = (import.meta.env as Record<string, string | undefined>)[k]
+  return typeof v === 'string' ? v.trim() : ''
+}
+
+const SB_URL = env('VITE_SUPABASE_URL') || PROD_SUPABASE_URL
+const SB_ANON = env('VITE_SUPABASE_ANON_KEY') || PROD_SUPABASE_ANON_KEY
+
+/** 生产云端后端（CloudBase 云函数 mim-api）的固定入口。
+ *
+ *    为何内置兜底：EdgeOne Makers 走 .edgeone 目录自动构建，构建环境读不到
+ *    仓库环境变量（CI 日志：`No environment variables found`），若仅依赖
+ *    VITE_MIM_API_BASE 会导致线上产物缺失云端地址、回退本地演示模式。
+ *    该地址是公开 HTTP 端点（不含任何密钥，权限由云函数服务端强制校验）；
+ *    需要用自建后端时仍可用 VITE_MIM_API_BASE 覆盖。 */
 const PROD_API_BASE = 'https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api'
 
-const API_BASE = ((import.meta.env.VITE_MIM_API_BASE ?? '').trim() || PROD_API_BASE).replace(/\/+$/, '')
+const API_BASE = (env('VITE_MIM_API_BASE') || PROD_API_BASE).replace(/\/+$/, '')
+
+const FORCED = env('VITE_MIM_BACKEND')
+const hasSupabaseConfig = !!SB_URL && !!SB_ANON
+const hasCloudbaseConfig = !!API_BASE
+
+function resolveBackend(): CloudBackend {
+  if (FORCED === 'supabase') return hasSupabaseConfig ? 'supabase' : 'local'
+  if (FORCED === 'cloudbase') return hasCloudbaseConfig ? 'cloudbase' : 'local'
+  if (FORCED === 'local') return 'local'
+  return hasSupabaseConfig ? 'supabase' : hasCloudbaseConfig ? 'cloudbase' : 'local'
+}
+
+/** 当前后端模式：'supabase' | 'cloudbase' | 'local' */
+export const cloudBackend: CloudBackend = resolveBackend()
+
+/* ---------------------------------------------------------------------------
+ * Supabase 后端（主）
+ * ------------------------------------------------------------------------- */
+
+/** 应用账号（用户名）→ GoTrue 登录邮箱。
+ *  含 @ 的输入按邮箱直通（兼容历史上用邮箱注册的账号）；
+ *  否则拼接合成邮箱，mailer_autoconfirm 已开启故无需真收信。 */
+export function toAuthEmail(usernameOrEmail: string): string {
+  const v = String(usernameOrEmail || '').trim()
+  if (!v) return ''
+  return v.includes('@') ? v : `${v}@${SYNTHETIC_DOMAIN}`
+}
+
+/** 合成邮箱 → 展示用用户名；非合成邮箱（邮箱直通登录）原样返回 */
+export function fromAuthEmail(email: string | null | undefined, fallback = ''): string {
+  const e = String(email || '')
+  const suffix = `@${SYNTHETIC_DOMAIN}`
+  if (e.endsWith(suffix)) return e.slice(0, -suffix.length) || fallback
+  return e || fallback
+}
+
+/** GoTrue User → 应用 CloudUser（username 优先取 user_metadata，其次反解合成邮箱） */
+function normalizeUser(u: SupabaseUser | null | undefined): CloudUser | null {
+  if (!u) return null
+  const meta = (u.user_metadata ?? {}) as { username?: string; name?: string }
+  const username = (meta.username && String(meta.username)) || fromAuthEmail(u.email) || meta.name || null
+  return { id: u.id, email: u.email ?? null, username, is_anonymous: !!u.is_anonymous }
+}
+
+/** Supabase 模式的模块级会话快照：onAuthStateChange + getSession 双保险刷新，
+ *  供 cloudToken() / cloudUid() 同步读取（存储就绪判断需要）。 */
+let sbSession: Session | null = null
+
+function createSupabaseClient(): { client: CloudClient; raw: SupabaseClient } {
+  const raw = createClient(SB_URL, SB_ANON, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      // 固定 storageKey：云函数代理分支之外的同步会话读取依赖它
+      storageKey: 'mim-sb-auth',
+    },
+  })
+
+  void raw.auth.getSession().then(({ data }) => {
+    sbSession = data.session
+  })
+  raw.auth.onAuthStateChange((_event, session) => {
+    sbSession = session
+  })
+
+  const client: CloudClient = {
+    from: (table: string) => raw.from(table),
+    rpc: (fn: string, params?: Record<string, unknown>) => raw.rpc(fn, params ?? {}),
+    channel: (name: string) => raw.channel(name) as unknown as CloudChannel,
+    removeChannel: (channel: CloudChannel) => {
+      void raw.removeChannel(channel as unknown as Parameters<typeof raw.removeChannel>[0])
+    },
+    auth: {
+      async getSession() {
+        const { data } = await raw.auth.getSession()
+        const user = normalizeUser(data.session?.user)
+        return { data: { session: user ? { user } : null }, error: null }
+      },
+      async signUp({ username, email, password }) {
+        const login = String(email || username || '').trim()
+        const displayName = String(username || '').trim() || fromAuthEmail(login)
+        const { data, error } = await raw.auth.signUp({
+          email: toAuthEmail(login),
+          password,
+          options: { data: { username: displayName, name: displayName } },
+        })
+        if (error) return { data: null, error: { message: error.message } }
+        const user = normalizeUser(data.user ?? data.session?.user)
+        return { data: { user, session: user ? { user } : null }, error: null }
+      },
+      async signInWithPassword({ username, email, password }) {
+        const login = String(email || username || '').trim()
+        const { data, error } = await raw.auth.signInWithPassword({
+          email: toAuthEmail(login),
+          password,
+        })
+        if (error) return { data: null, error: { message: error.message } }
+        const user = normalizeUser(data.user ?? data.session?.user)
+        return { data: { user, session: user ? { user } : null }, error: null }
+      },
+      async signInWithOAuth({ provider, options }) {
+        const { error } = await raw.auth.signInWithOAuth({
+          provider: provider as 'github',
+          options: options as { redirectTo?: string } | undefined,
+        })
+        return { error: error ? { message: error.message } : null }
+      },
+      async signOut() {
+        const { error } = await raw.auth.signOut()
+        return { error: error ? { message: error.message } : null }
+      },
+      onAuthStateChange(callback) {
+        const ret = raw.auth.onAuthStateChange((event, session) => {
+          const user = normalizeUser(session?.user)
+          callback(event, user ? { user } : null)
+        // supabase-js 各版本返回形态不一（{ data: { subscription } } 或 { subscription }），
+        // 这里兼容两种并归一化为 CloudClient 的 { data: { subscription } }
+        }) as {
+          data?: { subscription: { unsubscribe: () => void } }
+          subscription?: { unsubscribe: () => void }
+        }
+        const sub = ret.data?.subscription ?? ret.subscription
+        return { data: { subscription: { unsubscribe: () => sub?.unsubscribe() } } }
+      },
+    },
+  }
+
+  return { client, raw }
+}
+
+/* ---------------------------------------------------------------------------
+ * CloudBase 后端（备）：HTTP 适配器
+ * ------------------------------------------------------------------------- */
 
 const TOKEN_KEY = 'mim.cloud.token'
 const USER_KEY = 'mim.cloud.user'
@@ -292,38 +506,6 @@ async function postAuth(path: string, payload: Record<string, unknown>) {
   }
 }
 
-export interface CloudClient {
-  from: (table: string) => any
-  rpc: (fn: string, params?: Record<string, unknown>) => any
-  channel: (name: string) => CloudChannel
-  removeChannel: (channel: CloudChannel) => void
-  auth: {
-    getSession: () => Promise<{
-      data: { session: { user?: CloudUser | null } | null }
-      error: { message: string } | null
-    }>
-    signUp: (params: { username?: string; email?: string; password: string }) => Promise<{
-      data: { user?: CloudUser | null; session?: { user?: CloudUser | null } | null } | null
-      error: { message: string } | null
-    }>
-    signInWithPassword: (params: {
-      username?: string
-      email?: string
-      password: string
-    }) => Promise<{
-      data: { user?: CloudUser | null; session?: { user?: CloudUser | null } | null } | null
-      error: { message: string } | null
-    }>
-    signInWithOAuth: (params: { provider: string; options?: Record<string, unknown> }) => Promise<{
-      error: { message: string } | null
-    }>
-    signOut: () => Promise<{ error: { message: string } | null }>
-    onAuthStateChange: (
-      callback: (event: string, session: { user?: CloudUser | null } | null) => void,
-    ) => { data: { subscription: { unsubscribe: () => void } } }
-  }
-}
-
 /** Realtime 通道存根：本后端无 CDC 推送，订阅降级为 no-op。
     私信的发送与拉取均正常，仅「对方来信实时推送」退化为进入会话时拉取。 */
 function makeNoopChannel(_name: string): CloudChannel {
@@ -365,25 +547,50 @@ function createCloudClient(): CloudClient {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * 导出
+ * ------------------------------------------------------------------------- */
+
+const supabaseBackend = cloudBackend === 'supabase' ? createSupabaseClient() : null
+
 /**
- * 云端客户端：未配置 VITE_MIM_API_BASE 时为 null，
+ * 云端客户端：未配置任何后端时为 null，
  * 应用整体回退纯本地模式，保证无云端配置也能随时安全构建上线。
  */
-export const supabase: CloudClient | null = API_BASE ? createCloudClient() : null
+export const supabase: CloudClient | null =
+  supabaseBackend?.client ?? (cloudBackend === 'cloudbase' ? createCloudClient() : null)
 
-/** 是否已接入云端（true 时读路径/写路径走 CloudBase PG） */
+/** 是否已接入云端（true 时读路径/写路径走云端） */
 export const cloudEnabled = supabase !== null
 
-/** 云端后端地址（供存储等子模块拼自己的接口路径） */
-export const cloudApiBase = API_BASE
+/** 真实 Supabase 客户端（仅 Supabase 模式；供存储适配层直连 Storage） */
+export const sbClient: SupabaseClient | null = supabaseBackend?.raw ?? null
 
-/** 当前会话令牌（供存储等子模块自行携带鉴权头） */
+/** 云端后端地址（供存储等子模块拼自己的接口路径） */
+export const cloudApiBase = cloudBackend === 'supabase' ? SB_URL : API_BASE
+
+/** 当前会话令牌（供存储等子模块自行携带鉴权头；Supabase 模式为 JWT） */
 export function cloudToken(): string {
+  if (cloudBackend === 'supabase') return sbSession?.access_token ?? ''
   return getToken()
 }
 
-/* 自建账号体系不提供 OAuth provider 探测端点，保持 null 以跳过探测。 */
-export const authSettingsUrl: string | null = null
+/** 当前登录用户 id（Supabase 模式取自会话；CloudBase 模式从令牌 payload 反解） */
+export function cloudUid(): string {
+  if (cloudBackend === 'supabase') return sbSession?.user?.id ?? ''
+  const token = getToken()
+  if (!token) return ''
+  try {
+    const payload = JSON.parse(atob(token.slice(0, token.lastIndexOf('.'))))
+    return typeof payload?.uid === 'string' ? payload.uid : ''
+  } catch {
+    return ''
+  }
+}
 
-/** 匿名凭据导出（自建后端用签名令牌，无需单独携带 anon key） */
-export const anonKeyExport: string | null = null
+/** GoTrue settings 端点（Supabase 模式驱动 OAuth provider 探测；自建后端无此端点） */
+export const authSettingsUrl: string | null =
+  cloudBackend === 'supabase' ? `${SB_URL}/auth/v1/settings` : null
+
+/** 匿名凭据（Supabase 模式为 publishable key，供 settings 探测使用） */
+export const anonKeyExport: string | null = cloudBackend === 'supabase' ? SB_ANON : null
