@@ -3,7 +3,8 @@ name: CI/CD · 构建 & 部署
 # 边开发边上线：
 # - push main / 手动触发 → 构建 → 同步部署到 GitHub Pages + EdgeOne Makers
 # - cloudfunctions/ 有变更 + 已配 CloudBase 密钥 → 额外部署云函数 mim-api
-# - 打 tag v* → 构建 + 发布 npm 包到 GitHub Packages（Pages/Makers 与 main 同提交，无需重复部署）
+# - 打 tag v* → 构建 + 发布 npm 包到 GitHub Packages（需配 NPM_TOKEN，见 publish-package 内注释；
+#   Pages/Makers 与 main 同提交，无需重复部署）
 # - pull_request → 只跑质量门禁（typecheck + build），不部署
 #
 # 云函数部署需先在仓库 Settings → Secrets 配三项（未配则整 job 跳过，不影响其他部署）：
@@ -216,9 +217,10 @@ jobs:
 
       - name: 发布
         # 作用域包（@afdk1991/mim）默认按 private 发布，GitHub Packages 免费套餐仅允许 public → 必须 --access public
-        # 凭据：优先用 PAT（secrets.NPM_TOKEN，需 write:packages + read:packages 作用域）；
-        #       未配置时回退 GITHUB_TOKEN。若两者都报 403 write_package，说明账号级 GitHub Packages
-        #       未开通/未接受条款，需在 github.com/settings/packages 开通后再跑。
+        # 凭据：必须用 PAT（secrets.NPM_TOKEN，需 write:packages + read:packages 作用域）。
+        # ⚠️ 不要指望 GITHUB_TOKEN 兜底 —— 实测即使包已关联仓库，
+        #    GITHUB_TOKEN 仍报 403 permission_denied: write_package（v0.0.4 复现两次）。
+        #    用户级公开 npm 包只能用 PAT 发布。
         run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

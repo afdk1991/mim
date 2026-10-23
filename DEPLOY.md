@@ -113,9 +113,19 @@ https://<你的用户名>.github.io/mim/
 
 配置完成后，push main 即自动把 `dist/` 通过官方 CLI `edgeone pages deploy` 发布上线。
 
-### 4. GitHub Packages（npm 包托管，无需额外配置）
+### 4. GitHub Packages（npm 包托管，需配一个 PAT Secret）
 
-打 tag 发版即自动发布：
+> ⚠️ **PAT 是硬要求，不是可选回退。** 实测：即使包已关联到仓库，
+> `GITHUB_TOKEN` 发布仍报 `403 permission_denied: write_package`（v0.0.4 复现过两次）。
+> 用户级公开 npm 包必须用带 `write:packages` + `read:packages` 的 PAT。
+
+先在仓库 **Settings → Secrets and variables → Actions** 新增：
+
+| Secret 名 | 值 | 说明 |
+|---|---|---|
+| `NPM_TOKEN` | GitHub PAT | 需勾选 `write:packages` + `read:packages`（Settings → Developer settings → Personal access tokens） |
+
+配好后打 tag 发版即自动发布：
 
 ```powershell
 git tag v1.0.0
