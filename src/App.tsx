@@ -59,6 +59,7 @@ import { LivePage } from './media-domain' /* 轮 24 打通：B5 直播推拉流/
 import { TeenBanner } from './user-domain'
 import { ScheduledTicker } from './content-domain'
 import { RanksPage, VideosPage } from './feed-domain' /* 轮 23 打通：B4 视频沉浸流 / 榜单体系路由 */
+import { PullSearchBar } from './PullSearchBar' /* 微博式下拉揭示搜索栏（全局，覆盖整个项目） */
 import './viewswitch.css'
 
 /** 视图模式：广场态（消费/社交/交易）与知识态（生产/学习/开发工具） */
@@ -1519,6 +1520,8 @@ function Shell() {
       {/* 轮 21 打通：定时发布 App 级轮询（挂载即检 + 每 30s 一轮，到点经现有发布 api 入库） */}
       <ScheduledTicker />
       <WbHero />
+      {/* 微博式下拉揭示搜索栏：全局常驻，任意页面顶部下拉手势即可揭示 */}
+      <PullSearchBar />
       <div className="shell">
         <SideNav />
         <main className="app-shell">
