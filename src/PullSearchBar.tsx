@@ -69,7 +69,9 @@ export function PullSearchBar() {
     usePullReveal({
       threshold: 80,
       refreshThreshold: 170,
-      maxPull: 240,
+      /* 阻尼后位移上限：132 ≈ 手指拉 240px 时的阻尼位移，即下拉 240px 完全揭示搜索栏。
+         若按阻尼前理解写成 240，则需手指拉 436px 才能完全揭示，视觉严重滞后。 */
+      maxPull: 132,
       damping: 0.55,
       onRefresh,
     })

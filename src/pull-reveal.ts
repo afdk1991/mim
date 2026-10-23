@@ -24,9 +24,13 @@ import { useCallback, useRef, useState } from 'react'
 export type RevealState = 'idle' | 'pulling' | 'expanded' | 'settling' | 'refreshing'
 
 export interface PullRevealOptions {
-  /** 触发展开搜索栏所需的下拉距离(px) */
+  /**
+   * 触发展开搜索栏所需的下拉距离(px)。
+   * 注意：阈值一律按「手指原始位移」判定，不乘阻尼——否则 0.55 阻尼下
+   * 标称 80px 实际要拉 145px，标称 170px 要拉 309px，超出正常拇指行程。
+   */
   threshold?: number
-  /** 触发下拉刷新所需的下拉距离(px)，须大于 threshold */
+  /** 触发下拉刷新所需的下拉距离(px，同为手指原始位移)，须大于 threshold */
   refreshThreshold?: number
   /** 最大可下拉距离(px)，超过后不再跟随 */
   maxPull?: number
@@ -82,7 +86,10 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
   stateRef.current = state
   const startY = useRef(0)
   const pulling = useRef(false)
+  /** 阻尼后的位移，仅用于视觉揭示比例 */
   const dist = useRef(0)
+  /** 手指原始位移，用于阈值判定（见 PullRevealOptions.threshold 注释） */
+  const rawDist = useRef(0)
   const transitioning = useRef(false)
 
   /**
@@ -93,15 +100,16 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
     (allowRefresh: boolean) => {
       if (transitioning.current) return
       pulling.current = false
-      const d = dist.current
-      const goRefresh = allowRefresh && d >= refreshThreshold
-      const reached = d >= threshold
+      const raw = rawDist.current
+      const goRefresh = allowRefresh && raw >= refreshThreshold
+      const reached = raw >= threshold
       transitioning.current = true
       setState('settling')
       setReveal(goRefresh || reached ? 1 : 0)
       window.setTimeout(() => {
         transitioning.current = false
         dist.current = 0
+        rawDist.current = 0
         setRefreshArmed(false)
         if (goRefresh) {
           setState('refreshing')
@@ -151,6 +159,7 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
     window.setTimeout(() => {
       transitioning.current = false
       dist.current = 0
+      rawDist.current = 0
       setRefreshArmed(false)
       setState('idle')
       onCollapsed?.()
@@ -166,6 +175,7 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
       startY.current = e.touches[0].clientY
       pulling.current = true
       dist.current = 0
+      rawDist.current = 0
     }
     const onMove = (e: TouchEvent) => {
       if (!pulling.current || transitioning.current) return
@@ -174,6 +184,7 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
         // 上滑：恢复初始，交还滚动
         if (dist.current !== 0) {
           dist.current = 0
+          rawDist.current = 0
           setReveal(0)
           setState('idle')
         }
@@ -183,9 +194,10 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
       }
       const d = Math.min(dy * damping, maxPull)
       dist.current = d
+      rawDist.current = dy
       setReveal(d / maxPull)
       setState('pulling')
-      setRefreshArmed(d >= refreshThreshold)
+      setRefreshArmed(dy >= refreshThreshold)
       // 顶部下拉时阻止原生滚动橡皮筋（监听以 passive:false 注册）
       if (getScrollTop() <= 0) e.preventDefault()
     }
@@ -223,6 +235,7 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
           if (dy <= 0) {
             if (dist.current !== 0) {
               dist.current = 0
+              rawDist.current = 0
               setReveal(0)
               setState('idle')
             }
@@ -230,6 +243,7 @@ export function usePullReveal(opts: PullRevealOptions = {}): PullRevealApi {
           }
           const d = Math.min(dy, maxPull)
           dist.current = d
+          rawDist.current = dy
           setReveal(d / maxPull)
           setState('pulling')
         }
