@@ -139,6 +139,67 @@ npm run build
 edgeone pages deploy ./dist -n mim -e production
 ```
 
+## 四、云函数开发与排障
+
+### 改完云函数必须手动重新部署
+
+CI 只部署**前端**（GitHub Pages + EdgeOne）。`cloudfunctions/mim-api/index.js` 改动后
+必须手动部署才会生效，否则线上仍跑旧代码：
+
+```powershell
+# 用 CloudBase CLI
+tcb fn deploy mim-api --dir ./cloudfunctions
+```
+
+或通过 CloudBase MCP：`manageFunctions(action="updateFunctionCode", functionName="mim-api",
+functionRootPath="<项目根>/cloudfunctions", handler="index.main")`。
+
+> 注意 `functionRootPath` 指向**包含函数目录的父目录**（`cloudfunctions`），
+> 不是项目根目录，也不是 `cloudfunctions/mim-api` 本身。
+
+### 上线前回归清单（真实 curl 验证，别靠静态推断）
+
+```powershell
+$API = "https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api"
+
+# 1. 注册拿 token
+$r = Invoke-RestMethod "$API/auth/register" -Method POST -ContentType "application/json" `
+      -Body '{"username":"smoke_test","password":"SmokeTest@2026"}'
+$t = $r.token
+
+# 2. 鉴权 / 权限 / 越权 逐项核对（期望值见下表）
+Invoke-RestMethod "$API/auth/me" -Headers @{ Authorization = "Bearer $t" }   # 200
+Invoke-RestMethod "$API/db/rest/posts"                                       # 200 匿名可读
+Invoke-RestMethod "$API/db/rest/favorites"                                   # 401 匿名不可读私有表
+Invoke-RestMethod "$API/db/rest/app_users" -Headers @{ Authorization="Bearer $t" }  # 403
+Invoke-RestMethod "$API/db/rest/topics" -Method POST -Headers @{ Authorization="Bearer $t" } `
+      -ContentType "application/json" -Body '{"name":"x"}'                   # 403 只读表
+```
+
+| 用例 | 期望 |
+| --- | --- |
+| `POST /auth/register`、`POST /auth/login` | 200 |
+| `GET /auth/me`（带 Bearer） | 200 |
+| 匿名读 `posts` / `topics` 等公开表 | 200 |
+| 匿名读 `favorites` 等私有表、匿名写任意表 | 401 |
+| 写只读表（`topics` / `hot_searches` / `resources`） | 403 |
+| 访问 `app_users` / `audit_logs` | 403 |
+| 非法表名（如 `posts;drop`） | 400 |
+| 改他人数据 | 返回空（强制追加 owner 过滤，改 0 行） |
+| 任意域名携带 Origin | 响应 `Access-Control-Allow-Origin: *` |
+
+### 「注册/登录成功，但 /auth/me 返回 401」
+
+**先别改鉴权代码**，按此顺序排查：
+
+1. **重新登录取一个新 token 再试。** 最常见原因是 `MIM_TOKEN_SECRET` 被轮换过，
+   旧 token 的 HMAC 签名校验自然失败。换发新 token 后通常立即恢复 200。
+2. 确认请求头名是 `Authorization: Bearer <token>`（也接受 `x-mim-token: <token>`）。
+3. 仍失败再查云函数日志：`queryFunctions(action="listFunctionLogs", functionName="mim-api")`。
+
+> 副作用：轮换 `MIM_TOKEN_SECRET` 会让**全部已登录用户的令牌失效**（需重新登录）。
+> 这是设计使然，但生产环境不要频繁轮换。
+
 ## 常见问题
 
 - **Pages 部署按钮置灰**：未把 Settings → Pages 的 Source 切成 GitHub Actions。

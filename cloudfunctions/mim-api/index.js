@@ -370,7 +370,12 @@ async function proxyRpc({ fn, body, uid }) {
 // ---------------------------------------------------------------------------
 async function handler(event) {
   const method = (event.httpMethod || event.method || 'GET').toUpperCase()
-  const headers = event.headers || {}
+  /* HTTP 头名大小写不敏感，但 CloudBase HTTP 访问服务透传的是原始大小写
+     （curl 发 `Authorization`，浏览器可能发 `authorization`）。
+     若直接读 headers.authorization，大小写不匹配时恒为 undefined
+     ⇒ token 取空 ⇒ 所有需登录的接口一律 401。这里统一小写化后再读取。 */
+  const headers = {}
+  for (const k of Object.keys(event.headers || {})) headers[k.toLowerCase()] = (event.headers || {})[k]
   if (method === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' }
 
   let rawBody = event.body
