@@ -866,7 +866,7 @@ function UserMenu() {
             <Avatar emoji={api.me.emoji} color={api.me.color} size={38} />
             <div>
               <b>{api.me.name}</b>
-              <small>{auth.mode === 'cloud' ? (auth.email ?? '云端账号') : '本地演示模式'}</small>
+              <small>{auth.mode === 'cloud' ? (auth.username ?? auth.email ?? '云端账号') : '本地演示模式'}</small>
             </div>
           </div>
           <div className="usermenu-sec">演示身份</div>
