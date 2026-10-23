@@ -1,8 +1,8 @@
 name: CI/CD · 构建 & 部署
 
 # 边开发边上线：
-# - push main / 手动触发 → 构建 → 同步部署到 GitHub Pages + EdgeOne Pages
-# - 打 tag v* → 构建 + 发布 npm 包到 GitHub Packages（Pages/EdgeOne 与 main 同提交，无需重复部署）
+# - push main / 手动触发 → 构建 → 同步部署到 GitHub Pages + EdgeOne Makers
+# - 打 tag v* → 构建 + 发布 npm 包到 GitHub Packages（Pages/Makers 与 main 同提交，无需重复部署）
 # - pull_request → 只跑质量门禁（typecheck + build），不部署
 
 on:
@@ -87,12 +87,12 @@ jobs:
         uses: actions/deploy-pages@v4
 
   deploy-edgeone:
-    name: 部署 EdgeOne Pages
+    name: 部署 EdgeOne Makers
     needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
-      # EdgeOne Pages 项目名（项目不存在会自动创建），可在仓库变量或此处修改
+      # EdgeOne Makers 项目名（已存在 makers-euoglvyjyknd），可在仓库变量或此处修改
       EDGEONE_PROJECT_NAME: mim
     steps:
       - uses: actions/checkout@v4
@@ -101,17 +101,18 @@ jobs:
         with:
           node-version: 22
 
+      # 升级 npm 规避 arborist edgesOut 崩溃（vite 8 optional peers，同 build job）
+      - name: 安装依赖
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
+
       - name: 安装 EdgeOne CLI
         run: npm install -g edgeone
 
-      - name: 下载构建产物
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist
-
-      - name: 推送至 EdgeOne Pages（production）
-        run: edgeone pages deploy ./dist -n "$EDGEONE_PROJECT_NAME" -t "${{ secrets.EDGEONE_API_TOKEN }}" -e production
+      # Makers 部署：CLI 自动检测框架、构建并上传 dist；-t 复用 EdgeOne API Token
+      - name: 部署至 EdgeOne Makers（production）
+        run: PAGES_SOURCE=skills edgeone makers deploy -n "$EDGEONE_PROJECT_NAME" -t "${{ secrets.EDGEONE_API_TOKEN }}" --json
 
   publish-package:
     name: 发布 npm 包到 GitHub Packages
