@@ -2,6 +2,22 @@
 
 本项目已配置一条完整的 CI/CD 流水线：[.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml)。
 
+## 全栈分层：谁负责哪一层
+
+| 能力层 | Mim 的选型 | 落地位置 | 免费额度 / 说明 |
+| --- | --- | --- | --- |
+| 代码仓库 + CI | GitHub | 仓库 `afdk1991/mim` + Actions | 私有库免费，Actions 每月 2000 分钟 |
+| 制品仓库 | GitHub Packages | 打 tag `v*` 自动发布 `@afdk1991/mim` | 免费套餐仅 public，故 `npm publish --access public` |
+| 纯静态前端 | GitHub Pages | `#/feed` hash 路由，`dist/` 直发 | 免费，无需 404 兜底 |
+| 动态前端（国内边缘） | EdgeOne Makers | 同一份 `dist/`，CLI 自动部署 | 免费档，自动给预览域名 |
+| 后端 API | CloudBase 云函数 `mim-api` | `cloudfunctions/mim-api/index.js` | 自建账号 + 数据库代理 + 存储代理 |
+| 数据库 | CloudBase PostgreSQL | 经 `mim-api` 代理（postgREST） | RLS 由云函数强制注入 |
+| 对象存储 | CloudBase PG 存储桶 `mim-media` | 经 `mim-api` 代理（私有桶 + 签名链接） | 见「云存储」一节 |
+| Auth | 自建（PBKDF2 + HMAC） | `mim-api` 内 | 平台 signup 恒 501，只能自建 |
+
+一句话：**GitHub 管代码与制品，Pages + EdgeOne 管前端，CloudBase 云函数统一管 API / 数据库 / 存储。**
+三者通过一次 `git push` 串起来。
+
 ## 〇、云端后端（先读这段）
 
 Mim 的云端后端是 **CloudBase 云函数 `mim-api`**（代码见 `cloudfunctions/mim-api/index.js`），
@@ -47,6 +63,7 @@ VITE_MIM_API_BASE=https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tclo
 | 事件 | 动作 |
 | --- | --- |
 | Push 到 `main` | 类型检查 → 构建 → 自动部署 **GitHub Pages** + **EdgeOne Pages** |
+| Push 到 `main` 且 `cloudfunctions/` 有变更 | 额外部署云函数 **mim-api**（需先配 CloudBase 密钥，未配则跳过） |
 | Push tag `v*`（如 `v1.0.0`） | 类型检查 → 构建 → 发布 npm 包到 **GitHub Packages**（站点与 main 同提交，无需重复部署） |
 | Pull Request | 只跑质量门禁（typecheck + build），不部署 |
 | 手动触发 | 在仓库 Actions 页点 `Run workflow` 随时部署 |
@@ -141,14 +158,22 @@ edgeone pages deploy ./dist -n mim -e production
 
 ## 四、云函数开发与排障
 
-### 改完云函数必须手动重新部署
+### 部署方式：CI 自动（推荐）+ 手动兜底
 
-CI 只部署**前端**（GitHub Pages + EdgeOne）。`cloudfunctions/mim-api/index.js` 改动后
-必须手动部署才会生效，否则线上仍跑旧代码：
+CI 的 `deploy-function` job 会在 `cloudfunctions/` 有变更时自动部署，
+但需要仓库先配好三个 Secrets（**Settings → Secrets and variables → Actions**）：
+
+| Secret | 说明 |
+| --- | --- |
+| `CLOUDBASE_SECRET_ID` | 腾讯云 API 密钥 SecretId（CAM 子账号，授予 CloudBase 相关权限） |
+| `CLOUDBASE_SECRET_KEY` | 对应 SecretKey |
+| `CLOUDBASE_ENV_ID` | CloudBase 环境 ID，形如 `xxx-1a2b3c4d` |
+
+**未配置时该 job 整段跳过**，不影响 Pages / EdgeOne 部署。此时改完云函数仍需手动部署：
 
 ```powershell
 # 用 CloudBase CLI
-tcb fn deploy mim-api --dir ./cloudfunctions
+tcb fn deploy mim-api --dir ./cloudfunctions -e <环境ID>
 ```
 
 或通过 CloudBase MCP：`manageFunctions(action="updateFunctionCode", functionName="mim-api",
@@ -156,6 +181,46 @@ functionRootPath="<项目根>/cloudfunctions", handler="index.main")`。
 
 > 注意 `functionRootPath` 指向**包含函数目录的父目录**（`cloudfunctions`），
 > 不是项目根目录，也不是 `cloudfunctions/mim-api` 本身。
+>
+> 另：函数开启了 `InstallDependency`，上传带 `package.json` 的代码后云端会装依赖，
+> 刚部署完的 1～2 分钟内 `require` 可能仍报 MODULE_NOT_FOUND，稍等再验。
+
+### 云存储（对象存储层）
+
+桶 `mim-media` 为**私有桶**，文件只能凭签名链接访问。因为是 CloudBase **PostgreSQL 模式**，
+旧 COS 接口（`app.uploadFile` / `getTempFileURL`）会直接报 `STORAGE_NOT_SUPPORTED`，
+必须走 PG 存储 HTTP API（云函数内已封装）：
+
+| 动作 | 端点 |
+| --- | --- |
+| 上传 | `POST /v1/storages/object/<bucket>/<key>`（请求体即文件字节） |
+| 取签名链接 | `POST /v1/storages/object/sign/<bucket>/<key>` `{expiresIn}` |
+| 列目录 | `POST /v1/storages/object/list/<bucket>` `{prefix,limit}` |
+| 删除 | `DELETE /v1/storages/object/<bucket>/<key>` |
+
+前端可用路由（均需登录，返回 CORS `*`）：
+
+| 路由 | 说明 |
+| --- | --- |
+| `POST /storage/upload` | `{name, mime, data(base64)}` → `{key, bucket, size}` |
+| `GET /storage/url?key=…&expiresIn=…` | 取临时可访问链接 |
+| `GET /storage/list` | 列出自己目录下的文件 |
+| `POST /storage/delete` | `{keys:[…]}` 删除自己的文件 |
+
+约束与隔离：
+
+- 单文件上限 **3MB**（HTTP 请求体 ~6MB，base64 膨胀 33% 后留余量）；
+- 仅放行 `image/*`、`video/*`、`audio/*`（`image/svg+xml` 因可内嵌脚本被排除）；
+- 对象 key 固定为 `<uid>/<yyyy-mm>/<uuid>.<ext>`，取链与删除前校验首段 uid ⇒ **无法读写他人文件**。
+
+建桶 SQL（已执行，重建时再用）：
+
+```sql
+INSERT INTO storage.buckets (id, name, public) VALUES ('mim-media', 'mim-media', false);
+```
+
+前端入口见 `src/lib/cloud-storage.ts`，UI 见「发布页 → 媒体 → 上传/转码工作台」：
+已登录即真上传并显示 `☁️ 已上传云端`，未登录/超限时自动退回本地预览，不静默失败。
 
 ### 上线前回归清单（真实 curl 验证，别靠静态推断）
 
@@ -187,6 +252,17 @@ Invoke-RestMethod "$API/db/rest/topics" -Method POST -Headers @{ Authorization="
 | 非法表名（如 `posts;drop`） | 400 |
 | 改他人数据 | 返回空（强制追加 owner 过滤，改 0 行） |
 | 任意域名携带 Origin | 响应 `Access-Control-Allow-Origin: *` |
+
+### 存储链路回归（一键跑真实调用）
+
+```powershell
+node scripts/smoke-storage.mjs     # 默认打线上 mim-api
+MIM_API=https://xxx/mim-api node scripts/smoke-storage.mjs
+```
+
+覆盖 14 项：注册 → 上传 → 匿名拦截(401) → 类型拦截(415) → 超限拦截(413) →
+取签名链接 → 链接匿名可下载 → 越权取链(403) → 列目录 → 删除 → 越权删除(403) →
+删除后取链(404)。全通过退出码 0，有失败为 1。
 
 ### 「注册/登录成功，但 /auth/me 返回 401」
 

@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:apply": "node scripts/apply-migration.mjs"
+    "db:apply": "node scripts/apply-migration.mjs",
+    "smoke:storage": "node scripts/smoke-storage.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

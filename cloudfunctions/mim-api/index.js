@@ -366,6 +366,167 @@ async function proxyRpc({ fn, body, uid }) {
 }
 
 // ---------------------------------------------------------------------------
+// 云存储代理（对象存储层）
+// ---------------------------------------------------------------------------
+/*
+ * 为什么必须走云函数代理（而不是浏览器直传 sdk）：
+ *   1) CloudBase 客户端 SDK 的 uploadFile 依赖 SDK 自身的登录态；
+ *      本环境匿名登录与邮箱通道均关闭，注册为自建体系 ⇒ 浏览器拿不到可用于上传的登录态。
+ *   2) 网关 CORS 只放行安全域名白名单（体验版不可加域名），浏览器直传会被 403。
+ *   云函数以服务端身份写入存储，并自行回写 CORS ⇒ 任意部署域名可用。
+ *
+ * 存储形态：本环境为 CloudBase PostgreSQL 模式，旧 COS 接口（sdk 的 uploadFile /
+ *   getTempFileURL）会直接报 STORAGE_NOT_SUPPORTED，必须走 PG 存储 HTTP API：
+ *     POST   /v1/storages/object/<bucket>/<key>       上传（请求体即文件字节）
+ *     POST   /v1/storages/object/sign/<bucket>/<key>  取签名下载链接 {expiresIn}
+ *     POST   /v1/storages/object/list/<bucket>        列目录 {prefix,limit}
+ *     DELETE /v1/storages/object/<bucket>/<key>       删除
+ *   桶为私有（public=false），文件只能通过签名链接访问。
+ *
+ * 隔离模型（与数据库代理同构，全部由服务端强制，不接受客户端指定）：
+ *   对象 key 固定为 <uid>/<yyyy-mm>/<uuid>.<ext>，首段即当前登录者的 uid。
+ *   取链 / 删除前校验首段，越权 key 一律 403 —— 无法读写他人文件。
+ */
+
+/** 单文件上限：HTTP 访问服务请求体上限约 6MB，base64 膨胀 33%，取 3MB 留足余量 */
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024
+
+/** 允许的类型（按 MIME 前缀放行）。svg 可内嵌脚本存在 XSS 面，显式排除 */
+const MIME_ALLOW = ['image/', 'video/', 'audio/']
+const MIME_DENY = new Set(['image/svg+xml'])
+
+const EXT_BY_MIME = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
+  'image/bmp': 'bmp', 'image/avif': 'avif',
+  'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/webm': 'weba',
+  'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/x-msvideo': 'avi',
+}
+
+/** 从原始文件名取扩展名并做白名单收敛，避免 ../ 与双扩展名等路径问题 */
+function safeExt(name, mime) {
+  const byMime = EXT_BY_MIME[mime]
+  if (byMime) return byMime
+  const m = String(name || '').match(/\.([a-zA-Z0-9]{1,8})$/)
+  const ext = m ? m[1].toLowerCase() : ''
+  if (/^[a-zA-Z0-9]{1,8}$/.test(ext) && !/^(php|jsp|asp|aspx|sh|exe|html?|js)$/.test(ext)) return ext
+  return 'bin'
+}
+
+/** 私有桶：文件只能通过签名链接访问（可由环境变量覆盖） */
+const STORAGE_BUCKET = process.env.MIM_STORAGE_BUCKET || 'mim-media'
+
+/** key 首段必须等于自己的 uid —— 无法读写他人文件 */
+function ownKey(uid, key) {
+  return typeof key === 'string' && key.startsWith(`${uid}/`) && !key.includes('..')
+}
+
+/** 调用 PG 存储 HTTP API（服务端 service_role 凭据） */
+async function stor(path, { method = 'GET', body, contentType } = {}) {
+  const headers = { Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY }
+  if (contentType) headers['Content-Type'] = contentType
+  const r = await fetch(`${GW}${path}`, { method, headers, body })
+  const text = await r.text()
+  let json = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    json = text
+  }
+  return { status: r.status, json, text }
+}
+
+async function storageUpload({ uid, body }) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const p = body && typeof body === 'object' ? body : {}
+  const dataB64 = typeof p.data === 'string' ? p.data : ''
+  if (!dataB64) return resp(400, { error: '缺少文件数据（base64）' })
+
+  const buf = Buffer.from(dataB64, 'base64')
+  if (!buf.length) return resp(400, { error: '文件内容为空' })
+  if (buf.length > MAX_UPLOAD_BYTES) {
+    return resp(413, { error: `文件过大，单文件上限 ${Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)}MB（HTTP 请求体限制）` })
+  }
+
+  const mime = String(p.mime || 'application/octet-stream').split(';')[0].trim().toLowerCase()
+  if (MIME_DENY.has(mime) || !MIME_ALLOW.some((prefix) => mime.startsWith(prefix))) {
+    return resp(415, { error: `不支持的文件类型：${mime}（仅支持图片 / 音频 / 视频）` })
+  }
+
+  const now = new Date()
+  const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+  const key = `${uid}/${ym}/${crypto.randomUUID()}.${safeExt(p.name, mime)}`
+
+  const r = await stor(`/v1/storages/object/${STORAGE_BUCKET}/${key}`, {
+    method: 'POST',
+    body: buf,
+    contentType: mime,
+  })
+  if (r.status >= 400) return resp(502, { error: '上传失败', detail: r.text.slice(0, 300) })
+  return resp(200, {
+    key,
+    bucket: STORAGE_BUCKET,
+    id: r.json && r.json.Id,
+    size: buf.length,
+    mime,
+    name: String(p.name || ''),
+  })
+}
+
+async function storageUrl({ uid, key, expiresIn }) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  if (!ownKey(uid, key)) return resp(403, { error: '只能访问自己的文件' })
+  const secs = Math.min(Math.max(Number(expiresIn) || 3600, 60), 86400)
+  const r = await stor(`/v1/storages/object/sign/${STORAGE_BUCKET}/${key}`, {
+    method: 'POST',
+    body: JSON.stringify({ expiresIn: secs }),
+    contentType: 'application/json',
+  })
+  if (r.status >= 400) return resp(404, { error: '取链失败（文件可能不存在）', detail: r.text.slice(0, 300) })
+  const url = (r.json && (r.json.fullSignedURL || r.json.signedURL)) || ''
+  if (!url) return resp(404, { error: '取链失败', detail: r.text.slice(0, 300) })
+  return resp(200, { key, url, expiresIn: secs })
+}
+
+async function storageList({ uid, prefix }) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  // 前缀强制收敛到自己的目录：客户端传入的任何值都只作为自己的子目录使用
+  const sub = String(prefix || '').replace(/^\/+/, '').replace(/\.\./g, '')
+  const dir = `${uid}/${sub}`.replace(/\/+/g, '/').replace(/\/$/, '')
+  const r = await stor(`/v1/storages/object/list/${STORAGE_BUCKET}`, {
+    method: 'POST',
+    body: JSON.stringify({ prefix: dir, limit: 100 }),
+    contentType: 'application/json',
+  })
+  if (r.status >= 400) return resp(502, { error: '列目录失败', detail: r.text.slice(0, 300) })
+  const objects = (r.json && r.json.objects) || []
+  return resp(200, {
+    bucket: STORAGE_BUCKET,
+    dir,
+    items: objects.map((o) => ({
+      key: `${dir}/${o.name}`.replace(/^\/+/, ''),
+      name: o.name,
+      size: o.metadata ? o.metadata.size : (o.size ?? null),
+      mime: o.metadata ? o.metadata.mimetype : null,
+      updated: o.updated_at || o.created_at || null,
+    })),
+  })
+}
+
+async function storageDelete({ uid, body }) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const p = body && typeof body === 'object' ? body : {}
+  const list = Array.isArray(p.keys) ? p.keys : [p.key]
+  const targets = list.filter((x) => ownKey(uid, x))
+  if (targets.length === 0) return resp(403, { error: '未提供可删除的文件（只能删除自己的文件）' })
+  const done = []
+  for (const key of targets.slice(0, 20)) {
+    const r = await stor(`/v1/storages/object/${STORAGE_BUCKET}/${key}`, { method: 'DELETE' })
+    done.push({ key, ok: r.status < 400, status: r.status })
+  }
+  return resp(200, { ok: true, deleted: done.filter((d) => d.ok).length, detail: done })
+}
+
+// ---------------------------------------------------------------------------
 // 入口
 // ---------------------------------------------------------------------------
 async function handler(event) {
@@ -398,7 +559,7 @@ async function handler(event) {
   const path = String(event.path || event.requestContext?.path || '')
   // CloudBase HTTP 访问服务路径形如 /<函数名>/<业务路径>，这里截取业务段
   let rest = path
-  const marker = Math.max(path.indexOf('/auth/'), path.indexOf('/db/'))
+  const marker = Math.max(path.indexOf('/auth/'), path.indexOf('/db/'), path.indexOf('/storage/'))
   if (marker >= 0) rest = path.slice(marker)
 
   const qp = event.queryStringParameters || event.query || {}
@@ -439,7 +600,25 @@ async function handler(event) {
     })
   }
 
-  return resp(200, { ok: true, service: 'mim-api', routes: ['/auth/register', '/auth/login', '/auth/me', '/db/rest/<table>'] })
+  // ---- 云存储代理 ----
+  if (rest.startsWith('/storage/')) {
+    const route = rest.slice('/storage'.length)
+    if (route === '/upload' && method === 'POST') return storageUpload({ uid: session?.uid, body })
+    if (route === '/url' && method === 'GET') return storageUrl({ uid: session?.uid, key: qp.key, expiresIn: qp.expiresIn })
+    if (route === '/list' && method === 'GET') return storageList({ uid: session?.uid, prefix: qp.prefix })
+    if (route === '/delete' && (method === 'POST' || method === 'DELETE')) return storageDelete({ uid: session?.uid, body })
+    return resp(404, { error: 'storage 路由不存在' })
+  }
+
+  return resp(200, {
+    ok: true,
+    service: 'mim-api',
+    routes: [
+      '/auth/register', '/auth/login', '/auth/me',
+      '/db/rest/<table>', '/db/rpc/<fn>',
+      '/storage/upload', '/storage/url', '/storage/list', '/storage/delete',
+    ],
+  })
 }
 
 exports.main = async (event) => {

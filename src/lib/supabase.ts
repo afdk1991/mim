@@ -374,6 +374,14 @@ export const supabase: CloudClient | null = API_BASE ? createCloudClient() : nul
 /** 是否已接入云端（true 时读路径/写路径走 CloudBase PG） */
 export const cloudEnabled = supabase !== null
 
+/** 云端后端地址（供存储等子模块拼自己的接口路径） */
+export const cloudApiBase = API_BASE
+
+/** 当前会话令牌（供存储等子模块自行携带鉴权头） */
+export function cloudToken(): string {
+  return getToken()
+}
+
 /* 自建账号体系不提供 OAuth provider 探测端点，保持 null 以跳过探测。 */
 export const authSettingsUrl: string | null = null
 
