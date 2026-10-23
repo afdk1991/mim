@@ -128,17 +128,28 @@ jobs:
   deploy-function:
     name: 部署云函数 mim-api
     needs: build
-    # 仅 main 分支；未配置 CloudBase 密钥时整 job 跳过（不判失败）
-    if: github.ref == 'refs/heads/main' && secrets.CLOUDBASE_SECRET_ID != ''
+    # 仅 main 分支。
+    # ⚠️ 不能写成 `if: ... && secrets.CLOUDBASE_SECRET_ID != ''` ——
+    #    secrets 上下文在 job 级 if 中不合法，会导致整个 workflow 解析失败
+    #    （实测：0 个 job 启动，Pages/EdgeOne 部署全部被阻塞）。
+    #    正确做法：job 级 env 承接布尔值，再用 step 级 if 判断。
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      HAS_CLOUDBASE: ${{ secrets.CLOUDBASE_SECRET_ID != '' && secrets.CLOUDBASE_SECRET_KEY != '' && secrets.CLOUDBASE_ENV_ID != '' }}
     steps:
+      - name: 未配置 CloudBase 密钥时跳过
+        if: env.HAS_CLOUDBASE != 'true'
+        run: echo "未配置 CLOUDBASE_SECRET_ID/KEY/ENV_ID，跳过云函数部署（不影响其他部署）"
       - uses: actions/checkout@v4
+        if: env.HAS_CLOUDBASE == 'true'
         with:
           # 需要与上一个 commit 比对才能判断 cloudfunctions/ 是否变更
           fetch-depth: 0
 
       - name: 判断 cloudfunctions 是否变更
         id: changed
+        if: env.HAS_CLOUDBASE == 'true'
         run: |
           before="${{ github.event.before }}"
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
@@ -151,12 +162,12 @@ jobs:
           fi
 
       - uses: actions/setup-node@v4
-        if: steps.changed.outputs.changed == 'true'
+        if: env.HAS_CLOUDBASE == 'true' && steps.changed.outputs.changed == 'true'
         with:
           node-version: 22
 
       - name: 安装 CloudBase CLI 并部署
-        if: steps.changed.outputs.changed == 'true'
+        if: env.HAS_CLOUDBASE == 'true' && steps.changed.outputs.changed == 'true'
         env:
           CLOUDBASE_SECRET_ID: ${{ secrets.CLOUDBASE_SECRET_ID }}
           CLOUDBASE_SECRET_KEY: ${{ secrets.CLOUDBASE_SECRET_KEY }}
