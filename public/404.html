@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>正在跳转… · Mim</title>
+    <!--
+      GitHub Pages（及多数静态托管）对未知路径直接 404。
+      本站是 hash 路由 SPA（路由写在 location.hash 里），正确地址形如 /#/admin/audit。
+      本页把 clean path（如 /mim/admin/audit）还原为 hash 路由，兼容两种部署：
+        - GitHub Pages 项目站：仓库子路径 /mim
+        - EdgeOne Pages 根路径：/
+      原理：相对 ./ 会自动解析到 index.html 所在目录，因此无需硬编码 base。
+    -->
+    <script>
+      (function () {
+        try {
+          var pathname = window.location.pathname || '/'
+          // 去掉 GitHub Pages 项目子路径前缀 /mim（EdgeOne 根部署无此前缀，replace 不生效）
+          var route = pathname.replace(/^\/mim/, '')
+          // 拼回 hash 路由；保留原始 query（若有）
+          var target = './#' + route + (window.location.search || '')
+          window.location.replace(target)
+        } catch (e) {
+          // 兜底：直接回到站点根
+          window.location.replace('./')
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <p style="font-family: system-ui, sans-serif; text-align: center; margin-top: 40vh">
+      正在跳转到正确页面…<br />
+      若未自动跳转，请访问 <a href="./">站点首页</a>。
+    </p>
+    <noscript>
+      <p style="font-family: system-ui, sans-serif; text-align: center; margin-top: 40vh">
+        本站点为单页应用，需要 JavaScript。请<a href="./">返回首页</a>。
+      </p>
+    </noscript>
+  </body>
+</html>

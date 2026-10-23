@@ -85,6 +85,22 @@ as $$
   );
 $$;
 
+-- 权限判定（security definer：绕过 RLS，避免 user_roles/role_permissions 策略递归）
+-- 用于把后端 RLS 与前端 RBAC 的权限点（permissions.key）对齐，例如 audit:view / role:manage
+create or replace function public.has_perm(perm_key text)
+returns boolean
+language sql security definer stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_roles ur
+    join public.role_permissions rp on rp.role_id = ur.role_id
+    join public.permissions p on p.id = rp.permission_id
+    where ur.user_id = auth.uid() and p.key = perm_key
+  );
+$$;
+
 -- ---------- 种子：四角色 + 权限点（菜单+按钮级，Phase1 粒度） ----------
 insert into public.roles (name, description) values
   ('admin',        '超级管理员：全部权限'),
@@ -166,10 +182,11 @@ drop policy if exists user_roles_admin_write on public.user_roles;
 create policy user_roles_admin_write on public.user_roles for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- 审计日志：admin 可读；登录用户可写且 actor 必须是本人（记录自己的操作轨迹）
+-- 审计日志：admin 或持有 audit:view 权限者（如 operator）可读；
+-- 登录用户可写且 actor 必须是本人（记录自己的操作轨迹）
 drop policy if exists audit_logs_admin_read on public.audit_logs;
 create policy audit_logs_admin_read on public.audit_logs for select to authenticated
-  using (public.is_admin());
+  using (public.is_admin() or public.has_perm('audit:view'));
 drop policy if exists audit_logs_insert on public.audit_logs;
 create policy audit_logs_insert on public.audit_logs for insert to authenticated
   with check (actor_id = auth.uid());

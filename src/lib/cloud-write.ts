@@ -197,6 +197,29 @@ export async function cloudUpdateArticle(
   return true
 }
 
+/* ---------- 动态编辑（轮 4 补全）：patch 仅含可编辑字段，author_id 二次校验防越权 ---------- */
+
+export async function cloudUpdatePost(
+  id: string,
+  d: { content: string; images: string[]; topic?: string | null; source?: string },
+): Promise<boolean> {
+  const userId = await cloudUserId()
+  if (!userId) return true
+  const patch: Record<string, unknown> = { content: d.content, images: d.images }
+  if (d.topic !== undefined) patch.topic = d.topic
+  if (d.source !== undefined) patch.source = d.source
+  const { error } = await supabase!
+    .from('posts')
+    .update(patch)
+    .eq('id', id)
+    .eq('author_id', userId)
+  if (error) {
+    cloudToast(`⚠ 动态云端更新失败，已恢复：${error.message}`)
+    return false
+  }
+  return true
+}
+
 /* ---------- 关注 / 收藏 / 档案（轮 4） ---------- */
 
 export async function cloudSetFollow(followeeId: string, follow: boolean): Promise<boolean> {

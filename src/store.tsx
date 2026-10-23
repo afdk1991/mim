@@ -20,6 +20,7 @@ import {
   cloudDeleteArticle,
   cloudDeleteSnippet,
   cloudUpdateArticle,
+  cloudUpdatePost,
   cloudSetFollow,
   cloudSetFavorite,
   cloudWriteProfile,
@@ -165,6 +166,7 @@ type Action =
   | { type: 'downloadResource'; payload: string }
   | { type: 'updateProfile'; payload: { name: string; emoji: string; color: string; bio: string } }
   | { type: 'editArticle'; payload: { id: string; title: string; content: string; tags: string[] } }
+  | { type: 'editPost'; payload: { id: string; content: string; images: string[] } }
   | { type: 'deleteArticle'; payload: string }
   | { type: 'setIdentity'; payload: { meId: string; user?: User } }
   | { type: 'cloudRollbackPost'; payload: string }
@@ -511,6 +513,24 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
+    case 'editPost': {
+      const target = state.posts.find((p) => p.id === action.payload.id)
+      if (!target || target.authorId !== state.meId) return state
+      // 云端异步同步（失败不回滚，本地已是最新）
+      cloudUpdatePost(action.payload.id, {
+        content: action.payload.content,
+        images: action.payload.images,
+      })
+      return {
+        ...state,
+        posts: state.posts.map((p) =>
+          p.id === action.payload.id
+            ? { ...p, content: action.payload.content, images: action.payload.images }
+            : p,
+        ),
+      }
+    }
+
     case 'updateProfile': {
       const me = state.users[state.meId]
       // 云端异步同步（失败不回滚，本地已是最新）
@@ -819,6 +839,7 @@ interface AppApi {
   deleteArticleDraft: (id: string) => void
   updateProfile: (data: { name: string; emoji: string; color: string; bio: string }) => void
   editArticle: (id: string, data: { title: string; content: string; tags: string[] }) => void
+  editPost: (id: string, data: { content: string; images: string[] }) => void
   deleteArticle: (id: string) => void
   toggleArticleLike: (id: string) => void
   addArticleComment: (articleId: string, content: string) => void
@@ -1124,6 +1145,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             tags: data.tags,
           }).then((ok) => {
             if (!ok) dispatch({ type: 'cloudRestoreArticle', payload: snap })
+          })
+        }
+      },
+      editPost: (id, data) => {
+        const snap = state.posts.find((p) => p.id === id)
+        dispatch({ type: 'editPost', payload: { id, ...data } })
+        if (snap && state.cloudIds?.posts.includes(id)) {
+          void cloudUpdatePost(id, { content: data.content, images: data.images }).then((ok) => {
+            if (!ok) dispatch({ type: 'cloudRestorePost', payload: snap })
           })
         }
       },

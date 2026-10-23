@@ -419,6 +419,21 @@ export function PostDetailPage({ id }: { id: string }) {
   const [input, setInput] = useState('')
   /* 轮 21 打通：楼中楼——当前正在回复的评论（null = 发顶级评论） */
   const [replyTo, setReplyTo] = useState<PostComment | null>(null)
+  /* 轮 25 打通：作者本人编辑动态（正文 + 图片，上云走 editPost） */
+  const [editOpen, setEditOpen] = useState(false)
+  const [draft, setDraft] = useState({ content: '', images: '' })
+  const openEdit = () => {
+    if (!post) return
+    setDraft({ content: post.content, images: (post.images ?? []).join('\n') })
+    setEditOpen(true)
+  }
+  const saveEdit = () => {
+    if (!post) return
+    const images = draft.images.split('\n').map((s) => s.trim()).filter(Boolean)
+    api.editPost(post.id, { content: draft.content, images })
+    toast('动态已更新')
+    setEditOpen(false)
+  }
 
   useEffect(() => {
     if (post) recordView('post', post.id)
@@ -449,6 +464,19 @@ export function PostDetailPage({ id }: { id: string }) {
     <div className="page-grid single">
       <div>
         <PostCard post={post} />
+
+        {post.authorId === api.me.id && (
+          <div
+            className="card"
+            style={{ marginBottom: 10, padding: 10, display: 'flex', gap: 8, alignItems: 'center' }}
+          >
+            <strong style={{ fontSize: 14 }}>我的动态</strong>
+            <span style={{ flex: 1 }} />
+            <button className="btn btn-ghost btn-sm" onClick={openEdit}>
+              ✏️ 编辑
+            </button>
+          </div>
+        )}
 
         <div className="card">
           <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>💬 全部评论（{comments.length}）</h3>
@@ -519,6 +547,58 @@ export function PostDetailPage({ id }: { id: string }) {
             <button className="btn btn-primary btn-sm" onClick={submit}>评论</button>
           </div>
         </div>
+
+        {editOpen && (
+          <Modal title="编辑动态" onClose={() => setEditOpen(false)}>
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--muted, #8a8f99)', margin: '0 0 4px' }}>
+              正文
+            </label>
+            <textarea
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--line, #d8dbe2)',
+                fontSize: 14,
+                boxSizing: 'border-box',
+                background: 'transparent',
+                color: 'inherit',
+                resize: 'vertical',
+              }}
+              value={draft.content}
+              onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+              rows={5}
+            />
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--muted, #8a8f99)', margin: '10px 0 4px' }}>
+              图片（每行一个链接，可留空）
+            </label>
+            <textarea
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--line, #d8dbe2)',
+                fontSize: 14,
+                boxSizing: 'border-box',
+                background: 'transparent',
+                color: 'inherit',
+                resize: 'vertical',
+              }}
+              value={draft.images}
+              onChange={(e) => setDraft({ ...draft, images: e.target.value })}
+              rows={3}
+              placeholder="https://..."
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button className="btn btn-primary btn-sm" onClick={saveEdit}>
+                保存
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditOpen(false)}>
+                取消
+              </button>
+            </div>
+          </Modal>
+        )}
       </div>
     </div>
   )

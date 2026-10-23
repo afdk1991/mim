@@ -133,6 +133,15 @@ function extractAddr(from: string): string {
   return m ? (m[1] ?? from.trim()) : from.trim()
 }
 
+/* 将 Worker 返回的错误包装为前端可读提示，重点澄清 MAIL_USER/MAIL_PASS 依赖 */
+function mailErr(e: unknown): string {
+  const m = e instanceof Error ? e.message : '请求失败'
+  if (/缺少邮箱凭据/.test(m)) {
+    return `${m}；请确认 Worker 已配置环境变量 MAIL_USER/MAIL_PASS，或在本页填写账号与授权码`
+  }
+  return m
+}
+
 const fmtTime = (s: string): string => {
   const t = new Date(s).getTime()
   if (!Number.isFinite(t)) return s
@@ -218,12 +227,10 @@ function SetupForm({ onSaved }: { onSaved: (cfg: MailCfg) => void }) {
       setErr('请先填写代理 Worker 地址（部署 worker/mail-proxy 后获得）')
       return
     }
-    if (!cfg.user) {
-      setErr('请填写邮箱账号')
-      return
-    }
-    if (!cfg.pass) {
-      setErr('若 Worker 已配置服务端凭据（MAIL_USER/MAIL_PASS）可留空授权码，否则请填写授权码')
+    // 服务端凭据模式：Worker 已配置 MAIL_USER/MAIL_PASS，前端账号/授权码均可留空
+    const serverMode = !cfg.user && !cfg.pass
+    if (!serverMode && (!cfg.user || !cfg.pass)) {
+      setErr('请填写邮箱账号与授权码；若 Worker 已配置服务端凭据（MAIL_USER/MAIL_PASS）可将两者都留空')
       return
     }
     try {
@@ -232,7 +239,7 @@ function SetupForm({ onSaved }: { onSaved: (cfg: MailCfg) => void }) {
       /* 存储失败不阻塞使用（本次会话内仍可用） */
     }
     onSaved(cfg)
-    emitToast('邮箱配置已保存')
+    emitToast(serverMode ? '邮箱配置已保存（服务端凭据模式）' : '邮箱配置已保存')
   }
 
   return (
@@ -392,7 +399,7 @@ function MailBox({ cfg, onReset }: { cfg: MailCfg; onReset: () => void }) {
       setView('list')
       emitToast(`已拉取 ${list.length} 封邮件`)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '拉取失败')
+      setErr(mailErr(e))
     } finally {
       setBusy('')
     }
@@ -413,7 +420,7 @@ function MailBox({ cfg, onReset }: { cfg: MailCfg; onReset: () => void }) {
       setView('detail')
       setReadSet((s) => new Set(s).add(m.uid))
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '读取失败')
+      setErr(mailErr(e))
     } finally {
       setBusy('')
     }
@@ -440,7 +447,7 @@ function MailBox({ cfg, onReset }: { cfg: MailCfg; onReset: () => void }) {
       setDraft({ to: '', subject: '', body: '' })
       setView('list')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '发送失败')
+      setErr(mailErr(e))
     } finally {
       setBusy('')
     }

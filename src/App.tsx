@@ -1,6 +1,6 @@
 import './search-box.css'
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { APP_VERSION } from './version'
 import { AppProvider, useApp } from './store'
 import { RouterProvider, useRouter } from './router'
@@ -38,6 +38,7 @@ import { ManjuPage } from './manju'
 import { ArdotPage } from './ardot'
 import { MallProvider, MALL_CHANNEL_META, type MallChannel } from './mall/store'
 import { AuthProvider, useAuth } from './auth'
+import { fetchAuditLogs, fetchIamRoles, type AuditLogRow, type IamRole } from './lib/cloud-iam'
 import { matchSearchPages } from './search-index'
 import { VipCenterPage } from './vip'
 import { LoginPage } from './login'
@@ -577,9 +578,41 @@ function HistoryPage() {
   )
 }
 
-/* ---------- Phase1 L1 IAM：管理后台骨架页 ----------
-   双保险：菜单级（SideNav 仅 admin 可见）+ 页内角色守卫；真实数据在下一轮接入
-   （audit 页读 audit_logs，roles 页读 roles/permissions/user_roles）。 */
+/* ---------- Phase1 L1 IAM：管理后台 ----------
+   双保险：菜单级（SideNav 仅 admin 可见）+ 页内角色守卫。
+   roles 页读 roles/permissions/role_permissions/user_roles；audit 页读 audit_logs。 */
+
+const thCell: CSSProperties = {
+  padding: '10px 12px',
+  fontWeight: 600,
+  color: 'var(--muted, #8a8f99)',
+  whiteSpace: 'nowrap',
+}
+const tdCell: CSSProperties = {
+  padding: '9px 12px',
+  verticalAlign: 'top',
+}
+
+function fmtTs(s: string | number | null | undefined): string {
+  if (!s) return '—'
+  const t = typeof s === 'number' ? s : Date.parse(String(s))
+  if (!Number.isFinite(t)) return String(s)
+  return new Date(t).toLocaleString('zh-CN', { hour12: false })
+}
+
+function shortId(s: string | null | undefined): string {
+  if (!s) return '系统'
+  return s.length > 8 ? `${s.slice(0, 8)}…` : s
+}
+
+function detailStr(d: Record<string, unknown>): string {
+  try {
+    const s = JSON.stringify(d)
+    return s.length > 64 ? s.slice(0, 64) + '…' : s
+  } catch {
+    return ''
+  }
+}
 
 function AdminGate({ children }: { children: ReactNode }) {
   const { auth, hasRole } = useAuth()
@@ -611,18 +644,82 @@ function AdminHomePage() {
 
 function AdminAuditPage() {
   const { hasPerm } = useAuth()
+  const [logs, setLogs] = useState<AuditLogRow[] | null>(null)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    fetchAuditLogs()
+      .then((r) => {
+        if (!alive) return
+        setLogs(r)
+        if (r === null) setErr('读取审计日志失败（需云端登录且具备 audit:view 权限）')
+      })
+      .catch((e: unknown) => {
+        if (alive) setErr(e instanceof Error ? e.message : '读取审计日志失败')
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   return (
     <AdminGate>
       <div className="page-grid single">
         <div>
           <h2 className="page-title">📜 审计日志</h2>
-          <div className="card" style={{ padding: 16 }}>
-            {hasPerm('audit:view') ? (
-              <Empty emoji="📜" text="审计流水将在下一轮接入（audit_logs 表已就绪）" />
-            ) : (
+          {loading ? (
+            <div className="card" style={{ padding: 16 }}>
+              <p className="muted" style={{ margin: 0 }}>加载中…</p>
+            </div>
+          ) : !hasPerm('audit:view') ? (
+            <div className="card" style={{ padding: 16 }}>
               <Empty emoji="🛡️" text="缺少 audit:view 权限" />
-            )}
-          </div>
+            </div>
+          ) : err ? (
+            <div className="card" style={{ padding: 16 }}>
+              <p style={{ color: '#e5484d', margin: 0 }}>{err}</p>
+            </div>
+          ) : !logs || logs.length === 0 ? (
+            <div className="card" style={{ padding: 16 }}>
+              <Empty emoji="📜" text="暂无审计记录（操作行为将按 append-only 写入 audit_logs）" />
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', background: 'var(--card-2, #f5f6f8)' }}>
+                    <th style={thCell}>时间</th>
+                    <th style={thCell}>操作</th>
+                    <th style={thCell}>对象</th>
+                    <th style={thCell}>操作者</th>
+                    <th style={thCell}>详情</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((l) => (
+                    <tr key={l.id} style={{ borderTop: '1px solid var(--line, #e6e8ec)' }}>
+                      <td style={tdCell}>{fmtTs(l.createdAt)}</td>
+                      <td style={tdCell}><span className="tag">{l.action}</span></td>
+                      <td style={tdCell}>
+                        {l.targetType || '—'}
+                        {l.targetId ? ` · ${shortId(l.targetId)}` : ''}
+                      </td>
+                      <td style={tdCell}>{shortId(l.actorId)}</td>
+                      <td style={tdCell}>
+                        <code style={{ fontSize: 12 }}>{detailStr(l.detail)}</code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </AdminGate>
@@ -631,18 +728,86 @@ function AdminAuditPage() {
 
 function AdminRolesPage() {
   const { hasPerm } = useAuth()
+  const [roles, setRoles] = useState<IamRole[] | null>(null)
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    fetchIamRoles()
+      .then((r) => {
+        if (!alive) return
+        setRoles(r)
+        if (r === null) setErr('读取角色数据失败（需云端登录且具备 role:manage 权限）')
+      })
+      .catch((e: unknown) => {
+        if (alive) setErr(e instanceof Error ? e.message : '读取角色数据失败')
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   return (
     <AdminGate>
       <div className="page-grid single">
         <div>
           <h2 className="page-title">👥 角色管理</h2>
-          <div className="card" style={{ padding: 16 }}>
-            {hasPerm('role:manage') ? (
-              <Empty emoji="👥" text="角色/权限管理将在下一轮接入（roles + user_roles 表）" />
-            ) : (
+          {loading ? (
+            <div className="card" style={{ padding: 16 }}>
+              <p className="muted" style={{ margin: 0 }}>加载中…</p>
+            </div>
+          ) : !hasPerm('role:manage') ? (
+            <div className="card" style={{ padding: 16 }}>
               <Empty emoji="🛡️" text="缺少 role:manage 权限" />
-            )}
-          </div>
+            </div>
+          ) : err ? (
+            <div className="card" style={{ padding: 16 }}>
+              <p style={{ color: '#e5484d', margin: 0 }}>{err}</p>
+            </div>
+          ) : !roles || roles.length === 0 ? (
+            <div className="card" style={{ padding: 16 }}>
+              <Empty emoji="👥" text="暂无角色数据（请先执行 IAM 迁移 0001 并分配角色）" />
+            </div>
+          ) : (
+            <div>
+              {roles.map((r) => (
+                <div className="card" key={r.id} style={{ marginBottom: 10, padding: 14 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                      gap: 8,
+                    }}
+                  >
+                    <strong style={{ fontSize: 16 }}>{r.name}</strong>
+                    <span className="muted" style={{ fontSize: 12, flexShrink: 0 }}>
+                      {r.members} 名成员
+                    </span>
+                  </div>
+                  <p className="muted" style={{ margin: '4px 0 8px', fontSize: 13 }}>
+                    {r.description || '—'}
+                  </p>
+                  {r.permissionKeys.length === 0 ? (
+                    <span className="muted" style={{ fontSize: 12 }}>无权限点</span>
+                  ) : (
+                    <div className="chip-row">
+                      {r.permissionKeys.map((k) => (
+                        <span className="chip" key={k}>
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </AdminGate>
