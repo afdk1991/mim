@@ -20,6 +20,7 @@
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/ios": "^8.5.3",
+    "@cloudbase/js-sdk": "^3.10.3",
     "@supabase/supabase-js": "^2.118.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

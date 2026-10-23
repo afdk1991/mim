@@ -76,7 +76,9 @@ type NavItem = {
   views?: ViewMode[]
 }
 
-/** 单一导航：全量一级平铺（低频入口不再收纳进「工具箱」，直接可见，搜索/导航双闭环）。
+/** 单一导航：业务域入口一级平铺（低频入口直接可见，搜索/导航双闭环）；
+    个人账户/权益/营收类入口（发布器 · 钱包 · VIP · 成长 · 收藏 · 足迹 · 设置）
+    按《开发吧.md》「我的 · Work」定义统一归入「我的」分组二级。
     views 按《开发吧.md》合并矩阵标注视图归属：生活/社交/交易域 → 广场态；
     生产/学习/开发工具域 → 知识态；不标 = 双视图共用（我的/会员）。 */
 const NAV: NavItem[] = [
@@ -97,6 +99,11 @@ const NAV: NavItem[] = [
       { href: '#/favorites', match: '/favorites', label: '收藏' },
       { href: '#/history', match: '/history', label: '足迹' },
       { href: '#/following', match: '/following', label: '关注列表' },
+      /* 个人中心 · Work（开发吧.md「我的·Work」）：创作中心 + 收益/结算 + 会员/成长，与「工具箱」平铺解耦 */
+      { href: '#/publish', match: '/publish', label: '发布器' },
+      { href: '#/wallet', match: '/wallet', label: '统一钱包' },
+      { href: '#/vip', match: '/vip', label: 'VIP 会员' },
+      { href: '#/growth', match: '/growth', label: '成长引擎' },
       { href: '#/settings', match: '/settings', label: '设置' },
     ],
   },
@@ -113,11 +120,7 @@ const NAV: NavItem[] = [
       { href: '#/mall/wallet', match: '/mall/wallet', label: '钱包' },
     ],
   },
-  { href: '#/vip', match: '/vip', label: 'VIP 会员', icon: '👑' },
-  { href: '#/growth', match: '/growth', label: '成长引擎', icon: '🚀' },
-  { href: '#/publish', match: '/publish', label: '发布器', icon: '📤' },
   { href: '#/live', match: '/live', label: '直播开播', icon: '📡', views: ['feed'] }, /* 轮 24 打通：B5 直播开播台入口 */
-  { href: '#/wallet', match: '/wallet', label: '统一钱包', icon: '💰' },
   { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻', views: ['kb'] },
   { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦', views: ['kb'] },
   { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️', views: ['kb'] },

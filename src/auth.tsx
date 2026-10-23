@@ -11,20 +11,28 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase, cloudEnabled, authSettingsUrl, anonKeyExport } from './lib/supabase'
-import type { Provider } from '@supabase/supabase-js'
 import type { AuthMode } from './permissions'
 
 export type AuthState = {
   mode: AuthMode
   userId: string
   email: string | null
+  /** 用户名（CloudBase 本环境仅启用 usernamePassword 登录，email 可能为 null） */
+  username: string | null
   /** RBAC：当前账号的角色名列表（未登录/本地模式恒为 []） */
   roles: string[]
   /** RBAC：当前账号的权限 key 列表（未登录/本地模式恒为 []） */
   permissions: string[]
 }
 
-const LOCAL_AUTH: AuthState = { mode: 'local', userId: 'local', email: null, roles: [], permissions: [] }
+const LOCAL_AUTH: AuthState = {
+  mode: 'local',
+  userId: 'local',
+  email: null,
+  username: null,
+  roles: [],
+  permissions: [],
+}
 
 /* ---------- IAM（Phase1 L1）：登录后从 user_roles + role_permissions 拉取 RBAC ----------
    roles/permissions/role_permissions 三表对登录用户可读（参考数据），
@@ -64,8 +72,8 @@ export type AuthApi = {
   cloudEnabled: boolean
   /** 后台已启用的第三方登录 provider id（未配置云端或探测失败时为 []） */
   oauthProviders: string[]
-  signUp: (email: string, password: string) => Promise<string | null>
-  signIn: (email: string, password: string) => Promise<string | null>
+  signUp: (username: string, password: string) => Promise<string | null>
+  signIn: (username: string, password: string) => Promise<string | null>
   signInWithOAuth: (provider: string) => Promise<string | null>
   signOut: () => Promise<void>
   /** RBAC：是否拥有指定角色（未登录/本地模式恒 false） */
@@ -94,7 +102,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuth(LOCAL_AUTH)
         return
       }
-      setAuth({ mode: 'cloud', userId: u.id, email: u.email ?? null, roles: [], permissions: [] })
+      setAuth({
+        mode: 'cloud',
+        userId: u.id,
+        email: u.email ?? null,
+        username: u.username ?? u.email ?? null,
+        roles: [],
+        permissions: [],
+      })
       /* RBAC 异步拉取；alive + userId 双重守卫防会话切换期间旧请求回写 */
       loadIam(u.id)
         .then((iam) => {
@@ -138,22 +153,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       auth,
       cloudEnabled,
       oauthProviders,
-      async signUp(email, password) {
+      /* CloudBase 本环境仅启用 usernamePassword（email / phone / anonymous 均关闭），
+         注册与登录统一走用户名；注册成功后由应用层补写 profiles（CloudBase 无
+         auth.users 触发器，不会自动建档）。 */
+      async signUp(username, password) {
         if (!supabase) return '云端未配置，当前为本地演示模式'
-        const { error } = await supabase.auth.signUp({ email, password })
-        return error ? error.message : null
+        const { data, error } = await supabase.auth.signUp({ username, password })
+        if (error) return error.message
+        const uid = data?.user?.id ?? data?.session?.user?.id
+        if (uid) {
+          try {
+            await supabase.from('profiles').upsert({ id: uid, name: username })
+          } catch {
+            /* 建档失败不阻塞注册：若注册需验证而未拿到会话，RLS 会拒绝写入，登录后再补 */
+          }
+        }
+        return null
       },
-      async signIn(email, password) {
+      async signIn(username, password) {
         if (!supabase) return '云端未配置，当前为本地演示模式'
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { error } = await supabase.auth.signInWithPassword({ username, password })
         return error ? error.message : null
       },
       async signInWithOAuth(provider) {
         if (!supabase) return '云端未配置，当前为本地演示模式'
-        // origin + pathname：GitHub Pages 等子路径部署下回跳必须落在应用自身路径
-        // （origin 不含 /mim/，会落到域名根且不匹配白名单）；hash 路由下 pathname 恒定。
+        // origin + pathname：子路径部署下回跳必须落在应用自身路径；hash 路由下 pathname 恒定。
+        // 本环境未启用 OAuth provider，保留入口以便后台开启后自动可用。
         const { error } = await supabase.auth.signInWithOAuth({
-          provider: provider as Provider,
+          provider,
           options: { redirectTo: window.location.origin + window.location.pathname },
         })
         return error ? error.message : null

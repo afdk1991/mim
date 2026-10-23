@@ -39,10 +39,12 @@ export interface CloudPayload {
   articleDrafts: ArticleDraft[]
 }
 
-/** 单查询解包：失败抛错由外层 catch 统一降级 */
-function unwrap<T>(r: { error: { message: string } | null; data: T[] | null }, name: string): T[] {
-  if (r.error || !r.data) throw new Error(`${name}: ${r.error?.message ?? 'empty'}`)
-  return r.data
+/** 单查询解包：失败抛错由外层 catch 统一降级。
+    CloudBase rdb 返回行结构与 Supabase 一致（同为 postgREST），此处按宽松类型解包，
+    由调用点自行完成到域模型的字段映射（见下方 profiles→User 等转换）。 */
+function unwrap<T = any>(r: { error?: { message: string } | null; data?: any }, name: string): T[] {
+  if (r?.error || !r?.data) throw new Error(`${name}: ${r?.error?.message ?? 'empty'}`)
+  return r.data as T[]
 }
 
 export async function pullCloudContent(): Promise<CloudPayload | null> {

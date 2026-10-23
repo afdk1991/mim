@@ -51,7 +51,7 @@ export function subscribeMessages(
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `owner_id=eq.${meId}` },
-      (payload) => {
+      (payload: any) => {
         const row = payload.new as { id: string; peer_id: string; from_me: boolean; content: string; created_at: string }
         if (row.from_me) return // 我方乐观行已在本地，忽略
         onIncoming({

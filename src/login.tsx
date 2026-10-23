@@ -67,7 +67,7 @@ export function LoginPage() {
   const rawUrl = query.get('url') ?? ''
   const returnTo = rawUrl.startsWith('/') || rawUrl.startsWith('#/') ? rawUrl : ''
   const [tab, setTab] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
+  const [account, setAccount] = useState('')
   const [pwd, setPwd] = useState('')
   const [busy, setBusy] = useState(false)
   const [oauthBusy, setOauthBusy] = useState<string | null>(null)
@@ -81,7 +81,7 @@ export function LoginPage() {
           <div className="card auth-card">
             <h2 className="page-title">🔐 账号与身份</h2>
             <p className="auth-hint">
-              当前为<b>本地演示模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置 Supabase
+              当前为<b>本地演示模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置 CloudBase
               后即可注册登录，由云端按账号隔离数据边界。
             </p>
             <div className="usermenu-sec auth-sec">切换演示身份（影响内容的作者视角）</div>
@@ -101,7 +101,7 @@ export function LoginPage() {
             <div className="usermenu-head auth-head">
               <Avatar emoji={api.me.emoji} color={api.me.color} size={40} />
               <div>
-                <b>{auth.email ?? '云端账号'}</b>
+                <b>{auth.username ?? auth.email ?? '云端账号'}</b>
                 <small>云端账号 · 演示身份：{api.me.name}</small>
               </div>
             </div>
@@ -126,15 +126,15 @@ export function LoginPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (busy || !email || !pwd) return
+    if (busy || !account || !pwd) return
     setBusy(true)
     setErr(null)
     setOk(null)
-    const r = tab === 'login' ? await signIn(email.trim(), pwd) : await signUp(email.trim(), pwd)
+    const r = tab === 'login' ? await signIn(account.trim(), pwd) : await signUp(account.trim(), pwd)
     setBusy(false)
     if (r) setErr(r)
     else if (tab === 'login') navigate(returnTo || '#/feed')
-    else if (tab === 'register') setOk('注册成功。如未自动登录，请先到邮箱完成确认后再登录')
+    else if (tab === 'register') setOk('注册成功，已自动登录')
   }
 
   /* 第三方登录：成功即整页跳转授权页，回跳后 onAuthStateChange 自动收会话 */
@@ -176,12 +176,12 @@ export function LoginPage() {
           </div>
           <form className="auth-form" onSubmit={submit}>
             <input
-              type="email"
+              type="text"
               required
-              placeholder="邮箱"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="用户名"
+              autoComplete="username"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
             />
             <input
               type="password"
@@ -202,8 +202,8 @@ export function LoginPage() {
             <div className="auth-oauth-title">第三方登录</div>
             {oauthProviders.length === 0 ? (
               <p className="auth-hint" style={{ margin: 0 }}>
-                后台暂未启用第三方登录；在 Supabase 控制台
-                Authentication → Providers 中开启后，对应按钮会自动出现在这里。
+                后台暂未启用第三方登录；在 CloudBase 控制台
+                身份认证 → 登录方式 中开启后，对应按钮会自动出现在这里。
               </p>
             ) : (
               <div className="auth-oauth-grid">

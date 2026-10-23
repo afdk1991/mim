@@ -44,9 +44,12 @@ jobs:
       - name: 构建
         run: npm run build
         env:
-          # Supabase 云凭证（未配置时 supabase client 为 null，回退纯本地）
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # CloudBase 云凭证：Publishable Key 是公开凭据（等价 Supabase anon key），
+          # 安全由库表 RLS 保障，因此直接内联而不再走 secrets —— 根治
+          # 「仓库未配 secret → 构建产物缺凭证 → 永远回退本地演示模式」。
+          VITE_CLOUDBASE_ENV_ID: cs-1-d5g815slocb5a611a
+          VITE_CLOUDBASE_REGION: ap-shanghai
+          VITE_CLOUDBASE_ACCESS_KEY: eyJhbGciOiJSUzI1NiIsImtpZCI6IjBkNjA2MmRkLTBlNTktNGRiMi1iYTYyLTViNDdlNTE1ZDFkYyJ9.eyJpc3MiOiJodHRwczovL2NzLTEtZDVnODE1c2xvY2I1YTYxMWEuYXAtc2hhbmdoYWkudGNiLWFwaS50ZW5jZW50Y2xvdWRhcGkuY29tIiwic3ViIjoiYW5vbiIsImF1ZCI6ImNzLTEtZDVnODE1c2xvY2I1YTYxMWEiLCJleHAiOjQwOTM4NTIyNDUsImlhdCI6MTc5MDE2OTA0NSwibm9uY2UiOiJUNXhwRkExTFRkS3IxM1p6UG9nTW9nIiwiYXRfaGFzaCI6IlQ1eHBGQTFMVGRLcjEzWnpQb2dNb2ciLCJuYW1lIjoiQW5vbnltb3VzIiwic2NvcGUiOiJhbm9ueW1vdXMiLCJwcm9qZWN0X2lkIjoiY3MtMS1kNWc4MTVzbG9jYjVhNjExYSIsIm1ldGEiOnsicGxhdGZvcm0iOiJQdWJsaXNoYWJsZUtleSJ9LCJyb2xlIjoiYW5vbiIsImlzX2Fub255bW91cyI6dHJ1ZSwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiYW5vbnltb3VzIiwicHJvdmlkZXJzIjpbImFub255bW91cyJdfSwidXNlcl9tZXRhZGF0YSI6eyJuYW1lIjoiQW5vbnltb3VzIn0sInVzZXJfdHlwZSI6IiIsImNsaWVudF90eXBlIjoiY2xpZW50X3VzZXIiLCJpc19zeXN0ZW1fYWRtaW4iOmZhbHNlfQ.QOs7aVNhZY_vUwyUVCuj4TZAzvuQlfMAej2ueORaDpH38DHYJFqMFscHzDUDcyYg0HkBwJJX5TKE4y8AwpeOHyJBQco-8d1pU_9qJI8EFiAXsbFUf94lU6JvLdcbfFq4hQDxA8tEwJJZ8Zswk-A91ZagM6RJ-LcZTsAGL7Q3QT0oyh7Hd_-74pAPpPQ7-gmInIBZLViGD6UQf2RvjFQpZcjwlY5_jw3XcoA3LlPsp5KxXMOPZFI_LPtNSaLUDC6Qecvw63mMq_Jl1n3WdCXYMqV-9UAAOVbtx54P2FtWe4UF5LyAn1rrbaVWl_VYGYDCr_TipZzhNB2u0sLnbAYJAQ
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -142,9 +145,12 @@ jobs:
       - name: 构建
         run: npm run build
         env:
-          # Supabase 云凭证（未配置时 supabase client 为 null，回退纯本地）
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # CloudBase 云凭证：Publishable Key 是公开凭据（等价 Supabase anon key），
+          # 安全由库表 RLS 保障，因此直接内联而不再走 secrets —— 根治
+          # 「仓库未配 secret → 构建产物缺凭证 → 永远回退本地演示模式」。
+          VITE_CLOUDBASE_ENV_ID: cs-1-d5g815slocb5a611a
+          VITE_CLOUDBASE_REGION: ap-shanghai
+          VITE_CLOUDBASE_ACCESS_KEY: eyJhbGciOiJSUzI1NiIsImtpZCI6IjBkNjA2MmRkLTBlNTktNGRiMi1iYTYyLTViNDdlNTE1ZDFkYyJ9.eyJpc3MiOiJodHRwczovL2NzLTEtZDVnODE1c2xvY2I1YTYxMWEuYXAtc2hhbmdoYWkudGNiLWFwaS50ZW5jZW50Y2xvdWRhcGkuY29tIiwic3ViIjoiYW5vbiIsImF1ZCI6ImNzLTEtZDVnODE1c2xvY2I1YTYxMWEiLCJleHAiOjQwOTM4NTIyNDUsImlhdCI6MTc5MDE2OTA0NSwibm9uY2UiOiJUNXhwRkExTFRkS3IxM1p6UG9nTW9nIiwiYXRfaGFzaCI6IlQ1eHBGQTFMVGRLcjEzWnpQb2dNb2ciLCJuYW1lIjoiQW5vbnltb3VzIiwic2NvcGUiOiJhbm9ueW1vdXMiLCJwcm9qZWN0X2lkIjoiY3MtMS1kNWc4MTVzbG9jYjVhNjExYSIsIm1ldGEiOnsicGxhdGZvcm0iOiJQdWJsaXNoYWJsZUtleSJ9LCJyb2xlIjoiYW5vbiIsImlzX2Fub255bW91cyI6dHJ1ZSwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiYW5vbnltb3VzIiwicHJvdmlkZXJzIjpbImFub255bW91cyJdfSwidXNlcl9tZXRhZGF0YSI6eyJuYW1lIjoiQW5vbnltb3VzIn0sInVzZXJfdHlwZSI6IiIsImNsaWVudF90eXBlIjoiY2xpZW50X3VzZXIiLCJpc19zeXN0ZW1fYWRtaW4iOmZhbHNlfQ.QOs7aVNhZY_vUwyUVCuj4TZAzvuQlfMAej2ueORaDpH38DHYJFqMFscHzDUDcyYg0HkBwJJX5TKE4y8AwpeOHyJBQco-8d1pU_9qJI8EFiAXsbFUf94lU6JvLdcbfFq4hQDxA8tEwJJZ8Zswk-A91ZagM6RJ-LcZTsAGL7Q3QT0oyh7Hd_-74pAPpPQ7-gmInIBZLViGD6UQf2RvjFQpZcjwlY5_jw3XcoA3LlPsp5KxXMOPZFI_LPtNSaLUDC6Qecvw63mMq_Jl1n3WdCXYMqV-9UAAOVbtx54P2FtWe4UF5LyAn1rrbaVWl_VYGYDCr_TipZzhNB2u0sLnbAYJAQ
 
       - name: 发布
         # 作用域包（@afdk1991/mim）默认按 private 发布，GitHub Packages 免费套餐仅允许 public → 必须 --access public

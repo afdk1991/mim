@@ -56,7 +56,7 @@ export function SettingsPage() {
       <div>
         <h2 className="page-title">⚙️ 设置</h2>
         <p className="set-hint" style={{ marginBottom: 12 }}>
-          当前登录身份：{auth.mode === 'cloud' ? `云端账号（${auth.email ?? auth.userId.slice(0, 8)}…）` : '本机演示模式（local）'}
+          当前登录身份：{auth.mode === 'cloud' ? `云端账号（${auth.username ?? auth.email ?? auth.userId.slice(0, 8)}…）` : '本机演示模式（local）'}
           ，以下数据均按该身份隔离存储。
         </p>
         <div className="tabs">
