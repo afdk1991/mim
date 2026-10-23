@@ -65,11 +65,14 @@ Mim 有**两套云端后端**，前端按优先级自动选择，页面无需任
 ```powershell
 # A. 数据库连接串（Dashboard → Project Settings → Database → Session pooler）
 $env:SUPABASE_DB_URL="postgresql://postgres.<ref>:<密码>@aws-0-<区域>.pooler.supabase.com:5432/postgres"
-npm run db:apply                      # 应用 0001
-# 0002 目前需在 Dashboard → SQL Editor 粘贴执行（或改用 psql 执行该文件）
+$env:ADMIN_EMAIL="you@example.com"        # 可选：给该注册邮箱授予 admin 角色
+npm run db:apply                          # 按序应用全部迁移（已应用的自动跳过）
 
 # B. Supabase Dashboard → SQL Editor → 依次粘贴两个 .sql 文件全量执行（幂等）
 ```
+
+> `npm run db:apply` 会自动发现 `supabase/migrations/*.sql` 并按文件名顺序执行，
+> 已记录于 `public.schema_migrations` 的版本跳过；两个迁移均为幂等 SQL，重复执行安全。
 
 #### 本地开发
 
