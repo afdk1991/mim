@@ -35,23 +35,6 @@ interface MjExtItem {
   homeUrl?: string;
 }
 
-/** 红果短剧公开元数据条目（public/external/*.json 运行时加载，仅元数据不含视频） */
-interface HgItem {
-  id: string;
-  title: string;
-  cover: string;
-  episodesText: string;
-  sourceLabel: string;
-  detailUrl: string;
-}
-
-/** external/index.json 分类索引 */
-interface HgIndex {
-  providerLabel: string;
-  attribution: string;
-  catalogs: Array<{ category: 'ai-drama' | 'comic-drama'; categoryLabel: string; total: number }>;
-}
-
 interface MjState {
   favorites: string[];
   seen: string[];
@@ -61,10 +44,8 @@ interface MjState {
 
 type MjView =
   | { kind: 'home' }
-  | { kind: 'extIndex' }
-  | { kind: 'extList'; cat: 'comic' | 'ai' | 'pd' }
-  | { kind: 'extWatch'; cat: 'comic' | 'ai'; id: string }
-  | { kind: 'play'; id: string; from: 'home' | 'pd' };
+  | { kind: 'list' }
+  | { kind: 'play'; id: string; from: 'home' | 'list' };
 
 interface MjContRow {
   id: string;
@@ -164,77 +145,7 @@ export function saveManju(s: MjState): void {
   }
 }
 
-/* ================= 红果短剧公开元数据目录（运行时加载 public/external/*.json） ================= */
-
-const EXT_FILES = { comic: 'comic-drama.json', ai: 'ai-drama.json' } as const;
-const HG_STEP = 60;
-
-/** 模块级内存缓存：同一会话内避免重复拉取 500KB 级目录 */
-const hgCache = new Map<string, HgItem[]>();
-
-export function extUrl(file: string): string {
-  return `${import.meta.env.BASE_URL}external/${file}`;
-}
-
-function isHgItemRaw(v: unknown): boolean {
-  if (!v || typeof v !== 'object') return false;
-  const o = v as Record<string, unknown>;
-  return typeof o.id === 'string' && typeof o.title === 'string' && typeof o.cover_url === 'string';
-}
-
-export async function loadHgIndex(sig: AbortSignal): Promise<HgIndex> {
-  const res = await fetch(extUrl('index.json'), { signal: sig });
-  if (!res.ok) throw new Error(`目录加载失败（HTTP ${res.status}）`);
-  const raw: unknown = await res.json();
-  if (!raw || typeof raw !== 'object') throw new Error('目录数据格式异常');
-  const o = raw as Record<string, unknown>;
-  const catalogs = (Array.isArray(o.catalogs) ? o.catalogs : [])
-    .map((c): HgIndex['catalogs'][number] | null => {
-      if (!c || typeof c !== 'object') return null;
-      const cc = c as Record<string, unknown>;
-      if ((cc.category !== 'ai-drama' && cc.category !== 'comic-drama') || typeof cc.category_label !== 'string') return null;
-      return {
-        category: cc.category,
-        categoryLabel: cc.category_label,
-        total: typeof cc.total === 'number' ? cc.total : 0,
-      };
-    })
-    .filter((c): c is HgIndex['catalogs'][number] => !!c);
-  if (catalogs.length === 0) throw new Error('目录数据格式异常');
-  return {
-    providerLabel: typeof o.provider_label === 'string' ? o.provider_label : '红果短剧',
-    attribution: typeof o.attribution === 'string' ? o.attribution : '',
-    catalogs,
-  };
-}
-
-export async function loadHgItems(cat: 'comic' | 'ai', sig: AbortSignal): Promise<HgItem[]> {
-  const hit = hgCache.get(cat);
-  if (hit) return hit;
-  const res = await fetch(extUrl(EXT_FILES[cat]), { signal: sig });
-  if (!res.ok) throw new Error(`片单加载失败（HTTP ${res.status}）`);
-  const raw: unknown = await res.json();
-  const arr =
-    raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).items)
-      ? ((raw as Record<string, unknown>).items as unknown[])
-      : [];
-  const parsed: HgItem[] = [];
-  for (const v of arr) {
-    if (!isHgItemRaw(v)) continue;
-    const o = v as Record<string, unknown>;
-    parsed.push({
-      id: o.id as string,
-      title: o.title as string,
-      cover: o.cover_url as string,
-      episodesText: typeof o.episodes_text === 'string' ? o.episodes_text : '集数未知',
-      sourceLabel: typeof o.source_label === 'string' ? o.source_label : '红果短剧',
-      detailUrl: typeof o.detail_url === 'string' ? o.detail_url : '',
-    });
-  }
-  if (parsed.length === 0) throw new Error('片单数据格式异常');
-  hgCache.set(cat, parsed);
-  return parsed;
-}
+/* ================= 红果外部目录加载层已随「彻底下线红果」方案移除（见 漫剧片单变更总结） ================= */
 
 /**
  * 打开来源站点：必须是「用户已二次确认」之后才会走到这里。
@@ -253,10 +164,6 @@ function openExternal(url: string): void {
 }
 
 /* ================= 通用小组件 ================= */
-
-function MjLoading({ text = '加载中…' }: { text?: string }) {
-  return <div className="manju-loading muted">{text}</div>;
-}
 
 /** 站内精选卡片（公版 / CC 授权真实内容） */
 function MjCard({
@@ -301,16 +208,15 @@ function HomeView(props: {
   favorites: MjExtItem[];
   items: MjExtItem[];
   seenList: string[];
-  extTotal: number;
   onOpen: (id: string) => void;
   onContinue: (id: string) => void;
-  onOpenExt: () => void;
+  onViewAll: () => void;
 }) {
   return (
     <>
       <div className="manju-hero">
         <h1>漫剧 Manju</h1>
-        <p>站内精选（公版 / CC 授权真实内容）+ 外部片单索引（红果短剧公开目录）</p>
+        <p>站内精选 · 公有领域 / CC 授权真实内容，全部可看、无版权争议</p>
       </div>
 
       {props.cont.length > 0 && (
@@ -356,9 +262,11 @@ function HomeView(props: {
         </div>
       )}
 
-      <div className="manju-section-head">
+      <div className="manju-section-head manju-section-head-row">
         <h3>站内精选</h3>
-        <span className="muted">{props.items.length} 部 · 公版动画 / Blender 开源电影</span>
+        <button className="btn btn-ghost btn-sm" onClick={props.onViewAll}>
+          全部 {props.items.length} 部 ›
+        </button>
       </div>
       <div className="manju-grid">
         {props.items.map((it, i) => (
@@ -370,23 +278,6 @@ function HomeView(props: {
             onOpen={() => props.onOpen(it.id)}
           />
         ))}
-      </div>
-
-      <div
-        className="manju-ext-entry card"
-        role="button"
-        tabIndex={0}
-        onClick={props.onOpenExt}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') props.onOpenExt();
-        }}
-      >
-        <span className="manju-ext-entry-emoji">🧭</span>
-        <div className="manju-cont-info">
-          <div className="manju-card-title">外部片单索引</div>
-          <div className="muted">共 {props.extTotal} 条 · 红果公开元数据 / 公版 / CC 授权</div>
-        </div>
-        <span className="manju-ext-arrow">›</span>
       </div>
     </>
   );
@@ -493,169 +384,7 @@ function PlayView(props: {
   );
 }
 
-/* ================= 外部片单（红果短剧目录 + 站内精选，母本三级形态） ================= */
-
-/** 三级页面之一：分类索引页（红果漫剧 / AI剧 + 站内精选入口） */
-function ExtIndexView(props: {
-  idx: HgIndex | null;
-  err: string | null;
-  pdCount: number;
-  onReload: () => void;
-  onOpenCat: (c: 'comic' | 'ai' | 'pd') => void;
-}) {
-  const idx = props.idx;
-  return (
-    <>
-      <div className="muted manju-ext-note">
-        外部片单仅收录公开元数据与来源链接，站内不存储、不转码任何视频；
-        「站内精选」为公有领域（Public Domain）或 CC 授权内容，含真实视频直链或来源站页面。
-      </div>
-      {props.err ? (
-        <div className="manju-empty">
-          加载失败：{props.err}
-          <div style={{ marginTop: 10 }}>
-            <button className="btn btn-primary btn-sm" onClick={props.onReload}>
-              重试
-            </button>
-          </div>
-        </div>
-      ) : !idx ? (
-        <MjLoading text="正在加载片单目录…" />
-      ) : (
-        <div className="manju-ext-cats">
-          {idx.catalogs.map((c) => (
-            <div
-              key={c.category}
-              className="manju-ext-cat card"
-              role="button"
-              tabIndex={0}
-              onClick={() => props.onOpenCat(c.category === 'comic-drama' ? 'comic' : 'ai')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') props.onOpenCat(c.category === 'comic-drama' ? 'comic' : 'ai');
-              }}
-            >
-              <span className="manju-ext-entry-emoji">{c.category === 'comic-drama' ? '🎬' : '🤖'}</span>
-              <div className="manju-cont-info">
-                <div className="manju-card-title">{c.categoryLabel}</div>
-                <div className="muted">
-                  {c.total} 条 · {idx.providerLabel}公开目录
-                </div>
-              </div>
-              <span className="manju-ext-arrow">›</span>
-            </div>
-          ))}
-          <div
-            className="manju-ext-cat card"
-            role="button"
-            tabIndex={0}
-            onClick={() => props.onOpenCat('pd')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') props.onOpenCat('pd');
-            }}
-          >
-            <span className="manju-ext-entry-emoji">⭐</span>
-            <div className="manju-cont-info">
-              <div className="manju-card-title">站内精选 · 公版 / 开源</div>
-              <div className="muted">{props.pdCount} 条 · 公版动画 / Blender 开源电影 · 真实可播</div>
-            </div>
-            <span className="manju-ext-arrow">›</span>
-          </div>
-        </div>
-      )}
-      {idx && idx.attribution && <div className="manju-attrib muted">{idx.attribution}</div>}
-    </>
-  );
-}
-
-/** 红果条目封面：热链来源站 CDN，加载失败回退 emoji 占位 */
-function HgCover({ src, alt, lg }: { src: string; alt: string; lg?: boolean }) {
-  const [failed, setFailed] = useState(false);
-  if (failed || !src) {
-    return <div className={cx('manju-hg-cover-emoji', lg && 'manju-hg-cover-lg')}>📺</div>;
-  }
-  return (
-    <img
-      className={cx('manju-hg-cover', lg && 'manju-hg-cover-lg')}
-      src={src}
-      alt={alt}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-/** 三级页面之二：红果分类列表页（分批加载，每次 60 条） */
-function HgListView(props: { cat: 'comic' | 'ai'; title: string; onOpenItem: (id: string) => void }) {
-  const [items, setItems] = useState<HgItem[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [shown, setShown] = useState(HG_STEP);
-  const [reload, setReload] = useState(0);
-
-  useEffect(() => {
-    const ac = new AbortController();
-    setItems(null);
-    setShown(HG_STEP);
-    setErr(null);
-    loadHgItems(props.cat, ac.signal)
-      .then(setItems)
-      .catch((e: unknown) => {
-        if (ac.signal.aborted) return;
-        setErr(e instanceof Error ? e.message : '加载失败');
-      });
-    return () => ac.abort();
-  }, [props.cat, reload]);
-
-  if (err) {
-    return (
-      <div className="manju-empty">
-        加载失败：{err}
-        <div style={{ marginTop: 10 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => setReload((n) => n + 1)}>
-            重试
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (!items) return <MjLoading text="正在加载片单…" />;
-
-  const slice = items.slice(0, shown);
-  return (
-    <>
-      <div className="muted manju-ext-note">
-        {props.title} · 共 {items.length} 条 · 仅含公开元数据与来源链接，点击进入条目页跳转来源站
-      </div>
-      <div className="manju-hg-grid">
-        {slice.map((it) => (
-          <div
-            key={it.id}
-            className="manju-card card"
-            role="button"
-            tabIndex={0}
-            onClick={() => props.onOpenItem(it.id)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') props.onOpenItem(it.id);
-            }}
-          >
-            <HgCover src={it.cover} alt={it.title} />
-            <div className="manju-card-body">
-              <div className="manju-card-title">{it.title}</div>
-              <div className="manju-card-meta muted">{it.episodesText}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      {shown < items.length && (
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button className="btn btn-ghost" onClick={() => setShown((n) => n + HG_STEP)}>
-            加载更多（{shown} / {items.length}）
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
+/* ================= 站内精选全量列表（含自定义片源） ================= */
 
 /** 站内精选列表页（公版 / CC 授权真实内容 + 自定义片源） */
 function PdListView(props: {
@@ -739,96 +468,12 @@ function PdListView(props: {
   );
 }
 
-/** 三级页面之三：红果条目页（仅公开元数据，跳转来源站观看） */
-function ExtWatchView(props: {
-  cat: 'comic' | 'ai';
-  id: string;
-  providerLabel: string;
-  attribution: string;
-}) {
-  const toast = useToast();
-  const [items, setItems] = useState<HgItem[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [reload, setReload] = useState(0);
-
-  useEffect(() => {
-    const ac = new AbortController();
-    setItems(null);
-    setErr(null);
-    loadHgItems(props.cat, ac.signal)
-      .then(setItems)
-      .catch((e: unknown) => {
-        if (ac.signal.aborted) return;
-        setErr(e instanceof Error ? e.message : '加载失败');
-      });
-    return () => ac.abort();
-  }, [props.cat, reload]);
-
-  if (err) {
-    return (
-      <div className="manju-empty">
-        加载失败：{err}
-        <div style={{ marginTop: 10 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => setReload((n) => n + 1)}>
-            重试
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (!items) return <MjLoading text="正在加载条目…" />;
-
-  const it = items.find((x) => x.id === props.id) ?? null;
-  if (!it) return <div className="manju-empty">条目不存在</div>;
-
-  const gotoSource = () => {
-    if (!it.detailUrl) {
-      toast('该条目无来源链接');
-      return;
-    }
-    if (!window.confirm('即将离开本站，前往来源站观看。确定继续？')) return;
-    openExternal(it.detailUrl);
-  };
-
-  return (
-    <>
-      <div className="manju-extwatch card">
-        <div className="manju-extwatch-cover">
-          <HgCover src={it.cover} alt={it.title} lg />
-        </div>
-        <div className="manju-extwatch-info">
-          <h2>{it.title}</h2>
-          <div className="muted">
-            {it.sourceLabel} · {it.episodesText}
-          </div>
-          <div className="manju-tags">
-            <span className="tag">公开元数据</span>
-            <span className="tag">站内不存储视频</span>
-          </div>
-        </div>
-      </div>
-      <div className="manju-ctrls">
-        <button className="btn btn-primary" onClick={gotoSource}>
-          前往{props.providerLabel}观看 ↗
-        </button>
-      </div>
-      <div className="muted manju-ext-note">
-        红果条目仅提供公开元数据，站内不解析、不转码视频，请前往来源站观看正片。
-      </div>
-      {props.attribution && <div className="manju-attrib muted">{props.attribution}</div>}
-    </>
-  );
-}
-
 /* ================= 页面入口 ================= */
 
 export function ManjuPage() {
   const toast = useToast();
   const [state, setState] = useState<MjState>(loadManju);
   const [view, setView] = useState<MjView>({ kind: 'home' });
-  const [idx, setIdx] = useState<HgIndex | null>(null);
-  const [idxErr, setIdxErr] = useState<string | null>(null);
-  const [idxReload, setIdxReload] = useState(0);
 
   useEffect(() => {
     saveManju(state);
@@ -843,18 +488,6 @@ export function ManjuPage() {
       setState(loadManju());
     });
   }, []);
-
-  /* 红果目录索引：挂载时加载一次，失败可重试 */
-  useEffect(() => {
-    const ac = new AbortController();
-    loadHgIndex(ac.signal)
-      .then(setIdx)
-      .catch((e: unknown) => {
-        if (ac.signal.aborted) return;
-        setIdxErr(e instanceof Error ? e.message : '目录加载失败');
-      });
-    return () => ac.abort();
-  }, [idxReload]);
 
   /* 站内精选全集（含自定义片源），按 id 反查 */
   const allItems = useMemo<MjExtItem[]>(() => [...state.customExt, ...EXT_SEED], [state.customExt]);
@@ -924,19 +557,15 @@ export function ManjuPage() {
   };
 
   const goBack = () => {
-    if (view.kind === 'play') setView(view.from === 'home' ? { kind: 'home' } : { kind: 'extList', cat: 'pd' });
-    else if (view.kind === 'extWatch') setView({ kind: 'extList', cat: view.cat });
-    else if (view.kind === 'extList') setView({ kind: 'extIndex' });
+    if (view.kind === 'play') setView(view.from === 'home' ? { kind: 'home' } : { kind: 'list' });
     else setView({ kind: 'home' });
   };
 
-  const hgTotal = idx?.catalogs.reduce((a, c) => a + c.total, 0) ?? 0;
-  const extTotal = allItems.length + hgTotal;
   const favItems = state.favorites
     .map((id) => allItems.find((it) => it.id === id))
     .filter((it): it is MjExtItem => !!it);
 
-  const openItem = (id: string, from: 'home' | 'pd') => {
+  const openItem = (id: string, from: 'home' | 'list') => {
     const it = allItems.find((x) => x.id === id);
     if (!it) return;
     setView({ kind: 'play', id, from });
@@ -967,45 +596,8 @@ export function ManjuPage() {
         </>
       );
     }
-    if (view.kind === 'extIndex') {
-      return (
-        <ExtIndexView
-          idx={idx}
-          err={idxErr}
-          pdCount={allItems.length}
-          onReload={() => setIdxReload((n) => n + 1)}
-          onOpenCat={(c) => setView({ kind: 'extList', cat: c })}
-        />
-      );
-    }
-    if (view.kind === 'extList') {
-      const cat = view.cat;
-      if (cat === 'pd') {
-        return (
-          <PdListView
-            items={allItems}
-            onPlay={(id) => openItem(id, 'pd')}
-            onAdd={addCustom}
-          />
-        );
-      }
-      return (
-        <HgListView
-          cat={cat}
-          title={cat === 'comic' ? '漫剧' : 'AI剧'}
-          onOpenItem={(id) => setView({ kind: 'extWatch', cat, id })}
-        />
-      );
-    }
-    if (view.kind === 'extWatch') {
-      return (
-        <ExtWatchView
-          cat={view.cat}
-          id={view.id}
-          providerLabel={idx?.providerLabel ?? '红果短剧'}
-          attribution={idx?.attribution ?? ''}
-        />
-      );
+    if (view.kind === 'list') {
+      return <PdListView items={allItems} onPlay={(id) => openItem(id, 'list')} onAdd={addCustom} />;
     }
     return (
       <HomeView
@@ -1013,10 +605,9 @@ export function ManjuPage() {
         favorites={favItems}
         items={allItems}
         seenList={state.seen}
-        extTotal={extTotal}
         onOpen={(id) => openItem(id, 'home')}
         onContinue={(id) => openItem(id, 'home')}
-        onOpenExt={() => setView({ kind: 'extIndex' })}
+        onViewAll={() => setView({ kind: 'list' })}
       />
     );
   };
@@ -1037,8 +628,7 @@ export function ManjuPage() {
       </div>
       {renderBody()}
       <div className="manju-foot muted">
-        站内精选均为公有领域（Public Domain）或 CC 授权内容，视频直链来自公开镜像（Blender 开源电影 / Google 公开样片库）；
-        红果短剧目录仅收录公开元数据与来源链接（作品与封面版权归权利人所有），站内不存储、不转码视频。
+        站内精选均为公有领域（Public Domain）或 CC 授权内容，视频直链来自公开镜像（Blender 开源电影 / Google 公开样片库），授权可验证、无版权争议。
       </div>
     </div>
   );

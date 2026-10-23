@@ -1,15 +1,14 @@
 /**
  * 漫剧模块单元测试（node 环境，无 jsdom）
  *
- * 覆盖三层：
+ * 覆盖两层：
  * - 纯函数：mkEps / seedState / isExtItem
  * - 本地持久化：loadManju / saveManju（localStorage stub）
- * - fetch 适配层：extUrl / loadHgIndex / loadHgItems（fetch stub + 模块级 hgCache 隔离）
  *
- * fetch 层测试通过 vi.resetModules() + 动态 import 获取全新模块实例，
- * 以隔离 manju.tsx 内的模块级缓存 hgCache。
+ * 注：红果外部目录 fetch 适配层（extUrl / loadHgIndex / loadHgItems）已随
+ * 「彻底下线红果」方案移除，相关用例同步删除。
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isExtItem, loadManju, mkEps, saveManju, seedState } from './manju';
 
 /* ============ 公共工具 ============ */
@@ -37,11 +36,6 @@ function makeThrowStore() {
     },
     removeItem: () => undefined,
   };
-}
-
-/** 模拟 fetch Response */
-function jsonRes(payload: unknown, ok = true, status = 200) {
-  return { ok, status, json: async () => payload };
 }
 
 afterEach(() => {
@@ -200,124 +194,5 @@ describe('saveManju / loadManju 往返', () => {
   it('setItem 抛异常时不向外抛出（隐私模式兜底）', () => {
     vi.stubGlobal('localStorage', makeThrowStore());
     expect(() => saveManju(seedState())).not.toThrow();
-  });
-});
-
-/* ============ fetch 适配层 ============ */
-
-describe('fetch 适配层（extUrl / loadHgIndex / loadHgItems）', () => {
-  const fetchMock = vi.fn();
-
-  beforeEach(() => {
-    // 每个用例重置模块注册表：动态 import 拿到全新实例，隔离模块级 hgCache
-    vi.resetModules();
-    vi.stubGlobal('fetch', fetchMock);
-    fetchMock.mockReset();
-  });
-
-  it('extUrl 拼接 BASE_URL + external/ 路径', async () => {
-    const m = await import('./manju');
-    expect(m.extUrl('index.json')).toBe(`${import.meta.env.BASE_URL}external/index.json`);
-    expect(m.extUrl('comic-drama.json')).toBe(`${import.meta.env.BASE_URL}external/comic-drama.json`);
-  });
-
-  it('loadHgIndex：成功映射目录并过滤非法 catalog 条目', async () => {
-    fetchMock.mockResolvedValue(
-      jsonRes({
-        provider_label: '红果短剧',
-        attribution: '版权说明',
-        catalogs: [
-          { category: 'ai-drama', category_label: 'AI剧', total: 989 },
-          { category: 'other', category_label: '非法', total: 1 },
-          { category: 'comic-drama', category_label: '漫剧', total: 1021 },
-          null,
-        ],
-      }),
-    );
-    const m = await import('./manju');
-    const idx = await m.loadHgIndex(new AbortController().signal);
-    expect(idx.providerLabel).toBe('红果短剧');
-    expect(idx.attribution).toBe('版权说明');
-    expect(idx.catalogs).toEqual([
-      { category: 'ai-drama', categoryLabel: 'AI剧', total: 989 },
-      { category: 'comic-drama', categoryLabel: '漫剧', total: 1021 },
-    ]);
-    // 请求走 extUrl('index.json')
-    expect(fetchMock.mock.calls[0][0]).toBe(`${import.meta.env.BASE_URL}external/index.json`);
-  });
-
-  it('loadHgIndex：provider_label 缺失时兜底"红果短剧"', async () => {
-    fetchMock.mockResolvedValue(
-      jsonRes({ catalogs: [{ category: 'comic-drama', category_label: '漫剧', total: 1 }] }),
-    );
-    const m = await import('./manju');
-    const idx = await m.loadHgIndex(new AbortController().signal);
-    expect(idx.providerLabel).toBe('红果短剧');
-    expect(idx.attribution).toBe('');
-  });
-
-  it('loadHgIndex：HTTP 非 2xx 抛出带状态码的错误', async () => {
-    fetchMock.mockResolvedValue(jsonRes(null, false, 500));
-    const m = await import('./manju');
-    await expect(m.loadHgIndex(new AbortController().signal)).rejects.toThrow(
-      '目录加载失败（HTTP 500）',
-    );
-  });
-
-  it('loadHgIndex：catalogs 为空或全非法时抛出格式异常', async () => {
-    fetchMock.mockResolvedValue(jsonRes({ catalogs: [{ category: 'bad', category_label: 'x' }] }));
-    const m = await import('./manju');
-    await expect(m.loadHgIndex(new AbortController().signal)).rejects.toThrow('目录数据格式异常');
-  });
-
-  it('loadHgItems：成功映射条目并补齐默认值，跳过非法条目', async () => {
-    fetchMock.mockResolvedValue(
-      jsonRes({
-        items: [
-          { id: '1', title: 'A', cover_url: 'c1' },
-          { id: '2', title: 'B', cover_url: 'c2', episodes_text: '全集 12 集', source_label: '其他源', detail_url: 'u2' },
-          { id: '3' }, // 缺 title/cover_url → 丢弃
-          null,
-          'junk',
-        ],
-      }),
-    );
-    const m = await import('./manju');
-    const items = await m.loadHgItems('comic', new AbortController().signal);
-    expect(items).toEqual([
-      { id: '1', title: 'A', cover: 'c1', episodesText: '集数未知', sourceLabel: '红果短剧', detailUrl: '' },
-      { id: '2', title: 'B', cover: 'c2', episodesText: '全集 12 集', sourceLabel: '其他源', detailUrl: 'u2' },
-    ]);
-    expect(fetchMock.mock.calls[0][0]).toBe(`${import.meta.env.BASE_URL}external/comic-drama.json`);
-  });
-
-  it('loadHgItems：全部条目非法时抛出格式异常', async () => {
-    fetchMock.mockResolvedValue(jsonRes({ items: [{ id: 'x' }] }));
-    const m = await import('./manju');
-    await expect(m.loadHgItems('ai', new AbortController().signal)).rejects.toThrow(
-      '片单数据格式异常',
-    );
-  });
-
-  it('loadHgItems：HTTP 非 2xx 抛出带状态码的错误', async () => {
-    fetchMock.mockResolvedValue(jsonRes(null, false, 404));
-    const m = await import('./manju');
-    await expect(m.loadHgItems('comic', new AbortController().signal)).rejects.toThrow(
-      '片单加载失败（HTTP 404）',
-    );
-  });
-
-  it('loadHgItems：同分类命中缓存不再请求，跨分类各自请求', async () => {
-    fetchMock.mockResolvedValue(
-      jsonRes({ items: [{ id: '1', title: 'A', cover_url: 'c1' }] }),
-    );
-    const m = await import('./manju');
-    const sig = new AbortController().signal;
-    const first = await m.loadHgItems('comic', sig);
-    const second = await m.loadHgItems('comic', sig);
-    expect(second).toEqual(first);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    await m.loadHgItems('ai', sig);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
