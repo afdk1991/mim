@@ -147,8 +147,10 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: 发布
-        # 作用域包（@afdk1991/mim）默认按 private 发布，GitHub Packages 免费套餐仅允许 public，
-        # 必须显式 --access public，否则 GITHUB_TOKEN 触发 403 write_package
+        # 作用域包（@afdk1991/mim）默认按 private 发布，GitHub Packages 免费套餐仅允许 public → 必须 --access public
+        # 凭据：优先用 PAT（secrets.NPM_TOKEN，需 write:packages + read:packages 作用域）；
+        #       未配置时回退 GITHUB_TOKEN。若两者都报 403 write_package，说明账号级 GitHub Packages
+        #       未开通/未接受条款，需在 github.com/settings/packages 开通后再跑。
         run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || secrets.GITHUB_TOKEN }}
