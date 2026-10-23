@@ -2,6 +2,46 @@
 
 本项目已配置一条完整的 CI/CD 流水线：[.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml)。
 
+## 〇、云端后端（先读这段）
+
+Mim 的云端后端是 **CloudBase 云函数 `mim-api`**（代码见 `cloudfunctions/mim-api/index.js`），
+前端通过环境变量 `VITE_MIM_API_BASE` 指向它：
+
+```
+https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api
+```
+
+**为什么需要它，而不是直连 CloudBase**：有两个平台级限制绕不开。
+
+| 限制 | 表现 | 结果 |
+| --- | --- | --- |
+| 注册通道被禁 | `POST /auth/v1/signup` 恒返回 `501 you can not signup just by username and password`，即便用 service_role Key 也一样 | 自助注册只能自建 |
+| CORS 白名单 | 网关只放行安全域名，体验版套餐不允许添加域名（`CreateAuthDomain` 被拒） | GitHub Pages / EdgeOne 等线上域名一律 **403** |
+
+`mim-api` 同时解决两者：自建账号体系（PBKDF2 密码哈希 + HMAC 签名令牌），
+并自行回写 `Access-Control-Allow-Origin: *`，因此**任意部署域名都能直接调用**。
+
+### 安全模型（务必了解）
+
+云函数用 `service_role` Key 访问数据库，而 **service_role 会绕过 RLS**，
+所以权限全部由云函数强制注入，不依赖浏览器传参：
+
+- 读：公开表放行；私有表自动追加 `owner 列 = 当前 uid`
+- 写：自动把 owner 列改写为当前 uid（伪造他人 id 无效）
+- 改/删：自动按 `owner 列 = 当前 uid` 过滤（改他人数据返回空）
+- `app_users` / `audit_logs` 永不代理；`topics` / `hot_searches` / `resources` 等只读
+
+### 本地开发
+
+`.env` 中写入（模板见 `.env.example`）：
+
+```ini
+VITE_MIM_API_BASE=https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api
+```
+
+未配置该变量时应用自动回退「本地演示模式」（数据仅存 localStorage），
+因此任何环境下都能安全构建上线。CI 已内联注入，无需再配 GitHub Secrets。
+
 ## 部署矩阵
 
 | 事件 | 动作 |

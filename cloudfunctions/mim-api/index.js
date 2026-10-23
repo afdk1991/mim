@@ -63,6 +63,11 @@ const AUTHOR_COL = {
   post_comments: 'author_id',
   article_comments: 'author_id',
 }
+/**
+ * 以自身主键归属的表（profiles.id = 用户 uid）。
+ * 必须强制：否则已登录用户可伪造任意 id 建档或改他人资料。
+ */
+const SELF_ID_COL = { profiles: 'id' }
 /** 仅服务端使用，禁止通过代理访问 */
 const SERVER_ONLY = new Set(['app_users', 'audit_logs'])
 /** 世界观点数据，禁止客户端写入 */
@@ -278,6 +283,8 @@ async function proxyDb({ table, method, query, body, uid, prefer }) {
       if (!obj || typeof obj !== 'object') return obj
       if (author) obj[author] = uid
       if (owner) obj[owner] = uid
+      const selfCol = SELF_ID_COL[table]
+      if (selfCol) obj[selfCol] = uid
       return obj
     }
     payload = Array.isArray(payload) ? payload.map(stamp) : stamp(payload)
@@ -287,7 +294,7 @@ async function proxyDb({ table, method, query, body, uid, prefer }) {
 
   // PATCH / PUT / DELETE：强制归属过滤
   if (method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
-    const col = owner || author
+    const col = owner || author || SELF_ID_COL[table]
     if (!col) return resp(403, { error: '该表不允许修改' })
     query = appendFilter(query, col, uid)
     if (method !== 'DELETE' && body) {
@@ -313,8 +320,31 @@ async function proxyDb({ table, method, query, body, uid, prefer }) {
   return resp(405, { error: '不支持的方法' })
 }
 
+/**
+ * 私信写入：原库内 send_message RPC 依赖 auth.uid()，而本函数以 service_role 访问，
+ * auth.uid() 为空会导致该函数抛错，故在服务端直接写「双行模型」两条记录。
+ */
+async function sendMessage({ uid, peer, content }) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const text = String(content || '').trim()
+  if (!peer || !text) return resp(400, { error: '参数不完整' })
+  if (peer === uid) return resp(400, { error: '不能给自己发消息' })
+
+  const msgId = `m${crypto.randomUUID().replace(/-/g, '')}`
+  const r = await pg('/v1/rdb/rest/messages', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: [
+      { id: msgId, owner_id: uid, peer_id: peer, from_me: true, content: text, read: true },
+      { id: msgId, owner_id: peer, peer_id: uid, from_me: false, content: text, read: false },
+    ],
+  })
+  if (r.status >= 400) return resp(502, { error: '发送失败', detail: r.text })
+  return resp(200, { ok: true, id: msgId })
+}
+
 /** RPC：仅允许白名单内的安全函数 */
-const RPC_ALLOW = new Set(['bump_article_views'])
+const RPC_ALLOW = new Set(['bump_article_views', 'send_message'])
 async function proxyRpc({ fn, body, uid }) {
   if (!RPC_ALLOW.has(fn)) return resp(403, { error: '该函数不允许调用' })
   let payload = body
@@ -325,7 +355,13 @@ async function proxyRpc({ fn, body, uid }) {
       payload = {}
     }
   }
-  const r = await pg(`/v1/rdb/rest/rpc/${fn}`, { method: 'POST', body: payload || {} })
+  payload = payload || {}
+
+  if (fn === 'send_message') {
+    return sendMessage({ uid, peer: payload.p_peer ?? payload.peer, content: payload.p_content ?? payload.content })
+  }
+
+  const r = await pg(`/v1/rdb/rest/rpc/${fn}`, { method: 'POST', body: payload })
   return resp(r.status, parsePg(r.text, r.status))
 }
 
