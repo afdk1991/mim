@@ -62,10 +62,10 @@ import { TeenBanner } from './user-domain'
 import { ScheduledTicker } from './content-domain'
 import { RanksPage, VideosPage } from './feed-domain' /* 轮 23 打通：B4 视频沉浸流 / 榜单体系路由 */
 import { PullSearchBar } from './PullSearchBar' /* 微博式下拉揭示搜索栏（全局，覆盖整个项目） */
-import './viewswitch.css'
-
-/** 视图模式：广场态（消费/社交/交易）与知识态（生产/学习/开发工具） */
-type ViewMode = 'feed' | 'kb'
+/* 单态架构（2026-10-23 决策）：原 PLAZA 广场态 / LEARN 知识态双态隔离已废止，
+   全站统一为单一形态——导航、搜索、内容分发不再按视图切分，所有入口常驻可见。
+   历史双态方案（三视图切换器 / domain 隔离 / 分域核算）见《开发吧.md》，
+   该文件仅作规划留档，不再作为实现约束。 */
 
 type NavItem = {
   href: string
@@ -74,22 +74,18 @@ type NavItem = {
   icon?: string
   badgeKey?: 'notif' | 'msg'
   children?: NavItem[]
-  /** 视图归属（开发吧.md 文档三「一个平台三种视图」）：缺省 = 广场/知识双视图可见 */
-  views?: ViewMode[]
 }
 
 /** 单一导航：业务域入口一级平铺（低频入口直接可见，搜索/导航双闭环）；
     个人账户/权益/营收类入口（发布器 · 钱包 · VIP · 成长 · 收藏 · 足迹 · 设置）
-    按《开发吧.md》「我的 · Work」定义统一归入「我的」分组二级。
-    views 按《开发吧.md》合并矩阵标注视图归属：生活/社交/交易域 → 广场态；
-    生产/学习/开发工具域 → 知识态；不标 = 双视图共用（我的/会员）。 */
+    按《开发吧.md》「我的 · Work」定义统一归入「我的」分组二级。 */
 const NAV: NavItem[] = [
-  { href: '#/feed', match: '/feed', label: '首页', icon: '🏠', views: ['feed'] },
-  { href: '#/articles', match: '/article', label: '文章', icon: '📝', views: ['kb'] },
-  { href: '#/write', match: '/write', label: '写文章', icon: '✍️', views: ['kb'] },
-  { href: '#/topics', match: '/topics', label: '超话', icon: '🔥', views: ['feed'] },
-  { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif', views: ['feed'] },
-  { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg', views: ['feed'] },
+  { href: '#/feed', match: '/feed', label: '首页', icon: '🏠' },
+  { href: '#/articles', match: '/article', label: '文章', icon: '📝' },
+  { href: '#/write', match: '/write', label: '写文章', icon: '✍️' },
+  { href: '#/topics', match: '/topics', label: '超话', icon: '🔥' },
+  { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif' },
+  { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg' },
   {
     href: '#/my',
     match: '/my',
@@ -114,7 +110,6 @@ const NAV: NavItem[] = [
     match: '/mall',
     label: '商城',
     icon: '🛒',
-    views: ['feed'],
     children: [
       { href: '#/mall', match: '/mall', label: '商城中心' },
       { href: '#/mall/cart', match: '/mall/cart', label: '购物车' },
@@ -122,24 +117,24 @@ const NAV: NavItem[] = [
       { href: '#/mall/wallet', match: '/mall/wallet', label: '钱包' },
     ],
   },
-  { href: '#/live', match: '/live', label: '直播开播', icon: '📡', views: ['feed'] }, /* 轮 24 打通：B5 直播开播台入口 */
-  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻', views: ['kb'] },
-  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦', views: ['kb'] },
-  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️', views: ['kb'] },
-  { href: '#/delivery', match: '/delivery', label: '配送台', icon: '🚚', views: ['feed'] },
-  { href: '#/price', match: '/price', label: '价格监控', icon: '📈', views: ['feed'] },
-  { href: '#/nav', match: '/nav', label: '路线导航', icon: '🗺️', views: ['feed'] },
-  { href: '#/mail', match: '/mail', label: '邮箱', icon: '📬', views: ['feed'] },
-  { href: '#/bom', match: '/bom', label: 'BOM 工具台', icon: '🖥️', views: ['kb'] },
-  { href: '#/coze', match: '/coze', label: '智能体', icon: '🤖', views: ['kb'] },
-  { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚', views: ['kb'] },
-  { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬', views: ['feed'] },
-  { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊', views: ['kb'] },
-  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️', views: ['feed'] },
-  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺', views: ['feed'] },
-  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜', views: ['feed'] },
-  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗', views: ['feed'] },
-  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡', views: ['feed'] },
+  { href: '#/live', match: '/live', label: '直播开播', icon: '📡' }, /* 轮 24 打通：B5 直播开播台入口 */
+  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻' },
+  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦' },
+  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️' },
+  { href: '#/delivery', match: '/delivery', label: '配送台', icon: '🚚' },
+  { href: '#/price', match: '/price', label: '价格监控', icon: '📈' },
+  { href: '#/nav', match: '/nav', label: '路线导航', icon: '🗺️' },
+  { href: '#/mail', match: '/mail', label: '邮箱', icon: '📬' },
+  { href: '#/bom', match: '/bom', label: 'BOM 工具台', icon: '🖥️' },
+  { href: '#/coze', match: '/coze', label: '智能体', icon: '🤖' },
+  { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚' },
+  { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬' },
+  { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊' },
+  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️' },
+  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺' },
+  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜' },
+  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗' },
+  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡' },
 ]
 
 /* ---------- 深色模式 ---------- */
@@ -169,36 +164,7 @@ function useTheme() {
   return [theme, setTheme] as const
 }
 
-/* ---------- 三视图（开发吧.md 文档三：广场态/知识态模式开关） ---------- */
-
-const VIEW_KEY = 'mim-view-mode'
-
-function loadView(): ViewMode {
-  try {
-    const v = localStorage.getItem(VIEW_KEY)
-    if (v === 'feed' || v === 'kb') return v
-  } catch {
-    /* ignore */
-  }
-  return 'feed'
-}
-
-function useViewMode() {
-  const [view, setView] = useState<ViewMode>(loadView)
-  useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_KEY, view)
-    } catch {
-      /* ignore */
-    }
-  }, [view])
-  return [view, setView] as const
-}
-
-/** 当前视图下可见的导航项：未标注 views 的条目（我的/会员）双视图常驻 */
-function navInView(items: NavItem[], view: ViewMode): NavItem[] {
-  return items.filter((it) => !it.views || it.views.includes(view))
-}
+/* ---------- 单态导航：全部入口常驻可见，不再按视图过滤 ---------- */
 
 /** Phase1 L1 IAM：管理后台入口（菜单级 RBAC，仅 admin 角色可见） */
 const ADMIN_NAV: NavItem = {
@@ -216,12 +182,12 @@ function SideNav() {
   const api = useApp()
   const { path, navigate } = useRouter()
   const { hasRole } = useAuth()
-  const [view, setView] = useViewMode()
   const [open, setOpen] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [dropOpen, setDropOpen] = useState(false)
 
-  const visible = hasRole('admin') ? [...navInView(NAV, view), ADMIN_NAV] : navInView(NAV, view)
+  /* 单态：全量 NAV 常驻可见；admin 角色追加管理后台入口 */
+  const visible = hasRole('admin') ? [...NAV, ADMIN_NAV] : NAV
 
   /* 路由变化后自动展开包含当前页的分组（admin 角色异步到位后同样触发一次） */
   useEffect(() => {
@@ -233,17 +199,7 @@ function SideNav() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, view, hasRole])
-
-  /* 切换视图：若当前页不属于新视图可见范围，则跳到该视图的默认首页 */
-  const switchView = (v: ViewMode) => {
-    if (v === view) return
-    setView(v)
-    const hit = navInView(NAV, v).some(
-      (item) => path.startsWith(item.match) || item.children?.some((k) => path.startsWith(k.match)),
-    )
-    if (!hit) navigate(v === 'kb' ? '#/articles' : '#/feed')
-  }
+  }, [path, hasRole])
 
   const hits = matchSearchPages(q)
 
@@ -257,18 +213,6 @@ function SideNav() {
   return (
     <aside className="sidenav">
       <a className="brand" href="#/feed">Mim</a>
-      {/* 三视图切换器：广场态/知识态合并为单按钮，点击在两视图间切换（开发吧.md 文档三「一个平台三种视图」） */}
-      <button
-        type="button"
-        key={view}
-        className="vw-toggle"
-        title={`切换到${view === 'feed' ? '知识态' : '广场态'}`}
-        onClick={() => switchView(view === 'feed' ? 'kb' : 'feed')}
-      >
-        <span aria-hidden="true">{view === 'feed' ? '🎬' : '📚'}</span>
-        <span className="vw-toggle-label">{view === 'feed' ? '广场态' : '知识态'}</span>
-        <span className="vw-toggle-swap" aria-hidden="true">⇄</span>
-      </button>
       <div
         className="sidenav-search"
         onBlur={(e) => {
