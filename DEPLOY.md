@@ -281,3 +281,46 @@ MIM_API=https://xxx/mim-api node scripts/smoke-storage.mjs
 - **Pages 部署按钮置灰**：未把 Settings → Pages 的 Source 切成 GitHub Actions。
 - **EdgeOne 部署报 token 无效**：确认 Secret 名是 `EDGEONE_API_TOKEN`，且 Token 是在 Pages 控制台（非腾讯云主账号密钥）生成。
 - **改了部署项目名后出现两个项目**：旧项目需在 EdgeOne 控制台手动删除。
+
+## 附：仓库重建后必做清单（2026-10-23 实测）
+
+远端仓库若被删除/转移，本地历史仍在，重建后一次 push 即全量恢复。但**新仓库是空壳**，
+以下三项必须补，否则部署链路会假失败或根本跑不起来：
+
+| # | 事项 | 命令 / 位置 | 漏做的后果 |
+|---|---|---|---|
+| 1 | 启用 GitHub Pages | `gh api --method POST repos/<owner>/<repo>/pages -f build_type=workflow` | `deploy-pages` 报 Pages 未启用 |
+| 2 | 配 `EDGEONE_API_TOKEN` | `gh secret set EDGEONE_API_TOKEN --repo <owner>/<repo> --body "$(从 ~/.edgeone/<hash> 取 .value.Token)"` | EdgeOne 部署鉴权失败 |
+| 3 | 确认 workflow 可解析 | 手动 `gh workflow run <file>.yml --ref main` | 见下方坑 ① |
+
+### 坑 ①：`secrets` 上下文不能用于 job 级 `if`（会静默掐掉全部部署）
+
+```yaml
+# ❌ 错误：GitHub 拒绝解析整个 workflow，run 启动 0 个 job
+if: github.ref == 'refs/heads/main' && secrets.CLOUDBASE_SECRET_ID != ''
+```
+
+表现极具误导性：**Pages / EdgeOne 两个部署 job 都不跑，run 状态 failure 但无任何日志**。
+只有手动 dispatch 才能拿到真实报错（HTTP 422 `Unrecognized named-value: 'secrets'`）。
+正确写法是 job 级 `env` 承接、step 级 `if` 判断：
+
+```yaml
+if: github.ref == 'refs/heads/main'
+env:
+  HAS_CLOUDBASE: ${{ secrets.CLOUDBASE_SECRET_ID != '' && secrets.CLOUDBASE_ENV_ID != '' }}
+steps:
+  - run: echo "跳过"
+    if: env.HAS_CLOUDBASE != 'true'
+```
+
+### 坑 ②：EdgeOne 默认域名裸访问返回 401 ≠ 部署失败
+
+`curl https://<project>.edgeone.cool/` 直接 401，页面文字为
+`Access Restricted or Authentication Expired`。这是 EdgeOne 对默认子域开启的访问保护，
+**部署本身是成功的**。判断真伪看 CI 日志里的 `Deploy Success` + `Deploy URL`。
+要裸域名可访问，需在 EdgeOne 控制台关闭该项目的访问限制，或绑定自有域名。
+
+### 坑 ③：仓库删除会让 npm 包变成孤儿包
+
+`gh api user/packages/npm/mim` 的 `repository` 字段会变成 `null`，但包本身仍在。
+用同名仓库重新发布即可重新关联，包版本不受影响。
