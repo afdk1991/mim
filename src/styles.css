@@ -1436,6 +1436,13 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     position: sticky;
     top: 0;
     width: auto;
+    /* 小屏折叠为横向顶栏。
+       根因：base 规则带 align-self:flex-start，在桌面「行向」flex 下只防纵向拉伸（正确）；
+       本媒体查询把 .shell 翻成「列向」后交叉轴变为水平，它就成了禁止横向拉伸，
+       导致 width:auto 以 shrink-to-fit 取到 max-content（23 个链接 ≈2921px）撑爆文档。
+       故小屏必须改回 stretch；min-width:0 保证内层 .sidenav-nav 的 overflow-x 能生效 */
+    align-self: stretch;
+    min-width: 0;
     height: auto;
     flex-direction: row;
     align-items: center;
@@ -1451,6 +1458,8 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
 
   .sidenav-nav {
     flex: 1;
+    /* 同上：min-width:0 让 nav 可收缩，overflow-x 才能在栏内横向滚动（否则撑爆文档） */
+    min-width: 0;
     flex-direction: row;
     align-items: center;
     gap: 4px;
