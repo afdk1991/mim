@@ -42,3 +42,6 @@ Thumbs.db
 .up.json
 .tiny.png
 verify-shots/
+# 浏览器实测脚本（替代已移除的 vitest 单测）：本地验证用，不入库
+verify-*.mjs
+scripts/verify-*.mjs
