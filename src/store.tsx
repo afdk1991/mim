@@ -53,34 +53,14 @@ const FEED_REFRESH_TEMPLATES: string[] = [
 ]
 
 /**
- * 云端真实模式迁移（Supabase 已配置时对历史 localStorage 存档执行）：
- * 演示域数据（u1..u9 的内容/关注/通知/私信，演示超话/热搜/资源库）全部剔除，
- * 仅保留「我」自产的帖子/文章/片段、其收藏与草稿——这些是用户真实创作，
- * 上云前不丢失；登录并拉取云端后与云端行同 id 合并。
+ * 内容空存档判定：没有任何动态/文章，且 users 只有 me 占位身份。
+ * 命中即视为「冷启动前的空态存档」——由 loadState 重播种演示数据。
+ * （历史背景：云端真实模式曾把演示数据全部剥离，云端库又为空，导致首页全空；
+ *  2026-10-24 起演示内容定位为冷启动推荐，空存档一律自愈重播种。）
  */
-function migrateLegacyForCloud(s: AppState): AppState {
-  if (!s.users['me']) return createSeedState()
-  const keepPostIds = new Set(s.posts.filter((p) => p.authorId === 'me').map((p) => p.id))
-  const keepArticleIds = new Set(s.articles.filter((a) => a.authorId === 'me').map((a) => a.id))
-  return {
-    ...s,
-    meId: 'me',
-    users: { me: s.users['me'] },
-    posts: s.posts.filter((p) => p.authorId === 'me'),
-    articles: s.articles.filter((a) => a.authorId === 'me'),
-    snippets: s.snippets.filter((x) => x.authorId === 'me'),
-    resources: [],
-    topics: [],
-    hotSearches: [],
-    notifications: [],
-    messages: [],
-    followingIds: [],
-    favorites: s.favorites.filter(
-      (f) =>
-        (f.type === 'post' && keepPostIds.has(f.targetId)) ||
-        (f.type === 'article' && keepArticleIds.has(f.targetId)),
-    ),
-  }
+function isContentEmpty(s: AppState): boolean {
+  const others = Object.keys(s.users).filter((id) => id !== 'me')
+  return s.posts.length === 0 && s.articles.length === 0 && others.length === 0
 }
 
 /**
@@ -127,8 +107,10 @@ function loadState(): AppState {
         parsed.articles = parsed.articles.map((a) => ({ ...a, comments: a.comments ?? [] }))
         // 兜底：cloudIds 为轮 4 新增可选字段，旧存档缺失时补空集
         if (!parsed.cloudIds) parsed.cloudIds = { users: [], posts: [], articles: [], snippets: [] }
-        // 云端真实模式：历史存档剔除演示域数据（见 migrateLegacyForCloud），纯本地模式不受影响
-        if (cloudEnabled) return ensureHotSearches(migrateLegacyForCloud(parsed))
+        // 空存档自愈：合法但内容为空的存档 → 重播种冷启动演示数据（无论是否配置云端）。
+        // 修复「云端真实模式清空演示数据」路线留下的空存档：本地与云端库均无内容时，
+        // 不重播种则首页信息流/文章/热搜/推荐关注全空。有真实内容的存档原样保留。
+        if (isContentEmpty(parsed)) return ensureHotSearches(createSeedState())
         return ensureHotSearches(parsed)
       }
     }

@@ -295,3 +295,66 @@
 .ab-debug-row code {
   color: var(--primary-deep);
 }
+
+/* ---------- 信息流「加载更多」（分页，对齐微博信息流底部） ---------- */
+.feed-loadmore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 8px;
+}
+.feed-loadmore small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ---------- 回到顶部悬浮球（滚动超过一屏后出现） ---------- */
+.feed-backtop {
+  position: fixed;
+  right: 22px;
+  bottom: 88px;
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  transition: transform 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.feed-backtop:hover {
+  transform: translateY(-2px);
+  color: var(--primary-deep);
+  border-color: var(--primary-deep);
+}
+
+/* ---------- 右栏公告位（对齐微博右侧栏公告/活动入口） ---------- */
+.rf-announce-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--text-2);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+}
+.rf-announce-item:last-child {
+  border-bottom: none;
+}
+.rf-announce-item:hover {
+  color: var(--primary-deep);
+}
+.rf-announce-item .rf-ann-tag {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--primary-weak, #eef2ff);
+  color: var(--primary-deep);
+}

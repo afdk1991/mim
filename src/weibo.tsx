@@ -190,9 +190,24 @@ export function FeedPage() {
   const neg = useNegFeedback()
   /* 轮 23 打通：B4 同城 —— 我设置的定位（未设置时默认城市走 AB 实验 city_default） */
   const [city, setCity] = useCity()
-  /* 轮 23 打通：B4 feed 顶部 Tab —— 关注 / 推荐 / 同城
+  /* 轮 23 打通：B4 feed 顶部 Tab —— 关注 / 推荐 / 热门 / 同城
      轮 20/21/22 口径保持：黑名单 / 青少年敏感词 / 快拍不进流 / 仅自己可见过滤不变 */
-  const [tab, setTab] = useState<'follow' | 'reco' | 'city'>('follow')
+  const [tab, setTab] = useState<'follow' | 'reco' | 'hot' | 'city'>('follow')
+  /* 信息流分页：每页 10 条，切 Tab 重置（对齐微博「加载更多」），长列表避免一次性全量渲染 */
+  const FEED_PAGE_SIZE = 10
+  const [visibleCount, setVisibleCount] = useState(FEED_PAGE_SIZE)
+  const switchTab = (t: 'follow' | 'reco' | 'hot' | 'city'): void => {
+    setTab(t)
+    setVisibleCount(FEED_PAGE_SIZE)
+  }
+  /* 回到顶部悬浮球：滚动超过一屏后出现 */
+  const [showBackTop, setShowBackTop] = useState(false)
+  useEffect(() => {
+    const onScroll = (): void => setShowBackTop(window.scrollY > 600)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   const basePosts = api.state.posts.filter(
     (p) =>
       !p.story &&
@@ -214,6 +229,12 @@ export function FeedPage() {
   })
   /* 同城流：按动态位置归属城市过滤（用户无城市字段，位置即地理信号） */
   const cityPosts = basePosts.filter((p) => (p.location ?? '').startsWith(city))
+  /* 热门流：公开动态按互动热度排序（赞 + 转发×2 + 评论×3），对齐微博首页「热门」Tab */
+  const hotPosts = basePosts
+    .filter((p) => p.authorId !== api.me.id)
+    .map((p) => ({ p, heat: p.likes + p.reposts * 2 + (p.comments?.length ?? 0) * 3 }))
+    .sort((a, b) => b.heat - a.heat)
+    .map((x) => x.p)
   const cities = [
     ...new Set([
       ...CITY_PRESETS,
@@ -221,21 +242,33 @@ export function FeedPage() {
     ]),
   ]
   const reasonStyle = abVariant('reco_reason_style')
+  /* 当前 Tab 的全量条数（供「加载更多」判断与已展示计数） */
+  const activeCount =
+    tab === 'follow'
+      ? followPosts.length
+      : tab === 'reco'
+        ? recoItems.length
+        : tab === 'hot'
+          ? hotPosts.length
+          : cityPosts.length
 
   return (
     <div className="page-grid">
       <div>
         {/* 轮 21 打通：feed 顶部快拍栏 */}
         <StoryBar />
-        {/* 轮 23 打通：B4 feed 顶部分发 Tab —— 关注 / 推荐 / 同城 + 视频沉浸流入口 */}
+        {/* 轮 23 打通：B4 feed 顶部分发 Tab —— 关注 / 推荐 / 热门 / 同城 + 视频沉浸流入口 */}
         <div className="tabs rf-feed-tabs">
-          <button className={cx('tab-btn', tab === 'follow' && 'active')} onClick={() => setTab('follow')}>
+          <button className={cx('tab-btn', tab === 'follow' && 'active')} onClick={() => switchTab('follow')}>
             👥 关注
           </button>
-          <button className={cx('tab-btn', tab === 'reco' && 'active')} onClick={() => setTab('reco')}>
+          <button className={cx('tab-btn', tab === 'reco' && 'active')} onClick={() => switchTab('reco')}>
             ✨ 推荐
           </button>
-          <button className={cx('tab-btn', tab === 'city' && 'active')} onClick={() => setTab('city')}>
+          <button className={cx('tab-btn', tab === 'hot' && 'active')} onClick={() => switchTab('hot')}>
+            🔥 热门
+          </button>
+          <button className={cx('tab-btn', tab === 'city' && 'active')} onClick={() => switchTab('city')}>
             📍 同城
           </button>
           <span style={{ flex: 1 }} />
@@ -327,7 +360,7 @@ export function FeedPage() {
         {tab === 'follow' && (
           <>
             {followPosts.length === 0 && <Empty emoji="👥" text="关注的人还没有新动态，去推荐页逛逛吧" />}
-            {followPosts.map((p) => (
+            {followPosts.slice(0, visibleCount).map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
           </>
@@ -337,7 +370,7 @@ export function FeedPage() {
           <>
             {recoItems.length === 0 && <Empty emoji="✨" text="暂无推荐内容，发布或互动越多推荐越准" />}
             {/* 轮 23 打通：B4 推荐理由小标 —— AB 实验 reco_reason_style 控制样式 A/B */}
-            {recoItems.map(({ post, reason }) => (
+            {recoItems.slice(0, visibleCount).map(({ post, reason }) => (
               <div key={post.id} className="rf-reco-item">
                 {reasonStyle === 'b' ? (
                   <span className="rf-reason rf-reason-b">✨ {reason}</span>
@@ -350,15 +383,36 @@ export function FeedPage() {
           </>
         )}
 
+        {tab === 'hot' && (
+          <>
+            {hotPosts.length === 0 && <Empty emoji="🔥" text="暂无热门动态，多互动让内容热起来" />}
+            {hotPosts.slice(0, visibleCount).map((p) => (
+              <PostCard key={p.id} post={p} />
+            ))}
+          </>
+        )}
+
         {tab === 'city' && (
           <>
             {cityPosts.length === 0 && (
               <Empty emoji="📍" text={`暂无「${city}」的同城动态，发布时选择位置即可现身同城`} />
             )}
-            {cityPosts.map((p) => (
+            {cityPosts.slice(0, visibleCount).map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
           </>
+        )}
+
+        {/* 加载更多：当前 Tab 仍有未展示内容时出现（对齐微博信息流分页） */}
+        {activeCount > visibleCount && (
+          <div className="feed-loadmore">
+            <button className="btn btn-ghost" onClick={() => setVisibleCount((v) => v + FEED_PAGE_SIZE)}>
+              加载更多
+            </button>
+            <small>
+              已展示 {Math.min(visibleCount, activeCount)} / {activeCount} 条
+            </small>
+          </div>
         )}
       </div>
 
@@ -391,6 +445,23 @@ export function FeedPage() {
           ))}
         </div>
 
+        {/* 公告/活动位（对齐微博右侧栏）：产品动态 + 运营活动入口 */}
+        <div className="side-card">
+          <h3>📢 公告</h3>
+          <a className="rf-announce-item" href="#/videos">
+            <span className="rf-ann-tag">产品</span>
+            <span>全站统一播放器上线，视频跨页播放不中断</span>
+          </a>
+          <a className="rf-announce-item" href="#/growth">
+            <span className="rf-ann-tag">活动</span>
+            <span>成长引擎每日签到，连续 7 天积分翻倍</span>
+          </a>
+          <a className="rf-announce-item" href="#/vip">
+            <span className="rf-ann-tag">会员</span>
+            <span>VIP 会员限时权益：免广告 + 动态置顶</span>
+          </a>
+        </div>
+
         {recos.length > 0 && (
           <div className="side-card">
             <h3>👀 推荐关注</h3>
@@ -406,6 +477,18 @@ export function FeedPage() {
         {/* 轮 22 打通：可能感兴趣的人 —— 好友的好友推导（排除已关注/黑名单/自己），无候选时 seed 兜底 */}
         <SuggestCard />
       </div>
+
+      {/* 回到顶部悬浮球：滚动超过一屏后出现 */}
+      {showBackTop && (
+        <button
+          className="feed-backtop"
+          title="回到顶部"
+          aria-label="回到顶部"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          ↑
+        </button>
+      )}
     </div>
   )
 }

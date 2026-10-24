@@ -106,10 +106,38 @@ export interface RecoItem {
 }
 
 /**
+ * 推荐流打散（对齐微博「内容去重与打散」）：分数排序后重排，
+ * 避免同一作者 / 同一话题连续扎堆。策略：线性扫描，每次从剩余条目中
+ * 挑得分最高的一个「作者与话题都不同于上一条」的；找不到时退化为
+ * 「仅作者不同」，仍找不到（剩余全部撞车）才取剩余最高分——保证不丢条目。
+ * null 话题（未参与话题）不参与撞车判定。
+ */
+function interleaveReco(items: RecoItem[]): RecoItem[] {
+  const rest = [...items]
+  const out: RecoItem[] = []
+  const sameTopic = (a: string | null, b: string | null): boolean => !!a && !!b && a === b
+  let lastAuthor: string | null = null
+  let lastTopic: string | null = null
+  while (rest.length > 0) {
+    let idx = rest.findIndex(
+      (it) => it.post.authorId !== lastAuthor && !sameTopic(it.post.topic ?? null, lastTopic),
+    )
+    if (idx < 0) idx = rest.findIndex((it) => it.post.authorId !== lastAuthor)
+    if (idx < 0) idx = 0
+    const [picked] = rest.splice(idx, 1)
+    out.push(picked)
+    lastAuthor = picked.post.authorId
+    lastTopic = picked.post.topic ?? null
+  }
+  return out
+}
+
+/**
  * 轮 23 打通：B4 推荐流本地排序 demo ——
  * 兴趣权重从既有互动数据推导（点赞/收藏/评论/转发各 +1 记作者与话题）；
  * 排序分 = 作者互动权重 ×2 + 话题命中 ×1.5 + 时间衰减（48h 指数近似，0~2 分）；
- * 负反馈话题命中降权 80%（作者级命中由调用方整卡过滤，不进候选）。
+ * 负反馈话题命中降权 80%（作者级命中由调用方整卡过滤，不进候选）；
+ * 末段过 interleaveReco 打散，同作者/同话题不连续出现。
  */
 export function buildRecFeed(opts: {
   candidates: Post[]
@@ -160,5 +188,6 @@ export function buildRecFeed(opts: {
           : '🔥 热门内容'
     return { post: p, reason, score }
   })
-  return items.sort((a, b) => b.score - a.score)
+  items.sort((a, b) => b.score - a.score)
+  return interleaveReco(items)
 }
