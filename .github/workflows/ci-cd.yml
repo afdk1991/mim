@@ -14,6 +14,17 @@ name: CI/CD · 构建 & 部署
 # Edge Function 部署需配四项（未配则整 job 跳过）：
 #   SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF / SUPABASE_SERVICE_ROLE_KEY / MIM_TOKEN_SECRET
 #
+# 全链路「线上化」说明（本机只需 git push，其余全部由本 workflow 在云端完成）：
+#   - 构建      → build job（typecheck + vite build）
+#   - 数据库迁移 → migrate-db job（走 Supabase Management API，无需数据库密码，幂等）
+#                 需配 secrets：SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF
+#                 （可选 ADMIN_EMAIL：自动为指定注册邮箱授予 admin 角色）
+#                 未配则整段跳过并提示，不阻塞部署
+#   - 站点部署  → deploy-pages（GitHub Pages）+ deploy-edgeone（EdgeOne Makers）
+#   - 线上验证  → verify-deploy job（对 Pages/Makers 做真实 HTTP 冒烟：
+#                 index 200+挂载点、入口 bundle 完整可达、/admin 兜底重定向、Makers 域名存活）
+#   故：本机不再需要执行 npm run build / db:apply / 部署 / 验证等任何命令。
+#
 # 前端后端优先级（src/lib/supabase.ts）：Supabase（直连，主）→ CloudBase mim-api（备）→ 本地演示。
 # 两个云端入口均为公开值（publishable key 的安全由 RLS 保证），故与 VITE_MIM_API_BASE
 # 一样直接内联注入，杜绝「仓库未配 secret → 构建产物缺配置 → 回退本地演示模式」。
@@ -90,6 +101,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: 下载构建产物
         uses: actions/download-artifact@v4
@@ -108,6 +121,28 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  migrate-db:
+    name: 应用数据库迁移（Supabase 云端）
+    needs: build
+    # 仅 main 分支。走 Management API，无需数据库密码 —— 目的是让「应用迁移」这件事
+    # 从本机搬到云端：配好 secret 后每次 push main 自动幂等应用，本机无需再跑 db:apply。
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 云端通道零依赖（用内置 fetch 调 Management API），故无需 npm install
+      - name: 按序应用 supabase/migrations/*.sql
+        run: node scripts/apply-migration-remote.mjs
+
   deploy-edgeone:
     name: 部署 EdgeOne Makers
     needs: build
@@ -116,6 +151,8 @@ jobs:
     env:
       # EdgeOne Makers 项目名（已存在 makers-euoglvyjyknd），可在仓库变量或此处修改
       EDGEONE_PROJECT_NAME: mim
+    outputs:
+      url: ${{ steps.eo.outputs.url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,7 +171,19 @@ jobs:
 
       # Makers 部署：CLI 自动检测框架、构建并上传 dist；-t 复用 EdgeOne API Token
       - name: 部署至 EdgeOne Makers（production）
-        run: PAGES_SOURCE=skills edgeone makers deploy -n "$EDGEONE_PROJECT_NAME" -t "${{ secrets.EDGEONE_API_TOKEN }}" --json
+        id: eo
+        run: |
+          set -o pipefail
+          OUT=$(PAGES_SOURCE=skills edgeone makers deploy -n "$EDGEONE_PROJECT_NAME" -t "${{ secrets.EDGEONE_API_TOKEN }}" --json 2>&1)
+          echo "$OUT"
+          # 提取部署 URL（形如 https://mim-xxxxxxxx.edgeone.cool?eo_token=…）
+          URL=$(printf '%s' "$OUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.edgeone\.[a-z]+[^"]*' | head -1)
+          if [ -n "$URL" ]; then
+            echo "url=$URL" >> "$GITHUB_OUTPUT"
+            echo "::notice::EdgeOne Makers 部署地址：$URL"
+          else
+            echo "::warning::未能从部署输出中解析出 URL，verify-deploy 将跳过 Makers 校验"
+          fi
 
   deploy-function:
     name: 部署云函数 mim-api
@@ -298,3 +347,71 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  verify-deploy:
+    name: 线上冒烟验证（Pages + Makers）
+    needs: [deploy-pages, deploy-edgeone]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 校验 GitHub Pages
+        env:
+          PAGE_URL: ${{ needs.deploy-pages.outputs.url }}
+        run: |
+          echo "Pages 站点：$PAGE_URL"
+          # Pages 部署后需等待 CDN 生效，最多轮询 5 分钟
+          ok=0
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /tmp/idx.html -w '%{http_code}' --max-time 30 "$PAGE_URL" || echo 000)
+            if [ "$code" = "200" ] && grep -q 'id="root"' /tmp/idx.html; then ok=1; break; fi
+            echo "  [$i] code=$code 等待生效…"
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then echo "::error::GitHub Pages 未通过校验（非 200 或缺少挂载点）"; exit 1; fi
+          echo '  ✅ index.html 200 且含挂载点 id="root"'
+
+          B=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' /tmp/idx.html | head -1)
+          if [ -z "$B" ]; then echo "::error::未能在 index.html 中定位入口 bundle"; exit 1; fi
+          echo "  入口 bundle：$B"
+          # 必须完整下载后再判断体积 —— 此前 curl 被 --max-time 截断导致误判「产物异常」
+          bcode=$(curl -s -o /tmp/b.js -w '%{http_code}' --max-time 120 "$PAGE_URL/assets/$B" || echo 000)
+          size=$(wc -c < /tmp/b.js)
+          echo "  bundle：HTTP=$bcode size=$size"
+          if [ "$bcode" != "200" ]; then echo "::error::入口 bundle 不可达"; exit 1; fi
+          if [ "$size" -lt 100000 ]; then echo "::error::入口 bundle 体积异常偏小（疑似下载被截断）"; exit 1; fi
+          if ! grep -qiE 'supabase|mim-state' /tmp/b.js; then echo "::error::bundle 内未检出应用代码标记"; exit 1; fi
+          echo '  ✅ bundle 完整且含应用代码'
+
+      - name: 校验 clean path 兜底（/admin → #/admin）
+        env:
+          PAGE_URL: ${{ needs.deploy-pages.outputs.url }}
+        run: |
+          code=$(curl -s -o /tmp/adm.html -w '%{http_code}' --max-time 30 "$PAGE_URL/admin" || echo 000)
+          echo "  /admin HTTP=$code"
+          # GitHub Pages 对未知路径回退 404.html（我们的兜底页），状态码仍是 404，
+          # 但正文必须是 hash 重定向脚本 —— 只看状态码会漏判
+          if ! grep -qE 'location\.(hash|replace)|正在跳转' /tmp/adm.html; then
+            echo "::error::/admin 未返回 hash 重定向兜底页"; exit 1
+          fi
+          echo '  ✅ /admin 命中 404.html 兜底重定向'
+
+      - name: 校验 EdgeOne Makers
+        env:
+          MAKERS_URL: ${{ needs.deploy-edgeone.outputs.url }}
+        run: |
+          if [ -z "$MAKERS_URL" ]; then
+            echo "::warning::未解析到 Makers URL，跳过该项（不影响其他结果）"; exit 0
+          fi
+          echo "  Makers 域名：${MAKERS_URL%%\?*}"
+          ok=0
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /tmp/mk.html -w '%{http_code}' --max-time 30 "$MAKERS_URL" || echo 000)
+            # 预览网关要求浏览器校验 eo_token：curl 请求会拿到 3xx（SSO 网关）→ 视为存活
+            case "$code" in
+              200|30*) ok=1; break;;
+            esac
+            echo "  [$i] code=$code 等待生效…"
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then echo "::error::EdgeOne Makers 未通过校验"; exit 1; fi
+          echo '  ✅ Makers 域名可达（200/3xx 均视为存活）'

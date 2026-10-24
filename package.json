@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "db:apply": "node scripts/apply-migration.mjs",
+    "db:apply:remote": "node scripts/apply-migration-remote.mjs",
     "sync:accounts": "node scripts/sync-accounts.mjs",
     "purge:test-users": "node scripts/purge-test-users.mjs"
   },
