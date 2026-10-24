@@ -1086,7 +1086,9 @@ button.sidenav-link {
 
 .snippet-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* minmax(320px, 1fr) 在 320px 视口（减去容器内边距后可用约 288px）会因轨道
+     下限 320px 撑出 16px 横向溢出；min(320px, 100%) 让下限在窄屏退化为可用宽度 */
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 12px;
 }
 
