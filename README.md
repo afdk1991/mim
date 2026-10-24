@@ -1,6 +1,6 @@
 # Mim
 
-[![CI/CD · 构建 & 部署](https://github.com/afdk1991/mim/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/afdk1991/mim/actions/workflows/ci-cd.yml) [![跨平台 Release](https://github.com/afdk1991/mim/actions/workflows/build-release.yml/badge.svg)](https://github.com/afdk1991/mim/actions/workflows/build-release.yml) [![Lighthouse CI](https://github.com/afdk1991/mim/actions/workflows/lighthouse.yml/badge.svg)](https://github.com/afdk1991/mim/actions/workflows/lighthouse.yml) ![GitHub Release Version](https://img.shields.io/github/v/release/afdk1991/mim?include_prereleases&label=release)
+[![CI/CD · 构建 & 部署](https://github.com/afdk1991/mim/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/afdk1991/mim/actions/workflows/ci-cd.yml) [![跨平台 Release](https://github.com/afdk1991/mim/actions/workflows/build-release.yml/badge.svg)](https://github.com/afdk1991/mim/actions/workflows/build-release.yml) ![GitHub Release Version](https://img.shields.io/github/v/release/afdk1991/mim?include_prereleases&label=release)
 
 React + Vite + TypeScript 实现的内容聚合社区 Demo（动态流 + 技术文章），并通过 Tauri 2、Capacitor 8 与 ArkTS 壳工程覆盖六大平台，内置 OTA 自动更新。
 

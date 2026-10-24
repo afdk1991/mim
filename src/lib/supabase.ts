@@ -14,8 +14,8 @@
           权限由数据库策略承担，无需服务端注入 owner 过滤。
         · 存储：Storage 私有桶 mim-media，RLS 限定 <uid>/ 前缀（见迁移 0002）。
         · Realtime：messages 表已加入 publication，私信实时推送开箱即用。
-      publishable key 按设计可暴露于客户端（安全由 RLS 保证，与
-      auth-oauth.test.ts 中的用法一致），故与 CloudBase 入口一样内置兜底，
+      publishable key 按设计可暴露于客户端（安全由 RLS 保证），
+      故与 CloudBase 入口一样内置兜底，
       保证 EdgeOne Makers 等读不到仓库环境变量的构建也能带上云端配置。
 
      CloudBase ↔ Supabase 账号桥（两套账号体系合并为同一用户名空间）：

@@ -84,18 +84,6 @@ VITE_SUPABASE_URL=https://sepfobukokrrivwyvhnd.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 ```
 
-#### 回归验证（真实 HTTP 调用）
-
-```powershell
-npm run smoke:supabase                  # 只读：settings/公开表读/RLS 隔离/RPC/OAuth URL/桶状态
-npm run smoke:supabase -- --with-auth   # 追加：注册→登录→会话→建档→JWT 读私有表（留冒烟账号）
-
-# 浏览器级端到端（真实 Edge 渲染 + 真实注册登录）：
-npm run build
-npx vite preview --port 5199 --host 127.0.0.1   # 另开终端
-node scripts/verify-supabase-e2e.mjs
-```
-
 ### 2. CloudBase（备后端）
 
 仅当未配置 Supabase（或 `VITE_MIM_BACKEND=cloudbase`）时生效。存在的理由（平台硬限制）：
@@ -365,48 +353,6 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('mim-media', 'mim-media',
 
 前端入口见 `src/lib/cloud-storage.ts`，UI 见「发布页 → 媒体 → 上传/转码工作台」：
 已登录即真上传并显示 `☁️ 已上传云端`，未登录/超限时自动退回本地预览，不静默失败。
-
-### 上线前回归清单（真实 curl 验证，别靠静态推断）
-
-```powershell
-$API = "https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api"
-
-# 1. 注册拿 token
-$r = Invoke-RestMethod "$API/auth/register" -Method POST -ContentType "application/json" `
-      -Body '{"username":"smoke_test","password":"SmokeTest@2026"}'
-$t = $r.token
-
-# 2. 鉴权 / 权限 / 越权 逐项核对（期望值见下表）
-Invoke-RestMethod "$API/auth/me" -Headers @{ Authorization = "Bearer $t" }   # 200
-Invoke-RestMethod "$API/db/rest/posts"                                       # 200 匿名可读
-Invoke-RestMethod "$API/db/rest/favorites"                                   # 401 匿名不可读私有表
-Invoke-RestMethod "$API/db/rest/app_users" -Headers @{ Authorization="Bearer $t" }  # 403
-Invoke-RestMethod "$API/db/rest/topics" -Method POST -Headers @{ Authorization="Bearer $t" } `
-      -ContentType "application/json" -Body '{"name":"x"}'                   # 403 只读表
-```
-
-| 用例 | 期望 |
-| --- | --- |
-| `POST /auth/register`、`POST /auth/login` | 200 |
-| `GET /auth/me`（带 Bearer） | 200 |
-| 匿名读 `posts` / `topics` 等公开表 | 200 |
-| 匿名读 `favorites` 等私有表、匿名写任意表 | 401 |
-| 写只读表（`topics` / `hot_searches` / `resources`） | 403 |
-| 访问 `app_users` / `audit_logs` | 403 |
-| 非法表名（如 `posts;drop`） | 400 |
-| 改他人数据 | 返回空（强制追加 owner 过滤，改 0 行） |
-| 任意域名携带 Origin | 响应 `Access-Control-Allow-Origin: *` |
-
-### 存储链路回归（一键跑真实调用）
-
-```powershell
-node scripts/smoke-storage.mjs     # 默认打线上 mim-api
-MIM_API=https://xxx/mim-api node scripts/smoke-storage.mjs
-```
-
-覆盖 14 项：注册 → 上传 → 匿名拦截(401) → 类型拦截(415) → 超限拦截(413) →
-取签名链接 → 链接匿名可下载 → 越权取链(403) → 列目录 → 删除 → 越权删除(403) →
-删除后取链(404)。全通过退出码 0，有失败为 1。
 
 ### 「注册/登录成功，但 /auth/me 返回 401」
 
