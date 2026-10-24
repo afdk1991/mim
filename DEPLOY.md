@@ -53,12 +53,13 @@ Mim 有**两套云端后端**，前端按优先级自动选择，页面无需任
 
 #### 待执行迁移（需人工凭证，AI 无法代执行）
 
-两个迁移文件已就绪但**尚未应用到线上库**（本环境只有 anon key，无数据库密码 / access token）：
+三个迁移文件已就绪但**尚未应用到线上库**（本环境只有 anon key，无数据库密码 / access token）：
 
 | 迁移 | 内容 | 缺失后果 |
 | --- | --- | --- |
 | `supabase/migrations/0001_iam_phase1.sql` | IAM 四表 + 审计日志 + RBAC 种子 | `user_roles` 等查询 404（PGRST205）⇒ 无 RBAC，管理后台入口不显示 |
 | `supabase/migrations/0002_storage_media.sql` | 私有桶 `mim-media` + 存储 RLS | 上传走本地预览降级（云端上传不可用） |
+| `supabase/migrations/0003_account_bridge.sql` | 账号桥表 + `username_taken` / `claim_username` RPC | 两端用户名空间不互通（见下节） |
 
 执行方式（二选一）：
 
@@ -68,11 +69,11 @@ $env:SUPABASE_DB_URL="postgresql://postgres.<ref>:<密码>@aws-0-<区域>.pooler
 $env:ADMIN_EMAIL="you@example.com"        # 可选：给该注册邮箱授予 admin 角色
 npm run db:apply                          # 按序应用全部迁移（已应用的自动跳过）
 
-# B. Supabase Dashboard → SQL Editor → 依次粘贴两个 .sql 文件全量执行（幂等）
+# B. Supabase Dashboard → SQL Editor → 依次粘贴三个 .sql 文件全量执行（幂等）
 ```
 
 > `npm run db:apply` 会自动发现 `supabase/migrations/*.sql` 并按文件名顺序执行，
-> 已记录于 `public.schema_migrations` 的版本跳过；两个迁移均为幂等 SQL，重复执行安全。
+> 已记录于 `public.schema_migrations` 的版本跳过；迁移均为幂等 SQL，重复执行安全。
 
 #### 本地开发
 
@@ -158,6 +159,37 @@ supabase secrets set SUPABASE_URL=https://sepfobukokrrivwyvhnd.supabase.co SUPAB
 ```
 
 部署后把前端指向它即可走备路径：`VITE_MIM_API_BASE=https://<ref>.supabase.co/functions/v1/mim-api`。
+
+### CloudBase ↔ Supabase 账号体系同步（账号桥）
+
+两套后端各有独立账号体系（CloudBase：`app_users`，`uid=u_xxx`，PBKDF2-SHA512 密码哈希；
+Supabase：GoTrue `auth.users`，uuid，bcrypt）。**账号桥**把两者在用户名维度合并为同一空间：
+
+| 场景 | 机制 |
+| --- | --- |
+| Supabase 侧注册 | 先调 RPC `username_taken` 全局查重（覆盖 CloudBase 桥接账号）→ 成功后 fire-and-forget 双写 CloudBase `/auth/register`（切回备后端时账号仍在） |
+| CloudBase 侧注册 | 先问 Supabase `username_taken`（占用则 409；**查询失败放行**，不因主后端不可用拒绝注册）→ 成功后 `claim_username` 把 用户名/哈希/salt/uid 登记进 `account_bridge` |
+| CloudBase 老账号在 Supabase 登录 | 原生登录失败 → Edge Function `/auth/bridge-login` 验 PBKDF2 旧哈希（与 CloudBase 版同参）→ 通过则 Admin API **自动落户** → 前端用原密码重试即成功，此后完全原生 |
+| 存量账号搬迁 | `npm run sync:accounts`（dry-run 默认，`--apply` 执行）把 CloudBase `app_users` 全量灌入 `account_bridge`，幂等 |
+
+安全要点（`account_bridge` 对客户端**禁 select**，仅 Edge Function 以 service_role 读取）：
+
+- 桥接登录**只可新建** GoTrue 账号；合成邮箱账号已存在时一律 409，**绝不修改对方密码**
+  ——否则知道 CloudBase 旧密码的人可接管同名 Supabase 账号；
+- 防爆破：同一用户名连续失败 5 次锁定 15 分钟（`failed_attempts` / `locked_until`）；
+- `username_taken` / `claim_username` 为 `security definer` RPC，anon 可调——
+  与开放注册同暴露面（抢注用户名本就是开放注册允许的行为）。
+
+启用清单（均需人工凭证）：
+
+1. 应用迁移 `0003_account_bridge.sql`（见上节）；
+2. 部署 Edge Function mim-api（配 4 个 Supabase secrets 后 CI 自动部署，或手动
+   `supabase functions deploy mim-api`）——未部署时前端桥接自动静默跳过，不影响原生登录；
+3. （可选，搬迁存量账号）`CLOUDBASE_SERVICE_KEY` + `SUPABASE_SERVICE_ROLE_KEY`（或
+   `SUPABASE_DB_URL`）后执行 `npm run sync:accounts`。
+
+> CloudBase 侧 mim-api 已随本次改动重新部署（注册链路接全局查重 + 桥接登记）；
+> Supabase 侧 RPC 未部署期间为 fail-open：CloudBase 注册照常，仅暂不参与全局查重。
 
 ## 部署矩阵
 

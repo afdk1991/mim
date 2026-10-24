@@ -24,6 +24,63 @@ const SERVICE_KEY = process.env.MIM_SERVICE_KEY || ''
 const TOKEN_SECRET = process.env.MIM_TOKEN_SECRET || ''
 const TOKEN_TTL_MS = 30 * 24 * 3600 * 1000
 
+/* ---------------------------------------------------------------------------
+ * Supabase 账号桥（与 supabase/migrations/0003_account_bridge.sql 配套）
+ *
+ * CloudBase 注册前先问 Supabase「用户名是否已被占用」（RPC username_taken，
+ * anon 可调）；注册成功后把 用户名/哈希/salt/uid 登记进 Supabase account_bridge
+ * （RPC claim_username）。两端账号由此合并为同一用户名空间：
+ *   · 防撞名：Supabase 已注册的用户名在 CloudBase 侧无法再注册（409）
+ *   · 免搬迁：CloudBase 老账号首次在 Supabase 登录时由 Edge Function
+ *     /auth/bridge-login 验旧哈希并自动落户（见 supabase/functions/mim-api）
+ *
+ * 可用性策略：Supabase 查询失败一律放行（fail-open）——CloudBase 是备后端，
+ * 不应因主后端不可用而拒绝注册；本地 app_users.username unique 仍兜底。
+ * ------------------------------------------------------------------------- */
+const SB_URL = (process.env.MIM_SUPABASE_URL || 'https://sepfobukokrrivwyvhnd.supabase.co').replace(/\/+$/, '')
+const SB_ANON = process.env.MIM_SUPABASE_ANON_KEY || 'sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg'
+
+/** 调 Supabase RPC（anon 凭据；publishable key 按设计可暴露，安全由 RLS/策略承担） */
+async function sbRpc(fn, payload) {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      apikey: SB_ANON,
+      Authorization: `Bearer ${SB_ANON}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+  const text = await r.text()
+  let json = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    json = text
+  }
+  return { status: r.status, json }
+}
+
+/** 全局用户名查重（auth.users + account_bridge）；异常时放行 */
+async function usernameTakenInSupabase(u) {
+  try {
+    const r = await sbRpc('username_taken', { p_username: u })
+    if (r.status >= 400) return false
+    return r.json === true
+  } catch {
+    return false
+  }
+}
+
+/** 把 CloudBase 新账号登记进 Supabase 账号桥；失败不影响注册主流程 */
+async function claimUsernameInSupabase({ username, password_hash, salt, uid }) {
+  try {
+    await sbRpc('claim_username', { p_username: username, p_password_hash: password_hash, p_salt: salt, p_uid: uid })
+  } catch {
+    /* 桥接登记失败不致命：存量同步脚本 scripts/sync-accounts.mjs 可补 */
+  }
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
@@ -171,6 +228,11 @@ async function register({ username, password, name }) {
   const rows = parsePg(exist.text, exist.status) || []
   if (Array.isArray(rows) && rows.length > 0) return resp(409, { error: '该用户名已被注册' })
 
+  // 全局查重：Supabase 已注册（含账号桥登记）的用户名在此不可再注册
+  if (await usernameTakenInSupabase(u)) {
+    return resp(409, { error: '该用户名已被注册' })
+  }
+
   const uid = `u_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`
   const salt = crypto.randomBytes(16).toString('hex')
   const password_hash = hashPassword(p, salt)
@@ -182,6 +244,10 @@ async function register({ username, password, name }) {
     body: { uid, username: u, password_hash, salt, name: displayName },
   })
   if (ins.status >= 400) return resp(502, { error: '创建账号失败', detail: ins.text })
+
+  // 登记到 Supabase 账号桥（fire-and-forget）：使该用户名在 Supabase 侧可见，
+  // 且老密码可在首次登录时经 /auth/bridge-login 自动落户
+  void claimUsernameInSupabase({ username: u, password_hash, salt, uid })
 
   // 建档：profiles（失败不致命，前端会兜底显示用户名）
   await pg('/v1/rdb/rest/profiles', {

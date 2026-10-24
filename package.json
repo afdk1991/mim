@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:apply": "node scripts/apply-migration.mjs",
+    "sync:accounts": "node scripts/sync-accounts.mjs",
     "smoke:storage": "node scripts/smoke-storage.mjs",
     "smoke:supabase": "node scripts/smoke-supabase.mjs"
   },

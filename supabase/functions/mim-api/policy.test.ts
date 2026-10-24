@@ -3,9 +3,13 @@
    这些纯函数是两个后端共享的安全底线：表访问策略、令牌、存储 key 隔离。 */
 
 import { describe, expect, it } from 'vitest'
+import { pbkdf2Sync } from 'node:crypto'
 import {
   AUTH_READ,
   AUTHOR_COL,
+  BRIDGE_LOCK_MINUTES,
+  BRIDGE_MAX_ATTEMPTS,
+  LEGACY_PBKDF2_ITERATIONS,
   MIME_ALLOW,
   MIME_DENY,
   OWNER_COL,
@@ -15,14 +19,20 @@ import {
   SERVER_ONLY,
   TOKEN_TTL_MS,
   appendFilter,
+  bridgeFailState,
+  bridgeLoginPlan,
   buildMediaKey,
+  constantTimeEqualHex,
+  isBridgeLocked,
   ownKey,
+  pbkdf2Hex,
   safeExt,
   signToken,
   toAuthEmail,
   validatePassword,
   validateUsername,
   verifyToken,
+  type BridgeRow,
 } from './_shared/policy.ts'
 
 describe('用户名 → GoTrue 邮箱映射', () => {
@@ -168,5 +178,82 @@ describe('MIME 放行规则', () => {
     expect(MIME_ALLOW.some((p) => 'video/mp4'.startsWith(p))).toBe(true)
     expect(MIME_ALLOW.some((p) => 'audio/mpeg'.startsWith(p))).toBe(true)
     expect(MIME_DENY.has('image/svg+xml')).toBe(true)
+  })
+})
+
+describe('账号桥 · PBKDF2 旧哈希验证（与 CloudBase 版同参同形）', () => {
+  const password = 'correct-horse-battery'
+  const salt = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'
+
+  it('与 Node crypto.pbkdf2Sync 逐位一致（跨端兼容的硬证据）', async () => {
+    const viaWebCrypto = await pbkdf2Hex(password, salt, 1000, 32)
+    // Node 侧参考值：PBKDF2-SHA512(1000, 32B)，hex
+    const expected = pbkdf2Sync(password, Buffer.from(salt, 'hex'), 1000, 32, 'sha512').toString('hex')
+    expect(viaWebCrypto).toBe(expected)
+  })
+
+  it('默认参数即 CloudBase 版参数（100k 迭代 / 64 字节）', async () => {
+    const expected = pbkdf2Sync(password, Buffer.from(salt, 'hex'), LEGACY_PBKDF2_ITERATIONS, 64, 'sha512').toString('hex')
+    expect(await pbkdf2Hex(password, salt)).toBe(expected)
+  })
+
+  it('密码差一位 → 哈希不同（验证有效）', async () => {
+    const a = await pbkdf2Hex(password, salt, 1000, 32)
+    const b = await pbkdf2Hex(`${password}x`, salt, 1000, 32)
+    expect(constantTimeEqualHex(a, b)).toBe(false)
+  })
+})
+
+describe('账号桥 · constantTimeEqualHex', () => {
+  it('相等 / 不等 / 长度不同', () => {
+    expect(constantTimeEqualHex('abcd', 'abcd')).toBe(true)
+    expect(constantTimeEqualHex('abcd', 'abce')).toBe(false)
+    expect(constantTimeEqualHex('abcd', 'abcde')).toBe(false)
+  })
+})
+
+describe('账号桥 · 锁定策略', () => {
+  const now = Date.parse('2026-10-24T12:00:00Z')
+
+  it('无锁定 / 未来时刻锁定 / 已过时刻解锁', () => {
+    expect(isBridgeLocked({ locked_until: null }, now)).toBe(false)
+    expect(isBridgeLocked({ locked_until: new Date(now + 60_000).toISOString() }, now)).toBe(true)
+    expect(isBridgeLocked({ locked_until: new Date(now - 60_000).toISOString() }, now)).toBe(false)
+  })
+
+  it('未达上限只计数；达到上限锁定 15 分钟', () => {
+    const below = bridgeFailState(BRIDGE_MAX_ATTEMPTS - 2, now)
+    expect(below.failed_attempts).toBe(BRIDGE_MAX_ATTEMPTS - 1)
+    expect(below.locked_until).toBeNull()
+
+    const at = bridgeFailState(BRIDGE_MAX_ATTEMPTS - 1, now)
+    expect(at.failed_attempts).toBe(BRIDGE_MAX_ATTEMPTS)
+    expect(new Date(at.locked_until!).getTime()).toBe(now + BRIDGE_LOCK_MINUTES * 60_000)
+  })
+})
+
+describe('账号桥 · bridgeLoginPlan 分支', () => {
+  const now = Date.parse('2026-10-24T12:00:00Z')
+  const base: BridgeRow = {
+    username: 'alice',
+    cloudbase_uid: 'u_abc',
+    password_hash: 'ff',
+    salt: 'ab',
+    migrated: false,
+    failed_attempts: 0,
+    locked_until: null,
+  }
+
+  it('无记录 → gone（前端不再重试）', () => {
+    expect(bridgeLoginPlan(null, now)).toBe('gone')
+  })
+  it('锁定中 → locked', () => {
+    expect(bridgeLoginPlan({ ...base, failed_attempts: 5, locked_until: new Date(now + 60_000).toISOString() }, now)).toBe('locked')
+  })
+  it('已升级 → migrated（引导走原生登录）', () => {
+    expect(bridgeLoginPlan({ ...base, migrated: true }, now)).toBe('migrated')
+  })
+  it('正常待验 → verify', () => {
+    expect(bridgeLoginPlan(base, now)).toBe('verify')
   })
 })

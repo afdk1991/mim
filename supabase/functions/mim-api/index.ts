@@ -38,6 +38,12 @@ import {
   MAX_UPLOAD_BYTES,
   MIME_ALLOW,
   MIME_DENY,
+  bridgeLoginPlan,
+  bridgeFailState,
+  pbkdf2Hex,
+  constantTimeEqualHex,
+  BRIDGE_LOCK_MINUTES,
+  type BridgeRow,
 } from './_shared/policy.ts'
 
 const SUPABASE_URL = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '')
@@ -159,6 +165,77 @@ async function me(token: string): Promise<Response> {
     username: payload.username,
     profile: Array.isArray(rows) && rows[0] ? rows[0] : null,
   })
+}
+
+/* ---------------------------------------------------------------------------
+ * 账号桥登录（CloudBase 老账号在 Supabase 首次登录自动落户）
+ *
+ * 安全模型（重要）：
+ *   · 验通过后只允许「新建」GoTrue 账号；若合成邮箱账号已存在（422 email_exists），
+ *     一律返回 409 且绝不修改对方密码 —— 否则知道 CloudBase 旧密码的人可以
+ *     接管同名 Supabase 账号。
+ *   · 防爆破：同一用户名连续失败 BRIDGE_MAX_ATTEMPTS 次锁定 BRIDGE_LOCK_MINUTES 分钟。
+ *   · 成功后 bridge.migrated = true，后续登录走原生通道，不再过桥。
+ * ------------------------------------------------------------------------- */
+async function bridgeLogin(body: Record<string, unknown>): Promise<Response> {
+  const u = String(body.username || '').trim()
+  const p = String(body.password || '')
+  if (!u || !p) return resp(400, { error: '请输入用户名和密码' })
+  if (u.includes('@')) return resp(400, { error: '邮箱账号请直接登录' })
+
+  // 1. 查桥接记录（service_role 绕过 RLS；account_bridge 对客户端禁 select）
+  const q = await sb(
+    `/rest/v1/account_bridge?select=username,cloudbase_uid,password_hash,salt,migrated,failed_attempts,locked_until&username=eq.${encodeURIComponent(u)}`,
+  )
+  if (q.status >= 400) return resp(502, { error: '账号桥查询失败', detail: q.text.slice(0, 300) })
+  const rows = parseJson(q.text, q.status) as BridgeRow[] | null
+  const row = Array.isArray(rows) ? (rows[0] ?? null) : null
+
+  const plan = bridgeLoginPlan(row)
+  if (plan === 'gone') return resp(404, { error: 'no_bridge_account' })
+  if (plan === 'locked') return resp(423, { error: `尝试次数过多，请 ${BRIDGE_LOCK_MINUTES} 分钟后再试` })
+  if (plan === 'migrated') return resp(409, { error: '该账号已升级，请使用原密码直接登录' })
+
+  // 2. 验 PBKDF2 旧哈希（与 CloudBase 版同参）
+  const computed = await pbkdf2Hex(p, row!.salt)
+  if (!constantTimeEqualHex(computed, row!.password_hash)) {
+    const state = bridgeFailState(row!.failed_attempts)
+    await sb(`/rest/v1/account_bridge?username=eq.${encodeURIComponent(u)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    })
+    return resp(401, { error: '用户名或密码不正确' })
+  }
+
+  // 3. Admin API 落户：仅新建；已存在则拒绝（防同名账号接管）
+  const created = await sb('/auth/v1/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: toAuthEmail(u),
+      password: p,
+      email_confirm: true,
+      user_metadata: { username: u, name: u, bridged_from: 'cloudbase' },
+    }),
+  })
+  if (created.status >= 400) {
+    const detail = parseJson(created.text, created.status) as { error_code?: string } | null
+    const code = detail?.error_code ?? ''
+    if (created.status === 422 && (code === 'email_exists' || code === 'user_already_exists')) {
+      return resp(409, { error: '该用户名已在 Supabase 注册，请直接用原密码登录' })
+    }
+    return resp(502, { error: '账号落户失败', detail: created.text.slice(0, 300) })
+  }
+
+  // 4. 清零失败计数并标记已升级
+  await sb(`/rest/v1/account_bridge?username=eq.${encodeURIComponent(u)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ migrated: true, failed_attempts: 0, locked_until: null }),
+  })
+
+  return resp(200, { upgraded: true, username: u })
 }
 
 /* ---------------------------------------------------------------------------
@@ -451,6 +528,7 @@ Deno.serve(async (req: Request) => {
     const route = rest.slice('/auth'.length)
     if (route === '/register' && method === 'POST') return register((body ?? {}) as Record<string, unknown>)
     if (route === '/login' && method === 'POST') return login((body ?? {}) as Record<string, unknown>)
+    if (route === '/bridge-login' && method === 'POST') return bridgeLogin((body ?? {}) as Record<string, unknown>)
     if (route === '/me') return me(token)
     return resp(404, { error: 'auth 路由不存在' })
   }
@@ -493,7 +571,7 @@ Deno.serve(async (req: Request) => {
     ok: true,
     service: 'mim-api',
     routes: [
-      '/auth/register', '/auth/login', '/auth/me',
+      '/auth/register', '/auth/login', '/auth/bridge-login', '/auth/me',
       '/db/rest/<table>', '/db/rpc/<fn>',
       '/storage/upload', '/storage/url', '/storage/list', '/storage/delete',
     ],

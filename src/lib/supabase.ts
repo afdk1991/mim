@@ -18,6 +18,15 @@
       auth-oauth.test.ts 中的用法一致），故与 CloudBase 入口一样内置兜底，
       保证 EdgeOne Makers 等读不到仓库环境变量的构建也能带上云端配置。
 
+     CloudBase ↔ Supabase 账号桥（两套账号体系合并为同一用户名空间）：
+       · 注册：Supabase 注册前先调 RPC username_taken 全局查重（迁移 0003），
+         成功后 fire-and-forget 双写 CloudBase /auth/register；
+         CloudBase 侧注册同样先查 Supabase，成功后把 用户名/哈希/salt/uid
+         登记进 account_bridge（claim_username）。
+       · 登录：原生登录失败 → Edge Function /auth/bridge-login 验 PBKDF2 旧
+         哈希（与 CloudBase 版同参）→ 通过则 Admin API 自动落户 → 原密码重试。
+         桥接只可新建账号，绝不改已存在账号的密码（防同名账号接管）。
+
    ② CloudBase（备后端）
       仅配 VITE_MIM_API_BASE 时走原 HTTP 适配器（自建 PBKDF2 账号 +
       mim-api 云函数代理）。存在原因（平台硬限制）：
@@ -171,6 +180,64 @@ function normalizeUser(u: SupabaseUser | null | undefined): CloudUser | null {
  *  供 cloudToken() / cloudUid() 同步读取（存储就绪判断需要）。 */
 let sbSession: Session | null = null
 
+/* ---------------------------------------------------------------------------
+ * CloudBase ↔ Supabase 账号桥（迁移 0003 + Edge Function /auth/bridge-login）
+ * ------------------------------------------------------------------------- */
+
+/** 注册前全局用户名查重：RPC username_taken（auth.users + account_bridge 合并视图）。
+ *  RPC 未部署（迁移 0003 未应用）或网络异常时返回 false 放行，由 GoTrue 唯一约束兜底。 */
+export async function usernameTakenGlobally(raw: SupabaseClient, login: string): Promise<boolean> {
+  const username = login.includes('@') ? '' : login.trim()
+  if (!username) return false
+  try {
+    const { data, error } = await raw.rpc('username_taken', { p_username: username })
+    if (error) return false
+    return data === true
+  } catch {
+    return false
+  }
+}
+
+/** 双写 CloudBase 注册（fire-and-forget）：切回备后端时账号仍在；
+ *  mim-api 会把该用户名登记进 Supabase 账号桥。失败不阻塞 Supabase 主流程。 */
+export function dualWriteCloudbase(username: string, password: string): void {
+  if (cloudBackend !== 'supabase' || !username) return
+  void fetch(`${PROD_API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  }).catch(() => {
+    /* 双写失败仅影响备后端可用性，不阻断主流程 */
+  })
+}
+
+type BridgeResult = 'upgraded' | 'locked' | 'none'
+
+/** CloudBase 老账号桥接登录：Edge Function 验 PBKDF2 旧哈希，通过则自动落户 GoTrue。
+ *  邮箱账号不走桥（CloudBase 侧只有用户名账号）；函数未部署/无记录/网络异常 → 'none'。 */
+export async function bridgeLogin(login: string, password: string): Promise<BridgeResult> {
+  if (!login || login.includes('@')) return 'none'
+  try {
+    const res = await fetch(`${SB_URL}/functions/v1/mim-api/auth/bridge-login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SB_ANON,
+        Authorization: `Bearer ${SB_ANON}`,
+      },
+      body: JSON.stringify({ username: login, password }),
+    })
+    if (res.status === 200) {
+      const json = (await res.json().catch(() => null)) as { upgraded?: boolean } | null
+      return json?.upgraded === true ? 'upgraded' : 'none'
+    }
+    if (res.status === 423) return 'locked'
+    return 'none'
+  } catch {
+    return 'none'
+  }
+}
+
 function createSupabaseClient(): { client: CloudClient; raw: SupabaseClient } {
   const raw = createClient(SB_URL, SB_ANON, {
     auth: {
@@ -205,6 +272,11 @@ function createSupabaseClient(): { client: CloudClient; raw: SupabaseClient } {
       async signUp({ username, email, password }) {
         const login = String(email || username || '').trim()
         const displayName = String(username || '').trim() || fromAuthEmail(login)
+        // 全局用户名查重（迁移 0003 的 username_taken RPC，覆盖 CloudBase 账号桥；
+        // RPC 未部署时静默放行，由 GoTrue 自身唯一约束兜底）
+        if (await usernameTakenGlobally(raw, login)) {
+          return { data: null, error: { message: '该用户名已被注册' } }
+        }
         const { data, error } = await raw.auth.signUp({
           email: toAuthEmail(login),
           password,
@@ -212,6 +284,9 @@ function createSupabaseClient(): { client: CloudClient; raw: SupabaseClient } {
         })
         if (error) return { data: null, error: { message: error.message } }
         const user = normalizeUser(data.user ?? data.session?.user)
+        // 双写 CloudBase（fire-and-forget）：使切回备后端时该账号仍在，
+        // 同时由 mim-api 把用户名登记进 Supabase 账号桥（失败不阻塞主流程）
+        dualWriteCloudbase(displayName, password)
         return { data: { user, session: user ? { user } : null }, error: null }
       },
       async signInWithPassword({ username, email, password }) {
@@ -220,9 +295,26 @@ function createSupabaseClient(): { client: CloudClient; raw: SupabaseClient } {
           email: toAuthEmail(login),
           password,
         })
-        if (error) return { data: null, error: { message: error.message } }
-        const user = normalizeUser(data.user ?? data.session?.user)
-        return { data: { user, session: user ? { user } : null }, error: null }
+        if (!error) {
+          const user = normalizeUser(data.user ?? data.session?.user)
+          return { data: { user, session: user ? { user } : null }, error: null }
+        }
+        // CloudBase 老账号桥接登录：原生失败 → Edge Function 验 PBKDF2 旧哈希 →
+        // 自动落户 GoTrue → 原密码重试一次（函数未部署 / 无桥接记录时静默跳过）
+        const bridged = await bridgeLogin(login, password)
+        if (bridged === 'upgraded') {
+          const retry = await raw.auth.signInWithPassword({
+            email: toAuthEmail(login),
+            password,
+          })
+          if (!retry.error) {
+            const user = normalizeUser(retry.data.user ?? retry.data.session?.user)
+            return { data: { user, session: user ? { user } : null }, error: null }
+          }
+        } else if (bridged === 'locked') {
+          return { data: null, error: { message: '尝试次数过多，请 15 分钟后再试' } }
+        }
+        return { data: null, error: { message: error.message } }
       },
       async signInWithOAuth({ provider, options }) {
         const { error } = await raw.auth.signInWithOAuth({

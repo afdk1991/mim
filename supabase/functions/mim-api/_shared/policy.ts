@@ -195,3 +195,108 @@ export function validatePassword(password: unknown): string | null {
   if (p.length < 8 || p.length > 72) return '密码长度需为 8-72 位'
   return null
 }
+
+/* ---------------------------------------------------------------------------
+ * CloudBase → Supabase 账号桥（迁移 0003 account_bridge）
+ *
+ * CloudBase 账号密码为 PBKDF2-SHA512(100k, 64B, hex) + 独立 salt，
+ * 与 GoTrue 的 bcrypt 不兼容，无法直接搬迁哈希。桥接登录的做法：
+ *   ① 把 CloudBase 侧 username/hash/salt 登记进 account_bridge（见迁移 0003）
+ *   ② 用户在 Supabase 登录页输入原用户名 + 原密码：
+ *      原生登录失败 → /auth/bridge-login 验 PBKDF2 →
+ *      通过则 Admin API 以该密码自动落户 GoTrue（已存在则拒绝，绝不改他人密码）
+ *   ③ 前端随后用原密码走原生登录成功，此后该账号完全原生
+ * ------------------------------------------------------------------------- */
+
+/** 与 CloudBase 版完全一致的 PBKDF2 参数（改参即两端哈希不兼容） */
+export const LEGACY_PBKDF2_ITERATIONS = 100000
+export const LEGACY_PBKDF2_KEY_BYTES = 64
+
+/** 桥接登录防爆破：同一用户名失败 N 次锁定 M 分钟 */
+export const BRIDGE_MAX_ATTEMPTS = 5
+export const BRIDGE_LOCK_MINUTES = 15
+
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length >> 1)
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16)
+  return out
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  let bin = ''
+  for (const b of bytes) bin += b.toString(16).padStart(2, '0')
+  return bin
+}
+
+/** PBKDF2-SHA512 派生（Web Crypto），输出 hex —— 与 CloudBase 版 hashPassword 同参同形 */
+export async function pbkdf2Hex(
+  password: string,
+  saltHex: string,
+  iterations = LEGACY_PBKDF2_ITERATIONS,
+  keyBytes = LEGACY_PBKDF2_KEY_BYTES,
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: hexToBytes(saltHex), iterations, hash: 'SHA-512' },
+    key,
+    keyBytes * 8,
+  )
+  return bytesToHex(new Uint8Array(bits))
+}
+
+/** 常量时间比较两个 hex 串（防时序侧信道） */
+export function constantTimeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+/** 桥接行最小形态（account_bridge 的相关列） */
+export interface BridgeRow {
+  username: string
+  cloudbase_uid: string
+  password_hash: string
+  salt: string
+  migrated: boolean
+  failed_attempts: number
+  locked_until: string | null
+}
+
+/** 是否处于锁定期（locked_until 未到即锁；到达时刻自动解锁由下一次写入清零） */
+export function isBridgeLocked(row: Pick<BridgeRow, 'locked_until'>, now = Date.now()): boolean {
+  if (!row.locked_until) return false
+  const until = new Date(row.locked_until).getTime()
+  return Number.isFinite(until) && until > now
+}
+
+/** 失败后的新状态：达到上限则写入锁定截止时刻（ISO），否则仅计数 */
+export function bridgeFailState(
+  failedAttempts: number,
+  now = Date.now(),
+): { failed_attempts: number; locked_until: string | null } {
+  const attempts = failedAttempts + 1
+  if (attempts >= BRIDGE_MAX_ATTEMPTS) {
+    return { failed_attempts: attempts, locked_until: new Date(now + BRIDGE_LOCK_MINUTES * 60_000).toISOString() }
+  }
+  return { failed_attempts: attempts, locked_until: null }
+}
+
+/** 桥接登录的账号判定（纯函数，供单测与入口共用）：
+ *  locked=锁定中；migrated=已升级走原生登录；gone=无桥接记录；
+ *  verify=需要验 PBKDF2。 */
+export function bridgeLoginPlan(
+  row: BridgeRow | null,
+  now = Date.now(),
+): 'locked' | 'migrated' | 'gone' | 'verify' {
+  if (!row) return 'gone'
+  if (isBridgeLocked(row, now)) return 'locked'
+  if (row.migrated) return 'migrated'
+  return 'verify'
+}
