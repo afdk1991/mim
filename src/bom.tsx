@@ -339,7 +339,8 @@ export function BomToolPage() {
 
         <div className="card">
           <p className="muted" style={{ marginTop: 0, marginBottom: 10 }}>{version.desc}</p>
-          <table className="bom-table">
+          <div className="bom-scroll">
+            <table className="bom-table">
             <thead>
               <tr>
                 <th>物料编码</th>
@@ -441,12 +442,14 @@ export function BomToolPage() {
                 </td>
               </tr>
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
 
         <div className="card">
           <h3 style={{ margin: '0 0 10px' }}>四版本成本对比汇总</h3>
-          <table className="bom-table">
+          <div className="bom-scroll">
+            <table className="bom-table">
             <thead>
               <tr>
                 <th>成本项</th>
@@ -498,12 +501,14 @@ export function BomToolPage() {
                 })}
               </tr>
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
 
         <div className="card">
           <h3 style={{ margin: '0 0 10px' }}>物料编码体系</h3>
-          <table className="bom-table">
+          <div className="bom-scroll">
+            <table className="bom-table">
             <tbody>
               {CODE_SYSTEM.map((s) => (
                 <tr key={s.prefix}>
@@ -514,7 +519,8 @@ export function BomToolPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -86,7 +86,9 @@
 
 .ardot-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0, 1fr)：1fr 等价 minmax(auto, 1fr)，轨道会被内容的 min-content
+     （数据源 URL 等不可断行文本，实测 587px）撑开，导致移动端文档溢出 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -95,6 +97,7 @@
   border-radius: var(--radius);
   background: var(--card);
   padding: 13px 14px;
+  min-width: 0;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -111,6 +114,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  /* 标题行内含 nowrap 的 URL（min-content 444px），不换行时必然撑破卡片 */
+  flex-wrap: wrap;
 }
 
 .ardot-src-emoji {
@@ -425,6 +430,6 @@
 
 @media (max-width: 860px) {
   .ardot-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

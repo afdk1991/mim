@@ -1420,11 +1420,21 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
 
 @media (max-width: 860px) {
   .page-grid {
-    grid-template-columns: 1fr;
+    /* 必须用 minmax(0,1fr) 而非 1fr：1fr 等价 minmax(auto,1fr)，轨道下限为内容
+       min-content，宽内容（如 ardot 工具栏）会把栅格撑到 587px 再撑爆 .app-shell。
+       与 base 的 .page-grid（minmax(0,1fr) 300px）保持一致 */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .page-grid .side-col {
     order: 2;
+  }
+
+  /* 小屏：Tab 行（含末尾操作按钮）常略宽于视口，改为内部横向滚动，
+     避免把文档顶出几像素的横向溢出 */
+  .tabs {
+    min-width: 0;
+    overflow-x: auto;
   }
 
   /* 小屏：侧边栏折回顶部条 */
@@ -2166,6 +2176,14 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
 }
 
 /* ============ BOM 工具台 ============ */
+
+/* 表格无法收缩到 min-content 以下（移动端会把文档撑到 ~458px 溢出），
+   必须靠外层容器裁剪并在容器内部横向滚动 */
+.bom-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 .bom-table {
   width: 100%;
