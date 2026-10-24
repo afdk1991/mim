@@ -35,3 +35,10 @@ Thumbs.db
 .workbuddy/*
 !.workbuddy/memory/
 .workbuddy/memory/tmp/
+
+# 本地状态 / 令牌 / 验证产物（疑似含令牌，禁止入库）
+.st.json
+.st.token
+.up.json
+.tiny.png
+verify-shots/

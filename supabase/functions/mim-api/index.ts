@@ -45,11 +45,28 @@ import {
   BRIDGE_LOCK_MINUTES,
   type BridgeRow,
 } from './_shared/policy.ts'
+import {
+  buildOpenverseUrl,
+  openverseMeta,
+  sanitizeQuery,
+  tokenUsable,
+  TtlCache,
+  type OpenverseMedia,
+  type OvToken,
+} from './_shared/openverse.ts'
 
 const SUPABASE_URL = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '')
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const TOKEN_SECRET = Deno.env.get('MIM_TOKEN_SECRET') ?? ''
 const STORAGE_BUCKET = Deno.env.get('MIM_STORAGE_BUCKET') || 'mim-media'
+
+/* Openverse 代理（可选配置）：
+   配置 OPENVERSE_CLIENT_ID / OPENVERSE_CLIENT_SECRET 后走注册客户端
+   （10,000 次/天），否则匿名（5 次/小时）；服务端 5 分钟缓存兜底。 */
+const OV_CLIENT_ID = Deno.env.get('OPENVERSE_CLIENT_ID') ?? ''
+const OV_CLIENT_SECRET = Deno.env.get('OPENVERSE_CLIENT_SECRET') ?? ''
+const OV_CACHE = new TtlCache(5 * 60 * 1000, 50)
+let ovToken: { token: string; exp: number } | null = null
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -485,6 +502,80 @@ async function storageDelete(uid: string | undefined, body: Record<string, unkno
 }
 
 /* ---------------------------------------------------------------------------
+ * Openverse 开放授权媒体检索代理
+ *
+ *   为什么存在：Openverse API 的浏览器 CORS 支持不稳定（外部实测称未启用），
+ *   前端直连会被拦截；匿名限流也只有 5 次/小时。本代理同时解决
+ *   「跨域 + 限流 + 重复检索」三个问题：
+ *     · 服务端转发（无 CORS 约束）+ 5 分钟内存缓存（重复关键词 0 次上游请求）
+ *     · 配置注册客户端凭证后限流提升至 10,000 次/天（令牌缓存至过期前 60s）
+ *     · 上游 429 / 5xx 透传语义化状态码，前端可给出针对性文案
+ *   路由：GET /openverse/videos?q=&page=&page_size=&license_type=
+ *         GET /openverse/audio?q=&page=&page_size=&license_type=
+ * ------------------------------------------------------------------------- */
+
+/** 取（或换）注册客户端令牌；未配置 / 失败时返回空（回落匿名） */
+async function ovAuthHeaders(): Promise<Record<string, string>> {
+  if (!OV_CLIENT_ID || !OV_CLIENT_SECRET) return {}
+  if (tokenUsable(ovToken)) return { Authorization: `Bearer ${ovToken!.token}` }
+  try {
+    const r = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: OV_CLIENT_ID,
+        client_secret: OV_CLIENT_SECRET,
+        grant_type: 'client_credentials',
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!r.ok) return {}
+    const data = (await r.json()) as OvToken
+    if (!data.access_token) return {}
+    ovToken = {
+      token: data.access_token,
+      exp: Date.now() + Math.max(Number(data.expires_in) || 3600, 60) * 1000,
+    }
+    return { Authorization: `Bearer ${ovToken.token}` }
+  } catch {
+    return {}
+  }
+}
+
+async function openverseProxy(media: OpenverseMedia, qp: URLSearchParams): Promise<Response> {
+  const q = sanitizeQuery(qp.get('q'))
+  if (!q) return resp(400, { error: '缺少搜索关键词 q' })
+  const upstream = buildOpenverseUrl(media, {
+    q,
+    page: qp.get('page'),
+    pageSize: qp.get('page_size'),
+    licenseType: qp.get('license_type'),
+    license: qp.get('license'),
+    source: qp.get('source'),
+    extension: qp.get('extension'),
+  })
+
+  const hit = OV_CACHE.get(upstream)
+  if (hit !== undefined) return resp(200, { ...(hit as Record<string, unknown>), cached: true })
+
+  try {
+    const r = await fetch(upstream, {
+      headers: { Accept: 'application/json', ...(await ovAuthHeaders()) },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (r.status === 429) {
+      return resp(429, { error: 'upstream_rate_limited', hint: 'Openverse 限流：稍后再试或配置注册客户端凭证' })
+    }
+    if (!r.ok) return resp(502, { error: 'openverse_upstream_error', status: r.status })
+    const json: unknown = await r.json()
+    OV_CACHE.set(upstream, json)
+    return resp(200, { ...(json as Record<string, unknown>), cached: false, meta: openverseMeta(json, 1) })
+  } catch {
+    return resp(504, { error: 'openverse_timeout', hint: '上游响应超时' })
+  }
+}
+
+/* ---------------------------------------------------------------------------
  * 入口
  * ------------------------------------------------------------------------- */
 
@@ -493,15 +584,29 @@ Deno.serve(async (req: Request) => {
   if (method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS })
   }
-  if (!SERVICE_KEY || !TOKEN_SECRET || !SUPABASE_URL) {
-    return resp(500, { error: '服务端未配置 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / MIM_TOKEN_SECRET' })
-  }
 
   const url = new URL(req.url)
   let rest = url.pathname
   // 路径形如 /functions/v1/mim-api/<业务路径>，截取业务段
-  const marker = Math.max(rest.indexOf('/auth/'), rest.indexOf('/db/'), rest.indexOf('/storage/'))
+  const marker = Math.max(
+    rest.indexOf('/auth/'),
+    rest.indexOf('/db/'),
+    rest.indexOf('/storage/'),
+    rest.indexOf('/openverse/'),
+  )
   if (marker >= 0) rest = rest.slice(marker)
+
+  // ---- Openverse 代理（不依赖 Supabase 凭据，先于配置门禁） ----
+  if (rest.startsWith('/openverse/')) {
+    const m = rest.match(/^\/openverse\/(videos|audio)$/)
+    if (!m) return resp(404, { error: 'openverse 路由不存在（支持 /openverse/videos 与 /openverse/audio）' })
+    if (method !== 'GET') return resp(405, { error: '仅支持 GET' })
+    return openverseProxy(m[1] as OpenverseMedia, url.searchParams)
+  }
+
+  if (!SERVICE_KEY || !TOKEN_SECRET || !SUPABASE_URL) {
+    return resp(500, { error: '服务端未配置 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / MIM_TOKEN_SECRET' })
+  }
 
   let body: unknown = null
   if (method !== 'GET' && method !== 'HEAD') {
@@ -574,6 +679,7 @@ Deno.serve(async (req: Request) => {
       '/auth/register', '/auth/login', '/auth/bridge-login', '/auth/me',
       '/db/rest/<table>', '/db/rpc/<fn>',
       '/storage/upload', '/storage/url', '/storage/list', '/storage/delete',
+      '/openverse/videos', '/openverse/audio',
     ],
   })
 })

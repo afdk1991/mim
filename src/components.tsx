@@ -9,6 +9,7 @@ import { can } from './permissions'
 import { VBadge } from './user-domain'
 import { recordNotInterested } from './lib/feed-core'
 import { DanmakuLayer } from './media-domain' /* 轮 24 打通：B5 视频弹幕层 */
+import { detectMediaKind, usePlayerControl, type MediaTrack } from './player' /* 全站统一播放器：动态视频卡复用，避免重复实现 */
 
 /* ---------- Avatar ---------- */
 
@@ -188,15 +189,37 @@ export function FollowButton({ userId, small = false }: { userId: string; small?
 
 /* ---------- 轮 21 打通：B2 内容域卡片扩展（视频/GIF / 投票 / 抽奖 / 位置 / 可见性角标） ---------- */
 
-/** 1. 视频/GIF 媒体卡：海报 + 播放按钮 + 时长角标；点击弹占位播放器（postId 供弹幕分 key） */
+/** 1. 视频/GIF 媒体卡：海报 + 播放按钮 + 时长角标；
+    - 有真实直链（media.src）时，点击交由全站统一播放器接管（跨页不中断、可拖拽进度、可切歌）；
+    - 无直链时保持原占位播放器（弹幕等体验不变）。 */
 export function MediaCard({ media, postId }: { media: PostMedia; postId?: string }) {
   const [open, setOpen] = useState(false)
+  const player = usePlayerControl()
+
+  const launch = () => {
+    if (!media.src) {
+      setOpen(true)
+      return
+    }
+    const kind = media.kind ?? detectMediaKind(media.src)
+    const track: MediaTrack = {
+      id: `post:${postId ?? media.poster}`,
+      title: '动态视频',
+      kind,
+      src: media.src,
+      poster: media.poster,
+      cover: media.poster,
+      meta: '动态视频 · 全站统一播放器',
+    }
+    player.play(track, { position: 0 })
+  }
+
   return (
     <>
       <button
         type="button"
         className={cx('wt-media-card', media.type === 'gif' && 'wt-gif')}
-        onClick={() => setOpen(true)}
+        onClick={launch}
         aria-label={media.type === 'gif' ? '播放GIF' : '播放视频'}
       >
         <span className="wt-media-poster">{media.poster}</span>
@@ -368,6 +391,8 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         <div className="post-head-meta">
           <TimeAgo ts={post.createdAt} />
           <span className="post-source">来自{post.source}</span>
+          {/* 轮 25 打通：置顶标识（对齐微博置顶微博标） */}
+          {post.pinned && <span className="wt-pin-tag">📌 置顶</span>}
           {/* 轮 21 打通：8. 仅自己可见角标 */}
           {post.visibility === 'self' && <span className="wt-vis-tag">🔒 仅自己</span>}
         </div>
@@ -413,7 +438,10 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
           <div className="quote-author">
             {quotedAuthor.name} <TimeAgo ts={quoted.createdAt} />
           </div>
-          <div className="quote-text">{quoted.content}</div>
+          {/* 轮 25 打通：转发卡原文同样走 RichText（@用户 / #话题# 高亮），与主正文一致 */}
+          <div className="quote-text">
+            <RichText text={quoted.content} />
+          </div>
           {quoted.images.length > 0 && (
             <div className="quote-images">{quoted.images.map((img, i) => <span key={i}>{img}</span>)}</div>
           )}
@@ -425,7 +453,11 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
 
       <div className="post-actions">
         <button className={cx('pa-btn', post.likedByMe && 'active')} onClick={() => api.togglePostLike(post.id)}>
-          {post.likedByMe ? '❤️' : '🤍'} {formatCount(post.likes)}
+          {/* 轮 25 打通：点赞 pop 动画 —— key 随 likedByMe 切换强制重挂，仅点亮态播放 */}
+          <span key={post.likedByMe ? 'on' : 'off'} className={cx('pa-like-emoji', post.likedByMe && 'pop')}>
+            {post.likedByMe ? '❤️' : '🤍'}
+          </span>{' '}
+          {formatCount(post.likes)}
         </button>
         <a className="pa-btn" href={`#/post/${post.id}`}>
           💬 {compact ? '评论' : formatCount(post.comments?.length ?? 0)}
@@ -433,6 +465,8 @@ export function PostCard({ post, compact = false }: { post: Post; compact?: bool
         <button className="pa-btn" onClick={() => setRepostOpen(true)}>
           🔁 {formatCount(post.reposts)}
         </button>
+        {/* 轮 25 打通：阅读量（缺省字段不显示，避免老数据出现「阅读 0」） */}
+        {post.views != null && <span className="pa-views">👁 {formatCount(post.views)}</span>}
         <button
           className={cx('pa-btn', api.isFavorited('post', post.id) && 'active')}
           onClick={() => {

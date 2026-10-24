@@ -358,3 +358,259 @@
   background: var(--primary-weak, #eef2ff);
   color: var(--primary-deep);
 }
+
+/* ---------- 轮 25：「有 N 条新微博」提示条（对齐微博首页顶部推送条） ---------- */
+.rf-newbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--primary-deep);
+  font-size: 13px;
+  cursor: pointer;
+  animation: rf-newbar-in 0.24s ease;
+}
+.rf-newbar:hover {
+  border-color: var(--primary-deep);
+}
+.rf-newbar-arrow {
+  font-weight: 700;
+}
+@keyframes rf-newbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 轮 25：信息流骨架屏（首屏加载态） ---------- */
+.feed-skeleton {
+  display: grid;
+  gap: 10px;
+}
+.sk {
+  display: block;
+  background: linear-gradient(90deg, var(--border) 25%, var(--card) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: sk-shimmer 1.3s infinite linear;
+}
+@keyframes sk-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.feed-sk-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+.feed-sk-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.feed-sk-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+}
+.feed-sk-lines {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+}
+.feed-sk-line {
+  height: 12px;
+}
+.feed-sk-actions {
+  height: 26px;
+  border-radius: 8px;
+}
+
+/* ---------- 轮 25：流内头条文章卡（对齐微博流内头条文章样式） ---------- */
+.rf-article-card {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.18s ease;
+}
+.rf-article-card:hover {
+  border-color: var(--primary-deep);
+}
+.rf-article-main {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.rf-article-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.rf-article-badge {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--primary-deep);
+  color: #fff;
+}
+.rf-article-title {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rf-article-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rf-article-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.rf-article-views {
+  margin-left: auto;
+}
+.rf-article-cover {
+  flex: none;
+  width: 76px;
+  border-radius: 8px;
+  background: var(--primary-weak, #eef2ff);
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  overflow: hidden;
+}
+
+/* ---------- 轮 25：热门 Tab「24 小时热榜」 ---------- */
+.rf-hot-banner {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.rf-hot-banner-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rf-hot-banner-head b {
+  font-size: 15px;
+}
+.rf-hot-banner-head small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.rf-hot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px dashed var(--border);
+  font-size: 13px;
+}
+.rf-hot-row:last-child {
+  border-bottom: none;
+}
+.rf-hot-row:hover .rf-hot-text {
+  color: var(--primary-deep);
+}
+.rf-hot-rank {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--border);
+  color: var(--text-2);
+}
+.rf-hot-rank.top {
+  background: #e64340;
+  color: #fff;
+}
+.rf-hot-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rf-hot-heat {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ---------- 轮 25：置顶标签 / 阅读量 / 点赞动画 ---------- */
+.wt-pin-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--primary-weak, #eef2ff);
+  color: var(--primary-deep);
+}
+.pa-views {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-3);
+  align-self: center;
+}
+.pa-like-emoji {
+  display: inline-block;
+}
+.pa-like-emoji.pop {
+  animation: pa-like-pop 0.45s ease;
+}
+@keyframes pa-like-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.45);
+  }
+  60% {
+    transform: scale(0.88);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

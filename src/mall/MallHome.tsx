@@ -1,7 +1,7 @@
 /* 商城中心：统一商品流 + 频道分类 chip + 资产条。
    全局通用电商入口——频道仅作分类标签（不保留旧模块独特交互）。 */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Empty } from '../components'
 import { cx } from '../utils'
 import { MALL_CHANNEL_META, MALL_GOODS, useMall } from './store'
@@ -12,6 +12,16 @@ type Cat = MallChannel | 'all'
 export function MallHomePage({ initial }: { initial?: MallChannel }) {
   const { state } = useMall()
   const [cat, setCat] = useState<Cat>(initial ?? 'all')
+
+  /* 频道直达同步：#/mall/<channel> 由 App.tsx（case 'mall'）以 initial prop 传入。
+     useState 的初始值只在组件「首次挂载」时生效，而 hash 路由切换时 React 会复用
+     同一个 MallHomePage 实例，导致 initial 变化被忽略 —— 实测从 #/mall 点进
+     #/mall/youxuan 后 activeChip 恒停在「全部」，五个频道入口点击无反馈。
+     故在此显式同步：路由变化即视为用户的新意图，覆盖手动点选的频道。 */
+  useEffect(() => {
+    setCat(initial ?? 'all')
+  }, [initial])
+
   const goods = cat === 'all' ? MALL_GOODS : MALL_GOODS.filter((g) => g.channel === cat)
   const cartCount = state.cart.reduce((n, c) => n + c.qty, 0)
 

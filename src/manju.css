@@ -294,9 +294,35 @@
 /* ---------- 模拟播放器（竖屏 9:16） ---------- */
 
 .manju-player {
-  max-width: 360px;
-  margin: 0 auto;
   width: 100%;
+}
+
+/* 统一播放器驱动后的播放页：封面 + 信息 + 控制 */
+.manju-now-player {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.manju-now-cover {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  background: var(--primary-weak);
+  color: var(--primary-deep);
+  font-size: 38px;
+  display: grid;
+  place-items: center;
+}
+.manju-now-info {
+  flex: 1;
+  min-width: 0;
+}
+.manju-now-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .manju-screen {
@@ -509,4 +535,100 @@
   text-align: center;
   font-size: 12px;
   padding: 6px 0 2px;
+}
+
+/* ---------- 在线发现（Openverse / Commons 检索） ---------- */
+
+.manju-discover {
+  margin-bottom: 16px;
+}
+
+.manju-discover-srcs,
+.manju-discover-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.manju-chip {
+  border: 1px solid var(--border, #e3e6ea);
+  background: var(--card, #fff);
+  color: var(--text, #1f2328);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.manju-chip:hover {
+  border-color: var(--primary, #ff6a00);
+}
+
+.manju-chip.on {
+  background: var(--primary, #ff6a00);
+  border-color: var(--primary, #ff6a00);
+  color: #fff;
+}
+
+.manju-chip-hist {
+  border-style: dashed;
+}
+
+.manju-discover-hist-label {
+  font-size: 12px;
+  align-self: center;
+  margin-right: 2px;
+}
+
+.manju-discover-meta {
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.manju-discover-more {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.manju-discover-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.manju-discover-row .input {
+  flex: 1;
+  min-width: 160px;
+  width: auto;
+}
+
+.manju-discover-err {
+  color: #c0392b;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.manju-discover-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 条目封面：emoji 兜底 + 缩略图覆盖（img 加载失败自行隐藏，露出 emoji） */
+.manju-ext-cover {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+}
+
+.manju-ext-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }

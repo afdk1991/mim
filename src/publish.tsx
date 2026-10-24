@@ -22,16 +22,14 @@ import { cx, formatDate } from './utils'
 import type { PostLottery, PostMedia, PostVote } from './types'
 
 /** 统一内容发布器（开发吧.md「内容统一模型：基表 + 扩展表」）
- *  基表 content：domain 是权限边界（1=广场 2=知识），分发/审核/计费全靠它路由；
+ *  单态（2026-10-23）：全站统一内容池，不再按 domain 路由；
  *  扩展表只存差异化字段：content_ext_dynamic / content_ext_article。
- *  轮 15 打通：提交不再只落本地预览——按 domain/content_type 真发布进 store
+ *  轮 15 打通：提交不再只落本地预览——按 content_type 真发布进 store
  *  （动态/图文→广场 Feed，博文→知识库），并触发成长引擎记分；落库预览保留作 JSON 展示。
  *  轮 17 打通：发布记录按真实登录身份隔离（mim-publish-v1:<userId>），
  *  本地模式一次性迁移旧全局 key；切号即重载。 */
 
-type Domain = 1 | 2
-
-/** content_type：域1=10动态短文/11图文/12视频GIF/13投票/14抽奖/15快拍；域2=20博文/22资源
+/** content_type：10动态短文/11图文/12视频GIF/13投票/14抽奖/15快拍；20博文/22资源
  *  轮 21 打通：广场态扩展 B2 内容类型 12-15 */
 type ContentType = 10 | 11 | 12 | 13 | 14 | 15 | 20 | 22
 
@@ -140,7 +138,6 @@ export function PublishPage() {
   const { auth } = useAuth()
 
   /* ---------- 表单状态 ---------- */
-  const [domain, setDomain] = useState<Domain>(1)
   const [contentType, setContentType] = useState<ContentType>(10)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -200,8 +197,9 @@ export function PublishPage() {
     return () => window.removeEventListener(SCHED_EVT, sync)
   }, [])
 
-  const isPlaza = domain === 1
-  const types: ContentType[] = isPlaza ? [10, 11, 12, 13, 14, 15] : [20, 22]
+  /* 单态：不再用独立 domain 开关，isPlaza 由 content_type 派生（10-15 广场 / 20-22 知识） */
+  const isPlaza = contentType <= 15
+  const types: ContentType[] = [10, 11, 12, 13, 14, 15, 20, 22]
   const priceFen = Math.round((parseFloat(priceYuan) || 0) * 100)
 
   /* 轮 21 打通：9. 敏感词前置——输入过程实时检测（纯前端词库，渲染期计算即可） */
@@ -210,14 +208,7 @@ export function PublishPage() {
   const acctSelf = readPrivacy(auth.userId).posts === 'self'
   const effVisibility: VisCode = acctSelf ? 'self' : visibleScope
 
-  /* 切域：content_type 跟随切换（domain 路由一切）；定时开关仅广场态有意义，切域时复位 */
-  const switchDomain = (d: Domain) => {
-    if (d === domain) return
-    setDomain(d)
-    setContentType(d === 1 ? 10 : 20)
-    setIndexFlag(false)
-    setScheduleOn(false)
-  }
+  /* 单态：content_type 直接切换内容类型，无独立域开关 */
 
   /* ---------- 轮 21 打通：按广场 content_type 构造 B2 扩展发布参数（校验失败 toast 并返回 null） ---------- */
   const buildB2 = (): B2Fields | null => {
@@ -276,7 +267,7 @@ export function PublishPage() {
     const base: Record<string, unknown> = {
       id,
       user_id: auth.userId, // 真实登录身份（本地未登录为 'local'）
-      domain,
+      domain: isPlaza ? 1 : 2,
       content_type: contentType,
       title: isPlaza ? null : title.trim(),
       body_draft: body,
@@ -441,31 +432,9 @@ export function PublishPage() {
           <h2>📤 统一内容发布器</h2>
           <p className="pb-sub">
             基表 <code>content</code> + 双扩展表（开发吧.md 内容统一模型）——
-            <code>domain</code> 是权限边界：所有分发/审核/计费都靠它路由
+            单态下统一内容池，不再按 <code>domain</code> 路由；动态/图文进广场 Feed，博文/资源进知识库
           </p>
         </header>
-
-        {/* 域切换：一表两态（广场态 / 知识态） */}
-        <div className="pb-domain" role="tablist" aria-label="发布域切换">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isPlaza}
-            className={cx('pb-domain-btn', isPlaza && 'active')}
-            onClick={() => switchDomain(1)}
-          >
-            🎬 广场态（domain=1）
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!isPlaza}
-            className={cx('pb-domain-btn', !isPlaza && 'active')}
-            onClick={() => switchDomain(2)}
-          >
-            📚 知识态（domain=2）
-          </button>
-        </div>
 
         {/* content_type 选择 */}
         <div className="pb-types">
@@ -811,8 +780,8 @@ export function PublishPage() {
 
         {/* 红线声明 */}
         <p className="pb-warn">
-          ⚠️ 权限边界红线（开发吧.md）：domain 天然是权限边界——知识态内容<b>绝不进广场 Feed</b>，
-          广场动态<b>绝不进 RAG 索引</b>（index_flag 广场默认 0）；点赞/评论/收藏/审核全走 content_id，不写两套交互逻辑。
+          ⚠️ 单态说明（开发吧.md）：全站统一内容池，不再按 domain 路由；广场动态默认
+          <b>index_flag=0 不进 RAG 索引</b>；点赞/评论/收藏/审核全走 content_id，不写两套交互逻辑。
         </p>
       </div>
     </div>

@@ -124,29 +124,6 @@
   background: var(--card);
 }
 
-.wl-domain-tag {
-  flex-shrink: 0;
-  width: 44px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 0;
-  border-radius: 999px;
-  color: #fff;
-}
-
-.wl-domain-tag[data-d='0'] {
-  background: #8a8a8a;
-}
-
-.wl-domain-tag[data-d='1'] {
-  background: #e8833a;
-}
-
-.wl-domain-tag[data-d='2'] {
-  background: #3a9e5f;
-}
-
 .wl-benefit-main {
   display: flex;
   flex-direction: column;

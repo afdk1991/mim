@@ -29,6 +29,10 @@ export interface PostMedia {
   poster: string
   /** 视频时长（秒）；GIF 无 */
   duration?: number
+  /** 可选：真实媒体直链，存在时由全站统一播放器接管播放（音频/视频通用） */
+  src?: string
+  /** 媒体类型提示：缺省按扩展名/后缀推断 */
+  kind?: 'audio' | 'video'
 }
 
 /** 投票：votes 记「选项→票数」；voters 按身份 key（meId→选项）记一人一票的判定真源 */
@@ -77,6 +81,10 @@ export interface Post {
   story?: boolean
   /** 轮 21 打通：过期时间戳（快拍 24h；过期自动从各流消失） */
   expiresAt?: number
+  /** 轮 25 打通：置顶动态（关注流内置顶排最前，卡片展示「置顶」标） */
+  pinned?: boolean
+  /** 轮 25 打通：阅读量（卡片互动栏展示「阅读 N」；缺省不显示该元素） */
+  views?: number
 }
 
 export interface ArticleComment {

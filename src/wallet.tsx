@@ -6,9 +6,8 @@ import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
 
 /** 统一钱包 + 权益矩阵（开发吧.md 4.2 entitlement_matrix / 4.3 revenue_rule）
- *  金额一律存「分」整数（结算铁律）；收益入账携带 revenue_rule 下单时刻快照，
- *  且永久保留 domain + content_type（广场靠广告 / 知识靠订阅，分部核算必需）；
- *  权益按域打标，两条禁止红线防「会员通兑破墙」。
+ *  金额一律存「分」整数（结算铁律）；收益入账携带 revenue_rule 下单时刻快照；
+ *  单态（2026-10-23）：统一钱包不分域，权益项不再按域打标。
  *  轮 14 打通：对外暴露模块级钱包 API（walletConsume/walletIncome/revenueSnapshot），
  *  VIP 购买、内容分成等跨模块链路统一走 mim-wallet-v1 入账/扣费，
  *  钱包页监听更新事件实时同步外部变更。
@@ -17,13 +16,11 @@ import { cx } from './utils'
  *  轮 16 打通：存档按真实登录身份隔离（mim-wallet-v1:<userId>），
  *  本地模式一次性幂等迁移旧全局 key；模块级 API 自动跟随当前身份。 */
 
-type Domain = 1 | 2
 type PlanCode = 'BASIC' | 'SUPER' | 'DOWNLOAD_PACK' | 'ENTERPRISE'
 
-/** 权益项：domain=null 表示跨域通用（唯一真正通用的权益只有 no_ads） */
+/** 权益项（单态：不再按域打标，全站统一权益池） */
 interface Entitlement {
   benefit: string
-  domain: Domain | null
   quota: string
   label: string
 }
@@ -31,51 +28,50 @@ interface Entitlement {
 /** entitlement_matrix 全量（对齐开发吧.md 4.2，❌ 两条为禁止项不进权益池） */
 const ENTITLEMENTS: Record<PlanCode, Entitlement[]> = {
   BASIC: [
-    { benefit: 'no_ads', domain: null, quota: '∞', label: '免广告' },
-    { benefit: 'decoration_theme', domain: 1, quota: '∞', label: '装扮主题' },
-    { benefit: 'post_top', domain: 1, quota: '5/月', label: '动态置顶' },
-    { benefit: 'edit_published', domain: 1, quota: '∞', label: '编辑已发内容' },
+    { benefit: 'no_ads', quota: '∞', label: '免广告' },
+    { benefit: 'decoration_theme', quota: '∞', label: '装扮主题' },
+    { benefit: 'post_top', quota: '5/月', label: '动态置顶' },
+    { benefit: 'edit_published', quota: '∞', label: '编辑已发内容' },
   ],
   SUPER: [
-    { benefit: 'column_library', domain: 2, quota: '∞', label: '订阅专栏库' },
-    { benefit: 'course_discount', domain: 2, quota: '∞', label: '购课 8 折' },
-    { benefit: 'geo_report', domain: 2, quota: '3/月', label: 'GEO 检测' },
-    { benefit: 'video_hd', domain: 2, quota: '∞', label: '高清视频' },
+    { benefit: 'column_library', quota: '∞', label: '订阅专栏库' },
+    { benefit: 'course_discount', quota: '∞', label: '购课 8 折' },
+    { benefit: 'geo_report', quota: '3/月', label: 'GEO 检测' },
+    { benefit: 'video_hd', quota: '∞', label: '高清视频' },
   ],
   DOWNLOAD_PACK: [
-    { benefit: 'download_quota', domain: 2, quota: '30/月', label: '下载配额（可单独售卖，不绑会员）' },
+    { benefit: 'download_quota', quota: '30/月', label: '下载配额（可单独售卖，不绑会员）' },
   ],
   ENTERPRISE: [
-    { benefit: 'brand_zone', domain: 1, quota: '∞', label: '品牌号 + 舆情' },
-    { benefit: 'tech_promo', domain: 2, quota: '∞', label: '技术推广 + 简历库' },
+    { benefit: 'brand_zone', quota: '∞', label: '品牌号 + 舆情' },
+    { benefit: 'tech_promo', quota: '∞', label: '技术推广 + 简历库' },
   ],
 }
 
 const PLAN_META: Record<PlanCode, { label: string; desc: string }> = {
-  BASIC: { label: '基础版', desc: '免广告 + 广场基础权益' },
-  SUPER: { label: '超级会员', desc: '知识态订阅/课程/检测全家桶' },
+  BASIC: { label: '基础版', desc: '免广告 + 基础创作权益' },
+  SUPER: { label: '超级会员', desc: '订阅/课程/检测全家桶' },
   DOWNLOAD_PACK: { label: '下载包', desc: '独立售卖，不绑会员' },
-  ENTERPRISE: { label: '企业版', desc: '跨域品牌 + 技术推广' },
+  ENTERPRISE: { label: '企业版', desc: '品牌 + 技术推广' },
 }
 
 /** revenue_rule 全量（费率可配置化，代码不硬编码；floor_price 单位分） */
 const REVENUE_RULES: {
   contentType: string
-  domain: Domain
   sku: string
   rate: string
   floor: string
   settle: string
 }[] = [
-  { contentType: '20 博文', domain: 2, sku: 'ad_cpc', rate: '60%', floor: '30分', settle: 'T+1' },
-  { contentType: '21 专栏', domain: 2, sku: 'column_buy', rate: '70%', floor: '0', settle: 'T+3' },
-  { contentType: '22 资源', domain: 2, sku: 'resource_buy', rate: '80%', floor: '0', settle: 'T+3' },
-  { contentType: '20 博文(VIP)', domain: 2, sku: 'vip_read', rate: '20%', floor: '0', settle: 'T+1' },
-  { contentType: '25 回答', domain: 2, sku: 'bounty', rate: '100%', floor: '0', settle: 'T+0' },
-  { contentType: '23 课程', domain: 2, sku: 'course_buy', rate: '60%', floor: '0', settle: 'T+7' },
-  { contentType: '10 动态', domain: 1, sku: 'ad_cpm_share', rate: '50%', floor: '0', settle: 'T+1' },
-  { contentType: '12 视频', domain: 1, sku: 'video_play', rate: '55%', floor: '0', settle: 'T+1' },
-  { contentType: '13 直播', domain: 1, sku: 'gift', rate: '45%', floor: '0', settle: 'T+7' },
+  { contentType: '20 博文', sku: 'ad_cpc', rate: '60%', floor: '30分', settle: 'T+1' },
+  { contentType: '21 专栏', sku: 'column_buy', rate: '70%', floor: '0', settle: 'T+3' },
+  { contentType: '22 资源', sku: 'resource_buy', rate: '80%', floor: '0', settle: 'T+3' },
+  { contentType: '20 博文(VIP)', sku: 'vip_read', rate: '20%', floor: '0', settle: 'T+1' },
+  { contentType: '25 回答', sku: 'bounty', rate: '100%', floor: '0', settle: 'T+0' },
+  { contentType: '23 课程', sku: 'course_buy', rate: '60%', floor: '0', settle: 'T+7' },
+  { contentType: '10 动态', sku: 'ad_cpm_share', rate: '50%', floor: '0', settle: 'T+1' },
+  { contentType: '12 视频', sku: 'video_play', rate: '55%', floor: '0', settle: 'T+1' },
+  { contentType: '13 直播', sku: 'gift', rate: '45%', floor: '0', settle: 'T+7' },
 ]
 
 /** 钱包流水：income 携带 revenue_rule 快照（下单时刻冻结，改费率不影响历史） */
@@ -86,7 +82,6 @@ interface Tx {
   note: string
   at: number
   snapshot?: {
-    domain: Domain
     content_type: number
     sku_type: string
     rate_pct: string
@@ -219,7 +214,6 @@ export function revenueSnapshot(sku: string): NonNullable<Tx['snapshot']> | null
   const r = REVENUE_RULES.find((x) => x.sku === sku)
   if (!r) return null
   return {
-    domain: r.domain,
     content_type: Number.parseInt(r.contentType, 10),
     sku_type: r.sku,
     rate_pct: r.rate,
@@ -302,8 +296,8 @@ export function WalletPage() {
         <header className="wl-head">
           <h2>💰 统一钱包 + 权益矩阵</h2>
           <p className="wl-sub">
-            entitlement_matrix 按域打标（开发吧.md 4.2）——广场权益（域1）/ 知识权益（域2）/ 通用（NULL），
-            <code>domain</code> 防止「买了 VIP 却能在广场看直播」的逻辑漏洞
+            entitlement_matrix（开发吧.md 4.2）——单态下统一权益池，不再按域打标；
+            所有权益全站通用，不再区分广场/知识边界
           </p>
         </header>
 
@@ -317,7 +311,7 @@ export function WalletPage() {
         </div>
 
         {/* 套餐切换 */}
-        <h3 className="wl-sec-title">套餐切换（plan_code × benefit_code × domain × quota）</h3>
+        <h3 className="wl-sec-title">套餐切换（plan_code × benefit_code × quota）</h3>
         <div className="wl-plans">
           {(Object.keys(PLAN_META) as PlanCode[]).map((p) => (
             <button
@@ -333,14 +327,11 @@ export function WalletPage() {
           ))}
         </div>
 
-        {/* 当前可用权益：按域打标 */}
+        {/* 当前可用权益（单态：统一权益池） */}
         <h3 className="wl-sec-title">当前可用权益（{benefits.length} 项）</h3>
         <div className="wl-benefits">
           {benefits.map((b) => (
             <div key={b.benefit} className="wl-benefit">
-              <span className="wl-domain-tag" data-d={b.domain === null ? '0' : String(b.domain)}>
-                {b.domain === null ? '通用' : b.domain === 1 ? '广场' : '知识'}
-              </span>
               <div className="wl-benefit-main">
                 <b>{b.label}</b>
                 <i>
@@ -364,8 +355,8 @@ export function WalletPage() {
             type="button"
             className="wl-act income"
             onClick={() =>
-              income(1800, '博文广告 CPC 结算（20 博文 · 知识态）', {
-                domain: 2, content_type: 20, sku_type: 'ad_cpc', rate_pct: '60%', settle_tn: 'T+1',
+              income(1800, '博文广告 CPC 结算（20 博文）', {
+                content_type: 20, sku_type: 'ad_cpc', rate_pct: '60%', settle_tn: 'T+1',
               })
             }
           >
@@ -375,8 +366,8 @@ export function WalletPage() {
             type="button"
             className="wl-act income"
             onClick={() =>
-              income(2400, '资源购买分成（22 资源 · 知识态）', {
-                domain: 2, content_type: 22, sku_type: 'resource_buy', rate_pct: '80%', settle_tn: 'T+3',
+              income(2400, '资源购买分成（22 资源）', {
+                content_type: 22, sku_type: 'resource_buy', rate_pct: '80%', settle_tn: 'T+3',
               })
             }
           >
@@ -386,8 +377,8 @@ export function WalletPage() {
             type="button"
             className="wl-act income"
             onClick={() =>
-              income(600, '动态广告 CPM 分成（10 动态 · 广场态）', {
-                domain: 1, content_type: 10, sku_type: 'ad_cpm_share', rate_pct: '50%', settle_tn: 'T+1',
+              income(600, '动态广告 CPM 分成（10 动态）', {
+                content_type: 10, sku_type: 'ad_cpm_share', rate_pct: '50%', settle_tn: 'T+1',
               })
             }
           >
@@ -416,7 +407,7 @@ export function WalletPage() {
                       {meta.label} · <TimeAgo ts={t.at} />
                       {t.snapshot && (
                         <em className="wl-snap">
-                          快照：{t.snapshot.sku_type} {t.snapshot.rate_pct} · 域{t.snapshot.domain} ·
+                          快照：{t.snapshot.sku_type} {t.snapshot.rate_pct} ·
                           类型{t.snapshot.content_type} · {t.snapshot.settle_tn}
                         </em>
                       )}
@@ -438,7 +429,6 @@ export function WalletPage() {
             <thead>
               <tr>
                 <th>content_type</th>
-                <th>domain</th>
                 <th>sku_type</th>
                 <th>费率</th>
                 <th>保底</th>
@@ -449,7 +439,6 @@ export function WalletPage() {
               {REVENUE_RULES.map((r) => (
                 <tr key={r.sku}>
                   <td>{r.contentType}</td>
-                  <td>{r.domain === 1 ? '广场' : '知识'}</td>
                   <td><code>{r.sku}</code></td>
                   <td>{r.rate}</td>
                   <td>{r.floor}</td>
@@ -466,9 +455,9 @@ export function WalletPage() {
 
         {/* 两条禁止红线 */}
         <p className="wl-warn">
-          ⚠️ 两条禁止红线（开发吧.md 4.2）：<b>❌ auto_expert_from_v —— 大V 自动变专家</b>
-          （广场 V 认证与知识专家认证并存，互不转化）；<b>❌ free_download_for_vip_in_plaza —— 会员通兑破墙</b>
-          （VIP 权益不得穿越 domain 边界兑换广场权益）。铁律：费率取下单时刻快照写入 revenue_record.snapshot，
+          ⚠️ 红线（开发吧.md 4.2）：<b>❌ auto_expert_from_v —— 大V 自动变专家</b>
+          （广场 V 认证与知识专家认证并存，互不转化）；<b>❌ free_download_for_vip —— 会员通兑破墙</b>
+          （VIP 权益不得跨内容类型兑换）。铁律：费率取下单时刻快照写入 revenue_record.snapshot，
           运营改费率不影响历史订单；每日对账 diff≠0 即冻结该渠道结算。
         </p>
       </div>

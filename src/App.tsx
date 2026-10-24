@@ -40,6 +40,7 @@ import { ManjuPage } from './manju'
 import { ArdotPage } from './ardot'
 import { MallProvider, MALL_CHANNEL_META, type MallChannel } from './mall/store'
 import { AuthProvider, useAuth } from './auth'
+import { PlayerProvider } from './player' /* 全站统一播放器（音频/视频通用，跨页不中断） */
 import { fetchAuditLogs, fetchIamRoles, type AuditLogRow, type IamRole } from './lib/cloud-iam'
 import { matchSearchPages } from './search-index'
 import { VipCenterPage } from './vip'
@@ -1040,16 +1041,18 @@ function Shell() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <MallProvider>
-            <RouterProvider>
-              <Shell />
-            </RouterProvider>
-          </MallProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </AppProvider>
+    <PlayerProvider>
+      <AppProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <MallProvider>
+              <RouterProvider>
+                <Shell />
+              </RouterProvider>
+            </MallProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </AppProvider>
+    </PlayerProvider>
   )
 }

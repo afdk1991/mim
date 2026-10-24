@@ -38,3 +38,47 @@ export function pushToolState(key: string, state: unknown): void {
       )
   })()
 }
+
+/* 节流推送：同一 key 在 minMs 窗口内多次调用只发一次（尾调用保证最终状态不丢）。
+   适用高频变更场景（如播放进度每 ~5s 一次），避免把云端 upsert 打爆。 */
+const pushTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const pushLastAt = new Map<string, number>()
+
+export function pushToolStateThrottled(key: string, state: unknown, minMs = 10_000): void {
+  const now = Date.now()
+  const last = pushLastAt.get(key) ?? 0
+  if (now - last >= minMs) {
+    pushLastAt.set(key, now)
+    pushToolState(key, state)
+    return
+  }
+  const pending = pushTimers.get(key)
+  if (pending) clearTimeout(pending)
+  pushTimers.set(
+    key,
+    setTimeout(() => {
+      pushTimers.delete(key)
+      pushLastAt.set(key, Date.now())
+      pushToolState(key, state)
+    }, Math.max(minMs - (now - last), 0)),
+  )
+}
+
+/* 拉取快照 + updated_at（供调用方做「新者优先」合并；比本地 savedAt 旧则丢弃） */
+export async function pullToolStateMeta(
+  key: string,
+): Promise<{ data: unknown; updatedAt: string } | null> {
+  const userId = await toolUserId()
+  if (!userId) return null
+  const { data, error } = await supabase!
+    .from('documents')
+    .select('data,updated_at')
+    .eq('user_id', userId)
+    .eq('key', key)
+    .maybeSingle()
+  if (error || !data || typeof data.data !== 'object' || data.data === null) return null
+  return {
+    data: data.data,
+    updatedAt: typeof data.updated_at === 'string' ? data.updated_at : '',
+  }
+}

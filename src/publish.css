@@ -26,31 +26,6 @@
   font-size: 12px;
 }
 
-/* 域切换 */
-.pb-domain {
-  display: flex;
-  gap: 8px;
-}
-
-.pb-domain-btn {
-  flex: 1;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  color: var(--text-2);
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.pb-domain-btn.active {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary-deep);
-  font-weight: 600;
-}
-
 /* content_type 卡片选择 */
 .pb-types {
   display: grid;

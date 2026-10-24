@@ -163,6 +163,7 @@ export function createSeedState(): AppState {
     posts: [
       {
         id: 'p1',
+        pinned: true,
         authorId: 'u1',
         content: 'React 19 正式版用了两周，最大的感受是表单场景代码量少了一半。Server Components + Actions 的组合真的改变了写法，整理了一篇长文放在专栏，欢迎讨论。',
         images: ['⚛️', '🚀'],
@@ -174,6 +175,7 @@ export function createSeedState(): AppState {
         reposts: 23,
         topic: '前端开发',
         source: '来自 网页版',
+        views: 11506,
         comments: [
           { id: 'pc1', authorId: 'u2', content: 'Actions 用下来确实香，表单校验逻辑终于不用散在各处了。', createdAt: hr(1), likes: 12, likedByMe: false },
           { id: 'pc2', authorId: 'u4', content: 'Server Components 在我们老项目里灰度了两周，心智负担比想象中小。', createdAt: hr(0.5), likes: 5, likedByMe: false },
@@ -192,6 +194,7 @@ export function createSeedState(): AppState {
         reposts: 12,
         topic: '后端架构',
         source: '来自 Android',
+        views: 8583,
       },
       {
         id: 'p3',
@@ -206,6 +209,7 @@ export function createSeedState(): AppState {
         reposts: 4,
         topic: '算法',
         source: '来自 iPhone',
+        views: 4069,
         comments: [
           { id: 'pc3', authorId: 'u1', content: '记口诀：求左边界用 left < right，求右边界才可能 left <= right。', createdAt: hr(5), likes: 31, likedByMe: false },
         ],
@@ -223,10 +227,12 @@ export function createSeedState(): AppState {
         reposts: 8,
         topic: '设计',
         source: '来自 网页版',
+        views: 8495,
       },
       {
         id: 'p5',
         authorId: 'me',
+        pinned: true,
         content: '今天上线了新功能的灰度版本，监控面板一片绿，睡个好觉。记录一下这次从开发到上线的完整流程，后面写成文章。',
         images: ['🚀'],
         createdAt: hr(12),
@@ -237,6 +243,7 @@ export function createSeedState(): AppState {
         reposts: 3,
         topic: '前端开发',
         source: '来自 网页版',
+        views: 1527,
       },
       {
         id: 'p6',
@@ -251,6 +258,7 @@ export function createSeedState(): AppState {
         reposts: 67,
         topic: '独立开发',
         source: '来自 网页版',
+        views: 20506,
       },
       {
         id: 'p7',
@@ -265,6 +273,7 @@ export function createSeedState(): AppState {
         reposts: 5,
         topic: '前端开发',
         source: '来自 网页版',
+        views: 3085,
       },
       {
         id: 'p8',
@@ -279,6 +288,7 @@ export function createSeedState(): AppState {
         reposts: 2,
         topic: '云原生',
         source: '来自 Android',
+        views: 3339,
       },
       {
         id: 'p9',
@@ -293,6 +303,7 @@ export function createSeedState(): AppState {
         reposts: 3,
         topic: '产品思考',
         source: '来自 iPhone',
+        views: 2827,
       },
       {
         id: 'p10',
@@ -307,6 +318,7 @@ export function createSeedState(): AppState {
         reposts: 19,
         topic: '人工智能',
         source: '来自 网页版',
+        views: 14405,
       },
       {
         id: 'p11',
@@ -321,6 +333,7 @@ export function createSeedState(): AppState {
         reposts: 1,
         topic: null,
         source: '来自 网页版',
+        views: 761,
       },
       {
         id: 'p12',
@@ -335,6 +348,7 @@ export function createSeedState(): AppState {
         reposts: 7,
         topic: '后端架构',
         source: '来自 网页版',
+        views: 7682,
       },
       {
         id: 'p13',
@@ -349,6 +363,7 @@ export function createSeedState(): AppState {
         reposts: 2,
         topic: '测试',
         source: '来自 网页版',
+        views: 1630,
       },
       {
         id: 'p14',
@@ -363,6 +378,7 @@ export function createSeedState(): AppState {
         reposts: 6,
         topic: '大数据',
         source: '来自 网页版',
+        views: 3965,
       },
       /* 24h 快拍（story）：只进快拍栏不进常规流，expiresAt 过期自动消失 */
       {

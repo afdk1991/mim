@@ -80,11 +80,19 @@ const WX_CODES: Record<number, string> = {
 
 const SOURCE_DEFS: SourceDef[] = [
   {
-    id: 'fx', label: '汇率', emoji: '�', provider: 'Frankfurter · 欧洲央行',
-    endpoint: 'api.frankfurter.app/latest?from=USD&to=CNY,EUR,JPY,GBP,HKD', ttl: 900,
-    desc: 'ECB 每日欧元参考汇率（USD 基准）',
+    id: 'fx', label: '汇率', emoji: '�', provider: 'ExchangeRate-API · 公开汇率',
+    /* 换源说明：原 Frankfurter(ECB) 响应不带 Access-Control-Allow-Origin，
+       浏览器直连必被 CORS 拦截（线上控制台报 ERR_FAILED，汇率卡片恒为降级态）。
+       open.er-api.com 返回 `access-control-allow-origin: *` 可直连，
+       同为 USD 基准的每日参考汇率，字段结构 { result, rates, time_last_update_utc }。 */
+    endpoint: 'open.er-api.com/v6/latest/USD', ttl: 900,
+    desc: 'USD 基准每日参考汇率（CNY / EUR / JPY / GBP / HKD）',
     parse: (raw) => {
-      const rates = (raw as { rates?: Record<string, unknown> } | null)?.rates
+      const o = raw as
+        | { result?: unknown; rates?: Record<string, unknown>; time_last_update_utc?: unknown }
+        | null
+      requireItem(o?.result === 'success', '汇率源返回失败')
+      const rates = o?.rates
       requireItem(!!rates && typeof rates === 'object', '数据格式异常')
       const items: ArdotItem[] = []
       for (const k of ['CNY', 'EUR', 'JPY', 'GBP', 'HKD']) {
@@ -92,8 +100,11 @@ const SOURCE_DEFS: SourceDef[] = [
         if (v !== null) items.push({ title: `USD → ${k}`, value: v.toFixed(4) })
       }
       requireItem(items.length > 0, '无有效汇率数据')
-      const date = (raw as { date?: unknown }).date
-      if (typeof date === 'string' && date) items.push({ title: 'ECB 报价日期', value: date })
+      const updated = o?.time_last_update_utc
+      // 原始值形如 "Sat, 24 Oct 2026 00:02:31 +0000"，去掉时区尾缀以免过长
+      if (typeof updated === 'string' && updated) {
+        items.push({ title: '报价时间', value: updated.replace(/\s+\+\d{4}$/, '') })
+      }
       return items
     },
   },

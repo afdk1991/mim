@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from './store'
 import { MyAppHub } from './myhub'
 import { useRouter } from './router'
@@ -22,6 +22,8 @@ import { postVisibleTo } from './content-domain'
 import { VoiceBubbleThread, VoiceRecordButton } from './media-domain' /* 轮 24 打通：B5 私信语音条 */
 /* 轮 23 打通：B4 发现与分发 —— 负反馈/同城 hooks 与核心打分逻辑、AB 实验取桶 */
 import { useCity, useNegFeedback } from './feed-domain'
+/* 轮 25 打通：微博式首页增强——实时新动态提示条 / 流内头条文章卡 / 骨架屏 / 24h 热榜 */
+import { ArticleFeedCard, FeedSkeleton, HotBanner, NewPostsBar } from './feed-extras'
 import { buildRecFeed, CITY_PRESETS, clearNeg, negCount } from './lib/feed-core'
 import { abVariant } from './lib/ab'
 import {
@@ -208,6 +210,39 @@ export function FeedPage() {
     onScroll()
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+  /* 首屏骨架屏：450ms 加载态占位（避免流区域空白跳动，对齐现代信息流加载体验） */
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    const t = window.setTimeout(() => setLoading(false), 450)
+    return () => window.clearTimeout(t)
+  }, [])
+  /* 轮 25 打通：「有 N 条新微博」实时提示条 —— 对齐微博首页后台推送交互。
+     信号源复用 store.refreshFeed()（拉取 1~2 条新演示动态并置顶，返回新增条数）：
+     首次 10s 后启动、之后每 22s 轮询；新动态只在提示条累计，用户点击才回顶展示，
+     避免正在阅读时信息流被顶动。卸载即停，不在后台耗轮询。 */
+  const [unseen, setUnseen] = useState(0)
+  const apiRef = useRef(api)
+  apiRef.current = api
+  useEffect(() => {
+    let alive = true
+    const pull = (): void => {
+      if (!alive) return
+      const n = apiRef.current.refreshFeed()
+      if (n > 0) setUnseen((v) => v + n)
+    }
+    const first = window.setTimeout(pull, 10_000)
+    const timer = window.setInterval(pull, 22_000)
+    return () => {
+      alive = false
+      window.clearTimeout(first)
+      window.clearInterval(timer)
+    }
+  }, [])
+  const openUnseen = (): void => {
+    setUnseen(0)
+    setVisibleCount(FEED_PAGE_SIZE)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   const basePosts = api.state.posts.filter(
     (p) =>
       !p.story &&
@@ -216,8 +251,10 @@ export function FeedPage() {
       !(teen.enabled && matchesTeenWords(p.content)) &&
       !neg.authors.includes(p.authorId),
   )
-  /* 关注流：自己 + 已关注作者 */
-  const followPosts = basePosts.filter((p) => p.authorId === api.me.id || api.isFollowing(p.authorId))
+  /* 关注流：自己 + 已关注作者；置顶动态（pinned）排最前，对齐微博个人主页/关注流置顶行为 */
+  const followPosts = basePosts
+    .filter((p) => p.authorId === api.me.id || api.isFollowing(p.authorId))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
   /* 推荐流：非自己、未关注作者的公开动态，按兴趣权重本地排序（互动统计见 lib/feed-core） */
   const recoItems = buildRecFeed({
     candidates: basePosts.filter((p) => p.authorId !== api.me.id && !api.isFollowing(p.authorId)),
@@ -229,12 +266,12 @@ export function FeedPage() {
   })
   /* 同城流：按动态位置归属城市过滤（用户无城市字段，位置即地理信号） */
   const cityPosts = basePosts.filter((p) => (p.location ?? '').startsWith(city))
-  /* 热门流：公开动态按互动热度排序（赞 + 转发×2 + 评论×3），对齐微博首页「热门」Tab */
-  const hotPosts = basePosts
+  /* 热门流：公开动态按互动热度排序（赞 + 转发×2 + 评论×3），对齐微博首页「热门」Tab。
+     heat 保留在条目上，供顶部「24 小时热榜」复用同一份排序，避免两处口径漂移。 */
+  const hotRanked = basePosts
     .filter((p) => p.authorId !== api.me.id)
     .map((p) => ({ p, heat: p.likes + p.reposts * 2 + (p.comments?.length ?? 0) * 3 }))
     .sort((a, b) => b.heat - a.heat)
-    .map((x) => x.p)
   const cities = [
     ...new Set([
       ...CITY_PRESETS,
@@ -242,6 +279,11 @@ export function FeedPage() {
     ]),
   ]
   const reasonStyle = abVariant('reco_reason_style')
+  /* 流内穿插的头条文章（按最新排序；关注流与热门流各穿插一篇，错开避免重复露出） */
+  const feedArticles = useMemo(
+    () => api.state.articles.slice().sort((a, b) => b.createdAt - a.createdAt),
+    [api.state.articles],
+  )
   /* 当前 Tab 的全量条数（供「加载更多」判断与已展示计数） */
   const activeCount =
     tab === 'follow'
@@ -249,7 +291,7 @@ export function FeedPage() {
       : tab === 'reco'
         ? recoItems.length
         : tab === 'hot'
-          ? hotPosts.length
+          ? hotRanked.length
           : cityPosts.length
 
   return (
@@ -290,6 +332,12 @@ export function FeedPage() {
             🎬 视频
           </a>
         </div>
+
+        {/* 轮 25 打通：「有 N 条新微博」实时提示条（后台到达，点击才回顶展示） */}
+        <NewPostsBar count={unseen} onOpen={openUnseen} />
+
+        {/* 首屏骨架屏：加载态占位 */}
+        {loading && <FeedSkeleton rows={3} />}
 
         <div className="card compose">
           <div className="compose-top">
@@ -357,16 +405,20 @@ export function FeedPage() {
           <Empty emoji="🛡" text="当前内容已按黑名单 / 青少年模式过滤" />
         )}
 
-        {tab === 'follow' && (
+        {!loading && tab === 'follow' && (
           <>
             {followPosts.length === 0 && <Empty emoji="👥" text="关注的人还没有新动态，去推荐页逛逛吧" />}
-            {followPosts.slice(0, visibleCount).map((p) => (
-              <PostCard key={p.id} post={p} />
+            {followPosts.slice(0, visibleCount).map((p, i) => (
+              <Fragment key={p.id}>
+                {/* 头条文章卡穿插：第 5 条动态后插入一篇（对齐微博流内头条文章） */}
+                {i === 4 && feedArticles[0] && <ArticleFeedCard article={feedArticles[0]} />}
+                <PostCard post={p} />
+              </Fragment>
             ))}
           </>
         )}
 
-        {tab === 'reco' && (
+        {!loading && tab === 'reco' && (
           <>
             {recoItems.length === 0 && <Empty emoji="✨" text="暂无推荐内容，发布或互动越多推荐越准" />}
             {/* 轮 23 打通：B4 推荐理由小标 —— AB 实验 reco_reason_style 控制样式 A/B */}
@@ -383,16 +435,21 @@ export function FeedPage() {
           </>
         )}
 
-        {tab === 'hot' && (
+        {!loading && tab === 'hot' && (
           <>
-            {hotPosts.length === 0 && <Empty emoji="🔥" text="暂无热门动态，多互动让内容热起来" />}
-            {hotPosts.slice(0, visibleCount).map((p) => (
-              <PostCard key={p.id} post={p} />
+            {/* 轮 25 打通：热门 Tab 顶部「24 小时热榜」top3 */}
+            <HotBanner items={hotRanked.slice(0, 3)} />
+            {hotRanked.length === 0 && <Empty emoji="🔥" text="暂无热门动态，多互动让内容热起来" />}
+            {hotRanked.slice(0, visibleCount).map(({ p }, i) => (
+              <Fragment key={p.id}>
+                {i === 4 && feedArticles[1] && <ArticleFeedCard article={feedArticles[1]} />}
+                <PostCard post={p} />
+              </Fragment>
             ))}
           </>
         )}
 
-        {tab === 'city' && (
+        {!loading && tab === 'city' && (
           <>
             {cityPosts.length === 0 && (
               <Empty emoji="📍" text={`暂无「${city}」的同城动态，发布时选择位置即可现身同城`} />
@@ -404,7 +461,7 @@ export function FeedPage() {
         )}
 
         {/* 加载更多：当前 Tab 仍有未展示内容时出现（对齐微博信息流分页） */}
-        {activeCount > visibleCount && (
+        {!loading && activeCount > visibleCount && (
           <div className="feed-loadmore">
             <button className="btn btn-ghost" onClick={() => setVisibleCount((v) => v + FEED_PAGE_SIZE)}>
               加载更多
@@ -414,6 +471,44 @@ export function FeedPage() {
             </small>
           </div>
         )}
+
+        {/* 单态（2026-10-23）：知识博文并入主信息流，打破"绝不进广场 Feed"隔离 */}
+        <section style={{ marginTop: 18 }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, margin: '0 0 10px', color: 'inherit' }}>
+            📚 知识博文
+            <a href="#/articles" style={{ marginLeft: 'auto', fontSize: 13, color: '#3b82f6', textDecoration: 'none' }}>全部 »</a>
+          </h3>
+          {api.state.articles.length === 0 ? (
+            <Empty emoji="📚" text="还没有博文，去发布一篇知识内容吧" />
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {api.state.articles
+                .slice()
+                .sort((a, b) => b.createdAt - a.createdAt)
+                .slice(0, 6)
+                .map((a) => (
+                  <a
+                    key={a.id}
+                    href={`#/article/${a.id}`}
+                    className="card"
+                    style={{
+                      display: 'block',
+                      padding: '10px 12px',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                    }}
+                  >
+                    <b style={{ display: 'block', fontSize: 14 }}>{a.title}</b>
+                    <small style={{ color: 'var(--text-3, #888)', fontSize: 12 }}>
+                      {a.summary || a.content.replace(/\n/g, ' ').slice(0, 40)}
+                      {' · '}
+                      {a.views} 阅读
+                    </small>
+                  </a>
+                ))}
+            </div>
+          )}
+        </section>
       </div>
 
       <div className="side-col">

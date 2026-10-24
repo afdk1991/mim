@@ -1240,16 +1240,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (snap) walletIncome(400, `资源下载分成（${res.title}）`, snap)
         }
       },
-      /* 下拉刷新：生成 1~2 条「新到达」演示动态并置顶（发现域演示数据，作者取自现有用户） */
+      /* 下拉刷新：生成 1~2 条「新到达」演示动态并置顶（发现域演示数据）。
+         作者优先取「我 + 已关注」——关注流下拉刷新后流首应能见到新动态
+         （微博语义：刷新拉回的是关注账号的新内容）；无关注时退回全部用户。 */
       refreshFeed: () => {
         const pickOne = <T,>(arr: T[]): T | undefined =>
           arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined
-        const authorIds = Object.keys(state.users)
+        const followPool = [state.meId, ...state.followingIds].filter((id) => state.users[id])
+        const authorPool = followPool.length > 0 ? followPool : Object.keys(state.users)
         const topicNames = state.topics.map((t) => t.name)
         const count = 1 + Math.floor(Math.random() * 2)
         const fresh: Post[] = Array.from({ length: count }, () => ({
           id: uid('p'),
-          authorId: pickOne(authorIds) ?? state.meId,
+          authorId: pickOne(authorPool) ?? state.meId,
           content: pickOne(FEED_REFRESH_TEMPLATES) ?? FEED_REFRESH_TEMPLATES[0],
           images: [],
           createdAt: Date.now(),
@@ -1258,6 +1261,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           likes: Math.floor(Math.random() * 30),
           likedByMe: false,
           reposts: Math.floor(Math.random() * 6),
+          views: 50 + Math.floor(Math.random() * 480),
           topic: pickOne(topicNames) ?? null,
           source: '来自 网页版',
           comments: [],

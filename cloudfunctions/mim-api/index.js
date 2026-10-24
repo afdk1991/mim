@@ -89,6 +89,137 @@ const CORS = {
 }
 
 // ---------------------------------------------------------------------------
+// Openverse 开放授权媒体检索代理（与 supabase/functions/mim-api 同契约）
+//
+// 为什么存在：Openverse API 的浏览器 CORS 支持不稳定（外部实测称未启用），
+// 前端直连会被拦截；匿名限流仅 5 次/小时（注册客户端 10,000 次/天）。
+// 本代理同时解决「跨域 + 限流 + 重复检索」：
+//   · 服务端转发 + 5 分钟内存缓存（重复关键词 0 次上游请求）
+//   · 配置 MIM_OV_CLIENT_ID / MIM_OV_CLIENT_SECRET 后走注册客户端提额
+//   · 上游 429 / 5xx 透传语义化状态码
+// 路由：GET /openverse/videos?q=&page=&page_size=&license_type=
+//       GET /openverse/audio?q=&page=&page_size=&license_type=
+// ---------------------------------------------------------------------------
+const OV_API = 'https://api.openverse.org/v1'
+const OV_CLIENT_ID = process.env.MIM_OV_CLIENT_ID || process.env.OPENVERSE_CLIENT_ID || ''
+const OV_CLIENT_SECRET = process.env.MIM_OV_CLIENT_SECRET || process.env.OPENVERSE_CLIENT_SECRET || ''
+const OV_CACHE = new Map() // url → { at, body }
+const OV_CACHE_TTL_MS = 5 * 60 * 1000
+const OV_CACHE_MAX = 50
+let ovToken = null // { token, exp }
+
+function ovSanitizeQuery(q, maxLen = 120) {
+  if (typeof q !== 'string') return ''
+  return q.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxLen)
+}
+
+function ovClampInt(v, min, max, dflt) {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN
+  if (!Number.isFinite(n)) return dflt
+  return Math.min(Math.max(Math.trunc(n), min), max)
+}
+
+function ovBuildUrl(media, qp) {
+  const q = ovSanitizeQuery(qp.q)
+  const lt = qp.license_type === 'modification' ? 'modification' : 'commercial'
+  const usp = new URLSearchParams({
+    q,
+    page: String(ovClampInt(qp.page, 1, 1000, 1)),
+    page_size: String(ovClampInt(qp.page_size, 1, 50, 12)),
+    license_type: lt,
+  })
+  const extra = ['license', 'source', 'extension']
+  for (const k of extra) {
+    const v = ovSanitizeQuery(qp[k], k === 'extension' ? 40 : 80)
+    if (v) usp.set(k, v)
+  }
+  return `${OV_API}/${media}/?${usp.toString()}`
+}
+
+function ovCacheGet(url) {
+  const hit = OV_CACHE.get(url)
+  if (!hit) return undefined
+  if (Date.now() - hit.at > OV_CACHE_TTL_MS) {
+    OV_CACHE.delete(url)
+    return undefined
+  }
+  OV_CACHE.delete(url)
+  OV_CACHE.set(url, hit) // 近似 LRU
+  return hit.body
+}
+
+function ovCacheSet(url, body) {
+  OV_CACHE.set(url, { at: Date.now(), body })
+  while (OV_CACHE.size > OV_CACHE_MAX) {
+    const oldest = OV_CACHE.keys().next()
+    if (oldest.done) break
+    OV_CACHE.delete(oldest.value)
+  }
+}
+
+/** 注册客户端令牌（未配置 / 失败回落匿名） */
+async function ovAuthHeaders() {
+  if (!OV_CLIENT_ID || !OV_CLIENT_SECRET) return {}
+  if (ovToken && ovToken.exp - Date.now() > 60_000) return { Authorization: `Bearer ${ovToken.token}` }
+  try {
+    const r = await fetch(`${OV_API}/auth_tokens/token/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: OV_CLIENT_ID,
+        client_secret: OV_CLIENT_SECRET,
+        grant_type: 'client_credentials',
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!r.ok) return {}
+    const data = await r.json()
+    if (!data.access_token) return {}
+    ovToken = {
+      token: data.access_token,
+      exp: Date.now() + Math.max(Number(data.expires_in) || 3600, 60) * 1000,
+    }
+    return { Authorization: `Bearer ${ovToken.token}` }
+  } catch {
+    return {}
+  }
+}
+
+async function openverseProxy(media, qp) {
+  const q = ovSanitizeQuery(qp.q)
+  if (!q) return resp(400, { error: '缺少搜索关键词 q' })
+  const upstream = ovBuildUrl(media, qp)
+
+  const hit = ovCacheGet(upstream)
+  if (hit !== undefined) return resp(200, { ...hit, cached: true })
+
+  try {
+    const r = await fetch(upstream, {
+      headers: { Accept: 'application/json', ...(await ovAuthHeaders()) },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (r.status === 429) {
+      return resp(429, { error: 'upstream_rate_limited', hint: 'Openverse 限流：稍后再试或配置注册客户端凭证' })
+    }
+    if (!r.ok) return resp(502, { error: 'openverse_upstream_error', status: r.status })
+    const json = await r.json()
+    ovCacheSet(upstream, json)
+    const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
+    return resp(200, {
+      ...json,
+      cached: false,
+      meta: {
+        resultCount: num(json.result_count, 0),
+        page: num(json.page, 1),
+        pageCount: Math.max(num(json.page_count, 1), 1),
+      },
+    })
+  } catch {
+    return resp(504, { error: 'openverse_timeout', hint: '上游响应超时' })
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 表访问策略
 // ---------------------------------------------------------------------------
 /** 匿名与登录用户均可读（社区公开内容） */
@@ -625,7 +756,12 @@ async function handler(event) {
   const path = String(event.path || event.requestContext?.path || '')
   // CloudBase HTTP 访问服务路径形如 /<函数名>/<业务路径>，这里截取业务段
   let rest = path
-  const marker = Math.max(path.indexOf('/auth/'), path.indexOf('/db/'), path.indexOf('/storage/'))
+  const marker = Math.max(
+    path.indexOf('/auth/'),
+    path.indexOf('/db/'),
+    path.indexOf('/storage/'),
+    path.indexOf('/openverse/'),
+  )
   if (marker >= 0) rest = path.slice(marker)
 
   const qp = event.queryStringParameters || event.query || {}
@@ -635,6 +771,14 @@ async function handler(event) {
 
   const token = headers['x-mim-token'] || headers['X-Mim-Token'] || (headers.authorization || '').replace(/^Bearer\s+/i, '')
   const session = verifyToken(token)
+
+  // ---- Openverse 代理（不依赖服务端凭据，先于配置门禁） ----
+  if (rest.startsWith('/openverse/')) {
+    const m = rest.match(/^\/openverse\/(videos|audio)$/)
+    if (!m) return resp(404, { error: 'openverse 路由不存在（支持 /openverse/videos 与 /openverse/audio）' })
+    if (method !== 'GET') return resp(405, { error: '仅支持 GET' })
+    return openverseProxy(m[1], qp)
+  }
 
   if (!SERVICE_KEY || !TOKEN_SECRET) {
     return resp(500, { error: '服务端未配置 MIM_SERVICE_KEY / MIM_TOKEN_SECRET' })
@@ -683,6 +827,7 @@ async function handler(event) {
       '/auth/register', '/auth/login', '/auth/me',
       '/db/rest/<table>', '/db/rpc/<fn>',
       '/storage/upload', '/storage/url', '/storage/list', '/storage/delete',
+      '/openverse/videos', '/openverse/audio',
     ],
   })
 }
