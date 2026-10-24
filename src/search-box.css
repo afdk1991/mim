@@ -104,7 +104,29 @@
   }
 }
 
-/* ============ 固定顶栏（滚动过 hero 后出现，条件渲染硬切换，无动画——复刻微博机制） ============ */
+/* ============ 顶部细搜索栏：滚动联动（下滑隐藏 / 上滑滑入） ============
+   取代原来的「条件渲染硬切换」：组件常驻，靠 transform 位移进出视口。
+   - transform 而非 height/margin：只跑合成层，不触发 layout/reflow；
+   - visibility 延迟到位移结束才切换（隐藏时 delay .26s / 显示时 0s），
+     既保证动画完整，又避免隐藏态的输入框仍可被 Tab 聚焦；
+   - .is-linked 为启用开关，避免影响可能存在的其它 .wb-fixedbar 用法。 */
+
+.wb-fixedbar.is-linked {
+  transform: translateY(-100%);
+  visibility: hidden;
+  transition:
+    transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s linear 0.26s;
+  will-change: transform;
+}
+
+.wb-fixedbar.is-linked.is-shown {
+  transform: translateY(0);
+  visibility: visible;
+  transition:
+    transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s linear 0s;
+}
 
 .wb-fixedbar {
   position: fixed;

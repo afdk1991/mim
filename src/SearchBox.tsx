@@ -269,9 +269,9 @@ export function SearchField({ variant, onAfterGo, forceOpen, className, style }:
   /* ---------- 富形态（hero 常驻区 / pull 下拉大面板） ---------- */
   return (
     <div
-      className={cx(variant === 'hero' ? 'wb-hero-search' : 'wb-hero-bar', className)}
+      className={cx(variant === 'hero' ? 'wb-hero-search' : 'pull-search-body', className)}
       ref={boxRef}
-      style={{ flex: variant === 'pull' ? 1 : undefined, ...style }}
+      style={style}
     >
       <div className="wb-hero-bar" style={{ flex: 1 }}>
         <span aria-hidden>🔍</span>
