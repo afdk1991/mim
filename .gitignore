@@ -50,4 +50,7 @@ scripts/verify-*.mjs
 # 只放行确定性脚本，依赖云端状态的一次性诊断脚本仍忽略。
 !scripts/verify-openverse.mjs
 !scripts/verify-routes.mjs
+# 线上云端端到端回归（GitHub Pages 真实站点：注册→发布→全新会话读回），
+# 是「线上实现」而非「本地实现」的唯一自动闸门，同样放行入库。
+!scripts/verify-cloud-e2e.mjs
 scripts/shot-*.mjs

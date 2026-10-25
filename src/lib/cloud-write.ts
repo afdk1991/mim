@@ -38,6 +38,61 @@ async function cloudUserId(): Promise<string | null> {
 
 type ContentTable = 'posts' | 'articles' | 'snippets' | 'post_comments' | 'article_comments'
 
+/* ---------- 线上库结构漂移容错（缺列自动降级） ----------
+   生产 Supabase 库可能落后于仓库迁移（迁移未应用时 posts 仍是无富字段的旧结构），
+   此时写入带新列的整行会收到 PGRST204「Could not find the 'X' column of 'Y'」
+   并整体失败，导致内容只落本地——即「看起来能用、实际是本地实现」。
+   本段做法：捕获缺列错误 → 记入该表的缺失列表 → 剔除该列后重试，
+   使写入始终能用线上库**实际存在**的列成功落库；迁移补齐后缓存自然不会被触发。
+   注意：这只降级「可缺省的扩展字段」，主键/必填列缺失仍按原样报错，不静默吞错。 */
+const missingCols = new Map<string, Set<string>>()
+
+function missingOf(table: string): Set<string> {
+  let s = missingCols.get(table)
+  if (!s) { s = new Set(); missingCols.set(table, s) }
+  return s
+}
+
+/** 按已记录的缺失列裁剪 payload（无记录时原样返回，零开销） */
+function stripMissing(table: string, row: Record<string, unknown>): Record<string, unknown> {
+  const s = missingOf(table)
+  if (!s.size) return row
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(row)) if (!s.has(k)) out[k] = v
+  return out
+}
+
+/** 从 PostgREST 报错里学习缺失列名；非缺列错误返回 null */
+function learnMissing(table: string, msg: string): string | null {
+  const m = /Could not find the '([^']+)' column/i.exec(msg || '')
+  if (!m) return null
+  missingOf(table).add(m[1])
+  return m[1]
+}
+
+/**
+ * 带缺列降级的写执行器。exec 每次收到裁剪后的 payload，
+ * 遇缺列报错即剔除该列重试，直到成功或无列可剔（最多 max 轮，防死循环）。
+ */
+async function writeWithFallback(
+  table: string,
+  payload: Record<string, unknown>,
+  exec: (p: Record<string, unknown>) => Promise<{ error: { message: string } | null }>,
+  max = 12,
+): Promise<{ error: { message: string } | null }> {
+  let p = stripMissing(table, payload)
+  for (let i = 0; i < max; i++) {
+    const r = await exec(p)
+    if (!r.error) return r
+    const col = learnMissing(table, r.error.message)
+    if (!col || !(col in p)) return r
+    const next: Record<string, unknown> = { ...p }
+    delete next[col]
+    p = next
+  }
+  return { error: { message: '字段结构与线上库不匹配，已放弃写入' } }
+}
+
 /** 发布/评论类 insert 统一入口：返回三态 CloudResult */
 async function insertRow(
   table: ContentTable,
@@ -46,9 +101,9 @@ async function insertRow(
 ): Promise<CloudResult> {
   const userId = await cloudUserId()
   if (!userId) return 'skip' // 未登录/未配置云端：跳过，保持本地演示行为
-  const { error } = await supabase!
-    .from(table)
-    .insert({ ...row, author_id: userId })
+  const { error } = await writeWithFallback(table, { ...row, author_id: userId }, (p) =>
+    supabase!.from(table).insert(p) as unknown as Promise<{ error: { message: string } | null }>,
+  )
   if (error) {
     cloudToast(`⚠ ${label}云端保存失败，已回滚：${error.message}`)
     return 'fail'
@@ -198,7 +253,9 @@ export async function cloudUpdateArticle(
 ): Promise<boolean> {
   const userId = await cloudUserId()
   if (!userId) return true
-  const { error } = await supabase!.from('articles').update(d).eq('id', id).eq('author_id', userId)
+  const { error } = await writeWithFallback('articles', d, (p) =>
+    supabase!.from('articles').update(p).eq('id', id).eq('author_id', userId) as unknown as Promise<{ error: { message: string } | null }>,
+  )
   if (error) {
     cloudToast(`⚠ 文章云端更新失败，已恢复：${error.message}`)
     return false
@@ -217,11 +274,9 @@ export async function cloudUpdatePost(
   const patch: Record<string, unknown> = { content: d.content, images: d.images }
   if (d.topic !== undefined) patch.topic = d.topic
   if (d.source !== undefined) patch.source = d.source
-  const { error } = await supabase!
-    .from('posts')
-    .update(patch)
-    .eq('id', id)
-    .eq('author_id', userId)
+  const { error } = await writeWithFallback('posts', patch, (p) =>
+    supabase!.from('posts').update(p).eq('id', id).eq('author_id', userId) as unknown as Promise<{ error: { message: string } | null }>,
+  )
   if (error) {
     cloudToast(`⚠ 动态云端更新失败，已恢复：${error.message}`)
     return false
@@ -299,7 +354,8 @@ export async function cloudWriteProfile(d: { name: string; emoji: string; color:
 export async function cloudUpsertPostDraft(d: PostDraft): Promise<boolean> {
   const userId = await cloudUserId()
   if (!userId) return true
-  const { error } = await supabase!.from('post_drafts').upsert(
+  const { error } = await writeWithFallback(
+    'post_drafts',
     {
       id: d.id,
       user_id: userId,
@@ -308,7 +364,7 @@ export async function cloudUpsertPostDraft(d: PostDraft): Promise<boolean> {
       images: d.images,
       saved_at: new Date(d.savedAt).toISOString(),
     },
-    { onConflict: 'id' },
+    (p) => supabase!.from('post_drafts').upsert(p, { onConflict: 'id' }) as unknown as Promise<{ error: { message: string } | null }>,
   )
   if (error) {
     cloudToast(`⚠ 动态草稿云端保存失败：${error.message}`)
@@ -331,7 +387,8 @@ export async function cloudDeletePostDraft(id: string): Promise<boolean> {
 export async function cloudUpsertArticleDraft(d: ArticleDraft): Promise<boolean> {
   const userId = await cloudUserId()
   if (!userId) return true
-  const { error } = await supabase!.from('article_drafts').upsert(
+  const { error } = await writeWithFallback(
+    'article_drafts',
     {
       id: d.id,
       user_id: userId,
@@ -340,7 +397,7 @@ export async function cloudUpsertArticleDraft(d: ArticleDraft): Promise<boolean>
       tags: d.tags,
       saved_at: new Date(d.savedAt).toISOString(),
     },
-    { onConflict: 'id' },
+    (p) => supabase!.from('article_drafts').upsert(p, { onConflict: 'id' }) as unknown as Promise<{ error: { message: string } | null }>,
   )
   if (error) {
     cloudToast(`⚠ 文章草稿云端保存失败：${error.message}`)
