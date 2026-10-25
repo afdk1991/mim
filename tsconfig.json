@@ -10,6 +10,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
     "strict": true,
     "noFallthroughCasesInSwitch": true,

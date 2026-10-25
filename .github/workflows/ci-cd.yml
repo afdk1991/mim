@@ -66,6 +66,12 @@ jobs:
       - name: 类型检查
         run: npm run typecheck
 
+      # 单元测试：Node ≥ 22.18 内置 node:test + 原生 TS 剥离，零新增依赖。
+      # 与 typecheck/build 同门禁：失败即阻断部署（恢复此前被移除的回归防线）。
+      # 本地复跑：npm test（需 Node ≥ 22.18）
+      - name: 单元测试（node:test）
+        run: npm test
+
       - name: 构建
         run: npm run build
         env:

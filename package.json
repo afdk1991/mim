@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
     "verify:manju": "node scripts/verify-openverse.mjs",
     "verify:feed": "node scripts/verify-feed-growth.mjs",
     "db:apply": "node scripts/apply-migration.mjs",
