@@ -1,0 +1,62 @@
+// 全站路由遍历实测：白屏 / JS 异常 / 渲染内容检测（仅本地验证，不入库）
+import { chromium } from 'playwright-core'
+
+const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const BASE = process.env.BASE || 'http://localhost:5198'
+
+const ROUTES = [
+  '#/feed', '#/articles', '#/write', '#/topics', '#/notifications', '#/messages',
+  '#/my', '#/blog', '#/favorites', '#/history', '#/following', '#/publish',
+  '#/wallet', '#/vip', '#/growth', '#/settings',
+  '#/mall', '#/mall/cart', '#/mall/orders', '#/mall/wallet',
+  '#/mall/youxuan', '#/mall/live', '#/mall/mix', '#/mall/gexm', '#/mall/laal',
+  '#/admin', '#/admin/audit', '#/admin/roles',
+  '#/ai', '#/ardot', '#/bom', '#/coze', '#/delivery', '#/live', '#/mail',
+  '#/manju', '#/nav', '#/price', '#/resources', '#/snippets', '#/tags',
+  '#/info/account-rules', '#/info/appeal', '#/info/disclaimer', '#/info/license',
+  '#/info/publish-license',
+]
+
+const browser = await chromium.launch({
+  executablePath: EDGE,
+  args: ['--no-sandbox', '--disable-setuid-sandbox'],
+})
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+
+const rows = []
+for (const r of ROUTES) {
+  const errs = []
+  const onErr = (e) => errs.push(e.message)
+  page.on('pageerror', onErr)
+  let len = 0
+  let hasShell = false
+  try {
+    await page.goto(`${BASE}/${r}`, { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(700)
+    const res = await page.evaluate(() => ({
+      len: (document.body.innerText || '').trim().length,
+      shell: !!document.querySelector('.app-shell, #root > *, .mim-shell'),
+    }))
+    len = res.len
+    hasShell = res.shell
+  } catch (e) {
+    errs.push('nav: ' + e.message)
+  }
+  page.off('pageerror', onErr)
+
+  // 白屏判定：正文过短且无 shell 容器
+  const blank = len < 40 && !hasShell
+  const bad = errs.length > 0
+  rows.push({ route: r, len, shell: hasShell, errs: errs.slice(0, 1), blank, bad })
+  const tag = blank ? '🔴白屏' : bad ? '🟠JS异常' : '✅'
+  console.log(`${tag} ${r.padEnd(24)} len=${String(len).padStart(5)} shell=${hasShell ? 'Y' : 'N'}${errs.length ? ' | ' + errs[0].slice(0, 90) : ''}`)
+}
+
+const blanks = rows.filter((r) => r.blank).length
+const bads = rows.filter((r) => r.bad).length
+console.log(`\n=== 汇总：${ROUTES.length} 路由 | 白屏 ${blanks} | JS异常 ${bads} ===`)
+if (bads) {
+  console.log('\n--- JS 异常明细 ---')
+  rows.filter((r) => r.bad).forEach((r) => console.log(`${r.route}: ${r.errs[0]}`))
+}
+await browser.close()
