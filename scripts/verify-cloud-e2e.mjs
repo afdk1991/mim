@@ -70,6 +70,8 @@ try {
   console.log('DIAG 控制台:', errors.slice(0, 6))
   throw new Error('登录表单未渲染')
 }
+// 弹窗挂载晚于首屏，点关键控件前再关一次（否则遮罩会拦截点击）
+await dismiss(p1)
 // 切到「注册」标签（第二个 tab）
 const tabs = p1.locator('.auth-tab')
 const tabCount = await tabs.count()
@@ -119,6 +121,7 @@ if (published) {
   hook(p2)
   await goto(p2, '#/login', 2500)
   await p2.waitForSelector('input[placeholder="用户名"]', { timeout: 60000 })
+  await dismiss(p2)
   await p2.fill('input[placeholder="用户名"]', USER)
   await p2.fill('input[placeholder^="密码"]', PWD)
   await p2.click('form.auth-form button[type="submit"]')
@@ -149,6 +152,29 @@ const real = errors.filter(
 ok('无 5xx / 未捕获 JS 异常', real.length === 0, real.slice(0, 2).join(' | ') || '无')
 
 await b.close()
+
+/* ---------- 收尾清理：删掉本次验证写进线上的内容，避免污染生产广场 ----------
+   用真实账号登录后再删（RLS 只允许作者删自己的行）；缺 .env.local 时静默跳过。 */
+try {
+  const { createClient } = await import('@supabase/supabase-js')
+  const fs = await import('node:fs')
+  const env = fs.readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
+  const url = /VITE_SUPABASE_URL=(.+)/.exec(env)?.[1].trim()
+  const key = /VITE_SUPABASE_ANON_KEY=(.+)/.exec(env)?.[1].trim()
+  if (url && key) {
+    const sb = createClient(url, key)
+    const { data } = await sb.auth.signInWithPassword({ email: `${USER}@mim.app`, password: PWD })
+    const uid = data?.session?.user?.id
+    if (uid) {
+      await sb.from('posts').delete().eq('author_id', uid)
+      await sb.from('post_comments').delete().eq('author_id', uid)
+      await sb.from('post_drafts').delete().eq('user_id', uid)
+      console.log(`\n已清理本次测试账号 ${USER} 写入的云端内容`)
+    }
+  }
+} catch {
+  /* 清理失败不影响验证结论，仅下次需手工清理 */
+}
 
 console.log('\n=== 线上云端端到端实测（GitHub Pages 生产站）===')
 for (const [s, n, d] of results) console.log(`${s} ${n.padEnd(26)} ${d}`)
