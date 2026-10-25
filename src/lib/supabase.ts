@@ -107,6 +107,18 @@ export interface CloudClient {
 /** 当前生效的后端模式（供存储适配层等分支使用） */
 export type CloudBackend = 'supabase' | 'cloudbase' | 'local'
 
+/* 内置示例后端（原作者个人的公开 Supabase / CloudBase 入口）
+ *
+ * 为什么还保留：EdgeOne Makers 是**远端构建**（`edgeone makers deploy` 在云端
+ * 检出自仓库代码后自行 build），构建环境读不到仓库环境变量/Secrets
+ * （CI 日志：`No environment variables found`）。若完全删除内置值，
+ * 该链路产出的 dist 会缺失云端地址、静默退化成本地演示模式。
+ *
+ * 为什么必须能关：源码内置他人后端 = 交付/二次分发时买家不配 .env 也会连到
+ * 示例数据库（数据互通、可被示例项目运营方清库）。因此这里提供显式开关：
+ *   VITE_MIM_BUILTIN_BACKEND=0   → 彻底禁用内置值，未配置即本地演示模式
+ * 默认仍启用，是为了不打断上述远端构建链路；二次分发时务必置 0 或改写下值。 */
+
 /** 生产 Supabase 项目（公开信息：publishable key 按设计可暴露，安全由 RLS 保证） */
 const PROD_SUPABASE_URL = 'https://sepfobukokrrivwyvhnd.supabase.co'
 const PROD_SUPABASE_ANON_KEY = 'sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg'
@@ -119,8 +131,17 @@ const env = (k: string): string => {
   return typeof v === 'string' ? v.trim() : ''
 }
 
-const SB_URL = env('VITE_SUPABASE_URL') || PROD_SUPABASE_URL
-const SB_ANON = env('VITE_SUPABASE_ANON_KEY') || PROD_SUPABASE_ANON_KEY
+/** 内置示例后端开关（见上方 PROD_SUPABASE_URL 处注释）：
+ *  VITE_MIM_BUILTIN_BACKEND=0 时禁用内置值，未配置即本地演示模式。
+ *
+ *  这里刻意用**静态**属性访问（而非 env('…') 动态取键）：Vite 只能在静态形态下
+ *  把 `import.meta.env.VITE_X` 折叠成字面量，从而让 `BUILTIN_ENABLED` 成为常量、
+ *  进而把 PROD_* 三个内置地址整段 tree-shake 掉——否则地址字符串仍会出现在
+ *  买家产物里（虽不生效，但交付时是隐患）。 */
+const BUILTIN_ENABLED = import.meta.env.VITE_MIM_BUILTIN_BACKEND !== '0'
+
+const SB_URL = env('VITE_SUPABASE_URL') || (BUILTIN_ENABLED ? PROD_SUPABASE_URL : '')
+const SB_ANON = env('VITE_SUPABASE_ANON_KEY') || (BUILTIN_ENABLED ? PROD_SUPABASE_ANON_KEY : '')
 
 /** 生产云端后端（CloudBase 云函数 mim-api）的固定入口。
  *
@@ -128,10 +149,11 @@ const SB_ANON = env('VITE_SUPABASE_ANON_KEY') || PROD_SUPABASE_ANON_KEY
  *    仓库环境变量（CI 日志：`No environment variables found`），若仅依赖
  *    VITE_MIM_API_BASE 会导致线上产物缺失云端地址、回退本地演示模式。
  *    该地址是公开 HTTP 端点（不含任何密钥，权限由云函数服务端强制校验）；
- *    需要用自建后端时仍可用 VITE_MIM_API_BASE 覆盖。 */
+ *    需要用自建后端时仍可用 VITE_MIM_API_BASE 覆盖，或用 VITE_MIM_BUILTIN_BACKEND=0
+ *    关闭全部内置值（详见 PROD_SUPABASE_URL 处注释与 INSTALL.md）。 */
 const PROD_API_BASE = 'https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api'
 
-const API_BASE = (env('VITE_MIM_API_BASE') || PROD_API_BASE).replace(/\/+$/, '')
+const API_BASE = (env('VITE_MIM_API_BASE') || (BUILTIN_ENABLED ? PROD_API_BASE : '')).replace(/\/+$/, '')
 
 const FORCED = env('VITE_MIM_BACKEND')
 const hasSupabaseConfig = !!SB_URL && !!SB_ANON
@@ -146,6 +168,19 @@ function resolveBackend(): CloudBackend {
 
 /** 当前后端模式：'supabase' | 'cloudbase' | 'local' */
 export const cloudBackend: CloudBackend = resolveBackend()
+
+/** 是否正在使用「内置示例后端」：既未自行配置任何云端地址，又未关闭内置开关。
+ *  二次分发/交付场景应确保此项为 false——否则买家站点会连到示例项目的数据库。 */
+export const usingBuiltinBackend =
+  BUILTIN_ENABLED && !env('VITE_SUPABASE_URL') && !env('VITE_SUPABASE_ANON_KEY') && !env('VITE_MIM_API_BASE')
+
+if (usingBuiltinBackend && import.meta.env.DEV) {
+  console.warn(
+    '[mim] 当前使用内置示例后端（他人 Supabase/CloudBase 项目），数据会写入示例库。\n' +
+      '生产部署请在 .env 配置 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY，' +
+      '或设 VITE_MIM_BUILTIN_BACKEND=0 退回本地演示模式。详见 INSTALL.md。',
+  )
+}
 
 /* ---------------------------------------------------------------------------
  * Supabase 后端（主）
