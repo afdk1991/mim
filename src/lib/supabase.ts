@@ -199,13 +199,15 @@ export async function usernameTakenGlobally(raw: SupabaseClient, login: string):
 }
 
 /** 双写 CloudBase 注册（fire-and-forget）：切回备后端时账号仍在；
- *  mim-api 会把该用户名登记进 Supabase 账号桥。失败不阻塞 Supabase 主流程。 */
+ *  mim-api 会把该用户名登记进 Supabase 账号桥。失败不阻塞 Supabase 主流程。
+ *  带 mirror=true：镜像写入语义——跳过「Supabase 全局查重」，
+ *  否则刚在 Supabase 建号的同名账号必被判为已占用（409），备后端账号永远建不出来。 */
 export function dualWriteCloudbase(username: string, password: string): void {
   if (cloudBackend !== 'supabase' || !username) return
   void fetch(`${PROD_API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, mirror: true }),
   }).catch(() => {
     /* 双写失败仅影响备后端可用性，不阻断主流程 */
   })

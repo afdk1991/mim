@@ -347,14 +347,16 @@ function parsePg(text, status) {
 // ---------------------------------------------------------------------------
 // 鉴权 API
 // ---------------------------------------------------------------------------
-async function register({ username, password, name }) {
+async function register({ username, password, name, mirror }) {
   const u = String(username || '').trim()
   const p = String(password || '')
   if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(u)) {
     return resp(400, { error: '用户名需为 3-32 位字母、数字、下划线、点或连字符' })
   }
-  if (p.length < 8 || p.length > 72) {
-    return resp(400, { error: '密码长度需为 8-72 位' })
+  // 镜像双写沿用主后端（Supabase）的 6 位下限，否则 6-7 位密码的账号在备后端建不出来
+  const minLen = mirror ? 6 : 8
+  if (p.length < minLen || p.length > 72) {
+    return resp(400, { error: `密码长度需为 ${minLen}-72 位` })
   }
 
   const exist = await pg('/v1/rdb/rest/app_users', { query: `select=uid&username=eq.${encodeURIComponent(u)}` })
@@ -362,8 +364,11 @@ async function register({ username, password, name }) {
   const rows = parsePg(exist.text, exist.status) || []
   if (Array.isArray(rows) && rows.length > 0) return resp(409, { error: '该用户名已被注册' })
 
-  // 全局查重：Supabase 已注册（含账号桥登记）的用户名在此不可再注册
-  if (await usernameTakenInSupabase(u)) {
+  // 全局查重：Supabase 已注册（含账号桥登记）的用户名在此不可再注册。
+  // mirror=true 表示「Supabase 注册成功后的镜像双写」，必须跳过本查重——
+  // 否则刚在 Supabase 建号的同名账号必被判为已占用（409），
+  // 备后端（Supabase 不可用时）将永远没有可用账号。
+  if (!mirror && (await usernameTakenInSupabase(u))) {
     return resp(409, { error: '该用户名已被注册' })
   }
 
