@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data: https: blob:; connect-src 'self' https://sepfobukokrrivwyvhnd.supabase.co https://*.app.tcloudbase.com https://api.github.com https://*.edgeone.cool https://api.coingecko.com https://*.workers.dev https://commons.wikimedia.org https://api.openverse.org; font-src 'self' data:; frame-src 'self'"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data: https: blob:; connect-src 'self' https://sepfobukokrrivwyvhnd.supabase.co https://*.supabase.co https://*.app.tcloudbase.com https://api.github.com https://*.edgeone.cool https://api.coingecko.com https://*.workers.dev https://commons.wikimedia.org https://api.openverse.org; font-src 'self' data:; frame-src 'self'"
     }
   },
   "bundle": {

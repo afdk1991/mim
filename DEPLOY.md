@@ -2,6 +2,10 @@
 
 本项目已配置一条完整的 CI/CD 流水线：[.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml)。
 
+> 本文是**作者自己维护线上站**的操作手册（以 `afdk1991/mim` 与作者 Supabase 项目为前提）。
+> 若你是拿到源码的部署方 / 买家，请改看 [INSTALL.md](INSTALL.md)：从零建库、配环境变量、
+> 以及必须改掉的 8 处作者绑定点。
+
 ## 全栈分层：谁负责哪一层
 
 | 能力层 | Mim 的选型 | 落地位置 | 免费额度 / 说明 |

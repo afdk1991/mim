@@ -53,6 +53,14 @@ cd ios/App && xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator
 node scripts/sync-harmony.mjs   # dist → rawfile 同步
 ```
 
+## 安装与交付（二次分发）
+
+拿到源码后从零部署成**你自己的站点**，见 [INSTALL.md](INSTALL.md)：三条路径
+（纯静态 Demo / 自建 Supabase / 六端全量）+ 8 项「去绑定」清单。
+
+> ⚠️ 源码内置了示例后端地址作为兜底，部署前必须按 INSTALL.md §0 处理，
+> 否则站点会连进示例项目的数据库。作者本人维护线上站的操作见 [DEPLOY.md](DEPLOY.md)。
+
 ## 仓库结构
 
 - `src/` 前端源码（hash 路由，42 条可达路由：导航 39 条 + 管理后台 3 条）
