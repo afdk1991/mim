@@ -3,7 +3,7 @@
    颜色全部走全局 CSS 变量，深色主题自动适配。 */
 
 /* 双线等级并排卡 */
-.gr-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.gr-duo { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
 .gr-line { padding: 14px 16px; }
 .gr-line-head { display: flex; align-items: center; justify-content: space-between; }
 .gr-reward { font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }

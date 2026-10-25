@@ -134,6 +134,15 @@ export async function pullCloudContent(): Promise<CloudPayload | null> {
       reposts: p.reposts ?? 0,
       topic: p.topic ?? null,
       source: p.source ?? '来自 网页版',
+      // 富媒体/互动扩展字段（迁移 0004）：回拉还原本地富帖能力
+      media: p.media ?? null,
+      vote: p.vote ?? null,
+      lottery: p.lottery ?? null,
+      location: p.location ?? null,
+      story: p.story ?? false,
+      visibility: p.visibility ?? 'public',
+      expiresAt: p.expires_at ? Date.parse(p.expires_at) : undefined,
+      pinned: p.pinned ?? false,
       comments: commentsByPost.get(p.id) ?? [],
     }))
 

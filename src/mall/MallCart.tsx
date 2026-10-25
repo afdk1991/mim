@@ -3,16 +3,19 @@
 
 import { Empty, useToast } from '../components'
 import { useRouter } from '../router'
-import { MALL_GOODS, useMall } from './store'
+import { useMall, useMallGoods } from './store'
 
 export function MallCartPage() {
   const toast = useToast()
   const { navigate } = useRouter()
   const { state, setCartQty, removeFromCart, checkout } = useMall()
+  /* 商品目录与商城中心同源：云端优先 + 演示兜底，
+     否则云端模式下购物车条目会因取不到商品而被当成孤儿条目丢弃 */
+  const { goods } = useMallGoods()
 
   const rows = state.cart
     .map((c) => {
-      const g = MALL_GOODS.find((x) => x.id === c.goodsId)
+      const g = goods.find((x) => x.id === c.goodsId)
       return g ? { c, g } : null
     })
     .filter((r) => r !== null)

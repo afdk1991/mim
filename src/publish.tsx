@@ -16,6 +16,7 @@ import {
   enqueueSchedule,
   findSensitiveHits,
   loadSchedule,
+  sensitiveHitLabels,
   type ScheduleItem,
 } from './content-domain'
 import { cx, formatDate } from './utils'
@@ -202,8 +203,11 @@ export function PublishPage() {
   const types: ContentType[] = [10, 11, 12, 13, 14, 15, 20, 22]
   const priceFen = Math.round((parseFloat(priceYuan) || 0) * 100)
 
-  /* 轮 21 打通：9. 敏感词前置——输入过程实时检测（纯前端词库，渲染期计算即可） */
+  /* 轮 21 打通：9. 敏感词前置——输入过程实时检测（纯前端词库，渲染期计算即可）
+     词库已按「导流营销 / 金融违规 / 黑产违规 / 色情低俗 / 暴力违法」分类，
+     提示一并给出命中类别，便于用户知道该改哪类表述 */
   const sensHits = findSensitiveHits(body)
+  const sensLabels = sensitiveHitLabels(body)
   /* 轮 21 打通：8. 与 B1 账号级隐私叠加取更严者——账号级为「仅自己」时本条强制 self */
   const acctSelf = readPrivacy(auth.userId).posts === 'self'
   const effVisibility: VisCode = acctSelf ? 'self' : visibleScope
@@ -319,7 +323,7 @@ export function PublishPage() {
   const submit = () => {
     /* 轮 21 打通：9. 敏感词前置——命中即阻断（即时发布与定时入库一体拦截） */
     if (sensHits.length > 0) {
-      toast(`命中敏感词：${sensHits.join('、')}，发布已阻断`)
+      toast(`命中敏感词（${sensLabels.join('/')}）：${sensHits.join('、')}，发布已阻断`)
       return
     }
     if (!body.trim()) {
@@ -473,7 +477,7 @@ export function PublishPage() {
           {/* 轮 21 打通：9. 敏感词前置——输入过程实时提示（命中高亮），发布时阻断 */}
           {sensHits.length > 0 && (
             <div className="wt-sens" role="alert">
-              ⚠️ 命中敏感词：
+              ⚠️ 命中敏感词（{sensLabels.join('/')}）：
               {sensHits.map((w) => (
                 <i key={w} className="wt-hit">
                   {w}

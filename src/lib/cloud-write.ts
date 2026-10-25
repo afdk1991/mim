@@ -70,6 +70,15 @@ export function cloudWritePost(p: Post): Promise<CloudResult> {
       repost_comment: p.repostComment,
       topic: p.topic,
       source: p.source,
+      // 富媒体/互动扩展字段（迁移 0004）：本地富帖能力上云，避免回拉时被静默降级
+      media: p.media ?? null,
+      vote: p.vote ?? null,
+      lottery: p.lottery ?? null,
+      location: p.location ?? null,
+      story: p.story ?? false,
+      visibility: p.visibility ?? 'public',
+      expires_at: p.expiresAt ? new Date(p.expiresAt).toISOString() : null,
+      pinned: p.pinned ?? false,
     },
     '动态',
   )

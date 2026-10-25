@@ -242,7 +242,10 @@ const OWNER_COL = {
   article_likes: 'user_id',
   snippet_likes: 'user_id',
   user_roles: 'user_id',
+  follows: 'follower_id',
 }
+/** 禁止客户端通过代理写入的表（权限/角色由服务端逻辑授予，防越权自写 user_roles 自授 admin） */
+const NO_CLIENT_WRITE = new Set(['user_roles'])
 /** 内容表 → 作者列名（写时强制，改删时按此过滤） */
 const AUTHOR_COL = {
   posts: 'author_id',
@@ -462,6 +465,8 @@ async function proxyDb({ table, method, query, body, uid, prefer }) {
 
   // 写：只读表拒绝
   if (READ_ONLY_TABLES.has(table)) return resp(403, { error: '该表为只读数据' })
+  // 禁止客户端自写权限/角色表（防越权提升：自授 admin）
+  if (NO_CLIENT_WRITE.has(table)) return resp(403, { error: '该表不允许客户端写入' })
 
   const headers = {}
   if (prefer) headers.Prefer = prefer

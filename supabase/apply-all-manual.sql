@@ -1,34 +1,562 @@
--- ============================================================================
--- Mim · 补齐脚本（供 Supabase Dashboard → SQL Editor 粘贴执行）
--- 生成时间：2026-10-24T12:12:13.693Z
+-- ==============================================================================
+-- Mim · 一键补齐脚本（供 Supabase Dashboard → SQL Editor 粘贴执行）
+-- 生成时间：2026-10-24T16:35:26.101Z
+-- 生成命令：npm run db:gen-manual（与本仓库 CI 迁移计划同源，顺序一致）
 --
--- 用途：无需数据库密码 / 无需本地 SUPABASE_DB_URL，直接在 Dashboard 补齐线上缺失内容。
+-- 用途：无需数据库密码 / 无需本地 SUPABASE_DB_URL，直接补齐线上缺失内容。
+-- 内容：0000_schema.sql → 0001_iam_phase1.sql → 0002_storage_media.sql → 0003_account_bridge.sql → 0004_post_rich_fields.sql → 0005_mall_catalog.sql → 9999_seed.sql
 --
--- 线上实测缺口（2026-10-24）：
---   ①  迁移 0001 未应用：roles / permissions / user_roles / role_permissions /
---      audit_logs / products / orders / live_rooms / devices 等 15 张表 → 全部 404
---   ②  迁移 0003 未应用：account_bridge 表 + username_taken/claim_username RPC
---      → RPC 报 PGRST202（函数不存在）
---   ③  seed.sql 未执行：topics / hot_searches 为空 → 前端只能显示内置演示热搜
---       （注：0002 存储桶大概率已应用，本脚本仍包含，幂等无害）
---
--- 影响：登录后权限判定报错（src/auth.tsx、src/lib/cloud-iam.ts 依赖 roles 系列表）；
---       跨端用户名查重失效（CloudBase 侧 fail-open，同名账号可两端重复注册）。
+-- 典型补齐项：
+--   ① 基线 20 张业务表（posts / profiles / articles / snippets / topics / hot_searches …）
+--   ② IAM 权限中心（roles / permissions / user_roles / role_permissions / audit_logs）
+--   ③ 商城目录（products 商品模型 + 五频道商品种子）
+--   ④ 对象存储私有桶 mim-media（迁移 0002）
+--   ⑤ 账号桥（account_bridge + username_taken / claim_username RPC，迁移 0003）
+--   ⑥ 演示数据（resources / topics / hot_searches，seed.sql）
 --
 -- 执行方式（二选一）：
---   ① Dashboard：SQL Editor → 粘贴本文件全部内容 → Run（推荐，无需密码）
---   ② 命令行：设置 SUPABASE_DB_URL（Session pooler 串）后 npm run db:apply
---      （该脚本只跑 migrations/*.sql，seed.sql 需单独执行）
+--   ① 推荐：Dashboard → SQL Editor → 粘贴本文件全部内容 → Run（无需密码）
+--   ② 命令行：设好 SUPABASE_DB_URL 后 npm run db:apply
 --
--- 安全性：全部为幂等 SQL（create table if not exists / drop policy if exists /
---   create or replace / on conflict do nothing），重复执行不报错、不清数据。
+-- 幂等：全部使用 create table if not exists / add column if not exists /
+--       insert ... on conflict do nothing，可重复执行，不会产生重复数据。
+-- ==============================================================================
+
+-- 迁移跟踪表（与 CI 共用：手工执行过的版本，CI 下次会自动跳过）
+create table if not exists public.schema_migrations (
+  version     text primary key,
+  applied_at  timestamptz not null default now()
+);
+
+-- ==============================================================================
+-- 基线结构
+-- ==============================================================================
+
+-- ============================================================================
+-- Mim · Supabase 数据库结构（轮 1 基建）
+-- 目标平台：supabase.com 国际版（火山引擎 Supabase 版同样兼容）
+-- 用法：Supabase Dashboard → SQL Editor → 粘贴全量执行
+-- 说明：
+--   · 不含演示 seed 数据（轮 4 接入读路径时再灌入）
+--   · 内容表主键为 text（default gen_random_uuid()::text），兼容应用层固定 id
+--   · likes/follows 用计数触发器维护父表冗余计数，likedByMe 由关联表推导
+--   · 私信采用双行模型（发送方/接收方各一行），经 send_message RPC 安全写入
 -- ============================================================================
 
+-- ---------- 1. profiles 用户档案（1:1 auth.users） ----------
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  name       text    not null,
+  emoji      text    not null default '🙂',
+  color      text    not null default '#ff8200',
+  bio        text    not null default '',
+  verified   boolean not null default false,
+  followers  int     not null default 0,
+  following  int     not null default 0,
+  created_at timestamptz not null default now()
+);
 
+-- ---------- 2. posts 动态 ----------
+create table if not exists public.posts (
+  id             text primary key default gen_random_uuid()::text,
+  author_id      uuid not null references auth.users(id) on delete cascade,
+  content        text not null,
+  images         text[] not null default '{}',
+  created_at     timestamptz not null default now(),
+  repost_of_id   text references public.posts(id) on delete set null,
+  repost_comment text not null default '',
+  reposts        int not null default 0,
+  topic          text,
+  source         text not null default '来自 网页版',
+  likes          int not null default 0
+);
 
--- ==========================================================================
--- 迁移：0001_iam_phase1.sql
--- ==========================================================================
+-- ---------- 3. post_comments 动态评论 ----------
+create table if not exists public.post_comments (
+  id         text primary key default gen_random_uuid()::text,
+  post_id    text not null references public.posts(id) on delete cascade,
+  author_id  uuid not null references auth.users(id) on delete cascade,
+  content    text not null,
+  created_at timestamptz not null default now(),
+  likes      int not null default 0
+);
+
+-- ---------- 4. articles 文章 ----------
+create table if not exists public.articles (
+  id         text primary key default gen_random_uuid()::text,
+  author_id  uuid not null references auth.users(id) on delete cascade,
+  title      text not null,
+  summary    text not null default '',
+  content    text not null,
+  tags       text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  views      int not null default 0,
+  likes      int not null default 0
+);
+
+-- ---------- 5. article_comments 文章评论 ----------
+create table if not exists public.article_comments (
+  id         text primary key default gen_random_uuid()::text,
+  article_id text not null references public.articles(id) on delete cascade,
+  author_id  uuid not null references auth.users(id) on delete cascade,
+  content    text not null,
+  created_at timestamptz not null default now()
+);
+
+-- ---------- 6. snippets 代码片段 ----------
+create table if not exists public.snippets (
+  id         text primary key default gen_random_uuid()::text,
+  author_id  uuid not null references auth.users(id) on delete cascade,
+  title      text not null,
+  language   text not null default 'text',
+  code       text not null,
+  created_at timestamptz not null default now(),
+  likes      int not null default 0
+);
+
+-- ---------- 7. 点赞关联表（likedByMe 推导源 + 计数触发器） ----------
+create table if not exists public.post_likes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  post_id    text not null references public.posts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, post_id)
+);
+
+create table if not exists public.comment_likes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  comment_id text not null references public.post_comments(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, comment_id)
+);
+
+create table if not exists public.article_likes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  article_id text not null references public.articles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, article_id)
+);
+
+create table if not exists public.snippet_likes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  snippet_id text not null references public.snippets(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, snippet_id)
+);
+
+-- ---------- 8. resources 资源库（演示世界观数据，写仅 service role） ----------
+create table if not exists public.resources (
+  id          text primary key default gen_random_uuid()::text,
+  title       text not null,
+  description text not null default '',
+  category    text not null default '通用',
+  uploader    text not null default '官方',
+  size        text not null default '0KB',
+  downloads   int not null default 0,
+  type        text not null default 'doc' check (type in ('pdf', 'video', 'code', 'doc'))
+);
+
+-- ---------- 9. topics 超话 / hot_searches 热搜（同上，写仅 service role） ----------
+create table if not exists public.topics (
+  id   text primary key default gen_random_uuid()::text,
+  name text not null unique,
+  heat int not null default 0,
+  "desc" text not null default ''
+);
+
+create table if not exists public.hot_searches (
+  id   text primary key default gen_random_uuid()::text,
+  rank int not null,
+  text text not null,
+  heat int not null default 0,
+  tag  text check (tag in ('热', '新', '爆', '沸'))
+);
+
+-- ---------- 10. notifications 通知（全私有） ----------
+create table if not exists public.notifications (
+  id           text primary key default gen_random_uuid()::text,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  type         text not null check (type in ('like', 'comment', 'repost', 'follow', 'mention')),
+  from_user_id uuid not null references auth.users(id) on delete cascade,
+  content      text not null default '',
+  post_id      text,
+  created_at   timestamptz not null default now(),
+  read         boolean not null default false
+);
+
+-- ---------- 11. messages 私信（双行模型：owner_id = 行所属用户） ----------
+create table if not exists public.messages (
+  id         text not null,
+  owner_id   uuid not null references auth.users(id) on delete cascade,
+  peer_id    uuid not null references auth.users(id) on delete cascade,
+  from_me    boolean not null,
+  content    text not null,
+  created_at timestamptz not null default now(),
+  read       boolean not null default false,
+  primary key (id, owner_id)
+);
+
+-- ---------- 12. favorites 收藏 ----------
+create table if not exists public.favorites (
+  id         text primary key default gen_random_uuid()::text,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  type       text not null check (type in ('post', 'article')),
+  target_id  text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, type, target_id)
+);
+
+-- ---------- 13. follows 关注关系 ----------
+create table if not exists public.follows (
+  follower_id uuid not null references auth.users(id) on delete cascade,
+  followee_id uuid not null references auth.users(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (follower_id, followee_id),
+  check (follower_id <> followee_id)
+);
+
+-- ---------- 14. 草稿箱（全私有） ----------
+create table if not exists public.post_drafts (
+  id         text primary key default gen_random_uuid()::text,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  content    text not null default '',
+  topic      text,
+  images     text[] not null default '{}',
+  saved_at   timestamptz not null default now()
+);
+
+create table if not exists public.article_drafts (
+  id       text primary key default gen_random_uuid()::text,
+  user_id  uuid not null references auth.users(id) on delete cascade,
+  title    text not null default '',
+  content  text not null default '',
+  tags     text[] not null default '{}',
+  saved_at timestamptz not null default now()
+);
+
+-- documents（轮 6）：通用键值文档层——工具台等本地状态整体迁移云端的通用存储。
+-- 每用户每 key 一行，data 为任意 jsonb 快照（各模块整存整取，无需按模块建表）。
+create table if not exists public.documents (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  key        text not null,
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, key)
+);
+
+-- ============================================================================
+-- 索引
+-- ============================================================================
+create index if not exists idx_posts_author_created    on public.posts (author_id, created_at desc);
+create index if not exists idx_posts_created           on public.posts (created_at desc);
+create index if not exists idx_posts_topic             on public.posts (topic) where topic is not null;
+create index if not exists idx_post_comments_post      on public.post_comments (post_id, created_at);
+create index if not exists idx_articles_author_created on public.articles (author_id, created_at desc);
+create index if not exists idx_articles_created        on public.articles (created_at desc);
+create index if not exists idx_article_comments_article on public.article_comments (article_id, created_at);
+create index if not exists idx_snippets_author         on public.snippets (author_id, created_at desc);
+create index if not exists idx_notifications_user      on public.notifications (user_id, created_at desc);
+create index if not exists idx_messages_owner_peer     on public.messages (owner_id, peer_id, created_at);
+create index if not exists idx_favorites_user          on public.favorites (user_id);
+create index if not exists idx_follows_followee        on public.follows (followee_id);
+
+-- ============================================================================
+-- 触发器：注册自动建档（auth.users → profiles）
+-- ============================================================================
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  emojis text[] := array['😀','😎','🦊','🐼','🐙','🦉','🐳','🦖','🐧','🐱'];
+  colors text[] := array['#ff8200','#409eff','#8bc34a','#e91e63','#795548','#00bcd4','#673ab7','#ff5722'];
+begin
+  insert into public.profiles (id, name, emoji, color, bio)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'name', '新用户'),
+    emojis[1 + floor(random() * 10)::int],
+    colors[1 + floor(random() * 8)::int],
+    ''
+  );
+  return null;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ============================================================================
+-- 触发器：点赞 / 关注计数维护
+-- ============================================================================
+create or replace function public.bump_post_likes()
+returns trigger language plpgsql security definer
+set search_path = public
+as $$
+begin
+  if (tg_op = 'INSERT') then
+    update public.posts set likes = likes + 1 where id = new.post_id;
+  elsif (tg_op = 'DELETE') then
+    update public.posts set likes = greatest(0, likes - 1) where id = old.post_id;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists post_likes_count on public.post_likes;
+create trigger post_likes_count
+  after insert or delete on public.post_likes
+  for each row execute function public.bump_post_likes();
+
+create or replace function public.bump_comment_likes()
+returns trigger language plpgsql security definer
+set search_path = public
+as $$
+begin
+  if (tg_op = 'INSERT') then
+    update public.post_comments set likes = likes + 1 where id = new.comment_id;
+  elsif (tg_op = 'DELETE') then
+    update public.post_comments set likes = greatest(0, likes - 1) where id = old.comment_id;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists comment_likes_count on public.comment_likes;
+create trigger comment_likes_count
+  after insert or delete on public.comment_likes
+  for each row execute function public.bump_comment_likes();
+
+create or replace function public.bump_article_likes()
+returns trigger language plpgsql security definer
+set search_path = public
+as $$
+begin
+  if (tg_op = 'INSERT') then
+    update public.articles set likes = likes + 1 where id = new.article_id;
+  elsif (tg_op = 'DELETE') then
+    update public.articles set likes = greatest(0, likes - 1) where id = old.article_id;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists article_likes_count on public.article_likes;
+create trigger article_likes_count
+  after insert or delete on public.article_likes
+  for each row execute function public.bump_article_likes();
+
+create or replace function public.bump_snippet_likes()
+returns trigger language plpgsql security definer
+set search_path = public
+as $$
+begin
+  if (tg_op = 'INSERT') then
+    update public.snippets set likes = likes + 1 where id = new.snippet_id;
+  elsif (tg_op = 'DELETE') then
+    update public.snippets set likes = greatest(0, likes - 1) where id = old.snippet_id;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists snippet_likes_count on public.snippet_likes;
+create trigger snippet_likes_count
+  after insert or delete on public.snippet_likes
+  for each row execute function public.bump_snippet_likes();
+
+create or replace function public.bump_follow_counts()
+returns trigger language plpgsql security definer
+set search_path = public
+as $$
+begin
+  if (tg_op = 'INSERT') then
+    update public.profiles set following = following + 1 where id = new.follower_id;
+    update public.profiles set followers = followers + 1 where id = new.followee_id;
+  elsif (tg_op = 'DELETE') then
+    update public.profiles set following = greatest(0, following - 1) where id = old.follower_id;
+    update public.profiles set followers = greatest(0, followers - 1) where id = old.followee_id;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists follows_count on public.follows;
+create trigger follows_count
+  after insert or delete on public.follows
+  for each row execute function public.bump_follow_counts();
+
+-- ============================================================================
+-- RPC：私信写入（security definer，一次写双方两行）
+-- ============================================================================
+create or replace function public.send_message(p_peer uuid, p_content text)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  me     uuid := auth.uid();
+  msg_id text := 'm' || replace(gen_random_uuid()::text, '-', '');
+begin
+  if me is null or me = p_peer or coalesce(trim(p_content), '') = '' then
+    raise exception 'invalid message';
+  end if;
+  insert into public.messages (id, owner_id, peer_id, from_me, content, read)
+  values (msg_id, me, p_peer, true, p_content, true);
+  insert into public.messages (id, owner_id, peer_id, from_me, content, read)
+  values (msg_id, p_peer, me, false, p_content, false);
+end $$;
+
+-- ============================================================================
+-- RPC：文章阅读数自增（匿名可调，绕过 update 权限）
+-- ============================================================================
+create or replace function public.bump_article_views(p_id text)
+returns int
+language sql security definer
+set search_path = public
+as $$
+  update public.articles set views = views + 1 where id = p_id returning views;
+$$;
+
+-- ============================================================================
+-- RLS：全表启用行级安全（静态托管无服务端，安全完全由 RLS 承担）
+-- ============================================================================
+alter table public.profiles         enable row level security;
+alter table public.posts            enable row level security;
+alter table public.post_comments    enable row level security;
+alter table public.post_likes       enable row level security;
+alter table public.comment_likes    enable row level security;
+alter table public.article_likes    enable row level security;
+alter table public.snippet_likes    enable row level security;
+alter table public.articles         enable row level security;
+alter table public.article_comments enable row level security;
+alter table public.snippets         enable row level security;
+alter table public.resources        enable row level security;
+alter table public.topics           enable row level security;
+alter table public.hot_searches     enable row level security;
+alter table public.notifications    enable row level security;
+alter table public.messages         enable row level security;
+alter table public.favorites        enable row level security;
+alter table public.follows          enable row level security;
+alter table public.post_drafts      enable row level security;
+alter table public.article_drafts   enable row level security;
+alter table public.documents        enable row level security;
+
+-- ---------- profiles：公开读，本人改 ----------
+drop policy if exists profiles_select on public.profiles;
+create policy profiles_select on public.profiles for select using (true);
+
+drop policy if exists profiles_update on public.profiles;
+create policy profiles_update on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- ---------- 内容表：公开读，本人写 ----------
+drop policy if exists posts_select on public.posts;
+create policy posts_select on public.posts for select using (true);
+drop policy if exists posts_insert on public.posts;
+create policy posts_insert on public.posts for insert with check (author_id = auth.uid());
+drop policy if exists posts_update on public.posts;
+create policy posts_update on public.posts for update using (author_id = auth.uid()) with check (author_id = auth.uid());
+drop policy if exists posts_delete on public.posts;
+create policy posts_delete on public.posts for delete using (author_id = auth.uid());
+
+drop policy if exists articles_select on public.articles;
+create policy articles_select on public.articles for select using (true);
+drop policy if exists articles_insert on public.articles;
+create policy articles_insert on public.articles for insert with check (author_id = auth.uid());
+drop policy if exists articles_update on public.articles;
+create policy articles_update on public.articles for update using (author_id = auth.uid()) with check (author_id = auth.uid());
+drop policy if exists articles_delete on public.articles;
+create policy articles_delete on public.articles for delete using (author_id = auth.uid());
+
+drop policy if exists snippets_select on public.snippets;
+create policy snippets_select on public.snippets for select using (true);
+drop policy if exists snippets_insert on public.snippets;
+create policy snippets_insert on public.snippets for insert with check (author_id = auth.uid());
+drop policy if exists snippets_update on public.snippets;
+create policy snippets_update on public.snippets for update using (author_id = auth.uid()) with check (author_id = auth.uid());
+drop policy if exists snippets_delete on public.snippets;
+create policy snippets_delete on public.snippets for delete using (author_id = auth.uid());
+
+-- ---------- 评论：公开读，本人写 ----------
+drop policy if exists post_comments_select on public.post_comments;
+create policy post_comments_select on public.post_comments for select using (true);
+drop policy if exists post_comments_insert on public.post_comments;
+create policy post_comments_insert on public.post_comments for insert with check (author_id = auth.uid());
+drop policy if exists post_comments_delete on public.post_comments;
+create policy post_comments_delete on public.post_comments for delete using (author_id = auth.uid());
+
+drop policy if exists article_comments_select on public.article_comments;
+create policy article_comments_select on public.article_comments for select using (true);
+drop policy if exists article_comments_insert on public.article_comments;
+create policy article_comments_insert on public.article_comments for insert with check (author_id = auth.uid());
+drop policy if exists article_comments_delete on public.article_comments;
+create policy article_comments_delete on public.article_comments for delete using (author_id = auth.uid());
+
+-- ---------- 点赞 / 收藏 / 关注：仅本人操作 ----------
+drop policy if exists post_likes_all on public.post_likes;
+create policy post_likes_all on public.post_likes for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists comment_likes_all on public.comment_likes;
+create policy comment_likes_all on public.comment_likes for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists article_likes_all on public.article_likes;
+create policy article_likes_all on public.article_likes for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists snippet_likes_all on public.snippet_likes;
+create policy snippet_likes_all on public.snippet_likes for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists favorites_all on public.favorites;
+create policy favorites_all on public.favorites for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists follows_all on public.follows;
+create policy follows_all on public.follows for all using (follower_id = auth.uid()) with check (follower_id = auth.uid());
+
+-- ---------- 通知：仅接收者读 / 标记，写入限发起者（from_user_id = auth.uid()） ----------
+drop policy if exists notifications_select on public.notifications;
+create policy notifications_select on public.notifications for select using (user_id = auth.uid());
+drop policy if exists notifications_insert on public.notifications;
+create policy notifications_insert on public.notifications for insert with check (from_user_id = auth.uid());
+drop policy if exists notifications_update on public.notifications;
+create policy notifications_update on public.notifications for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists notifications_delete on public.notifications;
+create policy notifications_delete on public.notifications for delete using (user_id = auth.uid());
+
+-- ---------- 私信：仅 owner 读写（跨用户写入走 send_message RPC） ----------
+drop policy if exists messages_select on public.messages;
+create policy messages_select on public.messages for select using (owner_id = auth.uid());
+drop policy if exists messages_update on public.messages;
+create policy messages_update on public.messages for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+drop policy if exists messages_delete on public.messages;
+create policy messages_delete on public.messages for delete using (owner_id = auth.uid());
+
+-- ---------- 草稿：全私有 ----------
+drop policy if exists post_drafts_all on public.post_drafts;
+create policy post_drafts_all on public.post_drafts for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists article_drafts_all on public.article_drafts;
+create policy article_drafts_all on public.article_drafts for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------- documents（轮 6）：全私有（通用键值文档层） ----------
+drop policy if exists documents_all on public.documents;
+create policy documents_all on public.documents for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------- resources / topics / hot_searches：公开读，写入仅 service role（不建写策略） ----------
+drop policy if exists resources_select on public.resources;
+create policy resources_select on public.resources for select using (true);
+drop policy if exists topics_select on public.topics;
+create policy topics_select on public.topics for select using (true);
+drop policy if exists hot_searches_select on public.hot_searches;
+create policy hot_searches_select on public.hot_searches for select using (true);
+
+-- ============================================================================
+-- Realtime（轮 5）：把 messages 表加入 supabase_realtime publication，
+-- 使 RLS 过滤后的 INSERT 事件可推送给登录客户端（私信实时收发）。
+-- 幂等：已存在则跳过，可重复执行。
+-- ============================================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+end $$;
+
+-- ==============================================================================
+-- 迁移 0001_iam_phase1.sql
+-- ==============================================================================
+
 -- ============================================================================
 -- Mim · Phase1 迁移 0001：IAM 账号权限中心（L1）+ L2/L3/L4 schema 骨架
 -- 依据《全栈全平台项目 Phase1 团队配置方案》4.2：
@@ -452,10 +980,10 @@ create policy device_telemetry_read on public.device_telemetry for select to aut
                where b.device_id = device_id and b.user_id = auth.uid() and b.unbound_at is null)
   );
 
+-- ==============================================================================
+-- 迁移 0002_storage_media.sql
+-- ==============================================================================
 
--- ==========================================================================
--- 迁移：0002_storage_media.sql
--- ==========================================================================
 -- ============================================================================
 -- Mim · Phase1 迁移 0002：对象存储（私有桶 mim-media + RLS 前缀隔离）
 -- 目标平台：supabase.com 国际版
@@ -512,10 +1040,10 @@ create policy mim_media_own_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'mim-media' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- ==============================================================================
+-- 迁移 0003_account_bridge.sql
+-- ==============================================================================
 
--- ==========================================================================
--- 迁移：0003_account_bridge.sql
--- ==========================================================================
 -- ============================================================================
 -- Mim · Phase1 迁移 0003：CloudBase ↔ Supabase 账号桥（account bridge）
 -- 目标平台：supabase.com 国际版
@@ -631,10 +1159,110 @@ end $$;
 revoke all on function public.claim_username(text, text, text, text) from public;
 grant execute on function public.claim_username(text, text, text, text) to anon, authenticated;
 
+-- ==============================================================================
+-- 迁移 0004_post_rich_fields.sql
+-- ==============================================================================
 
--- ==========================================================================
--- 演示数据：seed.sql（补齐 topics / hot_searches 空表）
--- ==========================================================================
+-- ============================================================================
+-- Mim · 迁移 0004：posts 富媒体 / 互动扩展字段
+-- 目的：前端本地已支持「视频/GIF、投票、抽奖、定位、仅自己可见、24h 快拍、置顶」
+--       等富帖能力，但云端 posts 表此前缺列，导致登录后拉取的云端帖子被静默降级为纯文本。
+--       本迁移补齐列，使富帖能力可正常上云 / 回拉。
+-- 幂等：全部使用 add column if not exists / add constraint if not exists。
+-- ============================================================================
+
+alter table if exists public.posts
+  add column if not exists media      jsonb,
+  add column if not exists vote       jsonb,
+  add column if not exists lottery    jsonb,
+  add column if not exists location   text,
+  add column if not exists story      boolean not null default false,
+  add column if not exists visibility text    not null default 'public',
+  add column if not exists expires_at timestamptz,
+  add column if not exists pinned     boolean not null default false;
+
+-- visibility 取值约束（与前端 Post.visibility 对齐）
+alter table if exists public.posts
+  add constraint if not exists posts_visibility_check
+  check (visibility in ('public', 'self'));
+
+-- ==============================================================================
+-- 迁移 0005_mall_catalog.sql
+-- ==============================================================================
+
+-- ============================================================================
+-- Mim · 迁移 0005：商城目录（products 商品模型扩展 + 五频道商品种子）
+--
+-- 背景（前后端数据模型断点）：
+--   前端 src/mall/store.tsx 的 MallGoods = { id, channel, emoji, title, price,
+--   origPrice?, desc }，五个频道（youxuan / gexm / mix / live / laal）；
+--   而 0001 建的 public.products 仅有 (id, title, price_cents, currency,
+--   status, created_at) 六个字段，缺 channel / emoji / description / 原价，
+--   导致商城在云端模式下无法承载任何商品（MALL_GOODS 恒为 [] → 商城为空态，
+--   前端只能显示「发布自己的商品」引导）。
+--
+-- 本迁移补齐商品模型字段，并灌入五频道种子数据，使商城端到端可用。
+--
+-- 幂等：全部 add column if not exists / add constraint if not exists /
+--       insert ... on conflict (id) do nothing，可重复执行。
+-- ============================================================================
+
+-- ---------- 1. 商品模型字段扩展 ----------
+
+alter table if exists public.products
+  add column if not exists channel              text not null default 'youxuan',
+  add column if not exists emoji                text not null default '📦',
+  add column if not exists description          text,
+  add column if not exists original_price_cents int,
+  add column if not exists stock                int  not null default 0,
+  add column if not exists sales                int  not null default 0,
+  add column if not exists sort                 int  not null default 0;
+
+-- 频道取值约束（与前端 MallChannel 联合类型对齐；
+-- 0001 建表后从未写入数据，故历史行不会违反该约束）
+alter table if exists public.products
+  add constraint if not exists products_channel_check
+  check (channel in ('youxuan', 'gexm', 'mix', 'live', 'laal'));
+
+-- 频道 + 上架状态联合索引：商城按频道筛选商品的主查询路径
+create index if not exists products_channel_status_idx
+  on public.products (channel, status, sort);
+
+-- ---------- 2. 五频道商品种子（15 件，与前端演示商品一致） ----------
+-- price_cents / original_price_cents 以「分」为单位（前端 price 为「元」）。
+-- 全部 status='active'，使 0001 的 products_select 策略对匿名用户放行可读。
+
+insert into public.products
+  (id, title, price_cents, original_price_cents, currency, channel, emoji, description, status, stock, sales, sort)
+values
+  ('y1', '无线蓝牙耳机',   12900, null,  'CNY', 'youxuan', '🎧', '半入耳式 长续航',                 'active', 200, 3120, 1),
+  ('y2', '电动牙刷',        8900, null,  'CNY', 'youxuan', '🪥', '声波震动 三档模式',               'active', 150, 2080, 2),
+  ('y3', '保温杯',          4900, null,  'CNY', 'youxuan', '🥤', '316不锈钢 24h保温',               'active', 300, 1560, 3),
+  ('y4', '桌面加湿器',      6900, null,  'CNY', 'youxuan', '💧', '静音大雾量 定时断电',             'active', 180,  940, 4),
+
+  ('g1', '智能手环',        9900, 19900, 'CNY', 'gexm',    '⌚', '心率血氧 运动记录',               'active', 100, 4210, 1),
+  ('g2', '便携榨汁杯',      5900, 12900, 'CNY', 'gexm',    '🥝', 'USB充电 六叶刀头',                'active', 120, 1870, 2),
+  ('g3', '电竞鼠标',        7900, 15900, 'CNY', 'gexm',    '🖱️', '16000DPI RGB灯效',               'active',  80, 1330, 3),
+
+  ('m1', '双人火锅套餐',   16800, null,  'CNY', 'mix',     '🍲', '招牌锅底 三荤三素',               'active',  50,  760, 1),
+  ('m2', '精品洗车券',      3900, null,  'CNY', 'mix',     '🚿', '内外清洗 免费吸尘',               'active', 500, 2240, 2),
+  ('m3', '影院通票',        4500, null,  'CNY', 'mix',     '🎬', '全国通用 有效期90天',             'active', 400, 1690, 3),
+
+  ('l1', '唇釉礼盒',        9900, null,  'CNY', 'live',    '💄', '直播间专供 五色装',               'active',  90, 2510, 1),
+  ('l2', '零食大礼包',      6800, null,  'CNY', 'live',    '🍫', '30包混装 追剧必备',               'active', 260, 3450, 2),
+  ('l3', '露营折叠椅',     11800, null,  'CNY', 'live',    '🏕️', '铝合金骨架 承重120kg',           'active',  70,  610, 3),
+
+  ('a1', '机场接送券',     12800, null,  'CNY', 'laal',    '🛫', '24h预约 全城可达',               'active', 300, 1180, 1),
+  ('a2', '代驾畅行卡',      9800, null,  'CNY', 'laal',    '🚗', '10次抵扣 全国可用',               'active', 250, 2040, 2)
+on conflict (id) do nothing;
+
+-- ---------- 3. 校验输出（供 CI 迁移日志核对） ----------
+-- select channel, count(*) from public.products where status='active' group by channel order by channel;
+
+-- ==============================================================================
+-- 演示数据
+-- ==============================================================================
+
 -- ============================================================
 -- Mim 演示数据 seed（轮 4）
 --
@@ -694,13 +1322,23 @@ insert into public.hot_searches (id, "rank", text, heat, tag) values
   ('h15', 15, '新一批国产游戏获批版号',          765430, '新')
 on conflict (id) do nothing;
 
--- ============================================================================
--- 执行后自检（另起一段单独执行），四条均应有返回且不报错：
---   select count(*) from public.roles;            -- 应 > 0（种子角色）
---   select count(*) from public.topics;           -- 应 = 10
---   select count(*) from public.hot_searches;     -- 应 = 15
---   select public.username_taken('probe_name');   -- 应 true/false，不再报 PGRST202
--- 等价的 HTTP 复验：
---   curl "<SUPABASE_URL>/rest/v1/roles?select=*&limit=1" -H "apikey: <ANON_KEY>"
---   → 应由 404 变为 200
--- ============================================================================
+-- ==============================================================================
+-- 记录已应用版本（使 CI 后续自动跳过，避免重复执行）
+-- ==============================================================================
+
+insert into public.schema_migrations (version) values ('0000_schema.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0001_iam_phase1.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0002_storage_media.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0003_account_bridge.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0004_post_rich_fields.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0005_mall_catalog.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('9999_seed.sql') on conflict (version) do nothing;
+
+-- ==============================================================================
+-- 执行后自检（四条均应有返回且不报错）：
+--   select count(*) from public.roles;                                    -- 应 > 0
+--   select count(*) from public.products where status = 'active';         -- 应 = 15
+--   select count(*) from public.topics;                                   -- 应 = 10
+--   select count(*) from public.hot_searches;                             -- 应 = 15
+--   select public.username_taken('probe_name');                           -- 应 true/false，不再报 PGRST202
+-- ==============================================================================

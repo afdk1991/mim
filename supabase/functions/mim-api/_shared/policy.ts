@@ -47,7 +47,10 @@ export const OWNER_COL: Record<string, string> = {
   article_likes: 'user_id',
   snippet_likes: 'user_id',
   user_roles: 'user_id',
+  follows: 'follower_id',
 }
+/** 禁止客户端通过代理写入的表（权限/角色由服务端逻辑授予，防越权自写） */
+export const NO_CLIENT_WRITE = new Set(['user_roles'])
 /** 内容表 → 作者列名（写时强制，改删时按此过滤） */
 export const AUTHOR_COL: Record<string, string> = {
   posts: 'author_id',

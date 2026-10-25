@@ -10,8 +10,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "verify:manju": "node scripts/verify-openverse.mjs",
+    "verify:feed": "node scripts/verify-feed-growth.mjs",
     "db:apply": "node scripts/apply-migration.mjs",
     "db:apply:remote": "node scripts/apply-migration-remote.mjs",
+    "db:gen-manual": "node scripts/gen-apply-all.mjs",
     "sync:accounts": "node scripts/sync-accounts.mjs",
     "purge:test-users": "node scripts/purge-test-users.mjs"
   },

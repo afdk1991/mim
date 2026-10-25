@@ -3,14 +3,17 @@
 import { useState } from 'react'
 import { Empty, useToast } from '../components'
 import { useRouter } from '../router'
-import { MALL_CHANNEL_META, MALL_GOODS, useMall } from './store'
+import { MALL_CHANNEL_META, useMall, useMallGoods } from './store'
 
 export function MallGoodsPage({ id }: { id: string }) {
   const toast = useToast()
   const { navigate } = useRouter()
   const { addToCart } = useMall()
   const [qty, setQty] = useState(1)
-  const g = MALL_GOODS.find((x) => x.id === id)
+  /* 商品目录与商城中心同源：云端优先 + 演示兜底，保证详情页可直接打开 */
+  const { goods, loading } = useMallGoods()
+  const g = goods.find((x) => x.id === id)
+  if (loading) return <Empty text="正在加载商品…" />
   if (!g) return <Empty text="商品不存在" />
   const meta = MALL_CHANNEL_META[g.channel]
 

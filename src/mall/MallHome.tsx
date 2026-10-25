@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { Empty } from '../components'
 import { cx } from '../utils'
-import { MALL_CHANNEL_META, MALL_GOODS, useMall } from './store'
+import { MALL_CHANNEL_META, useMall, useMallGoods } from './store'
 import type { MallChannel } from './store'
 
 type Cat = MallChannel | 'all'
@@ -12,6 +12,8 @@ type Cat = MallChannel | 'all'
 export function MallHomePage({ initial }: { initial?: MallChannel }) {
   const { state } = useMall()
   const [cat, setCat] = useState<Cat>(initial ?? 'all')
+  /* 商品目录：云端 products 优先，云端不可用/为空时由 useMallGoods 兜底演示商品 */
+  const { goods: allGoods, loading: goodsLoading } = useMallGoods()
 
   /* 频道直达同步：#/mall/<channel> 由 App.tsx（case 'mall'）以 initial prop 传入。
      useState 的初始值只在组件「首次挂载」时生效，而 hash 路由切换时 React 会复用
@@ -22,7 +24,7 @@ export function MallHomePage({ initial }: { initial?: MallChannel }) {
     setCat(initial ?? 'all')
   }, [initial])
 
-  const goods = cat === 'all' ? MALL_GOODS : MALL_GOODS.filter((g) => g.channel === cat)
+  const goods = cat === 'all' ? allGoods : allGoods.filter((g) => g.channel === cat)
   const cartCount = state.cart.reduce((n, c) => n + c.qty, 0)
 
   return (
@@ -61,9 +63,12 @@ export function MallHomePage({ initial }: { initial?: MallChannel }) {
           ))}
         </div>
 
-        {/* 云端真实模式下商品库为空：空态 + 「发布自己的商品」引导（商城暂无独立发布流程，仅作文案引导） */}
-        {goods.length === 0 ? (
-          <Empty text={MALL_GOODS.length === 0 ? '商城暂无商品，欢迎发布自己的商品' : '该频道暂无商品'} />
+        {/* 首次进入时短暂展示加载态；商品目录恒有内容（云端真实商品或演示商品兜底），
+            仅当所选频道确实无商品时才走空态 */}
+        {goodsLoading ? (
+          <Empty text="正在加载商品…" />
+        ) : goods.length === 0 ? (
+          <Empty text="该频道暂无商品" />
         ) : (
           <div className="mall-grid">
             {goods.map((g) => (

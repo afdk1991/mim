@@ -6,11 +6,11 @@ import { cx, uid } from './utils';
 import { pullToolStateMeta, pushToolStateThrottled } from './lib/tool-cloud';
 import { detectMediaKind, usePlayer, usePlayerControl, type MediaTrack } from './player';
 import {
-  fetchWithTimeout,
+  classifyDiscError,
   licenseLabel,
-  OvRateLimitError,
-  searchCommons,
-  searchOpenverse,
+  searchCommonsCached,
+  searchOpenverseCached,
+  UNKNOWN_LICENSE,
   type FetchLike,
   type OvMedia,
 } from './lib/openverse';
@@ -121,6 +121,10 @@ const EXT_SEED: MjExtItem[] = [
   { id: 'x_a13', title: 'Caminandes 3：Llama Drama（2016）', cat: 'ai', cover: '🦙', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '羊驼喜剧三部曲终章 · 全片约 3 分钟', homeUrl: 'https://studio.blender.org/films/caminandes-3-llama-drama/', license: 'CC-BY' },
   { id: 'x_a14', title: 'Napkin Films · AI 导演动画合集', cat: 'ai', cover: '🤖', source: 'Napkin Films · CC-BY 4.0 署名', episodesText: '代码生成的 AI 导演动画短片（73 部）', homeUrl: 'https://joshuaayson.com/films/', license: 'CC-BY' },
   { id: 'x_a15', title: 'Cyberpunk Rainy Street（Hailuo AI）', cat: 'ai', cover: '🌃', source: 'Wikimedia Commons · CC0 公共领域', episodesText: 'AI 文生视频短片 · 来源站可看', homeUrl: 'https://commons.wikimedia.org/wiki/File:Cyberpunk_Rainy_Street_(Hailuo_AI).webm', license: 'CC0' },
+  /* 音频种子（公有领域音乐，直链走 Wikimedia Commons Special:FilePath 稳定重定向，可在站内真实播放） */
+  { id: 'x_m1', title: '巴赫：D 小调托卡塔与赋格 BWV 565', cat: 'ai', cover: '🎵', source: 'Wikimedia Commons · 公版 Public Domain', episodesText: '巴洛克管风琴名曲 · 音频直链可播', audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Johann_Sebastian_Bach_-_Toccata_and_Fugue_in_D_minor,_BWV_565.ogg', license: '公版 PD' },
+  { id: 'x_m2', title: '贝多芬：第五交响曲第一乐章', cat: 'ai', cover: '🎼', source: 'Wikimedia Commons · 公版 Public Domain', episodesText: '命运交响曲 · 音频直链可播', audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Beethoven_Symphony_No._5_in_C_minor,_Op._67_-_I._Allegro_con_brio.ogg', license: '公版 PD' },
+  { id: 'x_m3', title: '斯科特·乔普林：艺人 The Entertainer', cat: 'ai', cover: '🎹', source: 'Wikimedia Commons · 公版 Public Domain', episodesText: '拉格泰姆钢琴名曲 · 音频直链可播', audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Scott_Joplin_-_The_Entertainer.ogg', license: '公版 PD' },
 ];
 
 /* ================= 在线发现：Openverse CC 授权视频/音频检索 ================= */
@@ -154,7 +158,7 @@ export function mapOpenverseItem(r: unknown, media: OvMedia = 'videos'): MjExtIt
     ...(kindOk ? (audio ? { audioUrl: directUrl } : { videoUrl: directUrl }) : {}),
     ...(thumb ? { thumb } : {}),
     ...(homeUrl ? { homeUrl } : {}),
-    license: licenseLabel(o.license, o.license_version),
+    license: licenseLabel(o.license, o.license_version) || UNKNOWN_LICENSE,
     custom: true,
   };
 }
@@ -193,7 +197,7 @@ export function mapCommonsPage(p: unknown): MjExtItem | null {
     ...(isVideo ? { videoUrl: url } : {}),
     ...(thumb ? { thumb } : {}),
     ...(homeUrl ? { homeUrl } : {}),
-    license: extmetaValue(em.LicenseShortName) || 'CC/PD',
+    license: extmetaValue(em.LicenseShortName) || UNKNOWN_LICENSE,
     custom: true,
   };
 }
@@ -203,11 +207,13 @@ export interface DiscoverResult {
   page: number;
   pageCount: number;
   resultCount: number;
+  /** Commons 等不返回总量的来源用 hasMore 判断是否可继续翻页 */
+  hasMore?: boolean;
 }
 
 /**
  * Openverse 检索（优先 mim-api 代理，本地模式回退直连）。
- * fetchFn 可注入以便测试；proxyBase 传 '' 强制直连。429 抛 OvRateLimitError。
+ * fetchFn 可注入以便测试；proxyBase 传 '' 强制直连。错误按 OvError 细分（rate_limit/network/upstream/parse）。
  */
 export async function discoverOpenverse(
   q: string,
@@ -215,7 +221,7 @@ export async function discoverOpenverse(
   opts: { media?: OvMedia; page?: number; proxyBase?: string } = {},
 ): Promise<DiscoverResult> {
   const media = opts.media ?? 'videos';
-  const r = await searchOpenverse(q, {
+  const r = await searchOpenverseCached(q, {
     media,
     page: opts.page,
     fetchFn,
@@ -226,25 +232,25 @@ export async function discoverOpenverse(
     const it = mapOpenverseItem(raw, media);
     if (it) items.push(it);
   }
-  return { items, page: r.page, pageCount: r.pageCount, resultCount: r.resultCount };
+  return { items, page: r.page, pageCount: r.pageCount, resultCount: r.resultCount, hasMore: r.hasMore };
 }
 
-/** Wikimedia Commons 视频检索（AI 生成短片等开放授权内容，CORS 友好直连） */
+/** Wikimedia Commons 视频检索（AI 生成短片等开放授权内容，CORS 友好直连，支持 gsroffset 翻页） */
 export async function discoverCommons(
   q: string,
   fetchFn?: FetchLike,
-  opts: { proxyBase?: string } = {},
+  opts: { proxyBase?: string; offset?: number } = {},
 ): Promise<DiscoverResult> {
-  const r = await searchCommons(q, {
+  const r = await searchCommonsCached(q, {
     fetchFn,
-    ...(opts.proxyBase !== undefined ? { proxyBase: opts.proxyBase } : {}),
+    offset: opts.offset,
   });
   const items: MjExtItem[] = [];
   for (const raw of r.results) {
     const it = mapCommonsPage(raw);
     if (it) items.push(it);
   }
-  return { items, page: 1, pageCount: 1, resultCount: r.resultCount };
+  return { items, page: 1, pageCount: 1, resultCount: r.resultCount, hasMore: r.hasMore };
 }
 
 /* ================= 与全站统一播放器对接 ================= */
@@ -627,11 +633,12 @@ function PdListView(props: {
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [resultCount, setResultCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [hist, setHist] = useState<string[]>(loadHist);
 
   const presets = DISC_SOURCES.find((s) => s.key === src)?.presets ?? [];
 
-  /* 在线发现：防重入（Enter 与按钮双入口）+ 分页追加 + 429 专属文案 */
+  /* 在线发现：防重入（Enter 与按钮双入口）+ 分页追加 + 错误细分文案 */
   const runDiscover = async (opts?: { append?: boolean; q?: string }) => {
     if (loading) return;
     const append = opts?.append ?? false;
@@ -642,27 +649,28 @@ function PdListView(props: {
     try {
       const r =
         src === 'commons'
-          ? await discoverCommons(q)
+          ? await discoverCommons(q, undefined, { offset: append ? page * 12 : 0 })
           : await discoverOpenverse(q, undefined, {
               media: src === 'ov-audio' ? 'audio' : 'videos',
               page: nextPage,
             });
       if (r.items.length === 0 && !append) setDiscErr('未找到开放授权内容，换个关键词试试。');
       setDisc((prev) => (append ? [...prev, ...r.items] : r.items));
-      setPage(r.page);
+      // Commons 上游永远回 page=1（用 gsroffset 翻页），故分页序号本地维护；
+      // Openverse 直接采用上游 page。
+      if (src === 'commons') setPage(append ? page + 1 : 1);
+      else setPage(r.page);
       setPageCount(r.pageCount);
       setResultCount(r.resultCount);
+      setHasMore(!!r.hasMore);
       if (!append) {
         const next = [q, ...hist.filter((h) => h !== q)].slice(0, HIST_MAX);
         setHist(next);
         saveHist(next);
       }
     } catch (e) {
-      if (e instanceof OvRateLimitError) {
-        setDiscErr('检索太频繁（开放 API 限流），请稍后再试；也可手动添加片源。');
-      } else {
-        setDiscErr('在线发现暂不可用（网络或跨域限制），可稍后重试，或手动添加片源。');
-      }
+      const info = classifyDiscError(e);
+      setDiscErr(info.message);
     } finally {
       setLoading(false);
     }
@@ -773,7 +781,9 @@ function PdListView(props: {
         {disc.length > 0 && (
           <>
             <div className="muted manju-discover-meta">
-              共约 {resultCount} 条结果{pageCount > 1 ? ` · 第 ${page}/${pageCount} 页` : ''}
+              {src === 'commons'
+                ? `实时检索 · 第 ${page} 页${hasMore ? '（还有更多）' : ''}`
+                : `共约 ${resultCount} 条结果${pageCount > 1 ? ` · 第 ${page}/${pageCount} 页` : ''}`}
             </div>
             <div className="manju-discover-list">
               {disc.map((it) => {
@@ -806,15 +816,25 @@ function PdListView(props: {
                 );
               })}
             </div>
-            {pageCount > 1 && (
-              <button
-                className="btn btn-ghost manju-discover-more"
-                disabled={loading || page >= pageCount}
-                onClick={() => void runDiscover({ append: true })}
-              >
-                {loading ? '加载中…' : page >= pageCount ? '已到最后一页' : '加载更多'}
-              </button>
-            )}
+            {src === 'commons'
+              ? hasMore && (
+                  <button
+                    className="btn btn-ghost manju-discover-more"
+                    disabled={loading}
+                    onClick={() => void runDiscover({ append: true })}
+                  >
+                    {loading ? '加载中…' : '加载更多'}
+                  </button>
+                )
+              : pageCount > 1 && (
+                  <button
+                    className="btn btn-ghost manju-discover-more"
+                    disabled={loading || page >= pageCount}
+                    onClick={() => void runDiscover({ append: true })}
+                  >
+                    {loading ? '加载中…' : page >= pageCount ? '已到最后一页' : '加载更多'}
+                  </button>
+                )}
           </>
         )}
       </div>

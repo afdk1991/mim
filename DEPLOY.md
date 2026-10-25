@@ -1,4 +1,4 @@
-# Mim 部署指南（GitHub Pages / GitHub Packages / EdgeOne Pages / Supabase）
+# Mim 部署指南（GitHub Pages / GitHub Packages / EdgeOne Makers / Supabase）
 
 本项目已配置一条完整的 CI/CD 流水线：[.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml)。
 
@@ -183,7 +183,7 @@ Supabase：GoTrue `auth.users`，uuid，bcrypt）。**账号桥**把两者在用
 
 | 事件 | 动作 |
 | --- | --- |
-| Push 到 `main` | 类型检查 → 构建 → 自动部署 **GitHub Pages** + **EdgeOne Pages** |
+| Push 到 `main` | 类型检查 → 构建 → 自动部署 **GitHub Pages** + **EdgeOne Makers** |
 | Push 到 `main` 且 `cloudfunctions/` 有变更 | 额外部署云函数 **mim-api**（需先配 CloudBase 密钥，未配则跳过） |
 | Push 到 `main` 且 `supabase/functions/` 有变更 | 额外部署 **Supabase Edge Function mim-api**（需先配 Supabase 密钥，未配则跳过） |
 | Push tag `v*`（如 `v1.0.0`） | 类型检查 → 构建 → 发布 npm 包到 **GitHub Packages**（站点与 main 同提交，无需重复部署） |
@@ -223,9 +223,9 @@ https://<你的用户名>.github.io/mim/
 
 项目使用 hash 路由（`#/feed` 等），无需任何 404 兜底配置，子路径直接可用。
 
-### 3. 配置 EdgeOne Pages（腾讯云免费托管）
+### 3. 配置 EdgeOne Makers（腾讯云免费托管）
 
-1. 打开 [EdgeOne Pages 控制台](https://console.cloud.tencent.com/edgeone/pages) 并开通服务；
+1. 打开 [EdgeOne Makers 控制台](https://console.cloud.tencent.com/edgeone/pages) 并开通服务；
 2. 在控制台生成 **API Token**（参考官方文档 [API Token](https://edgeone.cloud.tencent.com/pages/document/176921267881082880)）；
 3. 回到 GitHub 仓库 **Settings → Secrets and variables → Actions → New repository secret**：
    - Name：`EDGEONE_API_TOKEN`
@@ -233,7 +233,7 @@ https://<你的用户名>.github.io/mim/
 4. 项目名默认为 `mim`（项目不存在会自动创建）。如需改名，编辑
    [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml) 中 `deploy-edgeone` 的 `EDGEONE_PROJECT_NAME`。
 
-配置完成后，push main 即自动把 `dist/` 通过官方 CLI `edgeone pages deploy` 发布上线。
+配置完成后，push main 即自动把 `dist/` 通过官方 CLI `edgeone makers deploy` 发布上线。
 
 ### 4. GitHub Packages（npm 包托管，需配一个 PAT Secret）
 
@@ -268,7 +268,7 @@ git push origin v1.0.0
 ```powershell
 git add .
 git commit -m "..."
-git push          # 自动构建并同步上线 GitHub Pages + EdgeOne Pages
+git push          # 自动构建并同步上线 GitHub Pages + EdgeOne Makers
 ```
 
 安全网：
@@ -285,7 +285,7 @@ git push          # 自动构建并同步上线 GitHub Pages + EdgeOne Pages
 npm install -g edgeone
 edgeone login
 npm run build
-edgeone pages deploy ./dist -n mim -e production
+edgeone makers deploy -n mim -t "$EDGEONE_API_TOKEN"
 ```
 
 ## 四、云函数开发与排障

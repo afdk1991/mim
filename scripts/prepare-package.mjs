@@ -8,8 +8,9 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const owner = process.argv[2]
+const tag = process.argv[3] || ''
 if (!owner) {
-  console.error('用法: node scripts/prepare-package.mjs <owner>')
+  console.error('用法: node scripts/prepare-package.mjs <owner> [tag]')
   process.exit(1)
 }
 
@@ -26,5 +27,11 @@ pkg.repository = {
   url: `https://github.com/${owner}/mim`,
 }
 
+// 版本号跟随 tag（v1.2.3 → 1.2.3）。
+// 若不注入，package.json 内固定版本会在第二次发版时撞 409（npm 不允许覆写已发布版本），
+// 导致 tag 流水线仍执行但包实际未更新。
+const semver = tag.replace(/^[vV]/, '')
+if (semver) pkg.version = semver
+
 writeFileSync(new URL('../package.json', import.meta.url), JSON.stringify(pkg, null, 2) + '\n')
-console.log(`package.json 已准备发布: ${pkg.name}`)
+console.log(`package.json 已准备发布: ${pkg.name}@${pkg.version}`)

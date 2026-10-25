@@ -678,7 +678,18 @@ function reducer(state: AppState, action: Action): AppState {
       const posts = [
         ...c.posts.map((cp) => {
           const local = state.posts.find((p) => p.id === cp.id)
-          return local?.comments?.length && !cp.comments?.length ? { ...cp, comments: local.comments } : cp
+          if (!local) return cp
+          // 乐观窗口/降级保护：云端行缺本地富字段时回退本地，避免富帖被静默降级为纯文本
+          const merged: Post = { ...cp }
+          if (local.comments?.length && !cp.comments?.length) merged.comments = local.comments
+          for (const k of ['media', 'vote', 'lottery', 'location', 'visibility', 'expiresAt', 'pinned', 'story'] as const) {
+            const m = merged as unknown as Record<string, unknown>
+            const l = local as unknown as Record<string, unknown>
+            if (m[k] === undefined && l[k] !== undefined) {
+              m[k] = l[k]
+            }
+          }
+          return merged
         }),
         ...state.posts.filter((p) => !postSet.has(p.id)),
       ].sort((a, b) => b.createdAt - a.createdAt)

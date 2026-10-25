@@ -47,15 +47,6 @@
   font-size: 14px;
 }
 
-.manju-search-row {
-  display: flex;
-  gap: 8px;
-}
-
-.manju-search {
-  flex: 1;
-}
-
 /* ---------- 分区 ---------- */
 
 .manju-section-head {
@@ -108,17 +99,6 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
-.manju-cover-lg .manju-cover-emoji {
-  font-size: 56px;
-}
-
-.manju-cover-lg {
-  width: 132px;
-  flex-shrink: 0;
-  border-radius: 10px;
-  aspect-ratio: 3 / 4;
-}
-
 .manju-badge {
   position: absolute;
   top: 8px;
@@ -130,19 +110,8 @@
   color: #fff;
 }
 
-.manju-vip {
-  background: linear-gradient(135deg, #f7b500, #ff8c00);
-}
-
 .manju-seen {
   background: rgba(0, 0, 0, 0.55);
-}
-
-/* AI 原创徽标：置左上角，避免与右上角 VIP / 已看 徽标重叠 */
-.manju-ai {
-  left: 8px;
-  right: auto;
-  background: linear-gradient(135deg, #7c4dff, #448aff);
 }
 
 .manju-license {
@@ -214,83 +183,6 @@
   min-width: 0;
 }
 
-/* ---------- 详情页 ---------- */
-
-.manju-detail {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 0;
-}
-
-.manju-detail-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.manju-detail-info h2 {
-  margin: 0 0 4px;
-  font-size: 20px;
-}
-
-.manju-tags {
-  margin: 8px 0;
-}
-
-.manju-synopsis {
-  margin: 4px 0 12px;
-  font-size: 13px;
-}
-
-/* ---------- 选集 ---------- */
-
-.manju-eps {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-}
-
-.manju-ep {
-  position: relative;
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 10px;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  transition: all 0.15s;
-}
-
-.manju-ep:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.manju-ep-vip {
-  background: var(--bg);
-  color: var(--text-3);
-}
-
-.manju-ep-done {
-  border-color: var(--primary);
-  background: var(--primary-weak);
-}
-
-.manju-ep-tag {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-3);
-}
-
-.manju-ep-check {
-  color: var(--primary);
-  font-weight: 800;
-}
-
 /* ---------- 模拟播放器（竖屏 9:16） ---------- */
 
 .manju-player {
@@ -325,64 +217,6 @@
   margin-top: 10px;
 }
 
-.manju-screen {
-  position: relative;
-  aspect-ratio: 9 / 16;
-  border-radius: 12px;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-}
-
-.manju-screen-emoji {
-  font-size: 64px;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
-}
-
-.manju-playing .manju-screen-emoji {
-  animation: manju-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes manju-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.12); }
-}
-
-.manju-veil {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 46px;
-  background: rgba(0, 0, 0, 0.28);
-}
-
-.manju-caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 16px;
-  text-align: center;
-  color: #fff;
-  font-size: 12px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-}
-
-.manju-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.manju-bar-fill {
-  height: 100%;
-  background: var(--primary);
-  transition: width 0.4s linear;
-}
-
 .manju-now {
   margin-bottom: 0;
 }
@@ -398,33 +232,6 @@
 
 /* ---------- 外部片单 ---------- */
 
-.manju-ext-tabs {
-  display: flex;
-  gap: 8px;
-}
-
-.manju-tab {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 999px;
-  padding: 6px 16px;
-  font-size: 14px;
-  color: var(--text-2);
-  transition: all 0.15s;
-}
-
-.manju-tab:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.manju-tab-on {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  font-weight: 600;
-}
-
 .manju-ext-note {
   font-size: 13px;
 }
@@ -439,7 +246,10 @@
   gap: 12px;
 }
 
+/* 条目封面：emoji 兜底 + 缩略图覆盖（img 加载失败自行隐藏，露出 emoji） */
 .manju-ext-cover {
+  position: relative;
+  overflow: hidden;
   width: 52px;
   height: 52px;
   border-radius: 10px;
@@ -448,53 +258,6 @@
   place-items: center;
   font-size: 26px;
   flex-shrink: 0;
-}
-
-.manju-ext-res {
-  margin-top: 12px;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13px;
-}
-
-.manju-res-direct {
-  background: #eefbf2;
-  border: 1px solid #bfe8cd;
-  color: #1c7c3d;
-}
-
-.manju-res-embed {
-  background: #eef5ff;
-  border: 1px solid #c4dcff;
-  color: #1f5fbf;
-}
-
-.manju-res-blocked {
-  background: #fdeeee;
-  border: 1px solid #f5c9c8;
-  color: #b03430;
-}
-
-.manju-ext-res-text {
-  line-height: 1.5;
-}
-
-.manju-iframe {
-  margin-top: 8px;
-  border: 1px dashed currentColor;
-  border-radius: 8px;
-  padding: 22px 10px;
-  text-align: center;
-  opacity: 0.85;
-}
-
-.manju-reason {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 11px;
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 4px;
-  padding: 2px 8px;
 }
 
 /* ---------- 自定义片源表单 ---------- */
@@ -615,13 +378,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-/* 条目封面：emoji 兜底 + 缩略图覆盖（img 加载失败自行隐藏，露出 emoji） */
-.manju-ext-cover {
-  position: relative;
-  overflow: hidden;
-  flex: none;
 }
 
 .manju-ext-thumb {

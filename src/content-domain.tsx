@@ -7,28 +7,96 @@ import { useApp } from './store'
 import type { Post, PostLottery, PostMedia, PostVote } from './types'
 import { uid } from './utils'
 
-/* ---------- 9. 敏感词前置（发布侧词库检测，占位词库） ---------- */
-export const SENSITIVE_WORDS = [
-  '加微信',
-  '免费领取',
-  '点击链接',
-  '私下转账',
-  '博彩',
-  '代开发票',
-  '兼职刷单',
-  '高仿表',
-  '游戏外挂',
-  '私聊购买',
-  '色情',
-  '网络赌博',
-  '贷款秒批',
-  '代办证件',
-  '僵尸粉',
-]
+/* ---------- 9. 敏感词前置（发布侧词库检测） ---------- */
+
+/**
+ * 敏感词分类词库（发布侧命中即阻断发布）。
+ *
+ * 收录原则：一律收录「短语」而非单字/单词，避免误伤正常表达
+ * （例如只收录「加微信」而不收录「微信」，否则正常社交表述会被误拦）。
+ *
+ * 说明：纯前端词库，用于发布前即时提示；不等于服务端终审，
+ * 正式运营仍需服务端二次审核兜底。
+ */
+export type SensitiveCategory = 'spam' | 'finance' | 'blackmarket' | 'adult' | 'violence'
+
+export const SENSITIVE_WORDS_BY_CATEGORY: Record<
+  SensitiveCategory,
+  { label: string; words: string[] }
+> = {
+  spam: {
+    label: '导流营销',
+    words: [
+      '加微信',
+      '加微',
+      '薇信',
+      '私下转账',
+      '私聊购买',
+      '免费领取',
+      '点击链接',
+      '扫码进群',
+      '进群领取',
+      '低价代理',
+    ],
+  },
+  finance: {
+    label: '金融违规',
+    words: [
+      '贷款秒批',
+      '无抵押贷款',
+      '信用卡套现',
+      '兼职刷单',
+      '刷单返现',
+      '博彩',
+      '网络赌博',
+      '高利贷',
+      '资金盘',
+      '内幕消息',
+      '稳赚不赔',
+    ],
+  },
+  blackmarket: {
+    label: '黑产违规',
+    words: ['代开发票', '代办证件', '高仿表', '游戏外挂', '僵尸粉', '买卖个人信息', '游戏私服', '洗钱'],
+  },
+  adult: {
+    label: '色情低俗',
+    words: ['色情', '裸聊', '成人影片', '一夜情'],
+  },
+  violence: {
+    label: '暴力违法',
+    words: ['暴力催收', '非法拘禁', '贩卖毒品', '枪支弹药'],
+  },
+}
+
+/** 扁平词表：对外 API 保持不变（findSensitiveHits 与发布页 UI 直接消费） */
+export const SENSITIVE_WORDS: string[] = (
+  Object.keys(SENSITIVE_WORDS_BY_CATEGORY) as SensitiveCategory[]
+).flatMap((k) => SENSITIVE_WORDS_BY_CATEGORY[k].words)
+
+/** 命中详情：词 + 所属分类，便于给出「命中哪一类」的可理解提示 */
+export type SensitiveHit = { word: string; category: SensitiveCategory; label: string }
 
 /** 返回正文中命中的敏感词列表（顺序与词库一致） */
 export function findSensitiveHits(text: string): string[] {
   return SENSITIVE_WORDS.filter((w) => text.includes(w))
+}
+
+/** 返回命中详情（词 + 分类标签），供 UI 展示命中类别 */
+export function findSensitiveHitsDetailed(text: string): SensitiveHit[] {
+  const hits: SensitiveHit[] = []
+  for (const key of Object.keys(SENSITIVE_WORDS_BY_CATEGORY) as SensitiveCategory[]) {
+    const entry = SENSITIVE_WORDS_BY_CATEGORY[key]
+    for (const w of entry.words) {
+      if (text.includes(w)) hits.push({ word: w, category: key, label: entry.label })
+    }
+  }
+  return hits
+}
+
+/** 命中词去重后的分类标签列表（如 ['导流营销', '金融违规']） */
+export function sensitiveHitLabels(text: string): string[] {
+  return [...new Set(findSensitiveHitsDetailed(text).map((h) => h.label))]
 }
 
 /* ---------- 预设：发布位置 10 个、视频 emoji 海报 10 个 ---------- */

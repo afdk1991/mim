@@ -51,8 +51,8 @@ const STORAGE_KEY = 'mim-delivery-v2'
 const VEHICLE_OPTIONS = [
   { emoji: '🛵', label: '电动车' },
   { emoji: '🚴', label: '单车' },
-  { emoji: '�', label: '汽车' },
-  { emoji: '�', label: '步行' },
+  { emoji: '🚗', label: '汽车' },
+  { emoji: '🚶', label: '步行' },
 ]
 
 function emptyBoard(): BoardData {

@@ -65,6 +65,17 @@ jobs:
           node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');" "$VER"
           grep -n '"version"' src-tauri/tauri.conf.json
 
+      # 前端版本号注入：tag 四段式（V0.0.0.2 → 0.0.0.2）写入 src/version.ts，
+      # 供页脚展示、欢迎弹窗版本对齐、Android OTA 版本判定使用。
+      # 此前该常量恒为 0.0.0.0（CI 从未注入），导致版本显示错误 + OTA 每次误判有更新。
+      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#V}"
+          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
+          grep -n "APP_VERSION" src/version.ts
+
       - name: 构建 & 发布（tauri-action）
         uses: tauri-apps/tauri-action@v0
         env:
@@ -101,6 +112,14 @@ jobs:
         run: |
           npm install -g npm@10.9.9
           npm install --no-fund --no-audit --legacy-peer-deps
+      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#V}"
+          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
+          grep -n "APP_VERSION" src/version.ts
+
       - name: 构建 Web 资产
         run: npm run build
         env:
@@ -140,6 +159,14 @@ jobs:
         run: |
           npm install -g npm@10.9.9
           npm install --no-fund --no-audit --legacy-peer-deps
+      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#V}"
+          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
+          grep -n "APP_VERSION" src/version.ts
+
       - name: 构建 Web 资产
         run: npm run build
         env:
@@ -151,3 +178,42 @@ jobs:
         run: |
           cd ios/App
           xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator -configuration Release -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+
+  harmony:
+    name: HarmonyOS 壳资源同步（WebView rawfile）
+    # 鸿蒙端需在 DevEco Studio 本地打包 .hap（GitHub Actions 无 HarmonyOS 构建环境，与 README 一致）。
+    # 本 job 负责：构建 Web 资产 → 同步进鸿蒙壳 rawfile → 上传为产物，供本地 DevEco 取用，避免壳内白屏。
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/V')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 安装前端依赖
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
+      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#V}"
+          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
+          grep -n "APP_VERSION" src/version.ts
+      - name: 构建 Web 资产
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: 同步 Web 资源进鸿蒙壳 rawfile
+        run: node scripts/sync-harmony.mjs
+      - name: 上传 rawfile 产物（供 DevEco 打包 .hap）
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-rawfile
+          # 必须与 scripts/sync-harmony.mjs 的 dest 完全一致（rawfile 直接位于 resources 下，
+          # 而非 resources/base），否则上传的是不存在的目录 → 产物为空 → DevEco 壳内白屏。
+          path: harmony/entry/src/main/resources/rawfile
+          retention-days: 7

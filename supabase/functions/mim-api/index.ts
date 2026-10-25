@@ -32,6 +32,7 @@ import {
   SELF_ID_COL,
   READ_ONLY_TABLES,
   RPC_ALLOW,
+  NO_CLIENT_WRITE,
   appendFilter,
   ownKey,
   buildMediaKey,
@@ -296,6 +297,8 @@ async function proxyDb(req: {
 
   // 写：只读表拒绝
   if (READ_ONLY_TABLES.has(table)) return resp(403, { error: '该表为只读数据' })
+  // 禁止客户端自写权限/角色表（防越权提升：自授 admin）
+  if (NO_CLIENT_WRITE.has(table)) return resp(403, { error: '该表不允许客户端写入' })
 
   const headers: Record<string, string> = {}
   if (req.prefer) headers.Prefer = req.prefer

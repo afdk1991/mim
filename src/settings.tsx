@@ -475,7 +475,7 @@ function TeenTab() {
     setOpenSet(false)
     setPwd('')
     /* 开启提示：弹一次（demo 粒度，不做真实使用时长限制） */
-    emitToast('青少年模式已开启，每日限用 40 分钟 🧒')
+    emitToast('青少年模式已开启（演示：仅敏感词过滤，不做真实时长限制）🧒')
   }
 
   const disable = () => {
@@ -497,7 +497,7 @@ function TeenTab() {
           <b>{ud.teen.enabled ? '已开启' : '未开启'}</b>
           <p className="set-hint">
             开启后全站顶部展示横幅，feed 将过滤含敏感占位词的内容（演示用简单关键词过滤）。
-            {ud.teen.enabled ? '每日限用 40 分钟（演示提示）。' : ''}
+            {ud.teen.enabled ? '演示用：仅做敏感词过滤，不做真实使用时长限制。' : ''}
           </p>
         </div>
         {ud.teen.enabled ? (

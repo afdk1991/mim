@@ -11,7 +11,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth'
-import { cloudEnabled } from '../lib/supabase'
+import { supabase, cloudEnabled, cloudBackend } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
 import { WALLET_UPDATE_EVT, getWalletState, walletConsume, walletRecharge } from '../wallet'
 import { checkOperatorKey } from './payment'
@@ -81,7 +81,150 @@ const DEMO_GOODS: MallGoods[] = [
   { id: 'a1', channel: 'laal', title: '机场接送券', emoji: '🛫', price: 128, desc: '24h预约 全城可达' },
   { id: 'a2', channel: 'laal', title: '代驾畅行卡', emoji: '🚗', price: 98, desc: '10次抵扣 全国可用' },
 ]
-export const MALL_GOODS: MallGoods[] = cloudEnabled ? [] : DEMO_GOODS
+/* 纯本地/离线模式（cloudBackend==='local'，即未配置任一云端后端或被显式指定 local）
+   保留演示商品作离线回退；云端模式（supabase/cloudbase）不预置演示商品，
+   商品列表走空态 + 发布引导（与 data/seed.ts 的双模式一致）。
+   注：此前误用恒真的 cloudEnabled 作判据，导致本地演示商品永远不可达，此处修正。 */
+export const MALL_GOODS: MallGoods[] = cloudBackend === 'local' ? DEMO_GOODS : []
+
+/* ------------------------------------------------------------------ */
+/* 商品目录：云端优先 + 本地演示兜底                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 云端商品目录（products 表）此前是死数据：
+ *   · 0001 建的 products 只有 (id, title, price_cents, currency, status)，
+ *     缺前端 MallGoods 必需的 channel / emoji / description / 原价；
+ *   · 且从未灌过任何商品 → 云端模式下 MALL_GOODS 恒为 []，商城永远空态。
+ * 迁移 0005_mall_catalog.sql 补齐了字段与五频道种子数据，
+ * 本段负责把云端商品真正接进前端，并在云端不可用/为空时兜底演示商品，
+ * 保证商城在任何后端状态下都可用（「前后端数据交互正常」的落点）。
+ */
+
+/** 云端商品行形态（products 表；channel/emoji/description/original_price_cents 由迁移 0005 补齐） */
+export type ProductRow = {
+  id: string
+  title: string
+  price_cents: number
+  original_price_cents?: number | null
+  channel?: string | null
+  emoji?: string | null
+  description?: string | null
+}
+
+const MALL_CHANNEL_IDS: MallChannel[] = ['youxuan', 'gexm', 'mix', 'live', 'laal']
+
+function asChannel(v: unknown): MallChannel {
+  return typeof v === 'string' && (MALL_CHANNEL_IDS as string[]).includes(v) ? (v as MallChannel) : 'youxuan'
+}
+
+/** 云端商品行 → MallGoods。金额单位为「分」，前端统一用「元」。 */
+export function mapProduct(row: ProductRow): MallGoods {
+  const price = Math.max(0, Math.round((Number(row.price_cents) || 0) / 100))
+  const goods: MallGoods = {
+    id: String(row.id ?? ''),
+    channel: asChannel(row.channel),
+    title: String(row.title ?? '未命名商品'),
+    emoji: String(row.emoji ?? '📦'),
+    price,
+    desc: String(row.description ?? ''),
+  }
+  const orig = Number(row.original_price_cents)
+  // 原价必须高于现价才有展示意义，避免脏数据显示「划线价比现价还低」
+  if (Number.isFinite(orig) && orig > 0) {
+    const origYuan = Math.round(orig / 100)
+    if (origYuan > price) goods.origPrice = origYuan
+  }
+  return goods
+}
+
+/** 模块级缓存：路由来回切换不重复打云端（商品目录变更频率低） */
+let cloudGoodsCache: MallGoods[] | null = null
+/** 是否已尝试过拉取（失败也算）：迁移未应用时 products 表不存在，
+ *  不缓存失败会让用户每进一次商城就多打一次 404 */
+let cloudGoodsChecked = false
+/** 并发去重：多个组件同时挂载时共用同一个请求 */
+let cloudGoodsPromise: Promise<MallGoods[] | null> | null = null
+
+/** 取云端商品（带并发去重 + 结果/失败双重缓存） */
+function loadCloudGoods(): Promise<MallGoods[] | null> {
+  if (cloudGoodsChecked) return Promise.resolve(cloudGoodsCache)
+  if (!cloudGoodsPromise) {
+    cloudGoodsPromise = fetchCloudGoods().then((goods) => {
+      cloudGoodsChecked = true
+      cloudGoodsCache = goods
+      cloudGoodsPromise = null
+      return goods
+    })
+  }
+  return cloudGoodsPromise
+}
+
+/**
+ * 拉取云端在售商品。
+ * @returns 商品数组；表/列缺失、查询失败或无在售商品时返回 null（交由调用方兜底）
+ */
+export async function fetchCloudGoods(): Promise<MallGoods[] | null> {
+  if (!supabase) return null
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, title, price_cents, original_price_cents, channel, emoji, description, sort')
+      .eq('status', 'active')
+      .order('sort', { ascending: true })
+      .limit(200)
+    if (error || !Array.isArray(data)) return null
+    const goods = (data as ProductRow[]).filter((r) => r && r.id).map(mapProduct)
+    return goods.length > 0 ? goods : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 商品目录：云端有数据时用云端，否则回退本地演示商品。
+ * 纯本地模式直接返回演示商品，不发起任何云端请求。
+ */
+export function useMallGoods(): { goods: MallGoods[]; fromCloud: boolean; loading: boolean } {
+  const [cloudGoods, setCloudGoods] = useState<MallGoods[] | null>(cloudGoodsCache)
+  const [loading, setLoading] = useState(cloudBackend !== 'local' && cloudGoodsCache === null)
+
+  useEffect(() => {
+    if (cloudBackend === 'local') {
+      setLoading(false)
+      return
+    }
+    let alive = true
+    void (async () => {
+      const goods = await loadCloudGoods()
+      if (!alive) return
+      setCloudGoods(goods)
+      setLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // 云端拿到真实商品即用云端数据；否则兜底演示商品，保证商城永远可用
+  if (cloudGoods && cloudGoods.length > 0) {
+    return { goods: cloudGoods, fromCloud: true, loading }
+  }
+  return { goods: DEMO_GOODS, fromCloud: false, loading }
+}
+
+/**
+ * 当前可用商品全集：云端缓存优先，否则演示商品。
+ * 供购物车校验 / 结算等非 React 上下文使用（组件请用 useMallGoods）。
+ *
+ * 修复要点：此处若沿用 MALL_GOODS（云端模式下恒为 []），会导致
+ *   ① 购物车条目被校验逻辑全量清空（用户加购后购物车秒空）
+ *   ② checkout() 取不到首件商品直接返回 null → 结算完全不可用
+ *   ③ 订单金额为 0
+ */
+function currentGoods(): MallGoods[] {
+  return cloudGoodsCache && cloudGoodsCache.length > 0 ? cloudGoodsCache : DEMO_GOODS
+}
 
 /* 旧共享 key（迁移源）与按真实身份隔离的存储 key */
 const LEGACY_KEY = 'mim-mall-v1'
@@ -175,7 +318,7 @@ function loadMallFor(userId: string): MallState {
     // 云端真实模式清理演示期遗留：预置演示订单（MO-DEMO*）与引用已下架演示商品的购物车条目
     if (cloudEnabled) {
       base.orders = base.orders.filter((it) => !it.id.startsWith('MO-DEMO'))
-      base.cart = base.cart.filter((c) => MALL_GOODS.some((g) => g.id === c.goodsId))
+      base.cart = base.cart.filter((c) => currentGoods().some((g) => g.id === c.goodsId))
     }
     return base
   } catch {
@@ -270,10 +413,11 @@ export function MallProvider({ children }: { children: ReactNode }) {
     checkout() {
       const head = state.cart[0]
       if (!head) return null
-      const first = MALL_GOODS.find((g) => g.id === head.goodsId)
+      const goods = currentGoods()
+      const first = goods.find((g) => g.id === head.goodsId)
       if (!first) return null
       const amount = state.cart.reduce(
-        (sum, c) => sum + (MALL_GOODS.find((g) => g.id === c.goodsId)?.price ?? 0) * c.qty,
+        (sum, c) => sum + (goods.find((g) => g.id === c.goodsId)?.price ?? 0) * c.qty,
         0,
       )
       const qty = state.cart.reduce((sum, c) => sum + c.qty, 0)
