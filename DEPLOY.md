@@ -55,29 +55,38 @@ Mim 有**两套云端后端**，前端按优先级自动选择，页面无需任
 
 线上项目：`https://sepfobukokrrivwyvhnd.supabase.co`（schema 已应用，含既有数据）。
 
-#### 待执行迁移（需人工凭证，AI 无法代执行）
+#### 迁移状态（2026-10-25 已全部应用）
 
-三个迁移文件已就绪但**尚未应用到线上库**（本环境只有 anon key，无数据库密码 / access token）：
+全部 7 个迁移已通过 Management API 应用到线上库（`public.schema_migrations` 跟踪）：
 
-| 迁移 | 内容 | 缺失后果 |
+| 迁移 | 内容 | 状态 |
 | --- | --- | --- |
-| `supabase/migrations/0001_iam_phase1.sql` | IAM 四表 + 审计日志 + RBAC 种子 | `user_roles` 等查询 404（PGRST205）⇒ 无 RBAC，管理后台入口不显示 |
-| `supabase/migrations/0002_storage_media.sql` | 私有桶 `mim-media` + 存储 RLS | 上传走本地预览降级（云端上传不可用） |
-| `supabase/migrations/0003_account_bridge.sql` | 账号桥表 + `username_taken` / `claim_username` RPC | 两端用户名空间不互通（见下节） |
+| `0000_schema.sql` | 20 张业务表基线 + RLS | ✅ 已应用 |
+| `0001_iam_phase1.sql` | IAM 四表 + 审计日志 + RBAC 种子（4 角色 / 6 权限） | ✅ 已应用 |
+| `0002_storage_media.sql` | 私有桶 `mim-media` + 存储 RLS（3MB + MIME 白名单） | ✅ 已应用 |
+| `0003_account_bridge.sql` | 账号桥表 + `username_taken` / `claim_username` RPC | ✅ 已应用 |
+| `0004_post_rich_fields.sql` | posts 富媒体字段（media/vote/lottery/visibility/pinned 等） | ✅ 已应用 |
+| `0005_mall_catalog.sql` | products 商城字段 + 五频道 15 件种子商品 | ✅ 已应用 |
+| `9999_seed.sql` | 演示数据（超话 10 / 热搜 15） | ✅ 已应用 |
 
-执行方式（二选一）：
+执行方式（后续新增迁移同样适用）：
 
 ```powershell
-# A. 数据库连接串（Dashboard → Project Settings → Database → Session pooler）
+# A. 云端通道（推荐，无需数据库密码）
+$env:SUPABASE_ACCESS_TOKEN="sbp_..."      # Dashboard → Account → Access Tokens
+$env:SUPABASE_PROJECT_REF="sepfobukokrrivwyvhnd"
+npm run db:apply:remote                    # 按序应用全部迁移（已应用的自动跳过）
+
+# B. 本地通道（需要数据库连接串）
 $env:SUPABASE_DB_URL="postgresql://postgres.<ref>:<密码>@aws-0-<区域>.pooler.supabase.com:5432/postgres"
 $env:ADMIN_EMAIL="you@example.com"        # 可选：给该注册邮箱授予 admin 角色
-npm run db:apply                          # 按序应用全部迁移（已应用的自动跳过）
-
-# B. Supabase Dashboard → SQL Editor → 依次粘贴三个 .sql 文件全量执行（幂等）
+npm run db:apply
 ```
 
-> `npm run db:apply` 会自动发现 `supabase/migrations/*.sql` 并按文件名顺序执行，
-> 已记录于 `public.schema_migrations` 的版本跳过；迁移均为幂等 SQL，重复执行安全。
+> 两个通道共用 `scripts/lib/migration-plan.mjs` 统一计划；SQL 均为幂等写法
+> （`add column if not exists` / DO 块约束 / `on conflict`），重复执行安全。
+> 注意：PostgreSQL 的 `ADD CONSTRAINT` **不支持** `IF NOT EXISTS`，
+> 0004/0005 已改用 DO 块 + `duplicate_object` 异常处理实现幂等。
 
 #### 本地开发
 
@@ -142,13 +151,25 @@ VITE_SUPABASE_ANON_KEY=sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role Key（Dashboard → Project Settings → API） |
 | `MIM_TOKEN_SECRET` | 自建 HMAC 令牌密钥（任意长随机串；**轮换会使全部已签发令牌失效**） |
 
-`supabase/functions/` 有变更时 CI 自动部署并同步运行密钥；手动部署：
+`supabase/functions/` 有变更时 CI 自动部署并同步运行密钥；手动部署（三选一）：
 
 ```powershell
+# A. 远程脚本（推荐，无需安装 CLI / Docker）
+node scripts/deploy-supabase-function.mjs
+#   Access Token 来源：环境变量 SUPABASE_ACCESS_TOKEN
+#   或 browser-shots/supabase-access-token.txt（由 supabase-grab-keys.mjs 抓取）
+
+# B. Supabase CLI
 npm install -g supabase
 supabase functions deploy mim-api --project-ref <ref>
-supabase secrets set SUPABASE_URL=https://sepfobukokrrivwyvhnd.supabase.co SUPABASE_SERVICE_ROLE_KEY=<key> MIM_TOKEN_SECRET=<secret> --project-ref <ref>
+
+# C. Supabase Dashboard → Edge Functions → 新建 mim-api，粘贴源码
 ```
+
+> **function secrets 注意事项**：平台**禁止** secret 名以 `SUPABASE_` 开头
+> （`SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` 由
+> Edge Runtime 自动注入，手动设置会报 400）。故只需设置自定义的 `MIM_TOKEN_SECRET`：
+> `scripts/deploy-supabase-function.mjs` 已按此规则处理（随机生成并写入）。
 
 部署后把前端指向它即可走备路径：`VITE_MIM_API_BASE=https://<ref>.supabase.co/functions/v1/mim-api`。
 
@@ -172,16 +193,17 @@ Supabase：GoTrue `auth.users`，uuid，bcrypt）。**账号桥**把两者在用
 - `username_taken` / `claim_username` 为 `security definer` RPC，anon 可调——
   与开放注册同暴露面（抢注用户名本就是开放注册允许的行为）。
 
-启用清单（均需人工凭证）：
+启用清单（2026-10-25 已全部落地）：
 
-1. 应用迁移 `0003_account_bridge.sql`（见上节）；
-2. 部署 Edge Function mim-api（配 4 个 Supabase secrets 后 CI 自动部署，或手动
-   `supabase functions deploy mim-api`）——未部署时前端桥接自动静默跳过，不影响原生登录；
-3. （可选，搬迁存量账号）`CLOUDBASE_SERVICE_KEY` + `SUPABASE_SERVICE_ROLE_KEY`（或
+1. ✅ 迁移 `0003_account_bridge.sql` 已应用（`username_taken` RPC 实测可用）；
+2. ✅ Edge Function mim-api 已通过 Management API 部署上线（`/auth/bridge-login`
+   等全路由实测 200，`MIM_TOKEN_SECRET` 已写入 function secrets）；
+3. ✅ CloudBase 侧 mim-api 已重新部署（注册链路接全局查重 + 桥接登记）；
+4. （可选，搬迁存量账号）`CLOUDBASE_SERVICE_KEY` + `SUPABASE_SERVICE_ROLE_KEY`（或
    `SUPABASE_DB_URL`）后执行 `npm run sync:accounts`。
 
-> CloudBase 侧 mim-api 已随本次改动重新部署（注册链路接全局查重 + 桥接登记）；
-> Supabase 侧 RPC 未部署期间为 fail-open：CloudBase 注册照常，仅暂不参与全局查重。
+> 线上账号现状：CloudBase 与 Supabase 两边的测试号已全部清零（app_users / auth.users
+> 均为 0），账号桥随新用户注册自动开始积累记录。
 
 ## 部署矩阵
 
