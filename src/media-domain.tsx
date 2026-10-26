@@ -288,13 +288,26 @@ export function MediaTranscodeWorkbench() {
 }
 
 /* ================================================================
-   2. 直播开播台（模拟推拉流 / 连麦）——路由 #/live
-   开播面板：模拟 RTMP 推流地址（占位）+ 模拟在线人数缓动增长
-   + 连麦列表（模拟观众申请 → 同意/拒绝 → 上麦状态）+ 结束直播
+   2. 直播开播台——路由 #/live
+   开播面板：可填自有 RTMP 服务器（OBS 等直接推流），留空则生成占位地址并如实标注；
+   在线人数缓动增长与观众连麦申请为模拟，均已在界面标明。
    ================================================================ */
 
 type MicApp = { id: string; userId: string; at: number }
 type OnMic = { userId: string; since: number }
+
+const LIVE_CONF_KEY = 'mim-live-conf-v1'
+
+function loadLiveConf(): { rtmpBase: string } {
+  try {
+    const raw = localStorage.getItem(LIVE_CONF_KEY)
+    if (raw) {
+      const o = JSON.parse(raw) as { rtmpBase?: unknown }
+      if (o && typeof o.rtmpBase === 'string') return { rtmpBase: o.rtmpBase }
+    }
+  } catch { /* 忽略损坏数据 */ }
+  return { rtmpBase: '' }
+}
 
 export function LivePage() {
   const api = useApp()
@@ -309,6 +322,15 @@ export function LivePage() {
   const [apps, setApps] = useState<MicApp[]>([])
   const [onAir, setOnAir] = useState<OnMic[]>([])
   const [summary, setSummary] = useState<{ dur: number; peak: number; mic: number } | null>(null)
+  const [rtmpBase, setRtmpBase] = useState(loadLiveConf().rtmpBase)
+
+  const saveRtmpBase = (v: string) => {
+    setRtmpBase(v)
+    try { localStorage.setItem(LIVE_CONF_KEY, JSON.stringify({ rtmpBase: v })) } catch { /* ignore */ }
+  }
+
+  /* 去掉末尾斜杠，非空即视为自定义服务器 */
+  const customRtmp = rtmpBase.trim().replace(/\/+$/, '')
 
   const users = useMemo(() => Object.values(api.state.users), [api.state.users])
 
@@ -352,7 +374,7 @@ export function LivePage() {
     setApps([])
     setOnAir([])
     setSummary(null)
-    toast('开播成功，模拟推流已就绪（占位地址）🔴')
+    toast(customRtmp ? '开播成功，请用 OBS 等向您的服务器推流 🔴' : '开播成功，已生成占位推流地址（非真实推流）🔴')
   }
 
   const endLive = () => {
@@ -380,7 +402,7 @@ export function LivePage() {
         {!live && !summary && (
           <div className="card md-live-card">
             <h3 className="md-live-title">
-              开播面板 <span className="md-sim-tag">模拟推流</span>
+              开播面板 {!customRtmp && <span className="md-sim-tag">占位推流</span>}
             </h3>
             <label className="md-live-field">
               <span>直播标题</span>
@@ -391,9 +413,19 @@ export function LivePage() {
                 placeholder="Mim 直播间（留空用默认标题）"
               />
             </label>
+            <label className="md-live-field">
+              <span>自有 RTMP 服务器（可选）</span>
+              <input
+                className="input"
+                value={rtmpBase}
+                onChange={(e) => saveRtmpBase(e.target.value)}
+                placeholder="rtmp://your-server/live（留空则生成占位地址）"
+              />
+            </label>
             <p className="md-live-hint">
-              开播后生成模拟 RTMP 推流 / HLS 拉流地址（占位域名 live.mim.demo，非真实推流），
-              并模拟在线人数缓动增长与观众连麦申请。
+              {customRtmp
+                ? '开播后推流地址将基于您的服务器生成，可直接填入 OBS 等推流工具；在线人数与连麦申请仍为模拟演示。'
+                : '未配置自有服务器时仅生成占位 RTMP / HLS 地址（占位域名 live.mim.demo，非真实推流）；在线人数与连麦申请为模拟演示。'}
             </p>
             <button type="button" className="btn btn-primary md-live-start" onClick={startLive}>
               🔴 开播
@@ -412,15 +444,26 @@ export function LivePage() {
               </button>
             </div>
             <div className="md-live-stats">
-              <span>👥 在线 <b>{formatCount(viewers)}</b></span>
+              <span>👥 在线 <b>{formatCount(viewers)}</b>（模拟）</span>
               <span>🔝 峰值 <b>{formatCount(peak)}</b></span>
               <span>🎙 连麦 <b>{onAir.length}</b></span>
             </div>
             <div className="md-live-addr">
-              <span>推流地址（RTMP · 占位）</span>
-              <code>rtmp://live.mim.demo/live/{streamKey}</code>
-              <span>拉流地址（HLS · 占位）</span>
-              <code>https://cdn.mim.demo/hls/{streamKey}/index.m3u8</code>
+              <span>推流地址（RTMP{customRtmp ? ' · 您的服务器' : ' · 占位' }）</span>
+              <code>{customRtmp ? `${customRtmp}/${streamKey}` : `rtmp://live.mim.demo/live/${streamKey}`}</code>
+              {customRtmp ? (
+                <>
+                  <span>拉流地址</span>
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    由您的流媒体服务提供（如 HLS/FLV 播放地址请在服务商控制台获取）
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>拉流地址（HLS · 占位）</span>
+                  <code>https://cdn.mim.demo/hls/{streamKey}/index.m3u8</code>
+                </>
+              )}
             </div>
             <h4 className="md-live-sub">连麦管理（模拟观众申请）</h4>
             {apps.length === 0 && onAir.length === 0 && (
