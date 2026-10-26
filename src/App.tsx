@@ -831,7 +831,6 @@ function UserMenu() {
 function WbHero() {
   const { path } = useRouter()
   const { auth } = useAuth()
-  const api = useApp()
   const [theme, setTheme] = useTheme()
   const heroRef = useRef<HTMLElement>(null)
 
@@ -849,18 +848,6 @@ function WbHero() {
         >
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>
-        {/* 清空本地内容存档（回全空初始态）；云端模式下数据在云端，隐藏入口 */}
-        {auth.mode !== 'cloud' && (
-          <button
-            className="icon-btn"
-            title="清空本地数据"
-            onClick={() => {
-              if (window.confirm('确定要清空本机上的所有内容数据吗？此操作不可恢复。')) api.resetLocalData()
-            }}
-          >
-            ♻️
-          </button>
-        )}
         {/* 统一登录入口（微博 newlogin 模式）：未登录时显性呈现，携带当前页路径，登录后回跳来源页 */}
         {auth.mode !== 'cloud' && (
           <a className="btn btn-primary btn-sm" href={`#/login?url=${encodeURIComponent(path)}`}>
