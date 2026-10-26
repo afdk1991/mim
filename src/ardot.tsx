@@ -5,7 +5,7 @@ import { cx, timeAgo } from './utils'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* 多源聚合监控台：聚合 6 个真实公开 API（无密钥、支持跨域）——
-   汇率（Frankfurter/ECB）/ 天气（Open-Meteo）/ GitHub 仓库指标 / ISS 轨道（WhereTheISS.at）/
+   汇率（ExchangeRate-API）/ 天气（Open-Meteo）/ GitHub 仓库指标 / ISS 轨道（WhereTheISS.at）/
    日出日落（Sunrise-Sunset.org）/ 加密货币行情（Coinbase）。
    保留 TTL 缓存与强制回源、回源失败陈旧回退、健康探针、审计日志的真实机制；
    故障注入仅用于演示降级路径，不伪造任何数据。 */
@@ -80,7 +80,7 @@ const WX_CODES: Record<number, string> = {
 
 const SOURCE_DEFS: SourceDef[] = [
   {
-    id: 'fx', label: '汇率', emoji: '�', provider: 'ExchangeRate-API · 公开汇率',
+    id: 'fx', label: '汇率', emoji: '💱', provider: 'ExchangeRate-API · 公开汇率',
     /* 换源说明：原 Frankfurter(ECB) 响应不带 Access-Control-Allow-Origin，
        浏览器直连必被 CORS 拦截（线上控制台报 ERR_FAILED，汇率卡片恒为降级态）。
        open.er-api.com 返回 `access-control-allow-origin: *` 可直连，
@@ -155,7 +155,7 @@ const SOURCE_DEFS: SourceDef[] = [
     },
   },
   {
-    id: 'iss', label: 'ISS 轨道', emoji: '�️', provider: 'WhereTheISS.at',
+    id: 'iss', label: 'ISS 轨道', emoji: '🛰️', provider: 'WhereTheISS.at',
     endpoint: 'api.wheretheiss.at/v1/satellites/25544', ttl: 30,
     desc: '国际空间站实时位置（经纬度 / 高度 / 速度）',
     parse: (raw) => {
@@ -547,7 +547,7 @@ export function ArdotPage() {
           <div className="ardot-kpi"><span>缓存命中 / 回源</span><b>{state.cacheHits} / {state.originFetches} 次</b></div>
           <div className="ardot-kpi"><span>接口超时</span><b>{TIMEOUT_MS / 1000} s</b></div>
           <p className="muted" style={{ marginTop: 8 }}>
-            数据来源：Frankfurter(ECB)、Open-Meteo、GitHub API、WhereTheISS.at、Sunrise-Sunset.org、Coinbase；
+            数据来源：ExchangeRate-API、Open-Meteo、GitHub API、WhereTheISS.at、Sunrise-Sunset.org、Coinbase；
             回源失败时回退展示上一次真实数据并标记「陈旧回退」，绝不伪造数据。
           </p>
         </div>
