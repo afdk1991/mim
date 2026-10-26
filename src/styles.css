@@ -2325,6 +2325,38 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
   background: var(--primary-weak);
 }
 
+/* 数量直接输入：与 ± 按钮同高，居中窄输入框 */
+.qty-input {
+  width: 40px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0 2px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.qty-input:hover {
+  border-color: var(--border);
+}
+
+.qty-input:focus {
+  border-color: var(--primary);
+  background: var(--card);
+  outline: none;
+}
+
 .comp-cur {
   background: var(--primary-weak);
   color: var(--primary);

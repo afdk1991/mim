@@ -4,8 +4,9 @@ import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ============================================================
  * BOM 工具台 —— 重新开发自合并源码 chassis-bom-tool（机箱 BOM 清单）
- * 纯前端 mock：四版本 BOM 明细 / 数量可调实时计价 / 成本对比汇总
+ * 真实计价工具：四版本 BOM 明细 / 数量可调实时计价 / 成本对比汇总 / CSV 导出
  * 汇总全部由明细动态计算（母本手写汇总与明细差 174.4 元的缺陷在此修复）
+ * localStorage 即时落地 + 云端 documents 表整包快照同步（未登录静默跳过）
  * ============================================================ */
 
 interface BomRow {
@@ -276,6 +277,42 @@ export function BomToolPage() {
     setState({ ver: state.ver, qtys: { ...state.qtys, [code]: next } })
   }
 
+  /* 数量直接输入：失焦/回车落定，越界自动收敛到 1~99 */
+  const setQty = (code: string, raw: string) => {
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return
+    const next = Math.min(99, Math.max(1, Math.round(n)))
+    setState({ ver: state.ver, qtys: { ...state.qtys, [code]: next } })
+  }
+
+  /* 导出当前版本 BOM 明细为 CSV（\ufeff 头保证 Excel 中文不乱码） */
+  const exportCsv = () => {
+    const q = (code: string, def: number) => state.qtys[code] ?? def
+    const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
+    const lines: string[] = ['物料编码,零件名称,规格参数,数量,参考单价(元),小计(元),所属分类']
+    const rowLine = (r: BomRow, cat: string) =>
+      [r.code, esc(r.name), esc(r.spec), q(r.code, r.qty), r.price, (q(r.code, r.qty) * r.price).toFixed(1), esc(cat)].join(',')
+    for (const cat of CATEGORIES) {
+      for (const r of cat.rows) lines.push(rowLine(r, cat.name))
+      const sub = cat.rows.reduce((s, r) => s + q(r.code, r.qty) * r.price, 0)
+      lines.push(`,${esc(cat.name + ' 小计')},,,,${sub.toFixed(1)},`)
+    }
+    if (version.acy.length > 0) {
+      for (const r of version.acy) lines.push(rowLine(r, '亚克力件（本版本专属）'))
+      const sub = version.acy.reduce((s, r) => s + q(r.code, r.qty) * r.price, 0)
+      lines.push(`,亚克力件 小计,,,,${sub.toFixed(1)},`)
+    }
+    lines.push(`ASS-001,表面处理与整机组装,喷塑/抛光/装配/质检/包装,1,${version.surface[0]}~${version.surface[1]},${version.surface[0]}~${version.surface[1]},`)
+    lines.push(`,整机成本合计（不含核心硬件）,,,,约 ${fmtMoney(cur.low)}~${fmtMoney(cur.high)} 元,`)
+    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `BOM-${version.name}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const compRows: { label: string; get: (c: ReturnType<typeof versionCosts>) => number; range?: boolean }[] = [
     { label: '通用金属结构件', get: (c) => c.common },
     { label: '功能模块结构件', get: (c) => c.modules },
@@ -305,13 +342,18 @@ export function BomToolPage() {
               </button>
             ))}
           </div>
-          <button
-            className="btn btn-ghost btn-sm"
-            disabled={!dirty}
-            onClick={() => setState({ ver: state.ver, qtys: {} })}
-          >
-            恢复默认数量
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost btn-sm" onClick={exportCsv}>
+              ⬇ 导出 CSV
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={!dirty}
+              onClick={() => setState({ ver: state.ver, qtys: {} })}
+            >
+              恢复默认数量
+            </button>
+          </div>
         </div>
 
         <div className="stat-row">
@@ -371,7 +413,16 @@ export function BomToolPage() {
                               <button className="qty-btn" onClick={() => changeQty(r.code, r.qty, -1)}>
                                 −
                               </button>
-                              <b>{qty}</b>
+                              <input
+                                className="qty-input"
+                                type="number"
+                                min={1}
+                                max={99}
+                                value={qty}
+                                onChange={(e) => setQty(r.code, e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                                aria-label={`${r.name} 数量`}
+                              />
                               <button className="qty-btn" onClick={() => changeQty(r.code, r.qty, 1)}>
                                 +
                               </button>
@@ -406,7 +457,16 @@ export function BomToolPage() {
                             <button className="qty-btn" onClick={() => changeQty(r.code, r.qty, -1)}>
                               −
                             </button>
-                            <b>{qty}</b>
+                            <input
+                              className="qty-input"
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={qty}
+                              onChange={(e) => setQty(r.code, e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                              aria-label={`${r.name} 数量`}
+                            />
                             <button className="qty-btn" onClick={() => changeQty(r.code, r.qty, 1)}>
                               +
                             </button>
