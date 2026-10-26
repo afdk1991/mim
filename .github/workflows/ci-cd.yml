@@ -152,8 +152,12 @@ jobs:
     # EdgeOne 侧凭证/CLI 故障不阻塞 Pages 发布与线上验证；失败会以 warning 呈现
     continue-on-error: true
     env:
-      # EdgeOne Makers 项目名（已存在 makers-euoglvyjyknd），可在仓库变量或此处修改
-      EDGEONE_PROJECT_NAME: mim
+      # EdgeOne Makers 项目名。
+      # ⚠️ 不能叫 mim：该项目在 EdgeOne 侧是 Provider=Github 类型，
+      #    CLI 的「文件夹/zip 直传」只支持 Provider=Upload，实测报
+      #    「Project mim exists but has Provider 'Github'」而失败。
+      #    mim-upload 由 CLI 首次部署时自动创建为 Upload 类型。
+      EDGEONE_PROJECT_NAME: mim-upload
     outputs:
       url: ${{ steps.eo.outputs.url }}
     steps:
