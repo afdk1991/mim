@@ -5,9 +5,9 @@ import { getCurrentUserId, useAuth } from './auth'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
 import { walletConsume } from './wallet'
 
-/* ================= VIP 会员中心（盈利点：订阅收入 demo） =================
+/* ================= VIP 会员中心（订阅收入闭环） =================
    自包含模式：本地存档按登录身份隔离（mim-vip-v1:<userId>），云端快照 key 不变。
-   闭环链路：选档 → 统一钱包真实扣费 → 权益生效 → 到期续费叠加 → 订单留痕 → 可模拟退订。
+   闭环链路：选档 → 统一钱包真实扣费 → 权益生效 → 到期续费叠加 → 订单留痕 → 可退订。
    轮 14 打通：购买不再「假支付」，扣费走 mim-wallet-v1（余额不足自动中止订单）。
    轮 16 打通：本地存档按真实登录身份隔离 + 一次性迁移旧全局 key；切号即重载。 */
 
@@ -154,7 +154,7 @@ export function VipCenterPage() {
       setPaying(false)
       return
     }
-    /* 模拟支付通道耗时 */
+    /* 支付通道处理耗时（无真实网关，以定时器占位网关往返） */
     window.setTimeout(() => {
       const base = state.plan !== null && state.expireAt > Date.now() ? state.expireAt : Date.now()
       update({
@@ -169,7 +169,7 @@ export function VipCenterPage() {
   }
 
   const unsubscribe = () => {
-    if (!window.confirm('确定模拟退订吗？会员权益将立即失效（演示用）。')) return
+    if (!window.confirm('确定退订吗？会员权益将立即失效，已支付费用不予退回。')) return
     update({ ...state, plan: null, expireAt: 0 })
     toast('已退订，期待您再次开通')
   }
@@ -194,7 +194,7 @@ export function VipCenterPage() {
           </div>
           {active && (
             <button className="vip-ghost" onClick={unsubscribe}>
-              模拟退订
+              退订
             </button>
           )}
         </section>

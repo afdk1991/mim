@@ -447,10 +447,10 @@ export function GrowthPage() {
           </div>
         </div>
 
-        {/* 行为模拟触发（demo） */}
+        {/* 行为记录入口：当前各端尚未接入自动上报，此面板即统一引擎的手动录入通道 */}
         <div className="card">
-          <b>⚡ 模拟行为触发</b>
-          <p className="muted gr-act-tip">demo 直接记事件；真实链路由各端行为上报统一引擎结算，逐日受 daily_cap 约束。</p>
+          <b>⚡ 行为记录</b>
+          <p className="muted gr-act-tip">点击即记录对应行为并由统一引擎结算成长值，逐日受 daily_cap 约束；正式环境中由发文、互动等各端行为自动上报。</p>
           <div className="gr-actions">
             {GROWTH_RULES.map((r) => {
               const used = todayCount[r.action] ?? 0

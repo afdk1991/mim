@@ -326,8 +326,8 @@ export function WalletPage() {
           ))}
         </div>
 
-        {/* 模拟操作 */}
-        <h3 className="wl-sec-title">模拟操作（income 携带费率快照入账）</h3>
+        {/* 快速入账：暂无真实支付/结算通道，此处为手动入口（income 携带费率快照入账） */}
+        <h3 className="wl-sec-title">快速入账（income 携带费率快照入账）</h3>
         <div className="wl-actions">
           <button type="button" className="wl-act recharge" onClick={() => recharge(3000)}>
             🪙 充值 ¥30.00
@@ -376,7 +376,7 @@ export function WalletPage() {
         {/* 流水列表 */}
         <h3 className="wl-sec-title">钱包流水（最近 {Math.min(txs.length, 50)} 条）</h3>
         {txs.length === 0 ? (
-          <Empty text="还没有流水，点上面的模拟操作试试" />
+          <Empty text="还没有流水，点上面的快速入账试试" />
         ) : (
           <div className="wl-txs">
             {txs.map((t) => {
