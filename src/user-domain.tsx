@@ -191,7 +191,7 @@ export function writeTeen(next: TeenState): void {
 
 const ACCOUNTS_KEY = 'mim-ud-accounts'
 
-const isMode = (v: unknown): v is AuthMode => v === 'local' || v === 'cloud' || v === 'guest'
+const isMode = (v: unknown): v is AuthMode => v === 'guest' || v === 'cloud'
 
 export function readAccounts(): UdAccount[] {
   const v = parseJSON(localStorage.getItem(ACCOUNTS_KEY))
@@ -201,7 +201,7 @@ export function readAccounts(): UdAccount[] {
     .map((o) => ({
       uid: typeof o.uid === 'string' ? o.uid : '',
       label: typeof o.label === 'string' ? o.label : '',
-      mode: isMode(o.mode) ? o.mode : 'local',
+      mode: isMode(o.mode) ? o.mode : 'guest',
       lastAt: typeof o.lastAt === 'number' ? o.lastAt : 0,
     }))
     .filter((a) => a.uid !== '')
@@ -230,7 +230,7 @@ export function registerCurrentAccount(mode: AuthMode, email: string | null): vo
   const uid = getCurrentUserId()
   upsertAccount({
     uid,
-    label: mode === 'cloud' ? (email ?? `云端账号 ${uid.slice(0, 8)}`) : mode === 'local' ? '本机演示身份' : '游客身份',
+    label: mode === 'cloud' ? (email ?? `云端账号 ${uid.slice(0, 8)}`) : '游客身份',
     mode,
     lastAt: Date.now(),
   })
@@ -258,8 +258,8 @@ export function syncDiscoveredAccounts(): void {
     if (known.has(uid)) continue
     upsertAccount({
       uid,
-      label: uid === 'local' ? '本机演示身份' : `历史云端身份 ${uid.slice(0, 8)}`,
-      mode: uid === 'local' ? 'local' : 'cloud',
+      label: uid === 'local' ? '游客身份（本机）' : `历史云端身份 ${uid.slice(0, 8)}`,
+      mode: uid === 'local' ? 'guest' : 'cloud',
       lastAt: 0,
     })
     changed = true

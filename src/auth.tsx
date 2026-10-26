@@ -1,16 +1,17 @@
 /* 身份层：Supabase Auth 会话单一来源。
-   - cloudEnabled（配置了 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY）时监听 onAuthStateChange；
-     挂载即回调 INITIAL_SESSION，天然避免与 getSession 的竞态，不要再另调 getSession。
-   - 未配置或未登录：mode='local'，userId 恒为 'local'（钱包等真实身份数据以此隔离）。
+   - 后端恒为云端（Supabase 主 / CloudBase 备），配置缺失时应用已在 main.tsx 拦截；
+     本模块监听 onAuthStateChange，挂载即回调 INITIAL_SESSION，天然避免与 getSession 的竞态，
+     不要再另调 getSession。
+   - 未登录：mode='guest'，userId 恒为 'local'（钱包等本机数据的存储锚点，勿改）。
    - userId（真实身份锚点）与 meId（扮演的演示身份，见 store.tsx）分离；
-     轮 3+ 云端写路径时 userId 将作为作者锚点接入 RLS。
+     云端写路径时 userId 作为作者锚点接入 RLS。
    - 第三方 OAuth：oauthProviders 从 GoTrue /auth/v1/settings 动态探测后台已启用的
      provider（Supabase 控制台开启哪个就显示哪个）；signInWithOAuth 走标准浏览器
      重定向流，回跳后 detectSessionInUrl 自动消费会话并触发 SIGNED_IN。 */
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { supabase, cloudEnabled, cloudBackend, authSettingsUrl, anonKeyExport } from './lib/supabase'
+import { supabase, cloudBackend, authSettingsUrl, anonKeyExport } from './lib/supabase'
 import type { AuthMode } from './permissions'
 
 export type AuthState = {
@@ -19,14 +20,15 @@ export type AuthState = {
   email: string | null
   /** 用户名（CloudBase 本环境仅启用 usernamePassword 登录，email 可能为 null） */
   username: string | null
-  /** RBAC：当前账号的角色名列表（未登录/本地模式恒为 []） */
+  /** RBAC：当前账号的角色名列表（未登录游客恒为 []） */
   roles: string[]
-  /** RBAC：当前账号的权限 key 列表（未登录/本地模式恒为 []） */
+  /** RBAC：当前账号的权限 key 列表（未登录游客恒为 []） */
   permissions: string[]
 }
 
-const LOCAL_AUTH: AuthState = {
-  mode: 'local',
+/** 游客态：未登录时的身份。userId 固定 'local' 作为本机存储锚点（不代表本地模式）。 */
+const GUEST_AUTH: AuthState = {
+  mode: 'guest',
   userId: 'local',
   email: null,
   username: null,
@@ -60,7 +62,7 @@ async function loadIam(userId: string): Promise<{ roles: string[]; permissions: 
 /* ---------- 模块级身份单例（轮 16 打通：非 hook 场景）----------
    wallet/vip 等模块级 API 与 localStorage 读写无法使用 useAuth，
    这里维护一份与 AuthProvider 实时同步的当前真实身份锚点。 */
-let currentUserId = LOCAL_AUTH.userId
+let currentUserId = GUEST_AUTH.userId
 
 /** 非 hook 场景获取当前真实身份（未登录恒为 'local'，登录后为云端 user.id） */
 export function getCurrentUserId(): string {
@@ -69,23 +71,22 @@ export function getCurrentUserId(): string {
 
 export type AuthApi = {
   auth: AuthState
-  cloudEnabled: boolean
-  /** 后台已启用的第三方登录 provider id（未配置云端或探测失败时为 []） */
+  /** 后台已启用的第三方登录 provider id（探测失败时为 []） */
   oauthProviders: string[]
   signUp: (username: string, password: string) => Promise<string | null>
   signIn: (username: string, password: string) => Promise<string | null>
   signInWithOAuth: (provider: string) => Promise<string | null>
   signOut: () => Promise<void>
-  /** RBAC：是否拥有指定角色（未登录/本地模式恒 false） */
+  /** RBAC：是否拥有指定角色（未登录游客恒 false） */
   hasRole: (role: string) => boolean
-  /** RBAC：是否拥有指定权限点（菜单+按钮级，未登录/本地模式恒 false） */
+  /** RBAC：是否拥有指定权限点（菜单+按钮级，未登录游客恒 false） */
   hasPerm: (perm: string) => boolean
 }
 
 const AuthContext = createContext<AuthApi | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<AuthState>(LOCAL_AUTH)
+  const [auth, setAuth] = useState<AuthState>(GUEST_AUTH)
   const [oauthProviders, setOauthProviders] = useState<string[]>([])
 
   /* 轮 16 打通：同步模块级身份单例（getCurrentUserId 的数据源） */
@@ -99,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user
       if (!u) {
-        setAuth(LOCAL_AUTH)
+        setAuth(GUEST_AUTH)
         return
       }
       setAuth({
@@ -151,7 +152,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const api = useMemo<AuthApi>(
     () => ({
       auth,
-      cloudEnabled,
       oauthProviders,
       /* 注册与登录统一走「用户名」：
          · Supabase 模式：用户名映射为合成邮箱 <username>@mim.app（适配层内转换），
@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          · CloudBase 模式：仅启用 usernamePassword（email / phone / anonymous 均关闭），
            注册成功后由应用层补写 profiles（无 auth.users 触发器）。 */
       async signUp(username, password) {
-        if (!supabase) return '云端未配置，当前为本地演示模式'
+        if (!supabase) return '云端后端未配置'
         const { data, error } = await supabase.auth.signUp({ username, password })
         if (error) return error.message
         const uid = data?.user?.id ?? data?.session?.user?.id
@@ -179,12 +179,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null
       },
       async signIn(username, password) {
-        if (!supabase) return '云端未配置，当前为本地演示模式'
+        if (!supabase) return '云端后端未配置'
         const { error } = await supabase.auth.signInWithPassword({ username, password })
         return error ? error.message : null
       },
       async signInWithOAuth(provider) {
-        if (!supabase) return '云端未配置，当前为本地演示模式'
+        if (!supabase) return '云端后端未配置'
         // origin + pathname：子路径部署下回跳必须落在应用自身路径；hash 路由下 pathname 恒定。
         // 本环境未启用 OAuth provider，保留入口以便后台开启后自动可用。
         const { error } = await supabase.auth.signInWithOAuth({
@@ -212,7 +212,7 @@ export function useAuth(): AuthApi {
   return ctx
 }
 
-/** RBAC 按钮级守卫 hook：当前账号是否拥有指定权限点（未登录/本地模式恒 false） */
+/** RBAC 按钮级守卫 hook：当前账号是否拥有指定权限点（未登录游客恒 false） */
 export function usePermission(perm: string): boolean {
   return useAuth().hasPerm(perm)
 }

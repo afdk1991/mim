@@ -193,7 +193,7 @@ export interface ArticleDraft {
   savedAt: number
 }
 
-/** 云端真源 id 集合（轮 4）：写操作仅对这些 id 落云端，seed 演示内容保持纯本地 */
+/** 云端真源 id 集合（轮 4）：写操作仅对这些 id 落云端，其余 id 视为本地乐观内容 */
 export interface CloudIds {
   /** 云端 profiles 的用户 id（关注分流依据） */
   users: string[]

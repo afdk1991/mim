@@ -11,7 +11,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth'
-import { supabase, cloudBackend } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
 import { WALLET_UPDATE_EVT, getWalletState, walletConsume, walletRecharge } from '../wallet'
 import { checkOperatorKey } from './payment'
@@ -153,17 +153,13 @@ export async function fetchCloudGoods(): Promise<MallGoods[] | null> {
 
 /**
  * 商品目录：云端有数据时用云端，否则为空（空态 + 发布引导）。
- * 纯本地模式不发起任何云端请求，直接为空。
+ * 无云端商品缓存时发起一次拉取，拉取失败即为空态。
  */
 export function useMallGoods(): { goods: MallGoods[]; fromCloud: boolean; loading: boolean } {
   const [cloudGoods, setCloudGoods] = useState<MallGoods[] | null>(cloudGoodsCache)
-  const [loading, setLoading] = useState(cloudBackend !== 'local' && cloudGoodsCache === null)
+  const [loading, setLoading] = useState(cloudGoodsCache === null)
 
   useEffect(() => {
-    if (cloudBackend === 'local') {
-      setLoading(false)
-      return
-    }
     let alive = true
     void (async () => {
       const goods = await loadCloudGoods()

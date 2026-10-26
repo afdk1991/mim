@@ -2,7 +2,6 @@ import './growth.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Empty, Modal, TimeAgo, emitToast, useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
-import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
 
 /* ================= 统一成长引擎 =================
@@ -13,8 +12,7 @@ import { cx } from './utils'
    轮 13 打通：对外暴露 recordGrowth 上报入口，各端真实行为
    （发布/获赞/收藏/下载）经 store api 层流入本引擎；页内模拟按钮与
    外部上报共用同一份规则表、daily_cap 与徽章结算。
-   轮 17 打通：成长数据按真实登录身份隔离（mim-growth-v1:<userId>），
-   本地模式一次性迁移旧全局 key；recordGrowth 自动跟随当前身份。
+   轮 17 打通：成长数据按真实登录身份隔离（mim-growth-v1:<userId>），切号即重载。
    轮 18/19 打通：徽章墙展示增强——筛选 Tab / 距下一枚徽章提示 / 点击详情弹窗。 */
 
 /** 单态：成长值统一累加，不再区分广场/知识域 */
@@ -60,8 +58,7 @@ interface GrowthState {
   badges: Record<string, number>
 }
 
-/* 轮 17 打通：旧全局 key 仅作一次性迁移源；成长数据按登录身份分 key 隔离 */
-const GROWTH_LEGACY = 'mim-growth-v1'
+/* 轮 17 打通：成长数据按登录身份分 key 隔离 */
 const growthKeyFor = (userId: string) => `mim-growth-v1:${userId}`
 
 function localDate(ts: number | Date): string {
@@ -91,19 +88,6 @@ function loadGrowth(userId: string = getCurrentUserId()): GrowthState {
   const key = growthKeyFor(userId)
   const own = parseGrowth(localStorage.getItem(key))
   if (own) return own
-  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
-     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与钱包/商城一致） */
-  if (!cloudEnabled) {
-    const legacy = parseGrowth(localStorage.getItem(GROWTH_LEGACY))
-    if (legacy) {
-      try {
-        localStorage.setItem(key, JSON.stringify(legacy))
-      } catch {
-        /* ignore */
-      }
-      return legacy
-    }
-  }
   return { events: [], checkin: { last: '', streak: 0 }, badges: {} }
 }
 

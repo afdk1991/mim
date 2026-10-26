@@ -6,7 +6,7 @@
      我自己发的行1（owner=me, from_me=true）也会触发，但本地已有乐观行，忽略。
    本文件自带极简 toast（与 cloud-write.cloudToast 同源实现的独立副本——
    cloud-write.ts 正被并行会话修改中，禁止 import 以规避冲突）。 */
-import { supabase, cloudEnabled } from './supabase'
+import { supabase } from './supabase'
 
 export type CloudMsgResult = 'ok' | 'skip' | 'fail'
 
@@ -29,7 +29,7 @@ function msgToast(text: string, ok: boolean): void {
 
 /** 云端发送私信：走 send_message RPC（security definer 一次写双方两行） */
 export async function cloudSendMessage(peerId: string, content: string): Promise<CloudMsgResult> {
-  if (!cloudEnabled || !supabase) return 'skip'
+  if (!supabase) return 'skip'
   const { error } = await supabase.rpc('send_message', { p_peer: peerId, p_content: content })
   if (error) {
     console.warn('[cloud-msg] 发送失败：', error.message)
@@ -44,7 +44,7 @@ export function subscribeMessages(
   meId: string,
   onIncoming: (m: { id: string; userId: string; content: string; createdAt: number }) => void,
 ): () => void {
-  if (!cloudEnabled || !supabase) return () => {}
+  if (!supabase) return () => {}
   const sb = supabase // 闭包内不可依赖模块导入的窄化，捕获局部引用
   const channel = sb
     .channel(`mim-msg-${meId}`)

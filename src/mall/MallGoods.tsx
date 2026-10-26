@@ -10,7 +10,7 @@ export function MallGoodsPage({ id }: { id: string }) {
   const { navigate } = useRouter()
   const { addToCart } = useMall()
   const [qty, setQty] = useState(1)
-  /* 商品目录与商城中心同源：云端优先 + 演示兜底，保证详情页可直接打开 */
+  /* 商品目录与商城中心同源：云端为唯一来源 */
   const { goods, loading } = useMallGoods()
   const g = goods.find((x) => x.id === id)
   if (loading) return <Empty text="正在加载商品…" />

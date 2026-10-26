@@ -40,10 +40,10 @@
       读私有表自动追加 owner 过滤，写入自动改写 owner 列为当前 uid，
       改删自动按 owner 过滤，app_users / audit_logs 永不代理。
 
-   ③ 两者都未配置（或被 VITE_MIM_BACKEND 显式指定为 local）→ null，
-      应用整体回退纯本地模式（localStorage）。
+   ③ 两者都未配置 → null。项目已移除本地模式：
+      此时 main.tsx 直接渲染配置错误页，应用不可用（不再回退 localStorage 演示）。
 
-   选择逻辑：VITE_MIM_BACKEND 可强制指定 'supabase' / 'cloudbase' / 'local'；
+   选择逻辑：VITE_MIM_BACKEND 可强制指定 'supabase' / 'cloudbase'；
    默认 'auto' = Supabase 优先，其次 CloudBase。
    本文件把两种后端都包装成与 Supabase 同形的链式客户端，
    使 cloud-read / cloud-write / cloud-iam / cloud-msg / auth.tsx 无需改动。
@@ -105,19 +105,19 @@ export interface CloudClient {
  * ------------------------------------------------------------------------- */
 
 /** 当前生效的后端模式（供存储适配层等分支使用） */
-export type CloudBackend = 'supabase' | 'cloudbase' | 'local'
+export type CloudBackend = 'supabase' | 'cloudbase'
 
 /* 内置示例后端（原作者个人的公开 Supabase / CloudBase 入口）
  *
  * 为什么还保留：EdgeOne Makers 是**远端构建**（`edgeone makers deploy` 在云端
  * 检出自仓库代码后自行 build），构建环境读不到仓库环境变量/Secrets
  * （CI 日志：`No environment variables found`）。若完全删除内置值，
- * 该链路产出的 dist 会缺失云端地址、静默退化成本地演示模式。
+ * 该链路产出的 dist 会缺失云端地址、无法启动（错误页）。
  *
  * 为什么必须能关：源码内置他人后端 = 交付/二次分发时买家不配 .env 也会连到
  * 示例数据库（数据互通、可被示例项目运营方清库）。因此这里提供显式开关：
- *   VITE_MIM_BUILTIN_BACKEND=0   → 彻底禁用内置值，未配置即本地演示模式
- * 默认仍启用，是为了不打断上述远端构建链路；二次分发时务必置 0 或改写下值。 */
+ *   VITE_MIM_BUILTIN_BACKEND=0   → 彻底禁用内置值（此时必须自行配置云端，否则应用不可用）
+ * 默认仍启用，是为了不打断上述远端构建链路；二次分发时务必置 0 并改写下值。 */
 
 /** 生产 Supabase 项目（公开信息：publishable key 按设计可暴露，安全由 RLS 保证） */
 const PROD_SUPABASE_URL = 'https://sepfobukokrrivwyvhnd.supabase.co'
@@ -132,7 +132,7 @@ const env = (k: string): string => {
 }
 
 /** 内置示例后端开关（见上方 PROD_SUPABASE_URL 处注释）：
- *  VITE_MIM_BUILTIN_BACKEND=0 时禁用内置值，未配置即本地演示模式。
+ *  VITE_MIM_BUILTIN_BACKEND=0 时禁用内置值，未配置云端即启动错误页。
  *
  *  这里刻意用**静态**属性访问（而非 env('…') 动态取键）：Vite 只能在静态形态下
  *  把 `import.meta.env.VITE_X` 折叠成字面量，从而让 `BUILTIN_ENABLED` 成为常量、
@@ -147,7 +147,7 @@ const SB_ANON = env('VITE_SUPABASE_ANON_KEY') || (BUILTIN_ENABLED ? PROD_SUPABAS
  *
  *    为何内置兜底：EdgeOne Makers 走 .edgeone 目录自动构建，构建环境读不到
  *    仓库环境变量（CI 日志：`No environment variables found`），若仅依赖
- *    VITE_MIM_API_BASE 会导致线上产物缺失云端地址、回退本地演示模式。
+ *    VITE_MIM_API_BASE 会导致线上产物缺失云端地址、无法启动（错误页）。
  *    该地址是公开 HTTP 端点（不含任何密钥，权限由云函数服务端强制校验）；
  *    需要用自建后端时仍可用 VITE_MIM_API_BASE 覆盖，或用 VITE_MIM_BUILTIN_BACKEND=0
  *    关闭全部内置值（详见 PROD_SUPABASE_URL 处注释与 INSTALL.md）。 */
@@ -159,15 +159,20 @@ const FORCED = env('VITE_MIM_BACKEND')
 const hasSupabaseConfig = !!SB_URL && !!SB_ANON
 const hasCloudbaseConfig = !!API_BASE
 
-function resolveBackend(): CloudBackend {
-  if (FORCED === 'supabase') return hasSupabaseConfig ? 'supabase' : 'local'
-  if (FORCED === 'cloudbase') return hasCloudbaseConfig ? 'cloudbase' : 'local'
-  if (FORCED === 'local') return 'local'
-  return hasSupabaseConfig ? 'supabase' : hasCloudbaseConfig ? 'cloudbase' : 'local'
+/** 解析后端：只返回云端主/备后端；两者都未配置 → null（启动错误页，不回退本地模式） */
+function resolveBackend(): CloudBackend | null {
+  if (FORCED === 'supabase') return hasSupabaseConfig ? 'supabase' : null
+  if (FORCED === 'cloudbase') return hasCloudbaseConfig ? 'cloudbase' : null
+  return hasSupabaseConfig ? 'supabase' : hasCloudbaseConfig ? 'cloudbase' : null
 }
 
-/** 当前后端模式：'supabase' | 'cloudbase' | 'local' */
-export const cloudBackend: CloudBackend = resolveBackend()
+const resolvedBackend = resolveBackend()
+
+/** 云端后端配置缺失：main.tsx 直接渲染错误页，应用不可用（本地模式已移除） */
+export const cloudConfigMissing = resolvedBackend === null
+
+/** 当前后端模式：'supabase' | 'cloudbase'（cloudConfigMissing 时应用不会渲染） */
+export const cloudBackend: CloudBackend = resolvedBackend ?? 'supabase'
 
 /** 是否正在使用「内置示例后端」：既未自行配置任何云端地址，又未关闭内置开关。
  *  二次分发/交付场景应确保此项为 false——否则买家站点会连到示例项目的数据库。 */
@@ -177,8 +182,8 @@ export const usingBuiltinBackend =
 if (usingBuiltinBackend && import.meta.env.DEV) {
   console.warn(
     '[mim] 当前使用内置示例后端（他人 Supabase/CloudBase 项目），数据会写入示例库。\n' +
-      '生产部署请在 .env 配置 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY，' +
-      '或设 VITE_MIM_BUILTIN_BACKEND=0 退回本地演示模式。详见 INSTALL.md。',
+      '生产部署请在 .env 配置 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY。' +
+      '（本项目已无本地模式：未配置云端将无法启动）详见 INSTALL.md。',
   )
 }
 
@@ -682,15 +687,9 @@ function createCloudClient(): CloudClient {
 
 const supabaseBackend = cloudBackend === 'supabase' ? createSupabaseClient() : null
 
-/**
- * 云端客户端：未配置任何后端时为 null，
- * 应用整体回退纯本地模式，保证无云端配置也能随时安全构建上线。
- */
+/** 云端客户端：仅在后端配置缺失时为 null（此时应用由 main.tsx 拦截并显示错误页） */
 export const supabase: CloudClient | null =
   supabaseBackend?.client ?? (cloudBackend === 'cloudbase' ? createCloudClient() : null)
-
-/** 是否已接入云端（true 时读路径/写路径走云端） */
-export const cloudEnabled = supabase !== null
 
 /** 真实 Supabase 客户端（仅 Supabase 模式；供存储适配层直连 Storage） */
 export const sbClient: SupabaseClient | null = supabaseBackend?.raw ?? null

@@ -3,7 +3,7 @@
    路由策略（审计结论驱动）：
    · Openverse：浏览器 CORS 支持不稳定（外部实测称未启用）+ 匿名限流
      5 次/小时 → 走自家 mim-api 的 /openverse/* 代理（服务端缓存 + 可选
-     注册客户端提额）；仅当无代理（纯本地模式）才回退直连。
+     注册客户端提额）；无代理基座时回退直连。
    · Wikimedia Commons：MediaWiki API 原生支持 origin=* CORS 且限流宽松，
      直接检索；文件直链在 upload.wikimedia.org，可被 <video>/<audio> 直接播放。
    所有请求统一走 fetchWithTimeout（AbortController + 15s），与 coze/ardot
@@ -95,7 +95,7 @@ export function classifyDiscError(e: unknown): { kind: OvErrorKind; message: str
   return { kind: 'unknown', message: '在线发现暂不可用，可稍后重试，或手动添加片源。' }
 }
 
-/** mim-api 代理基座：Supabase 模式拼 /functions/v1/mim-api；本地模式无代理（返回 ''） */
+/** mim-api 代理基座：Supabase 模式拼 /functions/v1/mim-api；无代理基座时返回 '' */
 export function openverseProxyBase(): string {
   if (cloudBackend === 'supabase') return `${cloudApiBase}/functions/v1/mim-api`
   if (cloudBackend === 'cloudbase') return cloudApiBase
@@ -279,7 +279,7 @@ export interface SearchOpts {
   pageSize?: number
   licenseType?: string
   fetchFn?: FetchLike
-  /** 代理基座；传 '' 表示强制直连（测试/本地模式用）。不传则自动解析 */
+  /** 代理基座；传 '' 表示强制直连（测试用）。不传则自动解析 */
   proxyBase?: string
   timeoutMs?: number
 }
@@ -304,7 +304,7 @@ async function getJson(url: string, fetchFn: FetchLike, timeoutMs: number): Prom
 }
 
 /**
- * Openverse 检索：优先 mim-api 代理；代理基座为空（本地模式）时直连。
+ * Openverse 检索：优先 mim-api 代理；代理基座为空时直连。
  * 返回统一结构；结果映射（→ MjExtItem）由调用方负责。
  */
 export async function searchOpenverse(

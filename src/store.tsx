@@ -33,7 +33,7 @@ import {
 } from './lib/cloud-write'
 import { pullCloudContent, type CloudPayload } from './lib/cloud-read'
 import { cloudSendMessage, subscribeMessages } from './lib/cloud-msg'
-import { supabase, cloudEnabled } from './lib/supabase'
+import { supabase } from './lib/supabase'
 import { recordGrowth } from './growth'
 import { revenueSnapshot, walletIncome } from './wallet'
 
@@ -884,7 +884,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   /* 轮 4 读路径：启动拉取云端内容合并本地；SIGNED_IN（登录成功/会话恢复）时重拉。
      轮 5：登录态下订阅 messages Realtime（对方来信实时推送），登出/卸载退订。 */
   useEffect(() => {
-    if (!cloudEnabled || !supabase) return
+    if (!supabase) return
     const sb = supabase // 闭包内不可依赖模块导入的窄化，捕获局部引用
     let alive = true
     let unsubMsg: (() => void) | null = null

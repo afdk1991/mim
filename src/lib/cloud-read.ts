@@ -1,8 +1,7 @@
 /* 云端读路径（轮 4）：启动/登录时拉取云端内容与个人数据，转换为本地域模型。
-   双真源共存设计：云端行 = 真实登录用户写入的内容；seed 演示内容（作者 me/u1..u9
-   无 auth.users 行）= 本地真源。pullCloudContent 返回的载荷由 store.tsx dispatch
-   cloudMerge 合并（云端行覆盖同 id 本地乐观行，其余混排插入）。
-   任一查询失败或无登录会话返回 null，调用方保持纯本地状态（静默降级）。 */
+   云端为唯一真源：云端行 = 真实登录用户写入的内容。pullCloudContent 返回的载荷由
+   store.tsx dispatch cloudMerge 合并（云端行覆盖同 id 本地乐观行，其余混排插入）。
+   任一查询失败或无登录会话返回 null，调用方保持本地缓存状态（静默降级）。 */
 import { supabase } from './supabase'
 import type {
   AppNotification,
@@ -20,7 +19,7 @@ import type {
 } from '../types'
 
 export interface CloudPayload {
-  /** 云端 profiles（仅真实登录用户，key 为 uuid，与 seed 用户 id 无交集） */
+  /** 云端 profiles（真实登录用户，key 为 uuid） */
   users: Record<string, User>
   posts: Post[]
   articles: Article[]
@@ -227,7 +226,7 @@ export async function pullCloudContent(): Promise<CloudPayload | null> {
       articleDrafts,
     }
   } catch (err) {
-    console.warn('[cloud-read] 云端拉取失败，回退纯本地：', err)
+    console.warn('[cloud-read] 云端拉取失败，沿用本地缓存：', err)
     return null
   }
 }

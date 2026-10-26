@@ -56,7 +56,7 @@ export function SettingsPage() {
       <div>
         <h2 className="page-title">⚙️ 设置</h2>
         <p className="set-hint" style={{ marginBottom: 12 }}>
-          当前登录身份：{auth.mode === 'cloud' ? `云端账号（${auth.username ?? auth.email ?? auth.userId.slice(0, 8)}…）` : '本机演示模式（local）'}
+          当前登录身份：{auth.mode === 'cloud' ? `云端账号（${auth.username ?? auth.email ?? auth.userId.slice(0, 8)}…）` : '游客（未登录）'}
           ，以下数据均按该身份隔离存储。
         </p>
         <div className="tabs">
@@ -248,7 +248,7 @@ function SwitchAccountCard() {
       toast('当前已是此账号')
       return
     }
-    /* 本地演示模式无法恢复云端会话：引导去登录页重新登录（demo 取舍） */
+    /* 游客身份无法恢复云端会话：引导去登录页重新登录 */
     toast('云端账号需验证登录态，请前往登录页切换')
     navigate('/login')
   }
@@ -272,7 +272,7 @@ function SwitchAccountCard() {
               <div className="set-acct-main">
                 <b>{acc.label}</b>
                 <small>
-                  {acc.uid === 'local' ? 'local' : `${acc.uid.slice(0, 8)}…`}
+                  {acc.uid === 'local' ? '游客' : `${acc.uid.slice(0, 8)}…`}
                   {acc.lastAt ? ` · 最近使用 ${fmtDate(acc.lastAt)}` : ' · 历史存档'}
                 </small>
               </div>
@@ -305,9 +305,9 @@ function DangerZone() {
       /* 清除当前身份相关的全部 localStorage key（mim-ud-*、成长/钱包/商城/发布器/VIP 等 <key>:<uid>） */
       purgeIdentityData(auth.userId)
       if (auth.mode === 'cloud') {
-        await signOut() // 云端身份登出回本地态
+        await signOut() // 云端身份登出回游客态
       } else {
-        api.resetLocalData() // 本地态：清空本地内容存档
+        api.resetLocalData() // 游客态：清空本机内容存档
       }
       setOpen(false)
       setWord('')
@@ -321,7 +321,7 @@ function DangerZone() {
     <div className="set-card set-danger">
       <h3>⚠️ 危险区</h3>
       <p className="set-hint">
-        注销将清除当前身份（{auth.mode === 'cloud' ? `${auth.userId.slice(0, 8)}…` : 'local'}）名下的所有本机数据：
+        注销将清除当前身份（{auth.mode === 'cloud' ? `${auth.userId.slice(0, 8)}…` : '游客'}）名下的所有本机数据：
         成长、钱包、商城、发布器、VIP、隐私与认证记录等，操作不可恢复。
       </p>
       <button className="set-danger-btn" onClick={() => setOpen(true)}>注销账号</button>

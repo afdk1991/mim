@@ -5,7 +5,6 @@ import { Empty, Modal, TimeAgo, useToast } from './components'
 import { MediaTranscodeWorkbench } from './media-domain' /* 轮 24 打通：B5 上传/转码工作台 */
 import { getCurrentUserId, useAuth } from './auth'
 import { useApp } from './store'
-import { cloudEnabled } from './lib/supabase'
 import { readPrivacy } from './user-domain'
 import {
   SCHED_EVT,
@@ -27,8 +26,7 @@ import type { PostLottery, PostMedia, PostVote } from './types'
  *  扩展表只存差异化字段：content_ext_dynamic / content_ext_article。
  *  轮 15 打通：提交不再只落本地预览——按 content_type 真发布进 store
  *  （动态/图文→广场 Feed，博文→知识库），并触发成长引擎记分；落库预览保留作 JSON 展示。
- *  轮 17 打通：发布记录按真实登录身份隔离（mim-publish-v1:<userId>），
- *  本地模式一次性迁移旧全局 key；切号即重载。 */
+ *  轮 17 打通：发布记录按真实登录身份隔离（mim-publish-v1:<userId>），切号即重载。 */
 
 /** content_type：10动态短文/11图文/12视频GIF/13投票/14抽奖/15快拍；20博文/22资源
  *  轮 21 打通：广场态扩展 B2 内容类型 12-15 */
@@ -81,8 +79,7 @@ interface PublishedItem {
   preview: Record<string, unknown>
 }
 
-/* 轮 17 打通：旧全局 key 仅作一次性迁移源；发布记录按登录身份分 key 隔离 */
-const PUB_LEGACY = 'mim-publish-v1'
+/* 轮 17 打通：发布记录按登录身份分 key 隔离 */
 const publishKeyFor = (userId: string) => `mim-publish-v1:${userId}`
 
 /** 校验并解析发布记录（缺失/非法返回 null） */
@@ -104,19 +101,6 @@ function loadPublish(userId: string = getCurrentUserId()): PublishedItem[] {
   const key = publishKeyFor(userId)
   const own = parsePublish(localStorage.getItem(key))
   if (own) return own
-  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
-     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与钱包/商城一致） */
-  if (!cloudEnabled) {
-    const legacy = parsePublish(localStorage.getItem(PUB_LEGACY))
-    if (legacy) {
-      try {
-        localStorage.setItem(key, JSON.stringify(legacy))
-      } catch {
-        /* ignore */
-      }
-      return legacy
-    }
-  }
   return []
 }
 
@@ -135,7 +119,7 @@ export function PublishPage() {
   /* 轮 15 打通：接入全局 store——真发布进广场 Feed / 知识库
      轮 21 打通：取全量 api（state/me/deletePost 供批量管理使用） */
   const api = useApp()
-  /* 作者锚点绑真实登录身份（本地未登录为 'local'），不再写死演示 user_id */
+  /* 作者锚点绑真实登录身份（未登录为游客锚点 'local'），不再写死演示 user_id */
   const { auth } = useAuth()
 
   /* ---------- 表单状态 ---------- */
@@ -270,7 +254,7 @@ export function PublishPage() {
     /* 金额一律存「分」整数（结算铁律）；广场态标题为 NULL、seo_slug 为 NULL */
     const base: Record<string, unknown> = {
       id,
-      user_id: auth.userId, // 真实登录身份（本地未登录为 'local'）
+      user_id: auth.userId, // 真实登录身份（未登录为游客锚点 'local'）
       domain: isPlaza ? 1 : 2,
       content_type: contentType,
       title: isPlaza ? null : title.trim(),

@@ -1,4 +1,4 @@
-/* 我的钱包：余额 + 积分 + 充值。演示环境不接入真实支付。 */
+/* 我的钱包：余额 + 积分 + 充值。充值暂未接入在线支付，金额直接记入余额。 */
 
 import { useToast } from '../components'
 import { useMall } from './store'
@@ -43,7 +43,7 @@ export function MallWalletPage() {
               </button>
             ))}
           </div>
-          <small className="muted">充值立即到账（演示环境，不接入真实支付）</small>
+          <small className="muted">充值暂未接入在线支付，金额直接记入账户余额</small>
         </div>
       </div>
     </div>

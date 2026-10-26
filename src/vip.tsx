@@ -3,7 +3,6 @@ import './vip.css'
 import { useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
-import { cloudEnabled } from './lib/supabase'
 import { walletConsume } from './wallet'
 
 /* ================= VIP 会员中心（盈利点：订阅收入 demo） =================
@@ -54,8 +53,7 @@ interface VipState {
 
 /** 云端快照 key（轮 6 语义不变：云表按 RLS user_id 隔离，跨身份共用同一 key） */
 const KEY = 'mim-vip-v1'
-/* 轮 16 打通：旧全局 key 仅作一次性迁移源；本地存档按登录身份分 key 隔离 */
-const LEGACY_KEY = 'mim-vip-v1'
+/* 轮 16 打通：本地存档按登录身份分 key 隔离 */
 const vipKeyFor = (userId: string) => `mim-vip-v1:${userId}`
 const DAY = 24 * 60 * 60 * 1000
 
@@ -87,19 +85,6 @@ function loadVip(userId: string = getCurrentUserId()): VipState {
   const localKey = vipKeyFor(userId)
   const own = parseVip(localStorage.getItem(localKey))
   if (own) return own
-  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
-     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与商城一致） */
-  if (!cloudEnabled) {
-    const legacy = parseVip(localStorage.getItem(LEGACY_KEY))
-    if (legacy) {
-      try {
-        localStorage.setItem(localKey, JSON.stringify(legacy))
-      } catch {
-        /* ignore */
-      }
-      return legacy
-    }
-  }
   return { plan: null, expireAt: 0, orders: [] }
 }
 

@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | 代理代码（Supabase Edge Function） | ✅ 已就绪 | `supabase/functions/mim-api/index.ts` 已含 `/openverse/videos`、`/openverse/audio` 路由（先于鉴权门禁） |
 | 代理代码（CloudBase 云函数） | ✅ 已就绪 | `cloudfunctions/mim-api/index.js` 同契约实现 |
-| 前端接入 | ✅ 已就绪 | `src/lib/openverse.ts` 优先走 mim-api 代理，本地模式回退直连 |
+| 前端接入 | ✅ 已就绪 | `src/lib/openverse.ts` 优先走 mim-api 代理，无代理基座时回退直连 |
 | Openverse 凭证 | ⛔ 未配置 | 当前走匿名 5 次/小时 限流；本地直连还可能被 CORS 拦截 |
 | 函数实际部署 | ⛔ 未部署/未注入 Openverse 密钥 | 代码在仓库，但线上函数未接收到 `OPENVERSE_*` |
 
@@ -70,11 +70,11 @@ curl -s "https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.co
 
 > 不配置 `OPENVERSE_*` 也能部署，只是代理回落到匿名限流（5 次/小时）——功能可用但不适合正式使用。
 
-## 五、本地模式（无凭证）说明
+## 五、无代理基座（直连）说明
 
-- 未配任何后端时，前端**直连** `api.openverse.org`；但浏览器 CORS 支持不稳定，可能失败。
+- 未配置代理基座时，前端**直连** `api.openverse.org`；但浏览器 CORS 支持不稳定，可能失败。
 - 失败已被细分为 `network`（断网/跨域/超时）、`rate_limit`（429）、`upstream`（非 2xx）、`parse`（JSON 解析失败），并给出针对性文案。
-- 本次 P1/P2 已完成：前端结果缓存、Commons 分页、license 强制、音频种子、错误细分——本地模式**可用但不保证跨域稳定**。
+- 本次 P1/P2 已完成：前端结果缓存、Commons 分页、license 强制、音频种子、错误细分——直连**可用但不保证跨域稳定**。
 
 ## 六、执行清单（待你提供凭证后 AI 逐项执行）
 

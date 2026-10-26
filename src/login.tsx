@@ -1,7 +1,7 @@
-/* 登录注册页（#/login）三态：
-   1) 云端未配置 → 本地模式说明（数据仅存本机浏览器）；
-   2) 云端已配置且已登录 → 账号卡 + 退出登录；
-   3) 云端已配置且未登录 → 登录 / 注册表单 + 第三方登录网格。
+/* 登录注册页（#/login）两态：
+   1) 云端已登录 → 账号卡 + 退出登录；
+   2) 云端未登录 → 登录 / 注册表单 + 第三方登录网格。
+   （本地模式已移除，云端配置缺失时 main.tsx 直接渲染错误页。）
    第三方登录：oauthProviders（auth.tsx 探测后台已启用项）驱动——
    Supabase 控制台开启哪个 provider，这里就自动出现哪个按钮，零代码增删。
    身份模型见 auth.tsx：真实身份（userId，钱包/云端边界）即内容作者身份（登录后 meId = auth uuid）。 */
@@ -43,7 +43,7 @@ const OAUTH_META: Record<string, { name: string; mark: string; color: string; da
 
 export function LoginPage() {
   const api = useApp()
-  const { auth, cloudEnabled, oauthProviders, signIn, signUp, signInWithOAuth, signOut } = useAuth()
+  const { auth, oauthProviders, signIn, signUp, signInWithOAuth, signOut } = useAuth()
   const { navigate, query } = useRouter()
   /* 微博 newlogin 模式：?url= 携带来源页路径，登录成功后回跳；仅接受站内路径，防外链跳转 */
   const rawUrl = query.get('url') ?? ''
@@ -55,22 +55,6 @@ export function LoginPage() {
   const [oauthBusy, setOauthBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
-
-  if (!cloudEnabled) {
-    return (
-      <div className="page-grid single">
-        <div className="auth-wrap">
-          <div className="card auth-card">
-            <h2 className="page-title">🔐 账号与身份</h2>
-            <p className="auth-hint">
-              当前为<b>本地模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置云端后端
-              （Supabase / CloudBase）后即可注册登录，由云端按账号隔离数据边界。
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   if (auth.mode === 'cloud') {
     return (

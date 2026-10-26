@@ -769,11 +769,11 @@ function AdminRolesPage() {
    （原三处副本：App.tsx / PullSearchBar.tsx 各自维护一份，改动易漏。）
    本文件如需请从 './SearchBox' 引入 loadHeroHistory / HERO_HISTORY_KEY / HERO_TAG_BG。 */
 
-/* 顶部 hero 右侧用户菜单：演示身份切换 + 账号登录态入口。
-   演示身份（meId）决定内容作者视角；账号（cloud/local）决定云端数据边界，见 auth.tsx。 */
+/* 顶部 hero 右侧用户菜单：账号登录态入口（游客 / 云端账号）。
+   meId 仅决定内容作者视角；账号（guest/cloud）决定云端数据边界，见 auth.tsx。 */
 function UserMenu() {
   const api = useApp()
-  const { auth, cloudEnabled, signOut } = useAuth()
+  const { auth, signOut } = useAuth()
   const [open, setOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
 
@@ -798,7 +798,7 @@ function UserMenu() {
             <Avatar emoji={api.me.emoji} color={api.me.color} size={38} />
             <div>
               <b>{api.me.name}</b>
-              <small>{auth.mode === 'cloud' ? (auth.username ?? auth.email ?? '云端账号') : '本地模式'}</small>
+              <small>{auth.mode === 'cloud' ? (auth.username ?? auth.email ?? '云端账号') : '游客（未登录）'}</small>
             </div>
           </div>
           <div className="usermenu-sec">账号</div>
@@ -815,7 +815,7 @@ function UserMenu() {
           ) : (
             <a className="usermenu-item" href="#/login" onClick={() => setOpen(false)}>
               <span className="usermenu-ico">🔑</span>
-              {cloudEnabled ? '登录 / 注册' : '登录（本地演示）'}
+              登录 / 注册
             </a>
           )}
           <a className="usermenu-item" href="#/my" onClick={() => setOpen(false)}>

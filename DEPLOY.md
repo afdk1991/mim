@@ -25,12 +25,12 @@
 一句话：**GitHub 管代码与制品，Pages + EdgeOne 管前端，Supabase 直连管 API / 数据库 / 存储 / Auth（CloudBase 为备）。**
 三者通过一次 `git push` 串起来。
 
-后端优先级（`src/lib/supabase.ts` 自动选择，可用 `VITE_MIM_BACKEND` 强制指定）：
+后端优先级（`src/lib/supabase.ts` 自动选择，可用 `VITE_MIM_BACKEND=supabase|cloudbase` 强制指定）：
 
 ```
 Supabase（配了 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY）
   → CloudBase（仅配 VITE_MIM_API_BASE）
-    → 本地演示模式（两者皆无）
+    → 两者皆无：启动即渲染配置错误页（无本地兜底模式）
 ```
 
 ## 〇、云端后端（先读这段）
@@ -120,9 +120,8 @@ VITE_SUPABASE_ANON_KEY=sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 
 ### 本地开发
 
-`.env` 中写入（模板见 `.env.example`；未配置任何后端时应用自动回退「本地演示模式」，
-数据仅存 localStorage，因此任何环境下都能安全构建上线。CI 已内联注入两组公开配置，
-无需再配 GitHub Secrets）：
+`.env` 中写入（模板见 `.env.example`；**必须至少配置一组云端**，两者皆无时应用启动即渲染
+配置错误页，不再回退本地模式。CI 已内联注入两组公开配置，无需再配 GitHub Secrets）：
 
 ```ini
 # 主后端（Supabase 直连）
@@ -130,7 +129,7 @@ VITE_SUPABASE_URL=https://sepfobukokrrivwyvhnd.supabase.co
 VITE_SUPABASE_ANON_KEY=sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 # 备后端（仅在不配 Supabase 时生效）
 # VITE_MIM_API_BASE=https://cs-1-d5g815slocb5a611a-1320483685.ap-shanghai.app.tcloudbase.com/mim-api
-# 强制指定后端（可选）：supabase / cloudbase / local / auto（默认 auto）
+# 强制指定后端（可选）：supabase / cloudbase（缺省按上表优先级自动选择）
 # VITE_MIM_BACKEND=cloudbase
 ```
 

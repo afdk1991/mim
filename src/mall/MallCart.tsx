@@ -9,8 +9,7 @@ export function MallCartPage() {
   const toast = useToast()
   const { navigate } = useRouter()
   const { state, setCartQty, removeFromCart, checkout } = useMall()
-  /* 商品目录与商城中心同源：云端优先 + 演示兜底，
-     否则云端模式下购物车条目会因取不到商品而被当成孤儿条目丢弃 */
+  /* 商品目录与商城中心同源：云端为唯一来源，取不到商品的条目不渲染 */
   const { goods } = useMallGoods()
 
   const rows = state.cart
@@ -22,7 +21,7 @@ export function MallCartPage() {
   const total = rows.reduce((sum, r) => sum + r.g.price * r.c.qty, 0)
   const count = rows.reduce((n, r) => n + r.c.qty, 0)
 
-  // 以可解析到商品库的条目为准（云端模式演示商品下架后，孤儿条目不阻塞空态判断）
+  // 以可解析到商品库的条目为准（商品下架后，孤儿条目不阻塞空态判断）
   if (rows.length === 0) {
     return (
       <div className="page-grid single">

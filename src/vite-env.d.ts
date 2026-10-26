@@ -15,7 +15,7 @@ interface ImportMetaEnv {
   readonly VITE_CLOUDBASE_REGION?: string
   /**
    * Mim 云端后端地址（CloudBase 云函数 mim-api 的 HTTP 访问入口）。
-   * 未配置时 supabase 客户端为 null，应用回退「本地演示模式」（localStorage）。
+   * 未配置且无其他云端后端时，应用启动即渲染配置错误页（本地模式已移除）。
    */
   readonly VITE_MIM_API_BASE?: string
 }

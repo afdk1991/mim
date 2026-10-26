@@ -2,7 +2,6 @@ import './wallet.css'
 import { useEffect, useState } from 'react'
 import { Empty, TimeAgo, emitToast, useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
-import { cloudEnabled } from './lib/supabase'
 import { cx } from './utils'
 
 /** 统一钱包 + 权益矩阵（开发吧.md 4.2 entitlement_matrix / 4.3 revenue_rule）
@@ -13,8 +12,7 @@ import { cx } from './utils'
  *  钱包页监听更新事件实时同步外部变更。
  *  轮 15 打通：新增 walletRecharge（充值通道，kind=recharge 非收益），
  *  商城钱包充值并轨到统一钱包，全站余额唯一源。
- *  轮 16 打通：存档按真实登录身份隔离（mim-wallet-v1:<userId>），
- *  本地模式一次性幂等迁移旧全局 key；模块级 API 自动跟随当前身份。 */
+ *  轮 16 打通：存档按真实登录身份隔离（mim-wallet-v1:<userId>），切号即重载。 */
 
 type PlanCode = 'BASIC' | 'SUPER' | 'DOWNLOAD_PACK' | 'ENTERPRISE'
 
@@ -95,8 +93,7 @@ interface WalletState {
   txs: Tx[]
 }
 
-/* 轮 16 打通：旧全局 key 仅作一次性迁移源；真实数据按登录身份分 key 隔离 */
-const WL_LEGACY = 'mim-wallet-v1'
+/* 轮 16 打通：真实数据按登录身份分 key 隔离 */
 const walletKeyFor = (userId: string) => `mim-wallet-v1:${userId}`
 
 /** 校验并解析钱包快照（缺失/非法返回 null） */
@@ -122,19 +119,6 @@ function loadWallet(userId: string = getCurrentUserId()): WalletState {
   const key = walletKeyFor(userId)
   const own = parseWallet(localStorage.getItem(key))
   if (own) return own
-  /* 本地模式首次访问时把旧全局 key 历史数据一次性迁移到当前身份
-     （云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份，与商城一致） */
-  if (!cloudEnabled) {
-    const legacy = parseWallet(localStorage.getItem(WL_LEGACY))
-    if (legacy) {
-      try {
-        localStorage.setItem(key, JSON.stringify(legacy))
-      } catch {
-        /* ignore */
-      }
-      return legacy
-    }
-  }
   return { balanceFen: 0, plan: 'BASIC', txs: [] }
 }
 

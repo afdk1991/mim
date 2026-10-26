@@ -18,7 +18,7 @@
  *   未登录或云端不可用时全部返回 ok:false，调用方应保持本地预览降级。
  */
 
-import { cloudApiBase, cloudBackend, cloudEnabled, cloudToken, cloudUid, sbClient } from './supabase'
+import { cloudApiBase, cloudBackend, cloudToken, cloudUid, sbClient } from './supabase'
 
 /** 单文件上限（与云函数 MAX_UPLOAD_BYTES 保持一致；Supabase 桶侧同样设 3MB） */
 export const MAX_UPLOAD_BYTES = 3 * 1024 * 1024
@@ -43,7 +43,6 @@ type Result<T> = { ok: true; data: T } | { ok: false; error: string }
 
 /** 云端存储是否可用：已接入云端且当前有登录会话 */
 export function cloudStorageReady(): boolean {
-  if (!cloudEnabled) return false
   return cloudBackend === 'supabase' ? !!cloudUid() : !!cloudToken()
 }
 
@@ -59,7 +58,7 @@ export function canUploadToCloud(file: File): boolean {
  * ------------------------------------------------------------------------- */
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
-  if (!cloudEnabled) return { ok: false, error: '未接入云端' }
+  if (!cloudApiBase) return { ok: false, error: '未配置云端后端' }
   const token = cloudToken()
   if (!token) return { ok: false, error: '请先登录后再上传到云端' }
   try {

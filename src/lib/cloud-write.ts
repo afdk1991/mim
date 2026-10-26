@@ -3,7 +3,7 @@
    失败时本层弹极简 DOM toast 报错并返回失败态，由 store.tsx 回滚乐观结果或恢复快照。
    返回三态 CloudResult（发布/评论类）：
    - 'ok'   写成功（store 据此 dispatch cloudMark 注册 cloudIds，标记内容此后走云端）
-   - 'skip' 未配置云端或无登录会话（静默跳过，行为与纯本地演示一致）
+   - 'skip' 未配置云端或无登录会话（静默跳过，仅更新本机状态）
    - 'fail' 写失败（已 toast，调用方须回滚）
    点赞/关注/收藏/删除/编辑类返回 Promise<boolean>：true = 成功或跳过，false = 失败（已 toast）。
    身份取自 supabase.auth.getSession()（内存缓存），不依赖 React context。
@@ -100,7 +100,7 @@ async function insertRow(
   label: string,
 ): Promise<CloudResult> {
   const userId = await cloudUserId()
-  if (!userId) return 'skip' // 未登录/未配置云端：跳过，保持本地演示行为
+  if (!userId) return 'skip' // 未登录/未配置云端：跳过，仅保留本机状态
   const { error } = await writeWithFallback(table, { ...row, author_id: userId }, (p) =>
     supabase!.from(table).insert(p) as unknown as Promise<{ error: { message: string } | null }>,
   )

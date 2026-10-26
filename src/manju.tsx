@@ -157,7 +157,7 @@ export interface DiscoverResult {
 }
 
 /**
- * Openverse 检索（优先 mim-api 代理，本地模式回退直连）。
+ * Openverse 检索（优先 mim-api 代理，无代理时回退直连）。
  * fetchFn 可注入以便测试；proxyBase 传 '' 强制直连。错误按 OvError 细分（rate_limit/network/upstream/parse）。
  */
 export async function discoverOpenverse(

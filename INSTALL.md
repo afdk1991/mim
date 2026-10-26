@@ -13,7 +13,7 @@
 源码里有 3 个后端地址是**作者个人项目**的公开地址（`src/lib/supabase.ts` 的
 `PROD_SUPABASE_URL` / `PROD_SUPABASE_ANON_KEY` / `PROD_API_BASE`）。
 它们被保留是因为 EdgeOne Makers 是远端构建、读不到仓库环境变量 —— 删掉会让作者
-自己的线上站退化成本地演示模式。因此做法是**加开关**而不是删除：
+自己的线上站缺配置而无法启动。因此做法是**加开关**而不是删除：
 
 ```ini
 # .env —— 二选一，不要都空着
@@ -21,7 +21,8 @@
 VITE_SUPABASE_URL=https://<你的项目ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=<你的 publishable key>
 
-# 方案 B（纯本地演示）：彻底关掉内置示例后端，数据仅存 localStorage
+# 方案 B（强制自有后端）：关掉内置示例后端，同时必须填入自有云端
+# （至少配上面两个 Supabase 变量，或改用 VITE_MIM_API_BASE 走 CloudBase 云函数）
 VITE_MIM_BUILTIN_BACKEND=0
 ```
 
@@ -66,18 +67,19 @@ grep -o 'sepfobukokrrivwyvhnd' dist/assets/*.js | wc -l   # 应为 0
 
 ## 2. 三条部署路径
 
-### 路径 A：纯静态 Demo（最快，无需任何后端）
+### 路径 A：纯静态托管（最少配置：只需一组云端）
 
 ```bash
 npm install --legacy-peer-deps
-cp .env.example .env          # 写入 VITE_MIM_BUILTIN_BACKEND=0（见 §0 方案 B）
+cp .env.example .env          # 至少填 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+                              # （或改用 VITE_MIM_API_BASE 走 CloudBase 云函数）
 npm run build                 # 产出 dist/
 ```
 
 把 `dist/` 丢到任意静态托管即可（Nginx / OSS / COS / GitHub Pages / EdgeOne / Vercel…）。
 
 - 构建配置是 `base: './'` + hash 路由（`#/feed`），**任意子路径都能直接跑**，不需要 404 兜底或 rewrite；
-- 后端为本地演示模式，数据存浏览器 localStorage —— 刷新不丢、换设备不同步，适合演示/评估。
+- 本地演示模式已移除：**一组云端配置都没有时应用会直接渲染配置错误页**，构建前务必确认 `.env` 非空。
 
 ### 路径 B：自建 Supabase（完整可用，含账号/数据库/存储/实时）
 
