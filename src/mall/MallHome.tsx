@@ -63,8 +63,8 @@ export function MallHomePage({ initial }: { initial?: MallChannel }) {
           ))}
         </div>
 
-        {/* 首次进入时短暂展示加载态；商品目录恒有内容（云端真实商品或演示商品兜底），
-            仅当所选频道确实无商品时才走空态 */}
+        {/* 首次进入时短暂展示加载态；商品目录唯一来源是云端 products 表，
+            云端为空或所选频道无商品时走空态（无演示商品兜底） */}
         {goodsLoading ? (
           <Empty text="正在加载商品…" />
         ) : goods.length === 0 ? (

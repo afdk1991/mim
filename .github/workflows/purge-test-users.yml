@@ -1,0 +1,94 @@
+name: 清理测试账号（Supabase auth.users）
+
+# 手动触发的一次性运维任务，不参与 push 自动部署。
+# 使用方式：Actions → 清理测试账号 → Run workflow
+#   apply = false（默认）→ dry-run，只打印「将删除」与「保留」名单，不删任何数据
+#   apply = true          → 真正删除命中的测试账号
+#
+# 判定规则见 scripts/purge-test-users.mjs：
+#   username / email 前缀 smoke_ e2e_ dbg_ diag_ rt_ st_ bridgetest_ test_
+#   或 profile.name 为默认值「新用户」（可用 --no-default-name 关闭）
+#
+# 前置：仓库 Settings → Secrets → Actions 配置 SUPABASE_SERVICE_ROLE_KEY
+#       （Dashboard → Project Settings → API Keys → service_role secret）。
+#       未配置时本 workflow 只提示并跳过，不会报失败。
+#
+# profiles 的「默认名」判定走 anon 只读，故一并内联公开 anon key
+# （与 ci-cd.yml 同值；publishable key 可暴露于客户端，安全由 RLS 保证）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: '是否真正执行删除（false = 仅 dry-run 查看名单）'
+        type: boolean
+        default: false
+      use_default_name:
+        description: '是否按默认档案名「新用户」判定测试号'
+        type: boolean
+        default: true
+
+concurrency:
+  group: purge-test-users
+  cancel-in-progress: false
+
+jobs:
+  purge:
+    name: 列出并清理测试账号
+    runs-on: ubuntu-latest
+    # 不写 secrets 到 job 级 if（会导致 workflow 解析失败），改用 env 承接布尔值
+    env:
+      HAS_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+    steps:
+      - name: 未配置 SUPABASE_SERVICE_ROLE_KEY 时跳过
+        if: env.HAS_SERVICE_KEY != 'true'
+        run: |
+          echo "::warning::未配置 SUPABASE_SERVICE_ROLE_KEY，跳过测试账号清理。"
+          echo "请到仓库 Settings → Secrets → Actions 添加该 secret 后重新运行本 workflow。"
+
+      - uses: actions/checkout@v4
+        if: env.HAS_SERVICE_KEY == 'true'
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_SERVICE_KEY == 'true'
+        with:
+          node-version: 22
+
+      # 脚本依赖 devDependencies 中的 pg（DB URL 直连模式才用；service_role 模式下为无副作用导入）
+      - name: 安装依赖
+        if: env.HAS_SERVICE_KEY == 'true'
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
+
+      - name: 打印名单（dry-run）
+        if: env.HAS_SERVICE_KEY == 'true' && inputs.apply == false
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_URL: https://sepfobukokrrivwyvhnd.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
+        run: |
+          set -o pipefail
+          if [ "${{ inputs.use_default_name }}" = "true" ]; then
+            node scripts/purge-test-users.mjs
+          else
+            node scripts/purge-test-users.mjs --no-default-name
+          fi
+
+      - name: 执行删除（--apply）
+        if: env.HAS_SERVICE_KEY == 'true' && inputs.apply == true
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_URL: https://sepfobukokrrivwyvhnd.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
+        run: |
+          set -o pipefail
+          if [ "${{ inputs.use_default_name }}" = "true" ]; then
+            node scripts/purge-test-users.mjs --apply
+          else
+            node scripts/purge-test-users.mjs --apply --no-default-name
+          fi
+
+      - name: 汇总
+        if: env.HAS_SERVICE_KEY == 'true' && inputs.apply == true
+        run: echo "::notice::测试账号清理完成；profiles 及内容表随 auth.users 级联删除。"
