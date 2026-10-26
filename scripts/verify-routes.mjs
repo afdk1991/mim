@@ -1,7 +1,8 @@
 // 全站路由遍历实测：白屏 / JS 异常 / 渲染内容检测（仅本地验证，不入库）
 import { chromium } from 'playwright-core'
+import { resolveBrowser } from './lib/browser.mjs'
 
-const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const EDGE = resolveBrowser()
 const BASE = process.env.BASE || 'http://localhost:5198'
 
 const ROUTES = [
@@ -60,3 +61,4 @@ if (bads) {
   rows.filter((r) => r.bad).forEach((r) => console.log(`${r.route}: ${r.errs[0]}`))
 }
 await browser.close()
+process.exit(blanks + bads > 0 ? 1 : 0)

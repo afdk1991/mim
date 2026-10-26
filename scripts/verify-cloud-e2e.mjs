@@ -1,8 +1,9 @@
 // 线上云端端到端实测：注册 → 发布 → 全新会话（空 localStorage）可读回
 // 判据：换一个全新浏览器上下文若能读到另一会话发布的内容 ⇒ 数据确实落在云端
 import { chromium } from 'playwright-core'
+import { resolveBrowser } from './lib/browser.mjs'
 
-const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const EDGE = resolveBrowser()
 const BASE = 'https://afdk1991.github.io/mim/'
 const STAMP = Date.now()
 const USER = 'e2e' + STAMP.toString(36)

@@ -149,6 +149,8 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # EdgeOne 侧凭证/CLI 故障不阻塞 Pages 发布与线上验证；失败会以 warning 呈现
+    continue-on-error: true
     env:
       # EdgeOne Makers 项目名（已存在 makers-euoglvyjyknd），可在仓库变量或此处修改
       EDGEONE_PROJECT_NAME: mim
@@ -175,8 +177,17 @@ jobs:
         id: eo
         run: |
           set -o pipefail
+          # 关键：先关掉 -e 再取命令替换结果，否则 CLI 失败会直接终止脚本、日志空白（历史 8 次盲失败的原因）
+          set +e
           OUT=$(PAGES_SOURCE=skills edgeone makers deploy -n "$EDGEONE_PROJECT_NAME" -t "${{ secrets.EDGEONE_API_TOKEN }}" --json 2>&1)
-          echo "$OUT"
+          RC=$?
+          set -e
+          echo "---- edgeone makers deploy 输出（exit=$RC）----"
+          printf '%s\n' "$OUT"
+          if [ "$RC" -ne 0 ]; then
+            echo "::error::edgeone makers deploy 失败，退出码 $RC（多为 EDGEONE_API_TOKEN 失效或 CLI 版本变更）"
+            exit "$RC"
+          fi
           # 提取部署 URL（形如 https://mim-xxxxxxxx.edgeone.cool?eo_token=…）
           URL=$(printf '%s' "$OUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.edgeone\.[a-z]+[^"]*' | head -1)
           if [ -n "$URL" ]; then
@@ -416,3 +427,86 @@ jobs:
           done
           if [ "$ok" != "1" ]; then echo "::error::EdgeOne Makers 未通过校验"; exit 1; fi
           echo '  ✅ Makers 域名可达（200/3xx 均视为存活）'
+
+  verify-ui:
+    name: 浏览器回归（路由 / 桌面 / 移动 / 漫剧 / 成长）
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖
+        run: |
+          npm install -g npm@10.9.9
+          npm install --no-fund --no-audit --legacy-peer-deps
+
+      - name: 构建
+        # 故意不注入云端配置：回归用本地演示模式构建，数据确定、不依赖线上服务
+        run: npm run build
+
+      - name: 探测 Chromium 内核浏览器
+        id: browser
+        run: |
+          # ubuntu-latest 预装 Google Chrome；脚本通过 MIM_BROWSER 指定可执行文件
+          for p in /usr/bin/google-chrome /usr/bin/google-chrome-stable /usr/bin/chromium /usr/bin/chromium-browser; do
+            if [ -x "$p" ]; then
+              echo "path=$p" >> "$GITHUB_OUTPUT"
+              echo "::notice::使用浏览器 $p"
+              exit 0
+            fi
+          done
+          echo "::warning::runner 未预装 Chromium 内核浏览器，本轮跳过 UI 回归"
+
+      - name: 启动预览服务
+        if: steps.browser.outputs.path != ''
+        run: |
+          nohup npx vite preview --port 5198 --strictPort > /tmp/preview.log 2>&1 &
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null http://localhost:5198/; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::预览服务未就绪"
+            cat /tmp/preview.log
+            exit 1
+          fi
+          echo '  ✅ 预览服务已就绪（5198）'
+
+      - name: 路由遍历（白屏 / JS 异常）
+        if: steps.browser.outputs.path != ''
+        env:
+          MIM_BROWSER: ${{ steps.browser.outputs.path }}
+        run: node scripts/verify-routes.mjs
+
+      - name: 桌面布局回归
+        if: steps.browser.outputs.path != ''
+        env:
+          MIM_BROWSER: ${{ steps.browser.outputs.path }}
+        run: node scripts/verify-desktop-regress.mjs
+
+      - name: 移动端视口回归
+        if: steps.browser.outputs.path != ''
+        env:
+          MIM_BROWSER: ${{ steps.browser.outputs.path }}
+        run: node scripts/verify-mobile.mjs
+
+      - name: 信息流与成长页回归
+        if: steps.browser.outputs.path != ''
+        env:
+          MIM_BROWSER: ${{ steps.browser.outputs.path }}
+          BASE: http://localhost:5198
+        run: node scripts/verify-feed-growth.mjs
+
+      - name: 漫剧在线发现与播放器回归
+        if: steps.browser.outputs.path != ''
+        env:
+          MIM_BROWSER: ${{ steps.browser.outputs.path }}
+          BASE: http://localhost:5198
+        run: node scripts/verify-openverse.mjs

@@ -7,8 +7,9 @@
 // 用法：npm run verify:feed
 //       BASE=http://localhost:5199 npm run verify:feed
 import { chromium } from 'playwright-core'
+import { resolveBrowser } from './lib/browser.mjs'
 
-const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const EDGE = resolveBrowser()
 const BASE = process.env.BASE || 'http://localhost:5198'
 
 let pass = 0

@@ -1,5 +1,6 @@
 import { chromium } from 'playwright-core'
-const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+import { resolveBrowser } from './lib/browser.mjs'
+const EDGE = resolveBrowser()
 const b = await chromium.launch({ executablePath: EDGE, args: ['--no-sandbox'] })
 const p = await b.newPage({ viewport: { width: 1440, height: 900 } })
 let pass = 0, fail = 0
@@ -51,3 +52,4 @@ check('桌面通知页 Tab 栏正常', nt.tabs >= 4 && nt.ovf === 0, `tabs=${nt.
 
 console.log(`\n=== 桌面回归：${pass} 通过 / ${fail} 失败 ===`)
 await b.close()
+process.exit(fail > 0 ? 1 : 0)

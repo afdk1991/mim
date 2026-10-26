@@ -1,7 +1,8 @@
 // 移动端视口实测：用 --window-size + setViewportSize 绕过 headless innerWidth 退化
 import { chromium } from 'playwright-core'
+import { resolveBrowser } from './lib/browser.mjs'
 
-const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const EDGE = resolveBrowser()
 const BASE = process.env.BASE || 'http://localhost:5198'
 const W = Number(process.argv[2] || 390)
 const H = Number(process.argv[3] || 844)
@@ -57,3 +58,4 @@ await page.goto(`${BASE}/#/feed`, { waitUntil: 'domcontentloaded' })
 await page.waitForTimeout(600)
 await page.screenshot({ path: 'verify-shots/mobile-feed.png' })
 await browser.close()
+process.exit(fails.length > 0 ? 1 : 0)

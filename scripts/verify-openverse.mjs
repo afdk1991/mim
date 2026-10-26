@@ -2,9 +2,10 @@
  * 用法：先起 `npx vite --port 5199 --strictPort`，再 `node scripts/verify-openverse.mjs`
  * 沙箱无外网，Openverse / Commons / Supabase 代理全部用 route mock 模拟。 */
 import { chromium } from 'playwright-core'
+import { resolveBrowser } from './lib/browser.mjs'
 
-const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
-const BASE = 'http://localhost:5199'
+const EDGE = resolveBrowser()
+const BASE = process.env.BASE || 'http://localhost:5199'
 const results = []
 const check = (name, ok, detail = '') => {
   results.push({ name, ok, detail })
@@ -252,7 +253,8 @@ try {
     for (const r of results.filter((x) => !x.ok)) console.log(`  ❌ ${r.name} —— ${r.detail}`)
   }
 } catch (e) {
-  console.log('❌ 脚本异常:', e.message)
+  results.push({ name: '脚本异常', ok: false, detail: e.message })
 } finally {
   await browser.close()
 }
+process.exit(results.every((r) => r.ok) ? 0 : 1)
