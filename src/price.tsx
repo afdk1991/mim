@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useToast } from './components'
+import { Modal, useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
 
@@ -20,6 +20,8 @@ interface WatchProduct {
   emoji: string
   platform: string
   threshold: number
+  /** 最近一次同步的 24h 涨跌幅（%），来自 CoinGecko；未同步过为 0 */
+  dayChange: number
   prices: PricePoint[]
 }
 
@@ -46,20 +48,23 @@ interface PriceBoard {
 
 const STORAGE_KEY = 'mim-price-v2'
 
-/* CoinGecko 实时行情：一次批量请求全部监控标的，CNY 计价 + 24h 涨跌 */
-const CG_IDS = 'bitcoin,ethereum,solana,binancecoin,dogecoin'
+/* CoinGecko 实时行情：一次批量请求全部监控标的，CNY 计价 + 24h 涨跌。
+   ids 由看板当前监控列表动态给出，支持用户自定义任意 CoinGecko 资产 id。 */
+const DEFAULT_CG_IDS = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'dogecoin']
 
 interface CgQuote {
   price: number
   change: number
 }
 
-async function fetchCnyQuotes(): Promise<Record<string, CgQuote>> {
+async function fetchCnyQuotes(ids: string[]): Promise<Record<string, CgQuote>> {
+  const unique = Array.from(new Set(ids.map((s) => s.trim()).filter(Boolean)))
+  if (!unique.length) throw new Error('no watch ids')
   const ctl = new AbortController()
   const timer = window.setTimeout(() => ctl.abort(), 10000)
   try {
     const res = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${CG_IDS}&vs_currencies=cny&include_24hr_change=true`,
+      `https://api.coingecko.com/api/v3/simple/price?ids=${unique.join(',')}&vs_currencies=cny&include_24hr_change=true`,
       { signal: ctl.signal },
     )
     if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -77,19 +82,23 @@ async function fetchCnyQuotes(): Promise<Record<string, CgQuote>> {
   }
 }
 
+/* 默认监控清单：仅定义标的元信息（名称/图标），价格全部来自真实 API 同步，
+   不预置任何价格/预警数据。 */
+const DEFAULT_WATCHES: Array<[string, string, string]> = [
+  ['bitcoin', '比特币 BTC', '₿'],
+  ['ethereum', '以太坊 ETH', 'Ξ'],
+  ['solana', 'Solana SOL', '◎'],
+  ['binancecoin', 'BNB 币安币', '🔶'],
+  ['dogecoin', '狗狗币 DOGE', '🐕'],
+]
+
 function seedData(): PriceBoard {
   const mk = (id: string, name: string, emoji: string): WatchProduct => ({
-    id, name, emoji, platform: 'CoinGecko 实时', threshold: 0, prices: [],
+    id, name, emoji, platform: 'CoinGecko 实时', threshold: 0, dayChange: 0, prices: [],
   })
   return {
-    products: [
-      mk('bitcoin', '比特币 BTC', '₿'),
-      mk('ethereum', '以太坊 ETH', 'Ξ'),
-      mk('solana', 'Solana SOL', '◎'),
-      mk('binancecoin', 'BNB 币安币', '🔶'),
-      mk('dogecoin', '狗狗币 DOGE', '🐕'),
-    ],
-    tasks: ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'dogecoin'].map((productId) => ({
+    products: DEFAULT_WATCHES.map(([id, name, emoji]) => mk(id, name, emoji)),
+    tasks: DEFAULT_CG_IDS.map((productId) => ({
       productId, freq: '打开页面 / 手动同步', enabled: true, lastRunAt: 0,
     })),
     alerts: [],
@@ -109,6 +118,8 @@ function loadBoard(): PriceBoard {
             typeof p.id === 'string' && typeof p.name === 'string' &&
             typeof p.emoji === 'string' && typeof p.platform === 'string' &&
             typeof p.threshold === 'number' && Number.isFinite(p.threshold) &&
+            (typeof (p as WatchProduct).dayChange === 'undefined' ||
+              (typeof p.dayChange === 'number' && Number.isFinite(p.dayChange))) &&
             Array.isArray(p.prices) && p.prices.every(
               (pt): pt is PricePoint => !!pt && typeof pt === 'object' &&
                 typeof pt.at === 'number' && Number.isFinite(pt.at) &&
@@ -130,7 +141,7 @@ function loadBoard(): PriceBoard {
             typeof a.to === 'number' && Number.isFinite(a.to) &&
             typeof a.at === 'number' && Number.isFinite(a.at),
         )
-        return { products, tasks, alerts }
+        return { products: products.map((p) => ({ ...p, dayChange: p.dayChange ?? 0 })), tasks, alerts }
       }
     }
   } catch {
@@ -170,6 +181,8 @@ function Spark({ prices }: { prices: PricePoint[] }) {
 export function PriceMonitorPage() {
   const [board, setBoard] = useState<PriceBoard>(loadBoard)
   const [syncing, setSyncing] = useState(false)
+  const [lastError, setLastError] = useState('')
+  const [addDraft, setAddDraft] = useState<null | { id: string; name: string; emoji: string; threshold: string }>(null)
   const toast = useToast()
 
   useEffect(() => {
@@ -192,11 +205,20 @@ export function PriceMonitorPage() {
 
   const { products, tasks, alerts } = board
 
-  /* 从 CoinGecko 拉取全部监控标的实时价（CNY），更新价格曲线并按预警线判定降价 */
+  /* 从 CoinGecko 拉取实时价（CNY）：仅同步「采集任务」处于启用状态的标的，
+     更新价格曲线 / 24h 涨跌，并按预警线判定降价预警。 */
   function syncAll() {
     if (syncing) return
+    const enabledIds = board.products
+      .filter((p) => board.tasks.find((t) => t.productId === p.id)?.enabled !== false)
+      .map((p) => p.id)
+    if (!enabledIds.length) {
+      toast('没有启用中的采集任务，请先在下方启用')
+      return
+    }
     setSyncing(true)
-    void fetchCnyQuotes()
+    setLastError('')
+    void fetchCnyQuotes(enabledIds)
       .then((quotes) => {
         const now = Date.now()
         let fetched = 0
@@ -213,7 +235,7 @@ export function PriceMonitorPage() {
             if (last !== null && dropped && (q.price <= threshold || -pct >= 0.05)) {
               newAlerts.push({ id: uid('al'), productId: p.id, from: last, to: q.price, at: now })
             }
-            return { ...p, threshold, prices: [...p.prices, { at: now, price: q.price }].slice(-30) }
+            return { ...p, threshold, dayChange: q.change, prices: [...p.prices, { at: now, price: q.price }].slice(-30) }
           })
           return {
             products,
@@ -222,12 +244,55 @@ export function PriceMonitorPage() {
           }
         })
         toast(fetched ? `📊 已同步 ${fetched} 项实时价格（CNY）` : '未获取到行情数据')
+        if (!fetched) setLastError('CoinGecko 未返回任何标的数据，请检查资产 id 是否正确')
       })
       .catch((e) => {
         console.warn('[price] CoinGecko 请求失败', e)
+        setLastError('行情获取失败：网络异常或 API 限流，请稍后重试')
         toast('⚠️ 行情获取失败，请稍后重试')
       })
       .finally(() => setSyncing(false))
+  }
+
+  /* 新增监控标的：CoinGecko 资产 id 必填且唯一；名称缺省时用 id 顶格显示 */
+  function addWatch() {
+    const id = addDraft!.id.trim().toLowerCase()
+    if (!id) {
+      toast('请填写 CoinGecko 资产 id（如 bitcoin）')
+      return
+    }
+    if (products.some((p) => p.id === id)) {
+      toast('该标的已在监控列表中')
+      return
+    }
+    const th = Number(addDraft!.threshold)
+    const product: WatchProduct = {
+      id,
+      name: addDraft!.name.trim() || id.toUpperCase(),
+      emoji: addDraft!.emoji.trim() || '🪙',
+      platform: 'CoinGecko 实时',
+      threshold: Number.isFinite(th) && th > 0 ? Math.round(th * 10) / 10 : 0,
+      dayChange: 0,
+      prices: [],
+    }
+    setBoard((b) => ({
+      ...b,
+      products: [...b.products, product],
+      tasks: [...b.tasks, { productId: id, freq: '打开页面 / 手动同步', enabled: true, lastRunAt: 0 }],
+    }))
+    setAddDraft(null)
+    toast('已加入监控，点击「立即采集」获取实时价')
+  }
+
+  /* 移除监控标的：连带清理其采集任务与相关预警 */
+  function removeWatch(pid: string) {
+    if (!window.confirm('确定移除该监控标的吗？其价格曲线与预警将一并删除。')) return
+    setBoard((b) => ({
+      products: b.products.filter((p) => p.id !== pid),
+      tasks: b.tasks.filter((t) => t.productId !== pid),
+      alerts: b.alerts.filter((a) => a.productId !== pid),
+    }))
+    toast('已移除监控标的')
   }
 
   /* 首次进入（或迁移到 v2 存档）时自动同步一次实时行情 */
@@ -264,6 +329,41 @@ export function PriceMonitorPage() {
           <div className="stat-box"><b>{new Set(products.map((p) => p.platform)).size}</b><span>覆盖平台</span></div>
         </div>
 
+        <div className="board-toolbar" style={{ marginBottom: 12 }}>
+          <b>监控看板</b>
+          <div className="toolbar-actions">
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setAddDraft({ id: '', name: '', emoji: '', threshold: '' })}
+            >
+              + 新增监控
+            </button>
+          </div>
+        </div>
+
+        {lastError && (
+          <div className="card" style={{ marginBottom: 12, borderColor: 'var(--danger, #e5484d)' }}>
+            <div className="task-row" style={{ borderBottom: 'none' }}>
+              <span className="notif-icon">⚠️</span>
+              <div className="res-main">
+                <b>同步失败</b>
+                <p>{lastError}</p>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => syncAll()} disabled={syncing}>
+                {syncing ? '同步中…' : '重试'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {products.length === 0 && (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <p className="muted" style={{ margin: '8px 0' }}>
+              监控列表为空，点击「+ 新增监控」添加任意 CoinGecko 资产（如 bitcoin、ethereum）。
+            </p>
+          </div>
+        )}
+
         <div className="price-grid">
           {products.map((p) => {
             const last = p.prices.length ? p.prices[p.prices.length - 1] : null
@@ -277,13 +377,27 @@ export function PriceMonitorPage() {
                   <span className="price-emoji">{p.emoji}</span>
                   <div className="price-card-name">
                     <b>{p.name}</b>
-                    <small>{p.platform} · 预警线 {p.threshold > 0 ? fmtPrice(p.threshold) : '待采集'}</small>
+                    <small>
+                      {p.platform} · 预警线 {p.threshold > 0 ? fmtPrice(p.threshold) : '待采集'}
+                      {p.dayChange !== 0 && (
+                        <span className={p.dayChange < 0 ? 'price-drop' : 'price-up'}>
+                          {' · 24h '}{p.dayChange > 0 ? '+' : ''}{p.dayChange.toFixed(1)}%
+                        </span>
+                      )}
+                    </small>
                   </div>
                   {task && (
                     <span className={cx('tag', !task.enabled && 'tag-off')}>
                       {task.enabled ? '监控中' : '已停用'}
                     </span>
                   )}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="移除该监控标的"
+                    onClick={() => removeWatch(p.id)}
+                  >
+                    ✕
+                  </button>
                 </div>
                 <div className="price-now-row">
                   {last ? (
@@ -362,6 +476,41 @@ export function PriceMonitorPage() {
           })}
         </div>
       </div>
+
+      {addDraft && (
+        <Modal title="新增监控标的" onClose={() => setAddDraft(null)}>
+          <input
+            className="input"
+            placeholder="CoinGecko 资产 id（必填，如 bitcoin）"
+            value={addDraft.id}
+            onChange={(e) => setAddDraft({ ...addDraft, id: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            placeholder="显示名称（可选，默认可用 id）"
+            value={addDraft.name}
+            onChange={(e) => setAddDraft({ ...addDraft, name: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            placeholder="图标 emoji（可选，默认 🪙）"
+            value={addDraft.emoji}
+            onChange={(e) => setAddDraft({ ...addDraft, emoji: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            type="number"
+            placeholder="降价预警线（元，可选）"
+            value={addDraft.threshold}
+            onChange={(e) => setAddDraft({ ...addDraft, threshold: e.target.value })}
+            style={{ marginBottom: 10 }}
+          />
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={addWatch}>加入监控</button>
+        </Modal>
+      )}
     </div>
   )
 }
