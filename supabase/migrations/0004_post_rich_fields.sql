@@ -3,7 +3,7 @@
 -- 目的：前端本地已支持「视频/GIF、投票、抽奖、定位、仅自己可见、24h 快拍、置顶」
 --       等富帖能力，但云端 posts 表此前缺列，导致登录后拉取的云端帖子被静默降级为纯文本。
 --       本迁移补齐列，使富帖能力可正常上云 / 回拉。
--- 幂等：全部使用 add column if not exists / add constraint if not exists。
+-- 幂等：add column if not exists；约束用 DO 块 + duplicate_object 异常捕获（PG 不支持 ADD CONSTRAINT IF NOT EXISTS）。
 -- ============================================================================
 
 alter table if exists public.posts

@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- Mim · 一键补齐脚本（供 Supabase Dashboard → SQL Editor 粘贴执行）
--- 生成时间：2026-10-24T16:35:26.101Z
+-- 生成时间：2026-10-26T10:06:55.753Z
 -- 生成命令：npm run db:gen-manual（与本仓库 CI 迁移计划同源，顺序一致）
 --
 -- 用途：无需数据库密码 / 无需本地 SUPABASE_DB_URL，直接补齐线上缺失内容。
@@ -1168,7 +1168,7 @@ grant execute on function public.claim_username(text, text, text, text) to anon,
 -- 目的：前端本地已支持「视频/GIF、投票、抽奖、定位、仅自己可见、24h 快拍、置顶」
 --       等富帖能力，但云端 posts 表此前缺列，导致登录后拉取的云端帖子被静默降级为纯文本。
 --       本迁移补齐列，使富帖能力可正常上云 / 回拉。
--- 幂等：全部使用 add column if not exists / add constraint if not exists。
+-- 幂等：add column if not exists；约束用 DO 块 + duplicate_object 异常捕获（PG 不支持 ADD CONSTRAINT IF NOT EXISTS）。
 -- ============================================================================
 
 alter table if exists public.posts
@@ -1182,9 +1182,21 @@ alter table if exists public.posts
   add column if not exists pinned     boolean not null default false;
 
 -- visibility 取值约束（与前端 Post.visibility 对齐）
-alter table if exists public.posts
-  add constraint if not exists posts_visibility_check
-  check (visibility in ('public', 'self'));
+-- 注意：PostgreSQL 的 ADD CONSTRAINT 不支持 IF NOT EXISTS，
+--       用 DO 块 + 异常处理实现幂等（已存在则跳过）。
+do $$
+begin
+  if exists (select 1 from information_schema.tables
+             where table_schema = 'public' and table_name = 'posts') then
+    begin
+      alter table public.posts
+        add constraint posts_visibility_check
+        check (visibility in ('public', 'self'));
+    exception
+      when duplicate_object then null;  -- 约束已存在，跳过
+    end;
+  end if;
+end $$;
 
 -- ==============================================================================
 -- 迁移 0005_mall_catalog.sql
@@ -1203,7 +1215,7 @@ alter table if exists public.posts
 --
 -- 本迁移补齐商品模型字段，并灌入五频道种子数据，使商城端到端可用。
 --
--- 幂等：全部 add column if not exists / add constraint if not exists /
+-- 幂等：add column if not exists / DO 块约束 / create index if not exists /
 --       insert ... on conflict (id) do nothing，可重复执行。
 -- ============================================================================
 
@@ -1220,9 +1232,20 @@ alter table if exists public.products
 
 -- 频道取值约束（与前端 MallChannel 联合类型对齐；
 -- 0001 建表后从未写入数据，故历史行不会违反该约束）
-alter table if exists public.products
-  add constraint if not exists products_channel_check
-  check (channel in ('youxuan', 'gexm', 'mix', 'live', 'laal'));
+-- 注意：PostgreSQL 的 ADD CONSTRAINT 不支持 IF NOT EXISTS，用 DO 块实现幂等。
+do $$
+begin
+  if exists (select 1 from information_schema.tables
+             where table_schema = 'public' and table_name = 'products') then
+    begin
+      alter table public.products
+        add constraint products_channel_check
+        check (channel in ('youxuan', 'gexm', 'mix', 'live', 'laal'));
+    exception
+      when duplicate_object then null;  -- 约束已存在，跳过
+    end;
+  end if;
+end $$;
 
 -- 频道 + 上架状态联合索引：商城按频道筛选商品的主查询路径
 create index if not exists products_channel_status_idx
