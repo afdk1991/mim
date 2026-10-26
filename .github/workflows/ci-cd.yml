@@ -439,8 +439,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
+      # package-lock.json 不入库（.gitignore 第 4 行），故不能用 cache: npm
       - name: 安装依赖
         run: |
           npm install -g npm@10.9.9
