@@ -2,13 +2,13 @@
  * Mim · 数据库迁移执行脚本（本地通道：pg 直连，全量）
  *
  * 作用：按统一迁移计划（scripts/lib/migration-plan.mjs）把全部 SQL 应用到 Supabase：
- *       0000_schema.sql（基线 20 张业务表）→ 0001… 增量迁移 → 9999_seed.sql（演示数据）。
+ *       0000_schema.sql（基线 20 张业务表）→ 0001… 增量迁移。
  *       已在 public.schema_migrations 记录的版本自动跳过（迁移本身亦为幂等 SQL，
  *       重复执行不会报错，跟踪表只是避免无谓重跑）。
  *       应用完成后可选地为指定账号授予 admin 角色（解锁「🛡️ 管理后台」入口）。
  *
  * 修复记录（P1-1 根因）：早期版本只读 supabase/migrations/*.sql，
- *   漏掉目录外的 schema.sql 与 seed.sql，故本地执行同样无法补齐全库。
+ *   漏掉目录外的 schema.sql，故本地执行同样无法补齐全库。
  *   现与云端通道共用同一计划，两条通道行为一致。
  *
  * 前置准备：

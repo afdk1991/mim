@@ -5,7 +5,7 @@
  *       把本文件全文粘贴到 Supabase Dashboard → SQL Editor → Run 即可补齐线上全库。
  *
  * 生成内容（与 CI 云端通道同一迁移计划，顺序完全一致）：
- *   0000_schema.sql → 0001… 增量迁移 → 9999_seed.sql
+ *   0000_schema.sql → 0001… 增量迁移
  * 因此手工执行与 push main 自动执行的结果一致，不会分叉。
  *
  * 用法：npm run db:gen-manual
@@ -37,10 +37,9 @@ const head = `\
 -- 典型补齐项：
 --   ① 基线 20 张业务表（posts / profiles / articles / snippets / topics / hot_searches …）
 --   ② IAM 权限中心（roles / permissions / user_roles / role_permissions / audit_logs）
---   ③ 商城目录（products 商品模型 + 五频道商品种子）
+--   ③ 商城目录（products 商品模型字段；不含任何商品数据）
 --   ④ 对象存储私有桶 mim-media（迁移 0002）
 --   ⑤ 账号桥（account_bridge + username_taken / claim_username RPC，迁移 0003）
---   ⑥ 演示数据（resources / topics / hot_searches，seed.sql）
 --
 -- 执行方式（二选一）：
 --   ① 推荐：Dashboard → SQL Editor → 粘贴本文件全部内容 → Run（无需密码）
@@ -60,8 +59,7 @@ create table if not exists public.schema_migrations (
 
 const parts = plan.map((entry) => {
   const body = readFileSync(entry.path, 'utf8').trim()
-  const kindLabel =
-    entry.kind === 'schema' ? '基线结构' : entry.kind === 'seed' ? '演示数据' : `迁移 ${entry.version}`
+  const kindLabel = entry.kind === 'schema' ? '基线结构' : `迁移 ${entry.version}`
   return `-- ${RULE}\n-- ${kindLabel}\n-- ${RULE}\n\n${body}\n`
 })
 
@@ -76,10 +74,10 @@ ${plan
 
 -- ${RULE}
 -- 执行后自检（四条均应有返回且不报错）：
---   select count(*) from public.roles;                                    -- 应 > 0
---   select count(*) from public.products where status = 'active';         -- 应 = 15
---   select count(*) from public.topics;                                   -- 应 = 10
---   select count(*) from public.hot_searches;                             -- 应 = 15
+--   select count(*) from public.roles;                                    -- 应 > 0（系统基础权限）
+--   select count(*) from public.products where status = 'active';         -- 应 = 0（无演示商品）
+--   select count(*) from public.topics;                                   -- 应 = 0（无演示话题）
+--   select count(*) from public.hot_searches;                             -- 应 = 0（无演示热搜）
 --   select public.username_taken('probe_name');                           -- 应 true/false，不再报 PGRST202
 -- ${RULE}
 `

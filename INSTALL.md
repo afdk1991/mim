@@ -92,7 +92,7 @@ npm run build                 # 产出 dist/
 
    `apply-all-manual.sql` 由 `npm run db:gen-manual` 生成，改完 SQL 重新生成即可，保证与 CI 不产生分叉。
    迁移顺序：`0000_schema`（20 张业务表基线）→ `0001` IAM → `0002` 对象存储 → `0003` 账号桥
-   → `0004` 帖子富字段 → `0005` 商城目录 → `9999_seed`（演示数据）。全部幂等。
+   → `0004` 帖子富字段 → `0005` 商城目录（仅字段扩展，无演示商品）。全部幂等。
 
 3. 配 `.env`（§0 方案 A），`npm run build`，部署 `dist/`；
 4. 可选：开启 GitHub OAuth（Dashboard → Authentication → Providers），回跳白名单加上你的域名。

@@ -3,18 +3,18 @@
  *
  * 背景（P1-1 根因）：
  *   早期 apply-migration*.mjs 只读 supabase/migrations/*.sql，
- *   而 supabase/schema.sql（20 张业务表基线）与 supabase/seed.sql（演示数据）
- *   都位于 migrations/ 目录之外，从未被纳入自动化流水线 ——
+ *   而 supabase/schema.sql（20 张业务表基线）位于 migrations/ 目录之外，
+ *   从未被纳入自动化流水线 ——
  *   导致线上库只执行过手工粘贴的 schema.sql，
- *   0001/0003/seed 全部处于「从未应用」状态（roles 等表 404、热搜为空）。
+ *   0001/0003 全部处于「从未应用」状态（roles 等表 404、热搜为空）。
  *
- * 本模块把三类 SQL 收敛为单一有序计划，供两条通道共用：
+ * 本模块把两类 SQL 收敛为单一有序计划，供两条通道共用：
  *   0000_schema.sql  ← supabase/schema.sql     （基线：业务表 + RLS，必须最先）
  *   0001…00NN_*.sql  ← supabase/migrations/*   （增量迁移，按文件名排序）
- *   9999_seed.sql    ← supabase/seed.sql       （演示数据，最后灌入）
  *
- * 排序由 version 字符串决定（0000 < 0001… < 9999），故顺序恒为
- * 「基线 → 增量 → 数据」，且三者独立可缺失（缺文件则跳过，不报错）。
+ * 排序由 version 字符串决定（0000 < 0001…），故顺序恒为「基线 → 增量」，
+ * 且两者独立可缺失（缺文件则跳过，不报错）。
+ * 项目不含任何演示数据种子：数据库内容唯一来源为用户/运营真实写入。
  */
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,7 +26,7 @@ const MIGRATIONS_DIR = join(SUPABASE_DIR, 'migrations')
 
 /**
  * 构建全量迁移计划。
- * @returns {Array<{ version: string, path: string, kind: 'schema'|'migration'|'seed' }>}
+ * @returns {Array<{ version: string, path: string, kind: 'schema'|'migration' }>}
  */
 export function buildMigrationPlan() {
   const plan = []
@@ -42,12 +42,7 @@ export function buildMigrationPlan() {
     }
   }
 
-  const seedPath = join(SUPABASE_DIR, 'seed.sql')
-  if (existsSync(seedPath)) {
-    plan.push({ version: '9999_seed.sql', path: seedPath, kind: 'seed' })
-  }
-
-  // 以 version 字符串定序：0000_schema → 0001… → 9999_seed
+  // 以 version 字符串定序：0000_schema → 0001…
   plan.sort((a, b) => (a.version < b.version ? -1 : a.version > b.version ? 1 : 0))
   return plan
 }

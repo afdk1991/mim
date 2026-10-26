@@ -1,18 +1,17 @@
 -- ==============================================================================
 -- Mim · 一键补齐脚本（供 Supabase Dashboard → SQL Editor 粘贴执行）
--- 生成时间：2026-10-26T10:06:55.753Z
+-- 生成时间：2026-10-26T14:38:49.920Z
 -- 生成命令：npm run db:gen-manual（与本仓库 CI 迁移计划同源，顺序一致）
 --
 -- 用途：无需数据库密码 / 无需本地 SUPABASE_DB_URL，直接补齐线上缺失内容。
--- 内容：0000_schema.sql → 0001_iam_phase1.sql → 0002_storage_media.sql → 0003_account_bridge.sql → 0004_post_rich_fields.sql → 0005_mall_catalog.sql → 9999_seed.sql
+-- 内容：0000_schema.sql → 0001_iam_phase1.sql → 0002_storage_media.sql → 0003_account_bridge.sql → 0004_post_rich_fields.sql → 0005_mall_catalog.sql
 --
 -- 典型补齐项：
 --   ① 基线 20 张业务表（posts / profiles / articles / snippets / topics / hot_searches …）
 --   ② IAM 权限中心（roles / permissions / user_roles / role_permissions / audit_logs）
---   ③ 商城目录（products 商品模型 + 五频道商品种子）
+--   ③ 商城目录（products 商品模型字段；不含任何商品数据）
 --   ④ 对象存储私有桶 mim-media（迁移 0002）
 --   ⑤ 账号桥（account_bridge + username_taken / claim_username RPC，迁移 0003）
---   ⑥ 演示数据（resources / topics / hot_searches，seed.sql）
 --
 -- 执行方式（二选一）：
 --   ① 推荐：Dashboard → SQL Editor → 粘贴本文件全部内容 → Run（无需密码）
@@ -1213,10 +1212,9 @@ end $$;
 --   导致商城在云端模式下无法承载任何商品（MALL_GOODS 恒为 [] → 商城为空态，
 --   前端只能显示「发布自己的商品」引导）。
 --
--- 本迁移补齐商品模型字段，并灌入五频道种子数据，使商城端到端可用。
+-- 本迁移仅补齐商品模型字段；不写入任何商品数据（商品唯一来源为用户/运营上架）。
 --
--- 幂等：add column if not exists / DO 块约束 / create index if not exists /
---       insert ... on conflict (id) do nothing，可重复执行。
+-- 幂等：add column if not exists / DO 块约束 / create index if not exists，可重复执行。
 -- ============================================================================
 
 -- ---------- 1. 商品模型字段扩展 ----------
@@ -1251,99 +1249,8 @@ end $$;
 create index if not exists products_channel_status_idx
   on public.products (channel, status, sort);
 
--- ---------- 2. 五频道商品种子（15 件，与前端演示商品一致） ----------
--- price_cents / original_price_cents 以「分」为单位（前端 price 为「元」）。
--- 全部 status='active'，使 0001 的 products_select 策略对匿名用户放行可读。
-
-insert into public.products
-  (id, title, price_cents, original_price_cents, currency, channel, emoji, description, status, stock, sales, sort)
-values
-  ('y1', '无线蓝牙耳机',   12900, null,  'CNY', 'youxuan', '🎧', '半入耳式 长续航',                 'active', 200, 3120, 1),
-  ('y2', '电动牙刷',        8900, null,  'CNY', 'youxuan', '🪥', '声波震动 三档模式',               'active', 150, 2080, 2),
-  ('y3', '保温杯',          4900, null,  'CNY', 'youxuan', '🥤', '316不锈钢 24h保温',               'active', 300, 1560, 3),
-  ('y4', '桌面加湿器',      6900, null,  'CNY', 'youxuan', '💧', '静音大雾量 定时断电',             'active', 180,  940, 4),
-
-  ('g1', '智能手环',        9900, 19900, 'CNY', 'gexm',    '⌚', '心率血氧 运动记录',               'active', 100, 4210, 1),
-  ('g2', '便携榨汁杯',      5900, 12900, 'CNY', 'gexm',    '🥝', 'USB充电 六叶刀头',                'active', 120, 1870, 2),
-  ('g3', '电竞鼠标',        7900, 15900, 'CNY', 'gexm',    '🖱️', '16000DPI RGB灯效',               'active',  80, 1330, 3),
-
-  ('m1', '双人火锅套餐',   16800, null,  'CNY', 'mix',     '🍲', '招牌锅底 三荤三素',               'active',  50,  760, 1),
-  ('m2', '精品洗车券',      3900, null,  'CNY', 'mix',     '🚿', '内外清洗 免费吸尘',               'active', 500, 2240, 2),
-  ('m3', '影院通票',        4500, null,  'CNY', 'mix',     '🎬', '全国通用 有效期90天',             'active', 400, 1690, 3),
-
-  ('l1', '唇釉礼盒',        9900, null,  'CNY', 'live',    '💄', '直播间专供 五色装',               'active',  90, 2510, 1),
-  ('l2', '零食大礼包',      6800, null,  'CNY', 'live',    '🍫', '30包混装 追剧必备',               'active', 260, 3450, 2),
-  ('l3', '露营折叠椅',     11800, null,  'CNY', 'live',    '🏕️', '铝合金骨架 承重120kg',           'active',  70,  610, 3),
-
-  ('a1', '机场接送券',     12800, null,  'CNY', 'laal',    '🛫', '24h预约 全城可达',               'active', 300, 1180, 1),
-  ('a2', '代驾畅行卡',      9800, null,  'CNY', 'laal',    '🚗', '10次抵扣 全国可用',               'active', 250, 2040, 2)
-on conflict (id) do nothing;
-
--- ---------- 3. 校验输出（供 CI 迁移日志核对） ----------
+-- ---------- 2. 校验输出（供 CI 迁移日志核对） ----------
 -- select channel, count(*) from public.products where status='active' group by channel order by channel;
-
--- ==============================================================================
--- 演示数据
--- ==============================================================================
-
--- ============================================================
--- Mim 演示数据 seed（轮 4）
---
--- 用法：Supabase Dashboard → SQL Editor 以 postgres role 执行（绕过 RLS）。
--- 范围：仅灌 resources / topics / hot_searches 三张无外键的演示表——
---       posts / articles / snippets 的演示内容由前端 src/data/seed.ts 本地提供，
---       不写云端（其 authorId 指向 me/u1..u9，云端 auth.users 无对应行，外键必炸）。
--- 幂等：全部 on conflict (id) do nothing，可重复执行。
--- ============================================================
-
--- ---------- 1. resources 资源库 12 条 ----------
-insert into public.resources (id, title, description, category, uploader, size, downloads, type) values
-  ('r1',  '2026 前端面试题大全（含答案解析）',           '覆盖 JS / CSS / 框架 / 工程化 / 浏览器原理，800+ 道题', '面试求职', '阿狸的前端笔记', '12.6 MB', 45230, 'pdf'),
-  ('r2',  '算法刷题笔记：LeetCode 热题 100 详解',        '每题附思路推导与多种解法对比',                           '面试求职', '算法小白菜',     '8.9 MB',  38120, 'pdf'),
-  ('r3',  'React 19 官方文档中文标注版',                 '社区协作翻译 + 重点批注，适合系统学习',                   '前端',     '阿狸的前端笔记', '5.2 MB',  21340, 'doc'),
-  ('r4',  'Vue3 + Vite 企业级项目模板',                  '包含权限、国际化、主题、构建优化配置',                   '前端',     '独立开发者大熊', '2.1 MB',  15670, 'code'),
-  ('r5',  'MySQL 索引与 SQL 优化实战视频课',             '16 小时录播，从执行计划到线上调优',                       '后端',     '后端老张',       '1.8 GB',   9820, 'video'),
-  ('r6',  'Go 高并发实战：从 Channel 到池化',            '10 个可运行案例，附压测脚本',                             '后端',     '后端老张',       '3.4 MB',   8760, 'code'),
-  ('r7',  '大模型应用开发入门指南',                      'Prompt 工程 / RAG / Agent 三大方向入门',                  '人工智能', '算法小白菜',     '6.7 MB',  26540, 'pdf'),
-  ('r8',  'PyTorch 深度学习动手实验手册',                '30 个实验覆盖 CNN / RNN / Transformer',                   '人工智能', '算法小白菜',     '15.2 MB', 18230, 'pdf'),
-  ('r9',  'Kubernetes 运维排查手册（速查版）',           '50 个常见故障的现象、根因与修复命令',                     '后端',     '云原生养鱼佬',   '4.1 MB',  12980, 'doc'),
-  ('r10', 'Figma 设计系统模板（含组件库）',              '200+ 组件，Token 命名规范可直接套用',                     '工具效率', '设计师小鹿',     '9.8 MB',   7650, 'code'),
-  ('r11', '程序员效率工具清单 2026 版',                  '终端 / 编辑器 / AI 工具 / 效率插件全收录',                '工具效率', '独立开发者大熊', '1.2 MB',  19870, 'doc'),
-  ('r12', '深入理解计算机系统（CSAPP）读书笔记',         '按章节整理重点 + 习题解析',                               '电子书',   '后端老张',       '7.3 MB',  32110, 'pdf')
-on conflict (id) do nothing;
-
--- ---------- 2. topics 超话 10 条 ----------
-insert into public.topics (id, name, heat, "desc") values
-  ('t1',  '前端开发', 2350000, 'HTML / CSS / JS / 框架与工程化'),
-  ('t2',  '后端架构', 1980000, '服务端、数据库与分布式系统'),
-  ('t3',  '人工智能', 5120000, '大模型、机器学习与 AI 应用'),
-  ('t4',  '独立开发',   860000, '一个人也能做出好产品'),
-  ('t5',  '云原生',     720000, 'Kubernetes、容器与微服务'),
-  ('t6',  '算法',      1450000, '数据结构与刷题日常'),
-  ('t7',  '设计',       530000, 'UI / UX / 设计系统'),
-  ('t8',  '产品思考',   410000, '需求分析与产品方法论'),
-  ('t9',  '大数据',     380000, '数仓、实时计算与 BI'),
-  ('t10', '测试',       220000, '自动化测试与质量保障')
-on conflict (id) do nothing;
-
--- ---------- 3. hot_searches 热搜 15 条（tag 允许 null） ----------
-insert into public.hot_searches (id, "rank", text, heat, tag) values
-  ('h1',  1,  'AI 编程助手全面接入主流 IDE',    4862310, '沸'),
-  ('h2',  2,  '新款折叠屏手机正式发布',         4210980, '热'),
-  ('h3',  3,  '大厂宣布试点四天工作制',         3987650, '爆'),
-  ('h4',  4,  '前端框架性能天梯图更新',         3120540, null),
-  ('h5',  5,  '开源大模型刷新多项纪录',         2876320, '热'),
-  ('h6',  6,  '国产数据库市场份额突破 20%',     2530110, '新'),
-  ('h7',  7,  '程序员平均薪资报告出炉',         2298870, null),
-  ('h8',  8,  '全国大范围降温预警',             1987650, null),
-  ('h9',  9,  '微信新版本支持折叠群聊',         1654320, '新'),
-  ('h10', 10, '双 11 预售正式开启',             1432210, null),
-  ('h11', 11, '世界杯预选赛焦点战',             1287650, '热'),
-  ('h12', 12, '研究生扩招政策解读',             1098760, null),
-  ('h13', 13, 'SpaceX 星舰第六次试飞',           987650, null),
-  ('h14', 14, '城市马拉松赛季开启',              876540, null),
-  ('h15', 15, '新一批国产游戏获批版号',          765430, '新')
-on conflict (id) do nothing;
 
 -- ==============================================================================
 -- 记录已应用版本（使 CI 后续自动跳过，避免重复执行）
@@ -1355,13 +1262,12 @@ insert into public.schema_migrations (version) values ('0002_storage_media.sql')
 insert into public.schema_migrations (version) values ('0003_account_bridge.sql') on conflict (version) do nothing;
 insert into public.schema_migrations (version) values ('0004_post_rich_fields.sql') on conflict (version) do nothing;
 insert into public.schema_migrations (version) values ('0005_mall_catalog.sql') on conflict (version) do nothing;
-insert into public.schema_migrations (version) values ('9999_seed.sql') on conflict (version) do nothing;
 
 -- ==============================================================================
 -- 执行后自检（四条均应有返回且不报错）：
---   select count(*) from public.roles;                                    -- 应 > 0
---   select count(*) from public.products where status = 'active';         -- 应 = 15
---   select count(*) from public.topics;                                   -- 应 = 10
---   select count(*) from public.hot_searches;                             -- 应 = 15
+--   select count(*) from public.roles;                                    -- 应 > 0（系统基础权限）
+--   select count(*) from public.products where status = 'active';         -- 应 = 0（无演示商品）
+--   select count(*) from public.topics;                                   -- 应 = 0（无演示话题）
+--   select count(*) from public.hot_searches;                             -- 应 = 0（无演示热搜）
 --   select public.username_taken('probe_name');                           -- 应 true/false，不再报 PGRST202
 -- ==============================================================================

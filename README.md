@@ -67,14 +67,14 @@ node scripts/sync-harmony.mjs   # dist → rawfile 同步
 - `src-tauri/` 桌面壳（Tauri 2）
 - `android/`、`ios/` 移动壳（Capacitor 8）
 - `harmony/` 鸿蒙壳（ArkTS，仅源码入库）
-- `supabase/` 数据库：`schema.sql`（20 张业务表基线）+ `migrations/*.sql` + `seed.sql`
+- `supabase/` 数据库：`schema.sql`（20 张业务表基线）+ `migrations/*.sql`
 - `.github/workflows/`：`ci-cd.yml`（Pages/EdgeOne/云函数/npm 包 + 数据库迁移 + 线上冒烟）、`build-release.yml`（六平台发布）
 
 ## 数据库迁移
 
 三条通道**共用同一份迁移计划**（`scripts/lib/migration-plan.mjs`），顺序与内容完全一致：
 `0000_schema.sql`（基线）→ `0001` IAM 权限 → `0002` 对象存储 → `0003` 账号桥 →
-`0004` 帖子富字段 → `0005` 商城目录 → `9999_seed.sql`（演示数据）。
+`0004` 帖子富字段 → `0005` 商城目录（仅字段扩展，无演示商品）。
 
 | 方式 | 命令 / 操作 | 适用 |
 | --- | --- | --- |

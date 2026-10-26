@@ -66,8 +66,7 @@ Mim 有**两套云端后端**，前端按优先级自动选择，页面无需任
 | `0002_storage_media.sql` | 私有桶 `mim-media` + 存储 RLS（3MB + MIME 白名单） | ✅ 已应用 |
 | `0003_account_bridge.sql` | 账号桥表 + `username_taken` / `claim_username` RPC | ✅ 已应用 |
 | `0004_post_rich_fields.sql` | posts 富媒体字段（media/vote/lottery/visibility/pinned 等） | ✅ 已应用 |
-| `0005_mall_catalog.sql` | products 商城字段 + 五频道 15 件种子商品 | ✅ 已应用 |
-| `9999_seed.sql` | 演示数据（超话 10 / 热搜 15） | ✅ 已应用 |
+| `0005_mall_catalog.sql` | products 商城字段扩展（不含任何商品数据） | ✅ 已应用 |
 
 执行方式（后续新增迁移同样适用）：
 
