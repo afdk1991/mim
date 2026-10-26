@@ -5,8 +5,8 @@ import { pullToolState, pushToolState } from './lib/tool-cloud'
 
 /* ============================================================
  * 配送调度台 —— 重新开发自合并源码 delivery-router（配送调度应用）
- * 纯本地工具：订单看板 / 骑手分配 / 配送进度，全部数据由用户真实输入创建，
- * localStorage 持久化，不预置任何演示数据（v2 存档，旧演示数据作废）。
+ * 订单看板 / 骑手分配 / 配送进度，全部数据由用户真实输入创建，不预置任何演示数据。
+ * 持久化：localStorage 即时落地 + 云端 documents 表整包快照同步（登录后自动跨端恢复）。
  * ============================================================ */
 
 export type OrderStatus = 'pending' | 'picking' | 'delivering' | 'delivered'
@@ -210,6 +210,27 @@ export function DeliveryBoardPage() {
     toast('看板已清空')
   }
 
+  /* 删除单个订单：若订单正挂在骑手身上，先释放骑手 */
+  function removeOrder(order: DeliveryOrder) {
+    if (!window.confirm(`确定删除订单 ${order.code} 吗？`)) return
+    setBoard((b) => ({
+      riders: b.riders.map((r) => (r.orderId === order.id ? { ...r, orderId: null } : r)),
+      orders: b.orders.filter((o) => o.id !== order.id),
+    }))
+    toast('订单已删除')
+  }
+
+  /* 删除骑手：仅允许删除空闲骑手（忙碌骑手需先完成/删除其订单） */
+  function removeRider(rider: Rider) {
+    if (rider.orderId) {
+      toast('该骑手正在配送中，无法删除')
+      return
+    }
+    if (!window.confirm(`确定删除骑手「${rider.name}」吗？`)) return
+    setBoard((b) => ({ ...b, riders: b.riders.filter((r) => r.id !== rider.id) }))
+    toast('骑手已移除')
+  }
+
   return (
     <div className="page-grid single">
       <div>
@@ -243,6 +264,15 @@ export function DeliveryBoardPage() {
                     <b>{r.name}</b>
                     <small>{busyOrder ? '配送中 · ' + busyOrder.code : '空闲'}</small>
                   </span>
+                  {!busyOrder && (
+                    <button
+                      className="rider-chip-del"
+                      title="删除该骑手"
+                      onClick={() => removeRider(r)}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </span>
               )
             })}
@@ -274,6 +304,13 @@ export function DeliveryBoardPage() {
                       <div className="ko-head">
                         <b>{o.code}</b>
                         <span className="ko-amount">¥{o.amount}</span>
+                        <button
+                          className="ko-del"
+                          title="删除该订单"
+                          onClick={() => removeOrder(o)}
+                        >
+                          ✕
+                        </button>
                       </div>
                       <p className="ko-line">{o.customer} · {o.address}</p>
                       <p className="ko-line muted">🛍️ {o.items}</p>

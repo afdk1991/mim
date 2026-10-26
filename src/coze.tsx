@@ -187,7 +187,7 @@ export function CozePanelPage() {
 
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="task-row">
-            <span className="notif-icon">�</span>
+            <span className="notif-icon">📡</span>
             <div className="notif-body">
               <p>
                 <span className="tag">接口返回</span>
