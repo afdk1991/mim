@@ -157,7 +157,9 @@ VITE_SUPABASE_ANON_KEY=sb_publishable_TV4e4DtFiufiJiY05WSFsQ_2FmlMCUg
 # A. 远程脚本（推荐，无需安装 CLI / Docker）
 node scripts/deploy-supabase-function.mjs
 #   Access Token 来源：环境变量 SUPABASE_ACCESS_TOKEN
-#   或 browser-shots/supabase-access-token.txt（由 supabase-grab-keys.mjs 抓取）
+#   （原 browser-shots/supabase-access-token.txt 明文令牌文件已在测试产物清理中移除，
+#     不再落盘明文凭据；需要时以 node scripts/supabase-grab-keys.mjs 重新抓取到该 gitignore 目录，
+#     用后即删）
 
 # B. Supabase CLI
 npm install -g supabase
