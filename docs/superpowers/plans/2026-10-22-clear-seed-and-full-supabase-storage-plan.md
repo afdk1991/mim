@@ -1,5 +1,7 @@
 # Mim 清空演示数据 + 全模块 Supabase 存储 实施计划
 
+> **⚠️ 已作废（2026-10-26 复核）**：Task 1「seed.ts 始终返回空 state」已被后续产品决策覆盖——富种子属冷启动内容，删除会让首页空白，故 `createSeedState` 保留富数据。其余 Task（云搜索历史 / 文章编辑 / profile 云写路径）均已落地。本文件仅作历史记录，checkbox 不再回填，勿据此继续执行。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 删除全部演示数据让项目回到干净空态，并补齐搜索历史/文章编辑/profile 更新的云端存储，使全模块数据以 Supabase 为主、localStorage 仅离线缓存。
