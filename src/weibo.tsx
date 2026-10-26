@@ -217,9 +217,8 @@ export function FeedPage() {
     return () => window.clearTimeout(t)
   }, [])
   /* 轮 25 打通：「有 N 条新微博」实时提示条 —— 对齐微博首页后台推送交互。
-     信号源复用 store.refreshFeed()（拉取 1~2 条新演示动态并置顶，返回新增条数）：
-     首次 10s 后启动、之后每 22s 轮询；新动态只在提示条累计，用户点击才回顶展示，
-     避免正在阅读时信息流被顶动。卸载即停，不在后台耗轮询。 */
+     信号源为 store.refreshFeed()：seed 删除后该入口为预留空实现（恒返回 0），
+     提示条不出现；保留轮询管线，待云端有新内容推送通道后复用。 */
   const [unseen, setUnseen] = useState(0)
   const apiRef = useRef(api)
   apiRef.current = api

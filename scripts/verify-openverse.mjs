@@ -1,6 +1,7 @@
 /* 浏览器实测：漫剧在线发现 + 统一播放器回归（离线 route mock，替代已移除的 vitest）
  * 用法：先起 `npx vite --port 5199 --strictPort`，再 `node scripts/verify-openverse.mjs`
- * 沙箱无外网，Openverse / Commons / Supabase 代理全部用 route mock 模拟。 */
+ * 沙箱无外网，Openverse / Commons / Supabase 代理全部用 route mock 模拟。
+ * 空态基线：站内精选已彻底删除，片单唯一来源 = 用户自定义片源（含在线发现收入）。 */
 import { chromium } from 'playwright-core'
 import { resolveBrowser } from './lib/browser.mjs'
 
@@ -130,7 +131,9 @@ const texts = (sel) => page.$$eval(sel, (els) => els.map((e) => e.textContent.tr
 try {
   await goto('#/manju')
 
-  // 1. 首页 → 全量列表
+  // 1. 首页片单空态 → 全量列表
+  const homeEmpty = await page.$$eval('.manju-empty', (els) => els.map((e) => e.textContent || ''))
+  check('首页「我的片单」空态提示', homeEmpty.some((t) => /片单还是空的/.test(t)), homeEmpty.map((t) => t.trim().slice(0, 20)).join(' | '))
   await page.evaluate(() => {
     const b = [...document.querySelectorAll('button')].find((x) => /全部 \d+ 部/.test(x.textContent || ''))
     b?.click()
@@ -142,15 +145,11 @@ try {
   const srcChips = await texts('.manju-discover-srcs .manju-chip')
   check('三来源切换 chips', srcChips.length === 3, srcChips.join(' / '))
 
-  // 2. 站内精选条目（含本轮新增音频种子）
-  const itemTitles = await texts('.manju-ext-item .manju-card-title')
-  check('列表展示站内精选条目', itemTitles.length >= 20, `共 ${itemTitles.length} 条`)
-  const audioSeeds = ['巴赫', '贝多芬', '乔普林'].filter((k) => itemTitles.some((t) => t.includes(k)))
-  check('3 条公版音频种子在列', audioSeeds.length === 3, audioSeeds.join(' / '))
-  const audioPlay = await page.$$eval('.manju-ext-item', (els) =>
-    els.filter((e) => /巴赫|贝多芬|乔普林/.test(e.textContent) && /站内播放/.test(e.textContent)).length,
-  )
-  check('音频种子走站内播放（直链可播）', audioPlay === 3, `可播 ${audioPlay}/3`)
+  // 2. 片单空态基线（站内精选已删除：初始列表为空，仅在线发现/自定义入口）
+  const items0 = await page.$$('.manju-ext-item')
+  check('片单初始为空（无任何内置演示条目）', items0.length === 0, `共 ${items0.length} 条`)
+  const listEmpty = await page.$$eval('.manju-empty', (els) => els.map((e) => e.textContent || ''))
+  check('列表空态给出收录引导', listEmpty.some((t) => /片单还是空的/.test(t) && /在线发现/.test(t)))
 
   // 3. Openverse 视频检索 + 授权展示
   const beforeVideo = cnt.video
@@ -226,7 +225,9 @@ try {
   )
   check('已加入条目按钮置灰防重复', dedup >= 1, `disabled=${dedup}`)
 
-  // 8. 统一播放器：起播 + 跨页保持
+  // 8. 统一播放器：收入的 Commons 条目（wc_111 带 .webm 直链）已入片单 → 起播 + 跨页保持
+  const items1 = await page.$$('.manju-ext-item')
+  check('收入的条目出现在片单列表', items1.length >= 1, `片单 ${items1.length} 条`)
   await page.evaluate(() => {
     const row = [...document.querySelectorAll('.manju-ext-item')].find((e) => /站内播放/.test(e.textContent || ''))
     row?.querySelector('button')?.click()

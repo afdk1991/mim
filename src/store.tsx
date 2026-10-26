@@ -1,9 +1,8 @@
 /* 全局状态中台。
-   身份模型：state.meId = 当前扮演的演示身份（seed 用户 me/u1..u9，内容 authorId 域）；
+   身份模型：state.meId = 内容作者视角身份——未登录为本地占位 'me'，登录后切换为 auth uuid；
    真实登录身份（AuthState.userId，见 auth.tsx）不进此 store——
    钱包/订单等钱类数据在 mall 中台按真实身份隔离，内容权限由 can()（permissions.ts）+ reducer ownership 守卫双层兜底。 */
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
-import { createSeedState, DEMO_HOT_SEARCHES } from './data/seed'
 import type { AppState, Post, PostComment, Article, Snippet, User, PostMedia, PostVote, PostLottery } from './types'
 import { uid } from './utils'
 import {
@@ -38,38 +37,34 @@ import { supabase, cloudEnabled } from './lib/supabase'
 import { recordGrowth } from './growth'
 import { revenueSnapshot, walletIncome } from './wallet'
 
-const STORAGE_KEY = 'mim-state-v2'
-
-/** 下拉刷新时模拟「新到达」的演示动态文案池（发现域演示数据，非用户自产内容） */
-const FEED_REFRESH_TEMPLATES: string[] = [
-  '刚整理完这一版的硬件清单，BOM 直接导出就能用 🧾',
-  '疾风引擎这波更新把冷启动压下去不少，实测省心 ⚡',
-  '把服务器资源按算力/带宽分了个类，找起来快多了 🗂️',
-  '配送路线加了货车模式，绕开限行后里程少了好几公里 🚚',
-  '漫剧片单又补了一批，周末够看了 🎬',
-  '邮箱聚合把几个号的通知收拢到一个时间线，清爽 ✉️',
-  '超话签到连续第 7 天，等级终于动了一下 🔥',
-  '比价探针抓到的价差比想象中明显，值得蹲一波 📉',
-]
+/* v3：演示 seed 已彻底删除，旧 key（mim-state-v2）存档含演示内容，直接换 key 作废——
+   所有访客（含老浏览器）一律从全空态起步，真实内容来自用户自产与云端合并。 */
+const STORAGE_KEY = 'mim-state-v3'
 
 /**
- * 内容空存档判定：没有任何动态/文章，且 users 只有 me 占位身份。
- * 命中即视为「冷启动前的空态存档」——由 loadState 重播种演示数据。
- * （历史背景：云端真实模式曾把演示数据全部剥离，云端库又为空，导致首页全空；
- *  2026-10-24 起演示内容定位为冷启动推荐，空存档一律自愈重播种。）
+ * 空状态工厂：全空集合 + 'me' 本地占位身份（头像/昵称兜底与登出回落用，非演示内容）。
+ * 不内置任何动态/文章/热搜/推荐用户——首页空态由 Empty 组件承接，云端登录后经 cloudMerge 合并真实内容。
  */
-function isContentEmpty(s: AppState): boolean {
-  const others = Object.keys(s.users).filter((id) => id !== 'me')
-  return s.posts.length === 0 && s.articles.length === 0 && others.length === 0
-}
-
-/**
- * 热搜兜底：热搜属发现/运营位，本地模式没有云端来源，历史存档（或云端未下发）可能为空数组，
- * 此时回填默认演示榜，避免下拉揭示的搜索面板恒为空白。已有真实热搜（非空）时不覆盖。
- */
-function ensureHotSearches(s: AppState): AppState {
-  if (Array.isArray(s.hotSearches) && s.hotSearches.length > 0) return s
-  return { ...s, hotSearches: DEMO_HOT_SEARCHES }
+function createEmptyState(): AppState {
+  return {
+    meId: 'me',
+    users: {
+      me: { id: 'me', name: '我', emoji: '🙂', color: '#4f7cff', bio: '', followers: 0, following: 0, verified: false },
+    },
+    posts: [],
+    articles: [],
+    snippets: [],
+    resources: [],
+    notifications: [],
+    topics: [],
+    hotSearches: [],
+    messages: [],
+    favorites: [],
+    postDrafts: [],
+    articleDrafts: [],
+    followingIds: [],
+    cloudIds: { users: [], posts: [], articles: [], snippets: [] },
+  }
 }
 
 function loadState(): AppState {
@@ -100,24 +95,20 @@ function loadState(): AppState {
         // 兜底：meId 必须存在于 users，否则整站头像/昵称落 FALLBACK_USER
         if (!parsed.users[parsed.meId]) {
           if (parsed.users['me']) parsed.meId = 'me'
-          else return createSeedState()
+          else return createEmptyState()
         }
         // 兼容旧存档：确保评论数组存在，避免缺字段导致页面崩溃
         parsed.posts = parsed.posts.map((p) => ({ ...p, comments: p.comments ?? [] }))
         parsed.articles = parsed.articles.map((a) => ({ ...a, comments: a.comments ?? [] }))
         // 兜底：cloudIds 为轮 4 新增可选字段，旧存档缺失时补空集
         if (!parsed.cloudIds) parsed.cloudIds = { users: [], posts: [], articles: [], snippets: [] }
-        // 空存档自愈：合法但内容为空的存档 → 重播种冷启动演示数据（无论是否配置云端）。
-        // 修复「云端真实模式清空演示数据」路线留下的空存档：本地与云端库均无内容时，
-        // 不重播种则首页信息流/文章/热搜/推荐关注全空。有真实内容的存档原样保留。
-        if (isContentEmpty(parsed)) return ensureHotSearches(createSeedState())
-        return ensureHotSearches(parsed)
+        return parsed
       }
     }
   } catch {
-    /* 忽略损坏的本地数据，重新播种 */
+    /* 忽略损坏的本地数据，从空态起步 */
   }
-  return createSeedState()
+  return createEmptyState()
 }
 
 type Action =
@@ -791,7 +782,7 @@ function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'reset':
-      return createSeedState()
+      return createEmptyState()
 
     default:
       return state
@@ -871,10 +862,10 @@ interface AppApi {
   addSnippet: (title: string, language: string, code: string) => void
   deleteSnippet: (id: string) => void
   downloadResource: (id: string) => void
-  /** 下拉刷新：模拟「拉取到 N 条新动态」并置顶，返回新增条数 */
+  /** 下拉刷新：预留「拉取到新动态」入口；演示伪造已删除，无远端来源时恒返回 0 */
   refreshFeed: () => number
-  switchDemoUser: (id: string) => void
-  resetDemo: () => void
+  /** 清空本地内容存档，回到全空初始态（不影响云端数据） */
+  resetLocalData: () => void
 }
 
 const AppContext = createContext<AppApi | null>(null)
@@ -1053,7 +1044,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleFollow: (id) => {
         const wasFollowing = state.followingIds.includes(id)
         dispatch({ type: 'toggleFollow', payload: id })
-        // 仅云端 profile 用户走云端关注表；seed 演示用户保持纯本地
+        // 仅云端 profile 用户走云端关注表；非云端用户保持纯本地
         if (state.cloudIds?.users.includes(id)) {
           void cloudSetFollow(id, !wasFollowing).then((ok) => {
             if (!ok) dispatch({ type: 'toggleFollow', payload: id })
@@ -1072,7 +1063,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sendMessage: (userId, content) => {
         const msgId = uid('m')
         dispatch({ type: 'sendMessage', payload: { id: msgId, userId, content } })
-        // 云端真实用户走 send_message RPC（失败回滚乐观行）；seed 演示用户保持模拟回复
+        // 云端真实用户走 send_message RPC（失败回滚乐观行）；非云端用户保持本地模拟回复
         if (state.cloudIds?.users.includes(userId)) {
           void cloudSendMessage(userId, content).then((r) => {
             if (r === 'fail') dispatch({ type: 'cloudRollbackMessage', payload: msgId })
@@ -1086,7 +1077,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
       readConversation: (userId) => {
         dispatch({ type: 'readConversation', payload: userId })
-        // 云端真实用户（uuid）才可回写已读；seed id 不是 uuid 会 22P02，须守卫
+        // 云端真实用户（uuid）才可回写已读；非 uuid id 会触发 22P02，须守卫
         if (state.cloudIds?.users.includes(userId)) void cloudReadConversation(userId)
       },
       toggleFavorite: (kind, targetId) => {
@@ -1251,37 +1242,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (snap) walletIncome(400, `资源下载分成（${res.title}）`, snap)
         }
       },
-      /* 下拉刷新：生成 1~2 条「新到达」演示动态并置顶（发现域演示数据）。
-         作者优先取「我 + 已关注」——关注流下拉刷新后流首应能见到新动态
-         （微博语义：刷新拉回的是关注账号的新内容）；无关注时退回全部用户。 */
-      refreshFeed: () => {
-        const pickOne = <T,>(arr: T[]): T | undefined =>
-          arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined
-        const followPool = [state.meId, ...state.followingIds].filter((id) => state.users[id])
-        const authorPool = followPool.length > 0 ? followPool : Object.keys(state.users)
-        const topicNames = state.topics.map((t) => t.name)
-        const count = 1 + Math.floor(Math.random() * 2)
-        const fresh: Post[] = Array.from({ length: count }, () => ({
-          id: uid('p'),
-          authorId: pickOne(authorPool) ?? state.meId,
-          content: pickOne(FEED_REFRESH_TEMPLATES) ?? FEED_REFRESH_TEMPLATES[0],
-          images: [],
-          createdAt: Date.now(),
-          repostOfId: null,
-          repostComment: '',
-          likes: Math.floor(Math.random() * 30),
-          likedByMe: false,
-          reposts: Math.floor(Math.random() * 6),
-          views: 50 + Math.floor(Math.random() * 480),
-          topic: pickOne(topicNames) ?? null,
-          source: '来自 网页版',
-          comments: [],
-        }))
-        dispatch({ type: 'refreshFeed', payload: fresh })
-        return fresh.length
-      },
-      switchDemoUser: (id) => dispatch({ type: 'setIdentity', payload: { meId: id } }),
-      resetDemo: () => dispatch({ type: 'reset' }),
+      /* 下拉刷新：演示伪造已随 seed 一并删除；云端内容经 cloudMerge 进入，此处恒 0 */
+      refreshFeed: () => 0,
+      resetLocalData: () => dispatch({ type: 'reset' }),
     }
   }, [state])
 

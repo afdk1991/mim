@@ -1,8 +1,8 @@
 /* 商城中台：统一钱包 / 积分 / 购物车 / 订单状态。
    全局通用电商流程——五个旧商城（优选/秒杀/本地生活/直播/代驾）
    在这里收敛为「频道」分类标签，不保留各自独特交互。
-   数据归属：积分/购物车/订单按真实登录身份隔离（mim-mall-v1:<userId>），
-   切换演示身份不清数据；老共享 key（mim-mall-v1）一次性幂等迁移。
+   数据归属：积分/购物车/订单按真实登录身份隔离（mim-mall-v2:<userId>）。
+   商品唯一来源为云端 products 表；不含任何演示商品/演示订单/演示积分。
    轮 15 打通：余额不再独立存储，统一镜像 mim-wallet-v1（getWalletState），
    支付走 walletConsume 真实扣费，充值走 walletRecharge 进统一钱包流水。
    轮 17：支付通道适配（src/mall/payment.ts）——钱包余额 + 收款码扫码人工确认
@@ -11,7 +11,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth'
-import { supabase, cloudEnabled, cloudBackend } from '../lib/supabase'
+import { supabase, cloudBackend } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
 import { WALLET_UPDATE_EVT, getWalletState, walletConsume, walletRecharge } from '../wallet'
 import { checkOperatorKey } from './payment'
@@ -61,44 +61,14 @@ export const MALL_CHANNEL_META: Record<MallChannel, { emoji: string; label: stri
   laal: { emoji: '🚗', label: '出行服务' },
 }
 
-/* 统一商品库：五个频道各取代表商品，emoji 占位（项目零图片依赖）。
-   云端真实模式不内置任何演示商品（与 data/seed.ts 的双模式一致），
-   商品列表走空态 + 「发布自己的商品」引导；纯本地模式保留演示商品作离线回退。 */
-const DEMO_GOODS: MallGoods[] = [
-  { id: 'y1', channel: 'youxuan', title: '无线蓝牙耳机', emoji: '🎧', price: 129, desc: '半入耳式 长续航' },
-  { id: 'y2', channel: 'youxuan', title: '电动牙刷', emoji: '🪥', price: 89, desc: '声波震动 三档模式' },
-  { id: 'y3', channel: 'youxuan', title: '保温杯', emoji: '🥤', price: 49, desc: '316不锈钢 24h保温' },
-  { id: 'y4', channel: 'youxuan', title: '桌面加湿器', emoji: '💧', price: 69, desc: '静音大雾量 定时断电' },
-  { id: 'g1', channel: 'gexm', title: '智能手环', emoji: '⌚', price: 99, origPrice: 199, desc: '心率血氧 运动记录' },
-  { id: 'g2', channel: 'gexm', title: '便携榨汁杯', emoji: '🥝', price: 59, origPrice: 129, desc: 'USB充电 六叶刀头' },
-  { id: 'g3', channel: 'gexm', title: '电竞鼠标', emoji: '🖱️', price: 79, origPrice: 159, desc: '16000DPI RGB灯效' },
-  { id: 'm1', channel: 'mix', title: '双人火锅套餐', emoji: '🍲', price: 168, desc: '招牌锅底 三荤三素' },
-  { id: 'm2', channel: 'mix', title: '精品洗车券', emoji: '🚿', price: 39, desc: '内外清洗 免费吸尘' },
-  { id: 'm3', channel: 'mix', title: '影院通票', emoji: '🎬', price: 45, desc: '全国通用 有效期90天' },
-  { id: 'l1', channel: 'live', title: '唇釉礼盒', emoji: '💄', price: 99, desc: '直播间专供 五色装' },
-  { id: 'l2', channel: 'live', title: '零食大礼包', emoji: '🍫', price: 68, desc: '30包混装 追剧必备' },
-  { id: 'l3', channel: 'live', title: '露营折叠椅', emoji: '🏕️', price: 118, desc: '铝合金骨架 承重120kg' },
-  { id: 'a1', channel: 'laal', title: '机场接送券', emoji: '🛫', price: 128, desc: '24h预约 全城可达' },
-  { id: 'a2', channel: 'laal', title: '代驾畅行卡', emoji: '🚗', price: 98, desc: '10次抵扣 全国可用' },
-]
-/* 纯本地/离线模式（cloudBackend==='local'，即未配置任一云端后端或被显式指定 local）
-   保留演示商品作离线回退；云端模式（supabase/cloudbase）不预置演示商品，
-   商品列表走空态 + 发布引导（与 data/seed.ts 的双模式一致）。
-   注：此前误用恒真的 cloudEnabled 作判据，导致本地演示商品永远不可达，此处修正。 */
-export const MALL_GOODS: MallGoods[] = cloudBackend === 'local' ? DEMO_GOODS : []
-
 /* ------------------------------------------------------------------ */
-/* 商品目录：云端优先 + 本地演示兜底                                    */
+/* 商品目录：云端 products 表为唯一来源（无任何内置演示商品）            */
 /* ------------------------------------------------------------------ */
 
 /**
- * 云端商品目录（products 表）此前是死数据：
- *   · 0001 建的 products 只有 (id, title, price_cents, currency, status)，
- *     缺前端 MallGoods 必需的 channel / emoji / description / 原价；
- *   · 且从未灌过任何商品 → 云端模式下 MALL_GOODS 恒为 []，商城永远空态。
- * 迁移 0005_mall_catalog.sql 补齐了字段与五频道种子数据，
- * 本段负责把云端商品真正接进前端，并在云端不可用/为空时兜底演示商品，
- * 保证商城在任何后端状态下都可用（「前后端数据交互正常」的落点）。
+ * 商品目录唯一来源为云端 products 表（迁移 0005_mall_catalog.sql 补齐
+ * channel/emoji/description/original_price_cents 字段）。
+ * 云端不可用或无在售商品时，商城显示空态 + 发布引导，不兜底任何演示商品。
  */
 
 /** 云端商品行形态（products 表；channel/emoji/description/original_price_cents 由迁移 0005 补齐） */
@@ -182,8 +152,8 @@ export async function fetchCloudGoods(): Promise<MallGoods[] | null> {
 }
 
 /**
- * 商品目录：云端有数据时用云端，否则回退本地演示商品。
- * 纯本地模式直接返回演示商品，不发起任何云端请求。
+ * 商品目录：云端有数据时用云端，否则为空（空态 + 发布引导）。
+ * 纯本地模式不发起任何云端请求，直接为空。
  */
 export function useMallGoods(): { goods: MallGoods[]; fromCloud: boolean; loading: boolean } {
   const [cloudGoods, setCloudGoods] = useState<MallGoods[] | null>(cloudGoodsCache)
@@ -206,63 +176,31 @@ export function useMallGoods(): { goods: MallGoods[]; fromCloud: boolean; loadin
     }
   }, [])
 
-  // 云端拿到真实商品即用云端数据；否则兜底演示商品，保证商城永远可用
+  // 云端拿到真实商品即用云端数据；否则空态，不兜底演示商品
   if (cloudGoods && cloudGoods.length > 0) {
     return { goods: cloudGoods, fromCloud: true, loading }
   }
-  return { goods: DEMO_GOODS, fromCloud: false, loading }
+  return { goods: [], fromCloud: false, loading }
 }
 
 /**
- * 当前可用商品全集：云端缓存优先，否则演示商品。
+ * 当前可用商品全集：云端缓存（无缓存即为空）。
  * 供购物车校验 / 结算等非 React 上下文使用（组件请用 useMallGoods）。
- *
- * 修复要点：此处若沿用 MALL_GOODS（云端模式下恒为 []），会导致
- *   ① 购物车条目被校验逻辑全量清空（用户加购后购物车秒空）
- *   ② checkout() 取不到首件商品直接返回 null → 结算完全不可用
- *   ③ 订单金额为 0
  */
 function currentGoods(): MallGoods[] {
-  return cloudGoodsCache && cloudGoodsCache.length > 0 ? cloudGoodsCache : DEMO_GOODS
+  return cloudGoodsCache ?? []
 }
 
-/* 旧共享 key（迁移源）与按真实身份隔离的存储 key */
-const LEGACY_KEY = 'mim-mall-v1'
-const mallKeyFor = (userId: string) => `mim-mall-v1:${userId}`
+/* 按真实身份隔离的存储 key（v2：随演示数据清除换代，旧 v1 存档整体作废） */
+const mallKeyFor = (userId: string) => `mim-mall-v2:${userId}`
 
 function seedState(): MallState {
-  // 云端真实模式：不预填假余额/演示订单（与 data/seed.ts 的云端空种子一致）
-  if (cloudEnabled) return { wallet: 0, points: 0, cart: [], orders: [] }
-  const now = Date.now()
   return {
     /* 轮 15 并轨：余额镜像统一钱包（分→元取整展示），不再本地独立记账 */
     wallet: Math.round(getWalletState().balanceFen / 100),
-    points: 6666,
+    points: 0,
     cart: [],
-    orders: [
-      {
-        id: 'MO-DEMO1',
-        goodsId: 'y1',
-        title: '无线蓝牙耳机',
-        emoji: '🎧',
-        amount: 129,
-        qty: 1,
-        channel: 'youxuan',
-        status: 'done',
-        at: now - 2 * 86400000,
-      },
-      {
-        id: 'MO-DEMO2',
-        goodsId: 'y2',
-        title: '电动牙刷',
-        emoji: '🪥',
-        amount: 89,
-        qty: 1,
-        channel: 'youxuan',
-        status: 'unpaid',
-        at: now - 3600000,
-      },
-    ],
+    orders: [],
   }
 }
 
@@ -296,16 +234,6 @@ function loadMallFor(userId: string): MallState {
   const base = seedState()
   const key = mallKeyFor(userId)
   try {
-    // 一次性迁移：老共享存档复制到当前用户专属 key（幂等；失败不阻塞，按 seed 兜底）
-    // 云端真实模式跳过迁移：老共享 key 存的是演示期数据，不注入真实身份
-    const legacy = cloudEnabled ? null : localStorage.getItem(LEGACY_KEY)
-    if (legacy && !localStorage.getItem(key)) {
-      try {
-        localStorage.setItem(key, legacy)
-      } catch {
-        /* ignore */
-      }
-    }
     const raw = localStorage.getItem(key)
     if (!raw) return base
     const v: unknown = JSON.parse(raw)
@@ -315,11 +243,6 @@ function loadMallFor(userId: string): MallState {
     /* 轮 15 并轨：余额以统一钱包为准，不再读取本地旧值（wallet 字段仅为展示镜像） */
     if (Array.isArray(o.cart)) base.cart = o.cart.filter(isCartItem)
     if (Array.isArray(o.orders)) base.orders = o.orders.filter(isOrder)
-    // 云端真实模式清理演示期遗留：预置演示订单（MO-DEMO*）与引用已下架演示商品的购物车条目
-    if (cloudEnabled) {
-      base.orders = base.orders.filter((it) => !it.id.startsWith('MO-DEMO'))
-      base.cart = base.cart.filter((c) => currentGoods().some((g) => g.id === c.goodsId))
-    }
     return base
   } catch {
     return base
@@ -357,8 +280,8 @@ export function MallProvider({ children }: { children: ReactNode }) {
   // 真实身份变化（登录/退出/云端会话切换）时重载该身份的钱包数据
   useEffect(() => {
     setState(loadMallFor(userId))
-    // 云端恢复（轮 6）：拉取该身份快照 → 写回本地 → 重载（云 key 统一 mim-mall-v1，表按 user_id 隔离）
-    void pullToolState('mim-mall-v1').then((d) => {
+    // 云端恢复（轮 6）：拉取该身份快照 → 写回本地 → 重载（云 key 统一 mim-mall-v2，表按 user_id 隔离）
+    void pullToolState('mim-mall-v2').then((d) => {
       if (!d || typeof d !== 'object') return
       try { localStorage.setItem(mallKeyFor(userId), JSON.stringify(d)) } catch { /* ignore */ }
       setState(loadMallFor(userId))
@@ -379,7 +302,7 @@ export function MallProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    pushToolState('mim-mall-v1', state) // 云端整包快照（未登录/未配置时静默跳过）
+    pushToolState('mim-mall-v2', state) // 云端整包快照（未登录/未配置时静默跳过）
   }, [state, storageKey])
 
   const api: MallApi = {

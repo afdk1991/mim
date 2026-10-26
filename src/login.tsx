@@ -1,10 +1,10 @@
 /* 登录注册页（#/login）三态：
-   1) 云端未配置 → 本地演示模式说明 + 演示身份切换；
+   1) 云端未配置 → 本地模式说明（数据仅存本机浏览器）；
    2) 云端已配置且已登录 → 账号卡 + 退出登录；
    3) 云端已配置且未登录 → 登录 / 注册表单 + 第三方登录网格。
    第三方登录：oauthProviders（auth.tsx 探测后台已启用项）驱动——
    Supabase 控制台开启哪个 provider，这里就自动出现哪个按钮，零代码增删。
-   身份模型见 auth.tsx：真实身份（userId，钱包/云端边界）与演示身份（meId，内容作者视角）分离。 */
+   身份模型见 auth.tsx：真实身份（userId，钱包/云端边界）即内容作者身份（登录后 meId = auth uuid）。 */
 
 import { useState } from 'react'
 import type { FormEvent } from 'react'
@@ -41,25 +41,6 @@ const OAUTH_META: Record<string, { name: string; mark: string; color: string; da
   zoom: { name: 'Zoom', mark: 'Z', color: '#2D8CFF' },
 }
 
-/* 演示身份切换网格：切换只影响「扮演谁发内容」，不影响钱包（绑真实身份） */
-function DemoUsers() {
-  const api = useApp()
-  return (
-    <div className="auth-users">
-      {Object.values(api.state.users).map((u) => (
-        <button
-          key={u.id}
-          className={cx('auth-user', u.id === api.state.meId && 'active')}
-          onClick={() => api.switchDemoUser(u.id)}
-        >
-          <Avatar emoji={u.emoji} color={u.color} size={22} />
-          {u.name}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export function LoginPage() {
   const api = useApp()
   const { auth, cloudEnabled, oauthProviders, signIn, signUp, signInWithOAuth, signOut } = useAuth()
@@ -82,11 +63,9 @@ export function LoginPage() {
           <div className="card auth-card">
             <h2 className="page-title">🔐 账号与身份</h2>
             <p className="auth-hint">
-              当前为<b>本地演示模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置云端后端
+              当前为<b>本地模式</b>：内容与钱包数据仅保存在本机浏览器，不会上传。配置云端后端
               （Supabase / CloudBase）后即可注册登录，由云端按账号隔离数据边界。
             </p>
-            <div className="usermenu-sec auth-sec">切换演示身份（影响内容的作者视角）</div>
-            <DemoUsers />
           </div>
         </div>
       </div>
@@ -103,11 +82,9 @@ export function LoginPage() {
               <Avatar emoji={api.me.emoji} color={api.me.color} size={40} />
               <div>
                 <b>{auth.username ?? auth.email ?? '云端账号'}</b>
-                <small>云端账号 · 演示身份：{api.me.name}</small>
+                <small>云端账号 · {api.me.name}</small>
               </div>
             </div>
-            <div className="usermenu-sec auth-sec">切换演示身份</div>
-            <DemoUsers />
             <button
               className="btn btn-ghost btn-sm"
               style={{ marginTop: 14 }}
@@ -237,7 +214,7 @@ export function LoginPage() {
             )}
           </div>
           <p className="auth-hint" style={{ marginTop: 12 }}>
-            登录后钱包与订单按云端账号隔离；演示身份切换仍在本机生效。
+            登录后钱包与订单按云端账号隔离。
           </p>
         </div>
       </div>

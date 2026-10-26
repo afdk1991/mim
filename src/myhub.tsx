@@ -1,7 +1,7 @@
 /* 我的应用面板：聚合商城中台与 9 个工具台的本地状态摘要与虚拟资产。
    只读各模块独立 localStorage（松耦合），不改任何工具台代码；
    任一存档缺失或字段异常时指标显示「—」，不影响页面渲染。
-   商城中台数据按真实登录身份隔离（mim-mall-v1:<userId>，见 mall/store.tsx）。 */
+   商城中台数据按真实登录身份隔离（mim-mall-v2:<userId>，见 mall/store.tsx）。 */
 
 import { useAuth } from './auth'
 
@@ -47,7 +47,7 @@ type AppEntry = {
 
 /* 各工具台状态摘要（字段与各模块 interface 对齐） */
 const APPS: AppEntry[] = [
-  { href: '#/mall', key: 'mim-mall-v1', emoji: '🛒', label: '商城', stat: (s) => ({ label: '订单', value: fmt(len(s, 'orders')) }) },
+  { href: '#/mall', key: 'mim-mall-v2', emoji: '🛒', label: '商城', stat: (s) => ({ label: '订单', value: fmt(len(s, 'orders')) }) },
   { href: '#/price', key: 'mim-price-v1', emoji: '📉', label: '价格监控', stat: (s) => ({ label: '降价预警', value: fmt(len(s, 'alerts')) }) },
   { href: '#/delivery', key: 'mim-delivery-v2', emoji: '🛵', label: '配送调度', stat: (s) => ({ label: '订单', value: fmt(len(s, 'orders')) }) },
   { href: '#/bom', key: 'mim-bom-v1', emoji: '🧰', label: 'BOM 工具台', stat: (s) => ({ label: '部件用量', value: fmt(keys(s, 'qtys')) }) },
@@ -59,7 +59,7 @@ const APPS: AppEntry[] = [
   { href: '#/ardot', key: 'mim-ardot-v1', emoji: '📡', label: '聚合监控', stat: (s) => ({ label: '审计日志', value: fmt(len(s, 'logs')) }) },
 ]
 
-/* 虚拟资产：读自商城中台（mim-mall-v1）的钱包与积分 */
+/* 虚拟资产：读自商城中台（mim-mall-v2）的钱包与积分 */
 const ASSETS: { href: string; emoji: string; label: string; read: (mallKey: string) => number | null; prefix?: string }[] = [
   { href: '#/mall/wallet', emoji: '💰', label: '商城余额', read: (k) => num(readStore(k), 'wallet'), prefix: '¥' },
   { href: '#/mall/wallet', emoji: '🪙', label: '商城积分', read: (k) => num(readStore(k), 'points') },
@@ -67,8 +67,8 @@ const ASSETS: { href: string; emoji: string; label: string; read: (mallKey: stri
 
 export function MyAppHub() {
   const { auth } = useAuth()
-  // 商城资产绑真实身份（切换演示身份不清钱包）；其余工具台保持共享沙盒
-  const mallKey = `mim-mall-v1:${auth.userId}`
+  // 商城资产绑真实身份；其余工具台保持共享沙盒
+  const mallKey = `mim-mall-v2:${auth.userId}`
   return (
     <>
       <div className="card myhub-card">
@@ -93,7 +93,7 @@ export function MyAppHub() {
         </div>
         <div className="myhub-grid">
           {APPS.map((app) => {
-            const st = app.stat(readStore(app.key === 'mim-mall-v1' ? mallKey : app.key))
+            const st = app.stat(readStore(app.key === 'mim-mall-v2' ? mallKey : app.key))
             return (
               <a key={app.href} className="myhub-app" href={app.href}>
                 <span className="myhub-app-emoji">{app.emoji}</span>

@@ -17,13 +17,6 @@ import {
 
 /* ================= 数据模型 ================= */
 
-interface MjEpisode {
-  id: string;
-  index: number;
-  durationSec: number;
-  free: boolean;
-}
-
 /** 兼容旧存档的播放模式标记（保留类型以通过持久化往返契约，新逻辑不再依赖） */
 type MjExtMode = 'direct' | 'embed' | 'blocked';
 
@@ -78,54 +71,6 @@ interface OpenverseVideo {
   license_version?: string;
   source?: string;
 }
-
-/* ================= 站内精选（公版 / CC 授权真实内容） ================= */
-
-export const mkEps = (sid: string, n: number, freeN: number): MjEpisode[] =>
-  Array.from({ length: n }, (_, i) => ({
-    id: `${sid}_e${String(i + 1).padStart(2, '0')}`,
-    index: i + 1,
-    durationSec: 80 + ((i * 37) % 70),
-    free: i < freeN,
-  }));
-
-/* 以下全部为真实存在的公有领域 / CC 授权内容：
-   - Big Buck Bunny / Elephants Dream / Sintel / Tears of Steel 的 mp4 直链来自
-     Google GTV 公开样片库（commondatastorage.googleapis.com），官方长期镜像，可真实播放；
-   - 其余条目附来源站页面（Blender Studio / Internet Archive），跳转即可观看。 */
-const EXT_SEED: MjExtItem[] = [
-  /* 漫剧分类：公有领域经典动画（Public Domain，Internet Archive 可检索） */
-  { id: 'x_c1', title: '超人：疯狂科学家（1941）', cat: 'comic', cover: '🦸', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '首部超人动画 · 全片约 10 分钟', homeUrl: 'https://archive.org/search?query=superman+%22the+mad+scientist%22+1941', license: '公版 PD' },
-  { id: 'x_c2', title: '超人：机械怪物（1941）', cat: 'comic', cover: '🤖', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '超人系列第 2 部 · 全片约 10 分钟', homeUrl: 'https://archive.org/search?query=superman+%22the+mechanical+monsters%22', license: '公版 PD' },
-  { id: 'x_c3', title: '贝蒂娃娃：Minnie the Moocher（1932）', cat: 'comic', cover: '💃', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '贝蒂娃娃早期短片 · 全片约 8 分钟', homeUrl: 'https://archive.org/search?query=betty+boop+%22minnie+the+moocher%22', license: '公版 PD' },
-  { id: 'x_c4', title: '大力水手公版短剧合集', cat: 'comic', cover: '🥬', source: 'Fleischer / Famous Studios · 公版 Public Domain', episodesText: '多部公版短剧 · 1930s-1950s', homeUrl: 'https://archive.org/search?query=popeye+the+sailor+fleischer', license: '公版 PD' },
-  /* AI 剧 / 开源分类：Blender 开源电影（CC-BY / CC-BY-ND 署名授权，studio.blender.org 可验证） */
-  { id: 'x_a1', title: 'Big Buck Bunny（2008）', cat: 'ai', cover: '🐰', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '全片约 10 分钟 · 真实直链可播', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', license: 'CC-BY' },
-  { id: 'x_a2', title: 'Elephants Dream（2006）', cat: 'ai', cover: '🐘', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '首部开源电影 · 全片约 11 分钟 · 真实直链可播', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', license: 'CC-BY' },
-  { id: 'x_a3', title: 'Sintel（2010）', cat: 'ai', cover: '🐉', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '奇幻短片 · 全片约 15 分钟 · 真实直链可播', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', license: 'CC-BY' },
-  { id: 'x_a4', title: 'Tears of Steel（2012）', cat: 'ai', cover: '🦾', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '真人+CG 科幻 · 全片约 12 分钟 · 真实直链可播', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', license: 'CC-BY' },
-  { id: 'x_a5', title: 'Cosmos Laundromat: First Cycle（2015）', cat: 'ai', cover: '🐑', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '首集正式片 · 全片约 12 分钟', homeUrl: 'https://studio.blender.org/films/cosmos-laundromat/', license: 'CC-BY' },
-  { id: 'x_a6', title: 'Sprite Fright（2021）', cat: 'ai', cover: '🧚', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '喜剧恐怖短片 · 全片约 10 分钟', homeUrl: 'https://studio.blender.org/films/sprite-fright/', license: 'CC-BY' },
-  /* 第二轮扩充（授权逐条检索验证） */
-  { id: 'x_c5', title: '超人：极地巨人（1942）', cat: 'comic', cover: '🦕', source: 'Fleischer Studios · 公版 Public Domain', episodesText: '超人系列第 4 部 · 冰封恐龙苏醒 · 全片约 9 分钟', homeUrl: 'https://archive.org/search?query=superman+%22arctic+giants%22', license: '公版 PD' },
-  { id: 'x_c6', title: '汽船威利 Steamboat Willie（1928）', cat: 'comic', cover: '🚢', source: 'Walt Disney / Ub Iwerks · 公版 Public Domain（2024-01-01 起）', episodesText: '首部有声米奇动画 · 全片约 8 分钟', homeUrl: 'https://archive.org/search?query=%22steamboat+willie%22', license: '公版 PD' },
-  { id: 'x_c7', title: '恐龙葛蒂 Gertie the Dinosaur（1914）', cat: 'comic', cover: '🦖', source: 'Winsor McCay · 公版 Public Domain', episodesText: '动画史首部角色动画 · 全片约 12 分钟', homeUrl: 'https://archive.org/search?query=gertie+the+dinosaur', license: '公版 PD' },
-  { id: 'x_c8', title: '梦乡奇遇 Somewhere in Dreamland（1936）', cat: 'comic', cover: '🌙', source: 'Fleischer Studios 彩色经典系列 · 公版 Public Domain', episodesText: '彩色经典系列短片 · 全片约 8 分钟', homeUrl: 'https://archive.org/search?query=%22somewhere+in+dreamland%22', license: '公版 PD' },
-  { id: 'x_a7', title: 'Charge 充电危机（2022）', cat: 'ai', cover: '🔋', source: 'Blender 开源电影 · CC-BY 4.0 署名', episodesText: '能源荒废土科幻 · 全片约 8 分钟', homeUrl: 'https://studio.blender.org/films/charge/', license: 'CC-BY' },
-  { id: 'x_a8', title: 'Coffee Run 咖啡快跑（2020）', cat: 'ai', cover: '☕', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '咖啡因驱动的追忆短片 · 全片约 4 分钟', homeUrl: 'https://studio.blender.org/films/coffee-run/', license: 'CC-BY' },
-  { id: 'x_a9', title: 'Glass Half 半杯水（2015）', cat: 'ai', cover: '🥛', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '卡通渲染实验短片 · 全片约 3 分钟', homeUrl: 'https://studio.blender.org/films/glass-half/', license: 'CC-BY' },
-  { id: 'x_a10', title: 'Agent 327：Operation Barbershop（2017）', cat: 'ai', cover: '🕵️', source: 'Blender 开源电影 · CC-BY-ND 署名-禁止演绎', episodesText: '荷兰侦探动画测试片 · 全片约 4 分钟', homeUrl: 'https://studio.blender.org/films/agent-327/', license: 'CC-BY-ND' },
-  /* 第二轮继续扩充（CC / 公版，来源站可验证） */
-  { id: 'x_a11', title: 'Spring 春（2019）', cat: 'ai', cover: '🌸', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '四季童话短片 · 全片约 8 分钟', homeUrl: 'https://studio.blender.org/films/spring/', license: 'CC-BY' },
-  { id: 'x_a12', title: 'Wing it! 展翅（2021）', cat: 'ai', cover: '🕊️', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '喜剧飞行短片 · 全片约 3 分钟', homeUrl: 'https://studio.blender.org/films/wing-it/', license: 'CC-BY' },
-  { id: 'x_a13', title: 'Caminandes 3：Llama Drama（2016）', cat: 'ai', cover: '🦙', source: 'Blender 开源电影 · CC-BY 署名', episodesText: '羊驼喜剧三部曲终章 · 全片约 3 分钟', homeUrl: 'https://studio.blender.org/films/caminandes-3-llama-drama/', license: 'CC-BY' },
-  { id: 'x_a14', title: 'Napkin Films · AI 导演动画合集', cat: 'ai', cover: '🤖', source: 'Napkin Films · CC-BY 4.0 署名', episodesText: '代码生成的 AI 导演动画短片（73 部）', homeUrl: 'https://joshuaayson.com/films/', license: 'CC-BY' },
-  { id: 'x_a15', title: 'Cyberpunk Rainy Street（Hailuo AI）', cat: 'ai', cover: '🌃', source: 'Wikimedia Commons · CC0 公共领域', episodesText: 'AI 文生视频短片 · 来源站可看', homeUrl: 'https://commons.wikimedia.org/wiki/File:Cyberpunk_Rainy_Street_(Hailuo_AI).webm', license: 'CC0' },
-  /* 音频种子（公有领域音乐，直链走 Wikimedia Commons Special:FilePath 稳定重定向，可在站内真实播放） */
-  { id: 'x_m1', title: '巴赫：D 小调托卡塔与赋格 BWV 565', cat: 'ai', cover: '🎵', source: 'Wikimedia Commons · 公版 Public Domain', episodesText: '巴洛克管风琴名曲 · 音频直链可播', audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Johann_Sebastian_Bach_-_Toccata_and_Fugue_in_D_minor,_BWV_565.ogg', license: '公版 PD' },
-  { id: 'x_m2', title: '贝多芬：第五交响曲第一乐章', cat: 'ai', cover: '🎼', source: 'Wikimedia Commons · 公版 Public Domain', episodesText: '命运交响曲 · 音频直链可播', audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Beethoven_Symphony_No._5_in_C_minor,_Op._67_-_I._Allegro_con_brio.ogg', license: '公版 PD' },
-  { id: 'x_m3', title: '斯科特·乔普林：艺人 The Entertainer', cat: 'ai', cover: '🎹', source: 'Wikimedia Commons · 公版 Public Domain', episodesText: '拉格泰姆钢琴名曲 · 音频直链可播', audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Scott_Joplin_-_The_Entertainer.ogg', license: '公版 PD' },
-];
 
 /* ================= 在线发现：Openverse CC 授权视频/音频检索 ================= */
 
@@ -366,7 +311,7 @@ function openExternal(url: string): void {
 
 /* ================= 通用小组件 ================= */
 
-/** 站内精选卡片（公版 / CC 授权真实内容） */
+/** 片单卡片（用户收录的公版 / CC 授权内容） */
 function MjCard({
   it,
   tone,
@@ -417,7 +362,7 @@ function HomeView(props: {
     <>
       <div className="manju-hero">
         <h1>漫剧 Manju</h1>
-        <p>站内精选 · 公有领域 / CC 授权真实内容，全部可看、无版权争议</p>
+        <p>开放授权媒体 · 在线发现公有领域 / CC 内容，收入自己的片单</p>
       </div>
 
       {props.cont.length > 0 && (
@@ -448,7 +393,7 @@ function HomeView(props: {
         <span className="muted">{props.favorites.length} 部</span>
       </div>
       {props.favorites.length === 0 ? (
-        <div className="manju-empty manju-empty-soft">还没有收藏 · 在「站内精选」中点亮 ❤️ 即可收藏</div>
+        <div className="manju-empty manju-empty-soft">还没有收藏 · 在片单中点亮 ❤️ 即可收藏</div>
       ) : (
         <div className="manju-grid">
           {props.favorites.map((it, i) => (
@@ -464,22 +409,26 @@ function HomeView(props: {
       )}
 
       <div className="manju-section-head manju-section-head-row">
-        <h3>站内精选</h3>
+        <h3>我的片单</h3>
         <button className="btn btn-ghost btn-sm" onClick={props.onViewAll}>
           全部 {props.items.length} 部 ›
         </button>
       </div>
-      <div className="manju-grid">
-        {props.items.map((it, i) => (
-          <MjCard
-            key={it.id}
-            it={it}
-            tone={(i % 5) + 1}
-            seen={props.seenList.includes(it.id)}
-            onOpen={() => props.onOpen(it.id)}
-          />
-        ))}
-      </div>
+      {props.items.length === 0 ? (
+        <div className="manju-empty manju-empty-soft">片单还是空的 · 去「全部」页用在线发现收录开放授权内容</div>
+      ) : (
+        <div className="manju-grid">
+          {props.items.map((it, i) => (
+            <MjCard
+              key={it.id}
+              it={it}
+              tone={(i % 5) + 1}
+              seen={props.seenList.includes(it.id)}
+              onOpen={() => props.onOpen(it.id)}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -570,7 +519,7 @@ function PlayView(props: {
   );
 }
 
-/* ================= 站内精选全量列表（含自定义片源 + 在线发现） ================= */
+/* ================= 片单全量列表（自定义片源 + 在线发现） ================= */
 
 /** 在线发现来源：Openverse 视频 / Openverse 音频 / Wikimedia Commons 视频 */
 type DiscSource = 'ov-video' | 'ov-audio' | 'commons'
@@ -615,7 +564,7 @@ function saveHist(list: string[]): void {
   }
 }
 
-/** 站内精选列表页（公版 / CC 授权真实内容 + 自定义片源 + 在线发现） */
+/** 片单列表页（自定义片源 + 在线发现；仅收录公版 / CC 授权内容） */
 function PdListView(props: {
   items: MjExtItem[];
   onPlay: (id: string) => void;
@@ -708,7 +657,7 @@ function PdListView(props: {
   return (
     <>
       <div className="muted manju-ext-note">
-        站内精选收录公有领域（Public Domain）或 CC 署名授权内容，授权可验证、无版权争议；
+        片单仅收录公有领域（Public Domain）或 CC 署名授权内容，授权可验证、无版权争议；
         有直链的可站内真实播放，其余跳转来源站观看。
       </div>
 
@@ -716,7 +665,7 @@ function PdListView(props: {
         <div className="manju-card-title">在线发现 · 开放授权媒体检索</div>
         <div className="muted">
           从 Openverse（8 亿+ 开放媒体）与 Wikimedia Commons 检索公有领域 / CC 内容，
-          仅收录可商用（license_type=commercial）的授权条目，结果与站内精选同样可收入片单。
+          仅收录可商用（license_type=commercial）的授权条目，检索结果可一键收入片单。
         </div>
         <div className="manju-discover-srcs" role="group" aria-label="检索来源">
           {DISC_SOURCES.map((s) => (
@@ -839,6 +788,9 @@ function PdListView(props: {
         )}
       </div>
 
+      {props.items.length === 0 && (
+        <div className="manju-empty manju-empty-soft">片单还是空的 · 用上方「在线发现」检索开放授权内容并收入片单，或下方添加自定义片源</div>
+      )}
       {props.items.map((it) => (
         <div key={it.id} className="manju-ext-item card">
           <div className="manju-ext-row">
@@ -869,7 +821,7 @@ function PdListView(props: {
 
       <div className="manju-addform card">
         <div className="manju-card-title">添加自定义片源</div>
-        <div className="muted">填一个名称与直链地址（可选），加入站内精选片单；无地址的条目仅作记录。</div>
+        <div className="muted">填一个名称与直链地址（可选），收入自己的片单；无地址的条目仅作记录。</div>
         <div className="manju-addform-row">
           <input
             className="input"
@@ -945,8 +897,8 @@ export function ManjuPage() {
     });
   }, []);
 
-  /* 站内精选全集（含自定义片源），按 id 反查 */
-  const allItems = useMemo<MjExtItem[]>(() => [...state.customExt, ...EXT_SEED], [state.customExt]);
+  /* 片单全集 = 用户自定义片源（含在线发现收入），按 id 反查 */
+  const allItems = useMemo<MjExtItem[]>(() => state.customExt, [state.customExt]);
 
   /* 续播列表：有进度且未看完（保存进度 < 时长 95%）的条目，取前 4 条 */
   const cont = useMemo<MjContRow[]>(() => {
@@ -1148,7 +1100,7 @@ export function ManjuPage() {
       </div>
       {renderBody()}
       <div className="manju-foot muted">
-        站内精选均为公有领域（Public Domain）或 CC 授权内容，视频直链来自公开镜像（Blender 开源电影 / Google 公开样片库），授权可验证、无版权争议。
+        片单仅收录公有领域（Public Domain）或 CC 授权内容，授权标识来自来源平台（Openverse / Wikimedia Commons），可验证、无版权争议。
       </div>
     </div>
   );

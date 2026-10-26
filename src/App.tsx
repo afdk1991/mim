@@ -798,24 +798,9 @@ function UserMenu() {
             <Avatar emoji={api.me.emoji} color={api.me.color} size={38} />
             <div>
               <b>{api.me.name}</b>
-              <small>{auth.mode === 'cloud' ? (auth.username ?? auth.email ?? '云端账号') : '本地演示模式'}</small>
+              <small>{auth.mode === 'cloud' ? (auth.username ?? auth.email ?? '云端账号') : '本地模式'}</small>
             </div>
           </div>
-          <div className="usermenu-sec">演示身份</div>
-          {Object.values(api.state.users).map((u) => (
-            <button
-              key={u.id}
-              className={cx('usermenu-item', u.id === api.state.meId && 'active')}
-              onClick={() => {
-                api.switchDemoUser(u.id)
-                setOpen(false)
-              }}
-            >
-              <Avatar emoji={u.emoji} color={u.color} size={22} />
-              {u.name}
-              {u.id === api.state.meId && <em className="usermenu-check">✓</em>}
-            </button>
-          ))}
           <div className="usermenu-sec">账号</div>
           {auth.mode === 'cloud' ? (
             <button
@@ -864,13 +849,13 @@ function WbHero() {
         >
           {theme === 'dark' ? '☀️' : '🌙'}
         </button>
-        {/* 重置的是本地演示种子（seed.ts），云端模式下数据在云端、无演示概念，隐藏入口 */}
+        {/* 清空本地内容存档（回全空初始态）；云端模式下数据在云端，隐藏入口 */}
         {auth.mode !== 'cloud' && (
           <button
             className="icon-btn"
-            title="重置演示数据"
+            title="清空本地数据"
             onClick={() => {
-              if (window.confirm('确定要重置所有演示数据吗？')) api.resetDemo()
+              if (window.confirm('确定要清空本机上的所有内容数据吗？此操作不可恢复。')) api.resetLocalData()
             }}
           >
             ♻️

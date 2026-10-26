@@ -238,7 +238,7 @@ export function registerCurrentAccount(mode: AuthMode, email: string | null): vo
 
 /** 扫描 localStorage 里按身份分 key 的数据（growth/mall/wallet/publish/vip/mim-ud-*），反推本机出现过的身份 */
 function scanStoredUids(): string[] {
-  const re = /^(?:mim-growth-v1|mim-mall-v1|mim-wallet-v1|mim-publish-v1|mim-vip-v1):(.+)$|^mim-ud-(.+):[a-z]+$/
+  const re = /^(?:mim-growth-v1|mim-mall-v2|mim-wallet-v1|mim-publish-v1|mim-vip-v1):(.+)$|^mim-ud-(.+):[a-z]+$/
   const out = new Set<string>()
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i)

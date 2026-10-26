@@ -307,7 +307,7 @@ function DangerZone() {
       if (auth.mode === 'cloud') {
         await signOut() // 云端身份登出回本地态
       } else {
-        api.resetDemo() // 本地演示态：重置演示内容回初始 seed
+        api.resetLocalData() // 本地态：清空本地内容存档
       }
       setOpen(false)
       setWord('')

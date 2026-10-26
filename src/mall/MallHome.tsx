@@ -12,7 +12,7 @@ type Cat = MallChannel | 'all'
 export function MallHomePage({ initial }: { initial?: MallChannel }) {
   const { state } = useMall()
   const [cat, setCat] = useState<Cat>(initial ?? 'all')
-  /* 商品目录：云端 products 优先，云端不可用/为空时由 useMallGoods 兜底演示商品 */
+  /* 商品目录：云端 products 表为唯一来源；云端不可用/为空时显示空态，无演示商品兜底 */
   const { goods: allGoods, loading: goodsLoading } = useMallGoods()
 
   /* 频道直达同步：#/mall/<channel> 由 App.tsx（case 'mall'）以 initial prop 传入。
