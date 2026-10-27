@@ -23,7 +23,7 @@ export const SITE_CONFIG = {
   contactEmail: 'afdk1991@users.noreply.github.com',
   /** 联系地址（可只到城市） */
   address: '',
-  /** 邮箱聚合代理 Worker 地址（部署 worker/mail-proxy 后填写，如 https://mim-mail-proxy.<子域>.workers.dev） */
+  /** 邮箱聚合代理 Worker 地址（部署中转 Worker 后填写，如 https://mim-mail-proxy.<子域>.workers.dev） */
   mailProxyUrl: 'https://mim-mail-proxy.15726833367.workers.dev',
   /** 商城扫码收款码图片直链（未配置时商城「扫码支付」通道不可用） */
   payQrCodeUrl: '',

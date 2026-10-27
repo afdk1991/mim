@@ -5,7 +5,7 @@ import { Empty, emitToast } from './components'
 import { SITE_CONFIG } from './site-config'
 import { cx } from './utils'
 
-/* 邮箱聚合：经 worker/mail-proxy（Cloudflare Worker）代理 IMAP 收件 / SMTP 发信。
+/* 邮箱聚合：经自托管中转 Worker（Cloudflare Worker）代理 IMAP 收件 / SMTP 发信。
    浏览器无法直连 993/465 端口，须先部署中转 Worker（见 worker/mail-proxy/README），
    并把 Worker 地址填入 SITE_CONFIG.mailProxyUrl 或前端「账号设置」表单。
    凭据两种模式：① 服务端 Worker 环境变量注入（推荐，前端授权码留空即可）
@@ -206,7 +206,7 @@ function SetupForm({ onSaved }: { onSaved: (cfg: MailCfg) => void }) {
   const doTest = async () => {
     const cfg = buildCfg()
     if (!cfg.proxyUrl) {
-      setErr('请先填写代理 Worker 地址（部署 worker/mail-proxy 后获得）')
+      setErr('请先填写代理 Worker 地址（部署中转 Worker 后获得）')
       return
     }
     setBusy(true)
@@ -224,7 +224,7 @@ function SetupForm({ onSaved }: { onSaved: (cfg: MailCfg) => void }) {
   const doSave = () => {
     const cfg = buildCfg()
     if (!cfg.proxyUrl) {
-      setErr('请先填写代理 Worker 地址（部署 worker/mail-proxy 后获得）')
+      setErr('请先填写代理 Worker 地址（部署中转 Worker 后获得）')
       return
     }
     // 服务端凭据模式：Worker 已配置 MAIL_USER/MAIL_PASS，前端账号/授权码均可留空
@@ -249,7 +249,7 @@ function SetupForm({ onSaved }: { onSaved: (cfg: MailCfg) => void }) {
         <div className="card">
           <p className="muted" style={{ margin: '0 0 4px', fontSize: 13 }}>
             通过 IMAP 收件 / SMTP 发信接入真实邮箱。浏览器无法直连 993/465 端口，
-            需先部署中转 Worker：<code>worker/mail-proxy</code>
+            需先部署中转 Worker（Cloudflare Worker）：自行托管 IMAP/SMTP 代理服务
             （Cloudflare Workers 免费额度内运行，见其 README）。
           </p>
 
