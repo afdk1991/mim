@@ -1,211 +1,243 @@
-# Mim 安装与部署指南（二次分发 / 交付版）
+# Mim 安装指南（环境依赖与逐平台安装步骤）
 
-> 面向**拿到本仓库源码的部署方**。
-> 作者自己维护线上站的操作在 [DEPLOY.md](DEPLOY.md)；本文只讲「从零把这套代码变成你自己的站点」。
->
-> ⚠️ 源码中保留了作者个人示例后端的地址作为兜底（原因见 [§0](#0-先做这一件事去绑定)）。
-> **部署前必须先完成 §0**，否则你的站点会连进示例项目的数据库。
+> 面向**拿到仓库源码的人**：把本机从零装到能跑 `npm run dev` 与 `npm run server:up`。
+> 只想看前端效果的话，装完 Node 就够 —— 不配置后端时前端完全可用。
 
 ---
 
-## 0. 先做这一件事：去绑定
+## 一、依赖清单
 
-源码里有 3 个后端地址是**作者个人项目**的公开地址（`src/lib/supabase.ts` 的
-`PROD_SUPABASE_URL` / `PROD_SUPABASE_ANON_KEY` / `PROD_API_BASE`）。
-它们被保留是因为 EdgeOne Makers 是远端构建、读不到仓库环境变量 —— 删掉会让作者
-自己的线上站缺配置而无法启动。因此做法是**加开关**而不是删除：
+| 依赖 | 版本要求 | 是否必需 | 用于 |
+| --- | --- | --- | --- |
+| Node.js | `>=20` | ✅ 必需 | 前端构建（`npm run dev/build`）、后端运行（`server/`） |
+| npm | 随 Node 附带 | ✅ 必需 | 依赖安装 |
+| Git | 近期版本 | ✅ 必需 | 拉取代码 |
+| Docker Desktop / Docker Engine + Compose 插件 | 近期版本 | ⚠️ 后端用 Docker 时才需要 | 起 PostgreSQL 16 与 API 容器 |
+| PostgreSQL | `16` | ⬜ 二选一 | 不想用 Docker 时自行准备数据库 |
+| JDK 21 + Android SDK | — | ⬜ 可选 | Android 壳（`android/`） |
+| Xcode | — | ⬜ 可选 | iOS 壳（`ios/`，仅 macOS） |
+| DevEco Studio | — | ⬜ 可选 | HarmonyOS 壳（`harmony/`） |
+| Rust 工具链 | — | ⬜ 可选 | 桌面壳（`src-tauri/`） |
 
-```ini
-# .env —— 二选一，不要都空着
-# 方案 A（推荐，完整可用）：填你自己的 Supabase 项目
-VITE_SUPABASE_URL=https://<你的项目ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<你的 publishable key>
+版本约束的真源：
 
-# 方案 B（强制自有后端）：关掉内置示例后端，同时必须填入自有云端
-# （至少配上面两个 Supabase 变量，或改用 VITE_MIM_API_BASE 走 CloudBase 云函数）
-VITE_MIM_BUILTIN_BACKEND=0
+- 前端 Node 版本：`package.json` 的 `engines.node`（`>=20`）
+- 后端 Node 版本：`server/package.json` 的 `engines.node`（`>=20`）
+- 数据库版本：`server/docker-compose.yml` 的 `db.image`（`postgres:16-alpine`）
+
+---
+
+## 二、Windows
+
+### 1) Node.js（>= 20）
+
+**方式 A：官方安装包**
+
+1. 打开 <https://nodejs.org/> ，下载 **LTS**（≥ 20）的 Windows Installer（`.msi`）。
+2. 一路 Next，勾选「Add to PATH」。
+3. 验证（重新打开一个终端）：
+
+```powershell
+node -v      # v20.x 或更高
+npm -v
 ```
 
-自检方式：开发模式下若仍在用示例后端，控制台会打印
-`[mim] 当前使用内置示例后端…`；也可直接看导出值 `usingBuiltinBackend` 是否为 `false`。
+**方式 B：winget**
 
-产物级验证（确认示例地址没被打进你的包）：
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+**方式 C：nvm-windows**（需要多版本切换时）
+
+```powershell
+winget install CoreyButler.NVMforWindows
+nvm install 20
+nvm use 20
+```
+
+### 2) Git
+
+```powershell
+winget install Git.Git
+git -v
+```
+
+### 3) Docker Desktop（后端用 Docker 时）
+
+1. <https://www.docker.com/products/docker-desktop/> 下载安装。
+2. 安装时勾选 **Use WSL 2 instead of Hyper-V**；按提示完成 WSL 后端初始化并重启。
+3. 启动 Docker Desktop，等到托盘图标显示 *Running*。
+4. 验证：
+
+```powershell
+docker -v
+docker compose version
+docker run hello-world
+```
+
+### 4) 可选：原生壳工具链
+
+| 目标 | 安装 |
+| --- | --- |
+| Android | 安装 **Android Studio**（自带 JDK 21 与 Android SDK），在 SDK Manager 里装 Android SDK Platform 34+ 与 Build-Tools |
+| HarmonyOS | 安装 **DevEco Studio** |
+| 桌面端（Tauri） | 先装 **Visual Studio C++ Build Tools**（MSVC）与 **WebView2 Runtime**，再按 <https://tauri.app/start/prerequisites/> 装 Rust（`winget install Rustlang.Rustup`） |
+| iOS | 不支持 —— 需要 macOS + Xcode |
+
+---
+
+## 三、macOS
+
+### 1) Node.js（>= 20）
 
 ```bash
-npm run build
-grep -o 'sepfobukokrrivwyvhnd' dist/assets/*.js | wc -l   # 应为 0
+# 方式 A：Homebrew
+brew install node@20
+
+# 方式 B：nvm（推荐，便于多版本切换）
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+nvm install 20
+nvm use 20
 ```
 
-### 去绑定完整清单
-
-| # | 位置 | 说明 | 何时必改 |
-|---|---|---|---|
-| 1 | `src/lib/supabase.ts` 内置后端 | 见上方 `.env` 二选一 | **总是** |
-| 2 | `src/ota.ts:22` `MANIFEST_URL` | OTA 清单指向作者 Releases → 桌面/安卓会**自动下载作者的更新包** | 打包桌面端/安卓前 |
-| 3 | `src/ota.ts:24` `STORE_URL` | App Store 跳转地址（`https://apps.apple.com/app/mim` 为占位） | 上架 iOS 前 |
-| 4 | `src/site-config.ts` | 主办单位 / ICP / 公安备案 / 域名 / 联系邮箱 / 收款码 —— 已刻意收成**单一数据源**，改一处全站信息页生效 | 国内上线前（合规） |
-| 5 | `src-tauri/tauri.conf.json` | `identifier: com.afdk1991.mim`（包名）+ `updater.endpoints`（=作者 latest.json）+ CSP 白名单 | 打包桌面端前 |
-| 6 | `android/app/build.gradle` | `namespace` / `applicationId` = `com.afdk1991.mim`；release 签名用 CI 环境变量中的固定 keystore | 打包安卓前 |
-| 7 | `.github/workflows/*.yml` | 内联注入作者的两组公开配置与 Secrets；CI badge / 在线地址写在 `README.md` | fork 后自建 CI 时 |
-| 8 | `src/version.ts` `APP_VERSION` | 四段式版本号，每次递增 `0.0.0.1` | 每次发版 |
-
-> 第 5 项 CSP 已放宽为 `https://*.supabase.co`，自建 Supabase 不会被桌面端 CSP 拦截；
-> 若改用其他后端域名，需自行在 `connect-src` 中补上。
-
----
-
-## 1. 环境要求
-
-| 项 | 版本 | 备注 |
-|---|---|---|
-| Node.js | **20+（推荐 22，CI 用 22）** | |
-| npm | 10.9.9+ | CI 会先 `npm i -g npm@10.9.9` 规避 vite 8 optional peers 的 arborist 崩溃 |
-
-依赖安装若报 peer 冲突，加 `--legacy-peer-deps`（CI 就是这么装的）。
-
----
-
-## 2. 三条部署路径
-
-### 路径 A：纯静态托管（最少配置：只需一组云端）
+验证：
 
 ```bash
-npm install --legacy-peer-deps
-cp .env.example .env          # 至少填 VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
-                              # （或改用 VITE_MIM_API_BASE 走 CloudBase 云函数）
-npm run build                 # 产出 dist/
+node -v
+npm -v
 ```
 
-把 `dist/` 丢到任意静态托管即可（Nginx / OSS / COS / GitHub Pages / EdgeOne / Vercel…）。
+### 2) Git
 
-- 构建配置是 `base: './'` + hash 路由（`#/feed`），**任意子路径都能直接跑**，不需要 404 兜底或 rewrite；
-- 本地演示模式已移除：**一组云端配置都没有时应用会直接渲染配置错误页**，构建前务必确认 `.env` 非空。
+macOS 装完 Xcode Command Line Tools 即有 Git：
 
-### 路径 B：自建 Supabase（完整可用，含账号/数据库/存储/实时）
+```bash
+xcode-select --install
+git -v
+```
 
-1. 在 [supabase.com](https://supabase.com) 建项目（免费档：500MB 库 / 1GB 存储 / 5 万 MAU）；
-2. 建库 —— **三选一**：
+### 3) Docker Desktop
 
-   | 方式 | 操作 | 适用 |
-   |---|---|---|
-   | 一键补齐（推荐） | 把 `supabase/apply-all-manual.sql` 全文粘贴到 Dashboard → SQL Editor → Run | 无数据库密码 |
-   | 本地执行 | `SUPABASE_DB_URL=postgresql://… npm run db:apply` | 有连接串 |
-   | CI 自动 | push main 由 `migrate-db` job 应用 | 已配 `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` |
+```bash
+brew install --cask docker
+open -a Docker       # 首次启动会引导授权
+docker compose version
+```
 
-   `apply-all-manual.sql` 由 `npm run db:gen-manual` 生成，改完 SQL 重新生成即可，保证与 CI 不产生分叉。
-   建库后建议跑一次 `npm run db:probe` 自检（只读）：它会列出线上库缺失的表/函数及所属迁移。
-   （注意：CI 的 `migrate-db` job 在未配 `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF`
-   时会**整段跳过且不报错**，此时新迁移不会自动到线上，需走方式 1 或配好 secrets。）
-   迁移顺序：`0000_schema`（20 张业务表基线）→ `0001` IAM → `0002` 对象存储 → `0003` 账号桥
-   → `0004` 帖子富字段 → `0005` 商城目录（仅字段扩展，无演示商品）。全部幂等。
+### 4) 可选：原生壳工具链
 
-3. 配 `.env`（§0 方案 A），`npm run build`，部署 `dist/`；
-4. 可选：开启 GitHub OAuth（Dashboard → Authentication → Providers），回跳白名单加上你的域名。
-
-安全模型：浏览器直连 Supabase，publishable key 按设计可暴露，数据安全由 **RLS 行级安全**
-承担（全表已启用策略）。**不要**把 `service_role` key 写进前端。
-
-## 3. 解锁管理后台（`#/admin`）
-
-> **新部署的站点默认没有任何管理员。** 注册只会分配默认角色 `user`，
-> 而 `user_roles` 表的写策略要求调用者已是 admin —— 没有这一脚，
-> `/#/admin` 对所有人（包括你自己）都显示「无访问权限」。任选一条通道：
-
-| 通道 | 做法 | 适用 |
-|---|---|---|
-| ① 自助（最快） | 注册并登录后打开 `#/admin`，若系统尚无管理员，页面会给出「👑 成为首个管理员」按钮，点一下即可 | 全新库、本地/CI 无凭证 |
-| ② SQL Editor | Dashboard → SQL Editor 粘贴 `supabase/grant-admin.sql`，把 `'alice'` 换成你的用户名执行 | 零凭证，任意时刻 |
-| ③ 脚本 | `SUPABASE_ACCESS_TOKEN=… SUPABASE_PROJECT_REF=… npm run admin:grant -- 你的用户名` | 有 Access Token；`--list` 列账号、`--who` 看现有管理员 |
-| ④ CI 自动 | 仓库 Secrets 设 `ADMIN_EMAIL=<注册邮箱>`，push main 时随迁移自动授予 | 已接 GitHub Actions |
-
-用户名与邮箱都能匹配：应用把用户名注册映射为合成邮箱 `<username>@mim.app`，
-授权函数对两种写法都做了兼容。授权后**刷新页面即可**，无需重新登录。
-
-安全提示：① 的引导门「仅当系统尚无管理员」时开放，一旦有人成为 admin 就永久关闭，
-不会被后来的注册者滥用。公开站点建议：**自己先注册 → 立刻自助或 SQL 抢占首个管理员 → 再宣传站点**。
-
-### 路径 C：六端全量（桌面 / 安卓 / iOS / 鸿蒙）
-
-先完成路径 B，再按平台打包：
-
-| 平台 | 前置工具链 | 命令 |
-|---|---|---|
-| Windows / macOS / Linux | Rust 工具链 | `npx tauri build` |
-| Android | JDK 21 + Android SDK | `npx cap sync android && cd android && ./gradlew assembleRelease` |
-| iOS | macOS + Xcode | `npx cap sync ios && cd ios/App && xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator build` |
-| HarmonyOS | DevEco Studio | 打开 `harmony/`；`node scripts/sync-harmony.mjs` 同步 dist → rawfile |
-
-打包前**务必**改掉 §0 清单第 2、3、5、6 项：
-- 桌面端 OTA：`tauri.conf.json` 的 `updater.endpoints` 指向你的 `latest.json`；
-- 安卓 OTA：`src/ota.ts` 的 `MANIFEST_URL` 指向你的 `manifest.json`；
-  且 **release 必须用同一份 keystore 签名**，否则 OTA 下载后无法覆盖安装；
-- iOS 红线：禁止应用内静默自装，一律弹窗跳 App Store。
+| 目标 | 安装 |
+| --- | --- |
+| iOS | App Store 装 **Xcode**，首次打开执行 `sudo xcode-select -s /Applications/Xcode.app`，并跑一次 `xcodebuild -license accept` |
+| Android | 装 **Android Studio** + Android SDK Platform 34+；`brew install --cask android-studio` |
+| 桌面端（Tauri） | `xcode-select --install`，再按 <https://tauri.app/start/prerequisites/> 装 Rust（`curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf \| sh`） |
+| HarmonyOS | DevEco Studio（macOS 版） |
 
 ---
 
-## 4. 部署后的两件收尾（漏做会静默失效）
+## 四、Linux（Ubuntu / Debian 系）
 
-### 4.1 补齐线上缺失的迁移
-
-CI 的 `migrate-db` job 在仓库未配 `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF` 时会
-**整段跳过且不报错**（job 仍显示 success，属假成功），于是线上库会长期落后于仓库迁移。
-用只读探测确认（无需数据库密码）：
+### 1) Node.js（>= 20）
 
 ```bash
-npm run db:probe
+# 方式 A：nvm（推荐）
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+nvm use 20
+
+# 方式 B：NodeSource
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
 ```
 
-缺失的表 / 函数会连同「所属迁移」一并列出。补齐只需两步：
+验证：
 
 ```bash
-npm run db:gen-pending -- 0008      # 生成 supabase/apply-pending-manual.sql
-# 把该文件全文粘到 Supabase Dashboard → SQL Editor → Run（幂等，可重复执行）
+node -v
+npm -v
 ```
 
-`db:gen-pending` 与 `db:gen-manual` 共用同一份迁移计划（`scripts/lib/migration-plan.mjs`），
-顺序与 CI 完全一致，不会与自动通道分叉；起始版本号取 `db:probe` 报出的最小缺失迁移即可。
+### 2) Git
 
-### 4.2 首次配置商城核销口令
+```bash
+sudo apt-get update && sudo apt-get install -y git
+git -v
+```
 
-管理员核销（充值到账、订单核销）的口令**必须在服务端比对**，前端永不持有、永不下发。
-两个后端的配置入口不同：
+### 3) Docker Engine + Compose 插件
 
-| 后端 | 配置方式 |
-|---|---|
-| Supabase | 以 admin 登录 →「我的钱包」→ 核销口令框输入（≥6 位）→ 点「设为核销口令」。口令写入 `mall_ops_config`（启用 RLS 且不建任何策略 ⇒ anon/authenticated 一律无法读取，仅 definer 函数可访问） |
-| CloudBase | 云函数环境变量 `MIM_PAY_CONFIRM_KEY` |
+```bash
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker "$USER"     # 重新登录后生效，免 sudo 用 docker
+docker compose version
+```
 
-未配置时核销通道 **fail-closed**：拒绝一切核销请求（返回 `unconfigured`），
-不会退化成「任意口令都能通过」。Supabase 侧可查 `select public.ops_key_ready();`
-确认 `configured` 是否为 `true`。
+### 4) 不用 Docker，直接用系统 Postgres 16
 
-## 5. 验证（交付前建议全跑）
+```bash
+sudo apt-get install -y postgresql postgresql-contrib
+sudo -u postgres psql -c "CREATE DATABASE mim;"
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD '换成你的密码';"
+```
 
-需先起本地预览服务：`npx vite preview --port 5198`
+然后：
 
-| 命令 | 覆盖 |
-|---|---|
-| `npm run typecheck` | TypeScript 0 错误 |
-| `npm run verify:routes` | 46 条路由：白屏 / JS 异常 |
-| `npm run verify:mobile` | 全路由移动端横向溢出（默认 390×844；可传参：`npm run verify:mobile -- 320 720`） |
-| `npm run verify:desktop` | 桌面端布局回归（侧栏 / 网格 / 表格） |
-| `npm run verify:feed` | 信息流 + 成长页（12 项断言） |
-| `npm run verify:manju` | 漫剧 / Openverse（21 项断言，离线 route mock 可跑） |
-| `npm run db:probe` | **线上库结构自检**（只读、无需密码）：列出缺失的表/函数及其所属迁移 |
+```bash
+export DATABASE_URL=postgres://postgres:你的密码@127.0.0.1:5432/mim
+npm run server:migrate
+npm run server:dev
+```
 
-浏览器实测依赖系统 Edge（`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`）
-+ `playwright-core`，无需下载浏览器。
+### 5) 可选：原生壳工具链
+
+| 目标 | 安装 |
+| --- | --- |
+| Android | 装 Android Studio 或命令行 SDK；`sudo apt-get install -y openjdk-21-jdk` |
+| 桌面端（Tauri） | `sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`，再装 Rust |
+| iOS / HarmonyOS | 不支持（分别需要 macOS / DevEco） |
 
 ---
 
-## 6. 合规与交接提示
+## 五、装完之后：拉代码并跑起来
 
-- **ICP / 公安备案**：`src/site-config.ts` 中所有备案字段默认为空，页面显示
-  「本项内容由站点运营方配置后展示」。国内上线必须由运营方按真实证照填写，
-  **不要沿用示例值**（示例里 `filingNote` 写的「由 afdk1991 维护」属于作者本人声明）。
-- **收款/商城**：`payQrCodeUrl` / `payQrNote` / `payConfirmKey` 为空时，扫码支付通道
-  与管理员核销入口自动关闭。
-- **版本与 OTA**：版本号统一四段式，初始 `0.0.0.0`，每次递增 `0.0.0.1`
-  （`src/version.ts` 与 Android `versionName` 同步，`versionCode` 单调递增）。
-- **许可**：`package.json` 标为 `UNLICENSED`，README 声明「个人项目，代码仅供学习交流」。
-  若作为商业交付，需由双方另行约定授权范围。
+```bash
+git clone <你的仓库地址>
+cd mim
+npm install
+npm run dev
+```
+
+打开 <http://localhost:5173/> 。
+
+后端（需要 Docker）：
+
+```bash
+npm run server:install
+npm run server:up
+npm run server:migrate
+npm run server:health
+```
+
+完整的 step by step（含创建首个管理员与常见问题）见 [`docs/rebuild/启动说明.md`](docs/rebuild/启动说明.md)。
+
+---
+
+## 六、常见安装问题
+
+| 现象 | 处理 |
+| --- | --- |
+| `npm : 无法加载文件 … 因为在此系统上禁止运行脚本`（PowerShell） | 以管理员身份执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `node -v` 报「不是内部或外部命令」 | PATH 未生效，重新打开终端；Windows 上确认安装时勾选了 Add to PATH |
+| `docker compose` 提示 `command not found` | 装的是旧版 `docker-compose`（带横杠）或没装 Compose 插件；Docker Desktop 自带 `docker compose` |
+| `docker: permission denied`（Linux） | `sudo usermod -aG docker $USER` 后**重新登录** |
+| `npm install` 卡住 / 报证书错误 | 换源：`npm config set registry https://registry.npmmirror.com` |
+| Node 版本低于 20 导致 vite 启动失败 | 用 nvm 切到 20：`nvm install 20 && nvm use 20` |
+| Windows 下 Git Bash 报路径相关错误 | 用 Git Bash 时路径写正斜杠（`f:/合并项目/Mim`），不要用反斜杠 |
