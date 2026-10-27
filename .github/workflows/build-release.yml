@@ -50,31 +50,40 @@ jobs:
         shell: bash
         run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}" | base64 -d > "$RUNNER_TEMP/mim.key"
 
-      # 桌面 OTA 版本注入：tauri/npm 只认三段 semver，而版本策略只递增第 4 段（前三段恒 0.0.0），
-      # 故映射取「第1.第2.第4段」（V0.0.0.2 → 0.0.2）写入 tauri.conf.json version，
-      # tauri-action 以此生成 latest.json 的 version 字段；客户端 updater 按 semver 比较，
-      # 三段必须高于已安装版本才触发更新。workflow_dispatch 无 tag 时跳过，保持 0.0.0
-      - name: 注入版本号（tag 第 1.2.4 段 → tauri.conf.json）
+      # 版本一致性门禁：tag 必须等于 V<src/version.ts 的 APP_VERSION>。
+      # 唯一版本源是 src/version.ts；tag 只是它的载体。此前本 workflow 会用 tag
+      # 反向覆盖 src/version.ts —— 一旦 tag 与源码不符就会静默产出「A 号制品 B 号代码」，
+      # 故改为强校验 + 只读派生。
+      - name: 校验 tag 与唯一版本源一致
         if: startsWith(github.ref, 'refs/tags/V')
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#V}"
-          MAJMIN="${VER%.*}"; MAJMIN="${MAJMIN%.*}"
-          VER="$MAJMIN.${VER##*.}"
-          echo "tag=$GITHUB_REF_NAME -> tauri version=$VER"
+          SRC_VER=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
+          if [ -z "$SRC_VER" ]; then echo "❌ 无法从 src/version.ts 解析 APP_VERSION"; exit 1; fi
+          if [ "V$SRC_VER" != "$GITHUB_REF_NAME" ]; then
+            echo "❌ tag $GITHUB_REF_NAME 与唯一版本源不一致：APP_VERSION=$SRC_VER（应为 V$SRC_VER）"
+            echo "   请先修改 src/version.ts 的 APP_VERSION，同步各载体并跑 npm run version:check 后再打 tag"
+            exit 1
+          fi
+          echo "✅ tag $GITHUB_REF_NAME 与 APP_VERSION $SRC_VER 一致"
+
+      # 桌面 OTA 版本注入：tauri 只认三段 semver，而版本策略只递增第 4 段（前三段恒 0.0.0），
+      # 故按项目统一派生规则取「第1.第2.第4段」（APP_VERSION 0.0.0.2 → 0.0.2）写入
+      # tauri.conf.json version。tauri-action 以此生成 latest.json 的 version 字段；
+      # 客户端 updater 按 semver 比较，三段必须高于已安装版本才触发更新。
+      - name: 注入 tauri 版本（APP_VERSION 第 1.2.4 段 → tauri.conf.json）
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: bash
+        run: |
+          SRC_VER=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
+          IFS='.' read -r S1 S2 S3 S4 <<< "$SRC_VER"
+          VER="$S1.$S2.$S4"
+          echo "APP_VERSION=$SRC_VER -> tauri version=$VER"
           node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');" "$VER"
           grep -n '"version"' src-tauri/tauri.conf.json
 
-      # 前端版本号注入：tag 四段式（V0.0.0.2 → 0.0.0.2）写入 src/version.ts，
-      # 供页脚展示、欢迎弹窗版本对齐、Android OTA 版本判定使用。
-      # 此前该常量恒为 0.0.0.0（CI 从未注入），导致版本显示错误 + OTA 每次误判有更新。
-      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
-        if: startsWith(github.ref, 'refs/tags/V')
-        shell: bash
-        run: |
-          VER="${GITHUB_REF_NAME#V}"
-          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
-          grep -n "APP_VERSION" src/version.ts
+      # 前端 APP_VERSION 不再由 CI 注入：src/version.ts 已是唯一源，
+      # 上面的门禁保证 tag 与之一致，注入只会变成「自己写回自己」。
 
       - name: 构建 & 发布（tauri-action）
         uses: tauri-apps/tauri-action@v0
@@ -112,13 +121,15 @@ jobs:
         run: |
           npm install -g npm@10.9.9
           npm install --no-fund --no-audit --legacy-peer-deps
-      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+      # 版本取唯一源 src/version.ts（checkout 即带出），此处只做一致性断言，
+      # 防止 tag 与源码版本脱钩后产出「A 号制品 B 号代码」。
+      - name: 校验 tag 与唯一版本源一致
         if: startsWith(github.ref, 'refs/tags/V')
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#V}"
-          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
-          grep -n "APP_VERSION" src/version.ts
+          SRC_VER=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
+          if [ "V$SRC_VER" != "$GITHUB_REF_NAME" ]; then echo "❌ tag $GITHUB_REF_NAME ≠ V$SRC_VER（唯一版本源）"; exit 1; fi
+          echo "✅ APP_VERSION=$SRC_VER 与 tag 一致"
 
       - name: 构建 Web 资产
         run: npm run build
@@ -159,13 +170,15 @@ jobs:
         run: |
           npm install -g npm@10.9.9
           npm install --no-fund --no-audit --legacy-peer-deps
-      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+      # 版本取唯一源 src/version.ts（checkout 即带出），此处只做一致性断言，
+      # 防止 tag 与源码版本脱钩后产出「A 号制品 B 号代码」。
+      - name: 校验 tag 与唯一版本源一致
         if: startsWith(github.ref, 'refs/tags/V')
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#V}"
-          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
-          grep -n "APP_VERSION" src/version.ts
+          SRC_VER=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
+          if [ "V$SRC_VER" != "$GITHUB_REF_NAME" ]; then echo "❌ tag $GITHUB_REF_NAME ≠ V$SRC_VER（唯一版本源）"; exit 1; fi
+          echo "✅ APP_VERSION=$SRC_VER 与 tag 一致"
 
       - name: 构建 Web 资产
         run: npm run build
@@ -195,13 +208,15 @@ jobs:
         run: |
           npm install -g npm@10.9.9
           npm install --no-fund --no-audit --legacy-peer-deps
-      - name: 注入 APP_VERSION（tag 四段式 → src/version.ts）
+      # 版本取唯一源 src/version.ts（checkout 即带出），此处只做一致性断言，
+      # 防止 tag 与源码版本脱钩后产出「A 号制品 B 号代码」。
+      - name: 校验 tag 与唯一版本源一致
         if: startsWith(github.ref, 'refs/tags/V')
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#V}"
-          node -e "const fs=require('fs');const p='src/version.ts';let s=fs.readFileSync(p,'utf8');s=s.replace(/export const APP_VERSION = '[^']*'/, \"export const APP_VERSION = '\"+process.argv[1]+\"';\");fs.writeFileSync(p,s);" "$VER"
-          grep -n "APP_VERSION" src/version.ts
+          SRC_VER=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
+          if [ "V$SRC_VER" != "$GITHUB_REF_NAME" ]; then echo "❌ tag $GITHUB_REF_NAME ≠ V$SRC_VER（唯一版本源）"; exit 1; fi
+          echo "✅ APP_VERSION=$SRC_VER 与 tag 一致"
       - name: 构建 Web 资产
         run: npm run build
         env:
