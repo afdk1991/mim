@@ -22,12 +22,8 @@
     "server:health": "node scripts/server-health.mjs",
 
     "verify:routes": "node scripts/verify-routes.mjs",
-    "verify:cloud": "node scripts/verify-cloud-e2e.mjs",
-    "version:check": "node scripts/version-check.mjs",
-
-    "native:sync": "npm run build && cap sync",
-    "native:android": "npm run build && cap open android",
-    "native:ios": "npm run build && cap open ios"
+    "verify:backend": "node scripts/verify-backend.mjs",
+    "version:check": "node scripts/version-check.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

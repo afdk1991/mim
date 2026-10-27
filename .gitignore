@@ -53,18 +53,12 @@ scripts/verify-*.mjs
 !scripts/verify-feed-growth.mjs
 !scripts/verify-mobile.mjs
 !scripts/verify-desktop-regress.mjs
-# 线上云端端到端回归（GitHub Pages 真实站点：注册→发布→全新会话读回），
-# 是「线上实现」而非「本地实现」的唯一自动闸门，同样放行入库。
-!scripts/verify-cloud-e2e.mjs
 scripts/shot-*.mjs
 # 浏览器自动化（playwright-core + Edge）截图产物
 browser-shots/
 
 # EdgeOne 控制台一次性探查产物（playwright-core 截图 + 文本，非源码资产）
 .edgeone-console/
-
-# Supabase CLI 临时目录
-supabase/.temp/
 
 # ---------- 重建后新增 ----------
 # 自托管后端
@@ -100,3 +94,19 @@ harmony/local.properties
 # Tauri：Rust 构建产物与生成的平台工程
 src-tauri/target/
 src-tauri/gen/
+
+# 本地调试冒烟脚本（一次性，不入库）
+.smoke-*.mjs
+
+# 浏览器截图产物
+.screenshots/
+
+# ---------- 遗留后端清理（scripts/ 收尾）----------
+.edgeone/
+.edgeone-console/
+.trae/
+.trae-html-share-packages/
+.screenshots/
+verify-shots/
+# 自托管后端端到端断言（替代已删除的 verify-cloud-e2e.mjs）：确定性回归基线，放行入库
+!scripts/verify-backend.mjs
