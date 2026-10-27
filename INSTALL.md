@@ -25,6 +25,8 @@
 - 后端 Node 版本：`server/package.json` 的 `engines.node`（`>=20`）
 - 数据库版本：`server/docker-compose.yml` 的 `db.image`（`postgres:16-alpine`）
 
+> CI（`.github/workflows/build.yml`）跑在 **Node 22** 上。`engines.node` 是 `>=20`，所以本机装 20 或 22 都能跑，**建议与 CI 对齐装 22**（下面命令里的 `20` 换成 `22` 即可）。
+
 ---
 
 ## 二、Windows
