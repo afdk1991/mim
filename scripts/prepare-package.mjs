@@ -8,7 +8,7 @@
  * 版本号来源（关键）：
  *   不直接使用 tag —— tag 是四段式（V0.0.0.0），而 npm 只接受三段 semver，
  *   直接取 tag 会得到非法版本 "0.0.0.0" 并导致 npm publish 报
- *   `Invalid version`（实测失败）。故此处从**唯一版本源** src/version.ts 的
+ *   `Invalid version`（实测失败）。故此处从**唯一版本源** src/core/version.ts 的
  *   APP_VERSION 读取四段值，按项目派生规则取「第1.第2.第4段」得到三段版本，
  *   与 package.json / iOS / Tauri 完全同源，杜绝「tag 与包版本分裂」。
  *
@@ -29,10 +29,10 @@ if (!owner) {
 }
 
 // ---------- 1. 读取唯一版本源 ----------
-const versionSrc = readFileSync(path.join(ROOT, 'src/version.ts'), 'utf8')
+const versionSrc = readFileSync(path.join(ROOT, 'src/core/version.ts'), 'utf8')
 const vm = versionSrc.match(/export const APP_VERSION\s*=\s*'([^']+)'/)
 if (!vm) {
-  console.error('❌ 无法从 src/version.ts 解析 APP_VERSION（唯一版本源缺失）')
+  console.error('❌ 无法从 src/core/version.ts 解析 APP_VERSION（唯一版本源缺失）')
   process.exit(1)
 }
 const APP_VERSION = vm[1]

@@ -1,13 +1,14 @@
 /**
  * 版本号一致性校验（本地开发 / CI 通用）
  *
- * 唯一版本源：src/version.ts 的 APP_VERSION（四段式 major.minor.patch.build）
+ * 唯一版本源：src/core/version.ts 的 APP_VERSION（四段式 major.minor.patch.build）
  * 派生规则  ：因 npm / iOS / Tauri 强制三段 semver，三段式载体取「第1.第2.第4段」
  *             V0.0.0.0 → 0.0.0   V0.0.0.1 → 0.0.1
  * 构建号     ：versionCode / CURRENT_PROJECT_VERSION 必须单调递增，不参与字面值比对
  *
  * 用法：
  *   node scripts/version-check.mjs                  # 校验工作区文件 + 本地 git tag
+ * 注：重建后唯一版本源由 src/version.ts 迁至 src/core/version.ts。
  *   node scripts/version-check.mjs --remote         # 追加校验远端 origin 的 tag（验证线上标签层）
  *   node scripts/version-check.mjs --tag V0.0.0.0   # 额外校验指定 tag 与版本源一致
  */
@@ -26,10 +27,10 @@ const match1 = (txt, re) => {
 }
 
 // ---------- 1. 读取唯一版本源 ----------
-const versionSrc = read('src/version.ts')
+const versionSrc = read('src/core/version.ts')
 const APP_VERSION = match1(versionSrc, /export const APP_VERSION\s*=\s*'([^']+)'/)
 if (!APP_VERSION) {
-  console.error('❌ 无法从 src/version.ts 解析 APP_VERSION（唯一版本源缺失）')
+  console.error('❌ 无法从 src/core/version.ts 解析 APP_VERSION（唯一版本源缺失）')
   process.exit(1)
 }
 const seg = APP_VERSION.split('.')
@@ -52,7 +53,7 @@ const ohEntry = read('harmony/entry/oh-package.json5')
 
 const checks = [
   // —— 四段式载体：必须与 APP_VERSION 字面一致 ——
-  { layer: 'src/version.ts (唯一源)', expect: APP_VERSION, actual: APP_VERSION, kind: 'four' },
+  { layer: 'src/core/version.ts (唯一源)', expect: APP_VERSION, actual: APP_VERSION, kind: 'four' },
   { layer: 'android versionName', expect: APP_VERSION, actual: match1(gradle, /versionName\s+"([^"]+)"/), kind: 'four' },
   { layer: 'harmony versionName', expect: APP_VERSION, actual: match1(appJson5, /"versionName"\s*:\s*"([^"]+)"/), kind: 'four' },
   // —— 三段式载体：必须等于派生值 ——

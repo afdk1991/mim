@@ -1,20 +1,22 @@
-/* 真实 Edge 浏览器自动化：渲染线上站点并采集控制台/网络错误 + 截图。
-   用法：node scripts/browser-check.mjs [url...]
-   默认检查 GitHub Pages 站点首页与商城页（商城页对应缺失的 products.channel 字段）。 */
+/* 真实浏览器自动化：渲染站点并采集控制台/网络错误 + 截图。
+   用法：BASE=http://localhost:5198 node scripts/browser-check.mjs [url...]
+   默认检查本地预览服务（npm run build && npx vite preview --port 5198）的首页与商城页。 */
 
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { resolveBrowser } from './lib/browser.mjs'
 
-const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+const EDGE = resolveBrowser()
+const BASE = (process.env.BASE || 'http://localhost:5198').replace(/\/+$/, '')
 const OUT = join(process.cwd(), 'browser-shots')
 mkdirSync(OUT, { recursive: true })
 
 const TARGETS = process.argv.slice(2).length
   ? process.argv.slice(2).map((u, i) => ({ name: `target${i + 1}`, url: u }))
   : [
-      { name: 'home', url: 'https://afdk1991.github.io/mim/#/' },
-      { name: 'mall', url: 'https://afdk1991.github.io/mim/#/mall' },
+      { name: 'home', url: `${BASE}/#/feed` },
+      { name: 'mall', url: `${BASE}/#/mall` },
     ]
 
 const browser = await chromium.launch({
@@ -32,21 +34,21 @@ for (const t of TARGETS) {
   const consoleErrors = []
   const pageErrors = []
   const badRequests = []
-  const supabaseCalls = []
+  const apiCalls = []
 
   page.on('console', (m) => {
     const txt = m.text()
     if (m.type() === 'error') consoleErrors.push(txt.slice(0, 300))
-    if (/supabase|42703|does not exist|PGRST|permission denied/i.test(txt)) {
-      supabaseCalls.push(`[console:${m.type()}] ${txt.slice(0, 250)}`)
+    if (/42703|does not exist|PGRST|permission denied|fetch failed/i.test(txt)) {
+      apiCalls.push(`[console:${m.type()}] ${txt.slice(0, 250)}`)
     }
   })
   page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 300)))
   page.on('response', (r) => {
     const u = r.url()
     if (r.status() >= 400) badRequests.push(`${r.status()} ${u.slice(0, 160)}`)
-    if (/supabase\.co\/(rest|auth|storage|functions)/.test(u)) {
-      supabaseCalls.push(`${r.status()} ${u.slice(0, 160)}`)
+    if (/\/api\/(rest|auth|rpc|storage)/.test(u)) {
+      apiCalls.push(`${r.status()} ${u.slice(0, 160)}`)
     }
   })
   page.on('requestfailed', (r) => {
@@ -79,7 +81,7 @@ for (const t of TARGETS) {
       (x) => !/favicon|\.png|\.jpg|\.svg|\.woff/i.test(x),
     )
     console.log(`失败请求(非静态资源): ${interestingBad.length ? interestingBad.slice(0, 6).join(' | ') : '无'}`)
-    console.log(`Supabase 相关调用:\n  ${supabaseCalls.length ? supabaseCalls.slice(0, 10).join('\n  ') : '无'}`)
+    console.log(`后端 /api 相关调用:\n  ${apiCalls.length ? apiCalls.slice(0, 10).join('\n  ') : '无'}`)
 
     summary.push({
       name: t.name,
