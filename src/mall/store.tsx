@@ -11,11 +11,12 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { emitToast } from '../components'
 import { useAuth } from '../auth'
 import { supabase } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
-import { WALLET_UPDATE_EVT, getWalletState, walletConsume } from '../wallet'
-import { checkOperatorKey } from './payment'
+import { WALLET_UPDATE_EVT, getWalletState, walletConsume, hydrateWallet } from '../wallet'
+import { mallConfirm, mallUpsertOrder } from '../lib/bizApi'
 import type { PayChannelId, PayProof } from './payment'
 
 export type MallChannel = 'youxuan' | 'gexm' | 'mix' | 'live' | 'laal'
@@ -191,6 +192,22 @@ function currentGoods(): MallGoods[] {
 /* 按真实身份隔离的存储 key（v2：随演示数据清除换代，旧 v1 存档整体作废） */
 const mallKeyFor = (userId: string) => `mim-mall-v2:${userId}`
 
+/** 订单 → 云端 mall_orders 列（snake_case，兼容 postgREST / CloudBase PG） */
+function toCloudOrder(o: MallOrder): Record<string, unknown> {
+  return {
+    id: o.id,
+    goods_id: o.goodsId,
+    title: o.title,
+    emoji: o.emoji,
+    amount: o.amount,
+    qty: o.qty,
+    channel: o.channel,
+    status: o.status,
+    pay_channel: o.payChannel ?? null,
+    proof: o.proof ?? null,
+  }
+}
+
 function seedState(): MallState {
   return {
     /* 轮 15 并轨：余额镜像统一钱包（分→元取整展示），不再本地独立记账 */
@@ -258,8 +275,9 @@ type MallApi = {
   payOrder: (id: string) => boolean
   /** 扫码人工确认通道：提交付款凭证（unpaid → awaiting_confirm，等待管理员核销） */
   submitPayProof: (id: string, method: string, ref: string) => void
-  /** 管理员凭口令确认收款（awaiting_confirm → paid，返 5% 积分）；口令错误返回 false */
-  confirmManualPay: (id: string, key: string) => boolean
+  /** 管理员凭口令确认收款（awaiting_confirm → paid，返 5% 积分）；
+   *  口令校验改在服务端（mim-api /mall/confirm）进行，前端只透传用户输入，永不下发/比对口令。 */
+  confirmManualPay: (id: string, key: string) => Promise<boolean>
   /** 取消 unpaid 订单（演示简化：直接从订单列表移除） */
   cancelOrder: (id: string) => void
   confirmOrder: (id: string) => void
@@ -276,6 +294,8 @@ export function MallProvider({ children }: { children: ReactNode }) {
   // 真实身份变化（登录/退出/云端会话切换）时重载该身份的钱包数据
   useEffect(() => {
     setState(loadMallFor(userId))
+    // 钱包后端化：切号时从云端拉取权威余额（云端优先 + localStorage 降级）
+    void hydrateWallet(userId)
     // 云端恢复（轮 6）：拉取该身份快照 → 写回本地 → 重载（云 key 统一 mim-mall-v2，表按 user_id 隔离）
     void pullToolState('mim-mall-v2').then((d) => {
       if (!d || typeof d !== 'object') return
@@ -352,6 +372,8 @@ export function MallProvider({ children }: { children: ReactNode }) {
         at: Date.now(),
       }
       setState((s) => ({ ...s, orders: [order, ...s.orders], cart: [] }))
+      // 云端持久化订单（真源从 localStorage 挪到数据库，按 user_id 隔离）
+      void mallUpsertOrder(toCloudOrder(order)).catch(() => {})
       return order
     },
     payOrder(id) {
@@ -367,24 +389,31 @@ export function MallProvider({ children }: { children: ReactNode }) {
       return true
     },
     submitPayProof(id, method, ref) {
+      const cur = state.orders.find((o) => o.id === id && o.status === 'unpaid')
+      if (!cur) return
+      const updated: MallOrder = {
+        ...cur,
+        status: 'awaiting_confirm',
+        payChannel: 'qrcode-manual',
+        proof: { method, ref, at: Date.now() },
+      }
       setState((s) => ({
         ...s,
-        orders: s.orders.map((o) =>
-          o.id === id && o.status === 'unpaid'
-            ? {
-                ...o,
-                status: 'awaiting_confirm',
-                payChannel: 'qrcode-manual' as PayChannelId,
-                proof: { method, ref, at: Date.now() },
-              }
-            : o,
-        ),
+        orders: s.orders.map((o) => (o.id === id && o.status === 'unpaid' ? updated : o)),
       }))
+      void mallUpsertOrder(toCloudOrder(updated)).catch(() => {})
     },
-    confirmManualPay(id, key) {
-      if (!checkOperatorKey(key)) return false
+    async confirmManualPay(id, key) {
       const order = state.orders.find((o) => o.id === id && o.status === 'awaiting_confirm')
       if (!order) return false
+      // P0-1 资金安全：口令校验改在服务端（mim-api /mall/confirm）进行，前端只透传。
+      // 服务端完成 admin 鉴权 + 口令比对 + 状态机转移 awaiting_confirm → paid。
+      try {
+        await mallConfirm(order.id, key)
+      } catch (e) {
+        emitToast(`核销失败：${(e as Error).message}`)
+        return false
+      }
       setState((s) => ({
         ...s,
         points: s.points + Math.floor(order.amount * 0.05),

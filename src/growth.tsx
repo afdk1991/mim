@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Empty, Modal, TimeAgo, emitToast, useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
 import { cx } from './utils'
+import { growthState as bizGrowthState, growthRecord, growthCheckin } from './lib/bizApi'
 
 /* ================= 统一成长引擎 =================
    蓝本：开发吧.md 4.1 growth_rule —— 单态（2026-10-23）统一为一条成长线。
@@ -167,8 +168,31 @@ export type GrowthFeedback =
   | { ok: true; label: string; value: number; reward: 'GROWTH' }
   | { ok: false; reason: 'no-rule' | 'cap' | 'quality' }
 
-/** 外部行为记分：规则校验 → 质量门 → daily_cap → 落盘（含徽章合并）→ 派发刷新事件 → toast */
-export function recordGrowth(action: string, opts?: { quality?: boolean }): GrowthFeedback {
+/** 从云端拉取权威成长态并回写本地缓存（云端优先 + localStorage 降级）。
+ *  服务端 events/checkin/streak 为真源，本地仅作展示缓存。 */
+export async function hydrateGrowth(userId: string = getCurrentUserId()): Promise<void> {
+  try {
+    const cloud = await bizGrowthState()
+    const base: GrowthState = {
+      events: cloud.events,
+      checkin: { last: cloud.checkin.last, streak: cloud.checkin.streak },
+      badges: Object.fromEntries(cloud.badges.map((b) => [b.code, b.at])),
+    }
+    const merged = withBadgeTimes(base)
+    try {
+      localStorage.setItem(growthKeyFor(userId), JSON.stringify(merged))
+    } catch {
+      /* ignore */
+    }
+    window.dispatchEvent(new CustomEvent(GROWTH_UPDATE_EVT))
+  } catch {
+    /* 云端不可用：保持本地缓存（降级） */
+  }
+}
+
+/** 外部行为记分（异步，云端优先）：规则校验 → 质量门 → daily_cap → 本地乐观落盘
+ *  → 派发刷新事件 → 异步写入云端 → 结算后回拉云端权威态（失败则回滚本地乐观值）。 */
+export async function recordGrowth(action: string, opts?: { quality?: boolean }): Promise<GrowthFeedback> {
   const rule = GROWTH_RULES.find((r) => r.action === action)
   if (!rule) return { ok: false, reason: 'no-rule' }
   if (rule.qualityGate && !(opts?.quality ?? false)) {
@@ -195,6 +219,9 @@ export function recordGrowth(action: string, opts?: { quality?: boolean }): Grow
   }
   window.dispatchEvent(new CustomEvent(GROWTH_UPDATE_EVT))
   emitToast(`🚀 已记分「${rule.label}」 ${rule.value > 0 ? '+' : ''}${rule.value} 成长值`)
+  void growthRecord(action, !!(opts?.quality))
+    .then(() => void hydrateGrowth())
+    .catch(() => void hydrateGrowth())
   return { ok: true, label: rule.label, value: rule.value, reward: rule.reward }
 }
 
@@ -224,9 +251,10 @@ export function GrowthPage() {
     return () => window.removeEventListener(GROWTH_UPDATE_EVT, sync)
   }, [])
 
-  /* 轮 17 打通：切号（登录/登出）即重载对应身份的成长数据 */
+  /* 轮 17 打通：切号（登录/登出）即重载对应身份的成长数据；
+     后端化：每次挂载/切号先从云端拉取权威态（云端优先 + localStorage 降级）。 */
   useEffect(() => {
-    setState(loadGrowth(auth.userId))
+    void hydrateGrowth(auth.userId)
   }, [auth.userId])
 
   const checkedToday = state.checkin.last === today
@@ -254,7 +282,8 @@ export function GrowthPage() {
     }
   }
 
-  /** 触发行为：尊重 daily_cap；负值行为（惩罚）不受上限约束 */
+  /** 触发行为：尊重 daily_cap；负值行为（惩罚）不受上限约束。
+   *  本地乐观落盘保证即时反馈，同时异步写入云端（防丢，不阻塞 UI）。 */
   const trigger = (rule: GrowthRule) => {
     if (rule.dailyCap !== null && rule.value > 0 && (todayCount[rule.action] ?? 0) >= rule.dailyCap) {
       toast(`「${rule.label}」已达今日上限 ${rule.dailyCap} 次`)
@@ -265,14 +294,26 @@ export function GrowthPage() {
       events: [...state.events, { id: Date.now(), action: rule.action, at: Date.now() }],
     })
     toast(`已记录「${rule.label}」 ${rule.value > 0 ? '+' : ''}${rule.value} 成长值`)
+    // 后台写入云端（行为事件真源移至数据库）
+    void growthRecord(rule.action, false).catch(() => {})
   }
 
-  /** 签到：断签即重置（昨天没签则从 1 重新计） */
-  const checkin = () => {
+  /** 签到：断签即重置（昨天没签则从 1 重新计）。
+   *  本地乐观落盘 + 服务端校时：以服务端返回的连击为准校正，根治改本地时钟刷连击作弊。 */
+  const checkin = async () => {
     if (checkedToday) return
-    const streak = state.checkin.last === yesterday ? state.checkin.streak + 1 : 1
-    persist({ ...state, checkin: { last: today, streak } })
-    toast(streak >= 7 ? `已签到，连续 ${streak} 天，徽章「七日之约」到手！` : `已签到，连续 ${streak} 天`)
+    const localStreak = state.checkin.last === yesterday ? state.checkin.streak + 1 : 1
+    persist({ ...state, checkin: { last: today, streak: localStreak } })
+    toast(localStreak >= 7 ? `已签到，连续 ${localStreak} 天，徽章「七日之约」到手！` : `已签到，连续 ${localStreak} 天`)
+    try {
+      const r = await growthCheckin()
+      if (r.ok && typeof r.streak === 'number') {
+        // 以服务端连击为准校正（服务端用 current_date，无法被本地时钟篡改）
+        persist({ ...loadGrowth(), checkin: { last: today, streak: r.streak } })
+      }
+    } catch {
+      /* 云端不可用：保留本地乐观值 */
+    }
   }
 
   const lvl = levelProgress(score)

@@ -8,7 +8,8 @@ import { useToast } from '../components'
 import { getCurrentUserId } from '../auth'
 import { walletRecharge } from '../wallet'
 import { useMall } from './store'
-import { checkOperatorKey, qrcodePayInfo } from './payment'
+import { qrcodePayInfo } from './payment'
+import { mallVerifyKey } from '../lib/bizApi'
 
 const AMOUNTS = [50, 100, 200, 500]
 
@@ -85,10 +86,13 @@ export function MallWalletPage() {
     toast(`已提交 ¥${amount} 的付款凭证，等待管理员核销到账`)
   }
 
-  /* 管理员核销：口令校验通过才真正把金额写入统一钱包 */
-  const confirmReq = (req: RechargeReq) => {
-    if (!checkOperatorKey(key)) {
-      toast('核销口令错误（site-config payConfirmKey 未配置或不匹配）')
+  /* 管理员核销：口令校验改在服务端（mim-api /mall/verify-key）进行，前端只透传用户输入，
+     永不下发/比对口令——根除「口令随 JS 包暴露、任何人可自充」的资金欺诈漏洞。 */
+  const confirmReq = async (req: RechargeReq) => {
+    try {
+      await mallVerifyKey(key)
+    } catch (e) {
+      toast(`核销失败：${(e as Error).message}`)
       return
     }
     walletRecharge(req.amount * 100, `充值 ¥${req.amount}（凭证 ${req.ref} 已人工核销）`)
@@ -96,7 +100,7 @@ export function MallWalletPage() {
     setReqs(next)
     saveReqs(next)
     setKey('')
-    toast(`已确认到账 ¥${req.amount}，余额已入账`)
+    toast('核销成功，余额已记入云端钱包')
   }
 
   const pending = reqs.filter((r) => r.status === 'pending')

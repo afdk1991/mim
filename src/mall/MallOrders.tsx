@@ -154,12 +154,13 @@ function AdminPanel({ order, onClose }: { order: MallOrder; onClose: () => void 
   const toast = useToast()
   const [key, setKey] = useState('')
 
-  const confirm = () => {
-    if (confirmManualPay(order.id, key)) {
+  const confirm = async () => {
+    const ok = await confirmManualPay(order.id, key)
+    if (ok) {
       toast(`已确认收款 ¥${order.amount}，返 ${Math.floor(order.amount * 0.05)} 积分`)
       onClose()
     } else {
-      toast('核销口令错误（site-config payConfirmKey 未配置或不匹配）')
+      toast('核销失败（口令错误 / 无权限 / 订单状态不正确）')
     }
   }
 

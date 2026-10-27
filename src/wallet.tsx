@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { Empty, TimeAgo, emitToast, useToast } from './components'
 import { getCurrentUserId, useAuth } from './auth'
 import { cx } from './utils'
+import { walletState as bizWalletState, walletDebit, walletCredit } from './lib/bizApi'
+import { hydrateRec } from './lib/feed-core'
 
 /** 统一钱包 + 权益矩阵（开发吧.md 4.2 entitlement_matrix / 4.3 revenue_rule）
  *  金额一律存「分」整数（结算铁律）；收益入账携带 revenue_rule 下单时刻快照；
@@ -131,13 +133,41 @@ const yuan = (fen: number) => (fen / 100).toFixed(2)
 export const WALLET_UPDATE_EVT = 'mim-wallet-update'
 
 /** 落盘并广播（外部链路写 localStorage 后通知钱包页重读） */
-function persistWallet(next: WalletState): void {
+function saveWalletFor(userId: string, next: WalletState): void {
   try {
-    localStorage.setItem(walletKeyFor(getCurrentUserId()), JSON.stringify(next))
+    localStorage.setItem(walletKeyFor(userId), JSON.stringify(next))
   } catch {
     /* ignore */
   }
   window.dispatchEvent(new Event(WALLET_UPDATE_EVT))
+}
+
+function persistWallet(next: WalletState): void {
+  saveWalletFor(getCurrentUserId(), next)
+}
+
+/** 从云端拉取权威钱包态并回写本地缓存（云端优先 + localStorage 降级）。
+ *  一次性迁移：云端为空（新用户）但本地已有余额时，把本地余额贷记到云端，
+ *  避免后端化切换瞬间丢失历史余额（迁完云端即非零，后续不再触发）。 */
+export async function hydrateWallet(userId: string = getCurrentUserId()): Promise<void> {
+  try {
+    const cloud = await bizWalletState()
+    const next: WalletState = {
+      balanceFen: cloud.balanceFen,
+      plan: (cloud.plan in ENTITLEMENTS ? cloud.plan : 'BASIC') as PlanCode,
+      txs: cloud.txns,
+    }
+    const local = loadWallet(userId)
+    if (local.balanceFen > 0 && cloud.balanceFen === 0) {
+      // 本地余额迁移到云端（仅一次）
+      walletCredit(local.balanceFen, '本地余额迁移至云端', 'recharge')
+      next.balanceFen = local.balanceFen
+      next.txs = local.txs
+    }
+    saveWalletFor(userId, next)
+  } catch {
+    /* 云端不可用：保持本地缓存（降级） */
+  }
 }
 
 /** 外部模块查询钱包快照（余额/当前套餐） */
@@ -145,7 +175,9 @@ export function getWalletState(): WalletState {
   return loadWallet()
 }
 
-/** 统一扣费入口：余额不足返回 false（内部已 toast，调用方应中止订单） */
+/** 统一扣费入口：余额不足返回 false（内部已 toast，调用方应中止订单）。
+ *  云端优先：本地乐观扣减后立即异步发起云端原子扣费，结算后回拉云端权威态
+ *  （成功/失败都重新 hydrate，云端余额不足时自动回滚本地乐观值）。 */
 export function walletConsume(fen: number, note: string): boolean {
   if (!Number.isFinite(fen) || fen <= 0) return false
   const s = loadWallet()
@@ -160,11 +192,18 @@ export function walletConsume(fen: number, note: string): boolean {
     txs: [tx, ...s.txs].slice(0, 50),
   })
   emitToast(`已扣费 ¥${yuan(fen)}：${note}`)
+  void walletDebit(fen, note)
+    .then(() => void hydrateWallet())
+    .catch((e) => {
+      emitToast(`扣费失败：${(e as Error).message}`)
+      void hydrateWallet()
+    })
   return true
 }
 
 /** 统一充值入口：仅由「真实收款渠道人工核销」调用（kind=recharge，非收益，不携快照）；
- *  禁止任何无凭证自助入账——余额只能来自已确认到账的款项或真实内容收益。 */
+ *  禁止任何无凭证自助入账——余额只能来自已确认到账的款项或真实内容收益。
+ *  云端优先：本地乐观加钱后异步发起云端原子入账，结算后回拉云端权威态。 */
 export function walletRecharge(fen: number, note: string): void {
   if (!Number.isFinite(fen) || fen <= 0) return
   const s = loadWallet()
@@ -175,9 +214,11 @@ export function walletRecharge(fen: number, note: string): void {
     txs: [tx, ...s.txs].slice(0, 50),
   })
   emitToast(`充值到账 +¥${yuan(fen)}`)
+  void walletCredit(fen, note, 'recharge').then(() => void hydrateWallet()).catch(() => void hydrateWallet())
 }
 
-/** 统一收益入账入口：携带 revenue_rule 下单时刻快照（域/类型/sku/费率/结算周期） */
+/** 统一收益入账入口：携带 revenue_rule 下单时刻快照（域/类型/sku/费率/结算周期）。
+ *  云端优先：本地乐观加钱后异步发起云端原子入账，结算后回拉云端权威态。 */
 export function walletIncome(
   fen: number,
   note: string,
@@ -192,6 +233,7 @@ export function walletIncome(
     txs: [tx, ...s.txs].slice(0, 50),
   })
   emitToast(`收益到账 +¥${yuan(fen)}：${note}`)
+  void walletCredit(fen, note, 'income', snap).then(() => void hydrateWallet()).catch(() => void hydrateWallet())
 }
 
 /** 按 sku 取 revenue_rule 快照（运营改表后新订单生效，历史流水快照不变） */
@@ -226,9 +268,12 @@ export function WalletPage() {
     return () => window.removeEventListener(WALLET_UPDATE_EVT, sync)
   }, [])
 
-  /* 轮 16 打通：切号（登录/登出）即重载对应身份的钱包 */
+  /* 轮 16 打通：切号（登录/登出）即重载对应身份的钱包；
+     后端化：每次挂载/切号先从云端拉取权威态（云端优先 + localStorage 降级）。
+     同时触发 feed 负反馈 / 同城定位的云端 hydrate（P1-2 跨端一致）。 */
   useEffect(() => {
-    setState(loadWallet(auth.userId))
+    void hydrateWallet(auth.userId)
+    void hydrateRec(auth.userId)
   }, [auth.userId])
 
   const save = (next: WalletState) => {

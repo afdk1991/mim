@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Modal, useToast } from './components'
 import { cx, timeAgo, uid } from './utils'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
+import { priceLatest, priceRefresh } from './lib/bizApi'
 
 /* ============================================================
  * 价格监控 —— 行情数据来自 CoinGecko 公开 API（真实数据源，无需密钥）
@@ -48,8 +49,11 @@ interface PriceBoard {
 
 const STORAGE_KEY = 'mim-price-v2'
 
-/* CoinGecko 实时行情：一次批量请求全部监控标的，CNY 计价 + 24h 涨跌。
-   ids 由看板当前监控列表动态给出，支持用户自定义任意 CoinGecko 资产 id。 */
+/* CoinGecko 实时行情已后端化（P1-1）：优先由服务端 priceRefresh() 回源 CoinGecko 写入
+   price_quotes 表，前端只读 priceLatest() 快照（消除限流 / 行情被篡改的面）。
+   但若服务端所在区域无法出网到 CoinGecko（如 ap-shanghai 对境外金融源出网被阻断），
+   云端快照为空 —— 此时回退浏览器直连 CoinGecko（其 API 已开 CORS，用户浏览器可正常
+   访问）以保住功能。两种路径任一成功即渲染。 */
 const DEFAULT_CG_IDS = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'dogecoin']
 
 interface CgQuote {
@@ -57,7 +61,8 @@ interface CgQuote {
   change: number
 }
 
-async function fetchCnyQuotes(ids: string[]): Promise<Record<string, CgQuote>> {
+/* 浏览器直连 CoinGecko 的回退通道（仅当云端快照不可用、且浏览器可直连时使用） */
+async function fetchCnyQuotesDirect(ids: string[]): Promise<Record<string, { price: number; change: number; at: number }>> {
   const unique = Array.from(new Set(ids.map((s) => s.trim()).filter(Boolean)))
   if (!unique.length) throw new Error('no watch ids')
   const ctl = new AbortController()
@@ -69,10 +74,10 @@ async function fetchCnyQuotes(ids: string[]): Promise<Record<string, CgQuote>> {
     )
     if (!res.ok) throw new Error('HTTP ' + res.status)
     const raw = (await res.json()) as Record<string, { cny?: number; cny_24h_change?: number }>
-    const out: Record<string, CgQuote> = {}
+    const out: Record<string, { price: number; change: number; at: number }> = {}
     for (const [id, v] of Object.entries(raw)) {
       if (v && typeof v.cny === 'number' && Number.isFinite(v.cny) && v.cny > 0) {
-        out[id] = { price: v.cny, change: typeof v.cny_24h_change === 'number' ? v.cny_24h_change : 0 }
+        out[id] = { price: v.cny, change: typeof v.cny_24h_change === 'number' ? v.cny_24h_change : 0, at: 0 }
       }
     }
     if (!Object.keys(out).length) throw new Error('empty quotes')
@@ -205,9 +210,9 @@ export function PriceMonitorPage() {
 
   const { products, tasks, alerts } = board
 
-  /* 从 CoinGecko 拉取实时价（CNY）：仅同步「采集任务」处于启用状态的标的，
-     更新价格曲线 / 24h 涨跌，并按预警线判定降价预警。 */
-  function syncAll() {
+  /* 行情已后端化（P1-1）：读云端快照 priceLatest()；首次/未采集时快照为空，
+     触发服务端 priceRefresh() 回源 CoinGecko，再回读快照。浏览器不再直连上游。 */
+  async function syncAll() {
     if (syncing) return
     const enabledIds = board.products
       .filter((p) => board.tasks.find((t) => t.productId === p.id)?.enabled !== false)
@@ -218,40 +223,51 @@ export function PriceMonitorPage() {
     }
     setSyncing(true)
     setLastError('')
-    void fetchCnyQuotes(enabledIds)
-      .then((quotes) => {
-        const now = Date.now()
-        let fetched = 0
-        setBoard((b) => {
-          const newAlerts: PriceAlert[] = []
-          const products = b.products.map((p) => {
-            const q = quotes[p.id]
-            if (!q) return p
-            fetched++
-            const last = p.prices.length ? p.prices[p.prices.length - 1].price : null
-            const threshold = p.threshold > 0 ? p.threshold : Math.round(q.price * 0.9)
-            const dropped = last !== null && q.price < last
-            const pct = last ? (q.price - last) / last : 0
-            if (last !== null && dropped && (q.price <= threshold || -pct >= 0.05)) {
-              newAlerts.push({ id: uid('al'), productId: p.id, from: last, to: q.price, at: now })
-            }
-            return { ...p, threshold, dayChange: q.change, prices: [...p.prices, { at: now, price: q.price }].slice(-30) }
-          })
-          return {
-            products,
-            tasks: b.tasks.map((t) => (quotes[t.productId] ? { ...t, lastRunAt: now } : t)),
-            alerts: [...newAlerts, ...b.alerts],
+    try {
+      let quotes: Record<string, { price: number; change: number; at: number }> = await priceLatest(enabledIds)
+      const haveAll = enabledIds.every((id) => quotes[id])
+      // 快照不全（首次/未采集）→ 触发服务端回源一次，再读快照（回源失败不致命，走回退）
+      if (!haveAll) {
+        await priceRefresh().catch(() => {})
+        quotes = await priceLatest(enabledIds).catch(() => quotes)
+      }
+      // 云端仍无数据（如服务端区域无法出网到 CoinGecko）→ 回退浏览器直连，保住功能
+      if (!enabledIds.some((id) => quotes[id])) {
+        quotes = await fetchCnyQuotesDirect(enabledIds)
+      }
+      const now = Date.now()
+      let fetched = 0
+      setBoard((b) => {
+        const newAlerts: PriceAlert[] = []
+        const products = b.products.map((p) => {
+          const q = quotes[p.id]
+          if (!q) return p
+          fetched++
+          const last = p.prices.length ? p.prices[p.prices.length - 1].price : null
+          const threshold = p.threshold > 0 ? p.threshold : Math.round(q.price * 0.9)
+          const dropped = last !== null && q.price < last
+          const pct = last ? (q.price - last) / last : 0
+          if (last !== null && dropped && (q.price <= threshold || -pct >= 0.05)) {
+            newAlerts.push({ id: uid('al'), productId: p.id, from: last, to: q.price, at: now })
           }
+          const at = typeof q.at === 'number' && q.at > 0 ? q.at : now
+          return { ...p, threshold, dayChange: q.change, prices: [...p.prices, { at, price: q.price }].slice(-30) }
         })
-        toast(fetched ? `📊 已同步 ${fetched} 项实时价格（CNY）` : '未获取到行情数据')
-        if (!fetched) setLastError('CoinGecko 未返回任何标的数据，请检查资产 id 是否正确')
+        return {
+          products,
+          tasks: b.tasks.map((t) => (quotes[t.productId] ? { ...t, lastRunAt: now } : t)),
+          alerts: [...newAlerts, ...b.alerts],
+        }
       })
-      .catch((e) => {
-        console.warn('[price] CoinGecko 请求失败', e)
-        setLastError('行情获取失败：网络异常或 API 限流，请稍后重试')
-        toast('⚠️ 行情获取失败，请稍后重试')
-      })
-      .finally(() => setSyncing(false))
+      toast(fetched ? `📊 已同步 ${fetched} 项实时价格（CNY）` : '未获取到行情数据')
+      if (!fetched) setLastError('行情快照为空，请稍后重试（服务端回源可能受限流）')
+    } catch (e) {
+      console.warn('[price] 行情同步失败', e)
+      setLastError('行情获取失败：' + (e instanceof Error ? e.message : '网络异常'))
+      toast('⚠️ 行情获取失败，请稍后重试')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   /* 新增监控标的：CoinGecko 资产 id 必填且唯一；名称缺省时用 id 顶格显示 */

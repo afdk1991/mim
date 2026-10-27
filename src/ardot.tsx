@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useToast } from './components'
 import { cx, timeAgo } from './utils'
 import { pullToolState, pushToolState } from './lib/tool-cloud'
+import { proxyExternalText } from './lib/bizApi'
 
 /* 多源聚合监控台：聚合 6 个真实公开 API（无密钥、支持跨域）——
    汇率（ExchangeRate-API）/ 天气（Open-Meteo）/ GitHub 仓库指标 / ISS 轨道（WhereTheISS.at）/
@@ -260,17 +261,40 @@ function loadArdot(): ArdotState {
   return defaultState()
 }
 
-/** 带超时的真实 JSON 请求：超时或网络失败均 reject */
+/** 带超时的真实 JSON 请求：优先经服务端白名单代理（P1-3，防 SSRF）回源外部 API；
+ *  若代理不可达（如云函数区域无法出网到该第三方源，实测 ap-shanghai 对境外金融/加密源
+ *  出网被阻断），自动回退浏览器直连（用户浏览器可正常访问、多数源已开 CORS）。
+ *  两种路径任一成功即返回，确保监控台不因单一链路故障整体失效。 */
 async function fetchJson(url: string, ms = TIMEOUT_MS): Promise<unknown> {
+  const full = /^https?:\/\//i.test(url) ? url : `https://${url}`
+  // 1) 优先代理（收敛出访面 + 防 SSRF）；代理返回非 2xx / 超时 / 不可达均视为失败走回退
+  try {
+    const text = await withTimeout(proxyExternalText(full), 12000)
+    return JSON.parse(text)
+  } catch {
+    /* 代理不可达，进入浏览器直连回退 */
+  }
+  // 2) 回退：浏览器直连（独立超时，避免被代理阶段的定时器误伤）
   const ac = new AbortController()
   const timer = window.setTimeout(() => ac.abort(), ms)
   try {
-    const res = await fetch(`https://${url}`, { signal: ac.signal, headers: { Accept: 'application/json' } })
+    const res = await fetch(full, { signal: ac.signal, headers: { Accept: 'application/json' } })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } finally {
     window.clearTimeout(timer)
   }
+}
+
+/** 给任意 Promise 包一层超时（不依赖外部 AbortController，避免与 fetch 的 signal 耦合） */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error('proxy_timeout')), ms)
+    p.then(
+      (v) => { window.clearTimeout(t); resolve(v) },
+      (e) => { window.clearTimeout(t); reject(e) },
+    )
+  })
 }
 
 type SrcPhase = 'ok' | 'error' | 'pending'

@@ -60,5 +60,8 @@ scripts/shot-*.mjs
 # 浏览器自动化（playwright-core + Edge）截图产物
 browser-shots/
 
+# EdgeOne 控制台一次性探查产物（playwright-core 截图 + 文本，非源码资产）
+.edgeone-console/
+
 # Supabase CLI 临时目录
 supabase/.temp/

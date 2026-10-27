@@ -734,10 +734,239 @@ async function storageDelete({ uid, body }) {
 }
 
 // ---------------------------------------------------------------------------
+// 钱包 / 成长 / 商城 后端化业务端点（CloudBase PG 原子函数，service_role 直调）
+// ---------------------------------------------------------------------------
+/** 调 CloudBase PG 函数（postgREST /rest/v1/rpc/<fn>） */
+async function rpcCall(fn, body) {
+  const r = await pg(`/v1/rdb/rest/rpc/${fn}`, { method: 'POST', body })
+  return { status: r.status, json: parsePg(r.text, r.status) }
+}
+
+/** 是否管理员（user_roles 表 role='admin'）；无表/列时降级 false */
+async function isAdmin(uid) {
+  if (!uid) return false
+  try {
+    const r = await pg('/v1/rdb/rest/user_roles', {
+      query: `select=role&user_id=eq.${encodeURIComponent(uid)}&role=eq.admin`,
+    })
+    const rows = parsePg(r.text, r.status)
+    if (Array.isArray(rows) && rows.length > 0) return true
+  } catch { /* ignore */ }
+  return false
+}
+
+async function walletState(uid) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await rpcCall('wallet_state', { p_uid: uid })
+  if (r.status >= 400) return resp(502, { error: '钱包查询失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function walletDebit(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const fen = Number(body?.fen)
+  const note = String(body?.note || '')
+  if (!Number.isFinite(fen) || fen <= 0) return resp(400, { error: '金额非法' })
+  const r = await rpcCall('wallet_debit', { p_uid: uid, p_fen: Math.trunc(fen), p_note: note })
+  if (r.status >= 400) return resp(502, { error: '扣费失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function walletCredit(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const fen = Number(body?.fen)
+  const note = String(body?.note || '')
+  const kind = String(body?.kind || 'recharge')
+  const snapshot = body?.snapshot ?? null
+  if (!Number.isFinite(fen) || fen <= 0) return resp(400, { error: '金额非法' })
+  const r = await rpcCall('wallet_credit', {
+    p_uid: uid, p_fen: Math.trunc(fen), p_note: note, p_kind: kind, p_snapshot: snapshot,
+  })
+  if (r.status >= 400) return resp(502, { error: '入账失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function growthState(uid) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await rpcCall('growth_state', { p_uid: uid })
+  if (r.status >= 400) return resp(502, { error: '查询失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function growthRecord(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const action = String(body?.action || '')
+  const quality = !!body?.quality
+  const r = await rpcCall('growth_record', { p_uid: uid, p_action: action, p_quality: quality })
+  if (r.status >= 400) return resp(502, { error: '记录失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function growthCheckin(uid) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await rpcCall('growth_checkin', { p_uid: uid })
+  if (r.status >= 400) return resp(502, { error: '签到失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function mallConfirm(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  if (!(await isAdmin(uid))) return resp(403, { error: '无核销权限' })
+  const expect = (process.env.MIM_PAY_CONFIRM_KEY || '').trim()
+  if (!expect) return resp(409, { error: '核销入口未开放' })
+  if (String(body?.key || '').trim() !== expect) return resp(401, { error: '核销口令错误' })
+  const r = await rpcCall('mall_confirm', { p_order_id: String(body?.orderId || '') })
+  if (r.status >= 400) return resp(502, { error: '核销失败', detail: r.text })
+  return resp(200, r.json)
+}
+/** 仅校验核销口令（服务端比对，永不下发前端）：用于钱包充值类核销（无订单行）。
+ *  与 mallConfirm 共用服务端口令，避免前端持有任何敏感口令。 */
+async function mallVerifyKey(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  if (!(await isAdmin(uid))) return resp(403, { error: '无核销权限' })
+  const expect = (process.env.MIM_PAY_CONFIRM_KEY || '').trim()
+  if (!expect) return resp(409, { error: '核销入口未开放' })
+  if (String(body?.key || '').trim() !== expect) return resp(401, { error: '核销口令错误' })
+  return resp(200, { ok: true })
+}
+
+async function mallUpsertOrder(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await pg('/v1/rdb/rest/mall_orders', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+    body: { ...(body || {}), user_id: uid, at: Date.now() },
+  })
+  if (r.status >= 400) return resp(502, { error: '下单失败', detail: r.text })
+  return resp(200, parsePg(r.text, r.status))
+}
+async function mallListOrders(uid) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await pg('/v1/rdb/rest/mall_orders', {
+    method: 'GET',
+    query: `user_id=eq.${encodeURIComponent(uid)}&order=at.desc`,
+  })
+  return resp(r.status, parsePg(r.text, r.status))
+}
+
+// ---------------------------------------------------------------------------
+// 价格行情（P1-1）：CoinGecko 回源由服务端完成，前端只读快照；定时/手动刷新
+// ---------------------------------------------------------------------------
+const CG_BASE = 'https://api.coingecko.com/api/v3/simple/price'
+const CG_DEFAULT_IDS = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'dogecoin']
+
+/** 服务端回源 CoinGecko 并 upsert 到 price_quotes（防浏览器 CORS / 限流 / 篡改） */
+async function priceRefresh() {
+  try {
+    const url = `${CG_BASE}?ids=${CG_DEFAULT_IDS.join(',')}&vs_currencies=cny&include_24hr_change=true`
+    const r = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    if (!r.ok) return resp(502, { error: 'upstream_error', status: r.status })
+    const raw = await r.json()
+    const now = Date.now()
+    const rows = []
+    for (const [id, v] of Object.entries(raw)) {
+      if (v && typeof v.cny === 'number' && v.cny > 0) {
+        rows.push({ coin_id: id, price_cny: v.cny, change_24h: typeof v.cny_24h_change === 'number' ? v.cny_24h_change : 0, at: now })
+      }
+    }
+    if (!rows.length) return resp(502, { error: 'empty_quotes' })
+    const up = await pg('/v1/rdb/rest/price_quotes', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: rows,
+    })
+    if (up.status >= 400) return resp(502, { error: 'write_failed', detail: up.text })
+    return resp(200, { ok: true, count: rows.length })
+  } catch (e) {
+    return resp(504, { error: 'refresh_failed', detail: String((e && e.message) || e) })
+  }
+}
+
+/** 读取最新行情快照（可按 coin_id 过滤） */
+async function priceLatest(ids) {
+  let query = ''
+  if (Array.isArray(ids) && ids.length) {
+    query = `coin_id=in.(${ids.map((x) => encodeURIComponent(x)).join(',')})`
+  }
+  const r = await pg('/v1/rdb/rest/price_quotes', { method: 'GET', query })
+  const rows = parsePg(r.text, r.status)
+  if (!Array.isArray(rows)) {
+    return resp(r.status >= 400 ? 502 : 200, r.status >= 400 ? { error: 'query_failed', detail: r.text } : {})
+  }
+  const map = {}
+  for (const row of rows) {
+    map[row.coin_id] = { price: Number(row.price_cny), change: Number(row.change_24h ?? 0), at: Number(row.at) }
+  }
+  return resp(200, map)
+}
+
+// ---------------------------------------------------------------------------
+// 推荐负反馈 / 同城定位（P1-2）：云端真源，跨端一致
+// ---------------------------------------------------------------------------
+async function recFeedbackGet(uid) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await rpcCall('rec_feedback_get', { p_uid: uid })
+  if (r.status >= 400) return resp(502, { error: '查询失败', detail: r.text })
+  return resp(200, r.json)
+}
+async function recFeedbackSave(uid, body) {
+  if (!uid) return resp(401, { error: '请先登录' })
+  const r = await rpcCall('rec_feedback_save', {
+    p_uid: uid,
+    p_authors: body?.authors ?? [],
+    p_topics: body?.topics ?? [],
+    p_city: body?.city ?? '北京市',
+  })
+  if (r.status >= 400) return resp(502, { error: '保存失败', detail: r.text })
+  return resp(200, r.json)
+}
+
+// ---------------------------------------------------------------------------
+// 外部探测代理（P1-3）：防 SSRF——仅放行白名单主机，服务端转发
+// 白名单 = 应用合法出访、且云函数出网可达的外部主机。实测 ap-shanghai 区域对
+// 境外金融/加密行情源（CoinGecko / Coinbase / Binance / OKX）出网被阻断（504），
+// 这些源改由浏览器直连（用户浏览器可正常访问、且多数已开启 CORS）；
+// 代理仅承载确实可达的主机，避免把不可达源误塞进请求链造成延迟。
+// 任何不在名单内的主机一律 403，杜绝内网/元数据地址探测。
+// ---------------------------------------------------------------------------
+const PROXY_ALLOW = new Set([
+  // 媒体检索
+  'api.openverse.org',
+  'commons.wikimedia.org',
+  // 代码源
+  'api.github.com',
+  'raw.githubusercontent.com',
+  // ardot 多源聚合监控台：汇率 / 天气 / ISS / 日出日落（无密钥、支持跨域、出网可达）
+  'open.er-api.com',
+  'api.open-meteo.com',
+  'api.wheretheiss.at',
+  'api.sunrise-sunset.org',
+])
+function proxySafeUrl(raw) {
+  try {
+    const u = new URL(typeof raw === 'string' ? raw : raw?.url)
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+    return PROXY_ALLOW.has(u.hostname) ? u.toString() : null
+  } catch {
+    return null
+  }
+}
+async function proxyFetch(body) {
+  const target = proxySafeUrl(body)
+  if (!target) return resp(403, { error: 'forbidden_host', hint: '仅允许白名单内的外部主机' })
+  try {
+    const r = await fetch(target, { signal: AbortSignal.timeout(15_000), headers: { Accept: 'application/json' } })
+    const text = await r.text()
+    return resp(r.status, text, { 'Content-Type': r.headers.get('content-type') || 'application/json' })
+  } catch (e) {
+    return resp(504, { error: 'proxy_failed', detail: String((e && e.message) || e) })
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 入口
 // ---------------------------------------------------------------------------
 async function handler(event) {
   const method = (event.httpMethod || event.method || 'GET').toUpperCase()
+  /* 定时器（cron）触发：CloudBase 定时触发器以事件形式调用，无 HTTP 路径。
+     命中时直接执行价格回源任务（P1-1 cron 化），不影响任何 HTTP 路由。 */
+  if (event && (event.Type === 'timer' || event.type === 'timer' || event.triggerName || event.Time || event.time)) {
+    return priceRefresh()
+  }
   /* HTTP 头名大小写不敏感，但 CloudBase HTTP 访问服务透传的是原始大小写
      （curl 发 `Authorization`，浏览器可能发 `authorization`）。
      若直接读 headers.authorization，大小写不匹配时恒为 undefined
@@ -771,6 +1000,12 @@ async function handler(event) {
     path.indexOf('/db/'),
     path.indexOf('/storage/'),
     path.indexOf('/openverse/'),
+    path.indexOf('/wallet/'),
+    path.indexOf('/growth/'),
+    path.indexOf('/mall/'),
+    path.indexOf('/price/'),
+    path.indexOf('/rec/'),
+    path.indexOf('/proxy'),
   )
   if (marker >= 0) rest = path.slice(marker)
 
@@ -830,6 +1065,52 @@ async function handler(event) {
     return resp(404, { error: 'storage 路由不存在' })
   }
 
+  // ---- 钱包 / 成长 / 商城（后端化业务端点）----
+  if (rest.startsWith('/wallet/')) {
+    const route = rest.slice('/wallet'.length)
+    if (route === '/state' && method === 'GET') return walletState(session?.uid)
+    if (route === '/debit' && method === 'POST') return walletDebit(session?.uid, body)
+    if (route === '/credit' && method === 'POST') return walletCredit(session?.uid, body)
+    return resp(404, { error: 'wallet 路由不存在' })
+  }
+  if (rest.startsWith('/growth/')) {
+    const route = rest.slice('/growth'.length)
+    if (route === '/state' && method === 'GET') return growthState(session?.uid)
+    if (route === '/record' && method === 'POST') return growthRecord(session?.uid, body)
+    if (route === '/checkin' && method === 'POST') return growthCheckin(session?.uid)
+    return resp(404, { error: 'growth 路由不存在' })
+  }
+  if (rest.startsWith('/mall/')) {
+    const route = rest.slice('/mall'.length)
+    if (route === '/confirm' && method === 'POST') return mallConfirm(session?.uid, body)
+    if (route === '/verify-key' && method === 'POST') return mallVerifyKey(session?.uid, body)
+    if (route === '/order' && method === 'POST') return mallUpsertOrder(session?.uid, body)
+    if (route === '/orders' && method === 'GET') return mallListOrders(session?.uid)
+    return resp(404, { error: 'mall 路由不存在' })
+  }
+
+  // ---- 价格行情（P1-1）：服务端回源 CoinGecko，前端只读快照 ----
+  if (rest.startsWith('/price/')) {
+    const route = rest.slice('/price'.length)
+    if (route === '/refresh' && method === 'POST') return priceRefresh()
+    if (route === '/latest' && method === 'GET') {
+      const ids = qp.ids ? String(qp.ids).split(',').filter(Boolean) : []
+      return priceLatest(ids)
+    }
+    return resp(404, { error: 'price 路由不存在（支持 /price/refresh 与 /price/latest）' })
+  }
+
+  // ---- 推荐负反馈 / 同城定位（P1-2）：云端真源 ----
+  if (rest.startsWith('/rec/')) {
+    const route = rest.slice('/rec'.length)
+    if (route === '/feedback' && method === 'GET') return recFeedbackGet(session?.uid)
+    if (route === '/feedback' && method === 'POST') return recFeedbackSave(session?.uid, body)
+    return resp(404, { error: 'rec 路由不存在' })
+  }
+
+  // ---- 外部探测代理（P1-3）：防 SSRF 白名单 ----
+  if (rest.startsWith('/proxy') && method === 'POST') return proxyFetch(body)
+
   return resp(200, {
     ok: true,
     service: 'mim-api',
@@ -838,6 +1119,12 @@ async function handler(event) {
       '/db/rest/<table>', '/db/rpc/<fn>',
       '/storage/upload', '/storage/url', '/storage/list', '/storage/delete',
       '/openverse/videos', '/openverse/audio',
+      '/wallet/state', '/wallet/debit', '/wallet/credit',
+      '/growth/state', '/growth/record', '/growth/checkin',
+      '/mall/confirm', '/mall/verify-key', '/mall/order', '/mall/orders',
+      '/price/refresh', '/price/latest',
+      '/rec/feedback',
+      '/proxy',
     ],
   })
 }

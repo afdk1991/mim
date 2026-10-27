@@ -1,8 +1,11 @@
 /* 轮 23 打通：B4 feed 分发域核心逻辑（纯函数 + localStorage 按真实登录身份分 key）——
    负反馈（不感兴趣）/ 同城定位 / 推荐排序打分。
-   依赖仅 auth + types，避免与组件层形成循环引用；UI 层见 feed-domain.tsx。 */
+   依赖仅 auth + types，避免与组件层形成循环引用；UI 层见 feed-domain.tsx。
+   P1-2 后端化：负反馈 / 同城定位以云端为唯一真源（跨端一致），localStorage 作为即时源 +
+   离线兜底；变更后写穿云端，登录切换时由 hydrateRec 从云端拉取覆盖本地。 */
 import { getCurrentUserId } from '../auth'
 import type { Post } from '../types'
+import { recGet, recSave } from './bizApi'
 
 /* ---------- 负反馈（不感兴趣） ---------- */
 
@@ -43,7 +46,34 @@ function writeNeg(next: NegFeedback, userId: string): void {
   window.dispatchEvent(new Event(RF_EVT))
 }
 
-/** 记录「不感兴趣」：作者级 + 话题级一并入册，各流按 RF_EVT 即时刷新 */
+/** 把本地负反馈 + 城市写穿云端真源（跨端一致）；云端不可用 / 未登录时静默降级 */
+function syncRecToCloud(userId: string): void {
+  try {
+    const neg = loadNeg(userId)
+    const city = loadCity(userId)
+    void recSave({ authors: neg.authors, topics: neg.topics, city }).catch(() => {})
+  } catch {
+    /* 云端未配置 / 离线：忽略，保留本地 */
+  }
+}
+
+/** 从云端真源拉取并覆盖本地（登录切换 / 挂载时调用）；云端不可用 / 未登录静默跳过。
+ *  仅当云端确有记录（exists=true）才覆盖本地，避免把本地仅有的负反馈反向清空。 */
+export async function hydrateRec(userId = getCurrentUserId()): Promise<void> {
+  try {
+    const r = await recGet()
+    if (!r || !r.exists) return
+    try {
+      localStorage.setItem(negKey(userId), JSON.stringify({ authors: r.authors, topics: r.topics }))
+      localStorage.setItem(cityKey(userId), r.city)
+    } catch { /* ignore */ }
+    window.dispatchEvent(new Event(RF_EVT))
+  } catch {
+    /* 云端未配置 / 离线：忽略 */
+  }
+}
+
+/** 记录「不感兴趣」：作者级 + 话题级一并入册，各流按 RF_EVT 即时刷新，并写穿云端 */
 export function recordNotInterested(post: Post, userId = getCurrentUserId()): NegFeedback {
   const cur = loadNeg(userId)
   const next: NegFeedback = {
@@ -51,12 +81,14 @@ export function recordNotInterested(post: Post, userId = getCurrentUserId()): Ne
     topics: post.topic && !cur.topics.includes(post.topic) ? [...cur.topics, post.topic] : cur.topics,
   }
   writeNeg(next, userId)
+  syncRecToCloud(userId)
   return next
 }
 
-/** 恢复：清空当前身份的全部负反馈记录 */
+/** 恢复：清空当前身份的全部负反馈记录，并写穿云端 */
 export function clearNeg(userId = getCurrentUserId()): void {
   writeNeg({ authors: [], topics: [] }, userId)
+  syncRecToCloud(userId)
 }
 
 export function negCount(n: NegFeedback): number {
@@ -94,6 +126,7 @@ export function saveCity(city: string, userId = getCurrentUserId()): void {
     /* ignore */
   }
   window.dispatchEvent(new Event(RF_EVT))
+  syncRecToCloud(userId)
 }
 
 /* ---------- 推荐排序 ---------- */
