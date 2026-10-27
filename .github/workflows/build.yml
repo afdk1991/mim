@@ -29,8 +29,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-      - run: npm ci
+          # 不能开 cache: npm —— 本仓库有意不入库 package-lock.json
+          # （npm/cli#4828 会按当前平台裁剪可选依赖，跨平台复用会缺 rollup 原生二进制），
+          # setup-node 的 cache 找不到 lock 文件会直接报错让作业变红。
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
       - name: 类型检查
         run: npm run typecheck
       - name: 构建
