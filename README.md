@@ -28,7 +28,8 @@ React + Vite + TypeScript 实现的内容聚合社区 Demo（动态流 + 技术�
   | git tag（大写 `V`）、`android/app/build.gradle` versionName、`harmony/AppScope/app.json5` versionName | 原值四段式 |
   | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、iOS `MARKETING_VERSION`、`harmony/**/oh-package.json5` | 三段派生「第1.第2.第4段」（`V0.0.0.0 → 0.0.0`、`V0.0.0.1 → 0.0.1`）——因 npm / iOS / Tauri 强制三段 semver |
   | `versionCode` / `CURRENT_PROJECT_VERSION` | 构建号，只增不减，不参与字面比对 |
-- **更新流程**：① 只改 `src/version.ts` 的 `APP_VERSION` → ② 按上表同步各载体 → ③ `npm run version:check` 校验 9 个载体全绿 → ④ 提交并打 `V<四段式>` tag（大写 V 触发 `build-release.yml`；小写 `v*` 触发 `ci-cd.yml` 的 npm 发布）
+- **更新流程**：① 只改 `src/version.ts` 的 `APP_VERSION` → ② 按上表同步各载体 → ③ `npm run version:check -- --remote` 校验 9 个载体 + 本地/远端 tag 全绿 → ④ 提交并打 `V<四段式>` tag → ⑤ push tag（`ci-cd.yml` 与 `build-release.yml` 均响应大写 `V*`；npm 包版本由 `scripts/prepare-package.mjs` 从 `APP_VERSION` 派生三段，不取 tag 字面值）
+- **发版一致性保障**：`prepare-package.mjs` 读取唯一源派生版本，并在 tag 与 `APP_VERSION` 不符时直接失败，杜绝「打了 A 号却发布 B 版」；`ci-cd.yml` 的 tag 过滤同时匹配 `v*` 与 `V*`（GitHub Actions 区分大小写，只写小写会让大写 tag 既不构建也不发版）
 - OTA 清单：`https://github.com/afdk1991/mim/releases/latest/download/manifest.json`
   ```json
   {

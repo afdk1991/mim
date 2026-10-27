@@ -7,8 +7,9 @@
  * 构建号     ：versionCode / CURRENT_PROJECT_VERSION 必须单调递增，不参与字面值比对
  *
  * 用法：
- *   node scripts/version-check.mjs            # 校验工作区文件
- *   node scripts/version-check.mjs --tag V0.0.0.0   # 额外校验 git tag 与版本源一致
+ *   node scripts/version-check.mjs                  # 校验工作区文件 + 本地 git tag
+ *   node scripts/version-check.mjs --remote         # 追加校验远端 origin 的 tag（验证线上标签层）
+ *   node scripts/version-check.mjs --tag V0.0.0.0   # 额外校验指定 tag 与版本源一致
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
@@ -63,11 +64,51 @@ const checks = [
   { layer: 'harmony entry/oh-package.json5', expect: THREE, actual: match1(ohEntry, /"version"\s*:\s*"([^"]+)"/), kind: 'three' },
 ]
 
-// ---------- 3. 可选：校验 git tag ----------
-const tagArg = process.argv.find((a) => a.startsWith('--tag='))
-  ?.split('=')[1] ?? (process.argv.includes('--tag') ? process.argv[process.argv.indexOf('--tag') + 1] : null)
+// ---------- 3. 校验 git tag（本地必查；--remote 追加远端）----------
+const EXPECT_TAG = `V${APP_VERSION}`
+
+const listLocalTags = () => {
+  try {
+    return execSync('git tag -l', { cwd: ROOT }).toString().split('\n').map((s) => s.trim()).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+const localTags = listLocalTags()
+// 规范：仓库内只应存在唯一版本 tag，且等于 V<APP_VERSION>
+checks.push({
+  layer: '本地 git tag（唯一）',
+  expect: EXPECT_TAG,
+  actual: localTags.length === 0 ? '(无 tag)' : localTags.join(','),
+  kind: 'four',
+})
+
+const wantRemote = process.argv.includes('--remote')
+if (wantRemote) {
+  let remoteTags = []
+  try {
+    remoteTags = execSync('git ls-remote --tags origin', { cwd: ROOT })
+      .toString()
+      .split('\n')
+      .map((l) => l.split('refs/tags/')[1])
+      .filter(Boolean)
+      .filter((t) => !t.endsWith('^{}'))
+  } catch {
+    remoteTags = []
+  }
+  checks.push({
+    layer: '远端 git tag（origin）',
+    expect: EXPECT_TAG,
+    actual: remoteTags.length === 0 ? '(无 tag)' : remoteTags.join(','),
+    kind: 'four',
+  })
+}
+
+const tagArg = process.argv.find((a) => a.startsWith('--tag='))?.split('=')[1]
+  ?? (process.argv.includes('--tag') ? process.argv[process.argv.indexOf('--tag') + 1] : null)
 if (tagArg) {
-  checks.push({ layer: `git tag (${tagArg})`, expect: `V${APP_VERSION}`, actual: tagArg, kind: 'four' })
+  checks.push({ layer: `指定 tag (${tagArg})`, expect: EXPECT_TAG, actual: tagArg, kind: 'four' })
 }
 
 // ---------- 4. 输出与判定 ----------
