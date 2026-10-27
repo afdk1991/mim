@@ -42,8 +42,28 @@ export const isSet = (v: string): boolean => v.trim() !== ''
  *  公开只读接口，不含任何密钥，写死在前端是安全的（原实现同样如此）。 */
 export const PROD_API_BASE = ''
 
-/** 构建期可注入；未注入时回退同源 `/api`（配合 vite proxy / 网关反代）。 */
-export const API_BASE: string = (import.meta.env.VITE_MIM_API_BASE as string | undefined)?.replace(/\/+$/, '') || '/api'
+/**
+ * 纯本地模式的显式开关取值。
+ *
+ * 为什么需要它：此前「未配置后端 → skip」这条契约根本无法表达 ——
+ * 变量留空时 API_BASE 会回退同源 `/api`，于是 isBackendConfigured() 恒为 true，
+ * 纯静态部署（如 GitHub Pages 无后端）仍会向同源发 /api 请求，被托管方回 404/405，
+ * 控制台刷红。写入路径有 isSignedIn() 挡着，但读路径（商品列表、钱包状态）没有，
+ * 线上每开一页就有固定几条失败请求。
+ */
+const OFFLINE_VALUES = new Set(['off', 'none', 'false', '0', 'local'])
+
+const RAW_API_BASE = (import.meta.env.VITE_MIM_API_BASE as string | undefined)?.trim() ?? ''
+
+/**
+ * 构建期可注入。三种取值语义：
+ *   留空 / 未注入 → 回退同源 `/api`（适配静态站点 + 网关反代部署）
+ *   off / none 等 → 纯本地模式，一个后端请求都不发（见 OFFLINE_VALUES）
+ *   https://...   → 后端公网地址
+ */
+export const API_BASE: string = OFFLINE_VALUES.has(RAW_API_BASE.toLowerCase())
+  ? ''
+  : RAW_API_BASE.replace(/\/+$/, '') || '/api'
 
 export const isBackendConfigured = (): boolean => API_BASE !== ''
 

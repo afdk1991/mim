@@ -15,6 +15,7 @@ import { db } from './client'
 import type { Result } from '../core/result'
 import type { WriteBack } from '../core/result'
 import { readJson, userKey, writeJson } from '../core/storage'
+import { isBackendConfigured } from '../core/config'
 
 const MAX_DROP_ROUNDS = 12
 
@@ -43,9 +44,14 @@ export function saveSnapshot(scope: string, value: unknown): void {
   writeJson(userKey(scope, currentUid(), 'state'), value)
 }
 
-/** 云端写入的三态收敛：未登录/未配置 → skip（不算错） */
+/**
+ * 云端写入的三态收敛：未登录 / 未配置后端 → skip（不算错）
+ *
+ * 这里必须同时判 isBackendConfigured()：纯本地模式下 http 层会直接返回 offline，
+ * 若只判 isSignedIn()，登录用户每写一次都被记成 fail，与「skip 不算错误」的契约矛盾。
+ */
 export async function pushCloud(run: () => Promise<Result<unknown>>): Promise<WriteBack> {
-  if (!isSignedIn()) return 'skip'
+  if (!isSignedIn() || !isBackendConfigured()) return 'skip'
   const r = await run()
   return r.ok ? 'ok' : 'fail'
 }
