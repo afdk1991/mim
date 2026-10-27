@@ -45,10 +45,9 @@ verify-shots/
 # 浏览器实测脚本（替代已移除的 vitest 单测）：默认本地验证用，不入库
 verify-*.mjs
 scripts/verify-*.mjs
-# 例外放行：这两个是「离线可跑 + 确定性」的回归基线（route mock，无需外网/云端），
+# 例外放行：以下是「离线可跑 + 确定性」的回归基线（route mock，无需外网/云端），
 # 不入库会导致回归能力随工作区丢失（已发生过：verify-feed-growth.mjs 消失后无法复跑）。
 # 只放行确定性脚本，依赖云端状态的一次性诊断脚本仍忽略。
-!scripts/verify-openverse.mjs
 !scripts/verify-routes.mjs
 !scripts/verify-feed-growth.mjs
 !scripts/verify-mobile.mjs
