@@ -23,7 +23,11 @@
 
     "verify:routes": "node scripts/verify-routes.mjs",
     "verify:backend": "node scripts/verify-backend.mjs",
-    "version:check": "node scripts/version-check.mjs"
+    "version:check": "node scripts/version-check.mjs",
+
+    "native:sync": "npm run build && cap sync",
+    "native:android": "npm run build && cap open android",
+    "native:ios": "npm run build && cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
