@@ -9,7 +9,7 @@ import { getCurrentUserId } from '../auth'
 import { walletRecharge } from '../wallet'
 import { useMall } from './store'
 import { qrcodePayInfo } from './payment'
-import { mallVerifyKey } from '../lib/bizApi'
+import { mallVerifyKey, setOpsKey } from '../lib/bizApi'
 
 const AMOUNTS = [50, 100, 200, 500]
 
@@ -101,6 +101,22 @@ export function MallWalletPage() {
     saveReqs(next)
     setKey('')
     toast('核销成功，余额已记入云端钱包')
+  }
+
+  /* 首次配置核销口令：写入服务端安全存储（Supabase 后端）。
+     CloudBase 后端口令由云函数环境变量注入，运行时不可改，此时给出对应指引。 */
+  const setupOpsKey = async () => {
+    if (key.trim().length < 6) {
+      toast('口令至少 6 位')
+      return
+    }
+    try {
+      await setOpsKey(key.trim())
+      toast('核销口令已写入服务端，之后前端不再持有该口令')
+      setKey('')
+    } catch (e) {
+      toast(`设置失败：${(e as Error).message}`)
+    }
   }
 
   const pending = reqs.filter((r) => r.status === 'pending')
@@ -198,7 +214,7 @@ export function MallWalletPage() {
             {pending.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                  管理员核销口令（site-config.payConfirmKey，仅站方持有）
+                  管理员核销口令（服务端比对，永不下发前端；首次使用需先设置一次）
                 </div>
                 <input
                   style={inputStyle}
@@ -207,6 +223,11 @@ export function MallWalletPage() {
                   onChange={(e) => setKey(e.target.value)}
                   placeholder="核销口令"
                 />
+                <div style={{ marginTop: 6 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={setupOpsKey}>
+                    设为核销口令
+                  </button>
+                </div>
               </div>
             )}
           </div>

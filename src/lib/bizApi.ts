@@ -136,16 +136,39 @@ export async function growthCheckin(): Promise<{ ok: boolean; streak?: number; r
 
 /* ----------------------------- 商城 ----------------------------- */
 
-/** 管理员核销口令（服务端比对，永不下发前端）：仅校验口令，不计余额 */
+/** 服务端业务错误码 → 中文提示（RPC 返回 { ok:false, error:'bad_key' } 时的可读文案） */
+const OPS_ERR_CN: Record<string, string> = {
+  no_auth: '请先登录',
+  forbidden: '仅管理员可执行核销',
+  unconfigured: '服务端尚未配置核销口令，请先在「我的钱包 → 设置核销口令」中配置',
+  bad_key: '核销口令不正确',
+  no_order: '订单不存在',
+  bad_status: '订单状态不是「待核销」',
+  too_short: '口令至少 6 位',
+}
+
+/** 把服务端 code 翻译成用户可读文案（未登记的原样返回，便于排查） */
+function opsFailure(e: unknown): Error {
+  const raw = e instanceof Error ? e.message : String(e)
+  return new Error(OPS_ERR_CN[raw] ?? raw)
+}
+
+/**
+ * 管理员核销口令（服务端比对，永不下发前端）：仅校验口令，不计余额。
+ *
+ * Supabase 侧走库内 verify_ops_key（迁移 0011）：口令存于 mall_ops_config（RLS 对
+ * anon/authenticated 全拒，仅 definer 函数可读），比对与状态机全在服务端完成。
+ * 必须校验返回体 ok —— 只判 RPC 传输错误会把「业务拒绝」误判为通过。
+ */
 export async function mallVerifyKey(key: string): Promise<void> {
   if (cloudBackend === 'cloudbase') {
     await cbFetch('/mall/verify-key', 'POST', { key })
-  } else if (supabase) {
-    const { error } = await supabase.rpc('confirm_order', { p_order_id: '', p_key: key })
-    // supabase 主模式口令比对由 Edge Function 层完成，此处仅占位校验入口
-    if (error) throw new Error(error.message)
-  } else {
-    throw new Error('云端未配置')
+    return
+  }
+  try {
+    await sbRpc('verify_ops_key', { p_key: key })
+  } catch (e) {
+    throw opsFailure(e)
   }
 }
 
@@ -153,11 +176,27 @@ export async function mallVerifyKey(key: string): Promise<void> {
 export async function mallConfirm(orderId: string, key: string): Promise<void> {
   if (cloudBackend === 'cloudbase') {
     await cbFetch('/mall/confirm', 'POST', { orderId, key })
-  } else if (supabase) {
-    const { error } = await supabase.rpc('confirm_order', { p_order_id: orderId, p_key: key })
-    if (error) throw new Error(error.message)
-  } else {
-    throw new Error('云端未配置')
+    return
+  }
+  try {
+    await sbRpc('confirm_order', { p_order_id: orderId, p_key: key })
+  } catch (e) {
+    throw opsFailure(e)
+  }
+}
+
+/**
+ * 首次配置核销口令（仅 Supabase 后端）：写入服务端安全存储，之后前端永不再持有口令。
+ * CloudBase 后端的口令由云函数环境变量 MIM_PAY_CONFIRM_KEY 注入，不支持运行时设置。
+ */
+export async function setOpsKey(key: string): Promise<void> {
+  if (cloudBackend === 'cloudbase') {
+    throw new Error('CloudBase 后端请在云函数环境变量 MIM_PAY_CONFIRM_KEY 中配置核销口令')
+  }
+  try {
+    await sbRpc('set_mall_ops_key', { p_key: key })
+  } catch (e) {
+    throw opsFailure(e)
   }
 }
 
@@ -193,24 +232,33 @@ export type BizPriceMap = Record<string, BizPriceQuote>
 /**
  * 触发服务端回源刷新行情（CloudBase 侧 priceRefresh 回源 CoinGecko 并写 price_quotes）。
  * 浏览器不再直连 CoinGecko —— 消除 CORS / 限流 / 行情被篡改的面。
- * 仅 CloudBase 后端支持；supabase 模式需自建 Edge Function + 定时器（暂未接入）。
+ *
+ * Supabase 侧（迁移 0009）只提供 price_latest 读取快照，回源需 pg_cron + Edge Function，
+ * 当前未接入 ⇒ 这里不抛错（抛错会短路 price.tsx 的浏览器直连回退，导致页面必然失败），
+ * 而是静默返回，由调用方按「快照为空」继续走回退通道。
  */
 export async function priceRefresh(): Promise<void> {
   if (cloudBackend === 'cloudbase') {
     await cbFetch('/price/refresh', 'POST')
     return
   }
-  throw new Error('云端未配置（行情刷新仅 CloudBase 后端支持）')
+  if (supabase) return // supabase 侧无回源通道：降级为「只读快照 + 直连回退」
+  throw new Error('云端未配置')
 }
 
-/** 读取行情快照（ids 为空返回全部）。前端只读快照，不直连上游。 */
+/**
+ * 读取行情快照（ids 为空返回全部）。前端只读快照，不直连上游。
+ * Supabase 侧走 PG RPC price_latest(text[])（迁移 0009），返回 { coin_id: {price,change,at} }，
+ * 与 CloudBase 侧 /price/latest 同构。
+ */
 export async function priceLatest(ids: string[] = []): Promise<BizPriceMap> {
   if (cloudBackend === 'cloudbase') {
     const q = ids.length ? `?ids=${encodeURIComponent(ids.join(','))}` : ''
     const j = await cbFetch(`/price/latest${q}`, 'GET')
     return (j && typeof j === 'object' ? j : {}) as BizPriceMap
   }
-  throw new Error('云端未配置（行情读取仅 CloudBase 后端支持）')
+  const j = await sbRpc('price_latest', { p_ids: ids.length ? ids : null })
+  return (j && typeof j === 'object' ? j : {}) as BizPriceMap
 }
 
 /* ----------------------------- 推荐负反馈 / 同城（P1-2） ----------------------------- */

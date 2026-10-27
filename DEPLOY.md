@@ -55,18 +55,37 @@ Mim 有**两套云端后端**，前端按优先级自动选择，页面无需任
 
 线上项目：`https://sepfobukokrrivwyvhnd.supabase.co`（schema 已应用，含既有数据）。
 
-#### 迁移状态（2026-10-25 已全部应用）
+#### 迁移状态（2026-10-28 实测 · 以 `npm run db:probe` 为准）
 
-全部 7 个迁移已通过 Management API 应用到线上库（`public.schema_migrations` 跟踪）：
+> 此前本节写的是「2026-10-25 已全部应用」，与实测不符 —— 原因是 CI 的 `migrate-db` job
+> 在未配 `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF` 时**整段跳过且不报错**，
+> job 仍显示 success。因此**任何时候都应以 `npm run db:probe` 的只读探测结果为准**，
+> 不要以 CI 绿灯判断迁移已落地。
 
-| 迁移 | 内容 | 状态 |
+| 迁移 | 内容 | 线上状态 |
 | --- | --- | --- |
-| `0000_schema.sql` | 20 张业务表基线 + RLS | ✅ 已应用 |
+| `0000_schema.sql` | 20 张业务表基线 + RLS + `send_message` / `bump_*` | ✅ 已应用 |
 | `0001_iam_phase1.sql` | IAM 四表 + 审计日志 + RBAC 种子（4 角色 / 6 权限） | ✅ 已应用 |
 | `0002_storage_media.sql` | 私有桶 `mim-media` + 存储 RLS（3MB + MIME 白名单） | ✅ 已应用 |
 | `0003_account_bridge.sql` | 账号桥表 + `username_taken` / `claim_username` RPC | ✅ 已应用 |
 | `0004_post_rich_fields.sql` | posts 富媒体字段（media/vote/lottery/visibility/pinned 等） | ✅ 已应用 |
 | `0005_mall_catalog.sql` | products 商城字段扩展（不含任何商品数据） | ✅ 已应用 |
+| `0006_wallet.sql` | 钱包表 + `wallet_state` / `wallet_debit` / `wallet_credit` | ✅ 已应用 |
+| `0007_growth.sql` | 成长体系 + `growth_state` / `growth_record` / `growth_checkin` | ✅ 已应用 |
+| `0008_mall.sql` | `mall_orders` + `confirm_order` | ❌ **未应用**（线上缺表与函数） |
+| `0009_price_rec.sql` | `price_quotes` / `rec_feedback` + `price_latest` / `rec_feedback_*` | ❌ **未应用** |
+| `0010_admin_bootstrap.sql` | `has_any_admin` / `bootstrap_admin` / `grant_admin_by_name` | ❌ **未应用** |
+| `0011_mall_ops_key.sql` | `mall_ops_config` + `verify_ops_key` / `set_mall_ops_key` + `ops_key_ready` | ❌ **未应用** |
+
+补齐（零凭证，SQL Editor）：
+
+```bash
+npm run db:gen-pending -- 0008     # 生成 supabase/apply-pending-manual.sql
+# 全文粘贴到 Dashboard → SQL Editor → Run（幂等，可重复执行，不触碰既有数据）
+```
+
+影响面：上述四个迁移未落地时，**商城云端订单、价格行情快照、推荐负反馈同城、
+`/#/admin` 首个管理员引导**均处于失效状态（前端会静默降级或报错）。
 
 执行方式（后续新增迁移同样适用）：
 

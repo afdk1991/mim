@@ -143,7 +143,43 @@ npm run build                 # 产出 dist/
 
 ---
 
-## 4. 验证（交付前建议全跑）
+## 4. 部署后的两件收尾（漏做会静默失效）
+
+### 4.1 补齐线上缺失的迁移
+
+CI 的 `migrate-db` job 在仓库未配 `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF` 时会
+**整段跳过且不报错**（job 仍显示 success，属假成功），于是线上库会长期落后于仓库迁移。
+用只读探测确认（无需数据库密码）：
+
+```bash
+npm run db:probe
+```
+
+缺失的表 / 函数会连同「所属迁移」一并列出。补齐只需两步：
+
+```bash
+npm run db:gen-pending -- 0008      # 生成 supabase/apply-pending-manual.sql
+# 把该文件全文粘到 Supabase Dashboard → SQL Editor → Run（幂等，可重复执行）
+```
+
+`db:gen-pending` 与 `db:gen-manual` 共用同一份迁移计划（`scripts/lib/migration-plan.mjs`），
+顺序与 CI 完全一致，不会与自动通道分叉；起始版本号取 `db:probe` 报出的最小缺失迁移即可。
+
+### 4.2 首次配置商城核销口令
+
+管理员核销（充值到账、订单核销）的口令**必须在服务端比对**，前端永不持有、永不下发。
+两个后端的配置入口不同：
+
+| 后端 | 配置方式 |
+|---|---|
+| Supabase | 以 admin 登录 →「我的钱包」→ 核销口令框输入（≥6 位）→ 点「设为核销口令」。口令写入 `mall_ops_config`（启用 RLS 且不建任何策略 ⇒ anon/authenticated 一律无法读取，仅 definer 函数可访问） |
+| CloudBase | 云函数环境变量 `MIM_PAY_CONFIRM_KEY` |
+
+未配置时核销通道 **fail-closed**：拒绝一切核销请求（返回 `unconfigured`），
+不会退化成「任意口令都能通过」。Supabase 侧可查 `select public.ops_key_ready();`
+确认 `configured` 是否为 `true`。
+
+## 5. 验证（交付前建议全跑）
 
 需先起本地预览服务：`npx vite preview --port 5198`
 
@@ -162,7 +198,7 @@ npm run build                 # 产出 dist/
 
 ---
 
-## 5. 合规与交接提示
+## 6. 合规与交接提示
 
 - **ICP / 公安备案**：`src/site-config.ts` 中所有备案字段默认为空，页面显示
   「本项内容由站点运营方配置后展示」。国内上线必须由运营方按真实证照填写，
