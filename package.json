@@ -1,7 +1,7 @@
 {
   "name": "mim",
   "private": true,
-  "version": "0.0.0.0",
+  "version": "0.0.0-0",
   "description": "Mim 内容聚合社区 Web 应用（动态 / 文章 / 商城 / 工具台）",
   "license": "UNLICENSED",
   "type": "module",
