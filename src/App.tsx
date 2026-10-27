@@ -42,6 +42,7 @@ import { MallProvider, MALL_CHANNEL_META, type MallChannel } from './mall/store'
 import { AuthProvider, useAuth } from './auth'
 import { PlayerProvider } from './player' /* 全站统一播放器（音频/视频通用，跨页不中断） */
 import { fetchAuditLogs, fetchIamRoles, type AuditLogRow, type IamRole } from './lib/cloud-iam'
+import { adminBootstrapSupported, bootstrapAdmin, queryHasAnyAdmin } from './lib/admin-bootstrap'
 import { matchSearchPages } from './search-index'
 import { VipCenterPage } from './vip'
 import { LoginPage } from './login'
@@ -567,9 +568,129 @@ function detailStr(d: Record<string, unknown>): string {
 
 function AdminGate({ children }: { children: ReactNode }) {
   const { auth, hasRole } = useAuth()
-  if (auth.mode !== 'cloud') return <Empty emoji="🔐" text="管理后台需要云端账号登录" />
-  if (!hasRole('admin')) return <Empty emoji="🛡️" text="没有管理后台访问权限" />
+  /* 未登录：先引导登录（登录页在 #/login） */
+  if (auth.mode !== 'cloud') return <AdminNoAccess kind="login" />
+  /* 已登录但无 admin 角色：给出可操作的授权路径，而非一句无权限 */
+  if (!hasRole('admin')) {
+    return (
+      <AdminNoAccess
+        kind="role"
+        who={auth.email ?? auth.username ?? auth.userId}
+        roles={auth.roles}
+      />
+    )
+  }
   return <>{children}</>
+}
+
+/* 管理后台无权限时的引导卡片：
+   注册只会自动分配 user 角色，成为 admin 必须显式授权（user_roles 写策略要求调用者已是 admin），
+   因此这里必须把「怎么获得权限」讲清楚，否则部署后谁都进不来。 */
+function AdminNoAccess({
+  kind,
+  who,
+  roles,
+}: {
+  kind: 'login' | 'role'
+  who?: string
+  roles?: string[]
+}) {
+  const [noAdmin, setNoAdmin] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const supported = adminBootstrapSupported()
+
+  useEffect(() => {
+    if (kind !== 'role' || !supported) return
+    let alive = true
+    queryHasAnyAdmin().then((v) => {
+      if (alive) setNoAdmin(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [kind, supported])
+
+  async function claim() {
+    setBusy(true)
+    setMsg('')
+    const r = await bootstrapAdmin()
+    setMsg(r.msg)
+    setBusy(false)
+    if (r.ok) setTimeout(() => window.location.reload(), 600)
+  }
+
+  if (kind === 'login') {
+    return (
+      <div className="page-grid single">
+        <div>
+          <h2 className="page-title">🛡️ 管理后台</h2>
+          <div className="card" style={{ padding: 16 }}>
+            <p>管理后台仅对已登录的 admin 账号开放。</p>
+            <p style={{ marginTop: 8 }}>
+              <a className="btn" href="#/login">
+                🔐 去登录
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="page-grid single">
+      <div>
+        <h2 className="page-title">🛡️ 管理后台</h2>
+        <div className="card" style={{ padding: 16 }}>
+          <p>
+            当前账号：<b>{who ?? '—'}</b> · 角色：{roles?.join(' / ') || '—'}
+          </p>
+          <p style={{ marginTop: 8 }}>该账号没有 admin 角色，因此看不到管理后台。</p>
+
+          {noAdmin === true && supported ? (
+            <div style={{ marginTop: 12 }}>
+              <p>当前系统还没有任何管理员，你可以成为第一个（成功后该入口自动关闭）：</p>
+              <button className="btn" disabled={busy} onClick={claim} style={{ marginTop: 8 }}>
+                {busy ? '提交中…' : '👑 成为首个管理员'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginTop: 12 }}>
+              <p>获得权限的方式（二选一）：</p>
+              <ol style={{ marginTop: 6, paddingLeft: 20 }}>
+                <li>
+                  在 Supabase Dashboard → SQL Editor 执行（把用户名换成你自己的）：
+                  <pre
+                    style={{
+                      marginTop: 6,
+                      padding: 10,
+                      background: 'var(--bg-soft, #f5f5f5)',
+                      borderRadius: 6,
+                      overflowX: 'auto',
+                    }}
+                  >
+                    select public.grant_admin_by_name('你的用户名');
+                  </pre>
+                  脚本文件见仓库 <code>supabase/grant-admin.sql</code>。
+                </li>
+                <li style={{ marginTop: 6 }}>
+                  本地/CI 执行 <code>npm run admin:grant -- 你的用户名</code>（需配置
+                  SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF）。
+                </li>
+              </ol>
+              {!supported ? (
+                <p style={{ marginTop: 8 }}>
+                  当前为 CloudBase 备后端，无上述 RPC；请在云端数据库中直接插入 user_roles 记录。
+                </p>
+              ) : null}
+            </div>
+          )}
+          {msg ? <p style={{ marginTop: 10 }}>{msg}</p> : null}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function AdminHomePage() {

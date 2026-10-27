@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- Mim · 一键补齐脚本（供 Supabase Dashboard → SQL Editor 粘贴执行）
--- 生成时间：2026-10-26T14:38:49.920Z
+-- 生成时间：2026-10-27T15:14:40.975Z
 -- 生成命令：npm run db:gen-manual（与本仓库 CI 迁移计划同源，顺序一致）
 --
 -- 用途：无需数据库密码 / 无需本地 SUPABASE_DB_URL，直接补齐线上缺失内容。
--- 内容：0000_schema.sql → 0001_iam_phase1.sql → 0002_storage_media.sql → 0003_account_bridge.sql → 0004_post_rich_fields.sql → 0005_mall_catalog.sql
+-- 内容：0000_schema.sql → 0001_iam_phase1.sql → 0002_storage_media.sql → 0003_account_bridge.sql → 0004_post_rich_fields.sql → 0005_mall_catalog.sql → 0006_wallet.sql → 0007_growth.sql → 0008_mall.sql → 0009_price_rec.sql → 0010_admin_bootstrap.sql
 --
 -- 典型补齐项：
 --   ① 基线 20 张业务表（posts / profiles / articles / snippets / topics / hot_searches …）
@@ -1253,6 +1253,599 @@ create index if not exists products_channel_status_idx
 -- select channel, count(*) from public.products where status='active' group by channel order by channel;
 
 -- ==============================================================================
+-- 迁移 0006_wallet.sql
+-- ==============================================================================
+
+/* ============================================================================
+ * 0006_wallet —— 统一钱包后端化（P0 资金安全）
+ *
+ * 现状：钱包余额/流水仅存浏览器 localStorage（src/wallet.tsx），可任意篡改，
+ * 且跨设备不互通。本迁移把真源挪到数据库：
+ *   · wallet_balances：每用户一行余额（分整数）+ 当前套餐
+ *   · wallet_txns：所有流水（充值/消费/收益），不可篡改的账本
+ *   · RLS：用户只能读写自己的余额与流水
+ *   · 原子 RPC（SECURITY DEFINER，内部用 auth.uid()）：
+ *       wallet_debit  —— 原子扣费，余额不足返回 insufficient（防负余额竞态）
+ *       wallet_credit —— 原子入账（充值/收益），首笔自动建余额行
+ *       wallet_state  —— 返回余额/套餐/最近流水
+ * 注：CloudBase 备模式使用同名 PG 函数（见 CloudBase 云函数部署），本文件为
+ *      Supabase 主模式资产，apply 后前端主模式即生效。
+ * ========================================================================== */
+
+create table if not exists wallet_balances (
+  user_id      uuid primary key references auth.users (id) on delete cascade,
+  balance_fen  bigint not null default 0 check (balance_fen >= 0),
+  plan         text   not null default 'BASIC',
+  updated_at   timestamptz not null default now()
+);
+
+create table if not exists wallet_txns (
+  id       bigint generated always as identity primary key,
+  user_id  uuid not null references auth.users (id) on delete cascade,
+  kind     text not null check (kind in ('recharge', 'consume', 'income')),
+  fen      bigint not null check (fen > 0),
+  note     text,
+  snapshot jsonb,
+  at       bigint not null
+);
+create index if not exists idx_wallet_txns_user on wallet_txns (user_id, at desc);
+
+/* ---------- RLS ---------- */
+alter table wallet_balances enable row level security;
+alter table wallet_txns enable row level security;
+
+drop policy if exists wallet_balances_owner on wallet_balances;
+create policy wallet_balances_owner on wallet_balances
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists wallet_txns_owner on wallet_txns;
+create policy wallet_txns_owner on wallet_txns
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+/* ---------- 原子 RPC ---------- */
+create or replace function wallet_debit(p_fen bigint, p_note text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_bal bigint;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  if p_fen <= 0 then return jsonb_build_object('ok', false, 'error', 'bad_amount'); end if;
+  update wallet_balances set balance_fen = balance_fen - p_fen, updated_at = now()
+   where user_id = v_uid and balance_fen >= p_fen
+   returning balance_fen into v_bal;
+  if v_bal is null then
+    return jsonb_build_object('ok', false, 'error', 'insufficient');
+  end if;
+  insert into wallet_txns (user_id, kind, fen, note, at)
+   values (v_uid, 'consume', p_fen, coalesce(p_note, ''), extract(epoch from now())::bigint * 1000);
+  return jsonb_build_object('ok', true, 'balance_fen', v_bal);
+end;
+$$;
+
+create or replace function wallet_credit(p_fen bigint, p_note text, p_kind text, p_snapshot jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_bal bigint;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  if p_fen <= 0 or p_kind not in ('recharge', 'income') then
+    return jsonb_build_object('ok', false, 'error', 'bad_amount');
+  end if;
+  insert into wallet_balances (user_id, balance_fen)
+   values (v_uid, p_fen)
+   on conflict (user_id) do update set balance_fen = wallet_balances.balance_fen + p_fen, updated_at = now()
+   returning balance_fen into v_bal;
+  insert into wallet_txns (user_id, kind, fen, note, snapshot, at)
+   values (v_uid, p_kind, p_fen, coalesce(p_note, ''), p_snapshot, extract(epoch from now())::bigint * 1000);
+  return jsonb_build_object('ok', true, 'balance_fen', v_bal);
+end;
+$$;
+
+create or replace function wallet_state()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row wallet_balances%rowtype;
+  v_txns jsonb;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  select * into v_row from wallet_balances where user_id = v_uid;
+  if not found then
+    insert into wallet_balances (user_id) values (v_uid);
+    v_row := (v_uid, 0, 'BASIC', now());
+  end if;
+  select coalesce(jsonb_agg(t), '[]'::jsonb) into v_txns
+   from (
+     select id, kind, fen, note, at from wallet_txns
+      where user_id = v_uid order by at desc limit 50
+   ) t;
+  return jsonb_build_object(
+    'ok', true,
+    'balance_fen', v_row.balance_fen,
+    'plan', v_row.plan,
+    'txns', v_txns
+  );
+end;
+$$;
+
+grant execute on function wallet_debit(bigint, text) to authenticated;
+grant execute on function wallet_credit(bigint, text, text, jsonb) to authenticated;
+grant execute on function wallet_state() to authenticated;
+
+-- ==============================================================================
+-- 迁移 0007_growth.sql
+-- ==============================================================================
+
+/* ============================================================================
+ * 0007_growth —— 统一成长引擎后端化（P0 资金/安全：防作弊）
+ *
+ * 现状：成长值/签到/徽章仅存浏览器 localStorage（src/growth.tsx），可改系统时钟
+ * 伪造签到连击、改 localStorage 刷分。本迁移把真相挪到数据库：
+ *   · growth_events   —— 不可篡改的行为事件账本（计分唯一真源）
+ *   · growth_checkins —— 签到（last 日期 + 连续天数），服务端校时防作弊
+ *   · growth_badges   —— 徽章首次达成时刻（独立于 events，便于前端展示）
+ *   · growth_rules    —— 规则配置表（值/日上限/质量门），运营可改、代码不硬编码
+ *   · RLS：仅本人可读写
+ *   · 原子 RPC（SECURITY DEFINER，内部 auth.uid()）：
+ *       growth_record  —— 校验规则/质量门/日上限后写事件，返回 ok/reason
+ *       growth_checkin —— 服务端计算连击（断签重置），返回 streak
+ *       growth_state   —— 返回 events/checkin/badges 派生
+ * ========================================================================== */
+
+create table if not exists growth_rules (
+  action       text primary key,
+  value        integer not null,
+  daily_cap    integer,               -- null = 无上限
+  quality_gate boolean not null default false
+);
+
+insert into growth_rules (action, value, daily_cap, quality_gate) values
+  ('publish_dynamic',     2,   10,  false),
+  ('dynamic_liked',       1,  200, false),
+  ('live_open',          50,    1, false),
+  ('follow_gained',       1,   50, false),
+  ('publish_article',    10,    5, true),
+  ('article_collected',   3, null, false),
+  ('answer_adopted',     20, null, false),
+  ('resource_downloaded', 5, null, false),
+  ('column_finished',    30, null, false),
+  ('course_review_good',  5, null, false),
+  ('anti_spam_penalty', -50, null, false)
+on conflict (action) do nothing;
+
+create table if not exists growth_events (
+  id        bigint generated always as identity primary key,
+  user_id   uuid not null references auth.users (id) on delete cascade,
+  action    text not null,
+  at        bigint not null
+);
+create index if not exists idx_growth_events_user on growth_events (user_id, at desc);
+
+create table if not exists growth_checkins (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  last       date not null default current_date,
+  streak     integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists growth_badges (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  code    text not null,
+  at      bigint not null,
+  primary key (user_id, code)
+);
+
+/* ---------- RLS ---------- */
+alter table growth_events     enable row level security;
+alter table growth_checkins   enable row level security;
+alter table growth_badges     enable row level security;
+alter table growth_rules      enable row level security;
+
+drop policy if exists growth_events_owner on growth_events;
+create policy growth_events_owner on growth_events
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists growth_checkins_owner on growth_checkins;
+create policy growth_checkins_owner on growth_checkins
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists growth_badges_owner on growth_badges;
+create policy growth_badges_owner on growth_badges
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists growth_rules_read on growth_rules;
+create policy growth_rules_read on growth_rules for select using (true);
+
+/* ---------- 原子 RPC ---------- */
+create or replace function growth_record(p_action text, p_quality boolean)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  r growth_rules%rowtype;
+  used int;
+  day_start bigint := extract(epoch from date_trunc('day', now()))::bigint * 1000;
+  new_id bigint;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  select * into r from growth_rules where action = p_action;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'no_rule'); end if;
+  if r.quality_gate and not p_quality then
+    return jsonb_build_object('ok', false, 'reason', 'quality');
+  end if;
+  if r.daily_cap is not null and r.value > 0 then
+    select count(*)::int into used from growth_events
+     where user_id = v_uid and action = p_action and at >= day_start;
+    if used >= r.daily_cap then
+      return jsonb_build_object('ok', false, 'reason', 'cap');
+    end if;
+  end if;
+  insert into growth_events (user_id, action, at)
+   values (v_uid, p_action, extract(epoch from now())::bigint * 1000)
+   returning id into new_id;
+  return jsonb_build_object('ok', true, 'id', new_id, 'value', r.value);
+end;
+$$;
+
+create or replace function growth_checkin()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  c growth_checkins%rowtype;
+  new_streak int;
+  today date := current_date;
+  yest  date := current_date - 1;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  select * into c from growth_checkins where user_id = v_uid;
+  if not found then
+    insert into growth_checkins (user_id, last, streak) values (v_uid, today, 1);
+    return jsonb_build_object('ok', true, 'streak', 1);
+  end if;
+  if c.last = today then
+    return jsonb_build_object('ok', false, 'reason', 'already');
+  end if;
+  new_streak := case when c.last = yest then c.streak + 1 else 1 end;
+  update growth_checkins set last = today, streak = new_streak, updated_at = now()
+   where user_id = v_uid;
+  return jsonb_build_object('ok', true, 'streak', new_streak);
+end;
+$$;
+
+create or replace function growth_state()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  ev jsonb;
+  ck jsonb;
+  bd jsonb;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'action', action, 'at', at)), '[]'::jsonb)
+   into ev from (select id, action, at from growth_events where user_id = v_uid order by at desc) t;
+  select coalesce(jsonb_agg(jsonb_build_object('code', code, 'at', at)), '[]'::jsonb)
+   into bd from (select code, at from growth_badges where user_id = v_uid) t;
+  select jsonb_build_object('last', to_char(last, 'YYYY-M-D'), 'streak', streak)
+   into ck from growth_checkins where user_id = v_uid;
+  return jsonb_build_object(
+    'ok', true,
+    'events', ev,
+    'checkin', coalesce(ck, jsonb_build_object('last', '', 'streak', 0)),
+    'badges', bd
+  );
+end;
+$$;
+
+grant execute on function growth_record(text, boolean) to authenticated;
+grant execute on function growth_checkin() to authenticated;
+grant execute on function growth_state() to authenticated;
+
+-- ==============================================================================
+-- 迁移 0008_mall.sql
+-- ==============================================================================
+
+/* ============================================================================
+ * 0008_mall —— 商城订单后端化 + 支付核销口令后端化（P0 资金安全：根除欺诈漏洞）
+ *
+ * 现状：订单存浏览器 localStorage；管理员核销口令由前端 checkOperatorKey 比对
+ * SITE_CONFIG.payConfirmKey，口令一旦配置即随 JS 包明文暴露，任何人可自确认订单、
+ * 自充余额（资金欺诈）。本迁移：
+ *   · mall_orders —— 订单表（真源从 localStorage 挪到数据库，按 user_id 隔离）
+ *   · RLS：本人可读自己订单；核销由服务端 RPC 处理
+ *   · confirm_order(p_order_id, p_key) RPC（SECURITY DEFINER）：
+ *       - 仅 is_admin 用户可核销（is_admin 由 user_roles 判定）
+ *       - 口令在服务端比对（来自安全配置，永不下发前端）
+ *       - awaiting_confirm → paid，返 5% 积分由调用方处理
+ *   注：CloudBase 备模式同名逻辑在 CloudBase 云函数 + PG 函数实现，本文件为
+ *       Supabase 主模式资产。前端 supply 的口令仅透传，不存储、不比对。
+ * ========================================================================== */
+
+create table if not exists mall_orders (
+  id          text primary key,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  goods_id    text,
+  title       text,
+  emoji       text,
+  amount      integer not null,           -- 元
+  qty         integer not null default 1,
+  channel     text,
+  status      text not null default 'unpaid'
+                check (status in ('unpaid', 'awaiting_confirm', 'paid', 'done')),
+  pay_channel text,
+  proof       jsonb,
+  at          bigint not null
+);
+create index if not exists idx_mall_orders_user on mall_orders (user_id, at desc);
+
+alter table mall_orders enable row level security;
+
+drop policy if exists mall_orders_owner on mall_orders;
+create policy mall_orders_owner on mall_orders
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+/* is_admin 判定（user_roles 表，role='admin'） */
+create or replace function is_admin(p_uid uuid)
+returns boolean language sql security definer set search_path = public as $$
+  select exists (
+    select 1 from user_roles where user_id = p_uid and role = 'admin'
+  );
+$$;
+
+/* 服务端核销：口令比对在服务端进行（来自安全配置），前端只透传用户输入 */
+create or replace function confirm_order(p_order_id text, p_key text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  cfg text;
+  o mall_orders%rowtype;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  if not is_admin(v_uid) then
+    return jsonb_build_object('ok', false, 'error', 'forbidden');
+  end if;
+  -- 核销口令来自服务端安全配置（vault/函数常量），此处占位由部署注入
+  -- 实际比对在 Edge Function / 云函数层完成，本 RPC 仅做状态机转移。
+  select * into o from mall_orders where id = p_order_id;
+  if not found then return jsonb_build_object('ok', false, 'error', 'no_order'); end if;
+  if o.status <> 'awaiting_confirm' then
+    return jsonb_build_object('ok', false, 'error', 'bad_status');
+  end if;
+  update mall_orders set status = 'paid' where id = p_order_id;
+  return jsonb_build_object('ok', true, 'order_id', p_order_id, 'amount', o.amount);
+end;
+$$;
+
+grant execute on function is_admin(uuid) to authenticated;
+grant execute on function confirm_order(text, text) to authenticated;
+
+-- ==============================================================================
+-- 迁移 0009_price_rec.sql
+-- ==============================================================================
+
+-- P1 后端化增量迁移（Supabase 源码资产 · 与 cloudbase/migrations/20261028000000_price_rec.sql 同构）
+-- 主后端为 CloudBase；本文件为 supabase 备后端的同源实现，使用 auth.uid() 取当前用户。
+-- price 回源 cron 在 supabase 侧需经 pg_cron + Edge Function 实现，本 RPC 仅提供读取快照。
+
+-- ---------------------------------------------------------------------------
+-- 价格行情快照（P1-1）：服务端回源写入，前端只读
+-- ---------------------------------------------------------------------------
+create table if not exists price_quotes (
+  coin_id    text primary key,
+  price_cny  numeric(24,8) not null,
+  change_24h numeric(12,4) not null default 0,
+  at         bigint not null
+);
+create index if not exists idx_price_quotes_at on price_quotes (at desc);
+
+-- 读取行情快照（公开读，不依赖登录）
+create or replace function price_latest(p_ids text[] default null)
+returns jsonb language plpgsql security definer as $$
+declare
+  rows record;
+  out jsonb := '{}'::jsonb;
+begin
+  if p_ids is null then
+    for rows in select coin_id, price_cny, change_24h, at from price_quotes loop
+      out := jsonb_set(out, array[rows.coin_id],
+        jsonb_build_object('price', rows.price_cny, 'change', rows.change_24h, 'at', rows.at));
+    end loop;
+  else
+    for rows in select coin_id, price_cny, change_24h, at from price_quotes
+               where coin_id = any(p_ids) loop
+      out := jsonb_set(out, array[rows.coin_id],
+        jsonb_build_object('price', rows.price_cny, 'change', rows.change_24h, 'at', rows.at));
+    end loop;
+  end if;
+  return out;
+end;
+$$;
+grant execute on function price_latest(text[]) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 推荐负反馈 / 同城定位（P1-2）：云端真源，auth.uid() 隔离
+-- ---------------------------------------------------------------------------
+create table if not exists rec_feedback (
+  user_id text primary key,
+  authors jsonb not null default '[]'::jsonb,
+  topics  jsonb not null default '[]'::jsonb,
+  city    text   not null default '北京市',
+  updated_at timestamptz not null default now()
+);
+
+create or replace function rec_feedback_get()
+returns jsonb language plpgsql security definer as $$
+declare
+  v_uid uuid := auth.uid();
+  fb rec_feedback%rowtype;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  select * into fb from rec_feedback where user_id = v_uid::text;
+  if not found then
+    return jsonb_build_object('ok', true, 'exists', false, 'authors', '[]'::jsonb, 'topics', '[]'::jsonb, 'city', '北京市');
+  end if;
+  return jsonb_build_object(
+    'ok', true, 'exists', true,
+    'authors', coalesce(fb.authors, '[]'::jsonb),
+    'topics',  coalesce(fb.topics, '[]'::jsonb),
+    'city',    fb.city
+  );
+end;
+$$;
+
+create or replace function rec_feedback_save(p_authors jsonb, p_topics jsonb, p_city text)
+returns jsonb language plpgsql security definer as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'error', 'no_auth'); end if;
+  insert into rec_feedback(user_id, authors, topics, city, updated_at)
+  values (
+    v_uid::text,
+    coalesce(p_authors, '[]'::jsonb),
+    coalesce(p_topics, '[]'::jsonb),
+    coalesce(nullif(btrim(p_city), ''), '北京市'),
+    now()
+  )
+  on conflict (user_id) do update
+    set authors = excluded.authors,
+        topics  = excluded.topics,
+        city    = excluded.city,
+        updated_at = now();
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+grant execute on function rec_feedback_get() to authenticated;
+grant execute on function rec_feedback_save(jsonb, jsonb, text) to authenticated;
+
+-- ==============================================================================
+-- 迁移 0010_admin_bootstrap.sql
+-- ==============================================================================
+
+-- 0010 · 管理后台权限引导（首个管理员引导 + is_admin 修正）
+--
+-- 背景（实测缺陷）：
+--   注册触发器 handle_new_user_role() 只分配默认角色 'user'，
+--   而 public.user_roles 的写策略要求调用者已是 admin（is_admin()），
+--   于是「没有任何人能成为第一个 admin」——/#/admin 对所有人恒为无权限。
+--   本迁移补上两条引导通道，并保持「门自动关闭」语义：
+--     · 自助通道：仅当系统尚无 admin 时，登录用户可把自己提为 admin（之后永久失效）
+--     · 显式通道：SQL Editor / service_role 按用户名或邮箱授予（不开放给 authenticated）
+--
+-- 另修正 0008_mall.sql：is_admin(uuid) 误用 user_roles.role 列（实际为 role_id 外键），
+--   运行时报 column "role" does not exist，导致商城订单核销恒失败。
+
+-- ---------- 1. 修正 is_admin(uuid)：改为 join roles 判定 ----------
+create or replace function public.is_admin(p_uid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_roles ur
+    join public.roles r on r.id = ur.role_id
+    where ur.user_id = p_uid and r.name = 'admin'
+  );
+$$;
+
+-- ---------- 2. 系统是否已有管理员（前端据其决定是否显示「成为首个管理员」） ----------
+create or replace function public.has_any_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_roles ur
+    join public.roles r on r.id = ur.role_id
+    where r.name = 'admin'
+  );
+$$;
+
+revoke all on function public.has_any_admin() from public;
+grant execute on function public.has_any_admin() to anon, authenticated;
+
+-- ---------- 3. 自助引导：仅当系统尚无管理员时可调用（门自动关闭） ----------
+create or replace function public.bootstrap_admin()
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_role_id uuid;
+begin
+  if v_uid is null then
+    return false; -- 未登录：RLS 下无从提升
+  end if;
+
+  if public.has_any_admin() then
+    return false; -- 已有管理员：引导通道永久关闭，避免被后续注册者滥用
+  end if;
+
+  select id into v_role_id from public.roles where name = 'admin';
+  if v_role_id is null then
+    return false; -- admin 角色未播种（0001 未应用）
+  end if;
+
+  insert into public.user_roles (user_id, role_id)
+  values (v_uid, v_role_id)
+  on conflict do nothing;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.bootstrap_admin() from public;
+grant execute on function public.bootstrap_admin() to authenticated;
+
+-- ---------- 4. 显式授予：按用户名或邮箱（SQL Editor / service_role 通道） ----------
+-- 入参支持两种写法（对齐「用户名映射合成邮箱 <username>@mim.app」的注册规则）：
+--   p_name = 'alice'          → 匹配 alice@mim.app 或 alice
+--   p_name = 'a@b.com'        → 直接按邮箱匹配（含 @ 的输入按邮箱直通注册）
+-- 返回诊断串，便于执行后一眼核对结果。
+create or replace function public.grant_admin_by_name(p_name text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid;
+  v_role_id uuid;
+begin
+  select id into v_role_id from public.roles where name = 'admin';
+  if v_role_id is null then
+    return 'roles 表缺少 admin 角色：请确认 0001_iam_phase1.sql 已应用';
+  end if;
+
+  select u.id into v_uid
+  from auth.users u
+  where lower(u.email) = lower(p_name)
+     or lower(u.email) = lower(p_name) || '@mim.app'
+  limit 1;
+
+  if v_uid is null then
+    return '未找到账号：' || p_name || '（请先在应用内注册，再执行授权）';
+  end if;
+
+  insert into public.user_roles (user_id, role_id)
+  values (v_uid, v_role_id)
+  on conflict do nothing;
+
+  return '已授予 admin：' || p_name || ' —— 刷新页面即可看到「🛡️ 管理后台」入口';
+end;
+$$;
+
+-- 仅保留 service_role / postgres（SQL Editor）可执行：
+-- 默认 public 可执行，此处显式回收，避免普通登录用户把自己提权。
+revoke all on function public.grant_admin_by_name(text) from public;
+
+-- ==============================================================================
 -- 记录已应用版本（使 CI 后续自动跳过，避免重复执行）
 -- ==============================================================================
 
@@ -1262,6 +1855,11 @@ insert into public.schema_migrations (version) values ('0002_storage_media.sql')
 insert into public.schema_migrations (version) values ('0003_account_bridge.sql') on conflict (version) do nothing;
 insert into public.schema_migrations (version) values ('0004_post_rich_fields.sql') on conflict (version) do nothing;
 insert into public.schema_migrations (version) values ('0005_mall_catalog.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0006_wallet.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0007_growth.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0008_mall.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0009_price_rec.sql') on conflict (version) do nothing;
+insert into public.schema_migrations (version) values ('0010_admin_bootstrap.sql') on conflict (version) do nothing;
 
 -- ==============================================================================
 -- 执行后自检（四条均应有返回且不报错）：

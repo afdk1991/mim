@@ -205,6 +205,21 @@ Supabase：GoTrue `auth.users`，uuid，bcrypt）。**账号桥**把两者在用
 > 线上账号现状：CloudBase 与 Supabase 两边的测试号已全部清零（app_users / auth.users
 > 均为 0），账号桥随新用户注册自动开始积累记录。
 
+### 管理后台权限（`#/admin`）
+
+注册只自动分配 `user` 角色，必须显式授权才能进后台（`user_roles` 写策略要求调用者已是 admin）。
+迁移 `0010_admin_bootstrap.sql` 提供四条通道（详见 `INSTALL.md` §3）：
+
+| 通道 | 命令 / 操作 |
+|---|---|
+| 前端自助 | 登录后开 `#/admin` → 系统无管理员时出现「👑 成为首个管理员」（RPC `bootstrap_admin()`，门自动关闭） |
+| SQL Editor | 粘贴 `supabase/grant-admin.sql`，替换用户名执行（`grant_admin_by_name()`） |
+| 脚本 | `npm run admin:grant -- <用户名>`（`--list` / `--who`；需 `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`） |
+| CI | Secrets 设 `ADMIN_EMAIL=<注册邮箱>`，push main 随迁移自动授予 |
+
+同时修正了 `0008_mall.sql` 中 `is_admin(uuid)` 误用 `user_roles.role` 列（实际为 `role_id`
+外键）导致的运行时报错——该 bug 会让商城订单核销恒失败。
+
 ## 部署矩阵
 
 | 事件 | 动作 |

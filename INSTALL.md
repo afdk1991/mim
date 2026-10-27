@@ -102,6 +102,25 @@ npm run build                 # 产出 dist/
 安全模型：浏览器直连 Supabase，publishable key 按设计可暴露，数据安全由 **RLS 行级安全**
 承担（全表已启用策略）。**不要**把 `service_role` key 写进前端。
 
+## 3. 解锁管理后台（`#/admin`）
+
+> **新部署的站点默认没有任何管理员。** 注册只会分配默认角色 `user`，
+> 而 `user_roles` 表的写策略要求调用者已是 admin —— 没有这一脚，
+> `/#/admin` 对所有人（包括你自己）都显示「无访问权限」。任选一条通道：
+
+| 通道 | 做法 | 适用 |
+|---|---|---|
+| ① 自助（最快） | 注册并登录后打开 `#/admin`，若系统尚无管理员，页面会给出「👑 成为首个管理员」按钮，点一下即可 | 全新库、本地/CI 无凭证 |
+| ② SQL Editor | Dashboard → SQL Editor 粘贴 `supabase/grant-admin.sql`，把 `'alice'` 换成你的用户名执行 | 零凭证，任意时刻 |
+| ③ 脚本 | `SUPABASE_ACCESS_TOKEN=… SUPABASE_PROJECT_REF=… npm run admin:grant -- 你的用户名` | 有 Access Token；`--list` 列账号、`--who` 看现有管理员 |
+| ④ CI 自动 | 仓库 Secrets 设 `ADMIN_EMAIL=<注册邮箱>`，push main 时随迁移自动授予 | 已接 GitHub Actions |
+
+用户名与邮箱都能匹配：应用把用户名注册映射为合成邮箱 `<username>@mim.app`，
+授权函数对两种写法都做了兼容。授权后**刷新页面即可**，无需重新登录。
+
+安全提示：① 的引导门「仅当系统尚无管理员」时开放，一旦有人成为 admin 就永久关闭，
+不会被后来的注册者滥用。公开站点建议：**自己先注册 → 立刻自助或 SQL 抢占首个管理员 → 再宣传站点**。
+
 ### 路径 C：六端全量（桌面 / 安卓 / iOS / 鸿蒙）
 
 先完成路径 B，再按平台打包：
@@ -121,7 +140,7 @@ npm run build                 # 产出 dist/
 
 ---
 
-## 3. 验证（交付前建议全跑）
+## 4. 验证（交付前建议全跑）
 
 需先起本地预览服务：`npx vite preview --port 5198`
 
@@ -139,7 +158,7 @@ npm run build                 # 产出 dist/
 
 ---
 
-## 4. 合规与交接提示
+## 5. 合规与交接提示
 
 - **ICP / 公安备案**：`src/site-config.ts` 中所有备案字段默认为空，页面显示
   「本项内容由站点运营方配置后展示」。国内上线必须由运营方按真实证照填写，
