@@ -28,7 +28,6 @@ import { buildRecFeed, CITY_PRESETS, clearNeg, negCount } from './lib/feed-core'
 import { abVariant } from './lib/ab'
 import {
   GroupCreateModal,
-  PEER_READ_DELAY,
   RoamModal,
   SuggestCard,
   checkinOf,
@@ -39,10 +38,8 @@ import {
   leaveGroup,
   loadGroupReads,
   loadGroups,
-  loadPeerRead,
   loadPins,
   markGroupRead,
-  markPeerRead,
   sendGroupMessage,
   togglePin,
   topicHostOf,
@@ -807,7 +804,7 @@ export function TopicPage({ name }: { name: string }) {
   const base = [...posts].sort((a, b) => (sort === 'new' ? b.createdAt - a.createdAt : b.likes - a.likes))
   const sorted = [...base.filter((p) => pins.includes(p.id)), ...base.filter((p) => !pins.includes(p.id))]
   const authors = [...new Set(posts.map((p) => p.authorId))]
-  /* 轮 22 打通：名人堂 —— 连续签到 Top5（本机真实签到 + 成员模拟兜底） */
+  /* 轮 22 打通：名人堂 —— 连续签到 Top5（仅本机真实签到，不伪造成员数据） */
   const hall = hallOfFame(name, api.me.id, authors)
   const related = api.state.topics.filter((t) => t.name !== name).slice(0, 8)
 
@@ -1140,15 +1137,8 @@ export function MessagesPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [activeCount, activeId])
 
-  /* 轮 22 打通：已读回执 —— 单聊打开 3 秒后模拟对方（seed 机器人）读走我的全部消息 */
-  const peerReads = loadPeerRead()
+  /* 已读回执：本机无法获知对方是否真实已读（云端无已读 API），仅展示「已送达」，不伪造已读状态 */
   const mySentCount = active && !activeGroup ? active.msgs.filter((m) => m.fromMe).length : 0
-  useEffect(() => {
-    if (!activeId || activeGroup || mySentCount === 0) return
-    const t = window.setTimeout(() => markPeerRead(activeId), PEER_READ_DELAY)
-    return () => window.clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, activeGroup?.id, mySentCount])
 
   const send = () => {
     if (!input.trim() || !activeId || activeGroup) return
@@ -1281,17 +1271,8 @@ export function MessagesPage() {
                     <div className="bubble">{m.content}</div>
                     <span className="bubble-time">
                       {timeAgo(m.createdAt)}
-                      {/* 轮 22 打通：已读回执角标 —— 对方（机器人）读取后我的消息由「未读」变「已读」 */}
-                      {m.fromMe && (
-                        <em
-                          className={cx(
-                            'sg-receipt',
-                            m.createdAt <= (peerReads[active.userId] ?? 0) && 'sg-read',
-                          )}
-                        >
-                          {m.createdAt <= (peerReads[active.userId] ?? 0) ? '已读' : '未读'}
-                        </em>
-                      )}
+                      {/* 已读回执：仅展示「已送达」，不伪造对方已读（云端无已读 API） */}
+                      {m.fromMe && <em className="sg-receipt">已送达</em>}
                     </span>
                   </div>
                 ))}

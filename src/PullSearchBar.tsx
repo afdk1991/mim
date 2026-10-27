@@ -33,7 +33,6 @@ export function PullSearchBar() {
 
   const onRefresh = useCallback(() => {
     void (async () => {
-      await new Promise((r) => setTimeout(r, 700)) // 模拟网络往返
       const n = apiRef.current.refreshFeed()
       toastRef.current(n > 0 ? `已更新 ${n} 条新动态` : '暂无新内容')
       finishRef.current()

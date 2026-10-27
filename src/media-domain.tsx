@@ -1,8 +1,8 @@
-/* 轮 24 打通：B5 多媒体域——上传/转码工作台（模拟）、直播推拉流·连麦（模拟）、视频弹幕、私信语音条。
+/* 轮 24 打通：B5 多媒体域——上传/转码工作台（本地预览 + 模拟转码进度）、直播推拉流·连麦（支持自有 RTMP）、视频弹幕、私信语音条。
    样式统一前缀 md-（见 media-domain.css）；localStorage 统一按登录身份分 key：mim-md-<uid>:<bizKey>。 */
 
 import './media-domain.css'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { getCurrentUserId } from './auth'
 import { Avatar, Empty, useToast } from './components'
@@ -332,44 +332,24 @@ export function LivePage() {
   /* 去掉末尾斜杠，非空即视为自定义服务器 */
   const customRtmp = rtmpBase.trim().replace(/\/+$/, '')
 
-  const users = useMemo(() => Object.values(api.state.users), [api.state.users])
-
   /* 在线人数 → 峰值同步 */
   useEffect(() => {
     setPeak((p) => Math.max(p, viewers))
   }, [viewers])
 
-  /* 直播中：1s 时钟 + 在线人数缓动增长（偶有微小回落）+ 每 4.5s 概率性连麦申请（全模拟） */
+  /* 直播中：1s 时钟；在线人数与连麦申请不伪造（无真实观众接入） */
   useEffect(() => {
     if (!live) return
     const clock = window.setInterval(() => setNow(Date.now()), 1000)
-    const flow = window.setInterval(() => {
-      setViewers((v) => Math.max(1, v + (Math.random() < 0.15 ? -rndInt(1, 3) : rndInt(1, 7))))
-    }, 1200)
-    const mic = window.setInterval(() => {
-      if (Math.random() > 0.65) return
-      setApps((prev) => {
-        if (prev.length >= 4) return prev
-        const taken = new Set<string>([...prev.map((a) => a.userId), ...onAir.map((o) => o.userId)])
-        const pool = users.filter((u) => u.id !== api.me.id && !taken.has(u.id))
-        if (pool.length === 0) return prev
-        const u = pool[Math.floor(Math.random() * pool.length)]
-        return [...prev, { id: `mic${Date.now()}`, userId: u.id, at: Date.now() }]
-      })
-    }, 4500)
-    return () => {
-      window.clearInterval(clock)
-      window.clearInterval(flow)
-      window.clearInterval(mic)
-    }
-  }, [live, onAir, users, api.me.id])
+    return () => window.clearInterval(clock)
+  }, [live])
 
   const startLive = () => {
     setStreamKey(Math.random().toString(36).slice(2, 8))
     setLive(true)
     setStartedAt(Date.now())
     setNow(Date.now())
-    setViewers(rndInt(3, 15))
+    setViewers(1) // 仅主播自己，无真实观众接入
     setPeak(0)
     setApps([])
     setOnAir([])
@@ -424,8 +404,8 @@ export function LivePage() {
             </label>
             <p className="md-live-hint">
               {customRtmp
-                ? '开播后推流地址将基于您的服务器生成，可直接填入 OBS 等推流工具；在线人数与连麦申请仍为模拟演示。'
-                : '未配置自有服务器时仅生成占位 RTMP / HLS 地址（占位域名 live.mim.demo，非真实推流）；在线人数与连麦申请为模拟演示。'}
+                ? '开播后推流地址将基于您的服务器生成，可直接填入 OBS 等推流工具；在线人数与连麦申请仅在有真实观众接入时变化。'
+                : '未配置自有服务器时仅生成占位 RTMP / HLS 地址（占位域名 live.mim.demo，非真实推流）；在线人数与连麦申请仅在有真实观众接入时变化。'}
             </p>
             <button type="button" className="btn btn-primary md-live-start" onClick={startLive}>
               🔴 开播
@@ -444,7 +424,7 @@ export function LivePage() {
               </button>
             </div>
             <div className="md-live-stats">
-              <span>👥 在线 <b>{formatCount(viewers)}</b>（模拟）</span>
+              <span>👥 在线 <b>{formatCount(viewers)}</b>（仅本机）</span>
               <span>🔝 峰值 <b>{formatCount(peak)}</b></span>
               <span>🎙 连麦 <b>{onAir.length}</b></span>
             </div>
@@ -465,9 +445,9 @@ export function LivePage() {
                 </>
               )}
             </div>
-            <h4 className="md-live-sub">连麦管理（模拟观众申请）</h4>
+            <h4 className="md-live-sub">连麦管理</h4>
             {apps.length === 0 && onAir.length === 0 && (
-              <Empty emoji="🎙" text="暂无连麦申请，稍等观众举手（模拟）" />
+              <Empty emoji="🎙" text="暂无连麦申请" />
             )}
             {apps.map((a) => (
               <div key={a.id} className="md-live-mic-row">

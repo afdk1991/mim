@@ -214,20 +214,7 @@ export function GroupCreateModal({ onClose }: { onClose: () => void }) {
 
 /* ================= 4. 已读回执（单聊） ================= */
 
-/** 对方读走我的消息的时间线：convUserId → 该时刻前我发出的消息视为「已读」 */
-export function loadPeerRead(): Record<string, number> {
-  const map = sdGet<Record<string, number>>('receipts', {})
-  return map && typeof map === 'object' ? map : {}
-}
-
-export function markPeerRead(convUserId: string) {
-  const map = loadPeerRead()
-  map[convUserId] = Date.now()
-  sdSet('receipts', map)
-}
-
-/** 打开会话多少毫秒后模拟对方（seed 机器人）已读 */
-export const PEER_READ_DELAY = 3000
+/* 本机无云端已读 API，不伪造对方已读状态；相关本地存储与模拟逻辑已移除。 */
 
 /* ================= 5. 消息漫游 ================= */
 
@@ -375,15 +362,8 @@ export function togglePin(topic: string, postId: string): boolean {
   return on
 }
 
-/** 稳定散列：给模拟数据兜底用（同输入永远同输出） */
-function stableHash(s: string): number {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
-  return Math.abs(h)
-}
-
 /**
- * 主持人判定：keyed 指定（模拟 seed 指定 / 创建者）优先，demo 兜底取该超话最早发帖的作者。
+ * 主持人判定：已指定的主持人优先，否则兜底取该超话最早发帖的作者。
  */
 export function topicHostOf(topic: string, posts: Post[]): string | null {
   const assigned = sdGet<Record<string, string>>('hosts', {})[topic]
@@ -401,17 +381,14 @@ export interface HallEntry {
 
 /**
  * 轮 22 打通：名人堂 —— 按连续签到天数 Top5。
- * 本机只存我的真实签到；其他成员用「userId+超话」稳定散列模拟兜底（seed 口径）。
+ * 本机只存我的真实签到；其他成员签到数据需云端同步，不伪造。
  */
 export function hallOfFame(topic: string, meId: string, memberIds: string[]): HallEntry[] {
   const entries: HallEntry[] = []
   const mine = checkinOf(topic)
   if (mine) entries.push({ userId: meId, streak: mine.streak, total: mine.total, simulated: false })
-  for (const id of memberIds) {
-    if (id === meId) continue
-    const h = stableHash(topic + '#' + id)
-    entries.push({ userId: id, streak: 3 + (h % 26), total: 3 + (h % 26) + (h % 40), simulated: true })
-  }
+  /* 其他成员无本机真实签到记录，不纳入排行榜（需云端同步） */
+  void memberIds
   return entries
     .sort((a, b) => b.streak - a.streak || b.total - a.total)
     .slice(0, 5)
@@ -427,7 +404,7 @@ export interface SuggestUser {
 /**
  * 轮 22 打通：可能感兴趣的人 —— 基于共同关注推导（好友的好友）：
  * ① 好友发帖所在超话下的其他作者；② 与好友在同帖互动过的其他评论者。
- * 排除已关注 / 拉黑 / 自己；计重合次数模拟「共同关注 N 人」；无候选时退化为全站未关注用户兜底。
+ * 排除已关注 / 拉黑 / 自己；计重合次数作为「共同关注 N 人」；无候选时退化为全站未关注用户兜底。
  */
 export function useSuggestUsers(): SuggestUser[] {
   const api = useApp()
