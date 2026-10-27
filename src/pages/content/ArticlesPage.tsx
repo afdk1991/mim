@@ -2,9 +2,7 @@
  * ArticlesPage 文章列表 —— 标签筛选 + 最新/最热 排序
  *
  * 卡片沿用原实现的文章行：摘要 / 作者 / 阅读 / 收藏。
- * 收藏走状态层唯一的 toggleFavorite('article', id) 出口。
- * 遗留：文章点赞在重建后的状态层没有出口（toggleArticleLike 缺失），
- *       这里只展示真实计数，不做点了会「假成功」的按钮。
+ * 收藏走状态层唯一的 toggleFavorite('article', id) 出口；点赞走 toggleArticleLike(id)。
  * ======================================================================== */
 
 import { useMemo, useState } from 'react'
@@ -16,6 +14,7 @@ import type { Article } from '@/domain/content/model'
 import { useFirstPaint } from './content-data'
 import { AsyncState } from './content-parts'
 import { authorOf } from './content-lib'
+import { reportGrowth } from './growth-report'
 
 export function ArticlesPage() {
   const app = useApp()
@@ -107,7 +106,14 @@ export function ArticleRow({ article, manage }: { article: Article; manage?: Rea
           </a>
           <span className="muted">{timeAgo(article.createdAt)}</span>
           <span className="muted">👀 {formatCount(article.views)}</span>
-          <span className="muted">👍 {formatCount(article.likes)}</span>
+          <button
+            className={cx('act-btn', article.likedByMe && 'active')}
+            onClick={() => app.toggleArticleLike(article.id)}
+            title={article.likedByMe ? '取消赞' : '点赞'}
+            aria-label={article.likedByMe ? '取消赞' : '点赞'}
+          >
+            👍 {formatCount(article.likes)}
+          </button>
           <span className="muted">💬 {article.comments.length}</span>
           <div className="chip-row">
             {article.tags.slice(0, 3).map((t) => (
@@ -122,6 +128,8 @@ export function ArticleRow({ article, manage }: { article: Article; manage?: Rea
         title={fav ? '取消收藏' : '收藏'}
         aria-label={fav ? '取消收藏' : '收藏'}
         onClick={() => {
+          // 只在「由未收藏变已收藏」时上报
+          if (!fav) reportGrowth('article_collected')
           app.toggleFavorite('article', article.id)
           toast(fav ? '已取消收藏' : '已收藏 ⭐')
         }}

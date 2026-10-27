@@ -5,16 +5,19 @@
  *           不引入 Markdown 依赖，也不做 HTML 注入（全部走 React 节点）。
  * 目录：标题锚点 id 与内容同步生成（同一套 scan 顺序），点击 scrollIntoView 平滑滚动。
  * 阅读时长：走 rules.readMinutes（400 字/分钟，下限 1 分钟），不自算。
- * 遗留：文章点赞与评论写入在重建后的状态层没有出口，这里如实标注而不是伪造成功。
+ * 互动：点赞走 toggleArticleLike；评论走 addArticleComment（云端 article_comments，失败回滚）。
  * ======================================================================== */
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Avatar, Empty, Tag, TimeAgo, useToast } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { cx, formatCount } from '@/core/utils'
 import { readMinutes } from '@/domain/content/rules'
+// 浏览足迹（键 mim.history）的写入口由社交域提供，内容域只在真正打开内容时上报
+import { recordView } from '../social/HistoryPage'
 import { useFirstPaint } from './content-data'
 import { authorOf } from './content-lib'
+import { reportGrowth } from './growth-report'
 
 export interface ArticleDetailPageProps {
   id: string
@@ -87,6 +90,13 @@ export function ArticleDetailPage({ id }: ArticleDetailPageProps) {
   const toast = useToast()
   const ready = useFirstPaint()
   const article = app.state.articles.find((a) => a.id === id)
+  const [comment, setComment] = useState('')
+
+  /* 打开即写一次浏览足迹（社交域 HistoryPage 读取）；依赖只放 id，避免每次状态变化都刷新「看过时间」 */
+  useEffect(() => {
+    if (article) recordView('article', id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   const blocks = useMemo(() => (article ? parseBlocks(article.content) : []), [article])
   /* 锚点在一次扫描里定好：目录与我正共用同一份 id，避免标题重名时跳错 */
@@ -113,6 +123,17 @@ export function ArticleDetailPage({ id }: ArticleDetailPageProps) {
   const authorUser = app.state.users.find((u) => u.id === article.authorId)
   const fav = app.state.favorites.some((f) => f.type === 'article' && f.targetId === article.id)
   const minutes = readMinutes(article.content)
+
+  const submitComment = (): void => {
+    const text = comment.trim()
+    if (!text) {
+      toast('评论内容不能为空')
+      return
+    }
+    app.addArticleComment(article.id, text)
+    setComment('')
+    toast('评论成功')
+  }
 
   return (
     <div className="page-grid">
@@ -163,12 +184,21 @@ export function ArticleDetailPage({ id }: ArticleDetailPageProps) {
 
             <div className="post-actions">
               <button
-                className={cx('act-btn', fav && 'active')}
-                onClick={() => {
-                  app.toggleFavorite('article', article.id)
-                  toast(fav ? '已取消收藏' : '已收藏 ⭐')
-                }}
+                className={cx('act-btn', article.likedByMe && 'active')}
+                onClick={() => app.toggleArticleLike(article.id)}
+                title={article.likedByMe ? '取消赞' : '点赞'}
               >
+                {article.likedByMe ? '👍 已赞' : '👍 点赞'} {formatCount(article.likes)}
+              </button>
+            <button
+              className={cx('act-btn', fav && 'active')}
+              onClick={() => {
+                // 只在「由未收藏变已收藏」时记分
+                if (!fav) reportGrowth('article_collected')
+                app.toggleFavorite('article', article.id)
+                toast(fav ? '已取消收藏' : '已收藏 ⭐')
+              }}
+            >
                 {fav ? '⭐ 已收藏' : '☆ 收藏'}
               </button>
               {article.authorId === app.meId ? (
@@ -197,10 +227,21 @@ export function ArticleDetailPage({ id }: ArticleDetailPageProps) {
               </div>
             </div>
           ))}
-          {/* 评论写入需要状态层提供 addArticleComment，当前不提供按钮避免「点了没反应」的假交互 */}
-          <p className="muted comment-note">
-            文章评论写入接口尚未在重建后的状态层提供（待补 addArticleComment），当前仅支持浏览。
-          </p>
+          <div className={cx('msg-input-bar', 'comment-input')}>
+            <Avatar emoji={author.emoji} color={author.color} size={32} />
+            <input
+              className="input"
+              placeholder="写下你的看法…"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitComment()
+              }}
+            />
+            <button className="btn btn-primary btn-sm" onClick={submitComment}>
+              评论
+            </button>
+          </div>
         </div>
       </div>
 

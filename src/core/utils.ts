@@ -1,6 +1,9 @@
 /* ==========================================================================
  * 通用纯函数 —— 无副作用、无依赖，可被任何层引用
+ * 浏览足迹相关函数带 localStorage 副作用，依赖同层 storage
  * ======================================================================== */
+
+import { arrayOf, readJson, removeKey, writeJson } from './storage'
 
 /** 本地唯一 id：`前缀 + 随机 7 位 base36 + 时间末 4 位 base36` */
 export function uid(prefix = ''): string {
@@ -104,4 +107,43 @@ export function ellipsis(text: string, max: number): string {
 /** 延迟（仅用于测试与节流，业务禁止用 sleep 赌渲染） */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/* ---------- 浏览足迹 ---------- */
+
+const HISTORY_KEY = 'mim.history'
+const HISTORY_MAX = 50
+
+export type ViewKind = 'post' | 'article'
+
+export interface HistoryEntry {
+  kind: ViewKind
+  id: string
+  at: number
+}
+
+function parseEntry(v: unknown): HistoryEntry | null {
+  if (!v || typeof v !== 'object') return null
+  const r = v as Record<string, unknown>
+  if (r.kind !== 'post' && r.kind !== 'article') return null
+  if (typeof r.id !== 'string' || !r.id) return null
+  if (typeof r.at !== 'number' || !Number.isFinite(r.at)) return null
+  return { kind: r.kind, id: r.id, at: r.at }
+}
+
+const parseHistory = arrayOf<HistoryEntry>(parseEntry)
+
+export function loadHistory(): HistoryEntry[] {
+  return readJson(HISTORY_KEY, parseHistory, [])
+}
+
+/** 记录一次浏览：同条目去重置顶，上限 50 条 */
+export function recordView(kind: ViewKind, id: string): void {
+  if (!id) return
+  const rest = loadHistory().filter((h) => !(h.kind === kind && h.id === id))
+  writeJson(HISTORY_KEY, [{ kind, id, at: Date.now() }, ...rest].slice(0, HISTORY_MAX))
+}
+
+export function clearHistory(): void {
+  removeKey(HISTORY_KEY)
 }

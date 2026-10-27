@@ -191,14 +191,9 @@ export interface User {
   verified: boolean
 }
 
-/** 浏览足迹 */
-export type ViewKind = 'post' | 'article'
-
-export interface HistoryEntry {
-  kind: ViewKind
-  id: string
-  at: number
-}
+/** 浏览足迹：实现在 core/utils（含本机持久化与 50 条上限），
+ *  这里再导出以保持单一真源，避免两处各定义一份导致结构漂移。 */
+export type { HistoryEntry, ViewKind } from '../../core/utils'
 
 /** 内容类型编码：与统一发布器的 content_type 对齐 */
 export const CONTENT_TYPE = {

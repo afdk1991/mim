@@ -17,8 +17,9 @@ import { useRouter } from '@/app/router'
 import { cx } from '@/core/utils'
 import { CONTENT_TYPE } from '@/domain/content/model'
 import type { Visibility } from '@/domain/content/model'
-import { findSensitiveHits, sensitiveHitLabels } from '@/domain/content/rules'
+import { articleQualityPass, findSensitiveHits, sensitiveHitLabels } from '@/domain/content/rules'
 import { sortTopics, topicsFromPosts } from './content-lib'
+import { reportGrowth } from './growth-report'
 
 const IMAGE_EMOJIS = ['⚛️', '🚀', '🎨', '🐱', '🌸', '🍜', '🏔️', '💻', '📱']
 
@@ -79,6 +80,7 @@ export function PublishPage() {
     }
     if (isPlaza) {
       app.publishPost(body.trim(), { topic: topic.trim() || null, images, visibility })
+      reportGrowth('publish_dynamic')
       toast(`已发布：${meta.name}`)
       navigate('/feed')
       return
@@ -88,7 +90,9 @@ export function PublishPage() {
       content: body,
       tags: tags.split(/[,，、\s]+/).map((t) => t.trim()).filter(Boolean),
     })
-    toast('文章已发布 🎉')
+    // 博文走质量门：正文去空白不足 50 字不计成长分
+    const outcome = reportGrowth('publish_article', articleQualityPass(body))
+    toast(outcome.ok ? '文章已发布 🎉' : '文章已发布（正文不足 50 字，本次不计成长分）')
     navigate(`/article/${id}`)
   }
 

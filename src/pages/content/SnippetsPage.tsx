@@ -3,7 +3,7 @@
  *
  * 语言一律走 domain 的 SNIPPET_LANGUAGES 白名单（页面不得自行放宽，避免脏语言值入库）。
  * 复制：优先 Clipboard API，被拒时回退 execCommand；两种都失败就如实提示，不假装成功。
- * 遗留：片段点赞缺 toggleSnippetLike 接口，因此只展示真实计数，不提供会空转的点赞按钮。
+ * 点赞：走状态层 toggleSnippetLike（本机计数 +1/-1，取消赞不空转）。
  * ======================================================================== */
 
 import { useMemo, useState } from 'react'
@@ -141,9 +141,14 @@ export function SnippetsPage() {
                       <Avatar emoji={u.emoji} color={u.color} size={20} />
                       {u.name}
                     </span>
-                    <span className="muted">
+                    <button
+                      className={cx('act-btn', s.likedByMe && 'active')}
+                      onClick={() => app.toggleSnippetLike(s.id)}
+                      title={s.likedByMe ? '取消赞' : '点赞'}
+                      aria-label={s.likedByMe ? '取消赞' : '点赞'}
+                    >
                       <TimeAgo ts={s.createdAt} /> · ❤️ {formatCount(s.likes)}
-                    </span>
+                    </button>
                   </div>
                 </div>
               )

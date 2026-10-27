@@ -1,0 +1,65 @@
+# Mim 自托管后端：Postgres 16 + API（Node 20 / node:http + pg）
+#
+#   docker compose up -d      # 首次会自动建库
+#   docker compose run --rm migrate   # 应用 server/db/migrations/*.sql
+#   docker compose logs -f api
+#
+# 生产部署前务必修改 db 的密码与 JWT_SECRET（见 server/README.md）。
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mim-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
+      POSTGRES_DB: ${PGDATABASE:-mim}
+    ports:
+      - '${PGPORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${PGUSER:-postgres} -d ${PGDATABASE:-mim}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mim-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 8787
+      NODE_ENV: production
+      DATABASE_URL: postgres://${PGUSER:-postgres}:${PGPASSWORD:-postgres}@db:5432/${PGDATABASE:-mim}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      UPLOAD_DIR: /app/data/uploads
+      # 全新库首个管理员：留空则用 scripts/promote-admin.js 授予
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
+    ports:
+      - '${PORT:-8787}:8787'
+    volumes:
+      - uploads:/app/data/uploads
+
+  # 迁移是一次性任务：docker compose run --rm migrate
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://${PGUSER:-postgres}:${PGPASSWORD:-postgres}@db:5432/${PGDATABASE:-mim}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ['node', 'scripts/migrate.js']
+    restart: 'no'
+
+volumes:
+  pgdata:
+  uploads:

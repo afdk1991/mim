@@ -14,23 +14,13 @@
  * ======================================================================== */
 
 import type { Article, HotSearchItem, Post, User } from '@/domain/content/model'
+import type { AuthorLite } from '@/ui'
 import { heatOf } from '@/domain/content/rules'
 
-/* ---------- 作者 ---------- */
+/* 卡片作者摘要的规范定义在 ui/post-card；这里转出一份，页面仍只依赖内容域入口 */
+export type { AuthorLite }
 
-/**
- * 卡片作者摘要。
- * 说明：ui/post-card.tsx 里有一份同构的 AuthorLite，但 '@/ui' 桶文件未导出它；
- *      这里按同样字段定义一份与 PostCard props 结构兼容的类型，避免页面深链到具体文件
- *      （已建议主控在 ui/index.ts 补一行 export type { AuthorLite }）。
- */
-export interface AuthorLite {
-  id: string
-  name: string
-  emoji: string
-  color: string
-  verified?: boolean
-}
+/* ---------- 作者 ---------- */
 
 /** 未知作者（被删除的用户 / 未同步的云端作者）统一落匿名占位，不伪造昵称 */
 export const ANON_AUTHOR: AuthorLite = {

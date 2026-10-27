@@ -14,6 +14,7 @@ import { Empty, useToast } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { cx, formatCount, formatDuration } from '@/core/utils'
 import { asString, globalKey, readJson, writeJson } from '@/core/storage'
+import { reportGrowth } from './growth-report'
 
 const CONF_KEY = globalKey('live', 'rtmpBase')
 
@@ -63,6 +64,7 @@ export function LivePage() {
     setApps([])
     setSummary(null)
     setLive(true)
+    reportGrowth('live_open') // 走 evaluate：每日上限 1 场
     toast(customRtmp ? '开播成功，用 OBS 等向你的服务器推流 🔴' : '开播成功，已生成占位推流地址（非真实推流）🔴')
   }
 

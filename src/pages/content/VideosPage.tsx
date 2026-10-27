@@ -15,6 +15,7 @@ import { feedFilter } from '@/domain/content/rules'
 import { useFirstPaint } from './content-data'
 import { useFeedPrefs } from './content-prefs'
 import { AsyncState } from './content-parts'
+import { reportGrowth } from './growth-report'
 import { CITY_PRESETS, authorOf, nameOf } from './content-lib'
 
 export function VideosPage() {
@@ -71,7 +72,14 @@ export function VideosPage() {
                     </div>
                     <p>{p.content}</p>
                     <div className="video-actions">
-                      <button className={cx('vf-btn', p.likedByMe && 'active')} onClick={() => app.togglePostLike(p.id)}>
+                      <button
+                        className={cx('vf-btn', p.likedByMe && 'active')}
+                        onClick={() => {
+                          // 只在「由未赞变已赞」时上报
+                          if (!p.likedByMe) reportGrowth('dynamic_liked')
+                          app.togglePostLike(p.id)
+                        }}
+                      >
                         {p.likedByMe ? '❤️' : '🤍'} {formatCount(p.likes)}
                       </button>
                       <a className="vf-btn" href={`#/post/${p.id}`}>

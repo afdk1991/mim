@@ -16,6 +16,7 @@ import { cx } from '@/core/utils'
 import type { Post } from '@/domain/content/model'
 import { authorOf, highlightPieces } from './content-lib'
 import type { AuthorLite } from './content-lib'
+import { reportGrowth } from './growth-report'
 
 /* ---------- 四态容器 ---------- */
 
@@ -76,7 +77,11 @@ export function FollowButton({ userId, small = true }: { userId: string; small?:
   return (
     <button
       className={cx('btn', following ? 'btn-ghost' : 'btn-primary', small && 'btn-sm')}
-      onClick={() => app.toggleFollow(userId)}
+      onClick={() => {
+        // 只在新增关注时上报；取关不倒扣
+        if (!following) reportGrowth('follow_gained')
+        app.toggleFollow(userId)
+      }}
     >
       {following ? '已关注' : '+ 关注'}
     </button>

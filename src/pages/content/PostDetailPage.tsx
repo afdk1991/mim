@@ -5,18 +5,21 @@
  *       避免通过直接改地址看到别人「仅自己」的内容。
  * 评论：只支持二级缩进（顶级评论 + 其回复），与 domain/content/rules.splitComments 对齐，
  *       不做无限层级——无限层级会让移动端缩进失控，且数据模型本身只有一层 replyTo。
- * 遗留：评论点赞 / 删除在重建后的状态层没有出口（详见交付说明），这里只读展示不伪造交互。
+ * 评论点赞：走状态层 toggleCommentLike(postId, commentId)。
+ * 遗留：删除单条评论在状态层仍无出口（deleteComment 缺失），故不提供该按钮。
  * ======================================================================== */
 
 import { useEffect, useState } from 'react'
-import { Avatar, Empty, RichText, TimeAgo, useToast } from '@/ui'
+import { Avatar, Empty, Modal, RichText, TimeAgo, useToast } from '@/ui'
 import { ImageGrid, RepostModal } from './content-parts'
 import { PostCard } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { useRouter } from '@/app/router'
-import { cx, formatCount, recordView } from '@/core/utils'
+import { cx, formatCount } from '@/core/utils'
 import type { PostComment } from '@/domain/content/model'
 import { postVisibleTo, splitComments, storyExpired } from '@/domain/content/rules'
+// 浏览足迹（键 mim.history）的写入口由社交域提供，内容域只在真正打开内容时上报
+import { recordView } from '../social/HistoryPage'
 import { useFirstPaint } from './content-data'
 import { authorOf, nameOf, userNameResolver } from './content-lib'
 import { reportGrowth } from './growth-report'
@@ -35,6 +38,9 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
   const [input, setInput] = useState('')
   const [replyTo, setReplyTo] = useState<PostComment | null>(null)
   const [repostOpen, setRepostOpen] = useState(false)
+  /* 作者本人编辑动态：正文 + 图片（每行一个链接），走状态层 editPost（带 authorId 归属校验） */
+  const [editOpen, setEditOpen] = useState(false)
+  const [draft, setDraft] = useState({ content: '', images: '' })
 
   /* 打开即写一次浏览足迹（社交域 HistoryPage 读取）；依赖只放 id —— 每次状态变化都重写会不断刷新「看过时间」 */
   useEffect(() => {
@@ -73,6 +79,28 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
   const favorited = app.state.favorites.some((f) => f.type === 'post' && f.targetId === post.id)
   const source = post.repostOfId ? app.state.posts.find((p) => p.id === post.repostOfId) : undefined
 
+  const openEdit = (): void => {
+    setDraft({ content: post.content, images: (post.images ?? []).join('\n') })
+    setEditOpen(true)
+  }
+
+  const saveEdit = (): void => {
+    const content = draft.content.trim()
+    if (!content) {
+      toast('正文不能为空')
+      return
+    }
+    app.editPost(post.id, {
+      content,
+      images: draft.images
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    })
+    toast('动态已更新 ✅')
+    setEditOpen(false)
+  }
+
   const submit = (): void => {
     if (!input.trim()) {
       toast('评论内容不能为空')
@@ -105,6 +133,11 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
             🔁 转发
           </button>
           {post.authorId === app.meId ? (
+            <button className="btn btn-ghost btn-sm" onClick={openEdit}>
+              ✏️ 编辑
+            </button>
+          ) : null}
+          {post.authorId === app.meId ? (
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => {
@@ -122,7 +155,11 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
           post={post}
           author={author}
           viewerId={app.meId}
-          onToggleLike={() => app.togglePostLike(post.id)}
+          onToggleLike={() => {
+            // 只在「由未赞变已赞」时上报，取消赞不倒扣（与原成长口径一致）
+            if (!post.likedByMe) reportGrowth('dynamic_liked')
+            app.togglePostLike(post.id)
+          }}
           onRepost={() => setRepostOpen(true)}
           onDelete={post.authorId === app.meId ? () => app.deletePost(post.id) : undefined}
           onUser={(uid) => navigate(uid === app.meId ? '/my' : `/user/${uid}`)}
@@ -170,9 +207,17 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
                     <RichText text={c.content} resolveUser={userNameResolver(users)} />
                   </p>
                   <small className="muted">
-                    <TimeAgo ts={c.createdAt} /> · ❤️ {formatCount(c.likes)}
+                    <TimeAgo ts={c.createdAt} />
                   </small>
                 </div>
+                <button
+                  className={cx('act-btn', c.likedByMe && 'active')}
+                  onClick={() => app.toggleCommentLike(post.id, c.id)}
+                  title={c.likedByMe ? '取消赞' : '点赞'}
+                  aria-label={c.likedByMe ? '取消赞' : '点赞'}
+                >
+                  ❤️ {formatCount(c.likes)}
+                </button>
                 <button className="btn btn-ghost btn-sm" onClick={() => setReplyTo(c)}>
                   ↳ 回复
                 </button>
@@ -189,9 +234,17 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
                       <RichText text={r.content} resolveUser={userNameResolver(users)} />
                     </p>
                     <small className="muted">
-                      <TimeAgo ts={r.createdAt} /> · ❤️ {formatCount(r.likes)}
+                      <TimeAgo ts={r.createdAt} />
                     </small>
                   </div>
+                  <button
+                    className={cx('act-btn', r.likedByMe && 'active')}
+                    onClick={() => app.toggleCommentLike(post.id, r.id)}
+                    title={r.likedByMe ? '取消赞' : '点赞'}
+                    aria-label={r.likedByMe ? '取消赞' : '点赞'}
+                  >
+                    ❤️ {formatCount(r.likes)}
+                  </button>
                 </div>
               ))}
             </div>
@@ -221,6 +274,34 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
       </div>
 
       {repostOpen ? <RepostModal post={post} onClose={() => setRepostOpen(false)} /> : null}
+
+      {editOpen ? (
+        <Modal title="编辑动态" onClose={() => setEditOpen(false)}>
+          <label className="edit-label">正文</label>
+          <textarea
+            className="input"
+            rows={5}
+            value={draft.content}
+            onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+          />
+          <label className="edit-label">图片（每行一个链接，可留空）</label>
+          <textarea
+            className="input mono-textarea"
+            rows={3}
+            placeholder="https://..."
+            value={draft.images}
+            onChange={(e) => setDraft({ ...draft, images: e.target.value })}
+          />
+          <div className="modal-actions">
+            <button className="btn btn-primary" onClick={saveEdit}>
+              保存
+            </button>
+            <button className="btn btn-ghost" onClick={() => setEditOpen(false)}>
+              取消
+            </button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }

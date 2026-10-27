@@ -3,12 +3,12 @@
  *
  * 统计全部来自本机真源：阅读数 / 点赞数目前只会随真实收录增长（publishArticle 从 0 起算），
  *       不预铺任何「示例文章」或假计数。
- * 遗留：缺少 deleteArticle / deleteArticleDraft 接口，因此暂不提供删除按钮——
- *       与其放一个点了没反应的按钮，不如留到状态层补齐（见交付说明）。
+ * 删除：走状态层 deleteArticle / deleteArticleDraft（两者都带 authorId 归属校验），
+ *       删除前二次确认——文章是不可恢复内容。
  * ======================================================================== */
 
 import { useMemo, useState } from 'react'
-import { Avatar, Empty, TimeAgo } from '@/ui'
+import { Avatar, Empty, TimeAgo, useToast } from '@/ui'
 import { Tag } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { useRouter } from '@/app/router'
@@ -20,6 +20,7 @@ import { ArticleRow } from './ArticlesPage'
 
 export function BlogHomePage() {
   const app = useApp()
+  const toast = useToast()
   const { navigate } = useRouter()
   const ready = useFirstPaint()
   const [tab, setTab] = useState<'published' | 'drafts'>('published')
@@ -90,7 +91,21 @@ export function BlogHomePage() {
               <ArticleRow
                 key={a.id}
                 article={a}
-                manage={<a href={`#/write?edit=${a.id}`}>✏️ 编辑</a>}
+                manage={
+                  <>
+                    <a href={`#/write?edit=${a.id}`}>✏️ 编辑</a>
+                    <button
+                      className="act-btn"
+                      onClick={() => {
+                        if (!window.confirm(`删除文章「${a.title}」？删除后不可恢复。`)) return
+                        app.deleteArticle(a.id)
+                        toast('文章已删除 🗑')
+                      }}
+                    >
+                      🗑 删除
+                    </button>
+                  </>
+                }
               />
             ))}
           </AsyncState>
@@ -113,6 +128,16 @@ export function BlogHomePage() {
                     存于 <TimeAgo ts={d.savedAt} />
                   </small>
                   <span className="grow" />
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      if (!window.confirm(`删除草稿「${d.title || '无标题'}」？`)) return
+                      app.deleteArticleDraft(d.id)
+                      toast('草稿已删除 🗑')
+                    }}
+                  >
+                    🗑 删除
+                  </button>
                   <button className="btn btn-primary btn-sm" onClick={() => navigate(`/write/${d.id}`)}>
                     继续编辑
                   </button>

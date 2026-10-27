@@ -5,15 +5,18 @@
  *   这是内容域里唯一走后端读取的页面：重建时确认 resources 尚无写入通道，
  *   所以「一张资源都没有」是当前的真实状态，页面如实显示空态而不预铺示例附件。
  *   后端未配置 / 表不存在时降级为空态并给出原因（errText），绝不用演示数据兜底。
- * 下载：状态层暂无 downloadResource，按钮置灰并说明，不做假的下载动画。
+ * 下载：走状态层 downloadResource —— 它只向后端递增一次下载计数（无收益流水），
+ *       资源行本身没有附件地址字段，所以这里如实「记一次下载」，不伪造文件流或下载动画。
  * ======================================================================== */
 
 import { useMemo, useState } from 'react'
-import { Empty } from '@/ui'
+import { Empty, useToast } from '@/ui'
+import { useApp } from '@/app/state/content'
 import { cx, formatCount } from '@/core/utils'
 import type { Resource } from '@/domain/content/model'
 import { useCloudRows } from './content-data'
 import { AsyncState } from './content-parts'
+import { reportGrowth } from './growth-report'
 
 const RES_ICONS: Record<string, string> = { pdf: '📕', video: '🎬', code: '💾', doc: '📘' }
 
@@ -34,6 +37,8 @@ function mapResource(row: Record<string, unknown>): Resource | null {
 }
 
 export function ResourcesPage() {
+  const app = useApp()
+  const toast = useToast()
   const { rows, loading, error, reload } = useCloudRows<Resource>('resources', mapResource)
   const [cat, setCat] = useState<string | null>(null)
   const [sort, setSort] = useState<'default' | 'downloads' | 'name'>('default')
@@ -110,7 +115,15 @@ export function ResourcesPage() {
                 <div>{r.size}</div>
                 <div className="muted">{formatCount(r.downloads)} 次下载</div>
               </div>
-              <button className="btn btn-ghost btn-sm" disabled title="状态层暂未提供 downloadResource 接口">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  app.downloadResource(r.id)
+                  // 计数由后端 rpc 落库；本机成长分同样在真实点击后走 evaluate() 判定
+                  const outcome = reportGrowth('resource_downloaded')
+                  toast(outcome.ok ? '已记录一次下载 ⬇️' : '已记录下载（今日成长分已达上限）')
+                }}
+              >
                 下载
               </button>
             </div>

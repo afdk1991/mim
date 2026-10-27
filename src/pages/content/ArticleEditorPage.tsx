@@ -4,8 +4,9 @@
  * 标题 + 正文 + 标签编辑器；摘要走 rules.makeSummary，质量门走 articleQualityPass
  *       （正文去空白 <50 字会提示「不计成长分」，但不阻断发布——原实现同样只是不记分）。
  * 草稿：走 saveArticleDraft，同一份草稿反复保存会复用 id（不堆叠重名草稿）。
- * 遗留：editId 场景下缺 editArticle 接口，因此「编辑已有文章」只做内容载入 + 另存草稿，
- *       不会假装更新原文（见页面提示与交付说明）。
+ * 编辑已有文章：走状态层 editArticle（带 authorId 归属校验，传 content 时自动重算 summary）；
+ *       由草稿发布时把 draftId 交给 publishArticle，草稿会被自动消费，草稿箱不留残件。
+ * 成长分：只有「真发布」才上报 publish_article；编辑更新不重复上报，避免绕过日上限。
  * ======================================================================== */
 
 import { useMemo, useState } from 'react'
@@ -13,6 +14,7 @@ import { Empty, useToast } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { useRouter } from '@/app/router'
 import { articleQualityPass, makeSummary, plainLength } from '@/domain/content/rules'
+import { reportGrowth } from './growth-report'
 
 export interface ArticleEditorPageProps {
   draftId?: string
@@ -63,12 +65,18 @@ export function ArticleEditorPage({ draftId, editId }: ArticleEditorPageProps) {
       toast('标题和正文不能为空')
       return
     }
+    // 编辑已有文章：更新原文（含 summary 重算），不再另存草稿
     if (editing) {
-      toast('已有文章的更新需要状态层提供 editArticle 接口，当前可「另存为草稿」后再发布')
+      app.editArticle(editing.id, { title: title.trim(), content, tags })
+      toast('文章已更新 ✅')
+      navigate(`/article/${editing.id}`)
       return
     }
-    const id = app.publishArticle({ title: title.trim(), content, tags })
-    toast(quality ? '文章已发布 🎉' : '文章已发布（正文不足 50 字，本次不计成长分）')
+    // draftId 交给状态层：由草稿发布时自动消费该草稿
+    const id = app.publishArticle({ title: title.trim(), content, tags, draftId: draftIdNow })
+    // 质量门：正文去空白 <50 字不计成长分（规则见 domain/growth）
+    const outcome = reportGrowth('publish_article', articleQualityPass(content))
+    toast(outcome.ok ? '文章已发布 🎉' : '文章已发布（正文不足 50 字，本次不计成长分）')
     navigate(`/article/${id}`)
   }
 
@@ -95,12 +103,6 @@ export function ArticleEditorPage({ draftId, editId }: ArticleEditorPageProps) {
             我的博客
           </a>
         </div>
-
-        {editing ? (
-          <div className="notice-bar">
-            ⚠️ 状态层暂无 editArticle 接口：这里载入的是原文内容，保存只会另存为新草稿，不会覆盖原文。
-          </div>
-        ) : null}
 
         <input
           className="input"
@@ -154,8 +156,11 @@ export function ArticleEditorPage({ draftId, editId }: ArticleEditorPageProps) {
             <button className="btn btn-ghost btn-sm" onClick={saveDraft}>
               保存草稿
             </button>
-            <button className="btn btn-primary btn-sm" onClick={publish} disabled={!!editing}>
-              {editing ? '暂不支持更新原文' : '发布文章'}
+            <a className="btn btn-ghost btn-sm" href={`#/article/${editing?.id ?? ''}`} hidden={!editing}>
+              查看原文
+            </a>
+            <button className="btn btn-primary btn-sm" onClick={publish}>
+              {editing ? '保存修改' : '发布文章'}
             </button>
           </div>
         </div>

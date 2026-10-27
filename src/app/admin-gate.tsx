@@ -6,8 +6,10 @@
  * ======================================================================== */
 
 import type { ReactNode } from 'react'
-import { Empty } from '../ui'
+import { emitToast, Empty } from '../ui'
 import { hasPerm, hasRole, isSignedIn } from '../data/session'
+import { db } from '../data/client'
+import { errText } from '../core/result'
 
 export function AdminGate({ perm, children }: { perm?: string; children: ReactNode }) {
   if (!isSignedIn()) return <AdminNoAccess kind="login" />
@@ -44,16 +46,19 @@ export function AdminNoAccess({ kind, perm }: { kind: 'login' | 'role' | 'perm';
         <p className="dim" style={{ margin: '0 0 8px' }}>
           若是全新部署且尚无管理员，可把自己设为首个管理员（服务端会校验是否已有管理员）：
         </p>
+        {/* 必须走 data 层的 db.rpc：它会带上 Authorization 头。
+            此前用裸 fetch 不带令牌，服务端恒定 401，全新库将永远进不去后台。 */}
         <button
           className="btn btn-primary"
           onClick={() => {
-            void fetch('/api/rpc/bootstrap_admin', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: '{}',
+            void db.rpc('bootstrap_admin', {}, { write: true }).then((r) => {
+              if (r.ok) {
+                emitToast('已成为管理员')
+                location.reload()
+              } else {
+                emitToast(errText(r.error))
+              }
             })
-              .then(() => location.reload())
-              .catch(() => undefined)
           }}
         >
           👑 成为首个管理员

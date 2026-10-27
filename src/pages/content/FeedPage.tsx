@@ -29,6 +29,7 @@ import {
 } from '@/domain/content/rules'
 import { useFirstPaint } from './content-data'
 import { useFeedPrefs } from './content-prefs'
+import { reportGrowth } from './growth-report'
 import { AsyncState, FollowButton, RepostModal, UserRow } from './content-parts'
 import {
   CITY_PRESETS,
@@ -113,6 +114,7 @@ export function FeedPage() {
       return
     }
     app.publishPost(content.trim(), { topic: topic.trim() || null, images })
+    reportGrowth('publish_dynamic')
     setContent('')
     setTopic('')
     setImages([])
@@ -141,7 +143,11 @@ export function FeedPage() {
       viewerId={app.meId}
       onOpen={() => navigate(`/post/${p.id}`)}
       onComment={() => navigate(`/post/${p.id}`)}
-      onToggleLike={() => app.togglePostLike(p.id)}
+      onToggleLike={() => {
+        // 只在「由未赞变已赞」时上报，取消赞不倒扣
+        if (!p.likedByMe) reportGrowth('dynamic_liked')
+        app.togglePostLike(p.id)
+      }}
       onRepost={() => setRepostOf(p)}
       onDelete={p.authorId === app.meId ? () => app.deletePost(p.id) : undefined}
       onUser={(id) => navigate(id === app.meId ? '/my' : `/user/${id}`)}
