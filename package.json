@@ -5,25 +5,25 @@
   "description": "Mim 内容聚合社区 Web 应用（动态 / 文章 / 商城 / 工具台）",
   "license": "UNLICENSED",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-  "version:check": "node scripts/version-check.mjs",
-    "verify:manju": "node scripts/verify-openverse.mjs",
-    "verify:feed": "node scripts/verify-feed-growth.mjs",
+
+    "server:install": "npm --prefix server install",
+    "server:dev": "npm --prefix server run dev",
+    "server:up": "docker compose -f server/docker-compose.yml up -d",
+    "server:down": "docker compose -f server/docker-compose.yml down",
+    "server:migrate": "npm --prefix server run migrate",
+    "server:health": "node scripts/server-health.mjs",
+
     "verify:routes": "node scripts/verify-routes.mjs",
-    "verify:mobile": "node scripts/verify-mobile.mjs",
-    "verify:desktop": "node scripts/verify-desktop-regress.mjs",
-    "db:apply": "node scripts/apply-migration.mjs",
-    "db:apply:remote": "node scripts/apply-migration-remote.mjs",
-    "db:gen-manual": "node scripts/gen-apply-all.mjs",
-    "db:gen-pending": "node scripts/gen-apply-pending.mjs",
-    "admin:grant": "node scripts/grant-admin.mjs",
-    "db:probe": "node scripts/probe-schema.mjs",
-    "sync:accounts": "node scripts/sync-accounts.mjs",
-    "purge:test-users": "node scripts/purge-test-users.mjs"
+    "verify:cloud": "node scripts/verify-cloud-e2e.mjs",
+    "version:check": "node scripts/version-check.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
@@ -32,8 +32,6 @@
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/ios": "^8.5.3",
-    "@cloudbase/js-sdk": "^3.10.3",
-    "@supabase/supabase-js": "^2.118.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

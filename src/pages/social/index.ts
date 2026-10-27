@@ -1,0 +1,7 @@
+export { NotificationsPage } from './NotificationsPage'
+export { MessagesPage } from './MessagesPage'
+export { FavoritesPage } from './FavoritesPage'
+export { HistoryPage } from './HistoryPage'
+export { MyProfilePage } from './MyProfilePage'
+export { FollowingPage } from './FollowingPage'
+export { ProfilePage } from './ProfilePage'

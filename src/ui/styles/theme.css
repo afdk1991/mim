@@ -1,0 +1,62 @@
+/* ==========================================================================
+ * 主题变量 —— 全站唯一配色来源
+ *
+ * 铁律：组件样式里禁止出现硬编码颜色值，一律引用这里的变量，
+ * 否则深色模式下必然出现「深色背景上的深色文字」这类不可读问题。
+ * ======================================================================== */
+
+:root {
+  --primary: #ff8200;
+  --primary-deep: #e06400;
+  --primary-weak: rgba(255, 130, 0, 0.12);
+
+  --text: #1f2328;
+  --text-2: #4a5158;
+  --text-3: #8b949e;
+
+  --bg: #ffffff;
+  --bg-soft: #f6f8fa;
+  --card: #ffffff;
+  --card-2: #f6f8fa;
+
+  --line: rgba(128, 128, 128, 0.2);
+  --border: rgba(128, 128, 128, 0.28);
+
+  --danger: #e64340;
+  --danger-weak: rgba(230, 67, 64, 0.12);
+  --success: #2da44e;
+  --warn: #d29922;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.14);
+
+  --max-w: 1180px;
+}
+
+html[data-theme='dark'] {
+  --primary: #ff9a33;
+  --primary-deep: #ffb066;
+  --primary-weak: rgba(255, 154, 51, 0.16);
+
+  --text: #e6edf3;
+  --text-2: #b9c2cc;
+  --text-3: #8b949e;
+
+  --bg: #0d1117;
+  --bg-soft: #161b22;
+  --card: #161b22;
+  --card-2: #1c2129;
+
+  --line: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.16);
+
+  --danger: #ff7b72;
+  --danger-weak: rgba(255, 123, 114, 0.16);
+  --success: #3fb950;
+  --warn: #e3b341;
+
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
