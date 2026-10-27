@@ -154,18 +154,16 @@ export function VipCenterPage() {
       setPaying(false)
       return
     }
-    /* 支付通道处理耗时（无真实网关，以定时器占位网关往返） */
-    window.setTimeout(() => {
-      const base = state.plan !== null && state.expireAt > Date.now() ? state.expireAt : Date.now()
-      update({
-        plan: payPlan.id,
-        expireAt: base + payPlan.days * DAY,
-        orders: [{ id: uid(), plan: payPlan.id, amount: payPlan.price, at: Date.now() }, ...state.orders].slice(0, 20),
-      })
-      setPaying(false)
-      setPayPlan(null)
-      toast(`🎉 支付成功，${payPlan.label}已生效`)
-    }, 900)
+    /* 钱包扣费为本地即时操作，无外部网关，VIP 权益立即生效 */
+    const base = state.plan !== null && state.expireAt > Date.now() ? state.expireAt : Date.now()
+    update({
+      plan: payPlan.id,
+      expireAt: base + payPlan.days * DAY,
+      orders: [{ id: uid(), plan: payPlan.id, amount: payPlan.price, at: Date.now() }, ...state.orders].slice(0, 20),
+    })
+    setPaying(false)
+    setPayPlan(null)
+    toast(`🎉 支付成功，${payPlan.label}已生效`)
   }
 
   const unsubscribe = () => {
@@ -256,7 +254,7 @@ export function VipCenterPage() {
         <p className="vip-note">本页为商业化方向演示：订阅收入模型（月/季/年卡 + 到期续费叠加），扣费走统一钱包（mim-wallet-v1），余额不足时订单中止，可在钱包页充值后重试。</p>
       </div>
 
-      {/* 模拟支付弹层 */}
+      {/* 确认订单弹层（钱包即时扣费，无外部网关） */}
       {payPlan && (
         <div className="vip-overlay" onClick={() => !paying && setPayPlan(null)}>
           <div className="vip-pay" onClick={(e) => e.stopPropagation()}>

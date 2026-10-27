@@ -1281,7 +1281,7 @@ export function MessagesPage() {
                 <div ref={bottomRef} />
               </div>
               <div className="msg-input-bar">
-                {/* 轮 24 打通：B5 语音条——按住说话（模拟录音 0.5s 起，松开停止并发送） */}
+                {/* 轮 24 打通：B5 语音条——按住说话（真实 MediaRecorder 录音 0.5s 起，松开停止并发送） */}
                 <VoiceRecordButton convId={active.userId} />
                 <input
                   className="input"

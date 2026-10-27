@@ -507,7 +507,7 @@ export function PublishPage() {
                   {mediaType === 'video' && (
                     <input inputMode="numeric" value={mediaDur} onChange={(e) => setMediaDur(e.target.value)} placeholder="时长（秒），如 15" />
                   )}
-                  {/* 轮 24 打通：B5 上传/转码工作台（文件选择 → URL.createObjectURL 本地预览 → 模拟转码进度 → 完成标记） */}
+                  {/* 轮 24 打通：B5 上传/转码工作台（文件选择 → URL.createObjectURL 本地预览 → 本地处理进度 → 完成标记） */}
                   <MediaTranscodeWorkbench />
                 </fieldset>
               )}

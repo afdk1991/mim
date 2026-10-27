@@ -1,4 +1,4 @@
-/* 轮 24 打通：B5 多媒体域——上传/转码工作台（本地预览 + 模拟转码进度）、直播推拉流·连麦（支持自有 RTMP）、视频弹幕、私信语音条。
+/* 轮 24 打通：B5 多媒体域——上传/转码工作台（本地预览 + 本地处理进度）、直播推拉流·连麦（支持自有 RTMP）、视频弹幕、私信语音条（真实 MediaRecorder 录音）。
    样式统一前缀 md-（见 media-domain.css）；localStorage 统一按登录身份分 key：mim-md-<uid>:<bizKey>。 */
 
 import './media-domain.css'
@@ -22,10 +22,6 @@ import { cx, formatCount, timeAgo } from './utils'
 /** 所有 B5 存储 key：mim-md-<uid>:<bizKey>（uid = getCurrentUserId() 登录身份锚点） */
 const mdKey = (biz: string) => `mim-md-${getCurrentUserId()}:${biz}`
 
-function rndInt(min: number, max: number): number {
-  return Math.floor(min + Math.random() * (max - min + 1))
-}
-
 function fmtSize(n: number): string {
   if (n >= 1_048_576) return `${(n / 1_048_576).toFixed(1)} MB`
   if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`
@@ -43,7 +39,7 @@ function fmtDur(ms: number): string {
      选择文件 → base64 → mim-api /storage/upload → CloudBase 存储桶
      → 记录对象 key；预览用签名链接（按需换取，1 小时有效）
    降级路径（未登录 / 未接入云端 / 超 3MB / 非媒体类型）：
-     沿用原模拟转码：本地 blob 预览 + 2.5s 进度条，不产生云端文件
+     本地处理：本地 blob 预览 + 2.5s 进度条，不产生云端文件，不伪造输出参数
    完成记录按身份分 key 持久化，云端条目额外保存 key 以支持刷新后回看
    ================================================================ */
 
@@ -63,10 +59,8 @@ type TransRecord = {
   cloud?: { key: string; bucket: string }
 }
 
-/** 模拟转码输出池（随机分辨率文案） */
-const RES_POOL = ['1080P 超清', '720P 高清', '480P 标清', '2K', '4K 超高清']
-
-const TRANSCODE_MS = 2500 // 模拟转码总时长
+/** 本地处理总时长：浏览器端无真实转码能力，仅做本地读取与预览准备 */
+const TRANSCODE_MS = 2500
 
 function loadTransHistory(): TransRecord[] {
   try {
@@ -127,7 +121,7 @@ export function MediaTranscodeWorkbench() {
     return () => window.clearInterval(t)
   }, [])
 
-  /* 模拟转码推进：transcoding 项每 100ms +4%（2.5s 走完），到点补随机码率/分辨率并持久化 */
+  /* 本地处理推进：transcoding 项每 100ms 推进，到点标记完成（不伪造分辨率/码率等输出参数） */
   useEffect(() => {
     const t = window.setInterval(() => {
       setItems((list) => {
@@ -141,8 +135,6 @@ export function MediaTranscodeWorkbench() {
             ...it,
             progress: 100,
             status: 'done' as const,
-            bitrate: rndInt(800, 8200),
-            resolution: RES_POOL[Math.floor(Math.random() * RES_POOL.length)],
           }
         })
         if (!changed) return list
@@ -185,7 +177,7 @@ export function MediaTranscodeWorkbench() {
       )
       toast('已上传到云端 ☁️')
     } else {
-      // 上传失败不丢文件：退回模拟转码，仍可本地预览
+      // 上传失败不丢文件：退回本地处理，仍可本地预览
       setItems((list) => list.map((it) => (it.id === id ? { ...it, status: 'transcoding' } : it)))
       toast(`云端上传失败，已退回本地预览：${r.error}`)
     }
@@ -219,7 +211,7 @@ export function MediaTranscodeWorkbench() {
       <div className="md-trans-head">
         🎞 上传 / 转码工作台
         <span className={cx('md-sim-tag', cloudReady && 'md-cloud-tag')}>
-          {cloudReady ? '☁️ 云端存储已就绪' : '本地模拟'}
+          {cloudReady ? '☁️ 云端存储已就绪' : '本地预览'}
         </span>
       </div>
       <label className="md-trans-pick">
@@ -255,13 +247,13 @@ export function MediaTranscodeWorkbench() {
                     <div className="md-trans-bar">
                       <span style={{ width: `${it.progress}%` }} />
                     </div>
-                    <small>模拟转码中 {Math.round(it.progress)}%</small>
+                    <small>本地处理中 {Math.round(it.progress)}%</small>
                   </>
                 ) : it.cloud ? (
                   <small className="md-trans-st">☁️ 已上传云端 · {it.cloud.bucket}</small>
                 ) : (
                   <small className="md-trans-st">
-                    ✅ 转码完成 · {it.resolution} · {it.bitrate} kbps（模拟参数）
+                    ✅ 本地预览就绪 · {it.mime || '媒体文件'} · {fmtSize(it.size)}
                   </small>
                 )}
               </div>
@@ -601,7 +593,7 @@ export function DanmakuLayer({ postId, posterKey }: { postId?: string; posterKey
 
 export const VOICE_EVT = 'mim-md-voice-evt'
 
-type VoiceItem = { id: string; dur: number; at: number }
+type VoiceItem = { id: string; dur: number; at: number; dataUrl?: string }
 
 function loadVoices(convId: string): VoiceItem[] {
   try {
@@ -625,41 +617,126 @@ function saveVoices(convId: string, list: VoiceItem[]): void {
   window.dispatchEvent(new Event(VOICE_EVT))
 }
 
-/** 「按住说话」录音按钮：pointerdown 开始计时，pointerup/leave 停止（<0.5s 丢弃） */
+/** 选择浏览器支持的录音 MIME 类型 */
+function pickAudioMime(): string {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+  for (const m of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m
+  }
+  return ''
+}
+
+/** 「按住说话」录音按钮：pointerdown 请求麦克风并开始真实录音，pointerup 停止并保存音频 */
 export function VoiceRecordButton({ convId }: { convId: string }) {
   const toast = useToast()
   const [startAt, setStartAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<number | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const startAtRef = useRef<number | null>(null)
 
   const stop = () => {
-    if (startAt == null) return
+    const t0 = startAtRef.current
+    if (t0 == null) return
+    const dur = (Date.now() - t0) / 1000
+    startAtRef.current = null
+    setStartAt(null)
+    setElapsed(0)
     if (timerRef.current != null) {
       window.clearInterval(timerRef.current)
       timerRef.current = null
     }
-    const dur = (Date.now() - startAt) / 1000
-    setStartAt(null)
-    setElapsed(0)
+
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state !== 'inactive') {
+      mr.stop()
+    }
+    const stream = streamRef.current
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+
     if (dur < 0.5) {
       toast('说话太短（不足 0.5s），已取消')
+      chunksRef.current = []
+      mediaRecorderRef.current = null
       return
     }
-    const item: VoiceItem = { id: `v${Date.now()}`, dur: Math.round(dur * 10) / 10, at: Date.now() }
-    saveVoices(convId, [...loadVoices(convId), item].slice(-50))
-    toast(`语音条已发送（${item.dur.toFixed(1)}s · 模拟）🎤`)
+    const finalDur = Math.round(dur * 10) / 10
+    const chunks = chunksRef.current
+    const blob = chunks.length > 0 ? new Blob(chunks, { type: mr?.mimeType || pickAudioMime() }) : null
+    chunksRef.current = []
+    mediaRecorderRef.current = null
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : undefined
+      const item: VoiceItem = { id: `v${Date.now()}`, dur: finalDur, at: Date.now(), dataUrl }
+      saveVoices(convId, [...loadVoices(convId), item].slice(-30))
+      toast(`语音条已发送（${finalDur.toFixed(1)}s）🎤`)
+    }
+    reader.onerror = () => {
+      const item: VoiceItem = { id: `v${Date.now()}`, dur: finalDur, at: Date.now() }
+      saveVoices(convId, [...loadVoices(convId), item].slice(-30))
+      toast(`语音条已保存（${finalDur.toFixed(1)}s · 音频编码失败，仅时长）`)
+    }
+    if (blob) {
+      reader.readAsDataURL(blob)
+    } else {
+      const item: VoiceItem = { id: `v${Date.now()}`, dur: finalDur, at: Date.now() }
+      saveVoices(convId, [...loadVoices(convId), item].slice(-30))
+      toast(`语音条已保存（${finalDur.toFixed(1)}s · 无音频数据，仅时长）`)
+    }
   }
 
-  const start = () => {
-    if (startAt != null) return
+  const start = async () => {
+    if (startAtRef.current != null) return
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      toast('当前环境不支持麦克风录音')
+      return
+    }
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      toast('未获得麦克风权限，无法录音')
+      return
+    }
+    streamRef.current = stream
+    const mime = pickAudioMime()
+    let mr: MediaRecorder
+    try {
+      mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+    } catch {
+      stream.getTracks().forEach((t) => t.stop())
+      toast('当前浏览器不支持录音')
+      return
+    }
+    mediaRecorderRef.current = mr
+    chunksRef.current = []
+    mr.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
+    }
+    mr.onerror = () => {
+      toast('录音出错，已停止')
+    }
     const t0 = Date.now()
+    startAtRef.current = t0
     setStartAt(t0)
+    mr.start(100)
     timerRef.current = window.setInterval(() => setElapsed((Date.now() - t0) / 1000), 100)
   }
 
   useEffect(
     () => () => {
       if (timerRef.current != null) window.clearInterval(timerRef.current)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop() } catch { /* ignore */ }
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop())
     },
     [],
   )
@@ -668,21 +745,23 @@ export function VoiceRecordButton({ convId }: { convId: string }) {
     <button
       type="button"
       className={cx('md-voice-btn', startAt != null && 'rec')}
-      onPointerDown={start}
+      onPointerDown={() => void start()}
       onPointerUp={stop}
       onPointerLeave={stop}
       onPointerCancel={stop}
-      title="按住说话（模拟录音，松开发送）"
+      title="按住说话（真实录音，松开发送）"
     >
       {startAt != null ? `● 录音中 ${elapsed.toFixed(1)}s` : '🎤 按住说话'}
     </button>
   )
 }
 
-/** 会话内语音条气泡列表（右对齐，点击播放 = 纯 CSS 波形动画，不发声） */
+/** 会话内语音条气泡列表：有真实音频数据时点击用 <audio> 播放，否则仅展示时长 */
 export function VoiceBubbleThread({ convId }: { convId: string }) {
+  const toast = useToast()
   const [list, setList] = useState<VoiceItem[]>(() => loadVoices(convId))
   const [playing, setPlaying] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   /* 录音按钮写入后广播 VOICE_EVT 刷新列表；切会话重载 */
   useEffect(() => {
@@ -692,11 +771,43 @@ export function VoiceBubbleThread({ convId }: { convId: string }) {
     return () => window.removeEventListener(VOICE_EVT, sync)
   }, [convId])
 
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [])
+
   if (list.length === 0) return null
 
   const play = (v: VoiceItem) => {
+    if (!v.dataUrl) {
+      toast('该语音无音频数据，仅展示时长')
+      return
+    }
+    if (playing === v.id) {
+      audioRef.current?.pause()
+      setPlaying(null)
+      return
+    }
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    const audio = new Audio(v.dataUrl)
+    audioRef.current = audio
+    audio.onended = () => setPlaying(null)
+    audio.onerror = () => {
+      setPlaying(null)
+      toast('音频播放失败')
+    }
     setPlaying(v.id)
-    window.setTimeout(() => setPlaying((p) => (p === v.id ? null : p)), Math.max(600, v.dur * 1000))
+    void audio.play().catch(() => {
+      setPlaying(null)
+      toast('无法播放该语音')
+    })
   }
 
   return (
@@ -707,7 +818,7 @@ export function VoiceBubbleThread({ convId }: { convId: string }) {
             className={cx('bubble md-voice-bubble', playing === v.id && 'on')}
             onClick={() => play(v)}
             role="button"
-            title="点击播放（模拟）"
+            title={v.dataUrl ? '点击播放' : '无音频数据（仅时长）'}
           >
             <span className="md-voice-wave" aria-hidden>
               <i /><i /><i /><i /><i />

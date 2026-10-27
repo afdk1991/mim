@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Article, Post, PostComment, PostLottery, PostMedia, PostVote, User } from './types'
 import { cx, formatCount, timeAgo } from './utils'
@@ -229,7 +229,7 @@ export function MediaCard({ media, postId }: { media: PostMedia; postId?: string
         )}
       </button>
       {open && (
-        <Modal title={media.type === 'gif' ? 'GIF 动图（占位播放器）' : '视频播放（占位播放器）'} onClose={() => setOpen(false)}>
+        <Modal title={media.type === 'gif' ? 'GIF 动图' : '视频播放'} onClose={() => setOpen(false)}>
           <VideoPlayerScreen media={media} postId={postId} />
         </Modal>
       )}
@@ -237,33 +237,56 @@ export function MediaCard({ media, postId }: { media: PostMedia; postId?: string
   )
 }
 
-/** 占位播放器画面：假进度条（useEffect 计时推进），视频/GIF 均可复用；轮 24 打通：挂 B5 弹幕层 */
+/** 视频/GIF 播放画面：有真实 src 时用原生 <video> 播放；无直链时退化为海报 + 计时进度（不伪造画面） */
 export function VideoPlayerScreen({ media, postId }: { media: PostMedia; postId?: string }) {
   const total = media.type === 'video' ? (media.duration ?? 15) : 5
   const [sec, setSec] = useState(0)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const hasRealSrc = !!media.src
+
   useEffect(() => {
+    if (hasRealSrc) return
     const timer = window.setInterval(() => {
       setSec((s) => (s >= total ? total : s + 0.2))
     }, 200)
     return () => window.clearInterval(timer)
-  }, [total])
+  }, [total, hasRealSrc])
+
   const done = sec >= total
   return (
     <>
       {/* 轮 24 打通：B5 弹幕层挂载（按 post id 分 key，无 post id 退化为海报 key） */}
       <div className="md-player-host">
-        <div className={cx('wt-player-screen', media.type === 'gif' && 'wt-gif')}>{media.poster}</div>
+        {hasRealSrc ? (
+          <video
+            ref={videoRef}
+            className="wt-player-video"
+            src={media.src}
+            poster={media.poster ? undefined : undefined}
+            controls
+            autoPlay
+            playsInline
+          >
+            您的浏览器不支持视频播放
+          </video>
+        ) : (
+          <div className={cx('wt-player-screen', media.type === 'gif' && 'wt-gif')}>{media.poster}</div>
+        )}
         <DanmakuLayer postId={postId} posterKey={media.poster} />
       </div>
-      <div className="wt-player-bar">
-        <span style={{ width: `${Math.min(100, (sec / total) * 100)}%` }} />
-      </div>
-      <div className="wt-player-meta">
-        <span>{done ? '播放完毕' : '播放中…'}</span>
-        <span>
-          {sec.toFixed(1)}s / {total}s
-        </span>
-      </div>
+      {!hasRealSrc && (
+        <>
+          <div className="wt-player-bar">
+            <span style={{ width: `${Math.min(100, (sec / total) * 100)}%` }} />
+          </div>
+          <div className="wt-player-meta">
+            <span>{done ? '播放完毕' : '播放中…'}</span>
+            <span>
+              {sec.toFixed(1)}s / {total}s
+            </span>
+          </div>
+        </>
+      )}
     </>
   )
 }

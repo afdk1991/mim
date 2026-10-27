@@ -111,7 +111,7 @@ export function VideosPage() {
                     )}
                   </button>
                   {openId === p.id && (
-                    <Modal title="视频播放（占位播放器）" onClose={() => setOpenId(null)}>
+                    <Modal title="视频播放" onClose={() => setOpenId(null)}>
                       <VideoPlayerScreen media={p.media} />
                     </Modal>
                   )}
