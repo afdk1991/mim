@@ -187,11 +187,12 @@ GET    /api/storage/<key>              回读对象（含 Content-Type 与长缓
 
 全新库没有任何管理员时的两个官方出口（都是一次性）：
 
-1. `BOOTSTRAP_ADMIN_USERNAME=<username>` 后该账号下次登录/`me` 时自动获 admin；
-2. `node scripts/promote-admin.js <username|userId>`（已有管理员时脚本拒绝执行）。
-   > 注意：前端 `src/app/admin-gate.tsx` 的「成为首个管理员」按钮用裸 `fetch('/api/rpc/bootstrap_admin')`
-   > **不带 Authorization 头**，因此服务端会返回 401。这是前端侧缺陷（本目录不改 `src/`），
-   > 需用上面两个出口之一替代。
+1. 前端 `src/app/admin-gate.tsx` 的「成为首个管理员」按钮 —— 走 `db.rpc('bootstrap_admin', {}, { write: true })`，
+   `data/client.ts` 会自动带上 `Authorization` 头，全新库点一下即可。
+   > 历史缺陷：该按钮曾用裸 `fetch('/api/rpc/bootstrap_admin')` 且不带令牌，服务端恒定 401，
+   > 导致全新库永远进不去后台。已修，勿回退成裸 fetch。
+2. `BOOTSTRAP_ADMIN_USERNAME=<username>` 后该账号下次登录/`me` 时自动获 admin；
+3. `node scripts/promote-admin.js <username|userId>`（已有管理员时脚本拒绝执行）。
 
 ## 六、常见问题
 
