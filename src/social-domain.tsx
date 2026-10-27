@@ -141,19 +141,9 @@ function appendGroupMsg(groupId: string, authorId: string, content: string) {
   sdSet('gmsgs', [...loadGroupMsgs(), msg])
 }
 
-/** 群成员模拟回复（demo：本地单视角，用随机成员机器人发言让「群内所有成员消息可见」可信） */
-const GROUP_REPLIES = ['+1', '冲！', '这个可以有 🎉', '收到收到', '今晚搞起来？', '同问', '哈哈哈哈', '赞成 👍']
-
-/** 轮 22 打通：群聊发送 = 写入我的发言 + 延时模拟一位成员回复 */
+/** 群聊发送 = 只写入我的真实发言；本机示例账号不会真的回复，不伪造成员消息 */
 export function sendGroupMessage(group: ChatGroup, fromId: string, content: string): void {
   appendGroupMsg(group.id, fromId, content)
-  const others = group.memberIds.filter((id) => id !== fromId)
-  if (others.length === 0) return
-  window.setTimeout(() => {
-    if (!loadGroups().some((g) => g.id === group.id)) return // 已退群则不再回复
-    const member = others[Math.floor(Math.random() * others.length)]
-    appendGroupMsg(group.id, member, GROUP_REPLIES[Math.floor(Math.random() * GROUP_REPLIES.length)])
-  }, 900)
 }
 
 /** 轮 22 打通：群聊创建弹窗 —— 选 2 位以上好友 + 群名 */

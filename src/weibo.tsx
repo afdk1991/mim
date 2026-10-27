@@ -1169,7 +1169,7 @@ export function MessagesPage() {
     setInput('')
   }
 
-  /* 轮 22 打通：群聊发送 —— 成员发言写入分 key 存储（本地单视角），随后模拟一位成员回复 */
+  /* 轮 22 打通：群聊发送 —— 成员发言写入分 key 存储（本地单视角，仅记录本人真实发言） */
   const sendToGroup = () => {
     const text = input.trim()
     if (!text || !activeGroup) return

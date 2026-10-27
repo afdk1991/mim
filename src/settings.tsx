@@ -166,20 +166,21 @@ function VerifyCard() {
       return
     }
     writeVerify({ status: 'pending', level, desc: desc.trim(), appliedAt: Date.now() })
-    toast('认证申请已提交，模拟审核中…')
-    /* 模拟审核：2.6 秒后自动通过（demo 占位真实性，与「未接入真实支付」同级） */
-    window.setTimeout(() => {
-      const cur = readVerify()
-      if (cur.status !== 'pending') return
-      writeVerify({
-        status: 'approved',
-        level: cur.level,
-        desc: cur.desc,
-        appliedAt: cur.appliedAt,
-        approvedAt: Date.now(),
-      })
-      emitToast(cur.level === 'orange' ? '🎉 恭喜，个人认证审核通过，已点亮橙 V' : '🎉 恭喜，机构认证审核通过，已点亮蓝 V')
-    }, 2600)
+    toast('认证申请已提交，等待审核')
+  }
+
+  /* 本机演示环境未接入平台审核后台：由本人确认资料真实后本地生效，并如实标注，不做假自动审批 */
+  const selfApprove = () => {
+    const cur = readVerify()
+    if (cur.status !== 'pending') return
+    writeVerify({
+      status: 'approved',
+      level: cur.level,
+      desc: cur.desc,
+      appliedAt: cur.appliedAt,
+      approvedAt: Date.now(),
+    })
+    emitToast(cur.level === 'orange' ? '已点亮橙 V（本人确认资料真实，演示环境）' : '已点亮蓝 V（本人确认资料真实，演示环境）')
   }
 
   return (
@@ -199,13 +200,22 @@ function VerifyCard() {
           <span className="set-chip ok">已认证</span>
         </div>
       ) : ud.verify.status === 'pending' ? (
-        <div className="set-row">
-          <div>
-            <b>审核中（{ud.verify.level === 'orange' ? '橙V' : '蓝V'}）</b>
-            <p className="set-hint">申请于 {fmtDate(ud.verify.appliedAt)} · 模拟审核稍后自动通过</p>
+        <>
+          <div className="set-row">
+            <div>
+              <b>待审核（{ud.verify.level === 'orange' ? '橙V' : '蓝V'}）</b>
+              <p className="set-hint">
+                申请于 {fmtDate(ud.verify.appliedAt)} · 本机演示环境未接入平台审核后台，需本人确认资料真实后本地生效
+              </p>
+            </div>
+            <span className="set-chip wait">待审核</span>
           </div>
-          <span className="set-chip wait">审核中</span>
-        </div>
+          <div style={{ marginTop: 10 }}>
+            <button className="btn btn-primary btn-sm" onClick={selfApprove}>
+              本人确认资料真实，启用徽章
+            </button>
+          </div>
+        </>
       ) : (
         <>
           <p className="set-hint">

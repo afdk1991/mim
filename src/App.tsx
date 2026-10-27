@@ -58,7 +58,7 @@ import { clearHistory, cx, formatCount, loadHistory } from './utils'
 import { scheduleOtaCheck } from './ota'
 import { WelcomeModal } from './welcome'
 import { SettingsPage } from './settings'
-import { LivePage } from './media-domain' /* 轮 24 打通：B5 直播推拉流/连麦（模拟） */
+import { LivePage } from './media-domain' /* 轮 24 打通：B5 直播推拉流/连麦（推流地址支持自有 RTMP） */
 import { TeenBanner } from './user-domain'
 import { ScheduledTicker } from './content-domain'
 import { RanksPage, VideosPage } from './feed-domain' /* 轮 23 打通：B4 视频沉浸流 / 榜单体系路由 */
@@ -403,7 +403,7 @@ function Page() {
       return <GrowthPage />
     case 'publish':
       return <PublishPage />
-    /* 轮 24 打通：B5 多媒体——直播推拉流/连麦（模拟开播台） */
+    /* 轮 24 打通：B5 多媒体——直播推拉流/连麦（开播台支持自有 RTMP 地址） */
     case 'live':
       return <LivePage />
     case 'wallet':

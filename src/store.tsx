@@ -800,14 +800,6 @@ const FALLBACK_USER: User = {
   verified: false,
 }
 
-const AUTO_REPLIES = [
-  '收到！我看一下~',
-  '好嘞，回头细聊 👌',
-  '赞同，这块我也在琢磨',
-  '哈哈哈，正好我也在弄这块',
-  '稍等，我发你个链接',
-]
-
 interface AppApi {
   state: AppState
   me: User
@@ -1063,17 +1055,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sendMessage: (userId, content) => {
         const msgId = uid('m')
         dispatch({ type: 'sendMessage', payload: { id: msgId, userId, content } })
-        // 云端真实用户走 send_message RPC（失败回滚乐观行）；非云端用户保持本地模拟回复
+        // 云端真实用户走 send_message RPC（失败回滚乐观行）；
+        // 非云端用户（本机示例账号）只落本地发言，不再伪造对方回复
         if (state.cloudIds?.users.includes(userId)) {
           void cloudSendMessage(userId, content).then((r) => {
             if (r === 'fail') dispatch({ type: 'cloudRollbackMessage', payload: msgId })
           })
-          return
         }
-        const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)]
-        window.setTimeout(() => {
-          dispatch({ type: 'receiveMessage', payload: { id: uid('m'), userId, content: reply } })
-        }, 900)
       },
       readConversation: (userId) => {
         dispatch({ type: 'readConversation', payload: userId })

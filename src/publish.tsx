@@ -215,13 +215,13 @@ export function PublishPage() {
       }
     }
     if (contentType === 13) {
-      /* 投票：2-4 个不重复选项；随机铺少量底票让百分比条可信 */
+      /* 投票：2-4 个不重复选项；票数从 0 起，由真实投票累加（不再预铺随机底票） */
       const options = voteOpts.map((x) => x.trim()).filter(Boolean)
       if (options.length < 2 || options.length > 4 || new Set(options).size !== options.length) {
         toast('投票需要 2-4 个不重复的选项')
         return null
       }
-      const votes = Object.fromEntries(options.map((o) => [o, 3 + Math.floor(Math.random() * 28)] as const))
+      const votes = Object.fromEntries(options.map((o) => [o, 0] as const))
       return { ...common, vote: { options, votes, endsAt: Date.now() + voteHours * 3_600_000, voters: {} } }
     }
     if (contentType === 14) {
