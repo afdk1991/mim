@@ -79,3 +79,24 @@ server/.env.*
 !scripts/server-health.mjs
 # 页面占位生成脚手架是一次性工具，重建完成后忽略
 scripts/gen-page-stubs.mjs
+
+# ---------- 原生壳构建产物 ----------
+# Capacitor：cap copy/sync 生成的 Web 资源与配置文件（android/.gitignore、ios/.gitignore 已有同名规则，此处兜底）
+android/app/build/
+android/build/
+android/.gradle/
+android/app/src/main/assets/public/
+android/local.properties
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/App/App/public/
+ios/App/DerivedData/
+# HarmonyOS：hvigor 构建产物与依赖目录
+harmony/entry/build/
+harmony/.hvigor/
+harmony/oh_modules/
+harmony/local.properties
+# Tauri：Rust 构建产物与生成的平台工程
+src-tauri/target/
+src-tauri/gen/
