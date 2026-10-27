@@ -19,6 +19,7 @@
     "db:apply:remote": "node scripts/apply-migration-remote.mjs",
     "db:gen-manual": "node scripts/gen-apply-all.mjs",
     "admin:grant": "node scripts/grant-admin.mjs",
+    "db:probe": "node scripts/probe-schema.mjs",
     "sync:accounts": "node scripts/sync-accounts.mjs",
     "purge:test-users": "node scripts/purge-test-users.mjs"
   },

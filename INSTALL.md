@@ -93,6 +93,9 @@ npm run build                 # 产出 dist/
    | CI 自动 | push main 由 `migrate-db` job 应用 | 已配 `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` |
 
    `apply-all-manual.sql` 由 `npm run db:gen-manual` 生成，改完 SQL 重新生成即可，保证与 CI 不产生分叉。
+   建库后建议跑一次 `npm run db:probe` 自检（只读）：它会列出线上库缺失的表/函数及所属迁移。
+   （注意：CI 的 `migrate-db` job 在未配 `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF`
+   时会**整段跳过且不报错**，此时新迁移不会自动到线上，需走方式 1 或配好 secrets。）
    迁移顺序：`0000_schema`（20 张业务表基线）→ `0001` IAM → `0002` 对象存储 → `0003` 账号桥
    → `0004` 帖子富字段 → `0005` 商城目录（仅字段扩展，无演示商品）。全部幂等。
 
@@ -152,6 +155,7 @@ npm run build                 # 产出 dist/
 | `npm run verify:desktop` | 桌面端布局回归（侧栏 / 网格 / 表格） |
 | `npm run verify:feed` | 信息流 + 成长页（12 项断言） |
 | `npm run verify:manju` | 漫剧 / Openverse（21 项断言，离线 route mock 可跑） |
+| `npm run db:probe` | **线上库结构自检**（只读、无需密码）：列出缺失的表/函数及其所属迁移 |
 
 浏览器实测依赖系统 Edge（`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`）
 + `playwright-core`，无需下载浏览器。
