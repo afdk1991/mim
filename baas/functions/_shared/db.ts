@@ -34,6 +34,27 @@ export async function rpc<T>(name: string, args: unknown, userJwt?: string): Pro
   return (await res.json()) as T
 }
 
+/**
+ * 配额判定（见 db/migrations/0010_quotas.sql）。
+ * 先判再计数：within_quota → 执行业务 → bump_usage，避免超发一次。
+ */
+export async function withinQuota(metric: string, limit: number, userJwt?: string): Promise<boolean> {
+  if (!Number.isFinite(limit) || limit <= 0) return true
+  const rows = await rpc<{ within_quota: boolean }[]>(
+    'within_quota',
+    { metric, limit_per_period: Math.floor(limit), period: 'hour' },
+    userJwt
+  )
+  return rows[0]?.within_quota !== false
+}
+
+export async function bumpUsage(metric: string, amount = 1, userJwt?: string): Promise<void> {
+  await rpc('bump_usage', { metric, amount, period: 'hour' }, userJwt).catch(() => {
+    // 计量失败不应阻断主流程，但要留痕
+    console.error('bump_usage 失败')
+  })
+}
+
 export async function rest<T>(path: string, init?: { method?: string; body?: unknown; userJwt?: string }): Promise<T> {
   const res = await fetch(`${BASE}/rest/v1/${path}`, {
     method: init?.method ?? 'GET',

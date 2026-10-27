@@ -8,7 +8,13 @@
  * 让 RLS 按用户身份裁剪结果（db.ts 的 rpc() 已支持第三参）。
  */
 import { error, json, preflight } from '../_shared/cors.ts'
-import { embed as embedText, rpc, toVectorLiteral } from '../_shared/db.ts'
+import {
+  bumpUsage,
+  embed as embedText,
+  rpc,
+  toVectorLiteral,
+  withinQuota,
+} from '../_shared/db.ts'
 
 type Body = {
   query?: string
@@ -39,13 +45,19 @@ export default async function handler(req: Request): Promise<Response> {
   }
   if (!body.query?.trim()) return error('query 不能为空')
 
-  const dim = Number(Deno.env.get('EMBEDDING_DIM') ?? 1536)
-  const embedding = await embedText(body.query, dim)
-  const matchCount = Math.min(Math.max(body.match_count ?? 8, 1), 50)
-
   // 传入用户 JWT 时按用户身份检索；否则按平台身份（service_role）
   const userJwt = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '')
   const scoped = body.hybrid === true
+
+  // 配额：QUOTA_RPC_PER_HOUR <= 0 表示不限
+  const limit = Number(Deno.env.get('QUOTA_RPC_PER_HOUR') ?? 0)
+  if (!(await withinQuota('rag_search', limit, userJwt))) {
+    return error('已超出本小时检索配额', 429)
+  }
+
+  const dim = Number(Deno.env.get('EMBEDDING_DIM') ?? 1536)
+  const embedding = await embedText(body.query, dim)
+  const matchCount = Math.min(Math.max(body.match_count ?? 8, 1), 50)
 
   const rows = scoped
     ? await rpc<ChunkRow[]>(
@@ -68,6 +80,8 @@ export default async function handler(req: Request): Promise<Response> {
         },
         userJwt
       )
+
+  await bumpUsage('rag_search', 1, userJwt)
 
   return json({
     mode: scoped ? 'hybrid' : 'vector',

@@ -226,6 +226,7 @@ services:
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       EMBEDDING_DIM: ${EMBEDDING_DIM}
+      QUOTA_RPC_PER_HOUR: ${QUOTA_RPC_PER_HOUR}
     volumes:
       - ./functions:/home/deno/functions:ro
 
@@ -276,6 +277,66 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
+  # ==================== 可选 profile：pooler / metrics ====================
+  # pooler：Supavisor，把 PostgREST / 应用连接收敛到有限条物理连接
+  #   启用后把 rest 的 PGRST_DB_URI 指向 supavisor:6543（见 README §连接池）
+  supavisor:
+    <<: *common
+    image: ${SUPAVISOR_IMAGE}
+    container_name: baas-pooler
+    profiles: ["pooler"]
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${POOLER_PORT}:6543"
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      CLUSTER_POSTGRES: "true"
+      SECRET_KEY_BASE: ${SUPAVISOR_SECRET_KEY_BASE}
+      VAULT_ENC_KEY: ${SUPAVISOR_VAULT_ENC_KEY}
+      ERL_COOKIE: ${SUPAVISOR_ERL_COOKIE}
+      REGION: local
+      POOLER_MAX_CLIENT_CONN: "500"
+      POOLER_DEFAULT_POOL_SIZE: "25"
+      POOLER_DB_POOL_SIZE: "5"
+      POOLER_TENANT_ID: local
+      # 事务模式下：应用侧禁止使用会话级 GUC / LISTEN / advisory lock，
+      # 迁移与策略只允许 SET LOCAL（scripts/check-sql.mjs 会静态拦截）
+
+  # metrics：复制槽滞后、连接饱和、慢查询的可观测性
+  postgres_exporter:
+    <<: *common
+    image: ${PG_EXPORTER_IMAGE}
+    container_name: baas-pg-exporter
+    profiles: ["metrics"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pg_exporter/queries.yml
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    volumes:
+      - ./metrics/pg_exporter.queries.yml:/etc/pg_exporter/queries.yml:ro
+
+  prometheus:
+    <<: *common
+    image: ${PROMETHEUS_IMAGE}
+    container_name: baas-prometheus
+    profiles: ["metrics"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    volumes:
+      - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./metrics/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus-data:/prometheus
+
 volumes:
   db-data:
   minio-data:
+  prometheus-data:

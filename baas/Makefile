@@ -23,6 +23,15 @@ pull: ## 拉取镜像（首次或改过镜像 tag 后执行）
 up: env ## 拉起全栈（可选 --profile s3 / studio）
 	$(COMPOSE) up -d
 
+up-pooler: env ## 额外拉起连接池（Supavisor）
+	$(COMPOSE) --profile pooler up -d
+
+up-metrics: env ## 额外拉起 postgres_exporter + prometheus
+	$(COMPOSE) --profile metrics up -d
+
+up-hardened: env ## 以加固覆盖层启动（cap_drop/只读根/资源上限，见 docs/edge-isolation.md）
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.hardened.yml up -d
+
 down: ## 停止
 	$(COMPOSE) down
 
@@ -61,6 +70,9 @@ fn-check: ## Edge Functions 类型检查
 
 verify: ## 全部可离线执行的检查
 	node scripts/verify.mjs
+
+ci: verify ## CI 入口（与 .github/workflows/baas.yml 的 verify job 一致）
+	node scripts/gen-jwt.mjs --secret "ci-only-secret-value-at-least-32-chars" --self-test
 
 health: ## 运行时健康探测（需栈已启动，可用 url=... 覆盖）
 	node scripts/healthcheck.mjs $(if $(url),--url $(url),)

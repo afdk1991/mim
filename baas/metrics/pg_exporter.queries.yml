@@ -1,0 +1,39 @@
+# postgres_exporter 自定义查询：把 Realtime 相关的复制槽指标暴露出来
+# 只有这些指标能提前发现「Realtime 断连 → WAL 堆积撑爆磁盘」这个高危故障
+pg_replication_slots:
+  query: >
+    select slot_name,
+           active,
+           coalesce(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) as lag_bytes,
+           wal_status,
+           coalesce(pg_size_bytes(max_slot_wal_keep_size), 0) as keep_size_bytes
+    from pg_replication_slots
+    group by slot_name, active, lag_bytes, wal_status, keep_size_bytes
+  master: true
+  metrics:
+    - slot_name:
+        usage: "LABEL"
+        description: "复制槽名"
+    - active:
+        usage: "LABEL"
+        description: "是否有消费端连接"
+    - wal_status:
+        usage: "LABEL"
+        description: "WAL 保留状态（reserved / extended / unreserved / lost）"
+    - lag_bytes:
+        usage: "GAUGE"
+        description: "订阅端落后字节数"
+    - keep_size_bytes:
+        usage: "GAUGE"
+        description: "max_slot_wal_keep_size 字节数（0 表示不限制）"
+
+pg_publication_tables:
+  query: "select pubname, count(*) as tables from pg_publication_tables group by pubname"
+  master: true
+  metrics:
+    - pubname:
+        usage: "LABEL"
+        description: "publication 名"
+    - tables:
+        usage: "GAUGE"
+        description: "订阅表数量（白名单外的表不应出现）"

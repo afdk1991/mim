@@ -23,6 +23,9 @@ const results = []
 const add = (ok, section, detail, level = 'fail') =>
   results.push({ ok, section, detail, level })
 
+/** 移除 dollar-quoted 段，避免把函数体里的文本当作顶层语句扫描 */
+const stripDollarQuoted = (sql) => sql.replace(/(\$[A-Za-z_]*\$)([\s\S]*?)\1/g, ' $1$1 ')
+
 const run = (cmd, args, cwd = ROOT) => {
   const r = spawnSync(cmd, args, { cwd, encoding: 'utf8' })
   return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
@@ -51,8 +54,16 @@ const envExample = readFileSync(path.join(ROOT, '.env.example'), 'utf8')
 
 // 3.1 不能有 Tab（YAML 硬性要求）
 {
+  const yamls = [
+    ['docker-compose.yml', compose],
+    ['envoy/envoy.yaml', envoy],
+    ['docker-compose.hardened.yml', readFileSync(path.join(ROOT, 'docker-compose.hardened.yml'), 'utf8')],
+    ['metrics/prometheus.yml', readFileSync(path.join(ROOT, 'metrics', 'prometheus.yml'), 'utf8')],
+    ['metrics/alert.rules.yml', readFileSync(path.join(ROOT, 'metrics', 'alert.rules.yml'), 'utf8')],
+    ['metrics/pg_exporter.queries.yml', readFileSync(path.join(ROOT, 'metrics', 'pg_exporter.queries.yml'), 'utf8')],
+  ]
   const bad = []
-  for (const [name, text] of [['docker-compose.yml', compose], ['envoy/envoy.yaml', envoy]]) {
+  for (const [name, text] of yamls) {
     if (/^\s*[\w"-]+:.*\t/.test(text) || /\t/.test(text)) bad.push(name)
   }
   add(bad.length === 0, 'YAML 无 Tab 缩进', bad.length ? `含 Tab：${bad.join(', ')}` : 'ok')
@@ -172,6 +183,54 @@ const prefixes = [...envoy.matchAll(/match:\s*\{\s*prefix:\s*"([^"]+)"\s*\}/g)].
     const r = run('node', [tscPath, '-p', 'functions/tsconfig.json', '--noEmit'])
     add(r.code === 0, 'functions 类型检查', r.out || '0 error')
   }
+}
+
+// ------------------------------------------- 6. 连接池 / 可观测 / 加固 / CI
+{
+  // 6.1 事务池安全：迁移里不能出现 LISTEN / NOTIFY（事务模式下会失效）
+  const sqlAll = readdirSync(path.join(ROOT, 'db', 'migrations'))
+    .filter((f) => f.endsWith('.sql'))
+    .map((f) => readFileSync(path.join(ROOT, 'db', 'migrations', f), 'utf8'))
+    .map((s) => stripDollarQuoted(s.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n')))
+    .join('\n')
+  const usesListen = /\b(LISTEN|NOTIFY)\s+/i.test(sqlAll)
+  add(!usesListen, '迁移未使用 LISTEN/NOTIFY',
+    usesListen ? '事务连接池下 LISTEN 会失效，Realtime 必须走逻辑复制' : 'Realtime 走逻辑复制，不依赖 LISTEN')
+
+  // 6.2 连接池模式
+  const envFile = path.join(ROOT, '.env')
+  const src = existsSync(envFile) ? readFileSync(envFile, 'utf8') : envExample
+  const pm = src.match(/^POOL_MODE=([^#\r\n]*)/m)
+  const mode = pm ? pm[1].trim() : '(未设置，默认直连)'
+  add(true, '连接池模式', `POOL_MODE=${mode}`)
+
+  // 6.3 新增产物文件齐全
+  const must = [
+    'metrics/prometheus.yml',
+    'metrics/alert.rules.yml',
+    'metrics/pg_exporter.queries.yml',
+    'docker-compose.hardened.yml',
+    'docs/edge-isolation.md',
+    'docs/implementation-plan.md',
+  ]
+  const missingFiles = must.filter((f) => !existsSync(path.join(ROOT, f)))
+  add(missingFiles.length === 0, '可观测/加固/文档产物齐全',
+    missingFiles.length ? `缺失：${missingFiles.join(', ')}` : `${must.length} 个文件就位`)
+
+  // 6.4 compose 挂载的宿主机路径必须真实存在
+  // ./volumes/* 由 Docker 自动创建，不要求仓库中存在
+  const mounts = [...compose.matchAll(/-\s+(\.\/[^\s:]+):/g)]
+    .map((m) => m[1])
+    .filter((p) => !p.startsWith('./volumes/'))
+  const badMount = mounts.filter((p) => !existsSync(path.resolve(ROOT, p)))
+  add(badMount.length === 0, 'compose 挂载路径均存在',
+    badMount.length ? `缺失：${badMount.join(', ')}` : mounts.join(', '))
+
+  // 6.5 CI 流水线
+  const wf = path.resolve(ROOT, '..', '.github', 'workflows', 'baas.yml')
+  const wfOk = existsSync(wf) && readFileSync(wf, 'utf8').includes('scripts/verify.mjs')
+  add(wfOk, 'CI 流水线已接入 verify.mjs',
+    wfOk ? '.github/workflows/baas.yml' : '缺少 .github/workflows/baas.yml 或未调用 verify.mjs')
 }
 
 // ---------------------------------------------------------------- 输出

@@ -161,3 +161,18 @@
 **未能在本机执行的验收（需在装 Docker 的机器上补跑）**：`docker compose config`、`make up`、
 `make migrate`、`make health`（`healthcheck.mjs` 探测七端点）、`baas_selfcheck()` SQL。
 原因：本机无 docker / psql / deno，且 Docker Hub 出口不可达。
+
+---
+
+## 5. 优化轮（同日追加）
+
+| 优化项 | 交付 | 验收 |
+|---|---|---|
+| 连接池 | compose `pooler` profile（Supavisor）+ 池安全约束 | verify 新增「迁移未使用 LISTEN/NOTIFY」与 POOL_MODE 报告；check-sql 拦截裸 SET |
+| CI 流水线 | `.github/workflows/baas.yml`（verify 离线 job + runtime 冒烟 job） | workflow YAML 经 js-yaml 解析通过；verify 断言其调用了 verify.mjs |
+| 多租户 | 迁移 `0009_multitenancy.sql`（行级、tenant_id 可空 → 向后兼容） | libpg_query 解析通过；现有策略全部重放并叠加租户条件 |
+| 监控 + 配额 | `metrics/{prometheus,alert.rules,pg_exporter.queries}.yml` + 迁移 `0010_quotas.sql` | 6 条告警规则解析通过；rag-search 接入 within_quota/bump_usage（429） |
+| Edge 隔离 | `docker-compose.hardened.yml`（L1）+ `docs/edge-isolation.md`（L1/L2/L3） | hardened YAML 解析通过；L2 需 KVM，故只给路径不内置编排 |
+
+复验：`scripts/verify.mjs` **21/21 通过**；11 个 SQL 文件经 libpg_query 全量解析通过；
+8 个 YAML/JSON 经 js-yaml / JSON.parse 通过。

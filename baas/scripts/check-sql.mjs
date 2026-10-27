@@ -84,8 +84,10 @@ function checkRls(sql, file) {
 }
 
 function checkDefiner(sql, file) {
-  const definer = (sql.match(/security\s+definer/gi) || []).length
-  const searchPath = (sql.match(/set\s+search_path/gi) || []).length
+  // 注释里出现的 "security definer" 不算数，先去掉行注释
+  const code = stripComments(sql)
+  const definer = (code.match(/security\s+definer/gi) || []).length
+  const searchPath = (code.match(/set\s+search_path/gi) || []).length
   if (definer > searchPath) {
     add(YELLOW, file, 'security definer 未固定 search_path', `definer=${definer} search_path=${searchPath}`)
   }

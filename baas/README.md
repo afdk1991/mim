@@ -155,14 +155,80 @@ bash scripts/db-psql.sh -c "select * from public.baas_selfcheck();"
 
 ---
 
-## 9. 目录结构
+## 9. 连接池（可选，高并发必开）
+
+```bash
+make up-pooler          # docker compose --profile pooler up -d
+# 然后把 rest 的 PGRST_DB_URI 指向 supavisor:6543
+```
+
+事务模式（`POOL_MODE=transaction`）下的硬性约束：
+
+- 会话级 GUC 一律改用 `SET LOCAL` / `set_config(..., true)`（裸 `SET` 会跨请求残留 → **串号越权**）
+- 禁止依赖 `LISTEN/NOTIFY`（Realtime 走逻辑复制，不依赖它）
+- 禁止会话级 advisory lock、临时表、预处理语句跨请求复用
+
+`scripts/check-sql.mjs` 静态拦截裸 `SET`；`scripts/verify.mjs` 校验迁移里没有 LISTEN/NOTIFY。
+
+## 10. 多租户（可选，行级，向后兼容）
+
+`db/migrations/0009_multitenancy.sql` 提供 `tenants` / `tenant_members` / `current_tenant()`，
+并给业务表加上可空 `tenant_id`：**为 NULL 时行为与单租户完全一致**，因此启用与否都不影响既有部署。
+
+| 粒度 | 隔离 | 成本 | 适用 |
+|---|---|---|---|
+| 库级 | 最强 | 最高（N 套实例/备份/迁移） | 租户 < 50、合规硬要求 |
+| schema 级 | 强 | 中（迁移要按 schema 重放） | 几十~几百租户 |
+| **行级（已实现）** | 依赖 RLS 正确性 | 最低（一套迁移） | 百~万级租户 |
+
+使用：登录后 `rpc/create_tenant {"name":"acme"}` → JWT 中带上 `tenant_id` claim →
+所有带 `tenant_id` 的行自动按成员关系隔离。
+
+## 11. 用量配额
+
+`db/migrations/0010_quotas.sql`：`bump_usage()` 计数、`within_quota()` 判定（limit ≤ 0 表示不限）。
+`functions/rag-search` 已接入（超限返回 429，配额变量 `QUOTA_RPC_PER_HOUR`）。
+网关层令牌桶与这里互补：前者挡瞬时洪峰，后者管业务量。
+
+## 12. 可观测性（--profile metrics）
+
+`postgres_exporter` + `prometheus`：开箱带三条 Realtime 高危告警（复制槽滞后 > 512MB、
+复制槽无消费端、`max_slot_wal_keep_size` 未限制）与三条 PG 告警（宕机、连接数 > 80%、长事务 > 1h）。
+
+```bash
+make up-metrics   # Prometheus: http://localhost:9090 ，告警页 /alerts
+```
+
+需要通知渠道再加 Alertmanager；需要磁盘水位告警再加 node-exporter（WAL 堆积最终表现为磁盘耗尽）。
+
+## 13. Edge Functions 隔离
+
+分三档，详见 [`docs/edge-isolation.md`](docs/edge-isolation.md)：
+
+- **L1 容器级（默认提供）**：`make up-hardened` → `cap_drop: ALL`、`no-new-privileges`、
+  只读根 + tmpfs、PID/内存/CPU 上限、非 root
+- **L2 microVM（Firecracker）**：需宿主机支持 KVM，本仓库**不内置**——在无法确认 KVM 的场景
+  给出编排只会得到一个启动即失败的栈，路径与前提写在文档里
+- **L3 gVisor/seccomp**：折中方案
+
+## 14. CI
+
+`.github/workflows/baas.yml`：
+
+- job `verify`（离线）：`scripts/verify.mjs` 全部 21 项 + JWT 签发验签自检
+- job `runtime`（真起栈）：`make up` → `migrate` → `storage-init` → `healthcheck` → `baas_selfcheck()`，
+  失败时自动收集容器日志
+
+## 15. 目录结构
 
 ```
 baas/
-├── docker-compose.yml        # 编排（含 s3 / studio 可选 profile）
+├── docker-compose.yml        # 编排（profile: s3 / studio / pooler / metrics）
+├── docker-compose.hardened.yml  # 加固覆盖层（cap_drop / 只读根 / 资源上限）
 ├── envoy/envoy.yaml          # 网关路由（七类流量 + WebSocket upgrade）
 ├── Makefile                  # 常用操作封装
 ├── .env.example              # 全部配置（含镜像 tag）
+├── metrics/                  # prometheus.yml / alert.rules.yml / pg_exporter.queries.yml
 ├── db/
 │   ├── init/                 # 容器首次启动执行（角色 / 扩展 / 授权，幂等）
 │   └── migrations/           # 0001~0008，按序、幂等、有记录
@@ -174,5 +240,16 @@ baas/
 │   ├── gen-jwt.mjs           # 生成 anon/service JWT 并自验签
 │   ├── healthcheck.mjs       # 运行时七端点探测
 │   └── verify.mjs            # 一键体检总入口
-└── functions/                # Deno 函数：main 路由 + hello / embed / rag-search
+├── functions/                # Deno 函数：main 路由 + hello / embed / rag-search
+└── docs/                     # implementation-plan.md（含验收回填）/ edge-isolation.md
 ```
+
+## 16. 优化项状态
+
+| 优化项 | 状态 | 交付物 |
+|---|---|---|
+| 连接池（Supavisor） | ✅ | compose `pooler` profile + 池安全校验（裸 SET / LISTEN 拦截） |
+| CI 集成 | ✅ | `.github/workflows/baas.yml`（离线 verify + 运行时冒烟） |
+| 多租户 | ✅ 行级、向后兼容 | `0009_multitenancy.sql` + 三粒度对比文档 |
+| 监控告警 + 配额 | ✅ | `metrics/*` + `0010_quotas.sql` + rag-search 接入 429 |
+| Edge 强隔离 | ⚠️ 部分 | L1 加固已落地；L2（Firecracker microVM）需 KVM，仅提供路径文档 |
