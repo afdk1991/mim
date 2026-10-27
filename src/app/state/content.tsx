@@ -22,10 +22,13 @@ import type {
   Post,
   PostComment,
   PostDraft,
+  PostLottery,
+  PostMedia,
+  PostVote,
   Snippet,
   User,
 } from '../../domain/content/model'
-import { makeSummary } from '../../domain/content/rules'
+import { canCastVote, makeSummary } from '../../domain/content/rules'
 import { uid } from '../../core/utils'
 import { emit, EVT } from '../../core/events'
 import { currentUid } from '../../data/session'
@@ -49,6 +52,9 @@ export interface AppState {
 
 const SCOPE = 'content'
 
+/** 快拍存活时长：24 小时 */
+const STORY_TTL_MS = 24 * 60 * 60 * 1000
+
 function emptyState(meId: string): AppState {
   return {
     meId,
@@ -68,6 +74,26 @@ function emptyState(meId: string): AppState {
 /* ---------- 反序列化：元素级校验，脏数据剔除 ---------- */
 
 const isArr = (v: unknown): v is unknown[] => Array.isArray(v)
+
+/**
+ * 收集「根评论 + 其下全部后代回复」的 id 集合。
+ * 数据模型只有一层 replyTo，但历史脏数据里可能出现 replyTo 指向回复的链路，
+ * 这里做闭包收敛，避免删完父评论还留着孙回复。
+ */
+function threadIds(comments: PostComment[], rootId: string): Set<string> {
+  const out = new Set<string>([rootId])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const c of comments) {
+      if (c.replyTo && out.has(c.replyTo) && !out.has(c.id)) {
+        out.add(c.id)
+        grew = true
+      }
+    }
+  }
+  return out
+}
 
 function parseState(raw: unknown): AppState | null {
   if (!raw || typeof raw !== 'object') return null
@@ -91,13 +117,34 @@ function parseState(raw: unknown): AppState | null {
 
 /* ---------- API ---------- */
 
+/** 发动态的扩展入参：富字段一律可选，未传即不写进 Post（避免出现显式 undefined / null） */
+export interface PublishPostOptions {
+  images?: string[]
+  topic?: string | null
+  visibility?: Post['visibility']
+  /** 视频 / 音频 / GIF 媒体块 */
+  media?: PostMedia
+  /** 投票：一人一票，counts 由调用方按 options 长度初始化全 0 */
+  vote?: PostVote
+  /** 抽奖：未开奖时不写 winners */
+  lottery?: PostLottery
+  /** 位置，形如「北京市 · 三里屯」 */
+  location?: string
+  /** 快拍：不进信息流，24h 后过期 */
+  story?: boolean
+  /** 过期时刻；story 为 true 且未传时由 publishPost 兜底为 now + 24h */
+  expiresAt?: number
+}
+
 export interface AppApi {
   state: AppState
   meId: string
-  publishPost: (content: string, opts?: { images?: string[]; topic?: string | null; visibility?: Post['visibility'] }) => string
+  publishPost: (content: string, opts?: PublishPostOptions) => string
   deletePost: (id: string) => void
   togglePostLike: (id: string) => void
   addPostComment: (postId: string, content: string, replyTo?: string) => void
+  /** 删除自己的评论；连带删掉挂在它下面的回复，找不到或非本人则 no-op */
+  deleteComment: (postId: string, commentId: string) => void
   repostPost: (postId: string, comment: string) => string
   toggleFollow: (id: string) => void
   toggleFavorite: (kind: FavoriteKind, targetId: string) => void
@@ -117,6 +164,8 @@ export interface AppApi {
   toggleArticleLike: (id: string) => void
   addArticleComment: (articleId: string, content: string) => void
   toggleCommentLike: (postId: string, commentId: string) => void
+  /** 投票：一人一票，已投过 / 已截止 / 下标越界一律 no-op */
+  castVote: (postId: string, optionIndex: number) => void
   addSnippet: (title: string, language: string, code: string) => void
   deleteSnippet: (id: string) => void
   toggleSnippetLike: (id: string) => void
@@ -188,6 +237,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       publishPost(content, opts) {
         const id = uid('p')
+        const story = opts?.story === true
+        // 快拍默认 24h 过期：兜底放在状态层，避免每个页面各算一份导致口径漂移
+        const expiresAt = story ? (opts?.expiresAt ?? Date.now() + STORY_TTL_MS) : opts?.expiresAt
         const post: Post = {
           id,
           authorId: stateRef.current.meId,
@@ -203,6 +255,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           source: '来自 网页版',
           comments: [],
           visibility: opts?.visibility ?? 'public',
+          ...(story ? { story } : {}),
+          ...(expiresAt === undefined ? {} : { expiresAt }),
+          ...(opts?.media ? { media: opts.media } : {}),
+          ...(opts?.vote ? { vote: opts.vote } : {}),
+          ...(opts?.lottery ? { lottery: opts.lottery } : {}),
+          ...(opts?.location ? { location: opts.location } : {}),
         }
         patch((s) => ({ ...s, posts: [post, ...s.posts] }))
         write(() =>
@@ -217,6 +275,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               topic: post.topic,
               source: post.source,
               visibility: post.visibility,
+              ...(post.story ? { story: post.story } : {}),
+              ...(post.expiresAt === undefined ? {} : { expires_at: post.expiresAt }),
+              ...(post.media ? { media: post.media } : {}),
+              ...(post.vote ? { vote: post.vote } : {}),
+              ...(post.lottery ? { lottery: post.lottery } : {}),
+              ...(post.location ? { location: post.location } : {}),
             },
             '发布',
           ),
@@ -493,6 +557,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         )
       },
 
+      deleteComment(postId, commentId) {
+        const post = stateRef.current.posts.find((p) => p.id === postId)
+        const target = post?.comments.find((c) => c.id === commentId)
+        // 只删自己的评论；找不到 / 不是本人写的评论一律 no-op，不报错也不提示
+        if (!post || !target || target.authorId !== stateRef.current.meId) return
+        // 连带删掉挂在这条评论下的回复，避免留下读不到上下文的孤儿回复
+        const doomed = threadIds(post.comments, commentId)
+        patch((s) => ({
+          ...s,
+          posts: s.posts.map((p) =>
+            p.id === postId ? { ...p, comments: p.comments.filter((c) => !doomed.has(c.id)) } : p,
+          ),
+        }))
+        write(() => Promise.all(Array.from(doomed, (cid) => db.remove('post_comments', cid))))
+      },
+
       toggleCommentLike(postId, commentId) {
         patch((s) => ({
           ...s,
@@ -519,6 +599,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ? { ...x, likedByMe: !x.likedByMe, likes: Math.max(0, x.likes + (x.likedByMe ? -1 : 1)) }
               : x,
           ),
+        }))
+      },
+
+      castVote(postId, optionIndex) {
+        patch((s) => ({
+          ...s,
+          posts: s.posts.map((p) => {
+            if (p.id !== postId || !p.vote) return p
+            const v = p.vote
+            // 一人一票 + 截止即锁定：判定统一交给 domain 规则，页面不重复实现
+            if (!canCastVote(v, s.meId, Date.now())) return p
+            if (optionIndex < 0 || optionIndex >= v.options.length) return p
+            return {
+              ...p,
+              vote: {
+                ...v,
+                counts: v.counts.map((n, i) => (i === optionIndex ? n + 1 : n)),
+                voters: { ...v.voters, [s.meId]: optionIndex },
+              },
+            }
+          }),
         }))
       },
 

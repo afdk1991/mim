@@ -29,6 +29,8 @@ export interface PostCardProps {
   onToggleLike?: () => void
   onRepost?: () => void
   onComment?: () => void
+  /** 投票：回调抛出选项下标，由页面决定如何落库（卡片本身不碰状态） */
+  onVote?: (optionIndex: number) => void
   onDelete?: () => void
   onOpen?: () => void
   onUser?: (id: string) => void
@@ -44,6 +46,7 @@ export function PostCard({
   onToggleLike,
   onRepost,
   onComment,
+  onVote,
   onDelete,
   onOpen,
   onUser,
@@ -99,7 +102,7 @@ export function PostCard({
       ) : null}
 
       {post.media ? <MediaCard media={post.media} /> : null}
-      {post.vote ? <VoteBlock vote={post.vote} viewerId={viewerId} /> : null}
+      {post.vote ? <VoteBlock vote={post.vote} viewerId={viewerId} onVote={onVote} /> : null}
       {post.lottery ? <LotteryBlock lottery={post.lottery} viewerId={viewerId} /> : null}
       {post.location ? (
         <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>

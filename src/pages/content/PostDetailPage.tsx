@@ -161,6 +161,10 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
             app.togglePostLike(post.id)
           }}
           onRepost={() => setRepostOpen(true)}
+          onVote={(i: number) => {
+            app.castVote(post.id, i)
+            toast('投票成功，一人一票 🗳️')
+          }}
           onDelete={post.authorId === app.meId ? () => app.deletePost(post.id) : undefined}
           onUser={(uid) => navigate(uid === app.meId ? '/my' : `/user/${uid}`)}
           onTopic={(n) => navigate(`/topic/${encodeURIComponent(n)}`)}
@@ -221,6 +225,18 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
                 <button className="btn btn-ghost btn-sm" onClick={() => setReplyTo(c)}>
                   ↳ 回复
                 </button>
+                {c.authorId === app.meId ? (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="删除评论"
+                    onClick={() => {
+                      app.deleteComment(post.id, c.id)
+                      toast('评论已删除 🗑')
+                    }}
+                  >
+                    🗑
+                  </button>
+                ) : null}
               </div>
               {repliesOf(c.id).map((r) => (
                 <div key={r.id} className="comment-row reply">
@@ -245,6 +261,18 @@ export function PostDetailPage({ id }: PostDetailPageProps) {
                   >
                     ❤️ {formatCount(r.likes)}
                   </button>
+                  {r.authorId === app.meId ? (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      title="删除回复"
+                      onClick={() => {
+                        app.deleteComment(post.id, r.id)
+                        toast('回复已删除 🗑')
+                      }}
+                    >
+                      🗑
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -114,6 +114,12 @@ export interface Resource {
   size: string
   downloads: number
   type: string
+  /**
+   * 附件地址。资源表目前只有读取通道（无写入 / 上传接口），
+   * 因此该字段通常缺省：有值时页面可直接打开链接，无值时只记录一次下载计数，
+   * 不伪造文件流、不编造地址。
+   */
+  url?: string
 }
 
 export interface Topic {

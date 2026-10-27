@@ -4,19 +4,23 @@
  * 单态口径（与原实现一致）：全站统一内容池，广场态（10/11…）进动态流，知识态（20）进文库。
  * 敏感词前置：命中即禁用发布按钮并给出类别标签（sensitiveHitLabels）——
  *             这是机审前置，不等于服务端终审，文案里如实说明。
- * 不支持的类型（12 视频 / 13 投票 / 14 抽奖 / 15 快拍 / 22 资源）：
- *   重建后的 publishPost 仅接收 images / topic / visibility 三类扩展参数，
- *   上述类型缺少媒体与玩法字段的存储出口，因此置灰并说明原因，
- *   不做「点了成功但内容其实没存进去」的假释放。
+ * 富字段发布（12 视频 / 13 投票 / 14 抽奖 / 15 快拍）：
+ *   这些字段在 Post 模型与 posts 表里都存在，publishPost 也已接收，
+ *   因此按类型给出最小可用录入 UI，不假装支持、也不无谓置灰。
+ *   快拍由状态层兜底 24h 过期；投票 counts 必须按 options 长度初始化全 0，
+ *   否则渲染读 counts[i] 会得到 NaN。
+ * 资源（22）不支持：资源表在 server/db/migrations 里没有写入通道，前端也没有上传接口，
+ *   这与字段无关，故如实说明而不是笼统写「暂未开放」。
  * ======================================================================== */
 
 import { useState } from 'react'
 import { Empty, useToast } from '@/ui'
 import { useApp } from '@/app/state/content'
+import type { PublishPostOptions } from '@/app/state/content'
 import { useRouter } from '@/app/router'
 import { cx } from '@/core/utils'
 import { CONTENT_TYPE } from '@/domain/content/model'
-import type { Visibility } from '@/domain/content/model'
+import type { PostMedia, Visibility } from '@/domain/content/model'
 import { articleQualityPass, findSensitiveHits, sensitiveHitLabels } from '@/domain/content/rules'
 import { sortTopics, topicsFromPosts } from './content-lib'
 import { reportGrowth } from './growth-report'
@@ -27,20 +31,33 @@ interface TypeMeta {
   code: number
   name: string
   hint: string
-  /** false = 状态层暂无该类型的字段出口 */
+  /** false = 该类型当前没有可写入通道（与前端字段无关） */
   supported: boolean
 }
 
 const TYPES: TypeMeta[] = [
   { code: CONTENT_TYPE.text, name: '动态短文', hint: '纯文字动态，进广场 Feed', supported: true },
   { code: CONTENT_TYPE.image, name: '图文', hint: '带配图的动态', supported: true },
-  { code: CONTENT_TYPE.video, name: '视频 / GIF', hint: '需 media 字段存储，暂未开放', supported: false },
-  { code: CONTENT_TYPE.vote, name: '投票', hint: '需 vote 字段存储，暂未开放', supported: false },
-  { code: CONTENT_TYPE.lottery, name: '抽奖', hint: '需 lottery 字段存储，暂未开放', supported: false },
-  { code: CONTENT_TYPE.story, name: '快拍', hint: '需 story / expiresAt 字段，暂未开放', supported: false },
+  { code: CONTENT_TYPE.video, name: '视频 / GIF', hint: '填媒体地址与封面，标题与时长可选', supported: true },
+  { code: CONTENT_TYPE.vote, name: '投票', hint: '问题 + 至少 2 个选项 + 结束时间，一人一票', supported: true },
+  { code: CONTENT_TYPE.lottery, name: '抽奖', hint: '奖品名 + 份数 + 结束时间，到点才能开奖', supported: true },
+  { code: CONTENT_TYPE.story, name: '快拍', hint: '不进信息流，发布后 24 小时自动过期', supported: true },
   { code: CONTENT_TYPE.article, name: '博文', hint: 'Markdown 长文，进知识库', supported: true },
-  { code: CONTENT_TYPE.resource, name: '资源', hint: '资源表无写入通道，暂未开放', supported: false },
+  {
+    code: CONTENT_TYPE.resource,
+    name: '资源',
+    hint: '资源表在 server/db/migrations 里没有写入通道，前端也没有上传接口，无法从此处发布',
+    supported: false,
+  },
 ]
+
+/** 由地址后缀推断媒体类型：.gif → gif，音频后缀 → audio，其余按视频处理 */
+function mediaKindOf(src: string): PostMedia['kind'] {
+  const lower = src.trim().toLowerCase()
+  if (lower.endsWith('.gif')) return 'gif'
+  if (/\.(mp3|m4a|wav|ogg|flac)$/.test(lower)) return 'audio'
+  return 'video'
+}
 
 export function PublishPage() {
   const app = useApp()
@@ -54,6 +71,18 @@ export function PublishPage() {
   const [topic, setTopic] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Visibility>('public')
+  /* 富字段录入：视频媒体 / 投票 / 抽奖 */
+  const [mediaSrc, setMediaSrc] = useState('')
+  const [mediaPoster, setMediaPoster] = useState('')
+  const [mediaTitle, setMediaTitle] = useState('')
+  const [mediaDuration, setMediaDuration] = useState('')
+  const [voteQuestion, setVoteQuestion] = useState('')
+  const [voteOptions, setVoteOptions] = useState<string[]>(['', ''])
+  const [endsInHours, setEndsInHours] = useState('24')
+  const [prize, setPrize] = useState('')
+  const [prizeCount, setPrizeCount] = useState('1')
+  /* 命名避开全局 location，避免与 window.location 混淆 */
+  const [place, setPlace] = useState('')
 
   const meta = TYPES.find((t) => t.code === type) ?? TYPES[0]!
   const isPlaza = type <= 15
@@ -61,17 +90,47 @@ export function PublishPage() {
   const hits = findSensitiveHits(checkText)
   const labels = sensitiveHitLabels(checkText)
   const titleOk = type !== CONTENT_TYPE.article || title.trim().length > 0
-  const canPublish = meta.supported && body.trim().length > 0 && hits.length === 0 && titleOk
+
+  /* 各类型的必填项：为空时禁用发布并说明缺什么，而不是点了才报错 */
+  const hours = Number(endsInHours)
+  const endsAtOk = Number.isFinite(hours) && hours > 0
+  const optionList = voteOptions.map((s) => s.trim()).filter(Boolean)
+  const countOk = Number.isFinite(Number(prizeCount)) && Math.round(Number(prizeCount)) >= 1
+  const missing =
+    type === CONTENT_TYPE.video && !mediaSrc.trim()
+      ? '请填写视频 / GIF 地址'
+      : type === CONTENT_TYPE.vote
+        ? !voteQuestion.trim()
+          ? '请填写投票问题'
+          : optionList.length < 2
+            ? '投票至少需要 2 个有效选项'
+            : !endsAtOk
+              ? '请填写大于 0 的结束时间（小时）'
+              : ''
+        : type === CONTENT_TYPE.lottery
+          ? !prize.trim()
+            ? '请填写奖品名称'
+            : !countOk
+              ? '奖品份数至少为 1'
+              : !endsAtOk
+                ? '请填写大于 0 的结束时间（小时）'
+                : ''
+          : ''
+  const canPublish = meta.supported && body.trim().length > 0 && hits.length === 0 && titleOk && !missing
 
   const existingTopics = sortTopics(topicsFromPosts(app.state.posts), 'posts').slice(0, 10)
 
   const submit = (): void => {
     if (!meta.supported) {
-      toast(`${meta.name} 暂未开放发布`)
+      toast(`${meta.name} 暂不支持从发布器创建，请改用对应页面`)
       return
     }
     if (!body.trim()) {
       toast('正文不能为空')
+      return
+    }
+    if (missing) {
+      toast(missing)
       return
     }
     if (hits.length > 0) {
@@ -79,7 +138,39 @@ export function PublishPage() {
       return
     }
     if (isPlaza) {
-      app.publishPost(body.trim(), { topic: topic.trim() || null, images, visibility })
+      const opts: PublishPostOptions = { topic: topic.trim() || null, images, visibility }
+      if (type === CONTENT_TYPE.video) {
+        const duration = Number(mediaDuration)
+        opts.media = {
+          kind: mediaKindOf(mediaSrc),
+          src: mediaSrc.trim(),
+          ...(mediaPoster.trim() ? { poster: mediaPoster.trim() } : {}),
+          ...(mediaTitle.trim() ? { title: mediaTitle.trim() } : {}),
+          ...(Number.isFinite(duration) && duration > 0 ? { duration } : {}),
+        }
+      }
+      if (type === CONTENT_TYPE.vote) {
+        opts.vote = {
+          question: voteQuestion.trim(),
+          options: optionList,
+          // counts 必须与 options 等长且全 0，否则百分比渲染会 NaN
+          counts: optionList.map(() => 0),
+          voters: {},
+          endsAt: Date.now() + Math.max(1, Math.round(hours)) * 3_600_000,
+        }
+      }
+      if (type === CONTENT_TYPE.lottery) {
+        opts.lottery = {
+          prize: prize.trim(),
+          count: Math.max(1, Math.round(Number(prizeCount))),
+          participants: [],
+          endsAt: Date.now() + Math.max(1, Math.round(hours)) * 3_600_000,
+        }
+      }
+      // 快拍的 expiresAt 由 publishPost 兜底为 24h，这里只置标记
+      if (type === CONTENT_TYPE.story) opts.story = true
+      if (place.trim()) opts.location = place.trim()
+      app.publishPost(body.trim(), opts)
       reportGrowth('publish_dynamic')
       toast(`已发布：${meta.name}`)
       navigate('/feed')
@@ -113,10 +204,8 @@ export function PublishPage() {
               </button>
             ))}
           </div>
-          <Empty emoji="🚧" text={`「${meta.name}」暂未开放：${meta.hint}`} />
-          <p className="muted">
-            已开放的类型：动态短文 / 图文 / 博文。其余类型待状态层补齐对应存储字段后上线。
-          </p>
+          <Empty emoji="🚧" text={`「${meta.name}」无法从发布器创建`} />
+          <p className="muted">{meta.hint}</p>
         </div>
       </div>
     )
@@ -177,6 +266,134 @@ export function PublishPage() {
                 ))}
               </div>
             ) : null}
+
+            {type === CONTENT_TYPE.video ? (
+              <div className="col" style={{ marginTop: 10 }}>
+                <h3 className="section-title">🎬 媒体</h3>
+                <input
+                  className="input"
+                  placeholder="媒体地址 src（必填，.gif 自动识别为 GIF）"
+                  value={mediaSrc}
+                  onChange={(e) => setMediaSrc(e.target.value)}
+                />
+                <input
+                  className="input"
+                  placeholder="封面 poster（可选）"
+                  value={mediaPoster}
+                  onChange={(e) => setMediaPoster(e.target.value)}
+                />
+                <input
+                  className="input"
+                  placeholder="标题 title（可选）"
+                  value={mediaTitle}
+                  onChange={(e) => setMediaTitle(e.target.value)}
+                />
+                <input
+                  className="input"
+                  placeholder="时长 duration（秒，可选）"
+                  value={mediaDuration}
+                  onChange={(e) => setMediaDuration(e.target.value)}
+                />
+                <small className="muted">
+                  媒体地址会被渲染为 {mediaKindOf(mediaSrc) === 'gif' ? 'GIF' : mediaKindOf(mediaSrc) === 'audio' ? '音频' : '视频'}
+                  块；无真实片源时卡片降级为海报占位，不会伪造画面。
+                </small>
+              </div>
+            ) : null}
+
+            {type === CONTENT_TYPE.vote ? (
+              <div className="col" style={{ marginTop: 10 }}>
+                <h3 className="section-title">🗳 投票</h3>
+                <input
+                  className="input"
+                  placeholder="投票问题"
+                  value={voteQuestion}
+                  onChange={(e) => setVoteQuestion(e.target.value)}
+                />
+                {voteOptions.map((opt, i) => (
+                  <div className="row" key={i}>
+                    <input
+                      className="input grow"
+                      placeholder={`选项 ${i + 1}`}
+                      value={opt}
+                      onChange={(e) => setVoteOptions((s) => s.map((x, j) => (j === i ? e.target.value : x)))}
+                    />
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      aria-label={`删除选项 ${i + 1}`}
+                      onClick={() => setVoteOptions((s) => (s.length > 2 ? s.filter((_, j) => j !== i) : s))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button className="btn btn-ghost btn-sm" onClick={() => setVoteOptions((s) => [...s, ''])}>
+                  + 增加选项
+                </button>
+                <div className="row">
+                  <span className="muted">结束时间</span>
+                  <input
+                    className="input"
+                    style={{ width: 90 }}
+                    inputMode="numeric"
+                    placeholder="24"
+                    value={endsInHours}
+                    onChange={(e) => setEndsInHours(e.target.value)}
+                  />
+                  <span className="muted">小时后</span>
+                </div>
+              </div>
+            ) : null}
+
+            {type === CONTENT_TYPE.lottery ? (
+              <div className="col" style={{ marginTop: 10 }}>
+                <h3 className="section-title">🎁 抽奖</h3>
+                <input
+                  className="input"
+                  placeholder="奖品名称"
+                  value={prize}
+                  onChange={(e) => setPrize(e.target.value)}
+                />
+                <div className="row">
+                  <span className="muted">奖品份数</span>
+                  <input
+                    className="input"
+                    style={{ width: 90 }}
+                    inputMode="numeric"
+                    placeholder="1"
+                    value={prizeCount}
+                    onChange={(e) => setPrizeCount(e.target.value)}
+                />
+                </div>
+                <div className="row">
+                  <span className="muted">开奖时间</span>
+                  <input
+                    className="input"
+                    style={{ width: 90 }}
+                    inputMode="numeric"
+                    placeholder="24"
+                    value={endsInHours}
+                    onChange={(e) => setEndsInHours(e.target.value)}
+                  />
+                  <span className="muted">小时后</span>
+                </div>
+              </div>
+            ) : null}
+
+            {type === CONTENT_TYPE.story ? (
+              <div className="notice-bar" style={{ marginTop: 10 }}>
+                📸 快拍不进入信息流，发布后 24 小时自动过期。
+              </div>
+            ) : null}
+
+            <div className="row wrap" style={{ marginTop: 10 }}>
+              <input
+                className="input topic-input"
+                placeholder="📍 位置（可选）"
+                value={place}
+                onChange={(e) => setPlace(e.target.value)}
+              />
+            </div>
 
             <div className="row" style={{ marginTop: 10 }}>
               <span className="muted">可见范围</span>

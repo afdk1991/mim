@@ -25,6 +25,7 @@ import {
   userNameResolver,
 } from './content-lib'
 import { AsyncState } from './content-parts'
+import { reportGrowth } from './growth-report'
 
 export interface TopicPageProps {
   name: string
@@ -125,7 +126,15 @@ export function TopicPage({ name }: TopicPageProps) {
               viewerId={app.meId}
               onOpen={() => navigate(`/post/${p.id}`)}
               onComment={() => navigate(`/post/${p.id}`)}
-              onToggleLike={() => app.togglePostLike(p.id)}
+              onToggleLike={() => {
+                // 只在「由未赞变已赞」时上报，取消赞不倒扣
+                if (!p.likedByMe) reportGrowth('dynamic_liked')
+                app.togglePostLike(p.id)
+              }}
+              onVote={(i: number) => {
+                app.castVote(p.id, i)
+                toast('投票成功，一人一票 🗳️')
+              }}
               onDelete={p.authorId === app.meId ? () => app.deletePost(p.id) : undefined}
               onUser={(id) => navigate(id === app.meId ? '/my' : `/user/${id}`)}
               onTopic={(t) => navigate(`/topic/${encodeURIComponent(t)}`)}

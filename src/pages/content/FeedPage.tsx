@@ -149,6 +149,10 @@ export function FeedPage() {
         app.togglePostLike(p.id)
       }}
       onRepost={() => setRepostOf(p)}
+      onVote={(i: number) => {
+        app.castVote(p.id, i)
+        toast('投票成功，一人一票 🗳️')
+      }}
       onDelete={p.authorId === app.meId ? () => app.deletePost(p.id) : undefined}
       onUser={(id) => navigate(id === app.meId ? '/my' : `/user/${id}`)}
       onTopic={(name) => navigate(`/topic/${encodeURIComponent(name)}`)}

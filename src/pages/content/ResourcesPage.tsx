@@ -33,6 +33,7 @@ function mapResource(row: Record<string, unknown>): Resource | null {
     size: typeof row.size === 'string' ? row.size : '—',
     downloads: typeof row.downloads === 'number' ? row.downloads : 0,
     type: typeof row.type === 'string' ? row.type : 'file',
+    ...(typeof row.url === 'string' && row.url ? { url: row.url } : {}),
   }
 }
 
@@ -117,11 +118,13 @@ export function ResourcesPage() {
               </div>
               <button
                 className="btn btn-primary btn-sm"
+                title={r.url ? '打开附件' : '该资源未登记附件地址，仅记录一次下载'}
                 onClick={() => {
                   app.downloadResource(r.id)
                   // 计数由后端 rpc 落库；本机成长分同样在真实点击后走 evaluate() 判定
                   const outcome = reportGrowth('resource_downloaded')
                   toast(outcome.ok ? '已记录一次下载 ⬇️' : '已记录下载（今日成长分已达上限）')
+                  if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer')
                 }}
               >
                 下载
