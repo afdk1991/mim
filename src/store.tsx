@@ -35,7 +35,6 @@ import { pullCloudContent, type CloudPayload } from './lib/cloud-read'
 import { cloudSendMessage, subscribeMessages } from './lib/cloud-msg'
 import { supabase } from './lib/supabase'
 import { recordGrowth } from './growth'
-import { revenueSnapshot, walletIncome } from './wallet'
 
 /* v3：演示 seed 已彻底删除，旧 key（mim-state-v2）存档含演示内容，直接换 key 作废——
    所有访客（含老浏览器）一律从全空态起步，真实内容来自用户自产与云端合并。 */
@@ -1221,14 +1220,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'downloadResource', payload: id })
         // 轮 13 打通：资源被下载 → 知识线 resource_downloaded
         recordGrowth('resource_downloaded')
-        // 轮 14 打通：资源被下载 → 作者按 revenue_rule(resource_buy 80%) 分成入账
-        // demo 单身份模拟：uploader 为当前身份名时，视为自己的资源被他人下载；
-        // 演示定价 ¥5.00（500 分）× 80% = 400 分，快照冻结下单时刻费率
-        const res = state.resources.find((r) => r.id === id)
-        if (res && res.uploader === state.users[state.meId]?.name) {
-          const snap = revenueSnapshot('resource_buy')
-          if (snap) walletIncome(400, `资源下载分成（${res.title}）`, snap)
-        }
+        // 分成入账需要「他人真实购买 + 服务端结算」，本机无法判定，
+        // 因此不再在本地凭空生成收益流水（避免伪造金额）
       },
       /* 下拉刷新：演示伪造已随 seed 一并删除；云端内容经 cloudMerge 进入，此处恒 0 */
       refreshFeed: () => 0,

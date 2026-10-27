@@ -150,7 +150,7 @@ export function walletConsume(fen: number, note: string): boolean {
   if (!Number.isFinite(fen) || fen <= 0) return false
   const s = loadWallet()
   if (s.balanceFen < fen) {
-    emitToast(`余额不足：需 ¥${yuan(fen)}，当前 ¥${yuan(s.balanceFen)}，请先到钱包页充值`)
+    emitToast(`余额不足：需 ¥${yuan(fen)}，当前 ¥${yuan(s.balanceFen)}，请到商城钱包扫码付款并等待管理员核销到账`)
     return false
   }
   const tx: Tx = { id: Date.now(), kind: 'consume', fen, note, at: Date.now() }
@@ -163,7 +163,8 @@ export function walletConsume(fen: number, note: string): boolean {
   return true
 }
 
-/** 统一充值入口：外部模块（商城等）模拟渠道到账（kind=recharge，非收益，不携快照） */
+/** 统一充值入口：仅由「真实收款渠道人工核销」调用（kind=recharge，非收益，不携快照）；
+ *  禁止任何无凭证自助入账——余额只能来自已确认到账的款项或真实内容收益。 */
 export function walletRecharge(fen: number, note: string): void {
   if (!Number.isFinite(fen) || fen <= 0) return
   const s = loadWallet()
@@ -237,30 +238,6 @@ export function WalletPage() {
     persistWallet(next)
   }
 
-  /* 追加一条流水（金额校验 > 0） */
-  const push = (tx: Tx) => {
-    const delta = tx.kind === 'consume' ? -tx.fen : tx.fen
-    const nextFen = balanceFen + delta
-    if (nextFen < 0) {
-      toast('余额不足')
-      return
-    }
-    save({ ...state, balanceFen: nextFen, txs: [tx, ...state.txs].slice(0, 50) })
-  }
-
-  const recharge = (fen: number) =>
-    push({ id: Date.now(), kind: 'recharge', fen, note: `充值 ¥${yuan(fen)}（未接入真实支付）`, at: Date.now() })
-
-  const consume = (fen: number, note: string) =>
-    push({ id: Date.now(), kind: 'consume', fen, note, at: Date.now() })
-
-  /* 收益：费率快照取「下单时刻」——demo 直接把规则表当前值冻结进流水 */
-  const income = (
-    fen: number,
-    note: string,
-    snap: NonNullable<Tx['snapshot']>,
-  ) => push({ id: Date.now(), kind: 'income', fen, note, at: Date.now(), snapshot: snap })
-
   const switchPlan = (p: PlanCode) => {
     if (p === plan) return
     save({ ...state, plan: p })
@@ -326,57 +303,22 @@ export function WalletPage() {
           ))}
         </div>
 
-        {/* 快速入账：暂无真实支付/结算通道，此处为手动入口（income 携带费率快照入账） */}
-        <h3 className="wl-sec-title">快速入账（income 携带费率快照入账）</h3>
+        {/* 入账说明：本站未接入在线支付，余额只能来自真实到账或真实内容收益，不提供自助加钱入口 */}
+        <h3 className="wl-sec-title">余额从哪来（无自助入账）</h3>
         <div className="wl-actions">
-          <button type="button" className="wl-act recharge" onClick={() => recharge(3000)}>
-            🪙 充值 ¥30.00
-          </button>
-          <button type="button" className="wl-act recharge" onClick={() => recharge(10000)}>
-            🪙 充值 ¥100.00
-          </button>
-          <button
-            type="button"
-            className="wl-act income"
-            onClick={() =>
-              income(1800, '博文广告 CPC 结算（20 博文）', {
-                content_type: 20, sku_type: 'ad_cpc', rate_pct: '60%', settle_tn: 'T+1',
-              })
-            }
-          >
-            📈 博文广告结算 +¥18.00
-          </button>
-          <button
-            type="button"
-            className="wl-act income"
-            onClick={() =>
-              income(2400, '资源购买分成（22 资源）', {
-                content_type: 22, sku_type: 'resource_buy', rate_pct: '80%', settle_tn: 'T+3',
-              })
-            }
-          >
-            📈 资源分成 +¥24.00
-          </button>
-          <button
-            type="button"
-            className="wl-act income"
-            onClick={() =>
-              income(600, '动态广告 CPM 分成（10 动态）', {
-                content_type: 10, sku_type: 'ad_cpm_share', rate_pct: '50%', settle_tn: 'T+1',
-              })
-            }
-          >
-            📈 动态分成 +¥6.00
-          </button>
-          <button type="button" className="wl-act consume" onClick={() => consume(1500, 'VIP 会员月费（消费）')}>
-            💳 VIP 月费 -¥15.00
-          </button>
+          <a className="wl-act recharge" href="#/mall/wallet">
+            💳 去商城钱包提交付款凭证
+          </a>
         </div>
+        <p className="wl-sub" style={{ marginTop: 8 }}>
+          充值需在商城钱包提交付款凭证，由管理员凭核销口令确认到账后，才会记入本页余额；
+          内容分成（资源下载 / 广告结算）由结算链路写入。本站不提供「点一下余额就增加」的自助入口。
+        </p>
 
         {/* 流水列表 */}
         <h3 className="wl-sec-title">钱包流水（最近 {Math.min(txs.length, 50)} 条）</h3>
         {txs.length === 0 ? (
-          <Empty text="还没有流水，点上面的快速入账试试" />
+          <Empty text="还没有流水，充值到账或内容分成结算后会显示在这里" />
         ) : (
           <div className="wl-txs">
             {txs.map((t) => {

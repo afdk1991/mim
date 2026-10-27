@@ -4,7 +4,8 @@
    数据归属：积分/购物车/订单按真实登录身份隔离（mim-mall-v2:<userId>）。
    商品唯一来源为云端 products 表；不含任何演示商品/演示订单/演示积分。
    轮 15 打通：余额不再独立存储，统一镜像 mim-wallet-v1（getWalletState），
-   支付走 walletConsume 真实扣费，充值走 walletRecharge 进统一钱包流水。
+   支付走 walletConsume 真实扣费；充值不再由本模块直接加钱，
+   改由 MallWallet 走「扫码付款 + 凭证 + 管理员核销」后调用 walletRecharge 入账。
    轮 17：支付通道适配（src/mall/payment.ts）——钱包余额 + 收款码扫码人工确认
    （付款凭证 → awaiting_confirm → 管理员口令核销），为后续聚合支付预留通道位。 */
 
@@ -13,7 +14,7 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../auth'
 import { supabase } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
-import { WALLET_UPDATE_EVT, getWalletState, walletConsume, walletRecharge } from '../wallet'
+import { WALLET_UPDATE_EVT, getWalletState, walletConsume } from '../wallet'
 import { checkOperatorKey } from './payment'
 import type { PayChannelId, PayProof } from './payment'
 
@@ -262,7 +263,6 @@ type MallApi = {
   /** 取消 unpaid 订单（演示简化：直接从订单列表移除） */
   cancelOrder: (id: string) => void
   confirmOrder: (id: string) => void
-  recharge: (amount: number) => void
 }
 
 const MallContext = createContext<MallApi | null>(null)
@@ -402,10 +402,6 @@ export function MallProvider({ children }: { children: ReactNode }) {
         ...s,
         orders: s.orders.map((o) => (o.id === id && o.status === 'paid' ? { ...o, status: 'done' } : o)),
       }))
-    },
-    recharge(amount) {
-      /* 轮 15 并轨：充值进统一钱包（元→分），余额镜像由 WALLET_UPDATE_EVT 事件同步刷新 */
-      walletRecharge(amount * 100, `商城充值 ¥${amount}（未接入真实支付）`)
     },
   }
 
