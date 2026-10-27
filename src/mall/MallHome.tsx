@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Empty } from '../components'
 import { cx } from '../utils'
 import { MALL_CHANNEL_META, useMall, useMallGoods } from './store'
+import { BIZ_ENTRIES } from './biz/registry'
 import type { MallChannel } from './store'
 
 type Cat = MallChannel | 'all'
@@ -50,6 +51,25 @@ export function MallHomePage({ initial }: { initial?: MallChannel }) {
               <small>购物车</small>
             </a>
           </div>
+        </div>
+
+        {/* 四大业务统一入口：会场承载各自的差异化履约（抢购/核销/直播/出行），
+            与下方频道商品流并存 —— 频道按商品归类看，会场按业务履约进 */}
+        <div className="mall-biz-entries">
+          {BIZ_ENTRIES.map((b) => (
+            <a key={b.kind} className="card mall-biz-entry" href={b.route}>
+              <span className="mall-biz-entry-emoji">{b.emoji}</span>
+              <b>{b.label}</b>
+              <small>{b.desc}</small>
+              <div className="mall-biz-entry-tags">
+                {b.highlights.map((h) => (
+                  <span key={h} className="tag">
+                    {h}
+                  </span>
+                ))}
+              </div>
+            </a>
+          ))}
         </div>
 
         <div className="mall-chips">

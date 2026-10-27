@@ -3689,3 +3689,191 @@ html[data-theme='dark'] .hist-chip .hist-del:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+ * 商城四大业务会场（轮 26）：秒杀 / 本地生活 / 直播尖货 / 出行服务
+ * 与既有 .mall-* 同族，复用 --primary / --danger / --text-3 主题变量，
+ * 深浅色主题均由变量驱动，不再单独写死颜色。
+ * ======================================================================== */
+
+/* 商城中心：四大业务统一入口 */
+.mall-biz-entries {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mall-biz-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+}
+
+.mall-biz-entry-emoji {
+  font-size: 26px;
+}
+
+.mall-biz-entry small {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.mall-biz-entry-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* 会场区块标题 */
+.mall-biz-section {
+  font-size: 14px;
+  margin: 14px 0 8px;
+}
+
+/* 业务卡片 */
+.mall-biz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mall-biz-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mall-biz-emoji {
+  font-size: 30px;
+  width: 46px;
+  height: 46px;
+  line-height: 46px;
+  text-align: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary-weak), var(--bg));
+  flex: none;
+  user-select: none;
+}
+
+.mall-biz-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mall-biz-title small {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 库存进度条（秒杀） */
+.mall-biz-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.mall-biz-progress i {
+  display: block;
+  height: 100%;
+  background: var(--danger);
+}
+
+/* 卡片底部：价格 + 操作 */
+.mall-biz-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mall-biz-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mall-biz-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mall-biz-merchant {
+  padding: 12px;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mall-biz-explaining {
+  outline: 1px solid var(--primary);
+}
+
+/* 出行预订表单 */
+.mall-biz-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mall-biz-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+
+/* 订单中心的业务差异行 */
+.mall-biz-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(128, 128, 128, 0.3);
+  font-size: 12px;
+}
+
+/* 履约状态徽标（与资金状态 .mall-order-status 同形，语义独立） */
+.mall-biz-status {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  color: var(--text-3);
+  background: var(--bg);
+  flex: none;
+}
+
+.mall-biz-pending {
+  background: var(--primary-weak);
+  color: var(--primary);
+}
+
+.mall-biz-locked {
+  background: rgba(230, 67, 64, 0.12);
+  color: var(--danger);
+}
+
+.mall-biz-done {
+  background: var(--primary-weak);
+  color: var(--primary-deep);
+}
+
+.mall-biz-closed {
+  background: var(--bg);
+  color: var(--text-3);
+}

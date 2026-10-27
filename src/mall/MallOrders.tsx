@@ -9,6 +9,11 @@ import { Empty, useToast } from '../components'
 import { cx } from '../utils'
 import { MALL_CHANNEL_META, useMall } from './store'
 import type { MallOrder } from './store'
+import { BIZ_STATUS_META, bizStatusLabel, readOrderExt } from './biz/registry'
+import { fmtDate } from './biz/types'
+import { issueVoucherCode } from './biz/local'
+import { refundTravel } from './biz/travel'
+import { releaseSeckill } from './biz/seckill'
 import { PAY_CHANNELS, qrcodePayInfo } from './payment'
 import type { PayChannelId } from './payment'
 
@@ -148,6 +153,83 @@ function PayPanel({ order, onClose }: { order: MallOrder; onClose: () => void })
   )
 }
 
+/* 业务差异行：展示各业务独有字段，并提供该业务的履约动作。
+   主订单状态（资金）与履约状态（bizStatus）同时展示 —— 二者正交，不互相替代。 */
+function BizLine({ order }: { order: MallOrder }) {
+  const toast = useToast()
+  const { setBizStatus, setBizExt } = useMall()
+  const [busy, setBusy] = useState(false)
+  const ext = readOrderExt(order.ext)
+  if (!ext) return null
+  /* 联合类型收窄：闭包内直接判 ext.kind 会被 TS 的收窄规则漏掉，这里先落变量 */
+  const localExt = ext.kind === 'local' ? ext : null
+  const travelExt = ext.kind === 'travel' ? ext : null
+  const seckillExt = ext.kind === 'seckill' ? ext : null
+  const liveExt = ext.kind === 'live' ? ext : null
+
+  let summary = ''
+  if (seckillExt) summary = `秒杀价 ¥${seckillExt.seckillPrice} · 库存锁定至 ${fmtTime(seckillExt.lockExpireAt)}`
+  if (localExt) {
+    summary = `${localExt.merchantName} · 券码 ${localExt.voucherCode || '待支付后发放'} · 有效期至 ${fmtDate(new Date(localExt.expireAt))}`
+  }
+  if (liveExt) summary = `${liveExt.roomTitle} · 主播 ${liveExt.anchorName} · 专享价 ¥${liveExt.livePrice}`
+  if (travelExt) {
+    summary = `${travelExt.kindLabel} ${travelExt.date} · ${travelExt.passengers.join('、')} · ${travelExt.seatClass} · ${
+      travelExt.rule.refundable ? `可退（手续费 ${Math.round(travelExt.rule.feeRate * 100)}%）` : '不可退'
+    }`
+  }
+
+  const takeCode = async () => {
+    if (!localExt || busy) return
+    setBusy(true)
+    try {
+      const code = await issueVoucherCode(order.id, localExt.voucherId)
+      if (!code) {
+        toast('取码失败：服务端未返回券码')
+        return
+      }
+      setBizExt(order.id, { ...localExt, voucherCode: code })
+      setBizStatus(order.id, 'pending_verify')
+      toast(`券码 ${code} · 到店出示即可核销`)
+    } catch (e) {
+      toast(`取码失败：${(e as Error).message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doRefund = async () => {
+    if (!travelExt || busy) return
+    setBusy(true)
+    try {
+      const r = await refundTravel(order.id)
+      setBizStatus(order.id, 'refunded')
+      toast(`已退票 · 实退 ¥${r.refund}（手续费 ¥${r.fee}）`)
+    } catch (e) {
+      toast(`退票失败：${(e as Error).message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mall-biz-line">
+      <span className="muted">{summary}</span>
+      {localExt && !localExt.voucherCode && (order.status === 'paid' || order.status === 'done') && (
+        <button className="btn btn-primary btn-sm" disabled={busy} onClick={takeCode}>
+          {busy ? '取码中…' : '取券码'}
+        </button>
+      )}
+      {travelExt && order.bizStatus === 'ticketed' && (
+        <button className="btn btn-ghost btn-sm" disabled={busy} onClick={doRefund}>
+          {busy ? '退票中…' : '申请退票'}
+        </button>
+      )}
+      {seckillExt && order.status === 'unpaid' && <span className="muted">请在锁定期内完成支付，超时自动释放</span>}
+    </div>
+  )
+}
+
 /* 管理员核销面板：输入口令确认收款（口令配置于 site-config payConfirmKey） */
 function AdminPanel({ order, onClose }: { order: MallOrder; onClose: () => void }) {
   const { confirmManualPay } = useMall()
@@ -195,7 +277,30 @@ export function MallOrdersPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [openPayId, setOpenPayId] = useState<string | null>(null)
   const [openAdminId, setOpenAdminId] = useState<string | null>(null)
+  const [canceling, setCanceling] = useState<string | null>(null)
   const orders = filter === 'all' ? state.orders : state.orders.filter((o) => o.status === filter)
+
+  /**
+   * 取消订单：秒杀单要先向服务端释放锁库存，否则库存会被「幽灵锁」占住到超时。
+   * 释放失败不阻断取消（锁本身有 15 分钟过期兜底，服务端幂等）。
+   */
+  const cancel = async (o: MallOrder) => {
+    const ext = readOrderExt(o.ext)
+    setCanceling(o.id)
+    try {
+      if (ext?.kind === 'seckill') {
+        try {
+          await releaseSeckill(ext.sessionId, o.id)
+        } catch {
+          /* 锁已过期/无锁：服务端幂等，忽略 */
+        }
+      }
+      cancelOrder(o.id)
+      toast('已取消订单')
+    } finally {
+      setCanceling(null)
+    }
+  }
 
   return (
     <div className="page-grid single">
@@ -227,6 +332,14 @@ export function MallOrdersPage() {
                 </div>
                 <div className="mall-order-side">
                   <span className={`mall-order-status ${STATUS_META[o.status].cls}`}>{STATUS_META[o.status].label}</span>
+                  {/* 履约状态：与主状态并列展示（资金归资金、交付归交付） */}
+                  {o.bizStatus && (
+                    <span
+                      className={`mall-biz-status ${BIZ_STATUS_META[o.bizStatus]?.cls ?? 'mall-biz-pending'}`}
+                    >
+                      {bizStatusLabel(o.bizStatus)}
+                    </span>
+                  )}
                   {o.status === 'unpaid' && (
                     <>
                       <button
@@ -235,14 +348,8 @@ export function MallOrdersPage() {
                       >
                         去支付
                       </button>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => {
-                          cancelOrder(o.id)
-                          toast('已取消订单')
-                        }}
-                      >
-                        取消订单
+                      <button className="btn btn-ghost btn-sm" disabled={canceling === o.id} onClick={() => cancel(o)}>
+                        {canceling === o.id ? '取消中…' : '取消订单'}
                       </button>
                     </>
                   )}
@@ -279,6 +386,8 @@ export function MallOrdersPage() {
                   （等待站点管理员确认收款）
                 </div>
               )}
+              {/* 业务差异化：独有字段 + 该业务的履约动作（取券码 / 退票 …） */}
+              <BizLine order={o} />
             </div>
           ))
         )}

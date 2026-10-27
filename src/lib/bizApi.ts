@@ -224,6 +224,133 @@ export async function mallListOrders(): Promise<Record<string, unknown>[]> {
   return Array.isArray(data) ? (data as Record<string, unknown>[]) : []
 }
 
+/* ----------------------------- 商城四业务（迁移 0012） ----------------------------- */
+
+/**
+ * 四大业务（秒杀 / 本地生活 / 直播尖货 / 出行服务）的通用读写通道。
+ *
+ * 设计要点：
+ *   · 本层只做「传输 + 错误翻译」，不做业务建模 —— 行 → 领域模型的映射与
+ *     降级策略放在 src/mall/biz/*，避免出现第二套业务真源。
+ *   · 读取失败一律返回 null（调用方渲染空态），绝不兜底演示数据。
+ *   · 写操作（抢购/占座/核销/发码/退票）一律走服务端 definer RPC：
+ *     库存扣减、限购、状态机必须由数据库保证并发正确性，
+ *     应用层 read-modify-write 必然超卖。
+ */
+
+/** 迁移 0012 建立的业务表（白名单：前端不得代理任意表名，防越权探测） */
+export type MallBizTable =
+  | 'seckill_sessions'
+  | 'seckill_locks'
+  | 'local_merchants'
+  | 'local_vouchers'
+  | 'local_voucher_codes'
+  | 'live_rooms'
+  | 'live_shelf'
+  | 'travel_tickets'
+  | 'travel_date_stock'
+  | 'travel_rules'
+
+/** 迁移 0012 的 definer 函数（写操作唯一入口） */
+export type MallBizRpcFn =
+  | 'seckill_grab'
+  | 'seckill_release'
+  | 'verify_voucher'
+  | 'issue_voucher_code'
+  | 'travel_book'
+  | 'travel_refund'
+
+/** 业务查询描述（只覆盖列表场景需要的过滤/排序/分页，不过度设计） */
+export interface BizQuery {
+  select?: string
+  eq?: [string, string | number | boolean][]
+  order?: { col: string; asc?: boolean }
+  limit?: number
+}
+
+/** 服务端业务错误码 → 中文提示（与迁移 0012 各 RPC 返回的 error 码对齐） */
+const BIZ_ERR_CN: Record<string, string> = {
+  ...OPS_ERR_CN,
+  no_auth: '请先登录',
+  forbidden: '仅管理员可执行该操作',
+  bad_qty: '购买数量不合法',
+  no_session: '场次不存在',
+  closed: '该场次已关闭',
+  not_started: '还没开抢，请稍候',
+  ended: '本场已结束',
+  over_limit: '已达每人限购上限',
+  sold_out: '库存不足，已被抢完',
+  no_code: '券码不存在',
+  already_used: '该券码已核销，不可重复使用',
+  expired: '券码已过期',
+  bad_status: '当前状态不允许该操作',
+  no_voucher: '套餐不存在',
+  unpaid: '订单未支付，暂不可取券',
+  no_stock: '该日期不可售',
+  no_rule: '未配置退改规则',
+  non_refundable: '该票种不支持退票',
+  already_refunding: '已在退款流程中',
+  not_travel: '该订单不是出行订单',
+}
+
+/** 把服务端 code 翻译成用户可读文案（未登记的原样返回，便于排查） */
+function bizFailure(e: unknown): Error {
+  const raw = e instanceof Error ? e.message : String(e)
+  return new Error(BIZ_ERR_CN[raw] ?? raw)
+}
+
+/**
+ * 读取业务表（云端优先）。
+ * @returns 行数组；表/列缺失（迁移未应用）、查询失败或无数据时返回 null，由调用方渲染空态
+ */
+export async function mallBizRows<T = Record<string, unknown>>(
+  table: MallBizTable,
+  q: BizQuery = {},
+): Promise<T[] | null> {
+  const cols = q.select ?? '*'
+  if (cloudBackend === 'cloudbase') {
+    const p = new URLSearchParams()
+    p.set('select', cols)
+    for (const [c, v] of q.eq ?? []) p.append(c, `eq.${v}`)
+    if (q.order) p.set('order', `${q.order.col}.${q.order.asc === false ? 'desc' : 'asc'}`)
+    if (q.limit) p.set('limit', String(q.limit))
+    try {
+      const j = await cbFetch(`/db/rest/${table}?${p.toString()}`, 'GET')
+      return Array.isArray(j) ? (j as T[]) : null
+    } catch {
+      return null // 表不存在/无权限：降级空态，不打断页面
+    }
+  }
+  if (!supabase) return null
+  try {
+    let query = supabase.from(table).select(cols)
+    for (const [c, v] of q.eq ?? []) query = query.eq(c, v)
+    if (q.order) query = query.order(q.order.col, { ascending: q.order.asc !== false })
+    if (q.limit) query = query.limit(q.limit)
+    const { data, error } = await query
+    if (error || !Array.isArray(data)) return null
+    return data as T[]
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 调用业务 RPC（写操作唯一入口）。
+ * @throws 服务端返回 { ok:false, error:'xxx' } 时抛对应中文错误，供页面 toast
+ */
+export async function mallBizRpc<T = Record<string, unknown>>(
+  fn: MallBizRpcFn,
+  params: Record<string, unknown> = {},
+): Promise<T> {
+  try {
+    if (cloudBackend === 'cloudbase') return (await cbFetch(`/db/rpc/${fn}`, 'POST', params)) as T
+    return (await sbRpc(fn, params)) as T
+  } catch (e) {
+    throw bizFailure(e)
+  }
+}
+
 /* ----------------------------- 价格行情（P1-1） ----------------------------- */
 
 export interface BizPriceQuote { price: number; change: number; at: number }

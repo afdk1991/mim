@@ -52,6 +52,11 @@ import { MallGoodsPage } from './mall/MallGoods'
 import { MallCartPage } from './mall/MallCart'
 import { MallOrdersPage } from './mall/MallOrders'
 import { MallWalletPage } from './mall/MallWallet'
+import { MallSeckillPage } from './mall/MallSeckill'
+import { MallLocalPage } from './mall/MallLocal'
+import { MallLivePage } from './mall/MallLive'
+import { MallTravelPage } from './mall/MallTravel'
+import { BIZ_BY_ROUTE } from './mall/biz/registry'
 import { GrowthPage } from './growth'
 import { PublishPage } from './publish'
 import { WalletPage } from './wallet'
@@ -387,6 +392,21 @@ function Page() {
     /* ---------- 商城中台 ---------- */
     case 'mall': {
       if (param === 'goods') return <MallGoodsPage id={segs[2] ?? ''} />
+      /* 四大业务会场：#/mall/biz/<kind>。
+         单独前缀是为了与频道路由（#/mall/live 等，走商品流）互不干扰：
+         频道是「商品归类」，会场是「业务履约」，两者入口并存、都不破坏。 */
+      if (param === 'biz') {
+        switch (BIZ_BY_ROUTE[segs[2] ?? '']) {
+          case 'seckill':
+            return <MallSeckillPage />
+          case 'local':
+            return <MallLocalPage />
+          case 'live':
+            return <MallLivePage />
+          case 'travel':
+            return <MallTravelPage />
+        }
+      }
       /* 频道直达：#/mall/youxuan 等五个频道子路径 → 商城中心预选频道 */
       if (param && param in MALL_CHANNEL_META) return <MallHomePage initial={param as MallChannel} />
       if (param === 'cart') return <MallCartPage />

@@ -7,7 +7,10 @@
    支付走 walletConsume 真实扣费；充值不再由本模块直接加钱，
    改由 MallWallet 走「扫码付款 + 凭证 + 管理员核销」后调用 walletRecharge 入账。
    轮 17：支付通道适配（src/mall/payment.ts）——钱包余额 + 收款码扫码人工确认
-   （付款凭证 → awaiting_confirm → 管理员口令核销），为后续聚合支付预留通道位。 */
+   （付款凭证 → awaiting_confirm → 管理员口令核销），为后续聚合支付预留通道位。
+   轮 26 扩展：四大业务（秒杀/本地生活/直播尖货/出行服务）接入同一条链路——
+   商品、购物车、订单、支付仍是唯一一套，业务独有字段挂在 MallOrder.ext（OrderExt），
+   履约语义走 bizStatus，与主状态正交。ext 为 undefined 的普通订单行为完全不变。 */
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -17,6 +20,8 @@ import { supabase } from '../lib/supabase'
 import { pullToolState, pushToolState } from '../lib/tool-cloud'
 import { WALLET_UPDATE_EVT, getWalletState, walletConsume, hydrateWallet } from '../wallet'
 import { mallConfirm, mallUpsertOrder } from '../lib/bizApi'
+import { initialBizStatus, channelOfBiz } from './biz/types'
+import type { BizKind, OrderBizStatus, OrderExt } from './biz/types'
 import type { PayChannelId, PayProof } from './payment'
 
 export type MallChannel = 'youxuan' | 'gexm' | 'mix' | 'live' | 'laal'
@@ -31,7 +36,8 @@ export type MallGoods = {
   desc: string
 }
 
-export type MallCartItem = { goodsId: string; qty: number; spec?: string }
+/** 购物车行：price 为业务成交单价覆盖（秒杀价/直播价），缺省取商品目录价 */
+export type MallCartItem = { goodsId: string; qty: number; spec?: string; price?: number; ext?: OrderExt }
 
 export type MallOrder = {
   id: string
@@ -46,6 +52,11 @@ export type MallOrder = {
   at: number
   payChannel?: PayChannelId
   proof?: PayProof
+  /* ---- 业务扩展（四大业务；普通实物订单三项均为 undefined，行为不变） ---- */
+  bizKind?: BizKind
+  ext?: OrderExt
+  /** 履约状态（到店核销 / 出票 / 退改…），与 status 正交 */
+  bizStatus?: OrderBizStatus
 }
 
 export type MallState = {
@@ -205,6 +216,10 @@ function toCloudOrder(o: MallOrder): Record<string, unknown> {
     status: o.status,
     pay_channel: o.payChannel ?? null,
     proof: o.proof ?? null,
+    /* 迁移 0012 新增列；未应用时整行会被拒，由 cloud-write 的缺列降级自动裁剪 */
+    biz_kind: o.bizKind ?? null,
+    ext: o.ext ?? null,
+    biz_status: o.bizStatus ?? null,
   }
 }
 
@@ -230,6 +245,15 @@ const isCartItem = (c: unknown): c is MallCartItem =>
 const isOrder = (it: unknown): it is MallOrder => {
   if (!it || typeof it !== 'object') return false
   const r = it as Partial<MallOrder>
+  /* 业务扩展三件套：要么全无（普通订单），要么有 ext 且 kind 合法；
+     半残数据（有 bizKind 无 ext）视为脏数据丢弃，避免订单页渲染出无源状态 */
+  const ext = r.ext
+  const extOk =
+    ext === undefined ||
+    (!!ext &&
+      typeof ext === 'object' &&
+      (ext.kind === 'seckill' || ext.kind === 'local' || ext.kind === 'live' || ext.kind === 'travel'))
+  const bizOk = extOk && (r.bizStatus === undefined || typeof r.bizStatus === 'string')
   return (
     typeof r.id === 'string' &&
     typeof r.goodsId === 'string' &&
@@ -239,7 +263,8 @@ const isOrder = (it: unknown): it is MallOrder => {
     typeof r.qty === 'number' &&
     isChannel(r.channel) &&
     (r.status === 'unpaid' || r.status === 'awaiting_confirm' || r.status === 'paid' || r.status === 'done') &&
-    typeof r.at === 'number'
+    typeof r.at === 'number' &&
+    bizOk
   )
 }
 
@@ -263,14 +288,41 @@ function loadMallFor(userId: string): MallState {
   }
 }
 
+/** 业务直接下单入参（秒杀抢购 / 券购买 / 直播下单 / 出行占座统一入口） */
+export type PlaceBizInput = {
+  goodsId: string
+  title: string
+  emoji: string
+  /** 成交单价（元）：秒杀价 / 券价 / 直播专享价 / 日期票价 */
+  price: number
+  qty: number
+  ext: OrderExt
+  /**
+   * 服务端占库存回调（拿到订单号后执行：seckill_grab / travel_book）。
+   * 回调抛错即放弃建单 —— 库存没占到就不该产生订单，避免「下单成功但无库存」。
+   */
+  hold?: (orderId: string) => Promise<void>
+}
+
 type MallApi = {
   state: MallState
-  addToCart: (goodsId: string, qty?: number, spec?: string) => void
+  /** @param biz 业务成交单价与扩展（省略即普通实物商品，走目录价） */
+  addToCart: (goodsId: string, qty?: number, spec?: string, biz?: { price?: number; ext?: OrderExt }) => void
   setCartQty: (goodsId: string, spec: string | undefined, qty: number) => void
   removeFromCart: (goodsId: string, spec?: string) => void
   clearCart: () => void
-  /** 购物车合并为一笔 unpaid 订单（不扣钱，payOrder 时才扣） */
+  /** 购物车合并为一笔 unpaid 订单（不扣钱，payOrder 时才扣）；业务行按其 ext 归入对应频道 */
   checkout: () => MallOrder | null
+  /**
+   * 业务直接下单：先让服务端占住库存（hold），成功才建单。
+   * 与普通 checkout 的区别：库存/场次资格由服务端裁定，失败即无订单。
+   * @returns 订单；hold 失败返回 null（已 toast 服务端原因）
+   */
+  placeBizOrder: (input: PlaceBizInput) => Promise<MallOrder | null>
+  /** 推进履约状态（核销 / 出票 / 退票…）；与资金状态互不干扰 */
+  setBizStatus: (id: string, bizStatus: OrderBizStatus) => void
+  /** 覆写业务扩展（如支付后回填服务端下发的券码）；整段替换便于联合类型收窄 */
+  setBizExt: (id: string, ext: OrderExt) => void
   /** 校验 unpaid + 统一钱包扣费成功 → 返 5% 积分 → paid；失败返回 false */
   payOrder: (id: string) => boolean
   /** 扫码人工确认通道：提交付款凭证（unpaid → awaiting_confirm，等待管理员核销） */
@@ -323,13 +375,18 @@ export function MallProvider({ children }: { children: ReactNode }) {
 
   const api: MallApi = {
     state,
-    addToCart(goodsId, qty = 1, spec) {
+    addToCart(goodsId, qty = 1, spec, biz) {
       setState((s) => {
         const i = s.cart.findIndex((c) => c.goodsId === goodsId && c.spec === spec)
-        if (i < 0) return { ...s, cart: [...s.cart, { goodsId, qty, spec }] }
+        if (i < 0) return { ...s, cart: [...s.cart, { goodsId, qty, spec, ...biz }] }
         const cur = s.cart[i]
         if (!cur) return s
         const cart = s.cart.slice()
+        // 业务行（有 ext）不与普通行合并：秒杀价与目录价混在一行会算错钱
+        if (cur.ext || biz?.ext) {
+          cart.push({ goodsId, qty, spec, ...biz })
+          return { ...s, cart }
+        }
         cart[i] = { ...cur, qty: cur.qty + qty }
         return { ...s, cart }
       })
@@ -355,11 +412,13 @@ export function MallProvider({ children }: { children: ReactNode }) {
       const goods = currentGoods()
       const first = goods.find((g) => g.id === head.goodsId)
       if (!first) return null
-      const amount = state.cart.reduce(
-        (sum, c) => sum + (goods.find((g) => g.id === c.goodsId)?.price ?? 0) * c.qty,
-        0,
-      )
+      /* 业务行按成交单价（price）计价，普通行按目录价 */
+      const unitPrice = (c: MallCartItem) => c.price ?? goods.find((g) => g.id === c.goodsId)?.price ?? 0
+      const amount = state.cart.reduce((sum, c) => sum + unitPrice(c) * c.qty, 0)
       const qty = state.cart.reduce((sum, c) => sum + c.qty, 0)
+      /* 业务归属：任一行带 ext 即以该业务的频道落单（业务单不跨业务混单） */
+      const bizLine = state.cart.find((c) => c.ext)
+      const ext = bizLine?.ext
       const order: MallOrder = {
         id: `MO-${Date.now()}`,
         goodsId: first.id,
@@ -367,14 +426,63 @@ export function MallProvider({ children }: { children: ReactNode }) {
         emoji: first.emoji,
         amount,
         qty,
-        channel: first.channel,
+        channel: ext ? channelOfBiz(ext) : first.channel,
         status: 'unpaid',
         at: Date.now(),
+      }
+      if (ext) {
+        order.bizKind = ext.kind
+        order.ext = ext
+        order.bizStatus = initialBizStatus(ext)
       }
       setState((s) => ({ ...s, orders: [order, ...s.orders], cart: [] }))
       // 云端持久化订单（真源从 localStorage 挪到数据库，按 user_id 隔离）
       void mallUpsertOrder(toCloudOrder(order)).catch(() => {})
       return order
+    },
+    async placeBizOrder(input) {
+      const id = `MO-${Date.now()}`
+      // 先占库存：服务端裁定失败（售罄/未开抢/超限/不可退…）即不建单
+      if (input.hold) {
+        try {
+          await input.hold(id)
+        } catch (e) {
+          emitToast(`下单失败：${(e as Error).message}`)
+          return null
+        }
+      }
+      const ext = input.ext
+      const order: MallOrder = {
+        id,
+        goodsId: input.goodsId,
+        title: input.title,
+        emoji: input.emoji,
+        amount: Math.round(input.price * input.qty),
+        qty: input.qty,
+        channel: channelOfBiz(ext),
+        status: 'unpaid',
+        at: Date.now(),
+        bizKind: ext.kind,
+        ext,
+        bizStatus: initialBizStatus(ext),
+      }
+      setState((s) => ({ ...s, orders: [order, ...s.orders] }))
+      void mallUpsertOrder(toCloudOrder(order)).catch(() => {})
+      return order
+    },
+    setBizStatus(id, bizStatus) {
+      const cur = state.orders.find((o) => o.id === id)
+      if (!cur) return
+      const next: MallOrder = { ...cur, bizStatus }
+      setState((s) => ({ ...s, orders: s.orders.map((o) => (o.id === id ? next : o)) }))
+      void mallUpsertOrder(toCloudOrder(next)).catch(() => {})
+    },
+    setBizExt(id, ext) {
+      const cur = state.orders.find((o) => o.id === id)
+      if (!cur) return
+      const next: MallOrder = { ...cur, ext, bizKind: ext.kind }
+      setState((s) => ({ ...s, orders: s.orders.map((o) => (o.id === id ? next : o)) }))
+      void mallUpsertOrder(toCloudOrder(next)).catch(() => {})
     },
     payOrder(id) {
       const order = state.orders.find((o) => o.id === id)

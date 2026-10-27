@@ -11,6 +11,8 @@ const ROUTES = [
   '#/wallet', '#/vip', '#/growth', '#/settings',
   '#/mall', '#/mall/cart', '#/mall/orders', '#/mall/wallet',
   '#/mall/youxuan', '#/mall/live', '#/mall/mix', '#/mall/gexm', '#/mall/laal',
+  /* 四大业务会场（#/mall/biz/<kind>）：与频道路由并存，需一并防白屏 */
+  '#/mall/biz/seckill', '#/mall/biz/local', '#/mall/biz/live', '#/mall/biz/travel',
   '#/admin', '#/admin/audit', '#/admin/roles',
   '#/ai', '#/ardot', '#/bom', '#/coze', '#/delivery', '#/live', '#/mail',
   '#/manju', '#/nav', '#/price', '#/resources', '#/snippets', '#/tags',
