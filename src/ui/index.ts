@@ -7,6 +7,9 @@ export {
   ArticleCard,
   LotteryBlock,
   MediaCard,
+  Money,
   PostCard,
   VoteBlock,
 } from './post-card'
+
+export type { AuthorLite } from './post-card'

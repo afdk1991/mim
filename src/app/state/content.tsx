@@ -14,6 +14,7 @@ import type { ReactNode } from 'react'
 import type {
   AppNotification,
   Article,
+  ArticleComment,
   ArticleDraft,
   FavoriteKind,
   FavoriteItem,
@@ -107,10 +108,20 @@ export interface AppApi {
   savePostDraft: (content: string, topic: string, images: string[]) => string
   publishPostDraft: (draftId: string) => void
   deletePostDraft: (id: string) => void
-  publishArticle: (input: { title: string; content: string; tags: string[] }) => string
+  publishArticle: (input: { title: string; content: string; tags: string[]; draftId?: string }) => string
   saveArticleDraft: (input: { id?: string; title: string; content: string; tags: string[] }) => string
+  deleteArticleDraft: (id: string) => void
+  deleteArticle: (id: string) => void
+  editPost: (id: string, patch: { content?: string; images?: string[] }) => void
+  editArticle: (id: string, patch: { title?: string; content?: string; tags?: string[] }) => void
+  toggleArticleLike: (id: string) => void
+  addArticleComment: (articleId: string, content: string) => void
+  toggleCommentLike: (postId: string, commentId: string) => void
   addSnippet: (title: string, language: string, code: string) => void
   deleteSnippet: (id: string) => void
+  toggleSnippetLike: (id: string) => void
+  /** 仅递增下载计数；不凭空生成收益流水 */
+  downloadResource: (id: string) => void
   updateProfile: (patch: Partial<User>) => void
   refreshFeed: () => number
   resetLocalData: () => void
@@ -368,7 +379,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         patch((s) => ({ ...s, postDrafts: s.postDrafts.filter((d) => d.id !== id) }))
       },
 
-      publishArticle({ title, content, tags }) {
+      publishArticle({ title, content, tags, draftId }) {
         const id = uid('a')
         const article: Article = {
           id,
@@ -383,7 +394,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           likedByMe: false,
           comments: [],
         }
-        patch((s) => ({ ...s, articles: [article, ...s.articles] }))
+        patch((s) => ({
+          ...s,
+          articles: [article, ...s.articles],
+          // 由草稿发布时消费该草稿，避免草稿箱残留已发布内容
+          ...(draftId ? { articleDrafts: s.articleDrafts.filter((d) => d.id !== draftId) } : {}),
+        }))
         write(() =>
           cloudInsert(
             'articles',
@@ -414,6 +430,102 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return finalId
       },
 
+      deleteArticleDraft(id) {
+        patch((s) => ({ ...s, articleDrafts: s.articleDrafts.filter((d) => d.id !== id) }))
+      },
+
+      deleteArticle(id) {
+        patch((s) => ({ ...s, articles: s.articles.filter((a) => a.id !== id || a.authorId !== s.meId) }))
+      },
+
+      editPost(id, patchBody) {
+        patch((s) => ({
+          ...s,
+          posts: s.posts.map((p) => (p.id === id && p.authorId === s.meId ? { ...p, ...patchBody } : p)),
+        }))
+      },
+
+      editArticle(id, patchBody) {
+        patch((s) => ({
+          ...s,
+          articles: s.articles.map((a) =>
+            a.id === id && a.authorId === s.meId
+              ? { ...a, ...patchBody, ...(patchBody.content ? { summary: makeSummary(patchBody.content) } : {}) }
+              : a,
+          ),
+        }))
+      },
+
+      toggleArticleLike(id) {
+        patch((s) => ({
+          ...s,
+          articles: s.articles.map((a) =>
+            a.id === id
+              ? { ...a, likedByMe: !a.likedByMe, likes: Math.max(0, a.likes + (a.likedByMe ? -1 : 1)) }
+              : a,
+          ),
+        }))
+      },
+
+      addArticleComment(articleId, content) {
+        const c: ArticleComment = {
+          id: uid('ac'),
+          authorId: stateRef.current.meId,
+          content,
+          createdAt: Date.now(),
+        }
+        patch((s) => ({
+          ...s,
+          articles: s.articles.map((a) => (a.id === articleId ? { ...a, comments: [...a.comments, c] } : a)),
+        }))
+        write(() =>
+          cloudInsert(
+            'article_comments',
+            {
+              id: c.id,
+              article_id: articleId,
+              author_id: c.authorId,
+              content,
+              created_at: new Date(c.createdAt).toISOString(),
+            },
+            '评论',
+          ),
+        )
+      },
+
+      toggleCommentLike(postId, commentId) {
+        patch((s) => ({
+          ...s,
+          posts: s.posts.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  comments: p.comments.map((c) =>
+                    c.id === commentId
+                      ? { ...c, likedByMe: !c.likedByMe, likes: Math.max(0, c.likes + (c.likedByMe ? -1 : 1)) }
+                      : c,
+                  ),
+                }
+              : p,
+          ),
+        }))
+      },
+
+      toggleSnippetLike(id) {
+        patch((s) => ({
+          ...s,
+          snippets: s.snippets.map((x) =>
+            x.id === id
+              ? { ...x, likedByMe: !x.likedByMe, likes: Math.max(0, x.likes + (x.likedByMe ? -1 : 1)) }
+              : x,
+          ),
+        }))
+      },
+
+      downloadResource(id) {
+        void db.rpc('resource_download', { p_id: id }, { write: true })
+      },
+
       addSnippet(title, language, code) {
         patch((s) => ({
           ...s,
@@ -438,10 +550,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
 
       updateProfile(p) {
-        patch((s) => ({
-          ...s,
-          users: s.users.map((u) => (u.id === s.meId ? { ...u, ...p } : u)),
-        }))
+        patch((s) => {
+          // users 里没有本人记录时直接 upsert 一条：否则「编辑资料」会静默无效
+          // （users 只有在关注/被关注同步后才有数据，纯本机用户此前永远改不动资料）
+          if (!s.users.some((u) => u.id === s.meId)) {
+            return {
+              ...s,
+              users: [
+                {
+                  id: s.meId,
+                  name: p.name ?? '我',
+                  emoji: p.emoji ?? '🙂',
+                  color: p.color ?? '#ff8200',
+                  bio: p.bio ?? '',
+                  followers: 0,
+                  following: 0,
+                  verified: false,
+                },
+                ...s.users,
+              ],
+            }
+          }
+          return { ...s, users: s.users.map((u) => (u.id === s.meId ? { ...u, ...p } : u)) }
+        })
       },
 
       // 无远端推送通道时恒返回 0；保留管线以便接入真实源时不改调用方

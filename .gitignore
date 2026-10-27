@@ -65,3 +65,17 @@ browser-shots/
 
 # Supabase CLI 临时目录
 supabase/.temp/
+
+# ---------- 重建后新增 ----------
+# 自托管后端
+server/node_modules/
+server/.storage/
+server/.data/
+server/.env
+server/.env.*
+!server/.env.example
+
+# 后端健康探测脚本是回归基线，放行入库
+!scripts/server-health.mjs
+# 页面占位生成脚手架是一次性工具，重建完成后忽略
+scripts/gen-page-stubs.mjs

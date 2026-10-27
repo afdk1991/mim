@@ -1,0 +1,56 @@
+name: build
+
+# 重建后的新流水线：只做「质量闸门 + 静态站点部署」。
+# 旧 ci-cd.yml 里的 migrate-db / 云函数 / Edge Function 三个作业依赖
+# Supabase 与 CloudBase 凭证，后端收敛到自托管 server 后已无意义，不再保留。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 类型检查与构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 构建
+        env:
+          # 后端地址在构建期注入；未配置时前端回退同源 /api
+          VITE_MIM_API_BASE: ${{ vars.MIM_API_BASE }}
+        run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: dist
+
+  deploy-pages:
+    name: 部署到 GitHub Pages
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

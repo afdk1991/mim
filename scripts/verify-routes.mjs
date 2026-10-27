@@ -7,6 +7,7 @@ const BASE = process.env.BASE || 'http://localhost:5198'
 
 const ROUTES = [
   '#/feed', '#/articles', '#/write', '#/topics', '#/notifications', '#/messages',
+  '#/videos', '#/ranks', '#/login', '#/search?q=%E6%B5%8B%E8%AF%95',
   '#/my', '#/blog', '#/favorites', '#/history', '#/following', '#/publish',
   '#/wallet', '#/vip', '#/growth', '#/settings',
   '#/mall', '#/mall/cart', '#/mall/orders', '#/mall/wallet',
@@ -16,8 +17,8 @@ const ROUTES = [
   '#/admin', '#/admin/audit', '#/admin/roles',
   '#/ai', '#/ardot', '#/bom', '#/coze', '#/delivery', '#/live', '#/mail',
   '#/manju', '#/nav', '#/price', '#/resources', '#/snippets', '#/tags',
-  '#/info/account-rules', '#/info/appeal', '#/info/disclaimer', '#/info/license',
-  '#/info/publish-license',
+  '#/info/about', '#/info/terms', '#/info/privacy', '#/info/account-rules',
+  '#/info/appeal', '#/info/disclaimer', '#/info/license', '#/info/publish-license',
 ]
 
 const browser = await chromium.launch({

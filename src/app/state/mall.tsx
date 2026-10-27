@@ -16,7 +16,6 @@ import type {
   MallOrder,
   OrderBizStatus,
   OrderExt,
-  OrderStatus,
 } from '../../domain/commerce/model'
 import { MALL_CHANNEL_META } from '../../domain/commerce/model'
 import { buildOrder, isValidOrder, rewardPoints, unitPriceFen } from '../../domain/commerce/order'
@@ -261,33 +260,28 @@ export function MallProvider({ children }: { children: ReactNode }) {
         const o = ref.current.orders.find((x) => x.id === id)
         if (!o || o.status !== 'unpaid') return false
         if (!walletConsume(o.amountFen, `订单 ${o.title}`)) return false
-        const points = rewardPoints(o.amountFen)
+        // 先构造下一态再落库：避免 setState 后读 ref 拿到上一态（陈旧读会让云端被旧值覆盖）
+        const next: MallOrder = { ...o, status: 'paid', payChannel: 'wallet' }
         patch((s) => ({
           ...s,
-          points: s.points + points,
-          orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'paid' as OrderStatus, payChannel: 'wallet' } : x)),
+          points: s.points + rewardPoints(o.amountFen),
+          orders: s.orders.map((x) => (x.id === id ? next : x)),
         }))
-        const next = ref.current.orders.find((x) => x.id === id)
-        if (next) upsertOrder(next)
+        upsertOrder(next)
         return true
       },
 
       submitPayProof(id, method, ref2) {
-        patch((s) => ({
-          ...s,
-          orders: s.orders.map((o) =>
-            o.id === id
-              ? {
-                  ...o,
-                  status: 'awaiting_confirm' as OrderStatus,
-                  payChannel: 'qrcode-manual',
-                  proof: { method, ref: ref2, at: Date.now() },
-                }
-              : o,
-          ),
-        }))
-        const next = ref.current.orders.find((x) => x.id === id)
-        if (next) upsertOrder(next)
+        const o = ref.current.orders.find((x) => x.id === id)
+        if (!o) return
+        const next: MallOrder = {
+          ...o,
+          status: 'awaiting_confirm',
+          payChannel: 'qrcode-manual',
+          proof: { method, ref: ref2, at: Date.now() },
+        }
+        patch((s) => ({ ...s, orders: s.orders.map((x) => (x.id === id ? next : x)) }))
+        upsertOrder(next)
       },
 
       async cancelOrder(id) {
@@ -311,30 +305,34 @@ export function MallProvider({ children }: { children: ReactNode }) {
           }
         }
         patch((s) => ({ ...s, orders: s.orders.filter((x) => x.id !== id) }))
+        void db.remove('mall_orders', id)
       },
 
       confirmOrder(id) {
-        patch((s) => ({
-          ...s,
-          orders: s.orders.map((o) => (o.id === id && o.status === 'paid' ? { ...o, status: 'done' as OrderStatus } : o)),
-        }))
-        const next = ref.current.orders.find((x) => x.id === id)
-        if (next) upsertOrder(next)
+        const o = ref.current.orders.find((x) => x.id === id)
+        if (!o || o.status !== 'paid') return
+        // 确认收货同步推进履约状态，避免资金已结算但履约停在中间态
+        const biz: OrderBizStatus | null =
+          o.ext?.kind === 'travel' ? 'traveled' : o.ext?.kind === 'live' ? 'shipped' : null
+        const next: MallOrder = { ...o, status: 'done', ...(biz ? { bizStatus: biz } : {}) }
+        patch((s) => ({ ...s, orders: s.orders.map((x) => (x.id === id ? next : x)) }))
+        upsertOrder(next)
       },
 
       setBizStatus(id, s2) {
-        patch((s) => ({ ...s, orders: s.orders.map((o) => (o.id === id ? { ...o, bizStatus: s2 } : o)) }))
-        const next = ref.current.orders.find((x) => x.id === id)
-        if (next) upsertOrder(next)
+        const o = ref.current.orders.find((x) => x.id === id)
+        if (!o) return
+        const next: MallOrder = { ...o, bizStatus: s2 }
+        patch((s) => ({ ...s, orders: s.orders.map((x) => (x.id === id ? next : x)) }))
+        upsertOrder(next)
       },
 
       setBizExt(id, ext) {
-        patch((s) => ({
-          ...s,
-          orders: s.orders.map((o) => (o.id === id ? { ...o, ext, bizKind: ext.kind } : o)),
-        }))
-        const next = ref.current.orders.find((x) => x.id === id)
-        if (next) upsertOrder(next)
+        const o = ref.current.orders.find((x) => x.id === id)
+        if (!o) return
+        const next: MallOrder = { ...o, ext, bizKind: ext.kind }
+        patch((s) => ({ ...s, orders: s.orders.map((x) => (x.id === id ? next : x)) }))
+        upsertOrder(next)
       },
 
       cartTotalFen(list) {
