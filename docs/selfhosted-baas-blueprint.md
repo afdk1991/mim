@@ -4,9 +4,7 @@
 > **不代表 Mim 项目当前的后端实现**。
 >
 > Mim 当前后端是仓库内的 `server/`（Node 20 + `node:http` + `pg`，零框架），部署方式见
-> [`deploy/README.md`](../../deploy/README.md)（宿主机直部署 + systemd 守护）。
->
-> **本项目全程不使用 Docker**：下文涉及的容器化拓扑仅作原方案记录，不作为部署依据。
+> [`deploy/README.md`](../../deploy/README.md)（宿主机直部署 + systemd 守护，全程不使用容器化方案）。
 
 > 定位：对标 Supabase 的后端即服务平台，**全部组件可自建、无云端强依赖**。
 > 设计原则：**Postgres 是唯一真相源**——权限在库内（RLS），身份是一张 JWT，
@@ -381,7 +379,7 @@ $$;
 
 | 档位 | 组成 | 适用 | 最低规格 |
 |---|---|---|---|
-| **A 单机** | 单机：宿主机直接安装 PG + PostgREST + GoTrue + Realtime + Storage + 对象存储 + 网关 + Studio，各组件以 systemd 单元守护（原方案此行写的是 Compose 编排，本仓库不用容器） | 内部工具 / POC / 小项目 | 4C8G + 100G SSD |
+| **A 单机** | 单机：宿主机直接安装 PG + PostgREST + GoTrue + Realtime + Storage + 对象存储 + 网关 + Studio，各组件以 systemd 单元守护 | 内部工具 / POC / 小项目 | 4C8G + 100G SSD |
 | **B 单区生产** | PG 主备（Patroni）+ 连接池 + 各服务 ≥2 副本（无状态）+ 对象存储 3 节点 + LB + 监控 | 对外生产 | 库 8C32G；服务 各 2C4G×2 |
 | **C 全球多区** | 中心写库 + 区域只读副本 + 区域 Realtime/Edge + GeoDNS + CDN | 跨洲用户 | 每区同 B 的只读层 |
 
