@@ -1,0 +1,145 @@
+name: deploy-release
+
+# 服务器端部署包发布：tag（小写 v*）触发 → 质量闸门 → 构建 → 打包 zip → GitHub Release。
+#
+# tag 命名约定（与客户端构建严格区分，避免同一事件多文件重复触发）：
+#   V*.*.*.*  → 客户端发布（桌面/移动安装包，见 build-release.yml）
+#   v*        → 服务器端部署包（本 workflow），建议与 src/core/version.ts 的 APP_VERSION 对应，
+#               例如 APP_VERSION=0.0.0.5 时打 v0.0.0.5
+#
+# 产物：mim-deploy-<tag>.zip —— 服务器部署用源码快照
+#   （不含 .git / node_modules / 原生端构建产物），内含已构建好的 dist。
+#   服务器解压后执行 deploy/install.sh 即可，等价于 git clone 后部署。
+#
+# 可选 npm 发布（默认关闭）：
+#   仓库 Settings → Secrets and variables → Actions → Variables 新增 ENABLE_NPM_PUBLISH=true
+#   后，才会把 dist 以 @<owner>/mim 发布到 GitHub Packages（复用 scripts/prepare-package.mjs）。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '手动触发时标注的版本号（仅用于产物命名，默认取当前 ref）'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: 质量闸门
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 仓库不提交 package-lock.json，不能用 cache: npm（与 build.yml / deploy.yml 一致）
+          node-version: '22'
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+      - name: 禁止容器化产物
+        # 与 build.yml / deploy.yml 同款闸门：本项目全程不使用容器
+        run: |
+          hit=$(git ls-files | grep -Ei '(^|/)(Dockerfile|docker-compose\.ya?ml|\.dockerignore)$' || true)
+          if [ -n "$hit" ]; then
+            echo "::error::本项目不使用容器：$hit"
+            exit 1
+          fi
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 单元与契约测试
+        run: npm run test
+      - name: 后端语法门禁
+        run: npm --prefix server run check
+
+  package:
+    name: 打包部署 zip
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+      - name: 构建前端（产物 dist 打进 zip，服务器可跳过构建）
+        env:
+          VITE_MIM_API_BASE: ${{ vars.MIM_API_BASE }}
+        run: npm run build
+      - name: 打包 mim-deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#refs/tags/}"
+          PKG="mim-deploy-${TAG}.zip"
+          zip -r "$PKG" . \
+            -x '.git/*' \
+            -x 'node_modules/*' \
+            -x '*/node_modules/*' \
+            -x '.screenshots/*' \
+            -x 'browser-shots/*' \
+            -x 'verify-shots/*' \
+            -x 'android/app/build/*' \
+            -x 'src-tauri/target/*' \
+            -x 'harmony/entry/build/*'
+          ls -lh "$PKG"
+      - name: 上传 zip 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mim-deploy
+          path: mim-deploy-*.zip
+          retention-days: 30
+
+  release:
+    name: 创建 GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 下载 zip 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: mim-deploy
+      - name: 创建 Release 并附带 zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mim-deploy-*.zip
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  npm-publish:
+    name: 发布 npm 包（可选，默认关闭）
+    needs: gate
+    if: ${{ vars.ENABLE_NPM_PUBLISH == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@${{ github.repository_owner }}'
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+      - name: 构建前端
+        env:
+          VITE_MIM_API_BASE: ${{ vars.MIM_API_BASE }}
+        run: npm run build
+      - name: 改写 package.json 为可发布形态
+        run: node scripts/prepare-package.mjs "${{ github.repository_owner }}" "${GITHUB_REF_NAME}"
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+      - name: 发布到 GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

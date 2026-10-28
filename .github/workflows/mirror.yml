@@ -1,0 +1,85 @@
+name: mirror-repos
+
+# GitHub 主仓（afdk1991/mim）→ 国内只读镜像仓单向同步。
+# 触发：push main + 每天 04:00 UTC 兜底 + 手动触发。
+# 镜像仓一律只读（平台侧开启保护分支），任何镜像仓上的提交视为事故，需人工回搬。
+#
+# 需要的 Secrets（缺哪个就跳过哪个目标，不会让整次同步失败）：
+#   GITEE_TOKEN     gitee.com 个人访问令牌（仅仓库写权限，不给删仓权限）
+#   GITCODE_TOKEN   gitcode.com（阿里云效 Codeup）个人访问令牌
+#   ATOMGIT_TOKEN   atomgit.com 个人访问令牌
+#   CNB_TOKEN       腾讯云 CNB（git.code.tencent.com）令牌（可选，不配则跳过）
+#
+# 与 scripts/init-multi-remote.sh 的分工：
+#   脚本只注册 remote（本地一次性）；本 workflow 负责日常增量推送。
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-main
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    name: 镜像到国内仓库
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout（完整历史）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 完整历史，用于镜像
+
+      - name: 配置 git 身份
+        run: |
+          git config --global user.email "ci-bot@users.noreply.github.com"
+          git config --global user.name "Mim CI Bot"
+
+      - name: 推送到 Gitee
+        if: ${{ env.GITEE_TOKEN != '' }}
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "=== Mirroring to Gitee ==="
+          git push --force https://oauth2:${GITEE_TOKEN}@gitee.com/${{ github.repository }}.git main:main
+
+      - name: 推送到 gitcode（云效 Codeup）
+        if: ${{ env.GITCODE_TOKEN != '' }}
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "=== Mirroring to gitcode ==="
+          git push --force https://${GITCODE_TOKEN}@gitcode.com/${{ github.repository }}.git main:main
+
+      - name: 推送到 AtomGit
+        if: ${{ env.ATOMGIT_TOKEN != '' }}
+        env:
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "=== Mirroring to AtomGit ==="
+          git push --force https://${ATOMGIT_TOKEN}@atomgit.com/${{ github.repository }}.git main:main
+
+      - name: 推送到腾讯云 CNB（可选）
+        if: ${{ env.CNB_TOKEN != '' }}
+        env:
+          CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "=== Mirroring to Tencent CNB ==="
+          git push --force https://${CNB_TOKEN}@git.code.tencent.com/${{ github.repository }}.git main:main
+
+      - name: 失败告警
+        if: failure()
+        run: |
+          echo "::warning::镜像同步失败：请检查对应平台的 Token 是否有效、目标仓库是否已创建。"

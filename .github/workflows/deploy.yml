@@ -1,0 +1,142 @@
+name: deploy
+
+# 部署到自有服务器（宿主机直部署 + systemd + nginx，全程不使用 Docker）。
+#
+# 与 build.yml 的分工：
+#   build.yml  ——  质量闸门 + 前端静态站点发布到 GitHub Pages（只读展示用）
+#   deploy.yml ——  质量闸门 + SSH 登录宿主机，按 deploy/README.md 的「更新发版」流程上线
+#
+# 必要 Secrets（仓库 Settings → Secrets and variables → Actions）：
+#   OCI_HOST     服务器地址（如 140.238.x.x）
+#   OCI_USER     部署账号（需要 sudo 权限执行 systemctl restart mim-server）
+#   OCI_SSH_KEY  该账号的私钥（整段 PEM，含首尾行）
+# 可选 Variables：
+#   MIM_DIR      服务器安装目录，默认 /opt/mim
+#
+# 注意：本仓库有意不提交 package-lock.json（见 .gitignore），
+#      因此只能用 `npm install`，`npm ci` 必然失败。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_build:
+        description: '跳过前端构建（只重启后端时用）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: 质量闸门
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 不能用 cache: npm —— 仓库没有 lock 文件，setup-node 会直接报错
+          node-version: '22'
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+      - name: 禁止容器化产物
+        # 与 build.yml 同款闸门：本项目全程不使用 Docker
+        run: |
+          hit=$(git ls-files | grep -Ei '(^|/)(Dockerfile|docker-compose\.ya?ml|\.dockerignore)$' || true)
+          if [ -n "$hit" ]; then
+            echo "::error::本项目不使用容器：$hit"
+            exit 1
+          fi
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 单元与契约测试
+        run: npm run test
+      - name: 后端语法门禁
+        run: npm --prefix server run check
+
+  deploy:
+    name: 发布到服务器
+    needs: gate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: 校验部署密钥
+        run: |
+          missing=""
+          [ -n "${{ secrets.OCI_HOST }}" ]    || missing="$missing OCI_HOST"
+          [ -n "${{ secrets.OCI_USER }}" ]    || missing="$missing OCI_USER"
+          [ -n "${{ secrets.OCI_SSH_KEY }}" ] || missing="$missing OCI_SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::缺少 Secrets:$missing"
+            exit 1
+          fi
+
+      - name: 配置 SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # 首次连接写入 known_hosts；正式环境建议改成预置指纹，避免 TOFU 信任
+          ssh-keyscan -H "${{ secrets.OCI_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: 拉取代码并重启服务
+        env:
+          MIM_DIR: ${{ vars.MIM_DIR || '/opt/mim' }}
+          SKIP_BUILD: ${{ github.event.inputs.skip_build == 'true' && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
+            "MIM_DIR='$MIM_DIR' SKIP_BUILD='$SKIP_BUILD' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$MIM_DIR"
+
+          echo '--> git pull（只允许快进，避免服务器上有本地改动被覆盖）'
+          git pull --ff-only
+
+          echo '--> 前端与后端依赖'
+          npm install --no-audit --no-fund
+          npm --prefix server install --omit=dev --no-audit --no-fund
+
+          if [ "${SKIP_BUILD:-0}" = '1' ]; then
+            echo '--> SKIP_BUILD=1，跳过前端构建'
+          else
+            echo '--> 构建前端'
+            npm run build
+          fi
+
+          echo '--> 数据库迁移（幂等）'
+          cd "$MIM_DIR/server"
+          npm run migrate
+
+          echo '--> 重启后端'
+          sudo systemctl restart mim-server
+          REMOTE
+
+      - name: 健康检查
+        env:
+          MIM_DIR: ${{ vars.MIM_DIR || '/opt/mim' }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 20); do
+            # 端口从远端 $MIM_DIR/server/.env 读取（读不到回退 8787），
+            # 避免服务器改了 PORT 后 CI 仍打 8787 误报部署失败
+            if ssh -i ~/.ssh/id_deploy -o BatchMode=yes "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
+               "set -euo pipefail; P=\$(grep -E '^PORT=' '$MIM_DIR/server/.env' | cut -d= -f2-); P=\${P:-8787}; curl -fsS http://127.0.0.1:\$P/api/health"; then
+              echo
+              echo '健康检查通过'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo '::error::健康检查连续失败，下面是后端最近日志'
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
+            'sudo journalctl -u mim-server -n 50 --no-pager' || true
+          exit 1

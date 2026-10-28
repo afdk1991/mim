@@ -1,0 +1,50 @@
+# .gitee/pipeline.yml
+# Gitee Go 流水线配置 —— 国内网络环境下的构建校验兜底（参考文件）。
+#
+# 使用方式（需在 Gitee 平台侧手动创建，本文件不自动生效）：
+#   Gitee 项目 → 持续集成 → 流水线 → 创建流水线 → 导入配置文件 → 上传本文件。
+#
+# 定位说明：
+#   Mim 的正式部署不经过 Gitee Go —— 服务器端是宿主机 systemd + nginx，
+#   由 GitHub Actions deploy.yml 通过 SSH 完成发布。本流水线只做
+#   「国内 npm 源能否装依赖、能否通过质量门禁、能否构建」的可达性校验，
+#   不做任何部署动作，也不依赖任何云端托管平台的 Token。
+
+version: "1.0"
+name: mim-cn-build-check
+namespace: default
+
+triggers:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 8 * * *"  # 每天 08:00 构建校验
+
+stages:
+  - name: checkout
+    steps:
+      - step: checkout@default
+        name: checkout
+        repo: ${{repo.name}}
+        ref: ${{revision.branch}}
+
+  - name: build
+    steps:
+      - step: build@nodejs
+        name: build
+        nodeVersion: 22.x
+        # 仓库不提交 package-lock.json，只能用 npm install（npm ci 必然失败）
+        installCommand: npm install --no-audit --no-fund --registry=https://registry.npmmirror.com
+        buildCommand: npm run build
+        cache: true
+        cachePaths:
+          - node_modules
+
+  - name: check
+    steps:
+      - step: run@default
+        name: typecheck-and-test
+        command: npm run typecheck && npm test && npm --prefix server run check
+        env:
+          NODE_ENV: test
