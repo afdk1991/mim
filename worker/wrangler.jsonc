@@ -1,0 +1,45 @@
+{
+  // worker/wrangler.jsonc —— Mim 可选边缘层（Cloudflare Workers）配置
+  //
+  // 【定位】Mim 主路线 = 自托管 systemd + nginx，本配置仅在启用边缘层时使用。
+  // 使用前先创建资源，然后把 <创建后回填> 占位替换为真实值：
+  //   wrangler d1 create mim-readonly          # 输出 database_id
+  //   wrangler kv namespace create MIM_CACHE   # 输出 id
+  //   wrangler d1 migrations apply mim-readonly --remote
+  // 密钥（SYNC_TOKEN / HEALTH_CHECK_SECRET）不要写在这里，用：
+  //   wrangler secret put SYNC_TOKEN
+  //   wrangler secret put HEALTH_CHECK_SECRET
+
+  "name": "mim-edge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // 上游自托管主站地址（替换为实际地址，如 Cloudflare Tunnel 域名）
+  "vars": {
+    "OCI_TUNNEL": "<创建后回填：主站地址，如 https://mim.example.com>",
+    "CN_ORIGIN": "",
+    "APP_ENV": "production",
+    "MAINTENANCE_MODE": false
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mim-readonly",
+      "database_id": "<创建后回填：wrangler d1 create 输出的 database_id>"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "<创建后回填：wrangler kv namespace create 输出的 id>"
+    }
+  ],
+
+  // 每天 03:00 UTC 拉取主站只读增量写 D1
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  }
+}
