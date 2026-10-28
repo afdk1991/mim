@@ -535,7 +535,7 @@ GitHub 唯一可写源」主路线逐项落地如下：
 | 3 | `cleanup-images.sh`（GHCR/ACR 镜像清理） | `scripts/cleanup-images.sh` | 无 Docker 适配：改为 GitHub Releases/旧 tag 过期清理（gh api，保留最近 N 个，DRY_RUN）；GHCR/ACR 容器清理函数保留为标注 **N/A 的参考实现**，不默认执行 |
 | 4 | `deploy.yml`（三运行时 CI 编排） | `.github/workflows/deploy.yml`（既有） | 已落地：质量闸门 + SSH 发布到宿主机（无容器）；Cloudflare/Makers 分发分支对自托管路线 **N/A** |
 | 5 | `docker-compose.yml` | — | **决策剔除**：项目禁用容器；等价物为第一节 systemd 原生进程架构（nginx↔nginx-mim.conf、api↔mim-server.service、db↔宿主机 PostgreSQL，worker/redis 省略并注明原因） |
-| 6 | `index.ts`（Workers 网关升级版，含 Makers 路由） | `worker/src/index.ts`（新建） | 新建**可选边缘层**：健康探测 + 故障转移 + Cron 拉取主站 `/api/sync/posts` 写 D1；主路线仍是自托管 systemd+nginx，不强制启用 |
+| 6 | `index.ts`（Workers 网关升级版，含 Makers 路由） | `worker/src/index.ts`（新建） | 新建**可选边缘层**：健康探测 + 故障转移 + Cron 拉取主站 `/api/sync/posts` 写 D1；主路线仍是自托管 systemd+nginx，不强制启用。**不参与主构建**（主 tsconfig include 仅 `src/`）；本地校验：`cd worker && npm install && npx tsc --noEmit` |
 | 7 | `init-multi-remote.sh` | `scripts/init-multi-remote.sh`（既有） | 已落地并补 tencent-cnb remote；日常推送由 mirror.yml 承担 |
 | 8 | `mirror.yml`（GitHub→国内镜像仓） | `.github/workflows/mirror.yml`（既有） | 已落地：gitee/gitcode(Codeup)/atomgit + 可选 CNB，Token 缺失自动跳过 |
 | 9 | `nginx/default.conf`（SPA + API 代理 + 安全头） | `deploy/nginx-mim.conf`（等价物，不新建） | 核对通过：`try_files ... /index.html` SPA 回退、`/api/` 反代保留前缀、CSP/X-Content-Type-Options/X-Frame-Options/Referrer-Policy 安全头齐备，与现状兼容 |

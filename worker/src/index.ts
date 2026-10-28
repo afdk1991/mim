@@ -46,7 +46,7 @@ async function handleHealth(request: Request, env: Env): Promise<Response> {
     upstreams: { origin: upstream },
     env: env.APP_ENV,
     ts: Date.now(),
-  })
+  }, 200)
 }
 
 // ===== 主请求：按健康状态转发到主站 =====
@@ -65,7 +65,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
   let originHealthy = cached?.healthy ?? true
   if (!cached || Date.now() - cached.ts > 60_000) {
     originHealthy = await probe(env.OCI_TUNNEL)
-    await env.CACHE.put('upstream:health', JSON.stringify({ healthy: originHealthy, ts: Date.now() }), { ttl: 120 })
+    await env.CACHE.put('upstream:health', JSON.stringify({ healthy: originHealthy, ts: Date.now() }), { expirationTtl: 120 })
   }
 
   // 路由决策：境外/默认走主站；主站挂了才考虑境内只读入口
@@ -118,8 +118,14 @@ async function syncPosts(env: Env): Promise<void> {
       console.warn(`同步失败: HTTP ${r.status}`)
       return
     }
-    // Mim 主站响应外层是统一契约的 data 字段
-    const { data } = await r.json<{ data: { rows: Array<{ id: string; content: string; created_at: number; updated_at: number }>; next: number } }>()
+    // Mim 主站响应外层是统一契约的 data 字段（main.js ok() 包装为 { data }）
+    const body = (await r.json()) as {
+      data: {
+        rows: Array<{ id: string; content: string; created_at: number; updated_at: number }>
+        next: number
+      }
+    }
+    const { data } = body
     for (const row of data.rows) {
       await env.DB.prepare(
         `INSERT INTO posts (id, content, created_at, updated_at)

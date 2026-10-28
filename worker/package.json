@@ -1,0 +1,16 @@
+{
+  "name": "mim-worker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Mim 可选边缘层（Cloudflare Workers）：健康探测 + 故障转移 + D1 只读副本同步。Mim 主路线是自托管 systemd+nginx，不依赖本包。",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250820.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.0.0"
+  }
+}
