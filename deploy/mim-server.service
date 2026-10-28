@@ -1,0 +1,63 @@
+# Mim 自托管后端 —— systemd 单元
+#
+# 安装：
+#   sudo cp deploy/mim-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mim-server     # enable = 开机自启，--now = 立即启动
+#
+# 运维：
+#   sudo systemctl status mim-server
+#   sudo journalctl -u mim-server -f           # 看日志
+#   sudo systemctl restart mim-server          # 改了 .env 之后重载
+#
+# 崩溃自动重启：Restart=always + RestartSec=3（进程无论以什么状态码退出都会重启，
+# 包括代码抛未捕获异常导致 node 退出；被 SIGTERM 正常关停时不会触发重启）。
+
+[Unit]
+Description=Mim 自托管后端 API（node:http + PostgreSQL）
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+Type=simple
+
+# 不建议用 root 跑后端：这里用专用低权限账号，上传目录单独放开写权限
+User=mim
+Group=mim
+
+WorkingDirectory=/opt/mim/server
+
+# 配置文件方式管理环境变量：服务端只读 process.env，不加载 .env 文件本身，
+# 所以必须由 EnvironmentFile 注入。文件权限应为 600（内含 JWT_SECRET 与数据库口令）。
+EnvironmentFile=/opt/mim/server/.env
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/node src/main.js
+
+# 崩溃重启策略
+Restart=always
+RestartSec=3
+# 连续失败 RateLimit：5 秒内重启超过 5 次就停手，避免打满日志刷爆磁盘
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+# 优雅关停：服务端 main.js 已注册 SIGTERM/SIGINT 处理器，会先 close 连接池再退出。
+# 这里给足 20s 让它体面退出，超时才 SIGKILL。
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# 日志统一进 journald（见 README.md 的「日志」一节）
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mim-server
+
+# 最小权限加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+# ProtectSystem=full 会把 /usr、/etc、/opt 变为只读，这里显式放行需要写的上传目录
+ReadWritePaths=/opt/mim/server/data
+
+[Install]
+WantedBy=multi-user.target

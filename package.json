@@ -16,9 +16,9 @@
 
     "server:install": "npm --prefix server install",
     "server:dev": "npm --prefix server run dev",
-    "server:up": "docker compose -f server/docker-compose.yml up -d",
-    "server:down": "docker compose -f server/docker-compose.yml down",
+    "server:start": "npm --prefix server start",
     "server:migrate": "npm --prefix server run migrate",
+    "server:check": "npm --prefix server run check",
     "server:health": "node scripts/server-health.mjs",
 
     "verify:routes": "node scripts/verify-routes.mjs",
