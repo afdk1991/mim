@@ -70,7 +70,7 @@ npm run migrate && npm run dev
 
 ```bash
 curl http://127.0.0.1:8787/api/health
-# {"data":{"ok":true,"db":true,"service":"mim-server","uptime_ms":…,"rpcs":16}}
+# {"data":{"ok":true,"db":true,"service":"mim-server","uptime_ms":…,"rpcs":19}}
 # 仓库根目录另有 npm run server:health（scripts/server-health.mjs），
 # 会真实探测 /api/health 与 /api/rest/products?limit=1 并打印结果
 ```
