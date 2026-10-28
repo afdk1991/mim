@@ -520,3 +520,31 @@ curl -fsS -H "x-sync-token: $SYNC_TOKEN" \
 | `deploy/README.md` | 重写为本文（保留原有安装/运维内容，补对照表、CI/CD、降级矩阵等章节） |
 
 **未触碰**：`src/`、`server/` 业务代码、`docs/` 目录、既有四个 workflow 的内容。
+
+---
+
+## 二十二、3.txt 交付清单对照表（13 个文件逐项落地）
+
+3.txt 要求把通用架构手册落成具体仓库文件，共 13 个交付文件。Mim 按「全程无 Docker、
+GitHub 唯一可写源」主路线逐项落地如下：
+
+| # | 3.txt 交付文件 | Mim 落地位置 | 决策 |
+| --- | --- | --- | --- |
+| 1 | `.env.example`（密钥矩阵模板） | 根 `.env.example` + `server/.env.example` | 补齐：根模板新增可选边缘层变量段（CLOUDFLARE_API_TOKEN/ACCOUNT_ID、EO_TOKEN、AI_GATEWAY_API_KEY/BASE_URL、SYNC_TOKEN），均标注「可选边缘层用」；server 模板补 PG_POOL_MAX/MAX_BODY_BYTES |
+| 2 | `build-publish.yml`（镜像构建+GHCR/ACR+npm） | `.github/workflows/deploy-release.yml` | 改写落地：tag 触发构建 zip + GitHub Release；GHCR/ACR 容器镜像步骤**剔除（无 Docker 约束）**；npm 发布为默认关闭的可选 job（复用 scripts/prepare-package.mjs） |
+| 3 | `cleanup-images.sh`（GHCR/ACR 镜像清理） | `scripts/cleanup-images.sh` | 无 Docker 适配：改为 GitHub Releases/旧 tag 过期清理（gh api，保留最近 N 个，DRY_RUN）；GHCR/ACR 容器清理函数保留为标注 **N/A 的参考实现**，不默认执行 |
+| 4 | `deploy.yml`（三运行时 CI 编排） | `.github/workflows/deploy.yml`（既有） | 已落地：质量闸门 + SSH 发布到宿主机（无容器）；Cloudflare/Makers 分发分支对自托管路线 **N/A** |
+| 5 | `docker-compose.yml` | — | **决策剔除**：项目禁用容器；等价物为第一节 systemd 原生进程架构（nginx↔nginx-mim.conf、api↔mim-server.service、db↔宿主机 PostgreSQL，worker/redis 省略并注明原因） |
+| 6 | `index.ts`（Workers 网关升级版，含 Makers 路由） | `worker/src/index.ts`（新建） | 新建**可选边缘层**：健康探测 + 故障转移 + Cron 拉取主站 `/api/sync/posts` 写 D1；主路线仍是自托管 systemd+nginx，不强制启用 |
+| 7 | `init-multi-remote.sh` | `scripts/init-multi-remote.sh`（既有） | 已落地并补 tencent-cnb remote；日常推送由 mirror.yml 承担 |
+| 8 | `mirror.yml`（GitHub→国内镜像仓） | `.github/workflows/mirror.yml`（既有） | 已落地：gitee/gitcode(Codeup)/atomgit + 可选 CNB，Token 缺失自动跳过 |
+| 9 | `nginx/default.conf`（SPA + API 代理 + 安全头） | `deploy/nginx-mim.conf`（等价物，不新建） | 核对通过：`try_files ... /index.html` SPA 回退、`/api/` 反代保留前缀、CSP/X-Content-Type-Options/X-Frame-Options/Referrer-Policy 安全头齐备，与现状兼容 |
+| 10 | `pipeline.yml`（Gitee Go） | `.gitee/pipeline.yml`（既有） | 已落地：国内 npmmirror 源构建校验，不做部署；需 Gitee 平台侧手动导入 |
+| 11 | `README.md`（交付文件说明） | 本文件 `deploy/README.md` | 已重写为本手册 |
+| 12 | `sync.ts`（主库只读同步接口） | `server/src/sync.js`（既有） | 已落地：`GET /api/sync/posts`，x-sync-token 鉴权，留空即关闭 |
+| 13 | `wrangler.jsonc` + D1 迁移 SQL + `bootstrap.sh` + 备份脚本（手册另列要求） | `worker/wrangler.jsonc`、`worker/migrations/0001_init.sql`、`deploy/bootstrap.sh`、`scripts/backup.sh` | 新建：wrangler 参考配置（占位标注「创建后回填」）、D1 只读副本表、无 Docker 一键重建脚本（委托 install.sh）、pg_dump 本地轮转 + 可选 rclone 异地 |
+
+**无 Docker 适配说明**：3.txt 的容器相关产物（docker-compose、GHCR/ACR 双推、镜像清理）
+在 Mim 全部剔除或改写——制品分发走 GitHub Releases zip + npm（可选），进程守护走
+systemd，数据库是宿主机原生 PostgreSQL。worker/ 与 D1 副本属于**可选边缘层**，
+不启用时对主路线零影响。
