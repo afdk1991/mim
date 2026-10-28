@@ -85,11 +85,14 @@ log "5/10 生成配置文件 $MIM_DIR/server/.env"
 ENV_FILE="$MIM_DIR/server/.env"
 if [ ! -f "$ENV_FILE" ]; then
   cp "$MIM_DIR/server/.env.example" "$ENV_FILE"
-  DB_PASS="$(openssl rand -hex 16 2>/dev/null || tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
-  JWT="$(openssl rand -hex 32 2>/dev/null || tr -dc 'A-Za-z0-9' </dev/urandom | head -c 64)"
+  # 用 node 生成随机串，避免依赖 openssl 是否存在，
+  # 也避免 `tr … | head -c` 这类管道在 set -o pipefail 下因 SIGPIPE 让脚本中断
+  DB_PASS="$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")"
+  JWT="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
   # 库名与账号保持默认，口令随机生成后写回 .env
   sed -i "s#^DATABASE_URL=.*#DATABASE_URL=postgres://mim:${DB_PASS}@127.0.0.1:5432/mim#" "$ENV_FILE"
   sed -i "s#^JWT_SECRET=.*#JWT_SECRET=${JWT}#" "$ENV_FILE"
+  sed -i "s#^PORT=.*#PORT=${PORT}#" "$ENV_FILE"
   # 生产只监听回环，由 nginx 对外：把模板里注释掉的 HOST 打开（后端 main.js 支持该变量）
   sed -i 's/^# *HOST=/HOST=/' "$ENV_FILE"
   chmod 600 "$ENV_FILE"
@@ -123,7 +126,9 @@ if [ "$SKIP_BUILD" = "1" ]; then
   warn "SKIP_BUILD=1，跳过前端构建（dist 不会被更新）"
 else
   log "构建前端静态资源 → $MIM_DIR/dist"
-  VITE_MIM_API_BASE="${VITE_MIM_API_BASE:-/api}" npm run build
+  # 不在这里写死 VITE_MIM_API_BASE：未设置时前端会回退同源 /api（正是 nginx 反代的场景），
+  # 而运维若需要覆盖（如跨域直连或纯本地 off），可以自己 export 后再跑本脚本。
+  npm run build
 fi
 
 # 上传目录属主给运行账号。注意 systemd 单元里 ProtectSystem=full 会把磁盘变为只读，
@@ -134,7 +139,11 @@ chown -R "$APP_USER":"$APP_USER" "$MIM_DIR/server/data"
 # ---------- 8. 应用迁移 ----------
 log "8/10 应用数据库迁移（幂等，可重复执行）"
 cd "$MIM_DIR/server"
-set -a; [ -f .env ] && . ./.env; set +a
+if [ -f .env ]; then
+  set -a; . ./.env; set +a
+else
+  die "缺少 $MIM_DIR/server/.env，无法执行迁移"
+fi
 npm run migrate
 
 # ---------- 9. systemd 守护 + nginx + 日志轮转 ----------
@@ -157,6 +166,12 @@ systemctl enable mim-server          # 开机自启
 systemctl restart mim-server         # 崩溃重启策略由单元文件 Restart=always 提供
 
 if command -v nginx >/dev/null 2>&1; then
+  # Debian 系自带的默认站点也监听 80 且 server_name 为 _，会与本站冲突
+  # （nginx -t 会报 conflicting server name）。这里只提示、不擅自删除发行版默认配置。
+  if [ -e /etc/nginx/sites-enabled/default ]; then
+    warn "检测到发行版默认站点 /etc/nginx/sites-enabled/default 仍在，可能与本站抢占 80 端口。"
+    warn "确认无其他站点在用后执行：sudo rm /etc/nginx/sites-enabled/default && sudo systemctl reload nginx"
+  fi
   nginx -t && systemctl enable --now nginx
 else
   warn "未安装 nginx，跳过站点启用；前端 dist 可直接由任意静态服务器承载"
