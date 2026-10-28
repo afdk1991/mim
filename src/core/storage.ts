@@ -8,7 +8,11 @@
  *    否则一条损坏记录会让整个页面白屏（原实现踩过）。
  * 3. 旧键名通过 `legacy` 声明，首次读取时自动迁移一次，老用户数据不丢。
  * 4. 隐私模式下 setItem 抛异常：静默降级，绝不阻断渲染。
+ * 5. 底层读写一律走 `getPlatform().storage`（见 src/platform），本文件是全工程
+ *    唯一允许出现存储键名规范的地方，禁止再直接写 localStorage。
  * ======================================================================== */
+
+import { getPlatform } from '../platform'
 
 const NS = 'mim'
 
@@ -27,7 +31,7 @@ export function userKey(scope: string, uid: string, field: string): string {
 
 export function readRaw(key: string): string | null {
   try {
-    return localStorage.getItem(key)
+    return getPlatform().storage.get(key)
   } catch {
     return null
   }
@@ -35,7 +39,7 @@ export function readRaw(key: string): string | null {
 
 export function writeRaw(key: string, value: string): void {
   try {
-    localStorage.setItem(key, value)
+    getPlatform().storage.set(key, value)
   } catch {
     /* 隐私模式 / 配额超限：静默忽略，内存态仍可用 */
   }
@@ -43,7 +47,7 @@ export function writeRaw(key: string, value: string): void {
 
 export function removeKey(key: string): void {
   try {
-    localStorage.removeItem(key)
+    getPlatform().storage.remove(key)
   } catch {
     /* 同上 */
   }
@@ -51,12 +55,7 @@ export function removeKey(key: string): void {
 
 export function listKeys(prefix = `${NS}.`): string[] {
   try {
-    const out: string[] = []
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const k = localStorage.key(i)
-      if (k && k.startsWith(prefix)) out.push(k)
-    }
-    return out
+    return getPlatform().storage.keys(prefix)
   } catch {
     return []
   }
