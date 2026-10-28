@@ -67,9 +67,15 @@ log "3/10 同步源码 → $MIM_DIR"
 mkdir -p "$MIM_DIR"
 if command -v rsync >/dev/null 2>&1; then
   # 不用 --delete：保留安装目录里已有的数据与配置文件
-  rsync -a --exclude node_modules --exclude dist --exclude .git "$SRC_DIR"/ "$MIM_DIR"/
+  # 排除开发环境的配置与上传数据（模式锚定 SRC_DIR 根）：开发机的 server/.env（开发口令）
+  # 与 server/data/uploads 不能进生产。.env.example 不排除——install.sh 靠它生成模板
+  rsync -a \
+    --exclude node_modules --exclude dist --exclude .git \
+    --exclude '/.env' --exclude '/server/.env' --exclude '/server/data/' \
+    "$SRC_DIR"/ "$MIM_DIR"/
 else
   warn "没有 rsync，改用 cp（会覆盖同名文件，但不会删除目标目录里的其他文件）"
+  warn "cp 无法排除开发配置：若 SRC_DIR 内含 /.env 或 /server/.env 或 /server/data/，请改用 rsync 路径执行"
   cp -a "$SRC_DIR"/. "$MIM_DIR"/
 fi
 # 不清理目标目录已有内容：重复部署时保留数据与已有 node_modules，避免误删
