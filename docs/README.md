@@ -23,6 +23,7 @@
 
 | 文件 | 一句话说明 | 更新日期 |
 | --- | --- | --- |
+| [review/代码审查报告.md](review/代码审查报告.md) | 三线合并版总报告：执行摘要、已修复项、P0~P3 与 AN-001~012 风险全表（看结论先读这份） | 2026-10-28 |
 | [review/后端-审查.md](review/后端-审查.md) | `server/` 全量静态走读：HTTP 契约、REST/RPC 注册、金额分口径、迁移 SQL 核对 | 2026-10-28 |
 | [review/前端-审查.md](review/前端-审查.md) | `src/**` 约 110 个源文件的分层、状态、数据访问与红线执行情况审查 | 2026-10-28 |
 | [review/脚本部署-审查.md](review/脚本部署-审查.md) | `scripts/` 15 个脚本与 `deploy/`（install.sh / systemd / nginx / logrotate）审查清单 | 2026-10-28 |

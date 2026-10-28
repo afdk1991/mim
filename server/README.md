@@ -70,7 +70,7 @@ npm run migrate && npm run dev
 
 ```bash
 curl http://127.0.0.1:8787/api/health
-# {"data":{"ok":true,"db":true,"service":"mim-server","uptime_ms":…,"rpcs":19}}
+# {"data":{"ok":true,"db":true,"service":"mim-server","uptime_ms":…,"rpcs":20}}
 # 仓库根目录另有 npm run server:health（scripts/server-health.mjs），
 # 会真实探测 /api/health 与 /api/rest/products?limit=1 并打印结果
 ```
@@ -155,6 +155,7 @@ POST   /api/rest/:table                返回整行（写操作强制注入 owne
 PATCH  /api/rest/:table/:id
 DELETE /api/rest/:table/:id
 POST   /api/rpc/:fn                    服务端过程（全部需登录）
+GET    /api/sync/posts?since=<ms>&limit=<n>  只读增量同步（x-sync-token 鉴权；未配 SYNC_TOKEN 即关闭）
 POST   /api/storage/upload             {name,mime,body(base64)} → {key,url,size}
 GET    /api/storage/<key>              回读对象（含 Content-Type 与长缓存）
 ```
@@ -178,13 +179,18 @@ GET    /api/storage/<key>              回读对象（含 Content-Type 与长缓
 - `seckill_grab(p_session_id, p_qty, p_order_id)` → `{session_id, remaining, qty, expire_at}`
   防超卖三件套在同一事务内完成：① `SELECT … FOR UPDATE` 场次行锁 串行化并发；
   ② `UPDATE … WHERE remaining >= p_qty` 条件更新 库存不足即失败；
-  ③ `seckill_locks(session_id, user_id)` 主键唯一约束兜底限购。
+  ③ 限购按「(会话,用户) 未过期订单锁行」聚合 qty 后比对 `limit_per_user`。
+  锁落 `seckill_lock_items`（一单一行，`(session_id,user_id,order_id)` 唯一）；
+  旧表 `seckill_locks` 仅由定时器兜底清幽灵行，不再读写。
   场次不存在/未开始/已结束/已关闭 → 对应 404/409；超限购 → 409。
-- `seckill_release(p_session_id, p_order_id)` → `{released}`，幂等（无锁返回 0）。
+- `seckill_release(p_session_id, p_order_id)` → `{released}`，按订单精确删行、只回补该单 qty，幂等（无锁返回 0）。
 - `travel_book(p_ticket_id, p_date, p_qty, p_order_id)` → `{remaining}`，
   按 `(ticket_id, date)` 行锁 + 条件更新；同时把本人订单置 `pending_ticket`。
 - `travel_release(p_ticket_id, p_date, p_qty, p_order_id)` → `{released, remaining}`，
   仅本人且未支付订单可释放。
+- `travel_issue(p_order_id)` → `{order_id, biz_status, issued_at, reused}`，
+  把已支付出行单从 `pending_ticket` 推到 `ticketed`（未支付拒出票、重复出票返回 `reused=true`），
+  使 `travel_refund` 的闸口可达；出票时间戳记入 `ext.issued_at`。
 - `travel_refund(p_order_id)` → `{amount_fen, fee_fen, refund_fen, credited_fen, restored}`
   防重复退四道闸：非出行单 / 已 `refunding`·`refunded` / 非 `ticketed` / 不可退。
   手续费取 `ceil(amount_fen * fee_rate)`（不可退时全额手续费），实退
