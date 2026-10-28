@@ -212,22 +212,35 @@ export function MallProvider({ children }: { children: ReactNode }) {
         patch((s) => ({ ...s, cart: [] }))
       },
 
+      /* FE-001 多商品拆单结算：每一行商品独立建一张 mall_orders（复用现有订单模型，
+       * 不引入订单行表）。金额口径 = Σ(行单价 × 行数量)，与 cartTotalFen(goods)
+       * 走同一个 unitPriceFen —— 购物车展示合计与落库订单总额天然一致。
+       * 无对应商品（已下架）的行不结算，保留在车里让用户自行删除。 */
       checkout() {
-        const head = ref.current.cart[0]
-        if (!head) return null
-        const g = goods.find((x) => x.id === head.goodsId)
-        if (!g) return null
-        const order = buildOrder({
-          goodsId: g.id,
-          title: ref.current.cart.length === 1 ? g.title : `${g.title} 等${ref.current.cart.length}种`,
-          emoji: g.emoji,
-          priceFen: unitPriceFen(head, g),
-          qty: ref.current.cart.reduce((n, c) => n + c.qty, 0),
-          ...(head.ext ? { ext: head.ext } : {}),
+        const byId = new Map(goods.map((g) => [g.id, g]))
+        const rows = ref.current.cart
+          .map((c) => ({ c, g: byId.get(c.goodsId) }))
+          .filter((r): r is { c: MallCartItem; g: MallGoods } => r.g !== undefined)
+        if (!rows.length) return null
+        const made: MallOrder[] = rows.map(({ c, g }, i) => {
+          const order = buildOrder({
+            goodsId: g.id,
+            title: g.title,
+            emoji: g.emoji,
+            priceFen: unitPriceFen(c, g),
+            qty: c.qty,
+            ...(c.ext ? { ext: c.ext } : {}),
+          })
+          // buildOrder 的 id 是 MO-毫秒：同毫秒拆出多单必须逐单加后缀，否则撞主键
+          return { ...order, id: `${order.id}-${i + 1}` }
         })
-        patch((s) => ({ ...s, orders: [order, ...s.orders], cart: [] }))
-        upsertOrder(order)
-        return order
+        patch((s) => ({
+          ...s,
+          orders: [...made, ...s.orders],
+          cart: s.cart.filter((c) => !rows.some((r) => r.c === c)),
+        }))
+        made.forEach((o) => upsertOrder(o))
+        return made[0] ?? null
       },
 
       async placeBizOrder(input) {

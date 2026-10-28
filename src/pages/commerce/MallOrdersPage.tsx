@@ -8,7 +8,8 @@
  * 业务差异只出现在「有 ext 的订单」上：
  *   秒杀  取消即释放库存（mall.cancelOrder 内部已调 seckill_release）
  *   本地  支付后可「取券码」→ 服务端发码（幂等，重复取返回原码）
- *   出行  bizStatus==='ticketed' 才可「申请退票」，手续费按 ext.rule 快照算
+ *   出行  已支付后可「出票」（pending_ticket → ticketed）；
+ *         bizStatus==='ticketed' 才可「申请退票」，手续费按 ext.rule 快照算
  *
  * 金额铁律：travel_refund 返回的 amount / fee / refund 已经是「分」，
  *      页面只做展示，绝不再除一次 100（历史 bug）。
@@ -100,6 +101,21 @@ export function MallOrdersPage() {
     toast(`券码已生成：${code}`)
   }
 
+  /* ---------- 出行：出票（AN-001：打通 pending_ticket → ticketed，退票链路才可达） ---------- */
+
+  const issueTravel = async (o: MallOrder): Promise<void> => {
+    setBusy(true)
+    const r = await db.rpc('travel_issue', { p_order_id: o.id }, { write: true })
+    setBusy(false)
+    if (!r.ok) {
+      toast(`出票失败：${errText(r.error)}`)
+      return
+    }
+    // 服务端事务内已把 biz_status 置 ticketed；本地同步推进，退票闸口随即开放
+    setBizStatus(o.id, 'ticketed')
+    toast('出票成功，可申请退票')
+  }
+
   /* ---------- 出行：申请退票 ---------- */
 
   const refundTravel = async (o: MallOrder): Promise<void> => {
@@ -111,12 +127,13 @@ export function MallOrdersPage() {
       return
     }
     const d = asRecord(r.data)
-    // amount / fee / refund 已经是以「分」为单位的整数，禁止再除 100
-    const feeFen = numOf(d, 'fee')
-    const refundFen = numOf(d, 'refund')
+    // 服务端 travel_refund 回包字段为 fee_fen / refund_fen（rpc.js:284-291），
+    // 本身已是以「分」为单位的整数，禁止再除 100
+    const feeFen = numOf(d, 'fee_fen')
+    const refundFen = numOf(d, 'refund_fen')
     setBizStatus(o.id, 'refunded')
-    // 不在这里给钱包加钱：订单可能走的是扫码通道，入账必须由服务端按原通道退回
-    toast(`退票已受理：手续费 ¥${yuanText(feeFen)}，应退 ¥${yuanText(refundFen)}，将按原支付通道退回`)
+    // 不在这里给钱包加钱：服务端已在事务内把退款以 income 流水入钱包（rpc.js:250-266）
+    toast(`退票已受理：手续费 ¥${yuanText(feeFen)}，应退 ¥${yuanText(refundFen)}，退款将退回至 Mim 钱包`)
   }
 
   const closePay = (): void => {
@@ -224,6 +241,11 @@ export function MallOrdersPage() {
                 {ext.kind === 'local' && isPaid(o) ? (
                   <button className="btn btn-sm" disabled={busy} onClick={() => void issueVoucher(o)}>
                     {ext.voucherCode ? '重新取码' : '取券码'}
+                  </button>
+                ) : null}
+                {ext.kind === 'travel' && isPaid(o) && o.bizStatus === 'pending_ticket' ? (
+                  <button className="btn btn-sm" disabled={busy} onClick={() => void issueTravel(o)}>
+                    出票
                   </button>
                 ) : null}
                 {ext.kind === 'travel' && o.bizStatus === 'ticketed' ? (

@@ -38,10 +38,6 @@ export const isSet = (v: string): boolean => v.trim() !== ''
 
 /* ---------- 后端地址 ---------- */
 
-/** 生产默认地址：与 server/ 部署后的公网入口一致。
- *  公开只读接口，不含任何密钥，写死在前端是安全的（原实现同样如此）。 */
-export const PROD_API_BASE = ''
-
 /**
  * 纯本地模式的显式开关取值。
  *
@@ -93,7 +89,8 @@ export const LIMITS = {
   uploadMaxBytes: 3 * 1024 * 1024,
   /** 快拍存活时长 */
   storyTtlMs: 24 * 60 * 60 * 1000,
-  /** 秒杀锁库存有效期 */
+  /** 秒杀锁库存有效期（毫秒）。前端无法读服务端 env，此常量必须与 server/.env 的
+   *  SECKILL_LOCK_MS 保持一致（默认均为 15 分钟）；改一处必须同步另一处。 */
   seckillLockMs: 15 * 60 * 1000,
   /** 券码最长有效期 */
   voucherMaxDays: 90,

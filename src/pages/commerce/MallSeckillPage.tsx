@@ -59,7 +59,8 @@ export function MallSeckillPage() {
     })
     setBusyId('')
     if (order) {
-      toast('抢购成功，请在 15 分钟内完成支付')
+      // 锁时长取 LIMITS.seckillLockMs（与服务端 SECKILL_LOCK_MS 对齐），不写死 15 分钟
+      toast(`抢购成功，请在 ${Math.round(LIMITS.seckillLockMs / 60_000)} 分钟内完成支付`)
       navigate('/mall/orders')
       sessions.reload()
     }

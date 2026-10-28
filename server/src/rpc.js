@@ -87,6 +87,27 @@ async function seckill_grab(ctx, p) {
     if (now < s.start_at) throw conflict('秒杀尚未开始')
     if (now >= s.end_at) throw conflict('秒杀已结束')
 
+    // AN-004 懒清理（主路径）：本会话里已过期未付的锁，在这里 DELETE 即「认领」回补库存。
+    // 已持本会话行锁（上面的 for update），同会话所有 grab 串行，清理与扣减无并发窗口；
+    // 与 main.js 的定时器兜底靠「DELETE 即认领」互斥——谁删到过期行谁回补，不会双倍。
+    // 过期行先被删，下面的 had 自然只数未过期锁，限购额度同步释放（BE-002 的多单累计
+    // 问题不在本次范围，这里只清理真正过期的锁行，不改变仍有效锁的累计语义）。
+    const swept = (
+      await c.query(
+        'delete from seckill_locks where session_id = $1 and expire_at < $2 returning qty',
+        [sessionId, now],
+      )
+    ).rows
+    if (swept.length) {
+      const freed = swept.reduce((n, r) => n + Number(r.qty), 0)
+      if (freed > 0) {
+        await c.query(
+          'update seckill_sessions set remaining = least(total, remaining + $1) where id = $2',
+          [freed, sessionId],
+        )
+      }
+    }
+
     const had = (await c.query('select qty from seckill_locks where session_id = $1 and user_id = $2', [sessionId, ctx.uid])).rows[0]?.qty ?? 0
     if (had + qty > s.limit_per_user) throw conflict(`每人限购 ${s.limit_per_user} 件，你已抢 ${had} 件`)
 
@@ -134,6 +155,37 @@ async function seckill_release(ctx, p) {
   })
 }
 
+/**
+ * AN-004 过期锁兜底清理：删除全站 expire_at < now 的秒杀锁并回补对应场次库存。
+ *
+ * 调用方：main.js 启动时一次 + 进程内 setInterval（周期见 main.js）。
+ * 为什么还需要它（懒清理之外的兜底）：懒清理只在「有人再抢同一会场」时才发生，
+ * 一个被幽灵单占着库存、再无人问津的老场次永远不会被清理。
+ *
+ * 并发安全：CTE 里 delete ... returning 即认领——与 seckill_grab 事务内的懒清理互斥，
+ * 同一条过期锁行只会被一个事务删掉并回补一次；按 session 聚合后再回补，
+ * 避免一次 delete 多行同 session 触发 UPDATE 的「target row updated multiple times」。
+ * 重启后定时器丢失可接受：grab 懒清理不依赖本函数，进程重启前已过期的锁
+ * 会在下一次该场次被访问时由懒清理补上。
+ */
+export async function sweepSeckillLocks() {
+  const now = Date.now()
+  const r = await tx(async (c) =>
+    c.query(
+      `with expired as (
+         delete from seckill_locks where expire_at < $1 returning session_id, qty
+       ), agg as (
+         select session_id, sum(qty)::int as freed from expired group by session_id
+       )
+       update seckill_sessions s set remaining = least(s.total, s.remaining + agg.freed)
+         from agg where agg.session_id = s.id
+       returning agg.session_id as session_id, agg.freed`,
+      [now],
+    ),
+  )
+  return r.rows
+}
+
 /** 出行占座：按 (票种, 日期) 行锁 + 条件更新 */
 async function travel_book(ctx, p) {
   const ticketId = str(p, 'p_ticket_id', { max: 200 })
@@ -165,18 +217,19 @@ async function travel_book(ctx, p) {
   })
 }
 
-/** 出行释放：回滚某票种某日库存（取消未支付订单） */
+/** 出行释放：回滚某票种某日库存（取消未支付订单）。
+ *  p_order_id 必填：必须凭「本人且未支付」的订单才能加库存，否则任意登录用户
+ *  可对任意 (票种, 日期) 无凭据地放大 remaining，击穿防超卖的库存水位。 */
 async function travel_release(ctx, p) {
   const ticketId = str(p, 'p_ticket_id', { max: 200 })
   const date = dateParam(p, 'p_date')
   const qty = int(p, 'p_qty', { min: 1, max: 999 })
-  const orderId = p.p_order_id === undefined || p.p_order_id === null ? null : str(p, 'p_order_id', { max: 200 })
+  const orderId = str(p, 'p_order_id', { max: 200 })
 
-  if (orderId) {
-    const o = await one('select id, user_id, status from mall_orders where id = $1', [orderId])
-    if (o && o.user_id !== ctx.uid) throw forbidden('只能操作自己的订单')
-    if (o && o.status !== 'unpaid') return { released: 0, reason: 'order_not_unpaid' }
-  }
+  const o = await one('select id, user_id, status from mall_orders where id = $1', [orderId])
+  if (!o) throw notFound('订单不存在')
+  if (o.user_id !== ctx.uid) throw forbidden('只能操作自己的订单')
+  if (o.status !== 'unpaid') return { released: 0, reason: 'order_not_unpaid' }
   const up = await query(
     'update travel_date_stock set remaining = remaining + $1 where ticket_id = $2 and date = $3 returning remaining',
     [qty, ticketId, date],
@@ -294,6 +347,41 @@ async function travel_refund(ctx, p) {
 /* ==========================================================================
  * 本地生活：服务端发码 / 一次性核销
  * ========================================================================== */
+
+/**
+ * AN-001 出行出票 —— 打通 pending_ticket → ticketed，使退票链路可达。
+ *
+ * 状态机（与前端 BIZ_STATUS_META 一致）：
+ *   下单占座后 pending_ticket → （本 RPC）ticketed → travel_refund 闸口放行。
+ * 闸口：
+ *   ① 订单存在且归属本人；② 必须是出行单；③ 必须已支付（paid/done）——
+ *   未支付订单不占资金，出票无意义；④ 仅 pending_ticket 可出票。
+ * 幂等：已是 ticketed 视为重复点击，原样返回 reused=true，不重复写 ext。
+ * 出票时间戳（bigint 毫秒）记进 ext.issued_at，便于对账。
+ */
+async function travel_issue(ctx, p) {
+  const orderId = str(p, 'p_order_id', { max: 200 })
+
+  return tx(async (c) => {
+    const o = (await c.query('select * from mall_orders where id = $1 for update', [orderId])).rows[0]
+    if (!o) throw notFound('订单不存在')
+    if (o.user_id !== ctx.uid) throw forbidden('只能操作自己的订单') // ①
+    if (o.biz_kind !== 'travel') throw badRequest('该订单不是出行订单') // ②
+    if (o.biz_status === 'ticketed') return { order_id: orderId, biz_status: 'ticketed', reused: true }
+    if (o.biz_status !== 'pending_ticket') throw conflict('当前状态不可出票')
+    if (o.status !== 'paid' && o.status !== 'done') throw conflict('订单未支付，不能出票') // ③
+
+    const issuedAt = Date.now()
+    await c.query(
+      `update mall_orders set biz_status = 'ticketed',
+              ext = coalesce(ext, '{}'::jsonb) || jsonb_build_object('issued_at', $2::bigint),
+              updated_at = now()
+        where id = $1`,
+      [orderId, issuedAt],
+    )
+    return { order_id: orderId, biz_status: 'ticketed', issued_at: issuedAt, reused: false }
+  })
+}
 
 /** 支付后发码：幂等（同订单返回原码）、未支付拒绝、有效期 least(voucher.valid_until, now+90d) */
 async function issue_voucher_code(ctx, p) {
@@ -635,6 +723,75 @@ async function growth_state(ctx) {
   }
 }
 
+/* ==========================================================================
+ * 后台：充值核销（仅管理员）
+ *
+ * 为什么必须走服务端：wallet_balances 不在 REST 白名单、wallet_txs 是 write:none，
+ * 前端无法也不应直接改他人余额；wallet_credit 只能给「调用者自己」入账。
+ * 管理员给他人入账必须由服务端校验角色并原子完成「加余额 + 记流水 + 写审计」。
+ * ========================================================================== */
+
+/** 按 UUID 或用户名查用户与余额，供核销前核对 */
+async function admin_user_lookup(ctx, p) {
+  ctx.requireAdmin()
+  const q = str(p, 'p_query', { max: 64 })
+  const byId = UUID_RE.test(q)
+  const r = await one(
+    `select u.id, u.username, u.name, coalesce(b.balance_fen, 0) as balance_fen
+       from users u left join wallet_balances b on b.user_id = u.id
+      where ${byId ? 'u.id = $1' : 'u.username = $1'}`,
+    [q],
+  )
+  if (!r) throw notFound('用户不存在')
+  return { id: r.id, username: r.username, name: r.name, balance_fen: Number(r.balance_fen) }
+}
+
+/** 管理员核销入账：一次性完成加余额、记充值流水、写审计留痕 */
+async function admin_wallet_credit(ctx, p) {
+  ctx.requireAdmin()
+  const uid = uuidParam(p, 'p_user_id')
+  const fen = int(p, 'p_fen', { min: 1, max: 100_000_000_000 })
+  const note = p.p_note === undefined || p.p_note === null ? '' : str(p, 'p_note', { min: 0, max: 200 })
+
+  return tx(async (c) => {
+    const user = (await c.query('select username from users where id = $1', [uid])).rows[0]
+    if (!user) throw notFound('用户不存在')
+    await ensureBalance(c, uid)
+    const up = await c.query(
+      `update wallet_balances set balance_fen = balance_fen + $1, updated_at = now()
+        where user_id = $2 returning balance_fen`,
+      [fen, uid],
+    )
+    await c.query(
+      `insert into wallet_txs (user_id, kind, fen, note, at) values ($1, 'recharge', $2, $3, $4)`,
+      [uid, fen, note, Date.now()],
+    )
+    await c.query(
+      `insert into audit_logs (actor_id, action, target_type, target_id, detail)
+       values ($1, 'wallet.credit', 'user', $2, $3)`,
+      [ctx.uid, uid, JSON.stringify({ fen, note, username: user.username })],
+    )
+    return { balance_fen: Number(up.rows[0].balance_fen), fen }
+  })
+}
+
+/** 充值流水：p_user_id 缺省时返回全站最近充值记录，便于对账 */
+async function admin_wallet_ledger(ctx, p) {
+  ctx.requireAdmin()
+  const limit = int(p, 'p_limit', { min: 1, max: 200, def: 50 })
+  const raw = p.p_user_id === undefined || p.p_user_id === null || p.p_user_id === '' ? '' : String(p.p_user_id)
+  const uid = raw ? uuidParam(p, 'p_user_id') : ''
+  const sql = uid
+    ? `select t.id, t.user_id, u.username, t.fen, t.note, t.at
+         from wallet_txs t join users u on u.id = t.user_id
+        where t.user_id = $1 and t.kind = 'recharge' order by t.at desc limit $2`
+    : `select t.id, t.user_id, u.username, t.fen, t.note, t.at
+         from wallet_txs t join users u on u.id = t.user_id
+        where t.kind = 'recharge' order by t.at desc limit $2`
+  const r = await query(sql, uid ? [uid, limit] : [limit])
+  return { rows: r.rows }
+}
+
 /* ---------- 注册表 ---------- */
 
 export const RPCS = new Map(
@@ -644,6 +801,7 @@ export const RPCS = new Map(
     seckill_release,
     travel_book,
     travel_release,
+    travel_issue,
     travel_refund,
     /* 本地生活券码 */
     issue_voucher_code,
@@ -656,6 +814,10 @@ export const RPCS = new Map(
     mall_upsert_order,
     send_message,
     bootstrap_admin,
+    /* 后台充值核销 */
+    admin_user_lookup,
+    admin_wallet_credit,
+    admin_wallet_ledger,
     /* 成长 */
     growth_record,
     growth_checkin,

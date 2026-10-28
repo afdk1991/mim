@@ -14,8 +14,9 @@ import { fileURLToPath } from 'node:url'
 import { close, ping } from './db.js'
 import { authenticate, login, register, revokeToken } from './auth.js'
 import * as rest from './rest.js'
-import { callRpc, knownRpcs } from './rpc.js'
+import { callRpc, knownRpcs, sweepSeckillLocks } from './rpc.js'
 import * as storage from './storage.js'
+import { checkSyncToken, syncPosts } from './sync.js'
 import { toApiError, badRequest } from './errors.js'
 
 const PORT = Number(process.env.PORT ?? 8787)
@@ -28,7 +29,7 @@ const startedAt = Date.now()
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Mim-Token')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Mim-Token,X-Sync-Token')
   res.setHeader('Access-Control-Max-Age', '86400')
   res.setHeader('Vary', 'Origin')
 }
@@ -129,6 +130,12 @@ async function route(req, res, url) {
     return undefined
   }
 
+  /* --- 只读增量同步：外部镜像按水位拉公开动态，令牌鉴权，无写能力 --- */
+  if (restPath === '/sync/posts' && method === 'GET') {
+    checkSyncToken(req)
+    return ok(res, await syncPosts(searchParams))
+  }
+
   /* --- RPC --- */
   if (restPath.startsWith('/rpc/')) {
     const fn = restPath.slice('/rpc/'.length)
@@ -175,6 +182,10 @@ async function tryAuth(req) {
 
 /* ---------- 服务器 ---------- */
 
+/** AN-004：秒杀过期锁兜底定时器。主路径是 seckill_grab 事务内的懒清理，
+ * 本定时器只兜底「无人再访问的老场次」；进程重启后丢失可接受（见 rpc.js）。 */
+let sweepTimer
+
 const server = http.createServer((req, res) => {
   const started = Date.now()
   const done = (status) => {
@@ -205,10 +216,18 @@ export async function start(port = PORT, host = HOST) {
   await once(server, 'listening')
   console.log(`[mim] 自托管后端已启动：http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/api/health`)
   console.log(`[mim] REST 表 ${rest.knownTables().length} 张，RPC ${knownRpcs().length} 个，上传目录 ${storage.uploadDir}`)
+
+  // AN-004：启动即清理一次历史遗留的过期锁，之后每 60s 兜底一轮。
+  // 清理失败只记日志，绝不影响服务本身（下次定时器/下次 grab 会再试）。
+  void sweepSeckillLocks().catch((e) => console.error('[seckill] 启动清理过期锁失败', e.message))
+  sweepTimer = setInterval(() => {
+    void sweepSeckillLocks().catch((e) => console.error('[seckill] 清理过期锁失败', e.message))
+  }, 60_000)
   return server
 }
 
 export async function stop() {
+  if (sweepTimer) clearInterval(sweepTimer)
   server.close()
   await close()
 }
