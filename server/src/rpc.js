@@ -72,11 +72,11 @@ const BIZ_KINDS = ['seckill', 'local', 'live', 'travel']
  * 四业务：库存 / 券码 / 退票
  * ========================================================================== */
 
-/** 秒杀抢购：行锁 + 条件更新 + 限购锁三位一体，返回 {remaining, qty} */
+/** 秒杀抢购：行锁 + 条件更新 + 按订单粒度的限购锁三位一体，返回 {remaining, qty} */
 async function seckill_grab(ctx, p) {
   const sessionId = str(p, 'p_session_id', { max: 200 })
   const qty = int(p, 'p_qty', { min: 1, max: 999 })
-  const orderId = p.p_order_id === undefined || p.p_order_id === null ? null : str(p, 'p_order_id', { max: 200 })
+  const orderId = p.p_order_id === undefined || p.p_order_id === null ? '' : str(p, 'p_order_id', { max: 200 })
 
   return tx(async (c) => {
     const s = (await c.query('select * from seckill_sessions where id = $1 for update', [sessionId])).rows[0]
@@ -87,14 +87,13 @@ async function seckill_grab(ctx, p) {
     if (now < s.start_at) throw conflict('秒杀尚未开始')
     if (now >= s.end_at) throw conflict('秒杀已结束')
 
-    // AN-004 懒清理（主路径）：本会话里已过期未付的锁，在这里 DELETE 即「认领」回补库存。
+    // AN-004 懒清理（主路径）：本会话里已过期未付的订单锁，在这里 DELETE 即「认领」回补库存。
     // 已持本会话行锁（上面的 for update），同会话所有 grab 串行，清理与扣减无并发窗口；
     // 与 main.js 的定时器兜底靠「DELETE 即认领」互斥——谁删到过期行谁回补，不会双倍。
-    // 过期行先被删，下面的 had 自然只数未过期锁，限购额度同步释放（BE-002 的多单累计
-    // 问题不在本次范围，这里只清理真正过期的锁行，不改变仍有效锁的累计语义）。
+    // 锁按订单一行一条（0007），过期行先删，下面的 had 聚合自然只数未过期的有效单。
     const swept = (
       await c.query(
-        'delete from seckill_locks where session_id = $1 and expire_at < $2 returning qty',
+        'delete from seckill_lock_items where session_id = $1 and expire_at < $2 returning qty',
         [sessionId, now],
       )
     ).rows
@@ -108,7 +107,15 @@ async function seckill_grab(ctx, p) {
       }
     }
 
-    const had = (await c.query('select qty from seckill_locks where session_id = $1 and user_id = $2', [sessionId, ctx.uid])).rows[0]?.qty ?? 0
+    // 限购额度：按 (会话, 用户) 聚合「未过期订单锁」的 qty（与旧 seckill_locks 累计口径一致）
+    const had = Number(
+      (
+        await c.query(
+          'select coalesce(sum(qty),0)::int as qty from seckill_lock_items where session_id = $1 and user_id = $2 and expire_at >= $3',
+          [sessionId, ctx.uid, now],
+        )
+      ).rows[0].qty,
+    )
     if (had + qty > s.limit_per_user) throw conflict(`每人限购 ${s.limit_per_user} 件，你已抢 ${had} 件`)
 
     // 条件更新：库存不够时 affected=0，不在应用层做「读库存再判断」
@@ -118,35 +125,39 @@ async function seckill_grab(ctx, p) {
     )
     if (!up.rows.length) throw conflict('库存不足，已被抢完')
 
+    // 一单一行（0007）：同一订单重复抢（极端）才累加 qty；order_id 不再「只留首个」
     await c.query(
-      `insert into seckill_locks (session_id, user_id, qty, order_id, expire_at, created_at)
+      `insert into seckill_lock_items (session_id, user_id, order_id, qty, expire_at, created_at)
        values ($1, $2, $3, $4, $5, $6)
-       on conflict (session_id, user_id) do update
-         set qty = seckill_locks.qty + excluded.qty,
-             order_id = coalesce(excluded.order_id, seckill_locks.order_id),
+       on conflict (session_id, user_id, order_id) do update
+         set qty = seckill_lock_items.qty + excluded.qty,
              expire_at = excluded.expire_at`,
-      [sessionId, ctx.uid, qty, orderId, now + SEC_LOCK_MS, now],
+      [sessionId, ctx.uid, orderId, qty, now + SEC_LOCK_MS, now],
     )
 
     return { session_id: sessionId, remaining: up.rows[0].remaining, qty: had + qty, expire_at: now + SEC_LOCK_MS }
   })
 }
 
-/** 秒杀释放（取消订单 / 超时未付）：幂等，无锁返回 released=0 */
+/** 秒杀释放（取消订单 / 超时未付）：按订单精确粒度，幂等，无锁返回 released=0。
+ *  BE-002：只删「本订单」那一行锁、只回补那一单的 qty，绝不动同用户同场其它在途单。 */
 async function seckill_release(ctx, p) {
   const sessionId = str(p, 'p_session_id', { max: 200 })
-  const orderId = p.p_order_id === undefined || p.p_order_id === null ? null : str(p, 'p_order_id', { max: 200 })
+  const orderId = p.p_order_id === undefined || p.p_order_id === null ? '' : str(p, 'p_order_id', { max: 200 })
 
   return tx(async (c) => {
     const lock = (
       await c.query(
-        `select qty from seckill_locks
-          where session_id = $1 and user_id = $2 and order_id is not distinct from $3`,
+        'select qty from seckill_lock_items where session_id = $1 and user_id = $2 and order_id = $3',
         [sessionId, ctx.uid, orderId],
       )
     ).rows[0]
     if (!lock) return { released: 0 }
-    await c.query('delete from seckill_locks where session_id = $1 and user_id = $2', [sessionId, ctx.uid])
+    // DELETE 即认领：删本订单这一行，回补的恰好是这一单的 qty
+    await c.query(
+      'delete from seckill_lock_items where session_id = $1 and user_id = $2 and order_id = $3',
+      [sessionId, ctx.uid, orderId],
+    )
     await c.query(
       'update seckill_sessions set remaining = least(total, remaining + $1) where id = $2',
       [lock.qty, sessionId],
@@ -162,6 +173,9 @@ async function seckill_release(ctx, p) {
  * 为什么还需要它（懒清理之外的兜底）：懒清理只在「有人再抢同一会场」时才发生，
  * 一个被幽灵单占着库存、再无人问津的老场次永远不会被清理。
  *
+ * 覆盖两张表：现行的 seckill_lock_items（0007，一单一行）+ 旧的 seckill_locks
+ *   （0004，grab/release 已不再写，仅遗留幽灵行在此兜底清掉并回补）。
+ *
  * 并发安全：CTE 里 delete ... returning 即认领——与 seckill_grab 事务内的懒清理互斥，
  * 同一条过期锁行只会被一个事务删掉并回补一次；按 session 聚合后再回补，
  * 避免一次 delete 多行同 session 触发 UPDATE 的「target row updated multiple times」。
@@ -172,10 +186,15 @@ export async function sweepSeckillLocks() {
   const now = Date.now()
   const r = await tx(async (c) =>
     c.query(
-      `with expired as (
+      `with expired_items as (
+         delete from seckill_lock_items where expire_at < $1 returning session_id, qty
+       ), expired_legacy as (
          delete from seckill_locks where expire_at < $1 returning session_id, qty
+       ), all_expired as (
+         select session_id, qty from expired_items union all
+         select session_id, qty from expired_legacy
        ), agg as (
-         select session_id, sum(qty)::int as freed from expired group by session_id
+         select session_id, sum(qty)::int as freed from all_expired group by session_id
        )
        update seckill_sessions s set remaining = least(s.total, s.remaining + agg.freed)
          from agg where agg.session_id = s.id

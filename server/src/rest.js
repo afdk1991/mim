@@ -57,6 +57,7 @@ const TABLES = new Map([
   /* ---- 四业务（读公开，写走 RPC 或管理员维护） ---- */
   t('seckill_sessions', { read: 'public', write: 'admin' }),
   t('seckill_locks', { owner: 'user_id', read: 'owner', write: 'none' }),
+  t('seckill_lock_items', { owner: 'user_id', read: 'owner', write: 'none' }),
   t('local_merchants', { read: 'public', write: 'admin' }),
   t('local_vouchers', { read: 'public', write: 'admin' }),
   t('local_voucher_codes', { owner: 'user_id', read: 'owner', write: 'none' }),
