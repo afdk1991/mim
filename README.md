@@ -16,7 +16,7 @@ Mim 是一个「动态 / 文章 / 商城 / 工具台」四合一的内容聚合�
 | 路由 | 自研 hash 路由 | — | `src/app/router.tsx` + `src/app/routes.tsx` |
 | 后端 | 自托管 `server/`（Node 20 + `node:http`） | Node `>=20` | `server/package.json` |
 | 后端唯一外部依赖 | `pg`（PostgreSQL 驱动） | `^8.23.1` | `server/package.json` 的 `dependencies` |
-| 数据库 | PostgreSQL | `16`（`postgres:16-alpine`） | `server/docker-compose.yml` 的 `db.image` |
+| 数据库 | PostgreSQL | `14+`（建议 16） | `deploy/README.md` 的「前置条件」表（宿主机系统包） |
 | 原生壳 | Capacitor（Android / iOS）、Tauri、Harmony | `^8.5.3`（Capacitor） | 根 `package.json` 的 `dependencies` |
 
 > 前端零第三方 UI 库、零 CSS 框架：样式是手写 CSS + 主题变量（`src/ui/styles/*.css`）。
@@ -28,7 +28,7 @@ Mim 是一个「动态 / 文章 / 商城 / 工具台」四合一的内容聚合�
 ```
 mim/
 ├─ index.html                      构建入口（挂载 #root，矢量 favicon）
-├─ package.json                    前端依赖与脚本（含 server:* 一键起停）
+├─ package.json                    前端依赖与脚本（含 server:* 后端命令转发）
 ├─ vite.config.ts                  base './'、别名 @→src、/api /auth /storage 开发代理
 ├─ tsconfig.json                   严格开关（strict / noUnusedLocals / verbatimModuleSyntax …）
 ├─ capacitor.config.ts             Capacitor 壳配置（webDir: dist）
@@ -84,13 +84,19 @@ mim/
 │
 ├─ server/                         自托管后端（Node 20 + node:http + pg）
 │  ├─ package.json                  依赖只有 pg；scripts: dev / start / migrate / seed:admin / check
-│  ├─ Dockerfile                    node:20-alpine
-│  ├─ docker-compose.yml            db(postgres:16) + api + 一次性 migrate 任务
 │  ├─ .env.example                  后端环境变量模板
 │  ├─ db/migrations/                0001_iam / 0002_content / 0003_commerce / 0004_business / 0005_growth
 │  ├─ scripts/migrate.js            迁移执行器（记录于 schema_migrations，幂等）
 │  ├─ scripts/promote-admin.js      命令行授予首个管理员
 │  └─ src/                          main.js / db.js / auth.js / rest.js / rpc.js / storage.js / errors.js
+│
+├─ deploy/                         宿主机部署资产（不使用容器，详见 deploy/README.md）
+│  ├─ README.md                     部署与运维主手册（唯一权威口径）
+│  ├─ install.sh                    一键部署脚本（幂等）
+│  ├─ init-db.sh                    建 PostgreSQL 库与账号（幂等）
+│  ├─ mim-server.service            systemd 单元（开机自启 + 崩溃重启）
+│  ├─ nginx-mim.conf                静态资源直出 + /api 反代
+│  └─ logrotate-mim.conf            nginx 日志轮转（每天，保留 14 天）
 │
 ├─ scripts/                        Node 工具脚本
 │  ├─ server-health.mjs             后端健康探测（对应 npm run server:health）
@@ -228,12 +234,29 @@ npm run dev
 
 ### 3) 启动后端（可选，但多端同步 / 商城 / 后台需要）
 
+后端是宿主机上的普通 Node 进程，数据库是宿主机安装的 PostgreSQL —— 不需要任何虚拟化环境。
+
 ```bash
-npm run server:install     # 安装 server 依赖（只有 pg）
-npm run server:up          # Docker 起 Postgres 16 与 API
-npm run server:migrate     # 应用 server/db/migrations/*.sql（幂等，可重复执行）
-npm run server:health      # 健康探测
+# ① 装 PostgreSQL（Debian 系；其它发行版见 INSTALL.md）
+sudo apt-get update && sudo apt-get install -y postgresql
+sudo systemctl enable --now postgresql
+
+# ② 建库建账号（幂等，可重复执行；口令换成你自己的）
+PGUSER=mim PGPASSWORD='换成你的密码' PGDATABASE=mim ./deploy/init-db.sh
+
+# ③ 安装后端依赖（只有 pg）+ 写配置
+npm run server:install
+cp server/.env.example server/.env
+vi server/.env                 # DATABASE_URL=postgres://mim:换成你的密码@127.0.0.1:5432/mim
+
+# ④ 应用迁移并启动
+npm run server:migrate         # 应用 server/db/migrations/*.sql（幂等，可重复执行）
+npm run server:dev             # node src/main.js，默认 http://127.0.0.1:8787
+npm run server:health          # 健康探测
 ```
+
+macOS 用 `brew install postgresql@16 && brew services start postgresql@16`，
+Windows 用 `winget install PostgreSQL.PostgreSQL.16`，逐平台步骤见 [`INSTALL.md`](INSTALL.md)。
 
 `npm run server:health` 预期输出：
 
@@ -245,11 +268,8 @@ Mim 后端健康探测 → http://127.0.0.1:8787
 全部通过：后端可用
 ```
 
-想在容器外直接跑进程（便于看日志 / 断点调试）：
-
-```bash
-npm run server:dev         # node server/src/main.js，默认 http://127.0.0.1:8787
-```
+`npm run server:dev` 就是直接跑进程（`node src/main.js`），日志打在当前终端，便于断点调试；
+生产则交给 systemd 守护，见 [`deploy/README.md`](deploy/README.md)。
 
 后端起来后，前端 dev 无需任何跨域配置：`vite.config.ts` 已把 `/api`、`/auth`、`/storage` 代理到 `http://127.0.0.1:8787`。
 
@@ -285,7 +305,7 @@ cp .env.example .env.local
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `PORT` | `8787` | 监听端口 |
-| `DATABASE_URL` | `postgres://postgres:postgres@127.0.0.1:5432/mim` | 连接串（Docker 内 hostname 是 `db`） |
+| `DATABASE_URL` | `postgres://postgres:postgres@127.0.0.1:5432/mim` | 宿主机 PostgreSQL 连接串（本机就是 `127.0.0.1`） |
 | `JWT_SECRET` | `change-me-in-production` | **生产必须替换**：`openssl rand -hex 32` |
 | `BOOTSTRAP_ADMIN_USERNAME` | 空 | 全新库首个管理员账号名 |
 | `UPLOAD_DIR` / `UPLOAD_MAX_BYTES` | `./data/uploads` / `3145728` | 对象存储落盘目录与单文件上限（与前端 `LIMITS.uploadMaxBytes` 对齐） |
@@ -293,18 +313,28 @@ cp .env.example .env.local
 
 ---
 
-## 六、后端一键起停
+## 六、后端命令
 
 全部在**仓库根目录**执行（内部用 `npm --prefix server` 转发）：
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run server:install` | 安装 `server/` 依赖 |
-| `npm run server:up` | `docker compose -f server/docker-compose.yml up -d`（起 Postgres 16 + API，一次性 `migrate` 任务也会被带起） |
-| `npm run server:down` | `docker compose … down`（停止并移除容器，数据卷保留） |
+| `npm run server:install` | 安装 `server/` 依赖（只有 `pg`） |
 | `npm run server:migrate` | 应用 `server/db/migrations/*.sql`（幂等，可重复执行） |
-| `npm run server:dev` | 本机直接启动 API（`node src/main.js`） |
+| `npm run server:dev` | 前台直接启动 API（`node src/main.js`），日志打在终端，Ctrl+C 停止 |
+| `npm run server:start` | 以 `npm start` 方式启动（`node src/main.js`，适合挂后台脚本） |
+| `npm run server:check` | 对所有 `src/*.js` 与 `scripts/*.js` 做 `node --check` 语法检查 |
 | `npm run server:health` | 探测 `/api/health` 与 `/api/rest/products?limit=1` |
+
+生产环境不用这些命令守护进程，交给 systemd：
+
+```bash
+sudo systemctl enable --now mim-server     # enable = 开机自启，--now = 立即启动
+sudo systemctl restart mim-server          # 改了 .env 或拉了新代码之后
+sudo journalctl -u mim-server -f           # 看日志
+```
+
+注意 **`start` 不等于 `enable`**：只 `start` 的服务重启机器后不会自己起来。
 
 ---
 
@@ -318,10 +348,10 @@ cp .env.example .env.local
 | `npm run build` | 生产构建到 `dist/` |
 | `npm run preview` | 预览构建产物 |
 | `npm run server:install` | 安装后端依赖 |
-| `npm run server:up` | Docker 起 Postgres + API |
-| `npm run server:down` | Docker 停止 |
 | `npm run server:migrate` | 执行数据库迁移 |
-| `npm run server:dev` | 本机启动后端（8787） |
+| `npm run server:dev` | 本机启动后端（8787，前台） |
+| `npm run server:start` | 本机启动后端（8787） |
+| `npm run server:check` | 后端语法自检 |
 | `npm run server:health` | 后端健康探测 |
 | `npm run verify:routes` | 全站路由遍历实测（需先起 dev server，需本机浏览器） |
 | `npm run version:check` | 版本号一致性校验（`src/core/version.ts` 为唯一源） |
@@ -344,6 +374,7 @@ cp .env.example .env.local
 | `docs/rebuild/页面实现规范.md` | 页面开发契约基线（分层、别名、可直接使用的 API、红线） |
 | `docs/rebuild/路由清单.md` | 全站路由表（hash / 组件 / 所属域 / 是否需要登录 / 功能说明） |
 | `docs/rebuild/迁移说明.md` | 从旧双后端架构迁移到自托管 `server/` 的变化与回滚方式 |
-| `DEPLOY.md` | 部署：GitHub Pages / 任意静态托管 / 后端 Docker Compose |
+| `DEPLOY.md` | 部署形态、端口表、三个部署入口、nginx 反代要点、日志 |
+| `deploy/README.md` | 部署与运维手册（systemd / nginx / 备份 / 排错，权威口径） |
 | `INSTALL.md` | 环境依赖清单与逐平台安装步骤 |
 | `server/README.md` | 后端路由契约、RPC 清单、环境变量全表、常见问题 |

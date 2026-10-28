@@ -10,9 +10,7 @@ express / fastify / jwt / bcrypt 等任何第三方库）。密码用 `crypto.sc
 ```
 server/
   package.json            依赖只有 pg
-  Dockerfile              node:20-alpine
-  docker-compose.yml      postgres:16 + api（+ 一次性 migrate 任务）
-  .env.example
+  .env.example            环境变量模板（服务端只读 process.env，不加载该文件本身）
   db/migrations/
     0001_iam.sql           users/profiles/app_users/roles/permissions/user_roles/
                            role_permissions/audit_logs/token_revocations（+ 角色种子）
@@ -37,14 +35,35 @@ server/
 
 ## 一、启动
 
-### A. 本机（已有 PostgreSQL 16）
+后端是宿主机上的一个普通 Node 进程：**就一个 `node src/main.js`**。
+数据库是宿主机直接安装的 PostgreSQL。没有任何镜像、没有编排文件、没有卷。
+
+### A. 本机开发（宿主机 PostgreSQL）
+
+先确认 PostgreSQL 在跑并已建库：
+
+```bash
+sudo apt-get install -y postgresql                 # Debian/Ubuntu；其它平台见 INSTALL.md
+sudo systemctl enable --now postgresql
+PGUSER=mim PGPASSWORD='换成你的密码' PGDATABASE=mim ../deploy/init-db.sh   # 幂等，建账号+建库
+```
+
+然后：
 
 ```bash
 cd server
 npm install
-export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/mim
-npm run migrate        # 应用 db/migrations/*.sql（幂等，可重复执行）
-npm run dev            # 默认监听 8787
+cp .env.example .env
+vi .env                    # DATABASE_URL=postgres://mim:换成你的密码@127.0.0.1:5432/mim
+npm run migrate            # 应用 db/migrations/*.sql（幂等，可重复执行）
+npm run dev                # node src/main.js，默认监听 127.0.0.1:8787
+```
+
+不想写 `.env` 时给 shell 临时注入：
+
+```bash
+export DATABASE_URL=postgres://mim:换成你的密码@127.0.0.1:5432/mim   # PowerShell: $env:DATABASE_URL = "..."
+npm run migrate && npm run dev
 ```
 
 健康检查：
@@ -59,21 +78,41 @@ curl http://127.0.0.1:8787/api/health
 前端 `vite.config.ts` 已把 `/api`、`/auth`、`/storage` 代理到 `http://127.0.0.1:8787`，
 所以 `npm run dev`（前端）只需后端在跑即可，无需处理跨域。
 
-### B. Docker
+### B. 服务器上：systemd 守护
+
+进程交给 systemd 单元 `deploy/mim-server.service`：
 
 ```bash
-cd server
-docker compose up -d db            # 先起库并等待 healthy
-docker compose run --rm migrate    # 应用迁移（一次性任务）
-docker compose up -d api           # 起后端 → http://127.0.0.1:8787/api/health
+sudo cp deploy/mim-server.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mim-server     # enable = 开机自启，--now = 立即启动
 ```
+
+| 操作 | 命令 |
+| --- | --- |
+| 看状态 | `sudo systemctl status mim-server` |
+| 看日志 | `sudo journalctl -u mim-server -f` |
+| 改了 `.env` / 拉了新代码 | `sudo systemctl restart mim-server` |
+| 停服并取消自启 | `sudo systemctl disable --now mim-server` |
+| 重启风暴卡住后复位 | `sudo systemctl reset-failed mim-server && sudo systemctl start mim-server` |
+
+要点：
+
+- 单元里 `Restart=always` + `RestartSec=3` 提供**崩溃自动重启**（进程异常退出后 3 秒拉起，正常 SIGTERM 关停不触发）。
+- **开机自启靠 `systemctl enable`，不等于 `start`** —— 只 start 的机器重启后不会起来。
+- 环境变量 `/opt/mim/server/.env` 由单元的 `EnvironmentFile=` 注入，因为服务端只读 `process.env`，
+  自己不解析 `.env` 文件。文件权限应为 `600`。
+- 单元以 `User=mim` 运行、`ProtectSystem=full`，只有 `ReadWritePaths=/opt/mim/server/data` 可写。
+
+完整部署（nginx 静态资源直出 + `/api` 反代 + 日志轮转 + 备份 + 排错）见
+[`deploy/README.md`](../deploy/README.md)。
 
 ## 二、环境变量
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `PORT` | `8787` | 监听端口 |
-| `HOST` | `0.0.0.0` | 监听地址 |
+| `HOST` | `0.0.0.0` | 监听地址，**生产建议 `127.0.0.1`**，只让本机 nginx 访问 |
 | `DATABASE_URL` | `postgres://postgres:postgres@127.0.0.1:5432/mim` | 连接串 |
 | `JWT_SECRET` | 开发用常量（启动时告警） | **生产必须替换**（`openssl rand -hex 32`） |
 | `TOKEN_TTL_MS` | `604800000`（7 天） | 令牌有效期 |
@@ -198,9 +237,12 @@ GET    /api/storage/<key>              回读对象（含 Content-Type 与长缓
 
 - **`relation "xxx" does not exist` / `表 xxx 不存在`**：没跑迁移。在 `server` 目录执行 `npm run migrate`。
 - **health 里 `db:false`**：`/api/health` 本身仍返回 200，表示进程活着但连不上库——
-  检查 `DATABASE_URL`（Docker 内 hostname 是 `db`，不是 `127.0.0.1`）。
+  检查 `DATABASE_URL`（宿主机上 PostgreSQL 与后端同机，hostname 就是 `127.0.0.1`，端口 `5432`），
+  并确认服务在跑：`systemctl status postgresql`。
 - **未知列报 `schema`**：线上表结构比迁移旧/新。确认迁移跑全后重启服务
-  （列名缓存在进程内，迁移后需重启以刷新 `describe()` 缓存）。
+  （列名缓存在进程内，迁移后需重启以刷新 `describe()` 缓存）：`sudo systemctl restart mim-server`。
+- **重启后服务没起来**：漏了 `systemctl enable mim-server`（`start` 不等于 `enable`）。
+- **`/api/*` 全部 404（`未知接口，请带 /api 前缀`）**：nginx 的 `proxy_pass` 末尾多了斜杠，把 `/api` 前缀剥掉了。
 - **`启动了但立刻退出`**：Windows 下 `import.meta.url` 与 `process.argv[1]` 路径格式不同，
   main.js 已按 `fileURLToPath` 处理；若自行改入口请注意这一点。
 - **上传 400（超过 3MB）**：与前端 `LIMITS.uploadMaxBytes` 对齐，需要放大就同时改

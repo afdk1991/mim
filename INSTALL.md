@@ -1,7 +1,9 @@
 # Mim 安装指南（环境依赖与逐平台安装步骤）
 
-> 面向**拿到仓库源码的人**：把本机从零装到能跑 `npm run dev` 与 `npm run server:up`。
+> 面向**拿到仓库源码的人**：把本机从零装到能跑 `npm run dev` 与 `npm run server:dev`。
 > 只想看前端效果的话，装完 Node 就够 —— 不配置后端时前端完全可用。
+>
+> 本项目**不使用容器**：数据库是宿主机上直接安装的 PostgreSQL，后端是宿主机上的普通 Node 进程。
 
 ---
 
@@ -12,8 +14,8 @@
 | Node.js | `>=20` | ✅ 必需 | 前端构建（`npm run dev/build`）、后端运行（`server/`） |
 | npm | 随 Node 附带 | ✅ 必需 | 依赖安装 |
 | Git | 近期版本 | ✅ 必需 | 拉取代码 |
-| Docker Desktop / Docker Engine + Compose 插件 | 近期版本 | ⚠️ 后端用 Docker 时才需要 | 起 PostgreSQL 16 与 API 容器 |
-| PostgreSQL | `16` | ⬜ 二选一 | 不想用 Docker 时自行准备数据库 |
+| PostgreSQL | `14+`（建议 16） | ⚠️ 跑后端时需要 | 后端唯一数据源，宿主机直接安装（`apt-get install -y postgresql`） |
+| nginx | 近期版本 | ⬜ 部署到服务器时需要 | 静态资源直出 + `/api` 反向代理（`apt-get install -y nginx`） |
 | JDK 21 + Android SDK | — | ⬜ 可选 | Android 壳（`android/`） |
 | Xcode | — | ⬜ 可选 | iOS 壳（`ios/`，仅 macOS） |
 | DevEco Studio | — | ⬜ 可选 | HarmonyOS 壳（`harmony/`） |
@@ -23,13 +25,17 @@
 
 - 前端 Node 版本：`package.json` 的 `engines.node`（`>=20`）
 - 后端 Node 版本：`server/package.json` 的 `engines.node`（`>=20`）
-- 数据库版本：`server/docker-compose.yml` 的 `db.image`（`postgres:16-alpine`）
+- 数据库版本：`deploy/README.md` 「前置条件」表（`apt-get install -y postgresql` 装到的系统版本即可）
+- nginx 无版本要求，配置模板是 [`deploy/nginx-mim.conf`](deploy/nginx-mim.conf)
 
-> CI（`.github/workflows/build.yml`）跑在 **Node 22** 上。`engines.node` 是 `>=20`，所以本机装 20 或 22 都能跑，**建议与 CI 对齐装 22**（下面命令里的 `20` 换成 `22` 即可）。
+> CI（`.github/workflows/build.yml`）跑在 **Node 22** 上。`engines.node` 是 `>=20`，所以本机装 20 或 22 都能跑，
+> **建议与 CI 对齐装 22**（下面命令里的 `20` 换成 `22` 即可）。
 
 ---
 
 ## 二、Windows
+
+Windows 只能作为**开发机**（systemd 部署手册面向 Linux 服务器）。
 
 ### 1) Node.js（>= 20）
 
@@ -65,17 +71,28 @@ winget install Git.Git
 git -v
 ```
 
-### 3) Docker Desktop（后端用 Docker 时）
-
-1. <https://www.docker.com/products/docker-desktop/> 下载安装。
-2. 安装时勾选 **Use WSL 2 instead of Hyper-V**；按提示完成 WSL 后端初始化并重启。
-3. 启动 Docker Desktop，等到托盘图标显示 *Running*。
-4. 验证：
+### 3) PostgreSQL（跑后端时需要）
 
 ```powershell
-docker -v
-docker compose version
-docker run hello-world
+winget install PostgreSQL.PostgreSQL.16
+```
+
+安装向导里把**口令**记牢（后面 `DATABASE_URL` 要用），端口保持 `5432`。装完确认服务在跑：
+
+```powershell
+Get-Service -Name postgresql*          # Status 应为 Running
+psql --version
+```
+
+> 若安装时没勾选加入 PATH，用安装目录下的 `psql.exe`，或在 PowerShell 里临时补：
+> `$env:Path += ";C:\Program Files\PostgreSQL\16\bin"`。
+
+然后建库并启动后端：
+
+```powershell
+$env:DATABASE_URL = "postgres://postgres:你的密码@127.0.0.1:5432/mim"
+npm run server:migrate
+npm run server:dev
 ```
 
 ### 4) 可选：原生壳工具链
@@ -90,6 +107,8 @@ docker run hello-world
 ---
 
 ## 三、macOS
+
+macOS 同样只作**开发机**用。
 
 ### 1) Node.js（>= 20）
 
@@ -119,12 +138,26 @@ xcode-select --install
 git -v
 ```
 
-### 3) Docker Desktop
+### 3) PostgreSQL（跑后端时需要）
 
 ```bash
-brew install --cask docker
-open -a Docker       # 首次启动会引导授权
-docker compose version
+brew install postgresql@16
+brew services start postgresql@16      # 开机自启 + 立即启动
+psql --version
+```
+
+建库：
+
+```bash
+createdb mim
+```
+
+然后：
+
+```bash
+export DATABASE_URL=postgres://$(whoami)@127.0.0.1:5432/mim
+npm run server:migrate
+npm run server:dev
 ```
 
 ### 4) 可选：原生壳工具链
@@ -139,6 +172,8 @@ docker compose version
 ---
 
 ## 四、Linux（Ubuntu / Debian 系）
+
+这是唯一的**部署目标平台**：systemd 单元与 Nginx 配置都按 Debian 系的路径写。
 
 ### 1) Node.js（>= 20）
 
@@ -168,37 +203,53 @@ sudo apt-get update && sudo apt-get install -y git
 git -v
 ```
 
-### 3) Docker Engine + Compose 插件
+### 3) PostgreSQL（宿主机系统服务）
 
 ```bash
-sudo apt-get install -y ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker "$USER"     # 重新登录后生效，免 sudo 用 docker
-docker compose version
+sudo apt-get install -y postgresql
+sudo systemctl enable --now postgresql          # enable = 开机自启，--now = 立即启动
+systemctl status postgresql                     # 期望 active (running)
+psql --version                                  # 14+ 即可
 ```
 
-### 4) 不用 Docker，直接用系统 Postgres 16
+建库建账号（幂等，可重复执行；口令换成你自己的）：
 
 ```bash
-sudo apt-get install -y postgresql postgresql-contrib
-sudo -u postgres psql -c "CREATE DATABASE mim;"
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD '换成你的密码';"
+PGUSER=mim PGPASSWORD='换成你的密码' PGDATABASE=mim ./deploy/init-db.sh
 ```
 
-然后：
+数据库连接串随后填进 `server/.env` 的 `DATABASE_URL`：
 
 ```bash
-export DATABASE_URL=postgres://postgres:你的密码@127.0.0.1:5432/mim
-npm run server:migrate
-npm run server:dev
+DATABASE_URL=postgres://mim:换成你的密码@127.0.0.1:5432/mim
 ```
 
-### 5) 可选：原生壳工具链
+### 4) nginx（部署服务器需要）
+
+```bash
+sudo apt-get install -y nginx
+sudo systemctl enable --now nginx
+nginx -v
+```
+
+配置直接用仓库里的模板，详见 [`deploy/README.md`](deploy/README.md) 第四、八节。
+
+### 5) RHEL / CentOS / Rocky（命令差异速查）
+
+```bash
+# Node.js
+sudo dnf module enable -y nodejs:22 && sudo dnf install -y nodejs
+
+# PostgreSQL（RHEL 需要先初始化数据目录）
+sudo dnf install -y postgresql-server
+sudo postgresql-setup --initdb
+sudo systemctl enable --now postgresql
+
+# nginx
+sudo dnf install -y nginx && sudo systemctl enable --now nginx
+```
+
+### 6) 可选：原生壳工具链
 
 | 目标 | 安装 |
 | --- | --- |
@@ -219,16 +270,18 @@ npm run dev
 
 打开 <http://localhost:5173/> 。
 
-后端（需要 Docker）：
+后端（宿主机原生，不需要任何虚拟化环境）：
 
 ```bash
-npm run server:install
-npm run server:up
-npm run server:migrate
-npm run server:health
+npm run server:install                  # 安装后端依赖（只有 pg）
+PGPASSWORD='你的密码' ./deploy/init-db.sh   # 建库建账号（幂等）
+npm run server:migrate                  # 应用迁移（幂等）
+npm run server:dev                      # node src/main.js → http://127.0.0.1:8787
+npm run server:health                   # 健康探测
 ```
 
 完整的 step by step（含创建首个管理员与常见问题）见 [`docs/rebuild/启动说明.md`](docs/rebuild/启动说明.md)。
+上线部署（systemd + nginx + 日志轮转）见 [`deploy/README.md`](deploy/README.md)。
 
 ---
 
@@ -238,8 +291,10 @@ npm run server:health
 | --- | --- |
 | `npm : 无法加载文件 … 因为在此系统上禁止运行脚本`（PowerShell） | 以管理员身份执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
 | `node -v` 报「不是内部或外部命令」 | PATH 未生效，重新打开终端；Windows 上确认安装时勾选了 Add to PATH |
-| `docker compose` 提示 `command not found` | 装的是旧版 `docker-compose`（带横杠）或没装 Compose 插件；Docker Desktop 自带 `docker compose` |
-| `docker: permission denied`（Linux） | `sudo usermod -aG docker $USER` 后**重新登录** |
+| `psql: command not found` | PostgreSQL 客户端没进 PATH。Linux：`sudo apt-get install -y postgresql-client`；macOS：`brew link --force postgresql@16`；Windows：见第二节第 3 步 |
+| `systemctl status postgresql` 不是 `active` | `sudo systemctl enable --now postgresql`；仍失败看 `sudo journalctl -u postgresql -n 50` |
+| 连不上库（`could not connect to server`） | 确认 PostgreSQL 在跑、端口是 `5432`、`DATABASE_URL` 的账号口令与 `init-db.sh` 建的一致 |
+| `认证失败 password authentication failed` | 口令不对。**重新执行一次 `PGPASSWORD=xxx ./deploy/init-db.sh`** —— 它只重置口令，不删库不动数据 |
 | `npm install` 卡住 / 报证书错误 | 换源：`npm config set registry https://registry.npmmirror.com` |
 | Node 版本低于 20 导致 vite 启动失败 | 用 nvm 切到 20：`nvm install 20 && nvm use 20` |
 | Windows 下 Git Bash 报路径相关错误 | 用 Git Bash 时路径写正斜杠（`f:/合并项目/Mim`），不要用反斜杠 |

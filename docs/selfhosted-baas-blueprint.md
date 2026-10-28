@@ -72,7 +72,7 @@ PostgREST  pg_graphql Auth   Storage-api  Realtime   Edge Runtime
 | 连接池 | Supavisor / PgBouncer | 直连（小规格） | Apache-2.0 / ISC | 服务多副本下必须收敛连接数 |
 | 管理面 | Studio + postgres-meta | 自研控制台 + meta API | Apache-2.0 | 表浏览/SQL 编辑器/策略编辑器 |
 
-> 🟡 **待确认**：MinIO 采用 AGPLv3 且社区形态近年有调整（Docker 镜像与功能范围变动），
+> 🟡 **待确认**：MinIO 采用 AGPLv3 且社区形态近年有调整（发行物与功能范围变动），
 > 商用前请自行复核许可与维护状态；本方案默认选 Apache-2.0 的 Garage/RustFS/SeaweedFS。
 
 ---
@@ -373,7 +373,7 @@ $$;
 
 | 档位 | 组成 | 适用 | 最低规格 |
 |---|---|---|---|
-| **A 单机** | docker compose：PG + PostgREST + Auth + Realtime + Storage + 对象存储 + 网关 + Studio | 内部工具 / POC / 小项目 | 4C8G + 100G SSD |
+| **A 单机** | 单机直部署：PG + PostgREST + Auth + Realtime + Storage + 对象存储 + 网关 + Studio（全部为宿主机系统进程，以 systemd 单元守护） | 内部工具 / POC / 小项目 | 4C8G + 100G SSD |
 | **B 单区生产** | PG 主备（Patroni）+ 连接池 + 各服务 ≥2 副本（无状态）+ 对象存储 3 节点 + LB + 监控 | 对外生产 | 库 8C32G；服务 各 2C4G×2 |
 | **C 全球多区** | 中心写库 + 区域只读副本 + 区域 Realtime/Edge + GeoDNS + CDN | 跨洲用户 | 每区同 B 的只读层 |
 
