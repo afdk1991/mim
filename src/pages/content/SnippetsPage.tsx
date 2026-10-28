@@ -2,7 +2,8 @@
  * SnippetsPage 代码片段 —— 语言白名单收录 + 复制 + 删除自己的片段
  *
  * 语言一律走 domain 的 SNIPPET_LANGUAGES 白名单（页面不得自行放宽，避免脏语言值入库）。
- * 复制：优先 Clipboard API，被拒时回退 execCommand；两种都失败就如实提示，不假装成功。
+ * 复制：统一走平台适配层 ui.copyText（内部已含 Clipboard API → execCommand 兜底）；
+ *       失败就如实提示，不假装成功。
  * 点赞：走状态层 toggleSnippetLike（本机计数 +1/-1，取消赞不空转）。
  * ======================================================================== */
 
@@ -11,6 +12,7 @@ import { Empty, Modal, TimeAgo, useToast, Avatar } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { cx, formatCount } from '@/core/utils'
 import { SNIPPET_LANGUAGES } from '@/domain/content/model'
+import { getPlatform } from '@/platform'
 import { useFirstPaint } from './content-data'
 import { AsyncState } from './content-parts'
 import { authorOf } from './content-lib'
@@ -31,30 +33,15 @@ export function SnippetsPage() {
   const list = snippets.filter((s) => !lang || s.language === lang)
 
   const copy = (id: string, text: string): void => {
-    const done = (): void => {
+    void getPlatform().ui.copyText(text).then((ok) => {
+      if (!ok) {
+        toast('复制失败，请手动选择复制')
+        return
+      }
       setCopiedId(id)
       toast('代码已复制 📋')
       window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500)
-    }
-    const fallback = (): void => {
-      try {
-        const ta = document.createElement('textarea')
-        ta.value = text
-        ta.style.position = 'fixed'
-        ta.style.opacity = '0'
-        document.body.appendChild(ta)
-        ta.select()
-        const ok = document.execCommand('copy')
-        document.body.removeChild(ta)
-        if (ok) done()
-        else toast('复制失败，请手动选择复制')
-      } catch {
-        toast('复制失败，请手动选择复制')
-      }
-    }
-    // 非安全上下文（http 且非 localhost）没有 clipboard 对象，必须回退
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback)
-    else fallback()
+    })
   }
 
   const create = (): void => {

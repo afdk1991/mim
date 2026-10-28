@@ -14,7 +14,7 @@ const ROUTES = [
   '#/mall/youxuan', '#/mall/live', '#/mall/mix', '#/mall/gexm', '#/mall/laal',
   /* 四大业务会场（#/mall/biz/<kind>）：与频道路由并存，需一并防白屏 */
   '#/mall/biz/seckill', '#/mall/biz/local', '#/mall/biz/live', '#/mall/biz/travel',
-  '#/admin', '#/admin/audit', '#/admin/roles',
+  '#/admin', '#/admin/products', '#/admin/recharge', '#/admin/audit', '#/admin/roles',
   '#/ai', '#/ardot', '#/bom', '#/coze', '#/delivery', '#/live', '#/mail',
   '#/manju', '#/nav', '#/price', '#/resources', '#/snippets', '#/tags',
   '#/info/about', '#/info/terms', '#/info/privacy', '#/info/account-rules',

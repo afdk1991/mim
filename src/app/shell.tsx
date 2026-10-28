@@ -16,6 +16,7 @@ import { cx } from '../core/utils'
 import { SITE_CONFIG } from '../core/config'
 import { APP_VERSION } from '../core/version'
 import { getTheme, toggleTheme } from '../core/theme'
+import { readRaw } from '../core/storage'
 
 export function Shell({ children }: { children: ReactNode }) {
   const { path } = useRouter()
@@ -148,7 +149,7 @@ function BadgeDot({ kind }: { kind: 'notif' | 'msg' }) {
 
 function readUnread(kind: 'notif' | 'msg'): number {
   try {
-    const raw = localStorage.getItem(`mim.unread.${kind}`)
+    const raw = readRaw(`mim.unread.${kind}`)
     const n = Number(raw ?? 0)
     return Number.isFinite(n) && n > 0 ? n : 0
   } catch {

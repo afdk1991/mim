@@ -22,7 +22,12 @@ interface Overview {
   userRoles: number | null
 }
 
-const ENTRIES: Array<{ href: string; icon: string; title: string; perm: string; desc: string }> = [
+/* perm 缺省表示「只要通过 AdminGate 即可进入」——
+ * 商品管理 / 充值核销依赖的是管理员角色本身，库里没有对应的按钮级权限点，
+ * 若强行填一个不存在的 key，hasPerm 会恒 false，反而把管理员挡在门外。 */
+const ENTRIES: Array<{ href: string; icon: string; title: string; perm?: string; desc: string }> = [
+  { href: '#/admin/products', icon: '📦', title: '商品管理', desc: '新增 / 编辑商品，控制上下架与库存' },
+  { href: '#/admin/recharge', icon: '🪙', title: '充值核销', desc: '核对收款后为用户钱包入账，全程审计留痕' },
   { href: '#/admin/audit', icon: '📜', title: '审计日志', perm: 'audit:view', desc: '查看后台操作与写操作的留痕记录' },
   { href: '#/admin/roles', icon: '🔐', title: '角色管理', perm: 'role:manage', desc: '查看角色、权限与用户授权关系' },
 ]
@@ -127,13 +132,13 @@ function AdminHomeInner() {
       <div className="section-title">后台入口</div>
       <div className="plan-grid">
         {ENTRIES.map((e) => {
-          const allowed = hasPerm(e.perm)
+          const allowed = e.perm ? hasPerm(e.perm) : true
           return (
             <div key={e.href} className="card plan-card">
               <div className="row" style={{ alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 18 }}>{e.icon}</span>
                 <b>{e.title}</b>
-                <Tag>{allowed ? '有权限' : `无 ${e.perm}`}</Tag>
+                <Tag>{e.perm ? (allowed ? '有权限' : `无 ${e.perm}`) : '管理员可用'}</Tag>
               </div>
               <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
                 {e.desc}

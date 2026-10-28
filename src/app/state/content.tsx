@@ -625,8 +625,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }))
       },
 
-      downloadResource(id) {
-        void db.rpc('resource_download', { p_id: id }, { write: true })
+      // 云端计数：服务端 RPC 注册表中只有 growth_record（action 种子含 resource_downloaded），
+      // 不存在 resource_download；旧调用恒定返回「未开放的服务端过程」错误且被静默吞掉。
+      downloadResource(_id) {
+        void db.rpc('growth_record', { p_action: 'resource_downloaded' }, { write: true })
       },
 
       addSnippet(title, language, code) {

@@ -1,5 +1,6 @@
 /* ==========================================================================
- * 路由表 —— 全站 45 条路由的唯一真源
+ * 路由表 —— 全站 57 条可达路由的唯一真源
+ * （`case` 行 45 行、去重路径根 40 条，三种口径见 docs/rebuild/路由清单.md）
  *
  * 页面组件按域从桶文件导入（pages/<域>/index.ts），路由表不再散落 import。
  * 新增页面必须同时改这里与对应域的桶文件，否则会拿到 undefined 组件。
@@ -71,6 +72,8 @@ import {
 import {
   AdminAuditPage,
   AdminHomePage,
+  AdminProductsPage,
+  AdminRechargePage,
   AdminRolesPage,
   GrowthPage,
   InfoPage,
@@ -206,6 +209,8 @@ export function resolveRoute(path: string, query: URLSearchParams): ReactNode {
     case 'admin':
       if (param === 'audit') return <AdminAuditPage />
       if (param === 'roles') return <AdminRolesPage />
+      if (param === 'products') return <AdminProductsPage />
+      if (param === 'recharge') return <AdminRechargePage />
       return <AdminHomePage />
 
     default:

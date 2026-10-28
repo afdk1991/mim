@@ -72,6 +72,8 @@ export const ADMIN_NAV: NavItem = {
   label: '管理后台',
   icon: '🛡️',
   children: [
+    { href: '#/admin/products', match: '/admin/products', label: '商品管理', icon: '📦' },
+    { href: '#/admin/recharge', match: '/admin/recharge', label: '充值核销', icon: '🪙' },
     { href: '#/admin/audit', match: '/admin/audit', label: '审计日志', icon: '📜' },
     { href: '#/admin/roles', match: '/admin/roles', label: '角色管理', icon: '🔐' },
   ],

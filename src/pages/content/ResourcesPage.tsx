@@ -14,6 +14,7 @@ import { Empty, useToast } from '@/ui'
 import { useApp } from '@/app/state/content'
 import { cx, formatCount } from '@/core/utils'
 import type { Resource } from '@/domain/content/model'
+import { getPlatform } from '@/platform'
 import { useCloudRows } from './content-data'
 import { AsyncState } from './content-parts'
 import { reportGrowth } from './growth-report'
@@ -124,7 +125,7 @@ export function ResourcesPage() {
                   // 计数由后端 rpc 落库；本机成长分同样在真实点击后走 evaluate() 判定
                   const outcome = reportGrowth('resource_downloaded')
                   toast(outcome.ok ? '已记录一次下载 ⬇️' : '已记录下载（今日成长分已达上限）')
-                  if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer')
+                  if (r.url) void getPlatform().ui.openExternal(r.url)
                 }}
               >
                 下载

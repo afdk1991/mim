@@ -13,6 +13,7 @@ import { AI_LEVEL_META } from '@/domain/tools/model'
 import type { AiLevel, AiResource, AiState } from '@/domain/tools/model'
 import { loadSnapshot, saveSnapshot } from '@/data/sync'
 import { cx } from '@/core/utils'
+import { getPlatform } from '@/platform'
 import { Badge, Empty, Modal, Tag, useToast } from '@/ui'
 
 const SCOPE = 'tools.aires'
@@ -327,12 +328,8 @@ export function AiResPage() {
   }
 
   const copy = async (text: string, tip: string): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast(tip)
-    } catch {
-      toast('浏览器拒绝了剪贴板访问，请手动选中复制')
-    }
+    const ok = await getPlatform().ui.copyText(text)
+    toast(ok ? tip : '浏览器拒绝了剪贴板访问，请手动选中复制')
   }
 
   const checkedCount = STEP_IDS.filter((id) => state.checks.includes(id)).length

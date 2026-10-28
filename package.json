@@ -13,18 +13,16 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-
+    "test": "vitest run",
     "server:install": "npm --prefix server install",
     "server:dev": "npm --prefix server run dev",
     "server:start": "npm --prefix server start",
     "server:migrate": "npm --prefix server run migrate",
     "server:check": "npm --prefix server run check",
     "server:health": "node scripts/server-health.mjs",
-
     "verify:routes": "node scripts/verify-routes.mjs",
     "verify:backend": "node scripts/verify-backend.mjs",
     "version:check": "node scripts/version-check.mjs",
-
     "native:sync": "npm run build && cap sync",
     "native:android": "npm run build && cap open android",
     "native:ios": "npm run build && cap open ios"
@@ -47,6 +45,7 @@
     "pg": "^8.23.1",
     "playwright-core": "^1.64.1",
     "typescript": "~5.9.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vitest": "^3.2.7"
   }
 }
