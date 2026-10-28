@@ -37,6 +37,15 @@ jobs:
           # setup-node 的 cache 找不到 lock 文件会直接报错让作业变红。
       - name: 安装依赖
         run: npm install --no-audit --no-fund
+      - name: 禁止容器化产物
+        # 本项目全程不使用 Docker（部署方式是宿主机直部署 + systemd，见 deploy/README.md）。
+        # 这道闸门把约定变成机器可校验的约束，防止将来有人顺手把 Dockerfile 或 compose 加回来。
+        run: |
+          hit=$(git ls-files | grep -Ei '(^|/)(Dockerfile|docker-compose\.ya?ml|\.dockerignore)$' || true)
+          if [ -n "$hit" ]; then
+            echo "::error::本项目不使用容器：$hit"
+            exit 1
+          fi
       - name: 类型检查
         run: npm run typecheck
       - name: 构建
