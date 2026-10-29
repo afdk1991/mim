@@ -92,10 +92,10 @@ async function fetchPage(since) {
     }
 
     const data = payload && typeof payload === 'object' && 'data' in payload ? payload.data : payload
-    if (!data || !Array.isArray(data.rows) || !Number.isFinite(Number(data.next))) {
-      throw new Error(`响应结构不符预期：${text.slice(0, 160)}`)
+    if (!data || !Array.isArray(data.rows) || typeof data.next !== 'string' || !data.next.includes(',')) {
+      throw new Error(`响应结构不符预期：${text.slice(0, 160)}（next 应为 "毫秒,id" 复合游标）`)
     }
-    return { rows: data.rows, next: Number(data.next), hasMore: data.has_more === true }
+    return { rows: data.rows, next: data.next, hasMore: data.has_more === true }
   } catch (e) {
     if (e?.name === 'AbortError') throw new Error(`请求超时（${TIMEOUT_MS}ms）：${url}`)
     throw e
@@ -120,6 +120,27 @@ async function withRetry(fn) {
   throw last
 }
 
+/** 复合游标排序键：(ts, id) 元组，用于判断水位是否前进 */
+function cursorKey(c) {
+  const comma = String(c).indexOf(',')
+  const ts = comma === -1 ? Number(c) : Number(String(c).slice(0, comma))
+  const id = comma === -1 ? '' : String(c).slice(comma + 1)
+  return [Number.isFinite(ts) ? ts : 0, id]
+}
+
+function cursorGt(a, b) {
+  const [ats, aid] = cursorKey(a)
+  const [bts, bid] = cursorKey(b)
+  return ats > bts || (ats === bts && aid > bid)
+}
+
+/** 按身份隔离的复合游标读取：state.next 可能是 "毫秒,id" 或旧版纯数字 */
+function readCursor(state) {
+  if (!state || state.next == null) return '0'
+  const s = String(state.next)
+  return s.includes(',') ? s : `${s},`
+}
+
 async function main() {
   if (!TOKEN) {
     console.error('缺少 SYNC_TOKEN：请提供与服务端 .env 一致的同步令牌（openssl rand -hex 32 生成的那份）')
@@ -128,7 +149,7 @@ async function main() {
   }
 
   const state = await readJson(STATE_FILE)
-  let since = Number.isFinite(state?.next) && state.next >= 0 ? Number(state.next) : 0
+  let since = readCursor(state)
   const startedAt = since
 
   const existing = await readJson(OUT_FILE)
@@ -152,7 +173,7 @@ async function main() {
       since = page.next
       break
     }
-    if (page.next <= since) {
+    if (!cursorGt(page.next, since)) {
       console.warn(`  ! 水位未前进（${since} → ${page.next}），停止翻页以免死循环`)
       since = page.next
       break

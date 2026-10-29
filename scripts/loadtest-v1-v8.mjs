@@ -171,19 +171,20 @@ async function V6() {
 /* ---------------- V7 同步游标增量/断点 ---------------- */
 async function V7() {
   const alice = await register(`alice7_${Date.now()}`)
-  // 造 12 条公开动态：每条间隔 5ms——0006 触发器会把 updated_at 覆写为 clock_timestamp()，
-  // 挤在同一毫秒的行会因游标 updated_at > since 被整批跳过（BE-005），故需真实错开水位。
+  // 造 12 条公开动态：全部挤在同一毫秒（now 相同、仅 id 递增）——
+  // BE-005 修复后游标为 (ts,id) 元组，同毫秒翻页不再漏行；
+  // 修复前 `col > since` 会把同毫秒的 11 条整批跳过。
+  const base = now + 1
   for (let i = 0; i < 12; i++) {
     await pool.query(
       `insert into posts (author_id, content, visibility, created_at, updated_at) values ($1,$2,'public',$3,$3)`,
-      [alice.user.id, `sync-${i}`, now + i * 10],
+      [alice.user.id, `sync-${base}-${i}`, base],
     )
-    await new Promise((r) => setTimeout(r, 5))
   }
   const wrong = await fetch(`${BASE}/api/sync/posts?since=0&limit=5`, { headers: { 'x-sync-token': 'wrong' } })
-  // 分页拉全
-  let since = 0, all = []
-  for (let page = 0; page < 5; page++) {
+  // 分页拉全（next 为 "毫秒,id" 复合游标，直接透传）
+  let since = '0', all = []
+  for (let page = 0; page < 10; page++) {
     const r = await fetch(`${BASE}/api/sync/posts?since=${since}&limit=5`, { headers: { 'x-sync-token': 'sync-test-token-abc123' } })
     const j = await r.json()
     all = all.concat(j.data.rows)
@@ -194,7 +195,7 @@ async function V7() {
   const noDup = new Set(ids).size === ids.length
   const got12 = all.length >= 12
   const pass = wrong.status === 403 && noDup && got12
-  record('V7', '同步游标增量断点', pass,
+  record('V7', '同步游标增量断点(同毫秒不漏行)', pass,
     `错token=${wrong.status}(应403) 拉取${all.length}行(应≥12) 去重后=${new Set(ids).size} 无重=${noDup}`)
 }
 

@@ -119,10 +119,11 @@ async function syncPosts(env: Env): Promise<void> {
       return
     }
     // Mim 主站响应外层是统一契约的 data 字段（main.js ok() 包装为 { data }）
+    // next 为 "毫秒,id" 复合游标（BE-005 修复后），透传给下一次 since
     const body = (await r.json()) as {
       data: {
         rows: Array<{ id: string; content: string; created_at: number; updated_at: number }>
-        next: number
+        next: string
       }
     }
     const { data } = body

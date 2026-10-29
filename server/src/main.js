@@ -96,6 +96,11 @@ async function route(req, res, url) {
   /* --- 健康检查 --- */
   if (restPath === '/health' || restPath === '/healthz') return ok(res, await health())
 
+  /* --- 无鉴权回声端点（GAP-02）：Coze 面板/连通性探测的第二探针 --- */
+  if (restPath === '/hello') {
+    return ok(res, { service: 'mim-server', hello: true, ts: Date.now() })
+  }
+
   /* --- 认证 --- */
   if (restPath === '/auth/register') {
     const body = await readBody(req)
@@ -121,11 +126,20 @@ async function route(req, res, url) {
   if (restPath.startsWith('/storage/') && method === 'GET') {
     const file = await storage.get(decodeURIComponent(restPath.slice('/storage/'.length)))
     cors(res)
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': file.mime,
       'Content-Length': file.size,
       'Cache-Control': 'public, max-age=31536000, immutable',
-    })
+    }
+    // BE-003：SVG 内联脚本在同域回读时构成 stored-XSS 向量。
+    // 方案：仅对 SVG 加 CSP default-src 'none'（内联脚本/样式失效，<img> 引用仍正常渲染）
+    // + nosniff（浏览器不按 MIME 猜测执行）+ inline 提示；对图片/音视频不加，保持原有渲染行为。
+    if (file.mime === 'image/svg+xml') {
+      headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'"
+      headers['X-Content-Type-Options'] = 'nosniff'
+      headers['Content-Disposition'] = 'inline; filename="image.svg"'
+    }
+    res.writeHead(200, headers)
     res.end(file.body)
     return undefined
   }

@@ -36,11 +36,20 @@ export function checkSyncToken(req) {
   if (!got || !sameToken(got, expected)) throw forbidden('同步令牌不正确')
 }
 
-function parseSince(raw) {
-  if (raw === null || raw === '') return 0
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n < 0) throw badRequest('since 必须是非负整数（毫秒时间戳）')
-  return Math.floor(n)
+/**
+ * 解析游标：兼容两种格式
+ *   - 纯数字 `1234`          （旧契约/首次：ts 水位，id 视为 ''）
+ *   - 复合游标 `1234,<id>`    （BE-005 修复后的契约：同毫秒靠 id 区分次序）
+ * 返回 { ts, id }。
+ */
+function parseCursor(raw) {
+  const s = raw === null || raw === '' ? '0' : String(raw)
+  const comma = s.indexOf(',')
+  const tsPart = comma === -1 ? s : s.slice(0, comma)
+  const idPart = comma === -1 ? '' : s.slice(comma + 1)
+  const ts = Number(tsPart)
+  if (!Number.isFinite(ts) || ts < 0) throw badRequest('since 必须是非负整数（毫秒时间戳）或 "毫秒,id" 复合游标')
+  return { ts: Math.floor(ts), id: idPart }
 }
 
 function parseLimit(raw) {
@@ -75,24 +84,27 @@ const COLUMNS = [
 ].join(', ')
 
 export async function syncPosts(searchParams) {
-  const since = parseSince(searchParams.get('since'))
+  const { ts: sinceTs, id: sinceId } = parseCursor(searchParams.get('since'))
   const limit = parseLimit(searchParams.get('limit'))
   const now = Date.now()
 
-  // 排序必须以"本次返回的水位"为准，且让 id 参与排序保证同一毫秒内也有稳定顺序，
-  // 否则 next 游标会在并发写入时跳过行。
+  // 排序必须以"本次返回的水位"为准，且让 id 参与排序保证同一毫秒内也有稳定顺序。
+  // BE-005：游标改为 (ts, id) 元组比较——同一毫秒待返回行数 > limit 时，
+  // 旧实现 `col > since` 会把同毫秒行整批跳过；元组比较保证不漏行。
   const sql = `
     select ${COLUMNS}
       from posts
      where visibility = 'public'
-       and coalesce(updated_at, created_at) > $1
-       and (expires_at is null or expires_at > $2)
+       and (coalesce(updated_at, created_at), id) > ($1, $2)
+       and (expires_at is null or expires_at > $3)
      order by coalesce(updated_at, created_at) asc, id asc
-     limit $3`
+     limit $4`
 
-  const rows = (await query(sql, [since, now, limit])).rows
+  const rows = (await query(sql, [sinceTs, sinceId, now, limit])).rows
   const last = rows.length ? rows[rows.length - 1] : null
-  const next = last ? Number(last.updated_at ?? last.created_at) : since
+  const next = last
+    ? `${Number(last.updated_at ?? last.created_at)},${last.id}`
+    : `${sinceTs},${sinceId}`
 
   return {
     rows,

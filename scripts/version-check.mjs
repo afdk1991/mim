@@ -77,11 +77,16 @@ const listLocalTags = () => {
 }
 
 const localTags = listLocalTags()
-// 规范：仓库内只应存在唯一版本 tag，且等于 V<APP_VERSION>
+// GAP-01：仓库内允许存在非版本形态的辅助 tag（如回滚锚点 pre-rebuild-*，
+// 见 docs/rebuild/迁移说明.md —— 文档化锚点不可删）。只对「V 四段式」版本 tag
+// 做唯一性校验；其余形态列出为 info，不参与判定。
+const VERSION_TAG_RE = /^V\d+\.\d+\.\d+\.\d+$/
+const versionTags = localTags.filter((t) => VERSION_TAG_RE.test(t))
+const otherTags = localTags.filter((t) => !VERSION_TAG_RE.test(t))
 checks.push({
-  layer: '本地 git tag（唯一）',
+  layer: '本地版本 tag（V 四段式，唯一）',
   expect: EXPECT_TAG,
-  actual: localTags.length === 0 ? '(无 tag)' : localTags.join(','),
+  actual: versionTags.length === 0 ? '(无)' : versionTags.join(','),
   kind: 'four',
 })
 
@@ -98,12 +103,17 @@ if (wantRemote) {
   } catch {
     remoteTags = []
   }
+  const remoteVersionTags = remoteTags.filter((t) => VERSION_TAG_RE.test(t))
+  const remoteOtherTags = remoteTags.filter((t) => !VERSION_TAG_RE.test(t))
   checks.push({
-    layer: '远端 git tag（origin）',
+    layer: '远端版本 tag（V 四段式）',
     expect: EXPECT_TAG,
-    actual: remoteTags.length === 0 ? '(无 tag)' : remoteTags.join(','),
+    actual: remoteVersionTags.length === 0 ? '(无)' : remoteVersionTags.join(','),
     kind: 'four',
   })
+  if (remoteOtherTags.length) {
+    console.log(`  ℹ️ 远端辅助 tag（不参与判定）：${remoteOtherTags.join(', ')}`)
+  }
 }
 
 const tagArg = process.argv.find((a) => a.startsWith('--tag='))?.split('=')[1]
@@ -114,6 +124,9 @@ if (tagArg) {
 
 // ---------- 4. 输出与判定 ----------
 console.log(`唯一版本源 APP_VERSION = ${APP_VERSION}  →  三段派生值 = ${THREE}\n`)
+if (otherTags.length) {
+  console.log(`  ℹ️ 本地辅助 tag（回滚/快照锚点，不参与判定）：${otherTags.join(', ')}`)
+}
 const pad = (s, n) => String(s).padEnd(n)
 let bad = 0
 for (const c of checks) {
