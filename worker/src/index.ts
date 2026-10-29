@@ -1,23 +1,37 @@
-// worker/src/index.ts —— Mim 可选边缘网关（Cloudflare Workers）
+// worker/src/index.ts —— Mim 可选边缘网关 v2（Cloudflare Workers）
 //
 // 【定位说明】这是**可选边缘层**，不是 Mim 主路线。
 // Mim 主路线 = 自托管 systemd + nginx（见 deploy/README.md），不依赖本目录。
 // 仅当需要「境外用户就近接入 / 多运行时容灾 / 边缘只读副本」时才启用：
 //   cd worker && wrangler deploy
 //
-// 职责（对齐 3.txt 架构手册的边缘层分工）：
-//   1. /api/health 拨测端点：探测上游自托管主站，带密钥鉴权
-//   2. 主请求转发：按地理与上游健康状态路由到主站（OCI_TUNNEL），故障时降级
-//   3. Cron：拉取主站只读增量同步端点 server/src/sync.js（/api/sync/posts），
-//      幂等写入 D1 只读副本（INSERT ... ON CONFLICT(id) DO UPDATE）
+// v2 升级（对齐「全栈全站部署架构手册」边缘层分工）：
+//   1. /api/health 拨测端点：探测全部上游，带密钥鉴权
+//   2. 主请求转发：按 CF 地理（cf.country）+ 上游健康状态选路
+//        - 中国大陆/HK/MO/TW 用户：优先 EdgeOne Makers 境内节点 → 国内备案只读入口 → Makers 亚太兜底（只读）
+//        - 其他地区用户：优先 OCI 主站 → Makers 亚太 → 国内入口兜底（只读）
+//      健康状态在 KV 缓存 60s，避免每个请求都探测
+//   3. 只读降级：兜底路径（非首选上游）拒绝写操作，引导用户切主站域名
+//   4. Cron：每天 03:00 UTC 拉主站 /api/sync/posts 增量，幂等写 D1 只读副本
 //
 // 单向数据流：主站 PostgreSQL 是唯一可写源，D1 只是只读副本，不做任何写回。
 // 运行时需要的绑定见 worker/wrangler.jsonc。
 
+type OriginHealth = {
+  oci: boolean
+  makers: boolean
+  cn: boolean
+  ts: number
+}
+
 type Env = {
-  // 上游自托管主站（如 Cloudflare Tunnel 地址，创建后在 wrangler 变量中填写）
+  // 上游自托管主站（Cloudflare Tunnel 后的 OCI 服务器，必填）
   OCI_TUNNEL: string
-  // 国内只读入口（可选；不需要境内层时留空字符串）
+  // EdgeOne Makers 亚太节点（境外用户容灾用，可选）
+  MAKERS_ORIGIN?: string
+  // EdgeOne Makers 境内节点（大陆用户首选，可选）
+  CN_MAKERS_ORIGIN?: string
+  // 国内备案域名只读入口（CloudBase/FC 等，可选）
   CN_ORIGIN?: string
 
   // 存储绑定
@@ -32,6 +46,8 @@ type Env = {
   MAINTENANCE_MODE?: boolean
 }
 
+const HEALTH_TTL_MS = 60_000
+
 // ===== 健康检查端点（供外部拨测） =====
 async function handleHealth(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
@@ -40,49 +56,73 @@ async function handleHealth(request: Request, env: Env): Promise<Response> {
     return json({ error: 'unauthorized' }, 401)
   }
 
-  const upstream = await probe(env.OCI_TUNNEL)
+  // 拨测时强制重新探测，不读缓存
+  const [oci, makers, cn] = await Promise.all([
+    probe(env.OCI_TUNNEL),
+    probe(env.MAKERS_ORIGIN ?? ''),
+    probe(env.CN_ORIGIN ?? ''),
+  ])
   return json({
-    status: upstream ? 'healthy' : 'degraded',
-    upstreams: { origin: upstream },
+    status: [oci, makers, cn].some(Boolean) ? (oci ? 'healthy' : 'degraded') : 'down',
+    upstreams: { oci, makers, cn },
     env: env.APP_ENV,
     ts: Date.now(),
   }, 200)
 }
 
-// ===== 主请求：按健康状态转发到主站 =====
+// ===== 主请求：地理 + 健康状态选路 =====
 async function handleFetch(request: Request, env: Env): Promise<Response> {
   if (env.MAINTENANCE_MODE) {
-    return new Response(
-      '<!DOCTYPE html><html><body><h1>系统维护中</h1><p>我们正在升级服务，请稍后再试。</p></body></html>',
-      { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-    )
+    return new Response(await maintenancePage(env), {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
   }
 
   const url = new URL(request.url)
+  const country = (request.cf?.country as string | undefined) ?? 'XX'
+  const isCN = ['CN', 'HK', 'MO', 'TW'].includes(country)
 
-  // 健康状态缓存 60s，避免每个请求都探测一次
-  const cached = await env.CACHE.get('upstream:health', 'json') as { healthy: boolean; ts: number } | null
-  let originHealthy = cached?.healthy ?? true
-  if (!cached || Date.now() - cached.ts > 60_000) {
-    originHealthy = await probe(env.OCI_TUNNEL)
-    await env.CACHE.put('upstream:health', JSON.stringify({ healthy: originHealthy, ts: Date.now() }), { expirationTtl: 120 })
-  }
+  const health = await getHealth(env)
 
-  // 路由决策：境外/默认走主站；主站挂了才考虑境内只读入口
-  let target = env.OCI_TUNNEL
+  // 选路决策
+  let target = ''
   let readOnly = false
-  if (!originHealthy) {
-    if (env.CN_ORIGIN) {
+  if (isCN) {
+    // 大陆用户：Makers 境内节点 → 国内备案入口 → Makers 亚太（只读兜底）
+    if (env.CN_MAKERS_ORIGIN && health.makers) {
+      target = env.CN_MAKERS_ORIGIN
+    } else if (env.CN_ORIGIN && health.cn) {
+      target = env.CN_ORIGIN
+    } else if (env.MAKERS_ORIGIN && health.makers) {
+      target = env.MAKERS_ORIGIN
+      readOnly = true
+    } else if (health.oci) {
+      target = env.OCI_TUNNEL
+    } else {
+      return await fallbackError(request, env)
+    }
+  } else {
+    // 境外用户：OCI 主站 → Makers 亚太（只读兜底）→ 国内入口（只读兜底）
+    if (health.oci) {
+      target = env.OCI_TUNNEL
+    } else if (env.MAKERS_ORIGIN && health.makers) {
+      target = env.MAKERS_ORIGIN
+      readOnly = true
+    } else if (env.CN_ORIGIN && health.cn) {
       target = env.CN_ORIGIN
       readOnly = true
     } else {
-      return json({ error: 'upstream_unavailable', message: '服务暂时不可用，请稍后重试' }, 502)
+      return await fallbackError(request, env)
     }
   }
 
   // 只读降级路径拒绝写操作
   if (readOnly && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
-    return json({ error: 'read_only_region', hint: '当前区域仅支持读取，请切换主站域名提交' }, 503)
+    return json({
+      error: 'read_only_region',
+      hint: '当前区域仅支持读取，请切换主站域名提交',
+    }, 503)
   }
 
   try {
@@ -100,15 +140,29 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     })
     return new Response(upstream.body, { status: upstream.status, headers })
   } catch (err) {
-    console.error('上游请求失败:', err)
-    return json({ error: 'upstream_unavailable', message: '服务暂时不可用，请稍后重试' }, 502)
+    console.error('上游请求失败:', target, err)
+    return await fallbackError(request, env)
   }
+}
+
+// ===== 健康状态缓存（60s TTL） =====
+async function getHealth(env: Env): Promise<OriginHealth> {
+  const cached = await env.CACHE.get('upstream:health', 'json') as OriginHealth | null
+  if (cached && Date.now() - cached.ts < HEALTH_TTL_MS) return cached
+
+  const [oci, makers, cn] = await Promise.all([
+    probe(env.OCI_TUNNEL),
+    probe(env.MAKERS_ORIGIN ?? ''),
+    probe(env.CN_ORIGIN ?? ''),
+  ])
+  const next: OriginHealth = { oci, makers, cn, ts: Date.now() }
+  await env.CACHE.put('upstream:health', JSON.stringify(next), { expirationTtl: 120 })
+  return next
 }
 
 // ===== Cron：从主站拉取只读增量，幂等写入 D1 副本 =====
 async function syncPosts(env: Env): Promise<void> {
   const cursor = (await env.CACHE.get('sync:posts:cursor')) ?? '0'
-  let next = cursor
   try {
     const r = await fetch(`${env.OCI_TUNNEL}/api/sync/posts?since=${cursor}&limit=500`, {
       headers: { 'x-sync-token': env.SYNC_TOKEN },
@@ -136,9 +190,8 @@ async function syncPosts(env: Env): Promise<void> {
         .bind(row.id, row.content, row.created_at, row.updated_at)
         .run()
     }
-    next = String(data.next)
-    await env.CACHE.put('sync:posts:cursor', next)
-    console.log(`同步完成: ${data.rows.length} 条, 游标: ${next}`)
+    await env.CACHE.put('sync:posts:cursor', String(data.next))
+    console.log(`同步完成: ${data.rows.length} 条, 游标: ${data.next}`)
   } catch (err) {
     console.error('同步任务异常:', err)
   }
@@ -146,11 +199,12 @@ async function syncPosts(env: Env): Promise<void> {
 
 // ===== 辅助 =====
 async function probe(url: string): Promise<boolean> {
+  if (!url) return false
   try {
     const r = await fetch(url + '/api/health', {
       method: 'GET',
       signal: AbortSignal.timeout(3000),
-      headers: { 'User-Agent': 'mim-edge-probe/1.0' },
+      headers: { 'User-Agent': 'mim-edge-probe/2.0' },
     })
     return r.ok
   } catch {
@@ -166,6 +220,24 @@ function filterHeaders(original: Headers): Headers {
     }
   })
   return filtered
+}
+
+async function maintenancePage(env: Env): Promise<string> {
+  const cached = await env.CACHE.get('maintenance-page')
+  if (cached) return cached
+  return '<!DOCTYPE html><html lang="zh-CN"><body><h1>系统维护中</h1><p>我们正在升级服务，请稍后再试。</p></body></html>'
+}
+
+async function fallbackError(request: Request, env: Env): Promise<Response> {
+  // GET/HEAD 请求优先返回缓存的静态错误页，避免整站空白
+  if (['GET', 'HEAD'].includes(request.method)) {
+    const cached = await env.CACHE.get('error-page')
+    if (cached) return new Response(cached, { status: 502 })
+  }
+  return json({
+    error: 'upstream_unavailable',
+    message: '服务暂时不可用，请稍后重试',
+  }, 502)
 }
 
 function json(payload: unknown, status: number): Response {

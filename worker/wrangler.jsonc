@@ -15,9 +15,11 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // 上游自托管主站地址（替换为实际地址，如 Cloudflare Tunnel 域名）
+  // 上游地址（替换为实际值；带 Makers 的变量留空字符串即不启用该容灾路径）
   "vars": {
     "OCI_TUNNEL": "<创建后回填：主站地址，如 https://mim.example.com>",
+    "MAKERS_ORIGIN": "",
+    "CN_MAKERS_ORIGIN": "",
     "CN_ORIGIN": "",
     "APP_ENV": "production",
     "MAINTENANCE_MODE": false
