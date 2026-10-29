@@ -29,14 +29,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           # Node 20 自带的 npm 10.8.2 在无 lock 文件构建依赖树时会抛
-          # `Cannot read properties of null (reading 'edgesOut')`（npm/cli 已知缺陷），
-          # Node 22 自带的 npm 10.9.x 已修复。本项目 engines 为 >=20，22 满足。
+          # `Cannot read properties of null (reading 'edgesOut')`（npm/cli 已知缺陷）。
+          # Node 22 的 npm 10.9.x 在出现 peer 冲突（如 vitest 4）时同样会复现该缺陷，
+          # 必须配合 --legacy-peer-deps 规避（与 build-release.yml 同一修复方案）。
           node-version: '22'
           # 不能开 cache: npm —— 本仓库有意不入库 package-lock.json
           # （npm/cli#4828 会按当前平台裁剪可选依赖，跨平台复用会缺 rollup 原生二进制），
           # setup-node 的 cache 找不到 lock 文件会直接报错让作业变红。
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: 禁止容器化产物
         # 本项目全程不使用 Docker（部署方式是宿主机直部署 + systemd，见 deploy/README.md）。
         # 这道闸门把约定变成机器可校验的约束，防止将来有人顺手把 Dockerfile 或 compose 加回来。

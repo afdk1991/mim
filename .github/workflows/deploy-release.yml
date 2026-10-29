@@ -43,7 +43,8 @@ jobs:
           # 仓库不提交 package-lock.json，不能用 cache: npm（与 build.yml / deploy.yml 一致）
           node-version: '22'
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps：npm/cli#7678，vitest 4 peer 冲突会触发 edgesOut 崩溃
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: 禁止容器化产物
         # 与 build.yml / deploy.yml 同款闸门：本项目全程不使用容器
         run: |
@@ -70,7 +71,8 @@ jobs:
         with:
           node-version: '22'
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps：npm/cli#7678，vitest 4 peer 冲突会触发 edgesOut 崩溃
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: 构建前端（产物 dist 打进 zip，服务器可跳过构建）
         env:
           VITE_MIM_API_BASE: ${{ vars.MIM_API_BASE }}
@@ -130,7 +132,8 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@${{ github.repository_owner }}'
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps：npm/cli#7678，vitest 4 peer 冲突会触发 edgesOut 崩溃
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: 构建前端
         env:
           VITE_MIM_API_BASE: ${{ vars.MIM_API_BASE }}

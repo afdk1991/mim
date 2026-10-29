@@ -44,7 +44,8 @@ jobs:
           # 不能用 cache: npm —— 仓库没有 lock 文件，setup-node 会直接报错
           node-version: '22'
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        # --legacy-peer-deps：npm/cli#7678，vitest 4 peer 冲突会触发 edgesOut 崩溃
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: 禁止容器化产物
         # 与 build.yml 同款闸门：本项目全程不使用 Docker
         run: |
@@ -102,8 +103,8 @@ jobs:
           git pull --ff-only
 
           echo '--> 前端与后端依赖'
-          npm install --no-audit --no-fund
-          npm --prefix server install --omit=dev --no-audit --no-fund
+          npm install --no-audit --no-fund --legacy-peer-deps
+          npm --prefix server install --omit=dev --no-audit --no-fund --legacy-peer-deps
 
           if [ "${SKIP_BUILD:-0}" = '1' ]; then
             echo '--> SKIP_BUILD=1，跳过前端构建'
