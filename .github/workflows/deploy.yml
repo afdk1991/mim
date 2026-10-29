@@ -211,6 +211,7 @@ jobs:
         env:
           EO_DEPLOY_HOOK_URL: ${{ secrets.EO_DEPLOY_HOOK_URL }}
           EO_TOKEN: ${{ secrets.EO_TOKEN || secrets.EDGEONE_API_TOKEN }}
+          EO_PROJECT_NAME: ${{ vars.EO_PROJECT_NAME }}
         run: |
           set -euo pipefail
           if [ -n "${EO_DEPLOY_HOOK_URL:-}" ]; then
@@ -218,10 +219,14 @@ jobs:
             curl -fsSL -X POST "$EO_DEPLOY_HOOK_URL"
           elif [ -n "${EO_TOKEN:-}" ]; then
             echo '--> 通过 edgeone CLI 部署前端构建产物（要求项目为「直接上传」型）'
+            if [ -z "${EO_PROJECT_NAME:-}" ]; then
+              echo '::error::缺少 Variable：EO_PROJECT_NAME（Makers 项目名）'
+              exit 1
+            fi
             npm install --no-audit --no-fund --legacy-peer-deps
             npm run build
             npx --yes edgeone login -t "$EO_TOKEN" --local
-            npx --yes edgeone makers deploy ./dist
+            npx --yes edgeone makers deploy ./dist -n "$EO_PROJECT_NAME"
           else
             echo '::error::缺少 Secrets：EO_DEPLOY_HOOK_URL（推荐）或 EO_TOKEN'
             exit 1
