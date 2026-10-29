@@ -191,6 +191,10 @@ curl -fsS http://localhost/api/health          # 走 nginx
 | `ENABLE_SERVER_DEPLOY`（Variable） | deploy.yml 服务器发布层开关 | 缺省关闭（job 跳过不红）；配好三项 Secrets 后显式置 `true` 激活 |
 | `MIM_DIR`（Variable） | 服务器安装目录 | — |
 | `MIM_API_BASE`（Variable） | 前端构建期注入 | — |
+| `ENABLE_EDGE_DEPLOY`（Variable） | deploy.yml 边缘层开关 | 缺省关闭（job 跳过不红）；配好两项 Secrets 后显式置 `true` 激活 |
+| `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | deploy.yml 边缘层（wrangler deploy） | Token 仅授该 Worker 的 Edit 权限；前置：创建 D1 `mim-readonly`、KV `MIM_CACHE` 并回填 `worker/wrangler.jsonc`，`wrangler secret put SYNC_TOKEN / HEALTH_CHECK_SECRET` |
+| `ENABLE_MAKERS_DEPLOY`（Variable） | deploy.yml Makers 层开关 | 缺省关闭（job 跳过不红）；配好 HOOK 或 TOKEN 后显式置 `true` 激活 |
+| `EO_DEPLOY_HOOK_URL`（推荐）或 `EO_TOKEN` | deploy.yml Makers 层触发 | 优先用部署 Webhook（不含账号凭证）；用 `EO_TOKEN` 时仅授项目部署权限 |
 | `GITEE_TOKEN` / `GITCODE_TOKEN` / `ATOMGIT_TOKEN` / `CNB_TOKEN` | mirror.yml | 仅目标仓库写权限，不给删仓权限 |
 | `ENABLE_NPM_PUBLISH`（Variable） | deploy-release.yml | 缺省不发布；显式置 `true` 才发 npm 包 |
 | 客户端签名密钥（`TAURI_*`、`ANDROID_*`） | build-release.yml | 仅 Release 构建机可用 |

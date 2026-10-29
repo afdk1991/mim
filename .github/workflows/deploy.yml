@@ -6,15 +6,25 @@ name: deploy
 #   build.yml  ——  质量闸门 + 前端静态站点发布到 GitHub Pages（只读展示用）
 #   deploy.yml ——  质量闸门 + SSH 登录宿主机，按 deploy/README.md 的「更新发版」流程上线
 #
-# 开关（Variables）：服务器发布层默认关闭——未买服务器时「发布到服务器」job
-#   自动跳过（中性 skipped，不阻塞流水线变绿）。买好服务器后设：
-#   ENABLE_SERVER_DEPLOY = true
-# 必要 Secrets（开关打开后需配齐，仓库 Settings → Secrets and variables → Actions）：
-#   OCI_HOST     服务器地址（如 140.238.x.x）
-#   OCI_USER     部署账号（需要 sudo 权限执行 systemctl restart mim-server）
-#   OCI_SSH_KEY  该账号的私钥（整段 PEM，含首尾行）
-# 可选 Variables：
-#   MIM_DIR      服务器安装目录，默认 /opt/mim
+# 一次提交，多运行时分发（对齐《全栈全站部署架构手册》CI 层）。三个发布层全部为
+# 显式开关，缺省全部跳过（skipped 不影响 run 结论），配好对应 Secrets 后把
+# Variable 置 true 即激活：
+#
+# 1) 服务器发布层（主路线，systemd + nginx）
+#    Variable: ENABLE_SERVER_DEPLOY = true
+#    Secrets:  OCI_HOST（服务器地址）/ OCI_USER（部署账号，需 sudo）/ OCI_SSH_KEY（私钥整段 PEM）
+#    Variable: MIM_DIR（可选，安装目录，默认 /opt/mim）
+#
+# 2) 边缘层（可选，Cloudflare Workers 地理选路 + D1 只读副本，见 worker/）
+#    Variable: ENABLE_EDGE_DEPLOY = true
+#    Secrets:  CLOUDFLARE_API_TOKEN（仅 Workers 编辑权限，限定 account）/ CLOUDFLARE_ACCOUNT_ID
+#    前置:     wrangler d1 create mim-readonly && wrangler kv namespace create MIM_CACHE，
+#              把 id 回填 worker/wrangler.jsonc，并 wrangler secret put SYNC_TOKEN / HEALTH_CHECK_SECRET
+#
+# 3) EdgeOne Makers（可选，亚太/国内就近入口。正常由 Makers 控制台连 Git 自动部署，
+#    本 job 用于 CI 侧主动触发重新部署）
+#    Variable: ENABLE_MAKERS_DEPLOY = true
+#    Secrets:  EO_DEPLOY_HOOK_URL（推荐，Makers 项目的部署 Webhook）或 EO_TOKEN（CLI 方式）
 #
 # 注意：本仓库有意不提交 package-lock.json（见 .gitignore），
 #      因此只能用 `npm install`，`npm ci` 必然失败。
@@ -63,6 +73,11 @@ jobs:
         run: npm run test
       - name: 后端语法门禁
         run: npm --prefix server run check
+      - name: 边缘层类型检查（worker/）
+        # worker 目录同样不提交 lock 文件（wrangler/esbuild 跨平台可选依赖，npm/cli#4828）
+        run: |
+          npm --prefix worker install --no-audit --no-fund --legacy-peer-deps
+          npm --prefix worker run typecheck
 
   deploy:
     name: 发布到服务器
@@ -146,3 +161,61 @@ jobs:
           ssh -i ~/.ssh/id_deploy -o BatchMode=yes "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
             'sudo journalctl -u mim-server -n 50 --no-pager' || true
           exit 1
+
+  edge:
+    name: 发布到 Cloudflare 边缘层（可选）
+    needs: gate
+    # 可选层：worker/ 边缘网关（地理选路 + D1 只读副本），默认关闭。
+    # 配好 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 后设 ENABLE_EDGE_DEPLOY=true 激活。
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_EDGE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 校验边缘层密钥
+        run: |
+          missing=""
+          [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]  || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::缺少 Secrets:$missing"
+            exit 1
+          fi
+      - name: 安装依赖并类型检查
+        run: |
+          npm --prefix worker install --no-audit --no-fund --legacy-peer-deps
+          npm --prefix worker run typecheck
+      - name: wrangler deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'worker'
+          command: deploy
+
+  makers:
+    name: 触发 EdgeOne Makers 部署（可选）
+    needs: gate
+    # 可选层：Makers 正常由控制台连 Git 自动构建部署；本 job 用于 CI 侧主动触发重新部署。
+    # 默认关闭，配好 EO_DEPLOY_HOOK_URL 或 EO_TOKEN 后设 ENABLE_MAKERS_DEPLOY=true 激活。
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_MAKERS_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 触发部署
+        env:
+          EO_DEPLOY_HOOK_URL: ${{ secrets.EO_DEPLOY_HOOK_URL }}
+          EO_TOKEN: ${{ secrets.EO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${EO_DEPLOY_HOOK_URL:-}" ]; then
+            echo '--> 通过部署 Webhook 触发 Makers 重新部署'
+            curl -fsSL -X POST "$EO_DEPLOY_HOOK_URL"
+          elif [ -n "${EO_TOKEN:-}" ]; then
+            echo '--> 通过 edgeone-cli 部署'
+            npx --yes edgeone-cli deploy --token "$EO_TOKEN"
+          else
+            echo '::error::缺少 Secrets：EO_DEPLOY_HOOK_URL（推荐）或 EO_TOKEN'
+            exit 1
+          fi
