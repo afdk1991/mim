@@ -206,7 +206,7 @@ jobs:
       - name: 触发部署
         env:
           EO_DEPLOY_HOOK_URL: ${{ secrets.EO_DEPLOY_HOOK_URL }}
-          EO_TOKEN: ${{ secrets.EO_TOKEN }}
+          EO_TOKEN: ${{ secrets.EO_TOKEN || secrets.EDGEONE_API_TOKEN }}
         run: |
           set -euo pipefail
           if [ -n "${EO_DEPLOY_HOOK_URL:-}" ]; then
