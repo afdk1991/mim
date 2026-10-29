@@ -6,7 +6,10 @@ name: deploy
 #   build.yml  ——  质量闸门 + 前端静态站点发布到 GitHub Pages（只读展示用）
 #   deploy.yml ——  质量闸门 + SSH 登录宿主机，按 deploy/README.md 的「更新发版」流程上线
 #
-# 必要 Secrets（仓库 Settings → Secrets and variables → Actions）：
+# 开关（Variables）：服务器发布层默认关闭——未买服务器时「发布到服务器」job
+#   自动跳过（中性 skipped，不阻塞流水线变绿）。买好服务器后设：
+#   ENABLE_SERVER_DEPLOY = true
+# 必要 Secrets（开关打开后需配齐，仓库 Settings → Secrets and variables → Actions）：
 #   OCI_HOST     服务器地址（如 140.238.x.x）
 #   OCI_USER     部署账号（需要 sudo 权限执行 systemctl restart mim-server）
 #   OCI_SSH_KEY  该账号的私钥（整段 PEM，含首尾行）
@@ -64,7 +67,9 @@ jobs:
   deploy:
     name: 发布到服务器
     needs: gate
-    if: github.ref == 'refs/heads/main'
+    # 服务器发布层为显式开关的可选层：未配置变量时整体跳过（skipped 不影响 run 结论），
+    # 避免「还没买服务器」阶段每次 push 都红。配好 Secrets 后设 ENABLE_SERVER_DEPLOY=true 即激活。
+    if: github.ref == 'refs/heads/main' && vars.ENABLE_SERVER_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment:
       name: production

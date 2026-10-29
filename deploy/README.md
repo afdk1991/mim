@@ -188,6 +188,7 @@ curl -fsS http://localhost/api/health          # 走 nginx
 | Secret / Variable | 用于 | 权限范围 |
 | --- | --- | --- |
 | `OCI_HOST` / `OCI_USER` / `OCI_SSH_KEY` | deploy.yml SSH 发布 | 仅部署账号，禁 root |
+| `ENABLE_SERVER_DEPLOY`（Variable） | deploy.yml 服务器发布层开关 | 缺省关闭（job 跳过不红）；配好三项 Secrets 后显式置 `true` 激活 |
 | `MIM_DIR`（Variable） | 服务器安装目录 | — |
 | `MIM_API_BASE`（Variable） | 前端构建期注入 | — |
 | `GITEE_TOKEN` / `GITCODE_TOKEN` / `ATOMGIT_TOKEN` / `CNB_TOKEN` | mirror.yml | 仅目标仓库写权限，不给删仓权限 |
@@ -196,6 +197,22 @@ curl -fsS http://localhost/api/health          # 走 nginx
 
 规则：任何密钥不跨平台复用；镜像仓 token 不给删除权限；生产数据库凭证只存在于服务器
 `.env`，不进 GitHub Secrets。
+
+**部署密钥对已预置**：`deploy/mim-deploy.pub`（ed25519，公钥可公开）与仓库 Secret
+`OCI_SSH_KEY`（私钥，2026-10-29 生成并写入，本机未留副本）是一对。新服务器初始化时把
+公钥追加到部署账号的 `~/.ssh/authorized_keys` 即可，无需再生成密钥对：
+
+```bash
+# 在服务器上（部署账号下）执行一次
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+cat >> ~/.ssh/authorized_keys <<'EOF'
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO/6QNNFABgTkxqzD1/COQtd8KlNyHHliuOAJJW7XwSu mim-deploy@github-actions
+EOF
+chmod 600 ~/.ssh/authorized_keys
+```
+
+之后只剩三项配置：`OCI_HOST`（服务器 IP）、`OCI_USER`（部署账号）、
+Variable `ENABLE_SERVER_DEPLOY=true`，push main 即自动发布。
 
 ---
 
