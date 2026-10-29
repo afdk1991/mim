@@ -17,7 +17,9 @@
 
   // 上游地址（替换为实际值；带 Makers 的变量留空字符串即不启用该容灾路径）
   "vars": {
-    "OCI_TUNNEL": "<创建后回填：主站地址，如 https://mim.example.com>",
+    // 后端尚未部署：留空即禁用主站上游（probe 返回 false，请求走降级页）。
+    // 服务器上线后回填真实地址（如 https://mim.example.com）并重新 wrangler deploy
+    "OCI_TUNNEL": "",
     "MAKERS_ORIGIN": "",
     "CN_MAKERS_ORIGIN": "",
     "CN_ORIGIN": "",

@@ -162,6 +162,8 @@ async function getHealth(env: Env): Promise<OriginHealth> {
 
 // ===== Cron：从主站拉取只读增量，幂等写入 D1 副本 =====
 async function syncPosts(env: Env): Promise<void> {
+  // 主站未配置（后端未部署）时跳过同步，避免每天 Cron 产生无效报错
+  if (!env.OCI_TUNNEL) return
   const cursor = (await env.CACHE.get('sync:posts:cursor')) ?? '0'
   try {
     const r = await fetch(`${env.OCI_TUNNEL}/api/sync/posts?since=${cursor}&limit=500`, {
