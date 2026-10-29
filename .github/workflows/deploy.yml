@@ -213,8 +213,11 @@ jobs:
             echo '--> 通过部署 Webhook 触发 Makers 重新部署'
             curl -fsSL -X POST "$EO_DEPLOY_HOOK_URL"
           elif [ -n "${EO_TOKEN:-}" ]; then
-            echo '--> 通过 edgeone-cli 部署'
-            npx --yes edgeone-cli deploy --token "$EO_TOKEN"
+            echo '--> 通过 edgeone CLI 部署前端构建产物（要求项目为「直接上传」型）'
+            npm install --no-audit --no-fund --legacy-peer-deps
+            npm run build
+            npx --yes edgeone login -t "$EO_TOKEN" --local
+            npx --yes edgeone makers deploy ./dist
           else
             echo '::error::缺少 Secrets：EO_DEPLOY_HOOK_URL（推荐）或 EO_TOKEN'
             exit 1

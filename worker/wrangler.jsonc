@@ -29,14 +29,14 @@
     {
       "binding": "DB",
       "database_name": "mim-readonly",
-      "database_id": "<创建后回填：wrangler d1 create 输出的 database_id>"
+      "database_id": "ebb554f5-04d3-412c-9d9b-684c1a9e4210"
     }
   ],
 
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "<创建后回填：wrangler kv namespace create 输出的 id>"
+      "id": "523add2ffff64547878c146a8cf684c2"
     }
   ],
 
