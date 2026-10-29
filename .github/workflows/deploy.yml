@@ -203,6 +203,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && vars.ENABLE_MAKERS_DEPLOY == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: 触发部署
         env:
           EO_DEPLOY_HOOK_URL: ${{ secrets.EO_DEPLOY_HOOK_URL }}
