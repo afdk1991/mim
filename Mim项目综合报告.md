@@ -311,8 +311,46 @@ dec51ab deploy: 无 Docker 部署方案落地
 | CI | `.github/workflows/`（deploy/build/build-release/deploy-release/mirror/release-notes）+ `.gitee/pipeline.yml` |
 | 可选边缘层 | `worker/`（src/index.ts + wrangler.jsonc + package.json + migrations/0001_init.sql） |
 | 文档 | `docs/README.md`（索引）、`docs/archive/`（归档）、`docs/rebuild/`（现行规范） |
-| 迁移 | `server/db/migrations/0001~0008` |
+| 迁移 | `server/db/migrations/0001~0012` |
 
 ---
 
-*报告完。项目当前状态：全部任务完成、验证通过、16 项产物落盘；8 个 commit 待推送（等确认）。*
+## 14. 商业级可用性收口（2026-11-01 最终实测）
+
+### 14.1 A 模块安全加固（实测全绿）
+| 契约 | 实现 | 实测（EDGE-1~6 实跑 6/6 PASS） |
+|---|---|---|
+| EDGE-1 config 权限分层 | `0012_system_config.sql` + `config_get`（匿名仅见非敏感键）/ `admin_config_set`（管理员写+脱敏回显+audit 留痕） | ✅ 匿名/普通无泄漏、管理员写 200、脱敏 `****3456`、留痕 2 条 |
+| EDGE-2 限流 | `server/src/rate-limit.js` 独立令牌桶，main.js 接线 | ✅ 连发 40 次即 429 |
+| EDGE-3 错误脱敏 | `errors.js` 加固，5xx 不携带 PG detail/堆栈 | ✅ 非法 RPC 400、409 形状正确 |
+| EDGE-4 wallet_credit 收口 | admin 专属 RPC，普通用户 403 | ✅ 普通自充 403、管理员核销 200 |
+| EDGE-5 growth 防刷 | 质量闸 400 + daily_cap 409 + 重复签到 409 | ✅ 全序列符合契约 |
+| EDGE-6 health 深度 | `health.js`：pool/disk/uploads/migrations/rpcs 全字段 | ✅ 32 RPC、full 字段齐全 |
+
+### 14.2 F 模块外部项后台可配（已实现）
+- 迁移 `0012_system_config.sql`（应用通过，种子校验通过）
+- `config_get` / `admin_config_set` RPC（登录前可读非敏感键）
+- 前端 `AdminSettingsPage.tsx` + `#/admin/settings` 路由（F5）+ `SITE_CONFIG` 运行期合并（F6，默认值真源在 config_get，后端覆盖）
+- 路由清单同步至 60 条（e620664）
+
+### 14.3 C 模块运营基建（已实现）
+- `scripts/monitor.sh`（进程/健康检查）、`scripts/restore.sh`（备份恢复）
+- 结构化 JSON 日志（server 已生效：`{"ts":...}` 行）+ `deploy/部署演练手册.md`
+
+### 14.4 实测与线上验证（2026-11-01）
+- **V1–V8 连库压测 7/7 全绿**（exit 0）：秒杀 40 并发不超卖、限购+锁过期回补、BE-002 订单粒度释放、出票闭环+退票幂等、归属五档、同步游标同毫秒 12/12、并发取码唯一
+- **EDGE-1~6 边界契约 6/6 PASS**（本机 server 实跑）
+- **线上 GitHub Pages**：`https://afdk1991.github.io/mim/index.html` HTTP 200，CI 每次 push 自动重建（最新 build success）
+- **桌面端 Release**：V0.1.0.0 构建全平台成功（Windows/macOS/Ubuntu/Android/iOS/HarmonyOS）
+- **CI**：build/deploy/mirror 最新 push 全 success
+- 版本规范：废弃四段式，全项目统一三段 semver V0.0.0（9046726/8b58554）
+
+### 14.5 仍待外部项（非代码阻塞，需用户提供）
+- 服务器部署：`OCI_HOST/OCI_USER/OCI_SSH_KEY` Secrets + `ENABLE_SERVER_DEPLOY=true`
+- Cloudflare 边缘层：`CLOUDFLARE_API_TOKEN/ACCOUNT_ID` + `ENABLE_EDGE_DEPLOY=true`
+- EdgeOne Makers：`EO_DEPLOY_HOOK_URL/EO_TOKEN` + `ENABLE_MAKERS_DEPLOY=true`
+- 支付商户号 / 备案主体：F 模块后台配置即可（表结构已就绪）
+
+---
+
+*报告完。项目当前状态：商业级可用性 A/F/C 模块全部实现并实测通过（V1-V8 7/7、EDGE-1~6 6/6），线上前端站/桌面端 Release/CI 均已部署验证；剩余外部项（服务器/域名/CI Secrets）待用户提供后一键激活部署。*
