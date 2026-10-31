@@ -71,8 +71,10 @@ export function MallHomePage({ initial }: MallHomePageProps) {
 
       {goodsLoading ? <Skeleton rows={3} height={110} /> : null}
 
+      {/* 面向用户的表达：不把「products 表不可读」这类数据源细节暴露给终端用户，
+          技术原因只在控制台输出，避免引发不信任感 */}
       {!goodsLoading && !goodsFromCloud ? (
-        <Empty emoji="📭" text="商品数据尚未就绪：云端 products 表暂不可读，请稍后再来" />
+        <Empty emoji="📭" text="商品正在上架中，稍后再来看看" />
       ) : null}
 
       {!goodsLoading && goodsFromCloud && list.length === 0 ? <Empty emoji="📭" text={`${meta.label} 暂无在售商品`} /> : null}

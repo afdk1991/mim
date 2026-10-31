@@ -221,7 +221,7 @@ export function ManjuPage() {
                     ▶️ 播放
                   </button>
                 ) : null}
-                {item.homeUrl ? (
+                {item.homeUrl && /^https?:\/\//i.test(item.homeUrl) ? (
                   <a className="btn btn-ghost btn-sm" href={item.homeUrl} target="_blank" rel="noreferrer">
                     来源页 ↗
                   </a>

@@ -44,6 +44,17 @@ img {
   max-width: 100%;
 }
 
+/* ---------- 键盘焦点环（WCAG 2.4.7）----------
+ * 用 :focus-visible 而非 :focus：鼠标点击不出现焦点环，键盘导航才出现，
+ * 避免为鼠标用户引入视觉噪音。
+ * 此前全站仅 .input:focus 有焦点样式，按钮/Tab/链接一律依赖浏览器默认 1px 细线，
+ * 在橙色背景下几乎不可见。 */
+:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 /* 播放器激活时为内容区预留底部留白 */
 body.player-active {
   padding-bottom: 76px;
@@ -116,6 +127,7 @@ body.player-active {
 }
 
 .btn:hover {
+  /* hover 是临时态，用品牌原色保持轻快；选中/焦点态才用 --primary-text 的高对比版本 */
   border-color: var(--primary);
 }
 
@@ -125,14 +137,21 @@ body.player-active {
 }
 
 .btn-primary {
-  background: var(--primary);
-  border-color: var(--primary);
+  /* 填充用 --primary-strong：#ff8200 配白字实测仅 2.49:1（不达 AA），
+     #c2570a 配白字 4.50:1 达标，视觉上仍是同一橙色系 */
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
   color: #fff;
 }
 
 .btn-primary:hover {
   background: var(--primary-deep);
   border-color: var(--primary-deep);
+}
+
+/* 深色模式：亮橙填充上白字仅 2.12:1，改用深色文字（6.35:1） */
+html[data-theme='dark'] .btn-primary {
+  color: #1f2328;
 }
 
 .btn-ghost {
@@ -239,8 +258,8 @@ body.player-active {
 
 .chip.active {
   background: var(--primary-weak);
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--primary-text);
+  color: var(--primary-text);
 }
 
 /* ---------- 表单 ---------- */
@@ -256,7 +275,7 @@ body.player-active {
 }
 
 .input:focus {
-  border-color: var(--primary);
+  border-color: var(--primary-text);
 }
 
 textarea.input {
@@ -283,8 +302,10 @@ textarea.input {
 }
 
 .tab-btn.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+  color: var(--primary-text);
+  border-bottom-color: var(--primary-text);
+  /* 选中态不只靠颜色传达（WCAG 1.4.1）：叠加字重，色觉障碍用户也能辨识当前 Tab */
+  font-weight: 600;
 }
 
 /* ---------- 空态 ---------- */

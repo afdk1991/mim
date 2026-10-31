@@ -30,7 +30,6 @@ import type {
 } from '../../domain/content/model'
 import { canCastVote, makeSummary } from '../../domain/content/rules'
 import { uid } from '../../core/utils'
-import { emit, EVT } from '../../core/events'
 import { currentUid } from '../../data/session'
 import { loadSnapshot, pushCloud, saveSnapshot, writeWithFallback } from '../../data/sync'
 import { db } from '../../data/client'
@@ -207,10 +206,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
   stateRef.current = state
 
-  /* 落地本机 + 广播（切号/跨模块刷新依赖事件） */
+  /* 落地本机：仅在内容状态变更时持久化；身份域变化不应由内容状态驱动广播 */
   useEffect(() => {
     saveSnapshot(SCOPE, state)
-    emit(EVT.identity)
   }, [state])
 
   /* 云写统一出口：三态收敛 */

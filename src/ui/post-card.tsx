@@ -5,9 +5,9 @@
  * 由页面注入真实动作。这样同一张卡片能在广场、话题页、个人主页复用。
  * ======================================================================== */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Article, Post, PostLottery, PostMedia, PostVote } from '../domain/content/model'
-import { canDrawLottery, splitComments, voteOpen, voteTotal } from '../domain/content/rules'
+import { canDrawLottery, voteOpen, voteTotal } from '../domain/content/rules'
 import { formatCount, timeAgo, yuanText } from '../core/utils'
 import { Avatar, Badge, RichText } from './index'
 import { cx } from '../core/utils'
@@ -55,7 +55,6 @@ export function PostCard({
   compact = false,
 }: PostCardProps) {
   const images = post.images.slice(0, 9)
-  const comments = useMemo(() => splitComments(post.comments), [post.comments])
   const isMine = post.authorId === viewerId
 
   return (
@@ -115,9 +114,7 @@ export function PostCard({
           🔁 {post.reposts > 0 ? formatCount(post.reposts) : '转发'}
         </button>
         <button onClick={onComment}>
-          💬 {comments.top.length + post.comments.length - comments.top.length > 0
-            ? formatCount(post.comments.length)
-            : '评论'}
+          💬 {post.comments.length > 0 ? formatCount(post.comments.length) : '评论'}
         </button>
         <button onClick={onToggleLike} style={post.likedByMe ? { color: 'var(--primary)' } : undefined}>
           {post.likedByMe ? '❤️' : '🤍'} {post.likes > 0 ? formatCount(post.likes) : '赞'}
@@ -267,7 +264,8 @@ export function ArticleCard({
   onOpen?: () => void
   onToggleLike?: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
+  // 只需要 setter 翻转展开态；读到的值本身未参与渲染，故不解构（避免 TS6133 未使用变量）
+  const [, setExpanded] = useState(false)
   return (
     <article className="article-card">
       <h3>
@@ -303,7 +301,6 @@ export function ArticleCard({
           </button>
         </span>
       </div>
-      {expanded ? null : null}
     </article>
   )
 }

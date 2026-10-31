@@ -6,13 +6,21 @@
  * ======================================================================== */
 
 :root {
+  /* 主色三分工（对比度实测后拆分，见 UIUX_审阅与优化方案.md 1.1）：
+     --primary        填充 / 边框 / 图标底色（品牌原色，不做文字用）
+     --primary-strong 按钮填充：配白字 = 4.50:1（--primary 配白字仅 2.49:1，不达标）
+     --primary-text   文字与图标专用：白底 4.50:1（--primary 用在文字上仅 2.49:1）
+     橙是高明度色，同一个值无法同时满足「白字压橙底」与「橙字压白底」，必须拆分。 */
   --primary: #ff8200;
   --primary-deep: #e06400;
+  --primary-strong: #c2570a;
+  --primary-text: #c2570a;
   --primary-weak: rgba(255, 130, 0, 0.12);
 
   --text: #1f2328;
   --text-2: #4a5158;
-  --text-3: #8b949e;
+  /* 原 #8b949e 白底仅 3.08:1，不达 AA 4.5:1；调深至 4.55:1 */
+  --text-3: #6e7781;
 
   --bg: #ffffff;
   --bg-soft: #f6f8fa;
@@ -38,10 +46,14 @@
 html[data-theme='dark'] {
   --primary: #ff9a33;
   --primary-deep: #ffb066;
+  /* 深色底上 #ff9a33 约 7.6:1，文字用安全；按钮填充同样用它，但文字须转深色（见 base.css .btn-primary） */
+  --primary-strong: #ff9a33;
+  --primary-text: #ff9a33;
   --primary-weak: rgba(255, 154, 51, 0.16);
 
   --text: #e6edf3;
   --text-2: #b9c2cc;
+  /* 深底卡片上 #8b949e = 5.62:1，已达标，保持不变 */
   --text-3: #8b949e;
 
   --bg: #0d1117;

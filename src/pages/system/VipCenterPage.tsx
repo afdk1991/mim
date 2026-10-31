@@ -9,7 +9,7 @@
  *  4. 金额一律「分」，展示用 yuanText()。
  * ======================================================================== */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LIMITS } from '../../core/config'
 import { EVT, subscribe } from '../../core/events'
 import { cx, formatDate, formatDay, uid, yuanText } from '../../core/utils'
@@ -33,6 +33,7 @@ export function VipCenterPage() {
   const [vip, setVip] = useState<VipState>(getVipState)
   const [orders, setOrders] = useState<VipOrder[]>(getVipOrders)
   const [balanceFen, setBalanceFen] = useState(() => getWalletState().balanceFen)
+  const subscribingRef = useRef(false)
 
   // 余额在别处变动（消费 / 核销入账）后要跟着刷新，否则会出现「钱够却提示不足」
   useEffect(() => subscribe(EVT.wallet, () => setBalanceFen(getWalletState().balanceFen)), [])
@@ -43,21 +44,28 @@ export function VipCenterPage() {
 
   function onSubscribe(plan: VipPlan): void {
     // 扣款失败即中止：绝不先发权益再补扣
-    if (!walletConsume(plan.priceFen, `开通${plan.label}`)) return
-    const next = vipRenew(vip, plan)
-    setVipState(next)
-    setVip(next)
-    const order: VipOrder = {
-      id: uid('vip_'),
-      planId: plan.id,
-      label: plan.label,
-      priceFen: plan.priceFen,
-      days: plan.days,
-      at: Date.now(),
+    // 连点保护：用 ref 挡住同一渲染周期内的重复点击，避免双扣余额、有效期叠加两次
+    if (subscribingRef.current) return
+    subscribingRef.current = true
+    try {
+      if (!walletConsume(plan.priceFen, `开通${plan.label}`)) return
+      const next = vipRenew(vip, plan)
+      setVipState(next)
+      setVip(next)
+      const order: VipOrder = {
+        id: uid('vip_'),
+        planId: plan.id,
+        label: plan.label,
+        priceFen: plan.priceFen,
+        days: plan.days,
+        at: Date.now(),
+      }
+      setOrders(prependVipOrder(order))
+      setBalanceFen(getWalletState().balanceFen)
+      toast(`已开通${plan.label}，有效期至 ${formatDay(next.expireAt)}`)
+    } finally {
+      subscribingRef.current = false
     }
-    setOrders(prependVipOrder(order))
-    setBalanceFen(getWalletState().balanceFen)
-    toast(`已开通${plan.label}，有效期至 ${formatDay(next.expireAt)}`)
   }
 
   function onCancel(): void {

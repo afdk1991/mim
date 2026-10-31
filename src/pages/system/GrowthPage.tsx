@@ -13,7 +13,9 @@ import { useEffect, useState } from 'react'
 import { EVT, subscribe } from '../../core/events'
 import { asNumber, asRecord, asString, readJson, userKey, writeJson } from '../../core/storage'
 import { formatDate, formatDay } from '../../core/utils'
+import { isBackendConfigured } from '../../core/config'
 import { currentUid } from '../../data/session'
+import { db } from '../../data/client'
 import {
   BADGES,
   dayKeyOf,
@@ -75,11 +77,53 @@ function stateKey(): string {
   return userKey(SCOPE, currentUid(), 'state')
 }
 
+/**
+ * 服务端签到返回兼容两种形态：扁平 { last, streak } 或嵌套 { checkin: { last, streak } }。
+ * last 可能是日期字符串或时间戳；时间戳统一走 dayKeyOf() 补零，与本地 dayKey() 一致。
+ */
+function coerceCheckin(raw: unknown): { last: string; streak: number } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const src = r.checkin && typeof r.checkin === 'object' ? (r.checkin as Record<string, unknown>) : r
+  const rawLast = src.last
+  const rawStreak = src.streak
+  const streak = typeof rawStreak === 'number' ? rawStreak : Number(rawStreak)
+  if (!Number.isFinite(streak)) return null
+  let last = ''
+  if (typeof rawLast === 'string') last = rawLast
+  else if (typeof rawLast === 'number' && Number.isFinite(rawLast)) last = dayKeyOf(rawLast)
+  return { last: last || dayKey(), streak }
+}
+
 export function GrowthPage() {
   const toast = useToast()
   const [state, setState] = useState<GrowthState>(() => readJson(stateKey(), parseGrowth, EMPTY_STATE))
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => subscribe(EVT.growth, () => setState(readJson(stateKey(), parseGrowth, EMPTY_STATE))), [])
+
+  // GAP-03：挂载时以服务端为准拉取成长状态；连不上后端（未配置 / 表缺失）时
+  // 静默回退本地 localStorage，绝不报错、不弹 toast，保证「未配置后端」页面仍可用。
+  useEffect(() => {
+    if (!isBackendConfigured()) return
+    let alive = true
+    void (async () => {
+      setSyncing(true)
+      const r = await db.rpc<GrowthState>('growth_state')
+      if (!alive) return
+      if (r.ok) {
+        const pulled = parseGrowth(r.data)
+        if (pulled) {
+          setState(pulled)
+          writeJson(stateKey(), pulled)
+        }
+      }
+      setSyncing(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const score = growthScore(state.events)
   const { lv, pct, next } = levelProgress(score)
@@ -106,10 +150,23 @@ export function GrowthPage() {
     }
     const prev = state.checkin.last ? { streak: state.checkin.streak, total: 0, lastDate: state.checkin.last } : undefined
     const result = nextStreak(prev, today)
+    // 本地乐观更新，保证离线 / 未配置后端时也能立即看到连击数
     const nextState: GrowthState = { ...state, checkin: { last: today, streak: result.streak } }
     writeJson(stateKey(), nextState)
     setState(nextState)
     toast(`签到成功，已连续 ${result.streak} 天`)
+
+    // 已配置后端：调用服务端签到并据返回结果校正连击数（服务端为准）
+    if (!isBackendConfigured()) return
+    void (async () => {
+      const r = await db.rpc<unknown>('growth_checkin', {}, { write: true })
+      if (!r.ok) return // 失败静默：本地乐观态已保留，不打断用户
+      const server = coerceCheckin(r.data)
+      if (!server) return
+      const s2: GrowthState = { ...state, checkin: { last: server.last, streak: server.streak } }
+      writeJson(stateKey(), s2)
+      setState(s2)
+    })()
   }
 
   const recent = state.events.slice(-EVENT_SHOWN).reverse()
@@ -117,6 +174,13 @@ export function GrowthPage() {
   return (
     <div className="page page-grid single">
       <h1 className="page-title">🌱 成长引擎</h1>
+      <p className="muted" style={{ fontSize: 12, marginTop: -8 }}>
+        {isBackendConfigured()
+          ? syncing
+            ? '正在从云端同步成长状态…'
+            : '成长状态以云端为准（未连通时回退本机）'
+          : '当前未配置后端，成长数据仅保存在本机'}
+      </p>
 
       <div className="card">
         <div className="row" style={{ alignItems: 'center', gap: 10 }}>

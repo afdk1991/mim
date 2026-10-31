@@ -60,7 +60,11 @@ export function FeedPage() {
   const ready = useFirstPaint()
   const prefs = useFeedPrefs(app.meId, CITY_PRESETS[0])
 
-  const [tab, setTab] = useState<Tab>('follow')
+  /* 默认落到「推荐」而非「关注」：新用户关注数为 0，默认关注 Tab 必然空态；
+     推荐流基于全站内容打分（buildReco），接入后端后任何新用户都有内容可看。
+     注：未配置后端时本地 posts 初始为空（见 app/state/content.tsx），四个 Tab 都会空态——
+     那是数据源缺失，不是 Tab 选择问题，需由「是否提供演示种子」的产品决策解决。 */
+  const [tab, setTab] = useState<Tab>('reco')
   const [page, setPage] = useState(1)
   const switchTab = (t: Tab): void => {
     setTab(t)
@@ -97,6 +101,9 @@ export function FeedPage() {
   )
 
   const hotList = useMemo(() => sortHot(visible.filter((p) => p.authorId !== app.meId)), [visible, app.meId])
+  /* 热门流正文：跳过已在「24 小时热榜 Top3」横幅展示过的前 3 条，
+     否则同一屏里这 3 条会先以榜单行、再以完整卡片各出现一次。 */
+  const hotRestList = useMemo(() => hotList.slice(3), [hotList])
   const cityList = useMemo(
     () => filterByCity(visible, prefs.city).sort((a, b) => b.createdAt - a.createdAt),
     [visible, prefs.city],
@@ -104,7 +111,7 @@ export function FeedPage() {
 
   const topicStats = useMemo(() => topicsFromPosts(visible), [visible])
   const cities = useMemo(() => citiesOf(posts), [posts])
-  const activePosts = tab === 'follow' ? followList : tab === 'reco' ? recoList.map((r) => r.post) : tab === 'hot' ? hotList : cityList
+  const activePosts = tab === 'follow' ? followList : tab === 'reco' ? recoList.map((r) => r.post) : tab === 'hot' ? hotRestList : cityList
   const shownCount = Math.min(page * 10, activePosts.length)
   const [repostOf, setRepostOf] = useState<Post | null>(null)
 
@@ -322,7 +329,7 @@ export function FeedPage() {
                 ))}
               </div>
             ) : null}
-            {pageOf(hotList, page).map(renderPost)}
+            {pageOf(hotRestList, page).map(renderPost)}
           </AsyncState>
         ) : null}
 
