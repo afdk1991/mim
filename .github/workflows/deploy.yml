@@ -6,9 +6,10 @@ name: deploy
 #   build.yml  ——  质量闸门 + 前端静态站点发布到 GitHub Pages（只读展示用）
 #   deploy.yml ——  质量闸门 + SSH 登录宿主机，按 deploy/README.md 的「更新发版」流程上线
 #
-# 一次提交，多运行时分发（对齐《全栈全站部署架构手册》CI 层）。三个发布层全部为
-# 显式开关，缺省全部跳过（skipped 不影响 run 结论），配好对应 Secrets 后把
-# Variable 置 true 即激活：
+# 一次提交，多运行时分发（对齐《全栈全站部署架构手册》CI 层）。两个 CI 发布层
+# （服务器、边缘层）全部为显式开关，缺省全部跳过（skipped 不影响 run 结论），配好
+# 对应 Secrets 后把 Variable 置 true 即激活：
+#   （EdgeOne Makers 走控制台 Git 关联自动构建，不在 CI 内触发，见下方 Layer 3 说明）
 #
 # 1) 服务器发布层（主路线，systemd + nginx）
 #    Variable: ENABLE_SERVER_DEPLOY = true
@@ -22,10 +23,12 @@ name: deploy
 #    前置:     wrangler d1 create mim-readonly && wrangler kv namespace create MIM_CACHE，
 #              把 id 回填 worker/wrangler.jsonc，并 wrangler secret put SYNC_TOKEN / HEALTH_CHECK_SECRET
 #
-# 3) EdgeOne Makers（可选，亚太/国内就近入口。正常由 Makers 控制台连 Git 自动部署，
-#    本 job 用于 CI 侧主动触发重新部署）
-#    Variable: ENABLE_MAKERS_DEPLOY = true
-#    Secrets:  EO_DEPLOY_HOOK_URL（推荐，Makers 项目的部署 Webhook）或 EO_TOKEN（CLI 方式）
+# 3) EdgeOne Makers（亚太/国内就近入口）
+#    已统一为「纯控制台 Git 关联自动构建」单一模式：在 Makers 控制台把 GitHub 仓库
+#    afdk1991/mim 关联为项目 mim，每次 push main 自动构建并发布 dist/。
+#    ⚠️ 原 makers CI 触发 job 已删除（见文件末尾）——保留它会在 Makers 再生成名为
+#    mim-web 的「直接上传」型项目，与 Git 关联的 mim 并存造成双站点 / 命名混乱。
+#    如需重新启用 Upload 型部署，请先在控制台确认项目命名策略，不要直接恢复该 job。
 #
 # 注意：本仓库有意不提交 package-lock.json（见 .gitignore），
 #      因此只能用 `npm install`，`npm ci` 必然失败。
@@ -206,42 +209,3 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'worker'
           command: deploy
-
-  makers:
-    name: 触发 EdgeOne Makers 部署（可选）
-    needs: gate
-    # 可选层：Makers 正常由控制台连 Git 自动构建部署；本 job 用于 CI 侧主动触发重新部署。
-    # 默认关闭，配好 EO_DEPLOY_HOOK_URL 或 EO_TOKEN 后设 ENABLE_MAKERS_DEPLOY=true 激活。
-    if: github.ref == 'refs/heads/main' && vars.ENABLE_MAKERS_DEPLOY == 'true'
-    # 可选层失败不影响整体 run 结论（Makers 控制台连 Git 会自动部署，本 job 只是主动触发）
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: 触发部署
-        env:
-          EO_DEPLOY_HOOK_URL: ${{ secrets.EO_DEPLOY_HOOK_URL }}
-          EO_TOKEN: ${{ secrets.EO_TOKEN || secrets.EDGEONE_API_TOKEN }}
-          EO_PROJECT_NAME: ${{ vars.EO_PROJECT_NAME }}
-        run: |
-          set -euo pipefail
-          if [ -n "${EO_DEPLOY_HOOK_URL:-}" ]; then
-            echo '--> 通过部署 Webhook 触发 Makers 重新部署'
-            curl -fsSL -X POST "$EO_DEPLOY_HOOK_URL"
-          elif [ -n "${EO_TOKEN:-}" ]; then
-            echo '--> 通过 edgeone CLI 部署前端构建产物（要求项目为「直接上传」型）'
-            if [ -z "${EO_PROJECT_NAME:-}" ]; then
-              echo '::error::缺少 Variable：EO_PROJECT_NAME（Makers 项目名）'
-              exit 1
-            fi
-            npm install --no-audit --no-fund --legacy-peer-deps
-            npm run build
-            npx --yes edgeone login -t "$EO_TOKEN" --local
-            npx --yes edgeone makers deploy ./dist -n "$EO_PROJECT_NAME"
-          else
-            echo '::error::缺少 Secrets：EO_DEPLOY_HOOK_URL（推荐）或 EO_TOKEN'
-            exit 1
-          fi
