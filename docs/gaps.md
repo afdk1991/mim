@@ -28,7 +28,9 @@
 | BE-003 | `server/src/storage.js:17-32`、`main.js:121-131` | `image/svg+xml` 上传后 GET 内联返回、无 CSP/Disposition，同域 stored-XSS 向量。 | **已修复（2026-10-29）**：对象回读对 SVG 加 `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'` + `X-Content-Type-Options: nosniff` + `Content-Disposition: inline`（实测响应头齐全：内联脚本失效、`<img>` 引用仍正常渲染）；图片/音视频不加头保持原行为。 | ✅ 已修复 |
 | BE-005 | `server/src/sync.js:84-101` | 排序已带 `id asc`，但 `next` 游标只回 `updated_at ?? created_at`（毫秒水位、未编码 id）。同毫秒待返回行数 > limit 时下一轮 `(col > next)` 会漏行。 | **已修复（2026-10-29）**：游标改 `(ts,id)` 元组——`parseCursor` 兼容纯数字与 `"毫秒,id"` 两种格式，SQL 改 `(coalesce(updated_at,created_at), id) > ($1,$2)`，`next` 回 `"毫秒,id"`；同步改 worker（类型 `next:string` 透传）、sync-pull.mjs（字符串游标比较）、loadtest V7（改为同毫秒造数验证）。**连库实测 12 条同毫秒 12/12 无重无漏**（修复前必漏 11 条）。 | ✅ 已修复+实测 |
 | BE-004 | `server/src/rpc.js:681-704` | `growth_record` 不校验行为真实性，登录用户可自行刷分（日上限内）。 | 高价值事件改服务端在业务写入后内部触发。 | 待产品决策（沿用审查结论） |
-| BE-006 | `server/src/rpc.js:521-540` | `wallet_credit` 无 admin 校验，演示期任意账号可自助加余额（README 已注明有意为之）。 | 接入真实支付回调后收口 self-credit。 | 演示期已知（沿用） |
+| BE-006 | `server/src/rpc.js:629-648` | `wallet_credit` 无 admin 校验，任意登录用户可自助加余额（EDGE-4 实测：普通用户自充=200，余额真实增加）。 | 接入真实支付回调后收口 self-credit，或改为仅 `admin_wallet_credit` 可写。 | 演示期已知（EDGE-4 实测复现） |
+| EDGE-1 | `server/src/rpc.js` RPCS Map | `config_get` / `admin_config_set` 配置域 RPC 未注册（RPCS 30 个中无 config 相关）。EDGE-1 实测：匿名 config_get=401、管理员调用=400「未开放的服务端过程」。 | 实现配置表 + config_get（非敏感键公开）/ admin_config_set（管理员写+脱敏回显+audit留痕）。 | 待实现（阶段二实测确认未落地） |
+| EDGE-2 | `server/src/main.js` / `rpc.js` | 通用 RPC 无限流闸门。当前仅 `events.js` 有 600/min/IP 令牌桶。EDGE-2 实测：连发 40 次 `wallet_state` 全部 200，无 429。 | 在 RPC 入口加中间件级限流（令牌桶或滑动窗口），按 UID/IP 双维度。 | 待实现（阶段二实测确认无 RPC 级限流） |
 | BE-007/008 | `main.js:155-167` / `errors.js:47-56` | 列表匿名可读、单条强制登录的读权限不对称；PG detail 轻微外泄。 | 见 `docs/review/后端-审查.md`，均 P3。 | 待排期 |
 | SD-002/003/004 | `.github/workflows/deploy.yml:128`、`build-release.yml:19-24`、`install.sh:70-73` | CI 健康检查写死 8787；分支手动触发可能污染 Release；install.sh 未排除 .env/data。 | **已修复（前序轮次实际已改）**：deploy.yml 健康检查从远端 `.env` 读 PORT（读不到回退 8787）；build-release.yml 各 job 均加 `if: startsWith(github.ref, 'refs/tags/V')` 限 tag 触发；install.sh rsync 锚定排除 `/.env`、`/server/.env`、`/server/data/`。本条状态更新为已修复。 | ✅ 已修复 |
 
@@ -47,9 +49,21 @@
 
 ## 四、本轮验证结论
 
+### 阶段一（2026-10-29）
 - `npm run typecheck` → 通过（exit 0）
 - `npm test`（vitest）→ 30/30 通过
 - `npm run build` → 通过（vite 8，135 模块）
 - `npm run server:check` → 通过（10 个 `node --check`）
 - `node --check scripts/loadtest-v1-v8.mjs` → 通过
 - `npm run version:check` → 9/10 一致，仅 tag 层不符（GAP-01）
+
+### 阶段二全量回归（2026-10-31，HEAD=8b58554）
+- `npm run typecheck` → ✅ exit 0
+- `npx vitest run` → ✅ 42/42（core-utils 16 + telemetry 10 + platform-contract 16）
+- `npm run build` → ✅ PASS（139 modules，vite 8.3.4）
+- `npm run server:check` → ✅ 11 文件全过
+- `node --check scripts/*.mjs` → ✅ 18/18
+- `worker/ npx tsc --noEmit` → ✅ exit 0
+- V1~V8 连库压测 → ✅ 7/7 全绿（exit 0）
+- EDGE-1~6 边界测试 → 3/6 通过（EDGE-3/5/6 ✅；EDGE-1/2/4 ❌，详见上表）
+- CI YAML 校验 → ✅ 7 文件全部 `yaml.safe_load_all` 解析通过，无 docker build/push/container 指令
