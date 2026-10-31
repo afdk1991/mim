@@ -30,6 +30,7 @@ const ENTRIES: Array<{ href: string; icon: string; title: string; perm?: string;
   { href: '#/admin/recharge', icon: '🪙', title: '充值核销', desc: '核对收款后为用户钱包入账，全程审计留痕' },
   { href: '#/admin/verify', icon: '🎫', title: '券码核销', desc: '输入券码核验是否可用与核销时间' },
   { href: '#/admin/devices', icon: '📟', title: '设备与 OTA', desc: '查看设备档案、下行指令历史与升级包熔断状态' },
+  { href: '#/admin/settings', icon: '⚙️', title: '站点配置', desc: '支付 / 备案 / 主体 / 客服邮箱，保存后即时生效' },
   { href: '#/admin/audit', icon: '📜', title: '审计日志', perm: 'audit:view', desc: '查看后台操作与写操作的留痕记录' },
   { href: '#/admin/roles', icon: '🔐', title: '角色管理', perm: 'role:manage', desc: '查看角色、权限与用户授权关系' },
 ]

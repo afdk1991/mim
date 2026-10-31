@@ -74,6 +74,9 @@ export const ADMIN_NAV: NavItem = {
   children: [
     { href: '#/admin/products', match: '/admin/products', label: '商品管理', icon: '📦' },
     { href: '#/admin/recharge', match: '/admin/recharge', label: '充值核销', icon: '🪙' },
+    { href: '#/admin/verify', match: '/admin/verify', label: '券码核销', icon: '🎫' },
+    { href: '#/admin/devices', match: '/admin/devices', label: '设备与 OTA', icon: '📟' },
+    { href: '#/admin/settings', match: '/admin/settings', label: '站点配置', icon: '⚙️' },
     { href: '#/admin/audit', match: '/admin/audit', label: '审计日志', icon: '📜' },
     { href: '#/admin/roles', match: '/admin/roles', label: '角色管理', icon: '🔐' },
   ],

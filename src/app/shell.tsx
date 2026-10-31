@@ -6,14 +6,15 @@
  *  2. 分组展开由当前路径自动推导，不依赖组件内部状态
  * ======================================================================== */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ADMIN_NAV, NAV, navMatches } from './nav'
 import type { NavItem } from './nav'
 import { useRouter } from './router'
 import { hasRole } from '../data/session'
 import { cx } from '../core/utils'
-import { SITE_CONFIG } from '../core/config'
+import { getSiteConfig } from '../core/runtime-config'
+import { subscribe, EVT } from '../core/events'
 import { APP_VERSION } from '../core/version'
 import { getTheme, toggleTheme } from '../core/theme'
 import { readRaw } from '../core/storage'
@@ -21,7 +22,10 @@ import { readRaw } from '../core/storage'
 export function Shell({ children }: { children: ReactNode }) {
   const { path } = useRouter()
   const [, force] = useState(0)
+  // F6：运行期配置回来后页脚的邮箱 / 主体名也要跟着刷新
+  useEffect(() => subscribe(EVT.siteConfig, () => force((n) => n + 1)), [])
   const items = hasRole('admin') ? [...NAV, ADMIN_NAV] : NAV
+  const cfg = getSiteConfig()
 
   return (
     <>
@@ -58,16 +62,16 @@ export function Shell({ children }: { children: ReactNode }) {
                 <a href="#/info/about">关于我们</a>
               </div>
               <div>
-                <a href="#/info/terms">服务条款</a>
+                <a href="#/legal/terms">用户协议</a>
               </div>
               <div>
-                <a href="#/info/privacy">隐私政策</a>
+                <a href="#/legal/privacy">隐私政策</a>
               </div>
             </div>
             <div>
               <h4>联系</h4>
-              <div>{SITE_CONFIG.contactEmail}</div>
-              <div>{SITE_CONFIG.owner}</div>
+              <div>{cfg.contactEmail}</div>
+              <div>{cfg.owner}</div>
             </div>
           </div>
           <div style={{ marginTop: 10 }}>

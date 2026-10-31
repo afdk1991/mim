@@ -76,6 +76,7 @@ import {
   AdminProductsPage,
   AdminRechargePage,
   AdminRolesPage,
+  AdminSettingsPage,
   AdminVerifyPage,
   GrowthPage,
   InfoPage,
@@ -215,7 +216,14 @@ export function resolveRoute(path: string, query: URLSearchParams): ReactNode {
       if (param === 'recharge') return <AdminRechargePage />
       if (param === 'verify') return <AdminVerifyPage />
       if (param === 'devices') return <AdminDevicesPage />
+      if (param === 'settings') return <AdminSettingsPage />
       return <AdminHomePage />
+
+    /* ---------- 合规静态页（隐私 / 用户协议） ---------- */
+    case 'legal':
+      if (param === 'privacy') return <InfoPage slug="privacy" />
+      if (param === 'terms') return <InfoPage slug="terms" />
+      return <Empty emoji="📄" text="未知的合规页面" />
 
     default:
       return <Empty emoji="🧭" text="页面不存在，检查一下地址吧" />
