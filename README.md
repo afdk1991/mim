@@ -368,6 +368,32 @@ sudo journalctl -u mim-server -f           # 看日志
 | `npm run verify:routes` | 全站路由遍历实测（需先起 dev server，需本机浏览器） |
 | `npm run version:check` | 版本号一致性校验（`src/core/version.ts` 为唯一源） |
 
+### 发版：bump 版本号
+
+唯一版本源是 `src/core/version.ts` 的 `APP_VERSION`，共 11 个载体（package.json / tauri.conf.json / Cargo.toml / Android / iOS / HarmonyOS / worker）。**不要手改**任何载体，统一用脚本：
+
+```bash
+node scripts/bump-version.mjs             # patch：0.0.0 → 0.0.1（默认）
+node scripts/bump-version.mjs --minor     # minor：0.0.0 → 0.1.0
+node scripts/bump-version.mjs --major     # major：0.0.0 → 1.0.0
+node scripts/bump-version.mjs --dry-run   # 只打印将要改什么，不写盘
+```
+
+脚本会自动：
+1. 从最新 `V<semver>` git tag 读当前版本（无 tag 时回退读 `src/core/version.ts`）；
+2. 改全部 11 个载体的三段版本号，并把 Android `versionCode` / Harmony `versionCode` / iOS `CURRENT_PROJECT_VERSION` 自动 +1；
+3. 跑完 `node scripts/version-check.mjs` 校验文件载体一致（bump 本身不打 tag，tag 行不匹配属于预期，commit 后手动 `git tag` 即闭环）。
+
+脚本**不** commit / 不打 tag / 不 push。改完确认无误后手动执行：
+
+```bash
+git commit -am "chore: release v<新版本>"
+git tag V<新版本>
+git push --tags
+```
+
+CI（`.github/workflows/build-release.yml`）会在推送 `V*` tag 时自动构建六端产物并 attach 到 Release。
+
 后端目录内另有（`cd server` 后执行）：
 
 | 命令 | 作用 |
