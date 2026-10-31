@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Mim favicon：品牌橙圆角底 + 白色 M 字标（矢量，约 0.3KB，无需位图缩放） -->
+  <rect width="64" height="64" rx="14" fill="#ff8200" />
+  <path
+    d="M14 47V18h6.6l11.4 17.2L43.4 18H50v29h-6.3V30.4L33.6 46h-3.2L20.3 30.4V47z"
+    fill="#fff"
+  />
+</svg>

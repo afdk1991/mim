@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Mim 应用隐私政策：说明账号注册登录、内容数据的云端存储与本地缓存等处理方式。">
+<title>Mim 隐私政策</title>
+<style>
+  :root { --brand:#ff8200; --brand-deep:#a85300; --text:#1f2329; --muted:#646a73; --bg:#f5f6f7; --card:#ffffff; --line:#e5e6eb; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",sans-serif; color:var(--text); background:var(--bg); line-height:1.85; }
+  header { background:var(--card); border-bottom:1px solid var(--line); text-align:center; padding:38px 20px 26px; }
+  .logo { display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; border-radius:14px; background:var(--brand); color:#fff; font-size:28px; font-weight:700; margin-bottom:12px; }
+  h1 { font-size:26px; letter-spacing:1px; }
+  .meta { color:var(--muted); font-size:13px; margin-top:6px; }
+  .wrap { max-width:860px; margin:0 auto; padding:8px 20px 60px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:6px 26px 22px; margin-top:16px; }
+  h2 { font-size:19px; margin:26px 0 10px; padding-left:10px; border-left:4px solid var(--brand); line-height:1.4; }
+  h3 { font-size:15.5px; margin:18px 0 6px; }
+  p, li { font-size:14.5px; }
+  ul, ol { padding-left:22px; margin:8px 0; }
+  li { margin:4px 0; }
+  strong { color:var(--brand-deep); }
+  .hl { background:#fff7ee; border:1px solid #ffd9b0; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:14px; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:13.5px; }
+  th, td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#fff7ee; white-space:nowrap; }
+  code { background:#f2f3f5; border-radius:4px; padding:1px 6px; font-size:13px; word-break:break-all; }
+  a { color:var(--brand-deep); word-break:break-all; }
+  footer { text-align:center; color:var(--muted); font-size:12.5px; margin-top:30px; line-height:1.9; }
+  @media (max-width:600px){ .wrap{padding:4px 12px 40px;} section{padding:2px 14px 16px;} h1{font-size:22px;} h2{font-size:17.5px;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">M</div>
+  <h1>Mim 隐私政策</h1>
+  <div class="meta">版本 0.0.0.3&nbsp;｜&nbsp;生效日期：2026 年 10 月 28 日&nbsp;｜&nbsp;开发者：afdk1991（个人开发者）</div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2>引言</h2>
+  <p>Mim（以下简称"本应用"）是由个人开发者 afdk1991 开发并维护的内容社区类应用（含多个实用工具模块）。我们深知个人信息对您的重要性，将以高度审慎的态度处理相关信息。本政策帮助您了解：</p>
+  <ul>
+    <li>本应用<strong>收集哪些信息</strong>（仅限注册登录与内容发布所必需的信息）；</li>
+    <li>本应用如何在您的设备本地与云端服务器处理数据；</li>
+    <li>本应用在何种场景下发起网络请求。</li>
+  </ul>
+  <p>请您在使用本应用前仔细阅读本政策。您开始使用本应用，即表示您已理解并同意本政策所述内容。</p>
+</section>
+
+<section>
+  <h2>一、适用范围</h2>
+  <p>本政策适用于 Mim 应用及其全部内置功能模块（内容社区、文章、私信、商城、出行、监控等工具模块），覆盖以下平台：</p>
+  <table>
+    <tr><th>平台</th><th>分发渠道</th></tr>
+    <tr><td>iOS</td><td>App Store</td></tr>
+    <tr><td>HarmonyOS（鸿蒙）</td><td>华为应用市场 AppGallery</td></tr>
+    <tr><td>Android</td><td>GitHub Releases / 官方分发</td></tr>
+    <tr><td>Windows / macOS / Linux</td><td>GitHub Releases</td></tr>
+    <tr><td>Web</td><td>GitHub Pages / EdgeOne Pages</td></tr>
+  </table>
+  <p>应用统一包名：<code>com.afdk1991.mim</code>。本应用各端统一使用同一账号体系，且该账号体系由本项目<strong>自行实现</strong>，不依赖任何第三方身份服务：登录令牌由服务端以 HMAC-SHA256 自签，密码以 scrypt 加盐哈希形式存储于服务端数据库。</p>
+  <p>登录用户发布的内容与账号数据，存储于<strong>本项目自托管的后端服务</strong>（PostgreSQL 数据库，表结构由本项目的数据库迁移文件定义）；未登录（游客）时，您的内容仅保存在本机浏览器或设备本地，不会上传。后端服务地址由部署方自行配置；<strong>若部署方未配置后端，本应用完全在本机运行，不会向任何服务器发送数据。</strong></p>
+  <div class="hl">本政策中的「后端服务」指运行本项目服务端程序（<code>server/</code>）的实例。该实例可能由本项目管理者自托管，也可能由第三方部署方托管：<strong>若您使用的是第三方托管的实例，则该实例的数据处理方为该实例的运营者</strong>，其数据处理行为适用该运营者自己的隐私政策。</div>
+</section>
+
+<section>
+  <h2>二、我们收集哪些信息</h2>
+  <ul>
+    <li><strong>不收集敏感权限与数据</strong>：本应用不请求、不读取您的通讯录、相册、定位、麦克风、摄像头、剪贴板、短信、通话记录等任何权限与数据（唯一例外见"五、权限使用说明"中 Android 平台的更新安装场景）。</li>
+    <li><strong>账号信息</strong>：注册时您需要提供<strong>用户名与密码</strong>（可选提供邮箱）。密码在服务端以 scrypt 加盐哈希形式存储，服务端不保存密码明文；我们不收集手机号、身份证件、人脸等身份信息。</li>
+    <li><strong>您主动发布的内容</strong>：动态、文章、评论、私信、头像与媒体附件等，用于在您的账号下存储与展示；这些内容仅由您主动提交。</li>
+    <li><strong>交易与钱包记录</strong>：您在应用内的充值、购买、订单记录。<strong>不收集银行卡号、支付密码、验证码等信息</strong>；扫码支付由您在第三方支付应用内自行完成，本应用仅保存您主动提交的付款凭证（如交易单号）用于对账。</li>
+    <li><strong>无第三方 SDK</strong>：不集成任何广告、统计分析、崩溃收集、消息推送等第三方 SDK。</li>
+    <li><strong>不出售、不共享</strong>：我们不会出售您的个人信息，也不会向无关第三方共享；登录用户的数据仅为提供功能所必需而传输至本项目的自托管后端服务（详见"一、适用范围"中关于第三方托管实例的说明）。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>三、本地缓存与云端存储</h2>
+  <p>为提供离线可用的体验，本应用会在您的设备本地（浏览器 localStorage / 应用沙盒目录）缓存以下数据，并按登录身份隔离：</p>
+  <ul>
+    <li><strong>内容与工具状态</strong>：动态、文章、评论、私信的本地副本，以及钱包、成长、发布记录、会员等各模块产生的状态；</li>
+    <li><strong>偏好设置</strong>：主题（浅色 / 深色）、浏览历史等。</li>
+  </ul>
+  <p>登录后，内容与账号数据以<strong>后端服务为真源</strong>存储，本地保存仅为加速与离线可用；未登录（游客）时数据仅保存在本机。您可随时清除：</p>
+  <ul>
+    <li><strong>应用内重置</strong>：点击应用顶部的 ♻️ 重置按钮，清除本机缓存内容；</li>
+    <li><strong>云端删除</strong>：登录后在应用内删除您的内容，云端对应记录同步删除；</li>
+    <li><strong>彻底删除</strong>：卸载本应用（移动端 / 桌面端），或在浏览器中清除本站点数据（Web 端）。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>四、网络请求说明</h2>
+  <p>本应用在以下场景下主动发起网络请求：</p>
+  <ul>
+    <li><strong>账号与内容同步</strong>：注册 / 登录 / 退出，以及内容发布、评论、私信、媒体上传等操作，会请求本项目的自托管后端服务，仅传输完成该操作所必需的数据与您的登录凭证；未配置后端时不会产生任何此类请求；</li>
+    <li><strong>版本更新检查</strong>：移动端与桌面端在启动约 8 秒后，向 GitHub Releases（github.com）拉取更新清单文件（<code>manifest.json</code> / <code>latest.json</code>），检查频率不低于每 6 小时一次；该请求仅传输应用当前版本号用于比较，<strong>不携带任何设备标识、个人信息或使用数据</strong>；发现新版本时：Android 端将下载新版安装包并经 SHA-256 校验后提示安装；iOS 与 HarmonyOS 端仅弹窗提示，并引导您前往官方应用商店更新；</li>
+    <li><strong>工具模块的公开数据源</strong>：当您主动使用聚合监控、价格监控等工具时，应用会直接向相应的免密钥公开数据接口发起请求（可能包括汇率、天气、公开行情、代码托管等公开接口），<strong>不携带账号信息</strong>；</li>
+    <li><strong>邮箱聚合</strong>：当您使用邮箱功能时，由于浏览器无法直连邮件协议，应用会经您或部署方配置的<strong>邮箱代理服务</strong>中转收发邮件；若邮箱账号与授权码由您填写，该凭据会传输至该代理服务，凭据本身仅保存在您的设备本地。</li>
+  </ul>
+  <p>此外：</p>
+  <ul>
+    <li>Web 端访问页面时，静态资源由第三方云服务（GitHub Pages / EdgeOne Pages）分发，该等服务商可能出于安全与加速目的按其自身隐私条款处理基本网络信息（如 IP 地址）；</li>
+    <li>本应用不存在上述之外的其他网络通信。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>五、权限使用说明</h2>
+  <table>
+    <tr><th>平台</th><th>权限</th><th>用途</th><th>拒绝后果</th></tr>
+    <tr><td>全平台</td><td>网络访问（INTERNET）</td><td>账号登录、内容同步、版本更新检查、Web 页面加载</td><td>无法登录与同步账号内容，已缓存的本地内容仍可浏览</td></tr>
+    <tr><td>Android</td><td>安装应用（REQUEST_INSTALL_PACKAGES）</td><td>仅在您确认更新时调起系统安装器</td><td>无法自动安装更新</td></tr>
+    <tr><td>iOS / HarmonyOS</td><td>—</td><td>不申请任何敏感权限</td><td>—</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>六、数据存储与保留</h2>
+  <ul>
+    <li><strong>本地缓存</strong>：自生成起保留，直至您主动重置、清除站点数据或卸载应用；</li>
+    <li><strong>后端数据</strong>：账号信息与您发布的内容保存在本项目自托管的后端数据库（PostgreSQL），保留至您主动删除内容或注销账号；账号注销后，账号及其关联内容将在 15 个工作日内删除；</li>
+    <li><strong>服务运行日志</strong>：后端服务可能按行业惯例保留短期运行日志（如请求时间、错误信息）用于安全防护与故障排查，不包含您发布内容的正文。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>七、数据安全</h2>
+  <ul>
+    <li><strong>传输加密</strong>：与后端服务的所有通信均通过 HTTPS（TLS）加密传输，登录凭证与内容数据不以明文经过网络；</li>
+    <li><strong>账号隔离</strong>：服务端对每一次读写做账号归属校验，您的数据仅能被您的账号读取与修改；密码以 scrypt 加盐哈希形式存储，服务端不保存密码明文；</li>
+    <li><strong>更新完整性校验</strong>：Android 更新包经 SHA-256 摘要校验，桌面端更新经 Ed25519（minisign）数字签名验证，防止更新内容被篡改；</li>
+    <li><strong>本地存储保护</strong>：数据保存于操作系统沙盒或浏览器存储内，受系统安全机制保护；</li>
+    <li>尽管我们已采取上述措施，任何网络传输或电子存储方式都无法保证绝对安全；如发生个人信息安全事件，我们将依法及时告知您并向主管部门报告。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>八、未成年人保护</h2>
+  <ul>
+    <li>本应用面向具备完全民事行为能力的用户提供内容社区与工具服务，不专门面向未成年人设计；</li>
+    <li>我们不会有意收集未成年人的个人信息。若您是未成年人，请在监护人陪同下阅读本政策，并在取得监护人同意后使用本应用；</li>
+    <li>监护人如发现未成年人未经同意向我们提供了个人信息，可通过下述方式联系我们，我们将在核实后删除相关账号与数据。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>九、您的权利</h2>
+  <p>依据《中华人民共和国个人信息保护法》等法律法规，您享有以下权利：</p>
+  <ul>
+    <li><strong>知情权与决定权</strong>：本政策已完整披露本应用的各项数据处理活动；</li>
+    <li><strong>查阅与更正权</strong>：您可在应用内随时查看并修改您的账号资料与已发布内容；</li>
+    <li><strong>删除权</strong>：在应用内删除内容会同步删除云端对应记录；点击应用内 ♻️ 重置可清除本机缓存；账号注销后，账号及关联数据将在 15 个工作日内删除；</li>
+    <li><strong>注销权</strong>：您可通过本政策列明的联系方式提出账号注销申请；</li>
+    <li><strong>撤回同意</strong>：您可随时退出登录并停止使用本应用，撤回同意不影响撤回前基于您的同意已进行的处理。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>十、政策变更</h2>
+  <ul>
+    <li>若数据处理方式发生变化，我们将在本页面发布更新版本，并同步更新生效日期与版本号；</li>
+    <li>重大变更前，我们将在应用内显著提示，并在依法需要时重新征求您的同意。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>十一、联系我们</h2>
+  <ul>
+    <li><strong>开发者</strong>：afdk1991（个人开发者）</li>
+    <li><strong>反馈渠道</strong>：GitHub Issues — <a href="https://github.com/afdk1991/mim/issues" target="_blank" rel="noopener">https://github.com/afdk1991/mim/issues</a></li>
+    <li>我们将尽快处理您的反馈（一般不超过 15 个工作日）。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>十二、合规依据</h2>
+  <p>本政策的制定参考并遵循：</p>
+  <ul>
+    <li>《中华人民共和国个人信息保护法》（PIPL）</li>
+    <li>《中华人民共和国网络安全法》</li>
+    <li>《App 违法违规收集使用个人信息行为认定方法》</li>
+    <li>GB/T 35273《信息安全技术 个人信息安全规范》（参考）</li>
+    <li>华为 AppGallery 审核指南（隐私政策与权限要求）</li>
+    <li>Apple《App Store 审核指南》及 App 隐私标签要求</li>
+  </ul>
+</section>
+
+<footer>
+  本政策自 2026 年 10 月 28 日起生效 ｜ Mim · com.afdk1991.mim<br>
+  本页面为应用随附的隐私政策说明，随应用一同分发与更新。<br>
+  本应用后端为自托管服务：若您使用的是由第三方托管的实例，则该实例的数据处理方为该实例的运营者，其数据处理行为适用该运营者自己的隐私政策。
+</footer>
+
+</div>
+</body>
+</html>
