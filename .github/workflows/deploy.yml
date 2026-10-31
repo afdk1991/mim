@@ -168,6 +168,8 @@ jobs:
     # 可选层：worker/ 边缘网关（地理选路 + D1 只读副本），默认关闭。
     # 配好 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 后设 ENABLE_EDGE_DEPLOY=true 激活。
     if: github.ref == 'refs/heads/main' && vars.ENABLE_EDGE_DEPLOY == 'true'
+    # 可选层失败不影响整体 run 结论（主路线是服务器发布层）
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -201,6 +203,8 @@ jobs:
     # 可选层：Makers 正常由控制台连 Git 自动构建部署；本 job 用于 CI 侧主动触发重新部署。
     # 默认关闭，配好 EO_DEPLOY_HOOK_URL 或 EO_TOKEN 后设 ENABLE_MAKERS_DEPLOY=true 激活。
     if: github.ref == 'refs/heads/main' && vars.ENABLE_MAKERS_DEPLOY == 'true'
+    # 可选层失败不影响整体 run 结论（Makers 控制台连 Git 会自动部署，本 job 只是主动触发）
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
