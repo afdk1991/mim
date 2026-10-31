@@ -8,6 +8,7 @@ import { AppProviders } from './app/providers'
 import { Shell } from './app/shell'
 import { resolveRoute } from './app/routes'
 import { useRouter } from './app/router'
+import { BackendGate } from './app/backend-gate'
 import { hydrateWallet } from './app/state/wallet'
 import { refreshSession } from './data/session'
 import { loadRuntimeConfig } from './core/runtime-config'
@@ -31,10 +32,12 @@ export default function App() {
 
   return (
     <AppProviders>
-      <OtaBanner />
-      <Shell>
-        <Page />
-      </Shell>
+      <BackendGate>
+        <OtaBanner />
+        <Shell>
+          <Page />
+        </Shell>
+      </BackendGate>
     </AppProviders>
   )
 }

@@ -140,11 +140,14 @@ export async function signOut(): Promise<void> {
   clearSession()
 }
 
-/** 启动或 token 变更时校验会话有效性；失效则清空（避免带着坏令牌打所有接口） */
+/** 启动或 token 变更时校验会话有效性；失效则清空（避免带着坏令牌打所有接口）
+ * 离线 / 后端未配置时不清 token（保留本地态，待恢复后复用） */
 export async function refreshSession(): Promise<void> {
   if (!current.token) return
   const r = await authApi.me()
   if (!r.ok) {
+    // 后端不可达（未配置 / 探测失败 / 网络中断）：保留 token，等恢复后复用
+    if (r.error.code === 'offline') return
     clearSession()
     return
   }

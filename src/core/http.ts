@@ -10,8 +10,9 @@
 
 import { ERR_CN, err, fail, isErrCode, ok } from './result'
 import type { AppError, ErrCode, Result } from './result'
-import { API_BASE, isBackendConfigured } from './config'
+import { REQUEST_BASE, isBackendConfigured } from './config'
 import { getPlatform } from '../platform'
+import { markBackendOnline, markBackendOffline } from './backend-status'
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
@@ -64,19 +65,24 @@ async function once(path: string, opts: RequestOptions): Promise<Result<unknown>
   let raw: { ok: boolean; status: number; text: string }
   try {
     // 统一走平台适配层的 http 能力（web/capacitor 用 fetch，miniprogram 用 wx.request）
-    raw = await getPlatform().http.request(method, `${API_BASE}${path}`, {
+    raw = await getPlatform().http.request(method, `${REQUEST_BASE}${path}`, {
       headers,
       body,
       timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     })
   } catch (e) {
+    markBackendOffline()
     return fail('offline', ERR_CN.offline, e)
   }
 
   // 网络层失败（status=0，如超时 / DNS 不可达）：统一视为离线
   if (!raw.ok && raw.status === 0) {
+    markBackendOffline()
     return fail('offline', ERR_CN.offline)
   }
+
+  // 任何 2xx 都视为后端在线（健康信号回流给 backend-status）
+  if (raw.ok) markBackendOnline()
 
   const text = raw.text
   let payload: unknown = null

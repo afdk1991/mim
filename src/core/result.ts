@@ -17,6 +17,9 @@ export type ErrCode =
   | 'schema' // 线上库结构不匹配（缺列 / 缺表）
   | 'busy' // 并发冲突，可重试
   | 'server' // 5xx
+  | 'device_not_found' // 设备不存在（原 IoT 30101）
+  | 'device_offline' // 设备离线（原 IoT 30102）
+  | 'device_not_owned' // 设备未绑定或已被他人绑定（原 IoT 30103）
   | 'unknown'
 
 export interface AppError {
@@ -60,13 +63,16 @@ export function isErrCode(v: unknown): v is ErrCode {
     v === 'schema' ||
     v === 'busy' ||
     v === 'server' ||
+    v === 'device_not_found' ||
+    v === 'device_offline' ||
+    v === 'device_not_owned' ||
     v === 'unknown'
   )
 }
 
 /** 后端错误码 → 中文文案（唯一真源，页面不得各自翻译） */
 export const ERR_CN: Record<ErrCode, string> = {
-  offline: '后端未配置或网络不可达，已保存在本机',
+  offline: '后端未配置或暂不可达，数据已保存在本机',
   no_auth: '请先登录',
   forbidden: '没有操作权限',
   not_found: '资源不存在或已被删除',
@@ -75,6 +81,9 @@ export const ERR_CN: Record<ErrCode, string> = {
   schema: '线上数据结构尚未就绪，已保存在本机',
   busy: '系统繁忙，请稍后重试',
   server: '服务端异常，请稍后重试',
+  device_not_found: '设备不存在',
+  device_offline: '设备离线，请稍后重试',
+  device_not_owned: '设备未绑定或已被他人绑定',
   unknown: '操作失败，请稍后重试',
 }
 

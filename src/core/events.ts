@@ -27,6 +27,8 @@ export const EVT = {
   voice: 'mim:voice',
   /** 运行期站点配置（config_get 拉取完成 / 后台保存后覆盖） */
   siteConfig: 'mim:site-config',
+  /** 后端状态机变更（启动探测完成 / http 回灌 online-offline） */
+  backend: 'mim:backend',
 } as const
 
 export type EvtName = (typeof EVT)[keyof typeof EVT]
