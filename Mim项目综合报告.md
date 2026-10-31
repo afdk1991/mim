@@ -71,7 +71,7 @@ pages → app（路由/状态） → ui → domain（模型/规则）
 - **认证**：scrypt 加盐哈希（N=16384）+ HMAC-SHA256 自签令牌（jti 吊销），支持「首个管理员」环境变量引导
 - **REST 安全三层**：① 表白名单（`users` 永不在内）② 列白名单（information_schema 实时核定）③ 归属强制（owner 服务端注入）
 - **RPC 事务层**：秒杀抢购=行锁+条件更新+限购锁；券码服务端生成、`WHERE status='unused'` 一次性核销；钱包余额服务端原子计算；出行退票四道闸防重复退；成长计分服务端校时防刷
-- **迁移 0001→0007**：IAM(RBAC/审计/令牌吊销) → 内容 → 商城 → 四大业务 → 成长 → posts 增量同步水位 → **seckill_lock_items（订单粒度锁，0007 新增）**
+- **迁移 0001→0008**：IAM(RBAC/审计/令牌吊销) → 内容 → 商城 → 四大业务 → 成长 → posts 增量同步水位 → seckill_lock_items（订单粒度锁，0007 新增）→ **iot_device（物联网设备表，0008 新增）**
 - **额外能力**：`/api/storage` 本地磁盘对象存储（base64 上传、目录穿越防护）、`/api/sync/posts` 只读增量同步端点（X-Sync-Token 鉴权，`{data:{rows,next,has_more}}` 契约，供边缘层/镜像站拉取）
 
 ---
@@ -144,7 +144,7 @@ pages → app（路由/状态） → ui → domain（模型/规则）
 
 ### 7.3 本机连库实测 V1–V8 ✅（真实数据，非推断）
 
-**环境**：winget 无人值守安装 **PostgreSQL 17.11**（Windows 服务）→ `createdb mim` → 迁移 **0001~0007 全部应用** → `node server/src/main.js`（会话注入 DATABASE_URL/JWT_SECRET/SECKILL_LOCK_MS/SYNC_TOKEN）→ `/api/health` 返回 `{ok:true, db:true, rpcs:20}`。
+**环境**：winget 无人值守安装 **PostgreSQL 17.11**（Windows 服务）→ `createdb mim` → 迁移 **0001~0008 全部应用** → `node server/src/main.js`（会话注入 DATABASE_URL/JWT_SECRET/SECKILL_LOCK_MS/SYNC_TOKEN）→ `/api/health` 返回 `{ok:true, db:true, rpcs:20}`。
 
 **结果 7/7 通过，退出码 0**（脚本 `scripts/loadtest-v1-v8.mjs`，真实 HTTP + SQL 断言）：
 
@@ -179,7 +179,7 @@ pages → app（路由/状态） → ui → domain（模型/规则）
 
 - **修复 4 处**：server/README 四处滞后（rpcs 19→20、补 travel_issue、seckill_lock_items、/api/sync/posts 路由）；server/.env.example 补 VOUCHER_MAX_DAYS；package.json 补 3 个 verify npm 入口；docs/README 索引补代码审查报告
 - **登记 11 条 gap** → `docs/gaps.md`（GAP-01~05 + BE-003/004/005/006/007-008/SD-002-004）
-- **验证**：typecheck 0 / vitest 30/30 / build / server:check(10 文件) / loadtest --check 全通过；路由 57/57 一致；版本文件层 9/9 全绿
+- **验证**：typecheck 0 / 单测 `tests/` 2 个文件全过 / build / server:check(10 文件) / loadtest --check 全通过；路由 57/57 一致；版本文件层 9/9 全绿
 
 ---
 
@@ -243,7 +243,7 @@ pages → app（路由/状态） → ui → domain（模型/规则）
 |---|---|
 | `npm run typecheck` | ✅ 0 错误 |
 | `npm run build` | ✅ 通过 |
-| `npm run test`（vitest） | ✅ 30/30 |
+| `npm run test`（vitest） | ✅ `tests/` 下 2 个文件（`core-utils.test.ts`、`platform-contract.test.ts`）全过 |
 | `server:check`（node --check ×10） | ✅ 通过 |
 | 连库实测 loadtest V1–V8 | ✅ 7/7 通过（真实数据回填） |
 | YAML 解析（workflows + .gitee + wrangler） | ✅ 全过 |
@@ -311,7 +311,7 @@ dec51ab deploy: 无 Docker 部署方案落地
 | CI | `.github/workflows/`（deploy/build/build-release/deploy-release/mirror/release-notes）+ `.gitee/pipeline.yml` |
 | 可选边缘层 | `worker/`（src/index.ts + wrangler.jsonc + package.json + migrations/0001_init.sql） |
 | 文档 | `docs/README.md`（索引）、`docs/archive/`（归档）、`docs/rebuild/`（现行规范） |
-| 迁移 | `server/db/migrations/0001~0007` |
+| 迁移 | `server/db/migrations/0001~0008` |
 
 ---
 

@@ -137,7 +137,7 @@ cd /opt/mim && npm run build
 
 | 作业 | 触发条件 | 步骤 |
 | --- | --- | --- |
-| `verify`（类型检查与构建） | push / PR 到 `main`、`workflow_dispatch` | `npm ci` → `npm run typecheck` → `npm run build`（注入 `VITE_MIM_API_BASE`）→ 上传 `dist` 为 Pages 产物 |
+| `verify`（类型检查与构建） | push / PR 到 `main`、`workflow_dispatch` | `npm install` → `npm run typecheck` → `npm run build`（注入 `VITE_MIM_API_BASE`）→ 上传 `dist` 为 Pages 产物 |
 | `deploy-pages` | 仅 `refs/heads/main`，`needs: verify` | `actions/deploy-pages@v4` |
 
 需要配两件事：
@@ -156,7 +156,7 @@ cd /opt/mim && npm run build
 `vite.config.ts` 里 `base: './'`、路由是自研 hash 路由（`src/app/router.tsx`），产物对路径不敏感。
 
 ```bash
-npm ci
+npm install
 VITE_MIM_API_BASE= npm run build          # 留空 → 同源 /api
 ```
 

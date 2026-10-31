@@ -41,10 +41,38 @@ jobs:
       - name: 禁止容器化产物
         # 本项目全程不使用 Docker（部署方式是宿主机直部署 + systemd，见 deploy/README.md）。
         # 这道闸门把约定变成机器可校验的约束，防止将来有人顺手把 Dockerfile 或 compose 加回来。
+        # 加固：在原有单层扩展名检查之外，额外拦截双扩展名残留（*.yml.yml / *.sh.sh / *.ts.ts /
+        # *.yaml.yaml / *.json.json），并以文件内容关键字（docker-compose / FROM / image:）做兜底扫描。
         run: |
-          hit=$(git ls-files | grep -Ei '(^|/)(Dockerfile|docker-compose\.ya?ml|\.dockerignore)$' || true)
-          if [ -n "$hit" ]; then
-            echo "::error::本项目不使用容器：$hit"
+          # 仅当处于 git 工作树内才扫描仓库文件；非 git 仓库（罕见）跳过本闸门，避免命令失败。
+          if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "::notice::非 git 仓库，跳过禁容器闸门"
+            exit 0
+          fi
+
+          hits=""
+
+          # 1) 单层扩展名：Dockerfile / docker-compose.y(a)ml / .dockerignore
+          h1=$(git ls-files | grep -Ei '(^|/)(Dockerfile|docker-compose\.ya?ml|\.dockerignore)$' || true)
+          [ -n "$h1" ] && hits="$hits$h1"$'\n'
+
+          # 2) 双扩展名残留：*.yml.yml / *.sh.sh / *.ts.ts / *.yaml.yaml / *.json.json
+          h2=$(git ls-files | grep -Ei '\.(ya?ml|sh|ts|json)\.(ya?ml|sh|ts|json)$' || true)
+          [ -n "$h2" ] && hits="$hits$h2"$'\n'
+
+          # 3) 内容关键字兜底：docker-compose / FROM (Dockerfile 标记) / image: (compose 镜像字段)。
+          #    仅扫描可能成为容器产物的 YAML / Dockerfile / .dockerignore，并排除 .github/ 工作流
+          #    （其注释/字符串常含 image:、docker-compose，属正常 CI 配置，并非容器产物）。
+          h3=$(git ls-files \
+                 | grep -Ei '\.ya?ml$|/Dockerfile$|\.dockerfile$|\.dockerignore$' \
+                 | grep -v '^\.github/' \
+                 | xargs -I{} grep -IliE 'docker-compose|^FROM |image:' {} 2>/dev/null \
+                 || true)
+          [ -n "$h3" ] && hits="$hits$h3"$'\n'
+
+          if [ -n "$hits" ]; then
+            echo "::error::本项目不使用容器，命中以下文件/内容："
+            printf '%s\n' "$hits"
             exit 1
           fi
       - name: 类型检查

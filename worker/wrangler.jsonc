@@ -17,9 +17,10 @@
 
   // 上游地址（替换为实际值；带 Makers 的变量留空字符串即不启用该容灾路径）
   "vars": {
-    // 后端尚未部署：留空即禁用主站上游（probe 返回 false，请求走降级页）。
-    // 服务器上线后回填真实地址（如 https://mim.example.com）并重新 wrangler deploy
-    "OCI_TUNNEL": "",
+    // 主站上游地址。当前指向本机后端的临时公网隧道（cloudflared quick tunnel，会话级有效）。
+    // 生产环境应替换为真实主站域名（如 https://mim.example.com）并重新 wrangler deploy。
+    // 留空字符串 = 禁用主站上游（probe 返回 false，请求走降级路径）。
+    "OCI_TUNNEL": "https://path-algorithm-measured-networking.trycloudflare.com",
     "MAKERS_ORIGIN": "",
     "CN_MAKERS_ORIGIN": "",
     "CN_ORIGIN": "",

@@ -1,5 +1,6 @@
 // 移动端视口实测：用 --window-size + setViewportSize 绕过 headless innerWidth 退化
 import { chromium } from 'playwright-core'
+import { mkdirSync } from 'node:fs'
 import { resolveBrowser } from './lib/browser.mjs'
 
 const EDGE = resolveBrowser()
@@ -56,6 +57,7 @@ if (fails.length) fails.forEach((f) => console.log(`  问题页 ${f.r}: innerWid
 
 await page.goto(`${BASE}/#/feed`, { waitUntil: 'domcontentloaded' })
 await page.waitForTimeout(600)
+mkdirSync('verify-shots', { recursive: true })
 await page.screenshot({ path: 'verify-shots/mobile-feed.png' })
 await browser.close()
 process.exit(fails.length > 0 ? 1 : 0)

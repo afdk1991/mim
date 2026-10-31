@@ -4,6 +4,7 @@
  * 与后端 GET /api/sync/posts 配对的调用方实现：
  *   1. 从本地 state.json 读上次水位 since（首次为 0）
  *   2. 按 since → next 循环翻页，直到 has_more === false
+ *      （游标视为不透明字符串：不解析、不构造，原样回传；服务端兼容旧版纯数字水位）
  *   3. 按 id 合并进 posts.json（同一 id 用新版本覆盖），再原子写回
  *   4. 水位单独落盘，因此进程中断后重跑会从断点继续，不会重拉全量
  *
@@ -62,7 +63,7 @@ async function writeJsonAtomic(file, value) {
 
 /** 拉一页；失败时把 HTTP 状态挂在 error.status 上，供重试判断 */
 async function fetchPage(since) {
-  const url = `${BASE}/api/sync/posts?since=${since}&limit=${LIMIT}`
+  const url = `${BASE}/api/sync/posts?since=${encodeURIComponent(since)}&limit=${LIMIT}`
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
   try {
@@ -120,25 +121,10 @@ async function withRetry(fn) {
   throw last
 }
 
-/** 复合游标排序键：(ts, id) 元组，用于判断水位是否前进 */
-function cursorKey(c) {
-  const comma = String(c).indexOf(',')
-  const ts = comma === -1 ? Number(c) : Number(String(c).slice(0, comma))
-  const id = comma === -1 ? '' : String(c).slice(comma + 1)
-  return [Number.isFinite(ts) ? ts : 0, id]
-}
-
-function cursorGt(a, b) {
-  const [ats, aid] = cursorKey(a)
-  const [bts, bid] = cursorKey(b)
-  return ats > bts || (ats === bts && aid > bid)
-}
-
-/** 按身份隔离的复合游标读取：state.next 可能是 "毫秒,id" 或旧版纯数字 */
+/** 游标读取：不透明字符串原样透传（服务端兼容旧版纯数字水位，首次为 0） */
 function readCursor(state) {
   if (!state || state.next == null) return '0'
-  const s = String(state.next)
-  return s.includes(',') ? s : `${s},`
+  return String(state.next)
 }
 
 async function main() {
@@ -173,9 +159,8 @@ async function main() {
       since = page.next
       break
     }
-    if (!cursorGt(page.next, since)) {
-      console.warn(`  ! 水位未前进（${since} → ${page.next}），停止翻页以免死循环`)
-      since = page.next
+    if (page.next === since) {
+      console.warn(`  ! 水位未前进（${since}），停止翻页以免死循环`)
       break
     }
     since = page.next

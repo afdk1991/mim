@@ -125,7 +125,7 @@ bash "$MIM_DIR/deploy/init-db.sh"
 # ---------- 7. 安装依赖与构建 ----------
 log "7/10 安装依赖"
 cd "$MIM_DIR"
-npm install --no-audit --no-fund
+npm install --omit=dev --no-audit --no-fund
 npm --prefix server install --omit=dev --no-audit --no-fund
 
 if [ "$SKIP_BUILD" = "1" ]; then

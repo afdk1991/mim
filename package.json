@@ -20,6 +20,7 @@
     "server:migrate": "npm --prefix server run migrate",
     "server:check": "npm --prefix server run check",
     "server:health": "node scripts/server-health.mjs",
+    "sync:pull": "node scripts/sync-pull.mjs",
     "verify:routes": "node scripts/verify-routes.mjs",
     "verify:backend": "node scripts/verify-backend.mjs",
     "verify:feed": "node scripts/verify-feed-growth.mjs",

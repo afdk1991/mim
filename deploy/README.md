@@ -456,7 +456,7 @@ curl -fsS -H "x-sync-token: $SYNC_TOKEN" \
 
 | 参数 | 说明 |
 | --- | --- |
-| `since` | 上次拿到的 `next` 水位（毫秒时间戳），首次传 `0` |
+| `since` | 上次拿到的 `next` 水位，首次传 `0`。服务端返回 `"毫秒,id"` 复合游标（同毫秒靠 id 定序），调用方按**不透明字符串**原样回传，不要解析或自行构造 |
 | `limit` | 单次返回条数，默认 200，上限 500 |
 
 请求头 `x-sync-token` 必须等于 `SYNC_TOKEN`；**未配置 `SYNC_TOKEN` 时端点直接关闭**（403），
@@ -464,6 +464,19 @@ curl -fsS -H "x-sync-token: $SYNC_TOKEN" \
 
 语义约束：只返回 `visibility = 'public'` 且未过期的动态；水位取 `updated_at`，编辑过的旧动态
 也会被同步；同一 `since` 反复请求结果稳定。
+
+配套调用方脚本（本仓库 `scripts/sync-pull.mjs`，已注册为 npm script）：
+
+```bash
+# 令牌与服务端 .env 的 SYNC_TOKEN 一致（openssl rand -hex 32 生成的那份）
+SYNC_TOKEN=xxxx npm run sync:pull                          # 默认打 http://127.0.0.1:8787
+SYNC_TOKEN=xxxx npm run sync:pull -- https://mim.example.com   # 指定后端地址
+```
+
+脚本从 `data/sync/state.json` 读上次水位循环翻页，按 id 合并后原子写入
+`data/sync/posts.json`，水位单独落盘——进程中断重跑会从断点继续，不会重拉全量。
+可用环境变量覆盖默认值：`SYNC_OUT` / `SYNC_STATE` / `SYNC_LIMIT` / `SYNC_MAX_PAGES` /
+`SYNC_TIMEOUT_MS`。退出码：缺令牌为 2，其余失败为 1。
 
 ---
 
