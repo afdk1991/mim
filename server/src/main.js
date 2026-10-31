@@ -17,6 +17,8 @@ import * as rest from './rest.js'
 import { callRpc, knownRpcs, sweepSeckillLocks } from './rpc.js'
 import * as storage from './storage.js'
 import { checkSyncToken, syncPosts } from './sync.js'
+import * as iot from './iot.js'
+import { ingest } from './events.js'
 import { toApiError, badRequest } from './errors.js'
 
 const PORT = Number(process.env.PORT ?? 8787)
@@ -101,6 +103,15 @@ async function route(req, res, url) {
     return ok(res, { service: 'mim-server', hello: true, ts: Date.now() })
   }
 
+  /* --- 埋点摄取：允许匿名（app_launch/首帧都发生在登录之前）---
+   * 令牌坏了不连坐：降级为匿名上报，避免前端拿 401 反复重试刷爆日志。
+   * user_id 由服务端按令牌回填，请求体里带什么 uid 都不认。 */
+  if (restPath === '/events' && method === 'POST') {
+    const ctx = await tryAuth(req).catch(() => null)
+    const ip = req.socket?.remoteAddress ?? ''
+    return ok(res, await ingest(ctx, await readBody(req), { ip }), 202)
+  }
+
   /* --- 认证 --- */
   if (restPath === '/auth/register') {
     const body = await readBody(req)
@@ -148,6 +159,38 @@ async function route(req, res, url) {
   if (restPath === '/sync/posts' && method === 'GET') {
     checkSyncToken(req)
     return ok(res, await syncPosts(searchParams))
+  }
+
+  /* --- IoT 长连接网关（10 号文 §2） ---
+   * EMQX 钩子/上行用共享密钥鉴权，响应契约是 EMQX 约定的 { result }；
+   * App 侧指令接口走用户鉴权 + 常规 { data } 包装。 */
+  if (restPath === '/iot/hook/auth' && method === 'POST') {
+    iot.checkHookToken(req)
+    return json(res, 200, await iot.hookAuth(await readBody(req)))
+  }
+  if (restPath === '/iot/hook/acl' && method === 'POST') {
+    iot.checkHookToken(req)
+    return json(res, 200, await iot.hookAcl(await readBody(req)))
+  }
+  if (restPath === '/iot/hook/event' && method === 'POST') {
+    iot.checkHookToken(req)
+    return json(res, 200, await iot.hookEvent(await readBody(req)))
+  }
+  if (restPath === '/iot/uplink' && method === 'POST') {
+    iot.checkHookToken(req)
+    return ok(res, await iot.uplink(await readBody(req)))
+  }
+  if (restPath.startsWith('/iot/devices/')) {
+    const seg = restPath.slice('/iot/devices/'.length).split('/').filter(Boolean).map(decodeURIComponent)
+    if (seg.length === 2 && seg[1] === 'command' && method === 'POST') {
+      const ctx = await authenticate(req)
+      return ok(res, await iot.sendCommand(ctx, seg[0], await readBody(req)), 201)
+    }
+    if (seg.length === 3 && seg[1] === 'command' && method === 'GET') {
+      const ctx = await authenticate(req)
+      return ok(res, await iot.commandStatus(ctx, seg[0], seg[2]))
+    }
+    throw badRequest('未知设备接口')
   }
 
   /* --- RPC --- */

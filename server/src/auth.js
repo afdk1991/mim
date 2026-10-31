@@ -11,6 +11,7 @@
 import { randomBytes, scrypt, createHmac, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { query, one } from './db.js'
+import { jwtSecret } from './secrets.js'
 import { badRequest, conflict, forbidden, noAuth } from './errors.js'
 
 const scryptAsync = promisify(scrypt)
@@ -20,13 +21,15 @@ const r = 8
 const p = 1
 const KEYLEN = 64
 
-const DEV_SECRET = 'mim-dev-secret-change-me'
-const secret = process.env.JWT_SECRET || DEV_SECRET
+/* 密钥统一由 secrets.js 裁决：
+ *   生产缺失/弱密钥 → 该模块在加载期抛错，进程起不来（fail-fast）；
+ *   开发缺失        → 随机串，而不是写死在源码里的公开常量。
+ * 历史上这里写死 'mim-dev-secret-change-me'，等于公开签发权，必须根除。 */
+const secret = jwtSecret()
 const ttlMs = Number(process.env.TOKEN_TTL_MS ?? 7 * 24 * 3600 * 1000)
 
-if (!process.env.JWT_SECRET) {
-  console.warn('[auth] 未设置 JWT_SECRET，正在使用开发用默认密钥——生产部署必须显式设置')
-}
+/** 令牌寿命上限：即使将来有人动了签发逻辑，也不允许出现「百年不过期」的令牌 */
+const MAX_TOKEN_LIFETIME_MS = Math.max(ttlMs, 30 * 24 * 3600 * 1000)
 
 /* ---------- 密码 ---------- */
 
@@ -82,7 +85,12 @@ export function parseToken(token) {
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
     if (typeof payload?.uid !== 'string' || !payload.uid) return null
-    if (typeof payload.exp === 'number' && payload.exp < Date.now()) return null
+    // 必须带 exp：否则一份漏签 exp 的令牌就是「永不过期」，登出/停用都奈何不了它
+    if (typeof payload.exp !== 'number') return null
+    if (payload.exp < Date.now()) return null
+    // 寿命上限兜底：签发方若被改坏（或 exp 被手工放大），这里仍能拦住超长寿命令牌
+    if (typeof payload.iat === 'number' && payload.exp - payload.iat > MAX_TOKEN_LIFETIME_MS) return null
+    if (typeof payload.iat !== 'number' && payload.exp - Date.now() > MAX_TOKEN_LIFETIME_MS) return null
     return payload
   } catch {
     return null

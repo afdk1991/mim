@@ -71,10 +71,12 @@ import {
 
 import {
   AdminAuditPage,
+  AdminDevicesPage,
   AdminHomePage,
   AdminProductsPage,
   AdminRechargePage,
   AdminRolesPage,
+  AdminVerifyPage,
   GrowthPage,
   InfoPage,
   LoginPage,
@@ -211,6 +213,8 @@ export function resolveRoute(path: string, query: URLSearchParams): ReactNode {
       if (param === 'roles') return <AdminRolesPage />
       if (param === 'products') return <AdminProductsPage />
       if (param === 'recharge') return <AdminRechargePage />
+      if (param === 'verify') return <AdminVerifyPage />
+      if (param === 'devices') return <AdminDevicesPage />
       return <AdminHomePage />
 
     default:

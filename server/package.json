@@ -12,7 +12,7 @@
     "start": "node src/main.js",
     "migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/promote-admin.js",
-    "check": "node --check src/main.js && node --check src/db.js && node --check src/auth.js && node --check src/rest.js && node --check src/rpc.js && node --check src/storage.js && node --check src/sync.js && node --check src/errors.js && node --check scripts/migrate.js && node --check scripts/promote-admin.js"
+    "check": "node --check src/main.js && node --check src/db.js && node --check src/auth.js && node --check src/rest.js && node --check src/rpc.js && node --check src/storage.js && node --check src/sync.js && node --check src/iot.js && node --check src/errors.js && node --check scripts/migrate.js && node --check scripts/promote-admin.js"
   },
   "dependencies": {
     "pg": "^8.23.1"

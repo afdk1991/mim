@@ -15,6 +15,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { one, query, tx } from './db.js'
 import { badRequest, conflict, forbidden, notFound, schemaError } from './errors.js'
+import { eventSummary } from './events.js'
 
 const DAY_MS = 86_400_000
 const SEC_LOCK_MS = Number(process.env.SECKILL_LOCK_MS ?? 15 * 60 * 1000)
@@ -236,25 +237,60 @@ async function travel_book(ctx, p) {
   })
 }
 
-/** 出行释放：回滚某票种某日库存（取消未支付订单）。
- *  p_order_id 必填：必须凭「本人且未支付」的订单才能加库存，否则任意登录用户
- *  可对任意 (票种, 日期) 无凭据地放大 remaining，击穿防超卖的库存水位。 */
+/**
+ * 出行释放：回滚某票种某日库存（取消未支付订单）。
+ *
+ * p_order_id 必填：必须凭「本人且未支付」的订单才能加库存，否则任意登录用户
+ * 可对任意 (票种, 日期) 无凭据地放大 remaining，击穿防超卖的库存水位。
+ *
+ * R7 —— 原来有三个问题，本次一并修掉：
+ *   ① 信任前端传的 p_qty：伪造超大数量即可凭空放大库存 → 现在数量一律从订单本身反查，
+ *      p_qty 即使传了也被忽略。
+ *   ② 不在事务内（旧实现是 one() → query() 两步，存在读后写窗口）
+ *      → 现在整体包在 tx() 内，并用 for update 锁住订单行。
+ *   ③ 无幂等：重复调用会重复回补 → 现在用订单 ext.released 标记，与本笔回补同事务写入，
+ *      同一订单第二次调用直接返回 released:0 / reused:true。
+ */
 async function travel_release(ctx, p) {
   const ticketId = str(p, 'p_ticket_id', { max: 200 })
   const date = dateParam(p, 'p_date')
-  const qty = int(p, 'p_qty', { min: 1, max: 999 })
   const orderId = str(p, 'p_order_id', { max: 200 })
 
-  const o = await one('select id, user_id, status from mall_orders where id = $1', [orderId])
-  if (!o) throw notFound('订单不存在')
-  if (o.user_id !== ctx.uid) throw forbidden('只能操作自己的订单')
-  if (o.status !== 'unpaid') return { released: 0, reason: 'order_not_unpaid' }
-  const up = await query(
-    'update travel_date_stock set remaining = remaining + $1 where ticket_id = $2 and date = $3 returning remaining',
-    [qty, ticketId, date],
-  )
-  if (!up.rows.length) throw notFound('该日期库存不存在')
-  return { released: qty, remaining: up.rows[0].remaining }
+  return tx(async (c) => {
+    const o = (
+      await c.query('select id, user_id, status, qty, ext from mall_orders where id = $1 for update', [orderId])
+    ).rows[0]
+    if (!o) throw notFound('订单不存在')
+    if (o.user_id !== ctx.uid) throw forbidden('只能操作自己的订单')
+
+    // 已支付/已完成订单不在此释放（那属于退票 travel_refund 的领地）
+    if (o.status !== 'unpaid') return { released: 0, reason: 'order_not_unpaid' }
+
+    const ext = o.ext ?? {}
+    if (ext.released === true) return { released: 0, reused: true, reason: 'already_released' }
+
+    // 数量只认订单自身：ext.passengerCount（下单快照）优先，其次订单 qty，兜底 1。
+    // 绝不读请求里的 p_qty —— 那是可被伪造的输入。
+    const qty = Math.max(1, Math.min(Number(ext.passengerCount ?? o.qty ?? 1) || 1, 999))
+
+    const up = await c.query(
+      `update travel_date_stock set remaining = remaining + $1 where ticket_id = $2 and date = $3 returning remaining`,
+      [qty, ticketId, date],
+    )
+    if (!up.rows.length) throw notFound('该日期库存不存在')
+
+    // 幂等标记与回补同事务：要么都成功，要么一起回滚，不会出现「库存加了但没标记」。
+    await c.query(
+      `update mall_orders
+          set ext = coalesce(ext, '{}'::jsonb)
+                      || jsonb_build_object('released', true, 'released_at', $2::bigint, 'released_qty', $3::int),
+              updated_at = now()
+        where id = $1`,
+      [orderId, Date.now(), qty],
+    )
+
+    return { released: qty, remaining: Number(up.rows[0].remaining) }
+  })
 }
 
 /**
@@ -402,13 +438,22 @@ async function travel_issue(ctx, p) {
   })
 }
 
-/** 支付后发码：幂等（同订单返回原码）、未支付拒绝、有效期 least(voucher.valid_until, now+90d) */
+/**
+ * 支付后发码：幂等（同订单返回原码）、未支付拒绝、有效期 least(voucher.valid_until, now+90d)
+ *
+ * R6 服务端库存扣减：成交必须真实减少 local_vouchers.remaining，「剩余 N 份」
+ *   才是可信的库存账。用条件更新 remaining >= take 扣减，库存不足即拒绝，防超卖。
+ * R10 并发取码兜底：并发双击时另一事务可能刚写完同一 order_id 的码行
+ *   （local_voucher_codes UNIQUE(order_id)），此时不再把唯一冲突以 500 抛给用户，
+ *   而是回读原码返回 reused=true —— 用户得到同一个码，而不是一个报错。
+ */
 async function issue_voucher_code(ctx, p) {
   const orderId = str(p, 'p_order_id', { max: 200 })
   const voucherId = str(p, 'p_voucher_id', { max: 200 })
 
   return tx(async (c) => {
-    const v = (await c.query('select * from local_vouchers where id = $1', [voucherId])).rows[0]
+    // 锁套餐行：同一套餐的并发取码在此串行化，配合唯一索引彻底消除超卖/重发窗口
+    const v = (await c.query('select * from local_vouchers where id = $1 for update', [voucherId])).rows[0]
     if (!v) throw notFound('套餐券不存在')
 
     const o = (await c.query('select * from mall_orders where id = $1', [orderId])).rows[0]
@@ -419,6 +464,9 @@ async function issue_voucher_code(ctx, p) {
     const exist = (await c.query('select code, expire_at from local_voucher_codes where order_id = $1', [orderId])).rows[0]
     if (exist) return { code: exist.code, expire_at: exist.expire_at, reused: true }
 
+    // 本单要核销的份数（本地生活一般 1 份，允许按订单 qty 多份）
+    const take = Math.max(1, Math.min(Number(o.qty ?? 1) || 1, 999))
+
     const now = Date.now()
     const code = createHash('md5')
       .update(`${orderId}|${voucherId}|${randomUUID()}`)
@@ -427,11 +475,36 @@ async function issue_voucher_code(ctx, p) {
       .toUpperCase()
     const expireAt = Math.min(Number(v.valid_until), now + VOUCHER_MAX_MS)
 
-    await c.query(
+    // R10：并发下另一事务可能刚写完同一 order_id 的码行（local_voucher_codes UNIQUE(order_id)）。
+    // 这里刻意用 `on conflict do nothing` 而不用 try/catch 23505 —— 因为 PG 一旦语句报错，
+    // 整个事务就进入中止态，后续语句一律 25P02「current transaction is aborted」，
+    // catch 之后回读同样读不到。on conflict 不产生错误，事务保持健康：
+    // returning 为空即说明这一单的码刚被别人发过。
+    const ins = await c.query(
       `insert into local_voucher_codes (code, order_id, voucher_id, merchant_id, user_id, status, expire_at)
-       values ($1, $2, $3, $4, $5, 'unused', $6)`,
+       values ($1, $2, $3, $4, $5, 'unused', $6)
+       on conflict (order_id) do nothing
+       returning code, expire_at`,
       [code, orderId, voucherId, v.merchant_id, ctx.uid, expireAt],
     )
+    if (!ins.rows.length) {
+      // 并发重复取码：回读已存在的那个码，原样返回，并且不能再扣库存
+      const dupe = (
+        await c.query('select code, expire_at from local_voucher_codes where order_id = $1', [orderId])
+      ).rows[0]
+      if (dupe) return { code: dupe.code, expire_at: dupe.expire_at, reused: true }
+      throw conflict('券码生成失败，请重试')
+    }
+
+    // R6：真实扣减库存。remaining 不足时 affected=0 → 抛错 → 整个事务回滚（连同刚插的码行），
+    // 保证「发码成功」与「库存已扣」同生共死，不会出现「有码但没占库存」的脏账。
+    const stock = await c.query(
+      `update local_vouchers set remaining = remaining - $1
+        where id = $2 and remaining >= $1 returning remaining`,
+      [take, voucherId],
+    )
+    if (!stock.rows.length) throw conflict('该套餐券库存不足，已售罄')
+
     await c.query(
       `update mall_orders
           set biz_status = coalesce(biz_status, 'pending_verify'),
@@ -440,7 +513,7 @@ async function issue_voucher_code(ctx, p) {
         where id = $1`,
       [orderId, code],
     )
-    return { code, expire_at: expireAt, reused: false }
+    return { code, expire_at: expireAt, reused: false, remaining: Number(stock.rows[0].remaining) }
   })
 }
 
@@ -497,13 +570,47 @@ async function wallet_state(ctx) {
     'select id, kind, fen, note, at from wallet_txs where user_id = $1 order by at desc limit 50',
     [ctx.uid],
   )
-  return { balance_fen: Number(b?.balance_fen ?? 0), plan: b?.plan ?? 'BASIC', txns: txs.rows }
+  return { balance_fen: Number(b?.balance_fen ?? 0), plan: b?.plan ?? 'BASIC', txs: txs.rows }
 }
 
+/**
+ * 钱包扣款 —— 服务端计算余额、服务端原子扣（客户端传余额 = 任意改余额）。
+ *
+ * R8 业务幂等键：新增可选 `p_order_id`（业务单据号，通常是订单号）。
+ *   为什么是「业务单据号」而不是请求级 nonce：nonce 挡不住「同一个业务动作被重试」——
+ *   重试会带上新的 nonce，照样穿透去重，用户还是被多扣一次。
+ *   幂等语义：同一 (用户, 单据) 只允许产生一条 consume 流水；重复提交返回上次结果。
+ */
 async function wallet_debit(ctx, p) {
   const fen = int(p, 'p_fen', { min: 1, max: 100_000_000_000 })
   const note = p.p_note === undefined || p.p_note === null ? '' : str(p, 'p_note', { min: 0, max: 200 })
+  const bizKey =
+    p.p_order_id === undefined || p.p_order_id === null || p.p_order_id === ''
+      ? ''
+      : str(p, 'p_order_id', { max: 200 })
+
   return tx(async (c) => {
+    if (bizKey) {
+      // 事务级咨询锁：把「同一张业务单据的扣款」串行化，下面的去重 SELECT 才是可靠的。
+      // 为什么不靠「唯一索引冲突报错再回滚」：PG 语句报错会中止整个事务（25P02），
+      // catch 也救不回来、还可能让本该幂等的请求变成 500。锁住窗口 > 事后救火。
+      // 唯一索引 uq_wallet_txs_consume_bizkey（迁移 0010）保留为第二道硬闸。
+      await c.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [`wallet_debit:${bizKey}`])
+
+      const dupe = (
+        await c.query(
+          `select id, fen from wallet_txs
+            where user_id = $1 and kind = 'consume' and snapshot ->> 'debit_order_id' = $2
+            limit 1`,
+          [ctx.uid, bizKey],
+        )
+      ).rows[0]
+      if (dupe) {
+        const bal = await c.query('select balance_fen from wallet_balances where user_id = $1', [ctx.uid])
+        return { balance_fen: Number(bal.rows[0]?.balance_fen ?? 0), fen: Number(dupe.fen), reused: true }
+      }
+    }
+
     const up = await c.query(
       `update wallet_balances set balance_fen = balance_fen - $1, updated_at = now()
         where user_id = $2 and balance_fen >= $1 returning balance_fen`,
@@ -511,10 +618,11 @@ async function wallet_debit(ctx, p) {
     )
     if (!up.rows.length) throw conflict('余额不足')
     await c.query(
-      `insert into wallet_txs (user_id, kind, fen, note, at) values ($1, 'consume', $2, $3, $4)`,
-      [ctx.uid, fen, note, Date.now()],
+      `insert into wallet_txs (user_id, kind, fen, note, snapshot, at)
+       values ($1, 'consume', $2, $3, $4::jsonb, $5)`,
+      [ctx.uid, fen, note, bizKey ? JSON.stringify({ debit_order_id: bizKey }) : null, Date.now()],
     )
-    return { balance_fen: Number(up.rows[0].balance_fen), fen }
+    return { balance_fen: Number(up.rows[0].balance_fen), fen, reused: false }
   })
 }
 
@@ -811,6 +919,390 @@ async function admin_wallet_ledger(ctx, p) {
   return { rows: r.rows }
 }
 
+/* ==========================================================================
+ * 设备域：绑定 / 解绑 / 状态查询 / 管理后台（后端 B 主责）
+ *
+ * 绑定为什么必须走 RPC 而不是开放 devices 的 REST 写：
+ *   devices.owner_id 是归属列。一旦允许客户端 REST 写 devices.owner_id，
+ *   任意登录用户都能把别人的设备改到自己名下（或解绑别人的设备）——
+ *   归属转移只能由服务端按「当前归属 + 序列号」双重裁定，客户端不能自证。
+ *
+ * devices / device_commands 因此刻意不进 rest.js 的 TABLES 白名单，
+ * 全部访问收口到本节 RPC（DBA/安全结论见 docs/specs/账号与权限模型.md）。
+ * ======================================================================== */
+
+const OTA_STAGES = ['download', 'download_ok', 'install', 'success', 'failed', 'rollback']
+const OTA_PKG_STATUS = ['draft', 'published', 'paused', 'revoked']
+
+/** 审计留痕：detail 统一 jsonb，target_id 是 text，务必 String 化（见 bootstrap_admin 注释） */
+async function writeAudit(c, uid, action, targetType, targetId, detail = {}) {
+  await c.query(
+    `insert into audit_logs (actor_id, action, target_type, target_id, detail)
+     values ($1, $2, $3, $4, $5::jsonb)`,
+    [uid, action, targetType, String(targetId), JSON.stringify(detail ?? {})],
+  )
+}
+
+/** 设备归属裁定：越权一律 forbidden，不存在一律 notFound（不泄漏设备是否存在） */
+async function loadOwnedDevice(c, ctx, deviceId) {
+  const d = (
+    await c.query('select id, sn, model, owner_id, status, fw_version, build from devices where id = $1', [deviceId])
+  ).rows[0]
+  if (!d) throw notFound('设备不存在')
+  if (d.owner_id !== ctx.uid && !ctx.isAdmin()) throw forbidden('只能操作自己绑定的设备')
+  return d
+}
+
+/** 绑定：序列号自证 + 抢占拦截。重复绑定同一台是幂等的（返回 reused）。 */
+async function device_bind(ctx, p) {
+  const deviceId = str(p, 'p_device_id', { max: 200 })
+  const sn = p.p_sn === undefined || p.p_sn === null ? '' : str(p, 'p_sn', { max: 200 })
+
+  return tx(async (c) => {
+    const d = (
+      await c.query('select id, sn, owner_id, status from devices where id = $1 for update', [deviceId])
+    ).rows[0]
+    if (!d) throw notFound('设备不存在')
+    // 序列号为第二凭证：只拿 device_id 猜不到也无法绑定（设备 id 印在机身上，sn 在包装内）
+    if (sn && d.sn !== sn) throw forbidden('设备序列号不匹配，无法绑定')
+    if (d.owner_id && d.owner_id !== ctx.uid) throw conflict('该设备已被其他账号绑定')
+    if (d.owner_id === ctx.uid) return { device_id: d.id, status: d.status, reused: true }
+
+    await c.query(
+      `update devices
+          set owner_id = $1,
+              status = case when status = 'pending_activate' then 'offline' else status end,
+              activated_at = coalesce(activated_at, now()),
+              updated_at = now()
+        where id = $2`,
+      [ctx.uid, deviceId],
+    )
+    await writeAudit(c, ctx.uid, 'device_bind', 'device', deviceId, { sn: d.sn })
+    return { device_id: deviceId, status: 'offline', reused: false }
+  })
+}
+
+/** 解绑：仅当前归属者可解，回到待激活态 */
+async function device_unbind(ctx, p) {
+  const deviceId = str(p, 'p_device_id', { max: 200 })
+  return tx(async (c) => {
+    const d = await loadOwnedDevice(c, ctx, deviceId)
+    if (!d.owner_id) return { device_id: deviceId, status: d.status, reused: true }
+    await c.query(
+      `update devices set owner_id = null, status = 'pending_activate', updated_at = now() where id = $1`,
+      [deviceId],
+    )
+    await writeAudit(c, ctx.uid, 'device_unbind', 'device', deviceId, {})
+    return { device_id: deviceId, status: 'pending_activate', reused: false }
+  })
+}
+
+/** 设备详情（影子 + 最近指令 + 最近 OTA 结果）：归属者或管理员可读 */
+async function device_state(ctx, p) {
+  const deviceId = str(p, 'p_device_id', { max: 200 })
+  const d = await one('select id, model, owner_id, status, fw_version, build from devices where id = $1', [deviceId])
+  if (!d) throw notFound('设备不存在')
+  if (d.owner_id !== ctx.uid && !ctx.isAdmin()) throw forbidden('只能查看自己绑定的设备')
+
+  const shadow = await one('select desired, reported, version from device_shadow where device_id = $1', [deviceId])
+  const cmds = await query(
+    'select id, action, status, fail_reason, created_at, sent_at, acked_at from device_commands where device_id = $1 order by created_at desc limit 20',
+    [deviceId],
+  )
+  const ota = await query(
+    `select r.stage, r.progress, r.from_build, r.to_build, r.message, r.created_at, p.version, p.channel
+       from ota_report r join ota_package p on p.id = r.package_id
+      where r.device_id = $1 order by r.created_at desc limit 5`,
+    [deviceId],
+  )
+  return {
+    device: { id: d.id, model: d.model, status: d.status, fw_version: d.fw_version, build: Number(d.build) },
+    shadow: shadow
+      ? { desired: shadow.desired, reported: shadow.reported, version: Number(shadow.version) }
+      : { desired: {}, reported: {}, version: 0 },
+    commands: cmds.rows,
+    ota_reports: ota.rows,
+  }
+}
+
+/** 管理后台：设备列表 */
+async function admin_devices(ctx, p) {
+  ctx.requireAdmin()
+  const status = p.p_status === undefined || p.p_status === null ? '' : str(p, 'p_status', { max: 32 })
+  const limit = int(p, 'p_limit', { min: 1, max: 500, def: 100 })
+  const rows = await query(
+    `select d.id, d.sn, d.model, d.status, d.fw_version, d.build, d.owner_id, d.last_seen_at, d.created_at,
+            coalesce(s.version, 0) as shadow_version
+       from devices d left join device_shadow s on s.device_id = d.id
+      where ($1 = '' or d.status = $1)
+      order by d.created_at desc limit $2`,
+    [status, limit],
+  )
+  return { rows: rows.rows }
+}
+
+/** 管理后台：指定设备的指令历史 */
+async function admin_device_commands(ctx, p) {
+  ctx.requireAdmin()
+  const deviceId = str(p, 'p_device_id', { max: 200 })
+  const limit = int(p, 'p_limit', { min: 1, max: 500, def: 50 })
+  const rows = await query(
+    'select id, action, payload, status, fail_reason, created_at, sent_at, acked_at from device_commands where device_id = $1 order by created_at desc limit $2',
+    [deviceId, limit],
+  )
+  return { rows: rows.rows }
+}
+
+/* --------------------------------------------------------------------------
+ * OTA：版本管理 / 灰度放行 / 前置校验下发 / 失败率熔断 / 进度上报
+ * ------------------------------------------------------------------------ */
+
+/**
+ * 灰度放行判定：对 (包, 设备) 做稳定哈希，落在 rollout 百分比内才放行。
+ * 为什么不用 random()：设备会反复轮询 ota_check，随机放行会让同一台设备在
+ * 「有更新 / 无更新」之间抖动，也可能刷多次把自己刷进灰度名単。
+ * 稳定哈希保证同一设备要么一直在灰度内、要么一直在灰度外。
+ */
+function inRollout(pkgId, key, rollout) {
+  if (rollout >= 100) return true
+  if (rollout <= 0) return false
+  const h = createHash('sha256').update(`${pkgId}|${key}`).digest()
+  const bucket = h.readUInt32BE(0) % 100
+  return bucket < rollout
+}
+
+/** 发行/编排升级包：(model, build) 唯一；已发行(published)的包禁止覆盖内容 */
+async function ota_publish(ctx, p) {
+  ctx.requireAdmin()
+  const model = str(p, 'p_model', { max: 64 })
+  const version = str(p, 'p_version', { max: 64 })
+  const build = int(p, 'p_build', { min: 1, max: 1_000_000_000 })
+  const channel = p.p_channel === undefined || p.p_channel === null ? 'release' : str(p, 'p_channel', { max: 16 })
+  const rollout = int(p, 'p_rollout', { min: 0, max: 100, def: 100 })
+  const url = str(p, 'p_url', { max: 1000 })
+  const sha256 = str(p, 'p_sha256', { min: 64, max: 64 })
+  const size = int(p, 'p_size', { min: 1, max: 10_000_000_000 })
+  const minBattery = int(p, 'p_min_battery', { min: 0, max: 100, def: 30 })
+  const requireWifi = bool(p, 'p_require_wifi', true)
+  const maxFailRate = int(p, 'p_max_fail_rate', { min: 1, max: 100, def: 20 })
+  const minSamples = int(p, 'p_min_samples', { min: 1, max: 100_000, def: 20 })
+  const note = p.p_note === undefined || p.p_note === null ? '' : str(p, 'p_note', { min: 0, max: 500 })
+  const status = p.p_status === undefined || p.p_status === null ? 'published' : str(p, 'p_status', { max: 16 })
+
+  if (!['release', 'gray', 'beta'].includes(channel)) throw badRequest('灰度通道需为 release / gray / beta')
+  if (!OTA_PKG_STATUS.includes(status)) throw badRequest(`包状态需为 ${OTA_PKG_STATUS.join(' / ')}`)
+
+  return tx(async (c) => {
+    const exist = (
+      await c.query('select id, status from ota_package where model = $1 and build = $2 for update', [model, build])
+    ).rows[0]
+    // 已在网络上流通的包不允许改内容：否则签名/哈希与历史下发记录不一致，设备侧无法校验
+    if (exist && exist.status === 'published') throw conflict('该版本已发行，不允许覆盖（请发更高 build）')
+
+    if (exist) {
+      await c.query(
+        `update ota_package
+            set version = $2, channel = $3, rollout = $4, url = $5, sha256 = $6, size = $7,
+                min_battery = $8, require_wifi = $9, max_fail_rate = $10, min_samples = $11,
+                note = $12, status = $13,
+                published_at = case when $13 = 'published' then now() else published_at end,
+                created_by = $14, updated_at = now()
+          where id = $1`,
+        [
+          exist.id,
+          version,
+          channel,
+          rollout,
+          url,
+          sha256,
+          size,
+          minBattery,
+          requireWifi,
+          maxFailRate,
+          minSamples,
+          note,
+          status,
+          ctx.uid,
+        ],
+      )
+      await writeAudit(c, ctx.uid, 'ota_publish', 'ota_package', exist.id, { model, build, status })
+      return { id: exist.id, model, build, status, reused: true }
+    }
+
+    const ins = await c.query(
+      `insert into ota_package (model, version, build, channel, rollout, status, url, sha256, size,
+                                min_battery, require_wifi, max_fail_rate, min_samples, note,
+                                created_by, published_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+               case when $6 = 'published' then now() else null end)
+       returning id, status`,
+      [
+        model, version, build, channel, rollout, status, url, sha256, size,
+        minBattery, requireWifi, maxFailRate, minSamples, note, ctx.uid,
+      ],
+    )
+    const row = ins.rows[0]
+    await writeAudit(c, ctx.uid, 'ota_publish', 'ota_package', row.id, { model, build, status })
+    return { id: row.id, model, build, status: row.status, reused: false }
+  })
+}
+
+/**
+ * 设备/App 查询升级：严格取 build 更高的 published 包，命中灰度才放行。
+ * 返回 has_update=false 同时给出 reason，便于端侧区分「已最新」「不在灰度」「无可用包」。
+ */
+async function ota_check(ctx, p) {
+  const model = str(p, 'p_model', { max: 64 })
+  const build = int(p, 'p_build', { min: 0, max: 1_000_000_000 })
+  const deviceId = p.p_device_id === undefined || p.p_device_id === null ? '' : str(p, 'p_device_id', { max: 200 })
+  const channel = p.p_channel === undefined || p.p_channel === null ? 'release' : str(p, 'p_channel', { max: 16 })
+
+  let key = String(ctx.uid)
+  if (deviceId) {
+    // 指定设备时也要裁定归属：不允许拿别人的 device_id 探测其升级状态
+    key = deviceId
+    const d = await one('select owner_id from devices where id = $1', [deviceId])
+    if (!d) throw notFound('设备不存在')
+    if (d.owner_id !== ctx.uid && !ctx.isAdmin()) throw forbidden('只能查询自己绑定的设备')
+  }
+
+  const r = await query(
+    `select id, version, build, channel, rollout, url, sha256, size, min_battery, require_wifi, note
+       from ota_package
+      where model = $1 and status = 'published' and build > $2 and channel = $3
+      order by build desc limit 1`,
+    [model, build, channel],
+  )
+  const pkg = r.rows[0]
+  if (!pkg) return { has_update: false, reason: 'no_package' }
+  if (!inRollout(pkg.id, key, Number(pkg.rollout))) return { has_update: false, reason: 'not_in_rollout' }
+
+  return {
+    has_update: true,
+    reason: 'upgrade_available',
+    package: {
+      id: pkg.id,
+      version: pkg.version,
+      build: Number(pkg.build),
+      channel: pkg.channel,
+      url: pkg.url,
+      sha256: pkg.sha256,
+      size: Number(pkg.size),
+      min_battery: Number(pkg.min_battery),
+      require_wifi: !!pkg.require_wifi,
+      note: pkg.note,
+    },
+  }
+}
+
+/** 升级结果统计 + 熔断裁定（管理员） */
+async function ota_stats(ctx, p) {
+  ctx.requireAdmin()
+  const packageId = p.p_package_id === undefined || p.p_package_id === null ? '' : str(p, 'p_package_id', { max: 200 })
+
+  if (!packageId) {
+    const rows = await query(
+      `select id, model, version, build, channel, rollout, status, max_fail_rate, min_samples, published_at
+         from ota_package order by build desc, created_at desc limit 20`,
+    )
+    const list = []
+    for (const pkg of rows.rows) list.push({ ...pkg, ...(await otaRateOf(pkg.id)) })
+    return { packages: list }
+  }
+
+  const pkg = await one('select * from ota_package where id = $1', [packageId])
+  if (!pkg) throw notFound('升级包不存在')
+  const rate = await otaRateOf(packageId)
+  const recent = await query(
+    `select r.stage, r.device_id, r.from_build, r.to_build, r.message, r.created_at
+       from ota_report r where r.package_id = $1 and r.stage in ('failed', 'rollback')
+      order by r.created_at desc limit 10`,
+    [packageId],
+  )
+  return {
+    package: {
+      id: pkg.id, model: pkg.model, version: pkg.version, build: Number(pkg.build),
+      channel: pkg.channel, rollout: Number(pkg.rollout), status: pkg.status,
+      max_fail_rate: Number(pkg.max_fail_rate), min_samples: Number(pkg.min_samples),
+    },
+    ...rate,
+    recent_failures: recent.rows,
+  }
+}
+
+/**
+ * 失败率：一律按「去重设备数」统计。
+ * ota_report 是 append-only，同一台反复失败会写多行；直接用行数会让失败率虚高，
+ * 触发误熔断 —— 所以这里 count(distinct device_id)。
+ */
+async function otaRateOf(packageId, c) {
+  // 必须允许传入事务连接 c：ota_report 在同一个事务里「先插上报、再算失败率」，
+  // 若这里走连接池（另一条连接），读不到本事务尚未提交的行，熔断永远不会触发。
+  const exec = c ?? { query }
+  const r = await exec.query(
+    `select
+       count(distinct device_id) filter (where stage = 'success')::int  as ok_devices,
+       count(distinct device_id) filter (where stage in ('failed','rollback'))::int as bad_devices,
+       count(distinct device_id)::int as total_devices
+     from ota_report where package_id = $1`,
+    [packageId],
+  )
+  const row = r.rows[0] ?? { ok_devices: 0, bad_devices: 0, total_devices: 0 }
+  const total = Number(row.total_devices)
+  const bad = Number(row.bad_devices)
+  const failRate = total > 0 ? Math.round((bad * 100) / total) : 0
+  return { ok_devices: Number(row.ok_devices), bad_devices: bad, total_devices: total, fail_rate: failRate }
+}
+
+/** 熔断：达到最小样本且失败率超阈值时把包打到 paused，停止继续下发 */
+async function otaCircuitBreak(c, pkg) {
+  if (pkg.status !== 'published') return false
+  const rate = await otaRateOf(pkg.id, c)
+  if (rate.total_devices < Number(pkg.min_samples)) return false
+  if (rate.fail_rate <= Number(pkg.max_fail_rate)) return false
+  await c.query(`update ota_package set status = 'paused', updated_at = now() where id = $1`, [pkg.id])
+  return true
+}
+
+/** 进度与结果上报：成功后回写设备当前版本，形成「下发 → 升级 → 状态」闭环 */
+async function ota_report(ctx, p) {
+  const deviceId = str(p, 'p_device_id', { max: 200 })
+  const packageId = str(p, 'p_package_id', { max: 200 })
+  const stage = str(p, 'p_stage', { max: 32 })
+  const progress = int(p, 'p_progress', { min: 0, max: 100, def: 0 })
+  const fromBuild = int(p, 'p_from_build', { min: 0, max: 1_000_000_000, def: 0 })
+  const toBuild = int(p, 'p_to_build', { min: 0, max: 1_000_000_000, def: 0 })
+  const message = p.p_message === undefined || p.p_message === null ? '' : str(p, 'p_message', { min: 0, max: 500 })
+  if (!OTA_STAGES.includes(stage)) throw badRequest(`升级阶段需为 ${OTA_STAGES.join(' / ')}`)
+
+  return tx(async (c) => {
+    const d = await loadOwnedDevice(c, ctx, deviceId)
+    if (!d.owner_id) throw conflict('设备尚未绑定，不能上报升级结果')
+
+    const pkg = (await c.query('select id, build, version, status, max_fail_rate, min_samples from ota_package where id = $1', [packageId])).rows[0]
+    if (!pkg) throw notFound('升级包不存在')
+
+    await c.query(
+      `insert into ota_report (package_id, device_id, user_id, stage, progress, from_build, to_build, message)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [packageId, deviceId, ctx.uid, stage, progress, fromBuild, toBuild, message],
+    )
+
+    // 只有真的升级成功才回写版本号，且必须单调递增（防降级：旧包回执不能把新版本冲回去）
+    if (stage === 'success') {
+      await c.query(
+        `update devices set fw_version = $1, build = $2, updated_at = now()
+          where id = $3 and build < $2`,
+        [pkg.version, toBuild > 0 ? toBuild : Number(pkg.build), deviceId],
+      )
+    }
+
+    const paused = await otaCircuitBreak(c, pkg)
+    const rate = await otaRateOf(packageId, c)
+    return { reported: true, stage, fail_rate: rate.fail_rate, sample_size: rate.total_devices, paused }
+  })
+}
+
 /* ---------- 注册表 ---------- */
 
 export const RPCS = new Map(
@@ -841,6 +1333,19 @@ export const RPCS = new Map(
     growth_record,
     growth_checkin,
     growth_state,
+    /* 设备域（绑定/解绑/状态/后台查询：归属裁定必须服务端做） */
+    device_bind,
+    device_unbind,
+    device_state,
+    admin_devices,
+    admin_device_commands,
+    /* OTA（版本管理/灰度放行/失败率熔断/进度上报） */
+    ota_publish,
+    ota_check,
+    ota_report,
+    ota_stats,
+    /* 埋点口径（管理员：让落库数据能被算出来） */
+    admin_events_summary: eventSummary,
   }),
 )
 

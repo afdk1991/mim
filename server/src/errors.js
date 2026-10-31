@@ -51,7 +51,7 @@ export function toApiError(e) {
     if (code === 'conflict') return conflict('唯一约束冲突（重复写入）', e)
     if (code === 'busy') return busy('系统繁忙，请稍后重试', e)
     if (code === 'schema') return schemaError('线上数据结构尚未就绪', e)
-    return badRequest(e.detail || e.message || '请求参数不合法', e)
+    return badRequest('请求参数不合法', e)
   }
   return new ApiError('server', '服务端异常，请稍后重试', 500, e)
 }
