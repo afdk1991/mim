@@ -4,6 +4,17 @@
  * 关键不变量（与原实现一致，不得改动）：
  *  未登录时 uid 恒为 'local'，它是「本机存储锚点」，不是「演示模式」标记。
  * 钱类数据按 uid 隔离，内容归属按 meId 隔离，两者不可混用。
+ *
+ * ── 已知风险（FE-009，已在 README「安全说明」同步登记）─────────────────
+ * 令牌以明文 JSON 形式存在 localStorage（键 mim.session），这是单防线：
+ *   · 任何能跑在同源上下文里的 XSS 都能直接读出 token；
+ *   · 浏览器扩展 / 本机恶意软件也能直接读。
+ * 为什么没上「二级混淆」：前端 SPA 里任何 encode / base64 / 异或都只是
+ * 混淆而非加密，拿到 bundle 的人几行代码就能还原，属「安全感」而非安全
+ * 边界，反而误导审计。真正的收敛路径是把会话换成 HttpOnly + Secure +
+ * SameSite=Lax 的 Cookie，那需要服务端配合；在没换之前，本站默认关闭
+ * 用户上传 HTML 渲染、所有外链加 rel="noreferrer"、所有用户输入经
+ * 富文本白名单（见 ui/rich-text.tsx），把 XSS 面压到最小。
  * ======================================================================== */
 
 import { LOCAL_UID, readJson, removeKey, writeJson } from '../core/storage'

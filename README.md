@@ -201,6 +201,18 @@ pages / ui  →  app  →  domain  →  data  →  core
 - 券码只能由服务端生成（`issue_voucher_code`），前端不构造、不猜测。
 - 法定登记信息（备案号 / 许可证）留空时显示「本项内容由站点运营方配置后展示。」，禁止虚构。
 
+### 3.10 已知安全边界（FE-009）
+
+- **会话令牌以明文存在 localStorage**（键 `mim.session`）：同源 XSS 或本机恶意软件可直接读取。
+  这是单防线，不是加密存储。当前**未引入 base64 / 异或等「二级混淆」**——前端 bundle 内任何
+  可逆变换都不是安全边界，只会误导审计；真正的收敛路径是把会话换成服务端下发的
+  `HttpOnly + Secure + SameSite=Lax` Cookie，需要后端配合。
+- 在上述收敛落地前，本站已采取的缓解措施：用户上传的 HTML 不内联渲染（`ui/rich-text.tsx`
+  走白名单）、所有外链 `rel="noreferrer"`、`ManjuPage` 等用户自填 URL 仅放行 `http(s)://`
+  协议（`javascript:` / `data:` 伪协议在解析与渲染两端都被拦截）。
+- 演示期已知：`wallet_credit`（前端自助加余额）未加 admin 校验，仅供本地调试；接入真实
+  支付回调后必须收口（见 `docs/gaps.md` BE-006）。
+
 ---
 
 ## 四、快速开始

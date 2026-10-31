@@ -33,9 +33,15 @@ export interface MallState {
   cart: MallCartItem[]
   orders: MallOrder[]
   points: number
+  /**
+   * FE-006：订单云端同步失败的订单 id → 错误文案。
+   * 本地状态已变更但服务端写回失败时，把失败原因挂在这里，订单页据此
+   * 显示「同步失败」徽标并提供重试入口，而不是让本地与云端悄悄分叉。
+   */
+  syncErrors: Record<string, string>
 }
 
-const EMPTY: MallState = { cart: [], orders: [], points: 0 }
+const EMPTY: MallState = { cart: [], orders: [], points: 0, syncErrors: {} }
 
 function parseMall(raw: unknown): MallState | null {
   if (!raw || typeof raw !== 'object') return null
@@ -46,7 +52,13 @@ function parseMall(raw: unknown): MallState | null {
   const orders = Array.isArray(r.orders)
     ? (r.orders as MallOrder[]).filter((o) => o && typeof o.id === 'string' && isValidOrder(o))
     : []
-  return { cart, orders, points: typeof r.points === 'number' ? r.points : 0 }
+  return {
+    cart,
+    orders,
+    points: typeof r.points === 'number' ? r.points : 0,
+    // 同步失败标记不持久化：刷新后本地状态已落盘，下次进入重新同步即可。
+    syncErrors: {},
+  }
 }
 
 export interface PlaceBizInput {
@@ -78,6 +90,8 @@ export interface MallApi {
   setBizStatus: (id: string, s: OrderBizStatus) => void
   setBizExt: (id: string, ext: OrderExt) => void
   cartTotalFen: (goods: MallGoods[]) => number
+  /** FE-006：重试某张订单的云端同步（upsert 而非 remove） */
+  retrySyncOrder: (id: string) => Promise<void>
 }
 
 const MallCtx = createContext<MallApi | null>(null)
@@ -152,8 +166,27 @@ export function MallProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const upsertOrder = useCallback((o: MallOrder) => {
-    void db.rpc('mall_upsert_order', { p_order: toCloud(o) }, { write: true })
+  /**
+   * FE-006：订单云端 upsert。原实现 `void db.rpc(...)` fire-and-forget，
+   * 失败被静默吞掉，本地与云端会悄悄分叉。现在：
+   *   1. 失败时把原因挂到 state.syncErrors[orderId]，订单页据此显示徽标 + 重试；
+   *   2. 成功时清掉该单的 syncErrors；
+   *   3. 同时 emitToast 给出即时反馈（非阻塞）。
+   */
+  const upsertOrder = useCallback(async (o: MallOrder): Promise<void> => {
+    const r = await db.rpc('mall_upsert_order', { p_order: toCloud(o) }, { write: true })
+    if (r.ok) {
+      setState((s) => {
+        if (!s.syncErrors[o.id]) return s
+        const next = { ...s.syncErrors }
+        delete next[o.id]
+        return { ...s, syncErrors: next }
+      })
+      return
+    }
+    const msg = errText(r.error)
+    setState((s) => ({ ...s, syncErrors: { ...s.syncErrors, [o.id]: msg } }))
+    emitToast(`订单「${o.title}」云端同步失败：${msg}`)
   }, [])
 
   const api = useMemo<MallApi>(() => {
@@ -317,8 +350,17 @@ export function MallProvider({ children }: { children: ReactNode }) {
             /* 释放失败不阻断取消：服务端有过期兜底 */
           }
         }
+        const removed = ref.current.orders.find((x) => x.id === id)
         patch((s) => ({ ...s, orders: s.orders.filter((x) => x.id !== id) }))
-        void db.remove('mall_orders', id)
+        // FE-006：删除云端订单失败要把本地记录加回来并提示，而不是悄悄不一致
+        const delR = await db.remove('mall_orders', id)
+        if (!delR.ok) {
+          const msg = errText(delR.error)
+          if (removed) {
+            patch((s) => ({ ...s, orders: [removed, ...s.orders] }))
+          }
+          emitToast(`订单「${removed?.title ?? id}」删除失败：${msg}（已保留本地记录）`)
+        }
       },
 
       confirmOrder(id) {
@@ -351,6 +393,12 @@ export function MallProvider({ children }: { children: ReactNode }) {
       cartTotalFen(list) {
         const byId = new Map(list.map((g) => [g.id, g]))
         return ref.current.cart.reduce((sum, c) => sum + unitPriceFen(c, byId.get(c.goodsId)) * c.qty, 0)
+      },
+
+      async retrySyncOrder(id) {
+        const o = ref.current.orders.find((x) => x.id === id)
+        if (!o) return
+        await upsertOrder(o)
       },
     }
   }, [state, goods, goodsLoading, goodsFromCloud, upsertOrder])

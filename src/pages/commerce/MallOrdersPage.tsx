@@ -62,7 +62,7 @@ function bizLine(o: MallOrder): string {
 }
 
 export function MallOrdersPage() {
-  const { state, payOrder, submitPayProof, cancelOrder, confirmOrder, setBizStatus, setBizExt } = useMall()
+  const { state, payOrder, submitPayProof, cancelOrder, confirmOrder, setBizStatus, setBizExt, retrySyncOrder } = useMall()
   const toast = useToast()
   const [tab, setTab] = useState<TabKey>('all')
   const [payTarget, setPayTarget] = useState<MallOrder | null>(null)
@@ -191,8 +191,22 @@ export function MallOrdersPage() {
                 {o.bizStatus ? (
                   <Badge cls={BIZ_STATUS_META[o.bizStatus].cls}>{BIZ_STATUS_META[o.bizStatus].label}</Badge>
                 ) : null}
+                {state.syncErrors[o.id] ? <Badge cls="unpaid">云端同步失败</Badge> : null}
               </div>
             </div>
+
+            {state.syncErrors[o.id] ? (
+              <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                本地已更新，但服务端写入失败：{state.syncErrors[o.id]}
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => void retrySyncOrder(o.id)}
+                >
+                  重试
+                </button>
+              </div>
+            ) : null}
 
             <div className="row-between" style={{ marginTop: 8 }}>
               <span className="mall-goods-price" style={{ fontSize: 18 }}>

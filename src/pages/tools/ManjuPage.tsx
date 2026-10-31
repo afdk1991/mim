@@ -114,6 +114,14 @@ export function ManjuPage() {
       toast('请填写片名')
       return
     }
+    // FE-008：协议白名单显式提示。原实现是静默丢弃非 http(s) 地址，
+    // 用户填了 javascript:/data: 之类的伪协议却看不到任何反馈，等于无声放行。
+    const bad: string[] = []
+    if (adding.videoUrl.trim() && !isUrl(adding.videoUrl)) bad.push('媒体直链')
+    if (adding.homeUrl.trim() && !isUrl(adding.homeUrl)) bad.push('来源页')
+    if (bad.length) {
+      toast(`${bad.join('、')} 仅支持 http(s):// 开头，已忽略非法地址`)
+    }
     const item: MjItem = {
       id: uid('mj'),
       title,
