@@ -1,16 +1,14 @@
 /**
  * 版本号一致性校验（本地开发 / CI 通用）
  *
- * 唯一版本源：src/core/version.ts 的 APP_VERSION（四段式 major.minor.patch.build）
- * 派生规则  ：因 npm / iOS / Tauri 强制三段 semver，三段式载体取「第1.第2.第4段」
- *             V0.0.0.0 → 0.0.0   V0.0.0.1 → 0.0.1
- * 构建号     ：versionCode / CURRENT_PROJECT_VERSION 必须单调递增，不参与字面值比对
+ * 唯一版本源：src/core/version.ts 的 APP_VERSION（三段式 semver major.minor.patch）
+ * 所有载体统一使用同一三段版本号，git tag 形如 V0.0.0。
+ * 构建号（versionCode / CURRENT_PROJECT_VERSION）需单调递增，不参与字面值比对。
  *
  * 用法：
  *   node scripts/version-check.mjs                  # 校验工作区文件 + 本地 git tag
- * 注：重建后唯一版本源由 src/version.ts 迁至 src/core/version.ts。
- *   node scripts/version-check.mjs --remote         # 追加校验远端 origin 的 tag（验证线上标签层）
- *   node scripts/version-check.mjs --tag V0.0.0.0   # 额外校验指定 tag 与版本源一致
+ *   node scripts/version-check.mjs --remote          # 追加校验远端 origin 的 tag
+ *   node scripts/version-check.mjs --tag V0.0.0     # 额外校验指定 tag 与版本源一致
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
@@ -34,14 +32,12 @@ if (!APP_VERSION) {
   process.exit(1)
 }
 const seg = APP_VERSION.split('.')
-if (seg.length !== 4) {
-  console.error(`❌ APP_VERSION 必须为四段式，当前为 ${seg.length} 段：${APP_VERSION}`)
+if (seg.length !== 3) {
+  console.error(`❌ APP_VERSION 必须为三段式 semver，当前为 ${seg.length} 段：${APP_VERSION}`)
   process.exit(1)
 }
-// 派生三段式：第1.第2.第4段
-const THREE = `${seg[0]}.${seg[1]}.${seg[3]}`
 
-// ---------- 2. 采集各载体实际值 ----------
+// ---------- 2. 采集各载体实际值（全部三段，必须等于 APP_VERSION）----------
 const gradle = read('android/app/build.gradle')
 const appJson5 = read('harmony/AppScope/app.json5')
 const pkg = JSON.parse(read('package.json'))
@@ -54,19 +50,17 @@ const workerPkg = JSON.parse(read('worker/package.json'))
 const workerWrangler = read('worker/wrangler.jsonc')
 
 const checks = [
-  // —— 四段式载体：必须与 APP_VERSION 字面一致 ——
-  { layer: 'src/core/version.ts (唯一源)', expect: APP_VERSION, actual: APP_VERSION, kind: 'four' },
-  { layer: 'android versionName', expect: APP_VERSION, actual: match1(gradle, /versionName\s+"([^"]+)"/), kind: 'four' },
-  { layer: 'harmony versionName', expect: APP_VERSION, actual: match1(appJson5, /"versionName"\s*:\s*"([^"]+)"/), kind: 'four' },
-  { layer: 'worker wrangler APP_VERSION', expect: APP_VERSION, actual: match1(workerWrangler, /"APP_VERSION"\s*:\s*"([^"]+)"/), kind: 'four' },
-  // —— 三段式载体：必须等于派生值 ——
-  { layer: 'package.json', expect: THREE, actual: pkg.version, kind: 'three' },
-  { layer: 'tauri.conf.json', expect: THREE, actual: tauriConf.version, kind: 'three' },
-  { layer: 'src-tauri/Cargo.toml', expect: THREE, actual: match1(cargo, /^version\s*=\s*"([^"]+)"/m), kind: 'three' },
-  { layer: 'iOS MARKETING_VERSION', expect: THREE, actual: match1(pbx, /MARKETING_VERSION\s*=\s*([^;]+);/), kind: 'three' },
-  { layer: 'harmony oh-package.json5', expect: THREE, actual: match1(ohRoot, /"version"\s*:\s*"([^"]+)"/), kind: 'three' },
-  { layer: 'harmony entry/oh-package.json5', expect: THREE, actual: match1(ohEntry, /"version"\s*:\s*"([^"]+)"/), kind: 'three' },
-  { layer: 'worker/package.json', expect: THREE, actual: workerPkg.version, kind: 'three' },
+  { layer: 'src/core/version.ts (唯一源)', expect: APP_VERSION, actual: APP_VERSION },
+  { layer: 'package.json', expect: APP_VERSION, actual: pkg.version },
+  { layer: 'tauri.conf.json', expect: APP_VERSION, actual: tauriConf.version },
+  { layer: 'src-tauri/Cargo.toml', expect: APP_VERSION, actual: match1(cargo, /^version\s*=\s*"([^"]+)"/m) },
+  { layer: 'android versionName', expect: APP_VERSION, actual: match1(gradle, /versionName\s+"([^"]+)"/) },
+  { layer: 'iOS MARKETING_VERSION', expect: APP_VERSION, actual: match1(pbx, /MARKETING_VERSION\s*=\s*([^;]+);/) },
+  { layer: 'harmony versionName', expect: APP_VERSION, actual: match1(appJson5, /"versionName"\s*:\s*"([^"]+)"/) },
+  { layer: 'harmony oh-package.json5', expect: APP_VERSION, actual: match1(ohRoot, /"version"\s*:\s*"([^"]+)"/) },
+  { layer: 'harmony entry/oh-package.json5', expect: APP_VERSION, actual: match1(ohEntry, /"version"\s*:\s*"([^"]+)"/) },
+  { layer: 'worker/package.json', expect: APP_VERSION, actual: workerPkg.version },
+  { layer: 'worker wrangler APP_VERSION', expect: APP_VERSION, actual: match1(workerWrangler, /"APP_VERSION"\s*:\s*"([^"]+)"/) },
 ]
 
 // ---------- 3. 校验 git tag（本地必查；--remote 追加远端）----------
@@ -81,17 +75,15 @@ const listLocalTags = () => {
 }
 
 const localTags = listLocalTags()
-// GAP-01：仓库内允许存在非版本形态的辅助 tag（如回滚锚点 pre-rebuild-*，
-// 见 docs/rebuild/迁移说明.md —— 文档化锚点不可删）。只对「V 四段式」版本 tag
-// 做唯一性校验；其余形态列出为 info，不参与判定。
-const VERSION_TAG_RE = /^V\d+\.\d+\.\d+\.\d+$/
+// 仓库内允许存在非版本形态的辅助 tag（如回滚锚点 pre-rebuild-*）。
+// 只对「V 三段式」版本 tag 做唯一性校验；其余形态列出为 info。
+const VERSION_TAG_RE = /^V\d+\.\d+\.\d+$/
 const versionTags = localTags.filter((t) => VERSION_TAG_RE.test(t))
 const otherTags = localTags.filter((t) => !VERSION_TAG_RE.test(t))
 checks.push({
-  layer: '本地版本 tag（V 四段式，唯一）',
+  layer: '本地版本 tag（V 三段式，唯一）',
   expect: EXPECT_TAG,
   actual: versionTags.length === 0 ? '(无)' : versionTags.join(','),
-  kind: 'four',
 })
 
 const wantRemote = process.argv.includes('--remote')
@@ -110,10 +102,9 @@ if (wantRemote) {
   const remoteVersionTags = remoteTags.filter((t) => VERSION_TAG_RE.test(t))
   const remoteOtherTags = remoteTags.filter((t) => !VERSION_TAG_RE.test(t))
   checks.push({
-    layer: '远端版本 tag（V 四段式）',
+    layer: '远端版本 tag（V 三段式）',
     expect: EXPECT_TAG,
     actual: remoteVersionTags.length === 0 ? '(无)' : remoteVersionTags.join(','),
-    kind: 'four',
   })
   if (remoteOtherTags.length) {
     console.log(`  ℹ️ 远端辅助 tag（不参与判定）：${remoteOtherTags.join(', ')}`)
@@ -123,11 +114,11 @@ if (wantRemote) {
 const tagArg = process.argv.find((a) => a.startsWith('--tag='))?.split('=')[1]
   ?? (process.argv.includes('--tag') ? process.argv[process.argv.indexOf('--tag') + 1] : null)
 if (tagArg) {
-  checks.push({ layer: `指定 tag (${tagArg})`, expect: EXPECT_TAG, actual: tagArg, kind: 'four' })
+  checks.push({ layer: `指定 tag (${tagArg})`, expect: EXPECT_TAG, actual: tagArg })
 }
 
 // ---------- 4. 输出与判定 ----------
-console.log(`唯一版本源 APP_VERSION = ${APP_VERSION}  →  三段派生值 = ${THREE}\n`)
+console.log(`唯一版本源 APP_VERSION = ${APP_VERSION}\n`)
 if (otherTags.length) {
   console.log(`  ℹ️ 本地辅助 tag（回滚/快照锚点，不参与判定）：${otherTags.join(', ')}`)
 }
@@ -137,7 +128,7 @@ for (const c of checks) {
   const ok = c.actual === c.expect
   if (!ok) bad++
   const flag = ok ? '✅' : '❌'
-  console.log(`  ${flag} ${pad(c.layer, 30)} 期望 ${pad(c.expect, 12)} 实际 ${c.actual ?? '(解析失败)'}`)
+  console.log(`  ${flag} ${pad(c.layer, 30)} 期望 ${pad(c.expect, 10)} 实际 ${c.actual ?? '(解析失败)'}`)
 }
 
 // 构建号（只提示，要求单调递增）
@@ -149,7 +140,6 @@ const codes = {
 console.log('\n构建号（需单调递增，不参与字面比对）：')
 for (const [k, v] of Object.entries(codes)) console.log(`  ℹ️ ${pad(k, 30)} ${v ?? '(未解析)'}`)
 
-// 当前 HEAD 与 tag 信息
 try {
   const head = execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim()
   console.log(`\n当前 HEAD: ${head}`)

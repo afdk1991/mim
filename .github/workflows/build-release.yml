@@ -9,7 +9,7 @@ name: Release · 桌面端构建与发布
 
 on:
   push:
-    tags: ['V*.*.*.*']
+    tags: ['V*.*.*']
   workflow_dispatch:
 
 permissions:
@@ -72,19 +72,14 @@ jobs:
           fi
           echo "✅ tag $GITHUB_REF_NAME 与 APP_VERSION $SRC_VER 一致"
 
-      # 桌面 OTA 版本注入：tauri 只认三段 semver，而版本策略只递增第 4 段（前三段恒 0.0.0），
-      # 故按项目统一派生规则取「第1.第2.第4段」（APP_VERSION 0.0.0.2 → 0.0.2）写入
-      # tauri.conf.json version。tauri-action 以此生成 latest.json 的 version 字段；
-      # 客户端 updater 按 semver 比较，三段必须高于已安装版本才触发更新。
-      - name: 注入 tauri 版本（APP_VERSION 第 1.2.4 段 → tauri.conf.json）
+      # 版本统一为三段 semver，APP_VERSION 即 tauri.conf.json version，直接写入。
+      - name: "注入 tauri 版本（APP_VERSION → tauri.conf.json）"
         if: startsWith(github.ref, 'refs/tags/V')
         shell: bash
         run: |
           SRC_VER=$(node -e "const s=require('fs').readFileSync('src/core/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
-          IFS='.' read -r S1 S2 S3 S4 <<< "$SRC_VER"
-          VER="$S1.$S2.$S4"
-          echo "APP_VERSION=$SRC_VER -> tauri version=$VER"
-          node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');" "$VER"
+          echo "APP_VERSION=$SRC_VER -> tauri version=$SRC_VER"
+          node -e "const fs=require('fs');const p='src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));c.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');" "$SRC_VER"
           grep -n '"version"' src-tauri/tauri.conf.json
 
       # 前端 APP_VERSION 不再由 CI 注入：src/core/version.ts 已是唯一源，
