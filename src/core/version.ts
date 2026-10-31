@@ -8,6 +8,23 @@
 
 export const APP_VERSION = '0.0.0'
 
+/**
+ * 发布通道：区分「正式对外发布版」与「内部测试版 / 预发布版 / 草稿版」。
+ * 仅影响展示与发版校验，**绝不改变 APP_VERSION**（三段 semver 唯一源）。
+ *   ''        正式对外发布版（项目首个正式版 = V0.0.0）
+ *   'preview' 公网预览版（如后端暂缓、仅前端先上线的阶段）
+ *   'draft'   内部草稿 / 开发构建
+ *   'test'    内部测试版
+ * 正式版号 V0.0.0 在正式发布前，禁止被任何内部构建以 V0.0.0 形态占用（见 version-check.mjs）。
+ */
+export type ReleaseChannel = '' | 'preview' | 'draft' | 'test'
+export const RELEASE_CHANNEL: ReleaseChannel = 'preview'
+
+/** 展示用版本号：正式版 = V0.0.0；预览/草稿 = V0.0.0-preview 等 */
+export function displayVersion(v: string = APP_VERSION): string {
+  return RELEASE_CHANNEL ? `V${v}-${RELEASE_CHANNEL}` : `V${v}`
+}
+
 /** 三段版本（统一后即唯一值，保留函数位以便调用方过渡） */
 export function derivedVersion(v: string = APP_VERSION): string {
   return v
