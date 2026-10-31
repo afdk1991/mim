@@ -25,6 +25,8 @@ export const EVT = {
   mall: 'mim:mall',
   /** 语音消息变更 */
   voice: 'mim:voice',
+  /** 运行期站点配置（config_get 拉取完成 / 后台保存后覆盖） */
+  siteConfig: 'mim:site-config',
 } as const
 
 export type EvtName = (typeof EVT)[keyof typeof EVT]

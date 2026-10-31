@@ -24,6 +24,8 @@ export const SITE_CONFIG = {
   contactEmail: 'afdk1991@users.noreply.github.com',
   /** 联系地址 */
   address: '',
+  /** 站点头图 URL（hero 区，留空则不展示） */
+  heroImage: '',
   /** 邮箱聚合中转服务地址（浏览器无法直连 IMAP 993 / SMTP 465） */
   mailProxyUrl: 'https://mim-mail-proxy.15726833367.workers.dev',
   /** 商城扫码收款码直链；为空则扫码支付通道不可用 */

@@ -7,7 +7,10 @@
  * 状态：静态页无加载态；未知 / 空 slug 走空态，不白屏。
  * ======================================================================== */
 
-import { isSet, SITE_CONFIG } from '../../core/config'
+import { useEffect, useState } from 'react'
+import { isSet } from '../../core/config'
+import { getSiteConfig } from '../../core/runtime-config'
+import { subscribe, EVT } from '../../core/events'
 import { Empty } from '../../ui'
 
 export interface InfoPageProps {
@@ -34,24 +37,24 @@ interface InfoDoc {
   sections: Section[]
 }
 
-/** 法定登记信息表：行文案只有 SITE_CONFIG 一个真源 */
-function legalRows(): Array<[string, string]> {
+/** 法定登记信息表：行文案来自运行期合并配置（默认值真源 + 后台覆盖） */
+function legalRows(cfg: ReturnType<typeof getSiteConfig>): Array<[string, string]> {
   return [
-    ['主办单位 / 主体名称', fact(SITE_CONFIG.owner)],
-    ['ICP 备案号', fact(SITE_CONFIG.icp)],
-    ['公安联网备案号', fact(SITE_CONFIG.policeBeian)],
-    ['统一社会信用代码', fact(SITE_CONFIG.creditCode)],
-    ['正式域名', fact(SITE_CONFIG.domain)],
-    ['出版物许可证编号', fact(SITE_CONFIG.publishLicense)],
-    ['经营性网站备案编号', fact(SITE_CONFIG.opBeian)],
-    ['客服邮箱', fact(SITE_CONFIG.contactEmail)],
-    ['联系地址', fact(SITE_CONFIG.address)],
+    ['主办单位 / 主体名称', fact(cfg.owner)],
+    ['ICP 备案号', fact(cfg.icp)],
+    ['公安联网备案号', fact(cfg.policeBeian)],
+    ['统一社会信用代码', fact(cfg.creditCode)],
+    ['正式域名', fact(cfg.domain)],
+    ['出版物许可证编号', fact(cfg.publishLicense)],
+    ['经营性网站备案编号', fact(cfg.opBeian)],
+    ['客服邮箱', fact(cfg.contactEmail)],
+    ['联系地址', fact(cfg.address)],
   ]
 }
 
-function buildDocs(): Record<string, InfoDoc> {
-  const mail = fact(SITE_CONFIG.contactEmail)
-  const domain = fact(SITE_CONFIG.domain)
+function buildDocs(cfg: ReturnType<typeof getSiteConfig>): Record<string, InfoDoc> {
+  const mail = fact(cfg.contactEmail)
+  const domain = fact(cfg.domain)
   return {
     about: {
       title: '关于我们',
@@ -142,7 +145,7 @@ function buildDocs(): Record<string, InfoDoc> {
       sections: [
         {
           title: '备案状态',
-          lines: [SITE_CONFIG.filingNote],
+          lines: [cfg.filingNote],
         },
         {
           title: '内容责任',
@@ -248,9 +251,13 @@ function buildDocs(): Record<string, InfoDoc> {
   }
 }
 
-const DOCS = buildDocs()
-
 export function InfoPage({ slug }: InfoPageProps) {
+  // F6：配置可能在启动后由 config_get 异步覆盖，订阅 EVT.siteConfig 重渲
+  const [, setTick] = useState(0)
+  useEffect(() => subscribe(EVT.siteConfig, () => setTick((n) => n + 1)), [])
+
+  const cfg = getSiteConfig()
+  const DOCS = buildDocs(cfg)
   const doc = DOCS[slug]
 
   if (!doc) {
@@ -286,7 +293,7 @@ export function InfoPage({ slug }: InfoPageProps) {
             法定登记信息
           </div>
           <div className="kv-table">
-            {legalRows().map(([label, value]) => (
+            {legalRows(cfg).map(([label, value]) => (
               <div className="kv-row" key={label}>
                 <span className="muted">{label}</span>
                 <span>{value}</span>

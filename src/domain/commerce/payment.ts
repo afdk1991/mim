@@ -8,7 +8,8 @@
  *      页面明示「暂不提供自助充值」，而不是显示一个假二维码。
  * ======================================================================== */
 
-import { FEATURES, SITE_CONFIG, isSet } from '../../core/config'
+import { isSet } from '../../core/config'
+import { getSiteConfig, qrcodePayEnabled } from '../../core/runtime-config'
 
 export type PayChannelId = 'wallet' | 'qrcode-manual'
 
@@ -30,7 +31,7 @@ export const PAY_CHANNELS: PaymentChannel[] = [
     id: 'qrcode-manual',
     label: '扫码支付',
     desc: '扫码付款后提交凭证，等待管理员核销',
-    available: () => FEATURES.qrcodePay,
+    available: () => qrcodePayEnabled(),
   },
 ]
 
@@ -39,10 +40,11 @@ export function availableChannels(): PaymentChannel[] {
 }
 
 export function qrcodePayInfo(): { qrcodeUrl: string; note: string } {
-  return { qrcodeUrl: SITE_CONFIG.payQrCodeUrl, note: SITE_CONFIG.payQrNote }
+  const cfg = getSiteConfig()
+  return { qrcodeUrl: cfg.payQrCodeUrl, note: cfg.payQrNote }
 }
 
 /** 人工核销入口是否开放（依赖服务端口令配置，前端不持有口令） */
 export function manualConfirmEnabled(): boolean {
-  return isSet(SITE_CONFIG.payQrCodeUrl)
+  return isSet(getSiteConfig().payQrCodeUrl)
 }
