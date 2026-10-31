@@ -24,11 +24,9 @@ name: deploy
 #              把 id 回填 worker/wrangler.jsonc，并 wrangler secret put SYNC_TOKEN / HEALTH_CHECK_SECRET
 #
 # 3) EdgeOne Makers（亚太/国内就近入口）
-#    已统一为「纯控制台 Git 关联自动构建」单一模式：在 Makers 控制台把 GitHub 仓库
-#    afdk1991/mim 关联为项目 mim，每次 push main 自动构建并发布 dist/。
-#    ⚠️ 原 makers CI 触发 job 已删除（见文件末尾）——保留它会在 Makers 再生成名为
-#    mim-web 的「直接上传」型项目，与 Git 关联的 mim 并存造成双站点 / 命名混乱。
-#    如需重新启用 Upload 型部署，请先在控制台确认项目命名策略，不要直接恢复该 job。
+#    纯控制台 Git 关联自动构建：在 Makers 控制台把 GitHub 仓库 afdk1991/mim
+#    关联为项目 mim，每次 push main 自动构建并发布 dist/。仓库内不保留 Upload 型
+#    部署 job，避免与 Git 关联项目并存造成双站点 / 命名混乱。
 #
 # 注意：本仓库有意不提交 package-lock.json（见 .gitignore），
 #      因此只能用 `npm install`，`npm ci` 必然失败。

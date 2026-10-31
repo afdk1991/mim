@@ -193,8 +193,6 @@ curl -fsS http://localhost/api/health          # 走 nginx
 | `MIM_API_BASE`（Variable） | 前端构建期注入 | — |
 | `ENABLE_EDGE_DEPLOY`（Variable） | deploy.yml 边缘层开关 | 缺省关闭（job 跳过不红）；配好两项 Secrets 后显式置 `true` 激活 |
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | deploy.yml 边缘层（wrangler deploy） | Token 仅授该 Worker 的 Edit 权限；前置：创建 D1 `mim-readonly`、KV `MIM_CACHE` 并回填 `worker/wrangler.jsonc`，`wrangler secret put SYNC_TOKEN / HEALTH_CHECK_SECRET` |
-| `ENABLE_MAKERS_DEPLOY`（Variable） | deploy.yml Makers 层开关 | 缺省关闭（job 跳过不红）；配好 HOOK 或 TOKEN 后显式置 `true` 激活 |
-| `EO_DEPLOY_HOOK_URL`（推荐）或 `EO_TOKEN` | deploy.yml Makers 层触发 | 优先用部署 Webhook（不含账号凭证）；用 `EO_TOKEN` 时仅授项目部署权限 |
 | `GITEE_TOKEN` / `GITCODE_TOKEN` / `ATOMGIT_TOKEN` / `CNB_TOKEN` | mirror.yml | 仅目标仓库写权限，不给删仓权限 |
 | `ENABLE_NPM_PUBLISH`（Variable） | deploy-release.yml | 缺省不发布；显式置 `true` 才发 npm 包 |
 | 客户端签名密钥（`TAURI_*`、`ANDROID_*`） | build-release.yml | 仅 Release 构建机可用 |
@@ -636,9 +634,7 @@ Mim 有用户发帖/评论（UGC），上线前应接一家内容安全 API 做�
 
 1. 控制台新建 EdgeOne Makers 项目 → 关联 GitHub 仓库 `afdk1991/mim`；
 2. 构建命令 `npm run build`，输出目录 `dist`，Node 版本 22.x；
-3. CI 主动触发：配 Secrets `EO_DEPLOY_HOOK_URL`（推荐）或 `EO_TOKEN`，
-   设 Variable `ENABLE_MAKERS_DEPLOY=true`（见 `.github/workflows/deploy.yml`）；
-4. 免费额度注意：带宽/请求数有月度上限，超了会停服，仅作国内就近入口，**主站仍走自己的服务器**。
+3. 免费额度注意：带宽/请求数有月度上限，超了会停服，仅作国内就近入口，**主站仍走自己的服务器**。
 
 ### 23.3 Cloudflare R2 作为 /api/storage/* 云落点
 

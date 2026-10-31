@@ -348,7 +348,6 @@ dec51ab deploy: 无 Docker 部署方案落地
 ### 14.5 仍待外部项（非代码阻塞，需用户提供）
 - 服务器部署：`OCI_HOST/OCI_USER/OCI_SSH_KEY` Secrets + `ENABLE_SERVER_DEPLOY=true`
 - Cloudflare 边缘层：`CLOUDFLARE_API_TOKEN/ACCOUNT_ID` + `ENABLE_EDGE_DEPLOY=true`
-- EdgeOne Makers：`EO_DEPLOY_HOOK_URL/EO_TOKEN` + `ENABLE_MAKERS_DEPLOY=true`
 - 支付商户号 / 备案主体：F 模块后台配置即可（表结构已就绪）
 
 ---
