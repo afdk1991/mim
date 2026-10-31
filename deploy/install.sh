@@ -165,7 +165,15 @@ sed -e "s#^ *root /opt/mim/dist;#    root $MIM_DIR/dist;#" \
     "$MIM_DIR/deploy/nginx-mim.conf" > /etc/nginx/sites-available/mim
 mkdir -p /etc/nginx/sites-enabled
 ln -sf /etc/nginx/sites-available/mim /etc/nginx/sites-enabled/mim
-cp "$MIM_DIR/deploy/logrotate-mim.conf" /etc/logrotate.d/mim
+# SD-008：logrotate 属主按发行版替换（Debian=www-data:adm，RHEL=nginx:nginx），
+# 直接 cp 原样模板会因占位符未替换而轮转报错
+if command -v apt-get >/dev/null 2>&1; then
+  LOG_OWNER=www-data; LOG_GROUP=adm
+else
+  LOG_OWNER=nginx; LOG_GROUP=nginx
+fi
+sed -e "s#@LOG_OWNER@#$LOG_OWNER#" -e "s#@LOG_GROUP@#$LOG_GROUP#" \
+    "$MIM_DIR/deploy/logrotate-mim.conf" > /etc/logrotate.d/mim
 
 systemctl daemon-reload
 systemctl enable mim-server          # 开机自启

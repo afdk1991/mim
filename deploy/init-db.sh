@@ -47,8 +47,10 @@ END
 $$;
 SQL
 
+# SD-014：库名同样走 psql 变量 :'db' 传参（与上面角色块同款），
+# 不再把 $DB_NAME 直接 shell 插值进 SQL，避免口令/库名含单引号时语句被打断。
 DB_EXISTS="$(
-  sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'"
+  sudo -u postgres psql -tAc -v db="$DB_NAME" "SELECT 1 FROM pg_database WHERE datname = :'db'"
 )"
 
 if [ "$DB_EXISTS" = "1" ]; then

@@ -356,23 +356,34 @@ cd /opt/mim && git checkout <上一个 tag>     # git 流程
 
 ---
 
-## 十二、备份
+## 十二、备份与恢复
 
 ```bash
-# 备份（逻辑导出，普通 pg_dump）
-sudo -u postgres pg_dump mim | gzip > /var/backups/mim-$(date +%F).sql.gz
+# 一键备份（库 + uploads，自动轮转 + 可选 rclone 异地）：
+/opt/mim/scripts/backup.sh
+# 或自定义：BACKUP_DIR=/data/backup KEEP_DAYS=30 ./scripts/backup.sh
 
-# 恢复
-sudo -u postgres psql -c 'DROP DATABASE IF EXISTS mim;'
-sudo -u postgres createdb --owner=mim mim
-zcat /var/backups/mim-2026-10-28.sql.gz | sudo -u postgres psql mim
+# 备份（逻辑导出，普通 pg_dump，脚本内部已做）
+sudo -u postgres pg_dump mim | gzip > /var/backups/mim/mim-$(date +F-%H%M).sql.gz
 
-# 上传的文件也要一起备份
-tar czf /var/backups/mim-uploads-$(date +%F).tar.gz /opt/mim/server/data/uploads
+# 恢复（脚本：先恢复到临时库校验，确认后再切正式，绝不直接灌生产库）
+#   1) 演练（默认，不动生产）：
+RESTORE_FILE=/var/backups/mim/mim-2026-11-01-0200.sql.gz ./scripts/restore.sh
+#   2) 真切（校验通过后）：
+sudo systemctl stop mim-server
+DO_CUTOVER=1 RESTORE_FILE=/var/backups/mim/mim-....sql.gz ./scripts/restore.sh
+sudo systemctl start mim-server
+
+# 上传的文件也要一起备份（脚本自动打 uploads-*.tar.gz）
+tar czf /var/backups/mim-uploads-$(date +%F).tar.gz -C /opt/mim/server/data uploads
 ```
 
-建议：`crontab` 每天凌晨跑一次 pg_dump，保留最近 14 天；每季度做一次恢复演练
-（新建临时库还原 → 抽查关键表行数），没演练过的备份等于没有备份。
+建议：`crontab` 每天凌晨跑一次 `scripts/backup.sh`（保留最近 14 天）；每季度用
+`scripts/restore.sh` 做一次恢复演练（临时库还原 → 抽查 users/posts/mall_orders 行数 →
+核对 schema_migrations），**没演练过的备份等于没有备份**。
+
+异地备份链（可选，见二十三节）：本地备份 → rclone → Backblaze B2 / Cloudflare R2，
+restic 做去重加密增量。
 
 ---
 
@@ -392,15 +403,31 @@ tar czf /var/backups/mim-uploads-$(date +%F).tar.gz /opt/mim/server/data/uploads
 
 ---
 
-## 十四、健康检查
+## 十四、健康检查与监控探活
 
 | 手段 | 命令 / 入口 | 说明 |
 | --- | --- | --- |
-| 进程内健康接口 | `curl -fsS http://127.0.0.1:8787/api/health` | 返回 `ok` 与 `db` 连通状态 |
+| 进程内浅探活 | `curl -fsS http://127.0.0.1:8787/api/health` | 返回 `ok/db/rpcs/pool/uploads/disk`；`db=false` 即库没连上 |
+| 深度检查 | `curl -fsS 'http://127.0.0.1:8787/api/health?full=1'` | 追加 `migrations.applied/pending` 明细，发版后核对迁移是否跑齐 |
 | 端到端脚本 | `node scripts/server-health.mjs`（或 `npm run server:health`） | 探测 `/api/health` + 一条真实 REST 查询，CI 与本地通用 |
+| 综合探活脚本 | `./scripts/monitor.sh` | 进程/端口/health/磁盘/日志错误率五项，退出码 0=健康，可给 cron/UptimeRobot 用 |
 | systemd 状态 | `systemctl status mim-server` | 开机自启与崩溃重启是否正常 |
 | nginx 链路 | `curl -fsS http://localhost/api/health`（走 80 端口） | 验证静态直出 + 反代整链路 |
 | 外部拨测 | UptimeRobot 等免费拨测打 `/api/health` | 周期性发现故障（可选） |
+
+### 14.1 monitor.sh 监控接入
+
+```bash
+# 本地巡检
+MIM_DIR=/opt/mim ./scripts/monitor.sh
+
+# cron 每分钟探活（失败时脚本退出码非 0，配合 crontab 告警/邮件）
+* * * * * /opt/mim/scripts/monitor.sh >> /var/log/mim-monitor.log 2>&1
+```
+
+可调阈值（环境变量）：`DISK_PCT`（磁盘告警%，默认 92）、`LOG_MIN`（回看日志分钟数，
+默认 10）、`ERR_MAX`（时间窗 error 日志条数上限，默认 20）。生产日志已是 JSON 行
+（`ts/level/request_id/method/path/status/ms/ip`），Loki/Promtail 可直接按 `level` 索引。
 
 ---
 
@@ -582,3 +609,97 @@ GitHub 唯一可写源」主路线逐项落地如下：
 在 Mim 全部剔除或改写——制品分发走 GitHub Releases zip + npm（可选），进程守护走
 systemd，数据库是宿主机原生 PostgreSQL。worker/ 与 D1 副本属于**可选边缘层**，
 不启用时对主路线零影响。
+
+---
+
+## 二十三、第三方服务接入（UGC 审核 / 边缘 / 云存储 / 备份 / 证书 / 错误监控）
+
+> 全部为**可选接入**：不配置则对应功能关闭/走本地默认，不影响 systemd+nginx 主路线。
+> 所有密钥只填服务器 `server/.env` 或 GitHub Secrets，**不得进版本库**。
+
+### 23.1 内容安全（UGC 审核）
+
+Mim 有用户发帖/评论（UGC），上线前应接一家内容安全 API 做机审。两个主流选型：
+
+| 厂商 | 接入点 | 免费额度 | 密钥占位 |
+| --- | --- | --- | --- |
+| 腾讯云内容安全（CMS） | 帖子发布/评论入库前调 `TextModeration` | 新用户试用通常有免费额度，超出按量计费（约 ¥1.5/千次文本） | `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`（在 `server/.env` 占位） |
+| 阿里云内容安全 | 同上，调文本检测接口 | 有试用赠送额度，正式后按量 | `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_SECRET` |
+
+对接位置：`server/src/rpc.js` 里发帖/评论写库之前，加一个 `moderateText(text)` 调用——
+命中违规即抛 `badRequest('内容含违规信息')`，不落库。**当前未接（占位）**，上线前
+在 `server/.env.example` 追加上述变量并实现该函数。演示期可先不接。
+
+### 23.2 EdgeOne 免费套餐接入
+
+仓库已有 `.edgeone/` 目录（Makers 项目配置）。免费套餐（EdgeOne Makers）接入：
+
+1. 控制台新建 EdgeOne Makers 项目 → 关联 GitHub 仓库 `afdk1991/mim`；
+2. 构建命令 `npm run build`，输出目录 `dist`，Node 版本 22.x；
+3. CI 主动触发：配 Secrets `EO_DEPLOY_HOOK_URL`（推荐）或 `EO_TOKEN`，
+   设 Variable `ENABLE_MAKERS_DEPLOY=true`（见 `.github/workflows/deploy.yml`）；
+4. 免费额度注意：带宽/请求数有月度上限，超了会停服，仅作国内就近入口，**主站仍走自己的服务器**。
+
+### 23.3 Cloudflare R2 作为 /api/storage/* 云落点
+
+当前上传落本地磁盘（`server/data/uploads`）。量大后切 R2（S3 兼容、**出站流量免费**）：
+
+```bash
+# server/.env 追加（占位，bucket/account 待建后回填）：
+STORAGE_DRIVER=r2
+R2_ACCOUNT_ID=<你的Cloudflare_Account_ID>
+R2_ACCESS_KEY_ID=<你的R2_Access_Key_ID>
+R2_SECRET_ACCESS_KEY=<你的R2_Secret_Access_Key>
+R2_BUCKET=mim-uploads
+R2_PUBLIC_BASE=https://pub-<hash>.r2.dev   # 或绑自定义域名 cdn.example.com
+```
+
+迁移：本地已有 `server/data/uploads` 的文件，用 rclone 一把推上去——
+`rclone copy /opt/mim/server/data/uploads remote:mim-uploads`；然后把 `storage.js`
+的 `put/get` 从本地 fs 换成 S3 SDK（接口签名已预留，见 storage.js 头注释）。
+**当前未接，保留本地实现**。
+
+### 23.4 异地备份链：restic + rclone + Backblaze B2
+
+`scripts/backup.sh` 已做本地 pg_dump + rclone 异地。加密去重增量方案（推荐正式用）：
+
+```bash
+# 一次性初始化 restic 仓库到 B2（S3 兼容，比 R2 更适合冷备）
+export B2_ACCOUNT_ID=<keyID> B2_ACCOUNT_KEY=<applicationKey>
+restic -r b2:mim-backup init
+# 每天增量备份（自动加密、去重、保留策略在 restic 里）
+restic -r b2:mim-backup backup /opt/mim/server/data /var/backups/mim
+restic -r b2:mim-backup forget --daily 14 --weekly 8 --prune
+```
+
+把上面两行追加到 backup.sh 尾部的「可选异地」段即可；B2 密钥填服务器 root 的
+环境变量（不入 .env、不入库）。
+
+### 23.5 acme.sh 证书自动化（nginx HTTPS）
+
+`deploy/nginx-mim.conf` 目前是 80 端口。上 HTTPS 用 acme.sh（不用 certbot 也行）：
+
+```bash
+curl https://get.acme.sh | sh -s email=admin@example.com
+# DNS 验证（以 Cloudflare 为例）：export CF_Token=...
+~/.acme.sh/acme.sh --issue --dns dns_cf -d example.com -d www.example.com
+~/.acme.sh/acme.sh --install-cert -d example.com \
+  --key-file /etc/nginx/ssl/mim.key --fullchain-file /etc/nginx/ssl/mim.crt \
+  --reloadcmd "systemctl reload nginx"
+```
+
+然后在 `nginx-mim.conf` 的 server 块补 443 listen + ssl_certificate 两行即可。
+证书自动续期由 acme.sh 装的 cron 负责。
+
+### 23.6 Sentry 错误监控
+
+后端结构化错误日志（`level:error`）可接 Sentry 聚合：
+
+```bash
+# server/.env 追加（DSN 占位，建项目后回填）：
+SENTRY_DSN=https://<你的Sentry_DSN>@o<org>.ingest.sentry.io/<project>
+```
+
+在 `main.js` 启动时按 DSN 是否存在决定是否初始化（当前未接，占位）；前端同理在
+`src/core` 加 Sentry SDK。免费套餐每月 5k 事件，够演示期用。
+

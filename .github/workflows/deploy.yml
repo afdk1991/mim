@@ -13,6 +13,7 @@ name: deploy
 # 1) 服务器发布层（主路线，systemd + nginx）
 #    Variable: ENABLE_SERVER_DEPLOY = true
 #    Secrets:  OCI_HOST（服务器地址）/ OCI_USER（部署账号，需 sudo）/ OCI_SSH_KEY（私钥整段 PEM）
+#              KNOWN_HOSTS（推荐，ssh-keyscan -H <host> 的整行输出，消除 TOFU；未配则回退 keyscan 并告警）
 #    Variable: MIM_DIR（可选，安装目录，默认 /opt/mim）
 #
 # 2) 边缘层（可选，Cloudflare Workers 地理选路 + D1 只读副本，见 worker/）
@@ -105,8 +106,17 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          # 首次连接写入 known_hosts；正式环境建议改成预置指纹，避免 TOFU 信任
-          ssh-keyscan -H "${{ secrets.OCI_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          # SD-016：预置主机指纹到 Secrets.KNOWN_HOSTS，消除 ssh-keyscan 的 TOFU 中间人窗口。
+          # 真实指纹获取：在服务器/本机执行 ssh-keyscan -H "${{ secrets.OCI_HOST }}"，
+          #   把整行输出（含 hash 后的主机名列）填到 Settings→Secrets and variables→Actions→KNOWN_HOSTS。
+          # 【待用户提供】真实指纹未配置前走下方 keyscan 回退并打 warning（首版上线前必须补 secret）。
+          if [ -n "${{ secrets.KNOWN_HOSTS }}" ]; then
+            printf '%s\n' "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+            echo "已使用预置 known_hosts 主机指纹"
+          else
+            echo "::warning::未配置 KNOWN_HOSTS secret，回退 ssh-keyscan（TOFU，首次连接存在中间人窗口）"
+            ssh-keyscan -H "${{ secrets.OCI_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
 
       - name: 拉取代码并重启服务
         env:

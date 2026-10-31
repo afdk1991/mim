@@ -3,7 +3,10 @@
  * - 包名改为 @<owner>/mim（GitHub Packages npm 仓库要求 scope 等于仓库属主）
  * - private 置为 false，registry 指向 npm.pkg.github.com
  * - 声明发布内容仅包含 dist 与 README
- * 仅在发布工作流中运行，不会改动仓库内文件。
+ *
+ * ⚠️ 本脚本会**覆盖工作区根目录的 package.json**（改包名/版本/private），仅在发布
+ *    CI 工作流（不提交、跑完即弃的 runner）中运行；不要在本地工作区跑，会弄脏
+ *    你未提交的 package.json。
  *
  * 版本号来源（关键）：
  *   不直接使用 tag —— tag 是四段式（V0.0.0.0），而 npm 只接受三段 semver，

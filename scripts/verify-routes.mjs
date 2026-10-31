@@ -40,7 +40,9 @@ for (const r of ROUTES) {
     await page.waitForTimeout(700)
     const res = await page.evaluate(() => ({
       len: (document.body.innerText || '').trim().length,
-      shell: !!document.querySelector('.app-shell, #root > *, .mim-shell'),
+      // SD-007：原选择器 '#root > *' 在 SPA 正常挂载后恒真，白屏门禁形同虚设。
+      // 真实 shell 容器见 src/app/shell.tsx：外层 .shell + 主内容 .app-shell。
+      shell: !!document.querySelector('.app-shell, .shell'),
     }))
     len = res.len
     hasShell = res.shell
