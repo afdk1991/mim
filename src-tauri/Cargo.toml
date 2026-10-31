@@ -1,6 +1,6 @@
 [package]
 name = "mim"
-version = "0.1.0"
+version = "0.0.0"
 description = "Mim 跨平台社区与工具台应用"
 edition = "2021"
 

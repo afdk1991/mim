@@ -1,7 +1,7 @@
 {
   "modelVersion": "5.0.0",
   "name": "mim",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Mim HarmonyOS 壳工程（ArkTS Web 容器 + OTA 检测）",
   "dependencies": {},
   "devDependencies": {

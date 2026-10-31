@@ -5,7 +5,7 @@
  * 例：0.1.0.3 → 0.1.3
  * ======================================================================== */
 
-export const APP_VERSION = '0.1.0.0'
+export const APP_VERSION = '0.0.0.0'
 
 /** 三段式派生版本（原生壳 / 发版标签用） */
 export function derivedVersion(v: string = APP_VERSION): string {

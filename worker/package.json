@@ -1,7 +1,7 @@
 {
   "name": "mim-worker",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Mim 可选边缘层（Cloudflare Workers）：健康探测 + 故障转移 + D1 只读副本同步。Mim 主路线是自托管 systemd+nginx，不依赖本包。",
   "scripts": {
     "typecheck": "tsc --noEmit",
