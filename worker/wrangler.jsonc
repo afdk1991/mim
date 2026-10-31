@@ -25,6 +25,7 @@
     "CN_MAKERS_ORIGIN": "",
     "CN_ORIGIN": "",
     "APP_ENV": "production",
+    "APP_VERSION": "0.1.0.0",
     "MAINTENANCE_MODE": false
   },
 

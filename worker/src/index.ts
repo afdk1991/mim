@@ -43,6 +43,7 @@ type Env = {
   HEALTH_CHECK_SECRET: string
 
   APP_ENV: 'development' | 'production'
+  APP_VERSION?: string   // 与主项目 src/core/version.ts 对齐的发版号（四段）
   MAINTENANCE_MODE?: boolean
 }
 
@@ -66,6 +67,7 @@ async function handleHealth(request: Request, env: Env): Promise<Response> {
     status: [oci, makers, cn].some(Boolean) ? (oci ? 'healthy' : 'degraded') : 'down',
     upstreams: { oci, makers, cn },
     env: env.APP_ENV,
+    version: env.APP_VERSION ?? 'dev',
     ts: Date.now(),
   }, 200)
 }

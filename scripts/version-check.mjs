@@ -50,12 +50,15 @@ const cargo = read('src-tauri/Cargo.toml')
 const pbx = read('ios/App/App.xcodeproj/project.pbxproj')
 const ohRoot = read('harmony/oh-package.json5')
 const ohEntry = read('harmony/entry/oh-package.json5')
+const workerPkg = JSON.parse(read('worker/package.json'))
+const workerWrangler = read('worker/wrangler.jsonc')
 
 const checks = [
   // —— 四段式载体：必须与 APP_VERSION 字面一致 ——
   { layer: 'src/core/version.ts (唯一源)', expect: APP_VERSION, actual: APP_VERSION, kind: 'four' },
   { layer: 'android versionName', expect: APP_VERSION, actual: match1(gradle, /versionName\s+"([^"]+)"/), kind: 'four' },
   { layer: 'harmony versionName', expect: APP_VERSION, actual: match1(appJson5, /"versionName"\s*:\s*"([^"]+)"/), kind: 'four' },
+  { layer: 'worker wrangler APP_VERSION', expect: APP_VERSION, actual: match1(workerWrangler, /"APP_VERSION"\s*:\s*"([^"]+)"/), kind: 'four' },
   // —— 三段式载体：必须等于派生值 ——
   { layer: 'package.json', expect: THREE, actual: pkg.version, kind: 'three' },
   { layer: 'tauri.conf.json', expect: THREE, actual: tauriConf.version, kind: 'three' },
@@ -63,6 +66,7 @@ const checks = [
   { layer: 'iOS MARKETING_VERSION', expect: THREE, actual: match1(pbx, /MARKETING_VERSION\s*=\s*([^;]+);/), kind: 'three' },
   { layer: 'harmony oh-package.json5', expect: THREE, actual: match1(ohRoot, /"version"\s*:\s*"([^"]+)"/), kind: 'three' },
   { layer: 'harmony entry/oh-package.json5', expect: THREE, actual: match1(ohEntry, /"version"\s*:\s*"([^"]+)"/), kind: 'three' },
+  { layer: 'worker/package.json', expect: THREE, actual: workerPkg.version, kind: 'three' },
 ]
 
 // ---------- 3. 校验 git tag（本地必查；--remote 追加远端）----------
