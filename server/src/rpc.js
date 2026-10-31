@@ -627,6 +627,12 @@ async function wallet_debit(ctx, p) {
 }
 
 async function wallet_credit(ctx, p) {
+  // BE-006：演示期后收口自助加余额。默认仅管理员可调（WALLET_SELF_CREDIT_ADMIN_ONLY
+  // 缺省视为 true）；确需放开自助充值（例如接了真实支付回调前的临时演示）显式置 'false'。
+  // 管理员给他人入账走 admin_wallet_credit，不经过这里。
+  const selfCreditAdminOnly = String(process.env.WALLET_SELF_CREDIT_ADMIN_ONLY ?? 'true') !== 'false'
+  if (selfCreditAdminOnly) ctx.requireAdmin()
+
   const fen = int(p, 'p_fen', { min: 1, max: 100_000_000_000 })
   const kind = p.p_kind === undefined || p.p_kind === null ? 'recharge' : str(p, 'p_kind', { max: 20 })
   if (kind !== 'recharge' && kind !== 'income') throw badRequest('入账类型只能为 recharge 或 income')
@@ -786,9 +792,31 @@ const dayStart = () => {
   return d.getTime()
 }
 
+/**
+ * BE-004：高价值/社会证明类事件——只能由服务端在对应业务真实发生后内部记账，
+ * 禁止客户端直报（否则登录用户可自行刷分）。这些动作的共同点：
+ *   · 分值高（live_open=50、answer_adopted=20、column_finished=30）；
+ *   · 或本质是「他人行为」（follow_gained 被关注数自己报不了、anti_spam_penalty 扣分只能风控）。
+ * 客户端直报这些动作一律 403；服务端业务事务内应调用 awardGrowthEvent()。
+ * 普通动作（publish_dynamic/resource_downloaded 等用户自身行为）仍允许 growth_record 直报，
+ * 由 growth_rules 的 daily_cap / quality_gate 兜底。
+ */
+const SERVER_ONLY_GROWTH_ACTIONS = new Set([
+  'live_open',
+  'answer_adopted',
+  'follow_gained',
+  'column_finished',
+  'anti_spam_penalty',
+])
+
 async function growth_record(ctx, p) {
   const action = str(p, 'p_action', { max: 100 })
   const quality = bool(p, 'p_quality', true)
+
+  // 行为白名单：高价值事件禁止客户端直报
+  if (SERVER_ONLY_GROWTH_ACTIONS.has(action)) {
+    throw forbidden('该成长行为由服务端在业务完成后自动记录，不能客户端直报刷分')
+  }
 
   return tx(async (c) => {
     const rule = (await c.query('select * from growth_rules where action = $1', [action])).rows[0]
@@ -803,12 +831,38 @@ async function growth_record(ctx, p) {
       ).rows[0].n
       if (used >= rule.daily_cap) throw conflict(`今日该行为已达上限（${rule.daily_cap} 次）`)
     }
+    // 服务端校时：一律用 Date.now()，客户端改系统时钟伪造无效
     const r = await c.query(
       'insert into growth_events (user_id, action, at) values ($1, $2, $3) returning id',
       [ctx.uid, action, Date.now()],
     )
     return { id: Number(r.rows[0].id), action, value: rule.value }
   })
+}
+
+/**
+ * BE-004 服务端内部成长记账：在业务事务连接 c 上给用户记一笔事件。
+ * 高价值事件的唯一入口——调用方已确保行为真实发生（如回答被采纳、专栏完结），
+ * 不做质量闸、不向客户端暴露。日上限命中时静默返回 null，不阻断主业务事务。
+ */
+export async function awardGrowthEvent(c, uid, action, { quality = true } = {}) {
+  const rule = (await c.query('select * from growth_rules where action = $1', [action])).rows[0]
+  if (!rule) return null
+  if (rule.quality_gate && !quality) return null
+  if (rule.daily_cap !== null && rule.value > 0) {
+    const used = (
+      await c.query(
+        'select count(*)::int as n from growth_events where user_id = $1 and action = $2 and at >= $3',
+        [uid, action, dayStart()],
+      )
+    ).rows[0].n
+    if (used >= rule.daily_cap) return null
+  }
+  const r = await c.query(
+    'insert into growth_events (user_id, action, at) values ($1, $2, $3) returning id',
+    [uid, action, Date.now()],
+  )
+  return Number(r.rows[0].id)
 }
 
 async function growth_checkin(ctx) {
@@ -1303,6 +1357,80 @@ async function ota_report(ctx, p) {
   })
 }
 
+/* ==========================================================================
+ * 系统配置（0012_system_config）—— 外部接入参数后台可配
+ *
+ * 设计：
+ *   · config_get 公开只读：前端在登录前也要能拿到备案号/客服邮箱/支付二维码等
+ *     非敏感展示信息，因此只回 sensitive=false 的键；敏感键（商户号/密钥/JWT 等）
+ *     绝不进公开回包。
+ *   · admin_config_set 仅管理员：入参 p_updates:[{key,value}] 或单个 p_key/p_value；
+ *     敏感键回显仅末 4 位打码；每笔写操作写 audit_logs 留痕（who/what/when）。
+ * ======================================================================== */
+
+/** 敏感值脱敏：保留末 4 位，其余打码（如 ************3456） */
+function maskSecret(v) {
+  const s = String(v ?? '')
+  if (!s) return ''
+  if (s.length <= 4) return '*'.repeat(Math.max(4, s.length))
+  return '*'.repeat(Math.max(4, s.length - 4)) + s.slice(-4)
+}
+
+/** 公开读：仅返回 sensitive=false 键的当前值。匿名可调。 */
+async function config_get() {
+  const rows = await query('select key, value from system_config where sensitive = false order by key')
+  const config = {}
+  for (const r of rows.rows) config[r.key] = r.value
+  return { config }
+}
+
+/** 管理员写：upsert system_config，敏感键脱敏回显 + 审计留痕。 */
+async function admin_config_set(ctx, p) {
+  ctx.requireAdmin()
+
+  let updates = []
+  if (Array.isArray(p?.p_updates)) {
+    updates = p.p_updates
+  } else if (p?.p_key !== undefined && p.p_key !== null) {
+    updates = [{ key: p.p_key, value: p.p_value }]
+  }
+  if (!updates.length) throw badRequest('缺少参数：p_updates:[{key,value}] 或 p_key/p_value')
+
+  const result = {}
+  return tx(async (c) => {
+    for (const u of updates) {
+      const key = str(u ?? {}, 'key', { max: 100 })
+      if (u === null || u === undefined || u.value === undefined) throw badRequest(`配置项 ${key} 缺少 value`)
+      const raw = u.value
+      const jsonb = raw === null ? 'null' : JSON.stringify(raw)
+
+      await c.query(
+        `insert into system_config (key, value, updated_at, updated_by)
+         values ($1, $2::jsonb, $3, $4)
+         on conflict (key) do update
+            set value = $2::jsonb, updated_at = $3, updated_by = $4`,
+        [key, jsonb, Date.now(), String(ctx.uid)],
+      )
+      const row = (await c.query('select sensitive from system_config where key = $1', [key])).rows[0]
+      const isSensitive = !!row?.sensitive
+      const display = isSensitive ? maskSecret(raw) : raw
+      result[key] = display
+      await writeAudit(c, ctx.uid, 'config.set', 'system_config', key, {
+        sensitive: isSensitive,
+        value: isSensitive ? maskSecret(raw) : raw,
+      })
+    }
+
+    const out = { config: result }
+    // 单键写入时同时回显 value/echo，方便管理端就地展示脱敏结果
+    if (Object.keys(result).length === 1) {
+      out.value = result[Object.keys(result)[0]]
+      out.echo = out.value
+    }
+    return out
+  })
+}
+
 /* ---------- 注册表 ---------- */
 
 export const RPCS = new Map(
@@ -1346,6 +1474,9 @@ export const RPCS = new Map(
     ota_stats,
     /* 埋点口径（管理员：让落库数据能被算出来） */
     admin_events_summary: eventSummary,
+    /* 系统配置（公开读非敏感 / 管理员写脱敏+审计） */
+    config_get,
+    admin_config_set,
   }),
 )
 

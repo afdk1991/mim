@@ -133,6 +133,33 @@ function ownerGuard(ctx, cfg) {
   return cfg.owner
 }
 
+/**
+ * BE-010：按主键定位的 WHERE 构造。
+ * 单列主键：where = `pk[0] = :id`，行为与历史一致。
+ * 复合主键（cfg.pk 多列，如 live_shelf(room_id,goods_id)、travel_date_stock(ticket_id,date)）：
+ *   第一列取自路径 :id，其余键列必须由查询串 `eq=<col>.<值>` 补全，否则 400。
+ *   否则只按第一列匹配会把整组记录一起改掉（管理员操作粒度偏大）。
+ */
+function buildPkWhere(info, targetId, eqList) {
+  const { cfg } = info
+  const pk = cfg.pk ?? ['id']
+  const eqMap = new Map()
+  for (const raw of eqList ?? []) {
+    const s = String(raw ?? '')
+    const dot = s.indexOf('.')
+    if (dot > 0) eqMap.set(s.slice(0, dot), s.slice(dot + 1))
+  }
+  const cols = [pk[0]]
+  const params = [targetId]
+  for (let i = 1; i < pk.length; i++) {
+    const col = pk[i]
+    if (!eqMap.has(col)) throw badRequest(`表 ${info.table} 为复合主键，需通过 eq=${col}.<值> 定位后再写`)
+    cols.push(col)
+    params.push(eqMap.get(col))
+  }
+  return { cols, params }
+}
+
 /* ---------- 读 ---------- */
 
 export async function list(ctx, table, q) {
@@ -302,7 +329,7 @@ export async function insert(ctx, table, body) {
   }
 }
 
-export async function update(ctx, table, id, patch) {
+export async function update(ctx, table, id, patch, searchParams) {
   const info = await describe(table)
   const { cfg } = info
   checkWrite(ctx, cfg)
@@ -313,54 +340,72 @@ export async function update(ctx, table, id, patch) {
   // 而不是静默改写到自己身上——静默改写会让前端误以为别人的资料被改了。
   const self = cfg.write === 'self' && cfg.owner
   if (self && String(id) !== ctx.uid) throw forbidden('只能操作自己的资料')
-  const target = self ? ctx.uid : id
-  const pk = self ? cfg.owner : cfg.pk?.[0] ?? 'id'
+
   const params = []
   const sets = []
   picked.cols.forEach((c, i) => {
     params.push(encode(info, c, picked.vals[i]))
     sets.push(`${ident(c)} = $${params.length}`)
   })
-  params.push(target)
-  const where = [`${ident(pk)} = $${params.length}`]
+  if (info.cols.has('updated_at') && picked.cols.length) sets.push('updated_at = now()')
 
+  const where = []
+  if (self) {
+    params.push(ctx.uid)
+    where.push(`${ident(cfg.owner)} = $${params.length}`)
+  } else {
+    // BE-010：单列按 :id；复合主键其余列从 eq 补全，避免整组误改
+    const t = buildPkWhere(info, id, searchParams?.getAll?.('eq') ?? [])
+    t.params.forEach((v, i) => {
+      params.push(v)
+      where.push(`${ident(t.cols[i])} = $${params.length}`)
+    })
+  }
   const guard = ownerGuard(ctx, cfg)
-  if (cfg.write === 'owner' && guard) {
+  if (cfg.write === 'owner' && !self && guard) {
     params.push(ctx.uid)
     where.push(`${ident(guard)} = $${params.length}`)
   }
-  if (info.cols.has('updated_at') && picked.cols.length) sets.push('updated_at = now()')
 
   try {
     const r = await query(
       `update ${ident(info.table)} set ${sets.join(', ')} where ${where.join(' and ')} returning *`,
       params,
     )
-    if (!r.rows.length) throw await missingTarget(info.table, pk, target, cfg.write === 'owner')
+    if (!r.rows.length) throw await missingTarget(info.table, (cfg.pk ?? ['id'])[0], self ? ctx.uid : id, cfg.write === 'owner')
     return r.rows[0]
   } catch (e) {
     throw mapWriteError(e, table)
   }
 }
 
-export async function remove(ctx, table, id) {
+export async function remove(ctx, table, id, searchParams) {
   const info = await describe(table)
   const { cfg } = info
   checkWrite(ctx, cfg)
   const self = cfg.write === 'self' && cfg.owner
   if (self && String(id) !== ctx.uid) throw forbidden('只能操作自己的资料')
-  const pk = self ? cfg.owner : cfg.pk?.[0] ?? 'id'
-  const target = self ? ctx.uid : id
-  const params = [target]
-  const where = [`${ident(pk)} = $1`]
+
+  const params = []
+  const where = []
+  if (self) {
+    params.push(ctx.uid)
+    where.push(`${ident(cfg.owner)} = $${params.length}`)
+  } else {
+    const t = buildPkWhere(info, id, searchParams?.getAll?.('eq') ?? [])
+    t.params.forEach((v, i) => {
+      params.push(v)
+      where.push(`${ident(t.cols[i])} = $${params.length}`)
+    })
+  }
   const guard = ownerGuard(ctx, cfg)
-  if (cfg.write === 'owner' && guard) {
+  if (cfg.write === 'owner' && !self && guard) {
     params.push(ctx.uid)
     where.push(`${ident(guard)} = $${params.length}`)
   }
   try {
     const r = await query(`delete from ${ident(info.table)} where ${where.join(' and ')}`, params)
-    if (!r.rowCount) throw await missingTarget(info.table, pk, target, cfg.write === 'owner')
+    if (!r.rowCount) throw await missingTarget(info.table, (cfg.pk ?? ['id'])[0], self ? ctx.uid : id, cfg.write === 'owner')
     return true
   } catch (e) {
     throw mapWriteError(e, table)
@@ -378,7 +423,8 @@ function mapWriteError(e, table) {
   if (e?.code === '23505') return conflict('唯一约束冲突，记录可能已存在')
   if (e?.code === '23503') return badRequest(`引用了不存在的记录（${table}）`)
   if (e?.code === '23502') return badRequest(`缺少必填字段：${e.column ?? ''}`.trimEnd())
-  if (e?.code === '23514') return badRequest(e.detail || '字段取值超出允许范围')
+  // BE-008：PG check 约束的 e.detail 可能含内部列/表信息，不下发客户端，仅日志保留
+  if (e?.code === '23514') return badRequest('字段取值超出允许范围')
   if (e?.code === '42703') return missingColumn(table, e.column ?? '?')
   return e
 }

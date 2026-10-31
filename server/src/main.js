@@ -11,7 +11,8 @@ import http from 'node:http'
 import path from 'node:path'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
-import { close, ping } from './db.js'
+import { randomUUID } from 'node:crypto'
+import { close } from './db.js'
 import { authenticate, login, register, revokeToken } from './auth.js'
 import * as rest from './rest.js'
 import { callRpc, knownRpcs, sweepSeckillLocks } from './rpc.js'
@@ -19,12 +20,13 @@ import * as storage from './storage.js'
 import { checkSyncToken, syncPosts } from './sync.js'
 import * as iot from './iot.js'
 import { ingest } from './events.js'
+import { healthReport } from './health.js'
+import { assertAllowed } from './rate-limit.js'
 import { toApiError, badRequest } from './errors.js'
 
 const PORT = Number(process.env.PORT ?? 8787)
 const HOST = process.env.HOST ?? '0.0.0.0'
 const MAX_BODY = Number(process.env.MAX_BODY_BYTES ?? 12 * 1024 * 1024)
-const startedAt = Date.now()
 
 /* ---------- 响应工具 ---------- */
 
@@ -52,7 +54,7 @@ const ok = (res, data, status = 200) => json(res, status, { data })
 
 function fail(res, e) {
   const api = toApiError(e)
-  if (api.status >= 500) console.error('[500]', api.cause ?? api.message)
+  // 5xx 的详细错误已在 createServer 的 catch 里按结构化格式打过日志，这里不再重复打
   json(res, api.status, { error: { code: api.code, message: api.message } })
 }
 
@@ -75,16 +77,6 @@ async function readBody(req) {
 
 /* ---------- 路由 ---------- */
 
-async function health() {
-  let db = false
-  try {
-    db = await ping()
-  } catch {
-    db = false
-  }
-  return { ok: true, db, service: 'mim-server', uptime_ms: Date.now() - startedAt, rpcs: knownRpcs().length }
-}
-
 async function route(req, res, url) {
   const { pathname, searchParams } = url
   const path = pathname.replace(/\/+$/, '') || '/'
@@ -95,8 +87,11 @@ async function route(req, res, url) {
   }
   const restPath = path.slice(4) // 去掉 /api
 
-  /* --- 健康检查 --- */
-  if (restPath === '/health' || restPath === '/healthz') return ok(res, await health())
+  /* --- 健康检查（?full=1 深度检查：追加 migrations 明细）--- */
+  if (restPath === '/health' || restPath === '/healthz') {
+    const full = searchParams.get('full') === '1'
+    return ok(res, await healthReport(full))
+  }
 
   /* --- 无鉴权回声端点（GAP-02）：Coze 面板/连通性探测的第二探针 --- */
   if (restPath === '/hello') {
@@ -112,12 +107,16 @@ async function route(req, res, url) {
     return ok(res, await ingest(ctx, await readBody(req), { ip }), 202)
   }
 
-  /* --- 认证 --- */
+  /* --- 认证（限流：爆破重点，IP+auth 固定窗口） --- */
   if (restPath === '/auth/register') {
+    assertAllowed(clientIp(req), 'auth')
     const body = await readBody(req)
     return ok(res, await register(body), 201)
   }
-  if (restPath === '/auth/login') return ok(res, await login(await readBody(req)))
+  if (restPath === '/auth/login') {
+    assertAllowed(clientIp(req), 'auth')
+    return ok(res, await login(await readBody(req)))
+  }
   if (restPath === '/auth/logout') {
     const ctx = await tryAuth(req)
     if (ctx) await revokeToken(ctx)
@@ -193,12 +192,14 @@ async function route(req, res, url) {
     throw badRequest('未知设备接口')
   }
 
-  /* --- RPC --- */
+  /* --- RPC（限流：按 IP+函数名分桶，高频业务写另有更高阈值，见 rate-limit.js） --- */
   if (restPath.startsWith('/rpc/')) {
     const fn = restPath.slice('/rpc/'.length)
     if (!/^[a-z_][a-z0-9_]*$/.test(fn)) throw badRequest(`非法函数名：${fn}`)
+    assertAllowed(clientIp(req), 'rpc', fn)
     const body = method === 'GET' ? Object.fromEntries(searchParams) : await readBody(req)
-    const ctx = await authenticate(req)
+    // config_get 公开只读（登录前也要拿备案/客服等非敏感展示信息）；其余 RPC 一律需登录
+    const ctx = fn === 'config_get' ? await tryAuth(req) : await authenticate(req)
     return ok(res, await callRpc(ctx, fn, body))
   }
 
@@ -220,11 +221,18 @@ async function route(req, res, url) {
       return ok(res, await rest.list(await tryAuth(req), table, q))
     }
 
+    // BE-007：单条读与列表读权限对齐——公共表匿名可读，owner/admin 表在
+    // rest.checkRead 内强制登录（原来单条强制 authenticate，与列表匿名可读不对称）。
+    if (method === 'GET') {
+      return ok(res, await rest.one(await tryAuth(req), table, decodeURIComponent(id)))
+    }
+
+    // 写操作：限流 + 强制登录
+    assertAllowed(clientIp(req), 'rest')
     const ctx = await authenticate(req)
-    if (method === 'GET') return ok(res, await rest.one(ctx, table, decodeURIComponent(id)))
     if (method === 'POST') return ok(res, await rest.insert(ctx, table, await readBody(req)), 201)
-    if (method === 'PATCH') return ok(res, await rest.update(ctx, table, decodeURIComponent(id), await readBody(req)))
-    if (method === 'DELETE') return ok(res, await rest.remove(ctx, table, decodeURIComponent(id)))
+    if (method === 'PATCH') return ok(res, await rest.update(ctx, table, decodeURIComponent(id), await readBody(req), searchParams))
+    if (method === 'DELETE') return ok(res, await rest.remove(ctx, table, decodeURIComponent(id), searchParams))
     throw badRequest(`不支持的请求方法：${method}`)
   }
 
@@ -243,26 +251,81 @@ async function tryAuth(req) {
  * 本定时器只兜底「无人再访问的老场次」；进程重启后丢失可接受（见 rpc.js）。 */
 let sweepTimer
 
+/* ---------- 结构化日志 ----------
+ * 请求访问日志统一 JSON 行（便于 journald / Loki 采集）：
+ *   ts / level / request_id / method / path / status / ms / ip
+ * 不记任何请求头（Authorization、Cookie、x-iot-hook-token 等敏感字段一律不落盘）。
+ * request_id 每请求一个短 id，错误日志带同一个 id，可在 journalctl 里把
+ * 「哪次请求、报了什么错」串起来。 */
+function accessLog({ requestId, method, path, status, ms, ip }) {
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'info',
+      request_id: requestId,
+      method,
+      path,
+      status,
+      ms,
+      ip,
+    }),
+  )
+}
+
+function errorLog({ requestId, method, path, status, code, message, cause }) {
+  console.error(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'error',
+      request_id: requestId,
+      method,
+      path,
+      status,
+      code,
+      message,
+      cause,
+    }),
+  )
+}
+
+/** 取客户端 IP：nginx 反代后 socket 地址是 127.0.0.1，第一跳 X-Forwarded-For 才是真实来源 */
+function clientIp(req) {
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  return xff || req.socket?.remoteAddress || ''
+}
+
 const server = http.createServer((req, res) => {
   const started = Date.now()
+  const requestId = randomUUID().slice(0, 8)
+  const method = req.method ?? 'GET'
+  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+  const ip = clientIp(req)
+
   const done = (status) => {
-    const ms = Date.now() - started
-    console.log(`${req.method} ${req.url} → ${status} ${ms}ms`)
+    accessLog({ requestId, method, path: url.pathname, status, ms: Date.now() - started, ip })
   }
 
-  if (req.method === 'OPTIONS') {
+  if (method === 'OPTIONS') {
     cors(res)
     res.writeHead(204, { 'Content-Length': 0 })
     res.end()
     return
   }
 
-  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
   res.on('finish', () => done(res.statusCode))
 
   route(req, res, url).catch((e) => {
     const api = toApiError(e)
     done(api.status)
+    errorLog({
+      requestId,
+      method,
+      path: url.pathname,
+      status: api.status,
+      code: api.code,
+      message: api.message,
+      cause: api.cause?.message ?? '',
+    })
     if (res.writableEnded) return
     fail(res, e)
   })

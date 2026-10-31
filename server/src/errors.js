@@ -21,6 +21,7 @@ export const forbidden = (message = '没有操作权限') => new ApiError('forbi
 export const notFound = (message = '资源不存在或已被删除') => new ApiError('not_found', message, 404)
 export const conflict = (message = '操作冲突，请刷新后重试') => new ApiError('conflict', message, 409)
 export const busy = (message = '系统繁忙，请稍后重试') => new ApiError('busy', message, 503)
+export const rateLimited = (message = '请求过于频繁，请稍后再试') => new ApiError('rate_limited', message, 429)
 export const schemaError = (message, cause) => new ApiError('schema', message, 400, cause)
 
 /** 缺列提示文案刻意与 PostgREST 一致：前端 writeWithFallback 靠它做缺列降级 */
