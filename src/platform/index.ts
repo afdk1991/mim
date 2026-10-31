@@ -48,15 +48,25 @@ export function createAdapter(kind: PlatformKind): IPlatformAdapter {
   }
 }
 
+/**
+ * 缓存策略（P8）：
+ *  - `active`：首调 `getPlatform()` 探测并造出适配器后常驻，后续调用不再重复探测/构造。
+ *  - `detectedKind`：探测结果也缓存一次，确保探测函数在一个自动探测周期内只跑一次。
+ *  - `setPlatform(null)` 恢复自动探测，同时清空缓存，下次 `getPlatform()` 重新探测。
+ */
 let active: IPlatformAdapter | null = null
+let detectedKind: PlatformKind | null = null
 
 /** 取当前适配器；首次调用才探测，模块导入期不碰任何宿主对象 */
 export function getPlatform(): IPlatformAdapter {
-  if (!active) active = detectPlatformKind() === 'web' ? webAdapter : createAdapter(detectPlatformKind())
+  if (active) return active
+  if (detectedKind === null) detectedKind = detectPlatformKind()
+  active = detectedKind === 'web' ? webAdapter : createAdapter(detectedKind)
   return active
 }
 
 /** 显式注入（测试 / 原生壳启动时）；传 null 恢复自动探测 */
 export function setPlatform(adapter: IPlatformAdapter | null): void {
   active = adapter
+  if (adapter === null) detectedKind = null
 }

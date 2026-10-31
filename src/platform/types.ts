@@ -11,7 +11,8 @@
  * ======================================================================== */
 
 /** 当前实现的平台种类；新增端必须同时补进 `createAdapter()` 与契约测试 */
-export type PlatformKind = 'web' | 'mock' | 'capacitor' | 'miniprogram'
+export const PLATFORM_KINDS = ['web', 'mock', 'capacitor', 'miniprogram'] as const
+export type PlatformKind = (typeof PLATFORM_KINDS)[number]
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -49,11 +50,43 @@ export interface PlatformUi {
   openExternal(url: string): Promise<boolean>
 }
 
-export interface IPlatformAdapter {
+/**
+ * 网络出口：平台适配层统一提供的 HTTP 能力。
+ * 注意：adapter 只接收完整 url 与已注入 token 的 headers —— 平台层不得 import
+ * core，因此鉴权头由 core/http.ts 在调用前加好。超时由实现方用 AbortController
+ * （小程序用 wx.request 的 timeout）处理，JSON 解析留在 core 层做。
+ */
+export interface PlatformHttpOptions {
+  headers: Record<string, string>
+  /** 已序列化为字符串的请求体（core 层负责 JSON.stringify） */
+  body?: string
+  timeoutMs?: number
+}
+
+export interface PlatformHttp {
+  request(
+    method: string,
+    url: string,
+    opts: PlatformHttpOptions,
+  ): Promise<{ ok: boolean; status: number; text: string }>
+}
+
+/** 契约自检用的调试字段：记录「适配器确实收到/降级了什么」，便于上层区分真做了与降级 false */
+export interface PlatformDebug {
+  /** copyText 最近一次入参 */
+  _lastCopied: string
+  /** share 降级（返回 false）时记录的结构化原因，未降级为空串 */
+  _lastShareFallback: string
+  /** openExternal 降级（返回 false）时记录的结构化原因，未降级为空串 */
+  _lastOpenExternalFallback: string
+}
+
+export interface IPlatformAdapter extends PlatformDebug {
   readonly kind: PlatformKind
   readonly storage: KeyValueStore
   readonly env: PlatformEnv
   readonly ui: PlatformUi
+  readonly http: PlatformHttp
 }
 
 /* ---------- 宿主全局对象的最小声明（不引入 @types/wx-server 之类依赖） ---------- */
@@ -67,6 +100,15 @@ export interface WxLike {
   setClipboardData?(opts: { data: string; success?: () => void; fail?: () => void }): void
   vibrateShort?(opts?: Record<string, unknown>): void
   showToast?(opts: { title: string; icon?: string }): void
+  request?(opts: {
+    url: string
+    method?: string
+    header?: Record<string, string>
+    data?: unknown
+    timeout?: number
+    success?: (res: { statusCode: number; data: unknown }) => void
+    fail?: () => void
+  }): void
 }
 
 export interface CapacitorLike {

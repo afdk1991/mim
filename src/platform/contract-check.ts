@@ -9,6 +9,7 @@
  * ======================================================================== */
 
 import type { IPlatformAdapter } from './types'
+import { PLATFORM_KINDS } from './types'
 
 export interface ContractCase {
   name: string
@@ -16,7 +17,23 @@ export interface ContractCase {
   detail?: string
 }
 
-const KIND_WHITELIST = ['web', 'mock', 'capacitor', 'miniprogram']
+/** 读取适配器上的调试字段（平台层记录，契约层断言） */
+function probeDebug(adapter: IPlatformAdapter): {
+  copied: string
+  shareFb: string
+  openFb: string
+} {
+  const d = adapter as unknown as {
+    _lastCopied?: string
+    _lastShareFallback?: string
+    _lastOpenExternalFallback?: string
+  }
+  return {
+    copied: d._lastCopied ?? '',
+    shareFb: d._lastShareFallback ?? '',
+    openFb: d._lastOpenExternalFallback ?? '',
+  }
+}
 
 export async function runAdapterContract(adapter: IPlatformAdapter): Promise<ContractCase[]> {
   const cases: ContractCase[] = []
@@ -31,7 +48,7 @@ export async function runAdapterContract(adapter: IPlatformAdapter): Promise<Con
     }
   }
 
-  await check('kind 在允许列表内', () => KIND_WHITELIST.includes(adapter.kind), `未知 kind: ${adapter.kind}`)
+  await check('kind 在允许列表内', () => PLATFORM_KINDS.includes(adapter.kind), `未知 kind: ${adapter.kind}`)
 
   await check('storage.set → storage.get 读到同一值', () => {
     adapter.storage.set(tag, 'v1')
@@ -87,6 +104,32 @@ export async function runAdapterContract(adapter: IPlatformAdapter): Promise<Con
     async () => typeof (await adapter.ui.openExternal('https://example.com')) === 'boolean',
     '返回类型不是 boolean',
   )
+
+  /* ---------- 语义断言：适配器确实「收到」/「降级」了什么 ---------- */
+
+  await check('ui.copyText 在适配器上记录 _lastCopied 为入参', async () => {
+    await adapter.ui.copyText('mim')
+    return probeDebug(adapter).copied === 'mim'
+  }, '适配器未记录复制文本')
+
+  await check('ui.share 降级（返回 false）时记录 _lastShareFallback', async () => {
+    const r = await adapter.ui.share({ title: 'Mim', url: 'https://example.com' })
+    if (r === true) return true
+    const fb = probeDebug(adapter).shareFb
+    return typeof fb === 'string' && fb.length > 0
+  }, 'share 返回 false 但未记录降级原因')
+
+  await check('ui.openExternal 降级（返回 false）时记录 _lastOpenExternalFallback', async () => {
+    const r = await adapter.ui.openExternal('https://example.com')
+    if (r === true) return true
+    const fb = probeDebug(adapter).openFb
+    return typeof fb === 'string' && fb.length > 0
+  }, 'openExternal 返回 false 但未记录降级原因')
+
+  await check('http.request 返回 {ok,status,text} 形状', async () => {
+    const r = await adapter.http.request('GET', 'https://example.invalid/x', { headers: {}, timeoutMs: 2000 })
+    return typeof r.ok === 'boolean' && typeof r.status === 'number' && typeof r.text === 'string'
+  }, 'http 返回结构不符约定')
 
   return cases
 }

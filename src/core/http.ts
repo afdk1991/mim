@@ -11,6 +11,7 @@
 import { ERR_CN, err, fail, isErrCode, ok } from './result'
 import type { AppError, ErrCode, Result } from './result'
 import { API_BASE, isBackendConfigured } from './config'
+import { getPlatform } from '../platform'
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
@@ -50,56 +51,60 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 async function once(path: string, opts: RequestOptions): Promise<Result<unknown>> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-  try {
-    const headers: Record<string, string> = { ...(opts.headers ?? {}) }
-    if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
-    if (opts.auth !== false) {
-      const token = tokenProvider()
-      if (token) headers.Authorization = `Bearer ${token}`
-    }
-
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: opts.method ?? 'GET',
-      headers,
-      ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
-      signal: controller.signal,
-    })
-
-    const text = await res.text()
-    let payload: unknown = null
-    if (text) {
-      try {
-        payload = JSON.parse(text) as unknown
-      } catch {
-        payload = null
-      }
-    }
-
-    if (!res.ok) {
-      // 后端若返回 { error: { code, message } }，优先用它的文案
-      const body = isRecord(payload) ? payload : null
-      const inner = body && isRecord(body.error) ? body.error : null
-      const code = inner && isErrCode(inner.code) ? inner.code : statusToCode(res.status)
-      const message =
-        (inner && typeof inner.message === 'string' && inner.message) ||
-        (body && typeof body.message === 'string' && body.message) ||
-        ERR_CN[code]
-      return fail(code, message, { status: res.status })
-    }
-
-    // 后端约定：{ data: ... } 或裸数据
-    if (isRecord(payload) && 'data' in payload && Object.keys(payload).length === 1) {
-      return ok(payload.data)
-    }
-    return ok(payload ?? true)
-  } catch (e) {
-    const aborted = e instanceof DOMException && e.name === 'AbortError'
-    return fail(aborted ? 'busy' : 'offline', aborted ? ERR_CN.busy : ERR_CN.offline, e)
-  } finally {
-    clearTimeout(timer)
+  const method = opts.method ?? 'GET'
+  const headers: Record<string, string> = { ...(opts.headers ?? {}) }
+  if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (opts.auth !== false) {
+    // 鉴权头由 core 层注入后再交给平台 http 能力；platform 层不得 import core
+    const token = tokenProvider()
+    if (token) headers.Authorization = `Bearer ${token}`
   }
+  const body = opts.body === undefined ? undefined : JSON.stringify(opts.body)
+
+  let raw: { ok: boolean; status: number; text: string }
+  try {
+    // 统一走平台适配层的 http 能力（web/capacitor 用 fetch，miniprogram 用 wx.request）
+    raw = await getPlatform().http.request(method, `${API_BASE}${path}`, {
+      headers,
+      body,
+      timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    })
+  } catch (e) {
+    return fail('offline', ERR_CN.offline, e)
+  }
+
+  // 网络层失败（status=0，如超时 / DNS 不可达）：统一视为离线
+  if (!raw.ok && raw.status === 0) {
+    return fail('offline', ERR_CN.offline)
+  }
+
+  const text = raw.text
+  let payload: unknown = null
+  if (text) {
+    try {
+      payload = JSON.parse(text) as unknown
+    } catch {
+      payload = null
+    }
+  }
+
+  if (!raw.ok) {
+    // 后端若返回 { error: { code, message } }，优先用它的文案
+    const bodyObj = isRecord(payload) ? payload : null
+    const inner = bodyObj && isRecord(bodyObj.error) ? bodyObj.error : null
+    const code = inner && isErrCode(inner.code) ? inner.code : statusToCode(raw.status)
+    const message =
+      (inner && typeof inner.message === 'string' && inner.message) ||
+      (bodyObj && typeof bodyObj.message === 'string' && bodyObj.message) ||
+      ERR_CN[code]
+    return fail(code, message, { status: raw.status })
+  }
+
+  // 后端约定：{ data: ... } 或裸数据
+  if (isRecord(payload) && 'data' in payload && Object.keys(payload).length === 1) {
+    return ok(payload.data)
+  }
+  return ok(payload ?? true)
 }
 
 /** 统一请求入口 */

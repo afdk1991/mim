@@ -9,6 +9,7 @@ import { Shell } from './app/shell'
 import { resolveRoute } from './app/routes'
 import { useRouter } from './app/router'
 import { hydrateWallet } from './app/state/wallet'
+import { OtaBanner } from './ota'
 import { useEffect } from 'react'
 
 function Page(): JSX.Element {
@@ -24,6 +25,7 @@ export default function App() {
 
   return (
     <AppProviders>
+      <OtaBanner />
       <Shell>
         <Page />
       </Shell>

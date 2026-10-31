@@ -126,10 +126,13 @@ export function migrateOnce(newKey: string, legacyKeys: string[]): void {
 
 /** 清除某身份下的全部隔离键（注销 / 切换账号用） */
 export function purgeUid(uid: string): number {
-  const suffix = `.${uid}.`
   let n = 0
   for (const k of listKeys()) {
-    if (k.includes(suffix)) {
+    // 用户隔离键形如 `mim.<scope>.<uid>.<field>`，uid 是独立段，必须按点切分后逐个比对，
+    // 不能用 `.${uid}.` 子串匹配（否则会误删 `mim.<scope=uid>.<field>` 这类全局键，
+    // 或 `mim.x.uidseg.y` 之类含 uid 前缀的段）。
+    const seg = k.split('.')
+    if (seg.length >= 4 && seg[0] === NS && seg[2] === uid) {
       removeKey(k)
       n += 1
     }

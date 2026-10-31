@@ -5,7 +5,7 @@
  * 全部能力都有确定行为（不返回随机值），保证断言可复现。
  * ======================================================================== */
 
-import type { IPlatformAdapter, KeyValueStore, PlatformEnv, PlatformUi, ThemeMode } from './types'
+import type { IPlatformAdapter, KeyValueStore, PlatformEnv, PlatformUi, PlatformHttp, ThemeMode } from './types'
 
 export interface MockOptions {
   prefersDark?: boolean
@@ -63,24 +63,44 @@ export function createMockAdapter(opts: MockOptions = {}): MockAdapter {
     },
     async copyText(text) {
       log.push(`ui.copyText:${text.length}`)
+      result._lastCopied = text
       return opts.copyOk !== false
     },
     async share(payload) {
       log.push(`ui.share:${payload.url ?? payload.title ?? ''}`)
-      return opts.shareOk !== false
+      const ok = opts.shareOk !== false
+      if (!ok) result._lastShareFallback = 'share_unsupported'
+      return ok
     },
     async openExternal(url) {
       log.push(`ui.openExternal:${url}`)
-      return opts.openOk !== false
+      const ok = opts.openOk !== false
+      if (!ok) result._lastOpenExternalFallback = 'open_unsupported'
+      return ok
     },
   }
 
-  return {
+  const http: PlatformHttp = {
+    // Mock 无真实后端：调用直接返回失败形状，由测试另行注入行为或仅校验调用
+    async request() {
+      return { ok: false, status: 0, text: '' }
+    },
+  }
+
+  // 一次成型、不再事后赋值：IPlatformAdapter 的 ui / http 是 readonly，
+  // 事后 `adapter.ui = …` 会报 TS2540；ui 的方法体引用 result 属闭包延迟求值，安全。
+  const result: MockAdapter = {
     kind: 'mock',
     storage,
     env,
-    ui,
     themeMode: () => theme,
     calls: () => [...log],
+    _lastCopied: '',
+    _lastShareFallback: '',
+    _lastOpenExternalFallback: '',
+    ui,
+    http,
   }
+
+  return result
 }

@@ -5,7 +5,7 @@
  * 保证「写失败但本次会话内读写自洽」，不会出现「刚存进去就读不到」。
  * ======================================================================== */
 
-import type { IPlatformAdapter, KeyValueStore, PlatformEnv, PlatformUi } from './types'
+import type { IPlatformAdapter, KeyValueStore, PlatformEnv, PlatformUi, PlatformHttp, SharePayload, ThemeMode } from './types'
 import { hostGlobals } from './types'
 
 /** localStorage 不可用时的进程内兜底；随页面生命周期存在 */
@@ -100,8 +100,8 @@ export const webEnv: PlatformEnv = {
   },
 }
 
-/** 复制：navigator.clipboard → execCommand 兜底（老 WebView 没有 clipboard API） */
-async function copyViaDom(text: string): Promise<boolean> {
+/** 复制实现：navigator.clipboard → execCommand 兜底（老 WebView 没有 clipboard API） */
+export async function copyViaDom(text: string): Promise<boolean> {
   const { doc, win } = hostGlobals()
   if (!doc || !win) return false
   try {
@@ -120,7 +120,7 @@ async function copyViaDom(text: string): Promise<boolean> {
   }
 }
 
-async function copyText(text: string): Promise<boolean> {
+export async function defaultCopyText(text: string): Promise<boolean> {
   const { win } = hostGlobals()
   const clip = win?.navigator?.clipboard
   if (clip && typeof clip.writeText === 'function') {
@@ -134,48 +134,99 @@ async function copyText(text: string): Promise<boolean> {
   return copyViaDom(text)
 }
 
-export const webUi: PlatformUi = {
-  applyTheme(mode) {
-    const { doc } = hostGlobals()
-    if (!doc?.documentElement) return
-    doc.documentElement.dataset.theme = mode
-  },
-  copyText,
-  async share(payload) {
-    const { win } = hostGlobals()
-    const nav = win?.navigator
-    if (nav && typeof nav.share === 'function') {
-      try {
-        await nav.share(payload)
-        return true
-      } catch {
-        return false
-      }
-    }
-    // 无原生分享：有链接就复制链接，视为「分享成功」，由调用方提示文案
-    if (payload.url) return copyText(payload.url)
-    return false
-  },
-  async openExternal(url) {
-    const { win } = hostGlobals()
-    if (!win) return false
+export function applyThemeMode(mode: ThemeMode): void {
+  const { doc } = hostGlobals()
+  if (!doc?.documentElement) return
+  doc.documentElement.dataset.theme = mode
+}
+
+export async function defaultShare(payload: SharePayload): Promise<boolean> {
+  const { win } = hostGlobals()
+  const nav = win?.navigator
+  if (nav && typeof nav.share === 'function') {
     try {
-      win.open(url, '_blank', 'noopener,noreferrer')
+      await nav.share(payload)
       return true
     } catch {
       return false
     }
+  }
+  // 无原生分享：有链接就复制链接，视为「分享成功」，由调用方提示文案
+  if (payload.url) return defaultCopyText(payload.url)
+  return false
+}
+
+export async function defaultOpenExternal(url: string): Promise<boolean> {
+  const { win } = hostGlobals()
+  if (!win) return false
+  try {
+    win.open(url, '_blank', 'noopener,noreferrer')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Web / Capacitor WebView 的 HTTP 实现：fetch + AbortController 超时 */
+export const webHttp: PlatformHttp = {
+  async request(method, url, opts) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000)
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: opts.headers,
+        ...(opts.body === undefined ? {} : { body: opts.body }),
+        signal: controller.signal,
+      })
+      const text = await res.text()
+      return { ok: res.ok, status: res.status, text }
+    } catch {
+      // 网络不可达 / 超时（AbortError）统一归为失败，status=0 交给 core 判定离线
+      return { ok: false, status: 0, text: '' }
+    } finally {
+      clearTimeout(timer)
+    }
   },
 }
 
-export const webAdapter: IPlatformAdapter = {
-  kind: 'web',
-  storage: webStorage,
-  env: webEnv,
-  ui: webUi,
+/**
+ * 构造一个 Web 语义适配器（web / capacitor 浏览器态共用）。
+ * 调试字段挂在返回的适配器对象上：copyText 记录 `_lastCopied`，share /
+ * openExternal 降级（返回 false）时分别记录 `_lastShareFallback` / `_lastOpenExternalFallback`。
+ */
+export function createWebLikeAdapter(kind: 'web' | 'capacitor'): IPlatformAdapter {
+  const ui: PlatformUi = {
+    applyTheme: applyThemeMode,
+    async copyText(text) {
+      adapter._lastCopied = text
+      return defaultCopyText(text)
+    },
+    async share(payload) {
+      const ok = await defaultShare(payload)
+      if (!ok) adapter._lastShareFallback = 'share_unsupported'
+      return ok
+    },
+    async openExternal(url) {
+      const ok = await defaultOpenExternal(url)
+      if (!ok) adapter._lastOpenExternalFallback = 'open_unsupported'
+      return ok
+    },
+  }
+
+  // 一次成型、不再事后赋值：IPlatformAdapter 的 ui / http 是 readonly，
+  // 事后 `adapter.ui = …` 会报 TS2540；ui 的方法体引用 adapter 属闭包延迟求值，安全。
+  const adapter: IPlatformAdapter = {
+    kind,
+    storage: webStorage,
+    env: webEnv,
+    http: webHttp,
+    _lastCopied: '',
+    _lastShareFallback: '',
+    _lastOpenExternalFallback: '',
+    ui,
+  }
+  return adapter
 }
 
-/** Capacitor 复用同一份 WebView 语义，只是 kind 不同 */
-export function createWebLikeAdapter(kind: 'web' | 'capacitor'): IPlatformAdapter {
-  return { kind, storage: webStorage, env: webEnv, ui: webUi }
-}
+export const webAdapter: IPlatformAdapter = createWebLikeAdapter('web')

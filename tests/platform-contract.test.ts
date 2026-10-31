@@ -11,8 +11,8 @@ import {
 import type { ContractCase } from '../src/platform'
 import type { WxLike } from '../src/platform/types'
 import { createWebLikeAdapter } from '../src/platform/web'
-import { createCapacitorAdapterForTest } from '../src/platform/capacitor'
-import { listKeys, readRaw, writeRaw } from '../src/core/storage'
+import { createCapacitorAdapter, createCapacitorAdapterForTest } from '../src/platform/capacitor'
+import { globalKey, listKeys, purgeUid, readRaw, userKey, writeRaw } from '../src/core/storage'
 import { getTheme, setTheme } from '../src/core/theme'
 
 /** 假 wx：只实现契约层声明的同步接口，行为与真机一致（缺键返回空串） */
@@ -74,6 +74,64 @@ describe('平台适配层契约（同一份用例对四端全绿）', () => {
       ]),
     ).toBe('故意失败（示例原因）')
     expect(contractFailure([{ name: '通过项', ok: true }])).toBeNull()
+  })
+})
+
+describe('Capacitor 原生分支（P3）', () => {
+  afterEach(() => setPlatform(null))
+
+  it('openExternal 走 @capacitor/browser 原生，loader 抛错回退 Web', async () => {
+    const opened: string[] = []
+    const fakeLoader = async () => ({
+      Browser: { open: async (o: { url: string }) => { opened.push(o.url) } },
+    })
+    const adapter = createCapacitorAdapter(fakeLoader)
+    const ok = await adapter.ui.openExternal('https://example.com')
+    expect(ok).toBe(true)
+    expect(opened).toEqual(['https://example.com'])
+
+    // loader 抛错 → 回退 Web 实现（Node 无 window 返回 false），但路径走通不抛异常
+    const boom = async () => {
+      throw new Error('plugin missing')
+    }
+    const fallback = createCapacitorAdapter(boom)
+    let threw = false
+    let r: boolean | undefined
+    try {
+      r = await fallback.ui.openExternal('https://example.com')
+    } catch {
+      threw = true
+    }
+    expect(threw).toBe(false)
+    expect(r).toBe(false)
+  })
+})
+
+describe('purgeUid 按段精确匹配（P7）', () => {
+  afterEach(() => setPlatform(null))
+
+  it('只删 mim.<scope>.<uid>.<field> 中 uid 命中且 uid 为独立段的键', () => {
+    const mock = createMockAdapter()
+    setPlatform(mock)
+
+    // 目标用户
+    writeRaw(userKey('note', 'u123', 'draft'), 'a')
+    writeRaw(userKey('note', 'u123', 'meta'), 'b')
+    // 不该删：全局键 mim.<scope>.<field>，其 scope 段恰好等于 uid
+    writeRaw(globalKey('u123', 'draft'), 'keep1')
+    // 不该删：段内含 uid 前缀但不是整段
+    writeRaw('mim.note.u123x.foo', 'keep2')
+    // 不该删：恰好 .u123. 出现在 field 段（非 uid 位置）
+    writeRaw('mim.u123.local.enabled', 'keep3')
+
+    const removed = purgeUid('u123')
+
+    expect(removed).toBe(2)
+    expect(readRaw(userKey('note', 'u123', 'draft'))).toBeNull()
+    expect(readRaw(userKey('note', 'u123', 'meta'))).toBeNull()
+    expect(readRaw(globalKey('u123', 'draft'))).toBe('keep1')
+    expect(readRaw('mim.note.u123x.foo')).toBe('keep2')
+    expect(readRaw('mim.u123.local.enabled')).toBe('keep3')
   })
 })
 
