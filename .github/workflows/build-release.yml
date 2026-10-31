@@ -47,17 +47,13 @@ jobs:
           npm install -g npm@10.9.9
           npm install --no-fund --no-audit --legacy-peer-deps
 
-      # 签名私钥以 base64 形式存放（TAURI_SIGNING_PRIVATE_KEY_B64）。
-      # tauri CLI 要求 TAURI_SIGNING_PRIVATE_KEY 是 PEM 内容本身（不是文件路径），
-      # 多行内容经 $GITHUB_ENV heredoc 注入，规避 secret 写入时换行损坏。
+      # 签名私钥以 base64 形式存放（TAURI_SIGNING_PRIVATE_KEY_B64 = tauri signer generate 产出的私钥文件整体 base64）。
+      # 还原为文件后传路径：tauri build/bundle 的 TAURI_SIGNING_PRIVATE_KEY 支持「路径或字符串」，
+      # 文件形态与 tauri signer generate 产出逐字节一致（外层单行 base64，内含 untrusted comment），
+      # 由 tauri 内部解码，避免多行字符串在 secret 写入时换行损坏。
       - name: 还原签名私钥
         shell: bash
-        run: |
-          {
-            echo "TAURI_SIGNING_PRIVATE_KEY<<MIMKEY_EOF"
-            base64 -d <<< "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}"
-            echo "MIMKEY_EOF"
-          } >> "$GITHUB_ENV"
+        run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}" | base64 -d > "$RUNNER_TEMP/mim.key"
 
       # 版本一致性门禁：tag 必须等于 V<src/core/version.ts 的 APP_VERSION>。
       # 唯一版本源是 src/core/version.ts；tag 只是它的载体。此前本 workflow 会用 tag
@@ -98,7 +94,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # TAURI_SIGNING_PRIVATE_KEY 由上一步经 $GITHUB_ENV 注入（PEM 内容）
+          TAURI_SIGNING_PRIVATE_KEY: ${{ runner.temp }}/mim.key
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
           # vite build 由 beforeBuildCommand 触发，env 经此透传进前端产物
           VITE_MIM_API_BASE: ${{ vars.MIM_API_BASE }}

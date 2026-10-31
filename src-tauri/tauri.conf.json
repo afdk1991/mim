@@ -37,7 +37,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIyMkZCNjI1N0U1N0JCNEQKUldSTnUxZCtKYll2SW5UZ2dFbW15U3BydXlZNUtNRkJSS1N2S0d4OU9yY0lYd2ZyT2M3VjF0R04K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGQTdFOUUyM0MxMEYyREMKUldUYzhoQTg0dW1uZjhiWnEwcjE4ajRqdkkyS2NPZ0sxQ0Zod2FIWHF3U2xRMVhwaFBFWlFnL2UK",
       "endpoints": [
         "https://github.com/afdk1991/mim/releases/latest/download/latest.json"
       ]
