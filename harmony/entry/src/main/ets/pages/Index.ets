@@ -1,6 +1,6 @@
 import { webview } from '@kit.ArkWeb'
 import { http } from '@kit.NetworkKit'
-import { bundleManager, common } from '@kit.AbilityKit'
+import { bundleManager, common, getContext } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
 import { hilog } from '@kit.PerformanceAnalysisKit'
 import { preferences } from '@kit.ArkData'
@@ -149,10 +149,8 @@ struct Index {
       ]
     }).then((index: number) => {
       if (index === 1) {
-        /* TODO 上架 AppGallery 后启用跳转：
-         * const ctx = getContext(this) as common.UIAbilityContext
-         * ctx.openLink(APP_GALLERY_URL)
-         */
+        const ctx = getContext(this) as common.UIAbilityContext
+        ctx.openLink(APP_GALLERY_URL)
         hilog.info(DOMAIN, TAG, 'update confirmed: %{public}s %{public}s', version, APP_GALLERY_URL)
       }
     }).catch(() => {

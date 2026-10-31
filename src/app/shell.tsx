@@ -57,7 +57,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="site-footer">
           <div className="site-footer-cols">
             <div>
-              <h4>站点</h4>
+              <div className="footer-heading">站点</div>
               <div>
                 <a href="#/info/about">关于我们</a>
               </div>
@@ -69,7 +69,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </div>
             </div>
             <div>
-              <h4>联系</h4>
+              <div className="footer-heading">联系</div>
               <div>{cfg.contactEmail}</div>
               <div>{cfg.owner}</div>
             </div>
@@ -79,6 +79,9 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {/* 移动端底部 Tab Bar：仅 ≤860px 显示，桌面端隐藏 */}
+      <TabBar path={path} />
     </>
   )
 }
@@ -88,12 +91,12 @@ function SideNav({ items, path }: { items: NavItem[]; path: string }) {
     <aside className="sidenav">
       <div className="sidenav-brand">Mim</div>
       {items.map((item) => (
-        <NavNode key={item.href} item={item} path={path} />
+        <NavNode key={item.isSection ? `sec-${item.label}` : item.href} item={item} path={path} />
       ))}
       <div className="site-footer" style={{ marginTop: 12 }}>
         <div className="site-footer-cols">
           <div>
-            <h4>站点</h4>
+            <div className="footer-heading">站点</div>
             <div>
               <a href="#/info/about">关于我们</a>
             </div>
@@ -108,6 +111,10 @@ function SideNav({ items, path }: { items: NavItem[]; path: string }) {
 }
 
 function NavNode({ item, path }: { item: NavItem; path: string }) {
+  /* 分组小标题：不可点击，不参与路由高亮 */
+  if (item.isSection) {
+    return <div className="sidenav-section">{item.label}</div>
+  }
   const active = navMatches(item, path)
   if (!item.children) {
     return (
@@ -159,4 +166,28 @@ function readUnread(kind: 'notif' | 'msg'): number {
   } catch {
     return 0
   }
+}
+
+/** 移动端底部 Tab Bar：5 项核心入口，≤860px 显示 */
+function TabBar({ path }: { path: string }) {
+  const tabs = [
+    { href: '#/feed', match: '/feed', label: '首页', icon: '🏠' },
+    { href: '#/topics', match: '/topics', label: '发现', icon: '🔍' },
+    { href: '#/publish', match: '/publish', label: '发布', icon: '✍️' },
+    { href: '#/mall', match: '/mall', label: '商城', icon: '🛒' },
+    { href: '#/my', match: '/my', label: '我的', icon: '👤' },
+  ]
+  return (
+    <nav className="tabbar" aria-label="主导航">
+      {tabs.map((t) => {
+        const active = path === t.match || path.startsWith(`${t.match}/`)
+        return (
+          <a key={t.href} href={t.href} className={cx('tabbar-item', active && 'active')}>
+            <span className="tabbar-icon">{t.icon}</span>
+            <span className="tabbar-label">{t.label}</span>
+          </a>
+        )
+      })}
+    </nav>
+  )
 }

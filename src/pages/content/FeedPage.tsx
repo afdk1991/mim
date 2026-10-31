@@ -169,6 +169,7 @@ export function FeedPage() {
 
   return (
     <div className="page-grid">
+      <h1 className="sr-only">首页广场</h1>
       <div>
         <div className="tabs">
           {TABS.map((t) => (

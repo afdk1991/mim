@@ -78,6 +78,19 @@ body.player-active {
   text-align: right;
 }
 
+/* 屏幕阅读器专用：视觉隐藏但可被读屏器识别 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .center {
   text-align: center;
 }

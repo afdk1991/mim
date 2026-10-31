@@ -153,6 +153,36 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" android/app/build/outputs/apk/release/app-release.apk manifest.json --clobber --repo "$GITHUB_REPOSITORY"
 
+      # Tauri updater 桌面端清单：tauri-action 只上传 .sig 签名文件，不生成 latest.json。
+      # 本步把 Release 上所有 .sig 拉下来，按平台聚合后拼装 Tauri 标准格式 latest.json，
+      # 再回传 Release。客户端经 endpoints 配的 latest.json 检测桌面端自动更新。
+      - name: 下载桌面端 updater 签名产物（.sig）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-sigs"
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.sig' \
+            --dir "$RUNNER_TEMP/release-sigs" \
+            --clobber || echo "::warning::Release 暂无 .sig 产物（桌面端签名未配置时可接受）"
+          ls -lh "$RUNNER_TEMP/release-sigs" || true
+
+      - name: 生成 Tauri updater latest.json 并上传
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          SIG_DIR="$RUNNER_TEMP/release-sigs"
+          if ! ls "$SIG_DIR"/*.sig >/dev/null 2>&1; then
+            echo "::warning::Release 上没有 .sig 文件，跳过 latest.json 生成（桌面端签名未配置时可接受）"
+            exit 0
+          fi
+          SRC_VER=$(node -e "const s=require('fs').readFileSync('src/core/version.ts','utf8');const m=s.match(/export const APP_VERSION = '([^']+)'/);console.log(m?m[1]:'')")
+          node scripts/gen-tauri-updater-manifest.mjs "$SRC_VER" "$GITHUB_REF_NAME" "$SIG_DIR"
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber --repo "$GITHUB_REPOSITORY"
+          echo "✅ latest.json 已上传至 Release"
+
   ios:
     name: iOS 模拟器构建（免签名冒烟）
     needs: desktop

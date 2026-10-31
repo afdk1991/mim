@@ -15,10 +15,11 @@ export interface NavItem {
   icon?: string
   badgeKey?: BadgeKey
   children?: NavItem[]
+  /** 分组小标题标记：渲染为不可点击的 section label，不参与路由匹配 */
+  isSection?: boolean
 }
 
 const MY_CHILDREN: NavItem[] = [
-  { href: '#/my', match: '/my', label: '我的主页', icon: '👤' },
   { href: '#/blog', match: '/blog', label: '我的博客', icon: '📰' },
   { href: '#/favorites', match: '/favorites', label: '收藏', icon: '⭐' },
   { href: '#/history', match: '/history', label: '足迹', icon: '👣' },
@@ -32,24 +33,43 @@ const MY_CHILDREN: NavItem[] = [
 
 const MALL_CHILDREN: NavItem[] = [
   { href: '#/mall', match: '/mall', label: '商城中心', icon: '🛒' },
+  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️' },
+  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺' },
+  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜' },
+  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗' },
+  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡' },
   { href: '#/mall/cart', match: '/mall/cart', label: '购物车', icon: '🧺' },
   { href: '#/mall/orders', match: '/mall/orders', label: '订单', icon: '📋' },
   { href: '#/mall/wallet', match: '/mall/wallet', label: '钱包', icon: '💳' },
 ]
 
+/**
+ * 导航分组：桌面端侧栏 26 项归为 内容 / 社交 / 交易 / 工具 4 组，
+ * 每组有不可点击的小标题；5 个商城频道并入商城二级，不再一级平铺。
+ */
 export const NAV: NavItem[] = [
+  // ── 内容 ──
+  { href: '', match: '', label: '内容', isSection: true },
   { href: '#/feed', match: '/feed', label: '首页', icon: '🏠' },
   { href: '#/articles', match: '/articles', label: '文章', icon: '📝' },
   { href: '#/write', match: '/write', label: '写文章', icon: '✍️' },
   { href: '#/topics', match: '/topics', label: '超话', icon: '🔥' },
+  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️' },
+  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻' },
+  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦' },
+
+  // ── 社交 ──
+  { href: '', match: '', label: '社交', isSection: true },
   { href: '#/notifications', match: '/notifications', label: '通知', icon: '🔔', badgeKey: 'notif' },
   { href: '#/messages', match: '/messages', label: '私信', icon: '✉️', badgeKey: 'msg' },
   { href: '#/my', match: '/my', label: '我的', icon: '👤', children: MY_CHILDREN },
+
+  // ── 交易 ──
+  { href: '', match: '', label: '交易', isSection: true },
   { href: '#/mall', match: '/mall', label: '商城', icon: '🛒', children: MALL_CHILDREN },
-  { href: '#/live', match: '/live', label: '直播开播', icon: '📡' },
-  { href: '#/snippets', match: '/snippets', label: '代码片段', icon: '💻' },
-  { href: '#/resources', match: '/resources', label: '资源下载', icon: '📦' },
-  { href: '#/tags', match: '/tags', label: '标签', icon: '🏷️' },
+
+  // ── 工具 ──
+  { href: '', match: '', label: '工具', isSection: true },
   { href: '#/delivery', match: '/delivery', label: '配送台', icon: '🚚' },
   { href: '#/price', match: '/price', label: '价格监控', icon: '📈' },
   { href: '#/nav', match: '/nav', label: '路线导航', icon: '🗺️' },
@@ -59,11 +79,7 @@ export const NAV: NavItem[] = [
   { href: '#/ai', match: '/ai', label: 'AI 资源', icon: '📚' },
   { href: '#/manju', match: '/manju', label: '漫剧', icon: '🎬' },
   { href: '#/ardot', match: '/ardot', label: '聚合监控', icon: '📊' },
-  { href: '#/mall/youxuan', match: '/mall/youxuan', label: '优选商城', icon: '🛍️' },
-  { href: '#/mall/live', match: '/mall/live', label: '直播带货', icon: '📺' },
-  { href: '#/mall/mix', match: '/mall/mix', label: '本地生活', icon: '🍜' },
-  { href: '#/mall/laal', match: '/mall/laal', label: '出行服务', icon: '🚗' },
-  { href: '#/mall/gexm', match: '/mall/gexm', label: '秒杀特惠', icon: '⚡' },
+  { href: '#/live', match: '/live', label: '直播开播', icon: '📡' },
 ]
 
 export const ADMIN_NAV: NavItem = {

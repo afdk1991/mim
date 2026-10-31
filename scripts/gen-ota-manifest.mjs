@@ -17,10 +17,15 @@ const REPO = repoArg || process.env.OTA_REPO || 'afdk1991/mim'
 
 const sha256 = createHash('sha256').update(readFileSync(apkPath)).digest('hex')
 
+const apkUrl = `https://github.com/${REPO}/releases/download/${tag}/app-release.apk`
+
 const manifest = {
   version,
+  // 顶层 url 兼容 src/ota.ts 的 WebView manifest 流程（读 data.url）；
+  // 嵌套 android.url/android.sha256 供原生 MimOta 插件 downloadAndInstall 使用。
+  url: apkUrl,
   android: {
-    url: `https://github.com/${REPO}/releases/download/${tag}/app-release.apk`,
+    url: apkUrl,
     sha256,
   },
 }

@@ -68,6 +68,17 @@
   cursor: pointer;
 }
 
+.sidenav-section {
+  padding: 12px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-3);
+  pointer-events: none;
+  user-select: none;
+}
+
 .sidenav-sub {
   display: flex;
   flex-direction: column;
@@ -130,10 +141,11 @@
   gap: 10px;
 }
 
-.site-footer h4 {
+.site-footer .footer-heading {
   margin: 0 0 6px;
   font-size: 12px;
   color: var(--text-2);
+  font-weight: 600;
 }
 
 .site-footer a:hover {
@@ -142,6 +154,36 @@
 
 .site-footer-mini {
   display: none;
+}
+
+/* ---------- 移动端底部 Tab Bar（桌面端隐藏） ---------- */
+
+.tabbar {
+  display: none;
+}
+
+.tabbar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 0;
+  color: var(--text-3);
+  font-size: 11px;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.tabbar-item.active {
+  color: var(--primary-text);
+  font-weight: 600;
+}
+
+.tabbar-icon {
+  font-size: 20px;
+  line-height: 1;
 }
 
 /* ---------- 回到顶部 ---------- */
@@ -212,6 +254,30 @@
 
   .to-top {
     right: 10px;
-    bottom: 16px;
+    bottom: 72px;
+  }
+
+  /* 底部 Tab Bar：fixed 贴底，56px 高 + safe-area */
+  .tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    z-index: 600;
+  }
+
+  /* 内容区避让底部 Tab Bar */
+  body {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 移动端横滑条里隐藏分组小标题 */
+  .sidenav-section {
+    display: none;
   }
 }
