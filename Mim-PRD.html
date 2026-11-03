@@ -1,0 +1,812 @@
+<!-- 文档类型声明：告诉浏览器以 HTML5 标准模式解析本页 -->
+<!DOCTYPE html>
+<!-- 根元素；lang="zh-CN" 声明页面主要语言为简体中文（利于无障碍与搜索引擎） -->
+<html lang="zh-CN">
+<!-- 头部容器：放置元信息、标题与样式，不在页面上直接渲染 -->
+<head>
+<!-- 字符编码声明：UTF-8，保证中文不乱码 -->
+<meta charset="UTF-8">
+<!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 浏览器标签页标题 -->
+<title>Mim 全平台产品底座 PRD — V0.0.0-preview</title>
+<!-- 内联样式表：本 PRD 文档的全部视觉样式 -->
+<style>
+  /* CSS 自定义属性（设计令牌）：集中定义整页配色，便于统一修改 */
+  :root {
+    /* 页面背景 / 正文前景 / 弱提示灰 / 边框灰 */
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #6b7280; --border: #e5e7eb;
+    /* 强调蓝及其浅底 / 警告橙及其浅底 */
+    --accent: #2563eb; --accent-bg: #eff6ff; --warn: #d97706; --warn-bg: #fffbeb;
+    /* 代码块底色 / 表头底色 */
+    --code-bg: #f3f4f6; --table-head: #f9fafb;
+  }
+  /* 全局盒模型：统一 border-box，宽度包含内边距与边框，便于布局计算 */
+  * { box-sizing: border-box; }
+  /* 页面主体：零外边距、上下 40px 左右 24px 内边距、系统中文字体栈、行高 1.7、最大宽度 1080px 并水平居中 */
+  body { margin: 0; padding: 40px 24px; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--fg); line-height: 1.7; max-width: 1080px; margin: 0 auto; }
+  /* 一级标题：28px，底部 2px 强调蓝下划线 */
+  h1 { font-size: 28px; border-bottom: 2px solid var(--accent); padding-bottom: 12px; }
+  /* 二级标题：22px，左侧 4px 强调蓝竖条，与上文拉开 48px 间距 */
+  h2 { font-size: 22px; margin-top: 48px; border-left: 4px solid var(--accent); padding-left: 12px; }
+  /* 三级标题：17px，上间距 28px */
+  h3 { font-size: 17px; margin-top: 28px; }
+  /* 四级标题：15px，弱提示灰色，作为表格/小节的小标题 */
+  h4 { font-size: 15px; margin-top: 20px; color: var(--muted); }
+  /* 正文段落与列表项：15px */
+  p, li { font-size: 15px; }
+  /* 行内代码：灰底、圆角、略小字号 */
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  /* TBD 标签：红底红字胶囊，表示「待定」 */
+  .tag-tbd { background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  /* Assumption 标签：橙底橙字胶囊，表示「假设」 */
+  .tag-assume { background: var(--warn-bg); color: var(--warn); padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  /* P0 标签：绿底绿字胶囊，表示「必须交付」 */
+  .tag-p0 { background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  /* P1 标签：蓝底蓝字胶囊，表示「后续迭代」 */
+  .tag-p1 { background: var(--accent-bg); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  /* 表格：全宽、边框合并、上下留白 */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  /* 表头与单元格：细边框、内边距、左对齐、顶部对齐 */
+  th, td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; vertical-align: top; }
+  /* 表头：浅灰底、加粗 */
+  th { background: var(--table-head); font-weight: 600; }
+  /* 信息提示块：浅蓝底 + 左侧蓝色竖条 */
+  .callout { background: var(--accent-bg); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  /* 警告提示块：浅橙底 + 左侧橙色竖条 */
+  .callout-warn { background: var(--warn-bg); border-left: 4px solid var(--warn); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  /* 流程图块：灰底等宽字体，white-space:pre 保留换行与对齐（注意：该块内部不能放 HTML 注释，否则会多出空行） */
+  .flow { background: var(--code-bg); padding: 16px; border-radius: 8px; font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; overflow-x: auto; white-space: pre; margin: 16px 0; }
+  /* 演示卡片：细边框圆角容器，浅灰底 */
+  .demo { border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 16px 0; background: #fafbfc; }
+  /* 演示卡片左上角的小标签：小号大写字母 */
+  .demo-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  /* 主按钮：蓝底白字胶囊按钮 */
+  .btn { display: inline-block; padding: 6px 14px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 13px; cursor: pointer; border: none; }
+  /* 幽灵按钮：白底灰边框，用于次要操作 */
+  .btn-ghost { background: #fff; border: 1px solid var(--border); color: var(--fg); }
+  /* 输入框：细边框圆角，最大宽度 280px */
+  .input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 100%; max-width: 280px; }
+  /* 小徽章：灰底胶囊，用于「省 ¥58」这类辅助信息 */
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: var(--code-bg); color: var(--muted); }
+  /* 成功状态文字：绿色加粗 */
+  .state-active { color: #15803d; font-weight: 600; }
+  /* 错误状态文字：红色加粗 */
+  .state-error { color: #b91c1c; font-weight: 600; }
+  /* 无序列表：左侧缩进 22px */
+  ul { padding-left: 22px; }
+  /* 弱提示文本：灰色 */
+  .muted { color: var(--muted); }
+  /* 水平分割线：1px 浅灰线，上下留白 32px */
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+<!-- 头部结束 -->
+</head>
+<!-- 页面主体开始：以下为可见内容 -->
+<body>
+
+<!-- 文档主标题 -->
+<h1>Mim 全平台产品底座 — 产品需求文档</h1>
+<!-- 元信息行：版本 / 通道 / 日期 / 状态（灰色弱提示样式） -->
+<p class="muted">版本：V0.0.0-preview　|　通道：draft　|　日期：2026-11-03　|　状态：草案</p>
+
+<!-- 信息提示块：说明本文档定位 -->
+<div class="callout">
+  <!-- 加粗的小节引导词 -->
+  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。旗舰产品形态已定案为 <strong>SaaS 工具型（订阅制）— 跨端任务与轻协作工具</strong>（OQ-01 已定案，功能规格见 FR-03），首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
+</div>
+
+<!-- 章节标题：1. 背景与目标 -->
+<h2>1. 背景与目标</h2>
+
+<!-- 问题陈述段：加粗引导词 + 正文 -->
+<p><strong>观察到的问题</strong>：一套产品需要同时覆盖国内与海外、PC 与移动、小程序与原生 App，且要求支付、IM、音视频、AI 等重资产能力。若按传统方式为每个端独立开发业务逻辑，会导致：</p>
+<!-- 问题清单（无序列表） -->
+<ul>
+  <!-- 问题 1：多端重复实现 -->
+  <li>同一功能在多端重复实现，改一处需同步 N 处；</li>
+  <!-- 问题 2：账号体系后期打通代价高 -->
+  <li>国内/海外数据与账号体系后期打通代价极高；</li>
+  <!-- 问题 3：重资产能力重复对接 -->
+  <li>支付、IM、音视频等能力在各端重复对接，无法统一治理。</li>
+</ul>
+
+<!-- 产品决策段 -->
+<p><strong>产品决策</strong>：采用「Headless 中台 + 多端薄壳」架构，将业务逻辑、能力网关、账号与数据下沉为共享层，各端仅负责 UI 与平台 API 适配。</p>
+
+<!-- 可观测目标段 -->
+<p><strong>可观测的目标</strong>：用户在任意一端完成注册与订阅后，可在其他所有端以同一身份登录并使用已订阅的功能；支付、IM、音视频、AI 能力对业务方以统一接口暴露，国内/海外差异由驱动层屏蔽。</p>
+
+<!-- 章节标题：2. 产品契约 -->
+<h2>2. 产品契约</h2>
+
+<!-- 产品契约表：要素 → 定义 -->
+<table>
+  <!-- 表头行：左列固定 22% 宽 -->
+  <tr><th style="width:22%">要素</th><th>定义</th></tr>
+  <!-- 主要用户 -->
+  <tr><td>主要用户</td><td>终端用户（国内 / 海外）、运营管理员</td></tr>
+  <!-- 核心任务 -->
+  <tr><td>核心任务</td><td>注册账号 → 选择订阅计划 → 完成支付 → 使用核心 SaaS 功能 → 跨端继续使用</td></tr>
+  <!-- 触发方式 -->
+  <tr><td>触发</td><td>用户首次访问任意端，或从任一渠道（链接、扫码、推送）进入产品</td></tr>
+  <!-- 完成条件 -->
+  <tr><td>完成条件</td><td>用户在至少一端成功支付订阅，且可在另一端以同一账号登录并访问已订阅功能</td></tr>
+  <!-- 共享业务对象 -->
+  <tr><td>共享业务对象</td><td>User（用户）、Account（账号）、Subscription（订阅）、Order（订单）、Plan（计划）</td></tr>
+  <!-- 信任基础 -->
+  <tr><td>信任基础</td><td>支付安全（持牌通道 + IAP）、数据合规（PIPL/GDPR）、隐私保护（最小收集 + 可删除）</td></tr>
+</table>
+
+<!-- 章节标题：3. 范围 -->
+<h2>3. 范围</h2>
+
+<!-- P0 小节标题，带绿色「必须交付」标签 -->
+<h3>P0 <span class="tag-p0">必须交付</span></h3>
+<!-- P0 交付范围清单 -->
+<ul>
+  <!-- 账号与身份 -->
+  <li><strong>账号与身份</strong>：注册、登录、跨端账号打通、国内（手机号+微信/支付宝）与海外（邮箱+Google/Apple）双登录体系</li>
+  <!-- 订阅与支付 -->
+  <li><strong>订阅与支付</strong>：计划展示、订阅、支付（国内通道 + Stripe/PayPal + Apple IAP/Google Play）、订单、退款、凭证校验</li>
+  <!-- 核心 SaaS 工作区（OQ-01 已定案：跨端任务与轻协作工具） -->
+  <li><strong>核心 SaaS 工作区</strong>：跨端任务与轻协作工具——任务管理、多端实时同步、基础协作、个人仪表盘，功能规格见 FR-03</li>
+  <!-- 多端体验一致性 -->
+  <li><strong>多端体验一致性</strong>：Web、微信小程序、App（iOS/Android）、PC（Win/macOS）至少一端可用，其余端适配</li>
+  <!-- 国际化基础 -->
+  <li><strong>国际化基础</strong>：i18n 多语言、多币种、多时区</li>
+  <!-- 合规与隐私 -->
+  <li><strong>合规与隐私</strong>：隐私政策、用户协议、数据收集清单、账号注销、数据删除请求</li>
+</ul>
+
+<!-- P1 小节标题，带蓝色「后续迭代」标签 -->
+<h3>P1 <span class="tag-p1">后续迭代</span></h3>
+<!-- P1 迭代范围清单 -->
+<ul>
+  <!-- IM 即时通讯 -->
+  <li>IM 即时通讯（会话、消息、离线推送、内容审核）</li>
+  <!-- 音视频 -->
+  <li>音视频（信令、SFU、录制、转码）</li>
+  <!-- AI 编排 -->
+  <li>AI 编排（模型路由、Prompt 版本、审核、配额）</li>
+  <!-- 内容管理 -->
+  <li>内容管理（UGC、审核流、搜索、推荐）</li>
+  <!-- 开放平台 -->
+  <li>开放平台（OAuth2、API Key、Webhook、SDK）</li>
+  <!-- 管理后台 -->
+  <li>管理后台（RBAC、内容审核、工单、经营看板）</li>
+  <!-- 更多平台适配（小程序平台与 Ubuntu 下限见「平台兼容性要求」矩阵） -->
+  <li>更多小程序平台（支付宝、抖音、百度、QQ 等）、鸿蒙、Linux/国产化 PC（Ubuntu 20.04+）</li>
+</ul>
+
+<!-- 明确排除小节标题 -->
+<h3>明确排除（P0 不做）</h3>
+<!-- 排除项清单 -->
+<ul>
+  <!-- 排除：社交与电商 -->
+  <li>社交关系链、电商交易系统（待产品形态扩展时另行定义）</li>
+  <!-- 排除：IoT（标注假设） -->
+  <li>硬件设备接入与 IoT <span class="tag-assume">Assumption, TBD</span></li>
+  <!-- 排除：自研重资产底层 -->
+  <li>自研音视频 SFU 与 AI 推理（P0 全部采购第三方驱动）</li>
+</ul>
+
+<!-- 平台兼容性要求小节标题 -->
+<h3>平台兼容性要求（三端最低版本矩阵）</h3>
+<!-- 兼容性说明段 -->
+<p>以下兼容性下限为产品硬性规格：低于最低版本的系统不保证可用，不纳入测试与适配范围。P0 端必须满足矩阵下限并做全版本覆盖测试；P1 端在迭代上线时按同一下限执行。</p>
+<!-- 平台兼容性矩阵表 -->
+<table>
+  <!-- 表头：端 / 平台 / 兼容下限 / 分期 -->
+  <tr><th>端</th><th>平台</th><th>兼容下限</th><th>分期</th></tr>
+  <!-- 移动端 App：iOS -->
+  <tr><td rowspan="2">移动端 APP</td><td>iOS</td><td>iOS 15.0 及以上，覆盖全版本手机系统</td><td>P0</td></tr>
+  <!-- 移动端 App：Android -->
+  <tr><td>Android</td><td>Android 9.0 及以上，覆盖全版本手机系统</td><td>P0</td></tr>
+  <!-- 小程序：微信 -->
+  <tr><td rowspan="5">多平台小程序</td><td>微信小程序</td><td>跟随微信官方基础库稳定版</td><td>P0</td></tr>
+  <!-- 小程序：支付宝 -->
+  <tr><td>支付宝小程序</td><td>跟随支付宝官方基础库</td><td>P1</td></tr>
+  <!-- 小程序：抖音 -->
+  <tr><td>抖音小程序</td><td>跟随抖音官方基础库</td><td>P1</td></tr>
+  <!-- 小程序：百度 -->
+  <tr><td>百度小程序</td><td>跟随百度官方基础库</td><td>P1</td></tr>
+  <!-- 小程序：QQ -->
+  <tr><td>QQ 小程序</td><td>跟随 QQ 官方基础库</td><td>P1</td></tr>
+  <!-- PC：Windows -->
+  <tr><td rowspan="3">PC 客户端</td><td>Windows</td><td>Windows 10 / 11 全桌面操作系统</td><td>P0</td></tr>
+  <!-- PC：macOS -->
+  <tr><td>macOS</td><td>macOS 12 及以上</td><td>P0</td></tr>
+  <!-- PC：Ubuntu -->
+  <tr><td>Ubuntu</td><td>Ubuntu 20.04 及以上</td><td>P1</td></tr>
+</table>
+<!-- 分期归属说明 -->
+<p>分期归属依据：P0 范围已含 App（iOS/Android）、微信小程序、PC（Windows/macOS）；支付宝、抖音、百度、QQ 小程序与 Ubuntu（Linux）按 P1 清单迭代，上线时同样满足本表下限。各端 UI 差异仍由平台适配层吸收，业务逻辑统一（见 FR-04）。</p>
+
+<!-- 章节标题：4. 角色与对象模型 -->
+<h2>4. 角色与对象模型</h2>
+
+<!-- 4.1 角色小节标题 -->
+<h3>4.1 角色</h3>
+<!-- 角色定义表 -->
+<table>
+  <!-- 表头：角色 / 定义 / 核心权限 -->
+  <tr><th>角色</th><th>定义</th><th>核心权限</th></tr>
+  <!-- 访客 -->
+  <tr><td>访客</td><td>未登录用户</td><td>浏览公开内容、注册/登录</td></tr>
+  <!-- 免费用户 -->
+  <tr><td>免费用户</td><td>已注册未订阅</td><td>使用免费功能、查看计划、发起订阅</td></tr>
+  <!-- 订阅用户 -->
+  <tr><td>订阅用户</td><td>有有效订阅</td><td>使用付费功能、管理订阅、跨端登录</td></tr>
+  <!-- 运营管理员（权限范围 TBD） -->
+  <tr><td>运营管理员</td><td>内部运营人员</td><td>管理计划、查看订单、处理退款工单 <span class="tag-tbd">TBD</span></td></tr>
+</table>
+
+<!-- 4.2 核心对象与状态小节标题 -->
+<h3>4.2 核心对象与状态</h3>
+
+<!-- Subscription 对象小标题 -->
+<h4>Subscription（订阅）</h4>
+<!-- 订阅状态机表 -->
+<table>
+  <!-- 表头：状态 / 进入条件 / 可执行操作 -->
+  <tr><th>状态</th><th>进入条件</th><th>可执行操作</th></tr>
+  <!-- active：生效中 -->
+  <tr><td><code>active</code></td><td>支付成功且在有效期内</td><td>使用付费功能、取消续费、申请退款</td></tr>
+  <!-- past_due：续费失败宽限期 -->
+  <tr><td><code>past_due</code></td><td>续费失败，宽限期内</td><td>更新支付方式、查看欠费</td></tr>
+  <!-- canceled：已取消 -->
+  <tr><td><code>canceled</code></td><td>用户取消或退款完成</td><td>不可用付费功能（至当期结束）</td></tr>
+  <!-- expired：已过期 -->
+  <tr><td><code>expired</code></td><td>订阅到期未续费</td><td>重新订阅</td></tr>
+</table>
+
+<!-- Order 对象小标题 -->
+<h4>Order（订单）</h4>
+<!-- 订单状态表 -->
+<table>
+  <!-- 表头：状态 / 说明 -->
+  <tr><th>状态</th><th>说明</th></tr>
+  <!-- pending：待支付 -->
+  <tr><td><code>pending</code></td><td>已创建，等待支付</td></tr>
+  <!-- paid：已支付 -->
+  <tr><td><code>paid</code></td><td>支付成功</td></tr>
+  <!-- failed：支付失败 -->
+  <tr><td><code>failed</code></td><td>支付失败</td></tr>
+  <!-- refunded：已退款 -->
+  <tr><td><code>refunded</code></td><td>已退款（全额或部分）</td></tr>
+  <!-- closed：已关闭 -->
+  <tr><td><code>closed</code></td><td>超时未支付关闭</td></tr>
+</table>
+
+<!-- 章节标题：5. 功能需求 -->
+<h2>5. 功能需求</h2>
+
+<!-- FR-01 账号与身份小节标题 -->
+<h3>FR-01 账号与身份</h3>
+
+<!-- 目的子标题 -->
+<h4>目的</h4>
+<!-- 目的说明段 -->
+<p>用户在任意端完成注册/登录后，其账号与订阅状态在所有端实时同步。国内与海外采用不同的登录方式，但底层账号体系统一。</p>
+
+<!-- 注册与登录方式子标题 -->
+<h4>注册与登录方式</h4>
+<!-- 登录方式对照表 -->
+<table>
+  <!-- 表头：市场 / 方式 / 说明 -->
+  <tr><th>市场</th><th>注册/登录方式</th><th>说明</th></tr>
+  <!-- 国内市场登录方式 -->
+  <tr><td>国内</td><td>手机号 + 验证码、微信登录、支付宝登录</td><td>手机号为主，第三方为辅</td></tr>
+  <!-- 海外市场登录方式（含 App Store 合规要求说明） -->
+  <tr><td>海外</td><td>邮箱 + 密码/验证码、Google Sign-In、Apple Sign-In</td><td>App 端提供第三方登录时必须同时提供 Apple Sign-In（App Store 要求）</td></tr>
+</table>
+
+<!-- 跨端账号打通规则子标题 -->
+<h4>跨端账号打通规则</h4>
+<!-- 打通规则清单 -->
+<ul>
+  <!-- 国内与海外隔离 -->
+  <li>同一手机号或邮箱在国内与海外视为不同账号（数据物理隔离，region 维度区分）</li>
+  <!-- 同市场内多方式绑定 -->
+  <li>同一市场内，手机号、微信、支付宝等不同登录方式可绑定至同一账号</li>
+  <!-- 绑定需二次验证 -->
+  <li>绑定需二次验证（已登录方式确认 + 新方式验证码）</li>
+  <!-- 账号合并规则（策略 TBD） -->
+  <li>账号合并：若用户用两种方式注册了两个账号，可申请合并，合并后订阅与订单归并至保留账号 <span class="tag-tbd">TBD：合并策略细节</span></li>
+</ul>
+
+<!-- 异常与边界子标题 -->
+<h4>异常与边界</h4>
+<!-- 异常处理规则清单 -->
+<ul>
+  <!-- 验证码发送频控 -->
+  <li>验证码发送频率限制：同一标识 60 秒内仅一次，1 小时内不超过 5 次</li>
+  <!-- 验证码有效期与错误次数 -->
+  <li>验证码 5 分钟有效，错误 5 次后失效需重新获取</li>
+  <!-- 登录失败锁定策略 -->
+  <li>登录失败 5 次后账号锁定 15 分钟（仅该端，不影响其他端在线会话）</li>
+  <!-- 新设备登录保护 -->
+  <li>已登录用户在新设备登录时，若开启设备保护，需邮件/短信确认</li>
+</ul>
+
+<!-- FR-01 交互演示卡片 -->
+<div class="demo">
+  <!-- 演示卡片标签 -->
+  <div class="demo-label">FR-01 演示：登录流程</div>
+  <!-- 登录演示容器（供脚本按 id 定位） -->
+  <div id="login-demo">
+    <!-- 操作提示文字 -->
+    <p>选择登录方式：</p>
+    <!-- 手机号登录按钮（主样式），点击调用 showLogin('phone') -->
+    <button class="btn" onclick="showLogin('phone')">手机号</button>
+    <!-- 邮箱登录按钮（幽灵样式） -->
+    <button class="btn btn-ghost" onclick="showLogin('email')">邮箱</button>
+    <!-- 微信登录按钮（幽灵样式） -->
+    <button class="btn btn-ghost" onclick="showLogin('wechat')">微信</button>
+    <!-- 登录表单容器：初始 display:none 隐藏，选择方式后显示 -->
+    <div id="login-form" style="margin-top:14px; display:none;">
+      <!-- 账号输入框 -->
+      <input class="input" id="login-input" placeholder="请输入手机号/邮箱"><br><br>
+      <!-- 提交按钮：点击调用 submitLogin() -->
+      <button class="btn" onclick="submitLogin()">获取验证码并登录</button>
+      <!-- 结果提示区：由脚本写入成功/失败文案 -->
+      <p id="login-result" style="margin-top:10px;"></p>
+    </div>
+  </div>
+</div>
+<!-- FR-01 演示脚本 -->
+<script>
+// 切换登录方式：显示表单，并按方式设置输入框占位符与禁用状态
+function showLogin(type){
+  // 显示登录表单容器
+  document.getElementById('login-form').style.display='block';
+  // 取得输入框元素引用
+  const i=document.getElementById('login-input');
+  // 按登录方式设置占位提示：手机号 / 邮箱 / 微信授权提示
+  i.placeholder = type==='phone'?'请输入手机号':type==='email'?'请输入邮箱':'点击后跳转微信授权';
+  // 微信方式下禁用输入框（走授权跳转，无需输入）
+  i.disabled = type==='wechat';
+  // 清空上一次的结果提示
+  document.getElementById('login-result').textContent='';
+}
+// 提交登录：校验输入并展示演示用结果
+function submitLogin(){
+  // 读取输入框当前值
+  const v=document.getElementById('login-input').value;
+  // 取得结果提示区元素引用
+  const r=document.getElementById('login-result');
+  // 输入为空：显示错误提示并中止
+  if(!v){ r.innerHTML='<span class="state-error">请输入手机号/邮箱</span>'; return; }
+  // 输入非空：显示演示用的成功提示
+  r.innerHTML='<span class="state-active">验证码已发送（演示），登录成功，跳转至首页</span>';
+}
+</script>
+
+<!-- FR-02 订阅与支付小节标题 -->
+<h3>FR-02 订阅与支付</h3>
+
+<!-- 目的子标题 -->
+<h4>目的</h4>
+<!-- 目的说明段 -->
+<p>用户选择订阅计划并完成支付后，获得对应功能的使用权。支付通道按市场与平台路由，底层由驱动层屏蔽差异，业务方只感知统一的订阅状态。</p>
+
+<!-- 订阅计划子标题 -->
+<h4>订阅计划（Plan）</h4>
+<!-- Plan 字段定义表 -->
+<table>
+  <!-- 表头：字段 / 说明 -->
+  <tr><th>字段</th><th>说明</th></tr>
+  <!-- plan_id：唯一标识 -->
+  <tr><td>plan_id</td><td>计划唯一标识</td></tr>
+  <!-- name：多语言名称 -->
+  <tr><td>name</td><td>计划名称（多语言）</td></tr>
+  <!-- billing_cycle：计费周期 -->
+  <tr><td>billing_cycle</td><td>月 / 季 / 年</td></tr>
+  <!-- price：分币种定价 -->
+  <tr><td>price</td><td>分币种定价（CNY、USD 等）</td></tr>
+  <!-- features：功能权限列表 -->
+  <tr><td>features</td><td>包含的功能权限列表</td></tr>
+  <!-- region：适用市场 -->
+  <tr><td>region</td><td>适用市场（国内 / 海外 / 全球）</td></tr>
+  <!-- status：上架状态 -->
+  <tr><td>status</td><td>active / archived</td></tr>
+</table>
+
+<!-- 支付通道路由子标题 -->
+<h4>支付通道路由</h4>
+<!-- 支付通道路由表 -->
+<table>
+  <!-- 表头：场景 / 可用通道 / 规则 -->
+  <tr><th>场景</th><th>可用通道</th><th>规则</th></tr>
+  <!-- 国内 Web/小程序场景 -->
+  <tr><td>国内 Web/小程序</td><td>微信支付、支付宝、银联</td><td>按用户选择</td></tr>
+  <!-- 国内 App 数字商品场景（Android 渠道规则为假设项） -->
+  <tr><td>国内 App 数字商品</td><td>—</td><td>iOS 必须走 Apple IAP；Android 国内商店规则视渠道而定 <span class="tag-assume">Assumption</span></td></tr>
+  <!-- 海外 Web 场景 -->
+  <tr><td>海外 Web</td><td>Stripe、PayPal</td><td>按用户选择</td></tr>
+  <!-- 海外 App 数字商品场景（商店强制 IAP） -->
+  <tr><td>海外 App 数字商品</td><td>Apple IAP、Google Play Billing</td><td>商店强制，否则拒审</td></tr>
+</table>
+
+<!-- 警告提示块：资金合规硬约束 -->
+<div class="callout-warn">
+  <strong>资金合规硬约束</strong>：支付清算必须由持牌机构完成。产品自研的是「支付编排、账务、订阅计费、对账、风控」层，底层通道对接持牌方。iOS/Android 数字商品必须走商店 IAP，抽成 15%~30%。
+</div>
+
+<!-- 订阅生命周期子标题 -->
+<h4>订阅生命周期</h4>
+<!-- 预格式化流程图块（white-space:pre，内部不可插入 HTML 注释，否则会多出空行） -->
+<div class="flow">用户选择计划 → 创建 Order(pending) → 拉起支付 →
+  ├─ 支付成功 → Order(paid) → Subscription(active) → 发放权限
+  ├─ 支付失败 → Order(failed) → 提示重试
+  └─ 超时未支付 → Order(closed)
+
+续费：
+  到期前 N 天自动扣款 →
+  ├─ 成功 → Subscription 续期
+  └─ 失败 → Subscription(past_due)，宽限期内重试 → 仍失败 → expired</div>
+
+<!-- 退款规则子标题 -->
+<h4>退款规则</h4>
+<!-- 退款规则清单 -->
+<ul>
+  <!-- IAP 订单退款：走商店流程 -->
+  <li>IAP 订单：按商店政策走商店退款流程，产品侧接收退款回调并更新订阅状态</li>
+  <!-- 直连通道退款：人工审核（窗口条件 TBD） -->
+  <li>直连通道订单：支持用户申请退款，运营审核后执行 <span class="tag-tbd">TBD：退款窗口与条件</span></li>
+  <!-- 退款后订阅处理 -->
+  <li>退款后订阅立即失效（或按比例折算至当期结束），不可恢复</li>
+</ul>
+
+<!-- 异常与边界子标题 -->
+<h4>异常与边界</h4>
+<!-- 支付异常处理清单 -->
+<ul>
+  <!-- 回调幂等 -->
+  <li>支付回调重复到达：以 order_id + 通道流水号幂等处理</li>
+  <!-- 掉单补发：每日对账 -->
+  <li>支付成功但订阅未生效：对账任务每日扫描 paid 但无 active subscription 的订单，自动补发</li>
+  <!-- 跨端状态同步时限 -->
+  <li>跨端订阅状态：订阅状态变更后 5 秒内同步至所有在线端，离线端下次拉取时更新</li>
+</ul>
+
+<!-- FR-02 交互演示卡片 -->
+<div class="demo">
+  <!-- 演示卡片标签 -->
+  <div class="demo-label">FR-02 演示：订阅计划与支付</div>
+  <!-- 计划演示容器（供脚本按 id 定位） -->
+  <div id="plan-demo">
+    <!-- 计划对比表：宽度自适应内容 -->
+    <table style="width:auto;">
+      <!-- 表头：计划 / 月付 / 年付 / 操作列 -->
+      <tr><th>计划</th><th>月付</th><th>年付</th><th></th></tr>
+      <!-- 基础版行：选择按钮调用 selectPlan('基础版','¥29') -->
+      <tr><td>基础版</td><td>¥29</td><td>¥290 <span class="badge">省 ¥58</span></td><td><button class="btn btn-ghost" onclick="selectPlan('基础版','¥29')">选择</button></td></tr>
+      <!-- 专业版行：选择按钮调用 selectPlan('专业版','¥99') -->
+      <tr><td>专业版</td><td>¥99</td><td>¥990 <span class="badge">省 ¥198</span></td><td><button class="btn" onclick="selectPlan('专业版','¥99')">选择</button></td></tr>
+    </table>
+    <!-- 支付结果区：由脚本写入所选计划与支付按钮/结果 -->
+    <div id="pay-result" style="margin-top:12px;"></div>
+  </div>
+</div>
+<!-- FR-02 演示脚本 -->
+<script>
+// 选择计划：把所选计划名称与价格渲染进结果区，并给出两个支付按钮
+function selectPlan(name,price){
+  // 将结果区内容替换为：已选信息 + 微信支付按钮 + 支付宝按钮
+  document.getElementById('pay-result').innerHTML=
+    '<strong>已选：'+name+' '+price+'/月</strong><br>'+
+    '<button class="btn" style="margin-top:8px;" onclick="doPay()">微信支付</button> '+
+    '<button class="btn btn-ghost" onclick="doPay()">支付宝</button>';
+}
+// 模拟支付：把结果区替换为支付成功提示
+function doPay(){
+  // 显示演示用的支付成功文案
+  document.getElementById('pay-result').innerHTML=
+    '<span class="state-active">✓ 支付成功，订阅已激活，可使用付费功能</span>';
+}
+</script>
+
+<!-- FR-03 核心 SaaS 工作区小节标题 -->
+<h3>FR-03 核心 SaaS 工作区</h3>
+
+<!-- 信息提示块：OQ-01 已定案 -->
+<div class="callout">
+  <strong>OQ-01 已定案</strong>（2026-11-03）：旗舰产品形态为 <strong>SaaS 工具型（订阅制）— 跨端任务与轻协作工具</strong>。本节定义其 P0 功能规格与工作区通用框架。
+</div>
+
+<!-- P0 核心模块子标题 -->
+<h4>P0 核心模块（订阅用户可用）</h4>
+
+<!-- ① 任务管理 -->
+<p><strong>① 任务管理</strong>：</p>
+<ul>
+  <!-- 层级结构 -->
+  <li>层级结构：项目 → 任务 → 子任务（固定两级任务层级）</li>
+  <!-- 任务属性 -->
+  <li>任务属性：标题、描述、标签（多选）、截止日期、完成状态（待办/已完成）</li>
+  <!-- 提醒 -->
+  <li>提醒：截止日提醒推送（复用 FR-04 平台适配层推送能力）</li>
+</ul>
+
+<!-- ② 多端实时同步 -->
+<p><strong>② 多端实时同步</strong>：</p>
+<ul>
+  <!-- 契约依托 -->
+  <li>依托 FR-04 一致性契约：任务数据所有端可见可编辑，变更 5 秒内同步在线端，离线端下次拉取更新</li>
+  <!-- 冲突策略 -->
+  <li>冲突策略：服务端 last-write-wins，客户端乐观更新</li>
+</ul>
+
+<!-- ③ 基础协作 -->
+<p><strong>③ 基础协作</strong>：</p>
+<ul>
+  <!-- 项目共享 -->
+  <li>项目共享：项目所有者通过手机号/邮箱邀请成员加入项目</li>
+  <!-- 权限两档 -->
+  <li>权限两档：可编辑（读写任务）、只读（仅查看）</li>
+  <!-- 数据归属 -->
+  <li>数据归属：协作项目数据按创建者 user_id + region 归属</li>
+</ul>
+
+<!-- ④ 个人仪表盘 -->
+<p><strong>④ 个人仪表盘</strong>：</p>
+<ul>
+  <!-- 今日任务 -->
+  <li>今日任务：截止日为今天的全部任务</li>
+  <!-- 即将到期 -->
+  <li>即将到期：未来 7 天内到期的任务列表</li>
+</ul>
+
+<!-- 订阅 features 映射子标题 -->
+<h4>订阅计划 features 映射</h4>
+<!-- features 映射表：能力 × 三档计划 -->
+<table>
+  <!-- 表头：能力 / 免费版 / 基础版 / 专业版 -->
+  <tr><th>能力</th><th>免费版</th><th>基础版 ¥29/月</th><th>专业版 ¥99/月</th></tr>
+  <!-- 项目数 -->
+  <tr><td>项目数</td><td>3 个</td><td>无限</td><td>无限</td></tr>
+  <!-- 视图 -->
+  <tr><td>视图</td><td>列表 / 今日</td><td>列表 / 今日 / 日历</td><td>列表 / 今日 / 日历 / 看板</td></tr>
+  <!-- 提醒推送 -->
+  <tr><td>提醒推送</td><td>—</td><td>✓</td><td>✓</td></tr>
+  <!-- 协作 -->
+  <tr><td>协作（单项目协作者数）</td><td>—（单人）</td><td>≤ 3</td><td>无限</td></tr>
+  <!-- 高级筛选与主题 -->
+  <tr><td>高级筛选 / 自定义主题</td><td>—</td><td>—</td><td>✓</td></tr>
+  <!-- 导出 -->
+  <tr><td>导出 CSV</td><td>—</td><td>✓</td><td>✓</td></tr>
+</table>
+
+<!-- P1 增量子标题 -->
+<h4>P1 增量（挂接既有 P1 能力模块）</h4>
+<ul>
+  <!-- AI 能力 -->
+  <li>AI 摘要与智能安排（← AI 编排模块，模型路由/配额复用）</li>
+  <!-- IM 能力 -->
+  <li>任务评论与即时讨论（← IM 模块，会话能力复用）</li>
+  <!-- 模板市场 -->
+  <li>模板市场（任务/项目模板分享）</li>
+</ul>
+
+<!-- P0 不做子标题 -->
+<h4>P0 明确不做</h4>
+<ul>
+  <!-- 排除：复杂项目管理 -->
+  <li>甘特图、资源排期（复杂项目管理能力，另行评估）</li>
+  <!-- 排除：音视频会议 -->
+  <li>音视频会议入口（P1 音视频模块上线后再评估）</li>
+</ul>
+
+<!-- 工作区框架子标题 -->
+<h4>工作区框架</h4>
+<!-- 工作区框架规则清单 -->
+<ul>
+  <!-- 登录后进入工作区，左侧导航 -->
+  <li>用户登录后进入工作区，左侧导航展示可用功能模块</li>
+  <!-- 按订阅 features 控制模块显隐 -->
+  <li>功能模块按订阅计划的 features 列表显示/隐藏</li>
+  <!-- 免费用户升级引导 -->
+  <li>免费用户看到付费模块时，显示升级引导</li>
+  <!-- 数据隔离维度 -->
+  <li>工作区数据按 user_id + region 隔离</li>
+</ul>
+
+<!-- 权限校验规则子标题 -->
+<h4>权限校验规则</h4>
+<!-- 权限校验清单 -->
+<ul>
+  <!-- 服务端逐次校验 -->
+  <li>每次访问付费功能时，服务端校验当前订阅状态与 features 列表</li>
+  <!-- 客户端缓存 5 分钟 -->
+  <li>客户端缓存订阅状态 5 分钟，超时重新拉取</li>
+  <!-- 订阅失效后的页面引导 -->
+  <li>订阅失效后，已打开的付费页面提示并引导重新订阅</li>
+</ul>
+
+<!-- FR-04 多端体验一致性小节标题 -->
+<h3>FR-04 多端体验一致性</h3>
+
+<!-- 目的子标题 -->
+<h4>目的</h4>
+<!-- 目的说明段 -->
+<p>用户在不同端使用产品时，核心功能、数据、状态保持一致。各端的 UI 差异仅由平台适配层处理，业务逻辑统一。</p>
+
+<!-- 一致性契约子标题 -->
+<h4>一致性契约</h4>
+<!-- 一致性规则表 -->
+<table>
+  <!-- 表头：维度 / 统一规则 -->
+  <tr><th>维度</th><th>统一规则</th></tr>
+  <!-- 账号与订阅 -->
+  <tr><td>账号与订阅</td><td>同一市场内跨端实时同步</td></tr>
+  <!-- 业务数据 -->
+  <tr><td>业务数据</td><td>用户产生的数据在所有端可见可编辑</td></tr>
+  <!-- 文案与术语 -->
+  <tr><td>文案与术语</td><td>同一概念在所有端使用同一文案（来自 i18n 资源）</td></tr>
+  <!-- 错误提示 -->
+  <tr><td>错误提示</td><td>同一错误码在所有端映射为同一用户可读提示</td></tr>
+  <!-- 设计系统 -->
+  <tr><td>设计系统</td><td>Design Token 统一颜色、间距、字号，各端组件库基于 Token 实现</td></tr>
+  <!-- 平台兼容下限（矩阵详见 §3） -->
+  <tr><td>平台兼容下限</td><td>iOS 15.0+ / Android 9.0+ / 微信、支付宝、抖音、百度、QQ 小程序 / Windows 10–11 / macOS 12+ / Ubuntu 20.04+（P0/P1 分列见 §3「平台兼容性要求」矩阵）</td></tr>
+</table>
+
+<!-- 平台适配层职责子标题 -->
+<h4>平台适配层职责</h4>
+<!-- 适配层职责清单 -->
+<ul>
+  <!-- 登录封装 -->
+  <li>登录：封装各端原生登录 SDK（微信、支付宝、Google、Apple）</li>
+  <!-- 支付封装 -->
+  <li>支付：封装各端支付 SDK（微信支付、支付宝、Stripe、IAP）</li>
+  <!-- 推送封装 -->
+  <li>推送：封装各端推送通道（APNs、FCM、厂商通道）</li>
+  <!-- 存储封装 -->
+  <li>存储：封装本地存储 API（localStorage、AsyncStorage、SQLite）</li>
+  <!-- 分享封装 -->
+  <li>分享：封装各端原生分享能力</li>
+</ul>
+
+<!-- FR-05 国际化与本地化小节标题 -->
+<h3>FR-05 国际化与本地化</h3>
+
+<!-- 多语言子标题 -->
+<h4>多语言</h4>
+<!-- 多语言规则清单 -->
+<ul>
+  <!-- 默认语种（首批清单 TBD） -->
+  <li>默认语言：中文（简体）、英文；后续按需扩展 <span class="tag-tbd">TBD：首批语种清单</span></li>
+  <!-- 语言检测优先级 -->
+  <li>语言检测优先级：用户设置 → 浏览器/系统语言 → 默认语言</li>
+  <!-- 文案禁止硬编码 -->
+  <li>所有用户可见文案从 i18n 资源加载，禁止硬编码</li>
+  <!-- RTL 布局支持（P1） -->
+  <li>支持 RTL 布局（阿拉伯语等）<span class="tag-p1">P1</span></li>
+</ul>
+
+<!-- 多币种与价格子标题 -->
+<h4>多币种与价格</h4>
+<!-- 多币种规则清单 -->
+<ul>
+  <!-- 分币种独立定价 -->
+  <li>每个计划按币种独立定价，不使用实时汇率换算</li>
+  <!-- 币种由 region 决定 -->
+  <li>币种由 region 决定，国内默认 CNY，海外默认 USD</li>
+  <!-- 价格展示格式 -->
+  <li>价格展示包含货币符号与两位小数（日元等零小数币种除外）</li>
+</ul>
+
+<!-- 多时区子标题 -->
+<h4>多时区</h4>
+<!-- 时区规则清单 -->
+<ul>
+  <!-- 服务端统一 UTC 存储 -->
+  <li>服务端时间统一存储为 UTC</li>
+  <!-- 展示按用户时区转换 -->
+  <li>展示时按用户时区转换，时区默认取系统时区，可在设置中修改</li>
+</ul>
+
+<!-- FR-06 合规与隐私小节标题 -->
+<h3>FR-06 合规与隐私</h3>
+
+<!-- 隐私政策与用户协议子标题 -->
+<h4>隐私政策与用户协议</h4>
+<!-- 协议规则清单 -->
+<ul>
+  <!-- 注册时强制展示并勾选 -->
+  <li>首次注册时必须展示隐私政策与用户协议，用户勾选同意后方可继续</li>
+  <!-- 政策必含内容（第三方 SDK 清单以 docs/wiki/09-third-party-sdk-inventory.md 为唯一来源） -->
+  <li>隐私政策包含：数据收集清单、使用目的、存储期限、第三方 SDK 清单（来源：<code>docs/wiki/09-third-party-sdk-inventory.md</code>）、用户权利（访问、更正、删除、注销）</li>
+  <!-- 政策更新需重新确认 -->
+  <li>政策更新时，用户下次登录需重新确认</li>
+</ul>
+
+<!-- 数据收集最小化子标题 -->
+<h4>数据收集最小化</h4>
+<!-- 数据最小化规则清单 -->
+<ul>
+  <!-- 仅收集必要数据 -->
+  <li>仅收集实现功能所必需的数据</li>
+  <!-- 敏感数据加密与脱敏 -->
+  <li>敏感数据（手机号、邮箱）加密存储，展示时脱敏</li>
+  <!-- 数据属地存储、不出境 -->
+  <li>国内数据存储于境内服务器，海外数据存储于对应区域，数据不出境</li>
+</ul>
+
+<!-- 账号注销与数据删除子标题 -->
+<h4>账号注销与数据删除</h4>
+<!-- 注销规则清单 -->
+<ul>
+  <!-- 注销前风险提示 -->
+  <li>用户可申请账号注销，注销前提示：订阅将失效、数据将删除且不可恢复</li>
+  <!-- 7 天冷静期 -->
+  <li>注销申请有 7 天冷静期，期间可撤销</li>
+  <!-- 冷静期后删除与匿名化保留 -->
+  <li>冷静期结束后，删除用户个人数据，保留匿名化的订单与财务记录（合规要求）</li>
+  <!-- 海外删除请求时限 -->
+  <li>海外用户的数据删除请求按 GDPR/CCPA 要求在 30 天内处理</li>
+</ul>
+
+<!-- 章节标题：6. 共享规则 -->
+<h2>6. 共享规则</h2>
+
+<!-- 6.1 跨模块规则小节标题 -->
+<h3>6.1 跨模块规则</h3>
+<!-- 跨模块规则表 -->
+<table>
+  <!-- 表头：规则 / 定义 / 引用模块 -->
+  <tr><th>规则</th><th>定义</th><th>引用模块</th></tr>
+  <!-- Region 隔离 -->
+  <tr><td>Region 隔离</td><td>国内(cn)与海外(global)数据物理隔离，账号、订单、订阅按 region 分库</td><td>FR-01, FR-02, FR-03</td></tr>
+  <!-- 幂等性 -->
+  <tr><td>幂等性</td><td>所有支付、订阅状态变更接口以 request_id 幂等，重复请求返回首次结果</td><td>FR-02</td></tr>
+  <!-- 审计日志 -->
+  <tr><td>审计日志</td><td>登录、支付、退款、注销等关键操作记录审计日志，保留 180 天</td><td>FR-01, FR-02, FR-06</td></tr>
+</table>
+
+<!-- 6.2 通知规则小节标题 -->
+<h3>6.2 通知规则</h3>
+<!-- 通知规则清单 -->
+<ul>
+  <!-- 支付成功通知 -->
+  <li>支付成功：站内 + 邮件/短信通知</li>
+  <!-- 到期提醒节奏 -->
+  <li>订阅即将到期：到期前 7 天、3 天、1 天各提醒一次</li>
+  <!-- 续费失败通知 -->
+  <li>续费失败：立即通知用户更新支付方式</li>
+  <!-- 异常登录通知 -->
+  <li>账号异常登录：邮件/短信通知用户</li>
+</ul>
+
+<!-- 章节标题：7. 开放问题 -->
+<h2>7. 开放问题</h2>
+
+<!-- 开放问题跟踪表 -->
+<table>
+  <!-- 表头：编号 / 问题 / 影响 / 状态 -->
+  <tr><th>编号</th><th>问题</th><th>影响</th><th>状态</th></tr>
+  <!-- OQ-01：已定案（2026-11-03），定案内容见 FR-03 -->
+  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>决定 FR-03 工作区具体内容与订阅计划 features</td><td><span class="tag-p0">已定案：跨端任务与轻协作工具</span></td></tr>
+  <!-- OQ-02：国内 Android IAP 合规问题 -->
+  <tr><td>OQ-02</td><td>国内 Android 端数字商品是否必须走各商店 IAP？</td><td>影响支付通道设计与收入分成</td><td><span class="tag-assume">Assumption, TBD</span></td></tr>
+  <!-- OQ-03：首批出海市场与语种 -->
+  <tr><td>OQ-03</td><td>首批出海市场与语种？</td><td>影响 i18n 资源、支付通道、合规要求</td><td><span class="tag-tbd">TBD</span></td></tr>
+  <!-- OQ-04：退款窗口与条件 -->
+  <tr><td>OQ-04</td><td>退款窗口与条件（直连通道）？</td><td>影响 FR-02 退款规则</td><td><span class="tag-tbd">TBD</span></td></tr>
+  <!-- OQ-05：账号合并策略 -->
+  <tr><td>OQ-05</td><td>账号合并的具体策略与数据归属？</td><td>影响 FR-01 账号打通</td><td><span class="tag-tbd">TBD</span></td></tr>
+  <!-- OQ-06：IoT 是否支持（假设不支持） -->
+  <tr><td>OQ-06</td><td>是否支持硬件设备接入（IoT）？</td><td>影响范围定义与后端架构</td><td><span class="tag-assume">Assumption: P0 不支持</span></td></tr>
+</table>
+
+<!-- 文档末尾分割线 -->
+<hr>
+<!-- 页脚：版本与草案声明（灰色居中） -->
+<p class="muted" style="text-align:center;">Mim PRD · V0.0.0-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新</p>
+
+<!-- 页面主体结束 -->
+</body>
+<!-- 文档结束 -->
+</html>

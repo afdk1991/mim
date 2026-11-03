@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mim · 全平台产品底座</title>
+<meta name="description" content="Mim 全平台产品底座：Headless 中台 + 多端薄壳。一套业务逻辑，覆盖 Web、小程序、App、PC，支撑国内与出海双市场。" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111'/><text x='16' y='22' font-size='16' font-family='system-ui' font-weight='700' fill='%23fff' text-anchor='middle'>M</text></svg>" />
+<style>
+  :root{
+    --bg:#0b0c0e; --panel:#12141a; --panel-2:#171a21; --line:#262a33;
+    --fg:#eef1f6; --fg-dim:#9aa3b2; --fg-mute:#6b7484;
+    --accent:#4f8cff; --accent-2:#7ee0c0; --radius:14px;
+    --maxw:1120px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  /* nav */
+  header{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);
+    background:rgba(11,12,14,.72);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em}
+  .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    background:linear-gradient(140deg,var(--accent),#2f5fbf);font-size:15px;font-weight:800;color:#fff}
+  .nav-links{display:flex;gap:26px;font-size:14px;color:var(--fg-dim)}
+  .nav-links a:hover{color:var(--fg)}
+  .badge{font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:999px;color:var(--fg-dim)}
+  /* hero */
+  .hero{padding:88px 0 64px;position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:-40% 20% 40% -10%;
+    background:radial-gradient(60% 60% at 30% 20%,rgba(79,140,255,.18),transparent 70%),
+               radial-gradient(50% 50% at 80% 0%,rgba(126,224,192,.12),transparent 70%);
+    pointer-events:none}
+  .hero h1{font-size:clamp(34px,5vw,56px);line-height:1.15;letter-spacing:-.02em;font-weight:800;max-width:16em}
+  .hero h1 em{font-style:normal;background:linear-gradient(100deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lede{margin-top:20px;font-size:17px;color:var(--fg-dim);max-width:44em}
+  .cta{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--line);transition:.18s}
+  .btn.primary{background:var(--fg);color:#0b0c0e;border-color:transparent}
+  .btn.primary:hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,255,255,.14)}
+  .btn.ghost:hover{border-color:#3a4150;background:var(--panel)}
+  /* stats strip */
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-top:56px}
+  .strip div{background:var(--panel);padding:22px 20px}
+  .strip b{display:block;font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .strip span{font-size:13px;color:var(--fg-mute)}
+  /* sections */
+  section{padding:72px 0;border-top:1px solid var(--line)}
+  .sec-head{margin-bottom:38px}
+  .kicker{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h2{font-size:clamp(24px,3vw,32px);margin-top:10px;letter-spacing:-.01em}
+  .sec-head p{margin-top:12px;color:var(--fg-dim);max-width:52em}
+  .grid{display:grid;gap:16px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;transition:.18s}
+  .card:hover{border-color:#343b49;transform:translateY(-2px)}
+  .card h3{font-size:16px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .card p{font-size:14px;color:var(--fg-dim)}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:6px;
+    background:rgba(79,140,255,.14);color:#8fb6ff;border:1px solid rgba(79,140,255,.28)}
+  .tag.p1{background:rgba(126,224,192,.12);color:#8fe3c8;border-color:rgba(126,224,192,.28)}
+  /* architecture */
+  .arch{display:grid;gap:14px}
+  .layer{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:20px 24px;display:flex;gap:22px;align-items:center}
+  .layer .l-name{min-width:150px;font-weight:700;font-size:15px}
+  .layer .l-desc{color:var(--fg-dim);font-size:14px}
+  .layer.core{background:linear-gradient(120deg,rgba(79,140,255,.10),var(--panel) 55%)}
+  /* roadmap */
+  .road{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .road .card{position:relative;padding-top:28px}
+  .road .card::before{content:"";position:absolute;left:24px;top:16px;width:34px;height:3px;border-radius:2px;background:var(--accent)}
+  .road .card.p1::before{background:var(--accent-2)}
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:44px 0;color:var(--fg-mute);font-size:13px}
+  .foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .foot a{color:var(--fg-dim)}
+  .foot a:hover{color:var(--fg)}
+  @media (max-width:900px){
+    .g3{grid-template-columns:1fr 1fr}
+    .strip{grid-template-columns:1fr 1fr}
+    .road{grid-template-columns:1fr}
+    .nav-links{display:none}
+  }
+  @media (max-width:560px){
+    .g3,.g2{grid-template-columns:1fr}
+    .layer{flex-direction:column;align-items:flex-start;gap:8px}
+    .hero{padding:56px 0 40px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="brand"><div class="logo">M</div>Mim<span class="badge" id="ver">V0.0.0-preview</span></div>
+    <nav class="nav-links">
+      <a href="#arch">架构</a>
+      <a href="#p0">P0 能力</a>
+      <a href="#roadmap">路线</a>
+      <a href="/prd.html">PRD</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>一套业务逻辑，<em>覆盖所有端与市场</em></h1>
+    <p class="lede">
+      Mim 是全平台产品底座：以 Headless 中台 + 多端薄壳承载账号、订阅支付、SaaS 工作区与合规能力，
+      Web / 小程序 / App / PC 各自只做 UI 与平台适配，国内与出海共用同一身份与数据。
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#p0">查看 P0 交付范围</a>
+      <a class="btn ghost" href="/prd.html">阅读产品需求文档</a>
+    </div>
+
+    <div class="strip">
+      <div><b>4 端</b><span>Web / 小程序 / App / PC</span></div>
+      <div><b>2 市场</b><span>国内 + 出海</span></div>
+      <div><b>6 能力域</b><span>账号 · 支付 · 工作区 · 多端 · i18n · 合规</span></div>
+      <div><b>1 身份</b><span>跨端账号与订阅打通</span></div>
+    </div>
+  </div>
+
+  <section id="arch">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">Architecture</div>
+        <h2>Headless 中台 + 多端薄壳</h2>
+        <p>业务逻辑、能力网关、账号与数据下沉为共享层；各端只负责 UI 与平台 API 适配。改一处，所有端一致生效。</p>
+      </div>
+      <div class="arch">
+        <div class="layer">
+          <div class="l-name">多端薄壳</div>
+          <div class="l-desc">Web、微信小程序、iOS / Android、Windows / macOS —— 仅承载界面与平台差异</div>
+        </div>
+        <div class="layer core">
+          <div class="l-name">共享业务层</div>
+          <div class="l-desc">账号与身份、订阅与支付、SaaS 工作区、通知与规则 —— 统一实现、统一治理</div>
+        </div>
+        <div class="layer">
+          <div class="l-name">能力网关与驱动</div>
+          <div class="l-desc">支付通道（国内通道 / Stripe · PayPal / IAP）、IM、音视频、AI —— 以统一接口暴露，国内外差异由驱动层屏蔽</div>
+        </div>
+        <div class="layer">
+          <div class="l-name">数据与合规</div>
+          <div class="l-desc">用户、账号、订阅、订单、计划等共享业务对象；PIPL / GDPR 最小收集、可注销、可删除</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="p0">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">P0 · 必须交付</div>
+        <h2>核心用户旅程</h2>
+        <p>注册账号 → 选择订阅计划 → 完成支付 → 使用核心 SaaS 功能 → 跨端继续使用。</p>
+      </div>
+      <div class="grid g3">
+        <div class="card">
+          <h3>FR-01 账号与身份 <span class="tag">P0</span></h3>
+          <p>注册、登录、跨端账号打通。国内：手机号 + 微信 / 支付宝；海外：邮箱 + Google / Apple。</p>
+        </div>
+        <div class="card">
+          <h3>FR-02 订阅与支付 <span class="tag">P0</span></h3>
+          <p>计划展示、订阅、支付（国内通道 + Stripe / PayPal + Apple IAP / Google Play）、订单、退款与凭证校验。</p>
+        </div>
+        <div class="card">
+          <h3>FR-03 核心 SaaS 工作区 <span class="tag">P0</span></h3>
+          <p>跨端任务与轻协作工具：任务管理、多端实时同步、基础协作、个人仪表盘。</p>
+        </div>
+        <div class="card">
+          <h3>FR-04 多端体验一致性 <span class="tag">P0</span></h3>
+          <p>Web、微信小程序、App、PC 至少一端可用，其余端适配；低于最低版本的系统不纳入支持范围。</p>
+        </div>
+        <div class="card">
+          <h3>FR-05 国际化与本地化 <span class="tag">P0</span></h3>
+          <p>i18n 多语言、多币种、多时区，国内与出海共用一套内容与计费模型。</p>
+        </div>
+        <div class="card">
+          <h3>FR-06 合规与隐私 <span class="tag">P0</span></h3>
+          <p>隐私政策、用户协议、数据收集清单、账号注销与数据删除请求，全流程可审计。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">Roadmap</div>
+        <h2>分期交付</h2>
+        <p>P0 先打通「注册 → 订阅 → 支付 → 使用 → 跨端」闭环；P1 再扩展重资产能力与更多平台。</p>
+      </div>
+      <div class="road">
+        <div class="card">
+          <h3>P0 · 当前版本 <span class="tag">V0.0.0-preview</span></h3>
+          <p>账号、订阅支付、SaaS 工作区、多端一致性、i18n 基础、合规与隐私。</p>
+        </div>
+        <div class="card p1">
+          <h3>P1 · 能力扩展 <span class="tag p1">规划</span></h3>
+          <p>IM 即时通讯、音视频（信令 / SFU / 转码）、AI 编排、内容管理、开放平台、管理后台。</p>
+        </div>
+        <div class="card p1">
+          <h3>P1 · 更多端 <span class="tag p1">规划</span></h3>
+          <p>支付宝 / 抖音 / 百度 / QQ 小程序、鸿蒙、Linux 与国产化 PC。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="status">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">Status</div>
+        <h2>当前仓库状态</h2>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <h3>已具备</h3>
+          <p>产品需求文档（PRD）、协作铁律、Wiki 结构化文档（01~09）、版本与密钥一致性校验脚本。</p>
+        </div>
+        <div class="card">
+          <h3>进行中</h3>
+          <p>按 P0 范围落地共享业务层与首个端（Web + 微信小程序），并接入支付与合规能力。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>© 2026 Mim · 全平台产品底座</div>
+    <div>
+      <a href="/prd.html">产品需求文档</a> ·
+      <a href="#arch">架构</a> ·
+      <span id="ver2">V0.0.0-preview</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // 版本号与 PRD 单一来源保持一致：部署时若注入 window.__MIM_VERSION__ 则以其为准
+  (function () {
+    var v = (window.__MIM_VERSION__ || "V0.0.0-preview");
+    document.getElementById("ver").textContent = v;
+    document.getElementById("ver2").textContent = v;
+  })();
+</script>
+</body>
+</html>
