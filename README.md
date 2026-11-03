@@ -46,15 +46,14 @@ node scripts/env-check.mjs
 
 ## 站点与部署
 
-`site/` 为可部署的静态站点（`index.html` 落地页 + `prd.html` 完整 PRD，零外部依赖）。仓库通过 `package.json` 的 `build` 脚本（`scripts/build.mjs`，把 `site/` 复制到 `dist/`）产出 EdgeOne Pages 所需的构建目录。
+> **当前定位**：本仓库为产品需求文档（PRD）+ 架构设计仓库，**不是可运行的功能产品**。`site/` 仅为 PRD 的可视化阅读载体（落地页 + PRD 副本），用于本地或临时预览，**不绑定生产域名、不作为线上产品部署**。
 
-| 项 | 值 |
+| 项 | 说明 |
 |---|---|
-| GitHub 仓库 | `afdk1991/mim`（main 分支，Vite/Upload 兼容，`npm run build` → `dist/`） |
-| Pages 项目 | `mim`（ProjectId `makers-euoglvyjyknd`，GitHub 自动构建） |
-| 生产部署 | `dp1l6w9do186` · Status Success · commit `2a4891df` |
-| 产品站域名 | `https://data.mixm.top` —— 渲染 Mim 落地页（标题「Mim · 全平台产品底座」），`/prd.html` 可查阅完整 PRD |
-| 预览域名 | `https://mim-yrchrlps.edgeone.cool`（项目开启访问控制，需带 token） |
+| `site/index.html` | Mim 落地页（PRD 的可视化入口），本地双击可打开 |
+| `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读 |
+| `package.json` / `scripts/build.mjs` | 可选的本地构建脚本（`site/` → `dist/`），仅用于本地预览验证，**非生产部署** |
+| 生产域名 | 无。`data.mixm.top` 等线上域名不归本仓库所有 |
 
-本地构建：`npm run build`（产出 `dist/`）；校验：`npm run check`（版本 + 密钥模板）。部署与验证命令见 [docs/wiki/05-runbook.md](./docs/wiki/05-runbook.md) §7。
+本地构建（可选）：`npm run build`；校验：`npm run check`（版本 + 密钥模板）。
 

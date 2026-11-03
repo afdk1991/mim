@@ -101,34 +101,21 @@ packages/    # 共享层：能力网关、领域模型、i18n、Design Token
 
 届时本仓库将扩展为 Monorepo（`apps/` + `packages/`），依赖清单与构建脚本随之落地。当前根目录 `package.json` 已存在，承担版本号来源与站点构建脚本（`build` / `check`），业务代码尚未创建。
 
-## 7. 部署静态站点（EdgeOne Pages）
+## 7. 站点与构建（本地预览，非生产部署）
 
-### 7.1 生产部署（推荐，GitHub 自动构建）
+> **定位**：本仓库为 PRD + 架构文档仓库，`site/` 是 PRD 的可视化阅读载体，**不作为线上产品部署、不绑定生产域名**。
 
-仓库 `afdk1991/mim`（main 分支）已绑定 EdgeOne Pages 项目 `mim`（ProjectId `makers-euoglvyjyknd`），push 到 main 即触发自动构建：
-
-- 构建命令：`npm run build` → 调用 `scripts/build.mjs`，把 `site/` 复制到 `dist/`
-- 输出目录：`dist`（OutputDir）
-- 生产域名：`https://data.mixm.top`（渲染 Mim 落地页，`/prd.html` 查阅 PRD）
-
-本地验证构建产物：
+### 7.1 本地构建（可选）
 
 ```bash
-npm run build          # 产出 dist/index.html + dist/prd.html
-npm run check          # version-check + env-check（退出码 0 = 通过）
+npm run build    # scripts/build.mjs 把 site/ 复制到 dist/
+npm run check    # version-check + env-check（退出码 0 = 通过）
 ```
 
-### 7.2 CLI 直传部署（备用，Upload 型）
+构建产物 `dist/index.html` + `dist/prd.html` 可本地双击打开，或用任意静态服务器预览。
 
-前置：`edgeone` CLI 已登录（凭据存于 `~/.edgeone/`，本机 `region: china`）。
+### 7.2 不涉及的动作
 
-```bash
-edgeone makers deploy "F:\合并项目\Mim\site" -n mim-app --json
-```
-
-产物字段：`DeploymentId` / `PreviewUrl` / `ProjectUrl`。`mim-app`（ProjectId `makers-kyfamwxytnyj`）为 Upload 型备用项目，其 `*.edgeone.cool` 域名开启访问控制，不带 token 访问返回 `401 UNAUTHORIZED`。
-
-### 7.3 访问控制说明
-
-- `data.mixm.top`：生产域名，真实浏览器可直接访问（EdgeOne 边缘 JS 挑战对正常浏览器自动放行，curl 等无头客户端会收到 987 字节 challenge 脚本）。
-- `*.edgeone.cool` 预览域名：项目级访问控制开启，需在 EdgeOne 控制台获取带 token 的预览链接。
+- 不 push 到 GitHub 触发 EdgeOne 自动构建（仓库内容为文档，无功能代码可部署）。
+- 不绑定 `data.mixm.top` 等生产域名。
+- 线上域名归属与实际功能代码的部署由独立的应用仓库负责，不在本仓库范围内。

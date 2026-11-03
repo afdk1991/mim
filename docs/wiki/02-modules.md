@@ -108,21 +108,22 @@ Mim-PRD.html ◂──论据── 两份 txt 调研
 team-hiring-plan.md ◂──论据── 全栈项目人员配置指南 txt
 docs/wiki/README.md ──索引──> docs/wiki/01~09（其中 08 引用 07/01，09 引用 04）
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
-package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/ (site/index.html + site/prd.html)
-afdk1991/mim (GitHub main) ──自动构建──> EdgeOne Pages 项目 mim ──> https://data.mixm.top
-.edgeone/project.json ──CLI 直传锚点──> mim-app 项目（遗留，非生产入口）
+package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/（本地预览，非生产部署）
+.edgeone/project.json ──历史遗留──> mim-app 项目（当前不使用）
 ```
 
 代码层零依赖：无 import 任何第三方包。详见 [04-dependencies.md](./04-dependencies.md)。
 
-## 7. site/、package.json 与部署 — 对外站点
+## 7. site/、package.json 与构建 — PRD 可视化载体（本地预览）
+
+> 本仓库为 PRD + 架构文档仓库，**不是可运行的功能产品**。`site/` 与构建脚本仅用于本地预览 PRD，**不作为线上产品部署、不绑定生产域名**。
 
 | 文件 | 说明 |
 |---|---|
-| `site/index.html` | Mim 落地页，单文件自包含（内联 CSS/JS，无 CDN/字体/脚本外链），可直接双击打开或作为静态站点首页 |
-| `site/prd.html` | `Mim-PRD.html` 的站点副本，供线上 `/prd.html` 直接查阅，内容与根目录 PRD 保持一致 |
-| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 脚本调用 `scripts/build.mjs` 产出 `dist/` |
-| `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`（EdgeOne Pages OutputDir），零依赖 |
-| `.edgeone/project.json` | EdgeOne CLI 直传锚点（`mim-app` Upload 型）；当前生产部署走 GitHub 自动构建，此为遗留备用 |
+| `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开 |
+| `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致 |
+| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 脚本调用 `scripts/build.mjs` |
+| `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`，零依赖，仅用于本地构建验证 |
+| `.edgeone/project.json` | EdgeOne CLI 直传锚点（`mim-app` Upload 型），历史遗留，当前不使用 |
 
-两个 HTML 均**不含任何业务密钥**，可安全公开部署。生产部署为 GitHub `afdk1991/mim` 自动构建到 EdgeOne Pages 项目 `mim`，域名 `https://data.mixm.top` 渲染 Mim 落地页；部署命令与验证见 [05-runbook.md](./05-runbook.md) §7。
+两个 HTML 均**不含业务密钥**。生产域名（如 `data.mixm.top`）不归本仓库所有，线上功能代码的部署由独立应用仓库负责。
