@@ -10,6 +10,8 @@
 | `README.md` | 治理 | 项目入口；版本号规约摘要与校验命令 | 版本展示约定 `V0.0.0-preview` |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
 | `scripts/env-check.mjs` | 可执行代码 | 09 清单 §0（密钥治理硬约束）的自动校验器 | 退出码 0/1；校验 `.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性 |
+| `scripts/build.mjs` | 可执行代码 | 静态站点构建脚本：把 `site/` 递归复制到 `dist/`（EdgeOne Pages OutputDir） | `dist/index.html` + `dist/prd.html`，供 `npm run build` 调用 |
+| `package.json` | 配置 | 项目元信息与脚本入口（`build` / `check:version` / `check:env` / `check`）；版本号 `0.0.0` 为 `version-check.mjs` 的校验源 | `npm run build` → `dist/`；`npm run check` → 两项校验 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
 | `team-hiring-plan.md` | 技术/组织规划 | 约束→编制→分阶段落地→风险→成本 | 22–32 人全配 / 14–18 人最小可行方案 |
 | `.env.example` | 配置模板 | 第三方 SDK / API 密钥占位模板（全空值，禁止填入真实密钥后提交） | `MIM_<领域>_<提供方>_<密钥类型>` 命名基线，与 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md) 一一对应 |
@@ -18,7 +20,7 @@
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
 | `site/index.html` | 可部署静态站点 | Mim 落地页（零外部依赖，内联 CSS/JS） | 部署到 EdgeOne Pages 的首页产物 |
 | `site/prd.html` | 可部署静态站点 | `Mim-PRD.html` 的站点副本，供线上直接查阅 PRD | 站点内 `/prd.html` 路由 |
-| `.edgeone/project.json` | 部署绑定 | EdgeOne CLI 写入的项目绑定（项目名与 ProjectId） | 将 `site/` 部署到 `mim-app` 的本地锚点 |
+| `.edgeone/project.json` | 部署绑定（遗留） | EdgeOne CLI 写入的项目绑定（`mim-app` Upload 型，ProjectId `makers-kyfamwxytnyj`）；当前生产部署走 GitHub 自动构建（`afdk1991/mim` → `mim` 项目），此文件仅作 CLI 直传锚点 | `{"Name":"mim-app","ProjectId":"makers-kyfamwxytnyj"}` |
 | `.screenshots/` | 资产暂存 | 截图存放（当前为空，仅含 `.tmp`） | — |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~09 共 9 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单 | 与仓库资产一一对应的唯一文档入口 |
 
@@ -106,17 +108,21 @@ Mim-PRD.html ◂──论据── 两份 txt 调研
 team-hiring-plan.md ◂──论据── 全栈项目人员配置指南 txt
 docs/wiki/README.md ──索引──> docs/wiki/01~09（其中 08 引用 07/01，09 引用 04）
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
-site/index.html + site/prd.html ──部署──> .edgeone/project.json（mim-app）──> EdgeOne Pages
+package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/ (site/index.html + site/prd.html)
+afdk1991/mim (GitHub main) ──自动构建──> EdgeOne Pages 项目 mim ──> https://data.mixm.top
+.edgeone/project.json ──CLI 直传锚点──> mim-app 项目（遗留，非生产入口）
 ```
 
 代码层零依赖：无 import 任何第三方包。详见 [04-dependencies.md](./04-dependencies.md)。
 
-## 7. site/ 与 .edgeone/ — 对外站点与部署绑定
+## 7. site/、package.json 与部署 — 对外站点
 
 | 文件 | 说明 |
 |---|---|
 | `site/index.html` | Mim 落地页，单文件自包含（内联 CSS/JS，无 CDN/字体/脚本外链），可直接双击打开或作为静态站点首页 |
 | `site/prd.html` | `Mim-PRD.html` 的站点副本，供线上 `/prd.html` 直接查阅，内容与根目录 PRD 保持一致 |
-| `.edgeone/project.json` | EdgeOne CLI 写入的项目绑定：`{"Name":"mim-app","ProjectId":"makers-kyfamwxytnyj"}`；`edgeone makers deploy site -n mim-app` 依赖此锚点定位项目 |
+| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 脚本调用 `scripts/build.mjs` 产出 `dist/` |
+| `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`（EdgeOne Pages OutputDir），零依赖 |
+| `.edgeone/project.json` | EdgeOne CLI 直传锚点（`mim-app` Upload 型）；当前生产部署走 GitHub 自动构建，此为遗留备用 |
 
-两个 HTML 均**不含任何业务密钥**，可安全公开部署；部署方式与访问控制（`*.edgeone.cool` 需 token、`data.mixm.top` 归属 `mim` 项目并受边缘人机验证拦截）见 [05-runbook.md](./05-runbook.md) §7。
+两个 HTML 均**不含任何业务密钥**，可安全公开部署。生产部署为 GitHub `afdk1991/mim` 自动构建到 EdgeOne Pages 项目 `mim`，域名 `https://data.mixm.top` 渲染 Mim 落地页；部署命令与验证见 [05-runbook.md](./05-runbook.md) §7。

@@ -99,9 +99,26 @@ apps/        # 各端薄壳：web / weapp / ios / android / pc
 packages/    # 共享层：能力网关、领域模型、i18n、Design Token
 ```
 
-届时本仓库将新增 `package.json`（版本号来源自动被 `version-check.mjs` 接管）、依赖清单与构建脚本。当前这些均**尚未创建**，以 [01-architecture.md](./01-architecture.md) §2 的 PRD 架构为准。
+届时本仓库将扩展为 Monorepo（`apps/` + `packages/`），依赖清单与构建脚本随之落地。当前根目录 `package.json` 已存在，承担版本号来源与站点构建脚本（`build` / `check`），业务代码尚未创建。
 
 ## 7. 部署静态站点（EdgeOne Pages）
+
+### 7.1 生产部署（推荐，GitHub 自动构建）
+
+仓库 `afdk1991/mim`（main 分支）已绑定 EdgeOne Pages 项目 `mim`（ProjectId `makers-euoglvyjyknd`），push 到 main 即触发自动构建：
+
+- 构建命令：`npm run build` → 调用 `scripts/build.mjs`，把 `site/` 复制到 `dist/`
+- 输出目录：`dist`（OutputDir）
+- 生产域名：`https://data.mixm.top`（渲染 Mim 落地页，`/prd.html` 查阅 PRD）
+
+本地验证构建产物：
+
+```bash
+npm run build          # 产出 dist/index.html + dist/prd.html
+npm run check          # version-check + env-check（退出码 0 = 通过）
+```
+
+### 7.2 CLI 直传部署（备用，Upload 型）
 
 前置：`edgeone` CLI 已登录（凭据存于 `~/.edgeone/`，本机 `region: china`）。
 
@@ -109,6 +126,9 @@ packages/    # 共享层：能力网关、领域模型、i18n、Design Token
 edgeone makers deploy "F:\合并项目\Mim\site" -n mim-app --json
 ```
 
-产物字段：`DeploymentId` / `PreviewUrl` / `ProjectUrl`。项目开启访问控制时，`*.edgeone.cool` 域名必须携带 token 访问，否则返回 `401 UNAUTHORIZED`。
+产物字段：`DeploymentId` / `PreviewUrl` / `ProjectUrl`。`mim-app`（ProjectId `makers-kyfamwxytnyj`）为 Upload 型备用项目，其 `*.edgeone.cool` 域名开启访问控制，不带 token 访问返回 `401 UNAUTHORIZED`。
 
-自定义域名 `data.mixm.top` **不在** `mim-app` 项目上：它绑定在 `mim` 项目（`makers-euoglvyjyknd`，GitHub `afdk1991/mim` → Vite 构建 → `dist`），由 EdgeOne 边缘侧的人机验证（`captcha.eo.gtimg.com` 跨域 iframe）拦截；解除需在 EdgeOne 控制台调整该域名的安全策略。
+### 7.3 访问控制说明
+
+- `data.mixm.top`：生产域名，真实浏览器可直接访问（EdgeOne 边缘 JS 挑战对正常浏览器自动放行，curl 等无头客户端会收到 987 字节 challenge 脚本）。
+- `*.edgeone.cool` 预览域名：项目级访问控制开启，需在 EdgeOne 控制台获取带 token 的预览链接。
