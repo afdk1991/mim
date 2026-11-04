@@ -4,7 +4,9 @@
 # 说明：services/mim-api 的 start 脚本使用 tsx 直接运行 TypeScript（无 tsc 产物），
 #       因此服务器必须以「含 devDependencies」的方式安装依赖。
 # 数据库：better-sqlite3 落盘在 services/mim-api/data/mim.db（WAL）。
-# JWT 密钥：首次启动自动生成 .mim-dev-secret/jwt.key 并持久化在仓库目录。
+# JWT 密钥：生产环境必须经 EnvironmentFile 注入 MIM_JWT_SECRET（>=32 字符，
+#       由 deploy.sh §5 幂等生成 /opt/mim/mim-api.env，chmod 600）；
+#       EnvironmentFile 不带 '-' 前缀，文件缺失即启动失败（fail-fast）。
 
 [Unit]
 Description=Mim 后端 API（Express + SQLite）
@@ -20,6 +22,7 @@ Group=mim
 WorkingDirectory=/opt/mim/app/services/mim-api
 Environment=NODE_ENV=production
 Environment=PORT=8787
+EnvironmentFile=/opt/mim/mim-api.env
 ExecStart=/opt/mim/app/services/mim-api/node_modules/.bin/tsx src/index.ts
 Restart=always
 RestartSec=3

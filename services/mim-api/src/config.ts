@@ -1,7 +1,7 @@
 /**
  * 运行期常量。
- * 刻意不新增任何 MIM_* 环境变量：09 清单未登记「应用自有配置」段，
- * env-check 会把模板外变量判为违规。数据库路径与 JWT 密钥均为本地文件方案。
+ * 数据库路径为本地文件方案；JWT 密钥优先读取 MIM_JWT_SECRET 环境变量
+ * （已登记 docs/wiki/09「应用自有机密」段），非生产环境回退本地文件。
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -35,8 +35,23 @@ export const AUDIT_RETENTION_DAYS = 180;
 /** 写操作必须携带 Idempotency-Key（08 §3.3）；auth 端点天然非幂等，已豁免 */
 export const REQUIRE_IDEMPOTENCY = true;
 
-/** 首次运行生成本地开发 JWT 密钥；`.mim-dev-secret/` 已在 .gitignore 中 */
+/**
+ * JWT 密钥加载（优先级从高到低）：
+ * 1. `MIM_JWT_SECRET` 环境变量（生产必配，systemd 经 /opt/mim/mim-api.env 注入）；
+ * 2. 非生产环境回退到本地 `.mim-dev-secret/jwt.key`（首次运行自动生成，已在 .gitignore 中）。
+ * 生产环境缺失密钥即拒绝启动，避免静默使用可预测的本地文件密钥。
+ */
 export function loadJwtSecret(): string {
+  const fromEnv = process.env.MIM_JWT_SECRET?.trim();
+  if (fromEnv) {
+    if (fromEnv.length < 32) {
+      throw new Error('MIM_JWT_SECRET 长度不足 32 字符，无法满足 HS256 签名要求');
+    }
+    return fromEnv;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('生产环境必须通过 MIM_JWT_SECRET 注入 JWT 密钥（deploy.sh §5 生成 /opt/mim/mim-api.env）');
+  }
   if (existsSync(SECRET_FILE)) {
     const value = readFileSync(SECRET_FILE, 'utf8').trim();
     if (value.length >= 32) return value;

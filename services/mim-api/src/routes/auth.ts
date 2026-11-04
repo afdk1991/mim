@@ -200,6 +200,16 @@ export function createAuthRouter(deps: ApiDeps): Router {
       });
     }
 
+    // 生产环境禁止直下发验证码：未接入真实短信/邮件通道前直接拒绝，
+    // 避免 dev_code 明文出现在生产响应中（安全审计项）。
+    if (deps.env.NODE_ENV === 'production') {
+      throw new AppError(
+        'AUTH_CHANNEL_NOT_CONFIGURED',
+        'verification channel is not configured in production',
+        { identifier: identity.identifier, provider: identity.provider },
+      );
+    }
+
     const code = generateCode();
     deps.db
       .prepare(

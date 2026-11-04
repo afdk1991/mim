@@ -2,7 +2,8 @@
 # deploy/deploy.sh — Mim 生产发布脚本（服务器侧，幂等可重放）
 #
 # 职责：拉取 origin/main → 安装依赖（含 dev，因 tsx 是运行时依赖）
-#       → 构建前端 → 发布静态产物到 /opt/mim/web → 重启后端 → 健康检查
+#       → 构建前端 → 发布静态产物到 /opt/mim/web
+#       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET）→ 重启后端 → 健康检查
 #
 # 用法（服务器上）：
 #   sudo bash /opt/mim/app/deploy/deploy.sh
@@ -97,11 +98,25 @@ mkdir -p "$WEB_DIR"
 rm -rf "$WEB_DIR"/*
 cp -R "$APP_DIR/apps/web/dist/." "$WEB_DIR/"
 
-# --- 5. 数据目录与属主 ---
+# --- 5. 数据目录、JWT 密钥与属主 ---
 mkdir -p "$APP_DIR/services/mim-api/data"
 mkdir -p "$APP_DIR/.mim-dev-secret"
+
+# JWT 密钥（生产必配）：systemd unit 以 EnvironmentFile=/opt/mim/mim-api.env 注入
+# MIM_JWT_SECRET；首次部署幂等生成 64 位十六进制随机密钥，已存在则保留
+# （避免每次部署轮换密钥导致在线会话全部失效）。
+MIM_ENV_FILE="${MIM_ENV_FILE:-/opt/mim/mim-api.env}"
+if [ ! -f "$MIM_ENV_FILE" ]; then
+  log "生成 $MIM_ENV_FILE（MIM_JWT_SECRET 随机密钥）"
+  printf 'MIM_JWT_SECRET=%s\n' "$(openssl rand -hex 32)" > "$MIM_ENV_FILE"
+else
+  log "$MIM_ENV_FILE 已存在，保留现有 MIM_JWT_SECRET"
+fi
+chmod 600 "$MIM_ENV_FILE"
+
 if id -u "$RUN_USER" >/dev/null 2>&1; then
   chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$WEB_DIR" 2>/dev/null || true
+  chown "$RUN_USER:$RUN_USER" "$MIM_ENV_FILE" 2>/dev/null || true
 else
   warn "用户 $RUN_USER 不存在，跳过 chown（请先执行 bootstrap.sh）"
 fi
