@@ -22,6 +22,8 @@ import {
 import { idempotency, requireAuth } from '../middleware.js';
 import { parse } from '../validate.js';
 import { addDays, pathParam } from '../utils.js';
+import { appendTaskEvent } from './tasks.js';
+import type { TaskRow } from './tasks.js';
 import type { ApiDeps } from '../types.js';
 
 const projectCreateBody = z.object({
@@ -240,22 +242,54 @@ export function createProjectsRouter(deps: ApiDeps): Router {
   router.delete('/projects/:projectId', idempotency, (req, res) => {
     const user = req.user!;
     const now = clockOf(deps);
-    assertProjectAccess(deps.db, pathParam(req, 'projectId'), user.id, 'project:delete');
-    deps.db
+    const projectId = pathParam(req, 'projectId');
+    assertProjectAccess(deps.db, projectId, user.id, 'project:delete');
+
+    // 两级删除：项目 → 全部一级任务 → 全部二级子任务，均在事务内软删并写同步事件
+    const targets = deps.db
       .prepare(
-        `UPDATE projects SET status = 'deleted', deleted_at = ?, version = version + 1, updated_at = ?
-         WHERE id = ?`,
+        `SELECT * FROM tasks WHERE project_id = ? AND deleted_at IS NULL
+         ORDER BY level, created_at`,
       )
-      .run(now, now, pathParam(req, 'projectId'));
+      .all(projectId) as TaskRow[];
+    const cascaded_tasks = targets.filter((row) => row.level === 1).length;
+    const cascaded_subtasks = targets.length - cascaded_tasks;
+
+    deps.db.transaction(() => {
+      for (const row of targets) {
+        const seq = appendTaskEvent(
+          deps.db,
+          row,
+          'deleted',
+          { task_id: row.id, cascade: 'project.delete' },
+          now,
+          now,
+        );
+        deps.db
+          .prepare(
+            `UPDATE tasks SET deleted_at = ?, version = version + 1, seq = ?, updated_at = ?
+             WHERE id = ? AND deleted_at IS NULL`,
+          )
+          .run(now, seq, now, row.id);
+      }
+      deps.db
+        .prepare(
+          `UPDATE projects SET status = 'deleted', deleted_at = ?, version = version + 1, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(now, now, projectId);
+    })();
+
     writeAudit(deps.db, {
       userId: user.id,
       region: user.region,
       action: 'project.delete',
-      target: pathParam(req, 'projectId'),
+      target: projectId,
       requestId: req.requestId,
+      payload: { cascaded_tasks, cascaded_subtasks },
       createdAt: now,
     });
-    res.json({ status: 'deleted', id: pathParam(req, 'projectId') });
+    res.json({ status: 'deleted', id: projectId, cascaded_tasks, cascaded_subtasks });
   });
 
   router.get('/projects/:projectId/members', (req, res) => {

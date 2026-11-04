@@ -256,11 +256,21 @@ export function ProjectDetail({ locale, projectId, onBack }: Props) {
   }
 
   async function deleteProject() {
-    if (!window.confirm(`${t(locale, 'action.delete')} · ${data.project.name}`)) return;
+    const confirmText = `${t(locale, 'action.delete')} · ${data.project.name}\n${t(
+      locale,
+      'projects.deleteCascadeConfirm',
+    )}`;
+    if (!window.confirm(confirmText)) return;
     setBusy(true);
     setError(null);
     try {
-      await api.deleteProject(projectId);
+      const result = await api.deleteProject(projectId);
+      window.alert(
+        t(locale, 'projects.deleteCascade', {
+          tasks: result.cascaded_tasks,
+          subtasks: result.cascaded_subtasks,
+        }),
+      );
       onBack();
     } catch (err) {
       report(err);

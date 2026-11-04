@@ -467,7 +467,10 @@ export const api = {
   },
 
   deleteProject(projectId: string) {
-    return request<{ status: string; id: string }>(`/projects/${projectId}`, { method: 'DELETE' });
+    return request<{ status: string; id: string; cascaded_tasks: number; cascaded_subtasks: number }>(
+      `/projects/${projectId}`,
+      { method: 'DELETE' },
+    );
   },
 
   members(projectId: string) {

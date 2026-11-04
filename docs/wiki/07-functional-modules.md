@@ -8,7 +8,7 @@
 |---|---|---|---|
 | FR-01 账号与身份 | §5 FR-01 | P0 | **已实现（P0 最小集）**：cn 手机号验证码、global 邮箱密码/验证码；JWT access + refresh 轮换；region 强隔离。未实现：微信/支付宝/Google/Apple 第三方登录、账号合并（OQ-05）、新设备登录保护 |
 | FR-02 订阅与支付 | §5 FR-02 | P0 | **已实现（P0，mock 支付驱动）**：计划/价格/订阅状态机/checkout/取消/发票。未实现：真实通道（微信/支付宝/Stripe/IAP）、退款（OQ-04）、对账、掉单补发 |
-| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已实现（P0）**：项目→任务→子任务两级删除、协作者邀请（editor/viewer删除）、个人仪表盘保留、4s 轮询增量同步、CSV 导出（按套餐）。见 §5.2 features 映射 |
+| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已实现（P0）**：项目→任务→子任务两级删除（删除项目/任务均级联软删下级并写 `task_events(deleted)`，响应返回级联计数）、协作者邀请（editor/viewer）、个人仪表盘保留、4s 轮询增量同步、CSV 导出（按套餐）。见 §5.2 features 映射 |
 | FR-04 多端体验一致性 | §5 FR-04 | P0 | **部分实现**：`packages/core-domain`（领域/权限/错误码）+ `packages/i18n`（双语文案/货币格式化）+ 统一 HTTP 契约已落地；仅 Web 一端，`IPlatformAdapter` 未落地 |
 | FR-05 国际化与本地化 | §5 FR-05 | P0 | **部分实现**：zh-CN / en-US 文案包、未命中回退链、`formatCurrency`、UTC 存储；未实现：语言切换 UI 持久化、RTL、时区设置 UI |
 | FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：审计日志（登录/支付/关键写操作）、手机号/邮箱规范化与脱敏。未实现：隐私政策强制勾选、账号注销 + 7 天冷静期、数据导出/删除请求 |
@@ -226,12 +226,13 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | 新建项目 | `projects.ts` `POST /projects` | `Projects.tsx` | ✅ |
 | 项目详情 | `projects.ts` `GET /projects/:projectId` | `ProjectDetail.tsx` | ✅ |
 | 项目更新 | `projects.ts` `PATCH /projects/:projectId` | `ProjectDetail.tsx` | ✅ |
-| 归档项目 | `projects.ts` `POST /projects/:projectId/archive` | — | ✅（路由就绪，UI 未渲染） |
-| **删除项目** | `projects.ts` `DELETE /projects/:projectId` | — | ✅（路由就绪，UI 未渲染） |
-| 项目成员列表 | `projects.ts` `GET /projects/:projectId/members` | — | ✅（路由就绪） |
-| 邀请成员 | `projects.ts` `POST /projects/:projectId/invitations` | — | ✅（路由就绪） |
-| 接受邀请 | `projects.ts` `POST /invitations/:token/accept` | — | ✅（路由就绪） |
-| 移除成员 | `projects.ts` `DELETE /projects/:projectId/members/:userId` | — | ✅（路由就绪） |
+| 归档项目 | `projects.ts` `POST /projects/:projectId/archive` | `ProjectDetail.tsx` | ✅（owner 可见，二次确认） |
+| **删除项目（两级级联）** | `projects.ts` `DELETE /projects/:projectId` | `ProjectDetail.tsx` | ✅ 已实现：事务内软删项目 + 全部一级任务 + 全部二级子任务，逐条写 `task_events(deleted)`，响应与审计含 `cascaded_tasks` / `cascaded_subtasks`；UI 二次确认并提示级联数量 |
+| 项目成员列表 | `projects.ts` `GET /projects/:projectId/members` | `ProjectDetail.tsx` | ✅ |
+| 邀请成员 | `projects.ts` `POST /projects/:projectId/invitations` | `ProjectDetail.tsx` | ✅（owner 表单，含角色选择） |
+| 接受邀请 | `projects.ts` `POST /invitations/:token/accept` | `ProjectDetail.tsx`（复制令牌） | ✅ |
+| 移除成员 | `projects.ts` `DELETE /projects/:projectId/members/:userId` | `ProjectDetail.tsx` | ✅（二次确认） |
+| 撤销邀请 | `projects.ts` `DELETE /projects/:projectId/invitations/:invitationId` | `ProjectDetail.tsx` | ✅（二次确认） |
 
 ### 11.4 任务管理模块（FR-03-①）
 
@@ -242,7 +243,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | 任务详情 | `tasks.ts` `GET /tasks/:taskId` | — | ✅ |
 | 任务更新（LWW） | `tasks.ts` `PATCH /tasks/:taskId` | `ProjectDetail.tsx` | ✅（含 `client_updated_at` 冲突裁决） |
 | 状态切换 | `tasks.ts` `POST /tasks/:taskId/status` | `ProjectDetail.tsx` | ✅ |
-| **删除任务 / 级联子任务** | `tasks.ts` `DELETE /tasks/:taskId` | — | ✅（路由就绪，UI 未渲染） |
+| **删除任务 / 级联子任务** | `tasks.ts` `DELETE /tasks/:taskId` | `ProjectDetail.tsx` | ✅ 已实现：事务内软删任务 + 其全部子任务，逐条写 `task_events(deleted)`，响应含 `cascaded_children`；UI 二次确认 |
 
 ### 11.5 仪表盘模块（FR-03-④）
 
@@ -254,9 +255,9 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 协作者邀请（editor / viewer） | 见「项目管理模块」 invitations | — | ✅ |
-| 只读权限拦截 | `core-domain/src/permissions.ts` `assertCan` | 前端按 `features` 隐藏 UI | ✅ |
-| 协作者列表 / 移除 | 见「项目管理模块」 members | — | ✅ |
+| 协作者邀请（editor / viewer） | 见「项目管理模块」 invitations | `ProjectDetail.tsx` | ✅ |
+| 只读权限拦截 | `core-domain/src/permissions.ts` `assertCan` | 前端按角色隐藏写操作按钮 | ✅ |
+| 协作者列表 / 移除 | 见「项目管理模块」 members | `ProjectDetail.tsx` | ✅ |
 | 实时评论 / 讨论 | — | — | ❌ P1 |
 
 ### 11.7 同步模块（FR-04）

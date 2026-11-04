@@ -9,6 +9,7 @@ import { createDatabase } from '../src/db.js';
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef';
 
 let app: Express;
+let db: ReturnType<typeof createDatabase>;
 let keyCounter = 0;
 
 function nextKey(): string {
@@ -53,7 +54,7 @@ async function createTask(
 }
 
 beforeEach(() => {
-  const db = createDatabase(':memory:');
+  db = createDatabase(':memory:');
   app = createApp({ db, jwtSecret: JWT_SECRET, env: {} });
   keyCounter = 0;
 });
@@ -231,6 +232,83 @@ describe('FR-03 工作区与任务', () => {
       .set(auth(session, nextKey()));
     expect(deleted.status).toBe(200);
     expect(deleted.body.cascaded_children).toBe(1);
+
+    // 一级任务删除后，父任务与子任务均在库内软删，且各自写入 deleted 同步事件
+    const taskRows = db
+      .prepare('SELECT deleted_at FROM tasks WHERE project_id = ?')
+      .all(projectId) as Array<{ deleted_at: string | null }>;
+    expect(taskRows).toHaveLength(2);
+    expect(taskRows.every((row) => row.deleted_at !== null)).toBe(true);
+    const events = db
+      .prepare(`SELECT COUNT(*) AS total FROM task_events WHERE project_id = ? AND type = 'deleted'`)
+      .get(projectId) as { total: number };
+    expect(events.total).toBe(2);
+  });
+
+  it('删除项目级联软删全部任务与子任务（项目 → 任务 → 子任务两级删除）', async () => {
+    const session = await login('13800000016');
+    const project = await createProject(session, '级联删除项目');
+    const projectId = project.body.project.id as string;
+
+    const taskA = await createTask(session, projectId, { title: '任务 A' });
+    const subA1 = await createTask(session, projectId, {
+      title: '子任务 A1',
+      parent_id: taskA.body.task.id,
+    });
+    const subA2 = await createTask(session, projectId, {
+      title: '子任务 A2',
+      parent_id: taskA.body.task.id,
+    });
+    const taskB = await createTask(session, projectId, { title: '任务 B' });
+    expect(subA2.body.task.level).toBe(2);
+
+    const deleted = await request(app)
+      .delete(`/api/v1/projects/${projectId}`)
+      .set(auth(session, nextKey()));
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.cascaded_tasks).toBe(2);
+    expect(deleted.body.cascaded_subtasks).toBe(2);
+
+    // 项目不可再访问，重复删除返回 404
+    const reread = await request(app).get(`/api/v1/projects/${projectId}`).set(auth(session));
+    expect(reread.status).toBe(404);
+    const again = await request(app)
+      .delete(`/api/v1/projects/${projectId}`)
+      .set(auth(session, nextKey()));
+    expect(again.status).toBe(404);
+
+    // 任务与子任务均已软删，项目列表与仪表盘不再出现
+    const taskRows = db
+      .prepare('SELECT deleted_at FROM tasks WHERE project_id = ?')
+      .all(projectId) as Array<{ deleted_at: string | null }>;
+    expect(taskRows).toHaveLength(4);
+    expect(taskRows.every((row) => row.deleted_at !== null)).toBe(true);
+
+    const events = db
+      .prepare(`SELECT COUNT(*) AS total FROM task_events WHERE project_id = ? AND type = 'deleted'`)
+      .get(projectId) as { total: number };
+    expect(events.total).toBe(4);
+
+    const projects = await request(app).get('/api/v1/projects').set(auth(session));
+    expect(projects.body.items).toHaveLength(0);
+    const dashboard = await request(app).get('/api/v1/dashboard').set(auth(session));
+    expect(dashboard.body.unscheduled).toHaveLength(0);
+
+    // 审计记录包含级联计数
+    const audit = db
+      .prepare(`SELECT payload FROM audit_logs WHERE action = 'project.delete' AND target = ?`)
+      .get(projectId) as { payload: string } | undefined;
+    expect(audit ? JSON.parse(audit.payload) : null).toEqual({
+      cascaded_tasks: 2,
+      cascaded_subtasks: 2,
+    });
+
+    // 子任务单独访问返回 404（已被级联删除）
+    const subRead = await request(app)
+      .get(`/api/v1/tasks/${subA1.body.task.id}`)
+      .set(auth(session));
+    expect(subRead.status).toBe(404);
+    expect(taskB.body.task.id).toBeTruthy();
   });
 
   it('只读成员不能写入任务', async () => {

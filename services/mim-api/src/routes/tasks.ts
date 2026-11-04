@@ -117,7 +117,7 @@ function assertTaskAccess(db: Db, taskId: string, userId: string, action: 'task:
 }
 
 /** 任务事件 + tasks.seq 回写必须在同一事务内完成（08 §3.2） */
-function appendTaskEvent(
+export function appendTaskEvent(
   db: Db,
   row: Pick<TaskRow, 'id' | 'project_id' | 'user_id'>,
   type: string,
