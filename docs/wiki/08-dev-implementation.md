@@ -1,7 +1,7 @@
 # 08 · 开发实现全景（数据库 / 前端 / 后端 / 存储 / 后台管理平台）
 
 > **状态声明（证据）**：截至 V0.0.0-preview，仓库内已落地 `apps/web`（React + Vite）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express + SQLite），包管理器 pnpm workspace；`pnpm -w typecheck` / `pnpm -w test`（12 例）/ `pnpm -w build` / `node scripts/version-check.mjs` 均已通过并有命令输出留档。
-> **2026-11-04 变更**：FR-03 核心 SaaS 工作区（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已按用户指令整体移除，本页 §2 的 content 域表结构与后续同步/导出规则仅作历史参考，不再对应仓库实况。
+> **2026-11-04 变更（两次）**：① FR-03 旧范围（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已按用户指令整体移除，§3.2「content 域（已移除）」与同步/导出规则仅作历史参考，不再对应仓库实况；② FR-03 已**重定义为「功能模块商城 + 漫剧 AI 剧」**，新增 `catalog` / `comic` / `media` 三域与配套表，本页 §2 / §3.1 / §3.2 / §3.3 / §4.3 / §6 / §8 / §10 已同步，当前 **0 代码**；实现拆分清单见 [07-functional-modules.md](./07-functional-modules.md) §12。
 > 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
@@ -16,11 +16,12 @@
 │    platform-adapter · capability-client · observability · testing-utils
 ├── 服务端 services/*（Headless，无 UI）
 │    gateway · identity · billing · payment-driver · content
-│    im · rtc · ai-orchestrator · notification · openapi · admin-api · jobs
+│    catalog · comic · media · im · rtc · ai-orchestrator
+│    notification · openapi · admin-api · jobs
 ├── 数据层
 │    PostgreSQL（按 region 物理分库，按域分 schema）
 │    Redis（会话/频控/缓存/锁）· OpenSearch（检索）
-│    对象存储 + CDN（媒体/附件/导出）· MQ（异步与事件）
+│    对象存储 + CDN（漫剧关键帧/片段/成片、发票）· MQ（异步与事件）
 └── 基础设施 infra/*
      Terraform（cn/global 双套）· K8s · CI/CD · 监控告警 · 密钥管理
 ```
@@ -43,7 +44,7 @@
 | 实时同步 | WebSocket + MQ 推送，5 秒内到达 | **已移除（2026-11-04）**：原 4s 轮询 `GET /sync/changes` 随 FR-03 一并删除，当前无同步需求 |
 | 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 6），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
 | 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/套餐/金额/ID）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象；原 `permissions.ts` / `tasks.ts` 随 FR-03 删除 |
-| 存储 | 对象存储 + CDN（附件/媒体/导出） | 无对象存储（原 CSV 导出随 FR-03 于 2026-11-04 删除） | 当前无导出需求；恢复导出能力时按对象存储 + 预签名 URL 方案实现 |
+| 存储 | 对象存储 + CDN（附件/媒体/导出） | 无对象存储（原 CSV 导出随 FR-03 于 2026-11-04 删除） | 漫剧关键帧/分镜片段/成片**必须**对象存储 + 预签名 URL（规划，见 §6）；未落地前无任何媒体产物落盘与分发能力 |
 | 后台管理 | `admin-api` + RBAC 后台 | 未实现；审计数据已落 `audit_logs` 表 | P1 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
 | 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 12 例）保障字段一致性；后续补 OpenAPI 导出 |
@@ -57,10 +58,13 @@
 | `identity` | 注册登录、第三方登录绑定、会话与设备、账号合并、注销 | `/auth/*`、`/accounts/*`、`/devices/*` | 短信/邮件通道、Redis | 分库 |
 | `billing` | 计划与定价、订阅生命周期、续费、升降级、发票、对账 | `/plans`、`/subscriptions/*`、`/invoices/*` | payment-driver、MQ | 分库 |
 | `payment-driver` | 支付编排 + 通道驱动（wechat / alipay / unionpay / stripe / paypal / apple-iap / google-play），统一回调 | `/payments/*`、`/callbacks/{driver}` | 各持牌通道、商店服务端 API | 按通道 |
+| `catalog` | **（规划，0 代码）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；与 `billing` 同事务挂载 `order_items` | `/modules`、`/modules/{code}`、`/entitlements/*`、`/entitlements/{code}/check` | billing（订单/退款）、admin-api | 分库 |
+| `comic` | **（规划，0 代码）** 漫剧工程/角色/分镜、生成任务编排与产物登记、成片合成与版本、审核发布 | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*` | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
+| `media` | **（规划，0 代码）** 对象存储准入：签发上传/下载预签名 URL，登记 `object_key` 归属与保留期 | `/media/presign/upload`、`/media/presign/download` | 对象存储、CDN | 按 region 桶 |
 | `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
 | `im` | 会话、消息可靠性、已读回执、在线状态、离线推送、审核 | `/im/*`（HTTP + WebSocket） | MQ、推送通道、审核服务 | 分库 |
 | `rtc` | 信令、房间编排、录制、转码、质量监测 | `/rtc/*` | RTC 第三方、对象存储 | 分集群 |
-| `ai-orchestrator` | 模型路由、Prompt 版本、输出审核、配额与成本核算 | `/ai/*` | 大模型供应商、审核服务 | 按合规域 |
+| `ai-orchestrator` | 模型路由、Prompt 版本、输出审核、配额与成本核算；**漫剧生成**（文生图 / 图生视频 / TTS / 合成）的模型路由、成本预检与配额扣减在此编排 | `/ai/*`、内部消费 `generation_jobs` 队列 | 大模型供应商、审核服务、MQ | 按合规域 |
 | `notification` | 站内信、邮件、短信、推送编排与模板 | `/notifications/*` | 邮件/短信/推送通道 | 分库 |
 | `openapi` | 开放平台：OAuth2、API Key、Webhook 投递、限流 | `/open/*` | gateway | 分库 |
 | `admin-api` | 运营后台 BFF：聚合查询、写操作审批、审计埋点 | `/admin/*` | 各域服务、admin 库 | 分库 |
@@ -77,7 +81,7 @@
 | 约束 | 规则 |
 |---|---|
 | 分库 | `cn` 与 `global` **物理独立集群**，不共用实例；跨区只同步匿名聚合指标，不同步个人数据 |
-| 分 schema | 按域：`identity` / `billing` / `content` / `im` / `ai` / `admin` / `ops` |
+| 分 schema | 按域：`identity` / `billing` / `catalog` / `comic` / `media` / `content` / `im` / `ai` / `admin` / `ops` |
 | 主键 | `id` 使用 UUIDv7（时间有序，便于索引与分片） |
 | 金额 | 一律 `bigint` 整数**最小货币单位**（人民币=分，美元=分），配 `currency char(3)` |
 | 时间 | `timestamptz`，统一 UTC 存储，展示端负责时区转换 |
@@ -108,12 +112,38 @@
 | `plan_prices` | `id`、`plan_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | **价格与计划解耦**，改价不改历史订单 |
 | `subscriptions` | `id`、`user_id`、`plan_id`、`status(active/past_due/canceled/expired)`、`current_period_start/end`、`cancel_at_period_end`、`version` | 索引 `(user_id, status)`；状态机见 §3.3 |
 | `subscription_events` | `id`、`subscription_id`、`from_status`、`to_status`、`reason`、`source(payment/refund/admin/job)`、`created_at` | 只追加，禁止 UPDATE |
-| `orders` | `id`、`user_id`、`plan_id`、`amount_minor`、`currency`、`status(pending/paid/failed/closed)`、`idempotency_key`、`region` | 月分区；`(user_id, created_at)` 索引 |
+| `orders` | `id`、`user_id`、`plan_id`（纯模块单可为空）、`amount_minor`、`currency`、`status(pending/paid/failed/closed/refunded)`、`idempotency_key`、`region` | 月分区；`(user_id, created_at)` 索引；`refunded` **只能**由 `refunds.executed` 触发 |
 | `payments` | `id`、`order_id`、`driver(wechat/alipay/.../apple_iap)`、`channel_txn_id`、`status`、`paid_at`、`raw_callback jsonb` | 唯一索引 `(driver, channel_txn_id)`——**防重复入账** |
 | `refunds` | `id`、`payment_id`、`amount_minor`、`status(pending/approved/rejected/executed)`、`reviewer_id`、`executed_at` | 与 `orders` 分离，支持部分退款 |
 | `invoices` | `id`、`order_id`、`title`、`tax_no`、`file_url`、`issued_at` | 发票/税务（出海 VAT 另立 `tax_rules`） |
 | `reconciliation_batches` | `id`、`driver`、`biz_date`、`matched_count`、`diff_count`、`status` | 每日对账批次 |
 | `reconciliation_diffs` | `id`、`batch_id`、`payment_id`、`type(missing_local/missing_channel/amount_mismatch)`、`resolved_by` | 差异处理留痕 |
+
+**catalog 域（规划，0 代码）**
+
+> 功能模块商城（FR-03.1）。模块目录与定价、解锁发放与回收；解锁鉴权只认服务端 `entitlements`。与 `billing` 的 `orders` 同事务挂载 `order_items`。
+
+| 表 | 关键字段 | 说明 / 索引 |
+|---|---|---|
+| `modules` | `id`、`code`、`name_i18n jsonb`、`summary_i18n jsonb`、`unlock_mode(subscription/one_time)`、`entitlements_required jsonb`、`region`、`status(draft/active/archived)`、`sort_order` | 模块目录；`code` 唯一且不复用；索引 `(region, status, sort_order)` |
+| `module_prices` | `id`、`module_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | 定价与模块解耦，改价不改历史订单 |
+| `entitlements` | `id`、`user_id`、`module_id`、`source(order/subscription/admin)`、`source_id`、`status(active/expired/revoked)`、`expires_at`、`version` | **服务端解锁鉴权唯一依据**；唯一索引 `(user_id, module_id)`（一次性）与 `(user_id, module_id, source_id)`（订阅型） |
+| `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(order/refund/job/admin)`、`created_at` | 只追加，禁止 UPDATE |
+| `order_items` | `id`、`order_id`、`item_type(plan/module)`、`item_id`、`amount_minor`、`currency` | 一单可挂 1 计划 + N 模块；退款按项回收 |
+
+**comic 域（规划，0 代码）**
+
+> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表，四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。
+
+| 表 | 关键字段 | 说明 / 索引 |
+|---|---|---|
+| `comic_projects` | `id`、`owner_user_id`、`region`、`title`、`synopsis`、`status(draft/storyboarded/generating/rendered/published/archived)`、`version`、`deleted_at` | 漫剧工程；索引 `(owner_user_id, status)`；软删除但已发布成片保留 |
+| `comic_characters` | `id`、`project_id`、`name`、`appearance_prompt`、`seed`、`reference_asset_ids jsonb`、`voice_profile jsonb`、`version` | character bible，跨镜头一致性唯一来源 |
+| `storyboards` | `id`、`project_id`、`version_no`、`shots jsonb`、`confirmed_at`、`created_by` | 分镜表；只追加，确认后旧版本不被覆盖 |
+| `generation_jobs` | `id`、`project_id`、`storyboard_id`、`job_type(text/image/video/tts/compose)`、`status(queued/running/succeeded/failed/canceled)`、`retry_of`、`cost_estimate_minor`、`error_code`、`started_at`、`finished_at` | 生成任务；索引 `(project_id, created_at)`、`(status, job_type)`；失败重试新建 job |
+| `generation_assets` | `id`、`job_id`、`asset_type(image/video/audio/final)`、`object_key`、`mime`、`duration_ms`、`checksum`、`expires_at` | 产物登记，文件在对象存储，库里只存 `object_key` |
+| `comic_films` | `id`、`project_id`、`title`、`status(draft/reviewing/published/archived)`、`current_version_id` | 成片主体；`current_version_id` 指向最新已发布版本 |
+| `film_versions` | `id`、`film_id`、`version_no`、`object_key`、`duration_ms`、`resolution`、`composed_from_job_id`、`created_at` | 只追加；已发布版本不可覆盖，只能发新版 |
 
 **content 域（已移除，2026-11-04）**
 
@@ -160,6 +190,11 @@
 - ~~`project_invitations.status`~~：已移除（2026-11-04，FR-03 删除，`project_invitations` 表同步 DROP）。
 - ~~任务写操作幂等与 LWW~~：已移除（2026-11-04，随 FR-03 删除；订阅域仍强制 `Idempotency-Key` + `version` 乐观锁）。
 - `contents.status`（P1）：`draft → published ⇄ blocked`、`published → deleted`；任何机审/人审结论只能经 `audit_records` 追加，不允许直接改 `contents.status` 跳过审核。
+- `modules.status`（规划，0 代码）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配永不复用。
+- `entitlements.status`（规划，0 代码）：只能经 `entitlement_events` 追加推进；`revoked`（退款/风控）与 `expired`（订阅到期）**必须**与触发事务（`refunds.executed` / 订阅状态机）同事务写入，不允许事后异步补写。
+- `comic_projects.status`（规划，0 代码）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本；进入 `rendered` 必须有 `generation_assets` 覆盖全部分镜；进入 `published` 必须有已发布 `comic_films`，不得跳级。
+- `comic_films.status`（规划，0 代码）：`draft → reviewing → published`，驳回回到 `draft` 并留原因；`published` 只能由 `current_version_id` 指向的 `film_versions` 支撑，版本只追加不覆盖。
+- `generation_jobs.status`（规划，0 代码）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算。
 
 ## 4. 前端（多端）模块清单
 
@@ -197,6 +232,9 @@
 | 订阅管理 | 查看周期、取消续费、更换支付方式、发票申请、退款入口 | FR-02 |
 | 协议与隐私 | 首次强制勾选、政策更新后重新确认、SDK 清单展示 | FR-06 |
 | 语言与地区 | 语言切换、币种展示、时区设置 | FR-05 |
+| 功能模块商城（**❌ 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、加入订单、解锁状态与到期展示 | FR-03.1 |
+| 漫剧 AI 剧工作台（**❌ 0 代码**） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
+| 成片管理（**❌ 0 代码**） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
 
 任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。
 
@@ -256,17 +294,17 @@
 |---|---|---|
 | PostgreSQL | 主业务库（按 region 分集群、按域分 schema） | 主从 + 只读副本（供 admin 看板）；PITR 备份；连接池上限按服务配额 |
 | Redis | 会话/刷新令牌黑名单、验证码、频控计数、订阅状态缓存（TTL 5 分钟）、分布式锁、轻量队列 | 开启持久化用于锁场景；key 前缀按域隔离 |
-| OpenSearch | P1 内容与后台检索、日志检索；P0 无检索需求（原项目/任务检索随 FR-03 移除） | 按 region 独立索引；索引按天滚动 |
-| 对象存储 | 头像、附件、发票 PDF、音视频录制 | 私有桶 + 预签名 URL；发票 10 年、录制按套餐。原 CSV 导出产物随 FR-03 移除 |
-| CDN | 静态资源、媒体分发 | 国内/海外分开加速域；回源鉴权 |
-| MQ（Kafka/RabbitMQ） | 领域事件、异步任务、事务性发件箱（原 P0 `task.changed` 事件随 FR-03 移除） | `outbox_events → MQ`，消费失败进 `dead_letters` 并可重放 |
+| OpenSearch | P1 内容与后台检索、日志检索；**P1 漫剧工程/成片与生成产物的元数据检索**（P0 无检索需求，原项目/任务检索随 FR-03 移除） | 按 region 独立索引；索引按天滚动 |
+| 对象存储 | 头像、发票 PDF、音视频录制；**漫剧关键帧、分镜片段、TTS 音频、成片**（`generation_assets` / `film_versions` 仅存 `object_key`） | 私有桶 + 预签名 URL；发票 10 年、录制按套餐；漫剧原始产物保留 90 天、已发布成片按版权要求长期保留。原 CSV 导出产物随 FR-03 移除 |
+| CDN | 静态资源、媒体分发（含漫剧成片播放） | 国内/海外分开加速域；回源鉴权 |
+| MQ（Kafka/RabbitMQ） | 领域事件、异步任务、事务性发件箱（原 P0 `task.changed` 事件随 FR-03 移除）；**`generation.job.*`（入队/状态变更/完成/失败）与 `entitlement.*`（发放/回收）事件** | `outbox_events → MQ`，消费失败进 `dead_letters` 并可重放；生成任务队列与业务事件队列分 topic |
 
 数据分级：
 
 | 级别 | 数据 | 处理 |
 |---|---|---|
 | L1 敏感 | 手机号、邮箱、密码哈希、支付凭证 | 加密存储、展示脱敏、禁止进日志与埋点 |
-| L2 业务 | 订单、订阅、内容正文（P1） | 按 region 隔离、按角色授权、审计访问 |
+| L2 业务 | 订单、订阅、内容正文（P1）、**漫剧工程与成片、解锁与回收记录** | 按 region 隔离、按角色授权、审计访问 |
 | L3 公开 | 计划价格、公开内容 | 可缓存、可 CDN |
 
 ## 7. API 契约规范
@@ -296,6 +334,10 @@
 | 审计日志归档 | 每日 | 180 天在线，之后冷存 |
 | 搜索索引投递（P1） | 持续消费 | 仅 P1 `contents`；失败进死信，可重放 |
 | 配额重置（AI/存储） | 每月 1 日 | 按 `quota_id + period` 幂等 |
+| **AI 生成任务队列消费**（规划，0 代码） | 持续消费 | 消费 `generation_jobs`（`text`/`image`/`video`/`tts`/`compose`）；同工程串行、跨工程并行；失败进死信可重放；重试新建 job（`retry_of`）不覆盖历史 |
+| **生成成本告警**（规划，0 代码） | 每小时 | 实际成本 vs `cost_estimate_minor` 偏差超阈值告警，供运营调整模型路由（OQ-08） |
+| **成片审核超时提醒**（规划，0 代码） | 每 6 小时 | `comic_films.status = reviewing` 超 SLA 未处置则提醒审核队列（OQ-07） |
+| **解锁到期扫描**（规划，0 代码） | 每日 | 订阅 `expired` → 对应订阅型 `entitlements` 转 `expired`（经 `entitlement_events` 追加）；与订阅任务错峰，幂等键 `entitlement_id + period` |
 | 截止日提醒推送 | — | 已移除（FR-03 删除；`features` 套餐能力校验与 `task_events` 提醒源同步取消） |
 | 项目邀请过期 | — | 已移除（FR-03 删除，随 `project_invitations` 表清理） |
 | CSV 导出生成 | — | 已移除（FR-03 删除，随 `content_exports` 表清理） |
@@ -317,7 +359,17 @@
 | 第 3 步 | `apps/mobile` + IAP、`notification`、i18n 首批语种（~~日历/看板视图~~、~~CSV 导出~~ 已随 FR-03 移除） | P0 完成 |
 | 第 4 步 | `content`（P1 通用内容管理：内容/审核/检索）、`im`、`rtc`、`ai-orchestrator`、`openapi`、`apps/desktop` | P1 |
 
-**未决阻塞**：原「工作区实体设计」相关阻塞已随 FR-03 于 2026-11-04 整体移除而**失效**（8 张 content 表、两层任务限制、同步事务与 LWW 裁决、同步游标保留期、软删物理清理保留期均不再适用）。仍需确认：外部依赖 OQ-02 / OQ-04（支付通道细节）、OQ-03（首批语种）、OQ-05（账号合并）见 [07-functional-modules.md](./07-functional-modules.md) §10。P1 通用内容管理（`contents` / 审核 / 检索）不阻塞 P0。
+**FR-03 新范围（功能模块商城 + 漫剧 AI 剧）落地顺序**（与 [07-functional-modules.md](./07-functional-modules.md) §12 一致，四期串行）：
+
+| 期次 | 交付物 | 对应形态 | 依赖前置 |
+|---|---|---|---|
+| 基座 | `catalog` 域 5 表 + `/modules` `/entitlements` 路由；`order_items` 挂载 `billing` 同事务；`entitlements` 发放/回收与退款同事务 | 商城（FR-03.1） | 无（复用现有 identity/billing） |
+| 第 1 期 | `comic` 域工程/角色/分镜三表；工作台的工程 CRUD、character bible、分镜编辑与人工确认 | ② AI 辅助创作工作台 | 第 1 期仅工程，不产出成片 |
+| 第 2 期 | `generation_jobs` / `generation_assets` + `ai-orchestrator` 生成编排；文生图/图生视频/TTS/合成队列；工作台内单镜头生成与导出成片 | ④ 创作工作台 + 导出成片 | 模型供应商凭证（OQ-08）、对象存储 |
+| 第 3 期 | 全自动流水线：题材/大纲一次输入跑完整条链（无人工确认点） | ① AI 全自动生成成片 | 第 2 期全链路稳定 |
+| 第 4 期 | `comic_films` / `film_versions` + 审核发布 + 导出；成片列表/版本/浏览 | ③ 漫剧作品管理与分发 | 审核口径（OQ-07） |
+
+**未决阻塞**：原「工作区实体设计」相关阻塞已随 FR-03 于 2026-11-04 整体移除而**失效**（8 张 content 表、两层任务限制、同步事务与 LWW 裁决、同步游标保留期、软删物理清理保留期均不再适用）。仍需确认：外部依赖 OQ-02 / OQ-04（支付通道细节）、OQ-03（首批语种）、OQ-05（账号合并）、**OQ-07（漫剧版权与审核口径）**、**OQ-08（生成模型供应商与成本上限）**、**OQ-09（模块定价模式与一次性购买退款窗口）**，见 [07-functional-modules.md](./07-functional-modules.md) §10。P1 通用内容管理（`contents` / 审核 / 检索）不阻塞 P0；FR-03 新范围的商城基座不依赖 OQ-07/08/09，漫剧第 1 期（工作台）亦不依赖 OQ-08（无真实模型调用），第 2 期起被 OQ-07 / OQ-08 阻塞。
 
 ---
 

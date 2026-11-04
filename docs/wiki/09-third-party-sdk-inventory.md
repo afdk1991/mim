@@ -86,7 +86,9 @@
 
 ---
 
-## 6. AI 能力（PRD P1，模型路由 + Prompt 版本）
+## 6. AI 能力（PRD P1 通用 AI；**漫剧生成 P0，自第 2 期起**）
+
+通用大模型路由为 P1/P2；**漫剧 AI 剧（FR-03.2）所需的文生图 / 图生视频 / TTS 自第 2 期起为 P0**，未接入前第 1 期（AI 辅助创作工作台）不产出成片。
 
 | 提供方 | SDK / API 形态 | 用途 | 密钥 / 配置项（env） | 优先级 |
 |---|---|---|---|---|
@@ -94,13 +96,17 @@
 | Anthropic | Messages API | Claude 模型 | `MIM_AI_ANTHROPIC_API_KEY` | P1 |
 | Google Gemini | Generative Language API | 海外模型 | `MIM_AI_GEMINI_API_KEY` | P2 |
 | Azure OpenAI | Azure SDK / REST | 企业合规部署 | `MIM_AI_AZURE_OPENAI_ENDPOINT` / `MIM_AI_AZURE_OPENAI_KEY` | P2 |
-| 阿里云百炼 / 通义 | DashScope SDK / API | 国内大模型 | `MIM_AI_DASHSCOPE_API_KEY` | P1 |
-| 火山方舟（豆包） | Ark SDK / API | 国内大模型 | `MIM_AI_ARK_API_KEY` / `MIM_AI_ARK_ENDPOINT_ID` | P1 |
+| 阿里云百炼 / 通义（含通义万相文生图） | DashScope SDK / API | 国内大模型 + 文生图 | `MIM_AI_DASHSCOPE_API_KEY` | P1（文生图：漫剧第 2 期 P0） |
+| 火山方舟（豆包 / Seedream 文生图 / Seedance 图生视频） | Ark SDK / API | 国内大模型 + 漫剧关键帧与分镜片段 | `MIM_AI_ARK_API_KEY` / `MIM_AI_ARK_ENDPOINT_ID` | P1（漫剧第 2 期 P0） |
+| 可灵 AI（Kling） | REST API（异步任务 + 结果回调/轮询） | 图生视频备选 | `MIM_AI_KLING_ACCESS_KEY` / `MIM_AI_KLING_SECRET_KEY` | 漫剧第 2 期 P1（备选通道） |
+| Runway | REST API | 海外图生视频 | `MIM_AI_RUNWAY_API_KEY` | 漫剧第 3 期 P1（海外） |
+| OpenAI Images（gpt-image） | Images API | 海外文生图备选 | 复用 `MIM_AI_OPENAI_API_KEY` | 漫剧第 3 期 P1（海外） |
+| 火山引擎语音合成 / Azure Speech / ElevenLabs | TTS API | 漫剧配音（`job_type=tts`） | `MIM_AI_TTS_ARK_APP_ID` / `MIM_AI_AZURE_SPEECH_KEY` + `MIM_AI_AZURE_SPEECH_REGION` / `MIM_AI_ELEVENLABS_API_KEY` | 漫剧第 2 期 P1 |
 | 百度文心 | 千帆 SDK / API | 国内备选 | `MIM_AI_QIANFAN_API_KEY` / `MIM_AI_QIANFAN_SECRET_KEY` | P2 |
 | 讯飞星火 | WebSocket API | 语音/文本备选 | `MIM_AI_SPARK_APP_ID` / `MIM_AI_SPARK_API_KEY` / `MIM_AI_SPARK_API_SECRET` | P2 |
 | LiteLLM（自建网关） | 开源模型路由 | 统一多模型接入与配额 | `MIM_AI_GATEWAY_MASTER_KEY` | P1 |
 
-> 所有 AI 调用必须经统一网关（模型路由、Prompt 版本、配额、内容审核），业务层不得直连厂商密钥。
+> 所有 AI 调用必须经统一网关（模型路由、Prompt 版本、配额、内容审核），业务层不得直连厂商密钥。漫剧生成的**成本预检与额度扣减**在 `comic` / `ai-orchestrator` 内完成（`generation_jobs`），供应商选择与成本上限见 PRD OQ-08。
 
 ---
 
@@ -215,8 +221,11 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 工件 | 关系 |
 |---|---|
 | `Mim-PRD.html` FR-02 | 支付路由所需的第三方支付/IAP 能力，对应本文档 §2 |
+| `Mim-PRD.html` FR-03.1（功能模块商城） | 无新增第三方能力，复用 §2 支付通道；模块定价与解锁为自有业务逻辑 |
+| `Mim-PRD.html` FR-03.2（漫剧 AI 剧） | 文生图 / 图生视频 / TTS 对应本文档 §6；产物存储与分发对应 §8；内容审核对应 §7 |
 | `Mim-PRD.html` FR-04 | 平台适配层封装的登录/支付/推送/存储/分享 SDK，对应本文档 §1/§2/§3/§8 |
 | `Mim-PRD.html` FR-06 | 隐私政策必须包含的「第三方 SDK 清单」，以本文档为唯一来源 |
+| `docs/wiki/07-functional-modules.md` §12 | 实现拆分清单逐期列出所需第三方能力，与本文件 §6/§8 对应 |
 | `docs/wiki/04-dependencies.md` | 依赖实况与依赖治理；本文档为其「规划引入清单」的展开 |
 | `AGENTS.md` 铁律五 / 铁律七 | 真正引入依赖时必须写入 `package.json` + 锁文件，并全量同步文档 |
 
@@ -227,10 +236,11 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 优先级 | 范围 |
 |---|---|
 | **P0（随首个可运行端引入）** | 微信/支付宝/Google/Apple 登录、短信/邮件、微信支付/支付宝/Stripe/IAP/Google Play、APNs/FCM/华为/小米/OPPO/vivo 推送、验证码、对象存储、Sentry |
-| **P1（PRD P1 能力开放时）** | IM、音视频、AI 网关、内容审核、地图与位置、CDN、埋点 |
+| **P0（漫剧第 2 期起）** | 文生图（通义万相 / Seedream）、图生视频（Seedance / 可灵）、TTS（火山 / Azure / ElevenLabs）；漫剧产物对象存储与预签名下载（复用 §8） |
+| **P1（PRD P1 能力开放时）** | IM、音视频 RTC、AI 网关、内容审核、地图与位置、CDN、埋点 |
 | **P2（按需）** | 备份供应商、海外 IM、LiveKit、Mapbox、北斗高精度定位 |
 | **P3（需硬件，P0 排除）** | 北斗短报文 / 北斗终端接入 |
 
 ---
 
-_登记日期：2026-11-03。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力。新增第三方能力必须先更新本文件，再进入实现。_
