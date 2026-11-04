@@ -13,7 +13,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `jsonwebtoken` | ^9.0.3 | 运行时 | JWT 访问令牌 + refresh 轮换 |
 | `bcryptjs` | ^3.0.2 | 运行时 | 密码哈希（global 邮箱密码登录） |
 | `better-sqlite3` | ^13.0.3 | 运行时 | 嵌入式 SQLite 持久化（单库替代 PostgreSQL 规划） |
-| `@mim/core-domain` | workspace:* | 运行时 | 领域层：套餐、状态机、权限、任务层级、金额、错误码 |
+| `@mim/core-domain` | workspace:* | 运行时 | 领域层：套餐、状态机、金额、错误码 |
 | `@mim/i18n` | workspace:* | 运行时 | 错误码与文案的双语映射 |
 | `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告） |
 | `supertest` | ^7.1.4 | 开发 | HTTP 契约测试 |
@@ -92,11 +92,11 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | 端侧架构 | `IPlatformAdapter` 契约 + 契约测试套件，业务层禁止平台判断 | **未落地**：P0 仅 Web 单端，尚无多端差异需要封装 | 小程序调研 txt 第四部分 |
 | 支付 | 国内：微信支付/支付宝/银联；海外：Stripe/PayPal；App 数字商品：Apple IAP / Google Play Billing（商店强制） | **仅 `mock` 驱动**；真实通道 SDK 未引入，`driver !== 'mock'` 返回 `PAYMENT_DRIVER_UNAVAILABLE` | PRD FR-02 |
 | IM / 音视频 / AI | P0 全部采购第三方驱动，不自研 SFU 与 AI 推理 | **未落地**（P1） | PRD §3 排除项 |
-| 推送 | APNs / FCM / 国内厂商通道，平台适配层封装 | **未落地**（截止提醒 `reminders` 仅在 features 中声明） | PRD FR-04 |
+| 推送 | APNs / FCM / 国内厂商通道，平台适配层封装 | **未落地**（原截止提醒场景随 FR-03 移除，无 P0 推送需求） | PRD FR-04 |
 | 管理后台 | 直接用 Ant Design Pro / Arco Pro 模板，不定制设计 | **未落地**；仓库无 `apps/admin` | team-hiring-plan.md 省钱杠杆 |
-| 测试自动化 | Appium + Playwright | **部分落地**：后端 vitest + supertest 契约测试（18 例）；端到端 UI 自动化未落地 | team-hiring-plan.md |
+| 测试自动化 | Appium + Playwright | **部分落地**：后端 vitest + supertest 契约测试（12 例）；端到端 UI 自动化未落地 | team-hiring-plan.md |
 | 内容审核 | 第三方服务（数美、网易易盾等） | **未落地**（P1） | team-hiring-plan.md 坑 #1 |
-| 实时同步 | WebSocket 推送 | **改为 4s 增量轮询**：避免引入 WS 依赖，仍满足「5 秒内可见」；断线由下次轮询补齐 | PRD FR-03 |
+| 实时同步 | WebSocket 推送 | **未采用**：原 4s 增量轮询方案随 FR-03 一并移除（2026-11-04），当前无实时同步需求 | PRD FR-03（已移除） |
 
 ### 4.1 规划引入清单的展开位置（与运行实况区分）
 

@@ -8,9 +8,9 @@
 |---|---|---|---|
 | `AGENTS.md` | 治理 | 定义 8 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
-| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 18 例契约测试通过；端口 8787 |
-| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（4s 轮询增量同步 + 401 自动刷新）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
-| `packages/core-domain` | 共享包 | 错误码、套餐与 features、权限、任务层级、金额、UUIDv7 | 前后端共用单一事实源 |
+| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 12 例契约测试通过；端口 8787 |
+| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅套餐/设置）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
+| `packages/core-domain` | 共享包 | 错误码、套餐、金额、UUIDv7 | 前后端共用单一事实源 |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
 | `scripts/env-check.mjs` | 可执行代码 | 09 清单 §0（密钥治理硬约束）的自动校验器 | 退出码 0/1；校验 `.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性 |
@@ -84,9 +84,9 @@
 | §1–2 背景与产品契约 | 问题观察 →「Headless 中台 + 多端薄壳」决策；用户/任务/完成条件/共享对象/信任基础 |
 | §3 范围 | P0 / P1 / 明确排除三档 + 平台兼容性要求矩阵（三端最低版本） |
 | §4 角色与对象模型 | 4 角色；Subscription 与 Order 状态机 |
-| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付、FR-03 核心 SaaS 工作区（跨端任务与轻协作工具，OQ-01 已定案）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
+| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付、FR-03 核心 SaaS 工作区（2026-11-04 已整体移除）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
 | §6 共享规则 | Region 隔离、幂等性（request_id）、审计日志（180 天）、通知规则 |
-| §7 开放问题 | OQ-01~06（OQ-01 已定案为跨端任务与轻协作工具；余项：国内 Android IAP、首批市场、退款窗口、账号合并、IoT） |
+| §7 开放问题 | OQ-01~06（OQ-01 因 FR-03 移除已失效；余项：国内 Android IAP、首批市场、退款窗口、账号合并、IoT） |
 
 内置两个交互演示：FR-01 登录流程演示、FR-02 订阅计划与支付演示（基础版 ¥29/月、专业版 ¥99/月）。
 

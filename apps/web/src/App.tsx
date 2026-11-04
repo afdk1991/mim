@@ -3,23 +3,19 @@ import { normalizeLocale, t } from '@mim/i18n';
 import type { Locale } from '@mim/i18n';
 import { api, clearSession, getSession, setSession } from './api';
 import type { Session, UserInfo } from './api';
-import { Dashboard } from './views/Dashboard';
 import { Login } from './views/Login';
 import { Plans } from './views/Plans';
-import { ProjectDetail } from './views/ProjectDetail';
-import { Projects } from './views/Projects';
 import { Settings } from './views/Settings';
 
-type View = 'dashboard' | 'projects' | 'plans' | 'settings';
+type View = 'plans' | 'settings';
 
 interface Route {
   view: View;
-  projectId?: string;
 }
 
 export function App() {
   const [session, setLocalSession] = useState<Session | null>(getSession());
-  const [route, setRoute] = useState<Route>({ view: 'dashboard' });
+  const [route, setRoute] = useState<Route>({ view: 'plans' });
 
   if (!session) {
     return (
@@ -27,7 +23,7 @@ export function App() {
         onLogin={(result) => {
           setSession(result);
           setLocalSession(result);
-          setRoute({ view: 'dashboard' });
+          setRoute({ view: 'plans' });
         }}
       />
     );
@@ -53,8 +49,6 @@ export function App() {
   }
 
   const navItems: Array<{ view: View; label: string }> = [
-    { view: 'dashboard', label: t(locale, 'nav.dashboard') },
-    { view: 'projects', label: t(locale, 'nav.projects') },
     { view: 'plans', label: t(locale, 'nav.plans') },
     { view: 'settings', label: t(locale, 'nav.settings') },
   ];
@@ -88,25 +82,6 @@ export function App() {
       </aside>
 
       <main className="main">
-        {route.view === 'dashboard' && (
-          <Dashboard
-            locale={locale}
-            onOpenProject={(projectId) => setRoute({ view: 'projects', projectId })}
-          />
-        )}
-        {route.view === 'projects' &&
-          (route.projectId ? (
-            <ProjectDetail
-              locale={locale}
-              projectId={route.projectId}
-              onBack={() => setRoute({ view: 'projects' })}
-            />
-          ) : (
-            <Projects
-              locale={locale}
-              onOpenProject={(projectId) => setRoute({ view: 'projects', projectId })}
-            />
-          ))}
         {route.view === 'plans' && <Plans locale={locale} />}
         {route.view === 'settings' && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} />

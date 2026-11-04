@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS plans (
   id          TEXT PRIMARY KEY,
   name_zh     TEXT NOT NULL,
   name_en     TEXT NOT NULL,
-  features    TEXT NOT NULL,
   created_at  TEXT NOT NULL
 );
 
@@ -158,106 +157,6 @@ CREATE TABLE IF NOT EXISTS invoices (
   amount_minor  INTEGER NOT NULL,
   currency      TEXT NOT NULL,
   created_at    TEXT NOT NULL
-);
-
--- ---------- content 域（P0 工作区） ----------
-CREATE TABLE IF NOT EXISTS projects (
-  id           TEXT PRIMARY KEY,
-  user_id      TEXT NOT NULL,
-  region       TEXT NOT NULL,
-  name         TEXT NOT NULL,
-  description  TEXT NOT NULL DEFAULT '',
-  status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived','deleted')),
-  version      INTEGER NOT NULL DEFAULT 1,
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  deleted_at   TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id, status);
-
-CREATE TABLE IF NOT EXISTS project_members (
-  id          TEXT PRIMARY KEY,
-  project_id  TEXT NOT NULL REFERENCES projects(id),
-  user_id     TEXT NOT NULL,
-  role        TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
-  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','removed')),
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL,
-  UNIQUE (project_id, user_id)
-);
-CREATE INDEX IF NOT EXISTS idx_members_user ON project_members(user_id, status);
-
-CREATE TABLE IF NOT EXISTS project_invitations (
-  id               TEXT PRIMARY KEY,
-  project_id       TEXT NOT NULL REFERENCES projects(id),
-  inviter_user_id  TEXT NOT NULL,
-  region           TEXT NOT NULL,
-  provider         TEXT NOT NULL CHECK (provider IN ('phone','email')),
-  identifier       TEXT NOT NULL,
-  role             TEXT NOT NULL CHECK (role IN ('editor','viewer')),
-  token            TEXT NOT NULL UNIQUE,
-  status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','expired','revoked')),
-  expires_at       TEXT NOT NULL,
-  accepted_at      TEXT,
-  created_at       TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS tasks (
-  id                 TEXT PRIMARY KEY,
-  project_id         TEXT NOT NULL,
-  user_id            TEXT NOT NULL,
-  parent_id          TEXT,
-  level              INTEGER NOT NULL CHECK (level IN (1,2)),
-  title              TEXT NOT NULL,
-  description        TEXT NOT NULL DEFAULT '',
-  status             TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo','done')),
-  due_date           TEXT,
-  priority           INTEGER NOT NULL DEFAULT 0,
-  version            INTEGER NOT NULL DEFAULT 1,
-  seq                INTEGER NOT NULL DEFAULT 0,
-  client_updated_at  TEXT NOT NULL,
-  created_at         TEXT NOT NULL,
-  updated_at         TEXT NOT NULL,
-  deleted_at         TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id, deleted_at);
-CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
-
-CREATE TABLE IF NOT EXISTS task_tags (
-  id       TEXT PRIMARY KEY,
-  task_id  TEXT NOT NULL,
-  tag      TEXT NOT NULL,
-  UNIQUE (task_id, tag)
-);
-
-CREATE TABLE IF NOT EXISTS task_events (
-  seq                INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id            TEXT NOT NULL,
-  project_id         TEXT NOT NULL,
-  user_id            TEXT NOT NULL,
-  type               TEXT NOT NULL,
-  payload            TEXT NOT NULL,
-  client_updated_at  TEXT NOT NULL,
-  created_at         TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_task_events_project ON task_events(project_id, seq);
-
-CREATE TABLE IF NOT EXISTS sync_cursors (
-  id          TEXT PRIMARY KEY,
-  user_id     TEXT NOT NULL,
-  device_id   TEXT,
-  last_seq    INTEGER NOT NULL DEFAULT 0,
-  updated_at  TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS content_exports (
-  id          TEXT PRIMARY KEY,
-  user_id     TEXT NOT NULL,
-  project_id  TEXT,
-  status      TEXT NOT NULL DEFAULT 'pending',
-  file_path   TEXT,
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
 );
 
 -- ---------- 认证与会话辅助 ----------

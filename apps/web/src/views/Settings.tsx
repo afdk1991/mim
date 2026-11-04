@@ -155,10 +155,6 @@ export function Settings({ locale, onUserUpdated }: Props) {
                 {locale === 'zh-CN' ? me.plan.name_zh : me.plan.name_en}
               </span>
             </li>
-            <li>
-              <span>{t(locale, 'plans.orders')}</span>
-              <span className="muted">{me.counts.projects}</span>
-            </li>
             {me.subscription && (
               <li>
                 <span>{me.subscription.cycle}</span>

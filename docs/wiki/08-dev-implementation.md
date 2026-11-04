@@ -1,6 +1,7 @@
 # 08 · 开发实现全景（数据库 / 前端 / 后端 / 存储 / 后台管理平台）
 
-> **状态声明（证据）**：截至 V0.0.0-preview，仓库内已落地 `apps/web`（React + Vite）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express + SQLite），包管理器 pnpm workspace；`pnpm -r typecheck` / `pnpm --filter @mim/api test`（18 例）/ `pnpm --filter @mim/web build` / `npm run check` 均已通过并有命令输出留档。
+> **状态声明（证据）**：截至 V0.0.0-preview，仓库内已落地 `apps/web`（React + Vite）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express + SQLite），包管理器 pnpm workspace；`pnpm -w typecheck` / `pnpm -w test`（12 例）/ `pnpm -w build` / `node scripts/version-check.mjs` 均已通过并有命令输出留档。
+> **2026-11-04 变更**：FR-03 核心 SaaS 工作区（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已按用户指令整体移除，本页 §2 的 content 域表结构与后续同步/导出规则仅作历史参考，不再对应仓库实况。
 > 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
@@ -36,17 +37,17 @@
 
 | 维度 | 规划口径（本页 §2+） | 当前已实现（证据位置） | 差异原因 / 后续 |
 |---|---|---|---|
-| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|me|billing|dashboard|projects|tasks|sync|exports.ts`），拆分时不改业务逻辑 |
+| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|me|billing|audit.ts`）；原 FR-03 五条路由已于 2026-11-04 删除 |
 | 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
 | 支付 | `payment-driver` 多通道 + 回调验签 | 仅 `mock` 驱动：checkout 即置 `paid` 并激活订阅；其余 driver 返回 `PAYMENT_DRIVER_UNAVAILABLE` | 无持牌通道凭证；接入真实 driver 时只替换 `billing.ts` 内驱动分支 |
-| 实时同步 | WebSocket + MQ 推送，5 秒内到达 | 前端 4s 轮询 `GET /sync/changes?project_id=&since_seq=`，`task_events.seq` 增量拉取 | 满足「5 秒内」硬约束；避免引入 WebSocket 依赖。多端一致性靠服务端 `seq` + LWW 裁决 |
+| 实时同步 | WebSocket + MQ 推送，5 秒内到达 | **已移除（2026-11-04）**：原 4s 轮询 `GET /sync/changes` 随 FR-03 一并删除，当前无同步需求 |
 | 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 6），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
-| 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/套餐/权限/任务层级/金额/ID）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象 |
-| 存储 | 对象存储 + CDN（附件/媒体/导出） | CSV 导出同步生成、响应内直接下载（`routes/exports.ts`），无对象存储 | 小数据量可接受；导出转异步 + 对象存储时改 `exports.ts` |
+| 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/套餐/金额/ID）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象；原 `permissions.ts` / `tasks.ts` 随 FR-03 删除 |
+| 存储 | 对象存储 + CDN（附件/媒体/导出） | 无对象存储（原 CSV 导出随 FR-03 于 2026-11-04 删除） | 当前无导出需求；恢复导出能力时按对象存储 + 预签名 URL 方案实现 |
 | 后台管理 | `admin-api` + RBAC 后台 | 未实现；审计数据已落 `audit_logs` 表 | P1 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 18 例）保障字段一致性；后续补 OpenAPI 导出 |
-| 仪表盘切日 | 展示端负责时区转换 | 服务端按用户 `timezone` 用 `Intl.DateTimeFormat('sv-SE')` 求当地日期；今日已完成以 `updated_at` 按用户时区落在今日为准（48h 窗口 + 时区过滤，见 `routes/dashboard.ts`） | 避免 UTC 与本地日期跨日错位；已有回归测试「今日完成按用户时区切日」 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 12 例）保障字段一致性；后续补 OpenAPI 导出 |
+| 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
 ## 2. 后端服务模块清单
 
@@ -56,7 +57,7 @@
 | `identity` | 注册登录、第三方登录绑定、会话与设备、账号合并、注销 | `/auth/*`、`/accounts/*`、`/devices/*` | 短信/邮件通道、Redis | 分库 |
 | `billing` | 计划与定价、订阅生命周期、续费、升降级、发票、对账 | `/plans`、`/subscriptions/*`、`/invoices/*` | payment-driver、MQ | 分库 |
 | `payment-driver` | 支付编排 + 通道驱动（wechat / alipay / unionpay / stripe / paypal / apple-iap / google-play），统一回调 | `/payments/*`、`/callbacks/{driver}` | 各持牌通道、商店服务端 API | 按通道 |
-| `content` | **P0 任务与协作域**（OQ-01 定案）：项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P0：`/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*`；P1：`/contents/*`、`/search` | P0：billing（features 鉴权）、notification（截止提醒）、MQ/Redis、对象存储、PostgreSQL；P1：对象存储、OpenSearch、审核服务 | 分库 |
+| `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
 | `im` | 会话、消息可靠性、已读回执、在线状态、离线推送、审核 | `/im/*`（HTTP + WebSocket） | MQ、推送通道、审核服务 | 分库 |
 | `rtc` | 信令、房间编排、录制、转码、质量监测 | `/rtc/*` | RTC 第三方、对象存储 | 分集群 |
 | `ai-orchestrator` | 模型路由、Prompt 版本、输出审核、配额与成本核算 | `/ai/*` | 大模型供应商、审核服务 | 按合规域 |
@@ -103,7 +104,7 @@
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
-| `plans` | `id`、`code`、`name_i18n jsonb`、`billing_cycle(month/quarter/year)`、`features jsonb`、`region`、`status` | 计划定义；`code` 唯一 |
+| `plans` | `id`、`code`、`name_i18n jsonb`、`billing_cycle(month/quarter/year)`、`region`、`status` | 计划定义；`code` 唯一。原 `features jsonb` 已于 2026-11-04 随 FR-03 删除 |
 | `plan_prices` | `id`、`plan_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | **价格与计划解耦**，改价不改历史订单 |
 | `subscriptions` | `id`、`user_id`、`plan_id`、`status(active/past_due/canceled/expired)`、`current_period_start/end`、`cancel_at_period_end`、`version` | 索引 `(user_id, status)`；状态机见 §3.3 |
 | `subscription_events` | `id`、`subscription_id`、`from_status`、`to_status`、`reason`、`source(payment/refund/admin/job)`、`created_at` | 只追加，禁止 UPDATE |
@@ -114,20 +115,22 @@
 | `reconciliation_batches` | `id`、`driver`、`biz_date`、`matched_count`、`diff_count`、`status` | 每日对账批次 |
 | `reconciliation_diffs` | `id`、`batch_id`、`payment_id`、`type(missing_local/missing_channel/amount_mismatch)`、`resolved_by` | 差异处理留痕 |
 
-**content 域（P0 任务与协作，OQ-01 定案）**
+**content 域（已移除，2026-11-04）**
+
+> 下表 8 张表（`projects`、`project_members`、`project_invitations`、`tasks`、`task_tags`、`task_events`、`sync_cursors`、`content_exports`）已从 `schema.sql` 删除，生产库同步 DROP。保留为历史设计记录。
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
-| `projects` | `id`、`owner_user_id`、`region`、`name`、`description`、`status(active/archived/deleted)`、`version`、`created_at`、`updated_at`、`deleted_at` | 项目主体；索引 `(owner_user_id, region, status)`；项目数配额（免费版 3 个）由 `billing.features` 判定，不在本表硬编码 |
-| `project_members` | `id`、`project_id`、`user_id`、`role(editor/viewer)`、`invited_by`、`joined_at`、`revoked_at` | 两档权限（可编辑/只读）；唯一索引 `(project_id, user_id)`；单项目协作者数上限按套餐校验 |
-| `project_invitations` | `id`、`project_id`、`invite_type(phone/email)`、`invitee_hash`、`token_hash`、`status(pending/accepted/expired/revoked)`、`expires_at`、`invited_by` | 手机号/邮箱邀请加入项目；唯一索引 `(project_id, invite_type, invitee_hash, status)` |
-| `tasks` | `id`、`project_id`、`parent_task_id NULL`、`title`、`description`、`due_date date NULL`、`status(todo/done)`、`completed_at`、`created_by`、`updated_by`、`client_updated_at`、`version`、`sort_order`、`created_at`、`updated_at`、`deleted_at` | 任务与子任务共用一表；**只允许两层**：`parent_task_id` 非空时其父必须为顶层任务（服务层校验，禁止孙级）；索引 `(project_id, status, due_date)`、`(parent_task_id)`、`(due_date, status)` 供仪表盘查询 |
-| `task_tags` | `id`、`task_id`、`tag` | 标签多选；唯一索引 `(task_id, tag)`；标签筛选走 `(tag)` 索引，P0 不引入检索中间件 |
-| `task_events` | `id`、`task_id`、`project_id`、`actor_id`、`action(created/updated/completed/reopened/deleted)`、`changed_fields jsonb`、`client_ts`、`server_ts`、`seq bigint` | 只追加；`seq` 单调递增，既是审计来源也是增量同步数据源；索引 `(project_id, seq)` |
-| `sync_cursors` | `id`、`user_id`、`device_id`、`last_seq`、`updated_at` | 每设备每用户一条；离线端恢复后从 `last_seq` 拉增量 |
-| `content_exports` | `id`、`user_id`、`project_id`、`format(csv)`、`status(pending/running/succeeded/failed)`、`object_key`、`expires_at` | CSV 导出（基础版及以上）；产物落对象存储，凭预签名 URL 下载 |
+| `projects`（已删除） | `id`、`owner_user_id`、`region`、`name`、`description`、`status(active/archived/deleted)`、`version`、`created_at`、`updated_at`、`deleted_at` | 项目主体 |
+| `project_members`（已删除） | `id`、`project_id`、`user_id`、`role(editor/viewer)`、`invited_by`、`joined_at`、`revoked_at` | 两档权限 |
+| `project_invitations`（已删除） | `id`、`project_id`、`invite_type(phone/email)`、`invitee_hash`、`token_hash`、`status`、`expires_at`、`invited_by` | 邀请加入项目 |
+| `tasks`（已删除） | `id`、`project_id`、`parent_task_id`、`title`、`description`、`due_date`、`status`、`completed_at`、`client_updated_at`、`version`、`sort_order`、`deleted_at` | 两层任务 |
+| `task_tags`（已删除） | `id`、`task_id`、`tag` | 标签 |
+| `task_events`（已删除） | `id`、`task_id`、`project_id`、`actor_id`、`action`、`changed_fields`、`client_ts`、`server_ts`、`seq` | 增量同步与审计源 |
+| `sync_cursors`（已删除） | `id`、`user_id`、`device_id`、`last_seq`、`updated_at` | 离线增量游标 |
+| `content_exports`（已删除） | `id`、`user_id`、`project_id`、`format(csv)`、`status`、`object_key`、`expires_at` | CSV 导出 |
 
-同步落库规则（P0）：`tasks` 的更新与 `task_events` 的插入必须在**同一事务**内完成，事件再经 `ops.outbox_events` 投递到 MQ；在线端通过 `/api/v1/sync/ws` 接收 `task.changed` 事件（目标 P95 ≤ 5 秒，PRD FR-03 ②），断线或离线端用 `GET /api/v1/sync/changes?since_seq=` 补齐；冲突按服务端 last-write-wins 裁决（先比 `client_updated_at`，同值再比 `seq`），客户端乐观更新并以响应中的权威行回写本地缓存。
+原同步落库规则（已失效）：`tasks` 更新与 `task_events` 插入同事务，`/api/v1/sync/changes` 增量拉取，LWW 冲突裁决。当前无增量同步实现。
 
 **content 域（P1 通用内容管理）**
 
@@ -152,10 +155,10 @@
 - `subscriptions.status` 只能经 `subscription_events` 追加推进，服务层用 `UPDATE ... WHERE version = ?` 乐观锁；非法跃迁（如 `expired → past_due`）直接拒绝并记审计。
 - `orders.status` 单向：`pending → paid | failed | closed`；`paid → refunded` 由 `refunds.executed` 触发，不允许直接改 `orders` 金额。
 - 所有状态写入必须携带 `idempotency_key`，重复请求返回首次结果（PRD §6 幂等规则）。
-- `tasks.status`：`todo ⇄ done`；置 `done` 时写 `completed_at`，重新打开清空该字段；任务与子任务共用同一状态机。删除走 `deleted_at` 软删，父任务软删时子任务同批标记，恢复按同批还原。
-- `projects.status`：`active → archived → deleted`（软删）；归档项目默认不出现在列表但可筛选查看；`deleted` 项目拒绝一切写入。归档/删除不影响其下 `tasks` 行，仅由查询层过滤。
-- `project_invitations.status`：`pending → accepted | expired | revoked`；接受邀请时同事务写入 `project_members` 并校验协作者数套餐上限，超限则拒绝并返回升级引导错误码。
-- 任务写操作必须携带 `Idempotency-Key`；`version` 乐观锁用于离线重放，LWW 冲突由服务端裁决（规则见 §3.2 同步说明），客户端不得自行合并。
+- ~~`tasks.status`~~：已移除（2026-11-04，FR-03 删除，`tasks` 表同步 DROP）。
+- ~~`projects.status`~~：已移除（2026-11-04，FR-03 删除，`projects` 表同步 DROP）。
+- ~~`project_invitations.status`~~：已移除（2026-11-04，FR-03 删除，`project_invitations` 表同步 DROP）。
+- ~~任务写操作幂等与 LWW~~：已移除（2026-11-04，随 FR-03 删除；订阅域仍强制 `Idempotency-Key` + `version` 乐观锁）。
 - `contents.status`（P1）：`draft → published ⇄ blocked`、`published → deleted`；任何机审/人审结论只能经 `audit_records` 追加，不允许直接改 `contents.status` 跳过审核。
 
 ## 4. 前端（多端）模块清单
@@ -174,7 +177,7 @@
 
 | 包 | 职责 | 禁止事项 |
 |---|---|---|
-| `core-domain` | 类型、状态机、校验规则、权限判断（纯函数，可单测） | 禁止 import 任何端 SDK |
+| `core-domain` | 类型、状态机、校验规则（纯函数，可单测）；当前含错误码/套餐/订阅/订单/金额/UUIDv7 | 禁止 import 任何端 SDK；原权限判断与任务层级已于 2026-11-04 随 FR-03 删除 |
 | `core-sdk` | 由 OpenAPI 生成的请求客户端 + 类型 + 错误码 | 禁止手写接口与字段 |
 | `ui-kit` | Design Token（颜色/间距/字号/圆角）+ 基础组件 | 禁止写业务逻辑 |
 | `i18n` | 文案资源、复数规则、货币/时区格式化、RTL 预留 | 禁止硬编码文案 |
@@ -189,20 +192,13 @@
 |---|---|---|
 | 登录/注册 | 手机号验证码、邮箱密码/验证码、微信/支付宝/Google/Apple 登录；频控与错误提示 | FR-01 |
 | 计划与支付 | 计划对比、周期切换、拉起支付、结果轮询、失败重试 | FR-02 |
-| 工作区框架 | 左侧导航按 `features` 显隐、升级引导、订阅失效提示、免费版付费模块引导升级 | FR-03 |
-| 项目列表 | 项目新建/改名/归档、项目数配额提示（免费版 3 个）、成员与协作者入口 | FR-03 |
-| 任务列表与详情 | 列表视图、任务/子任务两级展开、标题/描述/标签/截止日期/完成状态编辑、父子任务新增与删除 | FR-03 |
-| 今日与个人仪表盘 | 今日任务（截止日为今天）+ 未来 7 天即将到期；按截止日期与状态排序 | FR-03 |
-| 日历视图（基础版及以上） | 按截止日期聚合任务，支持切月/切周；免费版隐藏并显示升级引导 | FR-03 |
-| 看板视图（专业版及以上） | 按状态分列（待办/已完成），拖拽改状态；基础版隐藏并显示升级引导 | FR-03 |
-| 协作与成员 | 手机号/邮箱邀请、成员列表、权限切换（可编辑/只读）、移除成员、协作者上限提示 | FR-03 |
-| 导出 CSV | 按项目导出任务清单（基础版及以上）；生成中状态、下载有效期提示 | FR-03 |
+| ~~工作区框架/项目/任务/今日/日历/看板/协作/导出~~ | 已随 FR-03 于 2026-11-04 整体移除；当前 P0 页面仅剩登录、计划与支付、账号设置、订阅管理、协议与隐私、语言与地区 | FR-03（已移除） |
 | 账号设置 | 资料、绑定管理、设备列表、注销（7 天冷静期可撤销） | FR-01 / FR-06 |
 | 订阅管理 | 查看周期、取消续费、更换支付方式、发票申请、退款入口 | FR-02 |
 | 协议与隐私 | 首次强制勾选、政策更新后重新确认、SDK 清单展示 | FR-06 |
 | 语言与地区 | 语言切换、币种展示、时区设置 | FR-05 |
 
-任务写操作统一交互规则（各端一致）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决（先比 `client_updated_at`，同值再比 `seq`），客户端以响应中的权威行回写本地缓存，不做自行合并。视图能力（列表/今日/日历/看板/导出）一律由 `features` 决定显隐，不由端类型决定。
+任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。
 
 ### 4.4 多端一致性检查点（进 CI）
 
@@ -210,9 +206,9 @@
 2. 同一错误码在不同端映射到不同提示 → 失败；
 3. `IPlatformAdapter` 契约测试未覆盖新增平台方法 → 失败；
 4. Design Token 外出现硬编码色值（如 `#2563eb`）→ 警告；
-5. 任务状态判断或项目权限判断未复用 `core-domain`（端上自行实现）→ 失败；
-6. 同一视图能力（列表/今日/日历/看板）按端类型而非 `features` 显隐 → 失败；
-7. 任务乐观更新与服务端权威行的一致性夹具未覆盖「离线变更 → 恢复重放」场景 → 失败。
+5. ~~任务状态判断或项目权限判断未复用 `core-domain`~~ → 已失效（FR-03 移除，`core-domain` 不再含权限/任务模块）；
+6. ~~同一视图能力按端类型而非 `features` 显隐~~ → 已失效（`features` 已随 FR-03 移除）；
+7. ~~任务乐观更新与服务端权威行一致性夹具~~ → 已失效（无任务写操作）。
 
 ## 5. 后台管理平台（apps/admin + services/admin-api）
 
@@ -225,11 +221,11 @@
 | 财务 | 订单、支付、退款、对账、发票 | 退款审核、对账差异核销、发票开具 |
 | 客服 | 用户、订单、工单 | 工单处理、补偿期发放（需审批） |
 | 内容审核 | 内容（P1）、审核队列 | 审核通过/驳回/下架（仅 P1 `contents`） |
-| 只读审计 | 全部（只读，含项目/任务只读） | 无 |
+| 只读审计 | 全部（只读） | 无 |
 
 硬规则：**任何写操作必须写 `admin.operation_logs`**（操作人、对象、前后值、IP、时间）；金额相关写操作需第二人复核（四眼原则）；跨 region 查询需显式切换且留痕。
 
-P0 任务与协作数据（项目/任务/子任务/成员）在后台**默认只读**：仅支持按 `user_id` / `project_id` 检索与排障查看，不提供代用户编辑任务的入口；任务数据不进入内容审核队列（审核队列仅服务 P1 `contents`）。
+原「P0 任务与协作数据后台默认只读」规则已失效（2026-11-04，FR-03 项目/任务数据整体移除；审核队列仅服务 P1 `contents`）。
 
 ### 5.2 功能模块
 
@@ -240,7 +236,7 @@ P0 任务与协作数据（项目/任务/子任务/成员）在后台**默认只
 | 退款工单 | 申请→审核→执行→结果回写；IAP 单标注「走商店流程」并只做记录 | billing |
 | 订阅管理 | 计划/价格配置（含生效时间）、升降级、补偿期、批量导出 | billing |
 | 对账中心 | 批次列表、差异清单、核销、导出财务凭证 | billing |
-| 任务与项目运维（P0） | 项目/任务检索、只读详情（成员、协作者数、配额超限提示）、导出异常排查 | content |
+| ~~任务与项目运维（P0）~~ | ~~项目/任务检索、只读详情（成员、协作者数、配额超限提示）、导出异常排查~~ | ~~content~~ —— 已移除（2026-11-04，FR-03 删除） |
 | 内容审核（P1） | 机审结果、人审队列、处置动作、申诉（仅 P1 `contents`） | content |
 | 工单系统 | 客服工单、SLA、内部备注、用户可见回复 | admin / notification |
 | 经营看板 | MRR/ARR、ARPU、续费率、流失率、退款率、支付成功率、region 拆分 | 数仓/只读副本 |
@@ -260,17 +256,17 @@ P0 任务与协作数据（项目/任务/子任务/成员）在后台**默认只
 |---|---|---|
 | PostgreSQL | 主业务库（按 region 分集群、按域分 schema） | 主从 + 只读副本（供 admin 看板）；PITR 备份；连接池上限按服务配额 |
 | Redis | 会话/刷新令牌黑名单、验证码、频控计数、订阅状态缓存（TTL 5 分钟）、分布式锁、轻量队列 | 开启持久化用于锁场景；key 前缀按域隔离 |
-| OpenSearch | P1 内容与后台检索、日志检索；**P0 项目/任务查询走 PostgreSQL 索引与标签索引，不引入检索中间件** | 按 region 独立索引；索引按天滚动 |
-| 对象存储 | 头像、附件、发票 PDF、P0 CSV 导出产物、音视频录制 | 私有桶 + 预签名 URL；导出产物按 `content_exports.expires_at` 到期清理；发票 10 年、录制按套餐 |
+| OpenSearch | P1 内容与后台检索、日志检索；P0 无检索需求（原项目/任务检索随 FR-03 移除） | 按 region 独立索引；索引按天滚动 |
+| 对象存储 | 头像、附件、发票 PDF、音视频录制 | 私有桶 + 预签名 URL；发票 10 年、录制按套餐。原 CSV 导出产物随 FR-03 移除 |
 | CDN | 静态资源、媒体分发 | 国内/海外分开加速域；回源鉴权 |
-| MQ（Kafka/RabbitMQ） | 领域事件（含 P0 `task.changed`）、异步任务、事务性发件箱 | `outbox_events → MQ`，消费失败进 `dead_letters` 并可重放 |
+| MQ（Kafka/RabbitMQ） | 领域事件、异步任务、事务性发件箱（原 P0 `task.changed` 事件随 FR-03 移除） | `outbox_events → MQ`，消费失败进 `dead_letters` 并可重放 |
 
 数据分级：
 
 | 级别 | 数据 | 处理 |
 |---|---|---|
 | L1 敏感 | 手机号、邮箱、密码哈希、支付凭证 | 加密存储、展示脱敏、禁止进日志与埋点 |
-| L2 业务 | 订单、订阅、项目/任务数据、内容正文（P1） | 按 region 隔离、按角色授权、审计访问 |
+| L2 业务 | 订单、订阅、内容正文（P1） | 按 region 隔离、按角色授权、审计访问 |
 | L3 公开 | 计划价格、公开内容 | 可缓存、可 CDN |
 
 ## 7. API 契约规范
@@ -300,10 +296,10 @@ P0 任务与协作数据（项目/任务/子任务/成员）在后台**默认只
 | 审计日志归档 | 每日 | 180 天在线，之后冷存 |
 | 搜索索引投递（P1） | 持续消费 | 仅 P1 `contents`；失败进死信，可重放 |
 | 配额重置（AI/存储） | 每月 1 日 | 按 `quota_id + period` 幂等 |
-| 截止日提醒推送 | 每 15 分钟 | 去重键 `task_id + user_id + remind_date`；仅基础版及以上（按 `features` 校验）；复用 `notification` 推送通道 |
-| 项目邀请过期 | 每小时 | `project_invitations` 超期置 `expired`，与「接受邀请」事务互斥 |
-| CSV 导出生成 | 持续消费 | 以 `content_exports.id` 幂等；产物过期随对象存储生命周期清理 |
-| 同步事件与游标清理 | 每日 | `task_events` / `sync_cursors` 默认保留 30 天（可配置） |
+| 截止日提醒推送 | — | 已移除（FR-03 删除；`features` 套餐能力校验与 `task_events` 提醒源同步取消） |
+| 项目邀请过期 | — | 已移除（FR-03 删除，随 `project_invitations` 表清理） |
+| CSV 导出生成 | — | 已移除（FR-03 删除，随 `content_exports` 表清理） |
+| 同步事件与游标清理 | — | 已移除（FR-03 删除，随 `task_events` / `sync_cursors` 表清理） |
 
 ## 9. 可观测性与安全
 
@@ -316,12 +312,12 @@ P0 任务与协作数据（项目/任务/子任务/成员）在后台**默认只
 
 | 阶段 | 交付物 | 对应 |
 |---|---|---|
-| 第 1 步 | monorepo 骨架、`gateway`、`identity`、`billing`、`payment-driver`（国内通道）、`content`（P0 任务与协作最小集：项目/任务/子任务、列表/今日/仪表盘）、`apps/web` + `apps/mini` | P0 |
-| 第 2 步 | `admin-api` + `apps/admin` 最小集（用户/订单/退款/审计）、`jobs`（续费/对账/掉单）、协作邀请与两档权限、同步通道（`/sync/ws` + 增量拉取）、截止日提醒 | P0 运营闭环 |
-| 第 3 步 | `apps/mobile` + IAP、`notification`、i18n 首批语种、日历/看板视图、CSV 导出 | P0 完成 |
+| 第 1 步 | monorepo 骨架、`identity`、`billing`、`payment-driver`（国内通道）、`apps/web`（~~`content` P0 任务与协作最小集~~ 已移除，FR-03） | P0 |
+| 第 2 步 | `admin-api` + `apps/admin` 最小集（用户/订单/退款/审计）、`jobs`（续费/对账/掉单）（~~协作邀请与两档权限~~、~~同步通道~~、~~截止日提醒~~ 已随 FR-03 移除） | P0 运营闭环 |
+| 第 3 步 | `apps/mobile` + IAP、`notification`、i18n 首批语种（~~日历/看板视图~~、~~CSV 导出~~ 已随 FR-03 移除） | P0 完成 |
 | 第 4 步 | `content`（P1 通用内容管理：内容/审核/检索）、`im`、`rtc`、`ai-orchestrator`、`openapi`、`apps/desktop` | P1 |
 
-**未决阻塞**：工作区实体设计已随 OQ-01 定案落地——`content` 域 P0 部分（任务与协作）的 8 张表、两层任务限制、同步事务与 LWW 裁决已写入 §3.2 / §3.3，功能口径见 [07-functional-modules.md](./07-functional-modules.md) §5。仍需确认：同步事件与游标保留期默认值（当前 30 天，可配置）、软删数据物理清理保留期（默认 30 天，可配置）。外部依赖 OQ-02 / OQ-04（支付通道细节）、OQ-03（首批语种）、OQ-05（账号合并）见 07 §10。P1 通用内容管理（`contents` / 审核 / 检索）不阻塞 P0。
+**未决阻塞**：原「工作区实体设计」相关阻塞已随 FR-03 于 2026-11-04 整体移除而**失效**（8 张 content 表、两层任务限制、同步事务与 LWW 裁决、同步游标保留期、软删物理清理保留期均不再适用）。仍需确认：外部依赖 OQ-02 / OQ-04（支付通道细节）、OQ-03（首批语种）、OQ-05（账号合并）见 [07-functional-modules.md](./07-functional-modules.md) §10。P1 通用内容管理（`contents` / 审核 / 检索）不阻塞 P0。
 
 ---
 

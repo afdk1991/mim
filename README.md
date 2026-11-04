@@ -44,7 +44,7 @@ pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`�
 ```
 apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173）
 services/mim-api/    # 后端 API（Express 5 + SQLite，端口 8787，前缀 /api/v1）
-packages/core-domain/# 共享领域层（错误码/套餐/权限/任务层级/金额/UUIDv7）
+packages/core-domain/# 共享领域层（错误码/套餐/金额/UUIDv7）
 packages/i18n/       # 双语文案（zh-CN / en-US）与货币格式化
 scripts/             # build / version-check / env-check
 deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）
@@ -60,7 +60,7 @@ docs/wiki/           # 结构化文档（01~09）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，18 例）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，12 例）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）

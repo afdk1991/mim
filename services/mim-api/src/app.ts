@@ -5,11 +5,6 @@ import type { Express, NextFunction, Request, Response } from 'express';
 import { createAuthRouter } from './routes/auth.js';
 import { createPublicBillingRouter, createBillingRouter } from './routes/billing.js';
 import { createMeRouter } from './routes/me.js';
-import { createProjectsRouter } from './routes/projects.js';
-import { createTasksRouter } from './routes/tasks.js';
-import { createDashboardRouter } from './routes/dashboard.js';
-import { createSyncRouter } from './routes/sync.js';
-import { createExportsRouter } from './routes/exports.js';
 import { createAuditRouter } from './routes/audit.js';
 import { errorHandler, notFound, requestId } from './middleware.js';
 import type { ApiDeps } from './types.js';
@@ -36,11 +31,6 @@ export function createApp(deps: ApiDeps): Express {
   for (const router of [
     createMeRouter(deps),
     createBillingRouter(deps),
-    createProjectsRouter(deps),
-    createTasksRouter(deps),
-    createDashboardRouter(deps),
-    createSyncRouter(deps),
-    createExportsRouter(deps),
     createAuditRouter(deps),
   ]) {
     app.use('/api/v1', router);

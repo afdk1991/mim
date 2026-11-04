@@ -1,4 +1,4 @@
-/** 契约测试：覆盖 FR-01~FR-06 的 P0 关键路径（内存库，独立时钟不作注入） */
+/** 契约测试：覆盖 FR-01 / FR-02 / FR-06 的 P0 关键路径（内存库，独立时钟不作注入） */
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
@@ -39,18 +39,6 @@ function auth(session: Session, key?: string) {
   const headers: Record<string, string> = { authorization: `Bearer ${session.token}` };
   if (key) headers['idempotency-key'] = key;
   return headers;
-}
-
-async function createProject(session: Session, name: string) {
-  return request(app).post('/api/v1/projects').set(auth(session, nextKey())).send({ name });
-}
-
-async function createTask(
-  session: Session,
-  projectId: string,
-  body: Record<string, unknown>,
-) {
-  return request(app).post(`/api/v1/projects/${projectId}/tasks`).set(auth(session, nextKey())).send(body);
 }
 
 beforeEach(() => {
@@ -98,7 +86,6 @@ describe('FR-01 账号身份', () => {
     const me = await request(app).get('/api/v1/me').set(auth(session));
     expect(me.status).toBe(200);
     expect(me.body.plan.id).toBe('free');
-    expect(me.body.counts.projects).toBe(0);
 
     const logout = await request(app)
       .post('/api/v1/auth/logout')
@@ -121,22 +108,17 @@ describe('FR-01 账号身份', () => {
   });
 
   it('未携带令牌访问受保护接口返回 401', async () => {
-    const res = await request(app).get('/api/v1/projects');
+    const res = await request(app).get('/api/v1/me');
     expect(res.status).toBe(401);
     expect(res.body.code).toBe('AUTH_UNAUTHORIZED');
   });
 });
 
 describe('FR-02 订阅计费', () => {
-  it('免费版项目配额在第 4 个被拒，升级后放行', async () => {
+  it('模拟支付下单后订阅立即生效，/me 套餐同步更新', async () => {
     const session = await login('13800000002');
-    for (const name of ['P1', 'P2', 'P3']) {
-      const res = await createProject(session, name);
-      expect(res.status).toBe(201);
-    }
-    const fourth = await createProject(session, 'P4');
-    expect(fourth.status).toBe(403);
-    expect(fourth.body.code).toBe('QUOTA_PROJECTS_EXCEEDED');
+    const before = await request(app).get('/api/v1/me').set(auth(session));
+    expect(before.body.plan.id).toBe('free');
 
     const checkout = await request(app)
       .post('/api/v1/subscriptions/checkout')
@@ -146,8 +128,9 @@ describe('FR-02 订阅计费', () => {
     expect(checkout.body.order.status).toBe('paid');
     expect(checkout.body.subscription.plan_id).toBe('basic');
 
-    const after = await createProject(session, 'P4');
-    expect(after.status).toBe(201);
+    const after = await request(app).get('/api/v1/me').set(auth(session));
+    expect(after.body.plan.id).toBe('basic');
+    expect(after.body.plan.expires_at).toBeTruthy();
   });
 
   it('真实支付驱动未接入时返回 503 并声明原因', async () => {
@@ -179,303 +162,57 @@ describe('FR-02 订阅计费', () => {
 
   it('写操作缺少 Idempotency-Key 被拒', async () => {
     const session = await login('13800000005');
-    const res = await request(app).post('/api/v1/projects').set(auth(session)).send({ name: 'no-key' });
+    const res = await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session))
+      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('VALIDATION_FAILED');
   });
 });
 
-describe('FR-03 工作区与任务', () => {
-  it('两级任务层级、状态流转与 LWW 冲突裁决', async () => {
-    const session = await login('13800000006');
-    const project = await createProject(session, '工作区');
-    const projectId = project.body.project.id as string;
-
-    const parent = await createTask(session, projectId, { title: '父任务', priority: 2 });
-    expect(parent.status).toBe(201);
-    expect(parent.body.task.level).toBe(1);
-
-    const child = await createTask(session, projectId, { title: '子任务', parent_id: parent.body.task.id });
-    expect(child.body.task.level).toBe(2);
-
-    const grandchild = await createTask(session, projectId, { title: '孙任务', parent_id: child.body.task.id });
-    expect(grandchild.status).toBe(400);
-    expect(grandchild.body.code).toBe('TASK_PARENT_INVALID');
-
-    const stale = await request(app)
-      .patch(`/api/v1/tasks/${parent.body.task.id}`)
-      .set(auth(session, nextKey()))
-      .send({ title: '改标题', version: 1, client_updated_at: '2000-01-01T00:00:00.000Z' });
-    expect(stale.status).toBe(409);
-    expect(stale.body.code).toBe('CONFLICT');
-    expect(stale.body.details.current.title).toBe('父任务');
-
-    const patched = await request(app)
-      .patch(`/api/v1/tasks/${parent.body.task.id}`)
-      .set(auth(session, nextKey()))
-      .send({ title: '父任务-改', version: 1, client_updated_at: parent.body.task.client_updated_at });
-    expect(patched.status).toBe(200);
-    expect(patched.body.task.version).toBe(2);
-
-    const done = await request(app)
-      .post(`/api/v1/tasks/${parent.body.task.id}/status`)
-      .set(auth(session, nextKey()))
-      .send({ status: 'done', version: 2, client_updated_at: patched.body.task.client_updated_at });
-    expect(done.status).toBe(200);
-    expect(done.body.task.status).toBe('done');
-
-    const list = await request(app).get(`/api/v1/projects/${projectId}/tasks`).set(auth(session));
-    expect(list.body.items).toHaveLength(2);
-
-    const deleted = await request(app)
-      .delete(`/api/v1/tasks/${parent.body.task.id}`)
-      .set(auth(session, nextKey()));
-    expect(deleted.status).toBe(200);
-    expect(deleted.body.cascaded_children).toBe(1);
-
-    // 一级任务删除后，父任务与子任务均在库内软删，且各自写入 deleted 同步事件
-    const taskRows = db
-      .prepare('SELECT deleted_at FROM tasks WHERE project_id = ?')
-      .all(projectId) as Array<{ deleted_at: string | null }>;
-    expect(taskRows).toHaveLength(2);
-    expect(taskRows.every((row) => row.deleted_at !== null)).toBe(true);
-    const events = db
-      .prepare(`SELECT COUNT(*) AS total FROM task_events WHERE project_id = ? AND type = 'deleted'`)
-      .get(projectId) as { total: number };
-    expect(events.total).toBe(2);
-  });
-
-  it('删除项目级联软删全部任务与子任务（项目 → 任务 → 子任务两级删除）', async () => {
-    const session = await login('13800000016');
-    const project = await createProject(session, '级联删除项目');
-    const projectId = project.body.project.id as string;
-
-    const taskA = await createTask(session, projectId, { title: '任务 A' });
-    const subA1 = await createTask(session, projectId, {
-      title: '子任务 A1',
-      parent_id: taskA.body.task.id,
-    });
-    const subA2 = await createTask(session, projectId, {
-      title: '子任务 A2',
-      parent_id: taskA.body.task.id,
-    });
-    const taskB = await createTask(session, projectId, { title: '任务 B' });
-    expect(subA2.body.task.level).toBe(2);
-
-    const deleted = await request(app)
-      .delete(`/api/v1/projects/${projectId}`)
-      .set(auth(session, nextKey()));
-    expect(deleted.status).toBe(200);
-    expect(deleted.body.cascaded_tasks).toBe(2);
-    expect(deleted.body.cascaded_subtasks).toBe(2);
-
-    // 项目不可再访问，重复删除返回 404
-    const reread = await request(app).get(`/api/v1/projects/${projectId}`).set(auth(session));
-    expect(reread.status).toBe(404);
-    const again = await request(app)
-      .delete(`/api/v1/projects/${projectId}`)
-      .set(auth(session, nextKey()));
-    expect(again.status).toBe(404);
-
-    // 任务与子任务均已软删，项目列表与仪表盘不再出现
-    const taskRows = db
-      .prepare('SELECT deleted_at FROM tasks WHERE project_id = ?')
-      .all(projectId) as Array<{ deleted_at: string | null }>;
-    expect(taskRows).toHaveLength(4);
-    expect(taskRows.every((row) => row.deleted_at !== null)).toBe(true);
-
-    const events = db
-      .prepare(`SELECT COUNT(*) AS total FROM task_events WHERE project_id = ? AND type = 'deleted'`)
-      .get(projectId) as { total: number };
-    expect(events.total).toBe(4);
-
-    const projects = await request(app).get('/api/v1/projects').set(auth(session));
-    expect(projects.body.items).toHaveLength(0);
-    const dashboard = await request(app).get('/api/v1/dashboard').set(auth(session));
-    expect(dashboard.body.unscheduled).toHaveLength(0);
-
-    // 审计记录包含级联计数
-    const audit = db
-      .prepare(`SELECT payload FROM audit_logs WHERE action = 'project.delete' AND target = ?`)
-      .get(projectId) as { payload: string } | undefined;
-    expect(audit ? JSON.parse(audit.payload) : null).toEqual({
-      cascaded_tasks: 2,
-      cascaded_subtasks: 2,
-    });
-
-    // 子任务单独访问返回 404（已被级联删除）
-    const subRead = await request(app)
-      .get(`/api/v1/tasks/${subA1.body.task.id}`)
-      .set(auth(session));
-    expect(subRead.status).toBe(404);
-    expect(taskB.body.task.id).toBeTruthy();
-  });
-
-  it('只读成员不能写入任务', async () => {
-    const owner = await login('13800000007');
-    const project = await createProject(owner, '协作项目');
-    const projectId = project.body.project.id as string;
-
-    // 免费版协作者配额为 0，邀请前先升级到基础版（协作 ≤3）
-    const upgrade = await request(app)
-      .post('/api/v1/subscriptions/checkout')
-      .set(auth(owner, nextKey()))
-      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
-    expect(upgrade.status).toBe(201);
-
-    const invite = await request(app)
-      .post(`/api/v1/projects/${projectId}/invitations`)
-      .set(auth(owner, nextKey()))
-      .send({ provider: 'phone', identifier: '13800000008', role: 'viewer' });
-    expect(invite.status).toBe(201);
-
-    const viewer = await login('13800000008');
-    const accept = await request(app)
-      .post(`/api/v1/invitations/${invite.body.invitation.token}/accept`)
-      .set(auth(viewer, nextKey()))
-      .send({});
-    expect(accept.status).toBe(200);
-
-    const read = await request(app).get(`/api/v1/projects/${projectId}/tasks`).set(auth(viewer));
-    expect(read.status).toBe(200);
-
-    const write = await createTask(viewer, projectId, { title: '越权写入' });
-    expect(write.status).toBe(403);
-    expect(write.body.code).toBe('FORBIDDEN');
-  });
-
-  it('仪表盘按用户时区分桶并给出计数', async () => {
-    const session = await login('13800000009');
-    const project = await createProject(session, '仪表盘');
-    const projectId = project.body.project.id as string;
-    await createTask(session, projectId, { title: '无日期任务' });
-
-    const dashboard = await request(app).get('/api/v1/dashboard').set(auth(session));
-    expect(dashboard.status).toBe(200);
-    expect(dashboard.body.timezone).toBe('Asia/Shanghai');
-    expect(dashboard.body.unscheduled).toHaveLength(1);
-    expect(dashboard.body.counts.unscheduled).toBe(1);
-  });
-
-  it('今日完成按用户时区切日（UTC 跨日不误判）', async () => {
-    // UTC 2026-11-03T16:30Z = Asia/Shanghai 2026-11-04 00:30，服务端若按 UTC 日期比较会漏计
-    const fixedNow = '2026-11-03T16:30:00.000Z';
-    app = createApp({
-      db: createDatabase(':memory:'),
-      jwtSecret: JWT_SECRET,
-      env: {},
-      now: () => fixedNow,
-    });
-
-    const session = await login('13800000014');
-    const project = await createProject(session, '跨日完成');
-    const projectId = project.body.project.id as string;
-    const task = await createTask(session, projectId, { title: '完成项' });
-
-    const done = await request(app)
-      .patch(`/api/v1/tasks/${task.body.task.id}`)
-      .set(auth(session, nextKey()))
-      .send({ status: 'done', version: 1, client_updated_at: task.body.task.client_updated_at });
-    expect(done.status).toBe(200);
-
-    const dashboard = await request(app).get('/api/v1/dashboard').set(auth(session));
-    expect(dashboard.status).toBe(200);
-    expect(dashboard.body.date).toBe('2026-11-04');
-    expect(dashboard.body.counts.completed_today).toBe(1);
-    expect(dashboard.body.counts.today).toBe(0);
-  });
-
-  it('增量同步返回事件流与游标', async () => {
-    const session = await login('13800000010');
-    const project = await createProject(session, '同步');
-    const projectId = project.body.project.id as string;
-    await createTask(session, projectId, { title: 'A', due_date: '2026-11-03' });
-    await createTask(session, projectId, { title: 'B' });
-
-    const changes = await request(app)
-      .get('/api/v1/sync/changes?since_seq=0&device_id=device-a')
-      .set(auth(session));
-    expect(changes.status).toBe(200);
-    expect(changes.body.items.length).toBeGreaterThanOrEqual(2);
-    expect(changes.body.next_seq).toBeGreaterThan(0);
-    expect(changes.body.has_more).toBe(false);
-
-    const again = await request(app)
-      .get(`/api/v1/sync/changes?since_seq=${changes.body.next_seq}&device_id=device-a`)
-      .set(auth(session));
-    expect(again.body.items).toHaveLength(0);
-    expect(again.body.next_seq).toBe(changes.body.next_seq);
-  });
-});
-
-describe('FR-03 CSV 导出与 FR-06 审计', () => {
-  it('免费版导出被拒；升级后导出可下载且内容含表头', async () => {
-    const free = await login('13800000011');
-    const project = await createProject(free, '导出');
-    const projectId = project.body.project.id as string;
-    await createTask(free, projectId, { title: '含逗号,的任务' });
-
-    const denied = await request(app)
-      .post(`/api/v1/projects/${projectId}/exports`)
-      .set(auth(free, nextKey()))
-      .send({});
-    expect(denied.status).toBe(403);
-    expect(denied.body.code).toBe('FEATURE_NOT_AVAILABLE');
-
-    await request(app)
-      .post('/api/v1/subscriptions/checkout')
-      .set(auth(free, nextKey()))
-      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
-
-    const created = await request(app)
-      .post(`/api/v1/projects/${projectId}/exports`)
-      .set(auth(free, nextKey()))
-      .send({});
-    expect(created.status).toBe(201);
-    expect(created.body.rows).toBe(1);
-
-    const download = await request(app)
-      .get(`/api/v1/exports/${created.body.export.id}/download`)
-      .set(auth(free));
-    expect(download.status).toBe(200);
-    expect(download.text.split('\r\n')[0]).toContain('title');
-    expect(download.text).toContain('"含逗号,的任务"');
-  });
-
+describe('FR-06 审计与幂等', () => {
   it('审计日志按时间倒序返回本人记录', async () => {
     const session = await login('13800000012');
-    await createProject(session, '审计');
+    const updated = await request(app)
+      .patch('/api/v1/me')
+      .set(auth(session, nextKey()))
+      .send({ display_name: '审计用户' });
+    expect(updated.status).toBe(200);
+
     const audit = await request(app).get('/api/v1/audit?limit=10').set(auth(session));
     expect(audit.status).toBe(200);
     expect(audit.body.total).toBeGreaterThan(0);
-    expect(audit.body.items[0].action).toBe('project.create');
+    expect(audit.body.items[0].action).toBe('account.profile_update');
   });
 
   it('幂等键回放返回首次结果，复用不同请求体返回 409', async () => {
     const session = await login('13800000013');
     const key = 'replay-key';
+    const body = { plan_id: 'basic', cycle: 'monthly', driver: 'mock' };
+
     const first = await request(app)
-      .post('/api/v1/projects')
+      .post('/api/v1/subscriptions/checkout')
       .set(auth(session, key))
-      .send({ name: '幂等项目' });
+      .send(body);
     expect(first.status).toBe(201);
 
     const replay = await request(app)
-      .post('/api/v1/projects')
+      .post('/api/v1/subscriptions/checkout')
       .set(auth(session, key))
-      .send({ name: '幂等项目' });
+      .send(body);
     expect(replay.status).toBe(201);
-    expect(replay.body.project.id).toBe(first.body.project.id);
+    expect(replay.body.order.id).toBe(first.body.order.id);
 
     const conflict = await request(app)
-      .post('/api/v1/projects')
+      .post('/api/v1/subscriptions/checkout')
       .set(auth(session, key))
-      .send({ name: '不同请求体' });
+      .send({ ...body, plan_id: 'pro' });
     expect(conflict.status).toBe(409);
     expect(conflict.body.code).toBe('IDEMPOTENCY_CONFLICT');
 
-    const list = await request(app).get('/api/v1/projects').set(auth(session));
-    expect(list.body.items).toHaveLength(1);
+    const orders = await request(app).get('/api/v1/orders').set(auth(session));
+    expect(orders.body.items).toHaveLength(1);
   });
 
   it('region 隔离：同标识在不同 region 视为不同账号', async () => {

@@ -6,7 +6,6 @@ import { PLANS } from '@mim/core-domain';
 import { DELETION_GRACE_DAYS } from '../config.js';
 import {
   clockOf,
-  countOwnedProjects,
   effectivePlan,
   latestSubscription,
   writeAudit,
@@ -46,7 +45,6 @@ export function createMeRouter(deps: ApiDeps): Router {
         id: plan.planId,
         name_zh: PLANS[plan.planId].nameZh,
         name_en: PLANS[plan.planId].nameEn,
-        features: plan.features,
         source: plan.source,
         expires_at: plan.expiresAt,
       },
@@ -60,9 +58,6 @@ export function createMeRouter(deps: ApiDeps): Router {
             cancel_at_period_end: subscription.cancelAtPeriodEnd,
           }
         : null,
-      counts: {
-        projects: countOwnedProjects(deps.db, user.id),
-      },
     });
   });
 

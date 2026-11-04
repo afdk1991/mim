@@ -6,12 +6,10 @@
 
 import { errorMessage, normalizeLocale } from '@mim/i18n';
 import type { Locale } from '@mim/i18n';
-import type { ErrorCode, PlanFeatures } from '@mim/core-domain';
+import type { ErrorCode } from '@mim/core-domain';
 
 export type Region = 'cn' | 'global';
 export type Provider = 'phone' | 'email';
-export type ProjectRole = 'owner' | 'editor' | 'viewer';
-export type TaskStatus = 'todo' | 'done';
 export type BillingCycle = 'monthly' | 'yearly';
 
 export interface UserInfo {
@@ -35,61 +33,6 @@ export interface LoginResult extends Session {
   expires_in: number;
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: string;
-  role: ProjectRole;
-  version: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Task {
-  id: string;
-  project_id: string;
-  parent_id: string | null;
-  level: 1 | 2;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  due_date: string | null;
-  priority: number;
-  version: number;
-  seq: number;
-  client_updated_at: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DashboardTask extends Task {
-  project_name: string;
-}
-
-export interface Member {
-  user_id: string;
-  role: ProjectRole;
-  display_name: string;
-  region: Region;
-  created_at: string;
-}
-
-export interface Invitation {
-  id: string;
-  project_id: string;
-  region: Region;
-  provider: Provider;
-  identifier: string;
-  role: 'editor' | 'viewer';
-  token: string;
-  status: string;
-  expires_at: string;
-  accepted_at: string | null;
-  created_at: string;
-}
-
 export interface SubscriptionView {
   id: string;
   plan_id: string;
@@ -107,7 +50,6 @@ export interface MeResponse {
     id: string;
     name_zh: string;
     name_en: string;
-    features: PlanFeatures;
     source: string;
     expires_at: string | null;
   };
@@ -119,7 +61,6 @@ export interface MeResponse {
     current_period_end: string;
     cancel_at_period_end: number;
   } | null;
-  counts: { projects: number };
 }
 
 export interface PlanCatalogItem {
@@ -128,7 +69,6 @@ export interface PlanCatalogItem {
   name_en: string;
   description_zh: string;
   description_en: string;
-  features: PlanFeatures;
   currency: string;
   prices: { monthly: number | null; yearly: number | null };
   configured: boolean;
@@ -155,27 +95,8 @@ export interface Invoice {
   created_at: string;
 }
 
-export interface DashboardResponse {
-  date: string;
-  timezone: string;
-  generated_at: string;
-  today: DashboardTask[];
-  next_7_days: DashboardTask[];
-  overdue: DashboardTask[];
-  unscheduled: DashboardTask[];
-  completed_today: DashboardTask[];
-  counts: {
-    today: number;
-    next_7_days: number;
-    overdue: number;
-    unscheduled: number;
-    completed_today: number;
-  };
-}
-
 const BASE = '/api/v1';
 const SESSION_KEY = 'mim.session.v1';
-const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 export class ApiError extends Error {
   readonly code: string;
@@ -317,31 +238,6 @@ async function request<T>(path: string, opts: RequestOptions = {}, retried = fal
   return data as T;
 }
 
-/** 下载类接口必须携带 Bearer，因此走 fetch + blob，而不是 <a href> */
-async function requestBlob(path: string, retried = false): Promise<Blob> {
-  const headers: Record<string, string> = {};
-  if (current) headers.Authorization = `Bearer ${current.access_token}`;
-  const res = await fetch(`${BASE}${path}`, { headers });
-
-  if (res.status === 401 && current && !retried) {
-    if (await refreshSession()) return requestBlob(path, true);
-    clearSession();
-  }
-  if (!res.ok) {
-    let code = 'INTERNAL_ERROR';
-    let message = res.statusText;
-    try {
-      const envelope = (await res.json()) as { code?: string; message?: string };
-      code = envelope.code ?? code;
-      message = envelope.message ?? message;
-    } catch {
-      /* 保持默认值 */
-    }
-    throw new ApiError(code, message, res.status);
-  }
-  return res.blob();
-}
-
 export function errorText(locale: Locale, error: unknown): string {
   if (error instanceof ApiError) {
     const translated = errorMessage(locale, error.code as ErrorCode);
@@ -415,7 +311,6 @@ export const api = {
       plan_id: string;
       source: string;
       expires_at: string | null;
-      features: PlanFeatures;
       subscription: SubscriptionView | null;
     }>('/subscriptions/current');
   },
@@ -441,139 +336,4 @@ export const api = {
   invoices() {
     return request<{ items: Invoice[] }>('/invoices');
   },
-
-  dashboard() {
-    return request<DashboardResponse>('/dashboard');
-  },
-
-  projects() {
-    return request<{ items: Project[] }>('/projects');
-  },
-
-  createProject(payload: { name: string; description?: string }) {
-    return request<{ project: Project }>('/projects', { method: 'POST', body: payload });
-  },
-
-  project(projectId: string) {
-    return request<{ project: Project }>(`/projects/${projectId}`);
-  },
-
-  updateProject(projectId: string, payload: { name?: string; description?: string; version: number }) {
-    return request<{ project: Project }>(`/projects/${projectId}`, { method: 'PATCH', body: payload });
-  },
-
-  archiveProject(projectId: string) {
-    return request<{ project: Project }>(`/projects/${projectId}/archive`, { method: 'POST', body: {} });
-  },
-
-  deleteProject(projectId: string) {
-    return request<{ status: string; id: string; cascaded_tasks: number; cascaded_subtasks: number }>(
-      `/projects/${projectId}`,
-      { method: 'DELETE' },
-    );
-  },
-
-  members(projectId: string) {
-    return request<{ items: Member[] }>(`/projects/${projectId}/members`);
-  },
-
-  removeMember(projectId: string, userId: string) {
-    return request<{ status: string; id: string }>(`/projects/${projectId}/members/${userId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  invitations(projectId: string) {
-    return request<{ items: Invitation[] }>(`/projects/${projectId}/invitations`);
-  },
-
-  createInvitation(projectId: string, payload: { provider: Provider; identifier: string; role: 'editor' | 'viewer' }) {
-    return request<{ invitation: Invitation }>(`/projects/${projectId}/invitations`, {
-      method: 'POST',
-      body: payload,
-    });
-  },
-
-  revokeInvitation(projectId: string, invitationId: string) {
-    return request<{ status: string; id: string }>(
-      `/projects/${projectId}/invitations/${invitationId}`,
-      { method: 'DELETE' },
-    );
-  },
-
-  acceptInvitation(token: string) {
-    const clean = token.trim();
-    const matched = clean.match(UUID_RE);
-    const value = matched ? matched[0] : clean;
-    return request<{ project_id: string; role: ProjectRole }>(`/invitations/${value}/accept`, {
-      method: 'POST',
-      body: {},
-    });
-  },
-
-  tasks(projectId: string) {
-    return request<{ items: Task[] }>(`/projects/${projectId}/tasks`);
-  },
-
-  /** FR-03 增量同步：按 task_events.seq 拉取游标之后的事件（前端 4s 轮询） */
-  syncChanges(projectId: string, sinceSeq: number) {
-    return request<{
-      items: Array<{ seq: number; type: string; task_id: string; project_id: string }>;
-      next_seq: number;
-      has_more: boolean;
-    }>(`/sync/changes?project_id=${projectId}&since_seq=${sinceSeq}`);
-  },
-
-  createTask(
-    projectId: string,
-    payload: { title: string; description?: string; parent_id?: string; due_date?: string; priority?: number },
-  ) {
-    return request<{ task: Task }>(`/projects/${projectId}/tasks`, { method: 'POST', body: payload });
-  },
-
-  updateTask(
-    taskId: string,
-    payload: {
-      title?: string;
-      description?: string;
-      due_date?: string | null;
-      priority?: number;
-      status?: TaskStatus;
-      version: number;
-      client_updated_at: string;
-    },
-  ) {
-    return request<{ task: Task }>(`/tasks/${taskId}`, { method: 'PATCH', body: payload });
-  },
-
-  setTaskStatus(taskId: string, payload: { status: TaskStatus; version: number; client_updated_at: string }) {
-    return request<{ task: Task }>(`/tasks/${taskId}/status`, { method: 'POST', body: payload });
-  },
-
-  deleteTask(taskId: string) {
-    return request<{ status: string; id: string; cascaded_children: number }>(`/tasks/${taskId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  createExport(projectId: string) {
-    return request<{ export: { id: string; status: string; created_at: string }; rows: number }>(
-      `/projects/${projectId}/exports`,
-      { method: 'POST', body: {} },
-    );
-  },
-
-  exportDownload(exportId: string) {
-    return requestBlob(`/exports/${exportId}/download`);
-  },
 };
-
-export function nowIso(): string {
-  return new Date().toISOString();
-}
-
-export function todayIsoDate(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}

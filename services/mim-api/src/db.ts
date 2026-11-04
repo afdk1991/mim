@@ -26,12 +26,11 @@ export function createDatabase(filename: string = ':memory:'): Db {
 export function seedPlans(db: Db): void {
   const now = new Date().toISOString();
   const upsertPlan = db.prepare(
-    `INSERT INTO plans (id, name_zh, name_en, features, created_at)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO plans (id, name_zh, name_en, created_at)
+     VALUES (?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name_zh = excluded.name_zh,
-       name_en = excluded.name_en,
-       features = excluded.features`,
+       name_en = excluded.name_en`,
   );
   const upsertPrice = db.prepare(
     `INSERT INTO plan_prices (id, plan_id, region, currency, cycle, amount_minor)
@@ -43,7 +42,7 @@ export function seedPlans(db: Db): void {
 
   const seed = db.transaction(() => {
     for (const plan of Object.values(PLANS)) {
-      upsertPlan.run(plan.id, plan.nameZh, plan.nameEn, JSON.stringify(plan.features), now);
+      upsertPlan.run(plan.id, plan.nameZh, plan.nameEn, now);
     }
     for (const [region, byPlan] of Object.entries(PLAN_PRICES)) {
       for (const [planId, byCycle] of Object.entries(byPlan)) {

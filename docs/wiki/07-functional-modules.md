@@ -8,7 +8,7 @@
 |---|---|---|---|
 | FR-01 账号与身份 | §5 FR-01 | P0 | **已实现（P0 最小集）**：cn 手机号验证码、global 邮箱密码/验证码；JWT access + refresh 轮换；region 强隔离。未实现：微信/支付宝/Google/Apple 第三方登录、账号合并（OQ-05）、新设备登录保护 |
 | FR-02 订阅与支付 | §5 FR-02 | P0 | **已实现（P0，mock 支付驱动）**：计划/价格/订阅状态机/checkout/取消/发票。未实现：真实通道（微信/支付宝/Stripe/IAP）、退款（OQ-04）、对账、掉单补发 |
-| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已实现（P0）**：项目→任务→子任务两级删除（删除项目/任务均级联软删下级并写 `task_events(deleted)`，响应返回级联计数）、协作者邀请（editor/viewer）、个人仪表盘保留、4s 轮询增量同步、CSV 导出（按套餐）。见 §5.2 features 映射 |
+| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已按用户指令移除（2026-11-04）**：项目和任务全部功能（含成员、邀请、两级级联删除、仪表盘、增量同步、CSV 导出）已从后端与前端删除，生产库对应表同步清理。当前产品能力仅余 FR-01 账号 + FR-02 订阅 + FR-06 审计 |
 | FR-04 多端体验一致性 | §5 FR-04 | P0 | **部分实现**：`packages/core-domain`（领域/权限/错误码）+ `packages/i18n`（双语文案/货币格式化）+ 统一 HTTP 契约已落地；仅 Web 一端，`IPlatformAdapter` 未落地 |
 | FR-05 国际化与本地化 | §5 FR-05 | P0 | **部分实现**：zh-CN / en-US 文案包、未命中回退链、`formatCurrency`、UTC 存储；未实现：语言切换 UI 持久化、RTL、时区设置 UI |
 | FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：审计日志（登录/支付/关键写操作）、手机号/邮箱规范化与脱敏。未实现：隐私政策强制勾选、账号注销 + 7 天冷静期、数据导出/删除请求 |
@@ -101,20 +101,20 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 
 PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 省 ¥58）、专业版 ¥99/月（年付 ¥990 省 ¥198），`selectPlan()` → `doPay()` 显示支付成功。
 
-## 5. FR-03 核心 SaaS 工作区
+## 5. FR-03 核心 SaaS 工作区（已移除）
 
-> **OQ-01 已定案**（2026-11-03）：旗舰产品形态为 **SaaS 工具型（订阅制）— 跨端任务与轻协作工具**。
+> **2026-11-04 按用户指令整体删除**。下表保留为历史决策记录，代码与生产库均已清理，不得再作为现状引用。
 
-### 5.1 P0 核心模块（订阅用户可用）
+### 5.1 原 P0 核心模块（已删除）
 
-| 模块 | 定义 |
+| 模块 | 原定义 |
 |---|---|
-| ① 任务管理 | 项目 → 任务 → 子任务（固定两级）；属性：标题、描述、标签（多选）、截止日期、完成状态；截止日提醒推送（复用 FR-04 平台适配层推送能力） |
-| ② 多端实时同步 | 依托 FR-04 一致性契约：变更 5 秒内同步在线端，离线端下次拉取更新；冲突策略 = 服务端 last-write-wins + 客户端乐观更新 |
+| ① 任务管理 | 项目 → 任务 → 子任务（固定两级）；属性：标题、描述、标签（多选）、截止日期、完成状态；截止日提醒推送 |
+| ② 多端实时同步 | 变更 5 秒内同步在线端，离线端下次拉取更新；冲突策略 = 服务端 last-write-wins + 客户端乐观更新 |
 | ③ 基础协作 | 项目所有者经手机号/邮箱邀请成员；权限两档（可编辑/只读）；协作项目数据按创建者 `user_id` + `region` 归属 |
-| ④ 个人仪表盘 | 今日任务（截止日为今天）+ 即将到期（未来 7 天）+ 逾期 + 未排期 + 今日已完成；**切日口径按用户时区**（`Intl.DateTimeFormat` 解析 IANA 时区），今日已完成取 `updated_at` 按用户时区落在今日的记录 |
+| ④ 个人仪表盘 | 今日任务、即将到期、逾期、未排期、今日已完成；切日口径按用户时区 |
 
-### 5.2 订阅计划 features 映射
+### 5.2 原订阅计划 features 映射（已随 `plans.features` 列删除）
 
 | 能力 | 免费版 | 基础版 ¥29/月 | 专业版 ¥99/月 |
 |---|---|---|---|
@@ -125,22 +125,9 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | 高级筛选 / 自定义主题 | — | — | ✓ |
 | 导出 CSV | — | ✓ | ✓ |
 
-### 5.3 P1 增量（挂接既有 P1 能力模块）
+### 5.3 现工作区框架（保留部分）
 
-- AI 摘要与智能安排（← AI 编排模块，模型路由/配额复用）
-- 任务评论与即时讨论（← IM 模块，会话能力复用）
-- 模板市场（任务/项目模板分享）
-
-### 5.4 P0 明确不做
-
-- 甘特图、资源排期（复杂项目管理能力，另行评估）
-- 音视频会议入口（P1 音视频模块上线后再评估）
-
-### 5.5 工作区框架与权限校验（通用规则保留）
-
-**工作区框架**：登录后进入工作区，左侧导航展示功能模块；模块按订阅计划 `features` 列表显隐；免费用户见付费模块显示升级引导；数据按 `user_id` + `region` 隔离。
-
-**权限校验**：服务端每次访问付费功能时校验订阅状态与 features；客户端缓存订阅状态 5 分钟，超时重拉；订阅失效后已打开的付费页面提示并引导重新订阅。
+登录后工作区仅展示 **套餐（Plans）** 与 **设置（Settings）** 两个入口；数据按 `user_id` + `region` 隔离。`features` 鉴权已移除，订阅状态仅用于展示套餐与有效期。
 
 ## 6. FR-04 多端体验一致性
 
@@ -173,7 +160,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 | 规则 | 定义 | 引用模块 |
 |---|---|---|
-| Region 隔离 | 国内(cn)/海外(global) 数据物理隔离，账号/订单/订阅按 region 分库 | FR-01, FR-02, FR-03 |
+| Region 隔离 | 国内(cn)/海外(global) 数据物理隔离，账号/订单/订阅按 region 分库 | FR-01, FR-02 |
 | 幂等性 | 支付、订阅状态变更接口以 `request_id` 幂等，重复请求返回首次结果 | FR-02 |
 | 审计日志 | 登录、支付、退款、注销等关键操作留痕，保留 180 天 | FR-01, FR-02, FR-06 |
 
@@ -183,7 +170,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 | 编号 | 问题 | 阻塞模块 | 状态 |
 |---|---|---|---|
-| OQ-01 | 旗舰 SaaS 核心功能是什么 | FR-03 工作区内容与订阅 features | 已定案（2026-11-03）：跨端任务与轻协作工具 |
+| OQ-01 | 旗舰 SaaS 核心功能是什么 | 原 FR-03 工作区内容与订阅 features | 已失效（2026-11-04 FR-03 整体移除，产品收敛为账号 + 订阅；后续重新立项需重开 OQ） |
 | OQ-02 | 国内 Android 数字商品是否必须走商店 IAP | FR-02 支付通道与分成 | Assumption, TBD |
 | OQ-03 | 首批出海市场与语种 | FR-05 i18n/支付/合规 | TBD |
 | OQ-04 | 退款窗口与条件（直连通道） | FR-02 退款规则 | TBD |
@@ -218,63 +205,29 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | 发票列表 | `billing.ts` `GET /invoices` | `Settings.tsx` | ✅ |
 | 真实支付驱动 / 退款 / 对账 | — | — | ❌ TBD |
 
-### 11.3 项目管理模块（FR-03-①）
+### 11.3 项目管理模块（FR-03-①）— 已删除
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 项目列表 | `projects.ts` `GET /projects` | `Projects.tsx` | ✅ |
-| 新建项目 | `projects.ts` `POST /projects` | `Projects.tsx` | ✅ |
-| 项目详情 | `projects.ts` `GET /projects/:projectId` | `ProjectDetail.tsx` | ✅ |
-| 项目更新 | `projects.ts` `PATCH /projects/:projectId` | `ProjectDetail.tsx` | ✅ |
-| 归档项目 | `projects.ts` `POST /projects/:projectId/archive` | `ProjectDetail.tsx` | ✅（owner 可见，二次确认） |
-| **删除项目（两级级联）** | `projects.ts` `DELETE /projects/:projectId` | `ProjectDetail.tsx` | ✅ 已实现：事务内软删项目 + 全部一级任务 + 全部二级子任务，逐条写 `task_events(deleted)`，响应与审计含 `cascaded_tasks` / `cascaded_subtasks`；UI 二次确认并提示级联数量 |
-| 项目成员列表 | `projects.ts` `GET /projects/:projectId/members` | `ProjectDetail.tsx` | ✅ |
-| 邀请成员 | `projects.ts` `POST /projects/:projectId/invitations` | `ProjectDetail.tsx` | ✅（owner 表单，含角色选择） |
-| 接受邀请 | `projects.ts` `POST /invitations/:token/accept` | `ProjectDetail.tsx`（复制令牌） | ✅ |
-| 移除成员 | `projects.ts` `DELETE /projects/:projectId/members/:userId` | `ProjectDetail.tsx` | ✅（二次确认） |
-| 撤销邀请 | `projects.ts` `DELETE /projects/:projectId/invitations/:invitationId` | `ProjectDetail.tsx` | ✅（二次确认） |
+原文件 `services/mim-api/src/routes/projects.ts`、`apps/web/src/views/Projects.tsx`、`ProjectDetail.tsx` 已删除。原能力清单（列表/新建/详情/更新/归档/两级级联删除/成员/邀请/接受邀请/移除成员/撤销邀请）不再提供。
 
-### 11.4 任务管理模块（FR-03-①）
+### 11.4 任务管理模块（FR-03-①）— 已删除
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 任务列表（含子任务） | `tasks.ts` `GET /projects/:projectId/tasks` | `ProjectDetail.tsx` | ✅ |
-| 新建任务 / 子任务 | `tasks.ts` `POST /projects/:projectId/tasks` | `ProjectDetail.tsx` | ✅（固定两级，三级返回 400） |
-| 任务详情 | `tasks.ts` `GET /tasks/:taskId` | — | ✅ |
-| 任务更新（LWW） | `tasks.ts` `PATCH /tasks/:taskId` | `ProjectDetail.tsx` | ✅（含 `client_updated_at` 冲突裁决） |
-| 状态切换 | `tasks.ts` `POST /tasks/:taskId/status` | `ProjectDetail.tsx` | ✅ |
-| **删除任务 / 级联子任务** | `tasks.ts` `DELETE /tasks/:taskId` | `ProjectDetail.tsx` | ✅ 已实现：事务内软删任务 + 其全部子任务，逐条写 `task_events(deleted)`，响应含 `cascaded_children`；UI 二次确认 |
+原文件 `services/mim-api/src/routes/tasks.ts` 已删除。原能力清单（任务列表含子任务、固定两级新建、详情、LWW 更新、状态切换、级联删除子任务）不再提供。
 
-### 11.5 仪表盘模块（FR-03-④）
+### 11.5 仪表盘模块（FR-03-④）— 已删除
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 今日 / 未来 7 天 / 逾期 / 未排期 / **今日已完成** | `dashboard.ts` `GET /dashboard` | `Dashboard.tsx` | ✅（今日已完成按用户时区切日，见 §5.1） |
+原文件 `services/mim-api/src/routes/dashboard.ts`、`apps/web/src/views/Dashboard.tsx` 已删除。
 
-### 11.6 协作模块（FR-03-③）
+### 11.6 协作模块（FR-03-③）— 已删除
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 协作者邀请（editor / viewer） | 见「项目管理模块」 invitations | `ProjectDetail.tsx` | ✅ |
-| 只读权限拦截 | `core-domain/src/permissions.ts` `assertCan` | 前端按角色隐藏写操作按钮 | ✅ |
-| 协作者列表 / 移除 | 见「项目管理模块」 members | `ProjectDetail.tsx` | ✅ |
-| 实时评论 / 讨论 | — | — | ❌ P1 |
+原文件 `packages/core-domain/src/permissions.ts` 已删除；成员与邀请接口随 `projects.ts` 一并移除。
 
-### 11.7 同步模块（FR-04）
+### 11.7 同步模块（FR-04 增量同步）— 已删除
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 增量变更拉取 | `sync.ts` `GET /sync/changes`（`since_seq` + `project_id`） | `api.ts` 4s 轮询 | ✅ |
-| 游标上报 | `sync.ts` `POST /sync/cursors` | `api.ts` 写入 `sync_cursors` | ✅ |
-| WebSocket 推送 | — | — | ❌（用 4s 轮询替代，满足 5 秒约束） |
+原文件 `services/mim-api/src/routes/sync.ts` 已删除（`sync_cursors` 表同步清理）。FR-04 的「多端体验一致性」设计约束仍保留，但当前无增量同步实现。
 
-### 11.8 导出模块
+### 11.8 导出模块 — 已删除
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 创建导出任务 | `exports.ts` `POST /projects/:projectId/exports` | `Projects.tsx`（导出按钮） | ✅（仅 basic 及以上） |
-| 导出列表 | `exports.ts` `GET /exports` | — | ✅ |
-| 下载导出文件 | `exports.ts` `GET /exports/:exportId/download` | — | ✅ |
+原文件 `services/mim-api/src/routes/exports.ts` 已删除（`content_exports` 表同步清理）。
 
 ### 11.9 审计与合规模块（FR-06）
 
@@ -287,7 +240,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 ### 11.10 模块间依赖（代码已体现）
 
-FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-03 全部子模块依赖 FR-01 登录态 + FR-02 `features` 鉴权；FR-04（同步）、FR-05（i18n）、FR-06（审计）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用。
+FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、FR-06（审计）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用。原 FR-03 已整体移除，无代码依赖残留。
 
 **开发实现口径**：数据库表结构、后端服务模块、存储分级见 [08-dev-implementation.md](./08-dev-implementation.md) §1.1；各功能所需第三方 SDK 与密钥命名见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
 

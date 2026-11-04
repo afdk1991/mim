@@ -193,7 +193,6 @@ export function createPublicBillingRouter(deps: ApiDeps): Router {
         name_en: plan.nameEn,
         description_zh: plan.descriptionZh,
         description_en: plan.descriptionEn,
-        features: plan.features,
         currency: REGION_CURRENCY[region],
         prices: { monthly, yearly },
         configured: monthly !== null || yearly !== null,
@@ -240,7 +239,6 @@ export function createBillingRouter(deps: ApiDeps): Router {
       plan_id: plan.planId,
       source: plan.source,
       expires_at: plan.expiresAt,
-      features: plan.features,
       subscription: subscriptionPayload(subscription),
     });
   });

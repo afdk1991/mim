@@ -1,21 +1,7 @@
-/** 跨路由复用的领域读取：生效套餐、项目权限、审计与订阅事件 */
+/** 跨路由复用的领域读取：生效套餐、审计与订阅事件 */
 
-import {
-  AppError,
-  PLANS,
-  assertCan,
-  isPlanId,
-  isSubscriptionEffective,
-  uuidv7,
-} from '@mim/core-domain';
-import type {
-  Action,
-  PlanFeatures,
-  PlanId,
-  ProjectRole,
-  SubscriptionRecord,
-  SubscriptionStatus,
-} from '@mim/core-domain';
+import { isPlanId, isSubscriptionEffective, uuidv7 } from '@mim/core-domain';
+import type { PlanId, SubscriptionRecord, SubscriptionStatus } from '@mim/core-domain';
 import type { ApiDeps, Db } from './types.js';
 
 export function clockOf(deps: ApiDeps): string {
@@ -35,30 +21,11 @@ interface SubscriptionRow {
   version: number;
 }
 
-interface ProjectRow {
-  id: string;
-  user_id: string;
-  region: string;
-  name: string;
-  description: string;
-  status: string;
-  version: number;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
 export interface EffectivePlan {
   planId: PlanId;
-  features: PlanFeatures;
   expiresAt: string | null;
   source: 'subscription' | 'free';
   subscription: SubscriptionRecord | null;
-}
-
-export interface ProjectAccess {
-  project: ProjectRow;
-  role: ProjectRole;
 }
 
 export function mapSubscription(row: SubscriptionRow): SubscriptionRecord {
@@ -94,7 +61,6 @@ export function effectivePlan(db: Db, userId: string, nowIso: string): Effective
   if (subscription && isSubscriptionEffective(subscription, nowIso) && isPlanId(subscription.planId)) {
     return {
       planId: subscription.planId,
-      features: PLANS[subscription.planId].features,
       expiresAt: subscription.currentPeriodEnd,
       source: 'subscription',
       subscription,
@@ -102,62 +68,10 @@ export function effectivePlan(db: Db, userId: string, nowIso: string): Effective
   }
   return {
     planId: 'free',
-    features: PLANS.free.features,
     expiresAt: null,
     source: 'free',
     subscription: subscription && isSubscriptionEffective(subscription, nowIso) ? subscription : null,
   };
-}
-
-export function getProjectRow(db: Db, projectId: string): ProjectRow | null {
-  const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as ProjectRow | undefined;
-  if (!row || row.status === 'deleted') return null;
-  return row;
-}
-
-export function getProjectRole(db: Db, projectId: string, userId: string): ProjectRole | null {
-  const row = db
-    .prepare(`SELECT role FROM project_members WHERE project_id = ? AND user_id = ? AND status = 'active'`)
-    .get(projectId, userId) as { role: ProjectRole } | undefined;
-  return row ? row.role : null;
-}
-
-/** 一次取齐项目 + 角色 + 动作鉴权；归档项目只允许读 */
-export function assertProjectAccess(
-  db: Db,
-  projectId: string,
-  userId: string,
-  action: Action,
-): ProjectAccess {
-  const project = getProjectRow(db, projectId);
-  if (!project) throw new AppError('PROJECT_NOT_FOUND', 'project not found', { project_id: projectId });
-  const role = getProjectRole(db, projectId, userId);
-  if (!role) throw new AppError('FORBIDDEN', 'you are not a member of this project');
-  if (project.status === 'archived' && action !== 'project:read') {
-    throw new AppError('PROJECT_ARCHIVED', 'archived project is read-only');
-  }
-  assertCan(role, action);
-  return { project, role };
-}
-
-export function countOwnedProjects(db: Db, userId: string): number {
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM projects
-       WHERE user_id = ? AND status IN ('active','archived')`,
-    )
-    .get(userId) as { n: number };
-  return row.n;
-}
-
-export function countActiveCollaborators(db: Db, projectId: string): number {
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM project_members
-       WHERE project_id = ? AND status = 'active' AND role <> 'owner'`,
-    )
-    .get(projectId) as { n: number };
-  return row.n;
 }
 
 export interface AuditEntry {

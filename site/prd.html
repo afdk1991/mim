@@ -91,10 +91,15 @@
 <!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，故展示 V0.0.0-preview -->
 <p class="muted">版本：V0.0.0-preview　|　通道：preview　|　日期：2026-11-03　|　状态：草案</p>
 
+<!-- 变更告示：本页为历史副本，FR-03 已于 2026-11-04 移除；权威版本见根目录 Mim-PRD.html -->
+<div class="callout-warn">
+  <strong>2026-11-04 变更告示</strong>：本页为 2026-11-03 的 PRD 离线副本。<strong>FR-03 核心 SaaS 工作区（项目/任务/子任务、成员与邀请、仪表盘、增量同步、CSV 导出）已于 2026-11-04 按用户指令整体移除</strong>，下文凡涉及 FR-03 与订阅计划 <code>features</code> 的内容均已失效，仅作历史记录。权威版本请以仓库根目录 <a href="../Mim-PRD.html">Mim-PRD.html</a> 为准。
+</div>
+
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
   <!-- 加粗的小节引导词 -->
-  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。旗舰产品形态已定案为 <strong>SaaS 工具型（订阅制）— 跨端任务与轻协作工具</strong>（OQ-01 已定案，功能规格见 FR-03），首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
+  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。旗舰产品形态原定案为 <strong>SaaS 工具型（订阅制）— 跨端任务与轻协作工具</strong>（原 FR-03，<s>已定案</s>，<strong>已于 2026-11-04 按用户指令整体移除</strong>），当前产品能力仅余 FR-01 账号身份、FR-02 订阅支付、FR-06 审计合规；首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
 </div>
 
 <!-- 章节标题：1. 背景与目标 -->
@@ -406,8 +411,8 @@ function submitLogin(){
   <tr><td>billing_cycle</td><td>月 / 季 / 年</td></tr>
   <!-- price：分币种定价 -->
   <tr><td>price</td><td>分币种定价（CNY、USD 等）</td></tr>
-  <!-- features：功能权限列表 -->
-  <tr><td>features</td><td>包含的功能权限列表</td></tr>
+  <!-- features：功能权限列表（已随 FR-03 于 2026-11-04 删除） -->
+  <tr><td><s>features</s></td><td>原功能权限列表，已随 FR-03 于 2026-11-04 删除</td></tr>
   <!-- region：适用市场 -->
   <tr><td>region</td><td>适用市场（国内 / 海外 / 全球）</td></tr>
   <!-- status：上架状态 -->
@@ -560,8 +565,9 @@ function doPay(){
   <li>即将到期：未来 7 天内到期的任务列表</li>
 </ul>
 
-<!-- 订阅 features 映射子标题 -->
-<h4>订阅计划 features 映射</h4>
+<!-- 订阅 features 映射子标题（已失效） -->
+<h4><s>订阅计划 features 映射</s>（已失效，2026-11-04）</h4>
+<p class="muted">下表随 FR-03 与 <code>plans.features</code> 列于 2026-11-04 一并移除，仅作历史记录。</p>
 <!-- features 映射表：能力 × 三档计划 -->
 <table>
   <!-- 表头：能力 / 免费版 / 基础版 / 专业版 -->
@@ -793,7 +799,7 @@ function doPay(){
   <!-- 表头：编号 / 问题 / 影响 / 状态 -->
   <tr><th>编号</th><th>问题</th><th>影响</th><th>状态</th></tr>
   <!-- OQ-01：已定案（2026-11-03），定案内容见 FR-03 -->
-  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>决定 FR-03 工作区具体内容与订阅计划 features</td><td><span class="tag-p0">已定案：跨端任务与轻协作工具</span></td></tr>
+  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>~~决定 FR-03 工作区具体内容与订阅计划 features~~</td><td><span class="tag-p0">已失效（FR-03 于 2026-11-04 整体移除）</span></td></tr>
   <!-- OQ-02：国内 Android IAP 合规问题 -->
   <tr><td>OQ-02</td><td>国内 Android 端数字商品是否必须走各商店 IAP？</td><td>影响支付通道设计与收入分成</td><td><span class="tag-assume">Assumption, TBD</span></td></tr>
   <!-- OQ-03：首批出海市场与语种 -->

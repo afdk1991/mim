@@ -118,31 +118,6 @@ export function Plans({ locale }: Props) {
                   ? t(locale, 'plan.notConfigured')
                   : formatCurrency(price, item.currency, locale)}
               </div>
-              <ul className="chips">
-                <li className="chip">
-                  {t(locale, 'plans.projectsLimit')}:{' '}
-                  {item.features.projectsLimit < 0
-                    ? t(locale, 'plans.unlimited')
-                    : item.features.projectsLimit}
-                </li>
-                <li className="chip">
-                  {t(locale, 'plans.collaboratorsLimit')}:{' '}
-                  {item.features.collaboratorsLimit < 0
-                    ? t(locale, 'plans.unlimited')
-                    : item.features.collaboratorsLimit}
-                </li>
-                {item.features.views.map((view) => (
-                  <li className="chip" key={view}>
-                    {t(locale, `plans.view${view.charAt(0).toUpperCase()}${view.slice(1)}`)}
-                  </li>
-                ))}
-                {item.features.reminders && <li className="chip">{t(locale, 'plans.reminders')}</li>}
-                {item.features.csvExport && <li className="chip">{t(locale, 'plans.csvExport')}</li>}
-                {item.features.advancedFilters && (
-                  <li className="chip">{t(locale, 'plans.advancedFilters')}</li>
-                )}
-                {item.features.customTheme && <li className="chip">{t(locale, 'plans.customTheme')}</li>}
-              </ul>
               <button
                 type="button"
                 className="btn primary block"
@@ -171,7 +146,7 @@ export function Plans({ locale }: Props) {
                 <th>{t(locale, 'settings.plan')}</th>
                 <th>{t(locale, 'plans.price')}</th>
                 <th>Status</th>
-                <th>{t(locale, 'tasks.dueDate')}</th>
+                <th>{t(locale, 'plans.createdAt')}</th>
               </tr>
             </thead>
             <tbody>

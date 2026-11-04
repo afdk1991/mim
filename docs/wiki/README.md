@@ -4,7 +4,7 @@
 
 ## 项目一句话概述
 
-Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号、FR-02 订阅（mock 支付）、FR-03 工作区（项目/任务/同步/导出/仪表盘）的 P0 最小集；同时保留协作治理体系（AGENTS.md 七条铁律）、版本规约校验脚本与产品需求文档。
+Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号、FR-02 订阅（mock 支付）的 P0 最小集（原 FR-03 工作区已于 2026-11-04 按用户指令整体移除）；同时保留协作治理体系（AGENTS.md 八条铁律）、版本规约校验脚本与产品需求文档。
 
 - 当前版本：**V0.0.0-preview**（预览通道，正式版 V0.0.0 未发布）
 - 仓库性质：**pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`）
