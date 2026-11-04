@@ -2,7 +2,7 @@
 
 > 本文档是 Mim 第三方能力接入的**唯一基线清单**。任何新增/变更的第三方 SDK、开放 API、密钥，必须先登记到本文件，再进入代码实现（铁律五 + 铁律七）。
 >
-> 当前状态：仓库处于治理与规划阶段，**尚无业务代码、无 `package.json`、运行时第三方依赖为零**。本文档登记的是「计划引入」的完整清单与密钥命名规范；对应模块开始编码时，才按铁律五把依赖写入 `package.json` 并提交锁文件。
+> 当前状态：仓库已进入编码阶段。`services/mim-api`（`@mim/api`）已含运行时依赖并写入 `package.json` + `pnpm-lock.yaml`：`express ^5.3.0`、`better-sqlite3 ^13.0.3`、`jsonwebtoken ^9.0.3`、`bcryptjs ^3.0.2`、`zod ^4.6.7`（devDeps：`vitest@4`、`supertest@7`、`tsx@4`、`typescript@5.6.3`），均属业务自研基础设施而非下表所列第三方 SaaS/SDK。本文档登记的第三方能力清单仍为「计划引入」状态；对应能力接入时，按铁律五把依赖写入 `package.json` 并提交锁文件，同时更新本清单状态。
 
 ---
 
