@@ -107,7 +107,7 @@ pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 
 ```bash
 pnpm -r typecheck                       # 四个 workspace 包类型检查
-pnpm --filter @mim/api test             # vitest + supertest，18 例契约测试
+pnpm --filter @mim/api test             # vitest + supertest，12 例契约测试
 pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
 npm run check                           # 版本规约 + 密钥模板校验
 ```
@@ -121,11 +121,11 @@ npm run check                           # 版本规约 + 密钥模板校验
 | 环境变量 | 不新增 `MIM_*`；`.env.example` 仅登记第三方密钥占位（P0 无真实密钥需求） |
 | 支付 | 仅 `mock` 驱动：`POST /api/v1/subscriptions/checkout` 传 `driver: 'mock'` 即置 `paid` 并激活订阅 |
 | 验证码 | 开发通道在响应中回传 `dev_code`（未接短信/邮件通道） |
-| 增量同步 | 前端每 4 秒 `GET /api/v1/sync/changes?project_id=&since_seq=` |
+| 前端视图 | 仅「套餐」「设置」两页；FR-03 项目/任务/仪表盘已于 2026-11-04 移除 |
 
 ### 6.4 冒烟顺序（HTTP 全链路）
 
-`auth/code → login → projects → tasks → dashboard → sync → checkout(basic,mock) → subscriptions/current → exports(csv) → orders → invoices`。CSV 导出需 `basic` 及以上套餐（免费版返回 `FEATURE_NOT_AVAILABLE`），因此必须先 checkout。
+`auth/code → login → me → plans → subscriptions/checkout(basic,mock) → subscriptions/current → orders → invoices → audit`。
 
 ## 7. 生产部署（铁律八）
 
@@ -137,7 +137,8 @@ push 到 `main` 即触发 `.github/workflows/deploy.yml`：
 
 ```
 verify:  pnpm install --frozen-lockfile → pnpm -r typecheck → @mim/api test → @mim/web build
-deploy:  ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+         → 校验服务器 HEAD == 本次提交 SHA（不一致即失败）
          → curl https://mim.mixm.top/health（必须 200）
          → curl https://mim.mixm.top/api/v1/plans
 ```
@@ -151,15 +152,28 @@ gh secret set DEPLOY_USER --body "ubuntu"
 gh run watch          # 观察最近一次运行
 ```
 
+### 7.1.1 服务器出网限制（重要）
+
+生产服务器 **访问 `https://github.com` 超时**（`curl: (28) SSL timeout`），但 `github.com:22` 可达，
+因此代码同步走 **SSH + 只读 deploy key**，不走 HTTPS：
+
+| 项 | 值 |
+|---|---|
+| 仓库地址 | `git@github.com:afdk1991/mim.git`（`deploy.sh` 内 `REPO_URL` 默认值） |
+| 私钥（服务器） | `/opt/mim/.ssh/deploy_key`（root 600，仅服务器持有） |
+| 公钥（GitHub） | 仓库 Settings → Deploy keys，标题 `mim-prod-deploy (115.159.159.11)`，**read-only** |
+| 连通性取证 | `sudo env GIT_SSH_COMMAND='ssh -i /opt/mim/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new' git ls-remote git@github.com:afdk1991/mim.git HEAD` |
+
+`deploy.sh` 会用该私钥设置 `GIT_SSH_COMMAND`，并对 `git fetch` 做 3 次重试；私钥缺失时直接报错退出。
+
 ### 7.2 服务器一次性引导（仅首次 / 重建机器）
 
 ```bash
 ssh ubuntu@115.159.159.11
-sudo -n git clone --depth 1 https://github.com/afdk1991/mim.git /opt/mim/app
-sudo -n bash /opt/mim/app/deploy/bootstrap.sh
+sudo -n bash /opt/mim/app/deploy/bootstrap.sh   # 需仓库已在 /opt/mim/app
 ```
 
-`bootstrap.sh` 幂等完成：apt 依赖（git/nginx/rsync/curl/certbot/sqlite3）→ corepack + pnpm 9.12.0 → 系统用户 `mim` → `/opt/mim/{app,web}` → nginx 站点 → systemd `mim-api` → Let's Encrypt 证书（仅对已解析域名申请）→ 首发布。
+`bootstrap.sh` 幂等完成：apt 依赖（git/nginx/rsync/curl/certbot）→ corepack + pnpm 9.12.0 → 系统用户 `mim` → `/opt/mim/{app,web}` → **生成/复用 SSH deploy key 并验证可读仓库** → nginx 站点 → systemd `mim-api` → Let's Encrypt 证书（仅对已解析域名申请）→ 首发布。首次执行若提示 `deploy key 未授权`，把打印出的公钥加为仓库 Deploy Key（只读）后重跑即可。
 
 ### 7.3 幂等重放与运维
 

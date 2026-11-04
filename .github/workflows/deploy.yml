@@ -49,6 +49,8 @@ jobs:
       name: production
       url: https://mim.mixm.top
     steps:
+      - uses: actions/checkout@v4
+
       - name: 配置 SSH
         run: |
           mkdir -p ~/.ssh
@@ -56,11 +58,35 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
+      # 服务器到 github.com 的 HTTPS 被阻断，代码同步走 SSH deploy key（见 deploy/deploy.sh）。
+      # 先把本次提交的部署脚本推到服务器，避免服务器上的旧脚本把部署跑死。
+      - name: 上传本次提交的部署脚本
+        run: |
+          scp -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
+            deploy/deploy.sh \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/mim-deploy.sh"
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "sudo -n install -m 755 /tmp/mim-deploy.sh /opt/mim/app/deploy/deploy.sh"
+
       - name: 远程发布（拉取代码 → 安装 → 构建 → 重启 → 健康检查）
         run: |
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+
+      - name: 校验服务器代码版本与本次提交一致
+        run: |
+          remote=$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "sudo -n git -C /opt/mim/app rev-parse HEAD")
+          echo "server=$remote"
+          echo "runner=$GITHUB_SHA"
+          if [ "$remote" != "$GITHUB_SHA" ]; then
+            echo "❌ 服务器代码版本与本次提交不一致"
+            exit 1
+          fi
+          echo "✅ 服务器版本与本次提交一致"
 
       - name: 线上健康检查
         run: |

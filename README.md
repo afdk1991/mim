@@ -88,7 +88,8 @@ npm run check                             # 版本规约 + 密钥模板校验
 | 生产域名 | `https://mim.mixm.top`（HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`） |
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（静态根）+ systemd `mim-api`（端口 8787） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
-| 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 线上 `/health` 取证 |
+| 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
+| 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
 | 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
 | `site/index.html` / `site/prd.html` | PRD 可视化入口与副本，仅离线阅读，**不参与生产** |

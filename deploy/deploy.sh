@@ -8,10 +8,15 @@
 #   sudo bash /opt/mim/app/deploy/deploy.sh
 #
 # 环境变量（可选）：
-#   APP_DIR  默认 /opt/mim/app
-#   WEB_DIR  默认 /opt/mim/web
-#   SERVICE  默认 mim-api
-#   PORT_    默认 8787
+#   APP_DIR     默认 /opt/mim/app
+#   WEB_DIR     默认 /opt/mim/web
+#   SERVICE     默认 mim-api
+#   PORT_       默认 8787
+#   REPO_URL    默认 git@github.com:afdk1991/mim.git（SSH，见下方说明）
+#   DEPLOY_KEY  默认 /opt/mim/.ssh/deploy_key（只读 deploy key 私钥）
+#
+# 网络说明：生产服务器访问 github.com 的 HTTPS 被阻断（SSL timeout），
+#           仅 github.com:22（SSH）可达，故代码同步走 SSH deploy key。
 #
 # 注意：本脚本对 /opt/mim/app 执行 git reset --hard origin/main，
 #       该目录是纯发布目录、不承载任何人工修改；本地开发请勿在此目录工作。
@@ -22,7 +27,8 @@ APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 SERVICE="${SERVICE:-mim-api}"
 PORT_="${PORT_:-8787}"
-REPO_URL="${REPO_URL:-https://github.com/afdk1991/mim.git}"
+REPO_URL="${REPO_URL:-git@github.com:afdk1991/mim.git}"
+DEPLOY_KEY="${DEPLOY_KEY:-/opt/mim/.ssh/deploy_key}"
 RUN_USER="${RUN_USER:-mim}"
 
 log()  { printf '\033[32m[deploy]\033[0m %s\n' "$*"; }
@@ -36,6 +42,22 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # --- 1. 代码同步 ---
+# 生产服务器到 github.com 的 HTTPS 被网络策略阻断（SSL timeout），
+# 因此统一走 SSH（22 端口可达），使用只读 deploy key。
+case "$REPO_URL" in
+  git@*|ssh://*)
+    if [ -f "$DEPLOY_KEY" ]; then
+      export GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+      log "git 使用 SSH 部署密钥 $DEPLOY_KEY"
+    else
+      die "缺少部署密钥 $DEPLOY_KEY（请在服务器生成 ed25519 密钥并注册为仓库 Deploy Key，参见 deploy/bootstrap.sh 第 3 步）"
+    fi
+    ;;
+  *)
+    warn "REPO_URL 非 SSH 形式，走 HTTPS（服务器出网可能被阻断）"
+    ;;
+esac
+
 if [ ! -d "$APP_DIR/.git" ]; then
   log "首次部署：克隆 $REPO_URL"
   mkdir -p "$(dirname "$APP_DIR")"
@@ -44,7 +66,13 @@ if [ ! -d "$APP_DIR/.git" ]; then
 else
   log "拉取 origin/main"
   git -C "$APP_DIR" remote set-url origin "$REPO_URL"
-  git -C "$APP_DIR" fetch --prune origin main
+  ok=0
+  for attempt in 1 2 3; do
+    if git -C "$APP_DIR" fetch --prune origin main; then ok=1; break; fi
+    warn "git fetch 第 $attempt 次失败，5s 后重试"
+    sleep 5
+  done
+  [ "$ok" -eq 1 ] || die "git fetch 连续 3 次失败，请检查服务器到 github.com:22 的连通性"
   git -C "$APP_DIR" reset --hard origin/main
   git -C "$APP_DIR" clean -fd -e node_modules -e .mim-dev-secret -e 'services/*/data' -e dist
 fi

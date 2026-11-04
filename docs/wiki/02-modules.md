@@ -150,10 +150,10 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | 工件 | 作用 |
 |---|---|
 | `deploy/bootstrap.sh` | 一次性引导：apt 依赖、corepack+pnpm、`mim` 系统用户、`/opt/mim/{app,web}`、nginx 站点、systemd 单元、certbot 证书、首发布 |
-| `deploy/deploy.sh` | 幂等发布：`git fetch/reset` → `pnpm install --prod=false` → `build:web` → 同步静态根 → 重启 `mim-api` → 健康轮询 → `nginx -t` + reload |
+| `deploy/deploy.sh` | 幂等发布：`git fetch/reset`（SSH deploy key，服务器 HTTPS 到 github.com 被阻断）→ `pnpm install --prod=false` → `build:web` → 同步静态根 → 重启 `mim-api` → 健康轮询 → `nginx -t` + reload |
 | `deploy/nginx-mim.conf` | 站点模板（root / 反代 / 缓存 / 安全头 / gzip） |
 | `deploy/mim-api.service` | systemd 单元（`User=mim`，`Restart=always`，仅 `data/` 与 `.mim-dev-secret/` 可写） |
 | `deploy/backup-db.sh` | SQLite 一致性备份（`sqlite3 .backup`），保留最近 N 份 |
-| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → SSH 执行 `deploy.sh` → 线上 `/health` + `/api/v1/plans` 取证 |
+| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → 上传本次提交的 `deploy.sh` → SSH 执行 → 服务器 HEAD == 提交 SHA 校验 → 线上 `/health` + `/api/v1/plans` 取证 |
 
 **生产事实（2026-11-04 取证）**：`curl https://mim.mixm.top/health` = 200；`/api/v1/plans` 返回套餐 JSON；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘。

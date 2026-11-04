@@ -20,7 +20,8 @@ DOMAIN="${DOMAIN:-mim.mixm.top}"
 APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 RUN_USER="${RUN_USER:-mim}"
-REPO_URL="${REPO_URL:-https://github.com/afdk1991/mim.git}"
+REPO_URL="${REPO_URL:-git@github.com:afdk1991/mim.git}"
+DEPLOY_KEY="${DEPLOY_KEY:-/opt/mim/.ssh/deploy_key}"
 PNPM_VERSION="9.12.0"
 
 log()  { printf '\033[32m[bootstrap]\033[0m %s\n' "$*"; }
@@ -55,6 +56,24 @@ else
 fi
 mkdir -p /opt/mim "$WEB_DIR"
 chown -R "$RUN_USER:$RUN_USER" /opt/mim
+
+# --- 3.1 SSH deploy key（服务器 HTTPS 到 github.com 被阻断，仅 22 端口可达） ---
+mkdir -p /opt/mim/.ssh
+chmod 700 /opt/mim/.ssh
+if [ ! -f "$DEPLOY_KEY" ]; then
+  log "生成只读部署密钥 $DEPLOY_KEY"
+  ssh-keygen -t ed25519 -f "$DEPLOY_KEY" -N '' -C "mim-deploy@$(hostname)" >/dev/null
+else
+  log "部署密钥已存在，复用"
+fi
+chmod 600 "$DEPLOY_KEY"
+export GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+if ! git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
+  warn "仓库不可读：请把下面的公钥添加为仓库 Deploy Key（只读）后重跑本脚本"
+  cat "$DEPLOY_KEY.pub"
+  die "deploy key 未授权"
+fi
+log "deploy key 验证通过"
 
 # 首次克隆（后续由 deploy.sh 更新）
 if [ ! -d "$APP_DIR/.git" ]; then
