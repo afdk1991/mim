@@ -2,14 +2,24 @@
   "name": "mim",
   "version": "0.0.0",
   "private": true,
-  "description": "Mim 全平台产品底座（Headless 中台 + 多端薄壳）。当前为规划与站点阶段：docs/ 为产品与技术决策，site/ 为可部署静态站点（落地页 + PRD），scripts/ 为版本与密钥校验。",
+  "packageManager": "pnpm@9.12.0",
+  "description": "Mim 全平台产品底座（Headless 中台 + 多端薄壳）。apps/ 多端薄壳，packages/ 共享包，services/ 后端服务，site/ 静态站点，scripts/ 校验脚本。",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:web": "pnpm --filter @mim/web build",
+    "build:all": "pnpm build && pnpm build:web",
+    "deploy": "bash deploy/deploy.sh",
+    "deploy:bootstrap": "bash deploy/bootstrap.sh",
+    "dev": "pnpm --filter @mim/api dev",
+    "dev:api": "pnpm --filter @mim/api dev",
+    "dev:web": "pnpm --filter @mim/web dev",
+    "test": "pnpm --filter @mim/api test",
+    "typecheck": "pnpm -r typecheck",
     "check:version": "node scripts/version-check.mjs",
     "check:env": "node scripts/env-check.mjs",
     "check": "node scripts/version-check.mjs && node scripts/env-check.mjs"
   },
   "engines": {
-    "node": ">=16.7.0"
+    "node": ">=18"
   }
 }

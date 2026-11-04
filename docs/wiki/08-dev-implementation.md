@@ -1,7 +1,7 @@
 # 08 · 开发实现全景（数据库 / 前端 / 后端 / 存储 / 后台管理平台）
 
-> **状态声明（证据）**：截至 V0.0.0-preview，仓库内无 `apps/`、`packages/`、`services/`、`infra/` 目录，无 `package.json`，除 [scripts/version-check.mjs](file:///f:/合并项目/Mim/scripts/version-check.mjs)（版本规约校验）与 [scripts/env-check.mjs](file:///f:/合并项目/Mim/scripts/env-check.mjs)（密钥模板校验）两个脚本外，无可执行业务代码。
-> 本页所有结构、表名、字段、接口均为**规划草案（Design Draft）**，用于让后续编码有唯一事实源；**不是已实现代码的说明书**。落地时须随代码同步修订（铁律七）。
+> **状态声明（证据）**：截至 V0.0.0-preview，仓库内已落地 `apps/web`（React + Vite）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express + SQLite），包管理器 pnpm workspace；`pnpm -r typecheck` / `pnpm --filter @mim/api test`（18 例）/ `pnpm --filter @mim/web build` / `npm run check` 均已通过并有命令输出留档。
+> 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
 
@@ -31,6 +31,22 @@
 | 契约先行 | 所有能力先写 OpenAPI/proto，`packages/core-sdk` 由契约生成，禁止手写接口 | 多端字段漂移 |
 | 业务下沉 | 业务规则只存在于 `packages/core-domain` 与后端领域服务，端上不复制 | 各端行为不一致 |
 | 端只做适配 | 登录/支付/推送/存储/分享差异封装在 `IPlatformAdapter` | 每加一端成本线性上升 |
+
+### 1.1 已实现 vs 规划（当前代码实况）
+
+| 维度 | 规划口径（本页 §2+） | 当前已实现（证据位置） | 差异原因 / 后续 |
+|---|---|---|---|
+| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|me|billing|dashboard|projects|tasks|sync|exports.ts`），拆分时不改业务逻辑 |
+| 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
+| 支付 | `payment-driver` 多通道 + 回调验签 | 仅 `mock` 驱动：checkout 即置 `paid` 并激活订阅；其余 driver 返回 `PAYMENT_DRIVER_UNAVAILABLE` | 无持牌通道凭证；接入真实 driver 时只替换 `billing.ts` 内驱动分支 |
+| 实时同步 | WebSocket + MQ 推送，5 秒内到达 | 前端 4s 轮询 `GET /sync/changes?project_id=&since_seq=`，`task_events.seq` 增量拉取 | 满足「5 秒内」硬约束；避免引入 WebSocket 依赖。多端一致性靠服务端 `seq` + LWW 裁决 |
+| 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 5），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
+| 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/套餐/权限/任务层级/金额/ID）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象 |
+| 存储 | 对象存储 + CDN（附件/媒体/导出） | CSV 导出同步生成、响应内直接下载（`routes/exports.ts`），无对象存储 | 小数据量可接受；导出转异步 + 对象存储时改 `exports.ts` |
+| 后台管理 | `admin-api` + RBAC 后台 | 未实现；审计数据已落 `audit_logs` 表 | P1 |
+| 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 18 例）保障字段一致性；后续补 OpenAPI 导出 |
+| 仪表盘切日 | 展示端负责时区转换 | 服务端按用户 `timezone` 用 `Intl.DateTimeFormat('sv-SE')` 求当地日期；今日已完成以 `updated_at` 按用户时区落在今日为准（48h 窗口 + 时区过滤，见 `routes/dashboard.ts`） | 避免 UTC 与本地日期跨日错位；已有回归测试「今日完成按用户时区切日」 |
 
 ## 2. 后端服务模块清单
 

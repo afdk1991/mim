@@ -1,15 +1,16 @@
 # 05 · 项目运行方式
 
-> 仓库当前无可「启动」的应用，唯一可运行项是版本规约校验脚本。本页同时覆盖其用法与未来应用代码落地后的衔接点。
+> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下三项仓库级脚本（版本校验、密钥模板校验、站点构建）。本页覆盖启动、测试、构建与校验的完整命令。
 
 ## 1. 前置条件
 
 | 依赖 | 必要性 | 检查命令 |
 |---|---|---|
-| Node.js（≥ 14.18） | **必需** | `node --version` |
+| Node.js（≥ 18，实测 v22.23.3） | **必需** | `node --version` |
+| pnpm 9.12.0（`packageManager` 已锁定） | **必需**（`corepack enable` 或 `npm i -g pnpm@9.12.0`） | `pnpm --version` |
 | git CLI | 可选（仅 tag 校验段需要） | `git --version` |
 
-无需 `npm install`——零第三方依赖。
+首次使用须 `pnpm install`（安装 workspace 全部依赖；锁文件 `pnpm-lock.yaml` 已入库）。
 
 ## 2. 运行版本校验
 
@@ -39,7 +40,7 @@ Remove-Item Env:RELEASE_CHANNEL
 
 | 场景 | 预期输出要点 | 退出码 |
 |---|---|---|
-| 当前仓库现状（无版本源、非 git 仓库） | 两条 ⚠️ 跳过提示 + ✅ 通过 | 0 |
+| 当前仓库现状（`package.json` 版本 `0.0.0`、无正式 tag） | `✅ 版本号 0.0.0 合法（V0.0.0）` + tag 段通过 | 0 |
 | `package.json` 写 `"version": "0.0.0-preview"` | ❌ 版本号不符合 semver（预发行后缀只允许走 RELEASE_CHANNEL，不进版本数字） | 1 |
 | `RELEASE_CHANNEL=preview` 且仓库已有 `V0.0.0` tag | ❌ 预览通道下已存在正式 tag | 1 |
 
@@ -90,20 +91,45 @@ node scripts/env-check.mjs
 | `Mim-PRD.html` | 浏览器直接打开（自包含、零依赖，含 FR-01 登录 / FR-02 支付两个交互演示） |
 | `team-hiring-plan.md`、两份调研 txt | 任意 Markdown/文本编辑器 |
 
-## 6. 未来应用代码的衔接点（规划口径）
+## 6. 启动功能应用（P0）
 
-PRD 与调研文档规划的目标形态为 **pnpm + Turborepo Monorepo**，业务代码落地后预期结构：
+### 6.1 一键命令
 
+```bash
+pnpm install                       # 首次
+pnpm --filter @mim/api dev         # 后端（tsx watch），http://127.0.0.1:8787
+pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 ```
-apps/        # 各端薄壳：web / weapp / ios / android / pc
-packages/    # 共享层：能力网关、领域模型、i18n、Design Token
+
+前端 Vite 已把 `/api` 与 `/health` 代理到 `http://127.0.0.1:8787`，因此浏览器只需访问 5173，无需配置跨域。
+
+### 6.2 质量门禁命令
+
+```bash
+pnpm -r typecheck                       # 四个 workspace 包类型检查
+pnpm --filter @mim/api test             # vitest + supertest，18 例契约测试
+pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
+npm run check                           # 版本规约 + 密钥模板校验
 ```
 
-届时本仓库将扩展为 Monorepo（`apps/` + `packages/`），依赖清单与构建脚本随之落地。当前根目录 `package.json` 已存在，承担版本号来源与站点构建脚本（`build` / `check`），业务代码尚未创建。
+### 6.3 数据结构与运行形态
 
-## 7. 站点与构建（本地预览，非生产部署）
+| 项 | 实况 |
+|---|---|
+| 数据库 | SQLite（`better-sqlite3`，WAL），首次启动自动建表；测试使用内存库 |
+| 端口 | API `8787`（读标准环境变量 `PORT`，默认 8787）；Web `5173` |
+| 环境变量 | 不新增 `MIM_*`；`.env.example` 仅登记第三方密钥占位（P0 无真实密钥需求） |
+| 支付 | 仅 `mock` 驱动：`POST /api/v1/subscriptions/checkout` 传 `driver: 'mock'` 即置 `paid` 并激活订阅 |
+| 验证码 | 开发通道在响应中回传 `dev_code`（未接短信/邮件通道） |
+| 增量同步 | 前端每 4 秒 `GET /api/v1/sync/changes?project_id=&since_seq=` |
 
-> **定位**：本仓库为 PRD + 架构文档仓库，`site/` 是 PRD 的可视化阅读载体，**不作为线上产品部署、不绑定生产域名**。
+### 6.4 冒烟顺序（HTTP 全链路）
+
+`auth/code → login → projects → tasks → dashboard → sync → checkout(basic,mock) → subscriptions/current → exports(csv) → orders → invoices`。CSV 导出需 `basic` 及以上套餐（免费版返回 `FEATURE_NOT_AVAILABLE`），因此必须先 checkout。
+
+## 7. 站点与构建（PRD 可视化，本地预览）
+
+> **定位**：`apps/web` + `services/mim-api` 是功能产品；`site/` 仍只是 PRD 的可视化阅读载体，**不作为线上产品部署、不绑定生产域名**。
 
 ### 7.1 本地构建（可选）
 
@@ -116,6 +142,6 @@ npm run check    # version-check + env-check（退出码 0 = 通过）
 
 ### 7.2 不涉及的动作
 
-- 不 push 到 GitHub 触发 EdgeOne 自动构建（仓库内容为文档，无功能代码可部署）。
-- 不绑定 `data.mixm.top` 等生产域名。
+- 不把 `site/` 部署到线上静态托管（`.edgeone/` 配置已移除）；功能前端用 `apps/web` 的 Vite 产物另行部署。
+- 不绑定 `data.mixm.top` 等生产域名（当前无生产部署）。
 - 线上域名归属与实际功能代码的部署由独立的应用仓库负责，不在本仓库范围内。

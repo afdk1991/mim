@@ -4,16 +4,16 @@
 
 ## 1. 模块全景
 
-| 模块 | PRD 锚点 | 优先级 | 状态 |
+| 模块 | PRD 锚点 | 优先级 | 状态（证据见 [08](./08-dev-implementation.md) §1.1） |
 |---|---|---|---|
-| FR-01 账号与身份 | §5 FR-01 | P0 | 需求已定义，未实现 |
-| FR-02 订阅与支付 | §5 FR-02 | P0 | 需求已定义，未实现（退款窗口 OQ-04 TBD） |
-| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | 已定案（OQ-01）：跨端任务与轻协作工具，规格已定义，未实现 |
-| FR-04 多端体验一致性 | §5 FR-04 | P0 | 契约已定义，未实现 |
-| FR-05 国际化与本地化 | §5 FR-05 | P0 | 规则已定义（首批语种 OQ-03 TBD，RTL 为 P1） |
-| FR-06 合规与隐私 | §5 FR-06 | P0 | 规则已定义，未实现 |
+| FR-01 账号与身份 | §5 FR-01 | P0 | **已实现（P0 最小集）**：cn 手机号验证码、global 邮箱密码/验证码；JWT access + refresh 轮换；region 强隔离。未实现：微信/支付宝/Google/Apple 第三方登录、账号合并（OQ-05）、新设备登录保护 |
+| FR-02 订阅与支付 | §5 FR-02 | P0 | **已实现（P0，mock 支付驱动）**：计划/价格/订阅状态机/checkout/取消/发票。未实现：真实通道（微信/支付宝/Stripe/IAP）、退款（OQ-04）、对账、掉单补发 |
+| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已实现（P0）**：项目→任务→子任务两级、协作者邀请（editor/viewer）、个人仪表盘、4s 轮询增量同步、CSV 导出（按套餐）。见 §5.2 features 映射 |
+| FR-04 多端体验一致性 | §5 FR-04 | P0 | **部分实现**：`packages/core-domain`（领域/权限/错误码）+ `packages/i18n`（双语文案/货币格式化）+ 统一 HTTP 契约已落地；仅 Web 一端，`IPlatformAdapter` 未落地 |
+| FR-05 国际化与本地化 | §5 FR-05 | P0 | **部分实现**：zh-CN / en-US 文案包、未命中回退链、`formatCurrency`、UTC 存储；未实现：语言切换 UI 持久化、RTL、时区设置 UI |
+| FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：审计日志（登录/支付/关键写操作）、手机号/邮箱规范化与脱敏。未实现：隐私政策强制勾选、账号注销 + 7 天冷静期、数据导出/删除请求 |
 | IM / 音视频 / AI 编排 / 内容管理 / 开放平台 / 管理后台 | §3 P1 清单 | P1 | 后续迭代，仅列名 |
-| 平台兼容性要求（三端最低版本矩阵） | §3 平台兼容性要求 | P0/P1 分列 | 规格已定义，未实现 |
+| 平台兼容性要求（三端最低版本矩阵） | §3 平台兼容性要求 | P0/P1 分列 | 规格已定义，未实现（当前仅 Web，浏览器环境下运行） |
 | IoT 硬件接入 | §3 排除项 / OQ-06 | 排除 | Assumption：P0 不支持 |
 
 旗舰产品形态已定案 **SaaS 工具型（订阅制）— 跨端任务与轻协作工具**（OQ-01，2026-11-03），首端为 Web + 微信小程序（国内），出海以 App + Web 切入（PRD 文首 callout）。
@@ -112,7 +112,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | ① 任务管理 | 项目 → 任务 → 子任务（固定两级）；属性：标题、描述、标签（多选）、截止日期、完成状态；截止日提醒推送（复用 FR-04 平台适配层推送能力） |
 | ② 多端实时同步 | 依托 FR-04 一致性契约：变更 5 秒内同步在线端，离线端下次拉取更新；冲突策略 = 服务端 last-write-wins + 客户端乐观更新 |
 | ③ 基础协作 | 项目所有者经手机号/邮箱邀请成员；权限两档（可编辑/只读）；协作项目数据按创建者 `user_id` + `region` 归属 |
-| ④ 个人仪表盘 | 今日任务（截止日为今天）+ 即将到期（未来 7 天） |
+| ④ 个人仪表盘 | 今日任务（截止日为今天）+ 即将到期（未来 7 天）+ 逾期 + 未排期 + 今日已完成；**切日口径按用户时区**（`Intl.DateTimeFormat` 解析 IANA 时区），今日已完成取 `updated_at` 按用户时区落在今日的记录 |
 
 ### 5.2 订阅计划 features 映射
 
@@ -190,22 +190,105 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | OQ-05 | 账号合并策略与数据归属 | FR-01 账号打通 | TBD |
 | OQ-06 | 是否支持 IoT 硬件接入 | 范围定义与后端架构 | Assumption：P0 不支持 |
 
-## 11. 功能模块 → 规划落地映射
+## 11. 功能模块落地对照表（P0，仓库实况）
 
-> 以下为规划口径（当前仓库无业务源码），架构依据见 [01-architecture.md](./01-architecture.md) §2，团队分工见 [team-hiring-plan.md](file:///f:/合并项目/Mim/team-hiring-plan.md)。
+> 本页从产品功能视角**逐模块**标注后端路由文件 + 路由数 + 前端页面 + 实现状态。技术资产视角见 [02-modules.md](./02-modules.md)，目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
 
-| 功能模块 | 规划落地位置 | 关键依赖方向 |
-|---|---|---|
-| FR-01 账号与身份 | 共享层（账号域）+ 各端 `apps/*` 薄壳 | 平台适配层封装各端登录 SDK |
-| FR-02 订阅与支付 | 共享层（订阅/订单域）+ 能力网关支付驱动 | 持牌通道、商店 IAP、每日对账任务 |
-| FR-03 工作区 | 各端应用 + `features` 显隐由共享层下发 | 阻塞已解除（OQ-01 已定案） |
-| FR-04 多端一致性 | `packages/*`：Design Token、i18n 资源、错误码表 | `IPlatformAdapter` 契约 + 契约测试 |
-| FR-05 国际化 | `packages/*`：i18n 资源包、多币种定价表、时区工具 | 首批语种依赖 OQ-03 |
-| FR-06 合规与隐私 | 共享层（审计、注销流程）+ 各端协议页 | 审计日志 180 天、7 天冷静期任务 |
+### 11.1 账号身份模块（FR-01）
 
-**模块间依赖**：FR-02 依赖 FR-01（先账号后订阅）；FR-03 依赖 FR-01/FR-02（登录态 + features）；FR-04/05/06 为横切约束，贯穿全部模块。
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 验证码发送 | `auth.ts` `POST /auth/code` | `Login.tsx` | ✅ |
+| 登录 / 注册 | `auth.ts` `POST /auth/login` | `Login.tsx` | ✅ |
+| 令牌刷新轮换 | `auth.ts` `POST /auth/refresh` | `api.ts refreshSession()` | ✅ |
+| 登出 | `auth.ts` `POST /auth/logout` | —（401 自动登出） | ✅ |
+| 我的信息 | `me.ts` `GET /me` / `PATCH /me` | `Settings.tsx` | ✅ |
+| 账号注销（冷静期） | `me.ts` `POST /me/deletion` + `POST /me/cancel-deletion` | `Settings.tsx` | ✅ |
+| 第三方登录 / 账号合并 | — | — | ❌ TBD |
 
-**开发实现口径**：数据库表结构、后端 12 个服务契约、存储分级、后台管理平台 RBAC 见 [08-dev-implementation.md](./08-dev-implementation.md)；各功能所需第三方 SDK 与密钥命名见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
+### 11.2 订阅支付模块（FR-02）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 套餐目录 | `billing.ts` `GET /plans` | `Plans.tsx` | ✅ |
+| 订阅创建（checkout） | `billing.ts` `POST /subscriptions/checkout` | `Plans.tsx` | ✅（仅 mock driver） |
+| 当前订阅 | `billing.ts` `GET /subscriptions/current` | `Settings.tsx` + `me.ts` | ✅ |
+| 取消订阅 | `billing.ts` `POST /subscriptions/cancel` | `Settings.tsx` | ✅ |
+| 订单列表 | `billing.ts` `GET /orders` | `Settings.tsx` | ✅ |
+| 发票列表 | `billing.ts` `GET /invoices` | `Settings.tsx` | ✅ |
+| 真实支付驱动 / 退款 / 对账 | — | — | ❌ TBD |
+
+### 11.3 项目管理模块（FR-03-①）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 项目列表 | `projects.ts` `GET /projects` | `Projects.tsx` | ✅ |
+| 新建项目 | `projects.ts` `POST /projects` | `Projects.tsx` | ✅ |
+| 项目详情 | `projects.ts` `GET /projects/:projectId` | `ProjectDetail.tsx` | ✅ |
+| 项目更新 | `projects.ts` `PATCH /projects/:projectId` | `ProjectDetail.tsx` | ✅ |
+| 归档项目 | `projects.ts` `POST /projects/:projectId/archive` | — | ✅（路由就绪，UI 未渲染） |
+| **删除项目** | `projects.ts` `DELETE /projects/:projectId` | — | ✅（路由就绪，UI 未渲染） |
+| 项目成员列表 | `projects.ts` `GET /projects/:projectId/members` | — | ✅（路由就绪） |
+| 邀请成员 | `projects.ts` `POST /projects/:projectId/invitations` | — | ✅（路由就绪） |
+| 接受邀请 | `projects.ts` `POST /invitations/:token/accept` | — | ✅（路由就绪） |
+| 移除成员 | `projects.ts` `DELETE /projects/:projectId/members/:userId` | — | ✅（路由就绪） |
+
+### 11.4 任务管理模块（FR-03-①）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 任务列表（含子任务） | `tasks.ts` `GET /projects/:projectId/tasks` | `ProjectDetail.tsx` | ✅ |
+| 新建任务 / 子任务 | `tasks.ts` `POST /projects/:projectId/tasks` | `ProjectDetail.tsx` | ✅（固定两级，三级返回 400） |
+| 任务详情 | `tasks.ts` `GET /tasks/:taskId` | — | ✅ |
+| 任务更新（LWW） | `tasks.ts` `PATCH /tasks/:taskId` | `ProjectDetail.tsx` | ✅（含 `client_updated_at` 冲突裁决） |
+| 状态切换 | `tasks.ts` `POST /tasks/:taskId/status` | `ProjectDetail.tsx` | ✅ |
+| **删除任务 / 级联子任务** | `tasks.ts` `DELETE /tasks/:taskId` | — | ✅（路由就绪，UI 未渲染） |
+
+### 11.5 仪表盘模块（FR-03-④）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 今日 / 未来 7 天 / 逾期 / 未排期 / **今日已完成** | `dashboard.ts` `GET /dashboard` | `Dashboard.tsx` | ✅（今日已完成按用户时区切日，见 §5.1） |
+
+### 11.6 协作模块（FR-03-③）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 协作者邀请（editor / viewer） | 见「项目管理模块」 invitations | — | ✅ |
+| 只读权限拦截 | `core-domain/src/permissions.ts` `assertCan` | 前端按 `features` 隐藏 UI | ✅ |
+| 协作者列表 / 移除 | 见「项目管理模块」 members | — | ✅ |
+| 实时评论 / 讨论 | — | — | ❌ P1 |
+
+### 11.7 同步模块（FR-04）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 增量变更拉取 | `sync.ts` `GET /sync/changes`（`since_seq` + `project_id`） | `api.ts` 4s 轮询 | ✅ |
+| 游标上报 | `sync.ts` `POST /sync/cursors` | `api.ts` 写入 `sync_cursors` | ✅ |
+| WebSocket 推送 | — | — | ❌（用 4s 轮询替代，满足 5 秒约束） |
+
+### 11.8 导出模块
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 创建导出任务 | `exports.ts` `POST /projects/:projectId/exports` | `Projects.tsx`（导出按钮） | ✅（仅 basic 及以上） |
+| 导出列表 | `exports.ts` `GET /exports` | — | ✅ |
+| 下载导出文件 | `exports.ts` `GET /exports/:exportId/download` | — | ✅ |
+
+### 11.9 审计与合规模块（FR-06）
+
+| 子模块 | 后端路由 | 前端页面 | 状态 |
+|---|---|---|---|
+| 审计日志查询 | `audit.ts` `GET /audit` | — | ✅（后端就绪） |
+| 手机号 / 邮箱规范化 | `core-domain` `normalizeIdentity` | `Login.tsx` | ✅ |
+| 隐私政策页 | — | — | ❌ |
+| 数据导出 / GDPR 请求 | — | — | ❌ |
+
+### 11.10 模块间依赖（代码已体现）
+
+FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-03 全部子模块依赖 FR-01 登录态 + FR-02 `features` 鉴权；FR-04（同步）、FR-05（i18n）、FR-06（审计）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用。
+
+**开发实现口径**：数据库表结构、后端服务模块、存储分级见 [08-dev-implementation.md](./08-dev-implementation.md) §1.1；各功能所需第三方 SDK 与密钥命名见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
 
 ---
 

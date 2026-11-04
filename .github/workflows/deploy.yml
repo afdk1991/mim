@@ -1,0 +1,78 @@
+name: Deploy
+
+# 铁律八：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库）
+# 触发：push 到 main，或手动 workflow_dispatch
+# 流程：安装 → 类型检查 → 测试 → 前端构建（质量门禁）→ SSH 远程发布 → 线上健康检查
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: 质量门禁（类型检查 + 测试 + 前端构建）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查
+        run: pnpm -r typecheck
+
+      - name: 后端契约测试
+        run: pnpm --filter @mim/api test
+
+      - name: 前端构建
+        run: pnpm --filter @mim/web build
+
+  deploy:
+    name: 发布到生产服务器
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://mim.mixm.top
+    steps:
+      - name: 配置 SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 远程发布（拉取代码 → 安装 → 构建 → 重启 → 健康检查）
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+
+      - name: 线上健康检查
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 5 https://mim.mixm.top/health; then
+              echo "✅ 生产健康检查通过"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "❌ 生产健康检查失败"
+          exit 1
+
+      - name: 线上套餐接口抽查
+        run: curl -fsS --max-time 5 https://mim.mixm.top/api/v1/plans >/dev/null && echo "✅ /api/v1/plans 正常"

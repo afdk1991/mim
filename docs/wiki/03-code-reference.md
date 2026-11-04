@@ -1,6 +1,7 @@
 # 03 · 关键代码说明
 
-> 仓库当前可执行代码为 `scripts/` 下的两个校验脚本：`version-check.mjs`（铁律四版本规约）与 `env-check.mjs`（09 清单 §0 密钥治理）。两者均为 ESM、仅用 Node 内置模块、退出码契约一致（`0` 通过 / `1` 违规）。§1–§6 为 `version-check.mjs` 的完整参考，§7 为 `env-check.mjs` 速览。
+> 本页覆盖仓库级脚本 `scripts/version-check.mjs`（铁律四版本规约，§1–§6）与 `scripts/env-check.mjs`（09 清单 §0 密钥治理，§7）。两者均为 ESM、仅用 Node 内置模块、退出码契约一致（`0` 通过 / `1` 违规）。
+> 业务代码（`services/mim-api` / `apps/web` / `packages/*`）的分层结构与实现对照见 [08-dev-implementation.md](./08-dev-implementation.md)，运行命令见 [05-runbook.md](./05-runbook.md)。
 
 ## 1. 文件元信息
 
@@ -73,20 +74,23 @@
 
 ## 6. 输出样例（当前仓库实际运行结果）
 
-当前仓库无 `package.json`/`VERSION`、非 git 仓库，运行输出为：
+当前仓库 `package.json` 版本为 `0.0.0`、git 仓库存在但无 tag，运行 `node scripts/version-check.mjs` 输出为：
 
 ```
 === Mim 版本号校验 (铁律四) ===
 RELEASE_CHANNEL = (unset / 正式通道)
 
-⚠️  未找到版本号来源（package.json 或 VERSION 文件），跳过版本号校验。
-   建议在项目根目录创建 package.json 或 VERSION 文件以启用校验。
-⚠️  当前目录不是 git 仓库，跳过 tag 校验。
+✅ [package.json] 版本号 0.0.0 格式正确
+   展示版本号: V0.0.0
+
+现有 git tags (0): (none)
 
 ✅ 版本号校验通过
 ```
 
-退出码 `0`——即当前仓库状态下校验器以「全跳过」方式通过。
+退出码 `0`——版本号来源（`package.json`）合法且无正式 tag，tag 校验段以「无 tag」空集通过。
+
+> 历史上（引入 `package.json` 之前）该脚本会输出「⚠️ 未找到版本号来源 / ⚠️ 当前目录不是 git 仓库」并以「全跳过」方式通过；当前仓库已不适用该情形。
 
 ## 7. scripts/env-check.mjs 速览
 

@@ -1,0 +1,38 @@
+# Mim 后端 API（systemd unit）
+# 安装位置：/etc/systemd/system/mim-api.service
+#
+# 说明：services/mim-api 的 start 脚本使用 tsx 直接运行 TypeScript（无 tsc 产物），
+#       因此服务器必须以「含 devDependencies」的方式安装依赖。
+# 数据库：better-sqlite3 落盘在 services/mim-api/data/mim.db（WAL）。
+# JWT 密钥：首次启动自动生成 .mim-dev-secret/jwt.key 并持久化在仓库目录。
+
+[Unit]
+Description=Mim 后端 API（Express + SQLite）
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=mim
+Group=mim
+WorkingDirectory=/opt/mim/app/services/mim-api
+Environment=NODE_ENV=production
+Environment=PORT=8787
+ExecStart=/opt/mim/app/services/mim-api/node_modules/.bin/tsx src/index.ts
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mim-api
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/opt/mim/app/services/mim-api/data /opt/mim/app/.mim-dev-secret
+
+[Install]
+WantedBy=multi-user.target

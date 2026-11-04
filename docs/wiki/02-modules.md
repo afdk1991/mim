@@ -1,26 +1,30 @@
 # 02 · 主要模块职责
 
-> 按仓库当前实际文件逐一说明。仓库无 `src/` 业务源码，「模块」指各顶层资产。
+> 按仓库当前实际文件逐一说明。仓库已是 pnpm workspace Monorepo：`apps/web`（Web 端）、`services/mim-api`（后端 API）、`packages/core-domain` 与 `packages/i18n`（共享包）、`scripts/`（校验与构建脚本）、`site/`（PRD 可视化载体）。本页侧重资产与职责全景，业务代码细节见 [08-dev-implementation.md](./08-dev-implementation.md)。
 
 ## 模块清单总表
 
 | 模块 | 类型 | 职责 | 关键产出 |
 |---|---|---|---|
 | `AGENTS.md` | 治理 | 定义 7 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
-| `README.md` | 治理 | 项目入口；版本号规约摘要与校验命令 | 版本展示约定 `V0.0.0-preview` |
+| `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
+| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 18 例契约测试通过；端口 8787 |
+| `apps/web` | 业务代码（前端） | React 18 + Vite 5 的 Web 端薄壳（4s 轮询增量同步 + 401 自动刷新）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
+| `packages/core-domain` | 共享包 | 错误码、套餐与 features、权限、任务层级、金额、UUIDv7 | 前后端共用单一事实源 |
+| `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
 | `scripts/env-check.mjs` | 可执行代码 | 09 清单 §0（密钥治理硬约束）的自动校验器 | 退出码 0/1；校验 `.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性 |
-| `scripts/build.mjs` | 可执行代码 | 静态站点构建脚本：把 `site/` 递归复制到 `dist/`（EdgeOne Pages OutputDir） | `dist/index.html` + `dist/prd.html`，供 `npm run build` 调用 |
-| `package.json` | 配置 | 项目元信息与脚本入口（`build` / `check:version` / `check:env` / `check`）；版本号 `0.0.0` 为 `version-check.mjs` 的校验源 | `npm run build` → `dist/`；`npm run check` → 两项校验 |
+| `scripts/build.mjs` | 可执行代码 | 静态站点构建脚本：把 `site/` 递归复制到 `dist/`（本地预览） | `dist/index.html` + `dist/prd.html`，供 `npm run build` 调用 |
+| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check`）；`packageManager: pnpm@9.12.0`；版本号 `0.0.0` 为 `version-check.mjs` 的校验源 | 零 dependencies，脚本转发到各 workspace |
+| `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `tsconfig.base.json` | 配置 | 声明 `apps/*`、`services/*`、`packages/*`；锁定依赖版本；共享 TS 编译基线 | 可复现安装与类型检查 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
 | `team-hiring-plan.md` | 技术/组织规划 | 约束→编制→分阶段落地→风险→成本 | 22–32 人全配 / 14–18 人最小可行方案 |
 | `.env.example` | 配置模板 | 第三方 SDK / API 密钥占位模板（全空值，禁止填入真实密钥后提交） | `MIM_<领域>_<提供方>_<密钥类型>` 命名基线，与 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md) 一一对应 |
 | `.gitignore` | 配置 | 版本库忽略规则：确保含真实密钥的 `.env` 永不入库，同时反向豁免 `.env.example` | `.env` / `.env.local` / `.env.*.local` 忽略 + `!.env.example` 豁免 |
 | `全平台小程序开发与分发-20261028181941.txt` | 参考调研 | 小程序全平台架构、合规、分发、Monorepo 骨架 | IPlatformAdapter 契约设计参考 |
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
-| `site/index.html` | 可部署静态站点 | Mim 落地页（零外部依赖，内联 CSS/JS） | 部署到 EdgeOne Pages 的首页产物 |
-| `site/prd.html` | 可部署静态站点 | `Mim-PRD.html` 的站点副本，供线上直接查阅 PRD | 站点内 `/prd.html` 路由 |
-| `.edgeone/project.json` | 部署绑定（遗留） | EdgeOne CLI 写入的项目绑定（`mim-app` Upload 型，ProjectId `makers-kyfamwxytnyj`）；当前生产部署走 GitHub 自动构建（`afdk1991/mim` → `mim` 项目），此文件仅作 CLI 直传锚点 | `{"Name":"mim-app","ProjectId":"makers-kyfamwxytnyj"}` |
+| `site/index.html` | 静态站点（本地预览） | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
+| `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
 | `.screenshots/` | 资产暂存 | 截图存放（当前为空，仅含 `.tmp`） | — |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~09 共 9 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单 | 与仓库资产一一对应的唯一文档入口 |
 
@@ -38,9 +42,9 @@
 
 **冲突裁决**：铁律五与铁律一冲突时（如沙箱无网络），执行优先，允许本地实现但必须在交付报告标注「已偏离铁律五」及理由。
 
-## 2. scripts/ 下的可执行校验脚本
+## 2. scripts/ 下的可执行脚本
 
-仓库目前仅有的可执行代码，零第三方依赖、仅用 Node 内置模块，均以退出码供人工与 CI 调用。
+除业务代码（`services/mim-api`、`apps/web`）外的仓库级脚本，均零第三方依赖、仅用 Node 内置模块，以退出码或产物供人工与 CI 调用。
 
 ### 2.1 scripts/version-check.mjs — 版本校验器
 
@@ -109,21 +113,20 @@ team-hiring-plan.md ◂──论据── 全栈项目人员配置指南 txt
 docs/wiki/README.md ──索引──> docs/wiki/01~09（其中 08 引用 07/01，09 引用 04）
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
 package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/（本地预览，非生产部署）
-.edgeone/project.json ──历史遗留──> mim-app 项目（当前不使用）
 ```
 
-代码层零依赖：无 import 任何第三方包。详见 [04-dependencies.md](./04-dependencies.md)。
+代码层依赖已按 `packages/*` / `services/*` / `apps/*` 分层落地，唯一必须遵守的方向约束是「共享包不反向依赖应用」。依赖清单与版本见 [04-dependencies.md](./04-dependencies.md) §1。
 
-## 7. site/、package.json 与构建 — PRD 可视化载体（本地预览）
+## 7. site/、构建脚本与业务代码 — 本地预览 vs 功能产品
 
-> 本仓库为 PRD + 架构文档仓库，**不是可运行的功能产品**。`site/` 与构建脚本仅用于本地预览 PRD，**不作为线上产品部署、不绑定生产域名**。
+> 本仓库已是**可运行的功能产品底座**（`apps/web` + `services/mim-api`）。`site/` 与构建脚本仅用于本地预览 PRD，**不作为线上产品部署、不绑定生产域名**。
 
 | 文件 | 说明 |
 |---|---|
+| `apps/web` + `services/mim-api` | 实际功能代码，运行方式见 [05-runbook.md](./05-runbook.md) §6 |
 | `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开 |
 | `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致 |
-| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 脚本调用 `scripts/build.mjs` |
+| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 脚本调用 `scripts/build.mjs`；`dev` / `test` / `typecheck` 转发到 workspace |
 | `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`，零依赖，仅用于本地构建验证 |
-| `.edgeone/project.json` | EdgeOne CLI 直传锚点（`mim-app` Upload 型），历史遗留，当前不使用 |
 
 两个 HTML 均**不含业务密钥**。生产域名（如 `data.mixm.top`）不归本仓库所有，线上功能代码的部署由独立应用仓库负责。
