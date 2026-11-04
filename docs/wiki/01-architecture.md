@@ -2,32 +2,40 @@
 
 ## 1. 仓库现状架构（当前实际形态）
 
-仓库当前是**单包、零构建、零运行时依赖**的治理 + 规划型仓库，分三层：
+仓库当前是 **pnpm workspace Monorepo**，可运行产品代码 + 治理/规划文档并存，分四层：
 
 ```
 ┌─────────────────────────────────────────────────────────┐
+│ 产品代码层（可运行）                                       │
+│   apps/web            React 18 + Vite 6 薄壳端（登录/套餐/设置）│
+│   services/mim-api    Express 5 + better-sqlite3 后端（8787） │
+│   packages/core-domain 错误码/套餐/金额/UUIDv7              │
+│   packages/i18n       zh-CN / en-US 文案与货币格式化        │
+├─────────────────────────────────────────────────────────┤
 │ 治理层（强制约束）                                        │
-│   AGENTS.md          七条铁律（执行/授权/证据/版本/依赖/自动化/同步） │
+│   AGENTS.md          八条铁律（执行/授权/证据/版本/依赖/自动化/同步/部署）│
 │   README.md          项目入口 + 版本规约摘要               │
 │   scripts/version-check.mjs   铁律四的版本规约校验器       │
 │   scripts/env-check.mjs       09 清单 §0 密钥治理校验器    │
 ├─────────────────────────────────────────────────────────┤
-│ 规划层（产品与技术决策）                                   │
+│ 交付层（生产链路）                                        │
+│   deploy/            bootstrap / deploy / nginx / systemd / backup-db / migrations│
+│   .github/workflows/deploy.yml  push main 自动上线         │
+├─────────────────────────────────────────────────────────┤
+│ 规划/参考层                                               │
 │   Mim-PRD.html       产品需求文档 V0.0.0-preview（草案）   │
 │   team-hiring-plan.md 技术约束分析 + 团队分阶段配置         │
-├─────────────────────────────────────────────────────────┤
-│ 参考层（外部调研沉淀）                                     │
-│   全平台小程序开发与分发-20261028181941.txt                │
-│   全栈项目人员配置指南-20261022184502.txt                  │
+│   docs/wiki/         01~09 项目文档                        │
 └─────────────────────────────────────────────────────────┘
 ```
 
 特征：
 
-- **无 package.json / 无源码目录 / 无 git 仓库**（当前工作区未初始化 `.git`）
-- 可执行代码只有 `scripts/` 下两个校验脚本（`version-check.mjs` / `env-check.mjs`），仅用 Node.js 内置模块，零第三方依赖
+- **pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`），根 `package.json` 统一编排 `dev/test/typecheck/build/check` 脚本
+- 后端 `services/mim-api`：Express 5 + `better-sqlite3`（WAL）+ JWT + zod，前缀 `/api/v1`，端口 8787
+- 前端 `apps/web`：React 18 + Vite 6，`src/api.ts` 统一 HTTP 契约；2026-11-04 已移除 FR-03 全部视图
 - 密钥治理载体为根目录 `.env.example`（全空占位）+ `.gitignore`（忽略 `.env`、反向豁免 `.env.example`），一致性由 `env-check.mjs` 自动校验
-- 版本号来源采用「探测式设计」：优先读 `package.json` 的 `version`，其次读 `VERSION` 文件，两者都不存在则跳过校验并给出建议（见 [03-code-reference.md](./03-code-reference.md)）
+- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.0-preview`，见 [03-code-reference.md](./03-code-reference.md)）
 
 ## 2. 目标产品架构（PRD 定义）
 

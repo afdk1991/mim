@@ -45,7 +45,7 @@ f:\合并项目\Mim
 ├── services/
 │   └── mim-api/                   # 后端 API（Express 5 + SQLite，8787）+ test/
 ├── packages/
-│   ├── core-domain/               # 错误码/套餐/权限/任务层级/金额/UUIDv7
+│   ├── core-domain/               # 错误码/套餐/金额/UUIDv7
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
 ├── docs/wiki/                     # 本 Wiki 全部文档（01~09）
 ├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）
