@@ -119,6 +119,62 @@ export function idempotency(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+interface ModuleRow {
+  id: string;
+  code: string;
+  status: 'draft' | 'active' | 'archived';
+}
+
+interface EntitlementRow {
+  id: string;
+  status: string;
+  expires_at: string | null;
+}
+
+/**
+ * 功能模块解锁门禁（07 §12.1）：用户须在所属区域持有该模块的有效权益。
+ * 模块缺失 / 非 active / 无有效权益统一返回 FEATURE_NOT_AVAILABLE(403)，
+ * 不泄漏「模块存在但未购买」与「模块不存在」的差异。
+ */
+export function requireEntitlement(moduleCode: string) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const user = req.user;
+    if (!user) throw new AppError('AUTH_UNAUTHORIZED', 'entitlement check requires an authenticated user');
+    const now = req.deps.now ? req.deps.now() : new Date().toISOString();
+
+    const moduleRow = req.deps.db
+      .prepare(
+        `SELECT id, code, status FROM modules
+         WHERE code = ? AND region = ? AND deleted_at IS NULL`,
+      )
+      .get(moduleCode, user.region) as ModuleRow | undefined;
+    if (!moduleRow || moduleRow.status !== 'active') {
+      throw new AppError('FEATURE_NOT_AVAILABLE', 'feature module is not available', {
+        module_code: moduleCode,
+        region: user.region,
+      });
+    }
+
+    const entitlement = req.deps.db
+      .prepare(
+        `SELECT id, status, expires_at FROM entitlements
+         WHERE user_id = ? AND module_id = ? AND status = 'active'
+           AND (expires_at IS NULL OR expires_at > ?)
+         ORDER BY created_at DESC
+         LIMIT 1`,
+      )
+      .get(user.id, moduleRow.id, now) as EntitlementRow | undefined;
+    if (!entitlement) {
+      throw new AppError('FEATURE_NOT_AVAILABLE', 'feature module is not unlocked', {
+        module_code: moduleCode,
+        region: user.region,
+      });
+    }
+
+    next();
+  };
+}
+
 export function notFound(req: Request, res: Response): void {
   res.status(404).json({
     code: 'NOT_FOUND',

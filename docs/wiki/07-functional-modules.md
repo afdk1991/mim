@@ -8,7 +8,7 @@
 |---|---|---|---|
 | FR-01 账号与身份 | §5 FR-01 | P0 | **已实现（P0 最小集）**：cn 手机号验证码、global 邮箱密码/验证码；JWT access + refresh 轮换；region 强隔离。未实现：微信/支付宝/Google/Apple 第三方登录、账号合并（OQ-05）、新设备登录保护 |
 | FR-02 订阅与支付 | §5 FR-02 | P0 | **已实现（P0，mock 支付驱动）**：计划/价格/订阅状态机/checkout/取消/发票。未实现：真实通道（微信/支付宝/Stripe/IAP）、退款（OQ-04）、对账、掉单补发 |
-| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已重定义（2026-11-04）为「功能模块商城 + 漫剧 AI 剧」**：原项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出已从前后端与生产库删除。新范围 **0 代码**：商城（FR-03.1）无 `catalog` 域、无模块/解锁表；漫剧 AI 剧（FR-03.2）无 `comic` 域、无生成队列。实现拆分见本页 §12 |
+| FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已重定义（2026-11-04）为「功能模块商城 + 漫剧 AI 剧」**：原项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出已从前后端与生产库删除。新范围 **部分落地（2026-11-04，第 1 期）**：`catalog` 域 4 表（`modules`/`module_prices`/`entitlements`/`entitlement_events`）与 `comic` 域 3 表（`comic_projects`/`comic_characters`/`storyboards`）已建；`requireEntitlement` 门禁与 `/api/v1/comic/*` 8 条路由已落地；生成队列、成片与导出未落地。实现拆分见本页 §12 |
 | FR-04 多端体验一致性 | §5 FR-04 | P0 | **部分实现**：`packages/core-domain`（领域/权限/错误码）+ `packages/i18n`（双语文案/货币格式化）+ 统一 HTTP 契约已落地；仅 Web 一端，`IPlatformAdapter` 未落地 |
 | FR-05 国际化与本地化 | §5 FR-05 | P0 | **部分实现**：zh-CN / en-US 文案包、未命中回退链、`formatCurrency`、UTC 存储；未实现：语言切换 UI 持久化、RTL、时区设置 UI |
 | FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：审计日志（登录/支付/关键写操作）、手机号/邮箱规范化与脱敏。未实现：隐私政策强制勾选、账号注销 + 7 天冷静期、数据导出/删除请求 |
@@ -117,7 +117,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 ## 5. FR-03 核心 SaaS 工作区（2026-11-04 重定义：功能模块商城 + 漫剧 AI 剧）
 
-> **现状：0 代码**。原 FR-03（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已于 2026-11-04 整体删除（历史见 §5.3）；本节为**新范围的产品定义**，后端 `catalog` / `comic` / `media` 三域与前端视图均未落地。
+> **现状：部分落地（2026-11-04，第 1 期）**。原 FR-03（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已于 2026-11-04 整体删除（历史见 §5.3）；本节为**新范围的产品定义**。已落地：`catalog` 域建表 + `requireEntitlement` 门禁；`comic` 域第 1 期工程/角色/分镜三表 + `/api/v1/comic/*` 路由（见 §12.1）。未落地：`media` 域、生成队列、成片与导出、前端 `ComicWorkbench.tsx`。
 
 ### 5.1 FR-03.1 功能模块商城
 
@@ -350,19 +350,19 @@ FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、F
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 模块目录 / 详情 | —（规划 `catalog.ts` `GET /modules`、`GET /modules/:code`） | —（规划 `Store.tsx`） | ❌ 0 代码 |
-| 模块定价（region / 币种 / 有效期） | —（规划 `module_prices` 表 + 定价接口） | — | ❌ 0 代码 |
-| 下单挂载模块 | —（规划 `billing.ts` 扩展 `order_items`） | — | ❌ 0 代码 |
-| 解锁发放 / 回收（Entitlement） | —（规划 `entitlements` / `entitlement_events`） | — | ❌ 0 代码 |
-| 解锁鉴权（服务端唯一依据） | —（规划 `requireEntitlement(code)` 中间件） | — | ❌ 0 代码 |
-| 退款触发解锁回收 | —（规划 `refunds` executed 同事务） | — | ❌ 0 代码（`refunds` 表已在 billing 域设计，无路由） |
+| 模块目录 / 详情 | —（未实现；`modules` 表已建并种子两条 `comic.workbench`，无 `GET /modules` 路由） | —（未实现） | 🟡 仅建表 |
+| 模块定价（region / 币种 / 有效期） | —（`module_prices` 表已建，无定价接口） | — | 🟡 仅建表 |
+| 下单挂载模块 | —（未实现；`order_items` 未建） | — | ❌ 0 代码 |
+| 解锁发放 / 回收（Entitlement） | —（`entitlements` / `entitlement_events` 表已建；发放/回收写路径未实现） | — | 🟡 仅建表 |
+| 解锁鉴权（服务端唯一依据） | `requireEntitlement(moduleCode)` 中间件（`src/middleware.ts`） | — | ✅ 已落地 |
+| 退款触发解锁回收 | —（未实现） | — | ❌ 0 代码（`refunds` 表已在 billing 域设计，无路由） |
 
 ### 11.12 漫剧 AI 剧（FR-03.2）
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 漫剧工程（剧本 / 角色 / 分镜） | —（规划 `comic.ts` `CRUD /comic/projects`） | —（规划 `ComicWorkbench.tsx`） | ❌ 0 代码 |
-| 角色一致性（character bible） | —（规划 `comic_characters` 表 + prompt/seed 锁定） | — | ❌ 0 代码 |
+| 漫剧工程（剧本 / 角色 / 分镜） | `comic.ts`：`GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/storyboard` | —（`ComicWorkbench.tsx` 前端未实现） | ✅ 后端已落地 |
+| 角色一致性（character bible） | `POST /comic/projects/:id/characters`（`comic_characters` 表，`(project_id, name)` 唯一 + prompt/seed） | — | ✅ 后端已落地 |
 | 生成任务队列（text / image / video / tts / compose） | —（规划 `generation_jobs` + `jobs` 消费者） | — | ❌ 0 代码 |
 | 生成产物存储与分发 | —（规划 `media` 域 + 对象存储 + 预签名 URL） | — | ❌ 0 代码 |
 | 成片合成与版本 | —（规划 `comic_films` / `film_versions`） | —（规划 `ComicFilms.tsx`） | ❌ 0 代码 |
@@ -389,10 +389,12 @@ FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、F
 |---|---|
 | 后端路由 | `comic.ts`：`POST/GET/PATCH/DELETE /comic/projects`、`POST /comic/projects/:id/storyboard`、`POST /comic/projects/:id/characters`；`POST /comic/projects/:id/suggest`（AI 建议：剧本/分镜/对白/配音） |
 | 数据表 | `comic_projects`、`comic_characters`、`storyboards` |
-| 前端视图 | `apps/web/src/views/ComicWorkbench.tsx`（剧本编辑、角色设定、分镜表、AI 建议确认） |
-| 鉴权 | 服务端 `requireEntitlement('comic.workbench')` |
-| 第三方 | 文本生成模型（剧本/分镜/对白建议）；TTS 可选（试听） |
-| 验收 | 工程 CRUD + 分镜表落库 + AI 建议人工确认后可保存；工程状态机 `draft → storyboarded` 可闭环 |
+| 前端视图 | `apps/web/src/views/ComicWorkbench.tsx`（剧本编辑、角色设定、分镜表、AI 建议确认）— **未实现** |
+| 鉴权 | 服务端 `requireEntitlement('comic.workbench')` — ✅ 已落地（`src/middleware.ts`） |
+| 第三方 | 文本生成模型（剧本/分镜/对白建议）— **未接入**；`POST /comic/projects/:id/suggest` 当前返回本地 mock（`model: 'mock-text-suggest'`，`requires_confirmation: true`），TTS 未实现 |
+| 验收 | 工程 CRUD + 分镜表落库 + AI 建议人工确认后可保存；工程状态机 `draft → storyboarded` 可闭环 — ✅ 后端已由 `test/comic.test.ts` 10 例覆盖 |
+
+> **落地状态（2026-11-04）**：后端与数据表已交付（`schema.sql` comic 域 3 表、`routes/comic.ts` 8 条路由、`test/comic.test.ts` 10 例全绿）；前端视图与真实文本模型接入未开始，属第 2 期范围。
 
 ### 12.2 第 2 期：④ 创作工作台 + 导出成片
 

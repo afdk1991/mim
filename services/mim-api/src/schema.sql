@@ -159,6 +159,108 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at    TEXT NOT NULL
 );
 
+-- ---------- catalog 域（功能模块商城 / 解锁鉴权，07 §5.1、08 §3.2）----------
+CREATE TABLE IF NOT EXISTS modules (
+  id                    TEXT PRIMARY KEY,
+  code                  TEXT NOT NULL,
+  name_i18n             TEXT NOT NULL,
+  summary_i18n          TEXT NOT NULL,
+  unlock_mode           TEXT NOT NULL CHECK (unlock_mode IN ('subscription','one_time')),
+  entitlements_required TEXT NOT NULL DEFAULT '[]',
+  region                TEXT NOT NULL CHECK (region IN ('cn','global')),
+  status                TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
+  sort_order            INTEGER NOT NULL DEFAULT 0,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
+  deleted_at            TEXT,
+  UNIQUE (region, code)
+);
+CREATE INDEX IF NOT EXISTS idx_modules_region_status ON modules(region, status, sort_order);
+
+CREATE TABLE IF NOT EXISTS module_prices (
+  id              TEXT PRIMARY KEY,
+  module_id       TEXT NOT NULL,
+  currency        TEXT NOT NULL,
+  amount_minor    INTEGER NOT NULL CHECK (amount_minor >= 0),
+  effective_from  TEXT NOT NULL,
+  effective_to    TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_module_prices_module ON module_prices(module_id, currency, effective_from);
+
+CREATE TABLE IF NOT EXISTS entitlements (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  module_id   TEXT NOT NULL,
+  source      TEXT NOT NULL CHECK (source IN ('order','subscription','admin')),
+  source_id   TEXT,
+  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','revoked')),
+  expires_at  TEXT,
+  version     INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_user_module_once
+  ON entitlements(user_id, module_id) WHERE source_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_user_module_source
+  ON entitlements(user_id, module_id, source_id) WHERE source_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_entitlements_user_status ON entitlements(user_id, status);
+
+CREATE TABLE IF NOT EXISTS entitlement_events (
+  id              TEXT PRIMARY KEY,
+  entitlement_id  TEXT NOT NULL,
+  from_status     TEXT,
+  to_status       TEXT NOT NULL,
+  reason          TEXT,
+  actor           TEXT NOT NULL CHECK (actor IN ('order','refund','job','admin','system')),
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_entitlement_events_ent ON entitlement_events(entitlement_id, created_at);
+
+-- ---------- comic 域（第 1 期：AI 辅助创作工作台，07 §12.1、08 §3.2）----------
+CREATE TABLE IF NOT EXISTS comic_projects (
+  id             TEXT PRIMARY KEY,
+  owner_user_id  TEXT NOT NULL,
+  region         TEXT NOT NULL CHECK (region IN ('cn','global')),
+  title          TEXT NOT NULL,
+  synopsis       TEXT,
+  status         TEXT NOT NULL DEFAULT 'draft'
+                 CHECK (status IN ('draft','storyboarded','generating','rendered','published','archived')),
+  version        INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  deleted_at     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_comic_projects_owner ON comic_projects(owner_user_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS comic_characters (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT NOT NULL,
+  name                TEXT NOT NULL,
+  appearance_prompt   TEXT NOT NULL,
+  seed                INTEGER,
+  reference_asset_ids TEXT NOT NULL DEFAULT '[]',
+  voice_profile       TEXT,
+  version             INTEGER NOT NULL DEFAULT 1,
+  created_at          TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  deleted_at          TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_comic_characters_project_name
+  ON comic_characters(project_id, name) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS storyboards (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL,
+  version_no    INTEGER NOT NULL,
+  shots         TEXT NOT NULL,
+  confirmed_at  TEXT,
+  created_by    TEXT NOT NULL,
+  created_at    TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_storyboards_project_version ON storyboards(project_id, version_no);
+CREATE INDEX IF NOT EXISTS idx_storyboards_project ON storyboards(project_id, created_at);
+
 -- ---------- 认证与会话辅助 ----------
 CREATE TABLE IF NOT EXISTS verification_codes (
   id           TEXT PRIMARY KEY,

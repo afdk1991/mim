@@ -58,8 +58,8 @@
 | `identity` | 注册登录、第三方登录绑定、会话与设备、账号合并、注销 | `/auth/*`、`/accounts/*`、`/devices/*` | 短信/邮件通道、Redis | 分库 |
 | `billing` | 计划与定价、订阅生命周期、续费、升降级、发票、对账 | `/plans`、`/subscriptions/*`、`/invoices/*` | payment-driver、MQ | 分库 |
 | `payment-driver` | 支付编排 + 通道驱动（wechat / alipay / unionpay / stripe / paypal / apple-iap / google-play），统一回调 | `/payments/*`、`/callbacks/{driver}` | 各持牌通道、商店服务端 API | 按通道 |
-| `catalog` | **（规划，0 代码）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；与 `billing` 同事务挂载 `order_items` | `/modules`、`/modules/{code}`、`/entitlements/*`、`/entitlements/{code}/check` | billing（订单/退款）、admin-api | 分库 |
-| `comic` | **（规划，0 代码）** 漫剧工程/角色/分镜、生成任务编排与产物登记、成片合成与版本、审核发布 | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*` | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
+| `catalog` | **（部分落地：建表 + 门禁，2026-11-04）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 已建，`requireEntitlement` 已落地；`/modules` 路由与 `order_items` 未实现 | `/modules`、`/modules/{code}`、`/entitlements/*`、`/entitlements/{code}/check`（未实现） | billing（订单/退款）、admin-api | 分库 |
+| `comic` | **（第 1 期已落地，2026-11-04）** 漫剧工程/角色/分镜已实现（`/comic/projects/*`）；生成任务编排、成片合成与版本、审核发布未实现 | `/comic/projects/*`（已实现）；`/comic/jobs/*`、`/comic/films/*`（未实现） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
 | `media` | **（规划，0 代码）** 对象存储准入：签发上传/下载预签名 URL，登记 `object_key` 归属与保留期 | `/media/presign/upload`、`/media/presign/download` | 对象存储、CDN | 按 region 桶 |
 | `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
 | `im` | 会话、消息可靠性、已读回执、在线状态、离线推送、审核 | `/im/*`（HTTP + WebSocket） | MQ、推送通道、审核服务 | 分库 |
@@ -119,21 +119,21 @@
 | `reconciliation_batches` | `id`、`driver`、`biz_date`、`matched_count`、`diff_count`、`status` | 每日对账批次 |
 | `reconciliation_diffs` | `id`、`batch_id`、`payment_id`、`type(missing_local/missing_channel/amount_mismatch)`、`resolved_by` | 差异处理留痕 |
 
-**catalog 域（规划，0 代码）**
+**catalog 域（部分落地：4 表已建 + `requireEntitlement` 已落地，2026-11-04）**
 
 > 功能模块商城（FR-03.1）。模块目录与定价、解锁发放与回收；解锁鉴权只认服务端 `entitlements`。与 `billing` 的 `orders` 同事务挂载 `order_items`。
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
-| `modules` | `id`、`code`、`name_i18n jsonb`、`summary_i18n jsonb`、`unlock_mode(subscription/one_time)`、`entitlements_required jsonb`、`region`、`status(draft/active/archived)`、`sort_order` | 模块目录；`code` 唯一且不复用；索引 `(region, status, sort_order)` |
+| `modules` | `id`、`code`、`name_i18n`、`summary_i18n`、`unlock_mode(subscription/one_time)`、`entitlements_required`、`region`、`status(draft/active/archived)`、`sort_order` | 模块目录；**唯一索引 `(region, code)`**（支持 cn/global 双区同 code 各一行），`code` 在区内不复用；索引 `(region, status, sort_order)`。JSON 字段在 SQLite 以 TEXT 存 |
 | `module_prices` | `id`、`module_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | 定价与模块解耦，改价不改历史订单 |
 | `entitlements` | `id`、`user_id`、`module_id`、`source(order/subscription/admin)`、`source_id`、`status(active/expired/revoked)`、`expires_at`、`version` | **服务端解锁鉴权唯一依据**；唯一索引 `(user_id, module_id)`（一次性）与 `(user_id, module_id, source_id)`（订阅型） |
 | `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(order/refund/job/admin)`、`created_at` | 只追加，禁止 UPDATE |
 | `order_items` | `id`、`order_id`、`item_type(plan/module)`、`item_id`、`amount_minor`、`currency` | 一单可挂 1 计划 + N 模块；退款按项回收 |
 
-**comic 域（规划，0 代码）**
+**comic 域（第 1 期三表已建，2026-11-04）**
 
-> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表，四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。
+> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表，四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。**第 1 期只建前三表，其余四表待第 2/3/4 期。**
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
@@ -190,9 +190,9 @@
 - ~~`project_invitations.status`~~：已移除（2026-11-04，FR-03 删除，`project_invitations` 表同步 DROP）。
 - ~~任务写操作幂等与 LWW~~：已移除（2026-11-04，随 FR-03 删除；订阅域仍强制 `Idempotency-Key` + `version` 乐观锁）。
 - `contents.status`（P1）：`draft → published ⇄ blocked`、`published → deleted`；任何机审/人审结论只能经 `audit_records` 追加，不允许直接改 `contents.status` 跳过审核。
-- `modules.status`（规划，0 代码）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配永不复用。
-- `entitlements.status`（规划，0 代码）：只能经 `entitlement_events` 追加推进；`revoked`（退款/风控）与 `expired`（订阅到期）**必须**与触发事务（`refunds.executed` / 订阅状态机）同事务写入，不允许事后异步补写。
-- `comic_projects.status`（规划，0 代码）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本；进入 `rendered` 必须有 `generation_assets` 覆盖全部分镜；进入 `published` 必须有已发布 `comic_films`，不得跳级。
+- `modules.status`（已建表，写路径未实现）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配在区内永不复用（唯一约束为 `(region, code)`）。
+- `entitlements.status`（已建表，发放/回收写路径未实现）：只能经 `entitlement_events` 追加推进；`revoked`（退款/风控）与 `expired`（订阅到期）**必须**与触发事务（`refunds.executed` / 订阅状态机）同事务写入，不允许事后异步补写。当前只读门禁 `requireEntitlement` 已按 `status='active' AND (expires_at IS NULL OR expires_at > now)` 判定。
+- `comic_projects.status`（**第 1 期已实现 `draft ⇄ storyboarded`**；`generating`/`rendered`/`published` 仅占位）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本（`confirmed_at` 非空），且仅 `draft`/`storyboarded` 两种状态允许编辑与写分镜；进入 `rendered` 必须有 `generation_assets` 覆盖全部分镜（第 2 期）；进入 `published` 必须有已发布 `comic_films`（第 4 期），不得跳级。
 - `comic_films.status`（规划，0 代码）：`draft → reviewing → published`，驳回回到 `draft` 并留原因；`published` 只能由 `current_version_id` 指向的 `film_versions` 支撑，版本只追加不覆盖。
 - `generation_jobs.status`（规划，0 代码）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算。
 
@@ -232,8 +232,8 @@
 | 订阅管理 | 查看周期、取消续费、更换支付方式、发票申请、退款入口 | FR-02 |
 | 协议与隐私 | 首次强制勾选、政策更新后重新确认、SDK 清单展示 | FR-06 |
 | 语言与地区 | 语言切换、币种展示、时区设置 | FR-05 |
-| 功能模块商城（**❌ 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、加入订单、解锁状态与到期展示 | FR-03.1 |
-| 漫剧 AI 剧工作台（**❌ 0 代码**） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
+| 功能模块商城（**🟡 后端建表 + 门禁，前端 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、加入订单、解锁状态与到期展示 | FR-03.1 |
+| 漫剧 AI 剧工作台（**🟡 后端第 1 期已落地，前端 0 代码**） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
 | 成片管理（**❌ 0 代码**） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
 
 任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。

@@ -121,11 +121,19 @@ npm run check                           # 版本规约 + 密钥模板校验
 | 环境变量 | 不新增 `MIM_*`；`.env.example` 仅登记第三方密钥占位（P0 无真实密钥需求） |
 | 支付 | 仅 `mock` 驱动：`POST /api/v1/subscriptions/checkout` 传 `driver: 'mock'` 即置 `paid` 并激活订阅 |
 | 验证码 | 开发通道在响应中回传 `dev_code`（未接短信/邮件通道） |
-| 前端视图 | 仅「套餐」「设置」两页；原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除，重定义后的「功能模块商城」「漫剧 AI 剧」工作台当前 **0 代码**（拆分见 `docs/wiki/07-functional-modules.md` §12） |
+| 前端视图 | 仅「套餐」「设置」两页；原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域第 1 期 3 表已建、`/api/v1/comic/*` 8 条路由已上线（拆分见 `docs/wiki/07-functional-modules.md` §12）；商城与漫剧前端视图 **0 代码** |
+| 模块解锁 | `comic.workbench` 种子行随 `createDatabase()` 自动写入 cn/global 两区；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
+| 授权命令 | 生产授予权益：`sqlite3 /opt/mim/app/services/mim-api/data/mim.db "INSERT INTO entitlements (id,user_id,module_id,source,source_id,status,version,created_at,updated_at) VALUES ('ent:<uid>:comic','<uid>',(SELECT id FROM modules WHERE code='comic.workbench' AND region='cn'),'admin',NULL,'active',1,datetime('now'),datetime('now'));"` |
 
 ### 6.4 冒烟顺序（HTTP 全链路）
 
-`auth/code → login → me → plans → subscriptions/checkout(basic,mock) → subscriptions/current → orders → invoices → audit`。
+`auth/code → login → me → plans → subscriptions/checkout(basic,mock) → subscriptions/current → orders → invoices → audit`
+
+漫剧工作台（第 1 期）：
+
+`GET /api/v1/comic/projects`（无权益 → 403 `FEATURE_NOT_AVAILABLE`）→ 授予 `comic.workbench` 权益 →
+`POST /api/v1/comic/projects`（带 `Idempotency-Key`）→ `POST /api/v1/comic/projects/:id/characters` →
+`POST /api/v1/comic/projects/:id/storyboard`（`confirm:true`，工程转 `storyboarded`）→ `GET /api/v1/comic/projects/:id` → `POST /api/v1/comic/projects/:id/suggest`
 
 ## 7. 生产部署（铁律八）
 

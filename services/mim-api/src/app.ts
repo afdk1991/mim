@@ -6,6 +6,7 @@ import { createAuthRouter } from './routes/auth.js';
 import { createPublicBillingRouter, createBillingRouter } from './routes/billing.js';
 import { createMeRouter } from './routes/me.js';
 import { createAuditRouter } from './routes/audit.js';
+import { createComicRouter } from './routes/comic.js';
 import { errorHandler, notFound, requestId } from './middleware.js';
 import type { ApiDeps } from './types.js';
 
@@ -32,6 +33,7 @@ export function createApp(deps: ApiDeps): Express {
     createMeRouter(deps),
     createBillingRouter(deps),
     createAuditRouter(deps),
+    createComicRouter(deps),
   ]) {
     app.use('/api/v1', router);
   }
