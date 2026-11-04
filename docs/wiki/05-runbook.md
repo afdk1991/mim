@@ -127,21 +127,63 @@ npm run check                           # 版本规约 + 密钥模板校验
 
 `auth/code → login → projects → tasks → dashboard → sync → checkout(basic,mock) → subscriptions/current → exports(csv) → orders → invoices`。CSV 导出需 `basic` 及以上套餐（免费版返回 `FEATURE_NOT_AVAILABLE`），因此必须先 checkout。
 
-## 7. 站点与构建（PRD 可视化，本地预览）
+## 7. 生产部署（铁律八）
 
-> **定位**：`apps/web` + `services/mim-api` 是功能产品；`site/` 仍只是 PRD 的可视化阅读载体，**不作为线上产品部署、不绑定生产域名**。
+> **生产环境已上线**：`https://mim.mixm.top`（前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。本地预览不是交付终点。
 
-### 7.1 本地构建（可选）
+### 7.1 自动部署（默认路径）
+
+push 到 `main` 即触发 `.github/workflows/deploy.yml`：
+
+```
+verify:  pnpm install --frozen-lockfile → pnpm -r typecheck → @mim/api test → @mim/web build
+deploy:  ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+         → curl https://mim.mixm.top/health（必须 200）
+         → curl https://mim.mixm.top/api/v1/plans
+```
+
+所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`。
 
 ```bash
-npm run build    # scripts/build.mjs 把 site/ 复制到 dist/
+gh secret set DEPLOY_SSH_KEY --body "$(cat ~/.ssh/mim_deploy)"
+gh secret set DEPLOY_HOST --body "115.159.159.11"
+gh secret set DEPLOY_USER --body "ubuntu"
+gh run watch          # 观察最近一次运行
+```
+
+### 7.2 服务器一次性引导（仅首次 / 重建机器）
+
+```bash
+ssh ubuntu@115.159.159.11
+sudo -n git clone --depth 1 https://github.com/afdk1991/mim.git /opt/mim/app
+sudo -n bash /opt/mim/app/deploy/bootstrap.sh
+```
+
+`bootstrap.sh` 幂等完成：apt 依赖（git/nginx/rsync/curl/certbot/sqlite3）→ corepack + pnpm 9.12.0 → 系统用户 `mim` → `/opt/mim/{app,web}` → nginx 站点 → systemd `mim-api` → Let's Encrypt 证书（仅对已解析域名申请）→ 首发布。
+
+### 7.3 幂等重放与运维
+
+```bash
+sudo -n bash /opt/mim/app/deploy/deploy.sh     # 手动重放发布（git reset → install → build → 发布 → 健康轮询）
+bash /opt/mim/app/deploy/backup-db.sh          # SQLite 在线热备份（默认 /var/backups/mim，保留 14 份）
+systemctl status mim-api; journalctl -u mim-api -n 50    # 服务状态与日志
+```
+
+### 7.4 生产布局
+
+| 项 | 路径 |
+|---|---|
+| 仓库 | `/opt/mim/app`（git，`mim` 用户所有） |
+| 静态根 | `/opt/mim/web`（`apps/web/dist` 同步而来，nginx `root`） |
+| 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（WAL，持久化） |
+| JWT 密钥 | `/opt/mim/app/.mim-dev-secret/jwt.key`（首次启动自动生成，不入库） |
+| 站点配置 | `/etc/nginx/sites-available/mim.conf`（源模板 `deploy/nginx-mim.conf`） |
+
+### 7.5 离线阅读构建（非生产）
+
+```bash
+npm run build    # scripts/build.mjs 把 site/ 复制到 dist/，仅用于本地阅读 PRD
 npm run check    # version-check + env-check（退出码 0 = 通过）
 ```
 
-构建产物 `dist/index.html` + `dist/prd.html` 可本地双击打开，或用任意静态服务器预览。
-
-### 7.2 不涉及的动作
-
-- 不把 `site/` 部署到线上静态托管（`.edgeone/` 配置已移除）；功能前端用 `apps/web` 的 Vite 产物另行部署。
-- 不绑定 `data.mixm.top` 等生产域名（当前无生产部署）。
-- 线上域名归属与实际功能代码的部署由独立的应用仓库负责，不在本仓库范围内。
+`site/` **不参与生产部署**；生产前端只来自 `apps/web` 构建产物。`.edgeone/` 配置已移除。

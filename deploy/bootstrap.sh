@@ -86,9 +86,17 @@ log "执行首次发布"
 bash "$APP_DIR/deploy/deploy.sh"
 
 # --- 7. HTTPS（失败不阻断） ---
+# 只申请已解析到本机的域名：www 子域若未建 A 记录，一并申请会让整张证书失败（NXDOMAIN）
 if [ ! -d "/etc/letsencrypt/live/${DOMAIN}" ]; then
-  log "尝试签发 Let's Encrypt 证书（$DOMAIN）"
-  certbot --nginx -d "$DOMAIN" -d "www.${DOMAIN}" \
+  CERT_ARGS=(-d "$DOMAIN")
+  if getent hosts "www.${DOMAIN}" >/dev/null 2>&1; then
+    CERT_ARGS+=(-d "www.${DOMAIN}")
+    log "检测到 www.${DOMAIN} 已解析，一并申请"
+  else
+    warn "www.${DOMAIN} 未解析，仅申请 ${DOMAIN}"
+  fi
+  log "尝试签发 Let's Encrypt 证书（${CERT_ARGS[*]}）"
+  certbot --nginx "${CERT_ARGS[@]}" \
     --non-interactive --agree-tos -m "admin@${DOMAIN}" --redirect || \
     warn "证书签发失败（域名解析未就绪 / 80 端口不可达），可稍后重试: certbot --nginx -d $DOMAIN"
 else

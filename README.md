@@ -26,7 +26,7 @@ node scripts/env-check.mjs
 
 ## 项目铁律
 
-所有 AI 协作者必须遵守 [AGENTS.md](./AGENTS.md) 中的七条铁律：
+所有 AI 协作者必须遵守 [AGENTS.md](./AGENTS.md) 中的八条铁律：
 
 1. **铁律一**：AI 负责执行，不把任务丢回用户，全权接管浏览器等一切可自动化环境（最高优先级）。
 2. **铁律二**：可逆操作直接做，不可逆操作先授权。
@@ -35,6 +35,7 @@ node scripts/env-check.mjs
 5. **铁律五**：必须引入所有第三方依赖，不得重复造轮子。
 6. **铁律六**：全角色全流程自动化——AI 承担所有人员职责，每轮交付前必须 BUG/代码检查。
 7. **铁律七**：功能模块增删必须全量同步，交付报告附同步清单。
+8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），**禁止以本地预览作为交付终点**。
 
 ## 仓库结构
 
@@ -46,7 +47,9 @@ services/mim-api/    # 后端 API（Express 5 + SQLite，端口 8787，前缀 /a
 packages/core-domain/# 共享领域层（错误码/套餐/权限/任务层级/金额/UUIDv7）
 packages/i18n/       # 双语文案（zh-CN / en-US）与货币格式化
 scripts/             # build / version-check / env-check
-site/                # PRD 可视化阅读载体（本地预览）
+deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）
+.github/workflows/   # CI/CD（push main 自动上线生产）
+site/                # PRD 可视化阅读载体（离线副本，非生产站点）
 docs/wiki/           # 结构化文档（01~09）
 ```
 
@@ -78,14 +81,18 @@ npm run check                             # 版本规约 + 密钥模板校验
 
 ## 站点与部署
 
-> **当前定位**：本仓库已是**可运行的功能产品底座**（P0：账号、订阅、项目/任务、同步、导出、仪表盘）。`site/` 仍仅作 PRD 的可视化阅读载体，本地预览，**不绑定生产域名**。
+> **生产环境已上线**：`https://mim.mixm.top`（前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。遵循 [铁律八](./AGENTS.md)，任务完成后由 CI 自动发布，**不以本地预览作为交付终点**。
 
 | 项 | 说明 |
 |---|---|
-| `apps/web` + `services/mim-api` | 实际功能代码；本地运行命令见上节 |
-| `site/index.html` / `site/prd.html` | PRD 可视化入口与副本，本地双击可打开 |
-| `package.json` / `scripts/build.mjs` | `site/` → `dist/` 的本地预览构建，**非生产部署** |
-| 生产域名 | 无。当前无生产部署与域名绑定 |
+| 生产域名 | `https://mim.mixm.top`（HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`） |
+| 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（静态根）+ systemd `mim-api`（端口 8787） |
+| 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
+| 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 线上 `/health` 取证 |
+| 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
+| 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
+| `site/index.html` / `site/prd.html` | PRD 可视化入口与副本，仅离线阅读，**不参与生产** |
 
-本地构建（可选）：`npm run build`；校验：`npm run check`（版本 + 密钥模板）。
+本地构建（可选）：`npm run build`（site → dist）；前端产物：`npm run build:web`；校验：`npm run check`。
+
 

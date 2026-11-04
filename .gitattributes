@@ -1,0 +1,5 @@
+* text=auto
+
+# Linux 生产脚本必须以 LF 落盘，否则在服务器上会因 \r 报 "bad interpreter"
+*.sh text eol=lf
+deploy/* text eol=lf

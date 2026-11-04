@@ -6,7 +6,7 @@
 
 | 模块 | 类型 | 职责 | 关键产出 |
 |---|---|---|---|
-| `AGENTS.md` | 治理 | 定义 7 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
+| `AGENTS.md` | 治理 | 定义 8 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
 | `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 18 例契约测试通过；端口 8787 |
 | `apps/web` | 业务代码（前端） | React 18 + Vite 5 的 Web 端薄壳（4s 轮询增量同步 + 401 自动刷新）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
@@ -25,12 +25,14 @@
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
 | `site/index.html` | 静态站点（本地预览） | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
 | `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
+| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元） | `https://mim.mixm.top` 前后端 + 数据库上线 |
+| `.github/workflows/deploy.yml` | CI/CD | 铁律八执行器：push `main` → 质量门禁（typecheck/test/build）→ SSH 远程发布 → 线上健康检查 | 每次 `main` 变更自动上线生产 |
 | `.screenshots/` | 资产暂存 | 截图存放（当前为空，仅含 `.tmp`） | — |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~09 共 9 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单 | 与仓库资产一一对应的唯一文档入口 |
 
 ## 1. AGENTS.md — 协作铁律（最高优先级）
 
-七条铁律的层级关系：
+八条铁律的层级关系：
 
 1. **铁律一（最高位）**：AI 负责执行，不得把「请你提供/请你操作」作为唯一推进路径；说「不可达」必须附取证证据。仅当外部服务需用户私有 OAuth/SSH 凭证时才可请求用户提供，且须附已尝试证据
 2. **铁律二**：可逆操作直接做；不可逆/结构性操作先出计划 + 影响清单，获授权后执行
@@ -39,6 +41,7 @@
 5. **铁律五**：通用能力优先引入成熟第三方依赖，禁止 vendor 复制源码；依赖须登记名称/版本/用途
 6. **铁律六**：全角色全流程自动化——AI 承担所有人员职责，覆盖写码/补全/修复/梳理/BUG 排查/代码检查，每轮交付前必须检查
 7. **铁律七**：功能模块增删必须全量同步全部受影响工件，交付报告附同步清单
+8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），禁止以本地预览作为交付终点；无线上取证不得宣称「已上线」
 
 **冲突裁决**：铁律五与铁律一冲突时（如沙箱无网络），执行优先，允许本地实现但必须在交付报告标注「已偏离铁律五」及理由。
 
@@ -112,21 +115,45 @@ Mim-PRD.html ◂──论据── 两份 txt 调研
 team-hiring-plan.md ◂──论据── 全栈项目人员配置指南 txt
 docs/wiki/README.md ──索引──> docs/wiki/01~09（其中 08 引用 07/01，09 引用 04）
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
-package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/（本地预览，非生产部署）
+package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/（site/ 静态站，本地阅读用）
+AGENTS.md (铁律八) ──强制──> .github/workflows/deploy.yml ──SSH──> deploy/deploy.sh ──构建/发布──> /opt/mim/web + systemd mim-api ──反代──> https://mim.mixm.top
+deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 + certbot HTTPS + 首发布
+deploy/backup-db.sh ──备份──> services/mim-api/data/mim.db（WAL 一致性快照）
 ```
 
 代码层依赖已按 `packages/*` / `services/*` / `apps/*` 分层落地，唯一必须遵守的方向约束是「共享包不反向依赖应用」。依赖清单与版本见 [04-dependencies.md](./04-dependencies.md) §1。
 
 ## 7. site/、构建脚本与业务代码 — 本地预览 vs 功能产品
 
-> 本仓库已是**可运行的功能产品底座**（`apps/web` + `services/mim-api`）。`site/` 与构建脚本仅用于本地预览 PRD，**不作为线上产品部署、不绑定生产域名**。
+> 本仓库是**已上线生产的功能产品**：前端 `apps/web`、后端 `services/mim-api`、数据库 SQLite 三者共同部署在 `https://mim.mixm.top`（详见 §7.1）。`site/` 与 `scripts/build.mjs` 只是 PRD 的离线阅读副本，不参与生产。
 
 | 文件 | 说明 |
 |---|---|
-| `apps/web` + `services/mim-api` | 实际功能代码，运行方式见 [05-runbook.md](./05-runbook.md) §6 |
-| `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开 |
-| `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致 |
-| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 脚本调用 `scripts/build.mjs`；`dev` / `test` / `typecheck` 转发到 workspace |
-| `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`，零依赖，仅用于本地构建验证 |
+| `apps/web` + `services/mim-api` | 实际功能代码；生产运行方式见 §7.1 与 [05-runbook.md](./05-runbook.md) §6 |
+| `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**） |
+| `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**） |
+| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`；`build:web` / `build:all` / `deploy` / `deploy:bootstrap` 指向生产链路 |
+| `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`，零依赖，仅用于离线阅读构建 |
 
-两个 HTML 均**不含业务密钥**。生产域名（如 `data.mixm.top`）不归本仓库所有，线上功能代码的部署由独立应用仓库负责。
+两个 HTML 均**不含业务密钥**。
+
+### 7.1 生产部署拓扑（铁律八）
+
+```
+浏览器 ──HTTPS──> nginx（mim.mixm.top，Let's Encrypt）
+                    ├── /                → /opt/mim/web（apps/web 构建产物，SPA fallback）
+                    ├── /api/v1/*        → 127.0.0.1:8787（Express，systemd: mim-api）
+                    └── /health          → 127.0.0.1:8787
+Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL，持久化磁盘）
+```
+
+| 工件 | 作用 |
+|---|---|
+| `deploy/bootstrap.sh` | 一次性引导：apt 依赖、corepack+pnpm、`mim` 系统用户、`/opt/mim/{app,web}`、nginx 站点、systemd 单元、certbot 证书、首发布 |
+| `deploy/deploy.sh` | 幂等发布：`git fetch/reset` → `pnpm install --prod=false` → `build:web` → 同步静态根 → 重启 `mim-api` → 健康轮询 → `nginx -t` + reload |
+| `deploy/nginx-mim.conf` | 站点模板（root / 反代 / 缓存 / 安全头 / gzip） |
+| `deploy/mim-api.service` | systemd 单元（`User=mim`，`Restart=always`，仅 `data/` 与 `.mim-dev-secret/` 可写） |
+| `deploy/backup-db.sh` | SQLite 一致性备份（`sqlite3 .backup`），保留最近 N 份 |
+| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → SSH 执行 `deploy.sh` → 线上 `/health` + `/api/v1/plans` 取证 |
+
+**生产事实（2026-11-04 取证）**：`curl https://mim.mixm.top/health` = 200；`/api/v1/plans` 返回套餐 JSON；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘。
