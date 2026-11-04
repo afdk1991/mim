@@ -131,9 +131,9 @@
 | `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(order/refund/job/admin)`、`created_at` | 只追加，禁止 UPDATE |
 | `order_items` | `id`、`order_id`、`item_type(plan/module)`、`item_id`、`amount_minor`、`currency` | 一单可挂 1 计划 + N 模块；退款按项回收 |
 
-**comic 域（第 1 期三表已建，2026-11-04）**
+**comic 域（第 1 期三表 2026-11-04 已建；第 2 期 `generation_jobs` / `comic_films` / `film_versions` 2026-11-05 已建）**
 
-> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表，四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。**第 1 期只建前三表，其余四表待第 2/3/4 期。**
+> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表，四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。**仅剩 `generation_assets` 待 media 域（对象存储预签名）就绪后建表。**
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
@@ -192,9 +192,9 @@
 - `contents.status`（P1）：`draft → published ⇄ blocked`、`published → deleted`；任何机审/人审结论只能经 `audit_records` 追加，不允许直接改 `contents.status` 跳过审核。
 - `modules.status`（已建表，写路径未实现）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配在区内永不复用（唯一约束为 `(region, code)`）。
 - `entitlements.status`（已建表，发放/回收写路径未实现）：只能经 `entitlement_events` 追加推进；`revoked`（退款/风控）与 `expired`（订阅到期）**必须**与触发事务（`refunds.executed` / 订阅状态机）同事务写入，不允许事后异步补写。当前只读门禁 `requireEntitlement` 已按 `status='active' AND (expires_at IS NULL OR expires_at > now)` 判定。
-- `comic_projects.status`（**第 1 期已实现 `draft ⇄ storyboarded`**；`generating`/`rendered`/`published` 仅占位）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本（`confirmed_at` 非空），且仅 `draft`/`storyboarded` 两种状态允许编辑与写分镜；进入 `rendered` 必须有 `generation_assets` 覆盖全部分镜（第 2 期）；进入 `published` 必须有已发布 `comic_films`（第 4 期），不得跳级。
-- `comic_films.status`（规划，0 代码）：`draft → reviewing → published`，驳回回到 `draft` 并留原因；`published` 只能由 `current_version_id` 指向的 `film_versions` 支撑，版本只追加不覆盖。
-- `generation_jobs.status`（规划，0 代码）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算。
+- `comic_projects.status`（**第 1 期已实现 `draft ⇄ storyboarded`；第 2 期骨架已实现 `storyboarded → generating → rendered → published`**，`archived` 保留给归档流）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本（`confirmed_at` 非空），且仅 `draft`/`storyboarded` 两种状态允许编辑与写分镜；首个 `generation_jobs` 派发驱动 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`（骨架口径；待 `generation_assets` 建表后收紧为「产物覆盖全部分镜」）；成片 `publish` 驱动 `rendered → published`，不得跳级。
+- `comic_films.status`（**第 2 期骨架已实现**）：`draft → reviewing → published → archived`；提交审核要求最新版本已登记 `object_key`；驳回回到 `draft` 并留原因（`review_note`）；`published` 只能由 `current_version_id` 指向的 `film_versions` 支撑，版本只追加不覆盖，发新版回到 `draft` 待重审。
+- `generation_jobs.status`（**第 2 期骨架已实现**）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算（结算写路径待成本预检迭代）。状态迁移暂由编排控制面端点驱动，ai-orchestrator 接入后改由其消费队列调用。
 
 ## 4. 前端（多端）模块清单
 

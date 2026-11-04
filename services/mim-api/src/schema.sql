@@ -261,6 +261,57 @@ CREATE TABLE IF NOT EXISTS storyboards (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_storyboards_project_version ON storyboards(project_id, version_no);
 CREATE INDEX IF NOT EXISTS idx_storyboards_project ON storyboards(project_id, created_at);
 
+-- ---------- comic 域（第 2 期：生成任务编排 + 成片合成，07 §12.2、08 §3.2）----------
+-- 失败重试新建 job（retry_of 指向原 job），历史 job 与产物永不覆盖；额度在 succeeded 时结算
+CREATE TABLE IF NOT EXISTS generation_jobs (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT NOT NULL,
+  storyboard_id       TEXT,
+  job_type            TEXT NOT NULL CHECK (job_type IN ('text','image','video','tts','compose')),
+  status              TEXT NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued','running','succeeded','failed','canceled')),
+  retry_of            TEXT,
+  cost_estimate_minor INTEGER,
+  error_code          TEXT,
+  payload             TEXT NOT NULL DEFAULT '{}',
+  result              TEXT,
+  created_by          TEXT NOT NULL,
+  created_at          TEXT NOT NULL,
+  started_at          TEXT,
+  finished_at         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_generation_jobs_project ON generation_jobs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_generation_jobs_status_type ON generation_jobs(status, job_type);
+
+-- 成片主体；current_version_id 指向最新已发布版本；版本只追加不覆盖
+CREATE TABLE IF NOT EXISTS comic_films (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT NOT NULL,
+  title               TEXT NOT NULL,
+  status              TEXT NOT NULL DEFAULT 'draft'
+                      CHECK (status IN ('draft','reviewing','published','archived')),
+  current_version_id  TEXT,
+  review_note         TEXT,
+  version             INTEGER NOT NULL DEFAULT 1,
+  created_at          TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  deleted_at          TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_comic_films_project ON comic_films(project_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS film_versions (
+  id            TEXT PRIMARY KEY,
+  film_id       TEXT NOT NULL,
+  version_no    INTEGER NOT NULL,
+  object_key    TEXT,
+  duration_sec  INTEGER,
+  size_bytes    INTEGER,
+  published_at  TEXT,
+  created_by    TEXT NOT NULL,
+  created_at    TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_film_versions_film_version ON film_versions(film_id, version_no);
+
 -- ---------- 认证与会话辅助 ----------
 CREATE TABLE IF NOT EXISTS verification_codes (
   id           TEXT PRIMARY KEY,
