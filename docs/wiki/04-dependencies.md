@@ -15,7 +15,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `better-sqlite3` | ^13.0.3 | 运行时 | 嵌入式 SQLite 持久化（单库替代 PostgreSQL 规划） |
 | `@mim/core-domain` | workspace:* | 运行时 | 领域层：套餐、状态机、权限、任务层级、金额、错误码 |
 | `@mim/i18n` | workspace:* | 运行时 | 错误码与文案的双语映射 |
-| `vitest` | ^2.1.9 | 开发 | 测试框架 |
+| `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告） |
 | `supertest` | ^7.1.4 | 开发 | HTTP 契约测试 |
 | `tsx` | ^4.20.6 | 开发 | TS 直接运行（`dev` / `start`） |
 | `typescript` | ^5.6.3 | 开发 | 类型检查（`tsc --noEmit`） |
@@ -28,8 +28,8 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `react` / `react-dom` | ^18.3.1 | 运行时 | 工作区 UI |
 | `@mim/core-domain` | workspace:* | 运行时 | 套餐 features 与金额格式化复用 |
 | `@mim/i18n` | workspace:* | 运行时 | 双语文案与 `formatCurrency` |
-| `vite` | ^5.4.11 | 开发 | 构建与 dev server（端口 5173，代理 `/api` `/health` → 8787） |
-| `@vitejs/plugin-react` | ^4.3.4 | 开发 | React 插件 |
+| `vite` | ^6.4.4 | 开发 | 构建与 dev server（端口 5173，代理 `/api` `/health` → 8787）；6.4.4 为安全修复线 |
+| `@vitejs/plugin-react` | ^4.7.0 | 开发 | React 插件（peer 支持 Vite 4/5/6/7） |
 | `typescript` | ^5.6.3 | 开发 | 类型检查 |
 | `@types/react` / `@types/react-dom` | 见 package.json | 开发 | 类型声明 |
 
@@ -45,7 +45,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | 项 | 版本 | 用途 |
 |---|---|---|
 | `pnpm` | `9.12.0`（`packageManager` 固定） | workspace 安装/过滤运行；锁文件 `pnpm-lock.yaml` |
-| Node.js | 声明 `>=18`（实测 `v22.23.3`） | 运行与测试 |
+| Node.js | 声明 `>=20`（实测 `v22.23.3`） | 运行与测试（Vitest 4 要求 Node ^20 / ^22 / >=24） |
 | `git` CLI | 可选 | 仅 `scripts/version-check.mjs` 的 tag 校验段需要；缺失时该段降级跳过 |
 
 两个校验脚本（`version-check.mjs` / `env-check.mjs`）仍只使用 Node 内置模块：
@@ -68,7 +68,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 
 | 项 | 要求 | 说明 |
 |---|---|---|
-| Node.js | `>= 18`（根 `engines` 声明；实测 `v22.23.3`） | Express 5 / better-sqlite3 / Vite 5 的最低要求 |
+| Node.js | `>= 20`（根 `engines` 声明；实测 `v22.23.3`） | Vitest 4 要求 Node ^20 / ^22 / >=24；Express 5 / better-sqlite3 / Vite 6 亦满足 |
 | 包管理器 | `pnpm 9.12.0`（`packageManager` 固定） | 必须使用 pnpm；`pnpm install` 生成 `pnpm-lock.yaml` |
 | 操作系统 | 跨平台 | Windows / macOS / Linux 均可；`better-sqlite3` 为原生模块，首次安装需可编译环境（prebuilt 可用时自动下载） |
 | 数据库 | 无外部服务 | SQLite 文件随服务启动自动创建（默认落本地 `.data/`，测试用内存库） |

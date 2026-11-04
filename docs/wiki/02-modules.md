@@ -9,7 +9,7 @@
 | `AGENTS.md` | 治理 | 定义 8 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
 | `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 18 例契约测试通过；端口 8787 |
-| `apps/web` | 业务代码（前端） | React 18 + Vite 5 的 Web 端薄壳（4s 轮询增量同步 + 401 自动刷新）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
+| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（4s 轮询增量同步 + 401 自动刷新）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
 | `packages/core-domain` | 共享包 | 错误码、套餐与 features、权限、任务层级、金额、UUIDv7 | 前后端共用单一事实源 |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |

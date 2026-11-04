@@ -6,7 +6,7 @@
 
 | 依赖 | 必要性 | 检查命令 |
 |---|---|---|
-| Node.js（≥ 18，实测 v22.23.3） | **必需** | `node --version` |
+| Node.js（≥ 20，实测 v22.23.3） | **必需** | `node --version` |
 | pnpm 9.12.0（`packageManager` 已锁定） | **必需**（`corepack enable` 或 `npm i -g pnpm@9.12.0`） | `pnpm --version` |
 | git CLI | 可选（仅 tag 校验段需要） | `git --version` |
 

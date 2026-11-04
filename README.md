@@ -42,7 +42,7 @@ node scripts/env-check.mjs
 pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`、`packages/*`）：
 
 ```
-apps/web/            # Web 端薄壳（React 18 + Vite 5，端口 5173）
+apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173）
 services/mim-api/    # 后端 API（Express 5 + SQLite，端口 8787，前缀 /api/v1）
 packages/core-domain/# 共享领域层（错误码/套餐/权限/任务层级/金额/UUIDv7）
 packages/i18n/       # 双语文案（zh-CN / en-US）与货币格式化
@@ -55,7 +55,7 @@ docs/wiki/           # 结构化文档（01~09）
 
 ## 开发与运行
 
-前置：Node >= 18（实测 v22.23.3）、pnpm 9.12.0。
+前置：Node >= 20（实测 v22.23.3）、pnpm 9.12.0。
 
 ```bash
 pnpm install                              # 安装全部 workspace 依赖

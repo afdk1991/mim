@@ -40,7 +40,7 @@
 | 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
 | 支付 | `payment-driver` 多通道 + 回调验签 | 仅 `mock` 驱动：checkout 即置 `paid` 并激活订阅；其余 driver 返回 `PAYMENT_DRIVER_UNAVAILABLE` | 无持牌通道凭证；接入真实 driver 时只替换 `billing.ts` 内驱动分支 |
 | 实时同步 | WebSocket + MQ 推送，5 秒内到达 | 前端 4s 轮询 `GET /sync/changes?project_id=&since_seq=`，`task_events.seq` 增量拉取 | 满足「5 秒内」硬约束；避免引入 WebSocket 依赖。多端一致性靠服务端 `seq` + LWW 裁决 |
-| 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 5），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
+| 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 6），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
 | 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/套餐/权限/任务层级/金额/ID）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象 |
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | CSV 导出同步生成、响应内直接下载（`routes/exports.ts`），无对象存储 | 小数据量可接受；导出转异步 + 对象存储时改 `exports.ts` |
 | 后台管理 | `admin-api` + RBAC 后台 | 未实现；审计数据已落 `audit_logs` 表 | P1 |

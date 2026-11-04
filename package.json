@@ -20,6 +20,6 @@
     "check": "node scripts/version-check.mjs && node scripts/env-check.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

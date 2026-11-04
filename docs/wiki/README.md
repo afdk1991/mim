@@ -41,7 +41,7 @@ f:\合并项目\Mim
 ├── 全平台小程序开发与分发-*.txt    # 参考调研：小程序全平台开发与分发
 ├── 全栈项目人员配置指南-*.txt      # 参考调研：全栈团队岗位与编制
 ├── apps/
-│   └── web/                       # Web 端（React 18 + Vite 5，5173）
+│   └── web/                       # Web 端（React 18 + Vite 6，5173）
 ├── services/
 │   └── mim-api/                   # 后端 API（Express 5 + SQLite，8787）+ test/
 ├── packages/
