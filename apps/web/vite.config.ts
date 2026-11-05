@@ -12,6 +12,8 @@ export default defineConfig({
       '/health': { target: API_TARGET, changeOrigin: true },
     },
   },
+  // 相对 base：同一份产物可挂载在任意子路径（GitHub Pages /mim/、Cloudflare /、Vercel /、自建 /）
+  base: './',
   build: {
     outDir: 'dist',
     sourcemap: true,

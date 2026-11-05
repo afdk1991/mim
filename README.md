@@ -94,6 +94,26 @@ npm run check                             # 版本规约 + 密钥模板校验
 | 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
 | `site/index.html` / `site/prd.html` | PRD 可视化入口与副本，仅离线阅读，**不参与生产** |
 
+### 多平台部署矩阵
+
+一套代码、一份前端产物（`vite base: './'`，可挂任意子路径），后端统一由 `services/mim-api` 提供。CI 在 push `main` 时并行触发下列链路；缺凭证的平台以 `SKIP` 跳过，不阻断主链路。
+
+| 平台 | 载体 | 入口 / 配置 | 状态 |
+|---|---|---|---|
+| GitHub 仓库 | 源码主仓 | `https://github.com/afdk1991/mim` | ✅ 已同步 |
+| GitHub Pages | 前端静态站 | CI job `pages`（`configure-pages` + `upload-pages-artifact` + `deploy-pages`），`https://afdk1991.github.io/mim/` | ✅ CI 自动发布 |
+| GitHub Packages | 容器镜像（ghcr） | CI job `packages` → `ghcr.io/afdk1991/mim-api:{latest,sha}`；npm registry 受「包 scope 必须等于仓库 owner」限制，故 `@mim/*` 不发 npm | ✅ CI 自动推送 |
+| 腾讯云 EdgeOne Pages | 静态站 `site/` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，输出 `dist`） | ✅ 已同步（`data.mixm.top`） |
+| Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js` | ⚙️ 配置就绪，待 `CLOUDFLARE_API_TOKEN` |
+| Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`） | ⚙️ 配置就绪，待 `VERCEL_TOKEN` |
+| Render | 静态站 + Node 服务 | `render.yaml`（`mim-web` + `mim-api` + 1GiB 持久盘） | ⚙️ 配置就绪，待 `RENDER_DEPLOY_HOOK` |
+| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC） | ⚙️ 配置就绪，待 `SEALOS_KUBECONFIG` |
+| veFaaS | 容器函数 | `deploy/vefaas/deploy.sh` | ⚙️ 脚本就绪，待 `vefaas` CLI + 火山引擎凭证 |
+| IGA Pages | 前端静态站 | `deploy/iga/deploy.sh` | ⚙️ 脚本就绪，待 IGA CLI + `IGA_TOKEN` |
+| 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ 生产 `https://mim.mixm.top` |
+
+托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
+
 本地构建（可选）：`npm run build`（site → dist）；前端产物：`npm run build:web`；校验：`npm run check`。
 
 

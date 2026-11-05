@@ -1,6 +1,7 @@
 /** Express 应用装配：对象收发 → 公开路由 → 鉴权路由 → 统一 404/错误信封 */
 
 import express from 'express';
+import cors from 'cors';
 import type { Express, NextFunction, Request, Response } from 'express';
 import { createAuthRouter } from './routes/auth.js';
 import { createMeRouter } from './routes/me.js';
@@ -23,6 +24,24 @@ export function createApp(deps: ApiDeps): Express {
   const app = express();
   app.disable('x-powered-by');
   app.use(requestId);
+  // 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel / Render）以独立域名直连本 API。
+  // MIM_CORS_ORIGINS 未配置时不挂载，保持自建服务器「同源反代」原有行为不变；Bearer 鉴权不依赖 Cookie，故 credentials 关闭。
+  const corsOrigins = (resolved.env.MIM_CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  if (corsOrigins.length > 0) {
+    app.use(
+      cors({
+        origin: corsOrigins,
+        methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id'],
+        exposedHeaders: ['X-Request-Id'],
+        credentials: false,
+        maxAge: 86400,
+      }),
+    );
+  }
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.deps = resolved;
     next();

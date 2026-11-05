@@ -1,0 +1,45 @@
+# Render Blueprint：静态前端 + Node 后端（同一份仓库、同一套构建）
+#
+# 前端 mim-web：构建 apps/web/dist，托管在 Render Static Site，域名独立；
+#   API 直连 mim-api（跨域白名单由 MIM_CORS_ORIGINS 控制，见 services/mim-api/src/app.ts）。
+# 后端 mim-api：esbuild 单文件产物 + 持久磁盘（SQLite 落在 services/mim-api/data）。
+# 注：Render 的 Node 运行时自带 node_modules 安装，原生模块 better-sqlite3 由 Render 侧编译。
+
+services:
+  - type: web
+    name: mim-api
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @mim/api build
+    startCommand: node services/mim-api/dist/index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MIM_JWT_SECRET
+        generateValue: true
+      - key: MIM_CORS_ORIGINS
+        value: https://mim-web.onrender.com
+    disk:
+      name: mim-data
+      mountPath: /opt/render/project/src/services/mim-api/data
+      sizeGB: 1
+
+  - type: web
+    name: mim-web
+    runtime: static
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @mim/web build
+    staticPublishPath: apps/web/dist
+    autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://mim-api.onrender.com/api/*
+      - type: rewrite
+        source: /health
+        destination: https://mim-api.onrender.com/health
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -134,3 +134,159 @@ jobs:
             exit 1
           fi
           echo "✅ /api/v1/auth/code 非法 JSON 返回 400（$bad）"
+
+  # ---------- GitHub Pages：托管前端静态产物 ----------
+  # Pages 无服务端，前端必须以 VITE_API_ORIGIN 直连生产 API；跨域由 MIM_CORS_ORIGINS 放行
+  # https://afdk1991.github.io（deploy/deploy.sh 幂等补齐）。vite base='./' 使产物可挂 /mim/ 子路径。
+  pages:
+    name: GitHub Pages（前端静态站）
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 构建前端（注入生产 API 源）
+        env:
+          VITE_API_ORIGIN: https://mim.mixm.top
+        run: pnpm --filter @mim/web build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+      - name: 发布到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ---------- GitHub Packages：ghcr 容器镜像（npm registry 受 scope==owner 限制，故走容器分发） ----------
+  packages:
+    name: GitHub Packages（ghcr 镜像）
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/afdk1991/mim-api:latest
+            ghcr.io/afdk1991/mim-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------- 托管平台同步（无凭证则 SKIP，不阻断主链路） ----------
+  platforms:
+    name: 托管平台同步（Cloudflare / Vercel / Render / Sealos / veFaaS / IGA）
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 构建前端（同源，由各平台反代 /api）
+        run: pnpm --filter @mim/web build
+
+      - name: Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "SKIP: 缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID"; exit 0
+          fi
+          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main
+
+      - name: Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "SKIP: 缺少 VERCEL_TOKEN"; exit 0
+          fi
+          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Render
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "SKIP: 缺少 RENDER_DEPLOY_HOOK"; exit 0
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+
+      - name: Sealos
+        env:
+          SEALOS_KUBECONFIG: ${{ secrets.SEALOS_KUBECONFIG }}
+          SEALOS_DOMAIN: ${{ secrets.SEALOS_DOMAIN }}
+          MIM_JWT_SECRET: ${{ secrets.MIM_JWT_SECRET }}
+        run: |
+          if [ -z "$SEALOS_KUBECONFIG" ]; then
+            echo "SKIP: 缺少 SEALOS_KUBECONFIG"; exit 0
+          fi
+          mkdir -p ~/.kube
+          printf '%s' "$SEALOS_KUBECONFIG" > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl create namespace mim --dry-run=client -o yaml | kubectl apply -f -
+          sed -e "s/__JWT_SECRET__/${MIM_JWT_SECRET}" -e "s/__DOMAIN__/${SEALOS_DOMAIN}" \
+            deploy/sealos/mim.yaml | kubectl apply -f -
+          kubectl -n mim rollout status deployment/mim-api --timeout=180s
+
+      - name: veFaaS
+        env:
+          VE_ACCESS_KEY: ${{ secrets.VE_ACCESS_KEY }}
+          VE_SECRET_KEY: ${{ secrets.VE_SECRET_KEY }}
+          VEFAAS_APP_ID: ${{ secrets.VEFAAS_APP_ID }}
+        run: bash deploy/vefaas/deploy.sh
+
+      - name: IGA Pages
+        env:
+          IGA_TOKEN: ${{ secrets.IGA_TOKEN }}
+          IGA_PROJECT_ID: ${{ secrets.IGA_PROJECT_ID }}
+        run: bash deploy/iga/deploy.sh

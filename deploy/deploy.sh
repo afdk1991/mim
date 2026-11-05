@@ -136,6 +136,16 @@ else
 fi
 chmod 600 "$MIM_ENV_FILE"
 
+# 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel 等）以独立域名直连本 API 所必需。
+# 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_CORS_ORIGINS 环境变量可覆盖默认列表。
+CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top}"
+if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE"; then
+  log "$MIM_ENV_FILE 已含 MIM_CORS_ORIGINS，保留现有值"
+else
+  log "补齐 $MIM_ENV_FILE（MIM_CORS_ORIGINS=$CORS_DEFAULT）"
+  printf 'MIM_CORS_ORIGINS=%s\n' "$CORS_DEFAULT" >> "$MIM_ENV_FILE"
+fi
+
 if id -u "$RUN_USER" >/dev/null 2>&1; then
   chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$WEB_DIR" 2>/dev/null || true
   chown "$RUN_USER:$RUN_USER" "$MIM_ENV_FILE" 2>/dev/null || true

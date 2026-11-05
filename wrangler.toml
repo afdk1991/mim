@@ -1,0 +1,7 @@
+name = "mim"
+compatibility_date = "2026-11-01"
+pages_build_output_dir = "apps/web/dist"
+
+# Cloudflare Pages：构建命令 pnpm --filter @mim/web build，产物 apps/web/dist。
+# 同源 /api 请求由 functions/api/[[path]].js 反代到生产 API（见该文件），
+# 因此前端无需在 Cloudflare 侧注入 VITE_API_ORIGIN。

@@ -1,0 +1,119 @@
+# Sealos 部署清单：API（ghcr 镜像）+ 持久卷（SQLite）+ Service + Ingress
+#
+# 镜像由 GitHub Actions 的 packages job 推送到 ghcr.io/afdk1991/mim-api:latest。
+# 数据库为持久化 PVC（mim-data），挂载到 /app/services/mim-api/data（与 config.ts 的 DATA_DIR 一致）。
+#
+# 应用前需替换 __JWT_SECRET__ 与 __DOMAIN__：
+#   kubectl create namespace mim --dry-run=client -o yaml | kubectl apply -f -
+#   sed -e "s/__JWT_SECRET__/$(openssl rand -hex 32)/" -e "s/__DOMAIN__/mim.example.com/" \
+#     deploy/sealos/mim.yaml | kubectl apply -f -
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mim-data
+  namespace: mim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mim-api
+  namespace: mim
+  labels:
+    app: mim-api
+spec:
+  replicas: 1
+  # SQLite 为单写者，副本数必须为 1，避免多实例写坏数据库
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mim-api
+  template:
+    metadata:
+      labels:
+        app: mim-api
+    spec:
+      containers:
+        - name: mim-api
+          image: ghcr.io/afdk1991/mim-api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8787
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "8787"
+            - name: MIM_JWT_SECRET
+              value: "__JWT_SECRET__"
+            - name: MIM_CORS_ORIGINS
+              value: "https://__DOMAIN__"
+          volumeMounts:
+            - name: data
+              mountPath: /app/services/mim-api/data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mim-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mim-api
+  namespace: mim
+spec:
+  selector:
+    app: mim-api
+  ports:
+    - name: http
+      port: 8787
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mim
+  namespace: mim
+  annotations:
+    # Sealos 内置 ingress-nginx；证书由 Sealos 自动签发
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: __DOMAIN__
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mim-api
+                port:
+                  number: 8787

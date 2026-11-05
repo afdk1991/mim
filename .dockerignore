@@ -1,0 +1,21 @@
+# 依赖与产物由镜像内构建生成，不进入构建上下文
+node_modules
+**/node_modules
+dist
+**/dist
+
+# 运行期数据与本地密钥（必须在容器内重新生成 / 挂载）
+services/mim-api/data
+.mim-dev-secret
+
+# 环境变量与凭证
+.env
+.env.*
+!.env.example
+
+# 版本控制与本地杂项
+.git
+.gitignore
+*.xls
+*.log
+.screenshots

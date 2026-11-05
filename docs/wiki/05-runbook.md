@@ -175,6 +175,41 @@ gh secret set DEPLOY_USER --body "ubuntu"
 gh run watch          # 观察最近一次运行
 ```
 
+### 7.1.2 多平台同步（GitHub Pages / Packages / 托管平台）
+
+同一次 push 还会并行触发 3 个 job（均 `needs: verify`，失败不影响自建服务器发布）：
+
+| job | 做什么 | 需要的 secret | 缺失时行为 |
+|---|---|---|---|
+| `pages` | `pnpm --filter @mim/web build`（注入 `VITE_API_ORIGIN=https://mim.mixm.top`）→ `upload-pages-artifact` → `deploy-pages` | 无（用 `GITHUB_TOKEN` + `pages: write` / `id-token: write`） | 直接发布 `https://afdk1991.github.io/mim/` |
+| `packages` | `docker/build-push-action` 推 `ghcr.io/afdk1991/mim-api:latest` 与 `:${GITHUB_SHA}` | 无（`GITHUB_TOKEN` + `packages: write`） | 直接推送；镜像供 Render / Sealos / veFaaS 复用 |
+| `platforms` | Cloudflare / Vercel / Render / Sealos / veFaaS / IGA 依次同步 | 见下表 | 每个 step `[ -z "$TOKEN" ] && exit 0`，打印 SKIP |
+
+| 平台 | 配置文件 | secret |
+|---|---|---|
+| Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js` | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
+| Vercel | `vercel.json` | `VERCEL_TOKEN` |
+| Render | `render.yaml` | `RENDER_DEPLOY_HOOK` |
+| Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`MIM_JWT_SECRET` |
+| veFaaS | `deploy/vefaas/deploy.sh` | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID` |
+| IGA Pages | `deploy/iga/deploy.sh` | `IGA_TOKEN`、`IGA_PROJECT_ID` |
+
+```bash
+# 一次性注入（有凭证时）
+gh secret set CLOUDFLARE_API_TOKEN --body "<token>"
+gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account id>"
+gh secret set VERCEL_TOKEN --body "<token>"
+gh secret set RENDER_DEPLOY_HOOK --body "<hook url>"
+gh secret set SEALOS_KUBECONFIG --body "$(cat ~/.kube/config)"
+```
+
+托管平台以独立域名直连 API 时，`MIM_CORS_ORIGINS` 必须包含其域名（`deploy/deploy.sh` 幂等补齐
+`https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`；Cloudflare / Vercel / Render 使用
+`functions` / `rewrites` 同源反代时无需额外配置）。
+
+容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
+`Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
+
 ### 7.1.1 服务器出网限制（重要）
 
 生产服务器 **访问 `https://github.com` 超时**（`curl: (28) SSL timeout`），但 `github.com:22` 可达，

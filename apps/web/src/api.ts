@@ -36,7 +36,10 @@ export interface MeResponse {
   user: UserInfo;
 }
 
-const BASE = '/api/v1';
+// API 源：默认同源（自建服务器经 nginx 反代）；托管平台（GitHub Pages / Cloudflare / Vercel）
+// 通过构建期 VITE_API_ORIGIN 指向生产 API。
+const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, '');
+const BASE = `${API_ORIGIN}/api/v1`;
 const SESSION_KEY = 'mim.session.v1';
 
 export class ApiError extends Error {

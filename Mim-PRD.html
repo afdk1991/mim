@@ -226,6 +226,27 @@
 <!-- 分期归属说明 -->
 <p>分期归属依据：P0 范围已含 App（iOS/Android）、微信小程序、PC（Windows/macOS）；支付宝、抖音、百度、QQ 小程序与 Ubuntu（Linux）按 P1 清单迭代，上线时同样满足本表下限。各端 UI 差异仍由平台适配层吸收，业务逻辑统一（见 FR-04）。</p>
 
+<!-- 部署载体小节标题（非产品需求，仅记录交付通道） -->
+<h3>部署载体（交付通道，非产品需求）</h3>
+<!-- 部署载体说明：一套代码多平台同步 -->
+<p class="muted">同一份前端产物（<code>vite base: './'</code>，可挂任意子路径）与同一套后端 <code>services/mim-api</code>（含 SQLite 持久化库）同步发布到多平台；CI 在 push <code>main</code> 后并行触发，缺凭证的平台以 SKIP 跳过、不阻断主链路。</p>
+<!-- 部署载体矩阵 -->
+<table>
+  <!-- 表头：平台 / 载体 / 配置入口 -->
+  <tr><th>平台</th><th>载体</th><th>配置入口</th></tr>
+  <tr><td>GitHub 仓库</td><td>源码主仓</td><td><code>github.com/afdk1991/mim</code></td></tr>
+  <tr><td>GitHub Pages</td><td>前端静态站</td><td>CI job <code>pages</code>，<code>afdk1991.github.io/mim/</code></td></tr>
+  <tr><td>GitHub Packages</td><td>容器镜像</td><td>CI job <code>packages</code>，<code>ghcr.io/afdk1991/mim-api</code></td></tr>
+  <tr><td>腾讯云 EdgeOne Pages</td><td>静态站 <code>site/</code></td><td>EdgeOne 控制台已连接仓库，<code>data.mixm.top</code></td></tr>
+  <tr><td>Cloudflare Pages / Workers</td><td>前端 + <code>/api</code> 反代</td><td><code>wrangler.toml</code> + <code>functions/api/[[path]].js</code></td></tr>
+  <tr><td>Vercel</td><td>前端 + <code>/api</code> rewrite</td><td><code>vercel.json</code></td></tr>
+  <tr><td>Render</td><td>静态站 + Node 服务 + 持久盘</td><td><code>render.yaml</code></td></tr>
+  <tr><td>Sealos</td><td>容器 + PVC</td><td><code>deploy/sealos/mim.yaml</code></td></tr>
+  <tr><td>veFaaS</td><td>容器函数</td><td><code>deploy/vefaas/deploy.sh</code></td></tr>
+  <tr><td>IGA Pages</td><td>前端静态站</td><td><code>deploy/iga/deploy.sh</code></td></tr>
+  <tr><td>腾讯云自建服务器</td><td>前后端 + SQLite</td><td><code>deploy/deploy.sh</code>，<code>mim.mixm.top</code></td></tr>
+</table>
+
 <!-- 章节标题：4. 角色与对象模型 -->
 <h2>4. 角色与对象模型</h2>
 

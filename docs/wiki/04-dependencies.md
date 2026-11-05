@@ -13,13 +13,14 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `jsonwebtoken` | ^9.0.3 | 运行时 | JWT 访问令牌 + refresh 轮换 |
 | `bcryptjs` | ^3.0.2 | 运行时 | 密码哈希（global 邮箱密码登录） |
 | `better-sqlite3` | ^13.0.3 | 运行时 | 嵌入式 SQLite 持久化（单库替代 PostgreSQL 规划） |
+| `cors` | ^2.8.6 | 运行时 | 跨域白名单中间件：托管平台（GitHub Pages / Cloudflare / Vercel / Render）以独立域名直连 API 时放行来源；`MIM_CORS_ORIGINS` 为空则不挂载，自建同源部署行为不变 |
 | `@mim/core-domain` | workspace:* | 运行时 | 领域层：状态机、错误码 |
 | `@mim/i18n` | workspace:* | 运行时 | 错误码与文案的双语映射 |
 | `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告） |
 | `supertest` | ^7.1.4 | 开发 | HTTP 契约测试 |
 | `tsx` | ^4.20.6 | 开发 | TS 直接运行（`dev` / `start`） |
 | `typescript` | ^5.6.3 | 开发 | 类型检查（`tsc --noEmit`） |
-| `@types/better-sqlite3` / `@types/express` / `@types/jsonwebtoken` / `@types/node` / `@types/supertest` | 见 package.json | 开发 | 类型声明 |
+| `@types/better-sqlite3` / `@types/cors` / `@types/express` / `@types/jsonwebtoken` / `@types/node` / `@types/supertest` | 见 package.json | 开发 | 类型声明 |
 
 ### 1.2 前端 `apps/web`
 
