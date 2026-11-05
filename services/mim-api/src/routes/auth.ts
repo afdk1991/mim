@@ -198,7 +198,7 @@ function findOrCreateUser(deps: ApiDeps, region: Region, provider: string, ident
 export function createAuthRouter(deps: ApiDeps): Router {
   const router = Router();
 
-  router.post('/auth/code', (req, res) => {
+  router.post('/auth/code', async (req, res) => {
     const body = parse(codeBody, req.body);
     const identity = normalizeIdentity(body.region, body.provider, body.identifier);
     const now = clockOf(deps);
@@ -215,9 +215,11 @@ export function createAuthRouter(deps: ApiDeps): Router {
       });
     }
 
-    // 生产环境禁止直下发验证码：未接入真实短信/邮件通道前直接拒绝，
-    // 避免 dev_code 明文出现在生产响应中（安全审计项）。
-    if (deps.env.NODE_ENV === 'production') {
+    // 通道选择：phone → 短信（阿里云 SMS），email → 邮件（AWS SES）。
+    // 生产环境通道未配置时直接拒绝，避免 dev_code 明文出现在生产响应中（安全审计项）；
+    // 开发/测试环境未配置通道时保持 dev_code 直发，便于本地联调。
+    const channel = identity.provider === 'phone' ? deps.notify?.sms : deps.notify?.email;
+    if (!channel && deps.env.NODE_ENV === 'production') {
       throw new AppError(
         'AUTH_CHANNEL_NOT_CONFIGURED',
         'verification channel is not configured in production',
@@ -226,6 +228,7 @@ export function createAuthRouter(deps: ApiDeps): Router {
     }
 
     const code = generateCode();
+    // 先落库后发送：若供应商已实际送达但响应超时/异常，用户仍可用该码登录
     deps.db
       .prepare(
         `INSERT INTO verification_codes
@@ -242,13 +245,31 @@ export function createAuthRouter(deps: ApiDeps): Router {
         now,
       );
 
+    if (!channel) {
+      res.status(201).json({
+        delivery: 'dev',
+        dev_code: code,
+        identifier: identity.identifier,
+        provider: identity.provider,
+        expires_in: CODE_TTL_SECONDS,
+        note: '开发模式：真实短信/邮件通道未配置，验证码直接下发；生产须配置第三方通道',
+      });
+      return;
+    }
+
+    try {
+      await channel.send(identity.identifier, code);
+    } catch {
+      throw new AppError('AUTH_CODE_DELIVERY_FAILED', 'failed to deliver verification code', {
+        provider: identity.provider,
+      });
+    }
+
     res.status(201).json({
-      delivery: 'dev',
-      dev_code: code,
+      delivery: identity.provider,
       identifier: identity.identifier,
       provider: identity.provider,
       expires_in: CODE_TTL_SECONDS,
-      note: '开发模式：真实短信/邮件通道未接入，验证码直接下发；上线前须替换为第三方通道',
     });
   });
 

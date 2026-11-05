@@ -1,5 +1,6 @@
 /** 服务端共享类型与 Express 请求扩展 */
 
+import type { NotifyChannels } from './notify.js';
 import type { Orchestrator } from './orchestrator.js';
 import type { StorageAdapter } from './storage.js';
 
@@ -16,6 +17,8 @@ export interface ApiDeps {
   storage?: StorageAdapter;
   /** 生成任务编排器（ai-orchestrator 域）；未注入时由 app 依据 env 构造默认实例 */
   orchestrator?: Orchestrator;
+  /** 验证码通知通道（短信/邮件）；未注入时由 app 依据 env 构造默认实例 */
+  notify?: NotifyChannels;
 }
 
 export type Region = 'cn' | 'global';

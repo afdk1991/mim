@@ -70,10 +70,26 @@ jobs:
             "sudo -n install -m 755 /tmp/mim-deploy.sh /opt/mim/app/deploy/deploy.sh"
 
       - name: 远程发布（检出本次提交 → 安装 → 构建 → 重启 → 健康检查）
+        env:
+          MIM_SMS_ALIYUN_ACCESS_KEY_ID: ${{ secrets.MIM_SMS_ALIYUN_ACCESS_KEY_ID }}
+          MIM_SMS_ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.MIM_SMS_ALIYUN_ACCESS_KEY_SECRET }}
+          MIM_SMS_ALIYUN_SIGN_NAME: ${{ secrets.MIM_SMS_ALIYUN_SIGN_NAME }}
+          MIM_SMS_ALIYUN_TEMPLATE_CODE: ${{ secrets.MIM_SMS_ALIYUN_TEMPLATE_CODE }}
+          MIM_EMAIL_SES_ACCESS_KEY_ID: ${{ secrets.MIM_EMAIL_SES_ACCESS_KEY_ID }}
+          MIM_EMAIL_SES_SECRET_ACCESS_KEY: ${{ secrets.MIM_EMAIL_SES_SECRET_ACCESS_KEY }}
+          MIM_EMAIL_SES_REGION: ${{ secrets.MIM_EMAIL_SES_REGION }}
+          MIM_EMAIL_SES_FROM_ADDRESS: ${{ secrets.MIM_EMAIL_SES_FROM_ADDRESS }}
         run: |
+          # 可选通道 secret 透传到远端 deploy.sh（%q 安全引用；未配置的 secret 为空则不传）
+          ENV_ARGS=""
+          for v in MIM_SMS_ALIYUN_ACCESS_KEY_ID MIM_SMS_ALIYUN_ACCESS_KEY_SECRET MIM_SMS_ALIYUN_SIGN_NAME MIM_SMS_ALIYUN_TEMPLATE_CODE \
+                   MIM_EMAIL_SES_ACCESS_KEY_ID MIM_EMAIL_SES_SECRET_ACCESS_KEY MIM_EMAIL_SES_REGION MIM_EMAIL_SES_FROM_ADDRESS; do
+            val="${!v}"
+            [ -n "$val" ] && ENV_ARGS="$ENV_ARGS $(printf '%s=%q' "$v" "$val")"
+          done
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "sudo -n bash /opt/mim/app/deploy/deploy.sh $GITHUB_SHA"
+            "sudo -n env $ENV_ARGS bash /opt/mim/app/deploy/deploy.sh $GITHUB_SHA"
 
       - name: 校验服务器代码版本与本次提交一致
         run: |

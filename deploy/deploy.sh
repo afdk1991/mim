@@ -156,6 +156,26 @@ else
   printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$AUTH_PASSWORD_DEFAULT" >> "$MIM_ENV_FILE"
 fi
 
+# 验证码通道（阿里云短信 / AWS SES）：deploy.yml 通过 sudo env 透传 CI Secret。
+# 幂等规则：已有非空值 → 保留；已有空占位且本次传来非空值 → 回填；缺失 → 写入（可能为空占位，
+# 生产保持 503 AUTH_CHANNEL_NOT_CONFIGURED，与代码优雅降级语义一致）。
+for VAR in MIM_SMS_ALIYUN_ACCESS_KEY_ID MIM_SMS_ALIYUN_ACCESS_KEY_SECRET MIM_SMS_ALIYUN_SIGN_NAME MIM_SMS_ALIYUN_TEMPLATE_CODE \
+           MIM_EMAIL_SES_ACCESS_KEY_ID MIM_EMAIL_SES_SECRET_ACCESS_KEY MIM_EMAIL_SES_REGION MIM_EMAIL_SES_FROM_ADDRESS; do
+  VALUE="$(eval "printf '%s' \"\${$VAR:-}\"")"
+  if grep -q "^${VAR}=" "$MIM_ENV_FILE"; then
+    CURRENT="$(grep "^${VAR}=" "$MIM_ENV_FILE" | head -n1 | cut -d= -f2-)"
+    if [ -n "$VALUE" ] && [ -z "$CURRENT" ]; then
+      sed -i "s|^${VAR}=.*|${VAR}=${VALUE}|" "$MIM_ENV_FILE"
+      log "回填 $MIM_ENV_FILE（${VAR} 空占位 → CI Secret）"
+    else
+      log "$MIM_ENV_FILE 已含 ${VAR}，保留现有值"
+    fi
+  else
+    printf '%s=%s\n' "$VAR" "$VALUE" >> "$MIM_ENV_FILE"
+    log "补齐 $MIM_ENV_FILE（${VAR}，$([ -n "$VALUE" ] && echo '来自 CI Secret' || echo '空占位')）"
+  fi
+done
+
 if id -u "$RUN_USER" >/dev/null 2>&1; then
   chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$WEB_DIR" 2>/dev/null || true
   chown "$RUN_USER:$RUN_USER" "$MIM_ENV_FILE" 2>/dev/null || true

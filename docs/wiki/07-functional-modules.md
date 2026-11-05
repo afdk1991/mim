@@ -259,7 +259,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 验证码发送 | `auth.ts` `POST /auth/code` | `Login.tsx` | ✅（生产强制走第三方通道，未接入即 503 `AUTH_CHANNEL_NOT_CONFIGURED`） |
+| 验证码发送 | `auth.ts` `POST /auth/code` + `notify.ts` 通道层 | `Login.tsx` | ✅（已接入真实通道：国内手机号 → 阿里云短信 `@alicloud/dysmsapi20170525`，海外邮箱 → AWS SES `@aws-sdk/client-ses`；凭证未配置时生产 503 `AUTH_CHANNEL_NOT_CONFIGURED`，供应商失败 502 `AUTH_CODE_DELIVERY_FAILED`） |
 | 验证码登录 / 注册 | `auth.ts` `POST /auth/login` | `Login.tsx` | ✅（开发/测试环境可用 `dev_code`） |
 | 密码登录（生产入口） | `auth.ts` `POST /auth/password` | `Login.tsx`（默认模式） | ✅（口令取自 `MIM_AUTH_ADMIN_PASSWORD`，401 / 503 / 423 语义见 [05-runbook.md](./05-runbook.md) §6.3） |
 | 令牌刷新轮换 | `auth.ts` `POST /auth/refresh` | `api.ts refreshSession()` | ✅ |

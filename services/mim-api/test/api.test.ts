@@ -207,6 +207,93 @@ describe('生产安全开关', () => {
   });
 });
 
+describe('验证码通道（短信/邮件供应商接入）', () => {
+  function channelApp(
+    env: Record<string, string | undefined>,
+    notify?: { sms?: { send(id: string, code: string): Promise<void> }; email?: { send(id: string, code: string): Promise<void> } },
+  ): Express {
+    return createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env, notify });
+  }
+
+  it('生产环境 + 短信通道已配置：201 无 dev_code，可用真实下发的码登录', async () => {
+    let sent: { identifier: string; code: string } | undefined;
+    const app = channelApp(
+      { NODE_ENV: 'production' },
+      { sms: { send: async (id, code) => { sent = { identifier: id, code }; } } },
+    );
+    const codeRes = await request(app)
+      .post('/api/v1/auth/code')
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000051' });
+    expect(codeRes.status).toBe(201);
+    expect(codeRes.body.dev_code).toBeUndefined();
+    expect(codeRes.body.delivery).toBe('phone');
+    expect(codeRes.body.expires_in).toBeGreaterThan(0);
+    expect(sent?.identifier).toBe('13800000051');
+    expect(sent?.code).toMatch(/^\d{6}$/);
+
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000051', code: sent!.code });
+    expect(login.status).toBe(200);
+    expect(login.body.access_token).toBeTruthy();
+  });
+
+  it('生产环境 + 邮件通道已配置：201 delivery=email 且无 dev_code', async () => {
+    let sent: { identifier: string; code: string } | undefined;
+    const app = channelApp(
+      { NODE_ENV: 'production' },
+      { email: { send: async (id, code) => { sent = { identifier: id, code }; } } },
+    );
+    const res = await request(app)
+      .post('/api/v1/auth/code')
+      .send({ region: 'global', provider: 'email', identifier: 'user@example.com' });
+    expect(res.status).toBe(201);
+    expect(res.body.dev_code).toBeUndefined();
+    expect(res.body.delivery).toBe('email');
+    expect(sent?.identifier).toBe('user@example.com');
+  });
+
+  it('生产环境只配置了邮件通道，请求短信：仍 503 AUTH_CHANNEL_NOT_CONFIGURED', async () => {
+    const app = channelApp(
+      { NODE_ENV: 'production' },
+      { email: { send: async () => {} } },
+    );
+    const res = await request(app)
+      .post('/api/v1/auth/code')
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000052' });
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe('AUTH_CHANNEL_NOT_CONFIGURED');
+  });
+
+  it('供应商发送失败：502 AUTH_CODE_DELIVERY_FAILED', async () => {
+    const app = channelApp(
+      { NODE_ENV: 'production' },
+      { sms: { send: async () => { throw new Error('provider down'); } } },
+    );
+    const res = await request(app)
+      .post('/api/v1/auth/code')
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000053' });
+    expect(res.status).toBe(502);
+    expect(res.body.code).toBe('AUTH_CODE_DELIVERY_FAILED');
+    expect(res.body.dev_code).toBeUndefined();
+  });
+
+  it('开发环境通道已配置时同样走真实通道（无 dev_code）', async () => {
+    let sentCode = '';
+    const app = channelApp(
+      {},
+      { sms: { send: async (_id, code) => { sentCode = code; } } },
+    );
+    const res = await request(app)
+      .post('/api/v1/auth/code')
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000054' });
+    expect(res.status).toBe(201);
+    expect(res.body.dev_code).toBeUndefined();
+    expect(res.body.delivery).toBe('phone');
+    expect(sentCode).toMatch(/^\d{6}$/);
+  });
+});
+
 describe('密码登录（验证码通道未接入时的生产入口）', () => {
   const PASSWORD = 'test-admin-pass-2026';
 

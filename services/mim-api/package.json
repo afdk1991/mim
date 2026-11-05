@@ -12,7 +12,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@alicloud/dysmsapi20170525": "^4.6.0",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@alicloud/tea-util": "^1.4.11",
     "@aws-sdk/client-s3": "^3.1162.0",
+    "@aws-sdk/client-ses": "^3.1162.0",
     "@aws-sdk/s3-request-presigner": "^3.1162.0",
     "@mim/core-domain": "workspace:*",
     "@mim/i18n": "workspace:*",
