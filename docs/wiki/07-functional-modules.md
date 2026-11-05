@@ -99,7 +99,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 |---|---|
 | `module_id` / `code` | 唯一标识；`code` 全局唯一、不可复用 |
 | `name` / `summary` | 多语言名称与一句话简介（i18n 资源，不硬编码） |
-| `unlock_mode` | `one_time`（一次性购买）— **当前唯一有效值**；`subscription`（订阅内含）随 FR-02 于 2026-11-05 下线，DB CHECK 约束需在收敛时同步移除 |
+| `unlock_mode` | `one_time`（一次性购买）— **当前唯一有效值**；`subscription`（订阅内含）随 FR-02 于 2026-11-05 下线，DB CHECK 约束已收敛为仅 `one_time` |
 | `price` | **按 region + 币种独立定价**，不换算汇率；`bigint` 最小货币单位 |
 | `entitlements_required` | 前置依赖模块（未解锁则不可购买/不可用） |
 | `status` | `draft` / `active` / `archived` |
@@ -249,7 +249,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 | OQ-06 | 是否支持 IoT 硬件接入 | 范围定义与后端架构 | Assumption：P0 不支持 |
 | OQ-07 | 漫剧生成产物的版权归属、可商用范围与内容审核口径 | FR-03.2 成片发布、导出授权与合规免责 | TBD |
 | OQ-08 | 文生图 / 图生视频 / TTS 模型选型与单工程成本上限 | FR-03.2 生成队列容量、配额与定价成本模型 | TBD |
-| OQ-09 | 功能模块采用「订阅内含」还是「独立一次性购买」 | FR-03.1 模块定价表结构与解锁回收规则 | **已定案（2026-11-05）**：仅 `one_time`；`subscription` 模式随 FR-02 下线，`modules.unlock_mode` 的 DB CHECK 约束待收敛时同步移除 |
+| OQ-09 | 功能模块采用「订阅内含」还是「独立一次性购买」 | FR-03.1 模块定价表结构与解锁回收规则 | **已定案（2026-11-05）**：仅 `one_time`；`subscription` 模式随 FR-02 下线，`modules.unlock_mode` 的 DB CHECK 约束已同步收敛 |
 
 ## 11. 功能模块落地对照表（P0，仓库实况）
 
