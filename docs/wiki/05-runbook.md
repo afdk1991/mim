@@ -152,16 +152,19 @@ push 到 `main` 即触发 `.github/workflows/deploy.yml`：
 
 ```
 verify:  pnpm install --frozen-lockfile → pnpm -r typecheck → @mim/api test → @mim/web build
-deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh $GITHUB_SHA"
+         → 脚本 reset --hard 到该 SHA（而非 origin/main，避免连续 push 时先跑的 Run 部署到后推的提交）
          → 校验服务器 HEAD == 本次提交 SHA（不一致即失败）
-         → curl https://mim.mixm.top/health（必须 200）
+         → curl https://mim.mixm.top/health（必须 200，最多重试 10 次）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/plans（必须 404）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/audit/logs（必须 404）
-         → curl -X POST -H 'Content-Type: application/json' --data-binary '{"region":"cn","provider":"phone","identifier":"13800000000"}'
-           https://mim.mixm.top/api/v1/auth/code（合法体必须 503 AUTH_CHANNEL_NOT_CONFIGURED，不得回 200/500）
+         → curl -X POST -H 'Content-Type: application/json' -d '{}'
+           https://mim.mixm.top/api/v1/auth/code（空体必须 400）
          → curl -X POST -H 'Content-Type: application/json' --data-binary '{"region":'
-           https://mim.mixm.top/api/v1/auth/code（非法 JSON 必须 400 VALIDATION_FAILED，不得回 500）
+           https://mim.mixm.top/api/v1/auth/code（非法 JSON 必须 400，不得回 500）
 ```
+
+手工验证生产安全开关（CI 不跑，需合法请求体）：`{"region":"cn","provider":"phone","identifier":"13800000000"}` 应返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`，不得回 200/500。
 
 所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`。
 
@@ -198,7 +201,8 @@ sudo -n bash /opt/mim/app/deploy/bootstrap.sh   # 需仓库已在 /opt/mim/app
 ### 7.3 幂等重放与运维
 
 ```bash
-sudo -n bash /opt/mim/app/deploy/deploy.sh     # 手动重放发布（git reset → install → build → 发布 → 健康轮询）
+sudo -n bash /opt/mim/app/deploy/deploy.sh              # 手动重放发布（origin/main → install → build → 发布 → 健康轮询）
+sudo -n bash /opt/mim/app/deploy/deploy.sh <commit-sha>  # 精确重放到指定提交（CI 同款行为）
 bash /opt/mim/app/deploy/backup-db.sh          # SQLite 在线热备份（默认 /var/backups/mim，保留 14 份）
 systemctl status mim-api; journalctl -u mim-api -n 50    # 服务状态与日志
 ```

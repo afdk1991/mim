@@ -8,7 +8,10 @@
 #       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端 → 健康检查
 #
 # 用法（服务器上）：
-#   sudo bash /opt/mim/app/deploy/deploy.sh
+#   sudo bash /opt/mim/app/deploy/deploy.sh [目标提交]
+#     不传目标提交时发布 origin/main 最新；CI 传 $GITHUB_SHA 保证「发布的提交
+#     与本次 Run 的提交一致」——否则连续两次 push 时，先跑的 Run 会部署到后推的
+#     提交，导致版本校验误判失败。
 #
 # 环境变量（可选）：
 #   APP_DIR     默认 /opt/mim/app
@@ -33,6 +36,9 @@ PORT_="${PORT_:-8787}"
 REPO_URL="${REPO_URL:-git@github.com:afdk1991/mim.git}"
 DEPLOY_KEY="${DEPLOY_KEY:-/opt/mim/.ssh/deploy_key}"
 RUN_USER="${RUN_USER:-mim}"
+
+# 目标提交：CI 传入 $GITHUB_SHA；为空则跟随 origin/main
+TARGET_REF="${1:-}"
 
 log()  { printf '\033[32m[deploy]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[deploy]\033[0m %s\n' "$*"; }
@@ -76,9 +82,21 @@ else
     sleep 5
   done
   [ "$ok" -eq 1 ] || die "git fetch 连续 3 次失败，请检查服务器到 github.com:22 的连通性"
-  git -C "$APP_DIR" reset --hard origin/main
-  git -C "$APP_DIR" clean -fd -e node_modules -e .mim-dev-secret -e 'services/*/data' -e dist
 fi
+
+# 精确检出目标提交（不留 origin/main 漂移）；目标提交缺失时单独按 SHA 获取
+if [ -n "$TARGET_REF" ]; then
+  if ! git -C "$APP_DIR" cat-file -e "${TARGET_REF}^{commit}" 2>/dev/null; then
+    log "目标提交 $TARGET_REF 不在本地，按 SHA 单独获取"
+    git -C "$APP_DIR" fetch --depth 1 origin "$TARGET_REF" || die "无法获取目标提交 $TARGET_REF"
+  fi
+  log "检出目标提交 $TARGET_REF"
+  git -C "$APP_DIR" reset --hard "$TARGET_REF"
+else
+  warn "未指定目标提交，发布 origin/main 最新"
+  git -C "$APP_DIR" reset --hard origin/main
+fi
+git -C "$APP_DIR" clean -fd -e node_modules -e .mim-dev-secret -e 'services/*/data' -e dist
 
 cd "$APP_DIR"
 

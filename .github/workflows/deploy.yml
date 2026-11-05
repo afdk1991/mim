@@ -69,11 +69,11 @@ jobs:
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             "sudo -n install -m 755 /tmp/mim-deploy.sh /opt/mim/app/deploy/deploy.sh"
 
-      - name: 远程发布（拉取代码 → 安装 → 构建 → 重启 → 健康检查）
+      - name: 远程发布（检出本次提交 → 安装 → 构建 → 重启 → 健康检查）
         run: |
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "sudo -n bash /opt/mim/app/deploy/deploy.sh"
+            "sudo -n bash /opt/mim/app/deploy/deploy.sh $GITHUB_SHA"
 
       - name: 校验服务器代码版本与本次提交一致
         run: |

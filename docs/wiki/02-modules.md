@@ -150,7 +150,7 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | 工件 | 作用 |
 |---|---|
 | `deploy/bootstrap.sh` | 一次性引导：apt 依赖、corepack+pnpm、`mim` 系统用户、`/opt/mim/{app,web}`、nginx 站点、systemd 单元、certbot 证书、首发布 |
-| `deploy/deploy.sh` | 幂等发布：`git fetch/reset`（SSH deploy key，服务器 HTTPS 到 github.com 被阻断）→ `pnpm install --prod=false` → `build:web` → 同步静态根 → 重启 `mim-api` → 健康轮询 → `nginx -t` + reload |
+| `deploy/deploy.sh` | 幂等发布：`git fetch`（SSH deploy key，服务器 HTTPS 到 github.com 被阻断）→ `reset --hard <目标 SHA>`（未传则 origin/main；CI 传 `$GITHUB_SHA` 防并发漂移）→ `pnpm install --prod=false` → `build:web` → 同步静态根 → 重启 `mim-api` → 健康轮询 → `nginx -t` + reload |
 | `deploy/nginx-mim.conf` | 站点模板（root / 反代 / 缓存 / 安全头 / gzip） |
 | `deploy/mim-api.service` | systemd 单元（`User=mim`，`Restart=always`，仅 `data/` 与 `.mim-dev-secret/` 可写） |
 | `deploy/backup-db.sh` | SQLite 一致性备份（`sqlite3 .backup`），保留最近 N 份 |
