@@ -206,3 +206,45 @@ describe('生产安全开关', () => {
     expect(res.body.dev_code).toBeUndefined();
   });
 });
+
+describe('密码登录（验证码通道未接入时的生产入口）', () => {
+  const PASSWORD = 'test-admin-pass-2026';
+
+  function passwordApp(env: Record<string, string | undefined>): Express {
+    return createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env });
+  }
+
+  it('口令正确：200 签发令牌且可访问 /me', async () => {
+    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD });
+    const res = await request(app)
+      .post('/api/v1/auth/password')
+      .send({ region: 'cn', identifier: '13800000041', password: PASSWORD });
+    expect(res.status).toBe(200);
+    expect(res.body.token_type).toBe('Bearer');
+    expect(res.body.access_token).toBeTruthy();
+    expect(res.body.refresh_token).toBeTruthy();
+    expect(res.body.user.id).toBeTruthy();
+
+    const me = await request(app)
+      .get('/api/v1/me')
+      .set('authorization', `Bearer ${res.body.access_token}`);
+    expect(me.status).toBe(200);
+    expect(me.body.user.id).toBe(res.body.user.id);
+  });
+
+  it('口令错误：401 AUTH_PASSWORD_INVALID', async () => {
+    const res = await request(passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD }))
+      .post('/api/v1/auth/password')
+      .send({ region: 'cn', identifier: '13800000042', password: 'wrong-pass' });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('AUTH_PASSWORD_INVALID');
+  });
+
+  it('未配置口令：503 AUTH_PASSWORD_NOT_CONFIGURED', async () => {
+    const res = await request(passwordApp({}))
+      .post('/api/v1/auth/password')
+      .send({ region: 'cn', identifier: '13800000043', password: PASSWORD });
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe('AUTH_PASSWORD_NOT_CONFIGURED');
+  });
+});

@@ -1,6 +1,6 @@
 /** 身份标识归一化、验证码、JWT 与不透明刷新令牌 */
 
-import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AppError } from '@mim/core-domain';
@@ -63,6 +63,16 @@ export function verifyCode(code: string, hash: string): boolean {
 
 export function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
+}
+
+/**
+ * 常数时间字符串比较：两端统一哈希为等长摘要后再比，
+ * 避免长度差异与逐字符短路带来的时序侧信道。
+ */
+export function secureEqual(a: string, b: string): boolean {
+  const left = createHash('sha256').update(a).digest();
+  const right = createHash('sha256').update(b).digest();
+  return timingSafeEqual(left, right);
 }
 
 export function newOpaqueToken(): string {

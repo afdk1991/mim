@@ -146,6 +146,16 @@ else
   printf 'MIM_CORS_ORIGINS=%s\n' "$CORS_DEFAULT" >> "$MIM_ENV_FILE"
 fi
 
+# 管理员密码登录口令：生产短信/邮件通道未接入时，POST /api/v1/auth/password 是唯一可用登录入口。
+# 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_AUTH_ADMIN_PASSWORD 环境变量可覆盖默认口令。
+AUTH_PASSWORD_DEFAULT="${MIM_AUTH_ADMIN_PASSWORD:-Mim@Admin2026}"
+if grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
+  log "$MIM_ENV_FILE 已含 MIM_AUTH_ADMIN_PASSWORD，保留现有值"
+else
+  log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD）"
+  printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$AUTH_PASSWORD_DEFAULT" >> "$MIM_ENV_FILE"
+fi
+
 if id -u "$RUN_USER" >/dev/null 2>&1; then
   chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$WEB_DIR" 2>/dev/null || true
   chown "$RUN_USER:$RUN_USER" "$MIM_ENV_FILE" 2>/dev/null || true

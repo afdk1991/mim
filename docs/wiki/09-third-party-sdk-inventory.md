@@ -272,5 +272,6 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 配置项（env） | 用途 | 生成与管理 | 优先级 |
 |---|---|---|---|
 | `MIM_JWT_SECRET` | 后端 JWT HS256 签名密钥（>=32 字符随机串） | 生产由 `deploy/deploy.sh` §5 幂等生成并写入 `/opt/mim/mim-api.env`（chmod 600），systemd 经 `EnvironmentFile` 注入；本地开发留空时自动生成 `.mim-dev-secret/jwt.key`（已 gitignore）。生产缺失即拒绝启动 | P0 |
+| `MIM_AUTH_ADMIN_PASSWORD` | `POST /api/v1/auth/password` 的管理员登录口令；短信/邮件通道未接入时的唯一可用登录入口 | `deploy/deploy.sh` §5 幂等补齐并写入 `/opt/mim/mim-api.env`（默认 `Mim@Admin2026`，已存在则保留）；可用同名环境变量在 CI/运维侧覆盖。留空时该端点返回 503 `AUTH_PASSWORD_NOT_CONFIGURED` | P0 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）。新增第三方能力必须先更新本文件，再进入实现。_

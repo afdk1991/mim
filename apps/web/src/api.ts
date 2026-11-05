@@ -202,6 +202,21 @@ export const api = {
     }>('/auth/code', { method: 'POST', body: { region, provider, identifier }, auth: false, idempotency: false });
   },
 
+  loginWithPassword(payload: {
+    region: Region;
+    provider?: Provider;
+    identifier: string;
+    password: string;
+    device?: { platform: string; name?: string };
+  }) {
+    return request<LoginResult>('/auth/password', {
+      method: 'POST',
+      body: { ...payload, device: payload.device ?? { platform: 'web', name: '浏览器' } },
+      auth: false,
+      idempotency: false,
+    });
+  },
+
   login(payload: {
     region: Region;
     provider: Provider;

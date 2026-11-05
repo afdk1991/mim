@@ -1,4 +1,4 @@
-/** FR-01 账号身份：验证码登录、刷新令牌轮换、登出 */
+/** FR-01 账号身份：验证码登录、密码登录、刷新令牌轮换、登出 */
 
 import { Router } from 'express';
 import { z } from 'zod';
@@ -19,6 +19,7 @@ import {
   issueAccessToken,
   newOpaqueToken,
   normalizeIdentity,
+  secureEqual,
   sha256,
   verifyCode,
 } from '../auth.js';
@@ -62,6 +63,20 @@ const codeBody = z.object({
 
 const loginBody = codeBody.extend({
   code: z.string().regex(/^\d{6}$/),
+  device: z
+    .object({
+      platform: z.string().min(1).max(32),
+      name: z.string().max(64).optional(),
+    })
+    .optional(),
+});
+
+/** 密码登录：短信/邮件通道未接入时的可用入口，口令来自 MIM_AUTH_ADMIN_PASSWORD */
+const passwordBody = z.object({
+  region: z.enum(['cn', 'global']),
+  provider: z.enum(['phone', 'email']).optional(),
+  identifier: z.string().min(1),
+  password: z.string().min(1).max(200),
   device: z
     .object({
       platform: z.string().min(1).max(32),
@@ -270,6 +285,47 @@ export function createAuthRouter(deps: ApiDeps): Router {
     deps.db
       .prepare('UPDATE verification_codes SET consumed_at = ? WHERE id = ?')
       .run(now, codeRow.id);
+    deps.db.prepare('DELETE FROM login_failures WHERE identifier = ?').run(key);
+
+    const user = findOrCreateUser(deps, body.region, identity.provider, identity.identifier);
+
+    let deviceId: string | null = null;
+    if (body.device) {
+      deviceId = uuidv7();
+      deps.db
+        .prepare(
+          `INSERT INTO devices (id, user_id, platform, name, last_seen_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(deviceId, user.id, body.device.platform, body.device.name ?? '', now, now);
+    }
+
+    const tokens = createSession(deps, user, deviceId);
+    res.json({ ...tokens, user: userPayload(user) });
+  });
+
+  router.post('/auth/password', (req, res) => {
+    const body = parse(passwordBody, req.body);
+    const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email');
+    const identity = normalizeIdentity(body.region, provider, body.identifier);
+    const now = clockOf(deps);
+    const key = failureKey(body.region, identity.identifier);
+    assertNotLocked(deps, key, now);
+
+    // 生产环境短信/邮件通道未接入时，管理员口令是最小可行登录入口（见 05-runbook §7.1）。
+    const expected = (deps.env.MIM_AUTH_ADMIN_PASSWORD ?? '').trim();
+    if (!expected) {
+      throw new AppError(
+        'AUTH_PASSWORD_NOT_CONFIGURED',
+        'password sign-in is not configured',
+        { env: 'MIM_AUTH_ADMIN_PASSWORD' },
+      );
+    }
+    if (!secureEqual(body.password, expected)) {
+      recordFailure(deps, key, body.region, now);
+      throw new AppError('AUTH_PASSWORD_INVALID', 'password is incorrect');
+    }
+
     deps.db.prepare('DELETE FROM login_failures WHERE identifier = ?').run(key);
 
     const user = findOrCreateUser(deps, body.region, identity.provider, identity.identifier);

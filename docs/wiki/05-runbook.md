@@ -107,7 +107,7 @@ pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 
 ```bash
 pnpm -r typecheck                       # 四个 workspace 包类型检查
-pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 40 例全通过
+pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 43 例全通过
 pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
 npm run check                           # 版本规约 + 密钥模板校验
 ```
@@ -118,16 +118,17 @@ npm run check                           # 版本规约 + 密钥模板校验
 |---|---|
 | 数据库 | SQLite（`better-sqlite3`，WAL），首次启动自动建表；测试使用内存库 |
 | 端口 | API `8787`（读标准环境变量 `PORT`，默认 8787）；Web `5173` |
-| 环境变量 | 不新增 `MIM_*`；`.env.example` 仅登记第三方密钥占位（P0 无真实密钥需求） |
+| 环境变量 | `.env.example` 登记第三方密钥占位（P0 无真实密钥需求）；应用自有 `MIM_JWT_SECRET`（生产必配）与 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，由 `deploy/deploy.sh` §5 幂等写入） |
 | 套餐/订阅/支付 | **已下线（2026-11-05）**：`/api/v1/plans`、`/api/v1/subscriptions/*`、`/api/v1/orders`、`/api/v1/invoices`、`/api/v1/audit/*` 路由与 9 张数据表均已移除，请求应返回 404 |
-| 验证码 | 开发/测试通道在响应中回传 `dev_code`；**生产环境（`NODE_ENV=production`）强制走第三方通道，不回传 `dev_code`** |
+| 验证码 | 开发/测试通道在响应中回传 `dev_code`；**生产环境（`NODE_ENV=production`）强制走第三方通道，不回传 `dev_code`，合法请求直接 503 `AUTH_CHANNEL_NOT_CONFIGURED`** |
+| 生产登录入口 | 短信/邮件通道未接入期间，生产使用 `POST /api/v1/auth/password`（`{region,identifier,password}`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`，由 `deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）。口令错误 401 `AUTH_PASSWORD_INVALID`，未配置 503 `AUTH_PASSWORD_NOT_CONFIGURED`，连续失败 5 次锁定 15 分钟（423 `AUTH_ACCOUNT_LOCKED`）。前端登录页默认「密码登录」模式 |
 | 前端视图 | 仅「设置」一页；原「套餐」页随套餐/订阅模块于 2026-11-05 删除，原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域 **7 表**（第 1 期 3 表 + 第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期**已装配上线（2026-11-05）**：`app.ts` 已 import 并挂载 `/api/v1/media/*`（`createMediaRouter` + 免鉴权对象收发 `createMediaObjectRouter`，后者先于全局 `express.json`）与 `/api/v1/ai/*`（`createAiRouter`），`index.ts` 构造 `storage` + `orchestrator` 并在 `MIM_AI_WORKER` 默认开启时 `orchestrator.start()` 自动消费 `generation_jobs`；商城与漫剧前端视图 **0 代码** |
 | 模块解锁 | `comic.workbench` 种子行随 `createDatabase()` 自动写入 cn/global 两区；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
 | 授权命令 | 生产授予权益：`sqlite3 /opt/mim/app/services/mim-api/data/mim.db "INSERT INTO entitlements (id,user_id,module_id,source,source_id,status,version,created_at,updated_at) VALUES ('ent:<uid>:comic','<uid>',(SELECT id FROM modules WHERE code='comic.workbench' AND region='cn'),'admin',NULL,'active',1,datetime('now'),datetime('now'));"` |
 
 ### 6.4 冒烟顺序（HTTP 全链路）
 
-`auth/code → login → me → comic/projects`（`plans` / `subscriptions` / `orders` / `invoices` / `audit` 已下线，冒烟时改为断言 404）
+生产冒烟顺序：`auth/password → me → comic/projects`（验证码 `auth/code` 在生产必回 503，仅开发/测试环境用 `auth/code → auth/login`）；`plans` / `subscriptions` / `orders` / `invoices` / `audit` 已下线，冒烟时断言 404。
 
 漫剧工作台（第 1 期）：
 
@@ -164,7 +165,10 @@ deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/d
            https://mim.mixm.top/api/v1/auth/code（非法 JSON 必须 400，不得回 500）
 ```
 
-手工验证生产安全开关（CI 不跑，需合法请求体）：`{"region":"cn","provider":"phone","identifier":"13800000000"}` 应返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`，不得回 200/500。
+生产安全开关与登录入口（CI 不跑，需合法请求体）：
+
+- `POST /api/v1/auth/code` 传 `{"region":"cn","provider":"phone","identifier":"13800000000"}` 应返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`，不得回 200/500。
+- `POST /api/v1/auth/password` 传 `{"region":"cn","identifier":"13800000000","password":"<MIM_AUTH_ADMIN_PASSWORD>"}` 应返回 200 并带 `access_token` / `refresh_token` / `user`；口令错误应 401 `AUTH_PASSWORD_INVALID`。生产口令由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`（默认 `Mim@Admin2026`，可用 CI Secret 同名变量覆盖）。
 
 所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`。
 

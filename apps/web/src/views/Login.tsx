@@ -12,7 +12,9 @@ interface Props {
 export function Login({ onLogin }: Props) {
   const [locale, setLocale] = useState<Locale>('zh-CN');
   const [region, setRegion] = useState<Region>('cn');
+  const [mode, setMode] = useState<'password' | 'code'>('password');
   const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,16 @@ export function Login({ onLogin }: Props) {
   function switchRegion(next: Region) {
     setRegion(next);
     setIdentifier('');
+    setPassword('');
     setCode('');
+    setDevCode(null);
+    setError(null);
+  }
+
+  function switchMode(next: 'password' | 'code') {
+    setMode(next);
+    setCode('');
+    setPassword('');
     setDevCode(null);
     setError(null);
   }
@@ -47,12 +58,15 @@ export function Login({ onLogin }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.login({
-        region,
-        provider,
-        identifier: identifier.trim(),
-        code: code.trim(),
-      });
+      const result =
+        mode === 'password'
+          ? await api.loginWithPassword({ region, identifier: identifier.trim(), password })
+          : await api.login({
+              region,
+              provider,
+              identifier: identifier.trim(),
+              code: code.trim(),
+            });
       setSession(result);
       onLogin(result);
     } catch (err) {
@@ -96,6 +110,23 @@ export function Login({ onLogin }: Props) {
           </button>
         </div>
 
+        <div className="segmented">
+          <button
+            type="button"
+            className={mode === 'password' ? 'active' : ''}
+            onClick={() => switchMode('password')}
+          >
+            {t(locale, 'auth.modePassword')}
+          </button>
+          <button
+            type="button"
+            className={mode === 'code' ? 'active' : ''}
+            onClick={() => switchMode('code')}
+          >
+            {t(locale, 'auth.modeCode')}
+          </button>
+        </div>
+
         <form className="form" onSubmit={submit}>
           <label>
             <span>{identifierLabel}</span>
@@ -108,27 +139,40 @@ export function Login({ onLogin }: Props) {
             />
           </label>
 
-          <label>
-            <span>{t(locale, 'auth.code')}</span>
-            <div className="row">
+          {mode === 'password' ? (
+            <label>
+              <span>{t(locale, 'auth.password')}</span>
               <input
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                placeholder="000000"
-                inputMode="numeric"
-                maxLength={6}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                autoComplete="current-password"
                 required
               />
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={sendCode}
-                disabled={busy || identifier.trim().length === 0}
-              >
-                {t(locale, 'auth.sendCode')}
-              </button>
-            </div>
-          </label>
+            </label>
+          ) : (
+            <label>
+              <span>{t(locale, 'auth.code')}</span>
+              <div className="row">
+                <input
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                />
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={sendCode}
+                  disabled={busy || identifier.trim().length === 0}
+                >
+                  {t(locale, 'auth.sendCode')}
+                </button>
+              </div>
+            </label>
+          )}
 
           {devCode && (
             <p className="dev-code">
