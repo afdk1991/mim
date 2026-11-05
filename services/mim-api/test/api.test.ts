@@ -224,3 +224,221 @@ describe('FR-06 审计与幂等', () => {
     expect(me.body.user.locale).toBe('en-US');
   });
 });
+
+describe('FR-02 订阅计费 · 补充', () => {
+  it('free 套餐不可购买', async () => {
+    const session = await login('13800000020');
+    const res = await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'free', cycle: 'monthly', driver: 'mock' });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('PLAN_NOT_FOUND');
+  });
+
+  it('同套餐重复下单返回 409 SUBSCRIPTION_ALREADY_ACTIVE', async () => {
+    const session = await login('13800000021');
+    const first = await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
+    expect(first.status).toBe(201);
+
+    const second = await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
+    expect(second.status).toBe(409);
+    expect(second.body.code).toBe('SUBSCRIPTION_ALREADY_ACTIVE');
+  });
+
+  it('无有效订阅时取消返回 404', async () => {
+    const session = await login('13800000022');
+    const res = await request(app)
+      .post('/api/v1/subscriptions/cancel')
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+  });
+
+  it('重复取消是幂等的：同一订阅原样返回', async () => {
+    const session = await login('13800000023');
+    await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'pro', cycle: 'yearly', driver: 'mock' });
+
+    const first = await request(app)
+      .post('/api/v1/subscriptions/cancel')
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(first.status).toBe(200);
+    expect(first.body.subscription.cancel_at_period_end).toBe(true);
+
+    const second = await request(app)
+      .post('/api/v1/subscriptions/cancel')
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(second.status).toBe(200);
+    expect(second.body.subscription.id).toBe(first.body.subscription.id);
+    expect(second.body.subscription.cancel_at_period_end).toBe(true);
+  });
+
+  it('重复 success 回调幂等：订单保持 paid 且不重复开票', async () => {
+    const session = await login('13800000024');
+    const checkout = await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
+    expect(checkout.status).toBe(201);
+    const orderId = checkout.body.order.id as string;
+    const paidAt = checkout.body.order.paid_at as string;
+
+    const replay = await request(app)
+      .post('/api/v1/callbacks/mock')
+      .send({ order_id: orderId, result: 'success' });
+    expect(replay.status).toBe(200);
+    expect(replay.body.order.status).toBe('paid');
+    expect(replay.body.order.paid_at).toBe(paidAt);
+
+    const invoices = await request(app).get('/api/v1/invoices').set(auth(session));
+    expect(invoices.body.items).toHaveLength(1);
+  });
+
+  it('failed 回调将待支付订单置为失败；订单不存在返回 404', async () => {
+    const session = await login('13800000025');
+    const orderId = 'test-order-failed-01';
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO orders
+         (id, user_id, plan_id, region, cycle, currency, amount_minor, status, driver, version, created_at, updated_at)
+       VALUES (?, ?, 'basic', 'cn', 'monthly', 'CNY', 2900, 'pending', 'mock', 1, ?, ?)`,
+    ).run(orderId, session.userId, now, now);
+
+    const failed = await request(app)
+      .post('/api/v1/callbacks/mock')
+      .send({ order_id: orderId, result: 'failed' });
+    expect(failed.status).toBe(200);
+    expect(failed.body.order.status).toBe('failed');
+
+    const missing = await request(app)
+      .post('/api/v1/callbacks/mock')
+      .send({ order_id: 'order-not-exists', result: 'success' });
+    expect(missing.status).toBe(404);
+    expect(missing.body.code).toBe('ORDER_NOT_FOUND');
+  });
+
+  it('订单与发票列表如实返回购买记录', async () => {
+    const session = await login('13800000026');
+    const checkout = await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
+    expect(checkout.status).toBe(201);
+
+    const orders = await request(app).get('/api/v1/orders').set(auth(session));
+    expect(orders.status).toBe(200);
+    expect(orders.body.items).toHaveLength(1);
+    expect(orders.body.items[0].amount_minor).toBe(2900);
+    expect(orders.body.items[0].currency).toBe('CNY');
+    expect(orders.body.items[0].status).toBe('paid');
+
+    const invoices = await request(app).get('/api/v1/invoices').set(auth(session));
+    expect(invoices.status).toBe(200);
+    expect(invoices.body.items).toHaveLength(1);
+    expect(invoices.body.items[0].order_id).toBe(checkout.body.order.id);
+    expect(invoices.body.items[0].amount_minor).toBe(2900);
+  });
+});
+
+describe('FR-06 审计 · 补充', () => {
+  it('按 action 过滤审计记录', async () => {
+    const session = await login('13800000027');
+    await request(app)
+      .patch('/api/v1/me')
+      .set(auth(session, nextKey()))
+      .send({ display_name: '过滤用户' });
+    await request(app)
+      .post('/api/v1/subscriptions/checkout')
+      .set(auth(session, nextKey()))
+      .send({ plan_id: 'basic', cycle: 'monthly', driver: 'mock' });
+
+    const checkoutAudit = await request(app).get('/api/v1/audit?action=billing.checkout').set(auth(session));
+    expect(checkoutAudit.status).toBe(200);
+    expect(checkoutAudit.body.total).toBe(1);
+    expect(checkoutAudit.body.items[0].action).toBe('billing.checkout');
+
+    const profileAudit = await request(app).get('/api/v1/audit?action=account.profile_update').set(auth(session));
+    expect(profileAudit.body.total).toBe(1);
+    expect(profileAudit.body.items[0].action).toBe('account.profile_update');
+  });
+
+  it('审计分页：limit 与 offset 翻页不重叠', async () => {
+    const session = await login('13800000028');
+    for (const name of ['分页一', '过滤二', '翻页三']) {
+      const res = await request(app)
+        .patch('/api/v1/me')
+        .set(auth(session, nextKey()))
+        .send({ display_name: name });
+      expect(res.status).toBe(200);
+    }
+
+    const page1 = await request(app)
+      .get('/api/v1/audit?action=account.profile_update&limit=2&offset=0')
+      .set(auth(session));
+    expect(page1.status).toBe(200);
+    expect(page1.body.total).toBe(3);
+    expect(page1.body.items).toHaveLength(2);
+
+    const page2 = await request(app)
+      .get('/api/v1/audit?action=account.profile_update&limit=2&offset=2')
+      .set(auth(session));
+    expect(page2.body.items).toHaveLength(1);
+    const page1Ids = page1.body.items.map((item: { id: string }) => item.id);
+    expect(page1Ids).not.toContain(page2.body.items[0].id);
+  });
+
+  it('非法分页参数返回 400', async () => {
+    const session = await login('13800000029');
+    const res = await request(app).get('/api/v1/audit?limit=0').set(auth(session));
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('未鉴权访问审计返回 401', async () => {
+    const res = await request(app).get('/api/v1/audit');
+    expect(res.status).toBe(401);
+  });
+
+  it('审计严格按用户隔离：他人不可见', async () => {
+    const userA = await login('13800000030');
+    await request(app)
+      .patch('/api/v1/me')
+      .set(auth(userA, nextKey()))
+      .send({ display_name: '用户甲' });
+
+    const userB = await login('13800000031');
+    const audit = await request(app)
+      .get('/api/v1/audit?action=account.profile_update')
+      .set(auth(userB));
+    expect(audit.status).toBe(200);
+    expect(audit.body.total).toBe(0);
+  });
+});
+
+describe('生产安全开关', () => {
+  it('生产环境拒绝直发验证码：503 AUTH_CHANNEL_NOT_CONFIGURED 且无 dev_code', async () => {
+    const prodApp = createApp({
+      db: createDatabase(':memory:'),
+      jwtSecret: JWT_SECRET,
+      env: { NODE_ENV: 'production' },
+    });
+    const res = await request(prodApp)
+      .post('/api/v1/auth/code')
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000032' });
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe('AUTH_CHANNEL_NOT_CONFIGURED');
+    expect(res.body.dev_code).toBeUndefined();
+  });
+});

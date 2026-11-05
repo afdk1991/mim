@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # deploy/deploy.sh — Mim 生产发布脚本（服务器侧，幂等可重放）
 #
-# 职责：拉取 origin/main → 安装依赖（含 dev，因 tsx 是运行时依赖）
-#       → 构建前端 → 发布静态产物到 /opt/mim/web
+# 职责：拉取 origin/main → 安装依赖（含 dev，因 vite/esbuild 为构建期依赖）
+#       → 构建前端（vite）→ 编译后端（esbuild → dist/index.js）
+#       → 发布静态产物到 /opt/mim/web
 #       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET）→ 重启后端 → 健康检查
 #
 # 用法（服务器上）：
@@ -80,17 +81,19 @@ fi
 
 cd "$APP_DIR"
 
-# --- 2. 依赖安装（必须含 devDependencies：tsx 是 start 的运行依赖） ---
+# --- 2. 依赖安装（含 devDependencies：vite/esbuild 是构建期依赖） ---
 command -v pnpm >/dev/null 2>&1 || die "未找到 pnpm，请先运行 deploy/bootstrap.sh"
-log "pnpm install（含 dev，保证 tsx / vite 可用）"
+log "pnpm install（含 dev，保证 vite / esbuild 可用）"
 if ! pnpm install --frozen-lockfile --prod=false; then
   warn "--frozen-lockfile 失败，退化为普通 install（锁文件可能与 package.json 不同步）"
   pnpm install --prod=false
 fi
 
-# --- 3. 前端构建 ---
+# --- 3. 前端构建 + 后端编译 ---
 log "构建 apps/web（tsc --noEmit + vite build）"
 pnpm --filter @mim/web build
+log "编译 services/mim-api（esbuild → dist/index.js）"
+pnpm --filter @mim/api build
 
 # --- 4. 发布静态产物 ---
 log "发布静态产物 → $WEB_DIR"
@@ -122,6 +125,18 @@ else
 fi
 
 # --- 6. 重启后端 ---
+# node 绝对路径检测：bootstrap.sh 不固定 node 安装位置（可能是 /usr/bin/node
+# 或 nvm 管理的版本路径），以实际 PATH 中的 node 为准生成 systemd override；
+# unit 文件默认 ExecStart=/usr/bin/node，路径不一致时由 override 覆盖。
+NODE_BIN="$(command -v node || true)"
+[ -n "$NODE_BIN" ] || die "未找到 node，请先运行 deploy/bootstrap.sh"
+if [ "$NODE_BIN" != "/usr/bin/node" ]; then
+  log "node 实际路径为 $NODE_BIN，生成 systemd override"
+  mkdir -p /etc/systemd/system/mim-api.service.d
+  printf '[Service]\nExecStart=\nExecStart=%s dist/index.js\n' "$NODE_BIN" \
+    > /etc/systemd/system/mim-api.service.d/override.conf
+fi
+
 log "重启 $SERVICE"
 systemctl daemon-reload
 systemctl enable "$SERVICE" >/dev/null 2>&1 || true

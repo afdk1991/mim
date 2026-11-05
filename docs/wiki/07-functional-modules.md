@@ -363,11 +363,11 @@ FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、F
 |---|---|---|---|
 | 漫剧工程（剧本 / 角色 / 分镜） | `comic.ts`：`GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/storyboard` | —（`ComicWorkbench.tsx` 前端未实现） | ✅ 后端已落地 |
 | 角色一致性（character bible） | `POST /comic/projects/:id/characters`（`comic_characters` 表，`(project_id, name)` 唯一 + prompt/seed） | — | ✅ 后端已落地 |
-| 生成任务队列（text / image / video / tts / compose） | `POST/GET /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}`（`generation_jobs` 表） | — | 🟡 后端骨架已落地（状态机控制面；真实模型调用与队列消费者未接入） |
-| 生成产物存储与分发 | —（规划 `media` 域 + 对象存储 + 预签名 URL） | — | ❌ 0 代码 |
+| 生成任务队列（text / image / video / tts / compose） | `POST/GET /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}`（`generation_jobs` 表） | — | 🟡 后端已落地（状态机 + 已装配的队列消费者 `src/orchestrator.ts`；真实厂商模型调用待 OQ-08） |
+| 生成产物存储与分发 | `src/storage.ts`：`LocalDiskStorage`（HMAC 预签名 URL，落盘 `data/media`）+ `S3Storage`（AWS SDK）；`generation_assets` 表已建、`src/orchestrator.ts` 写入真实产物；`/media/presign/{upload,download}`、`/media/assets`、`/media/objects/*` 已挂载 | —（前端页面未实现） | ✅ 后端已落地（2026-11-05 装配上线） |
 | 成片合成与版本 | `POST/GET /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/versions`（`comic_films` / `film_versions` 表） | —（规划 `ComicFilms.tsx`） | 🟡 后端骨架已落地 |
 | 审核与发布 | `POST /comic/films/:id/{submit-review,publish,reject,archive}`（状态机 + 驳回留原因） | — | 🟡 骨架已落地（人工审核队列与内容机审未实现） |
-| 成本 / 配额预检 | —（规划生成额度表 + 预检中间件） | — | ❌ 0 代码 |
+| 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
 | 导出成片 | —（规划导出任务 + 对象存储预签名下载） | — | ❌ 0 代码 |
 
 ## 12. 实现拆分清单（新 FR-03 落地路径）
@@ -401,13 +401,13 @@ FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、F
 | 维度 | 交付内容 |
 |---|---|
 | 后端路由 | **已落地（骨架，2026-11-05）**：`POST/GET /comic/projects/:id/jobs`（派发 / 列表）、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}`（状态机控制面，失败重试新建 job）；`POST/GET /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/versions`（版本只追加）、`POST /comic/films/:id/{submit-review,publish,reject,archive}`。规划增补：`POST /comic/projects/:id/generate`（按镜头生成关键帧 / 片段，真实模型驱动） |
-| 数据表 | **已建**：`generation_jobs`、`comic_films`、`film_versions`；待建：`generation_assets`（随 media 域） |
+| 数据表 | **七表已建齐**：第 1 期 `comic_projects`/`comic_characters`/`storyboards`；第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` |
 | 前端视图 | `ComicWorkbench.tsx`（生成进度、单镜头重生成）、`ComicFilms.tsx`（成片预览与导出） |
 | 第三方 | 文生图模型（关键帧）、图生视频模型（片段）、TTS（配音）、对象存储 + 预签名 URL — **均未接入**，骨架不含外部调用 |
 | 依赖前置 | 第 1 期完成 ✅；`media` 域就绪；生成队列消费者（`jobs`） |
 | 验收 | 分镜 → 关键帧 → 片段 → 合成可跑通；单镜头失败可重试且不影响其他镜头；导出给出预签名 URL |
 
-> **落地状态（2026-11-05）**：任务编排与成片合成的路由骨架与状态机已交付（`schema.sql` comic 域新增 3 表、`routes/comic.ts` 新增 16 条路由、`test/comic-phase2.test.ts` 10 例全绿，全套 32 例）。骨架口径：首个任务派发驱动工程 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`，成片发布驱动 `rendered → published`；状态迁移由编排控制面端点驱动（`start/complete/fail`），ai-orchestrator 接入后改由其消费队列调用；`generation_assets` 分镜全覆盖校验、成本预检与额度结算、media 预签名 URL 均在后续迭代接入。
+> **落地状态（2026-11-05）**：任务编排与成片合成的路由骨架与状态机已交付（`schema.sql` comic 域新增 **4 表**：`generation_jobs`/`generation_assets`/`comic_films`/`film_versions`、`routes/comic.ts` 新增 16 条路由、`test/comic-phase2.test.ts` 10 例全绿）。骨架口径：首个任务派发驱动工程 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`，成片发布驱动 `rendered → published`；状态迁移当前由编排控制面端点驱动（`start/complete/fail`）。**已装配上线（2026-11-05）**：`src/orchestrator.ts`（mock 产物真实落盘 + 单任务/当日成本预检 + `generation_assets` 写入 + compose 成功联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）均由 `app.ts`/`index.ts` import 并生效——对外暴露 `/api/v1/ai/*`（含 `GET /ai/capabilities`、`POST /ai/jobs/:id/run`）与 `/api/v1/media/*`（预签名上传/下载、资产列表、免鉴权对象收发），`MIM_AI_WORKER` 默认开启时 worker 轮询自动消费 `generation_jobs`；`generation_assets` 分镜全覆盖校验在接入真实厂商模型后收紧。
 
 ### 12.3 第 3 期：① AI 全自动生成成片
 

@@ -84,7 +84,7 @@
 | §1–2 背景与产品契约 | 问题观察 →「Headless 中台 + 多端薄壳」决策；用户/任务/完成条件/共享对象/信任基础 |
 | §3 范围 | P0 / P1 / 明确排除三档 + 平台兼容性要求矩阵（三端最低版本） |
 | §4 角色与对象模型 | 4 角色；Subscription / Order / Refund / Module / Entitlement / ComicProject / ComicFilm / GenerationJob 状态机 |
-| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付、FR-03 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」；第 1 期后端已落地：catalog 4 表 + comic 3 表 + `/api/v1/comic/*` 8 路由；第 2 期骨架 2026-11-05 已落地：comic 域 6 表 + 任务编排 `/comic/jobs/*` 与成片合成 `/comic/films/*` 16 路由）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
+| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付、FR-03 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」；第 1 期后端已落地：catalog 4 表 + comic 3 表 + `/api/v1/comic/*` 8 路由；第 2 期骨架 2026-11-05 已落地：comic 域累计 7 表（新增 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）+ 任务编排 `/comic/jobs/*` 与成片合成 `/comic/films/*` 16 路由）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
 | §6 共享规则 | Region 隔离、解锁鉴权、生成成本与配额、幂等性（request_id）、审计日志（180 天）、通知规则 |
 | §7 开放问题 | OQ-01~09（OQ-01 已重定义为商城 + 漫剧 AI 剧；新增 OQ-07 漫剧版权与审核口径、OQ-08 生成模型供应商与成本上限、OQ-09 模块定价与一次性购买退款窗口；余项：国内 Android IAP、首批市场、退款窗口、账号合并、IoT） |
 

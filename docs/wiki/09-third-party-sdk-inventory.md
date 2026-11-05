@@ -2,7 +2,7 @@
 
 > 本文档是 Mim 第三方能力接入的**唯一基线清单**。任何新增/变更的第三方 SDK、开放 API、密钥，必须先登记到本文件，再进入代码实现（铁律五 + 铁律七）。
 >
-> 当前状态：仓库已进入编码阶段。`services/mim-api`（`@mim/api`）已含运行时依赖并写入 `package.json` + `pnpm-lock.yaml`：`express ^5.3.0`、`better-sqlite3 ^13.0.3`、`jsonwebtoken ^9.0.3`、`bcryptjs ^3.0.2`、`zod ^4.6.7`（devDeps：`vitest@4`、`supertest@7`、`tsx@4`、`typescript@5.6.3`），均属业务自研基础设施而非下表所列第三方 SaaS/SDK。本文档登记的第三方能力清单仍为「计划引入」状态；对应能力接入时，按铁律五把依赖写入 `package.json` 并提交锁文件，同时更新本清单状态。
+> 当前状态：仓库已进入编码阶段。`services/mim-api`（`@mim/api`）已含运行时依赖并写入 `package.json` + `pnpm-lock.yaml`：`express ^5.3.0`、`better-sqlite3 ^13.0.3`、`jsonwebtoken ^9.0.3`、`bcryptjs ^3.0.2`、`zod ^4.6.7`、`@aws-sdk/client-s3 ^3.1162.0`、`@aws-sdk/s3-request-presigner ^3.1162.0`（devDeps：`vitest@4`、`supertest@7`、`tsx@4`、`typescript@5.6.3`、`esbuild@0.25`），均属业务自研基础设施而非下表所列第三方 SaaS/SDK。其中 AWS SDK 用于 media 域对象存储准入（预签名上传/下载、S3 兼容端点），已在 `package.json` + `pnpm-lock.yaml` 落位（铁律五）。本文档登记的第三方能力清单仍为「计划引入」状态；对应能力接入时，按铁律五把依赖写入 `package.json` 并提交锁文件，同时更新本清单状态。
 
 ---
 
@@ -106,6 +106,17 @@
 | 讯飞星火 | WebSocket API | 语音/文本备选 | `MIM_AI_SPARK_APP_ID` / `MIM_AI_SPARK_API_KEY` / `MIM_AI_SPARK_API_SECRET` | P2 |
 | LiteLLM（自建网关） | 开源模型路由 | 统一多模型接入与配额 | `MIM_AI_GATEWAY_MASTER_KEY` | P1 |
 
+**生成任务编排运行时配置（自研 `ai-orchestrator`，进程内模块，非第三方）**
+
+| 配置项（env） | 用途 | 默认值 | 优先级 |
+|---|---|---|---|
+| `MIM_AI_PROVIDER` | 任务执行使用的 AI 提供方标识（`mock` 时为本地确定性产出，接真实厂商时替换） | `mock` | P0（第 2 期已接入） |
+| `MIM_AI_WORKER` | 是否随 API 进程启动后台队列 worker（`1` 启用 / `0` 关闭，关闭后仅能由 `POST /ai/jobs/:id/run` 手动消费） | `1` | P0 |
+| `MIM_AI_WORKER_INTERVAL_MS` | worker 轮询间隔（毫秒） | `2000` | P0 |
+| `MIM_AI_JOB_COST_LIMIT_MINOR` | 单任务成本上限（分），超出即 `COST_LIMIT_EXCEEDED(402)` | `100000` | P0 |
+| `MIM_AI_DAILY_COST_LIMIT_MINOR` | 当日累计成本上限（分，按 `status='succeeded'` 求和） | `500000` | P0 |
+| `MIM_AI_ASSET_TTL_DAYS` | 原始生成产物保留天数（`compose` 成片长期保留） | `90` | P0 |
+
 > 所有 AI 调用必须经统一网关（模型路由、Prompt 版本、配额、内容审核），业务层不得直连厂商密钥。漫剧生成的**成本预检与额度扣减**在 `comic` / `ai-orchestrator` 内完成（`generation_jobs`），供应商选择与成本上限见 PRD OQ-08。
 
 ---
@@ -130,6 +141,20 @@
 | AWS S3 / Cloudflare R2 | S3 兼容 SDK | 海外对象存储 | `MIM_STORAGE_S3_ACCESS_KEY_ID` / `MIM_STORAGE_S3_SECRET_ACCESS_KEY` / `MIM_STORAGE_R2_ACCESS_KEY_ID` | P0 |
 | 七牛 / 又拍云 | 存储 + CDN SDK | CDN 加速与图片处理 | `MIM_STORAGE_QINIU_ACCESS_KEY` / `MIM_STORAGE_QINIU_SECRET_KEY` | P1 |
 | Cloudflare CDN / 阿里云 CDN | CDN API | 静态资源加速 | `MIM_CDN_CLOUDFLARE_API_TOKEN` / `MIM_CDN_ALIYUN_ACCESS_KEY` | P1 |
+
+**对象存储准入运行时配置（自研 `media` 域，进程内模块）**
+
+| 配置项（env） | 用途 | 默认值 | 优先级 |
+|---|---|---|---|
+| `MIM_STORAGE_DRIVER` | 存储驱动（`local` 本地磁盘 / `s3` S3 兼容） | `local` | P0（第 2 期已接入） |
+| `MIM_STORAGE_LOCAL_DIR` | 本地驱动落盘根目录 | `<服务目录>/data/media` | P0 |
+| `MIM_STORAGE_S3_ENDPOINT` | S3 兼容端点（OSS / COS / R2 / MinIO；AWS 可留空） | 空 | P0 |
+| `MIM_STORAGE_S3_REGION` | S3 区域 | `auto`（留空时用 `auto`，AWS 可改为具体区域如 `us-east-1`） | P0 |
+| `MIM_STORAGE_S3_BUCKET` | 存储桶名 | 空（缺失则驱动视为未配置） | P0 |
+| `MIM_STORAGE_S3_FORCE_PATH_STYLE` | 路径风格（MinIO 需 `1`） | `0` | P0 |
+| `MIM_PUBLIC_BASE_URL` | 对外公开基址（本地驱动预签名 URL 拼接） | 请求 Host | P0 |
+
+> 预签名 URL 的有效期默认 900 秒、上限 7 天；`object_key` 归属校验统一 404，不泄露他人资源存在性。
 
 ---
 
@@ -253,4 +278,4 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 |---|---|---|---|
 | `MIM_JWT_SECRET` | 后端 JWT HS256 签名密钥（>=32 字符随机串） | 生产由 `deploy/deploy.sh` §5 幂等生成并写入 `/opt/mim/mim-api.env`（chmod 600），systemd 经 `EnvironmentFile` 注入；本地开发留空时自动生成 `.mim-dev-secret/jwt.key`（已 gitignore）。生产缺失即拒绝启动 | P0 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）。新增第三方能力必须先更新本文件，再进入实现。_

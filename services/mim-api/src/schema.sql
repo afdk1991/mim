@@ -283,6 +283,25 @@ CREATE TABLE IF NOT EXISTS generation_jobs (
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_project ON generation_jobs(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_status_type ON generation_jobs(status, job_type);
 
+-- 生成产物登记（08 §5）：媒体对象统一登记 object_key / mime / 校验和 / 保留期；
+-- 产物只追加不覆盖，过期由清理任务删除对象并把 expires_at 保留为审计证据
+CREATE TABLE IF NOT EXISTS generation_assets (
+  id            TEXT PRIMARY KEY,
+  job_id        TEXT NOT NULL,
+  project_id    TEXT NOT NULL,
+  asset_type    TEXT NOT NULL CHECK (asset_type IN ('text','image','video','audio','final')),
+  object_key    TEXT NOT NULL,
+  mime          TEXT NOT NULL,
+  duration_ms   INTEGER,
+  size_bytes    INTEGER,
+  checksum      TEXT NOT NULL,
+  expires_at    TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_generation_assets_job ON generation_assets(job_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_generation_assets_project ON generation_assets(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_generation_assets_object ON generation_assets(object_key);
+
 -- 成片主体；current_version_id 指向最新已发布版本；版本只追加不覆盖
 CREATE TABLE IF NOT EXISTS comic_films (
   id                  TEXT PRIMARY KEY,

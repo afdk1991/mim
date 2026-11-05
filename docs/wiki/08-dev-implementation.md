@@ -59,8 +59,8 @@
 | `billing` | 计划与定价、订阅生命周期、续费、升降级、发票、对账 | `/plans`、`/subscriptions/*`、`/invoices/*` | payment-driver、MQ | 分库 |
 | `payment-driver` | 支付编排 + 通道驱动（wechat / alipay / unionpay / stripe / paypal / apple-iap / google-play），统一回调 | `/payments/*`、`/callbacks/{driver}` | 各持牌通道、商店服务端 API | 按通道 |
 | `catalog` | **（部分落地：建表 + 门禁，2026-11-04）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 已建，`requireEntitlement` 已落地；`/modules` 路由与 `order_items` 未实现 | `/modules`、`/modules/{code}`、`/entitlements/*`、`/entitlements/{code}/check`（未实现） | billing（订单/退款）、admin-api | 分库 |
-| `comic` | **（第 1 期已落地，2026-11-04）** 漫剧工程/角色/分镜已实现（`/comic/projects/*`）；生成任务编排、成片合成与版本、审核发布未实现 | `/comic/projects/*`（已实现）；`/comic/jobs/*`、`/comic/films/*`（未实现） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
-| `media` | **（规划，0 代码）** 对象存储准入：签发上传/下载预签名 URL，登记 `object_key` 归属与保留期 | `/media/presign/upload`、`/media/presign/download` | 对象存储、CDN | 按 region 桶 |
+| `comic` | **（第 1 期已落地 2026-11-04；第 2 期路由骨架已落地 2026-11-05）** 工程/角色/分镜（`/comic/projects/*` 8 条）与生成任务编排、成片合成与版本、审核发布（`/comic/jobs/*`、`/comic/films/*` 16 条）均已实现（共 24 条路由）；任务编排与队列消费（`src/orchestrator.ts` → `/api/v1/ai/*`）、对象存储（`src/storage.ts` → `/api/v1/media/*`）**已于 2026-11-05 装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认随进程自动消费；真实厂商模型调用待 OQ-08 凭证** | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*`（24 条已实现，骨架） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
+| `media` | **（已落地并装配上线，2026-11-05）** `src/storage.ts` 实现 `LocalDiskStorage`（HMAC-SHA256 预签名 URL，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名）；`/media/presign/*`、`/media/assets`、免鉴权对象收发端点均已挂载；`generation_assets` 表已建 | `/media/presign/upload`、`/media/presign/download`、`/media/assets`、`/media/objects/*`（已上线） | 对象存储、CDN | 按 region 桶 |
 | `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
 | `im` | 会话、消息可靠性、已读回执、在线状态、离线推送、审核 | `/im/*`（HTTP + WebSocket） | MQ、推送通道、审核服务 | 分库 |
 | `rtc` | 信令、房间编排、录制、转码、质量监测 | `/rtc/*` | RTC 第三方、对象存储 | 分集群 |
@@ -131,9 +131,9 @@
 | `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(order/refund/job/admin)`、`created_at` | 只追加，禁止 UPDATE |
 | `order_items` | `id`、`order_id`、`item_type(plan/module)`、`item_id`、`amount_minor`、`currency` | 一单可挂 1 计划 + N 模块；退款按项回收 |
 
-**comic 域（第 1 期三表 2026-11-04 已建；第 2 期 `generation_jobs` / `comic_films` / `film_versions` 2026-11-05 已建）**
+**comic 域（第 1 期三表 2026-11-04 已建；第 2 期 `generation_jobs` / `generation_assets` / `comic_films` / `film_versions` 四表 2026-11-05 已建）**
 
-> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表，四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。**仅剩 `generation_assets` 待 media 域（对象存储预签名）就绪后建表。**
+> 漫剧 AI 剧（FR-03.2）。工程/角色/分镜/生成任务/产物/成片/版本七表**已全部建齐**（第 1 期 3 表 2026-11-04；第 2 期新增 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表 2026-11-05），四种交付形态共用同一对象模型，差异仅在人工确认点与是否全自动。
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
@@ -192,9 +192,9 @@
 - `contents.status`（P1）：`draft → published ⇄ blocked`、`published → deleted`；任何机审/人审结论只能经 `audit_records` 追加，不允许直接改 `contents.status` 跳过审核。
 - `modules.status`（已建表，写路径未实现）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配在区内永不复用（唯一约束为 `(region, code)`）。
 - `entitlements.status`（已建表，发放/回收写路径未实现）：只能经 `entitlement_events` 追加推进；`revoked`（退款/风控）与 `expired`（订阅到期）**必须**与触发事务（`refunds.executed` / 订阅状态机）同事务写入，不允许事后异步补写。当前只读门禁 `requireEntitlement` 已按 `status='active' AND (expires_at IS NULL OR expires_at > now)` 判定。
-- `comic_projects.status`（**第 1 期已实现 `draft ⇄ storyboarded`；第 2 期骨架已实现 `storyboarded → generating → rendered → published`**，`archived` 保留给归档流）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本（`confirmed_at` 非空），且仅 `draft`/`storyboarded` 两种状态允许编辑与写分镜；首个 `generation_jobs` 派发驱动 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`（骨架口径；待 `generation_assets` 建表后收紧为「产物覆盖全部分镜」）；成片 `publish` 驱动 `rendered → published`，不得跳级。
+- `comic_projects.status`（**第 1 期已实现 `draft ⇄ storyboarded`；第 2 期骨架已实现 `storyboarded → generating → rendered → published`**，`archived` 保留给归档流）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本（`confirmed_at` 非空），且仅 `draft`/`storyboarded` 两种状态允许编辑与写分镜；首个 `generation_jobs` 派发驱动 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`（骨架口径；待 `orchestrator.ts` 装配并接入真实模型后收紧为「产物覆盖全部分镜」）；成片 `publish` 驱动 `rendered → published`，不得跳级。
 - `comic_films.status`（**第 2 期骨架已实现**）：`draft → reviewing → published → archived`；提交审核要求最新版本已登记 `object_key`；驳回回到 `draft` 并留原因（`review_note`）；`published` 只能由 `current_version_id` 指向的 `film_versions` 支撑，版本只追加不覆盖，发新版回到 `draft` 待重审。
-- `generation_jobs.status`（**第 2 期骨架已实现**）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算（结算写路径待成本预检迭代）。状态迁移暂由编排控制面端点驱动，ai-orchestrator 接入后改由其消费队列调用。
+- `generation_jobs.status`（**第 2 期骨架已实现**）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算（`src/orchestrator.ts` 已内置单任务/当日成本预检，并已于 2026-11-05 装配进 `app.ts`/`index.ts`）。状态迁移既可由编排控制面端点驱动，也可由 worker 轮询队列自动消费（`MIM_AI_WORKER` 默认 `1`，置 `0` 关闭）。
 
 ## 4. 前端（多端）模块清单
 
@@ -365,7 +365,7 @@
 |---|---|---|---|
 | 基座 | `catalog` 域 5 表 + `/modules` `/entitlements` 路由；`order_items` 挂载 `billing` 同事务；`entitlements` 发放/回收与退款同事务 | 商城（FR-03.1） | 无（复用现有 identity/billing） |
 | 第 1 期 | `comic` 域工程/角色/分镜三表；工作台的工程 CRUD、character bible、分镜编辑与人工确认 | ② AI 辅助创作工作台 | 第 1 期仅工程，不产出成片 |
-| 第 2 期 | `generation_jobs` / `generation_assets` + `ai-orchestrator` 生成编排；文生图/图生视频/TTS/合成队列；工作台内单镜头生成与导出成片 | ④ 创作工作台 + 导出成片 | 模型供应商凭证（OQ-08）、对象存储 |
+| 第 2 期 | `generation_jobs` / `generation_assets` + `ai-orchestrator` 生成编排；文生图/图生视频/TTS/合成队列；工作台内单镜头生成与导出成片。**代码状态（2026-11-05）**：路由骨架 16 条已上线；`src/orchestrator.ts`（mock 产物真实落盘 + 成本预检 + compose 联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）**已于 2026-11-05 装配进 `app.ts`/`index.ts`（`/api/v1/ai/*`、`/api/v1/media/*`，`MIM_AI_WORKER` 默认自动消费）**；真实模型调用待 OQ-08 凭证 | ④ 创作工作台 + 导出成片 | 模型供应商凭证（OQ-08）、对象存储 |
 | 第 3 期 | 全自动流水线：题材/大纲一次输入跑完整条链（无人工确认点） | ① AI 全自动生成成片 | 第 2 期全链路稳定 |
 | 第 4 期 | `comic_films` / `film_versions` + 审核发布 + 导出；成片列表/版本/浏览 | ③ 漫剧作品管理与分发 | 审核口径（OQ-07） |
 

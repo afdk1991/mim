@@ -121,7 +121,7 @@ npm run check                           # 版本规约 + 密钥模板校验
 | 环境变量 | 不新增 `MIM_*`；`.env.example` 仅登记第三方密钥占位（P0 无真实密钥需求） |
 | 支付 | 仅 `mock` 驱动：`POST /api/v1/subscriptions/checkout` 传 `driver: 'mock'` 即置 `paid` 并激活订阅 |
 | 验证码 | 开发通道在响应中回传 `dev_code`（未接短信/邮件通道） |
-| 前端视图 | 仅「套餐」「设置」两页；原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域 6 表（第 1 期 3 表 + 第 2 期 `generation_jobs`/`comic_films`/`film_versions`）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片骨架 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期为骨架：真实模型调用（ai-orchestrator）与对象存储预签名（media）未接入；商城与漫剧前端视图 **0 代码** |
+| 前端视图 | 仅「套餐」「设置」两页；原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域 **7 表**（第 1 期 3 表 + 第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期**已装配上线（2026-11-05）**：`app.ts` 已 import 并挂载 `/api/v1/media/*`（`createMediaRouter` + 免鉴权对象收发 `createMediaObjectRouter`，后者先于全局 `express.json`）与 `/api/v1/ai/*`（`createAiRouter`），`index.ts` 构造 `storage` + `orchestrator` 并在 `MIM_AI_WORKER` 默认开启时 `orchestrator.start()` 自动消费 `generation_jobs`；商城与漫剧前端视图 **0 代码** |
 | 模块解锁 | `comic.workbench` 种子行随 `createDatabase()` 自动写入 cn/global 两区；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
 | 授权命令 | 生产授予权益：`sqlite3 /opt/mim/app/services/mim-api/data/mim.db "INSERT INTO entitlements (id,user_id,module_id,source,source_id,status,version,created_at,updated_at) VALUES ('ent:<uid>:comic','<uid>',(SELECT id FROM modules WHERE code='comic.workbench' AND region='cn'),'admin',NULL,'active',1,datetime('now'),datetime('now'));"` |
 

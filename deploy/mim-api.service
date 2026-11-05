@@ -1,8 +1,11 @@
 # Mim 后端 API（systemd unit）
 # 安装位置：/etc/systemd/system/mim-api.service
 #
-# 说明：services/mim-api 的 start 脚本使用 tsx 直接运行 TypeScript（无 tsc 产物），
-#       因此服务器必须以「含 devDependencies」的方式安装依赖。
+# 说明：services/mim-api 的 start 脚本运行 esbuild 编译产物 dist/index.js
+#       （生产不再用 tsx 直跑 TypeScript）；依赖以「含 devDependencies」方式安装，
+#       因 vite/esbuild 为构建期依赖（tsx 仍保留于 devDeps 供本地 dev）。
+#       ExecStart 默认 /usr/bin/node；若服务器 node 路径不同，deploy.sh §6
+#       会按 command -v node 实测路径生成 override.conf 覆盖。
 # 数据库：better-sqlite3 落盘在 services/mim-api/data/mim.db（WAL）。
 # JWT 密钥：生产环境必须经 EnvironmentFile 注入 MIM_JWT_SECRET（>=32 字符，
 #       由 deploy.sh §5 幂等生成 /opt/mim/mim-api.env，chmod 600）；
@@ -23,7 +26,7 @@ WorkingDirectory=/opt/mim/app/services/mim-api
 Environment=NODE_ENV=production
 Environment=PORT=8787
 EnvironmentFile=/opt/mim/mim-api.env
-ExecStart=/opt/mim/app/services/mim-api/node_modules/.bin/tsx src/index.ts
+ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=3
 KillSignal=SIGTERM
