@@ -62,8 +62,9 @@ function requireOrchestrator(deps: ApiDeps): Orchestrator {
 
 export function createAiRouter(deps: ApiDeps): Router {
   const router = Router();
-  router.use(requireAuth);
-  router.use(requireEntitlement(MODULE_CODE));
+  // 鉴权按命名空间生效：未匹配到 /ai* 的请求直接放行到后续 router，避免未知路径被误拦成 401
+  router.use('/ai', requireAuth);
+  router.use('/ai', requireEntitlement(MODULE_CODE));
 
   /** 能力自检：provider / 成本上限 / 保留期 / 存储驱动 */
   router.get('/ai/capabilities', (_req, res) => {

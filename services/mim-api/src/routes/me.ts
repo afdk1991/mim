@@ -19,7 +19,8 @@ const profileBody = z
 
 export function createMeRouter(deps: ApiDeps): Router {
   const router = Router();
-  router.use(requireAuth);
+  // 鉴权按命名空间生效：未匹配到 /me* 的请求直接放行到后续 router，避免未知路径被误拦成 401
+  router.use('/me', requireAuth);
 
   router.get('/me', (req, res) => {
     const user = req.user!;

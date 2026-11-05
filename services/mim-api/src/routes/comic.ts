@@ -376,8 +376,9 @@ function buildMockSuggestions(
 
 export function createComicRouter(deps: ApiDeps): Router {
   const router = Router();
-  router.use(requireAuth);
-  router.use(requireEntitlement(MODULE_CODE));
+  // 鉴权按命名空间生效：未匹配到 /comic* 的请求直接放行到后续 router，避免未知路径被误拦成 401
+  router.use('/comic', requireAuth);
+  router.use('/comic', requireEntitlement(MODULE_CODE));
 
   // ---------- 创作工程 CRUD ----------
 

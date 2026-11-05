@@ -54,6 +54,14 @@ describe('公开能力', () => {
     expect(health.body.status).toBe('ok');
     expect(health.body.service).toBe('mim-api');
   });
+
+  it('已下线与未知路径返回 404，不被受保护 router 的鉴权拦成 401', async () => {
+    for (const path of ['/api/v1/plans', '/api/v1/audit/logs', '/api/v1/not-exist']) {
+      const res = await request(app).get(path);
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('NOT_FOUND');
+    }
+  });
 });
 
 describe('FR-01 账号身份', () => {

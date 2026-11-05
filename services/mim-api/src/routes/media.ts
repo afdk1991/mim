@@ -186,8 +186,9 @@ export function createMediaObjectRouter(deps: ApiDeps): Router {
 /** 受保护的 media 控制面：签发预签名 URL、查询产物 */
 export function createMediaRouter(deps: ApiDeps): Router {
   const router = Router();
-  router.use(requireAuth);
-  router.use(requireEntitlement(MODULE_CODE));
+  // 鉴权按命名空间生效：未匹配到 /media* 的请求直接放行到后续 router，避免未知路径被误拦成 401
+  router.use('/media', requireAuth);
+  router.use('/media', requireEntitlement(MODULE_CODE));
 
   router.post('/media/presign/upload', idempotency, async (req, res) => {
     const body = parse(presignUploadBody, req.body);
