@@ -142,25 +142,13 @@ export function Settings({ locale, onUserUpdated }: Props) {
 
         <section className="panel">
           <header className="panel-head">
-            <h2>{t(locale, 'settings.plan')}</h2>
+            <h2>{t(locale, 'settings.regionInfo')}</h2>
           </header>
           <ul className="plain-list">
             <li>
               <span>{t(locale, 'settings.region')}</span>
               <span className="badge">{me.user.region === 'cn' ? '中国区' : 'Global'}</span>
             </li>
-            <li>
-              <span>{t(locale, 'settings.plan')}</span>
-              <span className="badge role-owner">
-                {locale === 'zh-CN' ? me.plan.name_zh : me.plan.name_en}
-              </span>
-            </li>
-            {me.subscription && (
-              <li>
-                <span>{me.subscription.cycle}</span>
-                <span className="muted">{me.subscription.status}</span>
-              </li>
-            )}
           </ul>
 
           <header className="panel-head">

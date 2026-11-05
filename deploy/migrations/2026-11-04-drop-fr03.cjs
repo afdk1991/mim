@@ -140,27 +140,43 @@ async function main() {
   if (dangling.length) {
     log(`检测到悬空引用，重建：${dangling.map((d) => d.name).join(', ')}`);
     db.pragma('foreign_keys = OFF');
+    const hasPlanPrices = Boolean(
+      db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='plan_prices'").get(),
+    );
     db.transaction(() => {
-      db.exec(`CREATE TABLE plan_prices_fix (
-        id            TEXT PRIMARY KEY,
-        plan_id       TEXT NOT NULL REFERENCES plans(id),
-        region        TEXT NOT NULL,
-        currency      TEXT NOT NULL,
-        cycle         TEXT NOT NULL CHECK (cycle IN ('monthly','yearly')),
-        amount_minor  INTEGER NOT NULL,
-        UNIQUE (plan_id, region, cycle)
-      )`);
-      db.exec(`INSERT INTO plan_prices_fix (id, plan_id, region, currency, cycle, amount_minor)
-               SELECT id, plan_id, region, currency, cycle, amount_minor FROM plan_prices`);
-      db.exec('DROP TABLE plan_prices');
-      db.exec('ALTER TABLE plan_prices_fix RENAME TO plan_prices');
+      if (hasPlanPrices) {
+        db.exec(`CREATE TABLE plan_prices_fix (
+          id            TEXT PRIMARY KEY,
+          plan_id       TEXT NOT NULL REFERENCES plans(id),
+          region        TEXT NOT NULL,
+          currency      TEXT NOT NULL,
+          cycle         TEXT NOT NULL CHECK (cycle IN ('monthly','yearly')),
+          amount_minor  INTEGER NOT NULL,
+          UNIQUE (plan_id, region, cycle)
+        )`);
+        db.exec(`INSERT INTO plan_prices_fix (id, plan_id, region, currency, cycle, amount_minor)
+                 SELECT id, plan_id, region, currency, cycle, amount_minor FROM plan_prices`);
+        db.exec('DROP TABLE plan_prices');
+        db.exec('ALTER TABLE plan_prices_fix RENAME TO plan_prices');
+      } else {
+        // plan_prices 已被后续迁移删除，直接清理悬空的 plans_old
+        for (const d of dangling) db.exec(`DROP TABLE IF EXISTS "${d.name}"`);
+      }
     })();
     db.pragma('foreign_keys = ON');
   }
 
-  // 校验迁移结果
-  const plans = db.prepare('SELECT id, name_zh, name_en, created_at FROM plans ORDER BY id').all();
-  log(`✅ plans 剩余 ${plans.length} 行：${plans.map((p) => p.id).join(', ')}`);
+  // 校验迁移结果（plans 可能已被后续迁移 2026-11-05 删除，此处做存在性守卫，保证本脚本可幂等重放）
+  const afterTables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    .all()
+    .map((r) => r.name);
+  if (afterTables.includes('plans')) {
+    const plans = db.prepare('SELECT id, name_zh, name_en, created_at FROM plans ORDER BY id').all();
+    log(`✅ plans 剩余 ${plans.length} 行：${plans.map((p) => p.id).join(', ')}`);
+  } else {
+    log('plans 表已不存在（由后续迁移删除），跳过 plans 行数校验');
+  }
   const after = snapshot(db, '迁移后');
   const leftover = CONTENT_TABLES.filter((t) => after.tables.includes(t));
   if (leftover.length) throw new Error(`迁移后仍存在内容域表：${leftover.join(', ')}`);

@@ -9,8 +9,8 @@
 | `AGENTS.md` | 治理 | 定义 8 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
 | `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 12 例契约测试通过；端口 8787 |
-| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅套餐/设置）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
-| `packages/core-domain` | 共享包 | 错误码、套餐、金额、UUIDv7 | 前后端共用单一事实源 |
+| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅设置页）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
+| `packages/core-domain` | 共享包 | 错误码、状态机、UUIDv7 | 前后端共用单一事实源 |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
 | `scripts/env-check.mjs` | 可执行代码 | 09 清单 §0（密钥治理硬约束）的自动校验器 | 退出码 0/1；校验 `.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性 |
@@ -67,7 +67,7 @@
 1. `.env.example` 存在性 + 变量去重
 2. 模板全部为空值占位（只打印变量名，不回显值）
 3. 清单 → 模板：09 清单登记的 `MIM_*` 变量是否全部落位
-4. 通配符项（如 `MIM_PAY_STRIPE_PRICE_ID_*`）是否被模板中的展开项覆盖
+4. 通配符项（如 `MIM_STORAGE_S3_*`）是否被模板中的展开项覆盖
 5. 模板 → 清单：是否存在清单外的「先接入后登记」违规变量
 6. `MIM_` 命名前缀合规
 7. `.gitignore` 是否忽略 `.env`，且保留 `!.env.example` 反向豁免
@@ -83,12 +83,12 @@
 |---|---|
 | §1–2 背景与产品契约 | 问题观察 →「Headless 中台 + 多端薄壳」决策；用户/任务/完成条件/共享对象/信任基础 |
 | §3 范围 | P0 / P1 / 明确排除三档 + 平台兼容性要求矩阵（三端最低版本） |
-| §4 角色与对象模型 | 4 角色；Subscription / Order / Refund / Module / Entitlement / ComicProject / ComicFilm / GenerationJob 状态机 |
-| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付、FR-03 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」；第 1 期后端已落地：catalog 4 表 + comic 3 表 + `/api/v1/comic/*` 8 路由；第 2 期骨架 2026-11-05 已落地：comic 域累计 7 表（新增 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）+ 任务编排 `/comic/jobs/*` 与成片合成 `/comic/films/*` 16 路由）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
-| §6 共享规则 | Region 隔离、解锁鉴权、生成成本与配额、幂等性（request_id）、审计日志（180 天）、通知规则 |
+| §4 角色与对象模型 | 3 角色；Module / Entitlement / ComicProject / ComicFilm / GenerationJob 状态机（Subscription / Order / Refund 已于 2026-11-05 下线） |
+| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付（**已下线 2026-11-05**）、FR-03 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」；第 1 期后端已落地：catalog 4 表 + comic 3 表 + `/api/v1/comic/*` 8 路由；第 2 期骨架 2026-11-05 已落地：comic 域累计 7 表（新增 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）+ 任务编排 `/comic/jobs/*` 与成片合成 `/comic/films/*` 16 路由）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
+| §6 共享规则 | Region 隔离、解锁鉴权、生成成本与配额、幂等性（Idempotency-Key）、通知规则（应用内审计模块已于 2026-11-05 下线，变更留痕改由运维记录承担） |
 | §7 开放问题 | OQ-01~09（OQ-01 已重定义为商城 + 漫剧 AI 剧；新增 OQ-07 漫剧版权与审核口径、OQ-08 生成模型供应商与成本上限、OQ-09 模块定价与一次性购买退款窗口；余项：国内 Android IAP、首批市场、退款窗口、账号合并、IoT） |
 
-内置两个交互演示：FR-01 登录流程演示、FR-02 订阅计划与支付演示（基础版 ¥29/月、专业版 ¥99/月）。
+内置一个交互演示：FR-01 登录流程演示（原 FR-02 订阅计划与支付演示已随套餐/订阅/支付模块于 2026-11-05 下线）。
 
 ## 4. team-hiring-plan.md — 技术与团队规划
 
@@ -154,6 +154,6 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | `deploy/nginx-mim.conf` | 站点模板（root / 反代 / 缓存 / 安全头 / gzip） |
 | `deploy/mim-api.service` | systemd 单元（`User=mim`，`Restart=always`，仅 `data/` 与 `.mim-dev-secret/` 可写） |
 | `deploy/backup-db.sh` | SQLite 一致性备份（`sqlite3 .backup`），保留最近 N 份 |
-| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → 上传本次提交的 `deploy.sh` → SSH 执行 → 服务器 HEAD == 提交 SHA 校验 → 线上 `/health` + `/api/v1/plans` 取证 |
+| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → 上传本次提交的 `deploy.sh` → SSH 执行 → 服务器 HEAD == 提交 SHA 校验 → 线上 `/health` 取证 + 已下线接口 404 抽查 |
 
-**生产事实（2026-11-04 取证）**：`curl https://mim.mixm.top/health` = 200；`/api/v1/plans` 返回套餐 JSON；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘。
+**生产事实（2026-11-04 取证，2026-11-05 更新）**：`curl https://mim.mixm.top/health` = 200；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘；`/api/v1/plans`、`/api/v1/audit/logs` 等已下线接口应返回 404（套餐/订阅/审计模块于 2026-11-05 移除）。

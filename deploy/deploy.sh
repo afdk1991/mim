@@ -4,7 +4,8 @@
 # 职责：拉取 origin/main → 安装依赖（含 dev，因 vite/esbuild 为构建期依赖）
 #       → 构建前端（vite）→ 编译后端（esbuild → dist/index.js）
 #       → 发布静态产物到 /opt/mim/web
-#       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET）→ 重启后端 → 健康检查
+#       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET）
+#       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端 → 健康检查
 #
 # 用法（服务器上）：
 #   sudo bash /opt/mim/app/deploy/deploy.sh
@@ -122,6 +123,26 @@ if id -u "$RUN_USER" >/dev/null 2>&1; then
   chown "$RUN_USER:$RUN_USER" "$MIM_ENV_FILE" 2>/dev/null || true
 else
   warn "用户 $RUN_USER 不存在，跳过 chown（请先执行 bootstrap.sh）"
+fi
+
+# --- 5.5 数据库迁移（幂等，按文件名顺序执行；首次部署无 DB 时跳过） ---
+# 迁移脚本位于 deploy/migrations/*.cjs，均以 better-sqlite3 backup API 先备份再 DROP/重建，
+# 可反复重放。任一迁移失败即中止部署（set -e），避免把半迁移的库暴露给新代码。
+DB_FILE="$APP_DIR/services/mim-api/data/mim.db"
+if [ -f "$DB_FILE" ]; then
+  log "执行数据库迁移（$APP_DIR/deploy/migrations）"
+  shopt -s nullglob
+  for m in "$APP_DIR"/deploy/migrations/*.cjs; do
+    log "migration: $(basename "$m")"
+    node "$m" --apply
+  done
+  shopt -u nullglob
+  # 迁移以 root 运行，可能产生 root 属主的 -wal/-shm，重启前归还给运行用户
+  if id -u "$RUN_USER" >/dev/null 2>&1; then
+    chown -R "$RUN_USER:$RUN_USER" "$APP_DIR/services/mim-api/data" 2>/dev/null || true
+  fi
+else
+  warn "数据库文件尚不存在（首次部署），跳过迁移；应用启动时将按 schema.sql 建库"
 fi
 
 # --- 6. 重启后端 ---

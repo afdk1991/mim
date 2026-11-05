@@ -115,7 +115,7 @@ RELEASE_CHANNEL = (unset / 正式通道)
 | `NAME_PREFIX` | `'MIM_'` | 命名前缀门禁 |
 | `ASSIGN_LINE_RE` | `/^([A-Z][A-Z0-9_]*)[ \t]*=/` | **必须用 `[ \t]*` 而非 `\s*`**：JS 的 `\s` 含换行符，会把下一行变量名误判为本行非空值，造成大量假 ❌ |
 | `INVENTORY_VAR_RE` | ``/`(MIM_[A-Z0-9_]+)`/g`` | 闭合反引号紧跟变量名，天然排除通配符写法 |
-| `INVENTORY_WILDCARD_RE` | ``/`(MIM_[A-Z0-9_]+)\*`/g`` | 捕获通配项 stem（如 `MIM_PAY_STRIPE_PRICE_ID_`），用于前缀匹配模板中的展开项 |
+| `INVENTORY_WILDCARD_RE` | ``/`(MIM_[A-Z0-9_]+)\*`/g`` | 捕获通配项 stem（如 `MIM_STORAGE_S3_*`），用于前缀匹配模板中的展开项 |
 
 ### 7.3 八段检查
 
@@ -138,12 +138,11 @@ RELEASE_CHANNEL = (unset / 正式通道)
 模板: .env.example
 清单: docs/wiki/09-third-party-sdk-inventory.md
 
-模板变量: total=140 unique=140
+模板变量: total=138 unique=138
 ✅ 变量名无重复
 ✅ 模板全部为空值占位（无真实密钥）
-清单对齐: inventory=138 missing=0 extra=0 wildcardCovered=2
+清单对齐: inventory=138 missing=0 extra=0 wildcardCovered=0
 ✅ 清单登记变量已全部落位到模板
-⚠️  以下变量由清单通配符覆盖: MIM_PAY_STRIPE_PRICE_ID_MONTHLY, MIM_PAY_STRIPE_PRICE_ID_YEARLY
 ✅ 模板无清单外变量（先登记后接入合规）
 ✅ 全部变量均使用 MIM_ 前缀
 ✅ .gitignore 已忽略 .env
@@ -152,4 +151,4 @@ RELEASE_CHANNEL = (unset / 正式通道)
 ✅ 密钥模板校验通过
 ```
 
-退出码 `0`。模板变量数（140）比清单具体变量数（138）多 2，正是 Stripe 价格 ID 由通配符 `MIM_PAY_STRIPE_PRICE_ID_*` 覆盖的部分，因此判定为 ⚠️ 而非 ❌。
+退出码 `0`。模板变量数与清单具体变量数均为 138，双向完全对齐、无通配符覆盖项（订阅与支付下线后 `MIM_PAY_*` / `MIM_IAP_*` 已同步删除）。

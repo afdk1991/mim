@@ -13,7 +13,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `jsonwebtoken` | ^9.0.3 | 运行时 | JWT 访问令牌 + refresh 轮换 |
 | `bcryptjs` | ^3.0.2 | 运行时 | 密码哈希（global 邮箱密码登录） |
 | `better-sqlite3` | ^13.0.3 | 运行时 | 嵌入式 SQLite 持久化（单库替代 PostgreSQL 规划） |
-| `@mim/core-domain` | workspace:* | 运行时 | 领域层：套餐、状态机、金额、错误码 |
+| `@mim/core-domain` | workspace:* | 运行时 | 领域层：状态机、错误码 |
 | `@mim/i18n` | workspace:* | 运行时 | 错误码与文案的双语映射 |
 | `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告） |
 | `supertest` | ^7.1.4 | 开发 | HTTP 契约测试 |
@@ -26,7 +26,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | 依赖 | 版本 | 类型 | 用途 |
 |---|---|---|---|
 | `react` / `react-dom` | ^18.3.1 | 运行时 | 工作区 UI |
-| `@mim/core-domain` | workspace:* | 运行时 | 套餐 features 与金额格式化复用 |
+| `@mim/core-domain` | workspace:* | 运行时 | `ErrorCode` 类型复用 |
 | `@mim/i18n` | workspace:* | 运行时 | 双语文案与 `formatCurrency` |
 | `vite` | ^6.4.4 | 开发 | 构建与 dev server（端口 5173，代理 `/api` `/health` → 8787）；6.4.4 为安全修复线 |
 | `@vitejs/plugin-react` | ^4.7.0 | 开发 | React 插件（peer 支持 Vite 4/5/6/7） |
@@ -59,7 +59,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 
 ### 1.5 未引入的依赖（避免误判为已接入）
 
-- **真实支付驱动**：`wechat` / `alipay` / `stripe` 仅存在于接口枚举，未引入任何通道 SDK；P0 只有 `mock` 驱动可用。
+- **真实支付驱动**：已随套餐 / 订阅 / 支付模块于 2026-11-05 整体下线，`wechat` / `alipay` / `stripe` 等通道 SDK 均未引入且不再规划。
 - **短信/邮件通道**：验证码走 dev 通道（响应回传 `dev_code`），未接入真实网关。
 - **i18n 框架**（如 i18next）、**UI 组件库**、**Turborepo**：均未引入，原因见 §4。
 - 规划清单（Appium、Playwright、Ant Design Pro、内容审核服务等）仍为路线图，详见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
@@ -90,7 +90,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 |---|---|---|---|
 | Monorepo | pnpm + Turborepo | **pnpm workspace 已落地**；Turborepo **暂缓**（P0 仅 4 个包，无需远端缓存与任务图编排；`pnpm -r typecheck` / `--filter` 已满足） | 小程序调研 txt 第三部分 |
 | 端侧架构 | `IPlatformAdapter` 契约 + 契约测试套件，业务层禁止平台判断 | **未落地**：P0 仅 Web 单端，尚无多端差异需要封装 | 小程序调研 txt 第四部分 |
-| 支付 | 国内：微信支付/支付宝/银联；海外：Stripe/PayPal；App 数字商品：Apple IAP / Google Play Billing（商店强制） | **仅 `mock` 驱动**；真实通道 SDK 未引入，`driver !== 'mock'` 返回 `PAYMENT_DRIVER_UNAVAILABLE` | PRD FR-02 |
+| 支付 | ~~国内：微信支付/支付宝/银联；海外：Stripe/PayPal；App 数字商品：Apple IAP / Google Play Billing~~ | **已下线（2026-11-05）**：套餐 / 订阅 / 支付 / 发票模块随 PRD OQ-01 定案整体移除，无任何支付通道 SDK | PRD FR-02（已移除） |
 | IM / 音视频 / AI | P0 全部采购第三方驱动，不自研 SFU 与 AI 推理 | **未落地**（P1） | PRD §3 排除项 |
 | 推送 | APNs / FCM / 国内厂商通道，平台适配层封装 | **未落地**（原截止提醒场景随 FR-03 移除，无 P0 推送需求） | PRD FR-04 |
 | 管理后台 | 直接用 Ant Design Pro / Arco Pro 模板，不定制设计 | **未落地**；仓库无 `apps/admin` | team-hiring-plan.md 省钱杠杆 |
@@ -104,7 +104,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 
 - 新增任何第三方能力：先更新 09 清单，再在对应模块编码时按铁律五写入 `package.json` + 锁文件，并回填本文件 §1。
 - 北斗卫星导航系统（L1 系统定位 / L2 高精度 / L3 短报文）的接入边界与 PRD IoT 排除口径的处理，见 09 清单 §11。
-- 因此「§1 只列已安装依赖」与「09 已有全量规划清单」并不矛盾：前者是实况，后者是待接入基线；`MIM_PAY_WECHAT_*` 等变量存在但对应 SDK 未安装，属预期状态。
+- 因此「§1 只列已安装依赖」与「09 已有全量规划清单」并不矛盾：前者是实况，后者是待接入基线。2026-11-05 起 09 清单 §2（订阅与支付）已整体下线，`MIM_PAY_*` / `MIM_IAP_*` 变量亦从 `.env.example` 同步删除，不再存在「变量已登记但 SDK 未装」的历史状态。
 
 ## 5. 模块内部依赖图
 

@@ -3,9 +3,7 @@
 import express from 'express';
 import type { Express, NextFunction, Request, Response } from 'express';
 import { createAuthRouter } from './routes/auth.js';
-import { createPublicBillingRouter, createBillingRouter } from './routes/billing.js';
 import { createMeRouter } from './routes/me.js';
-import { createAuditRouter } from './routes/audit.js';
 import { createComicRouter } from './routes/comic.js';
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js';
 import { createAiRouter } from './routes/ai.js';
@@ -38,15 +36,12 @@ export function createApp(deps: ApiDeps): Express {
     res.json({ status: 'ok', service: 'mim-api', version: '0.0.0' });
   });
 
-  // 公开路由：套餐目录、mock 支付回调、验证码/登录/刷新
-  app.use('/api/v1', createPublicBillingRouter(resolved));
+  // 公开路由：验证码/登录/刷新
   app.use('/api/v1', createAuthRouter(resolved));
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [
     createMeRouter(resolved),
-    createBillingRouter(resolved),
-    createAuditRouter(resolved),
     createComicRouter(resolved),
     createMediaRouter(resolved),
     createAiRouter(resolved),

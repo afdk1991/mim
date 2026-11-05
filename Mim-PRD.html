@@ -94,7 +94,7 @@
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
   <!-- 加粗的小节引导词 -->
-  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。<strong>旗舰产品形态于 2026-11-04 重定义为 SaaS 工具型（订阅制）— 功能模块商城 + 漫剧 AI 剧工作室</strong>（FR-03 重写，替代原「跨端任务与轻协作工具」方案）。核心工作区由两域构成：<strong>功能模块商城</strong>负责模块上架、定价与解锁；<strong>漫剧 AI 剧</strong>覆盖 AI 全自动成片、AI 辅助创作工作台、作品管理与分发、工作台+导出成片四种交付形态。首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
+  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。<strong>旗舰产品形态于 2026-11-04 重定义为 SaaS 工具型（按模块一次性解锁）— 功能模块商城 + 漫剧 AI 剧工作室</strong>（FR-03 重写，替代原「跨端任务与轻协作工具」方案）。核心工作区由两域构成：<strong>功能模块商城</strong>负责模块上架、定价与解锁；<strong>漫剧 AI 剧</strong>覆盖 AI 全自动成片、AI 辅助创作工作台、作品管理与分发、工作台+导出成片四种交付形态。首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
 </div>
 
 <!-- 章节标题：1. 背景与目标 -->
@@ -128,15 +128,15 @@
   <!-- 主要用户 -->
   <tr><td>主要用户</td><td>终端用户（国内 / 海外）、运营管理员</td></tr>
   <!-- 核心任务 -->
-  <tr><td>核心任务</td><td>注册账号 → 进入功能模块商城选购模块/订阅 → 完成支付 → 在漫剧 AI 剧工作台创作 → 导出成片 → 跨端继续使用</td></tr>
+  <tr><td>核心任务</td><td>注册账号 → 进入功能模块商城解锁模块（一次性购买） → 在漫剧 AI 剧工作台创作 → 导出成片 → 跨端继续使用</td></tr>
   <!-- 触发方式 -->
   <tr><td>触发</td><td>用户首次访问任意端，或从任一渠道（链接、扫码、推送）进入产品</td></tr>
   <!-- 完成条件 -->
-  <tr><td>完成条件</td><td>用户在至少一端成功支付订阅，且可在另一端以同一账号登录并访问已订阅功能</td></tr>
+  <tr><td>完成条件</td><td>用户在至少一端成功解锁功能模块（一次性购买），且可在另一端以同一账号登录并访问已解锁功能</td></tr>
   <!-- 共享业务对象 -->
-  <tr><td>共享业务对象</td><td>User（用户）、Account（账号）、Subscription（订阅）、Order（订单）、Plan（计划）、Module（功能模块）、Entitlement（模块解锁）、ComicProject（漫剧工程）、ComicFilm（成片）、GenerationJob（生成任务）</td></tr>
+  <tr><td>共享业务对象</td><td>User（用户）、Account（账号）、Module（功能模块）、Entitlement（模块解锁）、ComicProject（漫剧工程）、ComicFilm（成片）、GenerationJob（生成任务）</td></tr>
   <!-- 信任基础 -->
-  <tr><td>信任基础</td><td>支付安全（持牌通道 + IAP）、数据合规（PIPL/GDPR）、隐私保护（最小收集 + 可删除）</td></tr>
+  <tr><td>信任基础</td><td>数据合规（PIPL/GDPR）、隐私保护（最小收集 + 可删除）、内容合规审核</td></tr>
 </table>
 
 <!-- 章节标题：3. 范围 -->
@@ -148,10 +148,10 @@
 <ul>
   <!-- 账号与身份 -->
   <li><strong>账号与身份</strong>：注册、登录、跨端账号打通、国内（手机号+微信/支付宝）与海外（邮箱+Google/Apple）双登录体系</li>
-  <!-- 订阅与支付 -->
-  <li><strong>订阅与支付</strong>：计划展示、订阅、支付（国内通道 + Stripe/PayPal + Apple IAP/Google Play）、订单、退款、凭证校验</li>
+  <!-- 订阅与支付（已下线） -->
+  <li><strong>订阅与支付</strong> <span class="tag-tbd">已下线（2026-11-05）</span>：原计划展示、订阅、支付（国内通道 + Stripe/PayPal + Apple IAP/Google Play）、订单、退款、凭证校验已整体删除，后端 `routes/billing.ts`、3 个领域模块、前端 `Plans.tsx` 与生产库 9 张表均已移除；`/api/v1/plans` 现返回 404</li>
   <!-- 核心 SaaS 工作区①：功能模块商城（2026-11-04 重定义） -->
-  <li><strong>核心 SaaS 工作区 — 功能模块商城</strong>：模块目录与详情、模块定价（按 region / 币种独立定价）、模块解锁（Entitlement）、订单挂载模块、解锁状态校验；支持「订阅制解锁」与「一次性购买解锁」两种模式，退款需回收解锁</li>
+  <li><strong>核心 SaaS 工作区 — 功能模块商城</strong>：模块目录与详情、模块定价（按 region / 币种独立定价）、模块解锁（Entitlement）、解锁状态校验；解锁方式为<strong>一次性购买解锁</strong>（`unlock_mode=one_time`，唯一方式）。<span class="muted">原「订阅制解锁」与「订单挂载模块 / 退款回收解锁」已于 2026-11-05 随 FR-02 下线；`order_items` 表取消，不建表。</span></li>
   <!-- 核心 SaaS 工作区②：漫剧 AI 剧（四形态） -->
   <li><strong>核心 SaaS 工作区 — 漫剧 AI 剧</strong>：覆盖四种交付形态 ① <strong>AI 全自动生成成片</strong>（题材/剧本大纲 → AI 分镜与角色设定 → 静帧/关键帧 → 合成漫剧短视频，需接入文生图/图生视频模型与任务队列）② <strong>AI 辅助创作工作台</strong>（剧本、分镜、角色一致性、对白、配音由 AI 建议、人工确认，交付物为创作工程）③ <strong>漫剧作品管理与分发</strong>（成片管理、版本、发布与浏览）④ <strong>创作工作台 + 导出成片</strong>（②与③的组合）。四种形态均在本 P0 定义范围内，按 §5 FR-03.2 的形态表与 [07 §12](file:///f:/合并项目/Mim/docs/wiki/07-functional-modules.md) 拆分清单分里程碑落地</li>
   <!-- 多端体验一致性 -->
@@ -237,66 +237,18 @@
   <tr><th>角色</th><th>定义</th><th>核心权限</th></tr>
   <!-- 访客 -->
   <tr><td>访客</td><td>未登录用户</td><td>浏览公开内容、注册/登录</td></tr>
-  <!-- 免费用户 -->
-  <tr><td>免费用户</td><td>已注册未订阅</td><td>使用免费功能、查看计划、发起订阅</td></tr>
-  <!-- 订阅用户 -->
-  <tr><td>订阅用户</td><td>有有效订阅</td><td>使用付费功能、管理订阅、跨端登录</td></tr>
+  <!-- 注册用户（原「免费用户 / 订阅用户」已随 FR-02 下线合并） -->
+  <tr><td>注册用户</td><td>已注册（当前无订阅体系）</td><td>使用免费功能、解锁功能模块、跨端登录</td></tr>
   <!-- 运营管理员（权限范围 TBD） -->
-  <tr><td>运营管理员</td><td>内部运营人员</td><td>管理计划、查看订单、处理退款工单 <span class="tag-tbd">TBD</span></td></tr>
+  <tr><td>运营管理员</td><td>内部运营人员</td><td>管理功能模块与解锁（后台规划，未实现） <span class="tag-tbd">TBD</span></td></tr>
 </table>
 
 <!-- 4.2 核心对象与状态小节标题 -->
 <h3>4.2 核心对象与状态</h3>
 
-<!-- Subscription 对象小标题 -->
-<h4>Subscription（订阅）</h4>
-<!-- 订阅状态机表 -->
-<table>
-  <!-- 表头：状态 / 进入条件 / 可执行操作 -->
-  <tr><th>状态</th><th>进入条件</th><th>可执行操作</th></tr>
-  <!-- active：生效中 -->
-  <tr><td><code>active</code></td><td>支付成功且在有效期内</td><td>使用付费功能、取消续费、申请退款</td></tr>
-  <!-- past_due：续费失败宽限期 -->
-  <tr><td><code>past_due</code></td><td>续费失败，宽限期内</td><td>更新支付方式、查看欠费</td></tr>
-  <!-- canceled：已取消 -->
-  <tr><td><code>canceled</code></td><td>用户取消或退款完成</td><td>不可用付费功能（至当期结束）</td></tr>
-  <!-- expired：已过期 -->
-  <tr><td><code>expired</code></td><td>订阅到期未续费</td><td>重新订阅</td></tr>
-</table>
-
-<!-- Order 对象小标题 -->
-<h4>Order（订单）</h4>
-<!-- 订单状态表 -->
-<table>
-  <!-- 表头：状态 / 说明 -->
-  <tr><th>状态</th><th>说明</th></tr>
-  <!-- pending：待支付 -->
-  <tr><td><code>pending</code></td><td>已创建，等待支付</td></tr>
-  <!-- paid：已支付 -->
-  <tr><td><code>paid</code></td><td>支付成功</td></tr>
-  <!-- failed：支付失败 -->
-  <tr><td><code>failed</code></td><td>支付失败</td></tr>
-  <!-- refunded：已退款 -->
-  <tr><td><code>refunded</code></td><td>已退款（全额或部分）</td></tr>
-  <!-- closed：已关闭 -->
-  <tr><td><code>closed</code></td><td>超时未支付关闭</td></tr>
-</table>
-
-<!-- Refund（退款）对象小标题 -->
-<h4>Refund（退款）</h4>
-<!-- 退款状态表 -->
-<table>
-  <!-- 表头：状态 / 说明 -->
-  <tr><th>状态</th><th>说明</th></tr>
-  <!-- pending：待审核 -->
-  <tr><td><code>pending</code></td><td>用户已申请，等待运营审核；IAP 退款以商店通知为准，本地同步为同一状态流</td></tr>
-  <!-- approved：审核通过 -->
-  <tr><td><code>approved</code></td><td>审核通过，等待通道执行退款</td></tr>
-  <!-- rejected：审核拒绝 -->
-  <tr><td><code>rejected</code></td><td>审核拒绝，订单与订阅状态不变，需记录驳回原因</td></tr>
-  <!-- executed：退款完成 -->
-  <tr><td><code>executed</code></td><td>通道退款成功；订单转 <code>refunded</code>，订阅按 §5 FR-02 规则失效或折算，模块解锁同步回收</td></tr>
-</table>
+<div class="callout-warn">
+  <strong>Subscription / Order / Refund — 已下线（2026-11-05）</strong>：以下三套状态机随 FR-02 整域删除，对应代码（<code>routes/billing.ts</code>、<code>packages/core-domain/{plans,subscription,order}.ts</code>、<code>views/Plans.tsx</code>）与生产库 9 张表均已移除。本节仅作历史留痕，<strong>不得</strong>作为当前实现依据。原状态：订阅 <code>active</code>/<code>past_due</code>/<code>canceled</code>/<code>expired</code>；订单 <code>pending</code>/<code>paid</code>/<code>failed</code>/<code>refunded</code>/<code>closed</code>；退款 <code>pending</code>/<code>approved</code>/<code>rejected</code>/<code>executed</code>。
+</div>
 
 <!-- Module（功能模块）对象小标题 -->
 <h4>Module（功能模块）</h4>
@@ -307,7 +259,7 @@
   <!-- draft：草稿 -->
   <tr><td><code>draft</code></td><td>运营创建，尚未上架</td><td>编辑信息与定价、预览、提交上架</td></tr>
   <!-- active：已上架 -->
-  <tr><td><code>active</code></td><td>审核通过并开放售卖</td><td>用户可浏览、订阅解锁或一次性购买解锁；运营可下架</td></tr>
+  <tr><td><code>active</code></td><td>审核通过并开放售卖</td><td>用户可浏览、一次性购买解锁；运营可下架</td></tr>
   <!-- archived：已下架 -->
   <tr><td><code>archived</code></td><td>运营下架</td><td>不可新购；已产生的 Entitlement 在其有效期内继续可用</td></tr>
 </table>
@@ -319,11 +271,11 @@
   <!-- 表头：状态 / 进入条件 / 可执行操作 -->
   <tr><th>状态</th><th>进入条件</th><th>可执行操作</th></tr>
   <!-- active：有效 -->
-  <tr><td><code>active</code></td><td>订阅覆盖该模块，或一次性购买订单已支付</td><td>使用该模块；订阅型解锁随订阅状态联动</td></tr>
+  <tr><td><code>active</code></td><td>一次性购买解锁已发放，或运营手工发放</td><td>使用该模块</td></tr>
   <!-- expired：已过期 -->
-  <tr><td><code>expired</code></td><td>订阅到期未续费（仅订阅型解锁）</td><td>重新订阅后恢复；永久解锁不进入此状态</td></tr>
+  <tr><td><code>expired</code></td><td>时效到期的临时解锁</td><td>重新解锁后恢复；永久解锁不进入此状态</td></tr>
   <!-- revoked：已回收 -->
-  <tr><td><code>revoked</code></td><td>退款执行完成或运营风控回收</td><td>不可使用该模块，需重新购买/订阅</td></tr>
+  <tr><td><code>revoked</code></td><td>运营风控回收（退款触发路径已随 FR-02 于 2026-11-05 下线）</td><td>不可使用该模块，需重新解锁</td></tr>
 </table>
 
 <!-- ComicProject（漫剧工程）对象小标题 -->
@@ -382,7 +334,7 @@
 
 <!-- 状态机通用约束 -->
 <div class="callout">
-  <strong>状态机通用约束</strong>：所有状态变更必须经领域层校验并写入事件表（只追加，禁止 UPDATE 历史）；金额相关对象（<code>Order</code> / <code>Refund</code>）禁止软删除，只能追加冲正；模块解锁的发放与回收必须与订单/退款在同一事务内完成，避免出现「已退款仍解锁」或「已支付未解锁」。
+  <strong>状态机通用约束</strong>：所有状态变更必须经领域层校验并写入事件表（只追加，禁止 UPDATE 历史）；金额相关对象（<code>Order</code> / <code>Refund</code>）禁止软删除，只能追加冲正<span class="muted">（两类对象已于 2026-11-05 随 FR-02 下线）</span>；模块解锁的发放必须与触发其的业务动作在同一事务内完成，避免出现「已支付未解锁」。
 </div>
 
 <!-- 章节标题：5. 功能需求 -->
@@ -394,7 +346,7 @@
 <!-- 目的子标题 -->
 <h4>目的</h4>
 <!-- 目的说明段 -->
-<p>用户在任意端完成注册/登录后，其账号与订阅状态在所有端实时同步。国内与海外采用不同的登录方式，但底层账号体系统一。</p>
+<p>用户在任意端完成注册/登录后，其账号状态（基础资料、地区、登录方式绑定）在所有端实时同步。国内与海外采用不同的登录方式，但底层账号体系统一。<span class="muted">原「订阅状态跨端同步」已于 2026-11-05 随 FR-02 下线，账号不再携带订阅维度。</span></p>
 
 <!-- 注册与登录方式子标题 -->
 <h4>注册与登录方式</h4>
@@ -419,7 +371,7 @@
   <!-- 绑定需二次验证 -->
   <li>绑定需二次验证（已登录方式确认 + 新方式验证码）</li>
   <!-- 账号合并规则（策略 TBD） -->
-  <li>账号合并：若用户用两种方式注册了两个账号，可申请合并，合并后订阅与订单归并至保留账号 <span class="tag-tbd">TBD：合并策略细节</span></li>
+  <li>账号合并：若用户用两种方式注册了两个账号，可申请合并，合并后身份绑定与历史业务数据归并至保留账号 <span class="tag-tbd">TBD：合并策略细节</span>（原「订阅与订单归并」已随 FR-02 于 2026-11-05 下线）</li>
 </ul>
 
 <!-- 异常与边界子标题 -->
@@ -489,16 +441,20 @@ function submitLogin(){
 }
 </script>
 
-<!-- FR-02 订阅与支付小节标题 -->
-<h3>FR-02 订阅与支付</h3>
+<!-- FR-02 订阅与支付小节标题（已下线，2026-11-05） -->
+<h3>FR-02 订阅与支付 <span class="tag-tbd">已下线（2026-11-05）</span></h3>
 
-<!-- 目的子标题 -->
-<h4>目的</h4>
-<!-- 目的说明段 -->
-<p>用户选择订阅计划并完成支付后，获得对应功能的使用权。支付通道按市场与平台路由，底层由驱动层屏蔽差异，业务方只感知统一的订阅状态。</p>
+<!-- 警告提示块：整域删除说明 -->
+<div class="callout-warn">
+  <strong>本模块已按用户指令整体删除（2026-11-05）</strong>：套餐、订阅、订单、支付、退款、发票、对账能力全部下线。后端 <code>routes/billing.ts</code> 与 <code>packages/core-domain/{plans,subscription,order}.ts</code> 已删除；前端 <code>views/Plans.tsx</code> 已删除；生产库 <code>plans</code> / <code>plan_prices</code> / <code>subscriptions</code> / <code>subscription_events</code> / <code>orders</code> / <code>payments</code> / <code>refunds</code> / <code>invoices</code> / <code>audit_logs</code> 共 9 张表已 DROP（迁移 <code>deploy/migrations/2026-11-05-drop-billing-audit.cjs</code>）；<code>/api/v1/plans</code> 现返回 404（CI 断言）。以下小节仅作<strong>历史设计留痕</strong>，不得作为当前实现依据。
+</div>
 
-<!-- 订阅计划子标题 -->
-<h4>订阅计划（Plan）</h4>
+<!-- 历史留痕：目的 -->
+<h4>目的（历史设计）</h4>
+<p class="muted">用户选择订阅计划并完成支付后，获得对应功能的使用权。支付通道按市场与平台路由，底层由驱动层屏蔽差异，业务方只感知统一的订阅状态。</p>
+
+<!-- 订阅计划子标题（历史设计，已删除） -->
+<h4>订阅计划（Plan）<span class="muted">（已删除）</span></h4>
 <!-- Plan 字段定义表 -->
 <table>
   <!-- 表头：字段 / 说明 -->
@@ -575,42 +531,8 @@ function submitLogin(){
   <li>跨端订阅状态：订阅状态变更后 5 秒内同步至所有在线端，离线端下次拉取时更新</li>
 </ul>
 
-<!-- FR-02 交互演示卡片 -->
-<div class="demo">
-  <!-- 演示卡片标签 -->
-  <div class="demo-label">FR-02 演示：订阅计划与支付</div>
-  <!-- 计划演示容器（供脚本按 id 定位） -->
-  <div id="plan-demo">
-    <!-- 计划对比表：宽度自适应内容 -->
-    <table style="width:auto;">
-      <!-- 表头：计划 / 月付 / 年付 / 操作列 -->
-      <tr><th>计划</th><th>月付</th><th>年付</th><th></th></tr>
-      <!-- 基础版行：选择按钮调用 selectPlan('基础版','¥29') -->
-      <tr><td>基础版</td><td>¥29</td><td>¥290 <span class="badge">省 ¥58</span></td><td><button class="btn btn-ghost" onclick="selectPlan('基础版','¥29')">选择</button></td></tr>
-      <!-- 专业版行：选择按钮调用 selectPlan('专业版','¥99') -->
-      <tr><td>专业版</td><td>¥99</td><td>¥990 <span class="badge">省 ¥198</span></td><td><button class="btn" onclick="selectPlan('专业版','¥99')">选择</button></td></tr>
-    </table>
-    <!-- 支付结果区：由脚本写入所选计划与支付按钮/结果 -->
-    <div id="pay-result" style="margin-top:12px;"></div>
-  </div>
-</div>
-<!-- FR-02 演示脚本 -->
-<script>
-// 选择计划：把所选计划名称与价格渲染进结果区，并给出两个支付按钮
-function selectPlan(name,price){
-  // 将结果区内容替换为：已选信息 + 微信支付按钮 + 支付宝按钮
-  document.getElementById('pay-result').innerHTML=
-    '<strong>已选：'+name+' '+price+'/月</strong><br>'+
-    '<button class="btn" style="margin-top:8px;" onclick="doPay()">微信支付</button> '+
-    '<button class="btn btn-ghost" onclick="doPay()">支付宝</button>';
-}
-// 模拟支付：把结果区替换为支付成功提示
-function doPay(){
-  // 显示演示用的支付成功文案
-  document.getElementById('pay-result').innerHTML=
-    '<span class="state-active">✓ 支付成功，订阅已激活，可使用付费功能</span>';
-}
-</script>
+<!-- FR-02 交互演示已随模块删除（2026-11-05） -->
+<p class="muted">原「订阅计划与支付」交互演示（<code>selectPlan()</code> / <code>doPay()</code>）已随 FR-02 整体删除，不再保留可交互入口。</p>
 
 <!-- FR-03 核心 SaaS 工作区小节标题（2026-11-04 重定义为：功能模块商城 + 漫剧 AI 剧） -->
 <h3>FR-03 核心 SaaS 工作区（功能模块商城 + 漫剧 AI 剧）</h3>
@@ -624,7 +546,7 @@ function doPay(){
 <h4>FR-03.1 功能模块商城</h4>
 
 <!-- 目的 -->
-<p><strong>目的</strong>：用户可在商城中浏览模块、按 region 与币种查看定价，并通过「订阅解锁」或「一次性购买解锁」获得模块使用权；服务端以 <code>Entitlement</code> 作为唯一鉴权依据，端上不得自行判断是否已购买。</p>
+<p><strong>目的</strong>：用户可在商城中浏览模块、按 region 与币种查看定价，并通过<strong>一次性购买解锁</strong>（<code>unlock_mode=one_time</code>，唯一方式）获得模块使用权；服务端以 <code>Entitlement</code> 作为唯一鉴权依据，端上不得自行判断是否已购买。<span class="muted">原「订阅解锁」与「订单挂载模块 / 退款回收解锁」已于 2026-11-05 随 FR-02 下线；当前未实现在线支付，解锁由运营侧发放（后台规划中）。</span></p>
 
 <!-- 模块对象字段 -->
 <table>
@@ -633,7 +555,7 @@ function doPay(){
   <tr><td><code>module_id</code></td><td>模块唯一标识（稳定不变，改版不换 ID）</td></tr>
   <tr><td><code>code</code></td><td>机器可读编码，用于代码内鉴权（如 <code>comic-studio</code>、<code>ai-film-auto</code>）</td></tr>
   <tr><td><code>name</code> / <code>summary</code></td><td>多语言名称与简介（zh-CN / en-US）</td></tr>
-  <tr><td><code>unlock_mode</code></td><td><code>subscription</code>（随订阅生效）或 <code>one_time</code>（一次性永久解锁）</td></tr>
+  <tr><td><code>unlock_mode</code></td><td><code>one_time</code>（一次性永久解锁，唯一方式）<span class="muted">；<code>subscription</code>（随订阅生效）已随 FR-02 于 2026-11-05 下线</span></td></tr>
   <tr><td><code>price</code></td><td>按 <code>region</code> + <code>currency</code> 独立定价，金额为最小货币单位整数</td></tr>
   <tr><td><code>entitlements_required</code></td><td>前置模块依赖（如「全自动成片」依赖「创作工作台」），未满足时商城展示为「需先解锁 X」</td></tr>
   <tr><td><code>status</code></td><td><code>draft</code> / <code>active</code> / <code>archived</code>（状态机见 §4.2）</td></tr>
@@ -643,31 +565,26 @@ function doPay(){
 <!-- 定价与解锁规则 -->
 <h4>定价与解锁规则</h4>
 <ul>
-  <li><strong>订阅解锁</strong>：订阅处于 <code>active</code> 且该订阅包含本模块时，系统自动发放 <code>Entitlement(active)</code>；订阅转 <code>past_due</code> 保留至当期结束，转 <code>expired</code> 时对应解锁转 <code>expired</code>。</li>
-  <li><strong>一次性购买解锁</strong>：订单 <code>paid</code> 后发放永久 <code>Entitlement(active)</code>，不随订阅状态变化，仅在退款执行后转 <code>revoked</code>。</li>
-  <li><strong>组合购买</strong>：同一订单可挂载多个模块（订单行 = 模块 + 计价项），任一模块退款只回收对应解锁，不影响其他模块。</li>
-  <li><strong>改价不改史</strong>：价格变更只影响新订单；历史订单与已发放解锁不受影响。</li>
+  <li><strong>一次性购买解锁</strong>：解锁发放后为永久 <code>Entitlement(active)</code>，不随任何订阅状态变化；仅由运营风控回收转 <code>revoked</code>（原「退款执行后转 revoked」已随 FR-02 于 2026-11-05 下线）。</li>
+  <li><strong>改价不改史</strong>：价格变更只影响新订单；已发放解锁不受影响。<span class="muted">（订单域已删除，「改价不改史」保留为价格变更语义）</span></li>
 </ul>
 
 <!-- 商城主流程 -->
 <h4>主流程</h4>
 <div class="flow">浏览商城 → 模块详情（查定价 / 查前置依赖）
-  → 选择解锁方式（订阅 / 一次性）
-  → 创建 Order（挂载 module 行）→ 拉起支付
-  → 支付成功 → 同事务发放 Entitlement → 工作区入口点亮
-  → 支付失败 / 超时 → Order(failed / closed)，不发解锁
-退款：Refund(pending) → 审核 → executed
-  → Order(refunded) → Entitlement(revoked) → 商城入口熄灭
+  → 确认一次性购买解锁
+  → 发放 Entitlement(active) → 工作区入口点亮
+  → 前置依赖缺失 → 禁止解锁（ENTITLEMENT_REQUIRED）
 </div>
+<p class="muted">原「创建 Order → 拉起支付 → 支付成功同事务发放 / 退款回收」链路已于 2026-11-05 随 FR-02 删除；当前无在线支付，解锁发放由运营侧动作触发。</p>
 
 <!-- 异常与边界 -->
 <h4>异常与边界</h4>
 <ul>
-  <li>价格展示与下单金额必须由服务端计算，客户端传入金额一律忽略。</li>
-  <li>重复支付同一模块：以 <code>order_id</code> + 通道流水号幂等，不重复发放解锁。</li>
-  <li>模块下架（<code>archived</code>）后不可新购，但已发放的解锁在有效期内继续可用。</li>
-  <li>前置依赖缺失时禁止下单，接口返回明确错误码（如 <code>ENTITLEMENT_REQUIRED</code>）。</li>
-  <li>退款回收解锁必须与退款执行同事务，避免出现「已退款仍解锁」。</li>
+  <li>价格展示金额必须由服务端计算，客户端传入金额一律忽略。</li>
+  <li>模块下架（<code>archived</code>）后不可新购解锁，但已发放的解锁继续可用。</li>
+  <li>前置依赖缺失时禁止解锁，接口返回明确错误码（如 <code>ENTITLEMENT_REQUIRED</code>）。</li>
+  <li>解锁回收必须与触发其的风控动作同事务，避免出现「已回收仍可用」。</li>
 </ul>
 
 <!-- FR-03.2 小节 -->
@@ -709,7 +626,7 @@ function doPay(){
 <h4>生成任务与队列</h4>
 <ul>
   <li>所有模型调用统一封装为 <code>GenerationJob</code>，按工程 + 镜头粒度可重试，状态机见 §4.2。</li>
-  <li>队列按用户配额与付费等级分配并发位；同工程禁止并发全量重生成，避免成本失控。</li>
+  <li>队列按全局成本上限分配并发位 <span class="muted">（原「按用户配额与付费等级」已随 FR-02 于 2026-11-05 下线）</span>；同工程禁止并发全量重生成，避免成本失控。</li>
   <li>任务失败自动重试上限 3 次（指数退避），超限转人工介入并通知用户。</li>
   <li>任务产物落对象存储，数据库只存 object key 与校验信息（尺寸、时长、哈希）。</li>
 </ul>
@@ -717,8 +634,8 @@ function doPay(){
 <!-- 成本与配额 -->
 <h4>成本与配额</h4>
 <ul>
-  <li>按模型调用计量（图片张数 / 视频秒数 / TTS 字数），免费用户与付费等级配额不同，配额由订阅计划决定。</li>
-  <li>每次任务创建前先做配额与成本预检，不足直接拒绝并提示升级或购买额度包。</li>
+  <li>按模型调用计量（图片张数 / 视频秒数 / TTS 字数）；当前以<strong>成本上限</strong>预检替代订阅配额——单任务上限 <code>MIM_AI_JOB_COST_LIMIT_MINOR</code>（默认 100000 分）、当日累计上限 <code>MIM_AI_DAILY_COST_LIMIT_MINOR</code>（默认 500000 分）。<span class="muted">原「免费用户与付费等级配额不同、配额由订阅计划决定」已随 FR-02 于 2026-11-05 下线。</span></li>
+  <li>每次任务创建前先做成本预检，超限直接拒绝并返回明确错误码。</li>
   <li>实际消耗与预估偏差超阈值时写入成本告警，供运营侧调整模型路由（供应商与单价见 OQ-08）。</li>
 </ul>
 
@@ -742,13 +659,13 @@ function doPay(){
 
 <!-- FR-03.3 对象模型 -->
 <h4>FR-03.3 对象模型与状态机</h4>
-<p>商城与漫剧的对象状态机统一在 §4.2「核心对象与状态」定义：<code>Module</code>（draft/active/archived）、<code>Entitlement</code>（active/expired/revoked）、<code>ComicProject</code>（draft/storyboarded/generating/rendered/published/archived）、<code>ComicFilm</code>（draft/reviewing/published/archived）、<code>GenerationJob</code>（queued/running/succeeded/failed/canceled）、<code>Refund</code>（pending/approved/rejected/executed）。</p>
+<p>商城与漫剧的对象状态机统一在 §4.2「核心对象与状态」定义：<code>Module</code>（draft/active/archived）、<code>Entitlement</code>（active/expired/revoked）、<code>ComicProject</code>（draft/storyboarded/generating/rendered/published/archived）、<code>ComicFilm</code>（draft/reviewing/published/archived）、<code>GenerationJob</code>（queued/running/succeeded/failed/canceled）。<span class="muted">原 <code>Refund</code>（pending/approved/rejected/executed）已随 FR-02 于 2026-11-05 下线。</span></p>
 
 <!-- 历史记录 -->
 <h4>历史记录（仅供追溯，不得作为现状引用）</h4>
 <ul>
   <li>原 FR-03（已于 2026-11-04 整体移除）：① 任务管理（项目 → 任务 → 子任务两级） ② 多端实时同步（5 秒内可见，LWW） ③ 基础协作（邀请成员、可编辑/只读两档） ④ 个人仪表盘（今日/未来 7 天/逾期/未排期/今日已完成，按用户时区切日）。</li>
-  <li>原订阅 features 映射（项目数、视图、提醒推送、协作者数、高级筛选、CSV 导出）随 <code>plans.features</code> 列一并删除。</li>
+  <li>原订阅 features 映射（项目数、视图、提醒推送、协作者数、高级筛选、CSV 导出）随 <code>plans.features</code> 列一并删除；<code>plans</code> 表本身已于 2026-11-05 DROP。</li>
 </ul>
 
 <!-- FR-04 多端体验一致性小节标题 -->
@@ -765,8 +682,8 @@ function doPay(){
 <table>
   <!-- 表头：维度 / 统一规则 -->
   <tr><th>维度</th><th>统一规则</th></tr>
-  <!-- 账号与订阅 -->
-  <tr><td>账号与订阅</td><td>同一市场内跨端实时同步</td></tr>
+  <!-- 账号（原「账号与订阅」，订阅维度已于 2026-11-05 随 FR-02 下线） -->
+  <tr><td>账号</td><td>同一市场内跨端实时同步</td></tr>
   <!-- 业务数据 -->
   <tr><td>业务数据</td><td>用户产生的数据在所有端可见可编辑</td></tr>
   <!-- 文案与术语 -->
@@ -785,8 +702,8 @@ function doPay(){
 <ul>
   <!-- 登录封装 -->
   <li>登录：封装各端原生登录 SDK（微信、支付宝、Google、Apple）</li>
-  <!-- 支付封装 -->
-  <li>支付：封装各端支付 SDK（微信支付、支付宝、Stripe、IAP）</li>
+  <!-- 支付封装（已下线：FR-02 于 2026-11-05 整域删除） -->
+  <li>支付：<span class="muted">当前无支付能力（FR-02 已于 2026-11-05 下线）；恢复时再按端封装微信支付、支付宝、Stripe、IAP</span></li>
   <!-- 推送封装 -->
   <li>推送：封装各端推送通道（APNs、FCM、厂商通道）</li>
   <!-- 存储封装 -->
@@ -816,8 +733,8 @@ function doPay(){
 <h4>多币种与价格</h4>
 <!-- 多币种规则清单 -->
 <ul>
-  <!-- 分币种独立定价 -->
-  <li>每个计划按币种独立定价，不使用实时汇率换算</li>
+  <!-- 分币种独立定价（原「每个计划」已改为「每个模块」，计划域随 FR-02 下线） -->
+  <li>每个模块按币种独立定价，不使用实时汇率换算</li>
   <!-- 币种由 region 决定 -->
   <li>币种由 region 决定，国内默认 CNY，海外默认 USD</li>
   <!-- 价格展示格式 -->
@@ -867,12 +784,12 @@ function doPay(){
 <h4>账号注销与数据删除</h4>
 <!-- 注销规则清单 -->
 <ul>
-  <!-- 注销前风险提示 -->
-  <li>用户可申请账号注销，注销前提示：订阅将失效、数据将删除且不可恢复</li>
+  <!-- 注销前风险提示（原「订阅将失效」随 FR-02 于 2026-11-05 下线） -->
+  <li>用户可申请账号注销，注销前提示：已解锁模块将失效、数据将删除且不可恢复</li>
   <!-- 7 天冷静期 -->
   <li>注销申请有 7 天冷静期，期间可撤销</li>
-  <!-- 冷静期后删除与匿名化保留 -->
-  <li>冷静期结束后，删除用户个人数据，保留匿名化的订单与财务记录（合规要求）</li>
+  <!-- 冷静期后删除与匿名化保留（订单/财务域已于 2026-11-05 随 FR-02 删除） -->
+  <li>冷静期结束后，删除用户个人数据，仅保留匿名化的必要合规记录（订单/财务域已于 2026-11-05 删除，不再产生此类记录）</li>
   <!-- 海外删除请求时限 -->
   <li>海外用户的数据删除请求按 GDPR/CCPA 要求在 30 天内处理</li>
 </ul>
@@ -886,38 +803,34 @@ function doPay(){
 <table>
   <!-- 表头：规则 / 定义 / 引用模块 -->
   <tr><th>规则</th><th>定义</th><th>引用模块</th></tr>
-  <!-- Region 隔离 -->
-  <tr><td>Region 隔离</td><td>国内(cn)与海外(global)数据物理隔离，账号、订单、订阅、模块定价、漫剧工程与生成产物按 region 分库；生成产物存储桶按 region 独立</td><td>FR-01, FR-02, FR-03</td></tr>
-  <!-- 模块解锁鉴权（2026-11-04 随 FR-03 重定义新增） -->
-  <tr><td>解锁鉴权</td><td>功能可见性以服务端 <code>Entitlement</code> 为唯一依据，端上不得缓存或自行判断；解锁发放/回收与订单、退款同事务</td><td>FR-02, FR-03</td></tr>
-  <!-- 生成成本与配额 -->
-  <tr><td>生成成本与配额</td><td>所有 AI 生成调用计入配额与成本账，任务创建前预检；配额由订阅计划决定，超限拒绝而非欠费</td><td>FR-02, FR-03</td></tr>
-  <!-- 幂等性 -->
-  <tr><td>幂等性</td><td>所有支付、订阅状态变更接口以 request_id 幂等，重复请求返回首次结果</td><td>FR-02</td></tr>
-  <!-- 审计日志 -->
-  <tr><td>审计日志</td><td>登录、支付、退款、注销等关键操作记录审计日志，保留 180 天</td><td>FR-01, FR-02, FR-06</td></tr>
+  <!-- Region 隔离（订单、订阅维度已于 2026-11-05 随 FR-02 下线） -->
+  <tr><td>Region 隔离</td><td>国内(cn)与海外(global)数据物理隔离，账号、模块定价、漫剧工程与生成产物按 region 分库；生成产物存储桶按 region 独立</td><td>FR-01, FR-03</td></tr>
+  <!-- 模块解锁鉴权（2026-11-04 随 FR-03 重定义新增；订单/退款联动已于 2026-11-05 下线） -->
+  <tr><td>解锁鉴权</td><td>功能可见性以服务端 <code>Entitlement</code> 为唯一依据，端上不得缓存或自行判断；解锁发放/回收与触发其的风控动作同事务（原「与订单、退款同事务」已随 FR-02 于 2026-11-05 下线）</td><td>FR-03</td></tr>
+  <!-- 生成成本与配额（原「配额由订阅计划决定」已于 2026-11-05 随 FR-02 下线） -->
+  <tr><td>生成成本与配额</td><td>所有 AI 生成调用计入成本账，任务创建前预检（单任务 <code>MIM_AI_JOB_COST_LIMIT_MINOR</code>、当日累计 <code>MIM_AI_DAILY_COST_LIMIT_MINOR</code>），超限拒绝而非欠费</td><td>FR-03</td></tr>
+  <!-- 幂等性（支付、订阅维度已于 2026-11-05 随 FR-02 下线） -->
+  <tr><td>幂等性</td><td>所有写操作（登录/注册、账号变更、漫剧工程与任务、媒体上传）以 <code>Idempotency-Key</code> 幂等，重复请求返回首次结果；同键异体返回 409（原「支付、订阅状态变更接口」已随 FR-02 于 2026-11-05 下线）</td><td>FR-01, FR-03</td></tr>
+  <!-- 审计日志（已下线，2026-11-05） -->
+  <tr><td>审计日志</td><td><span class="muted">已下线（2026-11-05）：<code>routes/audit.ts</code> 与 <code>audit_logs</code> 表已删除，当前不记录审计日志；关键操作改为仅在应用日志输出（保留 180 天的要求随审计域一并取消）</span></td><td>FR-01, FR-06</td></tr>
   <!-- 第三方与密钥治理：先登记后接入、密钥不入库、按 region 隔离（详见 09 清单 §0） -->
-  <tr><td>第三方与密钥治理</td><td>新增第三方能力须先在 09 清单登记六要素（提供方 / 形态 / 用途 / 密钥名 / 优先级 / 合规）再接入；密钥按 region 独立、永不入库，模板与清单一致性由 scripts/env-check.mjs 强制</td><td>FR-02, FR-04, FR-06</td></tr>
+  <tr><td>第三方与密钥治理</td><td>新增第三方能力须先在 09 清单登记六要素（提供方 / 形态 / 用途 / 密钥名 / 优先级 / 合规）再接入；密钥按 region 独立、永不入库，模板与清单一致性由 scripts/env-check.mjs 强制</td><td>FR-04, FR-06</td></tr>
 </table>
 
 <!-- 6.2 通知规则小节标题 -->
 <h3>6.2 通知规则</h3>
 <!-- 通知规则清单 -->
 <ul>
-  <!-- 支付成功通知 -->
-  <li>支付成功：站内 + 邮件/短信通知</li>
-  <!-- 到期提醒节奏 -->
-  <li>订阅即将到期：到期前 7 天、3 天、1 天各提醒一次</li>
-  <!-- 续费失败通知 -->
-  <li>续费失败：立即通知用户更新支付方式</li>
+  <!-- 支付/订阅类通知（已下线，2026-11-05：随 FR-02 整域删除，不再发送） -->
+  <li><span class="muted">支付成功 / 订阅即将到期 / 续费失败三类通知已随 FR-02 于 2026-11-05 下线，当前无此类通知</span></li>
   <!-- 异常登录通知 -->
   <li>账号异常登录：邮件/短信通知用户</li>
   <!-- 生成任务完成通知（2026-11-04 随 FR-03 新增） -->
   <li>漫剧生成完成 / 失败：站内通知（可选推送）；失败附失败原因与重试入口</li>
   <!-- 成片审核结果通知 -->
   <li>成片审核通过 / 驳回：站内通知，驳回附原因</li>
-  <!-- 模块解锁变更通知 -->
-  <li>模块解锁发放 / 回收（含退款回收）：站内通知，说明对应订单</li>
+  <!-- 模块解锁变更通知（原「含退款回收 / 说明对应订单」已随 FR-02 于 2026-11-05 下线） -->
+  <li>模块解锁发放 / 回收：站内通知（回收现仅由风控动作触发）</li>
 </ul>
 
 <!-- 章节标题：7. 开放问题 -->
@@ -928,13 +841,13 @@ function doPay(){
   <!-- 表头：编号 / 问题 / 影响 / 状态 -->
   <tr><th>编号</th><th>问题</th><th>影响</th><th>状态</th></tr>
   <!-- OQ-01：已重定义（2026-11-04） -->
-  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>决定 FR-03 工作区内容、模块清单与订阅计划权益</td><td><span class="tag-p0">已重定义（2026-11-04）：功能模块商城 + 漫剧 AI 剧（四形态）</span></td></tr>
+  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>决定 FR-03 工作区内容与模块清单（订阅计划权益已随 FR-02 于 2026-11-05 下线）</td><td><span class="tag-p0">已重定义（2026-11-04）：功能模块商城 + 漫剧 AI 剧（四形态）</span></td></tr>
   <!-- OQ-02：国内 Android IAP 合规问题 -->
-  <tr><td>OQ-02</td><td>国内 Android 端数字商品是否必须走各商店 IAP？</td><td>影响支付通道设计与收入分成</td><td><span class="tag-assume">Assumption, TBD</span></td></tr>
+  <tr><td>OQ-02</td><td>国内 Android 端数字商品是否必须走各商店 IAP？</td><td>影响支付通道设计与收入分成</td><td><span class="tag-tbd">已失效（2026-11-05：FR-02 支付域已删除，无 IAP）</span></td></tr>
   <!-- OQ-03：首批出海市场与语种 -->
   <tr><td>OQ-03</td><td>首批出海市场与语种？</td><td>影响 i18n 资源、支付通道、合规要求</td><td><span class="tag-tbd">TBD</span></td></tr>
   <!-- OQ-04：退款窗口与条件 -->
-  <tr><td>OQ-04</td><td>退款窗口与条件（直连通道）？</td><td>影响 FR-02 退款规则</td><td><span class="tag-tbd">TBD</span></td></tr>
+  <tr><td>OQ-04</td><td>退款窗口与条件（直连通道）？</td><td>影响 FR-02 退款规则</td><td><span class="tag-tbd">已失效（2026-11-05：退款域已删除）</span></td></tr>
   <!-- OQ-05：账号合并策略 -->
   <tr><td>OQ-05</td><td>账号合并的具体策略与数据归属？</td><td>影响 FR-01 账号打通</td><td><span class="tag-tbd">TBD</span></td></tr>
   <!-- OQ-06：IoT 是否支持（假设不支持） -->
@@ -942,9 +855,9 @@ function doPay(){
   <!-- OQ-07：漫剧内容版权归属与审核口径 -->
   <tr><td>OQ-07</td><td>漫剧生成产物的版权归属、可商用范围与内容审核口径（含 AI 生成标识、侵权投诉下架流程）？</td><td>影响 FR-03.2 成片发布、导出授权与合规免责条款；决定是否需接入第三方内容审核与版权存证</td><td><span class="tag-tbd">TBD</span></td></tr>
   <!-- OQ-08：生成模型供应商与成本上限 -->
-  <tr><td>OQ-08</td><td>文生图 / 图生视频 / TTS 模型选型与单工程成本上限？</td><td>影响 FR-03.2 生成队列容量、配额口径、订阅计划与模块定价的成本模型</td><td><span class="tag-tbd">TBD</span></td></tr>
+  <tr><td>OQ-08</td><td>文生图 / 图生视频 / TTS 模型选型与单工程成本上限？</td><td>影响 FR-03.2 生成队列容量、配额口径与模块定价的成本模型（订阅计划部分已随 FR-02 下线）</td><td><span class="tag-tbd">通道未定；已落地兜底默认值 <code>MIM_AI_JOB_COST_LIMIT_MINOR=100000</code>（单任务）/ <code>MIM_AI_DAILY_COST_LIMIT_MINOR=500000</code>（当日累计）</span></td></tr>
   <!-- OQ-09：功能模块定价模式 -->
-  <tr><td>OQ-09</td><td>功能模块采用「订阅内含」还是「独立一次性购买」，两模式定价与折扣如何组合？</td><td>影响 FR-03.1 模块定价表结构、订单挂载方式与解锁回收规则</td><td><span class="tag-assume">Assumption: 两模式并行，模块定价独立于计划定价</span></td></tr>
+  <tr><td>OQ-09</td><td>功能模块采用「订阅内含」还是「独立一次性购买」，两模式定价与折扣如何组合？</td><td>影响 FR-03.1 模块定价表结构、订单挂载方式与解锁回收规则</td><td><span class="tag-p0">已定案（2026-11-05）：仅保留一次性购买（<code>unlock_mode=one_time</code>）；「订阅内含」已随 FR-02 下线，<code>order_items</code> 不建表</span></td></tr>
 </table>
 
 <!-- 文档末尾分割线 -->

@@ -4,7 +4,7 @@
 
 ## 项目一句话概述
 
-Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号、FR-02 订阅（mock 支付）的 P0 最小集（原 FR-03 工作区已于 2026-11-04 按用户指令整体移除）；同时保留协作治理体系（AGENTS.md 八条铁律）、版本规约校验脚本与产品需求文档。
+Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号身份与漫剧 AI 剧工作台（FR-03 重定义版）的 P0 最小集（原 FR-03 工作区已于 2026-11-04 按用户指令整体移除，套餐 / 订阅 / 支付 / 审计模块于 2026-11-05 随 OQ-01 定案下线）；同时保留协作治理体系（AGENTS.md 八条铁律）、版本规约校验脚本与产品需求文档。
 
 - 当前版本：**V0.0.0-preview**（预览通道，正式版 V0.0.0 未发布）
 - 仓库性质：**pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`）
@@ -45,7 +45,7 @@ f:\合并项目\Mim
 ├── services/
 │   └── mim-api/                   # 后端 API（Express 5 + SQLite，8787）+ test/
 ├── packages/
-│   ├── core-domain/               # 错误码/套餐/金额/UUIDv7
+│   ├── core-domain/               # 错误码/状态机/UUIDv7
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
 ├── docs/wiki/                     # 本 Wiki 全部文档（01~09）
 ├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）

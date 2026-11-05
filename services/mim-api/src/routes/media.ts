@@ -13,7 +13,7 @@ import express, { Router } from 'express';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { AppError, uuidv7 } from '@mim/core-domain';
-import { clockOf, writeAudit } from '../domain.js';
+import { clockOf } from '../domain.js';
 import { idempotency, requireAuth, requireEntitlement } from '../middleware.js';
 import {
   assertSafeObjectKey,
@@ -205,16 +205,6 @@ export function createMediaRouter(deps: ApiDeps): Router {
       mime: body.mime,
       expires_seconds: body.expires_seconds,
       base_url: baseUrlOf(req, deps.env),
-    });
-
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'media.presign_upload',
-      target: projectId ?? user.id,
-      requestId: req.requestId,
-      payload: { object_key: key, mime: body.mime, asset_type: body.asset_type, size_bytes: body.size_bytes ?? null },
-      createdAt: clockOf(deps),
     });
 
     res.status(201).json({

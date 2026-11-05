@@ -100,5 +100,27 @@ jobs:
           echo "❌ 生产健康检查失败"
           exit 1
 
-      - name: 线上套餐接口抽查
-        run: curl -fsS --max-time 5 https://mim.mixm.top/api/v1/plans >/dev/null && echo "✅ /api/v1/plans 正常"
+      # 套餐 / 订阅 / 审计模块已下线：断言对应接口返回 404，防止残留路由复活
+      - name: 已下线接口抽查（应 404）
+        run: |
+          set -e
+          for path in /api/v1/plans /api/v1/audit/logs; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://mim.mixm.top$path")
+            if [ "$code" != "404" ]; then
+              echo "❌ $path 期望 404，实际 $code"
+              exit 1
+            fi
+            echo "✅ $path 已下线（$code）"
+          done
+
+      # 正向抽查一个仍在线且无需鉴权的接口：空体应返回 400（说明路由已挂载且校验生效）
+      - name: 线上认证接口抽查
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+            -X POST -H 'Content-Type: application/json' -d '{}' \
+            https://mim.mixm.top/api/v1/auth/code)
+          if [ "$code" != "400" ]; then
+            echo "❌ /api/v1/auth/code 空体期望 400，实际 $code"
+            exit 1
+          fi
+          echo "✅ /api/v1/auth/code 在线（$code）"

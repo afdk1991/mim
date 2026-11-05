@@ -1,7 +1,7 @@
 -- ============================================================
 -- Mim API · SQLite 本地开发库结构
 -- 忠于 08-dev-implementation §3.2/§3.3 的分域与表语义；
--- SQLite 无 schema 概念，ops 域表以 idempotency_keys / audit_logs 落位。
+-- SQLite 无 schema 概念，ops 域表以 idempotency_keys 落位。
 -- 时间统一 UTC ISO-8601 字符串；金额为最小货币单位整数。
 -- ============================================================
 
@@ -64,99 +64,6 @@ CREATE TABLE IF NOT EXISTS account_merges (
   merged_user_id    TEXT NOT NULL,
   status            TEXT NOT NULL,
   created_at        TEXT NOT NULL
-);
-
--- ---------- billing 域 ----------
-CREATE TABLE IF NOT EXISTS plans (
-  id          TEXT PRIMARY KEY,
-  name_zh     TEXT NOT NULL,
-  name_en     TEXT NOT NULL,
-  created_at  TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS plan_prices (
-  id            TEXT PRIMARY KEY,
-  plan_id       TEXT NOT NULL REFERENCES plans(id),
-  region        TEXT NOT NULL,
-  currency      TEXT NOT NULL,
-  cycle         TEXT NOT NULL CHECK (cycle IN ('monthly','yearly')),
-  amount_minor  INTEGER NOT NULL,
-  UNIQUE (plan_id, region, cycle)
-);
-
-CREATE TABLE IF NOT EXISTS subscriptions (
-  id                    TEXT PRIMARY KEY,
-  user_id               TEXT NOT NULL REFERENCES users(id),
-  plan_id               TEXT NOT NULL,
-  region                TEXT NOT NULL,
-  status                TEXT NOT NULL CHECK (status IN ('active','past_due','canceled','expired')),
-  cycle                 TEXT NOT NULL CHECK (cycle IN ('monthly','yearly')),
-  current_period_start  TEXT NOT NULL,
-  current_period_end    TEXT NOT NULL,
-  cancel_at_period_end  INTEGER NOT NULL DEFAULT 0,
-  version               INTEGER NOT NULL DEFAULT 1,
-  created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, status);
-
-CREATE TABLE IF NOT EXISTS subscription_events (
-  id               TEXT PRIMARY KEY,
-  subscription_id  TEXT NOT NULL,
-  type             TEXT NOT NULL,
-  from_status      TEXT,
-  to_status        TEXT,
-  payload          TEXT,
-  actor            TEXT NOT NULL,
-  created_at       TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS orders (
-  id                TEXT PRIMARY KEY,
-  user_id           TEXT NOT NULL,
-  plan_id           TEXT NOT NULL,
-  region            TEXT NOT NULL,
-  cycle             TEXT NOT NULL CHECK (cycle IN ('monthly','yearly')),
-  currency          TEXT NOT NULL,
-  amount_minor      INTEGER NOT NULL,
-  status            TEXT NOT NULL CHECK (status IN ('pending','paid','failed','closed','refunded')),
-  driver            TEXT NOT NULL,
-  provider_ref      TEXT,
-  idempotency_key   TEXT,
-  version           INTEGER NOT NULL DEFAULT 1,
-  paid_at           TEXT,
-  closed_at         TEXT,
-  created_at        TEXT NOT NULL,
-  updated_at        TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id, created_at);
-
-CREATE TABLE IF NOT EXISTS payments (
-  id                TEXT PRIMARY KEY,
-  order_id          TEXT NOT NULL REFERENCES orders(id),
-  driver            TEXT NOT NULL,
-  amount_minor      INTEGER NOT NULL,
-  currency          TEXT NOT NULL,
-  status            TEXT NOT NULL,
-  provider_txn_id   TEXT,
-  created_at        TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS refunds (
-  id            TEXT PRIMARY KEY,
-  order_id      TEXT NOT NULL,
-  amount_minor  INTEGER NOT NULL,
-  status        TEXT NOT NULL,
-  created_at    TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS invoices (
-  id            TEXT PRIMARY KEY,
-  order_id      TEXT NOT NULL,
-  user_id       TEXT NOT NULL,
-  amount_minor  INTEGER NOT NULL,
-  currency      TEXT NOT NULL,
-  created_at    TEXT NOT NULL
 );
 
 -- ---------- catalog 域（功能模块商城 / 解锁鉴权，07 §5.1、08 §3.2）----------
@@ -366,14 +273,3 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
   PRIMARY KEY (key, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id           TEXT PRIMARY KEY,
-  user_id      TEXT,
-  region       TEXT,
-  action       TEXT NOT NULL,
-  target       TEXT,
-  request_id   TEXT,
-  payload      TEXT,
-  created_at   TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id, created_at);

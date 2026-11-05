@@ -7,11 +7,11 @@
 | 模块 | PRD 锚点 | 优先级 | 状态（证据见 [08](./08-dev-implementation.md) §1.1） |
 |---|---|---|---|
 | FR-01 账号与身份 | §5 FR-01 | P0 | **已实现（P0 最小集）**：cn 手机号验证码、global 邮箱密码/验证码；JWT access + refresh 轮换；region 强隔离。未实现：微信/支付宝/Google/Apple 第三方登录、账号合并（OQ-05）、新设备登录保护 |
-| FR-02 订阅与支付 | §5 FR-02 | P0 | **已实现（P0，mock 支付驱动）**：计划/价格/订阅状态机/checkout/取消/发票。未实现：真实通道（微信/支付宝/Stripe/IAP）、退款（OQ-04）、对账、掉单补发 |
+| FR-02 订阅与支付 | §5 FR-02 | P0 | **已下线（2026-11-05）**：套餐/订阅/订单/支付/退款/发票/对账整域已按用户指令删除（后端 `routes/billing.ts`、`packages/core-domain` 的 plans/subscription/order、前端 `Plans.tsx`、生产库 9 张表），取证见本页 §11.2 与 `deploy/migrations/2026-11-05-drop-billing-audit.cjs` |
 | FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已重定义（2026-11-04）为「功能模块商城 + 漫剧 AI 剧」**：原项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出已从前后端与生产库删除。新范围 **部分落地（2026-11-04，第 1 期）**：`catalog` 域 4 表（`modules`/`module_prices`/`entitlements`/`entitlement_events`）与 `comic` 域 3 表（`comic_projects`/`comic_characters`/`storyboards`）已建；`requireEntitlement` 门禁与 `/api/v1/comic/*` 8 条路由已落地；生成队列、成片与导出未落地。实现拆分见本页 §12 |
 | FR-04 多端体验一致性 | §5 FR-04 | P0 | **部分实现**：`packages/core-domain`（领域/权限/错误码）+ `packages/i18n`（双语文案/货币格式化）+ 统一 HTTP 契约已落地；仅 Web 一端，`IPlatformAdapter` 未落地 |
 | FR-05 国际化与本地化 | §5 FR-05 | P0 | **部分实现**：zh-CN / en-US 文案包、未命中回退链、`formatCurrency`、UTC 存储；未实现：语言切换 UI 持久化、RTL、时区设置 UI |
-| FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：审计日志（登录/支付/关键写操作）、手机号/邮箱规范化与脱敏。未实现：隐私政策强制勾选、账号注销 + 7 天冷静期、数据导出/删除请求 |
+| FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：手机号/邮箱规范化与脱敏、账号注销 + 7 天冷静期（`POST /me/deletion`）。**审计日志已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表已删除。未实现：隐私政策强制勾选、数据导出/GDPR 请求 |
 | IM / 音视频 / AI 编排 / 内容管理 / 开放平台 / 管理后台 | §3 P1 清单 | P1 | 后续迭代，仅列名 |
 | 平台兼容性要求（三端最低版本矩阵） | §3 平台兼容性要求 | P0/P1 分列 | 规格已定义，未实现（当前仅 Web，浏览器环境下运行） |
 | IoT 硬件接入 | §3 排除项 / OQ-06 | 排除 | Assumption：P0 不支持 |
@@ -25,28 +25,20 @@
 | 角色 | 定义 | 核心权限 |
 |---|---|---|
 | 访客 | 未登录用户 | 浏览公开内容、注册/登录 |
-| 免费用户 | 已注册未订阅 | 使用免费功能、查看计划、发起订阅 |
-| 订阅用户 | 有有效订阅 | 使用付费功能、管理订阅、跨端登录 |
-| 运营管理员 | 内部运营人员 | 管理计划、查看订单、处理退款工单（TBD） |
+| 注册用户 | 已注册（**当前无订阅体系，2026-11-05 已下线**） | 使用已解锁/免费功能、跨端登录 |
+| 运营管理员 | 内部运营人员 | 管理功能模块与解锁（后台规划，未实现） |
+
+> **订阅角色已下线（2026-11-05）**：原「免费用户 / 订阅用户 / 运营管理员（管理计划、订单、退款）」随 FR-02 整域删除，账号不再有订阅状态。
 
 ### 2.2 核心对象状态机
 
-**Subscription（订阅）**：
+**Subscription / Order / Refund（订阅 / 订单 / 退款）— 已下线（2026-11-05）**：
 
-| 状态 | 进入条件 | 可执行操作 |
-|---|---|---|
-| `active` | 支付成功且在有效期内 | 使用付费功能、取消续费、申请退款 |
-| `past_due` | 续费失败，宽限期内 | 更新支付方式、查看欠费 |
-| `canceled` | 用户取消或退款完成 | 不可用付费功能（至当期结束） |
-| `expired` | 订阅到期未续费 | 重新订阅 |
-
-**Order（订单）**：`pending`（已创建待支付）→ `paid`（支付成功）/ `failed`（支付失败）/ `closed`（超时未支付关闭）；`refunded`（已退款，全额或部分）。
-
-**Refund（退款，2026-11-04 新增）**：`pending`（用户申请待审）→ `approved`（审核通过待执行）/ `rejected`（驳回）/ `executed`（已退款）。`executed` 同事务内：订单转 `refunded`、订阅失效、关联模块解锁转 `revoked`。
+> 三套状态机（订阅 `active/past_due/canceled/expired`、订单 `pending→paid/failed/closed→refunded`、退款 `pending→approved/rejected→executed`）随 FR-02 整域删除，对应代码文件与 9 张生产表均已移除。本节仅作历史留痕，**不得**作为当前实现依据。
 
 **Module（功能模块）**：`draft`（运营草稿，不可购买）→ `active`（上架可售）→ `archived`（下架，已购用户解锁不受影响）。
 
-**Entitlement（模块解锁）**：`active`（有效）→ `expired`（订阅到期）→ `revoked`（退款/风控回收）。**服务端为解锁鉴权唯一依据**，端上不得缓存判定结果。
+**Entitlement（模块解锁）**：`active`（有效）→ `expired`（时效到期）→ `revoked`（风控回收；退款触发路径已随 FR-02 下线）。**服务端为解锁鉴权唯一依据**，端上不得缓存判定结果。
 
 **ComicProject（漫剧工程）**：`draft`（剧本/角色编辑中）→ `storyboarded`（分镜表确认）→ `generating`（生成任务进行中）→ `rendered`（关键帧/片段就绪）→ `published`（已产出成片并发布）→ `archived`。
 
@@ -54,11 +46,11 @@
 
 **GenerationJob（生成任务）**：`queued` → `running` → `succeeded` / `failed` / `canceled`。失败可重试但生成新 job，不覆盖历史。
 
-> 通用约束（PRD §4.2）：状态变更只写事件表、不 UPDATE 历史；金额对象禁软删除，只能冲正；解锁发放/回收与订单/退款**同事务**。
+> 通用约束（PRD §4.2）：状态变更只写事件表、不 UPDATE 历史；金额对象禁软删除，只能冲正；解锁发放/回收与触发事务**同事务**（订单/退款域已于 2026-11-05 下线，回收现仅由风控动作触发）。
 
 ## 3. FR-01 账号与身份
 
-**目的**：用户在任意端完成注册/登录后，账号与订阅状态在所有端实时同步；国内与海外登录方式不同，底层账号体系统一。
+**目的**：用户在任意端完成注册/登录后，账号状态（基础资料、地区、登录方式绑定）在所有端实时同步；国内与海外登录方式不同，底层账号体系统一。~~订阅状态跨端同步~~ 已随 FR-02 于 2026-11-05 下线，账号不再携带订阅维度。
 
 **注册与登录方式**：
 
@@ -70,7 +62,7 @@
 **跨端打通规则**：
 - 同一手机号/邮箱在国内与海外视为**不同账号**（region 物理隔离）
 - 同一市场内多种登录方式可绑定至同一账号；绑定需二次验证（已登录方式确认 + 新方式验证码）
-- 账号可申请合并，合并后订阅与订单归并至保留账号（策略 TBD = OQ-05）
+- 账号可申请合并，合并后身份绑定与历史业务数据归并至保留账号（策略 TBD = OQ-05；原「订阅与订单归并」随 FR-02 于 2026-11-05 下线，不再涉及）
 
 **异常与边界**：
 - 验证码频控：同一标识 60 秒内 1 次，1 小时内 ≤ 5 次；验证码 5 分钟有效，错 5 次失效
@@ -79,49 +71,27 @@
 
 PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮箱/微信（微信禁用输入框），`submitLogin()` 空值报错、非空显示演示成功文案。
 
-## 4. FR-02 订阅与支付
+## 4. FR-02 订阅与支付 — 已下线（2026-11-05）
 
-**目的**：用户选计划并完成支付后获得功能使用权；支付通道按市场与平台路由，业务方只感知统一订阅状态。
+> **本模块已按用户指令整体删除，当前无任何订阅、订单、支付、退款、发票、对账能力。** 删除范围与取证：
+>
+> - 后端：`services/mim-api/src/routes/billing.ts` 删除；`packages/core-domain/src/{plans,subscription,order}.ts` 删除；`app.ts` 解除挂载。
+> - 前端：`apps/web/src/views/Plans.tsx` 删除；`api.ts` / `App.tsx` / `Settings.tsx` 清除订阅与订单调用；套餐入口移除，工作区仅剩「设置」。
+> - 数据：生产库 `plans` / `plan_prices` / `subscriptions` / `subscription_events` / `orders` / `payments` / `refunds` / `invoices` / `audit_logs` 共 9 张表 DROP，迁移脚本 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`（默认 DRY-RUN，`APPLY=1` 才执行）。
+> - 配置：`.env.example` 移除 23 个支付/订阅/IAP 变量；`scripts/env-check.mjs` 与 `09-third-party-sdk-inventory.md` 同步（138 = 138 通过）。
+> - 门禁：`.github/workflows/deploy.yml` 将 `GET /api/v1/plans` 断言为 404，防止回归。
+>
+> **保留的历史设计（仅供追溯，不得作为实现依据）**：原设计包含计划对象（`plan_id` / `name` / `billing_cycle` / `price` / `features` / `region` / `status`）、多通道支付路由（国内微信/支付宝/银联；海外 Stripe/PayPal；App 数字商品走 Apple IAP / Google Play Billing）、持牌机构清算约束、订阅生命周期（`pending → paid → active`，续费失败进 `past_due` 宽限期后 `expired`）、退款审核（OQ-04）、对账与掉单补发。相关开放问题 OQ-02 / OQ-04 随之失效（见 §10）。
 
-**订阅计划（Plan）字段**：`plan_id`（唯一标识）、`name`（多语言）、`billing_cycle`（月/季/年）、`price`（分币种 CNY/USD 等）、`features`（功能权限列表）、`region`（国内/海外/全球）、`status`（active/archived）。
-
-**支付通道路由**：
-
-| 场景 | 可用通道 | 规则 |
-|---|---|---|
-| 国内 Web/小程序 | 微信支付、支付宝、银联 | 按用户选择 |
-| 国内 App 数字商品 | — | iOS 必须 Apple IAP；Android 国内商店规则视渠道（Assumption = OQ-02） |
-| 海外 Web | Stripe、PayPal | 按用户选择 |
-| 海外 App 数字商品 | Apple IAP、Google Play Billing | 商店强制，否则拒审 |
-
-**资金合规硬约束**：清算必须由持牌机构完成；自研层 = 支付编排、账务、订阅计费、对账、风控。iOS/Android 数字商品走商店 IAP，抽成 15%~30%。
-
-**订阅生命周期**：
-
-```text
-选择计划 → Order(pending) → 拉起支付 →
-  ├─ 成功 → Order(paid) → Subscription(active) → 发放权限
-  ├─ 失败 → Order(failed) → 提示重试
-  └─ 超时 → Order(closed)
-续费：到期前 N 天自动扣款 → 成功续期 / 失败 → past_due 宽限期重试 → 仍失败 → expired
-```
-
-**退款规则**：IAP 走商店流程 + 回调更新订阅；直连通道用户申请 + 运营审核（窗口与条件 TBD = OQ-04）；退款后订阅立即失效或按比例折算至当期结束，不可恢复。
-
-**异常与边界**：
-- 支付回调幂等：`order_id` + 通道流水号
-- 掉单补发：对账任务每日扫描 `paid` 但无 `active` 订阅的订单，自动补发
-- 跨端同步：订阅状态变更 5 秒内同步所有在线端，离线端下次拉取时更新
-
-PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 省 ¥58）、专业版 ¥99/月（年付 ¥990 省 ¥198），`selectPlan()` → `doPay()` 显示支付成功。
+**当前获取功能使用权的唯一方式**：功能模块商城的一次性解锁（`one_time`，见 §5.1 / §11.11），服务端 `entitlements` 为唯一鉴权依据。
 
 ## 5. FR-03 核心 SaaS 工作区（2026-11-04 重定义：功能模块商城 + 漫剧 AI 剧）
 
-> **现状：部分落地（2026-11-04，第 1 期）**。原 FR-03（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已于 2026-11-04 整体删除（历史见 §5.3）；本节为**新范围的产品定义**。已落地：`catalog` 域建表 + `requireEntitlement` 门禁；`comic` 域第 1 期工程/角色/分镜三表 + `/api/v1/comic/*` 路由（见 §12.1）。未落地：`media` 域、生成队列、成片与导出、前端 `ComicWorkbench.tsx`。
+> **现状：后端第 1/2 期已落地（2026-11-05），前端未开始**。原 FR-03（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已于 2026-11-04 整体删除（历史见 §5.3）；本节为**新范围的产品定义**。已落地：`catalog` 域 4 表 + `requireEntitlement` 门禁；`comic` 域 7 表 + `/api/v1/comic/*` 24 条路由；`media` 域 `storage.ts` + `/api/v1/media/*` 已装配上线；`ai` 域 `orchestrator.ts` + `/api/v1/ai/*` 已装配（`MIM_AI_WORKER` 默认消费队列）。未落地：前端 `ComicWorkbench.tsx` / `ComicFilms.tsx`、真实厂商模型调用、导出成片。
 
 ### 5.1 FR-03.1 功能模块商城
 
-**目的**：把产品能力拆成可独立上架、独立定价、独立解锁的功能模块；用户既可通过订阅内含解锁，也可单独购买解锁。
+**目的**：把产品能力拆成可独立上架、独立定价、独立解锁的功能模块；**当前仅提供一次性购买解锁（`one_time`）**，原「订阅内含解锁」随 FR-02 于 2026-11-05 下线。
 
 **Module（功能模块）字段**：
 
@@ -129,36 +99,36 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 |---|---|
 | `module_id` / `code` | 唯一标识；`code` 全局唯一、不可复用 |
 | `name` / `summary` | 多语言名称与一句话简介（i18n 资源，不硬编码） |
-| `unlock_mode` | `subscription`（订阅内含）\| `one_time`（一次性购买） |
+| `unlock_mode` | `one_time`（一次性购买）— **当前唯一有效值**；`subscription`（订阅内含）随 FR-02 于 2026-11-05 下线，DB CHECK 约束需在收敛时同步移除 |
 | `price` | **按 region + 币种独立定价**，不换算汇率；`bigint` 最小货币单位 |
 | `entitlements_required` | 前置依赖模块（未解锁则不可购买/不可用） |
 | `status` | `draft` / `active` / `archived` |
 | `region` | `cn` / `global`（定价与可见性均分库） |
 
 **定价与解锁规则**：
-- 模块定价与订阅计划定价**解耦**，改价不改历史订单；上市时间用 `effective_from` / `effective_to` 控制
-- 一笔订单可挂载 1 个计划 + N 个模块（`order_items`），支付成功后按项发放解锁
+- 模块定价独立，改价不改历史解锁记录；上市时间用 `effective_from` / `effective_to` 控制
+- 一次下单解锁 1 个模块（原「一单挂 1 个计划 + N 个模块」的 `order_items` 设计已随订单域下线，当前无订单载体，解锁记录直接落 `entitlements`）
 - 解锁判定只看服务端 `Entitlement`（`active` 且未过期且 region 匹配）；端上缓存仅供展示
-- 退款 `executed`、订阅 `expired`、风控封禁均可触发解锁回收（`revoked` / `expired`），回收与退款同事务
+- 风控封禁可触发解锁回收（`revoked`）；退款触发的回收路径已随 FR-02 下线
 
 **主流程**：
 
 ```text
 进入商城 → 模块列表（按 region/status 过滤，仅 active 可售）
   → 模块详情（能力说明、解锁方式、价格、前置依赖）
-  → 加入订单（校验前置依赖已解锁）
-  → Order(pending) → 支付（通道见 FR-02）→ Order(paid)
-  → 同事务：发放 Entitlement(active) → 站内通知「解锁已发放」
+  → 解锁（校验前置依赖已解锁）→ 落 Entitlement(active) → 站内通知「解锁已发放」
   → 进入对应模块工作台
-退款：Refund(executed) → Order(refunded) → Entitlement(revoked) → 通知「解锁已回收」
+风控回收：Entitlement(revoked) → 通知「解锁已回收」
 ```
 
+> 原流程中的 `Order(pending) → 支付(FR-02) → Order(paid) → 同事务发放` 与 `Refund(executed) → Order(refunded) → Entitlement(revoked)` 两段已随支付/退款域于 2026-11-05 删除；`entitlements` 的发放写路径仍在规划中（见 §11.11）。
+
 **异常与边界**：
-- 前置依赖未满足：下单返回 `MODULE_DEPENDENCY_UNMET`，并提示需先解锁的模块
+- 前置依赖未满足：拒绝解锁并返回 `403` + 需先解锁的模块清单（通用错误语义，**不使用已不存在的 `MODULE_DEPENDENCY_UNMET` 错误码**）
 - 模块下架（`archived`）：不可新购，已解锁用户仍可用至到期
-- 重复购买：已 `active` 且非订阅型模块再次下单返回 `MODULE_ALREADY_OWNED`
+- 重复解锁：已 `active` 的模块再次解锁返回 `409`（通用冲突语义，**不使用已不存在的 `MODULE_ALREADY_OWNED` 错误码**）
 - region 不匹配：模块在另一 region 上架时，本区不可见、不可购
-- 一次性购买退款窗口与订阅退款窗口**必须分开定义**（见 OQ-04 / OQ-09）
+- 一次性解锁的有效期与回收窗口见 OQ-09（OQ-04 退款窗口已失效）
 
 ### 5.2 FR-03.2 漫剧 AI 剧（四种交付形态）
 
@@ -197,9 +167,9 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 - 任务执行前**预检成本与配额**，超限直接拒绝下单/拒绝入队（不做事后追扣）
 
 **成本与配额**：
-- 按订阅计划给定月度生成额度（图/秒/视频条数）；额度消耗在 job `succeeded` 时结算
+- 按 region 设定生成额度上限（图/秒/视频条数）；额度消耗在 job `succeeded` 时结算。当前实现以**成本上限**而非订阅额度落地：单任务 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `402 COST_LIMIT_EXCEEDED`（原「按订阅计划给定月度额度」随 FR-02 下线）
 - 实际成本与预估偏差超阈值写成本告警，供运营调整模型路由（供应商见 OQ-08）
-- 额度不足时提示升级计划或购买生成包（生成包属于模块商城的 `one_time` 模块）
+- 额度不足时提示购买生成包（生成包属于模块商城的 `one_time` 模块；原「升级计划」入口已随订阅下线）
 
 **成片版本与发布**：
 - `ComicFilm` 只追加版本（`film_versions`），已发布版本不可覆盖，只能发新版
@@ -228,7 +198,7 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | 高级筛选 / 自定义主题 | — | — | ✓ |
 | 导出 CSV | — | ✓ | ✓ |
 
-**现工作区框架（保留部分）**：登录后工作区仅展示 **套餐（Plans）** 与 **设置（Settings）** 两个入口；数据按 `user_id` + `region` 隔离。`features` 鉴权已移除，订阅状态仅用于展示套餐与有效期。新范围落地后需新增 **商场（Store）** 与 **漫剧（Comic）** 两个入口（见 §12）。
+**现工作区框架（2026-11-05 实况）**：登录后工作区**仅展示 设置（Settings）** 一个入口（原「套餐（Plans）」入口已随 FR-02 删除）；数据按 `user_id` + `region` 隔离。`features` 鉴权已移除。新范围落地后需新增 **商场（Store）** 与 **漫剧（Comic）** 两个入口（见 §12）。
 
 ## 6. FR-04 多端体验一致性
 
@@ -236,50 +206,50 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 | 维度 | 统一规则 |
 |---|---|
-| 账号与订阅 | 同一市场内跨端实时同步 |
+| 账号 | 同一市场内跨端实时同步（账号资料/地区/登录方式绑定；订阅维度已于 2026-11-05 下线） |
 | 业务数据 | 所有端可见可编辑 |
 | 文案与术语 | 同一概念同一文案（来自 i18n 资源） |
 | 错误提示 | 同一错误码映射同一用户可读提示 |
 | 设计系统 | Design Token 统一颜色/间距/字号，各端组件库基于 Token 实现 |
 | 平台兼容下限 | iOS 15.0+ / Android 9.0+ / 微信、支付宝、抖音、百度、QQ 小程序 / Windows 10–11 / macOS 12+ / Ubuntu 20.04+（P0/P1 分列见 PRD §3） |
 
-**平台适配层职责**：登录（微信/支付宝/Google/Apple SDK）、支付（微信支付/支付宝/Stripe/IAP）、推送（APNs/FCM/厂商通道）、存储（localStorage/AsyncStorage/SQLite）、分享（各端原生分享）。各端 UI 差异仅由适配层处理，业务逻辑统一。
+**平台适配层职责**：登录（微信/支付宝/Google/Apple SDK）、推送（APNs/FCM/厂商通道）、存储（localStorage/AsyncStorage/SQLite）、分享（各端原生分享）。~~支付（微信支付/支付宝/Stripe/IAP）~~ 已随 FR-02 于 2026-11-05 下线，`IPlatformAdapter` 的 `pay` 子接口在实现时不再需要。各端 UI 差异仅由适配层处理，业务逻辑统一。
 
 ## 7. FR-05 国际化与本地化
 
 - **多语言**：默认中文简体 + 英文（首批清单 TBD = OQ-03）；检测优先级 = 用户设置 → 浏览器/系统语言 → 默认；所有用户可见文案从 i18n 资源加载，禁止硬编码；RTL 布局（阿拉伯语等）为 P1
-- **多币种**：每计划按币种独立定价，不用实时汇率；币种由 region 决定（国内 CNY、海外 USD）；价格展示含货币符号 + 两位小数（日元等零小数币种除外）
+- **多币种**：模块定价按 region + 币种独立定价，不用实时汇率；币种由 region 决定（国内 CNY、海外 USD）；价格展示含货币符号 + 两位小数（日元等零小数币种除外）。原「每计划按币种独立定价」中的计划维度已随 FR-02 下线
 - **多时区**：服务端统一 UTC 存储；展示按用户时区转换（默认系统时区，可在设置中修改）
 
 ## 8. FR-06 合规与隐私
 
 - **隐私政策与用户协议**：首次注册强制展示并勾选；政策必含数据收集清单、使用目的、存储期限、第三方 SDK 清单、用户权利（访问、更正、删除、注销）；政策更新后下次登录需重新确认
 - **数据最小化**：仅收集必要数据；敏感数据（手机号、邮箱）加密存储、展示脱敏；国内数据境内存储、海外存对应区域，数据不出境
-- **账号注销**：注销前提示订阅失效、数据删除不可恢复；7 天冷静期可撤销；冷静期后删除个人数据，保留匿名化订单与财务记录（合规要求）；海外删除请求按 GDPR/CCPA 30 天内处理
+- **账号注销**：注销前提示数据删除不可恢复（原「提示订阅失效」已随 FR-02 下线，不再存在订阅维度）；7 天冷静期可撤销；冷静期后删除个人数据，保留匿名化业务与合规记录（海外删除请求按 GDPR/CCPA 30 天内处理）
 
 ## 9. 横切支撑（PRD §6 共享规则）
 
 | 规则 | 定义 | 引用模块 |
 |---|---|---|
-| Region 隔离 | 国内(cn)/海外(global) 数据物理隔离，账号/订单/订阅按 region 分库 | FR-01, FR-02 |
-| 幂等性 | 支付、订阅状态变更接口以 `request_id` 幂等，重复请求返回首次结果 | FR-02 |
-| 审计日志 | 登录、支付、退款、注销等关键操作留痕，保留 180 天 | FR-01, FR-02, FR-06 |
+| Region 隔离 | 国内(cn)/海外(global) 数据物理隔离，账号/解锁记录按 region 分库（原「订单/订阅按 region 分库」已随 FR-02 下线） | FR-01 |
+| 幂等性 | 写操作以 `Idempotency-Key` 幂等（同键同体重放首次结果，同键异体 409）；鉴权类接口豁免。原「支付、订阅状态变更接口以 `request_id` 幂等」已随 FR-02 下线 | FR-01 |
+| ~~审计日志~~ | **已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表已删除，不再有 180 天留存要求 | — |
 
-**通知规则**：支付成功（站内 + 邮件/短信）；到期前 7/3/1 天各提醒一次；续费失败立即通知更新支付方式；账号异常登录邮件/短信通知。
+**通知规则**：解锁成功/回收（站内 + 邮件/短信）；账号异常登录邮件/短信通知。原「支付成功通知」「到期前 7/3/1 天提醒」「续费失败通知」已随 FR-02 下线。
 
 ## 10. 开放问题对模块的阻塞（PRD §7）
 
 | 编号 | 问题 | 阻塞模块 | 状态 |
 |---|---|---|---|
 | OQ-01 | 旗舰 SaaS 核心功能是什么 | FR-03 功能模块商城 + 漫剧 AI 剧 | 已重定义（2026-11-04）：旗舰形态 = SaaS 工具型（订阅制）— 功能模块商城 + 漫剧 AI 剧工作室 |
-| OQ-02 | 国内 Android 数字商品是否必须走商店 IAP | FR-02 支付通道与分成 | Assumption, TBD |
-| OQ-03 | 首批出海市场与语种 | FR-05 i18n/支付/合规 | TBD |
-| OQ-04 | 退款窗口与条件（直连通道） | FR-02 / FR-03.1 退款与解锁回收 | TBD |
+| OQ-02 | 国内 Android 数字商品是否必须走商店 IAP | ~~FR-02 支付通道与分成~~ | **已失效（2026-11-05）**：FR-02 整域下线，无支付通道 |
+| OQ-03 | 首批出海市场与语种 | FR-05 i18n/合规 | TBD |
+| OQ-04 | 退款窗口与条件（直连通道） | ~~FR-02 / FR-03.1 退款与解锁回收~~ | **已失效（2026-11-05）**：退款域下线，解锁回收现仅由风控触发 |
 | OQ-05 | 账号合并策略与数据归属 | FR-01 账号打通 | TBD |
 | OQ-06 | 是否支持 IoT 硬件接入 | 范围定义与后端架构 | Assumption：P0 不支持 |
 | OQ-07 | 漫剧生成产物的版权归属、可商用范围与内容审核口径 | FR-03.2 成片发布、导出授权与合规免责 | TBD |
 | OQ-08 | 文生图 / 图生视频 / TTS 模型选型与单工程成本上限 | FR-03.2 生成队列容量、配额与定价成本模型 | TBD |
-| OQ-09 | 功能模块采用「订阅内含」还是「独立一次性购买」 | FR-03.1 模块定价表结构与解锁回收规则 | Assumption：两模式并行，模块定价独立于计划定价 |
+| OQ-09 | 功能模块采用「订阅内含」还是「独立一次性购买」 | FR-03.1 模块定价表结构与解锁回收规则 | **已定案（2026-11-05）**：仅 `one_time`；`subscription` 模式随 FR-02 下线，`modules.unlock_mode` 的 DB CHECK 约束待收敛时同步移除 |
 
 ## 11. 功能模块落地对照表（P0，仓库实况）
 
@@ -297,17 +267,9 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 | 账号注销（冷静期） | `me.ts` `POST /me/deletion` + `POST /me/cancel-deletion` | `Settings.tsx` | ✅ |
 | 第三方登录 / 账号合并 | — | — | ❌ TBD |
 
-### 11.2 订阅支付模块（FR-02）
+### 11.2 订阅支付模块（FR-02）— 已删除（2026-11-05）
 
-| 子模块 | 后端路由 | 前端页面 | 状态 |
-|---|---|---|---|
-| 套餐目录 | `billing.ts` `GET /plans` | `Plans.tsx` | ✅ |
-| 订阅创建（checkout） | `billing.ts` `POST /subscriptions/checkout` | `Plans.tsx` | ✅（仅 mock driver） |
-| 当前订阅 | `billing.ts` `GET /subscriptions/current` | `Settings.tsx` + `me.ts` | ✅ |
-| 取消订阅 | `billing.ts` `POST /subscriptions/cancel` | `Settings.tsx` | ✅ |
-| 订单列表 | `billing.ts` `GET /orders` | `Settings.tsx` | ✅ |
-| 发票列表 | `billing.ts` `GET /invoices` | `Settings.tsx` | ✅ |
-| 真实支付驱动 / 退款 / 对账 | — | — | ❌ TBD |
+原文件 `services/mim-api/src/routes/billing.ts`、`packages/core-domain/src/{plans,subscription,order}.ts`、`apps/web/src/views/Plans.tsx` 已删除；原 6 条路由（`GET /plans`、`POST /subscriptions/checkout`、`GET /subscriptions/current`、`POST /subscriptions/cancel`、`GET /orders`、`GET /invoices`）全部下线。生产库 9 张表（`plans`/`plan_prices`/`subscriptions`/`subscription_events`/`orders`/`payments`/`refunds`/`invoices`/`audit_logs`）DROP，迁移见 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`。`.github/workflows/deploy.yml` 已断言 `GET /api/v1/plans` 为 404，防止回归。**当前购物/支付能力为 0。**
 
 ### 11.3 项目管理模块（FR-03-①）— 已删除
 
@@ -337,14 +299,14 @@ PRD 内含交互演示（计划与支付）：基础版 ¥29/月（年付 ¥290 
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 审计日志查询 | `audit.ts` `GET /audit` | — | ✅（后端就绪） |
+| ~~审计日志查询~~ | ~~`audit.ts` `GET /audit`~~ | — | **已删除（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表移除，CI 断言 `GET /api/v1/audit/logs` 为 404 |
 | 手机号 / 邮箱规范化 | `core-domain` `normalizeIdentity` | `Login.tsx` | ✅ |
 | 隐私政策页 | — | — | ❌ |
 | 数据导出 / GDPR 请求 | — | — | ❌ |
 
 ### 11.10 模块间依赖
 
-FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、FR-06（审计）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用。**新 FR-03（商城 + 漫剧 AI 剧）依赖 FR-02（订单/支付/退款，当前仅 mock 驱动）与 FR-01（鉴权，已就绪）；`catalog` / `comic` / `media` 三域均未落地，无代码依赖。** 原 FR-03（项目/任务/成员/邀请/仪表盘/同步/导出）已于 2026-11-04 删除，仅历史留痕（见 §11.3–§11.8）。
+FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付依赖**。FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用；原 FR-06 审计查询已随 FR-02 一并删除（`audit_logs` 表移除）。**新 FR-03（商城 + 漫剧 AI 剧）仅依赖 FR-01 鉴权（已就绪）：`catalog` 域 4 表 + `requireEntitlement` 门禁已落地，`comic` 域 7 表 + 24 条路由已落地，`media` 域 `storage.ts` 已装配上线，`ai` 域 `orchestrator.ts` 已装配（`MIM_AI_WORKER` 默认消费）。** 原 FR-03（项目/任务/成员/邀请/仪表盘/同步/导出）已于 2026-11-04 删除，仅历史留痕（见 §11.3–§11.8）。
 
 ### 11.11 功能模块商城（FR-03.1）
 
@@ -352,10 +314,10 @@ FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、F
 |---|---|---|---|
 | 模块目录 / 详情 | —（未实现；`modules` 表已建并种子两条 `comic.workbench`，无 `GET /modules` 路由） | —（未实现） | 🟡 仅建表 |
 | 模块定价（region / 币种 / 有效期） | —（`module_prices` 表已建，无定价接口） | — | 🟡 仅建表 |
-| 下单挂载模块 | —（未实现；`order_items` 未建） | — | ❌ 0 代码 |
+| ~~下单挂载模块~~ | —（原 `order_items` 设计随订单域于 2026-11-05 下线，**不建表**；解锁直接落 `entitlements`） | — | **已取消** |
 | 解锁发放 / 回收（Entitlement） | —（`entitlements` / `entitlement_events` 表已建；发放/回收写路径未实现） | — | 🟡 仅建表 |
 | 解锁鉴权（服务端唯一依据） | `requireEntitlement(moduleCode)` 中间件（`src/middleware.ts`） | — | ✅ 已落地 |
-| 退款触发解锁回收 | —（未实现） | — | ❌ 0 代码（`refunds` 表已在 billing 域设计，无路由） |
+| ~~退款触发解锁回收~~ | —（退款域已删除，**不再实现**；回收仅保留风控动作路径） | — | **已取消（2026-11-05）** |
 
 ### 11.12 漫剧 AI 剧（FR-03.2）
 
@@ -379,9 +341,9 @@ FR-02 依赖 FR-01（`auth.ts` 的 `requireAuth` 前置）；FR-05（i18n）、F
 | 项 | 内容 |
 |---|---|
 | 后端域 | `catalog`（模块与解锁）、`comic`（工程/生成/成片）、`media`（对象存储与分发） |
-| 数据表 | 见 [08](./08-dev-implementation.md) §3.2（`modules`、`module_prices`、`entitlements`、`entitlement_events`、`order_items`；`comic_projects`、`comic_characters`、`storyboards`、`comic_films`、`film_versions`、`generation_jobs`、`generation_assets`） |
+| 数据表 | 见 [08](./08-dev-implementation.md) §3.2（`modules`、`module_prices`、`entitlements`、`entitlement_events`；`comic_projects`、`comic_characters`、`storyboards`、`comic_films`、`film_versions`、`generation_jobs`、`generation_assets`）。原 `order_items` 随订单域于 2026-11-05 取消，**不建表** |
 | 第三方 SDK | 对象存储（S3 兼容 / 云厂商 OSS/COS）、文生图模型、图生视频模型、TTS、内容审核（OQ-07/OQ-08 定选型） |
-| 前置依赖 | FR-02 订单/支付/退款闭环（当前仅 mock 驱动，需真实通道）、FR-01 鉴权（已就绪） |
+| 前置依赖 | **仅 FR-01 鉴权（已就绪）**。FR-02 订单/支付/退款闭环已于 2026-11-05 整域下线，不再作为前置 |
 
 ### 12.1 第 1 期：② AI 辅助创作工作台（交付物 = 创作工程）
 

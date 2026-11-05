@@ -14,7 +14,7 @@
 | 密钥按 region 隔离 | 国内（cn）与海外（global）使用**独立应用与独立密钥**，不得复用同一套凭证 |
 | 先登记后接入 | 新增第三方能力必须在本文件补齐「提供方 / 形态 / 用途 / 密钥名 / 优先级 / 合规」六要素，否则视为未完成交付 |
 
-密钥统一命名：`MIM_<领域>_<提供方>_<密钥类型>`，全大写下划线分隔，例如 `MIM_PAY_WECHAT_MCH_ID`。
+密钥统一命名：`MIM_<领域>_<提供方>_<密钥类型>`，全大写下划线分隔，例如 `MIM_STORAGE_S3_ACCESS_KEY_ID`。
 
 ---
 
@@ -32,20 +32,9 @@
 
 ---
 
-## 2. 订阅与支付（PRD FR-02）
+## 2. 订阅与支付（PRD FR-02）—— 已下线
 
-| 提供方 | SDK / API 形态 | 用途 | 密钥 / 配置项（env） | 优先级 |
-|---|---|---|---|---|
-| 微信支付 | JSAPI / Native / APP 支付 SDK、支付回调 API | 国内 Web/小程序/App 支付 | `MIM_PAY_WECHAT_MCH_ID` / `MIM_PAY_WECHAT_APP_ID` / `MIM_PAY_WECHAT_API_V3_KEY` / `MIM_PAY_WECHAT_CERT_SERIAL` / `MIM_PAY_WECHAT_PRIVATE_KEY` | P0 |
-| 支付宝 | 手机网站 / APP 支付 SDK、异步通知 API | 国内支付 | `MIM_PAY_ALIPAY_APP_ID` / `MIM_PAY_ALIPAY_PRIVATE_KEY` / `MIM_PAY_ALIPAY_PUBLIC_KEY` | P0 |
-| 银联 | 银联在线网关 / 云闪付 API | 国内银行卡支付 | `MIM_PAY_UNIONPAY_MER_ID` / `MIM_PAY_UNIONPAY_CERT_PATH` | P1 |
-| Stripe | Stripe SDK（Checkout / Billing / Webhook） | 海外订阅与订阅生命周期 | `MIM_PAY_STRIPE_SECRET_KEY` / `MIM_PAY_STRIPE_WEBHOOK_SECRET` / `MIM_PAY_STRIPE_PRICE_ID_*` | P0 |
-| PayPal | PayPal JS SDK / REST API | 海外备用支付 | `MIM_PAY_PAYPAL_CLIENT_ID` / `MIM_PAY_PAYPAL_CLIENT_SECRET` | P1 |
-| Apple IAP | StoreKit / App Store Server API / Server Notifications | iOS 数字商品订阅（商店强制） | `MIM_IAP_APPLE_SHARED_SECRET` / `MIM_IAP_APPLE_ISSUER_ID` / `MIM_IAP_APPLE_KEY_ID` / `MIM_IAP_APPLE_PRIVATE_KEY` | P0 |
-| Google Play Billing | Play Billing Library + Play Developer API | Android 海外订阅 | `MIM_IAP_GOOGLE_PACKAGE_NAME` / `MIM_IAP_GOOGLE_SERVICE_ACCOUNT_JSON` | P0 |
-| RevenueCat | RevenueCat SDK / REST API（可选聚合层） | 跨商店订阅状态统一 | `MIM_IAP_REVENUECAT_API_KEY` | P1 |
-
-> 资金合规硬约束不变：收款与清算必须由持牌机构完成；平台自身不经手资金池。
+> **已下线（2026-11-05）**：套餐 / 订阅 / 订单 / 支付 / 发票 / 审计模块随产品范围移除（PRD OQ-01 重定义）。本期不接入任何支付或 IAP 通道，对应 `MIM_PAY_*` / `MIM_IAP_*` 环境变量已从 `.env.example` 删除，本节的第三方能力登记同步作废。若未来重新引入计费能力，须重新登记本节并走铁律五（依赖入清单 + 锁文件）与铁律七（全量同步）。
 
 ---
 
@@ -235,9 +224,9 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 |---|---|
 | 分级 | 服务端密钥（`*_SECRET` / `*_PRIVATE_KEY`）严禁下发客户端；客户端仅持有 AppID/AppKey 类公开标识 |
 | 存储 | 生产环境使用云 KMS / Secret Manager；CI 使用加密 Secret；本地开发用 `.env`（已忽略提交） |
-| 轮换 | 支付、IAP、AI 类密钥至少每 12 个月轮换一次；泄露事件触发即时轮换并留审计记录 |
+| 轮换 | AI、短信/邮件、对象存储类密钥至少每 12 个月轮换一次；泄露事件触发即时轮换（支付 / IAP 通道已下线，不再涉及） |
 | 最小权限 | 每个密钥只授予所需 API 范围；AI 密钥按项目/环境配额隔离 |
-| 审计 | 密钥创建、使用、轮换、吊销记录保留 180 天（与 PRD §6 审计日志口径一致） |
+| 审计 | 密钥创建、使用、轮换、吊销由运维变更记录留痕 180 天（应用内审计模块已于 2026-11-05 随产品范围下线） |
 
 ---
 
@@ -245,10 +234,10 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 
 | 工件 | 关系 |
 |---|---|
-| `Mim-PRD.html` FR-02 | 支付路由所需的第三方支付/IAP 能力，对应本文档 §2 |
-| `Mim-PRD.html` FR-03.1（功能模块商城） | 无新增第三方能力，复用 §2 支付通道；模块定价与解锁为自有业务逻辑 |
+| `Mim-PRD.html` FR-02 | **已下线**（2026-11-05）：套餐 / 订阅 / 支付不再实现，本文档 §2 同步作废 |
+| `Mim-PRD.html` FR-03.1（功能模块商城） | 无新增第三方能力；模块解锁为自有业务逻辑，不依赖支付通道 |
 | `Mim-PRD.html` FR-03.2（漫剧 AI 剧） | 文生图 / 图生视频 / TTS 对应本文档 §6；产物存储与分发对应 §8；内容审核对应 §7 |
-| `Mim-PRD.html` FR-04 | 平台适配层封装的登录/支付/推送/存储/分享 SDK，对应本文档 §1/§2/§3/§8 |
+| `Mim-PRD.html` FR-04 | 平台适配层封装的登录/推送/存储/分享 SDK，对应本文档 §1/§3/§8 |
 | `Mim-PRD.html` FR-06 | 隐私政策必须包含的「第三方 SDK 清单」，以本文档为唯一来源 |
 | `docs/wiki/07-functional-modules.md` §12 | 实现拆分清单逐期列出所需第三方能力，与本文件 §6/§8 对应 |
 | `docs/wiki/04-dependencies.md` | 依赖实况与依赖治理；本文档为其「规划引入清单」的展开 |
@@ -260,7 +249,7 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 
 | 优先级 | 范围 |
 |---|---|
-| **P0（随首个可运行端引入）** | 微信/支付宝/Google/Apple 登录、短信/邮件、微信支付/支付宝/Stripe/IAP/Google Play、APNs/FCM/华为/小米/OPPO/vivo 推送、验证码、对象存储、Sentry |
+| **P0（随首个可运行端引入）** | 微信/支付宝/Google/Apple 登录、短信/邮件、APNs/FCM/华为/小米/OPPO/vivo 推送、验证码、对象存储、Sentry |
 | **P0（漫剧第 2 期起）** | 文生图（通义万相 / Seedream）、图生视频（Seedance / 可灵）、TTS（火山 / Azure / ElevenLabs）；漫剧产物对象存储与预签名下载（复用 §8） |
 | **P1（PRD P1 能力开放时）** | IM、音视频 RTC、AI 网关、内容审核、地图与位置、CDN、埋点 |
 | **P2（按需）** | 备份供应商、海外 IM、LiveKit、Mapbox、北斗高精度定位 |
@@ -278,4 +267,4 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 |---|---|---|---|
 | `MIM_JWT_SECRET` | 后端 JWT HS256 签名密钥（>=32 字符随机串） | 生产由 `deploy/deploy.sh` §5 幂等生成并写入 `/opt/mim/mim-api.env`（chmod 600），systemd 经 `EnvironmentFile` 注入；本地开发留空时自动生成 `.mim-dev-secret/jwt.key`（已 gitignore）。生产缺失即拒绝启动 | P0 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）。新增第三方能力必须先更新本文件，再进入实现。_

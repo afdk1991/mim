@@ -11,7 +11,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { AppError, uuidv7 } from '@mim/core-domain';
-import { clockOf, writeAudit } from '../domain.js';
+import { clockOf } from '../domain.js';
 import { idempotency, requireAuth, requireEntitlement } from '../middleware.js';
 import { parse } from '../validate.js';
 import { jsonParse, pathParam } from '../utils.js';
@@ -416,15 +416,6 @@ export function createComicRouter(deps: ApiDeps): Router {
          VALUES (?, ?, ?, ?, ?, 'draft', 1, ?, ?)`,
       )
       .run(id, user.id, user.region, body.title, body.synopsis ?? null, now, now);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.project_created',
-      target: id,
-      requestId: req.requestId,
-      payload: { title: body.title },
-      createdAt: now,
-    });
     res.status(201).json({ project: projectPayload(findProject(deps.db, user.id, id)) });
   });
 
@@ -490,15 +481,6 @@ export function createComicRouter(deps: ApiDeps): Router {
       throw new AppError('CONFLICT', 'project was modified concurrently');
     }
 
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.project_updated',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { fields: Object.keys(body).filter((key) => key !== 'version') },
-      createdAt: now,
-    });
     res.json({ project: projectPayload(findProject(deps.db, user.id, project.id)) });
   });
 
@@ -522,15 +504,6 @@ export function createComicRouter(deps: ApiDeps): Router {
         )
         .run(now, now, project.id);
     })();
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.project_deleted',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { title: project.title },
-      createdAt: now,
-    });
     res.json({ ok: true, project_id: project.id });
   });
 
@@ -584,16 +557,6 @@ export function createComicRouter(deps: ApiDeps): Router {
       }
       return { id, versionNo };
     })();
-
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.storyboard_saved',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { version_no: saved.versionNo, confirmed: body.confirm, shots: body.shots.length },
-      createdAt: now,
-    });
 
     res.status(201).json({
       storyboard: {
@@ -677,16 +640,6 @@ export function createComicRouter(deps: ApiDeps): Router {
       return { id, created: true };
     })();
 
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.character_upserted',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { character_id: upserted.id, name: body.name, created: upserted.created },
-      createdAt: now,
-    });
-
     const row = deps.db
       .prepare('SELECT * FROM comic_characters WHERE id = ?')
       .get(upserted.id) as CharacterRow;
@@ -704,15 +657,6 @@ export function createComicRouter(deps: ApiDeps): Router {
     const project = findProject(deps.db, user.id, pathParam(req, 'id'));
     const now = clockOf(deps);
     const items = buildMockSuggestions(body.kind, project, body.prompt ?? null, body.count);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.suggestion_generated',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { kind: body.kind, count: body.count, model: 'mock-text-suggest' },
-      createdAt: now,
-    });
     res.json({
       suggestion: {
         kind: body.kind,
@@ -806,15 +750,6 @@ export function createComicRouter(deps: ApiDeps): Router {
       return deps.db.prepare('SELECT * FROM generation_jobs WHERE id = ?').get(id) as JobRow;
     })();
 
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.job_created',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { job_id: id, job_type: body.job_type, storyboard_id: storyboardId },
-      createdAt: now,
-    });
     res.status(201).json({
       job: jobPayload(created),
       project_status: project.status === 'storyboarded' ? 'generating' : project.status,
@@ -840,15 +775,6 @@ export function createComicRouter(deps: ApiDeps): Router {
     deps.db
       .prepare(`UPDATE generation_jobs SET status = 'running', started_at = ? WHERE id = ?`)
       .run(now, job.id);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.job_started',
-      target: job.project_id,
-      requestId: req.requestId,
-      payload: { job_id: job.id, job_type: job.job_type },
-      createdAt: now,
-    });
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) });
   });
 
@@ -880,15 +806,6 @@ export function createComicRouter(deps: ApiDeps): Router {
           .run(now, job.project_id);
       }
     })();
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.job_succeeded',
-      target: job.project_id,
-      requestId: req.requestId,
-      payload: { job_id: job.id, job_type: job.job_type },
-      createdAt: now,
-    });
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) });
   });
 
@@ -907,15 +824,6 @@ export function createComicRouter(deps: ApiDeps): Router {
         `UPDATE generation_jobs SET status = 'failed', error_code = ?, finished_at = ? WHERE id = ?`,
       )
       .run(body.error_code, now, job.id);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.job_failed',
-      target: job.project_id,
-      requestId: req.requestId,
-      payload: { job_id: job.id, job_type: job.job_type, error_code: body.error_code },
-      createdAt: now,
-    });
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) });
   });
 
@@ -931,15 +839,6 @@ export function createComicRouter(deps: ApiDeps): Router {
     deps.db
       .prepare(`UPDATE generation_jobs SET status = 'canceled', finished_at = ? WHERE id = ?`)
       .run(now, job.id);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.job_canceled',
-      target: job.project_id,
-      requestId: req.requestId,
-      payload: { job_id: job.id, job_type: job.job_type },
-      createdAt: now,
-    });
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) });
   });
 
@@ -972,15 +871,6 @@ export function createComicRouter(deps: ApiDeps): Router {
         user.id,
         now,
       );
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.job_retried',
-      target: job.project_id,
-      requestId: req.requestId,
-      payload: { job_id: id, retry_of: job.id, job_type: job.job_type },
-      createdAt: now,
-    });
     res.status(201).json({ job: jobPayload(findJob(deps.db, user.id, id)) });
   });
 
@@ -1052,15 +942,6 @@ export function createComicRouter(deps: ApiDeps): Router {
       return deps.db.prepare('SELECT * FROM comic_films WHERE id = ?').get(filmId) as FilmRow;
     })();
 
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.film_created',
-      target: project.id,
-      requestId: req.requestId,
-      payload: { film_id: filmId, title: body.title, has_object_key: body.object_key !== undefined },
-      createdAt: now,
-    });
     const version = deps.db
       .prepare('SELECT * FROM film_versions WHERE id = ?')
       .get(versionId) as FilmVersionRow;
@@ -1123,15 +1004,6 @@ export function createComicRouter(deps: ApiDeps): Router {
       return { id, versionNo };
     })();
 
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.film_version_added',
-      target: film.id,
-      requestId: req.requestId,
-      payload: { version_no: saved.versionNo, has_object_key: body.object_key !== undefined },
-      createdAt: now,
-    });
     const version = deps.db
       .prepare('SELECT * FROM film_versions WHERE id = ?')
       .get(saved.id) as FilmVersionRow;
@@ -1163,15 +1035,6 @@ export function createComicRouter(deps: ApiDeps): Router {
          WHERE id = ?`,
       )
       .run(now, film.id);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.film_submitted',
-      target: film.id,
-      requestId: req.requestId,
-      payload: { version_no: latest.version_no },
-      createdAt: now,
-    });
     res.json({ film: filmPayload(findFilm(deps.db, user.id, film.id)) });
   });
 
@@ -1210,15 +1073,6 @@ export function createComicRouter(deps: ApiDeps): Router {
         )
         .run(now, film.project_id);
     })();
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.film_published',
-      target: film.id,
-      requestId: req.requestId,
-      payload: { film_version_id: latest.id, version_no: latest.version_no },
-      createdAt: now,
-    });
     res.json({ film: filmPayload(findFilm(deps.db, user.id, film.id)) });
   });
 
@@ -1240,15 +1094,6 @@ export function createComicRouter(deps: ApiDeps): Router {
          WHERE id = ?`,
       )
       .run(body.reason, now, film.id);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.film_rejected',
-      target: film.id,
-      requestId: req.requestId,
-      payload: { reason: body.reason },
-      createdAt: now,
-    });
     res.json({ film: filmPayload(findFilm(deps.db, user.id, film.id)) });
   });
 
@@ -1267,15 +1112,6 @@ export function createComicRouter(deps: ApiDeps): Router {
          WHERE id = ?`,
       )
       .run(now, film.id);
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'comic.film_archived',
-      target: film.id,
-      requestId: req.requestId,
-      payload: { from_status: film.status },
-      createdAt: now,
-    });
     res.json({ film: filmPayload(findFilm(deps.db, user.id, film.id)) });
   });
 

@@ -8,7 +8,7 @@
 
 import { Router } from 'express';
 import { AppError } from '@mim/core-domain';
-import { clockOf, writeAudit } from '../domain.js';
+
 import { idempotency, requireAuth, requireEntitlement } from '../middleware.js';
 import { jsonParse, pathParam } from '../utils.js';
 import type { Orchestrator } from '../orchestrator.js';
@@ -99,16 +99,6 @@ export function createAiRouter(deps: ApiDeps): Router {
     }
 
     const updated = deps.db.prepare('SELECT * FROM generation_jobs WHERE id = ?').get(jobId) as JobRow;
-
-    writeAudit(deps.db, {
-      userId: user.id,
-      region: user.region,
-      action: 'ai.job_run',
-      target: jobId,
-      requestId: req.requestId,
-      payload: { project_id: projectId, status: run.status, provider: run.provider, object_key: run.object_key ?? null },
-      createdAt: clockOf(deps),
-    });
 
     res.json({ run, job: jobPayload(updated) });
   });

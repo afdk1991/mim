@@ -4,10 +4,9 @@ import type { Locale } from '@mim/i18n';
 import { api, clearSession, getSession, setSession } from './api';
 import type { Session, UserInfo } from './api';
 import { Login } from './views/Login';
-import { Plans } from './views/Plans';
 import { Settings } from './views/Settings';
 
-type View = 'plans' | 'settings';
+type View = 'settings';
 
 interface Route {
   view: View;
@@ -15,7 +14,7 @@ interface Route {
 
 export function App() {
   const [session, setLocalSession] = useState<Session | null>(getSession());
-  const [route, setRoute] = useState<Route>({ view: 'plans' });
+  const [route, setRoute] = useState<Route>({ view: 'settings' });
 
   if (!session) {
     return (
@@ -23,7 +22,7 @@ export function App() {
         onLogin={(result) => {
           setSession(result);
           setLocalSession(result);
-          setRoute({ view: 'plans' });
+          setRoute({ view: 'settings' });
         }}
       />
     );
@@ -49,7 +48,6 @@ export function App() {
   }
 
   const navItems: Array<{ view: View; label: string }> = [
-    { view: 'plans', label: t(locale, 'nav.plans') },
     { view: 'settings', label: t(locale, 'nav.settings') },
   ];
 
@@ -82,7 +80,6 @@ export function App() {
       </aside>
 
       <main className="main">
-        {route.view === 'plans' && <Plans locale={locale} />}
         {route.view === 'settings' && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} />
         )}

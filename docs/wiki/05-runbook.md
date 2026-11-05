@@ -78,7 +78,7 @@ node scripts/env-check.mjs
 
 | 项 | 说明 |
 |---|---|
-| 占位模板 | 根目录 `.env.example`（140 个 `MIM_*` 空值变量，按领域分组，含北斗专项） |
+| 占位模板 | 根目录 `.env.example`（138 个 `MIM_*` 空值变量，按领域分组，含北斗专项；订阅与支付的 23 个 `MIM_PAY_*` / `MIM_IAP_*` 变量已于 2026-11-05 随模块下线删除） |
 | 本地使用 | 复制为 `.env` 后按需填写；根目录 `.gitignore` 已忽略 `.env`，禁止提交 |
 | 生产使用 | CI Secret / 云 KMS / Secret Manager，不落盘、不入库 |
 | 清单来源 | [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)（变量名与提供方一一对应） |
@@ -88,7 +88,7 @@ node scripts/env-check.mjs
 
 | 文档 | 打开方式 |
 |---|---|
-| `Mim-PRD.html` | 浏览器直接打开（自包含、零依赖，含 FR-01 登录 / FR-02 支付两个交互演示） |
+| `Mim-PRD.html` | 浏览器直接打开（自包含、零依赖，仅含 FR-01 登录交互演示；原 FR-02 订阅计划与支付演示已随模块于 2026-11-05 下线） |
 | `team-hiring-plan.md`、两份调研 txt | 任意 Markdown/文本编辑器 |
 
 ## 6. 启动功能应用（P0）
@@ -107,7 +107,7 @@ pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 
 ```bash
 pnpm -r typecheck                       # 四个 workspace 包类型检查
-pnpm --filter @mim/api test             # vitest + supertest，12 例契约测试
+pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 38 例全通过
 pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
 npm run check                           # 版本规约 + 密钥模板校验
 ```
@@ -119,15 +119,15 @@ npm run check                           # 版本规约 + 密钥模板校验
 | 数据库 | SQLite（`better-sqlite3`，WAL），首次启动自动建表；测试使用内存库 |
 | 端口 | API `8787`（读标准环境变量 `PORT`，默认 8787）；Web `5173` |
 | 环境变量 | 不新增 `MIM_*`；`.env.example` 仅登记第三方密钥占位（P0 无真实密钥需求） |
-| 支付 | 仅 `mock` 驱动：`POST /api/v1/subscriptions/checkout` 传 `driver: 'mock'` 即置 `paid` 并激活订阅 |
-| 验证码 | 开发通道在响应中回传 `dev_code`（未接短信/邮件通道） |
-| 前端视图 | 仅「套餐」「设置」两页；原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域 **7 表**（第 1 期 3 表 + 第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期**已装配上线（2026-11-05）**：`app.ts` 已 import 并挂载 `/api/v1/media/*`（`createMediaRouter` + 免鉴权对象收发 `createMediaObjectRouter`，后者先于全局 `express.json`）与 `/api/v1/ai/*`（`createAiRouter`），`index.ts` 构造 `storage` + `orchestrator` 并在 `MIM_AI_WORKER` 默认开启时 `orchestrator.start()` 自动消费 `generation_jobs`；商城与漫剧前端视图 **0 代码** |
+| 套餐/订阅/支付 | **已下线（2026-11-05）**：`/api/v1/plans`、`/api/v1/subscriptions/*`、`/api/v1/orders`、`/api/v1/invoices`、`/api/v1/audit/*` 路由与 9 张数据表均已移除，请求应返回 404 |
+| 验证码 | 开发/测试通道在响应中回传 `dev_code`；**生产环境（`NODE_ENV=production`）强制走第三方通道，不回传 `dev_code`** |
+| 前端视图 | 仅「设置」一页；原「套餐」页随套餐/订阅模块于 2026-11-05 删除，原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域 **7 表**（第 1 期 3 表 + 第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期**已装配上线（2026-11-05）**：`app.ts` 已 import 并挂载 `/api/v1/media/*`（`createMediaRouter` + 免鉴权对象收发 `createMediaObjectRouter`，后者先于全局 `express.json`）与 `/api/v1/ai/*`（`createAiRouter`），`index.ts` 构造 `storage` + `orchestrator` 并在 `MIM_AI_WORKER` 默认开启时 `orchestrator.start()` 自动消费 `generation_jobs`；商城与漫剧前端视图 **0 代码** |
 | 模块解锁 | `comic.workbench` 种子行随 `createDatabase()` 自动写入 cn/global 两区；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
 | 授权命令 | 生产授予权益：`sqlite3 /opt/mim/app/services/mim-api/data/mim.db "INSERT INTO entitlements (id,user_id,module_id,source,source_id,status,version,created_at,updated_at) VALUES ('ent:<uid>:comic','<uid>',(SELECT id FROM modules WHERE code='comic.workbench' AND region='cn'),'admin',NULL,'active',1,datetime('now'),datetime('now'));"` |
 
 ### 6.4 冒烟顺序（HTTP 全链路）
 
-`auth/code → login → me → plans → subscriptions/checkout(basic,mock) → subscriptions/current → orders → invoices → audit`
+`auth/code → login → me → comic/projects`（`plans` / `subscriptions` / `orders` / `invoices` / `audit` 已下线，冒烟时改为断言 404）
 
 漫剧工作台（第 1 期）：
 
@@ -155,7 +155,8 @@ verify:  pnpm install --frozen-lockfile → pnpm -r typecheck → @mim/api test 
 deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh"
          → 校验服务器 HEAD == 本次提交 SHA（不一致即失败）
          → curl https://mim.mixm.top/health（必须 200）
-         → curl https://mim.mixm.top/api/v1/plans
+         → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/plans（必须 404）
+         → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/audit/logs（必须 404）
 ```
 
 所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`。

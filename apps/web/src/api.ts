@@ -10,7 +10,6 @@ import type { ErrorCode } from '@mim/core-domain';
 
 export type Region = 'cn' | 'global';
 export type Provider = 'phone' | 'email';
-export type BillingCycle = 'monthly' | 'yearly';
 
 export interface UserInfo {
   id: string;
@@ -33,66 +32,8 @@ export interface LoginResult extends Session {
   expires_in: number;
 }
 
-export interface SubscriptionView {
-  id: string;
-  plan_id: string;
-  status: string;
-  cycle: BillingCycle;
-  current_period_start: string;
-  current_period_end: string;
-  cancel_at_period_end: number;
-  version: number;
-}
-
 export interface MeResponse {
   user: UserInfo;
-  plan: {
-    id: string;
-    name_zh: string;
-    name_en: string;
-    source: string;
-    expires_at: string | null;
-  };
-  subscription: {
-    plan_id: string;
-    status: string;
-    cycle: BillingCycle;
-    current_period_start: string;
-    current_period_end: string;
-    cancel_at_period_end: number;
-  } | null;
-}
-
-export interface PlanCatalogItem {
-  id: string;
-  name_zh: string;
-  name_en: string;
-  description_zh: string;
-  description_en: string;
-  currency: string;
-  prices: { monthly: number | null; yearly: number | null };
-  configured: boolean;
-}
-
-export interface Order {
-  id: string;
-  plan_id: string;
-  region: Region;
-  cycle: BillingCycle;
-  currency: string;
-  amount_minor: number;
-  status: string;
-  driver: string;
-  paid_at: string | null;
-  created_at: string;
-}
-
-export interface Invoice {
-  id: string;
-  order_id: string;
-  amount_minor: number;
-  currency: string;
-  created_at: string;
 }
 
 const BASE = '/api/v1';
@@ -298,42 +239,5 @@ export const api = {
 
   cancelDeletion() {
     return request<{ status: string }>('/me/cancel-deletion', { method: 'POST', body: {} });
-  },
-
-  plans(region: Region) {
-    return request<{ region: Region; items: PlanCatalogItem[] }>(`/plans?region=${region}`, {
-      auth: false,
-    });
-  },
-
-  subscriptionCurrent() {
-    return request<{
-      plan_id: string;
-      source: string;
-      expires_at: string | null;
-      subscription: SubscriptionView | null;
-    }>('/subscriptions/current');
-  },
-
-  checkout(planId: string, cycle: BillingCycle) {
-    return request<{ order: Order; subscription: SubscriptionView | null }>(
-      '/subscriptions/checkout',
-      { method: 'POST', body: { plan_id: planId, cycle, driver: 'mock' } },
-    );
-  },
-
-  cancelSubscription() {
-    return request<{ subscription: SubscriptionView | null }>('/subscriptions/cancel', {
-      method: 'POST',
-      body: {},
-    });
-  },
-
-  orders() {
-    return request<{ items: Order[] }>('/orders');
-  },
-
-  invoices() {
-    return request<{ items: Invoice[] }>('/invoices');
   },
 };
