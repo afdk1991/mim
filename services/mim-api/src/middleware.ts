@@ -183,11 +183,26 @@ export function notFound(req: Request, res: Response): void {
   });
 }
 
+/** body-parser 对非法 JSON 抛 SyntaxError 并打上 type=entity.parse.failed / status=400 */
+function isBodyParseError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  return (err as { type?: string }).type === 'entity.parse.failed';
+}
+
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   if (res.headersSent) return;
   const requestId = req.requestId ?? '';
   if (isAppError(err)) {
     res.status(err.status).json(err.toEnvelope(requestId));
+    return;
+  }
+  // 请求体非法 JSON 属客户端错误，必须归一为 400，不得按未处理异常回 500
+  if (isBodyParseError(err)) {
+    res.status(400).json({
+      code: 'VALIDATION_FAILED',
+      message: 'request body is not valid JSON',
+      request_id: requestId,
+    });
     return;
   }
   console.error(`[${requestId}] unhandled error`, err);

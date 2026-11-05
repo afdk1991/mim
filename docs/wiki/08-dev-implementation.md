@@ -1,8 +1,8 @@
 # 08 · 开发实现全景（数据库 / 前端 / 后端 / 存储 / 后台管理平台）
 
-> **状态声明（证据）**：截至 V0.0.0-preview（2026-11-05），仓库内已落地 `apps/web`（React 18 + Vite 6）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express 5 + SQLite/better-sqlite3），包管理器 pnpm workspace；`pnpm -r typecheck` / `pnpm --filter @mim/api test`（5 文件 39 例全通过）/ `pnpm -w build` / `node scripts/version-check.mjs` / `node scripts/env-check.mjs`（138 = 138）均已通过并有命令输出留档。
+> **状态声明（证据）**：截至 V0.0.0-preview（2026-11-05），仓库内已落地 `apps/web`（React 18 + Vite 6）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express 5 + SQLite/better-sqlite3），包管理器 pnpm workspace；`pnpm -r typecheck` / `pnpm --filter @mim/api test`（5 文件 40 例全通过）/ `pnpm -w build` / `node scripts/version-check.mjs` / `node scripts/env-check.mjs`（138 = 138）均已通过并有命令输出留档。
 > **2026-11-04 变更（两次）**：① FR-03 旧范围（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已按用户指令整体移除，§3.2「content 域（已移除）」与同步/导出规则仅作历史参考，不再对应仓库实况；② FR-03 已**重定义为「功能模块商城 + 漫剧 AI 剧」**，新增 `catalog` / `comic` / `media` 三域与配套表；实现拆分清单见 [07-functional-modules.md](./07-functional-modules.md) §12。
-> **2026-11-05 变更**：① FR-02（订阅与支付）与审计域（`routes/audit.ts` + `audit_logs`）整域删除，生产库 9 张表 DROP（迁移 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`）；② 漫剧第 1/2 期后端已落地——`comic` 域 7 表 + 24 条路由 + `src/orchestrator.ts` + `src/storage.ts` 均已装配进 `app.ts`/`index.ts`；③ 受保护 router 的 `requireAuth` / `requireEntitlement` 改为按命名空间生效（`/me`、`/comic`、`/media`、`/ai`），未匹配路径落到统一 404，不再被鉴权误拦成 401（契约测试「已下线与未知路径返回 404」锁定）。本页 §2 / §3 / §4 / §5 / §6 / §8 / §9 / §10 已按此同步。
+> **2026-11-05 变更**：① FR-02（订阅与支付）与审计域（`routes/audit.ts` + `audit_logs`）整域删除，生产库 9 张表 DROP（迁移 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`）；② 漫剧第 1/2 期后端已落地——`comic` 域 7 表 + 24 条路由 + `src/orchestrator.ts` + `src/storage.ts` 均已装配进 `app.ts`/`index.ts`；③ 受保护 router 的 `requireAuth` / `requireEntitlement` 改为按命名空间生效（`/me`、`/comic`、`/media`、`/ai`），未匹配路径落到统一 404，不再被鉴权误拦成 401（契约测试「已下线与未知路径返回 404」锁定）；④ 错误信封归一——`errorHandler` 识别 body-parser 的 `entity.parse.failed`（非法 JSON 请求体），返回 400 `VALIDATION_FAILED` 而非 500 `INTERNAL_ERROR`（契约测试新增 1 例，测试总数 39 → 40）。本页 §2 / §3 / §4 / §5 / §6 / §8 / §9 / §10 已按此同步。
 > 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
@@ -48,7 +48,7 @@
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
 | 后台管理 | `admin-api` + RBAC 后台 | 未实现；**审计已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表均已删除 | P1 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 等 5 文件 39 例）保障字段一致性；后续补 OpenAPI 导出 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 等 5 文件 40 例）保障字段一致性；后续补 OpenAPI 导出 |
 | 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
 ## 2. 后端服务模块清单
@@ -128,10 +128,10 @@
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
-| `modules` | `id`、`code`、`name_i18n`、`summary_i18n`、`unlock_mode(one_time)`、`entitlements_required`、`region`、`status(draft/active/archived)`、`sort_order` | 模块目录；**唯一索引 `(region, code)`**（支持 cn/global 双区同 code 各一行），`code` 在区内不复用；索引 `(region, status, sort_order)`。JSON 字段在 SQLite 以 TEXT 存。`unlock_mode` 当前唯一有效值 `one_time`；原 `subscription` 随 FR-02 于 2026-11-05 下线，DB CHECK 约束收敛时同步移除 |
+| `modules` | `id`、`code`、`name_i18n`、`summary_i18n`、`unlock_mode(one_time)`、`entitlements_required`、`region`、`status(draft/active/archived)`、`sort_order` | 模块目录；**唯一索引 `(region, code)`**（支持 cn/global 双区同 code 各一行），`code` 在区内不复用；索引 `(region, status, sort_order)`。JSON 字段在 SQLite 以 TEXT 存。`unlock_mode` 当前唯一有效值 `one_time`；原 `subscription` 随 FR-02 于 2026-11-05 下线，DB CHECK 约束已收敛为仅 `one_time` |
 | `module_prices` | `id`、`module_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | 定价与模块解耦，改价不改历史解锁记录 |
-| `entitlements` | `id`、`user_id`、`module_id`、`source(admin/risk_control)`、`source_id`、`status(active/expired/revoked)`、`expires_at`、`version` | **服务端解锁鉴权唯一依据**；唯一索引 `(user_id, module_id)`（一次性解锁）。原 `source(order/subscription)` 与订阅型唯一索引随 FR-02 于 2026-11-05 下线 |
-| `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(admin/risk_control/job)`、`created_at` | 只追加，禁止 UPDATE |
+| `entitlements` | `id`、`user_id`、`module_id`、`source(admin)`、`source_id`、`status(active/expired/revoked)`、`expires_at`、`version` | **服务端解锁鉴权唯一依据**；唯一索引 `(user_id, module_id)`（一次性解锁）。原 `source(order/subscription)` 与订阅型唯一索引随 FR-02 于 2026-11-05 下线，DB CHECK 已收敛为仅 `admin` |
+| `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(job/admin/system)`、`created_at` | 只追加，禁止 UPDATE |
 | ~~`order_items`~~ | — | **已取消（2026-11-05）**：随订单域下线，**本表不建**；解锁直接落 `entitlements` |
 
 **comic 域（第 1 期三表 2026-11-04 已建；第 2 期 `generation_jobs` / `generation_assets` / `comic_films` / `film_versions` 四表 2026-11-05 已建）**

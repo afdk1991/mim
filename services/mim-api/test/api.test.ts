@@ -55,6 +55,15 @@ describe('公开能力', () => {
     expect(health.body.service).toBe('mim-api');
   });
 
+  it('非法 JSON 请求体返回 400 VALIDATION_FAILED，而不是 500', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/code')
+      .set('content-type', 'application/json')
+      .send('{"region":');
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+  });
+
   it('已下线与未知路径返回 404，不被受保护 router 的鉴权拦成 401', async () => {
     for (const path of ['/api/v1/plans', '/api/v1/audit/logs', '/api/v1/not-exist']) {
       const res = await request(app).get(path);

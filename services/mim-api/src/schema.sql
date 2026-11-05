@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS modules (
   code                  TEXT NOT NULL,
   name_i18n             TEXT NOT NULL,
   summary_i18n          TEXT NOT NULL,
-  unlock_mode           TEXT NOT NULL CHECK (unlock_mode IN ('subscription','one_time')),
+  unlock_mode           TEXT NOT NULL CHECK (unlock_mode = 'one_time'),
   entitlements_required TEXT NOT NULL DEFAULT '[]',
   region                TEXT NOT NULL CHECK (region IN ('cn','global')),
   status                TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS entitlements (
   id          TEXT PRIMARY KEY,
   user_id     TEXT NOT NULL,
   module_id   TEXT NOT NULL,
-  source      TEXT NOT NULL CHECK (source IN ('order','subscription','admin')),
+  source      TEXT NOT NULL CHECK (source = 'admin'),
   source_id   TEXT,
   status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','revoked')),
   expires_at  TEXT,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS entitlement_events (
   from_status     TEXT,
   to_status       TEXT NOT NULL,
   reason          TEXT,
-  actor           TEXT NOT NULL CHECK (actor IN ('order','refund','job','admin','system')),
+  actor           TEXT NOT NULL CHECK (actor IN ('job','admin','system')),
   created_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_entitlement_events_ent ON entitlement_events(entitlement_id, created_at);

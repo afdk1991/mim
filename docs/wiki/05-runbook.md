@@ -107,7 +107,7 @@ pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 
 ```bash
 pnpm -r typecheck                       # 四个 workspace 包类型检查
-pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 39 例全通过
+pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 40 例全通过
 pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
 npm run check                           # 版本规约 + 密钥模板校验
 ```
@@ -157,6 +157,10 @@ deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/d
          → curl https://mim.mixm.top/health（必须 200）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/plans（必须 404）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/audit/logs（必须 404）
+         → curl -X POST -H 'Content-Type: application/json' --data-binary '{"region":"cn","provider":"phone","identifier":"13800000000"}'
+           https://mim.mixm.top/api/v1/auth/code（合法体必须 503 AUTH_CHANNEL_NOT_CONFIGURED，不得回 200/500）
+         → curl -X POST -H 'Content-Type: application/json' --data-binary '{"region":'
+           https://mim.mixm.top/api/v1/auth/code（非法 JSON 必须 400 VALIDATION_FAILED，不得回 500）
 ```
 
 所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`。

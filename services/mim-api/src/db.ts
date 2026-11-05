@@ -28,7 +28,7 @@ export function seedModules(db: Db): void {
     `INSERT INTO modules
        (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
         region, status, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'subscription', '[]', ?, 'active', ?, ?, ?)
+     VALUES (?, ?, ?, ?, 'one_time', '[]', ?, 'active', ?, ?, ?)
      ON CONFLICT(region, code) DO UPDATE SET
        name_i18n = excluded.name_i18n,
        summary_i18n = excluded.summary_i18n,

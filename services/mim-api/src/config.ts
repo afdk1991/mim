@@ -30,7 +30,6 @@ export const CODE_RATE_WINDOW_MINUTES = 10;
 export const LOGIN_LOCK_AFTER_FAILURES = 5;
 export const LOGIN_LOCK_MINUTES = 15;
 export const DELETION_GRACE_DAYS = 7;
-export const AUDIT_RETENTION_DAYS = 180;
 
 /** 写操作必须携带 Idempotency-Key（08 §3.3）；auth 端点天然非幂等，已豁免 */
 export const REQUIRE_IDEMPOTENCY = true;
