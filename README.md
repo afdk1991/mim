@@ -76,7 +76,7 @@ npm run check                             # 版本规约 + 密钥模板校验
 | [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
-| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.0-preview，含登录与支付交互演示） |
+| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.0-preview，仅含登录交互演示；支付演示随 FR-02 于 2026-11-05 下线） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 
 ## 站点与部署
@@ -89,6 +89,7 @@ npm run check                             # 版本规约 + 密钥模板校验
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（静态根）+ systemd `mim-api`（端口 8787） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
+| 生产登录入口 | 登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`，默认 `Mim@Admin2026`）；验证码通道未接入，`auth/code` 在生产恒返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
 | 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
