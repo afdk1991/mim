@@ -643,23 +643,6 @@ code {
   word-break: break-all;
 }
 
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.chip {
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #f1f3f8;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
 @media (max-width: 760px) {
   .layout {
     grid-template-columns: 1fr;

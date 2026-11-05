@@ -44,7 +44,7 @@ const NAME_PREFIX = 'MIM_';
 const ASSIGN_LINE_RE = /^([A-Z][A-Z0-9_]*)[ \t]*=/;
 // 清单中反引号包裹的具体变量名（闭合反引号必须紧跟变量名，故通配符项不会被误捕）
 const INVENTORY_VAR_RE = /`(MIM_[A-Z0-9_]+)`/g;
-// 清单中反引号包裹的通配变量（如 `MIM_PAY_STRIPE_PRICE_ID_*`），捕获其前缀主干
+// 清单中反引号包裹的通配变量（如 `MIM_CDN_*`），捕获其前缀主干
 const INVENTORY_WILDCARD_RE = /`(MIM_[A-Z0-9_]+)\*`/g;
 
 // 进程退出码：默认 0 通过，任何违规置 1
@@ -103,7 +103,7 @@ function readInventory() {
   const vars = new Set();
   // 逐条迭代匹配结果
   for (const m of text.matchAll(INVENTORY_VAR_RE)) vars.add(m[1]);
-  // 通配符前缀数组（如 MIM_PAY_STRIPE_PRICE_ID_）
+  // 通配符前缀数组（如 MIM_CDN_）
   const stems = [];
   // 逐条迭代通配符匹配结果
   for (const m of text.matchAll(INVENTORY_WILDCARD_RE)) stems.push(m[1]);

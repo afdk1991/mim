@@ -23,6 +23,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 | [07-functional-modules.md](./07-functional-modules.md) | 功能模块：PRD FR-01~06 需求、状态机、共享规则、实现状态 |
 | [08-dev-implementation.md](./08-dev-implementation.md) | 开发实现全景：目标架构 + §1.1「已实现 vs 规划」对照 |
 | [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md) | 第三方 SDK / API / API Key 全量清单（含北斗卫星导航专项） |
+| [10-comic-state-machines.md](./10-comic-state-machines.md) | 漫剧模块完整状态机：comic_projects / generation_jobs / comic_films 三套状态机、24 条路由转移对照、冒烟链路 |
 
 ## 仓库速览
 
@@ -47,7 +48,7 @@ f:\合并项目\Mim
 ├── packages/
 │   ├── core-domain/               # 错误码/状态机/UUIDv7
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
-├── docs/wiki/                     # 本 Wiki 全部文档（01~09）
+├── docs/wiki/                     # 本 Wiki 全部文档（01~10）
 ├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）
 ├── .github/workflows/deploy.yml   # CI/CD：push main 自动上线 https://mim.mixm.top
 ├── scripts/
@@ -61,6 +62,7 @@ f:\合并项目\Mim
 
 - 想了解**项目要做什么** → 先读 [01-architecture.md](./01-architecture.md) 的「目标产品架构」一节
 - 想了解**产品要交付哪些功能、已实现到什么程度** → 读 [07-functional-modules.md](./07-functional-modules.md)
+- 想了解**漫剧工作台三套状态机与 24 条路由转移** → 读 [10-comic-state-machines.md](./10-comic-state-machines.md)
 - 想了解**开发怎么落地 / 当前代码与规划差在哪** → 读 [08-dev-implementation.md](./08-dev-implementation.md) §1.1
 - 想了解**仓库里现在有什么** → 读 [02-modules.md](./02-modules.md)
 - 想**启动应用 / 跑测试 / 跑校验** → 读 [05-runbook.md](./05-runbook.md) §6
