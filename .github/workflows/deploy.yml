@@ -227,7 +227,7 @@ jobs:
 
   # ---------- 托管平台同步（无凭证则 SKIP，不阻断主链路） ----------
   platforms:
-    name: 托管平台同步（Cloudflare / Vercel / Render / Sealos / veFaaS / IGA）
+    name: 托管平台同步（Cloudflare / Vercel / Sealos / IGA）
     needs: verify
     runs-on: ubuntu-latest
     steps:
@@ -290,16 +290,6 @@ jobs:
           fi
           npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main
 
-      - name: Render
-        continue-on-error: true
-        env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
-            echo "SKIP: 缺少 RENDER_DEPLOY_HOOK"; exit 0
-          fi
-          curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
-
       - name: Sealos
         continue-on-error: true
         env:
@@ -324,14 +314,6 @@ jobs:
               -e "s/__DOMAIN__/${SEALOS_DOMAIN}/g" \
             deploy/sealos/mim.yaml | kubectl apply -f -
           kubectl -n "$SEALOS_NAMESPACE" rollout status deployment/mim-api --timeout=180s
-
-      - name: veFaaS
-        continue-on-error: true
-        env:
-          VE_ACCESS_KEY: ${{ secrets.VE_ACCESS_KEY }}
-          VE_SECRET_KEY: ${{ secrets.VE_SECRET_KEY }}
-          VEFAAS_APP_ID: ${{ secrets.VEFAAS_APP_ID }}
-        run: bash deploy/vefaas/deploy.sh
 
       - name: IGA Pages
         continue-on-error: true
