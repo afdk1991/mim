@@ -1,6 +1,6 @@
 # 05 · 项目运行方式
 
-> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下三项仓库级脚本（版本校验、密钥模板校验、站点构建）。本页覆盖启动、测试、构建与校验的完整命令。
+> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下四项仓库级脚本（版本校验、密钥模板校验、注释覆盖率校验、站点构建）。本页覆盖启动、测试、构建与校验的完整命令。
 
 ## 1. 前置条件
 
@@ -109,7 +109,7 @@ pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 pnpm -r typecheck                       # 四个 workspace 包类型检查
 pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 43 例全通过
 pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
-npm run check                           # 版本规约 + 密钥模板校验
+npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率基线
 ```
 
 ### 6.3 数据结构与运行形态
@@ -241,9 +241,9 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
 |---|---|---|---|---|
 | 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.071s** / 0.030s ⚡最快 |
-| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步 | `https://data.mixm.top` | 200 / **0.100s** / 0.041s ⚡次快 |
+| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`） | `https://data.mixm.top` | 200 / **0.100s** / 0.041s ⚡次快 |
 | GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.561s / 0.090s |
-| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC） | `https://mim-i3ywsdfn.cloud.sealos.io` | 200 / 0.611s / 0.113s |
+| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.354s / 0.094s；`/health` 200 / 0.294s |
 | Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 1.049s / 0.169s |
 | GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.538s / 0.111s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
@@ -251,6 +251,8 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | GitHub 仓库 | ✅ | ✅ 已同步（HEAD `34e2c54`，2026-11-06 23:20 +0800 推送） | `https://github.com/afdk1991/mim` | 本机 000 / 0.020s（HTTPS 阻断；仓库操作经 git push / gh CLI 取证 ✅） |
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
+
+> 候选平台的免费额度与选型路由见 [AGENTS.md 铁律十](../../AGENTS.md)：远程仓库 4 个（GitHub / GitLab / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render 750 实例小时/月、Cloudflare Workers 10 万请求/天）。**本表为已落地的 9 平台矩阵，铁律十为候选池与选型依据**；新增平台须先过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件。
 
 > **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
 
@@ -296,20 +298,22 @@ systemctl status mim-api; journalctl -u mim-api -n 50    # 服务状态与日志
 | JWT 密钥 | `/opt/mim/app/.mim-dev-secret/jwt.key`（首次启动自动生成，不入库） |
 | 站点配置 | `/etc/nginx/sites-available/mim.conf`（源模板 `deploy/nginx-mim.conf`） |
 
-### 7.5 离线阅读构建（非生产）
+### 7.5 根级构建（生产前端 / PRD 离线阅读）
 
 ```bash
-npm run build    # scripts/build.mjs 把 site/ 复制到 dist/，仅用于本地阅读 PRD
-npm run check    # version-check + env-check（退出码 0 = 通过）
+npm run build        # scripts/build.mjs：构建真实前端 apps/web/dist → 根 dist/（EdgeOne Pages OutputDir=dist 同款链路）
+npm run build:site   # scripts/build.mjs --site：仅把 site/ 复制到 根 dist/（PRD 阅读页离线预览）
+npm run build:web    # 仅构建 apps/web → apps/web/dist
+npm run check        # version-check + env-check + comment-check（退出码 0 = 通过）
 ```
 
-`site/` **不参与生产部署**；生产前端只来自 `apps/web` 构建产物。`.edgeone/` 配置已移除。
+`site/` **不参与任何生产托管**；生产前端与 EdgeOne Pages（`data.mixm.top`）前端**只来自 `apps/web` 构建产物**——根 `dist/` 由 `scripts/build.mjs` 从 `apps/web/dist` 复制而来。`.edgeone/` 配置已移除。
 
 ## 7.6 DNS 资产（DNSPod mixm.top）与功能模块对应
 
 来源：`dnspod_records_2026-11-05_21-42-26.xls`（197 条，含 GBK 中文备注）。结论（2026-11-06 全仓比对）：
 
-- **项目实际使用 3 条**：`mim`（生产主域）、`data`（EdgeOne Pages 静态站）、`_dnsauth.mim`（证书签发校验）；`cloud.mixm.top` DNS 在线但项目零引用；其余 193 条未使用。
+- **项目实际使用 3 条**：`mim`（生产主域）、`data`（EdgeOne Pages 真实前端站）、`_dnsauth.mim`（证书签发校验）；`cloud.mixm.top` DNS 在线但项目零引用；其余 193 条未使用。
 - **备注 ↔ 模块对应（40 种备注）**：仅 3 类直接命中——`auth` / `login` / `api` → FR-01 账号与身份 + `mim-api`；10 类部分沾边（`admin` / `center` / `user` / `dy` / `sp` / `video` / `yy` / `img` / `secure` / `portal`）；27 类无对应（`pay` 属 FR-02 已删除域；电商 7 类、资讯 4 类、工具 4 类、移动端 3 类等与当前「功能模块商城 + 漫剧 AI 剧」范围无关）。
 
 ### 部署平台 ↔ DNSPod 记录对应（2026-11-06 实测）

@@ -105,9 +105,9 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 平台 | 免费 | 状态 | 域名 | 访问速度（HTTP / 耗时 / 连接） |
 |---|---|---|---|---|
 | 腾讯云自建服务器 | ✅ 是（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / 0.071s / 0.030s ⚡最快 |
-| 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步 | `https://data.mixm.top` | 200 / 0.100s / 0.041s ⚡次快 |
+| 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步（真实前端 `apps/web/dist`，构建链 `scripts/build.mjs`） | `https://data.mixm.top` | 200 / 0.100s / 0.041s ⚡次快 |
 | GitHub Pages | ✅ 是 | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.561s / 0.090s |
-| Sealos | ✅ 是 | ✅ CI 自动发布（容器 + PVC） | `https://mim-i3ywsdfn.cloud.sealos.io` | 200 / 0.611s / 0.113s |
+| Sealos | ✅ 是 | ✅ CI 自动发布（容器 + PVC；**纯 API 容器，根路径 `/` 404 无路由，`/health` 200**） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，属正常非故障）/ 0.354s / 0.094s；`/health` 200 / 0.294s |
 | Cloudflare Pages | ✅ 是 | ✅ CI 自动发布（含 `/api` 反代） | `https://mim-8ah.pages.dev` | 200 / 1.049s / 0.169s |
 | GitHub Packages (ghcr) | ✅ 是 | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.538s / 0.111s（未鉴权 401 属正常） |
 | IGA Pages | ✅ 是 | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
@@ -119,7 +119,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **每次部署必须更新取证**：表中「HTTP / 耗时 / 连接」须以当轮真实 `curl`（或 CI 出口）结果刷新，并注明测试日期与本机网络位置；不得沿用旧数据冒充本轮结果。
 - **本机不可达 ≠ 部署失败**：`000` 类结果必须给出网络侧证据（DNS 污染地址、TCP 超时、HTTPS 阻断），并以 CI 日志、`git push` / `gh` CLI、平台控制台作为替代取证；无替代取证不得声明「已上线」。
 - **变更须全量同步**（铁律七）：平台增删、域名变更、凭证变更时，同轮更新本表、README、`docs/wiki/05-runbook.md`（含 DNSPod 对应表）与 CI 工作流，缺一视为交付未完成。
-- **最近一次复测（2026-11-06 23:20 +0800，本机 curl）**：`mim.mixm.top/health` 200 / 0.078s、`data.mixm.top` 200 / 0.065s、GitHub Pages 200 / 0.842s、Sealos `/health` 200 / 0.299s（`/` 返回 404「route GET / not found」，属纯 API 容器，非故障）、Cloudflare Pages 200 / 2.345s、Vercel 000 / 21.26s（DNS 污染至 108.160.169.37，TCP 超时）。同日 CI `Deploy` run `42242197917` 五个作业全绿。
+- **最近一次复测（2026-11-06 23:20 +0800，本机 curl）**：`mim.mixm.top/health` 200 / 0.078s、`data.mixm.top` 200 / 0.065s、GitHub Pages 200 / 0.842s、Sealos **根路径 `/` 404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，纯 API 容器未注册根路由，属正常非故障）且 `/health` 200 / 0.299s、Cloudflare Pages 200 / 2.345s、Vercel 000 / 21.26s（DNS 污染至 108.160.169.37，TCP 超时）。同日 CI `Deploy` run `42242197917` 五个作业全绿。
 - **与「不使用容器」既有约定的说明**：Sealos（容器 + PVC）、ghcr 镜像与 `deploy/sealos/mim.yaml` 属分发型平台的必要载体，仅限「托管平台同步」链路；生产主链路（`mim.mixm.top`）仍为宿主机直部署（nginx + systemd + SQLite），不得改为容器运行。
 
 ## 铁律十：免费平台额度矩阵与选型路由

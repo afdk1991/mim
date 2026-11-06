@@ -19,14 +19,16 @@
 node scripts/version-check.mjs
 RELEASE_CHANNEL=preview node scripts/version-check.mjs
 node scripts/env-check.mjs
+node scripts/comment-check.mjs
 ```
 
 - `version-check.mjs`：铁律四版本规约校验（退出码 0 / 1）
 - `env-check.mjs`：09 清单 §0 密钥治理校验——`.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性（退出码 0 / 1）
+- `comment-check.mjs`：铁律十一注释覆盖率校验——逐文件统计「可注释行 / 已解释行」，默认基线模式（退出码恒 0），`--strict` 为 CI 门禁模式（低于阈值退出 1）
 
 ## 项目铁律
 
-所有 AI 协作者必须遵守 [AGENTS.md](./AGENTS.md) 中的九条铁律：
+所有 AI 协作者必须遵守 [AGENTS.md](./AGENTS.md) 中的十一条铁律：
 
 1. **铁律一**：AI 负责执行，不把任务丢回用户，全权接管浏览器等一切可自动化环境（最高优先级）。
 2. **铁律二**：可逆操作直接做，不可逆操作先授权。
@@ -37,6 +39,8 @@ node scripts/env-check.mjs
 7. **铁律七**：功能模块增删必须全量同步，交付报告附同步清单。
 8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），**禁止以本地预览作为交付终点**。
 9. **铁律九**：多平台部署矩阵只走免费方案（9 个平台），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证。
+10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 4 个（GitHub / GitLab / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核。
+11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」。
 
 ## 仓库结构
 
@@ -47,10 +51,10 @@ apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173）
 services/mim-api/    # 后端 API（Express 5 + SQLite，端口 8787，前缀 /api/v1）
 packages/core-domain/# 共享领域层（错误码/套餐/金额/UUIDv7）
 packages/i18n/       # 双语文案（zh-CN / en-US）与货币格式化
-scripts/             # build / version-check / env-check
+scripts/             # build / version-check / env-check / comment-check
 deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）
 .github/workflows/   # CI/CD（push main 自动上线生产）
-site/                # PRD 可视化阅读载体（离线副本，非生产站点）
+site/                # PRD 可视化阅读载体（`npm run build:site` 离线副本，非生产站点）
 docs/wiki/           # 结构化文档（01~09）
 ```
 
@@ -65,10 +69,10 @@ pnpm --filter @mim/api test               # API 契约测试（vitest + supertes
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
-npm run check                             # 版本规约 + 密钥模板校验
+npm run check                             # 版本规约 + 密钥模板校验 + 注释覆盖率基线
 ```
 
-其他：`pnpm build`（`site/` → `dist/` 本地预览）、`pnpm test`（等价 `@mim/api test`）。
+其他：`npm run build`（构建真实前端 `apps/web/dist` → 根 `dist/`，EdgeOne Pages 等 OutputDir=dist 的托管平台同款）、`npm run build:site`（PRD 阅读页 `site/` → `dist/` 离线预览）、`npm test`（等价 `@mim/api test`）。
 
 ## 文档索引
 
@@ -106,17 +110,17 @@ npm run check                             # 版本规约 + 密钥模板校验
 | GitHub 仓库 | 源码主仓 | `https://github.com/afdk1991/mim` | ✅ 已同步 |
 | GitHub Pages | 前端静态站 | CI job `pages`（`configure-pages` + `upload-pages-artifact` + `deploy-pages`），`https://afdk1991.github.io/mim/` | ✅ CI 自动发布 |
 | GitHub Packages | 容器镜像（ghcr） | CI job `packages` → `ghcr.io/afdk1991/mim-api:{latest,sha}`；npm registry 受「包 scope 必须等于仓库 owner」限制，故 `@mim/*` 不发 npm | ✅ CI 自动推送 |
-| 腾讯云 EdgeOne Pages | 静态站 `site/` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，输出 `dist`） | ✅ 已同步（`data.mixm.top`） |
+| 腾讯云 EdgeOne Pages | 真实前端 `apps/web/dist` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，根 `dist` 由 `scripts/build.mjs` 产自真实前端） | ✅ 已同步（`data.mixm.top`） |
 | Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js`，`https://mim-8ah.pages.dev` | ✅ CI 自动发布（`CLOUDFLARE_API_TOKEN` 已配置） |
 | Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`），`https://mim-puce.vercel.app` | ✅ CI 自动发布（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 已配置） |
-| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC），命名空间 `ns-i3ywsdfn`，`https://mim-i3ywsdfn.cloud.sealos.io` | ✅ CI 自动发布（`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 已配置） |
+| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC），命名空间 `ns-i3ywsdfn`，`https://mim-i3ywsdfn.cloud.sealos.io`（纯 API 容器：根路径 `/` 返回 404 `route GET / not found`，`/health` 返回 200） | ✅ CI 自动发布（`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 已配置） |
 | IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name mim --scope domestic`） | ✅ 已部署（Project `fr95fuwu57`，Deploy `p4f5a4svqm`）；`preview.iga-pages.com` 带 `iga_token` 访问 200，自有域名需控制台绑定 |
 | 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ 生产 `https://mim.mixm.top` |
 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
 
-> **2026-11-06 本机实测（中国网络，两次取快）**：9 个免费平台全部接入或已取证上线——自建 `mim.mixm.top` 200/0.071s 最快、EdgeOne `data.mixm.top` 200/0.100s 次快；Vercel 与 github.com 本机不可达属网络侧限制（DNS 污染 / HTTPS 阻断），CI 与 git/gh 侧取证正常。逐平台 HTTP / 耗时 / 连接明细见 [05-runbook.md §7.1.3](./docs/wiki/05-runbook.md)；DNSPod 记录与功能模块对应见同页 §7.6。
+> **2026-11-06 本机实测（中国网络，两次取快）**：9 个免费平台全部接入或已取证上线——自建 `mim.mixm.top` 200/0.071s 最快、EdgeOne `data.mixm.top` 200/0.100s 次快；Vercel 与 github.com 本机不可达属网络侧限制（DNS 污染 / HTTPS 阻断），CI 与 git/gh 侧取证正常。Sealos 为纯 API 容器，根路径 `/` 返回 404 `route GET / not found` 属正常（`/health` 为 200），非宕机。逐平台 HTTP / 耗时 / 连接明细见 [05-runbook.md §7.1.3](./docs/wiki/05-runbook.md)；DNSPod 记录与功能模块对应见同页 §7.6。
 
-本地构建（可选）：`npm run build`（site → dist）；前端产物：`npm run build:web`；校验：`npm run check`。
+本地构建：`npm run build`（真实前端 → 根 `dist/`，与 EdgeOne Pages 同款链路）；PRD 阅读页：`npm run build:site`（`site/` → `dist/`）；前端单独产物：`npm run build:web`；校验：`npm run check`。
 
 
