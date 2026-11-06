@@ -192,11 +192,14 @@ gh run watch          # 观察最近一次运行
 | 平台 | 配置文件 | secret |
 |---|---|---|
 | Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js` | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
-| Vercel | `vercel.json` | `VERCEL_TOKEN` |
+| Vercel | `vercel.json` | `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` |
 | Render | `render.yaml` | `RENDER_DEPLOY_HOOK` |
 | Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`MIM_JWT_SECRET` |
-| veFaaS | `deploy/vefaas/deploy.sh` | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID` |
-| IGA Pages | `deploy/iga/deploy.sh` | `IGA_TOKEN`、`IGA_PROJECT_ID` |
+| veFaaS | `deploy/vefaas/deploy.sh`（`vefaas login` + `vefaas deploy --appId`） | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID` |
+| IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME` |
+
+> veFaaS 与 IGA Pages 同属火山引擎，共用一套 AK/SK；CLI 均由脚本在缺省时自装
+> （`@volcengine/vefaas-cli` / `@iga-pages/cli`），首建应用后把 ID / 项目名写入 secret 即可自动发布。
 
 ```bash
 # 一次性注入（有凭证时）
@@ -205,6 +208,12 @@ gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account id>"
 gh secret set VERCEL_TOKEN --body "<token>"
 gh secret set RENDER_DEPLOY_HOOK --body "<hook url>"
 gh secret set SEALOS_KUBECONFIG --body "$(cat ~/.kube/config)"
+gh secret set VE_ACCESS_KEY --body "<volcengine ak>"
+gh secret set VE_SECRET_KEY --body "<volcengine sk>"
+gh secret set VEFAAS_APP_ID --body "app-xxxxx"
+gh secret set IGA_ACCESS_KEY --body "<volcengine ak>"
+gh secret set IGA_SECRET_KEY --body "<volcengine sk>"
+gh secret set IGA_PROJECT_NAME --body "mim"
 ```
 
 托管平台以独立域名直连 API 时，`MIM_CORS_ORIGINS` 必须包含其域名（`deploy/deploy.sh` 幂等补齐

@@ -329,8 +329,9 @@ jobs:
       - name: IGA Pages
         continue-on-error: true
         env:
-          IGA_TOKEN: ${{ secrets.IGA_TOKEN }}
-          IGA_PROJECT_ID: ${{ secrets.IGA_PROJECT_ID }}
+          IGA_ACCESS_KEY: ${{ secrets.IGA_ACCESS_KEY }}
+          IGA_SECRET_KEY: ${{ secrets.IGA_SECRET_KEY }}
+          IGA_PROJECT_NAME: ${{ secrets.IGA_PROJECT_NAME }}
         run: bash deploy/iga/deploy.sh
 
       # 线上取证（铁律八）：在 Runner 侧验证各托管站点真实可访问。
