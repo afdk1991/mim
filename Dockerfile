@@ -32,6 +32,9 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/services/mim-api/node_modules ./services/mim-api/node_modules
 COPY --from=builder /app/services/mim-api/dist ./services/mim-api/dist
+# db.ts 以 new URL('./schema.sql', import.meta.url) 在运行时读取建表脚本，
+# esbuild 不会内联该资源，必须显式随 dist 一并搬运（否则容器启动 ENOENT 崩溃）。
+COPY --from=builder /app/services/mim-api/src/schema.sql ./services/mim-api/dist/schema.sql
 COPY --from=builder /app/services/mim-api/package.json ./services/mim-api/package.json
 RUN mkdir -p /app/services/mim-api/data
 
