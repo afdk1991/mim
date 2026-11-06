@@ -9,13 +9,18 @@ interface Props {
 
 interface ModuleCard {
   code: string;
-  name: string;
-  summary: string;
+  name: Record<string, string>;
+  summary: Record<string, string>;
   unlock_mode: 'one_time';
   region: string;
   status: string;
   requires: string[];
   current_price: { currency: string; amount_minor: number } | null;
+}
+
+function pick(locale: Locale, map: Record<string, string> | undefined, fallback = ''): string {
+  if (!map) return fallback;
+  return map[locale] ?? map['zh-CN'] ?? map['en-US'] ?? Object.values(map)[0] ?? fallback;
 }
 
 export function Store({ locale }: Props) {
@@ -73,10 +78,10 @@ export function Store({ locale }: Props) {
             return (
               <section key={m.code} className="card">
                 <header className="card-head">
-                  <h3>{m.name}</h3>
+                  <h3>{pick(locale, m.name, m.code)}</h3>
                   {owned && <span className="badge">✓ {locale === 'en-US' ? 'Owned' : '已解锁'}</span>}
                 </header>
-                <p className="muted">{m.summary}</p>
+                <p className="muted">{pick(locale, m.summary)}</p>
                 <div className="card-meta">
                   <code>{m.code}</code>
                   <span>{price}</span>

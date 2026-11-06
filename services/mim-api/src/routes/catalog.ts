@@ -91,10 +91,12 @@ export function createCatalogRouter(deps: ApiDeps): Router {
     const modules = rows.map((m) => {
       const price = activePrice(db, m.id, now);
       const requiredCodes = jsonParse<string[]>(m.entitlements_required) ?? [];
+      const nameMap = jsonParse<Record<string, string>>(m.name_i18n) ?? { 'zh-CN': m.code };
+      const summaryMap = jsonParse<Record<string, string>>(m.summary_i18n) ?? { 'zh-CN': '' };
       return {
         code: m.code,
-        name: m.name_i18n,
-        summary: m.summary_i18n,
+        name: nameMap,
+        summary: summaryMap,
         unlock_mode: m.unlock_mode,
         region: m.region,
         status: m.status,
@@ -138,11 +140,13 @@ export function createCatalogRouter(deps: ApiDeps): Router {
     const price = activePrice(db, row.id, now);
     const prices = listPrices(db, row.id);
     const requires = jsonParse<string[]>(row.entitlements_required) ?? [];
+    const nameMap = jsonParse<Record<string, string>>(row.name_i18n) ?? { 'zh-CN': row.code };
+    const summaryMap = jsonParse<Record<string, string>>(row.summary_i18n) ?? { 'zh-CN': '' };
 
     res.json({
       code: row.code,
-      name: row.name_i18n,
-      summary: row.summary_i18n,
+      name: nameMap,
+      summary: summaryMap,
       unlock_mode: row.unlock_mode,
       region: row.region,
       status: row.status,
@@ -260,17 +264,18 @@ export function createCatalogRouter(deps: ApiDeps): Router {
       created_at: string;
       updated_at: string;
     };
-    res.status(201).json({
-      entitlement: {
-        id: ent.id,
-        module_code: moduleRow.code,
-        module_name: moduleRow.name_i18n,
-        status: ent.status,
-        expires_at: ent.expires_at,
-        version: ent.version,
-        created_at: ent.created_at,
-      },
-    });
+      const nameMap = jsonParse<Record<string, string>>(moduleRow.name_i18n) ?? { 'zh-CN': moduleRow.code };
+      res.status(201).json({
+        entitlement: {
+          id: ent.id,
+          module_code: moduleRow.code,
+          module_name: nameMap,
+          status: ent.status,
+          expires_at: ent.expires_at,
+          version: ent.version,
+          created_at: ent.created_at,
+        },
+      });
   });
 
   /** GET /me/entitlements — 当前用户的有效解锁列表 */
@@ -297,14 +302,17 @@ export function createCatalogRouter(deps: ApiDeps): Router {
     }>;
 
     res.json({
-      entitlements: rows.map((r) => ({
-        id: r.id,
-        module_code: r.module_code,
-        module_name: r.module_name,
-        status: r.status,
-        expires_at: r.expires_at,
-        created_at: r.created_at,
-      })),
+      entitlements: rows.map((r) => {
+        const nameMap = jsonParse<Record<string, string>>(r.module_name) ?? { 'zh-CN': r.module_code };
+        return {
+          id: r.id,
+          module_code: r.module_code,
+          module_name: nameMap,
+          status: r.status,
+          expires_at: r.expires_at,
+          created_at: r.created_at,
+        };
+      }),
     });
   });
 

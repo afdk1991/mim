@@ -266,8 +266,8 @@ export const api = {
       return request<{
         modules: Array<{
           code: string;
-          name: string;
-          summary: string;
+          name: Record<string, string>;
+          summary: Record<string, string>;
           unlock_mode: 'one_time';
           region: Region;
           status: string;
@@ -279,8 +279,8 @@ export const api = {
     getModule(code: string) {
       return request<{
         code: string;
-        name: string;
-        summary: string;
+        name: Record<string, string>;
+        summary: Record<string, string>;
         unlock_mode: 'one_time';
         region: Region;
         status: string;
@@ -299,7 +299,7 @@ export const api = {
         entitlement: {
           id: string;
           module_code: string;
-          module_name: string;
+          module_name: Record<string, string>;
           status: string;
           expires_at: string | null;
           version: number;
@@ -312,7 +312,7 @@ export const api = {
         entitlements: Array<{
           id: string;
           module_code: string;
-          module_name: string;
+          module_name: Record<string, string>;
           status: string;
           expires_at: string | null;
           created_at: string;
