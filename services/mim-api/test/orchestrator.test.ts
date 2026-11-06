@@ -3,7 +3,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/app.js';
@@ -114,6 +114,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   rmSync(storageDir, { recursive: true, force: true });
 });
 
@@ -285,5 +286,167 @@ describe('失败路径（不伪造外部产物）', () => {
     expect(run.body.run.status).toBe('failed');
     expect(run.body.run.error_code).toBe('PROVIDER_NOT_CONFIGURED');
     expect(run.body.job.status).toBe('failed');
+  });
+
+  it('openai 提供方不支持的任务类型（video/tts/compose）→ PROVIDER_NOT_CONFIGURED', async () => {
+    app = createApp({
+      db,
+      jwtSecret: JWT_SECRET,
+      env: { MIM_AI_PROVIDER: 'openai', MIM_AI_OPENAI_API_KEY: 'sk-test' },
+      storage,
+    });
+    const session = await login('13900000048');
+    grantEntitlement(session.userId);
+
+    const caps = await request(app).get('/api/v1/ai/capabilities').set(auth(session));
+    expect(caps.body.ai.provider).toBe('openai');
+    expect(caps.body.ai.provider_configured).toBe(true);
+    expect(caps.body.ai.mock_provider).toBe(false);
+    expect(caps.body.ai.supported_job_types).toEqual(['text', 'image']);
+    expect(caps.body.ai.base_url).toBe('https://api.openai.com/v1');
+    expect(caps.body.ai.text_model).toBe('gpt-4o-mini');
+
+    const { projectId } = await setupStoryboardedProject(session, '编排-不支持类型');
+    const jobId = await dispatchJob(session, projectId, { job_type: 'video' });
+    const run = await request(app)
+      .post(`/api/v1/ai/jobs/${jobId}/run`)
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('failed');
+    expect(run.body.run.error_code).toBe('PROVIDER_NOT_CONFIGURED');
+  });
+});
+
+describe('真实提供方（openai 兼容协议，fetch 打桩）', () => {
+  const OPENAI_ENV = {
+    MIM_AI_PROVIDER: 'openai',
+    MIM_AI_OPENAI_API_KEY: 'sk-test',
+    MIM_AI_BASE_URL: 'https://llm.example.test/v1',
+    MIM_AI_TEXT_MODEL: 'test-text-model',
+    MIM_AI_IMAGE_MODEL: 'test-image-model',
+  };
+
+  function stubFetch(handler: (url: string, body: unknown) => { status?: number; json: unknown }) {
+    const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      const { status = 200, json } = handler(url, body);
+      return new Response(JSON.stringify(json), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  it('text 任务真实调用 chat/completions，产物为模型文本', async () => {
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    const spy = stubFetch((url, body) => {
+      expect(url).toBe('https://llm.example.test/v1/chat/completions');
+      const payload = body as { model: string; messages: Array<{ role: string; content: string }> };
+      expect(payload.model).toBe('test-text-model');
+      expect(payload.messages[1].content).toContain('写一句开场白');
+      return {
+        json: {
+          choices: [{ message: { role: 'assistant', content: '夜色降临，主角登场。' } }],
+          usage: { total_tokens: 42 },
+        },
+      };
+    });
+
+    const session = await login('13900000049');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-真实文本');
+    const jobId = await dispatchJob(session, projectId, {
+      job_type: 'text',
+      payload: { prompt: '写一句开场白' },
+    });
+
+    const run = await request(app)
+      .post(`/api/v1/ai/jobs/${jobId}/run`)
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(run.status).toBe(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(run.body.run.status).toBe('succeeded');
+    expect(run.body.run.provider).toBe('openai');
+    expect(run.body.job.result.provider).toBe('openai');
+
+    const assets = await request(app)
+      .get(`/api/v1/media/assets?project_id=${projectId}`)
+      .set(auth(session));
+    expect(assets.body.items).toHaveLength(1);
+    const download = await request(app).get(pathOf(assets.body.items[0].download_url));
+    expect(download.status).toBe(200);
+    const manifest = JSON.parse(download.text) as { provider: string; content: string; model: string };
+    expect(manifest.provider).toBe('openai');
+    expect(manifest.model).toBe('test-text-model');
+    expect(manifest.content).toBe('夜色降临，主角登场。');
+  });
+
+  it('image 任务真实调用 images/generations，b64 产物落盘为 PNG', async () => {
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    stubFetch((url, body) => {
+      expect(url).toBe('https://llm.example.test/v1/images/generations');
+      const payload = body as { model: string; prompt: string };
+      expect(payload.model).toBe('test-image-model');
+      expect(payload.prompt).toBe('一座霓虹城市');
+      return { json: { data: [{ b64_json: png }] } };
+    });
+
+    const session = await login('13900000050');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-真实图像');
+    const jobId = await dispatchJob(session, projectId, {
+      job_type: 'image',
+      payload: { prompt: '一座霓虹城市' },
+    });
+
+    const run = await request(app)
+      .post(`/api/v1/ai/jobs/${jobId}/run`)
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('succeeded');
+    expect(run.body.job.result.mime).toBe('image/png');
+
+    const assets = await request(app)
+      .get(`/api/v1/media/assets?project_id=${projectId}`)
+      .set(auth(session));
+    const download = await request(app).get(pathOf(assets.body.items[0].download_url));
+    expect(download.status).toBe(200);
+    expect(download.headers['content-type']).toContain('image/png');
+    expect(download.body.length).toBeGreaterThan(0);
+  });
+
+  it('上游 HTTP 500 → job failed（不伪造产物，可 retry）', async () => {
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    stubFetch(() => ({ status: 500, json: { error: { message: 'upstream down' } } }));
+
+    const session = await login('13900000051');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-上游失败');
+    const jobId = await dispatchJob(session, projectId, {
+      job_type: 'text',
+      payload: { prompt: 'hello' },
+    });
+
+    const run = await request(app)
+      .post(`/api/v1/ai/jobs/${jobId}/run`)
+      .set(auth(session, nextKey()))
+      .send({});
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('failed');
+    expect(run.body.job.status).toBe('failed');
+    expect(String(run.body.job.result.error)).toContain('HTTP 500');
+
+    const assets = await request(app)
+      .get(`/api/v1/media/assets?project_id=${projectId}`)
+      .set(auth(session));
+    expect(assets.body.items).toEqual([]);
   });
 });

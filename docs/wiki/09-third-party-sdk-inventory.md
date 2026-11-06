@@ -99,7 +99,10 @@
 
 | 配置项（env） | 用途 | 默认值 | 优先级 |
 |---|---|---|---|
-| `MIM_AI_PROVIDER` | 任务执行使用的 AI 提供方标识（`mock` 时为本地确定性产出，接真实厂商时替换） | `mock` | P0（第 2 期已接入） |
+| `MIM_AI_PROVIDER` | 任务执行使用的 AI 提供方标识（`mock` 为本地确定性产出；`openai` 为 OpenAI 兼容协议，凭证复用 `MIM_AI_OPENAI_API_KEY`） | `mock` | P0（第 2 期已接入 mock + openai） |
+| `MIM_AI_BASE_URL` | OpenAI 兼容端点（`MIM_AI_PROVIDER=openai` 时生效；可切换火山方舟 / DeepSeek / 百炼兼容模式） | `https://api.openai.com/v1` | P0 |
+| `MIM_AI_TEXT_MODEL` | 文本任务模型（方舟填推理接入点 ID） | `gpt-4o-mini` | P0 |
+| `MIM_AI_IMAGE_MODEL` | 图像任务模型（需支持 `b64_json` 或 `url` 返回） | `dall-e-3` | P0 |
 | `MIM_AI_WORKER` | 是否随 API 进程启动后台队列 worker（`1` 启用 / `0` 关闭，关闭后仅能由 `POST /ai/jobs/:id/run` 手动消费） | `1` | P0 |
 | `MIM_AI_WORKER_INTERVAL_MS` | worker 轮询间隔（毫秒） | `2000` | P0 |
 | `MIM_AI_JOB_COST_LIMIT_MINOR` | 单任务成本上限（分），超出即 `COST_LIMIT_EXCEEDED(402)` | `100000` | P0 |

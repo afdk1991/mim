@@ -3,8 +3,11 @@
  *
  * 职责：
  * 1. 轮询 queued 任务，`UPDATE ... WHERE status='queued'` 原子抢占为 running；
- * 2. 按 job_type 路由处理器；当前内置 mock 提供方（产物真实落盘，结果显式标注 provider=mock）；
- * 3. 真实提供方在未配置凭证时诚实失败（PROVIDER_NOT_CONFIGURED），不伪造外部产物；
+ * 2. 按 job_type 路由处理器；mock 提供方产物真实落盘（结果显式标注 provider=mock）；
+ * 3. 真实提供方 openai（OpenAI 兼容协议：OpenAI / 火山方舟 / DeepSeek / 百炼兼容模式，
+ *    经 MIM_AI_BASE_URL 切换）支持 text（chat/completions）与 image（images/generations）任务，
+ *    产物为真实模型返回内容；未配置凭证或不支持的 job_type 一律诚实失败
+ *    （PROVIDER_NOT_CONFIGURED），不伪造外部产物；
  * 4. 成本预检（单任务上限 + 当日累计）超限直接失败（COST_LIMIT_EXCEEDED）；
  * 5. 成功产物写入 generation_assets；compose 成功驱动项目 generating → rendered。
  */
@@ -125,6 +128,64 @@ function numberFromEnv(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+/** OpenAI 兼容提供方配置（OpenAI / 火山方舟 / DeepSeek / 百炼兼容模式，经 base_url 切换） */
+interface OpenAiCompatConfig {
+  apiKey: string;
+  baseUrl: string;
+  textModel: string;
+  imageModel: string;
+}
+
+function resolveOpenAiCompat(env: Record<string, string | undefined>): OpenAiCompatConfig | null {
+  const apiKey = (env.MIM_AI_OPENAI_API_KEY ?? '').trim();
+  if (!apiKey) return null;
+  return {
+    apiKey,
+    baseUrl: (env.MIM_AI_BASE_URL ?? '').trim().replace(/\/+$/, '') || 'https://api.openai.com/v1',
+    textModel: (env.MIM_AI_TEXT_MODEL ?? '').trim() || 'gpt-4o-mini',
+    imageModel: (env.MIM_AI_IMAGE_MODEL ?? '').trim() || 'dall-e-3',
+  };
+}
+
+/** 各提供方实际支持的任务类型（mock 全量；openai 兼容协议仅 text/image，其余诚实失败） */
+function supportedTypesFor(provider: string): readonly JobType[] {
+  if (provider === 'mock') return JOB_TYPES;
+  if (provider === 'openai') return ['text', 'image'];
+  return [];
+}
+
+/** 从任务 payload 提取提示词（prompt / text 字段优先，否则整体 JSON 透传） */
+function promptOf(job: JobRow): string {
+  try {
+    const payload = JSON.parse(job.payload) as Record<string, unknown>;
+    const candidate = payload.prompt ?? payload.text ?? payload.prompt_text;
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    return JSON.stringify(payload);
+  } catch {
+    return job.payload;
+  }
+}
+
+const OPENAI_TIMEOUT_MS = 90_000;
+
+async function openAiPost(cfg: OpenAiCompatConfig, path: string, body: unknown): Promise<unknown> {
+  const res = await fetch(`${cfg.baseUrl}${path}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${cfg.apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`openai-compatible HTTP ${res.status}: ${text.slice(0, 500)}`);
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error('openai-compatible returned a non-JSON response');
+  }
+}
+
 export interface CreateOrchestratorOptions {
   db: Db;
   storage: StorageAdapter;
@@ -138,7 +199,9 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
   const { db, storage, env } = options;
   const clock = options.now ?? (() => new Date().toISOString());
   const provider = (env.MIM_AI_PROVIDER ?? '').trim().toLowerCase() || 'mock';
-  const configured = provider === 'mock';
+  const openAi = provider === 'openai' ? resolveOpenAiCompat(env) : null;
+  const configured = provider === 'mock' || openAi !== null;
+  const supportedTypes = supportedTypesFor(provider);
   const jobCostLimitMinor = numberFromEnv(env.MIM_AI_JOB_COST_LIMIT_MINOR, 100000);
   const dailyCostLimitMinor = numberFromEnv(env.MIM_AI_DAILY_COST_LIMIT_MINOR, 500000);
   const assetTtlDays = numberFromEnv(env.MIM_AI_ASSET_TTL_DAYS, 90);
@@ -184,6 +247,66 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
     }
   }
 
+  /** 真实提供方产出：openai 兼容协议，text → chat/completions，image → images/generations */
+  async function produceWithOpenAi(
+    cfg: OpenAiCompatConfig,
+    jobType: JobType,
+    job: JobRow,
+  ): Promise<{ body: Buffer; mime: string }> {
+    const prompt = promptOf(job);
+    if (jobType === 'text') {
+      const data = (await openAiPost(cfg, '/chat/completions', {
+        model: cfg.textModel,
+        messages: [
+          { role: 'system', content: '你是 Mim 漫剧工坊的创作模型，按用户要求产出可直接使用的文本内容。' },
+          { role: 'user', content: prompt },
+        ],
+      })) as { choices?: Array<{ message?: { content?: unknown } }>; usage?: unknown };
+      const content = data.choices?.[0]?.message?.content;
+      if (typeof content !== 'string' || !content.trim()) {
+        throw new Error('openai-compatible chat completion returned empty content');
+      }
+      return {
+        body: Buffer.from(
+          JSON.stringify(
+            {
+              provider,
+              model: cfg.textModel,
+              job_id: job.id,
+              job_type: job.job_type,
+              project_id: job.project_id,
+              storyboard_id: job.storyboard_id,
+              content,
+              usage: data.usage ?? null,
+            },
+            null,
+            2,
+          ),
+          'utf8',
+        ),
+        mime: 'application/json',
+      };
+    }
+    // image：优先 b64_json；部分网关仅回 url 则回源拉取字节
+    const data = (await openAiPost(cfg, '/images/generations', {
+      model: cfg.imageModel,
+      prompt,
+      n: 1,
+      size: '1024x1024',
+      response_format: 'b64_json',
+    })) as { data?: Array<{ b64_json?: string; url?: string }> };
+    const first = data.data?.[0];
+    if (first?.b64_json) {
+      return { body: Buffer.from(first.b64_json, 'base64'), mime: 'image/png' };
+    }
+    if (first?.url) {
+      const img = await fetch(first.url, { signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS) });
+      if (!img.ok) throw new Error(`openai-compatible image fetch HTTP ${img.status}`);
+      return { body: Buffer.from(await img.arrayBuffer()), mime: 'image/png' };
+    }
+    throw new Error('openai-compatible images response missing b64_json/url');
+  }
+
   async function execute(job: JobRow): Promise<RunResult> {
     const jobType = JOB_TYPES.find((value) => value === job.job_type);
     if (!jobType) return fail(job, 'VALIDATION_FAILED', `unsupported job_type: ${job.job_type}`);
@@ -205,11 +328,19 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
       }
     }
 
+    if (!supportedTypes.includes(jobType)) {
+      return fail(
+        job,
+        'PROVIDER_NOT_CONFIGURED',
+        `provider "${provider}" does not support job_type "${jobType}"`,
+      );
+    }
     if (!configured) {
       return fail(job, 'PROVIDER_NOT_CONFIGURED', `provider "${provider}" is not configured`);
     }
 
-    const { body, mime } = bodyFor(jobType, job);
+    const { body, mime } =
+      provider === 'mock' ? bodyFor(jobType, job) : await produceWithOpenAi(openAi!, jobType, job);
     const assetType = ASSET_TYPE_BY_JOB[jobType];
     const objectKey = `${job.created_by}/${job.project_id}/${job.id}-${assetType}${extensionForMime(mime)}`;
     const stored = await storage.putObject(objectKey, body, mime);
@@ -314,8 +445,15 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
     return {
       provider,
       provider_configured: configured,
-      mock_provider: configured,
-      supported_job_types: [...JOB_TYPES],
+      mock_provider: provider === 'mock',
+      supported_job_types: [...supportedTypes],
+      ...(provider === 'openai'
+        ? {
+            base_url: openAi?.baseUrl ?? null,
+            text_model: openAi?.textModel ?? null,
+            image_model: openAi?.imageModel ?? null,
+          }
+        : {}),
       job_cost_limit_minor: jobCostLimitMinor,
       daily_cost_limit_minor: dailyCostLimitMinor,
       asset_ttl_days: assetTtlDays,

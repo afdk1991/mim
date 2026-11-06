@@ -190,6 +190,104 @@ export function errorText(locale: Locale, error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// ---------- 漫剧 AI 剧（comic）共享类型，与 routes/comic.ts payload 一一对应 ----------
+
+export interface ComicProject {
+  id: string;
+  region: Region;
+  title: string;
+  synopsis: string | null;
+  status: 'draft' | 'storyboarded' | 'generating' | 'rendered' | 'published' | 'archived';
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ComicCharacter {
+  id: string;
+  name: string;
+  appearance_prompt: string;
+  seed: number | null;
+  reference_asset_ids: string[];
+  voice_profile: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoryboardShot {
+  index: number;
+  description: string;
+  dialogue?: string;
+  [key: string]: unknown;
+}
+
+export interface Storyboard {
+  id: string;
+  version_no: number;
+  shots: StoryboardShot[];
+  confirmed_at: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export type SuggestKind = 'script' | 'storyboard' | 'dialogue' | 'voice';
+
+export interface Suggestion {
+  kind: SuggestKind;
+  model: string;
+  generated_at: string;
+  requires_confirmation: boolean;
+  items: Array<Record<string, unknown>>;
+}
+
+export type JobType = 'text' | 'image' | 'video' | 'tts' | 'compose';
+
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
+
+export interface GenerationJob {
+  id: string;
+  project_id: string;
+  storyboard_id: string | null;
+  job_type: JobType;
+  status: JobStatus;
+  retry_of: string | null;
+  cost_estimate_minor: number | null;
+  error_code: string | null;
+  payload: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  created_by: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export type FilmStatus = 'draft' | 'reviewing' | 'published' | 'archived';
+
+export interface Film {
+  id: string;
+  project_id: string;
+  title: string;
+  status: FilmStatus;
+  current_version_id: string | null;
+  review_note: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FilmVersion {
+  id: string;
+  film_id: string;
+  version_no: number;
+  object_key: string | null;
+  duration_sec: number | null;
+  size_bytes: number | null;
+  published_at: string | null;
+  created_by: string;
+  created_at: string;
+}
+
 export const api = {
   requestCode(region: Region, provider: Provider, identifier: string) {
     return request<{
@@ -321,137 +419,112 @@ export const api = {
     },
   },
 
-  // ---------- 漫剧 AI 剧（comic）----------
+  // ---------- 漫剧 AI 剧（comic，契约对齐 services/mim-api/src/routes/comic.ts）----------
 
   comic: {
     listProjects() {
-      return request<{
-        projects: Array<{
-          id: string;
-          title: string;
-          status: string;
-          updated_at: string;
-          version: number;
-        }>;
-      }>('/comic/projects', { idempotency: false });
+      return request<{ items: ComicProject[] }>('/comic/projects', { idempotency: false });
     },
     createProject(payload: { title: string; synopsis?: string }) {
-      return request<{
-        id: string;
-        title: string;
-        status: string;
-        created_at: string;
-      }>('/comic/projects', { method: 'POST', body: payload });
+      return request<{ project: ComicProject }>('/comic/projects', { method: 'POST', body: payload });
     },
     getProject(id: string) {
       return request<{
-        id: string;
-        title: string;
-        synopsis: string | null;
-        status: string;
-        region: Region;
-        version: number;
-        storyboard?: unknown;
-        characters?: unknown[];
-        created_at: string;
-        updated_at: string;
+        project: ComicProject;
+        characters: ComicCharacter[];
+        latest_storyboard: Storyboard | null;
       }>(`/comic/projects/${encodeURIComponent(id)}`, { idempotency: false });
     },
-    updateProject(id: string, payload: { title?: string; synopsis?: string }) {
-      return request<{ id: string; updated_at: string }>(
-        `/comic/projects/${encodeURIComponent(id)}`,
-        { method: 'PATCH', body: payload },
-      );
-    },
     deleteProject(id: string) {
-      return request<{ ok: true }>(`/comic/projects/${encodeURIComponent(id)}`, {
+      return request<{ ok: true; project_id: string }>(`/comic/projects/${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        body: {},
       });
     },
-    saveStoryboard(id: string, payload: { shots: unknown[]; confirmed?: boolean }) {
-      return request<{
-        id: string;
-        project_id: string;
-        version_no: number;
-        confirmed_at: string | null;
-      }>(`/comic/projects/${encodeURIComponent(id)}/storyboard`, {
-        method: 'POST',
-        body: payload,
-      });
+    saveStoryboard(id: string, payload: { shots: StoryboardShot[]; confirm?: boolean }) {
+      return request<{ storyboard: Storyboard; project_status: string }>(
+        `/comic/projects/${encodeURIComponent(id)}/storyboard`,
+        { method: 'POST', body: payload },
+      );
     },
     addCharacter(
       id: string,
       payload: { name: string; appearance_prompt: string; seed?: number; voice_profile?: string },
     ) {
-      return request<{
-        id: string;
-        project_id: string;
-        name: string;
-        created_at: string;
-      }>(`/comic/projects/${encodeURIComponent(id)}/characters`, {
-        method: 'POST',
-        body: payload,
-      });
+      return request<{ character: ComicCharacter; created: boolean }>(
+        `/comic/projects/${encodeURIComponent(id)}/characters`,
+        { method: 'POST', body: payload },
+      );
     },
-    suggest(id: string, kind: 'script' | 'storyboard' | 'dialogue' | 'tts', context?: unknown) {
-      return request<{
-        kind: string;
-        model: string;
-        suggestion: unknown;
-        requires_confirmation: boolean;
-      }>(`/comic/projects/${encodeURIComponent(id)}/suggest`, {
-        method: 'POST',
-        body: { kind, context },
-      });
+    suggest(id: string, kind: SuggestKind, prompt?: string) {
+      return request<{ suggestion: Suggestion }>(
+        `/comic/projects/${encodeURIComponent(id)}/suggest`,
+        { method: 'POST', body: { kind, prompt: prompt?.trim() || undefined, count: 3 } },
+      );
     },
     listJobs(projectId: string) {
-      return request<{ jobs: unknown[] }>(
+      return request<{ items: GenerationJob[] }>(
         `/comic/projects/${encodeURIComponent(projectId)}/jobs`,
         { idempotency: false },
       );
     },
     createJob(
       projectId: string,
-      payload: { job_type: 'text' | 'image' | 'video' | 'tts' | 'compose'; payload?: unknown },
+      payload: {
+        job_type: JobType;
+        storyboard_id?: string;
+        payload?: Record<string, unknown>;
+        cost_estimate_minor?: number;
+      },
     ) {
-      return request<{ id: string; status: string }>(
+      return request<{ job: GenerationJob; project_status: string }>(
         `/comic/projects/${encodeURIComponent(projectId)}/jobs`,
         { method: 'POST', body: payload },
       );
     },
     getJob(id: string) {
-      return request<{ id: string; status: string; payload: unknown; result: unknown }>(
-        `/comic/jobs/${encodeURIComponent(id)}`,
-        { idempotency: false },
-      );
+      return request<{ job: GenerationJob }>(`/comic/jobs/${encodeURIComponent(id)}`, {
+        idempotency: false,
+      });
     },
-    jobAction(id: string, action: 'start' | 'complete' | 'fail' | 'cancel' | 'retry') {
-      return request<{ ok: true }>(`/comic/jobs/${encodeURIComponent(id)}/${action}`, {
+    jobAction(
+      id: string,
+      action: 'start' | 'complete' | 'fail' | 'cancel' | 'retry',
+      body?: Record<string, unknown>,
+    ) {
+      return request<{ job: GenerationJob }>(`/comic/jobs/${encodeURIComponent(id)}/${action}`, {
         method: 'POST',
+        body: body ?? {},
       });
     },
     listFilms(projectId: string) {
-      return request<{ films: unknown[] }>(
-        `/comic/projects/${encodeURIComponent(projectId)}/films`,
-        { idempotency: false },
-      );
+      return request<{ items: Film[] }>(`/comic/projects/${encodeURIComponent(projectId)}/films`, {
+        idempotency: false,
+      });
     },
-    createFilm(projectId: string, payload: { title: string }) {
-      return request<{ id: string; title: string; status: string }>(
+    createFilm(
+      projectId: string,
+      payload: { title: string; object_key?: string; duration_sec?: number; size_bytes?: number },
+    ) {
+      return request<{ film: Film; version: FilmVersion }>(
         `/comic/projects/${encodeURIComponent(projectId)}/films`,
         { method: 'POST', body: payload },
       );
     },
     getFilm(id: string) {
-      return request<unknown>(`/comic/films/${encodeURIComponent(id)}`, { idempotency: false });
+      return request<{ film: Film; versions: FilmVersion[] }>(
+        `/comic/films/${encodeURIComponent(id)}`,
+        { idempotency: false },
+      );
     },
     publishFilm(id: string, action: 'submit-review' | 'publish' | 'archive') {
-      return request<{ ok: true }>(`/comic/films/${encodeURIComponent(id)}/${action}`, {
+      return request<{ film: Film }>(`/comic/films/${encodeURIComponent(id)}/${action}`, {
         method: 'POST',
+        body: {},
       });
     },
     rejectFilm(id: string, reason: string) {
-      return request<{ ok: true }>(`/comic/films/${encodeURIComponent(id)}/reject`, {
+      return request<{ film: Film }>(`/comic/films/${encodeURIComponent(id)}/reject`, {
         method: 'POST',
         body: { reason },
       });

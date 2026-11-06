@@ -324,12 +324,12 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 漫剧工程（剧本 / 角色 / 分镜） | `comic.ts`：`GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/storyboard` | —（`ComicWorkbench.tsx` 前端未实现） | ✅ 后端已落地 |
-| 角色一致性（character bible） | `POST /comic/projects/:id/characters`（`comic_characters` 表，`(project_id, name)` 唯一 + prompt/seed） | — | ✅ 后端已落地 |
-| 生成任务队列（text / image / video / tts / compose） | `POST/GET /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}`（`generation_jobs` 表） | — | 🟡 后端已落地（状态机 + 已装配的队列消费者 `src/orchestrator.ts`；真实厂商模型调用待 OQ-08） |
+| 漫剧工程（剧本 / 角色 / 分镜） | `comic.ts`：`GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/storyboard` | `ComicWorkbench.tsx`（创作标签页：工程列表 / 角色 / AI 建议） | ✅ 前后端已落地 |
+| 角色一致性（character bible） | `POST /comic/projects/:id/characters`（`comic_characters` 表，`(project_id, name)` 唯一 + prompt/seed） | `ComicWorkbench.tsx` 创作标签页 | ✅ 前后端已落地 |
+| 生成任务队列（text / image / video / tts / compose） | `POST/GET /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}`（`generation_jobs` 表） | `ComicWorkbench.tsx` 生成任务标签页（派发 / 状态机操作 / 3s 轮询） | ✅ 前后端已落地（状态机 + 队列消费者 `src/orchestrator.ts`；真实厂商 openai 兼容协议已接入 text/image，video/tts/compose 诚实失败 `PROVIDER_NOT_CONFIGURED`） |
 | 生成产物存储与分发 | `src/storage.ts`：`LocalDiskStorage`（HMAC 预签名 URL，落盘 `data/media`）+ `S3Storage`（AWS SDK）；`generation_assets` 表已建、`src/orchestrator.ts` 写入真实产物；`/media/presign/{upload,download}`、`/media/assets`、`/media/objects/*` 已挂载 | —（前端页面未实现） | ✅ 后端已落地（2026-11-05 装配上线） |
-| 成片合成与版本 | `POST/GET /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/versions`（`comic_films` / `film_versions` 表） | —（规划 `ComicFilms.tsx`） | 🟡 后端骨架已落地 |
-| 审核与发布 | `POST /comic/films/:id/{submit-review,publish,reject,archive}`（状态机 + 驳回留原因） | — | 🟡 骨架已落地（人工审核队列与内容机审未实现） |
+| 成片合成与版本 | `POST/GET /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/versions`（`comic_films` / `film_versions` 表） | `ComicWorkbench.tsx` 成片标签页（创建时可选取 compose 产物 object_key） | ✅ 前后端已落地 |
+| 审核与发布 | `POST /comic/films/:id/{submit-review,publish,reject,archive}`（状态机 + 驳回留原因） | `ComicWorkbench.tsx` 成片标签页（提交审核 / 发布 / 驳回 / 归档） | ✅ 前后端已落地（人工审核队列与内容机审未实现） |
 | 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
 | 导出成片 | —（规划导出任务 + 对象存储预签名下载） | — | ❌ 0 代码 |
 
@@ -352,12 +352,12 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 |---|---|
 | 后端路由 | `comic.ts`：`POST/GET/PATCH/DELETE /comic/projects`、`POST /comic/projects/:id/storyboard`、`POST /comic/projects/:id/characters`；`POST /comic/projects/:id/suggest`（AI 建议：剧本/分镜/对白/配音） |
 | 数据表 | `comic_projects`、`comic_characters`、`storyboards` |
-| 前端视图 | `apps/web/src/views/ComicWorkbench.tsx`（剧本编辑、角色设定、分镜表、AI 建议确认）— **未实现** |
+| 前端视图 | `apps/web/src/views/ComicWorkbench.tsx`（工程列表、角色设定、AI 建议确认）— ✅ 已实现（创作标签页） |
 | 鉴权 | 服务端 `requireEntitlement('comic.workbench')` — ✅ 已落地（`src/middleware.ts`） |
 | 第三方 | 文本生成模型（剧本/分镜/对白建议）— **未接入**；`POST /comic/projects/:id/suggest` 当前返回本地 mock（`model: 'mock-text-suggest'`，`requires_confirmation: true`），TTS 未实现 |
 | 验收 | 工程 CRUD + 分镜表落库 + AI 建议人工确认后可保存；工程状态机 `draft → storyboarded` 可闭环 — ✅ 后端已由 `test/comic.test.ts` 10 例覆盖 |
 
-> **落地状态（2026-11-04）**：后端与数据表已交付（`schema.sql` comic 域 3 表、`routes/comic.ts` 8 条路由、`test/comic.test.ts` 10 例全绿）；前端视图与真实文本模型接入未开始，属第 2 期范围。
+> **落地状态（2026-11-06）**：后端与数据表已交付（`schema.sql` comic 域 3 表、`routes/comic.ts`、`test/comic.test.ts` 全绿）；前端 `ComicWorkbench.tsx` 创作标签页已实现（工程 CRUD / 角色 / AI 建议，`kind` 对齐 `script|storyboard|dialogue|voice`）。真实文本模型已由第 2 期 orchestrator 承接（openai 兼容协议）。
 
 ### 12.2 第 2 期：④ 创作工作台 + 导出成片
 
@@ -365,12 +365,12 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 |---|---|
 | 后端路由 | **已落地（骨架，2026-11-05）**：`POST/GET /comic/projects/:id/jobs`（派发 / 列表）、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}`（状态机控制面，失败重试新建 job）；`POST/GET /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/versions`（版本只追加）、`POST /comic/films/:id/{submit-review,publish,reject,archive}`。规划增补：`POST /comic/projects/:id/generate`（按镜头生成关键帧 / 片段，真实模型驱动） |
 | 数据表 | **七表已建齐**：第 1 期 `comic_projects`/`comic_characters`/`storyboards`；第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` |
-| 前端视图 | `ComicWorkbench.tsx`（生成进度、单镜头重生成）、`ComicFilms.tsx`（成片预览与导出） |
-| 第三方 | 文生图模型（关键帧）、图生视频模型（片段）、TTS（配音）、对象存储 + 预签名 URL — **均未接入**，骨架不含外部调用 |
+| 前端视图 | `ComicWorkbench.tsx` 生成任务标签页（派发 / 状态机操作 / 3s 轮询）与成片标签页（创建 / 提交审核 / 发布 / 驳回 / 归档）— ✅ 已实现（2026-11-06） |
+| 第三方 | 文本 / 文生图模型 — ✅ 已接入（`MIM_AI_PROVIDER=openai` 走 OpenAI 兼容协议，经 `MIM_AI_BASE_URL` 可切换火山方舟 / DeepSeek / 百炼，2026-11-06）；图生视频模型、TTS（配音）— 未接入（诚实失败 `PROVIDER_NOT_CONFIGURED`）；对象存储 + 预签名 URL — ✅ 已接入（`storage.ts` local/S3） |
 | 依赖前置 | 第 1 期完成 ✅；`media` 域就绪；生成队列消费者（`jobs`） |
 | 验收 | 分镜 → 关键帧 → 片段 → 合成可跑通；单镜头失败可重试且不影响其他镜头；导出给出预签名 URL |
 
-> **落地状态（2026-11-05）**：任务编排与成片合成的路由骨架与状态机已交付（`schema.sql` comic 域新增 **4 表**：`generation_jobs`/`generation_assets`/`comic_films`/`film_versions`、`routes/comic.ts` 新增 16 条路由、`test/comic-phase2.test.ts` 10 例全绿）。骨架口径：首个任务派发驱动工程 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`，成片发布驱动 `rendered → published`；状态迁移当前由编排控制面端点驱动（`start/complete/fail`）。**已装配上线（2026-11-05）**：`src/orchestrator.ts`（mock 产物真实落盘 + 单任务/当日成本预检 + `generation_assets` 写入 + compose 成功联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）均由 `app.ts`/`index.ts` import 并生效——对外暴露 `/api/v1/ai/*`（含 `GET /ai/capabilities`、`POST /ai/jobs/:id/run`）与 `/api/v1/media/*`（预签名上传/下载、资产列表、免鉴权对象收发），`MIM_AI_WORKER` 默认开启时 worker 轮询自动消费 `generation_jobs`；`generation_assets` 分镜全覆盖校验在接入真实厂商模型后收紧。
+> **落地状态（2026-11-05）**：任务编排与成片合成的路由骨架与状态机已交付（`schema.sql` comic 域新增 **4 表**：`generation_jobs`/`generation_assets`/`comic_films`/`film_versions`、`routes/comic.ts` 新增 16 条路由、`test/comic-phase2.test.ts` 10 例全绿）。骨架口径：首个任务派发驱动工程 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`，成片发布驱动 `rendered → published`；状态迁移当前由编排控制面端点驱动（`start/complete/fail`）。**已装配上线（2026-11-05）**：`src/orchestrator.ts`（mock 产物真实落盘 + 单任务/当日成本预检 + `generation_assets` 写入 + compose 成功联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）均由 `app.ts`/`index.ts` import 并生效——对外暴露 `/api/v1/ai/*`（含 `GET /ai/capabilities`、`POST /ai/jobs/:id/run`）与 `/api/v1/media/*`（预签名上传/下载、资产列表、免鉴权对象收发），`MIM_AI_WORKER` 默认开启时 worker 轮询自动消费 `generation_jobs`；`generation_assets` 分镜全覆盖校验在接入真实厂商模型后收紧。**2026-11-06 增补**：① orchestrator 接入真实提供方 `MIM_AI_PROVIDER=openai`（OpenAI 兼容协议，支持 text `chat/completions` 与 image `images/generations`，b64_json 优先 / url 回源兜底；`video`/`tts`/`compose` 与未配置凭证保持诚实失败 `PROVIDER_NOT_CONFIGURED`；新增 env `MIM_AI_BASE_URL`/`MIM_AI_TEXT_MODEL`/`MIM_AI_IMAGE_MODEL`，登记见 wiki 09）；② 前端 `ComicWorkbench.tsx` 补「生成任务」「成片」标签页并修复 api.ts 信封契约（`{items}`/`{project, characters, latest_storyboard}` 等），任务列表有排队/运行中条目时 3s 轮询；`test/orchestrator.test.ts` 以 fetch 打桩覆盖真实调用路径。
 
 ### 12.3 第 3 期：① AI 全自动生成成片
 
