@@ -28,7 +28,7 @@
 | `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
 | `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
 | `.github/workflows/deploy.yml` | CI/CD | 铁律八执行器：push `main` → 质量门禁（typecheck/test/build）→ SSH 远程发布 → 线上健康检查 | 每次 `main` 变更自动上线生产 |
-| `.screenshots/` | 资产暂存 | 截图存放（当前为空，仅含 `.tmp`） | — |
+| `.screenshots/` | 资产暂存 | 截图取证目录（含 `.tmp/` 临时帧与 `data-mixm-top-e2e.png`：`data.mixm.top` 有头 Edge + CDP 端到端取证截图） | 交付取证附件 |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~10 共 10 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单、漫剧状态机 | 与仓库资产一一对应的唯一文档入口 |
 
 ## 1. AGENTS.md — 协作铁律（最高优先级）

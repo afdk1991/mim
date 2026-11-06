@@ -104,22 +104,23 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 | 平台 | 免费 | 状态 | 域名 | 访问速度（HTTP / 耗时 / 连接） |
 |---|---|---|---|---|
-| 腾讯云自建服务器 | ✅ 是（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / 0.068s / 0.028s ⚡最快 |
-| 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步（真实前端 `apps/web/dist`，构建链 `scripts/build.mjs`） | `https://data.mixm.top` | 200 / 0.094s / 0.039s ⚡次快 |
-| GitHub Pages | ✅ 是 | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 2.425s / 0.152s |
-| Sealos | ✅ 是 | ✅ CI 自动发布（容器 + PVC；**纯 API 容器，根路径 `/` 404 无路由，`/health` 200**） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，属正常非故障）/ 0.643s / 0.101s；`/health` 200 / 0.243s |
-| Cloudflare Pages | ✅ 是 | ✅ CI 自动发布（含 `/api` 反代） | `https://mim-8ah.pages.dev` | 200 / 0.549s / 0.175s |
-| GitHub Packages (ghcr) | ✅ 是 | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 1.192s / 0.124s（未鉴权 401 属正常） |
+| 腾讯云自建服务器 | ✅ 是（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / 0.081s / 0.038s ⚡最快（`/health` 200 / 0.078s） |
+| 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步（真实前端 `apps/web/dist`，构建链 `scripts/build.mjs`；**curl 命中 WAF 挑战页，须有头浏览器取证**） | `https://data.mixm.top` | curl 200 但仅 986B 为 EdgeOne WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；**真机（有头 Edge + CDP）**：`title=Mim — 跨端任务与轻协作`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；0.080s / 0.035s |
+| GitHub Pages | ✅ 是 | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.635s / 0.300s |
+| Sealos | ✅ 是 | ✅ CI 自动发布（容器 + PVC；**纯 API 容器，根路径 `/` 404 无路由，`/health` 200**） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，属正常非故障）/ 0.577s / 0.104s；`/health` 200 / 0.256s |
+| Cloudflare Pages | ✅ 是 | ✅ CI 自动发布（含 `/api` 反代） | `https://mim-8ah.pages.dev` | 200 / 0.689s / 0.163s |
+| GitHub Packages (ghcr) | ✅ 是 | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.617s / 0.140s（未鉴权 401 属正常） |
 | IGA Pages | ✅ 是 | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
-| Vercel | ✅ 是 | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / ≥12s（`--max-time 12` 截断）/ 0.000s（DNS 污染到 108.160.169.37，TCP 连接建立即失败） |
-| GitHub 仓库 | ✅ 是 | ✅ 已同步（HEAD `9bdf69c`，2026-11-07 00:20 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手被阻断，TCP 可连；仓库操作经 `git push` / `gh` CLI 取证 ✅） |
+| Vercel | ✅ 是 | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.01s（`--max-time 20` 截断）/ 0.000s（DNS 污染到 108.160.169.37，TCP 连接建立即失败） |
+| GitHub 仓库 | ✅ 是 | ✅ 已同步（HEAD `ba60659`，2026-11-07 00:23:17 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手被阻断，TCP 可连；仓库操作经 `git push` / `gh` CLI 取证 ✅） |
 
 - **权威明细位置**：逐平台发布作业见 [README.md](./README.md)「多平台部署矩阵」；实测汇总与 DNSPod 记录对应见 [05-runbook.md §7.1.3 / §7.6](./docs/wiki/05-runbook.md)；CI 实现见 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)（`deploy` / `pages` / `packages` / `platforms` 四个作业）。
 - **免费是硬约束**：新增平台前必须确认无付费门槛；`veFaaS` 等**无长期免费层**的方案已移出交付范围，不得重新引入。`Render` 因存在长期免费层（750 实例小时/月），已于 2026-11-06 按铁律十改为「免费候选平台」，不再属于排除项。
 - **每次部署必须更新取证**：表中「HTTP / 耗时 / 连接」须以当轮真实 `curl`（或 CI 出口）结果刷新，并注明测试日期与本机网络位置；不得沿用旧数据冒充本轮结果。
 - **本机不可达 ≠ 部署失败**：`000` 类结果必须给出网络侧证据（DNS 污染地址、TCP 超时、HTTPS 阻断），并以 CI 日志、`git push` / `gh` CLI、平台控制台作为替代取证；无替代取证不得声明「已上线」。
 - **变更须全量同步**（铁律七）：平台增删、域名变更、凭证变更时，同轮更新本表、README、`docs/wiki/05-runbook.md`（含 DNSPod 对应表）与 CI 工作流，缺一视为交付未完成。
-- **最近一次复测（2026-11-07 00:13:32 +0800，本机中国网络 curl）**：`mim.mixm.top/health` 200 / 0.068s、`mim.mixm.top/` 200 / 0.065s、`data.mixm.top` 200 / 0.094s、GitHub Pages 200 / 2.425s、Sealos **根路径 `/` 404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，纯 API 容器未注册根路由，属正常非故障）且 `/health` 200 / 0.243s、Cloudflare Pages 200 / 0.549s、ghcr tags 未鉴权 401 / 1.192s（属正常）、Vercel 000（`--max-time 12` 截断，DNS 污染至 108.160.169.37，TCP 连接即失败）、github.com 000 / curl exit 35（TLS 握手阻断，TCP 0.018s 可连）。状态码与 2026-11-06 基线完全一致，仅耗时刷新，无渠道新增或失效。
+- **最近一次复测（2026-11-07 00:22:29 +0800，本机中国网络 curl）**：`mim.mixm.top/health` 200 / 0.078s、`mim.mixm.top/` 200 / 0.081s、`data.mixm.top` 200 / 0.080s（**响应体仅 986B，为 EdgeOne WAF 机器校验页 `EO_Bot_Ssid`，非真实页面**，真实内容以有头 Edge + CDP 取证：`title=Mim — 跨端任务与轻协作`、`htmlLen=1553`、`assets/index-cpYhbG3w.js`、`isWafChallenge=false`）、GitHub Pages 200 / 0.635s、Sealos **根路径 `/` 404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，纯 API 容器未注册根路由，属正常非故障）且 `/health` 200 / 0.256s、Cloudflare Pages 200 / 0.689s、ghcr tags 未鉴权 401 / 0.617s（属正常）、Vercel 000（`--max-time 20` 截断，DNS 污染至 108.160.169.37，TCP 连接即失败）、github.com 000 / curl exit 35（TLS 握手阻断，TCP 0.018s 可连）。状态码与 2026-11-06 基线一致（`data.mixm.top` 的 200 口径已按 WAF 挑战页修正），无渠道新增或失效。
+- **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 **不得**作为「内容正确」的取证；须以有头真实浏览器（本机 Edge + CDP）读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
 - **与「不使用容器」既有约定的说明**：Sealos（容器 + PVC）、ghcr 镜像与 `deploy/sealos/mim.yaml` 属分发型平台的必要载体，仅限「托管平台同步」链路；生产主链路（`mim.mixm.top`）仍为宿主机直部署（nginx + systemd + SQLite），不得改为容器运行。
 
 ## 铁律十：免费平台额度矩阵与选型路由
