@@ -9,11 +9,11 @@
 │ 产品代码层（可运行）                                       │
 │   apps/web            React 18 + Vite 6 薄壳端（登录/设置）    │
 │   services/mim-api    Express 5 + better-sqlite3 后端（8787） │
-│   packages/core-domain 错误码/状态机/UUIDv7                  │
+│   packages/core-domain 错误码/UUIDv7（errors / ids）        │
 │   packages/i18n       zh-CN / en-US 文案与货币格式化        │
 ├─────────────────────────────────────────────────────────┤
 │ 治理层（强制约束）                                        │
-│   AGENTS.md          九条铁律（执行/授权/证据/版本/依赖/自动化/同步/部署/矩阵）│
+│   AGENTS.md          十一条铁律（执行/授权/证据/版本/依赖/自动化/同步/部署/矩阵/额度/注释）│
 │   README.md          项目入口 + 版本规约摘要               │
 │   scripts/version-check.mjs   铁律四的版本规约校验器       │
 │   scripts/env-check.mjs       09 清单 §0 密钥治理校验器    │
@@ -25,7 +25,7 @@
 │ 规划/参考层                                               │
 │   Mim-PRD.html       产品需求文档 V0.0.0-preview（草案）   │
 │   team-hiring-plan.md 技术约束分析 + 团队分阶段配置         │
-│   docs/wiki/         01~09 项目文档                        │
+│   docs/wiki/         01~10 项目文档                        │
 └─────────────────────────────────────────────────────────┘
 ```
 

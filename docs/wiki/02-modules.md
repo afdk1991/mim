@@ -26,10 +26,10 @@
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
 | `site/index.html` | 静态站点（本地预览） | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
 | `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
-| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元） | `https://mim.mixm.top` 前后端 + 数据库上线 |
+| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
 | `.github/workflows/deploy.yml` | CI/CD | 铁律八执行器：push `main` → 质量门禁（typecheck/test/build）→ SSH 远程发布 → 线上健康检查 | 每次 `main` 变更自动上线生产 |
 | `.screenshots/` | 资产暂存 | 截图存放（当前为空，仅含 `.tmp`） | — |
-| `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~09 共 9 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单 | 与仓库资产一一对应的唯一文档入口 |
+| `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~10 共 10 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单、漫剧状态机 | 与仓库资产一一对应的唯一文档入口 |
 
 ## 1. AGENTS.md — 协作铁律（最高优先级）
 
@@ -127,7 +127,7 @@ AGENTS.md (铁律十一) ──强制──> scripts/comment-check.mjs ──扫
 README.md ──引用──> AGENTS.md + version-check.mjs + env-check.mjs + comment-check.mjs
 Mim-PRD.html ◂──论据── 两份 txt 调研
 team-hiring-plan.md ◂──论据── 全栈项目人员配置指南 txt
-docs/wiki/README.md ──索引──> docs/wiki/01~09（其中 08 引用 07/01，09 引用 04）
+docs/wiki/README.md ──索引──> docs/wiki/01~10（其中 08 引用 07/01，09 引用 04，10 引用 07）
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
 package.json (build) ──调用──> scripts/build.mjs ──构建并复制──> dist/（真实前端 apps/web/dist，生产与 EdgeOne Pages 同款）
 package.json (build:site) ──调用──> scripts/build.mjs --site ──复制──> dist/（site/ PRD 阅读页，仅离线预览）

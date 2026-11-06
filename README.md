@@ -47,16 +47,50 @@ node scripts/comment-check.mjs
 pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`、`packages/*`）：
 
 ```
-apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173）
-services/mim-api/    # 后端 API（Express 5 + SQLite，端口 8787，前缀 /api/v1）
-packages/core-domain/# 共享领域层（错误码/套餐/金额/UUIDv7）
-packages/i18n/       # 双语文案（zh-CN / en-US）与货币格式化
+apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块 / 漫剧 AI 剧 / 站点地图 / 设置）
+apps/web/src/views/  # Login / Store / ComicWorkbench / SiteMap / Settings 五个视图组件
+services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
+services/mim-api/src/routes/  # auth / catalog / site / me / comic / media / ai 七个路由模块
+packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7）
+packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
 scripts/             # build / version-check / env-check / comment-check
-deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db）
-.github/workflows/   # CI/CD（push main 自动上线生产）
+deploy/              # 生产部署工件（bootstrap / deploy / backup-db / nginx / systemd / migrations / sealos / iga）
+.github/workflows/   # CI/CD（deploy.yml 五作业：verify / deploy / pages / packages / platforms）
 site/                # PRD 可视化阅读载体（`npm run build:site` 离线副本，非生产站点）
-docs/wiki/           # 结构化文档（01~09）
+docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ```
+
+## 功能与接口
+
+### 前端视图（`apps/web/src/views`）
+
+无 URL 路由，视图由 [App.tsx](./apps/web/src/App.tsx) 的 `View` 状态切换；未登录仅渲染登录页。
+
+| 视图 | 组件 | 说明 |
+|---|---|---|
+| 登录 | `Login.tsx` | 管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login` |
+| 功能模块 | `Store.tsx` | 模块目录浏览与一次性解锁（`/modules`、`/entitlements`、`/me/entitlements`） |
+| 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
+| 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`） |
+| 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
+
+### 后端接口（`services/mim-api`，前缀 `/api/v1`）
+
+| 分组 | 端点 | 鉴权 |
+|---|---|---|
+| 健康 | `GET /health` | 公开 |
+| 鉴权 | `POST /auth/code`、`/auth/login`、`/auth/password`、`/auth/refresh`、`/auth/logout` | 公开（`logout` 需登录） |
+| 商城 | `GET /modules`、`GET /modules/:code` | 公开 |
+| 权益 | `POST /entitlements`、`GET /me/entitlements` | 登录 + 幂等 |
+| 账号 | `GET /me`、`PATCH /me`、`POST /me/deletion`、`POST /me/cancel-deletion` | 登录 |
+| 漫剧工程 | `GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/{storyboard,characters,suggest}` | 登录 |
+| 生成任务 | `GET/POST /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}` | 登录 |
+| 成片 | `GET/POST /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/{versions,submit-review,publish,reject,archive}` | 登录 |
+| 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets` | 对象端点凭签名免鉴权 |
+| AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
+| 站点地图 | `GET /site/overview`、`GET /site/modules`、`GET /site/modules/:host` | 公开只读 |
+
+除 `auth/*` 外的写接口强制 `Idempotency-Key`（同键同体重放首次结果、同键异体 409）；错误统一信封携带 `requestId`。
 
 ## 开发与运行
 
@@ -65,7 +99,7 @@ docs/wiki/           # 结构化文档（01~09）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，64 例）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，7 个测试文件 / 64 例）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
@@ -78,9 +112,10 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 
 | 入口 | 内容 |
 |---|---|
-| [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 |
+| [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 / 10 漫剧状态机 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
+| [docs/wiki/10-comic-state-machines.md](./docs/wiki/10-comic-state-machines.md) | 漫剧工程 / 生成任务 / 成片版本的状态机与迁移约束 |
 | [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.0-preview，仅含登录交互演示；支付演示随 FR-02 于 2026-11-05 下线） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 
@@ -93,6 +128,8 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 | 生产域名 | `https://mim.mixm.top`（HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`） |
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（静态根）+ systemd `mim-api`（端口 8787） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
+| 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前先用 `better-sqlite3` backup 再幂等执行 |
+| 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
 | 生产登录入口 | 登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`，默认 `Mim@Admin2026`）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 站点模块地图 | `GET /api/v1/site/overview`、`GET /api/v1/site/modules?zone=&category=&q=`、`GET /api/v1/site/modules/:host`（公开只读，无鉴权）。数据源为 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列，45 条主机 × 2 zone（`laal.top` / `mixm.top`）、8 个分类；前端入口「站点地图 / Site Map」 |
