@@ -109,7 +109,7 @@ pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
 pnpm -r typecheck                       # 四个 workspace 包类型检查
 pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 43 例全通过
 pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
-npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率基线
+npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率门禁（CI 以 --strict 执行）
 ```
 
 ### 6.3 数据结构与运行形态

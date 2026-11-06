@@ -41,10 +41,10 @@ jobs:
       - name: 前端构建
         run: pnpm --filter @mim/web build
 
-      # 铁律十一：注释覆盖率基线报告（非 --strict，恒退出 0，仅作证据留档；
-      # 覆盖率提升到阈值后再改为 --strict 硬门禁）
-      - name: 注释覆盖率基线（铁律十一）
-        run: node scripts/comment-check.mjs
+      # 铁律十一：注释覆盖率硬门禁（--strict，总覆盖率低于阈值即退出 1 阻断发布）
+      # 当前全仓覆盖率 93.3%、未达标文件 0，已高于默认阈值 80%
+      - name: 注释覆盖率门禁（铁律十一）
+        run: node scripts/comment-check.mjs --strict
 
   deploy:
     name: 发布到生产服务器

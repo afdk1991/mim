@@ -103,7 +103,7 @@ pnpm --filter @mim/api test               # API 契约测试（vitest + supertes
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
-npm run check                             # 版本规约 + 密钥模板校验 + 注释覆盖率基线
+npm run check                             # 版本规约 + 密钥模板校验 + 注释覆盖率门禁（--strict 同条件）
 ```
 
 其他：`npm run build`（构建真实前端 `apps/web/dist` → 根 `dist/`，EdgeOne Pages 等 OutputDir=dist 的托管平台同款）、`npm run build:site`（PRD 阅读页 `site/` → `dist/` 离线预览）、`npm test`（等价 `@mim/api test`）。
