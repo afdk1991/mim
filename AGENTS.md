@@ -121,6 +121,8 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **变更须全量同步**（铁律七）：平台增删、域名变更、凭证变更时，同轮更新本表、README、`docs/wiki/05-runbook.md`（含 DNSPod 对应表）与 CI 工作流，缺一视为交付未完成。
 - **最近一次复测（2026-11-07 00:22:29 +0800，本机中国网络 curl）**：`mim.mixm.top/health` 200 / 0.078s、`mim.mixm.top/` 200 / 0.081s、`data.mixm.top` 200 / 0.080s（**响应体仅 986B，为 EdgeOne WAF 机器校验页 `EO_Bot_Ssid`，非真实页面**，真实内容以有头 Edge + CDP 取证：`title=Mim — 跨端任务与轻协作`、`htmlLen=1553`、`assets/index-cpYhbG3w.js`、`isWafChallenge=false`）、GitHub Pages 200 / 0.635s、Sealos **根路径 `/` 404**（`{"code":"NOT_FOUND","message":"route GET / not found"}`，纯 API 容器未注册根路由，属正常非故障）且 `/health` 200 / 0.256s、Cloudflare Pages 200 / 0.689s、ghcr tags 未鉴权 401 / 0.617s（属正常）、Vercel 000（`--max-time 20` 截断，DNS 污染至 108.160.169.37，TCP 连接即失败）、github.com 000 / curl exit 35（TLS 握手阻断，TCP 0.018s 可连）。状态码与 2026-11-06 基线一致（`data.mixm.top` 的 200 口径已按 WAF 挑战页修正），无渠道新增或失效。
 - **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 **不得**作为「内容正确」的取证；须以有头真实浏览器（本机 Edge + CDP）读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
+  - **拦截面实测（2026-11-07）**：`curl` / 无头 UA → 层 1 混淆 JS（约 986B）；**无头浏览器（`--headless=new`）与全新 user-data-dir 的有头 Edge → 层 2 验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。判定正则须同时覆盖 `EO_Bot_Ssid|_0x649a|TEOCaptchaWidgetV1|正在验证连接安全性`。
+  - **唯一可通过方式**：复用**已通过过校验的** user-data-dir（本机 `$env:TEMP\edge-cdp-profile`）+ 有头模式 + CDP（`--remote-debugging-port=9333`）。新建 profile 一律落入验证码页，不可作为取证手段。
 - **与「不使用容器」既有约定的说明**：Sealos（容器 + PVC）、ghcr 镜像与 `deploy/sealos/mim.yaml` 属分发型平台的必要载体，仅限「托管平台同步」链路；生产主链路（`mim.mixm.top`）仍为宿主机直部署（nginx + systemd + SQLite），不得改为容器运行。
 
 ## 铁律十：免费平台额度矩阵与选型路由

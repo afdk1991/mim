@@ -147,7 +147,7 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 | GitHub 仓库 | 源码主仓 | `https://github.com/afdk1991/mim` | ✅ 已同步 |
 | GitHub Pages | 前端静态站 | CI job `pages`（`configure-pages` + `upload-pages-artifact` + `deploy-pages`），`https://afdk1991.github.io/mim/` | ✅ CI 自动发布 |
 | GitHub Packages | 容器镜像（ghcr） | CI job `packages` → `ghcr.io/afdk1991/mim-api:{latest,sha}`；npm registry 受「包 scope 必须等于仓库 owner」限制，故 `@mim/*` 不发 npm | ✅ CI 自动推送 |
-| 腾讯云 EdgeOne Pages | 真实前端 `apps/web/dist` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，根 `dist` 由 `scripts/build.mjs` 产自真实前端）；`data.mixm.top` 对 curl/无头 UA 会返回 EdgeOne WAF 挑战页，真实内容须有头浏览器取证 | ✅ 已同步（`data.mixm.top`：有头 Edge + CDP 取证 `title=Mim — 跨端任务与轻协作` + `assets/index-cpYhbG3w.js`） |
+| 腾讯云 EdgeOne Pages | 真实前端 `apps/web/dist` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，根 `dist` 由 `scripts/build.mjs` 产自真实前端）；`data.mixm.top` 对 `curl` / 无头 UA 返回 WAF 混淆 JS，对**无头浏览器与全新 profile 的有头 Edge** 返回验证码页（`TEOCaptchaWidgetV1`），真实内容须复用**已通过过校验的** Edge user-data-dir + 有头模式 + CDP 取证（判定正则含 `EO_Bot_Ssid\|_0x649a\|TEOCaptchaWidgetV1\|正在验证连接安全性`） | ✅ 已同步（`data.mixm.top`：有头 Edge + CDP 取证 `title=Mim — 跨端任务与轻协作` + `assets/index-cpYhbG3w.js`） |
 | Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js`，`https://mim-8ah.pages.dev` | ✅ CI 自动发布（`CLOUDFLARE_API_TOKEN` 已配置） |
 | Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`），`https://mim-puce.vercel.app` | ✅ CI 自动发布（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 已配置） |
 | Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC），命名空间 `ns-i3ywsdfn`，`https://mim-i3ywsdfn.cloud.sealos.io`（纯 API 容器：根路径 `/` 返回 404 `route GET / not found`，`/health` 返回 200） | ✅ CI 自动发布（`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 已配置） |
@@ -157,6 +157,8 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
 
 > **2026-11-07 00:22:29 +08:00 本机实测（中国网络）**：9 个免费平台全部接入或已取证上线——自建 `mim.mixm.top` 200/0.081s 最快（`/health` 200/0.078s）；EdgeOne `data.mixm.top` curl 200/0.080s 但**响应体仅 986B，为 EdgeOne WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`），属假阳性**，真实内容以有头 Edge + CDP 取证（`title=Mim — 跨端任务与轻协作`、`assets/index-cpYhbG3w.js`、`isWafChallenge=false`）；GitHub Pages 200/0.635s、Cloudflare Pages 200/0.689s、Sealos `/health` 200/0.256s（根路径 `/` 404 `route GET / not found` 属正常）、ghcr 未鉴权 401/0.617s（正常）。Vercel 与 github.com 本机不可达属网络侧限制（DNS 污染至 108.160.169.37 / TLS 握手阻断 exit 35），CI 与 git/gh 侧取证正常。逐平台 HTTP / 耗时 / 连接明细见 [05-runbook.md §7.1.3](./docs/wiki/05-runbook.md)；DNSPod 记录与功能模块对应见同页 §7.6。
+
+> **EdgeOne WAF 拦截面（2026-11-07 补充实测）**：层 1 —— `curl` / 无头 UA 拿到约 986B 混淆 JS（`EO_Bot_Ssid` / `_0x649a`）；层 2 —— **无头浏览器（`--headless=new`）与全新 `user-data-dir` 的有头 Edge 都会落入验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。**唯一可通过方式**：复用**已通过过校验的** `user-data-dir`（本机 `$env:TEMP\edge-cdp-profile`）+ 有头模式 + CDP（`--remote-debugging-port=9333`），此时读得 `title=Mim — 跨端任务与轻协作`、`htmlLen=1553`、`isWafChallenge=false`，截图存 [.screenshots/data-mixm-top-e2e.png](./.screenshots/data-mixm-top-e2e.png)。
 
 本地构建：`npm run build`（真实前端 → 根 `dist/`，与 EdgeOne Pages 同款链路）；PRD 阅读页：`npm run build:site`（`site/` → `dist/`）；前端单独产物：`npm run build:web`；校验：`npm run check`。
 

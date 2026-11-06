@@ -251,6 +251,8 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | GitHub 仓库 | ✅ | ✅ 已同步（HEAD `ba60659`，2026-11-07 00:23:17 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
 
 > **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 不得作为「内容正确」的取证；须以有头真实浏览器读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
+>
+> **拦截面实测（2026-11-07）**：`curl` / 无头 UA → 层 1 混淆 JS（约 986B）；**无头浏览器（`--headless=new`）与全新 `user-data-dir` 的有头 Edge → 层 2 验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。判定正则须覆盖 `EO_Bot_Ssid|_0x649a|TEOCaptchaWidgetV1|正在验证连接安全性`。**唯一可通过方式**：复用**已通过过校验的** `user-data-dir`（本机 `$env:TEMP\edge-cdp-profile`）+ 有头模式 + CDP（`--remote-debugging-port=9333`）；新建 profile 一律落入验证码页，不可作为取证手段。
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 
