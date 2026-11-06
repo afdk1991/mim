@@ -86,8 +86,10 @@ export function ComicWorkbench({ locale }: Props) {
     }
   }
 
-  if (listState.loading) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
-  if (listState.error) return <div className="error">{errorText(locale, listState.error)}</div>;
+  // 仅在首次加载（尚无数据）时占位；reload 期间保留已渲染的列表与详情，
+  // 避免卸载 ProjectDetail 导致当前标签页被重置回「创作」。
+  if (listState.loading && !listState.data) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
+  if (listState.error && !listState.data) return <div className="error">{errorText(locale, listState.error)}</div>;
 
   return (
     <div className="page">
@@ -101,6 +103,7 @@ export function ComicWorkbench({ locale }: Props) {
       </header>
 
       {error && <p className="error">{error}</p>}
+      {listState.error != null && <p className="error">{errorText(locale, listState.error)}</p>}
       {message && <p className="success">{message}</p>}
 
       <div className="split">
@@ -179,8 +182,11 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
     setTab('create');
   }, [projectId]);
 
-  if (detailState.loading) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
-  if (detailState.error || !detailState.data) return <div className="error">{errorText(locale, detailState.error)}</div>;
+  // reload 期间保留已渲染内容，避免 JobsTab/FilmsTab 被卸载后丢失输入与轮询状态。
+  if (!detailState.data) {
+    if (detailState.loading) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
+    return <div className="error">{errorText(locale, detailState.error)}</div>;
+  }
 
   const { project, characters, latest_storyboard } = detailState.data;
   const reloadAll = () => {
@@ -201,6 +207,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
         <span className="badge">{STATUS_LABEL[project.status]?.[locale] ?? project.status}</span>
       </header>
       <p className="muted">{project.synopsis ?? (locale === 'en-US' ? 'No synopsis' : '暂无简介')}</p>
+      {detailState.error != null && <p className="error">{errorText(locale, detailState.error)}</p>}
 
       <div className="form-inline" role="tablist">
         {(['create', 'jobs', 'films'] as const).map((t) => (
@@ -230,6 +237,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
           projectStatus={project.status}
           storyboardId={latest_storyboard?.id ?? null}
           onProjectChange={reloadAll}
+          onProjectRefresh={detailState.reload}
         />
       )}
       {tab === 'films' && (
@@ -389,24 +397,31 @@ function JobsTab({
   projectStatus,
   storyboardId,
   onProjectChange,
+  onProjectRefresh,
 }: {
   locale: Locale;
   projectId: string;
   projectStatus: ComicProject['status'];
   storyboardId: string | null;
   onProjectChange: () => void;
+  /** 仅重载工程详情（不重载左侧列表），用于轮询时同步工程状态 */
+  onProjectRefresh: () => void;
 }) {
   const jobsState = useAsync(() => api.comic.listJobs(projectId), [projectId]);
   const jobs: GenerationJob[] = jobsState.data?.items ?? [];
   const hasActive = jobs.some((j) => j.status === 'queued' || j.status === 'running');
   const { reload: reloadJobs } = jobsState;
 
-  // 有排队/运行中任务时每 3 秒轮询一次
+  // 有排队/运行中任务时每 3 秒轮询一次：任务列表与工程详情同步刷新，
+  // 使 compose 成功导致的 project → rendered 能及时反映到成片门槛上。
   useEffect(() => {
     if (!hasActive) return;
-    const timer = setInterval(() => reloadJobs(), 3000);
+    const timer = setInterval(() => {
+      reloadJobs();
+      onProjectRefresh();
+    }, 3000);
     return () => clearInterval(timer);
-  }, [hasActive, reloadJobs]);
+  }, [hasActive, reloadJobs, onProjectRefresh]);
 
   const [jobType, setJobType] = useState<JobType>('text');
   const [prompt, setPrompt] = useState('');
