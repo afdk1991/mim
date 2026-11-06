@@ -439,6 +439,11 @@ code { /* 行内代码/令牌展示 */
   background: radial-gradient(circle at 20% 20%, #eef2ff 0%, var(--bg) 45%); /* 左上柔光渐变，避免纯色单调 */
 } /* 登录容器结束 */
 
+.auth-wrap.embedded { /* 内嵌登录容器：主布局内容区内的登录卡片 */
+  min-height: 100%; /* 跟随内容区高度，不再强制一屏高，避免出现多余滚动条 */
+  background: none; /* 去掉整屏渐变背景，与内容区底色保持一致 */
+} /* 内嵌登录容器结束 */
+
 .auth-card { /* 登录卡片 */
   display: flex; /* 纵向排列标题与表单 */
   flex-direction: column; /* 自上而下 */

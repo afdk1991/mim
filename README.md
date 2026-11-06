@@ -64,14 +64,14 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-无 URL 路由，视图由 [App.tsx](./apps/web/src/App.tsx) 的 `View` 状态切换；未登录仅渲染登录页。
+无 URL 路由，视图由 [App.tsx](./apps/web/src/App.tsx) 的 `View` 状态切换；功能模块与站点地图免登录可浏览，漫剧与设置未登录时内容区内嵌登录卡片。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
 | 登录 | `Login.tsx` | 管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login` |
-| 功能模块 | `Store.tsx` | 模块目录浏览与一次性解锁（`/modules`、`/entitlements`、`/me/entitlements`） |
+| 功能模块 | `Store.tsx` | 模块目录浏览（匿名可看）与一次性解锁（`/modules`、`/entitlements`、`/me/entitlements`；解锁需登录） |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
-| 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`） |
+| 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`，匿名可访问） |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
 
 ### 后端接口（`services/mim-api`，前缀 `/api/v1`）
@@ -131,7 +131,7 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前先用 `better-sqlite3` backup 再幂等执行 |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
-| 生产登录入口 | 登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`，默认 `Mim@Admin2026`）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
+| 生产登录入口 | 未登录可浏览功能模块与站点地图；漫剧、设置与解锁操作需登录。登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`，默认 `Mim@Admin2026`）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 站点模块地图 | `GET /api/v1/site/overview`、`GET /api/v1/site/modules?zone=&category=&q=`、`GET /api/v1/site/modules/:host`（公开只读，无鉴权）。数据源为 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列，45 条主机 × 2 zone（`laal.top` / `mixm.top`）、8 个分类；前端入口「站点地图 / Site Map」 |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |

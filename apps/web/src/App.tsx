@@ -6,8 +6,8 @@ import { normalizeLocale, t } from '@mim/i18n';
 import type { Locale } from '@mim/i18n';
 // api 命名空间与会话读写工具
 import { api, clearSession, getSession, setSession } from './api';
-// 仅类型导入：会话与用户信息结构
-import type { Session, UserInfo } from './api';
+// 仅类型导入：登录结果、会话与用户信息结构
+import type { LoginResult, Session, UserInfo } from './api';
 // 登录页组件（未登录时渲染）
 import { Login } from './views/Login';
 // 设置页组件
@@ -24,8 +24,8 @@ type View = 'store' | 'comic' | 'sitemap' | 'settings';
 
 // 路由状态：当前只有一个 view 字段（无 URL 路由）
 interface Route {
-  // 当前视图标识：取值受 View 联合类型约束，切换视图即改写该字段
-  view: View;
+  // 当前视图标识：除四个业务视图外，'login' 是未登录专用的伪视图（由侧栏「登录」按钮进入，不在导航中出现）
+  view: View | 'login';
 } // 路由结构定义结束
 
 // 应用根组件
@@ -35,30 +35,20 @@ export function App() {
   // 当前视图，默认进入功能模块页
   const [route, setRoute] = useState<Route>({ view: 'store' });
 
-  // 未登录：只渲染登录页，不展示侧边导航（站点地图因此需登录后可见）
-  if (!session) {
-    // 未登录分支：只渲染登录页，不渲染侧边导航
-    return (
-      // 登录页组件：把「登录成功」回调交给它，成功后写会话并跳转
-      <Login
-        // 登录成功回调：写入会话并跳转到功能模块页
-        onLogin={(result) => {
-          // 持久化会话到 localStorage
-          setSession(result);
-          // 同步更新内存状态
-          setLocalSession(result);
-          // 登录后默认落在功能模块页
-          setRoute({ view: 'store' });
-        }}
-      />
-      // 登录分支的 JSX 表达式收尾
-    );
-  } // 未登录分支结束
+  // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
+  const locale: Locale = normalizeLocale(session?.user.locale);
+  // 当前视图是否需登录：漫剧与设置涉及用户数据，未登录时内容区改为内嵌登录卡片
+  const needsAuth = route.view === 'comic' || route.view === 'settings';
 
-  // 已登录：取出用户信息
-  const user = session.user;
-  // 语言归一化，非法值回退到默认语言
-  const locale: Locale = normalizeLocale(user.locale);
+  // 登录成功回调：持久化会话；login 伪视图回功能模块页，受保护视图内嵌登录则原地解锁
+  function handleLogin(result: LoginResult) {
+    // 写会话到 localStorage（Login 内部已写一次，此处幂等覆盖，保证内存与磁盘一致）
+    setSession(result);
+    // 同步内存会话，触发已登录布局重渲染
+    setLocalSession(result);
+    // login 伪视图仅作登录中转，成功后回默认页；其余情形停留原视图
+    if (route.view === 'login') setRoute({ view: 'store' });
+  } // handleLogin 结束
 
   // 退出登录：先尽力调用后端登出，再清理本地会话
   async function handleLogout() {
@@ -71,8 +61,10 @@ export function App() {
     }
     // 清理 localStorage 中的会话
     clearSession();
-    // 清空内存会话，触发回到登录页
+    // 清空内存会话，界面退回访客态
     setLocalSession(null);
+    // 退出后回到公开的功能模块页，避免停留在需登录的视图上
+    setRoute({ view: 'store' });
   } // handleLogout 结束
 
   // 设置页更新用户信息后的回调：替换会话中的 user 并持久化
@@ -97,7 +89,7 @@ export function App() {
     { view: 'settings', label: t(locale, 'nav.settings') },
   ]; // 导航项定义结束，数组顺序即侧栏展示顺序
 
-  // 已登录主布局：左侧栏 + 右侧内容区
+  // 主布局常渲染：左侧栏 + 右侧内容区；登录与否只影响侧栏底部与受保护视图的内容
   return (
     // 布局容器
     <div className="layout">
@@ -129,35 +121,60 @@ export function App() {
             </button> // 单个导航按钮结束，回到 map 回调的表达式内部
           ))}{/* 导航项遍历结束 */}
         </nav>{/* 导航容器结束 */}
-        {/* 侧边栏底部：用户信息 + 退出按钮 */}
+        {/* 侧边栏底部：已登录显示用户区与退出；未登录显示访客标识与登录入口 */}
         <div className="sidebar-footer">{/* 吸底容器：margin-top:auto 把它推到侧栏底部 */}
-          {/* 显示名，缺失时回退到 id 前 8 位 */}
-          <span className="user-name">{user.display_name || user.id.slice(0, 8)}</span>{/* 显示名，缺失时回退到 id 前 8 位 */}
-          {/* 区域标识 */}
-          <span className="user-region">{user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 区域标识：cn 显示中国区，其余显示 Global */}
-          {/* 退出登录按钮 */}
-          <button type="button" className="btn ghost block" onClick={handleLogout}>{/* 退出登录按钮：点击后走 handleLogout */}
-            {/* 退出文案（i18n） */}
-            {t(locale, 'action.logout')}{/* 退出文案，走 i18n 词典 */}
-          </button>{/* 退出按钮结束 */}
+          {session ? ( // 已登录分支：用户信息 + 退出按钮
+            <>
+              {/* 显示名，缺失时回退到 id 前 8 位 */}
+              <span className="user-name">{session.user.display_name || session.user.id.slice(0, 8)}</span>{/* 显示名，缺失时回退到 id 前 8 位 */}
+              {/* 区域标识 */}
+              <span className="user-region">{session.user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 区域标识：cn 显示中国区，其余显示 Global */}
+              {/* 退出登录按钮 */}
+              <button type="button" className="btn ghost block" onClick={handleLogout}>{/* 退出登录按钮：点击后走 handleLogout */}
+                {/* 退出文案（i18n） */}
+                {t(locale, 'action.logout')}{/* 退出文案，走 i18n 词典 */}
+              </button>{/* 退出按钮结束 */}
+            </>
+          ) : ( // 访客分支：访客标识 + 登录入口按钮
+            <>
+              {/* 访客标识：未登录时替代用户名展示 */}
+              <span className="user-name">{locale === 'en-US' ? 'Guest' : '未登录'}</span>{/* 访客文案，随语言切换 */}
+              {/* 登录入口：进入 login 伪视图，不污染导航高亮 */}
+              <button type="button" className="btn primary block" onClick={() => setRoute({ view: 'login' })}>{/* 登录按钮：点击切到 login 伪视图 */}
+                {/* 登录文案（复用 auth.login 词条） */}
+                {t(locale, 'auth.login')}{/* 登录文案，走 i18n 词典 */}
+              </button>{/* 登录按钮结束 */}
+            </>
+          )}{/* 已登录 / 访客分支结束 */}
         </div>{/* 侧边栏底部结束 */}
       </aside>{/* 侧边栏结束 */}
 
       {/* 右侧内容区：按当前视图渲染对应页面 */}
       <main className="main">{/* 内容区容器：窄屏断点下与侧栏上下堆叠 */}
-        {/* 功能模块页 */}
+        {/* 功能模块页：公开视图，匿名可浏览（解锁操作在 Store 内按会话显隐） */}
         {route.view === 'store' && <Store locale={locale} />}{/* 功能模块页：展示 Mim 能力模块列表 */}
-        {/* 漫剧 AI 剧工作台 */}
-        {route.view === 'comic' && <ComicWorkbench locale={locale} />}{/* 漫剧 AI 剧工作台：分镜与剧集编辑 */}
-        {/* 站点地图 */}
+        {/* 站点地图：公开视图，后端 /site/* 接口全部免鉴权 */}
         {route.view === 'sitemap' && <SiteMap locale={locale} />}{/* 站点地图：DNSPod 备注结构化视图 */}
-        {/* 设置页，需要用户更新回调 */}
-        {route.view === 'settings' && (
+        {/* 漫剧 AI 剧工作台：仅已登录渲染，未登录由下方内嵌登录兜底 */}
+        {route.view === 'comic' && session && <ComicWorkbench locale={locale} />}{/* 漫剧 AI 剧工作台：分镜与剧集编辑 */}
+        {/* 设置页：仅已登录渲染，需要用户更新回调 */}
+        {route.view === 'settings' && session && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} /> // 设置页：传入用户信息更新回调
         )}{/* 设置页表达式容器结束 */}
+        {/* 未登录访问受保护视图：内容区内嵌登录卡片并给出提示，登录成功后原地解锁 */}
+        {!session && needsAuth && (
+          <div>{/* 内嵌登录容器：提示 + 登录卡片 */}
+            {/* 登录提示：说明当前视图需要登录 */}
+            <p className="hint">{locale === 'en-US' ? 'Sign in to use this section.' : '该功能需登录后使用，请先登录。'}</p>{/* 提示文案，随语言切换 */}
+            {/* 内嵌登录：embedded 去掉整屏背景与最小高度 */}
+            <Login embedded onLogin={handleLogin} />{/* 登录成功走 handleLogin，原地解锁当前视图 */}
+          </div> // 内嵌登录容器结束
+        )}{/* 受保护视图门禁分支结束 */}
+        {/* login 伪视图：未登录时由侧栏「登录」按钮进入，无额外提示 */}
+        {!session && route.view === 'login' && <Login embedded onLogin={handleLogin} />}{/* 伪视图登录成功后回功能模块页 */}
       </main>{/* 内容区结束 */}
     </div> // 布局容器结束，JSX 根元素到此闭合
-  ); // 已登录主布局渲染结束
+  ); // 主布局渲染结束
 } // App 组件结束
 
 // 重新导出 Locale 类型，便于其他模块从 App.tsx 引入

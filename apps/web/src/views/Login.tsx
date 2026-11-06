@@ -15,10 +15,12 @@ import type { LoginResult, Provider, Region } from '../api';
 interface Props {
   // 回调函数：携带用户信息与令牌，由上层切换为已登录视图
   onLogin: (result: LoginResult) => void;
+  // 内嵌模式：true 时去掉整屏最小高度与渐变背景，便于嵌入主布局内容区（默认 false 整屏展示）
+  embedded?: boolean;
 }
 
 // 登录页组件：同时支持「密码登录」与「验证码登录」两种模式
-export function Login({ onLogin }: Props) {
+export function Login({ onLogin, embedded = false }: Props) {
   // 本页语言状态，默认简体中文；顶部按钮可在中英之间切换
   const [locale, setLocale] = useState<Locale>('zh-CN');
   // 账号区域状态，默认中国区；决定账号标识用手机号还是邮箱
@@ -131,10 +133,10 @@ export function Login({ onLogin }: Props) {
     }
   }
 
-  // 渲染登录页：未登录时整个应用只展示这一屏
+  // 渲染登录页：整屏独立展示，或以 embedded 模式内嵌到主布局内容区
   return (
-    // 登录页外层容器：负责整屏居中与背景
-    <div className="auth-wrap">
+    // 登录页外层容器：负责整屏居中与背景；embedded 时仅保留居中能力
+    <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>
       <div className="auth-card">{/* 登录卡片：承载标题、切换器与登录表单 */}
         <div className="auth-head">{/* 卡片头部：品牌信息 + 语言切换 */}
           <div>{/* 品牌信息纵向排列 */}

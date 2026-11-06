@@ -2,8 +2,8 @@
 import { useState } from 'react';
 // 引入 Locale 类型：约束语言取值为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
-// 引入接口客户端与错误文案翻译器
-import { api, errorText } from '../api';
+// 引入接口客户端、错误文案翻译器与会话读取工具（判断匿名态）
+import { api, errorText, getSession } from '../api';
 // 引入通用异步加载钩子：统一处理 loading / error / reload
 import { useAsync } from '../hooks';
 
@@ -43,10 +43,12 @@ function pick(locale: Locale, map: Record<string, string> | undefined, fallback 
 
 // 商城视图：展示可解锁的功能模块，并提供一次性解锁入口
 export function Store({ locale }: Props) {
+  // 是否已登录：匿名态跳过权益接口（该接口需鉴权），并把解锁按钮替换为登录提示
+  const authed = Boolean(getSession());
   // 拉取模块目录；依赖数组为空表示只在挂载时请求一次
   const modulesState = useAsync(() => api.catalog.getModules(), []);
-  // 拉取当前用户已购权益，用于在卡片上标注「已解锁」
-  const entState = useAsync(() => api.catalog.getMyEntitlements(), []);
+  // 拉取当前用户已购权益，用于在卡片上标注「已解锁」；匿名时不发请求、权益视为空，登录态变化时重新拉取
+  const entState = useAsync(() => (authed ? api.catalog.getMyEntitlements() : Promise.resolve(null)), [authed]);
   // 正在解锁的模块编码：用于只禁用被点击的那一个按钮
   const [busyCode, setBusyCode] = useState<string | null>(null);
   // 错误提示：解锁失败时展示，null 表示无错误
@@ -58,7 +60,7 @@ export function Store({ locale }: Props) {
   const modules = (modulesState.data?.modules ?? []) as ModuleCard[];
   // 已解锁模块编码集合：用 Set 让卡片内的判断保持 O(1)
   const unlocked = new Set((entState.data?.entitlements ?? []).map((e) => e.module_code));
-  // 两个接口任一仍在加载即视为整体加载中，避免出现半屏数据
+  // 两个接口任一仍在加载即视为整体加载中（匿名态权益请求立即完成，不阻塞），避免出现半屏数据
   const loading = modulesState.loading || entState.loading;
 
   // 解锁指定模块：一次性买断，成功后刷新权益列表
@@ -134,7 +136,7 @@ export function Store({ locale }: Props) {
                     {locale === 'en-US' ? 'Requires' : '前置'}: {m.requires.join(', ')}{/* 「前置」+ 逗号连接的前置模块编码 */}
                   </p> // 结束前置依赖提示
                 )}{/* 结束前置依赖条件渲染 */}
-                {!owned && ( // 未拥有时才提供解锁按钮
+                {!owned && authed && ( // 已登录且未拥有时才提供解锁按钮
                   <button
                     // 解锁按钮：普通按钮，避免触发表单提交
                     type="button"
@@ -154,6 +156,11 @@ export function Store({ locale }: Props) {
                         : '解锁'}{/* 按钮文案结束 */}
                   </button> // 结束解锁按钮
                 )}{/* 结束解锁按钮条件渲染 */}
+                {!owned && !authed && ( // 匿名访客：展示登录提示替代解锁按钮
+                  <p className="muted small">{/* 弱化的小号提示行 */}
+                    {locale === 'en-US' ? 'Sign in to unlock' : '登录后可解锁'}{/* 匿名解锁提示文案，随语言切换 */}
+                  </p> // 结束匿名提示
+                )}{/* 结束匿名提示条件渲染 */}
               </section> // 结束模块卡片
             );
           })} {/* 结束模块遍历 */}
