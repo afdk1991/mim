@@ -3,16 +3,20 @@
 # 镜像由 GitHub Actions 的 packages job 推送到 ghcr.io/afdk1991/mim-api:latest。
 # 数据库为持久化 PVC（mim-data），挂载到 /app/services/mim-api/data（与 config.ts 的 DATA_DIR 一致）。
 #
-# 应用前需替换 __JWT_SECRET__ 与 __DOMAIN__：
-#   kubectl create namespace mim --dry-run=client -o yaml | kubectl apply -f -
-#   sed -e "s/__JWT_SECRET__/$(openssl rand -hex 32)/" -e "s/__DOMAIN__/mim.example.com/" \
+# 应用前需替换 __NAMESPACE__ / __JWT_SECRET__ / __DOMAIN__ 三个占位符：
+#   sed -e "s/__NAMESPACE__/$SEALOS_NAMESPACE/g" \
+#       -e "s/__JWT_SECRET__/$MIM_JWT_SECRET/g" \
+#       -e "s/__DOMAIN__/$SEALOS_DOMAIN/g" \
 #     deploy/sealos/mim.yaml | kubectl apply -f -
+#
+# 注意：Sealos Cloud 分配给用户的 ServiceAccount 只有自身命名空间（ns-xxxx）的权限，
+# 无法创建 Namespace，因此本清单不再自建命名空间，直接部署到 kubeconfig 所属命名空间。
 
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mim-data
-  namespace: mim
+  namespace: __NAMESPACE__
 spec:
   accessModes:
     - ReadWriteOnce
@@ -24,7 +28,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mim-api
-  namespace: mim
+  namespace: __NAMESPACE__
   labels:
     app: mim-api
 spec:
@@ -87,7 +91,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mim-api
-  namespace: mim
+  namespace: __NAMESPACE__
 spec:
   selector:
     app: mim-api
@@ -100,12 +104,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: mim
-  namespace: mim
+  namespace: __NAMESPACE__
   annotations:
-    # Sealos 内置 ingress-nginx；证书由 Sealos 自动签发
+    # 对齐 Sealos 内置应用的 Ingress 形态：使用 class 注解而非 spec.ingressClassName
+    kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
-  ingressClassName: nginx
+  # Sealos 网关以 *.cloud.sealos.io 通配证书统一终结 TLS
+  tls:
+    - hosts:
+        - __DOMAIN__
+      secretName: wildcard-cloud-sealos-io-cert
   rules:
     - host: __DOMAIN__
       http:

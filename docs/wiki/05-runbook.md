@@ -194,7 +194,7 @@ gh run watch          # 观察最近一次运行
 | Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js` | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
 | Vercel | `vercel.json` | `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` |
 | Render | `render.yaml` | `RENDER_DEPLOY_HOOK` |
-| Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`MIM_JWT_SECRET` |
+| Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`SEALOS_NAMESPACE`、`MIM_JWT_SECRET` |
 | veFaaS | `deploy/vefaas/deploy.sh`（`vefaas login` + `vefaas deploy --appId`） | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID` |
 | IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME` |
 
@@ -208,6 +208,9 @@ gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account id>"
 gh secret set VERCEL_TOKEN --body "<token>"
 gh secret set RENDER_DEPLOY_HOOK --body "<hook url>"
 gh secret set SEALOS_KUBECONFIG --body "$(cat ~/.kube/config)"
+gh secret set SEALOS_DOMAIN --body "mim-<ns>.cloud.sealos.io"
+gh secret set SEALOS_NAMESPACE --body "ns-<xxxx>"
+gh secret set MIM_JWT_SECRET --body "<64 位 hex>"
 gh secret set VE_ACCESS_KEY --body "<volcengine ak>"
 gh secret set VE_SECRET_KEY --body "<volcengine sk>"
 gh secret set VEFAAS_APP_ID --body "app-xxxxx"

@@ -108,7 +108,7 @@ npm run check                             # 版本规约 + 密钥模板校验
 | Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js`，`https://mim-8ah.pages.dev` | ✅ CI 自动发布（`CLOUDFLARE_API_TOKEN` 已配置） |
 | Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`），`https://mim-puce.vercel.app` | ✅ CI 自动发布（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 已配置） |
 | Render | 静态站 + Node 服务 | `render.yaml`（`mim-web` + `mim-api` + 1GiB 持久盘） | ⚙️ 配置就绪，待 `RENDER_DEPLOY_HOOK`（账号需先绑定支付方式完成验证） |
-| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC） | ⚙️ 配置就绪，待 `SEALOS_KUBECONFIG`（账号登录需完成） |
+| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC），命名空间 `ns-i3ywsdfn`，`https://mim-i3ywsdfn.cloud.sealos.io` | ✅ CI 自动发布（`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 已配置） |
 | veFaaS | 容器函数 | `deploy/vefaas/deploy.sh`（`vefaas login` → `vefaas deploy --appId`） | ⚙️ 脚本就绪，待 `VE_ACCESS_KEY` / `VE_SECRET_KEY` / `VEFAAS_APP_ID` |
 | IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name`） | ⚙️ 脚本就绪，待 `IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` |
 | 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ 生产 `https://mim.mixm.top` |
