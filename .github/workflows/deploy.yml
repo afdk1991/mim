@@ -265,6 +265,9 @@ jobs:
           fi
           npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main
 
+      # Vercel：仓库是 pnpm monorepo，在根目录部署会被 Vercel 自动识别出多个 service
+      # （mim-api / mim-web）并与根级构建属性冲突。因此改为「干净静态目录 + 根 vercel.json」部署：
+      # 目录内只有 apps/web/dist 产物与反代/SPA 回退配置，Vercel 视为纯静态站点。
       - name: Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -274,7 +277,14 @@ jobs:
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "SKIP: 缺少 VERCEL_TOKEN"; exit 0
           fi
-          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
+          STATIC_DIR="$RUNNER_TEMP/vercel-static"
+          rm -rf "$STATIC_DIR"
+          mkdir -p "$STATIC_DIR"
+          cp -r apps/web/dist/. "$STATIC_DIR"/
+          cp vercel.json "$STATIC_DIR"/vercel.json
+          # VERCEL_ORG_ID / VERCEL_PROJECT_ID 由 env 注入，CLI 会自动绑定到既有项目
+          cd "$STATIC_DIR"
+          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tail -n 20
 
       - name: Render
         env:
