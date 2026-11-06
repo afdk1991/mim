@@ -689,6 +689,86 @@ function submitLogin(){
   <li>原订阅 features 映射（项目数、视图、提醒推送、协作者数、高级筛选、CSV 导出）随 <code>plans.features</code> 列一并删除；<code>plans</code> 表本身已于 2026-11-05 DROP。</li>
 </ul>
 
+<!-- FR-03.4 站点模块地图小节标题（2026-11-06 新增） -->
+<h4>FR-03.4 站点模块地图（DNSPod 备注结构化）</h4>
+<!-- 目的子标题 -->
+<h4>目的</h4>
+<!-- 目的说明：把域名解析记录里的「备注」变成产品内的模块导航，避免运维信息散落在 DNS 控制台 -->
+<p>把 DNSPod 导出记录（<code>dnspod_records_2026-11-05_21-42-26.xls</code>）中的「备注 / 主机记录 / 解析值」结构化为产品内的<strong>站点模块地图</strong>，使每个子域名的用途、归属分类与线上地址在应用内可检索、可分组、可跳转，不再依赖 DNS 控制台查看备注。</p>
+<!-- 数据来源子标题 -->
+<h4>数据来源</h4>
+<!-- 数据来源清单 -->
+<ul>
+  <!-- 来源文件与规模：两个 zone、每个 zone 45 条主机记录 -->
+  <li>来源：DNSPod 导出 <code>dnspod_records_2026-11-05_21-42-26.xls</code>，共 <strong>2 个解析 zone</strong>（<code>laal.top</code> 默认值 <code>103.0.113.10</code>、<code>mixm.top</code> 默认值 <code>103.0.113.20</code>），每个 zone <strong>45 条</strong>主机记录。</li>
+  <!-- 模块粒度：同名主机在两个 zone 下合并为一个模块 -->
+  <li>模块粒度：按「主机记录」去重，两个 zone 下同名主机的记录合并为<strong>一个模块</strong>，因此模块总数 = <strong>45</strong>（不是 90）。</li>
+  <!-- 备注拆解：模块级备注取首句为主名、余下为说明；记录级备注用于覆盖个别 zone 的差异 -->
+  <li>备注拆解：模块级备注拆为 <code>label</code>（首段，模块名）+ <code>description</code>（余下，用途说明）；个别记录另有备注时落到 record 级 <code>label</code> / <code>description</code>（例：<code>gy.mixm.top</code> 为 <code>CNAME</code> 指向 <code>gale-engine-landing-*.edgeone.cool.</code>，备注「工具模块核心入口，疾风引擎承载节点」）。</li>
+</ul>
+<!-- 分类与规模子标题 -->
+<h4>分类与规模</h4>
+<!-- 八分类计数表 -->
+<table>
+  <!-- 表头：分类 / 计数字段 -->
+  <tr><th style="width:22%">分类（zh / en）</th><th style="width:12%">id</th><th>模块数</th></tr>
+  <!-- 门户与入口 -->
+  <tr><td>门户与入口 / Portal &amp; Entry</td><td><code>portal</code></td><td>6</td></tr>
+  <!-- 身份与权限 -->
+  <tr><td>身份与权限 / Identity &amp; Access</td><td><code>identity</code></td><td>2</td></tr>
+  <!-- 运营后台 -->
+  <tr><td>运营后台 / Operations Console</td><td><code>ops</code></td><td>8</td></tr>
+  <!-- 接口与开发 -->
+  <tr><td>接口与开发 / API &amp; Developer</td><td><code>api</code></td><td>5</td></tr>
+  <!-- 内容与媒体 -->
+  <tr><td>内容与媒体 / Content &amp; Media</td><td><code>content</code></td><td>7</td></tr>
+  <!-- 电商与交易 -->
+  <tr><td>电商与交易 / Commerce &amp; Trade</td><td><code>commerce</code></td><td>7</td></tr>
+  <!-- 数据与存储 -->
+  <tr><td>数据与存储 / Data &amp; Storage</td><td><code>data</code></td><td>4</td></tr>
+  <!-- 工具与服务 -->
+  <tr><td>工具与服务 / Tools &amp; Services</td><td><code>tools</code></td><td>6</td></tr>
+  <!-- 合计行：6+2+8+5+7+7+4+6 = 45 -->
+  <tr><td><strong>合计</strong></td><td>—</td><td><strong>45</strong></td></tr>
+</table>
+<!-- 接口契约子标题 -->
+<h4>接口契约（免鉴权只读）</h4>
+<!-- 三条路由表 -->
+<table>
+  <!-- 表头：方法路径 / 返回结构 / 说明 -->
+  <tr><th style="width:34%">方法 / 路径</th><th style="width:34%">返回结构</th><th>说明</th></tr>
+  <!-- 概览：zone 与分类聚合 -->
+  <tr><td><code>GET /api/v1/site/overview</code></td><td><code>{ total, zones[], categories[] }</code></td><td>zone 列表（含默认解析值与计数）与 8 个分类的计数聚合</td></tr>
+  <!-- 全量模块：支持 zone / category 过滤 -->
+  <tr><td><code>GET /api/v1/site/modules</code></td><td><code>{ total, module_total, filters, items[] }</code></td><td>全量 45 条模块；<code>?zone=</code> / <code>?category=</code> 过滤，非法 zone 返回 <strong>400</strong></td></tr>
+  <!-- 单模块：按 host 精确查询 -->
+  <tr><td><code>GET /api/v1/site/modules/:host</code></td><td><code>{ module: {...} }</code></td><td>单模块详情；未知 host 返回 <strong>404</strong></td></tr>
+</table>
+<!-- 前端行为子标题 -->
+<h4>前端行为（站点地图视图）</h4>
+<!-- 交互规则清单 -->
+<ul>
+  <!-- 一次性拉取 + 客户端筛选，避免每输入一次就请求后端 -->
+  <li>一次拉取全量 45 条，zone / 分类 / 关键词三级筛选全部在客户端完成，筛选结果实时反映在页头徽标（<code>命中数 / 总数</code>）。</li>
+  <!-- 关键词检索覆盖面 -->
+  <li>关键词检索覆盖：主机记录、模块备注（<code>label</code> + <code>description</code>）、每条记录的 <code>fqdn</code> / <code>record_value</code> / record 级备注；大小写不敏感。</li>
+  <!-- 分组展示与空分组剔除 -->
+  <li>结果按分类分组渲染，空分组自动剔除；每个模块卡片展示模块备注、两个 zone 的解析类型与解析值，并给出 <code>https://&lt;fqdn&gt;</code> 外链。</li>
+  <!-- 双语：分类名与界面文案随 locale 切换 -->
+  <li>分类名与界面文案随全局 <code>locale</code> 双语切换（<code>zh-CN</code> / <code>en-US</code>）。</li>
+</ul>
+<!-- 边界与验收子标题 -->
+<h4>边界与验收</h4>
+<!-- 验收点清单 -->
+<ul>
+  <!-- 接口级契约测试 -->
+  <li>契约测试：<code>services/mim-api/test/site.test.ts</code> 覆盖三条路由的结构、计数（45）、过滤与 404 / 400 分支。</li>
+  <!-- 线上取证口径 -->
+  <li>线上验收：<code>/site/overview</code> 返回 <code>total=45</code> 且 8 分类计数合计 45；<code>/site/modules</code> 返回 <code>items</code> 长度 45；未知 host 返回 404、非法 zone 返回 400。</li>
+  <!-- 数据维护方式：xls 更新后需同步 site.ts 常量 -->
+  <li>数据维护：DNSPod 记录变更后，需同步更新 <code>services/mim-api/src/site.ts</code> 中的 <code>SITE_MODULES</code> / <code>SITE_CATEGORIES</code> 常量并跑契约测试（当前无自动导入 xls 的管线）。</li>
+</ul>
+
 <!-- FR-04 多端体验一致性小节标题 -->
 <h3>FR-04 多端体验一致性</h3>
 
