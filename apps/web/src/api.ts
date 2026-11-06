@@ -349,49 +349,83 @@ export interface RunJobResult {
 
 // ---------- 站点模块地图（site）类型，对齐 routes/site.ts 与 src/site.ts ----------
 
+// zone 维度概览：laal.top / mixm.top
 export interface SiteZone {
+  // zone 标识，如 laal.top
   id: string;
+  // zone 根域名（与 id 同值）
   apex: string;
+  // 该 zone 的默认 A 记录值（IP）
   default_record_value: string;
+  // 该 zone 下存在解析记录的模块数量
   count: number;
 }
 
+// 分类维度概览：8 个站点分类
 export interface SiteCategory {
+  // 分类标识，如 tools
   id: string;
+  // 分类双语名称
   name: { zh: string; en: string };
+  // 该分类下的模块数量
   count: number;
 }
 
+// GET /site/overview 的响应结构
 export interface SiteOverview {
+  // 模块总数（45）
   total: number;
+  // 两个 zone 的概览
   zones: SiteZone[];
+  // 8 个分类的概览
   categories: SiteCategory[];
 }
 
+// 单条 DNS 解析记录（一个模块在某个 zone 下的记录）
 export interface SiteRecord {
+  // 记录所属 zone
   zone: string;
+  // 完整域名，如 api.laal.top / laal.top
   fqdn: string;
+  // 记录类型：A 或 CNAME
   record_type: 'A' | 'CNAME';
+  // 解析目标：A 为 IP，CNAME 为别名域名
   record_value: string;
+  // 生存时间（秒）
   ttl: number;
+  // record 级备注第一段（仅差异记录存在）
   label?: string;
+  // record 级备注第二段（仅差异记录存在）
   description?: string;
 }
 
+// 单个站点模块（主机 + 多 zone 记录聚合）
 export interface SiteModuleItem {
+  // 主机名（不含 zone），根域名为 '@'
   host: string;
+  // 所属分类 id
   category: string;
+  // 分类双语名称
   category_name: { zh: string; en: string };
+  // 备注第一段：模块定位
   label: string;
+  // 备注第二段：站点说明
   description: string;
+  // https 入口地址，与 records 一一对应
   urls: string[];
+  // 该模块的解析记录明细
   records: SiteRecord[];
 }
 
+// GET /site/modules 的响应结构
 export interface SiteModuleList {
+  // 当前过滤条件下的命中数量
   total: number;
+  // 全量模块数量（45）
   module_total: number;
+  // 回显生效的过滤条件
   filters: { zone: string | null; category: string | null; q: string | null };
+  // 模块列表本体
   items: SiteModuleItem[];
 }
 
@@ -700,13 +734,21 @@ export const api = {
     },
     /** GET /site/modules?zone=&category=&q=：模块列表（可组合过滤） */
     listModules(opts: { zone?: string; category?: string; q?: string } = {}) {
+      // 用 URLSearchParams 安全拼接查询串，自动做 encode
       const qs = new URLSearchParams();
+      // zone 过滤：存在才写入，避免空参数
       if (opts.zone) qs.set('zone', opts.zone);
+      // category 过滤：存在才写入
       if (opts.category) qs.set('category', opts.category);
+      // 关键词过滤：存在才写入
       if (opts.q) qs.set('q', opts.q);
+      // 生成查询串；无参数时为空串
       const suffix = qs.toString();
+      // 有查询串则拼 ?，无则直接请求列表路径
       return request<SiteModuleList>(`/site/modules${suffix ? `?${suffix}` : ''}`, {
+        // 公开只读接口，不带鉴权头
         auth: false,
+        // 只读 GET，无需幂等键
         idempotency: false,
       });
     },

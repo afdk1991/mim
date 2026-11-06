@@ -54,7 +54,8 @@ f:\合并项目\Mim
 ├── scripts/
 │   ├── version-check.mjs          # 铁律四版本规约校验器
 │   ├── env-check.mjs              # 09 清单 §0 密钥模板校验器
-│   └── build.mjs                  # site/ → dist/ 离线阅读构建（非生产）
+│   ├── comment-check.mjs          # 铁律十一注释覆盖率校验器（基线 / --strict）
+│   └── build.mjs                  # 默认：apps/web/dist → dist/（真实前端）；--site：site/ → dist/（PRD 离线。
 └── site/                          # PRD 可视化载体（离线副本，非生产站点）
 ```
 

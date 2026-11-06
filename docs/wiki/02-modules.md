@@ -6,7 +6,7 @@
 
 | 模块 | 类型 | 职责 | 关键产出 |
 |---|---|---|---|
-| `AGENTS.md` | 治理 | 定义 8 条协作铁律，对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
+| `AGENTS.md` | 治理 | 定义 11 条协作铁律（含免费平台额度矩阵、全仓库逐行注释），对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
 | `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 12 例契约测试通过；端口 8787 |
 | `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅设置页）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
@@ -14,7 +14,8 @@
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
 | `scripts/env-check.mjs` | 可执行代码 | 09 清单 §0（密钥治理硬约束）的自动校验器 | 退出码 0/1；校验 `.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性 |
-| `scripts/build.mjs` | 可执行代码 | 静态站点构建脚本：把 `site/` 递归复制到 `dist/`（本地预览） | `dist/index.html` + `dist/prd.html`，供 `npm run build` 调用 |
+| `scripts/comment-check.mjs` | 可执行代码 | 铁律十一（全仓库逐行注释）的覆盖率校验器：逐文件统计「可注释行 / 已解释行」 | 退出码 0（基线）/ 1（`--strict` 低于阈值）；逐文件覆盖率与缺口清单 |
+| `scripts/build.mjs` | 可执行代码 | 根级构建脚本：默认构建真实前端并把 `apps/web/dist` 递归复制到根 `dist/`（EdgeOne Pages 等 OutputDir=dist 的平台同款链路）；`--site` 模式才把 `site/` 复制到 `dist/` | 根 `dist/index.html`（真实应用）+ `dist/assets/*`，供 `npm run build` 调用 |
 | `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check`）；`packageManager: pnpm@9.12.0`；版本号 `0.0.0` 为 `version-check.mjs` 的校验源 | 零 dependencies，脚本转发到各 workspace |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `tsconfig.base.json` | 配置 | 声明 `apps/*`、`services/*`、`packages/*`；锁定依赖版本；共享 TS 编译基线 | 可复现安装与类型检查 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
@@ -32,7 +33,7 @@
 
 ## 1. AGENTS.md — 协作铁律（最高优先级）
 
-九条铁律的层级关系：
+十一条铁律的层级关系：
 
 1. **铁律一（最高位）**：AI 负责执行，不得把「请你提供/请你操作」作为唯一推进路径；说「不可达」必须附取证证据。仅当外部服务需用户私有 OAuth/SSH 凭证时才可请求用户提供，且须附已尝试证据
 2. **铁律二**：可逆操作直接做；不可逆/结构性操作先出计划 + 影响清单，获授权后执行
@@ -43,6 +44,8 @@
 7. **铁律七**：功能模块增删必须全量同步全部受影响工件，交付报告附同步清单
 8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），禁止以本地预览作为交付终点；无线上取证不得宣称「已上线」
 9. **铁律九**：多平台部署矩阵只走免费方案（9 个平台），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证
+10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 4 个（GitHub / GitLab / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核
+11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」
 
 **冲突裁决**：铁律五与铁律一冲突时（如沙箱无网络），执行优先，允许本地实现但必须在交付报告标注「已偏离铁律五」及理由。
 
@@ -75,6 +78,15 @@
 8. 本地 `.env` 存在性探测（只探测存在性，绝不读取内容）
 
 与 `version-check.mjs` 的差异：本脚本**不调用 git**，只读三个本地文件（`.env.example`、09 清单、`.gitignore`）。完整说明见 [03-code-reference.md](./03-code-reference.md) §7。
+
+### 2.3 scripts/comment-check.mjs — 注释覆盖率校验器
+
+铁律十一（全仓库逐行注释与解释）的落地工具。扫描范围 `apps/`、`services/`、`packages/`、`scripts/`、`site/` 及根目录 `Mim-PRD.html`，扩展名 `.ts/.tsx/.js/.jsx/.mjs/.cjs/.css/.html`，跳过 `node_modules` / `dist` / `build` / `coverage` / `.git` / `.vite` / `.turbo`。
+
+- 逐行判定：`//` 行注释、`/* */` 块注释（含跨行状态机）、上一行纯注释覆盖本行均计为「已解释」
+- 豁免：锁文件、二进制、数据文件、纯 `*.md`、`.env.example`
+- 默认阈值 80%；默认基线模式退出码恒 `0`，`--strict` 低于阈值退出 `1`（CI 门禁）
+- 输出：总体覆盖率 + 「缺口 Top 20」逐文件清单
 
 ## 3. Mim-PRD.html — 产品需求文档
 
@@ -111,12 +123,14 @@
 ```
 AGENTS.md (铁律四) ──强制──> scripts/version-check.mjs ──校验──> package.json / VERSION(未来) + git tags
 AGENTS.md (铁律七) + 09清单§0 ──强制──> scripts/env-check.mjs ──校验──> .env.example ↔ 09清单 ↔ .gitignore
-README.md ──引用──> AGENTS.md + version-check.mjs + env-check.mjs
+AGENTS.md (铁律十一) ──强制──> scripts/comment-check.mjs ──扫描──> apps/ services/ packages/ scripts/ site/ *.html
+README.md ──引用──> AGENTS.md + version-check.mjs + env-check.mjs + comment-check.mjs
 Mim-PRD.html ◂──论据── 两份 txt 调研
 team-hiring-plan.md ◂──论据── 全栈项目人员配置指南 txt
 docs/wiki/README.md ──索引──> docs/wiki/01~09（其中 08 引用 07/01，09 引用 04）
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
-package.json (build) ──调用──> scripts/build.mjs ──复制──> dist/（site/ 静态站，本地阅读用）
+package.json (build) ──调用──> scripts/build.mjs ──构建并复制──> dist/（真实前端 apps/web/dist，生产与 EdgeOne Pages 同款）
+package.json (build:site) ──调用──> scripts/build.mjs --site ──复制──> dist/（site/ PRD 阅读页，仅离线预览）
 AGENTS.md (铁律八) ──强制──> .github/workflows/deploy.yml ──SSH──> deploy/deploy.sh ──构建/发布──> /opt/mim/web + systemd mim-api ──反代──> https://mim.mixm.top
 deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 + certbot HTTPS + 首发布
 deploy/backup-db.sh ──备份──> services/mim-api/data/mim.db（WAL 一致性快照）
@@ -126,15 +140,15 @@ deploy/backup-db.sh ──备份──> services/mim-api/data/mim.db（WAL 一�
 
 ## 7. site/、构建脚本与业务代码 — 本地预览 vs 功能产品
 
-> 本仓库是**已上线生产的功能产品**：前端 `apps/web`、后端 `services/mim-api`、数据库 SQLite 三者共同部署在 `https://mim.mixm.top`（详见 §7.1）。`site/` 与 `scripts/build.mjs` 只是 PRD 的离线阅读副本，不参与生产。
+> 本仓库是**已上线生产的功能产品**：前端 `apps/web`、后端 `services/mim-api`、数据库 SQLite 三者共同部署在 `https://mim.mixm.top`（详见 §7.1）。根 `dist/` 由 `npm run build`（`scripts/build.mjs`）从真实前端 `apps/web/dist` 生成，EdgeOne Pages（`data.mixm.top`）与生产同源；`site/` 只是 PRD 的离线阅读副本，仅由 `npm run build:site` 产出，**不参与任何生产托管**。
 
 | 文件 | 说明 |
 |---|---|
 | `apps/web` + `services/mim-api` | 实际功能代码；生产运行方式见 §7.1 与 [05-runbook.md](./05-runbook.md) §6 |
 | `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**） |
 | `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**） |
-| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`；`build:web` / `build:all` / `deploy` / `deploy:bootstrap` 指向生产链路 |
-| `scripts/build.mjs` | 把 `site/` 递归复制到 `dist/`，零依赖，仅用于离线阅读构建 |
+| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`（真实前端 → 根 `dist/`）；`build:site` 为 PRD 阅读页离线构建；`build:web` / `deploy` / `deploy:bootstrap` 指向生产链路 |
+| `scripts/build.mjs` | 默认：`pnpm --filter @mim/web build` → 把 `apps/web/dist` 递归复制到根 `dist/`；`--site`：把 `site/` 复制到根 `dist/`（PRD 离线阅读）。零第三方依赖 |
 
 两个 HTML 均**不含业务密钥**。
 

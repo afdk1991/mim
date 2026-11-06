@@ -237,7 +237,7 @@
   <tr><td>GitHub 仓库</td><td>源码主仓</td><td><code>github.com/afdk1991/mim</code></td></tr>
   <tr><td>GitHub Pages</td><td>前端静态站</td><td>CI job <code>pages</code>，<code>afdk1991.github.io/mim/</code></td></tr>
   <tr><td>GitHub Packages</td><td>容器镜像</td><td>CI job <code>packages</code>，<code>ghcr.io/afdk1991/mim-api</code></td></tr>
-  <tr><td>腾讯云 EdgeOne Pages</td><td>静态站 <code>site/</code></td><td>EdgeOne 控制台已连接仓库，<code>data.mixm.top</code></td></tr>
+  <tr><td>腾讯云 EdgeOne Pages</td><td>真实前端 <code>apps/web/dist</code></td><td>EdgeOne 控制台已连接仓库（构建 <code>npm install &amp;&amp; npm run build</code>，输出 <code>dist</code>，由 <code>scripts/build.mjs</code> 产自真实前端），<code>data.mixm.top</code></td></tr>
   <tr><td>Cloudflare Pages / Workers</td><td>前端 + <code>/api</code> 反代</td><td><code>wrangler.toml</code> + <code>functions/api/[[path]].js</code></td></tr>
   <tr><td>Vercel</td><td>前端 + <code>/api</code> rewrite</td><td><code>vercel.json</code></td></tr>
   <tr><td>Render</td><td>静态站 + Node 服务 + 持久盘</td><td><code>render.yaml</code></td></tr>

@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:web": "pnpm --filter @mim/web build",
-    "build:all": "pnpm build && pnpm build:web",
+    "build:site": "node scripts/build.mjs --site",
     "deploy": "bash deploy/deploy.sh",
     "deploy:bootstrap": "bash deploy/bootstrap.sh",
     "dev": "pnpm --filter @mim/api dev",
@@ -17,7 +17,8 @@
     "typecheck": "pnpm -r typecheck",
     "check:version": "node scripts/version-check.mjs",
     "check:env": "node scripts/env-check.mjs",
-    "check": "node scripts/version-check.mjs && node scripts/env-check.mjs"
+    "check:comments": "node scripts/comment-check.mjs",
+    "check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs"
   },
   "engines": {
     "node": ">=20"
