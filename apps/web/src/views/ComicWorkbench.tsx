@@ -129,14 +129,14 @@ export function ComicWorkbench({ locale }: Props) {
       listState.reload();
       // 自动选中新工程，右栏立即进入创作界面。
       setSelectedId(result.project.id);
-    } catch (err) {
+    } catch (err) { // 捕获创建接口异常，转成当前语言的可读提示
       // 接口失败时把错误转换成当前语言的文案展示。
       setError(errorText(locale, err));
-    } finally {
+    } finally { // 无论成功或失败都复位创建中的加载态
       // 无论成功还是失败都退出加载态。
       setBusy(false);
-    }
-  }
+    } // 结束创建工程的 try 块
+  } // 结束 handleCreate 处理函数
 
   // 删除工程：先二次确认，成功后刷新列表并按需清空选中态。
   async function handleDelete(id: string) {
@@ -150,11 +150,11 @@ export function ComicWorkbench({ locale }: Props) {
       listState.reload();
       // 若删除的正是当前选中工程，则清空选中，避免右栏展示已删除数据。
       if (selectedId === id) setSelectedId(null);
-    } catch (err) {
+    } catch (err) { // 捕获删除接口异常并提示用户
       // 删除失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束删除工程的 try 块
+  } // 结束 handleDelete 处理函数
 
   // 仅在首次加载（尚无数据）时占位；reload 期间保留已渲染的列表与详情，
   // 避免卸载 ProjectDetail 导致当前标签页被重置回「创作」。
@@ -204,13 +204,13 @@ export function ComicWorkbench({ locale }: Props) {
               onChange={/* 同步标题到本地状态，供创建按钮判断可用性 */ (e) => setNewTitle(e.target.value)}
               placeholder={/* 占位文案：提示输入工程标题 */ locale === 'en-US' ? 'New project title…' : '新工程标题…'}
               disabled={/* 请求进行中禁用，避免并发创建 */ busy}
-            />
+            />{/* 新建工程标题输入框结束 */}
             {/* 创建按钮：标题为空或请求进行中时禁用，避免无效提交 */}
             <button type="button" className="btn primary" onClick={handleCreate} disabled={busy || !newTitle.trim()}>{/* 创建按钮：提交新建请求 */}
               {/* 按钮文案：加号 + 新建 */}
               + {locale === 'en-US' ? 'Create' : '新建'}
-            </button>
-          </div>
+            </button>{/* 创建按钮结束 */}
+          </div>{/* 新建表单行结束 */}
 
           {/* 工程卡片列表：点击整行切换右栏详情 */}
           <ul className="list">{/* 工程列表容器 */}
@@ -245,9 +245,9 @@ export function ComicWorkbench({ locale }: Props) {
                   >{/* 删除按钮：小号危险样式 */}
                     {/* 删除图标：用乘号表示移除 */}
                     ×
-                  </button>
+                  </button>{/* 删除按钮结束 */}
                 </div>{/* 次信息区结束 */}
-              </li>
+              </li> // 工程条目渲染结束
             // 关闭 map 回调与 JSX 表达式容器。
             ))}
             {/* 空列表引导：提示用户先创建工程 */}
@@ -256,8 +256,8 @@ export function ComicWorkbench({ locale }: Props) {
               <li className="hint">{/* 空态提示：引导先创建工程 */}{locale === 'en-US' ? 'No projects yet. Create one above.' : '尚无工程，在上方创建。'}</li>
             // 关闭空态条件渲染。
             )}
-          </ul>
-        </section>
+          </ul>{/* 工程列表结束 */}
+        </section>{/* 左栏面板结束 */}
 
         {/* 右栏：选中工程详情 */}
         <section className="panel col-8">{/* 右栏面板：选中工程详情 */}
@@ -274,7 +274,7 @@ export function ComicWorkbench({ locale }: Props) {
       </div>{/* 分栏容器结束 */}
     </div>
   );
-}
+} // 结束 ComicWorkbench 组件函数
 
 // ---------- 工程详情（创作 / 生成任务 / 成片 三个标签页） ----------
 
@@ -292,7 +292,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
   useEffect(() => {
     // 重置标签，避免沿用上一个工程的浏览位置造成误解。
     setTab('create');
-  }, [projectId]);
+  }, [projectId]); // 工程 id 变化时重新拉取详情，保证右栏数据跟随选中项
 
   // reload 期间保留已渲染内容，避免 JobsTab/FilmsTab 被卸载后丢失输入与轮询状态。
   if (!detailState.data) {
@@ -310,7 +310,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
     detailState.reload();
     // 通知父组件重载工程列表，保持标题与状态同步。
     onChange();
-  };
+  }; // 结束 reload 闭包定义，供子组件在数据变更后回调刷新
 
   // 标签页 → 双语显示名映射。
   const TAB_LABEL: Record<DetailTab, Record<Locale, string>> = {
@@ -353,8 +353,8 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
             {/* 当前语言下的标签名称 */}
             {TAB_LABEL[t][locale]}
           </button>
-        ))}
-      </div>
+        ))}{/* 结束标签页按钮的遍历渲染 */}
+      </div>{/* 标签栏结束 */}
 
       {/* 创作页：只在激活时挂载，避免无关请求 */}
       {tab === 'create' && ( /* 仅激活时挂载创作页 */
@@ -385,7 +385,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
       )}
     </div>
   );
-}
+} // 结束 ProjectDetail 组件函数
 
 // ---------- 创作标签页：角色设定 + AI 建议 ----------
 
@@ -399,7 +399,7 @@ function CreateTab({
   characters,
   // 新增角色成功后的回调，用于刷新父级详情。
   onChanged,
-}: {
+}: { // 子组件入参类型声明开始
   // 语言类型声明。
   locale: Locale;
   // 工程 id 类型声明。
@@ -408,7 +408,7 @@ function CreateTab({
   characters: Array<{ id: string; name: string; appearance_prompt: string }>;
   // 变更回调类型。
   onChanged: () => void;
-}) {
+}) { // 入参类型声明结束，进入 ProjectDetail 函数体
   // AI 建议种类，默认请求分镜表。
   const [suggestKind, setSuggestKind] = useState<SuggestKind>('storyboard');
   // 建议请求的可选提示词，可为空。
@@ -445,14 +445,14 @@ function CreateTab({
       const result = await api.comic.suggest(projectId, suggestKind, suggestPrompt);
       // 以两空格缩进格式化 JSON，提升可读性。
       setSuggestResult(JSON.stringify(result.suggestion, null, 2));
-    } catch (err) {
+    } catch (err) { // 捕获新增角色接口异常
       // 失败时展示按语言转换后的错误文案。
       setSuggestError(errorText(locale, err));
-    } finally {
+    } finally { // 无论成功或失败都复位角色提交的加载态
       // 退出加载态。
       setSuggestBusy(false);
-    }
-  }
+    } // 结束新增角色的 try 块
+  } // 结束 handleAddCharacter 处理函数
 
   // 添加角色：名称与外观描述都必填，成功后清空输入并刷新详情。
   async function handleAddCharacter() {
@@ -479,14 +479,14 @@ function CreateTab({
       setCharMsg(locale === 'en-US' ? 'Character added ✓' : '角色已添加 ✓');
       // 通知父级刷新详情，使新角色出现在下方列表。
       onChanged();
-    } catch (err) {
+    } catch (err) { // 捕获 AI 建议请求异常
       // 失败时展示错误文案。
       setCharError(errorText(locale, err));
-    } finally {
+    } finally { // 无论成功或失败都复位生成建议的加载态
       // 退出加载态。
       setCharBusy(false);
-    }
-  }
+    } // 结束生成建议的 try 块
+  } // 结束 handleSuggest 处理函数
 
   // 创作页渲染：角色区块 + AI 建议区块。
   return (
@@ -551,11 +551,11 @@ function CreateTab({
                   {/* 外观提示词：灰字小号展示，便于核对生成一致性 */}
                   <span className="muted small">{/* 外观提示词 */}{c.appearance_prompt}</span>
                 </div>{/* 主信息区结束 */}
-              </li>
-            ))}
+              </li> // 角色条目渲染结束
+            ))}{/* 结束角色列表的遍历渲染 */}
           </ul>
         )}
-      </section>
+      </section>{/* 角色区块结束 */}
 
       {/* AI 建议 */}
       <section className="sub-panel">{/* AI 建议区块：表单与结果 */}
@@ -587,7 +587,7 @@ function CreateTab({
           <button type="button" className="btn primary" onClick={handleSuggest} disabled={suggestBusy}>{/* 生成建议按钮 */}
             {suggestBusy ? (locale === 'en-US' ? 'Generating…' : '生成中…') : locale === 'en-US' ? 'Generate' : '生成建议'}
           </button>
-        </div>
+        </div>{/* 建议表单行结束 */}
 
         {/* 建议请求的错误提示 */}
         {suggestError && <p className="error">{suggestError}</p>}{/* 建议请求错误提示 */}
@@ -599,10 +599,10 @@ function CreateTab({
             <code>{/* JSON 文本本体 */}{suggestResult}</code>
           </pre>
         )}
-      </section>
+      </section>{/* AI 建议区块结束 */}
     </div>
   );
-}
+} // 结束 CreateTab 组件函数
 
 // ---------- 生成任务标签页：列表 / 创建 / 状态机操作 ----------
 
@@ -620,7 +620,7 @@ function JobsTab({
   onProjectChange,
   // 仅刷新详情：轮询时使用，避免整列表重载打断输入。
   onProjectRefresh,
-}: {
+}: { // 任务面板入参类型声明开始
   // 语言类型声明。
   locale: Locale;
   // 工程 id 类型声明。
@@ -633,7 +633,7 @@ function JobsTab({
   onProjectChange: () => void;
   /** 仅重载工程详情（不重载左侧列表），用于轮询时同步工程状态 */
   onProjectRefresh: () => void;
-}) {
+}) { // 入参类型声明结束，进入 JobsTab 函数体
   // 拉取当前工程的生成任务列表；切换工程时自动重载。
   const jobsState = useAsync(() => api.comic.listJobs(projectId), [projectId]);
   // 空数组兜底，保证下方 some/map 安全调用。
@@ -654,10 +654,10 @@ function JobsTab({
       reloadJobs();
       // 刷新工程详情，使工程状态与成片门槛同步。
       onProjectRefresh();
-    }, 3000);
+    }, 3000); // 每 3 秒轮询一次，及时反映排队/运行中任务的最新状态
     // 清理函数：活跃状态结束或组件卸载时停止轮询，避免内存泄漏。
     return () => clearInterval(timer);
-  }, [hasActive, reloadJobs, onProjectRefresh]);
+  }, [hasActive, reloadJobs, onProjectRefresh]); // 仅当存在活跃任务时开启轮询，避免无谓请求
 
   // 待派发的任务类型，默认文本。
   const [jobType, setJobType] = useState<JobType>('text');
@@ -712,14 +712,14 @@ function JobsTab({
       reloadJobs();
       // 刷新工程详情与左侧列表，同步状态变化。
       onProjectChange();
-    } catch (err) {
+    } catch (err) { // 捕获派发任务接口异常
       // 派发失败时展示错误文案。
       setError(errorText(locale, err));
-    } finally {
+    } finally { // 无论成功或失败都复位派发按钮的加载态
       // 退出加载态。
       setBusy(false);
-    }
-  }
+    } // 结束派发任务的 try 块
+  } // 结束 handleDispatch 处理函数
 
   /** 取消 / 重试走 comic 域端点；start/complete/fail 骨架端点已由 ai-orchestrator 接管，UI 不再暴露 */
   async function handleAction(job: GenerationJob, action: 'cancel' | 'retry') {
@@ -737,11 +737,11 @@ function JobsTab({
       reloadJobs();
       // 同步刷新工程详情与左侧列表。
       onProjectChange();
-    } catch (err) {
+    } catch (err) { // 捕获「立即运行」接口异常
       // 动作失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束立即运行的 try 块
+  } // 结束 handleRun 处理函数
 
   /** 立即运行：同步触发 ai-orchestrator 执行（POST /ai/jobs/:id/run）；成本超限 / provider 未配置等失败原因透传 */
   async function handleRun(job: GenerationJob) {
@@ -767,11 +767,11 @@ function JobsTab({
       reloadJobs();
       // 同步刷新工程详情与左侧列表。
       onProjectChange();
-    } catch (err) {
+    } catch (err) { // 捕获取消任务接口异常
       // 请求本身失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束取消任务的 try 块
+  } // 结束 handleCancel 处理函数
 
   /** 下载成功产物：预签名 GET → 新窗口打开 */
   async function handleDownload(objectKey: string) {
@@ -783,11 +783,11 @@ function JobsTab({
       const res = await api.media.presignDownload(objectKey);
       // 新窗口打开地址；noopener 防止被打开页面通过 window.opener 反向操控。
       window.open(res.download.url, '_blank', 'noopener');
-    } catch (err) {
+    } catch (err) { // 捕获预签名下载地址请求异常
       // 预签名失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束预签名下载的 try 块
+  } // 结束 handleDownload 处理函数
 
   /** draft 工程快捷入口：写入一条示例分镜并确认，使工程进入 storyboarded 后才可派发任务 */
   async function handleQuickConfirm() {
@@ -812,14 +812,14 @@ function JobsTab({
       setMessage(locale === 'en-US' ? 'Storyboard confirmed ✓' : '分镜已确认 ✓');
       // 刷新工程详情与左侧列表，使状态徽标更新。
       onProjectChange();
-    } catch (err) {
+    } catch (err) { // 捕获写入示例分镜接口异常
       // 保存失败时展示错误文案。
       setError(errorText(locale, err));
-    } finally {
+    } finally { // 无论成功或失败都复位示例分镜按钮的加载态
       // 退出加载态。
       setBusy(false);
-    }
-  }
+    } // 结束示例分镜的 try 块
+  } // 结束 seedSampleStoryboard 处理函数
 
   // 任务页渲染：派发区块 + 任务列表区块。
   return (
@@ -901,7 +901,7 @@ function JobsTab({
                 {/* 不支持时补一句提示，避免用户以为是故障 */}
                 {!typeSupported(t) ? (locale === 'en-US' ? ' (unsupported)' : '（不支持）') : ''}
               </option>
-            ))}
+            ))}{/* 结束任务类型下拉项的遍历渲染 */}
           </select>
           <input /* 派发提示词输入框：可选 */
             value={/* 受控值：派发提示词 */ prompt}
@@ -914,7 +914,7 @@ function JobsTab({
             {busy ? (locale === 'en-US' ? 'Dispatching…' : '派发中…') : locale === 'en-US' ? 'Dispatch' : '派发'}
           </button>
         </div>
-      </section>
+      </section>{/* 派发任务区块结束 */}
 
       {/* 任务列表区块 */}
       <section className="sub-panel">{/* 任务列表区块 */}
@@ -950,7 +950,7 @@ function JobsTab({
                 <span className="muted small">{/* 创建时间：本地化字符串 */}{new Date(job.created_at).toLocaleString()}</span>
                 {/* 失败任务的错误码，便于快速判断原因 */}
                 {job.error_code && <span className="error small">{job.error_code}</span>}{/* 错误码展示 */}
-              </div>
+              </div>{/* 任务头部信息结束 */}
               {/* 产物信息：仅当结果中存在 object_key 时才展示下载入口 */}
               {typeof job.result?.object_key === 'string' && ( /* 有产物才展示下载 */
                 // 产物行容器
@@ -967,7 +967,7 @@ function JobsTab({
                     {/* 按钮文案：下载产物 */}
                     {locale === 'en-US' ? 'Download' : '下载产物'}
                   </button>
-                </div>
+                </div> // 产物行渲染结束
               )}
               {/* 图像类任务成功后内联展示缩略图，免去下载再查看 */}
               {job.status === 'succeeded' && job.job_type === 'image' && typeof job.result?.object_key === 'string' && (
@@ -1002,19 +1002,19 @@ function JobsTab({
                     {locale === 'en-US' ? 'Retry' : '重试'}
                   </button>
                 )}
-              </div>
+              </div>{/* 任务操作按钮组结束 */}
             </li>
-          ))}
+          ))}{/* 结束任务列表的遍历渲染 */}
           {/* 空列表引导：加载完成且确实没有任务时才展示 */}
           {!jobsState.loading && jobs.length === 0 && ( /* 空态才展示引导 */
             // 空态提示行
             <li className="hint">{/* 空态提示：尚无任务 */}{locale === 'en-US' ? 'No jobs yet.' : '尚无任务。'}</li>
           )}
-        </ul>
+        </ul>{/* 任务列表结束 */}
       </section>
-    </div>
+    </div> // 任务面板根容器渲染结束
   );
-}
+} // 结束 JobsTab 组件函数
 
 // ---------- 成片标签页：列表 / 创建 / 发布流 ----------
 
@@ -1028,7 +1028,7 @@ function FilmsTab({
   projectStatus,
   // 变更回调：成片状态变化后同步刷新工程详情与左侧列表。
   onProjectChange,
-}: {
+}: { // 成片面板入参类型声明开始
   // 语言类型声明。
   locale: Locale;
   // 工程 id 类型声明。
@@ -1037,7 +1037,7 @@ function FilmsTab({
   projectStatus: ComicProject['status'];
   // 变更回调类型。
   onProjectChange: () => void;
-}) {
+}) { // 入参类型声明结束，进入 FilmsTab 函数体
   // 拉取成片列表；切换工程时自动重载。
   const filmsState = useAsync(() => api.comic.listFilms(projectId), [projectId]);
   // 同时拉取任务列表：用于筛出成功的合成产物作为成片来源。
@@ -1105,14 +1105,14 @@ function FilmsTab({
       setObjectKey('');
       // 刷新成片列表，让新成片出现在下方。
       filmsState.reload();
-    } catch (err) {
+    } catch (err) { // 捕获创建成片接口异常
       // 创建失败时展示错误文案。
       setError(errorText(locale, err));
-    } finally {
+    } finally { // 无论成功或失败都复位创建成片的加载态
       // 退出加载态。
       setBusy(false);
-    }
-  }
+    } // 结束创建成片的 try 块
+  } // 结束 handleCreate 处理函数
 
   // 发布流动作：提交审核 / 发布 / 归档，均由同一端点驱动状态机。
   async function handleAction(film: Film, action: 'submit-review' | 'publish' | 'archive') {
@@ -1130,11 +1130,11 @@ function FilmsTab({
       filmsState.reload();
       // 同步刷新工程详情与左侧列表。
       onProjectChange();
-    } catch (err) {
+    } catch (err) { // 捕获提交审核接口异常
       // 动作失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束提交审核的 try 块
+  } // 结束 handleSubmit 处理函数
 
   // 驳回：必须填写原因，原因会落库并展示在成片列表上。
   async function handleReject(film: Film) {
@@ -1150,11 +1150,11 @@ function FilmsTab({
       await api.comic.rejectFilm(film.id, reason.trim());
       // 刷新成片列表，展示新的状态与审核备注。
       filmsState.reload();
-    } catch (err) {
+    } catch (err) { // 捕获驳回成片接口异常
       // 驳回失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束驳回成片的 try 块
+  } // 结束 handleReject 处理函数
 
   // 成片页渲染：创建区 + 成片列表 + 工程产物。
   return (
@@ -1201,7 +1201,7 @@ function FilmsTab({
               <option key={o.jobId} value={o.objectKey}>{/* 单个产物选项 */}
                 {o.objectKey}（{new Date(o.createdAt).toLocaleString()}）
               </option>
-            ))}
+            ))}{/* 结束源产物下拉项的遍历渲染 */}
           </select>
           <button
             type="button"
@@ -1296,7 +1296,7 @@ function FilmsTab({
               {/* 仅当前展开的成片才挂载版本面板，避免一次性请求所有版本 */}
               {expandedFilmId === film.id && <FilmVersionsPanel filmId={film.id} locale={locale} />}{/* 版本面板：惰性挂载 */}
             </li>
-          ))}
+          ))}{/* 结束成片列表的遍历渲染 */}
           {/* 空列表引导：加载完成且确实没有成片时才展示 */}
           {!filmsState.loading && films.length === 0 && ( /* 空态才展示引导 */
             // 空态提示行
@@ -1359,7 +1359,7 @@ function FilmsTab({
                 </div>
               )}
             </li>
-          ))}
+          ))}{/* 结束候选产物列表的遍历渲染 */}
           {/* 空列表引导：加载完成且确实没有产物时才展示 */}
           {!assetsState.loading && assets.length === 0 && ( /* 空态才展示引导 */
             // 空态提示行
@@ -1407,11 +1407,11 @@ function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale 
       const res = await api.media.presignDownload(objectKey);
       // 新窗口打开；noopener 防止被打开页面反向操作当前页。
       window.open(res.download.url, '_blank', 'noopener');
-    } catch (err) {
+    } catch (err) { // 捕获版本记录请求异常
       // 失败时展示错误文案。
       setError(errorText(locale, err));
-    }
-  }
+    } // 结束版本记录的 try 块
+  } // 结束 reload 处理函数
 
   // 首次加载中：展示版本加载占位。
   if (state.loading && !state.data) {
@@ -1464,7 +1464,7 @@ function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale 
               )}
             </div>
           </li>
-        ))}
+        ))}{/* 结束历史版本的遍历渲染 */}
         {/* 空版本引导：该成片尚未产生任何版本 */}
         {versions.length === 0 && ( /* 空版本才展示引导 */
           // 空态提示行
@@ -1473,4 +1473,4 @@ function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale 
       </ul>
     </div>
   );
-}
+} // 结束 FilmVersionsPanel 组件函数

@@ -1,675 +1,675 @@
-:root {
-  color-scheme: light;
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --sidebar: #1d2433;
-  --sidebar-muted: #8a93a6;
-  --sidebar-hover: #2a3447;
-  --text: #1c2230;
-  --text-muted: #6b7280;
-  --border: #e3e6ec;
-  --primary: #3b6ef5;
-  --primary-dark: #2f59c9;
-  --danger: #d64545;
-  --success: #1f8a5b;
-  --warning: #a86a10;
-  --radius: 10px;
-  --shadow: 0 1px 2px rgba(20, 28, 45, 0.06), 0 8px 24px rgba(20, 28, 45, 0.05);
-}
+:root { /* 全局设计令牌：颜色/圆角/阴影集中定义，换肤或调整质感只改这里 */
+  color-scheme: light; /* 声明浅色配色方案，浏览器据此渲染滚动条与原生控件 */
+  --bg: #f4f5f7; /* 页面底色：极浅灰，让白色卡片形成层次 */
+  --surface: #ffffff; /* 卡片/面板表面色 */
+  --sidebar: #1d2433; /* 侧边栏深色底，与内容区形成强对比 */
+  --sidebar-muted: #8a93a6; /* 侧边栏内的次要文字（标语、区域标识） */
+  --sidebar-hover: #2a3447; /* 侧边栏悬停底色，比底色略亮一档 */
+  --text: #1c2230; /* 主文字色：近黑，保证正文可读性 */
+  --text-muted: #6b7280; /* 次要文字色：说明、计数、任务元信息 */
+  --border: #e3e6ec; /* 中性边框色，用于卡片与输入框描边 */
+  --primary: #3b6ef5; /* 品牌主色：主按钮、选中态、链接 */
+  --primary-dark: #2f59c9; /* 主色加深版：主按钮悬停 */
+  --danger: #d64545; /* 危险色：删除类操作与错误提示 */
+  --success: #1f8a5b; /* 成功色：已完成状态与成功提示 */
+  --warning: #a86a10; /* 警告色：需留意但不阻断流程 */
+  --radius: 10px; /* 卡片统一圆角，保持视觉一致性 */
+  --shadow: 0 1px 2px rgba(20, 28, 45, 0.06), 0 8px 24px rgba(20, 28, 45, 0.05); /* 双层阴影：近距勾边 + 远距柔和投影 */
+} /* 设计令牌块结束 */
 
-* {
-  box-sizing: border-box;
-}
+* { /* 通配选择器：统一盒模型 */
+  box-sizing: border-box; /* 宽高包含 padding 与 border，避免百分比/栅格布局横向溢出 */
+} /* 通配规则结束 */
 
-html,
-body,
-#root {
-  height: 100%;
-}
+html, /* 文档根元素 */
+body, /* 可见内容容器 */
+#root { /* React 挂载点 */
+  height: 100%; /* 三层都撑满视口，供内部 flex/grid 使用百分比高度 */
+} /* 高度规则结束 */
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-}
+body { /* 页面基础排版 */
+  margin: 0; /* 清除浏览器默认外边距，消除四周白边 */
+  background: var(--bg); /* 应用全局底色 */
+  color: var(--text); /* 继承主文字色，子元素无需重复声明 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', /* 系统字体栈：优先原生界面字体，避免额外字体请求 */
+    'Microsoft YaHei', sans-serif; /* 中文回退末位：Windows 雅黑 → 通用无衬线 */
+  font-size: 14px; /* 基准字号：紧凑的信息密度适合任务管理场景 */
+  line-height: 1.5; /* 1.5 倍行高保证中文段落可读性 */
+} /* body 规则结束 */
 
-h1,
-h2 {
-  margin: 0;
-  font-weight: 600;
-}
+h1, /* 一级标题 */
+h2 { /* 二级标题 */
+  margin: 0; /* 移除标题默认外边距，间距统一交给布局 gap 控制 */
+  font-weight: 600; /* 统一半粗字重，避免默认 700 过重 */
+} /* 标题基础样式结束 */
 
-h1 {
-  font-size: 22px;
-}
+h1 { /* 页面主标题 */
+  font-size: 22px; /* 与卡片正文形成明显层级差 */
+} /* h1 结束 */
 
-h2 {
-  font-size: 15px;
-}
+h2 { /* 面板/小节标题 */
+  font-size: 15px; /* 仅比正文略大，保持界面克制 */
+} /* h2 结束 */
 
-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
+code { /* 行内代码/令牌展示 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* 等宽字体，便于对齐与辨认字符 */
+  font-size: 12px; /* 略小于正文，避免等宽字过宽撑破布局 */
+} /* code 结束 */
 
 /* ---------- 布局 ---------- */
-.layout {
-  display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
-  min-height: 100%;
-}
+.layout { /* 应用整体两栏布局 */
+  display: grid; /* 栅格布局便于固定侧边栏 + 自适应内容区 */
+  grid-template-columns: 232px minmax(0, 1fr); /* 左栏固定 232px，右栏 minmax(0,1fr) 防止内容撑破 */
+  min-height: 100%; /* 至少铺满视口，内容不足时也不留白底 */
+} /* 布局容器结束 */
 
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 24px 18px;
-  background: var(--sidebar);
-  color: #eef1f7;
-}
+.sidebar { /* 左侧导航栏 */
+  display: flex; /* 纵向 flex 便于把用户区推到底部 */
+  flex-direction: column; /* 品牌 → 导航 → 用户区自上而下排列 */
+  gap: 24px; /* 三大区块之间的呼吸空间 */
+  padding: 24px 18px; /* 上下留白大于左右，突出纵向分区 */
+  background: var(--sidebar); /* 深色底与内容区区分 */
+  color: #eef1f7; /* 深底上的浅色文字，保证对比度 */
+} /* 侧边栏结束 */
 
-.brand {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 6px;
-}
+.brand { /* 品牌区 */
+  display: flex; /* 应用名与标语纵向排列 */
+  flex-direction: column; /* 名称在上、标语在下 */
+  gap: 2px; /* 两行文字贴近，视为一个整体 */
+  padding: 0 6px; /* 与导航按钮文字左对齐的微调 */
+} /* 品牌区结束 */
 
-.brand-name {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
+.brand-name { /* 应用名 */
+  font-size: 20px; /* 作为视觉锚点，明显大于正文 */
+  font-weight: 700; /* 加粗强化品牌识别 */
+  letter-spacing: 0.02em; /* 轻微字距，提升大写/短词的精致度 */
+} /* 应用名结束 */
 
-.brand-tagline {
-  font-size: 12px;
-  color: var(--sidebar-muted);
-}
+.brand-tagline { /* 应用标语 */
+  font-size: 12px; /* 弱化处理，不与应用名争夺注意力 */
+  color: var(--sidebar-muted); /* 深底上的次级灰，层级清晰 */
+} /* 标语结束 */
 
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.nav { /* 导航按钮容器 */
+  display: flex; /* 按钮纵向堆叠 */
+  flex-direction: column; /* 一项一行，阅读顺序与展示顺序一致 */
+  gap: 4px; /* 按钮间距小而紧凑 */
+} /* 导航容器结束 */
 
-.nav-item {
-  padding: 9px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #cfd6e4;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-}
+.nav-item { /* 单个导航按钮 */
+  padding: 9px 12px; /* 点击热区高度约 36px，兼顾触控与密度 */
+  border: 0; /* 去掉按钮默认边框 */
+  border-radius: 8px; /* 圆角与整体卡片风格统一 */
+  background: transparent; /* 默认无底色，仅文字可见 */
+  color: #cfd6e4; /* 深底上的次级浅灰文字 */
+  font-size: 14px; /* 与正文同号，导航不至于过小 */
+  text-align: left; /* 按钮默认居中，改为左对齐更像导航条目 */
+  cursor: pointer; /* 悬停显示手型，提示可点击 */
+} /* 导航按钮结束 */
 
-.nav-item:hover {
-  background: var(--sidebar-hover);
-}
+.nav-item:hover { /* 悬停态 */
+  background: var(--sidebar-hover); /* 提亮底色作为悬停反馈 */
+} /* 悬停态结束 */
 
-.nav-item.active {
-  background: var(--primary);
-  color: #fff;
-}
+.nav-item.active { /* 当前选中项 */
+  background: var(--primary); /* 主色填充，明确当前位置 */
+  color: #fff; /* 主色底上用纯白保证对比度 */
+} /* 选中态结束 */
 
-.sidebar-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: auto;
-  padding: 14px 12px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
+.sidebar-footer { /* 侧边栏底部用户区 */
+  display: flex; /* 纵向排列用户信息与退出按钮 */
+  flex-direction: column; /* 信息在上、按钮在下 */
+  gap: 4px; /* 紧凑排布 */
+  margin-top: auto; /* 吸底：把用户区推到侧边栏最下方 */
+  padding: 14px 12px 0; /* 顶部留白区分导航区 */
+  border-top: 1px solid rgba(255, 255, 255, 0.08); /* 极淡分隔线，深底上不抢眼 */
+} /* 用户区结束 */
 
-.user-name {
-  font-weight: 600;
-  word-break: break-all;
-}
+.user-name { /* 当前登录用户显示名 */
+  font-weight: 600; /* 半粗，便于快速定位自己 */
+  word-break: break-all; /* 长名/邮箱不换行会撑破侧栏，强制可断 */
+} /* 显示名结束 */
 
-.user-region {
-  font-size: 12px;
-  color: var(--sidebar-muted);
-}
+.user-region { /* 用户所属区域标识 */
+  font-size: 12px; /* 次要信息，弱化字号 */
+  color: var(--sidebar-muted); /* 与标语同一层级 */
+} /* 区域标识结束 */
 
-.main {
-  padding: 28px 32px 48px;
-  min-width: 0;
-}
+.main { /* 右侧内容区 */
+  padding: 28px 32px 48px; /* 上方略小、底部更大，滚动时有呼吸感 */
+  min-width: 0; /* 允许 grid 子项收缩，防止宽表格/长串撑破布局 */
+} /* 内容区结束 */
 
 /* ---------- 页面通用 ---------- */
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  max-width: 1040px;
-}
+.page { /* 各视图的页面容器 */
+  display: flex; /* 纵向堆叠页面区块 */
+  flex-direction: column; /* 标题、表单、列表自上而下 */
+  gap: 18px; /* 区块间统一间距，避免各处手写 margin */
+  max-width: 1040px; /* 限制阅读宽度，超宽屏不至于过散 */
+} /* 页面容器结束 */
 
-.page-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+.page-head { /* 页面标题行 */
+  display: flex; /* 标题与操作按钮同行 */
+  flex-wrap: wrap; /* 窄屏自动换行，避免挤压变形 */
+  align-items: center; /* 垂直居中，视觉更稳 */
+  justify-content: space-between; /* 标题左、操作右 */
+  gap: 12px; /* 换行后仍有间距 */
+} /* 标题行结束 */
 
-.muted {
-  color: var(--text-muted);
-  font-size: 13px;
-}
+.muted { /* 次要说明文字 */
+  color: var(--text-muted); /* 用弱化色表达「非重点」 */
+  font-size: 13px; /* 略小于正文 */
+} /* muted 结束 */
 
-.hint,
-.empty {
-  color: var(--text-muted);
-  padding: 12px 0;
-}
+.hint, /* 提示文案 */
+.empty { /* 空态文案 */
+  color: var(--text-muted); /* 弱化色，避免空态喧宾夺主 */
+  padding: 12px 0; /* 上下留白，空态时不至于贴边 */
+} /* 提示/空态结束 */
 
-.count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: #eef1f7;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
+.count { /* 数量徽标（如「3 个项目」） */
+  display: inline-flex; /* 便于垂直居中文本 */
+  align-items: center; /* 纵向居中 */
+  justify-content: center; /* 横向居中 */
+  min-width: 24px; /* 个位数也保持圆形胶囊观感 */
+  height: 24px; /* 固定高度，与文字行高协调 */
+  padding: 0 8px; /* 多位数时自动变宽 */
+  border-radius: 999px; /* 胶囊圆角 */
+  background: #eef1f7; /* 浅灰底，弱化存在感 */
+  color: var(--text-muted); /* 次要文字色 */
+  font-size: 12px; /* 小字号，作为附属信息 */
+  font-weight: 600; /* 加粗弥补小字号的可读性 */
+} /* 数量徽标结束 */
 
-.error,
-.success,
-.warning {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-}
+.error, /* 错误提示条 */
+.success, /* 成功提示条 */
+.warning { /* 警告提示条 */
+  margin: 0; /* 清除段落默认外边距 */
+  padding: 10px 12px; /* 内边距形成提示块 */
+  border-radius: 8px; /* 与卡片圆角体系一致 */
+  font-size: 13px; /* 略小正文，提示信息更紧凑 */
+} /* 提示条基础样式结束 */
 
-.error {
-  background: #fdecec;
-  color: var(--danger);
-}
+.error { /* 错误提示配色 */
+  background: #fdecec; /* 极浅红底 */
+  color: var(--danger); /* 危险色文字，突出失败 */
+} /* 错误提示结束 */
 
-.success {
-  background: #e9f7f0;
-  color: var(--success);
-}
+.success { /* 成功提示配色 */
+  background: #e9f7f0; /* 极浅绿底 */
+  color: var(--success); /* 成功色文字 */
+} /* 成功提示结束 */
 
-.warning {
-  background: #fdf3e3;
-  color: var(--warning);
-}
+.warning { /* 警告提示配色 */
+  background: #fdf3e3; /* 极浅橙底 */
+  color: var(--warning); /* 警告色文字 */
+} /* 警告提示结束 */
 
 /* ---------- 面板 ---------- */
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
+.panel { /* 通用卡片面板 */
+  display: flex; /* 纵向排列面板内的标题与内容 */
+  flex-direction: column; /* 自上而下 */
+  gap: 12px; /* 面板内部统一间距 */
+  padding: 18px; /* 内容与边框之间留白 */
+  border: 1px solid var(--border); /* 细边框勾勒卡片边界 */
+  border-radius: var(--radius); /* 统一圆角 */
+  background: var(--surface); /* 白底与页面底色区分 */
+  box-shadow: var(--shadow); /* 统一阴影，形成轻微浮起感 */
+} /* 面板结束 */
 
-.panel.danger {
-  border-color: #f2caca;
-}
+.panel.danger { /* 危险操作面板（如删除项目） */
+  border-color: #f2caca; /* 淡红描边提示风险 */
+} /* 危险面板结束 */
 
-.panel.done {
-  opacity: 0.85;
-}
+.panel.done { /* 已完成面板 */
+  opacity: 0.85; /* 整体淡出，表达「已完成不需关注」 */
+} /* 已完成面板结束 */
 
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+.panel-head { /* 面板标题行 */
+  display: flex; /* 标题与操作同一行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 标题左、操作右 */
+  gap: 12px; /* 两者最小间距 */
+} /* 面板标题行结束 */
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-}
+.cards { /* 卡片网格 */
+  display: grid; /* 栅格自动排版 */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* 每列至少 300px，自适应列数 */
+  gap: 16px; /* 卡片间距 */
+} /* 卡片网格结束 */
 
-.split {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-}
+.split { /* 左右分栏区域（如「项目 + 邀请」） */
+  display: grid; /* 栅格实现等宽分栏 */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* 窄屏自动降为单列 */
+  gap: 16px; /* 分栏间距 */
+} /* 分栏结束 */
 
 /* ---------- 表单 ---------- */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+.form { /* 纵向表单 */
+  display: flex; /* flex 纵向流 */
+  flex-direction: column; /* 字段一行一个 */
+  gap: 12px; /* 字段间统一间距 */
+} /* 纵向表单结束 */
 
-.form.inline {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
+.form.inline { /* 横向内联表单（筛选/快速创建） */
+  flex-direction: row; /* 字段横向排列 */
+  flex-wrap: wrap; /* 空间不足自动换行 */
+  align-items: flex-end; /* 底部对齐，使标签+输入框高度不一致时按钮仍齐平 */
+} /* 内联表单结束 */
 
-.form label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
+.form label { /* 表单字段标签 */
+  display: flex; /* 标签文字与输入控件纵向组合 */
+  flex-direction: column; /* 文字在上、控件在下 */
+  gap: 5px; /* 文字与控件贴近 */
+  font-size: 12px; /* 标签小字号，弱化于输入内容 */
+  color: var(--text-muted); /* 次要色，突出输入值 */
+} /* 标签结束 */
 
-.form label.grow {
-  flex: 1 1 220px;
-}
+.form label.grow { /* 需要占满剩余宽度的字段 */
+  flex: 1 1 220px; /* 基础宽 220px，可放大占满同行剩余空间 */
+} /* 可伸缩字段结束 */
 
-.form input,
-.form select {
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--text);
-  font-size: 14px;
-  outline: none;
-}
+.form input, /* 文本输入框 */
+.form select { /* 下拉选择框 */
+  height: 36px; /* 统一控件高度，行内对齐更整齐 */
+  padding: 0 10px; /* 左右内边距，文字不贴边 */
+  border: 1px solid var(--border); /* 默认细边框 */
+  border-radius: 8px; /* 与按钮圆角一致 */
+  background: #fff; /* 白底提高可辨识度 */
+  color: var(--text); /* 输入文字用主文字色 */
+  font-size: 14px; /* 与正文同号，避免移动端聚焦缩放 */
+  outline: none; /* 关闭浏览器默认轮廓，改用下方 focus 阴影表达焦点 */
+} /* 输入控件结束 */
 
-.form input:focus,
-.form select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 110, 245, 0.15);
-}
+.form input:focus, /* 输入框聚焦 */
+.form select:focus { /* 下拉框聚焦 */
+  border-color: var(--primary); /* 边框转主色，明确聚焦位置 */
+  box-shadow: 0 0 0 3px rgba(59, 110, 245, 0.15); /* 柔和外发光替代默认 outline，无障碍上仍可见焦点 */
+} /* 聚焦态结束 */
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
+.row { /* 横向排列的一行控件 */
+  display: flex; /* 单行 flex */
+  flex-wrap: wrap; /* 窄屏换行 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 控件间距 */
+} /* 横向行结束 */
 
-.row input {
-  flex: 1 1 120px;
-}
+.row input { /* 行内输入框 */
+  flex: 1 1 120px; /* 至少 120px 并吃掉剩余宽度 */
+} /* 行内输入框结束 */
 
 /* ---------- 按钮 ---------- */
-.btn {
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-}
+.btn { /* 通用按钮 */
+  height: 36px; /* 与输入控件等高，便于同行对齐 */
+  padding: 0 14px; /* 左右留白，触控区域足够 */
+  border: 1px solid var(--border); /* 默认描边式按钮 */
+  border-radius: 8px; /* 统一圆角 */
+  background: #fff; /* 白底次按钮 */
+  color: var(--text); /* 主文字色 */
+  font-size: 13px; /* 略小于正文，按钮更紧凑 */
+  font-weight: 500; /* 中等字重提升可读性 */
+  cursor: pointer; /* 手型提示可点击 */
+  white-space: nowrap; /* 按钮文字不换行，避免高度跳动 */
+} /* 按钮基础结束 */
 
-.btn:hover:not(:disabled) {
-  border-color: #c9ced9;
-}
+.btn:hover:not(:disabled) { /* 悬停且可用时 */
+  border-color: #c9ced9; /* 边框加深给出反馈 */
+} /* 按钮悬停结束 */
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn:disabled { /* 禁用态 */
+  opacity: 0.5; /* 半透明表示不可用 */
+  cursor: not-allowed; /* 禁用光标，避免误以为可点击 */
+} /* 禁用态结束 */
 
-.btn.primary {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: #fff;
-}
+.btn.primary { /* 主操作按钮 */
+  border-color: var(--primary); /* 边框与底色同为主色 */
+  background: var(--primary); /* 主色填充，视觉权重最高 */
+  color: #fff; /* 白字保证对比度 */
+} /* 主按钮结束 */
 
-.btn.primary:hover:not(:disabled) {
-  background: var(--primary-dark);
-  border-color: var(--primary-dark);
-}
+.btn.primary:hover:not(:disabled) { /* 主按钮悬停 */
+  background: var(--primary-dark); /* 加深底色区分悬停 */
+  border-color: var(--primary-dark); /* 边框同步加深，避免出现色差描边 */
+} /* 主按钮悬停结束 */
 
-.btn.danger {
-  border-color: #f0bfbf;
-  background: #fff;
-  color: var(--danger);
-}
+.btn.danger { /* 危险操作按钮（取消邀请/删除） */
+  border-color: #f0bfbf; /* 淡红描边 */
+  background: #fff; /* 白底降低误触风险 */
+  color: var(--danger); /* 红字强调危险性 */
+} /* 危险按钮结束 */
 
-.btn.ghost {
-  background: transparent;
-}
+.btn.ghost { /* 幽灵按钮：仅保留文字 */
+  background: transparent; /* 透明底，融入所在容器 */
+} /* 幽灵按钮结束 */
 
-.btn.small {
-  height: 30px;
-  padding: 0 10px;
-  font-size: 12px;
-}
+.btn.small { /* 小尺寸按钮（行内操作） */
+  height: 30px; /* 降低高度，避免列表行被撑高 */
+  padding: 0 10px; /* 左右收紧 */
+  font-size: 12px; /* 小字号配合紧凑行高 */
+} /* 小按钮结束 */
 
-.btn.block {
-  width: 100%;
-}
+.btn.block { /* 撑满整行的按钮 */
+  width: 100%; /* 占满父容器宽度，如侧栏退出按钮 */
+} /* 整行按钮结束 */
 
-.sidebar .btn.ghost {
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #dfe5f0;
-}
+.sidebar .btn.ghost { /* 侧栏内的幽灵按钮 */
+  border-color: rgba(255, 255, 255, 0.18); /* 深底上改用半透明白描边 */
+  color: #dfe5f0; /* 浅色文字保证深底可读 */
+} /* 侧栏幽灵按钮结束 */
 
-.sidebar .btn.ghost:hover {
-  background: var(--sidebar-hover);
-}
+.sidebar .btn.ghost:hover { /* 侧栏幽灵按钮悬停 */
+  background: var(--sidebar-hover); /* 用侧栏悬停底色反馈 */
+} /* 侧栏悬停结束 */
 
-.link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--primary);
-  font-size: 12px;
-  cursor: pointer;
-}
+.link { /* 文字链接按钮（如「切换语言」） */
+  padding: 0; /* 去掉内边距，纯文字形态 */
+  border: 0; /* 去掉边框 */
+  background: none; /* 去掉底色 */
+  color: var(--primary); /* 主色文字表达可点击 */
+  font-size: 12px; /* 次要操作用小字号 */
+  cursor: pointer; /* 手型提示 */
+} /* 链接按钮结束 */
 
-.link.danger {
-  color: var(--danger);
-}
+.link.danger { /* 危险文字链接（退出/移除） */
+  color: var(--danger); /* 红色表达不可逆或高风险 */
+} /* 危险链接结束 */
 
-.link:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.link:disabled { /* 链接禁用态 */
+  opacity: 0.5; /* 半透明表示不可用 */
+  cursor: not-allowed; /* 禁用光标 */
+} /* 链接禁用结束 */
 
 /* ---------- 徽标 / 分段 ---------- */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: #eef1f7;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
+.badge { /* 通用徽标（角色、状态） */
+  display: inline-flex; /* 便于居中对齐文字 */
+  align-items: center; /* 纵向居中 */
+  height: 22px; /* 固定高度与文字基线协调 */
+  padding: 0 8px; /* 左右留白 */
+  border-radius: 999px; /* 胶囊形 */
+  background: #eef1f7; /* 默认浅灰底 */
+  color: var(--text-muted); /* 默认次要文字色 */
+  font-size: 11px; /* 小字号，作为附属标签 */
+  font-weight: 600; /* 加粗弥补小字号 */
+} /* 徽标结束 */
 
-.badge.role-owner {
-  background: #e7edff;
-  color: var(--primary);
-}
+.badge.role-owner { /* 所有者角色徽标 */
+  background: #e7edff; /* 淡蓝底对应主色体系 */
+  color: var(--primary); /* 主色文字，权限最高最醒目 */
+} /* 所有者徽标结束 */
 
-.badge.role-editor {
-  background: #e9f7f0;
-  color: var(--success);
-}
+.badge.role-editor { /* 编辑者角色徽标 */
+  background: #e9f7f0; /* 淡绿底 */
+  color: var(--success); /* 成功色文字表达可写 */
+} /* 编辑者徽标结束 */
 
-.badge.role-viewer {
-  background: #f1ecfb;
-  color: #7a55c9;
-}
+.badge.role-viewer { /* 只读角色徽标 */
+  background: #f1ecfb; /* 淡紫底 */
+  color: #7a55c9; /* 紫色文字表达受限权限 */
+} /* 只读徽标结束 */
 
-.segmented {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #fff;
-}
+.segmented { /* 分段控件外壳 */
+  display: inline-flex; /* 宽度随内容，不占满一行 */
+  padding: 3px; /* 内边距形成凹槽感 */
+  border: 1px solid var(--border); /* 外描边 */
+  border-radius: 999px; /* 胶囊外壳 */
+  background: #fff; /* 白底与页面区分 */
+} /* 分段外壳结束 */
 
-.segmented button {
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-}
+.segmented button { /* 分段内单个选项 */
+  padding: 6px 14px; /* 点击区域足够大 */
+  border: 0; /* 去掉默认边框，由外壳统一描边 */
+  border-radius: 999px; /* 与外壳同心圆角 */
+  background: transparent; /* 未选中透明 */
+  color: var(--text-muted); /* 未选中弱化 */
+  font-size: 13px; /* 与按钮字号一致 */
+  cursor: pointer; /* 手型提示 */
+} /* 分段选项结束 */
 
-.segmented button.active {
-  background: var(--primary);
-  color: #fff;
-}
+.segmented button.active { /* 选中的分段选项 */
+  background: var(--primary); /* 主色填充表示当前选中 */
+  color: #fff; /* 白字保证对比度 */
+} /* 选中段结束 */
 
 /* ---------- 登录 ---------- */
-.auth-wrap {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 24px;
-  background: radial-gradient(circle at 20% 20%, #eef2ff 0%, var(--bg) 45%);
-}
+.auth-wrap { /* 登录页整屏容器 */
+  display: grid; /* 栅格便于双向居中 */
+  place-items: center; /* 水平垂直同时居中卡片 */
+  min-height: 100vh; /* 至少一屏高，卡片居中不受内容高度影响 */
+  padding: 24px; /* 小屏时留出安全边距 */
+  background: radial-gradient(circle at 20% 20%, #eef2ff 0%, var(--bg) 45%); /* 左上柔光渐变，避免纯色单调 */
+} /* 登录容器结束 */
 
-.auth-card {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: min(400px, 100%);
-  padding: 28px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
+.auth-card { /* 登录卡片 */
+  display: flex; /* 纵向排列标题与表单 */
+  flex-direction: column; /* 自上而下 */
+  gap: 20px; /* 区块间距略大，突出登录页的从容感 */
+  width: min(400px, 100%); /* 最多 400px，小屏自适应撑满 */
+  padding: 28px; /* 卡片内留白 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 14px; /* 比普通卡片更大圆角，强调独立焦点 */
+  background: var(--surface); /* 白底 */
+  box-shadow: var(--shadow); /* 统一阴影 */
+} /* 登录卡片结束 */
 
-.auth-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
+.auth-head { /* 登录页标题行 */
+  display: flex; /* 标题与语言切换同行 */
+  align-items: flex-start; /* 顶部对齐，切换控件不被拉高 */
+  justify-content: space-between; /* 左右分布 */
+  gap: 12px; /* 最小间距 */
+} /* 登录标题行结束 */
 
-.auth-head h1 {
-  font-size: 24px;
-}
+.auth-head h1 { /* 登录页主标题 */
+  font-size: 24px; /* 登录页标题更大，作为视觉入口 */
+} /* 登录标题结束 */
 
-.dev-code {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #eef2ff;
-  color: var(--primary);
-  font-size: 13px;
-}
+.dev-code { /* 开发环境验证码展示块 */
+  margin: 0; /* 清除默认外边距 */
+  padding: 10px 12px; /* 内边距形成提示块 */
+  border-radius: 8px; /* 统一圆角 */
+  background: #eef2ff; /* 淡蓝底提示「开发用」 */
+  color: var(--primary); /* 主色文字便于识别验证码 */
+  font-size: 13px; /* 略小正文 */
+} /* 验证码块结束 */
 
 /* ---------- 项目 ---------- */
-.project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.project-list { /* 项目列表 */
+  display: flex; /* 纵向列表 */
+  flex-direction: column; /* 一项一行 */
+  gap: 10px; /* 列表项间距 */
+  margin: 0; /* 清除 ul 默认外边距 */
+  padding: 0; /* 清除 ul 默认内边距 */
+  list-style: none; /* 去掉默认圆点 */
+} /* 项目列表结束 */
 
-.project-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  text-align: left;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-}
+.project-card { /* 项目卡片（整块可点击） */
+  display: flex; /* 名称与操作用横向 flex */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 名称左、操作右 */
+  gap: 16px; /* 两侧内容最小间距 */
+  width: 100%; /* 占满列表宽度 */
+  padding: 14px 16px; /* 卡片内留白 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: var(--radius); /* 统一圆角 */
+  background: var(--surface); /* 白底 */
+  text-align: left; /* 按钮默认居中，改为左对齐符合卡片阅读习惯 */
+  cursor: pointer; /* 手型提示整卡可点 */
+  box-shadow: var(--shadow); /* 统一阴影 */
+} /* 项目卡片结束 */
 
-.project-card:hover {
-  border-color: #c9d3ea;
-}
+.project-card:hover { /* 卡片悬停 */
+  border-color: #c9d3ea; /* 边框转淡蓝，暗示可进入 */
+} /* 项目卡片悬停结束 */
 
-.project-card-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
+.project-card-main { /* 卡片左侧主体（名称 + 元信息） */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 名称在上、元信息在下 */
+  gap: 2px; /* 紧贴成一组 */
+  min-width: 0; /* 允许收缩，长名称可省略而不撑破卡片 */
+} /* 卡片主体结束 */
 
-.project-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  word-break: break-all;
-}
+.project-name { /* 项目名称行 */
+  display: flex; /* 名称与角色徽标同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 名称与徽标间距 */
+  font-weight: 600; /* 半粗强调项目主体 */
+  word-break: break-all; /* 长名强制可断，避免溢出 */
+} /* 项目名称结束 */
 
 /* ---------- 任务 ---------- */
-.task-list,
-.task-children {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.task-list, /* 顶层任务列表 */
+.task-children { /* 子任务列表 */
+  display: flex; /* 纵向排列任务行 */
+  flex-direction: column; /* 一项一行 */
+  gap: 4px; /* 任务行间距紧凑 */
+  margin: 0; /* 清除 ul 默认外边距 */
+  padding: 0; /* 清除 ul 默认内边距 */
+  list-style: none; /* 去掉默认圆点 */
+} /* 任务列表基础样式结束 */
 
-.task-children {
-  margin: 4px 0 0 26px;
-  padding-left: 12px;
-  border-left: 2px solid var(--border);
-}
+.task-children { /* 子任务层级强调 */
+  margin: 4px 0 0 26px; /* 左侧缩进 26px，形成层级关系 */
+  padding-left: 12px; /* 与竖线保持距离 */
+  border-left: 2px solid var(--border); /* 左侧竖线直观表达从属关系 */
+} /* 子任务列表结束 */
 
-.task-block {
-  display: flex;
-  flex-direction: column;
-}
+.task-block { /* 任务块（行 + 其子任务） */
+  display: flex; /* 纵向包裹 */
+  flex-direction: column; /* 任务行在上、子列表在下 */
+} /* 任务块结束 */
 
-.task-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 6px;
-  border-radius: 8px;
-}
+.task-row { /* 单条任务行 */
+  display: flex; /* 勾选框、标题、操作同一行 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 元素间距 */
+  padding: 8px 6px; /* 行内留白，扩大点击热区 */
+  border-radius: 8px; /* 悬停底色圆角不突兀 */
+} /* 任务行结束 */
 
-.task-row:hover {
-  background: #f7f8fb;
-}
+.task-row:hover { /* 任务行悬停 */
+  background: #f7f8fb; /* 极浅底反馈当前行 */
+} /* 任务行悬停结束 */
 
-.task-row.done .task-title {
-  color: var(--text-muted);
-  text-decoration: line-through;
-}
+.task-row.done .task-title { /* 已完成任务的标题 */
+  color: var(--text-muted); /* 弱化颜色表示已完成 */
+  text-decoration: line-through; /* 删除线是最直观的完成信号 */
+} /* 已完成标题结束 */
 
-.check {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 1px solid #c9ced9;
-  border-radius: 6px;
-  background: #fff;
-  color: var(--success);
-  font-size: 12px;
-  cursor: pointer;
-}
+.check { /* 完成勾选框 */
+  display: inline-flex; /* 便于居中勾号 */
+  flex: 0 0 auto; /* 不参与伸缩，固定占位 */
+  align-items: center; /* 纵向居中 */
+  justify-content: center; /* 横向居中 */
+  width: 20px; /* 固定正方形 */
+  height: 20px; /* 固定正方形 */
+  border: 1px solid #c9ced9; /* 未勾选时的灰色描边 */
+  border-radius: 6px; /* 小圆角，弱化方正感 */
+  background: #fff; /* 白底 */
+  color: var(--success); /* 勾号用成功色 */
+  font-size: 12px; /* 勾号大小与方框匹配 */
+  cursor: pointer; /* 手型提示可切换 */
+} /* 勾选框结束 */
 
-.task-row.done .check {
-  border-color: var(--success);
-  background: #e9f7f0;
-}
+.task-row.done .check { /* 已完成任务的勾选框 */
+  border-color: var(--success); /* 边框转成功色 */
+  background: #e9f7f0; /* 淡绿底强化完成感 */
+} /* 已完成勾选框结束 */
 
-.check:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.check:disabled { /* 勾选框禁用（无编辑权限或子任务已锁定） */
+  opacity: 0.6; /* 半透明表示不可操作 */
+  cursor: not-allowed; /* 禁用光标 */
+} /* 勾选框禁用结束 */
 
-.task-main {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
+.task-main { /* 任务主体（标题 + 元信息） */
+  display: flex; /* 纵向排列 */
+  flex: 1 1 auto; /* 吃掉剩余宽度，把操作区推到右侧 */
+  flex-direction: column; /* 标题在上、元信息在下 */
+  min-width: 0; /* 允许收缩，长标题可断行 */
+} /* 任务主体结束 */
 
-.task-title {
-  font-size: 14px;
-  word-break: break-word;
-}
+.task-title { /* 任务标题 */
+  font-size: 14px; /* 与正文一致，任务列表是核心内容 */
+  word-break: break-word; /* 长词可断，避免横向滚动 */
+} /* 任务标题结束 */
 
-.task-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
+.task-meta { /* 任务元信息（时间、标签等） */
+  display: flex; /* 多项横向排列 */
+  flex-wrap: wrap; /* 空间不足自动换行 */
+  align-items: center; /* 垂直居中 */
+  gap: 4px; /* 元信息之间紧凑 */
+  color: var(--text-muted); /* 弱化色表示附属信息 */
+  font-size: 12px; /* 小字号弱化层级 */
+} /* 任务元信息结束 */
 
-.task-actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 10px;
-}
+.task-actions { /* 任务行右侧操作区 */
+  display: flex; /* 多个操作横向排列 */
+  flex: 0 0 auto; /* 不伸缩，保证按钮尺寸稳定 */
+  gap: 10px; /* 操作之间留空隙，降低误触 */
+} /* 任务操作区结束 */
 
 /* ---------- 列表 / 邀请 ---------- */
-.plain-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.plain-list { /* 无样式列表（成员、邀请码等） */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 一项一行 */
+  gap: 8px; /* 列表项间距 */
+  margin: 0; /* 清除 ul 默认外边距 */
+  padding: 0; /* 清除 ul 默认内边距 */
+  list-style: none; /* 去掉默认圆点 */
+} /* 无样式列表结束 */
 
-.plain-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f2f6;
-}
+.plain-list li { /* 无样式列表项 */
+  display: flex; /* 内容与操作同行 */
+  flex-wrap: wrap; /* 窄屏换行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 内容左、操作右 */
+  gap: 8px; /* 元素间距 */
+  padding: 8px 0; /* 上下留白 */
+  border-bottom: 1px solid #f0f2f6; /* 极淡分隔线，形成行感 */
+} /* 列表项结束 */
 
-.plain-list li:last-child {
-  border-bottom: 0;
-}
+.plain-list li:last-child { /* 最后一项 */
+  border-bottom: 0; /* 去掉末项分隔线，避免悬空线 */
+} /* 末项结束 */
 
-.plain-list li.wrap {
-  justify-content: flex-start;
-}
+.plain-list li.wrap { /* 需要左对齐换行的项 */
+  justify-content: flex-start; /* 从左侧开始排布，长内容更自然 */
+} /* 换行项结束 */
 
-.token {
-  flex: 1 1 220px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: #f4f6fa;
-  color: var(--text-muted);
-  word-break: break-all;
-}
+.token { /* 邀请码/令牌展示块 */
+  flex: 1 1 220px; /* 至少 220px 并可伸展，兼顾长串展示 */
+  padding: 4px 8px; /* 内边距使文字不贴边 */
+  border-radius: 6px; /* 小圆角块 */
+  background: #f4f6fa; /* 浅灰底标示「可复制的值」 */
+  color: var(--text-muted); /* 弱化色，避免与正文混淆 */
+  word-break: break-all; /* 长串强制换行，不撑破布局 */
+} /* 令牌块结束 */
 
-@media (max-width: 760px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 760px) { /* 窄屏断点：平板竖屏与手机改用单列布局 */
+  .layout { /* 整体布局在窄屏下 */
+    grid-template-columns: 1fr; /* 取消侧栏固定宽度，改为单列上下堆叠 */
+  } /* 窄屏布局结束 */
 
-  .sidebar {
-    gap: 14px;
-    padding: 16px;
-  }
+  .sidebar { /* 窄屏侧边栏 */
+    gap: 14px; /* 区块间距收紧，节省纵向空间 */
+    padding: 16px; /* 内边距减小，内容更宽 */
+  } /* 窄屏侧边栏结束 */
 
-  .nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
+  .nav { /* 窄屏导航 */
+    flex-direction: row; /* 导航改为横向排列 */
+    flex-wrap: wrap; /* 放不下时自动换行 */
+  } /* 窄屏导航结束 */
 
-  .sidebar-footer {
-    flex-direction: row;
-    align-items: center;
-    margin-top: 0;
-  }
+  .sidebar-footer { /* 窄屏用户区 */
+    flex-direction: row; /* 用户信息与退出按钮同行 */
+    align-items: center; /* 垂直居中 */
+    margin-top: 0; /* 取消吸底，单列布局无需推到底部 */
+  } /* 窄屏用户区结束 */
 
-  .main {
-    padding: 20px 16px 36px;
-  }
+  .main { /* 窄屏内容区 */
+    padding: 20px 16px 36px; /* 收紧留白，把宽度让给内容 */
+  } /* 窄屏内容区结束 */
 
-  .form.inline {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
+  .form.inline { /* 窄屏内联表单 */
+    flex-direction: column; /* 字段改为纵向堆叠，避免挤压 */
+    align-items: stretch; /* 控件撑满宽度，便于点按 */
+  } /* 窄屏内联表单结束 */
+} /* 窄屏断点结束 */

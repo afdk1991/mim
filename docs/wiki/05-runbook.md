@@ -234,21 +234,21 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
 `Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
 
-### 7.1.3 多平台实测汇总（2026-11-06，本机中国网络）
+### 7.1.3 多平台实测汇总（2026-11-07 00:13:32 +08:00，本机中国网络）
 
-每平台测试两次取较快耗时；结论：**9 个免费平台全部接入或已取证上线**。
+结论：**9 个免费平台全部接入或已取证上线；状态码与 2026-11-06 基线一致，仅耗时刷新，无渠道新增或失效。**
 
 | 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
 |---|---|---|---|---|
-| 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.071s** / 0.030s ⚡最快 |
-| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`） | `https://data.mixm.top` | 200 / **0.100s** / 0.041s ⚡次快 |
-| GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.561s / 0.090s |
-| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.354s / 0.094s；`/health` 200 / 0.294s |
-| Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 1.049s / 0.169s |
-| GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.538s / 0.111s（未鉴权 401 属正常） |
+| 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.068s** / 0.028s ⚡最快 |
+| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`） | `https://data.mixm.top` | 200 / **0.094s** / 0.039s ⚡次快 |
+| GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 2.425s / 0.152s |
+| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.643s / 0.101s；`/health` 200 / 0.243s |
+| Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 0.549s / 0.175s |
+| GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 1.192s / 0.124s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
-| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 21.27s（DNS 污染到 108.160.169.37，TCP 超时） |
-| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `34e2c54`，2026-11-06 23:20 +0800 推送） | `https://github.com/afdk1991/mim` | 本机 000 / 0.020s（HTTPS 阻断；仓库操作经 git push / gh CLI 取证 ✅） |
+| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / ≥12s（`--max-time 12` 截断）/ 0.000s（DNS 污染到 108.160.169.37，TCP 连接即失败） |
+| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `ee65414`，2026-11-07 00:04 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 

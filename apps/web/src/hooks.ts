@@ -46,22 +46,22 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): Asy
         setData(value);
         // 成功后清空旧错误，防止残留的报错提示
         setError(null);
-      })
+      }) // then 回调到此结束
       // 失败分支：保留原始错误对象交给调用方判断
       .catch((err: unknown) => {
         // 仅在仍有效时写入错误
         if (!cancelled) setError(err);
-      })
+      }) // catch 回调到此结束
       // 无论成败都要收尾，防止 loading 永久为 true
       .finally(() => {
         // 仍有效时退出加载态
         if (!cancelled) setLoading(false);
-      });
+      }); // 链式调用收尾，整个请求流程结束
     // 清理函数：卸载或依赖变化时执行
     return () => {
       // 标记本次请求作废
       cancelled = true;
-    };
+    }; // 清理函数结束，交还给 useEffect
     // 依赖展开 deps 并附上 tick，使 reload 能触发重跑
   }, [...deps, tick]);
 

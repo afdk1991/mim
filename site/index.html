@@ -1,263 +1,507 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- 声明 HTML5 文档类型，让浏览器以标准模式渲染本页 -->
+<!-- 根元素：lang 标注页面主语言为简体中文，供屏幕阅读器与搜索引擎识别 -->
 <html lang="zh-CN">
+<!-- 文档头：集中声明编码、视口、标题、SEO 描述、站点图标与全站样式 -->
 <head>
+<!-- 字符编码声明放在最前，避免中文出现乱码 -->
 <meta charset="UTF-8" />
+<!-- 视口设置：宽度跟随设备并提供初始缩放比，保证移动端正确适配 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- 浏览器标签页标题，同时也是搜索结果的主标题 -->
 <title>Mim · 全平台产品底座</title>
+<!-- SEO 描述：一句话概括产品定位与覆盖端，供搜索引擎摘要展示 -->
 <meta name="description" content="Mim 全平台产品底座：Headless 中台 + 多端薄壳。一套业务逻辑，覆盖 Web、小程序、App、PC，支撑国内与出海双市场。" />
+<!-- 站点图标：直接内联 SVG 数据 URI，省去一次图片请求，避免 404 -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111'/><text x='16' y='22' font-size='16' font-family='system-ui' font-weight='700' fill='%23fff' text-anchor='middle'>M</text></svg>" />
+<!-- 全站样式表：设计令牌、组件样式与响应式断点集中内联，省掉一次外链请求 -->
 <style>
+  /* 全局设计令牌：颜色、圆角与内容宽度集中定义，便于统一换肤与调整版式 */
   :root{
+    /* 四档中性色：页面背景、卡片面板、次级面板与分割线，构成深色主题的层次 */
     --bg:#0b0c0e; --panel:#12141a; --panel-2:#171a21; --line:#262a33;
+    /* 三级文字色：主文本、次要说明、弱化信息，用于区分信息优先级 */
     --fg:#eef1f6; --fg-dim:#9aa3b2; --fg-mute:#6b7484;
+    /* 品牌主色蓝、辅助薄荷绿，以及全站统一的圆角半径 */
     --accent:#4f8cff; --accent-2:#7ee0c0; --radius:14px;
+    /* 内容容器最大宽度：控制大屏下的行长，避免长文本难以阅读 */
     --maxw:1120px;
+  /* 设计令牌声明块结束 */
   }
+  /* 全局重置：宽度改按 border-box 计算，并清掉浏览器默认的外边距与内边距 */
   *{box-sizing:border-box;margin:0;padding:0}
+  /* 开启锚点跳转的平滑滚动，改善单页内导航的过渡体验 */
   html{scroll-behavior:smooth}
+  /* 页面主体：承载全站默认的深色背景、字体与行高 */
   body{
+    /* 应用深色背景与主文字色，作为所有区块的基调 */
     background:var(--bg); color:var(--fg);
+    /* 字体栈：优先 Inter，中文依次回落苹方、微软雅黑，最后用系统无衬线字体 */
     font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    /* 行高 1.65 便于长文阅读；字体平滑让深色背景下的笔画更清晰 */
     line-height:1.65; -webkit-font-smoothing:antialiased;
+  /* body 样式块结束 */
   }
+  /* 链接默认继承父级文字色并去掉下划线，具体组件的悬停态另行定义 */
   a{color:inherit;text-decoration:none}
+  /* 通用内容容器：限制最大宽度、水平居中，并留出左右安全边距 */
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
   /* nav */
+  /* 顶部导航：粘性定位固定在视口顶部，并用毛玻璃与半透明背景分隔内容 */
   header{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);
+    /* 近黑色的半透明底加底部细线，滚动时内容从下方透出仍保有层次感 */
     background:rgba(11,12,14,.72);border-bottom:1px solid var(--line)}
+  /* 导航条布局：品牌居左、菜单居右，两端对齐并固定 64px 高度 */
   .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  /* 品牌区：图标与文字横向排列，字重加粗并轻微拉开字距 */
   .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em}
+  /* 品牌方块图标：30px 方形容器，用网格居中字母，配蓝色渐变底 */
   .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    /* 从主色到深蓝的对角渐变，让图标比纯色更有质感 */
     background:linear-gradient(140deg,var(--accent),#2f5fbf);font-size:15px;font-weight:800;color:#fff}
+  /* 导航菜单：横向排列，次级文字色，用间距代替竖线分隔 */
   .nav-links{display:flex;gap:26px;font-size:14px;color:var(--fg-dim)}
+  /* 菜单项悬停时提亮为主文字色，给出可点击的反馈 */
   .nav-links a:hover{color:var(--fg)}
+  /* 版本徽标：胶囊形描边，字号更小，用于展示当前构建版本号 */
   .badge{font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:999px;color:var(--fg-dim)}
   /* hero */
+  /* 首屏区域：上下留白形成视觉焦点，overflow 裁剪装饰光斑的溢出 */
   .hero{padding:88px 0 64px;position:relative;overflow:hidden}
+  /* 首屏装饰层：用伪元素铺一层光晕，绝对定位铺满并向外扩张 */
   .hero::before{content:"";position:absolute;inset:-40% 20% 40% -10%;
+    /* 左上蓝色、右上薄荷绿两处径向渐变叠加，营造柔和的环境光 */
     background:radial-gradient(60% 60% at 30% 20%,rgba(79,140,255,.18),transparent 70%),
+               /* 第二处渐变移到右上角，与主色形成冷暖呼应 */
                radial-gradient(50% 50% at 80% 0%,rgba(126,224,192,.12),transparent 70%);
+    /* 装饰层不接收鼠标事件，避免遮挡下方按钮的点击 */
     pointer-events:none}
+  /* 主标题：字号随视口在 34px 到 56px 间缩放，紧凑行高与负字距更显张力 */
   .hero h1{font-size:clamp(34px,5vw,56px);line-height:1.15;letter-spacing:-.02em;font-weight:800;max-width:16em}
+  /* 标题内强调片段：去掉斜体，改用渐变文字作为视觉重点 */
   .hero h1 em{font-style:normal;background:linear-gradient(100deg,var(--accent),var(--accent-2));
+    /* 把渐变裁切到文字字形内并让填充透明，实现渐变字效果 */
     -webkit-background-clip:text;background-clip:text;color:transparent}
+  /* 副标题段落：与标题拉开间距，限制行宽保证易读 */
   .hero p.lede{margin-top:20px;font-size:17px;color:var(--fg-dim);max-width:44em}
+  /* 行动按钮组：横向排列，间距 14px，窄屏时自动换行 */
   .cta{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap}
+  /* 按钮基础样式：行内弹性布局、统一内边距与圆角，并加过渡以支持悬停动效 */
   .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--line);transition:.18s}
+  /* 主按钮：反色处理，白底深字，成为页面最强视觉引导 */
   .btn.primary{background:var(--fg);color:#0b0c0e;border-color:transparent}
+  /* 主按钮悬停：轻微上移并投出亮色阴影，强化可按压的观感 */
   .btn.primary:hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,255,255,.14)}
+  /* 次级按钮悬停：加深边框并填充面板底色，保持低调但可辨识 */
   .btn.ghost:hover{border-color:#3a4150;background:var(--panel)}
   /* stats strip */
+  /* 数据条：四列等宽网格，用 1px 间隙露出底色形成分隔线效果 */
   .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    /* 外描边与圆角配合裁剪，让间隙线在拐角处也保持整齐 */
     border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-top:56px}
+  /* 每个数据格子：面板底色加内边距，与间隙线形成卡片感 */
   .strip div{background:var(--panel);padding:22px 20px}
+  /* 数据值：加粗大字并块级独占一行，突出关键数字 */
   .strip b{display:block;font-size:22px;font-weight:700;letter-spacing:-.01em}
+  /* 数据说明：小号弱化文字，作为数字的补充注释 */
   .strip span{font-size:13px;color:var(--fg-mute)}
   /* sections */
+  /* 内容分区：统一上下留白，并以上边框区分相邻区块 */
   section{padding:72px 0;border-top:1px solid var(--line)}
+  /* 分区标题组与下方内容之间留出呼吸空间 */
   .sec-head{margin-bottom:38px}
+  /* 眉题（kicker）：小号大写字距的强调标签，标示分区主题 */
   .kicker{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  /* 二级标题：字号随视口缩放，负字距让大字号看起来更紧凑 */
   h2{font-size:clamp(24px,3vw,32px);margin-top:10px;letter-spacing:-.01em}
+  /* 分区描述段落：限宽并降级为次要文字色，避免抢标题的注意力 */
   .sec-head p{margin-top:12px;color:var(--fg-dim);max-width:52em}
+  /* 通用网格容器：统一 16px 间距，列数由修饰类决定 */
   .grid{display:grid;gap:16px}
+  /* 三列网格：用于能力卡片等需要并列展示的内容 */
   .g3{grid-template-columns:repeat(3,1fr)}
+  /* 两列网格：用于状态等成对对比的卡片 */
   .g2{grid-template-columns:repeat(2,1fr)}
+  /* 卡片：面板底色配描边与圆角，统一内边距，并加过渡以支持悬停动效 */
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;transition:.18s}
+  /* 卡片悬停：边框提亮并轻微上浮，提示该卡片可交互 */
   .card:hover{border-color:#343b49;transform:translateY(-2px)}
+  /* 卡片标题：弹性布局让标签与文字同排，并留出左侧标题符号的位置 */
   .card h3{font-size:16px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  /* 卡片正文：小号次要文字色，承载说明性内容 */
   .card p{font-size:14px;color:var(--fg-dim)}
+  /* 标签：小号粗体圆角标记，蓝底蓝字用于 P0 等优先级标识 */
   .tag{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:6px;
+    /* 半透明蓝底配同色描边与浅蓝字，和主色体系保持一致 */
     background:rgba(79,140,255,.14);color:#8fb6ff;border:1px solid rgba(79,140,255,.28)}
+  /* P1 或规划态标签：换成薄荷绿体系，与 P0 形成明确的颜色区分 */
   .tag.p1{background:rgba(126,224,192,.12);color:#8fe3c8;border-color:rgba(126,224,192,.28)}
   /* architecture */
+  /* 架构分层容器：纵向排列四层，用 14px 间距表示层与层的关系 */
   .arch{display:grid;gap:14px}
+  /* 单层条目：横向排布「层名 + 描述」，面板底色与卡片一致 */
   .layer{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:20px 24px;display:flex;gap:22px;align-items:center}
+  /* 层名：固定最小宽度，保证四层的描述文字左边缘对齐 */
   .layer .l-name{min-width:150px;font-weight:700;font-size:15px}
+  /* 层描述：次要文字色，说明该层承担的职责 */
   .layer .l-desc{color:var(--fg-dim);font-size:14px}
+  /* 核心层高亮：左侧带蓝色渐隐底，视觉上强调共享业务层是架构重心 */
   .layer.core{background:linear-gradient(120deg,rgba(79,140,255,.10),var(--panel) 55%)}
   /* roadmap */
+  /* 路线图容器：三列等宽，与 P0 与 P1 的卡片刻度一致 */
   .road{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  /* 路线卡片：预留顶部空间，给伪元素色条让位 */
   .road .card{position:relative;padding-top:28px}
+  /* 卡片顶部装饰条：用伪元素画一小段蓝色短线，标记阶段进度 */
   .road .card::before{content:"";position:absolute;left:24px;top:16px;width:34px;height:3px;border-radius:2px;background:var(--accent)}
+  /* P1 阶段装饰条改为薄荷绿，与标签颜色语义保持一致 */
   .road .card.p1::before{background:var(--accent-2)}
   /* footer */
+  /* 页脚：上边框分隔，弱化文字色，内容低调不抢主视觉 */
   footer{border-top:1px solid var(--line);padding:44px 0;color:var(--fg-mute);font-size:13px}
+  /* 页脚布局：左右两端对齐，窄屏时自动换行成上下两行 */
   .foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  /* 页脚链接：提亮为次要文字色，比正文更可辨识 */
   .foot a{color:var(--fg-dim)}
+  /* 页脚链接悬停时提亮到主文字色，给出可点击反馈 */
   .foot a:hover{color:var(--fg)}
+  /* 平板断点：三列降为两列，数据条两列，路线图单列并隐藏顶部菜单 */
   @media (max-width:900px){
+    /* 能力卡片由三列改为两列，避免窄屏下每列过窄 */
     .g3{grid-template-columns:1fr 1fr}
+    /* 数据条由四列改为两列两行，保持数字可读 */
     .strip{grid-template-columns:1fr 1fr}
+    /* 路线图改为单列纵向排列，避免三列挤压文字 */
     .road{grid-template-columns:1fr}
+    /* 屏幕变窄后隐藏导航菜单，仅保留品牌与版本号 */
     .nav-links{display:none}
+  /* 平板断点的样式块结束 */
   }
+  /* 手机断点：所有网格改为单列，架构层改为纵向堆叠并压缩首屏留白 */
   @media (max-width:560px){
+    /* 两列与三列网格统一降为单列，保证小屏阅读宽度 */
     .g3,.g2{grid-template-columns:1fr}
+    /* 架构层改为上下排列：层名在上、描述在下，避免横向溢出 */
     .layer{flex-direction:column;align-items:flex-start;gap:8px}
+    /* 手机端首屏留白收紧，让核心标题尽早进入首屏可视区 */
     .hero{padding:56px 0 40px}
+  /* 手机断点的样式块结束 */
   }
+  /* 样式表结束：以上覆盖全站视觉与两档响应式断点 */
 </style>
+<!-- 文档头结束：元信息、图标与样式均已声明完毕 -->
 </head>
+<!-- 可见内容开始：按导航、主内容、页脚三段组织 -->
 <body>
 
+<!-- 顶部导航区：固定吸顶，包含品牌、版本徽标与站点内锚点菜单 -->
 <header>
+  <!-- 导航内容容器：沿用 wrap 控制最大宽度，再叠加 nav 的横向布局 -->
   <div class="wrap nav">
+    <!-- 品牌区：方块图标、产品名与当前构建版本徽标；ver 供脚本回填真实版本号 -->
     <div class="brand"><div class="logo">M</div>Mim<span class="badge" id="ver">V0.0.0-preview</span></div>
+    <!-- 导航菜单：四个纯锚点链接，不发起页面跳转以外的新窗口行为 -->
     <nav class="nav-links">
+      <!-- 锚点跳转到架构分区，由 section 的 id 接收 -->
       <a href="#arch">架构</a>
+      <!-- 锚点跳转到 P0 能力分区 -->
       <a href="#p0">P0 能力</a>
+      <!-- 锚点跳转到路线图分区 -->
       <a href="#roadmap">路线</a>
+      <!-- 同站相对链接，跳转到由静态服务托管的 PRD 页面 -->
       <a href="/prd.html">PRD</a>
+    <!-- 导航菜单结束 -->
     </nav>
+  <!-- 顶部导航容器结束 -->
   </div>
+<!-- 吸顶导航区结束 -->
 </header>
 
+<!-- 主内容区：依次承载首屏、架构、P0 能力、路线图与仓库状态五个板块 -->
 <main>
+  <!-- 首屏：主标题、产品定位说明、行动按钮与关键数据条 -->
   <div class="wrap hero">
+    <!-- 主标题：前半句陈述价值主张，em 内为渐变强调的核心卖点 -->
     <h1>一套业务逻辑，<em>覆盖所有端与市场</em></h1>
+    <!-- 首屏说明段：解释 Headless 中台与多端薄壳的分工，并点出国内海外共用身份与数据 -->
     <p class="lede">
+      <!-- 正文承接换行书写，浏览器会把连续空白折叠为单个空格，输出仍是一段 -->
       Mim 是全平台产品底座：以 Headless 中台 + 多端薄壳承载账号、订阅支付、SaaS 工作区与合规能力，
+      <!-- 后半句强调各端只做 UI 与平台适配，国内与出海共用同一套身份与数据 -->
       Web / 小程序 / App / PC 各自只做 UI 与平台适配，国内与出海共用同一身份与数据。
+    <!-- 首屏说明段落结束 -->
     </p>
+    <!-- 行动按钮组：主按钮引导查看交付范围，次按钮引导阅读 PRD -->
     <div class="cta">
+      <!-- 主按钮：锚点跳到 P0 分区，说明当前版本到底交付了什么 -->
       <a class="btn primary" href="#p0">查看 P0 交付范围</a>
+      <!-- 次按钮：打开 PRD 静态页，供需要完整背景的读者深入阅读 -->
       <a class="btn ghost" href="/prd.html">阅读产品需求文档</a>
+    <!-- 行动按钮组结束 -->
     </div>
 
+    <!-- 数据条：用四个关键数字快速建立产品规模认知 -->
     <div class="strip">
+      <!-- 第一个数据：覆盖端数量，说明同一套逻辑要落到四类终端 -->
       <div><b>4 端</b><span>Web / 小程序 / App / PC</span></div>
+      <!-- 第二个数据：目标市场数量，国内与出海共用一套底座 -->
       <div><b>2 市场</b><span>国内 + 出海</span></div>
+      <!-- 第三个数据：能力域数量，列出 P0 的六个核心域 -->
       <div><b>6 能力域</b><span>账号 · 支付 · 工作区 · 多端 · i18n · 合规</span></div>
+      <!-- 第四个数据：身份体系数量，强调跨端只维护一个账号主体 -->
       <div><b>1 身份</b><span>跨端账号与订阅打通</span></div>
+    <!-- 数据条结束 -->
     </div>
+  <!-- 首屏容器结束 -->
   </div>
 
+  <!-- 架构分区：解释中台与各端的分层关系，是理解全站其余内容的前提 -->
   <section id="arch">
+    <!-- 分区内容容器，沿用 wrap 的宽度约束 -->
     <div class="wrap">
+      <!-- 分区标题组：眉题、主标题与一句话说明 -->
       <div class="sec-head">
+        <!-- 眉题：英文 Architecture，标示本区主题 -->
         <div class="kicker">Architecture</div>
+        <!-- 分区主标题：点明架构的基本形态 -->
         <h2>Headless 中台 + 多端薄壳</h2>
+        <!-- 分区说明：解释下沉共享层的收益，即改一处所有端一致生效 -->
         <p>业务逻辑、能力网关、账号与数据下沉为共享层；各端只负责 UI 与平台 API 适配。改一处，所有端一致生效。</p>
+      <!-- 架构分区标题组结束 -->
       </div>
+      <!-- 分层列表：自上而下依次是多端、共享业务层、能力网关、数据与合规 -->
       <div class="arch">
+        <!-- 顶层：各终端的薄壳，只承载界面与平台差异 -->
         <div class="layer">
+          <!-- 层名：多端薄壳 -->
           <div class="l-name">多端薄壳</div>
+          <!-- 层描述：枚举四类目标终端，说明它们只做界面与平台适配 -->
           <div class="l-desc">Web、微信小程序、iOS / Android、Windows / macOS —— 仅承载界面与平台差异</div>
+        <!-- 多端薄壳层结束 -->
         </div>
+        <!-- 核心层：共享业务层，加 core 类做渐变高亮 -->
         <div class="layer core">
+          <!-- 层名：共享业务层 -->
           <div class="l-name">共享业务层</div>
+          <!-- 层描述：四大核心业务能力统一实现、统一治理 -->
           <div class="l-desc">账号与身份、订阅与支付、SaaS 工作区、通知与规则 —— 统一实现、统一治理</div>
+        <!-- 共享业务层结束 -->
         </div>
+        <!-- 能力层：对外部服务的统一封装，屏蔽国内外差异 -->
         <div class="layer">
+          <!-- 层名：能力网关与驱动 -->
           <div class="l-name">能力网关与驱动</div>
+          <!-- 层描述：支付、IM、音视频、AI 均以统一接口暴露，差异由驱动层消化 -->
           <div class="l-desc">支付通道（国内通道 / Stripe · PayPal / IAP）、IM、音视频、AI —— 以统一接口暴露，国内外差异由驱动层屏蔽</div>
+        <!-- 能力网关与驱动层结束 -->
         </div>
+        <!-- 底层：数据对象与合规约束，是其他三层共同的落地基础 -->
         <div class="layer">
+          <!-- 层名：数据与合规 -->
           <div class="l-name">数据与合规</div>
+          <!-- 层描述：共享业务对象清单，以及最小收集、可注销、可删除的合规要求 -->
           <div class="l-desc">用户、账号、订阅、订单、计划等共享业务对象；PIPL / GDPR 最小收集、可注销、可删除</div>
+        <!-- 数据与合规层结束 -->
         </div>
+      <!-- 分层列表结束 -->
       </div>
+    <!-- 架构分区容器结束 -->
     </div>
+  <!-- 架构分区结束 -->
   </section>
 
+  <!-- P0 能力分区：列出必须交付的六项需求，对应 PRD 中的 FR 编号 -->
   <section id="p0">
+    <!-- 分区内容容器 -->
     <div class="wrap">
+      <!-- 分区标题组 -->
       <div class="sec-head">
+        <!-- 眉题：说明这一组是 P0 必须交付的范围 -->
         <div class="kicker">P0 · 必须交付</div>
+        <!-- 分区主标题：核心用户旅程 -->
         <h2>核心用户旅程</h2>
+        <!-- 分区说明：用箭头串起注册到跨端使用的完整闭环 -->
         <p>注册账号 → 选择订阅计划 → 完成支付 → 使用核心 SaaS 功能 → 跨端继续使用。</p>
+      <!-- P0 分区标题组结束 -->
       </div>
+      <!-- 六张能力卡片：三列网格排布，每张对应一个 FR 编号 -->
       <div class="grid g3">
+        <!-- FR-01：账号与身份，含国内外不同的登录组合 -->
         <div class="card">
+          <!-- 卡片标题：需求编号、名称与 P0 标签 -->
           <h3>FR-01 账号与身份 <span class="tag">P0</span></h3>
+          <!-- 卡片正文：说明国内用手机号加第三方，海外用邮箱加第三方 -->
           <p>注册、登录、跨端账号打通。国内：手机号 + 微信 / 支付宝；海外：邮箱 + Google / Apple。</p>
+        <!-- FR-01 账号与身份卡片结束 -->
         </div>
+        <!-- FR-02：订阅与支付，覆盖国内外多种支付通道 -->
         <div class="card">
+          <!-- 卡片标题：需求编号、名称与 P0 标签 -->
           <h3>FR-02 订阅与支付 <span class="tag">P0</span></h3>
+          <!-- 卡片正文：列举计划展示、支付方式、订单与凭证校验等子能力 -->
           <p>计划展示、订阅、支付（国内通道 + Stripe / PayPal + Apple IAP / Google Play）、订单、退款与凭证校验。</p>
+        <!-- FR-02 订阅与支付卡片结束 -->
         </div>
+        <!-- FR-03：核心 SaaS 工作区，即跨端任务与轻协作工具 -->
         <div class="card">
+          <!-- 卡片标题：需求编号、名称与 P0 标签 -->
           <h3>FR-03 核心 SaaS 工作区 <span class="tag">P0</span></h3>
+          <!-- 卡片正文：说明工作区包含任务管理、实时同步、协作与仪表盘 -->
           <p>跨端任务与轻协作工具：任务管理、多端实时同步、基础协作、个人仪表盘。</p>
+        <!-- FR-03 核心工作区卡片结束 -->
         </div>
+        <!-- FR-04：多端体验一致性，明确端与系统版本的支持边界 -->
         <div class="card">
+          <!-- 卡片标题：需求编号、名称与 P0 标签 -->
           <h3>FR-04 多端体验一致性 <span class="tag">P0</span></h3>
+          <!-- 卡片正文：至少一端可用，其余端适配，并划出系统版本下限 -->
           <p>Web、微信小程序、App、PC 至少一端可用，其余端适配；低于最低版本的系统不纳入支持范围。</p>
+        <!-- FR-04 多端一致性卡片结束 -->
         </div>
+        <!-- FR-05：国际化与本地化，含语言、币种与时区 -->
         <div class="card">
+          <!-- 卡片标题：需求编号、名称与 P0 标签 -->
           <h3>FR-05 国际化与本地化 <span class="tag">P0</span></h3>
+          <!-- 卡片正文：强调国内与出海共用同一套内容与计费模型 -->
           <p>i18n 多语言、多币种、多时区，国内与出海共用一套内容与计费模型。</p>
+        <!-- FR-05 国际化卡片结束 -->
         </div>
+        <!-- FR-06：合规与隐私，覆盖政策文本与注销删除全流程 -->
         <div class="card">
+          <!-- 卡片标题：需求编号、名称与 P0 标签 -->
           <h3>FR-06 合规与隐私 <span class="tag">P0</span></h3>
+          <!-- 卡片正文：隐私政策、用户协议、数据清单与注销删除请求均可审计 -->
           <p>隐私政策、用户协议、数据收集清单、账号注销与数据删除请求，全流程可审计。</p>
+        <!-- FR-06 合规与隐私卡片结束 -->
         </div>
+      <!-- 六张能力卡片网格结束 -->
       </div>
+    <!-- P0 分区容器结束 -->
     </div>
+  <!-- P0 能力分区结束 -->
   </section>
 
+  <!-- 路线图分区：说明 P0 与 P1 的分期交付安排 -->
   <section id="roadmap">
+    <!-- 分区内容容器 -->
     <div class="wrap">
+      <!-- 分区标题组 -->
       <div class="sec-head">
+        <!-- 眉题：Roadmap，标示分期规划 -->
         <div class="kicker">Roadmap</div>
+        <!-- 分区主标题：分期交付 -->
         <h2>分期交付</h2>
+        <!-- 分区说明：P0 先闭环，P1 再扩展重资产能力与更多平台 -->
         <p>P0 先打通「注册 → 订阅 → 支付 → 使用 → 跨端」闭环；P1 再扩展重资产能力与更多平台。</p>
+      <!-- 路线图标题组结束 -->
       </div>
+      <!-- 三张路线卡片：当前版本一张，规划中的能力扩展与更多端各一张 -->
       <div class="road">
+        <!-- 当前版本卡片：展示 P0 已覆盖的六个能力域 -->
         <div class="card">
+          <!-- 卡片标题：阶段名与当前构建版本号 -->
           <h3>P0 · 当前版本 <span class="tag">V0.0.0-preview</span></h3>
+          <!-- 卡片正文：罗列 P0 交付的能力域 -->
           <p>账号、订阅支付、SaaS 工作区、多端一致性、i18n 基础、合规与隐私。</p>
+        <!-- P0 当前版本卡片结束 -->
         </div>
+        <!-- P1 能力扩展卡片：加 p1 类把装饰条换成薄荷绿 -->
         <div class="card p1">
+          <!-- 卡片标题：阶段名与「规划」标签 -->
           <h3>P1 · 能力扩展 <span class="tag p1">规划</span></h3>
+          <!-- 卡片正文：列出 IM、音视频、AI 编排等重资产能力 -->
           <p>IM 即时通讯、音视频（信令 / SFU / 转码）、AI 编排、内容管理、开放平台、管理后台。</p>
+        <!-- P1 能力扩展卡片结束 -->
         </div>
+        <!-- P1 更多端卡片：同样使用规划态的绿色装饰条 -->
         <div class="card p1">
+          <!-- 卡片标题：阶段名与「规划」标签 -->
           <h3>P1 · 更多端 <span class="tag p1">规划</span></h3>
+          <!-- 卡片正文：列出后续要接入的小程序平台、鸿蒙与国产化 PC -->
           <p>支付宝 / 抖音 / 百度 / QQ 小程序、鸿蒙、Linux 与国产化 PC。</p>
+        <!-- P1 更多端卡片结束 -->
         </div>
+      <!-- 三张路线卡片结束 -->
       </div>
+    <!-- 路线图容器结束 -->
     </div>
+  <!-- 路线图分区结束 -->
   </section>
 
+  <!-- 仓库状态分区：如实告知当前已具备与进行中的工作，避免对外过度承诺 -->
   <section id="status">
+    <!-- 分区内容容器 -->
     <div class="wrap">
+      <!-- 分区标题组：本区只有眉题与主标题，无补充说明 -->
       <div class="sec-head">
+        <!-- 眉题：Status，标示仓库现状 -->
         <div class="kicker">Status</div>
+        <!-- 分区主标题：当前仓库状态 -->
         <h2>当前仓库状态</h2>
+      <!-- 状态分区标题组结束 -->
       </div>
+      <!-- 两张状态卡片：已具备与进行中，两列并排展示 -->
       <div class="grid g2">
+        <!-- 已具备卡片：列出文档、规则与校验脚本等已有资产 -->
         <div class="card">
+          <!-- 卡片标题：已具备 -->
           <h3>已具备</h3>
+          <!-- 卡片正文：PRD、协作铁律、Wiki、密钥登记清单、空值模板与两个零依赖校验脚本 -->
           <p>产品需求文档（PRD）、协作铁律（AGENTS.md 七条）、Wiki 结构化文档（01~09）、第三方 SDK / 密钥登记清单（09）与空值模板 .env.example、.gitignore，以及 scripts/version-check.mjs 与 scripts/env-check.mjs 两个零依赖校验脚本。</p>
+        <!-- 已具备卡片结束 -->
         </div>
+        <!-- 进行中卡片：说明当前正在落地的 P0 范围 -->
         <div class="card">
+          <!-- 卡片标题：进行中 -->
           <h3>进行中</h3>
+          <!-- 卡片正文：共享业务层与首个端，以及支付与合规接入 -->
           <p>按 P0 范围落地共享业务层与首个端（Web + 微信小程序），并接入支付与合规能力。</p>
+        <!-- 进行中卡片结束 -->
         </div>
+      <!-- 状态卡片网格结束 -->
       </div>
+    <!-- 状态分区容器结束 -->
     </div>
+  <!-- 仓库状态分区结束 -->
   </section>
+<!-- 主内容区结束 -->
 </main>
 
+<!-- 页脚：版权信息、文档入口与版本号 -->
 <footer>
+  <!-- 页脚内容容器：左右两组信息两端对齐 -->
   <div class="wrap foot">
+    <!-- 左侧：版权与产品定位 -->
     <div>© 2026 Mim · 全平台产品底座</div>
+    <!-- 右侧：PRD 链接、架构锚点与版本号；ver2 供脚本回填真实版本 -->
     <div>
+      <!-- 指向 PRD 静态页的相对链接 -->
       <a href="/prd.html">产品需求文档</a> ·
+      <!-- 返回页面顶部架构分区的锚点链接 -->
       <a href="#arch">架构</a> ·
+      <!-- 版本号占位：与页头徽标由同一脚本同步 -->
       <span id="ver2">V0.0.0-preview</span>
+    <!-- 页脚右侧信息组结束：链接与版本号 -->
     </div>
+  <!-- 页脚内容容器结束 -->
   </div>
+<!-- 页脚结束 -->
 </footer>
 
+<!-- 内联脚本：把真实版本号写入页头与页脚两处占位 -->
 <script>
   // 版本号与 PRD 单一来源保持一致：部署时若注入 window.__MIM_VERSION__ 则以其为准
   (function () {
+    // 优先取部署阶段注入的全局版本号，未注入时回落到仓库默认的预览版本
     var v = (window.__MIM_VERSION__ || "V0.0.0-preview");
+    // 回填页头品牌旁的版本徽标
     document.getElementById("ver").textContent = v;
+    // 回填页脚右侧的版本号，保证两处展示一致
     document.getElementById("ver2").textContent = v;
+  // 立即执行函数结束：版本号回填完成，且不向全局作用域暴露任何变量
   })();
+<!-- 内联脚本结束 -->
 </script>
+<!-- 页面主体结束 -->
 </body>
+<!-- 根元素结束，文档到此完整闭合 -->
 </html>
