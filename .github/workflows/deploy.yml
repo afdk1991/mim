@@ -247,28 +247,13 @@ jobs:
       - name: 构建前端（同源，由各平台反代 /api）
         run: pnpm --filter @mim/web build
 
-      - name: Cloudflare Pages
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_WRANGLER_CONFIG: ${{ secrets.CLOUDFLARE_WRANGLER_CONFIG }}
-        run: |
-          # 优先使用长期 API Token；未配置时回退到 wrangler OAuth 凭据（含 refresh_token 自动续期）
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_WRANGLER_CONFIG" ]; then
-            mkdir -p ~/.config/.wrangler/config
-            printf '%s\n' "$CLOUDFLARE_WRANGLER_CONFIG" > ~/.config/.wrangler/config/default.toml
-            chmod 600 ~/.config/.wrangler/config/default.toml
-            echo "使用 wrangler OAuth 凭据部署"
-          fi
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_WRANGLER_CONFIG" ]; then
-            echo "SKIP: 缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_WRANGLER_CONFIG"; exit 0
-          fi
-          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main
-
+      # 各平台步骤相互隔离：单个平台失败（凭证过期 / 平台侧故障）不得阻断其余平台同步。
+      # 失败仍会在该步骤标红并输出原因，便于定位。
       # Vercel：仓库是 pnpm monorepo，在根目录部署会被 Vercel 自动识别出多个 service
       # （mim-api / mim-web）并与根级构建属性冲突。因此改为「干净静态目录 + 根 vercel.json」部署：
       # 目录内只有 apps/web/dist 产物与反代/SPA 回退配置，Vercel 视为纯静态站点。
       - name: Vercel
+        continue-on-error: true
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -286,7 +271,27 @@ jobs:
           cd "$STATIC_DIR"
           npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tail -n 20
 
+      - name: Cloudflare Pages
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_WRANGLER_CONFIG: ${{ secrets.CLOUDFLARE_WRANGLER_CONFIG }}
+        run: |
+          # 优先使用长期 API Token；未配置时回退到 wrangler OAuth 凭据（含 refresh_token 自动续期）
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_WRANGLER_CONFIG" ]; then
+            mkdir -p ~/.config/.wrangler/config
+            printf '%s\n' "$CLOUDFLARE_WRANGLER_CONFIG" > ~/.config/.wrangler/config/default.toml
+            chmod 600 ~/.config/.wrangler/config/default.toml
+            echo "使用 wrangler OAuth 凭据部署"
+          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_WRANGLER_CONFIG" ]; then
+            echo "SKIP: 缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_WRANGLER_CONFIG"; exit 0
+          fi
+          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main
+
       - name: Render
+        continue-on-error: true
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
@@ -296,6 +301,7 @@ jobs:
           curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
 
       - name: Sealos
+        continue-on-error: true
         env:
           SEALOS_KUBECONFIG: ${{ secrets.SEALOS_KUBECONFIG }}
           SEALOS_DOMAIN: ${{ secrets.SEALOS_DOMAIN }}
@@ -313,6 +319,7 @@ jobs:
           kubectl -n mim rollout status deployment/mim-api --timeout=180s
 
       - name: veFaaS
+        continue-on-error: true
         env:
           VE_ACCESS_KEY: ${{ secrets.VE_ACCESS_KEY }}
           VE_SECRET_KEY: ${{ secrets.VE_SECRET_KEY }}
@@ -320,6 +327,7 @@ jobs:
         run: bash deploy/vefaas/deploy.sh
 
       - name: IGA Pages
+        continue-on-error: true
         env:
           IGA_TOKEN: ${{ secrets.IGA_TOKEN }}
           IGA_PROJECT_ID: ${{ secrets.IGA_PROJECT_ID }}
