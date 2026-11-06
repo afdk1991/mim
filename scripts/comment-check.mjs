@@ -42,6 +42,9 @@ const args = process.argv.slice(2);
 const STRICT = args.includes('--strict');
 const thresholdArg = args.find((a) => a.startsWith('--threshold='));
 const THRESHOLD = thresholdArg ? Number(thresholdArg.split('=')[1]) : DEFAULT_THRESHOLD;
+// 缺口清单展示条数：默认 20；--top=999 可一次看全，便于分批补齐时锁定完整待办列表。
+const topArg = args.find((a) => a.startsWith('--top='));
+const TOP_N = topArg ? Number(topArg.split('=')[1]) : 20;
 
 // 行内注释标记：// 前面不能是冒号或字母数字，避免把 https:// 误判为注释。
 const LINE_COMMENT = /(^|[^:\w])\/\//;
@@ -167,9 +170,9 @@ console.log(`阈值: ${(THRESHOLD * 100).toFixed(0)}% | 模式: ${STRICT ? 'stri
 console.log(`文件数: ${results.length} | 可注释行: ${totalLines} | 已解释行: ${coveredLines} | 总体覆盖率: ${(overall * 100).toFixed(1)}%`);
 console.log(`未达标文件: ${failing.length}`);
 
-// 输出缺口最大的前 20 个文件，便于分批补齐
-console.log('\n-- 缺口 Top 20（覆盖率升序）--');
-for (const r of results.slice(0, 20)) {
+// 输出缺口最大的前 N 个文件（默认 20），便于分批补齐
+console.log(`\n-- 缺口 Top ${TOP_N}（覆盖率升序）--`);
+for (const r of results.slice(0, TOP_N)) {
   const flag = r.ratio < THRESHOLD ? '❌' : '✅';
   console.log(`${flag} ${(r.ratio * 100).toFixed(1).padStart(6)}%  ${r.covered}/${r.total}  ${r.file}`);
 }
