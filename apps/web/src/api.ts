@@ -258,4 +258,226 @@ export const api = {
   cancelDeletion() {
     return request<{ status: string }>('/me/cancel-deletion', { method: 'POST', body: {} });
   },
+
+  // ---------- 功能模块商城（catalog）----------
+
+  catalog: {
+    getModules() {
+      return request<{
+        modules: Array<{
+          code: string;
+          name: string;
+          summary: string;
+          unlock_mode: 'one_time';
+          region: Region;
+          status: string;
+          requires: string[];
+          current_price: { currency: string; amount_minor: number } | null;
+        }>;
+      }>('/modules', { auth: false, idempotency: false });
+    },
+    getModule(code: string) {
+      return request<{
+        code: string;
+        name: string;
+        summary: string;
+        unlock_mode: 'one_time';
+        region: Region;
+        status: string;
+        requires: string[];
+        current_price: { currency: string; amount_minor: number } | null;
+        price_history: Array<{
+          currency: string;
+          amount_minor: number;
+          effective_from: string;
+          effective_to: string | null;
+        }>;
+      }>(`/modules/${encodeURIComponent(code)}`, { auth: false, idempotency: false });
+    },
+    unlockModule(module_code: string) {
+      return request<{
+        entitlement: {
+          id: string;
+          module_code: string;
+          module_name: string;
+          status: string;
+          expires_at: string | null;
+          version: number;
+          created_at: string;
+        };
+      }>('/entitlements', { method: 'POST', body: { module_code } });
+    },
+    getMyEntitlements() {
+      return request<{
+        entitlements: Array<{
+          id: string;
+          module_code: string;
+          module_name: string;
+          status: string;
+          expires_at: string | null;
+          created_at: string;
+        }>;
+      }>('/me/entitlements', { idempotency: false });
+    },
+  },
+
+  // ---------- 漫剧 AI 剧（comic）----------
+
+  comic: {
+    listProjects() {
+      return request<{
+        projects: Array<{
+          id: string;
+          title: string;
+          status: string;
+          updated_at: string;
+          version: number;
+        }>;
+      }>('/comic/projects', { idempotency: false });
+    },
+    createProject(payload: { title: string; synopsis?: string }) {
+      return request<{
+        id: string;
+        title: string;
+        status: string;
+        created_at: string;
+      }>('/comic/projects', { method: 'POST', body: payload });
+    },
+    getProject(id: string) {
+      return request<{
+        id: string;
+        title: string;
+        synopsis: string | null;
+        status: string;
+        region: Region;
+        version: number;
+        storyboard?: unknown;
+        characters?: unknown[];
+        created_at: string;
+        updated_at: string;
+      }>(`/comic/projects/${encodeURIComponent(id)}`, { idempotency: false });
+    },
+    updateProject(id: string, payload: { title?: string; synopsis?: string }) {
+      return request<{ id: string; updated_at: string }>(
+        `/comic/projects/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: payload },
+      );
+    },
+    deleteProject(id: string) {
+      return request<{ ok: true }>(`/comic/projects/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    },
+    saveStoryboard(id: string, payload: { shots: unknown[]; confirmed?: boolean }) {
+      return request<{
+        id: string;
+        project_id: string;
+        version_no: number;
+        confirmed_at: string | null;
+      }>(`/comic/projects/${encodeURIComponent(id)}/storyboard`, {
+        method: 'POST',
+        body: payload,
+      });
+    },
+    addCharacter(
+      id: string,
+      payload: { name: string; appearance_prompt: string; seed?: number; voice_profile?: string },
+    ) {
+      return request<{
+        id: string;
+        project_id: string;
+        name: string;
+        created_at: string;
+      }>(`/comic/projects/${encodeURIComponent(id)}/characters`, {
+        method: 'POST',
+        body: payload,
+      });
+    },
+    suggest(id: string, kind: 'script' | 'storyboard' | 'dialogue' | 'tts', context?: unknown) {
+      return request<{
+        kind: string;
+        model: string;
+        suggestion: unknown;
+        requires_confirmation: boolean;
+      }>(`/comic/projects/${encodeURIComponent(id)}/suggest`, {
+        method: 'POST',
+        body: { kind, context },
+      });
+    },
+    listJobs(projectId: string) {
+      return request<{ jobs: unknown[] }>(
+        `/comic/projects/${encodeURIComponent(projectId)}/jobs`,
+        { idempotency: false },
+      );
+    },
+    createJob(
+      projectId: string,
+      payload: { job_type: 'text' | 'image' | 'video' | 'tts' | 'compose'; payload?: unknown },
+    ) {
+      return request<{ id: string; status: string }>(
+        `/comic/projects/${encodeURIComponent(projectId)}/jobs`,
+        { method: 'POST', body: payload },
+      );
+    },
+    getJob(id: string) {
+      return request<{ id: string; status: string; payload: unknown; result: unknown }>(
+        `/comic/jobs/${encodeURIComponent(id)}`,
+        { idempotency: false },
+      );
+    },
+    jobAction(id: string, action: 'start' | 'complete' | 'fail' | 'cancel' | 'retry') {
+      return request<{ ok: true }>(`/comic/jobs/${encodeURIComponent(id)}/${action}`, {
+        method: 'POST',
+      });
+    },
+    listFilms(projectId: string) {
+      return request<{ films: unknown[] }>(
+        `/comic/projects/${encodeURIComponent(projectId)}/films`,
+        { idempotency: false },
+      );
+    },
+    createFilm(projectId: string, payload: { title: string }) {
+      return request<{ id: string; title: string; status: string }>(
+        `/comic/projects/${encodeURIComponent(projectId)}/films`,
+        { method: 'POST', body: payload },
+      );
+    },
+    getFilm(id: string) {
+      return request<unknown>(`/comic/films/${encodeURIComponent(id)}`, { idempotency: false });
+    },
+    publishFilm(id: string, action: 'submit-review' | 'publish' | 'archive') {
+      return request<{ ok: true }>(`/comic/films/${encodeURIComponent(id)}/${action}`, {
+        method: 'POST',
+      });
+    },
+    rejectFilm(id: string, reason: string) {
+      return request<{ ok: true }>(`/comic/films/${encodeURIComponent(id)}/reject`, {
+        method: 'POST',
+        body: { reason },
+      });
+    },
+  },
+
+  // ---------- 对象存储（media）----------
+
+  media: {
+    presignUpload(object_key: string) {
+      return request<{ upload_url: string; method: string; headers: Record<string, string> }>(
+        '/media/presign/upload',
+        { method: 'POST', body: { object_key } },
+      );
+    },
+    presignDownload(object_key: string) {
+      return request<{ download_url: string; expires_in: number }>('/media/presign/download', {
+        method: 'POST',
+        body: { object_key },
+      });
+    },
+    listAssets(project_id: string) {
+      return request<{ assets: unknown[] }>(`/media/assets?project_id=${encodeURIComponent(project_id)}`, {
+        method: 'GET',
+        idempotency: false,
+      });
+    },
+  },
 };

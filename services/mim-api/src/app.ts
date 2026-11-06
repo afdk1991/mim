@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import type { Express, NextFunction, Request, Response } from 'express';
 import { createAuthRouter } from './routes/auth.js';
+import { createCatalogRouter } from './routes/catalog.js';
 import { createMeRouter } from './routes/me.js';
 import { createComicRouter } from './routes/comic.js';
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js';
@@ -59,6 +60,9 @@ export function createApp(deps: ApiDeps): Express {
 
   // 公开路由：验证码/登录/刷新
   app.use('/api/v1', createAuthRouter(resolved));
+
+  // 商城路由：GET /modules 公开；POST /entitlements + GET /me/entitlements 内部 requireAuth
+  app.use('/api/v1', createCatalogRouter(resolved));
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [

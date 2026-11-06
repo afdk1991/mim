@@ -5,8 +5,10 @@ import { api, clearSession, getSession, setSession } from './api';
 import type { Session, UserInfo } from './api';
 import { Login } from './views/Login';
 import { Settings } from './views/Settings';
+import { Store } from './views/Store';
+import { ComicWorkbench } from './views/ComicWorkbench';
 
-type View = 'settings';
+type View = 'store' | 'comic' | 'settings';
 
 interface Route {
   view: View;
@@ -14,7 +16,7 @@ interface Route {
 
 export function App() {
   const [session, setLocalSession] = useState<Session | null>(getSession());
-  const [route, setRoute] = useState<Route>({ view: 'settings' });
+  const [route, setRoute] = useState<Route>({ view: 'store' });
 
   if (!session) {
     return (
@@ -22,7 +24,7 @@ export function App() {
         onLogin={(result) => {
           setSession(result);
           setLocalSession(result);
-          setRoute({ view: 'settings' });
+          setRoute({ view: 'store' });
         }}
       />
     );
@@ -48,6 +50,8 @@ export function App() {
   }
 
   const navItems: Array<{ view: View; label: string }> = [
+    { view: 'store', label: locale === 'en-US' ? 'Modules' : '功能模块' },
+    { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     { view: 'settings', label: t(locale, 'nav.settings') },
   ];
 
@@ -80,6 +84,8 @@ export function App() {
       </aside>
 
       <main className="main">
+        {route.view === 'store' && <Store locale={locale} />}
+        {route.view === 'comic' && <ComicWorkbench locale={locale} />}
         {route.view === 'settings' && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} />
         )}
