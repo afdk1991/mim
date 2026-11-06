@@ -248,7 +248,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.538s / 0.111s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
 | Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 21.27s（DNS 污染到 108.160.169.37，TCP 超时） |
-| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `647a5fc`，2026-11-06 23:19:32 +0800） | `https://github.com/afdk1991/mim` | 本机 000 / 0.020s（HTTPS 阻断；仓库操作经 git push / gh CLI 取证 ✅） |
+| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `34e2c54`，2026-11-06 23:20 +0800 推送） | `https://github.com/afdk1991/mim` | 本机 000 / 0.020s（HTTPS 阻断；仓库操作经 git push / gh CLI 取证 ✅） |
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 
