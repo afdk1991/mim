@@ -142,20 +142,27 @@ function analyze(file) {
         const idx = Math.max(line.lastIndexOf('/*'), line.lastIndexOf('<!--'));
         const before = idx >= 0 ? line.slice(0, idx).trim() : ''; // 注释标记之前的代码
         const after = closed ? line.split(/\*\/|-->/).pop().trim() : ''; // 闭合标记之后的代码
+        // 只有「标记之前无代码」且「标记之后无代码」才算纯注释行
         commentOnly = before === '' && after === '';
       // 起始标记处理完毕：commentOnly 已按标记前后是否残留代码确定
       }
       // 行注释判定（仅当本行尚未命中块注释逻辑）
       if (!hasComment && LINE_COMMENT.test(line)) {
+        // 命中行注释标记：本行视为已解释
         hasComment = true;
+        // 整行只有行注释才算「纯注释」；行尾注释仍视为有代码的行
         commentOnly = LINE_COMMENT_ONLY.test(line);
       // 行注释判定结束：命中时 hasComment 已置真，commentOnly 取决于整行是否只有注释
       }
       // 纯 HTML 注释行
       if (!hasComment && HTML_COMMENT_ONLY.test(line)) {
+        // 整行以连字符连感叹号开头：视为纯 HTML 注释
         hasComment = true;
+        // 纯注释行没有代码，可把「紧邻解释」传递给下一行
         commentOnly = true;
+      // HTML 注释分支结束
       }
+    // 两个补充判定结束：else 分支处理完毕
     }
 
     if (hasComment || prevCommentOnly) covered += 1; // 本行有注释，或紧邻上一行的纯注释，均视为已解释
@@ -164,8 +171,9 @@ function analyze(file) {
   }
 
   const ratio = total === 0 ? 1 : covered / total; // 空文件视为 100% 达标
+  // 本文件的统计已完成：分母、分子、覆盖率三项一并返回
   return { total, covered, ratio };
-// analyze 结束：把「分母 / 分子 / 覆盖率」三元组交回调用方汇总
+// analyze 结束：调用方据此累加全仓数据
 }
 
 // ===== 主流程 =====
@@ -181,6 +189,7 @@ for (const extra of EXTRA_FILES) {
     // 文件不存在时跳过，不阻断脚本
   // 结束 catch：缺文件属正常情况，静默忽略即可
   }
+// 根级文件扫描结束：files 已包含全部待统计路径
 }
 
 // 汇总每个文件的统计结果
@@ -222,7 +231,9 @@ for (const r of results.slice(0, TOP_N)) {
 
 // strict 模式：总体覆盖率不足阈值时以退出码 1 表达失败，供 CI 消费
 if (STRICT && overall < THRESHOLD) {
+  // 打印失败原因：同时给出当前总体覆盖率与阈值，便于一眼看出差多少
   console.error(`\n❌ strict 未通过：总体覆盖率 ${(overall * 100).toFixed(1)}% < 阈值 ${(THRESHOLD * 100).toFixed(0)}%`);
+  // 以退出码 1 结束：CI 据此判定门禁失败并阻断合并
   process.exit(1);
 // strict 门禁分支结束：退出码已置 1，CI 会据此判定失败
 }
