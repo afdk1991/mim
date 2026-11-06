@@ -19,7 +19,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 | [03-code-reference.md](./03-code-reference.md) | 仓库级脚本说明：`scripts/version-check.mjs`（§1–§6）与 `scripts/env-check.mjs`（§7）；业务代码见 08 |
 | [04-dependencies.md](./04-dependencies.md) | 依赖关系（已安装依赖 / 工具链 / 规划中能力） |
 | [05-runbook.md](./05-runbook.md) | 运行方式：启动 API/Web、测试、构建、校验命令 |
-| [06-governance.md](./06-governance.md) | 治理规约：八条铁律与版本号规则详解 |
+| [06-governance.md](./06-governance.md) | 治理规约：九条铁律与版本号规则详解 |
 | [07-functional-modules.md](./07-functional-modules.md) | 功能模块：PRD FR-01~06 需求、状态机、共享规则、实现状态 |
 | [08-dev-implementation.md](./08-dev-implementation.md) | 开发实现全景：目标架构 + §1.1「已实现 vs 规划」对照 |
 | [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md) | 第三方 SDK / API / API Key 全量清单（含北斗卫星导航专项） |
