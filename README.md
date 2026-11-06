@@ -105,12 +105,12 @@ npm run check                             # 版本规约 + 密钥模板校验
 | GitHub Pages | 前端静态站 | CI job `pages`（`configure-pages` + `upload-pages-artifact` + `deploy-pages`），`https://afdk1991.github.io/mim/` | ✅ CI 自动发布 |
 | GitHub Packages | 容器镜像（ghcr） | CI job `packages` → `ghcr.io/afdk1991/mim-api:{latest,sha}`；npm registry 受「包 scope 必须等于仓库 owner」限制，故 `@mim/*` 不发 npm | ✅ CI 自动推送 |
 | 腾讯云 EdgeOne Pages | 静态站 `site/` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，输出 `dist`） | ✅ 已同步（`data.mixm.top`） |
-| Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js` | ⚙️ 配置就绪，待 `CLOUDFLARE_API_TOKEN` |
-| Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`） | ⚙️ 配置就绪，待 `VERCEL_TOKEN` |
-| Render | 静态站 + Node 服务 | `render.yaml`（`mim-web` + `mim-api` + 1GiB 持久盘） | ⚙️ 配置就绪，待 `RENDER_DEPLOY_HOOK` |
-| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC） | ⚙️ 配置就绪，待 `SEALOS_KUBECONFIG` |
-| veFaaS | 容器函数 | `deploy/vefaas/deploy.sh` | ⚙️ 脚本就绪，待 `vefaas` CLI + 火山引擎凭证 |
-| IGA Pages | 前端静态站 | `deploy/iga/deploy.sh` | ⚙️ 脚本就绪，待 IGA CLI + `IGA_TOKEN` |
+| Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js`，`https://mim-8ah.pages.dev` | ✅ CI 自动发布（`CLOUDFLARE_API_TOKEN` 已配置） |
+| Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`），`https://mim-puce.vercel.app` | ✅ CI 自动发布（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 已配置） |
+| Render | 静态站 + Node 服务 | `render.yaml`（`mim-web` + `mim-api` + 1GiB 持久盘） | ⚙️ 配置就绪，待 `RENDER_DEPLOY_HOOK`（账号需先绑定支付方式完成验证） |
+| Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC） | ⚙️ 配置就绪，待 `SEALOS_KUBECONFIG`（账号登录需完成） |
+| veFaaS | 容器函数 | `deploy/vefaas/deploy.sh`（`vefaas login` → `vefaas deploy --appId`） | ⚙️ 脚本就绪，待 `VE_ACCESS_KEY` / `VE_SECRET_KEY` / `VEFAAS_APP_ID` |
+| IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name`） | ⚙️ 脚本就绪，待 `IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` |
 | 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ 生产 `https://mim.mixm.top` |
 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
