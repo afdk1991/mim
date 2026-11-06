@@ -347,6 +347,54 @@ export interface RunJobResult {
   message?: string;
 }
 
+// ---------- 站点模块地图（site）类型，对齐 routes/site.ts 与 src/site.ts ----------
+
+export interface SiteZone {
+  id: string;
+  apex: string;
+  default_record_value: string;
+  count: number;
+}
+
+export interface SiteCategory {
+  id: string;
+  name: { zh: string; en: string };
+  count: number;
+}
+
+export interface SiteOverview {
+  total: number;
+  zones: SiteZone[];
+  categories: SiteCategory[];
+}
+
+export interface SiteRecord {
+  zone: string;
+  fqdn: string;
+  record_type: 'A' | 'CNAME';
+  record_value: string;
+  ttl: number;
+  label?: string;
+  description?: string;
+}
+
+export interface SiteModuleItem {
+  host: string;
+  category: string;
+  category_name: { zh: string; en: string };
+  label: string;
+  description: string;
+  urls: string[];
+  records: SiteRecord[];
+}
+
+export interface SiteModuleList {
+  total: number;
+  module_total: number;
+  filters: { zone: string | null; category: string | null; q: string | null };
+  items: SiteModuleItem[];
+}
+
 export const api = {
   requestCode(region: Region, provider: Provider, identifier: string) {
     return request<{
@@ -640,6 +688,34 @@ export const api = {
         `/ai/jobs/${encodeURIComponent(jobId)}/run`,
         { method: 'POST', body: {} },
       );
+    },
+  },
+
+  // ---------- 站点模块地图（site）：DNSPod 备注结构化，公开只读 ----------
+
+  site: {
+    /** GET /site/overview：zone / 分类 / 模块计数 */
+    overview() {
+      return request<SiteOverview>('/site/overview', { auth: false, idempotency: false });
+    },
+    /** GET /site/modules?zone=&category=&q=：模块列表（可组合过滤） */
+    listModules(opts: { zone?: string; category?: string; q?: string } = {}) {
+      const qs = new URLSearchParams();
+      if (opts.zone) qs.set('zone', opts.zone);
+      if (opts.category) qs.set('category', opts.category);
+      if (opts.q) qs.set('q', opts.q);
+      const suffix = qs.toString();
+      return request<SiteModuleList>(`/site/modules${suffix ? `?${suffix}` : ''}`, {
+        auth: false,
+        idempotency: false,
+      });
+    },
+    /** GET /site/modules/:host：单模块详情 */
+    getModule(host: string) {
+      return request<{ module: SiteModuleItem }>(`/site/modules/${encodeURIComponent(host)}`, {
+        auth: false,
+        idempotency: false,
+      });
     },
   },
 };

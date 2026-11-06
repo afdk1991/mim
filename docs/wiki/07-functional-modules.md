@@ -333,6 +333,21 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
 | 导出成片 | —（规划导出任务 + 对象存储预签名下载） | — | ❌ 0 代码 |
 
+### 11.13 站点模块地图（DNSPod 备注结构化，2026-11-06）
+
+> 数据源：仓库根 `dnspod_records_2026-11-05_21-42-26.xls`（DNSPod 导出，2026-11-05）的**「备注」列**。原始表 197 行，其中 180 行带备注，去重后为 **45 条主机记录 × 2 个 zone**（短主机与 FQDN 重复行已合并）。备注内容即各子站的产品定位，本模块将其落成结构化只读数据 + 公开 API + 前端可视化。
+
+| 项 | 实况 |
+|---|---|
+| 数据文件 | `services/mim-api/src/site.ts`（`SITE_ZONES` / `SITE_CATEGORIES` / `SITE_MODULES`，纯静态常量，无数据库表） |
+| zone | `laal.top`（A → `103.0.113.10`）、`mixm.top`（A → `103.0.113.20`）；唯一例外 `mixm.top` 的 `gy` 为 CNAME → `gale-engine-landing-6j02gsvv.edgeone.cool.` |
+| 分类（8） | 门户与入口 6 / 身份与权限 2 / 运营后台 8 / 接口与开发 5 / 内容与媒体 7 / 电商与交易 7 / 数据与存储 4 / 工具与服务 6（合计 45） |
+| 后端路由 | `routes/site.ts`：`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`（3 条，**公开免鉴权**，zod `strictObject` 校验，非法 zone/category → 400 `VALIDATION_FAILED`，未知 host → 404 `NOT_FOUND`） |
+| 前端页面 | `apps/web/src/views/SiteMap.tsx`，侧栏「站点地图 / Site Map」；一次拉全量后在客户端做 zone / 分类 / 关键词过滤，按分类分组渲染卡片，每条 record 展示 zone、记录类型、解析值与外链 |
+| 搜索覆盖 | `q` 命中 host / label / description / FQDN / 解析值 / record 级备注（例如 `q=疾风引擎` 命中 `gy`） |
+| 测试 | `test/site.test.ts` 7 例（overview 计数、列表 45×2、分类与 `q` 过滤、`gy` 的 CNAME 与 record 级覆盖、`@` 的 FQDN、非法参数 400 / 未知 host 404） |
+| 状态 | ✅ 前后端已落地（不写入数据库，无迁移、无第三方依赖） |
+
 ## 12. 实现拆分清单（新 FR-03 落地路径）
 
 > 分期口径由 PRD §3 / §5 FR-03.2 的四形态表确定：**②（AI 辅助创作工作台）→ ④（工作台 + 导出成片）→ ①（AI 全自动生成成片）→ ③（作品管理与分发）**。每期均须同时交付后端、前端、数据表与第三方 SDK 接入（铁律五），并按铁律七同步 PRD、本页、[08](./08-dev-implementation.md)、README。

@@ -143,6 +143,13 @@ npm run check                           # 版本规约 + 密钥模板校验
 `POST /api/v1/comic/films/:id/submit-review`（最新版本须带 `object_key`）→ `POST /api/v1/comic/films/:id/publish`（工程转 `published`）；
 失败链路：`POST /api/v1/comic/jobs/:id/fail` → `POST /api/v1/comic/jobs/:id/retry`（新建 job，`retry_of` 指向原 job）
 
+站点模块地图（公开只读，**免鉴权**，数据源 = DNSPod 导出备注）：
+
+`GET /api/v1/site/overview`（200，`total=45`、2 个 zone、8 个分类）→ `GET /api/v1/site/modules`（200，45 模块 × 2 records）→
+`GET /api/v1/site/modules?zone=mixm.top&category=tools`（200，`gy` 为 CNAME → `gale-engine-landing-6j02gsvv.edgeone.cool.`）→
+`GET /api/v1/site/modules/gy`（200）→ `GET /api/v1/site/modules/unknown-host`（必须 404）→
+`GET /api/v1/site/modules?zone=bad`（必须 400 `VALIDATION_FAILED`）
+
 ## 7. 生产部署（铁律八）
 
 > **生产环境已上线**：`https://mim.mixm.top`（前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。本地预览不是交付终点。
@@ -159,6 +166,8 @@ deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/d
          → curl https://mim.mixm.top/health（必须 200，最多重试 10 次）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/plans（必须 404）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/audit/logs（必须 404）
+         → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/site/overview（必须 200）
+         → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/site/modules（必须 200）
          → curl -X POST -H 'Content-Type: application/json' -d '{}'
            https://mim.mixm.top/api/v1/auth/code（空体必须 400）
          → curl -X POST -H 'Content-Type: application/json' --data-binary '{"region":'

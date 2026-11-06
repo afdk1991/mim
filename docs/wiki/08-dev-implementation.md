@@ -39,7 +39,7 @@
 
 | 维度 | 规划口径（本页 §2+） | 当前已实现（证据位置） | 差异原因 / 后续 |
 |---|---|---|---|
-| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|me|comic|media|ai.ts`）；原 FR-03 五条路由已于 2026-11-04 删除；`billing` / `audit` 路由已于 2026-11-05 删除 |
+| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|me|comic|media|ai|site.ts`）；原 FR-03 五条路由已于 2026-11-04 删除；`billing` / `audit` 路由已于 2026-11-05 删除 |
 | 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
 | 支付 | `payment-driver` 多通道 + 回调验签 | **已删除（2026-11-05）**：`routes/billing.ts`、驱动分支与 9 张财务表整体移除，`/api/v1/plans` 等端点现返回 404（CI 断言） | 当前无任何支付能力；如需恢复须重新设计并引入持牌通道凭证 |
 | 实时同步 | WebSocket + MQ 推送，5 秒内到达 | **已移除（2026-11-04）**：原 4s 轮询 `GET /sync/changes` 随 FR-03 一并删除，当前无同步需求 |
@@ -48,7 +48,7 @@
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
 | 后台管理 | `admin-api` + RBAC 后台 | 未实现；**审计已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表均已删除 | P1 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 等 6 文件 57 例）保障字段一致性；后续补 OpenAPI 导出 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/*.test.ts` 等 7 文件 64 例，含 `site.test.ts` 7 例）保障字段一致性；后续补 OpenAPI 导出 |
 | 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
 ## 2. 后端服务模块清单
@@ -70,6 +70,7 @@
 | `openapi` | 开放平台：OAuth2、API Key、Webhook 投递、限流 | `/open/*` | gateway | 分库 |
 | `admin-api` | 运营后台 BFF：聚合查询、写操作审批、审计埋点 | `/admin/*` | 各域服务、admin 库 | 分库 |
 | `jobs` | 定时任务与队列消费者（见 §8） | 无 HTTP | MQ、全部域库 | 双区各一套 |
+| `site` | **（已落地，2026-11-06）** 站点模块地图：把 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列结构化为 45 个主机模块 × 2 zone × 8 分类，纯静态常量（`src/site.ts`），**无数据表、无迁移、无第三方依赖**；前端 `views/SiteMap.tsx` | `/site/overview`、`/site/modules`、`/site/modules/:host`（公开免鉴权，3 条） | 无 | 不分库（多区共用同一份解析数据） |
 
 服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `me` / `comic` / `media` / `ai`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
 
@@ -238,6 +239,7 @@
 | 功能模块商城（**🟡 后端建表 + 门禁，前端 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、解锁（校验前置依赖后直接落 `entitlements`，原「加入订单」已随 FR-02 下线）、解锁状态与到期展示 | FR-03.1 |
 | 漫剧 AI 剧工作台（**🟢 后端第 1/2 期已落地（`comic` 域 7 表 + 24 条路由 + `orchestrator.ts`/`storage.ts` 已装配）；前端三标签页已落地**——创作（工程/角色/AI 建议）、生成任务（capabilities 横幅 / 派发 / 手动运行 / 失败透传 / 产物下载 / 3s 轮询）、成片（工程产物面板 / 版本面板下载播放 / 审核发布），2026-11-06） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
 | 成片管理（**🟢 后端已落地（第 2 期 `comic_films`/`film_versions` + `/comic/films/*`）；前端已落地**——工作台成片标签页：列表/版本面板（预签名下载/播放）/提交审核/发布/驳回/归档，2026-11-06） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
+| 站点地图（**🟢 前后端已落地，2026-11-06**） | 45 个主机模块按 8 分类分组展示；zone 切换（全部 / `laal.top` / `mixm.top`）、分类筛选、关键词搜索（覆盖 host / 备注 / 记录值）；每条记录展示 `record_type` + `record_value` 并外链 `https://{fqdn}`。数据源为 DNSPod 导出备注（`services/mim-api/src/site.ts` 静态常量，无数据表） | 非 PRD FR（站点运维可视化，随备注结构化新增） |
 
 任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。
 

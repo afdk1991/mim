@@ -7,8 +7,9 @@ import { Login } from './views/Login';
 import { Settings } from './views/Settings';
 import { Store } from './views/Store';
 import { ComicWorkbench } from './views/ComicWorkbench';
+import { SiteMap } from './views/SiteMap';
 
-type View = 'store' | 'comic' | 'settings';
+type View = 'store' | 'comic' | 'sitemap' | 'settings';
 
 interface Route {
   view: View;
@@ -52,6 +53,7 @@ export function App() {
   const navItems: Array<{ view: View; label: string }> = [
     { view: 'store', label: locale === 'en-US' ? 'Modules' : '功能模块' },
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
+    { view: 'sitemap', label: locale === 'en-US' ? 'Site Map' : '站点地图' },
     { view: 'settings', label: t(locale, 'nav.settings') },
   ];
 
@@ -86,6 +88,7 @@ export function App() {
       <main className="main">
         {route.view === 'store' && <Store locale={locale} />}
         {route.view === 'comic' && <ComicWorkbench locale={locale} />}
+        {route.view === 'sitemap' && <SiteMap locale={locale} />}
         {route.view === 'settings' && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} />
         )}
