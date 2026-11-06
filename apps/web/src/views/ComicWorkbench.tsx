@@ -429,7 +429,14 @@ function JobsTab({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // AI 编排能力：provider / 支持的任务类型 / 存储（capabilities 横幅 + provider 感知派发）
+  const capsState = useAsync(() => api.ai.capabilities(), []);
+  const caps = capsState.data?.ai ?? null;
+  const supportedTypes = caps?.supported_job_types ?? null;
+  const typeSupported = (t: JobType) => !supportedTypes || supportedTypes.includes(t);
+
   const canDispatch = projectStatus === 'storyboarded' || projectStatus === 'generating';
+  const canDispatchType = canDispatch && typeSupported(jobType);
 
   async function handleCreate() {
     setBusy(true);
@@ -456,20 +463,46 @@ function JobsTab({
     }
   }
 
-  async function handleAction(job: GenerationJob, action: 'start' | 'complete' | 'fail' | 'cancel' | 'retry') {
+  /** 取消 / 重试走 comic 域端点；start/complete/fail 骨架端点已由 ai-orchestrator 接管，UI 不再暴露 */
+  async function handleAction(job: GenerationJob, action: 'cancel' | 'retry') {
     if (action === 'cancel' && !window.confirm(locale === 'en-US' ? 'Cancel this job?' : '确认取消此任务？')) return;
     setError(null);
     setMessage(null);
     try {
-      if (action === 'complete') {
-        await api.comic.jobAction(job.id, 'complete', { result: {} });
-      } else if (action === 'fail') {
-        await api.comic.jobAction(job.id, 'fail', { error_code: 'MANUAL_FAIL' });
+      await api.comic.jobAction(job.id, action);
+      reloadJobs();
+      onProjectChange();
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  /** 立即运行：同步触发 ai-orchestrator 执行（POST /ai/jobs/:id/run）；成本超限 / provider 未配置等失败原因透传 */
+  async function handleRun(job: GenerationJob) {
+    setError(null);
+    setMessage(null);
+    try {
+      const { run } = await api.ai.runJob(job.id);
+      if (run.status === 'succeeded') {
+        setMessage(locale === 'en-US' ? `Job succeeded via ${run.provider}` : `任务已成功（provider：${run.provider}）`);
+      } else if (run.status === 'failed') {
+        setError(`${run.error_code ?? 'FAILED'}${run.message ? ` — ${run.message}` : ''}`);
       } else {
-        await api.comic.jobAction(job.id, action);
+        setMessage(run.message ?? (locale === 'en-US' ? 'Skipped' : '已跳过'));
       }
       reloadJobs();
       onProjectChange();
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  /** 下载成功产物：预签名 GET → 新窗口打开 */
+  async function handleDownload(objectKey: string) {
+    setError(null);
+    try {
+      const res = await api.media.presignDownload(objectKey);
+      window.open(res.download.url, '_blank', 'noopener');
     } catch (err) {
       setError(errorText(locale, err));
     }
@@ -506,6 +539,23 @@ function JobsTab({
           <h3>{locale === 'en-US' ? 'Dispatch Job' : '派发任务'}</h3>
         </header>
 
+        {caps && (
+          <p className="muted small">
+            {locale === 'en-US' ? 'Provider: ' : '模型提供方：'}
+            <code>{caps.provider}</code>
+            {caps.mock_provider && (locale === 'en-US' ? ' (mock)' : '（mock）')}
+            {' · '}
+            {locale === 'en-US' ? 'types: ' : '支持类型：'}
+            {caps.supported_job_types.join(' / ')}
+            {' · '}
+            {locale === 'en-US' ? 'storage: ' : '存储：'}
+            {caps.storage.driver}
+            {!caps.provider_configured && !caps.mock_provider && (
+              <span className="error">{locale === 'en-US' ? ' · NOT CONFIGURED' : ' · 未配置'}</span>
+            )}
+          </p>
+        )}
+
         {error && <p className="error">{error}</p>}
         {message && <p className="success">{message}</p>}
 
@@ -527,8 +577,9 @@ function JobsTab({
         <div className="form-inline">
           <select value={jobType} onChange={(e) => setJobType(e.target.value as JobType)} disabled={!canDispatch}>
             {(Object.keys(JOB_TYPE_LABEL) as JobType[]).map((t) => (
-              <option key={t} value={t}>
+              <option key={t} value={t} disabled={!typeSupported(t)}>
                 {JOB_TYPE_LABEL[t][locale]}
+                {!typeSupported(t) ? (locale === 'en-US' ? ' (unsupported)' : '（不支持）') : ''}
               </option>
             ))}
           </select>
@@ -538,7 +589,7 @@ function JobsTab({
             placeholder={locale === 'en-US' ? 'Prompt (optional)…' : '提示词（可选）…'}
             disabled={!canDispatch}
           />
-          <button type="button" className="btn primary" onClick={handleCreate} disabled={busy || !canDispatch}>
+          <button type="button" className="btn primary" onClick={handleCreate} disabled={busy || !canDispatchType}>
             {busy ? (locale === 'en-US' ? 'Dispatching…' : '派发中…') : locale === 'en-US' ? 'Dispatch' : '派发'}
           </button>
         </div>
@@ -565,13 +616,26 @@ function JobsTab({
                 {job.error_code && <span className="error small">{job.error_code}</span>}
               </div>
               {typeof job.result?.object_key === 'string' && (
-                <div className="muted small">object_key: {job.result.object_key}</div>
+                <div className="muted small">
+                  object_key: {job.result.object_key}
+                  {' · '}
+                  <button
+                    type="button"
+                    className="btn ghost small"
+                    onClick={() => handleDownload(job.result!.object_key as string)}
+                  >
+                    {locale === 'en-US' ? 'Download' : '下载产物'}
+                  </button>
+                </div>
+              )}
+              {job.status === 'succeeded' && job.job_type === 'image' && typeof job.result?.object_key === 'string' && (
+                <AssetThumb objectKey={job.result.object_key as string} />
               )}
               <div className="form-inline">
                 {job.status === 'queued' && (
                   <>
-                    <button type="button" className="btn ghost small" onClick={() => handleAction(job, 'start')}>
-                      {locale === 'en-US' ? 'Start' : '开始'}
+                    <button type="button" className="btn primary small" onClick={() => handleRun(job)}>
+                      {locale === 'en-US' ? 'Run now' : '立即运行'}
                     </button>
                     <button type="button" className="btn ghost danger small" onClick={() => handleAction(job, 'cancel')}>
                       {locale === 'en-US' ? 'Cancel' : '取消'}
@@ -579,17 +643,9 @@ function JobsTab({
                   </>
                 )}
                 {job.status === 'running' && (
-                  <>
-                    <button type="button" className="btn ghost small" onClick={() => handleAction(job, 'complete')}>
-                      {locale === 'en-US' ? 'Complete' : '完成'}
-                    </button>
-                    <button type="button" className="btn ghost danger small" onClick={() => handleAction(job, 'fail')}>
-                      {locale === 'en-US' ? 'Fail' : '置失败'}
-                    </button>
-                    <button type="button" className="btn ghost danger small" onClick={() => handleAction(job, 'cancel')}>
-                      {locale === 'en-US' ? 'Cancel' : '取消'}
-                    </button>
-                  </>
+                  <button type="button" className="btn ghost danger small" onClick={() => handleAction(job, 'cancel')}>
+                    {locale === 'en-US' ? 'Cancel' : '取消'}
+                  </button>
                 )}
                 {job.status === 'failed' && (
                   <button type="button" className="btn ghost small" onClick={() => handleAction(job, 'retry')}>
@@ -636,6 +692,12 @@ function FilmsTab({
     .filter((o) => o.objectKey);
 
   const canCreate = projectStatus === 'rendered' || projectStatus === 'published';
+
+  // 工程产物面板（media 域：GET /media/assets?project_id=，每项已附 download_url）
+  const assetsState = useAsync(() => api.media.listAssets(projectId), [projectId]);
+  const assets = assetsState.data?.items ?? [];
+
+  const [expandedFilmId, setExpandedFilmId] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [objectKey, setObjectKey] = useState('');
@@ -778,7 +840,15 @@ function FilmsTab({
                     {locale === 'en-US' ? 'Archive' : '归档'}
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="btn ghost small"
+                  onClick={() => setExpandedFilmId(expandedFilmId === film.id ? null : film.id)}
+                >
+                  {locale === 'en-US' ? 'Versions' : '版本'}
+                </button>
               </div>
+              {expandedFilmId === film.id && <FilmVersionsPanel filmId={film.id} locale={locale} />}
             </li>
           ))}
           {!filmsState.loading && films.length === 0 && (
@@ -786,6 +856,120 @@ function FilmsTab({
           )}
         </ul>
       </section>
+
+      <section className="sub-panel">
+        <header className="panel-head">
+          <h3>{locale === 'en-US' ? 'Project Assets' : '工程产物'}</h3>
+        </header>
+
+        {assetsState.loading && <p className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</p>}
+        {assetsState.error != null && <p className="error">{errorText(locale, assetsState.error)}</p>}
+
+        <ul className="list">
+          {assets.map((a) => (
+            <li key={a.id} className="list-item">
+              <div className="list-item-main">
+                <strong>{a.asset_type}</strong>
+                <span className="badge">{a.mime}</span>
+              </div>
+              <div className="list-item-sub">
+                <span className="muted small">
+                  {a.size_bytes != null ? `${(a.size_bytes / 1024).toFixed(1)} KB · ` : ''}
+                  {new Date(a.created_at).toLocaleString()}
+                  {a.expires_at ? ` · ${locale === 'en-US' ? 'expires' : '过期'} ${new Date(a.expires_at).toLocaleDateString()}` : ''}
+                </span>
+                <a className="btn ghost small" href={a.download_url} target="_blank" rel="noreferrer">
+                  {locale === 'en-US' ? 'Download' : '下载'}
+                </a>
+              </div>
+              {a.asset_type === 'image' && (
+                <div style={{ marginTop: 4 }}>
+                  <img
+                    src={a.download_url}
+                    alt={a.object_key}
+                    style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
+                  />
+                </div>
+              )}
+            </li>
+          ))}
+          {!assetsState.loading && assets.length === 0 && (
+            <li className="hint">{locale === 'en-US' ? 'No assets yet.' : '尚无产物。'}</li>
+          )}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+/** 成功 image 任务的内联预览：按需预签名 GET（URL 有 TTL，组件随任务行挂载时拉取一次） */
+function AssetThumb({ objectKey }: { objectKey: string }) {
+  const state = useAsync(() => api.media.presignDownload(objectKey), [objectKey]);
+  if (!state.data) return null;
+  return (
+    <div style={{ marginTop: 4 }}>
+      <img
+        src={state.data.download.url}
+        alt={objectKey}
+        style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
+      />
+    </div>
+  );
+}
+
+/** 成片版本列表面板：展开时按 filmId 拉取（GET /comic/films/:id → versions），版本产物经预签名下载/播放 */
+function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale }) {
+  const state = useAsync(() => api.comic.getFilm(filmId), [filmId]);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDownload(objectKey: string) {
+    setError(null);
+    try {
+      const res = await api.media.presignDownload(objectKey);
+      window.open(res.download.url, '_blank', 'noopener');
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  if (state.loading && !state.data) {
+    return <p className="hint">{locale === 'en-US' ? 'Loading versions…' : '版本加载中…'}</p>;
+  }
+  if (state.error != null && !state.data) {
+    return <p className="error">{errorText(locale, state.error)}</p>;
+  }
+
+  const versions = state.data?.versions ?? [];
+  return (
+    <div style={{ marginTop: 6 }}>
+      {error && <p className="error">{error}</p>}
+      <ul className="list">
+        {versions.map((v) => (
+          <li key={v.id} className="list-item">
+            <div className="list-item-main">
+              <strong>v{v.version_no}</strong>
+              <span className="badge">
+                {v.published_at ? (locale === 'en-US' ? 'published' : '已发布') : locale === 'en-US' ? 'unpublished' : '未发布'}
+              </span>
+            </div>
+            <div className="list-item-sub">
+              <span className="muted small">
+                {new Date(v.created_at).toLocaleString()}
+                {v.size_bytes != null ? ` · ${(v.size_bytes / 1024).toFixed(1)} KB` : ''}
+                {v.duration_sec != null ? ` · ${v.duration_sec}s` : ''}
+              </span>
+              {v.object_key && (
+                <button type="button" className="btn ghost small" onClick={() => handleDownload(v.object_key!)}>
+                  {locale === 'en-US' ? 'Download / Play' : '下载 / 播放'}
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+        {versions.length === 0 && (
+          <li className="hint">{locale === 'en-US' ? 'No versions.' : '暂无版本。'}</li>
+        )}
+      </ul>
     </div>
   );
 }

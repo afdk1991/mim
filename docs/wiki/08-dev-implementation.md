@@ -48,7 +48,7 @@
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
 | 后台管理 | `admin-api` + RBAC 后台 | 未实现；**审计已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表均已删除 | P1 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 等 5 文件 40 例）保障字段一致性；后续补 OpenAPI 导出 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/api.test.ts` 等 6 文件 57 例）保障字段一致性；后续补 OpenAPI 导出 |
 | 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
 ## 2. 后端服务模块清单
@@ -60,7 +60,7 @@
 | ~~`billing`~~ | **已删除（2026-11-05）**：`routes/billing.ts` 与 `packages/core-domain/{plans,subscription,order}.ts` 移除，生产库 5 张计费表 DROP；当前无计划/订阅/发票/对账能力 | 无（原 `/plans`、`/subscriptions/*`、`/invoices/*` 现均 404） | 无 | — |
 | ~~`payment-driver`~~ | **已删除（2026-11-05）**：原 7 通道驱动与统一回调随 FR-02 一并移除，`/payments/*`、`/callbacks/{driver}` 现均 404 | 无 | 无 | — |
 | `catalog` | **（部分落地：建表 + 门禁，2026-11-04）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 已建，`requireEntitlement` 已落地；`/modules` 路由未实现；`order_items` 随订单域于 2026-11-05 取消，**不建表** | `/modules`、`/modules/{code}`、`/entitlements/*`、`/entitlements/{code}/check`（未实现） | admin-api（订单/退款依赖已于 2026-11-05 随 FR-02 移除） | 分库 |
-| `comic` | **（第 1 期已落地 2026-11-04；第 2 期路由骨架已落地 2026-11-05）** 工程/角色/分镜（`/comic/projects/*` 8 条）与生成任务编排、成片合成与版本、审核发布（`/comic/jobs/*`、`/comic/films/*` 16 条）均已实现（共 24 条路由）；任务编排与队列消费（`src/orchestrator.ts` → `/api/v1/ai/*`）、对象存储（`src/storage.ts` → `/api/v1/media/*`）**已于 2026-11-05 装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认随进程自动消费；真实厂商模型调用待 OQ-08 凭证** | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*`（24 条已实现，骨架） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
+| `comic` | **（第 1 期已落地 2026-11-04；第 2 期路由骨架已落地 2026-11-05）** 工程/角色/分镜（`/comic/projects/*` 8 条）与生成任务编排、成片合成与版本、审核发布（`/comic/jobs/*`、`/comic/films/*` 16 条）均已实现（共 24 条路由）；任务编排与队列消费（`src/orchestrator.ts` → `/api/v1/ai/*`）、对象存储（`src/storage.ts` → `/api/v1/media/*`）**已于 2026-11-05 装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认随进程自动消费；openai 兼容提供方已接入 text/image（2026-11-06，video/tts/compose 诚实失败 `PROVIDER_NOT_CONFIGURED`），更多真实厂商模型调用待 OQ-08 凭证** | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*`（24 条已实现，骨架） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
 | `media` | **（已落地并装配上线，2026-11-05）** `src/storage.ts` 实现 `LocalDiskStorage`（HMAC-SHA256 预签名 URL，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名）；`/media/presign/*`、`/media/assets`、免鉴权对象收发端点均已挂载；`generation_assets` 表已建 | `/media/presign/upload`、`/media/presign/download`、`/media/assets`、`/media/objects/*`（已上线） | 对象存储、CDN | 按 region 桶 |
 | `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
 | `im` | 会话、消息可靠性、已读回执、在线状态、离线推送、审核 | `/im/*`（HTTP + WebSocket） | MQ、推送通道、审核服务 | 分库 |
@@ -236,8 +236,8 @@
 | 协议与隐私 | 首次强制勾选、政策更新后重新确认、SDK 清单展示 | FR-06 |
 | 语言与地区 | 语言切换、币种展示、时区设置 | FR-05 |
 | 功能模块商城（**🟡 后端建表 + 门禁，前端 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、解锁（校验前置依赖后直接落 `entitlements`，原「加入订单」已随 FR-02 下线）、解锁状态与到期展示 | FR-03.1 |
-| 漫剧 AI 剧工作台（**🟡 后端第 1/2 期已落地（`comic` 域 7 表 + 24 条路由 + `orchestrator.ts`/`storage.ts` 已装配），前端 0 代码**） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
-| 成片管理（**🟡 后端已落地（第 2 期 `comic_films`/`film_versions` + `/comic/films/*`），前端 0 代码**） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
+| 漫剧 AI 剧工作台（**🟢 后端第 1/2 期已落地（`comic` 域 7 表 + 24 条路由 + `orchestrator.ts`/`storage.ts` 已装配）；前端三标签页已落地**——创作（工程/角色/AI 建议）、生成任务（capabilities 横幅 / 派发 / 手动运行 / 失败透传 / 产物下载 / 3s 轮询）、成片（工程产物面板 / 版本面板下载播放 / 审核发布），2026-11-06） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
+| 成片管理（**🟢 后端已落地（第 2 期 `comic_films`/`film_versions` + `/comic/films/*`）；前端已落地**——工作台成片标签页：列表/版本面板（预签名下载/播放）/提交审核/发布/驳回/归档，2026-11-06） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
 
 任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。
 
@@ -369,7 +369,7 @@
 |---|---|---|---|
 | 基座 | `catalog` 域 4 表已建（`modules`/`module_prices`/`entitlements`/`entitlement_events`）+ `/modules` `/entitlements` 路由（**未实现**）；`requireEntitlement` 门禁已落地。~~`order_items` 挂载 `billing` 同事务~~、~~`entitlements` 发放/回收与退款同事务~~ 随 FR-02 于 2026-11-05 取消；`entitlements` 现由后台/风控动作直接写入并追加 `entitlement_events` | 商城（FR-03.1） | 无（复用现有 identity） |
 | 第 1 期 | `comic` 域工程/角色/分镜三表；工作台的工程 CRUD、character bible、分镜编辑与人工确认 | ② AI 辅助创作工作台 | 第 1 期仅工程，不产出成片 |
-| 第 2 期 | `generation_jobs` / `generation_assets` + `ai-orchestrator` 生成编排；文生图/图生视频/TTS/合成队列；工作台内单镜头生成与导出成片。**代码状态（2026-11-05）**：路由骨架 16 条已上线；`src/orchestrator.ts`（mock 产物真实落盘 + 成本预检 + compose 联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）**已于 2026-11-05 装配进 `app.ts`/`index.ts`（`/api/v1/ai/*`、`/api/v1/media/*`，`MIM_AI_WORKER` 默认自动消费）**；真实模型调用待 OQ-08 凭证 | ④ 创作工作台 + 导出成片 | 模型供应商凭证（OQ-08）、对象存储 |
+| 第 2 期 | `generation_jobs` / `generation_assets` + `ai-orchestrator` 生成编排；文生图/图生视频/TTS/合成队列；工作台内单镜头生成与导出成片。**代码状态（2026-11-05）**：路由骨架 16 条已上线；`src/orchestrator.ts`（mock 产物真实落盘 + 成本预检 + compose 联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）**已于 2026-11-05 装配进 `app.ts`/`index.ts`（`/api/v1/ai/*`、`/api/v1/media/*`，`MIM_AI_WORKER` 默认自动消费）**；openai 兼容提供方已接入 text/image（2026-11-06），video/tts/compose 诚实失败，更多真实模型调用待 OQ-08 凭证 | ④ 创作工作台 + 导出成片 | 模型供应商凭证（OQ-08）、对象存储 |
 | 第 3 期 | 全自动流水线：题材/大纲一次输入跑完整条链（无人工确认点） | ① AI 全自动生成成片 | 第 2 期全链路稳定 |
 | 第 4 期 | `comic_films` / `film_versions` + 审核发布 + 导出；成片列表/版本/浏览 | ③ 漫剧作品管理与分发 | 审核口径（OQ-07） |
 

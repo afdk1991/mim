@@ -288,6 +288,65 @@ export interface FilmVersion {
   created_at: string;
 }
 
+// ---------- media / ai 类型（对齐 routes/media.ts、routes/ai.ts、orchestrator.ts、storage.ts） ----------
+
+export type AssetType = 'image' | 'video' | 'audio' | 'text' | 'final';
+
+export interface GenerationAsset {
+  id: string;
+  job_id: string | null;
+  project_id: string | null;
+  asset_type: AssetType;
+  object_key: string;
+  mime: string;
+  duration_ms: number | null;
+  size_bytes: number | null;
+  checksum: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+/** GET /media/assets 列表项：在产物字段上附带预签名下载地址 */
+export interface ListedAsset extends GenerationAsset {
+  download_url: string;
+}
+
+/** 与 storage.ts PresignedUrl 一致 */
+export interface PresignedUrl {
+  url: string;
+  method: 'PUT' | 'GET';
+  headers: Record<string, string>;
+  expires_at: string;
+}
+
+/** 与 orchestrator.capabilities() 一致（routes/ai.ts 包装为 { ai, storage }） */
+export interface AiCapabilities {
+  provider: string;
+  provider_configured: boolean;
+  mock_provider: boolean;
+  supported_job_types: JobType[];
+  base_url?: string;
+  text_model?: string;
+  image_model?: string;
+  job_cost_limit_minor: number;
+  daily_cost_limit_minor: number;
+  asset_ttl_days: number;
+  storage: { driver: string; configured: boolean };
+  worker_enabled: boolean;
+  worker_interval_ms: number;
+}
+
+/** 与 orchestrator.RunResult 一致 */
+export interface RunJobResult {
+  job_id: string;
+  status: 'succeeded' | 'failed' | 'skipped';
+  provider: string;
+  asset_id?: string;
+  object_key?: string;
+  error_code?: string;
+  message?: string;
+}
+
 export const api = {
   requestCode(region: Region, provider: Provider, identifier: string) {
     return request<{
@@ -531,26 +590,56 @@ export const api = {
     },
   },
 
-  // ---------- 对象存储（media）----------
+  // ---------- 对象存储（media）：object_key 一律由服务端生成，客户端不拼接 ----------
 
   media: {
-    presignUpload(object_key: string) {
-      return request<{ upload_url: string; method: string; headers: Record<string, string> }>(
-        '/media/presign/upload',
-        { method: 'POST', body: { object_key } },
+    /** POST /media/presign/upload → 201；服务端校验 asset_type/mime 并生成 object_key */
+    presignUpload(input: {
+      asset_type: AssetType;
+      mime: string;
+      project_id?: string;
+      size_bytes?: number;
+      expires_seconds?: number;
+    }) {
+      return request<{
+        upload: PresignedUrl;
+        object_key: string;
+        asset_type: AssetType;
+        expires_at: string;
+      }>('/media/presign/upload', { method: 'POST', body: input });
+    },
+    /** GET /media/presign/download?object_key=…（服务端为 GET，非 POST） */
+    presignDownload(objectKey: string, expiresSeconds?: number) {
+      const qs = new URLSearchParams({ object_key: objectKey });
+      if (expiresSeconds !== undefined) qs.set('expires_seconds', String(expiresSeconds));
+      return request<{ download: PresignedUrl; object_key: string; expires_at: string }>(
+        `/media/presign/download?${qs.toString()}`,
       );
     },
-    presignDownload(object_key: string) {
-      return request<{ download_url: string; expires_in: number }>('/media/presign/download', {
-        method: 'POST',
-        body: { object_key },
-      });
+    /** GET /media/assets?project_id=… → { items }，每项已附 download_url */
+    listAssets(projectId: string, opts: { asset_type?: AssetType; limit?: number } = {}) {
+      const qs = new URLSearchParams({ project_id: projectId });
+      if (opts.asset_type) qs.set('asset_type', opts.asset_type);
+      if (opts.limit !== undefined) qs.set('limit', String(opts.limit));
+      return request<{ items: ListedAsset[] }>(`/media/assets?${qs.toString()}`);
     },
-    listAssets(project_id: string) {
-      return request<{ assets: unknown[] }>(`/media/assets?project_id=${encodeURIComponent(project_id)}`, {
-        method: 'GET',
-        idempotency: false,
-      });
+  },
+
+  // ---------- AI 编排控制面（ai-orchestrator） ----------
+
+  ai: {
+    /** GET /ai/capabilities：provider 能力、成本限额、存储与 worker 状态 */
+    capabilities() {
+      return request<{ ai: AiCapabilities; storage: { driver: string; configured: boolean } | null }>(
+        '/ai/capabilities',
+      );
+    },
+    /** POST /ai/jobs/:id/run：同步触发 queued 任务执行（幂等；非 queued 返回 409） */
+    runJob(jobId: string) {
+      return request<{ run: RunJobResult; job: GenerationJob }>(
+        `/ai/jobs/${encodeURIComponent(jobId)}/run`,
+        { method: 'POST', body: {} },
+      );
     },
   },
 };

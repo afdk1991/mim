@@ -60,7 +60,7 @@ docs/wiki/           # 结构化文档（01~09）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，12 例）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，57 例）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
