@@ -112,7 +112,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | GitHub Packages (ghcr) | ✅ 是 | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 1.192s / 0.124s（未鉴权 401 属正常） |
 | IGA Pages | ✅ 是 | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
 | Vercel | ✅ 是 | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / ≥12s（`--max-time 12` 截断）/ 0.000s（DNS 污染到 108.160.169.37，TCP 连接建立即失败） |
-| GitHub 仓库 | ✅ 是 | ✅ 已同步（HEAD `ee65414`，2026-11-07 00:04 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手被阻断，TCP 可连；仓库操作经 `git push` / `gh` CLI 取证 ✅） |
+| GitHub 仓库 | ✅ 是 | ✅ 已同步（HEAD `9bdf69c`，2026-11-07 00:20 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手被阻断，TCP 可连；仓库操作经 `git push` / `gh` CLI 取证 ✅） |
 
 - **权威明细位置**：逐平台发布作业见 [README.md](./README.md)「多平台部署矩阵」；实测汇总与 DNSPod 记录对应见 [05-runbook.md §7.1.3 / §7.6](./docs/wiki/05-runbook.md)；CI 实现见 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)（`deploy` / `pages` / `packages` / `platforms` 四个作业）。
 - **免费是硬约束**：新增平台前必须确认无付费门槛；`veFaaS` 等**无长期免费层**的方案已移出交付范围，不得重新引入。`Render` 因存在长期免费层（750 实例小时/月），已于 2026-11-06 按铁律十改为「免费候选平台」，不再属于排除项。
