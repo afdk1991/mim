@@ -240,6 +240,27 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
 `Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
 
+### 7.1.3 多平台实测汇总（2026-11-06，本机中国网络）
+
+每平台测试两次取较快耗时；结论：**9 个免费平台全部接入或已取证上线**，Render / veFaaS 因付费门槛明确排除。
+
+| 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
+|---|---|---|---|---|
+| 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.071s** / 0.030s ⚡最快 |
+| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步 | `https://data.mixm.top` | 200 / **0.100s** / 0.041s ⚡次快 |
+| GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.561s / 0.090s |
+| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC） | `https://mim-i3ywsdfn.cloud.sealos.io` | 200 / 0.611s / 0.113s |
+| Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 1.049s / 0.169s |
+| GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.538s / 0.111s（未鉴权 401 属正常） |
+| IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
+| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 21.27s（DNS 污染到 108.160.169.37，TCP 超时） |
+| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `a5c0b15`） | `https://github.com/afdk1991/mim` | 本机 000 / 0.020s（HTTPS 阻断；仓库操作经 git push / gh CLI 取证 ✅） |
+| Render | ❌（需绑卡 $1 验证，`need_payment_info`） | ⛔ 不纳入 | mim-web.onrender.com（未创建） | — |
+| veFaaS | ❌（`AccountInArrears` + APIG 需余额 ≥ 100 元，`BalanceNotEnough`） | ⛔ 不纳入 | 无公网域名 | — |
+
+> **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
+> Render / veFaaS 的同等能力已由 Cloudflare / Vercel（前端）+ Sealos（容器后端）免费覆盖。
+
 ### 7.1.1 服务器出网限制（重要）
 
 生产服务器 **访问 `https://github.com` 超时**（`curl: (28) SSL timeout`），但 `github.com:22` 可达，
@@ -290,3 +311,10 @@ npm run check    # version-check + env-check（退出码 0 = 通过）
 ```
 
 `site/` **不参与生产部署**；生产前端只来自 `apps/web` 构建产物。`.edgeone/` 配置已移除。
+
+## 7.6 DNS 资产（DNSPod mixm.top）与功能模块对应
+
+来源：`dnspod_records_2026-11-05_21-42-26.xls`（197 条，含 GBK 中文备注）。结论（2026-11-06 全仓比对）：
+
+- **项目实际使用 3 条**：`mim`（生产主域）、`data`（EdgeOne Pages 静态站）、`_dnsauth.mim`（证书签发校验）；`cloud.mixm.top` DNS 在线但项目零引用；其余 193 条未使用。
+- **备注 ↔ 模块对应（40 种备注）**：仅 3 类直接命中——`auth` / `login` / `api` → FR-01 账号与身份 + `mim-api`；10 类部分沾边（`admin` / `center` / `user` / `dy` / `sp` / `video` / `yy` / `img` / `secure` / `portal`）；27 类无对应（`pay` 属 FR-02 已删除域；电商 7 类、资讯 4 类、工具 4 类、移动端 3 类等与当前「功能模块商城 + 漫剧 AI 剧」范围无关）。

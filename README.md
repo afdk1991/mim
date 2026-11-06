@@ -115,6 +115,8 @@ npm run check                             # 版本规约 + 密钥模板校验
 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
 
+> **2026-11-06 本机实测（中国网络，两次取快）**：9 个免费平台全部接入或已取证上线——自建 `mim.mixm.top` 200/0.071s 最快、EdgeOne `data.mixm.top` 200/0.100s 次快；Vercel 与 github.com 本机不可达属网络侧限制（DNS 污染 / HTTPS 阻断），CI 与 git/gh 侧取证正常。逐平台 HTTP / 耗时 / 连接明细见 [05-runbook.md §7.1.3](./docs/wiki/05-runbook.md)；DNSPod 记录与功能模块对应见同页 §7.6。
+
 本地构建（可选）：`npm run build`（site → dist）；前端产物：`npm run build:web`；校验：`npm run check`。
 
 
