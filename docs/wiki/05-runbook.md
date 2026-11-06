@@ -187,54 +187,39 @@ gh run watch          # 观察最近一次运行
 |---|---|---|---|
 | `pages` | `pnpm --filter @mim/web build`（注入 `VITE_API_ORIGIN=https://mim.mixm.top`）→ `upload-pages-artifact` → `deploy-pages` | 无（用 `GITHUB_TOKEN` + `pages: write` / `id-token: write`） | 直接发布 `https://afdk1991.github.io/mim/` |
 | `packages` | `docker/build-push-action` 推 `ghcr.io/afdk1991/mim-api:latest` 与 `:${GITHUB_SHA}` | 无（`GITHUB_TOKEN` + `packages: write`） | 直接推送；镜像供 Sealos 等容器平台复用 |
-| `platforms` | Cloudflare / Vercel / Render / Sealos / veFaaS / IGA 依次同步 | 见下表 | 每个 step `[ -z "$TOKEN" ] && exit 0`，打印 SKIP。其中 Render / veFaaS 为付费门槛，默认不启用（见「当前实况」） |
+| `platforms` | Cloudflare / Vercel / Sealos / IGA 依次同步 | 见下表 | 每个 step `[ -z "$TOKEN" ] && exit 0`，打印 SKIP |
 
 | 平台 | 配置文件 | secret |
 |---|---|---|
 | Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js` | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
 | Vercel | `vercel.json` | `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` |
-| Render | `render.yaml` | `RENDER_DEPLOY_HOOK`（不纳入免费交付范围：需绑卡验证，保留脚本可选启用） |
 | Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`SEALOS_NAMESPACE`、`MIM_JWT_SECRET` |
-| veFaaS | `deploy/vefaas/deploy.sh`（`vefaas login` + `vefaas deploy --appId` / `--newApp`） | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID`（可选 `VEFAAS_APP_NAME`、`VEFAAS_GATEWAY_NAME`）（不纳入免费交付范围：账户欠费 + 网关资金门槛，保留脚本可选启用） |
 | IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME`（可选 `IGA_SCOPE`，默认 `domestic`） |
 
 **当前实况（2026-11-06）**：
 
 | 平台 | 状态 | 取证 / 阻塞原因 |
 |---|---|---|
-| veFaaS | ⛔ 不纳入（免费范围不可用） | 函数创建 `vefaas fn create --name mim-api --type webserver --source ghcr.io/afdk1991/mim-api:latest --source-type image` 返回 `InvalidRequest: AccountInArrears: 您的账户已欠费，无法开通此服务！请前往账户充值`（requestId `202611062101255AE8FB00A8E8F86CD652`）；公网入口必须挂 APIG 网关，`vefaas api CreateGateway --service apig` 返回 `BalanceNotEnough: ... less than 100 yuan`（requestId `2026110620572774941322BC88983082E9`）。两项均属付费门槛，**不要求用户充值或绑卡**；同等能力已由 IGA Pages（前端）+ Sealos（容器 + 后端）免费覆盖 |
 | IGA Pages | ✅ 已部署 | `iga login`（本机 SSO）→ `iga pages deploy --name mim --scope domestic` → Project ID `fr95fuwu57`、Deploy `p4f5a4svqm`；preview 域名为 token 门禁（307 下发 `iga_token` Cookie 后可达），`curl -c/-b` 带 Cookie 实测 200 / 476 字节；自有域名需控制台绑定（domestic scope 需 ICP 备案） |
 
-> 两个脚本均支持「本机 SSO 登录态复用」：CI 用 AK/SK，本机执行前只需 `vefaas login --sso` / `iga login`，脚本内以 `whoami` 探测登录态。
-
-
-> veFaaS 与 IGA Pages 同属火山引擎，共用一套 AK/SK；CLI 均由脚本在缺省时自装
-> （`@volcengine/vefaas-cli` / `@iga-pages/cli`），首建应用后把 ID / 项目名写入 secret 即可自动发布。
->
-> **免费交付口径（2026-11-06）**：veFaaS 因账户欠费 + APIG 网关资金门槛（≥ 100 元），在「只走免费方案」约束下**不启用**；
-> IGA Pages 免费且已上线（Project `fr95fuwu57`）。Render 同样因需绑卡验证**不启用**。
-> 两套脚本与 CI step 保留为可选扩展，不改删，凭证齐备时可随时启用。
+> IGA 脚本支持「本机 SSO 登录态复用」：CI 用 AK/SK，本机执行前只需 `iga login`，脚本内以 `whoami` 探测登录态；CLI 由脚本在缺省时自装（`@iga-pages/cli`），首建应用后把项目名写入 secret 即可自动发布。
 
 ```bash
 # 一次性注入（有凭证时）
 gh secret set CLOUDFLARE_API_TOKEN --body "<token>"
 gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account id>"
 gh secret set VERCEL_TOKEN --body "<token>"
-gh secret set RENDER_DEPLOY_HOOK --body "<hook url>"
 gh secret set SEALOS_KUBECONFIG --body "$(cat ~/.kube/config)"
 gh secret set SEALOS_DOMAIN --body "mim-<ns>.cloud.sealos.io"
 gh secret set SEALOS_NAMESPACE --body "ns-<xxxx>"
 gh secret set MIM_JWT_SECRET --body "<64 位 hex>"
-gh secret set VE_ACCESS_KEY --body "<volcengine ak>"
-gh secret set VE_SECRET_KEY --body "<volcengine sk>"
-gh secret set VEFAAS_APP_ID --body "app-xxxxx"
 gh secret set IGA_ACCESS_KEY --body "<volcengine ak>"
 gh secret set IGA_SECRET_KEY --body "<volcengine sk>"
 gh secret set IGA_PROJECT_NAME --body "mim"
 ```
 
 托管平台以独立域名直连 API 时，`MIM_CORS_ORIGINS` 必须包含其域名（`deploy/deploy.sh` 幂等补齐
-`https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`；Cloudflare / Vercel / Render 使用
+`https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`；Cloudflare / Vercel 使用
 `functions` / `rewrites` 同源反代时无需额外配置）。
 
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
@@ -242,7 +227,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 ### 7.1.3 多平台实测汇总（2026-11-06，本机中国网络）
 
-每平台测试两次取较快耗时；结论：**9 个免费平台全部接入或已取证上线**，Render / veFaaS 因付费门槛明确排除。
+每平台测试两次取较快耗时；结论：**9 个免费平台全部接入或已取证上线**。
 
 | 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
 |---|---|---|---|---|
@@ -255,11 +240,8 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
 | Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 21.27s（DNS 污染到 108.160.169.37，TCP 超时） |
 | GitHub 仓库 | ✅ | ✅ 已同步（HEAD `a5c0b15`） | `https://github.com/afdk1991/mim` | 本机 000 / 0.020s（HTTPS 阻断；仓库操作经 git push / gh CLI 取证 ✅） |
-| Render | ❌（需绑卡 $1 验证，`need_payment_info`） | ⛔ 不纳入 | mim-web.onrender.com（未创建） | — |
-| veFaaS | ❌（`AccountInArrears` + APIG 需余额 ≥ 100 元，`BalanceNotEnough`） | ⛔ 不纳入 | 无公网域名 | — |
 
 > **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
-> Render / veFaaS 的同等能力已由 Cloudflare / Vercel（前端）+ Sealos（容器后端）免费覆盖。
 
 ### 7.1.1 服务器出网限制（重要）
 
@@ -318,3 +300,20 @@ npm run check    # version-check + env-check（退出码 0 = 通过）
 
 - **项目实际使用 3 条**：`mim`（生产主域）、`data`（EdgeOne Pages 静态站）、`_dnsauth.mim`（证书签发校验）；`cloud.mixm.top` DNS 在线但项目零引用；其余 193 条未使用。
 - **备注 ↔ 模块对应（40 种备注）**：仅 3 类直接命中——`auth` / `login` / `api` → FR-01 账号与身份 + `mim-api`；10 类部分沾边（`admin` / `center` / `user` / `dy` / `sp` / `video` / `yy` / `img` / `secure` / `portal`）；27 类无对应（`pay` 属 FR-02 已删除域；电商 7 类、资讯 4 类、工具 4 类、移动端 3 类等与当前「功能模块商城 + 漫剧 AI 剧」范围无关）。
+
+### 部署平台 ↔ DNSPod 记录对应（2026-11-06 实测）
+
+§7.1.3 的 9 个免费平台中，仅 2 个平台经 DNSPod `mixm.top` 自有域解析，其余 7 个使用平台方域名、不经 DNSPod：
+
+| 部署平台 | 域名 | DNSPod 记录（类型 \| 主机记录 \| 记录值） | 记录状态 |
+|---|---|---|---|
+| 腾讯云自建服务器（生产） | `mim.mixm.top` | `A \| mim \| 115.159.159.11`（TTL 600） | 正常（2026-11-01 16:44:49） |
+| 生产证书签发校验（Let's Encrypt DNS-01） | —（校验用，不提供访问） | `TXT \| _dnsauth.mim \| 20261101085017crjbxlenk4ad73ctm41heelf10vswxc`（TTL 600） | 正常（2026-11-01 16:50:18） |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `CNAME \| data \| data.mixm.top.pages.dnsoe5.com.`（TTL 600） | 正常（2026-11-01 21:18:09） |
+| GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 | 平台方域名（`*.github.io` / `*.cloud.sealos.io` / `*.pages.dev` / `ghcr.io` / `*.iga-pages.com` / `*.vercel.app` / `github.com`） | 不经 DNSPod，`mixm.top` 下无对应记录 | — |
+
+补充说明：
+
+- `cloud`（`A \| cloud \| 115.159.159.11`，正常，2026-11-01 21:08:13）DNS 在线但项目零引用，未指向任何部署平台功能。
+- `@` 根域及旧 `cloud` / `data` A 记录（103.0.113.20）状态为「暂停」，不参与服务。
+- 另有 `_dnsauth.gy`（CNAME → `gy.mixm.top.eoacme0.com.`）属 EdgeOne 证书校验，与 `gy.mixm.top` 子站相关，当前项目未使用。

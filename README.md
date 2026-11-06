@@ -107,9 +107,7 @@ npm run check                             # 版本规约 + 密钥模板校验
 | 腾讯云 EdgeOne Pages | 静态站 `site/` | EdgeOne 控制台已连接仓库（构建 `npm install && npm run build`，输出 `dist`） | ✅ 已同步（`data.mixm.top`） |
 | Cloudflare Pages / Workers | 前端 + `/api` 反代 | `wrangler.toml` + `functions/api/[[path]].js`，`https://mim-8ah.pages.dev` | ✅ CI 自动发布（`CLOUDFLARE_API_TOKEN` 已配置） |
 | Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`），`https://mim-puce.vercel.app` | ✅ CI 自动发布（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 已配置） |
-| Render | 静态站 + Node 服务 | `render.yaml`（`mim-web` + `mim-api` + 1GiB 持久盘） | ⛔ **不纳入（免费范围不可用）**：账号需绑定银行卡完成 $1 验证（`need_payment_info`），免费层亦要求支付方式。同等能力已由 Cloudflare Pages + Vercel（前端）+ Sealos（容器 + PVC + 后端）免费覆盖 |
 | Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC），命名空间 `ns-i3ywsdfn`，`https://mim-i3ywsdfn.cloud.sealos.io` | ✅ CI 自动发布（`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 已配置） |
-| veFaaS | 容器函数 | `deploy/vefaas/deploy.sh`（`vefaas login` → `vefaas deploy --appId` / `--newApp`） | ⛔ **不纳入（免费范围不可用）**：函数创建返回 `AccountInArrears`（requestId `202611062101255AE8FB00A8E8F86CD652`），公网入口依赖 APIG 网关且要求余额 + 代金券 ≥ 100 元（`BalanceNotEnough`，requestId `2026110620572774941322BC88983082E9`）。同等能力已由 IGA Pages（前端）+ Sealos（容器 + 后端）免费覆盖 |
 | IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name mim --scope domestic`） | ✅ 已部署（Project `fr95fuwu57`，Deploy `p4f5a4svqm`）；`preview.iga-pages.com` 带 `iga_token` 访问 200，自有域名需控制台绑定 |
 | 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ 生产 `https://mim.mixm.top` |
 
