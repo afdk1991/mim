@@ -109,8 +109,8 @@ npm run check                             # 版本规约 + 密钥模板校验
 | Vercel | 前端 + `/api` rewrite | `vercel.json`（rewrites 反代 `https://mim.mixm.top`），`https://mim-puce.vercel.app` | ✅ CI 自动发布（`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 已配置） |
 | Render | 静态站 + Node 服务 | `render.yaml`（`mim-web` + `mim-api` + 1GiB 持久盘） | ⚙️ 配置就绪，待 `RENDER_DEPLOY_HOOK`（账号需先绑定支付方式完成验证） |
 | Sealos | 容器 + PVC | `deploy/sealos/mim.yaml`（Deployment/Service/Ingress/PVC），命名空间 `ns-i3ywsdfn`，`https://mim-i3ywsdfn.cloud.sealos.io` | ✅ CI 自动发布（`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 已配置） |
-| veFaaS | 容器函数 | `deploy/vefaas/deploy.sh`（`vefaas login` → `vefaas deploy --appId`） | ⚙️ 脚本就绪，待 `VE_ACCESS_KEY` / `VE_SECRET_KEY` / `VEFAAS_APP_ID` |
-| IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name`） | ⚙️ 脚本就绪，待 `IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` |
+| veFaaS | 容器函数 | `deploy/vefaas/deploy.sh`（`vefaas login` → `vefaas deploy --appId` / `--newApp`） | ⚠️ 脚本就绪；CLI 已 SSO 登录（Account `2100829122`），但函数创建返回 `AccountInArrears: 您的账户已欠费`（requestId `202611062101255AE8FB00A8E8F86CD652`），且公网入口依赖 APIG 网关（要求余额 + 代金券 ≥ 100 元）。充值后复跑脚本即可 |
+| IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name mim --scope domestic`） | ✅ 已部署（Project `fr95fuwu57`，Deploy `p4f5a4svqm`）；`preview.iga-pages.com` 带 `iga_token` 访问 200，自有域名需控制台绑定 |
 | 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ 生产 `https://mim.mixm.top` |
 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。

@@ -195,8 +195,18 @@ gh run watch          # 观察最近一次运行
 | Vercel | `vercel.json` | `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` |
 | Render | `render.yaml` | `RENDER_DEPLOY_HOOK` |
 | Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`SEALOS_NAMESPACE`、`MIM_JWT_SECRET` |
-| veFaaS | `deploy/vefaas/deploy.sh`（`vefaas login` + `vefaas deploy --appId`） | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID` |
-| IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME` |
+| veFaaS | `deploy/vefaas/deploy.sh`（`vefaas login` + `vefaas deploy --appId` / `--newApp`） | `VE_ACCESS_KEY`、`VE_SECRET_KEY`、`VEFAAS_APP_ID`（可选 `VEFAAS_APP_NAME`、`VEFAAS_GATEWAY_NAME`） |
+| IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME`（可选 `IGA_SCOPE`，默认 `domestic`） |
+
+**当前实况（2026-11-06）**：
+
+| 平台 | 状态 | 取证 / 阻塞原因 |
+|---|---|---|
+| veFaaS | ⚠️ 阻塞（账户欠费） | CLI 已 SSO 登录（Account `2100829122`，Temporary AK/SK，到期自动刷新）；`vefaas fn create --name mim-api --type webserver --source ghcr.io/afdk1991/mim-api:latest --source-type image` 返回 `InvalidRequest: AccountInArrears: 您的账户已欠费，无法开通此服务！请前往账户充值`（requestId `202611062101255AE8FB00A8E8F86CD652`）。另：公网入口必须挂 APIG 网关，`vefaas api CreateGateway --service apig` 返回 `BalanceNotEnough: ... less than 100 yuan`（requestId `2026110620572774941322BC88983082E9`）。充值 ≥ 100 元后执行 `vefaas deploy --newApp mim-api --gatewayName mim-gw --yes` 即可上线 |
+| IGA Pages | ✅ 已部署 | `iga login`（本机 SSO）→ `iga pages deploy --name mim --scope domestic` → Project ID `fr95fuwu57`、Deploy `p4f5a4svqm`；preview 域名为 token 门禁（307 下发 `iga_token` Cookie 后可达），`curl -c/-b` 带 Cookie 实测 200 / 476 字节；自有域名需控制台绑定（domestic scope 需 ICP 备案） |
+
+> 两个脚本均支持「本机 SSO 登录态复用」：CI 用 AK/SK，本机执行前只需 `vefaas login --sso` / `iga login`，脚本内以 `whoami` 探测登录态。
+
 
 > veFaaS 与 IGA Pages 同属火山引擎，共用一套 AK/SK；CLI 均由脚本在缺省时自装
 > （`@volcengine/vefaas-cli` / `@iga-pages/cli`），首建应用后把 ID / 项目名写入 secret 即可自动发布。
