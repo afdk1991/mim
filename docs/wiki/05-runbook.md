@@ -234,25 +234,25 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
 `Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
 
-### 7.1.3 多平台实测汇总（2026-11-07 00:22:29 +08:00，本机中国网络）
+### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`）
 
-结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
+结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证）——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），层 2 验证码页 CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06）。自建主站首页已引用本轮新产物 `assets/index-B15IIvsS.js`（证明 commit `7e4e3e9`「整站强制登录改为公开视图免登录」已上线），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
 
 | 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
 |---|---|---|---|---|
-| 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.081s** / 0.038s ⚡最快（`/health` 200 / 0.078s） |
-| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`；curl 命中 WAF 挑战页，须有头浏览器取证） | `https://data.mixm.top` | curl 200 但仅 **986B** 为 WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；真机（有头 Edge + CDP）：`title=Mim — 跨端任务与轻协作`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；0.080s / 0.035s |
-| GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.635s / 0.300s |
-| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.577s / 0.104s；`/health` 200 / 0.256s |
-| Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 0.689s / 0.163s |
-| GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.617s / 0.140s（未鉴权 401 属正常） |
+| 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.065s** / 0.027s ⚡最快（`/health` 200 / 0.070s） |
+| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`；curl 命中 WAF 挑战页，须有头浏览器取证） | `https://data.mixm.top` | curl 200 / 0.062s / 0.025s 但仅 **986B** 为 WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；最近一次有头取证（2026-11-06）：`title=Mim — 跨端任务与轻协作`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；**2026-11-07 01:48 复测：复用 profile 的 WAF 放行凭证已过期（约 17h），回落层 2 验证码页，CDP 合成点击 ×15 未通过，本轮真实内容未复验（铁律三如实记录）** |
+| GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.225s / 0.095s |
+| Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.281s / 0.101s；`/health` 200 / 0.283s / 0.096s |
+| Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 1.172s / 0.166s |
+| GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.745s / 0.140s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
-| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.01s（`--max-time 20` 截断）/ 0.000s（DNS 污染到 108.160.169.37，TCP 连接即失败） |
-| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `ba60659`，2026-11-07 00:23:17 +0800 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.026s / 0.018s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
+| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败） |
+| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `7e4e3e9`，2026-11-07 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.029s / 0.019s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
 
 > **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 不得作为「内容正确」的取证；须以有头真实浏览器读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
 >
-> **拦截面实测（2026-11-07）**：`curl` / 无头 UA → 层 1 混淆 JS（约 986B）；**无头浏览器（`--headless=new`）与全新 `user-data-dir` 的有头 Edge → 层 2 验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。判定正则须覆盖 `EO_Bot_Ssid|_0x649a|TEOCaptchaWidgetV1|正在验证连接安全性`。**唯一可通过方式**：复用**已通过过校验的** `user-data-dir`（本机 `$env:TEMP\edge-cdp-profile`）+ 有头模式 + CDP（`--remote-debugging-port=9333`）；新建 profile 一律落入验证码页，不可作为取证手段。
+> **拦截面实测（2026-11-07）**：`curl` / 无头 UA → 层 1 混淆 JS（约 986B）；**无头浏览器（`--headless=new`）与全新 `user-data-dir` 的有头 Edge → 层 2 验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。判定正则须覆盖 `EO_Bot_Ssid|_0x649a|TEOCaptchaWidgetV1|正在验证连接安全性`。**可通过方式与其失效边界**：复用**已通过过校验的** `user-data-dir`（本机 `$env:TEMP\edge-cdp-profile`）+ 有头模式 + CDP（`--remote-debugging-port=9333`）；新建 profile 一律落入验证码页，不可作为取证手段。**且放行凭证会过期（实测约 17h 后失效：2026-11-07 01:48 复用该 profile 仍回落层 2）；层 2 的 TEOCaptcha 对 CDP 合成鼠标事件（`Input.dispatchMouseEvent`，×15 次点击）不放行；凭证过期后唯一出路是人工在有头浏览器勾选一次复选框，放行会回写 profile，后续 CDP 即可复用**。
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 
