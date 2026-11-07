@@ -37,12 +37,12 @@ export function attachImWebSocket(server: HttpServer, deps: ApiDeps): ImHub {
     // 从 URL query 中取 token
     const parsed = parseUrl(req.url, true);
     const token = (parsed.query.token as string) || '';
-    // 无 token 或 token 非法：直接拒绝升级（关闭 socket）
+    // 无 token 或 token 非法：返回 HTTP 401 后优雅关闭 socket
+    // 注意：不能直接 destroy()，否则 401 响应体来不及刷出，nginx 会回 502
     const payload = token ? verifyAccessToken(token, deps.jwtSecret) : null;
     if (!payload) {
-      // 写 HTTP 401 响应后关闭 socket，未鉴权不允许建立 WS
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
+      // 写 HTTP 401 响应头，end() 会确保数据刷出后再关闭连接
+      socket.end('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n');
       return;
     }
     // 通过鉴权，升级为 WebSocket 连接
