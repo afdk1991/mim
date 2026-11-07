@@ -345,7 +345,7 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | zone | 单 zone `mixm.top`：45 条主机记录，绝大多数为 A 记录，唯一例外 `gy` 为 CNAME；记录仅含 `zone / fqdn / record_type / ttl` 与可选备注 |
 | 分类（8） | 门户与入口 6 / 身份与权限 2 / 运营后台 8 / 接口与开发 5 / 内容与媒体 7 / 电商与交易 7 / 数据与存储 4 / 工具与服务 6（合计 45） |
 | 后端路由 | **已删除（2026-11-08）**：`routes/site.ts` 与 4 条公开路由（`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`）整体移除，请求现返回 404 |
-| 前端路由 | **已删除（2026-11-08）**：`#/sitemap`、`#/directory` 与 45 个 `#/site/<key>` 路由从 `apps/web/src/router.ts` 移除；现存 hash 为 `#/store`、`#/comic`、`#/chat`、`#/settings`、`#/login` |
+| 前端路由 | **已删除（2026-11-08）**：`#/sitemap`、`#/directory` 与 45 个 `#/site/<key>` 路由从 `apps/web/src/router.ts` 移除；现存为 history 路径路由 `/store`、`/comic`、`/chat`、`/settings`、`/login`（旧 `#/xxx` 链接启动时自动改写为对应路径） |
 | 前端页面 | **已删除（2026-11-08）**：`SiteMap.tsx` / `SiteDirectory.tsx` / `SiteNodePage.tsx` 三个视图组件整体移除；仅保留功能模块商城 `Store.tsx` 顶部的 www 主站入口静态卡片（新窗口打开 `https://www.mixm.top`，不请求接口） |
 | 节点下属条目 | 每节点逐项呈现：备注两段（label / description）、分类层级与目录序号、逐条解析记录（zone / fqdn / record_type / ttl）、逐条 HTTPS 入口、record 级覆盖备注（如 `gy`）、按职责类型的能力清单、关联节点 |
 | 搜索覆盖 | `q` 命中 host / label / description / FQDN / record 级备注（例如 `q=疾风引擎` 命中 `gy`）；目录页另支持导航名 / 职责检索 |

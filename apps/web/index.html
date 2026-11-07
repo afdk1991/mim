@@ -35,7 +35,7 @@
         } // 多段折叠结束
       })(); // 立即执行结束：此后的 spa.js 与 assets 均按规整后的地址解析
     </script><!-- 地址栏前置规整脚本结束 -->
-    <script src="%BASE_URL%spa.js"></script><!-- 地址归一化（外置脚本）：构建期 %BASE_URL% 被替换为 ./，随规整后的地址解析到部署根；外置是为绕开生产 CSP script-src 'self' 对内联脚本的禁用，让归一化在主站真实生效（全站会话门禁已移除，改为按需登录） -->
+    <script src="%BASE_URL%spa.js"></script><!-- 地址归一化（外置脚本）：构建期 %BASE_URL% 被替换为 ./，随规整后的地址解析到部署根；外置是为绕开生产 CSP script-src 'self' 对内联脚本的禁用，让归一化在主站真实生效（登录拦截由 App 内按需执行，本脚本不做整页替换） -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- 视口：移动端按设备宽度布局且初始不缩放，避免页面被整体缩小 -->
     <meta name="color-scheme" content="light dark" /><!-- 配色方案：声明同时支持浅/深色，浏览器可自动适配滚动条与原生控件 -->
     <title>Mim — 跨端任务与轻协作</title><!-- 标签页标题：产品名 + 一句话定位，利于分享与识别 -->

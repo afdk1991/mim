@@ -65,13 +65,13 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-站内采用零依赖 hash 路由（[router.ts](./apps/web/src/router.ts)）：`#/store`、`#/comic`、`#/chat`、`#/settings`、`#/login`；刷新、前进后退与外链直达均可用。视图由 [App.tsx](./apps/web/src/App.tsx) 按 hash 渲染。**全站会话门禁（2026-11-08 起）**：未登录时无论从首页、刷新还是直接访问任意内部 `#/` 路由，均只渲染整屏登录页，不渲染侧栏、导航或任何业务内容，也不发起业务接口请求；登录成功后解除锁定并开放全部视图（除 `#/login` 中转外原地解锁、保留原目标 hash）；退出登录、令牌失效或跨标签页退出时立即重新锁定。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)，静态文档入口（`site/*.html`、`Mim-PRD.html`）同样内置同源会话门禁。站点体系（站点地图 / 站点目录 / 45 节点页与 site 域 4 条接口）已于 2026-11-08 整体下线，功能模块商城页顶部保留一张 www 主站入口静态卡片。
+站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图——`/store`、`/comic`、`/chat`、`/settings`、`/login`，地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接在启动时自动改写为对应路径。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `_redirects` 回退、生产 nginx 由 `try_files` 回退）。**按需登录（2026-11-08 起）**：商城目录 `/store` **匿名可浏览**；`/comic`、`/chat`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌登录卡片（提示「此功能需登录后使用」），不再整站锁定；登录成功后原地解锁当前视图，退出登录、令牌失效或跨标签页退出时回落到匿名态、收费视图重新内嵌登录卡片。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。站点体系（站点地图 / 站点目录 / 45 节点页与 site 域 4 条接口）已于 2026-11-08 整体下线，功能模块商城页顶部保留一张 www 主站入口静态卡片。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ 权益管理（列表过滤、发放、回收、审计事件时间线）。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
-| 登录 | `Login.tsx` | 全站唯一登录入口；管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login`；顶部展示「全站已锁定 / 登录状态已失效」提示 |
+| 登录 | `Login.tsx` | 全站唯一登录入口；管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login`；匿名访问收费/私密视图时在内容区内嵌展示，顶部提示「此功能需登录后使用 / 登录状态已失效」 |
 | 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：目录浏览与 `?q=` 搜索、模块详情面板（能力说明 / 当前价 / 历史调价 `price_history` / 前置依赖链）、一次性解锁（`POST /entitlements`）、「我的权益」区块（`GET /me/entitlements`）、前置依赖缺失时的引导提示（`/modules`、`/modules/:code`、`/entitlements`、`/me/entitlements`） |
 | 主站入口卡片 | Store.tsx 顶部 | 站点体系 2026-11-08 下线后唯一保留的 www 主站直达入口（静态硬编码，新窗口打开 https://www.mixm.top，不请求接口） |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
