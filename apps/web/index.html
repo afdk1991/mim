@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- 视口：移动端按设备宽度布局且初始不缩放，避免页面被整体缩小 -->
     <meta name="color-scheme" content="light dark" /><!-- 配色方案：声明同时支持浅/深色，浏览器可自动适配滚动条与原生控件 -->
     <title>Mim — 跨端任务与轻协作</title><!-- 标签页标题：产品名 + 一句话定位，利于分享与识别 -->
+    <script>
+      /* 地址栏归一化：EdgeOne 等 WAF 挑战脚本会向地址栏追加 ?tads 参数，并在约 1.2 秒后自行清除；
+         但它的清除正则只匹配 "?tads" 这一段，会把裸问号留在地址栏（https://host/?）。
+         这里在应用挂载之前用 replaceState 原地修正：既清掉残留的裸问号，也顺手处理尚未被清除的 ?tads。
+         该脚本只改地址栏呈现，不产生新的历史记录，也不触发任何跳转。 */
+      (function () { // 立即执行函数：隔离内部变量，避免向全局作用域泄漏
+        var href = location.href; // 当前完整地址（含查询串与哈希），用于判断末位是否为问号
+        var search = location.search; // 查询串部分（含前导问号；空查询串时为 ''）
+        var hash = location.hash; // 哈希部分：本项目无哈希路由，正常为空，非空时一律不动地址
+        // 仅处理两种异常形态：①空查询串且地址以问号结尾；②查询串恰为平台注入的 ?tads
+        if (hash === '' && (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?'))) {
+          history.replaceState(null, '', location.pathname); // 只保留路径原地替换，不新增历史、不触发跳转
+        } // 归一化分支结束：其余地址形态一律保持原样，避免误改正常链接
+      })(); // 立即执行结束：此时 React 尚未挂载，地址栏已完成修正
+    </script><!-- 地址栏归一化脚本结束 -->
   </head><!-- 元信息结束 -->
   <body><!-- 可见内容容器 -->
     <div id="root"></div><!-- React 挂载点：main.tsx 通过 getElementById('root') 找到此节点 -->
