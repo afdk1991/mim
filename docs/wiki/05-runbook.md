@@ -208,10 +208,21 @@ gh run watch          # 观察最近一次运行
 
 | 平台 | 配置文件 | secret |
 |---|---|---|
-| Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js` | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
+| Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js`（/api 反代）+ `functions/[[catchall]].js`（SPA 深链接回退） | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
 | Vercel | `vercel.json` | `VERCEL_TOKEN`、`VERCEL_ORG_ID`、`VERCEL_PROJECT_ID` |
 | Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`SEALOS_NAMESPACE`、`MIM_JWT_SECRET` |
 | IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME`（可选 `IGA_SCOPE`，默认 `domestic`） |
+
+**SPA 深链接回退四件套（2026-11-08 定性）**：前端 history 路径路由（`/store` `/comic` `/chat` `/settings` `/login`）上线后，各平台回退载体分工如下——
+
+| 平台 | 回退载体 | 行为 |
+|---|---|---|
+| 腾讯云自建服务器 | nginx `try_files $uri $uri/ /index.html` | 深链接 200 重写 index.html（五条深链接实测全 200 / LEN=5182） |
+| Cloudflare Pages | `functions/[[catchall]].js` catch-all | **Pages 挂载 Functions 后 `_redirects` 被整体旁路**；函数只对「GET + 静态资源未命中返回 404 + 非 `/api/` 前缀 + `Accept` 含 `text/html`」的请求 200 重写 index.html |
+| GitHub Pages | `dist/404.html`（`index.html` 逐字节副本，`scripts/spa-404.mjs` 生成） | 深链接返回 **404 状态 + SPA 全文**，浏览器加载后 router 读 `location.pathname` 渲染，404 状态码属平台能力上限的预期设计；响应体长度与首页相同，不能以长度区分命中，只能看状态码 |
+| EdgeOne Pages 等 | `apps/web/public/_redirects`（`/* /index.html 200`） | CF 侧该文件被 Functions 旁路，仅对仍解析 `_redirects` 的平台生效 |
+
+> **CF 深链接 curl 取证口径**：裸 curl 默认发 `Accept: */*`（不含 `text/html`），catch-all Function 按设计跳过回退、返回 404——**这不代表回归**。测 CF 深链接必须带浏览器式 Accept 头：`curl -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"`，预期 200 / LEN=5182（CI run 42412711936 部署后五条深链接实测全部 200）。
 
 **当前实况（2026-11-06）**：
 
