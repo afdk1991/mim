@@ -1,6 +1,6 @@
 # 07 · 功能模块
 
-> 本页从 [Mim-PRD.html](file:///f:/合并项目/Mim/Mim-PRD.html)（V0.0.0-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
+> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.0-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
 
 ## 1. 模块全景
 

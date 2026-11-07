@@ -7,7 +7,7 @@
 
 | 项 | 值 |
 |---|---|
-| 路径 | [scripts/version-check.mjs](file:///f:/合并项目/Mim/scripts/version-check.mjs) |
+| 路径 | [scripts/version-check.mjs](../../scripts/version-check.mjs) |
 | 模块系统 | ES Module（`.mjs`） |
 | Shebang | `#!/usr/bin/env node` |
 | 运行时 | Node.js（无版本声明，用到 `node:child_process` / `node:fs` / `node:path` / `node:url`，Node ≥ 14 即可） |
@@ -100,7 +100,7 @@ RELEASE_CHANNEL = (unset / 正式通道)
 
 | 项 | 值 |
 |---|---|
-| 路径 | [scripts/env-check.mjs](file:///f:/合并项目/Mim/scripts/env-check.mjs) |
+| 路径 | [scripts/env-check.mjs](../../scripts/env-check.mjs) |
 | 模块系统 | ES Module（`.mjs`） |
 | Shebang | `#!/usr/bin/env node` |
 | 运行时 | Node.js ≥ 14.18（仅 `node:fs` / `node:path` / `node:url`，**不调用 git**） |
