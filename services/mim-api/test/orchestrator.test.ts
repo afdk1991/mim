@@ -303,7 +303,7 @@ describe('失败路径（不伪造外部产物）', () => { // describe 失败�
     expect(caps.body.ai.provider).toBe('openai'); // 断言提供方为 openai
     expect(caps.body.ai.provider_configured).toBe(true); // 断言已配置
     expect(caps.body.ai.mock_provider).toBe(false); // 断言非 mock 模式
-    expect(caps.body.ai.supported_job_types).toEqual(['text', 'image']); // 断言仅支持 text 与 image，其余类型无能力
+    expect(caps.body.ai.supported_job_types).toEqual(['text', 'image', 'tts']); // openai 兼容协议支持 text/image/tts；video/compose 走独立通道
     expect(caps.body.ai.base_url).toBe('https://api.openai.com/v1'); // 断言默认 base_url 指向官方 v1
     expect(caps.body.ai.text_model).toBe('gpt-4o-mini'); // 断言默认文本模型
 

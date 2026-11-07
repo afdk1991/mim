@@ -333,20 +333,35 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
 | 导出成片 | —（规划导出任务 + 对象存储预签名下载） | — | ❌ 0 代码 |
 
-### 11.13 站点模块地图（DNSPod 备注结构化，2026-11-06）
+### 11.13 站点模块地图（DNSPod 备注结构化 → 45 个可运行节点，2026-11-08）
 
-> 数据源：仓库根 `dnspod_records_2026-11-05_21-42-26.xls`（DNSPod 导出，2026-11-05）的**「备注」列**。原始表 197 行，其中 180 行带备注，去重并取单一 zone `mixm.top` 后为 **45 条主机记录**（短主机与 FQDN 重复行已合并）。备注内容即各子站的产品定位，本模块将其落成结构化只读数据 + 公开 API + 前端可视化；解析目标（IP / CNAME 目标值）不对外暴露。
+> 数据源：仓库根 `dnspod_records_2026-11-05_21-42-26.xls`（DNSPod 导出，2026-11-05）的**「备注」列**。原始表 197 行 = `laal.top` sheet 93 行 + `mixm.top` sheet 104 行，其中 180 行带备注；取单一 zone `mixm.top` 的短主机记录后为 **45 条站点模块**（45 条 FQDN 重复行已按 host 合并）。2026-11-08 起每条模块都对应一个可运行页面 / 路由 / 导航 / 职责与域名映射，真源为 `src/site.ts` + `src/site-nodes.ts`；解析目标（IP / CNAME 目标值）不对外暴露。
 
 | 项 | 实况 |
 |---|---|
-| 数据文件 | `services/mim-api/src/site.ts`（`SITE_ZONES` / `SITE_CATEGORIES` / `SITE_MODULES`，纯静态常量，无数据库表） |
-| zone | 单 zone `mixm.top`：45 条主机记录，绝大多数为 A 记录，唯一例外 `gy` 为 CNAME；解析目标值（IP / CNAME 目标）不对外暴露，记录仅含 `zone / fqdn / record_type / ttl` 与可选备注 |
+| 数据文件 | `services/mim-api/src/site.ts`（45 条 RAW + 8 分类 + 单 zone + `fqdnOf()`）、`src/site-nodes.ts`（45 行节点规格 + `routeKeyOf()` + `buildAndValidateNodeSpecs()` 完整性断言），纯静态常量，无数据库表 |
+| zone | 单 zone `mixm.top`：45 条主机记录，绝大多数为 A 记录，唯一例外 `gy` 为 CNAME；记录仅含 `zone / fqdn / record_type / ttl` 与可选备注 |
 | 分类（8） | 门户与入口 6 / 身份与权限 2 / 运营后台 8 / 接口与开发 5 / 内容与媒体 7 / 电商与交易 7 / 数据与存储 4 / 工具与服务 6（合计 45） |
-| 后端路由 | `routes/site.ts`：`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`（3 条，**公开免鉴权**，zod `strictObject` 校验，非法 zone/category → 400 `VALIDATION_FAILED`，未知 host → 404 `NOT_FOUND`） |
-| 前端页面 | `apps/web/src/views/SiteMap.tsx`，侧栏「站点地图 / Site Map」；一次拉全量后在客户端做分类 / 关键词过滤，按分类分组渲染卡片，每条 record 展示记录类型、TTL 与外链（不展示解析值） |
-| 搜索覆盖 | `q` 命中 host / label / description / FQDN / record 级备注（例如 `q=疾风引擎` 命中 `gy`） |
-| 测试 | `test/site.test.ts` 7 例（overview 计数、列表 45×1 且不含解析值、分类与 `q` 过滤、`gy` 的 CNAME 与 record 级覆盖、`@` 的 FQDN、非法参数 400（含 `zone=laal.top`）/ 未知 host 404） |
-| 状态 | ✅ 前后端已落地（不写入数据库，无迁移、无第三方依赖） |
+| 后端路由 | `routes/site.ts`：`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`（**4 条**，公开免鉴权，zod `strictObject` 校验，非法 zone/category → 400，未知 host → 404）；`/site/nodes` 一次返回 45 节点的路由 / 双语导航 / 职责 / 关联 / 能力清单 / 域名映射 |
+| 前端路由 | 零依赖 hash 路由 `apps/web/src/router.ts`：`#/sitemap`（原始备注卡片）、`#/directory`（8 分类 / 45 节点目录）、`#/site/<key>`（45 个节点模块页，根域名 `@` 映射为 `root`）；刷新、前进后退与外链直达均可用 |
+| 前端页面 | `SiteMap.tsx`（45 卡片 +「进入模块」）、`SiteDirectory.tsx`（分类导航 + 搜索）、`SiteNodePage.tsx`（面包屑 / 5 个下属栏目导航 / 域名映射 / 站点地图原始条目 / 模块职责 / 关联节点 / 实时接口 / 前后翻页）；节点页时侧栏「站点目录」保持 active |
+| 节点下属条目 | 每节点逐项呈现：备注两段（label / description）、分类层级与目录序号、逐条解析记录（zone / fqdn / record_type / ttl）、逐条 HTTPS 入口、record 级覆盖备注（如 `gy`）、按职责类型的能力清单、关联节点 |
+| 搜索覆盖 | `q` 命中 host / label / description / FQDN / record 级备注（例如 `q=疾风引擎` 命中 `gy`）；目录页另支持导航名 / 职责检索 |
+| 域名 / 路径映射 | `fqdnOf()` 统一生成 `https://<host>.mixm.top`（根记录为 `https://mixm.top`）；生产 nginx 仅服务 `mim.mixm.top`，不加通配 `server_name`，45 子域由各自服务承载（见 `deploy/nginx-mim.conf` 注释） |
+| 测试 | `test/site.test.ts` 7 例 + `test/site-nodes.test.ts` 11 例（45 节点计数 / 分类分布 / 规格完整 / 域名映射 / 路由唯一 / 关联不悬空 / 能力清单 / 备注与记录条目 / 冲突映射 / 两接口同源） |
+| 状态 | ✅ 45 个模块及下属条目全部实现为可运行页面（无数据库表、无迁移、无新增第三方依赖） |
+
+#### 11.13.1 映射调整结论（站点地图 ↔ 现有实现）
+
+| 现象 | 调整结论 | 落地位置 |
+|---|---|---|
+| 导出含两个 sheet（`laal.top` / `mixm.top`），站点地图只认单 zone | 以 `mixm.top` sheet 为唯一真源；`laal.top` 已下线，`zone=laal.top` 返回 400 | `SITE_ZONES` / `isSiteZone()` / 契约测试 |
+| 45 条短主机 + 45 条 FQDN 重复行 | 按 host 合并为 45 个模块、每模块 1 条记录，不重复建页面 | `RAW` / `buildModule()` |
+| xls 原始为字母序，站点地图按业务层级组织 | 保留 8 分类层级顺序（门户 → 工具），分类内保持导出相对次序 | `SITE_CATEGORIES` / `ROWS` |
+| 根域名 `@` 是 hash 保留字符 | 冲突映射 `@ → root`，站内路由 `#/site/root`，fqdn 仍为 `mixm.top` | `routeKeyOf()` / 契约测试 |
+| `gy` 在两个 sheet 的备注口径不同 | 采用分层映射：模块级保留通用定位备注，record 级保留 `mixm.top` 的「疾风引擎承载节点」备注；两者均来自 xls，节点页「站点地图条目」同时呈现，不构成数据冲突 | `RAW.mixm` / `present()` / `SiteNodePage.tsx` |
+| 45 个子域与生产 nginx 的关系 | 不新增通配 `server_name`；`mim.mixm.top` 承载本项目 SPA，45 子域由各自服务解析 | `deploy/nginx-mim.conf` |
+| 节点页此前侧栏无 active 高亮 | 节点视图统一回落到「站点目录」高亮，导航状态不再出现空档 | `App.tsx` 的 `activeView` |
 
 ## 12. 实现拆分清单（新 FR-03 落地路径）
 

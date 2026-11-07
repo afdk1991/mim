@@ -648,6 +648,130 @@ code { /* 行内代码/令牌展示 */
   word-break: break-all; /* 长串强制换行，不撑破布局 */
 } /* 令牌块结束 */
 
+/* ---------- 站点目录 / 节点模块页（45 个站点地图节点） ---------- */
+
+.site-node-grid { /* 节点卡片网格 */
+  display: grid; /* 栅格排版 */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 窄卡片容纳域名不换行溢出 */
+  gap: 12px; /* 卡片间距 */
+} /* 网格结束 */
+
+.site-node-card { /* 单个节点卡片：整卡可点击 */
+  display: flex; /* 纵向堆叠 */
+  flex-direction: column; /* 自上而下 */
+  gap: 8px; /* 内部间距 */
+  padding: 14px; /* 内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: var(--radius); /* 统一圆角 */
+  background: var(--surface); /* 白底 */
+  box-shadow: var(--shadow); /* 统一阴影 */
+  text-decoration: none; /* 去掉链接下划线 */
+  color: var(--text); /* 继承主文字色 */
+  transition: border-color 0.15s, transform 0.15s; /* 轻微交互反馈 */
+} /* 卡片结束 */
+
+.site-node-card:hover { /* 悬停态 */
+  border-color: var(--primary); /* 主色描边 */
+  transform: translateY(-2px); /* 轻微上浮 */
+} /* 悬停结束 */
+
+.site-node-title { /* 节点导航名 */
+  font-size: 15px; /* 略大于正文 */
+} /* 标题结束 */
+
+.site-node-domain { /* 完整域名 */
+  color: var(--primary); /* 主色强调可访问域名 */
+  font-size: 12px; /* 次要信息 */
+  word-break: break-all; /* 长域名换行不撑破卡片 */
+} /* 域名结束 */
+
+.site-crumb { /* 节点页面包屑 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 窄屏换行 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 层级间距 */
+  margin-bottom: 8px; /* 与页头留白 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 13px; /* 次要信息 */
+} /* 面包屑结束 */
+
+.site-actions { /* 节点页顶部操作区 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 窄屏换行 */
+  gap: 10px; /* 按钮间距 */
+  margin-bottom: 4px; /* 与下方面板留白 */
+} /* 操作区结束 */
+
+.site-sec-nav { /* 节点页下属栏目导航条 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 放不下自动换行 */
+  gap: 8px; /* 栏目间距 */
+  margin: 10px 0 16px; /* 与操作区、面板分别留白 */
+  padding-bottom: 10px; /* 与分隔线留白 */
+  border-bottom: 1px solid var(--border); /* 与内容区做视觉分隔 */
+} /* 栏目导航条结束 */
+
+.site-sec-btn { /* 单个栏目按钮 */
+  padding: 5px 12px; /* 紧凑但可点按的区域 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 999px; /* 胶囊形，与 badge 风格呼应 */
+  background: var(--surface); /* 白底 */
+  color: var(--text-muted); /* 未选中时弱化 */
+  font-size: 12px; /* 次要信息字号 */
+  cursor: pointer; /* 明确可点击 */
+} /* 栏目按钮结束 */
+
+.site-sec-btn.active { /* 当前栏目高亮：导航状态可见 */
+  border-color: var(--primary); /* 主色描边 */
+  background: var(--primary); /* 主色填充 */
+  color: #fff; /* 反白文字保证对比度 */
+} /* 高亮结束 */
+
+.site-kv { /* 域名映射键值表 */
+  display: flex; /* 纵向堆叠 */
+  flex-direction: column; /* 一行一个字段 */
+  gap: 0; /* 行间距由边框承担 */
+  border: 1px solid var(--border); /* 外框 */
+  border-radius: 8px; /* 圆角 */
+  overflow: hidden; /* 裁掉子元素溢出圆角 */
+} /* 键值表结束 */
+
+.site-kv-row { /* 键值表单行 */
+  display: grid; /* 两列栅格 */
+  grid-template-columns: 130px 1fr; /* 固定键宽 + 自适应值 */
+  gap: 12px; /* 键值间距 */
+  padding: 9px 12px; /* 行内留白 */
+  border-bottom: 1px solid var(--border); /* 行分隔线 */
+  font-size: 13px; /* 紧凑字号 */
+} /* 键值行结束 */
+
+.site-kv-row:last-child { /* 末行 */
+  border-bottom: none; /* 去掉多余分隔线 */
+} /* 末行结束 */
+
+.site-kv-key { /* 键名列 */
+  color: var(--text-muted); /* 次要色 */
+} /* 键名结束 */
+
+.site-cap { /* 模块职责清单 */
+  margin: 0; /* 清掉默认外边距 */
+  padding-left: 20px; /* 保留项目符号缩进 */
+  line-height: 1.9; /* 宽松行高便于阅读 */
+} /* 清单结束 */
+
+.site-related { /* 关联节点链接列表 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 放不下自动换行 */
+  gap: 8px; /* 链接间距 */
+} /* 关联列表结束 */
+
+.site-pager { /* 上一 / 下一节点 */
+  display: flex; /* 左右分布 */
+  justify-content: space-between; /* 两端对齐 */
+  gap: 12px; /* 最小间距 */
+  font-size: 13px; /* 次要信息 */
+} /* 翻页结束 */
+
 @media (max-width: 760px) { /* 窄屏断点：平板竖屏与手机改用单列布局 */
   .layout { /* 整体布局在窄屏下 */
     grid-template-columns: 1fr; /* 取消侧栏固定宽度，改为单列上下堆叠 */
@@ -677,4 +801,346 @@ code { /* 行内代码/令牌展示 */
     flex-direction: column; /* 字段改为纵向堆叠，避免挤压 */
     align-items: stretch; /* 控件撑满宽度，便于点按 */
   } /* 窄屏内联表单结束 */
+
+  .site-sec-nav { /* 窄屏栏目导航：单行横向滑动，少占纵向空间 */
+    flex-wrap: nowrap; /* 不换行 */
+    overflow-x: auto; /* 超出宽度可横向滚动 */
+  } /* 窄屏栏目导航结束 */
+
+  .site-sec-btn { /* 窄屏栏目按钮 */
+    flex: 0 0 auto; /* 不被压缩，保证文案完整 */
+  } /* 窄屏栏目按钮结束 */
+} /* 窄屏断点结束 */
+
+/* ---------- IM 聊天布局 ---------- */
+.chat-layout { /* 聊天视图整体两栏布局 */
+  display: grid; /* 栅格布局：左会话列表 + 右消息区 */
+  grid-template-columns: 300px minmax(0, 1fr); /* 左栏固定 300px，右栏自适应 */
+  height: calc(100vh - 0px); /* 撑满内容区高度 */
+  min-height: 0; /* 允许内部滚动容器收缩 */
+} /* 聊天布局结束 */
+
+.chat-sidebar { /* 左侧栏：搜索 + 会话列表 */
+  display: flex; /* 纵向排列搜索框与会话列表 */
+  flex-direction: column;
+  border-right: 1px solid var(--border); /* 与消息区分隔线 */
+  background: var(--surface); /* 白色背景 */
+  min-height: 0; /* 允许内部滚动 */
+} /* 左侧栏结束 */
+
+.chat-search { /* 搜索框容器 */
+  padding: 12px; /* 内边距 */
+  border-bottom: 1px solid var(--border); /* 与会话列表分隔 */
+} /* 搜索框容器结束 */
+
+.chat-search input { /* 搜索输入框 */
+  width: 100%; /* 占满宽度 */
+  padding: 8px 12px; /* 内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 统一圆角 */
+  font-size: 14px; /* 与正文一致 */
+  outline: none; /* 去除默认聚焦描边 */
+} /* 搜索输入框结束 */
+
+.chat-search input:focus { /* 搜索框聚焦态 */
+  border-color: var(--primary); /* 主色边框 */
+} /* 聚焦态结束 */
+
+.chat-search-results { /* 搜索结果列表 */
+  max-height: 240px; /* 最大高度，超出滚动 */
+  overflow-y: auto; /* 纵向滚动 */
+  border-bottom: 1px solid var(--border); /* 与会话列表分隔 */
+} /* 搜索结果结束 */
+
+.chat-user-item { /* 搜索结果用户项 */
+  display: flex; /* 头像 + 名称横向排列 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 间距 */
+  width: 100%; /* 占满宽度 */
+  padding: 10px 12px; /* 内边距 */
+  border: none; /* 无默认边框 */
+  background: transparent; /* 透明背景 */
+  text-align: left; /* 左对齐 */
+  cursor: pointer; /* 手型光标 */
+} /* 用户项结束 */
+
+.chat-user-item:hover { /* 用户项悬停 */
+  background: var(--bg); /* 浅灰底色 */
+} /* 悬停结束 */
+
+.chat-conversations { /* 会话列表容器 */
+  flex: 1; /* 占满剩余空间 */
+  overflow-y: auto; /* 超出滚动 */
+} /* 会话列表结束 */
+
+.chat-conv-item { /* 单个会话项 */
+  display: flex; /* 头像 + 内容横向排列 */
+  align-items: flex-start; /* 顶部对齐 */
+  gap: 10px; /* 间距 */
+  width: 100%; /* 占满 */
+  padding: 12px; /* 内边距 */
+  border: none; /* 无边框 */
+  border-bottom: 1px solid var(--border); /* 底部分隔线 */
+  background: transparent; /* 透明 */
+  text-align: left; /* 左对齐 */
+  cursor: pointer; /* 手型 */
+} /* 会话项结束 */
+
+.chat-conv-item:hover { /* 会话项悬停 */
+  background: var(--bg); /* 浅灰 */
+} /* 悬停结束 */
+
+.chat-conv-item.active { /* 当前选中会话 */
+  background: rgba(59, 110, 245, 0.08); /* 主色淡背景 */
+} /* 选中态结束 */
+
+.chat-avatar { /* 头像占位：首字母圆形 */
+  flex: 0 0 36px; /* 固定 36px 见方 */
+  width: 36px;
+  height: 36px;
+  border-radius: 50%; /* 圆形 */
+  background: var(--primary); /* 主色背景 */
+  color: #fff; /* 白色文字 */
+  display: flex; /* 居中首字母 */
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+} /* 头像结束 */
+
+.chat-conv-body { /* 会话标题 + 预览容器 */
+  flex: 1; /* 占满剩余 */
+  min-width: 0; /* 允许文本截断 */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+} /* 会话信息容器结束 */
+
+.chat-conv-title { /* 会话标题 */
+  font-weight: 600; /* 半粗 */
+  font-size: 14px;
+  white-space: nowrap; /* 不换行 */
+  overflow: hidden; /* 溢出隐藏 */
+  text-overflow: ellipsis; /* 省略号 */
+} /* 会话标题结束 */
+
+.chat-conv-preview { /* 最后消息预览 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+} /* 预览结束 */
+
+.chat-badge { /* 未读数角标 */
+  flex: 0 0 auto; /* 不压缩 */
+  min-width: 18px; /* 最小宽度 */
+  height: 18px;
+  padding: 0 5px; /* 水平内边距 */
+  border-radius: 9px; /* 胶囊形 */
+  background: var(--danger); /* 红色 */
+  color: #fff; /* 白字 */
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+} /* 角标结束 */
+
+.chat-empty { /* 空状态文案 */
+  padding: 20px 12px; /* 内边距 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 13px;
+  text-align: center; /* 居中 */
+} /* 空状态结束 */
+
+.chat-main { /* 右侧消息区 */
+  display: flex; /* 纵向：头部 + 消息 + 输入 */
+  flex-direction: column;
+  min-height: 0; /* 允许消息区滚动 */
+  background: var(--bg); /* 浅灰背景 */
+} /* 消息区结束 */
+
+.chat-header { /* 会话头部 */
+  display: flex; /* 标题 + 状态 + 按钮 */
+  align-items: center;
+  gap: 12px; /* 间距 */
+  padding: 14px 20px; /* 内边距 */
+  border-bottom: 1px solid var(--border); /* 分隔线 */
+  background: var(--surface); /* 白色 */
+} /* 头部结束 */
+
+.chat-header-title { /* 会话标题 */
+  font-weight: 600; /* 半粗 */
+  font-size: 16px;
+} /* 标题结束 */
+
+.chat-header-status { /* 连接状态 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px;
+} /* 状态结束 */
+
+.chat-messages { /* 消息列表容器 */
+  flex: 1; /* 占满中间 */
+  overflow-y: auto; /* 滚动 */
+  padding: 20px; /* 内边距 */
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* 消息间距 */
+} /* 消息列表结束 */
+
+.chat-msg { /* 单条消息容器 */
+  display: flex;
+  flex-direction: column;
+  max-width: 70%; /* 最大宽度，留出对侧空间 */
+} /* 消息结束 */
+
+.chat-msg.mine { /* 自己发的消息靠右 */
+  align-self: flex-end; /* 靠右 */
+  align-items: flex-end; /* 内部右对齐 */
+} /* 自己消息结束 */
+
+.chat-msg.theirs { /* 对方消息靠左 */
+  align-self: flex-start; /* 靠左 */
+  align-items: flex-start; /* 内部左对齐 */
+} /* 对方消息结束 */
+
+.chat-msg-sender { /* 发送者名 */
+  font-size: 12px;
+  color: var(--text-muted); /* 次要色 */
+  margin-bottom: 4px; /* 与气泡间距 */
+} /* 发送者名结束 */
+
+.chat-msg-bubble { /* 消息气泡 */
+  padding: 10px 14px; /* 内边距 */
+  border-radius: 12px; /* 圆角 */
+  background: var(--surface); /* 白色 */
+  border: 1px solid var(--border); /* 边框 */
+  word-break: break-word; /* 长词换行 */
+  line-height: 1.5;
+} /* 气泡结束 */
+
+.chat-msg.mine .chat-msg-bubble { /* 自己的气泡主色背景 */
+  background: var(--primary); /* 主色 */
+  color: #fff; /* 白字 */
+  border-color: var(--primary);
+} /* 自己气泡结束 */
+
+.chat-msg-time { /* 消息时间 */
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+} /* 时间结束 */
+
+.chat-input { /* 输入区 */
+  display: flex; /* 文本域 + 发送按钮 */
+  gap: 10px; /* 间距 */
+  padding: 14px 20px; /* 内边距 */
+  border-top: 1px solid var(--border); /* 分隔线 */
+  background: var(--surface); /* 白色 */
+} /* 输入区结束 */
+
+.chat-input textarea { /* 文本域 */
+  flex: 1; /* 占满宽度 */
+  resize: none; /* 禁止手动调整大小 */
+  padding: 10px 12px; /* 内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  font-family: inherit; /* 继承字体 */
+  font-size: 14px;
+  outline: none; /* 去默认描边 */
+} /* 文本域结束 */
+
+.chat-input textarea:focus { /* 文本域聚焦 */
+  border-color: var(--primary); /* 主色边框 */
+} /* 聚焦结束 */
+
+.chat-placeholder { /* 未选中会话时的占位 */
+  flex: 1; /* 占满 */
+  display: flex;
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 14px;
+} /* 占位结束 */
+
+.chat-error { /* 错误提示条 */
+  padding: 8px 20px; /* 内边距 */
+  background: rgba(214, 69, 69, 0.1); /* 红色淡背景 */
+  color: var(--danger); /* 红色文字 */
+  font-size: 13px;
+  border-top: 1px solid var(--border); /* 顶部分隔线 */
+} /* 错误条结束 */
+
+/* ---------- 视频通话浮窗 ---------- */
+.video-call-float { /* 视频通话浮窗 */
+  position: fixed; /* 固定定位 */
+  right: 24px; /* 距右 24px */
+  bottom: 24px; /* 距底 24px */
+  width: 360px; /* 宽度 */
+  background: #000; /* 黑色背景（视频未接通时） */
+  border-radius: 12px; /* 圆角 */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* 阴影 */
+  overflow: hidden; /* 裁掉超出圆角的内容 */
+  z-index: 1000; /* 高层级，避免被遮挡 */
+} /* 浮窗结束 */
+
+.video-call-title { /* 标题栏 */
+  display: flex; /* 名称 + 状态 */
+  justify-content: space-between; /* 两端对齐 */
+  padding: 10px 14px; /* 内边距 */
+  background: rgba(0, 0, 0, 0.6); /* 半透明黑 */
+  color: #fff; /* 白字 */
+  font-size: 13px;
+} /* 标题栏结束 */
+
+.video-call-name { /* 对方名称 */
+  font-weight: 600; /* 半粗 */
+} /* 名称结束 */
+
+.video-call-state { /* 通话状态 */
+  opacity: 0.8; /* 略透明 */
+} /* 状态结束 */
+
+.video-remote { /* 远端视频（大画面） */
+  width: 100%; /* 占满宽度 */
+  height: 240px; /* 固定高度 */
+  object-fit: cover; /* 裁剪填充 */
+  display: block; /* 消除行内间隙 */
+  background: #111; /* 未接通时深色 */
+} /* 远端视频结束 */
+
+.video-local { /* 本地视频（画中画） */
+  position: absolute; /* 绝对定位叠在远端上 */
+  right: 10px; /* 距右 10px */
+  bottom: 56px; /* 距底（留出按钮区） */
+  width: 100px; /* 小窗宽度 */
+  height: 70px; /* 小窗高度 */
+  border-radius: 6px; /* 圆角 */
+  border: 1px solid rgba(255, 255, 255, 0.4); /* 半透明白边框 */
+  object-fit: cover; /* 裁剪填充 */
+} /* 本地视频结束 */
+
+.video-call-error { /* 错误提示 */
+  padding: 6px 14px; /* 内边距 */
+  background: var(--danger); /* 红色背景 */
+  color: #fff; /* 白字 */
+  font-size: 12px;
+} /* 错误提示结束 */
+
+.video-call-actions { /* 操作按钮区 */
+  display: flex; /* 按钮横向排列 */
+  justify-content: center; /* 居中 */
+  gap: 12px; /* 间距 */
+  padding: 12px; /* 内边距 */
+  background: rgba(0, 0, 0, 0.6); /* 半透明黑底 */
+} /* 按钮区结束 */
+
+/* 聊天视图窄屏适配 */
+@media (max-width: 720px) { /* 窄屏断点 */
+  .chat-layout { /* 窄屏聊天布局 */
+    grid-template-columns: 1fr; /* 单列，消息区覆盖会话列表 */
+  } /* 窄屏布局结束 */
+  .chat-sidebar { /* 窄屏隐藏会话列表（简化） */
+    display: none; /* 窄屏暂不展示会话列表，保留右侧消息区 */
+  } /* 窄屏侧栏结束 */
 } /* 窄屏断点结束 */

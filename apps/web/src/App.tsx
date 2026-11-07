@@ -16,29 +16,30 @@ import { Settings } from './views/Settings';
 import { Store } from './views/Store';
 // 漫剧 AI 剧工作台
 import { ComicWorkbench } from './views/ComicWorkbench';
-// 站点地图：DNSPod 备注结构化的站点模块视图（本轮新增）
+// IM 聊天 + 视频通话
+import { Chat } from './views/Chat';
+// 站点地图：DNSPod 备注结构化的站点模块视图
 import { SiteMap } from './views/SiteMap';
-
-// 顶层视图枚举：新增视图必须同步 navItems 与下方渲染分支
-type View = 'store' | 'comic' | 'sitemap' | 'settings';
-
-// 路由状态：当前只有一个 view 字段（无 URL 路由）
-interface Route {
-  // 当前视图标识：除四个业务视图外，'login' 是未登录专用的伪视图（由侧栏「登录」按钮进入，不在导航中出现）
-  view: View | 'login';
-} // 路由结构定义结束
+// 站点目录：按 8 分类列出的 45 个可运行节点导航
+import { SiteDirectory } from './views/SiteDirectory';
+// 单节点模块页：路由 / 导航 / 职责 / 域名映射 / 关联节点
+import { SiteNodePage } from './views/SiteNodePage';
+// 无依赖 hash 路由：把 #/site/<key> 映射到节点模块页，刷新与前进后退均可用
+import { useHashRoute } from './router';
+// 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
+import type { AppView } from './router';
 
 // 应用根组件
 export function App() {
   // 会话状态：初始值从 localStorage 恢复，实现刷新后保持登录
   const [session, setLocalSession] = useState<Session | null>(getSession());
-  // 当前视图，默认进入功能模块页
-  const [route, setRoute] = useState<Route>({ view: 'store' });
+  // 当前视图由地址栏 hash 驱动：无 hash 时 parseHash 回落到功能模块页
+  const [route, go] = useHashRoute(); // go 为统一跳转入口，所有导航按钮都改用它
 
   // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
   const locale: Locale = normalizeLocale(session?.user.locale);
-  // 当前视图是否需登录：漫剧与设置涉及用户数据，未登录时内容区改为内嵌登录卡片
-  const needsAuth = route.view === 'comic' || route.view === 'settings';
+  // 当前视图是否需登录：漫剧、聊天与设置涉及用户数据，未登录时内容区改为内嵌登录卡片
+  const needsAuth = route.view === 'comic' || route.view === 'chat' || route.view === 'settings';
 
   // 登录成功回调：持久化会话；login 伪视图回功能模块页，受保护视图内嵌登录则原地解锁
   function handleLogin(result: LoginResult) {
@@ -47,7 +48,7 @@ export function App() {
     // 同步内存会话，触发已登录布局重渲染
     setLocalSession(result);
     // login 伪视图仅作登录中转，成功后回默认页；其余情形停留原视图
-    if (route.view === 'login') setRoute({ view: 'store' });
+    if (route.view === 'login') go({ view: 'store' });
   } // handleLogin 结束
 
   // 退出登录：先尽力调用后端登出，再清理本地会话
@@ -64,7 +65,7 @@ export function App() {
     // 清空内存会话，界面退回访客态
     setLocalSession(null);
     // 退出后回到公开的功能模块页，避免停留在需登录的视图上
-    setRoute({ view: 'store' });
+    go({ view: 'store' });
   } // handleLogout 结束
 
   // 设置页更新用户信息后的回调：替换会话中的 user 并持久化
@@ -77,14 +78,20 @@ export function App() {
     setLocalSession(updated);
   } // handleUserUpdated 结束
 
-  // 侧边导航项：顺序即展示顺序（功能模块 → 漫剧 → 站点地图 → 设置）
-  const navItems: Array<{ view: View; label: string }> = [
+  // 节点模块页（#/site/<key>）由站点目录进入，侧栏高亮回落到 directory，避免出现「无 active」的空导航状态
+  const activeView: AppView = route.view === 'node' ? 'directory' : route.view; // 单一映射点，前后台导航状态一致
+  // 侧边导航项：顺序即展示顺序（功能模块 → 漫剧 → 站点地图 → 站点目录 → 设置）
+  const navItems: Array<{ view: AppView; label: string }> = [
     // 功能模块页
     { view: 'store', label: locale === 'en-US' ? 'Modules' : '功能模块' },
     // 漫剧 AI 剧工作台
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
+    // IM 聊天 + 视频通话
+    { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
     // 站点地图（DNSPod 备注结构化视图）
     { view: 'sitemap', label: locale === 'en-US' ? 'Site Map' : '站点地图' },
+    // 站点目录：45 个可运行节点的分类导航入口（站点地图每个节点均可跳入）
+    { view: 'directory', label: locale === 'en-US' ? 'Site Directory' : '站点目录' },
     // 设置页，文案走 i18n 词典
     { view: 'settings', label: t(locale, 'nav.settings') },
   ]; // 导航项定义结束，数组顺序即侧栏展示顺序
@@ -111,10 +118,10 @@ export function App() {
               key={item.view}
               // 普通按钮
               type="button"
-              // 当前视图高亮 active
-              className={`nav-item${route.view === item.view ? ' active' : ''}`}
+              // 当前视图高亮 active；节点页统一按 activeView 回落到站点目录
+              className={`nav-item${activeView === item.view ? ' active' : ''}`}
               // 点击切换视图
-              onClick={() => setRoute({ view: item.view })}
+              onClick={() => go({ view: item.view })}
             >
               {/* 导航文案 */}
               {item.label}{/* 导航文案，随语言切换 */}
@@ -140,7 +147,7 @@ export function App() {
               {/* 访客标识：未登录时替代用户名展示 */}
               <span className="user-name">{locale === 'en-US' ? 'Guest' : '未登录'}</span>{/* 访客文案，随语言切换 */}
               {/* 登录入口：进入 login 伪视图，不污染导航高亮 */}
-              <button type="button" className="btn primary block" onClick={() => setRoute({ view: 'login' })}>{/* 登录按钮：点击切到 login 伪视图 */}
+              <button type="button" className="btn primary block" onClick={() => go({ view: 'login' })}>{/* 登录按钮：点击切到 login 伪视图 */}
                 {/* 登录文案（复用 auth.login 词条） */}
                 {t(locale, 'auth.login')}{/* 登录文案，走 i18n 词典 */}
               </button>{/* 登录按钮结束 */}
@@ -155,8 +162,14 @@ export function App() {
         {route.view === 'store' && <Store locale={locale} />}{/* 功能模块页：展示 Mim 能力模块列表 */}
         {/* 站点地图：公开视图，后端 /site/* 接口全部免鉴权 */}
         {route.view === 'sitemap' && <SiteMap locale={locale} />}{/* 站点地图：DNSPod 备注结构化视图 */}
+        {/* 站点目录：8 分类 / 45 节点，每个节点都是可点击的 #/site/<key> 入口 */}
+        {route.view === 'directory' && <SiteDirectory locale={locale} />}{/* 站点目录：节点导航 */}
+        {/* 单节点模块页：按 routeKey 渲染职责、域名映射与关联节点 */}
+        {route.view === 'node' && <SiteNodePage locale={locale} routeKey={route.key ?? ''} />}{/* 节点模块页 */}
         {/* 漫剧 AI 剧工作台：仅已登录渲染，未登录由下方内嵌登录兜底 */}
         {route.view === 'comic' && session && <ComicWorkbench locale={locale} />}{/* 漫剧 AI 剧工作台：分镜与剧集编辑 */}
+        {/* IM 聊天 + 视频通话：仅已登录渲染，需 WebSocket 连接 */}
+        {route.view === 'chat' && session && <Chat locale={locale} />}{/* 聊天视图：会话列表 + 消息 + 视频通话 */}
         {/* 设置页：仅已登录渲染，需要用户更新回调 */}
         {route.view === 'settings' && session && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} /> // 设置页：传入用户信息更新回调

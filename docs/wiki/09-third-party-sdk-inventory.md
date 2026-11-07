@@ -105,6 +105,11 @@
 | `MIM_AI_BASE_URL` | OpenAI 兼容端点（`MIM_AI_PROVIDER=openai` 时生效；可切换火山方舟 / DeepSeek / 百炼兼容模式） | `https://api.openai.com/v1` | P0 |
 | `MIM_AI_TEXT_MODEL` | 文本任务模型（方舟填推理接入点 ID） | `gpt-4o-mini` | P0 |
 | `MIM_AI_IMAGE_MODEL` | 图像任务模型（需支持 `b64_json` 或 `url` 返回） | `dall-e-3` | P0 |
+| `MIM_AI_TTS_MODEL` | 语音合成（TTS）模型；OpenAI 兼容网关不支持时任务诚实失败 | `tts-1` | 漫剧第 2 期 P1 |
+| `MIM_AI_VIDEO_BASE_URL` | 视频生成厂商端点（留空则 video 任务类型不可用） | 空（不启用） | 漫剧第 2 期 P1 |
+| `MIM_AI_VIDEO_API_KEY` | 视频生成厂商凭证（须与 `MIM_AI_VIDEO_BASE_URL` 同时配置） | 空（不启用） | 漫剧第 2 期 P1 |
+| `MIM_AI_VIDEO_MODEL` | 视频生成模型 | `image-to-video` | 漫剧第 2 期 P1 |
+| `MIM_FFMPEG_PATH` | ffmpeg 可执行文件路径；留空则 compose 合成与导出转码不可用 | 空（不启用） | 漫剧第 2 期 P1 |
 | `MIM_AI_WORKER` | 是否随 API 进程启动后台队列 worker（`1` 启用 / `0` 关闭，关闭后仅能由 `POST /ai/jobs/:id/run` 手动消费） | `1` | P0 |
 | `MIM_AI_WORKER_INTERVAL_MS` | worker 轮询间隔（毫秒） | `2000` | P0 |
 | `MIM_AI_JOB_COST_LIMIT_MINOR` | 单任务成本上限（分），超出即 `COST_LIMIT_EXCEEDED(402)` | `100000` | P0 |

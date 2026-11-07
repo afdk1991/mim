@@ -1,20 +1,25 @@
 /** 服务入口：本地 SQLite + 本地开发 JWT 密钥 + HTTP 监听 + 编排 worker + 定时任务 */
 
 import { createApp } from './app.js'; // 引入应用装配工厂，注入依赖后得到 Express 实例
+import { createServer } from 'node:http'; // 原生 HTTP server，用于把 Express 应用升级为支持 WebSocket
 import { DATA_DIR, DB_PATH, JOBS_ENABLED, PORT, loadJwtSecret } from './config.js'; // 引入数据目录、数据库路径、任务开关、监听端口与 JWT 密钥加载器
 import { createDatabase } from './db.js'; // 引入数据库初始化（建表 + 种子数据）
 import { createJobs } from './jobs.js'; // 引入后台定时任务工厂（成本告警 / 审核超时 / 权益到期）
 import { createStorage } from './storage.js'; // 引入存储驱动工厂（本地目录或对象存储）
 import { createOrchestrator } from './orchestrator.js'; // 引入 AI 编排器，负责后台任务的领取与执行
+import { attachImWebSocket } from './im/ws.js'; // 引入 IM WebSocket 接入层，负责实时消息与视频信令
 
 const db = createDatabase(DB_PATH); // 按配置路径打开持久化 SQLite，启动即完成建表与种子写入
 const jwtSecret = loadJwtSecret(); // 加载签名密钥；缺失时由 config 层决定回退开发密钥或直接报错
 const storage = createStorage({ env: process.env, jwtSecret, fallbackDir: DATA_DIR }); // 依据环境变量选择存储驱动，未配置远端时落本地数据目录
 const orchestrator = createOrchestrator({ db, storage, env: process.env }); // 装配 AI 编排器，复用同一数据库与存储实例以共享连接
 const jobs = createJobs({ db, env: process.env }); // 装配后台定时任务，复用同一数据库连接，避免多连接争抢 WAL 锁
-const app = createApp({ db, jwtSecret, env: process.env, storage, orchestrator }); // 组装 Express 应用，依赖显式注入便于测试替换
+const deps = { db, jwtSecret, env: process.env, storage, orchestrator }; // 统一依赖容器，供 app 与 WS 层共享
+const app = createApp(deps); // 组装 Express 应用，依赖显式注入便于测试替换
+const server = createServer(app); // 用原生 HTTP server 包裹 Express，以便同一端口承载 WebSocket 升级
+attachImWebSocket(server, deps); // 挂载 IM WebSocket：实时消息与视频通话信令走 /im/ws?token=...
 
-const server = app.listen(PORT, () => { // 监听端口并保留 server 句柄，供优雅停机时关闭连接
+server.listen(PORT, () => { // 监听端口并保留 server 句柄，供优雅停机时关闭连接
   console.log(`mim-api listening on http://127.0.0.1:${PORT}`); // 打印监听地址，便于本地确认服务已起
   console.log(`database: ${DB_PATH}`); // 打印实际数据库位置，避免误连内存库或旧文件
   console.log(`storage: driver=${storage.driver} configured=${storage.configured}`); // 打印存储驱动及是否已配置远端凭证，便于排查上传失败

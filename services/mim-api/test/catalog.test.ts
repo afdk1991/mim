@@ -332,3 +332,234 @@ describe('管理面权益回收（POST /entitlements/:id/revoke）', () => { // 
     expect(res.body.message).toBe('entitlement not found'); // 断言文案
   }); // 结束不存在用例
 }); // 结束权益回收分组
+
+describe('模块新建（POST /modules）', () => { // 新建默认 draft，编码区域内唯一且含软删行
+  it('合法创建 → 201，默认 draft + one_time，字段原样回显', async () => { // 正向路径
+    const res = await request(app) // 发起新建
+      .post('/api/v1/modules') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ // 合法请求体
+        code: 'notes.board', // 含点号编码，验证正则放行
+        name: { 'zh-CN': '笔记看板' }, // 单语言名称
+        summary: { 'zh-CN': '轻量笔记与看板组合' }, // 简介
+        sort_order: 7, // 排序权重
+        entitlements_required: ['comic.workbench'], // 依赖种子模块
+      }); // 结束请求体
+    expect(res.status).toBe(201); // 断言 201
+    expect(res.body.module.code).toBe('notes.board'); // 断言编码回显
+    expect(res.body.module.status).toBe('draft'); // 断言初始状态为 draft
+    expect(res.body.module.unlock_mode).toBe('one_time'); // 断言解锁方式固定值
+    expect(res.body.module.requires).toEqual(['comic.workbench']); // 断言依赖回显
+    const row = db.prepare(`SELECT status FROM modules WHERE code = 'notes.board' AND region = 'cn'`).get() as { status: string }; // 回读库内状态
+    expect(row.status).toBe('draft'); // 断言落库为 draft
+  }); // 结束正向用例
+
+  it('编码重复 → 409 module code already exists', async () => { // 撞种子模块编码
+    const res = await request(app) // 用已存在的种子编码
+      .post('/api/v1/modules') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ code: 'comic.workbench', name: { 'zh-CN': '重复' } }); // 重复编码
+    expect(res.status).toBe(409); // 断言 409
+    expect(res.body.message).toBe('module code already exists'); // 断言文案
+  }); // 结束重码用例
+
+  it('软删后的编码仍被占用 → 409', async () => { // dup 预检不滤 deleted_at，软删行同样占码
+    await request(app).post('/api/v1/modules').set(adminHeaders()).send({ code: 'temp.mod', name: { 'zh-CN': '临时' } }); // 先建 draft 模块
+    await request(app).delete('/api/v1/modules/temp.mod').set(adminHeaders()); // draft 可直接软删
+    const res = await request(app) // 再用同一编码新建
+      .post('/api/v1/modules') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ code: 'temp.mod', name: { 'zh-CN': '复用' } }); // 复用软删编码
+    expect(res.status).toBe(409); // 断言 409：UNIQUE(region, code) 含软删行
+  }); // 结束软删占码用例
+
+  it('前置依赖不存在 → 400 required modules not found 且 details.required 回传缺失项', async () => { // 依赖校验
+    const res = await request(app) // 依赖一个幽灵模块
+      .post('/api/v1/modules') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ code: 'dep.test', name: { 'zh-CN': '依赖测试' }, entitlements_required: ['ghost.mod'] }); // 缺失依赖
+    expect(res.status).toBe(400); // 断言 400
+    expect(res.body.message).toBe('required modules not found'); // 断言文案
+    expect(res.body.details.required).toEqual(['ghost.mod']); // 断言缺失项回传，供前端引导
+  }); // 结束依赖缺失用例
+
+  it('非法编码（大写/前导符号）→ 400 VALIDATION_FAILED', async () => { // zod 正则拦截
+    const res = await request(app) // 大写编码违反正则
+      .post('/api/v1/modules') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ code: 'Bad.Code', name: { 'zh-CN': '坏编码' } }); // 非法编码
+    expect(res.status).toBe(400); // 断言 400
+    expect(res.body.code).toBe('VALIDATION_FAILED'); // 断言错误码
+  }); // 结束非法编码用例
+}); // 结束模块新建分组
+
+describe('模块编辑（PATCH /modules/:code）', () => { // 仅文案/排序/依赖可改，状态走 /status
+  it('更新名称与排序 → 200 且回读一致', async () => { // 正向编辑
+    const res = await request(app) // 编辑种子模块
+      .patch('/api/v1/modules/comic.workbench') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ name: { 'zh-CN': '漫画工作台 Pro' }, sort_order: 99 }); // 改名 + 改排序
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.module.name['zh-CN']).toBe('漫画工作台 Pro'); // 断言新名称
+    expect(res.body.module.sort_order).toBe(99); // 断言新排序
+    expect(res.body.module.status).toBe('active'); // 断言状态未被本路由改动
+  }); // 结束正向用例
+
+  it('空更新 → 400 at least one editable field must be provided', async () => { // refine 拦截无字段请求
+    const res = await request(app) // 不传任何可编辑字段
+      .patch('/api/v1/modules/comic.workbench') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({}); // 空请求体
+    expect(res.status).toBe(400); // 断言 400
+    expect(res.body.message).toBe('at least one editable field must be provided'); // 断言文案
+  }); // 结束空更新用例
+
+  it('模块不存在 → 404 module not found', async () => { // 未知编码
+    const res = await request(app) // 编辑幽灵模块
+      .patch('/api/v1/modules/no.such.module') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ sort_order: 1 }); // 合法字段
+    expect(res.status).toBe(404); // 断言 404
+    expect(res.body.message).toBe('module not found'); // 断言文案
+  }); // 结束不存在用例
+
+  it('依赖含缺失项 → 400 required modules not found', async () => { // 编辑时同样校验依赖存在性
+    const res = await request(app) // 改依赖为幽灵模块
+      .patch('/api/v1/modules/comic.workbench') // 管理端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ entitlements_required: ['ghost.mod'] }); // 缺失依赖
+    expect(res.status).toBe(400); // 断言 400
+    expect(res.body.details.required).toEqual(['ghost.mod']); // 断言缺失项
+  }); // 结束依赖校验用例
+}); // 结束模块编辑分组
+
+describe('模块软删除（DELETE /modules/:code）', () => { // active 须先归档；重复删除幂等回放
+  it('active 模块直接删除 → 409 module must be archived before deletion', async () => { // 在售保护
+    const res = await request(app) // 种子模块为 active
+      .delete('/api/v1/modules/comic.workbench') // 管理端点
+      .set(adminHeaders()); // 管理令牌
+    expect(res.status).toBe(409); // 断言 409
+    expect(res.body.message).toBe('module must be archived before deletion'); // 断言提示先归档
+  }); // 结束 active 保护用例
+
+  it('draft 删除 → 200 deleted:true；重复删除回放同一 deleted_at', async () => { // 软删 + 幂等回放
+    await request(app).post('/api/v1/modules').set(adminHeaders()).send({ code: 'del.me', name: { 'zh-CN': '待删' } }); // 先建 draft 模块
+    const first = await request(app).delete('/api/v1/modules/del.me').set(adminHeaders()); // 第一次软删
+    expect(first.status).toBe(200); // 断言 200
+    expect(first.body.module.deleted).toBe(true); // 断言删除标记
+    expect(typeof first.body.module.deleted_at).toBe('string'); // 断言删除时间存在
+    const second = await request(app).delete('/api/v1/modules/del.me').set(adminHeaders()); // 重复删除
+    expect(second.status).toBe(200); // 断言回放 200
+    expect(second.body.module.deleted_at).toBe(first.body.module.deleted_at); // 断言回显同一删除时间，未被刷新
+    const pub = await request(app).get('/api/v1/modules'); // 公开列表复查
+    expect(pub.body.modules.some((m: { code: string }) => m.code === 'del.me')).toBe(false); // 断言软删模块不再外露
+  }); // 结束软删回放用例
+
+  it('模块不存在 → 404 module not found', async () => { // 未知编码
+    const res = await request(app) // 删幽灵模块
+      .delete('/api/v1/modules/no.such.module') // 管理端点
+      .set(adminHeaders()); // 管理令牌
+    expect(res.status).toBe(404); // 断言 404
+    expect(res.body.message).toBe('module not found'); // 断言文案
+  }); // 结束不存在用例
+}); // 结束模块软删除分组
+
+describe('管理端模块列表（GET /modules/manage）', () => { // 含 draft/archived，支持 q/status 过滤
+  it('返回 draft 模块与 total；注册顺序先于 /modules/:code', async () => { // 若被详情路由吞掉会 404 而非 200
+    await request(app).post('/api/v1/modules').set(adminHeaders()).send({ code: 'draft.one', name: { 'zh-CN': '草稿一' } }); // 造一条 draft
+    const res = await request(app).get('/api/v1/modules/manage').set(adminHeaders()); // 请求管理列表
+    expect(res.status).toBe(200); // 断言 200：证明 manage 未被 :code 吞掉
+    expect(res.body.total).toBe(res.body.modules.length); // 断言总数与列表一致
+    const draft = res.body.modules.find((m: { code: string }) => m.code === 'draft.one'); // 找草稿模块
+    expect(draft.status).toBe('draft'); // 断言 draft 可见（公开列表不含 draft）
+    expect(draft.created_at).toBeTruthy(); // 断言管理视图带创建时间
+  }); // 结束全量列表用例
+
+  it('status=draft 过滤 + q 名称搜索命中', async () => { // 组合过滤
+    await request(app).post('/api/v1/modules').set(adminHeaders()).send({ code: 'filter.me', name: { 'zh-CN': '过滤器' } }); // 造 draft
+    const byStatus = await request(app).get('/api/v1/modules/manage?status=draft').set(adminHeaders()); // 按状态过滤
+    expect(byStatus.body.modules.every((m: { status: string }) => m.status === 'draft')).toBe(true); // 断言全部为 draft
+    const byQ = await request(app).get('/api/v1/modules/manage?q=filter.me').set(adminHeaders()); // 按编码搜索
+    expect(byQ.body.modules.length).toBe(1); // 断言唯一命中
+    expect(byQ.body.modules[0].code).toBe('filter.me'); // 断言命中项
+  }); // 结束过滤用例
+
+  it('非法 status → 400 VALIDATION_FAILED', async () => { // 状态枚举校验
+    const res = await request(app).get('/api/v1/modules/manage?status=offline').set(adminHeaders()); // 非法状态
+    expect(res.status).toBe(400); // 断言 400
+    expect(res.body.message).toBe('status must be one of draft/active/archived'); // 断言文案
+  }); // 结束非法状态用例
+}); // 结束管理列表分组
+
+describe('管理端权益列表（GET /entitlements）', () => { // q/status/region 过滤 + limit/offset 分页
+  it('发放后可被列出，字段含模块编码与版本', async () => { // 正向列表
+    const session = await login('13800000020'); // 建用户
+    await request(app).post('/api/v1/entitlements/grant').set(adminHeaders()).send({ user_id: session.userId, module_code: 'comic.workbench' }); // 发放权益
+    const res = await request(app).get('/api/v1/entitlements').set(adminHeaders()); // 请求列表
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.total).toBe(1); // 断言总数
+    expect(res.body.limit).toBe(20); // 断言默认分页大小
+    const item = res.body.entitlements[0]; // 取首条
+    expect(item.user_id).toBe(session.userId); // 断言归属用户
+    expect(item.module_code).toBe('comic.workbench'); // 断言模块编码联表成功
+    expect(item.status).toBe('active'); // 断言状态
+    expect(item.version).toBe(1); // 断言初始版本
+  }); // 结束正向用例
+
+  it('q 命中模块编码；status=revoked 只回已回收项', async () => { // 搜索与状态过滤
+    const session = await login('13800000021'); // 建用户
+    const granted = await request(app).post('/api/v1/entitlements/grant').set(adminHeaders()).send({ user_id: session.userId, module_code: 'comic.workbench' }); // 发放
+    const byQ = await request(app).get('/api/v1/entitlements?q=comic.work').set(adminHeaders()); // 按模块编码片段搜索
+    expect(byQ.body.entitlements.length).toBe(1); // 断言搜索命中
+    await request(app).post(`/api/v1/entitlements/${granted.body.entitlement.id}/revoke`).set(adminHeaders()).send({}); // 回收该权益
+    const byStatus = await request(app).get('/api/v1/entitlements?status=revoked').set(adminHeaders()); // 按状态过滤
+    expect(byStatus.body.entitlements.length).toBe(1); // 断言仅一条已回收
+    expect(byStatus.body.entitlements[0].status).toBe('revoked'); // 断言状态
+    const activeOnly = await request(app).get('/api/v1/entitlements?status=active').set(adminHeaders()); // 过滤 active
+    expect(activeOnly.body.entitlements.length).toBe(0); // 断言已无 active
+  }); // 结束搜索过滤用例
+
+  it('非法 status / region → 400 VALIDATION_FAILED', async () => { // 枚举校验
+    const badStatus = await request(app).get('/api/v1/entitlements?status=banned').set(adminHeaders()); // 非法状态
+    expect(badStatus.status).toBe(400); // 断言 400
+    expect(badStatus.body.message).toBe('status must be one of active/expired/revoked'); // 断言文案
+    const badRegion = await request(app).get('/api/v1/entitlements?region=moon').set(adminHeaders()); // 非法地区
+    expect(badRegion.status).toBe(400); // 断言 400
+    expect(badRegion.body.message).toBe('region must be cn or global'); // 断言文案
+  }); // 结束枚举校验用例
+}); // 结束权益列表分组
+
+describe('权益审计事件（GET /entitlements/:id/events）', () => { // 按写入顺序升序返回完整流转链
+  it('发放→回收后返回两条事件，顺序与字段正确', async () => { // 正向审计链
+    const session = await login('13800000022'); // 建用户
+    const granted = await request(app).post('/api/v1/entitlements/grant').set(adminHeaders()).send({ user_id: session.userId, module_code: 'comic.workbench' }); // 发放
+    const entitlementId = granted.body.entitlement.id as string; // 记录权益 id
+    await request(app).post(`/api/v1/entitlements/${entitlementId}/revoke`).set(adminHeaders()).send({ reason: '审计验证' }); // 回收
+    const res = await request(app).get(`/api/v1/entitlements/${entitlementId}/events`).set(adminHeaders()); // 取事件链
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.events.length).toBe(2); // 断言两条事件
+    expect(res.body.events[0].from_status).toBeNull(); // 断言发放事件无前置状态
+    expect(res.body.events[0].to_status).toBe('active'); // 断言发放目标状态
+    expect(res.body.events[1].from_status).toBe('active'); // 断言回收前置状态
+    expect(res.body.events[1].to_status).toBe('revoked'); // 断言回收目标状态
+    expect(res.body.events[1].reason).toBe('审计验证'); // 断言原因原样返回
+  }); // 结束正向用例
+
+  it('权益不存在 → 404 entitlement not found', async () => { // 未知权益
+    const res = await request(app).get('/api/v1/entitlements/not-an-entitlement/events').set(adminHeaders()); // 幽灵权益
+    expect(res.status).toBe(404); // 断言 404
+    expect(res.body.message).toBe('entitlement not found'); // 断言文案
+  }); // 结束不存在用例
+}); // 结束审计事件分组
+
+describe('公开目录搜索（GET /modules?q=）', () => { // q 命中编码或多语言名称
+  it('q 命中编码片段 → 仅返回匹配模块；空结果不报错', async () => { // 搜索行为
+    const hit = await request(app).get('/api/v1/modules?q=comic.work'); // 按编码片段搜索
+    expect(hit.status).toBe(200); // 断言 200
+    expect(hit.body.modules.length).toBe(1); // 断言唯一命中种子模块
+    expect(hit.body.modules[0].code).toBe('comic.workbench'); // 断言命中项
+    const miss = await request(app).get('/api/v1/modules?q=no-such-thing'); // 无匹配搜索
+    expect(miss.status).toBe(200); // 断言 200，空集不报错
+    expect(miss.body.modules.length).toBe(0); // 断言空结果
+  }); // 结束搜索用例
+}); // 结束公开目录搜索分组

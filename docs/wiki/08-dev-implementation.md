@@ -71,7 +71,7 @@
 | `openapi` | 开放平台：OAuth2、API Key、Webhook 投递、限流 | `/open/*` | gateway | 分库 |
 | `admin-api` | **（已落地，2026-11-07）** 运营后台 BFF：RBAC 角色/权限/用户角色管理与 `GET /admin/me` 权限自省，实现在 `services/mim-api/src/routes/admin.ts`（**同进程路由，非独立服务**），共 11 个端点；独立前端 `apps/admin` 生产入口 `/admin/`；审计埋点仍下线 | `/admin/*` | catalog 库（当前 SQLite 单库） | 单库 |
 | `jobs` | **（已落地，2026-11-07）** `src/jobs.ts` 提供三个定时任务（成本告警 / 成片审核超时 / 权益到期扫描）+ `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`）做抢占与结算；`index.ts` 按 `MIM_JOBS_ENABLED`（默认开）装配并在优雅退出时 `stop()`（见 §8） | 无 HTTP | 全部域库（当前仅 SQLite 单库） | 双区各一套 |
-| `site` | **（已落地，2026-11-06）** 站点模块地图：把 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列结构化为 45 个主机模块 × 2 zone × 8 分类，纯静态常量（`src/site.ts`），**无数据表、无迁移、无第三方依赖**；前端 `views/SiteMap.tsx` | `/site/overview`、`/site/modules`、`/site/modules/:host`（公开免鉴权，3 条） | 无 | 不分库（多区共用同一份解析数据） |
+| `site` | **（已落地并升级，2026-11-08）** 站点模块地图：把 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列结构化为**单 zone `mixm.top` × 8 分类 × 45 个可运行节点**，纯静态常量（`src/site.ts` + `src/site-nodes.ts`，后者提供 45 条路由 / 双语导航 / 职责 / 关联规格与完整性断言），**无数据表、无迁移、无新增第三方依赖**；前端 `views/SiteMap.tsx`（45 卡片）、`views/SiteDirectory.tsx`（8 分类导航）、`views/SiteNodePage.tsx`（45 个节点模块页 + 下属栏目）、零依赖 hash 路由 `src/router.ts`；逐节点清单见本页 §2.1 | `/site/overview`、`/site/modules`、`/site/modules/:host`、`/site/nodes`（公开免鉴权，4 条） | 无 | 不分库（多区共用同一份解析数据） |
 
 服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `catalog` / `site` / `me` / `comic` / `media` / `ai` / `admin`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
 
@@ -241,6 +241,8 @@
 | 漫剧 AI 剧工作台（**🟢 后端第 1/2 期已落地（`comic` 域 7 表 + 24 条路由 + `orchestrator.ts`/`storage.ts` 已装配）；前端三标签页已落地**——创作（工程/角色/AI 建议）、生成任务（capabilities 横幅 / 派发 / 手动运行 / 失败透传 / 产物下载 / 3s 轮询）、成片（工程产物面板 / 版本面板下载播放 / 审核发布），2026-11-06） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
 | 成片管理（**🟢 后端已落地（第 2 期 `comic_films`/`film_versions` + `/comic/films/*`）；前端已落地**——工作台成片标签页：列表/版本面板（预签名下载/播放）/提交审核/发布/驳回/归档，2026-11-06） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
 | 站点地图（**🟢 前后端已落地，2026-11-06**） | 45 个主机模块按 8 分类分组展示；分类筛选、关键词搜索（覆盖 host / 备注 / FQDN）；每条记录展示 `record_type` + TTL 并外链 `https://{fqdn}`，不暴露解析目标值。数据源为 DNSPod 导出备注（`services/mim-api/src/site.ts` 静态常量，无数据表） | 非 PRD FR（站点运维可视化，随备注结构化新增） |
+
+> **2026-11-08 追加**：45 个节点已全部落为项目内可运行模块。新增 `apps/web/src/router.ts`（零依赖 hash 路由）、`views/SiteDirectory.tsx`（8 分类导航）、`views/SiteNodePage.tsx`（职责 / 域名映射 / 关联 / 实时接口详情）与 `services/mim-api/src/site-nodes.ts`（45 节点规格单一真源，含 `@ → root` 路由冲突处理、关联完整性断言）；新增 `GET /api/v1/site/nodes`，`/site/modules*` 同步返回 `node` 与 `fqdn` 字段；契约测试 `test/site-nodes.test.ts` 8 例。域名映射边界见 `deploy/nginx-mim.conf` 头部注释。
 
 任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。
 

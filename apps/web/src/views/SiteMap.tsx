@@ -180,6 +180,10 @@ export function SiteMap({ locale }: Props) {
                         )}{/* 结束备注条件渲染 */}
                       </div> // 结束记录容器
                     ))}{/* 结束记录遍历 */}
+                    {/* 节点入口：从站点地图卡片跳到该节点的可运行模块页（#/site/<key>） */}
+                    <a className="btn ghost small" href={item.node.route}>{/* 与站点目录使用同一路由，保证链接一致 */}
+                      {locale === 'en-US' ? 'Open module →' : '进入模块 →'}{/* 按钮文案随语言切换 */}
+                    </a>{/* 节点入口结束 */}
                   </article> // 结束模块卡片
                 );
               })} {/* 结束模块遍历 */}

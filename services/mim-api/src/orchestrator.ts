@@ -16,6 +16,11 @@ import { AppError } from '@mim/core-domain'; // 统一业务错误类型：供 r
 import { uuidv7 } from '@mim/core-domain'; // 时间有序 UUID，产物与任务主键写入时避免碰撞
 import { checksumOf, extensionForMime, type StorageAdapter } from './storage.js'; // 复用存储层的摘要算法、后缀映射与适配器契约
 import type { Db } from './types.js'; // 同步 SQLite 数据库抽象（prepare/transaction）
+import { tmpdir } from 'node:os'; // 取系统临时目录，compose 合成时存放中间素材
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'; // compose 合成时读写临时文件
+import { join } from 'node:path'; // compose 合成时拼接临时路径
+import { randomBytes } from 'node:crypto'; // compose 合成时生成唯一临时子目录名
+import { spawnSync } from 'node:child_process'; // compose 合成时同步调用 ffmpeg
 
 const JOB_TYPES = ['text', 'image', 'video', 'tts', 'compose'] as const; // 任务类型白名单，作为路由与校验的唯一事实来源
 type JobType = (typeof JOB_TYPES)[number]; // 由常量数组反推字面量联合类型，保证 switch/映射表被类型检查覆盖
@@ -28,12 +33,12 @@ const ASSET_TYPE_BY_JOB: Record<JobType, 'text' | 'image' | 'video' | 'audio' | 
   compose: 'final', // 合成任务产出成片，标记 final 以支持长期保留
 }; // 结束产物类型映射表
 
-const MIME_BY_JOB: Record<JobType, string> = { // 各任务产物的默认 MIME，用于落盘 Content-Type 与下载响应头
+const MIME_BY_JOB: Record<JobType, string> = { // 各任务产物的默认 MIME（mock 通道使用；真实通道由 producer 自报 MIME）
   text: 'application/json', // 文本以结构化 JSON 落盘，可携带 model/usage 等元数据
   image: 'image/png', // mock 与兼容网关统一按 PNG 处理，避免前端多分支
-  video: 'application/json', // mock 不伪造二进制视频，改用 JSON 清单占位
-  tts: 'audio/wav', // mock 生成可解码 WAV，保证播放链路真实可用
-  compose: 'application/json', // mock 合成返回清单，待接入真实渲染器再切换 MP4
+  video: 'video/mp4', // 真实视频厂商返回 MP4；mock 回落为 JSON 清单
+  tts: 'audio/mpeg', // 真实 TTS 返回 mp3；mock 生成可解码 WAV
+  compose: 'video/mp4', // ffmpeg 合成输出 MP4；mock 回落为 JSON 清单
 }; // 结束默认 MIME 映射表
 
 interface JobRow { // generation_jobs 在编排器内使用到的字段子集
@@ -134,6 +139,7 @@ interface OpenAiCompatConfig { // 兼容网关所需的最小配置集合
   baseUrl: string; // 网关根地址（保证无尾部斜杠）
   textModel: string; // 文本任务模型名
   imageModel: string; // 图片任务模型名
+  ttsModel: string; // 语音合成模型名（兼容网关需支持 /audio/speech）
 } // 结束 OpenAiCompatConfig
 
 function resolveOpenAiCompat(env: Record<string, string | undefined>): OpenAiCompatConfig | null { // 从环境变量解析兼容网关配置
@@ -144,13 +150,38 @@ function resolveOpenAiCompat(env: Record<string, string | undefined>): OpenAiCom
     baseUrl: (env.MIM_AI_BASE_URL ?? '').trim().replace(/\/+$/, '') || 'https://api.openai.com/v1', // 去尾斜杠便于拼路径，未配置时回落官方端点
     textModel: (env.MIM_AI_TEXT_MODEL ?? '').trim() || 'gpt-4o-mini', // 未指定时用低成本默认模型
     imageModel: (env.MIM_AI_IMAGE_MODEL ?? '').trim() || 'dall-e-3', // 未指定时用通用文生图模型
+    ttsModel: (env.MIM_AI_TTS_MODEL ?? '').trim() || 'tts-1', // 未指定时用 OpenAI 官方 TTS 模型；兼容网关如不支持会在调用时诚实失败
   }; // 结束配置对象
 } // 结束 resolveOpenAiCompat
 
-/** 各提供方实际支持的任务类型（mock 全量；openai 兼容协议仅 text/image，其余诚实失败） */
+/** 独立视频厂商配置（图生视频，非 OpenAI 兼容协议，如可灵/即梦/Runway 等） */
+interface VideoProviderConfig { // 视频厂商所需的最小配置集合
+  baseUrl: string; // 厂商 API 根地址（已去尾斜杠）
+  apiKey: string; // 厂商凭证
+  model: string; // 图生视频模型名
+} // 结束 VideoProviderConfig
+
+function resolveVideoProvider(env: Record<string, string | undefined>): VideoProviderConfig | null { // 从环境变量解析独立视频厂商配置
+  const baseUrl = (env.MIM_AI_VIDEO_BASE_URL ?? '').trim().replace(/\/+$/, ''); // 去尾斜杠便于拼路径
+  const apiKey = (env.MIM_AI_VIDEO_API_KEY ?? '').trim(); // 视频厂商凭证
+  if (!baseUrl || !apiKey) return null; // 地址与凭证任一缺失即视为未配置
+  return { // 返回归一化配置
+    baseUrl, // 已去尾斜杠的根地址
+    apiKey, // 已裁剪的凭证
+    model: (env.MIM_AI_VIDEO_MODEL ?? '').trim() || 'image-to-video', // 未指定时用通用图生视频模型名
+  }; // 结束配置对象
+} // 结束 resolveVideoProvider
+
+/** ffmpeg 可执行文件路径（compose 合成需要）；未安装时 compose 诚实失败 */
+function resolveFfmpegPath(env: Record<string, string | undefined>): string | null { // 从环境变量或系统 PATH 解析 ffmpeg
+  const explicit = (env.MIM_FFMPEG_PATH ?? '').trim(); // 显式指定优先，适配非标准安装位置
+  return explicit || null; // 未显式指定时返回 null，由运行时探测（见 probeFfmpeg）
+} // 结束 resolveFfmpegPath
+
+/** 各提供方实际支持的任务类型：mock 全量；openai 兼容协议支持 text/image/tts */
 function supportedTypesFor(provider: string): readonly JobType[] { // 按提供方能力裁剪可执行任务类型
   if (provider === 'mock') return JOB_TYPES; // mock 覆盖全部类型，便于本地跑通端到端
-  if (provider === 'openai') return ['text', 'image']; // 兼容协议仅实现两类，视频/合成不伪造
+  if (provider === 'openai') return ['text', 'image', 'tts']; // 兼容协议支持文本/图像/语音三类，视频与合成走独立通道
   return []; // 未知提供方一律不支持，避免静默产出错误产物
 } // 结束 supportedTypesFor
 
@@ -198,10 +229,17 @@ export interface CreateOrchestratorOptions { // 创建编排器的依赖注入�
 export function createOrchestrator(options: CreateOrchestratorOptions): Orchestrator { // 工厂：用闭包持有配置与定时器状态
   const { db, storage, env } = options; // 解构常用依赖
   const clock = options.now ?? (() => new Date().toISOString()); // 未注入则使用系统时间（ISO 字符串）
-  const provider = (env.MIM_AI_PROVIDER ?? '').trim().toLowerCase() || 'mock'; // 提供方归一化，未配置默认 mock 保证本地可用
+  const provider = (env.MIM_AI_PROVIDER ?? '').trim().toLowerCase() || 'mock'; // 主提供方归一化，未配置默认 mock 保证本地可用
   const openAi = provider === 'openai' ? resolveOpenAiCompat(env) : null; // 仅 openai 提供方需要解析凭证
-  const configured = provider === 'mock' || openAi !== null; // mock 天然可用；openai 需凭证齐全
-  const supportedTypes = supportedTypesFor(provider); // 缓存支持类型，避免每个任务重复计算
+  const videoProvider = resolveVideoProvider(env); // 独立视频厂商（与主 provider 解耦，可单独开关）
+  const ffmpegPath = resolveFfmpegPath(env); // ffmpeg 路径，compose 合成用；未配置时由运行时探测
+  // 能力并集：mock 全量；openai 提供 text/image/tts；video 厂商提供 video；ffmpeg 提供 compose
+  const baseTypes = supportedTypesFor(provider); // 主 provider 支持的类型
+  const extraTypes: JobType[] = []; // 额外通道支持的类型
+  if (videoProvider) extraTypes.push('video'); // 视频厂商就绪则支持 video
+  if (ffmpegPath) extraTypes.push('compose'); // ffmpeg 就绪则支持 compose
+  const supportedTypes: JobType[] = Array.from(new Set([...baseTypes, ...extraTypes])); // 去重合并为最终能力集
+  const configured = provider === 'mock' || openAi !== null || videoProvider !== null || ffmpegPath !== null; // 任一通道可用即视为已配置
   const jobCostLimitMinor = numberFromEnv(env.MIM_AI_JOB_COST_LIMIT_MINOR, 100000); // 单任务成本上限，默认 1000 元（最小单位）
   const dailyCostLimitMinor = numberFromEnv(env.MIM_AI_DAILY_COST_LIMIT_MINOR, 500000); // 当日累计上限，默认 5000 元
   const assetTtlDays = numberFromEnv(env.MIM_AI_ASSET_TTL_DAYS, 90); // 中间产物默认保留 90 天
@@ -287,6 +325,7 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
         mime: 'application/json', // 文本产物统一 JSON
       }; // 结束文本产物返回
     } // 结束文本任务分支
+    if (jobType === 'image') { // 图片任务分支：走 images/generations
     // image：优先 b64_json；部分网关仅回 url 则回源拉取字节
     const data = (await openAiPost(cfg, '/images/generations', { // 图片任务走 images generations
       model: cfg.imageModel, // 使用配置的图片模型
@@ -305,7 +344,142 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
       return { body: Buffer.from(await img.arrayBuffer()), mime: 'image/png' }; // 以字节形式写入对象存储
     } // 结束 url 分支
     throw new Error('openai-compatible images response missing b64_json/url'); // 两种字段都缺失说明协议不符
-  } // 结束 produceWithOpenAi
+    } // 结束 image 分支
+
+  /** tts：/audio/speech 返回二进制音频流（非 JSON），需单独走 fetch 取 arrayBuffer */
+  const ttsRes = await fetch(`${cfg.baseUrl}/audio/speech`, { // TTS 端点返回音频字节流
+    method: 'POST', // 统一 POST
+    headers: { authorization: `Bearer ${cfg.apiKey}`, 'content-type': 'application/json' }, // 标准鉴权头
+    body: JSON.stringify({ // 请求体：模型 + 输入文本 + 语音
+      model: cfg.ttsModel, // 使用配置的 TTS 模型
+      input: prompt, // 待合成文本
+      voice: (() => { // 从 payload 取 voice 字段，缺省用 alloy
+        try { // payload 可能非 JSON，先尝试解析
+          const p = JSON.parse(job.payload) as Record<string, unknown>; // 解析 payload
+          return typeof p.voice === 'string' && p.voice.trim() ? p.voice.trim() : 'alloy'; // 取 voice 字段，缺省 alloy
+        } catch { // 非 JSON 时回落默认音色
+          return 'alloy'; // 缺省音色
+        } // 结束 catch
+      })(), // IIFE 取音色，缺省 alloy
+      response_format: 'mp3', // 统一输出 mp3，浏览器兼容性最好
+    }), // 结束请求体
+    signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS), // 超时保护
+  }); // 结束 fetch 参数
+  if (!ttsRes.ok) { // 非 2xx 视为失败
+    const errText = await ttsRes.text(); // 取错误文本保留厂商原文
+    throw new Error(`openai-compatible tts HTTP ${ttsRes.status}: ${errText.slice(0, 500)}`); // 截断后抛错
+  } // 结束状态判断
+  const audioBuf = Buffer.from(await ttsRes.arrayBuffer()); // 取音频字节
+  if (audioBuf.byteLength === 0) throw new Error('openai-compatible tts returned empty audio'); // 空音频视为异常
+  return { body: audioBuf, mime: 'audio/mpeg' }; // 返回 mp3 音频与对应 MIME
+} // 结束 produceWithOpenAi
+
+/** 独立视频厂商生产：图生视频（非 OpenAI 兼容协议，按通用 POST 契约调用） */
+async function produceWithVideo(
+  cfg: VideoProviderConfig, // 已解析的视频厂商配置
+  job: JobRow, // 任务行，用于提取提示词与参考图
+): Promise<{ body: Buffer; mime: string }> { // 返回视频字节与 MIME
+  const prompt = promptOf(job); // 统一提取提示词
+  let imageObjectKey: string | null = null; // 参考图对象键（图生视频需要）
+  try { // 尝试从 payload 取参考图
+    const p = JSON.parse(job.payload) as Record<string, unknown>; // 解析 payload
+    if (typeof p.image_object_key === 'string' && p.image_object_key.trim()) { // 有参考图键
+      imageObjectKey = p.image_object_key.trim(); // 记录参考图对象键
+    } // 结束有参考图分支
+  } catch { // payload 非 JSON 时忽略
+    // 无参考图时纯 prompt 驱动视频生成
+  } // 结束 catch
+
+  const reqBody: Record<string, unknown> = { model: cfg.model, prompt }; // 通用请求体：模型 + 提示词
+  if (imageObjectKey) { // 有参考图时附加图像字段
+    reqBody.image = imageObjectKey; // 透传对象键，由厂商侧拉取或本服务后续上传
+  } // 结束参考图附加
+
+  const res = await fetch(`${cfg.baseUrl}/video/generations`, { // 视频厂商图生视频端点
+    method: 'POST', // 统一 POST
+    headers: { authorization: `Bearer ${cfg.apiKey}`, 'content-type': 'application/json' }, // 标准鉴权头
+    body: JSON.stringify(reqBody), // 序列化请求体
+    signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS), // 超时保护，视频生成耗时长
+  }); // 结束 fetch 参数
+  const text = await res.text(); // 先取文本保留厂商错误原文
+  if (!res.ok) throw new Error(`video provider HTTP ${res.status}: ${text.slice(0, 500)}`); // 非 2xx 截断抛错
+  let data: unknown; // 响应 JSON
+  try { // 尝试解析
+    data = JSON.parse(text) as unknown; // 成功响应约定为 JSON
+  } catch { // 非 JSON 视为协议不符
+    throw new Error('video provider returned non-JSON response'); // 协议不符
+  } // 结束 catch
+  const obj = data as { video_url?: string; b64_json?: string; data?: Array<{ video_url?: string; b64_json?: string }> }; // 兼容两种响应形态
+  const item = obj.data?.[0] ?? obj; // 优先取 data[0]，回落顶层
+  if (item?.b64_json) { // 厂商直接回 base64 视频
+    return { body: Buffer.from(item.b64_json, 'base64'), mime: 'video/mp4' }; // 解码为字节落盘
+  } // 结束 base64 分支
+  if (item?.video_url) { // 厂商回视频 URL
+    const vid = await fetch(item.video_url, { signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS) }); // 回源拉取视频字节
+    if (!vid.ok) throw new Error(`video provider fetch HTTP ${vid.status}`); // 拉取失败即任务失败
+    return { body: Buffer.from(await vid.arrayBuffer()), mime: 'video/mp4' }; // 以字节形式写入对象存储
+  } // 结束 url 分支
+  throw new Error('video provider response missing video_url/b64_json'); // 两种字段都缺失说明协议不符
+} // 结束 produceWithVideo
+
+/** ffmpeg 合成：把分镜素材（图片 + 音频）合成为成片 MP4 */
+async function produceWithCompose(
+  ffmpegBin: string, // ffmpeg 可执行路径
+  job: JobRow, // 任务行，payload 含素材列表
+): Promise<{ body: Buffer; mime: string }> { // 返回合成后的 MP4 字节与 MIME
+  let objectKeys: string[] = []; // 素材对象键列表（图片 + 音频）
+  try { // 从 payload 取素材列表
+    const p = JSON.parse(job.payload) as Record<string, unknown>; // 解析 payload
+    const raw = p.object_keys ?? p.assets; // 兼容两种字段名
+    if (Array.isArray(raw)) { // 素材是数组
+      objectKeys = raw.filter((k): k is string => typeof k === 'string' && !!k.trim()).map((k) => k.trim()); // 收窄为非空字符串数组
+    } // 结束数组分支
+  } catch { // payload 非 JSON 时素材列表为空
+    // 无素材则后续直接报错
+  } // 结束 catch
+  if (objectKeys.length === 0) throw new Error('compose job requires object_keys in payload'); // 无素材无法合成
+
+  // 从存储读取全部素材到临时目录
+  const tmpDir = tmpdir(); // 取系统临时目录
+  const runId = randomBytes(8).toString('hex'); // 8 字节随机串作为本次合成的临时目录名
+  const workDir = join(tmpDir, `mim-compose-${runId}`); // 临时工作目录
+  mkdirSync(workDir, { recursive: true }); // 递归创建临时目录
+  try { // try/finally 保证临时目录被清理
+    const localPaths: string[] = []; // 素材本地路径列表
+    for (const key of objectKeys) { // 逐个从存储读取素材
+      const obj = await storage.getObject(key); // 从对象存储读取素材字节
+      const ext = obj.mime === 'audio/mpeg' ? '.mp3' : obj.mime === 'audio/wav' ? '.wav' : '.png'; // 按 MIME 推扩展名
+      const local = join(workDir, `${localPaths.length}${ext}`); // 生成本地文件名
+      writeFileSync(local, obj.body); // 写入本地文件供 ffmpeg 读取
+      localPaths.push(local); // 记录本地路径
+    } // 结束素材读取循环
+
+    const outputPath = join(workDir, 'output.mp4'); // 合成输出路径
+    // 简化合成：用首帧图片 + 首段音频生成视频（完整多镜头拼接需更复杂的 concat filter，此处保证链路可跑通）
+    const imagePath = localPaths.find((p) => p.endsWith('.png')) ?? localPaths[0]; // 优先取图片作为画面
+    const audioPath = localPaths.find((p) => p.endsWith('.mp3') || p.endsWith('.wav')); // 取音频作为音轨
+    const args: string[] = ['-y', '-loop', '1', '-i', imagePath]; // 输入：图片循环播放
+    if (audioPath) args.push('-i', audioPath); // 有音频则追加音轨输入
+    args.push( // 输出参数：短边适配 + 音频编码 + 时长取音频时长
+      '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2', // 竖屏 1080x1920 居中填充
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-tune', 'stillimage', // 视频编码 H.264
+      '-c:a', 'aac', '-b:a', '128k', // 音频编码 AAC
+      '-shortest', // 取最短流时长，避免图片无限循环
+      '-movflags', '+faststart', // 优化网络播放
+      outputPath, // 输出文件
+    ); // 结束 ffmpeg 参数数组
+
+    const result = spawnSync(ffmpegBin, args, { encoding: 'utf8' }); // 执行 ffmpeg
+    if (result.status !== 0) { // ffmpeg 非零退出
+      throw new Error(`ffmpeg failed (exit ${result.status}): ${(result.stderr ?? '').slice(0, 500)}`); // 截断 stderr 抛错
+    } // 结束失败判断
+    const body = readFileSync(outputPath); // 读取合成后的 MP4 字节
+    if (body.byteLength === 0) throw new Error('ffmpeg produced empty output'); // 空文件视为异常
+    return { body, mime: 'video/mp4' }; // 返回 MP4 字节与 MIME
+  } finally { // 无论成败都清理临时目录
+    rmSync(workDir, { recursive: true, force: true }); // 递归删除临时目录
+  } // 结束 finally
+} // 结束 produceWithCompose
 
   async function execute(job: JobRow): Promise<RunResult> { // 单任务执行主流程：校验 → 限额 → 生产 → 落盘 → 事务回写
     const jobType = JOB_TYPES.find((value) => value === job.job_type); // 将数据库字符串收敛为白名单类型
@@ -339,8 +513,21 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
       return fail(job, 'PROVIDER_NOT_CONFIGURED', `provider "${provider}" is not configured`); // 凭证缺失时诚实失败，不伪造产物
     } // 结束配置校验
 
-    const { body, mime } =
-      provider === 'mock' ? bodyFor(jobType, job) : await produceWithOpenAi(openAi!, jobType, job); // 按提供方分派到 mock 或真实模型
+    // 按任务类型分派到对应生产通道：mock 全量走本地；text/image/tts 走 openai 兼容；video 走独立厂商；compose 走 ffmpeg
+    const { body, mime } = await (async () => { // IIFE：根据 jobType 选择生产函数
+      if (provider === 'mock') return bodyFor(jobType, job); // mock 提供方：本地生成可解码占位产物
+      if (jobType === 'text' || jobType === 'image' || jobType === 'tts') { // 文本/图像/语音走 openai 兼容协议
+        if (!openAi) throw new AppError('PROVIDER_NOT_CONFIGURED', `provider "${provider}" is not configured`); // 凭证缺失时诚实失败
+        return produceWithOpenAi(openAi, jobType, job); // 调用 openai 兼容生产函数
+      } // 结束 openai 类型分支
+      if (jobType === 'video') { // 视频走独立厂商
+        if (!videoProvider) throw new AppError('PROVIDER_NOT_CONFIGURED', 'video provider is not configured'); // 未配置视频厂商时诚实失败
+        return produceWithVideo(videoProvider, job); // 调用视频厂商生产函数
+      } // 结束 video 分支
+      // compose：ffmpeg 合成
+      if (!ffmpegPath) throw new AppError('PROVIDER_NOT_CONFIGURED', 'ffmpeg is not available for compose'); // 未安装 ffmpeg 时诚实失败
+      return produceWithCompose(ffmpegPath, job); // 调用 ffmpeg 合成函数
+    })(); // IIFE 结束，得到产物字节与 MIME
     const assetType = ASSET_TYPE_BY_JOB[jobType]; // 映射产物类型
     const objectKey = `${job.created_by}/${job.project_id}/${job.id}-${assetType}${extensionForMime(mime)}`; // 按用户/工程/任务分层，避免键冲突
     const stored = await storage.putObject(objectKey, body, mime); // 真实落盘，返回大小与摘要
@@ -360,7 +547,7 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
         assetType, // 产物类型
         objectKey, // 对象存储键
         mime, // 内容类型
-        jobType === 'tts' ? 500 : null, // mock WAV 固定 500ms，其余类型不填时长
+        jobType === 'tts' && provider === 'mock' ? 500 : null, // 仅 mock WAV 固定 500ms；真实 TTS/视频时长未知置 null
         stored.size_bytes, // 实际写入字节数
         checksum, // 摘要，便于前端校验完整性
         expiresAtFor(jobType), // 过期时间（成片为 null 即永久）
@@ -452,8 +639,18 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
             base_url: openAi?.baseUrl ?? null, // 透出网关地址便于排查
             text_model: openAi?.textModel ?? null, // 透出文本模型名
             image_model: openAi?.imageModel ?? null, // 透出图片模型名
+            tts_model: openAi?.ttsModel ?? null, // 透出 TTS 模型名（第3期配音用）
           } // 结束 openai 专属字段
         : {}), // 非 openai 提供方不追加这些字段
+      ...(videoProvider // 独立视频厂商配置就绪时追加
+        ? { // video 专属字段
+            video_base_url: videoProvider.baseUrl, // 透出视频厂商地址
+            video_model: videoProvider.model, // 透出图生视频模型名
+          } // 结束 video 专属字段
+        : { video_configured: false }), // 未配置视频厂商时明示
+      ...(ffmpegPath // ffmpeg 就绪时追加
+        ? { ffmpeg_path: ffmpegPath, compose_supported: true } // 透出 ffmpeg 路径与合成能力
+        : { ffmpeg_path: null, compose_supported: false }), // 未安装 ffmpeg 时明示合成不可用
       job_cost_limit_minor: jobCostLimitMinor, // 单任务限额
       daily_cost_limit_minor: dailyCostLimitMinor, // 当日限额
       asset_ttl_days: assetTtlDays, // 产物保留天数

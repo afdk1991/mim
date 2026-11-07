@@ -395,6 +395,25 @@ export interface SiteRecord { // 一条解析记录
   description?: string; // 备注第二段；仅差异记录才有
 } // SiteRecord 结束
 
+// 节点可运行模块规格：对齐 services/mim-api/src/site-nodes.ts
+export interface SiteNodeSpec { // 站点地图每个节点的路由 / 导航 / 职责 / 关联
+  host: string; // 原始主机名（根域名为 '@'）
+  key: string; // 路由键（'@' 映射为 'root'）
+  route: string; // 站内 hash 路由，如 #/site/www
+  kind: string; // 职责类型：portal / identity / console / gateway / content / commerce / data / tools
+  nav: { zh: string; en: string }; // 双语导航名
+  duty: { zh: string; en: string }; // 双语模块职责
+  links: string[]; // 关联节点 host 列表
+} // SiteNodeSpec 结束
+
+// 站点目录响应：一次返回 45 个节点 + 8 分类 + 能力清单
+export interface SiteNodeList { // GET /site/nodes 的响应结构
+  total: number; // 节点总数（45）
+  categories: SiteCategory[]; // 8 个分类（含双语名与节点数）
+  capabilities: Record<string, { zh: string; en: string }[]>; // 按职责类型的能力清单
+  items: SiteModuleItem[]; // 45 个节点完整信息（含 fqdn / records / node）
+} // SiteNodeList 结束
+
 // 单个站点模块（主机 + zone 记录聚合）
 export interface SiteModuleItem { // 一个站点模块（主机名维度）
   // 主机名（不含 zone），根域名为 '@'
@@ -409,8 +428,12 @@ export interface SiteModuleItem { // 一个站点模块（主机名维度）
   description: string; // 站点功能说明
   // https 入口地址，与 records 一一对应
   urls: string[]; // 各 zone 对应的 https 入口，与 records 顺序一致
+  // 主域名（单 zone 下即唯一记录的 fqdn），供目录与节点页展示域名映射
+  fqdn: string; // 完整域名，如 api.mixm.top / mixm.top
   // 该模块的解析记录明细
   records: SiteRecord[]; // 该模块的解析记录明细
+  // 可运行模块规格（路由 / 导航 / 职责 / 关联节点）
+  node: SiteNodeSpec; // 与后端 45 条规格一一对应
 } // SiteModuleItem 结束
 
 // GET /site/modules 的响应结构
@@ -424,6 +447,46 @@ export interface SiteModuleList { // 模块列表响应（带分页/过滤回显
   // 模块列表本体
   items: SiteModuleItem[]; // 模块列表
 } // SiteModuleList 结束
+
+// ---------- IM 即时通讯域类型 ----------
+export type ImConversationType = 'direct' | 'group'; // 会话类型：私聊 / 群聊
+export type ImMessageContentType = 'text' | 'image' | 'file' | 'system'; // 消息内容类型
+export type ImMessageStatus = 'sent' | 'delivered' | 'read'; // 投递状态
+
+/** 单条消息视图 */
+export interface ImMessage {
+  id: string; // 消息 ID
+  conversation_id: string; // 所属会话
+  sender_user_id: string; // 发送者 ID
+  sender_display_name: string; // 发送者显示名
+  content_type: ImMessageContentType; // 内容类型
+  content: string; // 文本内容
+  object_key?: string | null; // 媒体对象键（image/file）
+  object_mime?: string | null; // 媒体 MIME
+  object_name?: string | null; // 原始文件名
+  object_size?: number | null; // 文件大小
+  status: ImMessageStatus; // 投递状态
+  created_at: string; // 创建时间
+} // ImMessage 结束
+
+/** 会话列表项 */
+export interface ImConversation {
+  id: string; // 会话 ID
+  type: ImConversationType; // 类型
+  title: string; // 展示标题
+  avatar_object_key?: string | null; // 头像对象键
+  other_user_id?: string | null; // 私聊对方 ID（群聊为 null）
+  last_message: ImMessage | null; // 最后一条消息
+  unread_count: number; // 未读数
+  updated_at: string; // 最后更新时间
+} // ImConversation 结束
+
+/** 搜索到的用户项 */
+export interface ImUser {
+  id: string; // 用户 ID
+  display_name: string; // 显示名
+  region: string; // 区域
+} // ImUser 结束
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -748,6 +811,13 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         idempotency: false, // 读操作天然幂等
       }); // 请求调用结束
     }, // listModules 结束
+    /** GET /site/nodes：站点目录，一次取全量 45 个可运行节点规格 */
+    listNodes() { // 供目录页与节点页共享一份缓存数据
+      return request<SiteNodeList>('/site/nodes', { // 公开只读：免鉴权、无需幂等键
+        auth: false, // 未登录也能浏览站点目录
+        idempotency: false, // 读操作天然幂等
+      }); // 请求调用结束
+    }, // listNodes 结束
     /** GET /site/modules/:host：单模块详情 */
     getModule(host: string) { // 取单模块详情
       return request<{ module: SiteModuleItem }>(`/site/modules/${encodeURIComponent(host)}`, { // host 可能含 @ 等字符，需编码
@@ -756,4 +826,35 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       }); // 请求调用结束
     }, // getModule 结束
   }, // site 分组结束
+  im: { // IM 即时通讯：会话 / 消息 / 用户搜索（需登录）
+    /** GET /im/conversations：当前用户的会话列表 */
+    listConversations() { // 拉取会话列表，含最后消息与未读数
+      return request<{ items: ImConversation[] }>('/im/conversations', { auth: true, idempotency: false }); // 需鉴权，只读无需幂等键
+    }, // listConversations 结束
+    /** POST /im/conversations：创建会话（direct 或 group） */
+    createConversation(body: { type: ImConversationType; target_user_id?: string; name?: string; member_user_ids?: string[] }) {
+      return request<{ conversation_id: string; conversation: ImConversation }>('/im/conversations', { method: 'POST', body, auth: true }); // 写操作由 request 自动生成幂等键
+    }, // createConversation 结束
+    /** GET /im/conversations/:id/messages：分页拉取历史消息 */
+    listMessages(conversationId: string, opts: { before?: string; limit?: number } = {}) {
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      if (opts.before) qs.set('before', opts.before); // 游标：取比该 ID 更早的消息
+      if (opts.limit) qs.set('limit', String(opts.limit)); // 条数限制
+      const suffix = qs.toString(); // 无参数时空串
+      return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages${suffix ? `?${suffix}` : ''}`, { auth: true, idempotency: false });
+    }, // listMessages 结束
+    /** POST /im/conversations/:id/messages：HTTP 方式发消息（兜底；实时通道走 WebSocket） */
+    sendMessage(conversationId: string, body: { content_type: ImMessageContentType; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number }) {
+      return request<{ message: ImMessage }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages`, { method: 'POST', body, auth: true }); // 写操作由 request 自动生成幂等键
+    }, // sendMessage 结束
+    /** POST /im/conversations/:id/read：标记已读到指定消息 */
+    markRead(conversationId: string, messageId: string) {
+      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/read`, { method: 'POST', body: { message_id: messageId }, auth: true, idempotency: false });
+    }, // markRead 结束
+    /** GET /im/users?q=：搜索用户（创建会话时选人） */
+    searchUsers(q: string, limit = 20) {
+      const suffix = new URLSearchParams({ q, limit: String(limit) }).toString(); // 拼接查询串
+      return request<{ items: ImUser[] }>(`/im/users?${suffix}`, { auth: true, idempotency: false });
+    }, // searchUsers 结束
+  }, // im 分组结束
 }; // api 对象结束

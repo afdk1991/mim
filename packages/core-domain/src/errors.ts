@@ -49,6 +49,8 @@ export const ERROR_CODES = [
   'PROVIDER_NOT_CONFIGURED',
   // 超出单任务或当日的生成成本上限
   'COST_LIMIT_EXCEEDED',
+  // AI 生成任务执行失败（上游模型/存储/合成环节报错）
+  'GENERATION_FAILED',
   // 通用接口频控触发
   'RATE_LIMITED',
   // 未归类的服务端异常兜底
@@ -105,6 +107,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   PROVIDER_NOT_CONFIGURED: 503,
   // 成本超限用 402 Payment Required，提示需付费或等待额度重置
   COST_LIMIT_EXCEEDED: 402,
+  // 生成任务失败属上游环节报错，用 502 区分「我方调度无问题、模型/合成失败」
+  GENERATION_FAILED: 502,
   // 通用限流 429
   RATE_LIMITED: 429,
   // 兜底 500

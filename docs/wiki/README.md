@@ -24,6 +24,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 | [08-dev-implementation.md](./08-dev-implementation.md) | 开发实现全景：目标架构 + §1.1「已实现 vs 规划」对照 |
 | [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md) | 第三方 SDK / API / API Key 全量清单（含北斗卫星导航专项） |
 | [10-comic-state-machines.md](./10-comic-state-machines.md) | 漫剧模块完整状态机：comic_projects / generation_jobs / comic_films 三套状态机、24 条路由转移对照、冒烟链路 |
+| [../security-default-config-audit-20261108.md](../security-default-config-audit-20261108.md) | 后台默认配置安全自查（2026-11-08）：G1–G14 逐项、六类分系统、资产台账、P0/P1/P2、留档模板 |
 
 ## 仓库速览
 

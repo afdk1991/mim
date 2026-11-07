@@ -9,6 +9,11 @@
  * 按需求不对外暴露解析目标（IP / CNAME 目标值），记录只保留类型、域名与 TTL。
  */
 
+// 节点规格表：把 45 个节点补齐成「可运行模块」（路由 / 导航 / 职责 / 关联）
+import { buildAndValidateNodeSpecs } from './site-nodes.js';
+// 仅类型导入：单节点规格结构，用于给 SiteModule 增加 node 字段
+import type { SiteNodeSpec } from './site-nodes.js';
+
 // 单一托管 zone 的静态定义：id 与 apex 同值。
 // 用 as const 固化字面量类型，SiteZoneId 才能从数组中反推出 'mixm.top'。
 export const SITE_ZONES = [
@@ -82,6 +87,8 @@ export interface SiteModule {
   /** 可访问地址（按 zone 生成，CNAME 记录同样给出 https 入口） */
   urls: string[]; // 与 records 一一对应的 https 入口地址
   records: SiteRecord[]; // 该模块在 zone 下的解析记录
+  /** 可运行模块规格：路由键 / 双语导航名 / 职责类型 / 关联节点 */
+  node: SiteNodeSpec; // 由 site-nodes.ts 派生，保证 45 个节点一一对应
 }
 
 // 原始录入结构：比 SiteModule 少一层展开，便于逐条手写 45 行备注
@@ -250,8 +257,18 @@ function buildModule(raw: RawModule): SiteModule {
     description: raw.description, // 模块级备注第二段
     urls: records.map((r) => `https://${r.fqdn}`), // 每条记录给出一个 https 入口
     records, // 该 zone 的解析记录
+    node: SITE_NODE_SPECS[raw.host], // 挂上该节点的可运行模块规格（路由 / 导航 / 职责 / 关联）
   };
 }
+
+// 构造 45 个节点规格并立即做完整性断言：漏节点 / 重复路由 / 悬空关联都会在启动期暴露
+export const SITE_NODE_SPECS = buildAndValidateNodeSpecs(
+  RAW.map((r) => r.host), // 传入 DNSPod 原始 45 个 host
+  (host) => RAW.find((r) => r.host === host)!.category, // 按 host 回查分类，避免分类被复制成第二份真源
+); // 规格表构造结束
+
+// 按职责类型输出的能力清单，供 /site/nodes 一次返回给节点页渲染
+export { NODE_CAPABILITIES } from './site-nodes.js'; // 重导出，路由层无需跨文件二次导入
 
 /** 45 条站点模块（按分类顺序、分类内保持备注原序） */
 export const SITE_MODULES: SiteModule[] = RAW.map(buildModule); // 模块级派生一次，运行期只读使用

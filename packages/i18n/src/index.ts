@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 双语文案与本地化格式化（FR-06 / 08 §4.4 多端一致性）。
  * 客户端禁止硬编码文案：所有展示文案由本包或服务端下发。
  */
@@ -236,6 +236,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     PROVIDER_NOT_CONFIGURED: 'AI 模型提供方未配置',
     // 成本超限，说明限额维度
     COST_LIMIT_EXCEEDED: '已超出单任务/当日生成成本上限',
+    // AI 生成任务失败：上游模型/存储/合成环节报错，提示稍后重试
+    GENERATION_FAILED: '生成失败，请稍后重试',
     // 通用频控
     RATE_LIMITED: '请求过于频繁，请稍后再试',
     // 服务端异常，不暴露堆栈
@@ -288,6 +290,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     PROVIDER_NOT_CONFIGURED: 'AI model provider is not configured',
     // 成本超限
     COST_LIMIT_EXCEEDED: 'Generation cost limit exceeded (per job or daily)',
+    // AI 生成任务失败
+    GENERATION_FAILED: 'Generation failed, please try again later',
     // 通用频控
     RATE_LIMITED: 'Too many requests, try again later',
     // 服务端异常

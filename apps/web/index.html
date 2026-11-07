@@ -13,7 +13,7 @@
       (function () { // 立即执行函数：隔离内部变量，避免向全局作用域泄漏
         var href = location.href; // 当前完整地址（含查询串与哈希），用于判断末位是否为问号
         var search = location.search; // 查询串部分（含前导问号；空查询串时为 ''）
-        var hash = location.hash; // 哈希部分：本项目无哈希路由，正常为空，非空时一律不动地址
+        var hash = location.hash; // 哈希部分：本站使用 #/<view> 与 #/site/<key> 节点路由，非空时一律不动地址
         // 仅处理两种异常形态：①空查询串且地址以问号结尾；②查询串恰为平台注入的 ?tads
         if (hash === '' && (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?'))) {
           history.replaceState(null, '', location.pathname); // 只保留路径原地替换，不新增历史、不触发跳转

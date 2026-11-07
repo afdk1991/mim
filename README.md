@@ -65,7 +65,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-无 URL 路由，视图由 [App.tsx](./apps/web/src/App.tsx) 的 `View` 状态切换；功能模块与站点地图免登录可浏览，漫剧与设置未登录时内容区内嵌登录卡片。
+站内采用零依赖 hash 路由（[router.ts](./apps/web/src/router.ts)）：`#/store`、`#/comic`、`#/sitemap`、`#/directory`、`#/settings`、`#/login`，以及站点地图 45 个节点各自的 `#/site/<key>`（根域名 `@` 映射为 `#/site/root`）；刷新、前进后退与外链直达均可用。视图由 [App.tsx](./apps/web/src/App.tsx) 按 hash 渲染，节点页时侧栏「站点目录」保持高亮；功能模块、站点地图、站点目录与节点页免登录可浏览，漫剧与设置未登录时内容区内嵌登录卡片。45 节点的层级 / 路由 / 域名映射逐项清单见 [08-dev-implementation.md §2.1](./docs/wiki/08-dev-implementation.md)。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 模块状态流转 / 权益发放与回收。
 
@@ -74,7 +74,9 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 登录 | `Login.tsx` | 管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login` |
 | 功能模块 | `Store.tsx` | 模块目录浏览（匿名可看）与一次性解锁（`/modules`、`/entitlements`、`/me/entitlements`；解锁需登录） |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
-| 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`，匿名可访问） |
+| 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`，匿名可访问），每张卡片提供「进入模块」入口 |
+| 站点目录 | `SiteDirectory.tsx` | 8 分类 / 45 个可运行节点的分类导航与搜索，节点入口统一为 `#/site/<key>` |
+| 节点模块页 | `SiteNodePage.tsx` | 单个节点的四级面包屑、5 个下属栏目导航（概览 / 域名映射 / 站点地图条目 / 模块职责 / 关联节点）、逐条解析记录与 HTTPS 入口、DNSPod 备注两段与 record 级覆盖备注、模块职责清单、实时接口详情与前后节点翻页 |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
 
 ### 后端接口（`services/mim-api`，前缀 `/api/v1`）
@@ -91,7 +93,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 成片 | `GET/POST /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/{versions,submit-review,publish,reject,archive}` | 登录 |
 | 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets` | 对象端点凭签名免鉴权 |
 | AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
-| 站点地图 | `GET /site/overview`、`GET /site/modules`、`GET /site/modules/:host` | 公开只读 |
+| 站点地图 | `GET /site/overview`、`GET /site/modules`、`GET /site/modules/:host`、`GET /site/nodes` | 公开只读；`/site/nodes` 一次返回 45 节点的路由 / 双语导航 / 职责 / 关联与域名映射（真源 `src/site.ts` + `src/site-nodes.ts`） |
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
 
 除 `auth/*` 外的写接口强制 `Idempotency-Key`（同键同体重放首次结果、同键异体 409）；错误统一信封携带 `requestId`。

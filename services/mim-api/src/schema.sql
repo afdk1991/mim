@@ -316,3 +316,56 @@ CREATE TABLE IF NOT EXISTS user_roles (
 );
 CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_code);
 
+-- ---------- im 域（即时通讯与视频通话，07 §13）----------
+-- 会话主体：direct 为 1:1 私聊（同两人只能有一个），group 为群聊；
+-- 软删除保持消息历史可审计。
+CREATE TABLE IF NOT EXISTS im_conversations (
+  id              TEXT PRIMARY KEY,
+  type            TEXT NOT NULL CHECK (type IN ('direct','group')),
+  title           TEXT NOT NULL DEFAULT '',
+  owner_user_id   TEXT,
+  avatar_object_key TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  deleted_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_im_conversations_updated ON im_conversations(updated_at DESC);
+
+-- 会话成员：direct 会话固定两人；group 会话可多人；
+-- role 区分群主/管理员/普通成员；last_read_message_id 驱动未读数。
+CREATE TABLE IF NOT EXISTS im_conversation_members (
+  conversation_id     TEXT NOT NULL REFERENCES im_conversations(id) ON DELETE CASCADE,
+  user_id             TEXT NOT NULL,
+  role                TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner','admin','member')),
+  last_read_message_id TEXT,
+  muted               INTEGER NOT NULL DEFAULT 0 CHECK (muted IN (0,1)),
+  pinned              INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0,1)),
+  joined_at           TEXT NOT NULL,
+  PRIMARY KEY (conversation_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_im_members_user ON im_conversation_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_im_members_conv ON im_conversation_members(conversation_id);
+
+-- 消息主体：content_type 决定 content 字段语义；
+-- image/file 类型的对象键走 media 预签名通道，消息只存 object_key 引用（避免大 payload 走 WebSocket）。
+-- status 流转：sent（发送方本地）→ delivered（已投递到对方在线设备）→ read（对方已读）。
+CREATE TABLE IF NOT EXISTS im_messages (
+  id              TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES im_conversations(id) ON DELETE CASCADE,
+  sender_user_id  TEXT NOT NULL,
+  content_type    TEXT NOT NULL CHECK (content_type IN ('text','image','file','system')),
+  content         TEXT NOT NULL DEFAULT '',
+  object_key      TEXT,
+  object_mime     TEXT,
+  object_name     TEXT,
+  object_size     INTEGER,
+  status          TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent','delivered','read')),
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  deleted_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_im_messages_conv_created ON im_messages(conversation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_im_messages_sender ON im_messages(sender_user_id, created_at DESC);
+-- direct 会话的两人唯一性由应用层保证（按 sorted(user_id pair) 查询复用），
+-- 不在 DB 层做跨成员表的唯一约束，SQLite 无法表达。
+

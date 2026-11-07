@@ -11,11 +11,18 @@
 import { Router } from 'express'; // 路由工厂：把漫剧工作台做成可独立挂载的子路由
 import { z } from 'zod'; // 入参校验：所有写接口的字段类型 / 长度 / 枚举都集中在此声明
 import { AppError, uuidv7 } from '@mim/core-domain'; // 统一错误码与时间有序主键生成器
+import type { ErrorCode } from '@mim/core-domain'; // 错误码联合类型，用于编排器回传错误码的类型收窄
 import { clockOf } from '../domain.js'; // 注入式时钟：测试可固定时间，保证 created_at 可断言
 import { idempotency, requireAuth, requireEntitlement } from '../middleware.js'; // 幂等键拦截 + 登录态 + 模块权益三件套
 import { parse } from '../validate.js'; // 把裸入参交给 zod 解析，失败统一转 VALIDATION_FAILED
 import { jsonParse, pathParam } from '../utils.js'; // JSON 列反序列化兜底与路径参数取值
 import type { ApiDeps, Db } from '../types.js'; // 依赖注入容器类型与 SQLite 句柄类型（仅类型导入，不产生运行时依赖）
+// 导出成片转码所需的 Node 内置模块（与 orchestrator 一致，避免引入第三方转码依赖）
+import { spawnSync } from 'node:child_process'; // 同步调用 ffmpeg，导出链路为请求内完成
+import { tmpdir } from 'node:os'; // 临时目录，转码中间产物落盘后即删
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'; // 临时文件读写与清理
+import { join } from 'node:path'; // 路径拼接
+import { randomBytes } from 'node:crypto'; // 临时目录名随机化，避免并发冲突
 
 /** 工作台的解锁模块编码（与 db.ts seedModules 保持一致） */
 const MODULE_CODE = 'comic.workbench'; // 未购买该模块的用户访问 /comic/* 会被权益中间件拦下
@@ -241,6 +248,120 @@ function findFilm(db: Db, userId: string, filmId: string): FilmRow { // 成片�
   return row; // 供后续状态迁移使用
 } // 成片查询函数结束
 
+/** 全自动流水线专用：写入任务并同步执行，返回产物键。失败抛 AppError 中断链路 */
+async function runAutoJob( // 建任务 + 编排器执行 + 取结果，统一封装避免各环节重复样板
+  db: Db, // 数据库句柄
+  orch: NonNullable<ApiDeps['orchestrator']>, // 编排器实例（已校验非空）
+  projectId: string, // 所属工程
+  storyboardId: string | null, // 关联分镜，可空
+  jobType: 'text' | 'image' | 'tts' | 'video' | 'compose', // 任务类型
+  payload: Record<string, unknown>, // 任务入参
+  userId: string, // 发起人
+  now: string, // 统一时间戳
+): Promise<{ object_key: string | null; asset_id: string | null }> { // 返回产物键与资产 ID
+  const id = uuidv7(); // 任务主键
+  db // 写入排队中的任务
+    .prepare( // 预编译任务插入
+      `INSERT INTO generation_jobs
+         (id, project_id, storyboard_id, job_type, status, retry_of, cost_estimate_minor,
+          error_code, payload, result, created_by, created_at, started_at, finished_at)
+       VALUES (?, ?, ?, ?, 'queued', NULL, NULL, NULL, ?, NULL, ?, ?, NULL, NULL)`, // 新任务固定 queued，结果与错误留空
+    ) // 预编译结束
+    .run(id, projectId, storyboardId, jobType, JSON.stringify(payload), userId, now); // 绑定任务字段
+  const result = await orch.runOne(id); // 同步执行该任务（真实模型下可能耗时数秒到数十秒）
+  if (!result) throw new AppError('INTERNAL_ERROR', 'orchestrator did not return a result', { job_id: id }); // 编排器未返回结果属内部异常
+  if (result.status === 'failed') { // 任务失败则中断整条自动链路
+    throw new AppError((result.error_code as ErrorCode) ?? 'GENERATION_FAILED', result.message ?? 'generation task failed', { // 透传模型侧错误码与消息；error_code 来自编排器，强转为 ErrorCode 以适配构造函数
+      job_id: id, // 附任务 ID 便于排查
+      job_type: jobType, // 附任务类型定位失败环节
+    }); // 失败错误体结束
+  } // 失败分支结束
+  return { object_key: result.object_key ?? null, asset_id: result.asset_id ?? null }; // 成功返回产物键
+} // runAutoJob 结束
+
+/** 从文本任务的产物键读取剧本文本：编排器把文本内容存为 text 资产 */
+async function extractTextFromResult( // 读取存储中的文本资产，供后续拆分为镜
+  storage: NonNullable<ApiDeps['storage']>, // 存储适配器
+  objectKey: string | null, // 文本资产键
+): Promise<string> { // 返回 UTF-8 解码后的文本
+  if (!objectKey) return ''; // 无键则返回空串，由调用方兜底
+  const asset = await storage.getObject(objectKey); // 从对象存储读取原始字节
+  return asset.body.toString('utf-8'); // 文本资产按 UTF-8 解码
+} // extractTextFromResult 结束
+
+interface AutoShot { // 自动拆分出的分镜结构，与 shotSchema 对齐
+  index: number; // 镜头序号
+  description: string; // 画面描述
+  dialogue?: string; // 台词（可空）
+} // AutoShot 结束
+
+/** 把模型输出的剧本文本拆成 N 个分镜；解析不足时按标题生成兜底镜头 */
+function parseScriptToShots(script: string, expected: number, title: string): AutoShot[] { // 按【分镜N】标记拆分
+  const shots: AutoShot[] = []; // 累积解析出的镜头
+  const blocks = script.split(/【分镜\d+】/).map((b) => b.trim()).filter(Boolean); // 按【分镜N】切块并去空白
+  for (let i = 0; i < blocks.length; i++) { // 逐块提取画面与台词
+    const block = blocks[i]; // 当前分镜文本块
+    const descMatch = block.match(/【画面】\s*([^\n]+)/); // 抓取【画面】后的描述（到行尾）
+    const dialMatch = block.match(/【台词】\s*([^\n]+)/); // 抓取【台词】后的对白（到行尾）
+    const description = descMatch?.[1]?.trim() || block.split('\n')[0]?.trim() || `${title} 第 ${i + 1} 镜`; // 无画面标记则取首行，再不行用标题兜底
+    const dialogue = dialMatch?.[1]?.trim(); // 台词可为空
+    shots.push({ index: i + 1, description, dialogue: dialogue || undefined }); // 推入镜头列表
+  } // 分镜块循环结束
+  if (shots.length < expected) { // 解析出的镜头数不足期望值
+    for (let i = shots.length; i < expected; i++) { // 用标题兜底补齐到 expected 个
+      shots.push({ index: i + 1, description: `${title} 第 ${i + 1} 镜：承接剧情推进`, dialogue: undefined }); // 兜底镜头无台词
+    } // 补齐循环结束
+  } // 不足兜底结束
+  return shots.slice(0, expected); // 截取期望数量，避免模型多输出导致失控
+} // parseScriptToShots 结束
+
+/** 导出转码：用 ffmpeg 把原片转为指定格式/分辨率，存为新对象并返回键 */
+async function transcodeVideo( // 封装 ffmpeg 转码 + 存储写入，导出接口专用
+  storage: NonNullable<ApiDeps['storage']>, // 存储适配器，回读原片与写入转码产物
+  ffmpegBin: string, // ffmpeg 可执行文件路径（已校验非空）
+  sourceKey: string, // 原片对象键
+  format: 'mp4' | 'mov', // 目标格式
+  resolution: '720p' | '1080p', // 目标分辨率（高度）
+): Promise<string> { // 返回转码产物的对象键
+  const tmpDir = join(tmpdir(), `mim-export-${randomBytes(8).toString('hex')}`); // 临时目录名随机化，避免并发冲突
+  mkdirSync(tmpDir, { recursive: true }); // 创建临时目录，recursive 容忍已存在
+  const sourcePath = join(tmpDir, `source.${format === 'mov' ? 'mp4' : 'mp4'}`); // 原片临时路径（compose 产物为 mp4）
+  const outputPath = join(tmpDir, `output.${format}`); // 转码输出临时路径，扩展名决定容器格式
+  try { // try/finally 保证临时目录一定被清理
+    const sourceAsset = await storage.getObject(sourceKey); // 从存储回读原片字节
+    writeFileSync(sourcePath, sourceAsset.body); // 写入临时文件供 ffmpeg 读取
+
+    const height = resolution === '1080p' ? 1920 : 1280; // 竖版视频：1080p→1920 高，720p→1280 高
+    const width = resolution === '1080p' ? 1080 : 720; // 对应宽度，保持 9:16 竖版比例
+    const vf = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`; // 缩放并居中填充，避免拉伸变形
+
+    const result = spawnSync(ffmpegBin, [ // 同步执行 ffmpeg
+      '-y', // 覆盖已存在的输出文件
+      '-i', sourcePath, // 输入原片
+      '-vf', vf, // 视频滤镜：缩放+填充
+      '-c:v', 'libx264', // 视频编码 H.264，兼容性最好
+      '-c:a', 'aac', // 音频编码 AAC
+      '-b:a', '128k', // 音频码率 128kbps
+      '-movflags', '+faststart', // moov 前置，便于流式播放
+      outputPath, // 输出路径
+    ], { stdio: 'pipe' }); // 捕获 stderr 用于报错排查
+    if (result.status !== 0) { // ffmpeg 非零退出表示转码失败
+      const stderr = result.stderr?.toString('utf-8') ?? ''; // 取 stderr 尾部用于定位
+      throw new AppError('GENERATION_FAILED', 'video transcoding failed', { // 502 标识上游工具失败
+        detail: stderr.slice(-500), // 只回传最后 500 字符，避免日志过长
+      }); // 错误体结束
+    } // ffmpeg 退出码判断结束
+
+    const outputBuffer = readFileSync(outputPath); // 读取转码产物字节
+    const mime = format === 'mov' ? 'video/quicktime' : 'video/mp4'; // 输出 MIME 按容器格式
+    const exportKey = `exports/${sourceKey.split('/').pop()?.replace(/\.[^.]+$/, '')}-${resolution}.${format}`; // 导出对象键：exports/原文件名-分辨率.格式
+    await storage.putObject(exportKey, outputBuffer, mime); // 写入转码产物到存储
+    return exportKey; // 返回新对象键供预签名下载使用
+  } finally { // 无论成功失败都清理临时目录
+    rmSync(tmpDir, { recursive: true, force: true }); // 递归删除临时目录，force 容忍不存在
+  } // finally 结束
+} // transcodeVideo 结束
+
 const createBody = z.object({ // 创建工程入参 schema
   title: z.string().trim().min(1).max(120), // 工程标题：去空白后 1~120 字，必填
   synopsis: z.string().max(4000).optional(), // 简介：≤4000 字，可省略（后续作为 AI 主题来源）
@@ -317,6 +438,18 @@ const createFilmBody = z.object({ // 创建成片入参
   duration_sec: z.number().int().positive().optional(), // 时长（秒），正整数
   size_bytes: z.number().int().min(0).optional(), // 体积（字节），允许 0
 }); // 成片入参结束
+
+const autoBody = z.object({ // 漫剧第 3 期全自动成片入参：题材→成片单链路
+  title: z.string().trim().min(1).max(120), // 工程标题，必填
+  synopsis: z.string().trim().max(1000).optional(), // 题材简介，可空由模型自由发挥
+  storyboard_count: z.number().int().min(1).max(12).default(4), // 分镜数量，默认 4 镜，上限 12 控制成本
+  voice: z.string().trim().min(1).max(40).optional(), // 配音音色，缺省由编排器兜底为 alloy
+}); // 全自动成片入参结束
+
+const exportFilmBody = z.object({ // 导出成片入参：格式与分辨率选项
+  format: z.enum(['mp4', 'mov']).default('mp4'), // 导出格式，默认 mp4
+  resolution: z.enum(['720p', '1080p']).default('1080p'), // 导出分辨率，默认 1080p
+}); // 导出成片入参结束
 
 const filmVersionBody = z.object({ // 追加版本入参
   object_key: z.string().min(1).max(512).optional(), // 新版本的存储键，未上传时可先占位
@@ -419,6 +552,99 @@ export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外
       .run(id, user.id, user.region, body.title, body.synopsis ?? null, now, now); // 归属与地域取自登录用户
     res.status(201).json({ project: projectPayload(findProject(deps.db, user.id, id)) }); // 回读一次再返回，确保与库中一致
   }); // 新建工程接口结束
+
+  /** 漫剧第 3 期：题材 → 成片单链路全自动生成（同步执行，真实模型下耗时较长） */
+  router.post('/comic/auto', idempotency, async (req, res) => { // 一键成片：建工程→剧本→分镜→图+配音→合成→成片
+    const body = parse(autoBody, req.body); // 校验标题、简介、分镜数与音色
+    const user = req.user!; // 已登录用户，权益中间件已校验 comic.workbench
+    const orch = deps.orchestrator; // 编排器：真实模型或 mock 均经其统一调度
+    const storage = deps.storage; // 存储适配器：剧本等文本资产需回读解析
+    if (!orch) throw new AppError('PROVIDER_NOT_CONFIGURED', 'ai orchestrator is not available'); // 未注入编排器则整条链路不可用
+    if (!orch.configured) throw new AppError('PROVIDER_NOT_CONFIGURED', 'no ai provider is configured'); // 凭证缺失时诚实失败，不伪造产物
+    if (!storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 剧本回读与成片落盘都依赖存储
+    const now = clockOf(deps); // 统一时间源
+    const projectId = uuidv7(); // 工程主键
+    const storyboardId = uuidv7(); // 分镜版本主键（自动生成，用于关联任务）
+
+    // 1) 建工程，直接进入 generating（自动链路跳过人工确认的 storyboarded 中间态）
+    deps.db // 写入工程行
+      .prepare( // 预编译工程插入
+        `INSERT INTO comic_projects
+           (id, owner_user_id, region, title, synopsis, status, version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'generating', 1, ?, ?)`, // 自动链路从 generating 起步，内容由 AI 全量生成
+      ) // 预编译结束
+      .run(projectId, user.id, user.region, body.title, body.synopsis ?? null, now, now); // 归属与地域取自登录用户
+
+    // 2) 生成剧本（text 任务）：提示模型按分镜数输出结构化剧本
+    const scriptPrompt = `为漫剧《${body.title}》创作一个${body.synopsis ?? '自由发挥的短剧'}剧本，包含 ${body.storyboard_count} 个分镜。
+每个分镜以【分镜N】开头，下一行写【画面】描述镜头内容，再下一行写【台词】角色对白。
+要求画面描述具体可绘制，台词简短有力，整体节奏紧凑。`; // 结构化提示，便于后续按标记拆分镜头
+    const scriptRes = await runAutoJob(deps.db, orch, projectId, storyboardId, 'text', { prompt: scriptPrompt }, user.id, now); // 同步执行剧本任务
+    const scriptText = await extractTextFromResult(storage, scriptRes.object_key); // 从存储回读剧本文本
+
+    // 3) 解析剧本，拆出 N 个分镜的画面描述与台词
+    const shots = parseScriptToShots(scriptText, body.storyboard_count, body.title); // 按【分镜N】标记拆分，不足则用标题兜底
+    deps.db // 写入自动生成的分镜版本（留痕，供前端回放创作过程）
+      .prepare( // 预编译分镜插入
+        `INSERT INTO storyboards
+           (id, project_id, version_no, shots, confirmed_at, created_by, created_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?)`, // 自动生成的分镜直接确认，无需人工二次确认
+      ) // 预编译结束
+      .run(storyboardId, projectId, JSON.stringify(shots), now, user.id, now); // 绑定分镜字段
+
+    // 4) 逐镜生成图片 + 配音，收集所有产物键
+    const assetKeys: string[] = []; // 累积所有图片与音频的 object_key，供合成任务使用
+    for (let i = 0; i < shots.length; i++) { // 逐镜串行，避免同时打满外部模型配额
+      const shot = shots[i]; // 当前分镜
+      const imagePrompt = `漫画风格分镜插图：${shot.description}。竖版构图，电影感光影，角色表情生动。`; // 图片提示，统一风格前缀
+      const imgRes = await runAutoJob(deps.db, orch, projectId, storyboardId, 'image', { prompt: imagePrompt }, user.id, now); // 生成分镜图
+      if (imgRes.object_key) assetKeys.push(imgRes.object_key); // 图片键入合成清单
+      if (shot.dialogue) { // 有台词才生成配音，避免静音镜头也产生音频
+        const ttsPrompt = shot.dialogue; // 配音文本即分镜台词
+        const ttsRes = await runAutoJob(deps.db, orch, projectId, storyboardId, 'tts', { prompt: ttsPrompt, voice: body.voice ?? 'alloy' }, user.id, now); // 生成配音
+        if (ttsRes.object_key) assetKeys.push(ttsRes.object_key); // 音频键入合成清单
+      } // 台词分支结束
+    } // 逐镜循环结束
+
+    if (assetKeys.length === 0) { // 极端情况：所有生成任务都未产出键
+      throw new AppError('GENERATION_FAILED', 'no assets were produced for composition'); // 无素材无法合成，明确失败
+    } // 空产物守卫结束
+
+    // 5) 合成成片（compose 任务）：编排器内部用 ffmpeg 把图+音频拼成 mp4
+    const composeRes = await runAutoJob(deps.db, orch, projectId, storyboardId, 'compose', { object_keys: assetKeys }, user.id, now); // 执行合成
+    if (!composeRes.object_key) { // 合成成功但未返回存储键（不应发生，防御性校验）
+      throw new AppError('GENERATION_FAILED', 'compose succeeded but no object key returned'); // 明确失败，不返回半成品
+    } // 合成产物守卫结束
+
+    // 6) compose 成功已由编排器驱动 project generating→rendered，此处创建成片记录
+    const filmId = uuidv7(); // 成片主键
+    const versionId = uuidv7(); // 首版本主键
+    deps.db.transaction(() => { // 成片与版本同批写入
+      deps.db // 建成片壳
+        .prepare( // 预编译成片插入
+          `INSERT INTO comic_films
+             (id, project_id, title, status, current_version_id, review_note, version, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, 'draft', NULL, NULL, 1, ?, ?, NULL)`, // 新成片从 draft 起步，待审核发布
+        ) // 预编译结束
+        .run(filmId, projectId, body.title, now, now); // 绑定成片字段
+      deps.db // 建首版本，指向合成产物
+        .prepare( // 预编译版本插入
+          `INSERT INTO film_versions
+             (id, film_id, version_no, object_key, duration_sec, size_bytes, published_at, created_by, created_at)
+           VALUES (?, ?, 1, ?, NULL, NULL, NULL, ?, ?)`, // 首版本号 1，时长体积后续由资产表回填
+        ) // 预编译结束
+        .run(versionId, filmId, composeRes.object_key, user.id, now); // 绑定版本字段
+    })(); // 立即执行事务
+
+    res.status(201).json({ // 201 表示产出了成片资源
+      project_id: projectId, // 工程 ID
+      film_id: filmId, // 成片 ID
+      version_id: versionId, // 首版本 ID
+      object_key: composeRes.object_key, // 合成产物键，前端可直接拉取预览
+      asset_keys: assetKeys, // 全部中间产物键，便于前端逐镜回放
+      shot_count: shots.length, // 实际分镜数（与请求一致或兜底后的值）
+    }); // 全自动成片响应结束
+  }); // 漫剧第 3 期全自动接口结束
 
   router.get('/comic/projects/:id', (req, res) => { // 工程详情：聚合工程 + 角色 + 最新分镜
     const user = req.user!; // 登录用户
@@ -1115,6 +1341,61 @@ export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外
       .run(now, film.id); // 绑定时间与成片主键
     res.json({ film: filmPayload(findFilm(deps.db, user.id, film.id)) }); // 返回归档后的成片
   }); // 归档接口结束
+
+  /** POST /comic/films/:id/export — 导出成片：按格式/分辨率转码后返回预签名下载 URL */
+  router.post('/comic/films/:id/export', idempotency, async (req, res) => { // 导出可能涉及 ffmpeg 转码，标 async
+    const user = req.user!; // 登录用户
+    const film = findFilm(deps.db, user.id, pathParam(req, 'id')); // 归属校验
+    const body = parse(exportFilmBody, req.body); // 校验格式与分辨率
+    const storage = deps.storage; // 存储适配器，用于回读原片与写入转码产物
+    if (!storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 无存储无法导出
+
+    // 1) 取当前版本的 object_key（导出总是基于最新发布版本）
+    const versionRow = deps.db // 查当前版本
+      .prepare( // 预编译：按成片主键取最新版本的存储键
+        `SELECT object_key, version_no FROM film_versions WHERE film_id = ? ORDER BY version_no DESC LIMIT 1`, // 取版本号最大的一条
+      ) // 预编译结束
+      .get(film.id) as { object_key: string | null; version_no: number } | undefined; // 命中行含存储键与版本号
+    if (!versionRow || !versionRow.object_key) { // 成片尚无产物
+      throw new AppError('NOT_FOUND', 'film has no published version to export', { film_id: film.id }); // 404 提示先合成
+    } // 版本存在性判断结束
+
+    const originalKey = versionRow.object_key; // 原片存储键
+    const originalMime = 'video/mp4'; // compose 产物固定为 mp4
+    const isOriginalFormat = body.format === 'mp4' && body.resolution === '1080p'; // 与 compose 输出（1080x1920 mp4）一致则无需转码
+
+    let downloadKey = originalKey; // 默认直接下载原片
+    let downloadMime = originalMime; // 默认原片 MIME
+    if (!isOriginalFormat) { // 需要转码：格式或分辨率与原片不同
+      const ffmpegBin = (deps.env.MIM_FFMPEG_PATH ?? '').trim() || null; // 读取 ffmpeg 路径，未配置则为 null
+      if (!ffmpegBin) { // 未配置 ffmpeg 时无法转码
+        throw new AppError('FEATURE_NOT_AVAILABLE', 'transcoding is not available; export as mp4 1080p to download directly', { // 403 提示降级方案
+          requested: { format: body.format, resolution: body.resolution }, // 回显请求的格式与分辨率
+        }); // 错误体结束
+      } // ffmpeg 可用性判断结束
+      downloadKey = await transcodeVideo(storage, ffmpegBin, originalKey, body.format, body.resolution); // 执行转码并返回新对象键
+      downloadMime = body.format === 'mov' ? 'video/quicktime' : 'video/mp4'; // mov 用 quicktime，其余按 mp4
+    } // 转码分支结束
+
+    // 2) 生成预签名下载 URL（有效期 1 小时）
+    const presigned = await storage.presignDownload({ // 调存储适配器生成下载签名
+      key: downloadKey, // 待下载的对象键（原片或转码产物）
+      mime: downloadMime, // 响应 Content-Type
+      expires_seconds: 3600, // 1 小时有效期，足够用户下载
+    }); // 预签名入参结束
+
+    res.json({ // 返回下载信息
+      film_id: film.id, // 成片 ID
+      version_no: versionRow.version_no, // 导出版本号
+      format: body.format, // 请求格式
+      resolution: body.resolution, // 请求分辨率
+      transcoded: !isOriginalFormat, // 是否经过转码
+      download_url: presigned.url, // 预签名下载地址
+      expires_at: presigned.expires_at, // 下载地址过期时间
+      method: presigned.method, // 请求方法（GET）
+      headers: presigned.headers, // 需携带的请求头
+    }); // 导出响应体结束
+  }); // 导出成片接口结束
 
   return router; // 交出子路由，由上层 app 挂载
 } // 工厂函数结束

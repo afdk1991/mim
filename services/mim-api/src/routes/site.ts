@@ -20,6 +20,7 @@ import { parse } from '../validate.js';
 import { pathParam } from '../utils.js';
 // 站点静态数据：分类、模块、zone 以及两个类型守卫
 import {
+  NODE_CAPABILITIES, // 按职责类型的能力清单，随 /site/nodes 一次返回
   SITE_CATEGORIES,
   SITE_MODULES,
   SITE_ZONES,
@@ -60,8 +61,12 @@ function present(module: SiteModule, zone?: SiteZoneId) {
     description: module.description,
     // https 入口地址，与 records 一一对应
     urls: records.map((r) => `https://${r.fqdn}`),
+    // 主域名（单 zone 下即第一条记录的 fqdn），供目录页直接展示域名映射
+    fqdn: records[0]?.fqdn ?? '', // 过滤后无记录时回落空串，避免 undefined 污染响应
     // 该模块在当前 zone 下的解析记录明细
     records,
+    // 可运行模块规格：路由键 / 双语导航名 / 职责 / 关联节点
+    node: module.node, // 与 site-nodes.ts 的 45 条规格一一对应
   };
 }
 
@@ -123,6 +128,25 @@ export function createSiteRouter(): Router {
       })),
     });
   });
+
+  /** GET /site/nodes — 站点目录：45 个可运行模块的完整规格（分类 / 路由 / 职责 / 域名映射） */
+  router.get('/site/nodes', (_req, res) => {
+    // 一次返回全量节点，前端据此生成 8 分类导航与 #/site/<key> 页面，无需逐节点请求
+    res.json({
+      // 节点总数（45）
+      total: SITE_MODULES.length, // 与 /site/overview 的 total 同源
+      // 8 个分类的有序定义（含双语名与该分类节点数）
+      categories: SITE_CATEGORIES.map((category) => ({ // 复用同一份分类真源
+        id: category.id, // 分类 id
+        name: category.name, // 双语名称
+        count: SITE_MODULES.filter((m) => m.category === category.id).length, // 分类内节点数
+      })), // 分类映射结束
+      // 按职责类型的能力清单，供节点页渲染「模块职责」分栏
+      capabilities: NODE_CAPABILITIES, // 键为 SiteNodeKind，值为双语能力数组
+      // 45 个节点完整信息：present 已含 fqdn / records / urls / node
+      items: SITE_MODULES.map((m) => present(m)), // 顺序与 DNSPod 备注一致
+    }); // 响应体结束
+  }); // /site/nodes 路由结束
 
   /** GET /site/modules — 组合过滤：zone / category / q */
   router.get('/site/modules', (req, res) => {
