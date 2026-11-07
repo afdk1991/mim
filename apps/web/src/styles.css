@@ -467,6 +467,18 @@ code { /* 行内代码/令牌展示 */
   font-size: 24px; /* 登录页标题更大，作为视觉入口 */
 } /* 登录标题结束 */
 
+.auth-notice { /* 全站门禁提示：登录卡片内的锁定 / 失效说明 */
+  margin: 0; /* 清掉默认段落外边距，间距交给卡片 gap */
+  padding: 10px 12px; /* 内边距形成独立提示块 */
+  border: 1px solid var(--border); /* 细边框与卡片风格一致 */
+  border-left: 3px solid var(--warning); /* 左侧强调条提示「当前受限」 */
+  border-radius: 8px; /* 小圆角，与验证码提示块统一 */
+  background: #fff8ec; /* 淡暖色底，区别于普通表单区 */
+  color: var(--warning); /* 警告色文字，保证可读性 */
+  font-size: 13px; /* 略小于正文，作为辅助说明 */
+  line-height: 1.5; /* 多行时保持舒适行距 */
+} /* 门禁提示结束 */
+
 .dev-code { /* 开发环境验证码展示块 */
   margin: 0; /* 清除默认外边距 */
   padding: 10px 12px; /* 内边距形成提示块 */
@@ -771,6 +783,26 @@ code { /* 行内代码/令牌展示 */
   gap: 12px; /* 最小间距 */
   font-size: 13px; /* 次要信息 */
 } /* 翻页结束 */
+
+/* ---------- 商城 ---------- */
+.store-detail { /* 模块卡片展开详情容器：承载状态区域、依赖链、价格历史三个小节 */
+  display: flex; /* 纵向排列小节 */
+  flex-direction: column; /* 自上而下：状态行 → 依赖链 → 价格历史 */
+  gap: 8px; /* 小节间紧凑间距 */
+  margin-top: 10px; /* 与操作行拉开距离，避免挤压按钮 */
+  padding: 12px; /* 详情区内留白 */
+  border: 1px solid var(--border); /* 细边框勾勒详情区边界 */
+  border-radius: 8px; /* 圆角略小于卡片，形成嵌套层次 */
+  background: var(--bg); /* 页面底色与白色卡片区分，提示这是卡片内的二级区域 */
+  font-size: 13px; /* 略小正文，详情为附属信息 */
+} /* 详情容器结束 */
+
+.store-detail-title { /* 详情区小节标题（依赖链 / 价格历史） */
+  margin: 0; /* 清除 p 默认外边距，间距交给父容器 gap */
+  font-size: 12px; /* 小字号弱化层级，不抢详情内容 */
+  font-weight: 600; /* 半粗保证作为小节锚点仍可辨识 */
+  color: var(--text-muted); /* 次要色表达「区块标签」而非正文 */
+} /* 小节标题结束 */
 
 @media (max-width: 760px) { /* 窄屏断点：平板竖屏与手机改用单列布局 */
   .layout { /* 整体布局在窄屏下 */

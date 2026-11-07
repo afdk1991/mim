@@ -563,3 +563,23 @@ describe('公开目录搜索（GET /modules?q=）', () => { // q 命中编码或
     expect(miss.body.modules.length).toBe(0); // 断言空结果
   }); // 结束搜索用例
 }); // 结束公开目录搜索分组
+
+describe('模块详情（GET /modules/:code）', () => { // 扁平响应：顶层即模块字段，price_history 必须含价格行 id 供管理端调价
+  it('详情返回 price_history 且每行带 id / currency / amount_minor / 时间窗口', async () => { // 管理端调价 UI 依赖价格行 id 调 PUT/DELETE /modules/prices/:id
+    const created = await request(app) // 先造一条价格行
+      .post('/api/v1/modules/comic.workbench/prices') // 新增价格端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ currency: 'CNY', amount_minor: 9900, effective_from: '2026-01-01T00:00:00.000Z' }); // 永久生效价格
+    expect(created.status).toBe(201); // 断言 201，价格行已创建
+    const priceId = created.body.price.id as string; // 记录价格行主键，稍后与详情对拍
+    const res = await request(app).get('/api/v1/modules/comic.workbench'); // 拉取公开详情
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.code).toBe('comic.workbench'); // 扁平响应：顶层即模块码，无 module 包裹层
+    expect(Array.isArray(res.body.price_history)).toBe(true); // 历史价格必须为数组
+    expect(res.body.price_history.length).toBe(1); // 当前仅一条价格行
+    expect(res.body.price_history[0].id).toBe(priceId); // 关键断言：价格行 id 必须透出，否则管理端无法调价
+    expect(res.body.price_history[0].amount_minor).toBe(9900); // 断言金额回显一致
+    expect(res.body.current_price.amount_minor).toBe(9900); // 当前生效价格同步断言
+  }); // 结束详情价格历史用例
+}); // 结束模块详情分组
+

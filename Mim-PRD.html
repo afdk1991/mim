@@ -631,7 +631,7 @@ function submitLogin(){
 <h4>FR-03.1 功能模块商城</h4>
 
 <!-- 目的 -->
-<p><strong>目的</strong>：用户可在商城中浏览模块、按 region 与币种查看定价，并通过<strong>一次性购买解锁</strong>（<code>unlock_mode=one_time</code>，唯一方式）获得模块使用权；服务端以 <code>Entitlement</code> 作为唯一鉴权依据，端上不得自行判断是否已购买。<span class="muted">原「订阅解锁」与「订单挂载模块 / 退款回收解锁」已于 2026-11-05 随 FR-02 下线；当前未实现在线支付，解锁由运营侧发放（后台规划中）。</span></p>
+<p><strong>目的</strong>：用户可在商城中浏览模块、按 region 与币种查看定价，并通过<strong>一次性购买解锁</strong>（<code>unlock_mode=one_time</code>，唯一方式）获得模块使用权；服务端以 <code>Entitlement</code> 作为唯一鉴权依据，端上不得自行判断是否已购买。<span class="muted">原「订阅解锁」与「订单挂载模块 / 退款回收解锁」已于 2026-11-05 随 FR-02 下线；当前未实现在线支付，解锁由运营侧经独立管理后台发放与回收（<code>apps/admin</code> 权益管理页，生产入口 <code>/admin/</code>，2026-11-08 已上线：权益列表过滤、发放、回收与审计事件时间线；同后台另含商城管理页，支持模块创建 / 编辑 / 状态流转 / 软删除与定价行 CRUD）。</span></p>
 
 <!-- 模块对象字段 -->
 <table>

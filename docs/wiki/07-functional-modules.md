@@ -121,7 +121,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 风控回收：Entitlement(revoked) → 通知「解锁已回收」
 ```
 
-> 原流程中的 `Order(pending) → 支付(FR-02) → Order(paid) → 同事务发放` 与 `Refund(executed) → Order(refunded) → Entitlement(revoked)` 两段已随支付/退款域于 2026-11-05 删除；`entitlements` 的发放写路径已由管理面补齐——`POST /entitlements/grant` 发放、`POST /entitlements/:id/revoke` 回收、`GET /modules` / `GET /modules/:code` 提供目录只读（见 §11.11）。
+> 原流程中的 `Order(pending) → 支付(FR-02) → Order(paid) → 同事务发放` 与 `Refund(executed) → Order(refunded) → Entitlement(revoked)` 两段已随支付/退款域于 2026-11-05 删除；`entitlements` 的发放写路径已由管理面补齐——`POST /entitlements/grant` 发放、`POST /entitlements/:id/revoke` 回收、`GET /modules` / `GET /modules/:code` 提供目录只读。**2026-11-08 管理面再补齐**：`GET /modules/manage`（含 draft/archived 全态）、`POST /modules`、`PATCH /modules/:code`、`DELETE /modules/:code`（软删除）、`GET /modules?q=` 目录搜索、`GET /entitlements` 列表与 `GET /entitlements/:id/events` 审计事件（见 §11.11）。
 
 **异常与边界**：
 - 前置依赖未满足：拒绝解锁并返回 `403` + 需先解锁的模块清单（通用错误语义，**不使用已不存在的 `MODULE_DEPENDENCY_UNMET` 错误码**）
@@ -313,10 +313,10 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 模块目录 / 详情 | **已实现（2026-11-07）**：`GET /modules`、`GET /modules/:code`（公开只读）；管理写路由 `PATCH /modules/:code/status`（`draft→active→archived` 单向状态机） | ✅ 契约测试 `test/catalog.test.ts`（18 例） | ✅ 已实现 |
-| 模块定价（region / 币种 / 有效期） | —（`module_prices` 表已建，无定价接口） | — | 🟡 仅建表 |
+| 模块目录 / 详情 / 搜索 | **已实现（2026-11-07 只读面）**：`GET /modules`（支持 `?q=` 名称/描述模糊搜索，2026-11-08）、`GET /modules/:code`（公开只读，详情含 `price_history` / `requires` / `current_price`）；**管理写面（2026-11-08）**：`GET /modules/manage`（`module:read`，含 draft/archived 全态 + 价格行 + 已解锁人数）、`POST /modules`、`PATCH /modules/:code`、`PATCH /modules/:code/status`（`draft→active→archived` 单向状态机）、`DELETE /modules/:code`（软删除） | C 端 `Store.tsx`（目录 / 搜索 / 详情面板 / 依赖缺失引导）；管理端 `Modules.tsx`（列表 / 创建 / 编辑 / 状态流转 / 软删除） | ✅ 已实现（契约测试 `test/catalog.test.ts` 41 例） |
+| 模块定价（region / 币种 / 有效期） | **已实现（2026-11-08）**：`POST /modules/:code/prices`（新增价格行）、`PUT /modules/prices/:id`（改价）、`DELETE /modules/prices/:id`（删价），均 `module:write` 鉴权 | 管理端 `Modules.tsx` 定价面板（逐模块价格行 CRUD） | ✅ 已实现（契约测试覆盖） |
 | ~~下单挂载模块~~ | —（原 `order_items` 设计随订单域于 2026-11-05 下线，**不建表**；解锁直接落 `entitlements`） | — | **已取消** |
-| 解锁发放 / 回收（Entitlement） | **已实现（2026-11-07）**：`POST /entitlements/grant`（发放，唯一索引兜底幂等）、`POST /entitlements/:id/revoke`（回收，写 `entitlement_events`）；到期由 `src/jobs.ts` 的 `runEntitlementExpiry` 定时扫描置 `expired` | ✅ 契约测试 `test/catalog.test.ts`（18 例）+ `test/jobs.test.ts`（9 例） | ✅ 已实现 |
+| 解锁发放 / 回收（Entitlement） | **已实现（2026-11-07）**：`POST /entitlements/grant`（发放，唯一索引兜底幂等）、`POST /entitlements/:id/revoke`（回收，写 `entitlement_events`）；到期由 `src/jobs.ts` 的 `runEntitlementExpiry` 定时扫描置 `expired`；**2026-11-08 补齐查询面**：`GET /entitlements`（`entitlement:read`，按用户/模块/状态过滤）、`GET /entitlements/:id/events`（发放/回收/到期审计事件）；C 端自助解锁 `POST /entitlements`（登录 + 幂等）与 `GET /me/entitlements` | 管理端 `Entitlements.tsx`（列表 / 过滤 / 发放 / 回收 / 事件时间线）；C 端 `Store.tsx`「我的权益」区块 | ✅ 已实现（契约测试 `test/catalog.test.ts` 41 例 + `test/jobs.test.ts` 9 例） |
 | 解锁鉴权（服务端唯一依据） | `requireEntitlement(moduleCode)` 中间件（`src/middleware.ts`） | — | ✅ 已落地 |
 | ~~退款触发解锁回收~~ | —（退款域已删除，**不再实现**；回收仅保留风控动作路径） | — | **已取消（2026-11-05）** |
 
@@ -342,7 +342,7 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 数据文件 | `services/mim-api/src/site.ts`（45 条 RAW + 8 分类 + 单 zone + `fqdnOf()`）、`src/site-nodes.ts`（45 行节点规格 + `routeKeyOf()` + `buildAndValidateNodeSpecs()` 完整性断言），纯静态常量，无数据库表 |
 | zone | 单 zone `mixm.top`：45 条主机记录，绝大多数为 A 记录，唯一例外 `gy` 为 CNAME；记录仅含 `zone / fqdn / record_type / ttl` 与可选备注 |
 | 分类（8） | 门户与入口 6 / 身份与权限 2 / 运营后台 8 / 接口与开发 5 / 内容与媒体 7 / 电商与交易 7 / 数据与存储 4 / 工具与服务 6（合计 45） |
-| 后端路由 | `routes/site.ts`：`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`（**4 条**，公开免鉴权，zod `strictObject` 校验，非法 zone/category → 400，未知 host → 404）；`/site/nodes` 一次返回 45 节点的路由 / 双语导航 / 职责 / 关联 / 能力清单 / 域名映射 |
+| 后端路由 | `routes/site.ts`：`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`（**4 条**，公开免鉴权，zod `strictObject` 校验，非法 zone/category → 400，未知 host → 404）；`/site/nodes` 一次返回 45 节点的路由 / 双语导航 / 职责 / 关联 / 能力清单 / 域名映射；接口本身仍为静态元数据公开只读，**自 2026-11-08 起前端访问纳入全站会话门禁** |
 | 前端路由 | 零依赖 hash 路由 `apps/web/src/router.ts`：`#/sitemap`（原始备注卡片）、`#/directory`（8 分类 / 45 节点目录）、`#/site/<key>`（45 个节点模块页，根域名 `@` 映射为 `root`）；刷新、前进后退与外链直达均可用 |
 | 前端页面 | `SiteMap.tsx`（45 卡片 +「进入模块」）、`SiteDirectory.tsx`（分类导航 + 搜索）、`SiteNodePage.tsx`（面包屑 / 5 个下属栏目导航 / 域名映射 / 站点地图原始条目 / 模块职责 / 关联节点 / 实时接口 / 前后翻页）；节点页时侧栏「站点目录」保持 active |
 | 节点下属条目 | 每节点逐项呈现：备注两段（label / description）、分类层级与目录序号、逐条解析记录（zone / fqdn / record_type / ttl）、逐条 HTTPS 入口、record 级覆盖备注（如 `gy`）、按职责类型的能力清单、关联节点 |

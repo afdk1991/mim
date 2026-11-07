@@ -40,7 +40,51 @@ export interface MeResponse { // GET /me 的响应包装，便于服务端后续
 // 通过构建期 VITE_API_ORIGIN 指向生产 API。
 const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, ''); // 读构建期变量并去掉尾部斜杠，避免拼出双斜杠
 const BASE = `${API_ORIGIN}/api/v1`; // 统一路径前缀，集中定义便于未来整体迁移
-const SESSION_KEY = 'mim.session.v1'; // 键名带版本号，便于结构升级时隔离旧数据
+export const SESSION_KEY = 'mim.session.v1'; // 键名带版本号，便于结构升级时隔离旧数据；静态门禁脚本共用此键
+// 会话变更事件名：登录 / 退出 / 令牌失效 / 跨标签页同步统一广播，App 据此锁定或解锁界面
+export const SESSION_CHANGED_EVENT = 'mim:session-changed'; // 单一事件源，避免多处状态各自判断
+// 会话变更原因：App 只对 expired 显示「登录状态已失效」提示
+export type SessionChangeReason = 'login' | 'refresh' | 'logout' | 'expired' | 'sync'; // 五类来源，覆盖全部入口
+
+// 校验会话结构：脏 localStorage 不能被视为已登录，避免门禁被伪造的空对象绕过
+export function isValidSession(value: unknown): value is Session { // 类型守卫，调用后可安全当作 Session 使用
+  // 非对象（null / 字符串 / 数组）一律不合法
+  if (!value || typeof value !== 'object') return false; // 先挡住最常见的脏数据
+  // 收窄为可选字段视图，逐项检查而不信任任何断言
+  const s = value as Partial<Session>; // 仅用于读取字段，不做完整类型假设
+  // 用户对象必须存在且带非空主键
+  const user = s.user as Partial<UserInfo> | undefined; // 用户资料可能被手工删掉
+  // 两个令牌与用户主键同时有效才算登录态，与静态门禁脚本保持同一口径
+  return typeof s.access_token === 'string' && s.access_token.length > 0 // 访问令牌必须非空
+    && typeof s.refresh_token === 'string' && s.refresh_token.length > 0 // 刷新令牌必须非空
+    && !!user && typeof user.id === 'string' && user.id.length > 0; // 用户主键必须非空
+} // isValidSession 结束
+
+// 派发会话变更事件：同步广播，保证调用方返回前界面状态已更新
+function emitSessionChange(session: Session | null, reason: SessionChangeReason): void { // detail 同时携带会话与原因
+  // 构建期 / 测试环境没有 window，直接跳过
+  if (typeof window === 'undefined') return; // 非浏览器环境无需广播
+  try { // 个别宿主环境缺少 CustomEvent 时不能阻断登录主流程
+    // detail 用扁平结构，App 侧读取成本低
+    window.dispatchEvent(new CustomEvent(SESSION_CHANGED_EVENT, { detail: { session, reason } })); // 同步派发
+  } catch { // 事件构造失败属于环境能力缺失
+    /* 广播失败不影响会话读写本身，App 仍可通过 storage 与主动调用同步 */
+  } // try/catch 结束
+} // emitSessionChange 结束
+
+// 解析并校验持久化的会话字符串：读失败 / 解析失败 / 结构不全都按未登录处理
+function parseSession(raw: string | null): Session | null { // 返回 null 即锁定
+  // 空值表示已退出或从未登录
+  if (!raw) return null; // 无需解析
+  try { // JSON.parse 对损坏数据会抛错
+    // 先按 unknown 解析，再由类型守卫收窄，避免直接断言
+    const parsed: unknown = JSON.parse(raw); // 只接受合法 JSON
+    // 结构完整才返回会话对象
+    return isValidSession(parsed) ? parsed : null; // 不完整即视为脏数据
+  } catch { // 解析异常
+    return null; // 统一按未登录处理
+  } // try/catch 结束
+} // parseSession 结束
 
 export class ApiError extends Error { // 统一错误类型，保留业务 code 与 HTTP 状态供页面分支处理
   readonly code: string; // 业务错误码（如 UNAUTHORIZED），供 i18n 查表
@@ -60,9 +104,9 @@ export class ApiError extends Error { // 统一错误类型，保留业务 code 
 
 function readSession(): Session | null { // 从 localStorage 恢复会话，供模块加载时初始化内存态
   try { // 隐私模式或数据损坏时 localStorage 可能抛错，必须兜住
-    const raw = localStorage.getItem(SESSION_KEY); // 读取持久化的 JSON 字符串
-    return raw ? (JSON.parse(raw) as Session) : null; // 有值才解析；断言因信任自身写入格式
-  } catch { // 解析失败视为无会话，避免整页崩溃
+    // 读取并统一走结构校验，脏数据不会让门禁误判为已登录
+    return parseSession(localStorage.getItem(SESSION_KEY)); // 有值才解析，失败返回 null
+  } catch { // 读取失败视为无会话，避免整页崩溃
     return null; // 返回 null 让调用方走未登录分支
   } // try/catch 结束
 } // readSession 结束
@@ -74,19 +118,60 @@ export function getSession(): Session | null { // 只读访问当前会话
   return current; // 直接返回内存引用，调用方不应修改
 } // getSession 结束
 
-export function setSession(session: Session): void { // 登录或刷新成功后写回会话
+export function setSession(session: Session, reason: SessionChangeReason = 'login'): void { // 登录或刷新成功后写回会话
   current = session; // 先更新内存，保证后续请求立刻生效
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session)); // 再落盘，保证刷新页面后仍保持登录
+  try { // 隐私模式下写盘可能抛错，不应阻断本次登录
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session)); // 再落盘，保证刷新页面后仍保持登录
+  } catch { // 写盘失败时内存态仍然有效
+    /* 本次会话保持可用，仅失去刷新后的持久登录 */
+  } // try/catch 结束
+  // 广播解锁：全站门禁据此从登录页切换到完整布局
+  emitSessionChange(session, reason); // 刷新令牌轮换时由调用方传 refresh
 } // setSession 结束
 
-export function clearSession(): void { // 登出或刷新失败时清空会话
+export function clearSession(reason: 'logout' | 'expired' = 'logout'): void { // 登出或令牌失效时清空会话
   current = null; // 清内存
-  localStorage.removeItem(SESSION_KEY); // 清持久化，防止下次启动复活旧令牌
+  try { // 隐私模式下移除可能抛错
+    localStorage.removeItem(SESSION_KEY); // 清持久化，防止下次启动复活旧令牌
+  } catch { // 移除失败不影响内存态
+    /* 内存已清空，界面仍会立即重新锁定 */
+  } // try/catch 结束
+  // 广播重新锁定：退出与失效走同一条路径，仅提示文案不同
+  emitSessionChange(null, reason); // expired 会让登录页显示重登提示
 } // clearSession 结束
+
+// 跨标签页同步：其它标签页登录或退出后，本标签页内存会话与界面必须立刻跟随
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') { // 仅浏览器环境注册
+  window.addEventListener('storage', (event: StorageEvent) => { // storage 事件只在其它标签页触发
+    // 只关心会话键，忽略无关设置项
+    if (event.key !== SESSION_KEY) return; // 其它键的交动不影响门禁
+    // 按新值重建内存会话（不回写 localStorage，避免事件循环）
+    current = parseSession(event.newValue); // 新值为 null 表示对方已退出
+    // 广播同步结果，App 据此解锁或重新锁定
+    emitSessionChange(current, 'sync'); // sync 原因保持默认锁定文案
+  }); // storage 监听结束
+} // 浏览器环境判断结束
 
 export function currentLocale(): Locale { // 派生当前界面语言
   return normalizeLocale(current?.user.locale); // 未登录时传 undefined，由 i18n 包回退默认语言
 } // currentLocale 结束
+
+// 启动静默校验：刷新或直接打开内部页面时，用 requireAuth 的 /me 确认本地会话仍在有效期
+export async function verifySession(): Promise<boolean> { // true 保持解锁，false 必须重新锁定
+  // 本地无有效会话时无需发请求
+  if (!current) return false; // 直接判定为锁定态
+  try { // 网络异常不应被误判成「登录失效」
+    // /me 受 requireAuth 保护：令牌过期先尝试 refresh，续期失败由 request 内部清理并广播
+    await request<MeResponse>('/me', { idempotency: false }); // 只读 GET，无需幂等键
+    // 成功即会话有效（可能已被静默续期换成新令牌）
+    return Boolean(current); // 以最新内存态为准
+  } catch (err) { // 统一错误对象
+    // 401 且续期失败：request 已清理会话并广播，这里只做兜底确认
+    if (err instanceof ApiError && err.status === 401) return false; // 明确失效
+    // 断网 / 5xx / 网关异常等不确定状态：保持解锁，避免误伤正常在线用户
+    return true; // 等下一次真实业务请求再判定
+  } // try/catch 结束
+} // verifySession 结束
 
 function newKey(): string { // 生成幂等键，服务端据此去重重复提交
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') { // 优先用原生 UUID，熵高且几乎无碰撞
@@ -116,7 +201,7 @@ async function refreshSession(): Promise<boolean> { // 用 refresh_token 换新 
         }); // fetch 调用结束
         if (!res.ok) return false; // 刷新失败（如令牌过期）交由调用方清理会话
         const data = (await res.json()) as LoginResult; // 解析新会话，字段由服务端保证完整
-        setSession({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user }); // 覆盖写回：refresh_token 已轮换，必须同步更新
+        setSession({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user }, 'refresh'); // 覆盖写回：refresh_token 已轮换，必须同步更新
         return true; // 刷新成功
       } catch { // 网络中断或 JSON 解析失败
         return false; // 统一按失败处理
@@ -150,7 +235,7 @@ async function request<T>(path: string, opts: RequestOptions = {}, retried = fal
     if (await refreshSession()) { // 续期成功
       return request<T>(path, { ...opts, idempotency: key ?? false }, true); // 透传原幂等键重放一次，标记 retried 防止无限递归
     } // 续期成功分支结束
-    clearSession(); // 续期失败说明登录态彻底失效，清理本地会话
+    clearSession('expired'); // 续期失败说明登录态彻底失效，清理会话并广播重新锁定
   } // 401 处理结束
 
   const text = await res.text(); // 先读文本再决定解析方式，兼容空响应与非 JSON 响应
@@ -560,7 +645,9 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   // ---------- 功能模块商城（catalog）----------
 
   catalog: { // 模块商城：模块列表、详情、解锁、我的权益
-    getModules() { // 拉取全部可购买模块
+    getModules(opts: { q?: string } = {}) { // 拉取可购买模块；支持关键词过滤（后端按名称/编码模糊匹配）
+      // 拼接查询串：仅在有非空关键词时携带 q，避免空参数污染缓存键
+      const suffix = opts.q ? `?q=${encodeURIComponent(opts.q)}` : ''; // 关键词经编码防注入
       return request<{ // 响应为模块数组包装
         modules: Array<{ // 模块条目列表
           code: string; // 模块唯一编码，下单与解锁都用它
@@ -572,7 +659,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
           requires: string[]; // 前置依赖模块编码，前端据此提示
           current_price: { currency: string; amount_minor: number } | null; // 当前价格；未定价为 null
         }>; // 模块条目类型结束
-      }>('/modules', { auth: false, idempotency: false }); // 公开目录接口，免鉴权、只读无需幂等键
+      }>(`/modules${suffix}`, { auth: false, idempotency: false }); // 公开目录接口，免鉴权、只读无需幂等键
     }, // getModules 结束
     getModule(code: string) { // 拉取单个模块详情
       return request<{ // 详情比列表多价格历史

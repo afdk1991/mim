@@ -91,6 +91,8 @@ interface RequestOptions {
   body?: unknown;
   // 本次请求所用凭证；显式传 null 表示匿名请求
   credential?: Credential | null;
+  // 附加自定义请求头（如管理端区域通道 x-region），在凭证注入后合并以避免覆盖认证头
+  headers?: Record<string, string>;
 }
 
 /** 把任意异常转成可读文案：ApiError 取 message，其余兜底字符串化 */
@@ -116,6 +118,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   } else if (options.credential?.kind === 'bearer') {
     // 标准 Bearer 方案
     headers.Authorization = `Bearer ${options.credential.value}`;
+  }
+  // 合并调用方自定义头：放在凭证注入之后，但不允许覆盖认证头，防止误把身份写丢
+  if (options.headers) {
+    // 逐个键合并
+    for (const [key, value] of Object.entries(options.headers)) {
+      // 跳过认证相关头，避免自定义头把凭证顶掉
+      if (key.toLowerCase() === 'authorization' || key.toLowerCase() === 'x-admin-token') continue;
+      // 写入其余自定义头
+      headers[key] = value;
+    }
   }
   // 发起请求
   const response = await fetch(`${BASE}${path}`, {
@@ -466,7 +478,7 @@ export interface ModuleView {
   name: Record<string, string>;
   // 多语言简介
   summary: Record<string, string>;
-  // 解锁方式 free / paid / entitlement
+  // 解锁方式（当前仅 one_time 一次性买断，见 schema.sql 的 CHECK 约束）
   unlock_mode: string;
   // 所属地区
   region: string;
@@ -505,6 +517,225 @@ export async function updateModuleStatus(
   );
   // 解包模块
   return data.module;
+}
+
+/** 管理端模块视图：在公开视图基础上补排序权重与时间戳 */
+export interface ModuleManageView extends ModuleView {
+  // 展示排序权重
+  sort_order: number;
+  // 创建时间
+  created_at: string;
+  // 更新时间
+  updated_at: string;
+}
+
+/** 价格行视图：与 module_prices 表结构对齐 */
+export interface ModulePrice {
+  // 价格行主键，调价（PUT/DELETE /modules/prices/:id）必须携带
+  id: string;
+  // 币种（CNY/USD）
+  currency: string;
+  // 金额最小单位，避免浮点误差
+  amount_minor: number;
+  // 生效起始时间
+  effective_from: string;
+  // 生效结束时间，null 表示长期有效
+  effective_to: string | null;
+}
+
+/** 模块详情：公开详情端点为扁平响应（顶层即模块字段，无 module 包裹层） */
+export interface ModuleDetail extends ModuleView {
+  // 展示排序权重
+  sort_order: number;
+  // 创建时间
+  created_at: string;
+  // 更新时间
+  updated_at: string;
+  // 全部历史价格（按生效时间倒序），供调价轨迹展示与管理端调价
+  price_history: ModulePrice[];
+}
+
+/** 管理端模块全量列表：含 draft/archived，支持 q/status 过滤；区域走 x-region 头 */
+export async function listModulesManage(
+  credential: Credential,
+  query: { q?: string; status?: ModuleStatus; region?: string } = {},
+): Promise<ModuleManageView[]> {
+  // 组装查询串，空值不写入避免后端把空串当条件
+  const params = new URLSearchParams();
+  // 关键字（编码/名称包含匹配）
+  if (query.q) params.set('q', query.q);
+  // 状态过滤
+  if (query.status) params.set('status', query.status);
+  // 拼接查询串：无参数时不带问号
+  const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
+  // 区域缺省 cn，与后端缺省保持一致
+  const region = query.region ?? 'cn';
+  // 响应包裹 { modules, total }；后端该端点只读 x-region 头，故走自定义头通道
+  const data = await request<{ modules: ModuleManageView[]; total: number }>(`/modules/manage${suffix}`, {
+    // 携带凭证
+    credential,
+    // 区域通道头
+    headers: { 'x-region': region },
+  });
+  // 返回模块数组
+  return data.modules;
+}
+
+/** 模块详情：扁平响应，直接返回顶层对象 */
+export function getModule(credential: Credential, code: string, region?: string): Promise<ModuleDetail> {
+  // 区域仅作请求头，不影响路径
+  return request<ModuleDetail>(`/modules/${encodeURIComponent(code)}`, {
+    // 携带凭证
+    credential,
+    // 显式区域头，缺省时由后端按登录用户地区兜底
+    headers: region ? { 'x-region': region } : undefined,
+  });
+}
+
+/** 新建模块的入参：code 区域内唯一，默认落 draft */
+export interface ModuleCreatePayload {
+  // 模块编码，小写字母数字开头，可含 . _ -
+  code: string;
+  // 多语言名称
+  name: Record<string, string>;
+  // 多语言简介，选填
+  summary?: Record<string, string>;
+  // 所属地区，默认 cn
+  region?: string;
+  // 展示排序权重，选填
+  sort_order?: number;
+  // 前置依赖模块码，选填
+  requires?: string[];
+}
+
+/** 新建模块：成功返回 201 与完整模块视图 */
+export async function createModule(credential: Credential, payload: ModuleCreatePayload): Promise<ModuleManageView> {
+  // POST /modules，响应包裹 { module }
+  const data = await request<{ module: ModuleManageView }>('/modules', { method: 'POST', body: payload, credential });
+  // 解包模块
+  return data.module;
+}
+
+/** 编辑模块的入参：仅文案/排序/依赖可改，状态走 /status 路由 */
+export interface ModuleUpdatePayload {
+  // 多语言名称，选填
+  name?: Record<string, string>;
+  // 多语言简介，选填
+  summary?: Record<string, string>;
+  // 展示排序权重，选填
+  sort_order?: number;
+  // 前置依赖模块码，选填
+  requires?: string[];
+  // 区域仅用于定位模块行，不参与更新
+  region?: string;
+}
+
+/** 编辑模块：成功返回 200 与更新后的模块视图 */
+export async function updateModule(
+  credential: Credential,
+  code: string,
+  payload: ModuleUpdatePayload,
+): Promise<ModuleManageView> {
+  // PATCH 指定模块，响应包裹 { module }
+  const data = await request<{ module: ModuleManageView }>(`/modules/${encodeURIComponent(code)}`, {
+    // 局部更新
+    method: 'PATCH',
+    // 请求体
+    body: payload,
+    // 携带凭证
+    credential,
+  });
+  // 解包模块
+  return data.module;
+}
+
+/** 软删除模块：active 须先归档；重复删除后端回放 200 */
+export async function deleteModule(
+  credential: Credential,
+  code: string,
+  region?: string,
+): Promise<{ code: string; region: string; deleted: boolean; deleted_at: string }> {
+  // 区域走查询串，与后端 query>header>cn 的解析顺序对齐
+  const suffix = region ? `?region=${encodeURIComponent(region)}` : '';
+  // DELETE 无请求体；响应包裹 { module: { code, region, deleted, deleted_at } }
+  const data = await request<{ module: { code: string; region: string; deleted: boolean; deleted_at: string } }>(
+    // 目标路径
+    `/modules/${encodeURIComponent(code)}${suffix}`,
+    // 删除方法 + 凭证
+    { method: 'DELETE', credential },
+  );
+  // 解包模块删除回执
+  return data.module;
+}
+
+/** 新增价格行的入参：按时间窗口生效，支持多币种 */
+export interface ModulePricePayload {
+  // 币种（CNY/USD）
+  currency: string;
+  // 金额最小单位
+  amount_minor: number;
+  // 生效起始时间（ISO 字符串），缺省表示立即生效
+  effective_from?: string;
+  // 生效结束时间（ISO 字符串），缺省表示长期有效
+  effective_to?: string;
+}
+
+/** 新增价格行：成功返回 201 与价格行（含 module_code）；region 走 x-region 头定位模块 */
+export async function createModulePrice(
+  credential: Credential,
+  code: string,
+  payload: ModulePricePayload,
+  region?: string,
+): Promise<ModulePrice> {
+  // POST 到模块价格集合，响应包裹 { price }
+  const data = await request<{ price: ModulePrice }>(`/modules/${encodeURIComponent(code)}/prices`, {
+    // 新增语义
+    method: 'POST',
+    // 请求体
+    body: payload,
+    // 携带凭证
+    credential,
+    // 区域定位头：缺省时后端按 cn 兜底
+    headers: region ? { 'x-region': region } : undefined,
+  });
+  // 解包价格行
+  return data.price;
+}
+
+/** 更新价格行：金额、币种、生效窗口均可改；effective_to 传 null 表示转为长期有效 */
+export async function updateModulePrice(
+  credential: Credential,
+  priceId: string,
+  // 先从 Partial 中剔除 effective_to 再以可空类型覆盖：直接交集会把 null 收窄掉
+  payload: Partial<Omit<ModulePricePayload, 'effective_to'>> & { effective_to?: string | null },
+): Promise<ModulePrice> {
+  // PUT 精确到价格行，响应包裹 { price }（注意后端回显的是 module_id 而非 module_code）
+  const data = await request<{ price: ModulePrice }>(`/modules/prices/${encodeURIComponent(priceId)}`, {
+    // 覆盖更新
+    method: 'PUT',
+    // 请求体
+    body: payload,
+    // 携带凭证
+    credential,
+  });
+  // 解包价格行
+  return data.price;
+}
+
+/** 使价格行立即失效：后端软失效 effective_to = now，保留历史留痕；不存在或已过期返回 404 */
+export async function deleteModulePrice(
+  credential: Credential,
+  priceId: string,
+): Promise<{ id: string; effective_to: string; expired: boolean }> {
+  // DELETE 无请求体，响应包裹 { price: { id, effective_to, expired } }
+  const data = await request<{ price: { id: string; effective_to: string; expired: boolean } }>(
+    // 目标路径精确到价格行
+    `/modules/prices/${encodeURIComponent(priceId)}`,
+    // 删除方法 + 凭证
+    { method: 'DELETE', credential },
+  );
+  // 解包价格行失效回执
+  return data.price;
 }
 
 /** 权益视图 */
@@ -558,4 +789,78 @@ export async function revokeEntitlement(
   );
   // 解包权益
   return data.entitlement;
+}
+
+/** 权益列表行：在权益视图基础上补模块多语言名、区域与更新时间 */
+export interface EntitlementListRow extends EntitlementView {
+  // 模块多语言名称（用于列表展示，避免二次查模块表）
+  module_name: Record<string, string>;
+  // 所属区域
+  region: string;
+  // 更新时间
+  updated_at: string;
+}
+
+/** 权益列表分页结果 */
+export interface EntitlementListPage {
+  // 当前页权益
+  entitlements: EntitlementListRow[];
+  // 匹配总数
+  total: number;
+  // 每页条数
+  limit: number;
+  // 偏移量
+  offset: number;
+}
+
+/** 分页查询权益：q 匹配用户 ID / 模块码；status 过滤；region 留空表示跨区域 */
+export function listEntitlements(
+  credential: Credential,
+  query: { q?: string; status?: 'active' | 'expired' | 'revoked'; region?: string; limit?: number; offset?: number } = {},
+): Promise<EntitlementListPage> {
+  // 组装查询串，空值不写入避免后端把空串当条件
+  const params = new URLSearchParams();
+  // 关键字
+  if (query.q) params.set('q', query.q);
+  // 状态过滤
+  if (query.status) params.set('status', query.status);
+  // 区域过滤：仅在显式给出时写入，缺省由后端按跨区域处理
+  if (query.region) params.set('region', query.region);
+  // 每页条数
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  // 偏移量
+  if (query.offset !== undefined) params.set('offset', String(query.offset));
+  // 拼接查询串：无参数时不带问号
+  const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
+  // 发起请求，响应已是分页信封
+  return request<EntitlementListPage>(`/entitlements${suffix}`, { credential });
+}
+
+/** 权益审计事件视图 */
+export interface EntitlementEventView {
+  // 事件主键
+  id: string;
+  // 源状态，首次发放为 null
+  from_status: string | null;
+  // 目标状态
+  to_status: string;
+  // 事件原因，无则为 null
+  reason: string | null;
+  // 操作者（admin / system / user）
+  actor: string;
+  // 事件时间
+  created_at: string;
+}
+
+/** 查询某权益的状态流转审计事件（按写入顺序升序） */
+export async function listEntitlementEvents(credential: Credential, entitlementId: string): Promise<EntitlementEventView[]> {
+  // 响应包裹 { events }
+  const data = await request<{ events: EntitlementEventView[] }>(
+    // 目标路径
+    `/entitlements/${encodeURIComponent(entitlementId)}/events`,
+    // 携带凭证
+    { credential },
+  );
+  // 返回事件数组
+  return data.events;
 }

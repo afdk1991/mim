@@ -67,12 +67,12 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 站内采用零依赖 hash 路由（[router.ts](./apps/web/src/router.ts)）：`#/store`、`#/comic`、`#/sitemap`、`#/directory`、`#/settings`、`#/login`，以及站点地图 45 个节点各自的 `#/site/<key>`（根域名 `@` 映射为 `#/site/root`）；刷新、前进后退与外链直达均可用。视图由 [App.tsx](./apps/web/src/App.tsx) 按 hash 渲染，节点页时侧栏「站点目录」保持高亮。**全站会话门禁（2026-11-08 起）**：未登录时无论从首页、刷新还是直接访问任意内部 `#/` 路由，均只渲染整屏登录页，不渲染侧栏、导航或任何业务内容，也不发起业务接口请求；登录成功后解除锁定并开放全部视图与 45 个节点页（除 `#/login` 中转外原地解锁、保留原目标 hash）；退出登录、令牌失效或跨标签页退出时立即重新锁定。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)，静态文档入口（`site/*.html`、`Mim-PRD.html`）同样内置同源会话门禁。45 节点的层级 / 路由 / 域名映射逐项清单见 [08-dev-implementation.md §2.1](./docs/wiki/08-dev-implementation.md)。
 
-独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 模块状态流转 / 权益发放与回收。
+独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ 权益管理（列表过滤、发放、回收、审计事件时间线）。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
 | 登录 | `Login.tsx` | 全站唯一登录入口；管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login`；顶部展示「全站已锁定 / 登录状态已失效」提示 |
-| 功能模块 | `Store.tsx` | 解锁后才可访问的模块目录浏览与一次性解锁（`/modules`、`/entitlements`、`/me/entitlements`） |
+| 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：目录浏览与 `?q=` 搜索、模块详情面板（能力说明 / 当前价 / 历史调价 `price_history` / 前置依赖链）、一次性解锁（`POST /entitlements`）、「我的权益」区块（`GET /me/entitlements`）、前置依赖缺失时的引导提示（`/modules`、`/modules/:code`、`/entitlements`、`/me/entitlements`） |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
 | 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`），每张卡片提供「进入模块」入口；仅解锁后可达 |
 | 站点目录 | `SiteDirectory.tsx` | 8 分类 / 45 个可运行节点的分类导航与搜索，节点入口统一为 `#/site/<key>` |
@@ -86,8 +86,10 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 |---|---|---|
 | 健康 | `GET /health` | 公开 |
 | 鉴权 | `POST /auth/code`、`/auth/login`、`/auth/password`、`/auth/refresh`、`/auth/logout` | 公开（`logout` 需登录） |
-| 商城 | `GET /modules`、`GET /modules/:code` | 公开 |
+| 商城 | `GET /modules`（支持 `?q=` 搜索）、`GET /modules/:code`（详情含价格历史与前置依赖） | 公开 |
 | 权益 | `POST /entitlements`、`GET /me/entitlements` | 登录 + 幂等 |
+| 商城管理 | `GET /modules/manage`、`POST /modules`、`PATCH /modules/:code`、`PATCH /modules/:code/status`、`DELETE /modules/:code`、`POST /modules/:code/prices`、`PUT/DELETE /modules/prices/:id` | Bearer + `module:read` / `module:write` |
+| 权益管理 | `GET /entitlements`、`GET /entitlements/:id/events`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke` | Bearer + `entitlement:read` / `entitlement:grant` / `entitlement:revoke` |
 | 账号 | `GET /me`、`PATCH /me`、`POST /me/deletion`、`POST /me/cancel-deletion` | 登录 |
 | 漫剧工程 | `GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/{storyboard,characters,suggest}` | 登录 |
 | 生成任务 | `GET/POST /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}` | 登录 |

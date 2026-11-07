@@ -61,12 +61,13 @@ function activePrice(db: Db, moduleId: string, now: string) { // 查询模块在
 function listPrices(db: Db, moduleId: string) { // 列出模块全部历史价格，供详情页展示调价轨迹
   return db // 链式查询起点
     .prepare( // 预编译查询，按生效时间倒序
-      `SELECT currency, amount_minor, effective_from, effective_to
+      `SELECT id, currency, amount_minor, effective_from, effective_to
        FROM module_prices
        WHERE module_id = ?
        ORDER BY effective_from DESC`,
     ) // 结束预编译
     .all(moduleId) as Array<{ // 取回全部行并声明结果类型
+    id: string; // 价格行主键，管理端调价（PUT/DELETE /modules/prices/:id）必须携带
     currency: string; // 币种（CNY/USD）
     amount_minor: number; // 金额最小单位，避免浮点误差
     effective_from: string; // 生效起始时间
