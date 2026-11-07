@@ -1,0 +1,4 @@
+# Cloudflare Pages / EdgeOne Pages 的 SPA 回退规则：所有未命中静态文件的路径都返回 index.html（状态 200）
+# 让 /store、/comic、/chat、/settings、/login 等单段深链接直达时仍能加载前端应用
+# 注意：已存在的静态文件（assets、spa.js 等）优先于本规则，不会被回退覆盖
+/*    /index.html   200

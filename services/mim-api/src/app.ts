@@ -5,7 +5,6 @@ import cors from 'cors'; // 跨域中间件，托管平台以独立域名直连 
 import type { Express, NextFunction, Request, Response } from 'express'; // 仅类型引用，用于给工厂与中间件签名标注
 import { createAuthRouter } from './routes/auth.js'; // 公开鉴权路由：验证码 / 登录 / 刷新
 import { createCatalogRouter } from './routes/catalog.js'; // 商城路由：模块列表公开，权益接口内部鉴权
-import { createSiteRouter } from './routes/site.js'; // 站点模块地图，全量公开只读
 import { createImRouter } from './routes/im.js'; // 即时通讯：会话/消息/用户搜索，需登录
 import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内部统一 requireAuth
 import { createComicRouter } from './routes/comic.js'; // 创作工程与分镜，内部统一 requireAuth
@@ -66,9 +65,6 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 
   // 商城路由：GET /modules 公开；POST /entitlements + GET /me/entitlements 内部 requireAuth
   app.use('/api/v1', createCatalogRouter(resolved)); // 公开与受保护端点混装，鉴权下沉到 router 内部按路径处理
-
-  // 站点模块地图（DNSPod 备注结构化）：全量公开只读
-  app.use('/api/v1', createSiteRouter()); // 纯静态数据，无需依赖注入，故不传 resolved
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配

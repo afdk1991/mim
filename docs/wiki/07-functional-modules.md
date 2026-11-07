@@ -333,7 +333,9 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
 | 导出成片 | —（规划导出任务 + 对象存储预签名下载） | — | ❌ 0 代码 |
 
-### 11.13 站点模块地图（DNSPod 备注结构化 → 45 个可运行节点，2026-11-08）
+### 11.13 站点模块地图（DNSPod 备注结构化 → 45 个可运行节点，2026-11-08，已下线）
+
+> **已下线（2026-11-08）**：站点体系（站点地图 / 站点目录 / 45 节点页 + 后端 site 域 4 条路由）整体下线，前端仅在功能模块商城顶部保留 www 主站入口卡片；以下内容为历史留痕，不再对应现存代码。
 
 > 数据源：仓库根 `dnspod_records_2026-11-05_21-42-26.xls`（DNSPod 导出，2026-11-05）的**「备注」列**。原始表 197 行 = `laal.top` sheet 93 行 + `mixm.top` sheet 104 行，其中 180 行带备注；取单一 zone `mixm.top` 的短主机记录后为 **45 条站点模块**（45 条 FQDN 重复行已按 host 合并）。2026-11-08 起每条模块都对应一个可运行页面 / 路由 / 导航 / 职责与域名映射，真源为 `src/site.ts` + `src/site-nodes.ts`；解析目标（IP / CNAME 目标值）不对外暴露。
 
@@ -342,16 +344,16 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 数据文件 | `services/mim-api/src/site.ts`（45 条 RAW + 8 分类 + 单 zone + `fqdnOf()`）、`src/site-nodes.ts`（45 行节点规格 + `routeKeyOf()` + `buildAndValidateNodeSpecs()` 完整性断言），纯静态常量，无数据库表 |
 | zone | 单 zone `mixm.top`：45 条主机记录，绝大多数为 A 记录，唯一例外 `gy` 为 CNAME；记录仅含 `zone / fqdn / record_type / ttl` 与可选备注 |
 | 分类（8） | 门户与入口 6 / 身份与权限 2 / 运营后台 8 / 接口与开发 5 / 内容与媒体 7 / 电商与交易 7 / 数据与存储 4 / 工具与服务 6（合计 45） |
-| 后端路由 | `routes/site.ts`：`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`（**4 条**，公开免鉴权，zod `strictObject` 校验，非法 zone/category → 400，未知 host → 404）；`/site/nodes` 一次返回 45 节点的路由 / 双语导航 / 职责 / 关联 / 能力清单 / 域名映射；接口本身仍为静态元数据公开只读，**自 2026-11-08 起前端访问纳入全站会话门禁** |
-| 前端路由 | 零依赖 hash 路由 `apps/web/src/router.ts`：`#/sitemap`（原始备注卡片）、`#/directory`（8 分类 / 45 节点目录）、`#/site/<key>`（45 个节点模块页，根域名 `@` 映射为 `root`）；刷新、前进后退与外链直达均可用 |
-| 前端页面 | `SiteMap.tsx`（45 卡片 +「进入模块」）、`SiteDirectory.tsx`（分类导航 + 搜索）、`SiteNodePage.tsx`（面包屑 / 5 个下属栏目导航 / 域名映射 / 站点地图原始条目 / 模块职责 / 关联节点 / 实时接口 / 前后翻页）；节点页时侧栏「站点目录」保持 active |
+| 后端路由 | **已删除（2026-11-08）**：`routes/site.ts` 与 4 条公开路由（`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`）整体移除，请求现返回 404 |
+| 前端路由 | **已删除（2026-11-08）**：`#/sitemap`、`#/directory` 与 45 个 `#/site/<key>` 路由从 `apps/web/src/router.ts` 移除；现存 hash 为 `#/store`、`#/comic`、`#/chat`、`#/settings`、`#/login` |
+| 前端页面 | **已删除（2026-11-08）**：`SiteMap.tsx` / `SiteDirectory.tsx` / `SiteNodePage.tsx` 三个视图组件整体移除；仅保留功能模块商城 `Store.tsx` 顶部的 www 主站入口静态卡片（新窗口打开 `https://www.mixm.top`，不请求接口） |
 | 节点下属条目 | 每节点逐项呈现：备注两段（label / description）、分类层级与目录序号、逐条解析记录（zone / fqdn / record_type / ttl）、逐条 HTTPS 入口、record 级覆盖备注（如 `gy`）、按职责类型的能力清单、关联节点 |
 | 搜索覆盖 | `q` 命中 host / label / description / FQDN / record 级备注（例如 `q=疾风引擎` 命中 `gy`）；目录页另支持导航名 / 职责检索 |
 | 域名 / 路径映射 | `fqdnOf()` 统一生成 `https://<host>.mixm.top`（根记录为 `https://mixm.top`）；生产 nginx 仅服务 `mim.mixm.top`，不加通配 `server_name`，45 子域由各自服务承载（见 `deploy/nginx-mim.conf` 注释） |
 | 测试 | `test/site.test.ts` 7 例 + `test/site-nodes.test.ts` 11 例（45 节点计数 / 分类分布 / 规格完整 / 域名映射 / 路由唯一 / 关联不悬空 / 能力清单 / 备注与记录条目 / 冲突映射 / 两接口同源） |
-| 状态 | ✅ 45 个模块及下属条目全部实现为可运行页面（无数据库表、无迁移、无新增第三方依赖） |
+| 状态 | ❌ 已于 2026-11-08 整体下线：前后端代码、4 条公开路由与两份测试文件全部删除；前端仅保留商城页顶部 www 主站入口卡片 |
 
-#### 11.13.1 映射调整结论（站点地图 ↔ 现有实现）
+#### 11.13.1 映射调整结论（站点地图 ↔ 现有实现）（历史留痕，对应实现已于 2026-11-08 删除）
 
 | 现象 | 调整结论 | 落地位置 |
 |---|---|---|

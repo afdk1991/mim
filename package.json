@@ -20,6 +20,7 @@
     "check:version": "node scripts/version-check.mjs",
     "check:env": "node scripts/env-check.mjs",
     "check:comments": "node scripts/comment-check.mjs",
+    "verify:auth-gate": "node scripts/verify-auth-gate.mjs",
     "check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs"
   },
   "engines": {

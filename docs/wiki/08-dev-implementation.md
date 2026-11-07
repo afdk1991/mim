@@ -71,75 +71,15 @@
 | `openapi` | 开放平台：OAuth2、API Key、Webhook 投递、限流 | `/open/*` | gateway | 分库 |
 | `admin-api` | **（已落地，2026-11-07）** 运营后台 BFF：RBAC 角色/权限/用户角色管理与 `GET /admin/me` 权限自省，实现在 `services/mim-api/src/routes/admin.ts`（**同进程路由，非独立服务**），共 11 个端点；独立前端 `apps/admin` 生产入口 `/admin/`；审计埋点仍下线 | `/admin/*` | catalog 库（当前 SQLite 单库） | 单库 |
 | `jobs` | **（已落地，2026-11-07）** `src/jobs.ts` 提供三个定时任务（成本告警 / 成片审核超时 / 权益到期扫描）+ `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`）做抢占与结算；`index.ts` 按 `MIM_JOBS_ENABLED`（默认开）装配并在优雅退出时 `stop()`（见 §8） | 无 HTTP | 全部域库（当前仅 SQLite 单库） | 双区各一套 |
-| `site` | **（已落地并升级，2026-11-08）** 站点模块地图：把 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列结构化为**单 zone `mixm.top` × 8 分类 × 45 个可运行节点**，纯静态常量（`src/site.ts` + `src/site-nodes.ts`，后者提供 45 条路由 / 双语导航 / 职责 / 关联规格与完整性断言），**无数据表、无迁移、无新增第三方依赖**；前端 `views/SiteMap.tsx`（45 卡片）、`views/SiteDirectory.tsx`（8 分类导航）、`views/SiteNodePage.tsx`（45 个节点模块页 + 下属栏目）、零依赖 hash 路由 `src/router.ts`；逐节点清单见本页 §2.1 | `/site/overview`、`/site/modules`、`/site/modules/:host`、`/site/nodes`（公开免鉴权，4 条；前端访问自 2026-11-08 起纳入全站会话门禁） | 无 | 不分库（多区共用同一份解析数据） |
+| `site` | **（已删除，2026-11-08）** 站点模块地图（DNSPod 备注结构化的 45 节点）前后端整体下线：`src/site.ts` / `src/site-nodes.ts` / `routes/site.ts` 与前端 `SiteMap.tsx` / `SiteDirectory.tsx` / `SiteNodePage.tsx` 均已移除；www 主站入口以静态卡片保留在功能模块商城页顶部；历史清单见本页 §2.1 | 无（原 `/site/overview`、`/site/modules`、`/site/modules/:host`、`/site/nodes` 4 条均已删除，请求返回 404） | 无 | 不分库（多区共用同一份解析数据） |
 
-服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `catalog` / `site` / `me` / `comic` / `media` / `ai` / `admin`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
+服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `catalog` / `me` / `comic` / `media` / `ai` / `im` / `admin`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
 
 各服务所需的第三方提供方、SDK/API 形态与密钥命名见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)；密钥按 region 独立、不入库，仅存环境变量或 KMS。
 
-### 2.1 站点地图 45 个可运行节点（逐项清单，2026-11-08）
+### 2.1 站点地图 45 个可运行节点（已于 2026-11-08 整体下线，历史留痕）
 
-> **访问门禁（2026-11-08）**：本表 45 个路由与「站点地图 / 站点目录」入口均位于全站会话门禁之后；未登录时刷新或直接访问任意 `#/site/<key>` 只会看到整屏登录页，登录成功后逐项可达。
-
-> 数据源：`GET /api/v1/site/nodes`（本轮真实 HTTP 取证，`total=45`）。层级路径按站点地图的 8 分类组织；
-> 每个节点的「导航入口」统一为侧栏「站点目录」分类卡片 + 「站点地图」卡片「进入模块」+ 节点页关联节点/前后翻页；
-> 域名/路径映射由 `fqdnOf()` 单一真源生成，生产 nginx 仅服务 `mim.mixm.top`，45 子域由各自服务承载。
-
-| 层级路径 | 名称 | 路由 | 导航入口 | 模块职责 | 域名/路径映射 | 状态 |
-|---|---|---|---|---|---|---|
-| 站点地图 / 门户与入口 / @ | 统一门户 | `#/site/root` | 目录·门户与入口；卡片·进入模块 | 根域名统一跳转，按终端分流到主站与移动端 | `https://mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 门户与入口 / www | 官方网站 | `#/site/www` | 目录·门户与入口；卡片·进入模块 | 承载官方门户首页与品牌信息 | `https://www.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 门户与入口 / portal | 统一工作台 | `#/site/portal` | 目录·门户与入口；卡片·进入模块 | 企业内部统一门户与员工工作台 | `https://portal.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 门户与入口 / m | 移动精简版 | `#/site/m` | 目录·门户与入口；卡片·进入模块 | 移动端 H5 精简版官网 | `https://m.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 门户与入口 / mobile | 移动端全功能 | `#/site/mobile` | 目录·门户与入口；卡片·进入模块 | 全功能移动端站点与 APP 接口对接 | `https://mobile.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 门户与入口 / login | 单点登录 | `#/site/login` | 目录·门户与入口；卡片·进入模块 | 统一单点登录页，对接认证中心 | `https://login.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 身份与权限 / auth | 身份认证中心 | `#/site/auth` | 目录·身份与权限；卡片·进入模块 | 统一身份认证、令牌签发与权限中心 | `https://auth.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 身份与权限 / secure | 安全防护中心 | `#/site/secure` | 目录·身份与权限；卡片·进入模块 | 安全防护与风控策略中心 | `https://secure.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / admin | 运营管理后台 | `#/site/admin` | 目录·运营后台；卡片·进入模块 | 全站统一运营管理后台，复用 RBAC | `https://admin.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / user | 用户会员管理 | `#/site/user` | 目录·运营后台；卡片·进入模块 | 用户与会员资料管理后台 | `https://user.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / center | 用户中心 | `#/site/center` | 目录·运营后台；卡片·进入模块 | 用户个人中心与会员工作台 | `https://center.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / seller | 卖家后台 | `#/site/seller` | 目录·运营后台；卡片·进入模块 | 个人卖家店铺与商品管理 | `https://seller.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / supplier | 供应商后台 | `#/site/supplier` | 目录·运营后台；卡片·进入模块 | 供应商入驻、供货与结算管理 | `https://supplier.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / fwq | 运维监控 | `#/site/fwq` | 目录·运营后台；卡片·进入模块 | 服务器资源与运行状态监控面板 | `https://fwq.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / service | 服务治理 | `#/site/service` | 目录·运营后台；卡片·进入模块 | 服务注册、治理与调用链监控 | `https://service.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 运营后台 / stats | 数据 BI | `#/site/stats` | 目录·运营后台；卡片·进入模块 | 全站数据统计与 BI 看板 | `https://stats.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 接口与开发 / api | API 网关 | `#/site/api` | 目录·接口与开发；卡片·进入模块 | 对外统一 API 网关与接口聚合 | `https://api.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 接口与开发 / app | APP 接口 | `#/site/app` | 目录·接口与开发；卡片·进入模块 | 移动端专属接口服务 | `https://app.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 接口与开发 / dev | 开发者门户 | `#/site/dev` | 目录·接口与开发；卡片·进入模块 | 开发环境门户与接口文档 | `https://dev.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 接口与开发 / test | 测试环境 | `#/site/test` | 目录·接口与开发；卡片·进入模块 | 测试环境统一入口与契约验证 | `https://test.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 接口与开发 / dnpj | 低代码生成 | `#/site/dnpj` | 目录·接口与开发；卡片·进入模块 | 低代码 / 代码生成平台 | `https://dnpj.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / blog | 官方博客 | `#/site/blog` | 目录·内容与媒体；卡片·进入模块 | 官方博客与产品动态发布 | `https://blog.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / news | 资讯发布 | `#/site/news` | 目录·内容与媒体；卡片·进入模块 | 新闻资讯采编与发布系统 | `https://news.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / xw | 自媒体平台 | `#/site/xw` | 目录·内容与媒体；卡片·进入模块 | 自媒体资讯与创作者内容平台 | `https://xw.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / dy | 短视频社区 | `#/site/dy` | 目录·内容与媒体；卡片·进入模块 | UGC 短视频动态社区 | `https://dy.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / sp | 长视频点播 | `#/site/sp` | 目录·内容与媒体；卡片·进入模块 | 长视频点播与媒资管理 | `https://sp.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / video | 独立播放页 | `#/site/video` | 目录·内容与媒体；卡片·进入模块 | 独立视频播放页与分享入口 | `https://video.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 内容与媒体 / img | 图床素材站 | `#/site/img` | 目录·内容与媒体；卡片·进入模块 | 公共图床与素材资源站 | `https://img.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / mall | 官方商城 | `#/site/mall` | 目录·电商与交易；卡片·进入模块 | B2C 官方商城与订单履约 | `https://mall.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / shop | 多商户店铺 | `#/site/shop` | 目录·电商与交易；卡片·进入模块 | 多商户店铺与卖家入驻 | `https://shop.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / b2b | 企业批发 | `#/site/b2b` | 目录·电商与交易；卡片·进入模块 | B2B 企业批发采购平台 | `https://b2b.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / c2c | 个人交易 | `#/site/c2c` | 目录·电商与交易；卡片·进入模块 | C2C 个人闲置与商品交易 | `https://c2c.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / yp | 货源商品库 | `#/site/yp` | 目录·电商与交易；卡片·进入模块 | 货源商品库与选品数据 | `https://yp.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / market | 营销活动 | `#/site/market` | 目录·电商与交易；卡片·进入模块 | 营销活动配置与效果分析 | `https://market.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 电商与交易 / pay | 支付结算 | `#/site/pay` | 目录·电商与交易；卡片·进入模块 | 支付聚合网关与对账系统 | `https://pay.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 数据与存储 / data | 开放数据 | `#/site/data` | 目录·数据与存储；卡片·进入模块 | 开放数据集平台与数据出口 | `https://data.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 数据与存储 / sj | 数据采集 | `#/site/sj` | 目录·数据与存储；卡片·进入模块 | 爬虫调度与数据采集平台 | `https://sj.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 数据与存储 / cloud | 私有云盘 | `#/site/cloud` | 目录·数据与存储；卡片·进入模块 | 私有云盘与文件网盘系统 | `https://cloud.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 数据与存储 / store | 下载分发 | `#/site/store` | 目录·数据与存储；卡片·进入模块 | 软件源码与资源下载分发站 | `https://store.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 工具与服务 / gy | 在线工具平台 | `#/site/gy` | 目录·工具与服务；卡片·进入模块 | 在线工具集合，疾风引擎边缘节点承载 | `https://gy.mixm.top` · CNAME · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 工具与服务 / dh | 资源导航 | `#/site/dh` | 目录·工具与服务；卡片·进入模块 | 全站 45 个节点的资源导航站 | `https://dh.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 工具与服务 / help | 帮助中心 | `#/site/help` | 目录·工具与服务；卡片·进入模块 | 产品帮助文档与使用指南 | `https://help.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 工具与服务 / support | 工单客服 | `#/site/support` | 目录·工具与服务；卡片·进入模块 | 工单客服与问题跟踪系统 | `https://support.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 工具与服务 / yy | 语音工具 | `#/site/yy` | 目录·工具与服务；卡片·进入模块 | 语音合成与语音处理工具服务 | `https://yy.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-| 站点地图 / 工具与服务 / wp | WordPress 站点 | `#/site/wp` | 目录·工具与服务；卡片·进入模块 | 独立 WordPress 内容站点 | `https://wp.mixm.top` · A · TTL 600s · mixm.top | ✅ 可运行 |
-
-**汇总**：8 分类 6 / 2 / 8 / 5 / 7 / 7 / 4 / 6 = **45 个节点，零遗漏**；45 个 `#/site/<key>` 路由互不冲突，关联节点全部指向真实节点。
-
-**映射调整结论**：两个 sheet（`laal.top` 已下线 / `mixm.top` 唯一真源）、FQDN 重复行合并、字母序 → 8 分类层级、`@ → root`、
-`gy` 模块级与 record 级备注的分层映射、nginx 不加通配 `server_name`、节点页侧栏回落到「站点目录」高亮，逐条结论见 [07 §11.13.1](./07-functional-modules.md)。
-
-**验证取证**：`/site/nodes` 真实 HTTP `total=45`；Edge 无头浏览器逐个渲染 45 个节点页（标题 / 5 个下属栏目 / 导航高亮 / 备注两段 / 域名映射 / 关联链接 / 面包屑 / CSS 生效）全部通过，
-站点目录 45 卡片、站点地图 45「进入模块」入口、未知节点兜底页、0 控制台错误、0 资源加载失败；契约测试 `site-nodes.test.ts` 11 例 + `site.test.ts` 7 例通过。
+本节所述站点体系（45 节点 / 站点地图 / 站点目录）已于 2026-11-08 整体下线，前后端代码与接口已删除；www 主站入口以静态卡片形式保留在功能模块商城页顶部。本表内容作为历史留痕不再维护。
 
 ## 3. 数据库设计
 
@@ -304,9 +244,9 @@
 | 功能模块商城（**🟡 后端建表 + 门禁，前端 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、解锁（校验前置依赖后直接落 `entitlements`，原「加入订单」已随 FR-02 下线）、解锁状态与到期展示 | FR-03.1 |
 | 漫剧 AI 剧工作台（**🟢 后端第 1/2 期已落地（`comic` 域 7 表 + 24 条路由 + `orchestrator.ts`/`storage.ts` 已装配）；前端三标签页已落地**——创作（工程/角色/AI 建议）、生成任务（capabilities 横幅 / 派发 / 手动运行 / 失败透传 / 产物下载 / 3s 轮询）、成片（工程产物面板 / 版本面板下载播放 / 审核发布），2026-11-06） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
 | 成片管理（**🟢 后端已落地（第 2 期 `comic_films`/`film_versions` + `/comic/films/*`）；前端已落地**——工作台成片标签页：列表/版本面板（预签名下载/播放）/提交审核/发布/驳回/归档，2026-11-06） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
-| 站点地图（**🟢 前后端已落地，2026-11-06**） | 45 个主机模块按 8 分类分组展示；分类筛选、关键词搜索（覆盖 host / 备注 / FQDN）；每条记录展示 `record_type` + TTL 并外链 `https://{fqdn}`，不暴露解析目标值。数据源为 DNSPod 导出备注（`services/mim-api/src/site.ts` 静态常量，无数据表） | 非 PRD FR（站点运维可视化，随备注结构化新增） |
+| 站点地图（**🔴 已于 2026-11-08 整体下线**） | 原「45 个主机模块按 8 分类分组展示、分类筛选、关键词搜索（覆盖 host / 备注 / FQDN）、记录 `record_type` + TTL 并外链 `https://{fqdn}`」实现已随站点体系删除（`services/mim-api/src/site.ts` 等前后端代码与 4 条路由一并移除）；前端仅保留功能模块商城页顶部 www 主站入口静态卡片 | 非 PRD FR（站点运维可视化，随备注结构化新增，2026-11-08 下线） |
 
-> **2026-11-08 追加**：45 个节点已全部落为项目内可运行模块。新增 `apps/web/src/router.ts`（零依赖 hash 路由）、`views/SiteDirectory.tsx`（8 分类导航）、`views/SiteNodePage.tsx`（职责 / 域名映射 / 关联 / 实时接口详情）与 `services/mim-api/src/site-nodes.ts`（45 节点规格单一真源，含 `@ → root` 路由冲突处理、关联完整性断言）；新增 `GET /api/v1/site/nodes`，`/site/modules*` 同步返回 `node` 与 `fqdn` 字段；契约测试 `test/site-nodes.test.ts` 8 例。域名映射边界见 `deploy/nginx-mim.conf` 头部注释。
+> **2026-11-08 追加（同日晚些时候已整体下线，历史留痕）**：当日曾将 45 个节点落为项目内可运行模块（`apps/web/src/router.ts` hash 路由、`views/SiteDirectory.tsx`、`views/SiteNodePage.tsx`、`services/mim-api/src/site-nodes.ts`、`GET /api/v1/site/nodes` 与契约测试 `test/site-nodes.test.ts`）；同日晚些时候站点体系整体下线，上述前后端代码与接口全部删除，本段仅作历史记录。域名映射边界约束（不吸收 45 子域流量）仍见 `deploy/nginx-mim.conf` 头部注释。
 
 任务写操作统一交互规则（历史，已随 FR-03 移除）：客户端先行乐观更新并在本地维护待同步队列；离线变更恢复连接后按 `task_events.seq` 增量合并；冲突由服务端 last-write-wins 裁决。当前无任务写操作，`features` 鉴权亦一并移除。
 

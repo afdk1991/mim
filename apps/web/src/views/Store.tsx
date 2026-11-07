@@ -7,6 +7,8 @@ import type { Locale } from '@mim/i18n';
 import { ApiError, api, errorText, getSession } from '../api';
 // 引入通用异步加载钩子：统一处理 loading / error / reload
 import { useAsync } from '../hooks';
+// 引入编程式跳转：匿名访客点击「登录后解锁」时跳转登录伪视图
+import { navigate } from '../router';
 
 // 组件对外契约：商城文案跟随全局语言
 interface Props {
@@ -202,6 +204,22 @@ export function Store({ locale }: Props) {
         </p>{/* 结束说明文案 */}
       </header>{/* 结束页头 */}
 
+      <section className="panel">{/* 主站入口卡片：站点体系下线后唯一保留的 www 主站直达入口（静态硬编码，不请求接口） */}
+        <p className="muted">{/* 单行信息串：名称 · 主机 · 说明 · 链接，格式与用户确认稿一致 */}
+          主站常规访问入口 · www · 官方门户网站 ·{' '}{/* 分隔点后的空格让链接与上文留出呼吸 */}
+          <a
+            // 主站外链：指向官方门户网站
+            href="https://www.mixm.top"
+            // 新窗口打开，避免跳出当前商城会话
+            target="_blank"
+            // 禁传 referrer/ opener，防止目标站拿到本页引用与 window.opener
+            rel="noopener noreferrer"
+          >
+            https://www.mixm.top{/* 链接文案与地址一致，所见即所得 */}
+          </a>{/* 主站链接结束 */}
+        </p>{/* 信息串结束 */}
+      </section>{/* 主站入口卡片结束 */}
+
       <form className="form inline" onSubmit={submitSearch}>{/* 搜索行：提交制，避免按键即请求 */}
         <label className="grow">{/* 关键词输入：占满剩余宽度 */}
           {locale === 'en-US' ? 'Search modules' : '搜索模块'}{/* 字段标签 */}
@@ -344,12 +362,19 @@ export function Store({ locale }: Props) {
                           : '解锁'}{/* 按钮文案结束 */}
                     </button> // 结束解锁按钮
                   )}{/* 结束解锁按钮条件渲染 */}
+                  {!owned && !authed && ( // 匿名访客：解锁属收费动作，展示登录入口按钮替代解锁按钮
+                    <button
+                      // 登录后解锁按钮：普通按钮，避免触发表单提交
+                      type="button"
+                      // 幽灵小按钮：引导级操作，样式弱于主解锁按钮
+                      className="btn ghost small"
+                      // 点击跳转登录伪视图，登录成功后回到商城可继续解锁
+                      onClick={() => navigate({ view: 'login' })}
+                    >
+                      {locale === 'en-US' ? 'Sign in to unlock' : '登录后解锁'}{/* 匿名解锁引导文案，随语言切换 */}
+                    </button> // 结束登录后解锁按钮
+                  )}{/* 结束匿名引导条件渲染 */}
                 </div>{/* 操作行结束 */}
-                {!owned && !authed && ( // 匿名访客：展示登录提示替代解锁按钮
-                  <p className="muted">{/* 弱化的提示行 */}
-                    {locale === 'en-US' ? 'Sign in to unlock' : '登录后可解锁'}{/* 匿名解锁提示文案，随语言切换 */}
-                  </p> // 结束匿名提示
-                )}{/* 结束匿名提示条件渲染 */}
                 {expanded && ( // 展开态渲染详情块
                   <div className="store-detail">{/* 详情容器 */}
                     {detail.loading && <p className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</p>}{/* 详情加载态 */}

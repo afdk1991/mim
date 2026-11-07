@@ -17,10 +17,12 @@ interface Props {
   onLogin: (result: LoginResult) => void;
   // 内嵌模式：true 时去掉整屏最小高度与渐变背景，便于嵌入主布局内容区（默认 false 整屏展示）
   embedded?: boolean;
+  // 按需登录提示：required 为访问收费功能的登录说明，expired 为登录态失效后的重登说明，null 不展示
+  notice?: 'required' | 'expired' | null;
 }
 
-// 登录页组件：同时支持「密码登录」与「验证码登录」两种模式
-export function Login({ onLogin, embedded = false }: Props) {
+// 登录页组件：同时支持「密码登录」与「验证码登录」两种模式，并作为按需登录的统一入口（整屏或内嵌）
+export function Login({ onLogin, embedded = false, notice = null }: Props) {
   // 本页语言状态，默认简体中文；顶部按钮可在中英之间切换
   const [locale, setLocale] = useState<Locale>('zh-CN');
   // 账号区域状态，默认中国区；决定账号标识用手机号还是邮箱
@@ -44,6 +46,15 @@ export function Login({ onLogin, embedded = false }: Props) {
   const provider: Provider = region === 'cn' ? 'phone' : 'email';
   // 账号输入框标题：随提供方在「手机号 / 邮箱」文案之间切换
   const identifierLabel = provider === 'phone' ? t(locale, 'auth.phone') : t(locale, 'auth.email');
+  // 按需登录提示文案：随本页语言切换，失效态与收费功能登录说明分别取词
+  const gateText = notice // 有提示才计算文案
+    // 失效态：登录后又被令牌失效踢回，明确要求重新登录
+    ? (notice === 'expired'
+      ? (locale === 'en-US' ? 'Your session has expired. Please sign in again.' : '登录状态已失效，请重新登录。')
+      // 收费功能态：说明该功能需登录后使用
+      : (locale === 'en-US' ? 'Sign in to use this feature.' : '此功能需登录后使用。'))
+    // 无提示时为空串，JSX 条件渲染不输出节点
+    : ''; // gateText 计算结束
 
   // 切换区域：整体清空已填内容，避免手机号被当作邮箱提交
   function switchRegion(next: Region) {
@@ -154,6 +165,8 @@ export function Login({ onLogin, embedded = false }: Props) {
             {locale === 'zh-CN' ? 'EN' : '中文'}{/* 当前为中文时显示 EN，否则显示「中文」 */}
           </button>{/* 结束语言切换按钮 */}
         </div>{/* 结束卡片头部 */}
+
+        {gateText && <p className="auth-notice" role="status">{gateText}</p>}{/* 全站门禁提示：锁定 / 失效说明 */}
 
         <div className="segmented">{/* 区域分段控件：中国区 / Global */}
           <button

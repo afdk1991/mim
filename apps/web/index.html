@@ -1,25 +1,44 @@
 <!doctype html><!-- 文档类型声明：按 HTML5 标准解析，让浏览器进入标准渲染模式 -->
 <html lang="zh-CN"><!-- 根元素：lang 声明简体中文，影响断行规则、字体回退与读屏发音 -->
   <head><!-- 头部区：只放元信息，不渲染可见内容 -->
-    <meta charset="UTF-8" /><!-- 字符编码：显式 UTF-8，保证中文标题与文案不乱码 -->
+    <meta charset="UTF-8" /><!-- 字符编码：显式 UTF-8，须落在最前 1024 字节内，故置于一切脚本之前 -->
+    <script>
+      /* 地址栏前置规整：必须在任何相对路径资源（spa.js / assets）之前执行，replaceState 后相对解析才按新地址生效。
+         职责一：清理 EdgeOne WAF 注入的 ?tads —— 抢在 WAF 自带清理（只删 ?tads 本体、残留裸问号）之前整体移除查询串，
+                 避免地址栏留下 https://host/? 的裸问号形态。
+         职责二：折叠多段深链接 —— vite base './' 的产物以相对路径引用 assets，多段路径（如 /comic/detail/123）会把
+                 ./assets 解析到错误目录导致资源 404 白屏，故在资源加载前用 replaceState 折叠为单段地址。
+         注意：生产 nginx 的 CSP（script-src 'self'）会禁用本内联，届时多段深链接白屏维持现状、不回归；
+         单段路径（/store 等）不依赖本脚本，全部平台可用。 */
+      (function () { // 立即执行：隔离内部变量，避免污染全局作用域
+        var views = ['store', 'comic', 'chat', 'settings', 'login']; // 已知单段视图名：与 src/router.ts 的 VIEWS 保持一致
+        var href = location.href; // 完整地址：用于判断末位是否为 WAF 清理后残留的裸问号
+        var search = location.search; // 查询串（含前导问号；无查询串时为空串）
+        if (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?')) { // 命中 WAF 注入参数或裸问号两种异常形态
+          history.replaceState(null, '', location.pathname + location.hash); // 原地移除查询串：保留路径与 hash，不新增历史、不触发跳转
+        } // 查询串清理结束：正常查询参数一律保留原样
+        var segs = location.pathname.split('/').filter(Boolean); // 路径拆段并剔除空段（首尾斜杠产生的空串）
+        if (segs.length > 1) { // 仅多段路径需要折叠；根路径与单段路径（/store 等）保持原样
+          var cut = 0; // 命中视图段时截到该段的下标；0 表示尚未命中
+          for (var i = 0; i < segs.length; i++) { // 从头找第一个已知视图段
+            if (views.indexOf(segs[i]) >= 0) { cut = i + 1; break; } // 截到视图段为止：/mim/store/x → /mim/store，资源解析到 /mim/assets
+          } // 视图段查找结束
+          var folded; // 折叠后的路径
+          if (cut > 0) { // 命中视图段：前缀（如 /mim）+ 视图段
+            folded = '/' + segs.slice(0, cut).join('/'); // 无尾斜杠：./assets 相对其上级目录（部署根）解析
+          } else if (segs[0] === 'mim') { // 未命中视图段且首段为 mim：唯一的子路径部署是 GitHub Pages 的 /mim/（仓库名）
+            folded = '/mim/'; // 带尾斜杠回到子路径根：./assets 解析到 /mim/assets，路由层把空视图回落为 store
+          } else { // 未命中视图段的根部署多段地址（如 /foo/bar）
+            folded = '/' + segs[0]; // 只保留首段且无尾斜杠：./assets 相对根目录解析，路由层把未知视图回落为 store
+          } // 折叠分支结束
+          history.replaceState(null, '', folded + location.hash); // 原地改写地址：保留 hash，交由 router.ts 的旧 hash 链接兼容逻辑继续处理
+        } // 多段折叠结束
+      })(); // 立即执行结束：此后的 spa.js 与 assets 均按规整后的地址解析
+    </script><!-- 地址栏前置规整脚本结束 -->
+    <script src="%BASE_URL%spa.js"></script><!-- 地址归一化（外置脚本）：构建期 %BASE_URL% 被替换为 ./，随规整后的地址解析到部署根；外置是为绕开生产 CSP script-src 'self' 对内联脚本的禁用，让归一化在主站真实生效（全站会话门禁已移除，改为按需登录） -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- 视口：移动端按设备宽度布局且初始不缩放，避免页面被整体缩小 -->
     <meta name="color-scheme" content="light dark" /><!-- 配色方案：声明同时支持浅/深色，浏览器可自动适配滚动条与原生控件 -->
     <title>Mim — 跨端任务与轻协作</title><!-- 标签页标题：产品名 + 一句话定位，利于分享与识别 -->
-    <script>
-      /* 地址栏归一化：EdgeOne 等 WAF 挑战脚本会向地址栏追加 ?tads 参数，并在约 1.2 秒后自行清除；
-         但它的清除正则只匹配 "?tads" 这一段，会把裸问号留在地址栏（https://host/?）。
-         这里在应用挂载之前用 replaceState 原地修正：既清掉残留的裸问号，也顺手处理尚未被清除的 ?tads。
-         该脚本只改地址栏呈现，不产生新的历史记录，也不触发任何跳转。 */
-      (function () { // 立即执行函数：隔离内部变量，避免向全局作用域泄漏
-        var href = location.href; // 当前完整地址（含查询串与哈希），用于判断末位是否为问号
-        var search = location.search; // 查询串部分（含前导问号；空查询串时为 ''）
-        var hash = location.hash; // 哈希部分：本站使用 #/<view> 与 #/site/<key> 节点路由，非空时一律不动地址
-        // 仅处理两种异常形态：①空查询串且地址以问号结尾；②查询串恰为平台注入的 ?tads
-        if (hash === '' && (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?'))) {
-          history.replaceState(null, '', location.pathname); // 只保留路径原地替换，不新增历史、不触发跳转
-        } // 归一化分支结束：其余地址形态一律保持原样，避免误改正常链接
-      })(); // 立即执行结束：此时 React 尚未挂载，地址栏已完成修正
-    </script><!-- 地址栏归一化脚本结束 -->
   </head><!-- 元信息结束 -->
   <body><!-- 可见内容容器 -->
     <div id="root"></div><!-- React 挂载点：main.tsx 通过 getElementById('root') 找到此节点 -->

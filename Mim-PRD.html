@@ -7,69 +7,6 @@
 <!-- 字符编码声明：UTF-8，保证中文不乱码 -->
 <meta charset="UTF-8">
 
-<!-- 全站会话门禁：未登录只提供登录入口，覆盖刷新与直接打开本页；与 apps/web/src/api.ts 共用会话键 -->
-<script>
-  (function () { // 立即执行，隔离内部变量，避免污染全局
-    // 会话键与前端 SESSION_KEY 保持一致，跨页面共享同一登录态
-    var KEY = 'mim.session.v1'; // 版本号键名，结构升级时可作废旧数据
-    // 读取本地会话；隐私模式或跨源限制下可能抛错，统一按未登录处理
-    var raw = null; // 默认无会话
-    try { raw = window.localStorage.getItem(KEY); } catch (e) { raw = null; } // 读取失败即锁定
-    // 结构校验：两个令牌与用户主键必须同时存在，脏数据不视为已登录
-    var ok = false; // 默认锁定
-    try { // JSON 解析可能失败
-      var s = raw ? JSON.parse(raw) : null; // 无值直接按 null 处理
-      ok = !!(s && typeof s.access_token === 'string' && s.access_token && typeof s.refresh_token === 'string' && s.refresh_token && s.user && typeof s.user.id === 'string' && s.user.id); // 与 isValidSession 同口径
-    } catch (e) { ok = false; } // 解析异常保持锁定
-    // 已登录：不做任何 DOM 改动，原页面结构、样式与交互完全保留
-    if (ok) return; // 已登录用户零影响
-    // 未登录：先隐藏根节点，避免受保护内容在替换前闪现
-    document.documentElement.style.visibility = 'hidden'; // 整页隐藏，稍后只显示门禁卡片
-    // DOM 就绪后清空原正文并渲染纯登录入口
-    document.addEventListener('DOMContentLoaded', function () { // 此时 body 可安全写入
-      // React 应用优先写 #root（随后由 App 接管），静态文档页则替换整个 body
-      var root = document.getElementById('root'); // 应用挂载点，静态页为 null
-      var host = root || document.body; // 统一宿主，避免卡片挂到 #root 之外造成残留
-      // 清空宿主内容，确保未登录看不到任何受保护页面内容
-      host.innerHTML = ''; // root 为空壳，静态页为受保护正文
-      // 仅静态文档页需要整页居中基线；React 应用保持原样式，由 App 接管渲染
-      if (!root) document.body.style.cssText = 'margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f5f7;color:#1c2230;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'; // 浅色居中布局
-      // 门禁容器：带标记供自动化验证识别
-      var box = document.createElement('div'); // 外层卡片
-      box.setAttribute('data-auth-gate', 'locked'); // 自动化断言标记
-      box.style.cssText = 'width:min(400px,90vw);margin:24px auto;padding:28px;border:1px solid #e3e6ec;border-radius:14px;background:#fff;box-shadow:0 8px 24px rgba(20,28,45,.08);text-align:center;'; // 卡片样式
-      // 锁定态标题
-      var title = document.createElement('h1'); // 一级标题
-      title.textContent = '全站已锁定'; // 标题文案
-      title.style.cssText = 'margin:0 0 12px;font-size:22px;'; // 标题间距与字号
-      // 引导说明
-      var desc = document.createElement('p'); // 段落节点
-      desc.textContent = '请先登录以解锁全部功能；登录后在同源刷新本页即可查看。'; // 引导文案
-      desc.style.cssText = 'margin:0 0 20px;color:#6b7280;'; // 次要文字色
-      // 登录入口：指向主站登录伪视图
-      var link = document.createElement('a'); // 锚点节点
-      link.href = '/#/login'; // 主站登录入口
-      link.textContent = '前往登录'; // 入口文案
-      link.setAttribute('data-auth-gate-entry', 'login'); // 自动化断言标记
-      link.style.cssText = 'display:inline-block;padding:10px 18px;border-radius:8px;background:#3b6ef5;color:#fff;text-decoration:none;'; // 主按钮样式
-      // 刷新按钮：登录完成后无需重新输入地址即可解锁本页
-      var refresh = document.createElement('button'); // 按钮节点
-      refresh.type = 'button'; // 普通按钮，避免表单默认提交
-      refresh.textContent = '刷新'; // 刷新文案
-      refresh.style.cssText = 'display:block;margin:12px auto 0;padding:6px 12px;border:1px solid #e3e6ec;border-radius:8px;background:#fff;color:#1c2230;cursor:pointer;'; // 次级按钮样式
-      refresh.onclick = function () { location.reload(); }; // 点击后重新校验会话
-      // 依次挂载到卡片
-      box.appendChild(title); // 标题
-      box.appendChild(desc); // 说明
-      box.appendChild(link); // 登录入口
-      box.appendChild(refresh); // 刷新按钮
-      // 卡片挂到宿主，成为未登录态唯一可见内容
-      host.appendChild(box); // 挂载门禁卡片
-      // 恢复可见性，显示门禁卡片
-      document.documentElement.style.visibility = 'visible'; // 结束隐藏
-    }); // DOMContentLoaded 监听结束
-  })(); // 立即执行结束
-</script><!-- 全站会话门禁脚本结束 -->
 <!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 浏览器标签页标题 -->
@@ -753,97 +690,10 @@ function submitLogin(){
   <li>原订阅 features 映射（项目数、视图、提醒推送、协作者数、高级筛选、CSV 导出）随 <code>plans.features</code> 列一并删除；<code>plans</code> 表本身已于 2026-11-05 DROP。</li>
 </ul>
 
-<!-- FR-03.4 站点模块地图小节标题（2026-11-06 新增） -->
-<h4>FR-03.4 站点模块地图（DNSPod 备注结构化）</h4>
-<!-- 目的子标题 -->
-<h4>目的</h4>
-<!-- 目的说明：把域名解析记录里的「备注」变成产品内的模块导航，避免运维信息散落在 DNS 控制台 -->
-<p>把 DNSPod 导出记录（<code>dnspod_records_2026-11-05_21-42-26.xls</code>）中的「备注 / 主机记录」结构化为产品内的<strong>站点模块地图</strong>，使每个子域名的用途、归属分类与线上地址在应用内可检索、可分组、可跳转，不再依赖 DNS 控制台查看备注。</p>
-<!-- 数据来源子标题 -->
-<h4>数据来源</h4>
-<!-- 数据来源清单 -->
-<ul>
-  <!-- 来源文件与规模：单一 zone（mixm.top）45 条主机记录 -->
-  <li>来源：DNSPod 导出 <code>dnspod_records_2026-11-05_21-42-26.xls</code>，取单一解析 zone <code>mixm.top</code>，共 <strong>45 条</strong>主机记录。</li>
-  <!-- 模块粒度：一条主机记录即一个模块 -->
-  <li>模块粒度：按「主机记录」一一对应，模块总数 = <strong>45</strong>。</li>
-  <!-- 备注拆解：模块级备注取首句为主名、余下为说明；记录级备注用于覆盖个别 zone 的差异 -->
-  <li>备注拆解：模块级备注拆为 <code>label</code>（首段，模块名）+ <code>description</code>（余下，用途说明）；个别记录另有备注时落到 record 级 <code>label</code> / <code>description</code>（例：<code>gy.mixm.top</code> 为 <code>CNAME</code>，备注「工具模块核心入口，疾风引擎承载节点」）。解析目标（IP / CNAME 目标值）不对外暴露，记录只保留类型、域名与 TTL。</li>
-</ul>
-<!-- 分类与规模子标题 -->
-<h4>分类与规模</h4>
-<!-- 八分类计数表 -->
-<table>
-  <!-- 表头：分类 / 计数字段 -->
-  <tr><th style="width:22%">分类（zh / en）</th><th style="width:12%">id</th><th>模块数</th></tr>
-  <!-- 门户与入口 -->
-  <tr><td>门户与入口 / Portal &amp; Entry</td><td><code>portal</code></td><td>6</td></tr>
-  <!-- 身份与权限 -->
-  <tr><td>身份与权限 / Identity &amp; Access</td><td><code>identity</code></td><td>2</td></tr>
-  <!-- 运营后台 -->
-  <tr><td>运营后台 / Operations Console</td><td><code>ops</code></td><td>8</td></tr>
-  <!-- 接口与开发 -->
-  <tr><td>接口与开发 / API &amp; Developer</td><td><code>api</code></td><td>5</td></tr>
-  <!-- 内容与媒体 -->
-  <tr><td>内容与媒体 / Content &amp; Media</td><td><code>content</code></td><td>7</td></tr>
-  <!-- 电商与交易 -->
-  <tr><td>电商与交易 / Commerce &amp; Trade</td><td><code>commerce</code></td><td>7</td></tr>
-  <!-- 数据与存储 -->
-  <tr><td>数据与存储 / Data &amp; Storage</td><td><code>data</code></td><td>4</td></tr>
-  <!-- 工具与服务 -->
-  <tr><td>工具与服务 / Tools &amp; Services</td><td><code>tools</code></td><td>6</td></tr>
-  <!-- 合计行：6+2+8+5+7+7+4+6 = 45 -->
-  <tr><td><strong>合计</strong></td><td>—</td><td><strong>45</strong></td></tr>
-</table>
-<!-- 接口契约子标题 -->
-<h4>接口契约（免鉴权只读）</h4>
-<!-- 四条路由表：2026-11-08 新增 /site/nodes 目录接口 -->
-<table>
-  <!-- 表头：方法路径 / 返回结构 / 说明 -->
-  <tr><th style="width:34%">方法 / 路径</th><th style="width:34%">返回结构</th><th>说明</th></tr>
-  <!-- 概览：zone 与分类聚合 -->
-  <tr><td><code>GET /api/v1/site/overview</code></td><td><code>{ total, zones[], categories[] }</code></td><td>zone 列表（id / apex / 覆盖模块数）与 8 个分类的计数聚合</td></tr>
-  <!-- 全量模块：支持 zone / category 过滤 -->
-  <tr><td><code>GET /api/v1/site/modules</code></td><td><code>{ total, module_total, filters, items[] }</code></td><td>全量 45 条模块；<code>?zone=</code> / <code>?category=</code> 过滤，非法 zone 返回 <strong>400</strong></td></tr>
-  <!-- 单模块：按 host 精确查询 -->
-  <tr><td><code>GET /api/v1/site/modules/:host</code></td><td><code>{ module: {...} }</code></td><td>单模块详情；未知 host 返回 <strong>404</strong></td></tr>
-  <!-- 目录接口：一次返回 45 个可运行节点的路由 / 导航 / 职责 / 关联 / 域名映射 -->
-  <tr><td><code>GET /api/v1/site/nodes</code></td><td><code>{ total, categories[], capabilities, items[] }</code></td><td>45 节点单一真源；每条含 <code>node.route</code>（<code>#/site/&lt;key&gt;</code>）、双语导航与职责、关联节点、<code>fqdn</code> / <code>records</code> / <code>urls</code></td></tr>
-</table>
-<!-- 前端行为子标题：覆盖站点地图、站点目录与 45 个节点模块页 -->
-<h4>前端行为（站点地图 / 站点目录 / 45 个节点模块页）</h4>
-<!-- 全站会话门禁说明：所有站点地图入口仅在解锁后可达 -->
-<p><strong>访问门禁</strong>：上述视图与 45 个节点模块页均在全站会话门禁之后；未登录时刷新或直接访问任意 <code>#/</code> 路由只显示整屏登录页，登录成功后原地解锁，退出或登录状态失效立即重新锁定。</p>
-<!-- 交互规则清单 -->
-<ul>
-  <!-- 一次性拉取 + 客户端筛选，避免每输入一次就请求后端 -->
-  <li>一次拉取全量 45 条，分类 / 关键词两级筛选全部在客户端完成，筛选结果实时反映在页头徽标（<code>命中数 / 总数</code>）。</li>
-  <!-- 关键词检索覆盖面 -->
-  <li>关键词检索覆盖：主机记录、模块备注（<code>label</code> + <code>description</code>）、每条记录的 <code>fqdn</code> / record 级备注；大小写不敏感。</li>
-  <!-- 分组展示与空分组剔除 -->
-  <li>结果按分类分组渲染，空分组自动剔除；每个模块卡片展示模块备注、记录类型（A / CNAME）与 TTL，并给出 <code>https://&lt;fqdn&gt;</code> 外链。</li>
-  <!-- 双语：分类名与界面文案随 locale 切换 -->
-  <li>分类名与界面文案随全局 <code>locale</code> 双语切换（<code>zh-CN</code> / <code>en-US</code>）。</li>
-  <!-- 45 个节点逐个可进入：站点地图卡片与站点目录卡片共用同一路由 -->
-  <li>45 个模块均可从「站点地图」卡片或「站点目录」卡片进入 <code>#/site/&lt;key&gt;</code>；根域名 <code>@</code> 冲突映射为 <code>#/site/root</code>，刷新与前进后退均不丢失节点。</li>
-  <!-- 节点模块页的下属栏目与导航状态 -->
-  <li>节点模块页含四级面包屑与 5 个下属栏目（概览 / 域名映射 / 站点地图条目 / 模块职责 / 关联节点），逐条展示备注两段、解析记录、HTTPS 入口与 record 级覆盖备注；侧栏「站点目录」在该视图保持高亮。</li>
-  <!-- 域名映射由单一真源生成，nginx 不吸收 45 个子域 -->
-  <li>域名映射统一由 <code>fqdnOf()</code> 生成 <code>https://&lt;host&gt;.mixm.top</code>（根记录为 <code>https://mixm.top</code>）；生产 nginx 仅服务 <code>mim.mixm.top</code>，不新增通配 <code>server_name</code>。</li>
-</ul>
-<!-- 边界与验收子标题 -->
-<h4>边界与验收</h4>
-<!-- 验收点清单 -->
-<ul>
-  <!-- 接口级契约测试：site 域 7 例 + 45 节点规格 11 例 -->
-  <li>契约测试：<code>test/site.test.ts</code> 7 例覆盖四条公开路由的结构、计数（45）、过滤与 404 / 400 分支；<code>test/site-nodes.test.ts</code> 11 例覆盖 45 节点规格、路由唯一、关联不悬空、备注 / 记录条目、冲突映射与两接口同源。</li>
-  <!-- 线上取证口径：接口计数 + 45 个 hash 路由逐个可达 -->
-  <li>线上验收：<code>/site/overview</code> 与 <code>/site/nodes</code> 均返回 <code>total=45</code>，8 分类计数合计 45；<code>/site/modules</code> 返回 <code>items</code> 长度 45；45 个 <code>#/site/&lt;key&gt;</code> 路由逐个渲染成功、导航高亮正确、未知节点有兜底页；未知 host 返回 404、非法 zone 返回 400。</li>
-  <!-- 全站门禁验收：锁定 / 解锁 / 重新锁定三类场景 -->
-  <li>门禁验收：未登录访问任意 <code>#/</code> 路由（含 45 个节点页）与静态文档入口均只显示登录入口；登录成功后 45 个路由全部可达；退出或令牌失效立即重新锁定，刷新与直接访问内部页面不绕过。</li>
-  <!-- 数据维护方式：xls 更新后需同步 site.ts 常量 -->
-  <li>数据维护：DNSPod 记录变更后，需同步更新 <code>services/mim-api/src/site.ts</code> 中的 <code>SITE_MODULES</code> / <code>SITE_CATEGORIES</code> 常量并跑契约测试（当前无自动导入 xls 的管线）。</li>
-</ul>
+<!-- FR-03.4 站点模块地图小节：2026-11-08 站点体系整体下线，原目的 / 数据来源 / 分类表 / 4 条路由表 / 前端行为 / 边界验收全部移除，仅留痕 -->
+<h4>FR-03.4 站点模块地图（DNSPod 备注结构化）（已于 2026-11-08 整体下线）</h4>
+<!-- 下线说明：原 4 条 /api/v1/site/* 路由、站点地图 / 站点目录 / 45 个节点模块页随站点体系一并删除，前后端代码已不存在 -->
+<p>2026-11-08 站点体系整体下线，仅保留商城页顶部 www 主站入口卡片。</p>
 
 <!-- FR-04 多端体验一致性小节标题 -->
 <h3>FR-04 多端体验一致性</h3>

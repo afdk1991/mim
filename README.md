@@ -47,11 +47,11 @@ node scripts/comment-check.mjs
 pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`、`packages/*`）：
 
 ```
-apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块 / 漫剧 AI 剧 / 站点地图 / 设置）
-apps/web/src/views/  # Login / Store / ComicWorkbench / SiteMap / Settings 五个视图组件
+apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块商城 / 漫剧工作台 / 即时通讯 / 设置）
+apps/web/src/views/  # Login / Store / ComicWorkbench / Chat / Settings 五个视图组件
 apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；视图：概览 / 功能模块 / 权益管理 / 角色与权限 / 用户）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
-services/mim-api/src/routes/  # auth / catalog / site / me / comic / media / ai / admin 八个路由模块
+services/mim-api/src/routes/  # auth / catalog / me / comic / media / ai / im / admin 八个路由模块
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7）
 packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
 scripts/             # build / version-check / env-check / comment-check
@@ -65,7 +65,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-站内采用零依赖 hash 路由（[router.ts](./apps/web/src/router.ts)）：`#/store`、`#/comic`、`#/sitemap`、`#/directory`、`#/settings`、`#/login`，以及站点地图 45 个节点各自的 `#/site/<key>`（根域名 `@` 映射为 `#/site/root`）；刷新、前进后退与外链直达均可用。视图由 [App.tsx](./apps/web/src/App.tsx) 按 hash 渲染，节点页时侧栏「站点目录」保持高亮。**全站会话门禁（2026-11-08 起）**：未登录时无论从首页、刷新还是直接访问任意内部 `#/` 路由，均只渲染整屏登录页，不渲染侧栏、导航或任何业务内容，也不发起业务接口请求；登录成功后解除锁定并开放全部视图与 45 个节点页（除 `#/login` 中转外原地解锁、保留原目标 hash）；退出登录、令牌失效或跨标签页退出时立即重新锁定。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)，静态文档入口（`site/*.html`、`Mim-PRD.html`）同样内置同源会话门禁。45 节点的层级 / 路由 / 域名映射逐项清单见 [08-dev-implementation.md §2.1](./docs/wiki/08-dev-implementation.md)。
+站内采用零依赖 hash 路由（[router.ts](./apps/web/src/router.ts)）：`#/store`、`#/comic`、`#/chat`、`#/settings`、`#/login`；刷新、前进后退与外链直达均可用。视图由 [App.tsx](./apps/web/src/App.tsx) 按 hash 渲染。**全站会话门禁（2026-11-08 起）**：未登录时无论从首页、刷新还是直接访问任意内部 `#/` 路由，均只渲染整屏登录页，不渲染侧栏、导航或任何业务内容，也不发起业务接口请求；登录成功后解除锁定并开放全部视图（除 `#/login` 中转外原地解锁、保留原目标 hash）；退出登录、令牌失效或跨标签页退出时立即重新锁定。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)，静态文档入口（`site/*.html`、`Mim-PRD.html`）同样内置同源会话门禁。站点体系（站点地图 / 站点目录 / 45 节点页与 site 域 4 条接口）已于 2026-11-08 整体下线，功能模块商城页顶部保留一张 www 主站入口静态卡片。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ 权益管理（列表过滤、发放、回收、审计事件时间线）。
 
@@ -73,10 +73,8 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 |---|---|---|
 | 登录 | `Login.tsx` | 全站唯一登录入口；管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login`；顶部展示「全站已锁定 / 登录状态已失效」提示 |
 | 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：目录浏览与 `?q=` 搜索、模块详情面板（能力说明 / 当前价 / 历史调价 `price_history` / 前置依赖链）、一次性解锁（`POST /entitlements`）、「我的权益」区块（`GET /me/entitlements`）、前置依赖缺失时的引导提示（`/modules`、`/modules/:code`、`/entitlements`、`/me/entitlements`） |
+| 主站入口卡片 | Store.tsx 顶部 | 站点体系 2026-11-08 下线后唯一保留的 www 主站直达入口（静态硬编码，新窗口打开 https://www.mixm.top，不请求接口） |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
-| 站点地图 | `SiteMap.tsx` | DNSPod 备注结构化的站点模块检索（`/site/*`），每张卡片提供「进入模块」入口；仅解锁后可达 |
-| 站点目录 | `SiteDirectory.tsx` | 8 分类 / 45 个可运行节点的分类导航与搜索，节点入口统一为 `#/site/<key>` |
-| 节点模块页 | `SiteNodePage.tsx` | 单个节点的四级面包屑、5 个下属栏目导航（概览 / 域名映射 / 站点地图条目 / 模块职责 / 关联节点）、逐条解析记录与 HTTPS 入口、DNSPod 备注两段与 record 级覆盖备注、模块职责清单、实时接口详情与前后节点翻页 |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
 | 聊天 | `Chat.tsx` | 即时通讯与视频通话：会话列表、用户搜索、消息收发、WebRTC 视频通话（`VideoCall.tsx`），WS 端点 `/api/v1/im/ws` |
 
@@ -96,9 +94,10 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 成片 | `GET/POST /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/{versions,submit-review,publish,reject,archive}` | 登录 |
 | 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets` | 对象端点凭签名免鉴权 |
 | AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
-| 站点地图 | `GET /site/overview`、`GET /site/modules`、`GET /site/modules/:host`、`GET /site/nodes` | 公开只读；`/site/nodes` 一次返回 45 节点的路由 / 双语导航 / 职责 / 关联与域名映射（真源 `src/site.ts` + `src/site-nodes.ts`） |
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
 | 即时通讯 | `GET/POST /im/conversations`、`GET /im/conversations/:id/messages`、`POST /im/conversations/:id/read`、`GET /im/users`、`WS /im/ws?token=<access_token>` | 登录（WS 凭 query token） |
+
+site 域 4 条公开路由（`/site/overview`、`/site/modules`、`/site/modules/:host`、`/site/nodes`）已于 2026-11-08 随站点体系下线移除。
 
 除 `auth/*` 外的写接口强制 `Idempotency-Key`（同键同体重放首次结果、同键异体 409）；错误统一信封携带 `requestId`。
 
@@ -145,7 +144,6 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
 | 生产登录入口 | **未登录时全站锁定**：所有页面与功能均不可访问，仅提供登录入口；登录成功后开放完整功能，退出或令牌失效立即重新锁定。登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`；优先保留已有值 / CI Secret 同名变量，均未配置时现场生成随机口令且不回显日志，**不再有公开默认口令**，运维须从服务器 env 文件读取）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
-| 站点模块地图 | `GET /api/v1/site/overview`、`GET /api/v1/site/modules?zone=&category=&q=`、`GET /api/v1/site/modules/:host`（公开只读，无鉴权）。数据源为 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列，45 条主机 × 单 zone（`mixm.top`）、8 个分类；解析目标（IP / CNAME 目标值）不对外暴露，记录仅含类型 / 域名 / TTL；前端入口「站点地图 / Site Map」。接口为不含用户数据的静态元数据，仍保持公开只读；**前端访问已纳入全站会话门禁**，锁定态不会发起这些请求 |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
 | 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
