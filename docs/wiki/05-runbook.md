@@ -245,7 +245,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 ### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`，历史快照）
 
-> **取证口径说明（2026-11-07 22:2x 核对）**：本节标题、结论与下方表格为 **01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `c02c51d`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-07 22:25:52 +0800，commit `c02c51d`）**，其中 `/admin/` 已返回含 `noindex` 的管理后台新产物。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
+> **取证口径说明（2026-11-07 22:2x 核对）**：本节标题、结论与下方表格为 **01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `0cd7e1f`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-07 本轮，commit `0cd7e1f`，CI run `42384679876` 五作业全绿）**，其中 `/admin/` 已返回含 `noindex` 的管理后台新产物，且自建主站 / GitHub Pages / Cloudflare Pages 三处首页均已含 `?tads` / 裸问号归一化脚本。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
 
 结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证）——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），层 2 验证码页 CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06）。自建主站首页已引用本轮新产物 `assets/index-B15IIvsS.js`（证明 commit `7e4e3e9`「整站强制登录改为公开视图免登录」已上线），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
 
@@ -264,6 +264,8 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 > **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 不得作为「内容正确」的取证；须以有头真实浏览器读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
 >
 > **拦截面实测（2026-11-07）**：`curl` / 无头 UA → 层 1 混淆 JS（约 986B）；**无头浏览器（`--headless=new`）与全新 `user-data-dir` 的有头 Edge → 层 2 验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。判定正则须覆盖 `EO_Bot_Ssid|_0x649a|TEOCaptchaWidgetV1|正在验证连接安全性`。**可通过方式与其失效边界**：复用**已通过过校验的** `user-data-dir`（本机 `$env:TEMP\edge-cdp-profile`）+ 有头模式 + CDP（`--remote-debugging-port=9333`）；新建 profile 一律落入验证码页，不可作为取证手段。**且放行凭证会过期（实测约 17h 后失效：2026-11-07 01:48 复用该 profile 仍回落层 2）；层 2 的 TEOCaptcha 对 CDP 合成鼠标事件（`Input.dispatchMouseEvent`，×15 次点击）不放行；凭证过期后唯一出路是人工在有头浏览器勾选一次复选框，放行会回写 profile，后续 CDP 即可复用**。
+>
+> **`?tads` 注入机制与本轮修复（2026-11-07 定性）**：EdgeOne Bot 挑战脚本会给地址栏附加 `?tads` 参数，其字符串表内的清理逻辑为 `location.href=location.href.replace(/[?|&]tads/, '')`——该正则只匹配 `?tads` 本体、**不匹配**清理后残留的裸问号，因此地址栏最终留下 `https://data.mixm.top/?`。修复落在 [apps/web/index.html](../../apps/web/index.html) 的 `<head>` 内联脚本：在 React 挂载前用 `history.replaceState(null, '', location.pathname)` 原地清空查询串/裸问号，**不新增历史记录、不跳转**；仅命中「空查询串且地址以问号结尾」与「查询串恰为 `?tads`」两种形态，其余地址一律不动。该修复已随 CI 上线并实测：`mim.mixm.top/` → `tads=YES replaceState=YES`、`mim-8ah.pages.dev/` → `tads=YES replaceState=YES`、`afdk1991.github.io/mim/` → `LEN=1745 tads=True rs=True`。**EdgeOne 侧断根受限**：`edgeone makers --help` 仅 `init`/`dev`/`generate-routes`/`env`/`link`/`deploy`/`claim`/`create` 共 8 个子命令，**无任何 WAF / Bot 管理子命令**，关闭 WAF 只能走腾讯云 Web 控制台（需用户私有登录态，沙箱无凭证）；本轮已用 `edgeone makers deploy apps/web/dist -n mim-app --env production` 直传成功（Project ID `makers-qn9l8zxypkwd`、Deployment ID `dpbspulwd0nd`、exit 0 / `Deploy Success`），证明 `mim-app` 为 **direct upload 直传型**而非控制台「连接仓库」型。
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 
