@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # veFaaS（火山引擎函数服务）部署脚本
 #
+# ⚠️ 已停用候选（2026-11-07，铁律九/十）：APIG 网关为计费资源且有账户余额门槛，
+# 不满足「长期免费层」准入四要件；CI 工作流与 README 部署矩阵均不调用本脚本。
+# 保留仅为历史留痕，新部署一律走自建 nginx + systemd / ghcr / Pages 主链路；
+# 如需彻底清理，可整体删除 deploy/vefaas/ 目录（删除前请确认无外部引用）。
+#
 # 客观前提：veFaaS 依赖 `vefaas` CLI、火山引擎账号凭证，以及一个已处于 running 的 API 网关
 # （veFaaS 没有独立 HTTP trigger，公网入口只能挂 APIG 网关；APIG 为计费资源，创建网关要求
 # 账户余额 + 代金券合计 ≥ 100 元，实测不足时报 BalanceNotEnough）。

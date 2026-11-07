@@ -3,11 +3,12 @@
 #
 # 职责：拉取 origin/main → 安装依赖（含 dev，因 vite/esbuild 为构建期依赖）
 #       → 构建前端（apps/web,vite）与管理后台（apps/admin,vite）
-#       → 编译后端（esbuild → dist/index.js）
+#       → 编译后端（esbuild → dist/index.js，并搬运 dist/schema.sql）
 #       → 发布静态产物到 /opt/mim/web、管理后台到 /opt/mim/admin
 #       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET / MIM_CORS_ORIGINS /
 #         MIM_AUTH_ADMIN_PASSWORD / MIM_ADMIN_TOKEN / 可选验证码通道密钥）
-#       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端 → 健康检查
+#       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端
+#       → 安装并启用每日备份 timer（§6.5，MIM_ENABLE_BACKUP_TIMER=0 可关闭）→ 健康检查
 #
 # 用法（服务器上）：
 #   sudo bash /opt/mim/app/deploy/deploy.sh [目标提交]
@@ -123,6 +124,19 @@ pnpm --filter @mim/admin build
 log "编译 services/mim-api（esbuild → dist/index.js）"
 pnpm --filter @mim/api build
 
+# db.ts 以 new URL('./schema.sql', import.meta.url) 读取建表脚本；build.mjs 已负责搬运，
+# 此处再加一道兜底：生产 git clean 带 -e dist，旧产物目录可能残留历史版本，
+# 若缺该文件则宿主直部署启动即 ENOENT 崩溃（Dockerfile 链路另已有显式 COPY）。
+SCHEMA_SRC="$APP_DIR/services/mim-api/src/schema.sql"
+SCHEMA_DST="$APP_DIR/services/mim-api/dist/schema.sql"
+if [ -f "$SCHEMA_DST" ]; then
+  log "dist/schema.sql 已随构建产物落地"
+else
+  [ -f "$SCHEMA_SRC" ] || die "缺少 $SCHEMA_SRC，无法补齐 dist/schema.sql"
+  cp "$SCHEMA_SRC" "$SCHEMA_DST"
+  log "已补齐 $SCHEMA_DST（构建产物搬运兜底）"
+fi
+
 # --- 4. 发布静态产物 ---
 log "发布用户端静态产物 → $WEB_DIR"
 mkdir -p "$WEB_DIR"
@@ -164,13 +178,20 @@ else
 fi
 
 # 管理员密码登录口令：生产短信/邮件通道未接入时，POST /api/v1/auth/password 是唯一可用登录入口。
-# 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_AUTH_ADMIN_PASSWORD 环境变量可覆盖默认口令。
-AUTH_PASSWORD_DEFAULT="${MIM_AUTH_ADMIN_PASSWORD:-Mim@Admin2026}"
+# 安全修复（2026-11-07）：禁止再写入仓库内可查的固定默认口令（原字面值已从全仓移除）。
+# 幂等优先级：① env 文件已有值 → 保留；② CI/运维透传同名变量 → 采用；
+# ③ 两者皆无 → 现场生成随机口令写入 chmod 600 的 env 文件，且绝不回显到 CI 公开日志。
 if grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
   log "$MIM_ENV_FILE 已含 MIM_AUTH_ADMIN_PASSWORD，保留现有值"
+elif [ -n "${MIM_AUTH_ADMIN_PASSWORD:-}" ]; then
+  # CI Secret 透传路径：值来自 GitHub Actions secret，仅写入受保护的 env 文件
+  printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$MIM_AUTH_ADMIN_PASSWORD" >> "$MIM_ENV_FILE"
+  log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 来自 CI Secret，值不回显）"
 else
-  log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD）"
-  printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$AUTH_PASSWORD_DEFAULT" >> "$MIM_ENV_FILE"
+  # 兜底路径：base64 随机串去掉 /+= 特殊字符，避免 env 解析与 sed 替换歧义
+  AUTH_PASSWORD_GENERATED="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-24)"
+  printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$AUTH_PASSWORD_GENERATED" >> "$MIM_ENV_FILE"
+  log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 为现场随机值，请从该文件读取，日志不回显）"
 fi
 
 # 超管引导令牌（RBAC bootstrap）：/api/v1/admin/* 与 catalog 管理写路由的双通道鉴权之一。
@@ -251,6 +272,27 @@ log "重启 $SERVICE"
 systemctl daemon-reload
 systemctl enable "$SERVICE" >/dev/null 2>&1 || true
 systemctl restart "$SERVICE"
+
+# --- 6.5 每日数据库备份 timer（幂等安装；MIM_ENABLE_BACKUP_TIMER=0 可显式关闭） ---
+# 修复（2026-11-07）：backup-db.sh 虽已入库，但只写了「建议 cron」注释、从未被任何调度引用，
+# 备份链路等于不存在；这里把 service + timer 作为部署工件安装并 enable --now。
+# 备份脚本已改为复用项目自带 better-sqlite3，不再要求服务器安装 sqlite3 CLI。
+if [ "${MIM_ENABLE_BACKUP_TIMER:-1}" = "0" ]; then
+  log "MIM_ENABLE_BACKUP_TIMER=0，跳过备份 timer 安装"
+elif command -v systemctl >/dev/null 2>&1; then
+  # 先安装单元文件再 reload，保证每次部署都同步仓库内最新定义
+  cp "$APP_DIR/deploy/mim-backup.service" /etc/systemd/system/mim-backup.service
+  cp "$APP_DIR/deploy/mim-backup.timer" /etc/systemd/system/mim-backup.timer
+  systemctl daemon-reload
+  # timer 属辅助能力，启用失败只告警、不阻断主服务发布（set -e 下必须显式兜住）
+  if systemctl enable --now mim-backup.timer >/dev/null 2>&1; then
+    log "已启用 mim-backup.timer（每日 03:00，随机延迟 ≤5 分钟）"
+  else
+    warn "mim-backup.timer 启用失败，请检查 systemd；主服务发布不受影响"
+  fi
+else
+  warn "缺少 systemctl，跳过备份 timer 安装（非 systemd 主机）"
+fi
 
 # --- 7. 健康检查（最多等 20s） ---
 log "健康检查 http://127.0.0.1:$PORT_/health"

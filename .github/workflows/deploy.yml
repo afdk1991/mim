@@ -47,8 +47,8 @@ jobs:
         run: pnpm --filter @mim/admin build
 
       # 铁律十一：注释覆盖率硬门禁（--strict，总覆盖率低于阈值即退出 1 阻断发布）
-      # 当前全仓覆盖率 88.9%、未达标文件 7（均为新建 apps/admin 视图，分批补齐），
-      # 已高于默认阈值（80%），故门禁仍可通过
+      # 最近一次实测（2026-11-07）：总体覆盖率 93.7%、未达标文件 0、最低单文件 80.9%，
+      # 均高于默认阈值（80%）；数值随代码变动，以每次 CI 实测输出为准，此注释仅为基线说明
       - name: 注释覆盖率门禁（铁律十一）
         run: node scripts/comment-check.mjs --strict
 
@@ -93,12 +93,15 @@ jobs:
           # RBAC 超管引导令牌：缺失则 /api/v1/admin/* 与 catalog 管理写路由返回 403，
           # 独立后台 /admin/ 无法完成任何写操作（见 deploy/deploy.sh 的幂等写入段）。
           MIM_ADMIN_TOKEN: ${{ secrets.MIM_ADMIN_TOKEN }}
+          # 管理员密码登录口令：未配置时 deploy.sh 现场生成随机值（不再使用仓库内可查的固定口令）；
+          # 配置为 Secret 后可在多机/重装场景复用同一口令，值绝不落到公开日志。
+          MIM_AUTH_ADMIN_PASSWORD: ${{ secrets.MIM_AUTH_ADMIN_PASSWORD }}
         run: |
           # 可选通道 secret 透传到远端 deploy.sh（%q 安全引用；未配置的 secret 为空则不传）
           ENV_ARGS=""
           for v in MIM_SMS_ALIYUN_ACCESS_KEY_ID MIM_SMS_ALIYUN_ACCESS_KEY_SECRET MIM_SMS_ALIYUN_SIGN_NAME MIM_SMS_ALIYUN_TEMPLATE_CODE \
                    MIM_EMAIL_SES_ACCESS_KEY_ID MIM_EMAIL_SES_SECRET_ACCESS_KEY MIM_EMAIL_SES_REGION MIM_EMAIL_SES_FROM_ADDRESS \
-                   MIM_ADMIN_TOKEN; do
+                   MIM_ADMIN_TOKEN MIM_AUTH_ADMIN_PASSWORD; do
             val="${!v}"
             [ -n "$val" ] && ENV_ARGS="$ENV_ARGS $(printf '%s=%q' "$v" "$val")"
           done

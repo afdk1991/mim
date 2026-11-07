@@ -186,7 +186,7 @@ deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/d
 生产安全开关与登录入口（CI 不跑，需合法请求体）：
 
 - `POST /api/v1/auth/code` 传 `{"region":"cn","provider":"phone","identifier":"13800000000"}`：通道未配置应返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；已配置阿里云短信后返回 201 `delivery:"phone"` 且响应无 `dev_code`（真实短信下发，供应商失败返回 502 `AUTH_CODE_DELIVERY_FAILED`）。任何情况下不得回 200 带 `dev_code` 或 500。
-- `POST /api/v1/auth/password` 传 `{"region":"cn","identifier":"13800000000","password":"<MIM_AUTH_ADMIN_PASSWORD>"}` 应返回 200 并带 `access_token` / `refresh_token` / `user`；口令错误应 401 `AUTH_PASSWORD_INVALID`。生产口令由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`（默认 `Mim@Admin2026`，可用 CI Secret 同名变量覆盖）。
+- `POST /api/v1/auth/password` 传 `{"region":"cn","identifier":"13800000000","password":"<MIM_AUTH_ADMIN_PASSWORD>"}` 应返回 200 并带 `access_token` / `refresh_token` / `user`；口令错误应 401 `AUTH_PASSWORD_INVALID`。生产口令由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`（chmod 600）：优先保留已有值，其次采用 CI Secret 同名变量，两者皆无则现场 `openssl rand` 生成随机值且不回显日志；**不再存在公开默认口令**，运维须从服务器 env 文件读取。
 
 所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`；可选通道 secrets（配置后由 `deploy.yml` 经 `sudo env` 透传写入 `mim-api.env`，即配即生效）：`MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE`（阿里云短信）、`MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_REGION` / `MIM_EMAIL_SES_FROM_ADDRESS`（AWS SES）。
 
@@ -243,7 +243,9 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
 `Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
 
-### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`）
+### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`，历史快照）
+
+> **取证口径说明（2026-11-07 22:2x 核对）**：本节标题、结论与下方表格为 **01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `c02c51d`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-07 22:25:52 +0800，commit `c02c51d`）**，其中 `/admin/` 已返回含 `noindex` 的管理后台新产物。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
 
 结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证）——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），层 2 验证码页 CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06）。自建主站首页已引用本轮新产物 `assets/index-B15IIvsS.js`（证明 commit `7e4e3e9`「整站强制登录改为公开视图免登录」已上线），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
 

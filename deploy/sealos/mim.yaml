@@ -3,6 +3,8 @@
 # 镜像由 GitHub Actions 的 packages job 推送到 ghcr.io/afdk1991/mim-api:latest。
 # 数据库为持久化 PVC（mim-data），挂载到 /app/services/mim-api/data（与 config.ts 的 DATA_DIR 一致）。
 #
+# 安全提示：替换只在管道内传给 kubectl，禁止把含真实密钥的结果写回本文件或提交仓库；
+# __JWT_SECRET__ 必须始终保持占位符形态，真实值只从环境变量注入（清单内 value 为占位符，非明文密钥）。
 # 应用前需替换 __NAMESPACE__ / __JWT_SECRET__ / __DOMAIN__ 三个占位符：
 #   sed -e "s/__NAMESPACE__/$SEALOS_NAMESPACE/g" \
 #       -e "s/__JWT_SECRET__/$MIM_JWT_SECRET/g" \

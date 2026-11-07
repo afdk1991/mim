@@ -11,9 +11,10 @@ ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 
-# 依赖清单先行，最大化层缓存命中（覆盖 pnpm-workspace.yaml 的全部 4 个成员）
+# 依赖清单先行，最大化层缓存命中（覆盖 pnpm-workspace.yaml 的全部 5 个成员，含锁文件第 6 个 root importer）
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/admin/package.json ./apps/admin/
 COPY services/mim-api/package.json ./services/mim-api/
 COPY packages/core-domain/package.json ./packages/core-domain/
 COPY packages/i18n/package.json ./packages/i18n/

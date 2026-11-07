@@ -1,0 +1,20 @@
+# systemd timer 单元：让 deploy/backup-db.sh 真正按日自动执行（此前仅有 cron 建议注释、无调度）
+# deploy/deploy.sh §6.5 负责把本文件安装到 /etc/systemd/system 并 enable --now；
+# 可用 MIM_ENABLE_BACKUP_TIMER=0 显式跳过安装。
+[Unit]
+# 单元说明：仅供 systemctl list-timers 检索
+Description=Daily Mim SQLite backup timer
+
+[Timer]
+# 每日 03:00（服务器本地时区）触发，避开业务高峰
+OnCalendar=*-*-* 03:00:00
+# 随机延迟 0–5 分钟，避免多实例同一瞬间争抢磁盘 I/O
+RandomizedDelaySec=300
+# 关机错过触发时，开机后补执行一次，保证备份不因维护窗口丢失
+Persistent=true
+# 指定被触发的 service 单元（文件名与本 timer 前缀不同，必须显式声明）
+Unit=mim-backup.service
+
+[Install]
+# 开机即启用该计时器，无需人工 enable --now 之外再操作
+WantedBy=timers.target

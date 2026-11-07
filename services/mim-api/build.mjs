@@ -8,6 +8,8 @@
 // SRC_DIR/REPO_ROOT/DATA_DIR 的相对层级在编译前后保持一致，无需改代码。
 
 import { build } from 'esbuild';
+// fs/promises：把 SQLite 建表脚本随 esbuild 产物搬运，避免运行时 ENOENT（见文件末尾）
+import { copyFile, mkdir } from 'node:fs/promises';
 
 await build({
   entryPoints: ['src/index.ts'],
@@ -34,4 +36,9 @@ await build({
   logLevel: 'info',
 });
 
-console.log('[build] dist/index.js 生成完毕');
+// db.ts 以 new URL('./schema.sql', import.meta.url) 读取建表脚本，
+// esbuild 不会内联该静态资源；若 dist/ 缺文件，宿主直部署（systemd / Render / npm start）启动即 ENOENT 崩溃。
+await mkdir('dist', { recursive: true }); // 幂等创建产物目录，兼容首次构建与 dist 被清理的场景
+await copyFile('src/schema.sql', 'dist/schema.sql'); // 与 dist/index.js 同级，import.meta.url 才能正确定位
+console.log('[build] dist/index.js 生成完毕'); // 输出构建成功标记，便于 CI 日志核对
+console.log('[build] dist/schema.sql 同步完毕'); // 输出资源搬运标记，证明非容器链路也能找到建表脚本

@@ -1,0 +1,15 @@
+# systemd oneshot 单元：执行一次 SQLite 在线热备份（由 mim-backup.timer 每日触发）
+# 与 deploy/migrations/*.cjs 一致，备份走项目自带 better-sqlite3，不依赖服务器 sqlite3 CLI。
+[Unit]
+# 单元说明：仅供 journalctl 检索，无业务语义
+Description=Mim SQLite daily backup
+# 依赖本地文件系统就绪，避免 /opt/mim 尚未挂载时提前启动
+After=local-fs.target
+
+[Service]
+# 一次性任务：执行完即退出，timer 负责下次调度
+Type=oneshot
+# 直接调用仓库内备份脚本；APP_DIR 由脚本默认值 /opt/mim/app 解析
+ExecStart=/bin/bash /opt/mim/app/deploy/backup-db.sh
+# 备份需写入 /var/backups/mim 并读取运行用户创建的数据库，故以 root 执行
+User=root
