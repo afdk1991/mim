@@ -32,6 +32,15 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
+      # 配置门禁：此前只在本地 npm run check 中执行，CI 未挂导致「本地拦得住、流水线拦不住」。
+      # env-check 校验 .env.example 与 09 清单双向对齐且无真实密钥入库；version-check 落实铁律四。
+      # 两者都只读仓库内文件，不依赖任何 Secret / 外部服务，故放在类型检查之前快速失败。
+      - name: 密钥模板校验（09 清单 §0）
+        run: node scripts/env-check.mjs
+
+      - name: 版本号校验（铁律四）
+        run: node scripts/version-check.mjs
+
       - name: 类型检查
         run: pnpm -r typecheck
 
