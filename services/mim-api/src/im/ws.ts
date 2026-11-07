@@ -39,8 +39,16 @@ export function attachImWebSocket(server: HttpServer, deps: ApiDeps): ImHub {
     // 从 URL query 中取 token
     const parsed = parseUrl(req.url, true);
     const token = (parsed.query.token as string) || '';
-    // 校验 token：失败时 payload 为 null，仍需完成 upgrade 握手（避免 nginx 502）
-    const payload = token ? verifyAccessToken(token, deps.jwtSecret) : null;
+    // 校验 token：verifyAccessToken 失败时抛 AppError，必须 try/catch，
+    // 否则未捕获异常会导致 socket 被销毁、nginx 回 502。
+    let payload: { sub: string } | null = null;
+    if (token) {
+      try {
+        payload = verifyAccessToken(token, deps.jwtSecret);
+      } catch {
+        payload = null; // 鉴权失败：置空，由 connection 回调发送 error 帧后关闭
+      }
+    }
     // 无论鉴权是否通过，都完成 101 握手；鉴权结果在 connection 回调内处理
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit('connection', ws, req, payload?.sub); // payload.sub 即 user_id，鉴权失败时为 undefined
