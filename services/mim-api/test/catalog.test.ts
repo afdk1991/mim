@@ -64,34 +64,36 @@ beforeEach(() => { // 每例前置：重建内存库与已启用管理面的应�
   app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN } }); // env 注入管理令牌即开启管理面
 }); // 结束 beforeEach
 
-describe('管理面鉴权（requireAdmin）', () => { // 管理路由必须先过令牌校验，否则不应泄露任何写能力
-  it('未配置 MIM_ADMIN_TOKEN → 403 FEATURE_NOT_AVAILABLE', async () => { // 服务端未启用管理面时，即使带令牌也应拒绝
+describe('管理面鉴权（requirePermission 双通道）', () => { // 管理路由已切 RBAC：引导令牌与 Bearer 均可，二者都没有时一律 401
+  it('未配置 MIM_ADMIN_TOKEN 且无 Bearer → 401 AUTH_UNAUTHORIZED', async () => { // 双通道都不可用时不得泄露任何写能力
     const bareApp = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 独立应用实例，env 不含管理令牌
-    const res = await request(bareApp) // 用未启用管理面的实例发请求
+    const res = await request(bareApp) // 用未启用引导通道的实例发请求
       .patch('/api/v1/modules/comic.workbench/status') // 管理端点
       .set(adminHeaders()) // 带上令牌，证明拒绝原因不是缺令牌
       .send({ status: 'active' }); // 合法请求体
-    expect(res.status).toBe(403); // 断言 403，功能未启用
-    expect(res.body.code).toBe('FEATURE_NOT_AVAILABLE'); // 断言错误码
-    expect(res.body.message).toBe('admin API is not enabled'); // 断言文案，前端可据此提示运维配置
+    expect(res.status).toBe(401); // 断言 401：引导通道未开启，且请求未携带 Bearer
+    expect(res.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言错误码
+    expect(res.body.message).toBe('missing bearer token'); // 断言文案，来自 Bearer 解析分支
   }); // 结束未配置用例
 
-  it('缺少或错误令牌 → 401 AUTH_UNAUTHORIZED', async () => { // 已启用管理面时，令牌缺失与令牌错误必须同为 401
+  it('缺少凭据 → 401；错误 x-admin-token → 401 invalid admin token', async () => { // 缺失与错误同语义，避免令牌探测
     const missing = await request(app) // 完全不带头
       .patch('/api/v1/modules/comic.workbench/status') // 管理端点
       .send({ status: 'active' }); // 合法请求体
     expect(missing.status).toBe(401); // 断言 401
     expect(missing.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言错误码
-    expect(missing.body.message).toBe('invalid admin token'); // 断言文案，与中间件实现一致
+    expect(missing.body.message).toBe('missing bearer token'); // 完全没有凭据时落到 Bearer 分支
 
     const wrong = await request(app) // 带错误令牌
       .patch('/api/v1/modules/comic.workbench/status') // 同一端点
       .set(adminHeaders('wrong-token')) // 故意用错值
       .send({ status: 'active' }); // 合法请求体
     expect(wrong.status).toBe(401); // 断言 401，错误令牌与缺失同语义
+    expect(wrong.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言错误码
+    expect(wrong.body.message).toBe('invalid admin token'); // 断言文案，来自 adminTokenMatches
   }); // 结束令牌用例
 
-  it('正确令牌通过鉴权', async () => { // 正向用例：正确令牌应放行到业务逻辑
+  it('正确 x-admin-token（超管引导通道）通过鉴权', async () => { // 引导通道等同全权限，冷启动可用
     const res = await request(app) // 带正确令牌
       .patch('/api/v1/modules/comic.workbench/status') // 管理端点
       .set(adminHeaders()) // 正确令牌
@@ -99,6 +101,18 @@ describe('管理面鉴权（requireAdmin）', () => { // 管理路由必须先�
     expect(res.status).toBe(200); // 断言 200，说明鉴权已放行
     expect(res.body.module.code).toBe('comic.workbench'); // 断言回显模块码
   }); // 结束正向用例
+
+  it('Bearer 用户无 module:write 权限 → 403 FORBIDDEN 并回显缺失权限点', async () => { // RBAC 主通道：登录通过但权限不足
+    const session = await login('13800000009'); // 新建一个未授予任何角色的普通用户
+    const res = await request(app) // 用普通用户 Bearer 发起管理写操作
+      .patch('/api/v1/modules/comic.workbench/status') // 管理端点
+      .set('Authorization', `Bearer ${session.token}`) // 仅带 Bearer，不带引导令牌
+      .send({ status: 'archived' }); // 合法请求体
+    expect(res.status).toBe(403); // 断言 403，鉴权通过但授权失败
+    expect(res.body.code).toBe('FORBIDDEN'); // 断言 RBAC 专用错误码
+    expect(res.body.message).toBe('permission denied'); // 断言文案
+    expect(res.body.details.permission).toBe('module:write'); // 断言缺失的权限点，便于前端提示
+  }); // 结束权限不足用例
 }); // 结束管理面鉴权分组
 
 describe('模块状态机（draft → active → archived）', () => { // 单向迁移，任何回退或跨级都必须被拒

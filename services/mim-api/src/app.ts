@@ -10,6 +10,7 @@ import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内�
 import { createComicRouter } from './routes/comic.js'; // 创作工程与分镜，内部统一 requireAuth
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
 import { createAiRouter } from './routes/ai.js'; // AI 编排控制面，内部统一 requireAuth
+import { createAdminRouter } from './routes/admin.js'; // RBAC 后台控制面：角色 / 权限 / 用户角色授权
 import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -39,7 +40,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
       cors({ // 显式列出方法、请求头与暴露头，避免默认值缺项
         origin: corsOrigins, // 仅白名单来源可跨域访问
         methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // 含 PUT 与预检 OPTIONS，覆盖对象直传
-        allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id'], // 鉴权、幂等键、追踪头必须放行
+        allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id', 'X-Admin-Token'], // 鉴权、幂等键、追踪头、超管引导令牌必须放行（缺 X-Admin-Token 会让跨域后台登录被预检拦死）
         exposedHeaders: ['X-Request-Id'], // 让浏览器端能读到追踪 ID 便于报障
         credentials: false, // 不用 Cookie 会话，关闭凭证可避免必须精确匹配 origin
         maxAge: 86400, // 预检结果缓存一天，减少 OPTIONS 往返开销
@@ -77,6 +78,9 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   ]) { // 路由数组结束，进入逐个注册循环
     app.use('/api/v1', router); // 统一 /api/v1 前缀；鉴权按命名空间在 router 内部生效
   } // for 结束：四个受保护 router 已依次挂载
+
+  // 后台控制面（RBAC）：每个路由显式挂 requirePermission，未带凭证一律 401，带凭证但缺权限 403
+  app.use('/api/v1', createAdminRouter(resolved)); // 不挂 idempotency：超管引导通道无 req.user，挂上会被幂等中间件前置拦截成 401
 
   app.use(notFound); // 所有路由之后兜底：未命中即返回统一 404 信封
   app.use(errorHandler); // 必须最后挂：四参错误中间件只捕获其之前注册的链路抛错

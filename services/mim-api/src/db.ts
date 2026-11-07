@@ -18,6 +18,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   if (filename !== ':memory:') db.pragma('journal_mode = WAL'); // 落盘库启用 WAL，提升读写并发并降低写阻塞（内存库不支持）
   db.exec(readFileSync(SCHEMA_PATH, 'utf8')); // 执行建表脚本，全部 IF NOT EXISTS 以便每次启动幂等
   seedModules(db); // 写入模块商城基础数据，保证新库启动即有可售模块
+  seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束
 
@@ -75,3 +76,114 @@ export function seedModules(db: Db): void { // 模块种子入口：幂等 upser
   }); // 事务函数准备完成
   seed(); // 执行事务，完成种子数据写入
 } // seedModules 结束
+
+/** 内置权限点清单：路由侧 requirePermission 与后台角色编辑页共用同一份定义 */
+export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺序
+  { code: 'module:read', name: { 'zh-CN': '查看模块', 'en-US': 'Read modules' } }, // 读取模块目录与详情
+  { code: 'module:write', name: { 'zh-CN': '变更模块状态', 'en-US': 'Change module status' } }, // 模块状态迁移 draft→active→archived
+  { code: 'entitlement:read', name: { 'zh-CN': '查看权益', 'en-US': 'Read entitlements' } }, // 查询任意用户的权益记录
+  { code: 'entitlement:grant', name: { 'zh-CN': '发放权益', 'en-US': 'Grant entitlements' } }, // 手工发放模块权益
+  { code: 'entitlement:revoke', name: { 'zh-CN': '回收权益', 'en-US': 'Revoke entitlements' } }, // 回收已发放权益
+  { code: 'user:read', name: { 'zh-CN': '查看用户', 'en-US': 'Read users' } }, // 查询用户列表与详情
+  { code: 'rbac:read', name: { 'zh-CN': '查看角色权限', 'en-US': 'Read roles' } }, // 读取角色、权限与授权关系
+  { code: 'rbac:write', name: { 'zh-CN': '管理角色权限', 'en-US': 'Manage roles' } }, // 增删角色、改权限、改用户角色
+] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
+
+/** 权限点编码联合类型：路由调用处传错字符串会在编译期报错 */
+export type RbacPermissionCode = (typeof RBAC_PERMISSIONS)[number]['code'];
+
+/** 内置角色定义：code 稳定不变，名称与描述支持多语言，permissions 为基线权限集合 */
+export const RBAC_ROLES = [ // 内置角色数组，同样决定后台展示顺序
+  { // 超级管理员：拥有全部权限，不可删除
+    code: 'superadmin', // 角色码，路由与后台按此判定超管
+    name: { 'zh-CN': '超级管理员', 'en-US': 'Super Admin' }, // 多语言名称
+    description: { 'zh-CN': '拥有全部权限，可管理角色与用户授权', 'en-US': 'Full access including role and user administration' }, // 多语言描述
+    permissions: RBAC_PERMISSIONS.map((p) => p.code), // 基线权限即全部权限点，后续新增权限点会自动补齐
+  }, // superadmin 结束
+  { // 运营管理员：可改模块、发放与回收权益，不可改角色授权
+    code: 'operator', // 角色码
+    name: { 'zh-CN': '运营管理员', 'en-US': 'Operator' }, // 多语言名称
+    description: { 'zh-CN': '可变更模块状态、发放与回收权益，可查看用户', 'en-US': 'Change module status, grant/revoke entitlements, read users' }, // 多语言描述
+    permissions: [ // 运营侧基线权限
+      'module:read', // 需要看到模块列表才能操作
+      'module:write', // 允许上下线模块
+      'entitlement:read', // 需要查看权益现状
+      'entitlement:grant', // 允许发放权益
+      'entitlement:revoke', // 允许回收权益
+      'user:read', // 需要按用户查权益
+      'rbac:read', // 需要知道自己持有哪些权限
+    ] as const, // 断言常量，元素类型须落在 RbacPermissionCode 内
+  }, // operator 结束
+  { // 只读观察者：仅供审计与客服查询
+    code: 'viewer', // 角色码
+    name: { 'zh-CN': '只读观察员', 'en-US': 'Viewer' }, // 多语言名称
+    description: { 'zh-CN': '只读查看模块、权益与用户，不能产生任何写操作', 'en-US': 'Read-only access to modules, entitlements and users' }, // 多语言描述
+    permissions: [ // 只读基线权限
+      'module:read', // 查看模块
+      'entitlement:read', // 查看权益
+      'user:read', // 查看用户
+      'rbac:read', // 查看自己的角色与权限
+    ] as const, // 断言常量
+  }, // viewer 结束
+] as const; // 断言字面量常量，避免 code 等字段被拓宽为 string
+
+/**
+ * RBAC 种子：写入内置权限点、内置角色与角色权限映射。
+ *
+ * 幂等策略：
+ *   - 权限点 / 角色用 ON CONFLICT DO UPDATE，刷新名称与描述；
+ *   - 角色权限映射用 INSERT OR IGNORE，**只补不删**，
+ *     避免每次启动把后台给内置角色额外追加的权限抹掉。
+ */
+export function seedRbac(db: Db): void { // RBAC 种子入口，随 createDatabase 每次启动执行
+  const now = new Date().toISOString(); // 同一批次统一时间戳，便于事后按批次核对
+
+  const upsertPermission = db.prepare( // 预编译权限点 upsert 语句
+    `INSERT INTO permissions (code, name_i18n, description_i18n, builtin, created_at, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?)
+     ON CONFLICT(code) DO UPDATE SET
+       name_i18n = excluded.name_i18n,
+       builtin = 1,
+       updated_at = excluded.updated_at`, // 冲突时只刷新名称与时间，保留原有 created_at
+  ); // prepare 结束
+
+  const upsertRole = db.prepare( // 预编译角色 upsert 语句
+    `INSERT INTO roles (code, name_i18n, description_i18n, builtin, created_at, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?)
+     ON CONFLICT(code) DO UPDATE SET
+       name_i18n = excluded.name_i18n,
+       description_i18n = excluded.description_i18n,
+       builtin = 1,
+       updated_at = excluded.updated_at`, // 内置角色的名称与描述以代码为准，避免被后台随意改坏
+  ); // prepare 结束
+
+  const insertRolePermission = db.prepare( // 预编译角色权限映射插入语句
+    `INSERT OR IGNORE INTO role_permissions (role_code, permission_code, created_at)
+     VALUES (?, ?, ?)`, // OR IGNORE 保证重复执行不报主键冲突，且不删除后台追加的权限
+  ); // prepare 结束
+
+  const seed = db.transaction(() => { // 包成事务：任一语句失败整体回滚，避免出现半套角色
+    for (const permission of RBAC_PERMISSIONS) { // 逐条写入内置权限点
+      upsertPermission.run( // 按占位符顺序绑定
+        permission.code, // 权限码，如 module:write
+        JSON.stringify(permission.name), // 多语言名称序列化落库
+        '{}', // 内置权限暂无描述，保留空对象以便后台后续补充
+        now, // created_at
+        now, // updated_at
+      ); // run 结束
+    } // 权限点循环结束
+    for (const role of RBAC_ROLES) { // 逐条写入内置角色
+      upsertRole.run( // 按占位符顺序绑定
+        role.code, // 角色码，如 operator
+        JSON.stringify(role.name), // 多语言名称
+        JSON.stringify(role.description), // 多语言描述
+        now, // created_at
+        now, // updated_at
+      ); // run 结束
+      for (const permissionCode of role.permissions) { // 逐条补齐该角色的基线权限
+        insertRolePermission.run(role.code, permissionCode, now); // 已存在则忽略，保证幂等
+      } // 权限循环结束
+    } // 角色循环结束
+  }); // 事务函数准备完成
+  seed(); // 执行事务
+} // seedRbac 结束

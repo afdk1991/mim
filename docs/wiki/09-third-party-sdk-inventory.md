@@ -3,6 +3,8 @@
 > 本文档是 Mim 第三方能力接入的**唯一基线清单**。任何新增/变更的第三方 SDK、开放 API、密钥，必须先登记到本文件，再进入代码实现（铁律五 + 铁律七）。
 >
 > 当前状态：仓库已进入编码阶段。`services/mim-api`（`@mim/api`）已含运行时依赖并写入 `package.json` + `pnpm-lock.yaml`：`express ^5.3.0`、`better-sqlite3 ^13.0.3`、`jsonwebtoken ^9.0.3`、`bcryptjs ^3.0.2`、`zod ^4.6.7`、`@aws-sdk/client-s3 ^3.1162.0`、`@aws-sdk/s3-request-presigner ^3.1162.0`（devDeps：`vitest@4`、`supertest@7`、`tsx@4`、`typescript@5.6.3`、`esbuild@0.25`），均属业务自研基础设施而非下表所列第三方 SaaS/SDK。其中 AWS SDK 用于 media 域对象存储准入（预签名上传/下载、S3 兼容端点），已在 `package.json` + `pnpm-lock.yaml` 落位（铁律五）。本文档登记的第三方能力清单仍为「计划引入」状态；对应能力接入时，按铁律五把依赖写入 `package.json` 并提交锁文件，同时更新本清单状态。
+>
+> **2026-11-07 增补 `apps/admin`（独立管理后台）前端依赖 7 项**（同为构建期 / 基础设施类，非第三方 SaaS）：`react ^18.3.1`、`react-dom ^18.3.1`（视图运行时）、`vite ^6.4.4`、`@vitejs/plugin-react ^4.7.0`（构建与开发服务器）、`typescript ^5.6.3`（类型检查）、`@types/react ^18.3.12`、`@types/react-dom ^18.3.1`（类型声明）。全部已写入 `apps/admin/package.json` 并经 `pnpm install` 提交 `pnpm-lock.yaml`；管理后台不引入任何 UI 组件库（自写 CSS 令牌），因此无额外第三方组件依赖。
 
 ---
 
@@ -277,4 +279,4 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | `MIM_JWT_SECRET` | 后端 JWT HS256 签名密钥（>=32 字符随机串） | 生产由 `deploy/deploy.sh` §5 幂等生成并写入 `/opt/mim/mim-api.env`（chmod 600），systemd 经 `EnvironmentFile` 注入；本地开发留空时自动生成 `.mim-dev-secret/jwt.key`（已 gitignore）。生产缺失即拒绝启动 | P0 |
 | `MIM_AUTH_ADMIN_PASSWORD` | `POST /api/v1/auth/password` 的管理员登录口令；短信/邮件通道未接入时的唯一可用登录入口 | `deploy/deploy.sh` §5 幂等补齐并写入 `/opt/mim/mim-api.env`（默认 `Mim@Admin2026`，已存在则保留）；可用同名环境变量在 CI/运维侧覆盖。留空时该端点返回 503 `AUTH_PASSWORD_NOT_CONFIGURED` | P0 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）。新增第三方能力必须先更新本文件，再进入实现。_

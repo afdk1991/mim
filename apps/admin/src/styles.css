@@ -1,0 +1,193 @@
+/* 管理后台全局样式：复用用户端设计令牌，保证两端视觉语言一致 */
+:root { /* 设计令牌根作用域：所有变量在此集中声明 */ 
+  --bg: #f4f5f7; /* 页面底色：浅灰降低长时间盯屏的视觉疲劳 */ 
+  --surface: #ffffff; /* 卡片/面板底色：与页面底色形成层次 */ 
+  --sidebar: #1d2433; /* 侧栏深色底：管理端与用户端共用同一品牌色 */ 
+  --sidebar-muted: #8a93a6; /* 侧栏次要文字色：用于分组标题与说明 */ 
+  --sidebar-hover: #2a3447; /* 侧栏悬停底色：比底色略亮以表达可点击 */ 
+  --text: #1c2230; /* 主文字色：高对比保证可读性 */ 
+  --text-muted: #6b7280; /* 次要文字色：说明、时间戳、空态 */ 
+  --border: #e3e6ec; /* 分割线/描边色 */ 
+  --primary: #3b6ef5; /* 主色：主要按钮与激活态 */ 
+  --primary-dark: #2f59c9; /* 主色按下态 */ 
+  --danger: #d64545; /* 危险色：删除、下线、错误提示 */ 
+  --success: #1f8a5b; /* 成功色：上线成功、已激活 */ 
+  --warning: #a86a10; /* 警告色：待处理、需注意 */ 
+  --radius: 10px; /* 统一圆角 */ 
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06); /* 卡片阴影 */ 
+} /* 令牌结束 */ 
+
+/* 全局盒模型：宽度包含内边距与边框，避免布局溢出 */ 
+*, *::before, *::after { box-sizing: border-box; } /* 统一盒模型 */ 
+
+/* body 基础排版 */ 
+body { /* 页面主体 */ 
+  margin: 0; /* 清除浏览器默认外边距 */ 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; /* 中英文优先系统字体 */ 
+  background: var(--bg); /* 页面底色 */ 
+  color: var(--text); /* 默认文字色 */ 
+  font-size: 14px; /* 基础字号：信息密度与可读性折中 */ 
+  line-height: 1.55; /* 行高：中文段落更易读 */ 
+} /* body 结束 */ 
+
+/* 标题去除默认外边距，交由布局控制间距 */ 
+h1, h2, h3, h4 { margin: 0; font-weight: 600; } /* 标题统一字重 */ 
+
+/* 链接默认继承文字色，避免蓝色满屏 */ 
+a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */ 
+
+/* 两栏布局：固定侧栏 + 自适应内容区 */ 
+.layout { /* 应用外壳 */ 
+  display: grid; /* 网格布局便于固定列宽 */ 
+  grid-template-columns: 232px minmax(0, 1fr); /* 左固定 232px，右侧可压缩不溢出 */ 
+  min-height: 100vh; /* 至少铺满视口高度 */ 
+} /* 布局结束 */ 
+
+/* 侧栏容器 */ 
+.sidebar { /* 左侧导航 */ 
+  background: var(--sidebar); /* 深色底 */ 
+  color: #fff; /* 侧栏内文字为白色 */ 
+  display: flex; /* 纵向弹性布局 */ 
+  flex-direction: column; /* 从上到下：品牌、导航、底部身份 */ 
+  padding: 20px 14px; /* 内边距 */ 
+  position: sticky; /* 滚动时固定 */ 
+  top: 0; /* 贴顶 */ 
+  height: 100vh; /* 占满视口 */ 
+} /* 侧栏结束 */ 
+
+/* 品牌区 */ 
+.brand { padding: 4px 8px 18px; } /* 品牌块内边距 */ 
+.brand-name { font-size: 17px; font-weight: 700; color: #fff; } /* 品牌名 */ 
+.brand-tagline { color: var(--sidebar-muted); font-size: 12px; margin-top: 2px; } /* 品牌副标题 */ 
+
+/* 导航清单 */ 
+.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; } /* 纵向排列并占据剩余空间 */ 
+.nav-item { /* 单个导航项 */ 
+  display: block; /* 块级便于整行点击 */ 
+  width: 100%; /* 占满侧栏宽度 */ 
+  text-align: left; /* 文字左对齐 */ 
+  padding: 9px 10px; /* 内边距保证点击热区 */ 
+  border: 0; /* 去除按钮默认边框 */ 
+  border-radius: 8px; /* 圆角 */ 
+  background: transparent; /* 默认透明 */ 
+  color: #cfd6e4; /* 未激活文字色 */ 
+  font-size: 13px; /* 导航字号 */ 
+  cursor: pointer; /* 手型光标表达可点击 */ 
+} /* 导航项结束 */ 
+.nav-item:hover { background: var(--sidebar-hover); color: #fff; } /* 悬停高亮 */ 
+.nav-item.active { background: var(--primary); color: #fff; } /* 激活项主色填充 */ 
+
+/* 侧栏底部身份区 */ 
+.sidebar-footer { border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 12px; margin-top: 12px; } /* 分隔线与间距 */ 
+.user-name { color: #fff; font-size: 13px; word-break: break-all; } /* 身份名允许长 ID 换行 */ 
+.user-region { color: var(--sidebar-muted); font-size: 12px; } /* 身份附加信息 */ 
+
+/* 内容区 */ 
+.main { padding: 28px 32px 48px; min-width: 0; } /* 内边距 + 允许网格列收缩 */ 
+.page { max-width: 1180px; } /* 内容最大宽度，超宽屏不拉伸 */ 
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; } /* 标题行左右分置 */ 
+.page-head h2 { font-size: 19px; } /* 页面标题字号 */ 
+
+/* 通用文字辅助 */ 
+.muted { color: var(--text-muted); } /* 次要文字 */ 
+.hint { color: var(--text-muted); font-size: 12px; margin: 6px 0 0; } /* 表单提示 */ 
+.empty { color: var(--text-muted); padding: 18px 0; text-align: center; } /* 空态占位 */ 
+.count { color: var(--text-muted); font-size: 12px; } /* 计数徽标文字 */ 
+
+/* 状态提示条 */ 
+.error, .success, .warning { /* 三种语义提示共用结构 */ 
+  padding: 9px 12px; /* 内边距 */ 
+  border-radius: var(--radius); /* 圆角 */ 
+  font-size: 13px; /* 字号 */ 
+  margin: 12px 0; /* 上下间距 */ 
+  word-break: break-word; /* 长错误码允许换行 */ 
+} /* 提示条结束 */ 
+.error { background: #fdecec; color: var(--danger); } /* 错误：浅红底 */ 
+.success { background: #e8f6ef; color: var(--success); } /* 成功：浅绿底 */ 
+.warning { background: #fdf5e6; color: var(--warning); } /* 警告：浅黄底 */ 
+
+/* 面板卡片 */ 
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-top: 16px; } /* 卡片统一外观 */ 
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; } /* 卡片标题行 */ 
+
+/* 指标卡片网格 */ 
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; } /* 自适应列数 */ 
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; } /* 单卡外观 */ 
+.card-label { color: var(--text-muted); font-size: 12px; } /* 卡片标签 */ 
+.card-value { font-size: 20px; font-weight: 600; margin-top: 4px; word-break: break-all; } /* 卡片主值 */ 
+
+/* 两栏分栏 */ 
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; } /* 自适应双栏 */ 
+
+/* 表单 */ 
+.form { display: flex; flex-direction: column; gap: 10px; } /* 纵向表单流 */ 
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } /* 横向行内控件 */ 
+.field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; } /* 单个字段 */ 
+.field > span { font-size: 12px; color: var(--text-muted); } /* 字段标签 */ 
+input, select, textarea { /* 表单控件统一外观 */ 
+  padding: 7px 10px; /* 内边距 */ 
+  border: 1px solid var(--border); /* 描边 */ 
+  border-radius: 8px; /* 圆角 */ 
+  background: #fff; /* 白底 */ 
+  color: var(--text); /* 文字色 */ 
+  font-size: 13px; /* 字号 */ 
+  font-family: inherit; /* 继承中文字体栈 */ 
+  width: 100%; /* 占满字段容器 */ 
+} /* 控件结束 */ 
+input:focus, select:focus, textarea:focus { outline: 2px solid rgba(59, 110, 245, 0.28); outline-offset: 1px; border-color: var(--primary); } /* 聚焦可见性 */ 
+
+/* 按钮 */ 
+.btn { /* 基础按钮 */ 
+  display: inline-flex; /* 行内弹性布局 */ 
+  align-items: center; /* 垂直居中 */ 
+  gap: 6px; /* 图标与文字间距 */ 
+  padding: 7px 14px; /* 内边距 */ 
+  border: 1px solid var(--border); /* 默认描边 */ 
+  border-radius: 8px; /* 圆角 */ 
+  background: var(--surface); /* 默认白底 */ 
+  color: var(--text); /* 默认文字色 */ 
+  font-size: 13px; /* 字号 */ 
+  font-family: inherit; /* 继承字体 */ 
+  cursor: pointer; /* 手型光标 */ 
+  white-space: nowrap; /* 文案不折行 */ 
+} /* 按钮结束 */ 
+.btn:hover:not(:disabled) { border-color: #cfd5e1; } /* 悬停描边加深 */ 
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; } /* 主按钮 */ 
+.btn.primary:hover:not(:disabled) { background: var(--primary-dark); border-color: var(--primary-dark); } /* 主按钮按下态 */ 
+.btn.danger { color: var(--danger); border-color: #f0c4c4; } /* 危险按钮：文字红 */ 
+.btn.ghost { background: transparent; border-color: transparent; color: var(--primary); } /* 幽灵按钮 */ 
+.btn:disabled { opacity: 0.5; cursor: not-allowed; } /* 禁用态 */ 
+
+/* 表格 */ 
+.table { width: 100%; border-collapse: collapse; font-size: 13px; } /* 表宽占满并合并边框 */ 
+.table th, .table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; } /* 单元格内边距与分隔 */ 
+.table th { color: var(--text-muted); font-weight: 500; font-size: 12px; white-space: nowrap; } /* 表头弱化 */ 
+.table tbody tr:hover { background: #fafbfd; } /* 行悬停底色 */ 
+.table td code { font-size: 12px; } /* 单元格内代码字号 */ 
+
+/* 徽标 */ 
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; line-height: 1.7; background: #eef1f6; color: var(--text-muted); margin: 0 4px 4px 0; } /* 中性徽标 */ 
+.badge.active { background: #e8f6ef; color: var(--success); } /* 激活态徽标 */ 
+.badge.draft { background: #fdf5e6; color: var(--warning); } /* 草稿态徽标 */ 
+.badge.archived { background: #eef1f6; color: var(--text-muted); } /* 归档态徽标 */ 
+.badge.danger { background: #fdecec; color: var(--danger); } /* 危险态徽标 */ 
+.badge.builtin { background: #eaefff; color: var(--primary); } /* 内置标记徽标 */ 
+
+/* 登录页：无侧栏，居中卡片 */ 
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; } /* 全屏居中 */ 
+.login-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; } /* 登录卡片 */ 
+.login-title { font-size: 18px; font-weight: 700; } /* 登录标题 */ 
+.login-sub { color: var(--text-muted); font-size: 12px; margin: 4px 0 18px; } /* 登录副标题 */ 
+
+/* 页签 */ 
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; } /* 页签容器 */ 
+.tab { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text-muted); font-size: 13px; cursor: pointer; font-family: inherit; } /* 页签按钮 */ 
+.tab.active { background: var(--primary); border-color: var(--primary); color: #fff; } /* 激活页签 */ 
+
+/* 权限勾选矩阵 */ 
+.perm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; } /* 权限点网格 */ 
+.perm-item { display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; } /* 单权限项 */ 
+.perm-item input { width: auto; margin-top: 2px; } /* 复选框不占满宽度 */ 
+
+/* 分页条 */ 
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; } /* 右对齐分页 */ 

@@ -49,8 +49,9 @@ pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`�
 ```
 apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块 / 漫剧 AI 剧 / 站点地图 / 设置）
 apps/web/src/views/  # Login / Store / ComicWorkbench / SiteMap / Settings 五个视图组件
+apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；视图：概览 / 功能模块 / 权益管理 / 角色与权限 / 用户）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
-services/mim-api/src/routes/  # auth / catalog / site / me / comic / media / ai 七个路由模块
+services/mim-api/src/routes/  # auth / catalog / site / me / comic / media / ai / admin 八个路由模块
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7）
 packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
 scripts/             # build / version-check / env-check / comment-check
@@ -65,6 +66,8 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ### 前端视图（`apps/web/src/views`）
 
 无 URL 路由，视图由 [App.tsx](./apps/web/src/App.tsx) 的 `View` 状态切换；功能模块与站点地图免登录可浏览，漫剧与设置未登录时内容区内嵌登录卡片。
+
+独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 模块状态流转 / 权益发放与回收。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
@@ -89,6 +92,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets` | 对象端点凭签名免鉴权 |
 | AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
 | 站点地图 | `GET /site/overview`、`GET /site/modules`、`GET /site/modules/:host` | 公开只读 |
+| 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
 
 除 `auth/*` 外的写接口强制 `Idempotency-Key`（同键同体重放首次结果、同键异体 409）；错误统一信封携带 `requestId`。
 
@@ -99,14 +103,16 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，9 个测试文件 / 91 例）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，10 个测试文件 / 120 例）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
+pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
+pnpm --filter @mim/admin dev              # 启动管理后台（http://127.0.0.1:5174，/api 代理到 8787）
 npm run check                             # 版本规约 + 密钥模板校验 + 注释覆盖率（CI 以 --strict 执行）
 ```
 
-其他：`npm run build`（构建真实前端 `apps/web/dist` → 根 `dist/`，EdgeOne Pages 等 OutputDir=dist 的托管平台同款）、`npm run build:site`（PRD 阅读页 `site/` → `dist/` 离线预览）、`npm test`（等价 `@mim/api test`）。
+其他：`npm run build`（构建真实前端 `apps/web/dist` → 根 `dist/`，EdgeOne Pages 等 OutputDir=dist 的托管平台同款）、`npm run build:admin`（构建管理后台 `apps/admin/dist`）、`npm run build:site`（PRD 阅读页 `site/` → `dist/` 离线预览）、`npm test`（等价 `@mim/api test`）。
 
 ## 文档索引
 
@@ -126,7 +132,8 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 | 项 | 说明 |
 |---|---|
 | 生产域名 | `https://mim.mixm.top`（HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`） |
-| 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（静态根）+ systemd `mim-api`（端口 8787） |
+| 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（用户端静态根）+ `/opt/mim/admin`（管理后台静态根）+ systemd `mim-api`（端口 8787） |
+| 管理后台入口 | `https://mim.mixm.top/admin/`（`apps/admin` 构建产物；nginx `/admin/` location 独立 alias，与用户端静态根隔离；页面声明 `noindex, nofollow`） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前先用 `better-sqlite3` backup 再幂等执行 |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |

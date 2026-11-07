@@ -40,6 +40,7 @@ declare global { // 全局类型增强：让 Express Request 携带自定义字�
       requestId: string; // 请求追踪 ID，由 requestId 中间件最先写入
       user?: AuthUser; // 鉴权通过后才有值，故为可选；未鉴权路由不应读取
       deps: ApiDeps; // 每个请求共享的依赖容器，由依赖注入中间件赋值
+      adminBootstrap?: boolean; // 超管引导通道标记：命中 MIM_ADMIN_TOKEN 时为 true，用于区分「令牌超管」与「JWT 角色超管」
     } // Request 接口合并结束
   } // Express 命名空间结束
 } // declare global 结束，自定义字段已并入全局 Request 类型

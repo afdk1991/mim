@@ -1,0 +1,14 @@
+<!doctype html><!-- 文档类型声明：按 HTML5 标准解析，让浏览器进入标准渲染模式 -->
+<html lang="zh-CN"><!-- 根元素：lang 声明简体中文，影响断行规则、字体回退与读屏发音 -->
+  <head><!-- 头部区：只放元信息，不渲染可见内容 -->
+    <meta charset="UTF-8" /><!-- 字符编码：显式 UTF-8，保证中文标题与文案不乱码 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- 视口：移动端按设备宽度布局且初始不缩放 -->
+    <meta name="color-scheme" content="light dark" /><!-- 配色方案：声明支持浅/深色，浏览器可自动适配滚动条与原生控件 -->
+    <meta name="robots" content="noindex, nofollow" /><!-- 后台禁止被搜索引擎收录，避免管理入口暴露 -->
+    <title>Mim 管理后台 — 角色与权益</title><!-- 标签页标题：与用户端区分，便于多标签时快速识别 -->
+  </head><!-- 元信息结束 -->
+  <body><!-- 可见内容容器 -->
+    <div id="root"></div><!-- React 挂载点：main.tsx 通过 getElementById('root') 找到此节点 -->
+    <script type="module" src="/src/main.tsx"></script><!-- 入口脚本：type=module 走 ESM，由 Vite 负责 TSX 编译与热更新 -->
+  </body><!-- 可见内容结束 -->
+</html><!-- 文档结束 -->

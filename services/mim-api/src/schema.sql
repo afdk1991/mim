@@ -273,3 +273,46 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
   PRIMARY KEY (key, user_id)
 );
 
+-- ---------- rbac 域（角色-权限-用户三角色模型，08 §3.4 / 07 §2.1）----------
+-- 权限点：细粒度动作标识（如 module:write），由代码侧 requirePermission 按字符串匹配；
+-- 内置权限点在 db.ts seedRbac 中幂等写入，允许后台追加自定义权限点。
+CREATE TABLE IF NOT EXISTS permissions (
+  code              TEXT PRIMARY KEY,
+  name_i18n         TEXT NOT NULL,
+  description_i18n  TEXT NOT NULL DEFAULT '{}',
+  builtin           INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0,1)),
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL
+);
+
+-- 角色：权限集合的可命名载体；builtin=1 的内置角色禁止删除，避免把系统锁死
+CREATE TABLE IF NOT EXISTS roles (
+  code              TEXT PRIMARY KEY,
+  name_i18n         TEXT NOT NULL,
+  description_i18n  TEXT NOT NULL DEFAULT '{}',
+  builtin           INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0,1)),
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL
+);
+
+-- 角色-权限映射：多对多；删除角色或权限点时级联清理映射，杜绝悬空引用
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role_code         TEXT NOT NULL REFERENCES roles(code) ON DELETE CASCADE,
+  permission_code   TEXT NOT NULL REFERENCES permissions(code) ON DELETE CASCADE,
+  created_at        TEXT NOT NULL,
+  PRIMARY KEY (role_code, permission_code)
+);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_permission ON role_permissions(permission_code);
+
+-- 用户-角色映射：一个用户可持多个角色，权限为各角色并集；
+-- granted_by 记录授予人（用户 ID 或 'bootstrap'/'system'），用于审计回溯。
+-- 不对 user_id 建外键：与 entitlements 一致，用户软删除后保留授权历史便于审计。
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id           TEXT NOT NULL,
+  role_code         TEXT NOT NULL REFERENCES roles(code) ON DELETE CASCADE,
+  granted_by        TEXT NOT NULL DEFAULT 'system',
+  created_at        TEXT NOT NULL,
+  PRIMARY KEY (user_id, role_code)
+);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_code);
+

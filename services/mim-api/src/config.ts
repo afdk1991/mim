@@ -35,11 +35,16 @@ export const DELETION_GRACE_DAYS = 7; // 注销冷静期 7 天，期内可撤销
 export const REQUIRE_IDEMPOTENCY = true; // 全局开关：控制写路由是否强制幂等键，便于灰度或本地调试关闭
 
 /**
- * 管理面鉴权令牌（最小管理鉴权，RBAC 仍为 P1）。
- * 现有 users 表无 role 列，故 /modules/:code/status、/entitlements/grant 等管理写路径
- * 统一用 `x-admin-token` 头与 `MIM_ADMIN_TOKEN` 环境变量做常量时间比较。
+ * 管理面鉴权令牌（超管引导通道，与 RBAC 并存）。
+ *
+ * 鉴权双通道：
+ *   1. 主通道 —— Bearer JWT + RBAC：`requirePermission(code)` 每请求实时查 user_roles / role_permissions，
+ *      撤销授权立即生效，权限点见 db.ts 的 RBAC_PERMISSIONS。
+ *   2. 引导通道 —— 本常量对应的 `x-admin-token` 头：用于冷启动（库里还没有任何 superadmin 用户时）
+ *      先登录后台，把 superadmin 授给真实用户；命中后等同全权限（req.adminBootstrap = true）。
+ *
  * 注意：不在模块顶层缓存该值——中间件从 req.deps.env 读取，测试可直接注入而无需改全局 process.env。
- * 未配置环境变量时一律 403，端点不暴露任何管理能力。
+ * 未配置环境变量时引导通道直接失效（返回 false），管理端点仅接受 RBAC 通道，不暴露任何匿名管理能力。
  */
 export const ADMIN_TOKEN_ENV_KEY = 'MIM_ADMIN_TOKEN'; // 只导出键名常量，避免多处手写字符串拼错
 

@@ -3,7 +3,7 @@
 > **状态声明（证据）**：截至 V0.0.0-preview（2026-11-05），仓库内已落地 `apps/web`（React 18 + Vite 6）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express 5 + SQLite/better-sqlite3），包管理器 pnpm workspace；`pnpm -r typecheck` / `pnpm --filter @mim/api test`（5 文件 40 例全通过）/ `pnpm -w build` / `node scripts/version-check.mjs` / `node scripts/env-check.mjs`（138 = 138）均已通过并有命令输出留档。
 > **2026-11-04 变更（两次）**：① FR-03 旧范围（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已按用户指令整体移除，§3.2「content 域（已移除）」与同步/导出规则仅作历史参考，不再对应仓库实况；② FR-03 已**重定义为「功能模块商城 + 漫剧 AI 剧」**，新增 `catalog` / `comic` / `media` 三域与配套表；实现拆分清单见 [07-functional-modules.md](./07-functional-modules.md) §12。
 > **2026-11-05 变更**：① FR-02（订阅与支付）与审计域（`routes/audit.ts` + `audit_logs`）整域删除，生产库 9 张表 DROP（迁移 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`）；② 漫剧第 1/2 期后端已落地——`comic` 域 7 表 + 24 条路由 + `src/orchestrator.ts` + `src/storage.ts` 均已装配进 `app.ts`/`index.ts`；③ 受保护 router 的 `requireAuth` / `requireEntitlement` 改为按命名空间生效（`/me`、`/comic`、`/media`、`/ai`），未匹配路径落到统一 404，不再被鉴权误拦成 401（契约测试「已下线与未知路径返回 404」锁定）；④ 错误信封归一——`errorHandler` 识别 body-parser 的 `entity.parse.failed`（非法 JSON 请求体），返回 400 `VALIDATION_FAILED` 而非 500 `INTERNAL_ERROR`（契约测试新增 1 例，测试总数 39 → 40）。本页 §2 / §3 / §4 / §5 / §6 / §8 / §9 / §10 已按此同步。
-> **2026-11-07 变更**：① `catalog` 补三条管理写路由（`PATCH /modules/:code/status`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke`），鉴权由 `middleware.ts` 的 `requireAdmin` 承担（环境变量 `MIM_ADMIN_TOKEN`，常量时间比对），未配置时 403 `FEATURE_NOT_AVAILABLE`；② 新增 `services/mim-api/src/jobs.ts`——成本告警 / 成片审核超时 / 权益到期扫描三定时任务 + `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`），`index.ts` 按 `MIM_JOBS_ENABLED` 装配与优雅退出；③ 契约测试新增 `test/catalog.test.ts`（18 例）与 `test/jobs.test.ts`（9 例），全仓测试 64 → **91 例**；④ `apps/web` 整站强制登录改为两级门禁——`store` / `sitemap` 匿名可访问，`comic` / `settings` 未登录时内嵌 `<Login embedded />`。本页 §1.1 / §2 / §3 / §8 / §10 已按此同步。
+> **2026-11-07 变更**：① `catalog` 补三条管理写路由（`PATCH /modules/:code/status`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke`），鉴权由 `middleware.ts` 的 `requirePermission` 承担（Bearer JWT + RBAC 权限点，逐请求实时查库；`x-admin-token` 保留为超管引导通道，覆盖全部权限；无任何凭证返回 401 `AUTH_UNAUTHORIZED`，凭证无效返回 401 `invalid admin token`，权限不足返回 403 `FORBIDDEN` + `details.permission`）；② 新增 `services/mim-api/src/jobs.ts`——成本告警 / 成片审核超时 / 权益到期扫描三定时任务 + `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`），`index.ts` 按 `MIM_JOBS_ENABLED` 装配与优雅退出；③ 契约测试新增 `test/catalog.test.ts`（18 例）与 `test/jobs.test.ts`（9 例），全仓测试 64 → **91 例**；④ `apps/web` 整站强制登录改为两级门禁——`store` / `sitemap` 匿名可访问，`comic` / `settings` 未登录时内嵌 `<Login embedded />`；⑤ **完整 RBAC 与独立后台落地**：`schema.sql` 新增 `permissions` / `roles` / `role_permissions` / `user_roles` 四表，`db.ts` 新增 `RBAC_PERMISSIONS`（8 权限点）/ `RBAC_ROLES`（`superadmin` / `operator` / `viewer` 三内置角色）/ `seedRbac` 幂等播种，`middleware.ts` 新增 `loadPermissions` + `requirePermission`，新增 `routes/admin.ts`（11 个 RBAC 管理端点）并挂载 `/api/v1/admin/*`，新增 `apps/admin` 独立管理后台（React 18 + Vite 6，开发端口 5174，生产入口 `/admin/`，nginx 独立静态根 `/opt/mim/admin`），新增 `test/rbac.test.ts`（28 例），全仓测试 91 → **120 例**（10 文件）。本页 §1.1 / §2 / §3 / §4 / §5 / §8 / §10 已按此同步。
 > 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
@@ -40,16 +40,16 @@
 
 | 维度 | 规划口径（本页 §2+） | 当前已实现（证据位置） | 差异原因 / 后续 |
 |---|---|---|---|
-| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|me|comic|media|ai|site.ts`）；原 FR-03 五条路由已于 2026-11-04 删除；`billing` / `audit` 路由已于 2026-11-05 删除 |
+| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|catalog|site|me|comic|media|ai|admin.ts` 八个）；原 FR-03 五条路由已于 2026-11-04 删除；`billing` / `audit` 路由已于 2026-11-05 删除 |
 | 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
 | 支付 | `payment-driver` 多通道 + 回调验签 | **已删除（2026-11-05）**：`routes/billing.ts`、驱动分支与 9 张财务表整体移除，`/api/v1/plans` 等端点现返回 404（CI 断言） | 当前无任何支付能力；如需恢复须重新设计并引入持牌通道凭证 |
 | 实时同步 | WebSocket + MQ 推送，5 秒内到达 | **已移除（2026-11-04）**：原 4s 轮询 `GET /sync/changes` 随 FR-03 一并删除，当前无同步需求 |
-| 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 6），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
+| 客户端 | web / mini / mobile / desktop / admin 五端 | `apps/web`（用户端，React 18 + Vite 6，`/api` 与 `/health` 由 Vite 代理到 8787）+ `apps/admin`（独立管理后台，React 18 + Vite 6，开发端口 5174，生产入口 `/admin/`，同样经 Vite 代理 `/api`） | 先打通契约与核心流程；mini / mobile / desktop 三端复用同一 `/api/v1` 契约与 `packages/core-domain` |
 | 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/金额/UUIDv7）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象；原 `permissions.ts` / `tasks.ts` 随 FR-03 删除；`plans.ts` / `subscription.ts` / `order.ts` 随 FR-02 于 2026-11-05 删除 |
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
-| 后台管理 | `admin-api` + RBAC 后台 | **最小管理面已落地（2026-11-07）**：`middleware.ts` 的 `requireAdmin` 以环境变量 `MIM_ADMIN_TOKEN` 做常量时间比对（`timingSafeEqual` + sha256），未配置时返回 403 `FEATURE_NOT_AVAILABLE`；三条写路由 `PATCH /modules/:code/status`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke` 已挂载；**审计仍下线（2026-11-05 删除 `routes/audit.ts` + `audit_logs`）** | 完整 `admin-api` + 多角色 RBAC + 独立 `apps/admin` 仍为 P1；当前为单令牌最小管理面 |
+| 后台管理 | `admin-api` + RBAC 后台 | **完整 RBAC + `apps/admin` 独立后台已落地（2026-11-07）**：`schema.sql` 新增 `permissions` / `roles` / `role_permissions` / `user_roles` 四表，`db.ts` 定义 `RBAC_PERMISSIONS` 8 权限点（`module:read` / `module:write` / `entitlement:read` / `entitlement:grant` / `entitlement:revoke` / `user:read` / `rbac:read` / `rbac:write`）与 `RBAC_ROLES` 3 内置角色（`superadmin` 8 项 / `operator` 7 项不含 `rbac:write` / `viewer` 4 项）并由 `seedRbac` 幂等播种；`middleware.ts` 的 `loadPermissions` + `requirePermission` **逐请求实时查库**鉴权；`routes/admin.ts` 11 个 RBAC 端点挂载 `/api/v1/admin/*`；`apps/admin` 独立管理后台生产入口 `/admin/`（nginx 独立静态根 `/opt/mim/admin`）；`x-admin-token` 保留为**超管引导通道**（`timingSafeEqual` + sha256）；**审计仍下线（2026-11-05 删除 `routes/audit.ts` + `audit_logs`）** | 已达成原 P1 目标；后续待补：`apps/admin` 操作审计留痕（需重开审计域）、细粒度数据域权限、多组织隔离 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试保障字段一致性：`test/*.test.ts` 共 **9 文件 91 例**（`api` 19 / `comic` 10 / `comic-phase2` 10 / `orchestrator` 10 / `catalog` 18 / `jobs` 9 / `site` 7 / `ai-routes` 5 / `media` 3）；后续补 OpenAPI 导出 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试保障字段一致性：`test/*.test.ts` 共 **10 文件 120 例**（`api` 19 / `comic` 10 / `comic-phase2` 10 / `orchestrator` 10 / `catalog` 19 / `jobs` 9 / `site` 7 / `ai-routes` 5 / `media` 3 / `rbac` 28）；`apps/admin/src/api.ts` 复用同一契约（`snake_case` + 错误信封），后续补 OpenAPI 导出 |
 | 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
 ## 2. 后端服务模块清单
@@ -60,7 +60,7 @@
 | `identity` | 注册登录、第三方登录绑定、会话与设备、账号合并、注销 | `/auth/*`、`/accounts/*`、`/devices/*` | 短信/邮件通道、Redis | 分库 |
 | ~~`billing`~~ | **已删除（2026-11-05）**：`routes/billing.ts` 与 `packages/core-domain/{plans,subscription,order}.ts` 移除，生产库 5 张计费表 DROP；当前无计划/订阅/发票/对账能力 | 无（原 `/plans`、`/subscriptions/*`、`/invoices/*` 现均 404） | 无 | — |
 | ~~`payment-driver`~~ | **已删除（2026-11-05）**：原 7 通道驱动与统一回调随 FR-02 一并移除，`/payments/*`、`/callbacks/{driver}` 现均 404 | 无 | 无 | — |
-| `catalog` | **（已落地，2026-11-07 补管理写面）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 四表已建，`requireEntitlement` 门禁 + 公开只读 `GET /modules`、`GET /modules/:code` + 三条管理写路由（状态迁移 / 发放 / 回收）均已实现；`order_items` 随订单域于 2026-11-05 取消，**不建表** | `GET /modules`、`GET /modules/{code}`、`GET /entitlements`、`POST /entitlements`（普通用户自领）、`GET /entitlements/{code}/check`、`PATCH /modules/{code}/status`、`POST /entitlements/grant`、`POST /entitlements/{id}/revoke`（后三条需 `x-admin-token`） | admin-api（订单/退款依赖已于 2026-11-05 随 FR-02 移除） | 分库 |
+| `catalog` | **（已落地，2026-11-07 补管理写面）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 四表已建，`requireEntitlement` 门禁 + 公开只读 `GET /modules`、`GET /modules/:code` + 三条管理写路由（状态迁移 / 发放 / 回收）均已实现；`order_items` 随订单域于 2026-11-05 取消，**不建表** | `GET /modules`、`GET /modules/{code}`、`GET /entitlements`、`POST /entitlements`（普通用户自领）、`GET /entitlements/{code}/check`、`PATCH /modules/{code}/status`、`POST /entitlements/grant`、`POST /entitlements/{id}/revoke`（后三条需 `module:write` / `entitlement:grant` / `entitlement:revoke` 权限，Bearer + RBAC 逐请求实时查库；`x-admin-token` 为超管引导通道，覆盖全部权限） | admin-api（订单/退款依赖已于 2026-11-05 随 FR-02 移除） | 分库 |
 | `comic` | **（第 1 期已落地 2026-11-04；第 2 期路由骨架已落地 2026-11-05）** 工程/角色/分镜（`/comic/projects/*` 8 条）与生成任务编排、成片合成与版本、审核发布（`/comic/jobs/*`、`/comic/films/*` 16 条）均已实现（共 24 条路由）；任务编排与队列消费（`src/orchestrator.ts` → `/api/v1/ai/*`）、对象存储（`src/storage.ts` → `/api/v1/media/*`）**已于 2026-11-05 装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认随进程自动消费；openai 兼容提供方已接入 text/image（2026-11-06，video/tts/compose 诚实失败 `PROVIDER_NOT_CONFIGURED`），更多真实厂商模型调用待 OQ-08 凭证** | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*`（24 条已实现，骨架） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
 | `media` | **（已落地并装配上线，2026-11-05）** `src/storage.ts` 实现 `LocalDiskStorage`（HMAC-SHA256 预签名 URL，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名）；`/media/presign/*`、`/media/assets`、免鉴权对象收发端点均已挂载；`generation_assets` 表已建 | `/media/presign/upload`、`/media/presign/download`、`/media/assets`、`/media/objects/*`（已上线） | 对象存储、CDN | 按 region 桶 |
 | `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
@@ -69,11 +69,11 @@
 | `ai-orchestrator` | 模型路由、Prompt 版本、输出审核、配额与成本核算；**漫剧生成**（文生图 / 图生视频 / TTS / 合成）的模型路由、成本预检与配额扣减在此编排 | `/ai/*`、内部消费 `generation_jobs` 队列 | 大模型供应商、审核服务、MQ | 按合规域 |
 | `notification` | 站内信、邮件、短信、推送编排与模板 | `/notifications/*` | 邮件/短信/推送通道 | 分库 |
 | `openapi` | 开放平台：OAuth2、API Key、Webhook 投递、限流 | `/open/*` | gateway | 分库 |
-| `admin-api` | 运营后台 BFF：聚合查询、写操作审批、审计埋点 | `/admin/*` | 各域服务、admin 库 | 分库 |
+| `admin-api` | **（已落地，2026-11-07）** 运营后台 BFF：RBAC 角色/权限/用户角色管理与 `GET /admin/me` 权限自省，实现在 `services/mim-api/src/routes/admin.ts`（**同进程路由，非独立服务**），共 11 个端点；独立前端 `apps/admin` 生产入口 `/admin/`；审计埋点仍下线 | `/admin/*` | catalog 库（当前 SQLite 单库） | 单库 |
 | `jobs` | **（已落地，2026-11-07）** `src/jobs.ts` 提供三个定时任务（成本告警 / 成片审核超时 / 权益到期扫描）+ `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`）做抢占与结算；`index.ts` 按 `MIM_JOBS_ENABLED`（默认开）装配并在优雅退出时 `stop()`（见 §8） | 无 HTTP | 全部域库（当前仅 SQLite 单库） | 双区各一套 |
 | `site` | **（已落地，2026-11-06）** 站点模块地图：把 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列结构化为 45 个主机模块 × 2 zone × 8 分类，纯静态常量（`src/site.ts`），**无数据表、无迁移、无第三方依赖**；前端 `views/SiteMap.tsx` | `/site/overview`、`/site/modules`、`/site/modules/:host`（公开免鉴权，3 条） | 无 | 不分库（多区共用同一份解析数据） |
 
-服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `me` / `comic` / `media` / `ai`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
+服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `catalog` / `site` / `me` / `comic` / `media` / `ai` / `admin`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
 
 各服务所需的第三方提供方、SDK/API 形态与密钥命名见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)；密钥按 region 独立、不入库，仅存环境变量或 KMS。
 
@@ -182,7 +182,7 @@
 |---|---|---|
 | `im` | `conversations`、`conversation_members`、`messages`、`message_receipts`、`attachments` | 会话与消息（P1） |
 | `ai` | `prompt_templates`、`ai_requests`、`usage_quotas`、`model_routes` | Prompt 版本、调用流水、配额、模型路由 |
-| `admin` | `admin_users`、`roles`、`permissions`、`role_bindings`、`operation_logs`、`tickets`、`feature_flags`、`announcements` | RBAC、操作审计、工单、开关、公告 |
+| `admin` | **已落地四表（2026-11-07）**：`permissions`、`roles`、`role_permissions`、`user_roles` | RBAC 主体（8 权限点 / 3 内置角色 / 用户角色绑定）；**审计仍下线（2026-11-05）**，规划中的 `admin_users` / `role_bindings` / `operation_logs` / `tickets` / `feature_flags` / `announcements` **均未建表**，当前员工身份复用 `users` 表 |
 | `ops` | `idempotency_keys`、`outbox_events`、`dead_letters`、`job_runs` | 幂等、事务性发件箱、失败队列、任务记录（`audit_logs` 已于 2026-11-05 随审计域删除） |
 
 ### 3.3 状态机落库规则
@@ -211,7 +211,7 @@
 | `apps/mini` | uni-app 或 Taro（多编译目标、分包） | 首页、我的、设置 | 微信授权登录、设置（原「订阅」入口随 FR-02 下线） |
 | `apps/mobile` | Flutter（iOS/Android/鸿蒙 ArkTS 适配层） | 同上 | 登录、工作区、推送设置（IAP 支付随 FR-02 下线） |
 | `apps/desktop` | Tauri（Win/macOS/Linux） | 同上 | 登录（浏览器回调）、工作区、更新提示 |
-| `apps/admin` | React + Ant Design Pro | `/admin/*` | 见 §5 后台管理平台 |
+| `apps/admin` | **React 18 + Vite 6（自写 CSS 令牌，未引入 Ant Design Pro）** | `/admin/`（生产 nginx 独立静态根 `/opt/mim/admin`；开发端口 5174，`/api` 经 Vite 代理到 8787） | 见 §5 后台管理平台（**已上线，2026-11-07**） |
 
 ### 4.2 共享包职责
 
@@ -258,16 +258,30 @@
 
 ### 5.1 角色与权限（RBAC）
 
-| 角色 | 可见域 | 可写操作 |
-|---|---|---|
-| 超级管理员 | 全部 | 全部（含角色分配） |
-| 运营 | 用户、模块（`catalog`）、内容（P1）、公告 | 模块上架/定价配置、解锁发放与回收、公告发布、内容处置（仅 P1） |
-| ~~财务~~ | **已删除（2026-11-05）**：订单/支付/退款/对账/发票可见域不再存在 | 无（原退款审核、对账差异核销、发票开具随 FR-02 移除） |
-| 客服 | 用户、工单 | 工单处理（原「订单检索」与「补偿期发放」随 FR-02 于 2026-11-05 移除） |
-| 内容审核 | 内容（P1）、审核队列 | 审核通过/驳回/下架（仅 P1 `contents`） |
-| 只读审计 | 全部（只读） | 无（原「审计日志归档」已随审计域删除） |
+**当前实现（2026-11-07，完整 RBAC 已落地）**：角色与权限为**数据库驱动的动态模型**，定义在 `services/mim-api/src/db.ts` 的 `RBAC_PERMISSIONS` / `RBAC_ROLES`，由 `seedRbac(db)` 幂等播种（已存在则跳过，不覆盖人工改动），用户与角色经 `user_roles` 表绑定。权限点共 8 个，内置角色共 3 个：
 
-硬规则：**任何写操作必须写 `admin.operation_logs`**（操作人、对象、前后值、IP、时间）；跨 region 查询需显式切换且留痕。原「金额相关写操作需第二人复核（四眼原则）」**当前无适用对象**——所有金额写操作（订单/支付/退款/发票）已于 2026-11-05 随 FR-02 整域下线，未来若重开计费能力须同步恢复该规则。
+| 内置角色 | 权限点 | 说明 |
+|---|---|---|
+| `superadmin` | 全部 8 项 | `module:read` / `module:write` / `entitlement:read` / `entitlement:grant` / `entitlement:revoke` / `user:read` / `rbac:read` / `rbac:write` |
+| `operator` | 7 项（**不含 `rbac:write`**） | 可读角色定义、可做模块与权益写操作，但不能创建/修改角色、不能改角色权限集合 |
+| `viewer` | 4 项 | `module:read` / `entitlement:read` / `user:read` / `rbac:read`（纯只读） |
+
+鉴权链路（`middleware.ts`）：`requirePermission(permission)` 逐请求实时查库（`loadPermissions` 由 `user_roles → role_permissions → permissions` 关联取并集），不做进程内缓存，改权限立即生效。两条通道并存：① Bearer JWT + RBAC 权限点（常规后台用户）；② `x-admin-token`（sha256 + `timingSafeEqual` 常量时间比对，命中后 `req.adminBootstrap = true` 覆盖全部权限）作为**超管引导通道**，用于首次开通与紧急兜底；未配置 `MIM_ADMIN_TOKEN` 时该通道返回 403 `FEATURE_NOT_AVAILABLE`。错误语义：无任何凭证 → 401 `AUTH_UNAUTHORIZED`；token 错误 → 401 `invalid admin token`；Bearer 权限不足 → 403 `FORBIDDEN` + `details.permission`。
+
+管理端点由 `services/mim-api/src/routes/admin.ts` 提供（挂载 `/api/v1/admin/*`，共 11 条）：`GET /admin/me`（权限自省）、`GET /admin/permissions`、`GET|POST /admin/roles`、`PATCH|DELETE /admin/roles/:code`、`GET|PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET|POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode`。
+
+**历史设计留痕（已被上述实现取代）**：
+
+| ~~角色~~ | ~~可见域~~ | ~~可写操作~~ |
+|---|---|---|
+| ~~超级管理员~~ | ~~全部~~ | ~~全部（含角色分配）~~ |
+| ~~运营~~ | ~~用户、模块（`catalog`）、内容（P1）、公告~~ | ~~模块上架/定价配置、解锁发放与回收、公告发布、内容处置（仅 P1）~~ |
+| ~~财务~~ | ~~**已删除（2026-11-05）**：订单/支付/退款/对账/发票可见域不再存在~~ | ~~无（原退款审核、对账差异核销、发票开具随 FR-02 移除）~~ |
+| ~~客服~~ | ~~用户、工单~~ | ~~工单处理（原「订单检索」与「补偿期发放」随 FR-02 于 2026-11-05 移除）~~ |
+| ~~内容审核~~ | ~~内容（P1）、审核队列~~ | ~~审核通过/驳回/下架（仅 P1 `contents`）~~ |
+| ~~只读审计~~ | ~~全部（只读）~~ | ~~无（原「审计日志归档」已随审计域删除）~~ |
+
+硬规则（历史条文）：~~任何写操作必须写 `admin.operation_logs`~~ —— **该表不存在**：审计域已于 2026-11-05 整域下线（`routes/audit.ts` 与 `audit_logs` 表已删除），`admin.operation_logs` 从未建表。当前写路由的实际留痕手段为：`requirePermission` 逐请求实时查库鉴权 + `entitlement_events` 记录权益发放/回收事件（`POST /entitlements/grant`、`POST /entitlements/:id/revoke` 均写入事件行）。原「金额相关写操作需第二人复核（四眼原则）」同样**无适用对象**——所有金额写操作已于 2026-11-05 随 FR-02 整域下线，未来若重开计费能力须同步恢复操作审计与四眼原则。
 
 原「P0 任务与协作数据后台默认只读」规则已失效（2026-11-04，FR-03 项目/任务数据整体移除；审核队列仅服务 P1 `contents`）。
 
@@ -362,7 +376,7 @@
 | 阶段 | 交付物 | 对应 |
 |---|---|---|
 | 第 1 步 | monorepo 骨架、`identity`、`apps/web`（~~`billing` / `payment-driver` 已于 2026-11-05 随 FR-02 删除~~；~~`content` P0 任务与协作最小集~~ 已移除，FR-03） | P0 |
-| 第 2 步 | `admin-api` 最小管理面（**已落地，2026-11-07**：`MIM_ADMIN_TOKEN` + `requireAdmin`，三条管理写路由；`apps/admin` 独立端未建）、`jobs`（~~续费/对账/掉单~~ 已删除；注销冷静期清理、AI 队列消费；**三定时任务已落地，2026-11-07**：成本告警 / 成片审核超时 / 权益到期扫描）（~~协作邀请与两档权限~~、~~同步通道~~、~~截止日提醒~~ 已随 FR-03 移除） | P0 运营闭环 |
+| 第 2 步 | `admin-api` 完整管理面（**已落地，2026-11-07**：完整 RBAC —— `schema.sql` 四表 `permissions` / `roles` / `role_permissions` / `user_roles`，`db.ts` 8 权限点 + 3 内置角色 + `seedRbac` 幂等播种，`requirePermission` 逐请求实时查库，`routes/admin.ts` 11 条 RBAC 管理端点，`x-admin-token` 保留为超管引导通道；三条 catalog 管理写路由按权限点鉴权；`apps/admin` 独立端**已建并上线（2026-11-07）**：React 18 + Vite 6，开发端口 5174，生产入口 `/admin/`（nginx 独立静态根 `/opt/mim/admin`），覆盖概览 / 模块状态流转 / 权益发放回收 / 角色权限 / 用户角色五视图）、`jobs`（~~续费/对账/掉单~~ 已删除；注销冷静期清理、AI 队列消费；**三定时任务已落地，2026-11-07**：成本告警 / 成片审核超时 / 权益到期扫描）（~~协作邀请与两档权限~~、~~同步通道~~、~~截止日提醒~~ 已随 FR-03 移除） | P0 运营闭环 |
 | 第 3 步 | `apps/mobile`（~~IAP~~ 已随 FR-02 删除）、`notification`、i18n 首批语种（~~日历/看板视图~~、~~CSV 导出~~ 已随 FR-03 移除） | P0 完成 |
 | 第 4 步 | `content`（P1 通用内容管理：内容/审核/检索）、`im`、`rtc`、`ai-orchestrator`、`openapi`、`apps/desktop` | P1 |
 

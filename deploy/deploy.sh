@@ -2,8 +2,9 @@
 # deploy/deploy.sh — Mim 生产发布脚本（服务器侧，幂等可重放）
 #
 # 职责：拉取 origin/main → 安装依赖（含 dev，因 vite/esbuild 为构建期依赖）
-#       → 构建前端（vite）→ 编译后端（esbuild → dist/index.js）
-#       → 发布静态产物到 /opt/mim/web
+#       → 构建前端（apps/web,vite）与管理后台（apps/admin,vite）
+#       → 编译后端（esbuild → dist/index.js）
+#       → 发布静态产物到 /opt/mim/web、管理后台到 /opt/mim/admin
 #       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET）
 #       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端 → 健康检查
 #
@@ -16,6 +17,7 @@
 # 环境变量（可选）：
 #   APP_DIR     默认 /opt/mim/app
 #   WEB_DIR     默认 /opt/mim/web
+#   ADMIN_DIR   默认 /opt/mim/admin（管理后台静态根，nginx 的 /admin/ 指向此处）
 #   SERVICE     默认 mim-api
 #   PORT_       默认 8787
 #   REPO_URL    默认 git@github.com:afdk1991/mim.git（SSH，见下方说明）
@@ -31,6 +33,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
+ADMIN_DIR="${ADMIN_DIR:-/opt/mim/admin}"
 SERVICE="${SERVICE:-mim-api}"
 PORT_="${PORT_:-8787}"
 REPO_URL="${REPO_URL:-git@github.com:afdk1991/mim.git}"
@@ -108,17 +111,27 @@ if ! pnpm install --frozen-lockfile --prod=false; then
   pnpm install --prod=false
 fi
 
-# --- 3. 前端构建 + 后端编译 ---
+# --- 3. 前端构建（用户端 + 管理后台）+ 后端编译 ---
 log "构建 apps/web（tsc --noEmit + vite build）"
 pnpm --filter @mim/web build
+log "构建 apps/admin（tsc --noEmit + vite build）"
+pnpm --filter @mim/admin build
 log "编译 services/mim-api（esbuild → dist/index.js）"
 pnpm --filter @mim/api build
 
 # --- 4. 发布静态产物 ---
-log "发布静态产物 → $WEB_DIR"
+log "发布用户端静态产物 → $WEB_DIR"
 mkdir -p "$WEB_DIR"
 rm -rf "$WEB_DIR"/*
 cp -R "$APP_DIR/apps/web/dist/." "$WEB_DIR/"
+
+# 管理后台：独立静态根 /opt/mim/admin，由 nginx 的 /admin/ location 提供。
+# 与用户端隔离的理由：① 若混入同一 root，admin/index.html 会覆盖用户端入口；
+# ② 用户端 `location /` 的 SPA 回退会把 /admin/* 吞成用户端 index.html。
+log "发布管理后台静态产物 → $ADMIN_DIR"
+mkdir -p "$ADMIN_DIR"
+rm -rf "$ADMIN_DIR"/*
+cp -R "$APP_DIR/apps/admin/dist/." "$ADMIN_DIR/"
 
 # --- 5. 数据目录、JWT 密钥与属主 ---
 mkdir -p "$APP_DIR/services/mim-api/data"
@@ -177,7 +190,7 @@ for VAR in MIM_SMS_ALIYUN_ACCESS_KEY_ID MIM_SMS_ALIYUN_ACCESS_KEY_SECRET MIM_SMS
 done
 
 if id -u "$RUN_USER" >/dev/null 2>&1; then
-  chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$WEB_DIR" 2>/dev/null || true
+  chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$WEB_DIR" "$ADMIN_DIR" 2>/dev/null || true
   chown "$RUN_USER:$RUN_USER" "$MIM_ENV_FILE" 2>/dev/null || true
 else
   warn "用户 $RUN_USER 不存在，跳过 chown（请先执行 bootstrap.sh）"

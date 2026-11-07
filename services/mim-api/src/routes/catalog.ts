@@ -13,7 +13,8 @@
  *   POST  /entitlements/grant       管理 — 手工发放权益（已 active 未过期直接回放现有记录）
  *   POST  /entitlements/:id/revoke  管理 — 回收权益（已 revoked 直接回放当前状态）
  *
- * 管理写路径统一走 requireAdmin（`x-admin-token` 与 MIM_ADMIN_TOKEN 常量时间比较），
+ * 管理写路径统一走 requirePermission（RBAC：module:write / entitlement:grant / entitlement:revoke），
+ * 兼容 `x-admin-token` 超管引导通道：命中 MIM_ADMIN_TOKEN 即视为拥有全部权限，用于首个超管冷启动；
  * 不挂 idempotency 中间件：该中间件依赖 req.user，而管理端只有管理令牌；
  * 三条路径均按「当前已有状态」实现天然幂等，重复提交不会产生重复权益或重复事件。
  */
@@ -22,7 +23,7 @@ import { Router } from 'express'; // 路由容器，按前缀挂载到 /api/v1
 import { z } from 'zod'; // 请求体校验，拦截非法模块码
 import { AppError, uuidv7 } from '@mim/core-domain'; // 业务错误码 + 时间有序主键
 import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结时间
-import { idempotency, requireAdmin, requireAuth } from '../middleware.js'; // 解锁需登录 + 幂等；管理写路径走独立管理令牌
+import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 解锁需登录 + 幂等；管理写路径走 RBAC 权限点校验
 import { parse } from '../validate.js'; // zod 校验失败统一转 AppError
 import { jsonParse, pathParam } from '../utils.js'; // 安全解析 JSON 列 + 严格路径参数提取
 import type { ApiDeps, Db } from '../types.js'; // 路由依赖与数据库抽象类型
@@ -326,7 +327,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
   // ---------- 管理：模块状态迁移与权益发放 / 回收 ----------
 
   /** PATCH /modules/:code/status — 模块状态单向迁移：draft → active → archived */
-  router.patch('/modules/:code/status', requireAdmin, (req, res) => { // 管理写路径只认管理令牌，不走用户 JWT
+  router.patch('/modules/:code/status', requirePermission('module:write'), (req, res) => { // RBAC：需 module:write；x-admin-token 引导通道同样放行
     const body = parse( // 校验并解析请求体
       z.object({ // 仅接受状态与可选地区
         status: z.enum(['draft', 'active', 'archived']), // 与 modules.status 的 CHECK 约束保持一致
@@ -368,7 +369,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
   }); // 结束 PATCH /modules/:code/status 处理
 
   /** POST /entitlements/grant — 管理端发放权益（自然幂等：已 active 未过期直接回放现有记录） */
-  router.post('/entitlements/grant', requireAdmin, (req, res) => { // 管理令牌鉴权，不发用户令牌
+  router.post('/entitlements/grant', requirePermission('entitlement:grant'), (req, res) => { // RBAC：需 entitlement:grant
     const body = parse( // 校验并解析请求体
       z.object({ // 发放所需的最小字段集
         user_id: z.string().min(1).max(64), // 目标用户主键
@@ -460,7 +461,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
   }); // 结束 POST /entitlements/grant 处理
 
   /** POST /entitlements/:id/revoke — 管理端回收权益（已 revoked 直接回放当前状态） */
-  router.post('/entitlements/:id/revoke', requireAdmin, (req, res) => { // 管理令牌鉴权
+  router.post('/entitlements/:id/revoke', requirePermission('entitlement:revoke'), (req, res) => { // RBAC：需 entitlement:revoke
     const body = parse( // 校验并解析请求体
       z.object({ // 回收仅需可选原因
         reason: z.string().max(200).optional(), // 审计原因，超长直接 400

@@ -26,7 +26,7 @@
 |---|---|---|
 | 访客 | 未登录用户 | 浏览公开内容、注册/登录 |
 | 注册用户 | 已注册（**当前无订阅体系，2026-11-05 已下线**） | 使用已解锁/免费功能、跨端登录 |
-| 运营管理员 | 内部运营人员 | **最小管理面已落地（2026-11-07）**：`MIM_ADMIN_TOKEN` + `requireAdmin`（常量时间比对）+ 三条管理写路由（模块状态流转 / 权益发放 / 权益回收）；完整 RBAC 与 `apps/admin` 后台仍为 P1 |
+| 运营管理员 | 内部运营人员 | **完整 RBAC + 独立后台已落地（2026-11-07）**：8 个权限点（`module:read` / `module:write` / `entitlement:read` / `entitlement:grant` / `entitlement:revoke` / `user:read` / `rbac:read` / `rbac:write`）、3 个内置角色（`superadmin` 8 项 / `operator` 7 项，不含 `rbac:write` / `viewer` 4 项）、`user_roles` 绑定表、`requirePermission` 逐请求实时查库鉴权；`x-admin-token` 保留为超管引导通道；独立后台 `apps/admin` 已上线，生产入口 `/admin/`（角色权限 / 用户角色 / 模块状态流转 / 权益发放回收 / 概览） |
 
 > **订阅角色已下线（2026-11-05）**：原「免费用户 / 订阅用户 / 运营管理员（管理计划、订单、退款）」随 FR-02 整域删除，账号不再有订阅状态。
 

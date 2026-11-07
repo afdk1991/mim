@@ -5,6 +5,8 @@ import type { NextFunction, Request, Response } from 'express'; // 仅引入 Exp
 import { AppError, isAppError } from '@mim/core-domain'; // 引入统一业务异常与类型守卫，错误信封集中管理
 import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY } from './config.js'; // 引入幂等强制开关与管理令牌环境变量键名
 import { sha256, verifyAccessToken } from './auth.js'; // 引入请求指纹哈希与访问令牌校验
+import type { RbacPermissionCode } from './db.js'; // 权限点联合类型，保证 requirePermission 调用处拼写错误在编译期暴露
+import type { Db } from './types.js'; // 数据库句柄类型，供 loadPermissions 声明参数
 
 interface AuthRow { // 鉴权从库中读出的用户行结构
   id: string; // 用户唯一 ID
@@ -33,7 +35,12 @@ export function requestId(req: Request, res: Response, next: NextFunction): void
   next(); // 继续后续中间件链
 } // requestId 结束
 
-export function requireAuth(req: Request, _res: Response, next: NextFunction): void { // 中间件：解析 Bearer 令牌并加载当前用户
+/**
+ * 解析 Bearer 令牌并加载当前用户（不挂载到 req，由调用方决定）。
+ * 抽出为独立函数是为了让 requireAuth 与 requirePermission 共用同一套
+ * 「签名校验 + 用户有效性 + 注销冷静期」逻辑，避免两处实现漂移到不同安全水位。
+ */
+function resolveBearerUser(req: Request): AuthRow { // 内部辅助：令牌 → 用户行，失败一律抛 AppError
   const header = req.header('authorization') ?? ''; // 取 Authorization 头，缺失时用空串统一后续判断
   const match = /^Bearer\s+(.+)$/i.exec(header); // 严格匹配 Bearer 方案（大小写不敏感）并捕获令牌本体
   if (!match || !match[1]) { // 头缺失或格式不符
@@ -50,7 +57,11 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   if (row.status === 'pending_deletion' && !DELETION_WHITELIST.has(`${req.method} ${pathname}`)) { // 待删除账号除查资料与撤销外一律拒绝
     throw new AppError('ACCOUNT_DELETION_PENDING', 'account is pending deletion'); // 专用错误码，前端据此引导撤销注销
   } // 待删除门禁结束
-  req.user = row; // 挂载用户到请求上下文，供后续路由与中间件复用
+  return row; // 交出已校验用户行，由调用方决定是否写入 req.user
+} // resolveBearerUser 结束
+
+export function requireAuth(req: Request, _res: Response, next: NextFunction): void { // 中间件：解析 Bearer 令牌并加载当前用户
+  req.user = resolveBearerUser(req); // 复用统一解析逻辑，保持与 requirePermission 同一安全水位
   next(); // 通过鉴权，进入业务处理
 } // requireAuth 结束
 
@@ -180,11 +191,34 @@ export function requireEntitlement(moduleCode: string) { // 高阶中间件工�
 } // requireEntitlement 结束
 
 /**
- * 管理面鉴权（最小管理鉴权；RBAC 仍为 P1，见 docs/wiki/08-dev-implementation.md §1.1）。
- * 校验 `x-admin-token` 请求头与 `MIM_ADMIN_TOKEN` 环境变量是否一致：
- *   - 环境变量未配置 → 403 FEATURE_NOT_AVAILABLE，相当于管理面关闭，且不泄漏端点能力；
- *   - 令牌缺失或不匹配 → 401 AUTH_UNAUTHORIZED，与普通鉴权失败同码，避免区分「没带」与「带错」。
- * 比较时先做 sha256 归一长度再 timingSafeEqual，既避免长度差异导致的提前返回，也防止计时侧信道。
+ * 超管引导令牌校验（`x-admin-token` vs `MIM_ADMIN_TOKEN`）。
+ * 该通道存在的唯一目的是解决「第一个超管从哪来」的冷启动问题：
+ * 库里还没有任何 user_roles 记录时，运营须先用环境变量令牌进入后台，
+ * 再把 `rbac:write` 授予真实账号；之后日常操作一律走 JWT + requirePermission。
+ *
+ * 返回语义（刻意区分三种情形）：
+ *   - 环境变量未配置 → false（引导通道关闭，但仍可凭 JWT 权限进入，不算失败）；
+ *   - 请求未带该头   → false（走 JWT 分支）；
+ *   - 带了但不匹配   → 抛 401，避免「带错令牌」被静默降级成「没带令牌」而难以排查。
+ * 比较时先 sha256 归一长度再 timingSafeEqual，既避免长度差异导致的提前返回，也防计时侧信道。
+ */
+function adminTokenMatches(req: Request): boolean { // 内部辅助：判断请求是否命中超管引导通道
+  const expected = (req.deps.env[ADMIN_TOKEN_ENV_KEY] ?? '').trim(); // 从注入的 env 读取期望令牌；测试可直传替身环境
+  if (!expected) return false; // 未配置即引导通道关闭，交由 JWT 分支处理
+  const provided = (req.header('x-admin-token') ?? '').trim(); // 取客户端管理令牌，缺失时为空串
+  if (!provided) return false; // 未带该头，说明调用方走的是用户令牌路径
+  const providedDigest = Buffer.from(sha256(provided), 'hex'); // 对实际令牌取定长摘要，消除长度差异
+  const expectedDigest = Buffer.from(sha256(expected), 'hex'); // 对期望令牌取同样长度的摘要
+  if (!timingSafeEqual(providedDigest, expectedDigest)) { // 常量时间比较，防止逐字节试探
+    throw new AppError('AUTH_UNAUTHORIZED', 'invalid admin token'); // 401，与普通鉴权失败共用错误码
+  } // 令牌比对结束
+  return true; // 引导令牌有效
+} // adminTokenMatches 结束
+
+/**
+ * 管理面鉴权（引导通道专用）。
+ * 保留给 `MIM_ADMIN_TOKEN` 场景；业务路由主链路已改用 requirePermission，
+ * 仅在「尚无任何 RBAC 授权」的冷启动场景下由后台登录接口调用。
  */
 export function requireAdmin(req: Request, _res: Response, next: NextFunction): void { // 管理端点专用门禁
   const expected = (req.deps.env[ADMIN_TOKEN_ENV_KEY] ?? '').trim(); // 从注入的 env 读取期望令牌；测试可直传替身环境
@@ -199,6 +233,50 @@ export function requireAdmin(req: Request, _res: Response, next: NextFunction): 
   } // 令牌比对结束
   next(); // 通过管理鉴权，进入业务处理
 } // requireAdmin 结束
+
+/**
+ * 读取某个用户经由角色继承到的全部权限码。
+ * 权限刻意不写进 JWT：令牌一旦签发就难以撤销，而 RBAC 要求「收回角色即刻失效」，
+ * 因此每次请求都实时 join 两张关系表（本地 SQLite + 主键索引，成本可忽略）。
+ */
+export function loadPermissions(db: Db, userId: string): Set<string> { // 导出便于测试与后台 /admin/me 复用
+  const rows = db // 查询该用户全部权限码
+    .prepare( // 预编译：用户角色 ⋈ 角色权限
+      // 说明：DISTINCT 去重——多角色可能授予同一权限，调用方只关心「有没有」
+      `SELECT DISTINCT rp.permission_code AS code
+         FROM user_roles ur
+         JOIN role_permissions rp ON rp.role_code = ur.role_code
+        WHERE ur.user_id = ?`, // 单一条件即可命中 user_roles 主键前缀
+    ) // 结束预编译
+    .all(userId) as Array<{ code: string }>; // 取回权限码列表
+  return new Set(rows.map((r) => r.code)); // 转为 Set 便于 O(1) 判存在
+} // loadPermissions 结束
+
+/**
+ * RBAC 权限门禁：请求方须拥有指定权限码。
+ * 两条通道（满足其一即放行）：
+ *   1. 超管引导通道 —— 携带正确的 `x-admin-token`，视同拥有全部权限，并打上 req.adminBootstrap 标记；
+ *   2. 正常用户通道 —— Bearer JWT 有效且其角色集合覆盖该权限。
+ * 失败语义：
+ *   - 未登录 / 令牌无效 → 401（交给 resolveBearerUser 抛）；
+ *   - 已登录但权限不足 → 403 FORBIDDEN，携带 permission 字段便于前端提示。
+ */
+export function requirePermission(permission: RbacPermissionCode | string) { // 高阶中间件工厂：按权限码生成门禁
+  return (req: Request, _res: Response, next: NextFunction): void => { // 返回实际执行的中间件
+    if (adminTokenMatches(req)) { // 先试引导通道：冷启动阶段库里还没有任何角色授权
+      req.adminBootstrap = true; // 标记本次请求来自超管令牌，供审计或后续逻辑区分
+      next(); // 引导令牌等同全权限，直接放行
+      return; // 提前返回，不再查库
+    } // 引导通道分支结束
+    const user = resolveBearerUser(req); // 走正常用户通道：校验 JWT 与账号状态
+    req.user = user; // 挂载用户，供下游路由读取 user.id / region
+    const granted = loadPermissions(req.deps.db, user.id); // 实时查库取权限，保证角色回收即时生效
+    if (!granted.has(permission)) { // 权限不覆盖即拒绝
+      throw new AppError('FORBIDDEN', 'permission denied', { permission }); // 403 并回显缺失的权限码
+    } // 权限判定结束
+    next(); // 权限满足，进入业务处理
+  }; // 中间件函数结束
+} // requirePermission 结束
 
 export function notFound(req: Request, res: Response): void { // 兜底 404：所有未匹配路由统一信封
   res.status(404).json({ // 直接以 JSON 返回，保持与业务错误一致的响应形态
