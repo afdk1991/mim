@@ -349,14 +349,12 @@ export interface RunJobResult { // 单次任务执行结果
 
 // ---------- 站点模块地图（site）类型，对齐 routes/site.ts 与 src/site.ts ----------
 
-// zone 维度概览：laal.top / mixm.top
+// zone 维度概览：当前仅 mixm.top
 export interface SiteZone { // 按 zone（根域名）聚合的统计
-  // zone 标识，如 laal.top
+  // zone 标识，如 mixm.top
   id: string; // zone 唯一标识
   // zone 根域名（与 id 同值）
   apex: string; // 根域名，与 id 保持同值便于直接展示
-  // 该 zone 的默认 A 记录值（IP）
-  default_record_value: string; // 该 zone 默认指向的 IP，用于补齐缺失记录
   // 该 zone 下存在解析记录的模块数量
   count: number; // 已配置记录的模块计数
 } // SiteZone 结束
@@ -375,7 +373,7 @@ export interface SiteCategory { // 按业务分类聚合的统计
 export interface SiteOverview { // 站点地图总览
   // 模块总数（45）
   total: number; // 模块总数
-  // 两个 zone 的概览
+  // zone 概览（当前仅 mixm.top）
   zones: SiteZone[]; // 各 zone 的统计
   // 8 个分类的概览
   categories: SiteCategory[]; // 各分类的统计
@@ -385,12 +383,10 @@ export interface SiteOverview { // 站点地图总览
 export interface SiteRecord { // 一条解析记录
   // 记录所属 zone
   zone: string; // 所属 zone 标识
-  // 完整域名，如 api.laal.top / laal.top
+  // 完整域名，如 api.mixm.top / mixm.top
   fqdn: string; // 完整域名
   // 记录类型：A 或 CNAME
   record_type: 'A' | 'CNAME'; // 记录类型
-  // 解析目标：A 为 IP，CNAME 为别名域名
-  record_value: string; // 解析目标值
   // 生存时间（秒）
   ttl: number; // TTL（秒）
   // record 级备注第一段（仅差异记录存在）
@@ -399,7 +395,7 @@ export interface SiteRecord { // 一条解析记录
   description?: string; // 备注第二段；仅差异记录才有
 } // SiteRecord 结束
 
-// 单个站点模块（主机 + 多 zone 记录聚合）
+// 单个站点模块（主机 + zone 记录聚合）
 export interface SiteModuleItem { // 一个站点模块（主机名维度）
   // 主机名（不含 zone），根域名为 '@'
   host: string; // 主机名，根域名用 @

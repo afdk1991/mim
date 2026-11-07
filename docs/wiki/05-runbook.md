@@ -147,10 +147,10 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 
 站点模块地图（公开只读，**免鉴权**，数据源 = DNSPod 导出备注）：
 
-`GET /api/v1/site/overview`（200，`total=45`、2 个 zone、8 个分类）→ `GET /api/v1/site/modules`（200，45 模块 × 2 records）→
-`GET /api/v1/site/modules?zone=mixm.top&category=tools`（200，`gy` 为 CNAME → `gale-engine-landing-6j02gsvv.edgeone.cool.`）→
+`GET /api/v1/site/overview`（200，`total=45`、1 个 zone（`mixm.top`，无 `default_record_value`）、8 个分类）→ `GET /api/v1/site/modules`（200，45 模块 × 1 record，无 `record_value`）→
+`GET /api/v1/site/modules?zone=mixm.top&category=tools`（200，`gy` 为 CNAME，解析目标值不对外暴露）→
 `GET /api/v1/site/modules/gy`（200）→ `GET /api/v1/site/modules/unknown-host`（必须 404）→
-`GET /api/v1/site/modules?zone=bad`（必须 400 `VALIDATION_FAILED`）
+`GET /api/v1/site/modules?zone=bad`（必须 400 `VALIDATION_FAILED`；`zone=laal.top` 已下线，同样 400）
 
 ## 7. 生产部署（铁律八）
 

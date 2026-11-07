@@ -44,7 +44,7 @@ const categoryName = (id: SiteCategoryId) => SITE_CATEGORIES.find((c) => c.id ==
 
 // 把内部 SiteModule 转成接口响应体；zone 传入时只保留该 zone 的记录
 function present(module: SiteModule, zone?: SiteZoneId) {
-  // 有 zone 过滤则筛记录，否则保留两个 zone 的全部记录
+  // 有 zone 过滤则筛记录，否则保留全部记录
   const records = zone ? module.records.filter((r) => r.zone === zone) : module.records;
   // 返回对外字段：urls 由过滤后的记录重新推导，避免暴露多余 zone 的入口
   return {
@@ -65,7 +65,7 @@ function present(module: SiteModule, zone?: SiteZoneId) {
   };
 }
 
-// 关键词匹配：host / 备注 / 解析值 / record 级备注全部纳入检索范围
+// 关键词匹配：host / 备注 / 入口地址 / record 级备注全部纳入检索范围
 function matches(module: SiteModule, q: string): boolean {
   // 统一小写并去空格，实现大小写不敏感的关键词匹配
   const needle = q.trim().toLowerCase();
@@ -79,10 +79,10 @@ function matches(module: SiteModule, q: string): boolean {
     module.label,
     // 模块级备注第二段
     module.description,
-    // 两个 zone 的 https 入口地址
+    // 模块的 https 入口地址
     ...module.urls,
-    // 每条记录的 fqdn、解析值、record 级备注（覆盖项）也参与检索
-    ...module.records.flatMap((r) => [r.fqdn, r.record_value, r.label ?? '', r.description ?? '']),
+    // 每条记录的 fqdn、record 级备注（覆盖项）也参与检索
+    ...module.records.flatMap((r) => [r.fqdn, r.label ?? '', r.description ?? '']),
   ]
     // 用空格拼接，避免跨字段误匹配
     .join(' ')
@@ -103,14 +103,12 @@ export function createSiteRouter(): Router {
     res.json({
       // 模块总数（45 条主机记录）
       total: SITE_MODULES.length,
-      // 两个 zone 的概览：id / apex / 默认解析值 / 覆盖模块数
+      // zone 概览：id / apex / 覆盖模块数（不暴露解析目标）
       zones: SITE_ZONES.map((zone) => ({
-        // zone 标识，如 laal.top / mixm.top
+        // zone 标识（当前仅 mixm.top）
         id: zone.id,
         // zone 的根域名（与 id 同值）
         apex: zone.apex,
-        // 该 zone 的默认 A 记录值（IP）
-        default_record_value: zone.record_value,
         // 该 zone 下存在解析记录的模块数量（本数据集为 45）
         count: SITE_MODULES.filter((m) => m.records.some((r) => r.zone === zone.id)).length,
       })),
@@ -191,7 +189,7 @@ export function createSiteRouter(): Router {
     if (!module) {
       throw new AppError('NOT_FOUND', 'site module not found', { host });
     }
-    // 命中则返回单模块完整详情（含两个 zone 的记录）
+    // 命中则返回单模块完整详情
     res.json({ module: present(module) });
   });
 

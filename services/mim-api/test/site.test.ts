@@ -26,15 +26,17 @@ beforeEach(() => {
 // 站点模块地图接口的契约测试集合
 describe('站点模块地图', () => {
   // 用例 1：overview 的结构与计数
-  it('overview 返回 2 个 zone、8 个分类，计数合计 45', async () => {
+  it('overview 返回 1 个 zone、8 个分类，计数合计 45', async () => {
     // 发起 GET /api/v1/site/overview
     const res = await request(app).get('/api/v1/site/overview');
     // 期望 HTTP 200
     expect(res.status).toBe(200);
     // 模块总数应为 45（DNSPod 导出表的主机记录数）
     expect(res.body.total).toBe(45);
-    // zone 顺序应为 laal.top → mixm.top
-    expect(res.body.zones.map((z: { id: string }) => z.id)).toEqual(['laal.top', 'mixm.top']);
+    // zone 列表仅剩 mixm.top（laal.top 已下线）
+    expect(res.body.zones.map((z: { id: string }) => z.id)).toEqual(['mixm.top']);
+    // zone 概览不再暴露默认解析值
+    expect(res.body.zones[0].default_record_value).toBeUndefined();
     // 分类数量应为 8
     expect(res.body.categories).toHaveLength(8);
     // 各分类计数之和应等于 45
@@ -44,7 +46,7 @@ describe('站点模块地图', () => {
   });
 
   // 用例 2：列表全量结构
-  it('模块列表返回 45 条，每条含 2 个 zone 解析记录', async () => {
+  it('模块列表返回 45 条，每条含 1 个 zone 解析记录且不含解析值', async () => {
     // 发起 GET /api/v1/site/modules（无过滤）
     const res = await request(app).get('/api/v1/site/modules');
     // 期望 200
@@ -53,12 +55,14 @@ describe('站点模块地图', () => {
     expect(res.body.total).toBe(45);
     // 全量数 = 45
     expect(res.body.module_total).toBe(45);
-    // 逐条校验：每个模块都应有 2 条记录，且 zone 顺序固定
+    // 逐条校验：每个模块都应有 1 条记录，zone 固定为 mixm.top
     for (const item of res.body.items) {
-      // 每条模块 2 个 zone 的记录
-      expect(item.records).toHaveLength(2);
-      // 记录 zone 顺序应为 laal.top → mixm.top
-      expect(item.records.map((r: { zone: string }) => r.zone)).toEqual(['laal.top', 'mixm.top']);
+      // 每条模块仅 1 个 zone 的记录
+      expect(item.records).toHaveLength(1);
+      // 记录 zone 应为 mixm.top
+      expect(item.records.map((r: { zone: string }) => r.zone)).toEqual(['mixm.top']);
+      // 记录不再暴露解析目标（IP / CNAME 目标值）
+      expect(item.records[0].record_value).toBeUndefined();
     }
   });
 
@@ -103,20 +107,20 @@ describe('站点模块地图', () => {
   });
 
   // 用例 5：单模块详情与 record 级覆盖
-  it('单模块详情：gy 在 mixm.top 为 CNAME 指向疾风引擎节点', async () => {
+  it('单模块详情：gy 为 CNAME 指向疾风引擎节点（解析值不暴露）', async () => {
     // 请求 gy 的详情
     const res = await request(app).get('/api/v1/site/modules/gy');
     // 期望 200
     expect(res.status).toBe(200);
     // 取出 mixm.top 的那条记录
     const mixm = res.body.module.records.find((r: { zone: string }) => r.zone === 'mixm.top');
-    // mixm.top 侧应为 CNAME
+    // gy 应为 CNAME
     expect(mixm.record_type).toBe('CNAME');
-    // CNAME 目标为疾风引擎 EdgeOne 落地域名（含末尾点）
-    expect(mixm.record_value).toBe('gale-engine-landing-6j02gsvv.edgeone.cool.');
+    // CNAME 目标值不对外暴露
+    expect(mixm.record_value).toBeUndefined();
     // record 级备注应包含「疾风引擎承载节点」
     expect(mixm.label).toContain('疾风引擎承载节点');
-    // 模块级 label 仍是 laal.top 口径，未被 mixm 覆盖污染
+    // 模块级 label 保持 DNSPod 导出口径，未被 record 级覆盖污染
     expect(res.body.module.label).toBe('工具模块入口');
   });
 
@@ -127,10 +131,7 @@ describe('站点模块地图', () => {
     // 期望 200
     expect(res.status).toBe(200);
     // 根记录的 fqdn 不应拼成 '@.xxx'，而应等于 zone 本身
-    expect(res.body.module.records.map((r: { fqdn: string }) => r.fqdn)).toEqual([
-      'laal.top',
-      'mixm.top',
-    ]);
+    expect(res.body.module.records.map((r: { fqdn: string }) => r.fqdn)).toEqual(['mixm.top']);
   });
 
   // 用例 7：错误分支（400 / 404）
@@ -141,6 +142,13 @@ describe('站点模块地图', () => {
     expect(zone.status).toBe(400);
     // 错误码为 VALIDATION_FAILED
     expect(zone.body.code).toBe('VALIDATION_FAILED');
+
+    // 已下线的 laal.top 同样属于非法 zone → 400
+    const laal = await request(app).get('/api/v1/site/modules?zone=laal.top');
+    // 期望 400
+    expect(laal.status).toBe(400);
+    // 错误码为 VALIDATION_FAILED
+    expect(laal.body.code).toBe('VALIDATION_FAILED');
 
     // 非法 category → 400
     const category = await request(app).get('/api/v1/site/modules?category=nope');

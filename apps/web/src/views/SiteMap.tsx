@@ -1,4 +1,4 @@
-// React 状态钩子：用于 zone / 分类 / 关键词三个筛选条件
+// React 状态钩子：用于分类 / 关键词两个筛选条件
 import { useState } from 'react';
 // 仅类型导入：语言枚举（'zh-CN' | 'en-US'）
 import type { Locale } from '@mim/i18n';
@@ -15,19 +15,6 @@ interface Props {
   locale: Locale;
 }
 
-// zone 过滤选项：'all' 表示两个 zone 都展示
-type ZoneFilter = 'all' | 'laal.top' | 'mixm.top';
-
-// zone 分段控件的静态配置（顺序即展示顺序）
-const ZONES: Array<{ id: ZoneFilter; label: string }> = [
-  // 全部：不按 zone 裁剪记录
-  { id: 'all', label: '全部' },
-  // 只看 laal.top 的解析记录
-  { id: 'laal.top', label: 'laal.top' },
-  // 只看 mixm.top 的解析记录
-  { id: 'mixm.top', label: 'mixm.top' },
-];
-
 // 按 locale 取分类双语名称：英文取 name.en，其余取 name.zh
 function categoryName(locale: Locale, name: { zh: string; en: string }): string {
   // 英文环境下返回英文名
@@ -38,8 +25,6 @@ function categoryName(locale: Locale, name: { zh: string; en: string }): string 
 export function SiteMap({ locale }: Props) {
   // 一次性拉取 45 条模块；后续筛选全部在客户端完成，避免频繁请求
   const state = useAsync(() => api.site.listModules(), []);
-  // zone 过滤状态，默认全部
-  const [zone, setZone] = useState<ZoneFilter>('all');
   // 分类过滤状态，默认全部
   const [category, setCategory] = useState<string>('all');
   // 关键词搜索状态，默认空
@@ -69,15 +54,13 @@ export function SiteMap({ locale }: Props) {
     [],
   );
 
-  // 执行三级筛选：zone → category → 关键词
+  // 执行两级筛选：category → 关键词
   const filtered = modules.filter((item) => {
-    // zone 过滤：模块在该 zone 下没有记录则剔除
-    if (zone !== 'all' && !item.records.some((r) => r.zone === zone)) return false;
     // 分类过滤：分类不匹配则剔除
     if (category !== 'all' && item.category !== category) return false;
     // 关键词为空则直接通过
     if (!needle) return true;
-    // 关键词检索范围：host / 模块备注 / 记录 fqdn、解析值、record 级备注
+    // 关键词检索范围：host / 模块备注 / 记录 fqdn、record 级备注
     return [
       // 主机名
       item.host,
@@ -85,8 +68,8 @@ export function SiteMap({ locale }: Props) {
       item.label,
       // 模块级备注第二段
       item.description,
-      // 每条记录的 fqdn、解析值、record 级备注（覆盖项）
-      ...item.records.flatMap((r) => [r.fqdn, r.record_value, r.label ?? '', r.description ?? '']),
+      // 每条记录的 fqdn、record 级备注（覆盖项）
+      ...item.records.flatMap((r) => [r.fqdn, r.label ?? '', r.description ?? '']),
     ]
       // 空格拼接避免跨字段误匹配
       .join(' ')
@@ -112,44 +95,25 @@ export function SiteMap({ locale }: Props) {
           <h1>{locale === 'en-US' ? 'Site Map' : '站点地图'}</h1>{/* 标题：按 locale 切换中英文 */}
           <p className="muted">{/* 描述：数据来源（DNSPod 备注）与规模 */}
             {locale === 'en-US' // 英文描述文案
-              ? `${modules.length} modules across 2 zones, grouped by DNSPod remark`
-              : `DNSPod 备注结构化的 ${modules.length} 个站点模块，2 个解析 zone`}{/* 描述文案结束 */}
+              ? `${modules.length} modules on mixm.top, grouped by DNSPod remark`
+              : `DNSPod 备注结构化的 ${modules.length} 个站点模块（mixm.top）`}{/* 描述文案结束 */}
           </p>{/* 结束描述段落 */}
         </div>{/* 结束左侧标题区 */}
         <span className="badge">{filtered.length} / {modules.length}</span>{/* 命中数 / 总数 */}
       </header>{/* 结束页头 */}
 
-      <div className="form inline">{/* 筛选区：搜索框 + zone 分段控件 */}
+      <div className="form inline">{/* 筛选区：搜索框 */}
         <label className="grow">{/* 搜索输入框：占满剩余宽度 */}
           {locale === 'en-US' ? 'Search' : '搜索'}{/* 输入框标题文案 */}
           <input
             // 受控值：绑定 query
             value={query}
-            // 占位提示：可搜主机 / 备注 / 解析值
-            placeholder={locale === 'en-US' ? 'host / remark / record value' : '主机 / 备注 / 解析值'}
+            // 占位提示：可搜主机 / 备注
+            placeholder={locale === 'en-US' ? 'host / remark' : '主机 / 备注'}
             // 输入即更新关键词
             onChange={(e) => setQuery(e.target.value)}
           />{/* 搜索框结束 */}
         </label>{/* 结束搜索标签 */}
-        <label>{/* zone 分段控件外层标签 */}
-          Zone{/* 控件标题 */}
-          <div className="segmented">{/* 三个 zone 选项容器 */}
-            {ZONES.map((z) => ( // 遍历三个 zone 选项
-              <button
-                // 选项唯一键
-                key={z.id}
-                // 普通按钮，避免触发表单提交
-                type="button"
-                // 选中态加 active 类
-                className={zone === z.id ? 'active' : ''}
-                // 点击切换 zone 过滤
-                onClick={() => setZone(z.id)}
-              >
-                {z.label}{/* 选项文案 */}
-              </button> // 结束 zone 选项按钮
-            ))}{/* 结束 zone 选项遍历 */}
-          </div>{/* 结束 segmented 容器 */}
-        </label>{/* 结束 zone 标签 */}
       </div>{/* 结束筛选区 */}
 
       <div className="row">{/* 分类筛选按钮行 */}
@@ -190,9 +154,8 @@ export function SiteMap({ locale }: Props) {
             </div>{/* 结束分区头 */}
             <div className="cards">{/* 卡片网格 */}
               {group.items.map((item) => { // 遍历该分类下的模块
-                // 当前卡片要展示的记录：全部 zone 或仅选中 zone
-                const records =
-                  zone === 'all' ? item.records : item.records.filter((r) => r.zone === zone);
+                // 当前卡片要展示的记录：单一 zone（mixm.top）的全部记录
+                const records = item.records;
                 // 返回单模块卡片
                 return (
                   <article key={item.host} className="panel">{/* 卡片容器 */}
@@ -203,13 +166,12 @@ export function SiteMap({ locale }: Props) {
                     <p className="muted">{item.description}</p>{/* 模块级备注第二段：站点说明 */}
                     {records.map((r) => ( // 逐条解析记录展示
                       <div key={r.zone}>{/* 记录容器，以 zone 区分 */}
-                        <div className="row">{/* 记录信息行：外链 + zone / 类型 / 解析值 */}
+                        <div className="row">{/* 记录信息行：外链 + zone / 类型 */}
                           <a href={`https://${r.fqdn}`} target="_blank" rel="noreferrer">{/* https 入口外链，新标签打开 */}
                             {r.fqdn}{/* 完整域名 */}
                           </a>{/* 结束外链 */}
                           <span className="badge">{r.zone}</span>{/* zone 徽标 */}
                           <span className="badge">{r.record_type}</span>{/* 记录类型徽标（A / CNAME） */}
-                          <span className="muted">{r.record_value}</span>{/* 解析值（IP 或 CNAME 目标） */}
                         </div>{/* 结束记录信息行 */}
                         {(r.label || r.description) && ( // record 级备注：仅 gy@mixm.top 这类覆盖项存在
                           <p className="muted">{/* 备注段落 */}

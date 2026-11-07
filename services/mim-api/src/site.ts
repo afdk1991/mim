@@ -2,20 +2,18 @@
  * 站点模块地图（site 域）
  *
  * 数据源：dnspod_records_2026-11-05_21-42-26.xls 的「备注」列（2026-11-05 导出）。
- * 两个托管 zone 各 45 条主机记录，备注描述即该子站/服务模块的产品定位。
+ * 单一托管 zone（mixm.top）45 条主机记录，备注描述即该子站/服务模块的产品定位。
  * 本文件把备注落成结构化数据，供 GET /api/v1/site/modules 公开读取。
  *
- * 说明：记录值为 DNSPod 解析值（laal.top → 103.0.113.10、mixm.top → 103.0.113.20），
- * 仅取短主机记录（不含与 FQDN 重复的行）；gy 在 mixm.top 为 CNAME 指向疾风引擎边缘节点。
+ * 说明：仅取短主机记录（不含与 FQDN 重复的行）；gy 为 CNAME 指向疾风引擎边缘节点。
+ * 按需求不对外暴露解析目标（IP / CNAME 目标值），记录只保留类型、域名与 TTL。
  */
 
-// 两个托管 zone 的静态定义：id 与 apex 同值，record_value 为该 zone 的默认 A 记录值。
-// 用 as const 固化字面量类型，SiteZoneId 才能从数组中反推出 'laal.top' | 'mixm.top'。
+// 单一托管 zone 的静态定义：id 与 apex 同值。
+// 用 as const 固化字面量类型，SiteZoneId 才能从数组中反推出 'mixm.top'。
 export const SITE_ZONES = [
-  // laal.top 主 zone：默认解析到 103.0.113.10（DNSPod 导出值）
-  { id: 'laal.top', apex: 'laal.top', record_value: '103.0.113.10' },
-  // mixm.top 备用 zone：默认解析到 103.0.113.20（DNSPod 导出值）
-  { id: 'mixm.top', apex: 'mixm.top', record_value: '103.0.113.20' },
+  // mixm.top 唯一 zone：45 条主机记录全部挂在其下
+  { id: 'mixm.top', apex: 'mixm.top' },
 ] as const; // 冻结为只读元组，避免运行期被误改
 
 /** 默认解析 TTL（秒），与 DNSPod 导出一致 */
@@ -62,15 +60,14 @@ export const SITE_CATEGORIES: SiteCategory[] = [
   { id: 'tools', name: { zh: '工具与服务', en: 'Tools & Services' } },
 ];
 
-// 单条 DNS 解析记录：一个模块在每个 zone 各产生一条
+// 单条 DNS 解析记录：一个模块对应 zone 下的一条记录
 export interface SiteRecord {
   zone: SiteZoneId; // 该记录所属 zone
-  fqdn: string; // 完整域名，如 api.laal.top / laal.top（根记录）
-  record_type: 'A' | 'CNAME'; // 记录类型；绝大多数为 A，gy@mixm.top 为 CNAME
-  record_value: string; // 解析目标：A 记录为 IP，CNAME 记录为别名域名
+  fqdn: string; // 完整域名，如 api.mixm.top / mixm.top（根记录）
+  record_type: 'A' | 'CNAME'; // 记录类型；绝大多数为 A，gy 为 CNAME
   ttl: number; // 生存时间（秒）
-  /** 该 zone 的备注与默认备注不同时覆盖 */
-  label?: string; // record 级备注第一段；仅当该 zone 的备注与众模块不同才出现
+  /** 该记录的备注与模块级备注不同时覆盖 */
+  label?: string; // record 级备注第一段；仅当该记录的备注与模块级不同才出现
   description?: string; // record 级备注第二段；同上
 }
 
@@ -79,22 +76,22 @@ export interface SiteModule {
   host: string; // 主机名（不含 zone），根域名为 '@'
   category: SiteCategoryId; // 所属分类
   /** 备注第一段：模块定位 */
-  label: string; // 模块级备注第一段（默认取自 laal.top 的备注）
+  label: string; // 模块级备注第一段（取自 DNSPod 导出备注）
   /** 备注第二段：站点说明 */
   description: string; // 模块级备注第二段
   /** 可访问地址（按 zone 生成，CNAME 记录同样给出 https 入口） */
   urls: string[]; // 与 records 一一对应的 https 入口地址
-  records: SiteRecord[]; // 该模块在两个 zone 下的解析记录
+  records: SiteRecord[]; // 该模块在 zone 下的解析记录
 }
 
 // 原始录入结构：比 SiteModule 少一层展开，便于逐条手写 45 行备注
 interface RawModule {
   host: string; // 主机名
   category: SiteCategoryId; // 分类
-  label: string; // 备注第一段（laal.top 口径）
-  description: string; // 备注第二段（laal.top 口径）
-  /** 仅 mixm.top 与默认 A 记录不同时覆盖 */
-  mixm?: { record_type: 'A' | 'CNAME'; record_value: string; label?: string; description?: string }; // mixm.top 的差异项，缺省则沿用默认值
+  label: string; // 备注第一段（DNSPod 导出口径）
+  description: string; // 备注第二段（DNSPod 导出口径）
+  /** 记录类型或备注与默认值不同时的覆盖项（当前仅 gy 的 CNAME） */
+  mixm?: { record_type: 'A' | 'CNAME'; label?: string; description?: string }; // zone 内的差异项，缺省则沿用默认值
 }
 
 // 45 条原始录入，严格对应 DNSPod 导出表的 45 个主机记录备注
@@ -195,16 +192,14 @@ const RAW: RawModule[] = [
   {
     host: 'gy', // 工具模块主入口（疾风引擎）
     category: 'tools', // 归属工具与服务分类
-    label: '工具模块入口', // laal.top 口径备注第一段
-    description: '在线工具集合平台', // laal.top 口径备注第二段
+    label: '工具模块入口', // 备注第一段
+    description: '在线工具集合平台', // 备注第二段
     mixm: {
-      // mixm.top 是 CNAME 而非 A 记录，直接指向 EdgeOne 边缘节点
+      // gy 是 CNAME 而非 A 记录，指向疾风引擎 EdgeOne 边缘节点（目标值不对外暴露）
       record_type: 'CNAME',
-      // 疾风引擎在 EdgeOne 的落地域名（含末尾点，保持 DNSPod 原样）
-      record_value: 'gale-engine-landing-6j02gsvv.edgeone.cool.',
-      // mixm.top 侧的备注描述与 laal.top 不同，故在 record 级覆盖
+      // 该记录的备注与模块级不同，故在 record 级覆盖
       label: '工具模块核心入口，疾风引擎承载节点',
-      // mixm.top 侧的站点说明
+      // 该记录的站点说明
       description: '疾风引擎在线工具平台',
     },
   },
@@ -222,26 +217,25 @@ const RAW: RawModule[] = [
 
 /**
  * 把主机名拼成完整域名。
- * 根记录 '@' 直接返回 zone 本身（如 laal.top），其余拼成 host.zone。
+ * 根记录 '@' 直接返回 zone 本身（如 mixm.top），其余拼成 host.zone。
  */
 function fqdnOf(host: string, zone: SiteZoneId): string {
-  return host === '@' ? zone : `${host}.${zone}`; // '@' 是 DNS 根记录写法，不能拼成 @.laal.top
+  return host === '@' ? zone : `${host}.${zone}`; // '@' 是 DNS 根记录写法，不能拼成 @.mixm.top
 }
 
 /**
  * 把一条 RawModule 展开为 SiteModule：
- * 依次为两个 zone 生成解析记录，mixm.top 有差异项时以 record 级覆盖。
+ * 为唯一 zone 生成解析记录，存在差异项时以 record 级覆盖。
  */
 function buildModule(raw: RawModule): SiteModule {
-  // 每个 zone 生成一条记录，顺序与 SITE_ZONES 一致（laal.top 在前）
+  // 每个 zone 生成一条记录，顺序与 SITE_ZONES 一致
   const records: SiteRecord[] = SITE_ZONES.map((zone) => {
-    // 只有 mixm.top 存在覆盖项，其余 zone 一律走默认 A 记录
+    // 差异项（当前仅 gy 的 CNAME 与备注覆盖）
     const override = zone.id === 'mixm.top' ? raw.mixm : undefined;
     return {
       zone: zone.id, // 记录所属 zone
       fqdn: fqdnOf(raw.host, zone.id), // 按该 zone 拼出完整域名
       record_type: override?.record_type ?? 'A', // 有覆盖用覆盖类型，否则默认 A
-      record_value: override?.record_value ?? zone.record_value, // 有覆盖用覆盖值，否则用 zone 默认 IP
       ttl: TTL, // 统一 TTL，与 DNSPod 导出一致
       ...(override?.label ? { label: override.label } : {}), // 仅在有覆盖时写入 label，避免空字段污染响应
       ...(override?.description ? { description: override.description } : {}), // 同上，按需写入 description
@@ -252,10 +246,10 @@ function buildModule(raw: RawModule): SiteModule {
   return {
     host: raw.host, // 主机名
     category: raw.category, // 分类
-    label: raw.label, // 模块级备注第一段（保持 laal.top 口径，不被 mixm 覆盖）
+    label: raw.label, // 模块级备注第一段（保持 DNSPod 导出口径，不被 record 级覆盖污染）
     description: raw.description, // 模块级备注第二段
     urls: records.map((r) => `https://${r.fqdn}`), // 每条记录给出一个 https 入口
-    records, // 两 zone 的解析记录
+    records, // 该 zone 的解析记录
   };
 }
 
