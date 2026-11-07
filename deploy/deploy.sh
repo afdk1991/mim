@@ -40,6 +40,9 @@ PORT_="${PORT_:-8787}"
 REPO_URL="${REPO_URL:-git@github.com:afdk1991/mim.git}"
 DEPLOY_KEY="${DEPLOY_KEY:-/opt/mim/.ssh/deploy_key}"
 RUN_USER="${RUN_USER:-mim}"
+# 站点域名：用于把仓库内 deploy/nginx-mim.conf 的 server_name 替换为实际域名，
+# 并驱动 certbot 重新注入 TLS 段（与 bootstrap.sh 的 sed 规则保持一致）。
+NGINX_DOMAIN="${NGINX_DOMAIN:-mim.mixm.top}"
 
 # 目标提交：CI 传入 $GITHUB_SHA；为空则跟随 origin/main
 TARGET_REF="${1:-}"
@@ -260,11 +263,89 @@ for i in $(seq 1 20); do
   sleep 1
 done
 
-# --- 8. nginx 校验与热加载 ---
+# --- 8. nginx 配置安装与热加载 ---
+# 根因修复（2026-11-07）：此前本脚本只执行 `nginx -t && reload`，从不把仓库内的
+# deploy/nginx-mim.conf 安装到 /etc/nginx/sites-available/，导致仓库里新增的
+# `/admin/`、`/admin/assets/`、`location = /admin` 三个 block 从未生效——生产
+# `/admin/` 被 `location /` 的 SPA 回退吞成用户端 index.html（实测 `/admin`
+# 无斜杠返回 200 而非配置应有的 301，即为「服务器配置不是仓库版本」的铁证）。
+# 关键约束：bootstrap.sh 的 `certbot --nginx` 会把 TLS 段写进同一文件，
+# 故同步时必须保留 443/证书段，不得裸覆盖——做法是先装 HTTP 配置，再由 certbot
+# 以 --keep-until-expiring 重新注入 TLS（不重复签发证书）。
 if command -v nginx >/dev/null 2>&1; then
+  NGINX_AVAILABLE="/etc/nginx/sites-available/mim.conf"
+  NGINX_ENABLED="/etc/nginx/sites-enabled/mim.conf"
+  NGINX_BACKUP="${NGINX_AVAILABLE}.bak.$$"
+
+  # 有旧配置先备份：任何一步失败都用它一键回滚，保证线上 HTTPS 不中断
+  if [ -f "$NGINX_AVAILABLE" ]; then
+    cp -p "$NGINX_AVAILABLE" "$NGINX_BACKUP"
+    log "已备份现有 nginx 配置 → $NGINX_BACKUP"
+  fi
+
+  # 回滚函数：恢复备份与软链并 reload；无备份时只告警
+  nginx_rollback() {
+    if [ -f "$NGINX_BACKUP" ]; then
+      cp -p "$NGINX_BACKUP" "$NGINX_AVAILABLE"
+      ln -sfn "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+      nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+      warn "已回滚 nginx 配置至部署前版本"
+    else
+      warn "无 nginx 配置备份，跳过回滚"
+    fi
+  }
+
+  log "安装 nginx 站点配置 → $NGINX_AVAILABLE（server_name $NGINX_DOMAIN）"
+  # 与 bootstrap.sh 同一 sed 规则：把仓库里的默认域名替换为实际域名
+  sed "s/server_name mim.mixm.top;/server_name ${NGINX_DOMAIN} www.${NGINX_DOMAIN};/" \
+    "$APP_DIR/deploy/nginx-mim.conf" > "$NGINX_AVAILABLE"
+  chmod 644 "$NGINX_AVAILABLE"
+
+  # 先校验纯 HTTP 配置语法，语法错误立即回滚（此时尚未动 TLS，风险最低）
+  if ! nginx -t; then
+    nginx_rollback
+    die "nginx 配置语法校验失败，已回滚"
+  fi
+
+  # 重新注入 TLS：证书已存在时 certbot 仅改写配置而不重新签发
+  if [ -d "/etc/letsencrypt/live/${NGINX_DOMAIN}" ] && command -v certbot >/dev/null 2>&1; then
+    log "certbot 注入 HTTPS（已有证书，--keep-until-expiring）"
+    if ! certbot --nginx -d "$NGINX_DOMAIN" --redirect --non-interactive \
+        --keep-until-expiring --agree-tos -m "admin@${NGINX_DOMAIN}"; then
+      nginx_rollback
+      die "certbot 配置 HTTPS 失败，已回滚（线上 HTTPS 保持可用）"
+    fi
+    # certbot 改写后的配置必须再次校验
+    if ! nginx -t; then
+      nginx_rollback
+      die "certbot 改写后 nginx 校验失败，已回滚"
+    fi
+  else
+    warn "未找到 ${NGINX_DOMAIN} 证书或 certbot，跳过 HTTPS 注入（仅 HTTP 生效）"
+  fi
+
+  # 启用站点并停用默认站点，然后热加载
+  ln -sfn "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+  rm -f /etc/nginx/sites-enabled/default
   log "nginx -t && reload"
-  nginx -t
+  nginx -t || { nginx_rollback; die "启用站点后 nginx 校验失败，已回滚"; }
   systemctl reload nginx || systemctl restart nginx
+
+  # 断言 /admin/ 真实返回管理后台页面：以响应体含 noindex 为准。
+  # 不可用 `curl http://127.0.0.1/admin` 的 301 作为判据：certbot --redirect 会新增一个
+  # 80 端口 server 块，把任何 HTTP 请求都 301 到 HTTPS，该结果无法区分
+  # 「location = /admin 生效」与「整站强制 HTTPS」，属假阳性。
+  # 故用 --resolve 把域名指回本机 443 直取 HTTPS 内容（-k 忽略本机回环证书名差异）。
+  ADMIN_BODY="$(curl -k -s --max-time 5 --resolve "${NGINX_DOMAIN}:443:127.0.0.1" \
+    "https://${NGINX_DOMAIN}/admin/" || true)"
+  if printf '%s' "$ADMIN_BODY" | grep -q 'noindex'; then
+    log "/admin/ 返回管理后台页面（noindex 命中），nginx 站点配置已生效"
+  else
+    warn "/admin/ 未命中 noindex（可能仍落回用户端页面），请检查 nginx 配置安装"
+  fi
+
+  # 成功后清理备份，避免残留
+  rm -f "$NGINX_BACKUP"
 fi
 
 log "部署完成：$(git -C "$APP_DIR" rev-parse --short HEAD) $(date -u +%FT%TZ)"

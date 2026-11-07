@@ -98,17 +98,19 @@ node scripts/env-check.mjs
 ```bash
 pnpm install                       # 首次
 pnpm --filter @mim/api dev         # 后端（tsx watch），http://127.0.0.1:8787
-pnpm --filter @mim/web dev         # 前端（Vite），http://127.0.0.1:5173
+pnpm --filter @mim/web dev         # 用户端（Vite），http://127.0.0.1:5173
+pnpm --filter @mim/admin dev       # 管理后台（Vite），http://127.0.0.1:5174/admin/
 ```
 
-前端 Vite 已把 `/api` 与 `/health` 代理到 `http://127.0.0.1:8787`，因此浏览器只需访问 5173，无需配置跨域。
+用户端与后台的 Vite 均把 `/api` 与 `/health` 代理到 `http://127.0.0.1:8787`，因此浏览器只需访问 5173 / 5174，无需配置跨域。后台独立应用以 `base: './'` 构建，生产由 nginx 的 `/admin/` location 指向 `/opt/mim/admin`。
 
 ### 6.2 质量门禁命令
 
 ```bash
-pnpm -r typecheck                       # 四个 workspace 包类型检查
-pnpm --filter @mim/api test             # vitest + supertest，5 个测试文件 43 例全通过
-pnpm --filter @mim/web build            # 前端 tsc --noEmit + vite build
+pnpm -r typecheck                       # 5 of 6 workspace 项目类型检查（@mim/admin 已纳入）
+pnpm --filter @mim/api test             # vitest + supertest，10 个测试文件 120 例全通过
+pnpm --filter @mim/web build            # 用户端 tsc --noEmit + vite build
+pnpm --filter @mim/admin build          # 管理后台 tsc --noEmit + vite build（产物 dist/ 发布到 /opt/mim/admin）
 npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率门禁（CI 以 --strict 执行）
 ```
 
@@ -159,11 +161,18 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 push 到 `main` 即触发 `.github/workflows/deploy.yml`：
 
 ```
-verify:  pnpm install --frozen-lockfile → pnpm -r typecheck → @mim/api test → @mim/web build
+verify:  pnpm install --frozen-lockfile → pnpm -r typecheck → @mim/api test
+         → @mim/web build → @mim/admin build → comment-check --strict
 deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/deploy/deploy.sh $GITHUB_SHA"
          → 脚本 reset --hard 到该 SHA（而非 origin/main，避免连续 push 时先跑的 Run 部署到后推的提交）
+         → 安装 deploy/nginx-mim.conf 到 /etc/nginx/sites-available/mim.conf
+           → nginx -t → certbot 重注 TLS（--keep-until-expiring）→ reload
+           → 断言本机 curl -k --resolve <域名>:443:127.0.0.1 https://<域名>/admin/ 含 noindex
+             （不用 http://127.0.0.1/admin 的 301 判定：certbot --redirect 的 80 端口跳转块恒 301，属假阳性）
          → 校验服务器 HEAD == 本次提交 SHA（不一致即失败）
          → curl https://mim.mixm.top/health（必须 200，最多重试 10 次）
+         → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/admin（必须 301）
+         → curl https://mim.mixm.top/admin/（必须含 noindex 与 assets/index-*，否则落回用户端页面）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/plans（必须 404）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/audit/logs（必须 404）
          → curl -o /dev/null -w '%{http_code}' https://mim.mixm.top/api/v1/site/overview（必须 200）

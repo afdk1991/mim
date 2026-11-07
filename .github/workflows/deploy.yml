@@ -41,8 +41,14 @@ jobs:
       - name: 前端构建
         run: pnpm --filter @mim/web build
 
+      # 管理后台构建：与用户端同样是发布物，构建失败必须在 verify 阶段拦截，
+      # 而不是等到服务器侧 deploy.sh 才失败（那时用户端已被覆盖、回滚成本更高）
+      - name: 管理后台构建
+        run: pnpm --filter @mim/admin build
+
       # 铁律十一：注释覆盖率硬门禁（--strict，总覆盖率低于阈值即退出 1 阻断发布）
-      # 当前全仓覆盖率 93.3%、未达标文件 0，已高于默认阈值 80%
+      # 当前全仓覆盖率 88.9%、未达标文件 7（均为新建 apps/admin 视图，分批补齐），
+      # 已高于默认阈值（80%），故门禁仍可通过
       - name: 注释覆盖率门禁（铁律十一）
         run: node scripts/comment-check.mjs --strict
 
@@ -124,6 +130,25 @@ jobs:
           done
           echo "❌ 生产健康检查失败"
           exit 1
+
+      # 独立管理后台路由断言：/admin（无斜杠）必须 301 到 /admin/，
+      # /admin/ 必须返回后台自身 index.html（含 noindex 与 admin 产物引用）。
+      # 若此步失败，说明服务器 nginx 未安装仓库内的站点配置（历史 BUG：
+      # deploy.sh 只 reload 不 install，导致 /admin/* 被用户端 SPA 回退吞掉）。
+      - name: 管理后台路由断言
+        run: |
+          set -e
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 https://mim.mixm.top/admin)
+          if [ "$code" != "301" ]; then
+            echo "❌ /admin 期望 301，实际 $code"
+            exit 1
+          fi
+          echo "✅ /admin → 301"
+
+          body=$(curl -fsS --max-time 5 https://mim.mixm.top/admin/)
+          echo "$body" | grep -q 'noindex' || { echo "❌ /admin/ 缺少 noindex，疑似落回用户端页面"; exit 1; }
+          echo "$body" | grep -q 'assets/index-' || { echo "❌ /admin/ 未引用管理后台产物"; exit 1; }
+          echo "✅ /admin/ 返回管理后台页面"
 
       # 套餐 / 订阅 / 审计模块已下线：断言对应接口返回 404，防止残留路由复活
       - name: 已下线接口抽查（应 404）
