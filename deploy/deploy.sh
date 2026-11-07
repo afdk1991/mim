@@ -179,14 +179,19 @@ fi
 
 # 管理员密码登录口令：生产短信/邮件通道未接入时，POST /api/v1/auth/password 是唯一可用登录入口。
 # 安全修复（2026-11-07）：禁止再写入仓库内可查的固定默认口令（原字面值已从全仓移除）。
-# 幂等优先级：① env 文件已有值 → 保留；② CI/运维透传同名变量 → 采用；
-# ③ 两者皆无 → 现场生成随机口令写入 chmod 600 的 env 文件，且绝不回显到 CI 公开日志。
-if grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
+# 幂等优先级：① CI/运维透传同名变量非空 → 采用（覆盖现有值，支持口令轮换）；
+# ② env 文件已有值 → 保留；③ 两者皆无 → 现场生成随机口令写入 chmod 600 的 env 文件，且绝不回显到 CI 公开日志。
+if [ -n "${MIM_AUTH_ADMIN_PASSWORD:-}" ]; then
+  # CI Secret 透传路径：值来自 GitHub Actions secret，覆盖现有值以支持口令轮换
+  if grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
+    sed -i "s|^MIM_AUTH_ADMIN_PASSWORD=.*|MIM_AUTH_ADMIN_PASSWORD=${MIM_AUTH_ADMIN_PASSWORD}|" "$MIM_ENV_FILE"
+    log "更新 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 来自 CI Secret，值不回显）"
+  else
+    printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$MIM_AUTH_ADMIN_PASSWORD" >> "$MIM_ENV_FILE"
+    log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 来自 CI Secret，值不回显）"
+  fi
+elif grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
   log "$MIM_ENV_FILE 已含 MIM_AUTH_ADMIN_PASSWORD，保留现有值"
-elif [ -n "${MIM_AUTH_ADMIN_PASSWORD:-}" ]; then
-  # CI Secret 透传路径：值来自 GitHub Actions secret，仅写入受保护的 env 文件
-  printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$MIM_AUTH_ADMIN_PASSWORD" >> "$MIM_ENV_FILE"
-  log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 来自 CI Secret，值不回显）"
 else
   # 兜底路径：base64 随机串去掉 /+= 特殊字符，避免 env 解析与 sed 替换歧义
   AUTH_PASSWORD_GENERATED="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-24)"
