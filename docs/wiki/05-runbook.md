@@ -245,7 +245,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 ### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`，历史快照）
 
-> **取证口径说明（2026-11-07 22:2x 核对）**：本节标题、结论与下方表格为 **01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `0cd7e1f`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-07 本轮，commit `0cd7e1f`，CI run `42384679876` 五作业全绿）**，其中 `/admin/` 已返回含 `noindex` 的管理后台新产物，且自建主站 / GitHub Pages / Cloudflare Pages 三处首页均已含 `?tads` / 裸问号归一化脚本。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
+> **取证口径说明（2026-11-07 23:49 核对）**：本节标题、结论与下方表格为 **01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `41a871d`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-07 23:49:38 +0800，commit `41a871d`，CI run `42387996107` 五作业全绿）**，其中 `/admin/` 已返回含 `noindex` 的管理后台新产物，且自建主站 / GitHub Pages / Cloudflare Pages 三处首页均已含 `?tads` / 裸问号归一化脚本。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
 
 结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证）——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），层 2 验证码页 CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06）。自建主站首页已引用本轮新产物 `assets/index-B15IIvsS.js`（证明 commit `7e4e3e9`「整站强制登录改为公开视图免登录」已上线），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
 
@@ -259,7 +259,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.745s / 0.140s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
 | Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败） |
-| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `7e4e3e9`，2026-11-07 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.029s / 0.019s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
+| GitHub 仓库 | ✅ | ✅ 已同步（HEAD `41a871d`，2026-11-07 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.029s / 0.011s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
 
 > **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 不得作为「内容正确」的取证；须以有头真实浏览器读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
 >
