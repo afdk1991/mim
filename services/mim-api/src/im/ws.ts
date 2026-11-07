@@ -31,28 +31,31 @@ export function attachImWebSocket(server: HttpServer, deps: ApiDeps): ImHub {
   const wss = new WebSocketServer({ noServer: true }); // 不自动监听端口，由外部 server 的 upgrade 事件驱动
 
   // 处理升级请求：校验 token → 建立 WS 连接
+  // 注意：nginx 对 upgrade 请求要求上游返回 101，否则会回 502。
+  // 因此鉴权失败时不能直接回 401，而要先完成 101 握手，再在连接内关闭。
   server.on('upgrade', (req, socket, head) => {
     // 只处理 /api/v1/im/ws 路径的升级请求，其它路径交给其它处理
     if (!req.url || !req.url.startsWith('/api/v1/im/ws')) return;
     // 从 URL query 中取 token
     const parsed = parseUrl(req.url, true);
     const token = (parsed.query.token as string) || '';
-    // 无 token 或 token 非法：返回 HTTP 401 后优雅关闭 socket
-    // 注意：不能直接 destroy()，否则 401 响应体来不及刷出，nginx 会回 502
+    // 校验 token：失败时 payload 为 null，仍需完成 upgrade 握手（避免 nginx 502）
     const payload = token ? verifyAccessToken(token, deps.jwtSecret) : null;
-    if (!payload) {
-      // 写 HTTP 401 响应头，end() 会确保数据刷出后再关闭连接
-      socket.end('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n');
-      return;
-    }
-    // 通过鉴权，升级为 WebSocket 连接
+    // 无论鉴权是否通过，都完成 101 握手；鉴权结果在 connection 回调内处理
     wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req, payload.sub); // payload.sub 即 user_id
+      wss.emit('connection', ws, req, payload?.sub); // payload.sub 即 user_id，鉴权失败时为 undefined
     });
   });
 
   // 连接建立后注册到 hub 并绑定消息处理
   wss.on('connection', (ws: WebSocket, _req: IncomingMessage, userId: unknown) => {
+    // 鉴权失败（无 token 或 token 非法）：发 error 帧后立即关闭连接
+    // 必须先完成 101 握手才能发帧，否则 nginx 会把非 101 响应转成 502
+    if (userId === undefined || userId === null) {
+      sendFrame(ws, { type: 'error', error: { code: 'UNAUTHORIZED', message: 'token 无效或缺失' } });
+      ws.close(1008, 'UNAUTHORIZED'); // 1008 = Policy Violation
+      return;
+    }
     const uid = String(userId); // 转为字符串，确保类型一致
     hub.register(uid, ws); // 注册连接
 
