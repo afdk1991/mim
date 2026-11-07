@@ -245,7 +245,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 ### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`，历史快照）
 
-> **取证口径说明（2026-11-08 03:31 核对）**：本节标题、结论与下方表格为 **2026-11-07 01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `42b98bc`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-08 03:31:06 +0800，commit `42b98bc`，CI run `42405405950` 五作业全绿）**，其中商城 `/api/v1/modules` 系列接口已上线（公开 `GET /modules` 200 且 `?q=` 搜索生效、详情含 `price_history` / `requires` / `current_price`，管理面与权益接口无 token 均 401），自建主站与 Cloudflare Pages 首页产物指纹为 `index-s6n-xZuf.js`、GitHub Pages 为 `index-CDuo76_9.js`，三处均含 `?tads` / 裸问号归一化脚本。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
+> **取证口径说明（2026-11-08 04:01 核对）**：本节标题、结论与下方表格为 **2026-11-07 01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `d4c4620`；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-08 04:01:51 +0800，commit `d4c4620`，性质为可访问性复测轮——无新部署、未重复浏览器 E2E 与 CI 重跑）**，该轮复测：自建主站 `/health` 200/0.071s、首页 200/0.065s（LEN=2896，产物 `index-s6n-xZuf.js` 含 `?tads` / 裸问号归一化脚本）、`/api/v1/modules` 200/0.066s，Cloudflare Pages 200/0.534s 与生产同指纹，GitHub Pages 200/0.216s（产物 `index-CDuo76_9.js`），Sealos `/health` 200/0.272s（根路径 `/` 404 属正常），ghcr 401 属正常，EdgeOne `data.mixm.top` curl 仍为 985B WAF 挑战页（放行凭证过期中，真实内容连续多轮未复验），Vercel 本机 DNS 污染（162.125.32.9 Dropbox 段）与 github.com TLS 阻断（exit 35）均属网络侧限制（`git ls-remote` 取证 main=`d4c4620` ✅）。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
 
 结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证）——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），层 2 验证码页 CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06）。自建主站首页已引用本轮新产物 `assets/index-B15IIvsS.js`（证明 commit `7e4e3e9`「整站强制登录改为公开视图免登录」已上线），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
 
