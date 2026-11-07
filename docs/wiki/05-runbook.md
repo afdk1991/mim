@@ -118,7 +118,7 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 |---|---|
 | 数据库 | SQLite（`better-sqlite3`，WAL），首次启动自动建表；测试使用内存库 |
 | 端口 | API `8787`（读标准环境变量 `PORT`，默认 8787）；Web `5173` |
-| 环境变量 | `.env.example` 登记第三方密钥占位（P0 无真实密钥需求）；应用自有 `MIM_JWT_SECRET`（生产必配）与 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，由 `deploy/deploy.sh` §5 幂等写入） |
+| 环境变量 | `.env.example` 登记第三方密钥占位（P0 无真实密钥需求）；应用自有 `MIM_JWT_SECRET`（生产必配）、`MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令）与 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌），三者均由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`。`MIM_ADMIN_TOKEN` 缺失时 `/api/v1/admin/*` 与 catalog 管理写路由返回 403 `FEATURE_NOT_AVAILABLE 'admin API is not enabled'`，独立后台 `/admin/` 只能打开静态页无法写操作；配置后 `x-admin-token` 通道视同拥有全量权限（bootstrap），用于「第一个超管从哪来」的冷启动 |
 | 套餐/订阅/支付 | **已下线（2026-11-05）**：`/api/v1/plans`、`/api/v1/subscriptions/*`、`/api/v1/orders`、`/api/v1/invoices`、`/api/v1/audit/*` 路由与 9 张数据表均已移除，请求应返回 404 |
 | 验证码 | 开发/测试环境未配置通道时在响应中回传 `dev_code`；**生产环境（`NODE_ENV=production`）强制走第三方通道，不回传 `dev_code`**。通道已支持：国内手机号 → 阿里云短信（`@alicloud/dysmsapi20170525`，需 `MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE` 四项齐备），海外邮箱 → AWS SES（`@aws-sdk/client-ses`，需 `MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_FROM_ADDRESS`，`MIM_EMAIL_SES_REGION` 缺省回退 us-east-1）。通道未配置时合法请求返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；供应商发送失败返回 502 `AUTH_CODE_DELIVERY_FAILED` |
 | 生产登录入口 | 短信/邮件通道未接入期间，生产使用 `POST /api/v1/auth/password`（`{region,identifier,password}`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`，由 `deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）。口令错误 401 `AUTH_PASSWORD_INVALID`，未配置 503 `AUTH_PASSWORD_NOT_CONFIGURED`，连续失败 5 次锁定 15 分钟（423 `AUTH_ACCOUNT_LOCKED`）。前端登录页默认「密码登录」模式 |

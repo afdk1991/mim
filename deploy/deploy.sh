@@ -5,7 +5,8 @@
 #       → 构建前端（apps/web,vite）与管理后台（apps/admin,vite）
 #       → 编译后端（esbuild → dist/index.js）
 #       → 发布静态产物到 /opt/mim/web、管理后台到 /opt/mim/admin
-#       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET）
+#       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET / MIM_CORS_ORIGINS /
+#         MIM_AUTH_ADMIN_PASSWORD / MIM_ADMIN_TOKEN / 可选验证码通道密钥）
 #       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端 → 健康检查
 #
 # 用法（服务器上）：
@@ -167,6 +168,20 @@ if grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
 else
   log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD）"
   printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$AUTH_PASSWORD_DEFAULT" >> "$MIM_ENV_FILE"
+fi
+
+# 超管引导令牌（RBAC bootstrap）：/api/v1/admin/* 与 catalog 管理写路由的双通道鉴权之一。
+# 缺失时这些端点会返回 403 FEATURE_NOT_AVAILABLE 'admin API is not enabled'，
+# 导致独立后台 /admin/ 只能打开静态页却无法完成任何写操作。
+# 幂等规则与上面一致：文件已含该变量则保留运维自定义值，绝不覆盖；
+# 仅当本次由 CI 透传了非空 MIM_ADMIN_TOKEN 且文件缺失该变量时才写入。
+if grep -q '^MIM_ADMIN_TOKEN=' "$MIM_ENV_FILE"; then
+  log "$MIM_ENV_FILE 已含 MIM_ADMIN_TOKEN，保留现有值"
+elif [ -n "${MIM_ADMIN_TOKEN:-}" ]; then
+  log "补齐 $MIM_ENV_FILE（MIM_ADMIN_TOKEN 来自 CI Secret）"
+  printf 'MIM_ADMIN_TOKEN=%s\n' "$MIM_ADMIN_TOKEN" >> "$MIM_ENV_FILE"
+else
+  warn "跳过 MIM_ADMIN_TOKEN（CI Secret 未配置）：管理写路由将返回 403 FEATURE_NOT_AVAILABLE"
 fi
 
 # 验证码通道（阿里云短信 / AWS SES）：deploy.yml 通过 sudo env 透传 CI Secret。

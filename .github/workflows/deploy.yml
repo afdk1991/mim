@@ -84,11 +84,15 @@ jobs:
           MIM_EMAIL_SES_SECRET_ACCESS_KEY: ${{ secrets.MIM_EMAIL_SES_SECRET_ACCESS_KEY }}
           MIM_EMAIL_SES_REGION: ${{ secrets.MIM_EMAIL_SES_REGION }}
           MIM_EMAIL_SES_FROM_ADDRESS: ${{ secrets.MIM_EMAIL_SES_FROM_ADDRESS }}
+          # RBAC 超管引导令牌：缺失则 /api/v1/admin/* 与 catalog 管理写路由返回 403，
+          # 独立后台 /admin/ 无法完成任何写操作（见 deploy/deploy.sh 的幂等写入段）。
+          MIM_ADMIN_TOKEN: ${{ secrets.MIM_ADMIN_TOKEN }}
         run: |
           # 可选通道 secret 透传到远端 deploy.sh（%q 安全引用；未配置的 secret 为空则不传）
           ENV_ARGS=""
           for v in MIM_SMS_ALIYUN_ACCESS_KEY_ID MIM_SMS_ALIYUN_ACCESS_KEY_SECRET MIM_SMS_ALIYUN_SIGN_NAME MIM_SMS_ALIYUN_TEMPLATE_CODE \
-                   MIM_EMAIL_SES_ACCESS_KEY_ID MIM_EMAIL_SES_SECRET_ACCESS_KEY MIM_EMAIL_SES_REGION MIM_EMAIL_SES_FROM_ADDRESS; do
+                   MIM_EMAIL_SES_ACCESS_KEY_ID MIM_EMAIL_SES_SECRET_ACCESS_KEY MIM_EMAIL_SES_REGION MIM_EMAIL_SES_FROM_ADDRESS \
+                   MIM_ADMIN_TOKEN; do
             val="${!v}"
             [ -n "$val" ] && ENV_ARGS="$ENV_ARGS $(printf '%s=%q' "$v" "$val")"
           done
