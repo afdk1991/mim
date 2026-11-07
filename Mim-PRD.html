@@ -6,6 +6,70 @@
 <head>
 <!-- 字符编码声明：UTF-8，保证中文不乱码 -->
 <meta charset="UTF-8">
+
+<!-- 全站会话门禁：未登录只提供登录入口，覆盖刷新与直接打开本页；与 apps/web/src/api.ts 共用会话键 -->
+<script>
+  (function () { // 立即执行，隔离内部变量，避免污染全局
+    // 会话键与前端 SESSION_KEY 保持一致，跨页面共享同一登录态
+    var KEY = 'mim.session.v1'; // 版本号键名，结构升级时可作废旧数据
+    // 读取本地会话；隐私模式或跨源限制下可能抛错，统一按未登录处理
+    var raw = null; // 默认无会话
+    try { raw = window.localStorage.getItem(KEY); } catch (e) { raw = null; } // 读取失败即锁定
+    // 结构校验：两个令牌与用户主键必须同时存在，脏数据不视为已登录
+    var ok = false; // 默认锁定
+    try { // JSON 解析可能失败
+      var s = raw ? JSON.parse(raw) : null; // 无值直接按 null 处理
+      ok = !!(s && typeof s.access_token === 'string' && s.access_token && typeof s.refresh_token === 'string' && s.refresh_token && s.user && typeof s.user.id === 'string' && s.user.id); // 与 isValidSession 同口径
+    } catch (e) { ok = false; } // 解析异常保持锁定
+    // 已登录：不做任何 DOM 改动，原页面结构、样式与交互完全保留
+    if (ok) return; // 已登录用户零影响
+    // 未登录：先隐藏根节点，避免受保护内容在替换前闪现
+    document.documentElement.style.visibility = 'hidden'; // 整页隐藏，稍后只显示门禁卡片
+    // DOM 就绪后清空原正文并渲染纯登录入口
+    document.addEventListener('DOMContentLoaded', function () { // 此时 body 可安全写入
+      // React 应用优先写 #root（随后由 App 接管），静态文档页则替换整个 body
+      var root = document.getElementById('root'); // 应用挂载点，静态页为 null
+      var host = root || document.body; // 统一宿主，避免卡片挂到 #root 之外造成残留
+      // 清空宿主内容，确保未登录看不到任何受保护页面内容
+      host.innerHTML = ''; // root 为空壳，静态页为受保护正文
+      // 仅静态文档页需要整页居中基线；React 应用保持原样式，由 App 接管渲染
+      if (!root) document.body.style.cssText = 'margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f5f7;color:#1c2230;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'; // 浅色居中布局
+      // 门禁容器：带标记供自动化验证识别
+      var box = document.createElement('div'); // 外层卡片
+      box.setAttribute('data-auth-gate', 'locked'); // 自动化断言标记
+      box.style.cssText = 'width:min(400px,90vw);margin:24px auto;padding:28px;border:1px solid #e3e6ec;border-radius:14px;background:#fff;box-shadow:0 8px 24px rgba(20,28,45,.08);text-align:center;'; // 卡片样式
+      // 锁定态标题
+      var title = document.createElement('h1'); // 一级标题
+      title.textContent = '全站已锁定'; // 标题文案
+      title.style.cssText = 'margin:0 0 12px;font-size:22px;'; // 标题间距与字号
+      // 引导说明
+      var desc = document.createElement('p'); // 段落节点
+      desc.textContent = '请先登录以解锁全部功能；登录后在同源刷新本页即可查看。'; // 引导文案
+      desc.style.cssText = 'margin:0 0 20px;color:#6b7280;'; // 次要文字色
+      // 登录入口：指向主站登录伪视图
+      var link = document.createElement('a'); // 锚点节点
+      link.href = '/#/login'; // 主站登录入口
+      link.textContent = '前往登录'; // 入口文案
+      link.setAttribute('data-auth-gate-entry', 'login'); // 自动化断言标记
+      link.style.cssText = 'display:inline-block;padding:10px 18px;border-radius:8px;background:#3b6ef5;color:#fff;text-decoration:none;'; // 主按钮样式
+      // 刷新按钮：登录完成后无需重新输入地址即可解锁本页
+      var refresh = document.createElement('button'); // 按钮节点
+      refresh.type = 'button'; // 普通按钮，避免表单默认提交
+      refresh.textContent = '刷新'; // 刷新文案
+      refresh.style.cssText = 'display:block;margin:12px auto 0;padding:6px 12px;border:1px solid #e3e6ec;border-radius:8px;background:#fff;color:#1c2230;cursor:pointer;'; // 次级按钮样式
+      refresh.onclick = function () { location.reload(); }; // 点击后重新校验会话
+      // 依次挂载到卡片
+      box.appendChild(title); // 标题
+      box.appendChild(desc); // 说明
+      box.appendChild(link); // 登录入口
+      box.appendChild(refresh); // 刷新按钮
+      // 卡片挂到宿主，成为未登录态唯一可见内容
+      host.appendChild(box); // 挂载门禁卡片
+      // 恢复可见性，显示门禁卡片
+      document.documentElement.style.visibility = 'visible'; // 结束隐藏
+    }); // DOMContentLoaded 监听结束
+  })(); // 立即执行结束
+</script><!-- 全站会话门禁脚本结束 -->
 <!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 浏览器标签页标题 -->
@@ -257,7 +321,7 @@
   <!-- 表头：角色 / 定义 / 核心权限 -->
   <tr><th>角色</th><th>定义</th><th>核心权限</th></tr>
   <!-- 访客 -->
-  <tr><td>访客</td><td>未登录用户</td><td>浏览公开内容、注册/登录</td></tr>
+  <tr><td>访客</td><td>未登录用户</td><td>全站页面与功能均锁定，仅可访问登录入口（2026-11-08 起）</td></tr>
   <!-- 注册用户（原「免费用户 / 订阅用户」已随 FR-02 下线合并） -->
   <tr><td>注册用户</td><td>已注册（当前无订阅体系）</td><td>使用免费功能、解锁功能模块、跨端登录</td></tr>
   <!-- 运营管理员（权限范围 TBD） -->
@@ -748,6 +812,8 @@ function submitLogin(){
 </table>
 <!-- 前端行为子标题：覆盖站点地图、站点目录与 45 个节点模块页 -->
 <h4>前端行为（站点地图 / 站点目录 / 45 个节点模块页）</h4>
+<!-- 全站会话门禁说明：所有站点地图入口仅在解锁后可达 -->
+<p><strong>访问门禁</strong>：上述视图与 45 个节点模块页均在全站会话门禁之后；未登录时刷新或直接访问任意 <code>#/</code> 路由只显示整屏登录页，登录成功后原地解锁，退出或登录状态失效立即重新锁定。</p>
 <!-- 交互规则清单 -->
 <ul>
   <!-- 一次性拉取 + 客户端筛选，避免每输入一次就请求后端 -->
@@ -773,6 +839,8 @@ function submitLogin(){
   <li>契约测试：<code>test/site.test.ts</code> 7 例覆盖四条公开路由的结构、计数（45）、过滤与 404 / 400 分支；<code>test/site-nodes.test.ts</code> 11 例覆盖 45 节点规格、路由唯一、关联不悬空、备注 / 记录条目、冲突映射与两接口同源。</li>
   <!-- 线上取证口径：接口计数 + 45 个 hash 路由逐个可达 -->
   <li>线上验收：<code>/site/overview</code> 与 <code>/site/nodes</code> 均返回 <code>total=45</code>，8 分类计数合计 45；<code>/site/modules</code> 返回 <code>items</code> 长度 45；45 个 <code>#/site/&lt;key&gt;</code> 路由逐个渲染成功、导航高亮正确、未知节点有兜底页；未知 host 返回 404、非法 zone 返回 400。</li>
+  <!-- 全站门禁验收：锁定 / 解锁 / 重新锁定三类场景 -->
+  <li>门禁验收：未登录访问任意 <code>#/</code> 路由（含 45 个节点页）与静态文档入口均只显示登录入口；登录成功后 45 个路由全部可达；退出或令牌失效立即重新锁定，刷新与直接访问内部页面不绕过。</li>
   <!-- 数据维护方式：xls 更新后需同步 site.ts 常量 -->
   <li>数据维护：DNSPod 记录变更后，需同步更新 <code>services/mim-api/src/site.ts</code> 中的 <code>SITE_MODULES</code> / <code>SITE_CATEGORIES</code> 常量并跑契约测试（当前无自动导入 xls 的管线）。</li>
 </ul>
@@ -901,6 +969,55 @@ function submitLogin(){
   <li>冷静期结束后，删除用户个人数据，仅保留匿名化的必要合规记录（订单/财务域已于 2026-11-05 删除，不再产生此类记录）</li>
   <!-- 海外删除请求时限 -->
   <li>海外用户的数据删除请求按 GDPR/CCPA 要求在 30 天内处理</li>
+</ul>
+
+<!-- FR-07 即时通讯与视频通话小节标题（2026-11-08 新增） -->
+<h3>FR-07 即时通讯与视频通话</h3>
+
+<!-- IM 功能概述 -->
+<h4>功能概述</h4>
+<!-- IM 能力清单 -->
+<ul>
+  <!-- 单聊与群聊 -->
+  <li>支持单聊（direct）与群聊（group），会话列表按最后消息时间倒序</li>
+  <!-- 消息类型 -->
+  <li>消息类型：文本、图片、文件、系统消息；图片/文件走 media 预签名上传，WS 仅传 object_key 引用</li>
+  <!-- 实时性 -->
+  <li>消息通过 WebSocket 实时推送，离线消息在下次连接时可通过 HTTP 拉取</li>
+  <!-- 已读回执 -->
+  <li>支持已读回执（message.read），成员可查看自己的未读数</li>
+  <!-- 输入中提示 -->
+  <li>支持「输入中」状态广播（typing 帧）</li>
+  <!-- 在线状态 -->
+  <li>用户上下线时向其会话成员推送 presence 帧</li>
+</ul>
+
+<!-- 视频通话子标题 -->
+<h4>视频通话</h4>
+<!-- 视频通话能力清单 -->
+<ul>
+  <!-- 信令通道 -->
+  <li>信令复用 WebSocket 连接：call.invite → call.offer → call.answer → call.ice → call.hangup</li>
+  <!-- 媒体通道 -->
+  <li>媒体走 WebRTC（RTCPeerConnection），STUN 服务器 stun:stun.l.google.com:19302</li>
+  <!-- 浮动窗口 -->
+  <li>前端浮动窗口展示本地与远端视频流，支持挂断</li>
+  <!-- TURN 限制 -->
+  <li>当前未配置 TURN 服务器，对称 NAT 环境下可能无法直连（待后续按需引入免费 TURN）</li>
+</ul>
+
+<!-- 协议与鉴权子标题 -->
+<h4>协议与鉴权</h4>
+<!-- 协议规则清单 -->
+<ul>
+  <!-- WS 端点 -->
+  <li>WebSocket 端点：<code>wss://mim.mixm.top/api/v1/im/ws?token=&lt;access_token&gt;</code></li>
+  <!-- 鉴权方式 -->
+  <li>鉴权：query.token 经 JWT 校验；失败时完成 101 握手后发送 error 帧并以 close code 1008 关闭</li>
+  <!-- 心跳机制 -->
+  <li>心跳：客户端 25s 发 ping，服务端回 pong，10s 超时断开</li>
+  <!-- 自动重连 -->
+  <li>断线自动重连：指数退避 0.5s → 10s</li>
 </ul>
 
 <!-- 章节标题：6. 共享规则 -->
