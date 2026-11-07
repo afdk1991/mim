@@ -26,7 +26,7 @@
 |---|---|---|
 | 访客 | 未登录用户 | 浏览公开内容、注册/登录 |
 | 注册用户 | 已注册（**当前无订阅体系，2026-11-05 已下线**） | 使用已解锁/免费功能、跨端登录 |
-| 运营管理员 | 内部运营人员 | 管理功能模块与解锁（后台规划，未实现） |
+| 运营管理员 | 内部运营人员 | **最小管理面已落地（2026-11-07）**：`MIM_ADMIN_TOKEN` + `requireAdmin`（常量时间比对）+ 三条管理写路由（模块状态流转 / 权益发放 / 权益回收）；完整 RBAC 与 `apps/admin` 后台仍为 P1 |
 
 > **订阅角色已下线（2026-11-05）**：原「免费用户 / 订阅用户 / 运营管理员（管理计划、订单、退款）」随 FR-02 整域删除，账号不再有订阅状态。
 
@@ -121,7 +121,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 风控回收：Entitlement(revoked) → 通知「解锁已回收」
 ```
 
-> 原流程中的 `Order(pending) → 支付(FR-02) → Order(paid) → 同事务发放` 与 `Refund(executed) → Order(refunded) → Entitlement(revoked)` 两段已随支付/退款域于 2026-11-05 删除；`entitlements` 的发放写路径仍在规划中（见 §11.11）。
+> 原流程中的 `Order(pending) → 支付(FR-02) → Order(paid) → 同事务发放` 与 `Refund(executed) → Order(refunded) → Entitlement(revoked)` 两段已随支付/退款域于 2026-11-05 删除；`entitlements` 的发放写路径已由管理面补齐——`POST /entitlements/grant` 发放、`POST /entitlements/:id/revoke` 回收、`GET /modules` / `GET /modules/:code` 提供目录只读（见 §11.11）。
 
 **异常与边界**：
 - 前置依赖未满足：拒绝解锁并返回 `403` + 需先解锁的模块清单（通用错误语义，**不使用已不存在的 `MODULE_DEPENDENCY_UNMET` 错误码**）
@@ -313,10 +313,10 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| 模块目录 / 详情 | —（未实现；`modules` 表已建并种子两条 `comic.workbench`，无 `GET /modules` 路由） | —（未实现） | 🟡 仅建表 |
+| 模块目录 / 详情 | **已实现（2026-11-07）**：`GET /modules`、`GET /modules/:code`（公开只读）；管理写路由 `PATCH /modules/:code/status`（`draft→active→archived` 单向状态机） | ✅ 契约测试 `test/catalog.test.ts`（18 例） | ✅ 已实现 |
 | 模块定价（region / 币种 / 有效期） | —（`module_prices` 表已建，无定价接口） | — | 🟡 仅建表 |
 | ~~下单挂载模块~~ | —（原 `order_items` 设计随订单域于 2026-11-05 下线，**不建表**；解锁直接落 `entitlements`） | — | **已取消** |
-| 解锁发放 / 回收（Entitlement） | —（`entitlements` / `entitlement_events` 表已建；发放/回收写路径未实现） | — | 🟡 仅建表 |
+| 解锁发放 / 回收（Entitlement） | **已实现（2026-11-07）**：`POST /entitlements/grant`（发放，唯一索引兜底幂等）、`POST /entitlements/:id/revoke`（回收，写 `entitlement_events`）；到期由 `src/jobs.ts` 的 `runEntitlementExpiry` 定时扫描置 `expired` | ✅ 契约测试 `test/catalog.test.ts`（18 例）+ `test/jobs.test.ts`（9 例） | ✅ 已实现 |
 | 解锁鉴权（服务端唯一依据） | `requireEntitlement(moduleCode)` 中间件（`src/middleware.ts`） | — | ✅ 已落地 |
 | ~~退款触发解锁回收~~ | —（退款域已删除，**不再实现**；回收仅保留风控动作路径） | — | **已取消（2026-11-05）** |
 

@@ -35,6 +35,18 @@ export const DELETION_GRACE_DAYS = 7; // 注销冷静期 7 天，期内可撤销
 export const REQUIRE_IDEMPOTENCY = true; // 全局开关：控制写路由是否强制幂等键，便于灰度或本地调试关闭
 
 /**
+ * 管理面鉴权令牌（最小管理鉴权，RBAC 仍为 P1）。
+ * 现有 users 表无 role 列，故 /modules/:code/status、/entitlements/grant 等管理写路径
+ * 统一用 `x-admin-token` 头与 `MIM_ADMIN_TOKEN` 环境变量做常量时间比较。
+ * 注意：不在模块顶层缓存该值——中间件从 req.deps.env 读取，测试可直接注入而无需改全局 process.env。
+ * 未配置环境变量时一律 403，端点不暴露任何管理能力。
+ */
+export const ADMIN_TOKEN_ENV_KEY = 'MIM_ADMIN_TOKEN'; // 只导出键名常量，避免多处手写字符串拼错
+
+/** 后台定时任务总开关：默认开启；多副本部署只让一个实例消费时设 MIM_JOBS=0 */
+export const JOBS_ENABLED = (process.env.MIM_JOBS ?? '1') !== '0'; // 显式 0 才关闭，其余取值均视为开启，避免拼写错误导致任务静默不跑
+
+/**
  * JWT 密钥加载（优先级从高到低）：
  * 1. `MIM_JWT_SECRET` 环境变量（生产必配，systemd 经 /opt/mim/mim-api.env 注入）；
  * 2. 非生产环境回退到本地 `.mim-dev-secret/jwt.key`（首次运行自动生成，已在 .gitignore 中）。

@@ -3,6 +3,7 @@
 > **状态声明（证据）**：截至 V0.0.0-preview（2026-11-05），仓库内已落地 `apps/web`（React 18 + Vite 6）、`packages/core-domain`、`packages/i18n`、`services/mim-api`（Express 5 + SQLite/better-sqlite3），包管理器 pnpm workspace；`pnpm -r typecheck` / `pnpm --filter @mim/api test`（5 文件 40 例全通过）/ `pnpm -w build` / `node scripts/version-check.mjs` / `node scripts/env-check.mjs`（138 = 138）均已通过并有命令输出留档。
 > **2026-11-04 变更（两次）**：① FR-03 旧范围（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已按用户指令整体移除，§3.2「content 域（已移除）」与同步/导出规则仅作历史参考，不再对应仓库实况；② FR-03 已**重定义为「功能模块商城 + 漫剧 AI 剧」**，新增 `catalog` / `comic` / `media` 三域与配套表；实现拆分清单见 [07-functional-modules.md](./07-functional-modules.md) §12。
 > **2026-11-05 变更**：① FR-02（订阅与支付）与审计域（`routes/audit.ts` + `audit_logs`）整域删除，生产库 9 张表 DROP（迁移 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`）；② 漫剧第 1/2 期后端已落地——`comic` 域 7 表 + 24 条路由 + `src/orchestrator.ts` + `src/storage.ts` 均已装配进 `app.ts`/`index.ts`；③ 受保护 router 的 `requireAuth` / `requireEntitlement` 改为按命名空间生效（`/me`、`/comic`、`/media`、`/ai`），未匹配路径落到统一 404，不再被鉴权误拦成 401（契约测试「已下线与未知路径返回 404」锁定）；④ 错误信封归一——`errorHandler` 识别 body-parser 的 `entity.parse.failed`（非法 JSON 请求体），返回 400 `VALIDATION_FAILED` 而非 500 `INTERNAL_ERROR`（契约测试新增 1 例，测试总数 39 → 40）。本页 §2 / §3 / §4 / §5 / §6 / §8 / §9 / §10 已按此同步。
+> **2026-11-07 变更**：① `catalog` 补三条管理写路由（`PATCH /modules/:code/status`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke`），鉴权由 `middleware.ts` 的 `requireAdmin` 承担（环境变量 `MIM_ADMIN_TOKEN`，常量时间比对），未配置时 403 `FEATURE_NOT_AVAILABLE`；② 新增 `services/mim-api/src/jobs.ts`——成本告警 / 成片审核超时 / 权益到期扫描三定时任务 + `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`），`index.ts` 按 `MIM_JOBS_ENABLED` 装配与优雅退出；③ 契约测试新增 `test/catalog.test.ts`（18 例）与 `test/jobs.test.ts`（9 例），全仓测试 64 → **91 例**；④ `apps/web` 整站强制登录改为两级门禁——`store` / `sitemap` 匿名可访问，`comic` / `settings` 未登录时内嵌 `<Login embedded />`。本页 §1.1 / §2 / §3 / §8 / §10 已按此同步。
 > 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
@@ -46,9 +47,9 @@
 | 客户端 | web / mini / mobile / desktop / admin 五端 | 仅 `apps/web`（React 18 + Vite 6），`/api` 与 `/health` 由 Vite 代理到 8787 | 先打通契约与核心流程；其余端复用同一 `/api/v1` 契约与 `packages/core-domain` |
 | 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/金额/UUIDv7）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象；原 `permissions.ts` / `tasks.ts` 随 FR-03 删除；`plans.ts` / `subscription.ts` / `order.ts` 随 FR-02 于 2026-11-05 删除 |
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
-| 后台管理 | `admin-api` + RBAC 后台 | 未实现；**审计已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表均已删除 | P1 |
+| 后台管理 | `admin-api` + RBAC 后台 | **最小管理面已落地（2026-11-07）**：`middleware.ts` 的 `requireAdmin` 以环境变量 `MIM_ADMIN_TOKEN` 做常量时间比对（`timingSafeEqual` + sha256），未配置时返回 403 `FEATURE_NOT_AVAILABLE`；三条写路由 `PATCH /modules/:code/status`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke` 已挂载；**审计仍下线（2026-11-05 删除 `routes/audit.ts` + `audit_logs`）** | 完整 `admin-api` + 多角色 RBAC + 独立 `apps/admin` 仍为 P1；当前为单令牌最小管理面 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试（`test/*.test.ts` 等 7 文件 64 例，含 `site.test.ts` 7 例）保障字段一致性；后续补 OpenAPI 导出 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试保障字段一致性：`test/*.test.ts` 共 **9 文件 91 例**（`api` 19 / `comic` 10 / `comic-phase2` 10 / `orchestrator` 10 / `catalog` 18 / `jobs` 9 / `site` 7 / `ai-routes` 5 / `media` 3）；后续补 OpenAPI 导出 |
 | 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
 ## 2. 后端服务模块清单
@@ -59,7 +60,7 @@
 | `identity` | 注册登录、第三方登录绑定、会话与设备、账号合并、注销 | `/auth/*`、`/accounts/*`、`/devices/*` | 短信/邮件通道、Redis | 分库 |
 | ~~`billing`~~ | **已删除（2026-11-05）**：`routes/billing.ts` 与 `packages/core-domain/{plans,subscription,order}.ts` 移除，生产库 5 张计费表 DROP；当前无计划/订阅/发票/对账能力 | 无（原 `/plans`、`/subscriptions/*`、`/invoices/*` 现均 404） | 无 | — |
 | ~~`payment-driver`~~ | **已删除（2026-11-05）**：原 7 通道驱动与统一回调随 FR-02 一并移除，`/payments/*`、`/callbacks/{driver}` 现均 404 | 无 | 无 | — |
-| `catalog` | **（部分落地：建表 + 门禁，2026-11-04）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 已建，`requireEntitlement` 已落地；`/modules` 路由未实现；`order_items` 随订单域于 2026-11-05 取消，**不建表** | `/modules`、`/modules/{code}`、`/entitlements/*`、`/entitlements/{code}/check`（未实现） | admin-api（订单/退款依赖已于 2026-11-05 随 FR-02 移除） | 分库 |
+| `catalog` | **（已落地，2026-11-07 补管理写面）** 功能模块目录、模块定价、解锁发放与回收、解锁鉴权；`modules`/`module_prices`/`entitlements`/`entitlement_events` 四表已建，`requireEntitlement` 门禁 + 公开只读 `GET /modules`、`GET /modules/:code` + 三条管理写路由（状态迁移 / 发放 / 回收）均已实现；`order_items` 随订单域于 2026-11-05 取消，**不建表** | `GET /modules`、`GET /modules/{code}`、`GET /entitlements`、`POST /entitlements`（普通用户自领）、`GET /entitlements/{code}/check`、`PATCH /modules/{code}/status`、`POST /entitlements/grant`、`POST /entitlements/{id}/revoke`（后三条需 `x-admin-token`） | admin-api（订单/退款依赖已于 2026-11-05 随 FR-02 移除） | 分库 |
 | `comic` | **（第 1 期已落地 2026-11-04；第 2 期路由骨架已落地 2026-11-05）** 工程/角色/分镜（`/comic/projects/*` 8 条）与生成任务编排、成片合成与版本、审核发布（`/comic/jobs/*`、`/comic/films/*` 16 条）均已实现（共 24 条路由）；任务编排与队列消费（`src/orchestrator.ts` → `/api/v1/ai/*`）、对象存储（`src/storage.ts` → `/api/v1/media/*`）**已于 2026-11-05 装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认随进程自动消费；openai 兼容提供方已接入 text/image（2026-11-06，video/tts/compose 诚实失败 `PROVIDER_NOT_CONFIGURED`），更多真实厂商模型调用待 OQ-08 凭证** | `/comic/projects/*`、`/comic/jobs/*`、`/comic/films/*`（24 条已实现，骨架） | ai-orchestrator、media、对象存储、审核服务、MQ | 分库 |
 | `media` | **（已落地并装配上线，2026-11-05）** `src/storage.ts` 实现 `LocalDiskStorage`（HMAC-SHA256 预签名 URL，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名）；`/media/presign/*`、`/media/assets`、免鉴权对象收发端点均已挂载；`generation_assets` 表已建 | `/media/presign/upload`、`/media/presign/download`、`/media/assets`、`/media/objects/*`（已上线） | 对象存储、CDN | 按 region 桶 |
 | `content` | **P0 任务与协作域已整体移除（2026-11-04，本页保留为历史设计）**：原含项目/任务/子任务、列表/今日/日历/看板视图、个人仪表盘、成员邀请与两档权限、增量同步、CSV 导出；**P1 通用内容管理域**：内容/资源元数据、审核流、检索索引、推荐候选 | P1：`/contents/*`、`/search`（原 P0 的 `/projects/*`、`/tasks/*`、`/dashboard`、`/sync/*`、`/exports/*` 已删除） | P1：对象存储、OpenSearch、审核服务 | 分库 |
@@ -69,7 +70,7 @@
 | `notification` | 站内信、邮件、短信、推送编排与模板 | `/notifications/*` | 邮件/短信/推送通道 | 分库 |
 | `openapi` | 开放平台：OAuth2、API Key、Webhook 投递、限流 | `/open/*` | gateway | 分库 |
 | `admin-api` | 运营后台 BFF：聚合查询、写操作审批、审计埋点 | `/admin/*` | 各域服务、admin 库 | 分库 |
-| `jobs` | 定时任务与队列消费者（见 §8） | 无 HTTP | MQ、全部域库 | 双区各一套 |
+| `jobs` | **（已落地，2026-11-07）** `src/jobs.ts` 提供三个定时任务（成本告警 / 成片审核超时 / 权益到期扫描）+ `start`/`stop` 生命周期，复用 `idempotency_keys`（`user_id='system'`、`method='JOB'`）做抢占与结算；`index.ts` 按 `MIM_JOBS_ENABLED`（默认开）装配并在优雅退出时 `stop()`（见 §8） | 无 HTTP | 全部域库（当前仅 SQLite 单库） | 双区各一套 |
 | `site` | **（已落地，2026-11-06）** 站点模块地图：把 DNSPod 导出 `dnspod_records_2026-11-05_21-42-26.xls` 的「备注」列结构化为 45 个主机模块 × 2 zone × 8 分类，纯静态常量（`src/site.ts`），**无数据表、无迁移、无第三方依赖**；前端 `views/SiteMap.tsx` | `/site/overview`、`/site/modules`、`/site/modules/:host`（公开免鉴权，3 条） | 无 | 不分库（多区共用同一份解析数据） |
 
 服务拆分原则：**先单体后拆分**。P0 实际为单个部署单元 `services/mim-api`（模块化单体，按域分路由文件：`auth` / `me` / `comic` / `media` / `ai`），但代码边界仍按上表分目录，避免后期拆分时重构业务逻辑。原「`identity + billing + payment-driver` 合一」的设想随 FR-02 于 2026-11-05 失效。
@@ -194,8 +195,8 @@
 - ~~`project_invitations.status`~~：已移除（2026-11-04，FR-03 删除，`project_invitations` 表同步 DROP）。
 - ~~任务写操作幂等与 LWW~~：已移除（2026-11-04，随 FR-03 删除；本仓库所有写操作仍强制 `Idempotency-Key`，`auth` 路由豁免）。
 - `contents.status`（P1）：`draft → published ⇄ blocked`、`published → deleted`；任何机审/人审结论只能经 `audit_records` 追加，不允许直接改 `contents.status` 跳过审核。
-- `modules.status`（已建表，写路径未实现）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配在区内永不复用（唯一约束为 `(region, code)`）。
-- `entitlements.status`（已建表，发放/回收写路径未实现）：只能经 `entitlement_events` 追加推进；`revoked`（风控回收）与 `expired`（时效到期）必须与触发动作**同事务**写入，不允许事后异步补写。原「由 `refunds.executed` 或订阅状态机触发」的路径已随 FR-02 于 2026-11-05 下线。当前只读门禁 `requireEntitlement` 已按 `status='active' AND (expires_at IS NULL OR expires_at > now)` 判定。
+- `modules.status`（**写路径已实现，2026-11-07**：`PATCH /modules/:code/status` + 状态机校验 + 契约测试 7 例）：只能 `draft → active → archived` 单向；`archived` 后不可新购，已购 `entitlements` 不受影响；`code` 一旦分配在区内永不复用（唯一约束为 `(region, code)`）。
+- `entitlements.status`（**发放/回收写路径已实现，2026-11-07**：`POST /entitlements/grant` / `POST /entitlements/:id/revoke` 与 `entitlement_events` 同事务写入；到期由 `src/jobs.ts` 的 `entitlement-expiry` 任务扫描迁移）：只能经 `entitlement_events` 追加推进；`revoked`（风控回收）与 `expired`（时效到期）必须与触发动作**同事务**写入，不允许事后异步补写。原「由 `refunds.executed` 或订阅状态机触发」的路径已随 FR-02 于 2026-11-05 下线。当前只读门禁 `requireEntitlement` 已按 `status='active' AND (expires_at IS NULL OR expires_at > now)` 判定。
 - `comic_projects.status`（**第 1 期已实现 `draft ⇄ storyboarded`；第 2 期骨架已实现 `storyboarded → generating → rendered → published`**，`archived` 保留给归档流）：进入 `storyboarded` 必须有对应 `storyboards` 已确认版本（`confirmed_at` 非空），且仅 `draft`/`storyboarded` 两种状态允许编辑与写分镜；首个 `generation_jobs` 派发驱动 `storyboarded → generating`，`compose` 任务成功驱动 `generating → rendered`（骨架口径；`orchestrator.ts` 已于 2026-11-05 装配进 `app.ts`/`index.ts`，接入真实厂商模型后收紧为「产物覆盖全部分镜」）；成片 `publish` 驱动 `rendered → published`，不得跳级。
 - `comic_films.status`（**第 2 期骨架已实现**）：`draft → reviewing → published → archived`；提交审核要求最新版本已登记 `object_key`；驳回回到 `draft` 并留原因（`review_note`）；`published` 只能由 `current_version_id` 指向的 `film_versions` 支撑，版本只追加不覆盖，发新版回到 `draft` 待重审。
 - `generation_jobs.status`（**第 2 期骨架已实现**）：`queued → running → succeeded | failed | canceled` 单向；失败重试**新建** job（`retry_of` 指向原 job），历史 job 与产物永不覆盖；额度在 `succeeded` 时结算（`src/orchestrator.ts` 已内置单任务/当日成本预检，并已于 2026-11-05 装配进 `app.ts`/`index.ts`）。状态迁移既可由编排控制面端点驱动，也可由 worker 轮询队列自动消费（`MIM_AI_WORKER` 默认 `1`，置 `0` 关闭）。
@@ -341,9 +342,9 @@
 | 搜索索引投递（P1） | 持续消费 | 仅 P1 `contents`；失败进死信，可重放 |
 | 配额重置（AI/存储） | 每月 1 日 | 按 `quota_id + period` 幂等（原「订阅计划额度」口径随 FR-02 下线；当前以 `MIM_AI_JOB_COST_LIMIT_MINOR` / `MIM_AI_DAILY_COST_LIMIT_MINOR` 成本上限落地） |
 | **AI 生成任务队列消费**（**已落地，2026-11-05**） | 持续消费 | `src/orchestrator.ts` 消费 `generation_jobs`（`text`/`image`/`video`/`tts`/`compose`）；`MIM_AI_WORKER` 默认 `1` 随进程启动；同工程串行、跨工程并行；失败进死信可重放；重试新建 job（`retry_of`）不覆盖历史 |
-| **生成成本告警**（规划，0 代码） | 每小时 | 实际成本 vs `cost_estimate_minor` 偏差超阈值告警，供运营调整模型路由（OQ-08） |
-| **成片审核超时提醒**（规划，0 代码） | 每 6 小时 | `comic_films.status = reviewing` 超 SLA 未处置则提醒审核队列（OQ-07） |
-| **解锁到期扫描**（规划，0 代码） | 每日 | 时效型 `entitlements`（`expires_at` 到期）转 `expired`（经 `entitlement_events` 追加）；原「订阅 `expired` → 订阅型 entitlement 转 `expired`」随 FR-02 于 2026-11-05 下线；幂等键 `entitlement_id + period` |
+| **生成成本告警**（**已落地，2026-11-07**：`src/jobs.ts` `runCostAlert`） | 每小时（`DEFAULT_INTERVALS['cost-alert'] = 3600_000`） | 近一小时 `generation_jobs.cost_estimate_minor` 之和对比小时上限（`MIM_AI_HOURLY_COST_LIMIT_MINOR`，缺省按 `MIM_AI_DAILY_COST_LIMIT_MINOR / 24` 向上取整，日上限缺省 500000），越线即告警；幂等键 `job:cost-alert:<YYYY-MM-DDTHH>`（`idempotency_keys` 中 `user_id='system'`、`method='JOB'`） |
+| **成片审核超时提醒**（**已落地，2026-11-07**：`src/jobs.ts` `runFilmReviewSla`） | 每 6 小时（`DEFAULT_INTERVALS['film-review-sla'] = 21600_000`） | `comic_films.status = 'reviewing'` 且 `updated_at` 早于 `now - SLA` 的条目计数告警；SLA 由 `MIM_FILM_REVIEW_SLA_HOURS` 配置（缺省 48）；幂等键 `job:film-review-sla:<YYYY-MM-DDTHH>` |
+| **解锁到期扫描**（**已落地，2026-11-07**：`src/jobs.ts` `runEntitlementExpiry`） | 每日（`DEFAULT_INTERVALS['entitlement-expiry'] = 86400_000`） | 时效型 `entitlements`（`status='active' AND expires_at <= now`）转 `expired`，UPDATE 与 `entitlement_events` 追加（`actor='job'`、`reason='expires_at reached'`）**同事务**；原「订阅 `expired` → 订阅型 entitlement 转 `expired`」随 FR-02 于 2026-11-05 下线；逐条幂等键 `job:entitlement-expiry:<entitlement_id>:<expires_at>` |
 | 截止日提醒推送 | — | 已移除（FR-03 删除；`features` 套餐能力校验与 `task_events` 提醒源同步取消） |
 | 项目邀请过期 | — | 已移除（FR-03 删除，随 `project_invitations` 表清理） |
 | CSV 导出生成 | — | 已移除（FR-03 删除，随 `content_exports` 表清理） |
@@ -361,7 +362,7 @@
 | 阶段 | 交付物 | 对应 |
 |---|---|---|
 | 第 1 步 | monorepo 骨架、`identity`、`apps/web`（~~`billing` / `payment-driver` 已于 2026-11-05 随 FR-02 删除~~；~~`content` P0 任务与协作最小集~~ 已移除，FR-03） | P0 |
-| 第 2 步 | `admin-api` + `apps/admin` 最小集（用户/模块与解锁，~~订单/退款/审计~~ 已于 2026-11-05 删除）、`jobs`（~~续费/对账/掉单~~ 已删除；注销冷静期清理、AI 队列消费）（~~协作邀请与两档权限~~、~~同步通道~~、~~截止日提醒~~ 已随 FR-03 移除） | P0 运营闭环 |
+| 第 2 步 | `admin-api` 最小管理面（**已落地，2026-11-07**：`MIM_ADMIN_TOKEN` + `requireAdmin`，三条管理写路由；`apps/admin` 独立端未建）、`jobs`（~~续费/对账/掉单~~ 已删除；注销冷静期清理、AI 队列消费；**三定时任务已落地，2026-11-07**：成本告警 / 成片审核超时 / 权益到期扫描）（~~协作邀请与两档权限~~、~~同步通道~~、~~截止日提醒~~ 已随 FR-03 移除） | P0 运营闭环 |
 | 第 3 步 | `apps/mobile`（~~IAP~~ 已随 FR-02 删除）、`notification`、i18n 首批语种（~~日历/看板视图~~、~~CSV 导出~~ 已随 FR-03 移除） | P0 完成 |
 | 第 4 步 | `content`（P1 通用内容管理：内容/审核/检索）、`im`、`rtc`、`ai-orchestrator`、`openapi`、`apps/desktop` | P1 |
 
@@ -369,7 +370,7 @@
 
 | 期次 | 交付物 | 对应形态 | 依赖前置 |
 |---|---|---|---|
-| 基座 | `catalog` 域 4 表已建（`modules`/`module_prices`/`entitlements`/`entitlement_events`）+ `/modules` `/entitlements` 路由（**未实现**）；`requireEntitlement` 门禁已落地。~~`order_items` 挂载 `billing` 同事务~~、~~`entitlements` 发放/回收与退款同事务~~ 随 FR-02 于 2026-11-05 取消；`entitlements` 现由后台/风控动作直接写入并追加 `entitlement_events` | 商城（FR-03.1） | 无（复用现有 identity） |
+| 基座 | `catalog` 域 4 表已建（`modules`/`module_prices`/`entitlements`/`entitlement_events`）+ `/modules` `/entitlements` 路由**已实现（2026-11-07 补三条管理写路由）**；`requireEntitlement` 门禁已落地。~~`order_items` 挂载 `billing` 同事务~~、~~`entitlements` 发放/回收与退款同事务~~ 随 FR-02 于 2026-11-05 取消；`entitlements` 现由后台/风控动作直接写入并追加 `entitlement_events` | 商城（FR-03.1） | 无（复用现有 identity） |
 | 第 1 期 | `comic` 域工程/角色/分镜三表；工作台的工程 CRUD、character bible、分镜编辑与人工确认 | ② AI 辅助创作工作台 | 第 1 期仅工程，不产出成片 |
 | 第 2 期 | `generation_jobs` / `generation_assets` + `ai-orchestrator` 生成编排；文生图/图生视频/TTS/合成队列；工作台内单镜头生成与导出成片。**代码状态（2026-11-05）**：路由骨架 16 条已上线；`src/orchestrator.ts`（mock 产物真实落盘 + 成本预检 + compose 联动工程 `rendered`）与 `src/storage.ts`（local/S3 预签名）**已于 2026-11-05 装配进 `app.ts`/`index.ts`（`/api/v1/ai/*`、`/api/v1/media/*`，`MIM_AI_WORKER` 默认自动消费）**；openai 兼容提供方已接入 text/image（2026-11-06），video/tts/compose 诚实失败，更多真实模型调用待 OQ-08 凭证 | ④ 创作工作台 + 导出成片 | 模型供应商凭证（OQ-08）、对象存储 |
 | 第 3 期 | 全自动流水线：题材/大纲一次输入跑完整条链（无人工确认点） | ① AI 全自动生成成片 | 第 2 期全链路稳定 |

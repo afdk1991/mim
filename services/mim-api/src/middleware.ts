@@ -1,9 +1,9 @@
 /** 请求 ID、鉴权、幂等回放与统一错误信封 */
 
-import { randomUUID } from 'node:crypto'; // 引入 UUID 生成器，用于缺失上游请求 ID 时的本地兜底
+import { randomUUID, timingSafeEqual } from 'node:crypto'; // 引入 UUID 生成器与常量时间比较，后者防止令牌比较被计时侧信道猜解
 import type { NextFunction, Request, Response } from 'express'; // 仅引入 Express 中间件类型，编译期擦除
 import { AppError, isAppError } from '@mim/core-domain'; // 引入统一业务异常与类型守卫，错误信封集中管理
-import { REQUIRE_IDEMPOTENCY } from './config.js'; // 引入幂等强制开关，决定缺失 Idempotency-Key 时是否拒绝
+import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY } from './config.js'; // 引入幂等强制开关与管理令牌环境变量键名
 import { sha256, verifyAccessToken } from './auth.js'; // 引入请求指纹哈希与访问令牌校验
 
 interface AuthRow { // 鉴权从库中读出的用户行结构
@@ -178,6 +178,27 @@ export function requireEntitlement(moduleCode: string) { // 高阶中间件工�
     next(); // 校验通过，进入业务处理
   }; // 中间件函数结束
 } // requireEntitlement 结束
+
+/**
+ * 管理面鉴权（最小管理鉴权；RBAC 仍为 P1，见 docs/wiki/08-dev-implementation.md §1.1）。
+ * 校验 `x-admin-token` 请求头与 `MIM_ADMIN_TOKEN` 环境变量是否一致：
+ *   - 环境变量未配置 → 403 FEATURE_NOT_AVAILABLE，相当于管理面关闭，且不泄漏端点能力；
+ *   - 令牌缺失或不匹配 → 401 AUTH_UNAUTHORIZED，与普通鉴权失败同码，避免区分「没带」与「带错」。
+ * 比较时先做 sha256 归一长度再 timingSafeEqual，既避免长度差异导致的提前返回，也防止计时侧信道。
+ */
+export function requireAdmin(req: Request, _res: Response, next: NextFunction): void { // 管理端点专用门禁
+  const expected = (req.deps.env[ADMIN_TOKEN_ENV_KEY] ?? '').trim(); // 从注入的 env 读取期望令牌；测试可直传替身环境
+  if (!expected) { // 未配置即视为管理面未启用
+    throw new AppError('FEATURE_NOT_AVAILABLE', 'admin API is not enabled'); // 403，且不暴露「缺令牌」与「令牌错」的差别
+  } // 配置缺失分支结束
+  const provided = (req.header('x-admin-token') ?? '').trim(); // 取客户端管理令牌，缺失时为空串统一后续判断
+  const providedDigest = Buffer.from(sha256(provided), 'hex'); // 对实际令牌取定长摘要，消除长度差异
+  const expectedDigest = Buffer.from(sha256(expected), 'hex'); // 对期望令牌取同样长度的摘要
+  if (!provided || !timingSafeEqual(providedDigest, expectedDigest)) { // 常量时间比较，防止逐字节试探
+    throw new AppError('AUTH_UNAUTHORIZED', 'invalid admin token'); // 401，与普通鉴权失败共用错误码
+  } // 令牌比对结束
+  next(); // 通过管理鉴权，进入业务处理
+} // requireAdmin 结束
 
 export function notFound(req: Request, res: Response): void { // 兜底 404：所有未匹配路由统一信封
   res.status(404).json({ // 直接以 JSON 返回，保持与业务错误一致的响应形态
