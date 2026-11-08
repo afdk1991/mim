@@ -331,7 +331,7 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 成片合成与版本 | `POST/GET /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/versions`（`comic_films` / `film_versions` 表） | `ComicWorkbench.tsx` 成片标签页（创建时可选取 compose 产物 object_key） | ✅ 前后端已落地 |
 | 审核与发布 | `POST /comic/films/:id/{submit-review,publish,reject,archive}`（状态机 + 驳回留原因） | `ComicWorkbench.tsx` 成片标签页（提交审核 / 发布 / 驳回 / 归档） | ✅ 前后端已落地（人工审核队列与内容机审未实现） |
 | 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
-| 导出成片 | —（规划导出任务 + 对象存储预签名下载） | — | ❌ 0 代码 |
+| 导出成片 | **已实现（2026-11-08）**：`POST /comic/films/:id/export`（入参 `format: mp4 / mov`、`resolution: 720p / 1080p`；基于最新版本 `object_key` 签发 1 小时有效的预签名下载地址；MP4/1080p 原片直下，其余组合经 `MIM_FFMPEG_PATH` 调用 ffmpeg 转码并写回 `exports/` 对象；无产物 404、跨用户 404、未配置 ffmpeg 403 `FEATURE_NOT_AVAILABLE` 且回显 `details.requested`；写操作走 `Idempotency-Key`） | `ComicWorkbench.tsx` 成片标签页 `FilmExportPanel`（每条成片「导出」按钮、格式/分辨率下拉、下载链接与有效期、转码不可用的本地化提示 +「直接下载原片」一键降级、降级后表单回写实际参数） | ✅ 前后端已落地（契约测试 `test/film-export.test.ts` 9 例，含预签名地址真实下载字节闭环；`npm run verify:film-export` Edge CDP E2E 14/14） |
 
 ### 11.13 站点模块地图（DNSPod 备注结构化 → 45 个可运行节点，2026-11-08，已下线）
 

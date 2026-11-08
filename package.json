@@ -21,6 +21,8 @@
     "check:env": "node scripts/env-check.mjs",
     "check:comments": "node scripts/comment-check.mjs",
     "verify:auth-gate": "node scripts/verify-auth-gate.mjs",
+    "serve:local": "node scripts/serve-local.mjs",
+    "verify:film-export": "node scripts/verify-film-export.mjs",
     "check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs"
   },
   "engines": {

@@ -12,6 +12,7 @@
 - 内部 / 预览 / 草稿构建用 `RELEASE_CHANNEL`（`preview` / `draft` / `test`）区分，展示为 `V0.0.0-preview` 等，**不改 semver 数字**。
 - 内部 git tag 命名为 `draft-*` / `pre-*`，不得为 `V<semver>` 形态。
 - 校验由 `scripts/version-check.mjs` 强制。
+- **2026-11-08 功能变更**：补齐「成片导出」全链路（后端 `POST /api/v1/comic/films/:id/export` 早已存在但前端 0 代码，本轮接通前端入口、转码降级与契约测试）。当前仍处 `preview` 通道，按上述规约**只记录模块变更、不改 semver 数字**，展示版本保持 **V0.0.0-preview**；首个对外正式发布版本仍为未占用的 V0.0.0。
 
 ### 校验命令
 
@@ -25,6 +26,7 @@ node scripts/comment-check.mjs
 - `version-check.mjs`：铁律四版本规约校验（退出码 0 / 1）
 - `env-check.mjs`：09 清单 §0 密钥治理校验——`.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性（退出码 0 / 1）
 - `comment-check.mjs`：铁律十一注释覆盖率校验——逐文件统计「可注释行 / 已解释行」，默认基线模式（退出码恒 0），`--strict` 为 CI 门禁模式（低于阈值退出 1）
+- `verify:film-export`：成片导出 Edge CDP 真渲染 E2E（14 项断言）；前置 `pnpm --filter @mim/api build` 后启动 API :8787、`npm run serve:local`（:5188）、Edge `--remote-debugging-port=9222`，再执行 `npm run verify:film-export`
 
 ## 项目铁律
 
@@ -74,7 +76,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 登录 | `Login.tsx` | 全站唯一登录入口；管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login`；匿名访问收费/私密视图时在内容区内嵌展示，顶部提示「此功能需登录后使用 / 登录状态已失效」 |
 | 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：目录浏览与 `?q=` 搜索、模块详情面板（能力说明 / 当前价 / 历史调价 `price_history` / 前置依赖链）、一次性解锁（`POST /entitlements`）、「我的权益」区块（`GET /me/entitlements`）、前置依赖缺失时的引导提示（`/modules`、`/modules/:code`、`/entitlements`、`/me/entitlements`） |
 | 主站入口卡片 | Store.tsx 顶部 | 站点体系 2026-11-08 下线后唯一保留的 www 主站直达入口（静态硬编码，新窗口打开 https://www.mixm.top，不请求接口） |
-| 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程 |
+| 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程；**成片导出（2026-11-08）**：每个成片行新增「导出」面板，可选 MP4/MOV × 1080p/720p，`POST /comic/films/:id/export` 返回 1 小时有效的一次性预签名下载地址；MP4/1080p 直接下载原片，其它组合需服务端 `MIM_FFMPEG_PATH` 转码，未配置时前端显示本地化提示并提供「直接下载原片」一键降级；降级成功后表单回写实际格式/分辨率 |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
 | 聊天 | `Chat.tsx` | 即时通讯与视频通话：会话列表、用户搜索、消息收发、WebRTC 视频通话（`VideoCall.tsx`），WS 端点 `/api/v1/im/ws` |
 
@@ -91,7 +93,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 账号 | `GET /me`、`PATCH /me`、`POST /me/deletion`、`POST /me/cancel-deletion` | 登录 |
 | 漫剧工程 | `GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/{storyboard,characters,suggest}` | 登录 |
 | 生成任务 | `GET/POST /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}` | 登录 |
-| 成片 | `GET/POST /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/{versions,submit-review,publish,reject,archive}` | 登录 |
+| 成片 | `GET/POST /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/{versions,submit-review,publish,reject,archive}`、**`POST /comic/films/:id/export`**（导出：入参 `format: mp4\|mov` + `resolution: 720p\|1080p`，基于最新版本签发预签名下载地址；无产物 404、跨用户 404、转码不可用 403 且回显 `details.requested`，同键同体幂等） | 登录 |
 | 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets` | 对象端点凭签名免鉴权 |
 | AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
@@ -108,7 +110,7 @@ site 域 4 条公开路由（`/site/overview`、`/site/modules`、`/site/modules
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，10 个测试文件 / 120 例）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，11 个测试文件 / 154 例，含成片导出 9 例）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
@@ -143,7 +145,7 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前先用 `better-sqlite3` backup 再幂等执行 |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
-| 生产登录入口 | **未登录时全站锁定**：所有页面与功能均不可访问，仅提供登录入口；登录成功后开放完整功能，退出或令牌失效立即重新锁定。登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`；优先保留已有值 / CI Secret 同名变量，均未配置时现场生成随机口令且不回显日志，**不再有公开默认口令**，运维须从服务器 env 文件读取）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
+| 生产登录入口 | **按需登录（2026-11-08 起，与上文前端视图口径一致）**：商城目录 `/store` 匿名可浏览；`/comic`、`/chat`、`/settings` 在匿名态于内容区内嵌登录卡片，登录成功后原地解锁当前视图，退出、令牌失效或跨标签页退出即回落匿名态；独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的全站门禁。登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`；优先保留已有值 / CI Secret 同名变量，均未配置时现场生成随机口令且不回显日志，**不再有公开默认口令**，运维须从服务器 env 文件读取）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
 | 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
@@ -167,7 +169,9 @@ npm run check                             # 版本规约 + 密钥模板校验 + 
 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
 
-> **取证口径说明（2026-11-08 05:05:32 核对）**：下方一段为 **2026-11-07 01:48 的历史实测快照**（对应 commit `7e4e3e9`），数值按铁律三保留原样留痕，**不冒充本轮结果**。仓库当前 HEAD 已推进至 `83f454c`（CI run 42413909910 五作业全绿）；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](./AGENTS.md)（2026-11-08 05:05:32 按需登录交付轮，本机中国网络 curl）**——按需登录模型已上线：商城 `/store` 匿名可浏览，`/comic` `/chat` `/settings` 收费/私密视图匿名访问时于内容区内嵌登录卡片；自建主站 `/health` 200/0.087s、首页 200/0.066s（LEN=5182，产物 `assets/index-ChbzA5PZ.js` + `assets/index-CeRvh2Rf.css`）、五条深链接（`/store` `/comic` `/chat` `/settings` `/login`）全 200/LEN=5182、`/api/v1/modules` 200/0.062s（LEN=438）；**EdgeOne `data.mixm.top` curl 200/0.116s 仍为 985B WAF 挑战页**（真实内容最近一次复验为 2026-11-08 04:33 有头放行后商城全链路通过）；GitHub Pages `/mim/` 200/0.535s（深链接 404+LEN=5182 属 `404.html` 预期设计）、Cloudflare Pages 200/0.678s（LEN=5182 与自建同指纹，带 `Accept: text/html` 头深链接 `/store` `/comic` `/login` 全 200）、Sealos `/health` 200/0.269s；本地 `scripts/verify-auth-gate.mjs --live` 52/52 与生产匿名态 live 6/6 全 PASS。本页与 `docs/wiki/05-runbook.md §7.1.3` 的 01:48 数值待下一轮独立 curl 后再同步。
+> **最新取证（2026-11-08 17:42:36 +08:00，本机中国网络 curl，HEAD `1b3072e`；性质为「仓库 / 文档一致性加固轮」的可访问性复测，无新功能部署）**：自建主站 `/health` 200 / 0.074s / 0.035s / LEN=53、首页 200 / 0.075s / 0.034s / LEN=5182（产物 `assets/index-ChbzA5PZ.js` + `assets/index-CeRvh2Rf.css`）、五条深链接 `/store` 0.060s / `/comic` 0.063s / `/chat` 0.064s / `/settings` 0.053s / `/login` 0.061s 全部 200 / LEN=5182（nginx `try_files` SPA 回落实测生效）、`/admin/` 200 / 0.093s / LEN=1430、`/api/v1/modules` 200 / 0.066s / LEN=438（返回 `comic.workbench` 一条上架模块）、`/api/v1/site/overview` 404 / LEN=126（`NOT_FOUND` 信封，站点体系下线终态）；GitHub Pages `/mim/` 200 / 0.402s / LEN=5182（产物 `index-Mq2I8smM.js`），深链接 `/mim/store` 404 / 1.008s / LEN=5182（`404.html` 副本，属平台能力上限的预期设计）；Cloudflare Pages 首页 200 / 2.401s / LEN=5182（产物与自建同指纹），带 `Accept: text/html` 头深链接 `/store` 200 / 0.982s、`/comic` 200 / 0.749s、`/login` 200 / 0.948s 全部 LEN=5182，裸 curl `/store` 404 / 0.562s 属 catch-all Function 按设计只重写 html 导航；Sealos `/health` 200 / 0.366s / 0.196s / LEN=53；EdgeOne `data.mixm.top` 200 / 0.090s / LEN=985 仍为 WAF 挑战页（`EO_Bot_Ssid` / `_0x649a`，真实内容未以 curl 复验）；ghcr 未鉴权 401 / 0.537s / LEN=73 正常；Vercel 本机 000 / 21.276s（curl exit 28，DNS 污染）、github.com 本机 000 / 0.015s（curl exit 35，TLS 握手阻断，TCP 0.007s 可连），替代取证 `git ls-remote` 返回远端 `refs/heads/main` = `1b3072e`，与本地 HEAD 一致（0 ahead / 0 behind）。**逐平台明细以 [AGENTS.md 铁律九表格](./AGENTS.md) 为准**；下方 01:48 与 05:05 段落均为历史留痕，不冒充本轮结果。
+
+> **历史留痕：取证口径说明（2026-11-08 05:05:32 核对）**：下方一段为 **2026-11-07 01:48 的历史实测快照**（对应 commit `7e4e3e9`），数值按铁律三保留原样留痕，**不冒充本轮结果**。仓库当前 HEAD 已推进至 `83f454c`（CI run 42413909910 五作业全绿）；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](./AGENTS.md)（2026-11-08 05:05:32 按需登录交付轮，本机中国网络 curl）**——按需登录模型已上线：商城 `/store` 匿名可浏览，`/comic` `/chat` `/settings` 收费/私密视图匿名访问时于内容区内嵌登录卡片；自建主站 `/health` 200/0.087s、首页 200/0.066s（LEN=5182，产物 `assets/index-ChbzA5PZ.js` + `assets/index-CeRvh2Rf.css`）、五条深链接（`/store` `/comic` `/chat` `/settings` `/login`）全 200/LEN=5182、`/api/v1/modules` 200/0.062s（LEN=438）；**EdgeOne `data.mixm.top` curl 200/0.116s 仍为 985B WAF 挑战页**（真实内容最近一次复验为 2026-11-08 04:33 有头放行后商城全链路通过）；GitHub Pages `/mim/` 200/0.535s（深链接 404+LEN=5182 属 `404.html` 预期设计）、Cloudflare Pages 200/0.678s（LEN=5182 与自建同指纹，带 `Accept: text/html` 头深链接 `/store` `/comic` `/login` 全 200）、Sealos `/health` 200/0.269s；本地 `scripts/verify-auth-gate.mjs --live` 52/52 与生产匿名态 live 6/6 全 PASS。本页与 `docs/wiki/05-runbook.md §7.1.3` 的 01:48 数值待下一轮独立 curl 后再同步。
 
 > **2026-11-07 01:48:24 +08:00 本机实测（中国网络，commit `7e4e3e9`，历史快照）**：9 个免费平台全部接入或已取证上线——自建 `mim.mixm.top` 200/0.065s 最快（`/health` 200/0.070s），且首页已引用本轮新产物 `assets/index-B15IIvsS.js` + `assets/index-Dxv4qrxj.css`（证明「整站强制登录改为公开视图免登录」已上线）；EdgeOne `data.mixm.top` curl 200/0.062s 但**响应体仅 986B，为 EdgeOne WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`），属假阳性**——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），回落层 2 验证码页，CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06：`title=Mim — 跨端任务与轻协作`、`assets/index-cpYhbG3w.js`、`isWafChallenge=false`）；GitHub Pages 200/0.225s、Cloudflare Pages 200/1.172s、Sealos `/health` 200/0.283s（根路径 `/` 404 `route GET / not found` 属正常）、ghcr 未鉴权 401/0.745s（正常）。Vercel 与 github.com 本机不可达属网络侧限制（Vercel DNS 污染至 162.125.2.5（Dropbox 段地址）/ github.com TLS 握手阻断 exit 35、TCP 0.019s 可连），CI 与 git/gh 侧取证正常（HEAD `7e4e3e9`）。逐平台 HTTP / 耗时 / 连接明细见 [05-runbook.md §7.1.3](./docs/wiki/05-runbook.md)；DNSPod 记录与功能模块对应见同页 §7.6。
 

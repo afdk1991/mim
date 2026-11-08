@@ -40,6 +40,15 @@ export interface MeResponse { // GET /me 的响应包装，便于服务端后续
 // 通过构建期 VITE_API_ORIGIN 指向生产 API。
 const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, ''); // 读构建期变量并去掉尾部斜杠，避免拼出双斜杠
 const BASE = `${API_ORIGIN}/api/v1`; // 统一路径前缀，集中定义便于未来整体迁移
+
+/** 归一化服务端下发的预签名地址：绝对地址原样用，同源相对路径在跨源托管构建下补上 API 源 */
+export function resolvePublicUrl(url: string): string { // 避免 GitHub Pages / Cloudflare 等跨源站点把 /api/v1/... 打到自己域名
+  if (!url) return url; // 空串原样返回，调用方按无链接处理
+  if (/^https?:\/\//i.test(url)) return url; // 已是绝对地址（S3 或配置了 MIM_PUBLIC_BASE_URL）无需加工
+  if (url.startsWith('/')) return `${API_ORIGIN}${url}`; // 相对路径补 API 源；同源构建时 API_ORIGIN 为空即保持原样
+  return `${BASE}/${url}`; // 非斜杠开头的裸路径按 API 前缀兜底，保证总有一个可达地址
+} // resolvePublicUrl 结束
+
 export const SESSION_KEY = 'mim.session.v1'; // 键名带版本号，便于结构升级时隔离旧数据；静态门禁脚本共用此键
 // 会话变更事件名：登录 / 退出 / 令牌失效 / 跨标签页同步统一广播，App 据此锁定或解锁界面
 export const SESSION_CHANGED_EVENT = 'mim:session-changed'; // 单一事件源，避免多处状态各自判断
@@ -372,6 +381,24 @@ export interface FilmVersion { // 成片的一个版本（对应一次视频产�
   created_by: string; // 创建者用户 id
   created_at: string; // 创建时间
 } // FilmVersion 结束
+
+// ---------- 成片导出（对齐 routes/comic.ts 的 POST /comic/films/:id/export） ----------
+
+export type FilmExportFormat = 'mp4' | 'mov'; // 导出容器格式：mp4 走原片直下，mov 需服务端 ffmpeg 转码
+
+export type FilmExportResolution = '720p' | '1080p'; // 导出分辨率：1080p 与 compose 产物一致，无需转码
+
+export interface FilmExportResult { // 导出结果：一次性预签名下载地址，有效期由服务端限定
+  film_id: string; // 成片主键，回显便于前端核对
+  version_no: number; // 导出所基于的版本号（始终取最新版本）
+  format: FilmExportFormat; // 实际导出格式
+  resolution: FilmExportResolution; // 实际导出分辨率
+  transcoded: boolean; // 是否经过 ffmpeg 转码；false 表示直接下载原片
+  download_url: string; // 预签名下载地址，可能相对也可能绝对，交给 resolvePublicUrl 归一化
+  expires_at: string; // 下载地址过期时间（ISO）
+  method: string; // 下载请求方法，当前固定 GET
+  headers: Record<string, string>; // 下载需携带的请求头，S3 驱动下可能非空
+} // FilmExportResult 结束
 
 // ---------- media / ai 类型（对齐 routes/media.ts、routes/ai.ts、orchestrator.ts、storage.ts） ----------
 
@@ -715,6 +742,15 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         body: { reason }, // 原因必传，供作者修改
       }); // 请求调用结束
     }, // rejectFilm 结束
+    exportFilm( // 导出成片：按格式/分辨率换取一次性预签名下载地址
+      id: string, // 成片 id
+      payload: { format?: FilmExportFormat; resolution?: FilmExportResolution } = {}, // 省略时走服务端默认 mp4 + 1080p（原片直下）
+    ) { // 形参定义结束
+      return request<FilmExportResult>(`/comic/films/${encodeURIComponent(id)}/export`, { // 导出子资源
+        method: 'POST', // 写操作（会签发新的下载凭证）
+        body: payload, // 空对象也显式带上，保证 Content-Type 与幂等键生效
+      }); // 请求调用结束
+    }, // exportFilm 结束
   }, // comic 分组结束
 
   // ---------- 对象存储（media）：object_key 一律由服务端生成，客户端不拼接 ----------

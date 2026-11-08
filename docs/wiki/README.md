@@ -16,7 +16,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 |---|---|
 | [01-architecture.md](./01-architecture.md) | 项目整体架构：仓库现状分层 + PRD 目标产品架构 |
 | [02-modules.md](./02-modules.md) | 主要模块/文件职责清单（含 apps/services/packages 实况） |
-| [03-code-reference.md](./03-code-reference.md) | 仓库级脚本说明：`scripts/version-check.mjs`（§1–§6）与 `scripts/env-check.mjs`（§7）；业务代码见 08 |
+| [03-code-reference.md](./03-code-reference.md) | 仓库级脚本说明：`scripts/version-check.mjs`（§1–§6）与 `scripts/env-check.mjs`（§7）；另有 `serve-local.mjs` / `verify-film-export.mjs` 本地浏览器真渲染验证链（见 [08 §1.2](./08-dev-implementation.md)）；业务代码见 08 |
 | [04-dependencies.md](./04-dependencies.md) | 依赖关系（已安装依赖 / 工具链 / 规划中能力） |
 | [05-runbook.md](./05-runbook.md) | 运行方式：启动 API/Web、测试、构建、校验命令 |
 | [06-governance.md](./06-governance.md) | 治理规约：十一条铁律与版本号规则详解 |

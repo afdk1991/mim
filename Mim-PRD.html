@@ -667,6 +667,7 @@ function submitLogin(){
   <li>同一工程可产出多个 <code>ComicFilm</code> 版本，版本号单调递增，旧版本只读保留。</li>
   <li>发布前必须通过内容审核（机审 + 人审），审核不通过不得对外可见。</li>
   <li>发布后可下线（<code>archived</code>），下线不影响已导出到本地的文件。</li>
+  <li><!-- 实现状态：与代码实况交叉核对 --><strong>实现状态（2026-11-08，与代码交叉核对）</strong>：形态④「导出成片」已落地——<code>POST /api/v1/comic/films/:id/export</code> 基于最新成片版本签发 1 小时有效的一次性预签名下载地址；MP4 / 1080p 直接下载原片，MOV / 720p 等组合需服务端配置 <code>MIM_FFMPEG_PATH</code> 转码，未配置时前端提供本地化降级说明与「直接下载原片」一键入口。契约测试 9 例与浏览器真渲染 E2E 14 项断言全通过，实现明细见 <a href="./docs/wiki/08-dev-implementation.md">08 §1.2 成片导出实现</a>。</li>
   <li>P0 内只做作品管理与浏览，不含全站推荐与多渠道分发（见 §3 P1 内容管理）。</li>
 </ul>
 

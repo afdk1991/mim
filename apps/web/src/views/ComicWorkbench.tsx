@@ -12,6 +12,14 @@ import {
   type ComicProject,
   // Film：成片实体，成片列表与发布/归档操作使用。
   type Film,
+  // ApiError：导出转码降级需要按业务码判断，不能依赖服务端英文原文。
+  ApiError,
+  // resolvePublicUrl：把预签名相对地址在跨源托管构建下补成可达地址。
+  resolvePublicUrl,
+  // FilmExportFormat / FilmExportResolution / FilmExportResult：导出面板的选项与结果类型。
+  type FilmExportFormat,
+  type FilmExportResolution,
+  type FilmExportResult,
   // GenerationJob：生成任务实体，status 决定按钮显隐与是否开启轮询。
   type GenerationJob,
   // JobType：任务类型枚举（文本/图像/视频/配音/合成），决定派发时的参数走向。
@@ -782,7 +790,7 @@ function JobsTab({
       // 向后端换取带 TTL 的下载地址，避免直接暴露存储凭证。
       const res = await api.media.presignDownload(objectKey);
       // 新窗口打开地址；noopener 防止被打开页面通过 window.opener 反向操控。
-      window.open(res.download.url, '_blank', 'noopener');
+      window.open(resolvePublicUrl(res.download.url), '_blank', 'noopener');
     } catch (err) { // 捕获预签名下载地址请求异常
       // 预签名失败时展示错误文案。
       setError(errorText(locale, err));
@@ -1068,6 +1076,8 @@ function FilmsTab({
 
   // 当前展开版本面板的成片 id；再次点击同一成片则收起。
   const [expandedFilmId, setExpandedFilmId] = useState<string | null>(null);
+  // 当前展开导出面板的成片 id；与版本面板互斥，避免同一行堆两块表单。
+  const [exportFilmId, setExportFilmId] = useState<string | null>(null);
 
   // 新成片标题的受控输入值。
   const [title, setTitle] = useState('');
@@ -1287,14 +1297,30 @@ function FilmsTab({
                 <button
                   type="button"
                   className="btn ghost small"
-                  onClick={() => setExpandedFilmId(expandedFilmId === film.id ? null : film.id)}
+                  onClick={() => { // 打开版本面板时收起导出面板，保持单行只有一块展开区
+                    setExportFilmId(null); // 互斥：清掉导出面板
+                    setExpandedFilmId(expandedFilmId === film.id ? null : film.id); // 再次点击同一成片则收起
+                  }}
                 >{/* 版本面板开关：再次点击收起 */}
                   {/* 展开/收起该成片的版本列表 */}
                   {locale === 'en-US' ? 'Versions' : '版本'}
                 </button>
+                {/* 导出按钮：所有状态都可尝试导出，无产物时由后端返回可读错误 */}
+                <button
+                  type="button"
+                  className="btn ghost small"
+                  onClick={() => { // 打开导出面板时收起版本面板，避免两块表单互相挤压
+                    setExpandedFilmId(null); // 互斥：清掉版本面板
+                    setExportFilmId(exportFilmId === film.id ? null : film.id); // 再次点击同一成片则收起
+                  }}
+                >{/* 导出面板开关 */}
+                  {locale === 'en-US' ? 'Export' : '导出'}
+                </button>
               </div>
               {/* 仅当前展开的成片才挂载版本面板，避免一次性请求所有版本 */}
               {expandedFilmId === film.id && <FilmVersionsPanel filmId={film.id} locale={locale} />}{/* 版本面板：惰性挂载 */}
+              {/* 仅当前展开的成片才挂载导出面板，避免预签名地址在打开前就已过期 */}
+              {exportFilmId === film.id && <FilmExportPanel filmId={film.id} locale={locale} />}{/* 导出面板：惰性挂载 */}
             </li>
           ))}{/* 结束成片列表的遍历渲染 */}
           {/* 空列表引导：加载完成且确实没有成片时才展示 */}
@@ -1342,8 +1368,8 @@ function FilmsTab({
                   {/* 预签名地址有效期提示，提醒过期后需重新获取 */}
                   {a.expires_at ? ` · ${locale === 'en-US' ? 'expires' : '过期'} ${new Date(a.expires_at).toLocaleDateString()}` : ''}
                 </span>
-                {/* 下载入口：直接复用后端返回的预签名地址 */}
-                <a className="btn ghost small" href={a.download_url} target="_blank" rel="noreferrer">{/* 下载链接：预签名地址 */}
+                {/* 下载入口：直接复用后端返回的预签名地址，跨源托管时补 API 源 */}
+                <a className="btn ghost small" href={resolvePublicUrl(a.download_url)} target="_blank" rel="noreferrer">{/* 下载链接：预签名地址 */}
                   {locale === 'en-US' ? 'Download' : '下载'}
                 </a>
               </div>
@@ -1352,7 +1378,7 @@ function FilmsTab({
                 // 预览容器：与上方信息拉开一点间距
                 <div style={{ marginTop: 4 }}>{/* 预览容器：控制间距 */}
                   <img
-                    src={a.download_url}
+                    src={resolvePublicUrl(a.download_url)}
                     alt={a.object_key}
                     style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
                   />
@@ -1371,6 +1397,144 @@ function FilmsTab({
   );
 }
 
+/** 成片导出面板：选格式/分辨率换取一次性预签名下载地址；未配置 ffmpeg 时提供原片直下降级 */
+function FilmExportPanel({ filmId, locale }: { filmId: string; locale: Locale }) {
+  // 导出格式：默认 mp4，与 compose 产物容器一致，无需服务端转码。
+  const [format, setFormat] = useState<FilmExportFormat>('mp4');
+  // 导出分辨率：默认 1080p，与 compose 产物尺寸一致，无需服务端转码。
+  const [resolution, setResolution] = useState<FilmExportResolution>('1080p');
+  // 导出结果：非空时展示下载入口、版本号与凭证有效期。
+  const [result, setResult] = useState<FilmExportResult | null>(null);
+  // 请求进行中：禁用按钮，避免连点签发多份下载凭证。
+  const [busy, setBusy] = useState(false);
+  // 局部错误文案：与父级成片列表的错误横幅互不影响。
+  const [error, setError] = useState<string | null>(null);
+  // 转码不可用：服务端返回带 requested 细节的 403 时，提供一键降级入口。
+  const [transcodeUnavailable, setTranscodeUnavailable] = useState(false);
+
+  // 判定「转码不可用」而非「模块未解锁」：二者共用 FEATURE_NOT_AVAILABLE，只有前者带 requested 细节。
+  function isTranscodeUnavailable(err: unknown): boolean {
+    // 只认统一的接口错误类型，网络异常等不进入降级分支。
+    if (!(err instanceof ApiError) || err.code !== 'FEATURE_NOT_AVAILABLE') return false;
+    // details 为结构化对象且含 requested 字段，即后端明确回显了被拒绝的格式/分辨率。
+    return typeof err.details === 'object' && err.details !== null && 'requested' in err.details;
+  } // 结束 isTranscodeUnavailable 判定
+
+  // 发起导出；options 用于降级时强制走 mp4 + 1080p 原片直下。
+  async function handleExport(options?: { format: FilmExportFormat; resolution: FilmExportResolution }) {
+    // 每次请求前清空旧状态，避免继续展示上一次的过期链接。
+    setResult(null); // 清空旧结果
+    setError(null); // 清空旧错误
+    setTranscodeUnavailable(false); // 复位降级入口
+    setBusy(true); // 进入加载态
+    try { // 包住接口调用
+      // 不传 options 时取当前表单选择，传了则用于一键降级。
+      const data = await api.comic.exportFilm(filmId, options ?? { format, resolution }); // 换取预签名下载地址
+      setResult(data); // 保存结果，触发下载入口渲染
+      setFormat(data.format); // 表单回写实际格式：一键降级后不再停留在不可用的 MOV
+      setResolution(data.resolution); // 表单回写实际分辨率：避免再次点击重复触发转码失败
+    } catch (err) { // 捕获导出异常
+      // 转码不可用时给出可执行的降级提示，而不是把服务端英文原文丢给用户。
+      if (isTranscodeUnavailable(err)) { // 转码能力缺失分支
+        setError(locale === 'en-US' // 按语言给出降级说明
+          ? 'Server transcoding is not configured. Use MP4 / 1080p to download the original film.'
+          : '服务器未配置转码，可改用 MP4 / 1080p 直接下载原片。');
+        setTranscodeUnavailable(true); // 敞开一键降级入口
+      } else { // 其它错误分支
+        setError(errorText(locale, err)); // 统一走本地化错误码翻译
+      } // 结束错误分支
+    } finally { // 无论成败都复位加载态
+      setBusy(false); // 退出加载态
+    } // 结束 try 块
+  } // 结束 handleExport 处理函数
+
+  // 导出面板：说明 + 选项 + 动作 + 错误/降级 + 结果下载入口。
+  return (
+    // 面板根容器，与上方成片行拉开间距
+    <div className="sub-panel" style={{ marginTop: 8 }}>{/* 导出面板根容器 */}
+      {/* 面板标题栏 */}
+      <header className="panel-head">{/* 导出面板标题栏 */}
+        <h3>{/* 导出面板标题 */}{locale === 'en-US' ? 'Export Film' : '导出成片'}</h3>
+      </header>{/* 标题栏结束 */}
+      {/* 能力说明：区分原片直下与需要转码的选项，并提示凭证有效期 */}
+      <p className="hint">{/* 导出能力说明 */}
+        {locale === 'en-US'
+          ? 'MP4 / 1080p downloads the original file; other options require server-side ffmpeg transcoding. Links expire in 1 hour.'
+          : 'MP4 / 1080p 可直接下载原片；其它格式或分辨率需服务端配置 ffmpeg 转码。下载链接 1 小时内有效。'}
+      </p>
+      {/* 选项行：格式 / 分辨率 / 导出按钮 */}
+      <div className="form-inline">{/* 导出表单行 */}
+        {/* 格式下拉：mp4 为原片容器，mov 需转码 */}
+        <select
+          aria-label={locale === 'en-US' ? 'Export format' : '导出格式'}
+          value={format}
+          onChange={(e) => setFormat(e.target.value as FilmExportFormat)}
+          disabled={busy}
+        >{/* 格式选择器 */}
+          <option value="mp4">MP4</option>
+          <option value="mov">MOV</option>
+        </select>
+        {/* 分辨率下拉：1080p 为原片尺寸，720p 需转码 */}
+        <select
+          aria-label={locale === 'en-US' ? 'Export resolution' : '导出分辨率'}
+          value={resolution}
+          onChange={(e) => setResolution(e.target.value as FilmExportResolution)}
+          disabled={busy}
+        >{/* 分辨率选择器 */}
+          <option value="1080p">1080p</option>
+          <option value="720p">720p</option>
+        </select>
+        {/* 导出动作：请求期间禁用防重复签发 */}
+        <button
+          type="button"
+          className="btn primary small"
+          onClick={() => void handleExport()}
+          disabled={busy}
+        >{/* 导出按钮 */}
+          {busy // 按加载态切换文案
+            ? (locale === 'en-US' ? 'Preparing…' : '准备中…')
+            : (locale === 'en-US' ? 'Generate download link' : '生成下载链接')}
+        </button>
+      </div>
+      {/* 错误横幅：含转码不可用的降级说明 */}
+      {error && <p className="error">{error}</p>}{/* 导出错误提示 */}
+      {/* 一键降级：直接请求 mp4 + 1080p 原片直下，无需用户重新选表单 */}
+      {transcodeUnavailable && ( /* 仅在转码不可用时出现 */
+        <button
+          type="button"
+          className="btn ghost small"
+          onClick={() => void handleExport({ format: 'mp4', resolution: '1080p' })}
+          disabled={busy}
+        >{/* 降级按钮 */}
+          {locale === 'en-US' ? 'Download original (MP4 / 1080p)' : '直接下载原片（MP4 / 1080p）'}
+        </button>
+      )}
+      {/* 成功结果：版本 / 格式 / 是否转码 / 有效期 + 下载入口 */}
+      {result && ( /* 拿到预签名地址后才渲染 */
+        <div className="list-item-sub">{/* 结果信息行 */}
+          {/* 元信息：版本号、格式、分辨率、是否转码与过期时间 */}
+          <span className="muted small">{/* 结果元信息 */}
+            {`v${result.version_no} · ${result.format.toUpperCase()} · ${result.resolution} · `}
+            {result.transcoded // 按是否转码给出不同说明
+              ? (locale === 'en-US' ? 'transcoded' : '已转码')
+              : (locale === 'en-US' ? 'original' : '原片直下')}
+            {` · ${locale === 'en-US' ? 'expires' : '有效期至'} ${new Date(result.expires_at).toLocaleString()}`}
+          </span>
+          {/* 下载入口：跨源托管构建下补 API 源，避免打到静态站自身 */}
+          <a
+            className="btn primary small"
+            href={resolvePublicUrl(result.download_url)}
+            target="_blank"
+            rel="noreferrer"
+          >{/* 成片下载链接 */}
+            {locale === 'en-US' ? 'Download film' : '下载成片'}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** 成功 image 任务的内联预览：按需预签名 GET（URL 有 TTL，组件随任务行挂载时拉取一次） */
 function AssetThumb({ objectKey }: { objectKey: string }) {
   // 组件挂载时按对象键换取含 TTL 的预览地址，避免长期有效的公开链接。
@@ -1382,7 +1546,7 @@ function AssetThumb({ objectKey }: { objectKey: string }) {
     // 外层容器负责与上方信息拉开间距
     <div style={{ marginTop: 4 }}>{/* 缩略图容器：控制间距 */}
       <img
-        src={state.data.download.url}
+        src={resolvePublicUrl(state.data.download.url)}
         alt={objectKey}
         style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
       />
@@ -1406,7 +1570,7 @@ function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale 
       // 换取带 TTL 的下载地址。
       const res = await api.media.presignDownload(objectKey);
       // 新窗口打开；noopener 防止被打开页面反向操作当前页。
-      window.open(res.download.url, '_blank', 'noopener');
+      window.open(resolvePublicUrl(res.download.url), '_blank', 'noopener');
     } catch (err) { // 捕获版本记录请求异常
       // 失败时展示错误文案。
       setError(errorText(locale, err));

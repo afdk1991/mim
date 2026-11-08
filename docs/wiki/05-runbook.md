@@ -83,6 +83,7 @@ node scripts/env-check.mjs
 | 生产使用 | CI Secret / 云 KMS / Secret Manager，不落盘、不入库 |
 | 清单来源 | [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)（变量名与提供方一一对应） |
 | 核对方式 | `node scripts/env-check.mjs` 自动校验（见 §2「运行密钥模板校验」），失败即退出码 1 |
+| 成片导出转码（可选，2026-11-08） | `MIM_FFMPEG_PATH` 已在 `.env.example` / 09 清单登记，留空为**默认安全态**：`POST /api/v1/comic/films/:id/export` 对 MP4 / 1080p 直接签发原片预签名下载地址（1 小时有效，无需 ffmpeg）；请求 MOV 或 720p 时返回 403 `FEATURE_NOT_AVAILABLE` 并回显 `details.requested`，前端展示本地化提示与「直接下载原片」一键降级。需启用转码时在生产 `mim-api.env` 写入 ffmpeg 可执行文件绝对路径（服务器须已安装 ffmpeg + libx264），无需重启前端 |
 
 ## 5. 查看产品规划文档
 
@@ -108,7 +109,7 @@ pnpm --filter @mim/admin dev       # 管理后台（Vite），http://127.0.0.1:5
 
 ```bash
 pnpm -r typecheck                       # 5 of 6 workspace 项目类型检查（@mim/admin 已纳入）
-pnpm --filter @mim/api test             # vitest + supertest，10 个测试文件 120 例全通过
+pnpm --filter @mim/api test             # vitest + supertest，11 个测试文件 154 例全通过（含成片导出 9 例）
 pnpm --filter @mim/web build            # 用户端 tsc --noEmit + vite build
 pnpm --filter @mim/admin build          # 管理后台 tsc --noEmit + vite build（产物 dist/ 发布到 /opt/mim/admin）
 npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率门禁（CI 以 --strict 执行）
@@ -255,7 +256,9 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 ### 7.1.3 多平台实测汇总（2026-11-07 01:48:24 +08:00，本机中国网络，commit `7e4e3e9`，历史快照）
 
-> **取证口径说明（2026-11-08 05:05:32 核对）**：本节标题、结论与下方表格为 **2026-11-07 01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `83f454c`（CI run 42413909910 五作业全绿）；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-08 05:05:32 按需登录交付轮，本机中国网络 curl）**，该轮要点：按需登录模型已上线（商城 `/store` 匿名可浏览，`/comic` `/chat` `/settings` 收费/私密视图匿名访问时于内容区内嵌登录卡片）；自建主站 `/health` 200/0.087s、首页 200/0.066s（LEN=5182，产物 `assets/index-ChbzA5PZ.js`）、五条深链接（`/store` `/comic` `/chat` `/settings` `/login`）全 200/LEN=5182、`/admin/` 200/0.062s/LEN=1430、`/api/v1/modules` 200/0.062s/LEN=438；Cloudflare Pages 首页 200/0.678s（LEN=5182 与自建同指纹），带 `Accept: text/html` 头深链接 `/store` 200/0.570s、`/comic` 200/0.579s、`/login` 200/0.494s；GitHub Pages `/mim/` 200/0.535s（深链接 404+LEN=5182 属 `404.html` 预期设计）；Sealos `/health` 200/0.269s；ghcr 未鉴权 401 正常；**EdgeOne `data.mixm.top` curl 200/0.116s 仍为 985B WAF 挑战页**（真实内容最近一次复验为 2026-11-08 04:33 有头放行后商城全链路通过：`title=Mim — 跨端任务与轻协作`、`isWafChallenge=false`、`#/store` 渲染、搜索/详情/`/api/v1/modules` 200、console 零报错、无 `?tads` 残留）；Vercel 与 github.com 本机不可达属网络侧限制（DNS 污染 / TLS 阻断），CI 与 `git ls-remote` 取证正常。**按需登录 E2E**：本地 `scripts/verify-auth-gate.mjs --live` 52/52、生产匿名态 6/6 全 PASS；生产登录因 SMS 通道未配置（`auth/code` 503 `AUTH_CHANNEL_NOT_CONFIGURED`）以本地替代取证。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
+> **最新取证（2026-11-08 17:42:36 +08:00，本机中国网络 curl，HEAD `1b3072e`，可访问性复测轮、无新功能部署）**：自建 `/health` 200 / 0.074s / 0.035s / LEN=53、首页 200 / 0.075s / LEN=5182（`index-ChbzA5PZ.js`）、五条深链接 `/store` `/comic` `/chat` `/settings` `/login` 全 200 / LEN=5182（0.053–0.064s，nginx `try_files` 生效）、`/admin/` 200 / 0.093s / LEN=1430、`/api/v1/modules` 200 / 0.066s / LEN=438、`/api/v1/site/overview` 404 / LEN=126（`NOT_FOUND`，站点体系下线终态）；GitHub Pages `/mim/` 200 / 0.402s / LEN=5182（`index-Mq2I8smM.js`），深链接 `/mim/store` 404 / 1.008s / LEN=5182（`404.html` 副本预期设计）；Cloudflare Pages 首页 200 / 2.401s / LEN=5182（与自建同指纹），带 `Accept: text/html` 头深链接 `/store` 200 / 0.982s、`/comic` 200 / 0.749s、`/login` 200 / 0.948s 全 LEN=5182，裸 curl `/store` 404 / 0.562s 属 catch-all Function 按设计只重写 html 导航；Sealos `/health` 200 / 0.366s / 0.196s / LEN=53；EdgeOne 200 / 0.090s / LEN=985 仍为 WAF 挑战页（`EO_Bot_Ssid` / `_0x649a`）；ghcr 401 / 0.537s / LEN=73 正常；Vercel 本机 000 / 21.276s（exit 28，DNS 污染）、github.com 本机 000 / 0.015s（exit 35，TLS 阻断，TCP 0.007s 可连），`git ls-remote` 替代取证远端 main = `1b3072e`，与本地 0 ahead / 0 behind。**本节 01:48 表格及下方 05:05 段落为历史留痕，不代表当前运行状态；最新逐平台明细见 [AGENTS.md 铁律九表格](../../AGENTS.md)。**
+
+> **历史留痕：取证口径说明（2026-11-08 05:05:32 核对）**：本节标题、结论与下方表格为 **2026-11-07 01:48 的历史实测快照**（commit `7e4e3e9`），按铁律三保留原始数值留痕，**不代表当前运行状态**。仓库当前 HEAD 为 `83f454c`（CI run 42413909910 五作业全绿）；**最新一轮逐平台取证见 [AGENTS.md 铁律九表格](../../AGENTS.md)（2026-11-08 05:05:32 按需登录交付轮，本机中国网络 curl）**，该轮要点：按需登录模型已上线（商城 `/store` 匿名可浏览，`/comic` `/chat` `/settings` 收费/私密视图匿名访问时于内容区内嵌登录卡片）；自建主站 `/health` 200/0.087s、首页 200/0.066s（LEN=5182，产物 `assets/index-ChbzA5PZ.js`）、五条深链接（`/store` `/comic` `/chat` `/settings` `/login`）全 200/LEN=5182、`/admin/` 200/0.062s/LEN=1430、`/api/v1/modules` 200/0.062s/LEN=438；Cloudflare Pages 首页 200/0.678s（LEN=5182 与自建同指纹），带 `Accept: text/html` 头深链接 `/store` 200/0.570s、`/comic` 200/0.579s、`/login` 200/0.494s；GitHub Pages `/mim/` 200/0.535s（深链接 404+LEN=5182 属 `404.html` 预期设计）；Sealos `/health` 200/0.269s；ghcr 未鉴权 401 正常；**EdgeOne `data.mixm.top` curl 200/0.116s 仍为 985B WAF 挑战页**（真实内容最近一次复验为 2026-11-08 04:33 有头放行后商城全链路通过：`title=Mim — 跨端任务与轻协作`、`isWafChallenge=false`、`#/store` 渲染、搜索/详情/`/api/v1/modules` 200、console 零报错、无 `?tads` 残留）；Vercel 与 github.com 本机不可达属网络侧限制（DNS 污染 / TLS 阻断），CI 与 `git ls-remote` 取证正常。**按需登录 E2E**：本地 `scripts/verify-auth-gate.mjs --live` 52/52、生产匿名态 6/6 全 PASS；生产登录因 SMS 通道未配置（`auth/code` 503 `AUTH_CHANNEL_NOT_CONFIGURED`）以本地替代取证。本节数值待下一轮独立 curl 后整体同步，勿直接引用为现状。
 
 结论：**9 个免费平台全部接入或已取证上线；`data.mixm.top` 的 curl 200 已按 EdgeOne WAF 挑战页修正为假阳性（真实内容须有头浏览器取证）——本轮复用 profile 的 WAF 放行凭证已过期（约 17h），层 2 验证码页 CDP 合成点击 ×15 未通过，真实内容本轮未复验（最近一次有头取证 2026-11-06）。自建主站首页已引用本轮新产物 `assets/index-B15IIvsS.js`（证明 commit `7e4e3e9`「整站强制登录改为公开视图免登录」已上线），其余状态码与 2026-11-06 基线一致，无渠道新增或失效。**
 
