@@ -22,15 +22,121 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束
 
-/** 功能模块商城种子：第 1 期上线 comic.workbench（cn / global 双区各一行） */
-export function seedModules(db: Db): void { // 模块种子入口：幂等 upsert，重复执行不会产生重复行
-  const now = new Date().toISOString(); // 统一使用同一时间戳，保证同批数据 created_at / updated_at 一致
-  const upsertModule = db.prepare( // 预编译 upsert 语句，循环内复用减少解析开销
-    // 说明：按 (region, code) 唯一键冲突时更新可变字段，实现「存在则更新、不存在则插入」
+/**
+ * 功能模块商城种子：第 1 期上架一组真实模块（漫剧 AI 剧工作台 + 生成包三档 + AI 配音/剧本 + 素材扩容 + 模板包），
+ * cn / global 双区各一套，按区域独立币种定价；幂等 upsert，重复执行不会产生重复行。
+ */
+export function seedModules(db: Db): void { // 模块种子入口
+  const now = new Date().toISOString(); // 统一时间戳，保证同批数据 created_at / updated_at 一致
+
+  // 单条价格定义：币种 + 最小货币单位金额（避免浮点误差）
+  type PriceDef = { currency: 'CNY' | 'USD'; amount_minor: number };
+  // 模块定义：code 稳定、双语名称/简介、排序、前置依赖、按区域可选价格
+  interface SeedModule {
+    code: string; // 模块业务编码，权限校验时按此值匹配
+    sortOrder: number; // 展示排序权重，数字越小越靠前
+    requires: string[]; // 前置依赖模块编码，空数组表示无前置
+    nameI18n: Record<string, string>; // 多语言名称
+    summaryI18n: Record<string, string>; // 多语言简介
+    price?: { cn?: PriceDef; global?: PriceDef }; // 按区域独立币种定价；缺省即免费
+  } // SeedModule 接口结束
+
+  const defs: SeedModule[] = [ // 第 1 期上架模块清单
+    { // 漫剧创作工作台：核心入口，免费
+      code: 'comic.workbench', // 模块编码
+      sortOrder: 10, // 排序权重
+      requires: [], // 无前置依赖
+      nameI18n: { 'zh-CN': '漫剧创作工作台', 'en-US': 'Comic Creation Workbench' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '剧本、分镜、角色一致性与对白由 AI 建议，人工确认后导出创作工程。', // 中文简介
+        'en-US': 'AI-assisted script, storyboard, character consistency and dialogue, confirmed by humans before export.', // 英文简介
+      }, // summaryI18n 结束
+    }, // comic.workbench 结束
+    { // 漫剧生成包·基础版：付费，无前置
+      code: 'comic.genpack.basic', // 模块编码
+      sortOrder: 20, // 排序权重
+      requires: [], // 无前置依赖
+      nameI18n: { 'zh-CN': '漫剧生成包·基础版', 'en-US': 'Comic Generation Pack · Basic' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '为漫剧工作台提供基础 AI 生成额度：文生图、图生视频与 TTS 配音。', // 中文简介
+        'en-US': 'Base AI generation quota for the workbench: text-to-image, image-to-video and TTS dubbing.', // 英文简介
+      }, // summaryI18n 结束
+      price: { cn: { currency: 'CNY', amount_minor: 9900 }, global: { currency: 'USD', amount_minor: 1499 } }, // ¥99.00 / $14.99
+    }, // comic.genpack.basic 结束
+    { // 漫剧生成包·专业版：付费，依赖基础版
+      code: 'comic.genpack.pro', // 模块编码
+      sortOrder: 30, // 排序权重
+      requires: ['comic.genpack.basic'], // 前置：基础版
+      nameI18n: { 'zh-CN': '漫剧生成包·专业版', 'en-US': 'Comic Generation Pack · Pro' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '在基础版之上提升额度与并发，解锁高清成片与批量导出。', // 中文简介
+        'en-US': 'Higher quota and concurrency on top of Basic, unlocking HD output and batch export.', // 英文简介
+      }, // summaryI18n 结束
+      price: { cn: { currency: 'CNY', amount_minor: 29900 }, global: { currency: 'USD', amount_minor: 4299 } }, // ¥299.00 / $42.99
+    }, // comic.genpack.pro 结束
+    { // 漫剧生成包·团队版：付费，依赖专业版
+      code: 'comic.genpack.team', // 模块编码
+      sortOrder: 40, // 排序权重
+      requires: ['comic.genpack.pro'], // 前置：专业版
+      nameI18n: { 'zh-CN': '漫剧生成包·团队版', 'en-US': 'Comic Generation Pack · Team' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '面向小团队的共享额度与协作席位，支持成员管理与用量分摊。', // 中文简介
+        'en-US': 'Shared quota and seats for small teams, with member management and usage split.', // 英文简介
+      }, // summaryI18n 结束
+      price: { cn: { currency: 'CNY', amount_minor: 99900 }, global: { currency: 'USD', amount_minor: 13999 } }, // ¥999.00 / $139.99
+    }, // comic.genpack.team 结束
+    { // AI 配音合成：付费，无前置
+      code: 'ai.dubbing', // 模块编码
+      sortOrder: 50, // 排序权重
+      requires: [], // 无前置依赖
+      nameI18n: { 'zh-CN': 'AI 配音合成', 'en-US': 'AI Dubbing Studio' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '多语种、多音色的 AI 配音与情感语调控制，导出字幕对齐音频。', // 中文简介
+        'en-US': 'Multilingual, multi-voice AI dubbing with emotional prosody and subtitle-aligned export.', // 英文简介
+      }, // summaryI18n 结束
+      price: { cn: { currency: 'CNY', amount_minor: 19900 }, global: { currency: 'USD', amount_minor: 2899 } }, // ¥199.00 / $28.99
+    }, // ai.dubbing 结束
+    { // AI 剧本扩写：免费，无前置
+      code: 'ai.script', // 模块编码
+      sortOrder: 60, // 排序权重
+      requires: [], // 无前置依赖
+      nameI18n: { 'zh-CN': 'AI 剧本扩写', 'en-US': 'AI Script Expansion' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '基于角色设定与世界观，自动扩写分镜对白与桥段，保持一致性。', // 中文简介
+        'en-US': 'Auto-expand storyboard dialogue and beats from character and world settings while staying consistent.', // 英文简介
+      }, // summaryI18n 结束
+    }, // ai.script 结束
+    { // 素材云存储扩容：付费，无前置
+      code: 'media.storage', // 模块编码
+      sortOrder: 70, // 排序权重
+      requires: [], // 无前置依赖
+      nameI18n: { 'zh-CN': '素材云存储扩容', 'en-US': 'Media Storage Add-on' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '为工程素材与成片提供额外云存储空间，按容量一次性购买。', // 中文简介
+        'en-US': 'Additional cloud storage for assets and films, purchased once by capacity.', // 英文简介
+      }, // summaryI18n 结束
+      price: { cn: { currency: 'CNY', amount_minor: 4900 }, global: { currency: 'USD', amount_minor: 699 } }, // ¥49.00 / $6.99
+    }, // media.storage 结束
+    { // 分镜模板包：免费，无前置
+      code: 'template.pack', // 模块编码
+      sortOrder: 80, // 排序权重
+      requires: [], // 无前置依赖
+      nameI18n: { 'zh-CN': '分镜模板包', 'en-US': 'Storyboard Template Pack' }, // 多语言名称
+      summaryI18n: { // 多语言简介
+        'zh-CN': '精选分镜与镜头模板，一键套用到新工程，加速起步。', // 中文简介
+        'en-US': 'Curated storyboard and shot templates applied to new projects in one click.', // 英文简介
+      }, // summaryI18n 结束
+    }, // template.pack 结束
+  ]; // defs 结束
+
+  const REGIONS = ['cn', 'global'] as const; // 双区常量，类型收窄为联合类型
+
+  // 模块行 upsert：按 (region, code) 唯一键冲突时更新可变字段，实现「存在则更新、不存在则插入」
+  const upsertModule = db.prepare(
     `INSERT INTO modules
        (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
         region, status, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'one_time', '[]', ?, 'active', ?, ?, ?)
+     VALUES (?, ?, ?, ?, 'one_time', ?, ?, 'active', ?, ?, ?)
      ON CONFLICT(region, code) DO UPDATE SET
        name_i18n = excluded.name_i18n,
        summary_i18n = excluded.summary_i18n,
@@ -38,41 +144,48 @@ export function seedModules(db: Db): void { // 模块种子入口：幂等 upser
        entitlements_required = excluded.entitlements_required,
        status = excluded.status,
        sort_order = excluded.sort_order,
-       updated_at = excluded.updated_at`, // 模板结束：unlock_mode 固定一次性买断，entitlements_required 空数组表示无前置权益要求
+       updated_at = excluded.updated_at`,
   ); // prepare 结束
 
-  const modules = [ // 需要种入的区域清单：同一模块在 cn 与 global 各一条，靠区域隔离
-    { // 中国大陆区配置
-      region: 'cn', // 归属区域，与 users.region 口径一致
-      nameI18n: { 'zh-CN': '漫剧创作工作台', 'en-US': 'Comic Creation Workbench' }, // 多语言名称，前端按 locale 取对应文案
-      summaryI18n: { // 多语言简介
-        'zh-CN': '剧本、分镜、角色一致性与对白由 AI 建议，人工确认后导出创作工程。', // 中文简介
-        'en-US': 'AI-assisted script, storyboard, character consistency and dialogue, confirmed by humans before export.', // 英文简介
-      }, // summaryI18n 结束
-    }, // cn 配置结束
-    { // 海外区配置
-      region: 'global', // 归属海外区域
-      nameI18n: { 'zh-CN': '漫剧创作工作台', 'en-US': 'Comic Creation Workbench' }, // 名称与国内保持一致，避免两区文案漂移
-      summaryI18n: { // 多语言简介
-        'zh-CN': '剧本、分镜、角色一致性与对白由 AI 建议，人工确认后导出创作工程。', // 中文简介
-        'en-US': 'AI-assisted script, storyboard, character consistency and dialogue, confirmed by humans before export.', // 英文简介
-      }, // summaryI18n 结束
-    }, // global 配置结束
-  ] as const; // 断言为字面量常量，保证 region 等字段类型收窄不被拓宽为 string
+  // 价格行 upsert：按 id 唯一键冲突时刷新价格，避免重复写入多行历史价
+  const upsertPrice = db.prepare(
+    `INSERT INTO module_prices (id, module_id, currency, amount_minor, effective_from, effective_to, created_at)
+     VALUES (?, ?, ?, ?, ?, NULL, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       currency = excluded.currency,
+       amount_minor = excluded.amount_minor,
+       effective_from = excluded.effective_from,
+       created_at = excluded.created_at`,
+  ); // prepare 结束
 
-  const seed = db.transaction(() => { // 包成事务：任一区域写入失败则整体回滚，避免只写入半套数据
-    for (const module of modules) { // 逐区域执行 upsert
-      upsertModule.run( // 按占位符顺序绑定参数
-        `mod:comic.workbench:${module.region}`, // 主键：模块 ID 拼区域后缀，保证跨区唯一
-        'comic.workbench', // 模块业务编码，权限校验时按此值匹配
-        JSON.stringify(module.nameI18n), // 多语言名称序列化为 JSON 文本落库
-        JSON.stringify(module.summaryI18n), // 多语言简介序列化为 JSON 文本落库
-        module.region, // 区域值，参与唯一键与后续查询过滤
-        10, // 排序权重：数字越小越靠前，当前仅一个模块
-        now, // created_at：仅首次插入生效，冲突更新时不变
-        now, // updated_at：每次 upsert 都会刷新
-      ); // run 调用结束
-    } // 循环结束
+  const seed = db.transaction(() => { // 包成事务：任一写入失败则整体回滚，避免只写入半套数据
+    for (const def of defs) { // 逐模块
+      for (const region of REGIONS) { // 逐区域（cn / global 各一行）
+        upsertModule.run( // 按占位符顺序绑定参数
+          `mod:${def.code}:${region}`, // 主键：模块 ID 拼区域后缀，保证跨区唯一
+          def.code, // 模块业务编码
+          JSON.stringify(def.nameI18n), // 多语言名称序列化为 JSON 文本落库
+          JSON.stringify(def.summaryI18n), // 多语言简介序列化为 JSON 文本落库
+          JSON.stringify(def.requires), // 前置依赖序列化为 JSON 数组，空数组表示无前置
+          region, // 区域值，参与唯一键与后续查询过滤
+          def.sortOrder, // 排序权重
+          now, // created_at：仅首次插入生效，冲突更新时不变
+          now, // updated_at：每次 upsert 都会刷新
+        ); // run 调用结束
+        // 该区域有定价才写入价格行（免费模块不落价格，前端显示「免费」）
+        const price = def.price?.[region]; // 取本区域价格定义
+        if (price) { // 仅付费模块写价格
+          upsertPrice.run( // 写入/刷新价格行
+            `price:${def.code}:${region}`, // 价格行主键：模块 + 区域
+            `mod:${def.code}:${region}`, // 关联模块主键
+            price.currency, // 币种（CNY / USD）
+            price.amount_minor, // 金额（最小货币单位）
+            now, // 生效起始：种子时间，长期有效
+            now, // 创建时间
+          ); // run 调用结束
+        } // 价格写入结束
+      } // 区域循环结束
+    } // 模块循环结束
   }); // 事务函数准备完成
   seed(); // 执行事务，完成种子数据写入
 } // seedModules 结束
