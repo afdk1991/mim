@@ -60,6 +60,20 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
     res.json({ status: 'ok', service: 'mim-api', version: '0.0.0' }); // 返回最小静态响应，不查库以免探活放大故障
   }); // 健康检查路由结束
 
+  // 就绪探针：/health 只证明进程活着，/ready 还要确认依赖可用，部署与负载均衡据此决定是否放流量
+  app.get('/ready', (_req, res) => { // 依赖自检端点：不查业务表，只做最小可用性判定
+    const checks: Record<string, boolean> = {}; // 逐项记录各依赖是否就绪，便于运维直接定位是库还是存储挂了
+    try { // 数据库可能因文件损坏、锁冲突或磁盘满而不可读
+      resolved.db.prepare('SELECT 1 AS ok').get(); // 最轻量的一次真实查询
+      checks.database = true; // 查询成功即视为可读
+    } catch { // 任意异常都按「不可用」处理
+      checks.database = false; // 探针不应把异常抛给调用方，直接降级为未就绪
+    } // 数据库检查结束
+    checks.storage = storage.configured; // 存储缺凭证时上传链路必失败，故未配置即未就绪（用已解析的非空实例，避免可选字段误判）
+    const ready = Object.values(checks).every(Boolean); // 全部依赖就绪才算 ready
+    res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'unavailable', checks }); // 未就绪用 503 让编排器摘除实例
+  }); // 就绪探针结束
+
   // 公开路由：验证码/登录/刷新
   app.use('/api/v1', createAuthRouter(resolved)); // 登录端点无 token，必须注册在受保护路由之前才不会被拦成 401
 

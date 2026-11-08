@@ -172,4 +172,56 @@ describe('media 域', () => { // describe media 域：预签名上传下载、�
     expect(rejected.status).toBe(401); // 断言 401，签名校验在写入前拦截
     expect(rejected.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言未授权错误码
   }); // 结束签名用例
+  it('过期产物即使字节尚未清理也不可下载签名，与列表口径一致', async () => { // 用例：保留期在「列表」与「下载签名」两条路径上必须同口径
+    const session = await login('13900000036'); // 登录
+    grantEntitlement(session.userId); // 授予权益，排除门禁干扰
+
+    const created = await request(app) // 先建工程，产物登记行必须挂在真实工程上
+      .post('/api/v1/comic/projects') // 创建端点
+      .set(auth(session, nextKey())) // 新幂等键
+      .send({ title: '过期产物工程' }); // 标题
+    expect(created.status).toBe(201); // 断言 201
+    const projectId = created.body.project.id as string; // 取工程 ID
+
+    const presign = await request(app) // 申请上传预签名，拿到真实对象键
+      .post('/api/v1/media/presign/upload') // 上传预签名端点
+      .set(auth(session, nextKey())) // 新幂等键
+      .send({ asset_type: 'image', mime: 'image/png', project_id: projectId }); // 带上工程
+    expect(presign.status).toBe(201); // 断言 201
+    const objectKey = presign.body.object_key as string; // 取对象键
+    const uploaded = await request(app) // 真实上传字节，确保后续失败原因是保留期而不是对象缺失
+      .put(pathOf(presign.body.upload.url as string)) // 转同源路径
+      .set('content-type', 'image/png') // 声明类型
+      .send(Buffer.from('expired-contract-bytes')); // 发送内容
+    expect(uploaded.status).toBe(204); // 断言上传成功
+
+    const before = await request(app) // 登记保留期之前：应可正常签发
+      .get('/api/v1/media/presign/download') // 下载预签名端点
+      .query({ object_key: objectKey }) // 查询参数
+      .set(auth(session)); // 鉴权头
+    expect(before.status).toBe(200); // 断言 200，证明基线链路正常
+
+    // 手工登记一条「已过期」产物，模拟 TTL 到期但 asset-gc 尚未轮到清理的窗口
+    db.prepare( // 预编译插入
+      `INSERT INTO generation_assets
+         (id, job_id, project_id, asset_type, object_key, mime, checksum, expires_at, created_at)
+       VALUES ('asset-contract-expired', 'job-contract-expired', ?, 'image', ?, 'image/png', 'sha256-contract', ?, ?)`,
+    ).run(projectId, objectKey, new Date(Date.now() - 3_600_000).toISOString(), new Date().toISOString()); // 到期时间设为一小时前
+
+    const after = await request(app) // 登记过期之后：应被拒绝
+      .get('/api/v1/media/presign/download') // 同一端点
+      .query({ object_key: objectKey }) // 同一对象键
+      .set(auth(session)); // 同一用户
+    expect(after.status).toBe(404); // 与「不存在」同口径，不额外泄漏保留期策略
+    expect(after.body.code).toBe('NOT_FOUND'); // 错误码
+    expect(after.body.message).toContain('asset expired'); // 明确说明是过期而非权限问题
+
+    const listed = await request(app) // 列表接口核对同口径
+      .get('/api/v1/media/assets') // 产物列表
+      .query({ project_id: projectId }) // 限定工程
+      .set(auth(session)); // 鉴权头
+    expect(listed.status).toBe(200); // 断言 200
+    const listedKeys = (listed.body.items as Array<{ object_key: string }>).map((item) => item.object_key); // 取出列表里的对象键
+    expect(listedKeys).not.toContain(objectKey); // 过期产物同样不出现在列表中
+  }); // 结束过期产物用例
 }); // 结束 media 域分组

@@ -1,13 +1,15 @@
 /** 契约测试：catalog 管理面 —— 模块状态机 / 权益发放 / 权益回收（铁律十一：逐行中文注释） */
 
 import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例编排 API，beforeEach 每例重建内存库
+import { createHmac } from 'node:crypto'; // 渠道回调签名：与被测实现同一算法，验证「对的签名」与「错的签名」
 import request from 'supertest'; // supertest 进程内驱动 Express，无需监听真实端口
 import type { Express } from 'express'; // 仅引入类型，用于标注全局 app
 import { createApp } from '../src/app.js'; // 唯一装配入口，走它才能保证中间件挂载顺序真实
-import { createDatabase } from '../src/db.js'; // 内存库工厂，保证用例之间零共享状态
+import { createDatabase, ensureAdditiveIndexes } from '../src/db.js'; // 内存库工厂 + 补索引迁移（结构回归用）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，长度满足构建期强度校验
 const ADMIN_TOKEN = 'test-admin-token'; // 管理令牌固定值，必须与 createApp 注入的 env 保持一致
+const NOTIFY_SECRET = 'test-notify-secret-0123456789abcdef'; // 支付回调签名密钥，仅用于回调用例的独立应用实例
 
 let app: Express; // 待测应用实例（已启用管理面）
 let db: ReturnType<typeof createDatabase>; // 与 app 同生命周期的数据库句柄，用例内可直接写库造数据
@@ -582,4 +584,401 @@ describe('模块详情（GET /modules/:code）', () => { // 扁平响应：顶�
     expect(res.body.current_price.amount_minor).toBe(9900); // 当前生效价格同步断言
   }); // 结束详情价格历史用例
 }); // 结束模块详情分组
+
+// ---------- 商城订单闭环：付费模块下单 → 结算 → 发放权益 ----------
+
+/** 读取订单行，供状态、金额与关联权益断言 */
+function orderRow(id: string) { // 订单主键查询
+  return db // 数据库句柄
+    .prepare(`SELECT status, currency, amount_minor, entitlement_id, paid_at, cancelled_at FROM module_orders WHERE id = ?`) // 只取断言关心列
+    .get(id) as { status: string; currency: string; amount_minor: number; entitlement_id: string | null; paid_at: string | null; cancelled_at: string | null } | undefined; // 未命中返回 undefined
+} // 结束 orderRow
+
+/** 统计某用户在某模块上的订单来源权益条数，用于验证结算幂等 */
+function orderEntitlementCount(userId: string, moduleCode: string): number { // 只统计 source_id 非空的订单权益
+  const row = db // 数据库句柄
+    .prepare( // 预编译：联模块表按编码过滤
+      `SELECT COUNT(*) AS c FROM entitlements e
+       INNER JOIN modules m ON m.id = e.module_id
+       WHERE e.user_id = ? AND m.code = ? AND e.source_id IS NOT NULL`,
+    ) // 结束预编译
+    .get(userId, moduleCode) as { c: number } | undefined; // 命中行统一收窄类型
+  return row?.c ?? 0; // 未命中按 0 处理
+} // 结束 orderEntitlementCount
+
+describe('付费模块门禁与商城订单', () => { // 覆盖「不能免费拿付费模块」与完整下单结算链路
+  it('付费模块调解锁接口 → 402 PAYMENT_REQUIRED 并回传成交价；免费模块仍可直接解锁', async () => { // 付费墙口径
+    const session = await login('13900000041'); // 登录普通用户
+    const paid = await request(app) // 尝试免费解锁付费模块
+      .post('/api/v1/entitlements') // 解锁端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'paid-unlock-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 种子付费模块 ¥99
+    expect(paid.status).toBe(402); // 断言 402，提示先结算
+    expect(paid.body.code).toBe('PAYMENT_REQUIRED'); // 断言错误码
+    expect(paid.body.details.order_required).toBe(true); // 断言显式要求走下单
+    expect(paid.body.details.price.amount_minor).toBe(9900); // 断言回传成交价，前端可直接展示
+    expect(paid.body.details.price.currency).toBe('CNY'); // 断言币种
+
+    const free = await request(app) // 免费模块行为不变
+      .post('/api/v1/entitlements') // 解锁端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'free-unlock-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.workbench' }); // 免费种子模块
+    expect(free.status).toBe(201); // 断言 201，免费模块仍可直接解锁
+  }); // 结束付费门禁用例
+
+  it('下单 → 重复下单回放 → 取消 → 可重新下单', async () => { // 订单生命周期
+    const session = await login('13900000042'); // 登录
+    const first = await request(app) // 首次下单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 付费模块
+    expect(first.status).toBe(201); // 断言 201
+    expect(first.body.order.status).toBe('pending'); // 断言初始状态
+    expect(first.body.order.amount_minor).toBe(9900); // 断言金额取服务端快照
+    const orderId = first.body.order.id as string; // 记录订单号
+
+    const replay = await request(app) // 用新幂等键再次下单
+      .post('/api/v1/orders') // 同端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'order-2' }) // 新幂等键，证明回放靠业务幂等而非幂等中间件
+      .send({ module_code: 'comic.genpack.basic' }); // 同模块
+    expect(replay.status).toBe(200); // 断言 200 表示复用
+    expect(replay.body.order.id).toBe(orderId); // 断言同一张单，不产生重复待付
+
+    const cancelled = await request(app) // 取消订单
+      .post(`/api/v1/orders/${orderId}/cancel`) // 取消端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'order-cancel-1' }) // 鉴权 + 幂等键
+      .send({}); // 空体
+    expect(cancelled.status).toBe(200); // 断言 200
+    expect(orderRow(orderId)?.status).toBe('cancelled'); // 断言落库为已取消
+    expect(orderRow(orderId)?.cancelled_at).not.toBeNull(); // 断言取消时间已写
+
+    const again = await request(app) // 取消后可重新下单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'order-3' }) // 新幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 同模块
+    expect(again.status).toBe(201); // 断言 201，部分唯一索引只拦 pending
+    expect(again.body.order.id).not.toBe(orderId); // 断言新订单号
+  }); // 结束订单生命周期用例
+
+  it('前置依赖未满足 → 403 并回传缺失清单；免费模块不能下单 → 400', async () => { // 下单前置校验
+    const session = await login('13900000043'); // 登录
+    const blocked = await request(app) // 未买基础版直接下单专业版
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'dep-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.pro' }); // 依赖基础版的付费模块
+    expect(blocked.status).toBe(403); // 断言 403
+    expect(blocked.body.code).toBe('FEATURE_NOT_AVAILABLE'); // 断言错误码
+    expect(blocked.body.details.required).toEqual(['comic.genpack.basic']); // 断言精确缺失清单
+
+    const freeOrder = await request(app) // 免费模块走订单无意义
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'free-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.workbench' }); // 免费模块
+    expect(freeOrder.status).toBe(400); // 断言 400
+    expect(freeOrder.body.message).toBe('module is free, unlock it directly'); // 断言引导到解锁接口
+  }); // 结束下单前置校验用例
+
+  it('管理端结算 → 发放订单来源权益；重复结算回放不重复发放；结算后可下单后续模块', async () => { // 结算闭环
+    const session = await login('13900000044'); // 登录
+    const created = await request(app) // 下单基础版
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'settle-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 付费模块
+    expect(created.status).toBe(201); // 断言 201
+    const orderId = created.body.order.id as string; // 订单号
+
+    const settled = await request(app) // 管理端结算
+      .post(`/api/v1/orders/${orderId}/settle`) // 结算端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ reason: '线下转账已到账' }); // 结算备注
+    expect(settled.status).toBe(200); // 断言 200
+    expect(settled.body.order.status).toBe('paid'); // 断言订单已结算
+    const entitlementId = settled.body.order.entitlement_id as string; // 结算后权益主键
+    expect(entitlementId).toBeTruthy(); // 断言已发放权益
+    const row = orderRow(orderId); // 读库对拍
+    expect(row?.status).toBe('paid'); // 断言落库已结算
+    expect(row?.entitlement_id).toBe(entitlementId); // 断言订单关联权益
+    expect(row?.paid_at).not.toBeNull(); // 断言结算时间已写
+
+    const entitlements = await request(app) // 用户视角确认权益生效
+      .get('/api/v1/me/entitlements') // 我的权益
+      .set({ authorization: `Bearer ${session.token}` }); // 鉴权
+    expect(entitlements.body.entitlements.map((e: { module_code: string }) => e.module_code)).toContain('comic.genpack.basic'); // 断言权益列表含该模块
+
+    const events = await request(app) // 审计链
+      .get(`/api/v1/entitlements/${entitlementId}/events`) // 事件端点
+      .set(adminHeaders()); // 管理令牌
+    expect(events.body.events[0].reason).toBe('线下转账已到账'); // 断言结算备注写入事件原因
+    expect(events.body.events[0].actor).toBe('admin'); // 断言操作者
+
+    const replay = await request(app) // 重复结算
+      .post(`/api/v1/orders/${orderId}/settle`) // 同端点
+      .set(adminHeaders()) // 管理令牌
+      .send({}); // 空体
+    expect(replay.status).toBe(200); // 断言 200 回放
+    expect(replay.body.order.entitlement_id).toBe(entitlementId); // 断言回放同一权益
+    expect(orderEntitlementCount(session.userId, 'comic.genpack.basic')).toBe(1); // 断言未重复发放
+
+    const nextOrder = await request(app) // 依赖已满足后可下单专业版
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'settle-order-2' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.pro' }); // 依赖基础版的模块
+    expect(nextOrder.status).toBe(201); // 断言依赖链放行
+  }); // 结束结算闭环用例
+
+  it('已取消订单不能结算；已拥有模块再下单 → 409', async () => { // 反向分支
+    const session = await login('13900000045'); // 登录
+    const created = await request(app) // 下单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'rev-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 付费模块
+    const orderId = created.body.order.id as string; // 订单号
+    await request(app) // 先取消
+      .post(`/api/v1/orders/${orderId}/cancel`) // 取消端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'rev-order-cancel' }) // 鉴权 + 幂等键
+      .send({}); // 空体
+    const settleCancelled = await request(app) // 结算已取消订单
+      .post(`/api/v1/orders/${orderId}/settle`) // 结算端点
+      .set(adminHeaders()) // 管理令牌
+      .send({}); // 空体
+    expect(settleCancelled.status).toBe(409); // 断言 409
+    expect(settleCancelled.body.message).toBe('cancelled order cannot be settled'); // 断言文案
+
+    const own = await request(app) // 先直接解锁免费模块
+      .post('/api/v1/entitlements') // 解锁端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'own-unlock' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.workbench' }); // 免费模块
+    expect(own.status).toBe(201); // 断言已拥有
+
+    const dupOrder = await request(app) // 已拥有后给「付费模块」下单：先给该模块造价格
+      .post('/api/v1/modules/comic.workbench/prices') // 管理端加价格行
+      .set(adminHeaders()) // 管理令牌
+      .send({ currency: 'CNY', amount_minor: 9900, effective_from: '2026-01-01T00:00:00.000Z' }); // 立即生效价格
+    expect(dupOrder.status).toBe(201); // 断言价格行已建
+
+    const blocked = await request(app) // 再尝试下单已拥有的模块
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'dup-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.workbench' }); // 刚加了价格的已拥有模块
+    expect(blocked.status).toBe(409); // 断言 409
+    expect(blocked.body.message).toBe('module already unlocked'); // 断言文案
+  }); // 结束反向分支用例
+
+  it('依赖成环被拒绝：互指与自指都返回 400', async () => { // 环检测
+    const created = async (code: string, requires: string[] = []) => request(app) // 造模块的辅助
+      .post('/api/v1/modules') // 创建端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ code, name: { 'zh-CN': code }, entitlements_required: requires }); // 最小字段集
+    expect((await created('cycle.a')).status).toBe(201); // A 无依赖
+    expect((await created('cycle.b', ['cycle.a'])).status).toBe(201); // B 依赖 A
+
+    const mutual = await request(app) // 把 A 改成依赖 B，形成 A→B→A
+      .patch('/api/v1/modules/cycle.a') // 编辑端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ entitlements_required: ['cycle.b'] }); // 互指
+    expect(mutual.status).toBe(400); // 断言 400
+    expect(mutual.body.message).toBe('module dependency cycle detected'); // 断言成环文案
+
+    expect((await created('cycle.self')).status).toBe(201); // 再建一个无依赖模块
+    const self = await request(app) // 改成依赖自身
+      .patch('/api/v1/modules/cycle.self') // 编辑端点
+      .set(adminHeaders()) // 管理令牌
+      .send({ entitlements_required: ['cycle.self'] }); // 自指
+    expect(self.status).toBe(400); // 断言 400
+    expect(self.body.message).toBe('module dependency cycle detected'); // 断言同样是环
+  }); // 结束环检测用例
+
+  it('管理端订单列表跨用户可见、支持状态过滤；普通用户 403', async () => { // 人工结算需要全量视图
+    const session = await login('13900000046'); // 登录普通用户
+    const created = await request(app) // 该用户下单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'manage-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 付费模块
+    expect(created.status).toBe(201); // 断言下单成功
+    const orderId = created.body.order.id as string; // 订单号
+
+    const pendingList = await request(app) // 管理端按状态查待结算
+      .get('/api/v1/orders/manage?status=pending') // 管理列表端点
+      .set(adminHeaders()); // 管理令牌
+    expect(pendingList.status).toBe(200); // 断言 200
+    expect(pendingList.body.orders.some((row: { id: string }) => row.id === orderId)).toBe(true); // 断言能跨用户看到该单
+    expect(pendingList.body.total).toBeGreaterThanOrEqual(1); // 断言总数可用
+
+    const paidList = await request(app) // 已结算过滤应为空
+      .get('/api/v1/orders/manage?status=paid') // 只查已结算
+      .set(adminHeaders()); // 管理令牌
+    expect(paidList.body.orders.some((row: { id: string }) => row.id === orderId)).toBe(false); // 断言状态过滤生效
+
+    const denied = await request(app) // 普通用户访问管理列表
+      .get('/api/v1/orders/manage') // 管理列表端点
+      .set({ authorization: `Bearer ${session.token}` }); // 用户令牌
+    expect(denied.status).toBe(403); // 断言 403，不泄漏跨用户订单
+  }); // 结束管理端列表用例
+}); // 结束商城订单分组
+
+// ---------- 渠道支付回调：HMAC 签名 + 交易号幂等 ----------
+
+/** 计算回调签名：与被测实现完全相同的 canonical 串与算法 */
+function notifySignature(orderId: string, channel: string, txn: string, amount: number, ts: number, secret: string = NOTIFY_SECRET): string {
+  // HMAC-SHA256 输出 hex
+  return createHmac('sha256', secret).update(`${orderId}.${channel}.${txn}.${amount}.${ts}`).digest('hex'); // canonical 串逐字段拼接
+} // 结束 notifySignature
+
+/** 当前秒级时间戳：保证落在服务端 ±300s 窗口内 */
+function nowSeconds(): number {
+  // 取整到秒
+  return Math.floor(Date.now() / 1000);
+} // 结束 nowSeconds
+
+describe('渠道支付回调（POST /orders/:id/payment-notify）', () => { // 无商户凭证下可验证的在线支付接入层
+  it('未配置 MIM_PAYMENT_NOTIFY_SECRET → 503，且人工结算不受影响', async () => { // 环境不具备时明确报缺
+    const noSecretApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN } }); // 不含回调密钥的实例
+    const res = await request(noSecretApp) // 直接回调一个不存在的订单
+      .post('/api/v1/orders/ord_any/payment-notify') // 回调端点
+      .set({ 'x-payment-timestamp': String(nowSeconds()), 'x-payment-signature': 'deadbeef' }) // 任意签名头
+      .send({ channel: 'alipay', channel_txn_id: 'txn-1', amount_minor: 9900 }); // 合法报文
+    expect(res.status).toBe(503); // 断言 503
+    expect(res.body.code).toBe('PAYMENT_NOTIFY_NOT_CONFIGURED'); // 断言错误码
+    expect(res.body.details.env).toBe('MIM_PAYMENT_NOTIFY_SECRET'); // 断言指出缺失变量
+  }); // 结束未配置用例
+
+  it('签名正确 → 订单结算并发放权益，渠道交易号落库；同一交易号重复回调 200 回放', async () => { // 主链路 + 幂等
+    const notifyApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_PAYMENT_NOTIFY_SECRET: NOTIFY_SECRET } }); // 配齐密钥的实例
+    const session = await login('13900000048'); // 登录下单用户
+    const created = await request(notifyApp) // 下单并指定在线渠道
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'notify-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic', channel: 'alipay' }); // 渠道 alipay
+    expect(created.status).toBe(201); // 断言下单成功
+    expect(created.body.order.channel).toBe('alipay'); // 断言渠道已按请求落地
+    const orderId = created.body.order.id as string; // 订单号
+    const amount = created.body.order.amount_minor as number; // 成交金额
+
+    const ts = nowSeconds(); // 当前时间戳
+    const ok = await request(notifyApp) // 正确签名的回调
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': notifySignature(orderId, 'alipay', 'txn-alipay-1', amount, ts) }) // 正确签名
+      .send({ channel: 'alipay', channel_txn_id: 'txn-alipay-1', amount_minor: amount }); // 合法报文
+    expect(ok.status).toBe(200); // 断言结算成功
+    expect(ok.body.replayed).toBe(false); // 断言首次不是回放
+    expect(ok.body.order.status).toBe('paid'); // 断言订单已结算
+    expect(orderRow(orderId)?.status).toBe('paid'); // 断言落库状态
+    expect(orderEntitlementCount(session.userId, 'comic.genpack.basic')).toBe(1); // 断言已发放权益
+
+    const again = await request(notifyApp) // 同一交易号重复回调
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': notifySignature(orderId, 'alipay', 'txn-alipay-1', amount, ts) }) // 同一签名
+      .send({ channel: 'alipay', channel_txn_id: 'txn-alipay-1', amount_minor: amount }); // 同一报文
+    expect(again.status).toBe(200); // 断言 200 回放
+    expect(again.body.replayed).toBe(true); // 断言标记为回放
+    expect(again.body.order.entitlement_id).toBe(ok.body.order.entitlement_id); // 断言回放同一权益
+    expect(orderEntitlementCount(session.userId, 'comic.genpack.basic')).toBe(1); // 断言未重复发放
+
+    const differentTxn = await request(notifyApp) // 换交易号再回调同一已结算订单
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': notifySignature(orderId, 'alipay', 'txn-alipay-2', amount, ts) }) // 新交易号签名
+      .send({ channel: 'alipay', channel_txn_id: 'txn-alipay-2', amount_minor: amount }); // 新交易号报文
+    expect(differentTxn.status).toBe(409); // 断言 409，二次扣款需人工对账
+    expect(differentTxn.body.message).toBe('order already settled by another transaction'); // 断言文案
+  }); // 结束主链路用例
+
+  it('金额或渠道与下单快照不一致 → 400；签名错误 / 时间戳过期 → 401', async () => { // 拒绝错账与伪造
+    const notifyApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_PAYMENT_NOTIFY_SECRET: NOTIFY_SECRET } }); // 配齐密钥的实例
+    const session = await login('13900000049'); // 登录
+    const created = await request(notifyApp) // 下单，渠道 alipay
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'notify-order-2' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic', channel: 'alipay' }); // 渠道 alipay
+    const orderId = created.body.order.id as string; // 订单号
+    const amount = created.body.order.amount_minor as number; // 金额
+    const ts = nowSeconds(); // 时间戳
+
+    const wrongAmount = await request(notifyApp) // 金额少付
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': notifySignature(orderId, 'alipay', 'txn-2', amount - 100, ts) }) // 按少付金额签名
+      .send({ channel: 'alipay', channel_txn_id: 'txn-2', amount_minor: amount - 100 }); // 少付报文
+    expect(wrongAmount.status).toBe(400); // 断言 400
+    expect(wrongAmount.body.message).toBe('amount mismatch'); // 断言文案
+    expect(wrongAmount.body.details.expected).toBe(amount); // 断言回传应付金额
+
+    const wrongChannel = await request(notifyApp) // 渠道不符
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': notifySignature(orderId, 'wechat', 'txn-3', amount, ts) }) // 按微信签名
+      .send({ channel: 'wechat', channel_txn_id: 'txn-3', amount_minor: amount }); // 微信报文
+    expect(wrongChannel.status).toBe(400); // 断言 400
+    expect(wrongChannel.body.message).toBe('channel mismatch'); // 断言文案
+
+    const badSignature = await request(notifyApp) // 伪造签名
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': 'f'.repeat(64) }) // 长度正确内容错误
+      .send({ channel: 'alipay', channel_txn_id: 'txn-4', amount_minor: amount }); // 合法报文
+    expect(badSignature.status).toBe(401); // 断言 401
+    expect(badSignature.body.message).toBe('invalid payment signature'); // 断言文案
+
+    const expired = await request(notifyApp) // 过期时间戳（重放攻击面）
+      .post(`/api/v1/orders/${orderId}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts - 3600), 'x-payment-signature': notifySignature(orderId, 'alipay', 'txn-5', amount, ts - 3600) }) // 一小时前的签名
+      .send({ channel: 'alipay', channel_txn_id: 'txn-5', amount_minor: amount }); // 合法报文
+    expect(expired.status).toBe(401); // 断言 401
+    expect(expired.body.message).toBe('payment signature expired'); // 断言文案
+  }); // 结束错账与伪造用例
+
+  it('已取消订单不接受回调 409；同一交易号用于另一张单 409', async () => { // 状态与交易号唯一性
+    const notifyApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_PAYMENT_NOTIFY_SECRET: NOTIFY_SECRET } }); // 配齐密钥的实例
+    const session = await login('13900000050'); // 登录
+
+    const a = await request(notifyApp) // 第一张单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'notify-order-3' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic', channel: 'stripe' }); // 渠道 stripe
+    const orderA = a.body.order.id as string; // 订单 A
+    await request(notifyApp) // 取消订单 A
+      .post(`/api/v1/orders/${orderA}/cancel`) // 取消端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'notify-cancel-a' }) // 鉴权 + 幂等键
+      .send({}); // 空体
+    const ts = nowSeconds(); // 时间戳
+    const cancelled = await request(notifyApp) // 回调已取消订单
+      .post(`/api/v1/orders/${orderA}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(ts), 'x-payment-signature': notifySignature(orderA, 'stripe', 'txn-stripe-1', 9900, ts) }) // 正确签名
+      .send({ channel: 'stripe', channel_txn_id: 'txn-stripe-1', amount_minor: 9900 }); // 合法报文
+    expect(cancelled.status).toBe(409); // 断言 409
+    expect(cancelled.body.message).toBe('cancelled order cannot be settled'); // 断言文案
+
+    const b = await request(notifyApp) // 重新下单得到订单 B
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'notify-order-4' }) // 新幂等键
+      .send({ module_code: 'comic.genpack.basic', channel: 'stripe' }); // 渠道 stripe
+    const orderB = b.body.order.id as string; // 订单 B
+    const tsB = nowSeconds(); // 时间戳
+    const okB = await request(notifyApp) // 用交易号结算订单 B
+      .post(`/api/v1/orders/${orderB}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(tsB), 'x-payment-signature': notifySignature(orderB, 'stripe', 'txn-stripe-2', 9900, tsB) }) // 正确签名
+      .send({ channel: 'stripe', channel_txn_id: 'txn-stripe-2', amount_minor: 9900 }); // 合法报文
+    expect(okB.status).toBe(200); // 断言订单 B 结算成功
+
+    const other = await request(notifyApp) // 另一个用户下单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${(await login('13900000051')).token}`, 'idempotency-key': 'notify-order-5' }) // 另一用户登录
+      .send({ module_code: 'comic.genpack.basic', channel: 'stripe' }); // 渠道 stripe
+    const orderC = other.body.order.id as string; // 订单 C
+    const tsC = nowSeconds(); // 时间戳
+    const reused = await request(notifyApp) // 复用已被订单 B 用过的交易号
+      .post(`/api/v1/orders/${orderC}/payment-notify`) // 回调端点
+      .set({ 'x-payment-timestamp': String(tsC), 'x-payment-signature': notifySignature(orderC, 'stripe', 'txn-stripe-2', 9900, tsC) }) // 复用交易号签名
+      .send({ channel: 'stripe', channel_txn_id: 'txn-stripe-2', amount_minor: 9900 }); // 复用交易号报文
+    expect(reused.status).toBe(409); // 断言 409
+    expect(reused.body.message).toBe('transaction already used'); // 断言文案
+  }); // 结束状态与交易号用例
+}); // 结束渠道回调查询分组
+
+describe('商城订单表结构（存量库兼容）', () => { // 防止「索引写在 schema.sql 里导致老库启动失败」回归
+  it('全新库即有 channel_txn_id 列与 uq_module_orders_txn 索引；重复补迁移幂等', async () => { // 结构断言
+    const cols = db.prepare('PRAGMA table_info(module_orders)').all() as Array<{ name: string }>; // 读取列定义
+    expect(cols.some((c) => c.name === 'channel_txn_id')).toBe(true); // 断言列存在
+    const idx = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'uq_module_orders_txn'").get() as { sql: string } | undefined; // 读取索引定义
+    expect(idx?.sql).toContain('WHERE channel_txn_id IS NOT NULL'); // 断言是部分唯一索引（人工结算的 NULL 不参与）
+    const again = ensureAdditiveIndexes(db); // 再跑一次补索引
+    expect(again).toEqual([]); // 断言幂等：第二次不再新建
+  }); // 结束结构用例
+}); // 结束结构分组
 

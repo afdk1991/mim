@@ -2,18 +2,14 @@
 /**
  * scripts/build.mjs
  *
- * 根级构建脚本：默认产出**真实 Mim 前端**（apps/web/dist）到根 dist/。
- * 该产物正是 EdgeOne Pages（项目 mim-app，域名 data.mixm.top）的输出目录约定：
- * 控制台配置 `npm install && npm run build` + OutputDir=dist，因此根 dist 必须是真实应用，
- * 而不是 site/ 下的 PRD 阅读页（2026-11-06 修复「data.mixm.top 与项目不符」）。
+ * 根级构建脚本：构建**真实 Mim 前端**（apps/web/dist）并同步到根 dist/，
+ * 供本地预览与静态托管使用。
  *
  * 用法：
- *   node scripts/build.mjs          # 构建真实前端 → dist/（托管平台用）
- *   node scripts/build.mjs --site   # 仅复制 site/ → dist/（PRD 阅读页离线预览用）
+ *   node scripts/build.mjs          # 构建真实前端 → 根 dist/
  *
  * 环境变量：
- *   VITE_API_ORIGIN  前端调用的 API 源；未设置时默认生产 API https://mim.mixm.top
- *                    （同源部署自建站时不走本脚本，由 deploy/deploy.sh 直接分发产物）。
+ *   VITE_API_ORIGIN  前端调用的 API 源；未设置时默认生产 API https://mim.mixm.top。
  *
  * 注：刻意不使用 fs.cpSync——本机 Node 在该 API 上出现 0xC0000409 崩溃，
  *     故采用 copyFileSync 手动递归复制，跨平台稳定。

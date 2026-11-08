@@ -68,14 +68,33 @@ const ENT_STATUS_BADGE: Record<string, string> = {
 }; // 权益徽标映射结束；未列出状态回退默认样式
 
 // 模块状态文案：目录接口理论上只返回已上架，详情面板仍做完整映射
-const MODULE_STATUS_LABEL: Record<string, { zh: string; en: string }> = {
-  // 草稿：仅后台可见
+const MODULE_STATUS_LABEL: Record<string, { zh: string; en: string }> = {  // 草稿：仅后台可见
   draft: { zh: '草稿', en: 'Draft' },
   // 已上架
   active: { zh: '已上架', en: 'Active' },
   // 已下架：终态
   archived: { zh: '已下架', en: 'Archived' },
 }; // 模块状态文案表结束
+
+// 订单状态文案：与 module_orders.status 的 CHECK 约束一一对应
+const ORDER_STATUS_LABEL: Record<string, { zh: string; en: string }> = {
+  // 待结算：已下单但尚未完成支付/人工结算
+  pending: { zh: '待结算', en: 'Pending settlement' },
+  // 已结算：权益已发放
+  paid: { zh: '已结算', en: 'Settled' },
+  // 已取消：用户主动取消，可重新下单
+  cancelled: { zh: '已取消', en: 'Cancelled' },
+}; // 订单状态文案表结束
+
+// 订单状态徽标样式：待结算用中性灰、已结算复用绿色、已取消用默认灰
+const ORDER_STATUS_BADGE: Record<string, string> = {
+  // 待结算：尚未完成，弱化展示
+  pending: '',
+  // 已结算：与「已解锁」同色，表达可用
+  paid: 'role-editor',
+  // 已取消：默认灰
+  cancelled: '',
+}; // 订单徽标映射结束
 
 // 把时间格式化为本地可读串；无效输入原样返回，避免抛错
 function formatTime(locale: Locale, iso: string): string {
@@ -99,6 +118,8 @@ export function Store({ locale }: Props) {
   const modulesState = useAsync(() => api.catalog.getModules({ q: applied || undefined }), [applied]);
   // 拉取当前用户已购权益，用于在卡片上标注「已解锁」；匿名时不发请求、权益视为空，登录态变化时重新拉取
   const entState = useAsync(() => (authed ? api.catalog.getMyEntitlements() : Promise.resolve(null)), [authed]);
+  // 拉取我的订单：付费模块下单后在这里展示「待结算 / 已结算 / 已取消」并提供取消入口；匿名时不发请求
+  const ordersState = useAsync(() => (authed ? api.catalog.getMyOrders() : Promise.resolve(null)), [authed]);
   // 当前展开详情的模块编码：null 表示全部收起
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
   // 展开项的详情（含历史价格与依赖链）：随展开目标变化重新拉取，收起时回 null 不发请求
@@ -119,8 +140,12 @@ export function Store({ locale }: Props) {
   const unlocked = new Set((entState.data?.entitlements ?? []).map((e) => e.module_code));
   // 我的权益列表：仅登录态有数据
   const entitlements = entState.data?.entitlements ?? [];
-  // 两个接口任一仍在加载即视为整体加载中（匿名态权益请求立即完成，不阻塞），避免出现半屏数据
-  const loading = modulesState.loading || entState.loading;
+  // 我的订单列表：仅登录态有数据
+  const orders = ordersState.data?.orders ?? [];
+  // 待结算订单按模块编码索引：卡片据此提示「已有待结算订单」，避免用户重复下单
+  const pendingOrders = new Map(orders.filter((order) => order.status === 'pending').map((order) => [order.module_code, order]));
+  // 三个接口任一仍在加载即视为整体加载中（匿名态权益/订单请求立即完成，不阻塞），避免出现半屏数据
+  const loading = modulesState.loading || entState.loading || ordersState.loading;
 
   // 按模块编码解析展示名：目录里有就用多语言名称，没有（如下架依赖）则退化为编码本身
   function nameOf(code: string): string {
@@ -128,6 +153,12 @@ export function Store({ locale }: Props) {
     const found = modules.find((item) => item.code === code);
     // 命中则按语言挑名称，缺失退回编码
     return found ? pick(locale, found.name, code) : code;
+  }
+
+  // 是否付费模块：有价格且金额大于 0 才必须走下单结算；免费/未定价模块仍直接解锁
+  function isPaid(item: ModuleCard): boolean {
+    // current_price 为 null 视为免费，金额 0 同样视为免费
+    return Boolean(item.current_price && item.current_price.amount_minor > 0);
   }
 
   // 提交搜索：把输入框值落到 applied，触发目录重新拉取
@@ -182,6 +213,65 @@ export function Store({ locale }: Props) {
       }
     } finally {
       // 解除按钮加载态，允许操作其它模块
+      setBusyCode(null);
+    }
+  }
+
+  // 付费模块下单：金额由后端按下单时刻价格快照；重复点击会回放同一张待结算订单
+  async function handlePurchase(code: string) {
+    // 仅禁用当前卡片按钮，避免整页交互被卡住
+    setBusyCode(code);
+    // 清空旧错误
+    setError(null);
+    // 清空旧提示
+    setMessage(null);
+    try {
+      // 下单：免费模块会被后端拒绝（400），付费模块返回 pending 订单
+      const result = await api.catalog.createOrder(code);
+      // 展示订单号前 8 位与金额，便于用户凭单号对账（当前为人工结算）
+      const amount = (result.order.amount_minor / 100).toFixed(2);
+      // 按语言拼装提示
+      setMessage(
+        locale === 'en-US'
+          ? `Order ${result.order.id.slice(0, 8)} created (${amount} ${result.order.currency}); unlock activates after settlement`
+          : `已生成订单 ${result.order.id.slice(0, 8)}（${amount} ${result.order.currency}），结算后自动解锁`,
+      );
+      // 刷新订单列表，让面板与卡片徽标立即反映待结算状态
+      ordersState.reload();
+    } catch (err) {
+      // 已解锁冲突：提示后刷新权益，让卡片回到「已解锁」正确状态
+      if (err instanceof ApiError && err.code === 'CONFLICT') {
+        // 先刷新权益，再用通用文案提示
+        entState.reload();
+      } // 冲突分支结束
+      // 其余错误（依赖缺失、网络异常）统一走可读文案
+      setError(errorText(locale, err));
+    } finally {
+      // 解除按钮加载态
+      setBusyCode(null);
+    }
+  }
+
+  // 取消待结算订单：取消后可重新下单；已结算订单后端禁止取消
+  async function handleCancelOrder(id: string) {
+    // 用带前缀的忙碌标记，避免与模块解锁按钮的 busyCode 互相干扰
+    setBusyCode(`order:${id}`);
+    // 清空旧错误
+    setError(null);
+    // 清空旧提示
+    setMessage(null);
+    try {
+      // 调用取消接口
+      await api.catalog.cancelOrder(id);
+      // 成功提示
+      setMessage(locale === 'en-US' ? 'Order cancelled' : '订单已取消');
+      // 刷新订单列表
+      ordersState.reload();
+    } catch (err) {
+      // 失败展示可读文案（如已结算订单不可取消）
+      setError(errorText(locale, err));
+    } finally {
+      // 解除忙碌态
       setBusyCode(null);
     }
   }
@@ -308,6 +398,52 @@ export function Store({ locale }: Props) {
         </section> // 权益面板结束
       )}{/* 结束我的权益区块 */}
 
+      {authed && orders.length > 0 && ( // 有订单时展示订单面板：待结算可取消，已结算保留对账记录
+        <section className="panel">{/* 订单面板 */}
+          <div className="panel-head">{/* 面板标题行 */}
+            <h3>{locale === 'en-US' ? 'My Orders' : '我的订单'}</h3>{/* 区块标题 */}
+            <span className="count">{orders.length}</span>{/* 订单数量徽标 */}
+          </div>{/* 标题行结束 */}
+          <ul className="plain-list">{/* 订单清单 */}
+            {orders.map((order) => { // 逐条订单渲染一行
+              // 状态文案：未知状态原样展示，避免脏数据渲染成空白
+              const statusText = ORDER_STATUS_LABEL[order.status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? order.status;
+              // 状态徽标修饰类：未知状态回退默认样式
+              const badgeClass = ORDER_STATUS_BADGE[order.status] ?? '';
+              // 金额文案：分转元并保留两位
+              const amount = (order.amount_minor / 100).toFixed(2);
+              // 返回单行订单
+              return (
+                <li key={order.id}>{/* 以订单主键作为 key */}
+                  <span>{/* 左侧：模块名 + 订单号前 8 位（便于对账） */}
+                    {nameOf(order.module_code)}{/* 模块展示名 */}
+                    <span className="muted">（{order.id.slice(0, 8)}）</span>{/* 短单号 */}
+                  </span>{/* 左侧结束 */}
+                  <span className="row">{/* 右侧：金额 + 状态 + 取消入口 */}
+                    <span className="muted">{amount} {order.currency}</span>{/* 成交金额 */}
+                    <span className={`badge ${badgeClass}`}>{statusText}</span>{/* 状态徽标 */}
+                    {order.status === 'pending' && ( // 仅待结算订单可取消
+                      <button
+                        // 取消按钮：普通按钮，避免触发表单提交
+                        type="button"
+                        // 幽灵小按钮：次级操作
+                        className="btn ghost small"
+                        // 取消中禁用，避免重复点击
+                        disabled={busyCode === `order:${order.id}`}
+                        // 点击取消该订单
+                        onClick={() => handleCancelOrder(order.id)}
+                      >
+                        {locale === 'en-US' ? 'Cancel' : '取消'}{/* 取消按钮文案 */}
+                      </button> // 取消按钮结束
+                    )}{/* 结束取消入口 */}
+                  </span>{/* 右侧结束 */}
+                </li> // 订单行结束
+              );
+            })}{/* 结束订单遍历 */}
+          </ul>{/* 订单清单结束 */}
+        </section> // 订单面板结束
+      )}{/* 结束订单面板 */}
+
       {modules.length === 0 ? ( // 无可用模块时展示占位文案，否则渲染卡片网格
         <p className="hint">{/* 空态：区分「本区无模块」与「搜索无结果」 */}
           {applied
@@ -335,6 +471,7 @@ export function Store({ locale }: Props) {
                 <div className="panel-head">{/* 卡片头部：模块名 + 已解锁徽标 */}
                   <h3>{pick(locale, m.name, m.code)}</h3>{/* 模块名：缺失时退化为模块编码 */}
                   {owned && <span className="badge role-editor">✓ {locale === 'en-US' ? 'Owned' : '已解锁'}</span>}{/* 已解锁徽标（绿色） */}
+                  {!owned && pendingOrders.has(m.code) && <span className="badge">{locale === 'en-US' ? 'Order pending' : '待结算'}</span>}{/* 待结算徽标：提示已下单未结算，避免重复购买 */}
                 </div>{/* 结束卡片头部 */}
                 <p className="muted">{pick(locale, m.summary)}</p>{/* 模块简介：按语言挑选 */}
                 <div className="task-meta">{/* 卡片元信息：模块编码与价格 */}
@@ -359,26 +496,28 @@ export function Store({ locale }: Props) {
                       ? locale === 'en-US' ? 'Hide details' : '收起详情'
                       : locale === 'en-US' ? 'Details' : '详情'}{/* 详情按钮文案结束 */}
                   </button>{/* 详情按钮结束 */}
-                  {!owned && authed && ( // 已登录且未拥有时才提供解锁按钮
+                  {!owned && authed && ( // 已登录且未拥有时才提供购买/解锁按钮
                     <button
-                      // 解锁按钮：普通按钮，避免触发表单提交
+                      // 购买/解锁按钮：普通按钮，避免触发表单提交
                       type="button"
                       // 主按钮样式
                       className="btn primary small"
-                      // 仅禁用正在解锁的这一个按钮，其它卡片仍可操作
+                      // 仅禁用当前卡片按钮，其它卡片仍可操作
                       disabled={busyCode === m.code}
-                      // 点击解锁当前模块
-                      onClick={() => handleUnlock(m.code)}
+                      // 付费模块走下单，免费模块走直接解锁；分支在后端同样有门禁，前端只是前置引导
+                      onClick={() => (isPaid(m) ? handlePurchase(m.code) : handleUnlock(m.code))}
                     >
-                      {busyCode === m.code // 按钮文案：按「是否本模块加载中 + 语言」四选一
-                        ? locale === 'en-US'
-                          ? 'Unlocking…'
-                          : '解锁中…'
-                        : locale === 'en-US'
-                          ? 'Unlock'
-                          : '解锁'}{/* 按钮文案结束 */}
-                    </button> // 结束解锁按钮
-                  )}{/* 结束解锁按钮条件渲染 */}
+                      {busyCode === m.code // 按钮文案：本模块处理中优先，其次按付费/免费与语言分支
+                        ? isPaid(m)
+                          ? locale === 'en-US' ? 'Creating order…' : '生成订单中…' // 付费模块按下单态展示
+                          : locale === 'en-US' ? 'Unlocking…' : '解锁中…' // 免费模块按解锁态展示
+                        : isPaid(m) // 非处理中：付费模块显示「购买 + 金额」，已存在待结算订单则提示待结算
+                          ? pendingOrders.has(m.code)
+                            ? locale === 'en-US' ? 'Order pending' : '待结算' // 已有待结算订单：再次点击只会回放同一张单
+                            : `${locale === 'en-US' ? 'Buy' : '购买'} ${(m.current_price!.amount_minor / 100).toFixed(2)} ${m.current_price!.currency}` // 有价格必定非空，非空断言安全
+                          : locale === 'en-US' ? 'Unlock' : '解锁'}{/* 按钮文案结束 */}
+                    </button> // 结束购买/解锁按钮
+                  )}{/* 结束购买/解锁按钮条件渲染 */}
                   {!owned && !authed && ( // 匿名访客：解锁属收费动作，展示登录入口按钮替代解锁按钮
                     <button
                       // 登录后解锁按钮：普通按钮，避免触发表单提交

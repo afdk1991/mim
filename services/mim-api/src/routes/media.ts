@@ -223,6 +223,16 @@ export function createMediaRouter(deps: ApiDeps): Router { // 控制面路由工
     const storage = requireStorage(deps); // 适配器
     assertOwnedKey(user.id, query.object_key); // 归属优先校验，跨用户直接 404
 
+    // 保留期一致性：`GET /media/assets` 按 `expires_at` 过滤隐藏过期产物，
+    // 下载签名若不做同样校验，过期产物在 asset-gc 真正删字节之前（最长一个清理周期）仍可下载，TTL 形同虚设。
+    // 这里按 object_key 反查产物登记行；用户直传的素材不在 generation_assets 中，无保留期，按原逻辑放行。
+    const assetRow = deps.db // 数据库句柄
+      .prepare(`SELECT expires_at FROM generation_assets WHERE object_key = ? ORDER BY created_at DESC LIMIT 1`) // 同一键理论上只有一行，取最新兜底
+      .get(query.object_key) as { expires_at: string | null } | undefined; // 未登记则 undefined
+    if (assetRow && assetRow.expires_at !== null && assetRow.expires_at <= clockOf(deps)) { // 已过保留期
+      throw new AppError('NOT_FOUND', 'asset expired', { object_key: query.object_key, expires_at: assetRow.expires_at }); // 与「不存在」同一口径，不额外泄漏保留期策略
+    } // 保留期判定结束
+
     if ((await storage.headObject(query.object_key)) === null) { // 先探测存在性，避免为不存在的对象签 URL
       throw new AppError('NOT_FOUND', 'object not found', { object_key: query.object_key }); // 不存在即 404
     } // if 结束：对象确实存在才继续签发

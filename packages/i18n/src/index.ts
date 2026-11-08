@@ -230,6 +230,10 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     IDEMPOTENCY_CONFLICT: '幂等键对应的请求内容不一致',
     // 功能未解锁，暗示与套餐/权限有关
     FEATURE_NOT_AVAILABLE: '当前账号未解锁该功能',
+    // 付费模块必须先下单并完成结算
+    PAYMENT_REQUIRED: '该模块为付费模块，请先下单并完成结算',
+    // 支付回调密钥未配置
+    PAYMENT_NOTIFY_NOT_CONFIGURED: '支付回调密钥未配置，暂无法接收渠道通知',
     // 对象存储缺失
     STORAGE_NOT_CONFIGURED: '对象存储未配置',
     // AI 提供方缺失
@@ -284,6 +288,10 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     IDEMPOTENCY_CONFLICT: 'Idempotency key was reused with a different payload',
     // 功能未解锁
     FEATURE_NOT_AVAILABLE: 'This feature is not unlocked for your account',
+    // 付费模块必须先下单并完成结算
+    PAYMENT_REQUIRED: 'This module is paid; place an order and settle it first',
+    // 支付回调密钥未配置
+    PAYMENT_NOTIFY_NOT_CONFIGURED: 'Payment callback secret is not configured',
     // 存储未配置
     STORAGE_NOT_CONFIGURED: 'Object storage is not configured',
     // 模型提供方未配置

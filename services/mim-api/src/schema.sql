@@ -95,6 +95,32 @@ CREATE TABLE IF NOT EXISTS module_prices (
 );
 CREATE INDEX IF NOT EXISTS idx_module_prices_module ON module_prices(module_id, currency, effective_from);
 
+-- 商城订单：付费模块必须先下单并结算，结算成功才发权益（免费模块仍走 POST /entitlements 直接解锁）
+CREATE TABLE IF NOT EXISTS module_orders (
+  id              TEXT PRIMARY KEY, -- 订单主键（uuidv7，时间有序便于按创建顺序排查）
+  user_id         TEXT NOT NULL, -- 下单用户
+  module_id       TEXT NOT NULL, -- 目标模块；金额在下单时快照，后续调价不影响已存在订单
+  region          TEXT NOT NULL, -- 下单时用户所在区域，防止跨区串单
+  currency        TEXT NOT NULL, -- 结算币种（下单时从当前有效价格快照）
+  amount_minor    INTEGER NOT NULL CHECK (amount_minor > 0), -- 成交金额（分）；0 元订单无意义，免费模块不走订单
+  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','cancelled')), -- 订单状态机：待结算 / 已结算 / 已取消
+  channel         TEXT NOT NULL DEFAULT 'manual' CHECK (channel IN ('manual','alipay','wechat','stripe')), -- 结算渠道；默认人工结算，接入在线渠道后在创建订单时指定
+  channel_txn_id  TEXT, -- 外部渠道交易号（人工结算为 NULL）；回调幂等依据，同一交易号不得结算两张单
+  entitlement_id  TEXT, -- 结算后发放的权益主键，供订单与权益双向对账
+  created_at      TEXT NOT NULL, -- 下单时间
+  updated_at      TEXT NOT NULL, -- 最近状态变更时间
+  paid_at         TEXT, -- 结算完成时间，pending 为 NULL
+  cancelled_at    TEXT -- 取消时间，仅 cancelled 填充
+);
+-- 同一用户同一模块同时只允许一笔待结算订单，避免重复下单产生多条待付记录
+CREATE UNIQUE INDEX IF NOT EXISTS uq_module_orders_pending
+  ON module_orders(user_id, module_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_module_orders_user ON module_orders(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_module_orders_status ON module_orders(status, created_at);
+-- 注意：channel_txn_id 属「后加列」，它的唯一索引不能在 schema.sql 里建——
+-- 老库此时还没有该列，全量 exec 会直接报 no such column 导致进程启动失败；
+-- 该索引由 db.ts 的 ADDITIVE_INDEXES 在补列之后创建（新建库同样会走这一步）。
+
 CREATE TABLE IF NOT EXISTS entitlements (
   id          TEXT PRIMARY KEY,
   user_id     TEXT NOT NULL,
@@ -185,7 +211,10 @@ CREATE TABLE IF NOT EXISTS generation_jobs (
   created_by          TEXT NOT NULL,
   created_at          TEXT NOT NULL,
   started_at          TEXT,
-  finished_at         TEXT
+  finished_at         TEXT,
+  -- 已被「超时回收」重新入队的次数：worker 崩溃/重启会把 running 任务放回 queued 并自增该列，
+  -- 超过 MIM_AI_JOB_MAX_RECLAIM 后直接判失败，防止同一个必然失败的任务无限重试
+  attempts            INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_project ON generation_jobs(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_status_type ON generation_jobs(status, job_type);
@@ -203,9 +232,13 @@ CREATE TABLE IF NOT EXISTS generation_assets (
   size_bytes    INTEGER,
   checksum      TEXT NOT NULL,
   expires_at    TEXT,
-  created_at    TEXT NOT NULL
+  created_at    TEXT NOT NULL,
+  -- 对象字节被 asset-gc 定时任务清理的时间：置空表示仍占用存储，非空表示已删除但保留行作审计证据
+  purged_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_generation_assets_job ON generation_assets(job_id, created_at);
+-- 过期清理按 expires_at 扫描：没有该索引时 asset-gc 每轮都要全表扫，产物表一旦上万行就会拖慢库
+CREATE INDEX IF NOT EXISTS idx_generation_assets_expiry ON generation_assets(expires_at);
 CREATE INDEX IF NOT EXISTS idx_generation_assets_project ON generation_assets(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_generation_assets_object ON generation_assets(object_key);
 

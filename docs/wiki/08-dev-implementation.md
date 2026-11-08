@@ -141,15 +141,16 @@
 | `reconciliation_batches` | `id`、`driver`、`biz_date`、`matched_count`、`diff_count`、`status` | 每日对账批次（未建表，仅设计） |
 | `reconciliation_diffs` | `id`、`batch_id`、`payment_id`、`type`、`resolved_by` | 差异处理留痕（未建表，仅设计） |
 
-**catalog 域（部分落地：4 表已建 + `requireEntitlement` 已落地，2026-11-04）**
+**catalog 域（5 表已建 + `requireEntitlement` 已落地，2026-11-08 增补 `module_orders`）**
 
-> 功能模块商城（FR-03.1）。模块目录与定价、解锁发放与回收；解锁鉴权只认服务端 `entitlements`。原「与 `billing.orders` 同事务挂载 `order_items`」的设计随订单域于 2026-11-05 取消——**当前无订单载体，解锁记录直接落 `entitlements`**。
+> 功能模块商城（FR-03.1）。模块目录与定价、解锁发放与回收；解锁鉴权只认服务端 `entitlements`。2026-11-05 曾因订单域下线而取消 `order_items`；2026-11-08 付费模块门禁落地后新增**模块级订单表 `module_orders`**（不含任何订阅/计划字段），付费模块须「下单 → 结算 → 发权益」，免费模块仍直接解锁。
 
 | 表 | 关键字段 | 说明 / 索引 |
 |---|---|---|
 | `modules` | `id`、`code`、`name_i18n`、`summary_i18n`、`unlock_mode(one_time)`、`entitlements_required`、`region`、`status(draft/active/archived)`、`sort_order` | 模块目录；**唯一索引 `(region, code)`**（支持 cn/global 双区同 code 各一行），`code` 在区内不复用；索引 `(region, status, sort_order)`。JSON 字段在 SQLite 以 TEXT 存。`unlock_mode` 当前唯一有效值 `one_time`；原 `subscription` 随 FR-02 于 2026-11-05 下线，DB CHECK 约束已收敛为仅 `one_time` |
-| `module_prices` | `id`、`module_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | 定价与模块解耦，改价不改历史解锁记录 |
-| `entitlements` | `id`、`user_id`、`module_id`、`source(admin)`、`source_id`、`status(active/expired/revoked)`、`expires_at`、`version` | **服务端解锁鉴权唯一依据**；唯一索引 `(user_id, module_id)`（一次性解锁）。原 `source(order/subscription)` 与订阅型唯一索引随 FR-02 于 2026-11-05 下线，DB CHECK 已收敛为仅 `admin` |
+| `module_prices` | `id`、`module_id`、`currency`、`amount_minor`、`effective_from`、`effective_to` | 定价与模块解耦，改价不改历史解锁记录；`amount_minor` 有 `CHECK (> 0)` |
+| `module_orders` | `id`、`user_id`、`module_id`、`region`、`currency`、`amount_minor`、`status(pending/paid/cancelled)`、`channel(manual/alipay/wechat/stripe)`、`channel_txn_id`、`entitlement_id`、`created_at`、`updated_at`、`paid_at`、`cancelled_at` | 付费模块订单；金额在**下单时刻由服务端快照**，不随改价变化。部分唯一索引 `uq_module_orders_pending (user_id, module_id) WHERE status='pending'` 防重复待付单（取消后可重新下单）；索引 `idx_module_orders_user`、`idx_module_orders_status`；**`uq_module_orders_txn`**（`channel_txn_id` 部分唯一，NULL 不参与）保证同一笔渠道交易只结算一张单。人工结算走 `POST /orders/:id/settle`（`channel_txn_id` 为 NULL）；在线渠道走 `POST /orders/:id/payment-notify`（HMAC 签名 + 交易号幂等），两条入口共用同一结算事务 |
+| `entitlements` | `id`、`user_id`、`module_id`、`source(admin)`、`source_id`、`status(active/expired/revoked)`、`expires_at`、`version` | **服务端解锁鉴权唯一依据**；唯一索引 `(user_id, module_id)`（一次性解锁）。原 `source(order/subscription)` 与订阅型唯一索引随 FR-02 于 2026-11-05 下线，DB CHECK 已收敛为仅 `admin`；订单结算发放时 `source_id` 写订单主键（一单一权益，可反查来源订单） |
 | `entitlement_events` | `id`、`entitlement_id`、`from_status`、`to_status`、`reason`、`actor(job/admin/system)`、`created_at` | 只追加，禁止 UPDATE |
 | ~~`order_items`~~ | — | **已取消（2026-11-05）**：随订单域下线，**本表不建**；解锁直接落 `entitlements` |
 
@@ -254,7 +255,7 @@
 | ~~订阅管理~~ | **已删除（2026-11-05）**：周期查看/取消续费/换支付方式/发票/退款入口随 FR-02 整域移除 | FR-02（已下线） |
 | 协议与隐私 | 首次强制勾选、政策更新后重新确认、SDK 清单展示 | FR-06 |
 | 语言与地区 | 语言切换、币种展示、时区设置 | FR-05 |
-| 功能模块商城（**🟡 后端建表 + 门禁，前端 0 代码**） | 模块列表（按 region/status 过滤）、模块详情（能力/价格/前置依赖）、解锁（校验前置依赖后直接落 `entitlements`，原「加入订单」已随 FR-02 下线）、解锁状态与到期展示 | FR-03.1 |
+| 功能模块商城（**🟢 全链路已落地（2026-11-08）：目录/详情/付费门禁/订单/人工结算/渠道回调 + Web 商城页 + Admin 订单页**） | 模块列表（按 region/status 过滤 + `?q=` 搜索）、模块详情（价格历史/前置依赖）、**免费模块直接解锁、付费模块一律 402 `PAYMENT_REQUIRED` 引导下单**、下单（金额服务端快照 + 渠道可选 + 待付唯一约束 + 业务回放）、取消订单、管理端跨用户订单列表（`GET /orders/manage`）、人工结算（订单置 paid + 发放订单来源权益 + 写 `entitlement_events` 同事务）、**渠道支付回调（`POST /orders/:id/payment-notify`：HMAC-SHA256 签名 + ±300s 时间窗 + 交易号幂等 + 金额/渠道一致性校验，与人工结算共用同一事务）**；依赖链写入时做**成环检测**（A→B→A 与自指均 400） | FR-03.1 |
 | 漫剧 AI 剧工作台（**🟢 后端第 1/2 期已落地（`comic` 域 7 表 + 24 条路由 + `orchestrator.ts`/`storage.ts` 已装配）；前端三标签页已落地**——创作（工程/角色/AI 建议）、生成任务（capabilities 横幅 / 派发 / 手动运行 / 失败透传 / 产物下载 / 3s 轮询）、成片（工程产物面板 / 版本面板下载播放 / 审核发布），2026-11-06） | 工程列表/详情、剧本与角色设定（character bible）、分镜表（镜头序列/台词/时长）、单镜头重生成、生成任务进度与失败重试 | FR-03.2（形态②④①） |
 | 成片管理（**🟢 后端已落地（第 2 期 `comic_films`/`film_versions` + `/comic/films/*`）；前端已落地**——工作台成片标签页：列表/版本面板（预签名下载/播放）/提交审核/发布/驳回/归档，2026-11-06） | 成片列表、版本列表、审核状态、发布/归档、导出（分辨率/格式，预签名 URL 下载） | FR-03.2（形态③） |
 | 站点地图（**🔴 已于 2026-11-08 整体下线**） | 原「45 个主机模块按 8 分类分组展示、分类筛选、关键词搜索（覆盖 host / 备注 / FQDN）、记录 `record_type` + TTL 并外链 `https://{fqdn}`」实现已随站点体系删除（`services/mim-api/src/site.ts` 等前后端代码与 4 条路由一并移除）；前端仅保留功能模块商城页顶部 www 主站入口静态卡片 | 非 PRD FR（站点运维可视化，随备注结构化新增，2026-11-08 下线） |
@@ -378,6 +379,7 @@
 | **生成成本告警**（**已落地，2026-11-07**：`src/jobs.ts` `runCostAlert`） | 每小时（`DEFAULT_INTERVALS['cost-alert'] = 3600_000`） | 近一小时 `generation_jobs.cost_estimate_minor` 之和对比小时上限（`MIM_AI_HOURLY_COST_LIMIT_MINOR`，缺省按 `MIM_AI_DAILY_COST_LIMIT_MINOR / 24` 向上取整，日上限缺省 500000），越线即告警；幂等键 `job:cost-alert:<YYYY-MM-DDTHH>`（`idempotency_keys` 中 `user_id='system'`、`method='JOB'`） |
 | **成片审核超时提醒**（**已落地，2026-11-07**：`src/jobs.ts` `runFilmReviewSla`） | 每 6 小时（`DEFAULT_INTERVALS['film-review-sla'] = 21600_000`） | `comic_films.status = 'reviewing'` 且 `updated_at` 早于 `now - SLA` 的条目计数告警；SLA 由 `MIM_FILM_REVIEW_SLA_HOURS` 配置（缺省 48）；幂等键 `job:film-review-sla:<YYYY-MM-DDTHH>` |
 | **解锁到期扫描**（**已落地，2026-11-07**：`src/jobs.ts` `runEntitlementExpiry`） | 每日（`DEFAULT_INTERVALS['entitlement-expiry'] = 86400_000`） | 时效型 `entitlements`（`status='active' AND expires_at <= now`）转 `expired`，UPDATE 与 `entitlement_events` 追加（`actor='job'`、`reason='expires_at reached'`）**同事务**；原「订阅 `expired` → 订阅型 entitlement 转 `expired`」随 FR-02 于 2026-11-05 下线；逐条幂等键 `job:entitlement-expiry:<entitlement_id>:<expires_at>` |
+| **过期产物清理 + 失联任务回收**（**已落地，2026-11-08**：`src/jobs.ts` `runAssetGc` / `src/orchestrator.ts` `reclaimStale`） | 产物清理每日（`DEFAULT_INTERVALS['asset-gc'] = 86400_000`）；失联回收随 worker 每轮 `tick()` 及启动瞬间执行 | `asset-gc`：`generation_assets.expires_at <= now AND purged_at IS NULL` 逐条真删对象字节并回写 `purged_at`（**行保留作审计**，成片 `expires_at` 为空天然豁免），逐条幂等键 `job:asset-gc:<asset_id>:<expires_at>`，单轮上限 `MIM_ASSET_GC_BATCH`（缺省 200），删除失败回滚幂等键待下轮重试；`reclaimStale`：`status='running'` 且 `started_at` 早于 `now - MIM_AI_JOB_STALE_MS`（缺省 900000）时放回 `queued` 并 `attempts+1`，达到 `MIM_AI_JOB_MAX_RECLAIM`（缺省 2）判 `failed / JOB_STALE_TIMEOUT`，避免崩溃后任务永久卡死 |
 | 截止日提醒推送 | — | 已移除（FR-03 删除；`features` 套餐能力校验与 `task_events` 提醒源同步取消） |
 | 项目邀请过期 | — | 已移除（FR-03 删除，随 `project_invitations` 表清理） |
 | CSV 导出生成 | — | 已移除（FR-03 删除，随 `content_exports` 表清理） |

@@ -129,6 +129,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers[key] = value;
     }
   }
+  // 写操作补幂等键：后端在 REQUIRE_IDEMPOTENCY 打开时会强制要求，缺失会 400
+  if ((options.method ?? 'GET') !== 'GET' && !headers['idempotency-key'] && !headers['Idempotency-Key']) {
+    // crypto.randomUUID 仅在安全上下文可用（HTTPS / localhost），局域网 http 下退化为时间戳+随机数
+    headers['idempotency-key'] =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID() // 现代浏览器安全上下文
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; // 兜底方案，仍保证低碰撞
+  }
   // 发起请求
   const response = await fetch(`${BASE}${path}`, {
     // 默认 GET
@@ -863,4 +871,90 @@ export async function listEntitlementEvents(credential: Credential, entitlementI
   );
   // 返回事件数组
   return data.events;
+}
+
+// ── 商城订单（人工结算） ────────────────────────────────────────────────
+
+/** 管理端订单行：跨用户可见，额外带模块与用户展示信息 */
+export interface AdminOrderRow {
+  // 订单主键
+  id: string;
+  // 下单用户 ID
+  user_id: string;
+  // 下单用户展示名（未设置时为空串）
+  user_display_name: string | null;
+  // 区域
+  region: string;
+  // 币种
+  currency: string;
+  // 成交金额（分）
+  amount_minor: number;
+  // 状态：pending / paid / cancelled
+  status: 'pending' | 'paid' | 'cancelled' | string;
+  // 结算渠道：manual / alipay / wechat / stripe
+  channel: string;
+  // 外部渠道交易号（人工结算为空）；与渠道账单对账时按此匹配
+  channel_txn_id: string | null;
+  // 结算后权益主键
+  entitlement_id: string | null;
+  // 模块编码
+  module_code: string;
+  // 模块多语言名
+  module_name: Record<string, string>;
+  // 下单时间
+  created_at: string;
+  // 更新时间
+  updated_at: string;
+  // 结算时间
+  paid_at: string | null;
+  // 取消时间
+  cancelled_at: string | null;
+}
+
+/** 管理端订单分页结果 */
+export interface AdminOrderPage {
+  // 当前页订单
+  orders: AdminOrderRow[];
+  // 匹配总数
+  total: number;
+  // 每页条数
+  limit: number;
+  // 偏移量
+  offset: number;
+}
+
+/** 拉取管理端订单列表：跨用户；status 过滤，q 匹配模块编码或用户 ID */
+export function listOrders(
+  credential: Credential,
+  query: { status?: 'pending' | 'paid' | 'cancelled'; region?: 'cn' | 'global'; q?: string; limit?: number; offset?: number } = {},
+): Promise<AdminOrderPage> {
+  // 组装查询串，空值不写入
+  const params = new URLSearchParams();
+  // 状态过滤
+  if (query.status) params.set('status', query.status);
+  // 区域过滤
+  if (query.region) params.set('region', query.region);
+  // 关键字：模块编码或用户 ID 片段
+  if (query.q) params.set('q', query.q);
+  // 每页条数
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  // 偏移量
+  if (query.offset !== undefined) params.set('offset', String(query.offset));
+  // 无参数时不带问号
+  const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
+  // 发起只读请求
+  return request<AdminOrderPage>(`/orders/manage${suffix}`, { credential });
+}
+
+/** 结算订单：后端在同一事务内把订单置 paid 并发放订单来源权益 */
+export async function settleOrder(credential: Credential, orderId: string, reason?: string): Promise<AdminOrderRow> {
+  // 响应包裹 { order }
+  const data = await request<{ order: AdminOrderRow }>(
+    // 目标路径：订单子资源
+    `/orders/${encodeURIComponent(orderId)}/settle`,
+    // 写操作，原因可选
+    { method: 'POST', body: reason ? { reason } : {}, credential },
+  );
+  // 返回结算后的订单
+  return data.order;
 }

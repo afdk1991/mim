@@ -47,6 +47,7 @@ interface JobRow { // generation_jobs 在编排器内使用到的字段子集
   storyboard_id: string | null; // 可选分镜归属，产物可精确挂到某个分镜
   job_type: string; // 数据库以字符串存储，运行时再收敛为 JobType
   status: string; // queued/running/succeeded/failed，决定能否被抢占
+  attempts: number | null; // 已被「超时回收」重新入队的次数，用于限制同一个任务无限重试
   cost_estimate_minor: number | null; // 预估成本（最小货币单位），用于双重限额预检
   payload: string; // 原始 JSON 字符串，处理器按需解析提示词
   created_by: string; // 创建者，作为对象键首段实现按用户隔离
@@ -63,13 +64,21 @@ export interface RunResult { // 单次执行结果，供调用方与观测接口
   message?: string; // 失败或跳过的可读原因
 } // 结束 RunResult
 
+export interface ReclaimResult { // 超时回收结果，供启动日志、能力自检与测试断言
+  reclaimed: string[]; // 被放回 queued 的任务 ID（worker 失联，可安全重跑）
+  failed: string[]; // 回收次数超上限、直接判失败的任务 ID（不再无限重试）
+} // 结束 ReclaimResult
+
 export interface Orchestrator { // 对外暴露的能力契约，便于测试时注入替身
   readonly provider: string; // 当前提供方名称
   readonly configured: boolean; // 凭证是否齐备，未配置时任务应诚实失败而非伪造
   readonly jobCostLimitMinor: number; // 单任务成本上限（0 表示不限制）
   readonly dailyCostLimitMinor: number; // 当日累计成本上限（0 表示不限制）
   readonly assetTtlDays: number; // 中间产物保留天数
+  readonly staleReclaimMs: number; // running 任务被判为失联的阈值（毫秒）
+  readonly maxReclaim: number; // 同一任务最多被回收重新入队多少次
   capabilities(): Record<string, unknown>; // 自述能力，供能力探测接口透出
+  reclaimStale(staleAfterMs?: number): ReclaimResult; // 把失联 worker 遗留的 running 任务回收（可指定更短阈值用于运维补偿）
   tick(limit?: number): Promise<RunResult[]>; // 批量消费一批队列任务
   runOne(jobId: string): Promise<RunResult | null>; // 精确执行指定任务
   start(): void; // 启动定时轮询
@@ -244,6 +253,10 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
   const dailyCostLimitMinor = numberFromEnv(env.MIM_AI_DAILY_COST_LIMIT_MINOR, 500000); // 当日累计上限，默认 5000 元
   const assetTtlDays = numberFromEnv(env.MIM_AI_ASSET_TTL_DAYS, 90); // 中间产物默认保留 90 天
   const intervalMs = options.intervalMs ?? numberFromEnv(env.MIM_AI_WORKER_INTERVAL_MS, 2000); // 轮询间隔优先取调用方入参
+  // 失联判定阈值：进程崩溃/被 kill/容器重建时，被抢占成 running 的任务不会再有人写回终态，
+  // 必须由存活实例按 started_at 超时把它放回队列，否则该任务永久卡死（前端一直看到「生成中」）。
+  const staleReclaimMs = numberFromEnv(env.MIM_AI_JOB_STALE_MS, 15 * 60_000); // 默认 15 分钟：远大于 90s 生成超时，避免误伤在跑任务
+  const maxReclaim = numberFromEnv(env.MIM_AI_JOB_MAX_RECLAIM, 2); // 同一任务最多回收 2 次，第 3 次判失败，防止毒任务反复烧配额
 
   let timer: ReturnType<typeof setInterval> | null = null; // 定时器句柄，start/stop 幂等的依据
   let ticking = false; // 重入保护：进程内串行消费，避免重复抢占同一批任务
@@ -255,6 +268,77 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
     ).run(code, JSON.stringify({ error: message, provider }), clock(), job.id); // 结果列同时记录 provider 便于归因
     return { job_id: job.id, status: 'failed', provider, error_code: code, message }; // 返回结构化失败结果给调用方
   } // 结束 fail
+
+  /**
+   * 超时回收：把 `status='running'` 且开始时间早于阈值的任务重新放回 `queued`。
+   *
+   * 为什么必须有：任务被抢占成 running 之后，写回终态只发生在同一个进程的 execute 里。
+   * 进程崩溃、被 SIGKILL、容器重建、机器重启都会让任务停在 running 且再没人处理，
+   * 前端看到的「生成中」会永远转圈，而 tick 只捞 queued，任务等于被静默丢弃。
+   *
+   * 防雪崩措施：每次回收 `attempts + 1`，达到 `maxReclaim` 即判 failed（JOB_STALE_TIMEOUT），
+   * 避免一个必然失败的任务把 worker 反复占满、反复烧外部模型配额。
+   */
+  function reclaimStale(staleAfterMs = staleReclaimMs): ReclaimResult { // 阈值可选，默认取配置值
+    const now = clock(); // 单次取时，保证同批回收使用同一基准
+    const cutoff = new Date(Date.parse(now) - staleAfterMs).toISOString(); // 早于该时间点开始执行即视为失联
+    const rows = db // 数据库句柄
+      .prepare( // 预编译：started_at 为空也视为异常（抢占时必定写入），故一并回收
+        `SELECT id, attempts FROM generation_jobs
+         WHERE status = 'running' AND (started_at IS NULL OR started_at <= ?)`,
+      )
+      .all(cutoff) as Array<{ id: string; attempts: number | null }>; // 候选任务：失联的 running 行
+    const reclaimed: string[] = []; // 已放回队列的任务 ID
+    const failed: string[] = []; // 超过回收上限、直接判失败的任务 ID
+    if (rows.length === 0) return { reclaimed, failed }; // 无候选直接返回，避免开启空事务
+
+    const tx = db.transaction(() => { // 批量迁移必须同事务，避免出现「回收了但 attempts 没加」
+      for (const row of rows) { // 逐条处理，单条条件更新失败不影响其余
+        const attempts = row.attempts ?? 0; // 老库迁移前该列为空，按 0 计
+        if (attempts >= maxReclaim) { // 已回收过上限次数：判定为毒任务
+          const info = db // 数据库句柄
+            .prepare( // 条件更新：仍为 running 才写终态，避免覆盖别人已完成的结果
+              `UPDATE generation_jobs
+               SET status = 'failed', error_code = 'JOB_STALE_TIMEOUT', result = ?, finished_at = ?
+               WHERE id = ? AND status = 'running'`,
+            ) // 结束预编译
+            .run( // 绑定失败说明与终态时间
+              JSON.stringify({ error: `job exceeded ${maxReclaim} stale reclaim(s)`, provider, stale_ms: staleAfterMs }), // 留证：回收次数与阈值
+              now, // 终态时间
+              row.id, // 目标任务
+            ); // run 结束
+          if (info.changes > 0) failed.push(row.id); // 只有真正改了状态才计入结果
+          continue; // 该任务处理完毕，进入下一条
+        } // 上限判断结束
+
+        const info = db // 数据库句柄
+          .prepare( // 放回队列：清空开始/结束时间，累加回收次数
+            `UPDATE generation_jobs
+             SET status = 'queued', started_at = NULL, finished_at = NULL, attempts = attempts + 1
+             WHERE id = ? AND status = 'running'`,
+          ) // 结束预编译
+          .run(row.id); // 只绑定主键，状态条件已写在 WHERE 中
+        if (info.changes > 0) reclaimed.push(row.id); // 记录成功回收的任务
+      } // 遍历结束
+    }); // 事务定义结束
+    tx(); // 执行事务
+
+    return { reclaimed, failed }; // 返回本批回收结果
+  } // 结束 reclaimStale
+
+  /** 调度路径专用包装：回收失败只记录日志，绝不能打断正常的队列消费 */
+  function reclaimStaleQuietly(): void { // tick / start 共用
+    try { // 回收语句本身可能因库锁或结构缺失抛错
+      const result = reclaimStale(); // 执行回收
+      if (result.reclaimed.length > 0 || result.failed.length > 0) { // 只有真的发生迁移才打日志，避免每 2 秒刷屏
+        console.log( // 运维可见的回收明细
+          `[ai-orchestrator] stale reclaim: requeued ${result.reclaimed.length}, failed ${result.failed.length}`,
+        ); // 日志结束
+      } // 日志判定结束
+    } catch (err) { // 回收异常
+      console.error('[ai-orchestrator] stale reclaim failed', err); // 只记录，下个周期自然重试
+    } // try/catch 结束
+  } // 结束 reclaimStaleQuietly
 
   function expiresAtFor(jobType: JobType): string | null { // 计算产物的过期时间
     // 成片长期保留（08 §6）；中间产物按保留期过期
@@ -610,6 +694,7 @@ async function produceWithCompose(
   async function tick(limit = 5): Promise<RunResult[]> { // 批量消费：默认一次最多 5 个任务
     if (ticking) return []; // 已有批次在执行则直接返回，避免并发重复抢占
     ticking = true; // 标记进入批次
+    reclaimStaleQuietly(); // 每轮先回收失联 worker 遗留的 running 任务，避免它们永久卡死；回收结果与本次消费互不影响
     try { // 批次主体，finally 保证释放标记
       const rows = db // 候选任务查询起点
         .prepare( // 预编译：按入队时间取一批
@@ -654,6 +739,8 @@ async function produceWithCompose(
       job_cost_limit_minor: jobCostLimitMinor, // 单任务限额
       daily_cost_limit_minor: dailyCostLimitMinor, // 当日限额
       asset_ttl_days: assetTtlDays, // 产物保留天数
+      stale_reclaim_ms: staleReclaimMs, // running 任务的失联判定阈值
+      max_reclaim: maxReclaim, // 同一任务允许被回收重新入队的次数上限
       storage: { driver: storage.driver, configured: storage.configured }, // 存储驱动状态，便于确认产物落点
       worker_enabled: (env.MIM_AI_WORKER ?? '1') !== '0', // 显式 '0' 才视为关闭 worker
       worker_interval_ms: intervalMs, // 实际轮询间隔
@@ -666,11 +753,15 @@ async function produceWithCompose(
     jobCostLimitMinor, // 对外暴露单任务限额
     dailyCostLimitMinor, // 对外暴露当日限额
     assetTtlDays, // 对外暴露保留天数
+    staleReclaimMs, // 对外暴露失联阈值
+    maxReclaim, // 对外暴露回收次数上限
     capabilities, // 能力自述
+    reclaimStale, // 超时回收入口：tick 自动调用，运维也可按需更短阈值补跑
     tick, // 批量消费入口
     runOne, // 单任务入口
     start() { // 启动定时轮询（幂等）
       if (timer) return; // 已启动则不重复创建定时器
+      reclaimStaleQuietly(); // 启动瞬间先回收上次进程残留的 running 任务（本次崩溃恢复的关键时点）
       timer = setInterval(() => { // 按间隔触发一批消费
         void tick().catch((err) => console.error('[ai-orchestrator] tick failed', err)); // 单批异常只记录日志，不中断定时器
       }, intervalMs); // 绑定轮询间隔

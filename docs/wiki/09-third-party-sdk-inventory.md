@@ -115,6 +115,9 @@
 | `MIM_AI_JOB_COST_LIMIT_MINOR` | 单任务成本上限（分），超出即 `COST_LIMIT_EXCEEDED(402)` | `100000` | P0 |
 | `MIM_AI_DAILY_COST_LIMIT_MINOR` | 当日累计成本上限（分，按 `status='succeeded'` 求和） | `500000` | P0 |
 | `MIM_AI_ASSET_TTL_DAYS` | 原始生成产物保留天数（`compose` 成片长期保留） | `90` | P0 |
+| `MIM_AI_JOB_STALE_MS` | `running` 任务失联判定阈值（毫秒）：进程崩溃/重启后超过该时长即回收重跑 | `900000` | P0 |
+| `MIM_AI_JOB_MAX_RECLAIM` | 同一任务允许被回收重新入队的次数上限，超出即判 `JOB_STALE_TIMEOUT`（防毒任务反复烧配额） | `2` | P0 |
+| `MIM_ASSET_GC_BATCH` | `asset-gc` 定时任务单轮清理的过期产物条数上限 | `200` | P1 |
 
 > 所有 AI 调用必须经统一网关（模型路由、Prompt 版本、配额、内容审核），业务层不得直连厂商密钥。漫剧生成的**成本预检与额度扣减**在 `comic` / `ai-orchestrator` 内完成（`generation_jobs`），供应商选择与成本上限见 PRD OQ-08。
 
@@ -285,5 +288,6 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | `MIM_AUTH_ADMIN_PASSWORD` | `POST /api/v1/auth/password` 的管理员登录口令；短信/邮件通道未接入时的唯一可用登录入口 | `deploy/deploy.sh` §5 幂等补齐并写入 `/opt/mim/mim-api.env`（chmod 600）；优先级为「env 文件已有值 → 保留」>「CI/运维同名环境变量透传」>「现场 `openssl rand` 生成随机口令」。**不再使用仓库内可查的固定默认口令**，随机口令不回显到 CI 日志，运维从服务器 env 文件读取。留空时该端点返回 503 `AUTH_PASSWORD_NOT_CONFIGURED` | P0 |
 | `MIM_ADMIN_TOKEN` | RBAC 超管引导令牌（bootstrap）：请求头 `x-admin-token` 携带即视同拥有全部 8 个权限点，解决「第一个超管从哪来」的冷启动；同时是 `/api/v1/admin/*` 与 catalog 管理写路由的双通道鉴权之一 | `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`（已存在则保留运维自定义值，仅当 CI Secret 透传非空且文件缺失该变量时才补写）；口令由 GitHub Actions secret 同名变量下发，本地/仓库均不落盘。缺失时管理写路由返回 403 `FEATURE_NOT_AVAILABLE 'admin API is not enabled'`；值错误返回 401 `invalid admin token`（sha256 归一长度后 `timingSafeEqual` 比对，防时序侧信道） | P0 |
 | `MIM_JOBS` | 进程内后台定时任务总开关（生成任务 worker 等）；多副本部署时只让一个实例消费 | `services/mim-api/src/config.ts` 读取，留空或任意非 `0` 值均视为启用（避免拼写错误导致任务静默不跑），显式 `0` 关闭；`services/mim-api/src/index.ts` 在关闭时打印 `jobs: disabled`。无凭证含义，属运行时开关 | P1 |
+| `MIM_PAYMENT_NOTIFY_SECRET` | 支付渠道回调密钥：`POST /api/v1/orders/:id/payment-notify` 用 hex(HMAC-SHA256(secret, `订单号.渠道.交易号.金额.时间戳`)) 校验渠道身份 | 与支付渠道后台约定同一串随机密钥（`openssl rand -hex 32` 生成后两处配置），由运维写入 `/opt/mim/mim-api.env`，仓库与 CI 日志均不落盘。留空时该回调返回 503 `PAYMENT_NOTIFY_NOT_CONFIGURED`；人工结算 `POST /orders/:id/settle` 不依赖该变量 | P1 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 下线 §2 订阅与支付通道（23 项 `MIM_PAY_*` / `MIM_IAP_*` 变量从模板与本节登记同步删除）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）。新增第三方能力必须先更新本文件，再进入实现。_

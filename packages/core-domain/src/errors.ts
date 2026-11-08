@@ -43,6 +43,10 @@ export const ERROR_CODES = [
   'IDEMPOTENCY_CONFLICT',
   // 当前套餐未解锁该功能（付费墙）
   'FEATURE_NOT_AVAILABLE',
+  // 付费模块必须下单并完成结算后才能解锁（不能凭解锁接口免费取得）
+  'PAYMENT_REQUIRED',
+  // 支付回调签名密钥未配置，外部渠道回调暂不可用
+  'PAYMENT_NOTIFY_NOT_CONFIGURED',
   // 对象存储（S3/OSS）未配置，附件类能力不可用
   'STORAGE_NOT_CONFIGURED',
   // AI 模型提供方未配置，生成类能力不可用
@@ -101,6 +105,10 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   IDEMPOTENCY_CONFLICT: 409,
   // 功能未解锁用 403，提示这是权限/套餐问题
   FEATURE_NOT_AVAILABLE: 403,
+  // 付费模块未结算用 402，语义为「先完成支付/结算再解锁」
+  PAYMENT_REQUIRED: 402,
+  // 回调密钥未配置 503：能力存在但环境不具备
+  PAYMENT_NOTIFY_NOT_CONFIGURED: 503,
   // 存储未配置 503
   STORAGE_NOT_CONFIGURED: 503,
   // 模型提供方未配置 503

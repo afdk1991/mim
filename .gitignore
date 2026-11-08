@@ -47,8 +47,6 @@ temp/
 dnspod_records_*.xls
 # AI 工具生成的 HTML 分享包副本（含 dist/site 副本，非源码）
 .trae-html-share-packages/
-# EdgeOne CLI 本地项目映射（记录本机绝对路径与 projectId，属本机状态，不入库）
-.edgeone/
 # AI 协作者本地记忆目录（本机会话状态，不入库）
 .workbuddy/
 

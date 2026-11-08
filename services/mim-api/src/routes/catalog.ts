@@ -1,16 +1,22 @@
 /**
  * 功能模块商城（FR-03.1，07 §5.1 / §11.11）
  *
- * catalog 域 4 表已建：modules / module_prices / entitlements / entitlement_events；
+ * catalog 域 5 表已建：modules / module_prices / entitlements / entitlement_events / module_orders；
  * 本文件补齐后端路由（此前仅有 requireEntitlement 中间件门禁，无商城侧写路径）。
  *
  * 路由一览：
  *   GET    /modules                 公开 — 按 region 列出 active 模块（含当前有效价格，支持 q 搜索）
  *   GET    /modules/manage          管理 — 模块全量列表（含 draft/archived，支持 q/status 过滤；须先于 /modules/:code 注册）
  *   GET    /modules/:code           公开 — 模块详情（含前置依赖、当前有效价格、历史价格）
- *   POST   /entitlements            鉴权 — 请求解锁（校验前置依赖，发放 active entitlement + event）
+ *   POST   /entitlements            鉴权 — 请求解锁（免费模块直接发放；付费模块 402 引导下单）
  *   GET    /me/entitlements         鉴权 — 当前用户的有效解锁列表
- *   POST   /modules                 管理 — 新建模块（默认 draft，code 区域内唯一）
+ *   POST   /orders                  鉴权 — 下单（金额服务端快照；已有待付单回放）
+ *   GET    /orders                  鉴权 — 我的订单列表（status 过滤 + 分页）
+ *   POST   /orders/:id/cancel       鉴权 — 取消待结算订单
+ *   GET    /orders/manage           管理 — 跨用户订单列表（人工结算视图）
+ *   POST   /orders/:id/settle       管理 — 人工结算（订单置 paid + 发放权益 + 审计事件，同事务）
+ *   POST   /orders/:id/payment-notify 公开（签名）— 渠道支付回调（HMAC 校验 + 交易号幂等 + 同事务结算）
+ *   POST   /modules                 管理 — 新建模块（默认 draft，code 区域内唯一，写入前做依赖环检测）
  *   PATCH  /modules/:code           管理 — 编辑模块文案/排序/前置依赖（状态变更走 /status 路由）
  *   PATCH  /modules/:code/status    管理 — 模块状态单向迁移 draft → active → archived
  *   DELETE /modules/:code           管理 — 软删除模块（active 须先归档；重复删除回放）
@@ -28,6 +34,7 @@
  * 三条路径均按「当前已有状态」实现天然幂等，重复提交不会产生重复权益或重复事件。
  */
 
+import { createHmac, timingSafeEqual } from 'node:crypto'; // 支付回调签名校验：HMAC-SHA256 + 定长时间比较
 import { Router } from 'express'; // 路由容器，按前缀挂载到 /api/v1
 import { z } from 'zod'; // 请求体校验，拦截非法模块码
 import { AppError, uuidv7 } from '@mim/core-domain'; // 业务错误码 + 时间有序主键
@@ -97,6 +104,137 @@ function resolveActiveModules(db: Db, region: string) { // 按地区取未删除
   }>; // 结束结果类型声明
   return rows; // 交由调用方做状态过滤，保持查询职责单一
 } // 结束 resolveActiveModules
+
+/** 取模块当前生效价格的公开视图；无价格行时返回 null（视图层显示「免费/待定价」） */
+function currentPrice(db: Db, moduleId: string, now: string): { currency: string; amount_minor: number } | null { // 统一价格视图口径，列表/详情/订单共用
+  const price = activePrice(db, moduleId, now); // 复用既有的生效价格查询
+  return price ? { currency: price.currency, amount_minor: price.amount_minor } : null; // 只透出币种与金额
+} // 结束 currentPrice
+
+/**
+ * 校验前置依赖是否全部满足：每个 required 模块必须有该用户的 active 且未过期权益。
+ * 解锁与下单两条写路径共用同一校验，避免两处口径漂移。
+ */
+function assertDependenciesMet(db: Db, params: { region: string; requiredCodes: string[]; userId: string; now: string }): void { // 依赖校验抽成公共实现
+  const { region, requiredCodes, userId, now } = params; // 解构入参便于下方拼接
+  if (requiredCodes.length === 0) return; // 无依赖直接放行，避免无谓查询
+  const placeholders = requiredCodes.map(() => '?').join(','); // 动态占位符，模块码走参数绑定不拼 SQL
+  const depRows = db // 依赖满足情况查询
+    .prepare( // 预编译：内连接权益表，一次查出已满足的依赖
+      `SELECT m.code FROM modules m
+       INNER JOIN entitlements e ON e.module_id = m.id
+       WHERE m.region = ? AND m.code IN (${placeholders}) AND m.deleted_at IS NULL
+         AND e.user_id = ? AND e.status = 'active'
+         AND (e.expires_at IS NULL OR e.expires_at > ?)`, // 三个时间/身份条件与解锁口径一致
+    ) // 结束预编译
+    .all(region, ...requiredCodes, userId, now) as Array<{ code: string }>; // 参数顺序与占位符一致
+  const satisfied = new Set(depRows.map((d) => d.code)); // 转集合便于 O(1) 判断
+  const missing = requiredCodes.filter((c) => !satisfied.has(c)); // 计算缺失依赖
+  if (missing.length > 0) { // 存在缺失依赖时拒绝
+    throw new AppError('FEATURE_NOT_AVAILABLE', 'module dependency not met', { required: missing }); // 回传缺失清单，前端可精确引导
+  } // 结束缺失判断
+} // 结束 assertDependenciesMet
+
+/**
+ * 依赖环检测：若「本模块 → 新依赖链」能走回本模块自身，则该模块将永远无法解锁，必须拒绝写入。
+ * 依赖只在同一区域内生效，故按 region 构图；缺失的下游模块（如已软删）不参与遍历。
+ */
+function assertNoDependencyCycle(db: Db, region: string, code: string, requires: string[]): void { // 写入前置依赖前的环检测
+  if (requires.length === 0) return; // 无依赖不可能成环
+  const rows = db // 取同区域全部未删除模块的依赖边
+    .prepare(`SELECT code, entitlements_required FROM modules WHERE region = ? AND deleted_at IS NULL`) // 只读构图所需两列
+    .all(region) as Array<{ code: string; entitlements_required: string }>; // 全部节点与出边
+  const graph = new Map<string, string[]>(); // 邻接表：模块码 → 依赖模块码数组
+  for (const row of rows) graph.set(row.code, jsonParse<string[]>(row.entitlements_required) ?? []); // 坏数据降级为空依赖
+  graph.set(code, requires); // 用「本次待写入的依赖」覆盖该节点出边，模拟写入后的图
+  const stack = [...requires]; // 从新依赖出发做深度优先遍历
+  const seen = new Set<string>(); // 已访问集合，防止在既有图中原地打转
+  while (stack.length > 0) { // 迭代式 DFS，避免深链递归爆栈
+    const current = stack.pop() as string; // 取一个待访问节点
+    if (current === code) { // 走回起点即说明成环
+      throw new AppError('VALIDATION_FAILED', 'module dependency cycle detected', { module_code: code, cycle_at: current }); // 400 且回传成环点
+    } // 结束成环判断
+    if (seen.has(current)) continue; // 已访问节点跳过，避免重复遍历
+    seen.add(current); // 标记为已访问
+    for (const next of graph.get(current) ?? []) stack.push(next); // 继续沿依赖边下探
+  } // 遍历结束
+} // 结束 assertNoDependencyCycle
+
+/** 订单行结构：数据库行 + 联表查询时可选带出的模块信息 */
+interface OrderRow { // 统一类型，避免各处 Record<string, unknown> 强转导致字段丢失
+  id: string; // 订单主键
+  user_id: string; // 下单用户
+  region: string; // 下单区域
+  currency: string; // 币种
+  amount_minor: number; // 金额（分）
+  status: string; // 订单状态
+  channel: string; // 结算渠道
+  channel_txn_id: string | null; // 外部渠道交易号（人工结算为 NULL）
+  entitlement_id: string | null; // 结算后权益主键
+  created_at: string; // 下单时间
+  updated_at: string; // 最近更新时间
+  paid_at: string | null; // 结算时间
+  cancelled_at: string | null; // 取消时间
+  module_code?: string; // 联表带出的模块编码
+  module_name?: string; // 联表带出的模块多语言名称 JSON
+} // 结束 OrderRow
+
+/** 订单对外视图：只透出对账与展示所需字段，不暴露内部 module_id */
+function orderView(row: OrderRow) { // 入参为数据库行（可含模块信息）
+  const nameMap = row.module_name ? jsonParse<Record<string, string>>(row.module_name) ?? { 'zh-CN': row.module_code ?? '' } : undefined; // 名称缺失时回落编码
+  return { // 统一订单视图
+    id: row.id, // 订单主键
+    user_id: row.user_id, // 下单用户
+    region: row.region, // 下单区域
+    currency: row.currency, // 币种
+    amount_minor: row.amount_minor, // 金额（分）
+    status: row.status, // 状态
+    channel: row.channel, // 渠道
+    channel_txn_id: row.channel_txn_id, // 渠道交易号（回调幂等依据，人工结算为空）
+    entitlement_id: row.entitlement_id, // 结算后权益主键
+    created_at: row.created_at, // 下单时间
+    updated_at: row.updated_at, // 最近更新时间
+    paid_at: row.paid_at, // 结算时间
+    cancelled_at: row.cancelled_at, // 取消时间
+    ...(row.module_code === undefined ? {} : { module_code: row.module_code, module_name: nameMap }), // 列表场景补上模块信息
+  }; // 结束订单视图
+} // 结束 orderView
+
+/** 结算入参：人工结算与渠道回调共用的最小字段集 */
+interface SettleInput {
+  orderId: string; // 订单主键（同时作为权益 source_id）
+  userId: string; // 下单用户
+  moduleId: string; // 目标模块
+  now: string; // 统一时间基准
+  reason: string; // 写入审计事件的原因
+  channelTxnId: string | null; // 渠道交易号（人工结算为 null）
+} // 结束 SettleInput
+
+/**
+ * 订单结算事务：订单置 paid、发放订单来源权益、追加 entitlement_events 三写同事务。
+ * 人工结算（POST /orders/:id/settle）与渠道回调（POST /orders/:id/payment-notify）共用同一实现，
+ * 保证两条入口的落库结构与审计口径完全一致。
+ * @returns 新发放的权益主键
+ */
+function settleOrderTx(db: Db, input: SettleInput): string {
+  const entId = uuidv7(); // 权益主键预生成
+  const evtId = uuidv7(); // 事件主键预生成
+  const tx = db.transaction(() => { // 三写同事务，任一步失败整体回滚
+    db.prepare( // 发放订单来源权益：source_id 取订单主键，天然一单一权益
+      `INSERT INTO entitlements (id, user_id, module_id, source, source_id, status, version, created_at, updated_at)
+       VALUES (?, ?, ?, 'admin', ?, 'active', 1, ?, ?)`,
+    ).run(entId, input.userId, input.moduleId, input.orderId, input.now, input.now); // 绑定权益字段
+    db.prepare( // 追加状态流转事件，供审计追溯
+      `INSERT INTO entitlement_events (id, entitlement_id, from_status, to_status, reason, actor, created_at)
+       VALUES (?, ?, NULL, 'active', ?, 'admin', ?)`,
+    ).run(evtId, entId, input.reason, input.now); // 记录「由哪张订单结算而来」
+    db.prepare( // 订单置为已结算，并记录渠道交易号（人工结算写 NULL）
+      `UPDATE module_orders SET status = 'paid', entitlement_id = ?, channel_txn_id = ?, paid_at = ?, updated_at = ? WHERE id = ?`,
+    ).run(entId, input.channelTxnId, input.now, input.now, input.orderId); // 绑定权益主键、交易号、时间与订单主键
+  }); // 结束事务定义
+  tx(); // 执行事务
+  return entId; // 返回权益主键供响应与对账
+} // 结束 settleOrderTx
 
 export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路由
   const router = Router(); // 独立路由实例
@@ -300,27 +438,19 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       }); // 结束错误构造
     } // 结束重复解锁判断
 
-    // 3. 前置依赖：每个 required 模块必须有 active entitlement
-    const requiredCodes = jsonParse<string[]>(moduleRow.entitlements_required) ?? []; // 解析依赖码
-    if (requiredCodes.length > 0) { // 无依赖则跳过整段校验
-      const placeholders = requiredCodes.map(() => '?').join(','); // 动态占位符，避免把用户输入拼进 SQL
-      const depRows = db // 依赖满足情况查询起点
-        .prepare( // 预编译：内连接权益表，一次查出已满足依赖
-          `SELECT m.code FROM modules m
-           INNER JOIN entitlements e ON e.module_id = m.id
-           WHERE m.region = ? AND m.code IN (${placeholders}) AND m.deleted_at IS NULL
-             AND e.user_id = ? AND e.status = 'active'
-             AND (e.expires_at IS NULL OR e.expires_at > ?)`,
-        ) // 结束预编译
-        .all(user.region, ...requiredCodes, user.id, now) as Array<{ code: string }>; // 参数顺序与占位符一致
-      const satisfied = new Set(depRows.map((d) => d.code)); // 转集合便于 O(1) 判断
-      const missing = requiredCodes.filter((c) => !satisfied.has(c)); // 计算缺失依赖
-      if (missing.length > 0) { // 存在缺失依赖时拒绝
-        throw new AppError('FEATURE_NOT_AVAILABLE', 'module dependency not met', { // 明确依赖未满足
-          required: missing, // 精确回传缺失项，前端可引导先解锁
-        }); // 结束错误构造
-      } // 结束缺失判断
-    } // 结束依赖校验
+    // 2.5 付费模块不可凭本接口免费取得：当前有效价格大于 0 时，必须先下单结算（402）
+    const price = currentPrice(db, moduleRow.id, now); // 取当前生效价格作为成交价快照
+    if (price && price.amount_minor > 0) { // 有价格且金额非 0 即视为付费商品
+      throw new AppError('PAYMENT_REQUIRED', 'paid module requires a settled order', { // 402：引导改走下单流程
+        module_code: moduleRow.code, // 回传模块码便于前端定位
+        price, // 回传成交价，前端可直接用于展示订单金额
+        order_required: true, // 显式标记：本次失败应改为 POST /orders
+      }); // 结束付费拦截
+    } // 结束付费判断
+
+    // 3. 前置依赖：每个 required 模块必须有 active entitlement（与下单路径共用同一实现，避免口径漂移）
+    const requiredCodes = jsonParse<string[]>(moduleRow.entitlements_required) ?? []; // 解析依赖码，坏数据降级为空数组
+    assertDependenciesMet(db, { region: user.region, requiredCodes, userId: user.id, now }); // 缺失依赖即抛 FEATURE_NOT_AVAILABLE + required 清单
 
     // 4. 发放 entitlement + event（source CHECK 仅允许 'admin'，解锁请求走此通道）
     const entId = uuidv7(); // 权益主键预生成
@@ -401,6 +531,361 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     }); // 结束响应
   }); // 结束 GET /me/entitlements 处理
 
+  // ---------- 商城订单：付费模块下单 → 结算 → 发权益 ----------
+
+  /** POST /orders — 为付费模块创建待结算订单（同用户同模块已有 pending 订单时直接回放） */
+  router.post('/orders', requireAuth, idempotency, (req, res) => { // 下单需登录 + 幂等键，避免重复点击产生多张单
+    const body = parse( // 校验请求体
+      z.object({ // 仅接受模块码与可选渠道：金额一律由服务端按当前价快照
+        module_code: z.string().min(1).max(64), // 目标模块编码
+        channel: z.enum(['manual', 'alipay', 'wechat', 'stripe']).optional(), // 结算渠道：缺省 manual（人工）；接渠道时由客户端指定
+      }), // 结束 schema
+      req.body, // 原始请求体
+    ); // 结束解析
+    const user = req.user!; // requireAuth 已保证存在
+    const now = clockOf(deps); // 统一时间基准，同时用于价格窗口判定与订单时间戳
+
+    const moduleRow = db // 定位目标模块
+      .prepare( // 预编译：按编码 + 用户区域 + 未删除定位
+        `SELECT id, code, name_i18n, entitlements_required, region, status
+         FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
+      ) // 结束预编译
+      .get(body.module_code, user.region) as // 绑定模块码与用户区域
+      | { id: string; code: string; name_i18n: string; entitlements_required: string; region: string; status: string }
+      | undefined; // 未命中即 undefined
+    if (!moduleRow) { // 模块不存在
+      throw new AppError('NOT_FOUND', 'module not found', { module_code: body.module_code }); // 404
+    } // 结束存在性判断
+    if (moduleRow.status !== 'active') { // 仅供上架模块下单，草稿/下架不允许成交
+      throw new AppError('FEATURE_NOT_AVAILABLE', 'module is not available for purchase', { module_code: body.module_code }); // 403
+    } // 结束状态判断
+
+    const owned = db // 是否已持有有效权益：已拥有者无需再下单
+      .prepare( // 预编译：取最新一条未过期权益
+        `SELECT id, status FROM entitlements
+         WHERE user_id = ? AND module_id = ? AND (expires_at IS NULL OR expires_at > ?)
+         ORDER BY created_at DESC LIMIT 1`,
+      ) // 结束预编译
+      .get(user.id, moduleRow.id, now) as { id: string; status: string } | undefined; // 命中已有权益
+    if (owned?.status === 'active') { // 已解锁：下单无意义
+      throw new AppError('CONFLICT', 'module already unlocked', { module_code: body.module_code, entitlement_id: owned.id }); // 409 回传已有权益，前端可直接复用
+    } // 结束已拥有判断
+
+    const price = currentPrice(db, moduleRow.id, now); // 下单金额一律取当前生效价格，不接受客户端传入
+    if (!price || price.amount_minor <= 0) { // 免费或未定价模块不走订单
+      throw new AppError('VALIDATION_FAILED', 'module is free, unlock it directly', { module_code: body.module_code }); // 400 引导调用 POST /entitlements
+    } // 结束免费判断
+
+    assertDependenciesMet(db, { // 前置依赖与直接解锁同一口径：未买前置不能买后续
+      region: user.region, // 依赖只在同区域生效
+      requiredCodes: jsonParse<string[]>(moduleRow.entitlements_required) ?? [], // 解析模块依赖
+      userId: user.id, // 当前用户
+      now, // 统一时间基准
+    }); // 缺失即抛 FEATURE_NOT_AVAILABLE + required 清单
+
+    const pending = db // 是否已有待结算订单：命中即回放，实现「点两次只生成一张单」
+      .prepare( // 预编译：同一用户 + 同一模块 + pending
+        `SELECT * FROM module_orders WHERE user_id = ? AND module_id = ? AND status = 'pending'`,
+      ) // 结束预编译
+      .get(user.id, moduleRow.id) as OrderRow | undefined; // 命中行
+    if (pending) { // 已有待结算订单直接回放
+      res.json({ // 200 表示复用既有订单，而非新建
+        order: orderView({ ...pending, module_code: moduleRow.code, module_name: moduleRow.name_i18n }), // 补上模块信息供前端展示
+      }); // 结束回放响应
+      return; // 提前返回，不重复写库
+    } // 结束回放分支
+
+    const id = uuidv7(); // 订单主键，时间有序便于按创建顺序排查
+    const channel = body.channel ?? 'manual'; // 渠道缺省 manual：未接在线网关时按人工结算处理
+    db.prepare( // 落库：金额与币种在此刻快照，后续调价不影响本单
+      `INSERT INTO module_orders
+         (id, user_id, module_id, region, currency, amount_minor, status, channel, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    ).run(id, user.id, moduleRow.id, user.region, price.currency, price.amount_minor, channel, now, now); // 渠道随订单落地，回调时按渠道校验
+
+    res.status(201).json({ // 201 表示新订单已创建
+      order: orderView({ // 订单视图
+        id, // 订单主键
+        user_id: user.id, // 下单用户
+        region: user.region, // 下单区域
+        currency: price.currency, // 币种
+        amount_minor: price.amount_minor, // 成交金额
+        status: 'pending', // 初始状态
+        channel, // 结算渠道（请求指定或 manual）
+        channel_txn_id: null, // 尚未收到渠道交易号
+        entitlement_id: null, // 尚未发放权益
+        created_at: now, // 下单时间
+        updated_at: now, // 更新时间
+        paid_at: null, // 未结算
+        cancelled_at: null, // 未取消
+        module_code: moduleRow.code, // 模块编码
+        module_name: moduleRow.name_i18n, // 模块多语言名称
+      }), // 结束订单视图
+    }); // 结束响应
+  }); // 结束 POST /orders 处理
+
+  /**
+   * GET /orders/manage — 管理端订单列表（跨用户）
+   * 人工结算场景需要先看到「谁的、哪个模块、多少钱、什么状态」的单子，用户态 GET /orders 只返回本人订单，
+   * 故另开管理端只读端点，复用 module_orders 与模块/用户联表。必须注册在 GET /orders 之前以免被前缀吞掉。
+   */
+  router.get('/orders/manage', requirePermission('entitlement:read'), (req, res) => { // RBAC：需 entitlement:read
+    const statusQuery = typeof req.query.status === 'string' ? req.query.status.trim() : ''; // 状态过滤，空串不过滤
+    if (statusQuery && !['pending', 'paid', 'cancelled'].includes(statusQuery)) { // 非法状态值直接 400
+      throw new AppError('VALIDATION_FAILED', 'status must be one of pending/paid/cancelled'); // 与表 CHECK 约束一致
+    } // 结束状态校验
+    const regionQuery = typeof req.query.region === 'string' ? req.query.region.trim() : ''; // 区域过滤：cn / global
+    if (regionQuery && !['cn', 'global'].includes(regionQuery)) { // 非法区域直接 400，避免静默返回空集
+      throw new AppError('VALIDATION_FAILED', 'region must be one of cn/global'); // 400
+    } // 结束区域校验
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 关键字：模块编码或用户 ID 片段
+    const limit = Math.min(Math.max(Number(req.query.limit ?? 20) || 20, 1), 100); // 分页大小默认 20，范围 1-100
+    const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0); // 分页偏移，不为负
+
+    const whereParts: string[] = []; // 条件片段（占位符仍走绑定，不拼用户输入）
+    const params: unknown[] = []; // 与片段顺序一致的参数
+    if (statusQuery) { // 状态条件
+      whereParts.push('o.status = ?'); // 状态占位符
+      params.push(statusQuery); // 绑定状态值
+    } // 结束状态条件
+    if (regionQuery) { // 区域条件
+      whereParts.push('o.region = ?'); // 区域占位符
+      params.push(regionQuery); // 绑定区域值
+    } // 结束区域条件
+    if (q) { // 关键字条件：模块编码模糊 + 用户 ID 模糊
+      whereParts.push('(m.code LIKE ? OR o.user_id LIKE ?)'); // 两列各一个占位符
+      params.push(`%${q}%`, `%${q}%`); // LIKE 通配由服务端补，仅作检索提示
+    } // 结束关键字条件
+    const where = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''; // 空条件时不带 WHERE
+
+    const totalRow = db // 总数：必须联模块表，因为关键字会用到 m.code
+      .prepare(`SELECT COUNT(*) AS c FROM module_orders o INNER JOIN modules m ON m.id = o.module_id ${where}`) // 计数查询
+      .get(...(params as never[])) as { c: number }; // 命中计数
+    const rows = db // 列表：再联用户表带出展示名，便于运营核对身份
+      .prepare( // 预编译：按创建时间倒序分页
+        `SELECT o.*, m.code AS module_code, m.name_i18n AS module_name, u.display_name AS user_display_name
+         FROM module_orders o
+         INNER JOIN modules m ON m.id = o.module_id
+         LEFT JOIN users u ON u.id = o.user_id
+         ${where}
+         ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
+      ) // 结束预编译
+      .all(...(params as never[]), limit, offset) as Array<OrderRow & { user_display_name: string | null }>; // 行含模块与用户展示名
+
+    res.json({ // 列表响应
+      orders: rows.map((row) => ({ ...orderView(row), user_display_name: row.user_display_name })), // 视图 + 用户展示名
+      total: totalRow.c, // 满足条件的总数
+      limit, // 本页大小
+      offset, // 本页偏移
+    }); // 结束响应
+  }); // 结束 GET /orders/manage 处理
+
+  /** GET /orders — 当前用户的订单列表（支持 status 过滤 + limit/offset 分页） */
+  router.get('/orders', requireAuth, (req, res) => { // 只读，无需幂等键
+    const statusQuery = typeof req.query.status === 'string' ? req.query.status.trim() : ''; // 状态过滤，空串不过滤
+    if (statusQuery && !['pending', 'paid', 'cancelled'].includes(statusQuery)) { // 非法状态值直接 400
+      throw new AppError('VALIDATION_FAILED', 'status must be one of pending/paid/cancelled'); // 与 module_orders.status 的 CHECK 约束一致
+    } // 结束状态校验
+    const limit = Math.min(Math.max(Number(req.query.limit ?? 20) || 20, 1), 100); // 分页大小默认 20，范围 1-100
+    const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0); // 分页偏移，不为负
+    const user = req.user!; // 登录态用户
+
+    const where = statusQuery ? 'WHERE o.user_id = ? AND o.status = ?' : 'WHERE o.user_id = ?'; // 条件按是否过滤状态拼接（占位符仍走绑定）
+    const params: unknown[] = statusQuery ? [user.id, statusQuery] : [user.id]; // 与 where 顺序一致的参数
+
+    const totalRow = db // 总数查询：与列表同条件
+      .prepare(`SELECT COUNT(*) AS c FROM module_orders o ${where}`) // 不联表，计数只依赖订单表
+      .get(...(params as never[])) as { c: number }; // 命中计数
+    const rows = db // 列表查询：联模块表带出编码与名称
+      .prepare( // 预编译：按创建时间倒序分页
+        `SELECT o.*, m.code AS module_code, m.name_i18n AS module_name
+         FROM module_orders o
+         INNER JOIN modules m ON m.id = o.module_id
+         ${where}
+         ORDER BY o.created_at DESC LIMIT ? OFFSET ?`,
+      ) // 结束预编译
+      .all(...(params as never[]), limit, offset) as OrderRow[]; // 行含模块信息
+
+    res.json({ // 列表响应
+      orders: rows.map((row) => orderView(row)), // 逐条转视图
+      total: totalRow.c, // 满足条件的总数
+      limit, // 本页大小
+      offset, // 本页偏移
+    }); // 结束响应
+  }); // 结束 GET /orders 处理
+
+  /** POST /orders/:id/cancel — 取消自己的待结算订单（已取消直接回放，已结算不可取消） */
+  router.post('/orders/:id/cancel', requireAuth, idempotency, (req, res) => { // 写操作需幂等键
+    const id = pathParam(req, 'id'); // 严格提取订单主键
+    const user = req.user!; // 当前用户
+    const now = clockOf(deps); // 统一时间基准
+
+    const row = db // 定位订单
+      .prepare('SELECT id, user_id, status, cancelled_at FROM module_orders WHERE id = ?') // 只取判定所需字段
+      .get(id) as { id: string; user_id: string; status: string; cancelled_at: string | null } | undefined; // 命中行
+    if (!row || row.user_id !== user.id) { // 不存在或不属于本人：统一 404 不泄漏他人订单
+      throw new AppError('NOT_FOUND', 'order not found', { order_id: id }); // 404
+    } // 结束归属判断
+    if (row.status === 'paid') { // 已结算订单不可取消，避免「付款后又退单」的账实不一致
+      throw new AppError('CONFLICT', 'paid order cannot be cancelled', { order_id: id, status: row.status }); // 409
+    } // 结束已结算判断
+    if (row.status === 'cancelled') { // 已取消：天然幂等，直接回放
+      res.json({ order: { id, status: 'cancelled', cancelled_at: row.cancelled_at } }); // 回显既有取消时间
+      return; // 提前返回
+    } // 结束回放分支
+
+    db.prepare(`UPDATE module_orders SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?`) // 置为已取消
+      .run(now, now, id); // 绑定两个时间与主键
+    res.json({ order: { id, status: 'cancelled', cancelled_at: now } }); // 返回取消结果
+  }); // 结束 POST /orders/:id/cancel 处理
+
+  /**
+   * POST /orders/:id/settle — 管理端结算订单（当前无在线支付网关，由人工/离线渠道对账后调用）
+   * 结算与发放权益在同一事务内完成：订单置 paid、写入订单来源权益、追加审计事件，三件事要么全成要么全废。
+   */
+  router.post('/orders/:id/settle', requirePermission('entitlement:grant'), (req, res) => { // RBAC：需 entitlement:grant
+    const id = pathParam(req, 'id'); // 严格提取订单主键
+    const now = clockOf(deps); // 统一时间基准
+    const body = parse( // 结算可选备注，仅用于事件原因
+      z.object({ reason: z.string().max(200).optional() }), // 超长原因直接 400
+      req.body ?? {}, // 允许空 body
+    ); // 结束解析
+
+    const row = db // 定位订单（跨用户，管理端视角）
+      .prepare( // 预编译：联模块表取编码与主键
+        `SELECT o.id, o.user_id, o.module_id, o.region, o.currency, o.amount_minor,
+                o.status, o.channel, o.entitlement_id, m.code AS module_code
+         FROM module_orders o INNER JOIN modules m ON m.id = o.module_id
+         WHERE o.id = ?`,
+      ) // 结束预编译
+      .get(id) as // 命中行
+      | { id: string; user_id: string; module_id: string; region: string; currency: string; amount_minor: number;
+          status: string; channel: string; entitlement_id: string | null; module_code: string }
+      | undefined; // 未命中
+    if (!row) { // 订单不存在
+      throw new AppError('NOT_FOUND', 'order not found', { order_id: id }); // 404
+    } // 结束存在性判断
+    if (row.status === 'cancelled') { // 已取消订单不可结算
+      throw new AppError('CONFLICT', 'cancelled order cannot be settled', { order_id: id, status: row.status }); // 409
+    } // 结束已取消判断
+    if (row.status === 'paid') { // 已结算：幂等回放，不重复发权益
+      res.json({ // 200 回放
+        order: { id, status: 'paid', entitlement_id: row.entitlement_id, channel: row.channel, channel_txn_id: null }, // 回显既有结算结果（人工通道无交易号）
+      }); // 结束回放响应
+      return; // 提前返回，避免二次发放
+    } // 结束回放分支
+
+    const entId = settleOrderTx(db, { // 三写同事务：订单 paid + 权益 + 事件
+      orderId: id, // 订单主键
+      userId: row.user_id, // 下单用户
+      moduleId: row.module_id, // 目标模块
+      now, // 统一时间
+      reason: (body.reason ?? '').trim() || 'order_settled', // 空原因回落默认值，保证事件可读
+      channelTxnId: null, // 人工结算没有渠道交易号
+    }); // 事务执行完毕
+
+    res.json({ // 返回结算结果，前端可据此刷新权益
+      order: { id, status: 'paid', entitlement_id: entId, paid_at: now, channel: row.channel, channel_txn_id: null }, // 订单摘要（人工结算无渠道交易号）
+      entitlement: { id: entId, user_id: row.user_id, module_code: row.module_code, status: 'active', created_at: now }, // 发放的权益摘要
+    }); // 结束响应
+  }); // 结束 POST /orders/:id/settle 处理
+
+  /**
+   * POST /orders/:id/payment-notify — 外部支付渠道回调（公开端点，靠 HMAC 签名认证）
+   *
+   * 设计口径：不内置任何具体渠道 SDK（无商户凭证就无法真实验证），而是定义一条可被
+   * 支付宝/微信/Stripe 的「支付成功回调」直接对接的标准入口：
+   *   - 认证：`x-payment-timestamp`（unix 秒）+ `x-payment-signature` = hex(HMAC-SHA256(secret, canonical))，
+   *           canonical = `${orderId}.${channel}.${channel_txn_id}.${amount_minor}.${timestamp}`，
+   *           密钥来自 MIM_PAYMENT_NOTIFY_SECRET；时间戳超出 ±300s 视为过期，防重放。
+   *   - 幂等：同一 channel_txn_id 只能结算一次（DB 唯一索引兜底）；已结算订单收到同一交易号回调直接 200 回放。
+   *   - 金额与渠道必须与下单时快照一致，否则拒绝，避免「改价后补差价」类错账。
+   *   - 结算落库与人工结算共用 settleOrderTx，保证权益与审计结构一致。
+   */
+  router.post('/orders/:id/payment-notify', (req, res) => { // 不挂 requireAuth：渠道服务端没有用户令牌
+    const secret = (deps.env.MIM_PAYMENT_NOTIFY_SECRET ?? '').trim(); // 回调密钥
+    if (!secret) { // 未配置密钥
+      throw new AppError('PAYMENT_NOTIFY_NOT_CONFIGURED', 'payment notify is not configured', { env: 'MIM_PAYMENT_NOTIFY_SECRET' }); // 503，明确缺失项
+    } // 结束配置检查
+
+    const id = pathParam(req, 'id'); // 严格提取订单主键
+    const now = clockOf(deps); // 统一时间基准
+    const body = parse( // 回调报文：渠道、交易号、实付金额
+      z.object({
+        channel: z.enum(['alipay', 'wechat', 'stripe']), // 在线渠道（manual 不走回调）
+        channel_txn_id: z.string().min(1).max(128), // 渠道交易号，幂等依据
+        amount_minor: z.number().int().positive(), // 实付金额（分）
+      }), // 结束 schema
+      req.body, // 原始报文
+    ); // 结束解析
+
+    const timestampRaw = (req.header('x-payment-timestamp') ?? '').trim(); // 时间戳头
+    const timestamp = Number(timestampRaw); // 转为秒级时间戳
+    if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) { // 缺失或超出 ±5 分钟
+      throw new AppError('AUTH_UNAUTHORIZED', 'payment signature expired', { header: 'x-payment-timestamp' }); // 401，拒绝重放
+    } // 结束时间戳校验
+
+    const canonical = `${id}.${body.channel}.${body.channel_txn_id}.${body.amount_minor}.${timestamp}`; // 待签名串：全部关键字段参与
+    const expected = createHmac('sha256', secret).update(canonical).digest('hex'); // 服务端计算签名
+    const provided = (req.header('x-payment-signature') ?? '').trim().toLowerCase(); // 客户端签名
+    const expectedBuf = Buffer.from(expected, 'utf8'); // 定长比较前先转 Buffer
+    const providedBuf = Buffer.from(provided, 'utf8'); // 同上
+    if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) { // 长度或内容任一不符
+      throw new AppError('AUTH_UNAUTHORIZED', 'invalid payment signature', { header: 'x-payment-signature' }); // 401
+    } // 结束签名校验
+
+    const row = db // 定位订单
+      .prepare( // 只取结算判定所需字段
+        `SELECT id, user_id, module_id, status, channel, amount_minor, entitlement_id, channel_txn_id
+         FROM module_orders WHERE id = ?`,
+      ) // 结束预编译
+      .get(id) as // 命中行
+      | { id: string; user_id: string; module_id: string; status: string; channel: string; amount_minor: number;
+          entitlement_id: string | null; channel_txn_id: string | null }
+      | undefined; // 未命中
+    if (!row) { // 订单不存在
+      throw new AppError('NOT_FOUND', 'order not found', { order_id: id }); // 404
+    } // 结束存在性判断
+
+    if (row.status === 'paid') { // 已结算：同一交易号回放，不同交易号视为二次扣款
+      if (row.channel_txn_id === body.channel_txn_id) { // 同一笔渠道交易重复通知
+        res.json({ order: { id, status: 'paid', entitlement_id: row.entitlement_id, channel_txn_id: row.channel_txn_id }, replayed: true }); // 200 幂等回放
+        return; // 提前返回，不重复发放
+      } // 结束同交易号分支
+      throw new AppError('CONFLICT', 'order already settled by another transaction', { order_id: id, settled_txn_id: row.channel_txn_id }); // 409，人工介入对账
+    } // 结束已结算判断
+
+    if (row.status === 'cancelled') { // 已取消订单不接受支付回调
+      throw new AppError('CONFLICT', 'cancelled order cannot be settled', { order_id: id, status: row.status }); // 409
+    } // 结束已取消判断
+
+    if (row.channel !== body.channel) { // 渠道必须与下单时一致
+      throw new AppError('VALIDATION_FAILED', 'channel mismatch', { expected: row.channel, received: body.channel }); // 400
+    } // 结束渠道校验
+
+    if (row.amount_minor !== body.amount_minor) { // 金额必须与快照一致
+      throw new AppError('VALIDATION_FAILED', 'amount mismatch', { expected: row.amount_minor, received: body.amount_minor }); // 400
+    } // 结束金额校验
+
+    const usedTxn = db // 交易号是否已被其它订单占用（唯一索引兜底前的可读校验）
+      .prepare('SELECT id FROM module_orders WHERE channel_txn_id = ?') // 全局查交易号
+      .get(body.channel_txn_id) as { id: string } | undefined; // 命中行
+    if (usedTxn) { // 同一交易号已结算过其它订单
+      throw new AppError('CONFLICT', 'transaction already used', { channel_txn_id: body.channel_txn_id, order_id: usedTxn.id }); // 409
+    } // 结束交易号占用判断
+
+    const entId = settleOrderTx(db, { // 与人工结算同一事务实现
+      orderId: id, // 订单主键
+      userId: row.user_id, // 下单用户
+      moduleId: row.module_id, // 目标模块
+      now, // 统一时间
+      reason: `payment_notify:${body.channel}`, // 审计原因标明渠道回调来源
+      channelTxnId: body.channel_txn_id, // 记录渠道交易号，供对账与幂等
+    }); // 事务执行完毕
+
+    res.json({ order: { id, status: 'paid', entitlement_id: entId, channel: body.channel, channel_txn_id: body.channel_txn_id, paid_at: now }, replayed: false }); // 200 结算成功
+  }); // 结束 POST /orders/:id/payment-notify 处理
+
   // ---------- 管理：模块状态迁移与权益发放 / 回收 ----------
 
   /** PATCH /modules/:code/status — 模块状态单向迁移：draft → active → archived */
@@ -478,6 +963,9 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       } // 结束缺失判断
     } // 结束依赖校验
 
+    // 依赖环检测：本模块 → 新依赖链若走回自身，则该模块永远无法解锁，必须在写入前拒绝
+    assertNoDependencyCycle(db, region, body.code, required); // 成环即 400 并回传成环点
+
     const dup = db // 唯一性预检：UNIQUE(region, code) 含软删行，提前拦截避免数据库约束报 500
       .prepare('SELECT id FROM modules WHERE region = ? AND code = ?') // 不滤 deleted_at，软删行同样占用编码
       .get(region, body.code) as { id: string } | undefined; // 命中即冲突
@@ -545,6 +1033,10 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
         throw new AppError('VALIDATION_FAILED', 'required modules not found', { required: missing }); // 400 并回传缺失项
       } // 结束缺失判断
     } // 结束依赖校验
+
+    if (body.entitlements_required) { // 只有改动依赖时才需要重算环
+      assertNoDependencyCycle(db, region, code, body.entitlements_required); // 成环即 400 并回传成环点
+    } // 结束环检测
 
     const sets: string[] = []; // 动态 SET 子句片段
     const params: unknown[] = []; // 与 SET 顺序一致的参数

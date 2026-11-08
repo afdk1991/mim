@@ -630,6 +630,43 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         }>; // 权益数组类型结束
       }>('/me/entitlements', { idempotency: false }); // 只读 GET，无需幂等键
     }, // getMyEntitlements 结束
+    createOrder(module_code: string) { // 为付费模块下单（待结算）；重复点击由后端回放同一张单
+      return request<{ // 返回订单对象
+        order: { // 订单视图
+          id: string; // 订单主键，取消订单要用
+          status: string; // pending / paid / cancelled
+          currency: string; // 结算币种
+          amount_minor: number; // 成交金额（分）
+          channel: string; // 结算渠道；当前为 manual 人工结算
+          module_code: string; // 模块编码
+          module_name: Record<string, string>; // 模块多语言名
+          entitlement_id: string | null; // 结算后发放的权益主键
+          created_at: string; // 下单时间
+          paid_at: string | null; // 结算时间
+        }; // 订单视图结束
+      }>('/orders', { method: 'POST', body: { module_code } }); // 写操作自动带幂等键，避免重复下单
+    }, // createOrder 结束
+    getMyOrders() { // 拉取我的订单列表
+      return request<{ // 响应为订单数组包装
+        orders: Array<{ // 订单条目
+          id: string; // 订单主键
+          status: string; // 订单状态
+          currency: string; // 币种
+          amount_minor: number; // 金额（分）
+          module_code: string; // 模块编码
+          module_name: Record<string, string>; // 模块多语言名
+          created_at: string; // 下单时间
+          paid_at: string | null; // 结算时间
+        }>; // 订单数组类型结束
+        total: number; // 总条数
+      }>('/orders', { idempotency: false }); // 只读 GET，无需幂等键
+    }, // getMyOrders 结束
+    cancelOrder(id: string) { // 取消自己的待结算订单
+      return request<{ order: { id: string; status: string; cancelled_at: string } }>( // 返回取消结果
+        `/orders/${encodeURIComponent(id)}/cancel`, // 订单子资源
+        { method: 'POST', body: {} }, // 显式空体，确保幂等键被附加
+      ); // 请求调用结束
+    }, // cancelOrder 结束
   }, // catalog 分组结束
 
   // ---------- 漫剧 AI 剧（comic，契约对齐 services/mim-api/src/routes/comic.ts）----------

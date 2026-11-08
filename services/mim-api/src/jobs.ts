@@ -1,10 +1,12 @@
 /**
  * 后台定时任务（08-dev-implementation §8「定时任务」）
  *
- * 三个任务此前只有规划、零代码，本文件补齐为可运行实现：
+ * 四个任务此前只有规划、零代码，本文件补齐为可运行实现：
  *   1. cost-alert          — 每小时，统计生成任务成本，越过阈值即告警（不再只是事后看报表）
  *   2. film-review-sla     — 每 6 小时，把 `comic_films.status='reviewing'` 超过 SLA 的成片点名提醒
  *   3. entitlement-expiry  — 每日，把 `expires_at <= now` 的 active 权益转 expired，并写 entitlement_events
+ *   4. asset-gc            — 每日，把已过 expires_at 的中间产物字节真删掉并记 purged_at，
+ *                            否则 `asset_ttl_days` 只是一句承诺，存储只增不减
  *
  * 幂等策略：全部复用 ops 域的 idempotency_keys（user_id 固定 'system'），
  * 以 `INSERT ... ON CONFLICT DO NOTHING` 抢占键，抢占成功者才执行；
@@ -15,8 +17,9 @@
 import { uuidv7 } from '@mim/core-domain'; // 事件主键需时间有序，复用领域层 UUIDv7 生成器
 import { isoDate } from './utils.js'; // 截取 UTC 日期，保证「当日」口径与全站一致
 import type { Db } from './types.js'; // 数据库抽象类型，便于测试注入内存库
+import type { StorageAdapter } from './storage.js'; // 过期产物清理需要真删对象，故注入统一存储契约
 
-export type JobKind = 'cost-alert' | 'film-review-sla' | 'entitlement-expiry'; // 三个任务的可辨识联合，供手动触发与测试断言
+export type JobKind = 'cost-alert' | 'film-review-sla' | 'entitlement-expiry' | 'asset-gc'; // 四个任务的可辨识联合，供手动触发与测试断言
 
 export interface JobRunResult { // 单次执行结果，便于日志与测试直接断言
   kind: JobKind; // 任务标识
@@ -29,6 +32,8 @@ export interface CreateJobsOptions { // 创建定时任务组的依赖注入参�
   db: Db; // 同步 SQLite 句柄，任务内直接 prepare/run
   env: Record<string, string | undefined>; // 环境变量，用于阈值与 SLA 配置
   now?: () => string; // 可注入时钟，测试可冻结时间
+  /** 对象存储适配器；asset-gc 需要真删过期对象字节，未注入时该任务诚实跳过 */
+  storage?: StorageAdapter; // 可选：仅 asset-gc 使用，其余任务不依赖存储
   /** 日志出口；默认 console，测试可注入捕获器 */
   logger?: { info(message: string): void; warn(message: string): void }; // 只要求两个级别，避免耦合具体日志库
   /** 各任务的执行间隔（毫秒）；defaults 见 DEFAULT_INTERVALS */
@@ -36,16 +41,17 @@ export interface CreateJobsOptions { // 创建定时任务组的依赖注入参�
 } // CreateJobsOptions 结束
 
 export interface Jobs { // 对外暴露的任务组契约
-  runOnce(kind: JobKind): JobRunResult; // 手动执行一次，测试与运维补跑都走它
+  runOnce(kind: JobKind): Promise<JobRunResult>; // 手动执行一次；asset-gc 需真删对象故整体收敛为 Promise
   start(): void; // 启动全部定时器（幂等）
   stop(): void; // 停止全部定时器（幂等）
 } // Jobs 结束
 
-/** 默认间隔：成本告警 1 小时、审核超时 6 小时、权益到期扫描 24 小时（对齐 08 §8） */
-const DEFAULT_INTERVALS: Record<JobKind, number> = { // 三个任务的基准节拍
+/** 默认间隔：成本告警 1 小时、审核超时 6 小时、权益到期与产物清理 24 小时（对齐 08 §8） */
+const DEFAULT_INTERVALS: Record<JobKind, number> = { // 四个任务的基准节拍
   'cost-alert': 3600_000, // 每小时一次，成本异常能在一个小时内被发现
   'film-review-sla': 6 * 3600_000, // 每 6 小时一次，审核提醒不必更密
   'entitlement-expiry': 24 * 3600_000, // 每日一次，到期以天为粒度足够
+  'asset-gc': 24 * 3600_000, // 每日一次，过期清理无需更密；成片 expires_at 为 null 天然不受影响
 }; // DEFAULT_INTERVALS 结束
 
 /** 定时任务在 idempotency_keys 中的伪用户，与真实用户 ID 空间天然隔离 */
@@ -58,6 +64,7 @@ function numberFromEnv(raw: string | undefined, fallback: number): number { // �
 
 export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭包持有 db、时钟与定时器句柄
   const { db, env } = options; // 解构稳定依赖
+  const storage = options.storage; // 存储适配器：仅 asset-gc 使用，未注入时该任务回显「未执行」
   const clock = options.now ?? (() => new Date().toISOString()); // 未注入时钟时取系统时间，口径与路由层一致
   const logger = options.logger ?? { info: (m: string) => console.log(m), warn: (m: string) => console.warn(m) }; // 默认 console，测试可替换
 
@@ -94,7 +101,7 @@ export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭�
     return row.total; // 返回合计金额（最小货币单位）
   } // sumCostSince 结束
 
-  function runCostAlert(): JobRunResult { // 任务一：生成成本告警
+  async function runCostAlert(): Promise<JobRunResult> { // 任务一：生成成本告警；协程化只为与统一契约对齐（内部仍全同步）
     const now = clock(); // 当前时间
     const hourKey = `job:cost-alert:${now.slice(0, 13)}`; // 以 YYYY-MM-DDTHH 为键，保证每小时只执行一次
     if (!claim(hourKey, '/jobs/cost-alert')) { // 抢不到键说明本小时已跑过
@@ -130,7 +137,7 @@ export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭�
     }; // 结果结束
   } // runCostAlert 结束
 
-  function runFilmReviewSla(): JobRunResult { // 任务二：成片审核超时提醒
+  async function runFilmReviewSla(): Promise<JobRunResult> { // 任务二：成片审核超时提醒；协程化只为与统一契约对齐
     const now = clock(); // 当前时间
     const bucketKey = `job:film-review-sla:${now.slice(0, 13)}`; // 每小时一个键，避免 6 小时窗口内反复刷同一批提醒
     if (!claim(bucketKey, '/jobs/film-review-sla')) { // 抢不到键说明本小时已提醒
@@ -162,7 +169,7 @@ export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭�
     }; // 结果结束
   } // runFilmReviewSla 结束
 
-  function runEntitlementExpiry(): JobRunResult { // 任务三：解锁到期扫描
+  async function runEntitlementExpiry(): Promise<JobRunResult> { // 任务三：解锁到期扫描；协程化只为与统一契约对齐
     const now = clock(); // 当前时间，作为到期判定基准
     const rows = db // 数据库句柄
       .prepare( // 预编译：取已到期但仍标记为 active 的权益
@@ -213,19 +220,81 @@ export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭�
     }; // 结果结束
   } // runEntitlementExpiry 结束
 
-  const runners: Record<JobKind, () => JobRunResult> = { // 任务标识到实现的映射，便于 start/runOnce 统一调度
+  /**
+   * 任务四：过期产物清理（asset-gc）。
+   *
+   * 此前 `generation_assets.expires_at` 只被 `GET /media/assets` 用来过滤展示，对象字节从未被删除，
+   * 也就是说 `MIM_AI_ASSET_TTL_DAYS` 只是一句承诺，本地磁盘 / S3 只增不减。
+   * 本任务按 expires_at 扫描并真删对象字节，再把清理时间写回 purged_at：
+   *   - 行保留（用量统计与审计证据都还在），只删字节；
+   *   - 每行一个幂等键，多副本并发时同一对象只会被删一次；
+   *   - 删除失败则回滚认领键，下一轮自然重试，不会静默把对象「当成已删」。
+   */
+  async function runAssetGc(): Promise<JobRunResult> { // 需要真实存储删除，故为异步
+    const now = clock(); // 当前时间，作为过期判定基准
+    if (!storage) { // 未注入存储（例如纯控制面部署）时诚实跳过
+      return { kind: 'asset-gc', ran: false, affected: 0, detail: 'storage adapter not injected' }; // 明确说明未执行，不假装清理成功
+    } // 存储检查结束
+
+    const batch = numberFromEnv(env.MIM_ASSET_GC_BATCH, 200); // 单轮条数上限，避免一次删太多把磁盘/对象存储 IO 打满
+    const rows = db // 数据库句柄
+      .prepare( // 预编译：按到期时间升序取一批尚未清理的产物
+        `SELECT id, object_key, expires_at FROM generation_assets
+         WHERE expires_at IS NOT NULL AND expires_at <= ? AND purged_at IS NULL
+         ORDER BY expires_at ASC LIMIT ?`,
+      ) // 结束预编译
+      .all(now, batch) as Array<{ id: string; object_key: string; expires_at: string }>; // 候选清单：成片 expires_at 为 null，天然不会被清
+
+    let affected = 0; // 真正完成「删字节 + 记时间」的产物数
+    let failed = 0; // 删除失败的产物数，用于结论里诚实回显
+    for (const row of rows) { // 逐条处理，单条失败不影响其余
+      const key = `job:asset-gc:${row.id}:${row.expires_at}`; // 幂等键含产物与到期时刻，保证同一对象只删一次
+      if (!claim(key, '/jobs/asset-gc')) continue; // 已被其他实例认领则跳过
+
+      try { // 删除对象字节可能是 IO / 网络错误
+        await storage.deleteObject(row.object_key); // 真删字节：本地驱动删文件，S3 驱动发 DeleteObject
+        const info = db // 数据库句柄
+          .prepare(`UPDATE generation_assets SET purged_at = ? WHERE id = ? AND purged_at IS NULL`) // 条件更新保证重复执行不重复计数
+          .run(now, row.id); // 写入清理时间
+        affected += info.changes; // 累加真实变更数
+        settle(key, 200, { asset_id: row.id, object_key: row.object_key, expires_at: row.expires_at, changes: info.changes }); // 回写结算结果作为审计证据
+      } catch (err) { // 删除失败
+        failed += 1; // 计入失败数
+        db.prepare(`DELETE FROM idempotency_keys WHERE key = ? AND user_id = ?`).run(key, SYSTEM_USER); // 回滚认领键，让下一轮能重新尝试
+        logger.warn( // 记录到日志，便于定位是权限还是网络问题
+          `[jobs] asset-gc: failed to purge ${row.id} (${row.object_key}): ${err instanceof Error ? err.message : String(err)}`,
+        ); // 告警结束
+      } // try/catch 结束
+    } // 处理循环结束
+
+    if (affected > 0) { // 只在有真实清理时打汇总日志
+      logger.info(`[jobs] asset-gc: ${affected} expired asset(s) purged`); // 汇总条数便于运维核对存储回收量
+    } // 日志分支结束
+
+    return { // 返回结构化结果
+      kind: 'asset-gc', // 任务标识
+      ran: true, // 扫描每轮都会执行（是否真正清理由 affected 体现）
+      affected, // 真正清理掉的产物数
+      detail: rows.length === 0 // 候选为空 / 有候选两种结论
+        ? 'no expired asset to purge' // 空结论
+        : `${affected}/${rows.length} purged${failed > 0 ? `, ${failed} failed` : ''}`, // 有失败时明确回显，不掩盖
+    }; // 结果结束
+  } // runAssetGc 结束
+
+  const runners: Record<JobKind, () => Promise<JobRunResult>> = { // 任务标识到实现的映射，便于 start/runOnce 统一调度
     'cost-alert': runCostAlert, // 成本告警
     'film-review-sla': runFilmReviewSla, // 审核超时提醒
     'entitlement-expiry': runEntitlementExpiry, // 到期扫描
+    'asset-gc': runAssetGc, // 过期产物清理
   }; // runners 结束
 
-  function runOnce(kind: JobKind): JobRunResult { // 手动执行单个任务
-    return runners[kind](); // 直接委托到对应实现
+  async function runOnce(kind: JobKind): Promise<JobRunResult> { // 手动执行单个任务
+    return runners[kind](); // 直接委托到对应实现；返回 Promise 便于调用方等待清理真正完成
   } // runOnce 结束
 
-  function safeRun(kind: JobKind): void { // 调度器专用包装：任何异常都只记录，不打断定时器
+  async function safeRun(kind: JobKind): Promise<void> { // 调度器专用包装：任何异常都只记录，不打断定时器
     try { // 任务体可能因数据库锁或脏数据抛错
-      const result = runners[kind](); // 执行任务
+      const result = await runners[kind](); // 执行任务并等待完成（asset-gc 含真实删除 IO）
       logger.info(`[jobs] ${kind} ran=${result.ran} affected=${result.affected} — ${result.detail}`); // 记录执行结论
     } catch (err) { // 捕获异常
       logger.warn(`[jobs] ${kind} failed: ${err instanceof Error ? err.message : String(err)}`); // 只告警，下个周期自然重试
@@ -236,10 +305,10 @@ export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭�
     runOnce, // 手动执行入口
     start() { // 启动全部定时器
       if (timers.length > 0) return; // 已启动则不重复创建，避免多份定时器叠加
-      for (const kind of Object.keys(runners) as JobKind[]) { // 遍历三个任务
+      for (const kind of Object.keys(runners) as JobKind[]) { // 遍历四个任务
         const interval = options.intervals?.[kind] ?? DEFAULT_INTERVALS[kind]; // 优先取调用方间隔，其次默认节拍
-        safeRun(kind); // 启动即补跑一次，覆盖进程重启错过的窗口（幂等键保证不会重复生效）
-        const timer = setInterval(() => safeRun(kind), interval); // 按间隔重复执行
+        void safeRun(kind); // 启动即补跑一次，覆盖进程重启错过的窗口（幂等键保证不会重复生效）；不阻塞启动流程
+        const timer = setInterval(() => void safeRun(kind), interval); // 按间隔重复执行；Promise 由 safeRun 内部自行收敛
         if (typeof timer.unref === 'function') timer.unref(); // 不阻止进程退出，兼容测试与优雅停机
         timers.push(timer); // 记录句柄供 stop 清理
       } // 任务循环结束

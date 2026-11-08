@@ -8,6 +8,76 @@ import type { Db } from './types.js'; // 仅引入数据库连接类型，编译
 
 const SCHEMA_PATH = fileURLToPath(new URL('./schema.sql', import.meta.url)); // 以模块自身位置解析 schema.sql 绝对路径，保证任意工作目录下都能找到建表脚本
 
+/** 允许出现在迁移语句里的标识符：只放行字母数字下划线，杜绝把外部字符串拼进 DDL */
+const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/; // 表名/列名都必须匹配该正则，避免 ALTER TABLE 被注入
+
+/**
+ * 增量列迁移清单：schema.sql 只保证「全新建库」结构正确。
+ * 已经在生产跑的库（`CREATE TABLE IF NOT EXISTS` 不会改动既有表）需要单独补列，
+ * 否则新代码 SELECT 新列会直接报 `no such column`。
+ *
+ * 这里只做「加列」这一类无破坏迁移：
+ *   - SQLite 的 ALTER TABLE ADD COLUMN 不允许「无默认值的 NOT NULL 列」，故定义一律带 DEFAULT；
+ *   - 可空列表直接追加，旧行读出来是 NULL，语义即「尚未清理 / 尚未被回收」。
+ */
+const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: string }> = [ // 只列真正需要向后兼容的列
+  { table: 'generation_jobs', column: 'attempts', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 超时回收重试计数
+  { table: 'generation_assets', column: 'purged_at', definition: 'TEXT' }, // 过期产物字节清理时间
+  { table: 'module_orders', column: 'channel_txn_id', definition: 'TEXT' }, // 外部渠道交易号（支付回调幂等依据）
+]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
+
+// 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
+const ADDITIVE_INDEXES: ReadonlyArray<{ name: string; sql: string }> = [ // 只放列由 ADDITIVE_COLUMNS 补出来的索引
+  { // 渠道交易号全局唯一（NULL 不参与）：同一笔渠道交易重复回调不能结算出第二张单／第二份权益
+    name: 'uq_module_orders_txn', // 索引名，与 wiki 记录一致
+    sql: "CREATE UNIQUE INDEX IF NOT EXISTS uq_module_orders_txn ON module_orders(channel_txn_id) WHERE channel_txn_id IS NOT NULL", // 部分唯一索引：人工结算（NULL）不受约束
+  }, // 索引定义结束
+]; // 清单结束：新增依赖后加列的索引请加在这里，不要写进 schema.sql
+
+/**
+ * 幂等补列：列已存在则什么都不做，缺失才 ALTER TABLE 追加。
+ * @returns true 表示本次真的执行了 ALTER；false 表示列本来就存在。
+ */
+export function ensureColumn(db: Db, table: string, column: string, definition: string): boolean { // 单列迁移的最小实现
+  if (!IDENT_RE.test(table) || !IDENT_RE.test(column)) { // 标识符来自常量清单，仍显式校验一次
+    throw new Error(`invalid identifier for migration: ${table}.${column}`); // 非法标识符直接拒绝，不拼进 SQL
+  } // 标识符校验结束
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>; // 读取现有列定义
+  if (columns.length === 0) throw new Error(`migration target table not found: ${table}`); // 表不存在说明 schema.sql 未执行，直接报错
+  if (columns.some((c) => c.name === column)) return false; // 列已存在：幂等返回，避免重复 ALTER 报错
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`); // 追加列：旧行按定义里的 DEFAULT/NULL 补齐
+  return true; // 告知调用方发生了结构变更，便于启动日志留证
+} // ensureColumn 结束
+
+/**
+ * 批量补齐增量列，返回本次真正新增的列名（形如 `generation_jobs.attempts`）。
+ * 全新建库时全部已存在，返回空数组，不做任何结构变更。
+ */
+export function migrateAdditiveColumns(db: Db): string[] { // 启动期调用一次，随 createDatabase 执行
+  const applied: string[] = []; // 收集本次变更，供启动日志与测试断言
+  for (const item of ADDITIVE_COLUMNS) { // 逐列尝试补齐
+    if (ensureColumn(db, item.table, item.column, item.definition)) { // 仅真正执行了 ALTER 才记录
+      applied.push(`${item.table}.${item.column}`); // 记录变更点，避免结构变化静默发生
+    } // 变更判定结束
+  } // 清单循环结束
+  return applied; // 返回变更清单，空数组代表无需迁移
+} // migrateAdditiveColumns 结束
+
+/**
+ * 创建依赖后加列的索引（幂等）。必须在 migrateAdditiveColumns 之后调用：
+ * 老库在 schema.sql 阶段还没有这些列，索引若写在 schema.sql 里会让进程启动即失败。
+ * @returns 本次真正新建的索引名列表
+ */
+export function ensureAdditiveIndexes(db: Db): string[] {
+  const applied: string[] = []; // 记录本次新建的索引，便于启动日志留证
+  for (const item of ADDITIVE_INDEXES) { // 逐条执行
+    const existed = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?`).get(item.name) as { name: string } | undefined; // 先查索引是否已存在
+    db.exec(item.sql); // IF NOT EXISTS 保证重复启动幂等
+    if (!existed) applied.push(item.name); // 只有真的新建才记录
+  } // 循环结束
+  return applied; // 返回新建清单，空数组代表无需变更
+} // ensureAdditiveIndexes 结束
+
 export function createDatabase(filename: string = ':memory:'): Db { // 创建数据库连接：默认内存库（测试用），传路径则落盘持久化
   if (filename !== ':memory:') { // 内存库没有文件系统目录，无需准备目录
     const dir = dirname(filename); // 取数据库文件所在目录
@@ -17,6 +87,10 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   db.pragma('foreign_keys = ON'); // 开启外键约束，保证关联表引用完整性
   if (filename !== ':memory:') db.pragma('journal_mode = WAL'); // 落盘库启用 WAL，提升读写并发并降低写阻塞（内存库不支持）
   db.exec(readFileSync(SCHEMA_PATH, 'utf8')); // 执行建表脚本，全部 IF NOT EXISTS 以便每次启动幂等
+  const migrated = migrateAdditiveColumns(db); // 存量库补齐后加的列；全新建库时为空
+  if (migrated.length > 0) console.log(`[db] additive migration applied: ${migrated.join(', ')}`); // 结构变更必须留痕，便于排查升级后的行为差异
+  const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column
+  if (indexed.length > 0) console.log(`[db] additive index created: ${indexed.join(', ')}`); // 同样留痕，便于确认回调幂等约束已生效
   seedModules(db); // 写入模块商城基础数据，保证新库启动即有可售模块
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   return db; // 返回已完成初始化的连接
