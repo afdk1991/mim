@@ -188,8 +188,25 @@ export function Store({ locale }: Props) {
 
   // 首屏加载态：只渲染一行提示，避免空白页面
   if (loading) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
-  // 目录加载失败：直接展示错误，不再渲染商品网格
-  if (modulesState.error) return <div className="error">{errorText(locale, modulesState.error)}</div>;
+  // 目录加载失败：展示错误 + 排查提示 + 重试入口，避免一次请求失败即永久空白且无恢复路径
+  if (modulesState.error) {
+    return (
+      <div className="page">
+        <header className="page-head">
+          <h1>{locale === 'en-US' ? 'Module Store' : '功能模块商城'}</h1>
+        </header>
+        <p className="error">{errorText(locale, modulesState.error)}</p>
+        <p className="muted">
+          {locale === 'en-US'
+            ? 'Cannot reach the catalog service. Check your network or ad-blocker, then retry.'
+            : '无法连接模块目录服务，请检查网络或广告拦截插件后重试。'}
+        </p>
+        <button type="button" className="btn primary" onClick={() => modulesState.reload()}>
+          {locale === 'en-US' ? 'Retry' : '重试'}
+        </button>
+      </div>
+    );
+  }
 
   // 渲染商城页面
   return (

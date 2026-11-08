@@ -118,10 +118,10 @@ export function App() {
     setLocalSession(updated);
   } // handleUserUpdated 结束
 
-  // 侧边导航项：顺序即展示顺序（功能模块 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
+  // 侧边导航项：顺序即展示顺序（商城 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
   const navItems: Array<{ view: AppView; label: string }> = [
-    // 功能模块页
-    { view: 'store', label: locale === 'en-US' ? 'Modules' : '功能模块' },
+    // 功能模块商城（用户习惯称「商城」，导航以「商城」呈现便于查找）
+    { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
     // 漫剧 AI 剧工作台
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话

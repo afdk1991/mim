@@ -247,9 +247,19 @@ gh secret set IGA_SECRET_KEY --body "<volcengine sk>"
 gh secret set IGA_PROJECT_NAME --body "mim"
 ```
 
-托管平台以独立域名直连 API 时，`MIM_CORS_ORIGINS` 必须包含其域名（`deploy/deploy.sh` 幂等补齐
-`https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`；Cloudflare / Vercel 使用
-`functions` / `rewrites` 同源反代时无需额外配置）。
+托管平台以独立域名访问时，**商城是否可见取决于前端如何请求 `/api/v1/modules`**，需按平台区分配置：
+
+| 平台 | 前端 API 源 | 是否需要 `MIM_CORS_ORIGINS` | 说明 |
+|---|---|---|---|
+| 自建 `mim.mixm.top` | 同源（nginx 反代 `/api/`） | 否 | 不挂 CORS 中间件 |
+| GitHub Pages `afdk1991.github.io` | 构建期注入 `VITE_API_ORIGIN=https://mim.mixm.top`（跨域直连） | **是** | 必须含 `https://afdk1991.github.io`（含 `/mim` 子路径同源） |
+| Cloudflare Pages `mim-8ah.pages.dev` | 相对 `/api`（同源） | 否 | `functions/api/[[path]].js` 已同源反代到 `mixm.top` |
+| Vercel `mim-puce.vercel.app` | 相对 `/api`（同源） | 否 | `vercel.json` `rewrites` 已同源反代 |
+| IGA Pages | 取决于其部署脚本 | 若直连则**是** | 见 `deploy/iga/deploy.sh`；若反代同源则无需 |
+| Sealos `mim-i3ywsdfn.cloud.sealos.io` | — | — | **纯 API 容器，不托管 Web SPA**，`/store` 返回 JSON 404 属预期，非缺陷 |
+
+> 配置要点：`MIM_CORS_ORIGINS` 缺配时后端**完全不挂 CORS 中间件**，跨域直连的镜像站（如 GitHub Pages）浏览器会拦截 `/api/v1/modules` → 商城整页报错/空白。
+> `deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`；其余镜像源（IGA 等）须按需追加。
 
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
 `Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
