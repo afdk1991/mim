@@ -232,6 +232,11 @@ jobs:
         run: pnpm --filter @mim/web build
 
       - uses: actions/configure-pages@v5
+        with:
+          # 仓库重建后 Pages 站点会随仓库一起消失，而 configure-pages 默认只读取已有站点、不负责开通，
+          # 站点不存在时该步骤直接失败（2026-11-08 实测：Run actions/configure-pages@v5 -> failure）。
+          # enablement=true 让该步骤在站点缺失时用 GITHUB_TOKEN（本作业已授予 pages: write）自动开通 Pages。
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
