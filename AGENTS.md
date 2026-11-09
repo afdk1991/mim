@@ -14,7 +14,7 @@
 | 远程仓库 | **2 个**：`origin` = `https://github.com/afdk1991/mim.git`、`gitee` = `https://gitee.com/mallwm_admin/mim.git`；**无非清单远端** | `git remote -v`（2026-11-09 18:08） |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `e7e364d`；远端 `refs/heads/main` = `e7e364d`（0 ahead / 0 behind） | `git log -1 --oneline`、`git ls-remote origin refs/heads/main`（2026-11-10） |
+| 仓库同步 | `main` @ `f15b8c5`（§9.3 提交并已推 origin）；`origin` 远端与本地一致（0 ahead / 0 behind）；**`gitee` 镜像本轮未同步**（`git push gitee` / `git ls-remote gitee` 均挂起，本机到 gitee 不可达，见 §9.3） | `git log -1 --oneline`、`git push origin main`、`git ls-remote`（2026-11-10） |
 | 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩 1 个未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **15 文件 / 211 例**；`verify-deployments` **52/52**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；`npm run check` 0；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.2 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
@@ -183,6 +183,25 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 - **未做**：CI run 取证（本机无法访问 GitHub Actions 页面）、生产浏览器 E2E、IGA Pages 探测（缺 `iga_token`）、Render / Azure / Netlify 真实发布（缺平台账号与 secret）。
 - **结论**：本轮修复的是「工作树与 HEAD 不一致导致 CI 依赖悬空」这一确凿缺陷，以及由此派生的清单口径漂移；生产侧结论不变——**未取得线上取证，不声明已上线**。
+
+### 9.3 提交、双推与真实 CI 取证（2026-11-10 01:2x–01:5x +08:00）
+
+**性质**：把 §9.2 的修复真正推上去并取一次真实 CI 结果；本轮只改 `.github/workflows/deploy.yml` 的凭据守卫与本节，不改任何业务代码。
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| 提交 | `f15b8c5`（12 files changed, 301 insertions, 152 deletions） | ✅ |
+| `origin/main` | `e7e364d..f15b8c5  main -> main` | ✅ |
+| `gitee` 镜像 | `git push gitee main` 与 `git ls-remote gitee` 两次均挂起（>10 分钟无输出后终止） | ❌ 本机到 gitee 不可达，**镜像未同步** |
+| CI（`gh` 取证） | run **42664471175**（Deploy @ `f15b8c5`）failure；42664471471（Azure SWA）success；上游 42657119711（Deploy @ `e7e364d`）已 failure、42655995208（Deploy @ `c1f8416`）已 failure | 见下 |
+| Deploy 作业逐项 | 质量门禁 ✅ / 托管平台同步 ✅ / GitHub Pages ✅ / **发布到生产服务器 ❌** / GitHub Packages ✅ | 唯一失败点 |
+| 失败根因 | 失败 step「上传本次提交的部署脚本」日志：`ssh: Could not resolve hostname : Name or service not known` → `@` 前主机名为空 | 凭据缺失 |
+| 凭据取证 | `gh api repos/afdk1991/mim/actions/secrets` → `{"total_count":0,"secrets":[]}` | 仓库**零 secret** |
+
+- **假绿说明**：「托管平台同步（Cloudflare / Vercel / Sealos / IGA / Netlify / Render）success」= 六个平台 step 全部命中 `SKIP: 缺少 XXX; exit 0`，不代表任何平台真的发过；Azure / Pages / Packages 三个作业不依赖私有凭据，属真绿。
+- **本轮修复（`.github/workflows/deploy.yml`）**：新增 `检查生产主机凭据`（id `creds`，输出 `has_creds`），7 个远程步骤加 `if: steps.creds.outputs.has_creds == '1'`，并新增 `未配置凭据 SKIP 提示`（`has_creds == '0'` 时 `::warning::` 明示「不等于已上线」）。凭据齐备时行为与原流程完全一致，失败依旧红；凭据缺失时不再用空主机名硬失败，红信号恢复可判别性。
+- **仍未满足的铁律八**：`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` 属私有凭据（铁律一例外），沙箱无法生成；在补齐前生产部署恒为 SKIP，**不得宣称已上线**。其余平台 token 清单见 `docs/仓库体检报告-2026-11-10.md` §6.4。
+- **本轮本地门禁**（提交前）：`typecheck` 0；api test **15 文件 211/211**；`verify-deployments` **52/52**；`comment-check --strict` 0；`env-check` 0；`deploy.yml` 经 `yaml.safe_load` 解析通过（11 个 step、7 个远程 step 均带 `has_creds == '1'` 守卫）。
 
 
 - **免费是硬约束**：新增平台前必须确认无付费门槛；`veFaaS` 等**无长期免费层**的方案已移出交付范围，不得重新引入。`Render` 因存在长期免费层（750 实例小时/月），已于 2026-11-06 按铁律十改为「免费候选平台」，不再属于排除项。

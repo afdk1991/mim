@@ -71,7 +71,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 生产主机凭据守卫（铁律一 / 十二）。
+      # 2026-11-10 修复：仓库当前未配置任何 secret，上一版直接执行 scp/ssh 导致
+      # 「ssh: Could not resolve hostname : Name or service not known」（主机名取到空串），
+      # main 连续 3 个提交的 Deploy 作业均失败，红信号与「代码真有 bug」无法区分。
+      # 现在：凭据缺失 → 后续远程步骤全部 SKIP 并输出 ::warning::（明确「不等于已上线」）；
+      # 凭据齐备 → 照原流程真实发布，失败依旧红。
+      - name: 检查生产主机凭据
+        id: creds
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "has_creds=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=1" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 配置 SSH
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
@@ -81,6 +101,7 @@ jobs:
       # 服务器到 github.com 的 HTTPS 被阻断，代码同步走 SSH deploy key（见 deploy/deploy.sh）。
       # 先把本次提交的部署脚本推到服务器，避免服务器上的旧脚本把部署跑死。
       - name: 上传本次提交的部署脚本
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           scp -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
             deploy/deploy.sh \
@@ -90,6 +111,7 @@ jobs:
             "sudo -n install -m 755 /tmp/mim-deploy.sh /opt/mim/app/deploy/deploy.sh"
 
       - name: 远程发布（检出本次提交 → 安装 → 构建 → 重启 → 健康检查）
+        if: steps.creds.outputs.has_creds == '1'
         env:
           MIM_SMS_ALIYUN_ACCESS_KEY_ID: ${{ secrets.MIM_SMS_ALIYUN_ACCESS_KEY_ID }}
           MIM_SMS_ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.MIM_SMS_ALIYUN_ACCESS_KEY_SECRET }}
@@ -119,6 +141,7 @@ jobs:
             "sudo -n env $ENV_ARGS bash /opt/mim/app/deploy/deploy.sh $GITHUB_SHA"
 
       - name: 校验服务器代码版本与本次提交一致
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           remote=$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=no \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
@@ -132,6 +155,7 @@ jobs:
           echo "✅ 服务器版本与本次提交一致"
 
       - name: 线上健康检查
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           for i in $(seq 1 10); do
             if curl -fsS --max-time 5 https://mim.mixm.top/health; then
@@ -148,6 +172,7 @@ jobs:
       # 若此步失败，说明服务器 nginx 未安装仓库内的站点配置（历史 BUG：
       # deploy.sh 只 reload 不 install，导致 /admin/* 被用户端 SPA 回退吞掉）。
       - name: 管理后台路由断言
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           set -e
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 https://mim.mixm.top/admin)
@@ -164,6 +189,7 @@ jobs:
 
       # 套餐 / 订阅 / 审计模块已下线：断言对应接口返回 404，防止残留路由复活
       - name: 已下线接口抽查（应 404）
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           set -e
           for path in /api/v1/plans /api/v1/audit/logs; do
@@ -177,6 +203,7 @@ jobs:
 
       # 正向抽查一个仍在线且无需鉴权的接口：空体应返回 400（说明路由已挂载且校验生效）
       - name: 线上认证接口抽查
+        if: steps.creds.outputs.has_creds == '1'
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
             -X POST -H 'Content-Type: application/json' -d '{}' \
@@ -196,6 +223,13 @@ jobs:
             exit 1
           fi
           echo "✅ /api/v1/auth/code 非法 JSON 返回 400（$bad）"
+
+      # 凭据缺失时的显式提示：作业变绿只代表「本地门禁 + 其它平台」通过，
+      # 生产并未部署，不得据此宣称已上线（铁律八 / 十二）。
+      - name: 未配置凭据 SKIP 提示
+        if: steps.creds.outputs.has_creds == '0'
+        run: |
+          echo "::warning::未配置 DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY，生产发布已 SKIP；这不等于「已上线」（铁律八），请补齐仓库 secrets 后重跑本作业。"
 
   # ---------- GitHub Pages：托管前端静态产物 ----------
   # Pages 无服务端，前端必须以 VITE_API_ORIGIN 直连生产 API；跨域由 MIM_CORS_ORIGINS 放行
