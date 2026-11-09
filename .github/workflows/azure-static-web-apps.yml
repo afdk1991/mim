@@ -2,6 +2,12 @@
 # 免费额度：100GB 带宽/月、10 个应用；超额带宽不可用（免费层）。
 # 部署步骤受 AZURE_SWA_TOKEN 保护：未配置该 secret 时直接 SKIP，不会因缺凭证导致 workflow 失败。
 # 在 Azure 门户创建 Static Web App 后，将「Deployment Token」写入仓库 secret AZURE_SWA_TOKEN 即自动接入。
+#
+# 2026-11-10 修复（44df53a 首轮 CI 取证）：
+# 1) secrets 上下文不能直接用于 step if 表达式（当轮 run 失败且 0 个 job），
+#    改为 job 级 env 中转 + if: env.SWA_TOKEN != ''，缺省时安全跳过；
+# 2) runner 无预装 pnpm，补 pnpm/action-setup + setup-node（与 deploy.yml 同款）；
+# 3) output_location 相对 app_location 拼接，去掉与 app_location 的重复路径。
 
 name: Azure Static Web Apps CI
 
@@ -16,20 +22,38 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     name: 构建并部署到 Azure Static Web Apps
+    # secret 经 env 中转：step if 只引用 env，避免 secrets 上下文直接进表达式
+    env:
+      SWA_TOKEN: ${{ secrets.AZURE_SWA_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
         with:
-          submodules: true
+          version: 9.12.0
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
       - name: 构建前端薄壳
         run: pnpm install --frozen-lockfile && pnpm --filter @mim/web build
 
       - name: 部署到 Azure Static Web Apps
-        if: ${{ secrets.AZURE_SWA_TOKEN != '' }}
+        if: env.SWA_TOKEN != ''
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
+          # 前一步已完成构建，产物在 apps/web/dist；output 为 app_location 本身
           app_location: "apps/web/dist"
-          output_location: "apps/web/dist"
+          output_location: "."
+          skip_app_build: true
+
+      - name: 缺省 SKIP 提示
+        if: env.SWA_TOKEN == ''
+        run: echo "SKIP: 缺少 AZURE_SWA_TOKEN（Azure Static Web Apps 未接入），构建已验证、部署跳过"
