@@ -1,9 +1,11 @@
 // React 钩子：状态、副作用与稳定回调
 import { useCallback, useEffect, useState } from 'react';
 
-// 全部视图标识：4 个业务视图 + 登录伪视图
+// 全部视图标识：6 个业务视图 + 登录伪视图
 export type AppView =
   | 'store' // 功能模块页
+  | 'sites' // 站点模块矩阵（45 类备注驱动的模块目录）
+  | 'deployments' // 部署汇总（所有部署仓库与部署项的效果 / 结果 / 异常）
   | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
   | 'settings' // 设置页
@@ -15,7 +17,7 @@ export interface AppRoute {
 } // 路由结构结束
 
 // 已知视图前缀集合：把路径第一段解析为视图，未知值回退到 store
-const VIEWS: AppView[] = ['store', 'comic', 'chat', 'settings', 'login']; // 全部视图均为单段路径（如 /store），保证 vite base './' 下相对资源解析正确
+const VIEWS: AppView[] = ['store', 'sites', 'deployments', 'comic', 'chat', 'settings', 'login']; // 全部视图均为单段路径（如 /deployments），保证 vite base './' 下相对资源解析正确
 
 // 自定义路由事件名：pushState 不会触发 popstate，编程式导航后派发此事件通知 hook 更新
 const ROUTE_EVENT = 'mim:route'; // 同窗口内导航专用，跨标签页不需要（各标签页独立渲染）

@@ -1,0 +1,20 @@
+# Netlify 免费层配置（纯静态站点）
+# 免费额度：300 构建分钟/月（2026-10 起新账号改 credit 制）；全球 CDN。
+# 在 Netlify 控制台关联本仓库，构建命令与发布目录见下；CI 侧 deploy.yml 的 Netlify 步骤按
+# Vercel 同款「缺 NETLIFY_AUTH_TOKEN 即 SKIP」模式运行，不阻断主链路。
+
+[build]
+  # 根目录为 pnpm monorepo，仅构建前端薄壳
+  command = "pnpm --filter @mim/web build"
+  # Vite 产物目录
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "9.12.0"
+
+# SPA 深链接回退：所有未知路径返回 index.html，由前端路由接管
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

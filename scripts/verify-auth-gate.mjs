@@ -99,7 +99,13 @@ check('spa.js 已移除会话门禁', !spaGate.includes('data-auth-gate') && !sp
 // 静态 HTML 入口：三份静态文档的同款内联门禁必须清零，匿名可直读
 const gatedFiles = ['site/index.html', 'site/prd.html', 'Mim-PRD.html']; // 三份静态文档
 for (const rel of gatedFiles) { // 逐个检查
-  // 断言门禁标记与门禁脚本注释均已移除
+  // A1 修复（2026-11-10）：site/* 已下线后 read() 返回空串，使「不含门禁标记」恒为真（假阳性）；
+  // 改为 existsSync 显式区分「文件存在须检内容」与「已下线仅登记」，两者都计入断言总数，保持 35/35 口径
+  if (!existsSync(join(ROOT, rel))) { // 文件不在工作树
+    check(`静态页 ${rel} 已下线（文件不存在，按已下线登记）`, true, ''); // 显式登记下线状态，不再以空串冒充内容检查
+    continue; // 跳过内容级断言
+  } // 下线分支结束
+  // 断言门禁标记与门禁脚本注释均已移除（仅对仍存在的文件执行）
   const html = read(rel); // 读取文件内容
   check(`静态页 ${rel} 已移除门禁`, !html.includes('data-auth-gate') && !html.includes('全站会话门禁'), '静态页门禁脚本残留'); // 零遗漏
 } // 静态入口遍历结束

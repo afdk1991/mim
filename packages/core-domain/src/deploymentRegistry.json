@@ -1,0 +1,694 @@
+{
+  "schema": "mim.deployment-registry.v1",
+  "capturedAt": "2026-11-09 23:03 +08:00",
+  "head": "3b9b251",
+  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 9 平台，另补远端镜像仓与独立 Worker 两类同类项",
+  "sources": [
+    "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-09 23:03 实测）",
+    "git ls-tree HEAD <artifact>（2026-11-09 23:03 实测，区分远端 HEAD 与本地工作树）",
+    "curl 逐平台探测（2026-11-09 23:03 实测）",
+    "AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3",
+    "README.md「多平台部署矩阵」与「站点与部署」",
+    ".github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）"
+  ],
+  "field_spec": {
+    "id": "规范唯一键，全表不得重复；同一平台的不同载体用不同 id，同一载体的不同发布形态不另开行",
+    "name": "统一中文名称，消除同名异写",
+    "aliases": "归并进本行的历史别名 / 文档异写，作为不重复计数的证据",
+    "platform_id": "归属平台规范编码，必落 platform_catalog 之一",
+    "platform": "归属平台展示名",
+    "layer": "层级：production | distribution | source",
+    "kind": "载体：repository | server | static_site | container_image | container_service | worker",
+    "repository": "仓库标识统一三字段：id（规范仓库 ID）/ url / role；无仓库载体时 id 与 url 为 null",
+    "entry_url": "部署入口；无公开入口时为 null 并在 missing_fields 标注",
+    "delivery": "交付链路统一六字段：mode / ci_job / ci_step / artifact / artifact_in_head / artifact_in_worktree / credential",
+    "status": "部署状态，取值见 status_codes",
+    "result": "部署结果对象；null 表示本轮无任何取证（空数据），取值见 verdict_codes",
+    "anomalies": "异常说明数组：code / severity / message，空数组表示无异常",
+    "missing_fields": "缺失信息清单：字段名或工件路径，空数组表示信息齐备",
+    "sources": "该行结论的取证来源"
+  },
+  "status_codes": {
+    "OK": "部署链路配置完整且本轮取证通过",
+    "BROKEN": "存在阻断性缺陷（工件缺失 / 生产不可达 / CI 悬空风险）",
+    "UNVERIFIED": "链路已配置但本轮无可信取证（超时 / 缺私有凭证）",
+    "MANUAL": "仅手工直传或手工触发，无固定自动化链路",
+    "NOT_APPLICABLE": "候选池 / 已排除项，不是部署项，不计入汇总"
+  },
+  "verdict_codes": {
+    "PASS": "本轮真实请求或 git 通道取证通过",
+    "DEGRADED": "可达但内容层不可核验（WAF 挑战页 / 设计内降级）",
+    "FAIL": "本轮请求失败或明确不可达",
+    "NOT_TESTED": "本轮未发起探测，附客观原因",
+    "EMPTY": "探测已发起但返回空数据（无响应体 / 无 hash / 无记录）"
+  },
+  "severity_codes": {
+    "critical": "🔴 阻断生产或交付链路，须修复",
+    "warning": "🟡 信息缺口或潜在悬空，须跟踪",
+    "info": "🟢 设计内行为或历史差异，不影响结论"
+  },
+  "layer_codes": {
+    "production": "生产权威终点，唯一可据以宣称「已上线」",
+    "distribution": "分发 / 镜像 / 可用性取证层，不得替代生产",
+    "source": "源码托管与镜像仓，不承担生产运行"
+  },
+  "platform_catalog": [
+    { "id": "tcloud", "name": "腾讯云自建服务器", "in_matrix": true },
+    { "id": "edgeone", "name": "腾讯云 EdgeOne Pages", "in_matrix": true },
+    { "id": "github-pages", "name": "GitHub Pages", "in_matrix": true },
+    { "id": "sealos", "name": "Sealos", "in_matrix": true },
+    { "id": "cloudflare", "name": "Cloudflare Pages / Workers", "in_matrix": true },
+    { "id": "ghcr", "name": "GitHub Packages (ghcr)", "in_matrix": true },
+    { "id": "iga", "name": "IGA Pages", "in_matrix": true },
+    { "id": "vercel", "name": "Vercel", "in_matrix": true },
+    { "id": "github", "name": "GitHub 仓库", "in_matrix": true },
+    { "id": "gitee", "name": "Gitee 镜像仓", "in_matrix": false },
+    { "id": "cloudflare-worker", "name": "Cloudflare 独立 Worker", "in_matrix": false },
+    { "id": "gitlab", "name": "GitLab 仓库", "in_matrix": false },
+    { "id": "bitbucket", "name": "Bitbucket 仓库", "in_matrix": false },
+    { "id": "netlify", "name": "Netlify", "in_matrix": false },
+    { "id": "azure-swa", "name": "Azure Static Web Apps", "in_matrix": false },
+    { "id": "render", "name": "Render", "in_matrix": false }
+  ],
+  "ci_jobs": [
+    { "id": "verify", "role": "质量门禁（类型检查 / 测试 / 构建）", "is_deploy": false },
+    { "id": "deploy", "role": "生产服务器 SSH 发布", "is_deploy": true },
+    { "id": "pages", "role": "GitHub Pages 静态站发布", "is_deploy": true },
+    { "id": "packages", "role": "ghcr 容器镜像推送", "is_deploy": true },
+    { "id": "platforms", "role": "Vercel / Cloudflare Pages / Sealos / IGA Pages 托管平台同步", "is_deploy": true }
+  ],
+  "coverage": {
+    "matrix_platforms": 9,
+    "total_platforms": 16,
+    "deployment_items": 16,
+    "git_remotes": 2,
+    "planned_git_remotes": 2,
+    "ci_jobs": 5,
+    "deploy_ci_jobs": 4,
+    "newly_adopted_free_tier": 5,
+    "dedup_note": "README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。",
+    "added_note": "相对铁律九 9 行矩阵补齐 2 项：Gitee 镜像仓（§12.2 有、README 矩阵缺）与独立 Worker mim-store（README 取证段有、矩阵表缺）。2026-11-10 用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
+    "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。"
+  },
+  "excluded": [
+    { "id": "candidate.cf-workers", "name": "Cloudflare Workers（免费层）", "reason": "已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列" },
+    { "id": "excluded.vefaas", "name": "veFaaS", "reason": "无长期免费层，铁律九明确排除，不得重新引入" }
+  ],
+  "items": [
+    {
+      "id": "repo.github",
+      "name": "GitHub 源码主仓",
+      "aliases": ["GitHub 仓库", "源码主仓", "origin", "github.com/afdk1991/mim"],
+      "platform_id": "github",
+      "platform": "GitHub 仓库",
+      "layer": "source",
+      "kind": "repository",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "源码主仓 + CI 触发源"
+      },
+      "entry_url": "https://github.com/afdk1991/mim",
+      "delivery": {
+        "mode": "push",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": null,
+        "artifact_in_head": null,
+        "artifact_in_worktree": null,
+        "credential": "GITHUB_TOKEN / SSH deploy key",
+        "modes": []
+      },
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": null,
+        "latency_ms": null,
+        "bytes": null,
+        "evidence": "git ls-remote origin refs/heads/main = 3b9b251106356a704afe678eedb55ecab3986509，与本地 HEAD 3b9b251 一致（0 ahead / 0 behind）",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "HTTPS_BLOCKED", "severity": "info", "message": "github.com 网页本机 TLS 握手被阻断，仓库同步改以 git ls-remote 取证，不影响同步结论" }
+      ],
+      "missing_fields": [],
+      "sources": ["git remote -v", "git ls-remote origin", "AGENTS.md §12.2", "AGENTS.md §9.1"]
+    },
+    {
+      "id": "repo.gitee",
+      "name": "Gitee 国内镜像仓",
+      "aliases": ["Gitee", "gitee", "mallwm_admin/mim", "国内镜像仓"],
+      "platform_id": "gitee",
+      "platform": "Gitee 镜像仓",
+      "layer": "source",
+      "kind": "repository",
+      "repository": {
+        "id": "gitee:mallwm_admin/mim",
+        "url": "https://gitee.com/mallwm_admin/mim.git",
+        "role": "国内镜像仓（铁律十二要求同轮全推）"
+      },
+      "entry_url": "https://gitee.com/mallwm_admin/mim",
+      "delivery": {
+        "mode": "push",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": null,
+        "artifact_in_head": null,
+        "artifact_in_worktree": null,
+        "credential": "Gitee 账号凭证（本轮缺失）",
+        "modes": []
+      },
+      "status": "UNVERIFIED",
+      "result": {
+        "verdict": "NOT_TESTED",
+        "http_code": null,
+        "latency_ms": 12000,
+        "bytes": null,
+        "evidence": "git ls-remote gitee refs/heads/main exit 124（12s 超时），仅返回 TLS 证书校验禁用告警、无 hash；本轮未取得远端 HEAD，不冒充全量同步",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "REMOTE_TIMEOUT", "severity": "critical", "message": "镜像仓本轮未取证，铁律十二 §12.2「双远端同轮全推」无法判定达成" },
+        { "code": "MATRIX_ROW_MISSING", "severity": "warning", "message": "README「多平台部署矩阵」未列 Gitee 镜像仓行，本汇总按 §12.2 补齐" }
+      ],
+      "missing_fields": ["remote_head_hash", "push_credential"],
+      "sources": ["git remote -v", "git ls-remote gitee（exit 124）", "AGENTS.md §12.2", "AGENTS.md §9.1 V1"]
+    },
+    {
+      "id": "server.tcloud",
+      "name": "腾讯云自建服务器（唯一生产权威终点）",
+      "aliases": ["腾讯云自建", "自建主站", "生产主站", "mim.mixm.top", "宿主机直部署"],
+      "platform_id": "tcloud",
+      "platform": "腾讯云自建服务器",
+      "layer": "production",
+      "kind": "server",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "服务器检出源（git@github.com:22 + 只读 deploy_key）"
+      },
+      "entry_url": "https://mim.mixm.top",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "deploy",
+        "ci_step": "远程发布（检出本次提交 → 安装 → 构建 → 重启 → 健康检查）",
+        "artifact": "deploy/deploy.sh",
+        "artifact_in_head": true,
+        "artifact_in_worktree": false,
+        "credential": "SSH 私钥 / MIM_AUTH_ADMIN_PASSWORD / tccli（本轮缺失）",
+        "modes": ["ci-ssh"]
+      },
+      "status": "BROKEN",
+      "result": {
+        "verdict": "FAIL",
+        "http_code": "000",
+        "latency_ms": 2123,
+        "bytes": 0,
+        "evidence": "curl -sS -o /dev/null -w '%{http_code}' --max-time 6 https://mim.mixm.top/health → http=000 time=2.123s exit 7，本地代理 CONNECT tunnel failed, response 502；DNS 正常解析 115.159.159.11",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "PRODUCTION_UNREACHABLE", "severity": "critical", "message": "生产 /health 本轮 000，无 V2/V3/V4 线上取证，不得宣称「已上线」；本机不可达 ≠ 部署失败，但主机侧亦不可验证" },
+        { "code": "WORKTREE_ARTIFACT_MISSING", "severity": "warning", "message": "deploy/ 全目录已从工作树移除（21 个 staged D 未提交）；远端 HEAD 3b9b251 仍含全部工件，CI 当前可读，一旦提交删除即悬空" },
+        { "code": "MISSING_HOST_CREDENTIALS", "severity": "warning", "message": "无 SSH 私钥 / tccli / 管理员口令，主机侧状态（systemd / nginx / SQLite）本轮无法验证" }
+      ],
+      "missing_fields": ["server_side_state", "ssh_private_key", "tccli_credentials", "deploy/deploy.sh（工作树）", "deploy/nginx-mim.conf（工作树）", "V2_health_200", "V3_modules_200", "V4_browser_e2e"],
+      "sources": ["curl https://mim.mixm.top/health", "git ls-tree HEAD deploy/...", "git diff --cached --name-status", "AGENTS.md §12.3 / §12.4", ".github/workflows/deploy.yml job deploy"]
+    },
+    {
+      "id": "pages.github",
+      "name": "GitHub Pages 前端静态站",
+      "aliases": ["GitHub Pages", "afdk1991.github.io/mim/", "Pages 静态站"],
+      "platform_id": "github-pages",
+      "platform": "GitHub Pages",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "Pages 构建源（CI job pages）"
+      },
+      "entry_url": "https://afdk1991.github.io/mim/",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "pages",
+        "ci_step": "发布到 GitHub Pages",
+        "artifact": ".github/workflows/deploy.yml",
+        "artifact_in_head": true,
+        "artifact_in_worktree": true,
+        "credential": "GITHUB_TOKEN（pages: write）",
+        "modes": ["ci-configure-pages", "ci-upload-pages-artifact", "ci-deploy-pages"]
+      },
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 472,
+        "bytes": 5182,
+        "evidence": "curl -sS -o /dev/null -w '%{http_code}|%{time_total}|%{size_download}' https://afdk1991.github.io/mim/ → 200|0.471593|5182",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "SPA_FALLBACK_WORKTREE_MISSING", "severity": "warning", "message": "scripts/spa-404.mjs 与 apps/web/public/_redirects 已从工作树移除（未提交，远端 HEAD 仍在），本地无法复现深链接 404.html 链路" },
+        { "code": "DEEP_LINK_404_BY_DESIGN", "severity": "info", "message": "/mim/store 返回 404 + 5182B 为 dist/404.html 逐字节副本的平台能力上限，浏览器加载后 SPA 正常启动" }
+      ],
+      "missing_fields": ["scripts/spa-404.mjs（工作树）", "apps/web/public/_redirects（工作树）"],
+      "sources": ["curl https://afdk1991.github.io/mim/", "git ls-tree HEAD", ".github/workflows/deploy.yml job pages", "README 多平台部署矩阵"]
+    },
+    {
+      "id": "packages.ghcr",
+      "name": "GitHub Packages 容器镜像（ghcr）",
+      "aliases": ["ghcr", "GitHub Packages", "ghcr.io/afdk1991/mim-api", "容器镜像"],
+      "platform_id": "ghcr",
+      "platform": "GitHub Packages (ghcr)",
+      "layer": "distribution",
+      "kind": "container_image",
+      "repository": {
+        "id": "ghcr:afdk1991/mim-api",
+        "url": "https://ghcr.io/afdk1991/mim-api",
+        "role": "容器镜像仓库（latest / sha 双标签）"
+      },
+      "entry_url": "https://ghcr.io/v2/",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "packages",
+        "ci_step": "构建并推送镜像",
+        "artifact": "Dockerfile",
+        "artifact_in_head": true,
+        "artifact_in_worktree": false,
+        "credential": "GITHUB_TOKEN（packages: write）",
+        "modes": ["ci-docker-build-push"]
+      },
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": "401",
+        "latency_ms": 3459,
+        "bytes": 73,
+        "evidence": "curl https://ghcr.io/v2/ → 401 / 3.459s / 73B，未鉴权 UNAUTHORIZED 属镜像仓库正常行为；CI job packages success 为推送替代取证",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "AUTH_401_BY_DESIGN", "severity": "info", "message": "未鉴权 401 为 ghcr 预期响应，不判定为部署失败" },
+        { "code": "DOCKERFILE_WORKTREE_MISSING", "severity": "warning", "message": "Dockerfile 与 .dockerignore 已从工作树移除（未提交，远端 HEAD 仍在），本地无法复现镜像构建；提交删除后 CI job packages 将悬空" }
+      ],
+      "missing_fields": ["Dockerfile（工作树）", ".dockerignore（工作树）", "image_digest"],
+      "sources": ["curl https://ghcr.io/v2/", "git ls-tree HEAD Dockerfile", ".github/workflows/deploy.yml job packages", "AGENTS.md §9.1"]
+    },
+    {
+      "id": "pages.edgeone",
+      "name": "腾讯云 EdgeOne Pages（直传静态站）",
+      "aliases": ["EdgeOne Pages", "data.mixm.top", "mim-app", "direct upload 直传"],
+      "platform_id": "edgeone",
+      "platform": "腾讯云 EdgeOne Pages",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": null,
+        "url": null,
+        "role": "无仓库连接，构建产物本地直传"
+      },
+      "entry_url": "https://data.mixm.top",
+      "delivery": {
+        "mode": "manual",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": "apps/web/dist",
+        "artifact_in_head": null,
+        "artifact_in_worktree": null,
+        "credential": "EdgeOne Makers CLI 登录态",
+        "modes": ["manual-direct-upload"]
+      },
+      "status": "MANUAL",
+      "result": {
+        "verdict": "DEGRADED",
+        "http_code": "200",
+        "latency_ms": 101,
+        "bytes": 984,
+        "evidence": "curl https://data.mixm.top/ → 200 / 0.101s / 984B，命中 EdgeOne WAF 机器校验页（EO_Bot_Ssid / _0x649a），按 WAF 假阳性规则不作内容层取证",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "WAF_FALSE_POSITIVE", "severity": "warning", "message": "200 + 984B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期" },
+        { "code": "NO_CI_LINK", "severity": "info", "message": "最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站" }
+      ],
+      "missing_fields": ["content_layer_e2e", "last_deployment_id（本轮）"],
+      "sources": ["curl https://data.mixm.top/", "AGENTS.md §9 / §9.1 / WAF 假阳性判别规则", "README 多平台部署矩阵"]
+    },
+    {
+      "id": "pages.cloudflare",
+      "name": "Cloudflare Pages / Workers 前端站",
+      "aliases": ["Cloudflare Pages", "mim-8ah.pages.dev", "同源自托管入口（_worker.js）", "Cloudflare Pages 同源自托管入口"],
+      "platform_id": "cloudflare",
+      "platform": "Cloudflare Pages / Workers",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "CI 构建源；同源自托管 Worker 为手工直传，不经仓库"
+      },
+      "entry_url": "https://mim-8ah.pages.dev/",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Cloudflare Pages",
+        "artifact": "wrangler.toml",
+        "artifact_in_head": true,
+        "artifact_in_worktree": false,
+        "credential": "CLOUDFLARE_API_TOKEN / CLOUDFLARE_WRANGLER_CONFIG",
+        "modes": ["ci-reverse-proxy(wrangler.toml + functions/)", "manual-same-origin-worker(.tmp/pages-src/_worker.js)"]
+      },
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 1283,
+        "bytes": 5182,
+        "evidence": "curl https://mim-8ah.pages.dev/ → 200 / 1.283s / 5182B；README 另载 2026-11-09 同源入口 /health 200/53B、/api/v1/modules 200/3411B（8 模块）、Edge CDP E2E 5/5",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "DUPLICATE_MATRIX_ROW_MERGED", "severity": "info", "message": "README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数" },
+        { "code": "LOCAL_PROCESS_DEPENDENCY", "severity": "warning", "message": "同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口" },
+        { "code": "MANUAL_DEPLOY_OVERWRITE", "severity": "warning", "message": "wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置" },
+        { "code": "CF_ARTIFACTS_WORKTREE_MISSING", "severity": "warning", "message": "wrangler.toml 与 functions/[[catchall]].js 已从工作树移除（未提交，远端 HEAD 仍在）；提交删除后 CI Cloudflare 步骤与 SPA 深链接回退将悬空" }
+      ],
+      "missing_fields": ["wrangler.toml（工作树）", "functions/[[catchall]].js（工作树）"],
+      "sources": ["curl https://mim-8ah.pages.dev/", "git ls-tree HEAD", ".github/workflows/deploy.yml step Cloudflare Pages", "README 多平台部署矩阵 / 2026-11-09 取证段"]
+    },
+    {
+      "id": "pages.vercel",
+      "name": "Vercel 前端静态站",
+      "aliases": ["Vercel", "mim-puce.vercel.app", "vercel.json rewrites"],
+      "platform_id": "vercel",
+      "platform": "Vercel",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "CI 构建源（干净静态目录直传，非仓库连接）"
+      },
+      "entry_url": "https://mim-puce.vercel.app",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Vercel",
+        "artifact": "vercel.json",
+        "artifact_in_head": true,
+        "artifact_in_worktree": false,
+        "credential": "VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID（本轮 secrets 为空）",
+        "modes": ["ci-vercel-cli-deploy"]
+      },
+      "status": "UNVERIFIED",
+      "result": {
+        "verdict": "FAIL",
+        "http_code": "000",
+        "latency_ms": 1229,
+        "bytes": 0,
+        "evidence": "curl https://mim-puce.vercel.app/ → 000 / 1.229s / exit 35 schannel failed to receive handshake, SSL/TLS connection failed；本机网络侧 TLS 阻断 / DNS 污染特征",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "CI_SKIP_FALSE_GREEN", "severity": "warning", "message": "README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署" },
+        { "code": "VERCEL_CONFIG_WORKTREE_MISSING", "severity": "warning", "message": "vercel.json 已从工作树移除（未提交，远端 HEAD 仍在），本地无法复现 rewrite 反代配置" }
+      ],
+      "missing_fields": ["vercel.json（工作树）", "vercel_secrets", "deployment_url（本轮）"],
+      "sources": ["curl https://mim-puce.vercel.app/", "git ls-tree HEAD vercel.json", ".github/workflows/deploy.yml step Vercel", "AGENTS.md §9.1"]
+    },
+    {
+      "id": "container.sealos",
+      "name": "Sealos 容器服务（纯 API）",
+      "aliases": ["Sealos", "mim-i3ywsdfn.cloud.sealos.io", "ns-i3ywsdfn", "容器 + PVC"],
+      "platform_id": "sealos",
+      "platform": "Sealos",
+      "layer": "distribution",
+      "kind": "container_service",
+      "repository": {
+        "id": "ghcr:afdk1991/mim-api",
+        "url": "https://ghcr.io/afdk1991/mim-api",
+        "role": "容器镜像来源（Deployment 拉取）"
+      },
+      "entry_url": "https://mim-i3ywsdfn.cloud.sealos.io/health",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Sealos",
+        "artifact": "deploy/sealos/mim.yaml",
+        "artifact_in_head": true,
+        "artifact_in_worktree": false,
+        "credential": "SEALOS_KUBECONFIG / SEALOS_DOMAIN / SEALOS_NAMESPACE / MIM_JWT_SECRET",
+        "modes": ["ci-kubectl-apply"]
+      },
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 1111,
+        "bytes": 53,
+        "evidence": "curl https://mim-i3ywsdfn.cloud.sealos.io/health → 200 / 1.111s / 53B（{\"status\":\"ok\"}）",
+        "captured_at": "2026-11-09 23:03 +08:00"
+      },
+      "anomalies": [
+        { "code": "ROOT_404_BY_DESIGN", "severity": "info", "message": "纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA" },
+        { "code": "SEALOS_MANIFEST_WORKTREE_MISSING", "severity": "warning", "message": "deploy/sealos/mim.yaml 已从工作树移除（未提交，远端 HEAD 仍在）；提交删除后 CI Sealos 步骤将悬空" }
+      ],
+      "missing_fields": ["deploy/sealos/mim.yaml（工作树）"],
+      "sources": ["curl https://mim-i3ywsdfn.cloud.sealos.io/health", "git ls-tree HEAD", ".github/workflows/deploy.yml step Sealos", "AGENTS.md §9.1"]
+    },
+    {
+      "id": "pages.iga",
+      "name": "IGA Pages 前端静态站",
+      "aliases": ["IGA Pages", "preview.iga-pages.com", "Project fr95fuwu57", "Deploy p4f5a4svqm"],
+      "platform_id": "iga",
+      "platform": "IGA Pages",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": null,
+        "url": null,
+        "role": "无公开仓库连接，CLI 直传"
+      },
+      "entry_url": "https://preview.iga-pages.com",
+      "delivery": {
+        "mode": "manual",
+        "ci_job": "platforms",
+        "ci_step": "IGA Pages",
+        "artifact": "deploy/iga/deploy.sh",
+        "artifact_in_head": true,
+        "artifact_in_worktree": false,
+        "credential": "iga_token（私有凭证，本轮缺失）",
+        "modes": ["ci-iga-cli", "manual-iga-cli"]
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮无任何探测取证（result = null 空数据），不以历史 200 冒充现状" },
+        { "code": "PRIVATE_TOKEN_REQUIRED", "severity": "warning", "message": "入口需 iga_token 私有凭证，沙箱缺失；按铁律一如实标注未测" },
+        { "code": "IGA_SCRIPT_WORKTREE_MISSING", "severity": "warning", "message": "deploy/iga/deploy.sh 已从工作树移除（未提交，远端 HEAD 仍在）；提交删除后 CI IGA 步骤将悬空" }
+      ],
+      "missing_fields": ["http_code", "latency_ms", "bytes", "iga_token", "deploy/iga/deploy.sh（工作树）", "captured_at"],
+      "sources": ["AGENTS.md §9.1（IGA Pages 未测）", ".github/workflows/deploy.yml step IGA Pages", "README 多平台部署矩阵", "git ls-tree HEAD"]
+    },
+    {
+      "id": "worker.mim-store",
+      "name": "Cloudflare 独立 Worker（mim-store 固定入口）",
+      "aliases": ["mim-store", "mim-store.15726833367.workers.dev", "Version a31ecf09", "固定入口 Worker"],
+      "platform_id": "cloudflare-worker",
+      "platform": "Cloudflare 独立 Worker",
+      "layer": "distribution",
+      "kind": "worker",
+      "repository": {
+        "id": null,
+        "url": null,
+        "role": "无仓库连接，wrangler 手工发布"
+      },
+      "entry_url": "https://mim-store.15726833367.workers.dev",
+      "delivery": {
+        "mode": "manual",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": null,
+        "artifact_in_head": null,
+        "artifact_in_worktree": null,
+        "credential": "Cloudflare 账号登录态",
+        "modes": ["manual-wrangler-worker"]
+      },
+      "status": "MANUAL",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮未对该 Worker 单独探测（result = null 空数据），不以同源 Pages 的 200 冒充" },
+        { "code": "DNS_POLLUTION", "severity": "warning", "message": "README 2026-11-09 取证载明本机 *.workers.dev 被 DNS 污染（156.233.67.243、443 不通），不作国内入口" },
+        { "code": "MATRIX_ROW_MISSING", "severity": "info", "message": "仅出现在 README 取证段落、矩阵表未列；因其域名与载体均不同于 pages.cloudflare，本汇总另列一行避免遗漏" }
+      ],
+      "missing_fields": ["http_code", "latency_ms", "bytes", "captured_at", "worker_source_path"],
+      "sources": ["README 2026-11-09 取证段落", "AGENTS.md §10.3 Cloudflare Workers 候选口径"]
+    },
+    {
+      "id": "repo.gitlab",
+      "name": "GitLab 源码镜像仓（免费层）",
+      "aliases": ["GitLab", "gitlab.com/afdk1991/mim", "镜像仓候选"],
+      "platform_id": "gitlab",
+      "platform": "GitLab 仓库",
+      "layer": "source",
+      "kind": "repository",
+      "repository": {
+        "id": null,
+        "url": null,
+        "role": "计划镜像仓（待关联账号后 git remote add）"
+      },
+      "entry_url": null,
+      "delivery": {
+        "mode": "push",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": null,
+        "artifact_in_head": null,
+        "artifact_in_worktree": null,
+        "credential": "GITLAB_TOKEN（待配置）",
+        "modes": []
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论" },
+        { "code": "ADOPTED_FREE_TIER_PENDING", "severity": "info", "message": "已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入" }
+      ],
+      "missing_fields": ["git_remote", "remote_head_hash", "push_credential", "http_code"],
+      "sources": ["用户决策 2026-11-10：全部采用免费层", "用户平台对比表（GitLab 免费层）"]
+    },
+    {
+      "id": "repo.bitbucket",
+      "name": "Bitbucket 源码镜像仓（免费层）",
+      "aliases": ["Bitbucket", "bitbucket.org/afdk1991/mim", "镜像仓候选"],
+      "platform_id": "bitbucket",
+      "platform": "Bitbucket 仓库",
+      "layer": "source",
+      "kind": "repository",
+      "repository": {
+        "id": null,
+        "url": null,
+        "role": "计划镜像仓（待关联账号后 git remote add）"
+      },
+      "entry_url": null,
+      "delivery": {
+        "mode": "push",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": null,
+        "artifact_in_head": null,
+        "artifact_in_worktree": null,
+        "credential": "Bitbucket App Password（待配置）",
+        "modes": []
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论" },
+        { "code": "ADOPTED_FREE_TIER_PENDING", "severity": "info", "message": "已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入" }
+      ],
+      "missing_fields": ["git_remote", "remote_head_hash", "push_credential", "http_code"],
+      "sources": ["用户决策 2026-11-10：全部采用免费层", "用户平台对比表（Bitbucket 免费层）"]
+    },
+    {
+      "id": "pages.netlify",
+      "name": "Netlify 前端静态站（免费层）",
+      "aliases": ["Netlify", "mim.netlify.app", "纯静态免费候选"],
+      "platform_id": "netlify",
+      "platform": "Netlify",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "CI 构建源（干净静态目录直传）"
+      },
+      "entry_url": null,
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Netlify",
+        "artifact": "netlify.toml",
+        "artifact_in_head": false,
+        "artifact_in_worktree": true,
+        "credential": "NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID（待配置）",
+        "modes": ["ci-netlify-cli-deploy"]
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮未部署，result = null 空数据；已落地 netlify.toml（发布 apps/web/dist + SPA 回退），CI 步骤按 Vercel 同款 SKIP 模式待 secrets 接入" },
+        { "code": "ADOPTED_FREE_TIER_PENDING", "severity": "info", "message": "已决策采用（免费层：300 构建分钟/月，2026-10 起新账号改 credit 制；表单 / A-B 测试等附加功能多）" }
+      ],
+      "missing_fields": ["http_code", "latency_ms", "bytes", "NETLIFY_AUTH_TOKEN", "NETLIFY_SITE_ID", "deployment_url（本轮）"],
+      "sources": ["用户决策 2026-11-10：全部采用免费层", "用户平台对比表（Netlify 免费层）", "netlify.toml（新增）"]
+    },
+    {
+      "id": "pages.azure-swa",
+      "name": "Azure Static Web Apps 前端站（免费层）",
+      "aliases": ["Azure SWA", "Azure Static Web Apps", "纯静态免费候选"],
+      "platform_id": "azure-swa",
+      "platform": "Azure Static Web Apps",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "CI 构建源（独立 SWA workflow 驱动）"
+      },
+      "entry_url": null,
+      "delivery": {
+        "mode": "ci",
+        "ci_job": null,
+        "ci_step": null,
+        "artifact": ".github/workflows/azure-static-web-apps.yml",
+        "artifact_in_head": false,
+        "artifact_in_worktree": true,
+        "credential": "AZURE_SWA_TOKEN（待配置）",
+        "modes": ["ci-azure-swa-deploy"]
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入" },
+        { "code": "ADOPTED_FREE_TIER_PENDING", "severity": "info", "message": "已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用）" }
+      ],
+      "missing_fields": ["http_code", "latency_ms", "bytes", "AZURE_SWA_TOKEN", "deployment_url（本轮）"],
+      "sources": ["用户决策 2026-11-10：全部采用免费层", "用户平台对比表（Azure SWA 免费层）", ".github/workflows/azure-static-web-apps.yml（新增）"]
+    },
+    {
+      "id": "container.render",
+      "name": "Render 前端静态站（免费层）",
+      "aliases": ["Render", "mim.onrender.com", "免费候选平台"],
+      "platform_id": "render",
+      "platform": "Render",
+      "layer": "distribution",
+      "kind": "static_site",
+      "repository": {
+        "id": "github:afdk1991/mim",
+        "url": "https://github.com/afdk1991/mim.git",
+        "role": "CI 构建源（render.yaml 声明免费静态站点）"
+      },
+      "entry_url": null,
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Render",
+        "artifact": "render.yaml",
+        "artifact_in_head": true,
+        "artifact_in_worktree": true,
+        "credential": "RENDER_API_KEY / RENDER_SERVICE_ID（待配置）",
+        "modes": ["ci-render-deploy-trigger"]
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤按 Vercel 同款 SKIP 模式待 secrets 接入" },
+        { "code": "ADOPTED_FREE_TIER_PENDING", "severity": "info", "message": "已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务）" }
+      ],
+      "missing_fields": ["http_code", "latency_ms", "bytes", "RENDER_API_KEY", "RENDER_SERVICE_ID", "deployment_url（本轮）"],
+      "sources": ["用户决策 2026-11-10：全部采用免费层", "用户平台对比表（Render 免费层）", "render.yaml（新增）"]
+    }
+  ]
+}

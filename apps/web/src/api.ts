@@ -499,6 +499,223 @@ export interface ImUser {
   region: string; // 区域
 } // ImUser 结束
 
+// ---------- 统一入口配置清单（entries / sites）共享类型 ----------
+
+export interface SiteCapability { // 单个功能点：由业务系统语义派生的最小可运行能力
+  code: string; // 能力编码：catalog / manage / record
+  name: string; // 能力展示名，例如「文章目录」
+  itemKind: string; // 业务条目实体名，例如「文章」
+  description: string; // 能力说明
+  states: string[]; // 允许的状态列表，顺序即展示顺序
+} // SiteCapability 结束
+
+export interface EntryResponsibility { // 职责边界：负责 / 不负责
+  inScope: string[]; // 本入口负责的范围
+  outOfScope: string[]; // 明确排除、由其它入口承担的范围
+} // EntryResponsibility 结束
+
+export interface EntryRelation { // 相似入口关联与区分
+  entryId: string; // 关联入口序号
+  entryKey: string; // 关联入口占位键
+  relation: string; // 关系类型：similar / depends / shares
+  distinction: string; // 区分说明
+  system?: string | null; // 关联入口业务系统说明（详情端点补充）
+  domainName?: string | null; // 关联入口业务域（详情端点补充）
+} // EntryRelation 结束
+
+export interface EntryModule { // 统一入口配置清单中的一项
+  id: string; // 两位序号
+  entryKey: string; // 稳定入口标识（占位键），不是具体主机值
+  placeholder: string; // 可配置占位标识
+  envKey: string; // 运行期配置注入键
+  configured: boolean; // 是否已由外部配置注入实际主机值
+  note: string; // 备注原文（含全角竖线）
+  entry: string; // 备注前半段：入口描述
+  system: string; // 备注后半段：业务系统/模块说明
+  domain: string; // 业务域编码
+  domainName: string; // 业务域中文名
+  coreFunctions: string[]; // 核心功能清单
+  responsibility: EntryResponsibility; // 职责边界
+  adminRole: string; // 后台管理职责
+  apiRole: string; // 接口职责
+  related: EntryRelation[]; // 相似入口关联与区分
+  rows: number[]; // 台账溯源行号
+  sheet: string; // 来源工作表
+} // EntryModule 结束
+
+export interface SiteModuleSummary extends EntryModule { // 运行时列表视图：清单字段 + 实时条目数
+  host: string; // 兼容字段：等于 entryKey，不是具体主机值
+  group: string; // 兼容字段：等于业务域编码
+  capability_count: number; // 功能点数量
+  item_count: number; // 该入口当前业务条目数
+} // SiteModuleSummary 结束
+
+export interface EntryDomain { // 业务域
+  code: string; // 业务域编码
+  name: string; // 业务域中文名
+  description: string; // 业务域覆盖说明
+  count: number; // 该域下的入口数
+  entryKeys: string[]; // 该域下的占位键清单
+} // EntryDomain 结束
+
+export interface SiteGroup extends EntryDomain {} // 兼容别名：旧分组语义由业务域承接
+
+export interface SiteModuleDetail extends EntryModule { // 运行时详情视图
+  host: string; // 兼容字段：等于 entryKey
+  group: string; // 兼容字段：等于业务域编码
+  capabilities: SiteCapability[]; // 三个功能点
+  seed: Array<{ capability: string; title: string; status: string; detail: string }>; // 演示数据定义
+} // SiteModuleDetail 结束
+
+export interface SiteItem { // 业务条目：每个入口能力下的可交互记录
+  id: string; // 条目主键
+  host: string; // 所属入口占位键（物理列沿用历史名）
+  capability: string; // 所属能力编码
+  title: string; // 条目标题
+  detail: string; // 条目说明
+  status: string; // 当前状态
+  created_by: string; // 创建者：system 表示演示数据
+  created_at: string; // 创建时间
+  updated_at: string; // 最近更新时间
+} // SiteItem 结束
+
+export interface SiteOverview { // 全站汇总响应
+  schema: string; // 契约版本
+  title: string; // 清单标题
+  source: string; // 依据说明
+  scope: string; // 取证范围
+  moduleBasis: string; // 模块划分依据
+  note_format: string; // 备注格式说明
+  derivation: string; // 实现推导声明
+  modules: number; // 去重后入口总数
+  capabilities: number; // 功能点总数
+  groups: number; // 兼容字段：业务域总数
+  domains: number; // 业务域总数
+  blankRows: number; // 台账空备注原始行数
+  placeholders: number; // 占位标识总数
+  configured: number; // 已配置实际主机值的入口数
+  unconfigured: number; // 仍为占位状态的入口数
+  items: number; // 库内业务条目总数
+  by_status: Record<string, number>; // 按状态分布
+} // SiteOverview 结束
+
+export interface EntryOverview { // 清单总览响应
+  schema: string; // 契约版本
+  title: string; // 清单标题
+  source: string; // 依据说明
+  scope: string; // 取证范围
+  moduleBasis: string; // 模块划分依据
+  noteFormat: string; // 备注格式说明
+  derivation: string; // 实现推导声明
+  entries: number; // 去重后入口数
+  domains: number; // 业务域数
+  capabilities: number; // 运行时功能点数
+  relations: number; // 相似模块关联条数
+  placeholders: number; // 占位标识总数
+  configured: number; // 已配置数
+  unconfigured: number; // 未配置数
+  dedupe: Record<string, unknown>; // @ / 空白 / 重复备注整理结果
+  atRecord: Record<string, unknown>; // @ 合并后的占位项
+  blankRecord: Record<string, unknown>; // 空白字段合并后的占位项
+  hostConfig: Record<string, unknown>; // 不补写具体主机值的策略
+  blankRows: number; // 台账空备注原始行数
+} // EntryOverview 结束
+
+// ---------- 部署汇总（deployments）共享类型，与 routes/deployments.ts 响应一一对应 ----------
+
+export interface DeploymentRepository { // 仓库标识统一三字段
+  id: string | null; // 规范仓库标识，直传型部署为 null
+  url: string | null; // 仓库地址
+  role: string; // 该仓库在本部署项中的角色
+} // DeploymentRepository 结束
+
+export interface DeploymentDelivery { // 交付链路：含远端 HEAD / 本地工作树双口径
+  mode: 'ci' | 'manual' | 'push'; // 交付方式
+  ci_job: string | null; // 关联 CI 作业
+  ci_step: string | null; // 关联 CI 步骤
+  artifact: string | null; // 关键工件
+  artifact_in_head: boolean | null; // 工件是否仍在远端 HEAD
+  artifact_in_worktree: boolean | null; // 工件是否存在于本地工作树
+  credential: string | null; // 所需凭证
+  modes: string[]; // 同一部署项的多种发布形态（合并展示，避免重复计数）
+} // DeploymentDelivery 结束
+
+export interface DeploymentResult { // 部署结果；null 由前端按空数据渲染
+  verdict: string; // PASS / DEGRADED / FAIL / NOT_TESTED / EMPTY
+  http_code: string | null; // HTTP 状态码
+  latency_ms: number | null; // 耗时（毫秒）
+  bytes: number | null; // 响应体字节数
+  evidence: string; // 取证原文与判读
+  captured_at: string | null; // 取证时间
+} // DeploymentResult 结束
+
+export interface DeploymentAnomaly { // 异常说明
+  code: string; // 异常码
+  severity: 'critical' | 'warning' | 'info'; // 严重度
+  message: string; // 说明与影响面
+} // DeploymentAnomaly 结束
+
+export interface DeploymentItem { // 单个部署项：所有同类项共用这一组统一字段
+  id: string; // 规范唯一键
+  name: string; // 统一名称
+  aliases: string[]; // 归并的历史别名
+  platform_id: string; // 平台编码
+  platform: string; // 平台展示名
+  layer: string; // production / distribution / source
+  kind: string; // 载体类型
+  repository: DeploymentRepository; // 仓库标识
+  entry_url: string | null; // 部署入口
+  delivery: DeploymentDelivery; // 交付链路
+  status: string; // 部署状态
+  result: DeploymentResult | null; // 部署结果，null 为空数据
+  anomalies: DeploymentAnomaly[]; // 异常说明
+  missing_fields: string[]; // 缺失信息
+  sources: string[]; // 取证来源
+} // DeploymentItem 结束
+
+export interface DeploymentOverview { // 全量汇总响应
+  schema: string; // 契约版本
+  captured_at: string; // 取证时间
+  head: string; // 取证时本地 HEAD
+  scope: string; // 覆盖范围
+  sources: string[]; // 取证来源
+  total: number; // 部署项总数
+  matrix_platforms: number; // 矩阵平台数
+  platform_catalog: number; // 平台目录总数
+  git_remotes: number; // git 远端数
+  ci_jobs: number; // CI 作业数
+  deploy_ci_jobs: number; // 其中部署作业数
+  excluded: number; // 候选池 / 排除项数
+  with_result: number; // 有取证项数
+  empty_result: number; // 空数据项数
+  anomalies: number; // 异常总数
+  missing_fields: number; // 缺失信息总数
+  worktree_drift: number; // 工作树漂移项数
+  by_status: Record<string, number>; // 状态分布
+  by_verdict: Record<string, number>; // 结果分布
+  by_layer: Record<string, number>; // 层级分布
+  by_platform: Record<string, number>; // 平台分布
+  by_severity: Record<string, number>; // 严重度分布
+  status_codes: Record<string, string>; // 状态字典
+  verdict_codes: Record<string, string>; // 结果字典
+  severity_codes: Record<string, string>; // 严重度字典
+  layer_codes: Record<string, string>; // 层级字典
+  platforms: Array<{ id: string; name: string; in_matrix: boolean }>; // 平台目录
+  ci_job_list: Array<{ id: string; role: string; is_deploy: boolean }>; // CI 作业明细
+  excluded_items: Array<{ id: string; name: string; reason: string }>; // 候选池 / 排除项明细
+  field_spec: Record<string, string>; // 统一字段说明
+  coverage: { // 覆盖口径：解释平台数与部署项数为何不同
+    matrix_platforms: number; // 矩阵平台数
+    deployment_items: number; // 规范部署项数
+    git_remotes: number; // git 远端数
+    ci_jobs: number; // CI 作业数
+    deploy_ci_jobs: number; // 部署作业数
+    dedup_note: string; // 去重说明
+    added_note: string; // 补齐说明
+    excluded_note: string; // 排除说明
+  }; // coverage 结束
+} // DeploymentOverview 结束
+
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string) { // 请求发送验证码（开发环境直接回传 dev_code）
     return request<{ // 发码响应结构
@@ -873,4 +1090,127 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ items: ImUser[] }>(`/im/users?${suffix}`, { auth: true, idempotency: false });
     }, // searchUsers 结束
   }, // im 分组结束
+
+  // ---------- 统一入口配置清单（entries / sites）----------
+
+  // 统一入口配置清单：45 个去重入口 / 19 业务域 / 职责边界 / 关联区分 / 可配置占位标识，全部只读公开。
+  entries: {
+    overview() { // 清单总览：规模、去重整理口径与占位配置统计
+      return request<EntryOverview>('/entries/overview', { auth: false, idempotency: false }); // 公开只读
+    }, // overview 结束
+    domains() { // 19 个业务域及其入口数
+      return request<{ total: number; domains: EntryDomain[] }>('/entries/domains', { auth: false, idempotency: false }); // 公开只读
+    }, // domains 结束
+    list(opts: { q?: string; domain?: string } = {}) { // 入口清单，支持关键词与业务域过滤
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      if (opts.q) qs.set('q', opts.q); // 关键词：占位键 / 系统名 / 备注原文 / 职责字段
+      if (opts.domain) qs.set('domain', opts.domain); // 业务域编码
+      const suffix = qs.toString(); // 无参数时空串
+      return request<{ schema: string; domains: EntryDomain[]; total: number; entries: EntryModule[] }>(
+        `/entries${suffix ? `?${suffix}` : ''}`, // 参数经 URLSearchParams 编码，防注入
+        { auth: false, idempotency: false }, // 公开只读
+      ); // 请求结束
+    }, // list 结束
+    detail(entryKey: string) { // 单入口详情：关联解析 + 运行时能力点
+      return request<{ entry: EntryModule; hostConfig: Record<string, unknown>; capabilities: SiteCapability[] }>(
+        `/entries/${encodeURIComponent(entryKey)}`, // 占位键编码；公开只读
+        { auth: false, idempotency: false }, // 公开只读
+      ); // 请求结束
+    }, // detail 结束
+    placeholders() { // 47 个占位标识及其配置状态
+      return request<{ total: number; configured: number; items: Array<{ entryKey: string; placeholder: string; envKey: string; configured: boolean; kind: string; system: string }> }>(
+        '/entries/placeholders', { auth: false, idempotency: false }, // 公开只读
+      ); // 请求结束
+    }, // placeholders 结束
+    config() { // 可配置占位标识模板（值恒为空，不回传具体主机值）
+      return request<{ schema: string; template: string; format: string; envPrefix: string; rule: string; resolutionOfMissing: string; hosts: Record<string, string> }>(
+        '/entries/config', { auth: false, idempotency: false }, // 公开只读
+      ); // 请求结束
+    }, // config 结束
+  }, // entries 分组结束
+
+  // 站点模块运行时：入口占位键下的能力点与业务条目，写操作需登录。
+  sites: { // 浏览类端点公开，写操作需登录（由 request 自动带 Bearer 与幂等键）
+    overview() { // 全站汇总：入口 / 能力 / 业务域 / 占位状态 / 条目与状态分布
+      return request<SiteOverview>('/sites/overview', { auth: false, idempotency: false }); // 公开只读
+    }, // overview 结束
+    list(opts: { q?: string; group?: string; domain?: string } = {}) { // 入口列表，支持关键词与业务域过滤
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      if (opts.q) qs.set('q', opts.q); // 关键词：占位键 / 系统名 / 备注原文 / 职责字段
+      if (opts.domain) qs.set('domain', opts.domain); // 业务域编码（新口径）
+      else if (opts.group) qs.set('domain', opts.group); // 兼容旧调用：group 值按业务域处理
+      const suffix = qs.toString(); // 无参数时空串
+      return request<{ domains: EntryDomain[]; groups: SiteGroup[]; total: number; modules: SiteModuleSummary[] }>(
+        `/sites${suffix ? `?${suffix}` : ''}`, // 参数经 URLSearchParams 编码，防注入
+        { auth: false, idempotency: false }, // 公开只读
+      ); // 请求结束
+    }, // list 结束
+    detail(host: string) { // 单模块详情：备注原文、行号、能力点与条目统计
+      return request<{
+        module: SiteModuleDetail; // 完整模块定义
+        capability_kinds: Record<string, { name: string; states: string[]; description: string }>; // 能力状态机字典
+        stats: { total: number; byCapability: Record<string, number>; byStatus: Record<string, number> }; // 条目统计
+      }>(`/sites/${encodeURIComponent(host)}`, { auth: false, idempotency: false }); // 主机记录编码；公开只读
+    }, // detail 结束
+    listItems(host: string, opts: { capability?: string; status?: string } = {}) { // 业务条目列表
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      if (opts.capability) qs.set('capability', opts.capability); // 按能力过滤
+      if (opts.status) qs.set('status', opts.status); // 按状态过滤
+      const suffix = qs.toString(); // 无参数时空串
+      return request<{ host: string; items: SiteItem[]; total: number }>(
+        `/sites/${encodeURIComponent(host)}/items${suffix ? `?${suffix}` : ''}`, // 路径参数编码
+        { auth: false, idempotency: false }, // 公开只读：浏览匿名可访问
+      ); // 请求结束
+    }, // listItems 结束
+    createItem(host: string, payload: { capability: string; title: string; detail?: string; status?: string }) { // 新建业务条目
+      return request<{ item: SiteItem }>(`/sites/${encodeURIComponent(host)}/items`, { // 写操作：自动带幂等键防重复提交
+        method: 'POST', // 新建语义
+        body: payload, // 标题必填，状态省略时由后端取能力默认态
+      }); // 请求结束
+    }, // createItem 结束
+    transitionItem(host: string, id: string, status: string) { // 推进条目状态
+      return request<{ item: SiteItem }>(`/sites/${encodeURIComponent(host)}/items/${encodeURIComponent(id)}/transition`, { // 写操作：自动带幂等键
+        method: 'POST', // 状态迁移语义
+        body: { status }, // 目标状态，后端按能力 states 校验
+      }); // 请求结束
+    }, // transitionItem 结束
+  }, // sites 分组结束
+
+  // ---------- 部署汇总（deployments）：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，全公开只读 ----------
+
+  deployments: { // 部署汇总：三个端点均匿名可访问，不提供写操作
+    overview() { // 全量汇总：状态 / 结果 / 层级 / 平台 / 严重度分布 + 覆盖口径 + 字典
+      return request<DeploymentOverview>('/deployments/overview', { auth: false, idempotency: false }); // 公开只读
+    }, // overview 结束
+    list(opts: { q?: string; layer?: string; status?: string; verdict?: string; platform_id?: string } = {}) { // 清单，支持五类过滤
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      if (opts.q) qs.set('q', opts.q); // 关键词：id / 名称 / 别名 / 仓库标识 / 入口
+      if (opts.layer) qs.set('layer', opts.layer); // 层级
+      if (opts.status) qs.set('status', opts.status); // 部署状态
+      if (opts.verdict) qs.set('verdict', opts.verdict); // 结果（EMPTY 命中空数据项）
+      if (opts.platform_id) qs.set('platform_id', opts.platform_id); // 平台编码
+      const suffix = qs.toString(); // 无参数时空串
+      return request<{
+        schema: string; // 契约版本
+        captured_at: string; // 取证时间
+        filters: Record<string, string>; // 过滤条件回显
+        total: number; // 过滤后条数
+        registry_total: number; // 注册表总数（区分「无命中」与「无数据」）
+        items: DeploymentItem[]; // 部署项清单
+        status_codes: Record<string, string>; // 状态字典
+        verdict_codes: Record<string, string>; // 结果字典
+        severity_codes: Record<string, string>; // 严重度字典
+      }>(`/deployments${suffix ? `?${suffix}` : ''}`, { auth: false, idempotency: false }); // 公开只读
+    }, // list 结束
+    detail(id: string) { // 单项详情：仓库标识、交付链路、结果、异常、缺失信息、同类项
+      return request<{
+        schema: string; // 契约版本
+        item: DeploymentItem; // 完整部署项
+        related: Array<{ id: string; name: string; layer: string }>; // 同平台同类项
+        status_codes: Record<string, string>; // 状态字典
+        verdict_codes: Record<string, string>; // 结果字典
+        severity_codes: Record<string, string>; // 严重度字典
+      }>(`/deployments/${encodeURIComponent(id)}`, { auth: false, idempotency: false }); // 路径参数编码
+    }, // detail 结束
+  }, // deployments 分组结束
 }; // api 对象结束

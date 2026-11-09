@@ -1,50 +1,14 @@
-# Render Blueprint：静态前端 + Node 后端（同一份仓库、同一套构建）
-#
-# 前端 mim-web：构建 apps/web/dist，托管在 Render Static Site，域名独立；
-#   API 直连 mim-api（跨域白名单由 MIM_CORS_ORIGINS 控制，见 services/mim-api/src/app.ts）。
-# 后端 mim-api：esbuild 单文件产物；SQLite 落在 services/mim-api/data。
-# 注：Render 的 Node 运行时自带 node_modules 安装，原生模块 better-sqlite3 由 Render 侧编译。
-# 免费约束（铁律十，2026-11-07 修正）：本文件仅为「候选 Blueprint」，CI/README 均未引用，
-# 生产以自建 nginx + systemd 主链路为准。免费层既无持久磁盘也不保证进程常驻，
-# 因此不再声明 starter 付费档与 1GB disk；若启用本文件，SQLite 数据在重启后会丢失，
-# 只能用于无状态联调，不得作为生产数据库承载点。
+# Render 免费层配置（Static Site）
+# 免费额度：每工作区 750 免费实例小时/月，空闲会休眠、冷启动慢（足够常驻一个小静态站）。
+# 在 Render 控制台创建「Static Site」，关联本仓库并指定本文件即可。
+# CI 侧 deploy.yml 的 Render 步骤按 Vercel 同款「缺 RENDER_API_KEY 即 SKIP」模式触发已存在服务的部署。
 
-services:
-  - type: web
-    name: mim-api
-    runtime: node
-    plan: free
-    region: singapore
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @mim/api build
-    startCommand: node services/mim-api/dist/index.js
-    healthCheckPath: /health
-    autoDeploy: true
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: MIM_JWT_SECRET
-        generateValue: true
-      - key: MIM_CORS_ORIGINS
-        value: https://mim-web.onrender.com
-    # 付费档专属的持久磁盘已移除（铁律十：不得把付费资源写成免费方案）：
-    # disk:
-    #   name: mim-data
-    #   mountPath: /opt/render/project/src/services/mim-api/data
-    #   sizeGB: 1
-
-  - type: web
-    name: mim-web
-    runtime: static
+static_sites:
+  - name: mim-web
+    branch: main
+    # 构建前端薄壳产物
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @mim/web build
-    staticPublishPath: apps/web/dist
-    autoDeploy: true
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://mim-api.onrender.com/api/*
-      - type: rewrite
-        source: /health
-        destination: https://mim-api.onrender.com/health
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    # Vite 产物目录
+    staticPublishPath: ./apps/web/dist
+    # 每个 PR 生成预览环境
+    pullRequestPreviewsEnabled: true

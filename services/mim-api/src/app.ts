@@ -11,6 +11,9 @@ import { createComicRouter } from './routes/comic.js'; // 创作工程与分镜�
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
 import { createAiRouter } from './routes/ai.js'; // AI 编排控制面，内部统一 requireAuth
 import { createAdminRouter } from './routes/admin.js'; // RBAC 后台控制面：角色 / 权限 / 用户角色授权
+import { createSitesRouter } from './routes/sites.js'; // 站点模块运行时：45 个去重入口的能力点 / 业务条目
+import { createEntriesRouter } from './routes/entries.js'; // 统一入口配置清单：19 业务域 / 职责边界 / 关联区分 / 占位标识
+import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
 import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -79,6 +82,13 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 
   // 商城路由：GET /modules 公开；POST /entitlements + GET /me/entitlements 内部 requireAuth
   app.use('/api/v1', createCatalogRouter(resolved)); // 公开与受保护端点混装，鉴权下沉到 router 内部按路径处理
+
+  // 站点模块路由：浏览类端点公开；新建条目 / 状态流转在 router 内部挂 requireAuth + idempotency
+  app.use('/api/v1', createSitesRouter(resolved)); // 与商城同属「浏览公开、写操作登录」的按需登录模型
+  app.use('/api/v1', createEntriesRouter(resolved)); // 统一入口配置清单：全部端点只读公开，静态路径先于 /:entryKey 注册
+
+  // 部署汇总路由：三个端点全部公开只读，不查业务表、不提供写操作
+  app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配

@@ -278,7 +278,7 @@ jobs:
 
   # ---------- 托管平台同步（无凭证则 SKIP，不阻断主链路） ----------
   platforms:
-    name: 托管平台同步（Cloudflare / Vercel / Sealos / IGA）
+    name: 托管平台同步（Cloudflare / Vercel / Sealos / IGA / Netlify / Render）
     needs: verify
     runs-on: ubuntu-latest
     steps:
@@ -373,6 +373,34 @@ jobs:
           IGA_SECRET_KEY: ${{ secrets.IGA_SECRET_KEY }}
           IGA_PROJECT_NAME: ${{ secrets.IGA_PROJECT_NAME }}
         run: bash deploy/iga/deploy.sh
+
+      # Netlify：纯静态站点免费层（300 构建分钟/月）。缺凭证即 SKIP，不阻断主链路。
+      - name: Netlify
+        continue-on-error: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "SKIP: 缺少 NETLIFY_AUTH_TOKEN"; exit 0
+          fi
+          npx --yes netlify-cli@latest deploy --prod \
+            --dir=apps/web/dist --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+
+      # Render：免费静态站点（750 实例小时/月，空闲休眠）。触发已存在服务的部署，缺凭证即 SKIP。
+      - name: Render
+        continue-on-error: true
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "SKIP: 缺少 RENDER_API_KEY"; exit 0
+          fi
+          curl -fsS -X POST \
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" -d '{}'
 
       # 线上取证（铁律八）：在 Runner 侧验证各托管站点真实可访问。
       # 本地网络对 *.vercel.app 存在 DNS 污染 / TCP 阻断，故以 CI 出口作为独立取证点。

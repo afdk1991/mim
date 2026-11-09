@@ -21,6 +21,10 @@ import { Login } from './views/Login';
 import { Settings } from './views/Settings';
 // 功能模块页（商城目录，匿名可浏览，解锁动作才要求登录）
 import { Store } from './views/Store';
+// 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问，写操作才引导登录
+import { Sites } from './views/Sites';
+// 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
+import { Deployments } from './views/Deployments';
 // 漫剧 AI 剧工作台
 import { ComicWorkbench } from './views/ComicWorkbench';
 // IM 聊天 + 视频通话
@@ -118,10 +122,14 @@ export function App() {
     setLocalSession(updated);
   } // handleUserUpdated 结束
 
-  // 侧边导航项：顺序即展示顺序（商城 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
+  // 侧边导航项：顺序即展示顺序（商城 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
   const navItems: Array<{ view: AppView; label: string }> = [
     // 功能模块商城（用户习惯称「商城」，导航以「商城」呈现便于查找）
     { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
+    // 站点模块矩阵：按 45 类备注开发的模块目录
+    { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单' },
+    // 部署汇总：统一字段核对整体部署情况
+    { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总' },
     // 漫剧 AI 剧工作台
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
@@ -193,6 +201,10 @@ export function App() {
       <main className="main">{/* 内容区容器：窄屏断点下与侧栏上下堆叠 */}
         {/* 功能模块页：匿名可浏览目录，解锁动作在页面内引导登录 */}
         {route.view === 'store' && <Store locale={locale} />}{/* 功能模块页 */}
+        {/* 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问 */}
+        {route.view === 'sites' && <Sites locale={locale} />}{/* 站点模块矩阵 */}
+        {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
+        {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
         {/* 收费 / 私密视图（漫剧 / 聊天 / 设置）：匿名访问时以内容区内嵌登录卡片替代 */}
         {gated && !session && (
           <Login embedded onLogin={handleLogin} notice={embeddedNotice} /> // 内嵌登录：保留侧栏导航上下文

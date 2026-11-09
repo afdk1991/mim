@@ -680,6 +680,73 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色表达「区块标签」而非正文 */
 } /* 小节标题结束 */
 
+/* ---------- 站点模块矩阵（45 类备注驱动） ---------- */
+.site-stats { /* 总览统计网格：五个指标横向均分，窄屏自动换行 */
+  display: flex; /* 横向排列统计项 */
+  flex-wrap: wrap; /* 放不下时换行，避免溢出面板 */
+  gap: 12px 24px; /* 行间距 12px、列间距 24px */
+} /* 统计网格结束 */
+
+.site-stat { /* 单个统计项：数值在上、标签在下 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 数值 → 标签 */
+  gap: 2px; /* 两项紧凑贴合 */
+  min-width: 72px; /* 最小宽度保证数值不换行 */
+} /* 统计项结束 */
+
+.site-stat-value { /* 统计数值：放大加粗，作为视觉锚点 */
+  font-size: 22px; /* 大字号突出规模 */
+  font-weight: 600; /* 半粗，避免过于沉重 */
+  color: var(--text); /* 主文本色 */
+  line-height: 1.2; /* 收紧行高，与标签贴近 */
+  font-variant-numeric: tabular-nums; /* 等宽数字，刷新时布局不跳动 */
+} /* 统计数值结束 */
+
+.site-card .site-system { /* 模块卡片系统名：备注后半段，作为卡片副标题 */
+  margin: 0 0 4px; /* 仅保留下间距，与备注原文分层 */
+  font-size: 14px; /* 略大于正文 */
+  font-weight: 600; /* 半粗区分于说明文字 */
+  color: var(--text); /* 主文本色 */
+} /* 系统名结束 */
+
+.site-card .site-note { /* 模块卡片备注原文：完整展示「入口描述｜系统名」 */
+  margin: 0 0 8px; /* 与下方元信息拉开距离 */
+  font-size: 12px; /* 小字号弱化，作为依据留痕 */
+  line-height: 1.5; /* 稍宽行高，长备注换行后仍易读 */
+  word-break: break-all; /* 全角竖线与长英文串均可换行 */
+} /* 备注原文结束 */
+
+.site-detail { /* 模块展开详情容器：沿用商城详情区的嵌套层次 */
+  display: flex; /* 纵向排列小节 */
+  flex-direction: column; /* 能力点 → 业务条目 → 新建表单 */
+  gap: 8px; /* 小节间紧凑间距 */
+  margin-top: 10px; /* 与卡片操作行拉开距离 */
+  padding: 12px; /* 详情区内留白 */
+  border: 1px solid var(--border); /* 细边框勾勒二级区域 */
+  border-radius: 8px; /* 圆角略小于卡片 */
+  background: var(--bg); /* 页面底色区分卡片与详情区 */
+  font-size: 13px; /* 略小正文，详情属附属信息 */
+} /* 详情容器结束 */
+
+.site-detail-title { /* 详情区小节标题（功能点 / 业务条目 / 新建条目） */
+  margin: 4px 0 0; /* 上方留白分隔小节，清除 p 默认外边距 */
+  font-size: 12px; /* 小字号弱化层级 */
+  font-weight: 600; /* 半粗保证作为锚点可辨识 */
+  color: var(--text-muted); /* 次要色表达区块标签 */
+} /* 小节标题结束 */
+
+.site-cap-row { /* 能力筛选按钮行：允许换行，避免 45 模块长名挤压 */
+  flex-wrap: wrap; /* 放不下自动换行 */
+  gap: 6px; /* 按钮间距收紧 */
+} /* 能力按钮行结束 */
+
+.site-item-head { /* 业务条目头：标题 + 状态徽标同行 */
+  display: flex; /* 横向排列 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 标题靠左、徽标靠右 */
+  gap: 8px; /* 标题与徽标最小间距 */
+} /* 条目头结束 */
+
 @media (max-width: 760px) { /* 窄屏断点：平板竖屏与手机改用单列布局 */
   .layout { /* 整体布局在窄屏下 */
     grid-template-columns: 1fr; /* 取消侧栏固定宽度，改为单列上下堆叠 */
@@ -1043,3 +1110,193 @@ code { /* 行内代码/令牌展示 */
     display: none; /* 窄屏暂不展示会话列表，保留右侧消息区 */
   } /* 窄屏侧栏结束 */
 } /* 窄屏断点结束 */
+
+/* ---------- 部署汇总视图：浅色主题、统一字段核对表 ---------- */
+.deploy-stats { /* 总览统计网格：九个指标自动换行 */
+  display: grid; /* 网格布局 */
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); /* 每列最小 96px，窄屏自动折行 */
+  gap: 12px; /* 网格间距 */
+} /* 统计网格结束 */
+.deploy-stat { /* 单个统计项：数值在上、标签在下 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 2px; /* 数值与标签间距 */
+  padding: 10px 12px; /* 内边距 */
+  background: var(--bg); /* 浅灰底与主内容区区分 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: var(--radius); /* 统一圆角 */
+} /* 统计项结束 */
+.deploy-stat-value { /* 统计数值：放大加粗作为视觉锚点 */
+  font-size: 20px; /* 放大字号 */
+  font-weight: 600; /* 半粗 */
+  color: var(--text); /* 主文字色 */
+} /* 统计数值结束 */
+.deploy-table-wrap { /* 核对表横向滚动容器：窄屏不挤压列宽 */
+  width: 100%; /* 占满内容区 */
+  overflow-x: auto; /* 列过多时横向滚动 */
+  background: var(--surface); /* 白色表面 */
+  border: 1px solid var(--border); /* 外边框 */
+  border-radius: var(--radius); /* 统一圆角 */
+  box-shadow: var(--shadow); /* 复用全局柔和阴影 */
+} /* 表格容器结束 */
+.deploy-table { /* 统一字段核对表：紧凑、可扫描 */
+  width: 100%; /* 撑满容器 */
+  border-collapse: collapse; /* 合并边框，避免双线 */
+  font-size: 13px; /* 略小字号提升信息密度 */
+} /* 表格结束 */
+.deploy-table th, /* 表头单元格 */
+.deploy-table td { /* 数据单元格 */
+  padding: 10px 12px; /* 内边距 */
+  text-align: left; /* 左对齐便于核对文本 */
+  vertical-align: top; /* 多行内容顶部对齐 */
+  border-bottom: 1px solid var(--border); /* 行分隔线 */
+} /* 表头 / 数据单元格结束 */
+.deploy-table th { /* 表头：浅灰底 + 加粗 */
+  background: var(--bg); /* 浅灰底 */
+  font-weight: 600; /* 半粗 */
+  color: var(--text); /* 主文字色 */
+  white-space: nowrap; /* 表头不换行 */
+} /* 表头结束 */
+.deploy-table tbody tr:last-child td { /* 最后一行去掉底边框 */
+  border-bottom: none; /* 避免与容器边框重叠 */
+} /* 末行结束 */
+.deploy-row:hover td { /* 行悬停：浅灰底提示可交互 */
+  background: #fafbfc; /* 极浅灰 */
+} /* 悬停结束 */
+.deploy-row.expanded td { /* 展开行：主色淡底标记当前项 */
+  background: #f2f6ff; /* 主色极淡底 */
+} /* 展开行结束 */
+.deploy-detail-row td { /* 详情行：不加悬停底色 */
+  background: var(--surface); /* 白色表面 */
+  padding: 0; /* 内边距交给详情容器 */
+} /* 详情行单元格结束 */
+.deploy-detail { /* 展开详情容器：左侧主色竖线 + 分区留白 */
+  padding: 14px 18px; /* 内边距 */
+  border-left: 3px solid var(--primary); /* 主色竖线标识展开归属 */
+  background: #fcfdff; /* 极浅蓝底 */
+} /* 详情容器结束 */
+.deploy-section-title { /* 详情小节标题 */
+  margin: 12px 0 6px; /* 上间距大于下间距 */
+  font-weight: 600; /* 半粗 */
+  color: var(--text); /* 主文字色 */
+} /* 小节标题结束 */
+.deploy-kv { /* 详情键值行：自动换行 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  gap: 6px 18px; /* 行列间距 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 键值行结束 */
+.deploy-missing { /* 缺失字段标签容器 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 自动折行 */
+  gap: 6px; /* 标签间距 */
+} /* 缺失容器结束 */
+.deploy-missing code { /* 单个缺失字段标签 */
+  padding: 2px 6px; /* 内边距 */
+  background: #fff5e6; /* 警告色浅底 */
+  border: 1px solid #f0d8ac; /* 警告色边框 */
+  border-radius: 4px; /* 小圆角 */
+  color: var(--warning); /* 警告色文字 */
+} /* 缺失标签结束 */
+.deploy-anomaly { /* 单条异常说明：徽标 + 异常码 + 说明 */
+  display: flex; /* 横向排列 */
+  align-items: flex-start; /* 顶部对齐 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  gap: 6px; /* 元素间距 */
+  padding: 4px 0; /* 行间距 */
+} /* 异常行结束 */
+.deploy-badge { /* 部署汇总通用徽标 */
+  display: inline-block; /* 行内块，便于设内边距 */
+  padding: 2px 8px; /* 内边距 */
+  border-radius: 999px; /* 胶囊状 */
+  font-size: 12px; /* 略小字号 */
+  font-weight: 600; /* 半粗 */
+  white-space: nowrap; /* 不换行 */
+  border: 1px solid var(--border); /* 默认边框 */
+  color: var(--text-muted); /* 默认次要文字色 */
+  background: var(--bg); /* 默认浅灰底 */
+} /* 徽标结束 */
+.deploy-badge.ok { /* 通过 / 正常 / 设计内行为 */
+  color: var(--success); /* 成功色文字 */
+  background: #eaf7f0; /* 成功色浅底 */
+  border-color: #bfe6cf; /* 成功色边框 */
+} /* 成功徽标结束 */
+.deploy-badge.warn { /* 警告 / 未取证 / 降级可用 */
+  color: var(--warning); /* 警告色文字 */
+  background: #fff5e6; /* 警告色浅底 */
+  border-color: #f0d8ac; /* 警告色边框 */
+} /* 警告徽标结束 */
+.deploy-badge.fail { /* 阻断 / 失败 / 严重异常 */
+  color: var(--danger); /* 危险色文字 */
+  background: #fdecec; /* 危险色浅底 */
+  border-color: #f3c2c2; /* 危险色边框 */
+} /* 失败徽标结束 */
+.deploy-badge.empty { /* 空数据：中性但明确可见 */
+  color: var(--text-muted); /* 次要文字色 */
+  background: #eef0f4; /* 中性浅底 */
+  border-color: var(--border); /* 中性边框 */
+} /* 空数据徽标结束 */
+.deploy-badge.missing { /* 缺失信息标识 */
+  color: var(--warning); /* 警告色文字 */
+  background: #fff5e6; /* 警告色浅底 */
+  border-color: #f0d8ac; /* 警告色边框 */
+} /* 缺失徽标结束 */
+.deploy-badge.muted { /* 未命中字典的未知值 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 中性徽标结束 */
+.deploy-columns { /* 覆盖说明区：CI 作业与排除项两列 */
+  display: grid; /* 网格布局 */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); /* 自适应两列 */
+  gap: 18px; /* 列间距 */
+} /* 覆盖区结束 */
+@media (max-width: 720px) { /* 窄屏断点 */
+  .deploy-table { /* 窄屏表格保留最小宽度，由外层横向滚动 */
+    min-width: 900px; /* 保证九列不被压扁 */
+  } /* 窄屏表格结束 */
+} /* 窄屏断点结束 */
+
+/* ---------- 统一入口配置清单（2026-11-09）：去重整理面板与职责/关联展示 ---------- */
+.entry-intake { /* 来源整理面板：与总览面板同层级但留出更明显的分隔 */
+  margin-bottom: 18px; /* 与下方筛选行拉开距离 */
+} /* 整理面板结束 */
+.entry-intake .plain-list li { /* 两个不建模块的占位项 */
+  font-size: 13px; /* 次要信息字号 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 占位项结束 */
+.entry-intake code { /* 占位标识等宽展示 */
+  font-size: 12px; /* 与次要信息一致 */
+} /* 占位标识结束 */
+.entry-functions { /* 核心功能与职责边界列表 */
+  margin: 6px 0 10px; /* 上下留白，避免与相邻小节粘连 */
+  font-size: 13px; /* 略小于正文，卡片内可承载更多条目 */
+} /* 功能列表结束 */
+.entry-functions li { /* 单条功能/职责 */
+  padding: 2px 0; /* 逐条留白 */
+  line-height: 1.5; /* 中文长句可读性 */
+} /* 单条结束 */
+.entry-boundary { /* 卡片上的职责边界摘要 */
+  margin: 4px 0 10px; /* 与操作行拉开距离 */
+  font-size: 12px; /* 次要信息 */
+  line-height: 1.5; /* 长句可读 */
+} /* 边界摘要结束 */
+.entry-boundary strong { /* 边界前缀加粗 */
+  color: var(--text); /* 主文字色 */
+} /* 边界前缀结束 */
+.entry-config { /* 展开详情里的占位标识与注入键 */
+  display: flex; /* 横向排布 */
+  flex-wrap: wrap; /* 窄屏自动换行 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 元素间距 */
+  margin-bottom: 10px; /* 与职责边界分开 */
+} /* 配置行结束 */
+.entry-config code { /* 可配置占位标识 */
+  font-size: 12px; /* 等宽小字 */
+} /* 占位标识结束 */
+.entry-relations { /* 相似模块关联与区分清单 */
+  margin: 6px 0 12px; /* 上下留白 */
+  font-size: 13px; /* 次要信息字号 */
+  line-height: 1.6; /* 区分说明较长，加大行高 */
+} /* 关联清单结束 */
+.entry-relations li { /* 单条关联 */
+  padding: 3px 0; /* 逐条留白 */
+} /* 单条关联结束 */

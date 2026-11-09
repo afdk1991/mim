@@ -402,3 +402,23 @@ CREATE INDEX IF NOT EXISTS idx_im_messages_sender ON im_messages(sender_user_id,
 -- direct 会话的两人唯一性由应用层保证（按 sorted(user_id pair) 查询复用），
 -- 不在 DB 层做跨成员表的唯一约束，SQLite 无法表达。
 
+-- ---------- site 域（统一入口配置清单，备注驱动，2026-11-09）----------
+-- 入口定义本身是静态契约（packages/core-domain/src/siteModules.json），不落库；
+-- 本表只持久化「入口 × 能力」下的业务条目，让每个备注对应的功能可运行、可交互。
+-- host 列的物理名沿用历史结构，语义自 v2 起为「可配置占位标识键」（如 BLOG），
+-- 不是具体主机值；用户未提供具体主机记录值，代码不补写、不推导真实域名。
+-- capability 为三类能力之一，二者共同隔离数据。
+CREATE TABLE IF NOT EXISTS site_module_items (
+  id            TEXT PRIMARY KEY,
+  host          TEXT NOT NULL,
+  capability    TEXT NOT NULL CHECK (capability IN ('catalog','manage','record')),
+  title         TEXT NOT NULL,
+  detail        TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL,
+  created_by    TEXT NOT NULL DEFAULT 'system',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_site_items_host_cap ON site_module_items(host, capability, status);
+CREATE INDEX IF NOT EXISTS idx_site_items_created ON site_module_items(created_at DESC);
+

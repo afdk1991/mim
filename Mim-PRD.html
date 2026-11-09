@@ -248,6 +248,30 @@
   <tr><td>腾讯云自建服务器</td><td>前后端 + SQLite</td><td><code>deploy/deploy.sh</code>，<code>mim.mixm.top</code></td></tr>
 </table>
 
+<!-- 部署汇总小节标题：交付核对能力，非产品功能需求 -->
+<h3>部署汇总（交付核对能力，2026-11-09 新增）</h3>
+<!-- 部署汇总定位：把上表与 README 矩阵、CI 作业、git 远端收口为一份单一事实源 -->
+<p class="muted">为便于核对整体部署情况，散落在多处的部署仓库与部署项统一收口到 <code>packages/core-domain/src/deploymentRegistry.json</code>（schema <code>mim.deployment-registry.v1</code>）：<strong>9 个矩阵平台 / 11 个规范部署项 / 5 个 CI 作业 / 2 个 git 远端</strong>，前后端与脚本共用同一份定义。</p>
+<!-- 统一字段表头：字段名 / 含义 / 空值约定 -->
+<table>
+  <!-- 表头行：统一字段、含义、空数据 / 失败标识 -->
+  <tr><th>统一字段</th><th>含义</th><th>空数据 / 失败 / 缺失标识</th></tr>
+  <!-- 仓库标识行：三字段结构 -->
+  <tr><td><code>repository{id,url,role}</code></td><td>仓库标识（规范 ID / 地址 / 角色）</td><td>直传型部署的 <code>id</code> / <code>url</code> 为 <code>null</code>，显示「—」</td></tr>
+  <!-- 部署状态行：五类枚举 -->
+  <tr><td><code>status</code></td><td>部署状态：<code>OK</code> / <code>BROKEN</code> / <code>UNVERIFIED</code> / <code>MANUAL</code></td><td>失败状态用 🔴 + 异常说明，不得静默</td></tr>
+  <!-- 部署结果行：五类枚举 -->
+  <tr><td><code>result</code></td><td>部署结果：<code>PASS</code> / <code>DEGRADED</code> / <code>FAIL</code> / <code>NOT_TESTED</code> / <code>EMPTY</code></td><td>整项 <code>null</code> 为「⚪ 空数据」，不填 0、不冒充成功</td></tr>
+  <!-- 异常说明行：分级结构 -->
+  <tr><td><code>anomalies</code></td><td>异常说明：<code>code</code> + <code>severity</code> + <code>message</code></td><td>🔴 critical / 🟡 warning / 🟢 info 三级</td></tr>
+  <!-- 缺失信息行：清单结构 -->
+  <tr><td><code>missing_fields</code></td><td>缺失信息清单（凭证 / 工件 / 未取得的取证）</td><td>非空时显示「⚠ 缺失 n 项」并逐项展开</td></tr>
+</table>
+<!-- 覆盖与去重说明：解释 9 平台与 11 部署项的差异 -->
+<p class="muted"><strong>覆盖与去重</strong>：补齐 Gitee 镜像仓与 <code>mim-store</code> 独立 Worker 两类同类项；README 曾将 Cloudflare 同源自托管入口另列一行，实为同一域名同载体的两种发布形态，已合并为一项并在 <code>delivery.modes</code> 区分；Bitbucket / Render / Netlify / Azure SWA / veFaaS 等属候选池或已排除，列入 <code>excluded</code> 但不计入汇总。</p>
+<!-- 交付物与取证边界说明 -->
+<p class="muted"><strong>交付物</strong>：<code>/deployments</code> 前端核对表、<code>/api/v1/deployments*</code> 三个公开只读端点、<code>docs/deployment-summary.{json,md}</code> 结构化结果、<code>scripts/deployment-summary.mjs</code> 生成器与 <code>scripts/verify-deployments.mjs</code> 校验器（52 项断言）。<strong>边界</strong>：汇总是核对工具，其通过不代表生产「已上线」；生产唯一权威终点仍为 <code>https://mim.mixm.top</code>（见运维铁律十二）。</p>
+
 <!-- 章节标题：4. 角色与对象模型 -->
 <h2>4. 角色与对象模型</h2>
 
@@ -936,6 +960,35 @@ function submitLogin(){
   <!-- OQ-09：功能模块定价模式 -->
   <tr><td>OQ-09</td><td>功能模块采用「订阅内含」还是「独立一次性购买」，两模式定价与折扣如何组合？</td><td>影响 FR-03.1 模块定价表结构、订单挂载方式与解锁回收规则</td><td><span class="tag-p0">已定案（2026-11-05）：仅保留一次性购买（<code>unlock_mode=one_time</code>）；「订阅内含」已随 FR-02 下线，<code>order_items</code> 不建表</span></td></tr>
 </table>
+
+<!-- 附录 A：站点模块矩阵（2026-11-09 按 DNSPod mixm.top 工作表 45 类备注新增） -->
+<!-- 说明：备注原文为「入口描述｜系统名」两段式，无功能规格；下列功能点为按系统名语义派生的最小可运行实现 -->
+<h2>附录 A · 站点模块矩阵（2026-11-09）</h2>
+<!-- 依据边界：仅 mixm.top 工作表第 4–93 行共 45 类业务备注，每类两行 -->
+<p class="muted">依据用户提供的「主机记录 + 备注」文本与备注列截图（等价于 <code>dnspod_records_2026-11-05_21-42-26.xls</code> 的 <code>mixm.top</code> 工作表第 4–93 行）。45 类业务备注每类连续重复两行，按「完全相同且用途一致按一项」合并为 45 个入口；两行 <code>@</code> 合并为 1 项根域名占位 <code>AT_ROOT</code>，其余 11 行空白备注合并为 1 项空白占位 <code>BLANK_UNSET</code>，二者均不建立业务模块。用户仅提供 <code>@</code> 与备注、未提供具体主机记录值，故<strong>不补写具体主机值</strong>，统一使用可配置占位标识 <code>{{HOST:&lt;ENTRY_KEY&gt;}}</code>（运行期由 <code>MIM_HOST_*</code> 注入）。备注本身只有「入口描述｜业务系统 / 模块说明」，<strong>不含功能规格、输入输出与交互流程</strong>；下表「功能点 / 核心功能 / 职责边界 / 关联区分」均由系统名语义派生，属实现推导而非备注原文。记录值 / 状态 / 优先级等 6 列已被清空，故本附录不定义 DNS 解析目标或线上子域可用性。</p>
+<!-- 实现形态：静态注册表 + 后端 API + 数据库 + 前端视图，四层共用同一数据源 -->
+<table border="1" cellpadding="6" cellspacing="0">
+  <!-- 表头：模块规模、功能点规模、演示数据、端点与视图 -->
+  <tr><th>项</th><th>落地结果</th></tr>
+  <!-- 模块规模：45 类备注去重整理为 45 个入口 + 19 业务域 -->
+  <tr><td>统一入口配置清单</td><td>45 个去重入口（可配置占位标识 <code>{{HOST:&lt;ENTRY_KEY&gt;}}</code>，不补写具体主机值；含备注原文、xls 行号、19 个业务域聚合）+ <code>AT_ROOT</code> / <code>BLANK_UNSET</code> 两项不建业务模块的占位</td></tr>
+  <!-- 功能点规模：每模块三类能力 -->
+  <tr><td>功能点</td><td>135 个（每模块「清单 / 管理 / 记录」三类能力，各带独立状态机）</td></tr>
+  <!-- 演示数据：明确标注非真实业务数据 -->
+  <tr><td>演示数据</td><td>90 条（每模块 2 条，稳定主键 + INSERT OR IGNORE 幂等，非真实业务数据）</td></tr>
+  <!-- 数据源：共享包单一事实源 -->
+  <tr><td>单一数据源</td><td><code>packages/core-domain/src/siteModules.json</code> + <code>siteModules.ts</code>，前后端共用</td></tr>
+  <!-- 后端：运行时 6 端点 + 清单 6 端点 + 持久化表 -->
+  <tr><td>后端</td><td>运行时（按占位键寻址）：<code>/api/v1/sites/overview</code>、<code>/sites</code>、<code>/sites/:host</code>、<code>/sites/:host/capabilities</code>、<code>/sites/:host/items</code>、<code>POST /sites/:host/items</code>、<code>POST /sites/:host/items/:id/transition</code>；统一入口配置清单（只读）：<code>/api/v1/entries/overview</code>、<code>/entries/domains</code>、<code>/entries/placeholders</code>、<code>/entries/config</code>、<code>/entries</code>、<code>/entries/:entryKey</code>；<code>site_module_items</code> 表（隔离键为占位标识键，非具体主机值）</td></tr>
+  <!-- 前端：统一入口配置清单视图，匿名可浏览 -->
+  <tr><td>前端</td><td><code>/sites</code> 视图（<code>apps/web/src/views/Sites.tsx</code>）：去重整理面板、45 入口卡片（占位标识 + 未配置状态）、19 业务域筛选、核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分展开、搜索、条目新建与状态流转；浏览匿名可访问，写操作按需登录</td></tr>
+  <!-- 验证：契约测试、零依赖校验、全量门禁与浏览器真渲染终值 -->
+  <tr><td>验证</td><td>契约测试 26 例（<code>test/sites.test.ts</code> 14 + <code>test/entries.test.ts</code> 12）；零依赖校验 <code>verify-site-modules</code> 79 项 + <code>verify-entry-manifest</code> 23 项；全量 15 文件 / 211 例测试 + <code>comment-check --strict</code> / <code>build:web</code> 通过；xls / 用户文本 ↔ 清单双向比对 0 差异；Edge CDP <code>/sites</code> 真渲染 26/26 PASS（2026-11-09 23:35 实测）</td></tr>
+  <!-- 交付说明：完整逐项清单与未决项 -->
+  <tr><td>交付说明</td><td><a href="./docs/统一入口配置清单与模块化实现说明-20261109.md">docs/统一入口配置清单与模块化实现说明-20261109.md</a>（口径变化、变更概览、45 入口 × 9 列、验证矩阵、U1–U7 未决项）；可读清单 <a href="./docs/统一入口配置清单-20261109.md">docs/统一入口配置清单-20261109.md</a>（45 入口全表）；上一轮 <a href="./docs/站点模块开发落地说明-20261109.md">docs/站点模块开发落地说明-20261109.md</a>（v1 站点模块矩阵）</td></tr>
+</table>
+<!-- 未决提示：同名异义、空备注、DNS 目标、生产部署均需另行确认 -->
+<p class="muted">未决：<code>mall</code> / <code>store</code> 与现有「功能模块商城」同名异义（本轮新建独立模块，未改动既有商城）；13 行空备注无功能描述；DNS 解析目标与线上子域可用性因记录值列清空无法确认；本轮为本地实现，未做生产部署与线上取证。</p>
 
 <!-- 文档末尾分割线 -->
 <hr>

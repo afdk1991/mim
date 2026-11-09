@@ -7,13 +7,13 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 产品代码层（可运行）                                       │
-│   apps/web            React 18 + Vite 6 薄壳端（登录/设置）    │
+│   apps/web            React 18 + Vite 6 薄壳端（商城/统一入口配置清单/漫剧/IM/设置）│
 │   services/mim-api    Express 5 + better-sqlite3 后端（8787） │
-│   packages/core-domain 错误码/UUIDv7（errors / ids）        │
+│   packages/core-domain 错误码/UUIDv7/统一入口配置清单（errors/ids/siteModules）│
 │   packages/i18n       zh-CN / en-US 文案与货币格式化        │
 ├─────────────────────────────────────────────────────────┤
 │ 治理层（强制约束）                                        │
-│   AGENTS.md          十一条铁律（执行/授权/证据/版本/依赖/自动化/同步/部署/矩阵/额度/注释）│
+│   AGENTS.md          十二条铁律（执行/授权/证据/版本/依赖/自动化/同步/部署/矩阵/额度/注释/生产）│
 │   README.md          项目入口 + 版本规约摘要               │
 │   scripts/version-check.mjs   铁律四的版本规约校验器       │
 │   scripts/env-check.mjs       09 清单 §0 密钥治理校验器    │
@@ -118,3 +118,18 @@ PRD（Mim-PRD.html，V0.0.0-preview 草案）确定的核心产品决策是 **�
 | [07-functional-modules.md](./07-functional-modules.md) | 产品功能视角（FR-01~06、状态机、共享规则、开放问题） |
 
 以上两页均为规划口径，落地时必须随代码同步修订（铁律七）。
+
+## 8. 部署汇总（2026-11-09 新增）
+
+架构定位：**只读运维视图**，不属于业务领域模型，不新增数据库表、不产生写操作。链路为「单一事实源 → 共享包 → 后端 API → 前端视图 / 结构化产物」：
+
+| 层 | 工件 | 职责 |
+|---|---|---|
+| 数据 | `packages/core-domain/src/deploymentRegistry.json` | 9 矩阵平台 / 11 规范部署项 / 5 CI 作业 / 2 git 远端 / 6 候选排除项；统一 `snake_case` 字段 |
+| 共享包 | `packages/core-domain/src/deploymentRegistry.ts` | 类型约束、id 索引、五类过滤、`deploymentSummary()` 分布统计 |
+| 后端 | `services/mim-api/src/routes/deployments.ts` | `GET /deployments/overview`、`GET /deployments`、`GET /deployments/:id`，全部公开只读 |
+| 前端 | `apps/web/src/views/Deployments.tsx` | 9 列核对表 + 五类筛选 + 展开详情；空数据 / 失败 / 缺失分别标识 |
+| 脚本 | `scripts/deployment-summary.mjs` / `verify-deployments.mjs` | 真实采集（git / 工件 / CI / 矩阵行数，可选 `--live` curl）→ 结构化产物；52 项一致性断言 |
+| 产物 | `docs/deployment-summary.{json,md}` | 机器可核对 JSON + 人工核对表 |
+
+设计约束：① 所有同类项共用同一组字段，别名归并到 `aliases` 而非另起一行；② `result = null` 表示空数据，不以 0 或历史 200 填充；③ 工件区分 `artifact_in_head`（远端 HEAD）与 `artifact_in_worktree`（本地工作树）两个口径；④ 汇总 `PASS` 不等于生产「已上线」，生产唯一权威终点仍为 `https://mim.mixm.top`（铁律十二）。详见 [AGENTS.md §13](../../AGENTS.md)。

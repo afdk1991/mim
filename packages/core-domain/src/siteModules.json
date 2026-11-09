@@ -1,0 +1,4943 @@
+{
+  "schema": "mim.site-modules.v2",
+  "title": "统一入口配置清单",
+  "source": "用户提供的主机记录与备注文本 + 备注列截图（dnspod_records_2026-11-05_21-42-26.xls 的 mixm.top 工作表仅作行号溯源）",
+  "scope": "mixm.top 工作表备注列；模块划分以备注「入口｜业务系统/模块说明」为唯一依据",
+  "noteFormat": "每条业务备注均为「入口描述｜业务系统/模块说明」两段式，未提供具体主机值、功能规格、输入输出或交互约束",
+  "moduleBasis": "备注后半段的业务系统/模块说明决定模块划分与职责；前半段入口描述只用于说明入口用途",
+  "derivation": "coreFunctions / responsibility / adminRole / apiRole / related / capabilities / seed 均由业务系统语义派生，属实现推导，非备注原文；备注原文只保留在 note 字段；具体主机值一律不推导、不补写",
+  "dedupe": {
+    "rule": "完全相同且用途一致的条目按一项处理",
+    "sourceRows": 104,
+    "headerRows": 1,
+    "businessNoteRows": 90,
+    "duplicatePairs": 45,
+    "mergedEntries": 45,
+    "atRecordRows": [
+      2,
+      3
+    ],
+    "atRecordMergedInto": "AT_ROOT",
+    "blankNoteRows": 11,
+    "blankMergedInto": "BLANK_UNSET",
+    "note": "业务备注每类连续重复两行（短主机记录行 + 全限定主机行），备注文字与用途完全一致，合并为 45 项；两行 @ 记录无备注且用途一致，合并为 1 项根域名占位；其余 11 行空白备注合并为 1 项空白占位。"
+  },
+  "atRecord": {
+    "entryKey": "AT_ROOT",
+    "placeholder": "{{HOST:AT_ROOT}}",
+    "hostValue": null,
+    "occurrences": 2,
+    "rows": [
+      2,
+      3
+    ],
+    "note": "",
+    "resolution": "两行 @ 完全相同且用途一致，合并为一项；备注为空，不建立业务模块，仅登记可配置根域名占位标识"
+  },
+  "blankRecord": {
+    "entryKey": "BLANK_UNSET",
+    "placeholder": "{{HOST:BLANK_UNSET}}",
+    "hostValue": null,
+    "occurrences": 11,
+    "note": "",
+    "resolution": "11 行空白备注用途一致，合并为一项；无可划分的业务系统说明，不建立模块，保留占位不补写具体值"
+  },
+  "hostConfig": {
+    "mode": "placeholder",
+    "format": "{{HOST:<ENTRY_KEY>}}",
+    "envPrefix": "MIM_HOST_",
+    "envKeyFormat": "MIM_HOST_<ENTRY_KEY>",
+    "template": "config/entry-hosts.example.json",
+    "defaultValue": null,
+    "rule": "用户仅提供 @ 记录与备注，未提供任何具体主机记录值；故模块不绑定具体主机值，统一使用可配置占位标识。运行期由配置注入实际主机值，未注入时保持未配置状态，代码不补写、不猜测。",
+    "resolutionOfMissing": "未配置时入口标识仍可用于模块寻址、职责说明与清单导出，但不得推导为任何真实域名"
+  },
+  "clearedColumns": [
+    "记录类型",
+    "记录值",
+    "MX优先级",
+    "权重",
+    "状态",
+    "最后操作时间"
+  ],
+  "capabilityKinds": {
+    "catalog": {
+      "name": "清单",
+      "states": [
+        "active",
+        "archived"
+      ],
+      "description": "登记并查看该系统的资源清单，可归档"
+    },
+    "manage": {
+      "name": "管理",
+      "states": [
+        "pending",
+        "active",
+        "archived"
+      ],
+      "description": "发起并处理该系统的业务事项，状态可推进或归档"
+    },
+    "record": {
+      "name": "记录",
+      "states": [
+        "pending",
+        "done",
+        "archived"
+      ],
+      "description": "记录该系统的运行或操作流水，可标记完成或归档"
+    }
+  },
+  "domains": [
+    {
+      "code": "portal",
+      "name": "主站门户与跳转",
+      "description": "根域名跳转分发与官方门户内容承载",
+      "count": 2,
+      "entryKeys": [
+        "PORTAL_ROOT",
+        "PORTAL_SITE"
+      ]
+    },
+    {
+      "code": "admin",
+      "name": "管理后台",
+      "description": "全站统一运营管理后台",
+      "count": 1,
+      "entryKeys": [
+        "ADMIN_CONSOLE"
+      ]
+    },
+    {
+      "code": "gateway",
+      "name": "API 与 APP 网关",
+      "description": "统一 API 网关与移动端专属接口",
+      "count": 2,
+      "entryKeys": [
+        "API_GATEWAY",
+        "APP_API"
+      ]
+    },
+    {
+      "code": "identity",
+      "name": "认证权限与单点登录",
+      "description": "身份认证权限中心与统一登录页",
+      "count": 2,
+      "entryKeys": [
+        "AUTH_CENTER",
+        "SSO_LOGIN"
+      ]
+    },
+    {
+      "code": "member",
+      "name": "用户与会员中心",
+      "description": "用户自助工作台与会员管理后台",
+      "count": 2,
+      "entryKeys": [
+        "MEMBER_CENTER",
+        "MEMBER_ADMIN"
+      ]
+    },
+    {
+      "code": "content",
+      "name": "博客 / 资讯 / 自媒体 / WordPress",
+      "description": "四类内容发布载体的职责区分",
+      "count": 4,
+      "entryKeys": [
+        "BLOG",
+        "NEWS_PUBLISH",
+        "WORDPRESS",
+        "SELF_MEDIA"
+      ]
+    },
+    {
+      "code": "storage",
+      "name": "云盘 / 图床 / 素材 / 下载分发",
+      "description": "私有文件、公共素材与源码分发",
+      "count": 3,
+      "entryKeys": [
+        "CLOUD_DRIVE",
+        "IMAGE_ASSETS",
+        "DOWNLOAD_DIST"
+      ]
+    },
+    {
+      "code": "commerce",
+      "name": "电商与商贸",
+      "description": "B2C 商城、支付结算、营销、多商户、B2B、C2C、供应商、货源、卖家管理",
+      "count": 9,
+      "entryKeys": [
+        "MALL_B2C",
+        "MARKETING",
+        "PAYMENT_GATEWAY",
+        "MULTI_MERCHANT",
+        "SOURCE_GOODS",
+        "B2B_TRADE",
+        "SUPPLIER_ADMIN",
+        "C2C_MARKET",
+        "SELLER_ADMIN"
+      ]
+    },
+    {
+      "code": "video",
+      "name": "UGC 短视频 / 长视频 / 独立播放页",
+      "description": "短视频社区、长视频点播与独立播放页",
+      "count": 3,
+      "entryKeys": [
+        "UGC_VIDEO",
+        "VOD_LONG_VIDEO",
+        "VIDEO_PLAYER"
+      ]
+    },
+    {
+      "code": "data",
+      "name": "数据开放 / BI / 爬虫采集",
+      "description": "开放数据集、BI 看板与采集调度",
+      "count": 3,
+      "entryKeys": [
+        "OPEN_DATA",
+        "CRAWLER_SCHEDULER",
+        "BI_DASHBOARD"
+      ]
+    },
+    {
+      "code": "dev",
+      "name": "开发测试环境与接口文档",
+      "description": "开发环境门户与测试环境入口",
+      "count": 2,
+      "entryKeys": [
+        "DEV_PORTAL",
+        "TEST_ENV"
+      ]
+    },
+    {
+      "code": "ops",
+      "name": "运维监控 / 安全防护 / 服务治理",
+      "description": "基础设施监控、安全与服务治理",
+      "count": 3,
+      "entryKeys": [
+        "OPS_MONITOR",
+        "SECURITY_CENTER",
+        "SERVICE_GOVERNANCE"
+      ]
+    },
+    {
+      "code": "support",
+      "name": "工单客服与帮助中心",
+      "description": "工单交互与产品文档",
+      "count": 2,
+      "entryKeys": [
+        "HELP_CENTER",
+        "TICKET_SUPPORT"
+      ]
+    },
+    {
+      "code": "navigation",
+      "name": "导航",
+      "description": "全站资源导航站",
+      "count": 1,
+      "entryKeys": [
+        "NAVIGATION"
+      ]
+    },
+    {
+      "code": "lowcode",
+      "name": "低代码生成",
+      "description": "低代码生成平台",
+      "count": 1,
+      "entryKeys": [
+        "LOWCODE"
+      ]
+    },
+    {
+      "code": "tools",
+      "name": "疾风引擎工具",
+      "description": "疾风引擎在线工具承载节点",
+      "count": 1,
+      "entryKeys": [
+        "GALE_TOOLS"
+      ]
+    },
+    {
+      "code": "voice",
+      "name": "语音工具",
+      "description": "语音工具服务平台",
+      "count": 1,
+      "entryKeys": [
+        "VOICE_TOOLS"
+      ]
+    },
+    {
+      "code": "mobile",
+      "name": "移动端 H5 与全功能移动站",
+      "description": "精简官网与全功能移动站点",
+      "count": 2,
+      "entryKeys": [
+        "MOBILE_H5",
+        "MOBILE_FULL"
+      ]
+    },
+    {
+      "code": "intranet",
+      "name": "企业内部门户",
+      "description": "内部统一门户与工作台",
+      "count": 1,
+      "entryKeys": [
+        "INTRANET_PORTAL"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "id": "01",
+      "entryKey": "PORTAL_ROOT",
+      "placeholder": "{{HOST:PORTAL_ROOT}}",
+      "envKey": "MIM_HOST_PORTAL_ROOT",
+      "hostValue": null,
+      "note": "核心根域名，主站基础入口｜主站统一跳转门户",
+      "entry": "核心根域名，主站基础入口",
+      "system": "主站统一跳转门户",
+      "sheet": "mixm.top",
+      "rows": [
+        4,
+        5
+      ],
+      "domain": "portal",
+      "domainName": "主站门户与跳转",
+      "coreFunctions": [
+        "根域名访问的统一跳转与分发规则",
+        "按来源/场景把根域名导向门户、移动端或业务入口",
+        "跳转命中记录与异常回退策略"
+      ],
+      "responsibility": {
+        "inScope": [
+          "根域名级跳转决策与回退",
+          "入口分发规则的配置"
+        ],
+        "outOfScope": [
+          "不承载门户页面内容",
+          "不实现业务系统登录与鉴权"
+        ]
+      },
+      "adminRole": "配置跳转目标、分发比例与回退链路，查看命中与异常记录",
+      "apiRole": "对外提供跳转决策与入口清单查询接口，供门户与网关消费",
+      "related": [
+        {
+          "entryId": "02",
+          "entryKey": "PORTAL_SITE",
+          "relation": "similar",
+          "distinction": "同为门户入口；本模块只做根域名跳转分发，官方门户网站承载实际页面内容"
+        },
+        {
+          "entryId": "12",
+          "entryKey": "NAVIGATION",
+          "relation": "similar",
+          "distinction": "导航站聚合全站资源链接，本模块只负责根域名一次跳转，不维护链接目录"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "跳转规则清单",
+          "itemKind": "跳转规则",
+          "description": "清单：登记并查看该系统的资源清单，可归档（主站统一跳转门户）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "入口路由配置",
+          "itemKind": "路由配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（主站统一跳转门户）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "跳转命中记录",
+          "itemKind": "命中记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（主站统一跳转门户）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "跳转规则·示例",
+          "status": "active",
+          "detail": "演示数据：主站统一跳转门户的跳转规则清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "路由配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：主站统一跳转门户的入口路由配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "entryKey": "PORTAL_SITE",
+      "placeholder": "{{HOST:PORTAL_SITE}}",
+      "envKey": "MIM_HOST_PORTAL_SITE",
+      "hostValue": null,
+      "note": "主站常规访问入口｜官方门户网站",
+      "entry": "主站常规访问入口",
+      "system": "官方门户网站",
+      "sheet": "mixm.top",
+      "rows": [
+        6,
+        7
+      ],
+      "domain": "portal",
+      "domainName": "主站门户与跳转",
+      "coreFunctions": [
+        "官方门户首页与栏目内容展示",
+        "站点公告、产品信息与对外入口聚合",
+        "门户内容发布与上下线管理"
+      ],
+      "responsibility": {
+        "inScope": [
+          "官方对外内容承载与展示",
+          "门户栏目与公告维护"
+        ],
+        "outOfScope": [
+          "不负责账号体系与交易流程",
+          "不承载各业务系统内部页面"
+        ]
+      },
+      "adminRole": "维护门户栏目、公告、推荐位与内容上下线",
+      "apiRole": "提供门户内容读取接口与对外入口索引，供导航站与移动端 H5 引用",
+      "related": [
+        {
+          "entryId": "01",
+          "entryKey": "PORTAL_ROOT",
+          "relation": "similar",
+          "distinction": "根域名只做跳转，本模块承载实际门户内容"
+        },
+        {
+          "entryId": "22",
+          "entryKey": "MOBILE_H5",
+          "relation": "similar",
+          "distinction": "移动端 H5 精简版官网是本模块的移动端裁剪视图，不另立内容体系"
+        },
+        {
+          "entryId": "12",
+          "entryKey": "NAVIGATION",
+          "relation": "similar",
+          "distinction": "导航站只做链接聚合，门户站提供内容本体"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "站点栏目",
+          "itemKind": "栏目",
+          "description": "清单：登记并查看该系统的资源清单，可归档（官方门户网站）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "内容发布",
+          "itemKind": "内容",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（官方门户网站）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "访问记录",
+          "itemKind": "访问记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（官方门户网站）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "栏目·示例",
+          "status": "active",
+          "detail": "演示数据：官方门户网站的站点栏目初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "内容·待处理",
+          "status": "pending",
+          "detail": "演示数据：官方门户网站的内容发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "entryKey": "ADMIN_CONSOLE",
+      "placeholder": "{{HOST:ADMIN_CONSOLE}}",
+      "envKey": "MIM_HOST_ADMIN_CONSOLE",
+      "hostValue": null,
+      "note": "管理后台入口｜全站统一运营管理后台",
+      "entry": "管理后台入口",
+      "system": "全站统一运营管理后台",
+      "sheet": "mixm.top",
+      "rows": [
+        8,
+        9
+      ],
+      "domain": "admin",
+      "domainName": "管理后台",
+      "coreFunctions": [
+        "全站统一运营管理后台入口",
+        "模块开关、配置与运营数据总览",
+        "跨业务系统的管理入口收敛与权限分发"
+      ],
+      "responsibility": {
+        "inScope": [
+          "全站级运营配置与模块治理",
+          "后台账号与角色入口"
+        ],
+        "outOfScope": [
+          "不替代各业务系统专属后台（会员/供应商/卖家）",
+          "不直接对外提供业务接口"
+        ]
+      },
+      "adminRole": "管理全站模块、配置项、运营总览与后台权限分配",
+      "apiRole": "对内提供管理面聚合接口，按权限转发到各业务域管理端点",
+      "related": [
+        {
+          "entryId": "36",
+          "entryKey": "MEMBER_ADMIN",
+          "relation": "similar",
+          "distinction": "会员管理后台只管会员域，本模块是全站治理入口"
+        },
+        {
+          "entryId": "43",
+          "entryKey": "SUPPLIER_ADMIN",
+          "relation": "similar",
+          "distinction": "供应商后台面向供应侧入驻，本模块面向平台运营"
+        },
+        {
+          "entryId": "45",
+          "entryKey": "SELLER_ADMIN",
+          "relation": "similar",
+          "distinction": "个人卖家后台面向 C2C 卖家，本模块不承载店铺经营"
+        },
+        {
+          "entryId": "26",
+          "entryKey": "INTRANET_PORTAL",
+          "relation": "similar",
+          "distinction": "企业内部门户面向员工协同工作台，本模块面向平台运营治理"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "运营模块清单",
+          "itemKind": "运营模块",
+          "description": "清单：登记并查看该系统的资源清单，可归档（全站统一运营管理后台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "运营配置",
+          "itemKind": "配置项",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（全站统一运营管理后台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "操作审计",
+          "itemKind": "审计记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（全站统一运营管理后台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "运营模块·示例",
+          "status": "active",
+          "detail": "演示数据：全站统一运营管理后台的运营模块清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "配置项·待处理",
+          "status": "pending",
+          "detail": "演示数据：全站统一运营管理后台的运营配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "entryKey": "API_GATEWAY",
+      "placeholder": "{{HOST:API_GATEWAY}}",
+      "envKey": "MIM_HOST_API_GATEWAY",
+      "hostValue": null,
+      "note": "接口服务入口｜API 统一网关",
+      "entry": "接口服务入口",
+      "system": "API 统一网关",
+      "sheet": "mixm.top",
+      "rows": [
+        10,
+        11
+      ],
+      "domain": "gateway",
+      "domainName": "API 与 APP 网关",
+      "coreFunctions": [
+        "统一 API 入口与路由转发",
+        "鉴权透传、限流、熔断与请求日志",
+        "接口版本与灰度策略管理"
+      ],
+      "responsibility": {
+        "inScope": [
+          "全站接口统一接入与治理",
+          "接口级安全与流量控制"
+        ],
+        "outOfScope": [
+          "不实现具体业务逻辑",
+          "不替代移动端专属接口的适配逻辑"
+        ]
+      },
+      "adminRole": "配置路由、限流阈值、黑白名单与接口版本，查看调用日志",
+      "apiRole": "对外暴露 /api 统一入口，向各业务域接口转发并回传统一错误信封",
+      "related": [
+        {
+          "entryId": "05",
+          "entryKey": "APP_API",
+          "relation": "similar",
+          "distinction": "APP 端接口是面向移动端的适配层，本模块是通用网关"
+        },
+        {
+          "entryId": "06",
+          "entryKey": "AUTH_CENTER",
+          "relation": "similar",
+          "distinction": "认证中心负责身份校验能力，本模块负责在网关侧透传与拦截"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "接口清单",
+          "itemKind": "接口",
+          "description": "清单：登记并查看该系统的资源清单，可归档（API 统一网关）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "路由配置",
+          "itemKind": "路由",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（API 统一网关）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "调用记录",
+          "itemKind": "调用记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（API 统一网关）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "接口·示例",
+          "status": "active",
+          "detail": "演示数据：API 统一网关的接口清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "路由·待处理",
+          "status": "pending",
+          "detail": "演示数据：API 统一网关的路由配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "entryKey": "APP_API",
+      "placeholder": "{{HOST:APP_API}}",
+      "envKey": "MIM_HOST_APP_API",
+      "hostValue": null,
+      "note": "APP 端接口入口｜移动端专属接口服务",
+      "entry": "APP 端接口入口",
+      "system": "移动端专属接口服务",
+      "sheet": "mixm.top",
+      "rows": [
+        12,
+        13
+      ],
+      "domain": "gateway",
+      "domainName": "API 与 APP 网关",
+      "coreFunctions": [
+        "移动端专属接口聚合与裁剪",
+        "按 APP / H5 场景合并请求、压缩载荷",
+        "移动端会话与设备标识适配"
+      ],
+      "responsibility": {
+        "inScope": [
+          "移动端接口编排与数据裁剪",
+          "端侧会话适配"
+        ],
+        "outOfScope": [
+          "不提供通用 PC 端接口",
+          "不存储业务主数据"
+        ]
+      },
+      "adminRole": "配置端侧接口编排、缓存与兼容版本，查看端侧调用质量",
+      "apiRole": "对移动端输出聚合接口，向下游业务域接口取数后裁剪返回",
+      "related": [
+        {
+          "entryId": "04",
+          "entryKey": "API_GATEWAY",
+          "relation": "similar",
+          "distinction": "通用网关负责路由治理，本模块负责端侧聚合与裁剪"
+        },
+        {
+          "entryId": "23",
+          "entryKey": "MOBILE_FULL",
+          "relation": "similar",
+          "distinction": "全功能移动站是页面载体，本模块是其接口供给方"
+        },
+        {
+          "entryId": "22",
+          "entryKey": "MOBILE_H5",
+          "relation": "similar",
+          "distinction": "H5 精简版官网只读门户内容，本模块服务完整移动端业务"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "移动端接口",
+          "itemKind": "接口",
+          "description": "清单：登记并查看该系统的资源清单，可归档（移动端专属接口服务）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "版本配置",
+          "itemKind": "版本配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（移动端专属接口服务）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "调用记录",
+          "itemKind": "调用记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（移动端专属接口服务）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "接口·示例",
+          "status": "active",
+          "detail": "演示数据：移动端专属接口服务的移动端接口初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "版本配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：移动端专属接口服务的版本配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "entryKey": "AUTH_CENTER",
+      "placeholder": "{{HOST:AUTH_CENTER}}",
+      "envKey": "MIM_HOST_AUTH_CENTER",
+      "hostValue": null,
+      "note": "权限验证入口｜统一身份认证与权限中心",
+      "entry": "权限验证入口",
+      "system": "统一身份认证与权限中心",
+      "sheet": "mixm.top",
+      "rows": [
+        14,
+        15
+      ],
+      "domain": "identity",
+      "domainName": "认证权限与单点登录",
+      "coreFunctions": [
+        "统一身份认证与令牌签发",
+        "权限点、角色与授权关系管理",
+        "跨系统鉴权结果输出与审计"
+      ],
+      "responsibility": {
+        "inScope": [
+          "身份校验、权限判定与令牌生命周期",
+          "授权关系与审计记录"
+        ],
+        "outOfScope": [
+          "不提供登录页面交互",
+          "不承载用户资料与会员权益"
+        ]
+      },
+      "adminRole": "维护角色、权限点、授权关系与令牌策略，查询鉴权审计",
+      "apiRole": "对网关与各业务域输出鉴权/校验接口，提供令牌校验与权限判定",
+      "related": [
+        {
+          "entryId": "19",
+          "entryKey": "SSO_LOGIN",
+          "relation": "similar",
+          "distinction": "单点登录页提供登录交互与会话入口，本模块提供校验能力本身"
+        },
+        {
+          "entryId": "08",
+          "entryKey": "MEMBER_CENTER",
+          "relation": "similar",
+          "distinction": "用户中心承载会员资料与自助服务，本模块只处理身份与权限"
+        },
+        {
+          "entryId": "04",
+          "entryKey": "API_GATEWAY",
+          "relation": "similar",
+          "distinction": "网关负责拦截与透传，本模块负责判定结果"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "身份凭证",
+          "itemKind": "凭证",
+          "description": "清单：登记并查看该系统的资源清单，可归档（统一身份认证与权限中心）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "权限策略",
+          "itemKind": "策略",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（统一身份认证与权限中心）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "认证记录",
+          "itemKind": "认证记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（统一身份认证与权限中心）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "凭证·示例",
+          "status": "active",
+          "detail": "演示数据：统一身份认证与权限中心的身份凭证初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "策略·待处理",
+          "status": "pending",
+          "detail": "演示数据：统一身份认证与权限中心的权限策略待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "entryKey": "BLOG",
+      "placeholder": "{{HOST:BLOG}}",
+      "envKey": "MIM_HOST_BLOG",
+      "hostValue": null,
+      "note": "博客模块入口｜官方博客系统",
+      "entry": "博客模块入口",
+      "system": "官方博客系统",
+      "sheet": "mixm.top",
+      "rows": [
+        16,
+        17
+      ],
+      "domain": "content",
+      "domainName": "博客 / 资讯 / 自媒体 / WordPress",
+      "coreFunctions": [
+        "官方博客文章发布与归档",
+        "专栏、标签与作者信息维护",
+        "文章评论与阅读数据查看"
+      ],
+      "responsibility": {
+        "inScope": [
+          "官方主体署名的长文内容",
+          "博客栏目与归档"
+        ],
+        "outOfScope": [
+          "不承载新闻采编流程",
+          "不接收外部多作者投稿"
+        ]
+      },
+      "adminRole": "管理文章、专栏、标签、上下线与评论审核",
+      "apiRole": "对外提供文章列表与详情读取接口，供门户与导航站引用",
+      "related": [
+        {
+          "entryId": "24",
+          "entryKey": "NEWS_PUBLISH",
+          "relation": "similar",
+          "distinction": "新闻资讯发布系统面向编辑部采编与时效稿件，官方博客面向官方署名长文"
+        },
+        {
+          "entryId": "39",
+          "entryKey": "SELF_MEDIA",
+          "relation": "similar",
+          "distinction": "自媒体平台接收多作者投稿，本模块仅官方主体发布"
+        },
+        {
+          "entryId": "38",
+          "entryKey": "WORDPRESS",
+          "relation": "similar",
+          "distinction": "WordPress 是独立站点自建 CMS，本模块是主站体系内博客"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "文章目录",
+          "itemKind": "文章",
+          "description": "清单：登记并查看该系统的资源清单，可归档（官方博客系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "文章发布",
+          "itemKind": "稿件",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（官方博客系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "阅读记录",
+          "itemKind": "阅读记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（官方博客系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "文章·示例",
+          "status": "active",
+          "detail": "演示数据：官方博客系统的文章目录初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "稿件·待处理",
+          "status": "pending",
+          "detail": "演示数据：官方博客系统的文章发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "08",
+      "entryKey": "MEMBER_CENTER",
+      "placeholder": "{{HOST:MEMBER_CENTER}}",
+      "envKey": "MIM_HOST_MEMBER_CENTER",
+      "hostValue": null,
+      "note": "用户中心入口｜用户个人中心 / 会员工作台",
+      "entry": "用户中心入口",
+      "system": "用户个人中心 / 会员工作台",
+      "sheet": "mixm.top",
+      "rows": [
+        18,
+        19
+      ],
+      "domain": "member",
+      "domainName": "用户与会员中心",
+      "coreFunctions": [
+        "用户资料、会员权益自助查看",
+        "订单、收藏与消息的自助查询",
+        "个人设置与安全自助操作"
+      ],
+      "responsibility": {
+        "inScope": [
+          "登录用户的自助服务与资料查看",
+          "会员权益展示"
+        ],
+        "outOfScope": [
+          "不提供后台批量会员管理",
+          "不处理支付与结算"
+        ]
+      },
+      "adminRole": "面向用户的自助页配置与权益展示规则维护",
+      "apiRole": "提供用户资料、权益、订单摘要读取接口，写入类操作走鉴权与幂等",
+      "related": [
+        {
+          "entryId": "36",
+          "entryKey": "MEMBER_ADMIN",
+          "relation": "similar",
+          "distinction": "会员管理后台面向运营批量管理，本模块面向用户自助"
+        },
+        {
+          "entryId": "06",
+          "entryKey": "AUTH_CENTER",
+          "relation": "similar",
+          "distinction": "认证中心处理身份权限，本模块展示用户资料与权益"
+        },
+        {
+          "entryId": "19",
+          "entryKey": "SSO_LOGIN",
+          "relation": "similar",
+          "distinction": "单点登录页只完成登录动作，登录后工作台由本模块承接"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "会员权益",
+          "itemKind": "权益",
+          "description": "清单：登记并查看该系统的资源清单，可归档（用户个人中心 / 会员工作台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "资料维护",
+          "itemKind": "资料变更",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（用户个人中心 / 会员工作台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "工作台记录",
+          "itemKind": "工作台记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（用户个人中心 / 会员工作台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "权益·示例",
+          "status": "active",
+          "detail": "演示数据：用户个人中心 / 会员工作台的会员权益初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "资料变更·待处理",
+          "status": "pending",
+          "detail": "演示数据：用户个人中心 / 会员工作台的资料维护待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "09",
+      "entryKey": "CLOUD_DRIVE",
+      "placeholder": "{{HOST:CLOUD_DRIVE}}",
+      "envKey": "MIM_HOST_CLOUD_DRIVE",
+      "hostValue": null,
+      "note": "云服务模块入口｜私有云盘 / 网盘系统",
+      "entry": "云服务模块入口",
+      "system": "私有云盘 / 网盘系统",
+      "sheet": "mixm.top",
+      "rows": [
+        20,
+        21
+      ],
+      "domain": "storage",
+      "domainName": "云盘 / 图床 / 素材 / 下载分发",
+      "coreFunctions": [
+        "私有文件与目录的上传、下载、分享",
+        "个人/团队空间配额与权限",
+        "文件版本与回收站管理"
+      ],
+      "responsibility": {
+        "inScope": [
+          "登录用户的私有文件存储",
+          "空间配额与分享权限"
+        ],
+        "outOfScope": [
+          "不提供公共图床外链",
+          "不承担源码发布分发"
+        ]
+      },
+      "adminRole": "管理空间配额、分享策略、文件审计与违规处置",
+      "apiRole": "提供文件上传/下载/分享凭证接口，写操作需鉴权与幂等",
+      "related": [
+        {
+          "entryId": "18",
+          "entryKey": "IMAGE_ASSETS",
+          "relation": "similar",
+          "distinction": "公共图床面向公开图片外链与素材复用，本模块面向私有文件"
+        },
+        {
+          "entryId": "33",
+          "entryKey": "DOWNLOAD_DIST",
+          "relation": "similar",
+          "distinction": "下载分发站面向公开源码包分发，本模块面向用户私有空间"
+        },
+        {
+          "entryId": "26",
+          "entryKey": "INTRANET_PORTAL",
+          "relation": "similar",
+          "distinction": "企业内部门户可集成团队空间入口，但不管理文件本体"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "文件目录",
+          "itemKind": "文件",
+          "description": "清单：登记并查看该系统的资源清单，可归档（私有云盘 / 网盘系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "文件登记",
+          "itemKind": "文件登记",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（私有云盘 / 网盘系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "传输记录",
+          "itemKind": "传输记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（私有云盘 / 网盘系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "文件·示例",
+          "status": "active",
+          "detail": "演示数据：私有云盘 / 网盘系统的文件目录初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "文件登记·待处理",
+          "status": "pending",
+          "detail": "演示数据：私有云盘 / 网盘系统的文件登记待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "entryKey": "OPEN_DATA",
+      "placeholder": "{{HOST:OPEN_DATA}}",
+      "envKey": "MIM_HOST_OPEN_DATA",
+      "hostValue": null,
+      "note": "数据中心入口｜开放数据集平台",
+      "entry": "数据中心入口",
+      "system": "开放数据集平台",
+      "sheet": "mixm.top",
+      "rows": [
+        22,
+        23
+      ],
+      "domain": "data",
+      "domainName": "数据开放 / BI / 爬虫采集",
+      "coreFunctions": [
+        "开放数据集目录与元数据登记",
+        "数据集版本、许可与下载凭证",
+        "开放接口配额与调用统计"
+      ],
+      "responsibility": {
+        "inScope": [
+          "对外公开数据集与元数据",
+          "开放数据接口配额"
+        ],
+        "outOfScope": [
+          "不展示内部经营 BI 指标",
+          "不执行采集任务调度"
+        ]
+      },
+      "adminRole": "登记数据集、维护许可与版本、审核开放申请",
+      "apiRole": "提供数据集目录与开放数据读取接口，按配额限流",
+      "related": [
+        {
+          "entryId": "32",
+          "entryKey": "BI_DASHBOARD",
+          "relation": "similar",
+          "distinction": "BI 看板面向内部经营指标可视化，本模块面向对外数据集开放"
+        },
+        {
+          "entryId": "30",
+          "entryKey": "CRAWLER_SCHEDULER",
+          "relation": "similar",
+          "distinction": "采集平台负责抓取与调度，本模块负责已入库数据的开放出口"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "数据集清单",
+          "itemKind": "数据集",
+          "description": "清单：登记并查看该系统的资源清单，可归档（开放数据集平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "数据集发布",
+          "itemKind": "数据集版本",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（开放数据集平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "下载记录",
+          "itemKind": "下载记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（开放数据集平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "数据集·示例",
+          "status": "active",
+          "detail": "演示数据：开放数据集平台的数据集清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "数据集版本·待处理",
+          "status": "pending",
+          "detail": "演示数据：开放数据集平台的数据集发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "11",
+      "entryKey": "DEV_PORTAL",
+      "placeholder": "{{HOST:DEV_PORTAL}}",
+      "envKey": "MIM_HOST_DEV_PORTAL",
+      "hostValue": null,
+      "note": "开发测试入口｜开发环境门户 + 接口文档",
+      "entry": "开发测试入口",
+      "system": "开发环境门户 + 接口文档",
+      "sheet": "mixm.top",
+      "rows": [
+        24,
+        25
+      ],
+      "domain": "dev",
+      "domainName": "开发测试环境与接口文档",
+      "coreFunctions": [
+        "开发环境门户与接口文档中心",
+        "接口调试沙箱与示例凭证",
+        "SDK / 变更日志与接入指引"
+      ],
+      "responsibility": {
+        "inScope": [
+          "开发接入文档与调试环境",
+          "接口契约说明"
+        ],
+        "outOfScope": [
+          "不是测试环境运行入口",
+          "不承载生产业务流量"
+        ]
+      },
+      "adminRole": "维护文档版本、沙箱配置、示例凭证与变更日志",
+      "apiRole": "提供文档读取与沙箱调试接口，与测试环境隔离",
+      "related": [
+        {
+          "entryId": "35",
+          "entryKey": "TEST_ENV",
+          "relation": "similar",
+          "distinction": "测试环境统一入口是运行环境入口，本模块是文档与调试门户"
+        },
+        {
+          "entryId": "04",
+          "entryKey": "API_GATEWAY",
+          "relation": "similar",
+          "distinction": "网关是运行时统一入口，本模块是开发期契约说明"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "文档清单",
+          "itemKind": "文档",
+          "description": "清单：登记并查看该系统的资源清单，可归档（开发环境门户 + 接口文档）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "环境配置",
+          "itemKind": "环境配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（开发环境门户 + 接口文档）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "调试记录",
+          "itemKind": "调试记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（开发环境门户 + 接口文档）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "文档·示例",
+          "status": "active",
+          "detail": "演示数据：开发环境门户 + 接口文档的文档清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "环境配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：开发环境门户 + 接口文档的环境配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "12",
+      "entryKey": "NAVIGATION",
+      "placeholder": "{{HOST:NAVIGATION}}",
+      "envKey": "MIM_HOST_NAVIGATION",
+      "hostValue": null,
+      "note": "导航模块入口｜全站资源导航站",
+      "entry": "导航模块入口",
+      "system": "全站资源导航站",
+      "sheet": "mixm.top",
+      "rows": [
+        26,
+        27
+      ],
+      "domain": "navigation",
+      "domainName": "导航",
+      "coreFunctions": [
+        "全站资源链接目录与分类",
+        "入口可达性检测与失效标记",
+        "导航检索与推荐位"
+      ],
+      "responsibility": {
+        "inScope": [
+          "链接聚合、分类与可达性",
+          "导航目录维护"
+        ],
+        "outOfScope": [
+          "不承载被链系统的内容",
+          "不负责域名解析或跳转决策"
+        ]
+      },
+      "adminRole": "维护分类、链接、可达性检测与推荐位",
+      "apiRole": "提供导航目录读取接口，链接目标为可配置占位标识",
+      "related": [
+        {
+          "entryId": "02",
+          "entryKey": "PORTAL_SITE",
+          "relation": "similar",
+          "distinction": "门户站提供内容本体，导航站只做链接聚合"
+        },
+        {
+          "entryId": "01",
+          "entryKey": "PORTAL_ROOT",
+          "relation": "similar",
+          "distinction": "根域名只做一次跳转，导航站维护完整链接目录"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "导航条目",
+          "itemKind": "导航条目",
+          "description": "清单：登记并查看该系统的资源清单，可归档（全站资源导航站）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "资源收录",
+          "itemKind": "收录申请",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（全站资源导航站）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "点击记录",
+          "itemKind": "点击记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（全站资源导航站）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "导航条目·示例",
+          "status": "active",
+          "detail": "演示数据：全站资源导航站的导航条目初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "收录申请·待处理",
+          "status": "pending",
+          "detail": "演示数据：全站资源导航站的资源收录待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "13",
+      "entryKey": "LOWCODE",
+      "placeholder": "{{HOST:LOWCODE}}",
+      "envKey": "MIM_HOST_LOWCODE",
+      "hostValue": null,
+      "note": "代码生成工具入口｜低代码生成平台",
+      "entry": "代码生成工具入口",
+      "system": "低代码生成平台",
+      "sheet": "mixm.top",
+      "rows": [
+        28,
+        29
+      ],
+      "domain": "lowcode",
+      "domainName": "低代码生成",
+      "coreFunctions": [
+        "表单/页面模型的可视化配置",
+        "模板与组件元数据管理",
+        "生成物预览与发布流程"
+      ],
+      "responsibility": {
+        "inScope": [
+          "低代码建模、模板与生成",
+          "生成物版本管理"
+        ],
+        "outOfScope": [
+          "不承载具体业务系统运行时",
+          "不负责源码分发"
+        ]
+      },
+      "adminRole": "维护组件库、模板、生成任务与发布审核",
+      "apiRole": "提供模型保存、生成与预览接口，写操作需鉴权",
+      "related": [
+        {
+          "entryId": "16",
+          "entryKey": "GALE_TOOLS",
+          "relation": "similar",
+          "distinction": "疾风引擎是在线工具运行平台，本模块是页面/表单的生成工具"
+        },
+        {
+          "entryId": "33",
+          "entryKey": "DOWNLOAD_DIST",
+          "relation": "similar",
+          "distinction": "下载分发站发布成品源码包，本模块产出配置化生成物"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "模板清单",
+          "itemKind": "模板",
+          "description": "清单：登记并查看该系统的资源清单，可归档（低代码生成平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "生成任务",
+          "itemKind": "生成任务",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（低代码生成平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "生成记录",
+          "itemKind": "生成记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（低代码生成平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "模板·示例",
+          "status": "active",
+          "detail": "演示数据：低代码生成平台的模板清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "生成任务·待处理",
+          "status": "pending",
+          "detail": "演示数据：低代码生成平台的生成任务待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "14",
+      "entryKey": "UGC_VIDEO",
+      "placeholder": "{{HOST:UGC_VIDEO}}",
+      "envKey": "MIM_HOST_UGC_VIDEO",
+      "hostValue": null,
+      "note": "视频动态模块入口｜UGC 短视频动态社区",
+      "entry": "视频动态模块入口",
+      "system": "UGC 短视频动态社区",
+      "sheet": "mixm.top",
+      "rows": [
+        30,
+        31
+      ],
+      "domain": "video",
+      "domainName": "UGC 短视频 / 长视频 / 独立播放页",
+      "coreFunctions": [
+        "UGC 短视频上传、发布与动态流",
+        "点赞、评论、关注与推荐",
+        "内容审核与违规处置"
+      ],
+      "responsibility": {
+        "inScope": [
+          "用户 produced 短视频与社区互动",
+          "动态流与审核"
+        ],
+        "outOfScope": [
+          "不承载长视频点播片库",
+          "不提供独立嵌入播放器"
+        ]
+      },
+      "adminRole": "管理内容审核、话题、推荐策略与违规处置",
+      "apiRole": "提供视频动态流与互动接口，上传/发布需鉴权",
+      "related": [
+        {
+          "entryId": "31",
+          "entryKey": "VOD_LONG_VIDEO",
+          "relation": "similar",
+          "distinction": "长视频点播面向版权片库与播放编排，本模块面向 UGC 短视频社区"
+        },
+        {
+          "entryId": "37",
+          "entryKey": "VIDEO_PLAYER",
+          "relation": "similar",
+          "distinction": "独立播放页是可嵌入的播放载体，本模块是内容社区"
+        },
+        {
+          "entryId": "39",
+          "entryKey": "SELF_MEDIA",
+          "relation": "similar",
+          "distinction": "自媒体平台以图文资讯为主，本模块以短视频动态为主"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "动态清单",
+          "itemKind": "动态",
+          "description": "清单：登记并查看该系统的资源清单，可归档（UGC 短视频动态社区）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "内容发布",
+          "itemKind": "稿件",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（UGC 短视频动态社区）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "互动记录",
+          "itemKind": "互动记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（UGC 短视频动态社区）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "动态·示例",
+          "status": "active",
+          "detail": "演示数据：UGC 短视频动态社区的动态清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "稿件·待处理",
+          "status": "pending",
+          "detail": "演示数据：UGC 短视频动态社区的内容发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "15",
+      "entryKey": "OPS_MONITOR",
+      "placeholder": "{{HOST:OPS_MONITOR}}",
+      "envKey": "MIM_HOST_OPS_MONITOR",
+      "hostValue": null,
+      "note": "服务器支撑入口｜运维监控面板",
+      "entry": "服务器支撑入口",
+      "system": "运维监控面板",
+      "sheet": "mixm.top",
+      "rows": [
+        32,
+        33
+      ],
+      "domain": "ops",
+      "domainName": "运维监控 / 安全防护 / 服务治理",
+      "coreFunctions": [
+        "主机/服务指标采集与面板展示",
+        "告警规则、阈值与通知",
+        "故障记录与容量趋势"
+      ],
+      "responsibility": {
+        "inScope": [
+          "基础设施与服务运行指标",
+          "告警与故障记录"
+        ],
+        "outOfScope": [
+          "不负责安全攻击防护策略",
+          "不负责服务注册与治理配置"
+        ]
+      },
+      "adminRole": "配置采集项、告警规则、值班与故障复盘",
+      "apiRole": "提供指标查询与告警回调接口，供治理平台引用",
+      "related": [
+        {
+          "entryId": "27",
+          "entryKey": "SECURITY_CENTER",
+          "relation": "similar",
+          "distinction": "安全防护中心面向攻击与风险处置，本模块面向运行指标"
+        },
+        {
+          "entryId": "28",
+          "entryKey": "SERVICE_GOVERNANCE",
+          "relation": "similar",
+          "distinction": "服务治理平台面向服务注册/熔断/链路，本模块面向资源指标"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "主机清单",
+          "itemKind": "主机",
+          "description": "清单：登记并查看该系统的资源清单，可归档（运维监控面板）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "告警处置",
+          "itemKind": "告警",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（运维监控面板）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "巡检记录",
+          "itemKind": "巡检记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（运维监控面板）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "主机·示例",
+          "status": "active",
+          "detail": "演示数据：运维监控面板的主机清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "告警·待处理",
+          "status": "pending",
+          "detail": "演示数据：运维监控面板的告警处置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "16",
+      "entryKey": "GALE_TOOLS",
+      "placeholder": "{{HOST:GALE_TOOLS}}",
+      "envKey": "MIM_HOST_GALE_TOOLS",
+      "hostValue": null,
+      "note": "工具模块核心入口，疾风引擎承载节点｜疾风引擎在线工具平台",
+      "entry": "工具模块核心入口，疾风引擎承载节点",
+      "system": "疾风引擎在线工具平台",
+      "sheet": "mixm.top",
+      "rows": [
+        34,
+        35
+      ],
+      "domain": "tools",
+      "domainName": "疾风引擎工具",
+      "coreFunctions": [
+        "疾风引擎在线工具承载节点",
+        "工具登记、运行参数与任务编排",
+        "工具执行结果与日志查看"
+      ],
+      "responsibility": {
+        "inScope": [
+          "在线工具的运行与编排",
+          "工具元数据与执行记录"
+        ],
+        "outOfScope": [
+          "不是低代码建模工具",
+          "不提供语音类专用能力"
+        ]
+      },
+      "adminRole": "登记工具、配置运行参数、查看执行日志与结果",
+      "apiRole": "提供工具调用与任务状态接口，执行类操作需鉴权与幂等",
+      "related": [
+        {
+          "entryId": "13",
+          "entryKey": "LOWCODE",
+          "relation": "similar",
+          "distinction": "低代码平台生成页面/表单模型，本模块承载通用在线工具运行"
+        },
+        {
+          "entryId": "41",
+          "entryKey": "VOICE_TOOLS",
+          "relation": "similar",
+          "distinction": "语音工具平台专注语音能力，本模块是通用工具承载节点"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "工具清单",
+          "itemKind": "工具",
+          "description": "清单：登记并查看该系统的资源清单，可归档（疾风引擎在线工具平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "工具任务",
+          "itemKind": "任务",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（疾风引擎在线工具平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "运行记录",
+          "itemKind": "运行记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（疾风引擎在线工具平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "工具·示例",
+          "status": "active",
+          "detail": "演示数据：疾风引擎在线工具平台的工具清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "任务·待处理",
+          "status": "pending",
+          "detail": "演示数据：疾风引擎在线工具平台的工具任务待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "17",
+      "entryKey": "HELP_CENTER",
+      "placeholder": "{{HOST:HELP_CENTER}}",
+      "envKey": "MIM_HOST_HELP_CENTER",
+      "hostValue": null,
+      "note": "帮助中心入口｜产品帮助文档中心",
+      "entry": "帮助中心入口",
+      "system": "产品帮助文档中心",
+      "sheet": "mixm.top",
+      "rows": [
+        36,
+        37
+      ],
+      "domain": "support",
+      "domainName": "工单客服与帮助中心",
+      "coreFunctions": [
+        "产品帮助文档与操作指南",
+        "常见问题分类与检索",
+        "版本说明与更新日志"
+      ],
+      "responsibility": {
+        "inScope": [
+          "静态帮助内容与文档检索",
+          "版本说明维护"
+        ],
+        "outOfScope": [
+          "不处理用户工单交互",
+          "不提供人工客服坐席"
+        ]
+      },
+      "adminRole": "维护文档分类、条目、检索词与版本说明",
+      "apiRole": "提供文档读取与检索接口，供门户与工单系统引用",
+      "related": [
+        {
+          "entryId": "34",
+          "entryKey": "TICKET_SUPPORT",
+          "relation": "similar",
+          "distinction": "工单客服系统处理用户请求与人工响应，本模块提供自助文档"
+        },
+        {
+          "entryId": "11",
+          "entryKey": "DEV_PORTAL",
+          "relation": "similar",
+          "distinction": "开发环境门户面向开发者接口文档，本模块面向终端用户产品帮助"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "帮助条目",
+          "itemKind": "帮助条目",
+          "description": "清单：登记并查看该系统的资源清单，可归档（产品帮助文档中心）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "文档发布",
+          "itemKind": "稿件",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（产品帮助文档中心）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "反馈记录",
+          "itemKind": "反馈记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（产品帮助文档中心）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "帮助条目·示例",
+          "status": "active",
+          "detail": "演示数据：产品帮助文档中心的帮助条目初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "稿件·待处理",
+          "status": "pending",
+          "detail": "演示数据：产品帮助文档中心的文档发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "18",
+      "entryKey": "IMAGE_ASSETS",
+      "placeholder": "{{HOST:IMAGE_ASSETS}}",
+      "envKey": "MIM_HOST_IMAGE_ASSETS",
+      "hostValue": null,
+      "note": "图片资源入口｜公共图床 + 素材资源站",
+      "entry": "图片资源入口",
+      "system": "公共图床 + 素材资源站",
+      "sheet": "mixm.top",
+      "rows": [
+        38,
+        39
+      ],
+      "domain": "storage",
+      "domainName": "云盘 / 图床 / 素材 / 下载分发",
+      "coreFunctions": [
+        "公共图床上传与外链地址",
+        "素材分类、标签与授权说明",
+        "图片规格、压缩与防盗链配置"
+      ],
+      "responsibility": {
+        "inScope": [
+          "公开图片与素材资源复用",
+          "外链与规格配置"
+        ],
+        "outOfScope": [
+          "不存储用户私有文件",
+          "不承担源码包分发"
+        ]
+      },
+      "adminRole": "管理素材分类、授权、外链策略与违规图片处置",
+      "apiRole": "提供图片上传与外链读取接口，上传需鉴权",
+      "related": [
+        {
+          "entryId": "09",
+          "entryKey": "CLOUD_DRIVE",
+          "relation": "similar",
+          "distinction": "私有云盘面向用户私有文件，本模块面向公开图片外链"
+        },
+        {
+          "entryId": "33",
+          "entryKey": "DOWNLOAD_DIST",
+          "relation": "similar",
+          "distinction": "下载分发站面向源码包，本模块面向图片与素材"
+        },
+        {
+          "entryId": "07",
+          "entryKey": "BLOG",
+          "relation": "similar",
+          "distinction": "博客文章可引用图床外链，但文章本体由博客系统管理"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "素材目录",
+          "itemKind": "素材",
+          "description": "清单：登记并查看该系统的资源清单，可归档（公共图床 + 素材资源站）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "素材登记",
+          "itemKind": "素材登记",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（公共图床 + 素材资源站）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "调用记录",
+          "itemKind": "调用记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（公共图床 + 素材资源站）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "素材·示例",
+          "status": "active",
+          "detail": "演示数据：公共图床 + 素材资源站的素材目录初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "素材登记·待处理",
+          "status": "pending",
+          "detail": "演示数据：公共图床 + 素材资源站的素材登记待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "19",
+      "entryKey": "SSO_LOGIN",
+      "placeholder": "{{HOST:SSO_LOGIN}}",
+      "envKey": "MIM_HOST_SSO_LOGIN",
+      "hostValue": null,
+      "note": "登录验证入口｜统一单点登录页",
+      "entry": "登录验证入口",
+      "system": "统一单点登录页",
+      "sheet": "mixm.top",
+      "rows": [
+        40,
+        41
+      ],
+      "domain": "identity",
+      "domainName": "认证权限与单点登录",
+      "coreFunctions": [
+        "统一单点登录页与登录交互",
+        "多端登录态同步与跳转回源",
+        "登录方式配置与失败提示"
+      ],
+      "responsibility": {
+        "inScope": [
+          "登录页面交互与会话建立",
+          "登录后回跳"
+        ],
+        "outOfScope": [
+          "不实现身份校验逻辑本身",
+          "不管理角色权限点"
+        ]
+      },
+      "adminRole": "配置登录方式、回源白名单与登录页文案",
+      "apiRole": "调用认证中心完成校验并下发会话，向各入口回跳",
+      "related": [
+        {
+          "entryId": "06",
+          "entryKey": "AUTH_CENTER",
+          "relation": "similar",
+          "distinction": "认证中心提供身份与权限判定能力，本模块提供登录交互入口"
+        },
+        {
+          "entryId": "08",
+          "entryKey": "MEMBER_CENTER",
+          "relation": "similar",
+          "distinction": "用户中心是登录后的自助工作台，本模块只完成登录动作"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "登录入口",
+          "itemKind": "登录入口",
+          "description": "清单：登记并查看该系统的资源清单，可归档（统一单点登录页）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "会话配置",
+          "itemKind": "会话配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（统一单点登录页）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "登录记录",
+          "itemKind": "登录记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（统一单点登录页）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "登录入口·示例",
+          "status": "active",
+          "detail": "演示数据：统一单点登录页的登录入口初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "会话配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：统一单点登录页的会话配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "entryKey": "MALL_B2C",
+      "placeholder": "{{HOST:MALL_B2C}}",
+      "envKey": "MIM_HOST_MALL_B2C",
+      "hostValue": null,
+      "note": "电商商城入口｜B2C 官方商城系统",
+      "entry": "电商商城入口",
+      "system": "B2C 官方商城系统",
+      "sheet": "mixm.top",
+      "rows": [
+        42,
+        43
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "B2C 商品目录、详情与搜索",
+        "购物车、下单与订单状态",
+        "自营库存与价格管理"
+      ],
+      "responsibility": {
+        "inScope": [
+          "平台自营零售交易链路",
+          "商品与订单主数据"
+        ],
+        "outOfScope": [
+          "不处理多商户入驻结算",
+          "不承担支付清分与对账"
+        ]
+      },
+      "adminRole": "管理商品、价格、库存、订单与售后",
+      "apiRole": "提供商品与订单接口；支付动作委托支付聚合网关",
+      "related": [
+        {
+          "entryId": "29",
+          "entryKey": "MULTI_MERCHANT",
+          "relation": "similar",
+          "distinction": "多商户店铺系统面向第三方商家入驻，本模块为平台自营"
+        },
+        {
+          "entryId": "25",
+          "entryKey": "PAYMENT_GATEWAY",
+          "relation": "similar",
+          "distinction": "支付聚合网关负责收款与对账，本模块负责交易订单"
+        },
+        {
+          "entryId": "40",
+          "entryKey": "SOURCE_GOODS",
+          "relation": "similar",
+          "distinction": "货源商品库是上游商品主数据，本模块面向消费者成交"
+        },
+        {
+          "entryId": "42",
+          "entryKey": "B2B_TRADE",
+          "relation": "similar",
+          "distinction": "B2B 批发面向企业采购与议价，本模块面向个人零售"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "商品清单",
+          "itemKind": "商品",
+          "description": "清单：登记并查看该系统的资源清单，可归档（B2C 官方商城系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "商品上架",
+          "itemKind": "上架申请",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（B2C 官方商城系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "订单记录",
+          "itemKind": "订单记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（B2C 官方商城系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "商品·示例",
+          "status": "active",
+          "detail": "演示数据：B2C 官方商城系统的商品清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "上架申请·待处理",
+          "status": "pending",
+          "detail": "演示数据：B2C 官方商城系统的商品上架待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "21",
+      "entryKey": "MARKETING",
+      "placeholder": "{{HOST:MARKETING}}",
+      "envKey": "MIM_HOST_MARKETING",
+      "hostValue": null,
+      "note": "营销模块入口｜营销活动管理平台",
+      "entry": "营销模块入口",
+      "system": "营销活动管理平台",
+      "sheet": "mixm.top",
+      "rows": [
+        44,
+        45
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "营销活动创建与投放时段管理",
+        "优惠券、满减与活动规则配置",
+        "活动效果数据与预算占用"
+      ],
+      "responsibility": {
+        "inScope": [
+          "活动规则与权益发放",
+          "投放时段与预算"
+        ],
+        "outOfScope": [
+          "不产生订单本体",
+          "不处理支付结算"
+        ]
+      },
+      "adminRole": "配置活动、券批次、规则与投放审核，查看效果数据",
+      "apiRole": "提供活动与券校验接口，供商城/多商户下单链路调用",
+      "related": [
+        {
+          "entryId": "20",
+          "entryKey": "MALL_B2C",
+          "relation": "similar",
+          "distinction": "商城负责商品与订单，本模块负责活动规则与优惠"
+        },
+        {
+          "entryId": "25",
+          "entryKey": "PAYMENT_GATEWAY",
+          "relation": "similar",
+          "distinction": "支付网关负责资金流，本模块负责优惠规则"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "活动清单",
+          "itemKind": "活动",
+          "description": "清单：登记并查看该系统的资源清单，可归档（营销活动管理平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "活动发布",
+          "itemKind": "活动方案",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（营销活动管理平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "效果记录",
+          "itemKind": "效果记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（营销活动管理平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "活动·示例",
+          "status": "active",
+          "detail": "演示数据：营销活动管理平台的活动清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "活动方案·待处理",
+          "status": "pending",
+          "detail": "演示数据：营销活动管理平台的活动发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "22",
+      "entryKey": "MOBILE_H5",
+      "placeholder": "{{HOST:MOBILE_H5}}",
+      "envKey": "MIM_HOST_MOBILE_H5",
+      "hostValue": null,
+      "note": "移动端适配入口｜移动端 H5 精简版官网",
+      "entry": "移动端适配入口",
+      "system": "移动端 H5 精简版官网",
+      "sheet": "mixm.top",
+      "rows": [
+        46,
+        47
+      ],
+      "domain": "mobile",
+      "domainName": "移动端 H5 与全功能移动站",
+      "coreFunctions": [
+        "移动端 H5 精简版官网",
+        "首屏内容裁剪与轻量化加载",
+        "向全功能移动站与 APP 的导流"
+      ],
+      "responsibility": {
+        "inScope": [
+          "移动端只读门户内容",
+          "轻量化展示与导流"
+        ],
+        "outOfScope": [
+          "不提供完整业务交易能力",
+          "不承载 APP 端接口"
+        ]
+      },
+      "adminRole": "维护精简版栏目、首屏内容与导流位",
+      "apiRole": "读取门户内容接口，输出移动端裁剪视图",
+      "related": [
+        {
+          "entryId": "23",
+          "entryKey": "MOBILE_FULL",
+          "relation": "similar",
+          "distinction": "全功能移动端站点提供完整业务，本模块仅精简官网"
+        },
+        {
+          "entryId": "02",
+          "entryKey": "PORTAL_SITE",
+          "relation": "similar",
+          "distinction": "PC 门户站是内容主体，本模块是其移动端裁剪"
+        },
+        {
+          "entryId": "05",
+          "entryKey": "APP_API",
+          "relation": "similar",
+          "distinction": "APP 端接口服务完整业务，本模块只读门户内容"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "精简栏目",
+          "itemKind": "栏目",
+          "description": "清单：登记并查看该系统的资源清单，可归档（移动端 H5 精简版官网）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "页面发布",
+          "itemKind": "页面",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（移动端 H5 精简版官网）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "访问记录",
+          "itemKind": "访问记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（移动端 H5 精简版官网）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "栏目·示例",
+          "status": "active",
+          "detail": "演示数据：移动端 H5 精简版官网的精简栏目初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "页面·待处理",
+          "status": "pending",
+          "detail": "演示数据：移动端 H5 精简版官网的页面发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "23",
+      "entryKey": "MOBILE_FULL",
+      "placeholder": "{{HOST:MOBILE_FULL}}",
+      "envKey": "MIM_HOST_MOBILE_FULL",
+      "hostValue": null,
+      "note": "移动终端专用入口｜全功能移动端站点",
+      "entry": "移动终端专用入口",
+      "system": "全功能移动端站点",
+      "sheet": "mixm.top",
+      "rows": [
+        48,
+        49
+      ],
+      "domain": "mobile",
+      "domainName": "移动端 H5 与全功能移动站",
+      "coreFunctions": [
+        "全功能移动端站点页面承载",
+        "移动交易、会员与消息完整链路",
+        "端侧适配与会话保持"
+      ],
+      "responsibility": {
+        "inScope": [
+          "移动端完整业务页面",
+          "端侧会话与适配"
+        ],
+        "outOfScope": [
+          "不实现网关路由治理",
+          "不生成 APP 原生包"
+        ]
+      },
+      "adminRole": "配置移动端栏目、适配规则与端侧会话策略",
+      "apiRole": "消费 APP 端接口与网关接口，输出完整移动端页面",
+      "related": [
+        {
+          "entryId": "22",
+          "entryKey": "MOBILE_H5",
+          "relation": "similar",
+          "distinction": "H5 精简版仅官网只读，本模块覆盖完整业务"
+        },
+        {
+          "entryId": "05",
+          "entryKey": "APP_API",
+          "relation": "similar",
+          "distinction": "APP 端接口是数据供给方，本模块是页面载体"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "移动栏目",
+          "itemKind": "栏目",
+          "description": "清单：登记并查看该系统的资源清单，可归档（全功能移动端站点）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "功能配置",
+          "itemKind": "功能配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（全功能移动端站点）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "访问记录",
+          "itemKind": "访问记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（全功能移动端站点）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "栏目·示例",
+          "status": "active",
+          "detail": "演示数据：全功能移动端站点的移动栏目初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "功能配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：全功能移动端站点的功能配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "24",
+      "entryKey": "NEWS_PUBLISH",
+      "placeholder": "{{HOST:NEWS_PUBLISH}}",
+      "envKey": "MIM_HOST_NEWS_PUBLISH",
+      "hostValue": null,
+      "note": "资讯模块入口｜新闻资讯发布系统",
+      "entry": "资讯模块入口",
+      "system": "新闻资讯发布系统",
+      "sheet": "mixm.top",
+      "rows": [
+        50,
+        51
+      ],
+      "domain": "content",
+      "domainName": "博客 / 资讯 / 自媒体 / WordPress",
+      "coreFunctions": [
+        "新闻采编、审核与发布流程",
+        "栏目、专题与时效性管理",
+        "稿件版本与撤稿记录"
+      ],
+      "responsibility": {
+        "inScope": [
+          "编辑部新闻稿件生产与发布",
+          "栏目专题"
+        ],
+        "outOfScope": [
+          "不接收外部自媒体投稿",
+          "不承载官方博客长文"
+        ]
+      },
+      "adminRole": "管理采编流程、审核权限、栏目专题与撤稿",
+      "apiRole": "提供新闻列表与详情读取接口，供门户与资讯聚合引用",
+      "related": [
+        {
+          "entryId": "39",
+          "entryKey": "SELF_MEDIA",
+          "relation": "similar",
+          "distinction": "自媒体平台面向外部作者投稿，本模块面向编辑部采编"
+        },
+        {
+          "entryId": "07",
+          "entryKey": "BLOG",
+          "relation": "similar",
+          "distinction": "官方博客为官方署名长文，本模块为时效性新闻"
+        },
+        {
+          "entryId": "38",
+          "entryKey": "WORDPRESS",
+          "relation": "similar",
+          "distinction": "WordPress 是独立站点 CMS，本模块是主站资讯发布"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "新闻目录",
+          "itemKind": "新闻",
+          "description": "清单：登记并查看该系统的资源清单，可归档（新闻资讯发布系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "新闻发布",
+          "itemKind": "稿件",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（新闻资讯发布系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "阅读记录",
+          "itemKind": "阅读记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（新闻资讯发布系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "新闻·示例",
+          "status": "active",
+          "detail": "演示数据：新闻资讯发布系统的新闻目录初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "稿件·待处理",
+          "status": "pending",
+          "detail": "演示数据：新闻资讯发布系统的新闻发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "25",
+      "entryKey": "PAYMENT_GATEWAY",
+      "placeholder": "{{HOST:PAYMENT_GATEWAY}}",
+      "envKey": "MIM_HOST_PAYMENT_GATEWAY",
+      "hostValue": null,
+      "note": "支付结算入口｜支付聚合网关 + 对账系统",
+      "entry": "支付结算入口",
+      "system": "支付聚合网关 + 对账系统",
+      "sheet": "mixm.top",
+      "rows": [
+        52,
+        53
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "多渠道支付聚合与下单收银",
+        "支付回调、退款与状态同步",
+        "交易对账、差错与资金流水"
+      ],
+      "responsibility": {
+        "inScope": [
+          "支付路由、回调、退款与对账",
+          "资金流水与差错处理"
+        ],
+        "outOfScope": [
+          "不产生商品订单本体",
+          "不配置营销优惠规则"
+        ]
+      },
+      "adminRole": "配置渠道、费率、对账任务与差错处置，查看资金流水",
+      "apiRole": "提供支付发起/回调/退款接口，写操作需签名与幂等",
+      "related": [
+        {
+          "entryId": "20",
+          "entryKey": "MALL_B2C",
+          "relation": "similar",
+          "distinction": "商城负责商品与订单，本模块负责资金流"
+        },
+        {
+          "entryId": "21",
+          "entryKey": "MARKETING",
+          "relation": "similar",
+          "distinction": "营销平台负责优惠规则，本模块负责实收与对账"
+        },
+        {
+          "entryId": "42",
+          "entryKey": "B2B_TRADE",
+          "relation": "similar",
+          "distinction": "B2B 批发可能有账期结算，但资金清分仍由本模块承担"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "交易流水",
+          "itemKind": "交易",
+          "description": "清单：登记并查看该系统的资源清单，可归档（支付聚合网关 + 对账系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "对账批次",
+          "itemKind": "对账批次",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（支付聚合网关 + 对账系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "渠道记录",
+          "itemKind": "渠道记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（支付聚合网关 + 对账系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "交易·示例",
+          "status": "active",
+          "detail": "演示数据：支付聚合网关 + 对账系统的交易流水初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "对账批次·待处理",
+          "status": "pending",
+          "detail": "演示数据：支付聚合网关 + 对账系统的对账批次待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "26",
+      "entryKey": "INTRANET_PORTAL",
+      "placeholder": "{{HOST:INTRANET_PORTAL}}",
+      "envKey": "MIM_HOST_INTRANET_PORTAL",
+      "hostValue": null,
+      "note": "门户首页入口｜企业内部统一门户 / 工作台",
+      "entry": "门户首页入口",
+      "system": "企业内部统一门户 / 工作台",
+      "sheet": "mixm.top",
+      "rows": [
+        54,
+        55
+      ],
+      "domain": "intranet",
+      "domainName": "企业内部门户",
+      "coreFunctions": [
+        "企业内部统一门户与工作台",
+        "内部应用入口聚合与待办",
+        "组织公告与内部资料入口"
+      ],
+      "responsibility": {
+        "inScope": [
+          "员工协同工作台与内部入口",
+          "组织公告"
+        ],
+        "outOfScope": [
+          "不是面向消费者的官方门户",
+          "不管理全站运营配置"
+        ]
+      },
+      "adminRole": "维护内部应用目录、待办源、组织公告与可见范围",
+      "apiRole": "聚合内部系统接口，按组织身份输出待办与入口",
+      "related": [
+        {
+          "entryId": "03",
+          "entryKey": "ADMIN_CONSOLE",
+          "relation": "similar",
+          "distinction": "全站运营后台面向平台治理，本模块面向员工日常协同"
+        },
+        {
+          "entryId": "02",
+          "entryKey": "PORTAL_SITE",
+          "relation": "similar",
+          "distinction": "官方门户网站面向公众，本模块面向企业内部"
+        },
+        {
+          "entryId": "09",
+          "entryKey": "CLOUD_DRIVE",
+          "relation": "similar",
+          "distinction": "私有云盘可提供团队空间，本模块只聚合入口"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "应用入口",
+          "itemKind": "应用",
+          "description": "清单：登记并查看该系统的资源清单，可归档（企业内部统一门户 / 工作台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "工作台配置",
+          "itemKind": "工作台配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（企业内部统一门户 / 工作台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "使用记录",
+          "itemKind": "使用记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（企业内部统一门户 / 工作台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "应用·示例",
+          "status": "active",
+          "detail": "演示数据：企业内部统一门户 / 工作台的应用入口初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "工作台配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：企业内部统一门户 / 工作台的工作台配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "27",
+      "entryKey": "SECURITY_CENTER",
+      "placeholder": "{{HOST:SECURITY_CENTER}}",
+      "envKey": "MIM_HOST_SECURITY_CENTER",
+      "hostValue": null,
+      "note": "安全防护入口｜安全防护中心",
+      "entry": "安全防护入口",
+      "system": "安全防护中心",
+      "sheet": "mixm.top",
+      "rows": [
+        56,
+        57
+      ],
+      "domain": "ops",
+      "domainName": "运维监控 / 安全防护 / 服务治理",
+      "coreFunctions": [
+        "攻击防护、黑白名单与风控规则",
+        "安全事件、漏洞与处置记录",
+        "证书、密钥与访问审计"
+      ],
+      "responsibility": {
+        "inScope": [
+          "安全策略、风险处置与审计",
+          "证书密钥台账"
+        ],
+        "outOfScope": [
+          "不采集主机性能指标",
+          "不配置服务熔断与注册"
+        ]
+      },
+      "adminRole": "配置防护规则、处置安全事件、维护证书与审计台账",
+      "apiRole": "对网关输出拦截策略，提供安全事件上报接口",
+      "related": [
+        {
+          "entryId": "15",
+          "entryKey": "OPS_MONITOR",
+          "relation": "similar",
+          "distinction": "运维监控面向指标与告警，本模块面向攻击与风险"
+        },
+        {
+          "entryId": "28",
+          "entryKey": "SERVICE_GOVERNANCE",
+          "relation": "similar",
+          "distinction": "服务治理面向服务间调用，本模块面向边界安全"
+        },
+        {
+          "entryId": "06",
+          "entryKey": "AUTH_CENTER",
+          "relation": "similar",
+          "distinction": "认证中心判定身份权限，本模块处置访问风险"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "防护策略",
+          "itemKind": "策略",
+          "description": "清单：登记并查看该系统的资源清单，可归档（安全防护中心）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "策略下发",
+          "itemKind": "下发任务",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（安全防护中心）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "风险记录",
+          "itemKind": "风险记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（安全防护中心）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "策略·示例",
+          "status": "active",
+          "detail": "演示数据：安全防护中心的防护策略初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "下发任务·待处理",
+          "status": "pending",
+          "detail": "演示数据：安全防护中心的策略下发待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "28",
+      "entryKey": "SERVICE_GOVERNANCE",
+      "placeholder": "{{HOST:SERVICE_GOVERNANCE}}",
+      "envKey": "MIM_HOST_SERVICE_GOVERNANCE",
+      "hostValue": null,
+      "note": "服务支撑入口｜服务治理监控平台",
+      "entry": "服务支撑入口",
+      "system": "服务治理监控平台",
+      "sheet": "mixm.top",
+      "rows": [
+        58,
+        59
+      ],
+      "domain": "ops",
+      "domainName": "运维监控 / 安全防护 / 服务治理",
+      "coreFunctions": [
+        "服务注册发现与健康检查",
+        "熔断、降级与链路追踪",
+        "接口依赖拓扑与变更记录"
+      ],
+      "responsibility": {
+        "inScope": [
+          "服务间调用治理与链路观测",
+          "依赖拓扑"
+        ],
+        "outOfScope": [
+          "不采集主机资源指标",
+          "不制定安全防护策略"
+        ]
+      },
+      "adminRole": "维护服务注册、熔断阈值、依赖拓扑与变更记录",
+      "apiRole": "对网关输出服务实例与熔断状态，提供链路查询接口",
+      "related": [
+        {
+          "entryId": "15",
+          "entryKey": "OPS_MONITOR",
+          "relation": "similar",
+          "distinction": "运维监控面向资源指标，本模块面向服务调用治理"
+        },
+        {
+          "entryId": "04",
+          "entryKey": "API_GATEWAY",
+          "relation": "similar",
+          "distinction": "网关执行转发，本模块提供服务实例与治理配置"
+        },
+        {
+          "entryId": "27",
+          "entryKey": "SECURITY_CENTER",
+          "relation": "similar",
+          "distinction": "安全中心面向边界攻击，本模块面向内部调用稳定性"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "服务清单",
+          "itemKind": "服务",
+          "description": "清单：登记并查看该系统的资源清单，可归档（服务治理监控平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "治理配置",
+          "itemKind": "治理配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（服务治理监控平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "巡检记录",
+          "itemKind": "巡检记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（服务治理监控平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "服务·示例",
+          "status": "active",
+          "detail": "演示数据：服务治理监控平台的服务清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "治理配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：服务治理监控平台的治理配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "29",
+      "entryKey": "MULTI_MERCHANT",
+      "placeholder": "{{HOST:MULTI_MERCHANT}}",
+      "envKey": "MIM_HOST_MULTI_MERCHANT",
+      "hostValue": null,
+      "note": "线上店铺入口｜多商户店铺系统",
+      "entry": "线上店铺入口",
+      "system": "多商户店铺系统",
+      "sheet": "mixm.top",
+      "rows": [
+        60,
+        61
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "多商户入驻、店铺与资质审核",
+        "商户商品与店铺装修",
+        "商户账单、分润与结算单"
+      ],
+      "responsibility": {
+        "inScope": [
+          "第三方商家经营与平台分润",
+          "店铺与资质"
+        ],
+        "outOfScope": [
+          "不是平台自营零售",
+          "不直接处理个人卖家 C2C 交易"
+        ]
+      },
+      "adminRole": "审核入驻、管理店铺与资质、生成结算单",
+      "apiRole": "提供商户与店铺接口；结算资金委托支付聚合网关",
+      "related": [
+        {
+          "entryId": "20",
+          "entryKey": "MALL_B2C",
+          "relation": "similar",
+          "distinction": "B2C 商城为平台自营，本模块为第三方商家入驻"
+        },
+        {
+          "entryId": "43",
+          "entryKey": "SUPPLIER_ADMIN",
+          "relation": "similar",
+          "distinction": "供应商后台面向 B2B 供货资质，本模块面向零售商户店铺"
+        },
+        {
+          "entryId": "45",
+          "entryKey": "SELLER_ADMIN",
+          "relation": "similar",
+          "distinction": "个人卖家后台面向 C2C 闲置交易，本模块面向企业商户"
+        },
+        {
+          "entryId": "25",
+          "entryKey": "PAYMENT_GATEWAY",
+          "relation": "similar",
+          "distinction": "支付网关负责资金清分，本模块生成分润账单"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "店铺清单",
+          "itemKind": "店铺",
+          "description": "清单：登记并查看该系统的资源清单，可归档（多商户店铺系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "店铺入驻",
+          "itemKind": "入驻申请",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（多商户店铺系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "经营记录",
+          "itemKind": "经营记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（多商户店铺系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "店铺·示例",
+          "status": "active",
+          "detail": "演示数据：多商户店铺系统的店铺清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "入驻申请·待处理",
+          "status": "pending",
+          "detail": "演示数据：多商户店铺系统的店铺入驻待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "30",
+      "entryKey": "CRAWLER_SCHEDULER",
+      "placeholder": "{{HOST:CRAWLER_SCHEDULER}}",
+      "envKey": "MIM_HOST_CRAWLER_SCHEDULER",
+      "hostValue": null,
+      "note": "数据采集入口｜爬虫调度与数据采集平台",
+      "entry": "数据采集入口",
+      "system": "爬虫调度与数据采集平台",
+      "sheet": "mixm.top",
+      "rows": [
+        62,
+        63
+      ],
+      "domain": "data",
+      "domainName": "数据开放 / BI / 爬虫采集",
+      "coreFunctions": [
+        "采集任务配置与调度执行",
+        "采集源、频率与合规白名单",
+        "采集结果入库、清洗与失败重试"
+      ],
+      "responsibility": {
+        "inScope": [
+          "爬虫任务调度与数据入库",
+          "采集源与频率"
+        ],
+        "outOfScope": [
+          "不对外提供开放数据集目录",
+          "不展示经营 BI 指标"
+        ]
+      },
+      "adminRole": "配置采集源、调度频率、白名单与失败重试，查看任务日志",
+      "apiRole": "提供任务下发与结果写入接口，执行类操作需鉴权与幂等",
+      "related": [
+        {
+          "entryId": "10",
+          "entryKey": "OPEN_DATA",
+          "relation": "similar",
+          "distinction": "开放数据集平台是对外出口，本模块是数据入口与调度"
+        },
+        {
+          "entryId": "32",
+          "entryKey": "BI_DASHBOARD",
+          "relation": "similar",
+          "distinction": "BI 看板消费数据做可视化，本模块负责采集入库"
+        },
+        {
+          "entryId": "40",
+          "entryKey": "SOURCE_GOODS",
+          "relation": "similar",
+          "distinction": "货源商品库可消费采集结果，但不负责任务调度"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "采集任务",
+          "itemKind": "采集任务",
+          "description": "清单：登记并查看该系统的资源清单，可归档（爬虫调度与数据采集平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "调度配置",
+          "itemKind": "调度配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（爬虫调度与数据采集平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "采集记录",
+          "itemKind": "采集记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（爬虫调度与数据采集平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "采集任务·示例",
+          "status": "active",
+          "detail": "演示数据：爬虫调度与数据采集平台的采集任务初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "调度配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：爬虫调度与数据采集平台的调度配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "31",
+      "entryKey": "VOD_LONG_VIDEO",
+      "placeholder": "{{HOST:VOD_LONG_VIDEO}}",
+      "envKey": "MIM_HOST_VOD_LONG_VIDEO",
+      "hostValue": null,
+      "note": "视频模块入口｜长视频点播系统",
+      "entry": "视频模块入口",
+      "system": "长视频点播系统",
+      "sheet": "mixm.top",
+      "rows": [
+        64,
+        65
+      ],
+      "domain": "video",
+      "domainName": "UGC 短视频 / 长视频 / 独立播放页",
+      "coreFunctions": [
+        "长视频片库、专辑与剧集编排",
+        "点播播放凭证与清晰度策略",
+        "版权、上下架与观看记录"
+      ],
+      "responsibility": {
+        "inScope": [
+          "版权长视频点播与片库编排",
+          "播放凭证"
+        ],
+        "outOfScope": [
+          "不承载 UGC 短视频社区互动",
+          "不是独立嵌入播放页"
+        ]
+      },
+      "adminRole": "管理片库、专辑、版权窗口、上下架与观看数据",
+      "apiRole": "提供片库与播放凭证接口，播放动作交由独立播放页承载",
+      "related": [
+        {
+          "entryId": "14",
+          "entryKey": "UGC_VIDEO",
+          "relation": "similar",
+          "distinction": "UGC 短视频社区面向用户投稿与互动，本模块面向版权长视频"
+        },
+        {
+          "entryId": "37",
+          "entryKey": "VIDEO_PLAYER",
+          "relation": "similar",
+          "distinction": "独立播放页是播放载体，本模块是片库与点播服务"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "视频目录",
+          "itemKind": "视频",
+          "description": "清单：登记并查看该系统的资源清单，可归档（长视频点播系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "视频上架",
+          "itemKind": "上架申请",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（长视频点播系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "播放记录",
+          "itemKind": "播放记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（长视频点播系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "视频·示例",
+          "status": "active",
+          "detail": "演示数据：长视频点播系统的视频目录初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "上架申请·待处理",
+          "status": "pending",
+          "detail": "演示数据：长视频点播系统的视频上架待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "32",
+      "entryKey": "BI_DASHBOARD",
+      "placeholder": "{{HOST:BI_DASHBOARD}}",
+      "envKey": "MIM_HOST_BI_DASHBOARD",
+      "hostValue": null,
+      "note": "数据统计入口｜全站数据 BI 看板",
+      "entry": "数据统计入口",
+      "system": "全站数据 BI 看板",
+      "sheet": "mixm.top",
+      "rows": [
+        66,
+        67
+      ],
+      "domain": "data",
+      "domainName": "数据开放 / BI / 爬虫采集",
+      "coreFunctions": [
+        "全站经营指标看板与报表",
+        "指标口径、维度与权限",
+        "定时报表与导出"
+      ],
+      "responsibility": {
+        "inScope": [
+          "内部经营指标可视化",
+          "指标口径管理"
+        ],
+        "outOfScope": [
+          "不对外提供开放数据集",
+          "不执行数据采集任务"
+        ]
+      },
+      "adminRole": "维护指标口径、看板权限、定时报表与导出审核",
+      "apiRole": "从各业务域读取聚合数据，输出看板与报表接口",
+      "related": [
+        {
+          "entryId": "10",
+          "entryKey": "OPEN_DATA",
+          "relation": "similar",
+          "distinction": "开放数据集平台面向外部数据集，本模块面向内部经营指标"
+        },
+        {
+          "entryId": "30",
+          "entryKey": "CRAWLER_SCHEDULER",
+          "relation": "similar",
+          "distinction": "采集平台负责数据入库，本模块负责指标呈现"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "指标清单",
+          "itemKind": "指标",
+          "description": "清单：登记并查看该系统的资源清单，可归档（全站数据 BI 看板）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "报表配置",
+          "itemKind": "报表配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（全站数据 BI 看板）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "查询记录",
+          "itemKind": "查询记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（全站数据 BI 看板）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "指标·示例",
+          "status": "active",
+          "detail": "演示数据：全站数据 BI 看板的指标清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "报表配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：全站数据 BI 看板的报表配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "33",
+      "entryKey": "DOWNLOAD_DIST",
+      "placeholder": "{{HOST:DOWNLOAD_DIST}}",
+      "envKey": "MIM_HOST_DOWNLOAD_DIST",
+      "hostValue": null,
+      "note": "资源存储 / 下载站点｜软件源码下载分发站",
+      "entry": "资源存储 / 下载站点",
+      "system": "软件源码下载分发站",
+      "sheet": "mixm.top",
+      "rows": [
+        68,
+        69
+      ],
+      "domain": "storage",
+      "domainName": "云盘 / 图床 / 素材 / 下载分发",
+      "coreFunctions": [
+        "软件源码包与版本发布",
+        "下载通道、校验值与更新日志",
+        "下载统计与授权说明"
+      ],
+      "responsibility": {
+        "inScope": [
+          "公开源码与安装包分发",
+          "版本与校验值"
+        ],
+        "outOfScope": [
+          "不存储用户私有文件",
+          "不提供图片外链"
+        ]
+      },
+      "adminRole": "登记版本、上传发布包、维护校验值与授权说明",
+      "apiRole": "提供版本清单与下载凭证接口，写操作需鉴权",
+      "related": [
+        {
+          "entryId": "09",
+          "entryKey": "CLOUD_DRIVE",
+          "relation": "similar",
+          "distinction": "私有云盘面向用户文件，本模块面向公开源码分发"
+        },
+        {
+          "entryId": "18",
+          "entryKey": "IMAGE_ASSETS",
+          "relation": "similar",
+          "distinction": "公共图床面向图片素材，本模块面向源码包"
+        },
+        {
+          "entryId": "13",
+          "entryKey": "LOWCODE",
+          "relation": "similar",
+          "distinction": "低代码平台产出生成物配置，本模块发布成品源码包"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "源码包清单",
+          "itemKind": "源码包",
+          "description": "清单：登记并查看该系统的资源清单，可归档（软件源码下载分发站）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "版本发布",
+          "itemKind": "发布版本",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（软件源码下载分发站）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "下载记录",
+          "itemKind": "下载记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（软件源码下载分发站）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "源码包·示例",
+          "status": "active",
+          "detail": "演示数据：软件源码下载分发站的源码包清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "发布版本·待处理",
+          "status": "pending",
+          "detail": "演示数据：软件源码下载分发站的版本发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "34",
+      "entryKey": "TICKET_SUPPORT",
+      "placeholder": "{{HOST:TICKET_SUPPORT}}",
+      "envKey": "MIM_HOST_TICKET_SUPPORT",
+      "hostValue": null,
+      "note": "技术支持入口｜工单客服系统",
+      "entry": "技术支持入口",
+      "system": "工单客服系统",
+      "sheet": "mixm.top",
+      "rows": [
+        70,
+        71
+      ],
+      "domain": "support",
+      "domainName": "工单客服与帮助中心",
+      "coreFunctions": [
+        "用户工单提交、分派与流转",
+        "客服回复、时效与满意度",
+        "工单分类、优先级与知识联动"
+      ],
+      "responsibility": {
+        "inScope": [
+          "用户请求受理与人工响应",
+          "工单流转与时效"
+        ],
+        "outOfScope": [
+          "不是静态帮助文档中心",
+          "不处理支付退款资金流"
+        ]
+      },
+      "adminRole": "配置工单分类、分派规则、时效与客服坐席，查看满意度",
+      "apiRole": "提供工单创建与流转接口，写操作需鉴权与幂等",
+      "related": [
+        {
+          "entryId": "17",
+          "entryKey": "HELP_CENTER",
+          "relation": "similar",
+          "distinction": "帮助中心提供自助文档，本模块处理人工工单交互"
+        },
+        {
+          "entryId": "25",
+          "entryKey": "PAYMENT_GATEWAY",
+          "relation": "similar",
+          "distinction": "退款资金由支付网关处理，本模块只受理用户请求"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "工单列表",
+          "itemKind": "工单",
+          "description": "清单：登记并查看该系统的资源清单，可归档（工单客服系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "工单受理",
+          "itemKind": "受理单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（工单客服系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "处理记录",
+          "itemKind": "处理记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（工单客服系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "工单·示例",
+          "status": "active",
+          "detail": "演示数据：工单客服系统的工单列表初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "受理单·待处理",
+          "status": "pending",
+          "detail": "演示数据：工单客服系统的工单受理待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "35",
+      "entryKey": "TEST_ENV",
+      "placeholder": "{{HOST:TEST_ENV}}",
+      "envKey": "MIM_HOST_TEST_ENV",
+      "hostValue": null,
+      "note": "测试环境入口｜测试环境统一入口",
+      "entry": "测试环境入口",
+      "system": "测试环境统一入口",
+      "sheet": "mixm.top",
+      "rows": [
+        72,
+        73
+      ],
+      "domain": "dev",
+      "domainName": "开发测试环境与接口文档",
+      "coreFunctions": [
+        "测试环境统一入口与环境隔离",
+        "测试账号、数据与开关配置",
+        "环境状态与版本标示"
+      ],
+      "responsibility": {
+        "inScope": [
+          "测试环境访问入口与隔离",
+          "环境开关与版本标示"
+        ],
+        "outOfScope": [
+          "不是开发文档与沙箱门户",
+          "不承载生产流量"
+        ]
+      },
+      "adminRole": "维护环境开关、测试账号、数据重置与版本标示",
+      "apiRole": "提供测试环境状态读取接口，与生产环境严格隔离",
+      "related": [
+        {
+          "entryId": "11",
+          "entryKey": "DEV_PORTAL",
+          "relation": "similar",
+          "distinction": "开发环境门户提供文档与调试沙箱，本模块提供可运行测试环境"
+        },
+        {
+          "entryId": "04",
+          "entryKey": "API_GATEWAY",
+          "relation": "similar",
+          "distinction": "网关为生产统一入口，本模块仅限测试环境"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "测试环境",
+          "itemKind": "环境",
+          "description": "清单：登记并查看该系统的资源清单，可归档（测试环境统一入口）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "环境配置",
+          "itemKind": "环境配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（测试环境统一入口）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "执行记录",
+          "itemKind": "执行记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（测试环境统一入口）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "环境·示例",
+          "status": "active",
+          "detail": "演示数据：测试环境统一入口的测试环境初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "环境配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：测试环境统一入口的环境配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "36",
+      "entryKey": "MEMBER_ADMIN",
+      "placeholder": "{{HOST:MEMBER_ADMIN}}",
+      "envKey": "MIM_HOST_MEMBER_ADMIN",
+      "hostValue": null,
+      "note": "用户管理入口｜用户会员管理后台",
+      "entry": "用户管理入口",
+      "system": "用户会员管理后台",
+      "sheet": "mixm.top",
+      "rows": [
+        74,
+        75
+      ],
+      "domain": "member",
+      "domainName": "用户与会员中心",
+      "coreFunctions": [
+        "会员资料检索与批量管理",
+        "等级、权益与标签配置",
+        "会员状态冻结与操作审计"
+      ],
+      "responsibility": {
+        "inScope": [
+          "运营侧会员主数据管理",
+          "等级权益与状态"
+        ],
+        "outOfScope": [
+          "不是用户自助工作台",
+          "不处理身份校验逻辑"
+        ]
+      },
+      "adminRole": "检索会员、配置等级权益与标签、冻结状态并留审计",
+      "apiRole": "提供管理面会员读写接口，需管理面权限与幂等",
+      "related": [
+        {
+          "entryId": "08",
+          "entryKey": "MEMBER_CENTER",
+          "relation": "similar",
+          "distinction": "用户中心面向用户自助，本模块面向运营批量管理"
+        },
+        {
+          "entryId": "03",
+          "entryKey": "ADMIN_CONSOLE",
+          "relation": "similar",
+          "distinction": "全站运营后台是治理入口，本模块只管会员域"
+        },
+        {
+          "entryId": "06",
+          "entryKey": "AUTH_CENTER",
+          "relation": "similar",
+          "distinction": "认证中心管理权限点，本模块管理会员资料与权益"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "会员清单",
+          "itemKind": "会员",
+          "description": "清单：登记并查看该系统的资源清单，可归档（用户会员管理后台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "会员维护",
+          "itemKind": "变更单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（用户会员管理后台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "变更记录",
+          "itemKind": "变更记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（用户会员管理后台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "会员·示例",
+          "status": "active",
+          "detail": "演示数据：用户会员管理后台的会员清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "变更单·待处理",
+          "status": "pending",
+          "detail": "演示数据：用户会员管理后台的会员维护待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "37",
+      "entryKey": "VIDEO_PLAYER",
+      "placeholder": "{{HOST:VIDEO_PLAYER}}",
+      "envKey": "MIM_HOST_VIDEO_PLAYER",
+      "hostValue": null,
+      "note": "视频播放入口｜独立视频播放页",
+      "entry": "视频播放入口",
+      "system": "独立视频播放页",
+      "sheet": "mixm.top",
+      "rows": [
+        76,
+        77
+      ],
+      "domain": "video",
+      "domainName": "UGC 短视频 / 长视频 / 独立播放页",
+      "coreFunctions": [
+        "独立视频播放页与嵌入能力",
+        "播放凭证校验、清晰度切换",
+        "播放进度与基础统计"
+      ],
+      "responsibility": {
+        "inScope": [
+          "可嵌入的播放载体",
+          "播放凭证与进度"
+        ],
+        "outOfScope": [
+          "不维护片库与专辑",
+          "不承载社区互动"
+        ]
+      },
+      "adminRole": "配置播放器参数、域名白名单与清晰度策略",
+      "apiRole": "接收播放凭证与媒体地址，向点播服务校验后播放",
+      "related": [
+        {
+          "entryId": "31",
+          "entryKey": "VOD_LONG_VIDEO",
+          "relation": "similar",
+          "distinction": "长视频点播提供片库与凭证，本模块负责播放呈现"
+        },
+        {
+          "entryId": "14",
+          "entryKey": "UGC_VIDEO",
+          "relation": "similar",
+          "distinction": "UGC 短视频社区以动态流为主，本模块是独立播放页"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "播放清单",
+          "itemKind": "播放项",
+          "description": "清单：登记并查看该系统的资源清单，可归档（独立视频播放页）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "播放配置",
+          "itemKind": "播放配置",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（独立视频播放页）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "播放记录",
+          "itemKind": "播放记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（独立视频播放页）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "播放项·示例",
+          "status": "active",
+          "detail": "演示数据：独立视频播放页的播放清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "播放配置·待处理",
+          "status": "pending",
+          "detail": "演示数据：独立视频播放页的播放配置待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "38",
+      "entryKey": "WORDPRESS",
+      "placeholder": "{{HOST:WORDPRESS}}",
+      "envKey": "MIM_HOST_WORDPRESS",
+      "hostValue": null,
+      "note": "WordPress 相关入口｜WordPress 独立站点",
+      "entry": "WordPress 相关入口",
+      "system": "WordPress 独立站点",
+      "sheet": "mixm.top",
+      "rows": [
+        78,
+        79
+      ],
+      "domain": "content",
+      "domainName": "博客 / 资讯 / 自媒体 / WordPress",
+      "coreFunctions": [
+        "WordPress 独立站点内容管理",
+        "主题、插件与站点配置",
+        "独立站点文章与页面发布"
+      ],
+      "responsibility": {
+        "inScope": [
+          "独立部署的 WordPress 站点",
+          "主题插件与页面"
+        ],
+        "outOfScope": [
+          "不属于主站博客系统",
+          "不参与新闻采编流程"
+        ]
+      },
+      "adminRole": "管理主题、插件、站点设置与内容发布",
+      "apiRole": "对外提供独立站点内容读取接口，与主站内容域解耦",
+      "related": [
+        {
+          "entryId": "07",
+          "entryKey": "BLOG",
+          "relation": "similar",
+          "distinction": "官方博客在主站体系内，本模块为独立 WordPress 站点"
+        },
+        {
+          "entryId": "24",
+          "entryKey": "NEWS_PUBLISH",
+          "relation": "similar",
+          "distinction": "新闻发布系统面向编辑部稿件，本模块为独立站点 CMS"
+        },
+        {
+          "entryId": "39",
+          "entryKey": "SELF_MEDIA",
+          "relation": "similar",
+          "distinction": "自媒体平台为多作者平台，本模块为单站点 CMS"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "站点页面",
+          "itemKind": "页面",
+          "description": "清单：登记并查看该系统的资源清单，可归档（WordPress 独立站点）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "内容发布",
+          "itemKind": "稿件",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（WordPress 独立站点）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "更新记录",
+          "itemKind": "更新记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（WordPress 独立站点）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "页面·示例",
+          "status": "active",
+          "detail": "演示数据：WordPress 独立站点的站点页面初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "稿件·待处理",
+          "status": "pending",
+          "detail": "演示数据：WordPress 独立站点的内容发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "39",
+      "entryKey": "SELF_MEDIA",
+      "placeholder": "{{HOST:SELF_MEDIA}}",
+      "envKey": "MIM_HOST_SELF_MEDIA",
+      "hostValue": null,
+      "note": "新闻资讯入口｜自媒体资讯平台",
+      "entry": "新闻资讯入口",
+      "system": "自媒体资讯平台",
+      "sheet": "mixm.top",
+      "rows": [
+        80,
+        81
+      ],
+      "domain": "content",
+      "domainName": "博客 / 资讯 / 自媒体 / WordPress",
+      "coreFunctions": [
+        "多作者入驻与投稿审核",
+        "自媒体资讯分发与推荐",
+        "作者主页、收益与内容合规"
+      ],
+      "responsibility": {
+        "inScope": [
+          "外部作者投稿与资讯分发",
+          "作者与内容合规"
+        ],
+        "outOfScope": [
+          "不是编辑部新闻采编",
+          "不是官方署名博客"
+        ]
+      },
+      "adminRole": "审核作者入驻、管理稿件与推荐、处理合规与收益",
+      "apiRole": "提供作者与资讯读取接口，投稿类写操作需鉴权",
+      "related": [
+        {
+          "entryId": "24",
+          "entryKey": "NEWS_PUBLISH",
+          "relation": "similar",
+          "distinction": "新闻发布系统面向编辑部采编，本模块面向外部多作者"
+        },
+        {
+          "entryId": "07",
+          "entryKey": "BLOG",
+          "relation": "similar",
+          "distinction": "官方博客为官方署名长文，本模块为开放投稿"
+        },
+        {
+          "entryId": "14",
+          "entryKey": "UGC_VIDEO",
+          "relation": "similar",
+          "distinction": "短视频社区以视频动态为主，本模块以图文资讯为主"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "资讯清单",
+          "itemKind": "资讯",
+          "description": "清单：登记并查看该系统的资源清单，可归档（自媒体资讯平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "内容发布",
+          "itemKind": "稿件",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（自媒体资讯平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "传播记录",
+          "itemKind": "传播记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（自媒体资讯平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "资讯·示例",
+          "status": "active",
+          "detail": "演示数据：自媒体资讯平台的资讯清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "稿件·待处理",
+          "status": "pending",
+          "detail": "演示数据：自媒体资讯平台的内容发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "40",
+      "entryKey": "SOURCE_GOODS",
+      "placeholder": "{{HOST:SOURCE_GOODS}}",
+      "envKey": "MIM_HOST_SOURCE_GOODS",
+      "hostValue": null,
+      "note": "商品资源入口｜货源商品库平台",
+      "entry": "商品资源入口",
+      "system": "货源商品库平台",
+      "sheet": "mixm.top",
+      "rows": [
+        82,
+        83
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "货源商品主数据与供应商目录",
+        "选品、比价与上架映射",
+        "货源状态、库存同步与资质"
+      ],
+      "responsibility": {
+        "inScope": [
+          "上游货源商品库与选品",
+          "商品主数据映射"
+        ],
+        "outOfScope": [
+          "不直接面向消费者成交",
+          "不处理 C2C 个人闲置"
+        ]
+      },
+      "adminRole": "维护货源目录、选品规则、映射关系与资质",
+      "apiRole": "向商城/B2B/多商户输出商品主数据接口",
+      "related": [
+        {
+          "entryId": "20",
+          "entryKey": "MALL_B2C",
+          "relation": "similar",
+          "distinction": "B2C 商城面向消费者成交，本模块是上游货源主数据"
+        },
+        {
+          "entryId": "42",
+          "entryKey": "B2B_TRADE",
+          "relation": "similar",
+          "distinction": "B2B 批发平台面向企业采购交易，本模块提供货源数据"
+        },
+        {
+          "entryId": "43",
+          "entryKey": "SUPPLIER_ADMIN",
+          "relation": "similar",
+          "distinction": "供应商后台管理入驻与供货关系，本模块管理商品库"
+        },
+        {
+          "entryId": "30",
+          "entryKey": "CRAWLER_SCHEDULER",
+          "relation": "similar",
+          "distinction": "采集平台可补充货源数据，但不负责选品映射"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "货源清单",
+          "itemKind": "货源",
+          "description": "清单：登记并查看该系统的资源清单，可归档（货源商品库平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "商品入库",
+          "itemKind": "入库单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（货源商品库平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "出库记录",
+          "itemKind": "出库记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（货源商品库平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "货源·示例",
+          "status": "active",
+          "detail": "演示数据：货源商品库平台的货源清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "入库单·待处理",
+          "status": "pending",
+          "detail": "演示数据：货源商品库平台的商品入库待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "41",
+      "entryKey": "VOICE_TOOLS",
+      "placeholder": "{{HOST:VOICE_TOOLS}}",
+      "envKey": "MIM_HOST_VOICE_TOOLS",
+      "hostValue": null,
+      "note": "语音相关入口｜语音工具服务平台",
+      "entry": "语音相关入口",
+      "system": "语音工具服务平台",
+      "sheet": "mixm.top",
+      "rows": [
+        84,
+        85
+      ],
+      "domain": "voice",
+      "domainName": "语音工具",
+      "coreFunctions": [
+        "语音转写、合成与识别能力入口",
+        "语音任务参数与结果查看",
+        "音频格式、时长与配额管理"
+      ],
+      "responsibility": {
+        "inScope": [
+          "语音类工具能力与任务",
+          "音频与配额"
+        ],
+        "outOfScope": [
+          "不是通用在线工具平台",
+          "不是低代码生成工具"
+        ]
+      },
+      "adminRole": "配置语音能力参数、配额与任务审核，查看执行结果",
+      "apiRole": "提供语音任务提交与结果读取接口，执行需鉴权与幂等",
+      "related": [
+        {
+          "entryId": "16",
+          "entryKey": "GALE_TOOLS",
+          "relation": "similar",
+          "distinction": "疾风引擎是通用工具承载节点，本模块专注语音能力"
+        },
+        {
+          "entryId": "13",
+          "entryKey": "LOWCODE",
+          "relation": "similar",
+          "distinction": "低代码平台生成页面表单，本模块提供语音服务"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "语音工具",
+          "itemKind": "工具",
+          "description": "清单：登记并查看该系统的资源清单，可归档（语音工具服务平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "处理任务",
+          "itemKind": "任务",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（语音工具服务平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "调用记录",
+          "itemKind": "调用记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（语音工具服务平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "工具·示例",
+          "status": "active",
+          "detail": "演示数据：语音工具服务平台的语音工具初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "任务·待处理",
+          "status": "pending",
+          "detail": "演示数据：语音工具服务平台的处理任务待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "42",
+      "entryKey": "B2B_TRADE",
+      "placeholder": "{{HOST:B2B_TRADE}}",
+      "envKey": "MIM_HOST_B2B_TRADE",
+      "hostValue": null,
+      "note": "B2B 大宗商贸平台主入口｜B2B 企业批发采购平台",
+      "entry": "B2B 大宗商贸平台主入口",
+      "system": "B2B 企业批发采购平台",
+      "sheet": "mixm.top",
+      "rows": [
+        86,
+        87
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "企业批发采购与询价报价",
+        "阶梯价、合同与账期管理",
+        "企业资质、额度与批量下单"
+      ],
+      "responsibility": {
+        "inScope": [
+          "企业间大宗批发交易",
+          "询价报价与账期"
+        ],
+        "outOfScope": [
+          "不是个人零售商城",
+          "不是个人闲置 C2C 平台"
+        ]
+      },
+      "adminRole": "审核企业资质、维护阶梯价与额度、管理合同账期",
+      "apiRole": "提供询价、报价与批量订单接口；结算委托支付网关",
+      "related": [
+        {
+          "entryId": "20",
+          "entryKey": "MALL_B2C",
+          "relation": "similar",
+          "distinction": "B2C 商城面向个人零售，本模块面向企业批发议价"
+        },
+        {
+          "entryId": "44",
+          "entryKey": "C2C_MARKET",
+          "relation": "similar",
+          "distinction": "C2C 面向个人闲置交易，本模块面向企业采购"
+        },
+        {
+          "entryId": "43",
+          "entryKey": "SUPPLIER_ADMIN",
+          "relation": "similar",
+          "distinction": "供应商后台面向供货侧入驻管理，本模块是交易平台主入口"
+        },
+        {
+          "entryId": "40",
+          "entryKey": "SOURCE_GOODS",
+          "relation": "similar",
+          "distinction": "货源商品库提供上游主数据，本模块承载交易"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "采购需求",
+          "itemKind": "需求",
+          "description": "清单：登记并查看该系统的资源清单，可归档（B2B 企业批发采购平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "报价管理",
+          "itemKind": "报价单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（B2B 企业批发采购平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "成交记录",
+          "itemKind": "成交记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（B2B 企业批发采购平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "需求·示例",
+          "status": "active",
+          "detail": "演示数据：B2B 企业批发采购平台的采购需求初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "报价单·待处理",
+          "status": "pending",
+          "detail": "演示数据：B2B 企业批发采购平台的报价管理待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "43",
+      "entryKey": "SUPPLIER_ADMIN",
+      "placeholder": "{{HOST:SUPPLIER_ADMIN}}",
+      "envKey": "MIM_HOST_SUPPLIER_ADMIN",
+      "hostValue": null,
+      "note": "供应商入驻管理入口｜供应商后台管理系统",
+      "entry": "供应商入驻管理入口",
+      "system": "供应商后台管理系统",
+      "sheet": "mixm.top",
+      "rows": [
+        88,
+        89
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "供应商入驻与资质审核",
+        "供货商品、价格与库存维护",
+        "供货订单、对账单与结算申请"
+      ],
+      "responsibility": {
+        "inScope": [
+          "供货侧后台与供货关系",
+          "资质与对账"
+        ],
+        "outOfScope": [
+          "不是平台全站运营后台",
+          "不是个人卖家店铺后台"
+        ]
+      },
+      "adminRole": "审核入驻、维护供货商品与价格、处理供货对账",
+      "apiRole": "提供供货侧读写接口，需供应侧权限与幂等",
+      "related": [
+        {
+          "entryId": "29",
+          "entryKey": "MULTI_MERCHANT",
+          "relation": "similar",
+          "distinction": "多商户后台面向零售店铺，本模块面向 B2B 供货资质"
+        },
+        {
+          "entryId": "45",
+          "entryKey": "SELLER_ADMIN",
+          "relation": "similar",
+          "distinction": "个人卖家后台面向 C2C 闲置，本模块面向企业供应商"
+        },
+        {
+          "entryId": "03",
+          "entryKey": "ADMIN_CONSOLE",
+          "relation": "similar",
+          "distinction": "全站运营后台面向平台治理，本模块面向供货侧"
+        },
+        {
+          "entryId": "40",
+          "entryKey": "SOURCE_GOODS",
+          "relation": "similar",
+          "distinction": "货源商品库是商品主数据，本模块管理供应商关系"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "供应商清单",
+          "itemKind": "供应商",
+          "description": "清单：登记并查看该系统的资源清单，可归档（供应商后台管理系统）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "入驻审核",
+          "itemKind": "审核单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（供应商后台管理系统）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "供货记录",
+          "itemKind": "供货记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（供应商后台管理系统）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "供应商·示例",
+          "status": "active",
+          "detail": "演示数据：供应商后台管理系统的供应商清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "审核单·待处理",
+          "status": "pending",
+          "detail": "演示数据：供应商后台管理系统的入驻审核待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "44",
+      "entryKey": "C2C_MARKET",
+      "placeholder": "{{HOST:C2C_MARKET}}",
+      "envKey": "MIM_HOST_C2C_MARKET",
+      "hostValue": null,
+      "note": "C2C 个人交易市场入口｜C2C 个人闲置 / 商品交易平台",
+      "entry": "C2C 个人交易市场入口",
+      "system": "C2C 个人闲置 / 商品交易平台",
+      "sheet": "mixm.top",
+      "rows": [
+        90,
+        91
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "个人闲置商品发布与检索",
+        "个人间交易下单与沟通",
+        "信用评价、争议与担保"
+      ],
+      "responsibility": {
+        "inScope": [
+          "个人对个人闲置交易",
+          "商品发布与评价"
+        ],
+        "outOfScope": [
+          "不是平台自营零售",
+          "不是企业批发布场"
+        ]
+      },
+      "adminRole": "管理类目、争议仲裁、信用评价与违规商品处置",
+      "apiRole": "提供商品与交易接口；资金担保委托支付网关",
+      "related": [
+        {
+          "entryId": "20",
+          "entryKey": "MALL_B2C",
+          "relation": "similar",
+          "distinction": "B2C 为平台自营，本模块为个人间交易"
+        },
+        {
+          "entryId": "42",
+          "entryKey": "B2B_TRADE",
+          "relation": "similar",
+          "distinction": "B2B 面向企业批发，本模块面向个人闲置"
+        },
+        {
+          "entryId": "45",
+          "entryKey": "SELLER_ADMIN",
+          "relation": "similar",
+          "distinction": "个人卖家后台是卖方经营工具，本模块是交易市场主入口"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "闲置清单",
+          "itemKind": "闲置商品",
+          "description": "清单：登记并查看该系统的资源清单，可归档（C2C 个人闲置 / 商品交易平台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "商品发布",
+          "itemKind": "发布单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（C2C 个人闲置 / 商品交易平台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "交易记录",
+          "itemKind": "交易记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（C2C 个人闲置 / 商品交易平台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "闲置商品·示例",
+          "status": "active",
+          "detail": "演示数据：C2C 个人闲置 / 商品交易平台的闲置清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "发布单·待处理",
+          "status": "pending",
+          "detail": "演示数据：C2C 个人闲置 / 商品交易平台的商品发布待办条目，可推进状态。"
+        }
+      ]
+    },
+    {
+      "id": "45",
+      "entryKey": "SELLER_ADMIN",
+      "placeholder": "{{HOST:SELLER_ADMIN}}",
+      "envKey": "MIM_HOST_SELLER_ADMIN",
+      "hostValue": null,
+      "note": "个人卖家管理入口｜个人卖家店铺管理后台",
+      "entry": "个人卖家管理入口",
+      "system": "个人卖家店铺管理后台",
+      "sheet": "mixm.top",
+      "rows": [
+        92,
+        93
+      ],
+      "domain": "commerce",
+      "domainName": "电商与商贸",
+      "coreFunctions": [
+        "个人卖家店铺与商品管理",
+        "订单发货、售后与评价回复",
+        "卖家收支与经营数据"
+      ],
+      "responsibility": {
+        "inScope": [
+          "C2C 卖方经营后台",
+          "商品订单与售后"
+        ],
+        "outOfScope": [
+          "不是交易市场主入口",
+          "不是企业供应商后台"
+        ]
+      },
+      "adminRole": "维护店铺、商品、发货售后与经营数据（卖家侧）",
+      "apiRole": "提供卖家侧读写接口，需卖家身份与幂等",
+      "related": [
+        {
+          "entryId": "43",
+          "entryKey": "SUPPLIER_ADMIN",
+          "relation": "similar",
+          "distinction": "供应商后台面向企业供货，本模块面向个人卖家"
+        },
+        {
+          "entryId": "44",
+          "entryKey": "C2C_MARKET",
+          "relation": "similar",
+          "distinction": "C2C 市场是交易主入口，本模块是卖方经营工具"
+        },
+        {
+          "entryId": "36",
+          "entryKey": "MEMBER_ADMIN",
+          "relation": "similar",
+          "distinction": "会员管理后台面向运营管人，本模块面向卖家管货"
+        }
+      ],
+      "capabilities": [
+        {
+          "code": "catalog",
+          "name": "店铺清单",
+          "itemKind": "店铺",
+          "description": "清单：登记并查看该系统的资源清单，可归档（个人卖家店铺管理后台）",
+          "states": [
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "manage",
+          "name": "商品维护",
+          "itemKind": "维护单",
+          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（个人卖家店铺管理后台）",
+          "states": [
+            "pending",
+            "active",
+            "archived"
+          ]
+        },
+        {
+          "code": "record",
+          "name": "订单记录",
+          "itemKind": "订单记录",
+          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（个人卖家店铺管理后台）",
+          "states": [
+            "pending",
+            "done",
+            "archived"
+          ]
+        }
+      ],
+      "seed": [
+        {
+          "capability": "catalog",
+          "title": "店铺·示例",
+          "status": "active",
+          "detail": "演示数据：个人卖家店铺管理后台的店铺清单初始条目，非真实业务数据。"
+        },
+        {
+          "capability": "manage",
+          "title": "维护单·待处理",
+          "status": "pending",
+          "detail": "演示数据：个人卖家店铺管理后台的商品维护待办条目，可推进状态。"
+        }
+      ]
+    }
+  ],
+  "blankRows": [
+    {
+      "entryKey": "AT_ROOT",
+      "placeholder": "{{HOST:AT_ROOT}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 2,
+      "givenByUser": true,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "AT_ROOT",
+      "placeholder": "{{HOST:AT_ROOT}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 3,
+      "givenByUser": true,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_94",
+      "placeholder": "{{HOST:BLANK_94}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 94,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_95",
+      "placeholder": "{{HOST:BLANK_95}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 95,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_96",
+      "placeholder": "{{HOST:BLANK_96}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 96,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_97",
+      "placeholder": "{{HOST:BLANK_97}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 97,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_98",
+      "placeholder": "{{HOST:BLANK_98}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 98,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_99",
+      "placeholder": "{{HOST:BLANK_99}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 99,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_100",
+      "placeholder": "{{HOST:BLANK_100}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 100,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_101",
+      "placeholder": "{{HOST:BLANK_101}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 101,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_102",
+      "placeholder": "{{HOST:BLANK_102}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 102,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_103",
+      "placeholder": "{{HOST:BLANK_103}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 103,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "entryKey": "BLANK_104",
+      "placeholder": "{{HOST:BLANK_104}}",
+      "hostValue": null,
+      "sheet": "mixm.top",
+      "row": 104,
+      "givenByUser": false,
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    }
+  ],
+  "blankRowPolicy": "台账主机记录列的原始具体值不作为入口标识依据，仅保留表内行号作溯源；空白备注统一以可配置占位标识表示，实际值不补写。"
+}

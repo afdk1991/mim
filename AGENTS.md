@@ -1,6 +1,29 @@
 # AGENTS.md — Mim 项目协作铁律
 
 > 本文件对在 Mim 仓库内工作的所有 AI 协作者（含本机 WorkBuddy 会话、CI、自动化）具有强制约束力。
+>
+> **项目名称：Mim**（用户 2026-11-09 18:50 统一定名，全仓名称口径一致）。仓库目录 `Mim`、npm scope `@mim/*`、仓库名 `afdk1991/mim` / `mallwm_admin/mim`、生产域名 `mim.mixm.top` 与项目名称保持一致，详见 [§12.1](#121-项目标识与适用边界)。
+
+## 0. 当前状态基线（2026-11-09 17:54 +08:00 复核）
+
+> **阅读约定（2026-11-09 梳理时新增，不改变任何铁律约束）**：铁律一～十一的编号、标题与规则正文保持原样；**2026-11-09 18:08 按用户指令新增铁律十二**（全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器），不改写原十一条。§9 矩阵表格中所有「状态 / HTTP / 耗时」以及标注「历史留痕」「最近一次复测」的段落，均为**各交付轮当时的取证快照**，按铁律三原样保留，**不得当作 2026-11-09 现状引用**。每轮以本节与 [§9.1 本轮复核](#91-本轮复核2026-11-09-1754-0800) 为准；新一轮部署后按铁律九「每次部署必须更新取证」追加新段落，不覆盖历史。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 项目标识 | 项目名称 **Mim**；仓库目录 / 域名 / npm scope / 仓库名均为 Mim 系标识，名称口径全仓统一（2026-11-09 18:50） | 用户 2026-11-09 18:50 指令；`git remote -v`、`package.json` |
+| 远程仓库 | **2 个**：`origin` = `https://github.com/afdk1991/mim.git`、`gitee` = `https://gitee.com/mallwm_admin/mim.git`；**无非清单远端** | `git remote -v`（2026-11-09 18:08） |
+| 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
+| 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
+| 仓库同步 | `main` @ `3b9b251`；远端 `refs/heads/main` = `3b9b251`（0 ahead / 0 behind） | `git log -1 --oneline`、`git ls-remote origin refs/heads/main` |
+| 工作树 | **23 个删除未提交**（`git diff --cached --name-status` 21 个 `D` + `git diff --name-status` 2 个 `D`）：`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`render.yaml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs` 等；另有文档 `M` 与未跟踪文件 | `git status --short`、`git diff --cached --name-status`、`git diff --name-status` |
+| 本地门禁 | `pnpm -r typecheck` 0；`pnpm --filter @mim/api test` **12 文件 / 174 例**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**83 文件 / 23882 可注释行 / 21485 已解释行 / 90.0%**）；`npm run check` 0 | 本轮真实命令输出，见 §9.1 与铁律十一缺口清单 |
+| 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
+| 铁律八偏离 | 本轮为**文档梳理、无新代码产物**，且生产主机侧不可验证，故未做生产部署、未刷新线上 E2E；**不以本地门禁通过冒充「已上线」** | 铁律一例外条款 + 铁律三；线上逐平台结果见 §9.1 |
+| 🔴 悬空引用 | `.github/workflows/deploy.yml` 仍在库且被 CI 使用，但其引用的 `deploy/deploy.sh`、`deploy/sealos/mim.yaml`、`deploy/iga/deploy.sh`、`vercel.json` 已不在工作树；直接触发 CI 会失败 | `git ls-files deploy .github/workflows site functions`、`grep -n -e "deploy/" -e "vercel.json" .github/workflows/deploy.yml`（命中 :86 / :90 / :119 / :320 / :366 / :375） |
+
+**本轮梳理边界**：仅做「现状可见性 + 口径刷新 + 悬空引用标注」，**不改任何铁律的约束语义**。恢复或确认删除部署工件、批量清理 CI 与文档引用属结构性变更，按铁律二须先输出影响清单并获明确授权后执行；本轮未做任何 `git add / commit / restore / push`。
+>
+> **2026-11-09 18:08 补充**：按用户指令新增铁律十二（远程仓库全量同步 + 生产统一部署腾讯云自建服务器），并全量删除原候选托管平台的全部相关内容；原铁律一～十一的编号 / 标题 / 约束语义仍未改动，规则变更的同步清单见 §12.5。2026-11-09 18:50 按用户指令将项目名称统一为 **Mim**，全仓名称口径一致。
 
 ## 铁律一：AI 负责执行，不把任务丢回用户 你全权接管所有包括浏览器等等
 
@@ -88,9 +111,9 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 - 每轮任务（新增功能、修复、改造、文档/静态站点变更）完成后，AI 必须把整个项目 **前后端 + 数据库** 自动部署到远程生产环境并上线可访问，不得以「本地跑通了」「本地预览正常」「你自己部署一下」作为交付结论。
 
-- 部署链路必须**全自动化、可重放**：CI（GitHub Actions）在 `main` 上触发 → 安装依赖 → 类型检查 → 测试 → 构建 → 远程发布 → 重启服务 → 健康检查；服务器侧以幂等脚本（`deploy/*.sh`）实现，禁止依赖手工敲命令。
+- 部署链路必须**全自动化、可重放**：CI（GitHub Actions）在 `main` 上触发 → 安装依赖 → 类型检查 → 测试 → 构建 → 远程发布 → 重启服务 → 健康检查；服务器侧以幂等脚本（`deploy/*.sh`）实现，禁止依赖手工敲命令。（**现状标注 2026-11-09**：`deploy/` 已于 2026-11-08 从工作树移除且未提交，见 §0；规则语义不变，恢复或收敛须按铁律二授权。）
 
-- **禁止只交付静态站点的本地预览**：静态产物（`apps/web` 构建产物）必须与后端 API、数据库一起上线到生产域名；生产部署配置（nginx / systemd / CI）必须入库（`deploy/`、`.github/workflows/`），不得散落在个人机器。
+- **禁止只交付静态站点的本地预览**：静态产物（`apps/web` 构建产物）必须与后端 API、数据库一起上线到生产域名；生产部署配置（nginx / systemd / CI）必须入库（`deploy/`、`.github/workflows/`），不得散落在个人机器。（**现状标注 2026-11-09**：`.github/workflows/deploy.yml` 仍在库，`deploy/` 已不在工作树，CI 存在悬空引用，见 §0。）
 
 - 交付报告必须附**线上取证**：生产域名健康检查（如 `curl https://<域名>/health` 返回 200）、关键接口返回（如 `/api/v1/plans`）、以及一次真实端到端操作（登录 / 建项目 / 建任务 / 仪表盘）的浏览器验证结果。**无线上取证不得宣称「已上线」。**
 
@@ -101,6 +124,8 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 ## 铁律九：多平台部署矩阵——只走免费方案，且必须逐平台取证
 
 **本项目部署矩阵为 9 个免费平台，任何一轮部署都不得脱离该矩阵、不得引入付费方案。**
+
+> ⚠️ **表格口径（2026-11-09 梳理标注）**：下表「状态 / 访问速度」为 **2026-11-08 18:14 成片导出交付轮**的历史快照，按铁律三原样保留，**不得作为本轮现状引用**；本轮真实 `curl` 复核见 [§9.1](#91-本轮复核2026-11-09-1754-0800)。表内 `✅ 已上线` 亦不表示 2026-11-09 生产可达，生产可达性以 §0 与 §9.1 为准。
 
 | 平台 | 免费 | 状态 | 域名 | 访问速度（HTTP / 耗时 / 连接） |
 |---|---|---|---|---|
@@ -114,16 +139,57 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | Vercel | ✅ 是 | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI「托管平台同步」作业 success（本轮 run 42470091995）；本机 000 / 0.183s（curl exit 35：schannel `failed to receive handshake, SSL/TLS connection failed`），`nslookup` 解析至 2001::c73b:94ca / 216.198.79.3 / 64.29.17.3，属本机网络侧 TLS 阻断 |
 | GitHub 仓库 | ✅ 是 | ✅ 已同步（远端 main HEAD `3271204`，2026-11-08 18:14 `git ls-remote` 取证，本地 0 ahead / 0 behind） | `https://github.com/afdk1991/mim` | 本机 HTTPS 000（TLS 阻断，历史取证）；替代取证 `git ls-remote origin refs/heads/main` = `3271204` ✅，CI run 42470091995 五作业全绿（2026-11-08T10:07:48Z → 10:09:54Z） |
 
+### 9.1 本轮复核（2026-11-09 17:54 +08:00）
+
+**性质**：文档梳理轮的可访问性复核，无新部署、未重跑 CI、未做浏览器 E2E；本机中国网络经本地代理出网，HEAD `3b9b251`。
+
+| 平台 / 入口 | 探测 URL | HTTP | 总耗时 | LEN | 判读 |
+|---|---|---|---|---|---|
+| 腾讯云自建 | `/health` | 000 | 2.149s | 0 | curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析 `115.159.159.11`；主机侧状态本轮不可验证 |
+| 腾讯云自建 | `/` | 000 | 2.072s | 0 | 同上 |
+| EdgeOne Pages | `/` | 200 | 0.697s | 985 | **WAF 挑战页**（`EO_Bot_Ssid` / `_0x649a`），按下方「WAF 假阳性判别规则」不作内容取证 |
+| GitHub Pages | `/mim/` | 200 | 0.764s | 5182 | 产物 `assets/index-CcCuY8hw.js` |
+| Sealos | `/health` | 200 | 0.882s | 53 | `{"status":"ok"}`（纯 API 容器，根路径无路由属预期） |
+| Cloudflare Pages | `/` | 200 | 0.892s | 5182 | 产物 `assets/index-BoTlMYaC.js` |
+| ghcr | `/v2/` | 401 | 0.671s | 73 | 未鉴权 `UNAUTHORIZED`，属正常 |
+| Vercel | `/` | 000 | 10.005s | 0 | `--max-time 10` 截断；`nslookup` 见 `2a03:2880:f11c:8083:face:b00c:0:25de` / `159.106.121.75`，DNS 污染特征 |
+| IGA Pages | — | 未测 | — | — | 需 `iga_token` 私有凭证，本轮未纳入 curl 批次，按铁律一如实标注「未测」，不以历史 200 冒充 |
+| GitHub 仓库 | — | — | — | — | 本机 HTTPS 阻断；替代取证 `git ls-remote origin refs/heads/main` = `3b9b251` ✅ |
+
+- **产物指纹变化**：GitHub Pages `index-CcCuY8hw.js`、Cloudflare Pages `index-BoTlMYaC.js`，与历史快照的 `index-D2UkZqM1.js` / `index-COy8rstl.js` 均不同，证明线上产物已更新；两站因根构建注入 `VITE_API_ORIGIN` 而指纹不同，属既有设计。
+- **本机不可达 ≠ 部署失败**（铁律九）：自建域名 `000` 已附代理 502 与 DNS 证据；但本轮**未取得**新 CI run、平台控制台或服务端日志作为替代取证，故**不声明生产「已上线」**，仅声明 4 个静态 / API 入口 200 可访问。
+- **本轮未做**（不以历史结果冒充）：线上 `/api/v1/modules` 内容层、深链接带 `Accept: text/html` 复核、EdgeOne 有头浏览器放行后的内容层、生产浏览器 E2E。
+
+**规则补充轮复核（2026-11-09 18:30 +08:00，铁律十二立规轮；无新部署、未重跑 CI、未做浏览器 E2E）**：本机中国网络经本地代理出网，HEAD `3b9b251`，以下为铁律十二 §12.4 的 V1–V6 本轮实测，按铁律九追加、不覆盖上方 17:54 快照。
+
+- **V1 双远端**：`git ls-remote origin refs/heads/main` = `3b9b251`（0 ahead / 0 behind ✅）；`git ls-remote gitee refs/heads/main` **exit 124（25s 超时，仅返回 TLS 证书校验禁用告警）**，按 §12.2 如实标注「`gitee` 本轮未取证」，**不冒充全量同步**；本轮无 commit，未 push 任何远端。
+- **V2 / V3 生产**：`mim.mixm.top` 的 `/health`、`/`、`/api/v1/modules` 均 `000` / 约 2.14s / LEN=0（curl exit 7，本地代理 `CONNECT tunnel failed, response 502`），主机侧无 SSH / `tccli` 凭证可验证 → **未通过，不宣称已上线**。
+- **V5 逐平台**：`data.mixm.top` 200 / 0.087s / 985B（WAF 挑战页，不作内容取证）；GitHub Pages `/mim/` 200 / 1.332s / 5182B；Sealos `/health` 200 / 0.713s / 53B；Cloudflare Pages 200 / 0.677s / 5182B；ghcr `/v2/` 401 / 0.736s / 73B（未鉴权属正常）；Vercel 000 / 0.270s；IGA Pages 需 `iga_token` 私有凭证，本轮未测。
+- **V4**：未做（生产主机不可达，无真实渲染对象）。**V6 本地门禁**：`pnpm -r typecheck` 0、`pnpm --filter @mim/api test` **12 文件 174/174**、`verify-auth-gate` **35/35**、`comment-check --strict` 0、`npm run check` 0，全绿。
+- **结论**：本轮为规则补充与文档清理，无新代码产物；按铁律八 / 十二如实标注**未做生产部署**，不以本地门禁通过或分发平台 200 冒充「已上线」。
+
 - **权威明细位置**：逐平台发布作业见 [README.md](./README.md)「多平台部署矩阵」；实测汇总与 DNSPod 记录对应见 [05-runbook.md §7.1.3 / §7.6](./docs/wiki/05-runbook.md)；CI 实现见 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)（`deploy` / `pages` / `packages` / `platforms` 四个作业）。
 - **免费是硬约束**：新增平台前必须确认无付费门槛；`veFaaS` 等**无长期免费层**的方案已移出交付范围，不得重新引入。`Render` 因存在长期免费层（750 实例小时/月），已于 2026-11-06 按铁律十改为「免费候选平台」，不再属于排除项。
 - **每次部署必须更新取证**：表中「HTTP / 耗时 / 连接」须以当轮真实 `curl`（或 CI 出口）结果刷新，并注明测试日期与本机网络位置；不得沿用旧数据冒充本轮结果。
 - **本机不可达 ≠ 部署失败**：`000` 类结果必须给出网络侧证据（DNS 污染地址、TCP 超时、HTTPS 阻断），并以 CI 日志、`git push` / `gh` CLI、平台控制台作为替代取证；无替代取证不得声明「已上线」。
 - **变更须全量同步**（铁律七）：平台增删、域名变更、凭证变更时，同轮更新本表、README、`docs/wiki/05-runbook.md`（含 DNSPod 对应表）与 CI 工作流，缺一视为交付未完成。
+> **历史留痕导航（2026-11-09 梳理新增）**：紧随其后的 5 个长段落是各交付轮当时的取证快照，按铁律三保留原数值与口径，**均不冒充本轮结果**；本轮现状以 §0 与 §9.1 为准。按起始短语定位：
+
+| 序号 | 时间 / HEAD | 轮次性质 | 该轮关键结论（仅历史） |
+|---|---|---|---|
+| H1 | 2026-11-08 04:01 / `d4c4620` | 可访问性复测 | 九平台状态码与基线一致，无新部署 |
+| H2 | 2026-11-08 05:05 / `83f454c` | 按需登录交付 | `verify-auth-gate --live` 52/52、生产匿名态 6/6 |
+| H3 | 2026-11-08 17:42 / `1b3072e` | 仓库 / 文档一致性加固 | 契约测试 10 文件 145/145、注释 90.5%（当时口径） |
+| H4 | 2026-11-08 18:14 / `3271204` | 成片导出交付 | 契约测试 11 文件 154/154、成片导出 E2E 14/14、生产 E2E 8/8 |
+| H5 | 2026-11-08 18:3x / HEAD 待定 | 商城充实 | `seedModules` 由 1 扩为 8 个模块，本地 `/store` 8 张卡片 |
+
+> 各轮测试规模差异（145 → 154 → 174）来自后续新增契约用例；**本轮为 12 文件 174 例**，见 §0 / §9.1，历史数字不改写、不作现状引用。
+
 - **上一次复测（历史留痕，2026-11-08 04:01:51 +08:00，本机中国网络 curl，HEAD `d4c4620`「docs: 刷新铁律九平台矩阵取证」，性质为可访问性复测轮——无新部署、未重复浏览器 E2E 与 CI 重跑，商城接口逐项与 E2E 结论沿用 2026-11-08 03:31 轮次）**：`mim.mixm.top/health` 200 / 0.071s / 0.036s、`mim.mixm.top/` 200 / 0.065s / 0.025s / LEN=2896 且首页产物 `assets/index-s6n-xZuf.js` + `assets/index-DFqN9O7h.css` 含 `?tads` / 裸问号归一化脚本（`history.replaceState`）、`mim.mixm.top/admin/` 200 / 0.065s / 0.029s / LEN=1430、`mim.mixm.top/api/v1/modules` 200 / 0.066s / 0.027s、**`data.mixm.top` 200 / 0.103s / 0.030s / LEN=985 为 WAF 挑战页（放行凭证自 2026-11-07 01:48 起已过期，真实内容连续多轮未复验；替代取证为 `git worktree` 干净树（HEAD `42b98bc`）构建产物直传 Deployment `dpu0n61jlos8`（exit 0，产物指纹 `index-s6n-xZuf.js` 与生产服务器一致））**、GitHub Pages 200 / 0.216s / 0.079s / LEN=2896（含归一化脚本，产物 `assets/index-CDuo76_9.js`）、Sealos `/health` 200 / 0.272s / 0.101s / LEN=53（`{"status":"ok"}`；根路径 `/` 404 / 0.264s / 0.093s / LEN=106 属正常，纯 API 容器未注册根路由）、Cloudflare Pages 200 / 0.534s / 0.169s / LEN=2896（含归一化脚本，产物 `assets/index-s6n-xZuf.js` 与生产服务器同指纹）、ghcr tags 未鉴权 401 / 0.544s / 0.111s（`UNAUTHORIZED` 属正常）、Vercel 本机 000 / 21.271s（`--max-time 25` 截断，curl exit 28；`nslookup` 解析至 162.125.32.9（Dropbox 段）与 2a03:2880:f126:83:face:b00c:0:25de（Facebook 段 IPv6），典型 DNS 污染特征；CI「托管平台同步」作业含 Vercel 部署成功作替代取证）、github.com 本机 000 / 0.020s（curl exit 35：TLS 握手被阻断，TCP 可连；仓库操作经 `git ls-remote` 取证 ✅，远端 main HEAD = `d4c4620`）。速度排序（本机总耗时升序）：自建 0.065s < EdgeOne 0.103s（WAF 挑战页）< GitHub Pages 0.216s < Sealos 0.272s < Cloudflare Pages 0.534s < ghcr 0.544s。状态码与基线一致，无渠道新增或失效。
 - **历史留痕：最近一次复测（2026-11-08 05:05:32 +08:00，按需登录交付轮——商城 `/store` 匿名可浏览、`/comic` `/chat` `/settings` 收费/私密视图匿名访问时于内容区内嵌登录卡片，本机中国网络 curl，HEAD `83f454c`，CI run 42413909910 五作业全绿）**：自建全链路实测——`/health` 200 / 0.087s / 0.045s / LEN=53、首页 200 / 0.066s / 0.024s / LEN=5182（含归一化脚本与 `history.replaceState`，产物 `assets/index-ChbzA5PZ.js` + `assets/index-CeRvh2Rf.css`）、**五条深链接 `/store` 200/0.089s、`/comic` 200/0.062s、`/chat` 200/0.068s、`/settings` 200/0.059s、`/login` 200/0.066s 全部 LEN=5182（nginx `try_files` SPA 回落实测生效）**、`/admin/` 200 / 0.062s / 0.027s / LEN=1430、`/api/v1/modules` 200 / 0.062s / 0.023s / LEN=438；**Cloudflare Pages 带 `Accept: text/html` 头深链接实测——`/store` 200/0.570s、`/comic` 200/0.579s、`/login` 200/0.494s 全部 LEN=5182（catch-all Function 生效；裸 curl 默认 `Accept: */*` 得 404 属预期，函数只对 html 导航重写）**，首页 200 / 0.678s / 0.179s / LEN=5182（产物与自建同指纹 `assets/index-ChbzA5PZ.js`）；GitHub Pages `/mim/` 200 / 0.535s / 0.259s / LEN=5182（产物 `assets/index-Mq2I8smM.js` + `assets/index-CeRvh2Rf.css`），深链接 `/mim/store` 404 / 0.328s / LEN=5182（`dist/404.html` 逐字节副本，404 状态码属平台能力上限的预期设计，浏览器加载后 SPA 直接启动渲染）；Sealos `/health` 200 / 0.269s / 0.103s / LEN=53（根路径 `/` 404 属正常，纯 API 容器未注册根路由）；ghcr 未鉴权 401 / 0.552s / 0.115s / LEN=73（`UNAUTHORIZED` 属正常）；EdgeOne `data.mixm.top` curl 200 / 0.116s / 0.040s 但仅 985B 为 WAF 挑战页（`EO_Bot_Ssid` / `_0x649a`；真实内容最近一次复验为 2026-11-08 04:33 有头 Edge + CDP 人工放行后商城全链路通过，放行凭证仍会过期）；Vercel 本机 000 / 21.286s（`--max-time 25` 截断，curl exit 28，DNS 污染，CI「托管平台同步」作业替代取证）；github.com 本机 000 / 0.018s（curl exit 35：schannel `CRYPT_E_NO_REVOCATION_CHECK`，TLS 握手被阻断，TCP 可连），`git ls-remote` 取证远端 main HEAD = `83f454c` ✅。**SPA 回退四件套终态分工沿用**：生产 nginx `try_files`（200 重写）、CF Pages `functions/[[catchall]].js`（200 重写）、GitHub Pages `dist/404.html`（404 状态 + SPA 全文）、`apps/web/public/_redirects`（EdgeOne Pages 等仍解析它的平台）。**按需登录 E2E 取证**：本地 `scripts/verify-auth-gate.mjs --live` 52/52 全 PASS（35 条静态断言 + 17 场景 Edge CDP）；生产匿名态 live 6/6 核心场景全 PASS（商城 `/store` 匿名可浏览、`/comic` `/chat` `/settings` 匿名访问内嵌登录卡片、登录页直达、`/admin/` 登录页正常）；生产登录链路因 `POST /api/v1/auth/code` 返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`（SMS 通道未配置）以本地替代取证。状态码与基线一致，无渠道新增或失效。
 - **历史留痕：最近一次复测（2026-11-08 17:42:36 +08:00，仓库 / 文档一致性加固轮——无新功能部署、未重跑 CI 与浏览器 E2E，本机中国网络 curl，HEAD `1b3072e`）**：自建全链路——`/health` 200 / 0.074s / 0.035s / LEN=53（`{"status":"ok","service":"mim-api","version":"0.0.0"}`）、首页 200 / 0.075s / 0.034s / LEN=5182（产物 `index-ChbzA5PZ.js` + `index-CeRvh2Rf.css`）、五条深链接 `/store` 0.060s / `/comic` 0.063s / `/chat` 0.064s / `/settings` 0.053s / `/login` 0.061s 全部 200 / LEN=5182、`/admin/` 200 / 0.093s / LEN=1430、`/api/v1/modules` 200 / 0.066s / LEN=438（返回 1 条 `comic.workbench` 上架模块）、`/api/v1/site/overview` 404 / LEN=126（`NOT_FOUND` 信封，站点体系下线终态）；GitHub Pages `/mim/` 200 / 0.402s / 0.073s / LEN=5182（产物 `index-Mq2I8smM.js`）、深链接 `/mim/store` 404 / 1.008s / 0.119s / LEN=5182（`404.html` 逐字节副本，属平台能力上限预期设计）；Cloudflare Pages 首页 200 / 2.401s / 0.160s / LEN=5182（与自建同指纹），带 `Accept: text/html` 头 `/store` 200 / 0.982s、`/comic` 200 / 0.749s、`/login` 200 / 0.948s 全部 LEN=5182，裸 curl `/store` 404 / 0.562s 属 catch-all Function 按设计只重写 html 导航；Sealos `/health` 200 / 0.366s / 0.196s / LEN=53；EdgeOne `data.mixm.top` 200 / 0.090s / 0.034s 但仅 985B 为 WAF 挑战页（`EO_Bot_Ssid` / `_0x649a`，真实内容本轮未以有头浏览器复验）；ghcr 401 / 0.537s / 0.107s / LEN=73（正常）；Vercel 本机 000 / 21.276s（curl exit 28，DNS 污染，CI「托管平台同步」作业替代取证）；github.com 本机 000 / 0.015s（curl exit 35：schannel 吊销检查阻断 TLS，TCP 0.007s 可连），`git ls-remote` 取证远端 main HEAD = `1b3072e`、本地 0 ahead / 0 behind ✅。**本轮本地门禁**：`pnpm -r typecheck` 0、`pnpm --filter @mim/api test` 10 文件 **145/145**、`npm run check` 0、`comment-check --strict` 0（总体 90.5%）、web/admin/root 三套构建 0（根构建需清空 `NODE_OPTIONS` 规避本机 safe-delete 批量删除保护）。**产物指纹**：生产自建与 CF Pages 同为 `index-ChbzA5PZ.js`，GitHub Pages 为 `index-Mq2I8smM.js`（根构建注入 `VITE_API_ORIGIN` 所致，符合既有设计），与仓库 HEAD 一致、无未部署的前端改动。状态码与基线一致，无渠道新增或失效。
-- **最近一次复测（2026-11-08 18:14:17 +08:00，成片导出交付轮——HEAD `3271204`，CI run 42470091995 五作业全绿，本机中国网络 curl + 生产 Edge CDP）**：自建 `/health` 200 / 0.061s / 0.001s / LEN=53、首页 200 / 0.064s / LEN=5182（**本轮新产物 `index-D2UkZqM1.js` + `index-CeRvh2Rf.css`**，与本地同源构建逐字一致，证明本轮前端改动已上线）、五条深链接 `/store` `/comic` `/chat` `/settings` `/login` 全 200 / LEN=5182（0.066–0.079s）、`/admin/` 200 / 0.069s / LEN=1430、`/api/v1/modules` 200 / 0.076s / LEN=438、`/api/v1/site/overview` 404 / LEN=126、`POST /api/v1/comic/films/does-not-exist/export` 匿名 401 `AUTH_UNAUTHORIZED`（导出路由在线）；GitHub Pages `/mim/` 200 / 0.867s / LEN=5182（`index-COy8rstl.js`，根构建注入 API 源）、深链接 `/mim/store` 404 / 0.370s / LEN=5182 属 `404.html` 预期设计；Cloudflare Pages 首页 200 / 1.384s / LEN=5182（与自建同指纹），带 `Accept: text/html` 头 `/store` 200 / 0.931s、`/comic` 200 / 0.842s、`/login` 200 / 1.526s 全 LEN=5182，裸 curl `/store` 404 / 0.791s 属 catch-all 按设计只重写 html 导航；Sealos `/health` 200 / 0.718s / LEN=53；EdgeOne 200 / 0.075s / LEN=985 仍为 WAF 挑战页（`EO_Bot_Ssid` / `_0x649a`，真实内容本轮未复验）；ghcr 401 / 1.087s / LEN=73 正常；Vercel 本机 000 / 0.183s（curl exit 35，schannel TLS 握手失败，`nslookup` 见 2001::c73b:94ca 等），CI「托管平台同步」success 替代取证；github.com 本机 HTTPS 阻断，`git ls-remote` 取证远端 main = `3271204` ✅。**本轮门禁**：`pnpm -r typecheck` 0、`pnpm --filter @mim/api test` 11 文件 **154/154**、`npm run check` 0、`comment-check --strict` 0（90.1%）、`verify-auth-gate` 35/35、web/admin/api/root 四套构建 0、`npm run verify:film-export` Edge CDP **14/14**（真实登录→造工程→成片→MOV/720p 转码降级→一键原片直下→下载链接可见→零控制台错误→零横向溢出）。**生产浏览器 E2E 8/8**：`/store` 匿名渲染商城、加载新 bundle、地址栏无 `?tads`、模块卡片来自真实 `/api/v1/modules`、输入 comic 提交搜索得 1 个结果、点「详情」展开「状态: 已上架 / 依赖链 无前置依赖 / 价格历史 暂无定价记录」、`/comic` 匿名内嵌「此功能需登录后使用」、console 零报错。**生产登录链路**：密码登录需服务器 `/opt/mim/mim-api.env` 中的 `MIM_AUTH_ADMIN_PASSWORD`（私有凭证、沙盒不可读），验证码通道生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；故登录后的成片导出全链路以本地 14/14 E2E 作为替代取证，不冒充生产登录态。状态码与基线一致，无渠道新增或失效。
-- **最近一次复测（2026-11-08 18:3x +08:00，商城充实轮——HEAD 待定，本地 Edge CDP 验证，本机中国网络 curl）**：**根因修复**：此前用户反馈「商城看不到」，定位为 `services/mim-api/src/db.ts` 的 `seedModules` 仅种入 1 个模块（`comic.workbench`），`/store` 虽正常渲染但页面显空（仅 1 张卡片 + 大块留白）。本轮将种子扩充为 **8 个模块**（cn/global 双区各一套）：`comic.workbench`（免费）、`comic.genpack.basic` ¥99/`$14.99`、`comic.genpack.pro` ¥299/`$42.99`（前置 basic）、`comic.genpack.team` ¥999/`$139.99`（前置 pro）、`ai.dubbing` ¥199/`$28.99`、`ai.script`（免费）、`media.storage` ¥49/`$6.99`、`template.pack`（免费），含付费价格与依赖链。**本地验证**：`pnpm --filter @mim/api build` 0、`api` 契约测试 11 文件 **154/154**、`pnpm -r typecheck` 0、`comment-check --strict` 0（90.1%）、`npm run check` 0、web 构建 0；本地 `GET /api/v1/modules` 返回 **8 条**、`Edge CDP` 渲染 `/store` 确认 8 张模块卡片（3 列网格）标题/价格/前置依赖/详情按钮全部可见、零控制台错误；生产 Edge CDP E2E 与九平台取证将在 push + CI 后刷新。**说明**：`/store` 为 Web SPA 路由，仅 `mim.mixm.top` / GitHub Pages / Cloudflare Pages 托管前端；`data.mixm.top`（EdgeOne）为 WAF 验证页、`mim-i3ywsdfn.cloud.sealos.io`（Sealos）为纯 API 容器（`/store` 命中 API 返回 404 JSON 属预期），此二者本就不提供商城 SPA，非缺陷。
+- **[H4 历史留痕] 复测（2026-11-08 18:14:17 +08:00，成片导出交付轮——HEAD `3271204`，CI run 42470091995 五作业全绿，本机中国网络 curl + 生产 Edge CDP）**：自建 `/health` 200 / 0.061s / 0.001s / LEN=53、首页 200 / 0.064s / LEN=5182（**本轮新产物 `index-D2UkZqM1.js` + `index-CeRvh2Rf.css`**，与本地同源构建逐字一致，证明本轮前端改动已上线）、五条深链接 `/store` `/comic` `/chat` `/settings` `/login` 全 200 / LEN=5182（0.066–0.079s）、`/admin/` 200 / 0.069s / LEN=1430、`/api/v1/modules` 200 / 0.076s / LEN=438、`/api/v1/site/overview` 404 / LEN=126、`POST /api/v1/comic/films/does-not-exist/export` 匿名 401 `AUTH_UNAUTHORIZED`（导出路由在线）；GitHub Pages `/mim/` 200 / 0.867s / LEN=5182（`index-COy8rstl.js`，根构建注入 API 源）、深链接 `/mim/store` 404 / 0.370s / LEN=5182 属 `404.html` 预期设计；Cloudflare Pages 首页 200 / 1.384s / LEN=5182（与自建同指纹），带 `Accept: text/html` 头 `/store` 200 / 0.931s、`/comic` 200 / 0.842s、`/login` 200 / 1.526s 全 LEN=5182，裸 curl `/store` 404 / 0.791s 属 catch-all 按设计只重写 html 导航；Sealos `/health` 200 / 0.718s / LEN=53；EdgeOne 200 / 0.075s / LEN=985 仍为 WAF 挑战页（`EO_Bot_Ssid` / `_0x649a`，真实内容本轮未复验）；ghcr 401 / 1.087s / LEN=73 正常；Vercel 本机 000 / 0.183s（curl exit 35，schannel TLS 握手失败，`nslookup` 见 2001::c73b:94ca 等），CI「托管平台同步」success 替代取证；github.com 本机 HTTPS 阻断，`git ls-remote` 取证远端 main = `3271204` ✅。**本轮门禁**：`pnpm -r typecheck` 0、`pnpm --filter @mim/api test` 11 文件 **154/154**、`npm run check` 0、`comment-check --strict` 0（90.1%）、`verify-auth-gate` 35/35、web/admin/api/root 四套构建 0、`npm run verify:film-export` Edge CDP **14/14**（真实登录→造工程→成片→MOV/720p 转码降级→一键原片直下→下载链接可见→零控制台错误→零横向溢出）。**生产浏览器 E2E 8/8**：`/store` 匿名渲染商城、加载新 bundle、地址栏无 `?tads`、模块卡片来自真实 `/api/v1/modules`、输入 comic 提交搜索得 1 个结果、点「详情」展开「状态: 已上架 / 依赖链 无前置依赖 / 价格历史 暂无定价记录」、`/comic` 匿名内嵌「此功能需登录后使用」、console 零报错。**生产登录链路**：密码登录需服务器 `/opt/mim/mim-api.env` 中的 `MIM_AUTH_ADMIN_PASSWORD`（私有凭证、沙盒不可读），验证码通道生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；故登录后的成片导出全链路以本地 14/14 E2E 作为替代取证，不冒充生产登录态。状态码与基线一致，无渠道新增或失效。
+- **[H5 历史留痕] 复测（2026-11-08 18:3x +08:00，商城充实轮——HEAD 待定，本地 Edge CDP 验证，本机中国网络 curl）**：**根因修复**：此前用户反馈「商城看不到」，定位为 `services/mim-api/src/db.ts` 的 `seedModules` 仅种入 1 个模块（`comic.workbench`），`/store` 虽正常渲染但页面显空（仅 1 张卡片 + 大块留白）。本轮将种子扩充为 **8 个模块**（cn/global 双区各一套）：`comic.workbench`（免费）、`comic.genpack.basic` ¥99/`$14.99`、`comic.genpack.pro` ¥299/`$42.99`（前置 basic）、`comic.genpack.team` ¥999/`$139.99`（前置 pro）、`ai.dubbing` ¥199/`$28.99`、`ai.script`（免费）、`media.storage` ¥49/`$6.99`、`template.pack`（免费），含付费价格与依赖链。**本地验证**：`pnpm --filter @mim/api build` 0、`api` 契约测试 11 文件 **154/154**、`pnpm -r typecheck` 0、`comment-check --strict` 0（90.1%）、`npm run check` 0、web 构建 0；本地 `GET /api/v1/modules` 返回 **8 条**、`Edge CDP` 渲染 `/store` 确认 8 张模块卡片（3 列网格）标题/价格/前置依赖/详情按钮全部可见、零控制台错误；生产 Edge CDP E2E 与九平台取证将在 push + CI 后刷新。**说明**：`/store` 为 Web SPA 路由，仅 `mim.mixm.top` / GitHub Pages / Cloudflare Pages 托管前端；`data.mixm.top`（EdgeOne）为 WAF 验证页、`mim-i3ywsdfn.cloud.sealos.io`（Sealos）为纯 API 容器（`/store` 命中 API 返回 404 JSON 属预期），此二者本就不提供商城 SPA，非缺陷。
 - **CI 重跑运维提示（2026-11-07 取证）**：`gh run rerun <run-id> --failed` 会在**同一 workflow run 内二次上传** `github-pages` artifact，导致 `actions/deploy-pages@v4` 报 `Multiple artifacts named "github-pages" were unexpectedly found for this workflow run. Artifact count is 2.` —— 重跑无效。正确做法是 `gh workflow run deploy.yml --ref main` 触发**全新 run**，再 `gh run watch <new-run-id> --exit-status` 监控。
 - **WAF 假阳性判别规则**：EdgeOne 等带机器人校验的托管平台，`curl` / 无头 UA 可能拿到 200 但响应体为数百字节混淆 JS（含 `EO_Bot_Ssid` / `_0x649a`）。此类 200 **不得**作为「内容正确」的取证；须以有头真实浏览器（本机 Edge + CDP）读取 `document.title` / `script[src]` / `body.innerText` 并确认 `isWafChallenge=false`。
   - **拦截面实测（2026-11-07）**：`curl` / 无头 UA → 层 1 混淆 JS（约 986B）；**无头浏览器（`--headless=new`）与全新 user-data-dir 的有头 Edge → 层 2 验证码页**（`title=Security Verification`、`https://captcha.eo.gtimg.com/TEOCaptchaWidgetV1.js`、`htmlLen≈16419`、文案「正在验证连接安全性」）。判定正则须同时覆盖 `EO_Bot_Ssid|_0x649a|TEOCaptchaWidgetV1|正在验证连接安全性`。
@@ -135,16 +201,17 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 9 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。
 
-### 10.1 远程仓库平台
+### 10.1 远程仓库平台（2026-11-09 清理后为 3 个）
 
 | 平台 | 免费版核心额度 | 特点 |
 |---|---|---|
-| GitHub | 无限公开/私有仓库、无限协作者；2,000 CI/CD 分钟/月；500MB Packages 存储 | 生态最大，Actions + Pages 一条龙 |
-| GitLab | 免费层存储上限 5GB（超限项目转只读）；CI/CD 分钟按顶级群组计，子群组不额外增加 | 内置 DevOps 全流程，CI/CD 能力强 |
+| GitHub | 无限公开/私有仓库、无限协作者；2,000 CI/CD 分钟/月；500MB Packages 存储 | 生态最大，Actions + Pages 一条龙；本项目 `origin` 主仓 |
 | Bitbucket | 最多 5 人永久免费；仓库软限 2GB / 硬限 4GB；LFS 1GB；约 50 构建分钟/月 | 与 Jira 深度集成，小团队够用 |
-| Gitee（码云） | 1000 个仓库、5GB 总容量，含 Gitee Pages 静态托管 ⚠️单源待校验 | 国内访问快，需实名 |
+| Gitee（码云） | 1000 个仓库、5GB 总容量，含 Gitee Pages 静态托管 ⚠️单源待校验 | 国内访问快，需实名；本项目 `gitee` 镜像仓 |
 
-**选型建议**：个人/开源默认 GitHub；重 CI/CD 或私有化诉求看 GitLab；5 人内小团队且用 Jira 选 Bitbucket；主要面向国内访问选 Gitee。
+> **删除留痕（2026-11-09 18:08，用户指令）**：原表第 2 行与选型建议中的原候选托管平台条目已**全量删除**；清理前该平台关键词全仓文本命中 5 处（本文件 2 处、README 1 处、Wiki 2 处），清理后命中 0；无对应 CI 配置文件、CI 变量、镜像仓库或 git 远端。按用户指令，**被移除的候选平台不得重新进入候选池**，新增远程仓库一律走铁律十二 §12.2 的授权流程；被删条目原文可从 git 历史追溯。
+
+**选型建议**：个人/开源默认 GitHub（本项目主仓）；5 人内小团队且用 Jira 选 Bitbucket；主要面向国内访问选 Gitee（本项目镜像仓）。实际启用的两个远端与同步要求见 [铁律十二 §12.2](#122-远程仓库清单与全量同步)。
 
 ### 10.2 免费网站部署 — 纯静态站（博客 / 文档 / 落地页 / 作品集）
 
@@ -176,16 +243,16 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **每一行自有代码都必须有可读的解释，注释是交付物的一部分，不是可选项。**
 
-- **适用范围**：仓库内所有自有源码与脚本 —— `apps/web/src/**`、`apps/admin/src/**`、`services/mim-api/src/**` 与 `services/mim-api/test/**`、`packages/*/src/**`、`scripts/**`、`*.css`、`*.html`（含 `site/*.html`、`Mim-PRD.html`）；新增与修改的每一行同样适用。校验实现 `scripts/comment-check.mjs` 的 `TARGET_DIRS` 覆盖 `apps`（含两个前端）、`services`、`packages`、`scripts`、`site`，与此处文本一致。
+- **适用范围**：仓库内所有自有源码与脚本 —— `apps/web/src/**`、`apps/admin/src/**`、`services/mim-api/src/**` 与 `services/mim-api/test/**`、`packages/*/src/**`、`scripts/**`、`*.css`、`*.html`（含 `Mim-PRD.html`；`site/*.html` 已于 2026-11-08 随 `site/` 移除下线）；新增与修改的每一行同样适用。校验实现 `scripts/comment-check.mjs` 的 `TARGET_DIRS` 仍覆盖 `apps`（含两个前端）、`services`、`packages`、`scripts`、`site`，其中 `site` 已是空目录（校验器对目录不存在有容错，见脚本 :72），属待清理的历史目录项，其余四项与此处文本一致；现状见 §0。
 - **注释粒度**：每行代码必须有对应解释（行内尾注或紧邻上一行）；注释用**中文**，说明「做什么 + 为什么」，禁止无信息量复述（如 `i++ // i 加一`）。
 - **豁免项**（不要求逐行注释）：锁文件（`pnpm-lock.yaml` 等）、`node_modules`、自动生成产物（`dist/`、`*.min.*`）、二进制与数据文件、纯文档 `*.md`、`.env.example`。
 - **校验工具**：`scripts/comment-check.mjs` 输出逐文件覆盖率与缺口清单；`pnpm check:comments` 为基线报告（`--strict` 为 CI 门禁模式）。
 - **诚实报告**：未达标文件列入缺口清单并分批补齐；**不得**在未全量达标时声称「已全量注释完成」（铁律三）。
 - **交付报告必附**：本轮覆盖文件数 / 总文件数、未达标清单、`comment-check` 退出码取证。
 
-### 当前缺口清单（2026-11-08 18:24 基线实测，84 文件 / 23142 可注释行 / 20855 已解释行 / 总体 90.1%）
+### 当前缺口清单（2026-11-09 17:54 基线实测，83 文件 / 23882 可注释行 / 21485 已解释行 / 总体 90.0%）
 
-以下 8 个文件低于 80% 阈值，`--strict` 目前只按**总体覆盖率**判定故仍通过（不阻断 CI），但按本铁律仍属未完成项，须分批补齐；**不得**以「strict 通过」等同于「逐行注释已完成」。本清单于 18:24 复核：新增 `scripts/verify-film-export.mjs` 来自并行会话「成片导出」交付轮，其余 7 个文件覆盖率与 17:30 基线逐项一致（未发生漂移）。
+以下 8 个文件低于 80% 阈值，`--strict` 目前只按**总体覆盖率**判定故仍通过（不阻断 CI），但按本铁律仍属未完成项，须分批补齐；**不得**以「strict 通过」等同于「逐行注释已完成」。本清单于 2026-11-09 17:54 复核：8 个文件的逐文件覆盖率与 2026-11-08 18:24 基线**逐项一致（未发生漂移）**；总体口径由 84 文件 / 23142 行变为 83 文件 / 23882 行，源于 `site/` 移除与新增源码文件导致的统计集合变化，非注释回退。
 
 | 批次 | 文件 | 覆盖率 | 已解释 / 可注释 | 缺口行 | 归属模块 |
 |---|---|---|---|---|---|
@@ -199,8 +266,102 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 3 | `scripts/verify-film-export.mjs` | 55.5% | 117 / 211 | 94 | 成片导出 E2E 校验脚本 |
 
 - **补齐口径**：逐行中文注释须说明「做什么 + 为什么」，禁止无信息量复述；`.tsx` 的 JSX 属性区域可用 `/* … */` 前导 / 尾注（TS 语法实测合法），JSX children 区域用 `{/* … */}`，普通 TS 行用 `// …`；每批完成后须重跑 `node scripts/comment-check.mjs --strict` + `pnpm -r typecheck` + `npm test` 取证。
-- **本轮状态**：清单已登记并按 18:24 实测刷新，**未补齐任何一行注释**（避免在无明确功能目标时产生数百行低信息量改动）；后续按批次 1 → 2 → 3 推进，补齐后同步删除本表对应行。
+- **本轮状态**：清单已登记并按 2026-11-09 17:54 实测刷新，**未补齐任何一行注释**（避免在无明确功能目标时产生数百行低信息量改动）；后续按批次 1 → 2 → 3 推进，补齐后同步删除本表对应行。
+- **本轮交付取证（2026-11-09 17:54）**：`node scripts/comment-check.mjs --strict --top=999` 退出码 0（总体 90.0% ≥ 80%）、`pnpm -r typecheck` 0、`pnpm --filter @mim/api test` **12 文件 174/174**、`node scripts/verify-auth-gate.mjs` **35/35**、`npm run check` 0；线上取证见 §9.1（生产主机侧本轮不可验证，按铁律八如实标注偏离）。
 - **交付取证（2026-11-08 18:24）**：`node scripts/comment-check.mjs --strict --top=999` 退出码 0（总体 90.1% ≥ 80%），`pnpm -r typecheck` 0、`pnpm --filter @mim/api test` 11 文件 154/154、CI run `42470711736`（HEAD `b455d9c`）success；生产 `https://mim.mixm.top/health` 200 / 0.092s、首页 200 / 0.069s / LEN=5182（新产物 `index-D2UkZqM1.js`）、`/api/v1/modules` 200 / 0.078s / LEN=438，GitHub Pages 200 / 0.653s、Cloudflare Pages 200 / 1.526s。
+
+## 铁律十二：全量远程仓库同步与生产统一部署到线上腾讯云自建服务器
+
+**本铁律由用户于 2026-11-09 18:08 指令补充，收口「所有远程仓库 + 部署 + 线上腾讯云自建服务器」三类事项；不推翻铁律八 / 九 / 十，只在其之上明确「代码托管清单」与「唯一生产终点」。原铁律一～十一的编号、标题与约束语义保持不变。**
+
+### 12.1 项目标识与适用边界
+
+| 项 | 口径 |
+|---|---|
+| 项目名称 | **Mim**（用户 2026-11-09 18:50 统一定名；全仓名称口径一致） |
+| 技术标识 | 仓库目录 `Mim`、npm scope `@mim/*`、仓库名 `afdk1991/mim` 与 `mallwm_admin/mim`、生产域名 `mim.mixm.top`，与项目名称一致，无需改名 |
+| 适用 | 本仓库所有 AI 协作者、CI、自动化；涉及代码托管、push、部署、上线、域名 / DNS、生产取证的**每一轮交付** |
+| 不适用 | 本地开发预览、单元测试、离线文档阅读（但仍不得作为交付终点，铁律八） |
+| 排除 | **已移除的候选托管平台及任何非清单代码托管 / CI 平台**，按用户 2026-11-09 指令全量删除（见 §10.1 删除留痕），不得重新进入候选池 |
+
+### 12.2 远程仓库清单与全量同步
+
+| 远端名 | 地址 | 角色 | 每轮同步要求 |
+|---|---|---|---|
+| `origin` | `https://github.com/afdk1991/mim.git` | 源码主仓 + CI 触发源 | `git push origin main` 后 `git ls-remote origin refs/heads/main` 取证 |
+| `gitee` | `https://gitee.com/mallwm_admin/mim.git` | 国内镜像仓 | `git push gitee main` 后 `git ls-remote gitee refs/heads/main` 取证 |
+
+- **全量**：两个远端必须**同轮全部推送**，禁止只推 `origin`；逐个比对 hash 与本地 HEAD 一致（0 ahead / 0 behind）才算同步完成。
+- **不可达处理**：某远端本轮网络 / 凭证不可达时，按铁律一如实报告「该远端未同步」并附命令输出与时间戳，**不得**以另一远端成功冒充全量同步，不得声明「已同步全部远程仓库」。
+- **变更管控**：新增 / 删除 / 改名 remote 属结构性变更（铁律二），须先列影响清单并获授权；禁止重新引入已移除平台的远端、其 CI 配置文件 / CI 变量 / 镜像仓库。
+- **托管 ≠ 生产**：远程仓库只承担源码托管与镜像，**不承担生产运行**；生产运行唯一落点为 §12.3。
+
+### 12.3 生产唯一权威终点：线上腾讯云自建服务器
+
+| 项 | 口径 |
+|---|---|
+| 主机 / 域名 | 腾讯云自建服务器（自有），`https://mim.mixm.top`；DNS A 记录 `115.159.159.11`（§9.1 取证），DNSPod 台账见 `dnspod_records_2026-11-05_21-42-26.xls` 与 [05-runbook.md §7.1.3 / §7.6](./docs/wiki/05-runbook.md) |
+| 运行形态 | 宿主机直部署：nginx（静态根 + `/api/v1` 反代 + SPA `try_files`）+ systemd `mim-api`（8787）+ SQLite WAL 持久化库 `/opt/mim/app/services/mim-api/data/mim.db`；**前后端 + 数据库一体上线** |
+| 服务器布局 | `/opt/mim/app`（git 仓库）/ `/opt/mim/web`（用户端静态根）/ `/opt/mim/admin`（管理后台静态根）/ `/opt/mim/mim-api.env`（运行期凭证） |
+| 代码同步通道 | 服务器 `https://github.com` 出网被阻断，改走 `git@github.com:22` + `/opt/mim/.ssh/deploy_key` 只读 Deploy Key |
+| 部署链路 | push `main`（双远端）→ GitHub Actions `.github/workflows/deploy.yml` → 类型检查 / 测试 / 构建 → SSH 幂等脚本发布 → systemd 重启 → `/health` 取证 |
+
+- **唯一性**：铁律九的 9 平台及其 200 响应**仅作分发 / 镜像 / 可用性取证**；静态站直传（EdgeOne / GitHub Pages / Cloudflare Pages）、同源反代 Worker、容器镜像（Sealos / ghcr）均属分发层，**任何一个都不得替代 `mim.mixm.top` 成为「已上线」依据**。
+- **冲突裁决**：铁律八 / 九的「多平台发布」与本节「唯一生产终点」并列时，本节定义**交付终点**；铁律九仍完整约束「只走免费方案 + 逐平台取证」，两者并行不悖、不构成豁免。
+- **禁止**：禁止把本地预览、`npm run dev`、任一托管平台 200、CI job success 单独当作「已上线」；禁止引入付费方案（铁律九 / 十）。
+- **凭证边界**：生产 SSH 私钥、`MIM_AUTH_ADMIN_PASSWORD`、`tccli` 等属用户私有凭证；沙箱缺失时按铁律一「唯一例外」处置，附已尝试取证后如实标注偏离，**不得伪造健康检查或线上截图**。
+- **现状如实标注（2026-11-09）**：`deploy/` 与 `deploy.sh` 已从工作树移除（未提交），`.github/workflows/deploy.yml` 仍在库且存在悬空引用（§0）；`mim.mixm.top` 本机 `000` 属本地代理 `CONNECT tunnel failed, response 502`，主机侧状态无 SSH / `tccli` 凭证可验证。恢复部署链路或收敛 CI 属结构性变更，须按铁律二授权后执行，本轮不擅自改动。
+
+### 12.4 每轮交付必须附的取证（缺一不得宣称完成）
+
+| # | 取证项 | 命令 / 方式 | 通过标准 |
+|---|---|---|---|
+| V1 | 双远端同步 | `git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main` | 两端 hash 均 == 本地 HEAD |
+| V2 | 生产健康 | `curl -sS -o /dev/null -w "%{http_code}" https://mim.mixm.top/health` | HTTP 200 且响应 `{"status":"ok"}` |
+| V3 | 关键接口 | `curl https://mim.mixm.top/api/v1/modules` | HTTP 200 且返回有效模块列表 |
+| V4 | 真实渲染 | 有头 Edge + CDP 打开 `https://mim.mixm.top/store` | 模块卡片可见、console 零报错 |
+| V5 | 逐平台 | 铁律九 / §9.1 各入口 `curl` | 按轮刷新；本机 `000` 须附网络侧证据与替代取证 |
+| V6 | 本地门禁 | `pnpm -r typecheck`、`pnpm --filter @mim/api test`、`verify-auth-gate`、`comment-check --strict`、`npm run check` | 全 0 / 全 PASS |
+
+> V2–V4 受制于生产主机可达性与私有凭证时，按铁律八「若生产环境客观不可达」条款如实标注偏离，**不得以 V5 / V6 通过冒充已上线**。
+
+### 12.5 变更同步清单（铁律七）
+
+规则、远端或平台发生变更时，同轮更新：`AGENTS.md` 本节与 §0 / §9.1 / §10.1、`README.md`（铁律清单 + 站点与部署 + 多平台部署矩阵）、`docs/wiki/01-architecture.md`、`02-modules.md`、`05-runbook.md`、`06-governance.md`、`docs/wiki/README.md`、`docs/rewrite-vs-refactor-decision.md`、`.github/workflows/deploy.yml`（若涉及 CI）、工作日志。不涉及源代码 / 依赖清单 / 锁文件 / 版本号时，须在交付报告明确标注「不涉及」。
+
+---
+
+## 13. 部署汇总：单一事实源与核对口径（2026-11-09 新增，非铁律）
+
+> 本章为**功能模块说明**，不新增铁律、不改写铁律一～十二的编号 / 标题 / 约束语义；§0 与 §9.1 的历史快照按铁律三原样保留，本章仅追加本轮取证与统一口径。
+
+**13.1 单一事实源**：部署仓库与部署项统一由 `packages/core-domain/src/deploymentRegistry.json`（schema `mim.deployment-registry.v1`）定义，共享包 `deploymentRegistry.ts` 提供类型 / 索引 / 过滤 / 汇总；后端 `services/mim-api/src/routes/deployments.ts`、前端 `apps/web/src/views/Deployments.tsx`、生成器 `scripts/deployment-summary.mjs` 一律消费该数据源，**不得各自维护第二份清单**。
+
+**13.2 统一字段**（`snake_case`，与 API 响应一致）：`id` / `name` / `aliases` / `platform_id` / `layer` / `kind` / `repository{id,url,role}`（仓库标识）/ `entry_url` / `delivery{mode,ci_job,ci_step,artifact,artifact_in_head,artifact_in_worktree,credential,modes}` / `status`（部署状态）/ `result`（部署结果）/ `anomalies`（异常说明）/ `missing_fields`（缺失信息）/ `sources`。
+
+**13.3 三类特殊态必须显式标识**（不得用 0 / 空串 / 绿色徽标掩盖）：
+- **空数据**：`result = null`，须带 `EMPTY_RESULT` 异常与 `http_code` 缺失项；本轮为 `pages.iga`、`worker.mim-store`，外加 2026-11-10 新增的 `repo.gitlab`、`repo.bitbucket`、`pages.netlify`、`pages.azure-swa`、`container.render` 共 7 项（均待接入外部账号，未达线上可达）。
+- **失败状态**：`status = BROKEN` 或 `result.verdict = FAIL`，须有异常说明；本轮为 `server.tcloud`（生产 `000`）、`pages.vercel`（TLS 阻断）、`repo.gitee`（`ls-remote` exit 124，按「未取证」处理，不以 `origin` 成功冒充全量同步）。
+- **缺失信息**：逐项列 `missing_fields`（私有凭证、工件路径、未取得的 V2/V3/V4 取证等）；本轮共 59 项（含 5 个新增免费层平台的凭据与入口缺失）。
+
+**13.4 覆盖、去重与排除**：铁律九 9 个矩阵平台 + 7 个补充平台 = 16 个平台目录 → 16 个规范部署项（补 `repo.gitee`、`worker.mim-store` 两类同类项，并于 2026-11-10 按用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从铁律十候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；README 曾将 Cloudflare 同源自托管入口另列一行，与 `pages.cloudflare` 同域名同载体，合并后用 `delivery.modes` 区分，避免重复计数。`candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入部署项**。
+
+**13.5 工件双口径（本轮纠正）**：`deploy/*`、`Dockerfile`、`vercel.json`、`wrangler.toml`、`functions/*` 等 21 个路径为 **staged `D` 未提交**，`git ls-tree HEAD` 实测**仍在远端 HEAD `3b9b251`**，故 CI 当前**不会**因缺件失败；风险在「一旦提交删除即悬空」。汇总以 `artifact_in_head` / `artifact_in_worktree` 两个字段分别记录，不得混为一谈。
+
+**13.6 汇总不是部署取证**：`docs/deployment-summary.{json,md}` 与 `/deployments` 视图是**核对工具**，其 `PASS` 只证明采集与字段自洽，**不得**替代铁律八 / 十二的 V2–V4 线上取证，也不得据以宣称「已上线」；生产唯一权威终点仍为 §12.3 的 `https://mim.mixm.top`。
+
+**13.7 每轮同步清单（铁律七）**：部署项 / 平台 / 远端 / CI 作业发生变化时，同轮更新 `deploymentRegistry.json`、本文件 §13、`README.md`（版本 / 校验命令 / 仓库结构 / 前端视图 / 后端接口 / 站点与部署 / 文档索引）、`docs/wiki/{01-architecture,02-modules,05-runbook,README}.md`、`Mim-PRD.html`、`package.json` 脚本、生成器与校验器断言，并重新生成两份结构化产物。**不涉及**：依赖清单 / 锁文件（零第三方依赖）、semver 数字（`preview` 通道）、CI 部署语义。
+
+**13.8 本轮取证（2026-11-09 23:03 +08:00，HEAD `3b9b251`）**：`origin` `ls-remote` = `3b9b251` ✅；`gitee` exit 124 未取证；生产 `/health` `000` / 2.123s / curl exit 7（代理 502）；GitHub Pages 200/5182B、Cloudflare Pages 200/5182B、Sealos `/health` 200/53B、EdgeOne 200/984B（WAF 挑战页，判 `DEGRADED`）、ghcr 401/73B（未鉴权属正常）、Vercel `000` / exit 35 TLS 阻断；6 项工件工作树漂移；异常 26 项（🔴2 / 🟡17 / 🟢7）、缺失信息 34 项。按铁律八 / 十二如实标注**未做生产部署**。
+
+**13.9 2026-11-10 决策：全部采用免费层**：用户明确「把你表里列的全部平台都纳入采用范围，且只用免费额度」。据此将铁律十候选池中的 GitLab / Bitbucket（远程仓库）、Netlify / Azure SWA / Render（部署平台）共 5 项从 `excluded` 提升为 `items` 中的「已采用（免费层）」登记项（`status = UNVERIFIED`、`result = null` 标 `EMPTY_RESULT`、各带免费额度 note 与缺失凭据清单），不冒充已部署。已配套新增免费层配置脚手架并接入受保护 CI：
+- `netlify.toml`：发布 `apps/web/dist` + SPA 回退；deploy.yml 的 `Netlify` 步骤按 Vercel 同款「缺 `NETLIFY_AUTH_TOKEN` 即 SKIP」模式运行。
+- `render.yaml`：Render 免费静态站点（750 实例小时/月）；deploy.yml 的 `Render` 步骤按同款 SKIP 模式触发已存在服务部署。
+- `.github/workflows/azure-static-web-apps.yml`：Azure SWA 独立工作流，`AZURE_SWA_TOKEN` 缺省即 SKIP，不阻断。
+- GitLab / Bitbucket 计划作为镜像仓，待用户关联账号并 `git remote add` 后接入（`coverage.planned_git_remotes = 2`）。
+**诚实边界**：本轮仅完成「决策登记 + 配置脚手架 + 受保护 CI」，5 项均未达到线上可达；真实部署需在对应平台控制台创建项目并填入 secret（`NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID` / `RENDER_API_KEY` / `RENDER_SERVICE_ID` / `AZURE_SWA_TOKEN` 及两镜像仓凭证）后由 CI 自动发布。
+
+---
 
 ## 与铁律一冲突时的优先级
 
@@ -208,4 +369,4 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 ***
 
-_本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，2026-11-04 增补铁律八（全自动化生产部署，禁止仅本地预览），2026-11-06 增补铁律九（9 平台免费部署矩阵与逐平台取证），2026-11-06 增补铁律十（免费平台额度矩阵与选型路由，含 Render 免费层定性修正）、铁律十一（全仓库逐行注释与解释）。AI 协作者在每轮交付前须自检是否违反铁律一、铁律八、铁律九、铁律十与铁律十一。_
+_本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，2026-11-04 增补铁律八（全自动化生产部署，禁止仅本地预览），2026-11-06 增补铁律九（9 平台免费部署矩阵与逐平台取证），2026-11-06 增补铁律十（免费平台额度矩阵与选型路由，含 Render 免费层定性修正）、铁律十一（全仓库逐行注释与解释）。AI 协作者在每轮交付前须自检是否违反铁律一、铁律八、铁律九、铁律十、铁律十一与铁律十二。2026-11-09 按「保留现有结构梳理」新增 §0 当前状态基线、§9.1 本轮复核、历史留痕导航与缺口口径刷新，铁律一～十一的编号 / 标题 / 约束语义均未改动。2026-11-09 18:08 按用户指令补充**铁律十二**（全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器 + 项目名称统一为 Mim），全量删除原候选托管平台的全部相关内容（§10.1 留痕），并按铁律七同步 README 与 Wiki 全部铁律条数口径。2026-11-09 18:50 按用户指令把全仓作为项目名称的旧称统一更正为 **Mim**，AGENTS / README / Wiki / 决策文档同步完成，原十一条铁律与铁律十二的约束语义未变。_

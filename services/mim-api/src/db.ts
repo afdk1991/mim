@@ -1,6 +1,7 @@
 /** SQLite 连接与结构迁移 */
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
+import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：45 个去重入口、19 个业务域、占位标识与运行时能力点
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
@@ -93,8 +94,49 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   if (indexed.length > 0) console.log(`[db] additive index created: ${indexed.join(', ')}`); // 同样留痕，便于确认回调幂等约束已生效
   seedModules(db); // 写入模块商城基础数据，保证新库启动即有可售模块
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
+  seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束
+
+/**
+ * 入口配置清单演示数据种子：把静态契约中每个入口的 seed 条目写入 site_module_items。
+ * 主键由「入口序号 + 能力编码 + 序号」拼接而成，天然幂等；INSERT OR IGNORE 保证
+ * 重复启动不会覆盖用户在演示条目上的状态流转，也不会产生重复行。
+ *
+ * v2 迁移：v1 曾用台账短主机记录作为数据隔离键，而本轮明确「不补写未提供的具体主机值」，
+ * 故按稳定主键把存量演示条目的隔离键幂等改写为占位键；用户的状态流转与时间字段保持不变，
+ * 语句中不含任何具体主机值字面量，也不依赖旧值的取值。
+ */
+export function seedSiteModules(db: Db): void { // 入口清单种子入口，测试内存库同样会执行
+  const now = new Date().toISOString(); // 统一时间戳，保证同批数据 created_at / updated_at 一致
+  const insert = db.prepare( // 预编译插入语句，逐条绑定参数避免拼接 SQL
+    `INSERT OR IGNORE INTO site_module_items
+       (id, host, capability, title, detail, status, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'system', ?, ?)`, // created_by 固定 system，标识这是演示数据
+  ); // prepare 结束
+  const align = db.prepare( // 幂等迁移：把 v1 演示条目的隔离键改写为占位键，只按主键定位
+    'UPDATE site_module_items SET host = ? WHERE id = ? AND host <> ?', // host 列物理名保留，语义已变为占位键
+  ); // prepare 结束
+  const seed = db.transaction(() => { // 包成事务：任一语句失败整体回滚，避免出现半套演示数据
+    for (const module of SITE_MODULES) { // 逐入口写入，模块定义仍以静态契约为准
+      for (const [index, item] of module.seed.entries()) { // 逐条演示条目写入
+        const id = `site-seed-${module.id}-${item.capability}-${index + 1}`; // 稳定主键，保证重复启动幂等
+        insert.run( // 按占位符顺序绑定九个参数
+          id, // 主键
+          module.entryKey, // 占位键作为数据隔离键，不是具体主机值
+          item.capability, // 能力编码：catalog / manage / record
+          item.title, // 演示条目标题
+          item.detail, // 演示条目说明，明确标注非真实业务数据
+          item.status, // 初始状态，取值落在该能力 states 内
+          now, // created_at
+          now, // updated_at
+        ); // run 结束
+        align.run(module.entryKey, id, module.entryKey); // 存量 v1 行按主键迁移，保留用户状态流转
+      } // 演示条目循环结束
+    } // 入口循环结束
+  }); // 事务函数准备完成
+  seed(); // 执行事务
+} // seedSiteModules 结束
 
 /**
  * 功能模块商城种子：第 1 期上架一组真实模块（漫剧 AI 剧工作台 + 生成包三档 + AI 配音/剧本 + 素材扩容 + 模板包），

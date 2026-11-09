@@ -1,0 +1,1364 @@
+{
+  "schema": "mim.site-directory.v1",
+  "source": "dnspod_records_2026-11-05_21-42-26.xls",
+  "scope": "laal.top + mixm.top 两个工作表全文（表头行不计入）",
+  "capturedAt": "2026-11-09 22:16 +08:00",
+  "noteFormat": "每条备注均为「入口描述｜系统名」两段式，未提供功能规格、输入输出、交互流程或行为约束",
+  "clearedColumns": [
+    "记录类型",
+    "记录值",
+    "MX优先级",
+    "权重",
+    "状态",
+    "最后操作时间"
+  ],
+  "clearedColumnEffect": "6 列在 195 个数据行中均为空，故无法确认解析目标、启用状态、优先级与时序",
+  "reasonCodes": {
+    "IMPLEMENTATION_MATCHES": "现有源码已实现备注所述能力，保守处理为不改动",
+    "CONTRACT_DRIVES_UI": "备注已作为契约数据驱动现有 UI 文案，渲染结果保持逐字一致",
+    "CONFLICT_WITH_EXISTING": "备注所述系统与现有同名实现语义冲突，改动会破坏兼容性，标记未决",
+    "NO_IMPLEMENTATION": "现有源码无对应系统；备注未提供功能规格，按不引入额外功能约束不新建，标记未决",
+    "NO_SPEC": "现有源码仅有相邻能力，备注未定义关键语义与交互，无法保守补齐，标记未决",
+    "BLANK_NOTE": "该行备注为空，无功能信息可落实，标记未决"
+  },
+  "entries": [
+    {
+      "id": "01",
+      "host": "@",
+      "entry": "核心根域名，主站基础入口",
+      "system": "主站统一跳转门户",
+      "note": "核心根域名，主站基础入口｜主站统一跳转门户",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "4",
+            "5"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "4",
+            "5"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "02",
+      "host": "www",
+      "entry": "主站常规访问入口",
+      "system": "官方门户网站",
+      "note": "主站常规访问入口｜官方门户网站",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "6",
+            "7"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "6",
+            "7"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": "apps/web/src/views/Store.tsx",
+      "resolution": "data-driven",
+      "reasonCode": "CONTRACT_DRIVES_UI",
+      "portalLabel": "主站常规访问入口 · www · 官方门户网站 ·",
+      "portalHref": "https://www.mixm.top",
+      "hrefOrigin": "existing-implementation（xls 记录值列已清空，备注未提供解析目标）"
+    },
+    {
+      "id": "03",
+      "host": "admin",
+      "entry": "管理后台入口",
+      "system": "全站统一运营管理后台",
+      "note": "管理后台入口｜全站统一运营管理后台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "8",
+            "9"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "8",
+            "9"
+          ]
+        }
+      ],
+      "alignment": "aligned",
+      "implementation": "apps/admin/src/App.tsx + services/mim-api/src/routes/admin.ts",
+      "resolution": "aligned-no-change",
+      "reasonCode": "IMPLEMENTATION_MATCHES"
+    },
+    {
+      "id": "04",
+      "host": "api",
+      "entry": "接口服务入口",
+      "system": "API 统一网关",
+      "note": "接口服务入口｜API 统一网关",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "10",
+            "11"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "10",
+            "11"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "05",
+      "host": "app",
+      "entry": "APP 端接口入口",
+      "system": "移动端专属接口服务",
+      "note": "APP 端接口入口｜移动端专属接口服务",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "12",
+            "13"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "12",
+            "13"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "06",
+      "host": "auth",
+      "entry": "权限验证入口",
+      "system": "统一身份认证与权限中心",
+      "note": "权限验证入口｜统一身份认证与权限中心",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "14",
+            "15"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "14",
+            "15"
+          ]
+        }
+      ],
+      "alignment": "aligned",
+      "implementation": "services/mim-api/src/routes/auth.ts + services/mim-api/src/middleware.ts",
+      "resolution": "aligned-no-change",
+      "reasonCode": "IMPLEMENTATION_MATCHES"
+    },
+    {
+      "id": "07",
+      "host": "blog",
+      "entry": "博客模块入口",
+      "system": "官方博客系统",
+      "note": "博客模块入口｜官方博客系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "16",
+            "17"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "16",
+            "17"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "08",
+      "host": "center",
+      "entry": "用户中心入口",
+      "system": "用户个人中心 / 会员工作台",
+      "note": "用户中心入口｜用户个人中心 / 会员工作台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "18",
+            "19"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "18",
+            "19"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "09",
+      "host": "cloud",
+      "entry": "云服务模块入口",
+      "system": "私有云盘 / 网盘系统",
+      "note": "云服务模块入口｜私有云盘 / 网盘系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "20",
+            "21"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "20",
+            "21"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "10",
+      "host": "data",
+      "entry": "数据中心入口",
+      "system": "开放数据集平台",
+      "note": "数据中心入口｜开放数据集平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "22",
+            "23"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "22",
+            "23"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "11",
+      "host": "dev",
+      "entry": "开发测试入口",
+      "system": "开发环境门户 + 接口文档",
+      "note": "开发测试入口｜开发环境门户 + 接口文档",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "24",
+            "25"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "24",
+            "25"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "12",
+      "host": "dh",
+      "entry": "导航模块入口",
+      "system": "全站资源导航站",
+      "note": "导航模块入口｜全站资源导航站",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "26",
+            "27"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "26",
+            "27"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "13",
+      "host": "dnpj",
+      "entry": "代码生成工具入口",
+      "system": "低代码生成平台",
+      "note": "代码生成工具入口｜低代码生成平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "28",
+            "29"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "28",
+            "29"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "14",
+      "host": "dy",
+      "entry": "视频动态模块入口",
+      "system": "UGC 短视频动态社区",
+      "note": "视频动态模块入口｜UGC 短视频动态社区",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "30",
+            "31"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "30",
+            "31"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "15",
+      "host": "fwq",
+      "entry": "服务器支撑入口",
+      "system": "运维监控面板",
+      "note": "服务器支撑入口｜运维监控面板",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "32",
+            "33"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "32",
+            "33"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "16",
+      "host": "gy",
+      "entry": "工具模块入口",
+      "system": "在线工具集合平台",
+      "note": "工具模块入口｜在线工具集合平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "34",
+            "35"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "17",
+      "host": "gy",
+      "entry": "工具模块核心入口，疾风引擎承载节点",
+      "system": "疾风引擎在线工具平台",
+      "note": "工具模块核心入口，疾风引擎承载节点｜疾风引擎在线工具平台",
+      "sources": [
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "34",
+            "35"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "18",
+      "host": "help",
+      "entry": "帮助中心入口",
+      "system": "产品帮助文档中心",
+      "note": "帮助中心入口｜产品帮助文档中心",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "36",
+            "37"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "36",
+            "37"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "19",
+      "host": "img",
+      "entry": "图片资源入口",
+      "system": "公共图床 + 素材资源站",
+      "note": "图片资源入口｜公共图床 + 素材资源站",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "38",
+            "39"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "38",
+            "39"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "20",
+      "host": "login",
+      "entry": "登录验证入口",
+      "system": "统一单点登录页",
+      "note": "登录验证入口｜统一单点登录页",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "40",
+            "41"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "40",
+            "41"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "21",
+      "host": "mall",
+      "entry": "电商商城入口",
+      "system": "B2C 官方商城系统",
+      "note": "电商商城入口｜B2C 官方商城系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "42",
+            "43"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "42",
+            "43"
+          ]
+        }
+      ],
+      "alignment": "conflict",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "CONFLICT_WITH_EXISTING"
+    },
+    {
+      "id": "22",
+      "host": "market",
+      "entry": "营销模块入口",
+      "system": "营销活动管理平台",
+      "note": "营销模块入口｜营销活动管理平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "44",
+            "45"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "44",
+            "45"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "23",
+      "host": "m",
+      "entry": "移动端适配入口",
+      "system": "移动端 H5 精简版官网",
+      "note": "移动端适配入口｜移动端 H5 精简版官网",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "46",
+            "47"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "46",
+            "47"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "24",
+      "host": "mobile",
+      "entry": "移动终端专用入口",
+      "system": "全功能移动端站点",
+      "note": "移动终端专用入口｜全功能移动端站点",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "48",
+            "49"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "48",
+            "49"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "25",
+      "host": "news",
+      "entry": "资讯模块入口",
+      "system": "新闻资讯发布系统",
+      "note": "资讯模块入口｜新闻资讯发布系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "50",
+            "51"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "50",
+            "51"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "26",
+      "host": "pay",
+      "entry": "支付结算入口",
+      "system": "支付聚合网关 + 对账系统",
+      "note": "支付结算入口｜支付聚合网关 + 对账系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "52",
+            "53"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "52",
+            "53"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "27",
+      "host": "portal",
+      "entry": "门户首页入口",
+      "system": "企业内部统一门户 / 工作台",
+      "note": "门户首页入口｜企业内部统一门户 / 工作台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "54",
+            "55"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "54",
+            "55"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "28",
+      "host": "secure",
+      "entry": "安全防护入口",
+      "system": "安全防护中心",
+      "note": "安全防护入口｜安全防护中心",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "56",
+            "57"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "56",
+            "57"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "29",
+      "host": "service",
+      "entry": "服务支撑入口",
+      "system": "服务治理监控平台",
+      "note": "服务支撑入口｜服务治理监控平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "58",
+            "59"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "58",
+            "59"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "30",
+      "host": "shop",
+      "entry": "线上店铺入口",
+      "system": "多商户店铺系统",
+      "note": "线上店铺入口｜多商户店铺系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "60",
+            "61"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "60",
+            "61"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "31",
+      "host": "sj",
+      "entry": "数据采集入口",
+      "system": "爬虫调度与数据采集平台",
+      "note": "数据采集入口｜爬虫调度与数据采集平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "62",
+            "63"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "62",
+            "63"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "32",
+      "host": "sp",
+      "entry": "视频模块入口",
+      "system": "长视频点播系统",
+      "note": "视频模块入口｜长视频点播系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "64",
+            "65"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "64",
+            "65"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "33",
+      "host": "stats",
+      "entry": "数据统计入口",
+      "system": "全站数据 BI 看板",
+      "note": "数据统计入口｜全站数据 BI 看板",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "66",
+            "67"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "66",
+            "67"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "34",
+      "host": "store",
+      "entry": "资源存储 / 下载站点",
+      "system": "软件源码下载分发站",
+      "note": "资源存储 / 下载站点｜软件源码下载分发站",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "68",
+            "69"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "68",
+            "69"
+          ]
+        }
+      ],
+      "alignment": "conflict",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "CONFLICT_WITH_EXISTING"
+    },
+    {
+      "id": "35",
+      "host": "support",
+      "entry": "技术支持入口",
+      "system": "工单客服系统",
+      "note": "技术支持入口｜工单客服系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "70",
+            "71"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "70",
+            "71"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "36",
+      "host": "test",
+      "entry": "测试环境入口",
+      "system": "测试环境统一入口",
+      "note": "测试环境入口｜测试环境统一入口",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "72",
+            "73"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "72",
+            "73"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "37",
+      "host": "user",
+      "entry": "用户管理入口",
+      "system": "用户会员管理后台",
+      "note": "用户管理入口｜用户会员管理后台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "74",
+            "75"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "74",
+            "75"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "38",
+      "host": "video",
+      "entry": "视频播放入口",
+      "system": "独立视频播放页",
+      "note": "视频播放入口｜独立视频播放页",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "76",
+            "77"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "76",
+            "77"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "39",
+      "host": "wp",
+      "entry": "WordPress 相关入口",
+      "system": "WordPress 独立站点",
+      "note": "WordPress 相关入口｜WordPress 独立站点",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "78",
+            "79"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "78",
+            "79"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "40",
+      "host": "xw",
+      "entry": "新闻资讯入口",
+      "system": "自媒体资讯平台",
+      "note": "新闻资讯入口｜自媒体资讯平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "80",
+            "81"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "80",
+            "81"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "41",
+      "host": "yp",
+      "entry": "商品资源入口",
+      "system": "货源商品库平台",
+      "note": "商品资源入口｜货源商品库平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "82",
+            "83"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "82",
+            "83"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "42",
+      "host": "yy",
+      "entry": "语音相关入口",
+      "system": "语音工具服务平台",
+      "note": "语音相关入口｜语音工具服务平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "84",
+            "85"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "84",
+            "85"
+          ]
+        }
+      ],
+      "alignment": "partial",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_SPEC"
+    },
+    {
+      "id": "43",
+      "host": "b2b",
+      "entry": "B2B 大宗商贸平台主入口",
+      "system": "B2B 企业批发采购平台",
+      "note": "B2B 大宗商贸平台主入口｜B2B 企业批发采购平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "86",
+            "87"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "86",
+            "87"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "44",
+      "host": "supplier",
+      "entry": "供应商入驻管理入口",
+      "system": "供应商后台管理系统",
+      "note": "供应商入驻管理入口｜供应商后台管理系统",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "88",
+            "89"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "88",
+            "89"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "45",
+      "host": "c2c",
+      "entry": "C2C 个人交易市场入口",
+      "system": "C2C 个人闲置 / 商品交易平台",
+      "note": "C2C 个人交易市场入口｜C2C 个人闲置 / 商品交易平台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "90",
+            "91"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "90",
+            "91"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    },
+    {
+      "id": "46",
+      "host": "seller",
+      "entry": "个人卖家管理入口",
+      "system": "个人卖家店铺管理后台",
+      "note": "个人卖家管理入口｜个人卖家店铺管理后台",
+      "sources": [
+        {
+          "sheet": "laal.top",
+          "rows": [
+            "92",
+            "93"
+          ]
+        },
+        {
+          "sheet": "mixm.top",
+          "rows": [
+            "92",
+            "93"
+          ]
+        }
+      ],
+      "alignment": "absent",
+      "implementation": null,
+      "resolution": "unresolved",
+      "reasonCode": "NO_IMPLEMENTATION"
+    }
+  ],
+  "blankRows": [
+    {
+      "sheet": "laal.top",
+      "row": 2,
+      "host": "@",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "laal.top",
+      "row": 3,
+      "host": "@",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 2,
+      "host": "@",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 3,
+      "host": "@",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 94,
+      "host": "edgeonereclaim.gy",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 95,
+      "host": "gy",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 96,
+      "host": "_dnsauth.gy",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 97,
+      "host": "egeonereclaim.ai",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 98,
+      "host": "egeonereclaim.delivery",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 99,
+      "host": "edgeonereclaim.probe",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 100,
+      "host": "mim",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 101,
+      "host": "_dnsauth.mim",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 102,
+      "host": "cloud",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 103,
+      "host": "edgeonereclaim.data",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    },
+    {
+      "sheet": "mixm.top",
+      "row": 104,
+      "host": "data",
+      "resolution": "unresolved",
+      "reasonCode": "BLANK_NOTE"
+    }
+  ]
+}

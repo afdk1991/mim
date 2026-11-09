@@ -1,0 +1,35 @@
+# Azure Static Web Apps 免费层 CI
+# 免费额度：100GB 带宽/月、10 个应用；超额带宽不可用（免费层）。
+# 部署步骤受 AZURE_SWA_TOKEN 保护：未配置该 secret 时直接 SKIP，不会因缺凭证导致 workflow 失败。
+# 在 Azure 门户创建 Static Web App 后，将「Deployment Token」写入仓库 secret AZURE_SWA_TOKEN 即自动接入。
+
+name: Azure Static Web Apps CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: 构建并部署到 Azure Static Web Apps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: 构建前端薄壳
+        run: pnpm install --frozen-lockfile && pnpm --filter @mim/web build
+
+      - name: 部署到 Azure Static Web Apps
+        if: ${{ secrets.AZURE_SWA_TOKEN != '' }}
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "apps/web/dist"
+          output_location: "apps/web/dist"

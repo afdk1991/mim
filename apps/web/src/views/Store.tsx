@@ -9,6 +9,8 @@ import { ApiError, api, errorText, getSession } from '../api';
 import { useAsync } from '../hooks';
 // 引入编程式跳转：匿名访客点击「登录后解锁」时跳转登录伪视图
 import { navigate } from '../router';
+// 引入站点入口契约的门户条目：备注「主站常规访问入口｜官方门户网站」的数据化落点
+import { PORTAL_ENTRY } from '../data/siteDirectory';
 
 // 组件对外契约：商城文案跟随全局语言
 interface Props {
@@ -311,18 +313,18 @@ export function Store({ locale }: Props) {
         </p>{/* 结束说明文案 */}
       </header>{/* 结束页头 */}
 
-      <section className="panel">{/* 主站入口卡片：站点体系下线后唯一保留的 www 主站直达入口（静态硬编码，不请求接口） */}
+      <section className="panel">{/* 主站入口卡片：文案与链接改由站点入口契约（xls 备注）驱动，渲染结果与改造前逐字一致 */}
         <p className="muted">{/* 单行信息串：名称 · 主机 · 说明 · 链接，格式与用户确认稿一致 */}
-          主站常规访问入口 · www · 官方门户网站 ·{' '}{/* 分隔点后的空格让链接与上文留出呼吸 */}
+          {PORTAL_ENTRY.label}{' '}{/* 文案取自契约 www 条目，分隔点后的空格让链接与上文留出呼吸 */}
           <a
             // 主站外链：指向官方门户网站
-            href="https://www.mixm.top"
+            href={PORTAL_ENTRY.href}
             // 新窗口打开，避免跳出当前商城会话
             target="_blank"
             // 禁传 referrer/ opener，防止目标站拿到本页引用与 window.opener
             rel="noopener noreferrer"
           >
-            https://www.mixm.top{/* 链接文案与地址一致，所见即所得 */}
+            {PORTAL_ENTRY.href}{/* 链接文案与地址一致，所见即所得 */}
           </a>{/* 主站链接结束 */}
         </p>{/* 信息串结束 */}
       </section>{/* 主站入口卡片结束 */}

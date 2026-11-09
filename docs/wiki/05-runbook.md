@@ -1,6 +1,8 @@
 # 05 · 项目运行方式
 
-> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下四项仓库级脚本（版本校验、密钥模板校验、注释覆盖率校验、站点构建）。本页覆盖启动、测试、构建与校验的完整命令。
+> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下仓库级脚本（版本校验、密钥模板校验、注释覆盖率校验、站点构建、统一入口配置清单校验、站点入口契约校验）。本页覆盖启动、测试、构建与校验的完整命令。
+>
+> **2026-11-09 统一入口配置清单轮**：按 45 类 DNSPod 备注去重整理为 45 个去重入口 + 19 业务域，统一可配置占位标识（不补写具体主机值）；`/sites` 视图升级为统一入口配置清单（消费 `/api/v1/entries*` 6 只读端点 + `/api/v1/sites*` 运行时端点）。启动 API 后 `npm run verify:site-modules` 离线校验 79 项、 `npm run verify:entry-manifest` 校验 19 业务用途覆盖与去重整理；`npm run verify:site-directory` 校验上一轮站点入口契约。交付说明见 [../统一入口配置清单与模块化实现说明-20261109.md](../统一入口配置清单与模块化实现说明-20261109.md)，可读清单见 [../统一入口配置清单-20261109.md](../统一入口配置清单-20261109.md)。
 
 ## 1. 前置条件
 
@@ -294,7 +296,9 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 
-> 候选平台的免费额度与选型路由见 [AGENTS.md 铁律十](../../AGENTS.md)：远程仓库 4 个（GitHub / GitLab / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render 750 实例小时/月、Cloudflare Workers 10 万请求/天）。**本表为已落地的 9 平台矩阵，铁律十为候选池与选型依据**；新增平台须先过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件。
+> 候选平台的免费额度与选型路由见 [AGENTS.md 铁律十](../../AGENTS.md)：远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render 750 实例小时/月、Cloudflare Workers 10 万请求/天）。**原候选托管平台相关内容已于 2026-11-09 全量删除，不得重新引入候选池**。**本表为已落地的 9 平台矩阵，铁律十为候选池与选型依据**；新增平台须先过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件。
+>
+> **生产权威终点（铁律十二，2026-11-09 补充）**：上述 9 平台仅为分发 / 镜像 / 可用性取证，**唯一生产上线终点为线上腾讯云自建服务器 `https://mim.mixm.top`**（nginx + systemd `mim-api` + SQLite WAL，前后端 + 数据库一体）；两个代码远端 `origin`（GitHub）与 `gitee`（Gitee）每轮须同轮全推并逐个 `git ls-remote` 取证。详见 [AGENTS.md §12](../../AGENTS.md)。
 
 > **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
 
@@ -374,3 +378,27 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 - `cloud`（`A \| cloud \| 115.159.159.11`，正常，2026-11-01 21:08:13）DNS 在线但项目零引用，未指向任何部署平台功能。
 - `@` 根域及旧 `cloud` / `data` A 记录（103.0.113.20）状态为「暂停」，不参与服务。
 - 另有 `_dnsauth.gy`（CNAME → `gy.mixm.top.eoacme0.com.`）属 EdgeOne 证书校验，与 `gy.mixm.top` 子站相关，当前项目未使用。
+
+## 8. 部署汇总核对（2026-11-09 新增）
+
+**何时跑**：每轮涉及远端 / 平台 / CI / 部署工件变更后；以及需要一次性核对「所有部署仓库及相关部署项的效果与结果」时。
+
+```bash
+npm run summary:deployments                 # 基线：采集仓库与工件，沿用契约取证快照
+node scripts/deployment-summary.mjs --live # 追加逐入口真实 curl 探测，刷新各部署项 result
+npm run verify:deployments                  # 52 项零依赖断言（唯一性 / 覆盖 / 双口径 / 全链路）
+```
+
+产物：`docs/deployment-summary.json`（结构化，schema `mim.deployment-registry.v1`）、`docs/deployment-summary.md`（主表 + 异常明细 + 仓库工件 + 覆盖去重 + 取证来源）。Web 端 `/deployments` 与 `/api/v1/deployments*` 提供同一份数据的交互式核对。
+
+**判读约定**：
+
+| 标识 | 含义 | 处置 |
+|---|---|---|
+| `⚪ 空数据` | `result = null`，本轮无任何取证 | 补私有凭证或发起探测；不得以历史 200 冒充 |
+| `🔴 FAIL / BROKEN` | 明确失败或不可达 | 附网络侧证据；生产项须回到铁律十二 V2–V4 取证 |
+| `🟡 DEGRADED / UNVERIFIED` | 可达但内容不可核验（WAF）/ 未取证 | 有头浏览器复验或补 `ls-remote` |
+| `⚠ 缺失 n 项` | `missing_fields` 非空 | 逐项补齐（凭证 / 工件 / 取证） |
+| `工件漂移` | `in_head=true` 且 `in_worktree=false` | 未提交删除时 CI 仍可读；提交前须评估 CI 悬空风险 |
+
+**本轮基线（2026-11-09 23:03，HEAD `3b9b251`）**：11 部署项 / 9 取证 + 2 空数据 / 异常 26（🔴2 🟡17 🟢7）/ 缺失 34 / 工件漂移 6；`origin` 同步 ✅、`gitee` exit 124 未取证；生产 `/health` `000`（代理 502），**未做生产部署、不宣称已上线**。逐平台实测见 [AGENTS.md §13.8](../../AGENTS.md)，结构化明细见 [deployment-summary.md](../deployment-summary.md)。
