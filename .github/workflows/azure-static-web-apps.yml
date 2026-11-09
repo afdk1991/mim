@@ -56,4 +56,5 @@ jobs:
 
       - name: 缺省 SKIP 提示
         if: env.SWA_TOKEN == ''
-        run: echo "SKIP: 缺少 AZURE_SWA_TOKEN（Azure Static Web Apps 未接入），构建已验证、部署跳过"
+        # 整段以单引号包裹：YAML 纯标量不得内含「冒号+空格」，否则被误判为映射键（L59 语法错误根因）
+        run: 'echo "SKIP: 缺少 AZURE_SWA_TOKEN（Azure Static Web Apps 未接入），构建已验证、部署跳过"'
