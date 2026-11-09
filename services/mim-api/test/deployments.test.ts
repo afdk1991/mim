@@ -58,7 +58,7 @@ describe('部署汇总总览', () => { // 公开只读端点
 }); // 总览分组结束
 
 describe('部署项清单与过滤', () => { // 统一字段与过滤
-  it('GET /deployments 返回 11 项且每项字段统一、与共享注册表逐项一致', async () => { // 零漂移断言
+  it('GET /deployments 返回全量部署项且每项字段统一、与共享注册表逐项一致', async () => { // 零漂移断言
     const res = await request(app).get('/api/v1/deployments'); // 公开清单
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(DEPLOYMENT_ITEMS.length); // 全量
@@ -98,7 +98,7 @@ describe('部署项清单与过滤', () => { // 统一字段与过滤
     expect(alias.body.items[0].id).toBe('pages.edgeone'); // 归并到规范 id
   }); // 过滤用例结束
 
-  it('过滤回显与空结果不混淆：无命中时 total=0 但 registry_total 仍为 11', async () => { // 空结果标识
+  it('过滤回显与空结果不混淆：无命中时 total=0 但 registry_total 仍为全量', async () => { // 空结果标识
     const res = await request(app).get('/api/v1/deployments?q=not-exist-keyword-xyz'); // 无命中关键词
     expect(res.status).toBe(200); // 200 而非 404
     expect(res.body.total).toBe(0); // 过滤结果为空
@@ -114,7 +114,7 @@ describe('部署项详情与异常标识', () => { // 详情与异常
     expect(res.body.item.layer).toBe('production'); // 生产层
     expect(res.body.item.repository.id).toBe('github:afdk1991/mim'); // 仓库标识
     expect(res.body.item.delivery.artifact_in_head).toBe(true); // 远端 HEAD 仍含工件
-    expect(res.body.item.delivery.artifact_in_worktree).toBe(false); // 本地工作树缺失
+    expect(res.body.item.delivery.artifact_in_worktree).toBe(true); // 工作树工件已于 2026-11-10 由 git 恢复，不再缺失
     expect(res.body.item.status).toBe('BROKEN'); // 失败状态
     expect(res.body.item.result.verdict).toBe('FAIL'); // 失败结果
     expect(res.body.item.anomalies.length).toBeGreaterThan(0); // 异常说明非空

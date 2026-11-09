@@ -30,6 +30,8 @@ services/mim-api/data/
 .mim-dev-secret/
 # 依赖探测目录
 .probe/
+# Cloudflare Wrangler 本地状态与缓存（账号信息 / 构建缓存，不入库）
+.wrangler/
 
 # ---------- 日志与临时文件 ----------
 # 运行日志

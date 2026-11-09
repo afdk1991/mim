@@ -302,6 +302,20 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 > **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
 
+### 7.1.4 已采用免费层平台（2026-11-10 扩展，待接入外部账号）
+
+用户 2026-11-10 决策「全部采用免费层」后，GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 五项从铁律十候选池升为**已采用登记项**，状态 `UNVERIFIED`（脚手架已就绪，真实发布需平台建项 + 填 secret，不冒充已部署）。本节只记录三条**已落地 CI 链路**的运维要点：
+
+| 平台 | 配置文件 | CI 行为 | 深链接回退 |
+|---|---|---|---|
+| Netlify | `netlify.toml` | `deploy.yml` 的 `Netlify` 步骤，缺 `NETLIFY_AUTH_TOKEN` 即 SKIP | `[[redirects]] /* → /index.html 200`（Netlify 原生规则） |
+| Azure Static Web Apps | `.github/workflows/azure-static-web-apps.yml`（独立 workflow） | 缺 `AZURE_SWA_TOKEN` 即 SKIP；已构建产物 `apps/web/dist` + `skip_app_build: true` | 部署前由 workflow 向产物注入 `staticwebapp.config.json`（`navigationFallback.rewrite=/index.html`，排除 `/assets/*` 与常见静态后缀） |
+| Render | `render.yaml` | `deploy.yml` 的 `Render` 步骤，缺 `RENDER_API_KEY` 即 SKIP | 蓝图 `routes: - type: rewrite / source: /* / destination: /index.html` |
+
+- **`render.yaml` schema 修正（2026-11-10）**：原文件用 `static_sites:` 顶层键，非 Render 官方蓝图 schema（官方为 `services:` 下 `type: web` + `runtime: static`），已按官方字段重写，避免平台建项时解析失败。
+- **接入步骤（需用户账号）**：平台控制台创建项目 → 拿到 site id / token 写入仓库 secrets（`NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`、`AZURE_SWA_TOKEN`、`RENDER_API_KEY` / `RENDER_SERVICE_ID`）→ 下一次 push `main` 由 CI 自动发布 → 按铁律九补 `curl` 取证后再改状态。
+- **未接入期间的判定**：这些步骤 `continue-on-error: true`（Azure 为 `if: env.SWA_TOKEN != ''`），**作业变绿不等于已部署**，不得据此宣称上线（铁律三 / 铁律九）。
+
 ### 7.1.1 服务器出网限制（重要）
 
 生产服务器 **访问 `https://github.com` 超时**（`curl: (28) SSL timeout`），但 `github.com:22` 可达，

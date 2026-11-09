@@ -124,7 +124,9 @@ check('D21 候选 / 排除项 id 不与部署项冲突', (REG.excluded ?? []).ev
 check('D22 覆盖口径含去重 / 补齐 / 排除说明', Boolean(REG.coverage?.dedup_note && REG.coverage?.added_note && REG.coverage?.excluded_note));
 // 关键异常码必须存在：生产不可达、CI 悬空风险、WAF 假阳性、远端超时。
 const allCodes = new Set(items.flatMap((i) => i.anomalies.map((a) => a.code)));
-check('D23 关键异常码齐备', ['PRODUCTION_UNREACHABLE', 'WORKTREE_ARTIFACT_MISSING', 'WAF_FALSE_POSITIVE', 'REMOTE_TIMEOUT', 'DUPLICATE_MATRIX_ROW_MERGED'].every((c) => allCodes.has(c)));
+// 工件类异常码允许两种形态：MISSING（工作树确实缺失）或 RESTORED（已恢复并留痕）；
+// 其余四类异常码必须在数据中出现，防止异常码体系被静默删减。
+check('D23 关键异常码齐备', ['PRODUCTION_UNREACHABLE', 'WAF_FALSE_POSITIVE', 'REMOTE_TIMEOUT', 'DUPLICATE_MATRIX_ROW_MERGED'].every((c) => allCodes.has(c)) && ['WORKTREE_ARTIFACT_MISSING', 'WORKTREE_ARTIFACT_RESTORED'].some((c) => allCodes.has(c)));
 
 // ---------- 2. 与真实仓库状态交叉核对 ----------
 // 共享包实现存在并导出汇总函数。

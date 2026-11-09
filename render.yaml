@@ -1,14 +1,31 @@
 # Render 免费层配置（Static Site）
 # 免费额度：每工作区 750 免费实例小时/月，空闲会休眠、冷启动慢（足够常驻一个小静态站）。
-# 在 Render 控制台创建「Static Site」，关联本仓库并指定本文件即可。
-# CI 侧 deploy.yml 的 Render 步骤按 Vercel 同款「缺 RENDER_API_KEY 即 SKIP」模式触发已存在服务的部署。
+# 在 Render 控制台创建 Blueprint 并指向本文件即可；CI 侧 deploy.yml 的 Render 步骤按
+# 「缺 RENDER_API_KEY 即 SKIP」模式触发已存在服务的部署，不阻断主链路。
+#
+# 2026-11-10 修复：原文件用的是 `static_sites:` 顶层键（非 Render 蓝图 schema），
+# 官方 schema 是 `services:` 下 `type: web` + `runtime: static`，按官方字段重写；
+# 同时补 routes rewrite，让 /store /comic 等前端深链接回退到 index.html
+# （否则静态站对未匹配路径直接 404，与 GitHub Pages / Cloudflare / Netlify 的回退口径不一致）。
 
-static_sites:
-  - name: mim-web
+services:
+  # 唯一服务：前端薄壳静态站
+  - type: web
+    # 服务名：与 Render 控制台中的项目名保持一致
+    name: mim-web
+    # 静态运行时（非 Node 服务进程）
+    runtime: static
+    # 跟踪分支：与仓库主分支一致，push 即触发构建
     branch: main
-    # 构建前端薄壳产物
+    # 构建命令：pnpm monorepo 只构建用户端薄壳
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @mim/web build
-    # Vite 产物目录
+    # Vite 产物目录，相对仓库根
     staticPublishPath: ./apps/web/dist
-    # 每个 PR 生成预览环境
-    pullRequestPreviewsEnabled: true
+    # 预览环境：每个 PR 自动生成一份预览
+    previews:
+      generation: automatic
+    # SPA 深链接回退：未命中真实文件的路径统一回 index.html，由前端路由接管
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

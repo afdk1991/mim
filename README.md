@@ -181,7 +181,7 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 
 ### 多平台部署矩阵
 
-> **层级定位（铁律十二）**：本表 9 个平台为**分发 / 镜像 / 可用性取证层**；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
+> **层级定位（铁律十二）**：本表 10 行为「1 个生产权威终点 + 9 个分发 / 镜像 / 可用性取证层」；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
 
 一套代码、一份前端产物（`vite base: './'`，可挂任意子路径），后端统一由 `services/mim-api` 提供。CI 在 push `main` 时并行触发下列链路；缺凭证的平台以 `SKIP` 跳过，不阻断主链路。代码远端为 `origin`（GitHub）与 `gitee`（Gitee），每轮须同轮全推；原候选托管平台已全量移除。
 
@@ -209,8 +209,8 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 | GitLab 仓库 | 顶级群组聚合 CI/CD 分钟、存储上限 5GB | 计划镜像仓，待关联账号后 `git remote add`（+2 计划远端） | ⏳ 已登记 / 待接入 |
 | Bitbucket | 最多 5 人永久免费；仓库软限 2GB / 硬限 4GB；LFS 1GB；约 50 构建分钟/月 | 计划镜像仓，待关联账号后 `git remote add` | ⏳ 已登记 / 待接入 |
 | Netlify | 300 构建分钟/月（2026-10 起新账号 credit 制） | `netlify.toml`（发布 `apps/web/dist` + SPA 回退）；CI `Netlify` 步骤缺 `NETLIFY_AUTH_TOKEN` 即 SKIP | ⏳ 已登记 / 待接入 |
-| Azure Static Web Apps | 100GB 带宽/月、10 个应用；超额带宽不可用 | `.github/workflows/azure-static-web-apps.yml`（缺 `AZURE_SWA_TOKEN` 即 SKIP） | ⏳ 已登记 / 待接入 |
-| Render | 每工作区 750 免费实例小时/月（空闲休眠） | `render.yaml` 免费静态站点；CI `Render` 步骤缺 `RENDER_API_KEY` 即 SKIP | ⏳ 已登记 / 待接入 |
+| Azure Static Web Apps | 100GB 带宽/月、10 个应用；超额带宽不可用 | `.github/workflows/azure-static-web-apps.yml`（缺 `AZURE_SWA_TOKEN` 即 SKIP；部署前向 `apps/web/dist` 注入 `staticwebapp.config.json` 的 `navigationFallback`，深链接回退 `index.html`） | ⏳ 已登记 / 待接入 |
+| Render | 每工作区 750 免费实例小时/月（空闲休眠） | `render.yaml`（官方蓝图 schema：`services: - type: web / runtime: static`，含 `routes` 深链接回退 `/* → /index.html`）；CI `Render` 步骤缺 `RENDER_API_KEY` 即 SKIP | ⏳ 已登记 / 待接入 |
 
 > **最新取证（2026-11-09，公网商城可用性恢复轮）**：`mim.mixm.top` 生产主机已不可达（80/443 拒连、`/opt/mim` 不存在、SSH 主机密钥变更且公钥被拒，无 `tccli` 凭据），Cloudflare 账号 `15726833367@139.com` 下 **zone = 0**（`mixm.top` 的 DNS 在 DNSPod），故「cloudflared 具名隧道绑自定义域名」不可行。改以**同源 Pages 入口**恢复商城：`_worker.js`（Pages 高级模式）把 `/api/*` 与 `/health` 反代到本机同源站点（cloudflared 快速隧道 `https://bid-actress-reflected-occasion.trycloudflare.com` → `127.0.0.1:5188` → `/api` 转 `127.0.0.1:8787`），静态资源由 Pages 托管。**取证**：`https://mim-8ah.pages.dev` `/health` 200 / 53B、`/api/v1/modules` 200 / 3411B（8 个模块）、`/store` `/comic` `/settings` `/login` 全 200 / 5182B；Edge CDP 真实浏览器 E2E **5/5 PASS**（登录 200 → 8 张卡片 → 购买 99/299/999/199/49 → 待结算 → 我的订单 → 取消后徽标消失），截图 [.tmp/store-pages.png](./.tmp/store-pages.png)。**同一账号另发固定入口 Worker `mim-store`（`https://mim-store.15726833367.workers.dev`，Version `a31ecf09`）**，但本机 `*.workers.dev` 被 DNS 污染（解析至 `156.233.67.243`、443 不通），故不作为国内入口。**限制如实记录**：该入口依赖本机三进程在线；`wrangler pages deploy` 为手工直传，后续 CI 若重发 Pages 会以 `mim.mixm.top` 覆盖（需先恢复主机或改 CI 的 `VITE_API_ORIGIN`）。Gitee(`mallwm_admin/mim`)、Sealos、Vercel、EdgeOne、ghcr 本轮均未产生新部署：Gitee 无凭据、后四者 CI secrets 为空（SKIP 假绿）。
 

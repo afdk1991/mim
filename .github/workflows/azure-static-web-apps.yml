@@ -42,6 +42,21 @@ jobs:
       - name: 构建前端薄壳
         run: pnpm install --frozen-lockfile && pnpm --filter @mim/web build
 
+      # SPA 深链接回退：Azure SWA 对未匹配路径默认直返 404，需要在产物根放 staticwebapp.config.json
+      # 声明 navigationFallback；assets 与常见静态后缀排除在外，避免把真实资源也重写成 HTML。
+      # 写在构建之后、部署之前，只作用于本次上传的产物，不影响其它托管平台的 dist。
+      - name: 注入 Azure SWA 回退配置
+        run: |
+          cat > apps/web/dist/staticwebapp.config.json <<'EOF'
+          {
+            "navigationFallback": {
+              "rewrite": "/index.html",
+              "exclude": ["/assets/*", "/*.{css,js,map,png,jpg,jpeg,svg,ico,json,txt,xml,woff,woff2}"]
+            }
+          }
+          EOF
+          cat apps/web/dist/staticwebapp.config.json
+
       - name: 部署到 Azure Static Web Apps
         if: env.SWA_TOKEN != ''
         uses: Azure/static-web-apps-deploy@v1
