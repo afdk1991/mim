@@ -199,6 +199,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 凭据取证 | `gh api repos/afdk1991/mim/actions/secrets` → `{"total_count":0,"secrets":[]}` | 仓库**零 secret** |
 
 - **假绿说明**：「托管平台同步（Cloudflare / Vercel / Sealos / IGA / Netlify / Render）success」= 六个平台 step 全部命中 `SKIP: 缺少 XXX; exit 0`，不代表任何平台真的发过；Azure / Pages / Packages 三个作业不依赖私有凭据，属真绿。
+- **修复后复验**：run **42666493322**（Deploy @ `49bbd46`）**completed success**，五作业全绿；「发布到生产服务器」内 `检查生产主机凭据` 执行、7 个远程步骤 `skipped`、`未配置凭据 SKIP 提示` 成功并输出 `::warning::`。绿≠已上线：生产仍未部署。
 - **本轮修复（`.github/workflows/deploy.yml`）**：新增 `检查生产主机凭据`（id `creds`，输出 `has_creds`），7 个远程步骤加 `if: steps.creds.outputs.has_creds == '1'`，并新增 `未配置凭据 SKIP 提示`（`has_creds == '0'` 时 `::warning::` 明示「不等于已上线」）。凭据齐备时行为与原流程完全一致，失败依旧红；凭据缺失时不再用空主机名硬失败，红信号恢复可判别性。
 - **仍未满足的铁律八**：`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` 属私有凭据（铁律一例外），沙箱无法生成；在补齐前生产部署恒为 SKIP，**不得宣称已上线**。其余平台 token 清单见 `docs/仓库体检报告-2026-11-10.md` §6.4。
 - **本轮本地门禁**（提交前）：`typecheck` 0；api test **15 文件 211/211**；`verify-deployments` **52/52**；`comment-check --strict` 0；`env-check` 0；`deploy.yml` 经 `yaml.safe_load` 解析通过（11 个 step、7 个远程 step 均带 `has_creds == '1'` 守卫）。
