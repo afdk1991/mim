@@ -792,9 +792,10 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ // 导航树响应
         groups: Array<{ // 一级分类列表
           slug: string; // 一级分类标识，作为 category 过滤值
-          name: string; // 一级分类名称
+          name: string; // 一级分类中文名称
+          name_en: string | null; // 一级分类英文名称（英文站点导航使用，未登记时为 null）
           count: number; // 该分类下模块总数
-          items: Array<{ slug: string; name: string; count: number }>; // 二级条目（slug / 名称 / 模块数）
+          items: Array<{ slug: string; name: string; name_en: string | null; count: number }>; // 二级条目（slug / 中英文名 / 模块数）
         }>; // 一级分类类型结束
         total_items: number; // 二级条目总数
         total_modules: number; // 可见模块总数

@@ -63,6 +63,14 @@ function pick(locale: Locale, map: Record<string, string> | undefined, fallback 
   return map[locale] ?? map['zh-CN'] ?? map['en-US'] ?? Object.values(map)[0] ?? fallback;
 }
 
+// 分类名称：英文站点优先用接口的 name_en，缺失才回落中文名（不做空文案兜底，便于暴露翻译缺口）
+function categoryName(locale: Locale, name: string, nameEn: string | null | undefined): string {
+  // 中文站点始终用中文名
+  if (locale !== 'en-US') return name;
+  // 英文站点优先英文名，未登记时回落中文名
+  return nameEn && nameEn.trim().length > 0 ? nameEn : name;
+}
+
 // 权益状态文案：与后端枚举一一对应，中英双语
 const ENT_STATUS_LABEL: Record<string, { zh: string; en: string }> = {
   // 生效中：权益可用
@@ -276,14 +284,14 @@ export function Store({ locale }: Props) {
     if (category === 'all') return locale === 'en-US' ? 'All recommended projects' : '全部推荐项目';
     // 先按一级分类匹配
     const group = groups.find((item) => item.slug === category);
-    // 命中一级分类直接返回
-    if (group) return group.name;
+    // 命中一级分类：按语言取中/英文名
+    if (group) return categoryName(locale, group.name, group.name_en);
     // 再按二级条目匹配
     for (const item of groups) {
       // 在该分类的二级条目里查找
       const child = item.items.find((sub) => sub.slug === category);
       // 命中即返回「一级 / 二级」形式，让用户知道自己在哪一层
-      if (child) return `${item.name} / ${child.name}`;
+      if (child) return `${categoryName(locale, item.name, item.name_en)} / ${categoryName(locale, child.name, child.name_en)}`;
     } // 二级匹配结束
     // 兜底回显原始 slug，便于排查脏数据
     return category;
@@ -298,7 +306,7 @@ export function Store({ locale }: Props) {
       // 命中二级条目即返回「一级 / 二级」形式
       const child = group.items.find((sub) => sub.slug === slug);
       // 命中即返回
-      if (child) return `${group.name} / ${child.name}`;
+      if (child) return `${categoryName(locale, group.name, group.name_en)} / ${categoryName(locale, child.name, child.name_en)}`;
     } // 遍历结束
     // 兜底回显原始 slug，便于排查脏数据
     return slug;
@@ -527,7 +535,7 @@ export function Store({ locale }: Props) {
                 onClick={() => toggleGroup(group.slug)}
               >
                 <span>
-                  {openGroups.includes(group.slug) ? '▾' : '▸'} {group.name}{/* 展开指示 + 分类名 */}
+                  {openGroups.includes(group.slug) ? '▾' : '▸'} {categoryName(locale, group.name, group.name_en)}{/* 展开指示 + 分类名（按语言取中英文） */}
                 </span>
                 <span className="count">{group.count}</span>{/* 该分类模块数 */}
               </button>{/* 一级分类按钮结束 */}
@@ -543,7 +551,7 @@ export function Store({ locale }: Props) {
                         // 点击筛选该二级条目
                         onClick={() => selectCategory(item.slug)}
                       >
-                        <span>{item.name}</span>{/* 条目名称 */}
+                        <span>{categoryName(locale, item.name, item.name_en)}</span>{/* 条目名称（按语言取中英文） */}
                         <span className="count">{item.count}</span>{/* 该条目模块数 */}
                       </button>{/* 二级条目按钮结束 */}
                     </li> // 单条结束

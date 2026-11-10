@@ -259,11 +259,11 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
   router.get('/taxonomy', (req, res) => { // 公开接口：导航与计数不需要登录
     const region = (req.user?.region ?? (req.headers['x-region'] as string)) ?? 'cn'; // 与 /modules 一致的地区解析策略
     const groups = db // 一级分类
-      .prepare('SELECT slug, name, sort_order FROM module_categories WHERE level = 1 ORDER BY sort_order ASC') // 按权重升序
-      .all() as Array<{ slug: string; name: string; sort_order: number }>; // 结果结构
+      .prepare('SELECT slug, name, name_en, sort_order FROM module_categories WHERE level = 1 ORDER BY sort_order ASC') // 按权重升序
+      .all() as Array<{ slug: string; name: string; name_en: string | null; sort_order: number }>; // 结果结构
     const items = db // 二级条目
-      .prepare('SELECT slug, name, parent_id, sort_order FROM module_categories WHERE level = 2 ORDER BY sort_order ASC') // 全量二级条目
-      .all() as Array<{ slug: string; name: string; parent_id: string | null; sort_order: number }>; // 结果结构
+      .prepare('SELECT slug, name, name_en, parent_id, sort_order FROM module_categories WHERE level = 2 ORDER BY sort_order ASC') // 全量二级条目
+      .all() as Array<{ slug: string; name: string; name_en: string | null; parent_id: string | null; sort_order: number }>; // 结果结构
     const counters = db // 每个二级分类下的可见模块数量
       .prepare(
         `SELECT category_slug AS slug, COUNT(*) AS total
@@ -277,8 +277,8 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const tree = groups.map((group) => { // 逐一级分类组装
       const children = items // 归属该一级分类的二级条目：slug 形如 `<group>-<序号>`
         .filter((item) => item.slug.startsWith(`${group.slug}-`)) // 前缀匹配即归属
-        .map((item) => ({ slug: item.slug, name: item.name, count: countMap.get(item.slug) ?? 0 })); // 带上模块数量
-      return { slug: group.slug, name: group.name, count: children.reduce((sum, child) => sum + child.count, 0), items: children }; // 一级带自身汇总数
+        .map((item) => ({ slug: item.slug, name: item.name, name_en: item.name_en, count: countMap.get(item.slug) ?? 0 })); // 带上模块数量与英文名
+      return { slug: group.slug, name: group.name, name_en: group.name_en, count: children.reduce((sum, child) => sum + child.count, 0), items: children }; // 一级带自身汇总数与英文名
     }); // 组装结束
 
     res.json({ groups: tree, total_items: items.length, total_modules: tree.reduce((sum, group) => sum + group.count, 0) }); // 返回树与总计数

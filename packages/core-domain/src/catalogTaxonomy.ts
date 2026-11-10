@@ -74,6 +74,148 @@ export const LANGUAGE_OPTIONS: readonly string[] = [
 /** 排序方式枚举：接口 sort 参数只接受这三个值 */
 export const CATALOG_SORT_MODES = ['stars', 'recommended', 'updated'] as const; // Stars / 最新推荐 / 最近更新
 
+/** 英文名称表：key 为一级 slug，items 与 CATALOG_GROUPS 的同组条目顺序**逐项对齐**（顺序错位会被测试抓到） */
+export interface CatalogGroupEn {
+  name: string; // 一级分类英文名
+  items: readonly string[]; // 二级条目英文名，顺序与中文清单一一对应
+}
+
+/** 19 组英文名称：与中文清单同序，供 global 区模块名 / 英文站点导航使用 */
+export const CATALOG_GROUP_EN: Record<string, CatalogGroupEn> = {
+  frontier: {
+    name: 'Frontier technology',
+    items: ['Low-code', 'Research papers', 'Quantum computing', 'Web 3.0', 'Cloud native'],
+  },
+  openharmony: {
+    name: 'OpenHarmony',
+    items: [
+      'Button', 'Text box (EditText)', 'Layout', 'Graphics & images', 'Progress bar', 'Menu', 'Popup', 'Selector',
+      'Text component (TextView)', 'List component (ListView)', 'Loader (Loading)', 'Notification', 'View transition', 'Slider',
+      'Chart', 'Drawing component (Draw)', 'Counter', 'Animation', 'CAPTCHA', 'Multimedia', 'Barcode', 'Advanced UI components',
+      'Map', 'OpenHarmony gaming (Gaming)', 'Networking', 'Communication', 'Payment', 'Database', 'Hardware drivers',
+      'OpenHarmony tutorials & guides', 'OpenHarmony toolkit', 'OpenHarmony apps', 'HMS (Huawei Mobile Services)',
+      'Permissions', 'Toolkit', 'Low-level components', 'Gesture control',
+    ],
+  },
+  dev: {
+    name: 'Software development',
+    items: [
+      'Chinese/English word segmentation', 'Payment SDK', 'Security development', 'Common utility libraries', 'Excel toolkit',
+      'Barcode / QR code', 'Template engine', 'Graphical UI components & frameworks', 'Network development kit', 'Speech processing',
+      'Network tools', 'Network services', 'Data mining', 'Job / task scheduling', 'Programming & scripting languages',
+      'Cache components', 'Markdown toolkit', 'Search engine', 'Microservices', 'Workflow', 'Chart components',
+      'Permission management', 'Reporting tools', 'Code generators', 'IoC / AOP frameworks', 'Image processing', 'Rule engine',
+      'JSON tools', 'Logging toolkit', 'Spring Boot extensions', 'CAPTCHA', 'Algorithms & math computation', 'Node extensions',
+      'Process engine / tools', 'Animation development', 'Mobile communications', 'Tauri plugins',
+    ],
+  },
+  ai: {
+    name: 'Artificial intelligence',
+    items: [
+      'AI — artificial intelligence', 'VR / AR', 'Machine learning / deep learning', 'Computer vision / face recognition',
+      'Smart home', 'Natural language processing', 'Large language models', 'Inference frameworks', 'MCP', 'RAG knowledge base', 'Datasets',
+    ],
+  },
+  industry: {
+    name: 'Industrial software',
+    items: [
+      'Smart hardware', 'IoT / edge computing', 'In-vehicle apps', 'In-vehicle systems', 'Autonomous driving / drones', 'Robotics',
+      '5G / communications', 'Chip development', 'Privacy computing', 'Engineering software', 'CAD (computer-aided design)',
+      'CAE (computer-aided engineering)', 'MBSE (model-based systems engineering)', 'CAM (computer-aided manufacturing)',
+      'EDA (electronic design automation)',
+    ],
+  },
+  blockchain: { name: 'Blockchain', items: ['Digital currency', 'NFT'] },
+  wechat: {
+    name: 'WeChat development',
+    items: ['WeChat SDK', 'WeChat mini programs & mini games', 'WeChat apps', 'WeChat mini games'],
+  },
+  enterprise: {
+    name: 'Enterprise applications',
+    items: [
+      'Task & project management', 'Enterprise applications', 'BI — business intelligence',
+      'Finance · stocks & securities', 'GIS · maps · navigation · positioning',
+    ],
+  },
+  store: {
+    name: 'Site builders',
+    items: [
+      'CMS site builders', 'New retail · online stores', 'BBS forums & Q&A', 'Blog systems', 'Surveys & forms',
+      'SNS social systems', 'School & teaching management', 'Photo galleries', 'RSS & Atom tools',
+    ],
+  },
+  tools: {
+    name: 'Utilities',
+    items: [
+      'File management tools', 'Multimedia', 'Text editors', 'IM & chat', 'Application software',
+      'RPA — robotic process automation',
+    ],
+  },
+  web: {
+    name: 'Web development',
+    items: [
+      'Web frameworks', 'jQuery plugins', 'WebUI components & frameworks', 'JavaScript toolkits', 'RESTful projects',
+      'Admin dashboard frameworks', 'Website themes', 'Vue extensions', 'Web crawlers', 'OAuth · SSO · unified auth',
+      'Angular extensions', 'Bootstrap plugins', 'React components', 'RPC frameworks', 'API gateways · interface management',
+      'URL shorteners', 'layui components',
+    ],
+  },
+  devops: { name: 'DevOps · operations', items: ['Network administration tools', 'Monitoring systems', 'DevOps tools'] },
+  mobile: {
+    name: 'Mobile development',
+    items: [
+      'Android components & projects', 'iOS components', 'Mobile apps', 'Alipay mini programs', 'Baidu mini programs',
+      'PhoneGap · Cordova plugins', 'Cross-platform mobile development', 'Quick apps', 'TV development',
+      'uniapp open-source components',
+    ],
+  },
+  devtools: {
+    name: 'Developer tools',
+    items: [
+      'Version control systems', 'Development & debugging', 'Wiki & documentation tools', 'Build & deployment',
+      'Maven plugins', 'Gulp extensions', 'Testing tools', 'Code scanning & analysis',
+    ],
+  },
+  server: {
+    name: 'Server applications',
+    items: [
+      'Distributed services & frameworks', 'Message servers & queues', 'Docker-related', 'Containers & virtual machines',
+      'Nginx modules', 'Big data', 'Cloud computing', 'One-click installers', 'OpenResty extensions',
+      'System performance tuning', 'Serverless', 'Distributed storage',
+    ],
+  },
+  database: {
+    name: 'Databases',
+    items: ['Database SDKs', 'Database services', 'Database management & monitoring'],
+  },
+  game: { name: 'Games & entertainment', items: ['Games', 'Game development', '3D engines'] },
+  plugin: {
+    name: 'Plugins & extensions',
+    items: [
+      'Chrome extensions', 'WordPress plugins', 'Eclipse plugins', 'IDEA plugins', 'Firefox add-ons',
+      'Safari extensions', 'Visual Studio Code extensions', 'Jenkins plugins',
+    ],
+  },
+  misc: {
+    name: 'Other open source',
+    items: [
+      'Clone projects', 'Books · manuals · tutorials', 'ACM / OJ projects', 'Operating systems', 'Teaching management',
+      'Companion code for tutorials', 'RISC-V development', 'Bio · medical · health', '2020 charity hackathon',
+      'COVID-19 open-source projects',
+    ],
+  },
+}; // 英文名称表结束：19 组、205 条，与中文清单逐项同序
+
+/** 取一级分类英文名：缺失时回落中文名，保证渲染不断链 */
+export function catalogGroupNameEn(slug: string): string {
+  return CATALOG_GROUP_EN[slug]?.name ?? slug; // 回落口径：未登记英文名时返回 slug，便于暴露缺口
+} // catalogGroupNameEn 结束
+
+/** 取二级条目英文名：按组内下标对齐，越界或缺失时回落中文条目名 */
+export function catalogItemNameEn(groupSlug: string, index: number, fallback: string): string {
+  return CATALOG_GROUP_EN[groupSlug]?.items[index] ?? fallback; // 回落中文名，避免出现空名
+} // catalogItemNameEn 结束
+
 /** 排序方式联合类型：路由与前端共用，传错值编译期即可发现 */
 export type CatalogSortMode = (typeof CATALOG_SORT_MODES)[number];
 
@@ -82,7 +224,8 @@ export interface CatalogModuleSeed {
   code: string; // 模块编码 `cat.<一级slug>.<两位序号>`，区域内唯一
   group_slug: string; // 所属一级分类 slug
   item_slug: string; // 二级条目 slug（一级slug + 序号，供 ?category= 精确过滤）
-  name: string; // 二级条目名称，直接作为模块中文名（英文名暂沿用中文，见文档说明）
+  name: string; // 二级条目中文名，作为模块 zh-CN 名称
+  name_en: string; // 二级条目英文名，作为模块 en-US 名称（取自 CATALOG_GROUP_EN，缺失回落中文）
   license: string; // 开源许可（演示口径）
   language: string; // 编程语言（演示口径）
   sort_order: number; // 排序权重：一级序号 × 100 + 二级序号
@@ -105,6 +248,7 @@ export function buildCatalogModuleSeeds(): CatalogModuleSeed[] {
         group_slug: group.slug, // 归属一级分类
         item_slug: itemSlug, // 二级标识，供分类过滤使用
         name: item, // 模块名即二级条目名
+        name_en: catalogItemNameEn(group.slug, itemIndex, item), // 英文名按组内下标对齐取，缺失回落中文
         license: group.license, // 继承一级分类的默认许可
         language: group.language, // 继承一级分类的默认语言
         sort_order: groupNo * 100 + itemNo, // 稳定权重：分组内按条目顺序

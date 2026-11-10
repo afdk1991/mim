@@ -248,7 +248,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 生产 | **未部署**：本轮未 commit / 未 push；生产主机仍不可达且仓库零 secret，按铁律八如实标注缺口 | `git status`（未提交）、§9.3 凭据取证 |
 
 - **排障留痕（避免重复试错）**：`Store.tsx` 曾出现 `TS2322: Type 'unknown' is not assignable to type 'ReactNode'`，报错位置在「最后添加的 JSX 元素」上漂移（`<form>`、`<span>` 均被误指）。真因是 `useAsync` 的 `error` 字段类型为 `unknown`，写成 `{taxonomyState.error && <p>…</p>}` 时 `unknown` 被当作子节点渲染。**规则**：`AsyncState.error` 一律用 `!== null` 布尔判断后再渲染，禁止直接 `&&` 短路渲染。修好后报错一次性消失，探针实验全部撤销。
-- **本轮未做**：`en-US` 二级条目名暂沿用中文（`seedCategoryModules` 注释已标注为占位口径）；205 个二级模块统一「免费 + 无前置」属当前假设，用户未给价格语义；「热门项目（今日/本周）」「搜索帮助浮窗」两区块未实现（用户答复口径为 "1-2"）；一级分类的管理端 CRUD 未暴露。
+- **本轮未做**：`en-US` 二级条目名暂沿用中文（`seedCategoryModules` 注释已标注为占位口径，已于 §9.6 补齐）；205 个二级模块统一「免费 + 无前置」属当前假设，用户未给价格语义；「热门项目（今日/本周）」「搜索帮助浮窗」两区块未实现（用户答复口径为 "1-2"，已于 §9.5 补齐）；一级分类的管理端 CRUD 未暴露。
 
 ### 9.5 商城非分类区块补齐（2026-11-10，第二轮；本地门禁全绿 + CI 五作业全绿，生产仍 SKIP）
 
@@ -269,7 +269,24 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **托管站点取证**：`https://afdk1991.github.io/mim/` 200 / 4.73s / 5182B，产物 `assets/index-YtVSj9dJ.js` + `assets/index-CW0Cu4wp.css`（CSS 指纹与本机构建逐字一致）；下载该 CSS 后 `grep store-hot|store-help|hot-item` 命中共 1 次 → 证明含「热门项目 / 搜索帮助」样式的本轮构建**真实上线到 GitHub Pages**。`mim.mixm.top/health` → `000` / 2.11s / LEN=0（本地代理 `CONNECT tunnel failed`），`mim-8ah.pages.dev` → `530`，均未取得内容层取证，**不宣称生产已上线**。
 
 - **排障留痕**：`clockOf(deps)` 返回 **ISO 字符串**而非 `Date`，`now.getTime()` 会报 `TS2339`；窗口回溯须写 `new Date(new Date(now).getTime() - hours*3600*1000).toISOString()`。
-- **仍未做**：一级分类管理端 CRUD；`en-US` 二级条目名翻译；205 个二级模块的差异化定价语义（当前全部免费、无前置）。
+- **仍未做**：一级分类管理端 CRUD；`en-US` 二级条目名翻译；205 个二级模块的差异化定价语义（当前全部免费、无前置）。（注：其中 `en-US` 翻译已在 §9.6 完成，此行保留为 §9.5 当时口径。）
+
+### 9.6 分类与模块的英文名落地（2026-11-10，第三轮）
+
+**性质**：清掉 §9.4 / §9.5 反复标注的「`en-US` 名称沿用中文」占位口径——把 19 个一级分类名 + 205 个二级条目名全部译成英文，并让英文站点真正用上。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 英文数据源 | `packages/core-domain/src/catalogTaxonomy.ts` 新增 `CATALOG_GROUP_EN`（19 组、205 条，与中文清单**逐项同序**）+ `catalogGroupNameEn()` / `catalogItemNameEn()` 两个取数函数（缺失回落中文，不产生空名） | 文件内容 |
+| 模块名 | `buildCatalogModuleSeeds()` 产出 `name_en`；`seedCategoryModules` 的 `name_i18n` 由 `{zh-CN: 中文, en-US: 中文}` 改为 `{zh-CN: 中文, en-US: 英文}`，英文简介同步改用英文条目名 | `grep` 种子段 + 契约测试 |
+| 分类表 | `module_categories` 新增 `name_en TEXT`（`schema.sql` 与 `ADDITIVE_COLUMNS` 双路径同改，老库启动即补列），`seedCatalogCategories` 写入英文名 | `db.ts` 迁移清单 + 启动日志 `additive column created` |
+| 接口 | `GET /taxonomy` 的分组与条目各带 `name_en`（未登记时为 `null`，不伪造空串） | 契约测试新增 2 例 |
+| 前端 | `Store.tsx` 新增 `categoryName(locale, name, name_en)`：`en-US` 优先 `name_en`，缺失回落中文；一级导航、二级条目、「一级 / 二级」面包屑、详情归属行四处统一走该函数 | `pnpm --filter @mim/web build` 0 |
+| 本地门禁 | `pnpm -r typecheck` 0（5/5）；`pnpm --filter @mim/api test` **16 文件 226 例**（224 + 英文名 2 例全绿）；`@mim/web` 构建 0；`comment-check --strict` 0 | 本轮真实命令输出 |
+
+- **翻译口径（供后续核对）**：一级分类 `Site builders` / `Software development` / `Games & entertainment` / `Plugins & extensions` / `Other open source` 等；OpenHarmony 组中文括号里的英文直接提为英文名（`按钮(Button)` → `Button`、`手势控制(Gesture)` → `Gesture control`），避免 `Button(Button)` 这类重复；分隔符统一用 `·` / `/`，不用中文顿号。
+- **顺序守卫**：英文清单靠**组内下标**与中文对齐，测试同时断言首条与末条（`Button` / `Gesture control`），任一侧插条导致错位会立刻红。
+- **仍未做**：205 个二级模块的差异化定价语义（用户未给价格口径）；一级分类管理端 CRUD。
 
 ## 铁律十：免费平台额度矩阵与选型路由
 

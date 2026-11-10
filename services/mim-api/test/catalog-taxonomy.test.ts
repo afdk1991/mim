@@ -25,12 +25,37 @@ describe('GET /taxonomy 分类导航树', () => { // 一级分组 + 二级条目
     expect(res.body.total_items).toBe(CATALOG_ITEM_TOTAL); // 二级条目总量与 core-domain 常量一致（205）
     const store = res.body.groups.find((group: { slug: string }) => group.slug === 'store'); // 取「建站系统」分组做定点校验
     expect(store.name).toBe('建站系统'); // 断言分组中文名与用户清单一致
+    expect(store.name_en).toBe('Site builders'); // 断言分组英文名已翻译（不再用中文占位）
+    expect(store.items[0].name_en).toBe('CMS site builders'); // 断言二级条目英文名与清单首条对齐
     expect(store.items.length).toBe(9); // 该组二级条目实数为 9（CMS/新零售/BBS/博客/问卷/SNS/学校/相册/RSS）
     const sum = res.body.groups.reduce((acc: number, group: { count: number }) => acc + group.count, 0); // 汇总各组模块数
     expect(res.body.total_modules).toBe(sum); // 断言顶层总计数等于各组之和
     expect(res.body.total_modules).toBeGreaterThanOrEqual(CATALOG_ITEM_TOTAL); // 每个二级条目至少一个模块
   }); // 结束结构校验用例
+
+  it('全量二级条目与一级分类都带英文名，且与中文名逐项同序', async () => { // 英文名完整性契约
+    const res = await request(app).get('/api/v1/taxonomy'); // 公开接口
+    const groups: Array<{ name: string; name_en: string | null; items: Array<{ name: string; name_en: string | null }> }> = res.body.groups; // 结构标注
+    expect(groups.every((group) => typeof group.name_en === 'string' && (group.name_en as string).length > 0)).toBe(true); // 一级分类英文名齐全
+    const allItems = groups.flatMap((group) => group.items); // 展平全部二级条目
+    expect(allItems.length).toBe(CATALOG_ITEM_TOTAL); // 条数仍是 205
+    expect(allItems.every((item) => typeof item.name_en === 'string' && (item.name_en as string).length > 0)).toBe(true); // 二级条目英文名齐全
+    const openharmony = groups.find((group) => group.name === 'OpenHarmony'); // OpenHarmony 组：中文清单英文在括号内，英文名不应带括号残留
+    expect(openharmony?.items[0].name_en).toBe('Button'); // 首条「按钮(Button)」→ Button
+    expect(openharmony?.items[36].name_en).toBe('Gesture control'); // 末条「手势控制(Gesture)」→ Gesture control（顺带守住顺序不错位）
+  }); // 结束英文名契约用例
 });
+
+describe('模块英文名（双区）', () => { // 双区模块名走真实英文名
+  it('en-US 名称取自英文清单，zh-CN 仍保留中文', async () => { // 两区名称分别校验
+    const cn = await request(app).get('/api/v1/modules?category=store-01'); // 默认 cn 区
+    const global = await request(app).get('/api/v1/modules?category=store-01').set('x-region', 'global'); // 显式切 global 区
+    expect(cn.body.modules[0].name['zh-CN']).toBe('CMS建站系统'); // cn 区中文名来自清单原文
+    expect(cn.body.modules[0].name['en-US']).toBe('CMS site builders'); // cn 区英文名也已是真实翻译
+    expect(global.body.modules[0].name['en-US']).toBe('CMS site builders'); // global 区英文名一致
+    expect(global.body.modules[0].name['zh-CN']).toBe('CMS建站系统'); // global 区仍保留中文，便于内部对账
+  }); // 结束双区名称用例
+}); // 结束模块英文名分组
 
 describe('GET /modules 分类与筛选', () => { // 分类过滤、排序、多选与分页
   it('category 精确命中二级分类，且返回体带分类/许可/语言/Stars 字段', async () => { // 二级过滤

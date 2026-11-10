@@ -2,7 +2,7 @@
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
 import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：45 个去重入口、19 个业务域、占位标识与运行时能力点
-import { CATALOG_GROUPS, buildCatalogModuleSeeds } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）
+import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 英文名称取数
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
@@ -30,6 +30,7 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'modules', column: 'license', definition: 'TEXT' }, // 模块开源许可（筛选维度，演示口径）
   { table: 'modules', column: 'language', definition: 'TEXT' }, // 模块编程语言（筛选维度，演示口径）
   { table: 'modules', column: 'stars', definition: 'INTEGER NOT NULL DEFAULT 0' }, // Star 数（「Stars」排序依据，确定性演示值）
+  { table: 'module_categories', column: 'name_en', definition: 'TEXT' }, // 分类英文名（英文站点导航 / 接口 name_en 字段）
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
 // 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
@@ -347,12 +348,13 @@ export function seedCatalogCategories(db: Db): void { // 分类树种子入口�
   const now = new Date().toISOString(); // 统一时间戳，保证同批数据创建时间一致
   // 分类行 upsert：slug 全局唯一，名称/排序变更随代码更新自动刷新
   const upsert = db.prepare(
-    `INSERT INTO module_categories (id, parent_id, level, slug, name, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO module_categories (id, parent_id, level, slug, name, name_en, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(slug) DO UPDATE SET
        parent_id = excluded.parent_id,
        level = excluded.level,
        name = excluded.name,
+       name_en = excluded.name_en,
        sort_order = excluded.sort_order,
        updated_at = excluded.updated_at`,
   ); // prepare 结束
@@ -360,7 +362,7 @@ export function seedCatalogCategories(db: Db): void { // 分类树种子入口�
   const seed = db.transaction(() => { // 整棵树同一事务写入，失败即整体回滚
     CATALOG_GROUPS.forEach((group, groupIndex) => { // 逐一级分类
       const groupNo = groupIndex + 1; // 一级序号从 1 开始
-      upsert.run(`cat:${group.slug}`, null, 1, group.slug, group.name, groupNo, now, now); // 一级分类：parent_id 为空
+      upsert.run(`cat:${group.slug}`, null, 1, group.slug, group.name, catalogGroupNameEn(group.slug), groupNo, now, now); // 一级分类：parent_id 为空
       group.items.forEach((item, itemIndex) => { // 逐二级条目
         const itemNo = itemIndex + 1; // 二级序号从 1 开始
         const itemSlug = `${group.slug}-${String(itemNo).padStart(2, '0')}`; // 二级标识，与模块编码共享同一规则
@@ -369,7 +371,8 @@ export function seedCatalogCategories(db: Db): void { // 分类树种子入口�
           `cat:${group.slug}`, // 父键指回一级分类
           2, // 层级
           itemSlug, // 全局唯一 slug
-          item, // 条目名称
+          item, // 条目中文名称
+          catalogItemNameEn(group.slug, itemIndex, item), // 条目英文名称（与中文逐项对齐，缺失回落中文）
           groupNo * 100 + itemNo, // 排序权重与模块一致
           now, // 创建时间
           now, // 更新时间
@@ -409,11 +412,11 @@ export function seedCategoryModules(db: Db): void { // 二级模块种子入口
 
   const seed = db.transaction(() => { // 整批同一事务
     for (const item of seeds) { // 逐条二级模块
-      // 名称与简介：英文暂沿用中文原名（人工翻译前的占位口径，已在文档标注）
-      const nameI18n = JSON.stringify({ 'zh-CN': item.name, 'en-US': item.name }); // 多语言名称
+      // 名称与简介：中英文分别取分类树里的中文名与英文名，不再用中文占位
+      const nameI18n = JSON.stringify({ 'zh-CN': item.name, 'en-US': item.name_en }); // 多语言名称
       const summaryI18n = JSON.stringify({ // 多语言简介
         'zh-CN': `${item.name} 方向的模块化能力集合，可在商城内一次性解锁后使用。`, // 中文简介
-        'en-US': `Modular capability set for ${item.name}; unlock once in the store.`, // 英文简介
+        'en-US': `Modular capability set for ${item.name_en}; unlock once in the store.`, // 英文简介取英文条目名
       }); // 简介序列化结束
       for (const region of REGIONS) { // 逐个区域
         upsert.run( // 写入模块行

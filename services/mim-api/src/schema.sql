@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS module_categories (
   level      INTEGER NOT NULL CHECK (level IN (1,2)),
   slug       TEXT NOT NULL UNIQUE,
   name       TEXT NOT NULL,
+  name_en    TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
