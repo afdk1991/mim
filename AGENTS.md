@@ -672,9 +672,35 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | **⑦ 主机侧状态** | 已落新版本 | `git -C /opt/mim/app rev-parse HEAD` = `cd74f6bb2d34c866b311088d54b666ab9d8beaa4`；`mim-api` `active`；新前端产物 `index-DeP9vjTY.js`（3283661B，00:42 构建）+ `index-z3rqfMFT.css` |
 | **⑧ 线上取证（本轮）** | 全 200 / 301 | `https://mim.mixm.top/health` 200 / 0.064s / 53B；`/api/v1/modules` 200 / 0.074s / 9514B；`/` 200 / 0.070s / 5114B；`/admin/` 200 / 1430B；`http://mim.mixm.top/health` 301 / 178B |
 | **⑨ sharp 在生产主机实跑** | **可用，且开销极低** | 云助手命令 `mim-sharp-test`（`cmd-nnw3bci6` / `inv-wb18bfg5as`，`命令成功 / ExitCode 0 / 1秒`）：`SHARP_VER 0.35.5 VIPS 8.18.7` / `SRC_BYTES 16032`（1200×900 PNG）/ `OUT_BYTES 982`（`resize(400,300).jpeg({quality:80})`）/ `RESIZE_MS 16` / `RSS_MB 71`；同期内存 `Mem total 1963MB / available 1458MB`，`systemctl is-active mim-api` = `active` |
-| **⑩ 生产登录态 E2E** | **登录 → 令牌 → 权益发放 → 权益回读全通** | 主机 `/opt/mim/mim-api.env` 中 `MIM_AUTH_ADMIN_PASSWORD` 存在（脚本仅判空、**不回显**）；`POST /api/v1/auth/password`（`region=cn`、`identifier=13900000001`）→ `LOGIN_HTTP=200`、`TOKEN_LEN=227`；`GET /api/v1/me/entitlements` → 200；`POST /api/v1/entitlements`（`module_code=comic.workbench` + `Idempotency-Key`）→ `GRANT_HTTP=201`；再读 `GET /api/v1/me/entitlements` → 200 且 `ME_CODES=comic.workbench`；`GET /api/v1/admin/me` → `ADMIN_ME_HTTP=403` + `{"code":"FORBIDDEN","permission":"rbac:read"}`，即 RBAC 对无后台角色账号按预期拒绝 |
+| **⑩ 生产登录态 E2E** | **登录 → 令牌 → 权益发放 → 权益回读全通** | 主机 `/opt/mim/mim-api.env` 中 `MIM_AUTH_ADMIN_PASSWORD` 存在（脚本仅判空、**不回显**）；`POST /api/v1/auth/password`（`region=cn`、`identifier=13900000001`）→ `LOGIN_HTTP=200`、`TOKEN_LEN=227`；`GET /api/v1/me/entitlements` → 200；`POST /api/v1/entitlements`（`module_code=comic.workbench` + `Idempotency-Key`）→ `GRANT_HTTP=201`；再读 `GET /api/v1/me/entitlements` → 200 且 `ME_CODES=comic.workbench`；`GET /api/v1/admin/me` → `ADMIN_ME_HTTP=403` + `{"code":"FORBIDDEN","permission":"rbac:read"}`，即 RBAC 对无后台角色账号按预期拒绝。**第二轮复验（两轮 CI 部署把主机更新到 `dba2e0a` 之后重跑）**：`LOGIN_HTTP=200`、`TOKEN_LEN=227`、`GRANT_HTTP=409`（权益已存在，重复解锁按冲突返回而非重复发放）、`ME_CODES=comic.workbench`、`ADMIN_ME_HTTP=403` —— 证明口令与已发权益都跨部署保留，`deploy.sh` 未覆写 `MIM_AUTH_ADMIN_PASSWORD`、也未清库 |
 | **⑪ 遗留 / 未做** | 如实登记 | 生产登录态浏览器 UI 端 E2E（前端登录表单 → 页面跳转）本轮未做，仅做接口级链路；`MIM_AUTH_ADMIN_PASSWORD` 属私有口令，本轮采取「在主机内读取、不回显、不落到仓库与日志」的方式使用；旧带口令私钥 `mim_prod_ed25519` 仍留在本机 `.tmp/prodkey/`（已被 v2 取代，保留仅作回溯，**不得再写入任何 secret**） |
 | **⑫ 本轮提交与双推** | 已完成 | `cd74f6b`（fix(deploy)：构建堆上限）与本节文档提交；`origin/main`、`gitee/main` 均以 `git ls-remote` 复核为同一 SHA |
+
+---
+
+### 9.16 多平台自定义域名矩阵：统一取 DNSPod 导出域名（2026-11-11 01:4x +08:00）
+
+**性质**：按用户「多平台部署矩阵所有自定义域名使用 `dnspod_records_2026-11-05_21-42-26.xls` 中对应的域名」指令，把铁律九 10 平台矩阵的自定义域名统一到该导出 `mixm.top` 工作表的主机记录上，落成单一事实源 `packages/core-domain/src/customDomains.json`，并配套门禁 `node scripts/verify-custom-domains.mjs`。
+
+**导出事实（先取证再落名）**：该 xls 含 `laal.top`（93 行）与 `mixm.top`（104 行）两个工作表，逐行只有「主机记录 / 线路类型 / TTL 600 / 备注」四列有值，**记录类型与记录值两列全为空** —— 它是 45 类入口的命名模板，解析记录尚未真正创建。因此本轮只确定「域名命名与平台归属」，解析值仍以 DNSPod 控制台现状为准，不得对外宣称这些域名已可访问。
+
+| 部署平台 | 自定义域名 | xls 主机 / 行号 | xls 备注 | 现状 |
+|---|---|---|---|---|
+| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 99 | 导出该行无备注 | **live**：`/health` 200 / 53B |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 103 | 导出该行无备注（同域 `data` 模块行 21–22 为「数据中心入口｜开放数据集平台」） | **live**：`/` 200，人机校验后深链接正常渲染 |
+| GitHub Pages | `www.mixm.top` | `www` / 5–6 | 主站常规访问入口｜官方门户网站 | pending_dns |
+| Cloudflare Pages | `portal.mixm.top` | `portal` / 53–54 | 门户首页入口｜企业内部统一门户 / 工作台 | pending_dns |
+| Vercel | `m.mixm.top` | `m` / 45–46 | 移动端适配入口｜移动端 H5 精简版官网 | pending_dns |
+| Sealos（纯 API 容器） | `api.mixm.top` | `api` / 9–10 | 接口服务入口｜API 统一网关 | pending_dns |
+| IGA Pages | `test.mixm.top` | `test` / 71–72 | 测试环境入口｜测试环境统一入口 | pending_dns |
+| Gitee（码云）镜像仓 | `store.mixm.top` | `store` / 67–68 | 资源存储 / 下载站点｜软件源码下载分发站 | pending_dns |
+| GitHub 仓库 | `dev.mixm.top` | `dev` / 23–24 | 开发测试入口｜开发环境门户 + 接口文档 | pending_dns |
+| Cloudflare 独立 Worker（`mim-store`） | `shop.mixm.top` | `shop` / 59–60 | 线上店铺入口｜多商户店铺系统 | pending_dns |
+
+- **保留域名**：`cloud.mixm.top`（xls 19–20 行，备注「云服务模块入口｜私有云盘 / 网盘系统」）已解析至生产 CVM `115.159.159.11`，nginx 已由该主机返回 SPA（实测 200 / 5114B），**不再分配给任何托管平台**。
+- **不适用**：ghcr（容器镜像仓库域名固定 `ghcr.io`，不支持自定义域名）。
+- **待办（按平台逐条登记在 `customDomains.json` 的 `next_steps`）**：① DNSPod 为 `www` / `portal` / `m` / `api` / `test` / `store` / `dev` / `shop` 添加解析记录；② 各平台控制台绑定自定义域名并签发证书；③ 新增域名若指向生产 CVM，需单独签发证书——2026-11-11 以未配置主机名做严格 TLS 探测失败（`curl --resolve probe-x.mixm.top` 严格校验 exit 000），说明现有证书不覆盖任意子域。
+- **门禁**：`node scripts/verify-custom-domains.mjs` 校验「矩阵 10 平台全覆盖、域名逐一来自 xls 主机清单、无重复分配、live 带取证、pending 带下一步、文档已登记」。
 
 ---
 
