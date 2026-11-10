@@ -117,6 +117,11 @@ if ! pnpm install --frozen-lockfile --prod=false; then
 fi
 
 # --- 3. 前端构建（用户端 + 管理后台）+ 后端编译 ---
+# 2026-11-11 修复：生产主机为 2C2G（另有 4G swap），Node 22 默认堆上限按物理内存推导后不足 1G，
+# CI 触发远程 build 时 `tsc --noEmit` 直接 OOM（FATAL ERROR: Reached heap limit，exit 134）。
+# 这里显式抬高 V8 老生代上限到 1536MB（配合 swap 足够完成 tsc + vite），仅影响本脚本内的构建进程。
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=1536"
+log "构建内存参数：NODE_OPTIONS=$NODE_OPTIONS；可用内存 $(free -m | awk '/Mem:/{print $7"MB"}')，swap $(free -m | awk '/Swap:/{print $2"MB"}')"
 log "构建 apps/web（tsc --noEmit + vite build）"
 pnpm --filter @mim/web build
 log "构建 apps/admin（tsc --noEmit + vite build）"
