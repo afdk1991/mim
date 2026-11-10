@@ -120,7 +120,22 @@ Error return from script
 - `node scripts/verify-deployments.mjs` → **52/52 PASS**。
 - 守卫版函数的端到端复验（EdgeOne 预览域名 `mim-app-dplt22tzwwr8.edgeone.cool`）：`/` 5874B、`/store` 6429B、`/chat` 6446B、`/comic` 6446B、`/settings` 6446B、`/login` 6388B 全部正常渲染 SPA；`/nope` 返回 268B `Not Found`（不再 545）。
 
-### 8.4 还差的一步
+### 8.4 上线与线上复验（2026-11-11 00:5x–01:0x）
 
-改动尚未 `git add / commit / push`。push 到 `main` 后 `mim` 项目自动重建，`data.mixm.top` 才会真正自愈（届时复验 `/store` `/chat` `/comic` `/settings` `/login` 应全部 200 渲染）。
+改动已提交为 `2221fa2` 并推送双远端：`git push origin main` → `8fa1c0d..2221fa2`，`git push gitee main` → `8fa1c0d..2221fa2`（均 exit 0，`git ls-remote origin refs/heads/main` = `2221fa2`）。EdgeOne 项目 `mim` 由 Git 集成自动重建后，`https://data.mixm.top` 实测：
+
+| 路径 | HTTP | 字节 | 说明 |
+|---|---|---|---|
+| `/` | 200 | 5114 | 命中静态入口 |
+| `/chat` | 200 | 5114 | 命中 `chat/index.html`（构建期生成的视图目录） |
+| `/store` | 200 | 5114 | 命中 `store/index.html` |
+| `/comic` | 200 | 5114 | 命中 `comic/index.html` |
+| `/settings` | 200 | 5114 | 命中 `settings/index.html` |
+| `/login` | 200 | 5114 | 命中 `login/index.html` |
+| `/nope` | 404 | 9 | 守卫后的函数返回 `Not Found`，不再 545 |
+
+真实浏览器复验（先完成人机校验）：`/chat` 标题 `Mim`、正文含「此功能需登录后使用」登录卡片、侧栏「聊天」高亮；`/store` 渲染「功能模块商城 · 19 个一级分类、205 个二级模块」。
+
+安全策略已按用户要求恢复：`mim` 项目「安全防护 → Bot 管理 → 基础 Bot 管理 → 人机校验页」重新开启，取证为全新客户端请求 `/chat` → 200 / 982B 混淆校验脚本、`/store` → 200 / 984B，行为回到修复前的安全口径；通过校验后深链接正常渲染。
+
 

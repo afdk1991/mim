@@ -651,8 +651,8 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 修复 3/3 | `scripts/build.mjs` 新增 `readSpaViews()`（从 `router.ts` 的 `VIEWS` 解析，杜绝两处清单漂移）与 `emitSpaFallback()`（根 `dist` 生成 `404.html` + 每个视图的同名目录），`emitDist` 后自动执行 |
 | 独立验证 | EdgeOne 预览域名（项目 `mim-app`，与 `data.mixm.top` 无关）：守卫版函数 + 7 个视图目录下 `/` `/store` `/chat` `/comic` `/settings` `/login` 全部正常渲染 SPA，`/nope` 返回 268B `Not Found`（不再 545） |
 | 本地门禁 | `pnpm -r typecheck` 0；`pnpm --filter @mim/api test` **16 文件 233/233**；`node scripts/verify-deployments.mjs` **52/52 PASS**；`node scripts/build.mjs` 退出码 0 并输出「✅ SPA 回退产物就绪: 404.html + 7 个视图目录」 |
-| 平台侧临时改动 | `mim` 项目「安全防护 → Bot 管理 → 基础 Bot 管理 → 人机校验页」本轮已被关闭（关闭前所有访客须过人机校验；如需恢复在原位置重新打开） |
-| 铁律八偏离 | 本轮改动**未提交、未 push**，因此 `mim` 项目尚未重建、`data.mixm.top` 仍为 545；按铁律八如实标注**未上线**，不以本地门禁或预览域通过冒充线上修复 |
+| 平台侧改动 | `mim` 项目「安全防护 → Bot 管理 → 基础 Bot 管理 → 人机校验页」先在排障期关闭、**修复上线后已按用户要求重新开启**；取证：全新客户端 `/chat` → 200 / 982B、`/store` → 200 / 984B（回到原安全口径），通过校验后深链接正常渲染 |
+| 上线与复验 | 提交 `2221fa2` 双推 `origin` / `gitee`（`8fa1c0d..2221fa2`，均 exit 0）；EdgeOne `mim` 项目重建后 `https://data.mixm.top` 的 `/` `/chat` `/store` `/comic` `/settings` `/login` **全部 200 / 5114B**、`/nope` **404 / 9B**；真实浏览器 `/chat` 渲染聊天视图 + 内嵌「此功能需登录后使用」登录卡片、`/store` 渲染商城（19 个一级分类 / 205 个二级模块）——**线上已修复，不再 545** |
 | 工作树 | 修改 3 个代码/构建文件（`apps/web/package.json`、`functions/[[catchall]].js`、`scripts/build.mjs`）+ 文档同步（本文件、`README.md`、`docs/wiki/05-runbook.md`、`docs/edgeone-data-mixm-top-545-诊断-20261111.md`）；另有 CLI 生成的未跟踪目录 `.edgeone/` |
 
 ---
