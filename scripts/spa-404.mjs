@@ -3,7 +3,7 @@
  * scripts/spa-404.mjs
  * 构建后处理：把 apps/web/dist/index.html 复制为 dist/404.html。
  * GitHub Pages 对未命中静态文件的路径会返回 404.html（状态 404），
- * 借此让 /mim/store 等单段深链接拿到与首页完全相同的 SPA 入口，
+ * 借此让 /mim/marketplace 等单段深链接（对外路径段为模块功能名称）拿到与首页完全相同的 SPA 入口，
  * 配合 index.html 头部的地址栏规整内联与 router.ts 的路径解析实现刷新可用。
  * 用法：由 apps/web 的 build 脚本在 vite build 之后自动调用，也可手动执行。
  */

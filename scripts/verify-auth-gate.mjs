@@ -252,21 +252,21 @@ async function live() {
   const anonEntry = await c.evaluate(`(Array.from(document.querySelectorAll('.sidebar-footer button')).some((b) => b.textContent.includes('登录')) ? 'entry' : '')`); // 侧栏登录入口
   check('live 匿名侧栏展示登录入口', anonEntry === 'entry', '侧栏应提供登录按钮'); // 按需登录入口
 
-  // 匿名访问收费视图：站内跳转 /comic，应在主布局内内嵌登录卡片
-  await c.evaluate(`history.pushState(null,'','/comic'); window.dispatchEvent(new Event('mim:route')); 'ok'`); // 触发编程式导航（router.ts 的 ROUTE_EVENT 事件名）
+  // 匿名访问收费视图：站内跳转 /comic-studio（漫剧 AI 剧的对外模块功能名），应在主布局内内嵌登录卡片
+  await c.evaluate(`history.pushState(null,'','/comic-studio'); window.dispatchEvent(new Event('mim:route')); 'ok'`); // 触发编程式导航（router.ts 的 ROUTE_EVENT 事件名）
   // 等待内嵌登录出现
   const gated = await c.waitUntil(async () => c.evaluate(`(document.querySelector('.layout') && document.querySelector('.auth-wrap') ? 'gated' : '')`)); // 主布局 + 内嵌登录并存
-  check('live 匿名访问收费视图内嵌登录卡片', gated === 'gated', '/comic 应在主布局内嵌登录'); // 按需登录核心
+  check('live 匿名访问收费视图内嵌登录卡片', gated === 'gated', '/comic-studio 应在主布局内嵌登录'); // 按需登录核心
   // 收费功能登录说明文案
   const notice = await c.evaluate(`(() => document.querySelector('.auth-notice')?.textContent ?? '')()`); // 读取提示
   check('live 收费功能登录说明可见', (notice ?? '').includes('此功能需登录后使用'), `实际：${notice}`); // required 文案
-  // 匿名直达内部视图（刷新等价）：整页加载 /comic 同样内嵌登录而非整站锁定
-  await c.send('Page.navigate', { url: BASE + 'comic' }); // 直接打开收费视图路径
+  // 匿名直达内部视图（刷新等价）：整页加载 /comic-studio 同样内嵌登录而非整站锁定
+  await c.send('Page.navigate', { url: BASE + 'comic-studio' }); // 直接打开收费视图路径
   // 等待渲染
   const deepLink = await c.waitUntil(async () => c.evaluate(`(document.querySelector('.layout') && document.querySelector('.auth-wrap') ? 'gated' : '')`)); // 断言
-  check('live 匿名直达收费视图为内嵌登录（主布局保留）', deepLink === 'gated', '直达 /comic 不得整站锁定'); // 刷新场景
+  check('live 匿名直达收费视图为内嵌登录（主布局保留）', deepLink === 'gated', '直达 /comic-studio 不得整站锁定'); // 刷新场景
   // 匿名回到商城：登录卡片应消失
-  await c.evaluate(`history.pushState(null,'','/store'); window.dispatchEvent(new Event('mim:route')); 'ok'`); // 跳回商城
+  await c.evaluate(`history.pushState(null,'','/marketplace'); window.dispatchEvent(new Event('mim:route')); 'ok'`); // 跳回商城（对外模块功能名 /marketplace）
   // 等待登录卡片消失
   const backToStore = await c.waitUntil(async () => c.evaluate(`(document.querySelector('.layout') && !document.querySelector('.auth-wrap') ? 'browsable' : '')`)); // 断言
   check('live 匿名跳回商城登录卡片消失', backToStore === 'browsable', '商城匿名可浏览'); // 浏览类页面
@@ -302,8 +302,8 @@ async function live() {
   // 无会话则跳过余下场景
   if (!session) { c.ws.close(); return; } // 提前收尾
 
-  // 注入会话并从 /comic 重新加载，等价于登录成功后收费视图原地解锁
-  await c.send('Page.navigate', { url: BASE + 'comic' }); // 回到收费视图路径
+  // 注入会话并从 /comic-studio 重新加载，等价于登录成功后收费视图原地解锁
+  await c.send('Page.navigate', { url: BASE + 'comic-studio' }); // 回到收费视图路径
   // 写入会话并刷新
   await c.evaluate(`localStorage.setItem('${SESSION_KEY}', ${JSON.stringify(JSON.stringify(session))}); location.reload(); 'ok'`); // 真实会话落盘
   // 等待解锁后的主布局（无内嵌登录卡片）
@@ -311,14 +311,14 @@ async function live() {
   check('live 登录后收费视图原地解锁', unlocked === 'unlocked', '应渲染完整工作台'); // 核心场景
   // 已登录用户保持原目标路径（handleLogin 仅在 login 视图跳 store，其余视图原地解锁）
   const stayed = await c.evaluate(`(() => location.pathname)()`); // 读取地址栏路径
-  check('live 登录后停留在目标收费视图', stayed === '/comic', `实际 ${stayed}`); // 直达内页体验
+  check('live 登录后停留在目标收费视图', stayed === '/comic-studio', `实际 ${stayed}`); // 直达内页体验
 
   // 退出登录：点击侧栏退出按钮，触发真实 handleLogout，回落到商城且会话被清除
   await c.waitUntil(async () => c.evaluate(`(Array.from(document.querySelectorAll('.sidebar-footer button')).some((b) => b.textContent.includes('退出')) ? 'ready' : '')`), 10000); // 退出按钮就绪
   // 点击退出
   await c.evaluate(`Array.from(document.querySelectorAll('.sidebar-footer button')).find((b) => b.textContent.includes('退出'))?.click(); 'ok'`); // React onClick
-  // 等待退出完成：会话清空且地址落到 /store，商城仍可浏览（无登录卡片）
-  const loggedOut = await c.waitUntil(async () => c.evaluate(`(!localStorage.getItem('${SESSION_KEY}') && location.pathname.endsWith('/store') && document.querySelector('.layout') && !document.querySelector('.auth-wrap') ? 'out' : '')`), 12000); // 断言
+  // 等待退出完成：会话清空且地址落到 /marketplace，商城仍可浏览（无登录卡片）
+  const loggedOut = await c.waitUntil(async () => c.evaluate(`(!localStorage.getItem('${SESSION_KEY}') && location.pathname.endsWith('/marketplace') && document.querySelector('.layout') && !document.querySelector('.auth-wrap') ? 'out' : '')`), 12000); // 断言
   check('live 退出登录清会话并回落商城', loggedOut === 'out', '退出后应回到匿名可浏览的商城'); // 核心场景
 
   // 令牌失效：注入无效令牌并访问收费视图，刷新后 /me 校验失败并展示失效重登提示
@@ -326,7 +326,7 @@ async function live() {
   // 写入失效会话
   await c.evaluate(`localStorage.setItem('${SESSION_KEY}', ${JSON.stringify(JSON.stringify(broken))}); 'ok'`); // 失效态落盘
   // 打开收费视图
-  await c.send('Page.navigate', { url: BASE + 'comic' }); // 触发启动校验
+  await c.send('Page.navigate', { url: BASE + 'comic-studio' }); // 触发启动校验
   // 等待失效提示出现（内嵌登录 + 失效文案）
   const expired = await c.waitUntil(async () => c.evaluate(`(document.querySelector('.auth-wrap') && (document.querySelector('.auth-notice')?.textContent ?? '').includes('登录状态已失效') ? 'expired' : '')`), 15000); // 含 /me + refresh 往返
   check('live 登录状态失效展示重登提示', expired === 'expired', '应显示「登录状态已失效」并内嵌登录'); // 失效联动

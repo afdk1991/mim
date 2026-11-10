@@ -17,6 +17,7 @@
 - **2026-11-09 23:35 功能变更（统一入口配置清单轮）**：在上一轮基础上按用户新指令升级为**统一入口配置清单**——45 类备注去重整理（两行 `@`→`AT_ROOT`、11 行空白→`BLANK_UNSET`、重复备注合并 45 项），**不补写具体主机值**，统一可配置占位标识 `{{HOST:<ENTRY_KEY>}}`（运行期由 `MIM_HOST_*` 注入），按「入口｜业务系统/模块说明」划分为 **19 个业务域**；新增核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分（均为实现推导，非备注原文）。单一数据源 `packages/core-domain/src/siteModules.json`（schema `mim.site-modules.v2`）升级，新增后端 `/api/v1/entries*` 6 只读清单端点，前端 `/sites` 升级为统一入口配置清单视图，配套 `config/entry-hosts.example.json` 占位模板、`docs/统一入口配置清单-20261109.md` 可读清单、`docs/统一入口配置清单与模块化实现说明-20261109.md` 交付说明。全量验证终值（2026-11-09 23:35 实测）：`npm run check` 0、`pnpm --filter @mim/api test` **15 文件 / 211 例全过**、`comment-check --strict` 通过、`build:web` 成功、`verify:site-modules` **79/79**、`verify:entry-manifest` **23/23**、xls / 用户文本 ↔ 清单双向比对 **0 差异**、Edge CDP `/sites` 真渲染 **26/26 PASS**。仍处 `preview` 通道、零 git 写操作。
 
 - **2026-11-09 功能变更（部署汇总）**：新增「部署汇总」模块——单一事实源 `packages/core-domain/src/deploymentRegistry.json`（9 矩阵平台 / 11 规范部署项 / 5 CI 作业 / 2 git 远端 / 6 候选排除项）+ 共享包 `deploymentRegistry.ts` + 公开只读 `/api/v1/deployments*` 3 端点 + `/deployments` 前端核对表 + 结构化产物 `docs/deployment-summary.{json,md}` + 生成器 / 校验器 + 10 例契约测试。统一字段（仓库标识 / 部署状态 / 部署结果 / 异常说明）并对空数据、失败状态、缺失信息分别标识；仍处 `preview` 通道，**只记录模块变更、不改 semver 数字**，展示版本保持 **V0.0.0-preview**。同步清单见 [AGENTS.md §13](./AGENTS.md)。
+- **2026-11-11 变更（对外路径段统一为模块功能名称）**：按用户「所有平台的访问域名 `https://XX.XXX.top/XXX` 里的路径段全部改成模块功能名称」指令，把前端对外地址的路径段与内部视图标识解耦，统一由 [router.ts](./apps/web/src/router.ts) 的 `VIEW_SEGMENTS` 一处定义：`/store → /marketplace`（商城）、`/sites → /entry-catalog`（入口配置清单）、`/comic → /comic-studio`（漫剧 AI 剧）、`/login → /signin`（登录），`/chat`、`/settings`、`/deployments` 原段名本身即功能名保持不变。旧段名保留兼容层（前端 `LEGACY_SEGMENTS` 原地改写 + 生产 nginx 四条 `location =` 301），旧书签与外链不失效。各平台回退规则均为 `/* → /index.html` 通配，改名后自动生效；构建期 `dist/<模块功能名>/index.html` 目录、入口页内联脚本的视图段清单、nginx CSP 的内联脚本 sha256 已同轮同步更新（`sha256-Q4BFbQUCW5bmauOy9Zn8D1km5RItTJrk6r3tkodIR0M=`）。后端接口前缀 `/api/v1/*` 与管理后台 `/admin/` 不在本次改名范围（前者是版本化接口命名空间、后者是静态入口，均非功能模块名）。
 
 ### 校验命令
 
@@ -76,7 +77,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图——`/store`、`/sites`、`/deployments`、`/comic`、`/chat`、`/settings`、`/login`，地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接在启动时自动改写为对应路径。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个视图的同名目录回退、生产 nginx 由 `try_files` 回退）。**按需登录（2026-11-08 起）**：商城目录 `/store` **匿名可浏览**；`/comic`、`/chat`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌登录卡片（提示「此功能需登录后使用」），不再整站锁定；登录成功后原地解锁当前视图，退出登录、令牌失效或跨标签页退出时回落到匿名态、收费视图重新内嵌登录卡片。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。功能模块商城页顶部保留一张 www 主站入口静态卡片。
+站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，且路径段一律使用模块功能名称——`/marketplace`（商城）、`/entry-catalog`（入口配置清单）、`/deployments`（部署汇总）、`/comic-studio`（漫剧 AI 剧）、`/chat`（聊天）、`/settings`（设置）、`/signin`（登录），地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接与改名前的旧段（`/store` `/sites` `/comic` `/login`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**按需登录（2026-11-08 起）**：商城目录 `/marketplace` **匿名可浏览**；`/comic-studio`、`/chat`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌登录卡片（提示「此功能需登录后使用」），不再整站锁定；登录成功后原地解锁当前视图，退出登录、令牌失效或跨标签页退出时回落到匿名态、收费视图重新内嵌登录卡片。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。功能模块商城页顶部保留一张 www 主站入口静态卡片。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ **分类导航（两级分类树 CRUD：`GET /categories/manage` 读树、`POST /categories` 新建、`PATCH /categories/:slug` 改名与排序、`DELETE /categories/:slug` 删除）** / 权益管理（列表过滤、发放、回收、审计事件时间线）/ **商城订单（跨用户订单列表 `GET /orders/manage` + 人工结算 `POST /orders/:id/settle`）**。
 
@@ -178,7 +179,7 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前先用 `better-sqlite3` backup 再幂等执行 |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
-| 生产登录入口 | **按需登录（2026-11-08 起，与上文前端视图口径一致）**：商城目录 `/store` 匿名可浏览；`/comic`、`/chat`、`/settings` 在匿名态于内容区内嵌登录卡片，登录成功后原地解锁当前视图，退出、令牌失效或跨标签页退出即回落匿名态；独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的全站门禁。登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`；优先保留已有值 / CI Secret 同名变量，均未配置时现场生成随机口令且不回显日志，**不再有公开默认口令**，运维须从服务器 env 文件读取）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
+| 生产登录入口 | **按需登录（2026-11-08 起，与上文前端视图口径一致）**：商城目录 `/marketplace` 匿名可浏览；`/comic-studio`、`/chat`、`/settings` 在匿名态于内容区内嵌登录卡片，登录成功后原地解锁当前视图，退出、令牌失效或跨标签页退出即回落匿名态；旧段 `/store` `/comic` `/chat` `/settings` `/login` 按 301 / 前端改写落到新路径。独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的全站门禁。登录页默认「密码登录」：`POST /api/v1/auth/password`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`（`deploy/deploy.sh` §5 幂等写入 `mim-api.env`；优先保留已有值 / CI Secret 同名变量，均未配置时现场生成随机口令且不回显日志，**不再有公开默认口令**，运维须从服务器 env 文件读取）；验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
 | 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
@@ -205,6 +206,26 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 | 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ **唯一生产权威终点（铁律十二）** `https://mim.mixm.top` |
 
 托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
+
+#### 自定义域名（2026-11-11 按 DNSPod `mixm.top` 导出统一命名）
+
+> 用户指令「多平台部署矩阵所有自定义域名使用导出中对应的域名」。命名取自 `dnspod_records_2026-11-05_21-42-26.xls` 的 `mixm.top` 工作表主机记录，单一事实源为 `packages/core-domain/src/customDomains.json`（含 xls 行号、备注、状态、下一步），门禁 `node scripts/verify-custom-domains.mjs`。该导出**只有主机记录与备注，记录类型与记录值两列全为空**，故下表只确定命名与归属，解析以 DNSPod 控制台现状为准。
+
+| 平台 | 自定义域名 | 状态 |
+|---|---|---|
+| 腾讯云自建服务器（生产权威终点） | `https://mim.mixm.top` | ✅ 已解析并在线（`/health` 200 / 53B） |
+| 腾讯云 EdgeOne Pages | `https://data.mixm.top` | ✅ 已解析并在线（CNAME → `data.mixm.top.pages.dnsoe5.com.`） |
+| GitHub Pages | `https://www.mixm.top` | ⏳ DNSPod 未解析 / 平台未绑定 |
+| Cloudflare Pages | `https://portal.mixm.top` | ⏳ DNSPod 未解析 / 平台未绑定 |
+| Vercel | `https://m.mixm.top` | ⏳ DNSPod 未解析 / 平台未绑定 |
+| Sealos（纯 API 容器） | `https://api.mixm.top` | ⏳ DNSPod 未解析 / 平台未绑定 |
+| IGA Pages | `https://test.mixm.top` | ⏳ DNSPod 未解析 / 平台未绑定 |
+| Gitee（码云）镜像仓 | `https://store.mixm.top` | ⏳ DNSPod 未解析 |
+| GitHub 仓库 | `https://dev.mixm.top` | ⏳ DNSPod 未解析 |
+| Cloudflare 独立 Worker（`mim-store`） | `https://shop.mixm.top` | ⏳ DNSPod 未解析 / Worker 未加路由 |
+| GitHub Packages（ghcr） | —（域名固定 `ghcr.io`，不适用） | — |
+
+补充：`cloud.mixm.top` 已解析至生产 CVM 并已被云服务模块占用（实测 200 / 5114B），不分配给任何托管平台；新域名若指向生产 CVM，需单独签发证书（现有证书不覆盖任意子域）。
 
 #### 已采用免费层平台（2026-11-10 扩展，待接入外部账号）
 

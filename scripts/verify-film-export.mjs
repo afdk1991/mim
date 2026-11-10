@@ -130,10 +130,10 @@ check('真实 API 登录 + 解锁 + 造出成片', prep?.ok, prepare ?? 'no resu
 const boot = await evaluate(`JSON.stringify({ title: document.title, root: !!document.querySelector('#root'), inner: document.body.innerText.slice(0, 60) })`); // 首页渲染快照
 check('首页真实渲染（#root + title）', boot && JSON.parse(boot).root && JSON.parse(boot).title.includes('Mim'), boot ?? 'no boot'); // 断言挂载
 
-// 3) 进入 /comic（history 路径路由），选中工程，切到成片标签
-await send('Page.navigate', { url: BASE + '/comic' }); // 直达深链接
+// 3) 进入 /comic-studio（history 路径路由，漫剧 AI 剧的对外模块功能名），选中工程，切到成片标签
+await send('Page.navigate', { url: BASE + '/comic-studio' }); // 直达深链接
 const workbench = await waitUntil(() => evaluate(`document.body.innerText.includes('漫剧 AI 剧工作台') ? JSON.stringify({ ok: true, text: document.body.innerText.slice(0, 300) }) : null`)); // 等 React 与列表
-check('/comic 深链接真实渲染', workbench && JSON.parse(workbench).ok, workbench ? JSON.parse(workbench).text.slice(0, 80) : 'no render'); // 断言深链接
+check('/comic-studio 深链接真实渲染', workbench && JSON.parse(workbench).ok, workbench ? JSON.parse(workbench).text.slice(0, 80) : 'no render'); // 断言深链接
 
 const selected = await waitUntil(() => evaluate(`(() => {
   const rows = [...document.querySelectorAll('li.list-item')].filter(e => e.textContent?.includes('E2E 导出工程'));

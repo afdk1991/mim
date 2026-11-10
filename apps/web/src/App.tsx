@@ -41,8 +41,8 @@ const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'chat', 'settings'])
 export function App() {
   // 会话状态：初始值从 localStorage 恢复（api.ts 已做结构校验），实现刷新后保持登录
   const [session, setLocalSession] = useState<Session | null>(getSession());
-  // 当前视图由地址栏路径驱动（/store 等单段路径）：根路径与未知路径经 parseLocation 回落到功能模块页
-  const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<view>）
+  // 当前视图由地址栏路径驱动（对外路径段为模块功能名称，如 /marketplace）：根路径与未知路径经 parseLocation 回落到商城
+  const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<模块功能名>）
   // 登录提示：null 默认无提示，expired 为登录态失效后的重登说明，required 为访问收费功能时的登录说明
   const [gateNotice, setGateNotice] = useState<'required' | 'expired' | null>(null);
 

@@ -16,8 +16,39 @@ export interface AppRoute {
   view: AppView; // 当前视图
 } // 路由结构结束
 
-// 已知视图前缀集合：把路径第一段解析为视图，未知值回退到 store
-const VIEWS: AppView[] = ['store', 'sites', 'deployments', 'comic', 'chat', 'settings', 'login']; // 全部视图均为单段路径（如 /deployments），保证 vite base './' 下相对资源解析正确
+// 视图 → 地址栏路径段（模块功能名称，2026-11-11 全平台统一）：
+// 对外地址一律为 https://<域名>/<模块功能名>，与 App.tsx 导航文案一一对应，
+// 不再使用 store / comic / sites / login 这类与功能名对不上的缩写段。
+export const VIEW_SEGMENTS: Record<AppView, string> = {
+  store: 'marketplace', // 商城目录（匿名可浏览）
+  sites: 'entry-catalog', // 入口配置清单（45 类备注驱动的模块目录）
+  deployments: 'deployments', // 部署汇总（原名即功能名，保持不变）
+  comic: 'comic-studio', // 漫剧 AI 剧工作台
+  chat: 'chat', // 聊天（原名即功能名，保持不变）
+  settings: 'settings', // 设置（原名即功能名，保持不变）
+  login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
+};
+
+// 路径段 → 视图的反向索引：由 VIEW_SEGMENTS 派生，保证正反两向永不走样
+const SEGMENT_VIEWS: ReadonlyMap<string, AppView> = new Map(
+  (Object.keys(VIEW_SEGMENTS) as AppView[]).map((view) => [VIEW_SEGMENTS[view], view]), // [路径段, 视图] 二元组
+);
+
+// 改名前的旧路径段：线上旧链接、旧书签与外部引用仍需可达，
+// 命中后由 resolveSegment 原地改写为新路径（等价 301，不新增历史记录）。
+// 已改名的四个视图之外的段（chat / settings / deployments）新名与旧名相同，写在表里只为口径完整。
+const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
+  store: 'store', // 旧：商城 → marketplace
+  sites: 'sites', // 旧：入口配置清单 → entry-catalog
+  comic: 'comic', // 旧：漫剧 AI 剧 → comic-studio
+  login: 'login', // 旧：登录 → signin
+  chat: 'chat', // 未改名（新旧一致）
+  settings: 'settings', // 未改名（新旧一致）
+  deployments: 'deployments', // 未改名（新旧一致）
+};
+
+// 全部视图均为单段路径（如 /comic-studio），保证 vite base './' 下相对资源解析正确
+const VIEWS: AppView[] = Object.keys(VIEW_SEGMENTS) as AppView[]; // 视图全集：由映射表派生的唯一真源
 
 // 自定义路由事件名：pushState 不会触发 popstate，编程式导航后派发此事件通知 hook 更新
 const ROUTE_EVENT = 'mim:route'; // 同窗口内导航专用，跨标签页不需要（各标签页独立渲染）
@@ -52,25 +83,41 @@ function firstSegment(): string {
   return path.split('/').filter(Boolean)[0] ?? ''; // 取首个非空段；空路径返回空串
 } // firstSegment 结束
 
+// 把路径段解析为视图：先按新路径段（模块功能名）精确匹配；未命中再查旧路径段，
+// 命中旧段时把地址原地改写为新路径（等价 301：保留查询串与 hash，不新增历史记录）。
+// 两向都不命中返回 null，交由调用方做安全回退。
+function resolveSegment(seg: string): AppView | null {
+  if (!seg) return null; // 空段（根路径）不做匹配
+  const canonical = SEGMENT_VIEWS.get(seg); // 优先匹配新路径段
+  if (canonical) return canonical; // 已是新路径，无需改写
+  const legacy = LEGACY_SEGMENTS[seg]; // 再匹配改名前的旧路径段
+  if (!legacy) return null; // 未知段：交给调用方回退
+  // 旧段命中：改写为新路径，查询串与 hash 原样保留（不丢 ?tads 清理后的其他参数）
+  const target = baseOf() + VIEW_SEGMENTS[legacy] + window.location.search + window.location.hash;
+  window.history.replaceState(null, '', target); // 原地替换，不新增浏览历史
+  return legacy; // 返回旧段对应的视图
+} // resolveSegment 结束
+
 // 解析当前地址栏为路由：兼容旧 hash 链接（#/view）与未知路径（安全回退 store）
 export function parseLocation(): AppRoute {
   if (typeof window === 'undefined') return { view: 'store' }; // 非浏览器环境兜底
   // 旧 hash 链接兼容：改造前线上地址一律为 #/<view>，老书签 / 外链仍可能带 hash 进入
   const hashSeg = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)[0] ?? ''; // hash 首段
   if (hashSeg) { // 存在旧 hash 路径
-    const hashView = VIEWS.find((v) => v === hashSeg); // 尝试匹配已知视图
-    const target = baseOf() + (hashView ?? 'store'); // 已知视图落到对应路径，已删除的旧页面（如 #/site/*）统一回退 store
+    const hashView = VIEWS.find((v) => v === hashSeg) ?? null; // hash 段是老口径的视图标识，直接按视图名匹配
+    // 已知视图落到其新路径，已删除的旧页面（如 #/site/*）统一回退商城
+    const target = baseOf() + VIEW_SEGMENTS[hashView ?? 'store'];
     window.history.replaceState(null, '', target); // 原地改写为路径形式，不新增历史记录
     return { view: hashView ?? 'store' }; // 返回匹配结果或安全回退
   } // hash 兼容分支结束
   const seg = firstSegment(); // 路径首段
-  const view = VIEWS.find((v) => v === seg); // 匹配已知视图
-  return view ? { view } : { view: 'store' }; // 未知路径与根路径都回落到功能模块页
+  const view = resolveSegment(seg); // 新段直接命中；旧段命中并原地重定向
+  return view ? { view } : { view: 'store' }; // 未知路径与根路径都回落到商城目录
 } // parseLocation 结束
 
 // 由路由生成路径：所有导航入口统一走这里，保证链接格式一致（含子路径部署前缀）
 export function hrefOf(route: AppRoute): string {
-  return baseOf() + route.view; // 形如 '/store' 或 '/mim/store'
+  return baseOf() + VIEW_SEGMENTS[route.view]; // 形如 '/marketplace' 或 '/mim/marketplace'
 } // hrefOf 结束
 
 // 编程式跳转：pushState 写入路径并派发路由事件；同地址时直接返回（popstate 与事件均不触发）

@@ -5,7 +5,7 @@
 #
 # 2026-11-10 修复：原文件用的是 `static_sites:` 顶层键（非 Render 蓝图 schema），
 # 官方 schema 是 `services:` 下 `type: web` + `runtime: static`，按官方字段重写；
-# 同时补 routes rewrite，让 /store /comic 等前端深链接回退到 index.html
+# 同时补 routes rewrite，让 /marketplace /comic-studio 等前端深链接回退到 index.html
 # （否则静态站对未匹配路径直接 404，与 GitHub Pages / Cloudflare / Netlify 的回退口径不一致）。
 
 services:

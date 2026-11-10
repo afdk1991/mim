@@ -222,14 +222,14 @@ gh run watch          # 观察最近一次运行
 | Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`SEALOS_NAMESPACE`、`MIM_JWT_SECRET` |
 | IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME`（可选 `IGA_SCOPE`，默认 `domestic`） |
 
-**SPA 深链接回退四件套（2026-11-08 定性）**：前端 history 路径路由（`/store` `/comic` `/chat` `/settings` `/login`）上线后，各平台回退载体分工如下——
+**SPA 深链接回退四件套（2026-11-08 定性；2026-11-11 路径段改为模块功能名称后回退载体不变）**：前端 history 路径路由的对外路径段为 `/marketplace` `/entry-catalog` `/deployments` `/comic-studio` `/chat` `/settings` `/signin`（旧段 `/store` `/sites` `/comic` `/login` 由前端 `LEGACY_SEGMENTS` 与生产 nginx 301 改写），各平台回退载体分工如下——
 
 | 平台 | 回退载体 | 行为 |
 |---|---|---|
-| 腾讯云自建服务器 | nginx `try_files $uri $uri/ /index.html` | 深链接 200 重写 index.html（五条深链接实测全 200 / LEN=5182） |
+| 腾讯云自建服务器 | nginx `try_files $uri $uri/ /index.html` + 四条旧段 `location = … { return 301 …; }` | 深链接 200 重写 index.html（2026-11-08 五条深链接实测全 200 / LEN=5182；2026-11-11 起旧段先 301 到新段） |
 | Cloudflare Pages | `functions/[[catchall]].js` catch-all | **Pages 挂载 Functions 后 `_redirects` 被整体旁路**；函数只对「GET + 静态资源未命中返回 404 + 非 `/api/` 前缀 + `Accept` 含 `text/html`」的请求 200 重写 index.html |
 | GitHub Pages | `dist/404.html`（`index.html` 逐字节副本，`scripts/spa-404.mjs` 生成） | 深链接返回 **404 状态 + SPA 全文**，浏览器加载后 router 读 `location.pathname` 渲染，404 状态码属平台能力上限的预期设计；响应体长度与首页相同，不能以长度区分命中，只能看状态码 |
-| EdgeOne Pages | 构建期生成的 `dist/404.html` + `dist/<view>/index.html`（视图清单从 `router.ts` 的 `VIEWS` 解析，`scripts/build.mjs` 的 `emitSpaFallback()` 产出） | **`_redirects` 在该平台不可靠且可能触发平台层报错**（2026-11-11 实测：深链接返回 HTTP 545 + 24 字节 `Error return from script`）；改为让每个视图命中真实静态目录，实测 `/store` `/chat` `/comic` `/settings` `/login` 全部正常渲染。`functions/[[catchall]].js` 已加运行时能力守卫，被该平台挂载时返回 404 而不再抛错 |
+| EdgeOne Pages | 构建期生成的 `dist/404.html` + `dist/<模块功能名>/index.html`（路径段清单从 `router.ts` 的 `VIEW_SEGMENTS` 解析，`scripts/build.mjs` 的 `emitSpaFallback()` 产出） | **`_redirects` 在该平台不可靠且可能触发平台层报错**（2026-11-11 实测：深链接返回 HTTP 545 + 24 字节 `Error return from script`）；改为让每个路径段命中真实静态目录，2026-11-11 前实测 `/store` `/chat` `/comic` `/settings` `/login` 全部正常渲染，改名后由同名目录 `marketplace/` `comic-studio/` 等承接。`functions/[[catchall]].js` 已加运行时能力守卫，被该平台挂载时返回 404 而不再抛错 |
 
 > **CF 深链接 curl 取证口径**：裸 curl 默认发 `Accept: */*`（不含 `text/html`），catch-all Function 按设计跳过回退、返回 404——**这不代表回归**。测 CF 深链接必须带浏览器式 Accept 头：`curl -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"`，预期 200 / LEN=5182（CI run 42412711936 部署后五条深链接实测全部 200）。
 
@@ -384,7 +384,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 
 ## 7.6 DNS 资产（DNSPod mixm.top）与功能模块对应
 
-来源：`dnspod_records_2026-11-05_21-42-26.xls`（197 条，含 GBK 中文备注）。结论（2026-11-06 全仓比对）：
+来源：`dnspod_records_2026-11-05_21-42-26.xls`（197 条，含 GBK 中文备注）。**口径更正（2026-11-11 实读）**：197 条 = 两个工作表原始行数之和（`laal.top` 93 + `mixm.top` 104，均含表头），逐行只有「主机记录 / 线路类型 / TTL 600 / 备注」有值，**记录类型与记录值两列全为空**，逐主机折叠后实为 46 条主机记录（45 类模块入口 + 根域），即这是一份命名模板而非可直接导入的解析记录。结论（2026-11-06 全仓比对）：
 
 - **项目实际使用 3 条**：`mim`（生产主域）、`data`（EdgeOne Pages 真实前端站）、`_dnsauth.mim`（证书签发校验）；`cloud.mixm.top` DNS 在线但项目零引用；其余 193 条未使用。
 - **备注 ↔ 模块对应（40 种备注）**：仅 3 类直接命中——`auth` / `login` / `api` → FR-01 账号与身份 + `mim-api`；10 类部分沾边（`admin` / `center` / `user` / `dy` / `sp` / `video` / `yy` / `img` / `secure` / `portal`）；27 类无对应（`pay` 无对应域；电商 7 类、资讯 4 类、工具 4 类、移动端 3 类等与当前「功能模块商城 + 漫剧 AI 剧」范围无关）。
@@ -406,6 +406,27 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 - `cloud`（`A \| cloud \| 115.159.159.11`，正常，2026-11-01 21:08:13）DNS 在线但项目零引用，未指向任何部署平台功能。
 - `@` 根域及旧 `cloud` / `data` A 记录（103.0.113.20）状态为「暂停」，不参与服务。
 - 另有 `_dnsauth.gy`（CNAME → `gy.mixm.top.eoacme0.com.`）属 EdgeOne 证书校验，与 `gy.mixm.top` 子站相关，当前项目未使用。
+
+### 多平台自定义域名矩阵（2026-11-11 按用户指令统一到 DNSPod 导出命名）
+
+用户要求「多平台部署矩阵所有自定义域名使用导出中对应的域名」，据此把 10 平台的**自定义域名**统一取 `mixm.top` 工作表的主机记录，单一事实源为 `packages/core-domain/src/customDomains.json`（含每条域名的 xls 行号、备注、状态与下一步），门禁脚本 `node scripts/verify-custom-domains.mjs`。
+
+| 部署平台 | 自定义域名 | xls 主机 / 行号 | 状态 |
+|---|---|---|---|
+| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 99 | live（`/health` 200 / 53B） |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 103 | live（`/` 200，校验通过后深链接正常） |
+| GitHub Pages | `www.mixm.top` | `www` / 5–6 | pending_dns |
+| Cloudflare Pages | `portal.mixm.top` | `portal` / 53–54 | pending_dns |
+| Vercel | `m.mixm.top` | `m` / 45–46 | pending_dns |
+| Sealos | `api.mixm.top` | `api` / 9–10 | pending_dns |
+| IGA Pages | `test.mixm.top` | `test` / 71–72 | pending_dns |
+| Gitee（码云）镜像仓 | `store.mixm.top` | `store` / 67–68 | pending_dns |
+| GitHub 仓库 | `dev.mixm.top` | `dev` / 23–24 | pending_dns |
+| Cloudflare 独立 Worker（`mim-store`） | `shop.mixm.top` | `shop` / 59–60 | pending_dns |
+
+- **保留**：`cloud.mixm.top`（xls 19–20 行）已解析至生产 CVM 并被云服务模块占用（实测 200 / 5114B），不分配给任何平台。
+- **不适用**：ghcr（域名固定 `ghcr.io`）。
+- **待办**：DNSPod 添加 `www` / `portal` / `m` / `api` / `test` / `store` / `dev` / `shop` 解析 → 各平台控制台绑定自定义域名 → 指向 CVM 的新域名需单独签发证书（现有证书不覆盖任意子域，2026-11-11 严格 TLS 探测未配置主机名得 exit 000）。
 
 ## 8. 部署汇总核对（2026-11-09 新增）
 

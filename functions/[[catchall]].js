@@ -4,6 +4,8 @@
 // Functions 路由器，未匹配到函数路由且未命中静态资源时直接返回 404（含自定义 404.html），
 // 静态目录内的 `_redirects`（`/* /index.html 200`）被整体旁路、不会生效。
 // 表现为 /store /comic /chat /settings /login 五条深链接全部 404。
+// 2026-11-11 起对外路径段改为模块功能名称（/marketplace /comic-studio /chat /settings /signin），
+// 本函数按路径通配生效、不枚举具体段名，因此无需随改名调整匹配规则。
 // 因此 SPA 回退改由本兜底函数实现：未命中资源（404）的 GET 页面请求重写为 index.html。
 // 路由匹配说明：`/api/*` 由更具体的 functions/api/[[path]].js 处理，不会进入本函数。
 
