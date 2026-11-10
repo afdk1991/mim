@@ -364,10 +364,10 @@
       "result": {
         "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 1455,
+        "latency_ms": 1585,
         "bytes": 5114,
-        "evidence": "2026-11-10 21:47 重建：控制台「直接上传」新建 Pages 项目 mim-8ah 并直传根构建 dist（6 文件）→ curl / 200 / 1.455s / 5114B（title=Mim、产物 assets/index-DkyuUDY7.js + index-DY6XAYXj.css）；深链接 /store 200 / 1.040s / 5114B；assets/index-DkyuUDY7.js 200；重建前同一 URL 为 530（项目不存在）",
-        "captured_at": "2026-11-10 21:47 +08:00"
+        "evidence": "2026-11-10 22:1x CI 自动发布恢复并带 Functions：补齐 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 两个 secret、把 CI 的 --project-name=mim 改为 mim-8ah 后，push 触发 deploy.yml（run 42831492102）→ Cloudflare Pages 步骤真实执行 wrangler 4.160.0「pages deploy apps/web/dist --project-name=mim-8ah --branch=main --commit-dirty=true」，日志「Success! Uploaded 3 files (2 already uploaded)」「Uploading _redirects」「Uploading Functions bundle」「Deployment complete!」，预览域 https://1c93fea4.mim-8ah.pages.dev；生产别名 / 200 / 1.585s / 5114B、/store 200 / 1.150s / 5114B、/api/v1/modules 521（Functions 已挂载，但上游 mim.mixm.top 的 80/443 拒连）",
+        "captured_at": "2026-11-10 22:18 +08:00"
       },
       "anomalies": [
         { "code": "DUPLICATE_MATRIX_ROW_MERGED", "severity": "info", "message": "README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数" },
@@ -375,10 +375,12 @@
         { "code": "MANUAL_DEPLOY_OVERWRITE", "severity": "warning", "message": "wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置" },
         { "code": "CF_ARTIFACTS_WORKTREE_RESTORED", "severity": "info", "message": "wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空" },
         { "code": "CF_PROJECT_ABSENT_RECREATED", "severity": "warning", "message": "2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿" },
-        { "code": "CF_CI_TOKEN_MISSING", "severity": "warning", "message": "仓库 secrets 无 CLOUDFLARE_API_TOKEN，deploy.yml 的 Cloudflare Pages 步骤每轮输出 SKIP 并 exit 0；本次上线为控制台手工直传，push 后不会自动重新发布，须补 token 才能恢复 CI 自动发布" }
+        { "code": "CF_CI_AUTODEPLOY_RESTORED", "severity": "info", "message": "2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环" },
+        { "code": "CF_CI_PROJECT_NAME_MISMATCH", "severity": "warning", "message": "deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿" },
+        { "code": "CF_API_UPSTREAM_DOWN", "severity": "warning", "message": "/api/* 反代已随 Functions 上线（functions/api/[[path]].js 上传成功），但上游 https://mim.mixm.top 的 80/443 端口 Connection refused（22 端口 OPEN、ping 通），故 /api/v1/modules 实测 521；接口层不可用是生产主机 Web 服务未运行所致，不是 Pages 侧缺陷" }
       ],
       "missing_fields": [],
-      "sources": ["curl https://mim-8ah.pages.dev/", "git ls-tree HEAD", ".github/workflows/deploy.yml step Cloudflare Pages", "README 多平台部署矩阵 / 2026-11-09 取证段"]
+      "sources": ["curl https://mim-8ah.pages.dev/", "gh run view 42831492102 --log（Cloudflare Pages 步骤）", "curl https://mim-8ah.pages.dev/api/v1/modules", "git ls-tree HEAD"]
     },
     {
       "id": "pages.vercel",

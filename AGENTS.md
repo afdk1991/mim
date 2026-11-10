@@ -399,6 +399,29 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 - **如实记录的限制**：① Gitee 的 200 仅为**仓库页可达性**取证，不代表任何生产服务可用，也不得替代 `mim.mixm.top`（铁律十二 §12.3）；② 未配置 Gitee Go / Webhook 自动镜像，镜像同步仍依赖每轮手工推送；③ 本轮未做生产部署与线上 E2E（CI 生产作业如实 SKIP）。
 
+### 9.13 Cloudflare 三项落地：/api 反代、CI 自动发布、生产核查（2026-11-10 22:18 +08:00）
+
+**性质**：按用户在交互确认里的「三项全做」推进 —— ① Pages 补回 `/api` 反代、② 恢复 push 后 CI 自动发 Pages、③ 生产 `mim.mixm.top` 上线核查。① 与 ② 本轮闭环并取得线上取证；③ 取得**主机侧不可达的完整证据链**后如实停下，不冒充上线。
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| ① 令牌 | 新建用户 API 令牌 `mim-ci-gh-actions`，权限「所有帐户 · Cloudflare Pages: 编辑」、无过期；`GET /client/v4/user/tokens/verify` → `{"status":"active","success":true}`，token id `2ddbedd09fc31376000a981237b0265d`；账号内原有一个同名体系旧令牌 `mim-ci`（`cfut…f84b`，含 Workers 脚本权限，创建 4 天前）无法取回明文 | ✅ 新令牌 active |
+| ① 带 Functions 部署 | `npx --yes wrangler@3 pages deploy apps/web/dist --project-name mim-8ah --branch main --commit-dirty=true` → 「Compiled Worker successfully」「Success! Uploaded 4 files (1 already uploaded) (8.27 sec)」「Uploading _redirects」「**Uploading Functions bundle**」「Deployment complete!」→ 预览域 `https://1f236943.mim-8ah.pages.dev` | ✅ `functions/api/[[path]].js` + `functions/[[catchall]].js` 已随站点上线 |
+| ① 反代实测 | `https://mim-8ah.pages.dev/api/v1/modules` → **521 / 1.183s / 7005B**（`/api/health` 同为 521） | Functions 在跑、上游不可达（见 ③） |
+| ② secret 补齐 | `gh secret set CLOUDFLARE_API_TOKEN`（新令牌）+ `gh secret set CLOUDFLARE_ACCOUNT_ID` → `repos/…/actions/secrets` 由 `total_count: 0` 变 **2** | ✅ 凭据就位 |
+| ② 首次真实调用暴露两处缺陷 | run **42830819050**（`workflow_dispatch`）结论 success，但日志里 Cloudflare 步骤实际报 `[ERROR] Invalid account ID "***" set in the CLOUDFLARE_ACCOUNT_ID environment variable`、`Process completed with exit code 1` —— `gh secret set` 从管道读入时把 `acct=` 前缀一并写入；同一行命令仍是 `--project-name=mim`（账号内实际项目名 `mim-8ah`），且步骤带 `continue-on-error: true` | ⚠️ 修 secret 前仍是**假绿**（作业 success ≠ 部署成功） |
+| ② 修复 | ① `gh secret set CLOUDFLARE_ACCOUNT_ID --body …`（裸值）；② `deploy.yml` 的 `--project-name` 改 `mim-8ah`、去掉 `continue-on-error`；③ `wrangler.toml` 的 `name` 改 `mim-8ah`。提交 `b739483`（2 files / +8 / −3）并 `git push origin main` | ✅ |
+| ② 修复后真发 | run **42831492102**（Deploy @ `b739483`）五作业：质量门禁 ✓ 57s / GitHub Packages ✓ 49s / 发布到生产服务器 ✓ 5s / GitHub Pages ✓ / 托管平台同步 ✓ 47s；Cloudflare 步骤日志：`⛅️ wrangler 4.160.0`、`Success! Uploaded 3 files (2 already uploaded) (4.57 sec)`、`Uploading _redirects`、`Uploading Functions bundle`、`**Deployment complete!** … https://1c93fea4.mim-8ah.pages.dev`，随后平台自检 `https://mim-8ah.pages.dev/ => 200` | ✅ **push 后 CI 真的发 Pages**（不再是 SKIP） |
+| ② 生产域复测 | `https://mim-8ah.pages.dev/` **200 / 1.585s / 5114B**；`/store` **200 / 1.150s / 5114B**；预览域 `https://1c93fea4.mim-8ah.pages.dev/` 200 / 1.541s / 5114B | ✅ 静态站可用 |
+| ③ 主机端口（Windows 侧 `--noproxy`） | `Test-NetConnection 115.159.159.11` → 80 **False** / 443 **False** / 22 **True**；`curl http(s)://mim.mixm.top/health` → **000 / 2.10s / 2.13s** | 主机在线但 Web 服务未运行 |
+| ③ SSH 凭据 | 云主机侧（`vm`，`hostname=vefaas-…` 沙箱，非生产机）无 `~/.ssh`；`ssh -o BatchMode=yes root@115.159.159.11` → `Permission denied (publickey,password)` | 无可用私钥，进不去主机 |
+| ③ 控制台 | `https://console.cloud.tencent.com/cvm/index` 跳转 `cloud.tencent.com/login`（无登录态），无法查实例状态 / 安全组 | 需用户登录才能从云侧定位 |
+| ③ 结论 | 生产站**未上线**：`/health` 000、80/443 拒连；`/api` 反代因此无后端可打（521） | **不宣称上线**（铁律八） |
+
+- **同步工件**：`packages/core-domain/src/deploymentRegistry.json`（`pages.cloudflare` 的 `result` 刷新为 22:18 取证、`latency_ms` 1455 → **1585**、异常新增 `CF_CI_AUTODEPLOY_RESTORED`（info，闭环原 `CF_CI_TOKEN_MISSING`）/ `CF_CI_PROJECT_NAME_MISMATCH`（warning）/ `CF_API_UPSTREAM_DOWN`（warning））、`docs/deployment-summary.json` 与 `.md`（重生成）、`README.md` 与 `docs/wiki/05-runbook.md` 取证段、本段。
+- **门禁**：`node scripts/verify-deployments.mjs` **52/52 PASS**、`verify-entry-manifest` PASS、`deploy.yml` 经 `yaml.safe_load` 解析通过。
+- **未覆盖项**：① Pages 侧未绑自定义域（`mixm.top` zone 内 0 条 DNS）；② 旧令牌 `mim-ci` 未吊销；③ 生产主机 Web 服务未起（nginx / systemd `mim-api`）的根因需服务器权限或腾讯云控制台登录后定位；④ 未做生产登录态 E2E（后端不可达）。
+
 ## 铁律十：免费平台额度矩阵与选型路由
 
 **免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 10 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。
