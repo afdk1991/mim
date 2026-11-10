@@ -149,7 +149,7 @@ export function App() {
     <div className="layout">
       {/* 左侧导航栏 */}
       <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
-        {/* 品牌区：仅保留应用名，旧「跨端任务与轻协作」标语已按用户指令删除 */}
+        {/* 品牌区：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
         <div className="brand">{/* 品牌区：应用名单独成组 */}
           {/* 应用名（i18n） */}
           <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名，走 i18n 词典 */}

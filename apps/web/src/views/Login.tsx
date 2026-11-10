@@ -150,7 +150,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>
       <div className="auth-card">{/* 登录卡片：承载标题、切换器与登录表单 */}
         <div className="auth-head">{/* 卡片头部：品牌信息 + 语言切换 */}
-          <div>{/* 品牌信息：仅保留应用名，旧「跨端任务与轻协作」标语已按用户指令删除 */}
+          <div>{/* 品牌信息：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
             <h1>{t(locale, 'app.name')}</h1>{/* 应用名，取自 i18n 词条 */}
           </div>{/* 结束品牌信息 */}
           <button
