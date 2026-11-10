@@ -33,7 +33,7 @@ body { /* 页面基础排版 */
   color: var(--text); /* 继承主文字色，子元素无需重复声明 */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', /* 系统字体栈：优先原生界面字体，避免额外字体请求 */
     'Microsoft YaHei', sans-serif; /* 中文回退末位：Windows 雅黑 → 通用无衬线 */
-  font-size: 14px; /* 基准字号：紧凑的信息密度适合任务管理场景 */
+  font-size: 14px; /* 基准字号：紧凑的信息密度适合模块列表与工作台场景 */
   line-height: 1.5; /* 1.5 倍行高保证中文段落可读性 */
 } /* body 规则结束 */
 

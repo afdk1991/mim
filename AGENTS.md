@@ -130,7 +130,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 平台 | 免费 | 状态 | 域名 | 访问速度（HTTP / 耗时 / 连接） |
 |---|---|---|---|---|
 | 腾讯云自建服务器 | ✅ 是（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / 0.061s ⚡最快（2026-11-08 18:14 本轮实测：`/health` 200 / 0.061s / 0.001s / LEN=53；首页 200 / 0.064s / 0.001s / LEN=5182，产物 `assets/index-D2UkZqM1.js` + `assets/index-CeRvh2Rf.css`；五条深链接 `/comic` 0.073s / `/store` 0.079s / `/chat` 0.071s / `/settings` 0.066s / `/login` 0.068s 全 200 / LEN=5182，nginx `try_files` 生效；`/admin/` 200 / 0.069s / LEN=1430；`/api/v1/modules` 200 / 0.076s / LEN=438；`/api/v1/site/overview` 404 / LEN=126 为站点下线终态；**导出路由匿名探测 `POST /api/v1/comic/films/does-not-exist/export` 返回 401 `AUTH_UNAUTHORIZED` 而非 404，证明路由在线**；生产 Edge CDP E2E 8/8——新 bundle 加载、`/store` 匿名渲染 8 个模块卡片、搜索 comic 命中漫剧工作台 → 详情面板「状态: 已上架 / 依赖链 / 价格历史」、`/comic` 匿名内嵌登录卡片、console 零报错；**本轮（2026-11-08 18:3x）商城种子由 1 个模块扩充为 8 个（含付费生成包与依赖链），`/api/v1/modules` 现返回 8 条、`/store` 不再显空**） |
-| 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步（**direct upload 直传型，非仓库连接**；最近一次 Deployment `dpu0n61jlos8`，2026-11-08，`git worktree` 干净树 HEAD `42b98bc` 构建产物，经 `edgeone makers deploy apps/web/dist -n mim-app --env production` 直传）；**curl 命中 WAF 挑战页，须有头浏览器取证**） | `https://data.mixm.top` | 200 / 0.075s / 0.001s 但仅 985B 为 EdgeOne WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a` 命中，本轮未做内容层复验；CI「托管平台同步」作业 success 作替代取证）；**2026-11-08 04:33 有头 Edge + CDP 人工放行后商城全链路通过**（历史留痕，放行凭证会过期）：`title=Mim — 跨端任务与轻协作`、`isWafChallenge=false`、搜索/详情/`/api/v1/modules` 200、console 零报错 |
+| 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步（**direct upload 直传型，非仓库连接**；最近一次 Deployment `dpu0n61jlos8`，2026-11-08，`git worktree` 干净树 HEAD `42b98bc` 构建产物，经 `edgeone makers deploy apps/web/dist -n mim-app --env production` 直传）；**curl 命中 WAF 挑战页，须有头浏览器取证**） | `https://data.mixm.top` | 200 / 0.075s / 0.001s 但仅 985B 为 EdgeOne WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a` 命中，本轮未做内容层复验；CI「托管平台同步」作业 success 作替代取证）；**2026-11-08 04:33 有头 Edge + CDP 人工放行后商城全链路通过**（历史留痕，放行凭证会过期）：`title=Mim（旧定位副标题已于 2026-11-10 删除）`、`isWafChallenge=false`、搜索/详情/`/api/v1/modules` 200、console 零报错 |
 | GitHub Pages | ✅ 是 | ✅ CI 自动发布（**含 `?tads` / 裸问号归一化脚本，已实测**） | `https://afdk1991.github.io/mim/` | `/mim/` 200 / 0.867s / 0.001s / LEN=5182（产物 `assets/index-COy8rstl.js`，根构建注入 `VITE_API_ORIGIN` 与自建同源指纹不同属预期）；深链接 `/mim/store` 404 / 0.370s / LEN=5182 属 `404.html` 逐字节副本的预期设计，浏览器加载后 SPA 直接启动 |
 | Sealos | ✅ 是 | ✅ CI 自动发布（容器 + PVC；**纯 API 容器，根路径 `/` 404 无路由，`/health` 200**） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/health` 200 / 0.718s / 0.001s / LEN=53（`{"status":"ok"}`；根路径 `/` 404 属纯 API 容器未注册根路由，本轮未重测；`/store` 等 Web 路由命中 API 返回 `route GET /store not found` 404 JSON 属预期——Sealos 为纯 API 容器，不托管商城 SPA；商城 SPA 仅在 `mim.mixm.top` / GitHub Pages / Cloudflare Pages 提供） |
 | Cloudflare Pages | ✅ 是 | ✅ CI 自动发布（含 `/api` 反代与 `?tads` / 裸问号归一化脚本；**`functions/[[catchall]].js` catch-all 修复深链接 404 已上线**） | `https://mim-8ah.pages.dev` | 首页 200 / 1.384s / 0.001s / LEN=5182（产物 `index-D2UkZqM1.js` 与自建同指纹）；带 `Accept: text/html` 头深链接 `/store` 200 / 0.931s、`/comic` 200 / 0.842s、`/login` 200 / 1.526s 全 LEN=5182（catch-all Function 生效）；裸 curl `/store` 404 / 0.791s / LEN=5182 属预期——函数只对 html 导航重写 |
@@ -307,20 +307,37 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **控制台噪声说明**：E2E 页面 console 里有 `ws://localhost:5173` 连接失败，是上一轮商城 dev server 已停导致的遗留 vite 客户端重连，与本轮管理端无关，零功能报错。
 - **仍未做**：分类树在管理端**没有做拖拽排序**（排序靠改 `sort_order` 数字）；205 个二级模块差异化定价语义、排序三档独立时间列仍为开放项。
 
-### 9.8 删除旧定位标语「跨端任务与轻协作」（2026-11-10）
+### 9.8 删除产品里的旧定位副标题与旧 FR-03 旗舰形态残留（2026-11-10）
 
-**性质**：按用户指令删除产品里残留的旧定位文案。该标语属于 2026-11-04 前的旗舰形态（「跨端任务与轻协作工具」），PRD 与 Wiki 已登记为历史范围，但前端仍在侧栏品牌区、登录卡片与标签页标题继续展示，与当前定位（功能模块商城 + 漫剧 AI 剧）不符。
+**性质**：按用户指令删除产品里残留的旧定位文案与旧 FR-03 旗舰形态的功能条目。该定位文案属于 2026-11-04 前旗舰形态的遗留表述，PRD 与 Wiki 早已登记为历史范围，但前端仍在侧栏品牌区、登录卡片与标签页标题继续展示、文档中仍按旧口径列功能条目，与当前定位（功能模块商城 + 漫剧 AI 剧）不符。
 
 | 项 | 本轮改动 | 取证方式 |
 |---|---|---|
 | 词条 | `packages/i18n/src/index.ts` 删除 `app.tagline`（中英各一条，连带注释），字典键集合仍中英对齐 | 文件内容 + `pnpm -r typecheck` 0 |
 | 侧栏 | `apps/web/src/App.tsx` 品牌区只留 `app.name`，移除 `brand-tagline` 一行 | `apps/web` 构建 0 |
-| 登录页 | `apps/web/src/views/Login.tsx` 登录卡片只留 `<h1>` 应用名，移除标语段 | 同上 |
-| 标签页 | `apps/web/index.html` `<title>` 由 `Mim — 跨端任务与轻协作` 改为 `Mim` | `apps/web/dist/index.html` 实测 `<title>Mim</title>` |
-| 样式 | `apps/web/src/styles.css` 删除已无引用的 `.brand-tagline` 规则，并把 `.brand` / `--sidebar-muted` / `.user-region` 处仍提「标语」的注释改写为现状描述（铁律十一要求注释与实际一致） | 产物 `assets/*.js`、`assets/*.css` grep `跨端任务` 与 `brand-tagline` **均 0 命中** |
-| 未动 | PRD / Wiki / README / AGENTS 中的**历史留痕**表述（如 EdgeOne 取证里 `title=Mim — 跨端任务与轻协作`）按铁律三原样保留，它们记录的是当时线上标题，不是现行文案 | `grep` 复核：业务代码与构建产物零残留，仅文档历史段落保留 |
+| 登录页 | `apps/web/src/views/Login.tsx` 登录卡片只留 `<h1>` 应用名，移除副标题段 | 同上 |
+| 标签页 | `apps/web/index.html` `<title>` 由「`Mim` + 旧副标题」改为 `Mim` | `apps/web/dist/index.html` 实测 `<title>Mim</title>` |
+| 样式 | `apps/web/src/styles.css` 删除已无引用的 `.brand-tagline` 规则，并把 `.brand` / `--sidebar-muted` / `.user-region` 处仍提旧文案的注释改写为现状描述（铁律十一要求注释与实际一致） | 产物 `assets/*.js`、`assets/*.css` grep 旧文案与 `brand-tagline` **均 0 命中** |
+| 文档功能条目（§9.9） | `Mim-PRD.html` / `site/index.html` / `site/prd.html` / `docs/wiki/01-architecture.md` 里的旧 FR-03 功能规格与旧定位表述全部删除或改写成现行范围 | 见 §9.9 的 grep 复核（tracked 文件 0 命中） |
 
-- **边界**：`site/`（PRD 阅读页）里的「跨端任务与轻协作工具」属 2026-11-04 之前的历史范围描述，本轮未改；若要连 PRD 阅读页一起删须另行确认。
+- **证据口径调整**：`README.md` / `docs/wiki/05-runbook.md` / 本文件铁律九表格里的 EdgeOne 有头取证原文是「`title=Mim` + 旧副标题」，按用户「整个项目删除」的指令，副标题原句已不再保留，改为「`title=Mim`（旧定位副标题已于 2026-11-10 删除）」——保留取证的可核对性（标题主体、`isWafChallenge=false`、产物指纹、时间戳均未动），只剥离已删除的文案。
+
+### 9.9 全项目清除旧 FR-03 旗舰形态与旧定位文案的残留（2026-11-10）
+
+**性质**：用户把范围从「删掉那句标语」升级为「删除整个项目里关于它的模块和功能」。本轮把仓库内**所有仍以现行口径描述该旧旗舰形态的位置**（PRD 两份、PRD 阅读页两份、Wiki 架构页、README/AGENTS 的取证串）一并清理，避免「代码已删、文档仍在教旧功能」的错位。**不删除**与它无关的通用技术词「跨端」（多端账号打通、跨端前端、跨端适配层等仍是现行需求），也**不动**用户自己的两个未跟踪文件。
+
+| 文件 | 处理 | 复核 |
+|---|---|---|
+| `Mim-PRD.html` | ①文档定位段删掉「替代原…方案」的旧形态指代；②§5 FR-03 历史记录里的四条旧功能规格（任务管理 / 多端同步 / 基础协作 / 个人仪表盘）改写为「已删除、不再保留实现口径」 | `grep 旧形态关键词` 0 命中 |
+| `site/prd.html` | ①文档定位段同步；②§FR-03 整节由「旧四条功能 + 订阅 features 映射表 + 旧工作区框架 + 旧权限校验」替换为**现行范围**（商城 + 漫剧），表与旧清单全部移除 | 同上 |
+| `site/index.html` | FR-03 卡片正文由旧形态描述改为现行两域范围 | 同上 |
+| `docs/wiki/01-architecture.md` | 旗舰形态行与 P0 必交付段的旧形态指代改为「早期旗舰形态（已随 FR-03 重写并于 2026-11-10 删除功能条目）」 | 同上 |
+| `README.md`（3 处）、`docs/wiki/05-runbook.md`（2 处）、`AGENTS.md`（1 处） | EdgeOne 有头取证里的线上标题串剥离旧副标题原句，改记为 `title=Mim（旧定位副标题已于 2026-11-10 删除）`，其余取证要素一字未动 | 同上 |
+| `apps/web/src/styles.css` | 基准字号注释里的「任务管理场景」改为「模块列表与工作台场景」（铁律十一：注释须与现状一致） | `@mim/web` 构建 0 |
+
+- **复核方式**：`git grep -I` 对旧定位文案与旧旗舰形态名（脚本里以关键词常量给出，避免本文件再复述原句）在 **tracked 文件**上 0 命中；`apps/web/dist` 全目录 grep 同组关键词 0 命中。
+- **明确不动的部分**：①通用技术词「跨端」（`docs/四份技术资料完整内容整理-20261109.md` 的跨端策略 / 跨端前端人力、PRD 里的跨端账号打通、跨端继续使用等）——这是多端技术表述，不是该旧模块；②用户未跟踪文件 `新建 文本文档.txt` 与 `docs/gitee-开源项目适配清单-2026-11-10.md`（后者是外部抓取资料，含与旧形态同名的对标小节，但属用户材料，未获指令不动）。
+- **未做**：旧功能的代码与库表在 2026-11-04 / 11-05 已随 FR-03 与订阅下线，本轮无代码可删；`site/` 只有静态页，构建脚本 `scripts/build-site.mjs` 未改动。
 
 
 
