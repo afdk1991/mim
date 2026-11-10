@@ -1102,6 +1102,30 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       if (opts.limit !== undefined) qs.set('limit', String(opts.limit)); // 分页条数需转字符串，0 也要保留
       return request<{ items: ListedAsset[] }>(`/media/assets?${qs.toString()}`); // 返回带 download_url 的产物列表
     }, // listAssets 结束
+    /** GET /media/thumb?object_key=…&size=…：带 Bearer 拉取 WebP 缩略图二进制，供产物列表内联预览；失败由调用方回退原图 */
+    async thumbBlob(objectKey: string, size = 240): Promise<Blob> {
+      // 查询串：对象键必填，边长限制在后端 32~512 区间内
+      const qs = new URLSearchParams({ object_key: objectKey, size: String(size) });
+      // 缩略图走鉴权端点（非预签名免鉴权），需手动注入 Bearer；统一 request 强制 text()+JSON 解析，不适配二进制，故独立 fetch
+      const headers: Record<string, string> = {};
+      if (current) headers.Authorization = `Bearer ${current.access_token}`; // 有会话才带令牌，避免 Bearer undefined
+      const res = await fetch(`${BASE}/media/thumb?${qs.toString()}`, { headers }); // GET 缩略图端点
+      // 非 2xx：读 JSON 信封抛结构化错误，与列表/下载错误口径一致；缩略图失败由视图回退原图，不阻断列表
+      if (!res.ok) {
+        const text = await res.text(); // 读取错误正文
+        let payload: unknown = null;
+        if (text) { try { payload = JSON.parse(text); } catch { payload = null; } } // 非 JSON 按空兜底
+        const body = (payload ?? {}) as { code?: string; message?: string; request_id?: string; details?: unknown };
+        throw new ApiError(
+          body.code ?? 'INTERNAL_ERROR', // 业务错误码兜底
+          body.message ?? res.statusText, // 错误文案兜底
+          res.status, // HTTP 状态码
+          body.details, // 详情原样透出
+          body.request_id, // 请求 ID 追踪
+        );
+      }
+      return res.blob(); // 返回 WebP 二进制，由调用方生成 BlobURL 喂给 <img>
+    }, // thumbBlob 结束
   }, // media 分组结束
 
   // ---------- AI 编排控制面（ai-orchestrator） ----------

@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'; // 表单事件类型：提交处理器�
 import { useState } from 'react'; // 过滤、分页与结算表单状态钩子
 // 类型与接口：只引入本视图用到的部分，避免无谓打包体积
 import type { AdminOrderPage, AdminOrderRow, Credential } from '../api';
-import { describeError, listOrders, settleOrder } from '../api'; // 错误转文案 + 订单列表 + 结算
+import { describeError, listOrders, settleOrder, exportOrders } from '../api'; // 错误转文案 + 订单列表 + 结算 + 导出 xlsx
 // 通用异步加载钩子：统一 loading / error / reload
 import { useAsync } from '../hooks';
 
@@ -135,6 +135,11 @@ export function Orders({ credential, permissions }: OrdersProps) {
   // 结算成功回执
   const [receipt, setReceipt] = useState<AdminOrderRow | null>(null);
 
+  // 导出 xlsx 在途标记，避免重复触发下载
+  const [exporting, setExporting] = useState(false);
+  // 导出错误文案（与结算错误并列展示，互不覆盖）
+  const [exportError, setExportError] = useState<string | null>(null);
+
   // 当前页订单与总数：无权限或加载前按空处理
   const rows = listState.data?.orders ?? [];
   const total = listState.data?.total ?? 0;
@@ -221,6 +226,37 @@ export function Orders({ credential, permissions }: OrdersProps) {
     } // try/catch/finally 结束
   } // submitSettle 结束
 
+  // 导出当前过滤口径下的订单清单为 xlsx：复用列表过滤条件，浏览器触发附件下载
+  async function submitExport() {
+    // 清空上一轮导出错误
+    setExportError(null);
+    // 置为在途，禁用导出按钮
+    setExporting(true);
+    try {
+      // 调导出端点：后端按同口径过滤生成 xlsx 流，返回 Blob 与建议文件名
+      const { blob, filename } = await exportOrders(credential, {
+        q: applied || undefined, // 已提交关键字，空则不携带
+        status: statusFilter || undefined, // 状态过滤
+        region: regionFilter || undefined, // 区域过滤
+      });
+      // 为 Blob 生成本地临时 URL，供 <a download> 触发浏览器保存
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); // 临时下载锚点
+      anchor.href = url; // 指向 Blob URL
+      anchor.download = filename; // 建议文件名取自响应头
+      document.body.appendChild(anchor); // 挂载后才能触发点击
+      anchor.click(); // 触发下载
+      anchor.remove(); // 用完即移除
+      URL.revokeObjectURL(url); // 释放临时 URL，避免内存泄漏
+    } catch (error) {
+      // 失败统一转可读文案（如无读权限 403、网络异常）
+      setExportError(describeError(error));
+    } finally {
+      // 解除在途
+      setExporting(false);
+    } // try/catch/finally 结束
+  } // submitExport 结束
+
   // 回执展示字段：抽成数组后用 map 渲染，避免重复 JSX
   const receiptRows = receipt
     ? [
@@ -270,7 +306,11 @@ export function Orders({ credential, permissions }: OrdersProps) {
               ))}
             </select>{/* 区域下拉结束 */}
             <button className="btn" type="submit">搜索</button>{/* 提交按钮：仅关键字需要点击生效 */}
+            <button className="btn ghost" type="button" disabled={exporting} onClick={() => void submitExport()}>{/* 导出 xlsx：复用当前过滤条件 */}
+              {exporting ? '导出中…' : '导出 Excel'}{/* 在途文案 */}
+            </button>
           </form>{/* 过滤行结束 */}
+          {exportError ? <div className="error">{exportError}</div> : null}{/* 导出失败提示，与列表错误互不覆盖 */}
 
           {listState.loading ? <p className="muted">加载中…</p> : null}{/* 加载占位 */}
           {listState.error ? (// 加载失败提示

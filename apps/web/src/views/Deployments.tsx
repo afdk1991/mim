@@ -1,5 +1,5 @@
 // 部署汇总视图：把全部部署仓库与部署项按统一字段铺成一张可筛选、可展开的核对表
-import { useState } from 'react'; // 本地状态钩子：搜索词、筛选条件、展开项
+import { useEffect, useRef, useState } from 'react'; // 本地状态钩子：搜索词、筛选条件、展开项；ref/effect 供图表挂载与销毁
 import type { FormEvent } from 'react'; // 表单事件类型：筛选表单 onSubmit 入参
 // 语言类型：约束文案取值为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
@@ -9,6 +9,8 @@ import { api, errorText } from '../api';
 import type { DeploymentAnomaly, DeploymentItem, DeploymentResult } from '../api';
 // 通用异步加载钩子：统一处理 loading / error / reload
 import { useAsync } from '../hooks';
+// ECharts：总览面板把部署状态分布画成饼图，替代纯文字罗列，卸载时 dispose 释放实例
+import * as echarts from 'echarts';
 
 // 组件对外契约：部署汇总文案跟随全局语言
 interface Props {
@@ -106,6 +108,48 @@ function AnomalyRow({ anomaly }: { anomaly: DeploymentAnomaly }) {
     </li>
   );
 } // AnomalyRow 结束
+
+// 部署状态分布饼图：把 by_status 计数画成 ECharts 环形图，标签走状态字典翻译；无数据不渲染容器。
+function StatusPieChart({ byStatus, codes, locale }: {
+  byStatus: Record<string, number>; // 各部署状态的计数
+  codes: Record<string, string>; // 状态字典：code → 展示文案
+  locale: Locale; // 当前语言（字典文案已按语言生成，仅留作未来多语言扩展）
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null); // 图表挂载容器
+  // 数据快照键：统计对象每次渲染都是新引用，拼成串作 effect 依赖，避免无关重渲染重建图表
+  const dataKey = Object.entries(byStatus).map(([code, value]) => `${code}:${value}`).join('|');
+
+  useEffect(() => { // 容器就绪且统计快照变化时（重新）绘图
+    const host = hostRef.current; // 取挂载节点
+    if (!host || dataKey === '') return; // 无容器或无数据时不建图
+    const chart = echarts.init(host); // 初始化 ECharts 实例
+    // 映射饼图数据：字典命中按语言取文案，未命中回退原始状态码
+    const data = Object.entries(byStatus).map(([code, value]) => ({
+      name: codes[code] ?? code,
+      value,
+    }));
+    chart.setOption({ // 环形饼图配置
+      tooltip: { trigger: 'item' }, // 悬停扇区显示名称与占比
+      legend: { bottom: 0, textStyle: { fontSize: 10 } }, // 底部图例
+      series: [{
+        type: 'pie', // 饼图
+        radius: ['38%', '62%'], // 环形内外半径
+        center: ['50%', '46%'], // 居中偏上给图例留位
+        label: { fontSize: 10 }, // 扇区标签字号
+        data, // 扇区数据
+      }],
+    }); // 配置结束
+    const onResize = () => chart.resize(); // 视口缩放时自适应重排
+    window.addEventListener('resize', onResize);
+    return () => { // 卸载或数据变化前清理
+      window.removeEventListener('resize', onResize); // 移除缩放监听
+      chart.dispose(); // 销毁实例，释放 canvas 与事件
+    };
+  }, [dataKey, codes, locale]); // 依赖：统计快照键 + 字典 + 语言；原始对象引用不进依赖
+
+  if (dataKey === '') return null; // 无状态计数时不渲染容器
+  return <div ref={hostRef} className="deploy-status-pie" />; // 图表挂载容器
+} // StatusPieChart 结束
 
 // 部署汇总主视图：总览 + 筛选 + 核对表 + 展开详情 + 覆盖口径
 export function Deployments({ locale }: Props) {
@@ -219,6 +263,8 @@ export function Deployments({ locale }: Props) {
             {' · '}{tr(locale, '状态分布', 'By status')}: {Object.entries(ov.by_status).map(([k, v]) => `${k} ${v}`).join(' / ')}
           </p>
         )}
+        {/* 状态分布环形图：与上方文字罗列互为补充，直观对比各状态占比 */}
+        {ov && <StatusPieChart byStatus={ov.by_status} codes={ov.status_codes} locale={locale} />}
       </section>
 
       <form className="form inline" onSubmit={submitSearch}>

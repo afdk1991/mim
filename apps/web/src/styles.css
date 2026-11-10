@@ -677,6 +677,40 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色表达「区块标签」而非正文 */
 } /* 小节标题结束 */
 
+.dep-graph { /* G6 依赖链图画布容器：固定高度、浅底圆角，隔离在详情面板内 */
+  width: 100%; /* 撑满详情面板宽度，G6 据此读取容器宽度 */
+  height: 168px; /* 与组件内画布高度一致，避免布局抖动 */
+  margin: 8px 0; /* 上下与标题、图下清单留白 */
+  border: 1px solid var(--border); /* 细边框勾勒画布边界 */
+  border-radius: var(--radius); /* 与节点圆角、卡片圆角呼应 */
+  background: var(--bg); /* 页面浅底衬托节点配色 */
+  overflow: hidden; /* 画布不溢出容器圆角 */
+} /* 依赖链图画布容器结束 */
+
+.dep-graph-legend { /* 图下状态清单：作为图的文字兜底，紧凑排列 */
+  margin-top: 4px; /* 与画布拉开小间距，不与标题混淆 */
+} /* 图下清单结束 */
+
+.price-history-chart { /* ECharts 价格趋势折线图容器：固定高度、浅底圆角，隔离在详情面板内 */
+  width: 100%; /* 撑满详情面板宽度，ECharts 据此读取容器宽度 */
+  height: 180px; /* 图表固定高度，避免布局抖动 */
+  margin: 8px 0; /* 上下与标题、清单留白 */
+  border: 1px solid var(--border); /* 细边框勾勒图表边界 */
+  border-radius: var(--radius); /* 与卡片圆角呼应 */
+  background: var(--surface); /* 白色底衬托折线 */
+  overflow: hidden; /* 画布不溢出容器圆角 */
+} /* 价格折线图容器结束 */
+
+.deploy-status-pie { /* ECharts 部署状态环形图容器：固定高度、浅底圆角，隔离在总览面板内 */
+  width: 100%; /* 撑满面板宽度，ECharts 据此读取容器宽度 */
+  height: 200px; /* 环形图 + 底部图例所需高度，避免布局抖动 */
+  margin: 8px 0; /* 上下与文字罗列留白 */
+  border: 1px solid var(--border); /* 细边框勾勒图表边界 */
+  border-radius: var(--radius); /* 与卡片圆角呼应 */
+  background: var(--surface); /* 白色底衬托扇区配色 */
+  overflow: hidden; /* 画布不溢出容器圆角 */
+} /* 部署状态环形图容器结束 */
+
 /* ---------- 站点模块矩阵（45 类备注驱动） ---------- */
 .site-stats { /* 总览统计网格：五个指标横向均分，窄屏自动换行 */
   display: flex; /* 横向排列统计项 */
@@ -1544,4 +1578,19 @@ code { /* 行内代码/令牌展示 */
     width: min(300px, calc(100vw - 24px)); /* 不超过屏幕可用宽度 */
   } /* 窄屏面板结束 */
 } /* 窄屏断点结束 */
+
+/* ---------- Markdown 脚本编辑器（Vditor 封装） ---------- */
+.script-editor-wrap { /* 编辑器外容器：纵向排列小标题与编辑器实例 */
+  display: flex; /* 纵向布局 */
+  flex-direction: column; /* 标题在上、编辑器在下 */
+  gap: 6px; /* 标题与编辑器间距 */
+  margin-top: 12px; /* 与上方建议表单/结果拉开间距 */
+} /* 编辑区容器结束 */
+
+.script-editor { /* Vditor 挂载容器：约束宽度与圆角，编辑器内部自适应高度 */
+  width: 100%; /* 撑满面板宽度 */
+  border: 1px solid var(--border); /* 细边框勾勒编辑器边界 */
+  border-radius: var(--radius); /* 与卡片圆角一致 */
+  overflow: hidden; /* 编辑器内部不溢出容器圆角 */
+} /* 编辑器容器结束 */
 

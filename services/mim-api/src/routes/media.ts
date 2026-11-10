@@ -11,6 +11,7 @@
 
 import express, { Router } from 'express'; // express 本体用于取 raw 解析器，Router 用于建独立子路由
 import type { Request } from 'express'; // 仅类型引用 Request，给辅助函数标注入参，不产生运行时代码
+import sharp from 'sharp'; // 图像缩放与 WebP 编码：为图片产物生成浏览器内联缩略图，避免直接拉全尺寸原图
 import { z } from 'zod'; // 声明请求体 / 查询串的 schema，交给 parse 统一校验
 import { AppError, uuidv7 } from '@mim/core-domain'; // AppError 产出统一错误信封；uuidv7 生成时间有序主键
 import { clockOf } from '../domain.js'; // 统一时间源，便于测试注入固定时钟
@@ -47,6 +48,11 @@ const listAssetsQuery = z.object({ // 产物列表查询串：全部可选，未
   asset_type: z.enum(ASSET_TYPES).optional(), // 按类型过滤，复用同一枚举保持口径
   limit: z.coerce.number().int().min(1).max(100).default(20), // 默认 20、上限 100，防止一次拉全表
 }); // 产物列表 schema 结束
+
+const thumbQuery = z.object({ // 缩略图查询串：对象键必填，边长可选并限制在合理区间
+  object_key: z.string().min(1).max(512), // 对象键必填且限长，与下载预签名同一口径
+  size: z.coerce.number().int().min(32).max(512).default(240), // 目标边长 32~512px，默认 240；超出区间拒绝防止放大爆内存
+}); // 缩略图 schema 结束
 
 interface AssetRow { // generation_assets 表行结构，用于 SQL 结果强类型化
   id: string; // 产物主键（uuidv7）
@@ -244,6 +250,41 @@ export function createMediaRouter(deps: ApiDeps): Router { // 控制面路由工
     }); // presignDownload 调用结束
     res.json({ download: presigned, object_key: query.object_key, expires_at: presigned.expires_at }); // 平铺返回，前端直接取 url
   }); // 下载预签名路由处理函数结束
+
+  router.get('/media/thumb', async (req, res) => { // 服务端生成 WebP 缩略图：前端内联预览用，避免直接加载全尺寸原图
+    const query = parse(thumbQuery, req.query); // 校验对象键与目标边长
+    const user = req.user!; // 已过 requireAuth，user 必定存在
+    const storage = requireStorage(deps); // 取适配器，未配置时报 STORAGE_NOT_CONFIGURED
+    assertOwnedKey(user.id, query.object_key); // 归属优先校验，跨用户直接 404
+
+    // 保留期口径与下载预签名一致：过期产物在字节被真正清理前也不应再出缩略图；直传素材未登记则无保留期，放行。
+    const assetRow = deps.db // 数据库句柄
+      .prepare(`SELECT expires_at FROM generation_assets WHERE object_key = ? ORDER BY created_at DESC LIMIT 1`) // 同一键理论上一行，取最新兜底
+      .get(query.object_key) as { expires_at: string | null } | undefined; // 未登记则 undefined，按长期保留处理
+    if (assetRow && assetRow.expires_at !== null && assetRow.expires_at <= clockOf(deps)) { // 已过保留期
+      throw new AppError('NOT_FOUND', 'asset expired', { object_key: query.object_key, expires_at: assetRow.expires_at }); // 与下载签名同一 404 口径，不泄漏保留策略
+    } // 保留期判定结束
+
+    const object = await storage.getObject(query.object_key); // 读取对象字节与 MIME；不存在由适配器抛 NOT_FOUND
+    if (!object.mime.startsWith('image/')) { // 仅图片可生成缩略图，音视频/文本直接拒绝
+      throw new AppError('VALIDATION_FAILED', 'object is not an image', { mime: object.mime }); // 400：客户端请求了错误类型的产物
+    } // 图片类型判定结束
+
+    let thumbnail: Buffer; // sharp 编码后的 WebP 字节，供响应体直接发送
+    try { // 解码与编码可能因脏图失败，需收敛为业务错误而非 500
+      thumbnail = await sharp(object.body) // 以原始字节构造图像实例
+        .resize(query.size, query.size, { fit: 'inside', withoutEnlargement: true }) // 等比缩到目标边长内，小图不放大，避免模糊拉伸
+        .webp({ quality: 80 }) // 统一输出 WebP，质量 80 在体积与清晰度间取平衡
+        .toBuffer(); // 编码为 Buffer，避免落临时文件
+    } catch { // 解码失败（损坏字节 / 非真实图像）按上传脏数据处理
+      throw new AppError('VALIDATION_FAILED', 'image could not be decoded for thumbnail', { object_key: query.object_key }); // 400：提示源图不可用，不暴露 sharp 内部堆栈
+    } // sharp 异常收敛结束
+
+    res.status(200) // 缩略图生成成功
+      .setHeader('Content-Type', 'image/webp') // 回写真实图像类型，浏览器据此渲染 <img>
+      .setHeader('Cache-Control', 'private, max-age=300') // 私有缓存 5 分钟：同一产物重复预览不必重复解码
+      .send(thumbnail); // 直接发送 WebP 字节，不再经过 JSON 信封
+  }); // 缩略图路由处理函数结束
 
   router.get('/media/assets', async (req, res) => { // 列出本人可见产物
     const query = parse(listAssetsQuery, req.query); // 校验过滤参数

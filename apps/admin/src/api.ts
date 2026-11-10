@@ -946,6 +946,55 @@ export function listOrders(
   return request<AdminOrderPage>(`/orders/manage${suffix}`, { credential });
 }
 
+/** 导出订单清单 xlsx：与 /orders/manage 同口径过滤，返回二进制 Blob 与建议文件名，由视图触发浏览器下载 */
+export async function exportOrders(
+  credential: Credential,
+  query: { status?: 'pending' | 'paid' | 'cancelled'; region?: 'cn' | 'global'; q?: string } = {},
+): Promise<{ blob: Blob; filename: string }> {
+  // 组装过滤查询串，空值不写入
+  const params = new URLSearchParams();
+  // 状态过滤
+  if (query.status) params.set('status', query.status);
+  // 区域过滤
+  if (query.region) params.set('region', query.region);
+  // 关键字：模块编码或用户 ID 片段
+  if (query.q) params.set('q', query.q);
+  // 无参数时不带问号
+  const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
+
+  // 二进制下载不走统一 request（其强制 text()+JSON 解析），独立 fetch 并注入凭证头
+  const headers: Record<string, string> = { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }; // 声明期望 xlsx
+  // 凭证注入：token 走自定义头，bearer 走标准 Authorization（与 request 口径一致）
+  if (credential.kind === 'token') headers['X-Admin-Token'] = credential.value;
+  else headers.Authorization = `Bearer ${credential.value}`;
+
+  const response = await fetch(`${BASE}/orders/export${suffix}`, { headers }); // GET 导出端点
+
+  // 非 2xx：读 JSON 信封抛结构化错误，与列表/结算错误口径一致
+  if (!response.ok) {
+    const text = await response.text(); // 读取错误正文
+    let payload: unknown = null;
+    if (text.length > 0) {
+      try { payload = JSON.parse(text); } catch { payload = null; } // 非 JSON 按空兜底
+    }
+    const body = (payload ?? {}) as { code?: string; message?: string; request_id?: string; details?: unknown };
+    throw new ApiError(
+      response.status,
+      body.code ?? 'HTTP_ERROR',
+      body.message ?? `request failed with status ${response.status}`,
+      body.request_id ?? '',
+      body.details,
+    );
+  }
+
+  const blob = await response.blob(); // 读取 xlsx 二进制
+  // 从 Content-Disposition 解析建议文件名，缺失时兜底 orders.xlsx
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? 'orders.xlsx';
+  return { blob, filename };
+}
+
 /** 结算订单：后端在同一事务内把订单置 paid 并发放订单来源权益 */
 export async function settleOrder(credential: Credential, orderId: string, reason?: string): Promise<AdminOrderRow> {
   // 响应包裹 { order }

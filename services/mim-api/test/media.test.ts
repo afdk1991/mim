@@ -6,6 +6,7 @@ import type { Express } from 'express'; // 只引入 Express 类型，用于标�
 import { mkdtempSync, rmSync } from 'node:fs'; // 建临时目录与递归删除目录的同步 API
 import { tmpdir } from 'node:os'; // 取系统临时目录作为存储根
 import { join } from 'node:path'; // 路径拼接工具
+import sharp from 'sharp'; // 测试内生成真实可解码的 PNG 字节，供缩略图端点走完整解码链路
 import { createApp } from '../src/app.js'; // createApp 是唯一装配入口
 import { createDatabase } from '../src/db.js'; // createDatabase 建库，用例用内存库隔离
 import { createStorage } from '../src/storage.js'; // createStorage 工厂：按驱动创建存储适配器
@@ -224,4 +225,81 @@ describe('media 域', () => { // describe media 域：预签名上传下载、�
     const listedKeys = (listed.body.items as Array<{ object_key: string }>).map((item) => item.object_key); // 取出列表里的对象键
     expect(listedKeys).not.toContain(objectKey); // 过期产物同样不出现在列表中
   }); // 结束过期产物用例
+
+  it('图片产物可生成 WebP 缩略图；非图片类型返回 400', async () => { // 用例：sharp 解码 → 缩放 → WebP 编码全链路，脏类型被拒
+    const session = await login('13900000041'); // 登录普通用户
+    grantEntitlement(session.userId); // 授予权益，排除门禁干扰
+
+    const png = await sharp({ // 用 sharp 造一张 200x200 真实可解码的 PNG（纯红底）
+      create: { width: 200, height: 200, channels: 3, background: { r: 255, g: 0, b: 0 } }, // 画布尺寸与底色
+    }).png().toBuffer(); // 编码为 PNG Buffer 作为上传源
+
+    const presign = await request(app) // 申请上传预签名
+      .post('/api/v1/media/presign/upload')
+      .set(auth(session, nextKey()))
+      .send({ asset_type: 'image', mime: 'image/png' });
+    expect(presign.status).toBe(201); // 断言预签名成功
+    const objectKey = presign.body.object_key as string; // 取对象键
+
+    const uploaded = await request(app) // 真实上传 PNG 字节
+      .put(pathOf(presign.body.upload.url as string))
+      .set('content-type', 'image/png')
+      .send(png);
+    expect(uploaded.status).toBe(204); // 断言落盘成功
+
+    const thumb = await request(app) // 请求 120px 缩略图
+      .get('/api/v1/media/thumb')
+      .query({ object_key: objectKey, size: 120 })
+      .set(auth(session));
+    expect(thumb.status).toBe(200); // 断言 200
+    expect(thumb.headers['content-type']).toContain('image/webp'); // 断言输出类型为 WebP
+    const thumbBody = Buffer.from(thumb.body); // 取响应字节做魔数校验
+    expect(thumbBody.subarray(0, 4).toString('ascii')).toBe('RIFF'); // WebP 前 4 字节为 RIFF
+    expect(thumbBody.subarray(8, 12).toString('ascii')).toBe('WEBP'); // 第 8~11 字节为 WEBP 标识
+
+    const textPresign = await request(app) // 再造一个纯文本对象，验证类型守卫
+      .post('/api/v1/media/presign/upload')
+      .set(auth(session, nextKey()))
+      .send({ asset_type: 'text', mime: 'text/plain' });
+    expect(textPresign.status).toBe(201); // 断言文本预签名成功
+    const textKey = textPresign.body.object_key as string; // 取文本对象键
+    await request(app) // 落盘文本字节
+      .put(pathOf(textPresign.body.upload.url as string))
+      .set('content-type', 'text/plain')
+      .send(Buffer.from('plain-text-payload'));
+
+    const nonImage = await request(app) // 对文本对象请求缩略图，应被类型守卫拒绝
+      .get('/api/v1/media/thumb')
+      .query({ object_key: textKey })
+      .set(auth(session));
+    expect(nonImage.status).toBe(400); // 断言 400
+    expect(nonImage.body.code).toBe('VALIDATION_FAILED'); // 断言参数/类型错误码
+  }); // 结束缩略图成功与类型守卫用例
+
+  it('跨用户缩略图一律 404，不泄漏对象存在性', async () => { // 用例：缩略图端点复用同一套对象归属守卫
+    const owner = await login('13900000042'); // 属主登录
+    const other = await login('13900000043'); // 他人登录
+    grantEntitlement(owner.userId); // 双方都授予权益，排除门禁因素
+    grantEntitlement(other.userId);
+
+    const png = await sharp({ // 造一张 40x40 蓝底 PNG
+      create: { width: 40, height: 40, channels: 3, background: { r: 0, g: 0, b: 255 } },
+    }).png().toBuffer();
+    const presign = await request(app) // 属主上传
+      .post('/api/v1/media/presign/upload')
+      .set(auth(owner, nextKey()))
+      .send({ asset_type: 'image', mime: 'image/png' });
+    expect(presign.status).toBe(201);
+    const objectKey = presign.body.object_key as string;
+    await request(app)
+      .put(pathOf(presign.body.upload.url as string))
+      .set('content-type', 'image/png')
+      .send(png);
+
+    const cross = await request(app) // 他人拿属主键请求缩略图
+      .get('/api/v1/media/thumb')
+      .query({ object_key: objectKey })
+      .set(auth(other));
+    expect(cross.status).toBe(404); // 断言 404，与下载预签名同一归属口径
+  }); // 结束跨用户用例
 }); // 结束 media 域分组

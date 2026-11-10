@@ -42,6 +42,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto'; // 支付回调签名校验：HMAC-SHA256 + 定长时间比较
 import { Router } from 'express'; // 路由容器，按前缀挂载到 /api/v1
+import ExcelJS from 'exceljs'; // 订单清单导出：服务端生成 xlsx，供管理端离线对账
 import { z } from 'zod'; // 请求体校验，拦截非法模块码
 import { AppError, CATALOG_SORT_MODES, uuidv7 } from '@mim/core-domain'; // 业务错误码 + 时间有序主键 + 排序枚举（与前端共用一份定义）
 import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结时间
@@ -975,6 +976,97 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       offset, // 本页偏移
     }); // 结束响应
   }); // 结束 GET /orders/manage 处理
+
+  /**
+   * GET /orders/export — 管理端订单清单导出 xlsx（RBAC entitlement:read）
+   * 与 /orders/manage 同一套状态 / 区域 / 关键字过滤，但不分页，导出命中全量（上限 5000 行）供离线对账。
+   * 必须注册在 GET /orders 与 /orders/:id 之前，避免被前缀路由吞掉。
+   */
+  router.get('/orders/export', requirePermission('entitlement:read'), async (req, res) => { // 导出需读权益权限；异步写 xlsx 流
+    const statusQuery = typeof req.query.status === 'string' ? req.query.status.trim() : ''; // 状态过滤，空串不过滤
+    if (statusQuery && !['pending', 'paid', 'cancelled'].includes(statusQuery)) { // 复用与 manage 一致的状态白名单
+      throw new AppError('VALIDATION_FAILED', 'status must be one of pending/paid/cancelled'); // 非法状态 400
+    } // 结束状态校验
+    const regionQuery = typeof req.query.region === 'string' ? req.query.region.trim() : ''; // 区域过滤：cn / global
+    if (regionQuery && !['cn', 'global'].includes(regionQuery)) { // 非法区域直接 400
+      throw new AppError('VALIDATION_FAILED', 'region must be one of cn/global'); // 400
+    } // 结束区域校验
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 关键字：模块编码或用户 ID 片段
+
+    const whereParts: string[] = []; // 条件片段（占位符仍走绑定，不拼用户输入）
+    const params: unknown[] = []; // 与片段顺序一致的参数
+    if (statusQuery) { // 状态条件
+      whereParts.push('o.status = ?'); // 状态占位符
+      params.push(statusQuery); // 绑定状态值
+    } // 结束状态条件
+    if (regionQuery) { // 区域条件
+      whereParts.push('o.region = ?'); // 区域占位符
+      params.push(regionQuery); // 绑定区域值
+    } // 结束区域条件
+    if (q) { // 关键字条件：模块编码模糊 + 用户 ID 模糊
+      whereParts.push('(m.code LIKE ? OR o.user_id LIKE ?)'); // 两列各一个占位符
+      params.push(`%${q}%`, `%${q}%`); // LIKE 通配由服务端补，仅作检索提示
+    } // 结束关键字条件
+    const where = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''; // 空条件时不带 WHERE
+
+    const rows = db // 导出全量命中，联模块与用户表带出编码、名称与展示名
+      .prepare( // 预编译：按创建时间倒序，硬上限 5000 行防止超大导出打爆内存
+        `SELECT o.*, m.code AS module_code, m.name_i18n AS module_name, u.display_name AS user_display_name
+         FROM module_orders o
+         INNER JOIN modules m ON m.id = o.module_id
+         LEFT JOIN users u ON u.id = o.user_id
+         ${where}
+         ORDER BY o.created_at DESC LIMIT 5000`,
+      ) // 结束预编译
+      .all(...(params as never[])) as Array<OrderRow & { user_display_name: string | null }>; // 行含模块与用户展示名
+
+    const workbook = new ExcelJS.Workbook(); // 新建工作簿
+    const sheet = workbook.addWorksheet('orders'); // 单工作表承载订单清单
+    sheet.columns = [ // 列定义：表头 + 字段键 + 列宽，对齐对账阅读习惯
+      { header: '订单号', key: 'id', width: 28 }, // 订单主键
+      { header: '用户ID', key: 'user_id', width: 28 }, // 下单用户
+      { header: '用户展示名', key: 'user_display_name', width: 18 }, // 用户展示名（可能为空）
+      { header: '区域', key: 'region', width: 8 }, // 下单区域
+      { header: '模块编码', key: 'module_code', width: 24 }, // 模块编码
+      { header: '模块名称', key: 'module_name', width: 28 }, // 模块多语言名（取中文，回落英文/编码）
+      { header: '金额', key: 'amount', width: 12 }, // 分转元后的可读金额
+      { header: '币种', key: 'currency', width: 8 }, // 结算币种
+      { header: '状态', key: 'status', width: 12 }, // 订单状态原值
+      { header: '渠道', key: 'channel', width: 12 }, // 结算渠道
+      { header: '渠道交易号', key: 'channel_txn_id', width: 28 }, // 外部渠道交易号（人工结算为空）
+      { header: '下单时间', key: 'created_at', width: 22 }, // 下单时间
+      { header: '结算时间', key: 'paid_at', width: 22 }, // 结算时间（未结算为空）
+      { header: '取消时间', key: 'cancelled_at', width: 22 }, // 取消时间（未取消为空）
+    ]; // 列定义结束
+
+    for (const row of rows) { // 逐行写入，避免一次性构造大数组
+      const nameMap = row.module_name ? jsonParse<Record<string, string>>(row.module_name) ?? {} : {}; // 解析多语言名称 JSON，脏数据回落空对象
+      sheet.addRow({ // 追加一行订单记录
+        id: row.id, // 订单号
+        user_id: row.user_id, // 用户 ID
+        user_display_name: row.user_display_name ?? '', // 展示名缺失留空
+        region: row.region, // 区域
+        module_code: row.module_code ?? '', // 模块编码
+        module_name: nameMap['zh-CN'] ?? nameMap['en-US'] ?? row.module_code ?? '', // 名称按中→英→编码回落
+        amount: (row.amount_minor / 100).toFixed(2), // 分转元，保留两位小数
+        currency: row.currency, // 币种
+        status: row.status, // 状态
+        channel: row.channel, // 渠道
+        channel_txn_id: row.channel_txn_id ?? '', // 交易号缺失留空
+        created_at: row.created_at, // 下单时间
+        paid_at: row.paid_at ?? '', // 结算时间
+        cancelled_at: row.cancelled_at ?? '', // 取消时间
+      }); // 单行结束
+    } // 逐行写入结束
+
+    sheet.getRow(1).font = { bold: true }; // 表头加粗，便于在表格软件中区分标题行
+
+    const stamp = clockOf(deps).replace(/[-:T.Z]/g, '').slice(0, 12); // 统一时间源生成文件名时间戳（年月日时分）
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); // xlsx MIME，浏览器据此触发下载
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${stamp}.xlsx"`); // 附件下载文件名
+    await workbook.xlsx.write(res); // 把工作簿直接写入响应流，不落临时文件
+    res.end(); // 显式结束响应，避免 keep-alive 悬挂
+  }); // 结束 GET /orders/export 处理
 
   /** GET /orders — 当前用户的订单列表（支持 status 过滤 + limit/offset 分页） */
   router.get('/orders', requireAuth, (req, res) => { // 只读，无需幂等键

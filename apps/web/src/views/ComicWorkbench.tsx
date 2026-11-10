@@ -1,7 +1,11 @@
-// 引入 React 两个基础 Hook：useEffect 承载副作用（任务轮询、切换工程重置标签），useState 保存交互状态。
-import { useEffect, useState } from 'react';
+// 引入 React 基础 Hook：useEffect 承载副作用（任务轮询、切换工程重置标签、编辑器挂载/销毁），useState 保存交互状态，useRef 持有编辑器实例与回调引用。
+import { useEffect, useRef, useState } from 'react';
 // 引入语言标识类型，让组件内所有文案按 zh-CN / en-US 二选一渲染。
 import type { Locale } from '@mim/i18n';
+// 引入 Vditor Markdown 编辑器：剧本/分镜文案的可视化编辑区，挂载到独立 div，卸载时销毁实例。
+import Vditor from 'vditor';
+// 引入 Vditor 样式表：工具栏、编辑区、预览区与主题变量随包一起打包，避免编辑器样式缺失。
+import 'vditor/dist/index.css';
 // 从统一 API 模块引入接口聚合对象与领域类型，避免组件内重复声明数据结构。
 import {
   // api：后端接口聚合对象，含 comic（漫剧域）/ ai（编排域）/ media（存储域）三组能力。
@@ -22,6 +26,8 @@ import {
   type FilmExportResult,
   // GenerationJob：生成任务实体，status 决定按钮显隐与是否开启轮询。
   type GenerationJob,
+  // ListedAsset：产物列表项，含 object_key 与预签名 download_url，缩略图组件据此取键、失败回退原图。
+  type ListedAsset,
   // JobType：任务类型枚举（文本/图像/视频/配音/合成），决定派发时的参数走向。
   type JobType,
   // SuggestKind：AI 建议的种类（分镜表/剧本/对白/配音），用于建议接口入参。
@@ -366,8 +372,9 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
 
       {/* 创作页：只在激活时挂载，避免无关请求 */}
       {tab === 'create' && ( /* 仅激活时挂载创作页 */
-        // 创作标签页组件
+        // 创作标签页组件；key=projectId 让切换工程时整页重建，脚本草稿/建议结果/角色输入与 Vditor 实例一并重置，避免跨工程串内容
         <CreateTab
+          key={projectId}
           locale={locale}
           projectId={projectId}
           characters={characters}
@@ -394,6 +401,61 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
     </div>
   );
 } // 结束 ProjectDetail 组件函数
+
+// ---------- Markdown 脚本编辑器（Vditor 封装） ----------
+
+// 脚本编辑器入参：受控 Markdown 值 + 变更回调 + 语言 + 占位提示。
+interface ScriptEditorProps {
+  // 外部受控的 Markdown 文本。
+  value: string;
+  // 输入回调：把最新 Markdown 同步到父级状态。
+  onChange: (markdown: string) => void;
+  // 界面语言，映射到编辑器内置语言包。
+  locale: Locale;
+  // 空内容占位提示。
+  placeholder: string;
+}
+
+// Vditor 受控封装：挂载一次创建实例，外部值回填时比对后 setValue，卸载销毁释放 DOM 与事件监听。
+function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProps) {
+  // 编辑器挂载容器 ref。
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  // 编辑器实例引用，卸载时据此销毁。
+  const vditorRef = useRef<Vditor | null>(null);
+  // 回调引用：避免实例持有过期闭包，每次渲染同步最新 onChange。
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // 挂载阶段：创建 Vditor 实例；仅执行一次，初始值取首次 value。
+  useEffect(() => {
+    const host = hostRef.current; // 取挂载节点
+    if (!host) return; // 容器未就绪时不建实例
+    const vd = new Vditor(host, { // 新建编辑器实例
+      value, // 初始 Markdown 文本
+      height: 260, // 编辑器总高度，适配面板纵向空间
+      placeholder, // 空内容占位提示
+      lang: locale === 'en-US' ? 'en_US' : 'zh_CN', // 编辑器内置语言映射
+      mode: 'sv', // 分屏预览：左侧编辑、右侧预览，便于核对排版
+      cache: { enable: false }, // 关闭 localStorage 缓存，避免跨工程/跨会话串内容
+      input: (markdown) => onChangeRef.current(markdown), // 输入后把最新 Markdown 回传父级
+    }); // 实例配置结束
+    vditorRef.current = vd; // 留存实例引用
+    return () => { // 卸载或工程切换时清理
+      vd.destroy(); // 销毁编辑器，释放 DOM、事件与定时器
+      vditorRef.current = null; // 清空引用
+    }; // 清理结束
+    // 仅挂载一次：初始值由 value 提供，后续外部回填走下方同步 effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 挂载 effect 结束
+
+  // 外部值回填（如 AI 生成建议后写入）：与当前编辑器内容不同才 setValue，避免覆盖用户正在编辑的文本与光标。
+  useEffect(() => {
+    const vd = vditorRef.current; // 取实例
+    if (vd && value !== vd.getValue()) vd.setValue(value); // 比对一致则不重复写入
+  }, [value]); // 依赖外部受控值
+
+  return <div ref={hostRef} className="script-editor" />; // 编辑器挂载容器
+} // ScriptEditor 结束
 
 // ---------- 创作标签页：角色设定 + AI 建议 ----------
 
@@ -425,6 +487,8 @@ function CreateTab({
   const [suggestBusy, setSuggestBusy] = useState(false);
   // 建议结果（已格式化 JSON 字符串），为空表示尚未生成。
   const [suggestResult, setSuggestResult] = useState<string | null>(null);
+  // 脚本编辑区的 Markdown 受控值：AI 生成后回填，用户可在编辑器内继续改写。
+  const [scriptMd, setScriptMd] = useState('');
   // 建议请求的错误文案。
   const [suggestError, setSuggestError] = useState<string | null>(null);
 
@@ -452,7 +516,9 @@ function CreateTab({
       // 调用建议接口，传入工程、建议种类与可选提示词。
       const result = await api.comic.suggest(projectId, suggestKind, suggestPrompt);
       // 以两空格缩进格式化 JSON，提升可读性。
-      setSuggestResult(JSON.stringify(result.suggestion, null, 2));
+      const formatted = JSON.stringify(result.suggestion, null, 2); // 格式化结果复用一份，避免两处口径漂移
+      setSuggestResult(formatted); // 原始 JSON 结果展示在代码块
+      setScriptMd(formatted); // 同一份结果回填到 Markdown 脚本编辑区，供用户继续改写
     } catch (err) { // 捕获新增角色接口异常
       // 失败时展示按语言转换后的错误文案。
       setSuggestError(errorText(locale, err));
@@ -607,6 +673,19 @@ function CreateTab({
             <code>{/* JSON 文本本体 */}{suggestResult}</code>
           </pre>
         )}
+
+        {/* 脚本编辑区：Markdown 可视化编辑，AI 结果回填后可继续改写为剧本/分镜文案 */}
+        <div className="script-editor-wrap">{/* 编辑器外容器：标题 + Vditor 实例 */}
+          {/* 编辑区标题 */}
+          <span className="muted small">{locale === 'en-US' ? 'Script draft' : '脚本草稿'}</span>
+          {/* Vditor 受控编辑器：value 为草稿 Markdown，input 回写 scriptMd */}
+          <ScriptEditor
+            value={scriptMd} // 受控 Markdown 值
+            onChange={setScriptMd} // 输入同步到本地状态
+            locale={locale} // 界面语言映射到编辑器语言包
+            placeholder={locale === 'en-US' ? 'Write your script or storyboard here…' : '在此撰写剧本或分镜文案…'}
+          />{/* 编辑器结束 */}
+        </div>{/* 编辑区容器结束 */}
       </section>{/* AI 建议区块结束 */}
     </div>
   );
@@ -1024,6 +1103,40 @@ function JobsTab({
   );
 } // 结束 JobsTab 组件函数
 
+// ---------- 产物缩略图（鉴权缩略图端点 + 原图兜底） ----------
+
+// 产物预览组件：先走鉴权缩略图端点拉 WebP BlobURL；未就绪或失败时回退预签名原图，保证列表不破图。
+function AssetPreview({ asset }: { asset: ListedAsset }) {
+  // 缩略图 BlobURL；null 表示尚未拉到或缩略图不可用，此时走原图兜底
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  // 原图预签名地址：跨源托管时补 API 源，作为缩略图失败时的兜底
+  const fallback = resolvePublicUrl(asset.download_url);
+
+  useEffect(() => { // 对象键变化时重新拉缩略图
+    let objectUrl: string | null = null; // 本轮创建的 BlobURL，卸载时释放
+    let cancelled = false; // 竞态守卫：effect 清理后不再写状态
+    api.media.thumbBlob(asset.object_key, 240) // 拉 240px WebP 缩略图（鉴权端点）
+      .then((blob) => {
+        if (cancelled) return; // 已清理，丢弃结果避免泄漏
+        objectUrl = URL.createObjectURL(blob); // 生成本地临时地址
+        setThumbUrl(objectUrl); // 切到缩略图
+      })
+      .catch(() => { /* 缩略图不可用（无权限/非图片/网络异常）时静默回退原图，不打断列表 */ });
+    return () => {
+      cancelled = true; // 标记取消
+      if (objectUrl) URL.revokeObjectURL(objectUrl); // 释放 BlobURL，避免内存泄漏
+    };
+  }, [asset.object_key]); // 仅对象键变化时重新拉取
+
+  return (
+    <img
+      src={thumbUrl ?? fallback} // 优先缩略图，未就绪/失败用原图兜底
+      alt={asset.object_key}
+      style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
+    />
+  );
+} // AssetPreview 结束
+
 // ---------- 成片标签页：列表 / 创建 / 发布流 ----------
 
 // 成片页：从合成产物创建成片，并驱动「草稿 → 审核中 → 已发布 / 已归档」的发布流。
@@ -1373,15 +1486,11 @@ function FilmsTab({
                   {locale === 'en-US' ? 'Download' : '下载'}
                 </a>
               </div>
-              {/* 图像类产物额外内联预览，免去下载再查看 */}
+              {/* 图像类产物额外内联预览，免去下载再查看；缩略图走鉴权端点，失败回退原图 */}
               {a.asset_type === 'image' && ( /* 图像产物才预览 */
                 // 预览容器：与上方信息拉开一点间距
                 <div style={{ marginTop: 4 }}>{/* 预览容器：控制间距 */}
-                  <img
-                    src={resolvePublicUrl(a.download_url)}
-                    alt={a.object_key}
-                    style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
-                  />
+                  <AssetPreview asset={a} />{/* 产物预览组件：内部处理 BlobURL 与原图兜底 */}
                 </div>
               )}
             </li>

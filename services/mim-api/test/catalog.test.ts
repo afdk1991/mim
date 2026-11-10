@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例编排 API，beforeEach 每例重建内存库
 import { createHmac } from 'node:crypto'; // 渠道回调签名：与被测实现同一算法，验证「对的签名」与「错的签名」
 import request from 'supertest'; // supertest 进程内驱动 Express，无需监听真实端口
+import ExcelJS from 'exceljs'; // 测试内读回导出的 xlsx，校验工作表与表头内容
 import type { Express } from 'express'; // 仅引入类型，用于标注全局 app
 import { createApp } from '../src/app.js'; // 唯一装配入口，走它才能保证中间件挂载顺序真实
 import { createDatabase, ensureAdditiveIndexes } from '../src/db.js'; // 内存库工厂 + 补索引迁移（结构回归用）
@@ -814,6 +815,48 @@ describe('付费模块门禁与商城订单', () => { // 覆盖「不能免费�
       .set({ authorization: `Bearer ${session.token}` }); // 用户令牌
     expect(denied.status).toBe(403); // 断言 403，不泄漏跨用户订单
   }); // 结束管理端列表用例
+
+  it('管理端可导出订单 xlsx；普通用户 403', async () => { // 导出端点复用同一 RBAC，产物为可解析的 xlsx
+    const session = await login('13900000047'); // 登录普通用户
+    const created = await request(app) // 该用户下一张付费模块订单
+      .post('/api/v1/orders') // 下单端点
+      .set({ authorization: `Bearer ${session.token}`, 'idempotency-key': 'export-order-1' }) // 鉴权 + 幂等键
+      .send({ module_code: 'comic.genpack.basic' }); // 种子付费模块
+    expect(created.status).toBe(201); // 断言下单成功
+    const orderId = created.body.order.id as string; // 记录订单号供导出表对拍
+
+    const denied = await request(app) // 普通用户尝试导出
+      .get('/api/v1/orders/export') // 导出端点
+      .set({ authorization: `Bearer ${session.token}` }); // 用户令牌
+    expect(denied.status).toBe(403); // 断言 403，与管理列表同一权限口径
+
+    const exported = await request(app) // 管理令牌导出全量订单
+      .get('/api/v1/orders/export') // 导出端点
+      .set(adminHeaders()) // 管理令牌
+      .buffer(true) // 强制缓冲响应体，避免 superagent 按 MIME 误解析
+      .parse((res, cb) => { // 自定义解析：原样收集二进制字节，xlsx 不经过 JSON/文本 parser
+        const chunks: Buffer[] = []; // 分片收集器
+        res.on('data', (chunk: Buffer) => chunks.push(chunk)); // 逐块入列
+        res.on('end', () => cb(null, Buffer.concat(chunks))); // 结束后拼接为完整 Buffer
+      }); // 自定义解析结束
+    expect(exported.status).toBe(200); // 断言 200
+    expect(exported.headers['content-type']).toContain('spreadsheetml'); // 断言 xlsx MIME
+    expect(exported.headers['content-disposition']).toContain('.xlsx'); // 断言附件下载文件名
+
+    const workbook = new ExcelJS.Workbook(); // 读回响应字节做内容校验
+    const rawBody = exported.body as Buffer; // 自定义 parser 已把响应收集为 Node Buffer
+    await workbook.xlsx.load(rawBody.buffer as never); // exceljs 本地 Buffer 即 ArrayBuffer，取底层 ArrayBuffer 传入以规避类型分裂
+    const sheet = workbook.getWorksheet('orders'); // 取订单工作表
+    expect(sheet).toBeTruthy(); // 断言工作表存在
+    expect(sheet!.getRow(1).getCell(1).value).toBe('订单号'); // 断言表头第一列为订单号
+
+    let found = false; // 标记导出表是否含刚下的订单
+    sheet!.eachRow((row, rowNumber) => { // 逐行扫描，跳过表头
+      if (rowNumber === 1) return; // 表头不参与匹配
+      if (String(row.getCell(1).value) === orderId) found = true; // 第一列即订单号
+    }); // 逐行扫描结束
+    expect(found).toBe(true); // 断言订单已进入导出清单
+  }); // 结束导出 xlsx 用例
 }); // 结束商城订单分组
 
 // ---------- 渠道支付回调：HMAC 签名 + 交易号幂等 ----------

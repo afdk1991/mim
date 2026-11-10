@@ -5,6 +5,8 @@
 > 当前状态：仓库已进入编码阶段。`services/mim-api`（`@mim/api`）已含运行时依赖并写入 `package.json` + `pnpm-lock.yaml`：`express ^5.3.0`、`better-sqlite3 ^13.0.3`、`jsonwebtoken ^9.0.3`、`bcryptjs ^3.0.2`、`zod ^4.6.7`、`@aws-sdk/client-s3 ^3.1162.0`、`@aws-sdk/s3-request-presigner ^3.1162.0`（devDeps：`vitest@4`、`supertest@7`、`tsx@4`、`typescript@5.6.3`、`esbuild@0.25`），均属业务自研基础设施而非下表所列第三方 SaaS/SDK。其中 AWS SDK 用于 media 域对象存储准入（预签名上传/下载、S3 兼容端点），已在 `package.json` + `pnpm-lock.yaml` 落位（铁律五）。本文档登记的第三方能力清单仍为「计划引入」状态；对应能力接入时，按铁律五把依赖写入 `package.json` 并提交锁文件，同时更新本清单状态。
 >
 > **2026-11-07 增补 `apps/admin`（独立管理后台）前端依赖 7 项**（同为构建期 / 基础设施类，非第三方 SaaS）：`react ^18.3.1`、`react-dom ^18.3.1`（视图运行时）、`vite ^6.4.4`、`@vitejs/plugin-react ^4.7.0`（构建与开发服务器）、`typescript ^5.6.3`（类型检查）、`@types/react ^18.3.12`、`@types/react-dom ^18.3.1`（类型声明）。全部已写入 `apps/admin/package.json` 并经 `pnpm install` 提交 `pnpm-lock.yaml`；管理后台不引入任何 UI 组件库（自写 CSS 令牌），因此无额外第三方组件依赖。
+>
+> **2026-11-10 增补本地 npm 开源库 5 项**（无密钥、进程内依赖，非第三方 SaaS；调研来源见 [开源组件引入决策-2026-11-10.md](../开源组件引入决策-2026-11-10.md)）：`apps/web` 前端——`echarts ^6.1.0`（`Store.tsx` 价格历史折线图 `PriceHistoryChart`；`Deployments.tsx` / `Sites.tsx` 总览状态分布环形图 `StatusPieChart`）、`@antv/g6 ^5.1.1`（`Store.tsx` 详情面板依赖链有向图 `DependencyGraph`）、`vditor ^4.0.1`（`ComicWorkbench.tsx` 创建标签页脚本 Markdown 编辑器 `ScriptEditor`）；`services/mim-api` 后端——`sharp ^0.35.5`（`GET /api/v1/media/thumb` WebP 缩略图端点；前端 `AssetPreview` 带 Bearer fetch BlobURL 内联预览、失败回退原图）、`exceljs ^4.4.0`（`GET /api/v1/orders/export` 订单 xlsx 导出端点）。5 项均已写入对应 `package.json` 并更新 `pnpm-lock.yaml`，typecheck / 构建 / 契约测试全绿（api 233 例）。
 
 ---
 

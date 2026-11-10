@@ -1,10 +1,12 @@
 // 统一入口配置清单视图：把去重后的 45 个入口按 19 个业务域呈现，含可配置占位标识、
 // 核心功能、职责边界、后台/接口职责、相似入口关联区分，并保留运行时能力点与业务条目交互。
 // 用户未提供任何具体主机记录值，本视图不展示、不推导真实域名，只展示可配置占位标识。
-import { useState } from 'react'; // 本地状态钩子：搜索词、筛选业务域、展开入口、表单输入、忙碌标记
+import { useEffect, useRef, useState } from 'react'; // 本地状态钩子：搜索词、筛选业务域、展开入口、表单输入、忙碌标记；ref/effect 供图表挂载与销毁
 import type { FormEvent } from 'react'; // 表单事件类型：搜索与新建表单的 onSubmit 入参
 // 语言类型：约束文案取值为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
+// ECharts：总览面板把入口状态分布画成饼图，卸载时 dispose 释放实例
+import * as echarts from 'echarts';
 // 接口客户端、错误文案翻译器与会话读取工具（判断匿名态）
 import { api, errorText, getSession } from '../api';
 // 清单响应类型：能力点、业务条目与业务域
@@ -91,6 +93,44 @@ function stateText(locale: Locale, status: string): string {
   // 查表命中则按语言取值，否则回退原始状态串
   return STATE_LABEL[status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? status;
 } // stateText 结束
+
+// 入口状态分布饼图：把 by_status 计数画成 ECharts 环形图，标签走 stateText 翻译；无数据不渲染容器。
+function StatusPieChart({ byStatus, locale }: { byStatus: Record<string, number>; locale: Locale }) {
+  const hostRef = useRef<HTMLDivElement | null>(null); // 图表挂载容器
+  // 数据快照键：统计对象每次渲染都是新引用，拼串作 effect 依赖，避免无关重渲染重建图表
+  const dataKey = Object.entries(byStatus).map(([status, value]) => `${status}:${value}`).join('|');
+
+  useEffect(() => { // 容器就绪且统计快照变化时（重新）绘图
+    const host = hostRef.current; // 取挂载节点
+    if (!host || dataKey === '') return; // 无容器或无数据时不建图
+    const chart = echarts.init(host); // 初始化 ECharts 实例
+    // 映射饼图数据：状态文案按当前语言翻译，未命中回退原始状态码
+    const data = Object.entries(byStatus).map(([status, value]) => ({
+      name: stateText(locale, status),
+      value,
+    }));
+    chart.setOption({ // 环形饼图配置
+      tooltip: { trigger: 'item' }, // 悬停扇区显示名称与占比
+      legend: { bottom: 0, textStyle: { fontSize: 10 } }, // 底部图例
+      series: [{
+        type: 'pie', // 饼图
+        radius: ['38%', '62%'], // 环形内外半径
+        center: ['50%', '46%'], // 居中偏上给图例留位
+        label: { fontSize: 10 }, // 扇区标签字号
+        data, // 扇区数据
+      }],
+    }); // 配置结束
+    const onResize = () => chart.resize(); // 视口缩放时自适应重排
+    window.addEventListener('resize', onResize);
+    return () => { // 卸载或数据变化前清理
+      window.removeEventListener('resize', onResize); // 移除缩放监听
+      chart.dispose(); // 销毁实例，释放 canvas 与事件
+    };
+  }, [dataKey, locale, byStatus]); // 依赖：统计快照键 + 语言；原始对象引用不进依赖
+
+  if (dataKey === '') return null; // 无状态计数时不渲染容器
+  return <div ref={hostRef} className="deploy-status-pie" />; // 图表挂载容器
+} // StatusPieChart 结束
 
 // 把时间格式化为本地可读串；无效输入原样返回，避免抛错
 function formatTime(locale: Locale, iso: string): string {
@@ -387,6 +427,8 @@ export function Sites({ locale }: Props) {
             ))}{/* 分布遍历结束 */}
           </p> // 分布行结束
         )}{/* 分布条件渲染结束 */}
+        {/* 状态分布环形图：与上方文字罗列互为补充，直观对比各状态占比 */}
+        {ov && <StatusPieChart byStatus={ov.by_status} locale={locale} />}
       </section>{/* 概览面板结束 */}
 
       <form className="form inline" onSubmit={submitSearch}>{/* 筛选行：关键词 + 业务域 + 提交 */}
