@@ -30,8 +30,11 @@ await build({
     '@aws-sdk/s3-request-presigner',
   ],
   // ESM 产物中还原 __dirname / import.meta.url 语义（esbuild 单文件 banner）
+  // 别名导入：esbuild 在产物内部（被内联的依赖需要 require 时）会自动注入
+  // `import { createRequire } from "node:module"`；若 banner 也叫 createRequire，
+  // 单文件 ESM 里就会出现同名标识符重复声明（Node 直接 SyntaxError 起不来）。
   banner: {
-    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+    js: "import { createRequire as mimCreateRequire } from 'node:module'; const require = mimCreateRequire(import.meta.url);",
   },
   logLevel: 'info',
 });
