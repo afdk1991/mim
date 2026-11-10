@@ -94,20 +94,20 @@
 
 <!-- 变更告示：本页为历史副本；FR-03 已于 2026-11-04 整体移除并重定义为「功能模块商城 + 漫剧 AI 剧」 -->
 <div class="callout-warn">
-  <strong>2026-11-04 变更告示</strong>：本页为 2026-11-03 的 PRD 离线副本。<strong>原 FR-03 核心 SaaS 工作区（项目/任务/子任务、成员与邀请、仪表盘、增量同步、CSV 导出）已于 2026-11-04 按用户指令整体移除，并重定义为「功能模块商城 + 漫剧 AI 剧」</strong>。新范围当前 <strong>0 代码</strong>：商城（FR-03.1）与漫剧 AI 剧（FR-03.2，含 AI 全自动成片 / AI 辅助创作工作台 / 作品管理与分发 / 工作台+导出成片四种形态）的实现拆分见 <code>docs/wiki/07-functional-modules.md</code> §12。下文凡涉及旧 FR-03 与订阅计划 <code>features</code> 的内容均已失效，仅作历史记录。权威版本请以仓库根目录 <a href="../Mim-PRD.html">Mim-PRD.html</a> 为准。
+  <strong>2026-11-04 变更告示</strong>：本页为 2026-11-03 的 PRD 离线副本。<strong>原 FR-03 核心 SaaS 工作区（项目/任务/子任务、成员与邀请、仪表盘、增量同步、CSV 导出）已于 2026-11-04 按用户指令整体移除，并重定义为「功能模块商城 + 漫剧 AI 剧」</strong>。新范围当前 <strong>0 代码</strong>：商城（FR-03.1）与漫剧 AI 剧（FR-03.2，含 AI 全自动成片 / AI 辅助创作工作台 / 作品管理与分发 / 工作台+导出成片四种形态）的实现拆分见 <code>docs/wiki/07-functional-modules.md</code> §12。下文凡涉及旧 FR-03 的相关内容均已失效，仅作历史记录。权威版本请以仓库根目录 <a href="../Mim-PRD.html">Mim-PRD.html</a> 为准。
 </div>
 
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
   <!-- 加粗的小节引导词 -->
-  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。旗舰产品形态于 <strong>2026-11-04 重定义为 SaaS 工具型（订阅制）— 功能模块商城 + 漫剧 AI 剧工作室</strong>（FR-03 已于 2026-11-04 整体重写，早期旗舰形态连同其功能条目已按用户指令于 2026-11-10 从文档中删除），当前 FR-03 新范围 0 代码，已落地的产品能力为 FR-01 账号身份、FR-02 订阅支付（mock 驱动）、FR-06 审计合规；首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
+  <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（IM/音视频/AI）。旗舰产品形态于 <strong>2026-11-04 重定义为 SaaS 工具型（按功能模块解锁）— 功能模块商城 + 漫剧 AI 剧工作室</strong>（FR-03 已于 2026-11-04 整体重写，早期旗舰形态连同其功能条目已按用户指令于 2026-11-10 从文档中删除），当前 FR-03 新范围 0 代码，已落地的产品能力为 FR-01 账号身份、FR-06 审计合规；首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
 </div>
 
 <!-- 章节标题：1. 背景与目标 -->
 <h2>1. 背景与目标</h2>
 
 <!-- 问题陈述段：加粗引导词 + 正文 -->
-<p><strong>观察到的问题</strong>：一套产品需要同时覆盖国内与海外、PC 与移动、小程序与原生 App，且要求支付、IM、音视频、AI 等重资产能力。若按传统方式为每个端独立开发业务逻辑，会导致：</p>
+<p><strong>观察到的问题</strong>：一套产品需要同时覆盖国内与海外、PC 与移动、小程序与原生 App，且要求 IM、音视频、AI 等重资产能力。若按传统方式为每个端独立开发业务逻辑，会导致：</p>
 <!-- 问题清单（无序列表） -->
 <ul>
   <!-- 问题 1：多端重复实现 -->
@@ -115,14 +115,14 @@
   <!-- 问题 2：账号体系后期打通代价高 -->
   <li>国内/海外数据与账号体系后期打通代价极高；</li>
   <!-- 问题 3：重资产能力重复对接 -->
-  <li>支付、IM、音视频等能力在各端重复对接，无法统一治理。</li>
+  <li>IM、音视频等能力在各端重复对接，无法统一治理。</li>
 </ul>
 
 <!-- 产品决策段 -->
 <p><strong>产品决策</strong>：采用「Headless 中台 + 多端薄壳」架构，将业务逻辑、能力网关、账号与数据下沉为共享层，各端仅负责 UI 与平台 API 适配。</p>
 
 <!-- 可观测目标段 -->
-<p><strong>可观测的目标</strong>：用户在任意一端完成注册与订阅后，可在其他所有端以同一身份登录并使用已订阅的功能；支付、IM、音视频、AI 能力对业务方以统一接口暴露，国内/海外差异由驱动层屏蔽。</p>
+<p><strong>可观测的目标</strong>：用户在任意一端完成注册并解锁功能后，可在其他所有端以同一身份登录并使用已解锁的功能；IM、音视频、AI 能力对业务方以统一接口暴露，国内/海外差异由驱动层屏蔽。</p>
 
 <!-- 章节标题：2. 产品契约 -->
 <h2>2. 产品契约</h2>
@@ -134,15 +134,15 @@
   <!-- 主要用户 -->
   <tr><td>主要用户</td><td>终端用户（国内 / 海外）、运营管理员</td></tr>
   <!-- 核心任务 -->
-  <tr><td>核心任务</td><td>注册账号 → 选择订阅计划 → 完成支付 → 使用核心 SaaS 功能 → 跨端继续使用</td></tr>
+  <tr><td>核心任务</td><td>注册账号 → 浏览功能模块商城并解锁 → 使用核心功能 → 跨端继续使用</td></tr>
   <!-- 触发方式 -->
   <tr><td>触发</td><td>用户首次访问任意端，或从任一渠道（链接、扫码、推送）进入产品</td></tr>
   <!-- 完成条件 -->
-  <tr><td>完成条件</td><td>用户在至少一端成功支付订阅，且可在另一端以同一账号登录并访问已订阅功能</td></tr>
+  <tr><td>完成条件</td><td>用户在至少一端成功解锁功能模块，且可在另一端以同一账号登录并访问已解锁功能</td></tr>
   <!-- 共享业务对象 -->
-  <tr><td>共享业务对象</td><td>User（用户）、Account（账号）、Subscription（订阅）、Order（订单）、Plan（计划）</td></tr>
+  <tr><td>共享业务对象</td><td>User（用户）、Account（账号）、Module（功能模块）、Entitlement（权益）、Order（订单）</td></tr>
   <!-- 信任基础 -->
-  <tr><td>信任基础</td><td>支付安全（持牌通道 + IAP）、数据合规（PIPL/GDPR）、隐私保护（最小收集 + 可删除）</td></tr>
+  <tr><td>信任基础</td><td>订单与权益校验安全、数据合规（PIPL/GDPR）、隐私保护（最小收集 + 可删除）</td></tr>
 </table>
 
 <!-- 章节标题：3. 范围 -->
@@ -154,10 +154,8 @@
 <ul>
   <!-- 账号与身份 -->
   <li><strong>账号与身份</strong>：注册、登录、跨端账号打通、国内（手机号+微信/支付宝）与海外（邮箱+Google/Apple）双登录体系</li>
-  <!-- 订阅与支付 -->
-  <li><strong>订阅与支付</strong>：计划展示、订阅、支付（国内通道 + Stripe/PayPal + Apple IAP/Google Play）、订单、退款、凭证校验</li>
   <!-- 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」） -->
-  <li><strong>核心 SaaS 工作区</strong>：<strong>功能模块商城</strong>（模块上架、按 region/币种独立定价、订阅内含或一次性购买、解锁发放与回收）＋ <strong>漫剧 AI 剧</strong>（AI 全自动生成成片 / AI 辅助创作工作台 / 漫剧作品管理与分发 / 创作工作台+导出成片四种形态），功能规格见 FR-03.1 与 FR-03.2；当前 0 代码，拆分清单见 <code>docs/wiki/07-functional-modules.md</code> §12</li>
+  <li><strong>核心 SaaS 工作区</strong>：<strong>功能模块商城</strong>（模块上架、按 region/币种独立定价、一次性购买与权益解锁、解锁发放与回收）＋ <strong>漫剧 AI 剧</strong>（AI 全自动生成成片 / AI 辅助创作工作台 / 漫剧作品管理与分发 / 创作工作台+导出成片四种形态），功能规格见 FR-03.1 与 FR-03.2；当前 0 代码，拆分清单见 <code>docs/wiki/07-functional-modules.md</code> §12</li>
   <!-- 多端体验一致性 -->
   <li><strong>多端体验一致性</strong>：Web、微信小程序、App（iOS/Android）、PC（Win/macOS）至少一端可用，其余端适配</li>
   <!-- 国际化基础 -->
@@ -230,11 +228,11 @@
 <!-- 分期归属说明 -->
 <p>分期归属依据：P0 范围已含 App（iOS/Android）、微信小程序、PC（Windows/macOS）；支付宝、抖音、百度、QQ 小程序与 Ubuntu（Linux）按 P1 清单迭代，上线时同样满足本表下限。各端 UI 差异仍由平台适配层吸收，业务逻辑统一（见 FR-04）。</p>
 
-<!-- 章节标题：4. 角色与对象模型 -->
-<h2>4. 角色与对象模型</h2>
+<!-- 章节标题：4. 用户角色与权限 -->
+<h2>4. 用户角色与权限</h2>
 
-<!-- 4.1 角色小节标题 -->
-<h3>4.1 角色</h3>
+<!-- 4.1 角色定义小节标题 -->
+<h3>4.1 角色定义</h3>
 <!-- 角色定义表 -->
 <table>
   <!-- 表头：角色 / 定义 / 核心权限 -->
@@ -242,48 +240,9 @@
   <!-- 访客 -->
   <tr><td>访客</td><td>未登录用户</td><td>浏览公开内容、注册/登录</td></tr>
   <!-- 免费用户 -->
-  <tr><td>免费用户</td><td>已注册未订阅</td><td>使用免费功能、查看计划、发起订阅</td></tr>
-  <!-- 订阅用户 -->
-  <tr><td>订阅用户</td><td>有有效订阅</td><td>使用付费功能、管理订阅、跨端登录</td></tr>
+  <tr><td>免费用户</td><td>已注册未解锁模块</td><td>使用免费功能、浏览功能模块商城、购买模块</td></tr>
   <!-- 运营管理员（权限范围 TBD） -->
-  <tr><td>运营管理员</td><td>内部运营人员</td><td>管理计划、查看订单、处理退款工单 <span class="tag-tbd">TBD</span></td></tr>
-</table>
-
-<!-- 4.2 核心对象与状态小节标题 -->
-<h3>4.2 核心对象与状态</h3>
-
-<!-- Subscription 对象小标题 -->
-<h4>Subscription（订阅）</h4>
-<!-- 订阅状态机表 -->
-<table>
-  <!-- 表头：状态 / 进入条件 / 可执行操作 -->
-  <tr><th>状态</th><th>进入条件</th><th>可执行操作</th></tr>
-  <!-- active：生效中 -->
-  <tr><td><code>active</code></td><td>支付成功且在有效期内</td><td>使用付费功能、取消续费、申请退款</td></tr>
-  <!-- past_due：续费失败宽限期 -->
-  <tr><td><code>past_due</code></td><td>续费失败，宽限期内</td><td>更新支付方式、查看欠费</td></tr>
-  <!-- canceled：已取消 -->
-  <tr><td><code>canceled</code></td><td>用户取消或退款完成</td><td>不可用付费功能（至当期结束）</td></tr>
-  <!-- expired：已过期 -->
-  <tr><td><code>expired</code></td><td>订阅到期未续费</td><td>重新订阅</td></tr>
-</table>
-
-<!-- Order 对象小标题 -->
-<h4>Order（订单）</h4>
-<!-- 订单状态表 -->
-<table>
-  <!-- 表头：状态 / 说明 -->
-  <tr><th>状态</th><th>说明</th></tr>
-  <!-- pending：待支付 -->
-  <tr><td><code>pending</code></td><td>已创建，等待支付</td></tr>
-  <!-- paid：已支付 -->
-  <tr><td><code>paid</code></td><td>支付成功</td></tr>
-  <!-- failed：支付失败 -->
-  <tr><td><code>failed</code></td><td>支付失败</td></tr>
-  <!-- refunded：已退款 -->
-  <tr><td><code>refunded</code></td><td>已退款（全额或部分）</td></tr>
-  <!-- closed：已关闭 -->
-  <tr><td><code>closed</code></td><td>超时未支付关闭</td></tr>
+  <tr><td>运营管理员</td><td>内部运营人员</td><td>管理模块目录、查看订单、发放与回收权益 <span class="tag-tbd">TBD</span></td></tr>
 </table>
 
 <!-- 章节标题：5. 功能需求 -->
@@ -295,7 +254,7 @@
 <!-- 目的子标题 -->
 <h4>目的</h4>
 <!-- 目的说明段 -->
-<p>用户在任意端完成注册/登录后，其账号与订阅状态在所有端实时同步。国内与海外采用不同的登录方式，但底层账号体系统一。</p>
+<p>用户在任意端完成注册/登录后，其账号与登录状态在所有端实时同步。国内与海外采用不同的登录方式，但底层账号体系统一。</p>
 
 <!-- 注册与登录方式子标题 -->
 <h4>注册与登录方式</h4>
@@ -320,7 +279,7 @@
   <!-- 绑定需二次验证 -->
   <li>绑定需二次验证（已登录方式确认 + 新方式验证码）</li>
   <!-- 账号合并规则（策略 TBD） -->
-  <li>账号合并：若用户用两种方式注册了两个账号，可申请合并，合并后订阅与订单归并至保留账号 <span class="tag-tbd">TBD：合并策略细节</span></li>
+  <li>账号合并：若用户用两种方式注册了两个账号，可申请合并，合并后订单与权益归并至保留账号 <span class="tag-tbd">TBD：合并策略细节</span></li>
 </ul>
 
 <!-- 异常与边界子标题 -->
@@ -390,137 +349,12 @@ function submitLogin(){
 }
 </script>
 
-<!-- FR-02 订阅与支付小节标题 -->
-<h3>FR-02 订阅与支付</h3>
-
-<!-- 目的子标题 -->
-<h4>目的</h4>
-<!-- 目的说明段 -->
-<p>用户选择订阅计划并完成支付后，获得对应功能的使用权。支付通道按市场与平台路由，底层由驱动层屏蔽差异，业务方只感知统一的订阅状态。</p>
-
-<!-- 订阅计划子标题 -->
-<h4>订阅计划（Plan）</h4>
-<!-- Plan 字段定义表 -->
-<table>
-  <!-- 表头：字段 / 说明 -->
-  <tr><th>字段</th><th>说明</th></tr>
-  <!-- plan_id：唯一标识 -->
-  <tr><td>plan_id</td><td>计划唯一标识</td></tr>
-  <!-- name：多语言名称 -->
-  <tr><td>name</td><td>计划名称（多语言）</td></tr>
-  <!-- billing_cycle：计费周期 -->
-  <tr><td>billing_cycle</td><td>月 / 季 / 年</td></tr>
-  <!-- price：分币种定价 -->
-  <tr><td>price</td><td>分币种定价（CNY、USD 等）</td></tr>
-  <!-- features：功能权限列表（已随 FR-03 于 2026-11-04 删除） -->
-  <tr><td><s>features</s></td><td>原功能权限列表，已随 FR-03 于 2026-11-04 删除</td></tr>
-  <!-- region：适用市场 -->
-  <tr><td>region</td><td>适用市场（国内 / 海外 / 全球）</td></tr>
-  <!-- status：上架状态 -->
-  <tr><td>status</td><td>active / archived</td></tr>
-</table>
-
-<!-- 支付通道路由子标题 -->
-<h4>支付通道路由</h4>
-<!-- 支付通道路由表 -->
-<table>
-  <!-- 表头：场景 / 可用通道 / 规则 -->
-  <tr><th>场景</th><th>可用通道</th><th>规则</th></tr>
-  <!-- 国内 Web/小程序场景 -->
-  <tr><td>国内 Web/小程序</td><td>微信支付、支付宝、银联</td><td>按用户选择</td></tr>
-  <!-- 国内 App 数字商品场景（Android 渠道规则为假设项） -->
-  <tr><td>国内 App 数字商品</td><td>—</td><td>iOS 必须走 Apple IAP；Android 国内商店规则视渠道而定 <span class="tag-assume">Assumption</span></td></tr>
-  <!-- 海外 Web 场景 -->
-  <tr><td>海外 Web</td><td>Stripe、PayPal</td><td>按用户选择</td></tr>
-  <!-- 海外 App 数字商品场景（商店强制 IAP） -->
-  <tr><td>海外 App 数字商品</td><td>Apple IAP、Google Play Billing</td><td>商店强制，否则拒审</td></tr>
-</table>
-
-<!-- 警告提示块：资金合规硬约束 -->
-<div class="callout-warn">
-  <strong>资金合规硬约束</strong>：支付清算必须由持牌机构完成。产品自研的是「支付编排、账务、订阅计费、对账、风控」层，底层通道对接持牌方。iOS/Android 数字商品必须走商店 IAP，抽成 15%~30%。
-</div>
-
-<!-- 订阅生命周期子标题 -->
-<h4>订阅生命周期</h4>
-<!-- 预格式化流程图块（white-space:pre，内部不可插入 HTML 注释，否则会多出空行） -->
-<div class="flow">用户选择计划 → 创建 Order(pending) → 拉起支付 →
-  ├─ 支付成功 → Order(paid) → Subscription(active) → 发放权限
-  ├─ 支付失败 → Order(failed) → 提示重试
-  └─ 超时未支付 → Order(closed)
-
-续费：
-  到期前 N 天自动扣款 →
-  ├─ 成功 → Subscription 续期
-  └─ 失败 → Subscription(past_due)，宽限期内重试 → 仍失败 → expired</div>
-
-<!-- 退款规则子标题 -->
-<h4>退款规则</h4>
-<!-- 退款规则清单 -->
-<ul>
-  <!-- IAP 订单退款：走商店流程 -->
-  <li>IAP 订单：按商店政策走商店退款流程，产品侧接收退款回调并更新订阅状态</li>
-  <!-- 直连通道退款：人工审核（窗口条件 TBD） -->
-  <li>直连通道订单：支持用户申请退款，运营审核后执行 <span class="tag-tbd">TBD：退款窗口与条件</span></li>
-  <!-- 退款后订阅处理 -->
-  <li>退款后订阅立即失效（或按比例折算至当期结束），不可恢复</li>
-</ul>
-
-<!-- 异常与边界子标题 -->
-<h4>异常与边界</h4>
-<!-- 支付异常处理清单 -->
-<ul>
-  <!-- 回调幂等 -->
-  <li>支付回调重复到达：以 order_id + 通道流水号幂等处理</li>
-  <!-- 掉单补发：每日对账 -->
-  <li>支付成功但订阅未生效：对账任务每日扫描 paid 但无 active subscription 的订单，自动补发</li>
-  <!-- 跨端状态同步时限 -->
-  <li>跨端订阅状态：订阅状态变更后 5 秒内同步至所有在线端，离线端下次拉取时更新</li>
-</ul>
-
-<!-- FR-02 交互演示卡片 -->
-<div class="demo">
-  <!-- 演示卡片标签 -->
-  <div class="demo-label">FR-02 演示：订阅计划与支付</div>
-  <!-- 计划演示容器（供脚本按 id 定位） -->
-  <div id="plan-demo">
-    <!-- 计划对比表：宽度自适应内容 -->
-    <table style="width:auto;">
-      <!-- 表头：计划 / 月付 / 年付 / 操作列 -->
-      <tr><th>计划</th><th>月付</th><th>年付</th><th></th></tr>
-      <!-- 基础版行：选择按钮调用 selectPlan('基础版','¥29') -->
-      <tr><td>基础版</td><td>¥29</td><td>¥290 <span class="badge">省 ¥58</span></td><td><button class="btn btn-ghost" onclick="selectPlan('基础版','¥29')">选择</button></td></tr>
-      <!-- 专业版行：选择按钮调用 selectPlan('专业版','¥99') -->
-      <tr><td>专业版</td><td>¥99</td><td>¥990 <span class="badge">省 ¥198</span></td><td><button class="btn" onclick="selectPlan('专业版','¥99')">选择</button></td></tr>
-    </table>
-    <!-- 支付结果区：由脚本写入所选计划与支付按钮/结果 -->
-    <div id="pay-result" style="margin-top:12px;"></div>
-  </div>
-</div>
-<!-- FR-02 演示脚本 -->
-<script>
-// 选择计划：把所选计划名称与价格渲染进结果区，并给出两个支付按钮
-function selectPlan(name,price){
-  // 将结果区内容替换为：已选信息 + 微信支付按钮 + 支付宝按钮
-  document.getElementById('pay-result').innerHTML=
-    '<strong>已选：'+name+' '+price+'/月</strong><br>'+
-    '<button class="btn" style="margin-top:8px;" onclick="doPay()">微信支付</button> '+
-    '<button class="btn btn-ghost" onclick="doPay()">支付宝</button>';
-}
-// 模拟支付：把结果区替换为支付成功提示
-function doPay(){
-  // 显示演示用的支付成功文案
-  document.getElementById('pay-result').innerHTML=
-    '<span class="state-active">✓ 支付成功，订阅已激活，可使用付费功能</span>';
-}
-</script>
-
 <!-- FR-03 核心 SaaS 工作区小节标题 -->
 <h3>FR-03 核心 SaaS 工作区</h3>
 
 <!-- 信息提示块：OQ-01 已重定义；旧的旗舰形态（任务管理 / 多端同步 / 协作 / 仪表盘）已于 2026-11-10 按用户指令整体删除，本节只保留现行范围 -->
 <div class="callout">
-  <strong>OQ-01 已重定义</strong>（2026-11-04）：旗舰产品形态为 <strong>SaaS 工具型 — 功能模块商城 + 漫剧 AI 剧（四形态）</strong>。早期旗舰形态（任务管理、多端实时同步、基础协作、个人仪表盘）与其配套的订阅 features 映射已于 2026-11-04 / 2026-11-05 下线，并按用户指令于 2026-11-10 从文档中整体删除，<strong>不再保留任何实现口径</strong>；现行范围见仓库 <code>Mim-PRD.html</code> §5 FR-03。
+  <strong>OQ-01 已重定义</strong>（2026-11-04）：旗舰产品形态为 <strong>SaaS 工具型 — 功能模块商城 + 漫剧 AI 剧（四形态）</strong>，<strong>现行范围见仓库 <code>Mim-PRD.html</code> §5 FR-03</strong>。
 </div>
 
 <!-- 现行范围子标题 -->
@@ -546,8 +380,8 @@ function doPay(){
 <table>
   <!-- 表头：维度 / 统一规则 -->
   <tr><th>维度</th><th>统一规则</th></tr>
-  <!-- 账号与订阅 -->
-  <tr><td>账号与订阅</td><td>同一市场内跨端实时同步</td></tr>
+  <!-- 账号与权益 -->
+  <tr><td>账号与权益</td><td>同一市场内跨端实时同步</td></tr>
   <!-- 业务数据 -->
   <tr><td>业务数据</td><td>用户产生的数据在所有端可见可编辑</td></tr>
   <!-- 文案与术语 -->
@@ -566,8 +400,6 @@ function doPay(){
 <ul>
   <!-- 登录封装 -->
   <li>登录：封装各端原生登录 SDK（微信、支付宝、Google、Apple）</li>
-  <!-- 支付封装 -->
-  <li>支付：封装各端支付 SDK（微信支付、支付宝、Stripe、IAP）</li>
   <!-- 推送封装 -->
   <li>推送：封装各端推送通道（APNs、FCM、厂商通道）</li>
   <!-- 存储封装 -->
@@ -649,7 +481,7 @@ function doPay(){
 <!-- 注销规则清单 -->
 <ul>
   <!-- 注销前风险提示 -->
-  <li>用户可申请账号注销，注销前提示：订阅将失效、数据将删除且不可恢复</li>
+  <li>用户可申请账号注销，注销前提示：已解锁权益将失效、数据将删除且不可恢复</li>
   <!-- 7 天冷静期 -->
   <li>注销申请有 7 天冷静期，期间可撤销</li>
   <!-- 冷静期后删除与匿名化保留 -->
@@ -668,25 +500,17 @@ function doPay(){
   <!-- 表头：规则 / 定义 / 引用模块 -->
   <tr><th>规则</th><th>定义</th><th>引用模块</th></tr>
   <!-- Region 隔离 -->
-  <tr><td>Region 隔离</td><td>国内(cn)与海外(global)数据物理隔离，账号、订单、订阅按 region 分库</td><td>FR-01, FR-02, FR-03</td></tr>
-  <!-- 幂等性 -->
-  <tr><td>幂等性</td><td>所有支付、订阅状态变更接口以 request_id 幂等，重复请求返回首次结果</td><td>FR-02</td></tr>
+  <tr><td>Region 隔离</td><td>国内(cn)与海外(global)数据物理隔离，账号、订单、权益按 region 分库</td><td>FR-01, FR-03</td></tr>
   <!-- 审计日志 -->
-  <tr><td>审计日志</td><td>登录、支付、退款、注销等关键操作记录审计日志，保留 180 天</td><td>FR-01, FR-02, FR-06</td></tr>
+  <tr><td>审计日志</td><td>登录、订单、注销等关键操作记录审计日志，保留 180 天</td><td>FR-01, FR-06</td></tr>
   <!-- 第三方与密钥治理：先登记后接入、密钥不入库、按 region 隔离（详见 09 清单 §0） -->
-  <tr><td>第三方与密钥治理</td><td>新增第三方能力须先在 09 清单登记六要素（提供方 / 形态 / 用途 / 密钥名 / 优先级 / 合规）再接入；密钥按 region 独立、永不入库，模板与清单一致性由 scripts/env-check.mjs 强制</td><td>FR-02, FR-04, FR-06</td></tr>
+  <tr><td>第三方与密钥治理</td><td>新增第三方能力须先在 09 清单登记六要素（提供方 / 形态 / 用途 / 密钥名 / 优先级 / 合规）再接入；密钥按 region 独立、永不入库，模板与清单一致性由 scripts/env-check.mjs 强制</td><td>FR-04, FR-06</td></tr>
 </table>
 
 <!-- 6.2 通知规则小节标题 -->
 <h3>6.2 通知规则</h3>
 <!-- 通知规则清单 -->
 <ul>
-  <!-- 支付成功通知 -->
-  <li>支付成功：站内 + 邮件/短信通知</li>
-  <!-- 到期提醒节奏 -->
-  <li>订阅即将到期：到期前 7 天、3 天、1 天各提醒一次</li>
-  <!-- 续费失败通知 -->
-  <li>续费失败：立即通知用户更新支付方式</li>
   <!-- 异常登录通知 -->
   <li>账号异常登录：邮件/短信通知用户</li>
 </ul>
@@ -699,13 +523,9 @@ function doPay(){
   <!-- 表头：编号 / 问题 / 影响 / 状态 -->
   <tr><th>编号</th><th>问题</th><th>影响</th><th>状态</th></tr>
   <!-- OQ-01：已重定义（2026-11-04），内容见 FR-03 与根目录 Mim-PRD.html -->
-  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>决定 FR-03 工作区内容、模块清单与订阅计划权益</td><td><span class="tag-p0">已重定义（2026-11-04）：功能模块商城 + 漫剧 AI 剧（四形态）</span></td></tr>
-  <!-- OQ-02：国内 Android IAP 合规问题 -->
-  <tr><td>OQ-02</td><td>国内 Android 端数字商品是否必须走各商店 IAP？</td><td>影响支付通道设计与收入分成</td><td><span class="tag-assume">Assumption, TBD</span></td></tr>
+  <tr><td>OQ-01</td><td>旗舰 SaaS 产品的核心功能是什么？</td><td>决定 FR-03 工作区内容与模块清单</td><td><span class="tag-p0">已重定义（2026-11-04）：功能模块商城 + 漫剧 AI 剧（四形态）</span></td></tr>
   <!-- OQ-03：首批出海市场与语种 -->
-  <tr><td>OQ-03</td><td>首批出海市场与语种？</td><td>影响 i18n 资源、支付通道、合规要求</td><td><span class="tag-tbd">TBD</span></td></tr>
-  <!-- OQ-04：退款窗口与条件 -->
-  <tr><td>OQ-04</td><td>退款窗口与条件（直连通道）？</td><td>影响 FR-02 退款规则</td><td><span class="tag-tbd">TBD</span></td></tr>
+  <tr><td>OQ-03</td><td>首批出海市场与语种？</td><td>影响 i18n 资源与合规要求</td><td><span class="tag-tbd">TBD</span></td></tr>
   <!-- OQ-05：账号合并策略 -->
   <tr><td>OQ-05</td><td>账号合并的具体策略与数据归属？</td><td>影响 FR-01 账号打通</td><td><span class="tag-tbd">TBD</span></td></tr>
   <!-- OQ-06：IoT 是否支持（假设不支持） -->

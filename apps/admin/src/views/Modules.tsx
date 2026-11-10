@@ -30,16 +30,16 @@ const STATUS_LABEL: Record<string, string> = {
   draft: '草稿',
   // 已上线：前台目录可见
   active: '已上线',
-  // 已下线：终态，不可再流转
-  archived: '已下线',
+  // 已归档：终态，不可再流转
+  archived: '已归档',
 }; // 状态文案表结束
 
 // 下一步迁移表：archived 为终态，故意不出现在表内
 const NEXT_STATUS: Record<string, { next: ModuleStatus; label: string }> = {
   // 草稿只能上线
   draft: { next: 'active', label: '上线' },
-  // 已上线只能下线
-  active: { next: 'archived', label: '下线' },
+  // 已上线只能归档
+  active: { next: 'archived', label: '归档' },
 }; // 迁移表结束：未列出的状态即无下一步
 
 // 状态过滤选项：空串表示不过滤
@@ -50,8 +50,8 @@ const STATUS_OPTIONS: Array<{ value: '' | ModuleStatus; label: string }> = [
   { value: 'draft', label: '草稿' },
   // 已上线
   { value: 'active', label: '已上线' },
-  // 已下线
-  { value: 'archived', label: '已下线' },
+  // 已归档
+  { value: 'archived', label: '已归档' },
 ]; // 状态选项结束
 
 // 多语言字段取值：入参放宽为 string | undefined，规避 TS2869 不可达分支告警
@@ -386,7 +386,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
       // 记录武装的模块码
       setDeleteArmed(module.code);
       // 提示再次点击确认
-      setNotice({ kind: 'error', text: `再次点击「确认删除」将软删除 ${module.code}（active 须先下线）` });
+      setNotice({ kind: 'error', text: `再次点击「确认删除」将软删除 ${module.code}（active 须先归档）` });
       // 提前结束
       return;
     } // 武装分支结束
@@ -869,7 +869,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
                         disabled={!canWrite || busyKey === `transition:${row.module.code}`} /* 无权限或本行迁移中时禁用 */
                         onClick={() => void runTransition(row.module, row.action!.next, row.action!.label)} /* 点击执行单向迁移；void 显式丢弃 Promise */
                       > {/* 按钮属性区收尾 */}
-                        {row.action.label} {/* 按钮文案：上线 / 下线 */}
+                        {row.action.label} {/* 按钮文案：上线 / 归档 */}
                       </button> // 迁移按钮结束（回到 row.action 三元的 JS 上下文）
                     ) : ( // 终态分支：无可执行动作
                       // 终态无可执行动作

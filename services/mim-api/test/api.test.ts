@@ -64,8 +64,8 @@ describe('公开能力', () => { // describe 公开能力：无需鉴权的端�
     expect(res.body.code).toBe('VALIDATION_FAILED'); // 断言错误码，避免把解析失败误报成 500
   }); // 结束畸形 JSON 用例
 
-  it('已下线与未知路径返回 404，不被受保护 router 的鉴权拦成 401', async () => { // 用例：已下线路由与未知路径统一 404，不能被受保护路由的鉴权抢答成 401
-    for (const path of ['/api/v1/plans', '/api/v1/audit/logs', '/api/v1/not-exist']) { // 遍历三类路径：已下线的老接口、审计接口、纯随机路径
+  it('已移除的旧接口与未知路径返回 404，不被受保护 router 的鉴权拦成 401', async () => { // 用例：已移除的旧接口与未知路径统一 404，不能被受保护路由的鉴权抢答成 401
+    for (const path of ['/api/v1/plans', '/api/v1/audit/logs', '/api/v1/not-exist']) { // 遍历三类路径：已移除的老接口、审计接口、纯随机路径
       const res = await request(app).get(path); // 逐个发起 GET，不带任何鉴权头
       expect(res.status).toBe(404); // 断言 404，证明路由层先于鉴权层给出结论
       expect(res.body.code).toBe('NOT_FOUND'); // 断言统一错误码，客户端可据此区分未实现与无权限

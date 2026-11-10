@@ -53,7 +53,7 @@
 | **G7** | 5–10 次锁定 + 告警 | 🟡 部分合格 | 锁定机制合格：`LOGIN_LOCK_AFTER_FAILURES=5`、`LOGIN_LOCK_MINUTES=15`（`config.ts:30-31`），`login_failures` 表 + `assertNotLocked/recordFailure`（`auth.ts:128-156`、`schema.sql:255-261`），验证码 5 次作废（`config.ts:26`）。**无告警出口**：`recordFailure` 仅写库，`auth.ts` 无 notify/告警联动 | 中 |
 | **G8** | 无离职/停用/共用，最小权限 | 🟡 部分合格 | 最小权限合格：三档内置角色 `superadmin/operator/viewer` 权限分离（`db.ts:96-128`），权限实时查库、撤销即时生效（`middleware.ts:242-279`），账号状态含 `deleted/pending_deletion`（`schema.sql:14`）。但 `x-admin-token` 是**共用全权限引导通道**（`middleware.ts:194-216`、`admin.ts:186-191`），等效共用超管；离职/停用账号清单需生产侧信息，**无法判定** | 中 |
 | **G9** | bcrypt/scrypt/argon2 慢哈希，禁明文/MD5 | 🟡 部分合格 | 验证码与凭据哈希使用 `bcryptjs` cost=10（`auth.ts:4,56-62`），刷新令牌仅存 `sha256` 摘要（`auth.ts:111`、`schema.sql:45`），JWT 限定 HS256 算法白名单（`auth.ts:91`）。但管理员登录口令 `MIM_AUTH_ADMIN_PASSWORD` **以明文配置值**参与 `secureEqual` 比较（`auth.ts:337-348`），未做慢哈希存储（虽 env 文件 chmod 600、不入仓库） | 中 |
-| **G10** | 日志 ≥180 天，含来源IP/时间/账号/动作 | ❌ 不合格 | nginx 有 `access_log`（`nginx-mim.conf:118`，默认格式含 IP/时间/请求行），`/health` 关闭日志；但**无应用审计日志表**（`schema.sql` 全表无账号/动作审计），`deploy/` 与 `scripts/` 无 logrotate / 180 天留存配置；`backup-db.sh:23` 的 `KEEP=14` 是数据库备份份数，不是日志留存；`05-runbook.md:124` 记录审计域已下线 | **高** |
+| **G10** | 日志 ≥180 天，含来源IP/时间/账号/动作 | ❌ 不合格 | nginx 有 `access_log`（`nginx-mim.conf:118`，默认格式含 IP/时间/请求行），`/health` 关闭日志；但**无应用审计日志表**（`schema.sql` 全表无账号/动作审计），`deploy/` 与 `scripts/` 无 logrotate / 180 天留存配置；`backup-db.sh:23` 的 `KEEP=14` 是数据库备份份数，不是日志留存；`05-runbook.md` 记录审计域未实现 | **高** |
 | **G11** | 令牌随机、超时、登出失效；Cookie HttpOnly+Secure | 🟡 部分合格 | 合格面：`randomBytes(32)` 刷新令牌（`auth.ts:79`）、访问令牌 15 分钟（`config.ts:23`）、刷新轮换即吊销旧会话（`auth.ts:385-387`）、登出撤销（`auth.ts:390-395`）、CORS `credentials:false`（`app.ts:45`）。**不适用/缺失面**：整站使用 Bearer + `localStorage` 持久化（`apps/admin/src/api.ts:8,17-56`、`apps/web/src/api.ts:61-84`），**无 Cookie 会话**，故 HttpOnly+Secure 无从落地；localStorage 存令牌存在脚本读取面 | 中 |
 | **G12** | 关键写操作 CSRF 校验 | ⚪ 不适用（附说明） | 鉴权为 `Authorization` / `X-Admin-Token` 自定义头，非 Cookie 自动携带，浏览器跨站请求无法附带凭证；`cors` 白名单限定来源（`app.ts:34-48`），写操作强制 `Idempotency-Key`（`config.ts:35`、`middleware.ts:79-81`）。**清单字面的 CSRF Token 校验未实现**，但因无 Cookie 会话不构成等效风险；若后续改用 Cookie 会话须同步补 CSRF | 低 |
 | **G13** | 受支持版本、无未修补高危 | ⚪ 无法判定 | 依赖清单记录 `vite 6.4.4`（标注安全修复线）、`vitest 4.1.12`（标注修复安全通告）、Node `>=20`、Express 5 等（`04-dependencies.md:11-33,72`）；锁文件 `lockfileVersion 9.0`。**本轮按约束不做漏洞核查**，未执行依赖审计/CVE 比对，故不判定 | 无法判定 |
@@ -70,7 +70,7 @@
 | **1. CMS / 建站** | `apps/web`（Vite SPA）、`site/index.html`、`site/prd.html`、`Mim-PRD.html`、`dist/` | 无 CMS 内核（WordPress/DedeCMS 类）、无 `install.php`、无安装向导、无示例管理员；静态页不含默认口令/测试账号；构建产物仅 `index.html`+`assets/`，未混入 `.sql`/`.env`/`.db` | ✅ 无出厂身份残留；P2 补 nginx deny 规则 |
 | **2. 服务器面板与运维** | `deploy/nginx-mim.conf`、`mim-api.service`、`mim-backup.service/.timer`、`bootstrap.sh`、`deploy.sh`、`backup-db.sh`、`.github/workflows/deploy.yml` | 无宝塔/cPanel/phpMyAdmin 类面板，故无面板出厂口令；`bootstrap.sh:65` 生成无口令短语的只读 deploy key（自动化部署密钥，非登录口令，已登记为仓库 Deploy Key）；运行用户 `mim` 为 `nologin` 系统用户；`sudo -n` 非交互。缺口：`/admin/` 无 basic auth / IP 白名单，SSH 来源未限制 | ⚠️ 面板类合格；入口前置控制不合格（G4/G5） |
 | **3. 数据库与缓存** | SQLite（`better-sqlite3`，WAL）；无 Redis/Memcached 实部署（仅规划文档 `08-dev-implementation.md:24,319`） | **使用主体**：应用进程以 `mim` 用户读写本地单文件，无独立 DB 账号；**初始口令状态**：不适用（文件权限 `chmod 600` env + 目录属主控制，非口令鉴权）；**远程范围**：无网络监听端口，不对外暴露；每日 03:00 备份、保留 14 份（`backup-db.sh:23`、`mim-backup.timer`）；生产库路径在发布目录内 | ✅ 无远程暴露、无出厂账号；日志留存另见 G10 |
-| **4. 网络设备与 IoT** | 无 | 项目文档明确排除硬件 IoT（`01-architecture.md:91`、`07-functional-modules.md:17,249`、`09-third-party-sdk-inventory.md:218-221`）；`src/site-nodes.ts`（该文件已于 2026-11-08 随站点体系下线删除，此处为历史审计留痕）的 45 个子域记录为站点地图元数据（并注明不暴露解析目标 IP/CNAME，`site.ts:9`），**不是真实网络设备资产**；无固件、路由器、交换机、MQTT/SNMP 端点 | ⚪ 不适用，无需核查 |
+| **4. 网络设备与 IoT** | 无 | 项目文档明确排除硬件 IoT（`01-architecture.md:91`、`07-functional-modules.md:17,249`、`09-third-party-sdk-inventory.md:218-221`）；历史审计对象 `src/site-nodes.ts`（已不在工作树）的 45 个子域记录为站点地图元数据（并注明不暴露解析目标 IP/CNAME，`site.ts:9`），**不是真实网络设备资产**；无固件、路由器、交换机、MQTT/SNMP 端点 | ⚪ 不适用，无需核查 |
 | **5. 云平台与 SaaS** | 9 个免费平台（腾讯云自建 / EdgeOne / GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库），见 `AGENTS.md` 铁律九 | 平台凭证全部经 CI Secret 引用（`deploy.yml:77-104,261,304-306,323-325,342-345,367`），仓库内无明文；`deploy.sh:181-194` 明确移除公开固定口令并改为现场随机；`.env.example` 全部空占位、`env-check.mjs` 为 CI 门禁。缺口：各平台账号自身 2FA、初始口令状态、是否有遗留试用账号，**不在授权可见信息内，未探测** | 🟡 仓库侧合格；平台账号侧无法判定（P1 由自有账号自查） |
 | **6. 自研后台** | `apps/admin` + `services/mim-api`：RBAC 双通道（`x-admin-token` 引导 + Bearer JWT/RBAC）、`/auth/password`、`/admin/*` | 这是出厂身份核查的核心区：无固定默认账号名、无示例账号种子、固定默认口令已移除；但**共用超管引导令牌全权限**、**单一共享管理员口令**、**无 2FA**、**`/admin/` 通用路径公网可达**、**无审计日志**、**后台凭证存 localStorage** | ⚠️ 见 G1/G2/G4–G11 逐项 |
 
@@ -106,7 +106,7 @@
 | P2-1 | 入口控制（G4 残余）：通用路径、无 deny 规则 | nginx 补 `location ~* \.(sql|bak|zip|env|db)$ { deny all; }`；`/admin/` 改非通用路径；评估 VPN / 白名单可行性（与 9 平台公网矩阵的设计冲突需业务决策） |
 | P2-2 | 补丁 / 固件（G13） | 在授权范围内执行依赖审计与版本核对（本轮按「不找漏洞」约束未做）；网络设备/IoT 类不适用 |
 | P2-3 | 最小权限与会话存储（G8/G11） | 后台/前台令牌从 `localStorage` 迁移到 `HttpOnly + Secure + SameSite` Cookie，并**同步补 CSRF 校验**（G12 的前提将变化）；复核内置角色权限基线 |
-| P2-4 | 管理员口令慢哈希（G9） | 若保留口令登录，改为 bcrypt/argon2 校验；或彻底下线该端点、改实名 + 2FA |
+| P2-4 | 管理员口令慢哈希（G9） | 若保留口令登录，改为 bcrypt/argon2 校验；或彻底移除该端点、改实名 + 2FA |
 
 ---
 

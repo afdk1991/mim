@@ -64,7 +64,7 @@ const zh: Dict = {
   'auth.register': '注册',
   // 设置页「账号」分区的标题
   'settings.account': '账号',
-  // 设置页设备管理分区：查看并下线已登录终端
+  // 设置页设备管理分区：查看并移除已登录终端
   'settings.devices': '登录设备',
   // 设置页注销分区的标题
   'settings.deletion': '账号注销',

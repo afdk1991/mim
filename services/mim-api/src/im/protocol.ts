@@ -29,7 +29,7 @@ export type ServerFrameType =
   | 'message.delivered' // 消息已投递到对方在线设备
   | 'message.read' // 对方已读某条消息
   | 'typing' // 对方正在输入
-  | 'presence' // 用户上线/下线状态变更
+  | 'presence' // 用户在线/离线状态变更
   | 'call.invite' // 收到视频通话邀请
   | 'call.offer' // 收到对端 SDP offer
   | 'call.answer' // 收到对端 SDP answer

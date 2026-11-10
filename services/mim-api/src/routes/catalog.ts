@@ -307,7 +307,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const page = Math.max(1, Number.parseInt(String(req.query.page ?? '1'), 10) || 1); // 页码从 1 起，非法值回落首页
     const pageSize = Math.min(100, Math.max(1, Number.parseInt(String(req.query.pageSize ?? '20'), 10) || 20)); // 每页 1–100 条，默认 20
 
-    const visible = resolveActiveModules(db, region).filter((m) => MODULE_VISIBLE.has(m.status)); // 仅保留 active 模块，过滤草稿与下线
+    const visible = resolveActiveModules(db, region).filter((m) => MODULE_VISIBLE.has(m.status)); // 仅保留 active 模块，过滤草稿与归档
     const filtered = visible.filter((m) => { // 叠加关键词、分类、许可、语言四类过滤
       if (q && !m.code.toLowerCase().includes(q) && !m.name_i18n.toLowerCase().includes(q)) return false; // 编码与名称都不命中即剔除
       if (category && category !== 'all') { // 分类过滤：'all' 等价于不过滤

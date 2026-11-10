@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-09T17:00:05.021Z",
-  "head": "e7e364d",
+  "generated_at": "2026-11-10T10:59:36.219Z",
+  "head": "5372205",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-09 23:03 实测）",
@@ -32,7 +32,7 @@
     "deployment_items_declared": 16,
     "ci_jobs_found": 5,
     "ci_jobs_declared": 5,
-    "ci_steps_found": 28,
+    "ci_steps_found": 29,
     "remotes_found": 2,
     "remotes_declared": 2,
     "probed_items": 0
@@ -113,7 +113,7 @@
     {
       "name": "origin",
       "ok": true,
-      "hash": "e7e364d31b8bc15d948ac052c012f8d90332890e",
+      "hash": "53722055110011c440f5263b326d503f3773760f",
       "exit": 0,
       "error": null
     }
@@ -134,14 +134,15 @@
     "前端构建",
     "管理后台构建",
     "注释覆盖率门禁（铁律十一）",
+    "检查生产主机凭据",
     "配置 SSH",
     "上传本次提交的部署脚本",
     "远程发布（检出本次提交 → 安装 → 构建 → 重启 → 健康检查）",
     "校验服务器代码版本与本次提交一致",
     "线上健康检查",
     "管理后台路由断言",
-    "已下线接口抽查（应 404）",
     "线上认证接口抽查",
+    "未配置凭据 SKIP 提示",
     "安装依赖",
     "构建前端（注入生产 API 源）",
     "发布到 GitHub Pages",

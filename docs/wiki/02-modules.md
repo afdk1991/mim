@@ -1,6 +1,6 @@
 # 02 · 主要模块职责
 
-> 按仓库当前实际文件逐一说明。仓库已是 pnpm workspace Monorepo：`apps/web`（Web 端）、`services/mim-api`（后端 API）、`packages/core-domain` 与 `packages/i18n`（共享包）、`scripts/`（校验与构建脚本）、`site/`（PRD 可视化载体；**已下线**：2026-11-08 起连同 `deploy/`、`functions/` 等从工作树移除，删除未提交、远端 HEAD 仍在）。本页侧重资产与职责全景，业务代码细节见 [08-dev-implementation.md](./08-dev-implementation.md)。
+> 按仓库当前实际文件逐一说明。仓库已是 pnpm workspace Monorepo：`apps/web`（Web 端）、`services/mim-api`（后端 API）、`packages/core-domain` 与 `packages/i18n`（共享包）、`scripts/`（校验与构建脚本）、`site/`（PRD 可视化载体，非生产站点）。本页侧重资产与职责全景，业务代码细节见 [08-dev-implementation.md](./08-dev-implementation.md)。
 >
 > **现状标注（2026-11-10，A4 收尾）**：下文涉及 `site/`、`deploy/`、`functions/`、`vercel.json`、`wrangler.toml`、`Dockerfile` 等条目均为**历史留痕**（工作树已移除、删除未提交）；相关描述保留用于说明原有链路，不代表当前工作树实况。恢复或确认删除须按 AGENTS.md 铁律二先获授权。
 
@@ -33,9 +33,9 @@
 | `.gitignore` | 配置 | 版本库忽略规则：确保含真实密钥的 `.env` 永不入库，同时反向豁免 `.env.example` | `.env` / `.env.local` / `.env.*.local` 忽略 + `!.env.example` 豁免 |
 | `全平台小程序开发与分发-20261028181941.txt` | 参考调研 | 小程序全平台架构、合规、分发、Monorepo 骨架 | IPlatformAdapter 契约设计参考 |
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
-| `site/index.html` | 静态站点（本地预览）【已下线·历史留痕】 | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
-| `site/prd.html` | 静态站点（本地预览）【已下线·历史留痕】 | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
-| `deploy/` | 运维工件【已下线·历史留痕，恢复/删除待授权】 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
+| `site/index.html` | 静态站点（本地预览） | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
+| `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
+| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
 | `.github/workflows/deploy.yml` | CI/CD | 铁律八执行器：push `main` → 质量门禁（typecheck/test/build）→ SSH 远程发布 → 线上健康检查 | 每次 `main` 变更自动上线生产 |
 | `.screenshots/` | 资产暂存 | 截图取证目录（含 `.tmp/` 临时帧与 `data-mixm-top-e2e.png`：`data.mixm.top` 有头 Edge + CDP 端到端取证截图） | 交付取证附件 |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~10 共 10 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单、漫剧状态机 | 与仓库资产一一对应的唯一文档入口 |
@@ -106,12 +106,12 @@
 |---|---|
 | §1–2 背景与产品契约 | 问题观察 →「Headless 中台 + 多端薄壳」决策；用户/任务/完成条件/共享对象/信任基础 |
 | §3 范围 | P0 / P1 / 明确排除三档 + 平台兼容性要求矩阵（三端最低版本） |
-| §4 角色与对象模型 | 3 角色；Module / Entitlement / ComicProject / ComicFilm / GenerationJob 状态机（Subscription / Order / Refund 已于 2026-11-05 下线） |
-| §5 功能需求 | FR-01 账号身份、FR-02 订阅支付（**已下线 2026-11-05**）、FR-03 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」；第 1 期后端已落地：catalog 4 表 + comic 3 表 + `/api/v1/comic/*` 8 路由；第 2 期骨架 2026-11-05 已落地：comic 域累计 7 表（新增 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）+ 任务编排 `/comic/jobs/*` 与成片合成 `/comic/films/*` 16 路由）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
-| §6 共享规则 | Region 隔离、解锁鉴权、生成成本与配额、幂等性（Idempotency-Key）、通知规则（应用内审计模块已于 2026-11-05 下线，变更留痕改由运维记录承担） |
+| §4 角色与对象模型 | 3 角色；Module / Entitlement / ComicProject / ComicFilm / GenerationJob 状态机 |
+| §5 功能需求 | FR-01 账号身份、FR-03 核心 SaaS 工作区（2026-11-04 重定义为「功能模块商城 + 漫剧 AI 剧」；第 1 期后端已落地：catalog 4 表 + comic 3 表 + `/api/v1/comic/*` 8 路由；第 2 期骨架 2026-11-05 已落地：comic 域累计 7 表（新增 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）+ 任务编排 `/comic/jobs/*` 与成片合成 `/comic/films/*` 16 路由）、FR-04 多端一致性、FR-05 国际化、FR-06 合规隐私 |
+| §6 共享规则 | Region 隔离、解锁鉴权、生成成本与配额、幂等性（Idempotency-Key）、通知规则（变更留痕由运维记录承担） |
 | §7 开放问题 | OQ-01~09（OQ-01 已重定义为商城 + 漫剧 AI 剧；新增 OQ-07 漫剧版权与审核口径、OQ-08 生成模型供应商与成本上限、OQ-09 模块定价与一次性购买退款窗口；余项：国内 Android IAP、首批市场、退款窗口、账号合并、IoT） |
 
-内置一个交互演示：FR-01 登录流程演示（原 FR-02 订阅计划与支付演示已随套餐/订阅/支付模块于 2026-11-05 下线）。
+内置一个交互演示：FR-01 登录流程演示。
 
 ## 4. team-hiring-plan.md — 技术与团队规划
 
@@ -157,8 +157,8 @@ deploy/backup-db.sh ──备份──> services/mim-api/data/mim.db（WAL 一�
 | 文件 | 说明 |
 |---|---|
 | `apps/web` + `services/mim-api` | 实际功能代码；生产运行方式见 §7.1 与 [05-runbook.md](./05-runbook.md) §6 |
-| `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**；**已下线·历史留痕**） |
-| `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**；**已下线·历史留痕**） |
+| `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**） |
+| `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**） |
 | `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`（真实前端 → 根 `dist/`）；`build:site` 为 PRD 阅读页离线构建；`build:web` / `deploy` / `deploy:bootstrap` 指向生产链路 |
 | `scripts/build.mjs` | 默认：`pnpm --filter @mim/web build` → 把 `apps/web/dist` 递归复制到根 `dist/`；`--site`：把 `site/` 复制到根 `dist/`（PRD 离线阅读）。零第三方依赖 |
 
@@ -183,9 +183,9 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | `deploy/nginx-mim.conf` | 站点模板（root / 反代 / 缓存 / 安全头 / gzip） |
 | `deploy/mim-api.service` | systemd 单元（`User=mim`，`Restart=always`，仅 `data/` 与 `.mim-dev-secret/` 可写） |
 | `deploy/backup-db.sh` | SQLite 一致性备份（`sqlite3 .backup`），保留最近 N 份 |
-| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → 上传本次提交的 `deploy.sh` → SSH 执行 → 服务器 HEAD == 提交 SHA 校验 → 线上 `/health` 取证 + 已下线接口 404 抽查 |
+| `.github/workflows/deploy.yml` | push `main` → 质量门禁 → 上传本次提交的 `deploy.sh` → SSH 执行 → 服务器 HEAD == 提交 SHA 校验 → 线上 `/health` 取证 |
 
-**生产事实（2026-11-04 取证，2026-11-05 更新）**：`curl https://mim.mixm.top/health` = 200；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘；`/api/v1/plans`、`/api/v1/audit/logs` 等已下线接口应返回 404（套餐/订阅/审计模块于 2026-11-05 移除）。
+**生产事实（2026-11-04 取证，2026-11-05 更新）**：`curl https://mim.mixm.top/health` = 200；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘。
 
 ## 部署汇总模块（2026-11-09 新增）
 

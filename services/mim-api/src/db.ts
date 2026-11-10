@@ -468,7 +468,7 @@ export const RBAC_ROLES = [ // 内置角色数组，同样决定后台展示顺�
     description: { 'zh-CN': '可变更模块状态、发放与回收权益，可查看用户', 'en-US': 'Change module status, grant/revoke entitlements, read users' }, // 多语言描述
     permissions: [ // 运营侧基线权限
       'module:read', // 需要看到模块列表才能操作
-      'module:write', // 允许上下线模块
+      'module:write', // 允许上架与归档模块
       'entitlement:read', // 需要查看权益现状
       'entitlement:grant', // 允许发放权益
       'entitlement:revoke', // 允许回收权益

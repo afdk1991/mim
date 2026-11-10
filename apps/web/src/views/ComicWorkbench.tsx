@@ -1288,7 +1288,7 @@ function FilmsTab({
                     </button>
                   </>
                 )}
-                {/* 草稿或已发布态：可归档下线 */}
+                {/* 草稿或已发布态：可归档 */}
                 {(film.status === 'draft' || film.status === 'published') && ( /* 可归档状态 */
                   <button type="button" className="btn ghost danger small" onClick={() => handleAction(film, 'archive')}>{/* 归档按钮 */}
                     {locale === 'en-US' ? 'Archive' : '归档'}

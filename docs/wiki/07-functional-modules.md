@@ -7,16 +7,15 @@
 | 模块 | PRD 锚点 | 优先级 | 状态（证据见 [08](./08-dev-implementation.md) §1.1） |
 |---|---|---|---|
 | FR-01 账号与身份 | §5 FR-01 | P0 | **已实现（P0 最小集）**：cn 手机号验证码、global 邮箱密码/验证码；JWT access + refresh 轮换；region 强隔离。未实现：微信/支付宝/Google/Apple 第三方登录、账号合并（OQ-05）、新设备登录保护 |
-| FR-02 订阅与支付 | §5 FR-02 | P0 | **已下线（2026-11-05）**：套餐/订阅/订单/支付/退款/发票/对账整域已按用户指令删除（后端 `routes/billing.ts`、`packages/core-domain` 的 plans/subscription/order、前端 `Plans.tsx`、生产库 9 张表），取证见本页 §11.2 与 `deploy/migrations/2026-11-05-drop-billing-audit.cjs` |
 | FR-03 核心 SaaS 工作区 | §5 FR-03 | P0 | **已重定义（2026-11-04）为「功能模块商城 + 漫剧 AI 剧」**：原项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出已从前后端与生产库删除。新范围 **部分落地（2026-11-04，第 1 期）**：`catalog` 域 4 表（`modules`/`module_prices`/`entitlements`/`entitlement_events`）与 `comic` 域 3 表（`comic_projects`/`comic_characters`/`storyboards`）已建；`requireEntitlement` 门禁与 `/api/v1/comic/*` 8 条路由已落地；生成队列、成片与导出未落地。实现拆分见本页 §12 |
 | FR-04 多端体验一致性 | §5 FR-04 | P0 | **部分实现**：`packages/core-domain`（领域/权限/错误码）+ `packages/i18n`（双语文案/货币格式化）+ 统一 HTTP 契约已落地；仅 Web 一端，`IPlatformAdapter` 未落地 |
 | FR-05 国际化与本地化 | §5 FR-05 | P0 | **部分实现**：zh-CN / en-US 文案包、未命中回退链、`formatCurrency`、UTC 存储；未实现：语言切换 UI 持久化、RTL、时区设置 UI |
-| FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：手机号/邮箱规范化与脱敏、账号注销 + 7 天冷静期（`POST /me/deletion`）。**审计日志已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表已删除。未实现：隐私政策强制勾选、数据导出/GDPR 请求 |
+| FR-06 合规与隐私 | §5 FR-06 | P0 | **部分实现**：手机号/邮箱规范化与脱敏、账号注销 + 7 天冷静期（`POST /me/deletion`）。未实现：隐私政策强制勾选、数据导出/GDPR 请求 |
 | IM / 音视频 / AI 编排 / 内容管理 / 开放平台 / 管理后台 | §3 P1 清单 | P1 | 后续迭代，仅列名 |
 | 平台兼容性要求（三端最低版本矩阵） | §3 平台兼容性要求 | P0/P1 分列 | 规格已定义，未实现（当前仅 Web，浏览器环境下运行） |
 | IoT 硬件接入 | §3 排除项 / OQ-06 | 排除 | Assumption：P0 不支持 |
 
-旗舰产品形态于 **2026-11-04 重定义为 SaaS 工具型（订阅制）— 功能模块商城 + 漫剧 AI 剧工作室**（OQ-01 已重定义），首端为 Web + 微信小程序（国内），出海以 App + Web 切入（PRD 文首 callout）。工作区由两域构成：**功能模块商城**负责模块上架、定价与解锁；**漫剧 AI 剧**覆盖 AI 全自动成片、AI 辅助创作工作台、作品管理与分发、工作台+导出成片四种交付形态。
+旗舰产品形态于 **2026-11-04 重定义为 SaaS 工具型 — 功能模块商城 + 漫剧 AI 剧工作室**（OQ-01 已重定义），首端为 Web + 微信小程序（国内），出海以 App + Web 切入（PRD 文首 callout）。工作区由两域构成：**功能模块商城**负责模块上架、定价与解锁；**漫剧 AI 剧**覆盖 AI 全自动成片、AI 辅助创作工作台、作品管理与分发、工作台+导出成片四种交付形态。
 
 ## 2. 角色与对象模型（PRD §4）
 
@@ -25,20 +24,14 @@
 | 角色 | 定义 | 核心权限 |
 |---|---|---|
 | 访客 | 未登录用户 | 浏览公开内容、注册/登录 |
-| 注册用户 | 已注册（**当前无订阅体系，2026-11-05 已下线**） | 使用已解锁/免费功能、跨端登录 |
+| 注册用户 | 已注册 | 使用已解锁/免费功能、跨端登录 |
 | 运营管理员 | 内部运营人员 | **完整 RBAC + 独立后台已落地（2026-11-07）**：8 个权限点（`module:read` / `module:write` / `entitlement:read` / `entitlement:grant` / `entitlement:revoke` / `user:read` / `rbac:read` / `rbac:write`）、3 个内置角色（`superadmin` 8 项 / `operator` 7 项，不含 `rbac:write` / `viewer` 4 项）、`user_roles` 绑定表、`requirePermission` 逐请求实时查库鉴权；`x-admin-token` 保留为超管引导通道；独立后台 `apps/admin` 已上线，生产入口 `/admin/`（角色权限 / 用户角色 / 模块状态流转 / 权益发放回收 / 概览） |
-
-> **订阅角色已下线（2026-11-05）**：原「免费用户 / 订阅用户 / 运营管理员（管理计划、订单、退款）」随 FR-02 整域删除，账号不再有订阅状态。
 
 ### 2.2 核心对象状态机
 
-**Subscription / Order / Refund（订阅 / 订单 / 退款）— 已下线（2026-11-05）**：
-
-> 三套状态机（订阅 `active/past_due/canceled/expired`、订单 `pending→paid/failed/closed→refunded`、退款 `pending→approved/rejected→executed`）随 FR-02 整域删除，对应代码文件与 9 张生产表均已移除。本节仅作历史留痕，**不得**作为当前实现依据。
-
 **Module（功能模块）**：`draft`（运营草稿，不可购买）→ `active`（上架可售）→ `archived`（下架，已购用户解锁不受影响）。
 
-**Entitlement（模块解锁）**：`active`（有效）→ `expired`（时效到期）→ `revoked`（风控回收；退款触发路径已随 FR-02 下线）。**服务端为解锁鉴权唯一依据**，端上不得缓存判定结果。
+**Entitlement（模块解锁）**：`active`（有效）→ `expired`（时效到期）→ `revoked`（风控回收）。**服务端为解锁鉴权唯一依据**，端上不得缓存判定结果。
 
 **ComicProject（漫剧工程）**：`draft`（剧本/角色编辑中）→ `storyboarded`（分镜表确认）→ `generating`（生成任务进行中）→ `rendered`（关键帧/片段就绪）→ `published`（已产出成片并发布）→ `archived`。
 
@@ -46,11 +39,11 @@
 
 **GenerationJob（生成任务）**：`queued` → `running` → `succeeded` / `failed` / `canceled`。失败可重试但生成新 job，不覆盖历史。
 
-> 通用约束（PRD §4.2）：状态变更只写事件表、不 UPDATE 历史；金额对象禁软删除，只能冲正；解锁发放/回收与触发事务**同事务**（订单/退款域已于 2026-11-05 下线，回收现仅由风控动作触发）。
+> 通用约束（PRD §4.2）：状态变更只写事件表、不 UPDATE 历史；解锁发放/回收与触发事务**同事务**（回收现仅由风控动作触发）。
 
 ## 3. FR-01 账号与身份
 
-**目的**：用户在任意端完成注册/登录后，账号状态（基础资料、地区、登录方式绑定）在所有端实时同步；国内与海外登录方式不同，底层账号体系统一。~~订阅状态跨端同步~~ 已随 FR-02 于 2026-11-05 下线，账号不再携带订阅维度。
+**目的**：用户在任意端完成注册/登录后，账号状态（基础资料、地区、登录方式绑定）在所有端实时同步；国内与海外登录方式不同，底层账号体系统一。
 
 **注册与登录方式**：
 
@@ -62,7 +55,7 @@
 **跨端打通规则**：
 - 同一手机号/邮箱在国内与海外视为**不同账号**（region 物理隔离）
 - 同一市场内多种登录方式可绑定至同一账号；绑定需二次验证（已登录方式确认 + 新方式验证码）
-- 账号可申请合并，合并后身份绑定与历史业务数据归并至保留账号（策略 TBD = OQ-05；原「订阅与订单归并」随 FR-02 于 2026-11-05 下线，不再涉及）
+- 账号可申请合并，合并后身份绑定与历史业务数据归并至保留账号（策略 TBD = OQ-05）
 
 **异常与边界**：
 - 验证码频控：同一标识 60 秒内 1 次，1 小时内 ≤ 5 次；验证码 5 分钟有效，错 5 次失效
@@ -70,18 +63,6 @@
 - 新设备登录保护：已登录用户在新设备登录需邮件/短信确认
 
 PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮箱/微信（微信禁用输入框），`submitLogin()` 空值报错、非空显示演示成功文案。
-
-## 4. FR-02 订阅与支付 — 已下线（2026-11-05）
-
-> **本模块已按用户指令整体删除，当前无任何订阅、订单、支付、退款、发票、对账能力。** 删除范围与取证：
->
-> - 后端：`services/mim-api/src/routes/billing.ts` 删除；`packages/core-domain/src/{plans,subscription,order}.ts` 删除；`app.ts` 解除挂载。
-> - 前端：`apps/web/src/views/Plans.tsx` 删除；`api.ts` / `App.tsx` / `Settings.tsx` 清除订阅与订单调用；套餐入口移除，工作区仅剩「设置」。
-> - 数据：生产库 `plans` / `plan_prices` / `subscriptions` / `subscription_events` / `orders` / `payments` / `refunds` / `invoices` / `audit_logs` 共 9 张表 DROP，迁移脚本 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`（默认 DRY-RUN，`APPLY=1` 才执行）。
-> - 配置：`.env.example` 移除 23 个支付/订阅/IAP 变量；`scripts/env-check.mjs` 与 `09-third-party-sdk-inventory.md` 同步（138 = 138 通过）。
-> - 门禁：`.github/workflows/deploy.yml` 将 `GET /api/v1/plans` 断言为 404，防止回归。
->
-> **保留的历史设计（仅供追溯，不得作为实现依据）**：原设计包含计划对象（`plan_id` / `name` / `billing_cycle` / `price` / `features` / `region` / `status`）、多通道支付路由（国内微信/支付宝/银联；海外 Stripe/PayPal；App 数字商品走 Apple IAP / Google Play Billing）、持牌机构清算约束、订阅生命周期（`pending → paid → active`，续费失败进 `past_due` 宽限期后 `expired`）、退款审核（OQ-04）、对账与掉单补发。相关开放问题 OQ-02 / OQ-04 随之失效（见 §10）。
 
 **当前获取功能使用权的唯一方式**：功能模块商城的一次性解锁（`one_time`，见 §5.1 / §11.11），服务端 `entitlements` 为唯一鉴权依据。
 
@@ -91,7 +72,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 
 ### 5.1 FR-03.1 功能模块商城
 
-**目的**：把产品能力拆成可独立上架、独立定价、独立解锁的功能模块；**当前仅提供一次性购买解锁（`one_time`）**，原「订阅内含解锁」随 FR-02 于 2026-11-05 下线。
+**目的**：把产品能力拆成可独立上架、独立定价、独立解锁的功能模块；**当前仅提供一次性购买解锁（`one_time`）**。
 
 **Module（功能模块）字段**：
 
@@ -99,7 +80,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 |---|---|
 | `module_id` / `code` | 唯一标识；`code` 全局唯一、不可复用 |
 | `name` / `summary` | 多语言名称与一句话简介（i18n 资源，不硬编码） |
-| `unlock_mode` | `one_time`（一次性购买）— **当前唯一有效值**；`subscription`（订阅内含）随 FR-02 于 2026-11-05 下线，DB CHECK 约束已收敛为仅 `one_time` |
+| `unlock_mode` | `one_time`（一次性购买）— **唯一有效值**（DB CHECK 约束仅允许 `one_time`） |
 | `price` | **按 region + 币种独立定价**，不换算汇率；`bigint` 最小货币单位 |
 | `entitlements_required` | 前置依赖模块（未解锁则不可购买/不可用） |
 | `status` | `draft` / `active` / `archived` |
@@ -107,9 +88,9 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 
 **定价与解锁规则**：
 - 模块定价独立，改价不改历史解锁记录；上市时间用 `effective_from` / `effective_to` 控制
-- 一次下单解锁 1 个模块（原「一单挂 1 个计划 + N 个模块」的 `order_items` 设计已随订单域下线，当前无订单载体，解锁记录直接落 `entitlements`）
+- 一次下单解锁 1 个模块（解锁记录直接落 `entitlements`）
 - 解锁判定只看服务端 `Entitlement`（`active` 且未过期且 region 匹配）；端上缓存仅供展示
-- 风控封禁可触发解锁回收（`revoked`）；退款触发的回收路径已随 FR-02 下线
+- 风控封禁可触发解锁回收（`revoked`）
 
 **主流程**：
 
@@ -121,14 +102,14 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 风控回收：Entitlement(revoked) → 通知「解锁已回收」
 ```
 
-> 原流程中的 `Order(pending) → 支付(FR-02) → Order(paid) → 同事务发放` 与 `Refund(executed) → Order(refunded) → Entitlement(revoked)` 两段已随支付/退款域于 2026-11-05 删除；`entitlements` 的发放写路径已由管理面补齐——`POST /entitlements/grant` 发放、`POST /entitlements/:id/revoke` 回收、`GET /modules` / `GET /modules/:code` 提供目录只读。**2026-11-08 管理面再补齐**：`GET /modules/manage`（含 draft/archived 全态）、`POST /modules`、`PATCH /modules/:code`、`DELETE /modules/:code`（软删除）、`GET /modules?q=` 目录搜索、`GET /entitlements` 列表与 `GET /entitlements/:id/events` 审计事件（见 §11.11）。
+> `entitlements` 的发放写路径已由管理面补齐——`POST /entitlements/grant` 发放、`POST /entitlements/:id/revoke` 回收、`GET /modules` / `GET /modules/:code` 提供目录只读。**2026-11-08 管理面再补齐**：`GET /modules/manage`（含 draft/archived 全态）、`POST /modules`、`PATCH /modules/:code`、`DELETE /modules/:code`（软删除）、`GET /modules?q=` 目录搜索、`GET /entitlements` 列表与 `GET /entitlements/:id/events` 审计事件（见 §11.11）。
 
 **异常与边界**：
 - 前置依赖未满足：拒绝解锁并返回 `403` + 需先解锁的模块清单（通用错误语义，**不使用已不存在的 `MODULE_DEPENDENCY_UNMET` 错误码**）
 - 模块下架（`archived`）：不可新购，已解锁用户仍可用至到期
 - 重复解锁：已 `active` 的模块再次解锁返回 `409`（通用冲突语义，**不使用已不存在的 `MODULE_ALREADY_OWNED` 错误码**）
 - region 不匹配：模块在另一 region 上架时，本区不可见、不可购
-- 一次性解锁的有效期与回收窗口见 OQ-09（OQ-04 退款窗口已失效）
+- 一次性解锁的有效期与回收窗口见 OQ-09
 
 ### 5.2 FR-03.2 漫剧 AI 剧（四种交付形态）
 
@@ -167,9 +148,9 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 - 任务执行前**预检成本与配额**，超限直接拒绝下单/拒绝入队（不做事后追扣）
 
 **成本与配额**：
-- 按 region 设定生成额度上限（图/秒/视频条数）；额度消耗在 job `succeeded` 时结算。当前实现以**成本上限**而非订阅额度落地：单任务 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `402 COST_LIMIT_EXCEEDED`（原「按订阅计划给定月度额度」随 FR-02 下线）
+- 按 region 设定生成额度上限（图/秒/视频条数）；额度消耗在 job `succeeded` 时结算。当前实现以**成本上限**落地：单任务 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `402 COST_LIMIT_EXCEEDED`
 - 实际成本与预估偏差超阈值写成本告警，供运营调整模型路由（供应商见 OQ-08）
-- 额度不足时提示购买生成包（生成包属于模块商城的 `one_time` 模块；原「升级计划」入口已随订阅下线）
+- 额度不足时提示购买生成包（生成包属于模块商城的 `one_time` 模块）
 
 **成片版本与发布**：
 - `ComicFilm` 只追加版本（`film_versions`），已发布版本不可覆盖，只能发新版
@@ -183,73 +164,53 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 - 工程删除：软删除工程，但已发布成片按版权与审计要求保留（不可物理删除）
 - 收藏/浏览计数等 P1 分发能力不在 P0；P0 只做到「成片管理 + 版本 + 发布 + 浏览」
 
-### 5.3 历史记录（原 FR-03，仅供追溯）
-
-> 以下内容为 2026-11-04 前的旧范围，代码与生产库均已删除，仅保留用于追溯；**不得**作为当前实现依据。
-
-**原订阅计划 features 映射（已随 `plans.features` 列删除）**：
-
-| 能力 | 免费版 | 基础版 ¥29/月 | 专业版 ¥99/月 |
-|---|---|---|---|
-| 项目数 | 3 个 | 无限 | 无限 |
-| 视图 | 列表 / 今日 | 列表 / 今日 / 日历 | 列表 / 今日 / 日历 / 看板 |
-| 提醒推送 | — | ✓ | ✓ |
-| 协作（单项目协作者数） | —（单人） | ≤ 3 | 无限 |
-| 高级筛选 / 自定义主题 | — | — | ✓ |
-| 导出 CSV | — | ✓ | ✓ |
-
-**现工作区框架（2026-11-05 实况）**：登录后工作区**仅展示 设置（Settings）** 一个入口（原「套餐（Plans）」入口已随 FR-02 删除）；数据按 `user_id` + `region` 隔离。`features` 鉴权已移除。新范围落地后需新增 **商场（Store）** 与 **漫剧（Comic）** 两个入口（见 §12）。
-
 ## 6. FR-04 多端体验一致性
 
 **一致性契约**：
 
 | 维度 | 统一规则 |
 |---|---|
-| 账号 | 同一市场内跨端实时同步（账号资料/地区/登录方式绑定；订阅维度已于 2026-11-05 下线） |
+| 账号 | 同一市场内跨端实时同步（账号资料/地区/登录方式绑定） |
 | 业务数据 | 所有端可见可编辑 |
 | 文案与术语 | 同一概念同一文案（来自 i18n 资源） |
 | 错误提示 | 同一错误码映射同一用户可读提示 |
 | 设计系统 | Design Token 统一颜色/间距/字号，各端组件库基于 Token 实现 |
 | 平台兼容下限 | iOS 15.0+ / Android 9.0+ / 微信、支付宝、抖音、百度、QQ 小程序 / Windows 10–11 / macOS 12+ / Ubuntu 20.04+（P0/P1 分列见 PRD §3） |
 
-**平台适配层职责**：登录（微信/支付宝/Google/Apple SDK）、推送（APNs/FCM/厂商通道）、存储（localStorage/AsyncStorage/SQLite）、分享（各端原生分享）。~~支付（微信支付/支付宝/Stripe/IAP）~~ 已随 FR-02 于 2026-11-05 下线，`IPlatformAdapter` 的 `pay` 子接口在实现时不再需要。各端 UI 差异仅由适配层处理，业务逻辑统一。
+**平台适配层职责**：登录（微信/支付宝/Google/Apple SDK）、推送（APNs/FCM/厂商通道）、存储（localStorage/AsyncStorage/SQLite）、分享（各端原生分享）。各端 UI 差异仅由适配层处理，业务逻辑统一。
 
 ## 7. FR-05 国际化与本地化
 
 - **多语言**：默认中文简体 + 英文（首批清单 TBD = OQ-03）；检测优先级 = 用户设置 → 浏览器/系统语言 → 默认；所有用户可见文案从 i18n 资源加载，禁止硬编码；RTL 布局（阿拉伯语等）为 P1
-- **多币种**：模块定价按 region + 币种独立定价，不用实时汇率；币种由 region 决定（国内 CNY、海外 USD）；价格展示含货币符号 + 两位小数（日元等零小数币种除外）。原「每计划按币种独立定价」中的计划维度已随 FR-02 下线
+- **多币种**：模块定价按 region + 币种独立定价，不用实时汇率；币种由 region 决定（国内 CNY、海外 USD）；价格展示含货币符号 + 两位小数（日元等零小数币种除外）。
 - **多时区**：服务端统一 UTC 存储；展示按用户时区转换（默认系统时区，可在设置中修改）
 
 ## 8. FR-06 合规与隐私
 
 - **隐私政策与用户协议**：首次注册强制展示并勾选；政策必含数据收集清单、使用目的、存储期限、第三方 SDK 清单、用户权利（访问、更正、删除、注销）；政策更新后下次登录需重新确认
 - **数据最小化**：仅收集必要数据；敏感数据（手机号、邮箱）加密存储、展示脱敏；国内数据境内存储、海外存对应区域，数据不出境
-- **账号注销**：注销前提示数据删除不可恢复（原「提示订阅失效」已随 FR-02 下线，不再存在订阅维度）；7 天冷静期可撤销；冷静期后删除个人数据，保留匿名化业务与合规记录（海外删除请求按 GDPR/CCPA 30 天内处理）
+- **账号注销**：注销前提示数据删除不可恢复；7 天冷静期可撤销；冷静期后删除个人数据，保留匿名化业务与合规记录（海外删除请求按 GDPR/CCPA 30 天内处理）
 
 ## 9. 横切支撑（PRD §6 共享规则）
 
 | 规则 | 定义 | 引用模块 |
 |---|---|---|
-| Region 隔离 | 国内(cn)/海外(global) 数据物理隔离，账号/解锁记录按 region 分库（原「订单/订阅按 region 分库」已随 FR-02 下线） | FR-01 |
-| 幂等性 | 写操作以 `Idempotency-Key` 幂等（同键同体重放首次结果，同键异体 409）；鉴权类接口豁免。原「支付、订阅状态变更接口以 `request_id` 幂等」已随 FR-02 下线 | FR-01 |
-| ~~审计日志~~ | **已下线（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表已删除，不再有 180 天留存要求 | — |
+| Region 隔离 | 国内(cn)/海外(global) 数据物理隔离，账号/解锁记录按 region 分库 | FR-01 |
+| 幂等性 | 写操作以 `Idempotency-Key` 幂等（同键同体重放首次结果，同键异体 409）；鉴权类接口豁免。 | FR-01 |
 
-**通知规则**：解锁成功/回收（站内 + 邮件/短信）；账号异常登录邮件/短信通知。原「支付成功通知」「到期前 7/3/1 天提醒」「续费失败通知」已随 FR-02 下线。
+**通知规则**：解锁成功/回收（站内 + 邮件/短信）；账号异常登录邮件/短信通知。
 
 ## 10. 开放问题对模块的阻塞（PRD §7）
 
 | 编号 | 问题 | 阻塞模块 | 状态 |
 |---|---|---|---|
-| OQ-01 | 旗舰 SaaS 核心功能是什么 | FR-03 功能模块商城 + 漫剧 AI 剧 | 已重定义（2026-11-04）：旗舰形态 = SaaS 工具型（订阅制）— 功能模块商城 + 漫剧 AI 剧工作室 |
-| OQ-02 | 国内 Android 数字商品是否必须走商店 IAP | ~~FR-02 支付通道与分成~~ | **已失效（2026-11-05）**：FR-02 整域下线，无支付通道 |
+| OQ-01 | 旗舰 SaaS 核心功能是什么 | FR-03 功能模块商城 + 漫剧 AI 剧 | 已重定义（2026-11-04）：旗舰形态 = SaaS 工具型 — 功能模块商城 + 漫剧 AI 剧工作室 |
 | OQ-03 | 首批出海市场与语种 | FR-05 i18n/合规 | TBD |
-| OQ-04 | 退款窗口与条件（直连通道） | ~~FR-02 / FR-03.1 退款与解锁回收~~ | **已失效（2026-11-05）**：退款域下线，解锁回收现仅由风控触发 |
 | OQ-05 | 账号合并策略与数据归属 | FR-01 账号打通 | TBD |
 | OQ-06 | 是否支持 IoT 硬件接入 | 范围定义与后端架构 | Assumption：P0 不支持 |
 | OQ-07 | 漫剧生成产物的版权归属、可商用范围与内容审核口径 | FR-03.2 成片发布、导出授权与合规免责 | TBD |
 | OQ-08 | 文生图 / 图生视频 / TTS 模型选型与单工程成本上限 | FR-03.2 生成队列容量、配额与定价成本模型 | TBD |
-| OQ-09 | 功能模块采用「订阅内含」还是「独立一次性购买」 | FR-03.1 模块定价表结构与解锁回收规则 | **已定案（2026-11-05）**：仅 `one_time`；`subscription` 模式随 FR-02 下线，`modules.unlock_mode` 的 DB CHECK 约束已同步收敛 |
+| OQ-09 | 功能模块采用「订阅内含」还是「独立一次性购买」 | FR-03.1 模块定价表结构与解锁回收规则 | **已定案（2026-11-05）**：仅 `one_time`，`modules.unlock_mode` 的 DB CHECK 约束同步收敛 |
 
 ## 11. 功能模块落地对照表（P0，仓库实况）
 
@@ -268,46 +229,17 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 | 账号注销（冷静期） | `me.ts` `POST /me/deletion` + `POST /me/cancel-deletion` | `Settings.tsx` | ✅ |
 | 第三方登录 / 账号合并 | — | — | ❌ TBD |
 
-### 11.2 订阅支付模块（FR-02）— 已删除（2026-11-05）
-
-原文件 `services/mim-api/src/routes/billing.ts`、`packages/core-domain/src/{plans,subscription,order}.ts`、`apps/web/src/views/Plans.tsx` 已删除；原 6 条路由（`GET /plans`、`POST /subscriptions/checkout`、`GET /subscriptions/current`、`POST /subscriptions/cancel`、`GET /orders`、`GET /invoices`）全部下线。生产库 9 张表（`plans`/`plan_prices`/`subscriptions`/`subscription_events`/`orders`/`payments`/`refunds`/`invoices`/`audit_logs`）DROP，迁移见 `deploy/migrations/2026-11-05-drop-billing-audit.cjs`。`.github/workflows/deploy.yml` 已断言 `GET /api/v1/plans` 为 404，防止回归。**当前购物/支付能力为 0。**
-
-### 11.3 项目管理模块（FR-03-①）— 已删除
-
-原文件 `services/mim-api/src/routes/projects.ts`、`apps/web/src/views/Projects.tsx`、`ProjectDetail.tsx` 已删除。原能力清单（列表/新建/详情/更新/归档/两级级联删除/成员/邀请/接受邀请/移除成员/撤销邀请）不再提供。
-
-### 11.4 任务管理模块（FR-03-①）— 已删除
-
-原文件 `services/mim-api/src/routes/tasks.ts` 已删除。原能力清单（任务列表含子任务、固定两级新建、详情、LWW 更新、状态切换、级联删除子任务）不再提供。
-
-### 11.5 仪表盘模块（FR-03-④）— 已删除
-
-原文件 `services/mim-api/src/routes/dashboard.ts`、`apps/web/src/views/Dashboard.tsx` 已删除。
-
-### 11.6 协作模块（FR-03-③）— 已删除
-
-原文件 `packages/core-domain/src/permissions.ts` 已删除；成员与邀请接口随 `projects.ts` 一并移除。
-
-### 11.7 同步模块（FR-04 增量同步）— 已删除
-
-原文件 `services/mim-api/src/routes/sync.ts` 已删除（`sync_cursors` 表同步清理）。FR-04 的「多端体验一致性」设计约束仍保留，但当前无增量同步实现。
-
-### 11.8 导出模块 — 已删除
-
-原文件 `services/mim-api/src/routes/exports.ts` 已删除（`content_exports` 表同步清理）。
-
 ### 11.9 审计与合规模块（FR-06）
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
-| ~~审计日志查询~~ | ~~`audit.ts` `GET /audit`~~ | — | **已删除（2026-11-05）**：`routes/audit.ts` 与 `audit_logs` 表移除，CI 断言 `GET /api/v1/audit/logs` 为 404 |
 | 手机号 / 邮箱规范化 | `core-domain` `normalizeIdentity` | `Login.tsx` | ✅ |
 | 隐私政策页 | — | — | ❌ |
 | 数据导出 / GDPR 请求 | — | — | ❌ |
 
 ### 11.10 模块间依赖
 
-FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付依赖**。FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用；原 FR-06 审计查询已随 FR-02 一并删除（`audit_logs` 表移除）。**新 FR-03（商城 + 漫剧 AI 剧）仅依赖 FR-01 鉴权（已就绪）：`catalog` 域 4 表 + `requireEntitlement` 门禁已落地，`comic` 域 7 表 + 24 条路由已落地，`media` 域 `storage.ts` 已装配上线，`ai` 域 `orchestrator.ts` 已装配（`MIM_AI_WORKER` 默认消费）。** 原 FR-03（项目/任务/成员/邀请/仪表盘/同步/导出）已于 2026-11-04 删除，仅历史留痕（见 §11.3–§11.8）。
+FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `services/mim-api` 同时引用；**新 FR-03（商城 + 漫剧 AI 剧）仅依赖 FR-01 鉴权（已就绪）：`catalog` 域 4 表 + `requireEntitlement` 门禁已落地，`comic` 域 7 表 + 24 条路由已落地，`media` 域 `storage.ts` 已装配上线，`ai` 域 `orchestrator.ts` 已装配（`MIM_AI_WORKER` 默认消费）。** 
 
 ### 11.11 功能模块商城（FR-03.1）
 
@@ -315,10 +247,8 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 |---|---|---|---|
 | 模块目录 / 详情 / 搜索 | **已实现（2026-11-07 只读面）**：`GET /modules`（支持 `?q=` 名称/描述模糊搜索，2026-11-08）、`GET /modules/:code`（公开只读，详情含 `price_history` / `requires` / `current_price`）；**管理写面（2026-11-08）**：`GET /modules/manage`（`module:read`，含 draft/archived 全态 + 价格行 + 已解锁人数）、`POST /modules`、`PATCH /modules/:code`、`PATCH /modules/:code/status`（`draft→active→archived` 单向状态机）、`DELETE /modules/:code`（软删除） | C 端 `Store.tsx`（目录 / 搜索 / 详情面板 / 依赖缺失引导）；管理端 `Modules.tsx`（列表 / 创建 / 编辑 / 状态流转 / 软删除） | ✅ 已实现（契约测试 `test/catalog.test.ts` 41 例） |
 | 模块定价（region / 币种 / 有效期） | **已实现（2026-11-08）**：`POST /modules/:code/prices`（新增价格行）、`PUT /modules/prices/:id`（改价）、`DELETE /modules/prices/:id`（删价），均 `module:write` 鉴权 | 管理端 `Modules.tsx` 定价面板（逐模块价格行 CRUD） | ✅ 已实现（契约测试覆盖） |
-| ~~下单挂载模块~~ | —（原 `order_items` 设计随订单域于 2026-11-05 下线，**不建表**；解锁直接落 `entitlements`） | — | **已取消** |
 | 解锁发放 / 回收（Entitlement） | **已实现（2026-11-07）**：`POST /entitlements/grant`（发放，唯一索引兜底幂等）、`POST /entitlements/:id/revoke`（回收，写 `entitlement_events`）；到期由 `src/jobs.ts` 的 `runEntitlementExpiry` 定时扫描置 `expired`；**2026-11-08 补齐查询面**：`GET /entitlements`（`entitlement:read`，按用户/模块/状态过滤）、`GET /entitlements/:id/events`（发放/回收/到期审计事件）；C 端自助解锁 `POST /entitlements`（登录 + 幂等）与 `GET /me/entitlements` | 管理端 `Entitlements.tsx`（列表 / 过滤 / 发放 / 回收 / 事件时间线）；C 端 `Store.tsx`「我的权益」区块 | ✅ 已实现（契约测试 `test/catalog.test.ts` 41 例 + `test/jobs.test.ts` 9 例） |
 | 解锁鉴权（服务端唯一依据） | `requireEntitlement(moduleCode)` 中间件（`src/middleware.ts`） | — | ✅ 已落地 |
-| ~~退款触发解锁回收~~ | —（退款域已删除，**不再实现**；回收仅保留风控动作路径） | — | **已取消（2026-11-05）** |
 
 ### 11.12 漫剧 AI 剧（FR-03.2）
 
@@ -333,38 +263,6 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 成本 / 配额预检 | `src/orchestrator.ts`（已装配进 `app.ts`/`index.ts`，`MIM_AI_WORKER` 默认消费）：单任务上限 `MIM_AI_JOB_COST_LIMIT_MINOR`（默认 100000）+ 当日累计 `MIM_AI_DAILY_COST_LIMIT_MINOR`（默认 500000），超限返回 `COST_LIMIT_EXCEEDED(402)` | — | ✅ 后端已落地（2026-11-05） |
 | 导出成片 | **已实现（2026-11-08）**：`POST /comic/films/:id/export`（入参 `format: mp4 / mov`、`resolution: 720p / 1080p`；基于最新版本 `object_key` 签发 1 小时有效的预签名下载地址；MP4/1080p 原片直下，其余组合经 `MIM_FFMPEG_PATH` 调用 ffmpeg 转码并写回 `exports/` 对象；无产物 404、跨用户 404、未配置 ffmpeg 403 `FEATURE_NOT_AVAILABLE` 且回显 `details.requested`；写操作走 `Idempotency-Key`） | `ComicWorkbench.tsx` 成片标签页 `FilmExportPanel`（每条成片「导出」按钮、格式/分辨率下拉、下载链接与有效期、转码不可用的本地化提示 +「直接下载原片」一键降级、降级后表单回写实际参数） | ✅ 前后端已落地（契约测试 `test/film-export.test.ts` 9 例，含预签名地址真实下载字节闭环；`npm run verify:film-export` Edge CDP E2E 14/14） |
 
-### 11.13 站点模块地图（DNSPod 备注结构化 → 45 个可运行节点，2026-11-08，已下线）
-
-> **已下线（2026-11-08）**：站点体系（站点地图 / 站点目录 / 45 节点页 + 后端 site 域 4 条路由）整体下线，前端仅在功能模块商城顶部保留 www 主站入口卡片；以下内容为历史留痕，不再对应现存代码。
-
-> 数据源：仓库根 `dnspod_records_2026-11-05_21-42-26.xls`（DNSPod 导出，2026-11-05）的**「备注」列**。原始表 197 行 = `laal.top` sheet 93 行 + `mixm.top` sheet 104 行，其中 180 行带备注；取单一 zone `mixm.top` 的短主机记录后为 **45 条站点模块**（45 条 FQDN 重复行已按 host 合并）。2026-11-08 起每条模块都对应一个可运行页面 / 路由 / 导航 / 职责与域名映射，真源为 `src/site.ts` + `src/site-nodes.ts`；解析目标（IP / CNAME 目标值）不对外暴露。
-
-| 项 | 实况 |
-|---|---|
-| 数据文件 | `services/mim-api/src/site.ts`（45 条 RAW + 8 分类 + 单 zone + `fqdnOf()`）、`src/site-nodes.ts`（45 行节点规格 + `routeKeyOf()` + `buildAndValidateNodeSpecs()` 完整性断言），纯静态常量，无数据库表 |
-| zone | 单 zone `mixm.top`：45 条主机记录，绝大多数为 A 记录，唯一例外 `gy` 为 CNAME；记录仅含 `zone / fqdn / record_type / ttl` 与可选备注 |
-| 分类（8） | 门户与入口 6 / 身份与权限 2 / 运营后台 8 / 接口与开发 5 / 内容与媒体 7 / 电商与交易 7 / 数据与存储 4 / 工具与服务 6（合计 45） |
-| 后端路由 | **已删除（2026-11-08）**：`routes/site.ts` 与 4 条公开路由（`GET /site/overview`、`GET /site/modules?zone=&category=&q=`、`GET /site/modules/:host`、`GET /site/nodes`）整体移除，请求现返回 404 |
-| 前端路由 | **已删除（2026-11-08）**：`#/sitemap`、`#/directory` 与 45 个 `#/site/<key>` 路由从 `apps/web/src/router.ts` 移除；现存为 history 路径路由 `/store`、`/comic`、`/chat`、`/settings`、`/login`（旧 `#/xxx` 链接启动时自动改写为对应路径） |
-| 前端页面 | **已删除（2026-11-08）**：`SiteMap.tsx` / `SiteDirectory.tsx` / `SiteNodePage.tsx` 三个视图组件整体移除；仅保留功能模块商城 `Store.tsx` 顶部的 www 主站入口静态卡片（新窗口打开 `https://www.mixm.top`，不请求接口） |
-| 节点下属条目 | 每节点逐项呈现：备注两段（label / description）、分类层级与目录序号、逐条解析记录（zone / fqdn / record_type / ttl）、逐条 HTTPS 入口、record 级覆盖备注（如 `gy`）、按职责类型的能力清单、关联节点 |
-| 搜索覆盖 | `q` 命中 host / label / description / FQDN / record 级备注（例如 `q=疾风引擎` 命中 `gy`）；目录页另支持导航名 / 职责检索 |
-| 域名 / 路径映射 | `fqdnOf()` 统一生成 `https://<host>.mixm.top`（根记录为 `https://mixm.top`）；生产 nginx 仅服务 `mim.mixm.top`，不加通配 `server_name`，45 子域由各自服务承载（见 `deploy/nginx-mim.conf` 注释） |
-| 测试 | `test/site.test.ts` 7 例 + `test/site-nodes.test.ts` 11 例（45 节点计数 / 分类分布 / 规格完整 / 域名映射 / 路由唯一 / 关联不悬空 / 能力清单 / 备注与记录条目 / 冲突映射 / 两接口同源） |
-| 状态 | ❌ 已于 2026-11-08 整体下线：前后端代码、4 条公开路由与两份测试文件全部删除；前端仅保留商城页顶部 www 主站入口卡片 |
-
-#### 11.13.1 映射调整结论（站点地图 ↔ 现有实现）（历史留痕，对应实现已于 2026-11-08 删除）
-
-| 现象 | 调整结论 | 落地位置 |
-|---|---|---|
-| 导出含两个 sheet（`laal.top` / `mixm.top`），站点地图只认单 zone | 以 `mixm.top` sheet 为唯一真源；`laal.top` 已下线，`zone=laal.top` 返回 400 | `SITE_ZONES` / `isSiteZone()` / 契约测试 |
-| 45 条短主机 + 45 条 FQDN 重复行 | 按 host 合并为 45 个模块、每模块 1 条记录，不重复建页面 | `RAW` / `buildModule()` |
-| xls 原始为字母序，站点地图按业务层级组织 | 保留 8 分类层级顺序（门户 → 工具），分类内保持导出相对次序 | `SITE_CATEGORIES` / `ROWS` |
-| 根域名 `@` 是 hash 保留字符 | 冲突映射 `@ → root`，站内路由 `#/site/root`，fqdn 仍为 `mixm.top` | `routeKeyOf()` / 契约测试 |
-| `gy` 在两个 sheet 的备注口径不同 | 采用分层映射：模块级保留通用定位备注，record 级保留 `mixm.top` 的「疾风引擎承载节点」备注；两者均来自 xls，节点页「站点地图条目」同时呈现，不构成数据冲突 | `RAW.mixm` / `present()` / `SiteNodePage.tsx` |
-| 45 个子域与生产 nginx 的关系 | 不新增通配 `server_name`；`mim.mixm.top` 承载本项目 SPA，45 子域由各自服务解析 | `deploy/nginx-mim.conf` |
-| 节点页此前侧栏无 active 高亮 | 节点视图统一回落到「站点目录」高亮，导航状态不再出现空档 | `App.tsx` 的 `activeView` |
-
 ## 12. 实现拆分清单（新 FR-03 落地路径）
 
 > 分期口径由 PRD §3 / §5 FR-03.2 的四形态表确定：**②（AI 辅助创作工作台）→ ④（工作台 + 导出成片）→ ①（AI 全自动生成成片）→ ③（作品管理与分发）**。每期均须同时交付后端、前端、数据表与第三方 SDK 接入（铁律五），并按铁律七同步 PRD、本页、[08](./08-dev-implementation.md)、README。
@@ -376,7 +274,7 @@ FR-02 已于 2026-11-05 整域下线，**当前不存在跨模块订单/支付�
 | 后端域 | `catalog`（模块与解锁）、`comic`（工程/生成/成片）、`media`（对象存储与分发） |
 | 数据表 | 见 [08](./08-dev-implementation.md) §3.2（`modules`、`module_prices`、`entitlements`、`entitlement_events`；`comic_projects`、`comic_characters`、`storyboards`、`comic_films`、`film_versions`、`generation_jobs`、`generation_assets`）。原 `order_items` 随订单域于 2026-11-05 取消，**不建表** |
 | 第三方 SDK | 对象存储（S3 兼容 / 云厂商 OSS/COS）、文生图模型、图生视频模型、TTS、内容审核（OQ-07/OQ-08 定选型） |
-| 前置依赖 | **仅 FR-01 鉴权（已就绪）**。FR-02 订单/支付/退款闭环已于 2026-11-05 整域下线，不再作为前置 |
+| 前置依赖 | **仅 FR-01 鉴权（已就绪）**。无其他前置 |
 
 ### 12.1 第 1 期：② AI 辅助创作工作台（交付物 = 创作工程）
 
