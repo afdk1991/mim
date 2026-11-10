@@ -19,7 +19,7 @@
 │    core-domain · core-sdk · ui-kit · i18n
 │    platform-adapter · capability-client · observability · testing-utils
 ├── 服务端 services/*（Headless，无 UI）
-│    gateway · identity · billing · payment-driver · content
+│    gateway · identity · content
 │    catalog · comic · media · im · rtc · ai-orchestrator
 │    notification · openapi · admin-api · jobs
 ├── 数据层
@@ -42,9 +42,9 @@
 
 | 维度 | 规划口径（本页 §2+） | 当前已实现（证据位置） | 差异原因 / 后续 |
 |---|---|---|---|
-| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|catalog|site|me|comic|media|ai|admin.ts` 八个）；原 FR-03 五条路由已于 2026-11-04 删除；`billing` / `audit` 路由已于 2026-11-05 删除 |
+| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|catalog|site|me|comic|media|ai|admin.ts` 八个），每个文件即一个域，未切分的域不预留空路由 |
 | 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
-| 实时同步 | WebSocket + MQ 推送，5 秒内到达 | **已移除（2026-11-04）**：原 4s 轮询 `GET /sync/changes` 随 FR-03 一并删除，当前无同步需求 |
+| 实时同步 | WebSocket + MQ 推送，5 秒内到达 | 当前无实时同步需求，同步层未实现 | 端侧数据按需拉取，无跨端一致性场景 |
 | 客户端 | web / mini / mobile / desktop / admin 五端 | `apps/web`（用户端，React 18 + Vite 6，`/api` 与 `/health` 由 Vite 代理到 8787）+ `apps/admin`（独立管理后台，React 18 + Vite 6，开发端口 5174，生产入口 `/admin/`，同样经 Vite 代理 `/api`） | 先打通契约与核心流程；mini / mobile / desktop 三端复用同一 `/api/v1` 契约与 `packages/core-domain` |
 | 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/金额/UUIDv7）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象；共享包只保留现行能力，未使用的旧域文件均已不在工作树 |
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
