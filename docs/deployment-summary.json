@@ -1,19 +1,19 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-10T13:48:40.686Z",
-  "head": "0ae667a",
+  "generated_at": "2026-11-10T14:07:35.868Z",
+  "head": "4398cf0",
   "mode": "baseline",
   "sources": [
-    "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-09 23:03 实测）",
+    "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-10 22:20 实测：origin = 4398cf0、gitee = 4398cf0，与本地 HEAD 一致）",
     "git ls-tree HEAD <artifact>（2026-11-09 23:03 实测，区分远端 HEAD 与本地工作树）",
-    "curl 逐平台探测（2026-11-09 23:03 实测）",
+    "curl 逐平台探测（2026-11-10 22:20 实测 gitee.com 200；其余 2026-11-09 23:03 快照）",
     "AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3",
     "README.md「多平台部署矩阵」与「站点与部署」",
     ".github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）"
   ],
   "registry_path": "packages/core-domain/src/deploymentRegistry.json",
   "coverage": {
-    "matrix_platforms": 9,
+    "matrix_platforms": 10,
     "total_platforms": 16,
     "deployment_items": 16,
     "git_remotes": 2,
@@ -22,12 +22,12 @@
     "deploy_ci_jobs": 4,
     "newly_adopted_free_tier": 5,
     "dedup_note": "README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。",
-    "added_note": "相对铁律九 9 行矩阵补齐 2 项：Gitee 镜像仓（§12.2 有、README 矩阵缺）与独立 Worker mim-store（README 取证段有、矩阵表缺）。2026-11-10 用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
+    "added_note": "2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
     "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。"
   },
   "coverage_check": {
-    "matrix_platforms": 9,
-    "matrix_platforms_expected": 9,
+    "matrix_platforms": 10,
+    "matrix_platforms_expected": 10,
     "deployment_items": 16,
     "deployment_items_declared": 16,
     "ci_jobs_found": 5,
@@ -39,7 +39,7 @@
   },
   "summary": {
     "total": 16,
-    "matrix_platforms": 9,
+    "matrix_platforms": 10,
     "platform_catalog": 16,
     "git_remotes": 2,
     "ci_jobs": 5,
@@ -47,18 +47,17 @@
     "excluded": 2,
     "with_result": 9,
     "empty_result": 7,
-    "anomalies": 38,
-    "missing_fields": 48,
+    "anomalies": 39,
+    "missing_fields": 46,
     "worktree_drift": 0,
     "by_status": {
-      "OK": 5,
-      "UNVERIFIED": 8,
+      "OK": 6,
       "BROKEN": 1,
-      "MANUAL": 2
+      "MANUAL": 2,
+      "UNVERIFIED": 7
     },
     "by_verdict": {
-      "PASS": 5,
-      "NOT_TESTED": 1,
+      "PASS": 6,
       "FAIL": 2,
       "DEGRADED": 1,
       "EMPTY": 7
@@ -87,9 +86,9 @@
       "render": 1
     },
     "by_severity": {
-      "critical": 2,
-      "warning": 17,
-      "info": 19
+      "critical": 1,
+      "warning": 16,
+      "info": 22
     }
   },
   "remotes": [
@@ -105,15 +104,15 @@
   "remote_heads": [
     {
       "name": "gitee",
-      "ok": false,
-      "hash": null,
-      "exit": null,
-      "error": "spawnSync git ETIMEDOUT"
+      "ok": true,
+      "hash": "4398cf032e65bd7c17437fe79c2a5524d722798e",
+      "exit": 0,
+      "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "0ae667a320f2b35ea1240f985bc3f3157694403c",
+      "hash": "4398cf032e65bd7c17437fe79c2a5524d722798e",
       "exit": 0,
       "error": null
     }
@@ -229,7 +228,7 @@
     {
       "file": "AGENTS.md",
       "section": "## 铁律九",
-      "table_rows": 9,
+      "table_rows": 10,
       "first_column": [
         "腾讯云自建服务器",
         "腾讯云 EdgeOne Pages",
@@ -239,15 +238,17 @@
         "GitHub Packages (ghcr)",
         "IGA Pages",
         "Vercel",
-        "GitHub 仓库"
+        "GitHub 仓库",
+        "**Gitee（码云）**（2026-11-10 新增为第 10 行）"
       ]
     },
     {
       "file": "README.md",
       "section": "### 多平台部署矩阵",
-      "table_rows": 15,
+      "table_rows": 16,
       "first_column": [
         "GitHub 仓库",
+        "Gitee 仓库（码云 · 国内镜像，铁律九矩阵第 10 行）",
         "GitHub Pages",
         "GitHub Packages",
         "腾讯云 EdgeOne Pages",
@@ -369,21 +370,23 @@
     },
     {
       "id": "repo.gitee",
-      "name": "Gitee 国内镜像仓",
+      "name": "Gitee 国内镜像仓（码云）",
       "aliases": [
         "Gitee",
         "gitee",
+        "码云",
+        "Gitee（码云）",
         "mallwm_admin/mim",
         "国内镜像仓"
       ],
       "platform_id": "gitee",
-      "platform": "Gitee 镜像仓",
+      "platform": "Gitee（码云）镜像仓",
       "layer": "source",
       "kind": "repository",
       "repository": {
         "id": "gitee:mallwm_admin/mim",
         "url": "https://gitee.com/mallwm_admin/mim.git",
-        "role": "国内镜像仓（铁律十二要求同轮全推）"
+        "role": "国内镜像仓（铁律十二要求同轮全推；2026-11-10 起为铁律九矩阵成员）"
       },
       "entry_url": "https://gitee.com/mallwm_admin/mim",
       "delivery": {
@@ -393,39 +396,42 @@
         "artifact": null,
         "artifact_in_head": null,
         "artifact_in_worktree": null,
-        "credential": "Gitee 账号凭证（本轮缺失）",
+        "credential": "Gitee 私人令牌（存于 Windows 凭据管理器，不写入 .git/config）",
         "modes": []
       },
-      "status": "UNVERIFIED",
+      "status": "OK",
       "result": {
-        "verdict": "NOT_TESTED",
-        "http_code": null,
-        "latency_ms": 12000,
-        "bytes": null,
-        "evidence": "git ls-remote gitee refs/heads/main exit 124（12s 超时），仅返回 TLS 证书校验禁用告警、无 hash；本轮未取得远端 HEAD，不冒充全量同步",
-        "captured_at": "2026-11-09 23:03 +08:00"
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 469,
+        "bytes": 52034,
+        "evidence": "git ls-remote gitee refs/heads/main → 4398cf032e65bd7c17437fe79c2a5524d722798e（exit 0 / 0.27s），与本地 HEAD 4398cf0 一致（0 ahead / 0 behind）；curl https://gitee.com/mallwm_admin/mim → 200 / 0.469s / 52034B，页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 main、129 次提交、最新提交与本地 HEAD 同一条",
+        "captured_at": "2026-11-10 22:20 +08:00"
       },
       "anomalies": [
         {
-          "code": "REMOTE_TIMEOUT",
-          "severity": "critical",
-          "message": "镜像仓本轮未取证，铁律十二 §12.2「双远端同轮全推」无法判定达成"
+          "code": "REMOTE_TIMEOUT_RECOVERED",
+          "severity": "info",
+          "message": "2026-11-09 23:03 曾 REMOTE_TIMEOUT（ls-remote exit 124）；实际根因为镜像仓从未创建，2026-11-10 建仓后首次推送成功，超时态已解除，历史不静默删除"
         },
         {
-          "code": "MATRIX_ROW_MISSING",
-          "severity": "warning",
-          "message": "README「多平台部署矩阵」未列 Gitee 镜像仓行，本汇总按 §12.2 补齐"
+          "code": "MATRIX_ROW_ADDED",
+          "severity": "info",
+          "message": "2026-11-10 按用户指令把本行由「补充项」提升为铁律九矩阵第 10 行：AGENTS.md 铁律九表格、README「多平台部署矩阵」、Wiki 与 PRD 同步新增 Gitee（码云）行，platform_catalog.in_matrix 改为 true"
+        },
+        {
+          "code": "NO_CI_MIRROR_JOB",
+          "severity": "info",
+          "message": "Gitee 镜像由每轮手工 git push gitee main 驱动（铁律十二 V1），deploy.yml 无 Gitee 推送作业；push origin 不会自动同步镜像，须每轮显式同推并 git ls-remote 取证"
         }
       ],
-      "missing_fields": [
-        "remote_head_hash",
-        "push_credential"
-      ],
+      "missing_fields": [],
       "sources": [
         "git remote -v",
-        "git ls-remote gitee（exit 124）",
-        "AGENTS.md §12.2",
-        "AGENTS.md §9.1 V1"
+        "git ls-remote gitee",
+        "Gitee API v5 /repos/mallwm_admin/mim",
+        "AGENTS.md §9.11",
+        "AGENTS.md §12.2"
       ]
     },
     {

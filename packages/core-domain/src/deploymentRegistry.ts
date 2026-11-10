@@ -3,7 +3,7 @@
  * 数据本体在同目录 deploymentRegistry.json；本文件只负责类型约束、索引、过滤与汇总，不产生业务副作用。
  * 统一字段一律 snake_case，与后端 API 响应字段一致；空数据用 null、缺失信息用 missing_fields 显式标注。
  */
-// 导入单一数据源 JSON：9 个矩阵平台 / 11 个规范部署项 / 5 个 CI 作业 / 2 个 git 远端 / 6 个候选排除项。
+// 导入单一数据源 JSON：10 个矩阵平台 / 16 个规范部署项 / 5 个 CI 作业 / 2 个 git 远端 / 6 个候选排除项。
 import registry from './deploymentRegistry.json';
 
 // 单个部署项的仓库标识：三字段统一，无仓库载体时 id 与 url 为 null。

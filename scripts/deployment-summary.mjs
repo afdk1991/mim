@@ -277,7 +277,7 @@ function renderMarkdown(report) {
   lines.push('');
   lines.push('| 指标 | 数值 | 说明 |');
   lines.push('|---|---|---|');
-  lines.push(`| 矩阵平台 | ${report.coverage_check.matrix_platforms} | 铁律九 9 个免费平台 |`);
+  lines.push(`| 矩阵平台 | ${report.coverage_check.matrix_platforms} | 铁律九 10 个免费平台 |`);
   lines.push(`| 规范部署项 | ${report.summary.total} | 去重后的部署仓库 + 部署项 |`);
   lines.push(`| git 远端 | ${report.remotes.length} | ${report.remotes.map((r) => r.name).join(' / ') || '—'} |`);
   lines.push(`| CI 作业 | ${report.ci_jobs.length} | 其中部署作业 ${report.summary.deploy_ci_jobs} 个 |`);

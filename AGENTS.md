@@ -12,9 +12,10 @@
 |---|---|---|
 | 项目标识 | 项目名称 **Mim**；仓库目录 / 域名 / npm scope / 仓库名均为 Mim 系标识，名称口径全仓统一（2026-11-09 18:50） | 用户 2026-11-09 18:50 指令；`git remote -v`、`package.json` |
 | 远程仓库 | **2 个**：`origin` = `https://github.com/afdk1991/mim.git`、`gitee` = `https://gitee.com/mallwm_admin/mim.git`；**无非清单远端** | `git remote -v`（2026-11-09 18:08） |
+| 部署矩阵 | **10 个免费平台**（2026-11-10 按用户指令新增 **Gitee（码云）** 为第 10 行）：腾讯云自建 / EdgeOne Pages / GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 / Gitee 镜像仓；`deploymentRegistry.json` 的 `coverage.matrix_platforms` 与 `platform_catalog.in_matrix` 同步为 10 | [铁律九](#铁律九多平台部署矩阵只走免费方案且必须逐平台取证)、`packages/core-domain/src/deploymentRegistry.json`、`node scripts/verify-deployments.mjs` D03 / D20 |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `44b2fee`（`fix(deps): 补齐 web 三包在 pnpm-lock.yaml 的 importer 记录`）；**双远端已全部同步**：`origin` / `gitee` 的 `refs/heads/main` 均 = `44b2fee`（0 ahead / 0 behind）；`gitee` 镜像仓由 2026-11-10 按用户提供的私人令牌新建（公开、默认分支 `main`），历史「镜像仍未同步」状态已解除，取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) | `git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`、`git push gitee main`（2026-11-10 21:50 前后） |
+| 仓库同步 | `main` @ `4398cf0`（`docs(agents): 补记 Gitee 镜像仓补齐取证`）；**双远端已全部同步**：`origin` / `gitee` 的 `refs/heads/main` 均 = `4398cf0`（0 ahead / 0 behind，2026-11-10 22:20 复测 `git ls-remote gitee` exit 0 / 0.27s）；`gitee` 镜像仓由 2026-11-10 按用户提供的私人令牌新建（公开、默认分支 `main`），历史「镜像仍未同步」状态已解除，取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) | `git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`、`git push gitee main`（2026-11-10 21:50 前后 + 22:20 复测） |
 | 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库）与 `gw.txt`（2026-11-10 21:57 实测，同样未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **16 文件 / 230 例**；`verify-deployments` **52/52**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.4 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
@@ -123,7 +124,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 ## 铁律九：多平台部署矩阵——只走免费方案，且必须逐平台取证
 
-**本项目部署矩阵为 9 个免费平台，任何一轮部署都不得脱离该矩阵、不得引入付费方案。**
+**本项目部署矩阵为 10 个免费平台（2026-11-10 按用户指令新增 Gitee（码云）镜像仓为第 10 行），任何一轮部署都不得脱离该矩阵、不得引入付费方案。**
 
 > ⚠️ **表格口径（2026-11-09 梳理标注）**：下表「状态 / 访问速度」为 **2026-11-08 18:14 成片导出交付轮**的历史快照，按铁律三原样保留，**不得作为本轮现状引用**；本轮真实 `curl` 复核见 [§9.1](#91-本轮复核2026-11-09-1754-0800)。表内 `✅ 已上线` 亦不表示 2026-11-09 生产可达，生产可达性以 §0 与 §9.1 为准。
 
@@ -138,6 +139,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | IGA Pages | ✅ 是 | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本轮本机 curl 批次；CI「托管平台同步」作业 success |
 | Vercel | ✅ 是 | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI「托管平台同步」作业 success（本轮 run 42470091995）；本机 000 / 0.183s（curl exit 35：schannel `failed to receive handshake, SSL/TLS connection failed`），`nslookup` 解析至 2001::c73b:94ca / 216.198.79.3 / 64.29.17.3，属本机网络侧 TLS 阻断 |
 | GitHub 仓库 | ✅ 是 | ✅ 已同步（远端 main HEAD `3271204`，2026-11-08 18:14 `git ls-remote` 取证，本地 0 ahead / 0 behind） | `https://github.com/afdk1991/mim` | 本机 HTTPS 000（TLS 阻断，历史取证）；替代取证 `git ls-remote origin refs/heads/main` = `3271204` ✅，CI run 42470091995 五作业全绿（2026-11-08T10:07:48Z → 10:09:54Z） |
+| **Gitee（码云）**（2026-11-10 新增为第 10 行） | ✅ 是 | ✅ 已同步（源码国内镜像仓，远端 `gitee`；**无 CI 推送作业，按铁律十二每轮手工同推**） | `https://gitee.com/mallwm_admin/mim` | **200 / 0.469s / LEN=52034（2026-11-10 22:20 本轮实测）**：`curl https://gitee.com/mallwm_admin/mim` → 200 / 0.469s / 52034B，页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交；git 通道 `git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s），与本地 HEAD 一致（0 ahead / 0 behind）。矩阵成员身份与 `in_matrix` 标记见 `packages/core-domain/src/deploymentRegistry.json` |
 
 ### 9.1 本轮复核（2026-11-09 17:54 +08:00）
 
@@ -377,6 +379,23 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 - **后续待办**：① 若要让 `/deployments` 仪表盘反映真实状态，需重跑 `node scripts/deployment-summary.mjs` 并同轮修正 `repo.gitee` 的契约断言与 D23 异常码白名单；② Gitee 侧如需 CI 镜像（Gitee Go / Webhook），须另配账号，本轮未做；③ 令牌若需轮换，重置后重新 `git credential approve` 即可，无需改仓库配置。
 
+### 9.12 部署矩阵新增 Gitee（码云）（2026-11-10 22:20 +08:00）
+
+**性质**：按用户指令「多平台部署矩阵添加 Gitee（码云）(gitee.com) 平台」，把已在铁律十二 §12.2 登记、但长期作为「矩阵外补充项」的 Gitee 镜像仓**提升为铁律九矩阵第 10 行**；同步刷新注册表、生成器、校验器、契约测试与全部文档口径。本轮不改业务代码、不触发任何平台部署。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| Gitee 网页可达 | `https://gitee.com/mallwm_admin/mim` → **200 / 0.469s / 52034B**，标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交、最新提交与本地 HEAD 同一条 | `curl -w '%{http_code}|%{time_total}|%{size_download}'`、`web.fetch` 页面标题与分支 |
+| Gitee git 通道 | `git ls-remote gitee refs/heads/main` = `4398cf032e65bd7c17437fe79c2a5524d722798e`（**exit 0 / 0.27s**），与本地 HEAD `4398cf0` 一致（0 ahead / 0 behind） | `git ls-remote gitee` |
+| 矩阵口径 | 铁律九 9 → **10 个免费平台**；`deploymentRegistry.json` 的 `platform_catalog.gitee.in_matrix` 由 `false` 改为 `true`、`coverage.matrix_platforms` 9 → 10 | `packages/core-domain/src/deploymentRegistry.json` |
+| 注册表取证 | `repo.gitee` 由 `UNVERIFIED / NOT_TESTED` 改为 **`OK / PASS`**（`http_code=200`、`latency_ms=469`、`bytes=52034`），保留 `REMOTE_TIMEOUT_RECOVERED` 历史留痕，新增 `MATRIX_ROW_ADDED` / `NO_CI_MIRROR_JOB` 两条 info 异常 | 同上，`captured_at = 2026-11-10 22:20 +08:00` |
+| 门禁同步 | `scripts/verify-deployments.mjs` D03 / D20 断言由 9 改为 **10**；`services/mim-api/test/deployments.test.ts` 两处 `9` 改为 **10**；`scripts/deployment-summary.mjs` 说明文案同步 | 本轮命令输出，见交付报告 |
+| 文档同步（铁律七） | `AGENTS.md`（§0 / 铁律九表格 / §9.12 / §13.4）、`README.md`（铁律清单 / 多平台部署矩阵 / 覆盖口径）、`docs/wiki/05-runbook.md`（§7.1.3 平台数与 DNSPod 表）、`06-governance.md`、`02-modules.md`、`Mim-PRD.html` | 逐文件改动 |
+| 交付链路 | Gitee 为**源码镜像仓**（layer `source`），交付方式 `push`：每轮手工 `git push gitee main` + `git ls-remote` 取证；**`deploy.yml` 无 Gitee 推送作业**，`push origin` 不会自动同步镜像 | `.github/workflows/deploy.yml` 全文 0 命中 `gitee` |
+| 铁律八边界 | 本轮为**平台登记与文档同步轮**，无功能产物、无部署，故不涉 V2–V4 线上取证；V1 双远端同步本轮实测通过 | 铁律八豁免场景：无产物可部署 |
+
+- **如实记录的限制**：① Gitee 的 200 仅为**仓库页可达性**取证，不代表任何生产服务可用，也不得替代 `mim.mixm.top`（铁律十二 §12.3）；② 未配置 Gitee Go / Webhook 自动镜像，镜像同步仍依赖每轮手工推送；③ 本轮未做生产部署与线上 E2E。
+
 ## 铁律十：免费平台额度矩阵与选型路由
 
 **免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 9 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。
@@ -472,7 +491,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 远端名 | 地址 | 角色 | 每轮同步要求 |
 |---|---|---|---|
 | `origin` | `https://github.com/afdk1991/mim.git` | 源码主仓 + CI 触发源 | `git push origin main` 后 `git ls-remote origin refs/heads/main` 取证 |
-| `gitee` | `https://gitee.com/mallwm_admin/mim.git` | 国内镜像仓 | `git push gitee main` 后 `git ls-remote gitee refs/heads/main` 取证（2026-11-10 已按用户提供的私人令牌建仓并完成首次同步，见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800)） |
+| `gitee` | `https://gitee.com/mallwm_admin/mim.git` | 国内镜像仓（2026-11-10 起同时为铁律九矩阵第 10 行） | `git push gitee main` 后 `git ls-remote gitee refs/heads/main` 取证（2026-11-10 已按用户提供的私人令牌建仓并完成首次同步，见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800)；入矩阵取证见 [§9.12](#912-部署矩阵新增-gitee码云2026-11-10-2220-0800)） |
 
 - **全量**：两个远端必须**同轮全部推送**，禁止只推 `origin`；逐个比对 hash 与本地 HEAD 一致（0 ahead / 0 behind）才算同步完成。
 - **不可达处理**：某远端本轮网络 / 凭证不可达时，按铁律一如实报告「该远端未同步」并附命令输出与时间戳，**不得**以另一远端成功冒充全量同步，不得声明「已同步全部远程仓库」。
@@ -524,10 +543,10 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **13.3 三类特殊态必须显式标识**（不得用 0 / 空串 / 绿色徽标掩盖）：
 - **空数据**：`result = null`，须带 `EMPTY_RESULT` 异常与 `http_code` 缺失项；本轮为 `pages.iga`、`worker.mim-store`，外加 2026-11-10 新增的 `repo.gitlab`、`repo.bitbucket`、`pages.netlify`、`pages.azure-swa`、`container.render` 共 7 项（均待接入外部账号，未达线上可达）。
-- **失败状态**：`status = BROKEN` 或 `result.verdict = FAIL`，须有异常说明；本轮为 `server.tcloud`（生产 `000`）、`pages.vercel`（TLS 阻断）、`repo.gitee`（`ls-remote` exit 124，按「未取证」处理，不以 `origin` 成功冒充全量同步）。
-- **缺失信息**：逐项列 `missing_fields`（私有凭证、工件路径、未取得的 V2/V3/V4 取证等）；本轮共 59 项（含 5 个新增免费层平台的凭据与入口缺失）。
+- **失败状态**：`status = BROKEN` 或 `result.verdict = FAIL`，须有异常说明；本轮为 `server.tcloud`（生产 `000`）、`pages.vercel`（TLS 阻断）。`repo.gitee` 的 2026-11-09 `ls-remote` exit 124 已于 2026-11-10 解除（建仓 + 同推成功后状态 `OK / PASS`），历史留痕以 `REMOTE_TIMEOUT_RECOVERED` 保留，**不静默删除**。
+- **缺失信息**：逐项列 `missing_fields`（私有凭证、工件路径、未取得的 V2/V3/V4 取证等）；2026-11-10 22:20 重生成后为 46 项（含 5 个新增免费层平台的凭据与入口缺失）。
 
-**13.4 覆盖、去重与排除**：铁律九 9 个矩阵平台 + 7 个补充平台 = 16 个平台目录 → 16 个规范部署项（补 `repo.gitee`、`worker.mim-store` 两类同类项，并于 2026-11-10 按用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从铁律十候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；README 曾将 Cloudflare 同源自托管入口另列一行，与 `pages.cloudflare` 同域名同载体，合并后用 `delivery.modes` 区分，避免重复计数。`candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入部署项**。
+**13.4 覆盖、去重与排除**：铁律九 **10 个矩阵平台**（2026-11-10 起含 Gitee 镜像仓）+ 6 个补充平台 = 16 个平台目录 → 16 个规范部署项（`repo.gitee` 已于 2026-11-10 由补充项提升为矩阵成员，仍为同一规范部署项；`worker.mim-store` 为矩阵外补充项，并于 2026-11-10 按用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从铁律十候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；README 曾将 Cloudflare 同源自托管入口另列一行，与 `pages.cloudflare` 同域名同载体，合并后用 `delivery.modes` 区分，避免重复计数。`candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入部署项**。
 
 **13.5 工件双口径（本轮纠正）**：`deploy/*`、`Dockerfile`、`vercel.json`、`wrangler.toml`、`functions/*` 等 21 个路径为 **staged `D` 未提交**，`git ls-tree HEAD` 实测**仍在远端 HEAD `3b9b251`**，故 CI 当前**不会**因缺件失败；风险在「一旦提交删除即悬空」。汇总以 `artifact_in_head` / `artifact_in_worktree` 两个字段分别记录，不得混为一谈。
 
@@ -535,7 +554,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **13.7 每轮同步清单（铁律七）**：部署项 / 平台 / 远端 / CI 作业发生变化时，同轮更新 `deploymentRegistry.json`、本文件 §13、`README.md`（版本 / 校验命令 / 仓库结构 / 前端视图 / 后端接口 / 站点与部署 / 文档索引）、`docs/wiki/{01-architecture,02-modules,05-runbook,README}.md`、`Mim-PRD.html`、`package.json` 脚本、生成器与校验器断言，并重新生成两份结构化产物。**不涉及**：依赖清单 / 锁文件（零第三方依赖）、semver 数字（`preview` 通道）、CI 部署语义。
 
-**13.8 本轮取证（2026-11-09 23:03 +08:00，HEAD `3b9b251`）**：`origin` `ls-remote` = `3b9b251` ✅；`gitee` exit 124 未取证；生产 `/health` `000` / 2.123s / curl exit 7（代理 502）；GitHub Pages 200/5182B、Cloudflare Pages 200/5182B、Sealos `/health` 200/53B、EdgeOne 200/984B（WAF 挑战页，判 `DEGRADED`）、ghcr 401/73B（未鉴权属正常）、Vercel `000` / exit 35 TLS 阻断；6 项工件工作树漂移；异常 26 项（🔴2 / 🟡17 / 🟢7）、缺失信息 34 项。按铁律八 / 十二如实标注**未做生产部署**。
+**13.8 历史取证快照（2026-11-09 23:03 +08:00，HEAD `3b9b251`；按铁律三留痕，不作现状引用）**：`origin` `ls-remote` = `3b9b251` ✅；`gitee` exit 124 未取证；生产 `/health` `000` / 2.123s / curl exit 7（代理 502）；GitHub Pages 200/5182B、Cloudflare Pages 200/5182B、Sealos `/health` 200/53B、EdgeOne 200/984B（WAF 挑战页，判 `DEGRADED`）、ghcr 401/73B（未鉴权属正常）、Vercel `000` / exit 35 TLS 阻断；6 项工件工作树漂移；异常 26 项（🔴2 / 🟡17 / 🟢7）、缺失信息 34 项。按铁律八 / 十二如实标注**未做生产部署**。
 
 **13.9 2026-11-10 决策：全部采用免费层**：用户明确「把你表里列的全部平台都纳入采用范围，且只用免费额度」。据此将铁律十候选池中的 GitLab / Bitbucket（远程仓库）、Netlify / Azure SWA / Render（部署平台）共 5 项从 `excluded` 提升为 `items` 中的「已采用（免费层）」登记项（`status = UNVERIFIED`、`result = null` 标 `EMPTY_RESULT`、各带免费额度 note 与缺失凭据清单），不冒充已部署。已配套新增免费层配置脚手架并接入受保护 CI：
 - `netlify.toml`：发布 `apps/web/dist` + SPA 回退；deploy.yml 的 `Netlify` 步骤按 Vercel 同款「缺 `NETLIFY_AUTH_TOKEN` 即 SKIP」模式运行。
@@ -543,6 +562,8 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - `.github/workflows/azure-static-web-apps.yml`：Azure SWA 独立工作流，`AZURE_SWA_TOKEN` 缺省即 SKIP，不阻断。
 - GitLab / Bitbucket 计划作为镜像仓，待用户关联账号并 `git remote add` 后接入（`coverage.planned_git_remotes = 2`）。
 **诚实边界**：本轮仅完成「决策登记 + 配置脚手架 + 受保护 CI」，5 项均未达到线上可达；真实部署需在对应平台控制台创建项目并填入 secret（`NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID` / `RENDER_API_KEY` / `RENDER_SERVICE_ID` / `AZURE_SWA_TOKEN` 及两镜像仓凭证）后由 CI 自动发布。
+
+**13.10 本轮取证：Gitee 入矩阵（2026-11-10 22:20 +08:00，HEAD `4398cf0`）**：`git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s，与本地 HEAD 一致，0 ahead / 0 behind）；`curl https://gitee.com/mallwm_admin/mim` = **200 / 0.469s / 52034B**（标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交）；`platform_catalog.in_matrix = true`、`coverage.matrix_platforms = 10`；重新生成 `docs/deployment-summary.{json,md}`（部署项 16 / 有取证 9 / 空数据 7 / 异常 39（🔴1 / 🟡16 / 🟢22）/ 缺失信息 46）；本地门禁 `verify-deployments` **52/52**、api 契约测试 **16 文件 233/233**、`pnpm -r typecheck` 0、`comment-check --strict` 0。生产 `mim.mixm.top` 沿用 2026-11-09 快照（`000`），**本轮未做生产部署、未宣称已上线**。
 
 ---
 
@@ -552,4 +573,4 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 ***
 
-_本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，2026-11-04 增补铁律八（全自动化生产部署，禁止仅本地预览），2026-11-06 增补铁律九（9 平台免费部署矩阵与逐平台取证），2026-11-06 增补铁律十（免费平台额度矩阵与选型路由，含 Render 免费层定性修正）、铁律十一（全仓库逐行注释与解释）。AI 协作者在每轮交付前须自检是否违反铁律一、铁律八、铁律九、铁律十、铁律十一与铁律十二。2026-11-09 按「保留现有结构梳理」新增 §0 当前状态基线、§9.1 本轮复核、历史留痕导航与缺口口径刷新，铁律一～十一的编号 / 标题 / 约束语义均未改动。2026-11-09 18:08 按用户指令补充**铁律十二**（全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器 + 项目名称统一为 Mim），全量删除原候选托管平台的全部相关内容（§10.1 留痕），并按铁律七同步 README 与 Wiki 全部铁律条数口径。2026-11-09 18:50 按用户指令把全仓作为项目名称的旧称统一更正为 **Mim**，AGENTS / README / Wiki / 决策文档同步完成，原十一条铁律与铁律十二的约束语义未变。_
+_本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，2026-11-04 增补铁律八（全自动化生产部署，禁止仅本地预览），2026-11-06 增补铁律九（9 平台免费部署矩阵与逐平台取证）与铁律十（免费平台额度矩阵与选型路由，含 Render 免费层定性修正）、铁律十一（全仓库逐行注释与解释）。AI 协作者在每轮交付前须自检是否违反铁律一、铁律八、铁律九、铁律十、铁律十一与铁律十二。2026-11-09 按「保留现有结构梳理」新增 §0 当前状态基线、§9.1 本轮复核、历史留痕导航与缺口口径刷新，铁律一～十一的编号 / 标题 / 约束语义均未改动。2026-11-09 18:08 按用户指令补充**铁律十二**（全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器 + 项目名称统一为 Mim），全量删除原候选托管平台的全部相关内容（§10.1 留痕），并按铁律七同步 README 与 Wiki 全部铁律条数口径。2026-11-09 18:50 按用户指令把全仓作为项目名称的旧称统一更正为 **Mim**，AGENTS / README / Wiki / 决策文档同步完成，原十一条铁律与铁律十二的约束语义未变。**2026-11-10 按用户指令把 Gitee（码云）镜像仓纳入铁律九部署矩阵第 10 行（矩阵由 9 平台扩为 10 平台），仅扩充矩阵成员与取证口径，铁律一～十二的编号 / 标题 / 约束语义未改动。**_

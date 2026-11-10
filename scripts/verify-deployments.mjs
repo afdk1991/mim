@@ -73,9 +73,9 @@ const modes = new Set(['ci', 'manual', 'push']);
 check('D01 契约 schema = mim.deployment-registry.v1', REG.schema === 'mim.deployment-registry.v1', REG.schema);
 // 部署项总数与覆盖口径一致。
 check('D02 部署项数 = coverage.deployment_items', items.length === REG.coverage?.deployment_items, `${items.length} vs ${REG.coverage?.deployment_items}`);
-// 9 平台矩阵口径。
+// 10 平台矩阵口径（2026-11-10 起含 Gitee 镜像仓）。
 const matrixPlatforms = (REG.platform_catalog ?? []).filter((p) => p.in_matrix).length;
-check('D03 平台目录 in_matrix = 9 且等于 coverage.matrix_platforms', matrixPlatforms === 9 && matrixPlatforms === REG.coverage?.matrix_platforms, String(matrixPlatforms));
+check('D03 平台目录 in_matrix = 10 且等于 coverage.matrix_platforms', matrixPlatforms === 10 && matrixPlatforms === REG.coverage?.matrix_platforms, String(matrixPlatforms));
 // CI 作业口径：5 个作业、4 个部署作业。
 check('D04 CI 作业 5 个、部署作业 4 个', REG.ci_jobs?.length === 5 && REG.ci_jobs.filter((j) => j.is_deploy).length === 4);
 // git 远端口径。
@@ -114,19 +114,19 @@ check('D18 单项内异常码不重复', items.every((i) => new Set(i.anomalies.
 const canonical = new Set([...ids, ...items.map((i) => i.name)]);
 const aliasClash = items.flatMap((i) => i.aliases.filter((a) => canonical.has(a)).map((a) => `${i.id}:${a}`));
 check('D19 别名不与其它项的规范名冲突', aliasClash.length === 0, aliasClash.join(', '));
-// 9 个矩阵平台每个至少有一个部署项（避免遗漏）。
+// 10 个矩阵平台每个至少有一个部署项（避免遗漏）。
 const covered = new Set(items.map((i) => i.platform_id));
 const missed = [...platformIds].filter((id) => REG.platform_catalog.find((p) => p.id === id)?.in_matrix && !covered.has(id));
-check('D20 9 个矩阵平台均有部署项覆盖（无遗漏）', missed.length === 0, missed.join(', '));
+check('D20 10 个矩阵平台均有部署项覆盖（无遗漏）', missed.length === 0, missed.join(', '));
 // 排除项不得与部署项 id 冲突。
 check('D21 候选 / 排除项 id 不与部署项冲突', (REG.excluded ?? []).every((e) => !ids.includes(e.id)));
 // 覆盖说明必须写明去重与补齐依据。
 check('D22 覆盖口径含去重 / 补齐 / 排除说明', Boolean(REG.coverage?.dedup_note && REG.coverage?.added_note && REG.coverage?.excluded_note));
 // 关键异常码必须存在：生产不可达、CI 悬空风险、WAF 假阳性、远端超时。
 const allCodes = new Set(items.flatMap((i) => i.anomalies.map((a) => a.code)));
-// 工件类异常码允许两种形态：MISSING（工作树确实缺失）或 RESTORED（已恢复并留痕）；
-// 其余四类异常码必须在数据中出现，防止异常码体系被静默删减。
-check('D23 关键异常码齐备', ['PRODUCTION_UNREACHABLE', 'WAF_FALSE_POSITIVE', 'REMOTE_TIMEOUT', 'DUPLICATE_MATRIX_ROW_MERGED'].every((c) => allCodes.has(c)) && ['WORKTREE_ARTIFACT_MISSING', 'WORKTREE_ARTIFACT_RESTORED'].some((c) => allCodes.has(c)));
+// 工件类与远端类异常码允许两种形态：MISSING（确实缺失 / 超时）或 RESTORED / RECOVERED（已恢复并留痕）；
+// 其余三类异常码必须在数据中出现，防止异常码体系被静默删减。
+check('D23 关键异常码齐备', ['PRODUCTION_UNREACHABLE', 'WAF_FALSE_POSITIVE', 'DUPLICATE_MATRIX_ROW_MERGED'].every((c) => allCodes.has(c)) && ['WORKTREE_ARTIFACT_MISSING', 'WORKTREE_ARTIFACT_RESTORED'].some((c) => allCodes.has(c)) && ['REMOTE_TIMEOUT', 'REMOTE_TIMEOUT_RECOVERED'].some((c) => allCodes.has(c)));
 
 // ---------- 2. 与真实仓库状态交叉核对 ----------
 // 共享包实现存在并导出汇总函数。

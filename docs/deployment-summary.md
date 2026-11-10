@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-10T13:48:40.686Z
-- 本地 HEAD：`0ae667a`
+- 生成时间：2026-11-10T14:07:35.868Z
+- 本地 HEAD：`4398cf0`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -9,14 +9,14 @@
 
 | 指标 | 数值 | 说明 |
 |---|---|---|
-| 矩阵平台 | 9 | 铁律九 9 个免费平台 |
+| 矩阵平台 | 10 | 铁律九 10 个免费平台 |
 | 规范部署项 | 16 | 去重后的部署仓库 + 部署项 |
 | git 远端 | 2 | gitee / origin |
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 9 | 本轮存在可信取证 |
 | 空数据 | 7 | result 为 null，明确标识而非填 0 |
-| 异常 | 38 | 🔴 2 / 🟡 17 / 🟢 19 |
-| 缺失信息 | 48 | 字段名或工件路径 |
+| 异常 | 39 | 🔴 1 / 🟡 16 / 🟢 22 |
+| 缺失信息 | 46 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -24,7 +24,7 @@
 | 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 部署状态 | 部署结果 | 异常说明 | 缺失信息 |
 |---|---|---|---|---|---|---|---|
 | `repo.github` | github:afdk1991/mim | GitHub 仓库 / source | push — | ✅ OK | ✅ PASS — / —B | HTTPS_BLOCKED 等 1 项 | — |
-| `repo.gitee` | gitee:mallwm_admin/mim | Gitee 镜像仓 / source | push — | 🟡 UNVERIFIED | 🟡 未测 — / —B | REMOTE_TIMEOUT 等 2 项 | ⚠ 2 项 |
+| `repo.gitee` | gitee:mallwm_admin/mim | Gitee（码云）镜像仓 / source | push — | ✅ OK | ✅ PASS 200 / 52034B | REMOTE_TIMEOUT_RECOVERED 等 3 项 | — |
 | `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | 🔴 BROKEN | 🔴 FAIL 000 / 0B | PRODUCTION_UNREACHABLE 等 3 项 | ⚠ 6 项 |
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 | — |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 | ⚠ 1 项 |
@@ -45,8 +45,9 @@
 | 部署项 | 严重度 | 异常码 | 说明 |
 |---|---|---|---|
 | `repo.github` | 🟢 info | `HTTPS_BLOCKED` | github.com 网页本机 TLS 握手被阻断，仓库同步改以 git ls-remote 取证，不影响同步结论 |
-| `repo.gitee` | 🔴 critical | `REMOTE_TIMEOUT` | 镜像仓本轮未取证，铁律十二 §12.2「双远端同轮全推」无法判定达成 |
-| `repo.gitee` | 🟡 warning | `MATRIX_ROW_MISSING` | README「多平台部署矩阵」未列 Gitee 镜像仓行，本汇总按 §12.2 补齐 |
+| `repo.gitee` | 🟢 info | `REMOTE_TIMEOUT_RECOVERED` | 2026-11-09 23:03 曾 REMOTE_TIMEOUT（ls-remote exit 124）；实际根因为镜像仓从未创建，2026-11-10 建仓后首次推送成功，超时态已解除，历史不静默删除 |
+| `repo.gitee` | 🟢 info | `MATRIX_ROW_ADDED` | 2026-11-10 按用户指令把本行由「补充项」提升为铁律九矩阵第 10 行：AGENTS.md 铁律九表格、README「多平台部署矩阵」、Wiki 与 PRD 同步新增 Gitee（码云）行，platform_catalog.in_matrix 改为 true |
+| `repo.gitee` | 🟢 info | `NO_CI_MIRROR_JOB` | Gitee 镜像由每轮手工 git push gitee main 驱动（铁律十二 V1），deploy.yml 无 Gitee 推送作业；push origin 不会自动同步镜像，须每轮显式同推并 git ls-remote 取证 |
 | `server.tcloud` | 🔴 critical | `PRODUCTION_UNREACHABLE` | 生产 /health 本轮 000，无 V2/V3/V4 线上取证，不得宣称「已上线」；本机不可达 ≠ 部署失败，但主机侧亦不可验证 |
 | `server.tcloud` | 🟢 info | `WORKTREE_ARTIFACT_MISSING` | deploy/ 全目录曾于 2026-11-08 从工作树移除（未提交，远端正品无损），2026-11-10 已由 git 恢复至 HEAD 状态；历史风险留痕，当前无悬空 |
 | `server.tcloud` | 🟡 warning | `MISSING_HOST_CREDENTIALS` | 无 SSH 私钥 / tccli / 管理员口令，主机侧状态（systemd / nginx / SQLite）本轮无法验证 |
@@ -87,8 +88,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | — | ⚪ 未取证（spawnSync git ETIMEDOUT） |
-| `origin` | https://github.com/afdk1991/mim.git | 0ae667a320f2b35ea1240f985bc3f3157694403c | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 4398cf032e65bd7c17437fe79c2a5524d722798e | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 4398cf032e65bd7c17437fe79c2a5524d722798e | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -106,9 +107,9 @@
 
 ## 5. 覆盖、去重与排除
 
-- 矩阵文档行数核对：AGENTS.md 9 行表格；README.md 15 行表格。
+- 矩阵文档行数核对：AGENTS.md 10 行表格；README.md 16 行表格。
 - 去重：README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。
-- 补齐：相对铁律九 9 行矩阵补齐 2 项：Gitee 镜像仓（§12.2 有、README 矩阵缺）与独立 Worker mim-store（README 取证段有、矩阵表缺）。2026-11-10 用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。
+- 补齐：2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。
 - 排除：仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。
 
 | 候选 / 排除项 | 理由 |
@@ -118,9 +119,9 @@
 
 ## 6. 取证来源
 
-- git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-09 23:03 实测）
+- git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-10 22:20 实测：origin = 4398cf0、gitee = 4398cf0，与本地 HEAD 一致）
 - git ls-tree HEAD <artifact>（2026-11-09 23:03 实测，区分远端 HEAD 与本地工作树）
-- curl 逐平台探测（2026-11-09 23:03 实测）
+- curl 逐平台探测（2026-11-10 22:20 实测 gitee.com 200；其余 2026-11-09 23:03 快照）
 - AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3
 - README.md「多平台部署矩阵」与「站点与部署」
 - .github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）

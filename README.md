@@ -48,10 +48,10 @@ node scripts/comment-check.mjs
 6. **铁律六**：全角色全流程自动化——AI 承担所有人员职责，每轮交付前必须 BUG/代码检查。
 7. **铁律七**：功能模块增删必须全量同步，交付报告附同步清单。
 8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），**禁止以本地预览作为交付终点**。
-9. **铁律九**：多平台部署矩阵只走免费方案（9 个平台），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证。
+9. **铁律九**：多平台部署矩阵只走免费方案（**10 个平台**：9 个原矩阵平台 + 2026-11-10 新增的 **Gitee（码云）** 镜像仓），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证。
 10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核。**原候选托管平台相关内容已于 2026-11-09 按用户指令全量删除，不得重新引入。**
 11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」。
-12. **铁律十二**：**全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器**——两个远端（`origin` GitHub、`gitee` Gitee）每轮必须同轮全部推送并逐个 `git ls-remote` 取证；远程仓库只承担源码托管与镜像，**生产唯一权威终点为 `https://mim.mixm.top`**（nginx + systemd + SQLite，前后端 + 数据库一体上线），铁律九的 9 平台仅作分发 / 镜像 / 取证，不得替代「已上线」；交付须附 V1–V6 取证矩阵（详见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)）。
+12. **铁律十二**：**全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器**——两个远端（`origin` GitHub、`gitee` Gitee）每轮必须同轮全部推送并逐个 `git ls-remote` 取证；远程仓库只承担源码托管与镜像，**生产唯一权威终点为 `https://mim.mixm.top`**（nginx + systemd + SQLite，前后端 + 数据库一体上线），铁律九的 10 平台仅作分发 / 镜像 / 取证，不得替代「已上线」；交付须附 V1–V6 取证矩阵（详见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)）。
 
 ## 仓库结构
 
@@ -182,13 +182,14 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 
 ### 多平台部署矩阵
 
-> **层级定位（铁律十二）**：本表 10 行为「1 个生产权威终点 + 9 个分发 / 镜像 / 可用性取证层」；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
+> **层级定位（铁律十二 / 铁律九）**：本表 11 行为「1 个生产权威终点 + 10 个分发 / 镜像 / 源码层」，其中 10 行即铁律九的 10 个免费平台矩阵成员（2026-11-10 起 Gitee 镜像仓由「矩阵外补充项」提升为矩阵第 10 行）；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像与源码镜像仓均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
 
 一套代码、一份前端产物（`vite base: './'`，可挂任意子路径），后端统一由 `services/mim-api` 提供。CI 在 push `main` 时并行触发下列链路；缺凭证的平台以 `SKIP` 跳过，不阻断主链路。代码远端为 `origin`（GitHub）与 `gitee`（Gitee），每轮须同轮全推；原候选托管平台已全量移除。
 
 | 平台 | 载体 | 入口 / 配置 | 状态 |
 |---|---|---|---|
 | GitHub 仓库 | 源码主仓 | `https://github.com/afdk1991/mim` | ✅ 已同步 |
+| Gitee 仓库（码云 · 国内镜像，铁律九矩阵第 10 行） | 镜像源仓（铁律十二 §12.2 双远端） | `https://gitee.com/mallwm_admin/mim`（`git push gitee main` 每轮与 `origin` 同推，逐个 `git ls-remote` 取证；无 CI 推送作业） | ✅ 已同步（2026-11-10 22:20 实测：网页 **200 / 0.469s / 52034B**（标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交）；`git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s）与本地 HEAD 一致；建仓与首次推送取证见 [AGENTS.md §9.11](./AGENTS.md#911-gitee-镜像仓补齐2026-11-10-2150-0800)，入矩阵取证见 [§9.12](./AGENTS.md#912-部署矩阵新增-gitee码云2026-11-10-2220-0800)） |
 | GitHub Pages | 前端静态站 | CI job `pages`（`configure-pages` + `upload-pages-artifact` + `deploy-pages`），`https://afdk1991.github.io/mim/` | ✅ CI 自动发布 |
 | GitHub Packages | 容器镜像（ghcr） | CI job `packages` → `ghcr.io/afdk1991/mim-api:{latest,sha}`；npm registry 受「包 scope 必须等于仓库 owner」限制，故 `@mim/*` 不发 npm | ✅ CI 自动推送 |
 | 腾讯云 EdgeOne Pages | 真实前端 `apps/web/dist` | `edgeone makers deploy apps/web/dist -n mim-app --env production` 本地直传（direct upload 型，非仓库连接；最近一次 Deployment `dpu0n61jlos8`，2026-11-08，`git worktree` 干净树 HEAD `42b98bc` 构建产物）；`apps/web/index.html` `<head>` 已内置 `?tads` / 裸问号归一化脚本；`data.mixm.top` 对 `curl` / 无头 UA 返回 WAF 混淆 JS，对**无头浏览器与全新 profile 的有头 Edge** 返回验证码页（`TEOCaptchaWidgetV1`），真实内容须复用**已通过过校验的** Edge user-data-dir + 有头模式 + CDP 取证（判定正则含 `EO_Bot_Ssid\|_0x649a\|TEOCaptchaWidgetV1\|正在验证连接安全性`） | ✅ 已同步（`data.mixm.top`：最近一次有头 Edge + CDP 取证（2026-11-06）`title=Mim（旧定位副标题已于 2026-11-10 删除）` + `assets/index-cpYhbG3w.js`；2026-11-07 01:48 复测时放行凭证过期回落验证码页，CDP 合成点击 ×15 未通过，需人工勾选一次复选框后恢复） |
@@ -244,9 +245,9 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 | `missing_fields` | **缺失信息**清单；空数组表示齐备 |
 | `delivery.artifact_in_head` / `artifact_in_worktree` | 工件双口径：区分「远端 HEAD 仍存在」与「本地工作树已删除」 |
 
-- **覆盖口径**：9 个矩阵平台 + 7 个补充平台 = **16 个平台目录** → **16 个规范部署项**（在 `repo.gitee` 镜像仓与 `worker.mim-store` 两项基础上，2026-11-10 用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；仅 `candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入汇总**。
+- **覆盖口径**：**10 个矩阵平台**（2026-11-10 起含 Gitee 镜像仓）+ 6 个补充平台 = **16 个平台目录** → **16 个规范部署项**（`repo.gitee` 由补充项提升为矩阵成员，仍是同一规范部署项；`worker.mim-store` 为矩阵外补充项；2026-11-10 用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；仅 `candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入汇总**。
 - **去重**：README 曾把「Cloudflare Pages 同源自托管入口（`_worker.js`）」与「Cloudflare Pages / Workers」列成两行，实为同一域名同载体的两种发布形态，合并为 `pages.cloudflare` 一行并在 `delivery.modes` 区分。
-- **本轮基线（2026-11-09 23:03 实测）**：生产 `mim.mixm.top/health` = `000`（curl exit 7，本地代理 502），`gitee` `ls-remote` exit 124 未取证，IGA Pages 与独立 Worker 为**空数据**（需私有凭证 / 本机 DNS 污染）；6 项工件在远端 HEAD 仍存在但本地工作树已缺失（21 个 staged `D` 未提交），**CI 当前不会因缺件失败，一旦提交删除即悬空**。
+- **本轮基线（2026-11-10 22:20 实测，Gitee 入矩阵轮）**：`gitee` 网页 200 / 0.469s / 52034B、`git ls-remote` exit 0 / 0.27s 且与本地 HEAD `4398cf0` 一致（历史 exit 124 超时已解除）；其余平台沿用 2026-11-09 23:03 快照（生产 `mim.mixm.top/health` = `000`，curl exit 7 本地代理 502；IGA Pages 与独立 Worker 为空数据）；工件双口径以 `git ls-tree HEAD` 与工作树实测为准，**不得以本表 `PASS` 冒充铁律八 / 十二的线上取证**。
 - **生成与核对**：`npm run summary:deployments`（`--live` 追加真实 `curl` 探测）→ `docs/deployment-summary.json` + `docs/deployment-summary.md`；`npm run verify:deployments`（52 项断言）；Web 端 `/deployments` 提供可筛选可展开的核对表。
 
 本地构建：`npm run build`（真实前端 → 根 `dist/`，与 EdgeOne Pages 同款链路）；PRD 阅读页：`npm run build:site`（`site/` → `dist/`）；前端单独产物：`npm run build:web`；校验：`npm run check`。

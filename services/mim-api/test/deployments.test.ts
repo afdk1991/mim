@@ -18,18 +18,18 @@ beforeEach(() => { // 每例前置：重建内存库与应用
 }); // beforeEach 结束
 
 describe('部署汇总总览', () => { // 公开只读端点
-  it('overview 返回全量部署项 / 9 矩阵平台 / 5 CI 作业 / 4 部署作业 / 空数据项', async () => { // 规模断言
+  it('overview 返回全量部署项 / 10 矩阵平台 / 5 CI 作业 / 4 部署作业 / 空数据项', async () => { // 规模断言
     const res = await request(app).get('/api/v1/deployments/overview'); // 公开汇总
     expect(res.status).toBe(200); // 匿名 200
     expect(res.body.schema).toBe('mim.deployment-registry.v1'); // 契约版本
     expect(res.body.total).toBe(DEPLOYMENT_ITEMS.length); // 去重后的规范部署项（动态，与注册表零漂移）
-    expect(res.body.matrix_platforms).toBe(9); // 铁律九 9 平台
+    expect(res.body.matrix_platforms).toBe(10); // 铁律九 10 平台（2026-11-10 起含 Gitee 镜像仓）
     expect(res.body.ci_jobs).toBe(5); // deploy.yml 五作业
     expect(res.body.deploy_ci_jobs).toBe(4); // verify 为门禁，不计入
     expect(res.body.git_remotes).toBe(2); // origin + gitee
     expect(res.body.empty_result).toBe(DEPLOYMENT_ITEMS.filter((i) => i.result === null).length); // 空数据项（result=null）动态计数
     expect(res.body.with_result + res.body.empty_result).toBe(res.body.total); // 有取证 + 空数据 = 总数
-    expect(res.body.platforms.filter((p: { in_matrix: boolean }) => p.in_matrix)).toHaveLength(9); // 平台目录标记
+    expect(res.body.platforms.filter((p: { in_matrix: boolean }) => p.in_matrix)).toHaveLength(10); // 平台目录标记
     expect(res.body.excluded).toBe(DEPLOYMENT_EXCLUDED.length); // 候选池 / 排除项数量（数字，不与明细字段混淆）
     expect(res.body.excluded_items.length).toBe(DEPLOYMENT_EXCLUDED.length); // 排除项明细明确列出且不计入
     expect(res.body.ci_job_list).toHaveLength(5); // CI 作业明细与数字口径分离
@@ -121,14 +121,14 @@ describe('部署项详情与异常标识', () => { // 详情与异常
     expect(Array.isArray(res.body.related)).toBe(true); // 同类项列表
   }); // 详情用例结束
 
-  it('未取证的镜像仓明确标注 NOT_TESTED 与缺失凭证', async () => { // 失败 / 缺失标识
+  it('已同步的镜像仓标注 PASS 并以恢复留痕保留历史超时', async () => { // 同步完成标识
     const res = await request(app).get('/api/v1/deployments/repo.gitee'); // Gitee 镜像仓
     expect(res.status).toBe(200); // 200
-    expect(res.body.item.status).toBe('UNVERIFIED'); // 未取证
-    expect(res.body.item.result.verdict).toBe('NOT_TESTED'); // 本轮未测
-    expect(res.body.item.missing_fields).toContain('push_credential'); // 缺失信息清晰标识
-    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'REMOTE_TIMEOUT')).toBe(true); // 异常码
-  }); // 未取证用例结束
+    expect(res.body.item.status).toBe('OK'); // 2026-11-10 建仓并首次推送后由 UNVERIFIED 转为正常
+    expect(res.body.item.result.verdict).toBe('PASS'); // 三方 hash 一致，非「本轮未测」
+    expect(res.body.item.missing_fields).toEqual([]); // 凭证与远端 hash 均已取得，不再登记缺失字段
+    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'REMOTE_TIMEOUT_RECOVERED')).toBe(true); // 历史超时以恢复码留痕，不静默删除
+  }); // 同步完成用例结束
 
   it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识
     const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages

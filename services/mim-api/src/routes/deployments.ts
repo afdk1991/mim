@@ -22,7 +22,7 @@ import {
   DEPLOYMENT_EXCLUDED, // 候选池 / 已排除项，明确不计入部署项
   DEPLOYMENT_ITEMS, // 16 个规范部署项（单一事实源，运行时实计数）
   DEPLOYMENT_LAYER_CODES, // 层级字典
-  DEPLOYMENT_PLATFORMS, // 平台目录（9 个矩阵平台 + 7 个补充平台，共 16）
+  DEPLOYMENT_PLATFORMS, // 平台目录（10 个矩阵平台 + 6 个补充平台，共 16）
   DEPLOYMENT_SEVERITY_CODES, // 严重度字典
   DEPLOYMENT_STATUS_CODES, // 部署状态字典
   DEPLOYMENT_VERDICT_CODES, // 部署结果字典

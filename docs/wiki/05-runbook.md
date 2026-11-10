@@ -291,6 +291,9 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
 | Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败） |
 | GitHub 仓库 | ✅ | ✅ 已同步（HEAD `41a871d`，2026-11-07 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.029s / 0.011s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
+| **Gitee（码云）镜像仓**（2026-11-10 入矩阵，第 10 行） | ✅ | ✅ 已同步（源码国内镜像仓，无 CI 推送作业，每轮手工 `git push gitee main`） | `https://gitee.com/mallwm_admin/mim` | **200 / 0.469s / 52034B（2026-11-10 22:20 实测）**：页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交；`git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s）与本地 HEAD 一致 |
+
+> **表格口径说明（2026-11-10）**：本表除「Gitee（码云）镜像仓」一行（2026-11-10 22:20 本轮新增实测）外，其余各行的 HTTP / 耗时仍为 2026-11-07 01:48 的历史数值，按铁律三留痕、不作现状引用；最新逐平台结论见 [AGENTS.md 铁律九表格](../../AGENTS.md) 与 §9.12。
 
 > **2026-11-10 21:47 复核与重建（本轮真实结果）**：上表 Cloudflare Pages 行所记「CI 自动发布（含 /api 反代）」已不成立——复核时 `https://mim-8ah.pages.dev` 返回 **530（项目不存在）**，Cloudflare 账号 `15726833367@139.com`（Account ID `a799197458978d508f927083360c635b`）的「Workers 和 Pages」项目列表为**空**，`mixm.top` zone 内 **0 条 DNS 记录**（域名权威解析不在该账号）；`deploy.yml` 的 Cloudflare 步骤因仓库无 `CLOUDFLARE_API_TOKEN` 每轮 `SKIP` 后 `exit 0`，属假绿。本轮用控制台「直接上传」重建 Pages 项目 `mim-8ah` 并直传根构建 `dist`（6 文件），取证：`/` **200 / 1.455s / 5114B**（`title=Mim`、产物 `assets/index-DkyuUDY7.js` + `index-DY6XAYXj.css`）、`/store` **200 / 1.040s / 5114B**、`assets/index-DkyuUDY7.js` **200**。**限制**：该入口为纯静态直传，**不含 `/api` 反代**（`functions/api/[[path]].js` 未随本次上传，故接口调用仍无同源后端）；且 push 后 CI 不会自动重发，须补 `CLOUDFLARE_API_TOKEN` 才恢复自动发布。
 
@@ -384,13 +387,14 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 
 ### 部署平台 ↔ DNSPod 记录对应（2026-11-06 实测）
 
-§7.1.3 的 9 个免费平台中，仅 2 个平台经 DNSPod `mixm.top` 自有域解析，其余 7 个使用平台方域名、不经 DNSPod：
+§7.1.3 的 **10 个免费平台**（2026-11-10 起含 Gitee 镜像仓）中，仅 2 个平台经 DNSPod `mixm.top` 自有域解析，其余 8 个使用平台方域名、不经 DNSPod：
 
 | 部署平台 | 域名 | DNSPod 记录（类型 \| 主机记录 \| 记录值） | 记录状态 |
 |---|---|---|---|
 | 腾讯云自建服务器（生产） | `mim.mixm.top` | `A \| mim \| 115.159.159.11`（TTL 600） | 正常（2026-11-01 16:44:49） |
 | 生产证书签发校验（Let's Encrypt DNS-01） | —（校验用，不提供访问） | `TXT \| _dnsauth.mim \| 20261101085017crjbxlenk4ad73ctm41heelf10vswxc`（TTL 600） | 正常（2026-11-01 16:50:18） |
 | 腾讯云 EdgeOne Pages | `data.mixm.top` | `CNAME \| data \| data.mixm.top.pages.dnsoe5.com.`（TTL 600） | 正常（2026-11-01 21:18:09） |
+| Gitee（码云）镜像仓 | `gitee.com`（平台方域名） | 不经 DNSPod，`mixm.top` 下无对应记录；仓库路径 `mallwm_admin/mim` | 2026-11-10 22:20 实测 200 / 0.469s / 52034B |
 | GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 | 平台方域名（`*.github.io` / `*.cloud.sealos.io` / `*.pages.dev` / `ghcr.io` / `*.iga-pages.com` / `*.vercel.app` / `github.com`） | 不经 DNSPod，`mixm.top` 下无对应记录 | — |
 
 补充说明：

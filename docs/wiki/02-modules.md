@@ -52,7 +52,7 @@
 6. **铁律六**：全角色全流程自动化——AI 承担所有人员职责，覆盖写码/补全/修复/梳理/BUG 排查/代码检查，每轮交付前必须检查
 7. **铁律七**：功能模块增删必须全量同步全部受影响工件，交付报告附同步清单
 8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），禁止以本地预览作为交付终点；无线上取证不得宣称「已上线」
-9. **铁律九**：多平台部署矩阵只走免费方案（9 个平台），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证
+9. **铁律九**：多平台部署矩阵只走免费方案（**10 个平台**，2026-11-10 起含 Gitee 镜像仓），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证
 10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核；**已移除的原候选托管平台相关内容全量删除，不得重新引入**
 11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」
 12. **铁律十二**：全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器——`origin`（GitHub）/ `gitee`（Gitee）每轮同轮全推并逐个取证；生产唯一权威终点 `https://mim.mixm.top`（nginx + systemd + SQLite），其余 9 平台仅为分发 / 镜像 / 取证；项目名称 **Mim**；V1–V6 取证矩阵见 [AGENTS.md §12](../../AGENTS.md)
@@ -199,6 +199,6 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | `services/mim-api/test/deployments.test.ts` | 10 例契约测试：规模 / 分布自洽 / 统一字段零漂移 / 五类过滤 / 空数据 / 404 / 匿名只读 |
 | `apps/web/src/views/Deployments.tsx` | 前端核对表；`apps/web/src/{api,router,App}.ts(x)` 与 `styles.css` 同步接入 |
 | `scripts/deployment-summary.mjs` | 采集 `git remote` / `git ls-tree HEAD` / 工作树工件 / CI 作业 / 两份矩阵表行数，输出 `docs/deployment-summary.{json,md}`；`--live` 追加真实 curl |
-| `scripts/verify-deployments.mjs` | 52 项断言：唯一性、枚举、9 平台无遗漏、别名不撞名、工件双口径、全链路消费、文档同步 |
+| `scripts/verify-deployments.mjs` | 52 项断言：唯一性、枚举、10 平台无遗漏、别名不撞名、工件双口径、全链路消费、文档同步 |
 
-**口径要点**：铁律九 9 个矩阵平台对应 11 个规范部署项（补 Gitee 镜像仓与 `mim-store` 独立 Worker）；README 曾把 Cloudflare 同源自托管入口另列一行，已合并去重；候选池（Bitbucket / Render / Netlify / Azure SWA / veFaaS 等）列入 `excluded` 但不计入。**本轮实测**：`deploy/*` 等 21 个路径为 staged `D` 未提交，远端 HEAD 仍含全部工件，CI 当前不悬空、提交删除后才有风险。
+**口径要点**：铁律九 **10 个矩阵平台**（2026-11-10 起含 Gitee 镜像仓）+ 6 个补充平台 = 16 个平台目录 → 16 个规范部署项（`repo.gitee` 由补充项提升为矩阵成员；`worker.mim-store` 独立 Worker 为矩阵外补充项）；README 曾把 Cloudflare 同源自托管入口另列一行，已合并去重；候选池（Bitbucket / Render / Netlify / Azure SWA / veFaaS 等）列入 `excluded` 但不计入。**本轮实测**：`repo.gitee` 网页 200 / 0.469s / 52034B、`git ls-remote` exit 0 / 0.27s 与 HEAD `4398cf0` 一致（历史 exit 124 超时已解除）。
