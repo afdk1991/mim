@@ -233,7 +233,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **`?tads` 注入机制（2026-11-07 定性）**：EdgeOne Bot 挑战脚本给地址栏附加 `?tads`，其字符串表内的清理逻辑为 `location.href=location.href.replace(/[?|&]tads/, '')`，只匹配 `?tads` 本体、不匹配清理后残留的裸问号，故留下 `https://data.mixm.top/?`。修复落在 `apps/web/index.html` `<head>`（`history.replaceState` 原地清空查询串/裸问号，不新增历史、不跳转）。`edgeone makers --help` 仅 8 个子命令，**无 WAF / Bot 管理子命令**，关闭 WAF 只能走腾讯云 Web 控制台（需用户私有登录态，沙箱无凭证）。
 - **与「不使用容器」既有约定的说明**：Sealos（容器 + PVC）、ghcr 镜像与 `deploy/sealos/mim.yaml` 属分发型平台的必要载体，仅限「托管平台同步」链路；生产主链路（`mim.mixm.top`）仍为宿主机直部署（nginx + systemd + SQLite），不得改为容器运行。
 
-### 9.4 商城两级分类改造（2026-11-10，本地门禁全绿 / 未提交未部署）
+### 9.4 商城两级分类改造（2026-11-10，本地门禁全绿 / 该轮未提交，已随 §9.5 一并提交为 `d65615e`）
 
 **性质**：按用户指令把商城从「平铺模块卡片」改为**两级分类结构**（19 个一级分类 + 205 个二级条目，二级条目一律作为功能模块入库），并补齐页面筛选（排序 3 档 / 开源许可 48 项 / 编程语言 87 项）。存量 8 个模块保留并归类，付费价与依赖链未改。
 
@@ -250,7 +250,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **排障留痕（避免重复试错）**：`Store.tsx` 曾出现 `TS2322: Type 'unknown' is not assignable to type 'ReactNode'`，报错位置在「最后添加的 JSX 元素」上漂移（`<form>`、`<span>` 均被误指）。真因是 `useAsync` 的 `error` 字段类型为 `unknown`，写成 `{taxonomyState.error && <p>…</p>}` 时 `unknown` 被当作子节点渲染。**规则**：`AsyncState.error` 一律用 `!== null` 布尔判断后再渲染，禁止直接 `&&` 短路渲染。修好后报错一次性消失，探针实验全部撤销。
 - **本轮未做**：`en-US` 二级条目名暂沿用中文（`seedCategoryModules` 注释已标注为占位口径）；205 个二级模块统一「免费 + 无前置」属当前假设，用户未给价格语义；「热门项目（今日/本周）」「搜索帮助浮窗」两区块未实现（用户答复口径为 "1-2"）；一级分类的管理端 CRUD 未暴露。
 
-### 9.5 商城非分类区块补齐（2026-11-10，第二轮；本地门禁全绿 / 未提交未部署）
+### 9.5 商城非分类区块补齐（2026-11-10，第二轮；本地门禁全绿 + CI 五作业全绿，生产仍 SKIP）
 
 **性质**：用户「整个项目所有」指令后，把 §9.4 未纳入的两个非分类区块补上——右侧「热门项目（今日 / 本周）」与右下「搜索帮助」浮窗（12 条）；列表分页在 §9.4 已实现。分类树、205 个二级模块、存量 8 模块归类与付费依赖链**未改动**。
 
@@ -262,7 +262,10 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 接口层 | `apps/web/src/api.ts` 新增 `catalog.getHotModules()` | typecheck 0 |
 | 存量库实测 | `GET /modules/hot` → `range=today window=24 total=213 items=5 top1=cat.dev-26 hotness=10900`（= stars 9900 + 窗口内加权 1000）；`?range=week&category=store&limit=20` → `window=168 total=9 items=9`，slug 全部 `store-*` | 本地 8788 实例 + `services/mim-api/data/mim.db` |
 | 本地门禁 | `pnpm -r typecheck` 0（5/5）；`pnpm --filter @mim/api test` **16 文件 224 例**（221 + 3）；`@mim/web` 构建 0（51 modules，`index-DQ1X-P9I.js` 407.50 kB / `index-CW0Cu4wp.css` 19.74 kB）；`verify-deployments` **52/52**；`verify-entry-manifest` / `verify-site-modules` / `env-check` / `version-check` / `comment-check --strict` 全 0 | 本轮真实命令输出 |
-| 生产 | **未部署**：仍未 commit / 未 push；生产主机不可达 + 仓库零 secret 未变 | `git status`、§9.3 |
+| 生产 | `mim.mixm.top` 仍 **未部署**（主机不可达 + 仓库零 secret 未变，远程步骤 skipped）；但本轮已 commit + push 并取得真实 CI：提交 `d65615e`（12 files / +1680 / −326），`origin/main` `f5468e8..d65615e` | `git push`、`gh run view` |
+
+- **提交与 CI（本轮真实取证）**：`git push origin main` → `f5468e8..d65615e main -> main`；CI run **42791339647**（Deploy @ `d65615e`）**completed success**，五作业全绿（质量门禁 / 发布到生产服务器 / GitHub Pages / GitHub Packages / 托管平台同步）；`42791339560`（Azure SWA @ `d65615e`）同样 success。「发布到生产服务器」内 7 个远程步骤 skipped、`未配置凭据 SKIP 提示` 成功——**绿 ≠ 已上线**。
+- **托管站点取证**：`https://afdk1991.github.io/mim/` 200 / 4.73s / 5182B，产物 `assets/index-YtVSj9dJ.js` + `assets/index-CW0Cu4wp.css`（CSS 指纹与本机构建逐字一致）；下载该 CSS 后 `grep store-hot|store-help|hot-item` 命中共 1 次 → 证明含「热门项目 / 搜索帮助」样式的本轮构建**真实上线到 GitHub Pages**。`mim.mixm.top/health` → `000` / 2.11s / LEN=0（本地代理 `CONNECT tunnel failed`），`mim-8ah.pages.dev` → `530`，均未取得内容层取证，**不宣称生产已上线**。
 
 - **排障留痕**：`clockOf(deps)` 返回 **ISO 字符串**而非 `Date`，`now.getTime()` 会报 `TS2339`；窗口回溯须写 `new Date(new Date(now).getTime() - hours*3600*1000).toISOString()`。
 - **仍未做**：一级分类管理端 CRUD；`en-US` 二级条目名翻译；205 个二级模块的差异化定价语义（当前全部免费、无前置）。
