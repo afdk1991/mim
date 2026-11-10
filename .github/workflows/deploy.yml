@@ -360,9 +360,9 @@ jobs:
           if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_WRANGLER_CONFIG" ]; then
             echo "SKIP: 缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_WRANGLER_CONFIG"; exit 0
           fi
-          # 项目名必须是 mim-8ah（账号内实际存在的 Pages 项目），
-          # 不能使用 wrangler.toml 里的兼容名 mim，否则会命中不存在的项目而失败。
-          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim-8ah --branch=main --commit-dirty=true
+          # 项目名统一为 mim（与项目名 Mim 对齐）；注意其域名是 mim-299.pages.dev ——
+          # Pages 子域全局唯一，mim.pages.dev 已被他人占用，平台在建项时自动分配后缀。
+          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main --commit-dirty=true
 
       - name: Sealos
         continue-on-error: true
@@ -433,7 +433,7 @@ jobs:
           set +e
           for url in \
             https://mim.mixm.top/health \
-            https://mim-8ah.pages.dev/ \
+            https://mim-299.pages.dev/ \
             https://mim-puce.vercel.app/ ; do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url")
             echo "$url => $code"

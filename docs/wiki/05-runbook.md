@@ -261,7 +261,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 |---|---|---|---|
 | 自建 `mim.mixm.top` | 同源（nginx 反代 `/api/`） | 否 | 不挂 CORS 中间件 |
 | GitHub Pages `afdk1991.github.io` | 构建期注入 `VITE_API_ORIGIN=https://mim.mixm.top`（跨域直连） | **是** | 必须含 `https://afdk1991.github.io`（含 `/mim` 子路径同源） |
-| Cloudflare Pages `mim-8ah.pages.dev` | 相对 `/api`（同源） | 否 | `functions/api/[[path]].js` 已同源反代到 `mixm.top` |
+| Cloudflare Pages `mim-299.pages.dev`（项目名 `mim`；旧 `mim-8ah` 保留回滚） | 相对 `/api`（同源） | 否 | `functions/api/[[path]].js` 已同源反代到 `mixm.top` |
 | Vercel `mim-puce.vercel.app` | 相对 `/api`（同源） | 否 | `vercel.json` `rewrites` 已同源反代 |
 | IGA Pages | 取决于其部署脚本 | 若直连则**是** | 见 `deploy/iga/deploy.sh`；若反代同源则无需 |
 | Sealos `mim-i3ywsdfn.cloud.sealos.io` | — | — | **纯 API 容器，不托管 Web SPA**，`/store` 返回 JSON 404 属预期，非缺陷 |
@@ -288,7 +288,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`；curl 命中 WAF 挑战页，须有头浏览器取证） | `https://data.mixm.top` | curl 200 / 0.062s / 0.025s 但仅 **986B** 为 WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；最近一次有头取证（2026-11-06）：`title=Mim（旧定位副标题已于 2026-11-10 删除）`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；**2026-11-07 01:48 复测：复用 profile 的 WAF 放行凭证已过期（约 17h），回落层 2 验证码页，CDP 合成点击 ×15 未通过，本轮真实内容未复验（铁律三如实记录）** |
 | GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.225s / 0.095s |
 | Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.281s / 0.101s；`/health` 200 / 0.283s / 0.096s |
-| Cloudflare Pages | ✅ | ✅ CI 自动发布（含 /api 反代） | `https://mim-8ah.pages.dev` | 200 / 1.172s / 0.166s |
+| Cloudflare Pages | ✅ | ✅ CI 自动发布（项目名 `mim`，含 /api 反代） | `https://mim-299.pages.dev` | 2026-11-11 实测 `/` 200 / 1.840s / 5114B、`/api/v1/modules` 200 / 3.200s / 9514B（历史 2026-11-07 快照为 200 / 1.172s / 0.166s，域名当时为 `mim-8ah.pages.dev`） |
 | GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.745s / 0.140s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
 | Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败） |

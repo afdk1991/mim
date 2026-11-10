@@ -1,12 +1,12 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "capturedAt": "2026-11-10 22:20 +08:00",
-  "head": "4398cf0",
-  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 10 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员），另补独立 Worker 与 5 个已采用免费层平台；2026-11-10 复核：工作树部署工件已由 git 恢复至 HEAD，delivery.artifact_in_head / artifact_in_worktree 按真实仓库重校",
+  "capturedAt": "2026-11-11 00:20 +08:00",
+  "head": "1fd7b5e",
+  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 10 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员），另补独立 Worker 与 5 个已采用免费层平台；2026-11-11 命名统一轮：Cloudflare Pages 项目由 mim-8ah 迁移为 mim（域名 mim-299.pages.dev），其余平台名称现状与阻塞逐项登记",
   "sources": [
-    "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-10 22:20 实测：origin = 4398cf0、gitee = 4398cf0，与本地 HEAD 一致）",
+    "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
     "git ls-tree HEAD <artifact>（2026-11-09 23:03 实测，区分远端 HEAD 与本地工作树）",
-    "curl 逐平台探测（2026-11-10 22:20 实测 gitee.com 200；其余 2026-11-09 23:03 快照）",
+    "curl 逐平台探测（2026-11-11 实测 Cloudflare Pages 新域名 mim-299.pages.dev 200；其余为 2026-11-09 / 11-10 快照）",
     "AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3",
     "README.md「多平台部署矩阵」与「站点与部署」",
     ".github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）"
@@ -340,7 +340,7 @@
     {
       "id": "pages.cloudflare",
       "name": "Cloudflare Pages / Workers 前端站",
-      "aliases": ["Cloudflare Pages", "mim-8ah.pages.dev", "同源自托管入口（_worker.js）", "Cloudflare Pages 同源自托管入口"],
+      "aliases": ["Cloudflare Pages", "Cloudflare Pages 项目 mim", "mim-299.pages.dev", "mim-8ah.pages.dev（迁移前域名）", "同源自托管入口（_worker.js）", "Cloudflare Pages 同源自托管入口"],
       "platform_id": "cloudflare",
       "platform": "Cloudflare Pages / Workers",
       "layer": "distribution",
@@ -350,7 +350,7 @@
         "url": "https://github.com/afdk1991/mim.git",
         "role": "CI 构建源；同源自托管 Worker 为手工直传，不经仓库"
       },
-      "entry_url": "https://mim-8ah.pages.dev/",
+      "entry_url": "https://mim-299.pages.dev/",
       "delivery": {
         "mode": "ci",
         "ci_job": "platforms",
@@ -365,10 +365,10 @@
       "result": {
         "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 1585,
+        "latency_ms": 1839,
         "bytes": 5114,
-        "evidence": "2026-11-10 22:1x CI 自动发布恢复并带 Functions：补齐 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 两个 secret、把 CI 的 --project-name=mim 改为 mim-8ah 后，push 触发 deploy.yml（run 42831492102）→ Cloudflare Pages 步骤真实执行 wrangler 4.160.0「pages deploy apps/web/dist --project-name=mim-8ah --branch=main --commit-dirty=true」，日志「Success! Uploaded 3 files (2 already uploaded)」「Uploading _redirects」「Uploading Functions bundle」「Deployment complete!」，预览域 https://1c93fea4.mim-8ah.pages.dev；生产别名 / 200 / 1.585s / 5114B、/store 200 / 1.150s / 5114B、/api/v1/modules 521（Functions 已挂载，但上游 mim.mixm.top 的 80/443 拒连）",
-        "captured_at": "2026-11-10 22:18 +08:00"
+        "evidence": "2026-11-11 00:20 +08:00 项目名统一为 mim：Cloudflare 账号 a799197458978d508f927083360c635b 内新建 Pages 项目 mim（wrangler pages project create mim），因 Pages 子域全局唯一、mim.pages.dev 已被他人占用，平台分配域名 mim-299.pages.dev；wrangler pages deploy apps/web/dist --project-name=mim 输出「Compiled Worker successfully」「Uploaded 5 files」「Uploading _redirects」「Uploading Functions bundle」「Deployment complete! … https://c30d170f.mim-299.pages.dev」；生产别名实测 / 200 / 1.840s / 5114B、/store 200 / 0.571s / 5114B、/comic 200 / 1.758s / 5114B、/api/v1/modules 200 / 3.200s / 9514B（Functions 反代生效，上游 mim.mixm.top 已在线）；旧项目 mim-8ah 保留可回滚",
+        "captured_at": "2026-11-11 00:20 +08:00"
       },
       "anomalies": [
         { "code": "DUPLICATE_MATRIX_ROW_MERGED", "severity": "info", "message": "README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数" },
@@ -378,10 +378,11 @@
         { "code": "CF_PROJECT_ABSENT_RECREATED", "severity": "warning", "message": "2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿" },
         { "code": "CF_CI_AUTODEPLOY_RESTORED", "severity": "info", "message": "2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环" },
         { "code": "CF_CI_PROJECT_NAME_MISMATCH", "severity": "warning", "message": "deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿" },
-        { "code": "CF_API_UPSTREAM_DOWN", "severity": "warning", "message": "历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B" }
+        { "code": "CF_API_UPSTREAM_DOWN", "severity": "warning", "message": "历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B" },
+        { "code": "CF_PROJECT_RENAMED_TO_MIM", "severity": "info", "message": "2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim" }
       ],
       "missing_fields": [],
-      "sources": ["curl https://mim-8ah.pages.dev/", "gh run view 42831492102 --log（Cloudflare Pages 步骤）", "curl https://mim-8ah.pages.dev/api/v1/modules", "git ls-tree HEAD"]
+      "sources": ["wrangler pages project create mim / pages deploy --project-name=mim（2026-11-11）", "curl https://mim-299.pages.dev/ 与 /store /comic /api/v1/modules", "gh run view 42831492102 --log（Cloudflare Pages 步骤，迁移前）", "git ls-tree HEAD"]
     },
     {
       "id": "pages.vercel",
@@ -418,7 +419,8 @@
       },
       "anomalies": [
         { "code": "CI_SKIP_FALSE_GREEN", "severity": "warning", "message": "README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署" },
-        { "code": "VERCEL_CONFIG_WORKTREE_RESTORED", "severity": "info", "message": "vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置" }
+        { "code": "VERCEL_CONFIG_WORKTREE_RESTORED", "severity": "info", "message": "vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置" },
+        { "code": "PLATFORM_NAME_ALIGNMENT_PENDING", "severity": "warning", "message": "2026-11-11 命名统一轮：Vercel 项目名仍为 mim-puce（默认域 mim-puce.vercel.app）。项目改名需 Vercel 账号登录态 / API Token，本机 CLI 为 Logged out 且仓库 secrets 无 VERCEL_TOKEN，本轮无法执行；改名后默认域会变为 mim-<hash>.vercel.app（mim.vercel.app 多半已被占用），须同步 CI 的 VERCEL_PROJECT_ID 与文档口径" }
       ],
       "missing_fields": ["vercel_secrets", "deployment_url（本轮）"],
       "sources": ["curl https://mim-puce.vercel.app/", "git ls-tree HEAD vercel.json", ".github/workflows/deploy.yml step Vercel", "AGENTS.md §9.1"]
@@ -458,7 +460,8 @@
       },
       "anomalies": [
         { "code": "ROOT_404_BY_DESIGN", "severity": "info", "message": "纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA" },
-        { "code": "SEALOS_MANIFEST_WORKTREE_RESTORED", "severity": "info", "message": "deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空" }
+        { "code": "SEALOS_MANIFEST_WORKTREE_RESTORED", "severity": "info", "message": "deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空" },
+        { "code": "PLATFORM_NAME_ALIGNMENT_PENDING", "severity": "info", "message": "2026-11-11 命名统一轮：Sealos 的命名空间 ns-i3ywsdfn 与域名 mim-i3ywsdfn.cloud.sealos.io 由平台分配、不可自选（Sealos Cloud 只授予该 ns 权限），应用内资源名（mim-api / mim-data / mim-secrets）已统一为 mim 前缀；无 SEALOS_KUBECONFIG 凭证，无法新建 ns-mim 命名空间来换域名" }
       ],
       "missing_fields": [],
       "sources": ["curl https://mim-i3ywsdfn.cloud.sealos.io/health", "git ls-tree HEAD", ".github/workflows/deploy.yml step Sealos", "AGENTS.md §9.1"]
@@ -492,7 +495,8 @@
       "anomalies": [
         { "code": "EMPTY_RESULT", "severity": "warning", "message": "本轮无任何探测取证（result = null 空数据），不以历史 200 冒充现状" },
         { "code": "PRIVATE_TOKEN_REQUIRED", "severity": "warning", "message": "入口需 iga_token 私有凭证，沙箱缺失；按铁律一如实标注未测" },
-        { "code": "IGA_SCRIPT_WORKTREE_RESTORED", "severity": "info", "message": "deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空" }
+        { "code": "IGA_SCRIPT_WORKTREE_RESTORED", "severity": "info", "message": "deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空" },
+        { "code": "PLATFORM_NAME_ALIGNMENT_PENDING", "severity": "warning", "message": "2026-11-11 命名统一轮：IGA 侧仅有 Project ID fr95fuwu57，项目展示名未在仓库内登记；改名需 iga_token 与控制台登录态（本轮均缺失），按铁律一如实标注未改" }
       ],
       "missing_fields": ["http_code", "latency_ms", "bytes", "iga_token", "captured_at"],
       "sources": ["AGENTS.md §9.1（IGA Pages 未测）", ".github/workflows/deploy.yml step IGA Pages", "README 多平台部署矩阵", "git ls-tree HEAD"]

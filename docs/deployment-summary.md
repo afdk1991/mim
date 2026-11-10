@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-10T15:38:45.575Z
-- 本地 HEAD：`f859114`
+- 生成时间：2026-11-10T16:22:03.494Z
+- 本地 HEAD：`1fd7b5e`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 9 | 本轮存在可信取证 |
 | 空数据 | 7 | result 为 null，明确标识而非填 0 |
-| 异常 | 42 | 🔴 0 / 🟡 16 / 🟢 26 |
+| 异常 | 46 | 🔴 0 / 🟡 18 / 🟢 28 |
 | 缺失信息 | 41 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -29,10 +29,10 @@
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 | — |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 | ⚠ 1 项 |
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | 🟡 MANUAL | 🟡 DEGRADED 200 / 984B | WAF_FALSE_POSITIVE 等 2 项 | ⚠ 2 项 |
-| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 8 项 | — |
-| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | CI_SKIP_FALSE_GREEN 等 2 项 | ⚠ 2 项 |
-| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 53B | ROOT_404_BY_DESIGN 等 2 项 | — |
-| `pages.iga` | — | IGA Pages / distribution | manual platforms | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 3 项 | ⚠ 5 项 |
+| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 | — |
+| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | CI_SKIP_FALSE_GREEN 等 3 项 | ⚠ 2 项 |
+| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 53B | ROOT_404_BY_DESIGN 等 3 项 | — |
+| `pages.iga` | — | IGA Pages / distribution | manual platforms | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 4 项 | ⚠ 5 项 |
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | manual — | 🟡 MANUAL | ⚪ 空数据 | EMPTY_RESULT 等 3 项 | ⚠ 5 项 |
 | `repo.gitlab` | — | GitLab 仓库 / source | push — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 4 项 |
 | `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 4 项 |
@@ -66,13 +66,17 @@
 | `pages.cloudflare` | 🟢 info | `CF_CI_AUTODEPLOY_RESTORED` | 2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环 |
 | `pages.cloudflare` | 🟡 warning | `CF_CI_PROJECT_NAME_MISMATCH` | deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
 | `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | 历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
+| `pages.cloudflare` | 🟢 info | `CF_PROJECT_RENAMED_TO_MIM` | 2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim |
 | `pages.vercel` | 🟡 warning | `CI_SKIP_FALSE_GREEN` | README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署 |
 | `pages.vercel` | 🟢 info | `VERCEL_CONFIG_WORKTREE_RESTORED` | vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置 |
+| `pages.vercel` | 🟡 warning | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：Vercel 项目名仍为 mim-puce（默认域 mim-puce.vercel.app）。项目改名需 Vercel 账号登录态 / API Token，本机 CLI 为 Logged out 且仓库 secrets 无 VERCEL_TOKEN，本轮无法执行；改名后默认域会变为 mim-<hash>.vercel.app（mim.vercel.app 多半已被占用），须同步 CI 的 VERCEL_PROJECT_ID 与文档口径 |
 | `container.sealos` | 🟢 info | `ROOT_404_BY_DESIGN` | 纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA |
 | `container.sealos` | 🟢 info | `SEALOS_MANIFEST_WORKTREE_RESTORED` | deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空 |
+| `container.sealos` | 🟢 info | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：Sealos 的命名空间 ns-i3ywsdfn 与域名 mim-i3ywsdfn.cloud.sealos.io 由平台分配、不可自选（Sealos Cloud 只授予该 ns 权限），应用内资源名（mim-api / mim-data / mim-secrets）已统一为 mim 前缀；无 SEALOS_KUBECONFIG 凭证，无法新建 ns-mim 命名空间来换域名 |
 | `pages.iga` | 🟡 warning | `EMPTY_RESULT` | 本轮无任何探测取证（result = null 空数据），不以历史 200 冒充现状 |
 | `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | 入口需 iga_token 私有凭证，沙箱缺失；按铁律一如实标注未测 |
 | `pages.iga` | 🟢 info | `IGA_SCRIPT_WORKTREE_RESTORED` | deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空 |
+| `pages.iga` | 🟡 warning | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：IGA 侧仅有 Project ID fr95fuwu57，项目展示名未在仓库内登记；改名需 iga_token 与控制台登录态（本轮均缺失），按铁律一如实标注未改 |
 | `worker.mim-store` | 🟡 warning | `EMPTY_RESULT` | 本轮未对该 Worker 单独探测（result = null 空数据），不以同源 Pages 的 200 冒充 |
 | `worker.mim-store` | 🟡 warning | `DNS_POLLUTION` | README 2026-11-09 取证载明本机 *.workers.dev 被 DNS 污染（156.233.67.243、443 不通），不作国内入口 |
 | `worker.mim-store` | 🟢 info | `MATRIX_ROW_MISSING` | 仅出现在 README 取证段落、矩阵表未列；因其域名与载体均不同于 pages.cloudflare，本汇总另列一行避免遗漏 |
@@ -91,8 +95,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | f859114c8895a560044e86e78d4d387e31c5de6b | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | f859114c8895a560044e86e78d4d387e31c5de6b | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 1fd7b5e046b442ab5e0efc6fa2e174b7c0c1ba15 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 1fd7b5e046b442ab5e0efc6fa2e174b7c0c1ba15 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -122,9 +126,9 @@
 
 ## 6. 取证来源
 
-- git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-10 22:20 实测：origin = 4398cf0、gitee = 4398cf0，与本地 HEAD 一致）
+- git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）
 - git ls-tree HEAD <artifact>（2026-11-09 23:03 实测，区分远端 HEAD 与本地工作树）
-- curl 逐平台探测（2026-11-10 22:20 实测 gitee.com 200；其余 2026-11-09 23:03 快照）
+- curl 逐平台探测（2026-11-11 实测 Cloudflare Pages 新域名 mim-299.pages.dev 200；其余为 2026-11-09 / 11-10 快照）
 - AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3
 - README.md「多平台部署矩阵」与「站点与部署」
 - .github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）

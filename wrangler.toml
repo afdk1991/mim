@@ -1,6 +1,7 @@
-# Cloudflare Pages 项目名：必须与账号内实际存在的项目一致（mim-8ah），
+# Cloudflare Pages 项目名统一为 mim（与项目名 Mim 对齐），须与账号内实际项目一致，
 # 否则 wrangler pages deploy 找不到项目会直接失败。
-name = "mim-8ah"
+# 该项目的访问域名是 mim-299.pages.dev（Pages 子域全局唯一，mim.pages.dev 已被他人占用）。
+name = "mim"
 compatibility_date = "2026-11-01"
 pages_build_output_dir = "apps/web/dist"
 
