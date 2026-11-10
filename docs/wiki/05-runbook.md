@@ -413,18 +413,18 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 
 | 部署平台 | 自定义域名 | xls 主机 / 行号 | 状态 |
 |---|---|---|---|
-| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 99 | live（`/health` 200 / 53B） |
-| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 103 | live（`/` 200，校验通过后深链接正常） |
-| GitHub Pages | `www.mixm.top` | `www` / 5–6 | pending_dns |
-| Cloudflare Pages | `portal.mixm.top` | `portal` / 53–54 | pending_dns |
-| Vercel | `m.mixm.top` | `m` / 45–46 | pending_dns |
-| Sealos | `api.mixm.top` | `api` / 9–10 | pending_dns |
-| IGA Pages | `test.mixm.top` | `test` / 71–72 | pending_dns |
-| Gitee（码云）镜像仓 | `store.mixm.top` | `store` / 67–68 | pending_dns |
-| GitHub 仓库 | `dev.mixm.top` | `dev` / 23–24 | pending_dns |
-| Cloudflare 独立 Worker（`mim-store`） | `shop.mixm.top` | `shop` / 59–60 | pending_dns |
+| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 100 | live（`/health` 200 / 53B） |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | live（`/` 200，校验通过后深链接正常） |
+| GitHub Pages | `www.mixm.top` | `www` / 6–7 | pending_dns |
+| Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | pending_dns |
+| Vercel | `m.mixm.top` | `m` / 46–47 | pending_dns |
+| Sealos | `api.mixm.top` | `api` / 10–11 | pending_dns |
+| IGA Pages | `test.mixm.top` | `test` / 72–73 | pending_dns |
+| Gitee（码云）镜像仓 | `store.mixm.top` | `store` / 68–69 | pending_dns |
+| GitHub 仓库 | `dev.mixm.top` | `dev` / 24–25 | pending_dns |
+| Cloudflare 独立 Worker（`mim-store`） | `shop.mixm.top` | `shop` / 60–61 | pending_dns |
 
-- **保留**：`cloud.mixm.top`（xls 19–20 行）已解析至生产 CVM 并被云服务模块占用（实测 200 / 5114B），不分配给任何平台。
+- **保留**：`cloud.mixm.top`（xls 20–21、102 行）已解析至生产 CVM 并被云服务模块占用（实测 200 / 5114B），不分配给任何平台。
 - **不适用**：ghcr（域名固定 `ghcr.io`）。
 - **待办**：DNSPod 添加 `www` / `portal` / `m` / `api` / `test` / `store` / `dev` / `shop` 解析 → 各平台控制台绑定自定义域名 → 指向 CVM 的新域名需单独签发证书（现有证书不覆盖任意子域，2026-11-11 严格 TLS 探测未配置主机名得 exit 000）。
 

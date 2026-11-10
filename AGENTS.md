@@ -686,18 +686,18 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 | 部署平台 | 自定义域名 | xls 主机 / 行号 | xls 备注 | 现状 |
 |---|---|---|---|---|
-| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 99 | 导出该行无备注 | **live**：`/health` 200 / 53B |
-| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 103 | 导出该行无备注（同域 `data` 模块行 21–22 为「数据中心入口｜开放数据集平台」） | **live**：`/` 200，人机校验后深链接正常渲染 |
-| GitHub Pages | `www.mixm.top` | `www` / 5–6 | 主站常规访问入口｜官方门户网站 | pending_dns |
-| Cloudflare Pages | `portal.mixm.top` | `portal` / 53–54 | 门户首页入口｜企业内部统一门户 / 工作台 | pending_dns |
-| Vercel | `m.mixm.top` | `m` / 45–46 | 移动端适配入口｜移动端 H5 精简版官网 | pending_dns |
-| Sealos（纯 API 容器） | `api.mixm.top` | `api` / 9–10 | 接口服务入口｜API 统一网关 | pending_dns |
-| IGA Pages | `test.mixm.top` | `test` / 71–72 | 测试环境入口｜测试环境统一入口 | pending_dns |
-| Gitee（码云）镜像仓 | `store.mixm.top` | `store` / 67–68 | 资源存储 / 下载站点｜软件源码下载分发站 | pending_dns |
-| GitHub 仓库 | `dev.mixm.top` | `dev` / 23–24 | 开发测试入口｜开发环境门户 + 接口文档 | pending_dns |
-| Cloudflare 独立 Worker（`mim-store`） | `shop.mixm.top` | `shop` / 59–60 | 线上店铺入口｜多商户店铺系统 | pending_dns |
+| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 100 | 导出该行无备注 | **live**：`/health` 200 / 53B |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | 数据中心入口｜开放数据集平台 | **live**：`/` 200，人机校验后深链接正常渲染 |
+| GitHub Pages | `www.mixm.top` | `www` / 6–7 | 主站常规访问入口｜官方门户网站 | pending_dns |
+| Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | 门户首页入口｜企业内部统一门户 / 工作台 | pending_dns |
+| Vercel | `m.mixm.top` | `m` / 46–47 | 移动端适配入口｜移动端 H5 精简版官网 | pending_dns |
+| Sealos（纯 API 容器） | `api.mixm.top` | `api` / 10–11 | 接口服务入口｜API 统一网关 | pending_dns |
+| IGA Pages | `test.mixm.top` | `test` / 72–73 | 测试环境入口｜测试环境统一入口 | pending_dns |
+| Gitee（码云）镜像仓 | `store.mixm.top` | `store` / 68–69 | 资源存储 / 下载站点｜软件源码下载分发站 | pending_dns |
+| GitHub 仓库 | `dev.mixm.top` | `dev` / 24–25 | 开发测试入口｜开发环境门户 + 接口文档 | pending_dns |
+| Cloudflare 独立 Worker（`mim-store`） | `shop.mixm.top` | `shop` / 60–61 | 线上店铺入口｜多商户店铺系统 | pending_dns |
 
-- **保留域名**：`cloud.mixm.top`（xls 19–20 行，备注「云服务模块入口｜私有云盘 / 网盘系统」）已解析至生产 CVM `115.159.159.11`，nginx 已由该主机返回 SPA（实测 200 / 5114B），**不再分配给任何托管平台**。
+- **保留域名**：`cloud.mixm.top`（xls 20–21、102 行，备注「云服务模块入口｜私有云盘 / 网盘系统」）已解析至生产 CVM `115.159.159.11`，nginx 已由该主机返回 SPA（实测 200 / 5114B），**不再分配给任何托管平台**。
 - **不适用**：ghcr（容器镜像仓库域名固定 `ghcr.io`，不支持自定义域名）。
 - **待办（按平台逐条登记在 `customDomains.json` 的 `next_steps`）**：① DNSPod 为 `www` / `portal` / `m` / `api` / `test` / `store` / `dev` / `shop` 添加解析记录；② 各平台控制台绑定自定义域名并签发证书；③ 新增域名若指向生产 CVM，需单独签发证书——2026-11-11 以未配置主机名做严格 TLS 探测失败（`curl --resolve probe-x.mixm.top` 严格校验 exit 000），说明现有证书不覆盖任意子域。
 - **门禁**：`node scripts/verify-custom-domains.mjs` 校验「矩阵 10 平台全覆盖、域名逐一来自 xls 主机清单、无重复分配、live 带取证、pending 带下一步、文档已登记」。

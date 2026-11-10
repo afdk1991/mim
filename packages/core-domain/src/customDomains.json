@@ -1,0 +1,694 @@
+{
+  "schema": "mim.custom-domains.v1",
+  "capturedAt": "2026-11-11 +08:00",
+  "source": {
+    "file": "dnspod_records_2026-11-05_21-42-26.xls",
+    "sheets": [
+      "laal.top",
+      "mixm.top"
+    ],
+    "zone_used": "mixm.top",
+    "raw_rows": {
+      "laal.top": 93,
+      "mixm.top": 104
+    },
+    "note": "导出为 DNSPod 主机记录模板：记录类型与记录值两列全部为空，仅主机记录 / 线路 / TTL=600 / 备注有值，因此本表只确定「域名命名与平台归属」，解析值以 DNSPod 控制台现状为准"
+  },
+  "zone": "mixm.top",
+  "hostsInZone": [
+    {
+      "host": "@",
+      "fqdn": "mixm.top",
+      "xls_rows": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "remark": "",
+      "ttl": 600
+    },
+    {
+      "host": "www",
+      "fqdn": "www.mixm.top",
+      "xls_rows": [
+        6,
+        7
+      ],
+      "remark": "主站常规访问入口｜官方门户网站",
+      "ttl": 600
+    },
+    {
+      "host": "admin",
+      "fqdn": "admin.mixm.top",
+      "xls_rows": [
+        8,
+        9
+      ],
+      "remark": "管理后台入口｜全站统一运营管理后台",
+      "ttl": 600
+    },
+    {
+      "host": "api",
+      "fqdn": "api.mixm.top",
+      "xls_rows": [
+        10,
+        11
+      ],
+      "remark": "接口服务入口｜API 统一网关",
+      "ttl": 600
+    },
+    {
+      "host": "app",
+      "fqdn": "app.mixm.top",
+      "xls_rows": [
+        12,
+        13
+      ],
+      "remark": "APP 端接口入口｜移动端专属接口服务",
+      "ttl": 600
+    },
+    {
+      "host": "auth",
+      "fqdn": "auth.mixm.top",
+      "xls_rows": [
+        14,
+        15
+      ],
+      "remark": "权限验证入口｜统一身份认证与权限中心",
+      "ttl": 600
+    },
+    {
+      "host": "blog",
+      "fqdn": "blog.mixm.top",
+      "xls_rows": [
+        16,
+        17
+      ],
+      "remark": "博客模块入口｜官方博客系统",
+      "ttl": 600
+    },
+    {
+      "host": "center",
+      "fqdn": "center.mixm.top",
+      "xls_rows": [
+        18,
+        19
+      ],
+      "remark": "用户中心入口｜用户个人中心 / 会员工作台",
+      "ttl": 600
+    },
+    {
+      "host": "cloud",
+      "fqdn": "cloud.mixm.top",
+      "xls_rows": [
+        20,
+        21,
+        102
+      ],
+      "remark": "云服务模块入口｜私有云盘 / 网盘系统",
+      "ttl": 600
+    },
+    {
+      "host": "data",
+      "fqdn": "data.mixm.top",
+      "xls_rows": [
+        22,
+        23,
+        104
+      ],
+      "remark": "数据中心入口｜开放数据集平台",
+      "ttl": 600
+    },
+    {
+      "host": "dev",
+      "fqdn": "dev.mixm.top",
+      "xls_rows": [
+        24,
+        25
+      ],
+      "remark": "开发测试入口｜开发环境门户 + 接口文档",
+      "ttl": 600
+    },
+    {
+      "host": "dh",
+      "fqdn": "dh.mixm.top",
+      "xls_rows": [
+        26,
+        27
+      ],
+      "remark": "导航模块入口｜全站资源导航站",
+      "ttl": 600
+    },
+    {
+      "host": "dnpj",
+      "fqdn": "dnpj.mixm.top",
+      "xls_rows": [
+        28,
+        29
+      ],
+      "remark": "代码生成工具入口｜低代码生成平台",
+      "ttl": 600
+    },
+    {
+      "host": "dy",
+      "fqdn": "dy.mixm.top",
+      "xls_rows": [
+        30,
+        31
+      ],
+      "remark": "视频动态模块入口｜UGC 短视频动态社区",
+      "ttl": 600
+    },
+    {
+      "host": "fwq",
+      "fqdn": "fwq.mixm.top",
+      "xls_rows": [
+        32,
+        33
+      ],
+      "remark": "服务器支撑入口｜运维监控面板",
+      "ttl": 600
+    },
+    {
+      "host": "gy",
+      "fqdn": "gy.mixm.top",
+      "xls_rows": [
+        34,
+        35,
+        95
+      ],
+      "remark": "工具模块核心入口，疾风引擎承载节点｜疾风引擎在线工具平台",
+      "ttl": 600
+    },
+    {
+      "host": "help",
+      "fqdn": "help.mixm.top",
+      "xls_rows": [
+        36,
+        37
+      ],
+      "remark": "帮助中心入口｜产品帮助文档中心",
+      "ttl": 600
+    },
+    {
+      "host": "img",
+      "fqdn": "img.mixm.top",
+      "xls_rows": [
+        38,
+        39
+      ],
+      "remark": "图片资源入口｜公共图床 + 素材资源站",
+      "ttl": 600
+    },
+    {
+      "host": "login",
+      "fqdn": "login.mixm.top",
+      "xls_rows": [
+        40,
+        41
+      ],
+      "remark": "登录验证入口｜统一单点登录页",
+      "ttl": 600
+    },
+    {
+      "host": "mall",
+      "fqdn": "mall.mixm.top",
+      "xls_rows": [
+        42,
+        43
+      ],
+      "remark": "电商商城入口｜B2C 官方商城系统",
+      "ttl": 600
+    },
+    {
+      "host": "market",
+      "fqdn": "market.mixm.top",
+      "xls_rows": [
+        44,
+        45
+      ],
+      "remark": "营销模块入口｜营销活动管理平台",
+      "ttl": 600
+    },
+    {
+      "host": "m",
+      "fqdn": "m.mixm.top",
+      "xls_rows": [
+        46,
+        47
+      ],
+      "remark": "移动端适配入口｜移动端 H5 精简版官网",
+      "ttl": 600
+    },
+    {
+      "host": "mobile",
+      "fqdn": "mobile.mixm.top",
+      "xls_rows": [
+        48,
+        49
+      ],
+      "remark": "移动终端专用入口｜全功能移动端站点",
+      "ttl": 600
+    },
+    {
+      "host": "news",
+      "fqdn": "news.mixm.top",
+      "xls_rows": [
+        50,
+        51
+      ],
+      "remark": "资讯模块入口｜新闻资讯发布系统",
+      "ttl": 600
+    },
+    {
+      "host": "pay",
+      "fqdn": "pay.mixm.top",
+      "xls_rows": [
+        52,
+        53
+      ],
+      "remark": "支付结算入口｜支付聚合网关 + 对账系统",
+      "ttl": 600
+    },
+    {
+      "host": "portal",
+      "fqdn": "portal.mixm.top",
+      "xls_rows": [
+        54,
+        55
+      ],
+      "remark": "门户首页入口｜企业内部统一门户 / 工作台",
+      "ttl": 600
+    },
+    {
+      "host": "secure",
+      "fqdn": "secure.mixm.top",
+      "xls_rows": [
+        56,
+        57
+      ],
+      "remark": "安全防护入口｜安全防护中心",
+      "ttl": 600
+    },
+    {
+      "host": "service",
+      "fqdn": "service.mixm.top",
+      "xls_rows": [
+        58,
+        59
+      ],
+      "remark": "服务支撑入口｜服务治理监控平台",
+      "ttl": 600
+    },
+    {
+      "host": "shop",
+      "fqdn": "shop.mixm.top",
+      "xls_rows": [
+        60,
+        61
+      ],
+      "remark": "线上店铺入口｜多商户店铺系统",
+      "ttl": 600
+    },
+    {
+      "host": "sj",
+      "fqdn": "sj.mixm.top",
+      "xls_rows": [
+        62,
+        63
+      ],
+      "remark": "数据采集入口｜爬虫调度与数据采集平台",
+      "ttl": 600
+    },
+    {
+      "host": "sp",
+      "fqdn": "sp.mixm.top",
+      "xls_rows": [
+        64,
+        65
+      ],
+      "remark": "视频模块入口｜长视频点播系统",
+      "ttl": 600
+    },
+    {
+      "host": "stats",
+      "fqdn": "stats.mixm.top",
+      "xls_rows": [
+        66,
+        67
+      ],
+      "remark": "数据统计入口｜全站数据 BI 看板",
+      "ttl": 600
+    },
+    {
+      "host": "store",
+      "fqdn": "store.mixm.top",
+      "xls_rows": [
+        68,
+        69
+      ],
+      "remark": "资源存储 / 下载站点｜软件源码下载分发站",
+      "ttl": 600
+    },
+    {
+      "host": "support",
+      "fqdn": "support.mixm.top",
+      "xls_rows": [
+        70,
+        71
+      ],
+      "remark": "技术支持入口｜工单客服系统",
+      "ttl": 600
+    },
+    {
+      "host": "test",
+      "fqdn": "test.mixm.top",
+      "xls_rows": [
+        72,
+        73
+      ],
+      "remark": "测试环境入口｜测试环境统一入口",
+      "ttl": 600
+    },
+    {
+      "host": "user",
+      "fqdn": "user.mixm.top",
+      "xls_rows": [
+        74,
+        75
+      ],
+      "remark": "用户管理入口｜用户会员管理后台",
+      "ttl": 600
+    },
+    {
+      "host": "video",
+      "fqdn": "video.mixm.top",
+      "xls_rows": [
+        76,
+        77
+      ],
+      "remark": "视频播放入口｜独立视频播放页",
+      "ttl": 600
+    },
+    {
+      "host": "wp",
+      "fqdn": "wp.mixm.top",
+      "xls_rows": [
+        78,
+        79
+      ],
+      "remark": "WordPress 相关入口｜WordPress 独立站点",
+      "ttl": 600
+    },
+    {
+      "host": "xw",
+      "fqdn": "xw.mixm.top",
+      "xls_rows": [
+        80,
+        81
+      ],
+      "remark": "新闻资讯入口｜自媒体资讯平台",
+      "ttl": 600
+    },
+    {
+      "host": "yp",
+      "fqdn": "yp.mixm.top",
+      "xls_rows": [
+        82,
+        83
+      ],
+      "remark": "商品资源入口｜货源商品库平台",
+      "ttl": 600
+    },
+    {
+      "host": "yy",
+      "fqdn": "yy.mixm.top",
+      "xls_rows": [
+        84,
+        85
+      ],
+      "remark": "语音相关入口｜语音工具服务平台",
+      "ttl": 600
+    },
+    {
+      "host": "b2b",
+      "fqdn": "b2b.mixm.top",
+      "xls_rows": [
+        86,
+        87
+      ],
+      "remark": "B2B 大宗商贸平台主入口｜B2B 企业批发采购平台",
+      "ttl": 600
+    },
+    {
+      "host": "supplier",
+      "fqdn": "supplier.mixm.top",
+      "xls_rows": [
+        88,
+        89
+      ],
+      "remark": "供应商入驻管理入口｜供应商后台管理系统",
+      "ttl": 600
+    },
+    {
+      "host": "c2c",
+      "fqdn": "c2c.mixm.top",
+      "xls_rows": [
+        90,
+        91
+      ],
+      "remark": "C2C 个人交易市场入口｜C2C 个人闲置 / 商品交易平台",
+      "ttl": 600
+    },
+    {
+      "host": "seller",
+      "fqdn": "seller.mixm.top",
+      "xls_rows": [
+        92,
+        93
+      ],
+      "remark": "个人卖家管理入口｜个人卖家店铺管理后台",
+      "ttl": 600
+    },
+    {
+      "host": "mim",
+      "fqdn": "mim.mixm.top",
+      "xls_rows": [
+        100
+      ],
+      "remark": "",
+      "ttl": 600
+    }
+  ],
+  "matrix": [
+    {
+      "platform_id": "tcloud",
+      "deployment_id": "server.tcloud",
+      "platform": "腾讯云自建服务器",
+      "custom_domain": "mim.mixm.top",
+      "dns_host": "mim",
+      "xls_rows": [
+        100
+      ],
+      "xls_remark": "",
+      "status": "live",
+      "status_note": "DNSPod 已解析至 115.159.159.11，nginx 生产主站直接服务",
+      "evidence": "2026-11-11 实测 https://mim.mixm.top/health -> 200 / 53B {\"status\":\"ok\",\"service\":\"mim-api\",\"version\":\"0.0.0\"}",
+      "next_steps": []
+    },
+    {
+      "platform_id": "edgeone",
+      "deployment_id": "pages.edgeone",
+      "platform": "腾讯云 EdgeOne Pages",
+      "custom_domain": "data.mixm.top",
+      "dns_host": "data",
+      "xls_rows": [
+        22,
+        23,
+        104
+      ],
+      "xls_remark": "数据中心入口｜开放数据集平台",
+      "status": "live",
+      "status_note": "DNSPod CNAME -> data.mixm.top.pages.dnsoe5.com（61.170.82.52），EdgeOne 项目 mim 承载",
+      "evidence": "2026-11-11 实测 https://data.mixm.top/ -> 200（人机校验页开启时 curl 得 982B 校验脚本，浏览器过校验后深链接正常渲染）",
+      "next_steps": []
+    },
+    {
+      "platform_id": "github-pages",
+      "deployment_id": "pages.github",
+      "platform": "GitHub Pages",
+      "custom_domain": "www.mixm.top",
+      "dns_host": "www",
+      "xls_rows": [
+        6,
+        7
+      ],
+      "xls_remark": "主站常规访问入口｜官方门户网站",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 www 解析；平台侧亦未绑定自定义域名",
+      "evidence": "2026-11-11 nslookup www.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 www 添加 CNAME -> afdk1991.github.io",
+        "在 GitHub 仓库 Settings -> Pages 绑定 www.mixm.top 并启用 HTTPS"
+      ]
+    },
+    {
+      "platform_id": "cloudflare",
+      "deployment_id": "pages.cloudflare",
+      "platform": "Cloudflare Pages",
+      "custom_domain": "portal.mixm.top",
+      "dns_host": "portal",
+      "xls_rows": [
+        54,
+        55
+      ],
+      "xls_remark": "门户首页入口｜企业内部统一门户 / 工作台",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 portal 解析；Cloudflare 项目 mim 目前只用平台域 mim-299.pages.dev",
+      "evidence": "2026-11-11 nslookup portal.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 portal 添加 CNAME -> mim-299.pages.dev",
+        "在 Cloudflare Pages 项目 mim 的 Custom domains 绑定 portal.mixm.top"
+      ]
+    },
+    {
+      "platform_id": "vercel",
+      "deployment_id": "pages.vercel",
+      "platform": "Vercel",
+      "custom_domain": "m.mixm.top",
+      "dns_host": "m",
+      "xls_rows": [
+        46,
+        47
+      ],
+      "xls_remark": "移动端适配入口｜移动端 H5 精简版官网",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 m 解析；Vercel 项目仍为 mim-puce（缺账号登录态无法改名/绑定）",
+      "evidence": "2026-11-11 nslookup m.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 m 添加 CNAME -> cname.vercel-dns.com",
+        "在 Vercel 项目设置 Domains 绑定 m.mixm.top"
+      ]
+    },
+    {
+      "platform_id": "sealos",
+      "deployment_id": "container.sealos",
+      "platform": "Sealos",
+      "custom_domain": "api.mixm.top",
+      "dns_host": "api",
+      "xls_rows": [
+        10,
+        11
+      ],
+      "xls_remark": "接口服务入口｜API 统一网关",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 api 解析；Sealos 仅暴露平台域 mim-i3ywsdfn.cloud.sealos.io",
+      "evidence": "2026-11-11 nslookup api.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 api 添加 CNAME -> 平台 Ingress 域名",
+        "在 Sealos 应用 Ingress 增加 api.mixm.top 与证书"
+      ]
+    },
+    {
+      "platform_id": "iga",
+      "deployment_id": "pages.iga",
+      "platform": "IGA Pages",
+      "custom_domain": "test.mixm.top",
+      "dns_host": "test",
+      "xls_rows": [
+        72,
+        73
+      ],
+      "xls_remark": "测试环境入口｜测试环境统一入口",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 test 解析；IGA 需 iga_token 才能操作，自有域名绑定未完成",
+      "evidence": "2026-11-11 nslookup test.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 test 添加 CNAME -> 平台分配域名",
+        "在 IGA 控制台绑定 test.mixm.top（需 iga_token）"
+      ]
+    },
+    {
+      "platform_id": "gitee",
+      "deployment_id": "repo.gitee",
+      "platform": "Gitee（码云）镜像仓",
+      "custom_domain": "store.mixm.top",
+      "dns_host": "store",
+      "xls_rows": [
+        68,
+        69
+      ],
+      "xls_remark": "资源存储 / 下载站点｜软件源码下载分发站",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 store 解析；Gitee 仓库当前只用平台域 gitee.com/mallwm_admin/mim",
+      "evidence": "2026-11-11 nslookup store.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 store 添加记录指向承载源码分发下载的站点（当前无对应服务）"
+      ]
+    },
+    {
+      "platform_id": "github",
+      "deployment_id": "repo.github",
+      "platform": "GitHub 仓库",
+      "custom_domain": "dev.mixm.top",
+      "dns_host": "dev",
+      "xls_rows": [
+        24,
+        25
+      ],
+      "xls_remark": "开发测试入口｜开发环境门户 + 接口文档",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 dev 解析；GitHub 仓库当前只用 github.com/afdk1991/mim",
+      "evidence": "2026-11-11 nslookup dev.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 dev 添加记录指向开发环境门户（当前无对应服务）"
+      ]
+    },
+    {
+      "platform_id": "cloudflare-worker",
+      "deployment_id": "worker.mim-store",
+      "platform": "Cloudflare 独立 Worker（mim-store）",
+      "custom_domain": "shop.mixm.top",
+      "dns_host": "shop",
+      "xls_rows": [
+        60,
+        61
+      ],
+      "xls_remark": "线上店铺入口｜多商户店铺系统",
+      "status": "pending_dns",
+      "status_note": "DNSPod 无 shop 解析；Worker 当前入口 mim-store.15726833367.workers.dev",
+      "evidence": "2026-11-11 nslookup shop.mixm.top -> 无 A 记录",
+      "next_steps": [
+        "在 DNSPod 为 shop 添加 CNAME -> Worker 路由域名",
+        "在 Worker 增加 shop.mixm.top Custom Domain 路由"
+      ]
+    }
+  ],
+  "reserved": [
+    {
+      "fqdn": "cloud.mixm.top",
+      "xls_rows": [
+        20,
+        21,
+        102
+      ],
+      "xls_remark": "云服务模块入口｜私有云盘 / 网盘系统",
+      "reason": "DNSPod 已解析至 115.159.159.11（同生产 CVM），nginx 已作为云服务模块入口返回 SPA（实测 https://cloud.mixm.top/ -> 200 / 5114B），故不再分配给任何托管平台",
+      "evidence": "2026-11-11 nslookup cloud.mixm.top -> 115.159.159.11；curl https://cloud.mixm.top/ -> 200 / 5114B"
+    }
+  ],
+  "notApplicable": [
+    {
+      "platform_id": "ghcr",
+      "deployment_id": "packages.ghcr",
+      "platform": "GitHub Packages (ghcr)",
+      "reason": "容器镜像仓库不支持自定义域名（域名固定 ghcr.io），不参与自定义域名矩阵"
+    }
+  ],
+  "pendingActions": [
+    "在 DNSPod 控制台为 www / portal / m / api / test / store / dev / shop 添加解析记录（本次导出的 45 类主机记录里，记录类型与记录值两列全为空，说明这些记录尚未真正创建）",
+    "每个第三方平台（GitHub Pages / Cloudflare Pages / Vercel / Sealos / IGA）需在对应控制台绑定自定义域名并签发证书",
+    "生产 CVM 的 nginx 证书目前只覆盖已配置的域名（2026-11-11 探测未配置主机名严格 TLS 校验失败），新域名指向 CVM 时需单独签发证书"
+  ]
+}

@@ -25,7 +25,8 @@
     "verify:entry-manifest": "node scripts/verify-entry-manifest.mjs",
     "summary:deployments": "node scripts/deployment-summary.mjs",
     "verify:deployments": "node scripts/verify-deployments.mjs",
-    "check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs"
+    "verify:custom-domains": "node scripts/verify-custom-domains.mjs",
+    "check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs && node scripts/verify-custom-domains.mjs"
   },
   "engines": {
     "node": ">=20"
