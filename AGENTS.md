@@ -421,6 +421,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **同步工件**：`packages/core-domain/src/deploymentRegistry.json`（`pages.cloudflare` 的 `result` 刷新为 22:18 取证、`latency_ms` 1455 → **1585**、异常新增 `CF_CI_AUTODEPLOY_RESTORED`（info，闭环原 `CF_CI_TOKEN_MISSING`）/ `CF_CI_PROJECT_NAME_MISMATCH`（warning）/ `CF_API_UPSTREAM_DOWN`（warning））、`docs/deployment-summary.json` 与 `.md`（重生成）、`README.md` 与 `docs/wiki/05-runbook.md` 取证段、本段。
 - **门禁**：`node scripts/verify-deployments.mjs` **52/52 PASS**、`verify-entry-manifest` PASS、`deploy.yml` 经 `yaml.safe_load` 解析通过。
 - **未覆盖项**：① Pages 侧未绑自定义域（`mixm.top` zone 内 0 条 DNS）；② 旧令牌 `mim-ci` 未吊销；③ 生产主机 Web 服务未起（nginx / systemd `mim-api`）的根因需服务器权限或腾讯云控制台登录后定位；④ 未做生产登录态 E2E（后端不可达）。
+- **本轮文档提交与 CI**：`1e7e99f`（6 files）推送后 run **42833194517** 的 GitHub Pages 作业因 `No artifacts named "github-pages" were found`（上传步骤成功、取件步骤失败，仓库既有的产物竞态偶发）变红，其余四作业全绿且 Cloudflare 步骤再次真实部署（`Success! Uploaded 3 files (2 already uploaded)`、`Uploading Functions bundle`、`Deployment complete! … https://11c2f561.mim-8ah.pages.dev`）；按 §9.3 的运维提示改用 `gh workflow run deploy.yml --ref main` 触发**全新 run 42833800822**，**全绿**（2m36s），避免 `--failed` 重跑导致的 github-pages 产物重复。收尾复测：`/` **200 / 0.884s / 5114B**、`/store` **200 / 0.899s / 5114B**、`/api/v1/modules` **521**、`https://afdk1991.github.io/mim/` **200 / 5.72s / 5114B**。
 
 ## 铁律十：免费平台额度矩阵与选型路由
 
