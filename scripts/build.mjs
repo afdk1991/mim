@@ -3,7 +3,9 @@
  * scripts/build.mjs
  *
  * 根级构建脚本：构建**真实 Mim 前端**（apps/web/dist）并同步到根 dist/，
- * 供本地预览与静态托管使用。
+ * 供本地预览与静态托管使用。同步后会额外生成 SPA 回退载体：
+ * `dist/404.html` 与 `dist/<view>/index.html`（视图清单从 router.ts 的 VIEWS 解析），
+ * 用于 EdgeOne Pages 这类不支持 history 路由重写的静态托管。
  *
  * 用法：
  *   node scripts/build.mjs          # 构建真实前端 → 根 dist/
@@ -16,7 +18,7 @@
  */
 
 // 文件系统原语：复制 / 判断存在 / 建目录 / 读目录 / 删目录 / 取文件状态
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 // 子进程执行器：用于调用 pnpm 完成 workspace 安装与前端构建
 import { spawnSync } from 'node:child_process';
 // 路径工具：目录名解析 / 拼接
@@ -127,6 +129,62 @@ function ensurePnpm() {
   return { cmd: 'npx', prefix: ['--yes', 'pnpm@9.12.0'] };
 }
 
+/**
+ * 从 apps/web/src/router.ts 解析 SPA 视图清单，避免构建脚本与前端路由两处手写清单漂移。
+ * @returns {string[]} 视图名数组（如 ['store', 'chat', ...]）
+ */
+function readSpaViews() {
+  // 路由源码路径：视图常量定义在此
+  const routerPath = join(WEB_DIR, 'src', 'router.ts');
+  // 源码缺失说明仓库结构异常，直接失败以免产出缺目录的部署
+  if (!existsSync(routerPath)) {
+    console.error(`❌ 未找到路由源码: ${routerPath}`);
+    process.exit(1);
+  }
+  // 读取源码文本，用正则抓 VIEWS 的数组字面量
+  const text = readFileSync(routerPath, 'utf8');
+  // 匹配形如 `const VIEWS: AppView[] = ['store', 'chat']`
+  const match = text.match(/const VIEWS[^=]*=\s*\[([^\]]+)\]/);
+  // 未命中说明路由实现已改结构，宁可失败也不静默产出错误目录
+  if (!match) {
+    console.error('❌ 未能从 apps/web/src/router.ts 解析 VIEWS 数组');
+    process.exit(1);
+  }
+  // 提取所有单引号字符串作为视图名
+  return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+}
+
+/**
+ * 为不支持 SPA 前端路由重写的静态托管（EdgeOne Pages 等）生成回退产物：
+ * 1) dist/404.html —— 与 index.html 逐字节一致的兜底页；
+ * 2) dist/<view>/index.html —— 每个视图一个同名目录，使刷新 /store、/chat 等深链接
+ *    能直接命中真实静态文件（实测这是 EdgeOne 上最可靠的深链接方案）。
+ * 只作用于根 dist/（EdgeOne 的 OutputDir），不改动 apps/web/dist，
+ * 避免 GitHub Pages 等以 apps/web/dist 为上传源、且会补斜杠的平台上相对资源解析失效。
+ */
+function emitSpaFallback() {
+  // 根 dist 的入口页：所有回退副本都以它为内容源
+  const indexHtml = join(DIST, 'index.html');
+  // 入口缺失说明复制步骤失败，直接终止
+  if (!existsSync(indexHtml)) {
+    console.error(`❌ 根 dist 缺少 index.html: ${indexHtml}`);
+    process.exit(1);
+  }
+  // 生成 404.html 兜底页（与入口同内容）
+  copyFileSync(indexHtml, join(DIST, '404.html'));
+  // 逐个视图建目录并放入同名入口副本
+  for (const view of readSpaViews()) {
+    // 视图目录绝对路径，如 dist/chat
+    const viewDir = join(DIST, view);
+    // 递归建目录（已存在时幂等）
+    mkdirSync(viewDir, { recursive: true });
+    // 写入该视图的入口副本
+    copyFileSync(indexHtml, join(viewDir, 'index.html'));
+  }
+  // 输出取证日志，便于平台构建日志核对
+  console.log(`✅ SPA 回退产物就绪: 404.html + ${readSpaViews().length} 个视图目录（${readSpaViews().join(' / ')}）`);
+}
+
 // --site 模式：只复制 PRD 阅读页，供离线预览（不再用于任何生产托管平台）
 if (SITE_ONLY) {
   // 输出 site/ 内容到 dist/，与历史行为保持一致
@@ -161,3 +219,5 @@ if (buildCode !== 0) {
 }
 // 把真实前端产物同步到根 dist/，供 EdgeOne Pages 等 OutputDir=dist 的平台读取
 emitDist(WEB_DIST, `真实前端 apps/web/dist → dist，API=${apiOrigin}`);
+// 为不支持 SPA 重写的静态托管补齐回退载体（404.html + 每个视图一个同名目录）
+emitSpaFallback();

@@ -635,6 +635,24 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **13.10 本轮取证：Gitee 入矩阵（2026-11-10 22:20 +08:00，HEAD `4398cf0`）**：`git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s，与本地 HEAD 一致，0 ahead / 0 behind）；`curl https://gitee.com/mallwm_admin/mim` = **200 / 0.469s / 52034B**（标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交）；`platform_catalog.in_matrix = true`、`coverage.matrix_platforms = 10`；重新生成 `docs/deployment-summary.{json,md}`（部署项 16 / 有取证 9 / 空数据 7 / 异常 39（🔴1 / 🟡16 / 🟢22）/ 缺失信息 46）；本地门禁 `verify-deployments` **52/52**、api 契约测试 **16 文件 233/233**、`pnpm -r typecheck` 0、`comment-check --strict` 0。生产 `mim.mixm.top` 沿用 2026-11-09 快照（`000`），**本轮未做生产部署、未宣称已上线**。
 
+**13.11 本轮取证：EdgeOne 入口深链接 545 修复（2026-11-11 00:4x–00:5x +08:00，HEAD `4c1334c`，本地改动未提交、未 push）**
+
+用户报障起点：`https://data.mixm.top/chat` 地址栏变 `/chat?`、页面只剩 `Error return from script`。经逐路径取证与四组对照部署，根因与修复如下（完整报告见 [docs/edgeone-data-mixm-top-545-诊断-20261111.md](./docs/edgeone-data-mixm-top-545-诊断-20261111.md)）：
+
+| 项 | 本轮实测 |
+|---|---|
+| 现象 | `data.mixm.top` 上命中真实静态文件的路径（`/`、`/index.html`、`/spa.js`、`/assets/*.js`）全 200；未命中路径（`/store` `/chat` `/comic` `/settings` `/login` `/404.html` `/nope`）一律 **HTTP 545 + 24 字节 `Error return from script`** |
+| 根因（实测确认） | EdgeOne 会把仓库里的 `functions/[[catchall]].js` 当处理器挂载并执行其命名导出 `onRequest`；该函数里的 `await next()` 与 `env.ASSETS.fetch()` 在 EdgeOne 运行时不存在 → 抛错 → 545。对照部署唯一差异即「是否放入该文件」：放入后 `/zzz-not-exist` 立刻变成 283 字节同一报错，移出即恢复正常 |
+| 副产物 | `apps/web/public/_redirects`（`/* /index.html 200`）在 EdgeOne 上**不可靠**，历史「EdgeOne 仍解析 `_redirects`」口径作废（对照部署中 `/store` 落到平台 404 页） |
+| 修复 1/3 | `functions/[[catchall]].js` 加运行时能力守卫（`next` 非函数或 `env.ASSETS` 缺失即返回 404），并补 `export default` 兜底导出 → 被非 Cloudflare 平台挂载时不再打挂整站 |
+| 修复 2/3 | `apps/web/package.json` 的 `build` 末尾追加 `node ../../scripts/spa-404.mjs` → 每次构建自动产出 `apps/web/dist/404.html` |
+| 修复 3/3 | `scripts/build.mjs` 新增 `readSpaViews()`（从 `router.ts` 的 `VIEWS` 解析，杜绝两处清单漂移）与 `emitSpaFallback()`（根 `dist` 生成 `404.html` + 每个视图的同名目录），`emitDist` 后自动执行 |
+| 独立验证 | EdgeOne 预览域名（项目 `mim-app`，与 `data.mixm.top` 无关）：守卫版函数 + 7 个视图目录下 `/` `/store` `/chat` `/comic` `/settings` `/login` 全部正常渲染 SPA，`/nope` 返回 268B `Not Found`（不再 545） |
+| 本地门禁 | `pnpm -r typecheck` 0；`pnpm --filter @mim/api test` **16 文件 233/233**；`node scripts/verify-deployments.mjs` **52/52 PASS**；`node scripts/build.mjs` 退出码 0 并输出「✅ SPA 回退产物就绪: 404.html + 7 个视图目录」 |
+| 平台侧临时改动 | `mim` 项目「安全防护 → Bot 管理 → 基础 Bot 管理 → 人机校验页」本轮已被关闭（关闭前所有访客须过人机校验；如需恢复在原位置重新打开） |
+| 铁律八偏离 | 本轮改动**未提交、未 push**，因此 `mim` 项目尚未重建、`data.mixm.top` 仍为 545；按铁律八如实标注**未上线**，不以本地门禁或预览域通过冒充线上修复 |
+| 工作树 | 修改 3 个代码/构建文件（`apps/web/package.json`、`functions/[[catchall]].js`、`scripts/build.mjs`）+ 文档同步（本文件、`README.md`、`docs/wiki/05-runbook.md`、`docs/edgeone-data-mixm-top-545-诊断-20261111.md`）；另有 CLI 生成的未跟踪目录 `.edgeone/` |
+
 ---
 
 ## 与铁律一冲突时的优先级

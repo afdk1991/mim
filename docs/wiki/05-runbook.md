@@ -229,7 +229,7 @@ gh run watch          # 观察最近一次运行
 | 腾讯云自建服务器 | nginx `try_files $uri $uri/ /index.html` | 深链接 200 重写 index.html（五条深链接实测全 200 / LEN=5182） |
 | Cloudflare Pages | `functions/[[catchall]].js` catch-all | **Pages 挂载 Functions 后 `_redirects` 被整体旁路**；函数只对「GET + 静态资源未命中返回 404 + 非 `/api/` 前缀 + `Accept` 含 `text/html`」的请求 200 重写 index.html |
 | GitHub Pages | `dist/404.html`（`index.html` 逐字节副本，`scripts/spa-404.mjs` 生成） | 深链接返回 **404 状态 + SPA 全文**，浏览器加载后 router 读 `location.pathname` 渲染，404 状态码属平台能力上限的预期设计；响应体长度与首页相同，不能以长度区分命中，只能看状态码 |
-| EdgeOne Pages 等 | `apps/web/public/_redirects`（`/* /index.html 200`） | CF 侧该文件被 Functions 旁路，仅对仍解析 `_redirects` 的平台生效 |
+| EdgeOne Pages | 构建期生成的 `dist/404.html` + `dist/<view>/index.html`（视图清单从 `router.ts` 的 `VIEWS` 解析，`scripts/build.mjs` 的 `emitSpaFallback()` 产出） | **`_redirects` 在该平台不可靠且可能触发平台层报错**（2026-11-11 实测：深链接返回 HTTP 545 + 24 字节 `Error return from script`）；改为让每个视图命中真实静态目录，实测 `/store` `/chat` `/comic` `/settings` `/login` 全部正常渲染。`functions/[[catchall]].js` 已加运行时能力守卫，被该平台挂载时返回 404 而不再抛错 |
 
 > **CF 深链接 curl 取证口径**：裸 curl 默认发 `Accept: */*`（不含 `text/html`），catch-all Function 按设计跳过回退、返回 404——**这不代表回归**。测 CF 深链接必须带浏览器式 Accept 头：`curl -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"`，预期 200 / LEN=5182（CI run 42412711936 部署后五条深链接实测全部 200）。
 
