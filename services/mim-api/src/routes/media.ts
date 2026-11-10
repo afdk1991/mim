@@ -11,7 +11,9 @@
 
 import express, { Router } from 'express'; // express 本体用于取 raw 解析器，Router 用于建独立子路由
 import type { Request } from 'express'; // 仅类型引用 Request，给辅助函数标注入参，不产生运行时代码
-import sharp from 'sharp'; // 图像缩放与 WebP 编码：为图片产物生成浏览器内联缩略图，避免直接拉全尺寸原图
+// 图像缩放与 WebP 编码原先在模块顶层 import sharp；sharp 是原生模块（运行时加载 @img/sharp-* 平台包与 libvips），
+// 放顶层会让服务一启动就加载原生库 —— 生产 2C2G 机器实测该步直接 SEGV（systemd 单元反复 core-dump，/health 恒 502）。
+// 故改为在缩略图路由内按需动态 import：启动期不碰原生库，仅该接口被调用时才加载。
 import { z } from 'zod'; // 声明请求体 / 查询串的 schema，交给 parse 统一校验
 import { AppError, uuidv7 } from '@mim/core-domain'; // AppError 产出统一错误信封；uuidv7 生成时间有序主键
 import { clockOf } from '../domain.js'; // 统一时间源，便于测试注入固定时钟
@@ -270,6 +272,8 @@ export function createMediaRouter(deps: ApiDeps): Router { // 控制面路由工
       throw new AppError('VALIDATION_FAILED', 'object is not an image', { mime: object.mime }); // 400：客户端请求了错误类型的产物
     } // 图片类型判定结束
 
+    // 按需加载原生图像库：通过才进入编解码，避免把原生库加载失败算成「图片损坏」
+    const { default: sharp } = await import('sharp'); // 动态导入：启动期不加载，只有本路由被调用才付出这次加载成本
     let thumbnail: Buffer; // sharp 编码后的 WebP 字节，供响应体直接发送
     try { // 解码与编码可能因脏图失败，需收敛为业务错误而非 500
       thumbnail = await sharp(object.body) // 以原始字节构造图像实例
