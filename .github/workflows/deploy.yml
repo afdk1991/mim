@@ -342,8 +342,9 @@ jobs:
           cd "$STATIC_DIR"
           npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tail -n 20
 
+      # Cloudflare Pages：唯一已配置真实凭据的分发平台，故不设 continue-on-error，
+      # 部署失败必须让作业变红，避免「SKIP / 报错但仍 success」的假绿。
       - name: Cloudflare Pages
-        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -359,7 +360,9 @@ jobs:
           if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_WRANGLER_CONFIG" ]; then
             echo "SKIP: 缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_WRANGLER_CONFIG"; exit 0
           fi
-          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main
+          # 项目名必须是 mim-8ah（账号内实际存在的 Pages 项目），
+          # 不能使用 wrangler.toml 里的兼容名 mim，否则会命中不存在的项目而失败。
+          npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim-8ah --branch=main --commit-dirty=true
 
       - name: Sealos
         continue-on-error: true

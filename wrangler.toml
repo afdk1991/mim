@@ -1,4 +1,6 @@
-name = "mim"
+# Cloudflare Pages 项目名：必须与账号内实际存在的项目一致（mim-8ah），
+# 否则 wrangler pages deploy 找不到项目会直接失败。
+name = "mim-8ah"
 compatibility_date = "2026-11-01"
 pages_build_output_dir = "apps/web/dist"
 
