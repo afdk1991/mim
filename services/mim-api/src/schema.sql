@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS modules (
   license               TEXT,
   language              TEXT,
   stars                 INTEGER NOT NULL DEFAULT 0,
+  capability            TEXT, -- 真实能力键（对应 @mim/core-domain 的 MODULE_CAPABILITIES.key）；NULL 表示该模块功能规划中
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL,
   deleted_at            TEXT,

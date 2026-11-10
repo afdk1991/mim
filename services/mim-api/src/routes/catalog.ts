@@ -49,6 +49,7 @@ import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结�
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 解锁需登录 + 幂等；管理写路径走 RBAC 权限点校验
 import { parse } from '../validate.js'; // zod 校验失败统一转 AppError
 import { jsonParse, pathParam } from '../utils.js'; // 安全解析 JSON 列 + 严格路径参数提取
+import { handlerOfCapability } from '../capabilities.js'; // 模块真实能力执行层（Markdown / 二维码 / cron / JSON / 摘要 / 编解码）
 import type { ApiDeps, Db } from '../types.js'; // 路由依赖与数据库抽象类型
 
 const MODULE_VISIBLE = new Set(['active']); // 对外可见状态白名单，隐藏 draft/offline 模块
@@ -93,7 +94,7 @@ function resolveActiveModules(db: Db, region: string) { // 按地区取未删除
   const rows = db // 查询结果暂存
     .prepare( // 预编译：仅过滤地区与软删除，状态由调用方再筛
       `SELECT id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-              region, status, sort_order, category_slug, license, language, stars, created_at
+              region, status, sort_order, category_slug, license, language, stars, capability, created_at
        FROM modules
        WHERE region = ? AND deleted_at IS NULL
        ORDER BY sort_order ASC, created_at ASC`,
@@ -112,6 +113,7 @@ function resolveActiveModules(db: Db, region: string) { // 按地区取未删除
     license: string | null; // 开源许可（筛选维度）
     language: string | null; // 编程语言（筛选维度）
     stars: number; // Star 数（Stars 排序依据）
+    capability: string | null; // 真实能力键；null 表示该模块功能规划中
     created_at: string; // 创建时间（「最近更新」排序依据）
   }>; // 结束结果类型声明
   return rows; // 交由调用方做状态过滤，保持查询职责单一
@@ -346,6 +348,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
         license: m.license, // 开源许可
         language: m.language, // 编程语言
         stars: m.stars, // Star 数
+        capability: m.capability, // 真实能力键；前端据此决定给「使用」面板还是「规划中」标记
         current_price: price // 当前价格分支
           ? { currency: price.currency, amount_minor: price.amount_minor } // 只透出当前价格关键字段
           : null, // 无有效价格则为 null，前端可显示「免费/待定价」
@@ -630,7 +633,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const row = db // 详情查询起点
       .prepare( // 预编译：按编码 + 地区 + 未删除定位唯一模块
         `SELECT id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-                region, status, category_slug, license, language, stars
+                region, status, category_slug, license, language, stars, capability
          FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
       ) // 结束预编译
       .get(code, region) as // 绑定编码与地区参数
@@ -647,6 +650,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
           license: string | null; // 开源许可
           language: string | null; // 编程语言
           stars: number; // Star 数
+          capability: string | null; // 真实能力键（null = 功能规划中）
         } // 结束模块行结构
       | undefined; // 未命中即 undefined
     if (!row) { // 模块不存在时
@@ -671,12 +675,76 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       license: row.license, // 开源许可，与列表页徽标一致
       language: row.language, // 编程语言，与列表页徽标一致
       stars: row.stars, // Star 数，详情页可复用同一排序口径
+      capability: row.capability, // 真实能力键；前端据此渲染「工具」区块或「规划中」标记
       current_price: price // 当前价格分支
         ? { currency: price.currency, amount_minor: price.amount_minor } // 当前价格
         : null, // 无有效价格
       price_history: prices, // 历史价格列表，便于展示调价记录
     }); // 结束详情响应
   }); // 结束 GET /modules/:code 处理
+
+  /**
+   * POST /modules/:code/invoke — 调用模块绑定的真实能力。
+   * 门禁三连：① 登录；② 模块存在且已上架；③ 该模块在 core-domain 登记了能力键；
+   * ④ 该用户对该模块有 active 且未过期权益。任一不满足即按语义返回 4xx，不做静默降级。
+   */
+  router.post('/modules/:code/invoke', requireAuth, async (req, res) => { // 登录 + 异步能力执行（Express 5 自动接住 Promise 拒绝）
+    const code = pathParam(req, 'code'); // 严格提取模块码，非字符串直接 400
+    const user = req.user!; // requireAuth 已保证存在
+    const now = clockOf(deps); // 统一时间基准，用于权益到期判断
+    const body = parse( // 校验请求体
+      z.object({ // 仅接受文本与扁平选项
+        text: z.string().min(1).max(20000), // 输入文本限长 20000 字符，避免超大输入拖垮进程
+        options: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), // 能力私有选项，扁平键值
+      }), // 结束 schema
+      req.body, // 原始请求体
+    ); // 结束解析
+
+    const row = db // 模块查询起点
+      .prepare( // 预编译：按编码 + 用户地区 + 未删除定位
+        `SELECT id, code, status, capability FROM modules
+         WHERE code = ? AND region = ? AND deleted_at IS NULL`,
+      ) // 结束预编译
+      .get(code, user.region) as // 绑定模块码与地区
+      | { id: string; code: string; status: string; capability: string | null } // 命中行结构
+      | undefined; // 未命中
+    if (!row) { // 模块不存在
+      throw new AppError('NOT_FOUND', 'module not found', { module_code: code, region: user.region }); // 404
+    } // 存在性判断结束
+    if (!MODULE_VISIBLE.has(row.status)) { // 未上架模块不提供调用
+      throw new AppError('FEATURE_NOT_AVAILABLE', 'module is not available in store', { module_code: code, status: row.status }); // 明确不可用
+    } // 状态判断结束
+    if (!row.capability) { // 无能力键即「规划中」
+      throw new AppError('FEATURE_NOT_AVAILABLE', 'module capability is planned, not implemented yet', { module_code: code, planned: true }); // 501/400 语义明确
+    } // 能力判断结束
+    const handler = handlerOfCapability(row.capability); // 取能力实现
+    if (!handler) { // 注册表缺项说明清单与实现不一致
+      throw new AppError('FEATURE_NOT_AVAILABLE', 'capability handler is not registered', { module_code: code, capability: row.capability }); // 明确报不可用
+    } // handler 判断结束
+
+    const entitlement = db // 权益查询起点
+      .prepare( // 预编译：同一模块 + 同一用户 + active + 未过期
+        `SELECT id FROM entitlements
+         WHERE module_id = ? AND user_id = ? AND status = 'active'
+           AND (expires_at IS NULL OR expires_at > ?)
+         LIMIT 1`,
+      ) // 结束预编译
+      .get(row.id, user.id, now) as { id: string } | undefined; // 命中即已解锁
+    if (!entitlement) { // 未解锁
+      throw new AppError('FORBIDDEN', 'module is not unlocked for current user', { module_code: code }); // 403，前端引导去解锁
+    } // 权益判断结束
+
+    const started = Date.now(); // 记录开始时间，回传耗时便于前端展示
+    const result = await handler({ text: body.text, options: body.options ?? {} }); // 执行真实能力
+    res.json({ // 调用结果
+      module_code: row.code, // 回显模块码，便于前端对账
+      capability: row.capability, // 回显能力键
+      output: result.output, // 结果正文
+      output_kind: result.output_kind, // 输出形态
+      meta: result.meta, // 附加信息
+      elapsed_ms: Date.now() - started, // 执行耗时（毫秒）
+    }); // 响应结束
+  }); // 结束 POST /modules/:code/invoke 处理
 
   // ---------- 鉴权：解锁与查询 ----------
 

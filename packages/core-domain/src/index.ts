@@ -13,3 +13,5 @@ export * from './siteModules.js';
 export * from './deploymentRegistry.js';
 // 聚合导出模块商城分类树与筛选项：19 个一级分类 / 205 个二级条目 / 48 项许可 / 87 种语言 / 排序枚举，服务端种子与前端导航共用
 export * from './catalogTaxonomy.js';
+// 聚合导出「模块 = 真实能力」清单：能力键 / 绑定模块编码 / 输入提示 / 输出形态，服务端 handler 与前端工具面板共用
+export * from './moduleCapabilities.js';

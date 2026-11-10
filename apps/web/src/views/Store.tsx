@@ -7,7 +7,7 @@ import * as echarts from 'echarts'; // 价格历史折线图：ECharts 6 在详�
 // 引入 Locale 类型：约束语言取值为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
 // 引入核心域常量：排序枚举 / 48 项开源许可 / 87 种编程语言，与后端共用同一份定义避免口径漂移
-import { CATALOG_SORT_MODES, LANGUAGE_OPTIONS, LICENSE_OPTIONS } from '@mim/core-domain';
+import { CATALOG_SORT_MODES, LANGUAGE_OPTIONS, LICENSE_OPTIONS, capabilityOfKey } from '@mim/core-domain'; // 追加能力定义：详情面板据此渲染「工具」区块（与后端共用同一份清单）
 // 引入接口客户端、错误类型（识别依赖缺失）、错误文案翻译器与会话读取工具（判断匿名态）
 import { ApiError, api, errorText, getSession } from '../api';
 // 引入通用异步加载钩子：统一处理 loading / error / reload
@@ -36,6 +36,49 @@ const SORT_LABEL: Record<CatalogSort, { zh: string; en: string }> = {
   updated: { zh: '最近更新', en: 'Recently updated' }, // 按创建时间倒序
 }; // 排序文案表结束
 
+/** 能力选项定义：不同能力暴露给用户的可调参数；value 直接作为 options 字段值 */
+interface CapabilityOptionSpec {
+  optionKey: string; // 传入 options 的字段名；'op:direction' 表示拆成 op 与 direction 两个字段
+  numeric: boolean; // value 是否按数字下发（尺寸 / 条数）
+  items: Array<{ value: string; zh: string; en: string }>; // 下拉项：值 + 中英文文案
+} // 选项定义结束
+
+// 六条已实现能力对应的可选参数（与 services/mim-api/src/capabilities.ts 的读取口径一一对应）
+const CAPABILITY_OPTIONS: Record<string, CapabilityOptionSpec> = {
+  'json.format': { optionKey: 'mode', numeric: false, items: [ // JSON 工具：三种模式
+    { value: 'pretty', zh: '格式化', en: 'Pretty-print' }, // 默认缩进输出
+    { value: 'minify', zh: '压缩', en: 'Minify' }, // 去掉空白
+    { value: 'validate', zh: '仅校验', en: 'Validate only' }, // 只回合法性
+  ] }, // JSON 工具结束
+  'text.encode': { optionKey: 'op:direction', numeric: false, items: [ // 编解码：方式 × 方向
+    { value: 'base64:encode', zh: 'Base64 编码', en: 'Base64 encode' },
+    { value: 'base64:decode', zh: 'Base64 解码', en: 'Base64 decode' },
+    { value: 'base64url:encode', zh: 'Base64URL 编码', en: 'Base64URL encode' },
+    { value: 'base64url:decode', zh: 'Base64URL 解码', en: 'Base64URL decode' },
+    { value: 'hex:encode', zh: 'Hex 编码', en: 'Hex encode' },
+    { value: 'hex:decode', zh: 'Hex 解码', en: 'Hex decode' },
+    { value: 'url:encode', zh: 'URL 编码', en: 'URL encode' },
+    { value: 'url:decode', zh: 'URL 解码', en: 'URL decode' },
+  ] }, // 编解码结束
+  'text.hash': { optionKey: 'algo', numeric: false, items: [ // 摘要算法
+    { value: 'sha256', zh: 'SHA-256', en: 'SHA-256' },
+    { value: 'sha512', zh: 'SHA-512', en: 'SHA-512' },
+    { value: 'sha1', zh: 'SHA-1', en: 'SHA-1' },
+    { value: 'md5', zh: 'MD5', en: 'MD5' },
+  ] }, // 摘要结束
+  'qrcode.generate': { optionKey: 'size', numeric: true, items: [ // 二维码尺寸（像素）
+    { value: '256', zh: '256 px', en: '256 px' },
+    { value: '512', zh: '512 px', en: '512 px' },
+    { value: '1024', zh: '1024 px', en: '1024 px' },
+  ] }, // 二维码结束
+  'cron.describe': { optionKey: 'count', numeric: true, items: [ // 推算次数
+    { value: '3', zh: '未来 3 次', en: 'Next 3 runs' },
+    { value: '5', zh: '未来 5 次', en: 'Next 5 runs' },
+    { value: '10', zh: '未来 10 次', en: 'Next 10 runs' },
+  ] }, // cron 结束
+}; // 能力选项表结束
+
+
 // 模块卡片结构：与 /modules 接口返回的字段一一对应
 interface ModuleCard {
   code: string; // 模块唯一编码，作为列表 key 与解锁入参
@@ -49,6 +92,7 @@ interface ModuleCard {
   license: string | null; // 开源许可（筛选维度）
   language: string | null; // 编程语言（筛选维度）
   stars: number; // Star 数（Stars 排序依据）
+  capability: string | null; // 真实能力键；null 表示该模块功能规划中（不给解锁入口）
   current_price: { currency: string; amount_minor: number } | null; // 当前售价；null 表示免费模块
 }
 
@@ -378,6 +422,16 @@ export function Store({ locale }: Props) {
   );
   // 正在解锁的模块编码：用于只禁用被点击的那一个按钮
   const [busyCode, setBusyCode] = useState<string | null>(null);
+  // 工具面板输入文本：切换模块时清空，避免把上一个模块的输入带过去
+  const [toolText, setToolText] = useState('');
+  // 工具面板下拉选项：空串表示用该能力的第一个默认项
+  const [toolOption, setToolOption] = useState('');
+  // 工具面板执行中标记：只禁用「执行」按钮
+  const [toolBusy, setToolBusy] = useState(false);
+  // 工具面板错误：能力调用失败（未解锁 / 输入非法 / 规划中）时展示
+  const [toolError, setToolError] = useState<string | null>(null);
+  // 工具面板结果：带模块码，避免切换模块后还显示上一个模块的结果
+  const [toolResult, setToolResult] = useState<{ code: string; output: string; output_kind: string } | null>(null);
   // 错误提示：解锁失败时展示，null 表示无错误
   const [error, setError] = useState<string | null>(null);
   // 成功提示：解锁成功后展示，null 表示无提示
@@ -493,6 +547,44 @@ export function Store({ locale }: Props) {
   function toggleDetail(code: string) {
     // 已展开则收起，否则展开该卡片并触发详情请求
     setExpandedCode((current) => (current === code ? null : code));
+    // 工具面板按模块隔离：切换展开目标时清空输入与结果，避免串味
+    setToolText('');
+    setToolOption('');
+    setToolError(null);
+    setToolResult(null);
+  }
+
+  // 调用当前模块绑定的真实能力：门禁（登录 / 已上架 / 有实现 / 已解锁）全部由服务端判定
+  async function handleInvoke(code: string, capability: string) {
+    // 进入执行态，清空上一次的错误与结果
+    setToolBusy(true);
+    setToolError(null);
+    setToolResult(null);
+    try {
+      // 按能力定义组选项：组合值（op:direction）拆成两个字段，数字类转 Number
+      const spec = CAPABILITY_OPTIONS[capability];
+      const options: Record<string, string | number | boolean> = {};
+      if (spec) {
+        const value = toolOption || spec.items[0].value; // 未选时用第一个默认项
+        if (spec.optionKey === 'op:direction') {
+          const [op, direction] = value.split(':'); // 组合值拆分
+          options.op = op; // 编码方式
+          options.direction = direction; // 方向
+        } else {
+          options[spec.optionKey] = spec.numeric ? Number(value) : value; // 其余能力单字段下发
+        }
+      }
+      // 发起调用：输入文本原样提交，服务端限长并校验
+      const result = await api.catalog.invokeModule(code, toolText, options);
+      // 只保留渲染需要的字段，并带上模块码用于隔离
+      setToolResult({ code: result.module_code, output: result.output, output_kind: result.output_kind });
+    } catch (err) {
+      // 未解锁 / 规划中 / 输入非法分别有独立错误码，统一走本地化文案
+      setToolError(errorText(locale, err));
+    } finally {
+      // 无论成功失败都退出执行态
+      setToolBusy(false);
+    }
   }
 
   // 解锁指定模块：一次性买断，成功后刷新权益列表
@@ -995,7 +1087,10 @@ export function Store({ locale }: Props) {
                             ? locale === 'en-US' ? 'Hide details' : '收起详情'
                             : locale === 'en-US' ? 'Details' : '详情'}{/* 详情按钮文案结束 */}
                         </button>{/* 详情按钮结束 */}
-                        {!owned && authed && ( // 已登录且未拥有时才提供购买/解锁按钮
+                        {(!owned && !m.capability) && ( // 无真实能力 = 规划中：不给解锁入口，避免用户为未实现条目付费
+                          <span className="badge">{locale === 'en-US' ? 'Planned' : '规划中'}</span> // 规划中徽标
+                        )}{/* 规划中徽标结束 */}
+                        {!owned && authed && m.capability !== null && ( // 已登录、未拥有、且模块有真实能力时才提供购买/解锁按钮
                           <button
                             // 购买/解锁按钮：普通按钮，避免触发表单提交
                             type="button"
@@ -1049,6 +1144,85 @@ export function Store({ locale }: Props) {
                                 {locale === 'en-US' ? 'Language' : '语言'}: {detail.data.language ?? '—'}
                                 {' · '}★ {detail.data.stars}
                               </p>{/* 元信息行结束 */}
+                              <div>{/* 工具区块：登记了能力的模块可真正执行；未登记则标注「功能规划中」 */}
+                                <p className="store-detail-title">{locale === 'en-US' ? 'Tool' : '工具'}{/* 小节标题 */}</p>
+                                {(() => { {/* 立即执行函数：把能力分支的局部变量收在一处，避免污染外层 */}
+                                  const data = detail.data!; // 外层已判空，这里断言非空以便在闭包内保住类型收窄
+                                  const capability = data.capability; // 当前模块绑定的能力键（可能为 null）
+                                  const seed = capability ? capabilityOfKey(capability) : undefined; // 能力定义：名称 / 提示 / 占位
+                                  const spec = capability ? CAPABILITY_OPTIONS[capability] : undefined; // 该能力的可选参数
+                                  if (!capability || !seed) { // 无能力 = 规划中：不给解锁入口，避免为未实现功能付费
+                                    return ( // 规划中提示
+                                      <p className="muted">{locale === 'en-US' ? 'Planned feature — not open for unlock yet.' : '功能规划中，暂不开放解锁。'}</p>
+                                    ); // 规划中提示结束
+                                  } // 无能力分支结束
+                                  return ( // 有能力：按是否已解锁决定给工具还是给提示
+                                    <>
+                                      <p className="muted">{seed.hint[locale === 'en-US' ? 'en-US' : 'zh-CN']}{/* 能力说明，来自 core-domain 同一份定义 */}</p>
+                                      {!owned ? ( // 未解锁：只提示先解锁，不暴露调用入口
+                                        <p className="muted">{locale === 'en-US' ? 'Unlock this module to use its tool.' : '解锁本模块后即可使用该工具。'}</p>
+                                      ) : ( // 已解锁：渲染输入 + 执行 + 结果
+                                        <>
+                                          {spec && ( // 有能力私有参数时给下拉
+                                            <label className="filter-inline">{/* 复用筛选行样式，视觉上与商城一致 */}
+                                              {locale === 'en-US' ? 'Option' : '选项'}
+                                              <select
+                                                // 受控下拉：空串表示用默认第一项
+                                                value={toolOption}
+                                                // 同步选中值
+                                                onChange={(event) => setToolOption(event.target.value)}
+                                              >
+                                                {spec.items.map((item) => ( // 逐项渲染下拉选项
+                                                  <option key={item.value} value={item.value}>{item[locale === 'en-US' ? 'en' : 'zh']}</option> // 中英文文案二选一
+                                                ))}{/* 选项遍历结束 */}
+                                              </select>
+                                            </label>
+                                          )}{/* 下拉结束 */}
+                                          <label className="grow">{/* 输入区：多行文本，限制展示高度 */}
+                                            {locale === 'en-US' ? 'Input' : '输入'}
+                                            <textarea
+                                              // 受控输入
+                                              value={toolText}
+                                              // 同步输入文本
+                                              onChange={(event) => setToolText(event.target.value)}
+                                              // 占位示例来自能力定义
+                                              placeholder={seed.placeholder[locale === 'en-US' ? 'en-US' : 'zh-CN']}
+                                              // 四行高度，长内容内部滚动
+                                              rows={4}
+                                            />
+                                          </label>{/* 输入区结束 */}
+                                          <div className="row">{/* 执行行 */}
+                                            <button
+                                              // 普通按钮，避免表单提交
+                                              type="button"
+                                              // 主按钮强调主操作
+                                              className="btn primary small"
+                                              // 执行中或输入为空时禁用
+                                              disabled={toolBusy || toolText.trim() === ''}
+                                              // 点击调用能力
+                                              onClick={() => handleInvoke(data.code, capability)}
+                                            >
+                                              {toolBusy // 执行中优先展示进行态
+                                                ? locale === 'en-US' ? 'Running…' : '执行中…'
+                                                : locale === 'en-US' ? 'Run' : '执行'}{/* 按钮文案结束 */}
+                                            </button>
+                                          </div>{/* 执行行结束 */}
+                                          {toolError !== null && <p className="error">{toolError}</p>}{/* 调用失败提示 */}
+                                          {toolResult && toolResult.code === data.code && ( // 只展示当前模块的结果，避免切换后串味
+                                            toolResult.output_kind === 'image' ? ( // 图片：dataURL 直接渲染
+                                              <img className="store-tool-image" src={toolResult.output} alt={locale === 'en-US' ? 'Tool output' : '工具输出'} />
+                                            ) : toolResult.output_kind === 'html' ? ( // HTML：服务端已转义原始 HTML，可安全渲染
+                                              <div className="store-tool-html" dangerouslySetInnerHTML={{ __html: toolResult.output }} />
+                                            ) : ( // 文本 / JSON：等宽字体预格式展示
+                                              <pre className="store-tool-output">{toolResult.output}</pre>
+                                            )
+                                          )}{/* 结果展示结束 */}
+                                        </>
+                                      )}{/* 已解锁分支结束 */}
+                                    </>
+                                  ); // 有能力分支返回结束
+                                })()}{/* 能力区块结束 */}
+                              </div>{/* 工具区块结束 */}
                               <div>{/* 依赖链区块 */}
                                 <p className="store-detail-title">{locale === 'en-US' ? 'Dependencies' : '依赖链'}</p>{/* 小节标题 */}
                                 {detail.data.requires.length === 0 ? ( // 无依赖时展示说明

@@ -670,12 +670,52 @@ code { /* 行内代码/令牌展示 */
   font-size: 13px; /* 略小正文，详情为附属信息 */
 } /* 详情容器结束 */
 
-.store-detail-title { /* 详情区小节标题（依赖链 / 价格历史） */
+.store-detail-title { /* 详情区小节标题（工具 / 依赖链 / 价格历史） */
   margin: 0; /* 清除 p 默认外边距，间距交给父容器 gap */
   font-size: 12px; /* 小字号弱化层级，不抢详情内容 */
   font-weight: 600; /* 半粗保证作为小节锚点仍可辨识 */
   color: var(--text-muted); /* 次要色表达「区块标签」而非正文 */
 } /* 小节标题结束 */
+
+.store-tool-output { /* 能力调用的文本 / JSON 结果：等宽字体 + 滚动，避免长串撑破卡片 */
+  margin: 0; /* 清除 pre 默认外边距 */
+  padding: 10px; /* 内边距让结果与边框分离 */
+  max-height: 240px; /* 限高，超长结果内部滚动 */
+  overflow: auto; /* 长行横向滚动 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* 等宽字体便于核对摘要与 JSON */
+  font-size: 12px; /* 小一号，避免结果区视觉过重 */
+  line-height: 1.5; /* 行距保证可读 */
+  white-space: pre-wrap; /* 保留换行同时允许折行 */
+  word-break: break-all; /* 超长无空格串（摘要 / Base64）强制折行 */
+  background: rgba(0, 0, 0, 0.03); /* 浅底与正文区分 */
+  border: 1px solid var(--border); /* 细边框勾勒结果边界 */
+  border-radius: var(--radius); /* 与卡片圆角一致 */
+} /* 文本结果结束 */
+
+.store-tool-html { /* Markdown 渲染结果容器：服务端已转义原始 HTML，这里只承载排版 */
+  padding: 10px; /* 内边距 */
+  max-height: 240px; /* 限高内部滚动 */
+  overflow: auto; /* 内容超长可滚动 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: var(--radius); /* 圆角 */
+  font-size: 13px; /* 略小于正文，避免抢主标题 */
+  line-height: 1.6; /* 段落行距 */
+} /* HTML 结果结束 */
+
+.store-tool-html h1, /* Markdown 一级标题：缩小默认字号，避免撑破详情面板 */
+.store-tool-html h2,
+.store-tool-html h3 {
+  font-size: 14px; /* 统一收敛为小节标题级别 */
+  margin: 8px 0 4px; /* 压缩段落间距 */
+} /* 标题样式结束 */
+
+.store-tool-image { /* 二维码等图片结果：限宽显示，避免超大图撑破卡片 */
+  max-width: 220px; /* 最大宽度 */
+  height: auto; /* 等比缩放 */
+  display: block; /* 独占一行，便于截图保存 */
+  border: 1px solid var(--border); /* 细边框，白底二维码在浅色背景上边界清晰 */
+  border-radius: var(--radius); /* 与整体圆角一致 */
+} /* 图片结果结束 */
 
 .dep-graph { /* G6 依赖链图画布容器：固定高度、浅底圆角，隔离在详情面板内 */
   width: 100%; /* 撑满详情面板宽度，G6 据此读取容器宽度 */

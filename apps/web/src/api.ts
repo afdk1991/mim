@@ -833,6 +833,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
           license: string | null; // 开源许可
           language: string | null; // 编程语言
           stars: number; // Star 数（Stars 排序依据）
+          capability: string | null; // 真实能力键；null 表示该模块功能规划中
           current_price: { currency: string; amount_minor: number } | null; // 当前价格；未定价为 null
         }>; // 模块条目类型结束
         total: number; // 过滤后的总条数
@@ -875,6 +876,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         license: string | null; // 开源许可，与列表徽标同源
         language: string | null; // 编程语言，与列表徽标同源
         stars: number; // Star 数
+        capability: string | null; // 真实能力键；前端据此渲染「工具」区块或「规划中」标记
         current_price: { currency: string; amount_minor: number } | null; // 当前价格，未定价为 null
         price_history: Array<{ // 价格变更历史，供详情页展示走势
           currency: string; // 币种
@@ -884,6 +886,16 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         }>; // 价格历史类型结束
       }>(`/modules/${encodeURIComponent(code)}`, { auth: false, idempotency: false }); // 编码路径参数防注入；公开只读接口
     }, // getModule 结束
+    invokeModule(module_code: string, text: string, options: Record<string, string | number | boolean> = {}) { // 调用模块绑定的真实能力
+      return request<{ // 能力调用结果
+        module_code: string; // 回显模块编码
+        capability: string; // 回显能力键
+        output: string; // 结果正文：文本 / JSON / HTML / 图片 dataURL
+        output_kind: 'text' | 'json' | 'html' | 'image'; // 输出形态，决定前端渲染方式
+        meta: Record<string, unknown>; // 附加信息（字节数 / 算法 / 尺寸等）
+        elapsed_ms: number; // 服务端执行耗时
+      }>(`/modules/${encodeURIComponent(module_code)}/invoke`, { method: 'POST', body: { text, options } }); // 写操作自动带幂等键；后端校验登录与权益
+    }, // invokeModule 结束
     unlockModule(module_code: string) { // 解锁（购买）模块，生成权益
       return request<{ // 返回新建/更新的权益
         entitlement: { // 权益对象

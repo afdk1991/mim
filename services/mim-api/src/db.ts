@@ -2,7 +2,7 @@
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
 import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：45 个去重入口、19 个业务域、占位标识与运行时能力点
-import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 英文名称取数
+import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn, capabilityOfModule } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 模块能力绑定
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
@@ -30,6 +30,7 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'modules', column: 'license', definition: 'TEXT' }, // 模块开源许可（筛选维度，演示口径）
   { table: 'modules', column: 'language', definition: 'TEXT' }, // 模块编程语言（筛选维度，演示口径）
   { table: 'modules', column: 'stars', definition: 'INTEGER NOT NULL DEFAULT 0' }, // Star 数（「Stars」排序依据，确定性演示值）
+  { table: 'modules', column: 'capability', definition: 'TEXT' }, // 真实能力键（2026-11-11「模块=真实能力」改造）；NULL 表示功能规划中
   { table: 'module_categories', column: 'name_en', definition: 'TEXT' }, // 分类英文名（英文站点导航 / 接口 name_en 字段）
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
@@ -396,8 +397,8 @@ export function seedCategoryModules(db: Db): void { // 二级模块种子入口
   const upsert = db.prepare(
     `INSERT INTO modules
        (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-        region, status, sort_order, category_slug, license, language, stars, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'one_time', '[]', ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+        region, status, sort_order, category_slug, license, language, stars, capability, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'one_time', '[]', ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(region, code) DO UPDATE SET
        name_i18n = excluded.name_i18n,
        summary_i18n = excluded.summary_i18n,
@@ -407,6 +408,7 @@ export function seedCategoryModules(db: Db): void { // 二级模块种子入口
        license = excluded.license,
        language = excluded.language,
        stars = excluded.stars,
+       capability = excluded.capability,
        updated_at = excluded.updated_at`,
   ); // prepare 结束
 
@@ -418,6 +420,8 @@ export function seedCategoryModules(db: Db): void { // 二级模块种子入口
         'zh-CN': `${item.name} 方向的模块化能力集合，可在商城内一次性解锁后使用。`, // 中文简介
         'en-US': `Modular capability set for ${item.name_en}; unlock once in the store.`, // 英文简介取英文条目名
       }); // 简介序列化结束
+      // 能力绑定：core-domain 里登记过的模块才有真实能力键，其余为「规划中」（NULL）
+      const capabilityKey = capabilityOfModule(item.code)?.key ?? null; // 未登记即 null，前端据此禁用解锁入口
       for (const region of REGIONS) { // 逐个区域
         upsert.run( // 写入模块行
           `mod:${item.code}:${region}`, // 主键：模块码 + 区域
@@ -430,6 +434,7 @@ export function seedCategoryModules(db: Db): void { // 二级模块种子入口
           item.license, // 许可
           item.language, // 语言
           item.stars, // Star 数
+          capabilityKey, // 真实能力键（可为 NULL）
           now, // 创建时间
           now, // 更新时间
         ); // run 结束

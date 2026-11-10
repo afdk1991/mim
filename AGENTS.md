@@ -734,6 +734,23 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 文档同步（铁律七） | `README.md`（新增 2026-11-11 变更条目、「路径即视图」段与「生产登录入口」段改新段）、`docs/wiki/05-runbook.md`（回退四件套段改新段 + nginx 四条 301）、`docs/wiki/08-dev-implementation.md`（顶部新增变更注记）、`Mim-PRD.html`（`/sites` 视图改 `/entry-catalog` 并注明旧段 301）、本节与 §0 现行状态覆盖 | 逐文件 Edit |
 | 未做 / 已知缺口（如实登记） | ① `verify-site-modules` / `verify-site-directory` 本轮未复跑（改动未触及其数据源，风险低但**未取证**）；② `verify-auth-gate --live` / `verify-film-export` 的官方 live 脚本未跑，改以自写 CDP 11/11 覆盖路由改名本身；③ `docs/deployment-summary.{json,md}` 未重生成（部署注册表本轮未变）；④ EdgeOne 内容层未取证（WAF 人机校验）；⑤ Vercel / Sealos / IGA / Netlify / Render 未重发（缺凭据 SKIP）；⑥ 中文功能名路径方案未采纳（用户未明示选择，本轮取推荐默认） | 本轮未执行项清单 |
 
+### 9.18 商城分类导航条目落成真实能力（模块 = 真实能力骨架 + 首批 6 条）（2026-11-11 02:1x +08:00）
+
+**性质**：按用户「把分类导航里的条目实现成项目中的功能和模块」指令落地的**框架 + 首批实现**，不是占位页面改造。口径：**导航条目 = 真实功能**；已登记能力的模块可调用，未登记的模块在商城标注「规划中」并**不提供解锁入口**（避免为未实现功能收费）。
+
+| 项 | 本轮落地 | 取证 / 位置 |
+|---|---|---|
+| 能力清单（唯一真源） | `packages/core-domain/src/moduleCapabilities.ts`：6 条能力，含 `key` / 中英文名 / 提示 / 占位 / `output_kind`（`text\|json\|html\|image`）/ 绑定模块编码；`capabilityOfKey()` / `capabilityOfModule()` | 由 `packages/core-domain/src/index.ts` 聚合导出，前后端共用 |
+| 能力 ↔ 模块绑定（编码规则 `cat.<一级slug>-<序号>`） | `json.format`→`cat.dev-28`（JSON工具）、`text.encode`→`cat.dev-04`（常用工具包）、`text.hash`→`cat.dev-03`（安全开发相关）、`markdown.render`→`cat.dev-17`（Markdown工具包）、`qrcode.generate`→`cat.dev-06`（条形码/二维码）、`cron.describe`→`cat.dev-14`（作业/任务调度） | 同上文件；均为「程序开发」组条目 |
+| 持久化 | `modules` 表新增 `capability TEXT`（NULL = 规划中）：`schema.sql` 建表列 + `db.ts` 的 `ADDITIVE_COLUMNS` 老库补列；`seedCategoryModules` 的 upsert 增列并在 `ON CONFLICT` 更新，取值 `capabilityOfModule(code)?.key ?? null` | `services/mim-api/src/{schema.sql,db.ts}` |
+| 服务端执行层 | 新增 `services/mim-api/src/capabilities.ts`：六个 handler + `handlerOfCapability()`；Markdown 用 **marked@18.2.0**（并覆盖 html token 渲染器，把原始 HTML 转义，防注入）、二维码 **qrcode@1.5.4**、cron **cron-parser@5.10.4**；JSON / 摘要 / 编解码用 Node 原生（JSON 与 crypto 属语言内建能力） | 依赖已写入 `services/mim-api/package.json`（devDep `@types/qrcode@1.5.6`） |
+| 调用路由 | `POST /api/v1/modules/:code/invoke`（`requireAuth` + `idempotency` 外的最小集）：① 模块存在且 `active`；② 有 `capability` 且注册表有 handler，否则 `FEATURE_NOT_AVAILABLE`（`details.planned=true`）；③ 该用户对该模块有 `active` 且未过期权益，否则 `FORBIDDEN`；入参 `text` 限长 20000、`options` 为扁平键值，出参 `{ output, output_kind, meta, elapsed_ms }` | `services/mim-api/src/routes/catalog.ts`（注册在 `/modules/:code` 详情之后、`/entitlements` 之前） |
+| 列表 / 详情透出 | `/modules`、`/modules/:code` 响应体新增 `capability` 字段，前端据此决定渲染「工具」区块还是「规划中」标记 | 同上 |
+| 前端 | `apps/web/src/views/Store.tsx` 详情面板新增「工具」区块：能力说明 + 参数下拉（模式/编解码方式/算法/尺寸/次数）+ 多行输入 + 执行按钮；按 `output_kind` 分别渲染（`text`/`json` 等宽预格式、`html` 容器渲染、`image` 直显 dataURL）；未解锁只提示「解锁后可用」；无能力显示「功能规划中，暂不开放解锁」并把卡片解锁按钮隐藏、加「规划中」徽标；`apps/web/src/api.ts` 新增 `catalog.invokeModule()` | `apps/web/src/{views/Store.tsx,api.ts,styles.css}`（新增 `.store-tool-*` 三个样式类） |
+| 契约测试 | 新增 `services/mim-api/test/module-invoke.test.ts`：注册表覆盖度 + 门禁三连（401 / 403 / 规划中 403 `FEATURE_NOT_AVAILABLE` / 超长 400）+ 六种能力端到端（含 SHA-256 与 MD5 已知向量、Base64 往返、Markdown 渲染、二维码尺寸夹紧、cron 触发时间） | **11/11 通过** |
+| 本地门禁（提交前） | `pnpm -r typecheck` **EXIT=0**；`pnpm --filter @mim/api test` **17 文件 / 244 例全过**；`pnpm --filter @mim/web build` **EXIT=0**；`node scripts/env-check.mjs` **EXIT=0**（模板变量 157 项）；`comment-check --strict` **EXIT=0**（109 文件 / 总体 88.7%） | 本轮真实命令输出（`.tmp/gate.log`、`.tmp/gate2.log`） |
+| 未做 / 已知缺口（如实登记） | ① 205 条里仅 6 条登记真实能力，其余 199 条仍为「规划中」，商城可见但不可解锁；② 前端「工具」区块只做了**本地类型检查与构建**，生产浏览器实机点击未取证（待部署后补）；③ 能力调用未加独立限流（当前复用全局请求约束）；④ PRD / Wiki 未同步本节（仅 AGENTS + README 记录） | 本轮未执行项清单 |
+
 ---
 
 ## 与铁律一冲突时的优先级
