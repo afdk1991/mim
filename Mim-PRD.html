@@ -862,7 +862,7 @@ function submitLogin(){
   <!-- 后端：运行时 6 端点 + 清单 6 端点 + 持久化表 -->
   <tr><td>后端</td><td>运行时（按占位键寻址）：<code>/api/v1/sites/overview</code>、<code>/sites</code>、<code>/sites/:host</code>、<code>/sites/:host/capabilities</code>、<code>/sites/:host/items</code>、<code>POST /sites/:host/items</code>、<code>POST /sites/:host/items/:id/transition</code>；统一入口配置清单（只读）：<code>/api/v1/entries/overview</code>、<code>/entries/domains</code>、<code>/entries/placeholders</code>、<code>/entries/config</code>、<code>/entries</code>、<code>/entries/:entryKey</code>；<code>site_module_items</code> 表（隔离键为占位标识键，非具体主机值）</td></tr>
   <!-- 前端：统一入口配置清单视图，匿名可浏览 -->
-  <tr><td>前端</td><td><code>/sites</code> 视图（<code>apps/web/src/views/Sites.tsx</code>）：去重整理面板、45 入口卡片（占位标识 + 未配置状态）、19 业务域筛选、核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分展开、搜索、条目新建与状态流转；浏览匿名可访问，写操作按需登录</td></tr>
+  <tr><td>前端</td><td><code>/entry-catalog</code> 视图（<code>apps/web/src/views/Sites.tsx</code>；对外路径段 2026-11-11 由 <code>/sites</code> 改为模块功能名称 <code>/entry-catalog</code>，旧段 301）：去重整理面板、45 入口卡片（占位标识 + 未配置状态）、19 业务域筛选、核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分展开、搜索、条目新建与状态流转；浏览匿名可访问，写操作按需登录</td></tr>
   <!-- 验证：契约测试、零依赖校验、全量门禁与浏览器真渲染终值 -->
   <tr><td>验证</td><td>契约测试 26 例（<code>test/sites.test.ts</code> 14 + <code>test/entries.test.ts</code> 12）；零依赖校验 <code>verify-site-modules</code> 79 项 + <code>verify-entry-manifest</code> 23 项；全量 15 文件 / 211 例测试 + <code>comment-check --strict</code> / <code>build:web</code> 通过；xls / 用户文本 ↔ 清单双向比对 0 差异；Edge CDP <code>/sites</code> 真渲染 26/26 PASS（2026-11-09 23:35 实测）</td></tr>
   <!-- 交付说明：完整逐项清单与未决项 -->

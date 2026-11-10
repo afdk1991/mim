@@ -23,6 +23,8 @@
 | ✅ 悬空引用已解除（2026-11-10） | 2026-11-09 登记的 🔴 悬空引用（`deploy.yml` 引用的 `deploy/*`、`vercel.json` 等已不在工作树）**已消除**：23 个工件由 `git checkout -- .` 恢复，`node scripts/verify-deployments.mjs` D26 由失败转为 **52/52 PASS** | `git status --short`（工作树干净）、`node scripts/verify-deployments.mjs`（52/52） |
 
 > **现行状态覆盖（2026-11-10 23:40 +08:00）**：本节表格是 2026-11-10 01:10 的基线快照；**生产可达性已变更** —— `https://mim.mixm.top` 已真实上线并取得 IP 级取证（`/health` 200、`/api/v1/modules` 200、HTTPS 200、`http` 301），逐项证据见 [§9.14](#914-生产上线腾讯云-cvm-从零部署到-http-https-全通2026-11-10-2340-0800)。表内「生产可达性 `000`」按铁律三保留为历史留痕，**不得再当作现状引用**。
+>
+> **现行状态覆盖（2026-11-11 00:52 +08:00）**：前端对外路径段已统一为模块功能名称 —— `/marketplace`（原 `/store`）、`/entry-catalog`（原 `/sites`）、`/comic-studio`（原 `/comic`）、`/signin`（原 `/login`）；`/chat`、`/settings`、`/deployments` 不变。旧段由**前端 `replaceState` + 生产 nginx 301** 双保险改写，后端 `/api/v1/*` 与管理端 `/admin/` 不在改名范围。逐项证据见 [§9.17](#917-全平台对外路径段统一为模块功能名称2026-11-11-0052-0800)。
 
 **本轮体检边界（2026-11-10）**：按用户「全项目全面检查与修复」指令，做了三类**可逆**修复——① 把误删的 23 个部署工件从 HEAD 恢复到工作树（`git checkout -- .`）；② 把部署注册表里「工作树缺失」的过时口径改为「已恢复」并重生成核对表（`WORKTREE_ARTIFACT_*_RESTORED`）；③ 修正 `render.yaml`（蓝图 schema 由非法的 `static_sites:` 改为 `services: - type: web / runtime: static`，并补 `routes` 深链接回退）与 `azure-static-web-apps.yml`（补 `staticwebapp.config.json` 回退注入）。**不改任何铁律的约束语义**，未做 `git add / commit / push`、未删除任何文件、未触发任何线上部署。
 >
@@ -668,7 +670,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | **③ 本机直连实证** | 通 | `ssh -i .tmp/prodkey/mim_prod_ed25519_v2 root@115.159.159.11 "echo SSH_OK; hostname; node -v; systemctl is-active mim-api"` → `SSH_OK` / `VM-0-13-ubuntu` / `v22.20.0` / `active` |
 | **④ CI → 主机自动发布（第一次真实跑）** | 通道通了，暴露新的主机侧故障 | run **42854405766**「发布到生产服务器」不再 SKIP：`scp deploy.sh` → `sudo -n install` → `ssh sudo -n env … bash deploy.sh` 全部执行，构建段失败：`FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory`（exit 134） |
 | **⑤ 主机侧根因与修复** | 2C2G 上 Node 22 默认堆上限不足 | `deploy/deploy.sh` 第 3 段构建前导出 `NODE_OPTIONS=--max-old-space-size=1536` 并打印可用内存与 swap；主机手工以同一提交实测：`built in 21.67s` → admin/api 编译通过 → `nginx -t` 通过并 reload → 日志 `部署完成：8fa1c0d`、`/health` 返回 `{"status":"ok"}` |
-| **⑥ CI 全绿实证（收口）** | **发布作业 success，主机版本与提交一致** | 提交 `cd74f6b` 双推后 run **42856784292** 五作业 `success`；部署作业日志：`构建内存参数：NODE_OPTIONS=--max-old-space-size=1536；可用内存 1511MB，swap 4095MB` → `✓ built in 21.30s` → `部署完成：cd74f6b 2026-11-10T16:42:50Z` → `server=cd74f6bb2d34c866b311088d54b666ab9d8beaa4` / `runner=cd74f6bb2d34c866b311088d54b666ab9d8beaa4`（两者相等） |
+| **⑥ CI 全绿实证（收口）** | **发布作业 success，主机版本与提交一致** | 提交 `cd74f6b` 双推后 run **42856784292** 五作业 `success`；部署作业日志：`构建内存参数：NODE_OPTIONS=--max-old-space-size=1536；可用内存 1511MB，swap 4095MB` → `✓ built in 21.30s` → `部署完成：cd74f6b 2026-11-10T16:42:50Z` → `server=cd74f6bb2d34c866b311088d54b666ab9d8beaa4` / `runner=cd74f6bb2d34c866b311088d54b666ab9d8beaa4`（两者相等）；**通道可重复**：此后 `dba2e0a`（run 42857618838）、`800cb84`（run 42859020631）两次 push 的「发布到生产服务器」作业同样 `success`，主机 HEAD 与远端 main 逐次一致 |
 | **⑦ 主机侧状态** | 已落新版本 | `git -C /opt/mim/app rev-parse HEAD` = `cd74f6bb2d34c866b311088d54b666ab9d8beaa4`；`mim-api` `active`；新前端产物 `index-DeP9vjTY.js`（3283661B，00:42 构建）+ `index-z3rqfMFT.css` |
 | **⑧ 线上取证（本轮）** | 全 200 / 301 | `https://mim.mixm.top/health` 200 / 0.064s / 53B；`/api/v1/modules` 200 / 0.074s / 9514B；`/` 200 / 0.070s / 5114B；`/admin/` 200 / 1430B；`http://mim.mixm.top/health` 301 / 178B |
 | **⑨ sharp 在生产主机实跑** | **可用，且开销极低** | 云助手命令 `mim-sharp-test`（`cmd-nnw3bci6` / `inv-wb18bfg5as`，`命令成功 / ExitCode 0 / 1秒`）：`SHARP_VER 0.35.5 VIPS 8.18.7` / `SRC_BYTES 16032`（1200×900 PNG）/ `OUT_BYTES 982`（`resize(400,300).jpeg({quality:80})`）/ `RESIZE_MS 16` / `RSS_MB 71`；同期内存 `Mem total 1963MB / available 1458MB`，`systemctl is-active mim-api` = `active` |
@@ -701,6 +703,34 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **不适用**：ghcr（容器镜像仓库域名固定 `ghcr.io`，不支持自定义域名）。
 - **待办（按平台逐条登记在 `customDomains.json` 的 `next_steps`）**：① DNSPod 为 `www` / `portal` / `m` / `api` / `test` / `store` / `dev` / `shop` 添加解析记录；② 各平台控制台绑定自定义域名并签发证书；③ 新增域名若指向生产 CVM，需单独签发证书——2026-11-11 以未配置主机名做严格 TLS 探测失败（`curl --resolve probe-x.mixm.top` 严格校验 exit 000），说明现有证书不覆盖任意子域。
 - **门禁**：`node scripts/verify-custom-domains.mjs` 校验「矩阵 10 平台全覆盖、域名逐一来自 xls 主机清单、无重复分配、live 带取证、pending 带下一步、文档已登记」。
+
+---
+
+### 9.17 全平台对外路径段统一为模块功能名称（2026-11-11 00:52 +08:00）
+
+**性质**：按用户「整个项目在所有平台是访问域名 `https://XX.XXX.top/XXX`，所有 `/XXX?` 等等全部修改为模块功能名称」指令，把前端对外地址的**路径段**改成语义化模块功能名称，并做到**内部视图标识与对外地址解耦**。改名口径（用户在澄清提问后只回「是否实现」，按推荐默认执行）：取**英文功能名**（中文路径会被编码成 `%E5%95%86…`，分享链接不可读）；旧段**保留 301 / 前端改写兼容**；`/api/v1/*`（版本化接口命名空间）与 `/admin/`（静态后台入口）**不在改名范围**。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 改名映射（唯一真源） | `store→marketplace`（商城）、`sites→entry-catalog`（入口配置清单）、`comic→comic-studio`（漫剧 AI 剧）、`login→signin`（登录）；`deployments` / `chat` / `settings` 原段名本身即功能名，不变 | `apps/web/src/router.ts` 的 `VIEW_SEGMENTS`；`SEGMENT_VIEWS` / `VIEWS` 由它派生 |
+| 旧段兼容（前端） | `LEGACY_SEGMENTS` + `resolveSegment()`：命中旧段即 `history.replaceState` 原地改写为新路径（**保留 `search` / `hash`**，不新增历史记录）；旧 `#/xxx` hash 链接同样落到新路径 | 生产浏览器取证：`/store` → 路径变为 `/marketplace` 且正常渲染 |
+| 旧段兼容（生产入口） | `deploy/nginx-mim.conf` 在 `location /` 之前新增四条：`location = /store → 301 /marketplace`、`= /sites → /entry-catalog`、`= /comic → /comic-studio`、`= /login → /signin` | 线上 `curl` 实测见下表（301 + 正确 `Location`） |
+| 各平台回退规则 | **无需逐平台改**：`vercel.json` / `netlify.toml` / `render.yaml` / `apps/web/public/_redirects` / `functions/[[catchall]].js` / Azure 注入的 `staticwebapp.config.json` / nginx `try_files` 全是「`/* → /index.html`」通配 | 逐文件核对规则行未变，仅改注释示例 |
+| 构建期目录 | `scripts/build.mjs` 由抓 `VIEWS` 数组改为抓 `VIEW_SEGMENTS` 对象字面量生成 `dist/<模块功能名>/index.html`，并加「解析结果为空即 exit 1」防静默产出 0 目录 | `npm run build` → `✅ SPA 回退产物就绪: 404.html + 7 个路径段目录（marketplace / entry-catalog / deployments / comic-studio / chat / settings / signin）`；`dist` 实见 8 个目录（含 `assets`） |
+| CSP 硬约束 | `apps/web/index.html` 内联脚本（多段深链接折叠）被生产 nginx 以 sha256 白名单放行，改脚本即失效 → 同轮重算并把 nginx 内**6 处**哈希全换：旧 `sha256-d7PscDjR7ck5c00MXJCg3RfE/XwnXcztI6xijKlWx0A=` → 新 **`sha256-Q4BFbQUCW5bmauOy9Zn8D1km5RItTJrk6r3tkodIR0M=`** | 线上 `Content-Security-Policy` 响应头：新哈希命中 **1** 处、旧哈希 **0** 处；浏览器实测 `/marketplace/abc` 折叠为 `/marketplace`（证明内联脚本在 CSP 下真的执行） |
+| 测试脚本同步 | `verify-auth-gate.mjs`（`/comic`→`/comic-studio`、`/store`→`/marketplace` 的断言与文案）、`verify-film-export.mjs`（`BASE + '/comic-studio'`）| `verify-auth-gate` 35/35 通过 |
+| 本地门禁（提交前） | `pnpm -r typecheck` **EXIT=0**（5/6 项目）；`npm run build` **EXIT=0**；`pnpm --filter @mim/api test` **16 文件 / 233 例全过**；`verify-deployments` **52/52**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`npm run check` 版本 / 密钥模板通过、注释覆盖 **88.8%**（105 文件） | 本轮真实命令输出 |
+| 本地真渲染 E2E | 自写 CDP 脚本（`.tmp/verify-route-rename.mjs`，未入库）对 `http://127.0.0.1:5188`：新段直达 4 项、旧段改写 2 项、未知路径回退、未改名段回归、多段折叠 2 项 → **11/11 PASS** | Edge `--headless=new` + `--remote-debugging-port=9222`，`scripts/serve-local.mjs` 托管 `apps/web/dist` |
+| 提交与双推 | `07db075 feat(routes): 全平台对外路径段统一为模块功能名称`；`git push origin main`（`dba2e0a..07db075`）、`git push gitee main`（`dba2e0a..07db075`）均 exit 0 | `git log` / push 输出 |
+| CI 与生产发布 | push 触发 run **42858363661** 五作业全 **success**；部署作业含 `[deploy] nginx -t && reload`、`[deploy] 部署完成：07db075 2026-11-10T16:51:11Z`；版本校验 `server=07db075…` = `runner=07db075…` | `gh run view` / `gh run watch --exit-status` |
+| 线上取证（生产 `mim.mixm.top`） | `/health` 200/53B；`/` 200/5263B；`/marketplace` 200/5263B；`/store` **301**→`/marketplace`；`/sites` **301**→`/entry-catalog`；`/comic` **301**→`/comic-studio`；`/login` **301**→`/signin`；`/comic-studio` `/entry-catalog` `/signin` `/deployments` `/chat` `/settings` 全 200/5263B；`/admin/` 200/1430B；`/api/v1/modules` 200/9514B | `curl.exe -o NUL -w "%{http_code} %{size_download} %{redirect_url}"`（2026-11-11 00:50 左右，本机直连） |
+| 线上取证（生产浏览器） | `/marketplace` 主布局渲染、`/store` 改写后渲染、`/comic-studio` 匿名内嵌登录卡、`/comic` 改写、`/entry-catalog`、`/signin`、未知路径回退、`/deployments` 回归、多段折叠 2 项 → **11/11 PASS** | Edge CDP 对生产域名（`MIM_GATE_BASE=https://mim.mixm.top`） |
+| GitHub Pages | `/mim/` 200 / 5263B（新产物）；深链接 `/mim/marketplace` **404 / 5263B** 属 `404.html` 逐字节副本的既有设计（浏览器加载后 SPA 启动） | `curl`（2026-11-11 00:50） |
+| Cloudflare Pages | CI 内真实发布：`✨ Success! Uploaded 4 files` → `✨ Deployment complete! … https://5ebbcce2.mim-299.pages.dev`；线上 `/`、`/marketplace`、`/comic-studio`、`/store`、`/comic` 全 200 / 5263B，`/api/v1/modules` 200 / 9514B | CI 作业日志 + `curl -H "Accept: text/html"` |
+| EdgeOne Pages | 本轮手工重发：`edgeone makers deploy dist -n mim-app --env production` → `Deploy Success`，Deployment **`dpqet7c16dhf`**，Project `makers-6b8km8xikz2l` | CLI 输出；`data.mixm.top/marketplace`、`/comic-studio`、`/` 仍为 **200 / 984B WAF 人机校验页**，**内容层本轮未取证**（按 §9 的 WAF 判别规则不作内容断言） |
+| 其余平台 | **未重发**：CI「托管平台同步」日志显示 `SKIP: 缺少 VERCEL_TOKEN`、`SKIP: 缺少 SEALOS_KUBECONFIG` 等，属既有凭据缺口（非本轮引入）。因回退规则为通配、且改名只在构建产物与前端路由内，这些平台一旦重发即自动生效 | CI 作业日志 |
+| 文档同步（铁律七） | `README.md`（新增 2026-11-11 变更条目、「路径即视图」段与「生产登录入口」段改新段）、`docs/wiki/05-runbook.md`（回退四件套段改新段 + nginx 四条 301）、`docs/wiki/08-dev-implementation.md`（顶部新增变更注记）、`Mim-PRD.html`（`/sites` 视图改 `/entry-catalog` 并注明旧段 301）、本节与 §0 现行状态覆盖 | 逐文件 Edit |
+| 未做 / 已知缺口（如实登记） | ① `verify-site-modules` / `verify-site-directory` 本轮未复跑（改动未触及其数据源，风险低但**未取证**）；② `verify-auth-gate --live` / `verify-film-export` 的官方 live 脚本未跑，改以自写 CDP 11/11 覆盖路由改名本身；③ `docs/deployment-summary.{json,md}` 未重生成（部署注册表本轮未变）；④ EdgeOne 内容层未取证（WAF 人机校验）；⑤ Vercel / Sealos / IGA / Netlify / Render 未重发（缺凭据 SKIP）；⑥ 中文功能名路径方案未采纳（用户未明示选择，本轮取推荐默认） | 本轮未执行项清单 |
 
 ---
 
