@@ -12,6 +12,8 @@
 | pnpm 9.12.0（`packageManager` 已锁定） | **必需**（`corepack enable` 或 `npm i -g pnpm@9.12.0`） | `pnpm --version` |
 | git CLI | 可选（仅 tag 校验段需要） | `git --version` |
 
+> **生产服务器 Node 口径（2026-11-10 实测补充）**：腾讯云 CVM 上 `services/mim-api` 的 esbuild 单文件产物（`dist/index.js` 约 6.5MB）在 **Node 22.11.0** 上启动即 `SEGV`（`status=11 / core-dump`，无任何输出），同一份产物在 Node 22.23 / 主机升级后的 **v22.20.0** 上正常。故生产机 Node 必须 ≥ 22.12，本轮实际部署在 `/opt/node22`（nodejs.org 官方 tarball 解包，软链到 `/usr/local/bin/node|npm|npx`）。另：生产主机必须先行 `systemctl restart mim-api` 前确认 `node -v`；`sharp` 已改为缩略图路由 `await import` 按需加载，不再阻塞启动。
+
 首次使用须 `pnpm install`（安装 workspace 全部依赖；锁文件 `pnpm-lock.yaml` 已入库）。
 
 ## 2. 运行版本校验

@@ -115,9 +115,9 @@ describe('部署项详情与异常标识', () => { // 详情与异常
     expect(res.body.item.repository.id).toBe('github:afdk1991/mim'); // 仓库标识
     expect(res.body.item.delivery.artifact_in_head).toBe(true); // 远端 HEAD 仍含工件
     expect(res.body.item.delivery.artifact_in_worktree).toBe(true); // 工作树工件已于 2026-11-10 由 git 恢复，不再缺失
-    expect(res.body.item.status).toBe('BROKEN'); // 失败状态
-    expect(res.body.item.result.verdict).toBe('FAIL'); // 失败结果
-    expect(res.body.item.anomalies.length).toBeGreaterThan(0); // 异常说明非空
+    expect(res.body.item.status).toBe('OK'); // 2026-11-10 23:40 生产已真实上线（/health 200、HTTPS 200）
+    expect(res.body.item.result.verdict).toBe('PASS'); // 上线取证齐备，不再是 FAIL / 000
+    expect(res.body.item.anomalies.length).toBeGreaterThan(0); // 历史异常（PRODUCTION_UNREACHABLE 等）仍以留痕保留
     expect(Array.isArray(res.body.related)).toBe(true); // 同类项列表
   }); // 详情用例结束
 

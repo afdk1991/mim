@@ -161,6 +161,8 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 
 > **生产环境已上线**：`https://mim.mixm.top`（前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。遵循 [铁律八](./AGENTS.md)，任务完成后由 CI 自动发布，**不以本地预览作为交付终点**。
 >
+> **2026-11-10 23:40 生产上线取证（现行状态）**：`https://mim.mixm.top` 已真实在线 —— `/health` **200 / 0.071s / 53B**（`{"status":"ok","service":"mim-api","version":"0.0.0"}`）、`/` 200 / 5114B、`/api/v1/modules` 200 / 9514B、`/store` 与 `/comic` 200 / 5114B（`try_files` SPA 回落生效）、`/admin/` 200 / 1430B；Let's Encrypt 证书已签发（`ssl_verify_result=0`），`http://` 一律 **301** 跳 HTTPS；Cloudflare Pages 的 `/api` 反代随上游恢复，`https://mim-8ah.pages.dev/api/v1/modules` 由 521/502 转 **200 / 2.491s / 9514B**。主机构建与启动链路上修掉三个真实缺陷（esbuild banner `createRequire` 重名 `22d2d2b`、`sharp` 未设 external 被内联 `726f5bb`、启动期加载原生库致 SEGV → sharp 改按需加载 `f859114` + 主机 Node 升到 22.20.0）。取证明细见 [AGENTS.md §9.14](./AGENTS.md)。
+>
 > **2026-11-09 17:54 复核（现状标注，非历史数值改写）**：本机探测 `mim.mixm.top` 返回 `000`（curl exit 7，本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析 `115.159.159.11`），主机侧状态本轮无 SSH / `tccli` 凭据可验证；逐平台实测与「历史快照不得冒充现状」的阅读约定见 [AGENTS.md §0 / §9.1](./AGENTS.md)。
 >
 > **生产权威终点与双远端（铁律十二，2026-11-09 18:08 补充）**：本项目生产**唯一权威终点**为线上腾讯云自建服务器 `https://mim.mixm.top`（前后端 + SQLite 一体上线），下方 9 平台矩阵仅为分发 / 镜像 / 可用性取证，**任一平台的 200 均不得替代「已上线」**。代码远端共 2 个：`origin`（`https://github.com/afdk1991/mim.git`）与 `gitee`（`https://gitee.com/mallwm_admin/mim.git`），每轮交付须**同轮全推并逐个 `git ls-remote` 取证**；**已移除的原候选托管平台相关内容全量删除且不得重新引入**。取证矩阵 V1–V6 与适用边界见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)。

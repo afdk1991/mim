@@ -22,6 +22,8 @@
 | 铁律八偏离 | 本轮为**仓库体检与修复轮**（恢复工件 / 对齐部署清单 / 修 Render 与 Azure 配置），无新功能产物；生产主机侧仍不可验证，故未做生产部署、未刷新线上 E2E；**不以本地门禁通过冒充「已上线」** | 铁律一例外条款 + 铁律三；线上逐平台结果见 §9.2 |
 | ✅ 悬空引用已解除（2026-11-10） | 2026-11-09 登记的 🔴 悬空引用（`deploy.yml` 引用的 `deploy/*`、`vercel.json` 等已不在工作树）**已消除**：23 个工件由 `git checkout -- .` 恢复，`node scripts/verify-deployments.mjs` D26 由失败转为 **52/52 PASS** | `git status --short`（工作树干净）、`node scripts/verify-deployments.mjs`（52/52） |
 
+> **现行状态覆盖（2026-11-10 23:40 +08:00）**：本节表格是 2026-11-10 01:10 的基线快照；**生产可达性已变更** —— `https://mim.mixm.top` 已真实上线并取得 IP 级取证（`/health` 200、`/api/v1/modules` 200、HTTPS 200、`http` 301），逐项证据见 [§9.14](#914-生产上线腾讯云-cvm-从零部署到-http-https-全通2026-11-10-2340-0800)。表内「生产可达性 `000`」按铁律三保留为历史留痕，**不得再当作现状引用**。
+
 **本轮体检边界（2026-11-10）**：按用户「全项目全面检查与修复」指令，做了三类**可逆**修复——① 把误删的 23 个部署工件从 HEAD 恢复到工作树（`git checkout -- .`）；② 把部署注册表里「工作树缺失」的过时口径改为「已恢复」并重生成核对表（`WORKTREE_ARTIFACT_*_RESTORED`）；③ 修正 `render.yaml`（蓝图 schema 由非法的 `static_sites:` 改为 `services: - type: web / runtime: static`，并补 `routes` 深链接回退）与 `azure-static-web-apps.yml`（补 `staticwebapp.config.json` 回退注入）。**不改任何铁律的约束语义**，未做 `git add / commit / push`、未删除任何文件、未触发任何线上部署。
 >
 > **2026-11-09 18:08 补充**：按用户指令新增铁律十二（远程仓库全量同步 + 生产统一部署腾讯云自建服务器），并全量删除原候选托管平台的全部相关内容；原铁律一～十一的编号 / 标题 / 约束语义仍未改动，规则变更的同步清单见 §12.5。2026-11-09 18:50 按用户指令将项目名称统一为 **Mim**，全仓名称口径一致。
@@ -422,6 +424,25 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **门禁**：`node scripts/verify-deployments.mjs` **52/52 PASS**、`verify-entry-manifest` PASS、`deploy.yml` 经 `yaml.safe_load` 解析通过。
 - **未覆盖项**：① Pages 侧未绑自定义域（`mixm.top` zone 内 0 条 DNS）；② 旧令牌 `mim-ci` 未吊销；③ 生产主机 Web 服务未起（nginx / systemd `mim-api`）的根因需服务器权限或腾讯云控制台登录后定位；④ 未做生产登录态 E2E（后端不可达）。
 - **本轮文档提交与 CI**：`1e7e99f`（6 files）推送后 run **42833194517** 的 GitHub Pages 作业因 `No artifacts named "github-pages" were found`（上传步骤成功、取件步骤失败，仓库既有的产物竞态偶发）变红，其余四作业全绿且 Cloudflare 步骤再次真实部署（`Success! Uploaded 3 files (2 already uploaded)`、`Uploading Functions bundle`、`Deployment complete! … https://11c2f561.mim-8ah.pages.dev`）；按 §9.3 的运维提示改用 `gh workflow run deploy.yml --ref main` 触发**全新 run 42833800822**，**全绿**（2m36s），避免 `--failed` 重跑导致的 github-pages 产物重复。收尾复测：`/` **200 / 0.884s / 5114B**、`/store` **200 / 0.899s / 5114B**、`/api/v1/modules` **521**、`https://afdk1991.github.io/mim/` **200 / 5.72s / 5114B**。
+
+### 9.14 生产上线：腾讯云 CVM 从零部署到 HTTP/HTTPS 全通（2026-11-10 23:40 +08:00）
+
+**性质**：③ 从「主机无入口」转为「用腾讯云自动化助手（云助手 root shell）替代 SSH，在 CVM `115.159.159.11` 上真正把生产栈跑起来」。本轮**首次取得生产线上取证**：`https://mim.mixm.top` 的 `/health`、`/`、`/api/v1/modules`、深链接全部 200，HTTP 一律 301 跳 HTTPS，Cloudflare Pages 的 `/api` 反代因上游恢复而由 521/502 转 **200**。
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| 执行通道 | SSH（22 端口可达、公钥已写入 root 但 `Permission denied`、host key 变化说明实例被重装）放弃，改用**腾讯云自动化助手**（控制台 `/cvm/command` 创建命令 → 执行 → 选实例 → 读执行记录），单次超时 60s，长任务统一 `nohup … &` 后台化 | ✅ 唯一可用 root 通道 |
+| 主机体检 | `VM-0-13-ubuntu` / Ubuntu 22.04.5；`/` 50G（43G 空闲）；初始**只有 22 端口监听**，`nginx` 与 `mim-api` 均 `could not be found`、`/opt/mim` 不存在 → 这台机器**从未部署过**生产栈 | 不是「服务挂了」而是「从未安装」 |
+| 环境 | apt 装 `nginx/1.18.0`、`curl`、`ca-certificates`、`certbot`、`python3-certbot-nginx`；Node 走 nodejs.org 手工解包（`/opt/node22`，软链到 `/usr/local/bin`）；`pnpm@9.12.0`；建 4G `/swapfile` 并写 `/etc/fstab`（2C2G 上 `vite build` 会 `Ineffective mark-compacts near heap limit`，`NODE_OPTIONS=--max-old-space-size=2560` 才能过） | ✅ |
+| 代码同步 | 主机 `https://github.com` 被阻断（`gh=000`），`git@github.com:22` 可用 → `git clone --depth 1 git@github.com:afdk1991/mim.git /opt/mim/app`，Deploy Key `/opt/mim/.ssh/deploy_key`（GitHub 侧只读 key `169408276`） | ✅ 与 `deploy/deploy.sh` 设计一致 |
+| 缺陷 ①：`createRequire` 重名 | 后端启动即 `SyntaxError: Identifier 'createRequire' has already been declared`（`services/mim-api/build.mjs` 的 esbuild `banner` 与 esbuild 为内联依赖自动注入的同名 import 冲突）→ 别名 `createRequire as mimCreateRequire`，提交 **`22d2d2b`** | ✅ 真仓库 bug，已修 |
+| 缺陷 ②：sharp 被内联 | 换新错 `Could not load the "sharp" module using the linux-x64 runtime`。根因：`sharp` 不在 `build.mjs` 的 `external` 清单，被 esbuild 打包进 `dist/index.js`，其平台包解析基准变成 `dist/` 目录，而 `@img/*` 实际在 `node_modules/sharp` 兄弟目录。`pnpm rebuild sharp` / `pnpm install --frozen-lockfile --prod=false`（`Already up to date`）/ `npm install`（`EUNSUPPORTEDPROTOCOL workspace:*`）均无效 → 把 `sharp` 加入 `external`，提交 **`726f5bb`** | ✅ 修法正确（`require('sharp')` 直测在 root / `mim` 用户下均 `DIRECT_OK`） |
+| 缺陷 ③：启动期加载原生库 | `726f5bb` 后进程改为 `status=11/SEGV`（systemd `Failed with result 'core-dump'`）。定位：同一份 `dist` 在本机 Node 22.23 能跑到业务校验（`MIM_JWT_SECRET 长度不足 32 字符`），在主机 Node **22.11.0** 上启动即段错误 → ① 把 `sharp` 改为 media 路由内 `await import('sharp')` 按需加载（提交 **`f859114`**）；② 主机 Node 升级到 **v22.20.0**（`/opt/node22`，`node -v` 验证） | ✅ 崩溃源为 Node 22.11 + 单文件大产物的组合，升级后消失 |
+| 生产取证（HTTP） | `/health` **200 / 0.049s / 53B**（`{"status":"ok","service":"mim-api","version":"0.0.0"}`）、`/` **200 / 0.063s / 5114B**、`/api/v1/modules` **200 / 0.041s / 9514B**（真实模块 JSON）、`/store` 200 / 5114B、`/comic` 200 / 5114B（nginx `try_files` SPA 回落）、`/admin/` 200 / 1430B | ✅ 前端 + 后端 + SQLite 一体在线 |
+| 生产取证（HTTPS） | `certbot --nginx -d mim.mixm.top --non-interactive --agree-tos --redirect` 签发 Let's Encrypt 证书；`https://mim.mixm.top/health` **200 / 0.071s / 53B**、`/` 200 / 5114B、`/api/v1/modules` 200 / 9514B、`/store` 200、`/admin/` 200 / 1430B；`ssl_verify_result=0`；`http://mim.mixm.top/health` → **301 / 178B**（强制跳 HTTPS） | ✅ 443 已开且证书链可信 |
+| Pages `/api` 反代恢复 | `https://mim-8ah.pages.dev/api/v1/modules` → **200 / 2.491s / 9514B**（此前 521 / 502 因上游无服务） | ✅ ①②③ 三项全部闭环 |
+| 提交与双推 | `22d2d2b`（esbuild banner 别名）、`726f5bb`（`sharp` external）、`f859114`（sharp 按需加载），均 `git push origin main` + `git push gitee main` 成功 | ✅ |
+| 已知限制 | ① 主机 Node 为手工解包在 `/opt/node22`（非 apt 托管），`deploy.sh` 若未来重装系统需重跑升级；② `mim-api.env` 的 `MIM_JWT_SECRET` 由 `deploy.sh` 生成（≥32 字符校验已通过启动阶段），`MIM_AUTH_ADMIN_PASSWORD` 等私有值未回显；③ `sharp` 缩略图接口在 2C2G 机器上仍未实测（按需加载后不再影响启动，但编解码本身未取证）；④ 生产登录态 E2E 本轮未做 | 如实标注，不以「health 200」冒充全链路 |
 
 ## 铁律十：免费平台额度矩阵与选型路由
 

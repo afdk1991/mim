@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-10T14:20:39.506Z
-- 本地 HEAD：`93b54f1`
+- 生成时间：2026-11-10T15:38:45.575Z
+- 本地 HEAD：`f859114`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,8 +15,8 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 9 | 本轮存在可信取证 |
 | 空数据 | 7 | result 为 null，明确标识而非填 0 |
-| 异常 | 41 | 🔴 1 / 🟡 17 / 🟢 23 |
-| 缺失信息 | 46 | 字段名或工件路径 |
+| 异常 | 42 | 🔴 0 / 🟡 16 / 🟢 26 |
+| 缺失信息 | 41 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -25,7 +25,7 @@
 |---|---|---|---|---|---|---|---|
 | `repo.github` | github:afdk1991/mim | GitHub 仓库 / source | push — | ✅ OK | ✅ PASS — / —B | HTTPS_BLOCKED 等 1 项 | — |
 | `repo.gitee` | gitee:mallwm_admin/mim | Gitee（码云）镜像仓 / source | push — | ✅ OK | ✅ PASS 200 / 52034B | REMOTE_TIMEOUT_RECOVERED 等 3 项 | — |
-| `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | 🔴 BROKEN | 🔴 FAIL 000 / 0B | PRODUCTION_UNREACHABLE 等 3 项 | ⚠ 6 项 |
+| `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 | ⚠ 1 项 |
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 | — |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 | ⚠ 1 项 |
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | 🟡 MANUAL | 🟡 DEGRADED 200 / 984B | WAF_FALSE_POSITIVE 等 2 项 | ⚠ 2 项 |
@@ -48,9 +48,10 @@
 | `repo.gitee` | 🟢 info | `REMOTE_TIMEOUT_RECOVERED` | 2026-11-09 23:03 曾 REMOTE_TIMEOUT（ls-remote exit 124）；实际根因为镜像仓从未创建，2026-11-10 建仓后首次推送成功，超时态已解除，历史不静默删除 |
 | `repo.gitee` | 🟢 info | `MATRIX_ROW_ADDED` | 2026-11-10 按用户指令把本行由「补充项」提升为铁律九矩阵第 10 行：AGENTS.md 铁律九表格、README「多平台部署矩阵」、Wiki 与 PRD 同步新增 Gitee（码云）行，platform_catalog.in_matrix 改为 true |
 | `repo.gitee` | 🟢 info | `NO_CI_MIRROR_JOB` | Gitee 镜像由每轮手工 git push gitee main 驱动（铁律十二 V1），deploy.yml 无 Gitee 推送作业；push origin 不会自动同步镜像，须每轮显式同推并 git ls-remote 取证 |
-| `server.tcloud` | 🔴 critical | `PRODUCTION_UNREACHABLE` | 生产 /health 本轮 000，无 V2/V3/V4 线上取证，不得宣称「已上线」；本机不可达 ≠ 部署失败，但主机侧亦不可验证 |
+| `server.tcloud` | 🟢 info | `PRODUCTION_UNREACHABLE` | 历史留痕：2026-11-09 生产 /health 为 000（主机从未部署过生产栈），已于 2026-11-10 23:40 解除；现 /health 200、/api/v1/modules 200、HTTPS 200 |
 | `server.tcloud` | 🟢 info | `WORKTREE_ARTIFACT_MISSING` | deploy/ 全目录曾于 2026-11-08 从工作树移除（未提交，远端正品无损），2026-11-10 已由 git 恢复至 HEAD 状态；历史风险留痕，当前无悬空 |
-| `server.tcloud` | 🟡 warning | `MISSING_HOST_CREDENTIALS` | 无 SSH 私钥 / tccli / 管理员口令，主机侧状态（systemd / nginx / SQLite）本轮无法验证 |
+| `server.tcloud` | 🟢 info | `MISSING_HOST_CREDENTIALS` | 历史留痕：SSH 直连始终 Permission denied（实例被重装、host key 变更），已改用腾讯云自动化助手（云助手 root shell）作为主执行通道，本轮所有主机操作均经该通道完成 |
+| `server.tcloud` | 🟢 info | `NODE_22_11_SEGV_FIXED` | 生产启动期曾因 Node 22.11.0 + esbuild 单文件产物触发 SEGV；已将主机 Node 升级至 v22.20.0 并把 sharp 改为按需加载，问题闭环 |
 | `pages.github` | 🟢 info | `SPA_FALLBACK_WORKTREE_RESTORED` | scripts/spa-404.mjs 与 apps/web/public/_redirects 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现深链接 404.html 链路 |
 | `pages.github` | 🟢 info | `DEEP_LINK_404_BY_DESIGN` | /mim/store 返回 404 + 5182B 为 dist/404.html 逐字节副本的平台能力上限，浏览器加载后 SPA 正常启动 |
 | `packages.ghcr` | 🟢 info | `AUTH_401_BY_DESIGN` | 未鉴权 401 为 ghcr 预期响应，不判定为部署失败 |
@@ -64,7 +65,7 @@
 | `pages.cloudflare` | 🟡 warning | `CF_PROJECT_ABSENT_RECREATED` | 2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿 |
 | `pages.cloudflare` | 🟢 info | `CF_CI_AUTODEPLOY_RESTORED` | 2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环 |
 | `pages.cloudflare` | 🟡 warning | `CF_CI_PROJECT_NAME_MISMATCH` | deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
-| `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | /api/* 反代已随 Functions 上线（functions/api/[[path]].js 上传成功），但上游 https://mim.mixm.top 的 80/443 端口 Connection refused（22 端口 OPEN、ping 通），故 /api/v1/modules 实测 521；接口层不可用是生产主机 Web 服务未运行所致，不是 Pages 侧缺陷 |
+| `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | 历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
 | `pages.vercel` | 🟡 warning | `CI_SKIP_FALSE_GREEN` | README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署 |
 | `pages.vercel` | 🟢 info | `VERCEL_CONFIG_WORKTREE_RESTORED` | vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置 |
 | `container.sealos` | 🟢 info | `ROOT_404_BY_DESIGN` | 纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA |
@@ -90,8 +91,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 93b54f1ee0e4b32a98424dd645aa84ff21ffb45b | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 93b54f1ee0e4b32a98424dd645aa84ff21ffb45b | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | f859114c8895a560044e86e78d4d387e31c5de6b | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | f859114c8895a560044e86e78d4d387e31c5de6b | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
