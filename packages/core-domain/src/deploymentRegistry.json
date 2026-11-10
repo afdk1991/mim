@@ -422,7 +422,7 @@
         "captured_at": "2026-11-09 23:03 +08:00"
       },
       "anomalies": [
-        { "code": "CI_SKIP_FALSE_GREEN", "severity": "warning", "message": "README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署" },
+        { "code": "CI_SKIP_FALSE_GREEN", "severity": "warning", "message": "run 42862799970（2026-11-11 01:16）日志实证：Vercel 步骤输出 `SKIP: 缺少 VERCEL_TOKEN；exit 0`，该步骤可跳过，故「作业 success」不等于 Vercel 已部署；同 run 线上取证 `https://mim-puce.vercel.app/ => 200` 只能证明既有站点在线" },
         { "code": "VERCEL_CONFIG_WORKTREE_RESTORED", "severity": "info", "message": "vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置" },
         { "code": "VERCEL_PROJECT_NAME_ALREADY_MIM", "severity": "info", "message": "2026-11-11 01:05 浏览器控制台实测：项目名本就是 `mim`（页签标题 `mim - Overview - Vercel`、面包屑 `mim`、生产部署别名 `mim-bochzr8hs-afdk1991s-projects.vercel.app`），`mim-puce` 只是 Vercel 在 `mim.vercel.app` 被占后自动追加的后缀域名；此前登记的「项目名 mim-puce / 待改名」为口径错误，已更正。设置页 Project Name 字段未取到（会话切换到 15726833367@139.com 账号后 /settings 返回 404），结论以概览页 + 部署别名双证据为准" }
       ],

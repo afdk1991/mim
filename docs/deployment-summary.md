@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-10T17:13:07.877Z
-- 本地 HEAD：`4eb2221`
+- 生成时间：2026-11-10T17:18:09.329Z
+- 本地 HEAD：`145816c`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -70,7 +70,7 @@
 | `pages.cloudflare` | 🟡 warning | `CF_CI_PROJECT_NAME_MISMATCH` | deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
 | `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | 历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
 | `pages.cloudflare` | 🟢 info | `CF_PROJECT_RENAMED_TO_MIM` | 2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim |
-| `pages.vercel` | 🟡 warning | `CI_SKIP_FALSE_GREEN` | README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署 |
+| `pages.vercel` | 🟡 warning | `CI_SKIP_FALSE_GREEN` | run 42862799970（2026-11-11 01:16）日志实证：Vercel 步骤输出 `SKIP: 缺少 VERCEL_TOKEN；exit 0`，该步骤可跳过，故「作业 success」不等于 Vercel 已部署；同 run 线上取证 `https://mim-puce.vercel.app/ => 200` 只能证明既有站点在线 |
 | `pages.vercel` | 🟢 info | `VERCEL_CONFIG_WORKTREE_RESTORED` | vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置 |
 | `pages.vercel` | 🟢 info | `VERCEL_PROJECT_NAME_ALREADY_MIM` | 2026-11-11 01:05 浏览器控制台实测：项目名本就是 `mim`（页签标题 `mim - Overview - Vercel`、面包屑 `mim`、生产部署别名 `mim-bochzr8hs-afdk1991s-projects.vercel.app`），`mim-puce` 只是 Vercel 在 `mim.vercel.app` 被占后自动追加的后缀域名；此前登记的「项目名 mim-puce / 待改名」为口径错误，已更正。设置页 Project Name 字段未取到（会话切换到 15726833367@139.com 账号后 /settings 返回 404），结论以概览页 + 部署别名双证据为准 |
 | `container.sealos` | 🟢 info | `ROOT_404_BY_DESIGN` | 纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA |
@@ -98,8 +98,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 4eb22216586c60dbed07f1335daaa3c8330098b0 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 4eb22216586c60dbed07f1335daaa3c8330098b0 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 145816c8197b54e32ec281d2a0327019cabcac70 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 145816c8197b54e32ec281d2a0327019cabcac70 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

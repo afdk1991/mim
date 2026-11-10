@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-10T17:13:07.877Z",
-  "head": "4eb2221",
+  "generated_at": "2026-11-10T17:18:09.329Z",
+  "head": "145816c",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -105,14 +105,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "4eb22216586c60dbed07f1335daaa3c8330098b0",
+      "hash": "145816c8197b54e32ec281d2a0327019cabcac70",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "4eb22216586c60dbed07f1335daaa3c8330098b0",
+      "hash": "145816c8197b54e32ec281d2a0327019cabcac70",
       "exit": 0,
       "error": null
     }
@@ -862,7 +862,7 @@
         {
           "code": "CI_SKIP_FALSE_GREEN",
           "severity": "warning",
-          "message": "README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署"
+          "message": "run 42862799970（2026-11-11 01:16）日志实证：Vercel 步骤输出 `SKIP: 缺少 VERCEL_TOKEN；exit 0`，该步骤可跳过，故「作业 success」不等于 Vercel 已部署；同 run 线上取证 `https://mim-puce.vercel.app/ => 200` 只能证明既有站点在线"
         },
         {
           "code": "VERCEL_CONFIG_WORKTREE_RESTORED",
