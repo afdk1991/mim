@@ -15,7 +15,7 @@
 | 部署矩阵 | **10 个免费平台**（2026-11-10 按用户指令新增 **Gitee（码云）** 为第 10 行）：腾讯云自建 / EdgeOne Pages / GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 / Gitee 镜像仓；`deploymentRegistry.json` 的 `coverage.matrix_platforms` 与 `platform_catalog.in_matrix` 同步为 10 | [铁律九](#铁律九多平台部署矩阵只走免费方案且必须逐平台取证)、`packages/core-domain/src/deploymentRegistry.json`、`node scripts/verify-deployments.mjs` D03 / D20 |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `4398cf0`（`docs(agents): 补记 Gitee 镜像仓补齐取证`）；**双远端已全部同步**：`origin` / `gitee` 的 `refs/heads/main` 均 = `4398cf0`（0 ahead / 0 behind，2026-11-10 22:20 复测 `git ls-remote gitee` exit 0 / 0.27s）；`gitee` 镜像仓由 2026-11-10 按用户提供的私人令牌新建（公开、默认分支 `main`），历史「镜像仍未同步」状态已解除，取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) | `git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`、`git push gitee main`（2026-11-10 21:50 前后 + 22:20 复测） |
+| 仓库同步 | `main` @ `b739483`（`fix(ci): Cloudflare Pages 部署对齐真实项目名 mim-8ah 并取消假绿`）；本轮 Gitee 入矩阵提交 `3f55bee`，推送记录 **`4398cf0..3f55bee`**（`origin` exit 0 / `gitee` exit 0），随后 `3f55bee..b739483` 亦双推；`git ls-remote origin` 与 `git ls-remote gitee` 均 = `b739483`（2026-11-10 22:26 实测，0 ahead / 0 behind）。`gitee` 镜像仓由 2026-11-10 按用户提供的私人令牌新建（公开、默认分支 `main`），历史「镜像仍未同步」状态已解除，取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) 与 [§9.12](#912-部署矩阵新增-gitee码云2026-11-10-2220-0800) | `git push origin main`、`git push gitee main`、`git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`（2026-11-10 22:16 / 22:26） |
 | 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库）与 `gw.txt`（2026-11-10 21:57 实测，同样未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **16 文件 / 230 例**；`verify-deployments` **52/52**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.4 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
@@ -393,12 +393,15 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 文档同步（铁律七） | `AGENTS.md`（§0 / 铁律九表格 / §9.12 / §13.4）、`README.md`（铁律清单 / 多平台部署矩阵 / 覆盖口径）、`docs/wiki/05-runbook.md`（§7.1.3 平台数与 DNSPod 表）、`06-governance.md`、`02-modules.md`、`Mim-PRD.html` | 逐文件改动 |
 | 交付链路 | Gitee 为**源码镜像仓**（layer `source`），交付方式 `push`：每轮手工 `git push gitee main` + `git ls-remote` 取证；**`deploy.yml` 无 Gitee 推送作业**，`push origin` 不会自动同步镜像 | `.github/workflows/deploy.yml` 全文 0 命中 `gitee` |
 | 铁律八边界 | 本轮为**平台登记与文档同步轮**，无功能产物、无部署，故不涉 V2–V4 线上取证；V1 双远端同步本轮实测通过 | 铁律八豁免场景：无产物可部署 |
+| 提交与双推 | 提交 `3f55bee`（`docs(deploy): 铁律九部署矩阵新增 Gitee(码云) 为第 10 平台并同步注册表与门禁`，15 files / +166 / −132）；`git push origin main` → `4398cf0..3f55bee` exit 0；`git push gitee main` → `4398cf0..3f55bee` exit 0；两端 `git ls-remote` 均 = `3f55bee` | `git push` 输出、`git ls-remote origin|gitee` |
+| CI 取证 | run **42831377382**（Deploy @ `3f55bee`）**五作业全绿**：质量门禁 / 发布到生产服务器 / GitHub Pages / 托管平台同步 / GitHub Packages；run 42831377456（Azure SWA）success。生产作业 5s 且带 `::warning::`「未配置 DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY，生产发布已 SKIP；这不等于『已上线』」 | `gh run view 42831377382` |
+| 并行改动同步 | 推送后发现工作树出现本次任务之外的 Cloudflare CI 修复（项目名 `mim-8ah`、去 `continue-on-error`），已由并行侧提交为 `b739483` 并推 `origin`；本会话按铁律十二把 `gitee` 同步至 `b739483`（`3f55bee..b739483` exit 0），两端一致 | `git log`、`git push gitee main`、`git ls-remote` |
 
-- **如实记录的限制**：① Gitee 的 200 仅为**仓库页可达性**取证，不代表任何生产服务可用，也不得替代 `mim.mixm.top`（铁律十二 §12.3）；② 未配置 Gitee Go / Webhook 自动镜像，镜像同步仍依赖每轮手工推送；③ 本轮未做生产部署与线上 E2E。
+- **如实记录的限制**：① Gitee 的 200 仅为**仓库页可达性**取证，不代表任何生产服务可用，也不得替代 `mim.mixm.top`（铁律十二 §12.3）；② 未配置 Gitee Go / Webhook 自动镜像，镜像同步仍依赖每轮手工推送；③ 本轮未做生产部署与线上 E2E（CI 生产作业如实 SKIP）。
 
 ## 铁律十：免费平台额度矩阵与选型路由
 
-**免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 9 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。
+**免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 10 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。
 
 ### 10.1 远程仓库平台（2026-11-09 清理后为 3 个）
 
@@ -508,7 +511,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 代码同步通道 | 服务器 `https://github.com` 出网被阻断，改走 `git@github.com:22` + `/opt/mim/.ssh/deploy_key` 只读 Deploy Key |
 | 部署链路 | push `main`（双远端）→ GitHub Actions `.github/workflows/deploy.yml` → 类型检查 / 测试 / 构建 → SSH 幂等脚本发布 → systemd 重启 → `/health` 取证 |
 
-- **唯一性**：铁律九的 9 平台及其 200 响应**仅作分发 / 镜像 / 可用性取证**；静态站直传（EdgeOne / GitHub Pages / Cloudflare Pages）、同源反代 Worker、容器镜像（Sealos / ghcr）均属分发层，**任何一个都不得替代 `mim.mixm.top` 成为「已上线」依据**。
+- **唯一性**：铁律九的 10 平台及其 200 响应**仅作分发 / 镜像 / 可用性取证**；静态站直传（EdgeOne / GitHub Pages / Cloudflare Pages）、同源反代 Worker、容器镜像（Sealos / ghcr）均属分发层，**任何一个都不得替代 `mim.mixm.top` 成为「已上线」依据**。
 - **冲突裁决**：铁律八 / 九的「多平台发布」与本节「唯一生产终点」并列时，本节定义**交付终点**；铁律九仍完整约束「只走免费方案 + 逐平台取证」，两者并行不悖、不构成豁免。
 - **禁止**：禁止把本地预览、`npm run dev`、任一托管平台 200、CI job success 单独当作「已上线」；禁止引入付费方案（铁律九 / 十）。
 - **凭证边界**：生产 SSH 私钥、`MIM_AUTH_ADMIN_PASSWORD`、`tccli` 等属用户私有凭证；沙箱缺失时按铁律一「唯一例外」处置，附已尝试取证后如实标注偏离，**不得伪造健康检查或线上截图**。
