@@ -564,7 +564,7 @@
       ],
       "xls_remark": "移动端适配入口｜移动端 H5 精简版官网",
       "status": "pending_dns",
-      "status_note": "DNSPod 无 m 解析；Vercel 项目仍为 mim-puce（缺账号登录态无法改名/绑定）",
+      "status_note": "DNSPod 无 m 解析；Vercel 项目名经 2026-11-11 01:05 控制台复核确认本就是 mim（域名 mim-puce.vercel.app 为平台自动追加后缀），无需改名；仅剩 DNS 与域名绑定两项待做",
       "evidence": "2026-11-11 nslookup m.mixm.top -> 无 A 记录",
       "next_steps": [
         "在 DNSPod 为 m 添加 CNAME -> cname.vercel-dns.com",

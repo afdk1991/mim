@@ -262,7 +262,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | 自建 `mim.mixm.top` | 同源（nginx 反代 `/api/`） | 否 | 不挂 CORS 中间件 |
 | GitHub Pages `afdk1991.github.io` | 构建期注入 `VITE_API_ORIGIN=https://mim.mixm.top`（跨域直连） | **是** | 必须含 `https://afdk1991.github.io`（含 `/mim` 子路径同源） |
 | Cloudflare Pages `mim-299.pages.dev`（项目名 `mim`；旧 `mim-8ah` 保留回滚） | 相对 `/api`（同源） | 否 | `functions/api/[[path]].js` 已同源反代到 `mixm.top` |
-| Vercel `mim-puce.vercel.app` | 相对 `/api`（同源） | 否 | `vercel.json` `rewrites` 已同源反代 |
+| Vercel（项目名 `mim`，域名 `mim-puce.vercel.app`） | 相对 `/api`（同源） | 否 | `vercel.json` `rewrites` 已同源反代 |
 | IGA Pages | 取决于其部署脚本 | 若直连则**是** | 见 `deploy/iga/deploy.sh`；若反代同源则无需 |
 | Sealos `mim-i3ywsdfn.cloud.sealos.io` | — | — | **纯 API 容器，不托管 Web SPA**，`/store` 返回 JSON 404 属预期，非缺陷 |
 
@@ -285,13 +285,13 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
 |---|---|---|---|---|
 | 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.065s** / 0.027s ⚡最快（`/health` 200 / 0.070s） |
-| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（真实前端 `apps/web/dist`；curl 命中 WAF 挑战页，须有头浏览器取证） | `https://data.mixm.top` | curl 200 / 0.062s / 0.025s 但仅 **986B** 为 WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；最近一次有头取证（2026-11-06）：`title=Mim（旧定位副标题已于 2026-11-10 删除）`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；**2026-11-07 01:48 复测：复用 profile 的 WAF 放行凭证已过期（约 17h），回落层 2 验证码页，CDP 合成点击 ×15 未通过，本轮真实内容未复验（铁律三如实记录）** |
+| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（项目名 **`mim`**，2026-11-11 01:05 控制台复核；遗留项目 `mim-app` 无流量保留回滚；真实前端 `apps/web/dist`；curl 命中 WAF 挑战页，须有头浏览器取证） | `https://data.mixm.top` | curl 200 / 0.062s / 0.025s 但仅 **986B** 为 WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；2026-11-11 01:05 实测 200 / **981B** / `server: edgeone makers`；最近一次有头取证（2026-11-06）：`title=Mim`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；**2026-11-07 01:48 复测：复用 profile 的 WAF 放行凭证已过期（约 17h），回落层 2 验证码页，CDP 合成点击 ×15 未通过，本轮真实内容未复验（铁律三如实记录）** |
 | GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.225s / 0.095s |
 | Sealos | ✅ | ✅ CI 自动发布（容器 + PVC；纯 API 容器，根路径 `/` 404 无路由，`/health` 200） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/` **404**（`route GET / not found`，属正常非故障）/ 0.281s / 0.101s；`/health` 200 / 0.283s / 0.096s |
 | Cloudflare Pages | ✅ | ✅ CI 自动发布（项目名 `mim`，含 /api 反代） | `https://mim-299.pages.dev` | 2026-11-11 实测 `/` 200 / 1.840s / 5114B、`/api/v1/modules` 200 / 3.200s / 9514B（历史 2026-11-07 快照为 200 / 1.172s / 0.166s，域名当时为 `mim-8ah.pages.dev`） |
 | GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.745s / 0.140s（未鉴权 401 属正常） |
 | IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
-| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败） |
+| Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z）；项目名 **`mim`**（2026-11-11 01:05 控制台复核，`mim-puce` 为 `mim.vercel.app` 被占后平台自动追加的后缀域名） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败；2026-11-11 01:05 复测仍 20s 超时） |
 | GitHub 仓库 | ✅ | ✅ 已同步（HEAD `41a871d`，2026-11-07 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.029s / 0.011s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
 | **Gitee（码云）镜像仓**（2026-11-10 入矩阵，第 10 行） | ✅ | ✅ 已同步（源码国内镜像仓，无 CI 推送作业，每轮手工 `git push gitee main`） | `https://gitee.com/mallwm_admin/mim` | **200 / 0.469s / 52034B（2026-11-10 22:20 实测）**：页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交；`git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s）与本地 HEAD 一致 |
 

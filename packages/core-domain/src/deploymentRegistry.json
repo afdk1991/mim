@@ -1,12 +1,13 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "capturedAt": "2026-11-11 00:20 +08:00",
-  "head": "1fd7b5e",
-  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 10 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员），另补独立 Worker 与 5 个已采用免费层平台；2026-11-11 命名统一轮：Cloudflare Pages 项目由 mim-8ah 迁移为 mim（域名 mim-299.pages.dev），其余平台名称现状与阻塞逐项登记",
+  "capturedAt": "2026-11-11 01:05 +08:00",
+  "head": "4eb2221",
+  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 10 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员），另补独立 Worker 与 5 个已采用免费层平台；2026-11-11 命名统一轮：Cloudflare Pages 项目由 mim-8ah 迁移为 mim（域名 mim-299.pages.dev），并经浏览器控制台复核确认 Vercel 项目名本就为 mim（mim-puce 为平台自动追加后缀域名）、EdgeOne 承载 data.mixm.top 的项目名已是 mim；IGA 仍缺 iga_token 未取证",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
+    "浏览器控制台实测（2026-11-11 01:05 +08:00）：vercel.com/afdk1991/mim 项目概览（页签 `mim - Overview - Vercel`、部署别名 mim-bochzr8hs-afdk1991s-projects.vercel.app）、console.cloud.tencent.com/edgeone/makers 项目列表（项目 mim / data.mixm.top / 代码源 afdk1991/mim main，遗留 mim-app）",
     "git ls-tree HEAD <artifact>（2026-11-09 23:03 实测，区分远端 HEAD 与本地工作树）",
-    "curl 逐平台探测（2026-11-11 实测 Cloudflare Pages 新域名 mim-299.pages.dev 200；其余为 2026-11-09 / 11-10 快照）",
+    "curl 逐平台探测（2026-11-11 实测：mim-299.pages.dev 200 / 5263B、mim.mixm.top/health 200 / 53B、data.mixm.top 200 / 981B；mim-puce.vercel.app 本机 20s 超时 000；data.mim.top DNS 解析失败）",
     "AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3",
     "README.md「多平台部署矩阵」与「站点与部署」",
     ".github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）"
@@ -300,7 +301,7 @@
     {
       "id": "pages.edgeone",
       "name": "腾讯云 EdgeOne Pages（直传静态站）",
-      "aliases": ["EdgeOne Pages", "data.mixm.top", "mim-app", "direct upload 直传"],
+      "aliases": ["EdgeOne Pages", "data.mixm.top", "EdgeOne Makers 项目 mim", "mim-app（迁移前 / 遗留项目）", "direct upload 直传"],
       "platform_id": "edgeone",
       "platform": "腾讯云 EdgeOne Pages",
       "layer": "distribution",
@@ -325,14 +326,17 @@
       "result": {
         "verdict": "DEGRADED",
         "http_code": "200",
-        "latency_ms": 101,
-        "bytes": 984,
-        "evidence": "curl https://data.mixm.top/ → 200 / 0.101s / 984B，命中 EdgeOne WAF 机器校验页（EO_Bot_Ssid / _0x649a），按 WAF 假阳性规则不作内容层取证",
-        "captured_at": "2026-11-09 23:03 +08:00"
+        "latency_ms": null,
+        "bytes": 981,
+        "evidence": "2026-11-11 01:05 +08:00：腾讯云 EdgeOne Makers 控制台（账号 100033061933 / APPID 1320483685）项目列表显示承载本站的项目名已是 `mim`（描述 data.mixm.top、代码源 afdk1991/mim main、近 24h 请求 542 / 15.1MB、运行中），另有遗留项目 `mim-app`（仅默认域、项目资产已上传）；线上 `GET https://data.mixm.top/` → 200 / 981B / server: edgeone makers，仍为 WAF 人机校验页（EO_Bot_Ssid 特征），按 WAF 假阳性规则不作内容层取证；对照 `data.mim.top` DNS 解析失败，佐证自定义域为 data.mixm.top",
+        "captured_at": "2026-11-11 01:05 +08:00"
       },
       "anomalies": [
-        { "code": "WAF_FALSE_POSITIVE", "severity": "warning", "message": "200 + 984B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期" },
-        { "code": "NO_CI_LINK", "severity": "info", "message": "最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站" }
+        { "code": "WAF_FALSE_POSITIVE", "severity": "warning", "message": "200 + 981B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期" },
+        { "code": "NO_CI_LINK", "severity": "info", "message": "历史口径：最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站" },
+        { "code": "EDGEONE_PROJECT_RENAMED_TO_MIM", "severity": "info", "message": "2026-11-11 01:05 控制台实测：承载 data.mixm.top 的 EdgeOne Makers 项目名已是 `mim`；此前登记的「项目名 mim-app」为迁移前口径，registry 与文档已同步更正" },
+        { "code": "EDGEONE_LEGACY_PROJECT_MIM_APP", "severity": "info", "message": "控制台仍存在遗留项目 `mim-app`（默认域、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权" },
+        { "code": "EDGEONE_DELIVERY_MODE_UNVERIFIED", "severity": "warning", "message": "控制台项目 `mim` 显示代码源 afdk1991/mim（main），与本文档「direct upload 直传」口径不一致；本轮未复验交付是否已改为 Git 连接，交付模式待复核" }
       ],
       "missing_fields": ["content_layer_e2e", "last_deployment_id（本轮）"],
       "sources": ["curl https://data.mixm.top/", "AGENTS.md §9 / §9.1 / WAF 假阳性判别规则", "README 多平台部署矩阵"]
@@ -387,7 +391,7 @@
     {
       "id": "pages.vercel",
       "name": "Vercel 前端静态站",
-      "aliases": ["Vercel", "mim-puce.vercel.app", "vercel.json rewrites"],
+      "aliases": ["Vercel", "Vercel 项目 mim", "mim-puce.vercel.app（平台自动追加后缀的域名）", "vercel.json rewrites"],
       "platform_id": "vercel",
       "platform": "Vercel",
       "layer": "distribution",
@@ -420,7 +424,7 @@
       "anomalies": [
         { "code": "CI_SKIP_FALSE_GREEN", "severity": "warning", "message": "README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署" },
         { "code": "VERCEL_CONFIG_WORKTREE_RESTORED", "severity": "info", "message": "vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置" },
-        { "code": "PLATFORM_NAME_ALIGNMENT_PENDING", "severity": "warning", "message": "2026-11-11 命名统一轮：Vercel 项目名仍为 mim-puce（默认域 mim-puce.vercel.app）。项目改名需 Vercel 账号登录态 / API Token，本机 CLI 为 Logged out 且仓库 secrets 无 VERCEL_TOKEN，本轮无法执行；改名后默认域会变为 mim-<hash>.vercel.app（mim.vercel.app 多半已被占用），须同步 CI 的 VERCEL_PROJECT_ID 与文档口径" }
+        { "code": "VERCEL_PROJECT_NAME_ALREADY_MIM", "severity": "info", "message": "2026-11-11 01:05 浏览器控制台实测：项目名本就是 `mim`（页签标题 `mim - Overview - Vercel`、面包屑 `mim`、生产部署别名 `mim-bochzr8hs-afdk1991s-projects.vercel.app`），`mim-puce` 只是 Vercel 在 `mim.vercel.app` 被占后自动追加的后缀域名；此前登记的「项目名 mim-puce / 待改名」为口径错误，已更正。设置页 Project Name 字段未取到（会话切换到 15726833367@139.com 账号后 /settings 返回 404），结论以概览页 + 部署别名双证据为准" }
       ],
       "missing_fields": ["vercel_secrets", "deployment_url（本轮）"],
       "sources": ["curl https://mim-puce.vercel.app/", "git ls-tree HEAD vercel.json", ".github/workflows/deploy.yml step Vercel", "AGENTS.md §9.1"]
