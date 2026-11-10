@@ -307,6 +307,22 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **控制台噪声说明**：E2E 页面 console 里有 `ws://localhost:5173` 连接失败，是上一轮商城 dev server 已停导致的遗留 vite 客户端重连，与本轮管理端无关，零功能报错。
 - **仍未做**：分类树在管理端**没有做拖拽排序**（排序靠改 `sort_order` 数字）；205 个二级模块差异化定价语义、排序三档独立时间列仍为开放项。
 
+### 9.8 删除旧定位标语「跨端任务与轻协作」（2026-11-10）
+
+**性质**：按用户指令删除产品里残留的旧定位文案。该标语属于 2026-11-04 前的旗舰形态（「跨端任务与轻协作工具」），PRD 与 Wiki 已登记为历史范围，但前端仍在侧栏品牌区、登录卡片与标签页标题继续展示，与当前定位（功能模块商城 + 漫剧 AI 剧）不符。
+
+| 项 | 本轮改动 | 取证方式 |
+|---|---|---|
+| 词条 | `packages/i18n/src/index.ts` 删除 `app.tagline`（中英各一条，连带注释），字典键集合仍中英对齐 | 文件内容 + `pnpm -r typecheck` 0 |
+| 侧栏 | `apps/web/src/App.tsx` 品牌区只留 `app.name`，移除 `brand-tagline` 一行 | `apps/web` 构建 0 |
+| 登录页 | `apps/web/src/views/Login.tsx` 登录卡片只留 `<h1>` 应用名，移除标语段 | 同上 |
+| 标签页 | `apps/web/index.html` `<title>` 由 `Mim — 跨端任务与轻协作` 改为 `Mim` | `apps/web/dist/index.html` 实测 `<title>Mim</title>` |
+| 样式 | `apps/web/src/styles.css` 删除已无引用的 `.brand-tagline` 规则，并把 `.brand` / `--sidebar-muted` / `.user-region` 处仍提「标语」的注释改写为现状描述（铁律十一要求注释与实际一致） | 产物 `assets/*.js`、`assets/*.css` grep `跨端任务` 与 `brand-tagline` **均 0 命中** |
+| 未动 | PRD / Wiki / README / AGENTS 中的**历史留痕**表述（如 EdgeOne 取证里 `title=Mim — 跨端任务与轻协作`）按铁律三原样保留，它们记录的是当时线上标题，不是现行文案 | `grep` 复核：业务代码与构建产物零残留，仅文档历史段落保留 |
+
+- **边界**：`site/`（PRD 阅读页）里的「跨端任务与轻协作工具」属 2026-11-04 之前的历史范围描述，本轮未改；若要连 PRD 阅读页一起删须另行确认。
+
+
 
 ## 铁律十：免费平台额度矩阵与选型路由
 

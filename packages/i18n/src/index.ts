@@ -22,8 +22,6 @@ type Dict = Record<string, string>;
 const zh: Dict = {
   // 产品名，出现在标题栏与启动页；各语言保持品牌同一写法
   'app.name': 'Mim',
-  // 副标题口号，用于登录页与落地页的一句话定位
-  'app.tagline': '跨端任务与轻协作',
   // 底部导航「设置」入口的名称
   'nav.settings': '设置',
   // 列表页主操作按钮：新建一条业务对象
@@ -107,8 +105,6 @@ const zh: Dict = {
 const en: Dict = {
   // 品牌名不做翻译，保持全球统一
   'app.name': 'Mim',
-  // 英文口号，对应中文「跨端任务与轻协作」
-  'app.tagline': 'Tasks and light collaboration across devices',
   // 导航项「Settings」
   'nav.settings': 'Settings',
   // 新建按钮用短词 New，贴合英文界面习惯

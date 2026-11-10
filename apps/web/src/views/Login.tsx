@@ -150,9 +150,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>
       <div className="auth-card">{/* 登录卡片：承载标题、切换器与登录表单 */}
         <div className="auth-head">{/* 卡片头部：品牌信息 + 语言切换 */}
-          <div>{/* 品牌信息纵向排列 */}
+          <div>{/* 品牌信息：仅保留应用名，旧「跨端任务与轻协作」标语已按用户指令删除 */}
             <h1>{t(locale, 'app.name')}</h1>{/* 应用名，取自 i18n 词条 */}
-            <p className="muted">{t(locale, 'app.tagline')}</p>{/* 一句话标语，弱化为灰色辅助文案 */}
           </div>{/* 结束品牌信息 */}
           <button
             // 语言切换按钮：普通按钮，避免触发表单提交

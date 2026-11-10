@@ -149,12 +149,10 @@ export function App() {
     <div className="layout">
       {/* 左侧导航栏 */}
       <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
-        {/* 品牌区：应用名 + 标语 */}
-        <div className="brand">{/* 品牌区：应用名与标语纵向成组 */}
+        {/* 品牌区：仅保留应用名，旧「跨端任务与轻协作」标语已按用户指令删除 */}
+        <div className="brand">{/* 品牌区：应用名单独成组 */}
           {/* 应用名（i18n） */}
           <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名，走 i18n 词典 */}
-          {/* 应用标语（i18n） */}
-          <span className="brand-tagline">{t(locale, 'app.tagline')}</span>{/* 应用标语，随语言切换 */}
         </div>{/* 品牌区结束 */}
         {/* 导航按钮列表 */}
         <nav className="nav">{/* 导航容器：按钮由 navItems 顺序决定 */}
