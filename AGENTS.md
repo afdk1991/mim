@@ -14,8 +14,8 @@
 | 远程仓库 | **2 个**：`origin` = `https://github.com/afdk1991/mim.git`、`gitee` = `https://gitee.com/mallwm_admin/mim.git`；**无非清单远端** | `git remote -v`（2026-11-09 18:08） |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `1839c6f`（本轮清理提交并已推 origin）；`origin` 远端与本地一致（0 ahead / 0 behind）；**`gitee` 镜像仍未同步**（`git push gitee` / `git ls-remote gitee` 挂起，本机到 gitee 不可达，见 §9.3） | `git log -1 --oneline`、`git push origin main`、`git ls-remote`（2026-11-10） |
-| 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩 1 个未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
+| 仓库同步 | `main` @ `44b2fee`（`fix(deps): 补齐 web 三包在 pnpm-lock.yaml 的 importer 记录`）；**双远端已全部同步**：`origin` / `gitee` 的 `refs/heads/main` 均 = `44b2fee`（0 ahead / 0 behind）；`gitee` 镜像仓由 2026-11-10 按用户提供的私人令牌新建（公开、默认分支 `main`），历史「镜像仍未同步」状态已解除，取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) | `git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`、`git push gitee main`（2026-11-10 21:50 前后） |
+| 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库）与 `gw.txt`（2026-11-10 21:57 实测，同样未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **16 文件 / 230 例**；`verify-deployments` **52/52**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.4 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
 | 铁律八偏离 | 本轮为**仓库体检与修复轮**（恢复工件 / 对齐部署清单 / 修 Render 与 Azure 配置），无新功能产物；生产主机侧仍不可验证，故未做生产部署、未刷新线上 E2E；**不以本地门禁通过冒充「已上线」** | 铁律一例外条款 + 铁律三；线上逐平台结果见 §9.2 |
@@ -360,6 +360,23 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 
 
+### 9.11 Gitee 镜像仓补齐（2026-11-10 21:50 +08:00）
+
+**性质**：按用户提供的 Gitee 私人令牌补齐国内镜像仓，首次实现铁律十二 §12.2「双远端同轮全推」。本轮只动**远程托管与文档取证**，不改业务代码、不触发任何平台部署。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 令牌有效性 | `GET /api/v5/user` → `login=mallwm_admin`、`name=mallwm`；`/api/v5/user/namespaces` → `mallwm_admin` | Gitee API v5 |
+| 建仓前状态 | `git ls-remote`（带 token）→ `remote: 404 not found!` / `fatal: repository 'https://gitee.com/mallwm_admin/mim.git/' not found`；`GET /api/v5/repos/mallwm_admin/mim` → 404；账号仓库列表返回 **0 个** | 建仓前确证「仓库不存在」，非权限不足 |
+| 建仓 | `POST /api/v5/user/repos`（`name=mim`、`path=mim`、`auto_init=false`）→ 创建 `mallwm_admin/mim`；再 `PATCH`（`private=false`）→ 公开、默认分支 `main`，与 GitHub 主仓（`private=False`）可见性口径一致 | API 返回 `private=False`、`default_branch=main`、`html_url=https://gitee.com/mallwm_admin/mim` |
+| 首次推送 | `git push <token-url> main` → `* [new branch] main -> main`（exit 0）；随后 `git push --all` / `git push --tags` 均 `Everything up-to-date`（本地仅 `main` 分支、0 个 tag） | git 真实输出 |
+| 同步验收 | `gitee` / `origin` 的 `refs/heads/main` 均 = 本地 HEAD = `44b2fee`（三端一致，0 ahead / 0 behind） | `git ls-remote origin`、`git ls-remote gitee`、`git rev-parse HEAD` |
+| 凭证落点 | 令牌写入 **Windows 凭据管理器**（`git-credential-manager`），**未**写入 `.git/config` 明文；实测 `git push gitee main`（不带 token）→ `Everything up-to-date`、exit 0 | `git credential approve`、`git push gitee main` |
+| 未覆盖项 | ① 工作树存在未跟踪草稿（`gw.txt`、`新建 文本文档.txt`），未提交故未进入任何远端；② `packages/core-domain/src/deploymentRegistry.json` 的 `repo.gitee` 仍是 **2026-11-09 23:03 采集快照**（`UNVERIFIED` / `NOT_TESTED` / `REMOTE_TIMEOUT`），本轮**未重跑采集器**；刷新须同步改 `services/mim-api/test/deployments.test.ts` 的 `repo.gitee` 断言与 `scripts/verify-deployments.mjs` D23 的关键异常码白名单，否则门禁必红 | 如实标注，**不冒充注册表已刷新** |
+| 铁律八边界 | 本轮为**仓库同步轮**，无功能产物、无部署，故不涉 V2–V4 线上取证；V1（双远端同步）本轮**首次通过** | 铁律八豁免场景：无产物可部署 |
+
+- **后续待办**：① 若要让 `/deployments` 仪表盘反映真实状态，需重跑 `node scripts/deployment-summary.mjs` 并同轮修正 `repo.gitee` 的契约断言与 D23 异常码白名单；② Gitee 侧如需 CI 镜像（Gitee Go / Webhook），须另配账号，本轮未做；③ 令牌若需轮换，重置后重新 `git credential approve` 即可，无需改仓库配置。
+
 ## 铁律十：免费平台额度矩阵与选型路由
 
 **免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 9 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。
@@ -455,7 +472,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 远端名 | 地址 | 角色 | 每轮同步要求 |
 |---|---|---|---|
 | `origin` | `https://github.com/afdk1991/mim.git` | 源码主仓 + CI 触发源 | `git push origin main` 后 `git ls-remote origin refs/heads/main` 取证 |
-| `gitee` | `https://gitee.com/mallwm_admin/mim.git` | 国内镜像仓 | `git push gitee main` 后 `git ls-remote gitee refs/heads/main` 取证 |
+| `gitee` | `https://gitee.com/mallwm_admin/mim.git` | 国内镜像仓 | `git push gitee main` 后 `git ls-remote gitee refs/heads/main` 取证（2026-11-10 已按用户提供的私人令牌建仓并完成首次同步，见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800)） |
 
 - **全量**：两个远端必须**同轮全部推送**，禁止只推 `origin`；逐个比对 hash 与本地 HEAD 一致（0 ahead / 0 behind）才算同步完成。
 - **不可达处理**：某远端本轮网络 / 凭证不可达时，按铁律一如实报告「该远端未同步」并附命令输出与时间戳，**不得**以另一远端成功冒充全量同步，不得声明「已同步全部远程仓库」。
