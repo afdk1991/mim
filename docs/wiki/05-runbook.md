@@ -128,7 +128,7 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 | 验证码 | 开发/测试环境未配置通道时在响应中回传 `dev_code`；**生产环境（`NODE_ENV=production`）强制走第三方通道，不回传 `dev_code`**。通道已支持：国内手机号 → 阿里云短信（`@alicloud/dysmsapi20170525`，需 `MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE` 四项齐备），海外邮箱 → AWS SES（`@aws-sdk/client-ses`，需 `MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_FROM_ADDRESS`，`MIM_EMAIL_SES_REGION` 缺省回退 us-east-1）。通道未配置时合法请求返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；供应商发送失败返回 502 `AUTH_CODE_DELIVERY_FAILED` |
 | 生产登录入口 | 短信/邮件通道未接入期间，生产使用 `POST /api/v1/auth/password`（`{region,identifier,password}`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`，由 `deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）。口令错误 401 `AUTH_PASSWORD_INVALID`，未配置 503 `AUTH_PASSWORD_NOT_CONFIGURED`，连续失败 5 次锁定 15 分钟（423 `AUTH_ACCOUNT_LOCKED`）。前端登录页默认「密码登录」模式 |
 | 前端视图 | 仅「设置」一页；原「套餐」页随套餐/订阅模块于 2026-11-05 删除，原 FR-03 项目/任务/仪表盘已于 2026-11-04 移除。重定义后：`catalog` 域 4 表 + `comic` 域 **7 表**（第 1 期 3 表 + 第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期**已装配上线（2026-11-05）**：`app.ts` 已 import 并挂载 `/api/v1/media/*`（`createMediaRouter` + 免鉴权对象收发 `createMediaObjectRouter`，后者先于全局 `express.json`）与 `/api/v1/ai/*`（`createAiRouter`），`index.ts` 构造 `storage` + `orchestrator` 并在 `MIM_AI_WORKER` 默认开启时 `orchestrator.start()` 自动消费 `generation_jobs`；商城与漫剧前端视图已上线。**门禁模型（2026-11-08 起，按需登录）**：商城目录 `/store` 匿名可浏览；`/comic`、`/chat`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌 `<Login embedded>` 卡片（提示「此功能需登录后使用」），不再整站锁定；登录成功后原地解锁当前视图，退出、`/me` 启动校验发现令牌失效（refresh 续期失败）或跨标签页退出时回落匿名态、收费视图重新内嵌登录卡片。前端路由为 history 路径路由（`/store` 等单段路径，`vite base './'` 兼容），旧 `#/xxx` 链接启动时自动改写。`apps/web/src/api.ts` 提供会话结构校验、`SESSION_CHANGED_EVENT` 广播与 `/me` 静默校验；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁；独立管理后台 `apps/admin` 原本即为「无凭证只渲染登录页」的全站门禁，无需改动。后端业务接口（`/me`、`/comic/*`、`/ai/*`、`/media/*`、`/im/*`、`/entitlements`、`/admin/*`）原本即 requireAuth；仅 `GET /modules` 系列为不含用户数据的公开只读静态元数据，保持原契约不变；`/site/*` 4 条公开路由已于 2026-11-08 随站点体系整体下线删除 |
-| 模块解锁 | 8 个商城模块种子行（`comic.workbench`、`comic.genpack.basic/pro/team`、`ai.dubbing`、`ai.script`、`media.storage`、`template.pack`）随 `createDatabase()` 自动 upsert 写入 cn/global 两区（幂等，重复启动不重复插入）；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
+| 模块解锁 | **商城模块目录（2026-11-10 两级分类改造后）**：`module_categories` 表存 19 个一级分类 + 205 个二级条目；二级条目一律生成一个功能模块（编码 `cat.<一级slug>-<两位序号>`，`sort_order = 一级序×100 + 二级序`，`license` / `language` / `stars` 随组默认值落库，定价全免费、无前置依赖），与 8 个存量模块（`comic.workbench`、`comic.genpack.basic/pro/team`、`ai.dubbing`、`ai.script`、`media.storage`、`template.pack`，由 `LEGACY_META` 归入 `ai-01` / `ai-06` / `ai-07` / `server-12` / `tools-03` 并保持原付费价与依赖链）共同随 `createDatabase()` 幂等 upsert 写入 cn/global 两区；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
 | 授权命令 | **首选管理后台（2026-11-08 起）**：`/admin/` →「权益管理」页按用户 ID + 模块 code 发放 / 回收，回收与事件审计（`GET /entitlements/:id/events`）同页可查；模块上架 / 调价走「功能模块」页（`POST /modules`、`PATCH /modules/:code/status`、`POST /modules/:code/prices` 等，需 `module:write`）。应急手工 SQL（不推荐，绕过事件审计）：`sqlite3 /opt/mim/app/services/mim-api/data/mim.db "INSERT INTO entitlements (id,user_id,module_id,source,source_id,status,version,created_at,updated_at) VALUES ('ent:<uid>:comic','<uid>',(SELECT id FROM modules WHERE code='comic.workbench' AND region='cn'),'admin',NULL,'active',1,datetime('now'),datetime('now'));"` |
 
 ### 6.4 冒烟顺序（HTTP 全链路）
@@ -150,8 +150,13 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 
 商城模块目录（公开只读，**免鉴权**；原 site 域冒烟序列随站点体系于 2026-11-08 下线，不再适用）：
 
-`GET /api/v1/modules`（200）→ `GET /api/v1/modules?q=comic`（200，搜索生效）→
-`GET /api/v1/modules/comic.workbench`（200，含 `price_history` / `requires` / `current_price`）→
+`GET /api/v1/taxonomy`（200，`groups` 19 个一级分类、`total_items` 205、`total_modules` 为 active 模块总数）→
+`GET /api/v1/modules`（200，默认 `sort=recommended`、`pageSize=20`，返回 `total / page / page_size / total_pages`）→
+`GET /api/v1/modules?category=store`（200，一级前缀命中 9 条）→ `GET /api/v1/modules?category=store-03`（200，二级精确命中 1 条）→
+`GET /api/v1/modules?sort=stars&licenses=MIT,Apache-2.0&languages=PHP`（200）→ `GET /api/v1/modules?sort=hot`（必须 400 `VALIDATION_FAILED`）→
+`GET /api/v1/modules?q=comic`（200，搜索生效）→
+`GET /api/v1/modules/hot`（200，默认 `range=today`、`window_hours=24`、`items` ≤5 且 `hotness` 降序）、`GET /api/v1/modules/hot?range=week`（200，`window_hours=168`）、`GET /api/v1/modules/hot?category=store&limit=20`（200，`total` 9 且全部归属 `store-` 前缀）、`GET /api/v1/modules/hot?range=month`（必须 400 `VALIDATION_FAILED`）→
+`GET /api/v1/modules/comic.workbench`（200，含 `price_history` / `requires` / `current_price` / `category_slug` / `license` / `language` / `stars`）→
 `GET /api/v1/modules/unknown-code`（必须 404）
 
 ## 7. 生产部署（铁律八）

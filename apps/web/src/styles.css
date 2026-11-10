@@ -1300,3 +1300,251 @@ code { /* 行内代码/令牌展示 */
 .entry-relations li { /* 单条关联 */
   padding: 3px 0; /* 逐条留白 */
 } /* 单条关联结束 */
+
+/* ---------- 商城分类树改造（2026-11-10）：左侧两级导航 + 筛选条 + 分页 ---------- */
+.store-layout { /* 商城两栏布局：导航固定宽度，列表自适应 */
+  display: grid; /* 网格布局 */
+  grid-template-columns: 268px minmax(0, 1fr); /* 左导航 268px，右主区占剩余宽度且允许收缩 */
+  gap: 18px; /* 两栏间距 */
+  align-items: start; /* 两栏顶部对齐，导航不随列表拉长 */
+} /* 两栏布局结束 */
+.store-nav { /* 分类导航面板 */
+  max-height: calc(100vh - 160px); /* 超出一屏时内部滚动，避免整页被 205 条拉长 */
+  overflow-y: auto; /* 纵向滚动 */
+  padding: 14px 12px; /* 比常规面板更紧凑 */
+  gap: 6px; /* 导航项之间小间距 */
+} /* 导航面板结束 */
+.store-nav-entry { /* 单个导航项（一级 / 二级 / 全部） */
+  display: flex; /* 左右分布：名称 + 计数 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 名称左、数字右 */
+  gap: 8px; /* 名称与计数最小间距 */
+  width: 100%; /* 撑满导航宽度 */
+  padding: 6px 8px; /* 行内留白 */
+  border: 0; /* 去掉浏览器默认按钮边框 */
+  border-radius: 6px; /* 小圆角 */
+  background: transparent; /* 默认透明，悬停再着色 */
+  color: var(--text); /* 主文字色 */
+  font: inherit; /* 继承全局字体，避免按钮字体变小 */
+  font-size: 13px; /* 导航字号略小于正文 */
+  text-align: left; /* 名称左对齐 */
+  cursor: pointer; /* 可点击提示 */
+} /* 导航项结束 */
+.store-nav-entry:hover { /* 悬停反馈 */
+  background: var(--bg); /* 极浅灰底 */
+} /* 悬停结束 */
+.store-nav-entry.active { /* 当前选中分类 */
+  background: #eef3ff; /* 主色极淡底 */
+  color: var(--primary); /* 主色文字 */
+  font-weight: 600; /* 加粗强调 */
+} /* 选中态结束 */
+.store-nav-entry.sub { /* 二级条目：缩进一级 */
+  padding-left: 22px; /* 缩进表达层级 */
+  font-size: 12px; /* 二级字号更小 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 二级条目结束 */
+.store-nav-group { /* 一级分类容器 */
+  display: flex; /* 纵向排列一级与二级 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 2px; /* 一级与二级之间紧贴 */
+} /* 容器结束 */
+.store-nav-items { /* 二级条目清单 */
+  margin: 0; /* 去掉默认外边距 */
+  padding: 0; /* 去掉默认内边距 */
+  list-style: none; /* 去掉默认圆点 */
+  max-height: 320px; /* 单个分类条目较多时内部滚动 */
+  overflow-y: auto; /* 纵向滚动 */
+} /* 二级清单结束 */
+.store-main { /* 右侧主区 */
+  display: flex; /* 纵向排列各区块 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 14px; /* 区块间距 */
+  min-width: 0; /* 允许内部网格收缩，避免撑破两栏 */
+} /* 主区结束 */
+.store-filters { /* 筛选面板 */
+  padding: 12px 16px; /* 比常规面板更紧凑 */
+  gap: 10px; /* 行间距 */
+} /* 筛选面板结束 */
+.filter-row { /* 单行筛选 */
+  display: flex; /* 横向排列 */
+  align-items: center; /* 垂直居中 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  gap: 10px; /* 元素间距 */
+} /* 筛选行结束 */
+.filter-inline { /* 内联字段（如排序） */
+  display: flex; /* 标签与控件同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 6px; /* 标签与控件间距 */
+  font-size: 12px; /* 次要字号 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 内联字段结束 */
+.filter-inline select { /* 排序下拉 */
+  padding: 4px 8px; /* 内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 6px; /* 小圆角 */
+  background: var(--surface); /* 白色底 */
+  color: var(--text); /* 主文字色 */
+  font-size: 12px; /* 与标签一致 */
+} /* 下拉结束 */
+.filter-pop { /* 多选筛选折叠面板 */
+  position: relative; /* 为绝对定位的下拉体提供参照 */
+  font-size: 12px; /* 次要字号 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 折叠面板结束 */
+.filter-pop summary { /* 折叠摘要行 */
+  display: inline-flex; /* 行内弹性布局 */
+  align-items: center; /* 垂直居中 */
+  gap: 6px; /* 标题与计数间距 */
+  padding: 4px 10px; /* 内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 6px; /* 小圆角 */
+  background: var(--surface); /* 白色底 */
+  cursor: pointer; /* 可点击提示 */
+  list-style: none; /* 去掉默认三角 */
+} /* 摘要行结束 */
+.filter-pop summary::-webkit-details-marker { /* Safari/Chrome 默认三角 */
+  display: none; /* 统一去掉，改用文字提示 */
+} /* 去掉标记结束 */
+.filter-pop[open] summary { /* 展开态摘要 */
+  border-color: var(--primary); /* 边框转主色 */
+  color: var(--primary); /* 文字转主色 */
+} /* 展开摘要结束 */
+.filter-pop-body { /* 选项清单下拉体 */
+  position: absolute; /* 浮于列表之上，不挤压布局 */
+  z-index: 20; /* 高于卡片 */
+  top: calc(100% + 6px); /* 紧贴摘要下沿 */
+  left: 0; /* 左对齐 */
+  width: 260px; /* 固定宽度，选项名较长 */
+  max-height: 280px; /* 限高，超出内部滚动 */
+  overflow-y: auto; /* 纵向滚动 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 2px; /* 选项间距 */
+  padding: 10px; /* 内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: 8px; /* 圆角 */
+  background: var(--surface); /* 白色底 */
+  box-shadow: var(--shadow); /* 浮层阴影 */
+} /* 下拉体结束 */
+.filter-option { /* 单个复选项 */
+  display: flex; /* 勾选框与文字同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 6px; /* 勾选框与文字间距 */
+  padding: 3px 4px; /* 行内留白 */
+  border-radius: 4px; /* 小圆角 */
+  cursor: pointer; /* 整行可点 */
+  color: var(--text); /* 主文字色 */
+} /* 复选项结束 */
+.filter-option:hover { /* 悬停反馈 */
+  background: var(--bg); /* 极浅灰底 */
+} /* 悬停结束 */
+.chips { /* 已选条件芯片容器 */
+  flex-wrap: wrap; /* 芯片折行 */
+  gap: 6px; /* 芯片间距 */
+} /* 芯片容器结束 */
+.chip { /* 单个已选条件 */
+  display: inline-flex; /* 文字与移除按钮同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 4px; /* 文字与 × 间距 */
+  padding: 2px 6px 2px 8px; /* 左多右少，视觉均衡 */
+  border: 1px solid #d6e0ff; /* 主色系浅边框 */
+  border-radius: 999px; /* 胶囊状 */
+  background: #eef3ff; /* 主色极淡底 */
+  color: var(--primary); /* 主色文字 */
+  font-size: 12px; /* 次要字号 */
+} /* 芯片结束 */
+.chip button { /* 芯片移除按钮 */
+  border: 0; /* 去边框 */
+  background: transparent; /* 透明底 */
+  color: inherit; /* 继承主色 */
+  cursor: pointer; /* 可点击 */
+  font-size: 12px; /* 与芯片一致 */
+  line-height: 1; /* 紧凑 */
+  padding: 0 2px; /* 极窄内边距 */
+} /* 移除按钮结束 */
+.pager { /* 分页条 */
+  display: flex; /* 横向排列 */
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 居中展示 */
+  gap: 12px; /* 元素间距 */
+  padding: 8px 0 4px; /* 上下留白 */
+  font-size: 12px; /* 次要字号 */
+} /* 分页条结束 */
+@media (max-width: 960px) { /* 窄屏断点：导航折叠到顶部 */
+  .store-layout { /* 窄屏两栏布局 */
+    grid-template-columns: 1fr; /* 单列，导航在上列表在下 */
+  } /* 窄屏布局结束 */
+  .store-nav { /* 窄屏导航 */
+    max-height: 280px; /* 限高，避免占据整屏 */
+  } /* 窄屏导航结束 */
+} /* 窄屏断点结束 */
+
+/* ---------- 商城热门项目卡片 + 搜索帮助浮窗（2026-11-10 追加） ---------- */
+.store-hot { /* 热门项目卡片：跟在筛选条下方、卡片网格上方 */
+  padding: 12px 14px; /* 紧凑内边距，不喧宾夺主 */
+} /* 热门卡片结束 */
+.hot-list { /* 热门榜单清单 */
+  display: grid; /* 单列网格 */
+  gap: 2px; /* 行间极窄间距 */
+  margin: 4px 0 0; /* 与标题拉开一点 */
+  padding: 0; /* 去默认内边距 */
+  list-style: none; /* 去列表符号，名次单独渲染 */
+} /* 榜单清单结束 */
+.hot-item { /* 单条热门项：整行可点击 */
+  display: flex; /* 名次 + 名称 + Star 同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 三段间距 */
+  width: 100%; /* 撑满卡片宽度 */
+  padding: 5px 6px; /* 行内留白，提升点击面积 */
+  border: 0; /* 去边框，靠 hover 底色表达可点 */
+  border-radius: 6px; /* 圆角与面板一致 */
+  background: transparent; /* 默认透明 */
+  color: inherit; /* 继承正文色 */
+  cursor: pointer; /* 可点击 */
+  font-size: 13px; /* 榜单字号略小于正文 */
+  text-align: left; /* 名称左对齐 */
+} /* 单条热门项结束 */
+.hot-item:hover { /* 悬停反馈 */
+  background: #f2f5ff; /* 主色极淡底 */
+} /* 悬停结束 */
+.hot-rank { /* 名次徽标 */
+  flex: 0 0 auto; /* 固定宽度，不参与伸缩 */
+  min-width: 18px; /* 两位数名次也能放得下 */
+  height: 18px; /* 方形徽标 */
+  border-radius: 4px; /* 小圆角 */
+  background: #eef3ff; /* 主色极淡底 */
+  color: var(--primary); /* 主色文字 */
+  font-size: 11px; /* 徽标小字 */
+  line-height: 18px; /* 垂直居中 */
+  text-align: center; /* 水平居中 */
+} /* 名次徽标结束 */
+.store-help { /* 搜索帮助浮窗容器：固定在右下角 */
+  position: fixed; /* 脱离文档流，滚动时保持可见 */
+  right: 24px; /* 距右边界 */
+  bottom: 24px; /* 距下边界 */
+  z-index: 40; /* 高于常规面板，低于弹窗遮罩 */
+  display: flex; /* 面板与按钮纵向堆叠 */
+  flex-direction: column; /* 面板在上、按钮在下 */
+  align-items: flex-end; /* 右对齐 */
+  gap: 10px; /* 面板与按钮间距 */
+} /* 浮窗容器结束 */
+.store-help-panel { /* 帮助面板主体 */
+  width: 300px; /* 固定宽度，避免长文案撑破 */
+  max-height: 60vh; /* 超长时内部滚动 */
+  overflow-y: auto; /* 纵向滚动 */
+  padding: 12px 14px; /* 紧凑内边距 */
+  box-shadow: 0 12px 32px rgba(16, 24, 64, 0.18); /* 浮层阴影，与背景分层 */
+} /* 帮助面板结束 */
+.store-help-toggle { /* 右下角触发按钮 */
+  box-shadow: 0 8px 20px rgba(16, 24, 64, 0.2); /* 悬浮球质感 */
+} /* 触发按钮结束 */
+@media (max-width: 960px) { /* 窄屏断点：浮窗收窄并贴边 */
+  .store-help { /* 窄屏浮窗 */
+    right: 12px; /* 贴右 */
+    bottom: 12px; /* 贴底 */
+  } /* 窄屏浮窗结束 */
+  .store-help-panel { /* 窄屏面板 */
+    width: min(300px, calc(100vw - 24px)); /* 不超过屏幕可用宽度 */
+  } /* 窄屏面板结束 */
+} /* 窄屏断点结束 */
+

@@ -2,6 +2,7 @@
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
 import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：45 个去重入口、19 个业务域、占位标识与运行时能力点
+import { CATALOG_GROUPS, buildCatalogModuleSeeds } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
@@ -25,6 +26,10 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'generation_jobs', column: 'attempts', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 超时回收重试计数
   { table: 'generation_assets', column: 'purged_at', definition: 'TEXT' }, // 过期产物字节清理时间
   { table: 'module_orders', column: 'channel_txn_id', definition: 'TEXT' }, // 外部渠道交易号（支付回调幂等依据）
+  { table: 'modules', column: 'category_slug', definition: 'TEXT' }, // 模块所属二级分类标识（2026-11-10 分类树改造）
+  { table: 'modules', column: 'license', definition: 'TEXT' }, // 模块开源许可（筛选维度，演示口径）
+  { table: 'modules', column: 'language', definition: 'TEXT' }, // 模块编程语言（筛选维度，演示口径）
+  { table: 'modules', column: 'stars', definition: 'INTEGER NOT NULL DEFAULT 0' }, // Star 数（「Stars」排序依据，确定性演示值）
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
 // 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
@@ -93,6 +98,8 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column
   if (indexed.length > 0) console.log(`[db] additive index created: ${indexed.join(', ')}`); // 同样留痕，便于确认回调幂等约束已生效
   seedModules(db); // 写入模块商城基础数据，保证新库启动即有可售模块
+  seedCatalogCategories(db); // 写入模块分类树（19 个一级 + 205 个二级），导航与过滤依赖它
+  seedCategoryModules(db); // 按分类树展开写入 205 个二级模块（cn/global 双区），实现「二级条目即模块」
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
   return db; // 返回已完成初始化的连接
@@ -245,14 +252,30 @@ export function seedModules(db: Db): void { // 模块种子入口
     }, // template.pack 结束
   ]; // defs 结束
 
+  /**
+   * 存量 8 个模块的归类口径（2026-11-10 分类树改造时新增）：
+   * 用户要求「现有模块保留并归类」，故不删不并，只补上二级分类与筛选属性；
+   * 未列出的模块统一落到 `misc`（其他开源）。
+   */
+  const LEGACY_META: Record<string, { category: string; license: string; language: string; stars: number }> = {
+    'comic.workbench': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 8900 }, // 漫剧工作台归入「AI-人工智能」
+    'comic.genpack.basic': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 7200 }, // 生成包基础版同属 AI 组
+    'comic.genpack.pro': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 6400 }, // 生成包专业版同属 AI 组
+    'comic.genpack.team': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 5100 }, // 生成包团队版同属 AI 组
+    'ai.dubbing': { category: 'ai-06', license: 'MIT', language: 'Python', stars: 6700 }, // 配音合成归入「自然语言处理」
+    'ai.script': { category: 'ai-07', license: 'MIT', language: 'Python', stars: 5600 }, // 剧本扩写归入「大模型」
+    'media.storage': { category: 'server-12', license: 'Apache-2.0', language: 'Go', stars: 4300 }, // 素材存储归入「分布式存储系统」
+    'template.pack': { category: 'tools-03', license: 'MIT', language: 'JavaScript', stars: 3800 }, // 模板包归入「文本编辑」
+  }; // 归类映射结束
+
   const REGIONS = ['cn', 'global'] as const; // 双区常量，类型收窄为联合类型
 
   // 模块行 upsert：按 (region, code) 唯一键冲突时更新可变字段，实现「存在则更新、不存在则插入」
   const upsertModule = db.prepare(
     `INSERT INTO modules
        (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-        region, status, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'one_time', ?, ?, 'active', ?, ?, ?)
+        region, status, sort_order, category_slug, license, language, stars, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'one_time', ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(region, code) DO UPDATE SET
        name_i18n = excluded.name_i18n,
        summary_i18n = excluded.summary_i18n,
@@ -260,6 +283,10 @@ export function seedModules(db: Db): void { // 模块种子入口
        entitlements_required = excluded.entitlements_required,
        status = excluded.status,
        sort_order = excluded.sort_order,
+       category_slug = excluded.category_slug,
+       license = excluded.license,
+       language = excluded.language,
+       stars = excluded.stars,
        updated_at = excluded.updated_at`,
   ); // prepare 结束
 
@@ -277,6 +304,7 @@ export function seedModules(db: Db): void { // 模块种子入口
   const seed = db.transaction(() => { // 包成事务：任一写入失败则整体回滚，避免只写入半套数据
     for (const def of defs) { // 逐模块
       for (const region of REGIONS) { // 逐区域（cn / global 各一行）
+        const meta = LEGACY_META[def.code] ?? { category: 'misc-01', license: 'MIT', language: 'TypeScript', stars: 1000 }; // 未登记的模块落到「其他开源」并给默认属性
         upsertModule.run( // 按占位符顺序绑定参数
           `mod:${def.code}:${region}`, // 主键：模块 ID 拼区域后缀，保证跨区唯一
           def.code, // 模块业务编码
@@ -285,6 +313,10 @@ export function seedModules(db: Db): void { // 模块种子入口
           JSON.stringify(def.requires), // 前置依赖序列化为 JSON 数组，空数组表示无前置
           region, // 区域值，参与唯一键与后续查询过滤
           def.sortOrder, // 排序权重
+          meta.category, // 二级分类标识（归类口径见 LEGACY_META）
+          meta.license, // 开源许可
+          meta.language, // 编程语言
+          meta.stars, // Star 数
           now, // created_at：仅首次插入生效，冲突更新时不变
           now, // updated_at：每次 upsert 都会刷新
         ); // run 调用结束
@@ -305,6 +337,104 @@ export function seedModules(db: Db): void { // 模块种子入口
   }); // 事务函数准备完成
   seed(); // 执行事务，完成种子数据写入
 } // seedModules 结束
+
+/**
+ * 分类树种子：把 core-domain 的 19 个一级分类与 205 个二级条目写入 module_categories。
+ * 幂等策略与模块种子一致——按 slug 唯一键 upsert，重复启动只刷新名称/排序，不产生重复行；
+ * 父键指向一级分类主键，保证导航查询可按 parent_id 直接组装两层结构。
+ */
+export function seedCatalogCategories(db: Db): void { // 分类树种子入口，测试内存库同样执行
+  const now = new Date().toISOString(); // 统一时间戳，保证同批数据创建时间一致
+  // 分类行 upsert：slug 全局唯一，名称/排序变更随代码更新自动刷新
+  const upsert = db.prepare(
+    `INSERT INTO module_categories (id, parent_id, level, slug, name, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(slug) DO UPDATE SET
+       parent_id = excluded.parent_id,
+       level = excluded.level,
+       name = excluded.name,
+       sort_order = excluded.sort_order,
+       updated_at = excluded.updated_at`,
+  ); // prepare 结束
+
+  const seed = db.transaction(() => { // 整棵树同一事务写入，失败即整体回滚
+    CATALOG_GROUPS.forEach((group, groupIndex) => { // 逐一级分类
+      const groupNo = groupIndex + 1; // 一级序号从 1 开始
+      upsert.run(`cat:${group.slug}`, null, 1, group.slug, group.name, groupNo, now, now); // 一级分类：parent_id 为空
+      group.items.forEach((item, itemIndex) => { // 逐二级条目
+        const itemNo = itemIndex + 1; // 二级序号从 1 开始
+        const itemSlug = `${group.slug}-${String(itemNo).padStart(2, '0')}`; // 二级标识，与模块编码共享同一规则
+        upsert.run( // 二级条目行
+          `cat:${itemSlug}`, // 主键
+          `cat:${group.slug}`, // 父键指回一级分类
+          2, // 层级
+          itemSlug, // 全局唯一 slug
+          item, // 条目名称
+          groupNo * 100 + itemNo, // 排序权重与模块一致
+          now, // 创建时间
+          now, // 更新时间
+        ); // run 结束
+      }); // 二级遍历结束
+    }); // 一级遍历结束
+  }); // 事务定义结束
+  seed(); // 执行事务
+} // seedCatalogCategories 结束
+
+/**
+ * 二级模块种子：把分类树里每个二级条目落成一个模块（cn/global 各一行，共 410 行）。
+ * 语义口径（用户 2026-11-10 指令）：只有二级条目是「模块」，一级分类仅作导航；
+ * 这些模块一律免费（不写价格行）、无前置依赖，许可/语言/Star 取自已确定的演示映射。
+ */
+export function seedCategoryModules(db: Db): void { // 二级模块种子入口
+  const now = new Date().toISOString(); // 统一时间戳
+  const seeds = buildCatalogModuleSeeds(); // 由分类树展开 205 条模块定义
+  const REGIONS = ['cn', 'global'] as const; // 双区常量
+  // 模块行 upsert：与存量模块同表，靠 (region, code) 唯一键共存
+  const upsert = db.prepare(
+    `INSERT INTO modules
+       (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
+        region, status, sort_order, category_slug, license, language, stars, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'one_time', '[]', ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(region, code) DO UPDATE SET
+       name_i18n = excluded.name_i18n,
+       summary_i18n = excluded.summary_i18n,
+       status = excluded.status,
+       sort_order = excluded.sort_order,
+       category_slug = excluded.category_slug,
+       license = excluded.license,
+       language = excluded.language,
+       stars = excluded.stars,
+       updated_at = excluded.updated_at`,
+  ); // prepare 结束
+
+  const seed = db.transaction(() => { // 整批同一事务
+    for (const item of seeds) { // 逐条二级模块
+      // 名称与简介：英文暂沿用中文原名（人工翻译前的占位口径，已在文档标注）
+      const nameI18n = JSON.stringify({ 'zh-CN': item.name, 'en-US': item.name }); // 多语言名称
+      const summaryI18n = JSON.stringify({ // 多语言简介
+        'zh-CN': `${item.name} 方向的模块化能力集合，可在商城内一次性解锁后使用。`, // 中文简介
+        'en-US': `Modular capability set for ${item.name}; unlock once in the store.`, // 英文简介
+      }); // 简介序列化结束
+      for (const region of REGIONS) { // 逐个区域
+        upsert.run( // 写入模块行
+          `mod:${item.code}:${region}`, // 主键：模块码 + 区域
+          item.code, // 模块编码
+          nameI18n, // 名称 JSON
+          summaryI18n, // 简介 JSON
+          region, // 区域
+          item.sort_order, // 排序权重
+          item.item_slug, // 二级分类标识
+          item.license, // 许可
+          item.language, // 语言
+          item.stars, // Star 数
+          now, // 创建时间
+          now, // 更新时间
+        ); // run 结束
+      } // 区域循环结束
+    } // 模块循环结束
+  }); // 事务定义结束
+  seed(); // 执行事务
+} // seedCategoryModules 结束
 
 /** 内置权限点清单：路由侧 requirePermission 与后台角色编辑页共用同一份定义 */
 export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺序

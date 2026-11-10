@@ -1,0 +1,159 @@
+/** 契约测试：分类导航树与目录筛选 —— /taxonomy 结构、/modules 的 category/sort/licenses/languages/page 语义（铁律十一：逐行中文注释） */
+
+import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例编排 API，每例重建内存库保证互不污染
+import request from 'supertest'; // supertest 进程内驱动 Express，无需占用真实端口
+import type { Express } from 'express'; // 仅引入类型，用于标注应用实例
+import { createApp } from '../src/app.js'; // 唯一装配入口，走它才能保证路由挂载顺序与线上一致
+import { createDatabase } from '../src/db.js'; // 内存库工厂：建库即执行 schema + 全部种子
+import { CATALOG_GROUP_TOTAL, CATALOG_ITEM_TOTAL } from '@mim/core-domain'; // 分类总量基准，取自唯一权威数据源
+
+const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，长度满足构建期强度校验
+
+let app: Express; // 待测应用实例
+let db: ReturnType<typeof createDatabase>; // 与 app 同生命周期的数据库句柄
+
+beforeEach(() => { // 每个用例独立建库，避免种子与用例写入相互影响
+  db = createDatabase(':memory:'); // 内存库：建库时自动补齐 schema、补列迁移与全部种子
+  app = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 公开面无需管理令牌，env 留空即可
+}); // 结束 beforeEach
+
+describe('GET /taxonomy 分类导航树', () => { // 一级分组 + 二级条目 + 模块计数
+  it('返回 19 个一级分类与全量二级条目，且计数与模块表一致', async () => { // 结构与口径同时校验
+    const res = await request(app).get('/api/v1/taxonomy'); // 公开接口，不带任何令牌
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.groups.length).toBe(CATALOG_GROUP_TOTAL); // 一级分类数量与 core-domain 常量一致（19）
+    expect(res.body.total_items).toBe(CATALOG_ITEM_TOTAL); // 二级条目总量与 core-domain 常量一致（205）
+    const store = res.body.groups.find((group: { slug: string }) => group.slug === 'store'); // 取「建站系统」分组做定点校验
+    expect(store.name).toBe('建站系统'); // 断言分组中文名与用户清单一致
+    expect(store.items.length).toBe(9); // 该组二级条目实数为 9（CMS/新零售/BBS/博客/问卷/SNS/学校/相册/RSS）
+    const sum = res.body.groups.reduce((acc: number, group: { count: number }) => acc + group.count, 0); // 汇总各组模块数
+    expect(res.body.total_modules).toBe(sum); // 断言顶层总计数等于各组之和
+    expect(res.body.total_modules).toBeGreaterThanOrEqual(CATALOG_ITEM_TOTAL); // 每个二级条目至少一个模块
+  }); // 结束结构校验用例
+});
+
+describe('GET /modules 分类与筛选', () => { // 分类过滤、排序、多选与分页
+  it('category 精确命中二级分类，且返回体带分类/许可/语言/Stars 字段', async () => { // 二级过滤
+    const res = await request(app).get('/api/v1/modules?category=store-03'); // 建站系统第 3 条（BBS论坛/问答）
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.total).toBe(1); // 每条二级条目恰好一个模块
+    const [module] = res.body.modules; // 取唯一结果
+    expect(module.code).toBe('cat.store-03'); // 模块编码等于分类条目编码
+    expect(module.category_slug).toBe('store-03'); // 分类字段回显二级 slug
+    expect(module.license).toBe('GPL-3.0'); // 建站系统组默认许可
+    expect(module.language).toBe('PHP'); // 建站系统组默认语言
+    expect(typeof module.stars).toBe('number'); // Stars 为数值，前端可直接渲染
+  }); // 结束二级精确过滤用例
+
+  it('category 传一级 slug 时按前缀归属整组', async () => { // 一级过滤
+    const res = await request(app).get('/api/v1/modules?category=store&pageSize=100'); // 取整组，放大每页条数以覆盖 9 条
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.total).toBe(9); // 建站系统组共 9 条
+    expect(res.body.modules.every((m: { category_slug: string }) => m.category_slug.startsWith('store-'))).toBe(true); // 全部归属 store 前缀
+  }); // 结束一级前缀过滤用例
+
+  it('category=all 等价于不过滤，total 与不带参数一致', async () => { // 兼容「全部推荐项目」入口
+    const withAll = await request(app).get('/api/v1/modules?category=all'); // 带 all 参数
+    const without = await request(app).get('/api/v1/modules'); // 不带分类参数
+    expect(withAll.status).toBe(200); // 断言 200
+    expect(withAll.body.total).toBe(without.body.total); // 两种口径总数一致
+  }); // 结束 all 兼容用例
+
+  it('sort=stars 按 Stars 降序，非法 sort 直接 400', async () => { // 排序三档之一 + 校验分支
+    const res = await request(app).get('/api/v1/modules?sort=stars&pageSize=100'); // 首页 100 条足够观察趋势
+    expect(res.status).toBe(200); // 断言 200
+    const stars = res.body.modules.map((m: { stars: number }) => m.stars); // 抽取 Stars 序列
+    const sorted = [...stars].sort((a, b) => b - a); // 期望的降序序列
+    expect(stars).toEqual(sorted); // 断言实际顺序等于降序
+    const bad = await request(app).get('/api/v1/modules?sort=hot'); // 不在枚举内的排序值
+    expect(bad.status).toBe(400); // 断言 400
+    expect(bad.body.code).toBe('VALIDATION_FAILED'); // 断言错误码，避免静默回退
+  }); // 结束排序用例
+
+  it('licenses / languages 多选按并集过滤', async () => { // 许可与语言筛选
+    const licenses = await request(app).get('/api/v1/modules?licenses=MIT,Apache-2.0&pageSize=100'); // 两项许可并集
+    expect(licenses.status).toBe(200); // 断言 200
+    expect(licenses.body.modules.every((m: { license: string }) => ['MIT', 'Apache-2.0'].includes(m.license))).toBe(true); // 断言许可在集合内
+    const languages = await request(app).get('/api/v1/modules?languages=PHP&category=store'); // 语言与分类叠加
+    expect(languages.status).toBe(200); // 断言 200
+    expect(languages.body.modules.every((m: { language: string }) => m.language === 'PHP')).toBe(true); // 断言语言一致
+    expect(languages.body.total).toBe(9); // 建站系统组默认语言即 PHP，仍是 9 条
+  }); // 结束多选过滤用例
+
+  it('page / pageSize 分页元信息自洽，越界页返回空列表但 total 不变', async () => { // 分页契约
+    const res = await request(app).get('/api/v1/modules?page=2&pageSize=5'); // 固定每页 5 条取第 2 页
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.page).toBe(2); // 回显页码
+    expect(res.body.page_size).toBe(5); // 回显每页条数
+    expect(res.body.modules.length).toBe(5); // 第 2 页仍是满页
+    expect(res.body.total_pages).toBe(Math.max(1, Math.ceil(res.body.total / 5))); // 总页数由 total 推出
+    const beyond = await request(app).get('/api/v1/modules?page=99&pageSize=5'); // 远超实际页数
+    expect(beyond.status).toBe(200); // 断言 200，越界不报错
+    expect(beyond.body.modules.length).toBe(0); // 越界页为空列表
+    expect(beyond.body.total).toBe(res.body.total); // total 与页码无关
+  }); // 结束分页用例
+
+  it('搜索词仍可叠加分类过滤，命中数为 1 与 0 两种边界', async () => { // 回归既有 q 语义
+    const hit = await request(app).get('/api/v1/modules?q=cat.store-05&category=store'); // 编码 + 分类同时命中
+    expect(hit.status).toBe(200); // 断言 200
+    expect(hit.body.total).toBe(1); // 只应命中一条
+    const miss = await request(app).get('/api/v1/modules?q=cat.store-05&category=web'); // 编码命中但分类不匹配
+    expect(miss.status).toBe(200); // 断言 200
+    expect(miss.body.total).toBe(0); // 应无命中
+  }); // 结束搜索叠加用例
+});
+
+describe('GET /modules/hot 热门项目', () => { // 右侧「热门项目」卡片的数据契约
+  it('默认今日窗口，返回条数受 limit 约束且热度降序', async () => { // 结构与排序同时校验
+    const res = await request(app).get('/api/v1/modules/hot'); // 不带参数：range=today、limit=5
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.range).toBe('today'); // 默认档位为今日
+    expect(res.body.window_hours).toBe(24); // 今日窗口 24 小时
+    expect(res.body.items.length).toBeLessThanOrEqual(5); // 默认最多 5 条
+    const scores = res.body.items.map((item: { hotness: number }) => item.hotness); // 抽取热度序列
+    expect(scores).toEqual([...scores].sort((a, b) => b - a)); // 断言热度降序
+  }); // 结束默认档位用例
+
+  it('range=week 窗口 168 小时；非法 range 返回 400', async () => { // 档位切换与校验分支
+    const week = await request(app).get('/api/v1/modules/hot?range=week'); // 本周档位
+    expect(week.status).toBe(200); // 断言 200
+    expect(week.body.range).toBe('week'); // 回显本周
+    expect(week.body.window_hours).toBe(168); // 本周 168 小时
+    const bad = await request(app).get('/api/v1/modules/hot?range=month'); // 非法档位
+    expect(bad.status).toBe(400); // 断言 400
+    expect(bad.body.code).toBe('VALIDATION_FAILED'); // 断言错误码
+  }); // 结束档位用例
+
+  it('跟随 category 收敛到当前分类，limit 上限 20', async () => { // 与左侧分类树联动
+    const res = await request(app).get('/api/v1/modules/hot?category=store&limit=20'); // 建站系统组
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.category).toBe('store'); // 回显分类
+    expect(res.body.total).toBe(9); // 该组可参与排序的模块实数为 9
+    expect(res.body.items.length).toBeLessThanOrEqual(9); // 不超过该组总数
+    expect(res.body.items.every((item: { category_slug: string }) => item.category_slug.startsWith('store-'))).toBe(true); // 全部归属该组
+    const capped = await request(app).get('/api/v1/modules/hot?limit=999'); // 超过上限
+    expect(capped.body.items.length).toBeLessThanOrEqual(20); // 上限被夹到 20
+  }); // 结束分类联动用例
+});
+
+describe('GET /modules/:code 详情与列表字段同源', () => { // 详情页与卡片徽标必须读到同一份字段
+  it('二级分类模块详情带 category_slug/license/language/stars，且免费无前置', async () => { // 新增二级模块
+    const res = await request(app).get('/api/v1/modules/cat.store-03'); // 建站系统第 3 条
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.category_slug).toBe('store-03'); // 分类字段与列表一致
+    expect(res.body.license).toBe('GPL-3.0'); // 许可字段与列表一致
+    expect(res.body.language).toBe('PHP'); // 语言字段与列表一致
+    expect(typeof res.body.stars).toBe('number'); // Stars 为数值
+    expect(res.body.requires).toEqual([]); // 二级模块默认无前置依赖
+    expect(res.body.current_price).toBeNull(); // 二级模块当前全部免费
+  }); // 结束二级模块详情用例
+
+  it('存量付费模块详情保留依赖链与价格，分类已归类', async () => { // 保护付费/依赖逻辑不被改造破坏
+    const res = await request(app).get('/api/v1/modules/comic.genpack.pro'); // 存量「专业版」生成包
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.requires).toEqual(['comic.genpack.basic']); // 依赖链保持原样
+    expect(res.body.current_price.amount_minor).toBe(29900); // 价格保持 ¥299.00
+    expect(res.body.category_slug).toBe('ai-01'); // 已按 LEGACY_META 归入「人工智能」首条
+    expect(res.body.license).toBe('MIT'); // 许可字段由种子补齐
+  }); // 结束存量模块详情用例
+});

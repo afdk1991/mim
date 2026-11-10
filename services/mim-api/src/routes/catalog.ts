@@ -5,7 +5,9 @@
  * 本文件补齐后端路由（此前仅有 requireEntitlement 中间件门禁，无商城侧写路径）。
  *
  * 路由一览：
- *   GET    /modules                 公开 — 按 region 列出 active 模块（含当前有效价格，支持 q 搜索）
+ *   GET    /taxonomy                公开 — 分类导航树（19 个一级分类 → 205 个二级条目，含每条目模块数）
+ *   GET    /modules                 公开 — 按 region 列出 active 模块（支持 q / category / sort / licenses / languages / page 分页）
+ *   GET    /modules/hot             公开 — 当前分类下的热门模块（range=today|week，热度=Stars+窗口内新建加权；须先于 /modules/:code 注册）
  *   GET    /modules/manage          管理 — 模块全量列表（含 draft/archived，支持 q/status 过滤；须先于 /modules/:code 注册）
  *   GET    /modules/:code           公开 — 模块详情（含前置依赖、当前有效价格、历史价格）
  *   POST   /entitlements            鉴权 — 请求解锁（免费模块直接发放；付费模块 402 引导下单）
@@ -37,7 +39,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'; // 支付回调签名校验：HMAC-SHA256 + 定长时间比较
 import { Router } from 'express'; // 路由容器，按前缀挂载到 /api/v1
 import { z } from 'zod'; // 请求体校验，拦截非法模块码
-import { AppError, uuidv7 } from '@mim/core-domain'; // 业务错误码 + 时间有序主键
+import { AppError, CATALOG_SORT_MODES, uuidv7 } from '@mim/core-domain'; // 业务错误码 + 时间有序主键 + 排序枚举（与前端共用一份定义）
 import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结时间
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 解锁需登录 + 幂等；管理写路径走 RBAC 权限点校验
 import { parse } from '../validate.js'; // zod 校验失败统一转 AppError
@@ -86,7 +88,7 @@ function resolveActiveModules(db: Db, region: string) { // 按地区取未删除
   const rows = db // 查询结果暂存
     .prepare( // 预编译：仅过滤地区与软删除，状态由调用方再筛
       `SELECT id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-              region, status, sort_order
+              region, status, sort_order, category_slug, license, language, stars, created_at
        FROM modules
        WHERE region = ? AND deleted_at IS NULL
        ORDER BY sort_order ASC, created_at ASC`,
@@ -101,9 +103,20 @@ function resolveActiveModules(db: Db, region: string) { // 按地区取未删除
     region: string; // 所属地区
     status: string; // 模块状态
     sort_order: number; // 展示排序权重
+    category_slug: string | null; // 所属二级分类标识（分类树改造后新增，老数据为 null）
+    license: string | null; // 开源许可（筛选维度）
+    language: string | null; // 编程语言（筛选维度）
+    stars: number; // Star 数（Stars 排序依据）
+    created_at: string; // 创建时间（「最近更新」排序依据）
   }>; // 结束结果类型声明
   return rows; // 交由调用方做状态过滤，保持查询职责单一
 } // 结束 resolveActiveModules
+
+/** 解析逗号分隔的筛选参数：去空、去重、保持输入顺序，非法值不做静默丢弃（交由上层判断是否命中零结果） */
+function parseMultiValue(raw: unknown): string[] { // 许可/语言筛选共用
+  if (typeof raw !== 'string') return []; // 非字符串视为未传
+  return [...new Set(raw.split(',').map((item) => item.trim()).filter(Boolean))]; // 去空白、去空项并按原顺序去重
+} // 结束 parseMultiValue
 
 /** 取模块当前生效价格的公开视图；无价格行时返回 null（视图层显示「免费/待定价」） */
 function currentPrice(db: Db, moduleId: string, now: string): { currency: string; amount_minor: number } | null { // 统一价格视图口径，列表/详情/订单共用
@@ -242,17 +255,76 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
 
   // ---------- 公开：模块目录与详情 ----------
 
-  /** GET /modules — 按 user.region 列出 active 模块（含当前有效价格，支持 q 搜索编码/名称） */
+  /** GET /taxonomy — 分类导航树（一级分类 → 二级条目，带每个条目的模块数量） */
+  router.get('/taxonomy', (req, res) => { // 公开接口：导航与计数不需要登录
+    const region = (req.user?.region ?? (req.headers['x-region'] as string)) ?? 'cn'; // 与 /modules 一致的地区解析策略
+    const groups = db // 一级分类
+      .prepare('SELECT slug, name, sort_order FROM module_categories WHERE level = 1 ORDER BY sort_order ASC') // 按权重升序
+      .all() as Array<{ slug: string; name: string; sort_order: number }>; // 结果结构
+    const items = db // 二级条目
+      .prepare('SELECT slug, name, parent_id, sort_order FROM module_categories WHERE level = 2 ORDER BY sort_order ASC') // 全量二级条目
+      .all() as Array<{ slug: string; name: string; parent_id: string | null; sort_order: number }>; // 结果结构
+    const counters = db // 每个二级分类下的可见模块数量
+      .prepare(
+        `SELECT category_slug AS slug, COUNT(*) AS total
+         FROM modules
+         WHERE region = ? AND deleted_at IS NULL AND status = 'active' AND category_slug IS NOT NULL
+         GROUP BY category_slug`,
+      ) // 按分类聚合计数
+      .all(region) as Array<{ slug: string; total: number }>; // 结果结构
+    const countMap = new Map(counters.map((row) => [row.slug, row.total])); // 转 Map，组装时 O(1) 取数
+
+    const tree = groups.map((group) => { // 逐一级分类组装
+      const children = items // 归属该一级分类的二级条目：slug 形如 `<group>-<序号>`
+        .filter((item) => item.slug.startsWith(`${group.slug}-`)) // 前缀匹配即归属
+        .map((item) => ({ slug: item.slug, name: item.name, count: countMap.get(item.slug) ?? 0 })); // 带上模块数量
+      return { slug: group.slug, name: group.name, count: children.reduce((sum, child) => sum + child.count, 0), items: children }; // 一级带自身汇总数
+    }); // 组装结束
+
+    res.json({ groups: tree, total_items: items.length, total_modules: tree.reduce((sum, group) => sum + group.count, 0) }); // 返回树与总计数
+  }); // 结束 GET /taxonomy
+
+  /**
+   * GET /modules — 按 user.region 列出 active 模块。
+   * 支持 q（编码/名称模糊）、category（一级 slug 或二级 slug）、sort（stars/recommended/updated）、
+   * licenses / languages（逗号分隔多选）与 page / pageSize 分页；响应带 total 便于前端算页数。
+   */
   router.get('/modules', (req, res) => { // 公开目录列表，无需登录
     const region = (req.user?.region ?? (req.headers['x-region'] as string)) ?? 'cn'; // 优先登录用户地区，其次请求头，最后兜底 cn
     const now = clockOf(deps); // 统一时间基准，保证价格区间判定一致
     const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : ''; // 搜索关键词小写化，空串视为未传
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : ''; // 分类过滤：一级 slug 或二级 slug
+    const sortRaw = typeof req.query.sort === 'string' ? req.query.sort.trim() : 'recommended'; // 排序方式，默认「最新推荐」
+    if (!CATALOG_SORT_MODES.includes(sortRaw as (typeof CATALOG_SORT_MODES)[number])) { // 与 core-domain 枚举对齐，非法值直接 400
+      throw new AppError('VALIDATION_FAILED', 'sort must be one of stars/recommended/updated'); // 不静默回退，避免前端以为筛选生效
+    } // 排序校验结束
+    const licenses = parseMultiValue(req.query.licenses); // 许可多选（空数组表示不过滤）
+    const languages = parseMultiValue(req.query.languages); // 语言多选（空数组表示不过滤）
+    const page = Math.max(1, Number.parseInt(String(req.query.page ?? '1'), 10) || 1); // 页码从 1 起，非法值回落首页
+    const pageSize = Math.min(100, Math.max(1, Number.parseInt(String(req.query.pageSize ?? '20'), 10) || 20)); // 每页 1–100 条，默认 20
 
     const visible = resolveActiveModules(db, region).filter((m) => MODULE_VISIBLE.has(m.status)); // 仅保留 active 模块，过滤草稿与下线
-    const rows = q // 有搜索词才过滤，避免空词触发无谓遍历
-      ? visible.filter((m) => m.code.toLowerCase().includes(q) || m.name_i18n.toLowerCase().includes(q)) // 编码或多语言名称 JSON 文本命中即可
-      : visible; // 无搜索词保持原列表
-    const modules = rows.map((m) => { // 将数据库行转换为对外视图
+    const filtered = visible.filter((m) => { // 叠加关键词、分类、许可、语言四类过滤
+      if (q && !m.code.toLowerCase().includes(q) && !m.name_i18n.toLowerCase().includes(q)) return false; // 编码与名称都不命中即剔除
+      if (category && category !== 'all') { // 分类过滤：'all' 等价于不过滤
+        const slug = m.category_slug ?? ''; // 老数据可能为空
+        if (!slug || (slug !== category && !slug.startsWith(`${category}-`))) return false; // 精确命中二级或前缀命中一级
+      } // 分类过滤结束
+      if (licenses.length > 0 && !licenses.includes(m.license ?? '')) return false; // 许可不在所选集合即剔除
+      if (languages.length > 0 && !languages.includes(m.language ?? '')) return false; // 语言不在所选集合即剔除
+      return true; // 通过全部条件
+    }); // 过滤结束
+
+    const sorted = [...filtered].sort((a, b) => { // 按所选维度排序；各维度都追加 sort_order 兜底，保证结果稳定
+      if (sortRaw === 'stars') return b.stars - a.stars || a.sort_order - b.sort_order; // Star 数从高到低
+      if (sortRaw === 'updated') return b.created_at.localeCompare(a.created_at) || a.sort_order - b.sort_order; // 创建时间倒序（本轮种子同刻写入，靠权重兜底）
+      return a.sort_order - b.sort_order; // 最新推荐：沿用人工权重
+    }); // 排序结束
+
+    const total = sorted.length; // 过滤后的总条数
+    const offset = (page - 1) * pageSize; // 本页起始偏移
+    const pageRows = sorted.slice(offset, offset + pageSize); // 仅映射本页数据，避免为整批算价格
+    const modules = pageRows.map((m) => { // 将数据库行转换为对外视图
       const price = activePrice(db, m.id, now); // 取当前有效价格，无则返回 undefined
       const requiredCodes = jsonParse<string[]>(m.entitlements_required) ?? []; // 解析前置依赖，坏数据降级为空数组
       const nameMap = jsonParse<Record<string, string>>(m.name_i18n) ?? { 'zh-CN': m.code }; // 名称缺省回落到模块码，避免空标题
@@ -265,13 +337,60 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
         region: m.region, // 地区
         status: m.status, // 状态
         requires: requiredCodes, // 前置依赖码列表
+        category_slug: m.category_slug, // 所属二级分类
+        license: m.license, // 开源许可
+        language: m.language, // 编程语言
+        stars: m.stars, // Star 数
         current_price: price // 当前价格分支
           ? { currency: price.currency, amount_minor: price.amount_minor } // 只透出当前价格关键字段
           : null, // 无有效价格则为 null，前端可显示「免费/待定价」
       }; // 结束单模块视图
     }); // 结束映射，得到模块数组
-    res.json({ modules }); // 统一包裹在 modules 字段下，便于后续扩展分页
+    res.json({ modules, total, page, page_size: pageSize, total_pages: Math.max(1, Math.ceil(total / pageSize)) }); // 分页元信息与前缀列表一起返回
   }); // 结束 GET /modules 处理
+
+  /**
+   * GET /modules/hot — 当前分类下的热门模块（右侧「热门项目」卡片）。
+   * 参数：range=today|week（窗口 24h / 168h，非法值 400）、category（一级前缀或二级精确，all 等价不过滤）、limit（1–20，默认 5）。
+   * 口径：hotness = stars + 时间窗内新建加权（1000），完全由库内真实字段计算，不插入任何虚构热度。
+   */
+  router.get('/modules/hot', (req, res) => { // 必须注册在 /modules/:code 之前，否则 hot 被详情路由吞掉
+    const region = (req.user?.region ?? (req.headers['x-region'] as string)) ?? 'cn'; // 地区解析策略与列表一致
+    const now = clockOf(deps); // 统一时间基准（ISO 字符串），窗口按它回溯
+    const rangeRaw = typeof req.query.range === 'string' ? req.query.range.trim() : 'today'; // 默认「今日」
+    if (!['today', 'week'].includes(rangeRaw)) { // 只允许两档，避免前端传错后静默降级
+      throw new AppError('VALIDATION_FAILED', 'range must be one of today/week'); // 明确 400
+    } // 档位校验结束
+    const windowHours = rangeRaw === 'today' ? 24 : 168; // 今日 24 小时 / 本周 168 小时
+    const since = new Date(new Date(now).getTime() - windowHours * 3600 * 1000).toISOString(); // 窗口起点（clockOf 返回 ISO 字符串，先转 Date 再回溯）
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : ''; // 分类过滤，与 /modules 同语义
+    const limit = Math.min(20, Math.max(1, Number.parseInt(String(req.query.limit ?? '5'), 10) || 5)); // 条数 1–20，默认 5
+
+    const visible = resolveActiveModules(db, region).filter((m) => MODULE_VISIBLE.has(m.status)); // 只统计上架模块
+    const scoped = visible.filter((m) => { // 先按分类收敛
+      if (!category || category === 'all') return true; // 未传或 all 表示当前全站
+      const slug = m.category_slug ?? ''; // 老数据可能没有分类
+      return Boolean(slug) && (slug === category || slug.startsWith(`${category}-`)); // 二级精确或一级前缀
+    }); // 分类收敛结束
+
+    const scored = scoped.map((m) => { // 逐条算热度
+      const recent = m.created_at >= since ? 1000 : 0; // 窗口内新建加权，窗口外不加权
+      return { module: m, score: m.stars + recent }; // 热度 = Stars + 新建加权
+    }); // 计算结束
+    scored.sort((a, b) => b.score - a.score || b.module.stars - a.module.stars || a.module.sort_order - b.module.sort_order); // 热度→Stars→权重三级稳定排序
+    const top = scored.slice(0, limit); // 取前 N 条
+    const items = top.map((row) => ({ // 精简视图：热门卡片只需要名称、Stars、归属
+      code: row.module.code, // 模块编码
+      name: jsonParse<Record<string, string>>(row.module.name_i18n) ?? { 'zh-CN': row.module.code }, // 多语言名称
+      stars: row.module.stars, // Star 数
+      category_slug: row.module.category_slug, // 归属二级分类
+      license: row.module.license, // 开源许可
+      language: row.module.language, // 编程语言
+      created_at: row.module.created_at, // 创建时间，前端可显示「新」
+      hotness: row.score, // 热度分值，便于页面展示与排查
+    })); // 映射结束
+    res.json({ range: rangeRaw, window_hours: windowHours, category: category || 'all', total: scoped.length, items }); // 回显窗口口径与结果
+  }); // 结束 GET /modules/hot
 
   /** GET /modules/manage — 管理端模块全量列表（含 draft/archived，支持 q/status 过滤） */
   router.get('/modules/manage', requirePermission('module:read'), (req, res) => { // 必须注册在 /modules/:code 之前，否则 manage 被详情路由吞掉
@@ -286,7 +405,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const rows = db // 管理视图查询起点
       .prepare( // 预编译：取未删除模块全字段，排序与公开列表一致
         `SELECT id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-                region, status, sort_order, created_at, updated_at
+                region, status, sort_order, category_slug, license, language, stars, created_at, updated_at
          FROM modules
          WHERE region = ? AND deleted_at IS NULL
          ORDER BY sort_order ASC, created_at ASC`,
@@ -301,6 +420,10 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       region: string; // 所属地区
       status: string; // 模块状态
       sort_order: number; // 展示排序权重
+      category_slug: string | null; // 所属二级分类
+      license: string | null; // 开源许可
+      language: string | null; // 编程语言
+      stars: number; // Star 数
       created_at: string; // 创建时间
       updated_at: string; // 更新时间
     }>; // 结束结果类型声明
@@ -324,6 +447,10 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
         status: m.status, // 状态（含 draft/archived）
         sort_order: m.sort_order, // 排序权重
         requires: jsonParse<string[]>(m.entitlements_required) ?? [], // 前置依赖码列表
+        category_slug: m.category_slug, // 所属二级分类（分类树改造新增）
+        license: m.license, // 开源许可
+        language: m.language, // 编程语言
+        stars: m.stars, // Star 数
         current_price: price ? { currency: price.currency, amount_minor: price.amount_minor } : null, // 当前价格或 null
         created_at: m.created_at, // 创建时间
         updated_at: m.updated_at, // 更新时间
@@ -341,7 +468,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const row = db // 详情查询起点
       .prepare( // 预编译：按编码 + 地区 + 未删除定位唯一模块
         `SELECT id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-                region, status
+                region, status, category_slug, license, language, stars
          FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
       ) // 结束预编译
       .get(code, region) as // 绑定编码与地区参数
@@ -354,6 +481,10 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
           entitlements_required: string; // 前置依赖 JSON
           region: string; // 地区
           status: string; // 状态
+          category_slug: string | null; // 所属二级分类（老数据可能为空）
+          license: string | null; // 开源许可
+          language: string | null; // 编程语言
+          stars: number; // Star 数
         } // 结束模块行结构
       | undefined; // 未命中即 undefined
     if (!row) { // 模块不存在时
@@ -374,6 +505,10 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       region: row.region, // 地区
       status: row.status, // 状态
       requires, // 前置依赖
+      category_slug: row.category_slug, // 所属二级分类，供详情页显示归属
+      license: row.license, // 开源许可，与列表页徽标一致
+      language: row.language, // 编程语言，与列表页徽标一致
+      stars: row.stars, // Star 数，详情页可复用同一排序口径
       current_price: price // 当前价格分支
         ? { currency: price.currency, amount_minor: price.amount_minor } // 当前价格
         : null, // 无有效价格

@@ -788,10 +788,38 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   // ---------- 功能模块商城（catalog）----------
 
   catalog: { // 模块商城：模块列表、详情、解锁、我的权益
-    getModules(opts: { q?: string } = {}) { // 拉取可购买模块；支持关键词过滤（后端按名称/编码模糊匹配）
-      // 拼接查询串：仅在有非空关键词时携带 q，避免空参数污染缓存键
-      const suffix = opts.q ? `?q=${encodeURIComponent(opts.q)}` : ''; // 关键词经编码防注入
-      return request<{ // 响应为模块数组包装
+    getTaxonomy() { // 拉取分类导航树：19 个一级分类 + 205 个二级条目（带模块计数）
+      return request<{ // 导航树响应
+        groups: Array<{ // 一级分类列表
+          slug: string; // 一级分类标识，作为 category 过滤值
+          name: string; // 一级分类名称
+          count: number; // 该分类下模块总数
+          items: Array<{ slug: string; name: string; count: number }>; // 二级条目（slug / 名称 / 模块数）
+        }>; // 一级分类类型结束
+        total_items: number; // 二级条目总数
+        total_modules: number; // 可见模块总数
+      }>('/taxonomy', { auth: false, idempotency: false }); // 公开只读接口
+    }, // getTaxonomy 结束
+    getModules(opts: { // 拉取可购买模块：支持关键词、分类、排序、许可、语言与分页
+      q?: string; // 关键词（名称/编码模糊匹配）
+      category?: string; // 分类过滤：一级或二级 slug，'all' 等价不过滤
+      sort?: 'stars' | 'recommended' | 'updated'; // 排序方式
+      licenses?: string[]; // 许可多选
+      languages?: string[]; // 语言多选
+      page?: number; // 页码，从 1 起
+      pageSize?: number; // 每页条数
+    } = {}) {
+      // 逐项拼接查询串：空值一律不下发，避免缓存键被空参数污染
+      const params: string[] = []; // 查询参数收集器
+      if (opts.q) params.push(`q=${encodeURIComponent(opts.q)}`); // 关键词经编码防注入
+      if (opts.category && opts.category !== 'all') params.push(`category=${encodeURIComponent(opts.category)}`); // 分类过滤
+      if (opts.sort) params.push(`sort=${encodeURIComponent(opts.sort)}`); // 排序方式
+      if (opts.licenses && opts.licenses.length > 0) params.push(`licenses=${encodeURIComponent(opts.licenses.join(','))}`); // 许可多选拼逗号串
+      if (opts.languages && opts.languages.length > 0) params.push(`languages=${encodeURIComponent(opts.languages.join(','))}`); // 语言多选拼逗号串
+      if (opts.page && opts.page > 1) params.push(`page=${opts.page}`); // 首页不必携带
+      if (opts.pageSize) params.push(`pageSize=${opts.pageSize}`); // 每页条数
+      const suffix = params.length > 0 ? `?${params.join('&')}` : ''; // 组装最终查询串
+      return request<{ // 响应为模块数组 + 分页元信息
         modules: Array<{ // 模块条目列表
           code: string; // 模块唯一编码，下单与解锁都用它
           name: Record<string, string>; // 多语言名称，键为语言码
@@ -800,10 +828,39 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
           region: Region; // 所属区域
           status: string; // 上架状态
           requires: string[]; // 前置依赖模块编码，前端据此提示
+          category_slug: string | null; // 所属二级分类
+          license: string | null; // 开源许可
+          language: string | null; // 编程语言
+          stars: number; // Star 数（Stars 排序依据）
           current_price: { currency: string; amount_minor: number } | null; // 当前价格；未定价为 null
         }>; // 模块条目类型结束
+        total: number; // 过滤后的总条数
+        page: number; // 当前页码
+        page_size: number; // 每页条数
+        total_pages: number; // 总页数
       }>(`/modules${suffix}`, { auth: false, idempotency: false }); // 公开目录接口，免鉴权、只读无需幂等键
     }, // getModules 结束
+    getHotModules(opts: { range: 'today' | 'week'; category?: string; limit?: number }) { // 右侧「热门项目」卡片数据
+      const params: string[] = [`range=${encodeURIComponent(opts.range)}`]; // 必带时间窗
+      if (opts.category && opts.category !== 'all') params.push(`category=${encodeURIComponent(opts.category)}`); // 跟随当前分类
+      if (opts.limit) params.push(`limit=${opts.limit}`); // 条数上限
+      return request<{ // 热门列表响应
+        range: 'today' | 'week'; // 回显时间窗
+        window_hours: number; // 窗口小时数（24 / 168）
+        category: string; // 回显分类，all 表示全站
+        total: number; // 参与排序的模块总数
+        items: Array<{ // 热门条目
+          code: string; // 模块编码
+          name: Record<string, string>; // 多语言名称
+          stars: number; // Star 数
+          category_slug: string | null; // 所属二级分类
+          license: string | null; // 开源许可
+          language: string | null; // 编程语言
+          created_at: string; // 创建时间，用于「新」标记
+          hotness: number; // 热度分值（Stars + 窗口内新建加权）
+        }>; // 热门条目类型结束
+      }>(`/modules/hot?${params.join('&')}`, { auth: false, idempotency: false }); // 公开只读接口
+    }, // getHotModules 结束
     getModule(code: string) { // 拉取单个模块详情
       return request<{ // 详情比列表多价格历史
         code: string; // 模块编码
@@ -813,6 +870,10 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         region: Region; // 所属区域
         status: string; // 上架状态
         requires: string[]; // 前置依赖
+        category_slug: string | null; // 所属二级分类，详情页显示归属
+        license: string | null; // 开源许可，与列表徽标同源
+        language: string | null; // 编程语言，与列表徽标同源
+        stars: number; // Star 数
         current_price: { currency: string; amount_minor: number } | null; // 当前价格，未定价为 null
         price_history: Array<{ // 价格变更历史，供详情页展示走势
           currency: string; // 币种

@@ -233,6 +233,40 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **`?tads` 注入机制（2026-11-07 定性）**：EdgeOne Bot 挑战脚本给地址栏附加 `?tads`，其字符串表内的清理逻辑为 `location.href=location.href.replace(/[?|&]tads/, '')`，只匹配 `?tads` 本体、不匹配清理后残留的裸问号，故留下 `https://data.mixm.top/?`。修复落在 `apps/web/index.html` `<head>`（`history.replaceState` 原地清空查询串/裸问号，不新增历史、不跳转）。`edgeone makers --help` 仅 8 个子命令，**无 WAF / Bot 管理子命令**，关闭 WAF 只能走腾讯云 Web 控制台（需用户私有登录态，沙箱无凭证）。
 - **与「不使用容器」既有约定的说明**：Sealos（容器 + PVC）、ghcr 镜像与 `deploy/sealos/mim.yaml` 属分发型平台的必要载体，仅限「托管平台同步」链路；生产主链路（`mim.mixm.top`）仍为宿主机直部署（nginx + systemd + SQLite），不得改为容器运行。
 
+### 9.4 商城两级分类改造（2026-11-10，本地门禁全绿 / 未提交未部署）
+
+**性质**：按用户指令把商城从「平铺模块卡片」改为**两级分类结构**（19 个一级分类 + 205 个二级条目，二级条目一律作为功能模块入库），并补齐页面筛选（排序 3 档 / 开源许可 48 项 / 编程语言 87 项）。存量 8 个模块保留并归类，付费价与依赖链未改。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 数据源 | `packages/core-domain/src/catalogTaxonomy.ts`（新建，唯一权威副本）：19 组 / 205 条 / 48 许可 / 87 语言 / `CATALOG_SORT_MODES` | 文件内容 + 契约测试断言与常量对齐 |
+| 库结构 | `modules` 增 `category_slug` / `license` / `language` / `stars`；新建 `module_categories`（`level` 1\|2、`parent_id` 自引用、`slug` 唯一）；`ADDITIVE_COLUMNS` 与 `schema.sql` 双路径同改 | `schema.sql`、`db.ts` 迁移段 |
+| 种子 | 二级条目 → 205 个模块 × cn/global = 410 行（编码 `cat.<一级slug>-<两位序号>`）；存量 8 模块经 `LEGACY_META` 归入 `ai-01` / `ai-06` / `ai-07` / `server-12` / `tools-03` | 存量开发库实测：`/taxonomy` → `groups=19 items=205 modules=213` |
+| 接口 | 新增 `GET /taxonomy`；`GET /modules` 支持 `q/category/sort/licenses/languages/page/pageSize` 并返回 `total/page/page_size/total_pages`；`GET /modules/:code` 与 `/modules/manage` 补 4 字段 | 契约测试 `test/catalog-taxonomy.test.ts`（10 例） |
+| 前端 | `Store.tsx` 整文件重写为两栏分类树 + 筛选面板 + 分页 + 卡片徽标 + 详情元信息行；`styles.css` 追加分类树样式段（含 960px 单列降级） | `pnpm --filter @mim/web build` 0 |
+| 本地门禁 | `pnpm -r typecheck` 0（5/5）；`pnpm --filter @mim/api test` **16 文件 221 例**；`@mim/web` 构建 0（51 modules，`index-CtMbsEKS.js` 403.97 kB）；`env-check` / `version-check` / `comment-check --strict` / `verify-deployments` **52/52** / `verify-entry-manifest` / `verify-site-modules` 全 0 | 本轮真实命令输出 |
+| 生产 | **未部署**：本轮未 commit / 未 push；生产主机仍不可达且仓库零 secret，按铁律八如实标注缺口 | `git status`（未提交）、§9.3 凭据取证 |
+
+- **排障留痕（避免重复试错）**：`Store.tsx` 曾出现 `TS2322: Type 'unknown' is not assignable to type 'ReactNode'`，报错位置在「最后添加的 JSX 元素」上漂移（`<form>`、`<span>` 均被误指）。真因是 `useAsync` 的 `error` 字段类型为 `unknown`，写成 `{taxonomyState.error && <p>…</p>}` 时 `unknown` 被当作子节点渲染。**规则**：`AsyncState.error` 一律用 `!== null` 布尔判断后再渲染，禁止直接 `&&` 短路渲染。修好后报错一次性消失，探针实验全部撤销。
+- **本轮未做**：`en-US` 二级条目名暂沿用中文（`seedCategoryModules` 注释已标注为占位口径）；205 个二级模块统一「免费 + 无前置」属当前假设，用户未给价格语义；「热门项目（今日/本周）」「搜索帮助浮窗」两区块未实现（用户答复口径为 "1-2"）；一级分类的管理端 CRUD 未暴露。
+
+### 9.5 商城非分类区块补齐（2026-11-10，第二轮；本地门禁全绿 / 未提交未部署）
+
+**性质**：用户「整个项目所有」指令后，把 §9.4 未纳入的两个非分类区块补上——右侧「热门项目（今日 / 本周）」与右下「搜索帮助」浮窗（12 条）；列表分页在 §9.4 已实现。分类树、205 个二级模块、存量 8 模块归类与付费依赖链**未改动**。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 热门项目接口 | 新增 `GET /modules/hot`：`range=today\|week`（24h / 168h，非法值 400 `VALIDATION_FAILED`）、`category`（一级前缀 / 二级精确 / `all`）、`limit`（1–20，默认 5）；**热度 = `stars` + 窗口内新建加权 1000**，全部由库内字段计算，不插入虚构热度 | 契约测试 3 例（`test/catalog-taxonomy.test.ts`）+ 存量开发库实测 |
+| 热门项目前端 | `Store.tsx` 新增 `.store-hot` 卡片：今日 / 本周按钮组切换、榜单显示名次 + 名称 + `★ stars`、点击条目直达其所属二级分类；`styles.css` 追加 `.store-hot` / `.hot-list` / `.hot-item` / `.hot-rank` | `pnpm --filter @mim/web build` 0 |
+| 搜索帮助浮窗 | `Store.tsx` 新增 `SEARCH_HELP` 固定 12 条（Git 命令在线学习 / Gitee 导入 GitHub / 仓库基础操作 / 企业版对比 / SSH 公钥 / 代码冲突 / 仓库体积 / 找回删除数据 / 配额说明 / GitHub 快速导入同步 / Release 是什么 / PHP 发布 packagist），右下方 `position: fixed` 面板 + 悬浮按钮可展开收起，条目为外链 | 同上 |
+| 接口层 | `apps/web/src/api.ts` 新增 `catalog.getHotModules()` | typecheck 0 |
+| 存量库实测 | `GET /modules/hot` → `range=today window=24 total=213 items=5 top1=cat.dev-26 hotness=10900`（= stars 9900 + 窗口内加权 1000）；`?range=week&category=store&limit=20` → `window=168 total=9 items=9`，slug 全部 `store-*` | 本地 8788 实例 + `services/mim-api/data/mim.db` |
+| 本地门禁 | `pnpm -r typecheck` 0（5/5）；`pnpm --filter @mim/api test` **16 文件 224 例**（221 + 3）；`@mim/web` 构建 0（51 modules，`index-DQ1X-P9I.js` 407.50 kB / `index-CW0Cu4wp.css` 19.74 kB）；`verify-deployments` **52/52**；`verify-entry-manifest` / `verify-site-modules` / `env-check` / `version-check` / `comment-check --strict` 全 0 | 本轮真实命令输出 |
+| 生产 | **未部署**：仍未 commit / 未 push；生产主机不可达 + 仓库零 secret 未变 | `git status`、§9.3 |
+
+- **排障留痕**：`clockOf(deps)` 返回 **ISO 字符串**而非 `Date`，`now.getTime()` 会报 `TS2339`；窗口回溯须写 `new Date(new Date(now).getTime() - hours*3600*1000).toISOString()`。
+- **仍未做**：一级分类管理端 CRUD；`en-US` 二级条目名翻译；205 个二级模块的差异化定价语义（当前全部免费、无前置）。
+
 ## 铁律十：免费平台额度矩阵与选型路由
 
 **免费是唯一准入标准，不看品牌标签。** 本铁律收录远程仓库与部署平台的免费额度，作为「候选池 + 选型依据」；铁律九的 9 平台表是「已落地矩阵」，二者关系为：铁律九 = 当前实际部署，铁律十 = 可纳入候选与选型依据。任一层级都不得引入付费方案。

@@ -11,3 +11,5 @@ export * from './ids.js';
 export * from './siteModules.js';
 // 聚合导出部署汇总注册表：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常 / 汇总统计，前后端共用同一数据源
 export * from './deploymentRegistry.js';
+// 聚合导出模块商城分类树与筛选项：19 个一级分类 / 205 个二级条目 / 48 项许可 / 87 种语言 / 排序枚举，服务端种子与前端导航共用
+export * from './catalogTaxonomy.js';

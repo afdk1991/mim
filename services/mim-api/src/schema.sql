@@ -77,12 +77,30 @@ CREATE TABLE IF NOT EXISTS modules (
   region                TEXT NOT NULL CHECK (region IN ('cn','global')),
   status                TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
   sort_order            INTEGER NOT NULL DEFAULT 0,
+  category_slug         TEXT,
+  license               TEXT,
+  language              TEXT,
+  stars                 INTEGER NOT NULL DEFAULT 0,
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL,
   deleted_at            TEXT,
   UNIQUE (region, code)
 );
 CREATE INDEX IF NOT EXISTS idx_modules_region_status ON modules(region, status, sort_order);
+
+-- 模块分类树：一级分类（parent_id 为空）+ 二级条目（parent_id 指向一级），导航与过滤都读这张表
+CREATE TABLE IF NOT EXISTS module_categories (
+  id         TEXT PRIMARY KEY,
+  parent_id  TEXT,
+  level      INTEGER NOT NULL CHECK (level IN (1,2)),
+  slug       TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (parent_id) REFERENCES module_categories(id)
+);
+CREATE INDEX IF NOT EXISTS idx_module_categories_parent ON module_categories(level, sort_order);
 
 CREATE TABLE IF NOT EXISTS module_prices (
   id              TEXT PRIMARY KEY,
