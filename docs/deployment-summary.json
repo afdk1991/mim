@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-10T16:22:03.494Z",
-  "head": "1fd7b5e",
+  "generated_at": "2026-11-10T16:36:14.527Z",
+  "head": "2221fa2",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -104,14 +104,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "1fd7b5e046b442ab5e0efc6fa2e174b7c0c1ba15",
+      "hash": "2221fa27ef2c751d5b43296580c2ae01b718fdef",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "1fd7b5e046b442ab5e0efc6fa2e174b7c0c1ba15",
+      "hash": "2221fa27ef2c751d5b43296580c2ae01b718fdef",
       "exit": 0,
       "error": null
     }
@@ -785,8 +785,8 @@
       "missing_fields": [],
       "sources": [
         "wrangler pages project create mim / pages deploy --project-name=mim（2026-11-11）",
+        "gh run 42854147887 --log（Cloudflare 步骤 Deployment complete → cf70ccda.mim-299.pages.dev；线上取证 mim-299.pages.dev => 200）",
         "curl https://mim-299.pages.dev/ 与 /store /comic /api/v1/modules",
-        "gh run view 42831492102 --log（Cloudflare Pages 步骤，迁移前）",
         "git ls-tree HEAD"
       ]
     },

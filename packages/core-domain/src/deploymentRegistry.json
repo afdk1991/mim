@@ -382,7 +382,7 @@
         { "code": "CF_PROJECT_RENAMED_TO_MIM", "severity": "info", "message": "2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim" }
       ],
       "missing_fields": [],
-      "sources": ["wrangler pages project create mim / pages deploy --project-name=mim（2026-11-11）", "curl https://mim-299.pages.dev/ 与 /store /comic /api/v1/modules", "gh run view 42831492102 --log（Cloudflare Pages 步骤，迁移前）", "git ls-tree HEAD"]
+      "sources": ["wrangler pages project create mim / pages deploy --project-name=mim（2026-11-11）", "gh run 42854147887 --log（Cloudflare 步骤 Deployment complete → cf70ccda.mim-299.pages.dev；线上取证 mim-299.pages.dev => 200）", "curl https://mim-299.pages.dev/ 与 /store /comic /api/v1/modules", "git ls-tree HEAD"]
     },
     {
       "id": "pages.vercel",

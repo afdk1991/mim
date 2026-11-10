@@ -465,6 +465,8 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 - **落地范围（如实）**：本轮真正完成平台侧改名的只有 **Cloudflare Pages（→ `mim`）**；GitHub / Gitee / ghcr / Worker 本就已是 `mim` 前缀；Vercel / Sealos / EdgeOne / IGA 四项受「无凭证 / 平台不提供改名 / 域名绑定」限制**未改**，已逐项写入 `deploymentRegistry.json` 的 `PLATFORM_NAME_ALIGNMENT_PENDING` 异常，并在 README 现行状态段公开标注，**不宣称「全部平台已统一」**。
 - **回滚点**：旧 Pages 项目 `mim-8ah` 未删除，若新项目异常，把 `deploy.yml --project-name` 与 `wrangler.toml name` 改回 `mim-8ah` 即可一行回滚。
+- **CI 复验（run `42854147887` @ `8fa1c0d`，push 触发）**：`托管平台同步` 作业 **云端真发** —— 日志 `Success! Uploaded 3 files (2 already uploaded)` / `Uploading Functions bundle` / `Deployment complete! Take a peek over at https://cf70ccda.mim-299.pages.dev`（实际命令为 `wrangler@4 pages deploy … --project-name=mim`）；同作业「线上取证」步骤：`https://mim.mixm.top/health => 200`、`https://mim-299.pages.dev/ => 200`、`https://mim-puce.vercel.app/ => 200`。`质量门禁` / `GitHub Pages` / `GitHub Packages` 均 success。
+- **同轮发现的独立缺口（不属于命名任务，如实记录）**：该 run 的 `发布到生产服务器` 作业 **failure** —— `scp … "***@***:/tmp/mim-deploy.sh"` 报 `Permission denied (publickey,password)`、exit 255；`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` 三条 secret 于 16:15–16:25 由并行会话补入，但对应公钥未在服务器 `authorized_keys` 授权。故**本轮不宣称「生产已由 CI 发布」**，生产域可达性仍以本 run 的 `/health => 200` 取证为准。
 
 ## 铁律十：免费平台额度矩阵与选型路由
 
