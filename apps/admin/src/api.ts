@@ -958,3 +958,105 @@ export async function settleOrder(credential: Credential, orderId: string, reaso
   // 返回结算后的订单
   return data.order;
 }
+
+// ── 分类导航（两级分类树 CRUD）──────────────────────────────────────────────
+
+/** 二级条目视图：与后端 /categories/manage 的 items 元素逐字段对齐 */
+export interface CategoryItemView {
+  // 分类主键（cat:<slug>）
+  id: string;
+  // 分类标识（全局唯一，参与模块编码与前缀判定）
+  slug: string;
+  // 中文名
+  name: string;
+  // 英文名，null 表示未登记（英文站点回落中文）
+  name_en: string | null;
+  // 同级展示权重
+  sort_order: number;
+  // 该条目下 active 模块数
+  module_count: number;
+} // CategoryItemView 结束
+
+/** 一级分类视图：在一级字段之上再带二级条目清单 */
+export interface CategoryGroupView extends CategoryItemView {
+  // 二级条目列表（按 sort_order 升序）
+  items: CategoryItemView[];
+} // CategoryGroupView 结束
+
+/** 分类树响应：区域 + 两级树 + 总量 */
+export interface CategoryTreeView {
+  // 计数口径对应的区域
+  region: string;
+  // 一级分类列表
+  groups: CategoryGroupView[];
+  // 一级分类总数
+  total_groups: number;
+  // 二级条目总数
+  total_items: number;
+} // CategoryTreeView 结束
+
+/** 读取分类树（管理视图）：需 module:read */
+export function listCategories(credential: Credential, region?: string): Promise<CategoryTreeView> {
+  // 区域走请求头，缺省由后端按 cn 兜底
+  return request<CategoryTreeView>('/categories/manage', { credential, headers: region ? { 'x-region': region } : undefined });
+} // listCategories 结束
+
+/** 新建分类入参：parent_slug 缺省即一级分类 */
+export interface CategoryCreatePayload {
+  // 标识：小写字母开头，可含数字与连字符
+  slug: string;
+  // 中文名
+  name: string;
+  // 英文名，选填
+  name_en?: string;
+  // 父分类标识，二级条目必填且 slug 须以「父 slug-」开头
+  parent_slug?: string;
+  // 展示权重，缺省追加到同级末尾
+  sort_order?: number;
+} // CategoryCreatePayload 结束
+
+/** 新建分类：返回 201 与创建后的行 */
+export async function createCategory(credential: Credential, payload: CategoryCreatePayload): Promise<CategoryItemView> {
+  // POST /categories，响应包裹 { category }
+  const data = await request<{ category: CategoryItemView }>('/categories', { method: 'POST', body: payload, credential });
+  // 解包分类行
+  return data.category;
+} // createCategory 结束
+
+/** 编辑分类入参：仅文案与排序可改 */
+export interface CategoryUpdatePayload {
+  // 中文名，选填
+  name?: string;
+  // 英文名，传 null 表示清空
+  name_en?: string | null;
+  // 排序权重，选填
+  sort_order?: number;
+} // CategoryUpdatePayload 结束
+
+/** 编辑分类：返回 200 与更新后的行 */
+export async function updateCategory(credential: Credential, slug: string, payload: CategoryUpdatePayload): Promise<CategoryItemView> {
+  // PATCH 指定分类，响应包裹 { category }
+  const data = await request<{ category: CategoryItemView }>(`/categories/${encodeURIComponent(slug)}`, {
+    // 局部更新
+    method: 'PATCH',
+    // 请求体
+    body: payload,
+    // 携带凭证
+    credential,
+  });
+  // 解包分类行
+  return data.category;
+} // updateCategory 结束
+
+/** 删除分类：有子级或有模块引用时后端 409；成功返回删除回执 */
+export async function deleteCategory(credential: Credential, slug: string): Promise<{ slug: string; level: number; deleted: boolean }> {
+  // DELETE 无请求体，响应包裹 { category }
+  const data = await request<{ category: { slug: string; level: number; deleted: boolean } }>(`/categories/${encodeURIComponent(slug)}`, {
+    // 删除方法
+    method: 'DELETE',
+    // 携带凭证
+    credential,
+  });
+  // 解包删除回执
+  return data.category;
+} // deleteCategory 结束

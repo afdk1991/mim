@@ -191,3 +191,25 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(59, 110, 245
 
 /* 分页条 */ 
 .pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; } /* 右对齐分页 */ 
+
+/* ---------- 分类导航管理（2026-11-10 新增）：两级树行布局与缩进 ---------- */
+.cat-group {
+  border-bottom: 1px solid var(--border, #2a2f3a); /* 每组之间画一条分隔线，视觉上收束 19 个分组 */
+  padding: 8px 0; /* 组内上下留白 */
+}
+.cat-group:last-child {
+  border-bottom: none; /* 最后一组不再画线，避免多余边框 */
+}
+.cat-row-g1 {
+  font-weight: 600; /* 一级分类加粗，与二级条目区分层级 */
+}
+.cat-row-g2 {
+  padding-left: 24px; /* 二级条目缩进，形成树形观感 */
+  font-weight: 400; /* 二级不加粗 */
+}
+.cat-slug {
+  min-width: 120px; /* 固定 slug 列宽，避免各行字段左右错位 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; /* 标识用等宽字体，便于比对 */
+  font-size: 12px; /* 标识略小，弱于业务字段 */
+  opacity: 0.8; /* 降低视觉权重 */
+}

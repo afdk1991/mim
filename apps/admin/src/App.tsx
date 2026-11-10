@@ -6,6 +6,8 @@ import { ApiError, describeError, getAdminMe, loadCredential, saveCredential } f
 import type { AdminIdentity, Credential } from './api';
 // 通用异步加载钩子：统一 loading / error / reload
 import { useAsync } from './hooks';
+// 分类导航视图：两级分类树 CRUD（一级 19 + 二级 205）
+import { Categories } from './views/Categories';
 // 五个业务视图：概览、模块、权益、角色权限、用户
 import { Entitlements } from './views/Entitlements';
 // 登录页：无凭证时的唯一出口，被动退出提示也由它展示
@@ -22,7 +24,7 @@ import { Roles } from './views/Roles';
 import { Users } from './views/Users';
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'modules' | 'entitlements' | 'orders' | 'roles' | 'users';
+type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -40,6 +42,8 @@ const NAV: NavItem[] = [
   { key: 'overview', label: '概览', permission: null },
   // 模块管理：需要读权限才展示
   { key: 'modules', label: '功能模块', permission: 'module:read' },
+  // 分类导航：两级分类树维护，与模块同属 module:read 可见
+  { key: 'categories', label: '分类导航', permission: 'module:read' },
   // 权益管理：需要读权限才展示
   { key: 'entitlements', label: '权益管理', permission: 'entitlement:read' },
   // 商城订单：人工结算入口，与权益管理同属 entitlement:read 可见
@@ -189,6 +193,8 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'overview') return <Overview identity={identity} />;
   // 模块：状态流转，需要 module:write 才能点按钮
   if (key === 'modules') return <Modules credential={credential} permissions={identity.permissions} />;
+  // 分类导航：两级分类树增删改查，写操作需 module:write
+  if (key === 'categories') return <Categories credential={credential} permissions={identity.permissions} />;
   // 权益：发放与回收
   if (key === 'entitlements') return <Entitlements credential={credential} permissions={identity.permissions} />;
   // 商城订单：列表 + 人工结算

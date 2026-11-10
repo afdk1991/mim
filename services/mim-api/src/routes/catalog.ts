@@ -9,6 +9,10 @@
  *   GET    /modules                 公开 — 按 region 列出 active 模块（支持 q / category / sort / licenses / languages / page 分页）
  *   GET    /modules/hot             公开 — 当前分类下的热门模块（range=today|week，热度=Stars+窗口内新建加权；须先于 /modules/:code 注册）
  *   GET    /modules/manage          管理 — 模块全量列表（含 draft/archived，支持 q/status 过滤；须先于 /modules/:code 注册）
+ *   GET    /categories/manage       管理 — 分类树全量视图（两级 + 模块计数 + 英文名；须先于 /categories/:slug 注册）
+ *   POST   /categories              管理 — 新建分类（带 parent_slug 建二级，否则建一级；二级 slug 必须以「父 slug-」开头）
+ *   PATCH  /categories/:slug        管理 — 改名 / 改英文名 / 改排序（slug 与父级不可改）
+ *   DELETE /categories/:slug        管理 — 删除分类（有子级或有模块引用时 409 拒绝）
  *   GET    /modules/:code           公开 — 模块详情（含前置依赖、当前有效价格、历史价格）
  *   POST   /entitlements            鉴权 — 请求解锁（免费模块直接发放；付费模块 402 引导下单）
  *   GET    /me/entitlements         鉴权 — 当前用户的有效解锁列表
@@ -391,6 +395,163 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     })); // 映射结束
     res.json({ range: rangeRaw, window_hours: windowHours, category: category || 'all', total: scoped.length, items }); // 回显窗口口径与结果
   }); // 结束 GET /modules/hot
+
+  // ---------- 管理端：分类树 CRUD（一级 / 二级共用同一张表，按 parent_id 区分层级） ----------
+
+  /**
+   * GET /categories/manage — 管理端分类树全量视图（含模块计数）。
+   * 与公开 /taxonomy 的差别：不按「仅 active」过滤之外再加任何收敛，且带 id / parent / 英文名，
+   * 便于管理前端直接渲染可编辑的两级列表。
+   */
+  router.get('/categories/manage', requirePermission('module:read'), (req, res) => { // RBAC：读模块权限即可看分类树
+    const region = req.header('x-region')?.trim() || 'cn'; // 与管理端其他接口一致：区域走请求头，缺省 cn
+    const rows = db // 分类行：两级一起取，前端自行按 parent_id 组装
+      .prepare('SELECT id, parent_id, level, slug, name, name_en, sort_order FROM module_categories ORDER BY level ASC, sort_order ASC, slug ASC') // 一级在前，同级按权重
+      .all() as Array<{ // 行结构
+      id: string; // 分类主键
+      parent_id: string | null; // 父分类主键，一级为 null
+      level: number; // 层级 1 / 2
+      slug: string; // 分类标识（全局唯一）
+      name: string; // 中文名
+      name_en: string | null; // 英文名
+      sort_order: number; // 展示权重
+    }>; // 类型结束
+    const counters = db // 每个二级分类下的 active 模块数（与公开树同口径，保证两处计数一致）
+      .prepare(
+        `SELECT category_slug AS slug, COUNT(*) AS total
+         FROM modules
+         WHERE region = ? AND deleted_at IS NULL AND status = 'active' AND category_slug IS NOT NULL
+         GROUP BY category_slug`,
+      )
+      .all(region) as Array<{ slug: string; total: number }>; // 聚合结果
+    const countMap = new Map(counters.map((row) => [row.slug, row.total])); // 转 Map，组装时 O(1)
+    const groups = rows // 一级分类
+      .filter((row) => row.level === 1) // 只取一级
+      .map((group) => { // 逐个一级分类组装其二级条目
+        const items = rows // 归属该一级的二级条目：按「前缀 slug-」判定归属，与公开树同规则
+          .filter((row) => row.parent_id === group.id) // parent_id 精确匹配优先（存在外键，最可靠）
+          .map((item) => ({ // 单条二级条目视图
+            id: item.id, // 主键
+            slug: item.slug, // 标识
+            name: item.name, // 中文名
+            name_en: item.name_en, // 英文名
+            sort_order: item.sort_order, // 权重
+            module_count: countMap.get(item.slug) ?? 0, // 该条目模块数
+          })); // 二级映射结束
+        return { // 一级分类视图
+          id: group.id, // 主键
+          slug: group.slug, // 标识
+          name: group.name, // 中文名
+          name_en: group.name_en, // 英文名
+          sort_order: group.sort_order, // 权重
+          module_count: items.reduce((sum, item) => sum + item.module_count, 0), // 组内模块数汇总
+          items, // 二级条目列表
+        }; // 一级视图结束
+      }); // 组装结束
+    res.json({ region, groups, total_groups: groups.length, total_items: groups.reduce((sum, group) => sum + group.items.length, 0) }); // 回显区域与总量
+  }); // 结束 GET /categories/manage
+
+  /** POST /categories — 新建分类：给 parent_slug 即二级条目，不给即一级分类 */
+  router.post('/categories', requirePermission('module:write'), (req, res) => { // RBAC：写模块权限即可改分类树
+    const body = parse( // 校验入参
+      z.object({ // 新建分类的字段
+        slug: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/, 'slug must be lowercase letters/digits/hyphen and start with a letter'), // 归一化标识，参与模块编码与前缀判定
+        name: z.string().min(1).max(64), // 中文名，必填
+        name_en: z.string().min(1).max(96).optional(), // 英文名，选填（缺省 null，英文站点回落中文）
+        parent_slug: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/).optional(), // 父分类标识，缺省表示建一级分类
+        sort_order: z.number().int().min(0).max(99999).optional(), // 权重，缺省排在同级末尾
+      }), // schema 结束
+      req.body, // 原始请求体
+    ); // 解析结束
+    const now = clockOf(deps); // 统一时间基准
+    const existing = db.prepare('SELECT id FROM module_categories WHERE slug = ?').get(body.slug) as { id: string } | undefined; // 查重
+    if (existing) { // 已存在同名 slug
+      throw new AppError('CONFLICT', 'category slug already exists', { slug: body.slug }); // 409，避免静默覆盖既有分类
+    } // 查重结束
+
+    let level = 1; // 默认一级分类
+    let parentId: string | null = null; // 一级分类没有父键
+    if (body.parent_slug) { // 指定父分类 → 二级条目
+      const parent = db // 定位父分类
+        .prepare('SELECT id, slug, level FROM module_categories WHERE slug = ?') // 按 slug 唯一命中
+        .get(body.parent_slug) as { id: string; slug: string; level: number } | undefined; // 命中行
+      if (!parent || parent.level !== 1) { // 父分类必须存在且是一级
+        throw new AppError('NOT_FOUND', 'parent category not found', { parent_slug: body.parent_slug }); // 404 便于前端定位
+      } // 父分类校验结束
+      // 二级 slug 必须以「父 slug-」开头：公开树与前缀过滤都靠这条约定组装子节点，破坏即导致条目挂不上父级
+      if (!body.slug.startsWith(`${parent.slug}-`)) { // 前缀不符直接拒绝
+        throw new AppError('VALIDATION_FAILED', `child slug must start with "${parent.slug}-"`, { slug: body.slug, parent_slug: parent.slug }); // 400 并回传期望前缀
+      } // 前缀校验结束
+      level = 2; // 层级下标
+      parentId = parent.id; // 父键指向一级分类主键
+    } else if (body.slug.includes('-')) { // 一级分类带上连字符会与二级前缀规则混淆
+      throw new AppError('VALIDATION_FAILED', 'top-level slug must not contain hyphen', { slug: body.slug }); // 400，提示改用纯字母/数字
+    } // 一级分类命名校验结束
+
+    const maxOrder = db // 同级末尾权重
+      .prepare('SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM module_categories WHERE level = ? AND parent_id IS ?') // 一级传 NULL，二级传父键
+      .get(level, parentId) as { max_order: number }; // 聚合结果（无行时 COALESCE 给 0）
+    const sortOrder = body.sort_order ?? maxOrder.max_order + 1; // 缺省追加到同级末尾，保持「新增排在最后」
+    db.prepare( // 写入分类行
+      `INSERT INTO module_categories (id, parent_id, level, slug, name, name_en, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, // 字段与 schema.sql 一一对应
+    ).run(`cat:${body.slug}`, parentId, level, body.slug, body.name, body.name_en ?? null, sortOrder, now, now); // 绑定全部字段
+
+    res.status(201).json({ // 201 表示新分类已创建
+      category: { id: `cat:${body.slug}`, parent_id: parentId, level, slug: body.slug, name: body.name, name_en: body.name_en ?? null, sort_order: sortOrder }, // 回显创建结果
+    }); // 响应体结束
+  }); // 结束 POST /categories
+
+  /** PATCH /categories/:slug — 改名 / 改英文名 / 改排序；slug 与父级不可改，避免模块归属断链 */
+  router.patch('/categories/:slug', requirePermission('module:write'), (req, res) => { // RBAC：写模块权限
+    const body = parse( // 校验入参
+      z.object({ // 仅允许三个字段
+        name: z.string().min(1).max(64).optional(), // 中文名
+        name_en: z.string().min(1).max(96).nullable().optional(), // 英文名，传 null 表示清空
+        sort_order: z.number().int().min(0).max(99999).optional(), // 权重
+      }).refine((value) => value.name !== undefined || value.name_en !== undefined || value.sort_order !== undefined, { message: 'at least one of name / name_en / sort_order is required' }), // 至少改一项
+      req.body, // 原始请求体
+    ); // 解析结束
+    const slug = pathParam(req, 'slug'); // 分类标识路径参数
+    const now = clockOf(deps); // 统一时间基准
+    const row = db // 定位待更新分类
+      .prepare('SELECT id, level, slug, name, name_en, sort_order FROM module_categories WHERE slug = ?') // 取可更新字段
+      .get(slug) as { id: string; level: number; slug: string; name: string; name_en: string | null; sort_order: number } | undefined; // 命中行
+    if (!row) { // 分类不存在
+      throw new AppError('NOT_FOUND', 'category not found', { slug }); // 404
+    } // 存在性判断结束
+
+    const name = body.name ?? row.name; // 中文名缺省沿用旧值
+    const nameEn = body.name_en === undefined ? row.name_en : body.name_en; // 显式传 null 才清空英文名
+    const sortOrder = body.sort_order ?? row.sort_order; // 权重缺省沿用旧值
+    db.prepare('UPDATE module_categories SET name = ?, name_en = ?, sort_order = ?, updated_at = ? WHERE id = ?').run(name, nameEn, sortOrder, now, row.id); // 只改文案与权重
+    res.json({ category: { id: row.id, level: row.level, slug: row.slug, name, name_en: nameEn, sort_order: sortOrder } }); // 回显更新结果
+  }); // 结束 PATCH /categories/:slug
+
+  /** DELETE /categories/:slug — 删除分类：有子级或有模块引用时拒绝，避免留下悬空归属 */
+  router.delete('/categories/:slug', requirePermission('module:write'), (req, res) => { // RBAC：写模块权限
+    const slug = pathParam(req, 'slug'); // 分类标识路径参数
+    const row = db // 定位待删分类
+      .prepare('SELECT id, level, slug FROM module_categories WHERE slug = ?') // 仅取判定所需字段
+      .get(slug) as { id: string; level: number; slug: string } | undefined; // 命中行
+    if (!row) { // 分类不存在
+      throw new AppError('NOT_FOUND', 'category not found', { slug }); // 404
+    } // 存在性判断结束
+    if (row.level === 1) { // 一级分类：必须先删光二级
+      const children = db.prepare('SELECT COUNT(*) AS total FROM module_categories WHERE parent_id = ?').get(row.id) as { total: number }; // 子级计数
+      if (children.total > 0) { // 仍有二级条目
+        throw new AppError('CONFLICT', 'category still has child items', { slug, children: children.total }); // 409，提示先删子级
+      } // 子级判断结束
+    } // 一级分支结束
+    const refs = row.level === 2 // 模块引用检查：二级精确匹配，一级按前缀归组（与公开树同一规则）
+      ? (db.prepare('SELECT COUNT(*) AS total FROM modules WHERE category_slug = ? AND deleted_at IS NULL').get(slug) as { total: number }) // 二级：精确
+      : (db.prepare('SELECT COUNT(*) AS total FROM modules WHERE category_slug LIKE ? AND deleted_at IS NULL').get(`${escapeLike(slug)}-%`) as { total: number }); // 一级：前缀
+    if (refs.total > 0) { // 仍有模块挂在该分类下
+      throw new AppError('CONFLICT', 'category still has modules', { slug, modules: refs.total }); // 409，避免模块失去归属
+    } // 引用判断结束
+    db.prepare('DELETE FROM module_categories WHERE id = ?').run(row.id); // 物理删除：分类是配置数据，无审计诉求
+    res.json({ category: { slug: row.slug, level: row.level, deleted: true } }); // 回执删除结果
+  }); // 结束 DELETE /categories/:slug
 
   /** GET /modules/manage — 管理端模块全量列表（含 draft/archived，支持 q/status 过滤） */
   router.get('/modules/manage', requirePermission('module:read'), (req, res) => { // 必须注册在 /modules/:code 之前，否则 manage 被详情路由吞掉

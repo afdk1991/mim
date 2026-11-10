@@ -286,7 +286,27 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 - **翻译口径（供后续核对）**：一级分类 `Site builders` / `Software development` / `Games & entertainment` / `Plugins & extensions` / `Other open source` 等；OpenHarmony 组中文括号里的英文直接提为英文名（`按钮(Button)` → `Button`、`手势控制(Gesture)` → `Gesture control`），避免 `Button(Button)` 这类重复；分隔符统一用 `·` / `/`，不用中文顿号。
 - **顺序守卫**：英文清单靠**组内下标**与中文对齐，测试同时断言首条与末条（`Button` / `Gesture control`），任一侧插条导致错位会立刻红。
-- **仍未做**：205 个二级模块的差异化定价语义（用户未给价格口径）；一级分类管理端 CRUD。
+- **仍未做**：205 个二级模块的差异化定价语义（用户未给价格口径）；一级分类管理端 CRUD（已于 §9.7 补齐）。
+
+### 9.7 分类导航管理端 CRUD（2026-11-10，本地门禁与浏览器 E2E 双绿）
+
+**性质**：把 §9.6 末尾标记「仍未做」的一级分类管理端 CRUD 补上——两级分类树（19 一级 + 205 二级）在 `apps/admin` 里可读、可增、可改、可删，写操作全部走 RBAC，不引入新表。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 读树接口 | `GET /categories/manage`（`module:read`，区域走 `x-region`）：返回 `groups[].items[]` 两级结构，一级 `module_count` 为组内二级计数之和，计数口径与公开 `/taxonomy` 一致（只算 `status='active'` 且未软删），另回 `total_groups` / `total_items` | 契约测试 + 本地 curl 200 |
+| 新建接口 | `POST /categories`（`module:write`）：zod 校验 slug `^[a-z][a-z0-9-]{0,40}$`；slug 重复 → 409 `CONFLICT`；`parent_slug` 不存在或非一级 → 404；二级 slug 必须以「父 slug-」开头否则 400（公开树与前缀过滤都依赖这条约定）；一级 slug 含连字符 → 400；`sort_order` 缺省取同级 `MAX+1` | 契约测试 |
+| 编辑接口 | `PATCH /categories/:slug`：仅 `name` / `name_en`（可传 `null` 清空）/ `sort_order`，三者全缺 → 400；不存在 → 404；改的是同一张表，公开 `/taxonomy` 立即读到新名（测试用「改名后回读公开树」守这条） | 契约测试 |
+| 删除接口 | `DELETE /categories/:slug`：不存在 404；一级仍有子级 409；仍有模块引用 409（二级按 `category_slug` 精确、一级按 `LIKE '<slug>-%'` 前缀，`escapeLike` 防通配注入）；成功为**物理删除**并回执 `{slug, level, deleted}` | 契约测试 |
+| 管理端页面 | `apps/admin/src/views/Categories.tsx`：19 组 + 205 条参数化渲染（`renderRow(row, level)`），行内可改中文名 / 英文名 / 排序，**只下发真正变化的字段**（`save()` 做差异比对），新建面板带父分类下拉，删除时把后端 409 文案直接透出；无 `module:write` 时全部写按钮禁用 | `pnpm -r typecheck` 0、`@mim/admin build` 0 |
+| 前端入口 | `App.tsx` 的 `ViewKey` 加 `'categories'`、侧栏 `NAV` 加「分类导航」（`module:read`）、`renderView` 加分支；`api.ts` 追加 9 个分类 CRUD 导出；`styles.css` 追加 `.cat-group` / `.cat-row-g1` / `.cat-row-g2` / `.cat-slug`（二级缩进 24px 形成树形观感） | 文件内容 |
+| 本地门禁 | `pnpm -r typecheck` 0（5/5）；`pnpm --filter @mim/api test` **16 文件 230 例**（226 + 分类 CRUD 4 例）；`@mim/admin` 构建 0；`comment-check --strict` 0；`verify-deployments` 52/52；`verify-entry-manifest` 23/23；`verify-site-modules` 79/79 | 本轮真实命令输出 |
+| 浏览器 E2E | 本地 API 8787（`MIM_ADMIN_TOKEN` 已设）+ admin dev 5174：令牌登录成功（`/admin/me` 200，权限含 `module:write`）→ 点「分类导航」→ **一级 19 / 二级 205** 渲染，英文名列回显 `Frontier technology` / `Low-code` / `Research papers` / `Quantum computing` / `Button` 等真实译名 → 新建 `e2echeck` 后变 **20 组**并提示「已创建」→ 行内改名保存提示「已保存」→ 删 `frontier` 被拒并显示 `CONFLICT: category still has child items`（409 保护在 UI 可见）→ 删 `e2echeck` 成功回到 **19 / 205** | 浏览器 `bu` 会话 + 截图 `.screenshots/admin-categories.png`（1280×960） |
+
+- **排障留痕（本地 E2E 首次失败的真因）**：首次令牌登录报 `AUTH_UNAUTHORIZED: missing bearer token`，且 `GET /categories/manage` 返回 404。**真因不是权限也不是新路由**——8787 端口上跑着上一轮遗留的旧 API 进程，新进程 `EADDRINUSE` 起不来（`.tmp/api-admin.err.log` 有 `EADDRINUSE ... port 8787`），浏览器打到的是旧代码。处置：按端口取 `OwningProcess` 杀掉旧进程后重启，`/health` 200、`/admin/me` 200、`/categories/manage` 200 立刻全绿。**规则**：本地起 API 前先查端口占用，看到 `EADDRINUSE` 必须杀旧进程重起，不得当成「路由没注册」去改代码。
+- **控制台噪声说明**：E2E 页面 console 里有 `ws://localhost:5173` 连接失败，是上一轮商城 dev server 已停导致的遗留 vite 客户端重连，与本轮管理端无关，零功能报错。
+- **仍未做**：分类树在管理端**没有做拖拽排序**（排序靠改 `sort_order` 数字）；205 个二级模块差异化定价语义、排序三档独立时间列仍为开放项。
+
 
 ## 铁律十：免费平台额度矩阵与选型路由
 

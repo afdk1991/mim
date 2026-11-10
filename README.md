@@ -60,7 +60,7 @@ pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`�
 ```
 apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块商城 / 站点矩阵 / 部署汇总 / 漫剧工作台 / 即时通讯 / 设置）
 apps/web/src/views/  # Login / Store / Sites / Deployments / ComicWorkbench / Chat / Settings 七个视图组件
-apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；视图：概览 / 功能模块 / 权益管理 / 角色与权限 / 用户）
+apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
 services/mim-api/src/routes/  # auth / catalog / me / comic / media / ai / im / admin / sites / deployments 十个路由模块
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 站点模块注册表 siteModules / 部署汇总注册表 deploymentRegistry）
@@ -78,7 +78,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图——`/store`、`/sites`、`/deployments`、`/comic`、`/chat`、`/settings`、`/login`，地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接在启动时自动改写为对应路径。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `_redirects` 回退、生产 nginx 由 `try_files` 回退）。**按需登录（2026-11-08 起）**：商城目录 `/store` **匿名可浏览**；`/comic`、`/chat`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌登录卡片（提示「此功能需登录后使用」），不再整站锁定；登录成功后原地解锁当前视图，退出登录、令牌失效或跨标签页退出时回落到匿名态、收费视图重新内嵌登录卡片。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。站点体系（站点地图 / 站点目录 / 45 节点页与 site 域 4 条接口）已于 2026-11-08 整体下线，功能模块商城页顶部保留一张 www 主站入口静态卡片。
 
-独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ 权益管理（列表过滤、发放、回收、审计事件时间线）/ **商城订单（跨用户订单列表 `GET /orders/manage` + 人工结算 `POST /orders/:id/settle`）**。
+独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ **分类导航（两级分类树 CRUD：`GET /categories/manage` 读树、`POST /categories` 新建、`PATCH /categories/:slug` 改名与排序、`DELETE /categories/:slug` 删除）** / 权益管理（列表过滤、发放、回收、审计事件时间线）/ **商城订单（跨用户订单列表 `GET /orders/manage` + 人工结算 `POST /orders/:id/settle`）**。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
@@ -112,6 +112,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets` | 对象端点凭签名免鉴权 |
 | AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
+| 管理分类 | `GET /categories/manage`（两级分类树 + 每组/每级 active 模块计数 + `name_en`）、`POST /categories`（带 `parent_slug` 建二级，否则建一级；二级 slug 必须以「父 slug-」开头，重复 slug 409，父分类不存在 404）、`PATCH /categories/:slug`（仅 `name` / `name_en`(nullable) / `sort_order`，至少一项否则 400）、`DELETE /categories/:slug`（有子级或有模块引用 409，成功为物理删除） | Bearer + `module:read` / `module:write`（`x-admin-token` 为超管引导通道） |
 | 即时通讯 | `GET/POST /im/conversations`、`GET /im/conversations/:id/messages`、`POST /im/conversations/:id/read`、`GET /im/users`、`WS /im/ws?token=<access_token>` | 登录（WS 凭 query token） |
 
 site 域 4 条公开路由（`/site/overview`、`/site/modules`、`/site/modules/:host`、`/site/nodes`）已于 2026-11-08 随站点体系下线移除。

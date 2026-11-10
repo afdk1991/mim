@@ -161,6 +161,81 @@ describe('GET /modules/hot 热门项目', () => { // 右侧「热门项目」卡
   }); // 结束分类联动用例
 });
 
+describe('管理端分类树 CRUD（/categories）', () => { // 一级 / 二级分类的后台增删改查
+  const ADMIN_TOKEN = 'test-admin-token-0123456789'; // 引导令牌：命中 MIM_ADMIN_TOKEN 即视为全权限
+  let adminApp: Express; // 已开启管理面的独立实例
+
+  beforeEach(() => { // 本组专用前置：在共享 db 之上再建一个带管理令牌的应用
+    adminApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN } }); // env 注入令牌才开启管理面
+  }); // 结束本组 beforeEach
+
+  it('未带令牌 → 401；带令牌可读到 19 组 / 205 条与模块计数', async () => { // 鉴权 + 读视图结构
+    const denied = await request(adminApp).get('/api/v1/categories/manage'); // 不带任何凭据
+    expect(denied.status).toBe(401); // 断言 401，未开启 Bearer 通道
+    const ok = await request(adminApp).get('/api/v1/categories/manage').set('x-admin-token', ADMIN_TOKEN); // 带引导令牌
+    expect(ok.status).toBe(200); // 断言 200
+    expect(ok.body.groups.length).toBe(CATALOG_GROUP_TOTAL); // 一级分类 19 组
+    expect(ok.body.total_items).toBe(CATALOG_ITEM_TOTAL); // 二级条目 205 条
+    const store = ok.body.groups.find((group: { slug: string }) => group.slug === 'store'); // 取建站系统定点校验
+    expect(store.items.length).toBe(9); // 该组 9 条二级
+    expect(store.module_count).toBe(9); // 组内模块数汇总（每条约 1 个 active 模块）
+    expect(store.items[0].module_count).toBe(1); // 单条二级分类下的模块数
+    expect(store.name_en).toBe('Site builders'); // 管理视图同样带英文名，便于英文站与后台共用一份数据
+  }); // 结束鉴权与结构用例
+
+  it('POST 建一级与二级；二级 slug 前缀不符或 slug 重复时拒绝', async () => { // 新建规则
+    const group = await request(adminApp).post('/api/v1/categories').set('x-admin-token', ADMIN_TOKEN).send({ slug: 'sandbox', name: '沙箱分类', name_en: 'Sandbox' }); // 建一级分类
+    expect(group.status).toBe(201); // 断言 201
+    expect(group.body.category.level).toBe(1); // 层级为 1
+    expect(group.body.category.parent_id).toBeNull(); // 一级无父键
+
+    const child = await request(adminApp).post('/api/v1/categories').set('x-admin-token', ADMIN_TOKEN).send({ slug: 'sandbox-01', name: '沙箱子项', parent_slug: 'sandbox' }); // 建二级条目
+    expect(child.status).toBe(201); // 断言 201
+    expect(child.body.category.level).toBe(2); // 层级为 2
+    expect(child.body.category.parent_id).toBe('cat:sandbox'); // 父键指回一级分类主键
+
+    const badPrefix = await request(adminApp).post('/api/v1/categories').set('x-admin-token', ADMIN_TOKEN).send({ slug: 'other-01', name: '错前缀', parent_slug: 'sandbox' }); // 前缀不符
+    expect(badPrefix.status).toBe(400); // 断言 400
+    expect(badPrefix.body.code).toBe('VALIDATION_FAILED'); // 断言错误码
+
+    const dup = await request(adminApp).post('/api/v1/categories').set('x-admin-token', ADMIN_TOKEN).send({ slug: 'sandbox', name: '重复' }); // slug 重复
+    expect(dup.status).toBe(409); // 断言 409，不静默覆盖
+    expect(dup.body.code).toBe('CONFLICT'); // 断言错误码
+
+    const missingParent = await request(adminApp).post('/api/v1/categories').set('x-admin-token', ADMIN_TOKEN).send({ slug: 'nope-01', name: '父不存在', parent_slug: 'nope' }); // 父分类不存在
+    expect(missingParent.status).toBe(404); // 断言 404
+  }); // 结束新建用例
+
+  it('PATCH 改名与英文名；不存在返回 404', async () => { // 编辑规则
+    const res = await request(adminApp).patch('/api/v1/categories/store').set('x-admin-token', ADMIN_TOKEN).send({ name: '建站系统（改）', name_en: 'Site builders (edited)' }); // 改名
+    expect(res.status).toBe(200); // 断言 200
+    expect(res.body.category.name).toBe('建站系统（改）'); // 中文名已更新
+    expect(res.body.category.name_en).toBe('Site builders (edited)'); // 英文名已更新
+    const tree = await request(adminApp).get('/api/v1/taxonomy'); // 公开树复核
+    const store = tree.body.groups.find((group: { slug: string }) => group.slug === 'store'); // 取建站系统
+    expect(store.name).toBe('建站系统（改）'); // 公开接口同步读到新名（改的是同一张表）
+    const missing = await request(adminApp).patch('/api/v1/categories/not-exist').set('x-admin-token', ADMIN_TOKEN).send({ name: 'x' }); // 不存在的 slug
+    expect(missing.status).toBe(404); // 断言 404
+    const empty = await request(adminApp).patch('/api/v1/categories/store').set('x-admin-token', ADMIN_TOKEN).send({}); // 空请求体
+    expect(empty.status).toBe(400); // 断言 400，至少改一项
+  }); // 结束编辑用例
+
+  it('DELETE 有子级或有模块引用时 409，删空分类成功', async () => { // 删除保护规则
+    const hasChildren = await request(adminApp).delete('/api/v1/categories/store').set('x-admin-token', ADMIN_TOKEN); // 一级且有条目
+    expect(hasChildren.status).toBe(409); // 断言 409
+    expect(hasChildren.body.code).toBe('CONFLICT'); // 断言错误码
+    const hasModules = await request(adminApp).delete('/api/v1/categories/store-01').set('x-admin-token', ADMIN_TOKEN); // 二级且有模块
+    expect(hasModules.status).toBe(409); // 断言 409
+    const created = await request(adminApp).post('/api/v1/categories').set('x-admin-token', ADMIN_TOKEN).send({ slug: 'trash', name: '待删分类' }); // 先建一个空分类
+    expect(created.status).toBe(201); // 断言建成功
+    const removed = await request(adminApp).delete('/api/v1/categories/trash').set('x-admin-token', ADMIN_TOKEN); // 再删它
+    expect(removed.status).toBe(200); // 断言 200
+    expect(removed.body.category.deleted).toBe(true); // 回执已删除
+    const again = await request(adminApp).delete('/api/v1/categories/trash').set('x-admin-token', ADMIN_TOKEN); // 重复删除
+    expect(again.status).toBe(404); // 物理删除后不存在即 404
+  }); // 结束删除用例
+}); // 结束管理端分类 CRUD 分组
+
 describe('GET /modules/:code 详情与列表字段同源', () => { // 详情页与卡片徽标必须读到同一份字段
   it('二级分类模块详情带 category_slug/license/language/stars，且免费无前置', async () => { // 新增二级模块
     const res = await request(app).get('/api/v1/modules/cat.store-03'); // 建站系统第 3 条
