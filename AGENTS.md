@@ -339,6 +339,25 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 - **明确不动的部分**：①通用技术词「跨端」（`docs/四份技术资料完整内容整理-20261109.md` 的跨端策略 / 跨端前端人力、PRD 里的跨端账号打通、跨端继续使用等）——这是多端技术表述，不是该旧模块；②用户未跟踪文件 `新建 文本文档.txt` 与 `docs/gitee-开源项目适配清单-2026-11-10.md`（后者是外部抓取资料，含与旧形态同名的对标小节，但属用户材料，未获指令不动）。
 - **未做**：旧功能的代码与库表已不在工作树中，本轮无代码可删；`site/` 只有静态页，构建脚本 `scripts/build-site.mjs` 未改动。
 
+### 9.10 Cloudflare Pages 复核与重建（2026-11-10 21:47 +08:00）
+
+**性质**：按用户给出的 Cloudflare 控制台地址做真实核查，发现此前矩阵里「Cloudflare Pages ✅ CI 自动发布」已不成立；本轮把项目重建并把取证写回注册表与文档。
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| 账号 | `15726833367@139.com`，Account ID `a799197458978d508f927083360c635b` | 登录态有效 |
+| Workers / Pages 项目 | 「Workers 和 Pages」列表 **No projects found** | 项目不存在 |
+| 站点可达性 | `curl https://mim-8ah.pages.dev/` → **530**，`curl` 报 DNS 不可解析 | 入口已失效 |
+| `mixm.top` zone | 该账号内 zone 存在但 **DNS 记录数 0**（「没有 DNS 记录」）；`mim.mixm.top` 由外部解析至 `115.159.159.11` | Cloudflare 侧不承载该域解析 |
+| CI 真实行为 | `deploy.yml` Cloudflare 步骤因无 `CLOUDFLARE_API_TOKEN` 输出 `SKIP: 缺少 …; exit 0` | 历史「自动发布」为假绿 |
+| 重建动作 | 控制台「直接上传」新建 Pages 项目 `mim-8ah`，直传根构建 `dist` 6 个文件后「部署站点」，控制台提示「成功！您的项目已部署到以下区域：全球」 | ✅ 项目已重建 |
+| 重建后取证 | `/` **200 / 1.455s / 5114B**（`title=Mim`、`assets/index-DkyuUDY7.js` + `index-DY6XAYXj.css`）；`/store` **200 / 1.040s / 5114B**；`assets/index-DkyuUDY7.js` **200** | ✅ 静态站可用 |
+| 未覆盖项 | 本次为纯静态直传，未上传 `functions/api/[[path]].js`，故**无 `/api` 反代**；仓库 secrets 仍缺 `CLOUDFLARE_API_TOKEN`，push 后不会自动重发 | 如实记录，不宣称「CI 自动发布已恢复」 |
+
+- **同步工件**：`packages/core-domain/src/deploymentRegistry.json`（`pages.cloudflare` 的 `result` 证据与 `captured_at` 刷新，新增 `CF_PROJECT_ABSENT_RECREATED` / `CF_CI_TOKEN_MISSING` 两条异常）、`docs/deployment-summary.json` 与 `.md`（由 `node scripts/deployment-summary.mjs` 重生成）、`README.md` 与 `docs/wiki/05-runbook.md` 的取证段。
+- **门禁**：`node scripts/verify-deployments.mjs` **52/52 PASS**。
+- **后续待办**：补 `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` 两个 secret 后 CI 才能真发；若需同源 `/api`，须把 `functions/` 一并上传或在 Pages 项目里启用 Git 集成。
+
 
 
 ## 铁律十：免费平台额度矩阵与选型路由

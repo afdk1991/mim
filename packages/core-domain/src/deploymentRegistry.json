@@ -363,16 +363,18 @@
       "result": {
         "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 1283,
-        "bytes": 5182,
-        "evidence": "curl https://mim-8ah.pages.dev/ → 200 / 1.283s / 5182B；README 另载 2026-11-09 同源入口 /health 200/53B、/api/v1/modules 200/3411B（8 模块）、Edge CDP E2E 5/5",
-        "captured_at": "2026-11-09 23:03 +08:00"
+        "latency_ms": 1455,
+        "bytes": 5114,
+        "evidence": "2026-11-10 21:47 重建：控制台「直接上传」新建 Pages 项目 mim-8ah 并直传根构建 dist（6 文件）→ curl / 200 / 1.455s / 5114B（title=Mim、产物 assets/index-DkyuUDY7.js + index-DY6XAYXj.css）；深链接 /store 200 / 1.040s / 5114B；assets/index-DkyuUDY7.js 200；重建前同一 URL 为 530（项目不存在）",
+        "captured_at": "2026-11-10 21:47 +08:00"
       },
       "anomalies": [
         { "code": "DUPLICATE_MATRIX_ROW_MERGED", "severity": "info", "message": "README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数" },
         { "code": "LOCAL_PROCESS_DEPENDENCY", "severity": "warning", "message": "同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口" },
         { "code": "MANUAL_DEPLOY_OVERWRITE", "severity": "warning", "message": "wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置" },
-        { "code": "CF_ARTIFACTS_WORKTREE_RESTORED", "severity": "info", "message": "wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空" }
+        { "code": "CF_ARTIFACTS_WORKTREE_RESTORED", "severity": "info", "message": "wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空" },
+        { "code": "CF_PROJECT_ABSENT_RECREATED", "severity": "warning", "message": "2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿" },
+        { "code": "CF_CI_TOKEN_MISSING", "severity": "warning", "message": "仓库 secrets 无 CLOUDFLARE_API_TOKEN，deploy.yml 的 Cloudflare Pages 步骤每轮输出 SKIP 并 exit 0；本次上线为控制台手工直传，push 后不会自动重新发布，须补 token 才能恢复 CI 自动发布" }
       ],
       "missing_fields": [],
       "sources": ["curl https://mim-8ah.pages.dev/", "git ls-tree HEAD", ".github/workflows/deploy.yml step Cloudflare Pages", "README 多平台部署矩阵 / 2026-11-09 取证段"]

@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-10T10:59:36.219Z
-- 本地 HEAD：`5372205`
+- 生成时间：2026-11-10T13:48:40.686Z
+- 本地 HEAD：`0ae667a`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 9 | 本轮存在可信取证 |
 | 空数据 | 7 | result 为 null，明确标识而非填 0 |
-| 异常 | 36 | 🔴 2 / 🟡 15 / 🟢 19 |
+| 异常 | 38 | 🔴 2 / 🟡 17 / 🟢 19 |
 | 缺失信息 | 48 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -29,7 +29,7 @@
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 | — |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 | ⚠ 1 项 |
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | 🟡 MANUAL | 🟡 DEGRADED 200 / 984B | WAF_FALSE_POSITIVE 等 2 项 | ⚠ 2 项 |
-| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 5182B | LOCAL_PROCESS_DEPENDENCY 等 4 项 | — |
+| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 6 项 | — |
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | CI_SKIP_FALSE_GREEN 等 2 项 | ⚠ 2 项 |
 | `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 53B | ROOT_404_BY_DESIGN 等 2 项 | — |
 | `pages.iga` | — | IGA Pages / distribution | manual platforms | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 3 项 | ⚠ 5 项 |
@@ -60,6 +60,8 @@
 | `pages.cloudflare` | 🟡 warning | `LOCAL_PROCESS_DEPENDENCY` | 同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口 |
 | `pages.cloudflare` | 🟡 warning | `MANUAL_DEPLOY_OVERWRITE` | wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置 |
 | `pages.cloudflare` | 🟢 info | `CF_ARTIFACTS_WORKTREE_RESTORED` | wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空 |
+| `pages.cloudflare` | 🟡 warning | `CF_PROJECT_ABSENT_RECREATED` | 2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿 |
+| `pages.cloudflare` | 🟡 warning | `CF_CI_TOKEN_MISSING` | 仓库 secrets 无 CLOUDFLARE_API_TOKEN，deploy.yml 的 Cloudflare Pages 步骤每轮输出 SKIP 并 exit 0；本次上线为控制台手工直传，push 后不会自动重新发布，须补 token 才能恢复 CI 自动发布 |
 | `pages.vercel` | 🟡 warning | `CI_SKIP_FALSE_GREEN` | README 2026-11-09 取证段载明 CI secrets 为空时该步骤 SKIP（continue-on-error: true），历史「作业 success」不等于本轮已部署 |
 | `pages.vercel` | 🟢 info | `VERCEL_CONFIG_WORKTREE_RESTORED` | vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置 |
 | `container.sealos` | 🟢 info | `ROOT_404_BY_DESIGN` | 纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA |
@@ -86,7 +88,7 @@
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
 | `gitee` | https://gitee.com/mallwm_admin/mim.git | — | ⚪ 未取证（spawnSync git ETIMEDOUT） |
-| `origin` | https://github.com/afdk1991/mim.git | 53722055110011c440f5263b326d503f3773760f | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 0ae667a320f2b35ea1240f985bc3f3157694403c | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
