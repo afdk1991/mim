@@ -3,7 +3,11 @@
 // 使用 esbuild 把 src/index.ts 打包为单文件 ESM 产物 dist/index.js。
 // - @mim/* 为 workspace 包、只发 TS 源码，必须打包进产物；
 // - 真实 npm 依赖保持 external（运行时由 node_modules 解析）；
-// - better-sqlite3 是原生模块，必须 external。
+// - better-sqlite3 是原生模块，必须 external；
+// - sharp 同样是原生模块（运行时靠 @img/sharp-* 平台包加载 .node）。
+//   若被 esbuild 内联进 dist/index.js，sharp 会以 dist 目录为基准去找平台包，
+//   而 @img/* 实际装在 node_modules/sharp 的兄弟目录里 → 启动即抛
+//   `Could not load the "sharp" module using the linux-x64 runtime`。必须 external。
 // 产物路径约定：dist 与 src 同为 mim-api 下一级目录，src/config.ts 中
 // SRC_DIR/REPO_ROOT/DATA_DIR 的相对层级在编译前后保持一致，无需改代码。
 
@@ -28,6 +32,7 @@ await build({
     'zod',
     '@aws-sdk/client-s3',
     '@aws-sdk/s3-request-presigner',
+    'sharp',
   ],
   // ESM 产物中还原 __dirname / import.meta.url 语义（esbuild 单文件 banner）
   // 别名导入：esbuild 在产物内部（被内联的依赖需要 require 时）会自动注入
