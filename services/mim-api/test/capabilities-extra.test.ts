@@ -177,3 +177,147 @@ describe('程序开发组新增能力', () => {
     expect(parsed.ok).toBe(true); // 校验通过
   });
 }); // 新增能力用例结束
+
+describe('WEB 应用开发组新增能力', () => {
+  it('web.scaffold 生成骨架清单', async () => {
+    const result = await run('web.scaffold', JSON.stringify({ name: 'shop', framework: 'vite-react', features: ['router', 'test'] })); // 两个特性
+    const parsed = JSON.parse(result.output) as { files: Array<{ path: string }>; unknown_features: string[] }; // 解析
+    expect(parsed.files.length).toBe(7); // 5 基础 + 2 特性
+    expect(parsed.files.some((f) => f.path.endsWith('router.ts'))).toBe(true); // 路由文件
+    expect(parsed.unknown_features).toEqual([]); // 无未知特性
+  });
+
+  it('web.scaffold 拒绝非 kebab-case 名称', async () => {
+    await expect(run('web.scaffold', JSON.stringify({ name: 'My Shop' }))).rejects.toThrow(); // 名称非法
+  });
+
+  it('jquery.plugin 生成 IIFE 骨架', async () => {
+    const result = await run('jquery.plugin', 'tooltip'); // 插件名
+    expect(result.output).toContain('$.fn.tooltip'); // 扩展点
+    expect(result.output).toContain('})(jQuery);'); // IIFE 收口
+  });
+
+  it('ui.props 校验必填与类型', async () => {
+    const result = await run('ui.props', JSON.stringify({ schema: { size: 'string!', count: 'number' }, props: { extra: 1 } })); // 缺必填 size + 多余 extra
+    const parsed = JSON.parse(result.output) as { valid: boolean; issues: string[]; extra_fields: string[] }; // 解析
+    expect(parsed.valid).toBe(false); // 不通过
+    expect(parsed.issues.some((issue) => issue.includes('size'))).toBe(true); // 必填缺失
+    expect(parsed.extra_fields).toContain('extra'); // 多余字段
+  });
+
+  it('js.type 区分数组与对象', async () => {
+    const arr = await run('js.type', '[1,2,3]'); // 数组
+    expect(JSON.parse(arr.output).type).toBe('array'); // 类型
+    const obj = await run('js.type', '{"a":1}'); // 对象
+    expect(JSON.parse(obj.output).type).toBe('object'); // 类型
+  });
+
+  it('js.type 识别未加引号字面量坑', async () => {
+    const result = await run('js.type', 'hello'); // 裸字面量
+    const parsed = JSON.parse(result.output) as { type: string; pitfalls: string[] }; // 解析
+    expect(parsed.type).toBe('string'); // 判为字符串
+    expect(parsed.pitfalls.length).toBeGreaterThan(0); // 有提示
+  });
+
+  it('rest.lint 抓动词与大小写', async () => {
+    const result = await run('rest.lint', JSON.stringify({ method: 'POST', path: '/api/v1/getUsers' })); // 动词 + 大写
+    const parsed = JSON.parse(result.output) as { valid: boolean; issues: string[]; suggested_path: string }; // 解析
+    expect(parsed.valid).toBe(false); // 不通过
+    expect(parsed.issues.some((issue) => issue.includes('动词'))).toBe(true); // 动词问题
+    expect(parsed.suggested_path.includes('users')).toBe(true); // 建议路径
+  });
+
+  it('admin.menu 建出父子层级', async () => {
+    const result = await run('admin.menu', JSON.stringify({ routes: [{ path: '/mods', title: '模块', order: 1 }, { path: '/mods/list', title: '列表', order: 2 }] })); // 两层
+    const parsed = JSON.parse(result.output) as { tree: Array<{ path: string; children: Array<{ path: string }> }> }; // 解析
+    expect(parsed.tree).toHaveLength(1); // 一个根
+    expect(parsed.tree[0].children[0].path).toBe('/mods/list'); // 子节点
+  });
+
+  it('admin.menu 标出重复路径', async () => {
+    const result = await run('admin.menu', JSON.stringify({ routes: [{ path: '/a', title: 'A' }, { path: '/a', title: 'B' }] })); // 重复
+    expect(JSON.parse(result.output).duplicates).toContain('/a'); // 重复清单
+  });
+
+  it('theme.tokens 按基数生成刻度', async () => {
+    const result = await run('theme.tokens', '4'); // 基数 4
+    const parsed = JSON.parse(result.output) as { spacing: Array<{ token: string; value: string }> }; // 解析
+    expect(parsed.spacing[0].value).toBe('4px'); // 第一档
+    expect(parsed.spacing[7].value).toBe('40px'); // 第八档
+  });
+
+  it('theme.tokens 拒绝越界基数', async () => {
+    await expect(run('theme.tokens', '200')).rejects.toThrow(); // 越界
+  });
+
+  it('vue.sfc 生成带 props 的 SFC', async () => {
+    const result = await run('vue.sfc', JSON.stringify({ name: 'UserCard', props: ['title'], emits: ['select'] })); // 组件
+    expect(result.output).toContain('defineProps'); // props 声明
+    expect(result.output).toContain("(e: 'select'): void"); // emits 类型
+    expect(result.output).toContain('<template>'); // 模板
+  });
+
+  it('crawler.plan 清理跟踪参数并给礼貌参数', async () => {
+    const result = await run('crawler.plan', JSON.stringify({ start: 'https://example.com/list?utm_source=newsletter&page=1', pages: 50 })); // 带跟踪参数
+    const parsed = JSON.parse(result.output) as { normalized_url: string; delay_ms: number; page_param_detected: boolean; robots_hint: string }; // 解析
+    expect(parsed.normalized_url.includes('utm_source')).toBe(false); // 跟踪参数被清
+    expect(parsed.page_param_detected).toBe(true); // 分页参数识别
+    expect(parsed.robots_hint.includes('/robots.txt')).toBe(true); // robots 提示
+    expect(parsed.delay_ms).toBeGreaterThan(0); // 有延迟
+  });
+
+  it('angular.cmp 生成 standalone 组件', async () => {
+    const result = await run('angular.cmp', JSON.stringify({ name: 'user-card', inputs: ['title'], outputs: ['select'] })); // 组件
+    expect(result.output).toContain("selector: 'app-user-card'"); // 选择器
+    expect(result.output).toContain('UserCardComponent'); // 类名
+    expect(result.output).toContain('output<void>()'); // 输出声明
+  });
+
+  it('bs.grid 换算 col 类名并夹紧越界', async () => {
+    const result = await run('bs.grid', JSON.stringify({ xs: 12, md: 6, lg: 20 })); // lg 越界
+    const parsed = JSON.parse(result.output) as { class_string: string; issues: string[] }; // 解析
+    expect(parsed.class_string).toBe('col-12 col-md-6'); // 有效类名
+    expect(parsed.issues.length).toBe(1); // 一条越界提示
+  });
+
+  it('react.cmp 生成 TSX 组件', async () => {
+    const result = await run('react.cmp', JSON.stringify({ name: 'UserCard', props: ['title'], memo: true })); // 带 memo
+    expect(result.output).toContain('export function UserCard'); // 函数组件
+    expect(result.output).toContain('memo(UserCard)'); // memo 包裹
+    expect(result.output).toContain('title?: string;'); // props 字段
+  });
+
+  it('rpc.methods 校验命名与参数类型', async () => {
+    const result = await run('rpc.methods', JSON.stringify({ methods: [{ name: 'user.get', params: ['id:string'] }, { name: 'Bad.Name', params: ['id:str'] }] })); // 一好一坏
+    const parsed = JSON.parse(result.output) as { issues: string[] }; // 解析
+    expect(parsed.issues.length).toBeGreaterThanOrEqual(2); // 名称与参数都报
+  });
+
+  it('api.routes 检出重复与参数命名漂移', async () => {
+    const result = await run('api.routes', JSON.stringify({ routes: [{ method: 'GET', path: '/users/:id' }, { method: 'GET', path: '/users/:userId' }, { method: 'GET', path: '/users/:id' }] })); // 漂移 + 重复
+    const parsed = JSON.parse(result.output) as { duplicates: string[]; param_naming_drift: string[]; healthy: boolean }; // 解析
+    expect(parsed.duplicates.length).toBe(2); // 第二条漂移、第三条重复各记一次
+    expect(parsed.param_naming_drift.length).toBe(1); // 一条漂移
+    expect(parsed.healthy).toBe(false); // 不健康
+  });
+
+  it('url.short 生成 6 位 Base62 短码', async () => {
+    const result = await run('url.short', 'https://mim.mixm.top/products?group=dev'); // 长链
+    const parsed = JSON.parse(result.output) as { code: string; short_path: string }; // 解析
+    expect(parsed.code).toHaveLength(6); // 六位
+    expect(/^[0-9a-zA-Z]{6}$/.test(parsed.code)).toBe(true); // Base62 字符
+    expect(parsed.short_path).toBe(`/s/${parsed.code}`); // 短路径
+  });
+
+  it('url.short 拒绝非绝对地址', async () => {
+    await expect(run('url.short', '/relative')).rejects.toThrow(); // 相对地址
+  });
+
+  it('layui.table 生成 cols 配置', async () => {
+    const result = await run('layui.table', JSON.stringify({ fields: ['id', 'name', 'created_at'] })); // 三个字段
+    expect(result.output).toContain("field: 'id'"); // 字段
+    expect(result.output).toContain('sort: true'); // 时间列可排序
+    expect(result.output).toContain("fixed: 'left'"); // 首列固定
+    expect(result.output).toContain('创建时间'); // 中文标题
+  });
+}); // WEB 组用例结束

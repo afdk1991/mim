@@ -828,8 +828,22 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 未做 / 已知缺口（如实登记） | ① 商城仍有 **159/205 条「规划中」**（178 − 19，仅「程序开发」组做满），其余 18 组补法口径待用户拍板；② **群通话未做**（当前仅 1v1，2C2G 上 SFU 不可行）；③ **浏览器点击级 E2E 仍未做**（本轮仍是接口级 + 契约测试 + 线上 bundle 取证）；④ 购物车付费分支仍止于 `pending`，在线支付未接 | 本轮未执行项清单 |
 
 
----
+### 9.22 「WEB应用开发」组 17 条能力做满（2026-11-11 深夜 +08:00）
 
+**性质**：沿 §9.21 的「逐组做满」口径继续补商城能力，本轮把「WEB应用开发」组 17 条导航条目全部绑定真实能力（`cat.web-10` 早前已由 `jwt.decode` 占用，本轮新增 16 条）。**结构性改动（新增 16 条能力 + 1 条已存在）不改变现有接口契约，仅扩 `POST /modules/:code/invoke` 的可达能力集合。**
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 能力清单规模 | `MODULE_CAPABILITIES` **46 → 62 条**，新增 16 条覆盖 `cat.web-01/02/03/04/05/06/07/08/09/11/12/13/14/15/16/17` | `packages/core-domain/src/moduleCapabilities.ts` |
+| 新增能力 | 脚手架生成、jQuery 插件骨架、Props 校验、JS 值类型判定、REST 路径规范检查、后台菜单树、设计令牌刻度、Vue SFC 骨架、爬虫合规计划、Angular standalone 组件、Bootstrap 栅格换算、React 组件骨架、RPC 签名校验、网关路由冲突/参数漂移检测、短链 Base62 码、layui 表格列配置 | `services/mim-api/src/capabilities.ts` |
+| 依赖（铁律五） | 无新增第三方依赖（短链复用 Node 内置 `crypto.createHash`，其余为纯函数逻辑） | `services/mim-api/package.json` 未变更 |
+| 本地门禁 | `pnpm -r typecheck` **0**；`pnpm --filter @mim/api test` **21 文件 / 336 例全过**（`capabilities-extra.test.ts` 由 23 例扩至 **44 例**）；`@mim/web build` **0**（产物 `apps/web/dist` + `404.html`）；`env-check` 0；`comment-check --strict` **0** | `.tmp/typecheck3.log`、`.tmp/api_test3.log`、`.tmp/web_build2.log`、`.tmp/env_check2.log`、`.tmp/comment_check4.log` |
+| 手工验算（补证） | `api.routes` 三条路由（`/users/:id`、`/users/:userId`、`/users/:id`）→ **重复 2 条、参数漂移 1 条**；`url.short` 产出 6 位 Base62；`crawler.plan` 清掉 `utm_source` 并保留 `page=1` 探测 | 用例内断言 + 本轮实测输出 |
+| 文档同步（铁律七） | `moduleCapabilities.ts` 头部规模注释、`README.md` 接口表能力计数、本节 | 本表与上述文件 |
+
+**仍未闭环（与 §9.21 一致，如实登记）**：① 商城剩余 **143/205 条「规划中」**（159 − 16），下一组建议 OpenHarmony（37 条）或工业软件（15 条），口径仍待用户拍板；② **群通话未做**；③ **浏览器点击级 E2E 未做**；④ 购物车付费分支仍止于 `pending`。
+
+---
 
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
 

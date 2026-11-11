@@ -8,7 +8,7 @@
  * 未登记的模块属于「规划中」：商城仍展示，但详情面板不给解锁/调用入口，
  * 避免用户为没有实现的条目付费。
  *
- * 当前规模（2026-11-11）：46 条能力；「程序开发」组 37 条导航条目**已全部绑定**，
+ * 当前规模（2026-11-11）：62 条能力；「程序开发」组 37 条与「WEB应用开发」组 17 条导航条目**已全部绑定**，
  * 其余分组 9 条能力分布在前沿技术 3 / WEB 应用开发 1 / 开发工具 2 / 数据库 1 / 应用工具 2。
  */
 
@@ -395,6 +395,134 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     output_kind: 'json', // 结构化输出
     module_codes: ['cat.dev-37'], // 程序开发 / Tauri 插件
   }, // Tauri 权限结束
+  { // Web 项目脚手架
+    key: 'web.scaffold', // 能力标识
+    name: { 'zh-CN': 'Web 项目脚手架', 'en-US': 'Web project scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入 {"name":"shop","framework":"vite-react","features":["router","test"]}，输出目录树与文件清单', 'en-US': 'Input name, framework and features to get a file tree' }, // 使用提示
+    placeholder: { 'zh-CN': '{"name":"shop","framework":"vite-react","features":["router","test"]}', 'en-US': '{"name":"shop","framework":"vite-react","features":["router","test"]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-01'], // WEB应用开发 / Web开发框架
+  }, // 脚手架结束
+  { // jQuery 插件骨架
+    key: 'jquery.plugin', // 能力标识
+    name: { 'zh-CN': 'jQuery 插件骨架', 'en-US': 'jQuery plugin skeleton' }, // 能力名
+    hint: { 'zh-CN': '输入插件名（如 tooltip），输出 IIFE + $.fn 扩展的标准骨架', 'en-US': 'Enter a plugin name to get an IIFE + $.fn skeleton' }, // 使用提示
+    placeholder: { 'zh-CN': 'tooltip', 'en-US': 'tooltip' }, // 占位
+    output_kind: 'text', // 代码文本
+    module_codes: ['cat.web-02'], // WEB应用开发 / jQuery插件
+  }, // jQuery 结束
+  { // 组件 props 校验
+    key: 'ui.props', // 能力标识
+    name: { 'zh-CN': '组件 Props 校验', 'en-US': 'Component props validator' }, // 能力名
+    hint: { 'zh-CN': '输入 {"schema":{"size":"string!","count":"number"},"props":{"size":"lg"}}，校验必填与类型', 'en-US': 'Input schema and props to validate required fields and types' }, // 使用提示
+    placeholder: { 'zh-CN': '{"schema":{"size":"string!","count":"number"},"props":{"size":"lg"}}', 'en-US': '{"schema":{"size":"string!","count":"number"},"props":{"size":"lg"}}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-03'], // WEB应用开发 / WebUI组件/框架
+  }, // props 结束
+  { // JS 值类型判定
+    key: 'js.type', // 能力标识
+    name: { 'zh-CN': 'JavaScript 值类型判定', 'en-US': 'JS value type inspect' }, // 能力名
+    hint: { 'zh-CN': '输入任意 JS 字面量（null / [] / {} / 1 / "s"），输出精确类型与安全转换建议', 'en-US': 'Input a JS literal to get its precise type' }, // 使用提示
+    placeholder: { 'zh-CN': '[1,2,3]', 'en-US': '[1,2,3]' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-04'], // WEB应用开发 / JavaScript工具包
+  }, // 类型判定结束
+  { // REST 路径规范检查
+    key: 'rest.lint', // 能力标识
+    name: { 'zh-CN': 'RESTful 路径规范检查', 'en-US': 'RESTful path lint' }, // 能力名
+    hint: { 'zh-CN': '输入 {"method":"POST","path":"/api/v1/getUsers"}，检查动词滥用、复数、层级与大小写', 'en-US': 'Input method and path to lint naming and hierarchy' }, // 使用提示
+    placeholder: { 'zh-CN': '{"method":"POST","path":"/api/v1/getUsers"}', 'en-US': '{"method":"POST","path":"/api/v1/getUsers"}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-05'], // WEB应用开发 / RESTful项目
+  }, // REST 检查结束
+  { // 后台菜单树
+    key: 'admin.menu', // 能力标识
+    name: { 'zh-CN': '后台菜单树生成', 'en-US': 'Admin menu tree' }, // 能力名
+    hint: { 'zh-CN': '输入路由清单 {"routes":[{"path":"/a","title":"A","order":1}]}，输出嵌套菜单并标出重复项', 'en-US': 'Input routes to get a nested menu and duplicates' }, // 使用提示
+    placeholder: { 'zh-CN': '{"routes":[{"path":"/mods","title":"模块","order":1},{"path":"/mods/list","title":"列表","order":2}]}', 'en-US': '{"routes":[{"path":"/mods","title":"Modules","order":1}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-06'], // WEB应用开发 / 后台管理框架
+  }, // 菜单树结束
+  { // 设计令牌
+    key: 'theme.tokens', // 能力标识
+    name: { 'zh-CN': '设计令牌生成', 'en-US': 'Design token scale' }, // 能力名
+    hint: { 'zh-CN': '输入基数（如 4），输出 4/8/12… 间距刻度与 12–48 字号刻度 JSON', 'en-US': 'Enter a base unit to get spacing and font-size scales' }, // 使用提示
+    placeholder: { 'zh-CN': '4', 'en-US': '4' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-07'], // WEB应用开发 / 网站主题
+  }, // 令牌结束
+  { // Vue SFC 骨架
+    key: 'vue.sfc', // 能力标识
+    name: { 'zh-CN': 'Vue SFC 骨架', 'en-US': 'Vue SFC skeleton' }, // 能力名
+    hint: { 'zh-CN': '输入 {"name":"UserCard","props":["title"],"emits":["select"]}，输出 <script setup> 版单文件组件', 'en-US': 'Input component name, props and emits to get an SFC' }, // 使用提示
+    placeholder: { 'zh-CN': '{"name":"UserCard","props":["title"],"emits":["select"]}', 'en-US': '{"name":"UserCard","props":["title"],"emits":["select"]}' }, // 占位
+    output_kind: 'text', // 代码
+    module_codes: ['cat.web-08'], // WEB应用开发 / Vue扩展组件
+  }, // Vue 结束
+  { // 爬虫计划
+    key: 'crawler.plan', // 能力标识
+    name: { 'zh-CN': '爬虫合规计划', 'en-US': 'Crawler compliance plan' }, // 能力名
+    hint: { 'zh-CN': '输入起点 URL 与目标数量，输出归一化 URL、延迟、并发与 robots 提示', 'en-US': 'Input a seed URL and page target to get a polite crawl plan' }, // 使用提示
+    placeholder: { 'zh-CN': '{"start":"https://example.com/list?page=1","pages":50}', 'en-US': '{"start":"https://example.com/list","pages":50}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-09'], // WEB应用开发 / Web爬虫
+  }, // 爬虫结束
+  { // Angular 组件骨架
+    key: 'angular.cmp', // 能力标识
+    name: { 'zh-CN': 'Angular 组件骨架', 'en-US': 'Angular component skeleton' }, // 能力名
+    hint: { 'zh-CN': '输入 {"name":"user-card","inputs":["title"],"outputs":["select"]}，输出 standalone 组件', 'en-US': 'Input name, inputs and outputs to get a standalone component' }, // 使用提示
+    placeholder: { 'zh-CN': '{"name":"user-card","inputs":["title"],"outputs":["select"]}', 'en-US': '{"name":"user-card","inputs":["title"]}' }, // 占位
+    output_kind: 'text', // 代码
+    module_codes: ['cat.web-11'], // WEB应用开发 / Angular扩展
+  }, // Angular 结束
+  { // Bootstrap 栅格换算
+    key: 'bs.grid', // 能力标识
+    name: { 'zh-CN': 'Bootstrap 栅格换算', 'en-US': 'Bootstrap grid mapping' }, // 能力名
+    hint: { 'zh-CN': '输入目标宽度占比 JSON（如 {"sm":12,"md":6}），输出 col 类名组合', 'en-US': 'Input breakpoint spans to get col class names' }, // 使用提示
+    placeholder: { 'zh-CN': '{"xs":12,"sm":12,"md":6,"lg":4}', 'en-US': '{"xs":12,"md":6}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-12'], // WEB应用开发 / Bootstrap扩展插件
+  }, // 栅格结束
+  { // React 组件骨架
+    key: 'react.cmp', // 能力标识
+    name: { 'zh-CN': 'React 组件骨架', 'en-US': 'React component skeleton' }, // 能力名
+    hint: { 'zh-CN': '输入 {"name":"UserCard","props":["title","count"],"memo":true}，输出 TSX 函数组件', 'en-US': 'Input name and props to get a TSX component' }, // 使用提示
+    placeholder: { 'zh-CN': '{"name":"UserCard","props":["title","count"],"memo":true}', 'en-US': '{"name":"UserCard","props":["title"]}' }, // 占位
+    output_kind: 'text', // 代码
+    module_codes: ['cat.web-13'], // WEB应用开发 / React 组件
+  }, // React 结束
+  { // RPC 方法签名校验
+    key: 'rpc.methods', // 能力标识
+    name: { 'zh-CN': 'RPC 方法签名校验', 'en-US': 'RPC method signature check' }, // 能力名
+    hint: { 'zh-CN': '输入 {"methods":[{"name":"user.get","params":["id:string"]}]}，校验命名与参数类型', 'en-US': 'Input methods to validate naming and param types' }, // 使用提示
+    placeholder: { 'zh-CN': '{"methods":[{"name":"user.get","params":["id:string"]}]}', 'en-US': '{"methods":[{"name":"user.get","params":["id:string"]}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-14'], // WEB应用开发 / RPC开发框架
+  }, // RPC 结束
+  { // 网关路由冲突检测
+    key: 'api.routes', // 能力标识
+    name: { 'zh-CN': 'API 网关路由体检', 'en-US': 'API route conflict check' }, // 能力名
+    hint: { 'zh-CN': '输入 {"routes":[{"method":"GET","path":"/a"},{"method":"GET","path":"/a"}]}，检测重复与参数命名不一致', 'en-US': 'Input routes to detect duplicates and param naming drift' }, // 使用提示
+    placeholder: { 'zh-CN': '{"routes":[{"method":"GET","path":"/users/:id"},{"method":"GET","path":"/users/:userId"}]}', 'en-US': '{"routes":[{"method":"GET","path":"/users/:id"},{"method":"GET","path":"/users/:userId"}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-15'], // WEB应用开发 / API 网关/接口管理
+  }, // 网关结束
+  { // 短链生成
+    key: 'url.short', // 能力标识
+    name: { 'zh-CN': '短链码生成', 'en-US': 'Short link code' }, // 能力名
+    hint: { 'zh-CN': '输入原始长链，输出 6 位 Base62 短码与短链示例（含冲突提示）', 'en-US': 'Enter a long URL to get a 6-char Base62 code' }, // 使用提示
+    placeholder: { 'zh-CN': 'https://mim.mixm.top/products?group=dev', 'en-US': 'https://mim.mixm.top/products?group=dev' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.web-16'], // WEB应用开发 / 短网址
+  }, // 短链结束
+  { // layui 表格列配置
+    key: 'layui.table', // 能力标识
+    name: { 'zh-CN': 'layui 表格列配置', 'en-US': 'layui table columns' }, // 能力名
+    hint: { 'zh-CN': '输入 {"fields":["id","name","created_at"]}，输出 layui table 的 cols 配置', 'en-US': 'Input field list to get layui cols config' }, // 使用提示
+    placeholder: { 'zh-CN': '{"fields":["id","name","created_at"]}', 'en-US': '{"fields":["id","name"]}' }, // 占位
+    output_kind: 'text', // 代码
+    module_codes: ['cat.web-17'], // WEB应用开发 / layui 组件
+  }, // layui 结束
 ]; // 能力清单结束
 
 /** 按能力键取定义：前端工具面板与服务端路由都用它做存在性判断 */

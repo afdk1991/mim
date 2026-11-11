@@ -1040,6 +1040,313 @@ const tauriPerm: CapabilityHandler = async ({ text }) => { // Tauri 权限入口
   return { output, output_kind: 'json', meta: { permissions: permissions.length, issues: issues.length } }; // 返回结果
 }; // tauriPerm 结束
 
+/** Web 项目脚手架：按框架与特性清单产出目录树，帮助快速判断项目骨架是否齐备 */
+const webScaffold: CapabilityHandler = async ({ text }) => { // 脚手架入口
+  const input = parseJsonInput(text, 'web.scaffold') as { name?: unknown; framework?: unknown; features?: unknown }; // 解析入参
+  const name = String(input.name ?? '').trim(); // 项目名
+  if (!/^[a-z][a-z0-9-]{1,40}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "name" must be kebab-case (a-z0-9-)', { capability: 'web.scaffold' }); // 名称规范
+  const framework = typeof input.framework === 'string' ? input.framework : 'vite-react'; // 默认 Vite + React
+  const features = Array.isArray(input.features) ? input.features.map((f) => String(f)) : []; // 可选特性
+  const files: Array<{ path: string; purpose: string }> = [ // 基础骨架
+    { path: `${name}/package.json`, purpose: '依赖与脚本' }, // 包清单
+    { path: `${name}/index.html`, purpose: '入口 HTML' }, // 入口页
+    { path: `${name}/src/main.ts`, purpose: '应用入口' }, // 应用入口
+    { path: `${name}/src/App.tsx`, purpose: '根组件' }, // 根组件
+    { path: `${name}/vite.config.ts`, purpose: '构建配置' }, // 构建配置
+  ]; // 基础清单结束
+  if (features.includes('router')) files.push({ path: `${name}/src/router.ts`, purpose: '路由表' }); // 路由
+  if (features.includes('test')) files.push({ path: `${name}/test/app.test.tsx`, purpose: '组件测试' }); // 测试
+  if (features.includes('ci')) files.push({ path: `${name}/.github/workflows/ci.yml`, purpose: 'CI 流水线' }); // CI
+  if (features.includes('docker')) files.push({ path: `${name}/Dockerfile`, purpose: '容器构建' }); // 容器
+  const unknownFeatures = features.filter((f) => !['router', 'test', 'ci', 'docker'].includes(f)); // 未识别的特性
+  const output = JSON.stringify({ name, framework, files, unknown_features: unknownFeatures }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { files: files.length, framework } }; // 返回骨架
+}; // webScaffold 结束
+
+/** jQuery 插件骨架：IIFE + $.fn 扩展 + 默认参数合并，直接可粘进项目 */
+const jqueryPlugin: CapabilityHandler = async ({ text }) => { // jQuery 入口
+  const name = text.trim(); // 插件名
+  if (!/^[a-z][a-zA-Z0-9]{1,30}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "text" must be a camelCase plugin name', { capability: 'jquery.plugin' }); // 名称规范
+  const output = [ // 拼接骨架
+    `/* ${name} 插件骨架：IIFE 隔离作用域，避免污染全局 */`, // 注释
+    `(function ($) {`, // IIFE 开始
+    `  $.fn.${name} = function (options) {`, // 扩展方法
+    `    var settings = $.extend({ text: '', delay: 0 }, options);`, // 合并默认参数
+    `    return this.each(function () {`, // 逐个元素处理
+    `      var $el = $(this);`, // 当前元素
+    `      $el.text(settings.text);`, // 示例动作
+    `    });`, // each 结束
+    `  };`, // 方法结束
+    `})(jQuery);`, // IIFE 结束
+  ].join('\n'); // 组装
+  return { output, output_kind: 'text', meta: { plugin: name } }; // 返回代码
+}; // jqueryPlugin 结束
+
+/** 组件 Props 校验：schema 里 `type!` 表示必填，输出缺失、类型不符与多余字段 */
+const uiProps: CapabilityHandler = async ({ text }) => { // Props 入口
+  const input = parseJsonInput(text, 'ui.props') as { schema?: unknown; props?: unknown }; // 解析入参
+  const schema = (input.schema ?? {}) as Record<string, string>; // schema 表
+  const props = (input.props ?? {}) as Record<string, unknown>; // 实际传参
+  if (Object.keys(schema).length === 0) throw new AppError('VALIDATION_FAILED', 'field "schema" must be a non-empty object', { capability: 'ui.props' }); // 缺参拒绝
+  const typeOf = (value: unknown): string => (Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value); // 细分类型
+  const issues: string[] = []; // 问题清单
+  for (const [key, spec] of Object.entries(schema)) { // 逐字段校验
+    const required = String(spec).endsWith('!'); // 是否必填
+    const expectType = String(spec).replace('!', ''); // 期望类型
+    const present = Object.prototype.hasOwnProperty.call(props, key); // 是否传入
+    if (!present && required) issues.push(`缺少必填字段: ${key}`); // 必填缺失
+    if (present && expectType && typeOf(props[key]) !== expectType) issues.push(`字段 ${key} 类型应为 ${expectType}，实际 ${typeOf(props[key])}`); // 类型不符
+  } // 校验结束
+  const extra = Object.keys(props).filter((key) => !Object.prototype.hasOwnProperty.call(schema, key)); // 多余字段
+  if (extra.length > 0) issues.push(`多余字段: ${extra.join(',')}`); // 记入问题
+  return { output: JSON.stringify({ valid: issues.length === 0, issues, extra_fields: extra }, null, 2), output_kind: 'json', meta: { issues: issues.length } }; // 返回结论
+}; // uiProps 结束
+
+/** JavaScript 值类型判定：按字面量给出精确类型、可安全转换的目标与常见坑 */
+const jsType: CapabilityHandler = async ({ text }) => { // 类型判定入口
+  const raw = text.trim(); // 原文
+  let value: unknown = raw; // 默认按字符串
+  let parsed = false; // 是否按 JSON 解析成功
+  if (raw === 'null') { value = null; parsed = true; } else if (raw === 'undefined') { value = undefined; parsed = true; } else { // 关键字单独处理
+    try { value = JSON.parse(raw); parsed = true; } catch { value = raw; } // 能解析就当字面量
+  } // 解析分支结束
+  const type = value === null ? 'null' : value === undefined ? 'undefined' : Array.isArray(value) ? 'array' : typeof value; // 精确类型
+  const conversions: Record<string, string[]> = { array: ['join() → string', 'JSON.stringify → string', 'Array.from → array'], object: ['JSON.stringify → string', 'Object.keys → array'], number: ['String() → string', 'Number.isInteger → boolean'], string: ['JSON.parse → object/array（需合法）', 'Number() → number 或 NaN'], boolean: ['String() → "true"/"false"'], null: ['String(null) → "null"'], undefined: ['String(undefined) → "undefined"'] }; // 转换建议表
+  const pitfalls: string[] = []; // 常见坑
+  if (!parsed && raw.length > 0) pitfalls.push('输入被判为字符串（未加引号的字面量不会被 JSON 解析）'); // 未加引号
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) pitfalls.push('非安全整数，超过 2^53 会丢精度'); // 精度
+  return { output: JSON.stringify({ input: raw.slice(0, 80), type, parsed_as_json: parsed, suggestions: conversions[type] ?? [], pitfalls }, null, 2), output_kind: 'json', meta: { type } }; // 输出结论
+}; // jsType 结束
+
+/** RESTful 路径检查：抓动词滥用、大小写混用、资源层级与版本前缀缺失 */
+const restLint: CapabilityHandler = async ({ text }) => { // REST 检查入口
+  const input = parseJsonInput(text, 'rest.lint') as { method?: unknown; path?: unknown }; // 解析入参
+  const method = String(input.method ?? 'GET').toUpperCase(); // 方法
+  const path = String(input.path ?? '').trim(); // 路径
+  if (!path.startsWith('/')) throw new AppError('VALIDATION_FAILED', 'field "path" must start with "/"', { capability: 'rest.lint' }); // 路径格式
+  const issues: string[] = []; // 问题
+  const segments = path.split('/').filter(Boolean); // 路径段
+  if (!/^\/api\/v\d+/.test(path) && !path.startsWith('/health')) issues.push('缺少版本前缀（建议 /api/v1/...）'); // 版本
+  const verb = segments.find((seg) => /^(get|post|create|update|delete|remove|fetch|query|save)[A-Z]/.test(seg)); // 动词开头段
+  if (verb) issues.push(`路径含动词: ${verb}（REST 用 HTTP 方法表达动作）`); // 动词滥用
+  if (/[A-Z]/.test(path)) issues.push('路径含大写字母（建议 kebab-case 全小写）'); // 大小写
+  if (segments.some((seg) => seg.includes('_'))) issues.push('路径含下划线（建议用连字符）'); // 下划线
+  const collectionIndex = segments.findIndex((seg) => !seg.startsWith(':') && seg === segments[segments.length - 1]); // 末段是否集合
+  if (!['GET', 'POST'].includes(method) && collectionIndex >= 0) issues.push('非 GET/POST 方法却指向集合资源（应指向单个资源）'); // 方法语义
+  const suggestion = path.replace(/\/get([A-Z][a-zA-Z]*)/g, (_all, rest: string) => `/${rest.charAt(0).toLowerCase()}${rest.slice(1)}`).replace(/([A-Z])/g, (_all, ch: string) => `-${ch.toLowerCase()}`).replace(/--+/g, '-').toLowerCase(); // 建议路径
+  return { output: JSON.stringify({ method, path, valid: issues.length === 0, issues, suggested_path: suggestion }, null, 2), output_kind: 'json', meta: { issues: issues.length } }; // 输出结论
+}; // restLint 结束
+
+/** 后台菜单树：按路径层级嵌套成树，标出重复路径与层级断裂 */
+const adminMenu: CapabilityHandler = async ({ text }) => { // 菜单入口
+  const input = parseJsonInput(text, 'admin.menu') as { routes?: unknown }; // 解析入参
+  const raw = Array.isArray(input.routes) ? input.routes : []; // 路由清单
+  if (raw.length === 0) throw new AppError('VALIDATION_FAILED', 'field "routes" must be a non-empty array', { capability: 'admin.menu' }); // 缺参拒绝
+  const duplicates: string[] = []; // 重复路径
+  const seen = new Set<string>(); // 已见路径
+  const flat = raw.slice(0, 200).map((item) => { // 归一化
+    const row = item as { path?: unknown; title?: unknown; order?: unknown }; // 断言
+    const path = String(row.path ?? '').trim(); // 路径
+    if (seen.has(path)) duplicates.push(path); // 重复记录
+    seen.add(path); // 登记
+    return { path, title: String(row.title ?? path), order: Number(row.order ?? 999) }; // 扁平项
+  }).filter((item) => item.path.startsWith('/')); // 只留绝对路径
+  const tree: Array<Record<string, unknown>> = []; // 树根
+  const index = new Map<string, Record<string, unknown>>(); // path → 节点
+  for (const item of [...flat].sort((a, b) => a.path.split('/').length - b.path.split('/').length || a.order - b.order)) { // 浅层先建
+    const node: Record<string, unknown> = { path: item.path, title: item.title, order: item.order, children: [] }; // 新节点
+    const parentPath = item.path.replace(/\/[^/]+$/, ''); // 父路径
+    const parent = index.get(parentPath); // 查父节点
+    if (parent) (parent.children as Record<string, unknown>[]).push(node); else tree.push(node); // 挂载
+    index.set(item.path, node); // 登记
+  } // 建树结束
+  const orphans = flat.filter((item) => item.path !== '/' && !index.has(item.path.replace(/\/[^/]+$/, ''))).map((item) => item.path); // 父级缺失
+  return { output: JSON.stringify({ total: flat.length, tree, duplicates, orphans }, null, 2), output_kind: 'json', meta: { total: flat.length, duplicates: duplicates.length } }; // 输出树
+}; // adminMenu 结束
+
+/** 设计令牌刻度：按基数生成间距阶与字号阶，统一设计系统数值 */
+const themeTokens: CapabilityHandler = async ({ text }) => { // 令牌入口
+  const base = Number.parseInt(text.trim(), 10); // 基数
+  if (!Number.isInteger(base) || base < 1 || base > 16) throw new AppError('VALIDATION_FAILED', 'field "text" must be an integer base between 1 and 16', { capability: 'theme.tokens' }); // 基数范围
+  const spacing = [1, 2, 3, 4, 5, 6, 8, 10].map((step) => ({ token: `space-${step}`, value: `${step * base}px` })); // 间距
+  const fontSizes = [12, 14, 16, 20, 24, 32, 40, 48].map((size) => ({ token: `font-${size}`, value: `${size}px` })); // 字号
+  const radius = [2, 4, 8, 12, 16].map((value) => ({ token: `radius-${value}`, value: `${value}px` })); // 圆角
+  return { output: JSON.stringify({ base, spacing, font_sizes: fontSizes, radius }, null, 2), output_kind: 'json', meta: { base, tokens: spacing.length + fontSizes.length + radius.length } }; // 输出令牌
+}; // themeTokens 结束
+
+/** Vue 单文件组件骨架：`<script setup>` + props/emits 定义 + 模板 */
+const vueSfc: CapabilityHandler = async ({ text }) => { // Vue 入口
+  const input = parseJsonInput(text, 'vue.sfc') as { name?: unknown; props?: unknown; emits?: unknown }; // 解析入参
+  const name = String(input.name ?? '').trim(); // 组件名
+  if (!/^[A-Z][a-zA-Z0-9]{1,40}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "name" must be PascalCase', { capability: 'vue.sfc' }); // 名称规范
+  const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props
+  const emits = Array.isArray(input.emits) ? input.emits.map((e) => String(e)) : []; // emits
+  const propsBlock = props.length > 0 ? `const props = defineProps<{ ${props.map((p) => `${p}: string`).join('; ')} }>();` : 'const props = defineProps<Record<string, never>>();'; // props 声明
+  const emitsBlock = emits.length > 0 ? `const emit = defineEmits<{ ${emits.map((e) => `(e: '${e}'): void`).join('; ')} }>();` : ''; // emits 声明
+  const output = [
+    `<script setup lang="ts">`, // 脚本区
+    propsBlock, // props
+    emitsBlock, // emits
+    `</script>`, // 脚本结束
+    ``, // 空行
+    `<template>`, // 模板区
+    `  <div class="${name.toLowerCase()}">`, // 根节点
+    `    <slot />`, // 默认插槽
+    `  </div>`, // 根节点结束
+    `</template>`, // 模板结束
+  ].filter((line) => line !== '').join('\n'); // 去掉空行拼接
+  return { output, output_kind: 'text', meta: { name, props: props.length, emits: emits.length } }; // 返回 SFC
+}; // vueSfc 结束
+
+/** 爬虫合规计划：URL 归一化 + 礼貌抓取参数 + 分页模板推断 */
+const crawlerPlan: CapabilityHandler = async ({ text }) => { // 爬虫入口
+  const input = parseJsonInput(text, 'crawler.plan') as { start?: unknown; pages?: unknown }; // 解析入参
+  const start = String(input.start ?? '').trim(); // 起点
+  let url: URL; // 解析结果
+  try { url = new URL(start); } catch { throw new AppError('VALIDATION_FAILED', 'field "start" must be an absolute URL', { capability: 'crawler.plan' }); } // 必须是绝对地址
+  if (!['http:', 'https:'].includes(url.protocol)) throw new AppError('VALIDATION_FAILED', 'only http/https are supported', { capability: 'crawler.plan' }); // 协议限制
+  const pages = Math.min(1000, Math.max(1, Number.parseInt(String(input.pages ?? 50), 10) || 50)); // 目标页数
+  const tracking = ['utm_source', 'utm_medium', 'utm_campaign', 'spm', 'from']; // 跟踪参数
+  for (const key of tracking) url.searchParams.delete(key); // 清理跟踪参数
+  const delayMs = 800; // 礼貌延迟
+  const estimateSeconds = Math.ceil((pages * delayMs) / 1000); // 预计耗时
+  const hasPageParam = [...url.searchParams.keys()].some((key) => /page|p|offset|start/i.test(key)); // 是否已有分页参数
+  const output = JSON.stringify({ normalized_url: url.toString(), pages, concurrency: 1, delay_ms: delayMs, estimated_seconds: estimateSeconds, page_param_detected: hasPageParam, robots_hint: `${url.origin}/robots.txt 需先读取并遵守 Disallow`, headers: { 'User-Agent': 'MimBot/0.0 (+https://mim.mixm.top)', 'Accept-Language': 'zh-CN,zh;q=0.9' } }, null, 2); // 计划
+  return { output, output_kind: 'json', meta: { pages, estimated_seconds: estimateSeconds } }; // 返回计划
+}; // crawlerPlan 结束
+
+/** Angular standalone 组件骨架：inputs/outputs 以 signal 形式声明 */
+const angularCmp: CapabilityHandler = async ({ text }) => { // Angular 入口
+  const input = parseJsonInput(text, 'angular.cmp') as { name?: unknown; inputs?: unknown; outputs?: unknown }; // 解析入参
+  const name = String(input.name ?? '').trim(); // 组件名（kebab-case）
+  if (!/^[a-z][a-z0-9-]{1,40}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "name" must be kebab-case', { capability: 'angular.cmp' }); // 名称规范
+  const className = name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('') + 'Component'; // 类名
+  const inputs = Array.isArray(input.inputs) ? input.inputs.map((i) => String(i)) : []; // 输入
+  const outputs = Array.isArray(input.outputs) ? input.outputs.map((o) => String(o)) : []; // 输出
+  const output = [
+    `import { Component, input, output } from '@angular/core';`, // 依赖
+    ``, // 空行
+    `@Component({`, // 装饰器
+    `  selector: 'app-${name}',`, // 选择器
+    `  standalone: true,`, // 独立组件
+    `  template: \`<div class="${name}"><ng-content /></div>\`,`, // 模板
+    `})`, // 装饰器结束
+    `export class ${className} {`, // 类声明
+    ...inputs.map((prop) => `  readonly ${prop} = input<string>('');`), // 输入声明
+    ...outputs.map((prop) => `  readonly ${prop} = output<void>();`), // 输出声明
+    `}`, // 类结束
+  ].join('\n'); // 组装
+  return { output, output_kind: 'text', meta: { inputs: inputs.length, outputs: outputs.length } }; // 返回组件
+}; // angularCmp 结束
+
+/** Bootstrap 栅格换算：断点 → col 类名，越界给出夹紧后的值 */
+const bsGrid: CapabilityHandler = async ({ text }) => { // 栅格入口
+  const input = parseJsonInput(text, 'bs.grid') as Record<string, unknown>; // 解析入参
+  const breakpoints = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl']; // 合法断点
+  const classes: string[] = []; // 类名
+  const issues: string[] = []; // 提示
+  for (const [bp, raw] of Object.entries(input)) { // 逐断点
+    if (!breakpoints.includes(bp)) { issues.push(`未知断点: ${bp}`); continue; } // 非法断点
+    const span = Number(raw); // 占比
+    if (!Number.isInteger(span) || span < 1 || span > 12) { issues.push(`${bp} 取值应为 1–12 的整数`); continue; } // 越界
+    classes.push(bp === 'xs' ? `col-${span}` : `col-${bp}-${span}`); // 类名
+  } // 循环结束
+  return { output: JSON.stringify({ classes, class_string: classes.join(' '), issues }, null, 2), output_kind: 'json', meta: { classes: classes.length } }; // 输出类名
+}; // bsGrid 结束
+
+/** React 函数组件骨架：TSX + props 接口 + 可选 memo 包裹 */
+const reactCmp: CapabilityHandler = async ({ text }) => { // React 入口
+  const input = parseJsonInput(text, 'react.cmp') as { name?: unknown; props?: unknown; memo?: unknown }; // 解析入参
+  const name = String(input.name ?? '').trim(); // 组件名
+  if (!/^[A-Z][a-zA-Z0-9]{1,40}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "name" must be PascalCase', { capability: 'react.cmp' }); // 名称规范
+  const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props
+  const useMemo = Boolean(input.memo); // 是否 memo
+  const propsType = props.length > 0 ? props.map((p) => `  ${p}?: string;`).join('\n') : '  // 无外部 props'; // 接口字段
+  const output = [
+    `import type { JSX } from 'react';`, // 类型导入
+    ``, // 空行
+    `export interface ${name}Props {`, // 接口
+    propsType, // 字段
+    `}`, // 接口结束
+    ``, // 空行
+    `/** ${name}：函数组件骨架 */`, // 注释
+    `export function ${name}(props: ${name}Props): JSX.Element {`, // 函数
+    `  return <div className="${name.toLowerCase()}">{props.${props[0] ?? 'title'} ?? '${name}'}</div>;`, // 渲染
+    `}`, // 函数结束
+    ...(useMemo ? ['', `export default memo(${name});`] : []), // 可选 memo
+  ].join('\n'); // 组装
+  return { output, output_kind: 'text', meta: { props: props.length, memo: useMemo } }; // 返回组件
+}; // reactCmp 结束
+
+/** RPC 方法签名校验：方法名分段小写、参数必须带类型且类型在白名单内 */
+const rpcMethods: CapabilityHandler = async ({ text }) => { // RPC 入口
+  const input = parseJsonInput(text, 'rpc.methods') as { methods?: unknown }; // 解析入参
+  const raw = Array.isArray(input.methods) ? input.methods : []; // 方法清单
+  const allowedTypes = ['string', 'number', 'boolean', 'object', 'array', 'any']; // 允许类型
+  const issues: string[] = []; // 问题
+  const methods = raw.slice(0, 100).map((item, index) => { // 逐方法
+    const row = item as { name?: unknown; params?: unknown }; // 断言
+    const name = String(row.name ?? '').trim(); // 方法名
+    const params = Array.isArray(row.params) ? row.params.map((p) => String(p)) : []; // 参数
+    const nameOk = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/.test(name); // 分段小写
+    if (!nameOk) issues.push(`#${index} 方法名不合法: ${name || '(空)'}`); // 名称问题
+    const badParams = params.filter((param) => { const [paramName, paramType] = param.split(':'); return !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(paramName ?? '') || !allowedTypes.includes(paramType ?? ''); }); // 非法参数
+    if (badParams.length > 0) issues.push(`#${index} 参数不合法: ${badParams.join(',')}`); // 参数问题
+    return { name, params, name_ok: nameOk, param_issues: badParams.length }; // 单条结果
+  }); // map 结束
+  return { output: JSON.stringify({ total: methods.length, issues, methods }, null, 2), output_kind: 'json', meta: { methods: methods.length, issues: issues.length } }; // 输出结论
+}; // rpcMethods 结束
+
+/** 网关路由体检：把参数段归一后检测重复与参数命名漂移 */
+const apiRoutes: CapabilityHandler = async ({ text }) => { // 网关入口
+  const input = parseJsonInput(text, 'api.routes') as { routes?: unknown }; // 解析入参
+  const raw = Array.isArray(input.routes) ? input.routes : []; // 路由清单
+  if (raw.length === 0) throw new AppError('VALIDATION_FAILED', 'field "routes" must be a non-empty array', { capability: 'api.routes' }); // 缺参拒绝
+  const seenShape = new Map<string, string>(); // 归一形 → 首次路径
+  const duplicates: string[] = []; // 重复
+  const drift: string[] = []; // 参数命名漂移
+  const paramNameByShape = new Map<string, string>(); // 归一形 → 参数名
+  const routes = raw.slice(0, 200).map((item) => { // 归一化
+    const row = item as { method?: unknown; path?: unknown }; // 断言
+    const method = String(row.method ?? 'GET').toUpperCase(); // 方法
+    const path = String(row.path ?? '').trim(); // 路径
+    const shape = `${method} ${path.replace(/:[^/]+/g, ':param')}`; // 归一形
+    if (seenShape.has(shape)) duplicates.push(`${shape}（首次: ${seenShape.get(shape)}，重复: ${path}）`); else seenShape.set(shape, path); // 重复记录
+    const paramMatch = /:([^/]+)/.exec(path); // 取参数名
+    if (paramMatch) { const prev = paramNameByShape.get(shape); if (prev && prev !== paramMatch[1]) drift.push(`${shape} 参数名不一致: ${prev} vs ${paramMatch[1]}`); else paramNameByShape.set(shape, paramMatch[1]); } // 漂移检测
+    return { method, path, shape }; // 单条
+  }); // map 结束
+  return { output: JSON.stringify({ total: routes.length, duplicates, param_naming_drift: drift, healthy: duplicates.length === 0 && drift.length === 0 }, null, 2), output_kind: 'json', meta: { routes: routes.length, duplicates: duplicates.length } }; // 输出结论
+}; // apiRoutes 结束
+
+/** 短链码生成：sha256 摘要映射到 Base62 取 6 位，附碰撞概率提示 */
+const urlShort: CapabilityHandler = async ({ text }) => { // 短链入口
+  const target = text.trim(); // 长链
+  let url: URL; // 解析
+  try { url = new URL(target); } catch { throw new AppError('VALIDATION_FAILED', 'field "text" must be an absolute URL', { capability: 'url.short' }); } // 必须绝对地址
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'; // Base62 字母表
+  const digest = createHash('sha256').update(url.toString()).digest('hex'); // 摘要
+  let code = ''; // 短码
+  for (let i = 0; i < 6; i++) { // 取 6 位
+    const chunk = Number.parseInt(digest.slice(i * 8, i * 8 + 8), 16); // 8 位十六进制转数值
+    code += alphabet[chunk % 62]; // 映射到字母表
+  }
+  const space = Math.pow(62, 6); // 6 位空间
+  const collisionAt = Math.floor(Math.sqrt(2 * space * 0.01)); // 生日问题下 1% 碰撞所需条数
+  return { output: JSON.stringify({ target: url.toString(), code, space, collision_notice: `约 ${collisionAt} 条后达到 1% 碰撞概率，建议入库前查重`, short_path: `/s/${code}` }, null, 2), output_kind: 'json', meta: { code } }; // 输出短码
+}; // urlShort 结束
+
+/** layui 表格列配置：按字段推断标题、排序与宽度，输出 cols 数组 */
+const layuiTable: CapabilityHandler = async ({ text }) => { // layui 入口
+  const input = parseJsonInput(text, 'layui.table') as { fields?: unknown }; // 解析入参
+  const fields = Array.isArray(input.fields) ? input.fields.map((f) => String(f)) : []; // 字段清单
+  if (fields.length === 0) throw new AppError('VALIDATION_FAILED', 'field "fields" must be a non-empty array', { capability: 'layui.table' }); // 缺参拒绝
+  const labelOf = (field: string): string => ({ id: 'ID', name: '名称', title: '标题', status: '状态', created_at: '创建时间', updated_at: '更新时间' } as Record<string, string>)[field] ?? field; // 常用中文标题
+  const cols = fields.slice(0, 50).map((field, index) => ({ field, title: labelOf(field), width: index === 0 ? 80 : undefined, sort: ['id', 'created_at', 'updated_at'].includes(field), fixed: index === 0 ? 'left' : undefined })); // 列配置
+  const output = `cols: [[\n${cols.map((col) => `  { field: '${col.field}', title: '${col.title}'${col.width ? `, width: ${col.width}` : ''}${col.sort ? ', sort: true' : ''}${col.fixed ? `, fixed: '${col.fixed}'` : ''} }`).join(',\n')}\n]]`; // 生成 cols 片段
+  return { output, output_kind: 'text', meta: { columns: cols.length } }; // 返回配置
+}; // layuiTable 结束
+
 /** 能力注册表：键必须与 core-domain 的 MODULE_CAPABILITIES.key 完全一致，否则路由回 501 */
 export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键为能力标识
   'json.format': jsonFormat, // JSON 工具
@@ -1088,6 +1395,22 @@ export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键�
   'anim.keyframes': animKeyframes, // CSS 关键帧
   'phone.format': phoneFormat, // 手机号规范化
   'tauri.perm': tauriPerm, // Tauri 能力配置
+  'web.scaffold': webScaffold, // Web 项目脚手架
+  'jquery.plugin': jqueryPlugin, // jQuery 插件骨架
+  'ui.props': uiProps, // 组件 Props 校验
+  'js.type': jsType, // JS 值类型判定
+  'rest.lint': restLint, // REST 路径检查
+  'admin.menu': adminMenu, // 后台菜单树
+  'theme.tokens': themeTokens, // 设计令牌
+  'vue.sfc': vueSfc, // Vue SFC 骨架
+  'crawler.plan': crawlerPlan, // 爬虫合规计划
+  'angular.cmp': angularCmp, // Angular 组件骨架
+  'bs.grid': bsGrid, // Bootstrap 栅格
+  'react.cmp': reactCmp, // React 组件骨架
+  'rpc.methods': rpcMethods, // RPC 签名校验
+  'api.routes': apiRoutes, // 网关路由体检
+  'url.short': urlShort, // 短链码
+  'layui.table': layuiTable, // layui 表格列
 }; // 注册表结束
 
 /** 按能力键取 handler：未注册即返回 undefined，由路由决定是否 501 */
