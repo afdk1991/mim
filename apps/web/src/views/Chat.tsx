@@ -8,7 +8,7 @@
  */
 
 // React 钩子：状态、副作用、引用与回调
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // 语言类型
 import type { Locale } from '@mim/i18n';
 // API 客户端与会话读取
@@ -29,6 +29,9 @@ interface ChatProps {
 
 /** 撤回窗口：2 分钟，与后端保持一致（仅用于前端是否显示「撤回」按钮） */
 const RECALL_WINDOW_MS = 120000; // 毫秒
+
+/** 表情面板候选：纯本地插入 Unicode 字符，不依赖表情包服务 */
+const CHAT_EMOJIS = ['😀', '😄', '😅', '😂', '🤣', '😊', '😍', '🤔', '😐', '😭', '😡', '👍', '👏', '🙏', '🎉', '❤️', '🔥', '✅', '❌', '👌'];
 
 /** 格式化时间戳为 HH:mm */
 function formatTime(iso: string): string {
@@ -72,6 +75,58 @@ function ChatImageBubble({ objectKey, name, isZh }: { objectKey: string; name?: 
     </a>
   );
 } // ChatImageBubble 结束
+
+/** 字节数格式化：文件气泡展示 1.2 MB 这类可读体积 */
+function formatBytes(size: number | null | undefined): string {
+  if (!size || size <= 0) return ''; // 缺失或 0 不展示
+  const units = ['B', 'KB', 'MB', 'GB']; // 单位阶梯
+  let value = size; // 逐级换算
+  let index = 0; // 当前单位下标
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024; // 换算到更大单位
+    index += 1; // 单位前移
+  } // 换算循环结束
+  return `${value.toFixed(1)} ${units[index]}`; // 保留一位小数
+} // formatBytes 结束
+
+/** 文件气泡：按 object_key 申请下载签名，给出文件名、体积与下载按钮
+ *  - 点击下载即触发浏览器保存（download 属性带原始文件名）
+ *  - 申请失败时回退为纯文本占位，不影响其它消息渲染
+ */
+function ChatFileBubble({ objectKey, name, size, isZh }: { objectKey: string; name?: string; size?: number | null; isZh: boolean }) {
+  const [url, setUrl] = useState<string | null>(null); // 签名后的下载地址
+  const [failed, setFailed] = useState(false); // 申请失败标记
+  useEffect(() => {
+    let alive = true; // 卸载后丢弃回调
+    setFailed(false); // 切换文件时重置失败态
+    api.media
+      .presignDownload(objectKey, 3600) // 申请 1 小时有效下载签名
+      .then((res) => {
+        if (alive) setUrl(res.download.url); // 拿到直链
+      })
+      .catch(() => {
+        if (alive) setFailed(true); // 失败回退
+      });
+    return () => {
+      alive = false; // 清理标记
+    };
+  }, [objectKey]); // 仅对象键变化时重新申请
+  const label = name ?? (isZh ? '文件' : 'file'); // 展示文件名
+  if (failed) return <span className="chat-file-fallback">{`[文件] ${label}`}</span>; // 失败占位
+  return (
+    <span className="chat-file">
+      <span className="chat-file-name">{label}</span>{/* 文件名 */}
+      {size ? <span className="chat-file-size">{formatBytes(size)}</span> : null}{/* 体积 */}
+      {url ? (
+        <a className="btn ghost small chat-file-download" href={url} download={label} target="_blank" rel="noreferrer">
+          {isZh ? '下载' : 'Download'}
+        </a>
+      ) : (
+        <span className="muted">{isZh ? '准备中…' : 'Preparing…'}</span>
+      )}{/* 下载入口 */}
+    </span>
+  );
+} // ChatFileBubble 结束
 
 /** 消息预览文本：列表里显示的摘要 */
 function messagePreview(msg: ImMessage): string {
@@ -123,6 +178,12 @@ export function Chat({ locale }: ChatProps) {
   const [msgQuery, setMsgQuery] = useState(''); // 会话内搜索词
   const [msgResults, setMsgResults] = useState<ImMessage[] | null>(null); // 搜索结果（null 表示未搜索）
 
+  // ---------- 引用回复 / 定位 / 未读分割 / 表情 ----------
+  const [replyTarget, setReplyTarget] = useState<ImMessage | null>(null); // 当前引用的消息（null 表示普通发送）
+  const [highlightId, setHighlightId] = useState<string | null>(null); // 搜索跳转后高亮的消息 ID
+  const [unreadAnchorId, setUnreadAnchorId] = useState<string | null>(null); // 未读分割线插入点（该消息之前）
+  const [emojiOpen, setEmojiOpen] = useState(false); // 表情面板开关
+
   // ---------- 输入中 ----------
   const [typingLabel, setTypingLabel] = useState<string | null>(null); // 正在输入的人名
   const typingTimerRef = useRef<number | null>(null); // 清空「正在输入」的定时器
@@ -133,6 +194,9 @@ export function Chat({ locale }: ChatProps) {
   const [members, setMembers] = useState<ImMember[]>([]); // 成员列表
   const [ownerId, setOwnerId] = useState<string | null>(null); // 群主 ID
   const [renameDraft, setRenameDraft] = useState(''); // 群改名输入
+  const [inviteQ, setInviteQ] = useState(''); // 加人搜索关键词
+  const [inviteResults, setInviteResults] = useState<ImUser[]>([]); // 加人搜索结果
+  const [invitePick, setInvitePick] = useState<string[]>([]); // 已勾选待邀请的用户
 
   // ---------- 视频通话 ----------
   const [callSession, setCallSession] = useState<CallSession | null>(null); // 通话会话
@@ -165,10 +229,17 @@ export function Chat({ locale }: ChatProps) {
       setMsgQuery(''); // 清会话内搜索
       setMsgResults(null); // 清搜索结果
       setPanelOpen(false); // 关群面板
+      setReplyTarget(null); // 清引用态，避免把上个会话的引用带过来
+      setHighlightId(null); // 清高亮
+      setUnreadAnchorId(null); // 清未读分割线
       try {
         const res = await api.im.listMessages(conversationId, { limit: 50 }); // 最近 50 条
         setMessages(res.items); // 更新消息
         setHasMore(res.items.length >= 50); // 满 50 条才可能还有更早
+        const unread = conversations.find((c) => c.id === conversationId)?.unread_count ?? 0; // 进入前的未读数
+        if (unread > 0 && res.items.length > unread) {
+          setUnreadAnchorId(res.items[res.items.length - unread].id); // 未读起点：分割线插在该条之前
+        } // 有未读且能定位才画分割线
         const last = res.items[res.items.length - 1]; // 最后一条
         if (last) {
           // 标记已读并刷新列表，让未读角标消失
@@ -179,7 +250,7 @@ export function Chat({ locale }: ChatProps) {
         setError(isZh ? '加载消息失败' : 'Failed to load messages'); // 失败提示
       } // try 结束
     },
-    [isZh, loadConversations],
+    [isZh, loadConversations, conversations],
   ); // openConversation 结束
 
   /** 加载更早消息：以当前第一条为游标向前翻页 */
@@ -247,6 +318,21 @@ export function Chat({ locale }: ChatProps) {
         } // 只处理当前会话
         return; // typing 处理完
       } // typing 结束
+      if (frame.type === 'conversation.members') {
+        const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 发生变化的会话
+        if (convId === activeId) {
+          // 成员/角色变更：直接拉一次会话详情刷新群面板（避免依赖尚未定义的 openPanel）
+          api.im
+            .getConversation(convId)
+            .then((res) => {
+              setMembers(res.members); // 刷新成员列表
+              setOwnerId(res.conversation.owner_user_id); // 刷新群主
+            })
+            .catch(() => undefined); // 失败静默，面板保持旧数据
+        } // 只处理当前会话
+        loadConversations(); // 成员数可能变化，列表同步
+        return; // 处理完
+      } // conversation.members 结束
       if (frame.type === 'message.read') {
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 会话
         if (convId === activeId) {
@@ -271,8 +357,9 @@ export function Chat({ locale }: ChatProps) {
 
   // 消息变化后滚动到底（加载更早时不强制跳到底部会造成跳动，这里只在追加时滚）
   useEffect(() => {
+    if (highlightId) return; // 搜索定位时不抢滚动，交给定位逻辑
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, highlightId]);
 
   // 用户搜索防抖（建私聊 / 建群选人共用）
   useEffect(() => {
@@ -291,15 +378,35 @@ export function Chat({ locale }: ChatProps) {
     return () => window.clearTimeout(timer); // 清理定时器
   }, [searchQ]);
 
+  // 群面板内「加人」搜索防抖：只在面板打开且有关键词时请求
+  useEffect(() => {
+    if (!panelOpen || !inviteQ.trim()) {
+      setInviteResults([]); // 未打开或无关键词清空
+      return;
+    } // 提前返回
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await api.im.searchUsers(inviteQ.trim()); // 搜索用户
+        setInviteResults(res.items); // 更新候选
+      } catch {
+        setInviteResults([]); // 失败清空
+      } // try 结束
+    }, 300); // 防抖
+    return () => window.clearTimeout(timer); // 清理
+  }, [panelOpen, inviteQ]);
+
   // ---------- 动作 ----------
 
   /** 通过 WS 或 HTTP 发一条消息：返回是否成功 */
   const deliver = useCallback(
-    async (body: { content_type: 'text' | 'image' | 'file'; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number }, optimistic: ImMessage) => {
+    async (
+      body: { content_type: 'text' | 'image' | 'file'; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number; reply_to_id?: string },
+      optimistic: ImMessage,
+    ) => {
       if (!activeId) return; // 无会话直接返回
       setMessages((prev) => [...prev, optimistic]); // 乐观追加
       if (connected) {
-        const reqId = send({ type: 'message.send', payload: { conversation_id: activeId, ...body } }); // WS 发送
+        const reqId = send({ type: 'message.send', payload: { conversation_id: activeId, ...body } }); // WS 发送（body 含 reply_to_id 引用目标）
         if (reqId) pendingRef.current.set(reqId, optimistic.id); // 记录请求序号，等 ack 回填
         return; // WS 分支结束
       } // connected 分支结束
@@ -322,6 +429,7 @@ export function Chat({ locale }: ChatProps) {
     setSending(true); // 置发送中
     setError(null); // 清旧错误
     setDraft(''); // 清输入框
+    const quoted = replyTarget; // 本次引用的消息
     const optimistic: ImMessage = {
       id: `pending-${Date.now()}`, // 临时 ID
       conversation_id: activeId, // 归属会话
@@ -329,12 +437,15 @@ export function Chat({ locale }: ChatProps) {
       sender_display_name: session?.user.display_name ?? currentUserId, // 显示名
       content_type: 'text', // 文本
       content: text, // 正文
+      reply_to_id: quoted?.id ?? null, // 引用目标
+      reply_excerpt: quoted ? messagePreview(quoted).slice(0, 80) : null, // 引用摘要（本地先显示）
       status: 'sent', // 初始状态
       created_at: new Date().toISOString(), // 本地时间
     };
-    await deliver({ content_type: 'text', content: text }, optimistic); // 统一投递
+    setReplyTarget(null); // 发送即清引用态
+    await deliver({ content_type: 'text', content: text, ...(quoted ? { reply_to_id: quoted.id } : {}) }, optimistic); // 统一投递
     setSending(false); // 复位
-  }, [draft, activeId, currentUserId, session, deliver]);
+  }, [draft, activeId, currentUserId, session, deliver, replyTarget]);
 
   /** 发送图片或文件：先直传拿到 object_key，再发消息 */
   const sendFile = useCallback(
@@ -414,7 +525,87 @@ export function Chat({ locale }: ChatProps) {
     } // try 结束
   }, [activeId, msgQuery, isZh]);
 
-  /** 新建私聊 */
+  /** 搜索结果点击：围绕目标消息重载一段上下文，滚动到该条并短暂高亮 */
+  const jumpToMessage = useCallback(
+    async (messageId: string) => {
+      if (!activeId) return; // 无会话
+      try {
+        const res = await api.im.listMessages(activeId, { around: messageId, limit: 40 }); // 目标前后各半页
+        setMessages(res.items); // 替换为定位窗口
+        setHasMore(res.items.length >= 40); // 仍可向前翻
+        setMsgResults(null); // 收起结果条
+        setHighlightId(messageId); // 标记高亮
+        window.setTimeout(() => {
+          document.getElementById(`msg-${messageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); // 滚到目标
+        }, 60); // 等列表渲染完再滚
+        window.setTimeout(() => setHighlightId(null), 2600); // 2.6 秒后取消高亮
+      } catch {
+        setError(isZh ? '定位消息失败' : 'Failed to jump to message'); // 失败提示
+      } // try 结束
+    },
+    [activeId, isZh],
+  ); // jumpToMessage 结束
+
+  /** 邀请成员入群（可多选） */
+  const inviteMembers = useCallback(async () => {
+    if (!activeId || invitePick.length === 0) return; // 无会话 / 未选人
+    try {
+      await api.im.addMembers(activeId, invitePick); // 调后端加人
+      setInvitePick([]); // 清勾选
+      setInviteQ(''); // 清搜索
+      setInviteResults([]); // 清结果
+      await openPanel(); // 刷新成员列表
+      await loadConversations(); // 刷新成员数
+    } catch {
+      setError(isZh ? '邀请失败' : 'Failed to invite'); // 失败提示
+    } // try 结束
+  }, [activeId, invitePick, isZh, loadConversations]); // inviteMembers 结束
+
+  /** 踢出成员（群主 / 管理员） */
+  const kickMember = useCallback(
+    async (userId: string) => {
+      if (!activeId) return; // 无会话
+      try {
+        await api.im.removeMember(activeId, userId); // 移除
+        await openPanel(); // 刷新面板
+        await loadConversations(); // 刷新成员数
+      } catch {
+        setError(isZh ? '移除成员失败（仅群主/管理员可操作）' : 'Failed to remove member'); // 失败提示
+      } // try 结束
+    },
+    [activeId, isZh, loadConversations],
+  ); // kickMember 结束
+
+  /** 设 / 撤管理员（仅群主） */
+  const changeRole = useCallback(
+    async (userId: string, role: 'admin' | 'member') => {
+      if (!activeId) return; // 无会话
+      try {
+        await api.im.setMemberRole(activeId, userId, role); // 改角色
+        await openPanel(); // 刷新面板
+      } catch {
+        setError(isZh ? '设置管理员失败（仅群主可操作）' : 'Failed to change role'); // 失败提示
+      } // try 结束
+    },
+    [activeId, isZh],
+  ); // changeRole 结束
+
+  /** 转让群主（仅群主） */
+  const transferTo = useCallback(
+    async (userId: string) => {
+      if (!activeId) return; // 无会话
+      try {
+        await api.im.transferOwnership(activeId, userId); // 转让
+        await openPanel(); // 刷新面板
+        await loadConversations(); // 标题等可能变化
+      } catch {
+        setError(isZh ? '转让群主失败' : 'Failed to transfer ownership'); // 失败提示
+      } // try 结束
+    },
+    [activeId, isZh, loadConversations],
+  ); // transferTo 结束
+
+
   const pickUser = useCallback(
     async (user: ImUser) => {
       try {
@@ -544,6 +735,10 @@ export function Chat({ locale }: ChatProps) {
   }, []);
 
   const activeConversation = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]); // 当前会话对象
+
+  const myRole = members.find((m) => m.user_id === currentUserId)?.role ?? 'member'; // 我在当前群的角色（未加载时按普通成员）
+  const isOwnerMe = myRole === 'owner'; // 是否群主
+  const canManage = activeConversation?.type === 'group' && (isOwnerMe || myRole === 'admin'); // 群主与管理员可管理成员
 
   return (
     <div className="chat-layout">
@@ -688,21 +883,18 @@ export function Chat({ locale }: ChatProps) {
               )}
             </header>
 
-            {/* 搜索结果条：点击某条跳回正文位置（简化：直接清空搜索并滚动到底） */}
+            {/* 搜索结果条：点击任一条跳转到正文对应位置（围绕目标重载上下文 + 高亮） */}
             {msgResults && (
               <div className="chat-msg-result-bar">
                 <span>{isZh ? `命中 ${msgResults.length} 条` : `${msgResults.length} matches`}</span>
-                {msgResults.slice(0, 5).map((m) => (
+                {msgResults.slice(0, 20).map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     className="chat-msg-result-item"
-                    onClick={() => {
-                      setMsgQuery(''); // 退出搜索态
-                      setMsgResults(null); // 清结果
-                    }}
+                    onClick={() => void jumpToMessage(m.id)} // 定位并高亮
                   >
-                    {formatTime(m.created_at)} · {messagePreview(m).slice(0, 20)}
+                    {formatTime(m.created_at)} · {messagePreview(m).slice(0, 24)}
                   </button>
                 ))}
                 <button type="button" className="btn ghost" onClick={() => setMsgResults(null)}>
@@ -721,31 +913,51 @@ export function Chat({ locale }: ChatProps) {
                 const mine = m.sender_user_id === currentUserId; // 是否自己发的
                 const canRecall = mine && Date.now() - Date.parse(m.created_at) < RECALL_WINDOW_MS && !m.id.startsWith('pending-'); // 2 分钟内且已落库
                 return (
-                  <div key={m.id} className={`chat-msg ${mine ? 'mine' : 'theirs'}`}>
-                    <span className="chat-msg-sender">{mine ? (isZh ? '我' : 'Me') : m.sender_display_name}</span>
-                    <div className="chat-msg-bubble">
-                      {m.content_type === 'text' ? (
-                        <span className="chat-msg-text">{m.content}</span>
-                      ) : m.content_type === 'image' ? (
-                        m.object_key ? (
-                          <ChatImageBubble objectKey={m.object_key} name={m.object_name ?? undefined} isZh={isZh} /> // 有对象键就内联预览
+                  <Fragment key={m.id}>
+                    {/* 未读分割线：进入会话前未读的第一条之前 */}
+                    {unreadAnchorId === m.id && (
+                      <div className="chat-unread-divider">
+                        <span>{isZh ? '以下是新消息' : 'New messages'}</span>
+                      </div>
+                    )}
+                    <div
+                      id={`msg-${m.id}`}
+                      className={`chat-msg ${mine ? 'mine' : 'theirs'}${highlightId === m.id ? ' highlight' : ''}`}
+                    >
+                      <span className="chat-msg-sender">{mine ? (isZh ? '我' : 'Me') : m.sender_display_name}</span>
+                      <div className="chat-msg-bubble">
+                        {/* 引用块：展示被引用消息的固化摘要 */}
+                        {m.reply_excerpt && <span className="chat-msg-quote">{m.reply_excerpt}</span>}
+                        {m.content_type === 'text' ? (
+                          <span className="chat-msg-text">{m.content}</span>
+                        ) : m.content_type === 'image' ? (
+                          m.object_key ? (
+                            <ChatImageBubble objectKey={m.object_key} name={m.object_name ?? undefined} isZh={isZh} /> // 有对象键就内联预览
+                          ) : (
+                            <span>{`[图片] ${m.object_name ?? ''}`}</span> // 无 object_key（历史消息）回退文字
+                          )
+                        ) : m.object_key ? (
+                          <ChatFileBubble objectKey={m.object_key} name={m.object_name ?? undefined} size={m.object_size} isZh={isZh} /> // 文件气泡带下载入口
                         ) : (
-                          <span>{`[图片] ${m.object_name ?? ''}`}</span> // 无 object_key（历史消息）回退文字
-                        )
-                      ) : (
-                        <span>{`[文件] ${m.object_name ?? ''}`}</span>
-                      )}
+                          <span>{`[文件] ${m.object_name ?? ''}`}</span> // 旧消息无对象键，回退文字
+                        )}
+                      </div>
+                      <span className="chat-msg-time">
+                        {formatTime(m.created_at)}
+                        {mine && <span className={`chat-msg-status ${m.status}`}>{statusMark(m.status, isZh)}</span>}
+                        {!m.id.startsWith('pending-') && (
+                          <button type="button" className="chat-reply-btn" onClick={() => setReplyTarget(m)}>
+                            {isZh ? '引用' : 'Quote'}
+                          </button>
+                        )}
+                        {canRecall && (
+                          <button type="button" className="chat-recall" onClick={() => void recall(m)}>
+                            {isZh ? '撤回' : 'Recall'}
+                          </button>
+                        )}
+                      </span>
                     </div>
-                    <span className="chat-msg-time">
-                      {formatTime(m.created_at)}
-                      {mine && <span className={`chat-msg-status ${m.status}`}>{statusMark(m.status, isZh)}</span>}
-                      {canRecall && (
-                        <button type="button" className="chat-recall" onClick={() => void recall(m)}>
-                          {isZh ? '撤回' : 'Recall'}
-                        </button>
-                      )}
-                    </span>
-                  </div>
+                  </Fragment>
                 );
               })}
               <div ref={messagesEndRef} />
@@ -754,7 +966,37 @@ export function Chat({ locale }: ChatProps) {
             {/* 对方正在输入 */}
             {typingLabel && <div className="chat-typing">{typingLabel}</div>}
 
+            {/* 引用回复提示条：显示被引用内容，可一键取消 */}
+            {replyTarget && (
+              <div className="chat-reply-bar">
+                <span className="chat-reply-quote">{messagePreview(replyTarget).slice(0, 60)}</span>
+                <button type="button" className="btn ghost small" onClick={() => setReplyTarget(null)}>
+                  {isZh ? '取消引用' : 'Cancel'}
+                </button>
+              </div>
+            )}
+
             <div className="chat-input">
+              {/* 表情：纯本地插入，插入后聚焦仍留在文本域 */}
+              <button type="button" className="btn ghost chat-emoji-btn" onClick={() => setEmojiOpen((v) => !v)} disabled={sending}>
+                🙂
+              </button>
+              {emojiOpen && (
+                <div className="chat-emoji-picker">
+                  {CHAT_EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      className="chat-emoji-item"
+                      onClick={() => {
+                        setDraft((prev) => `${prev}${e}`); // 追加到草稿
+                      }}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              )}
               <textarea
                 value={draft}
                 onChange={(e) => handleDraftChange(e.target.value)}
@@ -805,24 +1047,81 @@ export function Chat({ locale }: ChatProps) {
           <div className="chat-panel-row">
             <span>{isZh ? `成员 ${members.length} 人` : `${members.length} members`}</span>
           </div>
-          <div className="chat-member-list">
-            {members.map((m) => (
-              <div key={m.user_id} className="chat-member-chip">
-                <span className="chat-avatar">{(m.display_name || m.user_id).slice(0, 1)}</span>
-                <span className="chat-user-name">{m.display_name}</span>
-                <span className="chat-member-role">{m.role === 'owner' ? (isZh ? '群主' : 'Owner') : m.role === 'admin' ? (isZh ? '管理员' : 'Admin') : ''}</span>
-                {/* 群主可移除普通成员；自己可退群 */}
-                {m.user_id !== ownerId && m.user_id === currentUserId && (
+          {/* 邀请入群：群主 / 管理员可搜索选人 */}
+          {canManage && (
+            <div className="chat-panel-block">
+              <input
+                type="text"
+                placeholder={isZh ? '搜索用户，加入本群' : 'Search users to invite'}
+                value={inviteQ}
+                onChange={(e) => setInviteQ(e.target.value)}
+              />
+              {inviteResults
+                .filter((u) => !members.some((m) => m.user_id === u.id)) // 已在群里的不再列出
+                .map((u) => (
                   <button
+                    key={u.id}
                     type="button"
-                    className="btn ghost"
-                    onClick={() => void api.im.removeMember(activeConversation.id, m.user_id).then(() => leaveConversation())}
+                    className={`chat-user-item${invitePick.includes(u.id) ? ' picked' : ''}`}
+                    onClick={() =>
+                      setInvitePick((prev) => (prev.includes(u.id) ? prev.filter((id) => id !== u.id) : [...prev, u.id]))
+                    }
                   >
-                    {isZh ? '退群' : 'Leave'}
+                    <span className="chat-avatar">{(u.display_name || u.id).slice(0, 1)}</span>
+                    <span className="chat-user-name">{u.display_name || u.id}</span>
+                    <span className="chat-pick-mark">{invitePick.includes(u.id) ? '✓' : '+'}</span>
                   </button>
-                )}
-              </div>
-            ))}
+                ))}
+              <button type="button" className="btn primary small" onClick={() => void inviteMembers()} disabled={invitePick.length === 0}>
+                {isZh ? `邀请入群（${invitePick.length}）` : `Invite (${invitePick.length})`}
+              </button>
+            </div>
+          )}
+          <div className="chat-member-list">
+            {members.map((m) => {
+              const isOwnerRow = m.user_id === ownerId; // 是否群主
+              const canKick = canManage && m.user_id !== currentUserId && !isOwnerRow; // 群主/管理员可移除他人
+              return (
+                <div key={m.user_id} className="chat-member-chip">
+                  <span className="chat-avatar">{(m.display_name || m.user_id).slice(0, 1)}</span>
+                  <span className="chat-user-name">{m.display_name || m.user_id.slice(0, 8)}</span>
+                  <span className="chat-member-role">
+                    {m.role === 'owner' ? (isZh ? '群主' : 'Owner') : m.role === 'admin' ? (isZh ? '管理员' : 'Admin') : ''}
+                  </span>
+                  <span className="chat-member-actions">
+                    {/* 群主：设 / 撤管理员、转让群主 */}
+                    {isOwnerMe && !isOwnerRow && (
+                      <>
+                        {m.role === 'admin' ? (
+                          <button type="button" className="btn ghost small" onClick={() => void changeRole(m.user_id, 'member')}>
+                            {isZh ? '撤管理员' : 'Demote'}
+                          </button>
+                        ) : (
+                          <button type="button" className="btn ghost small" onClick={() => void changeRole(m.user_id, 'admin')}>
+                            {isZh ? '设管理员' : 'Promote'}
+                          </button>
+                        )}
+                        <button type="button" className="btn ghost small" onClick={() => void transferTo(m.user_id)}>
+                          {isZh ? '转让群主' : 'Transfer'}
+                        </button>
+                      </>
+                    )}
+                    {/* 群主 / 管理员：移除成员 */}
+                    {canKick && (
+                      <button type="button" className="btn ghost small" onClick={() => void kickMember(m.user_id)}>
+                        {isZh ? '移除' : 'Remove'}
+                      </button>
+                    )}
+                    {/* 自己且在群里：退群 */}
+                    {m.user_id === currentUserId && m.user_id !== ownerId && (
+                      <button type="button" className="btn ghost small" onClick={() => void leaveConversation()}>
+                        {isZh ? '退群' : 'Leave'}
+                      </button>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
           <button type="button" className="btn danger" onClick={() => void leaveConversation()}>
             {isZh ? '删除并退出' : 'Delete & leave'}

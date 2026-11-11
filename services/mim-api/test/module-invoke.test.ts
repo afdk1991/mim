@@ -80,16 +80,18 @@ describe('POST /modules/:code/invoke 门禁', () => { // 三层门禁逐条验�
     expect(res.body.code).toBe('FORBIDDEN'); // 断言错误码
   }); // 用例结束
 
-  it('未登记能力的模块 → 400 FEATURE_NOT_AVAILABLE（规划中）', async () => {
+  it('原「规划中」模块现已具备真实能力（产出模块起盘蓝图）', async () => {
     const session = await login('13900000032'); // 登录
-    grant('cat.store-03', session.userId); // 先给权益，确保失败原因是「无能力」而不是「未解锁」
+    grant('cat.store-03', session.userId); // 给权益，证明门禁放行后能真正产出内容
     const res = await request(app) // 调用 BBS 论坛模块
-      .post('/api/v1/modules/cat.store-03/invoke') // 该模块未登记能力
+      .post('/api/v1/modules/cat.store-03/invoke') // 该模块现由蓝图能力承接
       .set('authorization', `Bearer ${session.token}`) // 鉴权
-      .send({ text: 'hello' }); // 输入无所谓
-    expect(res.status).toBe(403); // FEATURE_NOT_AVAILABLE 在统一错误映射里是 403，与「未解锁」靠 error code 区分
-    expect(res.body.code).toBe('FEATURE_NOT_AVAILABLE'); // 断言错误码
-    expect(res.body.details?.planned).toBe(true); // 明示规划中
+      .send({ text: 'BBS 论坛改造' }); // 项目名即第一行
+    expect(res.status).toBe(200); // 蓝图能力正常返回
+    expect(res.body.output_kind).toBe('text'); // 输出为 Markdown 文本
+    expect(res.body.output).toContain('cat.store-03'); // 文档内回显模块编码
+    expect(res.body.output).not.toContain('功能规划中'); // 不再出现「规划中」文案
+    expect(res.body.meta.module_code).toBe('cat.store-03'); // 元信息回显编码
   }); // 用例结束
 
   it('输入超长 → 400 VALIDATION_FAILED', async () => {

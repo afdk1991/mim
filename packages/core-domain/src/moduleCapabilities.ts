@@ -8,8 +8,10 @@
  * 未登记的模块属于「规划中」：商城仍展示，但详情面板不给解锁/调用入口，
  * 避免用户为没有实现的条目付费。
  *
- * 当前规模（2026-11-11）：62 条能力；「程序开发」组 37 条与「WEB应用开发」组 17 条导航条目**已全部绑定**，
- * 其余分组 9 条能力分布在前沿技术 3 / WEB 应用开发 1 / 开发工具 2 / 数据库 1 / 应用工具 2。
+ * 当前规模（2026-11-11）：79 条能力，覆盖 205 条导航条目**全部**。
+ * 前 62 条是按能力语义逐个实现的工具型能力（程序开发 37 + WEB 应用开发 17 + 前沿/开发工具/数据库/应用工具 8）；
+ * 后 17 条是「模块起盘蓝图」能力（键名 `catalog.<一级slug>`），一个能力绑定该组全部软件方向条目，
+ * 调用后按模块编码产出该条目专属的交付目标 / 技术栈 / 起步代码 / 目录与验收清单（数据在 `blueprints/`）。
  */
 
 /** 输出形态：前端据此决定渲染方式（纯文本 / 结构化 JSON / HTML / 图片 dataURL） */
@@ -523,6 +525,142 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     output_kind: 'text', // 代码
     module_codes: ['cat.web-17'], // WEB应用开发 / layui 组件
   }, // layui 结束
+  { // 前沿技术起盘蓝图：量子计算 + Web3.0
+    key: 'catalog.frontier', // 能力标识
+    name: { 'zh-CN': '前沿技术起盘蓝图', 'en-US': 'Frontier stack blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入项目名或需求补充，输出该前沿条目的交付目标、技术栈、起步代码与验收清单', 'en-US': 'Enter a project name to get module-specific deliverables, stack, starter code and checklist' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-frontier（可留空按默认项目名）', 'en-US': 'e.g. mim-frontier' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.frontier-03', 'cat.frontier-04'], // 量子计算 / Web 3.0
+  }, // 前沿技术结束
+  { // OpenHarmony 起盘蓝图：37 条组件与应用条目
+    key: 'catalog.openharmony', // 能力标识
+    name: { 'zh-CN': 'OpenHarmony 组件脚手架', 'en-US': 'OpenHarmony scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入组件名或页面需求，输出该 API 的 ArkTS 示例、目录结构与验收清单', 'en-US': 'Enter a component or page need to get the ArkTS sample, tree and checklist' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：MimEntry（可留空按默认项目名）', 'en-US': 'e.g. MimEntry' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.openharmony-01', 'cat.openharmony-02', 'cat.openharmony-03', 'cat.openharmony-04', 'cat.openharmony-05', 'cat.openharmony-06', 'cat.openharmony-07', 'cat.openharmony-08', 'cat.openharmony-09', 'cat.openharmony-10', 'cat.openharmony-11', 'cat.openharmony-12', 'cat.openharmony-13', 'cat.openharmony-14', 'cat.openharmony-15', 'cat.openharmony-16', 'cat.openharmony-17', 'cat.openharmony-18', 'cat.openharmony-19', 'cat.openharmony-20', 'cat.openharmony-21', 'cat.openharmony-22', 'cat.openharmony-23', 'cat.openharmony-24', 'cat.openharmony-25', 'cat.openharmony-26', 'cat.openharmony-27', 'cat.openharmony-28', 'cat.openharmony-29', 'cat.openharmony-30', 'cat.openharmony-31', 'cat.openharmony-32', 'cat.openharmony-33', 'cat.openharmony-34', 'cat.openharmony-35', 'cat.openharmony-36', 'cat.openharmony-37'], // OpenHarmony 37 条
+  }, // OpenHarmony 结束
+  { // 人工智能起盘蓝图：11 条 AI 方向条目
+    key: 'catalog.ai', // 能力标识
+    name: { 'zh-CN': 'AI 项目脚手架', 'en-US': 'AI project scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入项目名与方向补充，输出该 AI 条目的训练/推理/服务起步代码与验收项', 'en-US': 'Enter a project name to get the training/inference/service starter and checks' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-ai（可留空按默认项目名）', 'en-US': 'e.g. mim-ai' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.ai-01', 'cat.ai-02', 'cat.ai-03', 'cat.ai-04', 'cat.ai-05', 'cat.ai-06', 'cat.ai-07', 'cat.ai-08', 'cat.ai-09', 'cat.ai-10', 'cat.ai-11'], // 人工智能 11 条
+  }, // 人工智能结束
+  { // 工业软件起盘蓝图：15 条工业方向条目
+    key: 'catalog.industry', // 能力标识
+    name: { 'zh-CN': '工业软件起盘蓝图', 'en-US': 'Industrial software blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入设备型号、标准或项目名，输出该工业条目的配置/算法片段与验算口径', 'en-US': 'Enter a device, standard or project name to get config/algorithm snippet and validation' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-industry（可留空按默认项目名）', 'en-US': 'e.g. mim-industry' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.industry-01', 'cat.industry-02', 'cat.industry-03', 'cat.industry-04', 'cat.industry-05', 'cat.industry-06', 'cat.industry-07', 'cat.industry-08', 'cat.industry-09', 'cat.industry-10', 'cat.industry-11', 'cat.industry-12', 'cat.industry-13', 'cat.industry-14', 'cat.industry-15'], // 工业软件 15 条
+  }, // 工业软件结束
+  { // 区块链起盘蓝图：2 条链上条目
+    key: 'catalog.blockchain', // 能力标识
+    name: { 'zh-CN': '区块链合约脚手架', 'en-US': 'Blockchain contract scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入资产名称或合约名，输出该链上条目的合约与元数据起步文件', 'en-US': 'Enter an asset or contract name to get the contract and metadata starter' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：MimToken（可留空按默认资产名）', 'en-US': 'e.g. MimToken' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.blockchain-01', 'cat.blockchain-02'], // 数字货币 / NFT
+  }, // 区块链结束
+  { // 微信开发起盘蓝图：4 条微信条目
+    key: 'catalog.wechat', // 能力标识
+    name: { 'zh-CN': '微信开发脚手架', 'en-US': 'WeChat scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入小程序或公众号名称，输出该微信条目的清单与调用代码', 'en-US': 'Enter an app or account name to get the manifest and call code' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-wechat（可留空按默认项目名）', 'en-US': 'e.g. mim-wechat' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.wechat-01', 'cat.wechat-02', 'cat.wechat-03', 'cat.wechat-04'], // 微信开发 4 条
+  }, // 微信开发结束
+  { // 企业应用起盘蓝图：5 条企业条目
+    key: 'catalog.enterprise', // 能力标识
+    name: { 'zh-CN': '企业应用起盘蓝图', 'en-US': 'Enterprise app blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入业务域或项目名，输出该企业条目的数据模型、查询口径与落地步骤', 'en-US': 'Enter a business domain to get the data model, query and rollout steps' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-enterprise（可留空按默认项目名）', 'en-US': 'e.g. mim-enterprise' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.enterprise-01', 'cat.enterprise-02', 'cat.enterprise-03', 'cat.enterprise-04', 'cat.enterprise-05'], // 企业应用 5 条
+  }, // 企业应用结束
+  { // 建站系统起盘蓝图：9 条站点条目
+    key: 'catalog.storefront', // 能力标识
+    name: { 'zh-CN': '建站系统起盘蓝图', 'en-US': 'Site builder blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入站点名与场景，输出该建站条目的内容模型、配置与落地步骤', 'en-US': 'Enter a site name to get the content model, config and rollout steps' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-site（可留空按默认站点名）', 'en-US': 'e.g. mim-site' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.store-01', 'cat.store-02', 'cat.store-03', 'cat.store-04', 'cat.store-05', 'cat.store-06', 'cat.store-07', 'cat.store-08', 'cat.store-09'], // 建站系统 9 条
+  }, // 建站系统结束
+  { // 应用工具起盘蓝图：4 条工具条目
+    key: 'catalog.tools', // 能力标识
+    name: { 'zh-CN': '应用工具起盘蓝图', 'en-US': 'Utility blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入工具名或目标流程，输出该工具条目的实现骨架与幂等要求', 'en-US': 'Enter a tool or workflow name to get the implementation skeleton' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-tool（可留空按默认工具名）', 'en-US': 'e.g. mim-tool' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.tools-02', 'cat.tools-04', 'cat.tools-05', 'cat.tools-06'], // 多媒体 / IM / 应用软件 / RPA
+  }, // 应用工具结束
+  { // DevOps 起盘蓝图：3 条运维条目
+    key: 'catalog.devops', // 能力标识
+    name: { 'zh-CN': '运维工具起盘蓝图', 'en-US': 'Ops tooling blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入服务名、端口或告警目标，输出该运维条目的配置与验证命令', 'en-US': 'Enter a service, port or alert target to get config and verification commands' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-api（可留空按默认服务名）', 'en-US': 'e.g. mim-api' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.devops-01', 'cat.devops-02', 'cat.devops-03'], // 网管 / 监控 / DevOps
+  }, // DevOps 结束
+  { // 移动开发起盘蓝图：10 条客户端条目
+    key: 'catalog.mobile', // 能力标识
+    name: { 'zh-CN': '移动开发脚手架', 'en-US': 'Mobile scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入 App 名或组件名，输出该端条目的工程骨架与运行验证方式', 'en-US': 'Enter an app or component name to get the project skeleton and how to run it' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-mobile（可留空按默认 App 名）', 'en-US': 'e.g. mim-mobile' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.mobile-01', 'cat.mobile-02', 'cat.mobile-03', 'cat.mobile-04', 'cat.mobile-05', 'cat.mobile-06', 'cat.mobile-07', 'cat.mobile-08', 'cat.mobile-09', 'cat.mobile-10'], // 移动开发 10 条
+  }, // 移动开发结束
+  { // 开发工具起盘蓝图：6 条工具链条目
+    key: 'catalog.devtools', // 能力标识
+    name: { 'zh-CN': '开发工具起盘蓝图', 'en-US': 'Devtool blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入工具链环节或仓库名，输出该条目的脚本、门禁与本机执行方式', 'en-US': 'Enter a toolchain step or repo name to get scripts, gates and how to run locally' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-devtools（可留空按默认项目名）', 'en-US': 'e.g. mim-devtools' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.devtools-01', 'cat.devtools-03', 'cat.devtools-04', 'cat.devtools-05', 'cat.devtools-06', 'cat.devtools-07'], // 版本管理 / Wiki / 构建 / Maven / Gulp / 测试
+  }, // 开发工具结束
+  { // 服务器应用起盘蓝图：12 条服务端条目
+    key: 'catalog.server', // 能力标识
+    name: { 'zh-CN': '服务器组件起盘蓝图', 'en-US': 'Server component blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入服务名、端口或机型，输出该服务器条目的配置、起停与健康检查口径', 'en-US': 'Enter a service, port or instance type to get config, start/stop and health check' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-api（可留空按默认服务名）', 'en-US': 'e.g. mim-api' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.server-01', 'cat.server-02', 'cat.server-03', 'cat.server-04', 'cat.server-05', 'cat.server-06', 'cat.server-07', 'cat.server-08', 'cat.server-09', 'cat.server-10', 'cat.server-11', 'cat.server-12'], // 服务器应用 12 条
+  }, // 服务器应用结束
+  { // 数据库起盘蓝图：2 条数据库条目
+    key: 'catalog.database', // 能力标识
+    name: { 'zh-CN': '数据库组件起盘蓝图', 'en-US': 'Database blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入库名或实例规格，输出该数据库条目的 DDL、运维与备份恢复口径', 'en-US': 'Enter a database name or instance spec to get DDL, ops and backup/restore steps' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-db（可留空按默认库名）', 'en-US': 'e.g. mim-db' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.database-02', 'cat.database-03'], // 数据库服务 / 数据库管理监控
+  }, // 数据库结束
+  { // 游戏开发起盘蓝图：3 条游戏条目
+    key: 'catalog.game', // 能力标识
+    name: { 'zh-CN': '游戏开发起盘蓝图', 'en-US': 'Game blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入游戏名或玩法关键词，输出该条目的玩法循环、数值表或渲染骨架', 'en-US': 'Enter a game name or mechanic to get the loop, tuning table or render skeleton' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-game（可留空按默认游戏名）', 'en-US': 'e.g. mim-game' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.game-01', 'cat.game-02', 'cat.game-03'], // 游戏 / 游戏开发 / 3D引擎
+  }, // 游戏结束
+  { // 插件扩展起盘蓝图：8 条宿主插件条目
+    key: 'catalog.plugin', // 能力标识
+    name: { 'zh-CN': '插件扩展脚手架', 'en-US': 'Plugin scaffold' }, // 能力名
+    hint: { 'zh-CN': '输入插件名，输出该宿主环境的清单文件、入口代码与加载验证方式', 'en-US': 'Enter a plugin name to get the manifest, entry code and load check' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-plugin（可留空按默认插件名）', 'en-US': 'e.g. mim-plugin' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.plugin-01', 'cat.plugin-02', 'cat.plugin-03', 'cat.plugin-04', 'cat.plugin-05', 'cat.plugin-06', 'cat.plugin-07', 'cat.plugin-08'], // 插件和扩展 8 条
+  }, // 插件扩展结束
+  { // 其他开源起盘蓝图：10 条非工具型条目
+    key: 'catalog.misc', // 能力标识
+    name: { 'zh-CN': '开源项目起盘蓝图', 'en-US': 'Open-source project blueprint' }, // 能力名
+    hint: { 'zh-CN': '输入项目名或命题，输出该条目的交付物清单、里程碑与可演示验收口径', 'en-US': 'Enter a project or topic to get deliverables, milestones and demo acceptance' }, // 使用提示
+    placeholder: { 'zh-CN': '例如：mim-oss（可留空按默认项目名）', 'en-US': 'e.g. mim-oss' }, // 占位
+    output_kind: 'text', // 输出 Markdown 交付文档
+    module_codes: ['cat.misc-01', 'cat.misc-02', 'cat.misc-03', 'cat.misc-04', 'cat.misc-05', 'cat.misc-06', 'cat.misc-07', 'cat.misc-08', 'cat.misc-09', 'cat.misc-10'], // 其他开源 10 条
+  }, // 其他开源结束
 ]; // 能力清单结束
 
 /** 按能力键取定义：前端工具面板与服务端路由都用它做存在性判断 */

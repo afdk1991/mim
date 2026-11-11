@@ -15,3 +15,5 @@ export * from './deploymentRegistry.js';
 export * from './catalogTaxonomy.js';
 // 聚合导出「模块 = 真实能力」清单：能力键 / 绑定模块编码 / 输入提示 / 输出形态，服务端 handler 与前端工具面板共用
 export * from './moduleCapabilities.js';
+// 聚合导出「模块起盘蓝图」：143 条软件方向模块的交付定义（目标/技术栈/起步代码）与 17 个分组输出模板
+export * from './blueprints/index.js';

@@ -1094,6 +1094,7 @@ code { /* 行内代码/令牌展示 */
   padding: 14px 20px; /* 内边距 */
   border-top: 1px solid var(--border); /* 分隔线 */
   background: var(--surface); /* 白色 */
+  position: relative; /* 定位基准：表情面板绝对定位到输入区上方 */
 } /* 输入区结束 */
 
 .chat-input textarea { /* 文本域 */
@@ -1839,6 +1840,166 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色 */
   font-size: 11px; /* 极小字号 */
 } /* 角色标签结束 */
+
+/* ---------- 聊天增强（2026-11-11）：引用回复 / 文件下载 / 搜索定位 / 未读分割 / 表情 / 群管理 ---------- */
+
+.chat-msg-quote { /* 气泡内引用块 */
+  display: block; /* 独占一行，位于正文之上 */
+  margin-bottom: 6px; /* 与正文留出间隔 */
+  padding: 4px 8px; /* 引用块内边距 */
+  border-left: 3px solid var(--primary, #4f46e5); /* 左侧主色竖线标识引用 */
+  border-radius: 4px; /* 小圆角 */
+  background: rgba(0, 0, 0, 0.06); /* 浅底与正文区分 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小于正文 */
+  line-height: 1.4; /* 行高 */
+  white-space: pre-wrap; /* 保留换行并自动折行 */
+  word-break: break-word; /* 长串强制换行 */
+} /* 引用块结束 */
+
+.chat-msg.highlight .chat-msg-bubble { /* 搜索定位后的高亮 */
+  outline: 2px solid var(--primary, #4f46e5); /* 主色描边强调目标消息 */
+  outline-offset: 2px; /* 描边外扩，避免压住文字 */
+  transition: outline-color 0.3s ease; /* 柔和过渡 */
+} /* 高亮结束 */
+
+.chat-unread-divider { /* 未读分割线 */
+  display: flex; /* 横向居中的线 + 文案 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 线文间距 */
+  margin: 10px 0; /* 上下留白 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字号 */
+} /* 分割线容器结束 */
+
+.chat-unread-divider::before,
+.chat-unread-divider::after { /* 两侧横线 */
+  content: ''; /* 装饰线无需文本 */
+  flex: 1; /* 平分剩余宽度 */
+  height: 1px; /* 细线 */
+  background: var(--border); /* 边框色 */
+} /* 横线结束 */
+
+.chat-file { /* 文件气泡内容 */
+  display: flex; /* 名称 + 体积 + 下载同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 元素间距 */
+  flex-wrap: wrap; /* 窄气泡内换行 */
+  font-size: 13px; /* 小字号 */
+} /* 文件气泡结束 */
+
+.chat-file-name { /* 文件名 */
+  max-width: 220px; /* 避免超长文件名挤压气泡 */
+  overflow: hidden; /* 超长截断 */
+  text-overflow: ellipsis; /* 省略号 */
+  white-space: nowrap; /* 单行 */
+} /* 文件名结束 */
+
+.chat-file-size { /* 文件体积 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字号 */
+} /* 体积结束 */
+
+.chat-file-download { /* 下载按钮 */
+  padding: 2px 8px; /* 紧凑内边距 */
+  font-size: 12px; /* 小字号 */
+} /* 下载按钮结束 */
+
+.chat-file-fallback { /* 下载签名失败时的占位 */
+  color: var(--text-muted); /* 次要色 */
+} /* 占位结束 */
+
+.chat-reply-btn,
+.chat-recall { /* 消息尾部的小操作按钮 */
+  margin-left: 6px; /* 与时间分隔 */
+  padding: 0 4px; /* 极小内边距 */
+  border: none; /* 无边框 */
+  background: none; /* 无底色 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字号 */
+  cursor: pointer; /* 手型光标 */
+} /* 小操作按钮结束 */
+
+.chat-reply-btn:hover,
+.chat-recall:hover { /* 悬停强调 */
+  color: var(--primary, #4f46e5); /* 主色 */
+} /* 悬停结束 */
+
+.chat-reply-bar { /* 输入框上方的引用提示条 */
+  display: flex; /* 文案 + 取消按钮 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 两端对齐 */
+  gap: 8px; /* 间距 */
+  padding: 6px 12px; /* 内边距 */
+  border-top: 1px solid var(--border); /* 与消息区分隔 */
+  background: rgba(0, 0, 0, 0.03); /* 浅底 */
+  font-size: 12px; /* 小字号 */
+} /* 引用条结束 */
+
+.chat-reply-quote { /* 引用条内文案 */
+  flex: 1; /* 占据剩余宽度 */
+  overflow: hidden; /* 超长截断 */
+  text-overflow: ellipsis; /* 省略号 */
+  white-space: nowrap; /* 单行 */
+  color: var(--text-muted); /* 次要色 */
+} /* 引用文案结束 */
+
+.chat-emoji-btn { /* 表情按钮 */
+  flex: 0 0 auto; /* 不压缩 */
+  font-size: 16px; /* 图标稍大 */
+} /* 表情按钮结束 */
+
+.chat-emoji-picker { /* 表情面板 */
+  position: absolute; /* 浮在输入区上方 */
+  bottom: 68px; /* 抬到输入框之上 */
+  left: 12px; /* 左对齐 */
+  display: grid; /* 网格铺开 */
+  grid-template-columns: repeat(10, 1fr); /* 每行 10 个 */
+  gap: 2px; /* 极小间距 */
+  padding: 8px; /* 内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  background: var(--surface); /* 白底 */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); /* 浮层阴影 */
+  z-index: 30; /* 高于输入区 */
+} /* 表情面板结束 */
+
+.chat-emoji-item { /* 单个表情 */
+  padding: 4px; /* 点击区域 */
+  border: none; /* 无边框 */
+  background: none; /* 无底色 */
+  font-size: 18px; /* 表情字号 */
+  cursor: pointer; /* 手型 */
+} /* 表情结束 */
+
+.chat-emoji-item:hover { /* 悬停反馈 */
+  background: rgba(0, 0, 0, 0.06); /* 浅底 */
+  border-radius: 4px; /* 圆角 */
+} /* 悬停结束 */
+
+.chat-panel-block { /* 面板内加人区块 */
+  display: flex; /* 纵向排列搜索与候选 */
+  flex-direction: column; /* 自上而下 */
+  gap: 6px; /* 间距 */
+  padding: 8px 0; /* 上下留白 */
+  border-top: 1px solid var(--border); /* 与上方分隔 */
+} /* 加人区块结束 */
+
+.chat-panel-block input { /* 加人搜索框 */
+  padding: 6px 10px; /* 紧凑内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  font-size: 13px; /* 小字号 */
+  outline: none; /* 去描边 */
+} /* 加人搜索框结束 */
+
+.chat-member-actions { /* 成员行操作按钮组 */
+  display: flex; /* 横排按钮 */
+  align-items: center; /* 垂直居中 */
+  gap: 2px; /* 紧凑间距 */
+  margin-left: 4px; /* 与角色标签分隔 */
+} /* 操作组结束 */
+
 
 
 

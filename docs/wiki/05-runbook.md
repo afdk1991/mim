@@ -113,11 +113,14 @@ pnpm --filter @mim/admin dev       # 管理后台（Vite），http://127.0.0.1:5
 
 ```bash
 pnpm -r typecheck                       # 5 of 6 workspace 项目类型检查（@mim/admin 已纳入）
-pnpm --filter @mim/api test             # vitest + supertest，11 个测试文件 154 例全通过（含成片导出 9 例）
+pnpm --filter @mim/api test             # vitest + supertest，22 个测试文件 347 例全通过（2026-11-11 复核）
 pnpm --filter @mim/web build            # 用户端 tsc --noEmit + vite build
 pnpm --filter @mim/admin build          # 管理后台 tsc --noEmit + vite build（产物 dist/ 发布到 /opt/mim/admin）
 npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率门禁（CI 以 --strict 执行）
 ```
+
+**聊天点击级 E2E（Edge CDP，两个脚本可重放）**：先起三件套 —— `MIM_JOBS=0 MIM_AI_WORKER=0 node services/mim-api/dist/index.js`（API :8787）、`node scripts/serve-local.mjs`（静态站 :5188，同源反代 `/api`）、`msedge --headless=new --remote-debugging-port=9222 --user-data-dir=<绝对路径>/.tmp/edge-profile-chat about:blank`；再跑 `npm run verify:chat-flow`（15 项）与 `npm run verify:chat-plus`（23 项，引用回复 / 文件下载直链 / 设管理员 / 邀请入群 / 搜索定位高亮），取证落 `.tmp/chat-flow-e2e.json`、`.tmp/chat-plus-e2e.json` 与同名 `.png`。
+> **踩坑**：本地 E2E 前必须确认 `apps/web/dist` 是**同源构建**（`$env:VITE_API_ORIGIN=''; pnpm --filter @mim/web build`）。若产物带 `VITE_API_ORIGIN=https://mim.mixm.top`，页面会把请求打到生产 API，本地 token 不被识别 → 会话列表空、用户搜索空，`verify-chat-flow` 会连锁 FAIL 6 项。
 
 ### 6.3 数据结构与运行形态
 

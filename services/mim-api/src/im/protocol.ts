@@ -29,6 +29,7 @@ export type ServerFrameType =
   | 'message.delivered' // 消息已投递到对方在线设备
   | 'message.read' // 对方已读某条消息
   | 'message.recall' // 某条消息被撤回（发送者 2 分钟内撤回，或管理员操作）
+  | 'conversation.members' // 群成员或角色发生变化（加人/踢人/设管理员/转让群主），客户端据此刷新群面板
   | 'typing' // 对方正在输入
   | 'presence' // 用户在线/离线状态变更
   | 'call.invite' // 收到视频通话邀请
@@ -53,6 +54,7 @@ export interface MessageSendPayload {
   object_mime?: string; // 媒体 MIME 类型
   object_name?: string; // 原始文件名
   object_size?: number; // 文件字节数
+  reply_to_id?: string; // 引用回复的目标消息 ID（同会话、未撤回）
 } // MessageSendPayload 结束
 
 /** message.read 的请求体 */
@@ -108,6 +110,8 @@ export interface MessageView {
   object_mime?: string | null; // 媒体 MIME
   object_name?: string | null; // 原始文件名
   object_size?: number | null; // 文件大小
+  reply_to_id?: string | null; // 引用回复的目标消息 ID（普通消息为 null）
+  reply_excerpt?: string | null; // 被引用消息的摘要（发送时固化，便于渲染引用块）
   status: MessageStatus; // 投递状态
   created_at: string; // 创建时间（UTC ISO-8601）
 } // MessageView 结束

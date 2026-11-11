@@ -476,6 +476,8 @@ export interface ImMessage {
   object_mime?: string | null; // 媒体 MIME
   object_name?: string | null; // 原始文件名
   object_size?: number | null; // 文件大小
+  reply_to_id?: string | null; // 引用回复的目标消息 ID
+  reply_excerpt?: string | null; // 被引用消息的摘要（发送时固化）
   status: ImMessageStatus; // 投递状态
   created_at: string; // 创建时间
 } // ImMessage 结束
@@ -1227,16 +1229,17 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     createConversation(body: { type: ImConversationType; target_user_id?: string; name?: string; member_user_ids?: string[] }) {
       return request<{ conversation_id: string; conversation: ImConversation }>('/im/conversations', { method: 'POST', body, auth: true }); // 写操作由 request 自动生成幂等键
     }, // createConversation 结束
-    /** GET /im/conversations/:id/messages：分页拉取历史消息 */
-    listMessages(conversationId: string, opts: { before?: string; limit?: number } = {}) {
+    /** GET /im/conversations/:id/messages：分页拉取历史消息（before 向前翻页；around 定位到指定消息附近） */
+    listMessages(conversationId: string, opts: { before?: string; around?: string; limit?: number } = {}) {
       const qs = new URLSearchParams(); // 安全拼接查询串
       if (opts.before) qs.set('before', opts.before); // 游标：取比该 ID 更早的消息
+      if (opts.around) qs.set('around', opts.around); // 定位：取该消息前后各半页（搜索结果跳转用）
       if (opts.limit) qs.set('limit', String(opts.limit)); // 条数限制
       const suffix = qs.toString(); // 无参数时空串
       return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages${suffix ? `?${suffix}` : ''}`, { auth: true, idempotency: false });
     }, // listMessages 结束
     /** POST /im/conversations/:id/messages：HTTP 方式发消息（兜底；实时通道走 WebSocket） */
-    sendMessage(conversationId: string, body: { content_type: ImMessageContentType; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number }) {
+    sendMessage(conversationId: string, body: { content_type: ImMessageContentType; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number; reply_to_id?: string }) {
       return request<{ message: ImMessage }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages`, { method: 'POST', body, auth: true }); // 写操作由 request 自动生成幂等键
     }, // sendMessage 结束
     /** POST /im/conversations/:id/read：标记已读到指定消息 */
@@ -1282,6 +1285,21 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         auth: true, // 需登录
       }); // 请求结束
     }, // removeMember 结束
+    /** PATCH /im/conversations/:id/members/:userId：设 / 撤管理员（仅群主） */
+    setMemberRole(conversationId: string, userId: string, role: 'admin' | 'member') {
+      return request<{ ok: boolean; role: 'admin' | 'member' }>(
+        `/im/conversations/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(userId)}`, // 成员端点
+        { method: 'PATCH', body: { role }, auth: true }, // 局部更新角色
+      ); // 请求结束
+    }, // setMemberRole 结束
+    /** POST /im/conversations/:id/transfer：转让群主（仅群主） */
+    transferOwnership(conversationId: string, userId: string) {
+      return request<{ ok: boolean; owner_user_id: string }>(`/im/conversations/${encodeURIComponent(conversationId)}/transfer`, {
+        method: 'POST', // 转让动作
+        body: { user_id: userId }, // 接任者
+        auth: true, // 需登录
+      }); // 请求结束
+    }, // transferOwnership 结束
     /** PATCH /im/conversations/:id/preferences：置顶 / 免打扰 */
     setPreference(conversationId: string, patch: { pinned?: boolean; muted?: boolean }) {
       return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/preferences`, {

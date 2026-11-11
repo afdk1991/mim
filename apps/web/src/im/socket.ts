@@ -28,6 +28,7 @@ export type ServerFrameType =
   | 'message.delivered'
   | 'message.read'
   | 'message.recall' // 某条消息被撤回（发送者 2 分钟内撤回）
+  | 'conversation.members' // 群成员或角色变化（加人/踢人/设管理员/转让群主），用于刷新群面板
   | 'typing'
   | 'presence'
   | 'call.invite'

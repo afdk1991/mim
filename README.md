@@ -34,6 +34,7 @@ node scripts/comment-check.mjs
 - `verify:film-export`：成片导出 Edge CDP 真渲染 E2E（14 项断言）；前置 `pnpm --filter @mim/api build` 后启动 API :8787、`npm run serve:local`（:5188）、Edge `--remote-debugging-port=9222`，再执行 `npm run verify:film-export`
 - `verify:site-modules`：站点模块注册表零依赖校验（43 项断言）——45 条备注逐字比对、行号/分组/状态机自洽、共享包→后端→前端→测试全链路消费断言
 - `verify:chat-flow`：聊天点击级 E2E（15 项断言，`scripts/verify-chat-flow.mjs`）——真点「+ 群聊」「创建群聊」、用 CDP 选文件发图片消息（断言气泡内 `<img>` 的 `naturalWidth > 0`）、点气泡上的「撤回」并断言消息从列表消失；前置同 `verify:film-export`，取证落 `.tmp/chat-flow-e2e.json` / `.png`
+- `verify:chat-plus`：聊天增强点击级 E2E（23 项断言，`scripts/verify-chat-plus.mjs`）——引用回复（引用条 → 气泡内引用块 → 发送后自动清除）、文件消息下载（真访问直链得 200）、群管理（设管理员后角色标签变「管理员」、邀请入群后成员数 2 → 3）、会话内搜索结果定位与目标消息高亮；前置同 `verify:chat-flow`，取证落 `.tmp/chat-plus-e2e.json` / `.png`
 - `verify:site-directory`：上一轮「站点入口契约」校验（16 项断言），两轮成果互不覆盖
 - `summary:deployments`：部署汇总生成器——采集 `git remote` / `git ls-tree HEAD` / 工作树工件 / CI 作业 / 两份矩阵表行数，输出 `docs/deployment-summary.json`（结构化）与 `docs/deployment-summary.md`（核对表）；追加 `--live` 可对各入口真实 `curl` 探测并刷新 `result`
 - `verify:deployments`：部署汇总零依赖校验（52 项断言）——规范 ID 唯一、枚举合法、9 平台无遗漏、别名不撞名、空数据标识、工件双口径与真实仓库一致、共享包→后端→前端→文档全链路消费
@@ -91,7 +92,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 站点矩阵（2026-11-09） | `Sites.tsx` | 按 DNSPod `mixm.top` 45 类备注开发的模块目录：总览统计（45 模块 / 135 功能点 / 8 分组 / 空备注行 / 条目数）、关键词搜索与分组筛选、45 张卡片逐条展示备注原文与 xls 行号、展开查看 3 个功能点及状态机、业务条目列表；**登录后可新建条目并流转状态**（清单 `active→archived`、管理 `pending→active→archived`、记录 `pending→done→archived`，归档为终态），匿名只读并显示「登录后操作」引导；数据源 `packages/core-domain/src/siteModules.json` |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程；**成片导出（2026-11-08）**：每个成片行新增「导出」面板，可选 MP4/MOV × 1080p/720p，`POST /comic/films/:id/export` 返回 1 小时有效的一次性预签名下载地址；MP4/1080p 直接下载原片，其它组合需服务端 `MIM_FFMPEG_PATH` 转码，未配置时前端显示本地化提示并提供「直接下载原片」一键降级；降级成功后表单回写实际格式/分辨率 |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
-| 聊天 | `Chat.tsx` | 即时通讯与视频通话：会话列表、用户搜索、消息收发、WebRTC 视频通话（`VideoCall.tsx`），WS 端点 `/api/v1/im/ws` |
+| 聊天 | `Chat.tsx` | 即时通讯与视频通话：会话列表、用户搜索、消息收发、WebRTC 视频通话（`VideoCall.tsx`），WS 端点 `/api/v1/im/ws`；**2026-11-11 增强**——引用回复（`reply_to_id` + 发送时固化 `reply_excerpt` 摘要快照，气泡内渲染引用块）、文件消息气泡（presign 下载直链 + 体积 + 下载按钮）、群管理（群主「设/撤管理员」「转让群主」、群主/管理员「移除」「邀请入群」、成员数实时刷新）、会话内搜索结果定位（`?around=` 按目标消息取上下文窗口 + 命中高亮）、未读分割线（`unread_count` 换算锚点，渲染「以下是新消息」）、表情选择器（20 个 Unicode 表情） |
 
 ### 后端接口（`services/mim-api`，前缀 `/api/v1`）
 
@@ -118,7 +119,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
 | 管理分类 | `GET /categories/manage`（两级分类树 + 每组/每级 active 模块计数 + `name_en`）、`POST /categories`（带 `parent_slug` 建二级，否则建一级；二级 slug 必须以「父 slug-」开头，重复 slug 409，父分类不存在 404）、`PATCH /categories/:slug`（仅 `name` / `name_en`(nullable) / `sort_order`，至少一项否则 400）、`DELETE /categories/:slug`（有子级或有模块引用 409，成功为物理删除） | Bearer + `module:read` / `module:write`（`x-admin-token` 为超管引导通道） |
 | 即时通讯 | `GET/POST /im/conversations`、`GET/PATCH/DELETE /im/conversations/:id`（详情/改名/删除或解散）、`GET/POST /im/conversations/:id/members`、`DELETE /im/conversations/:id/members/:userId`、`PATCH /im/conversations/:id/preferences`（置顶/免打扰）、`GET /im/conversations/:id/messages`、`GET /im/conversations/:id/messages/search?q=`、`POST /im/conversations/:id/messages`、`POST /im/conversations/:id/messages/:messageId/recall`（2 分钟内仅本人）、`POST /im/conversations/:id/read`、`GET /im/users`、`WS /im/ws?token=<access_token>`（服务端帧含 `message.recall`） | 登录（WS 凭 query token） |
-| 商城模块能力（2026-11-11） | **`POST /modules/:code/invoke`**：调用模块绑定的真实能力，入参 `{ text, options }`（`text` ≤ 20000 字符），出参 `{ output, output_kind, meta, elapsed_ms }`；门禁 = 登录 + 模块 `active` + 模块已登记能力 + 该用户对该模块有 active 未过期权益；`/modules` 与 `/modules/:code` 响应新增 `capability`（`null` 表示功能规划中）；**当前 62 条真实能力**覆盖程序开发 **37 条（该组已做满）** / WEB 应用开发 **17 条（该组已做满）** / 前沿技术 3 条 / 开发工具 2 条 / 数据库 1 条 / 应用工具 2 条 | Bearer + 模块权益；能力清单见 `packages/core-domain/src/moduleCapabilities.ts`，执行层见 `services/mim-api/src/capabilities.ts` |
+| 商城模块能力（2026-11-11） | **`POST /modules/:code/invoke`**：调用模块绑定的真实能力，入参 `{ text, options }`（`text` ≤ 20000 字符），出参 `{ output, output_kind, meta, elapsed_ms }`；门禁 = 登录 + 模块 `active` + 模块已登记能力 + 该用户对该模块有 active 未过期权益；`/modules` 与 `/modules/:code` 响应新增 `capability`（`null` 表示功能规划中）；**当前 79 条真实能力覆盖全部 205 条导航条目**——62 条「工具型」专项能力（程序开发 37 / WEB 应用开发 17 / 前沿技术 3 / 开发工具 2 / 数据库 1 / 应用工具 2）+ **17 条「模块起盘蓝图」分组能力**（`catalog.<groupSlug>`，一条能力绑定该一级分组下全部 143 条软件方向模块：按路由下发的 `module_code` 取该条目专属交付目标 / 技术栈 / 起步代码，再由分组模板补目录树、交付物与验收清单），**商城页不再出现「规划中」徽标** | Bearer + 模块权益；能力清单见 `packages/core-domain/src/moduleCapabilities.ts`，蓝图数据见 `packages/core-domain/src/blueprints/`，执行层见 `services/mim-api/src/capabilities.ts` |
 
 
 

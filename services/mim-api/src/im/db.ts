@@ -188,6 +188,29 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
   });
 } // listConversations 结束
 
+/** 单条消息的引用摘要：引用回复落库时固化，原消息被撤回后引用块仍可读 */
+export interface QuotedMessage {
+  id: string; // 被引用消息 ID
+  excerpt: string; // 「发送者: 内容」摘要，超长截断
+} // QuotedMessage 结束
+
+/** 取可引用的消息：必须同会话、未撤回；不存在返回 undefined，由调用方回 400 */
+export function getQuotedMessage(db: Db, conversationId: string, messageId: string): QuotedMessage | undefined {
+  const row = db
+    .prepare(
+      `SELECT m.id, m.content_type, m.content, m.object_name, m.deleted_at, u.display_name
+         FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
+        WHERE m.id = ? AND m.conversation_id = ?`,
+    )
+    .get(messageId, conversationId) as
+    | { id: string; content_type: MessageContentType; content: string; object_name: string | null; deleted_at: string | null; display_name: string | null }
+    | undefined;
+  if (!row || row.deleted_at) return undefined; // 已撤回或不存在都不允许引用
+  const sender = row.display_name || '成员'; // 发送者显示名，缺失用通用称谓
+  const body = row.content_type === 'image' ? '[图片]' : row.content_type === 'file' ? `[文件] ${row.object_name ?? ''}` : row.content || '[消息]'; // 按类型生成可读摘要
+  return { id: row.id, excerpt: `${sender}: ${body}`.slice(0, 80) }; // 摘要限 80 字，避免引用块过长
+} // getQuotedMessage 结束
+
 /** 创建消息并落库，返回完整 MessageView（含发送者显示名） */
 export function createMessage(
   db: Db,
@@ -200,6 +223,8 @@ export function createMessage(
     objectMime?: string; // 媒体 MIME
     objectName?: string; // 原始文件名
     objectSize?: number; // 文件大小
+    replyToId?: string; // 引用回复的目标消息 ID
+    replyExcerpt?: string; // 被引用消息的摘要快照
     now?: string; // 可注入时间
   },
 ): MessageView {
@@ -209,8 +234,8 @@ export function createMessage(
   db.prepare(
     `INSERT INTO im_messages
        (id, conversation_id, sender_user_id, content_type, content,
-        object_key, object_mime, object_name, object_size, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?)`,
+        object_key, object_mime, object_name, object_size, reply_to_id, reply_excerpt, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?)`,
   ).run(
     msgId,
     params.conversationId,
@@ -221,6 +246,8 @@ export function createMessage(
     params.objectMime ?? null,
     params.objectName ?? null,
     params.objectSize ?? null,
+    params.replyToId ?? null,
+    params.replyExcerpt ?? null,
     now,
     now,
   );
@@ -267,6 +294,34 @@ export function listMessages(
   // 倒序查出来后再反转为正序，前端按时间从上到下展示
   return rows.map(rowToMessageView).reverse();
 } // listMessages 结束
+
+/** 定位拉取：以目标消息为中心取前后各半页，供会话内搜索点击后跳转（UUIDv7 主键天然按时间有序） */
+export function listMessagesAround(
+  db: Db,
+  conversationId: string,
+  messageId: string,
+  limit = 40,
+): MessageView[] {
+  const total = Math.min(Math.max(limit ?? 40, 4), 200); // 限制总量，避免一次拉太多
+  const half = Math.floor(total / 2); // 前后各半页
+  const beforeRows = db
+    .prepare(
+      `SELECT m.*, u.display_name AS sender_display_name
+         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+        WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id < ?
+        ORDER BY m.id DESC LIMIT ?`,
+    )
+    .all(conversationId, messageId, half) as Array<Record<string, unknown> & { sender_display_name: string }>; // 目标之前的半页（倒序查）
+  const fromRows = db
+    .prepare(
+      `SELECT m.*, u.display_name AS sender_display_name
+         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+        WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id >= ?
+        ORDER BY m.id ASC LIMIT ?`,
+    )
+    .all(conversationId, messageId, total - half) as Array<Record<string, unknown> & { sender_display_name: string }>; // 目标及其后的半页（正序查）
+  return [...beforeRows.map(rowToMessageView).reverse(), ...fromRows.map(rowToMessageView)]; // 拼成从早到晚的正序列表
+} // listMessagesAround 结束
 
 /** 标记会话已读：更新该成员的 last_read_message_id，并把会话内状态为 delivered 的消息置为 read */
 export function markConversationRead(db: Db, conversationId: string, userId: string, messageId: string): void {
@@ -457,6 +512,38 @@ export function setConversationPreference(
   } // 免打扰分支
 } // setConversationPreference 结束
 
+/** 设置成员角色：仅允许在 admin 与 member 之间切换（owner 变换走 transferOwnership） */
+export function setMemberRole(
+  db: Db,
+  conversationId: string,
+  userId: string,
+  role: 'admin' | 'member',
+): boolean {
+  const result = db
+    .prepare(`UPDATE im_conversation_members SET role = ? WHERE conversation_id = ? AND user_id = ? AND role != 'owner'`)
+    .run(role, conversationId, userId); // 群主行不允许被这条语句改写
+  return result.changes > 0; // 返回是否真的变更
+} // setMemberRole 结束
+
+/** 转让群主：新群主升为 owner、原群主降为 member，并同步会话表的 owner_user_id */
+export function transferOwnership(
+  db: Db,
+  conversationId: string,
+  fromUserId: string,
+  toUserId: string,
+  now?: string,
+): boolean {
+  const nowIso = now ?? new Date().toISOString(); // 当前时间
+  const target = db
+    .prepare(`SELECT 1 FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`)
+    .get(conversationId, toUserId); // 目标必须是现有成员
+  if (!target) return false; // 非成员不能接任群主
+  db.prepare(`UPDATE im_conversation_members SET role = 'member' WHERE conversation_id = ? AND user_id = ?`).run(conversationId, fromUserId); // 原群主降级
+  db.prepare(`UPDATE im_conversation_members SET role = 'owner' WHERE conversation_id = ? AND user_id = ?`).run(conversationId, toUserId); // 新群主上任
+  db.prepare(`UPDATE im_conversations SET owner_user_id = ?, updated_at = ? WHERE id = ?`).run(toUserId, nowIso, conversationId); // 会话表同步
+  return true; // 转让成功
+} // transferOwnership 结束
+
 /** 取单个用户的显示名（用于消息视图冗余展示） */
 export function getUserDisplayName(db: Db, userId: string): string {
   const row = db.prepare(`SELECT display_name FROM users WHERE id = ?`).get(userId) as
@@ -478,6 +565,8 @@ function rowToMessageView(row: Record<string, unknown> & { sender_display_name: 
     object_mime: (row.object_mime as string | null) ?? null, // 媒体 MIME
     object_name: (row.object_name as string | null) ?? null, // 原始文件名
     object_size: (row.object_size as number | null) ?? null, // 文件大小
+    reply_to_id: (row.reply_to_id as string | null) ?? null, // 引用回复目标消息 ID
+    reply_excerpt: (row.reply_excerpt as string | null) ?? null, // 引用摘要快照
     status: row.status as MessageView['status'], // 投递状态
     created_at: String(row.created_at), // 创建时间
   };

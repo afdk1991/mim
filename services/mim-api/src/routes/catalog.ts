@@ -735,7 +735,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     } // 权益判断结束
 
     const started = Date.now(); // 记录开始时间，回传耗时便于前端展示
-    const result = await handler({ text: body.text, options: body.options ?? {} }); // 执行真实能力
+    const result = await handler({ text: body.text, options: { ...(body.options ?? {}), module_code: row.code } }); // 执行真实能力：模块码随选项下发，蓝图类能力据此产出该条目专属文档
     res.json({ // 调用结果
       module_code: row.code, // 回显模块码，便于前端对账
       capability: row.capability, // 回显能力键

@@ -13,7 +13,7 @@ import { parse as parseUrl } from 'node:url'; // 解析升级请求 URL，提取
 import { WebSocketServer, type WebSocket } from 'ws'; // ws 库的服务端与连接类型
 import { verifyAccessToken } from '../auth.js'; // JWT 校验，拿 user_id
 import { ImHub } from './hub.js'; // 连接管理
-import { createMessage, getMemberUserIds, isMember, markConversationRead } from './db.js'; // 数据访问
+import { createMessage, getMemberUserIds, getQuotedMessage, isMember, markConversationRead } from './db.js'; // 数据访问
 import type { ApiDeps } from '../types.js'; // 依赖注入
 import type {
   AckPayload,
@@ -171,6 +171,11 @@ async function handleMessageSend(
     return;
   }
   // 落库
+  const quoted = p.reply_to_id ? getQuotedMessage(deps.db, p.conversation_id, p.reply_to_id) : undefined; // 引用目标必须同会话且未撤回
+  if (p.reply_to_id && !quoted) {
+    sendAck(ws, frame.id, false, '被引用的消息不存在或已撤回'); // 非法引用回明确错误
+    return;
+  }
   const message = createMessage(deps.db, {
     conversationId: p.conversation_id,
     senderUserId: userId,
@@ -180,6 +185,8 @@ async function handleMessageSend(
     objectMime: p.object_mime,
     objectName: p.object_name,
     objectSize: p.object_size,
+    replyToId: quoted?.id, // 引用目标 ID
+    replyExcerpt: quoted?.excerpt, // 引用摘要快照
   });
   // 回 ack（携带消息 ID，前端用于更新本地状态）
   sendAck(ws, frame.id, true, undefined, message.id);

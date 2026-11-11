@@ -20,7 +20,8 @@ import mustache from 'mustache'; // Mustache 模板渲染：成熟模板引擎�
 import { format as formatSqlText } from 'sql-formatter'; // SQL 语句格式化：支持多种方言
 import { parse as parseYamlText, stringify as stringifyYamlText } from 'yaml'; // YAML ↔ JSON 互转
 import semver from 'semver'; // semver 版本与范围校验：package.json 体检用成熟库而非手写正则
-import { AppError } from '@mim/core-domain'; // 统一业务错误：校验失败一律抛 VALIDATION_FAILED
+import { AppError, blueprintGroupOfCapability, blueprintGroupOfCode, blueprintOfCode, buildCatalogModuleSeeds } from '@mim/core-domain'; // 统一业务错误 + 模块起盘蓝图数据（能力键 catalog.* 用它产出条目专属文档）
+import type { BlueprintGroupMeta, ModuleBlueprint } from '@mim/core-domain'; // 蓝图分组模板与单条蓝图类型
 
 /** 能力调用入参：文本主体 + 能力私有选项（选项由各 handler 自行校验，避免一个巨型 schema） */
 export interface CapabilityInput {
@@ -1347,6 +1348,85 @@ const layuiTable: CapabilityHandler = async ({ text }) => { // layui 入口
   return { output, output_kind: 'text', meta: { columns: cols.length } }; // 返回配置
 }; // layuiTable 结束
 
+/** 模块编码 → 中文条目名：蓝图文档首行必须写清「这是哪个导航条目」的交付，避免同组条目串味 */
+const CATALOG_ITEM_NAME: Record<string, string> = Object.fromEntries(buildCatalogModuleSeeds().map((seed) => [seed.code, seed.name])); // 205 条在模块加载时算一次
+
+/** 解析用户输入：首行当项目名，其余行当需求补充；纯空白时按分组目录名兜底 */
+function blueprintProjectName(text: string, fallback: string): { project: string; note: string } {
+  const lines = text.split(/\r?\n/); // 按行切分，容忍 Windows CRLF
+  const first = (lines[0] ?? '').trim(); // 首行：项目名
+  const rest = lines.slice(1).join('\n').trim(); // 其余行：需求补充
+  const cleaned = (first || fallback).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim(); // 去掉控制字符与连续空白，防止破坏 Markdown 结构
+  return { project: cleaned.slice(0, 60) || fallback, note: rest.slice(0, 2000) }; // 项目名限 60 字，补充说明限 2000 字
+} // blueprintProjectName 结束
+
+/** 组装蓝图文档：目标 / 技术栈 / 起步代码 / 目录 / 交付物 / 验收清单六段，全部来自该条目自身数据 */
+function buildBlueprintDoc(blueprint: ModuleBlueprint, group: BlueprintGroupMeta, project: string, note: string): string {
+  const itemName = CATALOG_ITEM_NAME[blueprint.code] ?? blueprint.code; // 模块中文名，缺失时回落编码
+  const fence = '```'; // 代码围栏常量，避免在模板里出现引号歧义
+  const tree = [ // 建议目录：三条固定骨架 + 项目名根目录
+    `${project}/`,
+    '├── README.md        # 目标 / 运行命令 / 验收结果（可直接落盘）',
+    `├── src/             # 起步代码放这里（扩展名 .${group.ext}）`,
+    '└── docs/            # 设计说明、联调记录与截图（可选）',
+  ]; // 目录树结束
+  const lines: string[] = []; // 文档行缓冲：逐行 push 便于每行单独注释
+  lines.push(`# ${itemName} · 模块起盘蓝图`); // 一级标题：条目名
+  lines.push(''); // 空行分隔
+  lines.push(`- 模块编码：${blueprint.code}`); // 编码：便于回到商城定位
+  lines.push(`- 所属分组：${group.nameZh}（能力键 ${group.capability}）`); // 分组与能力键
+  lines.push(`- 项目名：${project}`); // 本次落地使用的项目名
+  lines.push(''); // 空行分隔
+  lines.push('## 交付目标'); // 交付目标小节
+  lines.push(blueprint.summary); // 该条目专属的交付定义
+  lines.push(''); // 空行分隔
+  lines.push('## 推荐技术栈'); // 技术栈小节
+  lines.push(blueprint.stack); // 该条目的推荐依赖 / 工具链
+  lines.push(''); // 空行分隔
+  lines.push(`## 起步代码（.${group.ext}）`); // 起步代码小节
+  lines.push(`${fence}${group.ext}`); // 打开围栏并标注语言
+  lines.push(blueprint.starter); // 可直接粘贴运行的片段
+  lines.push(fence); // 关闭围栏
+  lines.push(''); // 空行分隔
+  lines.push('## 建议目录'); // 目录小节
+  lines.push(`${fence}text`); // 目录用 text 围栏，保留树形缩进
+  lines.push(...tree); // 逐行输出目录树
+  lines.push(fence); // 关闭围栏
+  lines.push(''); // 空行分隔
+  lines.push('## 交付物'); // 交付物小节
+  group.deliverablesZh.forEach((item, index) => lines.push(`${index + 1}. ${item}`)); // 逐条编号输出
+  lines.push(''); // 空行分隔
+  lines.push('## 验收清单'); // 验收小节
+  group.checksZh.forEach((item) => lines.push(`- [ ] ${item}`)); // 待勾选格式，便于直接当任务清单用
+  lines.push(''); // 空行分隔
+  lines.push('## 需求补充'); // 需求补充小节
+  lines.push(note.length > 0 ? note : '（未填写，可在下次调用时作为首行项目名之后的内容补充）'); // 有补充就回显，没有给引导
+  lines.push(''); // 空行分隔
+  lines.push(`> ${group.nameZh} 的每一条模块都有独立蓝图：换一个模块编码调用，目标、技术栈与起步代码全部随之变化。`); // 结尾提示复用方式
+  return lines.join('\n'); // 拼成 Markdown 文档
+} // buildBlueprintDoc 结束
+
+/** 蓝图能力工厂：同一份逻辑按能力键生成 handler，17 个分组不必各写一遍 */
+function createBlueprintHandler(capability: string): CapabilityHandler {
+  return async ({ text, options }) => { // 返回该能力键专用的处理函数
+    const group = blueprintGroupOfCapability(capability); // 取分组模板（目录根、扩展名、交付物、验收项）
+    if (!group) throw new AppError('FEATURE_NOT_AVAILABLE', `blueprint group is not registered for ${capability}`, { capability }); // 清单与数据不一致时明确报错
+    const moduleCode = optionString(options, 'module_code', ''); // 路由在 options 里下发的模块码
+    const blueprint = moduleCode.length > 0 ? blueprintOfCode(moduleCode) : undefined; // 按模块码取该条目蓝图
+    if (!blueprint) throw new AppError('VALIDATION_FAILED', `unknown module_code for capability ${capability}`, { capability, module_code: moduleCode }); // 缺码或未登记即拒绝
+    if (blueprintGroupOfCode(moduleCode)?.capability !== capability) throw new AppError('VALIDATION_FAILED', `module ${moduleCode} does not belong to ${capability}`, { capability, module_code: moduleCode }); // 防止跨组串用
+    const { project, note } = blueprintProjectName(text, group.rootDir.split('/').pop() ?? 'mim-module'); // 解析项目名与需求补充
+    const doc = buildBlueprintDoc(blueprint, group, project, note); // 组装该条目专属文档
+    return { output: doc, output_kind: 'text', meta: { module_code: moduleCode, capability, group: group.slug, project, bytes: Buffer.byteLength(doc, 'utf8') } }; // 回传文档与可对账的元信息
+  }; // handler 结束
+} // createBlueprintHandler 结束
+
+/** 17 条蓝图能力键：与 core-domain 中 MODULE_CAPABILITIES 的 catalog.* 键逐一对应 */
+const BLUEPRINT_CAPABILITY_KEYS = ['catalog.frontier', 'catalog.openharmony', 'catalog.ai', 'catalog.industry', 'catalog.blockchain', 'catalog.wechat', 'catalog.enterprise', 'catalog.storefront', 'catalog.tools', 'catalog.devops', 'catalog.mobile', 'catalog.devtools', 'catalog.server', 'catalog.database', 'catalog.game', 'catalog.plugin', 'catalog.misc']; // 顺序与首页分组展示一致
+
+/** 蓝图能力注册片段：用工厂批量展开，注册表里只需一行注入 */
+const BLUEPRINT_HANDLERS: Record<string, CapabilityHandler> = Object.fromEntries(BLUEPRINT_CAPABILITY_KEYS.map((key) => [key, createBlueprintHandler(key)])); // 键 → handler
+
 /** 能力注册表：键必须与 core-domain 的 MODULE_CAPABILITIES.key 完全一致，否则路由回 501 */
 export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键为能力标识
   'json.format': jsonFormat, // JSON 工具
@@ -1411,6 +1491,7 @@ export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键�
   'api.routes': apiRoutes, // 网关路由体检
   'url.short': urlShort, // 短链码
   'layui.table': layuiTable, // layui 表格列
+  ...BLUEPRINT_HANDLERS, // 17 个分组的模块起盘蓝图能力（catalog.*）
 }; // 注册表结束
 
 /** 按能力键取 handler：未注册即返回 undefined，由路由决定是否 501 */

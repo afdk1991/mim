@@ -24,10 +24,12 @@ import {
   getMemberRole,
   getMemberUserIds,
   getOrCreateDirectConversation,
+  getQuotedMessage,
   isMember,
   listConversations,
   listMembers,
   listMessages,
+  listMessagesAround,
   markConversationRead,
   recallMessage,
   removeConversationMember,
@@ -35,6 +37,8 @@ import {
   searchMessages,
   searchUsers,
   setConversationPreference,
+  setMemberRole,
+  transferOwnership,
 } from '../im/db.js'; // 数据访问层
 import type { MessageContentType } from '../im/protocol.js'; // 消息内容类型
 
@@ -47,6 +51,12 @@ export function createImRouter(deps: ApiDeps): Router {
 
   // 所有 IM 路由均需登录；必须限定 /im 前缀，否则会拦截同挂载点下的 admin 等其他路由
   router.use('/im', requireAuth);
+
+  /** 广播群成员变化：加人 / 踢人 / 设管理员 / 转让群主后，在线成员据此刷新群面板 */
+  function pushMembersChanged(conversationId: string): void {
+    const members = getMemberUserIds(deps.db, conversationId); // 取当前成员（含刚加入的人）
+    deps.imHub?.broadcastToUsers(members, { type: 'conversation.members', payload: { conversation_id: conversationId } }); // 复用 WS 广播通道
+  } // pushMembersChanged 结束
 
   /** GET /im/conversations — 当前用户的会话列表（含最后消息、未读数、置顶与成员数） */
   router.get('/im/conversations', (req, res) => {
@@ -137,6 +147,7 @@ export function createImRouter(deps: ApiDeps): Router {
     const role = getMemberRole(deps.db, conversationId, userId); // 角色
     if (role !== 'owner' && role !== 'admin') return res.status(403).json({ error: '只有群主或管理员可以加人' });
     const added = addConversationMembers(deps.db, conversationId, Array.from(new Set(body.user_ids))); // 批量入群
+    if (added > 0) pushMembersChanged(conversationId); // 有新人入群才广播
     res.status(201).json({ ok: true, added }); // 返回实际新增人数
   });
 
@@ -155,7 +166,41 @@ export function createImRouter(deps: ApiDeps): Router {
       return res.status(403).json({ error: '只有群主或管理员可以踢人' }); // 其余人只能自己退
     }
     const removed = removeConversationMember(deps.db, conversationId, targetId); // 移除
+    if (removed) pushMembersChanged(conversationId); // 移除成功则广播
     res.json({ ok: removed }); // 回包
+  });
+
+  /** PATCH /im/conversations/:id/members/:userId — 设 / 撤管理员（仅群主） */
+  router.patch('/im/conversations/:id/members/:userId', (req, res) => {
+    const userId = req.user!.id; // 当前用户
+    const conversationId = req.params.id; // 会话 ID
+    const targetId = req.params.userId; // 目标成员
+    const body = parse(z.object({ role: z.enum(['admin', 'member']) }), req.body); // 只接受两种角色
+    const info = getConversation(deps.db, conversationId); // 会话信息
+    if (!info) return res.status(404).json({ error: '会话不存在' }); // 不存在
+    if (info.type !== 'group') return res.status(400).json({ error: '只有群聊有管理员角色' }); // 私聊无角色
+    if (getMemberRole(deps.db, conversationId, userId) !== 'owner') return res.status(403).json({ error: '只有群主可以设置管理员' }); // 群主专属
+    if (targetId === info.owner_user_id) return res.status(400).json({ error: '群主角色不可更改' }); // 群主不能被降级
+    const changed = setMemberRole(deps.db, conversationId, targetId, body.role); // 落库
+    if (!changed) return res.status(404).json({ error: '成员不存在' }); // 目标非成员
+    pushMembersChanged(conversationId); // 广播角色变化
+    res.json({ ok: true, role: body.role }); // 回包
+  });
+
+  /** POST /im/conversations/:id/transfer — 转让群主（仅群主，目标必须是现有成员） */
+  router.post('/im/conversations/:id/transfer', (req, res) => {
+    const userId = req.user!.id; // 当前用户
+    const conversationId = req.params.id; // 会话 ID
+    const body = parse(z.object({ user_id: z.string().min(1) }), req.body); // 接任者
+    const info = getConversation(deps.db, conversationId); // 会话信息
+    if (!info) return res.status(404).json({ error: '会话不存在' }); // 不存在
+    if (info.type !== 'group') return res.status(400).json({ error: '只有群聊可以转让群主' }); // 私聊无群主
+    if (getMemberRole(deps.db, conversationId, userId) !== 'owner') return res.status(403).json({ error: '只有群主可以转让群主' }); // 群主专属
+    if (body.user_id === userId) return res.status(400).json({ error: '不能转让给自己' }); // 语义拒绝
+    const ok = transferOwnership(deps.db, conversationId, userId, body.user_id); // 落库
+    if (!ok) return res.status(404).json({ error: '目标成员不存在' }); // 目标非成员
+    pushMembersChanged(conversationId); // 广播群主变更
+    res.json({ ok: true, owner_user_id: body.user_id }); // 回包
   });
 
   /** PATCH /im/conversations/:id/preferences — 置顶 / 免打扰（按人独立） */
@@ -179,7 +224,7 @@ export function createImRouter(deps: ApiDeps): Router {
   });
 
   /** GET /im/conversations/:id/messages — 分页拉取历史消息
-   *  query: before?（消息 ID 游标） limit?（1-200，默认 50）
+   *  query: before?（消息 ID 游标） around?（定位消息 ID） limit?（1-200，默认 50）
    */
   router.get('/im/conversations/:id/messages', (req, res) => {
     const userId = req.user!.id;
@@ -188,8 +233,9 @@ export function createImRouter(deps: ApiDeps): Router {
     if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
     // 解析分页参数
     const before = typeof req.query.before === 'string' ? req.query.before : undefined;
+    const around = typeof req.query.around === 'string' ? req.query.around : undefined; // 定位：搜索结果点击跳转
     const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
-    const items = listMessages(deps.db, conversationId, { before, limit });
+    const items = around ? listMessagesAround(deps.db, conversationId, around, limit) : listMessages(deps.db, conversationId, { before, limit }); // 定位模式取目标前后各半页
     res.json({ items }); // 返回消息列表（正序）
   });
 
@@ -218,6 +264,7 @@ export function createImRouter(deps: ApiDeps): Router {
         object_mime: z.string().optional(), // 媒体 MIME
         object_name: z.string().optional(), // 原始文件名
         object_size: z.number().int().nonnegative().optional(), // 文件大小
+        reply_to_id: z.string().optional(), // 引用回复的目标消息 ID
       }),
       req.body,
     );
@@ -229,6 +276,9 @@ export function createImRouter(deps: ApiDeps): Router {
     if ((body.content_type === 'image' || body.content_type === 'file') && !body.object_key) {
       return res.status(400).json({ error: '图片/文件消息必须携带 object_key' });
     }
+    // 引用回复：必须引用同会话且未撤回的消息，摘要在此固化
+    const quoted = body.reply_to_id ? getQuotedMessage(deps.db, conversationId, body.reply_to_id) : undefined; // 解析被引用消息
+    if (body.reply_to_id && !quoted) return res.status(400).json({ error: '被引用的消息不存在或已撤回' }); // 非法引用直接拒绝
     // 落库
     const message = createMessage(deps.db, {
       conversationId,
@@ -239,6 +289,8 @@ export function createImRouter(deps: ApiDeps): Router {
       objectMime: body.object_mime,
       objectName: body.object_name,
       objectSize: body.object_size,
+      replyToId: quoted?.id, // 引用目标 ID
+      replyExcerpt: quoted?.excerpt, // 引用摘要快照
     });
     // 实时推送走 WebSocket 通道（见 im/ws.ts），HTTP 兜底仅落库并返回消息对象
     res.status(201).json({ message });

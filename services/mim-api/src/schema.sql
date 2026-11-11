@@ -424,6 +424,8 @@ CREATE TABLE IF NOT EXISTS im_messages (
   object_mime     TEXT,
   object_name     TEXT,
   object_size     INTEGER,
+  reply_to_id     TEXT, -- 引用回复的目标消息 ID（NULL 表示普通消息，2026-11-11 新增）
+  reply_excerpt   TEXT, -- 被引用消息的快照摘要（发送时固化，原消息被撤回后仍可展示引用块）
   status          TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent','delivered','read')),
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL,

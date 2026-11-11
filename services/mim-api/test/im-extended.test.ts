@@ -163,7 +163,88 @@ describe('IM 扩展能力', () => {
     const list = await request(app).get('/api/v1/im/conversations').set('Authorization', `Bearer ${a.token}`);
     const item = list.body.items[0];
     expect(item.member_count).toBe(3); // 三人群
-    expect(item.pinned).toBe(false);
-    expect(item.muted).toBe(false);
+    expect(item.pinned).toBe(false); // 默认不置顶
+    expect(item.muted).toBe(false); // 默认不免打扰
+  });
+
+  // 用例 10：引用回复落库并在历史中回显摘要，非法引用 400
+  it('POST /messages 支持引用回复并校验引用有效性', async () => {
+    const a = await login('13900000001');
+    const b = await login('13900000002');
+    const conv = await request(app).post('/api/v1/im/conversations').set('Authorization', `Bearer ${a.token}`).send({ type: 'direct', target_user_id: b.userId });
+    const cid = conv.body.conversation_id;
+    const first = await request(app).post(`/api/v1/im/conversations/${cid}/messages`).set('Authorization', `Bearer ${a.token}`).send({ content_type: 'text', content: '原始问题：部署脚本在哪' });
+    const firstId = first.body.message.id;
+    const reply = await request(app)
+      .post(`/api/v1/im/conversations/${cid}/messages`)
+      .set('Authorization', `Bearer ${b.token}`)
+      .send({ content_type: 'text', content: '在 deploy/ 目录', reply_to_id: firstId }); // 引用回复
+    expect(reply.status).toBe(201);
+    expect(reply.body.message.reply_to_id).toBe(firstId); // 引用目标回显
+    expect(reply.body.message.reply_excerpt).toContain('部署脚本在哪'); // 摘要包含被引用正文
+    const missing = await request(app)
+      .post(`/api/v1/im/conversations/${cid}/messages`)
+      .set('Authorization', `Bearer ${b.token}`)
+      .send({ content_type: 'text', content: '引用不存在的消息', reply_to_id: 'does-not-exist' });
+    expect(missing.status).toBe(400); // 非法引用被拒
+    const recalled = await request(app).post(`/api/v1/im/conversations/${cid}/messages/${firstId}/recall`).set('Authorization', `Bearer ${a.token}`); // 撤回原消息
+    expect(recalled.status).toBe(200);
+    const afterRecall = await request(app)
+      .post(`/api/v1/im/conversations/${cid}/messages`)
+      .set('Authorization', `Bearer ${b.token}`)
+      .send({ content_type: 'text', content: '引用已撤回的消息', reply_to_id: firstId });
+    expect(afterRecall.status).toBe(400); // 已撤回不可引用
+  });
+
+  // 用例 11：around 定位返回目标消息及其前后上下文
+  it('GET /messages?around= 返回目标附近的上下文', async () => {
+    const a = await login('13900000001');
+    const b = await login('13900000002');
+    const conv = await request(app).post('/api/v1/im/conversations').set('Authorization', `Bearer ${a.token}`).send({ type: 'direct', target_user_id: b.userId });
+    const cid = conv.body.conversation_id;
+    const ids: string[] = []; // 记录消息 ID 便于断言
+    for (let i = 0; i < 5; i += 1) {
+      const res = await request(app).post(`/api/v1/im/conversations/${cid}/messages`).set('Authorization', `Bearer ${a.token}`).send({ content_type: 'text', content: `第 ${i} 条` });
+      ids.push(res.body.message.id);
+    } // 造 5 条消息
+    const res = await request(app).get(`/api/v1/im/conversations/${cid}/messages?around=${ids[2]}&limit=4`).set('Authorization', `Bearer ${a.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.items.some((m: { id: string }) => m.id === ids[2])).toBe(true); // 目标必须在结果里
+    expect(res.body.items[0].id).not.toBe(ids[4]); // 不是把全部消息都返回
+  });
+
+  // 用例 12：设 / 撤管理员（仅群主，群主角色不可改）
+  it('PATCH /members/:userId 设管理员，非群主 403、群主行不可改', async () => {
+    const a = await login('13900000001');
+    const b = await login('13900000002');
+    const cid = await createGroup(a.token, [b.userId]);
+    const denied = await request(app).patch(`/api/v1/im/conversations/${cid}/members/${b.userId}`).set('Authorization', `Bearer ${b.token}`).send({ role: 'admin' });
+    expect(denied.status).toBe(403); // 非群主无权
+    const promote = await request(app).patch(`/api/v1/im/conversations/${cid}/members/${b.userId}`).set('Authorization', `Bearer ${a.token}`).send({ role: 'admin' });
+    expect(promote.status).toBe(200);
+    const detail = await request(app).get(`/api/v1/im/conversations/${cid}`).set('Authorization', `Bearer ${a.token}`);
+    expect(detail.body.members.find((m: { user_id: string }) => m.user_id === b.userId).role).toBe('admin'); // 角色已变更
+    const demoteOwner = await request(app).patch(`/api/v1/im/conversations/${cid}/members/${a.userId}`).set('Authorization', `Bearer ${a.token}`).send({ role: 'member' });
+    expect(demoteOwner.status).toBe(400); // 群主角色不可被这条接口改写
+    const notMember = await request(app).patch(`/api/v1/im/conversations/${cid}/members/nobody`).set('Authorization', `Bearer ${a.token}`).send({ role: 'admin' });
+    expect(notMember.status).toBe(404); // 非成员
+  });
+
+  // 用例 13：转让群主后原群主降级、新群主可改名
+  it('POST /transfer 转让群主并同步角色', async () => {
+    const a = await login('13900000001');
+    const b = await login('13900000002');
+    const cid = await createGroup(a.token, [b.userId]);
+    const self = await request(app).post(`/api/v1/im/conversations/${cid}/transfer`).set('Authorization', `Bearer ${a.token}`).send({ user_id: a.userId });
+    expect(self.status).toBe(400); // 不能转给自己
+    const denied = await request(app).post(`/api/v1/im/conversations/${cid}/transfer`).set('Authorization', `Bearer ${b.token}`).send({ user_id: b.userId });
+    expect(denied.status).toBe(403); // 非群主无权转让
+    const ok = await request(app).post(`/api/v1/im/conversations/${cid}/transfer`).set('Authorization', `Bearer ${a.token}`).send({ user_id: b.userId });
+    expect(ok.status).toBe(200);
+    const detail = await request(app).get(`/api/v1/im/conversations/${cid}`).set('Authorization', `Bearer ${a.token}`);
+    expect(detail.body.conversation.owner_user_id).toBe(b.userId); // 会话群主已切换
+    expect(detail.body.members.find((m: { user_id: string }) => m.user_id === a.userId).role).toBe('member'); // 原群主降级
+    const rename = await request(app).patch(`/api/v1/im/conversations/${cid}`).set('Authorization', `Bearer ${b.token}`).send({ title: '新群主改名' });
+    expect(rename.status).toBe(200); // 新群主获得管理权限
   });
 });
