@@ -15,7 +15,7 @@
 | 部署矩阵 | **10 个免费平台**（2026-11-10 按用户指令新增 **Gitee（码云）** 为第 10 行）：腾讯云自建 / EdgeOne Pages / GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 / Gitee 镜像仓；`deploymentRegistry.json` 的 `coverage.matrix_platforms` 与 `platform_catalog.in_matrix` 同步为 10 | [铁律九](#铁律九多平台部署矩阵只走免费方案且必须逐平台取证)、`packages/core-domain/src/deploymentRegistry.json`、`node scripts/verify-deployments.mjs` D03 / D20 |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `5cc77aa`（`fix(store): 交易型配套商品不再标注「规划中」，改为可购买并显示「配套权益」`）；**双远端已全部同步**：`origin` / `gitee` 均 = `5cc77aa`（2026-11-11 16:46 UTC / 00:46 +08 实测，0 ahead / 0 behind），本轮功能提交为 `e31e716`，取证见 [§9.24](#924-商城-205-条全覆盖--聊天七项增强--全链路点击级-e2e2026-11-11-深夜-0800)。历史推送记录：Gitee 入矩阵 `3f55bee`（`4398cf0..3f55bee`）、Cloudflare CI 修复 `b739483`（`3f55bee..b739483`）。`gitee` 镜像仓由 2026-11-10 按用户私人令牌新建（公开、默认分支 `main`），取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) / [§9.12](#912-部署矩阵新增-gitee码云2026-11-10-2220-0800) | `git push origin main`、`git push gitee main`、`git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`（2026-11-11） |
+| 仓库同步 | `main` @ `e12f624`（`feat(auth): 自助注册 + 账号口令登录 + 通道自检 + 聊天匿名只读演示`）；**双远端已全部同步**：`origin` / `gitee` 均 = `e12f624`（2026-11-11 17:0x UTC / 2026-11-12 01:0x +08 实测，0 ahead / 0 behind）。递交序列：`90da8bc`（部署汇总 8 列规范）→ `e12f624`（登录入口补齐）。取证见 [§9.24](#924-deployments-核对表落地-8-列规范2026-11-12-0800) / [§9.25](#925-登录入口补齐自助注册--账号口令--通道自检--聊天匿名只读2026-11-12-凌晨-0800)
 | 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库）与 `gw.txt`（2026-11-10 21:57 实测，同样未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **16 文件 / 230 例**；`verify-deployments` **52/52**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.4 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
@@ -942,7 +942,32 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 生产页面只读探针 | Edge CDP 打开线上 `/marketplace`：**12 张卡片 / 「规划中」徽标 0 个**（含此前 8 个商品），截图 `.tmp/live-marketplace.png` | ✅ 商城已无「规划中」 |
 | 未做 | 生产登录态点击级 E2E（需 `MIM_AUTH_ADMIN_PASSWORD` 主机私有口令）；群通话；在线支付；>3MB 上传的 nginx 上限放宽 | 如实登记 |
 
+### 9.25 登录入口补齐（自助注册 / 账号口令 / 通道自检 / 聊天匿名只读）（2026-11-12 凌晨 +08:00）
+
+**性质**：解决「普通访客在生产点开 `/chat` 只看到『此功能需登录后使用』、聊天实际不可用」这一可用性阻塞。上一轮线上取证已证明：`POST /auth/code` 恒 503 `AUTH_CHANNEL_NOT_CONFIGURED`（无短信/邮件私有凭证），`/auth/password` 只认 `MIM_AUTH_ADMIN_PASSWORD`（普通访客不知口令），`GET /auth/methods` 不存在 → 访客零自助入口。本轮按用户「1-4 全部推进」补齐四条路径中**不依赖外部凭证的三条**，并把第四条（短信/邮件通道）确认为「代码就绪、只缺私有凭据」。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 提交 | `90da8bc`（部署汇总 8 列规范）、`e12f624`（登录入口补齐），共 20 文件 / +529 −100 | `git log --oneline -3` |
+| 双远端 | `origin` `a32960d..e12f624` ✅；`gitee` `a32960d..e12f624` ✅ | `git push origin main`、`git push gitee main` 输出 |
+| CI | Deploy run **43065028824**（@ `e12f624`）**completed success**，5 作业全绿：质量门禁 / GitHub Pages / 托管平台同步 / **发布到生产服务器** / GitHub Packages；Azure SWA 43065028810 同期 | `gh run view 43065028824 --json conclusion,jobs` |
+| 本地门禁 | `pnpm -r typecheck` 0（5/6 项目）；`pnpm --filter @mim/api test` **23 文件 / 355 例全过**；`comment-check --strict` ✅（ChatPreview 69.3% 属非阻断告警）；`verify-deployments` **55/55**；web / api 构建 0 | 命令输出 |
+| 新增后端能力 | `POST /auth/register`（bcrypt 存 `credentials(kind=password)`，注册即下发双令牌）、`POST /auth/password` 改为「管理员口令 + 账号自身口令」双分支、`GET /auth/channels` 布尔能力清单；新增错误码 `AUTH_IDENTITY_EXISTS`(409) 与中英词条 | `services/mim-api/src/routes/auth.ts`、`packages/core-domain/src/errors.ts`、`packages/i18n/src/index.ts` |
+| 新增前端能力 | `Login.tsx` 三段式（密码 / 验证码 / 注册）+ 通道未配置提示；`ChatPreview.tsx` 匿名只读演示页（3 会话 / 5 消息 / 引用块 / 禁用输入区 / 登录引导），`GATED_VIEWS` 移除 `chat` | 文件本体 |
+| 新增测试 | `test/auth-account.test.ts` 8 例：通道清单、注册 201、重复 409、弱口令 400、账号口令 200 / 错误 401、全未配置 503、管理员口令兼容 | 测试输出 |
+| 线上通道查询 | `GET https://mim.mixm.top/api/v1/auth/channels` → **200** `{"sms":false,"email":false,"password":true,"register":true}`（旧构建为 404，本轮已上线） | curl |
+| 线上自助注册 | `POST /api/v1/auth/register`（`19986783887` / `Mim2026test`）→ **201**，返回 `access_token` / `refresh_token` / `user.id=01a1cb96-…` / `display_name=线上注册验证` | curl |
+| 线上账号口令登录 | 同账号 `POST /auth/password` → **200**；重复注册同标识 → **409** | curl |
+| 线上登录态聊天 | 新注册账号令牌 `GET /api/v1/me` **200**、`GET /api/v1/im/conversations` **200** `{"items":[]}` | curl + Bearer |
+| 线上匿名聊天页 | Edge CDP 打开 `https://mim.mixm.top/chat`（先清 localStorage 确保匿名）：`.chat-preview-banner` 存在且文案「只读演示：登录后即可创建会话、收发消息、传文件与群管理。去登录 / 注册」；`textarea` disabled=true、发送按钮 disabled=true；示例会话 **3**、示例消息 **5**、引用块 **1**；`此功能需登录后使用` **不存在**（旧门禁卡片已下线）；截图 `.tmp/live-chat-anon.png` | `probe-live-chat-anon.mjs`（CDP） |
+| 线上登录引导 | 点击「去登录 / 注册」→ 路径 `/signin`，登录方式分段含「密码登录 / 验证码登录 / 注册」 | 同上 |
+| 未做 / 已知缺口 | ① **短信 / 邮件通道仍未启用**（缺 `MIM_SMS_ALIYUN_*` / `MIM_EMAIL_SES_*` 私有凭证，代码侧 0 改动）；② **自助注册无独立频控与邮箱/手机验证**（仅口令强度 + 登录失败锁定），开放程度属产品决定；③ 本轮本地点击级 E2E 未跑成（8787 旧 node 进程绑 `::`，`Get-NetTCPConnection` 取不到 PID、`netstat` 无 LISTEN 行、新进程 `EADDRINUSE`），改以线上 CDP 取证替代 | 如实登记 |
+
+**口径说明**：线上取证使用了两个随机 11 位手机号各注册 1 个真实账号（`19986783887` / `19987065292`），属测试号，未修改任何存量数据；`register` 恒开放、`password` 因 `MIM_AUTH_ADMIN_PASSWORD` 已在生产配置而为 true，`sms` / `email` 为 false 属预期（凭证未注入）。
+
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
+
+
 
 ***
 
