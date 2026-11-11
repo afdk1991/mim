@@ -197,8 +197,8 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | `packages/core-domain/src/deploymentRegistry.ts` | 类型、id 索引、`listDeploymentItems()` 过滤、`deploymentSummary()` 汇总 |
 | `services/mim-api/src/routes/deployments.ts` | 3 个公开只读端点；`/deployments/overview` 须先于 `/deployments/:id` 注册 |
 | `services/mim-api/test/deployments.test.ts` | 10 例契约测试：规模 / 分布自洽 / 统一字段零漂移 / 五类过滤 / 空数据 / 404 / 匿名只读 |
-| `apps/web/src/views/Deployments.tsx` | 前端核对表；`apps/web/src/{api,router,App}.ts(x)` 与 `styles.css` 同步接入 |
+| `apps/web/src/views/Deployments.tsx` | 前端核对表：**固定 8 列**（ID / 名称、仓库标识、平台 / 层级、交付链路、访问域名、部署状态、部署结果、异常说明）；访问域名可点击直达，点击规范 ID 展开取证详情 |
 | `scripts/deployment-summary.mjs` | 采集 `git remote` / `git ls-tree HEAD` / 工作树工件 / CI 作业 / 两份矩阵表行数，输出 `docs/deployment-summary.{json,md}`；`--live` 追加真实 curl |
-| `scripts/verify-deployments.mjs` | 52 项断言：唯一性、枚举、10 平台无遗漏、别名不撞名、工件双口径、全链路消费、文档同步 |
+| `scripts/verify-deployments.mjs` | 55 项断言：唯一性、枚举、10 平台无遗漏、别名不撞名、工件双口径、全链路消费、文档同步、**主表 8 列规范与顺序（D53–D55）** |
 
 **口径要点**：铁律九 **10 个矩阵平台**（2026-11-10 起含 Gitee 镜像仓）+ 6 个补充平台 = 16 个平台目录 → 16 个规范部署项（`repo.gitee` 由补充项提升为矩阵成员；`worker.mim-store` 独立 Worker 为矩阵外补充项）；README 曾把 Cloudflare 同源自托管入口另列一行，已合并去重；候选池（Bitbucket / Render / Netlify / Azure SWA / veFaaS 等）列入 `excluded` 但不计入。**本轮实测**：`repo.gitee` 网页 200 / 0.469s / 52034B、`git ls-remote` exit 0 / 0.27s 与 HEAD `4398cf0` 一致（历史 exit 124 超时已解除）。

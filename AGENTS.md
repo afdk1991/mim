@@ -828,6 +828,25 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 未做 / 已知缺口（如实登记） | ① 商城仍有 **159/205 条「规划中」**（178 − 19，仅「程序开发」组做满），其余 18 组补法口径待用户拍板；② **群通话未做**（当前仅 1v1，2C2G 上 SFU 不可行）；③ **浏览器点击级 E2E 仍未做**（本轮仍是接口级 + 契约测试 + 线上 bundle 取证）；④ 购物车付费分支仍止于 `pending`，在线支付未接 | 本轮未执行项清单 |
 
 
+### 9.24 `/deployments` 核对表落地 8 列规范（2026-11-12 +08:00）
+
+**性质**：按用户给定口径把「部署汇总」主表收紧为**固定 8 列**，顺序逐字对齐：`ID / 名称 | 仓库标识 | 平台 / 层级 | 交付链路 | 访问域名 | 部署状态 | 部署结果 | 异常说明`。这是**展示层与文档口径**改动，不改后端接口契约、不改注册表数据。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 前端表头 | `Deployments.tsx` 主表 8 列；新增「访问域名」列（`EntryLink`，只显示主机、点击新窗口打开完整入口） | 文件本体 |
+| 原 9 列收敛 | 删除「缺失信息」「操作」独立列：缺失并入「异常说明」列的 `⚠ 缺失 N` 徽标；展开入口改为**点击规范 ID**（`button.link` + ▸/▾） | `Deployments.tsx` |
+| 列规范说明 | 页头新增一行「列规范（8 列）：…；点击规范 ID 展开取证详情」，避免口径只存在于代码 | `Deployments.tsx` |
+| Markdown 核对表 | `scripts/deployment-summary.mjs` 主表同步为同样 8 列（含访问域名），前端与文档同口径 | `docs/deployment-summary.md` |
+| 校验加固 | `scripts/verify-deployments.mjs` 新增 D53（表头 8 列且顺序一致，按 `<thead>` 内 `<th>` 抽取比对）、D54（前端存在 `EntryLink` / `entry_url` 渲染）、D55（核对表含 8 列规范表头）；断言总数 **52 → 55** | `.tmp/verify_dep2.log` |
+| 校验结果 | `node scripts/deployment-summary.mjs` 0；`node scripts/verify-deployments.mjs` **55/55 PASS** | 同上 |
+| UI 取证 | 本地 Edge CDP 打开 `/deployments`：表头取自真实渲染（8 列且顺序一致）、16 行、访问域名列链接 `github.com -> https://github.com/afdk1991/mim`、点击规范 ID 展开详情成功、脚本零错误 → **6/6 PASS** | `.tmp/deployments-ui-e2e.json` |
+| 本地门禁 | `pnpm -r typecheck` 0；`@mim/web build` 0；`comment-check --strict` 0 | `.tmp/typecheck5.log`、`.tmp/web_build4.log` |
+
+**边界说明**：`访问域名` 取注册表 `entry_url`，为 `null` 时显示 `—`（不编造域名）；`缺失信息` 未删除数据，只是不再独占列，展开详情内仍有完整「缺失信息」分区。
+
+---
+
 ### 9.23 聊天点击级 E2E 自动化（建群 / 发图 / 撤回）+ 两处真实缺陷修复（2026-11-11 深夜 +08:00）
 
 **性质**：补齐「从提交到交付」自动化里最薄的一环——**点击级 UI 自动化**。新增 `scripts/verify-chat-flow.mjs`（零第三方依赖，Node 内置 WebSocket 直连 Edge CDP），把「建群 / 发图 / 撤回」从接口级验证升级为**页面 DOM 点击驱动 + 页面渲染结果断言**。
