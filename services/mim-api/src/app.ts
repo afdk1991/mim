@@ -13,7 +13,7 @@ import { createComicRouter } from './routes/comic.js'; // 创作工程与分镜�
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
 import { createAiRouter } from './routes/ai.js'; // AI 编排控制面，内部统一 requireAuth
 import { createAdminRouter } from './routes/admin.js'; // RBAC 后台控制面：角色 / 权限 / 用户角色授权
-import { createSitesRouter } from './routes/sites.js'; // 站点模块运行时：45 个去重入口的能力点 / 业务条目
+import { createSitesRouter } from './routes/sites.js'; // 站点模块运行时：44 个去重入口的能力点 / 业务条目
 import { createEntriesRouter } from './routes/entries.js'; // 统一入口配置清单：19 业务域 / 职责边界 / 关联区分 / 占位标识
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
 import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
@@ -22,9 +22,23 @@ import { createStorage } from './storage.js'; // 存储适配器工厂，按 env
 import { createOrchestrator } from './orchestrator.js'; // 生成任务编排器工厂，会启动后台 worker
 import { createNotifyChannels } from './notify.js'; // 验证码通知通道工厂（短信 / 邮件）
 import type { ApiDeps } from './types.js'; // 依赖容器类型
+import { readFileSync } from 'node:fs'; // 读取本包清单以取默认 semver 版本
+import { fileURLToPath } from 'node:url'; // 解析模块自身位置，兼容打包前后工作目录
+import { dirname, join } from 'node:path'; // 拼出 package.json 的相对路径
 
-/** 对外声明的服务版本：默认与 package.json 的 semver 一致，部署时可注入 MIM_SERVICE_VERSION 覆盖 */
-const SERVICE_VERSION = (process.env.MIM_SERVICE_VERSION ?? '0.0.1').trim(); // 健康检查回显，便于线上核对版本
+/** 读取本包 package.json 的 version 作为健康检查默认版本；读取失败回落 0.0.0 */
+function readPackageVersion(): string {
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'); // src/ 与 dist/ 同为 mim-api 下一级，上级即包根
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: string }; // 解析清单，容错非 JSON
+    return pkg.version ?? '0.0.0'; // 缺 version 字段时回落
+  } catch {
+    return '0.0.0'; // 清单缺失或损坏时不阻断启动
+  }
+}
+
+/** 对外声明的服务版本：默认取本包 package.json semver，部署时可注入 MIM_SERVICE_VERSION 覆盖 */
+const SERVICE_VERSION = (process.env.MIM_SERVICE_VERSION ?? readPackageVersion()).trim(); // 健康检查回显，便于线上核对版本
 
 export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可传入替身依赖，生产传入真实 db
   // 未注入 storage / orchestrator / notify 时按 env 构造默认实例（测试可显式注入替身）

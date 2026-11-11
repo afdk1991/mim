@@ -1,7 +1,7 @@
 /** SQLite 连接与结构迁移 */
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
-import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：45 个去重入口、19 个业务域、占位标识与运行时能力点
+import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：44 个去重入口、19 个业务域、占位标识与运行时能力点
 import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn, capabilityOfModule } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 模块能力绑定
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
@@ -137,6 +137,11 @@ export function seedSiteModules(db: Db): void { // 入口清单种子入口，�
   const align = db.prepare( // 幂等迁移：把 v1 演示条目的隔离键改写为占位键，只按主键定位
     'UPDATE site_module_items SET host = ? WHERE id = ? AND host <> ?', // host 列物理名保留，语义已变为占位键
   ); // prepare 结束
+  const validKeys = SITE_MODULES.map((m) => m.entryKey); // 当前注册表占位键集合，用于识别已移除模块的孤儿演示行
+  const orphanPlaceholders = validKeys.map(() => '?').join(', '); // 动态 IN 列表占位符；键来自静态契约，不含外部输入
+  const removeOrphans = db.prepare( // 清理已从注册表移除的 system 演示条目；用户自建条目 created_by 非 system，不受影响
+    `DELETE FROM site_module_items WHERE created_by = 'system' AND host NOT IN (${orphanPlaceholders})`,
+  ); // prepare 结束
   const seed = db.transaction(() => { // 包成事务：任一语句失败整体回滚，避免出现半套演示数据
     for (const module of SITE_MODULES) { // 逐入口写入，模块定义仍以静态契约为准
       for (const [index, item] of module.seed.entries()) { // 逐条演示条目写入
@@ -154,6 +159,7 @@ export function seedSiteModules(db: Db): void { // 入口清单种子入口，�
         align.run(module.entryKey, id, module.entryKey); // 存量 v1 行按主键迁移，保留用户状态流转
       } // 演示条目循环结束
     } // 入口循环结束
+    removeOrphans.run(...validKeys); // 幂等清理孤儿演示行（如已移除序号 02 的 PORTAL_SITE），只删 system 种子
   }); // 事务函数准备完成
   seed(); // 执行事务
 } // seedSiteModules 结束

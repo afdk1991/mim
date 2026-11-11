@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例编�
 import request from 'supertest'; // supertest 进程内驱动 Express，无需监听真实端口
 import type { Express } from 'express'; // 仅类型导入，用于标注全局 app
 import { createApp } from '../src/app.js'; // 唯一装配入口，保证中间件挂载顺序与生产一致
-import { createDatabase } from '../src/db.js'; // 内存库工厂，启动即写入 44 模块演示数据
+import { createDatabase, seedSiteModules } from '../src/db.js'; // 内存库工厂，启动即写入 44 模块演示数据；种子函数用于重跑触发孤儿清理
 import { SITE_MODULES } from '@mim/core-domain'; // 共享注册表，作为断言基准
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，长度满足强度校验
@@ -267,4 +267,21 @@ describe('写操作鉴权 / 幂等 / 状态流转', () => { // 写路径
       expect(cap!.states).toContain(row.status); // 状态必须合法
     } // 校验循环结束
   }); // 种子自洽用例结束
+
+  it('重跑种子时清理已移除模块的 system 孤儿演示条目，保留用户自建条目', () => { // 迁移兜底：旧库残留已移除序号 02 的占位键
+    const now = new Date().toISOString(); // 统一时间戳
+    const insert = db.prepare( // 预编译插入，分别写入 system 孤儿与用户自建同名条目
+      `INSERT INTO site_module_items (id, host, capability, title, detail, status, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ); // prepare 结束
+    insert.run('orphan-system-1', 'PORTAL_SITE', 'catalog', '孤儿演示', '已移除模块残留', 'active', 'system', now, now); // system 孤儿：应被清理
+    insert.run('orphan-user-1', 'PORTAL_SITE', 'catalog', '用户自建', '非 system 条目', 'pending', 'user-abc', now, now); // 用户自建：必须保留
+    seedSiteModules(db); // 重跑种子，触发孤儿清理事务
+    const systemOrphan = db.prepare("SELECT COUNT(*) AS n FROM site_module_items WHERE host = ? AND created_by = 'system'").get('PORTAL_SITE') as { n: number }; // 残留 system 孤儿计数
+    const userRow = db.prepare("SELECT COUNT(*) AS n FROM site_module_items WHERE host = ? AND created_by <> 'system'").get('PORTAL_SITE') as { n: number }; // 用户自建计数
+    expect(systemOrphan.n).toBe(0); // system 孤儿已删除
+    expect(userRow.n).toBe(1); // 用户自建条目不受影响
+    const total = db.prepare('SELECT COUNT(*) AS n FROM site_module_items').get() as { n: number }; // 全表计数
+    expect(total.n).toBe(89); // 88 条当前种子 + 1 条用户自建
+  }); // 孤儿清理用例结束
 }); // 写路径分组结束
