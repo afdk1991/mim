@@ -55,7 +55,7 @@ node scripts/comment-check.mjs
 - `env-check.mjs`：09 清单 §0 密钥治理校验——`.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性（退出码 0 / 1）
 - `comment-check.mjs`：铁律十一注释覆盖率校验——逐文件统计「可注释行 / 已解释行」，默认基线模式（退出码恒 0），`--strict` 为 CI 门禁模式（低于阈值退出 1）
 - `verify:film-export`：成片导出 Edge CDP 真渲染 E2E（14 项断言）；前置 `pnpm --filter @mim/api build` 后启动 API :8787、`npm run serve:local`（:5188）、Edge `--remote-debugging-port=9222`，再执行 `npm run verify:film-export`
-- `verify:site-modules`：站点模块注册表零依赖校验（43 项断言）——45 条备注逐字比对、行号/分组/状态机自洽、共享包→后端→前端→测试全链路消费断言
+- `verify:site-modules`：站点模块注册表零依赖校验（83 项断言）——44 条备注逐字比对、行号/分组/状态机自洽、落地状态四态链路透出、共享包→后端→前端→测试全链路消费断言
 - `verify:chat-flow`：聊天点击级 E2E（15 项断言，`scripts/verify-chat-flow.mjs`）——真点「+ 群聊」「创建群聊」、用 CDP 选文件发图片消息（断言气泡内 `<img>` 的 `naturalWidth > 0`）、点气泡上的「撤回」并断言消息从列表消失；前置同 `verify:film-export`，取证落 `.tmp/chat-flow-e2e.json` / `.png`
 - `verify:chat-plus`：聊天增强点击级 E2E（23 项断言，`scripts/verify-chat-plus.mjs`）——引用回复（引用条 → 气泡内引用块 → 发送后自动清除）、文件消息下载（真访问直链得 200）、群管理（设管理员后角色标签变「管理员」、邀请入群后成员数 2 → 3）、会话内搜索结果定位与目标消息高亮；前置同 `verify:chat-flow`，取证落 `.tmp/chat-plus-e2e.json` / `.png`
 - `verify:site-directory`：上一轮「站点入口契约」校验（16 项断言），两轮成果互不覆盖
@@ -114,7 +114,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：**两级分类树（2026-11-10 改造）**——左侧「全部推荐项目」+ 19 个一级分类（1 前沿技术 … 19 其他开源），点击一级展开其二级条目（共 205 条，二级条目一律作为功能模块入库，模块编码 `cat.<一级slug>-<两位序号>`，权重 `sort_order = 一级序×100 + 二级序`）；右侧搜索（`?q=` 提交制）、筛选面板（排序三档 `星星最高 / 最新推荐 / 最近更新`、开源许可 48 项、编程语言 87 项，均为多选并可一键清空）、分页条（`page` / `pageSize`，默认 20 条/页）、卡片徽标（语言 + 许可 + `★ stars`）、模块详情面板（状态 / 区域 / 分类归属 / 许可 / 语言 / `★ stars` / 当前价 / 历史调价 `price_history` / 前置依赖链）、**免费模块一次性解锁（`POST /entitlements`）、付费模块一律 402 `PAYMENT_REQUIRED` 引导下单（`POST /orders`，金额由服务端快照）**、「我的权益」区块（`GET /me/entitlements`）、**「我的订单」区块（`GET /orders`，待结算可 `POST /orders/:id/cancel`）**、**右下「搜索帮助」浮窗（固定 12 条帮助外链，可展开/收起）**、**「热门项目」卡片（今日 / 本周两档，`GET /modules/hot`，跟随当前分类，点击条目直达其所属分类）**、卡片上的待结算/已解锁徽标、前置依赖缺失时的引导提示 |
 | 主站入口卡片 | Store.tsx 顶部 | 商城页唯一的 www 主站直达入口（文案/链接由 `siteDirectory.json` 契约驱动，新窗口打开 https://www.mixm.top，不请求接口） |
 | 部署汇总（2026-11-09） | `Deployments.tsx` | 统一字段核对表：9 个统计卡（部署项 / 矩阵平台 / 远端 / CI 作业 / 有取证 / 空数据 / 异常 / 缺失信息 / 工件漂移）、五类筛选（关键词 / 状态 / 结果 / 层级 / 平台）、8 列规范主表（规范 ID / 名称 / 仓库标识 / 平台 / 层级 / 交付链路 / 访问域名 / 部署状态 / 部署结果 / 异常说明）——访问域名可点击直达入口，缺失信息并入异常说明列，点击规范 ID 展开取证详情、展开详情（取证原文、异常分级、缺失清单、别名与发布形态去重依据、同平台同类项、取证来源）、覆盖与排除说明；**空数据（⚪）、失败（🔴）、缺失（⚠）分别标识**，匿名只读；数据源 `packages/core-domain/src/deploymentRegistry.json` |
-| 站点矩阵（2026-11-09） | `Sites.tsx` | 按 DNSPod `mixm.top` 45 类备注开发的模块目录：总览统计（45 模块 / 135 功能点 / 8 分组 / 空备注行 / 条目数）、关键词搜索与分组筛选、45 张卡片逐条展示备注原文与 xls 行号、展开查看 3 个功能点及状态机、业务条目列表；**登录后可新建条目并流转状态**（清单 `active→archived`、管理 `pending→active→archived`、记录 `pending→done→archived`，归档为终态），匿名只读并显示「登录后操作」引导；数据源 `packages/core-domain/src/siteModules.json` |
+| 站点矩阵（2026-11-09，2026-11-12 落地状态对齐） | `Sites.tsx` | 按 DNSPod `mixm.top` 44 类备注开发的模块目录：总览统计（44 模块 / 132 功能点 / 19 业务域 / 空备注行 / 条目数）、关键词搜索与业务域筛选、44 张卡片逐条展示备注原文与 xls 行号、**落地状态徽标**（已落地 / 部分相邻 / 规划中 / 语义冲突）与「进入模块 / 查看相邻实现」直达；展开查看 3 个功能点及状态机、已落地功能清单与边界说明；规划中入口隐藏演示条目与新建表单、显示规划空态；**登录后可新建条目并流转状态**（清单 `active→archived`、管理 `pending→active→archived`、记录 `pending→done→archived`，归档为终态），匿名只读并显示「登录后操作」引导；数据源 `packages/core-domain/src/siteModules.json` + 落地映射 `packages/core-domain/src/entryImplementation.ts` |
 | 漫剧放映厅 | `ComicTheater.tsx` / `ComicStudio.tsx` | **2026-11-12 新增**：`/comic-studio` 顶部「放映厅 / 创作工作台」分段，默认进放映厅；匿名可看内置演示片库（`GET /api/v1/comic/showcase`，2 部开放授权片源，静态站 `apps/web/public/demo/` 托管），原生 `<video>` 播放、作品网格选择、集数切换、`localStorage` 断点续播；登录后「我的作品」列出本人成片（`GET /api/v1/comic/theater` 签发 1 小时播放地址），可直接播放；创作工作台未登录时不再整页拦截，改为分段内登录引导 |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程；**成片导出（2026-11-08）**：每个成片行新增「导出」面板，可选 MP4/MOV × 1080p/720p，`POST /comic/films/:id/export` 返回 1 小时有效的一次性预签名下载地址；MP4/1080p 直接下载原片，其它组合需服务端 `MIM_FFMPEG_PATH` 转码，未配置时前端显示本地化提示并提供「直接下载原片」一键降级；降级成功后表单回写实际格式/分辨率 |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
@@ -130,7 +130,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | Mim ID（2026-11-12） | 无独立端点：`/auth/register`、`/auth/login`、`/auth/password`、`/auth/refresh`、`GET /me`、`GET /me/oauth` 的 `user.member_no` 字段 | 随登录态返回；号码由服务端在事务内发号，客户端只读 |
 | 商城 | `GET /taxonomy`（分类导航树：19 个一级分类 + 205 个二级条目，每个分组/条目带 `name`（中文）与 `name_en`（英文）以及各自的 active 模块数，英文站点凭 `name_en` 渲染导航）、`GET /modules`（支持 `?q=` 搜索、`?category=`（一级 slug 前缀命中 / 二级 slug 精确命中 / `all` 等价不过滤）、`?sort=`（`stars` / `recommended` / `updated`，非法值 400）、`?licenses=` / `?languages=`（逗号分隔多选）、`?page=` / `?pageSize=`（1–100，默认 20），响应带 `total / page / page_size / total_pages`）、`GET /modules/hot`（右侧「热门项目」：`?range=today|week`（24h / 168h，非法值 400）、`?category=`、`?limit=`（1–20，默认 5），热度 = stars + 窗口内新建加权，返回 `items[].hotness`）、`GET /modules/:code`（详情含价格历史、前置依赖、分类/许可/语言/stars） | 公开 |
 | 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（11 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 全部公开只读，不查业务表、无写端点 |
-| 站点模块（2026-11-09） | `GET /sites/overview`（全站汇总）、`GET /sites`（45 模块列表，支持 `?q=` / `?group=`）、`GET /sites/:host`（备注原文 + 行号 + 能力点 + 统计）、`GET /sites/:host/capabilities`、`GET /sites/:host/items`（支持 `?capability=` / `?status=`）、`POST /sites/:host/items`、`POST /sites/:host/items/:id/transition` | 浏览公开；两个写端点登录 + 幂等 |
+| 站点模块（2026-11-09） | `GET /sites/overview`（全站汇总 + 落地四态计数）、`GET /sites`（44 模块列表，支持 `?q=` / `?domain=`，逐条带落地映射）、`GET /sites/:host`（备注原文 + 行号 + 能力点 + 统计 + 落地映射）、`GET /sites/:host/capabilities`、`GET /sites/:host/items`（支持 `?capability=` / `?status=`）、`POST /sites/:host/items`、`POST /sites/:host/items/:id/transition` | 浏览公开；两个写端点登录 + 幂等 |
 | 权益 | `POST /entitlements`（**付费模块返回 402 `PAYMENT_REQUIRED`**，免费模块 201）、`GET /me/entitlements` | 登录 + 幂等 |
 | 商城订单 | `POST /orders`（下单，金额服务端快照；同模块已有待付单回放 200）、`GET /orders`（我的订单，`status` 过滤 + 分页）、`POST /orders/:id/cancel` | 登录 + 幂等 |
 | 购物车（2026-11-11） | `GET /cart`（条目含 `owned / free / available / price / added_at`，`totals` 按币种累计、`payable_count` 排除免费与已拥有）、`POST /cart/items`（加购；重复加购回放 `{added:false}`）、`DELETE /cart/items/:moduleCode`（天然幂等）、`DELETE /cart`（清空）、`POST /cart/checkout`（逐条结算：免费模块同事务发权益并写 `entitlement_events`（`reason=cart_checkout`）、付费模块生成 `pending` 订单（已有待结算单则回放）、已下架 / 已拥有 / 缺依赖分别 `skipped` 并保留在车；成功条目统一移出车） | 登录（写端点 + 幂等） |
@@ -168,7 +168,7 @@ pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
 pnpm --filter @mim/admin dev              # 启动管理后台（http://127.0.0.1:5174，/api 代理到 8787）
 npm run check                             # 版本规约 + 密钥模板校验 + 注释覆盖率（CI 以 --strict 执行）
-npm run verify:site-modules                # 统一入口配置清单 79 项零依赖校验（45 备注逐字 / 占位标识 / 19 域 / 全链路消费）
+npm run verify:site-modules                # 统一入口配置清单 83 项零依赖校验（44 备注逐字 / 占位标识 / 19 域 / 落地状态链路 / 全链路消费）
 npm run verify:entry-manifest              # 统一入口配置清单专项校验 23 项（19 业务用途覆盖 / 去重 / 占位配置）
 npm run verify:site-directory              # 站点入口契约 16 项零依赖校验
 npm run summary:deployments                # 生成部署汇总 JSON + Markdown 核对表（--live 追加真实 curl 探测）
