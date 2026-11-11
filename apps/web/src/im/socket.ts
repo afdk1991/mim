@@ -27,6 +27,7 @@ export type ServerFrameType =
   | 'message.new'
   | 'message.delivered'
   | 'message.read'
+  | 'message.recall' // 某条消息被撤回（发送者 2 分钟内撤回）
   | 'typing'
   | 'presence'
   | 'call.invite'

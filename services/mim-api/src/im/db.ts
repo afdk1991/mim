@@ -30,6 +30,9 @@ export interface ConversationListItem {
   other_user_id?: string | null; // 私聊的对方用户 ID（群聊为 null）
   last_message: MessageView | null; // 最后一条消息（无消息时为 null）
   unread_count: number; // 当前用户未读消息数
+  pinned: boolean; // 当前用户是否置顶该会话（来自成员表，按人独立）
+  muted: boolean; // 当前用户是否免打扰（来自成员表）
+  member_count: number; // 群成员数（私聊恒为 2），前端用于群头像展示
   updated_at: string; // 最后更新时间
 } // ConversationListItem 结束
 
@@ -107,18 +110,18 @@ export function getMemberUserIds(db: Db, conversationId: string): string[] {
 
 /** 列出某用户的全部会话（按最后更新时间倒序），含最后一条消息与未读数 */
 export function listConversations(db: Db, userId: string): ConversationListItem[] {
-  // 查该用户参与的所有会话基础信息
+  // 查该用户参与的所有会话基础信息；置顶会话排在最前，其次按最后更新时间倒序
   const convs = db
     .prepare(
       `SELECT c.id, c.type, c.title, c.avatar_object_key, c.updated_at,
-              m.last_read_message_id
+              m.last_read_message_id, m.pinned, m.muted
          FROM im_conversations c
          JOIN im_conversation_members m ON m.conversation_id = c.id
         WHERE m.user_id = ? AND c.deleted_at IS NULL
-        ORDER BY c.updated_at DESC`,
+        ORDER BY m.pinned DESC, c.updated_at DESC`,
     )
     .all(userId) as Array<
-    ConversationRow & { last_read_message_id: string | null }
+    ConversationRow & { last_read_message_id: string | null; pinned: number; muted: number }
   >;
 
   // 预编译：取会话最后一条消息
@@ -164,6 +167,10 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
 
     // 统计未读数：传入已读游标，空串时全部未读
     const unread = unreadStmt.get(c.id, userId, c.last_read_message_id ?? '') as { n: number };
+    // 统计成员数：群聊用于展示「N 人」，私聊固定 2
+    const memberCount = (db
+      .prepare(`SELECT COUNT(*) AS n FROM im_conversation_members WHERE conversation_id = ?`)
+      .get(c.id) as { n: number }).n;
 
     return {
       id: c.id,
@@ -173,6 +180,9 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
       other_user_id: otherUserId,
       last_message: lastMessage,
       unread_count: unread.n,
+      pinned: c.pinned === 1,
+      muted: c.muted === 1,
+      member_count: memberCount,
       updated_at: c.updated_at,
     };
   });
@@ -291,6 +301,161 @@ export function searchUsers(db: Db, query: string, limit: number, excludeUserId:
   }>;
   return rows;
 } // searchUsers 结束
+
+/** 单个会话的基础信息（群管理端点需要 type / owner 判断权限） */
+export interface ConversationInfo {
+  id: string; // 会话 ID
+  type: 'direct' | 'group'; // 会话类型
+  title: string; // 群名（私聊为空串）
+  owner_user_id: string | null; // 群主 ID（私聊为空）
+} // ConversationInfo 结束
+
+/** 取会话基础信息：不存在或已删除返回 undefined */
+export function getConversation(db: Db, conversationId: string): ConversationInfo | undefined {
+  return db
+    .prepare(`SELECT id, type, title, owner_user_id FROM im_conversations WHERE id = ? AND deleted_at IS NULL`)
+    .get(conversationId) as ConversationInfo | undefined;
+} // getConversation 结束
+
+/** 取成员角色：非成员返回 null，用于「群主才能改名/踢人」这类判断 */
+export function getMemberRole(db: Db, conversationId: string, userId: string): 'owner' | 'admin' | 'member' | null {
+  const row = db
+    .prepare(`SELECT role FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`)
+    .get(conversationId, userId) as { role: 'owner' | 'admin' | 'member' } | undefined;
+  return row?.role ?? null; // 未入表即非成员
+} // getMemberRole 结束
+
+/** 成员列表视图：带显示名，前端群成员面板直接渲染 */
+export interface ConversationMember {
+  user_id: string; // 成员 ID
+  display_name: string; // 显示名（缺失时回落 ID 前 8 位）
+  role: 'owner' | 'admin' | 'member'; // 群内角色
+  joined_at: string; // 入群时间
+} // ConversationMember 结束
+
+/** 列出会话成员（按入群时间升序，群主天然排最前） */
+export function listMembers(db: Db, conversationId: string): ConversationMember[] {
+  const rows = db
+    .prepare(
+      `SELECT m.user_id, m.role, m.joined_at, u.display_name
+         FROM im_conversation_members m
+         LEFT JOIN users u ON u.id = m.user_id
+        WHERE m.conversation_id = ?
+        ORDER BY m.joined_at ASC`,
+    )
+    .all(conversationId) as Array<{ user_id: string; role: ConversationMember['role']; joined_at: string; display_name: string | null }>;
+  return rows.map((row) => ({
+    user_id: row.user_id,
+    display_name: row.display_name || row.user_id.slice(0, 8), // 没设置显示名时回落 ID 前 8 位
+    role: row.role,
+    joined_at: row.joined_at,
+  }));
+} // listMembers 结束
+
+/** 消息撤回结果：成功或被拒的具体原因，便于路由返回可读错误 */
+export interface RecallResult {
+  ok: boolean; // 是否撤回成功
+  reason?: 'not_found' | 'not_owner' | 'expired' | 'already_deleted'; // 失败原因
+} // RecallResult 结束
+
+/** 撤回消息：仅发送者本人、且消息创建时间在窗口内（默认 2 分钟）可撤回；撤回即软删 */
+export function recallMessage(
+  db: Db,
+  params: { conversationId: string; messageId: string; userId: string; windowMs?: number; now?: string },
+): RecallResult {
+  const nowIso = params.now ?? new Date().toISOString(); // 当前时间
+  const windowMs = params.windowMs ?? 120000; // 微信式 2 分钟窗口
+  const row = db
+    .prepare(`SELECT id, sender_user_id, created_at, deleted_at FROM im_messages WHERE id = ? AND conversation_id = ?`)
+    .get(params.messageId, params.conversationId) as
+    | { id: string; sender_user_id: string; created_at: string; deleted_at: string | null }
+    | undefined;
+  if (!row) return { ok: false, reason: 'not_found' }; // 消息不存在
+  if (row.deleted_at) return { ok: false, reason: 'already_deleted' }; // 已撤回/已删除
+  if (row.sender_user_id !== params.userId) return { ok: false, reason: 'not_owner' }; // 只能撤回自己发的
+  const elapsed = Date.parse(nowIso) - Date.parse(row.created_at); // 已过去毫秒
+  if (!Number.isFinite(elapsed) || elapsed > windowMs) return { ok: false, reason: 'expired' }; // 超过撤回窗口
+  // 软删并清空正文/对象键，避免历史内容残留
+  db.prepare(
+    `UPDATE im_messages SET deleted_at = ?, content = '', object_key = NULL, object_mime = NULL, object_name = NULL, updated_at = ?
+      WHERE id = ?`,
+  ).run(nowIso, nowIso, params.messageId);
+  return { ok: true }; // 撤回成功
+} // recallMessage 结束
+
+/** 会话内消息搜索：按内容模糊匹配，只搜未删除消息，结果按时间倒序 */
+export function searchMessages(db: Db, conversationId: string, query: string, limit = 30): MessageView[] {
+  const q = `%${query.trim()}%`; // 通配符包裹
+  const cap = Math.min(Math.max(limit, 1), 100); // 条数上限，避免一次拉爆
+  const rows = db
+    .prepare(
+      `SELECT m.*, u.display_name AS sender_display_name
+         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+        WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.content LIKE ?
+        ORDER BY m.created_at DESC
+        LIMIT ?`,
+    )
+    .all(conversationId, q, cap) as Array<Record<string, unknown> & { sender_display_name: string }>;
+  return rows.map(rowToMessageView); // 倒序返回，前端按「最新命中在前」展示
+} // searchMessages 结束
+
+/** 群改名：同时刷新 updated_at，让该会话在列表里置顶 */
+export function renameConversation(db: Db, conversationId: string, title: string, now?: string): void {
+  const nowIso = now ?? new Date().toISOString(); // 当前时间
+  db.prepare(`UPDATE im_conversations SET title = ?, updated_at = ? WHERE id = ?`).run(title, nowIso, conversationId);
+} // renameConversation 结束
+
+/** 批量加入成员：已存在的成员忽略（INSERT OR IGNORE，避免重复入群报错） */
+export function addConversationMembers(db: Db, conversationId: string, userIds: string[], now?: string): number {
+  const nowIso = now ?? new Date().toISOString(); // 当前时间
+  const stmt = db.prepare(
+    `INSERT OR IGNORE INTO im_conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)`,
+  );
+  let added = 0; // 实际新增人数
+  for (const uid of userIds) added += stmt.run(conversationId, uid, nowIso).changes; // changes 为 0 表示已在群里
+  if (added > 0) db.prepare(`UPDATE im_conversations SET updated_at = ? WHERE id = ?`).run(nowIso, conversationId); // 有新人则顶起会话
+  return added; // 返回新增人数，路由用于回包
+} // addConversationMembers 结束
+
+/** 移除成员：同时清掉其已读游标，重新入群时从零开始统计未读 */
+export function removeConversationMember(db: Db, conversationId: string, userId: string, now?: string): boolean {
+  const nowIso = now ?? new Date().toISOString(); // 当前时间
+  const result = db
+    .prepare(`DELETE FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`)
+    .run(conversationId, userId);
+  if (result.changes > 0) db.prepare(`UPDATE im_conversations SET updated_at = ? WHERE id = ?`).run(nowIso, conversationId); // 退群也让会话在对方列表刷新
+  return result.changes > 0; // 是否真的移除了
+} // removeConversationMember 结束
+
+/** 删除会话（对当前用户生效）：群聊群主解散 → 整会话软删；成员退群 → 仅移除自己；私聊 → 仅移除自己 */
+export function deleteConversationForUser(db: Db, conversationId: string, userId: string, now?: string): 'dissolved' | 'left' | 'not_found' {
+  const info = getConversation(db, conversationId); // 先取会话信息
+  if (!info) return 'not_found'; // 会话不存在
+  const role = getMemberRole(db, conversationId, userId); // 当前用户角色
+  if (!role) return 'not_found'; // 非成员视作不存在，避免越权探测
+  const nowIso = now ?? new Date().toISOString(); // 当前时间
+  if (info.type === 'group' && role === 'owner') { // 群主解散：整条会话软删，消息按 deleted_at 过滤不再返回
+    db.prepare(`UPDATE im_conversations SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(nowIso, nowIso, conversationId);
+    return 'dissolved';
+  } // 解散分支结束
+  removeConversationMember(db, conversationId, userId, nowIso); // 私聊/普通成员：只把自己移出
+  return 'left'; // 返回「已退出」
+} // deleteConversationForUser 结束
+
+/** 设置置顶 / 免打扰：按人独立，写成员表，不影响对方 */
+export function setConversationPreference(
+  db: Db,
+  conversationId: string,
+  userId: string,
+  patch: { pinned?: boolean; muted?: boolean },
+): void {
+  if (patch.pinned !== undefined) {
+    db.prepare(`UPDATE im_conversation_members SET pinned = ? WHERE conversation_id = ? AND user_id = ?`).run(patch.pinned ? 1 : 0, conversationId, userId);
+  } // 置顶分支
+  if (patch.muted !== undefined) {
+    db.prepare(`UPDATE im_conversation_members SET muted = ? WHERE conversation_id = ? AND user_id = ?`).run(patch.muted ? 1 : 0, conversationId, userId);
+  } // 免打扰分支
+} // setConversationPreference 结束
 
 /** 取单个用户的显示名（用于消息视图冗余展示） */
 export function getUserDisplayName(db: Db, userId: string): string {

@@ -755,6 +755,27 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 未做 / 已知缺口（如实登记） | ① 205 条里仅 6 条登记真实能力，其余 199 条仍为「规划中」，商城可见但不可解锁；② 前端「工具」区块已随生产 bundle 上线（字符串取证），但**浏览器点击级 E2E 未做**（未在真实页面点开详情、填输入、按执行）；③ 能力调用未加独立限流（当前复用全局请求约束）；④ PRD / Wiki 未同步本节（仅 AGENTS + README 记录） | 本轮未执行项清单 |
 
 
+### 9.19 商城能力扩至 27 条 + IM 聊天完整化（群管理 / 撤回 / 搜索 / 置顶免打扰 / 图片文件）（2026-11-11 上午 +08:00）
+
+**性质**：按用户「先把商城产品和聊天开发完整」指令的第二轮交付。商城从 6 条真实能力扩到 **27 条**（覆盖 27 个导航条目，其余 178 条仍为「规划中」并保持不可解锁）；聊天从「会话列表 + 收发文本 + 已读」补齐为完整 IM。
+
+| 项 | 本轮落地 | 位置 / 取证 |
+|---|---|---|
+| 商城能力扩容（+21 条） | `text.segment`→`cat.dev-01`、`card.luhn`→`cat.dev-02`、`csv.json`→`cat.dev-05`、`template.render`→`cat.dev-07`、`url.parse`→`cat.dev-09`、`ip.cidr`→`cat.dev-11`、`chart.svg`→`cat.dev-21`、`report.table`→`cat.dev-23`、`image.dataurl`→`cat.dev-26`、`log.stats`→`cat.dev-29`、`captcha.svg`→`cat.dev-31`、`math.eval`→`cat.dev-32`、`json.schema`→`cat.frontier-01`、`cite.format`→`cat.frontier-02`、`yaml.json`→`cat.frontier-05`、`jwt.decode`→`cat.web-10`、`diff.text`→`cat.devtools-02`、`code.stats`→`cat.devtools-08`、`sql.format`→`cat.database-01`、`text.stats`→`cat.tools-03`、`file.rename`→`cat.tools-01` | `packages/core-domain/src/moduleCapabilities.ts`（27 条唯一真源） |
+| 新增第三方依赖（铁律五） | `mustache`（模板渲染）、`yaml`（YAML↔JSON）、`expr-eval`（数学表达式）、`diff`（unified diff）、`sql-formatter`（SQL 格式化）、`csv-parse`（CSV 解析）、devDep `@types/mustache` | `services/mim-api/package.json` |
+| 执行层扩展 | `services/mim-api/src/capabilities.ts` 新增 21 个 handler + 3 个本地工具函数（`parseJsonInput` / `readCsvRows` / `ipv4ToString`）；`math.eval` 拒绝赋值与语句、`file.rename` 只做 dry-run 映射不改磁盘、`jwt.decode` 明确 `signature_verified=false`、`markdown.render` 继续转义原始 HTML | 注册表 `CAPABILITY_HANDLERS` 27 键 |
+| 前端工具面板参数 | `apps/web/src/views/Store.tsx` 的 `CAPABILITY_OPTIONS` 新增 11 组下拉（csv/yaml 方向、报表格式、图表类型、SQL 方言、代码语言、MIME、精度、验证码位数、diff 上下文、文献类型） | 未登记下拉的能力仍显示「输入框 + 执行」，接口可用 |
+| IM 后端（数据层） | `src/im/db.ts` 新增 `getConversation` / `getMemberRole` / `listMembers` / `recallMessage`（2 分钟窗口 + 软删并清空 content/object_*）/ `searchMessages`（LIKE 倒序、上限 100）/ `renameConversation` / `addConversationMembers`（`INSERT OR IGNORE` 返回新增数）/ `removeConversationMember` / `deleteConversationForUser`（群主→`dissolved`、成员→`left`）/ `setConversationPreference`（pinned/muted 写成员表）；`ConversationListItem` 增 `pinned` / `muted` / `member_count`，列表排序改 `m.pinned DESC, c.updated_at DESC` | `services/mim-api/src/im/db.ts` |
+| IM 后端（HTTP） | `src/routes/im.ts` 新增 9 个端点：`GET/PATCH /im/conversations/:id`、`GET/POST /im/conversations/:id/members`、`DELETE /im/conversations/:id/members/:userId`（禁止移除群主）、`PATCH /im/conversations/:id/preferences`、`DELETE /im/conversations/:id`、`GET /im/conversations/:id/messages/search`、`POST /im/conversations/:id/messages/:messageId/recall`（`not_found`→404 / `not_owner`→403 / `expired`→400）；撤回成功后经 `deps.imHub.broadcastToUsers` 推 `message.recall` | `services/mim-api/src/routes/im.ts` |
+| IM 接线 | `src/types.ts` 增 `ApiDeps.imHub?`（仅类型引用避免运行时环依赖）；`src/index.ts` 用 `deps.imHub = attachImWebSocket(server, deps)` 回填 hub；`src/im/protocol.ts` 增服务端帧 `'message.recall'` | `services/mim-api/src/{types.ts,index.ts,im/protocol.ts}` |
+| IM 前端 | `apps/web/src/views/Chat.tsx` 全量重写：建群（勾选成员）、图片/文件（`media.presignUpload` → `PUT` → 发 image/file 消息）、撤回（2 分钟内且已落库）、会话内搜索、输入中提示（1.5s 节流广播 + 3s 自动清除）、加载更早消息（`before` 游标）、发送状态（sent/delivered/read）、群信息面板（成员/群主/改名/退群）、置顶与免打扰、视频通话入口；**修复旧缺陷**：WS `ack` 用 `pendingRef`（requestId → 乐观消息 ID）回填服务端 ID，不再出现同一条消息重复两条 | `apps/web/src/views/Chat.tsx`；`apps/web/src/im/socket.ts` 增 `'message.recall'` 帧类型；`apps/web/src/api.ts` 新增 `ImMember` 与 9 个 `im.*` 方法 |
+| 样式 | `apps/web/src/styles.css` 追加 24 个 `.chat-*` 类（建群表单 / 勾选标记 / 会话标记 / 结果条 / 更早按钮 / 状态 / 撤回 / 输入中 / 附件 / 群信息面板 / 成员行） | 文件末尾「IM 聊天增强」段 |
+| 契约测试 | 新增 `test/im-extended.test.ts`（9 例：详情/改名权限/加人去重/踢人与禁止踢群主/置顶免打扰/消息搜索/撤回权限与 404/退群与解散/列表新字段）；新增 `test/module-capability-coverage.test.ts`（30 例：清单非空键唯一、27 条能力均有 handler、绑定编码都存在且未被重复绑定、21 个新能力逐个真实产出断言） | **19 文件 / 283 例全过** |
+| 本地门禁（提交前） | `pnpm -r typecheck` **EXIT=0**；`pnpm --filter @mim/api test` **19 文件 / 283 例全过**；`pnpm --filter @mim/web build` **EXIT=0**（28.64s）；`node scripts/env-check.mjs` **EXIT=0**；`comment-check --strict` **EXIT=0**（111 文件 / 35421 可注释行 / 87.9%） | 本轮真实命令输出（`.tmp/tc3.log`、`.tmp/test3.log`、`.tmp/web_build.log`、`.tmp/comment_check.log`） |
+| 文档同步（铁律七） | `README.md` 接口表：即时通讯行补 9 个端点与 `message.recall` 帧；商城能力行更新为 27 条并给出分组分布；本节 | 逐文件 Edit |
+| 未做 / 已知缺口（如实登记） | ① 205 条里仍有 **178 条**为「规划中」（不可解锁），本轮只做到 27 条；② 聊天「图片/文件」消息此前只能点开文件名，**消息气泡内的图片预览未做**（需 media 下载 URL 签名）；③ 通话仍只支持私聊，群通话未做；④ IM 新增端点与能力扩容的**生产端到端取证**须在 push + CI 后执行；⑤ 浏览器点击级 E2E 仍未做（沿用 §9.18 缺口） | 本轮未执行项清单 |
+
+
 ---
 
 ## 与铁律一冲突时的优先级

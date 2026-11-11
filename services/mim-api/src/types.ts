@@ -19,6 +19,8 @@ export interface ApiDeps { // 依赖注入容器：所有路由通过它拿能�
   orchestrator?: Orchestrator; // 可选编排器：缺失时相关路由返回 PROVIDER_NOT_CONFIGURED
   /** 验证码通知通道（短信/邮件）；未注入时由 app 依据 env 构造默认实例 */
   notify?: NotifyChannels; // 可选通知通道：缺失时登录验证码走本地日志下发
+  /** IM 实时连接中心；由服务入口在挂载 WebSocket 后回填，HTTP 路由借此推送撤回等事件 */
+  imHub?: import('./im/hub.js').ImHub; // 仅类型引用，避免 types → hub 的运行时环依赖
 } // ApiDeps 结束：可选字段由 app 在装配时补齐默认实现
 
 export type Region = 'cn' | 'global'; // 数据驻留区域，决定账号归属与合规分区

@@ -489,8 +489,19 @@ export interface ImConversation {
   other_user_id?: string | null; // 私聊对方 ID（群聊为 null）
   last_message: ImMessage | null; // 最后一条消息
   unread_count: number; // 未读数
+  pinned: boolean; // 当前用户是否置顶
+  muted: boolean; // 当前用户是否免打扰
+  member_count: number; // 成员数（私聊为 2）
   updated_at: string; // 最后更新时间
 } // ImConversation 结束
+
+/** 群成员项 */
+export interface ImMember {
+  user_id: string; // 成员 ID
+  display_name: string; // 显示名
+  role: 'owner' | 'admin' | 'member'; // 群内角色
+  joined_at: string; // 入群时间
+} // ImMember 结束
 
 /** 搜索到的用户项 */
 export interface ImUser {
@@ -1187,6 +1198,70 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       const suffix = new URLSearchParams({ q, limit: String(limit) }).toString(); // 拼接查询串
       return request<{ items: ImUser[] }>(`/im/users?${suffix}`, { auth: true, idempotency: false });
     }, // searchUsers 结束
+    /** GET /im/conversations/:id：会话详情 + 成员列表 */
+    getConversation(conversationId: string) {
+      return request<{ conversation: { id: string; type: ImConversationType; title: string; owner_user_id: string | null }; members: ImMember[] }>(
+        `/im/conversations/${encodeURIComponent(conversationId)}`, // 会话 ID 编码
+        { auth: true, idempotency: false }, // 只读
+      ); // 请求结束
+    }, // getConversation 结束
+    /** PATCH /im/conversations/:id：群改名（仅群主/管理员） */
+    renameConversation(conversationId: string, title: string) {
+      return request<{ ok: boolean; title: string }>(`/im/conversations/${encodeURIComponent(conversationId)}`, {
+        method: 'PATCH', // 局部更新
+        body: { title }, // 新群名
+        auth: true, // 需登录
+      }); // 请求结束
+    }, // renameConversation 结束
+    /** GET /im/conversations/:id/members：群成员列表 */
+    listMembers(conversationId: string) {
+      return request<{ items: ImMember[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/members`, { auth: true, idempotency: false });
+    }, // listMembers 结束
+    /** POST /im/conversations/:id/members：邀请入群 */
+    addMembers(conversationId: string, userIds: string[]) {
+      return request<{ ok: boolean; added: number }>(`/im/conversations/${encodeURIComponent(conversationId)}/members`, {
+        method: 'POST', // 新增
+        body: { user_ids: userIds }, // 待邀请用户
+        auth: true, // 需登录
+      }); // 请求结束
+    }, // addMembers 结束
+    /** DELETE /im/conversations/:id/members/:userId：退群或踢人 */
+    removeMember(conversationId: string, userId: string) {
+      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(userId)}`, {
+        method: 'DELETE', // 移除成员
+        auth: true, // 需登录
+      }); // 请求结束
+    }, // removeMember 结束
+    /** PATCH /im/conversations/:id/preferences：置顶 / 免打扰 */
+    setPreference(conversationId: string, patch: { pinned?: boolean; muted?: boolean }) {
+      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/preferences`, {
+        method: 'PATCH', // 局部更新
+        body: patch, // 开关
+        auth: true, // 需登录
+      }); // 请求结束
+    }, // setPreference 结束
+    /** DELETE /im/conversations/:id：删除会话（群主解散 / 成员退群 / 私聊移除自己） */
+    deleteConversation(conversationId: string) {
+      return request<{ ok: boolean; result: 'dissolved' | 'left' }>(`/im/conversations/${encodeURIComponent(conversationId)}`, {
+        method: 'DELETE', // 删除
+        auth: true, // 需登录
+      }); // 请求结束
+    }, // deleteConversation 结束
+    /** GET /im/conversations/:id/messages/search?q=：会话内消息搜索 */
+    searchMessages(conversationId: string, q: string, limit = 30) {
+      const suffix = new URLSearchParams({ q, limit: String(limit) }).toString(); // 查询串
+      return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages/search?${suffix}`, {
+        auth: true, // 需登录
+        idempotency: false, // 只读
+      }); // 请求结束
+    }, // searchMessages 结束
+    /** POST /im/conversations/:id/messages/:messageId/recall：撤回消息（2 分钟内，仅本人） */
+    recallMessage(conversationId: string, messageId: string) {
+      return request<{ ok: boolean }>(
+        `/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/recall`, // 消息撤回端点
+        { method: 'POST', body: {}, auth: true }, // 写操作
+      ); // 请求结束
+    }, // recallMessage 结束
   }, // im 分组结束
 
   // ---------- 统一入口配置清单（entries / sites）----------

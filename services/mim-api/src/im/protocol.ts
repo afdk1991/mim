@@ -28,6 +28,7 @@ export type ServerFrameType =
   | 'message.new' // 新消息到达
   | 'message.delivered' // 消息已投递到对方在线设备
   | 'message.read' // 对方已读某条消息
+  | 'message.recall' // 某条消息被撤回（发送者 2 分钟内撤回，或管理员操作）
   | 'typing' // 对方正在输入
   | 'presence' // 用户在线/离线状态变更
   | 'call.invite' // 收到视频通话邀请

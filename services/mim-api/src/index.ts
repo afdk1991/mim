@@ -8,16 +8,17 @@ import { createJobs } from './jobs.js'; // 引入后台定时任务工厂（成�
 import { createStorage } from './storage.js'; // 引入存储驱动工厂（本地目录或对象存储）
 import { createOrchestrator } from './orchestrator.js'; // 引入 AI 编排器，负责后台任务的领取与执行
 import { attachImWebSocket } from './im/ws.js'; // 引入 IM WebSocket 接入层，负责实时消息与视频信令
+import type { ApiDeps } from './types.js'; // 依赖容器类型：显式标注后才能回填 imHub 字段
 
 const db = createDatabase(DB_PATH); // 按配置路径打开持久化 SQLite，启动即完成建表与种子写入
 const jwtSecret = loadJwtSecret(); // 加载签名密钥；缺失时由 config 层决定回退开发密钥或直接报错
 const storage = createStorage({ env: process.env, jwtSecret, fallbackDir: DATA_DIR }); // 依据环境变量选择存储驱动，未配置远端时落本地数据目录
 const orchestrator = createOrchestrator({ db, storage, env: process.env }); // 装配 AI 编排器，复用同一数据库与存储实例以共享连接
 const jobs = createJobs({ db, env: process.env, storage }); // 装配后台定时任务，复用同一数据库与存储实例（asset-gc 需要真删对象字节）
-const deps = { db, jwtSecret, env: process.env, storage, orchestrator }; // 统一依赖容器，供 app 与 WS 层共享
+const deps: ApiDeps = { db, jwtSecret, env: process.env, storage, orchestrator }; // 统一依赖容器，供 app 与 WS 层共享
 const app = createApp(deps); // 组装 Express 应用，依赖显式注入便于测试替换
 const server = createServer(app); // 用原生 HTTP server 包裹 Express，以便同一端口承载 WebSocket 升级
-attachImWebSocket(server, deps); // 挂载 IM WebSocket：实时消息与视频通话信令走 /im/ws?token=...
+deps.imHub = attachImWebSocket(server, deps); // 挂载 IM WebSocket，并把连接中心回填到 deps 供 HTTP 路由推送事件（如消息撤回）
 
 server.listen(PORT, () => { // 监听端口并保留 server 句柄，供优雅停机时关闭连接
   console.log(`mim-api listening on http://127.0.0.1:${PORT}`); // 打印监听地址，便于本地确认服务已起

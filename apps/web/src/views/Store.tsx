@@ -76,6 +76,62 @@ const CAPABILITY_OPTIONS: Record<string, CapabilityOptionSpec> = {
     { value: '5', zh: '未来 5 次', en: 'Next 5 runs' },
     { value: '10', zh: '未来 10 次', en: 'Next 10 runs' },
   ] }, // cron 结束
+  'csv.json': { optionKey: 'mode', numeric: false, items: [ // CSV/JSON 转换方向
+    { value: 'tojson', zh: 'CSV → JSON', en: 'CSV → JSON' }, // 默认方向
+    { value: 'tocsv', zh: 'JSON → CSV', en: 'JSON → CSV' }, // 反向
+  ] }, // CSV 互转结束
+  'yaml.json': { optionKey: 'mode', numeric: false, items: [ // YAML/JSON 转换方向
+    { value: 'yaml2json', zh: 'YAML → JSON', en: 'YAML → JSON' },
+    { value: 'json2yaml', zh: 'JSON → YAML', en: 'JSON → YAML' },
+  ] }, // YAML 互转结束
+  'report.table': { optionKey: 'format', numeric: false, items: [ // 报表输出格式
+    { value: 'html', zh: 'HTML 表格', en: 'HTML table' },
+    { value: 'markdown', zh: 'Markdown 表格', en: 'Markdown table' },
+  ] }, // 报表格式结束
+  'chart.svg': { optionKey: 'chart', numeric: false, items: [ // 图表类型
+    { value: 'bar', zh: '柱状图', en: 'Bar chart' },
+    { value: 'line', zh: '折线图', en: 'Line chart' },
+  ] }, // 图表类型结束
+  'sql.format': { optionKey: 'dialect', numeric: false, items: [ // SQL 方言
+    { value: 'sql', zh: '标准 SQL', en: 'Standard SQL' },
+    { value: 'mysql', zh: 'MySQL', en: 'MySQL' },
+    { value: 'postgresql', zh: 'PostgreSQL', en: 'PostgreSQL' },
+    { value: 'sqlite', zh: 'SQLite', en: 'SQLite' },
+    { value: 'tsql', zh: 'T-SQL', en: 'T-SQL' },
+  ] }, // SQL 方言结束
+  'code.stats': { optionKey: 'lang', numeric: false, items: [ // 注释语法按语言切换
+    { value: 'ts', zh: 'TypeScript', en: 'TypeScript' },
+    { value: 'js', zh: 'JavaScript', en: 'JavaScript' },
+    { value: 'py', zh: 'Python', en: 'Python' },
+    { value: 'sh', zh: 'Shell', en: 'Shell' },
+    { value: 'sql', zh: 'SQL', en: 'SQL' },
+  ] }, // 代码语言结束
+  'image.dataurl': { optionKey: 'mime', numeric: false, items: [ // Base64 转 dataURL 时的 MIME
+    { value: 'image/png', zh: 'PNG', en: 'PNG' },
+    { value: 'image/jpeg', zh: 'JPEG', en: 'JPEG' },
+    { value: 'image/webp', zh: 'WebP', en: 'WebP' },
+    { value: 'image/svg+xml', zh: 'SVG', en: 'SVG' },
+  ] }, // MIME 结束
+  'math.eval': { optionKey: 'precision', numeric: true, items: [ // 结果保留小数位
+    { value: '2', zh: '2 位小数', en: '2 decimals' },
+    { value: '6', zh: '6 位小数', en: '6 decimals' },
+    { value: '10', zh: '10 位小数', en: '10 decimals' },
+  ] }, // 精度结束
+  'captcha.svg': { optionKey: 'length', numeric: true, items: [ // 验证码位数
+    { value: '4', zh: '4 位', en: '4 chars' },
+    { value: '6', zh: '6 位', en: '6 chars' },
+    { value: '8', zh: '8 位', en: '8 chars' },
+  ] }, // 验证码位数结束
+  'diff.text': { optionKey: 'context', numeric: true, items: [ // diff 上下文行数
+    { value: '3', zh: '上下文 3 行', en: 'Context 3' },
+    { value: '1', zh: '上下文 1 行', en: 'Context 1' },
+    { value: '0', zh: '不含上下文', en: 'No context' },
+  ] }, // diff 上下文结束
+  'cite.format': { optionKey: 'type', numeric: false, items: [ // 文献类型
+    { value: 'book', zh: '专著 [M]', en: 'Book [M]' },
+    { value: 'journal', zh: '期刊 [J]', en: 'Journal [J]' },
+    { value: 'web', zh: '电子资源 [EB/OL]', en: 'Web [EB/OL]' },
+  ] }, // 文献类型结束
 }; // 能力选项表结束
 
 

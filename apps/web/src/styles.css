@@ -1634,3 +1634,190 @@ code { /* 行内代码/令牌展示 */
   overflow: hidden; /* 编辑器内部不溢出容器圆角 */
 } /* 编辑器容器结束 */
 
+/* ---------- IM 聊天增强（群聊 / 撤回 / 搜索 / 输入中 / 群信息面板） ---------- */
+.chat-new-group { /* 会话列表顶部「新建群聊」按钮 */
+  margin-top: 8px; /* 与搜索框拉开距离 */
+  width: 100%; /* 与搜索框同宽 */
+} /* 新建群聊按钮结束 */
+
+.chat-group-form { /* 建群表单：群名 + 勾选成员 + 创建按钮 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 群名在上、成员列表居中、按钮在下 */
+  gap: 8px; /* 控件间距 */
+  padding: 12px; /* 与搜索区一致的内边距 */
+  border-bottom: 1px solid var(--border); /* 与会话列表分隔 */
+  background: var(--surface); /* 与侧栏同色 */
+} /* 建群表单结束 */
+
+.chat-group-form input { /* 群名输入框 */
+  padding: 8px 12px; /* 与搜索框一致 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  font-size: 14px; /* 正文字号 */
+  outline: none; /* 去默认描边 */
+} /* 群名输入框结束 */
+
+.chat-hint { /* 已选人数等辅助提示 */
+  margin: 0; /* 去掉段落默认外边距 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小字号 */
+} /* 辅助提示结束 */
+
+.chat-user-item.picked { /* 建群模式下已勾选的用户项 */
+  background: rgba(59, 110, 245, 0.1); /* 主色淡底提示已选 */
+} /* 已勾选态结束 */
+
+.chat-pick-mark { /* 勾选标记（+ / ✓） */
+  margin-left: auto; /* 推到最右 */
+  color: var(--primary); /* 主色 */
+  font-weight: 600; /* 加粗 */
+} /* 勾选标记结束 */
+
+.chat-conv-meta { /* 群成员数后缀 */
+  margin-left: 6px; /* 与群名间隔 */
+  color: var(--text-muted); /* 次要色 */
+  font-weight: 400; /* 不加粗 */
+  font-size: 12px; /* 小字号 */
+} /* 成员数后缀结束 */
+
+.chat-conv-flag { /* 置顶 / 免打扰小标签 */
+  margin-left: 6px; /* 与标题间隔 */
+  padding: 0 4px; /* 左右内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 4px; /* 小圆角 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字号 */
+  font-weight: 400; /* 不加粗 */
+} /* 状态标签结束 */
+
+.chat-badge.muted { /* 免打扰会话的角标 */
+  background: var(--text-muted); /* 灰点表示有新消息但不打扰 */
+} /* 免打扰角标结束 */
+
+.chat-msg-search { /* 会话内搜索框 */
+  flex: 1 1 160px; /* 占据头部剩余空间 */
+  max-width: 240px; /* 避免挤掉其它按钮 */
+  padding: 6px 10px; /* 紧凑内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  font-size: 13px; /* 小字号 */
+  outline: none; /* 去默认描边 */
+} /* 会话内搜索框结束 */
+
+.chat-msg-result-bar { /* 搜索结果条 */
+  display: flex; /* 横向排列命中项 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 间距 */
+  padding: 8px 12px; /* 内边距 */
+  border-bottom: 1px solid var(--border); /* 与消息区分隔 */
+  background: var(--surface); /* 白底 */
+  overflow-x: auto; /* 命中项过多时横向滚动 */
+  font-size: 12px; /* 小字号 */
+} /* 搜索结果条结束 */
+
+.chat-msg-result-item { /* 单条命中结果 */
+  flex: 0 0 auto; /* 不压缩 */
+  padding: 4px 8px; /* 内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  background: var(--bg); /* 浅灰底 */
+  cursor: pointer; /* 可点击 */
+  font-size: 12px; /* 小字号 */
+} /* 命中项结束 */
+
+.chat-more { /* 「加载更早消息」按钮 */
+  align-self: center; /* 水平居中 */
+  margin-bottom: 8px; /* 与消息间隔 */
+} /* 加载更早按钮结束 */
+
+.chat-msg-status { /* 自己消息的投递状态 */
+  margin-left: 6px; /* 与时间间隔 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字号 */
+} /* 状态结束 */
+
+.chat-msg-status.read { /* 已读状态用主色强调 */
+  color: var(--primary); /* 主色 */
+} /* 已读结束 */
+
+.chat-recall { /* 撤回按钮 */
+  margin-left: 6px; /* 与时间间隔 */
+  padding: 0; /* 去掉内边距 */
+  border: none; /* 无边框 */
+  background: none; /* 透明底 */
+  color: var(--danger); /* 红色提示可撤销 */
+  font-size: 11px; /* 极小字号 */
+  cursor: pointer; /* 可点击 */
+} /* 撤回按钮结束 */
+
+.chat-typing { /* 「对方正在输入」提示 */
+  padding: 0 16px 6px; /* 与输入框拉开 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小字号 */
+} /* 输入中提示结束 */
+
+.chat-attach { /* 图片/文件按钮 */
+  flex: 0 0 auto; /* 不压缩 */
+} /* 附件按钮结束 */
+
+.chat-panel { /* 群信息面板 */
+  position: fixed; /* 浮在页面右侧 */
+  top: 64px; /* 顶部留出导航高度 */
+  right: 16px; /* 右侧留白 */
+  bottom: 16px; /* 底部留白 */
+  width: 320px; /* 固定宽度 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 标题在上、成员列表居中、按钮在下 */
+  gap: 10px; /* 区块间距 */
+  padding: 16px; /* 内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  background: var(--surface); /* 白底 */
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12); /* 浮层阴影 */
+  overflow-y: auto; /* 成员多时滚动 */
+  z-index: 40; /* 置于消息区之上 */
+} /* 群信息面板结束 */
+
+.chat-panel header { /* 面板标题行 */
+  display: flex; /* 标题 + 关闭按钮 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 两端对齐 */
+  font-weight: 600; /* 加粗 */
+} /* 标题行结束 */
+
+.chat-panel-row { /* 面板内一行控件 */
+  display: flex; /* 横向排列 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 间距 */
+} /* 控件行结束 */
+
+.chat-panel-row input { /* 改名输入框 */
+  flex: 1; /* 占满剩余宽度 */
+  padding: 6px 10px; /* 紧凑内边距 */
+  border: 1px solid var(--border); /* 边框 */
+  border-radius: var(--radius); /* 圆角 */
+  font-size: 13px; /* 小字号 */
+  outline: none; /* 去描边 */
+} /* 改名输入框结束 */
+
+.chat-member-list { /* 成员列表 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 逐个成员自上而下 */
+  gap: 6px; /* 成员间距 */
+} /* 成员列表结束 */
+
+.chat-member-chip { /* 单个成员行 */
+  display: flex; /* 头像 + 名字 + 角色 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 间距 */
+  padding: 4px 0; /* 上下留白 */
+  font-size: 13px; /* 小字号 */
+} /* 成员行结束 */
+
+.chat-member-role { /* 成员角色标签 */
+  margin-left: auto; /* 推到右侧 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字号 */
+} /* 角色标签结束 */
+
+
