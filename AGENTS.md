@@ -978,6 +978,10 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | GitHub Pages 页面 | `https://afdk1991.github.io/mim/deployments` 真实浏览器渲染出 8 列表头（顺序一致）、16 行、访问域名链接 `https://github.com/afdk1991/mim`；bundle `assets/index-C-3mRh0E.js` 同样含「访问域名」「列规范」 | Edge CDP + 下载核对 |
 | 本地门禁 | `verify-deployments` **55/55**；`comment-check --strict` 0；本地 UI 取证 **6/6 PASS** | `.tmp/verify_dep3.log`、`.tmp/comment_check10.log`、`.tmp/deployments-ui-e2e.json` |
 | 未做 | 未改 `Mim-PRD.html`（PRD 的部署汇总段落描述模块与端点，未列列数，判为「不涉及」） | 如实登记 |
+| 窄屏横向溢出修复 | 首版 8 列在 1440 宽下 `scrollWidth 1226 > clientWidth 1038`（异常说明列被截断）→ `.deploy-table td` 加 `overflow-wrap: anywhere` / `word-break: break-word`，窄屏 `min-width` 900 → 1080 并同步注释；本地实测 `client == scroll == 1038`，8 列完整可见无横向滚动 | `apps/web/src/styles.css`、`.tmp/local_wrap.log` |
+| 最终提交与 CI | `24b9485`（min-width）→ `ad7bb1f`（断行修复）；Deploy run **43069000178**（@ `24b9485`）、**43069994548**（@ `ad7bb1f`）均 completed success 5 作业全绿（含「发布到生产服务器」） | `gh run view --json jobs` |
+| 双入口最终取证 | 生产 `mim.mixm.top/deployments` 与 `afdk1991.github.io/mim/deployments` 真实浏览器：8 列表头逐字一致、16 行、访问域名链接 `https://github.com/afdk1991/mim`、`client == scroll`（无横向溢出）、页头「列规范（8 列）」存在 → **双 PASS**；`/health` 200、`/api/v1/deployments/overview` 200；截图 `.tmp/deployments-live-final.png`、`.tmp/deployments-gh-final.png` | Edge CDP `deployments-final-check.mjs`（`.tmp/deployments-final.json`） |
+| 远端一致性 | `git ls-remote origin` = `git ls-remote gitee` = `ad7bb1f` | ✅ 铁律十二 |
 
 #### 9.27 设置并入个人中心（信息架构收口：账号设置只在登录后可见）（2026-11-12 凌晨 +08:00）
 
