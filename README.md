@@ -37,7 +37,7 @@ node scripts/comment-check.mjs
 - `verify:chat-plus`：聊天增强点击级 E2E（23 项断言，`scripts/verify-chat-plus.mjs`）——引用回复（引用条 → 气泡内引用块 → 发送后自动清除）、文件消息下载（真访问直链得 200）、群管理（设管理员后角色标签变「管理员」、邀请入群后成员数 2 → 3）、会话内搜索结果定位与目标消息高亮；前置同 `verify:chat-flow`，取证落 `.tmp/chat-plus-e2e.json` / `.png`
 - `verify:site-directory`：上一轮「站点入口契约」校验（16 项断言），两轮成果互不覆盖
 - `summary:deployments`：部署汇总生成器——采集 `git remote` / `git ls-tree HEAD` / 工作树工件 / CI 作业 / 两份矩阵表行数，输出 `docs/deployment-summary.json`（结构化）与 `docs/deployment-summary.md`（核对表）；追加 `--live` 可对各入口真实 `curl` 探测并刷新 `result`
-- `verify:deployments`：部署汇总零依赖校验（52 项断言）——规范 ID 唯一、枚举合法、9 平台无遗漏、别名不撞名、空数据标识、工件双口径与真实仓库一致、共享包→后端→前端→文档全链路消费
+- `verify:deployments`：部署汇总零依赖校验（55 项断言）——规范 ID 唯一、枚举合法、9 平台无遗漏、别名不撞名、空数据标识、工件双口径与真实仓库一致、共享包→后端→前端→文档全链路消费
 
 ## 项目铁律
 
@@ -79,16 +79,16 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，且路径段一律使用模块功能名称——`/marketplace`（商城）、`/entry-catalog`（入口配置清单）、`/deployments`（部署汇总）、`/comic-studio`（漫剧 AI 剧）、`/chat`（聊天）、`/settings`（设置）、`/signin`（登录），地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接与改名前的旧段（`/store` `/sites` `/comic` `/login`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**按需登录（2026-11-08 起）**：商城目录 `/marketplace` **匿名可浏览**；`/comic-studio`、`/chat`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌登录卡片（提示「此功能需登录后使用」），不再整站锁定；登录成功后原地解锁当前视图，退出登录、令牌失效或跨标签页退出时回落到匿名态、收费视图重新内嵌登录卡片。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。功能模块商城页顶部保留一张 www 主站入口静态卡片。
+站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，且路径段一律使用模块功能名称——`/marketplace`（商城）、`/entry-catalog`（入口配置清单）、`/deployments`（部署汇总）、`/comic-studio`（漫剧 AI 剧）、`/chat`（聊天）、`/settings`（设置）、`/signin`（登录），地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接与改名前的旧段（`/store` `/sites` `/comic` `/login`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**按需登录（2026-11-08 起）**：商城目录 `/marketplace` **匿名可浏览**；`/comic-studio`、`/settings` 收费/私密视图在匿名访问时于内容区内嵌登录卡片（提示「此功能需登录后使用」），不再整站锁定；**`/chat` 自 2026-11-12 起匿名可进入只读演示页**（示例会话与消息、禁用输入区、登录/注册引导按钮），登录后才是真实聊天；登录成功后原地解锁当前视图，退出登录、令牌失效或跨标签页退出时回落到匿名态、收费视图重新内嵌登录卡片。会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。功能模块商城页顶部保留一张 www 主站入口静态卡片。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ **分类导航（两级分类树 CRUD：`GET /categories/manage` 读树、`POST /categories` 新建、`PATCH /categories/:slug` 改名与排序、`DELETE /categories/:slug` 删除）** / 权益管理（列表过滤、发放、回收、审计事件时间线）/ **商城订单（跨用户订单列表 `GET /orders/manage` + 人工结算 `POST /orders/:id/settle`）**。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
-| 登录 | `Login.tsx` | 全站唯一登录入口；管理员口令登录 `POST /auth/password` 与验证码登录 `/auth/code` + `/auth/login`；匿名访问收费/私密视图时在内容区内嵌展示，顶部提示「此功能需登录后使用 / 登录状态已失效」 |
+| 登录 | `Login.tsx` | 全站唯一登录入口：**账号密码登录**（自建账号 `POST /auth/register` + `POST /auth/password`，口令 bcrypt 存储）、**管理员口令登录**（同一 `/auth/password`，口令来自 `MIM_AUTH_ADMIN_PASSWORD`）、**验证码登录**（`/auth/code` + `/auth/login`，需短信/邮件通道凭证）；登录页挂载时查 `GET /auth/channels` 并在通道未配置时直接提示改用密码或注册。匿名访问收费/私密视图时在内容区内嵌展示；**聊天 `/chat` 匿名态改为只读演示页**（`ChatPreview.tsx`：完整聊天布局 + 示例会话与消息 + 禁用输入区 + 登录引导），不再是一张空白登录卡片 |
 | 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：**两级分类树（2026-11-10 改造）**——左侧「全部推荐项目」+ 19 个一级分类（1 前沿技术 … 19 其他开源），点击一级展开其二级条目（共 205 条，二级条目一律作为功能模块入库，模块编码 `cat.<一级slug>-<两位序号>`，权重 `sort_order = 一级序×100 + 二级序`）；右侧搜索（`?q=` 提交制）、筛选面板（排序三档 `星星最高 / 最新推荐 / 最近更新`、开源许可 48 项、编程语言 87 项，均为多选并可一键清空）、分页条（`page` / `pageSize`，默认 20 条/页）、卡片徽标（语言 + 许可 + `★ stars`）、模块详情面板（状态 / 区域 / 分类归属 / 许可 / 语言 / `★ stars` / 当前价 / 历史调价 `price_history` / 前置依赖链）、**免费模块一次性解锁（`POST /entitlements`）、付费模块一律 402 `PAYMENT_REQUIRED` 引导下单（`POST /orders`，金额由服务端快照）**、「我的权益」区块（`GET /me/entitlements`）、**「我的订单」区块（`GET /orders`，待结算可 `POST /orders/:id/cancel`）**、**右下「搜索帮助」浮窗（固定 12 条帮助外链，可展开/收起）**、**「热门项目」卡片（今日 / 本周两档，`GET /modules/hot`，跟随当前分类，点击条目直达其所属分类）**、卡片上的待结算/已解锁徽标、前置依赖缺失时的引导提示 |
 | 主站入口卡片 | Store.tsx 顶部 | 商城页唯一的 www 主站直达入口（文案/链接由 `siteDirectory.json` 契约驱动，新窗口打开 https://www.mixm.top，不请求接口） |
-| 部署汇总（2026-11-09） | `Deployments.tsx` | 统一字段核对表：9 个统计卡（部署项 / 矩阵平台 / 远端 / CI 作业 / 有取证 / 空数据 / 异常 / 缺失信息 / 工件漂移）、五类筛选（关键词 / 状态 / 结果 / 层级 / 平台）、9 列主表（规范 ID / 仓库标识 / 平台层级 / 交付链路 / 部署状态 / 部署结果 / 异常说明 / 缺失信息 / 操作）、展开详情（取证原文、异常分级、缺失清单、别名与发布形态去重依据、同平台同类项、取证来源）、覆盖与排除说明；**空数据（⚪）、失败（🔴）、缺失（⚠）分别标识**，匿名只读；数据源 `packages/core-domain/src/deploymentRegistry.json` |
+| 部署汇总（2026-11-09） | `Deployments.tsx` | 统一字段核对表：9 个统计卡（部署项 / 矩阵平台 / 远端 / CI 作业 / 有取证 / 空数据 / 异常 / 缺失信息 / 工件漂移）、五类筛选（关键词 / 状态 / 结果 / 层级 / 平台）、8 列规范主表（规范 ID / 名称 / 仓库标识 / 平台 / 层级 / 交付链路 / 访问域名 / 部署状态 / 部署结果 / 异常说明）——访问域名可点击直达入口，缺失信息并入异常说明列，点击规范 ID 展开取证详情、展开详情（取证原文、异常分级、缺失清单、别名与发布形态去重依据、同平台同类项、取证来源）、覆盖与排除说明；**空数据（⚪）、失败（🔴）、缺失（⚠）分别标识**，匿名只读；数据源 `packages/core-domain/src/deploymentRegistry.json` |
 | 站点矩阵（2026-11-09） | `Sites.tsx` | 按 DNSPod `mixm.top` 45 类备注开发的模块目录：总览统计（45 模块 / 135 功能点 / 8 分组 / 空备注行 / 条目数）、关键词搜索与分组筛选、45 张卡片逐条展示备注原文与 xls 行号、展开查看 3 个功能点及状态机、业务条目列表；**登录后可新建条目并流转状态**（清单 `active→archived`、管理 `pending→active→archived`、记录 `pending→done→archived`，归档为终态），匿名只读并显示「登录后操作」引导；数据源 `packages/core-domain/src/siteModules.json` |
 | 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程；**成片导出（2026-11-08）**：每个成片行新增「导出」面板，可选 MP4/MOV × 1080p/720p，`POST /comic/films/:id/export` 返回 1 小时有效的一次性预签名下载地址；MP4/1080p 直接下载原片，其它组合需服务端 `MIM_FFMPEG_PATH` 转码，未配置时前端显示本地化提示并提供「直接下载原片」一键降级；降级成功后表单回写实际格式/分辨率 |
 | 设置 | `Settings.tsx` | 资料、区域、语言与注销冷静期 |
@@ -99,7 +99,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 分组 | 端点 | 鉴权 |
 |---|---|---|
 | 健康 | `GET /health` | 公开 |
-| 鉴权 | `POST /auth/code`、`/auth/login`、`/auth/password`、`/auth/refresh`、`/auth/logout` | 公开（`logout` 需登录） |
+| 鉴权 | `POST /auth/code`、`/auth/login`、`/auth/register`、`/auth/password`、`/auth/refresh`、`/auth/logout`、`GET /auth/channels` | 公开（`logout` 需登录；`/auth/channels` 只返回各通道是否可用的布尔值） |
 | 商城 | `GET /taxonomy`（分类导航树：19 个一级分类 + 205 个二级条目，每个分组/条目带 `name`（中文）与 `name_en`（英文）以及各自的 active 模块数，英文站点凭 `name_en` 渲染导航）、`GET /modules`（支持 `?q=` 搜索、`?category=`（一级 slug 前缀命中 / 二级 slug 精确命中 / `all` 等价不过滤）、`?sort=`（`stars` / `recommended` / `updated`，非法值 400）、`?licenses=` / `?languages=`（逗号分隔多选）、`?page=` / `?pageSize=`（1–100，默认 20），响应带 `total / page / page_size / total_pages`）、`GET /modules/hot`（右侧「热门项目」：`?range=today|week`（24h / 168h，非法值 400）、`?category=`、`?limit=`（1–20，默认 5），热度 = stars + 窗口内新建加权，返回 `items[].hotness`）、`GET /modules/:code`（详情含价格历史、前置依赖、分类/许可/语言/stars） | 公开 |
 | 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（11 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 全部公开只读，不查业务表、无写端点 |
 | 站点模块（2026-11-09） | `GET /sites/overview`（全站汇总）、`GET /sites`（45 模块列表，支持 `?q=` / `?group=`）、`GET /sites/:host`（备注原文 + 行号 + 能力点 + 统计）、`GET /sites/:host/capabilities`、`GET /sites/:host/items`（支持 `?capability=` / `?status=`）、`POST /sites/:host/items`、`POST /sites/:host/items/:id/transition` | 浏览公开；两个写端点登录 + 幂等 |
@@ -143,7 +143,7 @@ npm run verify:site-modules                # 统一入口配置清单 79 项零�
 npm run verify:entry-manifest              # 统一入口配置清单专项校验 23 项（19 业务用途覆盖 / 去重 / 占位配置）
 npm run verify:site-directory              # 站点入口契约 16 项零依赖校验
 npm run summary:deployments                # 生成部署汇总 JSON + Markdown 核对表（--live 追加真实 curl 探测）
-npm run verify:deployments                 # 部署汇总 52 项零依赖校验
+npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 ```
 
 其他：`npm run build`（构建真实前端 `apps/web/dist` → 根 `dist/`，EdgeOne Pages 等 OutputDir=dist 的托管平台同款）、`npm run build:admin`（构建管理后台 `apps/admin/dist`）、`npm run build:site`（PRD 阅读页 `site/` → `dist/` 离线预览）、`npm test`（等价 `@mim/api test`）。
@@ -153,7 +153,7 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 | 入口 | 内容 |
 |---|---|
 | [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 / 10 漫剧状态机 |
-| [docs/deployment-summary.md](./docs/deployment-summary.md) | 部署汇总核对表：9 矩阵平台 / 11 规范部署项逐项列出仓库标识、部署状态、部署结果、异常说明、缺失信息；含异常明细、工件双口径、覆盖去重与排除说明 |
+| [docs/deployment-summary.md](./docs/deployment-summary.md) | 部署汇总核对表：9 矩阵平台 / 11 规范部署项逐项列出仓库标识、平台 / 层级、交付链路、访问域名、部署状态、部署结果、异常说明；含异常明细、工件双口径、覆盖去重与排除说明 |
 | [docs/deployment-summary.json](./docs/deployment-summary.json) | 同上的结构化结果（机器可核对，schema `mim.deployment-registry.v1`） |
 | [docs/站点模块开发落地说明-20261109.md](./docs/站点模块开发落地说明-20261109.md) | 45 类备注驱动的站点模块开发交付说明：逐项落实清单、45×3 功能点、验证矩阵、U1–U8 未决项与同步清单 |
 | [docs/站点入口契约落地说明-20261109.md](./docs/站点入口契约落地说明-20261109.md) | 上一轮站点入口契约（仅登记、43 类未决）交付说明，与本轮成果并存 |
@@ -282,7 +282,7 @@ npm run verify:deployments                 # 部署汇总 52 项零依赖校验
 - **覆盖口径**：**10 个矩阵平台**（2026-11-10 起含 Gitee 镜像仓）+ 6 个补充平台 = **16 个平台目录** → **16 个规范部署项**（`repo.gitee` 由补充项提升为矩阵成员，仍是同一规范部署项；`worker.mim-store` 为矩阵外补充项；2026-11-10 用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；仅 `candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入汇总**。
 - **去重**：README 曾把「Cloudflare Pages 同源自托管入口（`_worker.js`）」与「Cloudflare Pages / Workers」列成两行，实为同一域名同载体的两种发布形态，合并为 `pages.cloudflare` 一行并在 `delivery.modes` 区分。
 - **本轮基线（2026-11-10 22:20 实测，Gitee 入矩阵轮）**：`gitee` 网页 200 / 0.469s / 52034B、`git ls-remote` exit 0 / 0.27s 且与本地 HEAD `4398cf0` 一致（历史 exit 124 超时已解除）；其余平台沿用 2026-11-09 23:03 快照（生产 `mim.mixm.top/health` = `000`，curl exit 7 本地代理 502；IGA Pages 与独立 Worker 为空数据）；工件双口径以 `git ls-tree HEAD` 与工作树实测为准，**不得以本表 `PASS` 冒充铁律八 / 十二的线上取证**。
-- **生成与核对**：`npm run summary:deployments`（`--live` 追加真实 `curl` 探测）→ `docs/deployment-summary.json` + `docs/deployment-summary.md`；`npm run verify:deployments`（52 项断言）；Web 端 `/deployments` 提供可筛选可展开的核对表。
+- **生成与核对**：`npm run summary:deployments`（`--live` 追加真实 `curl` 探测）→ `docs/deployment-summary.json` + `docs/deployment-summary.md`；`npm run verify:deployments`（55 项断言）；Web 端 `/deployments` 提供可筛选可展开的核对表。
 
 本地构建：`npm run build`（真实前端 → 根 `dist/`，与 EdgeOne Pages 同款链路）；PRD 阅读页：`npm run build:site`（`site/` → `dist/`）；前端单独产物：`npm run build:web`；校验：`npm run check`。
 

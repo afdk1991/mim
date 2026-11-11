@@ -35,13 +35,15 @@ import { Deployments } from './views/Deployments';
 import { ComicWorkbench } from './views/ComicWorkbench';
 // IM 聊天 + 视频通话
 import { Chat } from './views/Chat';
+// 聊天只读演示页：匿名访客看到完整聊天布局与示例消息，输入区禁用并引导登录
+import { ChatPreview } from './views/ChatPreview';
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
 import type { AppView } from './router';
 
 // 需登录方可使用的视图集合：均为收费或私密功能；匿名访问时在内容区内嵌登录卡片而非整站锁定
-const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'chat', 'settings', 'products', 'cart', 'account']); // 商城目录保持匿名可浏览；商品列表 / 购物车 / 个人中心涉及个人数据，需登录
+const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'settings', 'products', 'cart', 'account']); // 商城目录匿名可浏览；聊天改为匿名只读演示（见 ChatPreview），不再整块替换为登录卡片
 
 // 应用根组件：浏览类页面匿名可访问，仅使用收费功能模块时才要求登录（按需登录）
 export function App() {
@@ -231,6 +233,10 @@ export function App() {
         {route.view === 'comic' && session && <ComicWorkbench locale={locale} />}{/* 漫剧 AI 剧工作台 */}
         {/* IM 聊天 + 视频通话：会话列表 + 消息 + 视频通话，仅已登录渲染 */}
         {route.view === 'chat' && session && <Chat locale={locale} />}{/* 聊天视图 */}
+        {/* 匿名聊天只读演示：展示完整聊天布局与示例消息，输入区禁用，登录后才可收发 */}
+        {route.view === 'chat' && !session && (
+          <ChatPreview locale={locale} onSignIn={() => go({ view: 'login' })} /> // 只读演示，登录引导回到登录视图
+        )}{/* 匿名聊天演示结束 */}
         {/* 设置页：需要用户更新回调，仅已登录渲染 */}
         {route.view === 'settings' && session && (
           <Settings locale={locale} onUserUpdated={handleUserUpdated} /> // 设置页：传入用户信息更新回调

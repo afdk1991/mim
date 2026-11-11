@@ -1,5 +1,5 @@
-// 引入 useState：维护登录表单的全部本地状态（语言、区域、模式、账号、各类凭证）
-import { useState } from 'react';
+// 引入 useState / useEffect：维护登录表单状态，并在挂载时查询可用登录方式
+import { useEffect, useState } from 'react';
 // 引入 FormEvent 类型：为表单提交处理函数的入参做类型标注
 import type { FormEvent } from 'react';
 // 引入 t 函数：按当前 locale 从 i18n 词条表取文案
@@ -27,12 +27,14 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [locale, setLocale] = useState<Locale>('zh-CN');
   // 账号区域状态，默认中国区；决定账号标识用手机号还是邮箱
   const [region, setRegion] = useState<Region>('cn');
-  // 登录方式状态，默认密码登录；验证码模式下需先发送验证码
-  const [mode, setMode] = useState<'password' | 'code'>('password');
+  // 登录方式状态，默认密码登录；验证码模式需先发送验证码，注册模式创建自建账号
+  const [mode, setMode] = useState<'password' | 'code' | 'register'>('password');
   // 账号标识输入值：中国区为手机号，Global 区为邮箱
   const [identifier, setIdentifier] = useState('');
-  // 密码输入值，仅在密码登录模式下参与提交
+  // 密码输入值，密码登录与注册模式共用
   const [password, setPassword] = useState('');
+  // 注册模式下的展示名（可选），注册成功后作为用户昵称
+  const [displayName, setDisplayName] = useState('');
   // 验证码输入值，仅在验证码登录模式下参与提交
   const [code, setCode] = useState('');
   // 开发态验证码回显：后端在非生产环境直接返回验证码，便于本地联调
@@ -41,6 +43,13 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [busy, setBusy] = useState(false);
   // 错误提示：null 表示无错误，有值时在表单下方以红字展示
   const [error, setError] = useState<string | null>(null);
+  // 部署可用登录方式：用于在验证码通道未配置时给出明确提示，避免用户反复触发 503
+  const [channels, setChannels] = useState<{ sms: boolean; email: boolean; password: boolean; register: boolean } | null>(null);
+
+  // 挂载时查一次通道能力；失败静默降级，不阻塞登录主流程
+  useEffect(() => {
+    api.authChannels().then(setChannels).catch(() => setChannels(null));
+  }, []);
 
   // 由区域推导身份提供方：中国区走手机号，Global 区走邮箱
   const provider: Provider = region === 'cn' ? 'phone' : 'email';
@@ -73,13 +82,15 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   }
 
   // 切换登录方式：清空两种凭证，防止残留值被误提交
-  function switchMode(next: 'password' | 'code') {
+  function switchMode(next: 'password' | 'code' | 'register') {
     // 写入目标登录方式
     setMode(next);
     // 清空验证码，切回密码模式后不再复用
     setCode('');
     // 清空密码，切到验证码模式后不再复用
     setPassword('');
+    // 清空展示名，避免把登录态残留昵称带进注册
+    setDisplayName('');
     // 清空开发态验证码回显
     setDevCode(null);
     // 清空旧错误提示
@@ -115,22 +126,30 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     // 提交前清空旧错误
     setError(null);
     try {
-      // 二选一发起登录请求，两条分支都返回统一的登录凭证
+      // 三选一发起认证请求，三条分支都返回统一的登录凭证
       const result =
-        // 密码模式：区域 + 账号标识 + 密码换取会话
-        mode === 'password'
-          ? await api.loginWithPassword({ region, identifier: identifier.trim(), password })
-          // 验证码模式：区域 + 提供方 + 账号标识 + 验证码换取会话
-          : await api.login({
-              // 账号所属区域
+        // 注册模式：账号 + 口令创建自建账号，注册成功即登录
+        mode === 'register'
+          ? await api.register({
               region,
-              // 身份提供方：手机号或邮箱
-              provider,
-              // 账号标识，去空格后提交
               identifier: identifier.trim(),
-              // 用户填写的验证码，去空格后提交
-              code: code.trim(),
-            });
+              password,
+              display_name: displayName.trim() || undefined,
+            })
+          // 密码模式：区域 + 账号标识 + 密码换取会话
+          : mode === 'password'
+            ? await api.loginWithPassword({ region, identifier: identifier.trim(), password })
+            // 验证码模式：区域 + 提供方 + 账号标识 + 验证码换取会话
+            : await api.login({
+                // 账号所属区域
+                region,
+                // 身份提供方：手机号或邮箱
+                provider,
+                // 账号标识，去空格后提交
+                identifier: identifier.trim(),
+                // 用户填写的验证码，去空格后提交
+                code: code.trim(),
+              });
       // 把令牌写入本地会话存储，供后续接口自动携带
       setSession(result);
       // 通知上层登录成功，触发视图切换
@@ -211,6 +230,16 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           >
             {t(locale, 'auth.modeCode')}{/* 验证码模式文案，走 i18n */}
           </button>{/* 结束验证码登录按钮 */}
+          <button
+            // 注册按钮：普通按钮，创建自建账号（不依赖短信/邮箱通道）
+            type="button"
+            // 当前为注册模式时高亮
+            className={mode === 'register' ? 'active' : ''}
+            // 切到注册模式并清空已填凭证
+            onClick={() => switchMode('register')}
+          >
+            {locale === 'en-US' ? 'Sign up' : '注册'}{/* 注册入口文案 */}
+          </button>{/* 结束注册按钮 */}
         </div>{/* 结束登录方式分段控件 */}
 
         <form className="form" onSubmit={submit}>{/* 登录表单：提交统一由 submit 处理 */}
@@ -230,9 +259,25 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
             />{/* 账号输入框结束 */}
           </label>{/* 结束账号输入项 */}
 
-          {mode === 'password' ? ( // 按登录模式切换凭证输入区
-            <label>{/* 密码模式：单个密码输入框 */}
-              <span>{t(locale, 'auth.password')}</span>{/* 密码标题，走 i18n */}
+          {mode === 'register' && ( // 注册模式：可选昵称，留空则回退为账号前 8 位展示
+            <label>{/* 昵称输入项 */}
+              <span>{locale === 'en-US' ? 'Display name (optional)' : '昵称（可选）'}</span>{/* 昵称标题 */}
+              <input
+                // 受控值绑定 displayName
+                value={displayName}
+                // 每次输入同步回状态
+                onChange={(event) => setDisplayName(event.target.value)}
+                // 最多 64 位，与后端校验上限一致
+                maxLength={64}
+                // 昵称非必填
+                placeholder={locale === 'en-US' ? 'Your name' : '可留空'}
+              />{/* 昵称输入框结束 */}
+            </label> // 结束昵称输入项
+          )}{/* 结束注册昵称条件渲染 */}
+
+          {mode !== 'code' ? ( // 密码与注册模式共用密码输入框，验证码模式换成验证码行
+            <label>{/* 密码输入项 */}
+              <span>{mode === 'register' ? (locale === 'en-US' ? 'Password (min 8, letters + digits)' : '设置密码（至少 8 位，含字母与数字）') : t(locale, 'auth.password')}</span>{/* 标题随模式切换 */}
               <input
                 // 受控值绑定 password
                 value={password}
@@ -240,8 +285,10 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 onChange={(event) => setPassword(event.target.value)}
                 // 密码类型，输入内容以圆点显示
                 type="password"
-                // 提示浏览器按当前密码做自动填充
-                autoComplete="current-password"
+                // 注册提示浏览器生成新密码，登录提示填充当前密码
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                // 注册要求至少 8 位，登录保持后端最小 1 位校验
+                minLength={mode === 'register' ? 8 : 1}
                 // 必填
                 required
               />{/* 密码输入框结束 */}
@@ -288,8 +335,16 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
 
           {error && <p className="error">{error}</p>}{/* 错误提示：仅在 error 非空时渲染 */}
 
+          {mode === 'code' && channels && !(provider === 'phone' ? channels.sms : channels.email) && ( // 通道未配置时明确引导改用密码或注册
+            <p className="hint">{locale === 'en-US' ? 'Verification channel is not configured on this deployment. Use password or sign up instead.' : '当前部署未配置该验证码通道，请改用密码登录或注册。'}</p>
+          )}{/* 通道提示结束 */}
+
           <button type="submit" className="btn primary block" disabled={busy}>{/* 提交按钮：请求中禁用 */}
-            {busy ? t(locale, 'common.loading') : t(locale, 'auth.login')}{/* 忙碌时显示加载文案，否则显示「登录」 */}
+            {busy // 忙碌时显示加载文案，否则按模式显示「注册 / 登录」
+              ? t(locale, 'common.loading')
+              : mode === 'register'
+                ? (locale === 'en-US' ? 'Create account' : '注册并登录')
+                : t(locale, 'auth.login')}{/* 按钮文案结束 */}
           </button>{/* 结束提交按钮 */}
         </form>{/* 结束登录表单 */}
       </div>{/* 结束登录卡片 */}

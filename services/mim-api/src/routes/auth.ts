@@ -16,12 +16,14 @@ import {
 import {
   generateCode, // 生成数字验证码
   hashCode, // 验证码摘要，库内不存明文
+  hashPassword, // 账号密码哈希，自建账号注册时写入
   issueAccessToken, // 签发 JWT 访问令牌
   newOpaqueToken, // 生成不可预测的刷新令牌
   normalizeIdentity, // 手机号/邮箱归一化
   secureEqual, // 定长时间比较，抵御计时攻击
   sha256, // 刷新令牌摘要
   verifyCode, // 校验验证码摘要
+  verifyPassword, // 账号密码校验，自建账号登录时使用
 } from '../auth.js'; // 认证基础能力集中在此模块
 import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结时间
 import { requireAuth } from '../middleware.js'; // 登出接口需要已登录身份
@@ -84,6 +86,21 @@ const passwordBody = z.object({ // 密码登录请求体
     }) // 结束设备对象
     .optional(), // 同样允许不传
 }); // 结束 passwordBody schema
+
+/** 自助注册：短信/邮件通道不可用时的可用入口，账号 + 口令即注册并直接拿到会话 */
+const registerBody = z.object({ // 注册请求体
+  region: z.enum(['cn', 'global']), // 地区决定默认语言与身份通道
+  provider: z.enum(['phone', 'email']).optional(), // 通道可选，缺省按地区推断
+  identifier: z.string().min(1), // 手机号或邮箱，注册前统一归一化
+  password: z.string().min(8).max(200), // 口令至少 8 位，长度上限避免超长输入拖慢哈希
+  display_name: z.string().max(64).optional(), // 展示名可选，缺省沿用空串由用户后续完善
+  device: z // 设备信息（可选），与登录一致的契约
+    .object({ // 设备对象结构
+      platform: z.string().min(1).max(32), // 平台标识
+      name: z.string().max(64).optional(), // 设备名
+    }) // 结束设备对象
+    .optional(), // 允许不传
+}); // 结束 registerBody schema
 
 function userPayload(row: UserRow) { // 对外输出的用户视图，剔除内部字段
   return { // 用户视图对象
@@ -194,6 +211,26 @@ function findOrCreateUser(deps: ApiDeps, region: Region, provider: string, ident
   const row = deps.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow; // 回读落库结果，确保返回真实数据
   return row; // 返回新用户
 } // 结束 findOrCreateUser
+
+function finishLogin( // 登录收尾：记录设备并签发双令牌，供各登录分支复用
+  deps: ApiDeps, // 依赖容器
+  user: UserRow, // 已确认可用的用户
+  device: { platform: string; name?: string } | undefined, // 客户端上报的设备信息（可空）
+) { // 返回与各登录端点一致的响应体
+  const now = clockOf(deps); // 统一取时，保证设备与令牌时间一致
+  let deviceId: string | null = null; // 未传设备信息时保持为空
+  if (device) { // 客户端上报了设备信息
+    deviceId = uuidv7(); // 预生成设备主键
+    deps.db // 设备写入起点
+      .prepare( // 预编译插入语句
+        `INSERT INTO devices (id, user_id, platform, name, last_seen_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ) // 结束预编译
+      .run(deviceId, user.id, device.platform, device.name ?? '', now, now); // 记录设备，便于多端会话管理
+  } // 结束设备记录
+  const tokens = createSession(deps, user, deviceId); // 创建会话
+  return { ...tokens, user: userPayload(user) }; // 令牌 + 用户视图
+} // 结束 finishLogin
 
 export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
   const router = Router(); // 独立的 express 路由实例
@@ -325,7 +362,64 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     res.json({ ...tokens, user: userPayload(user) }); // 返回令牌与用户视图
   }); // 结束 POST /auth/login 处理
 
-  router.post('/auth/password', (req, res) => { // 管理员口令登录
+  router.get('/auth/channels', (_req, res) => { // 公开能力查询：前端据此隐藏不可用的登录方式
+    res.json({ // 只暴露「是否可用」布尔值，不泄露任何凭证内容
+      sms: Boolean(deps.notify?.sms), // 国内短信通道是否已装配凭证
+      email: Boolean(deps.notify?.email), // 海外邮件通道是否已装配凭证
+      password: Boolean((deps.env.MIM_AUTH_ADMIN_PASSWORD ?? '').trim()), // 管理员口令入口是否可用
+      register: true, // 自助账号注册恒可用：不依赖任何外部通道
+    }); // 响应结束
+  }); // 结束 GET /auth/channels 处理
+
+  router.post('/auth/register', (req, res) => { // 自助注册：账号 + 口令一次完成注册与登录
+    const body = parse(registerBody, req.body); // 校验请求体
+    const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 未指定通道时按地区推断
+    const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识，非法格式直接 400
+    if (!/[A-Za-z]/.test(body.password) || !/\d/.test(body.password)) { // 基本强度：至少含一个字母与一个数字
+      throw new AppError('VALIDATION_FAILED', 'password must contain both letters and digits', { field: 'password' }); // 提示具体字段
+    } // 强度校验结束
+
+    const exists = deps.db // 身份占用检查起点
+      .prepare('SELECT user_id FROM identities WHERE region = ? AND provider = ? AND identifier = ?') // 唯一三元组
+      .get(body.region, identity.provider, identity.identifier) as { user_id: string } | undefined; // 已存在则返回归属
+    if (exists) { // 账号已被注册分支
+      throw new AppError('AUTH_IDENTITY_EXISTS', 'account already registered', { field: 'identifier' }); // 409 让前端提示改用登录
+    } // 结束占用检查
+
+    const now = clockOf(deps); // 注册时间
+    const userId = uuidv7(); // 预生成用户主键供两表共用
+    const displayName = (body.display_name ?? '').trim().slice(0, 64); // 展示名可选，限幅避免超长
+    deps.db.transaction(() => { // 用户 / 身份 / 口令三表必须同时写入
+      deps.db // 用户写入起点
+        .prepare( // 预编译用户插入
+          `INSERT INTO users (id, region, status, display_name, locale, timezone, created_at, updated_at)
+           VALUES (?, ?, 'active', ?, ?, ?, ?, ?)`,
+        ) // 结束预编译
+        .run( // 绑定参数
+          userId, // 用户主键
+          body.region, // 地区
+          displayName, // 展示名
+          body.region === 'cn' ? 'zh-CN' : 'en-US', // 默认语言随地区
+          body.region === 'cn' ? 'Asia/Shanghai' : 'UTC', // 默认时区随地区
+          now, // 创建时间
+          now, // 更新时间
+        ); // 结束用户写入
+      deps.db // 身份写入起点
+        .prepare( // 预编译身份插入
+          `INSERT INTO identities (id, user_id, region, provider, identifier, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        ) // 结束预编译
+        .run(uuidv7(), userId, body.region, identity.provider, identity.identifier, now); // 绑定唯一身份
+      deps.db // 口令写入起点：credentials 表已存在，kind=password 区分于其他凭据
+        .prepare('INSERT INTO credentials (id, user_id, kind, secret_hash, created_at) VALUES (?, ?, ?, ?, ?)') // 预编译凭据插入
+        .run(uuidv7(), userId, 'password', hashPassword(body.password), now); // 只存 bcrypt 摘要，绝不留明文
+    })(); // 执行事务，任一失败即整体回滚
+
+    const user = deps.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow; // 回读落库结果
+    res.status(201).json(finishLogin(deps, user, body.device)); // 注册即登录：直接下发令牌，省一次往返
+  }); // 结束 POST /auth/register 处理
+
+  router.post('/auth/password', (req, res) => { // 密码登录：先比管理员口令，再比账号自身口令
     const body = parse(passwordBody, req.body); // 校验请求体
     const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 未指定通道时按地区推断
     const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识
@@ -333,37 +427,34 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     const key = failureKey(body.region, identity.identifier); // 失败计数键
     assertNotLocked(deps, key, now); // 先检查锁定状态
 
-    // 生产环境短信/邮件通道未接入时，管理员口令是最小可行登录入口（见 05-runbook §7.1）。
+    // 生产环境短信/邮件通道未接入时，管理员口令与自建账号口令共同构成最小可行登录入口（见 05-runbook §7.1）。
     const expected = (deps.env.MIM_AUTH_ADMIN_PASSWORD ?? '').trim(); // 读取并裁剪配置口令
-    if (!expected) { // 未配置口令则功能不可用
-      throw new AppError( // 抛出配置错误
-        'AUTH_PASSWORD_NOT_CONFIGURED', // 未配置即功能不可用
-        'password sign-in is not configured', // 明确提示
-        { env: 'MIM_AUTH_ADMIN_PASSWORD' }, // 指出缺失的环境变量
-      ); // 结束错误构造
-    } // 结束配置检查
-    if (!secureEqual(body.password, expected)) { // 定长时间比较口令
+    const adminOk = expected.length > 0 && secureEqual(body.password, expected); // 管理员口令命中
+
+    const account = deps.db // 自建账号查询起点
+      .prepare('SELECT user_id FROM identities WHERE region = ? AND provider = ? AND identifier = ?') // 唯一三元组
+      .get(body.region, identity.provider, identity.identifier) as { user_id: string } | undefined; // 命中即已有身份
+    const credential = account // 口令凭据查询起点：只取 kind=password 的记录
+      ? (deps.db.prepare("SELECT secret_hash FROM credentials WHERE user_id = ? AND kind = 'password'").get(account.user_id) as { secret_hash: string } | undefined) // 命中即有自建口令
+      : undefined; // 无身份则无凭据
+    const accountOk = Boolean(credential) && verifyPassword(body.password, credential!.secret_hash); // 账号口令命中
+
+    if (!adminOk && !accountOk) { // 两种口令都未命中
+      if (!expected && !credential) { // 完全没有可用口令入口
+        throw new AppError( // 抛出配置错误
+          'AUTH_PASSWORD_NOT_CONFIGURED', // 未配置即功能不可用
+          'password sign-in is not configured', // 明确提示
+          { env: 'MIM_AUTH_ADMIN_PASSWORD' }, // 指出缺失的环境变量
+        ); // 结束错误构造
+      } // 结束配置检查
       recordFailure(deps, key, body.region, now); // 口令错误同样计入锁定策略
       throw new AppError('AUTH_PASSWORD_INVALID', 'password is incorrect'); // 不回显正确口令线索
     } // 结束口令校验
 
     deps.db.prepare('DELETE FROM login_failures WHERE identifier = ?').run(key); // 成功后清零失败计数
 
-    const user = findOrCreateUser(deps, body.region, identity.provider, identity.identifier); // 按身份查找或创建用户
-
-    let deviceId: string | null = null; // 设备主键占位
-    if (body.device) { // 客户端上报了设备信息
-      deviceId = uuidv7(); // 生成设备主键
-      deps.db // 设备写入起点
-        .prepare( // 预编译插入语句
-          `INSERT INTO devices (id, user_id, platform, name, last_seen_at, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-        ) // 结束预编译
-        .run(deviceId, user.id, body.device.platform, body.device.name ?? '', now, now); // 记录设备信息
-    } // 结束设备记录
-
-    const tokens = createSession(deps, user, deviceId); // 创建会话
-    res.json({ ...tokens, user: userPayload(user) }); // 返回令牌与用户
+    const user = findOrCreateUser(deps, body.region, identity.provider, identity.identifier); // 按身份查找或创建用户（自建账号已存在）
+    res.json(finishLogin(deps, user, body.device)); // 统一收尾：设备 + 双令牌 + 用户视图
   }); // 结束 POST /auth/password 处理
 
   router.post('/auth/refresh', (req, res) => { // 刷新令牌轮换

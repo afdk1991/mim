@@ -1097,6 +1097,18 @@ code { /* 行内代码/令牌展示 */
   position: relative; /* 定位基准：表情面板绝对定位到输入区上方 */
 } /* 输入区结束 */
 
+.chat-preview-banner { /* 匿名只读演示说明条 */
+  display: flex; /* 文案与按钮同行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 文案靠左、按钮靠右 */
+  gap: 12px; /* 最小间距，窄屏下也不挤在一起 */
+  padding: 10px 20px; /* 与消息区左右内边距对齐 */
+  border-bottom: 1px solid var(--border); /* 与消息区分隔 */
+  background: var(--surface-soft, #f7f8fa); /* 淡底突出这是提示条 */
+  font-size: 13px; /* 小于正文，弱化提示层级 */
+  color: var(--text-muted); /* 次要文字色 */
+} /* 说明条结束 */
+
 .chat-input textarea { /* 文本域 */
   flex: 1; /* 占满宽度 */
   resize: none; /* 禁止手动调整大小 */

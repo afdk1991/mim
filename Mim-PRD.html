@@ -400,8 +400,21 @@
   <tr><td>海外</td><td>邮箱 + 密码/验证码、Google Sign-In、Apple Sign-In</td><td>App 端提供第三方登录时必须同时提供 Apple Sign-In（App Store 要求）</td></tr>
 </table>
 
+<!-- 已实现的最小可用登录入口（2026-11-12） -->
+<h4>已实现的最小可用登录入口（2026-11-12）</h4>
+<!-- 实现现状说明 -->
+<p>在短信 / 邮件第三方通道尚未注入私有凭证的阶段，为避免「普通访客没有任何可自助的登录入口」导致聊天等模块实际不可用，先落地三条不依赖外部通道的入口，并由前端按部署实际能力自动呈现：</p>
+<ul>
+  <li><strong>自助注册 + 账号口令登录</strong>：<code>POST /api/v1/auth/register</code>（region + 账号标识 + 口令，可选昵称）创建自建账号，口令以 bcrypt 摘要写入 <code>credentials</code>（<code>kind=password</code>），注册成功即下发访问 / 刷新令牌；随后可用 <code>POST /api/v1/auth/password</code> 以同一账号口令登录。口令要求至少 8 位且同时包含字母与数字，重复注册返回 409 <code>AUTH_IDENTITY_EXISTS</code>。</li>
+  <li><strong>管理员口令登录</strong>：同一 <code>/auth/password</code> 端点，口令来自部署环境变量 <code>MIM_AUTH_ADMIN_PASSWORD</code>，用于冷启动与运维登录；与账号口令互不覆盖，两者都未配置时返回 503 <code>AUTH_PASSWORD_NOT_CONFIGURED</code>。</li>
+  <li><strong>通道自检</strong>：<code>GET /api/v1/auth/channels</code> 只返回 <code>{sms,email,password,register}</code> 布尔值，登录页据此在验证码通道未配置时直接提示「请改用密码登录或注册」，避免用户反复触发 503。</li>
+  <li><strong>聊天匿名只读体验</strong>：<code>/chat</code> 匿名访问不再显示「此功能需登录后使用」空白卡片，而是进入只读演示页（同一套聊天布局、示例会话与消息、禁用输入区、登录/注册引导），登录后才创建会话、收发消息、传文件与群管理。</li>
+</ul>
+<p>短信与邮件通道（阿里云短信 / AWS SES）代码路径已就绪，注入 <code>MIM_SMS_ALIYUN_*</code> 或 <code>MIM_EMAIL_SES_*</code> 环境变量后 <code>/auth/channels</code> 自动置真、验证码入口自动可用，无需改代码。自助注册的开放程度、频控与邮箱验证属产品与安全待决策项（当前注册端点无独立限流，仅受口令强度与登录失败锁定约束）。</p>
+
 <!-- 跨端账号打通规则子标题 -->
 <h4>跨端账号打通规则</h4>
+
 <!-- 打通规则清单 -->
 <ul>
   <!-- 国内与海外隔离 -->

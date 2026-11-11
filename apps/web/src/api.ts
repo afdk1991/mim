@@ -786,6 +786,26 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }); // 请求调用结束
   }, // loginWithPassword 结束
 
+  register(payload: { // 自助注册：账号 + 口令一次完成注册并拿到会话
+    region: Region; // 区域
+    provider?: Provider; // 凭证类型；省略时由服务端按 region 推断
+    identifier: string; // 手机号或邮箱
+    password: string; // 明文口令（≥8 位且含字母与数字），经 HTTPS 传输
+    display_name?: string; // 展示名可选，缺省由服务端留空
+    device?: { platform: string; name?: string }; // 设备信息，未传时兜底 web/浏览器
+  }) { // 形参定义结束
+    return request<LoginResult>('/auth/register', { // 注册成功即返回令牌，前端无需再登录一次
+      method: 'POST', // 写操作
+      body: { ...payload, device: payload.device ?? { platform: 'web', name: '浏览器' } }, // 补默认设备标识
+      auth: false, // 注册时尚无令牌
+      idempotency: false, // 重复提交由唯一身份冲突兜底
+    }); // 请求调用结束
+  }, // register 结束
+
+  authChannels() { // 查询当前部署可用的登录方式，用于登录页隐藏不可用入口
+    return request<{ sms: boolean; email: boolean; password: boolean; register: boolean }>('/auth/channels', { auth: false, idempotency: false }); // 公开只读接口
+  }, // authChannels 结束
+
   login(payload: { // 验证码登录
     region: Region; // 区域
     provider: Provider; // 凭证类型

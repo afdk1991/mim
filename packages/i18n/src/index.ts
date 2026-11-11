@@ -206,6 +206,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_PASSWORD_INVALID: '密码错误',
     // 未开启密码登录，指引联系管理员
     AUTH_PASSWORD_NOT_CONFIGURED: '密码登录未配置，请联系管理员',
+    // 注册身份已被占用，引导改用登录
+    AUTH_IDENTITY_EXISTS: '该账号已注册，请直接登录',
     // 账号锁定，告知原因与临时性
     AUTH_ACCOUNT_LOCKED: '登录失败次数过多，账号已临时锁定',
     // 会话失效，要求重新登录
@@ -264,6 +266,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_PASSWORD_INVALID: 'Incorrect password',
     // 密码登录未开启
     AUTH_PASSWORD_NOT_CONFIGURED: 'Password sign-in is not configured, contact the administrator',
+    // 注册身份已被占用
+    AUTH_IDENTITY_EXISTS: 'This account is already registered, please sign in',
     // 账号锁定
     AUTH_ACCOUNT_LOCKED: 'Too many failed sign-ins, account temporarily locked',
     // 会话失效

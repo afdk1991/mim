@@ -61,6 +61,14 @@ export function verifyCode(code: string, hash: string): boolean { // 校验用�
   return bcrypt.compareSync(code, hash); // bcrypt 内部做常数时间比较，天然抵御时序攻击
 } // verifyCode 结束
 
+export function hashPassword(password: string): string { // 账号密码哈希：账号体系自建口令与验证码共用同一慢哈希
+  return bcrypt.hashSync(password, 10); // 成本因子 10 与验证码一致，避免两套强度标准并存
+} // hashPassword 结束
+
+export function verifyPassword(password: string, hash: string): boolean { // 校验账号密码与库中哈希是否匹配
+  return bcrypt.compareSync(password, hash); // 常数时间比较，错误口令与不存在账号的耗时特征一致
+} // verifyPassword 结束
+
 export function sha256(input: string): string { // 通用 SHA-256 十六进制摘要，用于请求指纹与令牌哈希
   return createHash('sha256').update(input).digest('hex'); // 无密钥一次性哈希，仅用于指纹比对，不承担保密职责
 } // sha256 结束

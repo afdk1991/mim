@@ -23,6 +23,8 @@ export const ERROR_CODES = [
   'AUTH_PASSWORD_INVALID',
   // 该地区/租户尚未开启密码登录能力
   'AUTH_PASSWORD_NOT_CONFIGURED',
+  // 自助注册时账号（地区 + 通道 + 标识）已被占用
+  'AUTH_IDENTITY_EXISTS',
   // 连续登录失败次数超限，账号被临时锁定
   'AUTH_ACCOUNT_LOCKED',
   // 刷新令牌无效或已被轮换失效，需重新登录
@@ -85,6 +87,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_PASSWORD_INVALID: 401,
   // 密码登录未开启，属服务不可用 503
   AUTH_PASSWORD_NOT_CONFIGURED: 503,
+  // 注册身份已被占用 409，让前端引导改用登录
+  AUTH_IDENTITY_EXISTS: 409,
   // 账号锁定使用 423 Locked，语义最贴切
   AUTH_ACCOUNT_LOCKED: 423,
   // 刷新令牌失效需重新认证 401
