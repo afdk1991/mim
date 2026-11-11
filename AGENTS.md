@@ -1026,6 +1026,28 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 文档同步（铁律七） | `README.md`（版本 V0.0.1-preview、2026-11-12 变更条、端点表新增 OAuth / Mim ID 两行、视图表 Login 与个人中心、目录结构补 `oauth/` 与 `identity.ts`）；`docs/wiki/04-dependencies.md`（oauth4webapi）；`docs/wiki/09-third-party-sdk-inventory.md`（9 家登记 + 公共变量 + 落地状态）；`docs/wiki/05-runbook.md`（§4 环境变量 + §4.1 回调登记表）；`docs/wiki/07-functional-modules.md`（§3.1 四条链路表 + §11.1 落地对照）；`Mim-PRD.html`（Mim ID 与第三方登录两条 + 9 家清单）；`.env.example`（9 家凭证 + 通用 OAuth 变量）；`AGENTS.md`（本节 + §0 覆盖段） | 文件本体 |
 | 生产部署（铁律八） | **未执行**。仓库零 secret（`gh api .../actions/secrets` → `total_count:0`），`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` 属铁律一例外（私有凭证，沙箱不可生成）；9 家 provider 的 client_id / secret / Apple p8 / 平台回调登记亦需用户提供。**不以本地门禁与浏览器截图冒充「已上线」** | 如实登记 |
 
+#### 9.29 漫剧 / AI 剧放映厅上线（真正能看片）（2026-11-12 03:20 +08:00）
+
+**性质**：用户指出「漫剧和 AI 剧我要的是可以看漫剧和 AI 剧的视频功能模块」，而当时 `/comic-studio` 只有创作工作台、没有任何播放能力，匿名还被 `requireAuth + requireEntitlement('comic.workbench')` 双重拦截。本轮新增可直接观看的视频模块，并把门禁从「整页拦截」改为「放映厅匿名可看 + 工作台登录后使用」。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 后端端点 | `GET /api/v1/comic/showcase` 匿名返回 2 部演示作品（`showcase.stardust` 星尘之约 / `showcase.bloom` 花间序曲），片源与封面为相对路径；`GET /api/v1/comic/theater` 仅 `requireAuth`、不校验模块权益，返回本人工程成片最新版本 + 1 小时预签名播放地址；两条均注册在 `/comic` 鉴权中间件之前 | `services/mim-api/src/routes/comic.ts` |
+| 前端模块 | 新增 `views/ComicTheater.tsx`（作品网格 / 集数切换 / 原生 `<video controls>` / `localStorage` 断点续播 / 「我的作品」）与 `views/ComicStudio.tsx`（「放映厅 / 创作工作台」分段，默认放映厅；工作台未登录显示登录引导）；`App.tsx` comic 分支改为渲染外壳，`GATED_VIEWS` 收敛为 `products / cart / account` | 文件本体 |
+| 演示片源 | `apps/web/public/demo/` 入库 `stardust-ep1.mp4`（4,372,373 B）、`bloom-ep1.mp4`（1,128,375 B）、两张 1080×1440 封面；均为开放授权素材并在页面标注「演示片源」 | 文件本体 + `HEAD /demo/stardust-ep1.mp4` |
+| 本地实测 | Edge CDP `localhost:5175/comic-studio`：分段 `["放映厅","创作工作台"]`、卡片 `["星尘之约","花间序曲"]`、`readyState=4`、`duration=52.208s`、静音播放 2.2 秒后 `currentTime=2.017`、切换第二部片源生效、无内嵌登录卡片 | `probe-theater-local.mjs` |
+| 门禁 | `pnpm -r typecheck` 0；`pnpm --filter @mim/api test` **24 文件 / 368 例全过**；`@mim/web build` 0；根 `build.mjs` 0（404.html + 9 路径段）；`verify-auth-gate` 35/35；`verify-site-modules` 83/83；`verify-entry-manifest` 23/23；`verify-deployments` 55/55；`verify-custom-domains` 20/20；`comment-check --strict` 0；`npm run check` 0 | 本轮命令回显 |
+| D05 修复 | 自定义域名矩阵里 Cloudflare Pages 与独立 Worker 各占一行，旧断言用「行数 + 不适用数 = 10」导致 9+2=11 恒失败；改为按注册表 `in_matrix` 平台集合核对覆盖，20/20 恢复 | `scripts/verify-custom-domains.mjs` |
+| 提交 / 双远端 | `fc5b3a0 feat(comic): 新增漫剧/AI 剧放映厅（匿名看片 + 我的作品播放）`；`origin` 与 `gitee` 均 `87db9ae..fc5b3a0`（0 ahead / 0 behind） | `git push`、`git ls-remote` |
+| CI | Deploy run **43073161122**（@ `fc5b3a0`）**completed success**：质量门禁 / 托管平台同步 / **发布到生产服务器** / GitHub Pages / ghcr 五作业全绿 | `gh run watch --exit-status`、`gh run view --json jobs` |
+| 生产接口 | `/api/v1/comic/showcase` 200 / 671 B；`/comic-studio` 200 / 5,305 B；`HEAD /demo/stardust-ep1.mp4` 200 / 4,372,373 B / `video/mp4` | curl / Invoke-WebRequest |
+| 线上播放取证 | Edge CDP `https://mim.mixm.top/comic-studio`：`path=/comic-studio`、分段 `["放映厅","创作工作台"]`、卡片 `["星尘之约","花间序曲"]`、`videoSrc=https://mim.mixm.top/demo/stardust-ep1.mp4`、`readyState=4`、`duration=52.208333`、无 `.auth-wrap`、无「此功能需登录后使用」；播放后 `currentTime=2.414`、`paused=false`；切换后片源 `https://mim.mixm.top/demo/bloom-ep1.mp4`、标题「正片 · 花间序曲」 | `probe-theater-live.mjs` |
+| 截图 | `.tmp/theater-live.png`（1440×1200，放映厅播放中 + 剧集侧栏 + 演示片库） | CDP `Page.captureScreenshot` |
+| 文档同步（铁律七） | README（视图清单 / 按需登录段 / 模块表新增「漫剧放映厅」/ API 表两行）；`docs/wiki/05-runbook.md` 门禁模型；`docs/wiki/08-dev-implementation.md` 2026-11-12 变更段；`Mim-PRD.html` 作品管理与分发条目补放映厅上线说明 | 文件本体 |
+| 边界 | 演示片库为开放授权动画 / 自然短片（非真正漫剧剧情内容），页面已标注「演示片源」；创作工作台仍需登录，且 `/comic/*` 仍要求 `comic.workbench` 权益；新注册账号默认无该权益 | 如实登记 |
+
+---
+
 ---
 
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
