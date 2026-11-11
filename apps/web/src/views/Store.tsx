@@ -1194,10 +1194,10 @@ export function Store({ locale }: Props) {
                             ? locale === 'en-US' ? 'Hide details' : '收起详情'
                             : locale === 'en-US' ? 'Details' : '详情'}{/* 详情按钮文案结束 */}
                         </button>{/* 详情按钮结束 */}
-                        {(!owned && !m.capability) && ( // 无真实能力 = 规划中：不给解锁入口，避免用户为未实现条目付费
+                        {(!owned && !m.capability && m.code.startsWith('cat.')) && ( // 仅导航条目（cat.*）在无真实能力时算「规划中」：交易型商品（生成包 / 存储 / 模板包）不适用
                           <span className="badge">{locale === 'en-US' ? 'Planned' : '规划中'}</span> // 规划中徽标
                         )}{/* 规划中徽标结束 */}
-                        {!owned && authed && m.capability !== null && ( // 已登录、未拥有、且模块有真实能力时才提供购买/解锁按钮
+                        {!owned && authed && (m.code.startsWith('cat.') ? m.capability !== null : true) && ( // 已登录且未拥有：导航条目需有真实能力，交易型商品（配套权益包）本身即可购买
                           <button
                             // 购买/解锁按钮：普通按钮，避免触发表单提交
                             type="button"
@@ -1219,7 +1219,7 @@ export function Store({ locale }: Props) {
                                 : locale === 'en-US' ? 'Unlock' : '解锁'}{/* 按钮文案结束 */}
                           </button> // 结束购买/解锁按钮
                         )}{/* 结束购买/解锁按钮条件渲染 */}
-                        {!owned && authed && m.capability !== null && ( // 已登录且未拥有的模块：提供加购入口（结算语义与直接购买一致）
+                        {!owned && authed && (m.code.startsWith('cat.') ? m.capability !== null : true) && ( // 已登录且未拥有的模块：提供加购入口（结算语义与直接购买一致；配套权益包同样可加购）
                           <button
                             // 普通按钮，避免触发表单提交
                             type="button"
@@ -1272,7 +1272,12 @@ export function Store({ locale }: Props) {
                                   const capability = data.capability; // 当前模块绑定的能力键（可能为 null）
                                   const seed = capability ? capabilityOfKey(capability) : undefined; // 能力定义：名称 / 提示 / 占位
                                   const spec = capability ? CAPABILITY_OPTIONS[capability] : undefined; // 该能力的可选参数
-                                  if (!capability || !seed) { // 无能力 = 规划中：不给解锁入口，避免为未实现功能付费
+                                  if (!capability || !seed) { // 无能力：区分「导航条目未实现」与「交易型配套商品」
+                                    if (!data.code.startsWith('cat.')) { // 交易型配套商品（漫剧生成包 / 素材存储扩容 / 模板包 / 工作台）本就不提供 invoke 工具
+                                      return ( // 配套商品说明
+                                        <p className="muted">{locale === 'en-US' ? 'Add-on entitlement — takes effect inside its parent feature after unlock.' : '配套权益商品，解锁后在对应功能中生效。'}</p>
+                                      ); // 配套商品说明结束
+                                    } // 配套商品分支结束
                                     return ( // 规划中提示
                                       <p className="muted">{locale === 'en-US' ? 'Planned feature — not open for unlock yet.' : '功能规划中，暂不开放解锁。'}</p>
                                     ); // 规划中提示结束

@@ -167,7 +167,7 @@ export function Products({ locale }: Props) {
                 <td>{row.category_slug ?? '-'}</td>
                 <td>{priceText(locale, row.current_price)}</td>
                 <td>
-                  {row.capability ? <span className="tag ok">{isZh ? '可用' : 'Ready'}</span> : <span className="tag">{isZh ? '规划中' : 'Planned'}</span>}
+                  {row.capability ? <span className="tag ok">{isZh ? '可用' : 'Ready'}</span> : row.code.startsWith('cat.') ? <span className="tag">{isZh ? '规划中' : 'Planned'}</span> : <span className="tag">{isZh ? '配套权益' : 'Add-on'}</span>}
                 </td>
                 <td>
                   {owned ? (
