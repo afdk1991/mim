@@ -290,11 +290,11 @@ function renderMarkdown(report) {
   // 主表：用户要求的四类核心字段全部为独立列。
   lines.push('## 2. 部署项主表（统一字段）');
   lines.push('');
-  lines.push('| 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 部署状态 | 部署结果 | 异常说明 | 缺失信息 |');
+  lines.push('| 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 访问域名 | 部署状态 | 部署结果 | 异常说明 |');
   lines.push('|---|---|---|---|---|---|---|---|');
-  // 逐项输出一行，空值统一为「—」。
+  // 逐项输出一行，空值统一为「—」；访问域名列取入口 URL，缺失同样记「—」。
   for (const item of report.items) {
-    lines.push(`| \`${item.id}\` | ${cell(item.repository.id)} | ${cell(item.platform)} / ${cell(item.layer)} | ${cell(item.delivery.mode)} ${cell(item.delivery.ci_job)} | ${statusBadge(item.status)} | ${resultBadge(item.result)} | ${anomalyCell(item.anomalies)} | ${item.missing_fields.length ? `⚠ ${item.missing_fields.length} 项` : '—'} |`);
+    lines.push(`| \`${item.id}\` | ${cell(item.repository.id)} | ${cell(item.platform)} / ${cell(item.layer)} | ${cell(item.delivery.mode)} ${cell(item.delivery.ci_job)} | ${cell(item.entry_url)} | ${statusBadge(item.status)} | ${resultBadge(item.result)} | ${anomalyCell(item.anomalies)} |`);
   } // 主表循环结束
   lines.push('');
   // 异常明细：便于逐条核对异常说明与严重度。

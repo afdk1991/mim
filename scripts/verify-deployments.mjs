@@ -176,6 +176,12 @@ check('D39 App.tsx 渲染并导航部署汇总视图', appText.includes('<Deploy
 // 四个核心字段表头齐全，便于核对。
 const viewText = read('apps/web/src/views/Deployments.tsx');
 check('D40 前端表头含仓库标识 / 部署状态 / 部署结果 / 异常说明', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => viewText.includes(s)));
+// 表头 8 列规范：从 <thead> 里按顺序取出 <th> 文案，逐字比对文档口径
+const HEADER_SPEC = ['规范 ID / 名称', '仓库标识', '平台 / 层级', '交付链路', '访问域名', '部署状态', '部署结果', '异常说明'];
+const theadText = (viewText.match(/<thead>[\s\S]*?<\/thead>/) ?? [''])[0]; // 只截表头块，避免正文里的同名词干扰顺序
+const thTexts = [...theadText.matchAll(/<th>\{tr\(locale,\s*'([^']+)'/g)].map((m) => m[1]); // 抽取每个 <th> 的中文文案
+check('D53 前端表头为 8 列规范且顺序一致', thTexts.length === 8 && HEADER_SPEC.every((s, i) => thTexts[i] === s), thTexts.join(' / ') || '未取到表头');
+check('D54 前端提供访问域名列渲染（EntryLink）', viewText.includes('EntryLink') && viewText.includes('entry_url'));
 // 空数据 / 失败 / 缺失三种标识必须在视图里彼此可区分。
 check('D41 前端区分空数据 / 失败 / 缺失三类标识', ['空数据', '失败', '缺失'].every((s) => viewText.includes(s)));
 // 样式类存在。
@@ -205,6 +211,8 @@ check('D50 结构化结果部署项数与契约一致', Boolean(report) && repor
 // Markdown 核对表存在且四类核心字段齐全。
 const outMd = read('docs/deployment-summary.md');
 check('D51 核对表 docs/deployment-summary.md 含四列核心字段', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => outMd.includes(s)));
+// 核对表同样按 8 列规范输出（含访问域名），与前端表头口径一致。
+check('D55 核对表含 8 列规范表头（含访问域名）', outMd.includes('| 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 访问域名 | 部署状态 | 部署结果 | 异常说明 |'));
 // 核对表逐项覆盖（每个 id 都出现）。
 check('D52 核对表逐项覆盖全部部署项', items.every((i) => outMd.includes(`\`${i.id}\``)));
 

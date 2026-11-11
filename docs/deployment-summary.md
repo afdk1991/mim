@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-10T17:18:09.329Z
-- 本地 HEAD：`145816c`
+- 生成时间：2026-11-11T17:04:26.682Z
+- 本地 HEAD：`a32960d`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -21,24 +21,24 @@
 
 ## 2. 部署项主表（统一字段）
 
-| 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 部署状态 | 部署结果 | 异常说明 | 缺失信息 |
+| 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 访问域名 | 部署状态 | 部署结果 | 异常说明 |
 |---|---|---|---|---|---|---|---|
-| `repo.github` | github:afdk1991/mim | GitHub 仓库 / source | push — | ✅ OK | ✅ PASS — / —B | HTTPS_BLOCKED 等 1 项 | — |
-| `repo.gitee` | gitee:mallwm_admin/mim | Gitee（码云）镜像仓 / source | push — | ✅ OK | ✅ PASS 200 / 52034B | REMOTE_TIMEOUT_RECOVERED 等 3 项 | — |
-| `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 | ⚠ 1 项 |
-| `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 | — |
-| `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 | ⚠ 1 项 |
-| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | 🟡 MANUAL | 🟡 DEGRADED 200 / 981B | WAF_FALSE_POSITIVE 等 5 项 | ⚠ 2 项 |
-| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 | — |
-| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | CI_SKIP_FALSE_GREEN 等 3 项 | ⚠ 2 项 |
-| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | ✅ OK | ✅ PASS 200 / 53B | ROOT_404_BY_DESIGN 等 3 项 | — |
-| `pages.iga` | — | IGA Pages / distribution | manual platforms | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 4 项 | ⚠ 5 项 |
-| `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | manual — | 🟡 MANUAL | ⚪ 空数据 | EMPTY_RESULT 等 3 项 | ⚠ 5 项 |
-| `repo.gitlab` | — | GitLab 仓库 / source | push — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 4 项 |
-| `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 4 项 |
-| `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 6 项 |
-| `pages.azure-swa` | github:afdk1991/mim | Azure Static Web Apps / distribution | ci — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 5 项 |
-| `container.render` | github:afdk1991/mim | Render / distribution | ci platforms | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 | ⚠ 6 项 |
+| `repo.github` | github:afdk1991/mim | GitHub 仓库 / source | push — | https://github.com/afdk1991/mim | ✅ OK | ✅ PASS — / —B | HTTPS_BLOCKED 等 1 项 |
+| `repo.gitee` | gitee:mallwm_admin/mim | Gitee（码云）镜像仓 / source | push — | https://gitee.com/mallwm_admin/mim | ✅ OK | ✅ PASS 200 / 52034B | REMOTE_TIMEOUT_RECOVERED 等 3 项 |
+| `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | https://mim.mixm.top | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 |
+| `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | https://afdk1991.github.io/mim/ | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 |
+| `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
+| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | 🟡 MANUAL | 🟡 DEGRADED 200 / 981B | WAF_FALSE_POSITIVE 等 5 项 |
+| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
+| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | CI_SKIP_FALSE_GREEN 等 3 项 |
+| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | ✅ OK | ✅ PASS 200 / 53B | ROOT_404_BY_DESIGN 等 3 项 |
+| `pages.iga` | — | IGA Pages / distribution | manual platforms | https://preview.iga-pages.com | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 4 项 |
+| `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | manual — | https://mim-store.15726833367.workers.dev | 🟡 MANUAL | ⚪ 空数据 | EMPTY_RESULT 等 3 项 |
+| `repo.gitlab` | — | GitLab 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
+| `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
+| `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
+| `pages.azure-swa` | github:afdk1991/mim | Azure Static Web Apps / distribution | ci — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
+| `container.render` | github:afdk1991/mim | Render / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 
 ## 3. 异常说明明细
 
@@ -98,8 +98,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 145816c8197b54e32ec281d2a0327019cabcac70 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 145816c8197b54e32ec281d2a0327019cabcac70 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | a32960d846d6b0ea43cac8bbdb7abfd50adc8a38 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | a32960d846d6b0ea43cac8bbdb7abfd50adc8a38 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

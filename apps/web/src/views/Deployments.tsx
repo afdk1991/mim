@@ -151,6 +151,24 @@ function StatusPieChart({ byStatus, codes, locale }: {
   return <div ref={hostRef} className="deploy-status-pie" />; // 图表挂载容器
 } // StatusPieChart 结束
 
+// 渲染访问域名：只展示域名（省略协议与路径），点击在新窗口打开完整入口地址
+function EntryLink({ entryUrl }: { entryUrl: string | null }) {
+  // 空入口：显示占位符并保留说明，避免空白被误读为漏填
+  if (!entryUrl) return <span className="muted">—</span>;
+  // 解析失败（注册表里可能是非标准地址）时原样展示，不吞掉信息
+  let host = entryUrl;
+  try {
+    host = new URL(entryUrl).host; // 优先只展示主机（含端口），列宽可控
+  } catch {
+    host = entryUrl; // 解析失败保留原文
+  }
+  return (
+    <a className="link" href={entryUrl} target="_blank" rel="noreferrer" title={entryUrl}>
+      {host}
+    </a>
+  );
+} // EntryLink 结束
+
 // 部署汇总主视图：总览 + 筛选 + 核对表 + 展开详情 + 覆盖口径
 export function Deployments({ locale }: Props) {
   // 全量汇总：分布统计、覆盖口径与字典
@@ -236,6 +254,10 @@ export function Deployments({ locale }: Props) {
         <h1>{tr(locale, '部署汇总', 'Deployment Summary')}</h1>
         <p className="muted">
           {tr(locale, '统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常；空数据、失败状态与缺失信息分别标识，便于核对整体部署情况。', 'All deployment repositories and items in one unified schema; empty data, failures and missing information are explicitly marked.')}
+        </p>
+        {/* 列规范固定为 8 列，顺序与文档口径一致；点击规范 ID 可展开取证详情 */}
+        <p className="muted">
+          {tr(locale, '列规范（8 列）：规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明；点击规范 ID 展开取证详情。', 'Column spec (8): ID/name · repository · platform/layer · delivery · domain · status · result · anomalies; click the ID to expand evidence.')}
         </p>
         {ov && (
           <p className="muted">
@@ -328,11 +350,10 @@ export function Deployments({ locale }: Props) {
                 <th>{tr(locale, '仓库标识', 'Repository')}</th>
                 <th>{tr(locale, '平台 / 层级', 'Platform / Layer')}</th>
                 <th>{tr(locale, '交付链路', 'Delivery')}</th>
+                <th>{tr(locale, '访问域名', 'Domain')}</th>
                 <th>{tr(locale, '部署状态', 'Deploy status')}</th>
                 <th>{tr(locale, '部署结果', 'Deploy result')}</th>
                 <th>{tr(locale, '异常说明', 'Anomalies')}</th>
-                <th>{tr(locale, '缺失信息', 'Missing')}</th>
-                <th>{tr(locale, '操作', 'Action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -396,10 +417,17 @@ function DeployRow({ item, locale, expanded, related, detailLoading, onToggle }:
   return (
     <>
       <tr className={expanded ? 'deploy-row expanded' : 'deploy-row'}>
-        <td><code>{item.id}</code><div className="muted">{item.name}</div></td>
+        <td>
+          {/* 规范 ID 兼作展开入口：8 列规范下不再单设「操作」列，点击 ID 查看取证详情 */}
+          <button type="button" className="link" onClick={onToggle} title={tr(locale, '展开 / 收起取证详情', 'Toggle evidence detail')}>
+            <code>{item.id}</code> {expanded ? '▾' : '▸'}
+          </button>
+          <div className="muted">{item.name}</div>
+        </td>
         <td><code>{dash(item.repository.id)}</code><div className="muted">{dash(item.repository.role)}</div></td>
         <td>{item.platform}<div className="muted">{item.layer} / {item.kind}</div></td>
         <td><code>{item.delivery.mode}</code><div className="muted">{dash(item.delivery.ci_job)}{item.delivery.artifact_in_head === true && item.delivery.artifact_in_worktree === false ? ' · ⚠ 漂移' : ''}</div></td>
+        <td><EntryLink entryUrl={item.entry_url} /></td>
         <td><StatusBadge status={item.status} locale={locale} /></td>
         <td><ResultBadge result={item.result} locale={locale} /></td>
         <td>
@@ -407,17 +435,15 @@ function DeployRow({ item, locale, expanded, related, detailLoading, onToggle }:
             ? <span className="muted">—</span>
             : <span className="deploy-badge warn">{item.anomalies.length} {tr(locale, '项', 'items')}</span>}
           <div className="muted">{item.anomalies[0]?.code ?? '—'}</div>
+          {/* 缺失字段并入「异常说明」列：8 列规范下不再单列，但仍需可见 */}
+          {item.missing_fields.length > 0 && (
+            <div><span className="deploy-badge missing">⚠ {tr(locale, '缺失', 'missing')} {item.missing_fields.length}</span></div>
+          )}
         </td>
-        <td>
-          {item.missing_fields.length === 0
-            ? <span className="muted">—</span>
-            : <span className="deploy-badge missing">⚠ {tr(locale, '缺失', 'missing')} {item.missing_fields.length}</span>}
-        </td>
-        <td><button type="button" className="btn ghost small" onClick={onToggle}>{expanded ? tr(locale, '收起', 'Hide') : tr(locale, '展开', 'Open')}</button></td>
       </tr>
       {expanded && (
         <tr className="deploy-detail-row">
-          <td colSpan={9}>
+          <td colSpan={8}>
             <div className="deploy-detail">
               <p className="deploy-section-title">{tr(locale, '部署结果与取证', 'Result & evidence')}</p>
               <p className="muted">
