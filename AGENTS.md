@@ -28,6 +28,8 @@
 >
 > **现行状态覆盖（2026-11-12 02:40 +08:00）**：① **版本 / 通道** 已由 `V0.0.0-preview` 变更为 **`V0.0.1-preview`**（semver 递增，6 个 `package.json` 同步）。② **账号能力** 新增对外编号 `MIM-<8 位>`（`users.member_no` + `member_no_sequence` 发号表 + `uq_users_member_no` 唯一索引 + 启动回填 / 登录兜底），四条注册登录链路（自助注册 / 验证码首登 / 密码首登 / 第三方首登）统一走 `identity.ts` 建号，因此**注册即发号**。③ **登录方式** 由「验证码 + 密码 + 管理员口令」扩展为再加 **9 家第三方**（GitHub / Gitee / GitLab / Google / Apple / Microsoft / 微信 / QQ / 抖音），标准 OIDC 用 `oauth4webapi@3.8.8`，微信 / QQ / 抖音走专用适配器。④ **本地门禁全绿**：typecheck 0、api 24 文件 368 例、verify-* 全套 0、env-check / version-check / comment-check 0、三套构建 0。⑤ **已上线并取得线上取证**：Deploy run **`43073820378`**（@ `8f34714`）completed success，「发布到生产服务器」作业内远程发布 / 版本校验 / 健康检查 / 管理后台路由断言 / 认证接口抽查全部 success；线上 `/health` = `{"status":"ok","service":"mim-api","version":"0.0.1"}`，`GET /api/v1/auth/oauth/providers?region=cn` 返回 5 家，线上注册得 `MIM-10000007` 且 `GET /me` 回读一致。逐项证据见 [§9.28](#928-mim-id-自动分配--9-家第三方登录2026-11-12-0240-0800)。
 
+> **现行状态覆盖（2026-11-12 18:2x +08:00，免登录体验上线）**：全站**不再有「此功能需登录后使用」门禁**。前端启动时若本地无会话，自动调用 `POST /api/v1/auth/guest` 领取匿名访客会话（`users.is_guest=1`，同样自动分配 Mim ID、同样签发 access/refresh 双令牌），`/marketplace`、`/products`、`/cart`、`/account`、`/entry-catalog`、`/deployments`、`/comic-studio`（放映厅 + 创作工作台）、`/chat` 全部免登录直接可用；`/signin` 只承担「把访客升级为正式账号」。访客建号按 IP 限流 30 次/小时（超限 429 `AUTH_GUEST_RATE_LIMITED`）。**本文档下方所有「按需登录 / 内嵌登录卡片 / 只读演示」段落均为历史留痕，按铁律三保留，不得再当作现状引用**；现行口径以 [README.md](./README.md) 前端视图段与 [docs/wiki/05-runbook.md](./docs/wiki/05-runbook.md)「现行覆盖：免登录体验」行为准，实现与取证见 [docs/免登录体验-全站门禁解除-20261112.md](./docs/免登录体验-全站门禁解除-20261112.md)。本轮本地门禁：typecheck 0、api **25 文件 372 例**、`verify-auth-gate` 静态 **39/39** + 浏览器实测 **56/56**、`verify-deployments` 55/55、`verify-site-modules` 83/83、`verify-entry-manifest` 23/23；CI run **`43077258519`** 五作业全绿（含「发布到生产服务器」），线上 `POST /api/v1/auth/guest` 返回 `is_guest=true`、`MIM-10000010`，线上商城以访客身份加购 → 结算 → 权益 `active` 全通，线上浏览器实测 5 个原门禁视图 `.auth-wrap` 计数为 0、console 零报错。
+
 **本轮体检边界（2026-11-10）**：按用户「全项目全面检查与修复」指令，做了三类**可逆**修复——① 把误删的 23 个部署工件从 HEAD 恢复到工作树（`git checkout -- .`）；② 把部署注册表里「工作树缺失」的过时口径改为「已恢复」并重生成核对表（`WORKTREE_ARTIFACT_*_RESTORED`）；③ 修正 `render.yaml`（蓝图 schema 由非法的 `static_sites:` 改为 `services: - type: web / runtime: static`，并补 `routes` 深链接回退）与 `azure-static-web-apps.yml`（补 `staticwebapp.config.json` 回退注入）。**不改任何铁律的约束语义**，未做 `git add / commit / push`、未删除任何文件、未触发任何线上部署。
 >
 > **2026-11-09 18:08 补充**：按用户指令新增铁律十二（远程仓库全量同步 + 生产统一部署腾讯云自建服务器），并全量删除原候选托管平台的全部相关内容；原铁律一～十一的编号 / 标题 / 约束语义仍未改动，规则变更的同步清单见 §12.5。2026-11-09 18:50 按用户指令将项目名称统一为 **Mim**，全仓名称口径一致。
@@ -1064,6 +1066,20 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 本地门禁 | `pnpm -r typecheck` 0；`pnpm --filter @mim/api test` **25 文件 / 372 例全过**；`@mim/web build` 0；根 `node scripts/build.mjs` 0（`dist/catalog` 19 张图，404.html + 9 路径段）；`verify-auth-gate` **39/39**；`verify-site-modules` **83/83**；`verify-entry-manifest` **23/23**；`verify-deployments` **55/55**；`verify-custom-domains` **20/20**；`comment-check --strict` 0 | 本轮命令回显 |
 | 文档同步（铁律七） | README 商城功能模块行补「商品视觉（2026-11-12 改造）」；本节为 AGENTS 取证；`docs/wiki/08-dev-implementation.md` 追加实现说明 | 文件本体 |
 | 边界 | 封面按 **19 个一级分类** 复用（205 条模块共享 19 张分类图），未逐条生成 205 张独立商品图；参数图是数据驱动的 SVG（不是照片），保证与接口实时一致且可被 205 条模块覆盖 | 如实登记 |
+
+##### 9.30.1 提交、CI 与线上取证（2026-11-12 04:3x +08:00）
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| 提交 | `3dcc90b feat(store): 商城商品视觉改造（19 张分类封面图 + 逐商品参数详情图）` | ✅ |
+| 双远端 | `origin` / `gitee` 均 `04b3f85..3dcc90b`（后续并行会话 `ca45746` 又推进双远端，本改动仍在其历史内） | ✅ 铁律十二 |
+| CI | Deploy run **43076962536**（@ `3dcc90b`）**completed success**：质量门禁 / 托管平台同步 / GitHub Pages / **发布到生产服务器** / ghcr 五作业全绿；并行访客会话提交 `ca45746` 的 run **43077258519** 同样五作业全绿 | `gh run watch`、`gh run view --json jobs` |
+| 生产封面 | `https://mim.mixm.top/catalog/ai.jpg` **200 / image/jpeg / 55,642 B**；GitHub Pages `https://afdk1991.github.io/mim/catalog/ai.jpg` **200 / image/jpeg / 55,642 B** | `Invoke-WebRequest` |
+| 生产渲染 | Edge CDP `https://mim.mixm.top/marketplace`：`path=/marketplace`、`cards=12`、封面 `currentSrc=https://mim.mixm.top/catalog/ai.jpg` 且 `naturalWidth=768`、无「此功能需登录后使用」；详情 `hero=true`、`specRows=11`、参数图 `900×1180`、展开卡宽 754 | `probe-market-live.mjs` / `probe-market-final2.mjs` |
+| Pages 渲染 | Edge CDP `https://afdk1991.github.io/mim/marketplace`：`path=/mim/marketplace`、`cards=12`、封面 `https://afdk1991.github.io/mim/catalog/ai.jpg` `naturalWidth=768`；详情 `specRows=11`、参数图 `900×1180` | 同上 |
+| 访客可用性 | 并行会话 `ca45746` 上线匿名访客会话后，生产 `POST /auth/guest` **200 / 572 B**；清空本地会话重新加载后 `mim.session.v1` 有 `access_token`，卡片按钮为 **详情 / 解锁 / 加入购物车 / 购买 99.00 CNY**，不再是「重试免登录会话」 | `probe-market-final2.mjs` |
+| 截图 | `.tmp/market-prod-final.png`（生产 1440×1100：左侧 19 分类、热门项目、商品封面卡、展开详情参数表）；`.tmp/market-pages.png`（Pages 同口径） | CDP `Page.captureScreenshot` |
+| 边界 | 本节的封面/参数图改动与并行访客会话是**两个独立提交**；生产「重试免登录会话」的修复来自 `ca45746`，不属本提交，已在取证中区分 | 如实登记 |
 
 ---
 
