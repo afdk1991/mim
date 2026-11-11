@@ -15,7 +15,7 @@
 | 部署矩阵 | **10 个免费平台**（2026-11-10 按用户指令新增 **Gitee（码云）** 为第 10 行）：腾讯云自建 / EdgeOne Pages / GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 / Gitee 镜像仓；`deploymentRegistry.json` 的 `coverage.matrix_platforms` 与 `platform_catalog.in_matrix` 同步为 10 | [铁律九](#铁律九多平台部署矩阵只走免费方案且必须逐平台取证)、`packages/core-domain/src/deploymentRegistry.json`、`node scripts/verify-deployments.mjs` D03 / D20 |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `e12f624`（`feat(auth): 自助注册 + 账号口令登录 + 通道自检 + 聊天匿名只读演示`）；**双远端已全部同步**：`origin` / `gitee` 均 = `e12f624`（2026-11-11 17:0x UTC / 2026-11-12 01:0x +08 实测，0 ahead / 0 behind）。递交序列：`90da8bc`（部署汇总 8 列规范）→ `e12f624`（登录入口补齐）。取证见 [§9.24](#924-deployments-核对表落地-8-列规范2026-11-12-0800) / [§9.25](#925-登录入口补齐自助注册--账号口令--通道自检--聊天匿名只读2026-11-12-凌晨-0800)
+| 仓库同步 | `main` @ `cf13458`（`ci: 托管平台同步作业内新增 Gitee 镜像自动推送（GITEE_TOKEN 缺失时显式 SKIP 告警）`，其下含 `4f69956` 设置并入个人中心的实现提交）；**双远端已全部同步**：`origin` / `gitee` 均 = `cf13458`（2026-11-11 17:2x UTC / 2026-11-12 01:2x +08 实测，0 ahead / 0 behind）。递交序列：`90da8bc`（部署汇总 8 列）→ `e12f624`（登录入口补齐）→ `12aaca0` / `59c3046`（文档）→ `4b71896`（主题分类）→ `e1e6990`（MIT 许可）→ `e1f78e3`（§9.26 取证）→ `4f69956`（设置并入个人中心）→ `cf13458`（CI Gitee 推送）。取证见 [§9.25](#925-登录入口补齐自助注册--账号口令--通道自检--聊天匿名只读2026-11-12-凌晨-0800) / [§9.26](#926-deployments-核对表落地-8-列规范2026-11-12-0800) / [§9.27](#927-设置并入个人中心信息架构收口账号设置只在登录后可见2026-11-12-凌晨-0800)
 | 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库）与 `gw.txt`（2026-11-10 21:57 实测，同样未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **16 文件 / 230 例**；`verify-deployments` **52/52**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.4 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
@@ -978,6 +978,28 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | GitHub Pages 页面 | `https://afdk1991.github.io/mim/deployments` 真实浏览器渲染出 8 列表头（顺序一致）、16 行、访问域名链接 `https://github.com/afdk1991/mim`；bundle `assets/index-C-3mRh0E.js` 同样含「访问域名」「列规范」 | Edge CDP + 下载核对 |
 | 本地门禁 | `verify-deployments` **55/55**；`comment-check --strict` 0；本地 UI 取证 **6/6 PASS** | `.tmp/verify_dep3.log`、`.tmp/comment_check10.log`、`.tmp/deployments-ui-e2e.json` |
 | 未做 | 未改 `Mim-PRD.html`（PRD 的部署汇总段落描述模块与端点，未列列数，判为「不涉及」） | 如实登记 |
+
+#### 9.27 设置并入个人中心（信息架构收口：账号设置只在登录后可见）（2026-11-12 凌晨 +08:00）
+
+**性质**：用户指出「设置」在未登录状态就出现在导航里、而账号资料 / 注销本应属于登录后的个人中心，要求纠正这种「本该在个人中心的东西被另开一页」的错位。本轮**删除独立设置视图**并把内容并回个人中心，属前端信息架构收口 + 文档同步，不改后端契约、不改数据库 schema。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 视图枚举 | `router.ts` 的 `AppView` 由 9 业务视图 + login 收为 **8 业务视图 + login**（删 `settings`）；`VIEW_SEGMENTS` 去掉 `settings`，`LEGACY_SEGMENTS` 改为 `settings: 'account'`（旧 `/settings` 原地落到 `/account`） | 文件本体 |
+| 导航 | `App.tsx` 导航数组删掉「设置」项；「个人中心」改名「个人中心与设置 / Account & settings」且改为 `...(session ? [...] : [])`，**仅在登录后出现**，匿名态不暴露个人区入口 | 同上 |
+| 门禁集合 | `GATED_VIEWS` 收为 `['comic', 'products', 'cart', 'account']`（聊天为匿名只读演示；商城目录 / 入口清单 / 部署汇总匿名可浏览） | 同上 |
+| 内容合并 | 删除 `apps/web/src/views/Settings.tsx`；`Profile.tsx` 的「账号安全」页签改名「账号与设置」，补「账号 ID / 区域 / 状态」行与注销冷静期不可恢复说明；原设置页的语言 / 时区 / 昵称仍归「资料」分区 | 文件本体 |
+| 门禁断言 | `verify-auth-gate.mjs` 模型注释与 `GATED_VIEWS` 正则同步；`verify-site-modules.mjs` 的 `GATED_VIEWS` 断言同步，并修正既有漂移（`check` 链已含 `verify-custom-domains`，原断言只认三条 → **78/79 转 79/79**） | 命令输出 |
+| 本地门禁 | `pnpm -r typecheck` 0；`@mim/web build` 0；根 `node scripts/build.mjs` 0，SPA 回退目录 **9 个路径段且不含 `settings`**（`marketplace / products / cart / account / entry-catalog / deployments / comic-studio / chat / signin`）；`verify-auth-gate` **35/35**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-deployments` **55/55**；`comment-check --strict` 0；`npm run check` 0（含自定义域名 20/20） | 命令回显 |
+| 提交与双推 | `4f69956 refactor(web): 设置并入个人中心，账号设置仅在登录后可见`（10 files changed, 68 insertions, 30 deletions，含并行会话遗留的 `deploy.yml` Gitee 推送段）；`origin` / `gitee` 均 `e1f78e3..4f69956`；并行会话再推进 `cf13458 ci: … Gitee 镜像自动推送`，双远端现均 = `cf13458`（0 ahead / 0 behind） | `git push`、`git ls-remote` |
+| CI | Deploy run **43067678292**（@ `cf13458`）**completed success**，六作业全绿（质量门禁 / 托管平台同步 / GitHub Pages / 镜像同步（Gitee）/ **发布到生产服务器** / ghcr）；上一 run **43067518158** 仅「镜像同步（Gitee）」因远端已被并行会话推进而 `non-fast-forward`，属推送竞态、非本改动缺陷 | `gh run watch --exit-status`、`gh run view --json jobs` |
+| 生产可达性 | `/health` 200 / 53B；`/settings` 200（SPA 回退，前端再改写）；`/account` 200 / 5305B；`/marketplace` 200 / 5305B | `curl.exe -w` |
+| 线上匿名取证 | Edge CDP 打开 `https://mim.mixm.top/settings`：`location.pathname` 变为 **`/account`**；导航文案 **`["商城","商品列表","购物车","入口配置清单","部署汇总","漫剧 AI 剧","聊天"]`**——**无「设置」、无「个人中心」**；页面出现内嵌登录卡片（`密码登录` 分段）与「此功能需登录后使用」。截图 `.tmp/live-account-anon.png`（22,820 B） | `probe-settings-merged.mjs` |
+| 线上登录态取证 | 生产自助注册验收号（`19986783912`）→ `/auth/password` 取真实会话注入 `mim.session.v1` → `/account`：导航出现 **「个人中心与设置」**，页签 `["资料","我的权益","我的订单","账号与设置"]`；账号分区含「账号 ID：01a1cba7　区域：中国区　状态：active」与「注销后账号进入冷静期…不可恢复」。截图 `.tmp/live-account-login.png`（31,744 B） | `probe-account-login.mjs` |
+| 未做 / 边界 | ① 生产 nginx 未新增 `location = /settings` 301（现由前端 `LEGACY_SEGMENTS` 原地改写，`curl` 返回 200 SPA 属预期）；② 未删除 i18n 词典 `nav.settings`（无引用，保留无害）；③ 历史留痕段落中的 `/settings` 旧快照不改写 | 如实登记 |
+| 文档同步 | README 路由段与生产登录入口表；`docs/wiki/05-runbook.md` 门禁模型 + SPA 回退路径段清单；`docs/wiki/08-dev-implementation.md` 2026-11-12 变更段；`Mim-PRD.html` 已实现列表新增「信息架构收口」 | 文件本体 |
+
+---
 
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
 
