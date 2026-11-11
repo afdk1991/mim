@@ -2,6 +2,22 @@
 
 > **项目名称：Mim**（用户 2026-11-09 18:50 统一定名）。仓库目录、npm scope `@mim/*`、仓库名 `mim` 与生产域名 `mim.mixm.top` 均与项目名称一致。协作铁律见 [AGENTS.md](./AGENTS.md)。
 
+## 项目主题
+
+**主题**：IM 即时通讯 + AI 漫剧创作 + 模块化商城，一套 Node/TypeScript 全栈、多平台发布的跨端协作平台。
+
+主题词与归属分类全部取自 [Gitee Explore](https://gitee.com/explore) 的真实分类（不自造分类名）：
+
+| 归属 | 分类 | 链接 | 对应已实现功能 |
+|---|---|---|---|
+| 主 | IM即时通讯/聊天 | https://gitee.com/explore/im | `/chat` 单聊 / 群聊 / 引用回复 / 撤回 / 文件图片消息、WebRTC 视频通话 |
+| 主 | WEB应用开发 | https://gitee.com/explore/web-app-develop | `apps/web` SPA（深链接回退四件套）、`apps/admin` 管理端前端 |
+| 辅 | 后台管理框架 | https://gitee.com/explore/backend | `/admin/` 商城与订单运营视图、管理类 `/api/v1/*` |
+| 辅 | AI-人工智能 | https://gitee.com/explore/ai | 漫剧创作工作台、AI 剧本扩充、AI 配音合成、付费生成包 |
+| 辅 | 多媒体 | https://gitee.com/explore/multimedia | 漫剧成片渲染导出（MOV/720p 转码降级）、WebRTC 音视频链路、云存储扩容 |
+
+分类与标杆项目对标、以及「Gitee 仓库无主题字段」的实测结论见 [docs/项目主题与Gitee-Explore分类映射-20261112.md](./docs/项目主题与Gitee-Explore分类映射-20261112.md)。
+
 ## 版本
 
 当前版本：**V0.0.0-preview**
