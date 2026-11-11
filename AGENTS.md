@@ -1049,6 +1049,22 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 文档同步（铁律七） | README（视图清单 / 按需登录段 / 模块表新增「漫剧放映厅」/ API 表两行）；`docs/wiki/05-runbook.md` 门禁模型；`docs/wiki/08-dev-implementation.md` 2026-11-12 变更段；`Mim-PRD.html` 作品管理与分发条目补放映厅上线说明 | 文件本体 |
 | 边界 | 演示片库为开放授权动画 / 自然短片（非真正漫剧剧情内容），页面已标注「演示片源」；创作工作台仍需登录，且 `/comic/*` 仍要求 `comic.workbench` 权益；新注册账号默认无该权益 | 如实登记 |
 
+#### 9.30 商城商品视觉改造（分类封面图 + 商品参数详情图）（2026-11-12 04:0x +08:00）
+
+**性质**：用户直接给出 GitHub Pages 商城地址指出「不是商品图片详细商品参数图片等等」——改造前 `/marketplace` 只有文字卡片：无封面图、详情只有状态/区域/分类/许可/语言/Stars 一行逗号文案。本轮补齐**商品封面图**与**逐商品参数详情图**，不改后端契约、不改数据库、不改商品数量。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 分类封面 | 新增 19 张一级分类商品封面（`apps/web/public/catalog/<slug>.jpg`，768px 宽、3:2、JPEG 32–82 KB），覆盖全部 19 个一级分类；二级模块按 `category_slug` 前缀复用所属一级分类封面 | 文件本体 + `dist/catalog` 计数 **19** |
+| 路径兼容 | 封面 URL 由 `import.meta.env.BASE_URL` 拼接（`catalogArt.ts` 的 `categoryCoverUrl`），GitHub Pages `/mim/` 子路径与生产根路径都可命中；不写死 `/catalog/` | 文件本体 + 本地 CDP `src=/catalog/ai.jpg`、`naturalWidth=768` |
+| 卡片视觉 | `Store.tsx` 商品卡新增 `.store-card-media` 通栏封面（3:2，悬停 1.04 微放大），左上分类角标、右上价格角标；其余信息保留 | 本地 CDP 首屏 `cards=12`、封面图 `naturalWidth=768` |
+| 详情首屏 | 点「详情」后卡片加 `.is-expanded` **横跨整行**（21:9 宽幅封面），详情首屏为封面大图 + **11 项参数键值表**：模块编码 / 所属分类 / 开源许可 / 编程语言 / Star 数 / 区域 / 上架状态 / 解锁方式 / 价格 / 前置依赖 / 能力绑定 | 本地 CDP `specRows=11`、截图 `.tmp/market-after-local.png` |
+| 参数详情图 | `catalogArt.ts` 的 `specPosterUrl()` 按详情数据实时生成 **900×1180 SVG data URL**：深色卡片、标题、编码、12 行参数、底部说明；每条模块参数值不同，可右键另存；浏览器按 `<img>` 渲染（`naturalWidth=900 / naturalHeight=1180`） | 本地 CDP 实测 + 截图 `.tmp/market-after-detail.png` |
+| 依赖链 / 价格历史 | 原有 G6 依赖链与 ECharts 价格历史保留在参数图之后，未删除任何既有能力 | 文件本体 |
+| 本地门禁 | `pnpm -r typecheck` 0；`pnpm --filter @mim/api test` **25 文件 / 372 例全过**；`@mim/web build` 0；根 `node scripts/build.mjs` 0（`dist/catalog` 19 张图，404.html + 9 路径段）；`verify-auth-gate` **39/39**；`verify-site-modules` **83/83**；`verify-entry-manifest` **23/23**；`verify-deployments` **55/55**；`verify-custom-domains` **20/20**；`comment-check --strict` 0 | 本轮命令回显 |
+| 文档同步（铁律七） | README 商城功能模块行补「商品视觉（2026-11-12 改造）」；本节为 AGENTS 取证；`docs/wiki/08-dev-implementation.md` 追加实现说明 | 文件本体 |
+| 边界 | 封面按 **19 个一级分类** 复用（205 条模块共享 19 张分类图），未逐条生成 205 张独立商品图；参数图是数据驱动的 SVG（不是照片），保证与接口实时一致且可被 205 条模块覆盖 | 如实登记 |
+
 ---
 
 ---

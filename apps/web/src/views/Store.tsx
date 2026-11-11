@@ -14,8 +14,10 @@ import { ApiError, api, errorText, getSession } from '../api';
 import type { CartSummary } from '../api';
 // 引入通用异步加载钩子：统一处理 loading / error / reload
 import { useAsync } from '../hooks';
-// 引入编程式跳转：匿名访客点击「登录后解锁」时跳转登录伪视图
+// 引入编程式跳转：匿名访客在升级身份时跳转登录伪视图
 import { navigate } from '../router';
+// 商品视觉：分类封面图 + 按详情实时生成的「商品参数详情图」（SVG data URL）
+import { categoryCoverUrl, specPosterUrl } from '../catalogArt';
 
 // 组件对外契约：商城文案跟随全局语言
 interface Props {
@@ -1142,11 +1144,22 @@ export function Store({ locale }: Props) {
                     : locale === 'en-US' ? 'Free' : '免费';
                   // 本卡片是否处于展开态
                   const expanded = expandedCode === m.code;
+                  // 商品名：卡片标题、图片 alt 与参数图共用同一份展示名
+                  const title = pick(locale, m.name, m.code);
+                  // 分类封面：19 个一级分类各一张，二级模块按一级 slug 复用
+                  const cover = categoryCoverUrl(m.category_slug);
+                  // 一级分类展示名：同时作为图片角标
+                  const groupName = categoryLabelOf(m.category_slug).split(' / ')[0];
                   // 返回单个模块卡片
                   return (
-                    <section key={m.code} className="panel">{/* 卡片容器：复用面板样式，以模块编码作为唯一 key */}
+                    <section key={m.code} className={`panel store-card${expanded ? ' is-expanded' : ''}`}>{/* 卡片容器：展开时横跨整行，给参数表与参数图足够宽度 */}
+                      <div className="store-card-media">{/* 商品封面区：图在上、信息在下，形成电商卡片视觉 */}
+                        <img src={cover} alt={`${title} ${locale === 'en-US' ? 'cover' : '商品封面'}`} loading="lazy" />{/* 商品分类封面图 */}
+                        <span className="store-card-category">{groupName}</span>{/* 左上角分类角标 */}
+                        <span className="store-card-price">{price}</span>{/* 右上角价格角标：免费 / 金额 */}
+                      </div>{/* 封面区结束 */}
                       <div className="panel-head">{/* 卡片头部：模块名 + 已解锁徽标 */}
-                        <h3>{pick(locale, m.name, m.code)}</h3>{/* 模块名：缺失时退化为模块编码 */}
+                        <h3>{title}</h3>{/* 模块名：缺失时退化为模块编码 */}
                         {owned && <span className="badge role-editor">✓ {locale === 'en-US' ? 'Owned' : '已解锁'}</span>}{/* 已解锁徽标（绿色） */}
                         {!owned && pendingOrders.has(m.code) && <span className="badge">{locale === 'en-US' ? 'Order pending' : '待结算'}</span>}{/* 待结算徽标：提示已下单未结算，避免重复购买 */}
                       </div>{/* 结束卡片头部 */}
@@ -1215,18 +1228,18 @@ export function Store({ locale }: Props) {
                             {locale === 'en-US' ? 'Add to cart' : '加入购物车'}{/* 加购按钮文案 */}
                           </button> // 结束加购按钮
                         )}{/* 结束加购按钮条件渲染 */}
-                        {!owned && !authed && ( // 匿名访客：解锁属收费动作，展示登录入口按钮替代解锁按钮
+                        {!owned && !authed && ( // 会话未就绪的降级入口：正常情况访客会话已在启动时自动建立，此处仅覆盖离线 / 限流
                           <button
-                            // 登录后解锁按钮：普通按钮，避免触发表单提交
+                            // 重试按钮：普通按钮，避免触发表单提交
                             type="button"
-                            // 幽灵小按钮：引导级操作，样式弱于主解锁按钮
+                            // 幽灵小按钮：引导级操作
                             className="btn ghost small"
-                            // 点击跳转登录伪视图，登录成功后回到商城可继续解锁
-                            onClick={() => navigate({ view: 'login' })}
+                            // 重新加载页面即会再次自动领取免登录会话，随后可正常解锁
+                            onClick={() => window.location.reload()}
                           >
-                            {locale === 'en-US' ? 'Sign in to unlock' : '登录后解锁'}{/* 匿名解锁引导文案，随语言切换 */}
-                          </button> // 结束登录后解锁按钮
-                        )}{/* 结束匿名引导条件渲染 */}
+                            {locale === 'en-US' ? 'Retry guest session' : '重试免登录会话'}{/* 降级引导文案，随语言切换 */}
+                          </button> // 结束降级重试按钮
+                        )}{/* 降级条件渲染结束 */}
                       </div>{/* 操作行结束 */}
                       {expanded && ( // 展开态渲染详情块
                         <div className="store-detail">{/* 详情容器 */}
@@ -1247,6 +1260,68 @@ export function Store({ locale }: Props) {
                                 {locale === 'en-US' ? 'Language' : '语言'}: {detail.data.language ?? '—'}
                                 {' · '}★ {detail.data.stars}
                               </p>{/* 元信息行结束 */}
+                              {(() => { {/* 商品详情视觉块：封面 + 参数表 + 参数详情图，数据全部来自 detail.data */}
+                                const data = detail.data!; // 已判空，闭包内断言非空
+                                const title = pick(locale, data.name, data.code); // 商品名
+                                const category = categoryLabelOf(data.category_slug); // 一级 / 二级分类
+                                const groupName = category.split(' / ')[0]; // 一级分类名（封面角标口径）
+                                const priceText = data.current_price // 价格文案与卡片同口径
+                                  ? `${(data.current_price.amount_minor / 100).toFixed(2)} ${data.current_price.currency}`
+                                  : locale === 'en-US' ? 'Free' : '免费';
+                                const requiresText = data.requires.length > 0 ? data.requires.map(nameOf).join(locale === 'en-US' ? ', ' : '、') : (locale === 'en-US' ? 'None' : '无');
+                                const capabilityText = data.capability ?? (data.code.startsWith('cat.') ? (locale === 'en-US' ? 'Planned' : '功能规划中') : (locale === 'en-US' ? 'Add-on entitlement' : '配套权益商品'));
+                                const statusText = MODULE_STATUS_LABEL[data.status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? data.status;
+                                // 参数行：详情页以键值表完整展示，避免只有一行逗号文案
+                                const specRows: Array<[string, string]> = [
+                                  [locale === 'en-US' ? 'Module code' : '模块编码', data.code],
+                                  [locale === 'en-US' ? 'Category' : '所属分类', category],
+                                  [locale === 'en-US' ? 'License' : '开源许可', data.license ?? '—'],
+                                  [locale === 'en-US' ? 'Language' : '编程语言', data.language ?? '—'],
+                                  [locale === 'en-US' ? 'Stars' : 'Star 数', `★ ${data.stars}`],
+                                  [locale === 'en-US' ? 'Region' : '区域', data.region],
+                                  [locale === 'en-US' ? 'Status' : '上架状态', statusText],
+                                  [locale === 'en-US' ? 'Unlock mode' : '解锁方式', locale === 'en-US' ? 'One-time purchase' : '一次性买断'],
+                                  [locale === 'en-US' ? 'Price' : '价格', priceText],
+                                  [locale === 'en-US' ? 'Requires' : '前置依赖', requiresText],
+                                  [locale === 'en-US' ? 'Capability' : '能力绑定', capabilityText],
+                                ];
+                                return (
+                                  <>
+                                    <div className="store-detail-hero">{/* 商品封面 + 参数表并排，详情区第一屏就能看到图 */}
+                                      <img src={categoryCoverUrl(data.category_slug)} alt={`${title} ${locale === 'en-US' ? 'cover' : '商品封面'}`} loading="lazy" />{/* 与卡片同一张分类封面 */}
+                                      <dl className="store-spec-grid">{/* 参数键值表 */}
+                                        {specRows.map(([label, value]) => (
+                                          <div key={label} className="store-spec-row">
+                                            <dt>{label}</dt>{/* 参数名 */}
+                                            <dd>{value}</dd>{/* 参数值 */}
+                                          </div>
+                                        ))}
+                                      </dl>
+                                    </div>{/* 封面与参数表结束 */}
+                                    <p className="store-detail-title">{locale === 'en-US' ? 'Product spec sheet' : '商品参数详情图'}</p>{/* 参数图小节标题 */}
+                                    <img
+                                      className="store-spec-image"
+                                      src={specPosterUrl({
+                                        name: title,
+                                        code: data.code,
+                                        groupName,
+                                        categoryName: category,
+                                        license: data.license,
+                                        language: data.language,
+                                        stars: data.stars,
+                                        priceText,
+                                        region: data.region,
+                                        statusText,
+                                        requiresText,
+                                        capabilityText,
+                                        locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                                      })}
+                                      alt={`${title} ${locale === 'en-US' ? 'spec sheet' : '商品参数详情图'}`}
+                                      loading="lazy"
+                                    />{/* 可保存/可右键另存的参数长图 */}
+                                  </>
+                                );
+                              })()}{/* 商品详情视觉块结束 */}
                               <div>{/* 工具区块：登记了能力的模块可真正执行；未登记则标注「功能规划中」 */}
                                 <p className="store-detail-title">{locale === 'en-US' ? 'Tool' : '工具'}{/* 小节标题 */}</p>
                                 {(() => { {/* 立即执行函数：把能力分支的局部变量收在一处，避免污染外层 */}

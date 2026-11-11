@@ -783,6 +783,138 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色表达「区块标签」而非正文 */
 } /* 小节标题结束 */
 
+/* 商品卡片：图在上、信息在下，形成电商货架视觉（2026-11-12 商城视觉改造新增） */
+.store-card { /* 商品卡专用容器 */
+  padding: 0; /* 取消通用面板内边距，让封面图通栏贴边 */
+  overflow: hidden; /* 圆角裁掉封面图直角 */
+  gap: 10px; /* 卡片内部行距收紧，信息更紧凑 */
+} /* 商品卡容器结束 */
+
+.store-card-media { /* 封面图容器：固定 3:2 比例，避免不同图源高度抖动 */
+  position: relative; /* 为分类 / 价格角标提供定位基准 */
+  aspect-ratio: 3 / 2; /* 与生成的封面图比例一致 */
+  overflow: hidden; /* 裁切图片溢出 */
+  background: #0b1220; /* 图片加载前深色底，避免白块闪烁 */
+} /* 封面容器结束 */
+
+.store-card-media img { /* 分类封面图 */
+  width: 100%; /* 撑满卡片宽度 */
+  height: 100%; /* 撑满固定比例 */
+  object-fit: cover; /* 等比裁切，不变形 */
+  display: block; /* 去除行内图片底部间隙 */
+  transition: transform 0.35s ease; /* 悬停放大过渡 */
+} /* 封面图结束 */
+
+.store-card:hover .store-card-media img { /* 悬停微放大：电商货架的轻交互 */
+  transform: scale(1.04); /* 放大 4%，不改变布局 */
+} /* 悬停结束 */
+
+.store-card-category,
+.store-card-price { /* 封面左上分类角标与右上价格角标 */
+  position: absolute; /* 浮在封面图上 */
+  top: 10px; /* 距顶 10px */
+  padding: 4px 10px; /* 角标内边距 */
+  border-radius: 999px; /* 胶囊形 */
+  font-size: 12px; /* 角标小字 */
+  font-weight: 600; /* 半粗保证可读 */
+  color: #fff; /* 白字 */
+  background: rgba(11, 18, 32, 0.66); /* 半透明深色底，任何图上都可读 */
+  backdrop-filter: blur(6px); /* 轻背景模糊，提升层次 */
+} /* 角标公共样式结束 */
+
+.store-card-category { /* 分类角标靠左 */
+  left: 10px; /* 左侧定位 */
+} /* 分类角标结束 */
+
+.store-card-price { /* 价格角标靠右 */
+  right: 10px; /* 右侧定位 */
+  background: rgba(59, 108, 255, 0.86); /* 品牌蓝底突出价格 */
+} /* 价格角标结束 */
+
+.store-card > :not(.store-card-media) { /* 封面以外的卡片内容补回左右内边距 */
+  padding-left: 18px; /* 左留白 */
+  padding-right: 18px; /* 右留白 */
+} /* 卡片内容内边距结束 */
+
+.store-card > .row { /* 操作行额外补底部留白 */
+  padding-bottom: 18px; /* 底留白与卡片圆角协调 */
+} /* 操作行结束 */
+
+.store-card > .store-detail { /* 展开详情同样补左右留白 */
+  margin-left: 18px; /* 左对齐内容区 */
+  margin-right: 18px; /* 右对齐内容区 */
+} /* 详情留白结束 */
+
+.store-card.is-expanded { /* 展开中的商品卡横跨整行，详情区获得全宽 */
+  grid-column: 1 / -1; /* 从第一列跨到最后一列 */
+} /* 展开卡片结束 */
+
+.store-card.is-expanded .store-card-media { /* 展开展示时封面改为宽幅，避免占满整屏高度 */
+  aspect-ratio: 21 / 9; /* 影院宽幅比例 */
+} /* 展开封面结束 */
+
+.store-detail-hero { /* 详情首屏：封面 + 参数表并排 */
+  display: grid; /* 左右两列 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); /* 图片与参数表比例 */
+  gap: 14px; /* 两列间距 */
+  align-items: start; /* 两列顶部对齐，避免图片被拉高裁切 */
+} /* 详情首屏结束 */
+
+.store-detail-hero img { /* 详情封面大图 */
+  width: 100%; /* 撑满列宽 */
+  height: auto; /* 按 3:2 自身比例，不随参数表拉高 */
+  aspect-ratio: 3 / 2; /* 固定比例 */
+  object-fit: cover; /* 等比裁切 */
+  border-radius: 10px; /* 圆角与详情区一致 */
+  display: block; /* 去底部间隙 */
+  align-self: start; /* 顶部对齐 */
+} /* 详情封面结束 */
+
+.store-spec-grid { /* 参数键值表 */
+  margin: 0; /* 清除 dl 默认外边距 */
+  display: grid; /* 单列键值行 */
+  grid-template-columns: 1fr; /* 一行一个参数 */
+  gap: 0; /* 行间用分隔线，不留额外间距 */
+  border: 1px solid var(--border); /* 表格外框 */
+  border-radius: 10px; /* 圆角 */
+  overflow: hidden; /* 裁掉行分隔线出头 */
+} /* 参数表结束 */
+
+.store-spec-row { /* 单个参数行 */
+  display: grid; /* 左右两列 */
+  grid-template-columns: 38% 62%; /* 参数名固定 38%，值占余下 */
+  align-items: center; /* 垂直居中 */
+  padding: 8px 12px; /* 行内留白 */
+  border-bottom: 1px solid var(--border); /* 行分隔线 */
+  background: var(--surface); /* 白底 */
+} /* 参数行结束 */
+
+.store-spec-row:last-child { /* 最后一行不画分隔线 */
+  border-bottom: 0; /* 去掉多余线 */
+} /* 最后一行结束 */
+
+.store-spec-row dt { /* 参数名 */
+  font-size: 12px; /* 小字标签 */
+  color: var(--text-muted); /* 次要色 */
+} /* 参数名结束 */
+
+.store-spec-row dd { /* 参数值 */
+  margin: 0; /* 清除 dd 默认缩进 */
+  font-size: 13px; /* 正文大小 */
+  font-weight: 600; /* 半粗突出值 */
+  word-break: break-all; /* 长编码强制折行 */
+} /* 参数值结束 */
+
+.store-spec-image { /* 商品参数详情长图 */
+  width: 100%; /* 撑满详情区 */
+  height: auto; /* 按 SVG 原始比例 */
+  display: block; /* 独占一行 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 10px; /* 圆角 */
+  background: #0b1220; /* 加载前深色底 */
+} /* 参数图结束 */
+
+
 .store-tool-output { /* 能力调用的文本 / JSON 结果：等宽字体 + 滚动，避免长串撑破卡片 */
   margin: 0; /* 清除 pre 默认外边距 */
   padding: 10px; /* 内边距让结果与边框分离 */
@@ -857,7 +989,7 @@ code { /* 行内代码/令牌展示 */
   overflow: hidden; /* 画布不溢出容器圆角 */
 } /* 部署状态环形图容器结束 */
 
-/* ---------- 站点模块矩阵（45 类备注驱动） ---------- */
+/* ---------- 统一入口配置清单（44 个入口驱动） ---------- */
 .site-stats { /* 总览统计网格：五个指标横向均分，窄屏自动换行 */
   display: flex; /* 横向排列统计项 */
   flex-wrap: wrap; /* 放不下时换行，避免溢出面板 */
@@ -912,7 +1044,7 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色表达区块标签 */
 } /* 小节标题结束 */
 
-.site-cap-row { /* 能力筛选按钮行：允许换行，避免 45 模块长名挤压 */
+.site-cap-row { /* 能力筛选按钮行：允许换行，避免 44 模块长名挤压 */
   flex-wrap: wrap; /* 放不下自动换行 */
   gap: 6px; /* 按钮间距收紧 */
 } /* 能力按钮行结束 */
@@ -2546,6 +2678,13 @@ code { /* 行内代码/令牌展示 */
   .theater-head { /* 标题与按钮换行 */
     flex-direction: column; /* 纵向 */
     align-items: stretch; /* 按钮撑满 */
+  } /* 结束 */
+  .store-detail-hero { /* 窄屏：详情封面与参数表改为上下排列 */
+    grid-template-columns: minmax(0, 1fr); /* 只保留一列 */
+  } /* 结束 */
+  .store-detail-hero img { /* 窄屏封面不再拉伸等高 */
+    height: auto; /* 按图片自身比例 */
+    aspect-ratio: 3 / 2; /* 保持 3:2 */
   } /* 结束 */
 } /* 媒体查询结束 */
 

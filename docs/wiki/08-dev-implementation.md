@@ -436,6 +436,19 @@ WS URL 推导：host 为 `mim.mixm.top` 或 `localhost` 时同源连接；否则
 - 浏览器 E2E：登录 → 聊天 → 发消息 → 消息显示，7 步全 PASS
 - 后端测试：10 个 IM 测试全过；全量 163 测试全过
 
+### 8.8 商城商品视觉（2026-11-12）
+
+**背景**：`/marketplace` 在 205 条模块数据齐全的前提下仍只有文字卡片，用户要求「商品图片 + 详细商品参数图片」。
+
+- `apps/web/public/catalog/<slug>.jpg`：19 个一级分类各一张 3:2 商品封面（768px 宽，JPEG），构建时原样复制到 `dist/catalog/`。
+- `apps/web/src/catalogArt.ts`：
+  - `categoryGroupSlug()` 从二级 `category_slug`（如 `ai-01`）还原一级 slug，未知分类回落 `misc`；
+  - `categoryCoverUrl()` 用 `import.meta.env.BASE_URL` 拼封面路径，兼容 GitHub Pages `/mim/` 子路径；
+  - `specPosterUrl()` 按详情数据生成 900×1180 SVG data URL（标题、编码、12 行参数、底部说明），每条模块参数值不同，可右键另存。
+- `apps/web/src/views/Store.tsx`：卡片加 `.store-card-media` 封面与分类/价格角标；详情加 `.store-detail-hero`（封面 + 11 项参数键值表）与 `.store-spec-image`；展开卡片加 `.is-expanded` 横跨整行。
+- `apps/web/src/styles.css`：新增 `.store-card*` / `.store-spec-*` 样式与 860px 单列响应式。
+- **验证**：本地 Edge CDP 首屏 12 张卡、封面 `naturalWidth=768`；详情 `specRows=11`、参数图 `900×1180`；`pnpm -r typecheck` 0、API 372 例、web 构建 0、根构建 0、各 verify 脚本全 PASS。
+
 ---
 
 _本页为开发实现规划草案，随代码落地逐节替换为「已实现」描述；修订时必须同步 [02-modules.md](./02-modules.md)、[04-dependencies.md](./04-dependencies.md)、[README.md](./README.md) 与根 README（铁律七）。_
