@@ -15,7 +15,7 @@
 | 部署矩阵 | **10 个免费平台**（2026-11-10 按用户指令新增 **Gitee（码云）** 为第 10 行）：腾讯云自建 / EdgeOne Pages / GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 / Gitee 镜像仓；`deploymentRegistry.json` 的 `coverage.matrix_platforms` 与 `platform_catalog.in_matrix` 同步为 10 | [铁律九](#铁律九多平台部署矩阵只走免费方案且必须逐平台取证)、`packages/core-domain/src/deploymentRegistry.json`、`node scripts/verify-deployments.mjs` D03 / D20 |
 | 生产权威终点 | 线上**腾讯云自建服务器** `https://mim.mixm.top`（nginx + systemd `mim-api` + SQLite WAL）；其余平台仅分发 / 镜像 | [铁律十二](#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)、[README.md](./README.md)「站点与部署」 |
 | 版本 / 通道 | **V0.0.0-preview**（semver 未变，无功能模块增删） | `package.json`、`README.md` §版本、`scripts/version-check.mjs` |
-| 仓库同步 | `main` @ `1fd7b5e`（`fix(nginx): CSP 按哈希放行地址栏折叠脚本，修多段深链接白屏`）；**双远端已全部同步**：`origin` / `gitee` 均 = `1fd7b5e`（2026-11-11 00:1x 实测，0 ahead / 0 behind）。历史推送记录：Gitee 入矩阵 `3f55bee`（`4398cf0..3f55bee`）、Cloudflare CI 修复 `b739483`（`3f55bee..b739483`）。`gitee` 镜像仓由 2026-11-10 按用户私人令牌新建（公开、默认分支 `main`），取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) / [§9.12](#912-部署矩阵新增-gitee码云2026-11-10-2220-0800) | `git push origin main`、`git push gitee main`、`git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`（2026-11-11） |
+| 仓库同步 | `main` @ `5cc77aa`（`fix(store): 交易型配套商品不再标注「规划中」，改为可购买并显示「配套权益」`）；**双远端已全部同步**：`origin` / `gitee` 均 = `5cc77aa`（2026-11-11 16:46 UTC / 00:46 +08 实测，0 ahead / 0 behind），本轮功能提交为 `e31e716`，取证见 [§9.24](#924-商城-205-条全覆盖--聊天七项增强--全链路点击级-e2e2026-11-11-深夜-0800)。历史推送记录：Gitee 入矩阵 `3f55bee`（`4398cf0..3f55bee`）、Cloudflare CI 修复 `b739483`（`3f55bee..b739483`）。`gitee` 镜像仓由 2026-11-10 按用户私人令牌新建（公开、默认分支 `main`），取证见 [§9.11](#911-gitee-镜像仓补齐2026-11-10-2150-0800) / [§9.12](#912-部署矩阵新增-gitee码云2026-11-10-2220-0800) | `git push origin main`、`git push gitee main`、`git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main`（2026-11-11） |
 | 工作树 | **干净（0 个未提交改动）**；2026-11-08 从工作树误删的 23 个部署工件（`deploy/*`、`functions/*`、`site/*`、`Dockerfile`、`.dockerignore`、`vercel.json`、`wrangler.toml`、`apps/web/public/_redirects`、`scripts/spa-404.mjs`）已于 2026-11-10 由 `git checkout -- .` 恢复到 HEAD；仅剩未跟踪草稿 `新建 文本文档.txt`（团队配置问答笔记，未入库）与 `gw.txt`（2026-11-10 21:57 实测，同样未入库） | `git status --short`、`git checkout -- .`（2026-11-10） |
 | 本地门禁 | `pnpm -r typecheck` 0（5/6 项目，根无 typecheck）；`pnpm --filter @mim/api test` **16 文件 / 230 例**；`verify-deployments` **52/52**；`verify-site-modules` **79/79**；`verify-entry-manifest` **23/23**；`verify-auth-gate` **35/35**；`comment-check --strict` 0（**102 文件 / 30228 可注释行 / 27000 已解释行 / 89.3%**，11 个文件低于 80%）；web / admin / api / 根 `dist` 四套构建 0 | 本轮真实命令输出，见 §9.4 与铁律十一缺口清单 |
 | 生产可达性 | `mim.mixm.top` 本机 `000`（curl exit 7：本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析至 `115.159.159.11`）；**无 SSH 私钥 / `tccli` 凭据，主机侧状态本轮无法验证** | `curl -v --max-time 8`、`nslookup mim.mixm.top` |
@@ -907,6 +907,21 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 版本号 | semver 未变（`V0.0.0-preview`，本轮为既有模块能力补全与交互增强，无新增顶层模块） | `package.json`、`scripts/version-check.mjs` |
 
 **未做 / 已知缺口（如实登记）**：① 群通话仍未做（2C2G 上 SFU 不可行）；② 点击级 E2E 仍未接入 CI（需 runner 装 Edge + 起 SQLite 前置）；③ 购物车付费分支止于 `pending`，在线支付未接；④ 生产 nginx `client_max_body_size 3m` 与媒体上传上限 64mb 不匹配（>3MB 上传在生产会 413）；⑤ 蓝图能力的产出是「模块起盘文档」（Markdown），不等于已实现该模块的运行时代码。
+
+#### 9.24.1 提交 / 双推 / CI / 线上取证（2026-11-11 16:46 UTC，00:46 +08）
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| 功能提交 | `e31e716`「feat(marketplace+im): 商城 205 条导航条目全覆盖 + 聊天引用/群管理/文件/定位增强」 | ✅ |
+| 口径修正提交 | `5cc77aa`「fix(store): 交易型配套商品不再标注「规划中」，改为可购买并显示「配套权益」」：8 个交易型种子商品（`comic.workbench` / `comic.genpack.basic|pro|team` / `ai.dubbing` / `ai.script` / `media.storage` / `template.pack`）本无 invoke 工具，原卡片误标「规划中」并禁用购买；改为只在 `cat.*` 导航条目无能力时显示「规划中」，商品改显「配套权益商品，解锁后在对应功能中生效」，并恢复购买 / 加购入口（`Store.tsx`、`Products.tsx`） | ✅ |
+| 双推 | `git push origin main`：`0e73440..e31e716`、`e31e716..5cc77aa` 均 EXIT=0；`git push gitee main`：同样两段均 EXIT=0（本轮 Gitee 未挂起） | ✅ 双远端同 `5cc77aa` |
+| CI run 1 | **43060478845**（Deploy @ `e31e716`）**success**，5 作业全绿；「发布到生产服务器」真执行（检查凭据 / 配置 SSH / 上传脚本 / 远程发布 / 校验版本一致 / 线上健康检查 / 管理后台断言 / 认证接口抽查 全 success，`未配置凭据 SKIP 提示` skipped 属预期） | ✅ 本轮凭据齐备 → CI 绿 = 已上线 |
+| CI run 2 | **43061463155**（Deploy @ `5cc77aa`）**success**，同样 5 作业全绿且生产真部署；Azure SWA `43061462933` 同期 success | ✅ |
+| 线上健康 | `https://mim.mixm.top/health` **200 / 53B**；`/marketplace` **200 / 5305B**；`/chat` **200 / 5305B** | ✅ |
+| 线上能力全覆盖 | `/api/v1/modules/cat.openharmony-01` **200 / 499B** → `"capability":"catalog.openharmony"`（此前该条目为「规划中」）；`/api/v1/modules/cat.store-03` **200 / 504B** → `"capability":"catalog.storefront"`；分页汇总（`modules` 键）**TOTAL=213 / WITH_CAP=205 / NO_CAP=8**，8 条恰为上述交易型商品，205 条导航条目 100% 覆盖 | ✅ |
+| 线上产物指纹 | `assets/index-BIttBGeS.js`（3,363,463 B）+ `index-D6yV1B2B.css`；bundle 内字符串命中：`配套权益`×2、`转让群主`×2、`chat-reply-bar` / `chat-msg-quote` / `chat-file-download` / `以下是新消息` / `catalog.openharmony` 各 ×1 → 本轮前端改动确已上线 | ✅ |
+| 生产页面只读探针 | Edge CDP 打开线上 `/marketplace`：**12 张卡片 / 「规划中」徽标 0 个**（含此前 8 个商品），截图 `.tmp/live-marketplace.png` | ✅ 商城已无「规划中」 |
+| 未做 | 生产登录态点击级 E2E（需 `MIM_AUTH_ADMIN_PASSWORD` 主机私有口令）；群通话；在线支付；>3MB 上传的 nginx 上限放宽 | 如实登记 |
 
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
 
