@@ -1078,6 +1078,8 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 生产渲染 | Edge CDP `https://mim.mixm.top/marketplace`：`path=/marketplace`、`cards=12`、封面 `currentSrc=https://mim.mixm.top/catalog/ai.jpg` 且 `naturalWidth=768`、无「此功能需登录后使用」；详情 `hero=true`、`specRows=11`、参数图 `900×1180`、展开卡宽 754 | `probe-market-live.mjs` / `probe-market-final2.mjs` |
 | Pages 渲染 | Edge CDP `https://afdk1991.github.io/mim/marketplace`：`path=/mim/marketplace`、`cards=12`、封面 `https://afdk1991.github.io/mim/catalog/ai.jpg` `naturalWidth=768`；详情 `specRows=11`、参数图 `900×1180` | 同上 |
 | 访客可用性 | 并行会话 `ca45746` 上线匿名访客会话后，生产 `POST /auth/guest` **200 / 572 B**；清空本地会话重新加载后 `mim.session.v1` 有 `access_token`，卡片按钮为 **详情 / 解锁 / 加入购物车 / 购买 99.00 CNY**，不再是「重试免登录会话」 | `probe-market-final2.mjs` |
+| 访客交易链路 | 生产 Edge CDP 实测：点「加入购物车」→ `/cart` 出现「漫剧创作工作台 / comic.workbench / 免费 / 结算即解锁 / 去结算」；回商城点「解锁」→ 提示已解锁、该卡按钮收敛为「详情」，证明**无需正式账号即可完成加购与免费解锁** | `probe-market-buy.mjs` |
+| 聊天访客态 | 生产 `/chat`：`session=true`、`loginGate=false`、无「此功能需登录后使用」，导航提供「+ 群聊」，`GET /im/users` 200（当前库内仅访客账号，无第二真人可建私聊，故未造测试群） | `probe-chat-final.mjs` / `probe-chat-users.mjs` |
 | 截图 | `.tmp/market-prod-final.png`（生产 1440×1100：左侧 19 分类、热门项目、商品封面卡、展开详情参数表）；`.tmp/market-pages.png`（Pages 同口径） | CDP `Page.captureScreenshot` |
 | 边界 | 本节的封面/参数图改动与并行访客会话是**两个独立提交**；生产「重试免登录会话」的修复来自 `ca45746`，不属本提交，已在取证中区分 | 如实登记 |
 
