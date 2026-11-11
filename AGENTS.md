@@ -840,8 +840,12 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 本地门禁 | `pnpm -r typecheck` **0**；`pnpm --filter @mim/api test` **21 文件 / 336 例全过**（`capabilities-extra.test.ts` 由 23 例扩至 **44 例**）；`@mim/web build` **0**（产物 `apps/web/dist` + `404.html`）；`env-check` 0；`comment-check --strict` **0** | `.tmp/typecheck3.log`、`.tmp/api_test3.log`、`.tmp/web_build2.log`、`.tmp/env_check2.log`、`.tmp/comment_check4.log` |
 | 手工验算（补证） | `api.routes` 三条路由（`/users/:id`、`/users/:userId`、`/users/:id`）→ **重复 2 条、参数漂移 1 条**；`url.short` 产出 6 位 Base62；`crawler.plan` 清掉 `utm_source` 并保留 `page=1` 探测 | 用例内断言 + 本轮实测输出 |
 | 文档同步（铁律七） | `moduleCapabilities.ts` 头部规模注释、`README.md` 接口表能力计数、本节 | 本表与上述文件 |
+| 提交与双推 | 提交 `4b64041`（5 files / 612 insertions）；`origin`、`gitee` 均 `29e985b..4b64041`，push EXIT=0；`git ls-remote` 两端同为 `4b64041` | `.tmp/push_origin5.log`、`.tmp/push_gitee5.log`、`.tmp/lsr5.txt` |
+| CI | run **43042826817** 结论 **success**，五作业（质量门禁 / 发布到生产服务器 / GitHub Packages / 托管平台同步 / GitHub Pages）全 success；Azure 作业 **43042826645** success | `gh run view 43042826817 --json status,conclusion,jobs` |
+| 线上取证（`mim.mixm.top`，2026-11-11 22:5x +08:00） | 匿名 `GET /api/v1/modules` 三页合计 **213 条**（205 导航条目 + 8 个交易种子模块），其中 **`capability` 非空的 62 条**（= 能力清单全量）；`/health` 200 | `.tmp/cap_count.txt` |
+| WEB 组生产能力 E2E（主机内 `/tmp/cap-web.mjs`，执行后即删） | `GET /modules?category=web&pageSize=100` → **MODULES=17 / WITH_CAPABILITY=17**（该组 0 条规划中）；三条真实解锁并调用：`cat.web-16`（短链，入参 `https://mim.mixm.top/products?group=dev`）`CHECKOUT=200 unlocked` → `INVOKE=200 KIND=json HIT=true`；`cat.web-07`（设计令牌，入参 `4`）→ `INVOKE=200 KIND=json HIT=true`；`cat.web-17`（layui 列，入参 `id/name/created_at`）→ `INVOKE=200 KIND=text HIT=true`；**VERIFIED=3** | `.tmp/cap_web_result.txt` |
 
-**仍未闭环（与 §9.21 一致，如实登记）**：① 商城剩余 **143/205 条「规划中」**（159 − 16），下一组建议 OpenHarmony（37 条）或工业软件（15 条），口径仍待用户拍板；② **群通话未做**；③ **浏览器点击级 E2E 未做**；④ 购物车付费分支仍止于 `pending`。
+**仍未闭环（与 §9.21 一致，如实登记）**：① 商城剩余 **143/205 条「规划中」**（159 − 16，按导航条目口径；线上 213 条中 62 条有能力的差额同源），下一组建议 OpenHarmony（37 条）或工业软件（15 条），口径仍待用户拍板；② **群通话未做**；③ **浏览器点击级 E2E 未做**；④ 购物车付费分支仍止于 `pending`。
 
 ---
 
