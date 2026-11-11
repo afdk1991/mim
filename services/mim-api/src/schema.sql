@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
   display_name      TEXT NOT NULL DEFAULT '',
   locale            TEXT NOT NULL DEFAULT 'zh-CN',
   timezone          TEXT NOT NULL DEFAULT 'Asia/Shanghai',
+  -- 匿名访客标记：1 = 免登录自动建立的访客账号（未绑定任何登录身份），
+  -- 0 = 真实账号。访客可正常使用全部功能，登录后由真实账号接管同一份数据。
+  is_guest          INTEGER NOT NULL DEFAULT 0,
   deletion_scheduled_at TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL,

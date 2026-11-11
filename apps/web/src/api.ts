@@ -20,6 +20,7 @@ export interface UserInfo { // 当前登录用户的核心资料（登录响应�
   timezone: string; // IANA 时区名，用于把服务端 UTC 时间渲染成本地时间
   deletion_scheduled_at?: string | null; // 注销预约时间；仅注销流程中有值，其余为 null/缺省
   member_no: string; // 对外 Mim ID 号码（MIM-10000001 形态），与内部 uuid 主键解耦
+  is_guest?: boolean; // 匿名访客会话标记：true 表示尚未绑定任何登录身份，可随时登录升级
 } // UserInfo 结构结束
 
 export interface OAuthProviderInfo { // 第三方登录提供方（含是否已在当前部署配置好凭证）
@@ -198,6 +199,27 @@ export async function verifySession(): Promise<boolean> { // true 保持解锁�
     return true; // 等下一次真实业务请求再判定
   } // try/catch 结束
 } // verifySession 结束
+
+/**
+ * 免登录体验：本地没有会话时自动向服务端领一个匿名访客会话。
+ * 有了访客会话，商城下单、购物车、个人中心、聊天、漫剧工作台等原先「需登录」的功能
+ * 全部按已登录路径工作，界面不再出现任何登录门禁；用户随时可以登录升级为正式账号。
+ */
+export async function ensureGuestSession(): Promise<boolean> { // true 表示当前已有可用会话（访客或正式）
+  if (current) return true; // 已有会话（含正式登录与游客）直接复用，不再建号
+  try { // 网络不可用时不能让整页阻塞在门禁上
+    const result = await api.guest(); // 领一个访客会话
+    setSession(result, 'login'); // 与登录同一条广播路径，界面立即进入可用态
+    return true; // 访客会话就绪
+  } catch { // 建号失败（限流 / 离线 / 服务端异常）
+    return false; // 调用方保留只读降级界面
+  } // try/catch 结束
+} // ensureGuestSession 结束
+
+/** 当前是否为匿名访客会话（前端据此显示「访客」标签与登录升级入口） */
+export function isGuestSession(): boolean { // 正式登录用户同样可能保留旧 is_guest 标记，以服务端回传为准
+  return Boolean(current?.user.is_guest); // 未登录时为 false
+} // isGuestSession 结束
 
 function newKey(): string { // 生成幂等键，服务端据此去重重复提交
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') { // 优先用原生 UUID，熵高且几乎无碰撞
@@ -861,6 +883,15 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     return request<{ sms: boolean; email: boolean; password: boolean; register: boolean }>('/auth/channels', { auth: false, idempotency: false }); // 公开只读接口
   }, // authChannels 结束
 
+  guest(region?: Region) { // 匿名访客会话：免登录体验入口，不绑定任何身份也拿到完整可用会话
+    return request<LoginResult>('/auth/guest', { // 与登录同形状的响应：令牌 + 用户视图
+      method: 'POST', // 建号属写操作
+      body: { region, device: { platform: 'web', name: '浏览器' } }, // 区域可空，服务端缺省中国区
+      auth: false, // 此时还没有令牌
+      idempotency: false, // 每次建号都是新访客，重复提交由服务端限流兜底
+    }); // 请求调用结束
+  }, // guest 结束
+
   oauthProviders(region?: Region) { // 第三方登录提供方清单（含凭证配置状态）
     const query = region ? `?region=${region}` : ''; // 区域过滤：中国区只看国内可用项
     return request<{ providers: OAuthProviderInfo[] }>(`/auth/oauth/providers${query}`, { auth: false, idempotency: false }); // 公开只读接口
@@ -1468,7 +1499,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束
     }, // detail 结束
-    placeholders() { // 47 个占位标识及其配置状态
+    placeholders() { // 46 个占位标识及其配置状态
       return request<{ total: number; configured: number; items: Array<{ entryKey: string; placeholder: string; envKey: string; configured: boolean; kind: string; system: string }> }>(
         '/entries/placeholders', { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束

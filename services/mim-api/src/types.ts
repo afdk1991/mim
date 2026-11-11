@@ -35,6 +35,7 @@ export interface UserRow { // 用户行最小视图，登录响应与个人中�
   display_name: string; // 展示名
   locale: string; // 语言偏好
   timezone: string; // 时区偏好
+  is_guest: number | null; // 匿名访客标记：1 为免登录自动建的访客账号，0/NULL 为真实账号
   deletion_scheduled_at: string | null; // 注销预约时间，供前端提示
   created_at: string; // 注册时间
 } // UserRow 结束
@@ -47,6 +48,7 @@ export interface AuthUser { // 鉴权通过后挂到 req.user 的最小用户视
   display_name: string; // 展示名，前端界面直接使用
   locale: string; // 语言区域，决定返回文案语言
   timezone: string; // 时区，用于按用户本地时间做提醒
+  is_guest?: number | null; // 匿名访客标记：1 为免登录自动建的访客账号
 } // AuthUser 结束：字段随鉴权结果一并挂到 req.user
 
 declare global { // 全局类型增强：让 Express Request 携带自定义字段

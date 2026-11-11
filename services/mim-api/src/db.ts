@@ -36,6 +36,7 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'im_messages', column: 'reply_to_id', definition: 'TEXT' }, // 引用回复的目标消息 ID（2026-11-11 聊天增强）
   { table: 'im_messages', column: 'reply_excerpt', definition: 'TEXT' }, // 被引用消息的快照摘要（发送时固化）
   { table: 'users', column: 'member_no', definition: 'TEXT' }, // 对外 Mim ID 号码（2026-11-12 注册自动分配编号）
+  { table: 'users', column: 'is_guest', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 匿名访客标记（2026-11-12 免登录体验：访客自动建号）
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
 // 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃

@@ -65,6 +65,7 @@ export interface CreateUserInput { // 只声明真正需要外部决定的字段
   display_name?: string; // 展示名，可空
   locale?: string; // 语言偏好，缺省按地区推断
   timezone?: string; // 时区偏好，缺省按地区推断
+  is_guest?: boolean; // 是否匿名访客账号（免登录体验自动建号），缺省为 false
   now: string; // 创建时间，由调用方统一取时保证与其它写入一致
 } // CreateUserInput 结束
 
@@ -91,8 +92,8 @@ export function createUser(db: Db, input: CreateUserInput): UserRow { // 唯一�
   const id = uuidv7(); // 内部主键：时间有序，便于按注册顺序排查
   const memberNo = allocateMemberNo(db); // 先发号，再写行；写行失败时号码随事务回滚
   db.prepare( // 预编译插入语句
-    `INSERT INTO users (id, member_no, region, status, display_name, locale, timezone, created_at, updated_at)
-     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+    `INSERT INTO users (id, member_no, region, status, display_name, locale, timezone, is_guest, created_at, updated_at)
+     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
   ).run( // 绑定参数
     id, // 内部主键
     memberNo, // 对外号码
@@ -100,6 +101,7 @@ export function createUser(db: Db, input: CreateUserInput): UserRow { // 唯一�
     (input.display_name ?? '').trim().slice(0, 64), // 展示名限幅，空串表示待完善
     input.locale ?? defaultLocaleOf(input.region), // 默认语言
     input.timezone ?? defaultTimezoneOf(input.region), // 默认时区
+    input.is_guest ? 1 : 0, // 匿名访客标记：登录升级后可清零，清库策略按此列筛选
     input.now, // 创建时间
     input.now, // 更新时间
   ); // 结束执行

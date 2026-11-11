@@ -55,19 +55,19 @@ export function ComicStudio({ locale, hasSession, onSignIn }: Props) {
         />
       )}
 
-      {/* 创作工作台：登录后渲染；匿名时给出说明与登录入口 */}
+      {/* 创作工作台：免登录体验下访客会话建立后直接渲染；仅在会话建立失败时给出重试入口 */}
       {tab === 'workbench' && hasSession && <ComicWorkbench locale={locale} />}
       {tab === 'workbench' && !hasSession && (
         <div className="page">
           <div className="card theater-login">
-            <h2>{isZh ? '创作工作台需要登录' : 'Sign in to use the workbench'}</h2>
+            <h2>{isZh ? '正在建立免登录会话' : 'Setting up your anonymous session'}</h2>
             <p className="muted">
               {isZh
-                ? '放映厅无需登录即可看片；剧本、分镜、角色与一键成片属于你的私有创作数据，登录后才能使用。'
-                : 'The theater is open to everyone. Scripts, storyboards, characters and film generation are private, so sign in to use them.'}
+                ? '工作台无需登录即可使用；当前只是会话尚未就绪（离线或服务端限流），重试即可恢复。'
+                : 'The workbench needs no sign-in. Your anonymous session is not ready yet (offline or rate-limited) — retry to continue.'}
             </p>
             <button type="button" className="btn primary" onClick={onSignIn}>
-              {isZh ? '去登录 / 注册' : 'Sign in / Sign up'}
+              {isZh ? '重试 / 登录' : 'Retry / Sign in'}
             </button>
           </div>
         </div>

@@ -33,6 +33,7 @@ export function createMeRouter(deps: ApiDeps): Router { // 工厂函数：接收
         display_name: user.display_name, // 昵称，用于页面展示
         locale: user.locale, // 语言偏好，用于前端切换文案
         timezone: user.timezone, // 时区偏好，用于前端本地化时间展示
+        is_guest: user.is_guest === 1, // 匿名访客标记：刷新后前端仍能显示「访客」并保留登录升级入口
       }, // user 字段结束
     }); // 响应体结束
   }); // GET /me 路由结束

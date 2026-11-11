@@ -51,10 +51,10 @@ export function ChatPreview({ locale, onSignIn }: Props) {
       </aside>
 
       <section className="chat-main">{/* 右侧消息区 */}
-        <header className="chat-preview-banner">{/* 顶部说明条：明确这是演示态并给出登录入口 */}
-          <span>{isZh ? '只读演示：登录后即可创建会话、收发消息、传文件与群管理。' : 'Read-only demo. Sign in to chat, send files and manage groups.'}</span>
-          <button type="button" className="btn primary small" onClick={onSignIn}>{/* 登录引导按钮 */}
-            {isZh ? '去登录 / 注册' : 'Sign in / Sign up'}
+        <header className="chat-preview-banner">{/* 顶部说明条：会话尚未就绪时的降级提示 */}
+          <span>{isZh ? '正在建立免登录会话：就绪后即可直接创建会话、收发消息、传文件与群管理。' : 'Setting up your anonymous session — chat, files and groups unlock automatically once it is ready.'}</span>
+          <button type="button" className="btn primary small" onClick={onSignIn}>{/* 重试 / 登录按钮 */}
+            {isZh ? '重试 / 登录' : 'Retry / Sign in'}
           </button>
         </header>
 

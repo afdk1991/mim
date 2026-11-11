@@ -8,6 +8,7 @@ import type { Locale } from '@mim/i18n';
 import {
   api, // 业务接口集合：退出登录时调用 logout
   clearSession, // 清空本地会话并广播登出
+  ensureGuestSession, // 免登录体验：本地无会话时自动领匿名访客会话
   getSession, // 读取当前内存会话
   setSession, // 登录成功后持久化会话并广播登录态
   verifySession, // 用 /me 静默校验本地会话是否仍有效
@@ -25,7 +26,7 @@ import { Products } from './views/Products';
 import { Cart } from './views/Cart';
 // 个人中心：资料编辑 / 我的权益 / 我的订单 / 账号安全
 import { Profile } from './views/Profile';
-// 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问，写操作才引导登录
+// 统一入口配置清单：44 个入口驱动的模块目录，访客会话免登录可浏览，规划中入口不提供直达
 import { Sites } from './views/Sites';
 // 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
 import { Deployments } from './views/Deployments';
@@ -40,17 +41,19 @@ import { useAppRoute } from './router'; // 路径路由 hook：地址栏 /<view>
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
 import type { AppView } from './router';
 
-// 需登录方可使用的视图集合：均为收费或私密功能；匿名访问时在内容区内嵌登录卡片而非整站锁定
-const GATED_VIEWS: ReadonlySet<AppView> = new Set(['products', 'cart', 'account']); // 漫剧模块已改为「放映厅匿名可看 + 工作台登录后使用」，不再整页拦截；聊天为匿名只读演示（ChatPreview）
+// 免登录体验：全站不再有「此功能需登录后使用」的门禁集合。
+// 匿名访客进入站点时后端自动签发一个访客会话（POST /auth/guest），
+// 商城下单、购物车、个人中心、聊天、漫剧工作台等全部按已登录路径工作；
+// 访客可随时登录 / 注册，把身份升级为正式账号。
 
-// 应用根组件：浏览类页面匿名可访问，仅使用收费功能模块时才要求登录（按需登录）
+// 应用根组件：所有视图免登录可用（访客会话自动建立），登录仅用于把身份升级为正式账号
 export function App() {
   // 会话状态：初始值从 localStorage 恢复（api.ts 已做结构校验），实现刷新后保持登录
   const [session, setLocalSession] = useState<Session | null>(getSession());
   // 当前视图由地址栏路径驱动（对外路径段为模块功能名称，如 /marketplace）：根路径与未知路径经 parseLocation 回落到商城
   const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<模块功能名>）
-  // 登录提示：null 默认无提示，expired 为登录态失效后的重登说明，required 为访问收费功能时的登录说明
-  const [gateNotice, setGateNotice] = useState<'required' | 'expired' | null>(null);
+  // 登录提示：null 默认无提示，expired 为登录态失效后的重登说明（免登录体验下不再有「需登录」提示）
+  const [gateNotice, setGateNotice] = useState<'expired' | null>(null);
 
   // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
   const locale: Locale = normalizeLocale(session?.user.locale);
@@ -84,6 +87,19 @@ export function App() {
     // 卸载时移除监听，避免重复订阅
     return () => window.removeEventListener(SESSION_CHANGED_EVENT, onChange);
   }, []); // 仅挂载时注册一次，路由变化不重复校验
+
+  // 免登录体验：本地没有会话时自动向后端领一个匿名访客会话，全站立即进入可用态
+  useEffect(() => {
+    if (getSession()) return; // 已有会话（正式账号或访客）无需再建号
+    let cancelled = false; // 组件卸载后不再改状态，避免卸载后 setState 警告
+    void ensureGuestSession().then((ok) => {
+      if (cancelled || !ok) return; // 建号失败（离线 / 限流）保留只读降级界面，可由用户点击重试
+      setLocalSession(getSession()); // 会话已由 ensureGuestSession 写入内存与 localStorage
+    }); // then 结束
+    return () => {
+      cancelled = true; // 标记已卸载
+    }; // 清理函数结束
+  }, []); // 仅挂载时尝试一次，登录成功后会走会话变更事件
 
   // 登录成功回调：持久化会话并清除登录提示；保留原 hash 让直达内页的用户原地解锁
   function handleLogin(result: LoginResult) {
@@ -128,6 +144,13 @@ export function App() {
     setLocalSession(updated);
   } // handleUserUpdated 结束
 
+  // 访客会话建立失败后的重试入口：离线恢复或限流窗口过后可再触发一次，保证功能可用
+  function retryGuestSession() { // 无返回值，仅驱动界面状态
+    void ensureGuestSession().then((ok) => { // 重新领访客会话
+      if (ok) setLocalSession(getSession()); // 成功后同步界面会话
+    }); // then 结束
+  } // retryGuestSession 结束
+
   // 侧边导航项：顺序即展示顺序（商城 → 商品列表 → 购物车 → 个人中心 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天）；匿名可见，点击收费视图时再要求登录
   const navItems: Array<{ view: AppView; label: string }> = [
     // 功能模块商城（用户习惯称「商城」，导航以「商城」呈现便于查找）
@@ -136,9 +159,9 @@ export function App() {
     { view: 'products', label: locale === 'en-US' ? 'Products' : '商品列表' },
     // 购物车：待购模块与结算
     { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
-    // 个人中心：资料 / 权益 / 订单 / 账号与设置（仅在登录后出现在导航，匿名态不暴露个人区入口）
-    ...(session ? [{ view: 'account' as AppView, label: locale === 'en-US' ? 'Account & settings' : '个人中心与设置' }] : []),
-    // 站点模块矩阵：按 45 类备注开发的模块目录
+    // 个人中心：资料 / 权益 / 订单 / 账号与设置（免登录体验下访客同样拥有个人区，随时可登录升级）
+    { view: 'account', label: locale === 'en-US' ? 'Account & settings' : '个人中心与设置' },
+    // 统一入口配置清单：按 44 个入口开发的模块目录
     { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单' },
     // 部署汇总：统一字段核对整体部署情况
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总' },
@@ -148,10 +171,8 @@ export function App() {
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
   ]; // 导航项定义结束，数组顺序即侧栏展示顺序
 
-  // 当前视图是否属于收费 / 私密功能：命中集合时匿名访客看到内嵌登录卡片
-  const gated = GATED_VIEWS.has(route.view);
-  // 内嵌登录卡片展示的提示：失效提示优先，其次收费功能登录说明
-  const embeddedNotice: 'required' | 'expired' | null = gateNotice ?? (gated ? 'required' : null);
+  // 主布局：左侧栏 + 右侧内容区；访客与正式账号共用同一骨架，登录只用于升级身份
+  const needsSession = route.view === 'products' || route.view === 'cart' || route.view === 'account'; // 需要会话的功能视图（访客会话自动建立）
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
@@ -185,19 +206,23 @@ export function App() {
         </nav>{/* 导航容器结束 */}
         {/* 侧边栏底部：已登录显示用户区与退出，匿名显示登录入口 */}
         <div className="sidebar-footer">{/* 吸底容器：margin-top:auto 把它推到侧栏底部 */}
-          {session ? ( // 已登录分支：用户信息 + 退出按钮
+          {session ? ( // 有会话分支（访客或正式账号）：显示身份 + 登录升级 / 退出
             <>
               {/* 显示名，缺失时回退到 id 前 8 位 */}
               <span className="user-name">{session.user.display_name || session.user.id.slice(0, 8)}</span>{/* 显示名，缺失时回退到 id 前 8 位 */}
-              {/* 区域标识 */}
-              <span className="user-region">{session.user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 区域标识：cn 显示中国区，其余显示 Global */}
-              {/* 退出登录按钮：点击后清理会话并回到商城页 */}
-              <button type="button" className="btn ghost block" onClick={handleLogout}>{/* 退出登录按钮 */}
-                {/* 退出文案（i18n） */}
-                {t(locale, 'action.logout')}{/* 退出文案，走 i18n 词典 */}
-              </button>{/* 退出按钮结束 */}
-            </> // 已登录分支结束
-          ) : ( // 匿名分支：登录入口按钮
+              {/* 身份标识：访客显式标注「免登录」，正式账号显示区域 */}
+              <span className="user-region">{session.user.is_guest ? (locale === 'en-US' ? 'Guest · no sign-in' : '访客 · 免登录') : session.user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 身份标识结束 */}
+              {session.user.is_guest ? ( // 访客分支：不提供退出（退出后会立刻再建访客），改为登录升级入口
+                <button type="button" className="btn primary block" onClick={() => go({ view: 'login' })}>{/* 登录 / 注册升级按钮 */}
+                  {locale === 'en-US' ? 'Sign in / Sign up' : '登录 / 注册正式账号'}{/* 升级文案 */}
+                </button> // 升级按钮结束
+              ) : ( // 正式账号分支：正常退出登录
+                <button type="button" className="btn ghost block" onClick={handleLogout}>{/* 退出登录按钮 */}
+                  {t(locale, 'action.logout')}{/* 退出文案，走 i18n 词典 */}
+                </button> // 退出按钮结束
+              )}{/* 身份分支结束 */}
+            </> // 有会话分支结束
+          ) : ( // 会话尚未建立分支：提供登录入口，同时自动建号正在后台进行
             <button type="button" className="btn primary block" onClick={() => go({ view: 'login' })}>{/* 登录入口按钮 */}
               {locale === 'en-US' ? 'Sign in' : '登录'}{/* 登录按钮文案，随语言切换 */}
             </button> // 登录入口按钮结束
@@ -217,14 +242,19 @@ export function App() {
         {route.view === 'account' && session && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
-        {/* 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问 */}
+        {/* 统一入口配置清单：44 个入口驱动的模块目录，访客会话免登录可浏览 */}
         {route.view === 'sites' && <Sites locale={locale} onOpenView={(view) => go({ view })} />}{/* 站点模块矩阵：清单内的跳转由 App 统一注入 */}
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
-        {/* 收费 / 私密视图（漫剧 / 商品列表 / 购物车 / 个人中心）：匿名访问时以内容区内嵌登录卡片替代 */}
-        {gated && !session && (
-          <Login embedded onLogin={handleLogin} notice={embeddedNotice} /> // 内嵌登录：保留侧栏导航上下文
-        )}{/* 内嵌登录条件渲染结束 */}
+        {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
+        {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
+          <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}
+            <p className="hint">{locale === 'en-US' ? 'Setting up your anonymous session…' : '正在建立免登录会话…'}</p>{/* 状态说明 */}
+            <button type="button" className="btn ghost" onClick={retryGuestSession}>{/* 重试按钮 */}
+              {locale === 'en-US' ? 'Retry' : '重试'}{/* 重试文案 */}
+            </button> // 重试按钮结束
+          </div> // 占位容器结束
+        )}{/* 会话就绪占位结束 */}
         {/* 漫剧 AI 剧模块：放映厅匿名可看片，创作工作台在模块内按需登录 */}
         {route.view === 'comic' && (
           <ComicStudio locale={locale} hasSession={!!session} onSignIn={() => go({ view: 'login' })} />
@@ -235,12 +265,12 @@ export function App() {
         {route.view === 'chat' && !session && (
           <ChatPreview locale={locale} onSignIn={() => go({ view: 'login' })} /> // 只读演示，登录引导回到登录视图
         )}{/* 匿名聊天演示结束 */}
-        {/* 登录伪视图：匿名时提供独立登录入口 */}
-        {route.view === 'login' && !session && (
-          <Login embedded onLogin={handleLogin} notice={gateNotice} /> // 独立登录入口：内嵌于主布局
-        )}{/* 匿名登录伪视图结束 */}
-        {/* 登录伪视图：已登录时提示无需重复登录 */}
-        {route.view === 'login' && session && (
+        {/* 登录伪视图：访客（含免登录访客）可在此登录或注册，把身份升级为正式账号 */}
+        {route.view === 'login' && (!session || session.user.is_guest) && (
+          <Login embedded onLogin={handleLogin} notice={gateNotice} /> // 登录 / 注册入口
+        )}{/* 登录伪视图结束 */}
+        {/* 登录伪视图：正式账号已登录时提示无需重复登录 */}
+        {route.view === 'login' && session && !session.user.is_guest && (
           <div className="page"><p className="hint">{locale === 'en-US' ? 'Already signed in.' : '当前已登录，无需重复登录。'}</p></div> // 已登录提示
         )}{/* 已登录登录伪视图结束 */}
       </main>{/* 内容区结束 */}

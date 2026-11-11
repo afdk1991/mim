@@ -116,15 +116,10 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const provider: Provider = region === 'cn' ? 'phone' : 'email';
   // 账号输入框标题：随提供方在「手机号 / 邮箱」文案之间切换
   const identifierLabel = provider === 'phone' ? t(locale, 'auth.phone') : t(locale, 'auth.email');
-  // 按需登录提示文案：随本页语言切换，失效态与收费功能登录说明分别取词
+  // 登录提示文案：免登录体验下只有「登录态失效」一种提示，旧的功能门禁提示已移除
   const gateText = notice // 有提示才计算文案
-    // 失效态：登录后又被令牌失效踢回，明确要求重新登录
-    ? (notice === 'expired'
-      ? (locale === 'en-US' ? 'Your session has expired. Please sign in again.' : '登录状态已失效，请重新登录。')
-      // 收费功能态：说明该功能需登录后使用
-      : (locale === 'en-US' ? 'Sign in to use this feature.' : '此功能需登录后使用。'))
-    // 无提示时为空串，JSX 条件渲染不输出节点
-    : ''; // gateText 计算结束
+    ? (locale === 'en-US' ? 'Your session has expired. Please sign in again.' : '登录状态已失效，请重新登录。') // 失效态：登录后又被令牌失效踢回，明确要求重新登录
+    : ''; // 无提示时为空串，JSX 条件渲染不输出节点
 
   // 切换区域：整体清空已填内容，避免手机号被当作邮箱提交
   function switchRegion(next: Region) {    // 写入目标区域
