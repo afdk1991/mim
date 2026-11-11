@@ -179,7 +179,7 @@ export function Sites({ locale, onOpenView }: Props) {
   const overview = useAsync(() => api.sites.overview(), []);
   // 清单总览：去重整理口径、关联条数、@ 记录与空白字段合并结果
   const manifest = useAsync(() => api.entries.overview(), []);
-  // 占位标识清单：47 项（45 入口 + @ 根域名 + 空白占位）的配置状态
+  // 占位标识清单：46 项（44 入口 + @ 根域名 + 空白占位）的配置状态
   const placeholders = useAsync(() => api.entries.placeholders(), []);
   // 搜索框输入值（未提交）：按键不触发请求
   const [keyword, setKeyword] = useState('');

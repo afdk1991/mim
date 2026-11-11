@@ -12,16 +12,16 @@
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
 | `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 15 文件 / 211 例契约测试通过（2026-11-10 实测）；端口 8787 |
 | `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅设置页）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
-| `packages/core-domain` | 共享包 | 错误码、状态机、UUIDv7；**2026-11-09 新增统一入口配置清单** `siteModules.json`（schema `mim.site-modules.v2`：45 去重入口 / 19 业务域 / 135 功能点 / 90 演示 / 123 关联；可配置占位标识、去重整理 `dedupe` 与 `hostConfig` 声明）与 `siteModules.ts`（类型约束、占位解析 `resolveEntryHost` / `entryHostTemplate`、状态机工具） | 前后端共用单一事实源；统一入口配置清单与 `site_module_items` 的唯一数据源 |
+| `packages/core-domain` | 共享包 | 错误码、状态机、UUIDv7；**2026-11-09 新增统一入口配置清单** `siteModules.json`（schema `mim.site-modules.v2`：44 去重入口 / 19 业务域 / 132 功能点 / 88 演示 / 116 关联；可配置占位标识、去重整理 `dedupe` 与 `hostConfig` 声明）；**2026-11-12 新增落地状态层** `entryImplementation.ts`（四态映射：已落地 / 部分相邻 / 规划中 / 语义冲突，含真实能力与边界说明）；`siteModules.ts`（类型约束、占位解析 `resolveEntryHost` / `entryHostTemplate`、状态机工具、落地映射合并） | 前后端共用单一事实源；统一入口配置清单与 `site_module_items` 的唯一数据源 |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
 | `scripts/env-check.mjs` | 可执行代码 | 09 清单 §0（密钥治理硬约束）的自动校验器 | 退出码 0/1；校验 `.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性 |
 | `scripts/comment-check.mjs` | 可执行代码 | 铁律十一（全仓库逐行注释）的覆盖率校验器：逐文件统计「可注释行 / 已解释行」 | 退出码 0（基线）/ 1（`--strict` 低于阈值）；逐文件覆盖率与缺口清单 |
-| `scripts/verify-site-modules.mjs` | 可执行代码 | **2026-11-09 新增**：统一入口配置清单零依赖校验——45 条备注逐字比对、占位标识 / 19 域 / 状态机自洽、共享包→后端→前端→测试全链路消费断言 | 79 项断言，退出码 0/1；由 `npm run verify:site-modules` 调用 |
+| `scripts/verify-site-modules.mjs` | 可执行代码 | **2026-11-09 新增**：统一入口配置清单零依赖校验——44 条备注逐字比对、占位标识 / 19 域 / 状态机自洽、落地状态四态链路透出、共享包→后端→前端→测试全链路消费断言 | 83 项断言，退出码 0/1；由 `npm run verify:site-modules` 调用 |
 | `scripts/verify-site-directory.mjs` | 可执行代码 | 上一轮「站点入口契约」零依赖校验（仅登记 46 类备注与 15 空备注行） | 16 项断言，退出码 0/1；与本轮校验并存、互不覆盖 |
-| `apps/web/src/views/Sites.tsx` | 业务代码（前端） | **2026-11-09 新增**：统一入口配置清单视图——去重整理面板、45 入口卡片（占位标识 + 未配置状态）、19 业务域筛选、核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分展开、搜索、条目新建与状态流转；匿名只读、写操作按需登录 | `/sites` 路径视图，消费 `/api/v1/entries*` 6 只读端点 + `/api/v1/sites*` 运行时端点 |
-| `services/mim-api/src/routes/sites.ts` | 业务代码（后端） | **2026-11-09 新增**：运行时 6 端点（概览 / 列表 / 详情 / 能力 / 条目 / 新建 / 状态流转），按占位键寻址，配套 `site_module_items` 表（隔离键为占位标识键）与 90 条幂等演示数据 | 浏览公开；写操作 `requireAuth + idempotency` |
-| `services/mim-api/src/routes/entries.ts` | 业务代码（后端） | **2026-11-09 新增**：统一入口配置清单 6 只读端点（`/entries/overview`、`/entries/domains`、`/entries/placeholders`、`/entries/config`、`/entries`、`/entries/:entryKey`）——去重整理口径、19 业务域、47 占位标识与配置状态；不回显具体主机值 | 全部公开只读；静态路径先于动态参数注册 |
+| `apps/web/src/views/Sites.tsx` | 业务代码（前端） | **2026-11-09 新增**：统一入口配置清单视图——去重整理面板、44 入口卡片（占位标识 + 未配置状态 + 落地状态徽标）、19 业务域筛选、核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分展开、已落地功能与边界说明、搜索、条目新建与状态流转；规划中入口隐藏演示条目与新建表单；匿名只读、写操作按需登录；已落地 / 相邻入口可直达站内视图或独立后台 | `/entry-catalog` 路径视图，消费 `/api/v1/entries*` 6 只读端点 + `/api/v1/sites*` 运行时端点 |
+| `services/mim-api/src/routes/sites.ts` | 业务代码（后端） | **2026-11-09 新增**：运行时 6 端点（概览 / 列表 / 详情 / 能力 / 条目 / 新建 / 状态流转），按占位键寻址，概览与列表逐条透出落地状态映射与四态计数；配套 `site_module_items` 表（隔离键为占位标识键）与 88 条幂等演示数据 | 浏览公开；写操作 `requireAuth + idempotency` |
+| `services/mim-api/src/routes/entries.ts` | 业务代码（后端） | **2026-11-09 新增**：统一入口配置清单 6 只读端点（`/entries/overview`、`/entries/domains`、`/entries/placeholders`、`/entries/config`、`/entries`、`/entries/:entryKey`）——去重整理口径、19 业务域、46 占位标识与配置状态、落地四态计数；不回显具体主机值 | 全部公开只读；静态路径先于动态参数注册 |
 | `services/mim-api/test/sites.test.ts` | 测试代码 | **2026-11-09 新增 / 本轮修订**：站点模块契约测试 14 例（占位键寻址 / 详情 / 过滤 / 404 / 鉴权 / 幂等 / 状态机 / 作用域隔离 / 种子自洽） | vitest + supertest 全通过 |
 | `services/mim-api/test/entries.test.ts` | 测试代码 | **2026-11-09 本轮新增**：统一入口配置清单契约测试 12 例（19 域 / 去重整理 / 占位配置 / 关联对称 / 全链路消费） | vitest + supertest 全通过 |
 | `scripts/build.mjs` | 可执行代码 | 根级构建脚本：默认构建真实前端并把 `apps/web/dist` 递归复制到根 `dist/`（EdgeOne Pages 等 OutputDir=dist 的平台同款链路）；`--site` 模式才把 `site/` 复制到 `dist/` | 根 `dist/index.html`（真实应用）+ `dist/assets/*`，供 `npm run build` 调用 |

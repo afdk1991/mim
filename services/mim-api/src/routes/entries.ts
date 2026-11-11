@@ -11,9 +11,9 @@
  *
  * 路由一览（/api/v1 前缀由 app.ts 统一挂载）：
  *   GET /entries/overview        公开 — 清单规模、去重整理、占位配置统计
- *   GET /entries                 公开 — 45 入口清单，支持 q / domain 过滤
+ *   GET /entries                 公开 — 44 入口清单，支持 q / domain 过滤
  *   GET /entries/domains         公开 — 19 个业务域
- *   GET /entries/placeholders    公开 — 47 个占位标识（45 入口 + @ 根域名 + 空白占位）
+ *   GET /entries/placeholders    公开 — 46 个占位标识（44 入口 + @ 根域名 + 空白占位）
  *   GET /entries/config          公开 — 可配置占位标识模板与注入说明（值恒为空）
  *   GET /entries/:entryKey       公开 — 单入口详情，含关联入口的解析结果
  *
@@ -98,9 +98,9 @@ export function createEntriesRouter(_deps: ApiDeps): Router {
       moduleBasis: reg.moduleBasis, // 模块划分依据
       noteFormat: reg.noteFormat, // 备注格式说明
       derivation: reg.derivation, // 实现推导声明
-      entries: summary.modules, // 去重后业务入口数（45）
+      entries: summary.modules, // 去重后业务入口数（44）
       domains: summary.domains, // 业务域数（19）
-      capabilities: summary.capabilities, // 运行时功能点数（135）
+      capabilities: summary.capabilities, // 运行时功能点数（132）
       relations: SITE_MODULES.reduce((n, m) => n + m.related.length, 0), // 相似模块关联条数
       placeholders: entries.length + 2, // 44 入口 + @ 根域名占位 + 空白占位
       configured, // 已配置入口数，默认 0
@@ -171,7 +171,7 @@ export function createEntriesRouter(_deps: ApiDeps): Router {
 
   // ---------- 公开：入口清单与检索 ----------
 
-  /** GET /entries — 45 入口清单，支持 q（备注/系统名/占位键/业务域）与 domain 过滤 */
+  /** GET /entries — 44 入口清单，支持 q（备注/系统名/占位键/业务域）与 domain 过滤 */
   router.get('/entries', (req, res) => { // 公开只读，与商城目录同一访问模型
     const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : ''; // 搜索词小写化
     const domain = typeof req.query.domain === 'string' ? req.query.domain.trim() : ''; // 业务域编码

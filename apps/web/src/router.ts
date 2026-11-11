@@ -7,7 +7,7 @@ export type AppView =
   | 'products' // 商品列表（商城配套的密集列表页，含加购）
   | 'cart' // 购物车（清单 / 移除 / 清空 / 结算）
   | 'account' // 个人中心（资料 / 权益 / 订单 / 账号与设置）
-  | 'sites' // 站点模块矩阵（45 类备注驱动的模块目录）
+  | 'sites' // 统一入口配置清单（44 个入口驱动的模块目录）
   | 'deployments' // 部署汇总（所有部署仓库与部署项的效果 / 结果 / 异常）
   | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
@@ -26,7 +26,7 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   products: 'products', // 商品列表（与功能名一致）
   cart: 'cart', // 购物车（与功能名一致）
   account: 'account', // 个人中心（与功能名一致；账号设置在此，不再单独设「设置」页）
-  sites: 'entry-catalog', // 入口配置清单（45 类备注驱动的模块目录）
+  sites: 'entry-catalog', // 入口配置清单（44 个入口驱动的模块目录）
   deployments: 'deployments', // 部署汇总（原名即功能名，保持不变）
   comic: 'comic-studio', // 漫剧 AI 剧工作台
   chat: 'chat', // 聊天（原名即功能名，保持不变）

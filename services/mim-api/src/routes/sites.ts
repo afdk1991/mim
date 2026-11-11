@@ -1,5 +1,5 @@
 /**
- * 站点模块运行时路由（2026-11-09）：把去重后的 45 个入口落成可运行模块。
+ * 站点模块运行时路由（2026-11-09）：把去重后的 44 个入口落成可运行模块。
  *
  * 设计边界：
  *   - 模块 / 业务域 / 能力点为静态契约（packages/core-domain/src/siteModules.json），不在库里复制一份；
@@ -12,7 +12,7 @@
  *
  * 路由一览（/api/v1 前缀由 app.ts 统一挂载）：
  *   GET    /sites/overview                公开 — 全站汇总（入口/能力/业务域/条目/占位状态）
- *   GET    /sites                         公开 — 45 个入口列表，支持 q / domain（兼容 group）过滤
+ *   GET    /sites                         公开 — 44 个入口列表，支持 q / domain（兼容 group）过滤
  *   GET    /sites/:host                   公开 — 单入口详情（备注原文、行号、能力点、条目统计）
  *   GET    /sites/:host/capabilities      公开 — 单入口能力点清单
  *   GET    /sites/:host/items             公开 — 业务条目列表，支持 capability / status 过滤
@@ -202,7 +202,7 @@ export function createSitesRouter(deps: ApiDeps): Router {
 
   // ---------- 公开：模块列表 ----------
 
-  /** GET /sites — 45 个入口清单，支持 q（占位键/系统名/备注/职责）与 domain（兼容 group）过滤 */
+  /** GET /sites — 44 个入口清单，支持 q（占位键/系统名/备注/职责）与 domain（兼容 group）过滤 */
   router.get('/sites', (req, res) => { // 公开只读，与商城目录同一访问模型
     const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : ''; // 搜索词小写化
     // 业务域编码优先取 domain，兼容旧调用仍传 group；两者都给时以 domain 为准。
