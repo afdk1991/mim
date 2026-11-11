@@ -2,10 +2,10 @@
 // 只用 Node 22 内置 WebSocket / fetch，不引入第三方依赖。
 //
 // 可重放前置（三个本地进程，与 verify-chat-flow 相同）：
-//   1) MIM_JOBS=0 MIM_AI_WORKER=0 node services/mim-api/dist/index.js     # API :8787
+// 本地步骤 1) 启动 API 服务：MIM_JOBS=0 MIM_AI_WORKER=0 node services/mim-api/dist/index.js     # API :8787
 //   2) node scripts/serve-local.mjs                                       # 静态站 :5188（同源反代 /api）
-//   3) msedge --headless=new --remote-debugging-port=9222 --user-data-dir=<abs>/.tmp/edge-profile-chat about:blank
-//   4) npm run verify:chat-plus
+// 本地步骤 3) 启动无头 Edge：msedge --headless=new --remote-debugging-port=9222 --user-data-dir=<abs>/.tmp/edge-profile-chat about:blank
+// 本地步骤 4) 执行增强 E2E：npm run verify:chat-plus
 //
 // 与接口契约测试的分工：本脚本的引用、加人、设管理员、搜索跳转全部由页面 DOM 点击驱动，
 // 断言读取页面渲染结果（引用块文案、下载链接、角色标签、高亮类名），而不是接口返回体。

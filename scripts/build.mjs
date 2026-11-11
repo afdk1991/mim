@@ -11,7 +11,7 @@
  *   node scripts/build.mjs          # 构建真实前端 → 根 dist/
  *
  * 环境变量：
- *   VITE_API_ORIGIN  前端调用的 API 源；未设置时默认生产 API https://mim.mixm.top。
+ *   VITE_API_ORIGIN  前端调用的 API 源；未设置时默认生产 API 源为 https://mim.mixm.top。
  *
  * 注：刻意不使用 fs.cpSync——本机 Node 在该 API 上出现 0xC0000409 崩溃，
  *     故采用 copyFileSync 手动递归复制，跨平台稳定。

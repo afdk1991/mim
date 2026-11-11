@@ -73,7 +73,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   alipay: '支付宝',
   // 微信支付
   wechat: '微信支付',
-  // Stripe
+  // Stripe 支付渠道
   stripe: 'Stripe',
 }; // 渠道映射结束
 

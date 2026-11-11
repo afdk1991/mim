@@ -16,9 +16,9 @@ export type ClientFrameType =
   | 'message.read' // 标记会话已读：更新 last_read_message_id 并广播 read 事件
   | 'typing' // 输入中提示：广播给同会话其它在线成员（不落库）
   | 'call.invite' // 发起视频通话邀请
-  | 'call.offer' // WebRTC SDP offer
-  | 'call.answer' // WebRTC SDP answer
-  | 'call.ice' // WebRTC ICE candidate
+  | 'call.offer' // WebRTC SDP offer 信令
+  | 'call.answer' // WebRTC SDP answer 应答
+  | 'call.ice' // WebRTC ICE 候选
   | 'call.hangup'; // 挂断通话
 
 /** 服务端 → 客户端的事件类型枚举 */

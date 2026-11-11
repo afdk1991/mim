@@ -208,15 +208,15 @@ const cardLuhn: CapabilityHandler = async ({ text }) => { // 卡号校验
   else if ((Number.parseInt(prefix2, 10) >= 51 && Number.parseInt(prefix2, 10) <= 55) || (prefix4 >= 2221 && prefix4 <= 2720)) brand = 'Mastercard'; // 51-55 / 2221-2720
   else if (/^3[47]/.test(digits)) brand = 'American Express'; // 34/37
   else if (/^62/.test(digits)) brand = 'UnionPay'; // 62 银联
-  else if (/^35/.test(digits)) brand = 'JCB'; // 35 JCB
+  else if (/^35/.test(digits)) brand = 'JCB'; // 35 开头为 JCB
   const output = JSON.stringify({ valid, brand, length: digits.length, masked: `${digits.slice(0, 6)}****${digits.slice(-4)}` }, null, 2); // 不回显完整卡号
   return { output, output_kind: 'json', meta: { valid } }; // 返回结论
 }; // cardLuhn 结束
 
 /** CSV ↔ JSON：两个方向都走 csv-parse 解析，输出带表头信息（程序开发 / Excel 工具包） */
 const csvJson: CapabilityHandler = async ({ text, options }) => { // 表格互转
-  const mode = optionString(options, 'mode', 'tojson'); // tojson / tocsv
-  if (mode === 'tocsv') { // JSON → CSV
+  const mode = optionString(options, 'mode', 'tojson'); // 取值：tojson / tocsv
+  if (mode === 'tocsv') { // JSON 转 CSV
     const parsed = parseJsonInput(text, 'csv.json'); // 解析 JSON 输入
     const rows = Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : null; // 必须是对象数组
     if (!rows || rows.length === 0) throw new AppError('VALIDATION_FAILED', 'expect a non-empty JSON array of objects', { capability: 'csv.json' }); // 结构校验
@@ -293,7 +293,7 @@ const ipCidr: CapabilityHandler = async ({ text }) => { // 网段计算
 /** SVG 图表：CSV 首列当标签、次列当数值，输出柱状图或折线图（程序开发 / 图表组件） */
 const chartSvg: CapabilityHandler = async ({ text, options }) => { // 图表生成
   const rows = readCsvRows(text, options, 'chart.svg'); // 解析 CSV
-  const chart = optionString(options, 'chart', 'bar'); // bar / line
+  const chart = optionString(options, 'chart', 'bar'); // 取值：bar / line
   if (rows.length === 0) throw new AppError('VALIDATION_FAILED', 'empty CSV', { capability: 'chart.svg' }); // 空数据拒绝
   const columns = Object.keys(rows[0]); // 列名
   if (columns.length < 2) throw new AppError('VALIDATION_FAILED', 'CSV needs at least 2 columns: label,value', { capability: 'chart.svg' }); // 至少两列
@@ -322,7 +322,7 @@ const reportTable: CapabilityHandler = async ({ text, options }) => { // 报表�
   const rows = readCsvRows(text, options, 'report.table'); // 解析 CSV
   if (rows.length === 0) throw new AppError('VALIDATION_FAILED', 'empty CSV', { capability: 'report.table' }); // 空数据拒绝
   const columns = Object.keys(rows[0]); // 表头
-  const format = optionString(options, 'format', 'html'); // html / markdown
+  const format = optionString(options, 'format', 'html'); // 取值：html / markdown
   if (format === 'markdown') { // Markdown 表格
     const header = `| ${columns.join(' | ')} |`; // 表头行
     const divider = `| ${columns.map(() => '---').join(' | ')} |`; // 分隔行
@@ -372,7 +372,7 @@ const logStats: CapabilityHandler = async ({ text }) => { // 日志统计
     if (timeMatch) times.push(timeMatch[0]); // 收集时间
   } // 循环结束
   const levelList = [...levels.entries()].sort((a, b) => b[1] - a[1]).map(([level, count]) => ({ level, count })); // 级别降序
-  const topMessages = [...messages.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([message, count]) => ({ message, count })); // Top10
+  const topMessages = [...messages.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([message, count]) => ({ message, count })); // 前 10 名
   const output = JSON.stringify({ total_lines: lines.length, levels: levelList, error_rate: lines.length ? Number((((levels.get('ERROR') ?? 0) + (levels.get('FATAL') ?? 0)) / lines.length * 100).toFixed(2)) : 0, first_time: times[0] ?? null, last_time: times[times.length - 1] ?? null, top_messages: topMessages }, null, 2); // 结构化结论
   return { output, output_kind: 'json', meta: { lines: lines.length } }; // 返回
 }; // logStats 结束
@@ -429,7 +429,7 @@ const jsonSchema: CapabilityHandler = async ({ text }) => { // Schema 推导
     if (Array.isArray(value)) { // 数组
       return { type: 'array', items: value.length > 0 ? infer(value[0], depth + 1) : {} }; // 以首元素为元素类型
     } // 数组分支结束
-    if (value === null) return { type: 'null' }; // null
+    if (value === null) return { type: 'null' }; // 空值
     if (typeof value === 'object') { // 对象
       const properties: Record<string, unknown> = {}; // 属性表
       for (const [key, sub] of Object.entries(value as Record<string, unknown>)) properties[key] = infer(sub, depth + 1); // 逐属性推导
@@ -449,7 +449,7 @@ const citeFormat: CapabilityHandler = async ({ text, options }) => { // 文献�
   if (!title) throw new AppError('VALIDATION_FAILED', 'field "title" is required', { capability: 'cite.format' }); // 缺题名拒绝
   const authors = Array.isArray(input.authors) ? input.authors.map((a) => String(a)).filter(Boolean) : []; // 作者数组
   const authorText = authors.length === 0 ? '佚名' : authors.length > 3 ? `${authors.slice(0, 3).join(', ')}, 等` : authors.join(', '); // 超过 3 人用「等」
-  const type = optionString(options, 'type', typeof input.type === 'string' ? input.type : 'book'); // book / journal / web
+  const type = optionString(options, 'type', typeof input.type === 'string' ? input.type : 'book'); // 取值：book / journal / web
   const year = input.year === undefined ? '' : String(input.year); // 年份
   const pages = input.pages === undefined ? '' : String(input.pages); // 页码
   let output: string; // 结果
@@ -467,10 +467,10 @@ const citeFormat: CapabilityHandler = async ({ text, options }) => { // 文献�
 }; // citeFormat 结束
 
 /** YAML 与 JSON 互转（云原生配置的日常体操） */
-const yamlJson: CapabilityHandler = async ({ text, options }) => { // YAML ↔ JSON
-  const mode = optionString(options, 'mode', 'yaml2json'); // yaml2json / json2yaml
+const yamlJson: CapabilityHandler = async ({ text, options }) => { // YAML 与 JSON 互转
+  const mode = optionString(options, 'mode', 'yaml2json'); // 取值：yaml2json / json2yaml
   try {
-    if (mode === 'json2yaml') { // JSON → YAML
+    if (mode === 'json2yaml') { // JSON 转 YAML
       const parsed = parseJsonInput(text, 'yaml.json'); // 先解 JSON
       const output = stringifyYamlText(parsed); // 序列化为 YAML
       return { output, output_kind: 'text', meta: { mode, chars: output.length } }; // 返回
@@ -517,7 +517,7 @@ const diffText: CapabilityHandler = async ({ text, options }) => { // 文本对�
 
 /** 代码统计：按语言注释语法统计代码行 / 注释行 / 空行与注释率（代码扫描分析） */
 const codeStats: CapabilityHandler = async ({ text, options }) => { // 代码行统计
-  const lang = optionString(options, 'lang', 'ts'); // ts / js / py / sh / sql / html
+  const lang = optionString(options, 'lang', 'ts'); // 取值：ts / js / py / sh / sql / html
   const commentTokens: Record<string, string[]> = { ts: ['//', '/*', '*', '*/'], js: ['//', '/*', '*', '*/'], py: ['#'], sh: ['#'], sql: ['--'], html: ['<!--'] }; // 各语言行注释前缀
   const tokens = commentTokens[lang] ?? ['//']; // 未知语言按 JS 口径
   const lines = text.split(/\r?\n/); // 全部行
@@ -553,7 +553,7 @@ const textStats: CapabilityHandler = async ({ text }) => { // 文本统计
   const wordTokens = (text.match(/[\u4e00-\u9fff]|[A-Za-z][A-Za-z0-9'’_-]*/g) ?? []); // 词元
   const freq = new Map<string, number>(); // 词频
   for (const token of wordTokens) freq.set(token, (freq.get(token) ?? 0) + 1); // 计数
-  const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([token, count]) => ({ token, count })); // Top10
+  const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([token, count]) => ({ token, count })); // 前 10 名
   const output = JSON.stringify({ chars: text.length, chars_no_space: noSpace.length, cjk: (text.match(/[\u4e00-\u9fff]/g) ?? []).length, letters: (text.match(/[A-Za-z]/g) ?? []).length, digits: (text.match(/[0-9]/g) ?? []).length, lines, paragraphs, tokens: wordTokens.length, top }, null, 2); // 结构化结论
   return { output, output_kind: 'json', meta: { lines, paragraphs } }; // 返回
 }; // textStats 结束
@@ -610,36 +610,36 @@ const speechSsml: CapabilityHandler = async ({ text, options }) => { // 语音�
 
 /** HTTP 状态码字典：覆盖 1xx–5xx 常见码，查询时按入参逐个回放 */
 const HTTP_STATUS_TEXT: Record<number, { name: string; description: string }> = { // 码值 → 名称 + 说明
-  100: { name: 'Continue', description: '继续发送请求体' }, // 1xx
-  101: { name: 'Switching Protocols', description: '协议切换（如升级 WebSocket）' }, // 1xx
-  200: { name: 'OK', description: '请求成功' }, // 2xx
-  201: { name: 'Created', description: '资源已创建' }, // 2xx
-  202: { name: 'Accepted', description: '已接受，异步处理' }, // 2xx
-  204: { name: 'No Content', description: '成功但无响应体' }, // 2xx
-  206: { name: 'Partial Content', description: '范围请求的部分内容' }, // 2xx
-  301: { name: 'Moved Permanently', description: '永久重定向' }, // 3xx
-  302: { name: 'Found', description: '临时重定向' }, // 3xx
-  304: { name: 'Not Modified', description: '缓存仍然有效' }, // 3xx
-  307: { name: 'Temporary Redirect', description: '临时重定向，保持方法与请求体' }, // 3xx
-  308: { name: 'Permanent Redirect', description: '永久重定向，保持方法与请求体' }, // 3xx
-  400: { name: 'Bad Request', description: '请求语法或参数错误' }, // 4xx
-  401: { name: 'Unauthorized', description: '缺少或无效的身份凭证' }, // 4xx
-  403: { name: 'Forbidden', description: '已认证但无权限' }, // 4xx
-  404: { name: 'Not Found', description: '资源不存在' }, // 4xx
-  405: { name: 'Method Not Allowed', description: '方法不被允许' }, // 4xx
-  409: { name: 'Conflict', description: '与当前资源状态冲突' }, // 4xx
-  410: { name: 'Gone', description: '资源已被永久移除' }, // 4xx
-  412: { name: 'Precondition Failed', description: '前置条件不满足' }, // 4xx
-  413: { name: 'Payload Too Large', description: '请求体超出上限' }, // 4xx
-  415: { name: 'Unsupported Media Type', description: '媒体类型不受支持' }, // 4xx
-  422: { name: 'Unprocessable Entity', description: '语义校验失败' }, // 4xx
-  429: { name: 'Too Many Requests', description: '触发限流' }, // 4xx
-  500: { name: 'Internal Server Error', description: '服务端内部错误' }, // 5xx
-  501: { name: 'Not Implemented', description: '功能未实现' }, // 5xx
-  502: { name: 'Bad Gateway', description: '上游网关收到无效响应' }, // 5xx
-  503: { name: 'Service Unavailable', description: '服务暂不可用或过载' }, // 5xx
-  504: { name: 'Gateway Timeout', description: '上游响应超时' }, // 5xx
-  505: { name: 'HTTP Version Not Supported', description: 'HTTP 版本不受支持' }, // 5xx
+  100: { name: 'Continue', description: '继续发送请求体' }, // 1xx 信息类状态码
+  101: { name: 'Switching Protocols', description: '协议切换（如升级 WebSocket）' }, // 1xx 信息类状态码
+  200: { name: 'OK', description: '请求成功' }, // 2xx 成功状态码
+  201: { name: 'Created', description: '资源已创建' }, // 2xx 成功状态码
+  202: { name: 'Accepted', description: '已接受，异步处理' }, // 2xx 成功状态码
+  204: { name: 'No Content', description: '成功但无响应体' }, // 2xx 成功状态码
+  206: { name: 'Partial Content', description: '范围请求的部分内容' }, // 2xx 成功状态码
+  301: { name: 'Moved Permanently', description: '永久重定向' }, // 3xx 重定向状态码
+  302: { name: 'Found', description: '临时重定向' }, // 3xx 重定向状态码
+  304: { name: 'Not Modified', description: '缓存仍然有效' }, // 3xx 重定向状态码
+  307: { name: 'Temporary Redirect', description: '临时重定向，保持方法与请求体' }, // 3xx 重定向状态码
+  308: { name: 'Permanent Redirect', description: '永久重定向，保持方法与请求体' }, // 3xx 重定向状态码
+  400: { name: 'Bad Request', description: '请求语法或参数错误' }, // 4xx 客户端错误状态码
+  401: { name: 'Unauthorized', description: '缺少或无效的身份凭证' }, // 4xx 客户端错误状态码
+  403: { name: 'Forbidden', description: '已认证但无权限' }, // 4xx 客户端错误状态码
+  404: { name: 'Not Found', description: '资源不存在' }, // 4xx 客户端错误状态码
+  405: { name: 'Method Not Allowed', description: '方法不被允许' }, // 4xx 客户端错误状态码
+  409: { name: 'Conflict', description: '与当前资源状态冲突' }, // 4xx 客户端错误状态码
+  410: { name: 'Gone', description: '资源已被永久移除' }, // 4xx 客户端错误状态码
+  412: { name: 'Precondition Failed', description: '前置条件不满足' }, // 4xx 客户端错误状态码
+  413: { name: 'Payload Too Large', description: '请求体超出上限' }, // 4xx 客户端错误状态码
+  415: { name: 'Unsupported Media Type', description: '媒体类型不受支持' }, // 4xx 客户端错误状态码
+  422: { name: 'Unprocessable Entity', description: '语义校验失败' }, // 4xx 客户端错误状态码
+  429: { name: 'Too Many Requests', description: '触发限流' }, // 4xx 客户端错误状态码
+  500: { name: 'Internal Server Error', description: '服务端内部错误' }, // 5xx 服务端错误状态码
+  501: { name: 'Not Implemented', description: '功能未实现' }, // 5xx 服务端错误状态码
+  502: { name: 'Bad Gateway', description: '上游网关收到无效响应' }, // 5xx 服务端错误状态码
+  503: { name: 'Service Unavailable', description: '服务暂不可用或过载' }, // 5xx 服务端错误状态码
+  504: { name: 'Gateway Timeout', description: '上游响应超时' }, // 5xx 服务端错误状态码
+  505: { name: 'HTTP Version Not Supported', description: 'HTTP 版本不受支持' }, // 5xx 服务端错误状态码
 }; // 状态码字典结束
 
 /** HTTP 状态码查询：支持一次查多个码，未收录的码给出分类但不给说明 */
@@ -1009,7 +1009,7 @@ const phoneFormat: CapabilityHandler = async ({ text }) => { // 手机号入口
   const hasCnPrefix = cleaned.startsWith('+86') || (digits.length === 13 && digits.startsWith('86')); // 判断中国大陆
   const national = hasCnPrefix ? digits.replace(/^86/, '') : digits; // 去掉国家码
   const country = hasCnPrefix || (national.length === 11 && national.startsWith('1')) ? 'CN' : 'UNKNOWN'; // 粗判地区
-  const e164 = country === 'CN' ? `+86${national}` : `+${digits}`; // E.164
+  const e164 = country === 'CN' ? `+86${national}` : `+${digits}`; // E.164 手机号格式
   const carrier = (() => { // 号段粗判运营商
     if (country !== 'CN') return 'Unknown'; // 非中国大陆不判
     const prefix3 = national.slice(0, 3); // 前三位号段
@@ -1057,7 +1057,7 @@ const webScaffold: CapabilityHandler = async ({ text }) => { // 脚手架入口
   ]; // 基础清单结束
   if (features.includes('router')) files.push({ path: `${name}/src/router.ts`, purpose: '路由表' }); // 路由
   if (features.includes('test')) files.push({ path: `${name}/test/app.test.tsx`, purpose: '组件测试' }); // 测试
-  if (features.includes('ci')) files.push({ path: `${name}/.github/workflows/ci.yml`, purpose: 'CI 流水线' }); // CI
+  if (features.includes('ci')) files.push({ path: `${name}/.github/workflows/ci.yml`, purpose: 'CI 流水线' }); // CI 流水线
   if (features.includes('docker')) files.push({ path: `${name}/Dockerfile`, purpose: '容器构建' }); // 容器
   const unknownFeatures = features.filter((f) => !['router', 'test', 'ci', 'docker'].includes(f)); // 未识别的特性
   const output = JSON.stringify({ name, framework, files, unknown_features: unknownFeatures }, null, 2); // 结构化输出
@@ -1180,14 +1180,14 @@ const vueSfc: CapabilityHandler = async ({ text }) => { // Vue 入口
   const input = parseJsonInput(text, 'vue.sfc') as { name?: unknown; props?: unknown; emits?: unknown }; // 解析入参
   const name = String(input.name ?? '').trim(); // 组件名
   if (!/^[A-Z][a-zA-Z0-9]{1,40}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "name" must be PascalCase', { capability: 'vue.sfc' }); // 名称规范
-  const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props
-  const emits = Array.isArray(input.emits) ? input.emits.map((e) => String(e)) : []; // emits
+  const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props 入参
+  const emits = Array.isArray(input.emits) ? input.emits.map((e) => String(e)) : []; // emits 事件
   const propsBlock = props.length > 0 ? `const props = defineProps<{ ${props.map((p) => `${p}: string`).join('; ')} }>();` : 'const props = defineProps<Record<string, never>>();'; // props 声明
   const emitsBlock = emits.length > 0 ? `const emit = defineEmits<{ ${emits.map((e) => `(e: '${e}'): void`).join('; ')} }>();` : ''; // emits 声明
   const output = [
     `<script setup lang="ts">`, // 脚本区
-    propsBlock, // props
-    emitsBlock, // emits
+    propsBlock, // props 入参
+    emitsBlock, // emits 事件
     `</script>`, // 脚本结束
     ``, // 空行
     `<template>`, // 模板区
@@ -1260,7 +1260,7 @@ const reactCmp: CapabilityHandler = async ({ text }) => { // React 入口
   const input = parseJsonInput(text, 'react.cmp') as { name?: unknown; props?: unknown; memo?: unknown }; // 解析入参
   const name = String(input.name ?? '').trim(); // 组件名
   if (!/^[A-Z][a-zA-Z0-9]{1,40}$/.test(name)) throw new AppError('VALIDATION_FAILED', 'field "name" must be PascalCase', { capability: 'react.cmp' }); // 名称规范
-  const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props
+  const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props 入参
   const useMemo = Boolean(input.memo); // 是否 memo
   const propsType = props.length > 0 ? props.map((p) => `  ${p}?: string;`).join('\n') : '  // 无外部 props'; // 接口字段
   const output = [
@@ -1437,7 +1437,7 @@ export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键�
   'cron.describe': cronDescribe, // Cron 解析
   'text.segment': textSegment, // 中英文分词统计
   'card.luhn': cardLuhn, // 银行卡号 Luhn 校验
-  'csv.json': csvJson, // CSV ↔ JSON
+  'csv.json': csvJson, // CSV 与 JSON 互转
   'template.render': templateRender, // Mustache 模板渲染
   'url.parse': urlParse, // URL 解析
   'ip.cidr': ipCidr, // IPv4 CIDR 计算
@@ -1447,9 +1447,9 @@ export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键�
   'log.stats': logStats, // 日志分析
   'captcha.svg': captchaSvg, // SVG 验证码
   'math.eval': mathEval, // 数学表达式求值
-  'json.schema': jsonSchema, // JSON → JSON Schema
+  'json.schema': jsonSchema, // JSON 转 JSON Schema
   'cite.format': citeFormat, // 参考文献格式化
-  'yaml.json': yamlJson, // YAML ↔ JSON
+  'yaml.json': yamlJson, // YAML 与 JSON 互转
   'jwt.decode': jwtDecode, // JWT 解析
   'diff.text': diffText, // 文本差异
   'code.stats': codeStats, // 代码统计

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 上一行 shebang：指定 node 解释器，与仓库内其它脚本保持一致。
-// scripts/deployment-summary.mjs
+// 生成器：scripts/deployment-summary.mjs
 //
 // 部署汇总生成器：把「所有部署仓库 + 相关部署项」收口为一份可核对的结构化结果。
 // 依据：packages/core-domain/src/deploymentRegistry.json（单一事实源）+ 本轮真实采集。

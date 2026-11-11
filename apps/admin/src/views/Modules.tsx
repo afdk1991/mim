@@ -526,7 +526,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
     setNotice(null);
     // 调用失效端点
     try {
-      // DELETE /modules/prices/:id
+      // 删除模块定价接口（DELETE /modules/prices/:id）
       await deleteModulePrice(credential, priceId);
       // 成功提示
       setNotice({ kind: 'success', text: '价格行已失效（保留历史留痕）' });

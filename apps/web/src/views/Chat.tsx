@@ -149,7 +149,7 @@ export function Chat({ locale }: ChatProps) {
   const session = getSession(); // 取当前会话，拿 user.id
   const currentUserId = session?.user.id ?? ''; // 当前用户 ID
 
-  // IM socket
+  // IM 实时套接字
   const im = useImSocket();
   const { connected, send, onMessage, onCall, onFrame } = im;
 
@@ -471,7 +471,7 @@ export function Chat({ locale }: ChatProps) {
           content_type: isImage ? 'image' : 'file', // 类型
           content: '', // 无正文
           object_key: presign.object_key, // 对象键
-          object_mime: mime, // MIME
+          object_mime: mime, // MIME 类型
           object_name: file.name, // 文件名
           object_size: file.size, // 体积
           status: 'sent', // 初始状态
@@ -481,7 +481,7 @@ export function Chat({ locale }: ChatProps) {
           {
             content_type: isImage ? 'image' : 'file', // 类型
             object_key: presign.object_key, // 对象键
-            object_mime: mime, // MIME
+            object_mime: mime, // MIME 类型
             object_name: file.name, // 文件名
             object_size: file.size, // 体积
           },

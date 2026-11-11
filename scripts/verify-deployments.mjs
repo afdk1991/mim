@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 上一行 shebang：指定 node 解释器，与仓库内其它校验脚本保持一致。
-// scripts/verify-deployments.mjs
+// 校验脚本：scripts/verify-deployments.mjs
 //
 // 校验「部署汇总」是否自洽、覆盖完整、无重复，并且真的被共享包 → 后端 → 前端 → 文档全链路消费。
 // 依据：packages/core-domain/src/deploymentRegistry.json 单一事实源 + 本轮实现源码 + git 仓库真实状态。

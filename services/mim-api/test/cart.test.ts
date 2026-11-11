@@ -1,7 +1,7 @@
 /** 契约测试：商城购物车（加购 / 去重 / 移除 / 清空 / 免费即时解锁 / 付费生成待结算订单 / 依赖跳过 / 重复结算不重复下单）。 */
 
 import { randomUUID } from 'node:crypto'; // 生成幂等键
-import { beforeEach, describe, expect, it } from 'vitest'; // vitest
+import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例
 import request from 'supertest'; // 真实 HTTP
 import type { Express } from 'express'; // 类型
 import { createApp } from '../src/app.js'; // 应用工厂

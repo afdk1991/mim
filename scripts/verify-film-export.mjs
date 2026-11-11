@@ -4,8 +4,8 @@
 // 可重放前置（三个进程，均为本地）：
 //   1) MIM_JOBS=0 MIM_AI_WORKER=0 node services/mim-api/dist/index.js     # API :8787（需先 pnpm --filter @mim/api build）
 //   2) node scripts/serve-local.mjs                                          # 静态站 :5188，同源反代 /api → :8787
-//   3) msedge --headless=new --remote-debugging-port=9222 --user-data-dir=.tmp/edge-profile-export about:blank
-//   4) npm run verify:film-export
+// 本地步骤 3) 启动无头 Edge：msedge --headless=new --remote-debugging-port=9222 --user-data-dir=.tmp/edge-profile-export about:blank
+// 本地步骤 4) 执行成片导出 E2E：npm run verify:film-export
 // 产物：.tmp/film-export-e2e.json（断言明细）、.tmp/film-export-e2e.png（截图）；失败时退出码 1。
 import { mkdirSync, writeFileSync } from 'node:fs';
 

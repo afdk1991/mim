@@ -47,7 +47,7 @@ function insertJob(id: string, status: string, startedAt: string | null, attempt
 /** 读取任务当前状态与回收计数，断言迁移结果 */
 function jobState(id: string): { status: string; attempts: number; error_code: string | null } { // 只取断言需要的三列
   return db.prepare(`SELECT status, attempts, error_code FROM generation_jobs WHERE id = ?`).get(id) as { // 按主键定位
-    status: string; // queued / running / succeeded / failed
+    status: string; // 状态：queued / running / succeeded / failed
     attempts: number; // 被回收重新入队的次数
     error_code: string | null; // 失败码
   }; // 结果类型结束

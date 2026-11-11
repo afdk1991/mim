@@ -313,7 +313,7 @@ export interface RoleCreatePayload {
 
 /** 新建角色：成功返回完整角色视图 */
 export async function createRole(credential: Credential, payload: RoleCreatePayload): Promise<RoleView> {
-  // POST /admin/roles
+  // 管理员角色创建接口（POST /admin/roles）
   const data = await request<{ role: RoleView }>('/admin/roles', { method: 'POST', body: payload, credential });
   // 解包角色对象
   return data.role;

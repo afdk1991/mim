@@ -164,12 +164,12 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
   it('text.hash 四种算法与非法算法', async () => {
     const session = await login('13900000043'); // 登录
     grant('cat.dev-03', session.userId); // 解锁安全开发模块
-    const sha256 = await request(app) // SHA-256
+    const sha256 = await request(app) // SHA-256 摘要
       .post('/api/v1/modules/cat.dev-03/invoke') // 端点
       .set('authorization', `Bearer ${session.token}`) // 鉴权
       .send({ text: 'abc', options: { algo: 'sha256' } }); // 标准向量
     expect(sha256.body.output).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'); // NIST 已知向量
-    const md5 = await request(app) // MD5
+    const md5 = await request(app) // MD5 摘要
       .post('/api/v1/modules/cat.dev-03/invoke') // 端点
       .set('authorization', `Bearer ${session.token}`) // 鉴权
       .send({ text: 'abc', options: { algo: 'md5' } }); // 标准向量
@@ -204,7 +204,7 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
       .send({ text: 'https://mim.mixm.top', options: { size: 4096 } }); // 故意越界，期望被夹到 1024
     expect(res.status).toBe(200); // 断言 200
     expect(res.body.output_kind).toBe('image'); // 输出形态
-    expect(res.body.output.startsWith('data:image/png;base64,')).toBe(true); // PNG dataURL
+    expect(res.body.output.startsWith('data:image/png;base64,')).toBe(true); // PNG dataURL 数据
     expect(res.body.meta.size).toBe(1024); // 尺寸被夹紧到上限
   }); // 用例结束
 

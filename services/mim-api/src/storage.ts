@@ -76,13 +76,13 @@ const MIME_EXT: Record<string, string> = { // MIME → 扩展名，用于生成�
 }; // 结束 MIME_EXT 映射
 
 const EXT_MIME: Record<string, string> = { // 扩展名 → MIME，读取时回填 Content-Type
-  '.png': 'image/png', // PNG
-  '.jpg': 'image/jpeg', // JPG
+  '.png': 'image/png', // PNG 格式
+  '.jpg': 'image/jpeg', // JPG 格式
   '.jpeg': 'image/jpeg', // JPEG 长后缀
-  '.wav': 'audio/wav', // WAV
-  '.mp3': 'audio/mpeg', // MP3
-  '.mp4': 'video/mp4', // MP4
-  '.json': 'application/json', // JSON
+  '.wav': 'audio/wav', // WAV 格式
+  '.mp3': 'audio/mpeg', // MP3 格式
+  '.mp4': 'video/mp4', // MP4 格式
+  '.json': 'application/json', // JSON 格式
   '.txt': 'text/plain', // 纯文本
 }; // 结束 EXT_MIME 映射
 

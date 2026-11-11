@@ -173,7 +173,7 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     output_kind: 'json', // 结构化输出
     module_codes: ['cat.dev-32'], // 程序开发 / 算法/数学计算
   }, // 数学求值结束
-  { // JSON → JSON Schema
+  { // JSON 转 JSON Schema
     key: 'json.schema', // 能力标识
     name: { 'zh-CN': 'JSON 推导 Schema', 'en-US': 'JSON to JSON Schema' }, // 能力名
     hint: { 'zh-CN': '粘贴一份 JSON 样例，输出 draft-2020-12 JSON Schema（低代码表单起点）', 'en-US': 'Paste a JSON sample to get a draft-2020-12 schema' }, // 使用提示
@@ -189,7 +189,7 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     output_kind: 'text', // 纯文本
     module_codes: ['cat.frontier-02'], // 前沿技术 / 科研论文
   }, // 参考文献结束
-  { // YAML ↔ JSON
+  { // YAML 与 JSON 互转
     key: 'yaml.json', // 能力标识
     name: { 'zh-CN': 'YAML / JSON 互转', 'en-US': 'YAML ↔ JSON' }, // 能力名
     hint: { 'zh-CN': 'yaml2json 模式输入 YAML；json2yaml 模式输入 JSON', 'en-US': 'yaml2json: YAML in; json2yaml: JSON in' }, // 使用提示

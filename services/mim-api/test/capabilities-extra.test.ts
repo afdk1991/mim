@@ -56,7 +56,7 @@ describe('程序开发组新增能力', () => {
     const parsed = JSON.parse(result.output) as { key: string; ttl_seconds: number; expire_at: string }; // 解析
     expect(parsed.key.startsWith('app:')).toBe(true); // 前缀生效
     expect(parsed.key.length).toBeLessThan(30); // 短键
-    expect(parsed.ttl_seconds).toBe(60); // TTL
+    expect(parsed.ttl_seconds).toBe(60); // TTL 有效期
     expect(Number.isNaN(Date.parse(parsed.expire_at))).toBe(false); // 合法时间
   });
 
@@ -163,7 +163,7 @@ describe('程序开发组新增能力', () => {
   it('phone.format 输出 E.164 与运营商', async () => {
     const result = await run('phone.format', '138 0000 0001'); // 大陆手机号
     const parsed = JSON.parse(result.output) as { e164: string; country: string; carrier: string; masked: string }; // 解析
-    expect(parsed.e164).toBe('+8613800000001'); // E.164
+    expect(parsed.e164).toBe('+8613800000001'); // E.164 手机号格式
     expect(parsed.country).toBe('CN'); // 地区
     expect(parsed.carrier).toBe('中国移动'); // 号段判定
     expect(parsed.masked).toBe('138****0001'); // 掩码

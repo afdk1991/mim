@@ -15,9 +15,9 @@ export type ClientFrameType =
   | 'message.read' // 标记已读
   | 'typing' // 输入中
   | 'call.invite' // 发起通话
-  | 'call.offer' // WebRTC offer
-  | 'call.answer' // WebRTC answer
-  | 'call.ice' // WebRTC ICE candidate
+  | 'call.offer' // WebRTC offer 信令
+  | 'call.answer' // WebRTC answer 应答
+  | 'call.ice' // WebRTC ICE 候选
   | 'call.hangup'; // 挂断
 
 // 服务端帧类型

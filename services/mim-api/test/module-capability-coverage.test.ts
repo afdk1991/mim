@@ -76,7 +76,7 @@ describe('能力执行层真实产出', () => {
   // 二维码输出 dataURL
   it('qrcode.generate 输出 PNG dataURL', async () => {
     const result = await run('qrcode.generate', 'https://mim.mixm.top', { size: 128 });
-    expect(result.output.startsWith('data:image/png;base64,')).toBe(true); // PNG dataURL
+    expect(result.output.startsWith('data:image/png;base64,')).toBe(true); // PNG dataURL 数据
   });
 
   // cron 解析返回未来时间
@@ -169,7 +169,7 @@ describe('能力执行层真实产出', () => {
   // 验证码
   it('captcha.svg 输出 SVG dataURL 且返回答案', async () => {
     const result = await run('captcha.svg', '', { length: 4 });
-    expect(result.output.startsWith('data:image/svg+xml')).toBe(true); // dataURL
+    expect(result.output.startsWith('data:image/svg+xml')).toBe(true); // dataURL 数据
     expect(String(result.meta.answer)).toHaveLength(4); // 答案长度
   });
 

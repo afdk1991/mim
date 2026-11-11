@@ -61,7 +61,7 @@ export function attachImWebSocket(server: HttpServer, deps: ApiDeps): ImHub {
     // 必须先完成 101 握手才能发帧，否则 nginx 会把非 101 响应转成 502
     if (userId === undefined || userId === null) {
       sendFrame(ws, { type: 'error', error: { code: 'UNAUTHORIZED', message: 'token 无效或缺失' } });
-      ws.close(1008, 'UNAUTHORIZED'); // 1008 = Policy Violation
+      ws.close(1008, 'UNAUTHORIZED'); // 1008 为策略违规关闭码
       return;
     }
     const uid = String(userId); // 转为字符串，确保类型一致

@@ -51,8 +51,8 @@ export function createAliyunSmsChannel( // 构造国内短信通道，凭证来�
 export function createSesEmailChannel( // 构造海外邮件通道，凭证来自环境变量
   env: Record<string, string | undefined>, // 环境变量只读视图：逐项读取 SES 三项凭证
 ): CodeChannel | undefined { // 返回通道实例；凭证不全时返回 undefined
-  const accessKeyId = env.MIM_EMAIL_SES_ACCESS_KEY_ID?.trim(); // SES AccessKeyId
-  const secretAccessKey = env.MIM_EMAIL_SES_SECRET_ACCESS_KEY?.trim(); // SES SecretAccessKey
+  const accessKeyId = env.MIM_EMAIL_SES_ACCESS_KEY_ID?.trim(); // SES AccessKeyId 凭据
+  const secretAccessKey = env.MIM_EMAIL_SES_SECRET_ACCESS_KEY?.trim(); // SES SecretAccessKey 密钥
   const from = env.MIM_EMAIL_SES_FROM_ADDRESS?.trim(); // 发件人地址，必须在 SES 中完成验证否则会被拒发
   if (!accessKeyId || !secretAccessKey || !from) return undefined; // 三项缺一不可，缺省即视为未启用
 

@@ -26,7 +26,7 @@ describe('部署汇总总览', () => { // 公开只读端点
     expect(res.body.matrix_platforms).toBe(10); // 铁律九 10 平台（2026-11-10 起含 Gitee 镜像仓）
     expect(res.body.ci_jobs).toBe(5); // deploy.yml 五作业
     expect(res.body.deploy_ci_jobs).toBe(4); // verify 为门禁，不计入
-    expect(res.body.git_remotes).toBe(2); // origin + gitee
+    expect(res.body.git_remotes).toBe(2); // origin + gitee 双远端
     expect(res.body.empty_result).toBe(DEPLOYMENT_ITEMS.filter((i) => i.result === null).length); // 空数据项（result=null）动态计数
     expect(res.body.with_result + res.body.empty_result).toBe(res.body.total); // 有取证 + 空数据 = 总数
     expect(res.body.platforms.filter((p: { in_matrix: boolean }) => p.in_matrix)).toHaveLength(10); // 平台目录标记
@@ -131,7 +131,7 @@ describe('部署项详情与异常标识', () => { // 详情与异常
   }); // 同步完成用例结束
 
   it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识
-    const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages
+    const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages 平台
     expect(res.status).toBe(200); // 200
     expect(res.body.item.result).toBeNull(); // 明确 null，不填 0 / 不冒充成功
     expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'EMPTY_RESULT')).toBe(true); // 空数据异常

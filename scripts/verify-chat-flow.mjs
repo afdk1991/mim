@@ -4,8 +4,8 @@
 // 可重放前置（三个进程，均为本地）：
 //   1) MIM_JOBS=0 MIM_AI_WORKER=0 node services/mim-api/dist/index.js     # API :8787（需先 pnpm --filter @mim/api build）
 //   2) node scripts/serve-local.mjs                                          # 静态站 :5188，同源反代 /api → :8787
-//   3) msedge --headless=new --remote-debugging-port=9222 --user-data-dir=.tmp/edge-profile-chat about:blank
-//   4) npm run verify:chat-flow
+// 本地步骤 3) 启动无头 Edge：msedge --headless=new --remote-debugging-port=9222 --user-data-dir=.tmp/edge-profile-chat about:blank
+// 本地步骤 4) 执行点击级 E2E：npm run verify:chat-flow
 //
 // 与「接口级契约测试」的区别：本脚本的建群、选成员、发图、撤回全部由页面 DOM 点击驱动（React onClick 真实触发），
 // 断言读取的是页面渲染结果（会话标题、气泡内 <img> 的 naturalWidth、撤回后消息消失），而不是接口返回体。
@@ -195,7 +195,7 @@ const groupTitle = await waitFor(`(function () {
 check('新群出现在会话区且标题为群名', Boolean(groupTitle), groupTitle || '标题未命中'); // 断言
 
 // 4) 发图片：写一张最小 PNG 到磁盘，再用 CDP 塞进隐藏 file input（等价于用户选文件）
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII=', 'base64'); // 8×8 PNG
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX// 8×8 PNG 图片
 const pngPath = process.env.MIM_E2E_PNG || '.tmp/chat-e2e.png'; // 本地路径
 writeFileSync(pngPath, png); // 落盘（CDP 只能从磁盘选文件）
 await send('DOM.enable'); // 打开 DOM 域
