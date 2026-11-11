@@ -844,7 +844,20 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **自动化闭环现状（提交 → 交付）**：构建（CI 质量门禁 `typecheck + test + build`）✅ / 测试（单测 + 契约 + 点击级 E2E 本地可重放）✅ / 部署（CI「发布到生产服务器」作业全自动）✅ / 运维（`/health` 探活 + nginx + systemd 重启）✅。**未做的**是「点击级 E2E 进 CI」：GitHub 托管 runner 需要额外装 Edge/Chromium 与拉起的 SQLite 前置，当前以**本地门禁脚本 + 离线取证**方式固化，未接进 `deploy.yml`。
 
-**仍未闭环**：① 商城 **143/205 条「规划中」**；② **群通话未做**（2C2G 上 SFU 不可行，P2P 网状待评估）；③ 点击级 E2E 未进 CI（原因见上）；④ 购物车付费分支止于 `pending`。
+**仍未闭环**：① 商城 **143/205 条「规划中」**；② **群通话未做**（2C2G 上 SFU 不可行，P2P 网状待评估）；③ 点击级 E2E 未进 CI（原因见上）；④ 购物车付费分支止于 `pending`；⑤ 生产 nginx `client_max_body_size 3m` 与媒体上传上限 64mb 不匹配，超过 3MB 的图片/文件在生产会被 413 拦下（本轮未改，未验证）。
+
+#### 9.23.1 提交、CI 与线上取证（2026-11-11 23:34 +08:00）
+
+| 项 | 本轮实测 | 判读 |
+|---|---|---|
+| 提交 | `d33d91b`（7 files changed，277 insertions，4 deletions） | ✅ |
+| 双远端 | `origin` / `gitee` 均 = `d33d91b`（`git ls-remote` 取证，0 ahead / 0 behind） | ✅ 铁律十二 |
+| CI | run **43049669835**（Deploy @ `d33d91b`）**completed success**，5 作业全绿：质量门禁 / 发布到生产服务器 / 托管平台同步 / GitHub Pages / GitHub Packages；另有 Azure SWA run **43049670149** success | ✅ |
+| 生产健康 | `https://mim.mixm.top/health` **200** / 0.077s | ✅ |
+| 生产深链接 | `https://mim.mixm.top/chat` **200** | ✅ 本轮聊天改动的落地入口 |
+| 生产产物指纹 | 首页 bundle **`assets/index-CEptv0J0.js`**（与上一轮不同，证明前端改动已发布） | ✅ |
+| 生产目录 | `/api/v1/modules` 分页 11 页共 **213 条**、`capability` 非空 **62 条**（与 `d6395fd` 基线一致，无能力回退） | ✅ |
+| 未做 | 生产登录态点击级 E2E（需 `MIM_AUTH_ADMIN_PASSWORD`，属主机私有口令）；生产 >3MB 媒体上传校验 | 如实登记，不冒充 |
 
 ---
 
