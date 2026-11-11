@@ -18,6 +18,12 @@
 
 分类与标杆项目对标、以及「Gitee 仓库无主题字段」的实测结论见 [docs/项目主题与Gitee-Explore分类映射-20261112.md](./docs/项目主题与Gitee-Explore分类映射-20261112.md)。
 
+## 许可证
+
+本项目采用 **MIT License**，全文见 [LICENSE](./LICENSE)（`Copyright (c) 2026 Mim project contributors`）。
+
+- 若后续需要专利授权条款，可整体替换为 Apache-2.0：删除本仓库 `LICENSE` 并换入 Apache-2.0 全文，同时改本节与 Gitee / GitHub 仓库页的许可证标识，属一次性可逆改动。
+
 ## 版本
 
 当前版本：**V0.0.0-preview**

@@ -43,6 +43,7 @@
 | Gitee 仓库「主页」 | 指向生产入口 `https://mim.mixm.top` | 本轮设置（原为空） |
 | Gitee 仓库「语言」 | `TypeScript`（仓库主语言） | 本轮设置（原为空） |
 | README「项目主题」段 | 见 [README.md](../README.md) 顶部同名段落，含五个分类链接 | 本轮新增 |
+| 仓库开源许可证 | 新增 [LICENSE](../LICENSE)（MIT，`Copyright (c) 2026 Mim project contributors`），README 同步「许可证」段；Gitee 仓库页据 `LICENSE` 自动识别协议 | 2026-11-12 新增（原为空） |
 | 本文档 | 分类映射与对标表的唯一事实源 | 本轮新增 |
 | **「主题 / 标签」字段** | Gitee 仓库设置页（`/<owner>/<repo>/settings` 基本信息）只有：仓库名称、路径、介绍、主页、语言、默认分支、是否开源；`GET /api/v5/repos/{owner}/{repo}` 返回体也没有 `topics` 字段（`project_labels` 恒为 `[]`，且无公开写接口） | **不可自助设置**，主题只能通过上表其它落点表达 |
 | 期望被 Explore 收录 | Explore 分类为平台策展，本轮未发现自助提交入口 | 不承诺收录；以主题词与分类对齐为主 |
