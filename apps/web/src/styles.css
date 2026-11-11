@@ -1254,6 +1254,8 @@ code { /* 行内代码/令牌展示 */
   text-align: left; /* 左对齐便于核对文本 */
   vertical-align: top; /* 多行内容顶部对齐 */
   border-bottom: 1px solid var(--border); /* 行分隔线 */
+  overflow-wrap: anywhere; /* 长标识（如 HTTPS_TLS_… / REMOTE_…）可断行，避免把 8 列挤出横向滚动 */
+  word-break: break-word; /* 兼容不支持 anywhere 的浏览器 */
 } /* 表头 / 数据单元格结束 */
 .deploy-table th { /* 表头：浅灰底 + 加粗 */
   background: var(--bg); /* 浅灰底 */
