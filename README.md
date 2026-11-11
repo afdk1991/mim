@@ -33,6 +33,7 @@ node scripts/comment-check.mjs
 - `comment-check.mjs`：铁律十一注释覆盖率校验——逐文件统计「可注释行 / 已解释行」，默认基线模式（退出码恒 0），`--strict` 为 CI 门禁模式（低于阈值退出 1）
 - `verify:film-export`：成片导出 Edge CDP 真渲染 E2E（14 项断言）；前置 `pnpm --filter @mim/api build` 后启动 API :8787、`npm run serve:local`（:5188）、Edge `--remote-debugging-port=9222`，再执行 `npm run verify:film-export`
 - `verify:site-modules`：站点模块注册表零依赖校验（43 项断言）——45 条备注逐字比对、行号/分组/状态机自洽、共享包→后端→前端→测试全链路消费断言
+- `verify:chat-flow`：聊天点击级 E2E（15 项断言，`scripts/verify-chat-flow.mjs`）——真点「+ 群聊」「创建群聊」、用 CDP 选文件发图片消息（断言气泡内 `<img>` 的 `naturalWidth > 0`）、点气泡上的「撤回」并断言消息从列表消失；前置同 `verify:film-export`，取证落 `.tmp/chat-flow-e2e.json` / `.png`
 - `verify:site-directory`：上一轮「站点入口契约」校验（16 项断言），两轮成果互不覆盖
 - `summary:deployments`：部署汇总生成器——采集 `git remote` / `git ls-tree HEAD` / 工作树工件 / CI 作业 / 两份矩阵表行数，输出 `docs/deployment-summary.json`（结构化）与 `docs/deployment-summary.md`（核对表）；追加 `--live` 可对各入口真实 `curl` 探测并刷新 `result`
 - `verify:deployments`：部署汇总零依赖校验（52 项断言）——规范 ID 唯一、枚举合法、9 平台无遗漏、别名不撞名、空数据标识、工件双口径与真实仓库一致、共享包→后端→前端→文档全链路消费

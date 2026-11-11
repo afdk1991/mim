@@ -828,6 +828,26 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 未做 / 已知缺口（如实登记） | ① 商城仍有 **159/205 条「规划中」**（178 − 19，仅「程序开发」组做满），其余 18 组补法口径待用户拍板；② **群通话未做**（当前仅 1v1，2C2G 上 SFU 不可行）；③ **浏览器点击级 E2E 仍未做**（本轮仍是接口级 + 契约测试 + 线上 bundle 取证）；④ 购物车付费分支仍止于 `pending`，在线支付未接 | 本轮未执行项清单 |
 
 
+### 9.23 聊天点击级 E2E 自动化（建群 / 发图 / 撤回）+ 两处真实缺陷修复（2026-11-11 深夜 +08:00）
+
+**性质**：补齐「从提交到交付」自动化里最薄的一环——**点击级 UI 自动化**。新增 `scripts/verify-chat-flow.mjs`（零第三方依赖，Node 内置 WebSocket 直连 Edge CDP），把「建群 / 发图 / 撤回」从接口级验证升级为**页面 DOM 点击驱动 + 页面渲染结果断言**。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 新增脚本 | `scripts/verify-chat-flow.mjs`（15 断言）+ `package.json` 增加 `verify:chat-flow` | 文件本体 |
+| 前置链路（可重放） | API `dist` :8787（`MIM_JOBS=0 MIM_AI_WORKER=0`）→ `serve-local` :5188（同源反代 /api）→ Edge `--headless=new --remote-debugging-port=9222` | README 脚本清单 |
+| 脚本内动作（全部页面点击） | 注入会话 → 点「+ 群聊」→ 输入成员手机号 → 点搜索结果勾选 → 填群名 → 点「创建群聊」→ CDP `DOM.setFileInputFiles` 选 8×8 PNG → 点气泡「撤回」 | `.tmp/chat-flow-e2e.json` |
+| 结果 | **15/15 PASS**（含「图片气泡 `naturalWidth=8`」「撤回后 `recalled:0`」），页面 console 零 error | `.tmp/chat-e2e8.log`、`.tmp/chat-flow-e2e.png` |
+| **E2E 抓到的缺陷 1** | 建群成功但**会话列表未刷新**，新群不出现在左侧、右侧停在「选择一个会话」。修：`createGroup` 里先 `await loadConversations()` 再 `openConversation`，并把 `loadConversations` 补进依赖数组 | `apps/web/src/views/Chat.tsx` |
+| **E2E 抓到的缺陷 2** | 本地发图必定失败（`图片/文件发送失败`）。根因：预签名按请求 Host 拼绝对 URL，而 `serve-local` 反代时 `fetch` **禁止设置 Host 头**，预签名落到 `:8787`，浏览器直传变成跨域 PUT 被 CORS 拦下。修：反代改传 `X-Forwarded-Host/Proto`，`media.ts` 的 `baseUrlOf` 优先读反代头 | `scripts/serve-local.mjs`、`services/mim-api/src/routes/media.ts` |
+| 本地门禁 | `pnpm -r typecheck` **0**；`pnpm --filter @mim/api test` **21 文件 / 336 例**；`@mim/web build` 0；`env-check` 0；`comment-check --strict` 0 | `.tmp/typecheck4.log`、`.tmp/api_test4.log`、`.tmp/web_build3.log`、`.tmp/env_check3.log`、`.tmp/comment_check7.log` |
+
+**自动化闭环现状（提交 → 交付）**：构建（CI 质量门禁 `typecheck + test + build`）✅ / 测试（单测 + 契约 + 点击级 E2E 本地可重放）✅ / 部署（CI「发布到生产服务器」作业全自动）✅ / 运维（`/health` 探活 + nginx + systemd 重启）✅。**未做的**是「点击级 E2E 进 CI」：GitHub 托管 runner 需要额外装 Edge/Chromium 与拉起的 SQLite 前置，当前以**本地门禁脚本 + 离线取证**方式固化，未接进 `deploy.yml`。
+
+**仍未闭环**：① 商城 **143/205 条「规划中」**；② **群通话未做**（2C2G 上 SFU 不可行，P2P 网状待评估）；③ 点击级 E2E 未进 CI（原因见上）；④ 购物车付费分支止于 `pending`。
+
+---
+
 ### 9.22 「WEB应用开发」组 17 条能力做满（2026-11-11 深夜 +08:00）
 
 **性质**：沿 §9.21 的「逐组做满」口径继续补商城能力，本轮把「WEB应用开发」组 17 条导航条目全部绑定真实能力（`cat.web-10` 早前已由 `jwt.decode` 占用，本轮新增 16 条）。**结构性改动（新增 16 条能力 + 1 条已存在）不改变现有接口契约，仅扩 `POST /modules/:code/invoke` 的可达能力集合。**

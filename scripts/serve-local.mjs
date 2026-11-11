@@ -29,8 +29,13 @@ const server = createServer(async (req, res) => {
     try {
       const headers = {};
       for (const [k, v] of Object.entries(req.headers)) {
-        if (!['host', 'connection', 'content-length', 'transfer-encoding'].includes(k)) headers[k] = v;
+        if (!['connection', 'content-length', 'transfer-encoding'].includes(k)) headers[k] = v;
       }
+      // 透传原始公网 Host：fetch 会丢弃 Host 头（forbidden header），改用 X-Forwarded-Host 告知上游，
+      // 否则媒体预签名会按 :8787 拼绝对 URL，浏览器端变成跨域 PUT 被 CORS 拦下，本地“发图”必定失败
+      const host = req.headers.host || '127.0.0.1:5188';
+      headers['x-forwarded-host'] = host;
+      headers['x-forwarded-proto'] = 'http';
       let body;
       if (!['GET', 'HEAD'].includes(req.method || 'GET')) {
         const chunks = [];

@@ -100,8 +100,12 @@ function assertOwnedKey(userId: string, key: string): void { // 统一的对象�
 function baseUrlOf(req: Request, env: Record<string, string | undefined>): string | undefined { // 计算预签名 URL 的公网基址
   const configured = (env.MIM_PUBLIC_BASE_URL ?? '').trim(); // 显式配置优先，适配反代后 host 被改写的情况
   if (configured) return configured; // 配了就直用，完全不强依赖请求头
-  const host = req.get('host'); // 回退到请求 Host 头（反代通常已保留公网域名）
-  return host ? `${req.protocol}://${host}` : undefined; // 有 host 才拼协议；无 host 返回 undefined 由驱动兜底
+  // 反代（本地 serve-local 等）无法透传 Host（fetch 禁止设置），改由 X-Forwarded-* 还原对外地址；
+  // 少了这一步，本地预签名会指向 API 端口，浏览器直传变成跨域 PUT 被 CORS 拦截
+  const forwardedHost = (req.get('x-forwarded-host') ?? '').split(',')[0].trim(); // 取首个反代主机
+  const forwardedProto = (req.get('x-forwarded-proto') ?? '').split(',')[0].trim(); // 取首个反代协议
+  const host = forwardedHost || req.get('host'); // 反代头优先，其次请求 Host
+  return host ? `${forwardedProto || req.protocol}://${host}` : undefined; // 有 host 才拼协议；无 host 返回 undefined 由驱动兜底
 } // baseUrlOf 结束
 
 function requireStorage(deps: ApiDeps): StorageAdapter { // 取存储适配器，未注入则整个媒体域不可用

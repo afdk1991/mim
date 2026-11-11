@@ -20,6 +20,7 @@
     "verify:auth-gate": "node scripts/verify-auth-gate.mjs",
     "serve:local": "node scripts/serve-local.mjs",
     "verify:film-export": "node scripts/verify-film-export.mjs",
+    "verify:chat-flow": "node scripts/verify-chat-flow.mjs",
     "verify:site-directory": "node scripts/verify-site-directory.mjs",
     "verify:site-modules": "node scripts/verify-site-modules.mjs",
     "verify:entry-manifest": "node scripts/verify-entry-manifest.mjs",

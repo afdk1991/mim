@@ -451,11 +451,12 @@ export function Chat({ locale }: ChatProps) {
       setGroupPick([]); // 清勾选
       setSearchQ(''); // 清搜索
       setSearchResults([]); // 清结果
+      await loadConversations(); // 先刷新会话列表，否则新群不在 conversations 里，activeConversation 为空、右侧不会渲染
       await openConversation(res.conversation_id); // 打开新群
     } catch {
       setError(isZh ? '创建群聊失败' : 'Failed to create group'); // 失败提示
     } // try 结束
-  }, [groupPick, groupName, isZh, openConversation]);
+  }, [groupPick, groupName, isZh, openConversation, loadConversations]); // 建群依赖：列表刷新函数也要进依赖，避免拿旧闭包
 
   /** 打开群信息面板：拉成员与群主 */
   const openPanel = useCallback(async () => {
