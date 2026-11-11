@@ -1,0 +1,179 @@
+/** 契约测试：本轮新增的 19 条「程序开发」组能力 —— 每条都必须有真实、可断言的产出。 */
+
+import { describe, expect, it } from 'vitest'; // vitest 测试框架
+import { CAPABILITY_HANDLERS } from '../src/capabilities.js'; // 执行层注册表
+
+/** 小工具：取 handler 并执行，返回结果 */
+async function run(key: string, text: string, options: Record<string, unknown> = {}) {
+  const handler = CAPABILITY_HANDLERS[key]; // 直接读注册表
+  expect(handler, `未注册: ${key}`).toBeTypeOf('function'); // 必须存在
+  return handler!({ text, options }); // 执行
+} // run 结束
+
+describe('程序开发组新增能力', () => {
+  it('ui.theme 生成十档色阶', async () => {
+    const result = await run('ui.theme', '#2f6feb'); // 主色
+    expect(result.output).toContain('--brand-500'); // 500 档保留原色
+    expect(result.output).toContain('--brand-900'); // 深色档存在
+    expect(result.meta.steps).toBe(10); // 十档
+  });
+
+  it('ui.theme 拒绝非十六进制色值', async () => {
+    await expect(run('ui.theme', 'blue')).rejects.toThrow(); // 非 hex 直接失败
+  });
+
+  it('speech.ssml 按句插停顿', async () => {
+    const result = await run('speech.ssml', '你好。欢迎使用 Mim。'); // 两句
+    expect(result.output.startsWith('<speak')).toBe(true); // SSML 根节点
+    expect(result.output).toContain('<break time="300ms"/>'); // 句间停顿
+    expect(result.meta.sentences).toBe(2); // 句数
+  });
+
+  it('http.status 查询多个状态码', async () => {
+    const result = await run('http.status', '200,429,999'); // 含一个越界码
+    const parsed = JSON.parse(result.output) as { items: Array<{ code: number; klass: string; known: boolean }> }; // 解析输出
+    expect(parsed.items).toHaveLength(2); // 999 被过滤
+    expect(parsed.items[0].klass).toBe('2xx'); // 分类正确
+    expect(parsed.items[1].known).toBe(true); // 429 已收录
+  });
+
+  it('data.profile 计算分位与离群', async () => {
+    const result = await run('data.profile', '1,2,3,4,100'); // 一个明显离群值
+    const parsed = JSON.parse(result.output) as { median: number; outliers: number[] }; // 解析输出
+    expect(parsed.median).toBe(3); // 中位数
+    expect(parsed.outliers).toContain(100); // 离群值被识别
+  });
+
+  it('code.detect 识别 TypeScript 与 Python', async () => {
+    const ts = await run('code.detect', 'interface A { id: number }\nexport type B = string;'); // TS 特征
+    expect(JSON.parse(ts.output).language).toBe('TypeScript'); // 语言判定
+    const py = await run('code.detect', 'def main():\n    import os'); // Python 特征
+    expect(JSON.parse(py.output).language).toBe('Python'); // 语言判定
+  });
+
+  it('cache.key 生成短键与过期时间', async () => {
+    const result = await run('cache.key', 'user:42:profile', { prefix: 'app', ttl: 60 }); // 60 秒 TTL
+    const parsed = JSON.parse(result.output) as { key: string; ttl_seconds: number; expire_at: string }; // 解析
+    expect(parsed.key.startsWith('app:')).toBe(true); // 前缀生效
+    expect(parsed.key.length).toBeLessThan(30); // 短键
+    expect(parsed.ttl_seconds).toBe(60); // TTL
+    expect(Number.isNaN(Date.parse(parsed.expire_at))).toBe(false); // 合法时间
+  });
+
+  it('search.rank 按命中次数排序', async () => {
+    const result = await run('search.rank', JSON.stringify({ query: '购物车', docs: ['商城购物车结算流程', 'IM 聊天'] })); // 一个命中一个不命中
+    const parsed = JSON.parse(result.output) as { hits: number; ranked: Array<{ score: number }> }; // 解析
+    expect(parsed.hits).toBe(1); // 仅一条命中
+    expect(parsed.ranked[0].score).toBeGreaterThan(0); // 得分大于 0
+  });
+
+  it('service.topology 排出启动分层', async () => {
+    const result = await run('service.topology', JSON.stringify({ services: [{ name: 'api', depends_on: ['db'] }, { name: 'db', depends_on: [] }] })); // 两层依赖
+    const parsed = JSON.parse(result.output) as { start_order: string[]; layers: string[][]; healthy: boolean }; // 解析
+    expect(parsed.start_order).toEqual(['db', 'api']); // 依赖优先
+    expect(parsed.layers).toHaveLength(2); // 两层
+    expect(parsed.healthy).toBe(true); // 健康
+  });
+
+  it('service.topology 检出环形依赖', async () => {
+    const result = await run('service.topology', JSON.stringify({ services: [{ name: 'a', depends_on: ['b'] }, { name: 'b', depends_on: ['a'] }] })); // 互依赖
+    const parsed = JSON.parse(result.output) as { cycles: string[]; healthy: boolean }; // 解析
+    expect(parsed.cycles.sort()).toEqual(['a', 'b']); // 两个都在环里
+    expect(parsed.healthy).toBe(false); // 不健康
+  });
+
+  it('workflow.check 报告环形依赖与悬空边', async () => {
+    const result = await run('workflow.check', JSON.stringify({ steps: [{ id: 'a', next: ['b', 'ghost'] }, { id: 'b', next: ['a'] }] })); // a/b 互指成环，并带一条悬空边
+    const parsed = JSON.parse(result.output) as { unreachable: string[]; dangling_edges: string[]; healthy: boolean }; // 解析
+    expect(parsed.unreachable.sort()).toEqual(['a', 'b']); // 环内节点都从入口不可达
+    expect(parsed.dangling_edges[0]).toBe('a->ghost'); // 悬空边
+    expect(parsed.healthy).toBe(false); // 不健康
+  });
+
+  it('rbac.check 合并角色权限', async () => {
+    const result = await run('rbac.check', JSON.stringify({ roles: { admin: ['user:read'] }, users: [{ user: 'u1', roles: ['admin'] }, { user: 'u2', roles: ['guest'] }], required: 'user:read' })); // 一授一拒
+    const parsed = JSON.parse(result.output) as { granted: number; denied: number; details: Array<{ user: string; granted: boolean; unknown_roles: string[] }> }; // 解析
+    expect(parsed.granted).toBe(1); // u1 通过
+    expect(parsed.denied).toBe(1); // u2 拒绝
+    expect(parsed.details[1].unknown_roles).toContain('guest'); // 未定义角色
+  });
+
+  it('code.gen 渲染模板', async () => {
+    const result = await run('code.gen', JSON.stringify({ template: 'export const {{name}} = {{value}};', data: { name: 'LIMIT', value: 20 } })); // 简单模板
+    expect(result.output).toBe('export const LIMIT = 20;'); // 逐字匹配
+    expect(result.output_kind).toBe('text'); // 纯文本
+  });
+
+  it('ioc.graph 给出实例化顺序', async () => {
+    const result = await run('ioc.graph', JSON.stringify({ beans: [{ name: 'service', depends_on: ['repo'] }, { name: 'repo', depends_on: [] }] })); // 两层
+    const parsed = JSON.parse(result.output) as { instantiate_order: string[]; healthy: boolean }; // 解析
+    expect(parsed.instantiate_order).toEqual(['repo', 'service']); // 被依赖者先
+    expect(parsed.healthy).toBe(true); // 健康
+  });
+
+  it('rule.eval 命中断言与报错并存', async () => {
+    const result = await run('rule.eval', JSON.stringify({ rules: [{ when: 'amount > 100', then: 'high' }, { when: 'bad (', then: 'never' }], facts: { amount: 120 } })); // 一条正常一条语法错
+    const parsed = JSON.parse(result.output) as { fired: Array<{ then: string }>; errors: number }; // 解析
+    expect(parsed.fired[0].then).toBe('high'); // 命中
+    expect(parsed.errors).toBe(1); // 错误计数
+  });
+
+  it('spring.config 生成 application.yml', async () => {
+    const result = await run('spring.config', JSON.stringify({ app: { name: 'mim', port: 8080 }, datasource: { url: 'jdbc:h2:mem', user: 'sa' } })); // 完整配置
+    expect(result.output).toContain('application:'); // spring 段
+    expect(result.output).toContain('port: 8080'); // 端口
+    expect(result.meta.warnings).toEqual([]); // 无告警
+  });
+
+  it('spring.config 对非法端口给告警', async () => {
+    const result = await run('spring.config', JSON.stringify({ app: { name: 'mim', port: 70000 } })); // 越界端口
+    expect((result.meta.warnings as string[]).length).toBeGreaterThan(0); // 有告警
+  });
+
+  it('node.pkg 用 semver 校验依赖范围', async () => {
+    const result = await run('node.pkg', JSON.stringify({ name: 'mim', version: '0.0.0', dependencies: { semver: '^7.6.0', broken: 'not-a-range' }, devDependencies: { '@mim/api': 'workspace:*' } })); // 混入一个坏范围
+    const parsed = JSON.parse(result.output) as { ok: boolean; issues: string[]; dependencies_checked: number }; // 解析
+    expect(parsed.dependencies_checked).toBe(3); // 三段依赖都扫到
+    expect(parsed.issues.some((issue) => issue.includes('broken'))).toBe(true); // 坏范围被抓
+    expect(parsed.ok).toBe(false); // 体检不通过
+  });
+
+  it('bpmn.check 校验开始结束配对', async () => {
+    const result = await run('bpmn.check', JSON.stringify({ nodes: [{ id: 's', type: 'start', out: ['t'] }, { id: 't', type: 'task', out: ['e'] }, { id: 'e', type: 'end', out: [] }] })); // 完整流程
+    const parsed = JSON.parse(result.output) as { start_nodes: number; end_nodes: number; healthy: boolean }; // 解析
+    expect(parsed.start_nodes).toBe(1); // 一个开始
+    expect(parsed.end_nodes).toBe(1); // 一个结束
+    expect(parsed.healthy).toBe(true); // 健康
+  });
+
+  it('bpmn.check 抓出孤立与断头节点', async () => {
+    const result = await run('bpmn.check', JSON.stringify({ nodes: [{ id: 's', type: 'start', out: [] }, { id: 'x', type: 'task', out: [] }] })); // 开始无出边 + 孤立任务
+    const parsed = JSON.parse(result.output) as { orphan_nodes: string[]; dead_end_nodes: string[] }; // 解析
+    expect(parsed.orphan_nodes).toContain('x'); // 孤立任务
+    expect(parsed.dead_end_nodes).toContain('s'); // 断头开始
+  });
+
+  it('anim.keyframes 生成 CSS 关键帧', async () => {
+    const result = await run('anim.keyframes', JSON.stringify({ name: 'fade', duration: '1s', frames: [{ offset: '0%', styles: { opacity: '0' } }, { offset: '100%', styles: { opacity: '1' } }] })); // 两帧
+    expect(result.output).toContain('@keyframes fade'); // 动画名
+    expect(result.output).toContain('opacity: 0;'); // 首帧样式
+    expect(result.meta.frames).toBe(2); // 帧数
+  });
+
+  it('phone.format 输出 E.164 与运营商', async () => {
+    const result = await run('phone.format', '138 0000 0001'); // 大陆手机号
+    const parsed = JSON.parse(result.output) as { e164: string; country: string; carrier: string; masked: string }; // 解析
+    expect(parsed.e164).toBe('+8613800000001'); // E.164
+    expect(parsed.country).toBe('CN'); // 地区
+    expect(parsed.carrier).toBe('中国移动'); // 号段判定
+    expect(parsed.masked).toBe('138****0001'); // 掩码
+  });
+
+  it('tauri.perm 生成 capability JSON', async () => {
+    const result = await run('tauri.perm', JSON.stringify({ identifier: 'default', windows: ['main'], permissions: ['core:default'] })); // 合法输入
+    const parsed = JSON.parse(result.output) as { capability: { identifier: string; permissions: string[] }; ok: boolean }; // 解析
+    expect(parsed.capability.identifier).toBe('default'); // 标识
+    expect(parsed.capability.permissions).toContain('core:default'); // 权限
+    expect(parsed.ok).toBe(true); // 校验通过
+  });
+}); // 新增能力用例结束

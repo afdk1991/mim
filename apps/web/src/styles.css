@@ -1062,6 +1062,26 @@ code { /* 行内代码/令牌展示 */
   border-color: var(--primary);
 } /* 自己气泡结束 */
 
+.chat-image { /* 图片气泡内的预览容器：点击可开原图 */
+  display: block; /* 独占一行，避免与文字混排 */
+  max-width: 260px; /* 宽度上限，长图不撑破气泡 */
+} /* 图片容器结束 */
+
+.chat-image img { /* 气泡内缩略图 */
+  display: block; /* 去掉行内基线空隙 */
+  max-width: 100%; /* 不超容器 */
+  max-height: 240px; /* 高度上限，保持列表节奏 */
+  border-radius: 10px; /* 与气泡圆角呼应 */
+  object-fit: cover; /* 等比裁切不变形 */
+  cursor: zoom-in; /* 暗示可放大查看 */
+} /* 缩略图结束 */
+
+.chat-image-loading,
+.chat-image-fallback { /* 加载中与失败占位 */
+  font-size: 13px; /* 与气泡正文一致 */
+  opacity: 0.75; /* 弱化存在感 */
+} /* 占位结束 */
+
 .chat-msg-time { /* 消息时间 */
   font-size: 11px;
   color: var(--text-muted);

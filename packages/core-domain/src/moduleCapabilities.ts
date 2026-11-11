@@ -7,6 +7,9 @@
  *
  * 未登记的模块属于「规划中」：商城仍展示，但详情面板不给解锁/调用入口，
  * 避免用户为没有实现的条目付费。
+ *
+ * 当前规模（2026-11-11）：46 条能力；「程序开发」组 37 条导航条目**已全部绑定**，
+ * 其余分组 9 条能力分布在前沿技术 3 / WEB 应用开发 1 / 开发工具 2 / 数据库 1 / 应用工具 2。
  */
 
 /** 输出形态：前端据此决定渲染方式（纯文本 / 结构化 JSON / HTML / 图片 dataURL） */
@@ -240,6 +243,158 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     output_kind: 'json', // 映射结构
     module_codes: ['cat.tools-01'], // 应用工具 / 文件管理工具
   }, // 批量重命名结束
+  { // 主题色阶生成
+    key: 'ui.theme', // 能力标识
+    name: { 'zh-CN': 'UI 主题色阶生成', 'en-US': 'UI theme palette' }, // 能力名
+    hint: { 'zh-CN': '输入主色（如 #2f6feb），输出 50–900 明暗色阶 CSS 变量', 'en-US': 'Enter a primary color to get 50–900 CSS variables' }, // 使用提示
+    placeholder: { 'zh-CN': '#2f6feb', 'en-US': '#2f6feb' }, // 占位
+    output_kind: 'text', // 输出 CSS 文本
+    module_codes: ['cat.dev-08'], // 程序开发 / 图形UI组件/框架
+  }, // 主题色阶结束
+  { // 语音合成 SSML
+    key: 'speech.ssml', // 能力标识
+    name: { 'zh-CN': '语音合成 SSML 生成', 'en-US': 'Speech SSML builder' }, // 能力名
+    hint: { 'zh-CN': '输入待朗读文本，按句号切分并插入停顿，输出 SSML', 'en-US': 'Enter text to build SSML with sentence breaks' }, // 使用提示
+    placeholder: { 'zh-CN': '欢迎使用 Mim。今天天气不错。', 'en-US': 'Welcome to Mim. Nice day.' }, // 占位
+    output_kind: 'text', // 输出 SSML 文本
+    module_codes: ['cat.dev-10'], // 程序开发 / 语音处理
+  }, // SSML 结束
+  { // HTTP 状态码
+    key: 'http.status', // 能力标识
+    name: { 'zh-CN': 'HTTP 状态码查询', 'en-US': 'HTTP status lookup' }, // 能力名
+    hint: { 'zh-CN': '输入状态码（可逗号分隔多个），输出含义与分类', 'en-US': 'Enter one or more status codes' }, // 使用提示
+    placeholder: { 'zh-CN': '200,301,404,429,503', 'en-US': '200,301,404,429,503' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-12'], // 程序开发 / 网络服务
+  }, // 状态码结束
+  { // 数值画像
+    key: 'data.profile', // 能力标识
+    name: { 'zh-CN': '数值列画像', 'en-US': 'Numeric profiling' }, // 能力名
+    hint: { 'zh-CN': '粘贴逗号或换行分隔的数字，输出均值/中位数/分位/IQR 离群值', 'en-US': 'Paste numbers to get mean, median, quantiles and outliers' }, // 使用提示
+    placeholder: { 'zh-CN': '12, 15, 18, 21, 500', 'en-US': '12, 15, 18, 21, 500' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-13'], // 程序开发 / 数据挖掘
+  }, // 数值画像结束
+  { // 语言识别
+    key: 'code.detect', // 能力标识
+    name: { 'zh-CN': '代码语言识别', 'en-US': 'Code language detect' }, // 能力名
+    hint: { 'zh-CN': '粘贴代码片段，依据关键字与语法特征判断语言', 'en-US': 'Paste a snippet to detect its language' }, // 使用提示
+    placeholder: { 'zh-CN': 'const a = await fetch(url);', 'en-US': 'const a = await fetch(url);' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-15'], // 程序开发 / 编程语言/脚本语言
+  }, // 语言识别结束
+  { // 缓存键规划
+    key: 'cache.key', // 能力标识
+    name: { 'zh-CN': '缓存键与过期规划', 'en-US': 'Cache key planner' }, // 能力名
+    hint: { 'zh-CN': '输入业务键（如 user:42），按前缀与 TTL 生成稳定短键与过期时间', 'en-US': 'Enter a business key to get a stable short key and TTL' }, // 使用提示
+    placeholder: { 'zh-CN': 'user:42:profile', 'en-US': 'user:42:profile' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-16'], // 程序开发 / 缓存组件
+  }, // 缓存键结束
+  { // 检索排序
+    key: 'search.rank', // 能力标识
+    name: { 'zh-CN': '轻量检索排序', 'en-US': 'Lightweight search ranking' }, // 能力名
+    hint: { 'zh-CN': '输入 {"query":"关键词","docs":["文档1","文档2"]}，按词频得分排序并给高亮片段', 'en-US': 'Input query and docs to rank by term frequency' }, // 使用提示
+    placeholder: { 'zh-CN': '{"query":"商城 购物车","docs":["商城购物车结算","IM 聊天"]}', 'en-US': '{"query":"cart checkout","docs":["cart checkout flow","IM chat"]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-18'], // 程序开发 / 搜索引擎
+  }, // 检索排序结束
+  { // 服务拓扑
+    key: 'service.topology', // 能力标识
+    name: { 'zh-CN': '微服务依赖拓扑', 'en-US': 'Service topology' }, // 能力名
+    hint: { 'zh-CN': '输入 {"services":[{"name":"api","depends_on":["db"]}]}，输出启动分层与环检测', 'en-US': 'Input services and dependencies to get start layers' }, // 使用提示
+    placeholder: { 'zh-CN': '{"services":[{"name":"api","depends_on":["db"]},{"name":"db","depends_on":[]}]}', 'en-US': '{"services":[{"name":"api","depends_on":["db"]},{"name":"db","depends_on":[]}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-19'], // 程序开发 / 微服务
+  }, // 服务拓扑结束
+  { // 工作流 DAG
+    key: 'workflow.check', // 能力标识
+    name: { 'zh-CN': '工作流 DAG 校验', 'en-US': 'Workflow DAG check' }, // 能力名
+    hint: { 'zh-CN': '输入 {"steps":[{"id":"a","next":["b"]}]}，输出环、不可达节点与关键路径', 'en-US': 'Input steps to detect cycles, unreachable nodes and critical path' }, // 使用提示
+    placeholder: { 'zh-CN': '{"steps":[{"id":"a","next":["b"]},{"id":"b","next":[]}]}', 'en-US': '{"steps":[{"id":"a","next":["b"]},{"id":"b","next":[]}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-20'], // 程序开发 / 工作流
+  }, // 工作流校验结束
+  { // 权限矩阵校验
+    key: 'rbac.check', // 能力标识
+    name: { 'zh-CN': 'RBAC 权限矩阵校验', 'en-US': 'RBAC matrix check' }, // 能力名
+    hint: { 'zh-CN': '输入 {"roles":{"admin":["user:read"]},"users":[{"user":"u1","roles":["admin"]}],"required":"user:read"}，判断授权结果', 'en-US': 'Input roles, users and a required permission to evaluate access' }, // 使用提示
+    placeholder: { 'zh-CN': '{"roles":{"admin":["user:read"]},"users":[{"user":"u1","roles":["admin"]}],"required":"user:read"}', 'en-US': '{"roles":{"admin":["user:read"]},"users":[{"user":"u1","roles":["admin"]}],"required":"user:read"}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-22'], // 程序开发 / 权限管理
+  }, // 权限矩阵结束
+  { // 代码批量生成
+    key: 'code.gen', // 能力标识
+    name: { 'zh-CN': '模板代码生成', 'en-US': 'Template code generator' }, // 能力名
+    hint: { 'zh-CN': '输入 {"template":"export const {{name}} = {{value}};","data":{"name":"A","value":1}}', 'en-US': 'Input a Mustache template plus data to render code' }, // 使用提示
+    placeholder: { 'zh-CN': '{"template":"export const {{name}} = {{value}};","data":{"name":"LIMIT","value":20}}', 'en-US': '{"template":"export const {{name}} = {{value}};","data":{"name":"LIMIT","value":20}}' }, // 占位
+    output_kind: 'text', // 生成代码文本
+    module_codes: ['cat.dev-24'], // 程序开发 / 代码生成器
+  }, // 代码生成结束
+  { // 依赖注入装配
+    key: 'ioc.graph', // 能力标识
+    name: { 'zh-CN': 'IoC 装配顺序', 'en-US': 'IoC wiring order' }, // 能力名
+    hint: { 'zh-CN': '输入 {"beans":[{"name":"service","depends_on":["repo"]}]}，输出 bean 装配顺序与循环依赖', 'en-US': 'Input beans to get wiring order and cycles' }, // 使用提示
+    placeholder: { 'zh-CN': '{"beans":[{"name":"service","depends_on":["repo"]},{"name":"repo","depends_on":[]}]}', 'en-US': '{"beans":[{"name":"service","depends_on":["repo"]},{"name":"repo","depends_on":[]}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-25'], // 程序开发 / IoC/AOP框架
+  }, // IoC 装配结束
+  { // 规则集求值
+    key: 'rule.eval', // 能力标识
+    name: { 'zh-CN': '规则集求值', 'en-US': 'Rule set evaluation' }, // 能力名
+    hint: { 'zh-CN': '输入 {"rules":[{"when":"amount > 100","then":"high"}],"facts":{"amount":120}}', 'en-US': 'Input rules and facts to evaluate which rules fire' }, // 使用提示
+    placeholder: { 'zh-CN': '{"rules":[{"when":"amount > 100","then":"high"}],"facts":{"amount":120}}', 'en-US': '{"rules":[{"when":"amount > 100","then":"high"}],"facts":{"amount":120}}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-27'], // 程序开发 / 规则引擎
+  }, // 规则集结束
+  { // Spring Boot 配置
+    key: 'spring.config', // 能力标识
+    name: { 'zh-CN': 'Spring Boot 配置生成', 'en-US': 'Spring Boot config' }, // 能力名
+    hint: { 'zh-CN': '输入 {"app":{"name":"mim","port":8080},"datasource":{"url":"jdbc:h2:mem","user":"sa"}}', 'en-US': 'Input app and datasource settings to get application.yml' }, // 使用提示
+    placeholder: { 'zh-CN': '{"app":{"name":"mim","port":8080},"datasource":{"url":"jdbc:h2:mem","user":"sa"}}', 'en-US': '{"app":{"name":"mim","port":8080},"datasource":{"url":"jdbc:h2:mem","user":"sa"}}' }, // 占位
+    output_kind: 'text', // 输出 YAML
+    module_codes: ['cat.dev-30'], // 程序开发 / Spring Boot 扩展
+  }, // Spring 配置结束
+  { // package.json 体检
+    key: 'node.pkg', // 能力标识
+    name: { 'zh-CN': 'package.json 体检', 'en-US': 'package.json audit' }, // 能力名
+    hint: { 'zh-CN': '粘贴 package.json，校验名称、版本与依赖版本范围是否合法', 'en-US': 'Paste package.json to validate name, version and ranges' }, // 使用提示
+    placeholder: { 'zh-CN': '{"name":"mim","version":"0.0.0","dependencies":{"semver":"^7.6.0"}}', 'en-US': '{"name":"mim","version":"0.0.0","dependencies":{"semver":"^7.6.0"}}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-33'], // 程序开发 / Node 扩展
+  }, // package 体检结束
+  { // 流程完整性
+    key: 'bpmn.check', // 能力标识
+    name: { 'zh-CN': '流程节点完整性校验', 'en-US': 'Process integrity check' }, // 能力名
+    hint: { 'zh-CN': '输入 {"nodes":[{"id":"s","type":"start","out":["t"]}]}，校验开始/结束与孤立节点', 'en-US': 'Input nodes to check start/end pairing and orphans' }, // 使用提示
+    placeholder: { 'zh-CN': '{"nodes":[{"id":"s","type":"start","out":["t"]},{"id":"t","type":"task","out":["e"]},{"id":"e","type":"end","out":[]}]}', 'en-US': '{"nodes":[{"id":"s","type":"start","out":["t"]},{"id":"t","type":"task","out":["e"]},{"id":"e","type":"end","out":[]}]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-34'], // 程序开发 / 流程引擎/工具
+  }, // 流程校验结束
+  { // CSS 动画
+    key: 'anim.keyframes', // 能力标识
+    name: { 'zh-CN': 'CSS 关键帧生成', 'en-US': 'CSS keyframes builder' }, // 能力名
+    hint: { 'zh-CN': '输入 {"name":"fade","duration":"1s","frames":[{"offset":"0%","styles":{"opacity":"0"}},{"offset":"100%","styles":{"opacity":"1"}}]}', 'en-US': 'Input frames to get a @keyframes block' }, // 使用提示
+    placeholder: { 'zh-CN': '{"name":"fade","duration":"1s","frames":[{"offset":"0%","styles":{"opacity":"0"}},{"offset":"100%","styles":{"opacity":"1"}}]}', 'en-US': '{"name":"fade","duration":"1s","frames":[{"offset":"0%","styles":{"opacity":"0"}},{"offset":"100%","styles":{"opacity":"1"}}]}' }, // 占位
+    output_kind: 'text', // 输出 CSS
+    module_codes: ['cat.dev-35'], // 程序开发 / 动画开发
+  }, // 关键帧结束
+  { // 手机号规范化
+    key: 'phone.format', // 能力标识
+    name: { 'zh-CN': '手机号规范化', 'en-US': 'Phone normalization' }, // 能力名
+    hint: { 'zh-CN': '输入手机号，输出 E.164、国家/地区、运营商粗判与掩码', 'en-US': 'Enter a phone number to get E.164, region and masked form' }, // 使用提示
+    placeholder: { 'zh-CN': '138 0000 0001', 'en-US': '+86 138 0000 0001' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-36'], // 程序开发 / 移动通信
+  }, // 手机号结束
+  { // Tauri 权限
+    key: 'tauri.perm', // 能力标识
+    name: { 'zh-CN': 'Tauri 能力配置生成', 'en-US': 'Tauri capability builder' }, // 能力名
+    hint: { 'zh-CN': '输入 {"identifier":"default","windows":["main"],"permissions":["core:default"]}，输出 capability JSON', 'en-US': 'Input identifier, windows and permissions to get capability JSON' }, // 使用提示
+    placeholder: { 'zh-CN': '{"identifier":"default","windows":["main"],"permissions":["core:default","fs:allow-read"]}', 'en-US': '{"identifier":"default","windows":["main"],"permissions":["core:default"]}' }, // 占位
+    output_kind: 'json', // 结构化输出
+    module_codes: ['cat.dev-37'], // 程序开发 / Tauri 插件
+  }, // Tauri 权限结束
 ]; // 能力清单结束
 
 /** 按能力键取定义：前端工具面板与服务端路由都用它做存在性判断 */

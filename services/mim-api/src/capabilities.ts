@@ -19,6 +19,7 @@ import { Parser as ExpressionParser } from 'expr-eval'; // 数学表达式求值
 import mustache from 'mustache'; // Mustache 模板渲染：成熟模板引擎，不手写替换逻辑
 import { format as formatSqlText } from 'sql-formatter'; // SQL 语句格式化：支持多种方言
 import { parse as parseYamlText, stringify as stringifyYamlText } from 'yaml'; // YAML ↔ JSON 互转
+import semver from 'semver'; // semver 版本与范围校验：package.json 体检用成熟库而非手写正则
 import { AppError } from '@mim/core-domain'; // 统一业务错误：校验失败一律抛 VALIDATION_FAILED
 
 /** 能力调用入参：文本主体 + 能力私有选项（选项由各 handler 自行校验，避免一个巨型 schema） */
@@ -574,6 +575,471 @@ const fileRename: CapabilityHandler = async ({ text, options }) => { // 重命�
   return { output, output_kind: 'json', meta: { total: list.length, dry_run: true } }; // 标注 dry run
 }; // fileRename 结束
 
+/** 主题色阶：把主色分别向白与黑混合，产出可直接进 CSS 变量的 50–900 十档色 */
+const uiTheme: CapabilityHandler = async ({ text }) => { // UI 主题色阶入口
+  const primary = text.trim(); // 主色原文
+  const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(primary); // 只接受 3 位或 6 位十六进制
+  if (!match) throw new AppError('VALIDATION_FAILED', 'field "text" must be a hex color like #2f6feb', { capability: 'ui.theme' }); // 非法色值直接拒绝
+  const hex = match[1].length === 3 ? match[1].split('').map((c) => c + c).join('') : match[1]; // 三位简写补成六位
+  const rgb = [0, 2, 4].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)); // 拆出 RGB 三通道
+  const mix = (target: number[], weight: number): string => { // 与目标色按权重混合，weight 越大越接近目标
+    const parts = rgb.map((value, index) => Math.round(value * (1 - weight) + target[index] * weight)); // 逐通道线性混合
+    return '#' + parts.map((value) => value.toString(16).padStart(2, '0')).join(''); // 拼回十六进制
+  }; // 混合函数结束
+  const lightSteps = [50, 100, 200, 300, 400].map((step, index) => [step, mix([255, 255, 255], 0.92 - index * 0.16)] as const); // 向白混合，越靠前越浅
+  const mid = [[500, '#' + hex] as const]; // 500 档保留原色
+  const darkSteps = [600, 700, 800, 900].map((step, index) => [step, mix([0, 0, 0], 0.18 + index * 0.16)] as const); // 向黑混合，越靠后越深
+  const pairs = [...lightSteps, ...mid, ...darkSteps]; // 合并十档
+  const lines = pairs.map(([step, color]) => `  --brand-${step}: ${color};`); // 逐档生成 CSS 变量行
+  const output = [':root {', ...lines, '}', '', `/* primary: ${primary} */`].join('\n'); // 组装为可直接粘进样式表的片段
+  return { output, output_kind: 'text', meta: { primary, steps: pairs.length } }; // 返回 CSS 文本与档位数量
+}; // uiTheme 结束
+
+/** 语音 SSML：按句末标点切句并插入停顿，输出可供 TTS 直接使用的 SSML */
+const speechSsml: CapabilityHandler = async ({ text, options }) => { // 语音合成入口
+  const body = text.trim(); // 待朗读文本
+  if (!body) throw new AppError('VALIDATION_FAILED', 'field "text" must not be empty', { capability: 'speech.ssml' }); // 空文本拒绝
+  const voice = optionString(options, 'voice', 'zh-CN-XiaoxiaoNeural'); // 音色，默认中文女声
+  const rate = optionString(options, 'rate', '0%'); // 语速，默认原速
+  const sentences = body.split(/(?<=[。！？!?])/).map((s) => s.trim()).filter(Boolean); // 按句末标点切句，保留标点
+  const inner = sentences.map((sentence, index) => `${sentence}${index < sentences.length - 1 ? '<break time="300ms"/>' : ''}`).join('\n  '); // 句间插停顿
+  const output = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">\n  <voice name="${voice}">\n    <prosody rate="${rate}">\n      ${inner}\n    </prosody>\n  </voice>\n</speak>`; // 组装 SSML
+  return { output, output_kind: 'text', meta: { sentences: sentences.length, voice, rate } }; // 返回 SSML 与句数
+}; // speechSsml 结束
+
+/** HTTP 状态码字典：覆盖 1xx–5xx 常见码，查询时按入参逐个回放 */
+const HTTP_STATUS_TEXT: Record<number, { name: string; description: string }> = { // 码值 → 名称 + 说明
+  100: { name: 'Continue', description: '继续发送请求体' }, // 1xx
+  101: { name: 'Switching Protocols', description: '协议切换（如升级 WebSocket）' }, // 1xx
+  200: { name: 'OK', description: '请求成功' }, // 2xx
+  201: { name: 'Created', description: '资源已创建' }, // 2xx
+  202: { name: 'Accepted', description: '已接受，异步处理' }, // 2xx
+  204: { name: 'No Content', description: '成功但无响应体' }, // 2xx
+  206: { name: 'Partial Content', description: '范围请求的部分内容' }, // 2xx
+  301: { name: 'Moved Permanently', description: '永久重定向' }, // 3xx
+  302: { name: 'Found', description: '临时重定向' }, // 3xx
+  304: { name: 'Not Modified', description: '缓存仍然有效' }, // 3xx
+  307: { name: 'Temporary Redirect', description: '临时重定向，保持方法与请求体' }, // 3xx
+  308: { name: 'Permanent Redirect', description: '永久重定向，保持方法与请求体' }, // 3xx
+  400: { name: 'Bad Request', description: '请求语法或参数错误' }, // 4xx
+  401: { name: 'Unauthorized', description: '缺少或无效的身份凭证' }, // 4xx
+  403: { name: 'Forbidden', description: '已认证但无权限' }, // 4xx
+  404: { name: 'Not Found', description: '资源不存在' }, // 4xx
+  405: { name: 'Method Not Allowed', description: '方法不被允许' }, // 4xx
+  409: { name: 'Conflict', description: '与当前资源状态冲突' }, // 4xx
+  410: { name: 'Gone', description: '资源已被永久移除' }, // 4xx
+  412: { name: 'Precondition Failed', description: '前置条件不满足' }, // 4xx
+  413: { name: 'Payload Too Large', description: '请求体超出上限' }, // 4xx
+  415: { name: 'Unsupported Media Type', description: '媒体类型不受支持' }, // 4xx
+  422: { name: 'Unprocessable Entity', description: '语义校验失败' }, // 4xx
+  429: { name: 'Too Many Requests', description: '触发限流' }, // 4xx
+  500: { name: 'Internal Server Error', description: '服务端内部错误' }, // 5xx
+  501: { name: 'Not Implemented', description: '功能未实现' }, // 5xx
+  502: { name: 'Bad Gateway', description: '上游网关收到无效响应' }, // 5xx
+  503: { name: 'Service Unavailable', description: '服务暂不可用或过载' }, // 5xx
+  504: { name: 'Gateway Timeout', description: '上游响应超时' }, // 5xx
+  505: { name: 'HTTP Version Not Supported', description: 'HTTP 版本不受支持' }, // 5xx
+}; // 状态码字典结束
+
+/** HTTP 状态码查询：支持一次查多个码，未收录的码给出分类但不给说明 */
+const httpStatus: CapabilityHandler = async ({ text }) => { // 状态码入口
+  const codes = text.split(/[^0-9]+/).filter(Boolean).map((raw) => Number.parseInt(raw, 10)).filter((code) => code >= 100 && code <= 599); // 抽出 100–599 的数字
+  if (codes.length === 0) throw new AppError('VALIDATION_FAILED', 'field "text" must contain HTTP status codes', { capability: 'http.status' }); // 没有合法码就拒绝
+  const items = [...new Set(codes)].slice(0, 20).map((code) => { // 去重并限制 20 条
+    const known = HTTP_STATUS_TEXT[code]; // 查字典
+    return { code, klass: `${Math.floor(code / 100)}xx`, name: known?.name ?? 'Unknown', description: known?.description ?? '该码未收录，按分类判断语义', known: Boolean(known) }; // 组装单条结果
+  }); // map 结束
+  const output = JSON.stringify({ total: items.length, items }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { total: items.length } }; // 返回结果
+}; // httpStatus 结束
+
+/** 数值画像：均值、中位数、四分位、标准差与 IQR 离群值，用于快速摸底一批数字 */
+const dataProfile: CapabilityHandler = async ({ text }) => { // 数值画像入口
+  const values = text.split(/[^\-0-9.eE]+/).map((raw) => Number.parseFloat(raw)).filter((num) => Number.isFinite(num)); // 抽出所有有限数字
+  if (values.length === 0) throw new AppError('VALIDATION_FAILED', 'field "text" must contain numbers', { capability: 'data.profile' }); // 无数字拒绝
+  const sorted = [...values].sort((a, b) => a - b); // 升序副本
+  const quantile = (q: number): number => { // 线性插值分位数
+    const pos = (sorted.length - 1) * q; // 目标位置
+    const base = Math.floor(pos); // 下界索引
+    const rest = pos - base; // 小数部分
+    return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base]; // 插值或取端点
+  }; // 分位数函数结束
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length; // 均值
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length; // 方差
+  const p25 = quantile(0.25); // 下四分位
+  const p75 = quantile(0.75); // 上四分位
+  const iqr = p75 - p25; // 四分位距
+  const lowFence = p25 - 1.5 * iqr; // 下界
+  const highFence = p75 + 1.5 * iqr; // 上界
+  const outliers = values.filter((value) => value < lowFence || value > highFence); // 离群值
+  const summary = { count: values.length, min: sorted[0], max: sorted[sorted.length - 1], mean: Number(mean.toFixed(4)), median: Number(quantile(0.5).toFixed(4)), p25: Number(p25.toFixed(4)), p75: Number(p75.toFixed(4)), stddev: Number(Math.sqrt(variance).toFixed(4)), iqr: Number(iqr.toFixed(4)), outliers: outliers.slice(0, 20) }; // 汇总对象
+  return { output: JSON.stringify(summary, null, 2), output_kind: 'json', meta: { count: values.length, outliers: outliers.length } }; // 返回汇总
+}; // dataProfile 结束
+
+/** 语言识别：用关键字与语法特征投票，给出语言、置信度与命中证据 */
+const codeDetect: CapabilityHandler = async ({ text }) => { // 语言识别入口
+  const body = text.trim(); // 代码原文
+  if (!body) throw new AppError('VALIDATION_FAILED', 'field "text" must not be empty', { capability: 'code.detect' }); // 空文本拒绝
+  const rules: Array<{ language: string; patterns: RegExp[] }> = [ // 特征表：命中越多置信度越高
+    { language: 'TypeScript', patterns: [/interface\s+\w+\s*\{/, /: (string|number|boolean)\b/, /\bexport\s+type\b/, /\bas const\b/] }, // TS 特征
+    { language: 'JavaScript', patterns: [/\bconst\s+\w+\s*=/, /\bfunction\s+\w+\(/, /=>\s*\{/, /\bconsole\.log\(/] }, // JS 特征
+    { language: 'Python', patterns: [/\bdef\s+\w+\(.*\):/, /\bimport\s+\w+/, /\bself\./, /if\s+__name__\s*==/] }, // Python 特征
+    { language: 'Java', patterns: [/\bpublic\s+class\b/, /\bSystem\.out\./, /\bimport\s+java\./, /@Override/] }, // Java 特征
+    { language: 'Go', patterns: [/\bfunc\s+\w+\(/, /\bpackage\s+main\b/, /:=/, /\bfmt\.Print/] }, // Go 特征
+    { language: 'Rust', patterns: [/\bfn\s+\w+\(/, /\blet\s+mut\b/, /\buse\s+std::/, /->\s*Result</] }, // Rust 特征
+    { language: 'SQL', patterns: [/\bSELECT\b/i, /\bFROM\b/i, /\bWHERE\b/i, /;$/] }, // SQL 特征
+    { language: 'Shell', patterns: [/^#!/m, /\bexport\s+\w+=/, /\bif\s+\[\s/, /\becho\s+/] }, // Shell 特征
+  ]; // 特征表结束
+  const scored = rules.map((rule) => { // 逐语言计分
+    const hits = rule.patterns.filter((pattern) => pattern.test(body)); // 命中的特征
+    return { language: rule.language, score: hits.length, evidence: hits.map((pattern) => pattern.source).slice(0, 4) }; // 记录分数与证据
+  }).sort((a, b) => b.score - a.score); // 按分数降序
+  const best = scored[0]; // 最高分
+  const confidence = best.score === 0 ? 0 : Number((best.score / 4).toFixed(2)); // 满分 4 个特征
+  const output = JSON.stringify({ language: best.score > 0 ? best.language : 'Unknown', confidence, evidence: best.evidence, runners_up: scored.slice(1, 3).filter((item) => item.score > 0) }, null, 2); // 输出结论
+  return { output, output_kind: 'json', meta: { language: best.language, confidence } }; // 返回结果
+}; // codeDetect 结束
+
+/** 缓存键规划：业务键加前缀并取摘要短串，附 TTL 与过期时间，避免长键与碰撞 */
+const cacheKey: CapabilityHandler = async ({ text, options }) => { // 缓存键入口
+  const businessKey = text.trim(); // 业务键
+  if (!businessKey) throw new AppError('VALIDATION_FAILED', 'field "text" must not be empty', { capability: 'cache.key' }); // 空键拒绝
+  const prefix = optionString(options, 'prefix', 'mim'); // 命名空间前缀
+  const ttl = optionInt(options, 'ttl', 3600, 1, 604800); // TTL 秒，默认 1 小时，上限 7 天
+  const digest = createHash('sha256').update(businessKey).digest('hex').slice(0, 16); // 取 16 位摘要短串
+  const key = `${prefix}:${digest}`; // 最终键
+  const expireAt = new Date(Date.now() + ttl * 1000).toISOString(); // 过期时间
+  const output = JSON.stringify({ key, prefix, ttl_seconds: ttl, expire_at: expireAt, source_key: businessKey.slice(0, 120) }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { ttl_seconds: ttl } }; // 返回结果
+}; // cacheKey 结束
+
+/** 轻量检索排序：按查询词命中次数打分，并截取首个命中词附近的高亮片段 */
+const searchRank: CapabilityHandler = async ({ text }) => { // 检索排序入口
+  const input = parseJsonInput(text, 'search.rank') as { query?: unknown; docs?: unknown }; // 解析入参
+  const query = typeof input.query === 'string' ? input.query.trim() : ''; // 查询串
+  const docs = Array.isArray(input.docs) ? input.docs.map((doc) => String(doc)) : []; // 文档集合
+  if (!query || docs.length === 0) throw new AppError('VALIDATION_FAILED', 'fields "query" and "docs" are required', { capability: 'search.rank' }); // 缺参拒绝
+  const tokens = query.split(/[\s,，、]+/).filter(Boolean); // 查询词切分
+  const ranked = docs.slice(0, 200).map((doc, index) => { // 逐文档打分
+    let score = 0; // 累计得分
+    let firstHit = -1; // 首个命中位置
+    for (const token of tokens) { // 逐词统计
+      const positions = doc.split(token).length - 1; // 出现次数
+      score += positions; // 累加
+      const pos = doc.indexOf(token); // 首次位置
+      if (pos >= 0 && (firstHit < 0 || pos < firstHit)) firstHit = pos; // 更新首个命中
+    }
+    const start = Math.max(0, firstHit - 20); // 片段起点
+    const snippet = firstHit < 0 ? doc.slice(0, 60) : doc.slice(start, start + 100); // 片段内容
+    return { index, score, snippet, doc_length: doc.length }; // 单条结果
+  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 20); // 过滤零分并排序
+  const output = JSON.stringify({ query, tokens, total_docs: docs.length, hits: ranked.length, ranked }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { hits: ranked.length } }; // 返回结果
+}; // searchRank 结束
+
+/** 通用拓扑排序：给服务与 bean 两种图共用，返回装配顺序、分层与环 */
+function topologicalOrder(nodes: Array<{ name: string; depends: string[] }>): { order: string[]; layers: string[][]; cycles: string[]; missing: string[] } { // 拓扑排序
+  const known = new Set(nodes.map((node) => node.name)); // 已知节点集合
+  const missing = [...new Set(nodes.flatMap((node) => node.depends).filter((dep) => !known.has(dep)))]; // 依赖了不存在的节点
+  const indegree = new Map<string, number>(); // 入度表
+  const children = new Map<string, string[]>(); // 反向边表
+  for (const node of nodes) { // 初始化
+    indegree.set(node.name, 0); // 默认 0 入度
+    children.set(node.name, []); // 空出边表
+  } // 初始化结束
+  for (const node of nodes) { // 逐条依赖建边
+    for (const dep of node.depends) { // 依赖项
+      if (!known.has(dep)) continue; // 缺失依赖不计入图
+      indegree.set(node.name, (indegree.get(node.name) ?? 0) + 1); // 入度 +1
+      children.get(dep)?.push(node.name); // dep → node 边
+    }
+  } // 建边结束
+  const ready = nodes.filter((node) => (indegree.get(node.name) ?? 0) === 0).map((node) => node.name); // 初始无依赖节点
+  const order: string[] = []; // 装配顺序
+  const layers: string[][] = []; // 分层结果
+  let frontier = ready; // 当前层
+  while (frontier.length > 0) { // 层序推进
+    layers.push([...frontier]); // 记录本层
+    const next: string[] = []; // 下一层
+    for (const name of frontier) { // 逐个出队
+      order.push(name); // 追加顺序
+      for (const child of children.get(name) ?? []) { // 解锁后继
+        const remain = (indegree.get(child) ?? 0) - 1; // 入度减一
+        indegree.set(child, remain); // 写回
+        if (remain === 0) next.push(child); // 入度归零即入下一层
+      }
+    }
+    frontier = next; // 推进
+  } // 层序结束
+  const cycles = nodes.filter((node) => !order.includes(node.name)).map((node) => node.name); // 未出队即处于环中
+  return { order, layers, cycles, missing }; // 返回结果
+} // topologicalOrder 结束
+
+/** 微服务依赖拓扑：输出启动分层、启动顺序与环形依赖告警 */
+const serviceTopology: CapabilityHandler = async ({ text }) => { // 服务拓扑入口
+  const input = parseJsonInput(text, 'service.topology') as { services?: unknown }; // 解析入参
+  const raw = Array.isArray(input.services) ? input.services : []; // 服务数组
+  if (raw.length === 0) throw new AppError('VALIDATION_FAILED', 'field "services" must be a non-empty array', { capability: 'service.topology' }); // 缺参拒绝
+  const services = raw.slice(0, 200).map((item) => { // 归一化
+    const row = item as { name?: unknown; depends_on?: unknown }; // 断言结构
+    return { name: String(row.name ?? '').trim(), depends: Array.isArray(row.depends_on) ? row.depends_on.map((dep) => String(dep)) : [] }; // 取名字与依赖
+  }).filter((item) => item.name); // 过滤空名
+  const graph = topologicalOrder(services); // 拓扑计算
+  const output = JSON.stringify({ start_order: graph.order, layers: graph.layers, cycles: graph.cycles, missing_dependencies: graph.missing, healthy: graph.cycles.length === 0 && graph.missing.length === 0 }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { services: services.length, healthy: graph.cycles.length === 0 && graph.missing.length === 0 } }; // 返回结果
+}; // serviceTopology 结束
+
+/** 工作流 DAG 校验：检环、找不可达节点、算关键路径长度 */
+const workflowCheck: CapabilityHandler = async ({ text }) => { // 工作流校验入口
+  const input = parseJsonInput(text, 'workflow.check') as { steps?: unknown }; // 解析入参
+  const raw = Array.isArray(input.steps) ? input.steps : []; // 步骤数组
+  if (raw.length === 0) throw new AppError('VALIDATION_FAILED', 'field "steps" must be a non-empty array', { capability: 'workflow.check' }); // 缺参拒绝
+  const steps = raw.slice(0, 300).map((item) => { // 归一化
+    const row = item as { id?: unknown; next?: unknown }; // 断言结构
+    return { id: String(row.id ?? '').trim(), colons: [] as string[], next: Array.isArray(row.next) ? row.next.map((n) => String(n)) : [] }; // id 与后继
+  }).filter((item) => item.id); // 过滤空 id
+  const ids = new Set(steps.map((step) => step.id)); // 全部 id
+  const incoming = new Map<string, number>(); // 入度
+  for (const step of steps) incoming.set(step.id, 0); // 初始化
+  const dangling: string[] = []; // 指向不存在节点的边
+  for (const step of steps) { // 统计入度
+    for (const next of step.next) { // 逐个后继
+      if (!ids.has(next)) { dangling.push(`${step.id}->${next}`); continue; } // 悬空边记录
+      incoming.set(next, (incoming.get(next) ?? 0) + 1); // 入度 +1
+    }
+  } // 统计结束
+  const graph = topologicalOrder(steps.map((step) => ({ name: step.id, depends: [] }))); // 占位（保持返回结构一致）
+  const queue = steps.filter((step) => (incoming.get(step.id) ?? 0) === 0).map((step) => step.id); // 入口节点
+  const visited = new Set<string>(queue); // 已访问
+  const depth = new Map<string, number>(queue.map((id) => [id, 1])); // 深度
+  while (queue.length > 0) { // 自入口向下遍历
+    const id = queue.shift() as string; // 出队
+    const step = steps.find((item) => item.id === id); // 取步骤
+    for (const next of step?.next ?? []) { // 遍历后继
+      if (!ids.has(next)) continue; // 跳过悬空边
+      depth.set(next, Math.max(depth.get(next) ?? 0, (depth.get(id) ?? 0) + 1)); // 更新最长深度
+      if (!visited.has(next)) { visited.add(next); queue.push(next); } // 首次访问入队
+    }
+  } // 遍历结束
+  const unreachable = steps.map((step) => step.id).filter((id) => !visited.has(id)); // 从入口不可达
+  const criticalPath = Math.max(0, ...depth.values()); // 最长链长度
+  const cycles = steps.map((step) => step.id).filter((id) => !visited.has(id) && (incoming.get(id) ?? 0) > 0); // 入度非零且不可达，多为环
+  const output = JSON.stringify({ steps: steps.length, entry_points: steps.filter((step) => (incoming.get(step.id) ?? 0) === 0).map((step) => step.id), unreachable, dangling_edges: dangling, cycles, critical_path_length: criticalPath, healthy: unreachable.length === 0 && dangling.length === 0 }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { steps: steps.length, critical_path_length: criticalPath } }; // 返回结果
+}; // workflowCheck 结束
+
+/** RBAC 权限矩阵校验：把用户角色并成权限集，判断所需权限是否覆盖 */
+const rbacCheck: CapabilityHandler = async ({ text }) => { // 权限校验入口
+  const input = parseJsonInput(text, 'rbac.check') as { roles?: unknown; users?: unknown; required?: unknown }; // 解析入参
+  const roles = (input.roles ?? {}) as Record<string, unknown>; // 角色 → 权限数组
+  const users = Array.isArray(input.users) ? input.users : []; // 用户数组
+  const required = typeof input.required === 'string' ? input.required.trim() : ''; // 所需权限
+  if (!required || users.length === 0) throw new AppError('VALIDATION_FAILED', 'fields "users" and "required" are required', { capability: 'rbac.check' }); // 缺参拒绝
+  const rolePerms = new Map<string, string[]>(); // 角色权限表
+  for (const [role, perms] of Object.entries(roles)) rolePerms.set(role, Array.isArray(perms) ? perms.map((perm) => String(perm)) : []); // 归一化
+  const checks = users.slice(0, 100).map((item) => { // 逐用户判定
+    const row = item as { user?: unknown; roles?: unknown }; // 断言结构
+    const user = String(row.user ?? '').trim(); // 用户名
+    const owned = Array.isArray(row.roles) ? row.roles.map((role) => String(role)) : []; // 拥有角色
+    const perms = new Set<string>(); // 权限并集
+    const unknownRoles: string[] = []; // 未定义角色
+    for (const role of owned) { // 逐角色并入
+      const list = rolePerms.get(role); // 查表
+      if (!list) { unknownRoles.push(role); continue; } // 未定义角色记录
+      list.forEach((perm) => perms.add(perm)); // 并入
+    }
+    return { user, roles: owned, permissions: [...perms].sort(), granted: perms.has(required), unknown_roles: unknownRoles }; // 单用户结果
+  }); // map 结束
+  const grantedCount = checks.filter((item) => item.granted).length; // 授权人数
+  const output = JSON.stringify({ required, users: checks.length, granted: grantedCount, denied: checks.length - grantedCount, details: checks }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { required, granted: grantedCount } }; // 返回结果
+}; // rbacCheck 结束
+
+/** 模板代码生成：Mustache 模板 + 数据渲染成代码文本，限制长度防止刷屏 */
+const codeGen: CapabilityHandler = async ({ text }) => { // 代码生成入口
+  const input = parseJsonInput(text, 'code.gen') as { template?: unknown; data?: unknown }; // 解析入参
+  const template = typeof input.template === 'string' ? input.template : ''; // 模板
+  if (!template.trim()) throw new AppError('VALIDATION_FAILED', 'field "template" must not be empty', { capability: 'code.gen' }); // 空模板拒绝
+  const data = input.data && typeof input.data === 'object' ? (input.data as Record<string, unknown>) : {}; // 渲染数据
+  let rendered = ''; // 渲染结果
+  try {
+    rendered = mustache.render(template, data); // 交给成熟模板引擎
+  } catch (err) { // 模板语法错误
+    throw new AppError('VALIDATION_FAILED', `template render failed: ${(err as Error).message}`, { capability: 'code.gen' }); // 统一错误
+  }
+  if (rendered.length > 20000) throw new AppError('VALIDATION_FAILED', 'rendered output exceeds 20000 characters', { capability: 'code.gen' }); // 限制长度
+  return { output: rendered, output_kind: 'text', meta: { template_bytes: Buffer.byteLength(template, 'utf8'), output_bytes: Buffer.byteLength(rendered, 'utf8') } }; // 返回代码
+}; // codeGen 结束
+
+/** IoC 装配顺序：按 bean 依赖排出可实例化顺序，并报循环依赖与缺失 bean */
+const iocGraph: CapabilityHandler = async ({ text }) => { // IoC 装配入口
+  const input = parseJsonInput(text, 'ioc.graph') as { beans?: unknown }; // 解析入参
+  const raw = Array.isArray(input.beans) ? input.beans : []; // bean 数组
+  if (raw.length === 0) throw new AppError('VALIDATION_FAILED', 'field "beans" must be a non-empty array', { capability: 'ioc.graph' }); // 缺参拒绝
+  const beans = raw.slice(0, 200).map((item) => { // 归一化
+    const row = item as { name?: unknown; depends_on?: unknown }; // 断言结构
+    return { name: String(row.name ?? '').trim(), depends: Array.isArray(row.depends_on) ? row.depends_on.map((dep) => String(dep)) : [] }; // 名字与依赖
+  }).filter((item) => item.name); // 过滤空名
+  const graph = topologicalOrder(beans); // 拓扑计算
+  const output = JSON.stringify({ instantiate_order: graph.order, layers: graph.layers, circular_dependencies: graph.cycles, missing_beans: graph.missing, healthy: graph.cycles.length === 0 && graph.missing.length === 0 }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { beans: beans.length } }; // 返回结果
+}; // iocGraph 结束
+
+/** 规则集求值：用表达式库对 facts 求值 when，命中即产出 then，表达式不做任意代码执行 */
+const ruleEval: CapabilityHandler = async ({ text }) => { // 规则求值入口
+  const input = parseJsonInput(text, 'rule.eval') as { rules?: unknown; facts?: unknown }; // 解析入参
+  const rawRules = Array.isArray(input.rules) ? input.rules : []; // 规则数组
+  const facts = input.facts && typeof input.facts === 'object' ? (input.facts as Record<string, number>) : {}; // 事实表
+  if (rawRules.length === 0) throw new AppError('VALIDATION_FAILED', 'field "rules" must be a non-empty array', { capability: 'rule.eval' }); // 缺参拒绝
+  const results = rawRules.slice(0, 100).map((item, index) => { // 逐条求值
+    const row = item as { when?: unknown; then?: unknown }; // 断言结构
+    const when = String(row.when ?? '').trim(); // 条件表达式
+    const then = String(row.then ?? '').trim(); // 命中结果
+    if (!when) return { index, when, fired: false, error: 'empty expression' }; // 空条件视为未命中
+    try {
+      const value = new ExpressionParser().parse(when).evaluate(facts as Record<string, number>); // 只做数值/布尔求值
+      return { index, when, then, fired: Boolean(value), value: Number.isFinite(value) ? value : null }; // 记录结果
+    } catch (err) { // 表达式非法
+      return { index, when, then, fired: false, error: (err as Error).message }; // 记录错误但不中断整批
+    }
+  }); // map 结束
+  const fired = results.filter((item) => item.fired).map((item) => ({ when: item.when, then: item.then })); // 命中清单
+  const errors = results.filter((item) => item.error).length; // 错误条数
+  const output = JSON.stringify({ rules: results.length, fired, errors, details: results }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { rules: results.length, fired: fired.length, errors } }; // 返回结果
+}; // ruleEval 结束
+
+/** Spring Boot 配置生成：按 app / datasource / profiles 生成 application.yml 并给出校验告警 */
+const springConfig: CapabilityHandler = async ({ text }) => { // Spring 配置入口
+  const input = parseJsonInput(text, 'spring.config') as { app?: unknown; datasource?: unknown; profiles?: unknown }; // 解析入参
+  const app = (input.app ?? {}) as { name?: unknown; port?: unknown }; // 应用信息
+  const ds = (input.datasource ?? {}) as { url?: unknown; user?: unknown }; // 数据源
+  const name = typeof app.name === 'string' ? app.name.trim() : ''; // 应用名
+  const port = Number(app.port ?? 8080); // 端口
+  const warnings: string[] = []; // 校验告警
+  if (!name) warnings.push('spring.application.name 缺失'); // 缺应用名
+  if (!Number.isInteger(port) || port < 1 || port > 65535) warnings.push('server.port 不是合法端口'); // 端口非法
+  if (!ds.url && !ds.user) warnings.push('spring.datasource 未配置，运行时将使用默认内存库'); // 数据源缺失
+  const config: Record<string, unknown> = { // 组装静态配置
+    server: { port: Number.isInteger(port) ? port : 8080 }, // 端口
+    spring: { // spring 段
+      application: { name: name || 'application' }, // 应用名
+      ...(ds.url || ds.user ? { datasource: { url: String(ds.url ?? ''), username: String(ds.user ?? '') } } : {}), // 按需挂数据源
+    },
+  }; // 配置对象结束
+  if (Array.isArray(input.profiles) && input.profiles.length > 0) config['spring.profiles'] = input.profiles.map((p) => String(p)); // 允许显式列 profile
+  const output = stringifyYamlText(config, { lineWidth: 0 }); // 生成 YAML
+  return { output, output_kind: 'text', meta: { warnings, port } }; // 返回 YAML
+}; // springConfig 结束
+
+/** package.json 体检：校验名称规则、semver 版本、依赖范围是否可解析 */
+const nodePkg: CapabilityHandler = async ({ text }) => { // package 体检入口
+  const input = parseJsonInput(text, 'node.pkg') as { name?: unknown; version?: unknown; dependencies?: unknown; devDependencies?: unknown }; // 解析入参
+  const issues: string[] = []; // 问题清单
+  const name = typeof input.name === 'string' ? input.name : ''; // 包名
+  if (!/^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) issues.push(`name 不符合 npm 包名规范: ${name || '(空)'}`); // 名称校验
+  const version = typeof input.version === 'string' ? input.version : ''; // 版本
+  const validVersion = semver.valid(version); // semver 校验
+  if (!validVersion) issues.push(`version 不是合法 semver: ${version || '(空)'}`); // 版本校验
+  const bundles: Array<[string, Record<string, unknown>]> = [['dependencies', (input.dependencies ?? {}) as Record<string, unknown>], ['devDependencies', (input.devDependencies ?? {}) as Record<string, unknown>]]; // 两段依赖
+  const deps: Array<{ section: string; name: string; range: string; resolvable: boolean }> = []; // 依赖明细
+  for (const [section, bucket] of bundles) { // 逐段扫描
+    for (const [depName, range] of Object.entries(bucket)) { // 逐依赖
+      const spec = String(range); // 版本范围
+      const resolvable = Boolean(semver.validRange(spec)) || spec.startsWith('workspace:') || spec.startsWith('npm:') || spec.startsWith('file:') || spec.startsWith('link:'); // 允许 workspace / alias 形态
+      deps.push({ section, name: depName, range: spec, resolvable }); // 记录明细
+      if (!resolvable) issues.push(`${section}.${depName} 版本范围不可解析: ${spec}`); // 记入问题
+    }
+  } // 扫描结束
+  const output = JSON.stringify({ name, version: validVersion ?? version, dependencies_checked: deps.length, issues, ok: issues.length === 0, dependencies: deps.slice(0, 100) }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { dependencies: deps.length, issues: issues.length } }; // 返回结果
+}; // nodePkg 结束
+
+/** 流程节点完整性校验：开始/结束配对、悬空引用、孤立节点与不可达节点 */
+const bpmnCheck: CapabilityHandler = async ({ text }) => { // 流程校验入口
+  const input = parseJsonInput(text, 'bpmn.check') as { nodes?: unknown }; // 解析入参
+  const raw = Array.isArray(input.nodes) ? input.nodes : []; // 节点数组
+  if (raw.length === 0) throw new AppError('VALIDATION_FAILED', 'field "nodes" must be a non-empty array', { capability: 'bpmn.check' }); // 缺参拒绝
+  const nodes = raw.slice(0, 300).map((item) => { // 归一化
+    const row = item as { id?: unknown; type?: unknown; out?: unknown }; // 断言结构
+    return { id: String(row.id ?? '').trim(), type: String(row.type ?? 'task').trim(), out: Array.isArray(row.out) ? row.out.map((n) => String(n)) : [] }; // id/类型/出边
+  }).filter((node) => node.id); // 过滤空 id
+  const ids = new Set(nodes.map((node) => node.id)); // 全部 id
+  const starts = nodes.filter((node) => node.type === 'start'); // 开始节点
+  const ends = nodes.filter((node) => node.type === 'end'); // 结束节点
+  const dangling = nodes.flatMap((node) => node.out.filter((next) => !ids.has(next)).map((next) => `${node.id}->${next}`)); // 悬空出边
+  const incoming = new Map<string, number>(nodes.map((node) => [node.id, 0])); // 入度
+  let danglingCount = 0; // 悬空计数（用于与 dangling 对齐）
+  for (const node of nodes) { // 统计入度
+    for (const next of node.out) { // 逐出边
+      if (!ids.has(next)) { danglingCount += 1; continue; } // 悬空跳过
+      incoming.set(next, (incoming.get(next) ?? 0) + 1); // 入度 +1
+    }
+  } // 统计结束
+  const orphans = nodes.filter((node) => node.type !== 'start' && (incoming.get(node.id) ?? 0) === 0).map((node) => node.id); // 非开始且无入边即孤立
+  const deadEnds = nodes.filter((node) => node.type !== 'end' && node.out.length === 0).map((node) => node.id); // 非结束且无出边
+  const output = JSON.stringify({ nodes: nodes.length, start_nodes: starts.length, end_nodes: ends.length, dangling_edges: dangling, orphan_nodes: orphans, dead_end_nodes: deadEnds, healthy: starts.length === 1 && ends.length >= 1 && dangling.length === 0 && orphans.length === 0 && deadEnds.length === 0 }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { nodes: nodes.length, dangling: dangling.length || danglingCount } }; // 返回结果
+}; // bpmnCheck 结束
+
+/** CSS 关键帧生成：把偏移与样式声明拼成 @keyframes 块，附一条示例 animation 用法 */
+const animKeyframes: CapabilityHandler = async ({ text }) => { // 关键帧入口
+  const input = parseJsonInput(text, 'anim.keyframes') as { name?: unknown; duration?: unknown; frames?: unknown }; // 解析入参
+  const name = typeof input.name === 'string' && input.name.trim() ? input.name.trim().replace(/[^a-zA-Z0-9_-]/g, '') : 'mim-anim'; // 动画名只留安全字符
+  const duration = typeof input.duration === 'string' ? input.duration : '1s'; // 时长
+  const frames = Array.isArray(input.frames) ? input.frames : []; // 帧数组
+  if (frames.length === 0) throw new AppError('VALIDATION_FAILED', 'field "frames" must be a non-empty array', { capability: 'anim.keyframes' }); // 缺参拒绝
+  const blocks = frames.slice(0, 20).map((item) => { // 逐帧生成
+    const row = item as { offset?: unknown; styles?: unknown }; // 断言结构
+    const offset = String(row.offset ?? '0%'); // 偏移键
+    const styles = row.styles && typeof row.styles === 'object' ? (row.styles as Record<string, unknown>) : {}; // 样式声明
+    const decls = Object.entries(styles).map(([prop, value]) => `    ${prop}: ${String(value)};`); // 每条声明一行
+    return `  ${offset} {\n${decls.join('\n')}\n  }`; // 单帧块
+  }); // map 结束
+  const output = `@keyframes ${name} {\n${blocks.join('\n')}\n}\n\n/* 用法：animation: ${name} ${duration} ease-in-out infinite; */`; // 组装 CSS
+  return { output, output_kind: 'text', meta: { frames: frames.length, name, duration } }; // 返回 CSS
+}; // animKeyframes 结束
+
+/** 手机号规范化：清洗分隔符，按国家码与号段输出 E.164、地区、运营商与掩码 */
+const phoneFormat: CapabilityHandler = async ({ text }) => { // 手机号入口
+  const cleaned = text.trim().replace(/[()\s-]/g, '').replace(/^00/, '+'); // 去掉空格括号连字符，00 前缀换成 +
+  const digits = cleaned.replace(/[^0-9]/g, ''); // 纯数字
+  if (digits.length < 6 || digits.length > 15) throw new AppError('VALIDATION_FAILED', 'field "text" must be a phone number', { capability: 'phone.format' }); // 长度不合理拒绝
+  const hasCnPrefix = cleaned.startsWith('+86') || (digits.length === 13 && digits.startsWith('86')); // 判断中国大陆
+  const national = hasCnPrefix ? digits.replace(/^86/, '') : digits; // 去掉国家码
+  const country = hasCnPrefix || (national.length === 11 && national.startsWith('1')) ? 'CN' : 'UNKNOWN'; // 粗判地区
+  const e164 = country === 'CN' ? `+86${national}` : `+${digits}`; // E.164
+  const carrier = (() => { // 号段粗判运营商
+    if (country !== 'CN') return 'Unknown'; // 非中国大陆不判
+    const prefix3 = national.slice(0, 3); // 前三位号段
+    const mobile = ['134', '135', '136', '137', '138', '139', '147', '150', '151', '152', '157', '158', '159', '178', '182', '183', '184', '187', '188', '195', '197', '198']; // 移动号段
+    const unicom = ['130', '131', '132', '145', '155', '156', '166', '175', '176', '185', '186', '196']; // 联通号段
+    const telecom = ['133', '149', '153', '173', '177', '180', '181', '189', '190', '191', '193', '199']; // 电信号段
+    if (mobile.includes(prefix3)) return '中国移动'; // 移动
+    if (unicom.includes(prefix3)) return '中国联通'; // 联通
+    if (telecom.includes(prefix3)) return '中国电信'; // 电信
+    return '未知号段'; // 兜底
+  })(); // 运营商判定结束
+  const masked = national.length === 11 ? `${national.slice(0, 3)}****${national.slice(-4)}` : `${national.slice(0, 2)}****${national.slice(-2)}`; // 掩码形式
+  const output = JSON.stringify({ input: text.trim(), e164, country, national: national, carrier, masked, valid_length: national.length === 11 || country !== 'CN' }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { country, carrier } }; // 返回结果
+}; // phoneFormat 结束
+
+/** Tauri 能力配置生成：校验标识与权限后输出 capability JSON，可直接落到 src-tauri/capabilities */
+const tauriPerm: CapabilityHandler = async ({ text }) => { // Tauri 权限入口
+  const input = parseJsonInput(text, 'tauri.perm') as { identifier?: unknown; windows?: unknown; permissions?: unknown }; // 解析入参
+  const identifier = typeof input.identifier === 'string' ? input.identifier.trim() : 'default'; // 能力标识
+  const windows = Array.isArray(input.windows) ? input.windows.map((w) => String(w)) : ['main']; // 适用窗口
+  const permissions = Array.isArray(input.permissions) ? input.permissions.map((p) => String(p)) : []; // 权限清单
+  const issues: string[] = []; // 校验问题
+  if (!/^[a-z0-9-]+$/.test(identifier)) issues.push('identifier 只允许小写字母、数字与连字符'); // 标识规范
+  if (windows.length === 0) issues.push('windows 不能为空'); // 窗口为空
+  if (permissions.length === 0) issues.push('permissions 不能为空，至少应包含 core:default'); // 权限为空
+  const capability = { $schema: '../gen/schemas/desktop-schema.json', identifier, description: `Mim capability generated for ${identifier}`, windows, permissions }; // 目标结构
+  const output = JSON.stringify({ capability, issues, ok: issues.length === 0 }, null, 2); // 结构化输出
+  return { output, output_kind: 'json', meta: { permissions: permissions.length, issues: issues.length } }; // 返回结果
+}; // tauriPerm 结束
+
 /** 能力注册表：键必须与 core-domain 的 MODULE_CAPABILITIES.key 完全一致，否则路由回 501 */
 export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键为能力标识
   'json.format': jsonFormat, // JSON 工具
@@ -603,6 +1069,25 @@ export const CAPABILITY_HANDLERS: Record<string, CapabilityHandler> = { // 键�
   'sql.format': sqlFormat, // SQL 格式化
   'text.stats': textStats, // 文本统计
   'file.rename': fileRename, // 批量重命名预览
+  'ui.theme': uiTheme, // UI 主题色阶
+  'speech.ssml': speechSsml, // SSML 生成
+  'http.status': httpStatus, // HTTP 状态码查询
+  'data.profile': dataProfile, // 数值列画像
+  'code.detect': codeDetect, // 代码语言识别
+  'cache.key': cacheKey, // 缓存键规划
+  'search.rank': searchRank, // 轻量检索排序
+  'service.topology': serviceTopology, // 微服务依赖拓扑
+  'workflow.check': workflowCheck, // 工作流 DAG 校验
+  'rbac.check': rbacCheck, // RBAC 权限矩阵
+  'code.gen': codeGen, // 模板代码生成
+  'ioc.graph': iocGraph, // IoC 装配顺序
+  'rule.eval': ruleEval, // 规则集求值
+  'spring.config': springConfig, // Spring Boot 配置生成
+  'node.pkg': nodePkg, // package.json 体检
+  'bpmn.check': bpmnCheck, // 流程完整性校验
+  'anim.keyframes': animKeyframes, // CSS 关键帧
+  'phone.format': phoneFormat, // 手机号规范化
+  'tauri.perm': tauriPerm, // Tauri 能力配置
 }; // 注册表结束
 
 /** 按能力键取 handler：未注册即返回 undefined，由路由决定是否 501 */

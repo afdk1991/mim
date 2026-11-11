@@ -805,6 +805,25 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 线上取证（`mim.mixm.top`，2026-11-11 18:3x +08:00） | `/health` **200 / 53B**；`/marketplace`、`/products`、`/cart`、`/account` 均 **200 / 5305B**（nginx SPA 回退生效，新路径段可直接深链访问）；`GET /api/v1/cart` 匿名 **401 / 113B**（路由在线，非 404）；`GET /api/v1/modules?pageSize=5` **200 / 2754B**；新产物 `assets/index-C8tJ9Ywo.js` 与本地构建同名（JS_LEN=3271784），内含「加入购物车」3 次、「商品列表」4 次、「购物车」10 次、「个人中心」12 次、「待结算订单」2 次、「我的权益」2 次、「账号安全」1 次 | `curl.exe` + `.tmp/bundle_check.txt` |
 | 生产端到端（主机内 `/tmp/cart-e2e.mjs`，口令只判空不回显，执行后即删） | `ENV_PASSWORD_PRESENT=1`；登录 `200` 且有令牌；清空车 `200` / `COUNT=0`；加购免费模块 `cat.dev-32` **201**、付费模块 `comic.genpack.basic` **201**；读车 `CART_COUNT=2` / `PAYABLE=1` / `TOTALS=[{"currency":"CNY","amount_minor":9900}]` / 免费标记与单价均命中；结算 `200`，结果 `comic.genpack.basic:order` + `cat.dev-32:unlocked`，剩余车 `0`；权益到账 `ENT_HAS_FREE=true`；待结算订单 `PENDING_ORDER_COUNT=1` / `AMOUNT=9900`；再加购并二次结算 `REPLAY_SAME_ORDER=true` / `PENDING_AFTER_REPLAY=1`（不产生第二张单） | `.tmp/cart_e2e_result.txt` |
 
+### 9.21 「程序开发」组 37 条能力做满 + 聊天图片气泡内预览（2026-11-11 深夜 +08:00）
+
+**性质**：按用户「商城产品和聊天开发完整」与三条未闭环清单中的两项（图片气泡不可预览 / 商城 178 条规划中）推进。**178 条口径未获用户答复（`interaction_ask` 120s 无响应），本轮按最佳判断先做满「程序开发」组**（依据：该组是 `moduleCapabilities.ts` 头部注释的天然归属、验收点最清晰），其余分组维持规划中，口径仍待用户确认。
+
+| 项 | 本轮落地 | 位置 |
+|---|---|---|
+| 能力清单扩容 | `MODULE_CAPABILITIES` 由 27 条扩到 **46 条**，新增 **19 条**全部落在「程序开发」组（`cat.dev-08/10/12/13/15/16/18/19/20/22/24/25/27/30/33/34/35/36/37`），该组 **37 条导航条目已 100% 绑定** | `packages/core-domain/src/moduleCapabilities.ts` |
+| 新增能力（一） | `ui.theme`（主色 → 50–900 CSS 变量）、`speech.ssml`（文本 → SSML 断句）、`http.status`（状态码字典查询）、`data.profile`（均值/中位/分位/标准差/IQR 离群）、`code.detect`（关键字特征投票识别语言） | `services/mim-api/src/capabilities.ts` |
+| 新增能力（二） | `cache.key`（业务键 → 前缀 + sha256 短键 + TTL/过期）、`search.rank`（词频打分 + 命中片段）、`service.topology`（拓扑分层 + 环检测）、`workflow.check`（DAG 环/不可达/悬空边/关键路径）、`rbac.check`（角色并集判权） | 同上 |
+| 新增能力（三） | `code.gen`（Mustache 模板渲染）、`ioc.graph`（bean 装配顺序 + 循环依赖）、`rule.eval`（expr-eval 求值规则集，逐条容错）、`spring.config`（application.yml 生成 + 校验告警）、`node.pkg`（semver 校验包名/版本/依赖范围） | 同上 |
+| 新增能力（四） | `bpmn.check`（开始/结束配对、孤立、断头、悬空边）、`anim.keyframes`（CSS @keyframes 生成）、`phone.format`（E.164 + 号段运营商 + 掩码）、`tauri.perm`（capability JSON 生成 + 校验） | 同上 |
+| 第三方依赖（铁律五） | 新增 `semver@^7.7.2`（运行时）+ `@types/semver@^7.7.0`（类型），用于 `node.pkg` 的版本与范围校验，未手写正则替代 | `services/mim-api/package.json`、`pnpm-lock.yaml` |
+| 契约测试 | 新增 `test/capabilities-extra.test.ts` **23 例**（覆盖 19 条能力的真实产出与 4 条拒绝/告警分支）；`module-capability-coverage.test.ts` 的「每条能力都有 handler / 绑定编码存在 / 一对一绑定」自动覆盖新条目 | `services/mim-api/test/capabilities-extra.test.ts` |
+| 聊天图片预览 | `Chat.tsx` 新增 `ChatImageBubble`：按 `object_key` 走 `api.media.presignDownload(objectKey, 3600)` 申请 1 小时下载签名 → `<img>` 内联缩略（点击开原图）；失败回退 `[图片] 名称`，无 `object_key` 的历史消息保持文字；**消息列表重渲染不重复申请**（按 key 走 effect） | `apps/web/src/views/Chat.tsx` |
+| 图片样式 | `styles.css` 增 `.chat-image` / `.chat-image img`（宽 260px、高 240px、圆角、`zoom-in` 光标）与 `.chat-image-loading` / `.chat-image-fallback` 占位 | `apps/web/src/styles.css` |
+| 本地门禁（提交前） | `pnpm -r typecheck` **EXIT=0**；`pnpm --filter @mim/api test` **21 文件 / 315 例全过**；`pnpm --filter @mim/web build` **EXIT=0**（18.91s）；`env-check` **EXIT=0**；`comment-check --strict` **EXIT=0**（非阻断项含新测 `capabilities-extra.test.ts` 69.5%） | `.tmp/typecheck2.log`、`.tmp/api_test.log`、`.tmp/web_build.log`、`.tmp/comment_check.log` |
+| 未做 / 已知缺口（如实登记） | ① 商城仍有 **159/205 条「规划中」**（178 − 19，仅「程序开发」组做满），其余 18 组补法口径待用户拍板；② **群通话未做**（当前仅 1v1，2C2G 上 SFU 不可行）；③ **浏览器点击级 E2E 仍未做**（本轮仍是接口级 + 契约测试 + 线上 bundle 取证）；④ 购物车付费分支仍止于 `pending`，在线支付未接 | 本轮未执行项清单 |
+
+
 ---
 
 

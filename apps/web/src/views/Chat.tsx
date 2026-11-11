@@ -40,6 +40,39 @@ function formatTime(iso: string): string {
   }
 } // formatTime 结束
 
+/** 图片气泡：按 object_key 向服务端申请下载签名，取到后内联渲染缩略图，点击可看原图
+ *  - 签名地址有时效，故按 object_key 缓存一次结果，消息列表重渲染不重复申请
+ *  - 申请失败时回退为文字占位，不阻塞消息展示
+ * 入口：消息 content_type === 'image' 且带 object_key
+ * 出口：<img> 或占位文本
+ */
+function ChatImageBubble({ objectKey, name, isZh }: { objectKey: string; name?: string; isZh: boolean }) {
+  const [url, setUrl] = useState<string | null>(null); // 签名后的可访问地址
+  const [failed, setFailed] = useState(false); // 申请失败标记
+  useEffect(() => {
+    let alive = true; // 组件卸载后丢弃回调，避免卸载后 setState
+    setFailed(false); // 每次换 key 重置失败态
+    api.media
+      .presignDownload(objectKey, 3600) // 申请 1 小时有效的下载签名
+      .then((res) => {
+        if (alive) setUrl(res.download.url); // 拿到直链
+      })
+      .catch(() => {
+        if (alive) setFailed(true); // 失败回退占位
+      });
+    return () => {
+      alive = false; // 清理标记
+    };
+  }, [objectKey]); // 仅 object_key 变化时重新申请
+  if (failed) return <span className="chat-image-fallback">{`[图片] ${name ?? ''}`}</span>; // 失败占位
+  if (!url) return <span className="chat-image-loading">{isZh ? '图片加载中…' : 'Loading…'}</span>; // 加载中占位
+  return (
+    <a className="chat-image" href={url} target="_blank" rel="noreferrer" title={name ?? ''}>
+      <img src={url} alt={name ?? (isZh ? '图片' : 'image')} loading="lazy" />{/* 缩略展示，点击开原图 */}
+    </a>
+  );
+} // ChatImageBubble 结束
+
 /** 消息预览文本：列表里显示的摘要 */
 function messagePreview(msg: ImMessage): string {
   if (msg.content_type === 'text') return msg.content; // 文本直接显示
@@ -693,7 +726,11 @@ export function Chat({ locale }: ChatProps) {
                       {m.content_type === 'text' ? (
                         <span className="chat-msg-text">{m.content}</span>
                       ) : m.content_type === 'image' ? (
-                        <span>[图片] {m.object_name ?? ''}</span>
+                        m.object_key ? (
+                          <ChatImageBubble objectKey={m.object_key} name={m.object_name ?? undefined} isZh={isZh} /> // 有对象键就内联预览
+                        ) : (
+                          <span>{`[图片] ${m.object_name ?? ''}`}</span> // 无 object_key（历史消息）回退文字
+                        )
                       ) : (
                         <span>{`[文件] ${m.object_name ?? ''}`}</span>
                       )}
