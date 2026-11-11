@@ -141,6 +141,18 @@ CREATE INDEX IF NOT EXISTS idx_module_orders_status ON module_orders(status, cre
 -- 老库此时还没有该列，全量 exec 会直接报 no such column 导致进程启动失败；
 -- 该索引由 db.ts 的 ADDITIVE_INDEXES 在补列之后创建（新建库同样会走这一步）。
 
+-- 商城购物车：每用户每模块最多一行（模块属虚拟商品、不可重复购买，故不设数量列）
+CREATE TABLE IF NOT EXISTS cart_items (
+  id          TEXT PRIMARY KEY, -- 购物车条目主键（uuidv7，时间有序）
+  user_id     TEXT NOT NULL REFERENCES users(id), -- 归属用户；一个用户一份车
+  module_id   TEXT NOT NULL, -- 目标模块主键（与 modules.id 对应，跨区同码模块是不同行）
+  created_at  TEXT NOT NULL, -- 加购时间
+  updated_at  TEXT NOT NULL -- 最近一次加购/更新时间（重复加购时刷新）
+);
+-- 同一用户同一模块只允许一条：重复加购走幂等回放，不产生重复条目
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cart_items_user_module ON cart_items(user_id, module_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_user ON cart_items(user_id, created_at);
+
 CREATE TABLE IF NOT EXISTS entitlements (
   id          TEXT PRIMARY KEY,
   user_id     TEXT NOT NULL,

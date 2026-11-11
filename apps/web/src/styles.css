@@ -1821,3 +1821,168 @@ code { /* 行内代码/令牌展示 */
 } /* 角色标签结束 */
 
 
+
+/* ---------- 商品列表 / 购物车 / 个人中心 ---------- */
+
+.products-filter { /* 商品列表筛选栏 */
+  display: flex; /* 横向排列控件 */
+  flex-wrap: wrap; /* 窄屏换行 */
+  gap: 10px; /* 控件间距 */
+  align-items: center; /* 垂直居中 */
+} /* 筛选栏结束 */
+
+.products-search { /* 搜索表单：输入 + 按钮 */
+  display: flex; /* 同行 */
+  gap: 8px; /* 间距 */
+  flex: 1 1 260px; /* 允许伸展，窄屏独占一行 */
+} /* 搜索表单结束 */
+
+.products-search input { /* 搜索输入框 */
+  flex: 1; /* 撑满剩余宽度 */
+  padding: 9px 12px; /* 与通用输入一致的内边距 */
+  border: 1px solid var(--border); /* 细分隔线 */
+  border-radius: 8px; /* 圆角 */
+  background: var(--surface); /* 跟随主题背景 */
+  color: inherit; /* 继承文字色 */
+} /* 搜索输入框结束 */
+
+.products-filter select { /* 筛选下拉 */
+  padding: 9px 10px; /* 与输入框对齐 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 8px; /* 圆角 */
+  background: var(--surface); /* 跟随主题 */
+  color: inherit; /* 继承文字色 */
+} /* 下拉结束 */
+
+.products-table { /* 密集列表表格 */
+  width: 100%; /* 占满内容宽 */
+  border-collapse: collapse; /* 单线边框 */
+  font-size: 13px; /* 小字号提升信息密度 */
+} /* 表格结束 */
+
+.products-table th { /* 表头 */
+  text-align: left; /* 左对齐 */
+  padding: 8px 10px; /* 单元格留白 */
+  border-bottom: 1px solid var(--border); /* 分隔线 */
+  color: var(--text-muted); /* 弱化表头 */
+  font-weight: 600; /* 略加粗 */
+} /* 表头结束 */
+
+.products-table td { /* 数据行 */
+  padding: 10px; /* 单元格留白 */
+  border-bottom: 1px solid var(--border); /* 行分隔线 */
+  vertical-align: middle; /* 垂直居中 */
+} /* 数据行结束 */
+
+.products-name { /* 模块名 */
+  font-weight: 600; /* 突出主信息 */
+} /* 模块名结束 */
+
+.products-code { /* 模块编码 */
+  color: var(--text-muted); /* 次要信息 */
+  font-size: 12px; /* 更小字号 */
+} /* 编码结束 */
+
+.products-pager { /* 分页 / 行内操作条 */
+  display: flex; /* 横向排列 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 间距 */
+} /* 操作条结束 */
+
+.cart-badge { /* 购物车角标 */
+  display: inline-flex; /* 便于居中 */
+  align-items: center; /* 纵向居中 */
+  justify-content: center; /* 横向居中 */
+  min-width: 18px; /* 个位数保持圆形 */
+  height: 18px; /* 固定高度 */
+  margin-left: 6px; /* 与按钮文字分开 */
+  padding: 0 5px; /* 多位数自动变宽 */
+  border-radius: 999px; /* 胶囊 */
+  background: #2f6feb; /* 品牌蓝底 */
+  color: #fff; /* 白字 */
+  font-size: 11px; /* 小字号 */
+  font-weight: 700; /* 加粗 */
+} /* 角标结束 */
+
+.cart-foot { /* 购物车底部合计与结算 */
+  display: flex; /* 同行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 左合计右按钮 */
+  gap: 12px; /* 间距 */
+  padding-top: 12px; /* 与列表分开 */
+  border-top: 1px solid var(--border); /* 顶部分隔线 */
+} /* 合计栏结束 */
+
+.cart-results { /* 结算结果区 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 逐条堆叠 */
+  gap: 6px; /* 条目间距 */
+  padding-top: 8px; /* 与上方分开 */
+} /* 结算结果结束 */
+
+.tag { /* 状态标签 */
+  display: inline-block; /* 内容宽度自适应 */
+  padding: 1px 8px; /* 胶囊内边距 */
+  border-radius: 999px; /* 胶囊圆角 */
+  background: #eef1f7; /* 中性底色 */
+  font-size: 12px; /* 小字号 */
+  color: var(--text-muted); /* 次要色 */
+} /* 标签结束 */
+
+.tag.ok { /* 成功 / 可用状态标签 */
+  background: #e7f6ec; /* 浅绿底 */
+  color: #1a7f37; /* 深绿字 */
+} /* 可用标签结束 */
+
+.profile-tabs { /* 个人中心分区切换 */
+  display: flex; /* 横向 */
+  gap: 6px; /* 按钮间距 */
+  flex-wrap: wrap; /* 窄屏换行 */
+} /* 分区切换结束 */
+
+.tab { /* 分区按钮 */
+  padding: 6px 12px; /* 内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 999px; /* 胶囊 */
+  background: transparent; /* 透明底 */
+  color: var(--text-muted); /* 默认弱化 */
+  cursor: pointer; /* 手型 */
+  font-size: 13px; /* 小字号 */
+} /* 分区按钮结束 */
+
+.tab.active { /* 当前分区 */
+  background: var(--surface); /* 高亮底色 */
+  color: inherit; /* 正常文字色 */
+  border-color: var(--text-muted); /* 边框强调 */
+} /* 高亮分区结束 */
+
+.profile-form { /* 资料表单 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 逐字段堆叠 */
+  gap: 12px; /* 字段间距 */
+  max-width: 420px; /* 限制宽度，输入不至于过长 */
+} /* 表单结束 */
+
+.profile-form label { /* 字段容器 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 标题在上输入在下 */
+  gap: 6px; /* 间距 */
+  font-size: 13px; /* 小字号 */
+  color: var(--text-muted); /* 标签弱化 */
+} /* 字段结束 */
+
+.profile-form input, /* 文本输入 */
+.profile-form select { /* 下拉 */
+  padding: 9px 12px; /* 内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 8px; /* 圆角 */
+  background: var(--surface); /* 跟随主题 */
+  color: inherit; /* 继承文字色 */
+} /* 输入控件结束 */
+
+.profile-security { /* 账号安全分区 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 12px; /* 间距 */
+  align-items: flex-start; /* 按钮不撑满 */
+} /* 账号安全结束 */

@@ -779,10 +779,30 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 生产端到端（主机内 `.tmp/im-e2e.mjs`，口令只判空不回显） | `ENV_PASSWORD_PRESENT=1`；两账号登录 `200` / `USERS_DISTINCT=1`；建群 `201`、详情 `200` / `GROUP_MEMBER_COUNT=2` / 群主角色命中；群改名 `200` 且标题生效、成员改名 **403**；成员列表 `200` / 2 人；置顶+免打扰 `200` 且 `LIST_PINNED_FIRST=1` / `LIST_MUTED_OK=1` / `LIST_MEMBER_COUNT=2`；发消息 `201` 拿到 ID；搜索 `200` / `SEARCH_HITS=1`；非本人撤回 **403**、本人撤回 `200`、撤回后历史 `0`；踢人 `200` 且被踢者列表 `0`；群主删除 `200` / `DISSOLVE_RESULT=dissolved` | `scp` 脚本至 `/tmp` → `ssh node /tmp/im-e2e.mjs` → 执行后即删，落盘 `.tmp/im_e2e_result.txt` |
 | 未做 / 已知缺口（如实登记） | ① 205 条里仍有 **178 条**为「规划中」（不可解锁），本轮只做到 27 条；② 聊天「图片/文件」消息此前只能点开文件名，**消息气泡内的图片预览未做**（需 media 下载 URL 签名）；③ 通话仍只支持私聊，群通话未做；④ **浏览器点击级 E2E 仍未做**（未在真实页面点建群、发图片、撤回、搜索）；⑤ `Mim-PRD.html` 本轮未同步（能力与 IM 属实现层，PRD 无对应章节，登记为未同步而非「不涉及」）；⑥ 能力调用未加独立限流（复用全局请求约束） | 本轮未执行项清单 |
 
+### 9.20 购物车 + 商品列表 + 个人中心（商城交易链路与账户中心）（2026-11-11 晚 +08:00）
+
+**性质**：按用户「增加项目用户的个人中心 / 增加商城商品列表 / 购物车」指令交付。口径由 `interaction_ask` 拍板：购物车结算 = **生成待结算订单**（沿用既有订单与人工结算流程，免费模块直接解锁）；个人中心含**资料编辑 / 我的权益 / 我的订单 / 账号安全**四块；商品列表 = **强化现有商城页 + 新增独立 `/products` 列表页**。
+
+| 项 | 本轮落地 | 位置 |
+|---|---|---|
+| 购物车数据层 | `schema.sql` 新增 `cart_items`（`id / user_id / module_id / created_at / updated_at`）、唯一索引 `uq_cart_items_user_module (user_id, module_id)`、普通索引 `idx_cart_items_user`；虚拟商品不可重复购买，**刻意不设数量列** | `services/mim-api/src/schema.sql` |
+| 购物车后端 | 新建 `routes/cart.ts`（`createCartRouter`）：`GET /cart`（条目带 `owned / free / available / price / added_at`，`totals` 按币种累计、`payable_count` 排除免费与已拥有）、`POST /cart/items`（`active` 且未拥有才可加；已在车回放 `{added:false}`、已拥有 409）、`DELETE /cart/items/:moduleCode`（天然幂等）、`DELETE /cart`、`POST /cart/checkout`（逐条处理：`module_not_active` 保留、`already_owned` 移出、缺依赖 `skipped/missing_dependency:<codes>` 保留、免费模块同事务写 `entitlements` + `entitlement_events`（`reason=cart_checkout`）、付费模块生成 `pending` 订单（已有待结算单回放），成功条目用动态占位符批量移出车） | `services/mim-api/src/routes/cart.ts` |
+| 口径复用（不造第二套规则） | `routes/catalog.ts` 把 `currentPrice` / `assertDependenciesMet` / `OrderRow` / `orderView` 改 `export`，购物车与商城主路径共用同一价格、依赖校验与订单视图 | `services/mim-api/src/routes/catalog.ts` |
+| 挂载 | `app.ts` 在受保护路由循环里追加 `createCartRouter(resolved)`（`createImRouter` 之后），router 内部 `use('/cart', requireAuth)` | `services/mim-api/src/app.ts` |
+| 前端接口层 | `api.ts` 新增 `CartItem` / `CartSummary` / `CartCheckoutResult` 三类型与 `api.cart`（`get / add / remove / clear / checkout`） | `apps/web/src/api.ts` |
+| 商品列表页 | 新建 `views/Products.tsx`：关键词 / 一级分类 / 可购买性（全部・免费・付费・已解锁）/ 排序四维筛选 + 分页 + 行内加购（已解锁显示标签、规划中显示「规划中」）+ 页头购物车角标 | `apps/web/src/views/Products.tsx` |
+| 购物车页 | 新建 `views/Cart.tsx`：条目表格（价格 / 状态 / 移除）、合计（按币种）、结算按钮、结算结果逐条展示（即时解锁 / 待结算订单 / 跳过原因） | `apps/web/src/views/Cart.tsx` |
+| 个人中心页 | 新建 `views/Profile.tsx`：四个分区——资料（昵称 / 语言 / 时区，保存后同步全局用户态）、我的权益（`/me/entitlements` 表格）、我的订单（`/orders` 表格 + 取消待结算）、账号安全（注销申请 / 撤销，二次确认） | `apps/web/src/views/Profile.tsx` |
+| 路由与导航 | `router.ts` 的 `AppView` 增 `products` / `cart` / `account`；`VIEW_SEGMENTS` 增 `products: 'products'` / `cart: 'cart'` / `account: 'account'`；`LEGACY_SEGMENTS` 增 `profile → account`（兼容曾用名）；`App.tsx` 导航新增三项（商城之后）并新增三个渲染分支；`GATED_VIEWS` 增三项（个人数据需登录） | `apps/web/src/router.ts`、`apps/web/src/App.tsx` |
+| 商城页强化 | `Store.tsx` 页头新增「商品列表 / 购物车（角标）」入口；卡片动作行新增「加入购物车」（已登录且未拥有、有真实能力时）；`handleAddToCart` 走 `api.cart.add`，回放与新建两种提示 | `apps/web/src/views/Store.tsx` |
+| 内联脚本与 CSP | `apps/web/index.html` 内联 `views` 数组补 `products / cart / account / profile`；脚本正文变化后重算 CSP 哈希为 **`sha256-dx7A4PPWeWC48rajsnmlSYohErc75pUzV9+8bdWoB0k=`**，`deploy/nginx-mim.conf` 4 处同步替换（旧值 `sha256-Q4BFbQUC…` 全库归零） | `apps/web/index.html`、`deploy/nginx-mim.conf` |
+| 样式 | `styles.css` 末尾新增「商品列表 / 购物车 / 个人中心」段：`.products-filter` / `.products-search` / `.products-table` / `.products-name` / `.products-code` / `.products-pager` / `.cart-badge` / `.cart-foot` / `.cart-results` / `.tag(.ok)` / `.profile-tabs` / `.tab(.active)` / `.profile-form` / `.profile-security` | `apps/web/src/styles.css` |
+| 契约测试 | 新增 `test/cart.test.ts` **9 例**：匿名 401、免费加购与重复回放、不存在 404 / 已解锁 409、单价与按币种合计、移除与清空、免费结算即时解锁并清空车、付费生成 pending 订单（金额服务端快照）、依赖缺失跳过并保留、重复结算只保留一张 pending 订单 | `services/mim-api/test/cart.test.ts` |
+| 本地门禁（提交前） | `pnpm -r typecheck` **EXIT=0**；`pnpm --filter @mim/api test` **20 文件 / 292 例全过**；`pnpm --filter @mim/web build` **EXIT=0**（17.44s，产物 `assets/index-C8tJ9Ywo.js` + `index-C_J04-AW.css`）；`node scripts/env-check.mjs` **EXIT=0**；`comment-check --strict` **EXIT=0** | `.tmp/typecheck2.log`、`.tmp/api_test.log`、`.tmp/web_build.log`、`.tmp/env_check.log`、`.tmp/comment_check.log` |
+| 未做 / 已知缺口（如实登记） | ① 购物车结算的付费分支止于 `pending` 订单，**在线支付渠道未接**（仍走管理端人工结算 / 既有 `payment-notify`）；② 商品列表筛选中的「可购买性」为**当前页客户端过滤**，跨页统计未做；③ 商城仍有 **178/205 条「规划中」不可解锁**；④ `Mim-PRD.html` 未同步（本轮属实现层，PRD 无对应章节，登记为未同步而非「不涉及」） | 本轮未执行项清单 |
 
 ---
 
-## 与铁律一冲突时的优先级
 
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
 

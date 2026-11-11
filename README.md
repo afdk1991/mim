@@ -59,7 +59,7 @@ node scripts/comment-check.mjs
 pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`、`packages/*`）：
 
 ```
-apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块商城 / 站点矩阵 / 部署汇总 / 漫剧工作台 / 即时通讯 / 设置）
+apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块商城 / 商品列表 / 购物车 / 个人中心 / 站点矩阵 / 部署汇总 / 漫剧工作台 / 即时通讯 / 设置）
 apps/web/src/views/  # Login / Store / Sites / Deployments / ComicWorkbench / Chat / Settings 七个视图组件
 apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
@@ -103,6 +103,8 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 站点模块（2026-11-09） | `GET /sites/overview`（全站汇总）、`GET /sites`（45 模块列表，支持 `?q=` / `?group=`）、`GET /sites/:host`（备注原文 + 行号 + 能力点 + 统计）、`GET /sites/:host/capabilities`、`GET /sites/:host/items`（支持 `?capability=` / `?status=`）、`POST /sites/:host/items`、`POST /sites/:host/items/:id/transition` | 浏览公开；两个写端点登录 + 幂等 |
 | 权益 | `POST /entitlements`（**付费模块返回 402 `PAYMENT_REQUIRED`**，免费模块 201）、`GET /me/entitlements` | 登录 + 幂等 |
 | 商城订单 | `POST /orders`（下单，金额服务端快照；同模块已有待付单回放 200）、`GET /orders`（我的订单，`status` 过滤 + 分页）、`POST /orders/:id/cancel` | 登录 + 幂等 |
+| 购物车（2026-11-11） | `GET /cart`（条目含 `owned / free / available / price / added_at`，`totals` 按币种累计、`payable_count` 排除免费与已拥有）、`POST /cart/items`（加购；重复加购回放 `{added:false}`）、`DELETE /cart/items/:moduleCode`（天然幂等）、`DELETE /cart`（清空）、`POST /cart/checkout`（逐条结算：免费模块同事务发权益并写 `entitlement_events`（`reason=cart_checkout`）、付费模块生成 `pending` 订单（已有待结算单则回放）、已下架 / 已拥有 / 缺依赖分别 `skipped` 并保留在车；成功条目统一移出车） | 登录（写端点 + 幂等） |
+| 个人中心（2026-11-11） | 复用既有 `GET /me`、`PATCH /me`（`display_name` / `locale` / `timezone`）、`POST /me/deletion`、`POST /me/cancel-deletion`，前端新增 `/account` 页承载「资料编辑 / 我的权益 / 我的订单 / 账号安全」四块 | 登录 |
 | 订单结算 | `GET /orders/manage`（跨用户订单列表，`status`/`region`/`q` 过滤）、**`GET /orders/export`**（同口径过滤导出 14 列 xlsx，硬上限 5000 行，金额分转元）、`POST /orders/:id/settle`（订单置 paid + 发放订单来源权益 + 写 `entitlement_events`，同事务）、**`POST /orders/:id/payment-notify`**（渠道回调：`x-payment-timestamp` + `x-payment-signature` = HMAC-SHA256(`MIM_PAYMENT_NOTIFY_SECRET`, `订单号.渠道.交易号.金额.时间戳`)，±300s 时间窗、交易号幂等、金额与渠道须与下单快照一致） | Bearer + `entitlement:read` / `entitlement:grant`（回调靠签名，无需令牌） |
 | 商城管理 | `GET /modules/manage`（含 `category_slug / license / language / stars` 四字段）、`POST /modules`、`PATCH /modules/:code`、`PATCH /modules/:code/status`、`DELETE /modules/:code`、`POST /modules/:code/prices`、`PUT/DELETE /modules/prices/:id` | Bearer + `module:read` / `module:write` |
 | 权益管理 | `GET /entitlements`、`GET /entitlements/:id/events`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke` | Bearer + `entitlement:read` / `entitlement:grant` / `entitlement:revoke` |

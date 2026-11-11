@@ -126,7 +126,7 @@ function parseMultiValue(raw: unknown): string[] { // 许可/语言筛选共用
 } // 结束 parseMultiValue
 
 /** 取模块当前生效价格的公开视图；无价格行时返回 null（视图层显示「免费/待定价」） */
-function currentPrice(db: Db, moduleId: string, now: string): { currency: string; amount_minor: number } | null { // 统一价格视图口径，列表/详情/订单共用
+export function currentPrice(db: Db, moduleId: string, now: string): { currency: string; amount_minor: number } | null { // 统一价格视图口径，列表/详情/订单/购物车共用
   const price = activePrice(db, moduleId, now); // 复用既有的生效价格查询
   return price ? { currency: price.currency, amount_minor: price.amount_minor } : null; // 只透出币种与金额
 } // 结束 currentPrice
@@ -135,7 +135,7 @@ function currentPrice(db: Db, moduleId: string, now: string): { currency: string
  * 校验前置依赖是否全部满足：每个 required 模块必须有该用户的 active 且未过期权益。
  * 解锁与下单两条写路径共用同一校验，避免两处口径漂移。
  */
-function assertDependenciesMet(db: Db, params: { region: string; requiredCodes: string[]; userId: string; now: string }): void { // 依赖校验抽成公共实现
+export function assertDependenciesMet(db: Db, params: { region: string; requiredCodes: string[]; userId: string; now: string }): void { // 依赖校验抽成公共实现（解锁 / 下单 / 购物车结算共用）
   const { region, requiredCodes, userId, now } = params; // 解构入参便于下方拼接
   if (requiredCodes.length === 0) return; // 无依赖直接放行，避免无谓查询
   const placeholders = requiredCodes.map(() => '?').join(','); // 动态占位符，模块码走参数绑定不拼 SQL
@@ -181,7 +181,7 @@ function assertNoDependencyCycle(db: Db, region: string, code: string, requires:
 } // 结束 assertNoDependencyCycle
 
 /** 订单行结构：数据库行 + 联表查询时可选带出的模块信息 */
-interface OrderRow { // 统一类型，避免各处 Record<string, unknown> 强转导致字段丢失
+export interface OrderRow { // 统一类型，避免各处 Record<string, unknown> 强转导致字段丢失
   id: string; // 订单主键
   user_id: string; // 下单用户
   region: string; // 下单区域
@@ -200,7 +200,7 @@ interface OrderRow { // 统一类型，避免各处 Record<string, unknown> 强�
 } // 结束 OrderRow
 
 /** 订单对外视图：只透出对账与展示所需字段，不暴露内部 module_id */
-function orderView(row: OrderRow) { // 入参为数据库行（可含模块信息）
+export function orderView(row: OrderRow) { // 入参为数据库行（可含模块信息）；购物车结算复用同一视图
   const nameMap = row.module_name ? jsonParse<Record<string, string>>(row.module_name) ?? { 'zh-CN': row.module_code ?? '' } : undefined; // 名称缺失时回落编码
   return { // 统一订单视图
     id: row.id, // 订单主键

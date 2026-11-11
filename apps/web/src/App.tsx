@@ -21,6 +21,12 @@ import { Login } from './views/Login';
 import { Settings } from './views/Settings';
 // 功能模块页（商城目录，匿名可浏览，解锁动作才要求登录）
 import { Store } from './views/Store';
+// 商品列表页：商城配套的密集列表视图，支持搜索 / 筛选 / 加购
+import { Products } from './views/Products';
+// 购物车页：清单、移除、清空与结算
+import { Cart } from './views/Cart';
+// 个人中心：资料编辑 / 我的权益 / 我的订单 / 账号安全
+import { Profile } from './views/Profile';
 // 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问，写操作才引导登录
 import { Sites } from './views/Sites';
 // 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
@@ -35,7 +41,7 @@ import { useAppRoute } from './router'; // 路径路由 hook：地址栏 /<view>
 import type { AppView } from './router';
 
 // 需登录方可使用的视图集合：均为收费或私密功能；匿名访问时在内容区内嵌登录卡片而非整站锁定
-const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'chat', 'settings']); // 商城目录保持匿名可浏览
+const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'chat', 'settings', 'products', 'cart', 'account']); // 商城目录保持匿名可浏览；商品列表 / 购物车 / 个人中心涉及个人数据，需登录
 
 // 应用根组件：浏览类页面匿名可访问，仅使用收费功能模块时才要求登录（按需登录）
 export function App() {
@@ -122,10 +128,16 @@ export function App() {
     setLocalSession(updated);
   } // handleUserUpdated 结束
 
-  // 侧边导航项：顺序即展示顺序（商城 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
+  // 侧边导航项：顺序即展示顺序（商城 → 商品列表 → 购物车 → 个人中心 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
   const navItems: Array<{ view: AppView; label: string }> = [
     // 功能模块商城（用户习惯称「商城」，导航以「商城」呈现便于查找）
     { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
+    // 商品列表：商城配套的密集列表与加购入口
+    { view: 'products', label: locale === 'en-US' ? 'Products' : '商品列表' },
+    // 购物车：待购模块与结算
+    { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
+    // 个人中心：资料 / 权益 / 订单 / 账号安全
+    { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
     // 站点模块矩阵：按 45 类备注开发的模块目录
     { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单' },
     // 部署汇总：统一字段核对整体部署情况
@@ -199,6 +211,14 @@ export function App() {
       <main className="main">{/* 内容区容器：窄屏断点下与侧栏上下堆叠 */}
         {/* 功能模块页：匿名可浏览目录，解锁动作在页面内引导登录 */}
         {route.view === 'store' && <Store locale={locale} />}{/* 功能模块页 */}
+        {/* 商品列表：密集列表 + 筛选 + 加购，仅已登录渲染（匿名由上方内嵌登录卡片接管） */}
+        {route.view === 'products' && session && <Products locale={locale} />}{/* 商品列表 */}
+        {/* 购物车：清单 / 移除 / 清空 / 结算，仅已登录渲染 */}
+        {route.view === 'cart' && session && <Cart locale={locale} />}{/* 购物车 */}
+        {/* 个人中心：资料 / 权益 / 订单 / 账号安全，仅已登录渲染 */}
+        {route.view === 'account' && session && (
+          <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
+        )}{/* 个人中心表达式容器结束 */}
         {/* 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问 */}
         {route.view === 'sites' && <Sites locale={locale} />}{/* 站点模块矩阵 */}
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}

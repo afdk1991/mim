@@ -510,6 +510,36 @@ export interface ImUser {
   region: string; // 区域
 } // ImUser 结束
 
+/** 购物车条目：模块信息 + 单价 + 已拥有 / 免费标记 */
+export interface CartItem {
+  module_code: string; // 模块编码
+  name: Record<string, string>; // 多语言名称
+  capability: string | null; // 真实能力键；null 表示功能规划中
+  status: string; // 模块状态
+  available: boolean; // 是否可结算（仅 active 为 true）
+  owned: boolean; // 是否已拥有（已拥有则结算时跳过）
+  free: boolean; // 是否免费（无价格行或 0 价）
+  price: { currency: string; amount_minor: number } | null; // 单价；免费为 null
+  added_at: string; // 加购时间
+} // CartItem 结束
+
+/** 购物车汇总视图 */
+export interface CartSummary {
+  items: CartItem[]; // 条目列表（最近加购在前）
+  totals: Array<{ currency: string; amount_minor: number }>; // 按币种合计（只算可支付项）
+  count: number; // 条目总数
+  payable_count: number; // 需要结算的条目数（排除免费与已拥有）
+} // CartSummary 结束
+
+/** 结算单条结果：订单 / 即时解锁 / 跳过 */
+export interface CartCheckoutResult {
+  module_code: string; // 模块编码
+  kind: 'order' | 'unlocked' | 'skipped'; // 结果类型
+  order?: { id: string; status: string; currency: string; amount_minor: number; module_code: string; module_name: Record<string, string> }; // kind=order 时存在
+  entitlement_id?: string; // kind=unlocked 时存在
+  reason?: string; // kind=skipped 时的原因
+} // CartCheckoutResult 结束
+
 // ---------- 统一入口配置清单（entries / sites）共享类型 ----------
 
 export interface SiteCapability { // 单个功能点：由业务系统语义派生的最小可运行能力
@@ -795,6 +825,26 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   cancelDeletion() { // 撤销注销申请
     return request<{ status: string }>('/me/cancel-deletion', { method: 'POST', body: {} }); // 同样显式空体，返回恢复后的状态
   }, // cancelDeletion 结束
+
+  // ---------- 商城购物车（cart）----------
+
+  cart: { // 购物车：加购 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单）
+    get() { // 读我的购物车
+      return request<CartSummary>('/cart', { idempotency: false }); // 只读 GET
+    }, // get 结束
+    add(module_code: string) { // 加购：重复加购由后端回放
+      return request<{ added: boolean; item_id: string; cart: CartSummary }>('/cart/items', { method: 'POST', body: { module_code } }); // 写操作自动带幂等键
+    }, // add 结束
+    remove(moduleCode: string) { // 移除单个条目
+      return request<{ ok: boolean; cart: CartSummary }>(`/cart/items/${encodeURIComponent(moduleCode)}`, { method: 'DELETE' }); // 路径编码防注入
+    }, // remove 结束
+    clear() { // 清空购物车
+      return request<{ ok: boolean; cart: CartSummary }>('/cart', { method: 'DELETE' }); // 写操作带幂等键
+    }, // clear 结束
+    checkout(channel: 'manual' | 'alipay' | 'wechat' | 'stripe' = 'manual') { // 结算整车
+      return request<{ results: CartCheckoutResult[]; cart: CartSummary }>('/cart/checkout', { method: 'POST', body: { channel } }); // 返回逐条结果与剩余车
+    }, // checkout 结束
+  }, // cart 分组结束
 
   // ---------- 功能模块商城（catalog）----------
 

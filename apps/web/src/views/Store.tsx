@@ -10,6 +10,8 @@ import type { Locale } from '@mim/i18n';
 import { CATALOG_SORT_MODES, LANGUAGE_OPTIONS, LICENSE_OPTIONS, capabilityOfKey } from '@mim/core-domain'; // 追加能力定义：详情面板据此渲染「工具」区块（与后端共用同一份清单）
 // 引入接口客户端、错误类型（识别依赖缺失）、错误文案翻译器与会话读取工具（判断匿名态）
 import { ApiError, api, errorText, getSession } from '../api';
+// 仅类型导入：购物车摘要（页头角标与加购反馈用）
+import type { CartSummary } from '../api';
 // 引入通用异步加载钩子：统一处理 loading / error / reload
 import { useAsync } from '../hooks';
 // 引入编程式跳转：匿名访客点击「登录后解锁」时跳转登录伪视图
@@ -492,6 +494,14 @@ export function Store({ locale }: Props) {
   const [error, setError] = useState<string | null>(null);
   // 成功提示：解锁成功后展示，null 表示无提示
   const [message, setMessage] = useState<string | null>(null);
+  // 购物车摘要：仅已登录时拉取，用于页头角标与「加入购物车」后的即时反馈
+  const [cart, setCart] = useState<CartSummary | null>(null);
+
+  // 购物车角标数据：登录态变化时重拉；匿名不发请求
+  useEffect(() => {
+    if (!authed) { setCart(null); return; } // 匿名清空角标
+    void api.cart.get().then(setCart).catch(() => setCart(null)); // 失败静默，不阻塞浏览
+  }, [authed]); // 依赖登录态
 
   // 模块列表本体（当前页），接口未返回时兜底为空数组
   const modules = (modulesState.data?.modules ?? []) as ModuleCard[];
@@ -643,6 +653,38 @@ export function Store({ locale }: Props) {
     }
   }
 
+  // 加入购物车：已在车中由后端回放（added=false），成功后刷新角标
+  async function handleAddToCart(code: string) {
+    // 仅禁用当前卡片按钮
+    setBusyCode(code);
+    // 清空旧错误
+    setError(null);
+    // 清空旧提示
+    setMessage(null);
+    try {
+      // 加购接口：同名模块重复加购不产生重复条目
+      const result = await api.cart.add(code);
+      // 用响应里的最新购物车覆盖角标
+      setCart(result.cart);
+      // 回放与新建两种语义给出不同提示
+      setMessage(
+        result.added
+          ? locale === 'en-US'
+            ? 'Added to cart ✓'
+            : '已加入购物车 ✓'
+          : locale === 'en-US'
+            ? 'Already in cart'
+            : '已在购物车中',
+      );
+    } catch (err) {
+      // 已解锁（409）或未上架等业务错误统一翻译
+      setError(errorText(locale, err));
+    } finally {
+      // 解除按钮忙碌态
+      setBusyCode(null);
+    }
+  }
+
   // 解锁指定模块：一次性买断，成功后刷新权益列表
   async function handleUnlock(code: string) {
     // 记录当前解锁的模块编码，驱动按钮进入加载态
@@ -772,6 +814,15 @@ export function Store({ locale }: Props) {
     <div className="page">
       <header className="page-head">{/* 页头：标题 + 解锁规则说明 */}
         <h1>{locale === 'en-US' ? 'Module Store' : '功能模块商城'}</h1>{/* 标题：按语言切换中英文 */}
+        <div className="products-pager">{/* 配套入口：商品列表 / 购物车（角标显示待购数量） */}
+          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'products' })}>
+            {locale === 'en-US' ? 'Products' : '商品列表'}
+          </button>
+          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'cart' })}>
+            {locale === 'en-US' ? 'Cart' : '购物车'}
+            {cart && cart.count > 0 ? <span className="cart-badge">{cart.count}</span> : null}
+          </button>
+        </div>
         <p className="muted">{/* 说明文案：两级分类导航 + 一次性解锁 */}
           {locale === 'en-US' // 按语言选择对应的规则说明
             ? '19 top-level categories, 205 second-level modules; unlock once per module'
@@ -1168,6 +1219,20 @@ export function Store({ locale }: Props) {
                                 : locale === 'en-US' ? 'Unlock' : '解锁'}{/* 按钮文案结束 */}
                           </button> // 结束购买/解锁按钮
                         )}{/* 结束购买/解锁按钮条件渲染 */}
+                        {!owned && authed && m.capability !== null && ( // 已登录且未拥有的模块：提供加购入口（结算语义与直接购买一致）
+                          <button
+                            // 普通按钮，避免触发表单提交
+                            type="button"
+                            // 幽灵小按钮：次级操作，购买按钮仍为主操作
+                            className="btn ghost small"
+                            // 加购中禁用，防重复点击
+                            disabled={busyCode === m.code}
+                            // 加购：已拥有会被后端 409 拒绝，已在车中则回放
+                            onClick={() => void handleAddToCart(m.code)}
+                          >
+                            {locale === 'en-US' ? 'Add to cart' : '加入购物车'}{/* 加购按钮文案 */}
+                          </button> // 结束加购按钮
+                        )}{/* 结束加购按钮条件渲染 */}
                         {!owned && !authed && ( // 匿名访客：解锁属收费动作，展示登录入口按钮替代解锁按钮
                           <button
                             // 登录后解锁按钮：普通按钮，避免触发表单提交
