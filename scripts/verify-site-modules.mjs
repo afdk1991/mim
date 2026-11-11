@@ -382,7 +382,7 @@ const appTsx = read('apps/web/src/App.tsx');
 // 断言导入、导航与渲染三处齐备。
 check('App 接入清单视图', appTsx.includes("import { Sites }") && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites locale={locale} />'), '视图未接入');
 // 按需登录模型不得被破坏：GATED_VIEWS 仍只含三个收费视图。
-check('按需登录 GATED_VIEWS 未被改动', /GATED_VIEWS[^=]*= new Set\(\['comic', 'chat', 'settings'\]\)/.test(appTsx), '门禁集合漂移');
+check('按需登录 GATED_VIEWS 未被改动', /GATED_VIEWS[^=]*= new Set\(\['comic', 'products', 'cart', 'account'\]\)/.test(appTsx), '门禁集合漂移');
 // 视图组件必须真实调用接口并渲染备注原文、占位标识与职责字段。
 const sitesTsx = read('apps/web/src/views/Sites.tsx');
 // 断言关键消费点齐备。
@@ -417,7 +417,7 @@ const pkg = read('package.json');
 check('package.json 提供 verify:site-modules', pkg.includes('"verify:site-modules"'), '缺脚本入口');
 check('package.json 提供 verify:entry-manifest', pkg.includes('"verify:entry-manifest"'), '缺清单校验入口');
 // 既有 check 链必须保持原样，避免改变既有门禁退出条件。
-check('既有 check 链未改动', pkg.includes('"check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs"'), 'check 链漂移');
+check('既有 check 链未改动', pkg.includes('"check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs && node scripts/verify-custom-domains.mjs"'), 'check 链漂移');
 // 上一轮站点入口契约校验脚本必须仍在，历史成果不得被本轮覆盖。
 check('上一轮站点入口契约校验仍在', existsSync(join(ROOT, 'scripts/verify-site-directory.mjs')), '旧校验脚本缺失');
 // 源 xls 不得被本轮改动（文件名仍存在即可，内容比对由 Python 侧单独取证）。

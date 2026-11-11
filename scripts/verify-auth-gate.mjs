@@ -3,7 +3,7 @@
  * scripts/verify-auth-gate.mjs
  * 按需登录回归校验（2026-11-08 起替代原「全站会话门禁」校验）：静态断言 + 可选真实浏览器实测（--live）。
  *
- * 模型：浏览类页面（商城目录等）匿名可访问；仅使用收费/私密功能模块（comic / chat / settings）时才要求登录，
+ * 模型：浏览类页面（商城目录 / 入口配置清单 / 部署汇总 / 聊天只读演示）匿名可访问；仅使用收费/私密功能模块（comic / products / cart / account）时才要求登录，
  * 匿名访问这些视图时在主布局内容区内嵌登录卡片（GATED_VIEWS），不再整站锁定。
  *
  * 用法：
@@ -50,7 +50,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); // 仅用于轮询�
 // ---------- 1. 静态断言：源码层按需登录模型是否完整 ---------- //
 // Web 应用根组件：GATED_VIEWS 分级 + 匿名主布局是按需登录的核心
 const app = read('apps/web/src/App.tsx'); // 读取完整源码
-check('App 定义 GATED_VIEWS 收费/私密视图集合', /GATED_VIEWS[^=]*= new Set\(\['comic', 'chat', 'settings'\]\)/.test(app), '缺少 GATED_VIEWS 或集合成员漂移'); // 按需登录核心
+check('App 定义 GATED_VIEWS 收费/私密视图集合', /GATED_VIEWS[^=]*= new Set\(\['comic', 'products', 'cart', 'account'\]\)/.test(app), '缺少 GATED_VIEWS 或集合成员漂移'); // 按需登录核心
 check('App 已移除整站锁定 early return', !/if \(!session\)[\s\S]{0,240}?return <Login/.test(app), '仍存在未登录整屏锁定分支'); // 不得回退到全站锁定
 check('App 匿名态内嵌登录卡片', /<Login embedded/.test(app), '缺少 embedded 内嵌登录渲染分支'); // 收费功能匿名访问时内嵌登录
 check('App 登录提示类型为 required/expired', app.includes("'required' | 'expired' | null"), 'gateNotice 类型漂移'); // 提示类型契约

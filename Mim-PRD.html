@@ -409,6 +409,7 @@
   <li><strong>管理员口令登录</strong>：同一 <code>/auth/password</code> 端点，口令来自部署环境变量 <code>MIM_AUTH_ADMIN_PASSWORD</code>，用于冷启动与运维登录；与账号口令互不覆盖，两者都未配置时返回 503 <code>AUTH_PASSWORD_NOT_CONFIGURED</code>。</li>
   <li><strong>通道自检</strong>：<code>GET /api/v1/auth/channels</code> 只返回 <code>{sms,email,password,register}</code> 布尔值，登录页据此在验证码通道未配置时直接提示「请改用密码登录或注册」，避免用户反复触发 503。</li>
   <li><strong>聊天匿名只读体验</strong>：<code>/chat</code> 匿名访问不再显示「此功能需登录后使用」空白卡片，而是进入只读演示页（同一套聊天布局、示例会话与消息、禁用输入区、登录/注册引导），登录后才创建会话、收发消息、传文件与群管理。</li>
+  <li><strong>信息架构收口</strong>：账号设置不再是面向未登录访客的独立页面——原「设置」页的昵称 / 语言 / 时区 / 区域信息 / 注销操作全部并入登录后的<strong>个人中心</strong>（「资料」与「账号与设置」两个分区），导航里的个人中心入口仅在登录后出现；旧 <code>/settings</code> 链接自动落到 <code>/account</code>。</li>
 </ul>
 <p>短信与邮件通道（阿里云短信 / AWS SES）代码路径已就绪，注入 <code>MIM_SMS_ALIYUN_*</code> 或 <code>MIM_EMAIL_SES_*</code> 环境变量后 <code>/auth/channels</code> 自动置真、验证码入口自动可用，无需改代码。自助注册的开放程度、频控与邮箱验证属产品与安全待决策项（当前注册端点无独立限流，仅受口令强度与登录失败锁定约束）。</p>
 

@@ -1,17 +1,16 @@
 // React 钩子：状态、副作用与稳定回调
 import { useCallback, useEffect, useState } from 'react';
 
-// 全部视图标识：9 个业务视图 + 登录伪视图
+// 全部视图标识：8 个业务视图 + 登录伪视图（原「设置」已并入个人中心，不再单独成页）
 export type AppView =
   | 'store' // 功能模块页
   | 'products' // 商品列表（商城配套的密集列表页，含加购）
   | 'cart' // 购物车（清单 / 移除 / 清空 / 结算）
-  | 'account' // 个人中心（资料 / 权益 / 订单 / 账号安全）
+  | 'account' // 个人中心（资料 / 权益 / 订单 / 账号与设置）
   | 'sites' // 站点模块矩阵（45 类备注驱动的模块目录）
   | 'deployments' // 部署汇总（所有部署仓库与部署项的效果 / 结果 / 异常）
   | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
-  | 'settings' // 设置页
   | 'login'; // 未登录专用的登录伪视图
 
 // 路由状态：仅需当前视图标识
@@ -26,12 +25,11 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   store: 'marketplace', // 商城目录（匿名可浏览）
   products: 'products', // 商品列表（与功能名一致）
   cart: 'cart', // 购物车（与功能名一致）
-  account: 'account', // 个人中心（与功能名一致）
+  account: 'account', // 个人中心（与功能名一致；账号设置在此，不再单独设「设置」页）
   sites: 'entry-catalog', // 入口配置清单（45 类备注驱动的模块目录）
   deployments: 'deployments', // 部署汇总（原名即功能名，保持不变）
   comic: 'comic-studio', // 漫剧 AI 剧工作台
   chat: 'chat', // 聊天（原名即功能名，保持不变）
-  settings: 'settings', // 设置（原名即功能名，保持不变）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
 };
 
@@ -49,8 +47,8 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   comic: 'comic', // 旧：漫剧 AI 剧 → comic-studio
   login: 'login', // 旧：登录 → signin
   profile: 'account', // 旧口径：个人中心 → account（新增视图同时兼容曾用名）
+  settings: 'account', // 旧：独立「设置」页已并入个人中心，旧链接落到 /account，不再保留空设置页
   chat: 'chat', // 未改名（新旧一致）
-  settings: 'settings', // 未改名（新旧一致）
   deployments: 'deployments', // 未改名（新旧一致）
   products: 'products', // 未改名（新旧一致）
   cart: 'cart', // 未改名（新旧一致）

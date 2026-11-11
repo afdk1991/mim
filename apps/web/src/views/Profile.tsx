@@ -101,7 +101,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
           <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => setTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
           <button type="button" className={`tab${tab === 'entitlements' ? ' active' : ''}`} onClick={() => setTab('entitlements')}>{isZh ? '我的权益' : 'Entitlements'}</button>
           <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => setTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
-          <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => setTab('security')}>{isZh ? '账号安全' : 'Security'}</button>
+          <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => setTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
         </nav>
       </header>
 
@@ -206,11 +206,17 @@ export function Profile({ locale, onUserUpdated }: Props) {
         )
       ) : null}
 
-      {/* 分区四：账号安全 */}
+      {/* 分区四：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
       {tab === 'security' ? (
         <section className="profile-security">
           <p className="hint">
             {isZh ? '登录凭据由服务端签发 JWT，退出登录会吊销 refresh_token；注销账号进入冷静期，期内可撤销。' : 'Sessions are JWT based; signing out revokes the refresh token.'}
+          </p>
+          <p className="hint">
+            {isZh ? `账号 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Account ${user?.id.slice(0, 8) ?? '-'} · ${user?.region === 'cn' ? 'CN' : 'Global'} · ${user?.status ?? '-'}`}
+          </p>
+          <p className="hint">
+            {isZh ? '注销后账号进入冷静期，到期执行删除；冷静期内可随时撤销。删除后资料与权益不可恢复。' : 'Deletion enters a cooling-off period; you can cancel it before it executes.'}
           </p>
           <p className="hint">
             {isZh ? `当前账号状态：${user?.status ?? '-'}` : `Status: ${user?.status ?? '-'}`}

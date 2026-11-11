@@ -438,3 +438,44 @@ jobs:
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url")
             echo "$url => $code"
           done
+
+  # Gitee 镜像同步：main 每次变更后，由 CI 把同一次提交推到 Gitee 镜像仓（铁律十二）。
+  # 令牌来自仓库 secret GITEE_TOKEN（需 projects 权限）；缺失时明确 SKIP 并告警，
+  # 不得用「作业成功」冒充「已同步」。
+  mirror:
+    name: 镜像同步（Gitee）
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出（完整历史，保留提交号）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 检查 Gitee 令牌
+        id: gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          if [ -z "$GITEE_TOKEN" ]; then
+            echo "has_token=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 推送到 Gitee 镜像仓
+        if: steps.gitee.outputs.has_token == '1'
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_USER: ${{ secrets.GITEE_USER || 'mallwm_admin' }}
+        run: |
+          set -euo pipefail
+          BRANCH="${GITHUB_REF_NAME}"
+          SHA="$(git rev-parse --short HEAD)"
+          git push "https://${GITEE_USER}:${GITEE_TOKEN}@gitee.com/mallwm_admin/mim.git" \
+            "HEAD:refs/heads/${BRANCH}"
+          echo "已同步到 Gitee：${GITEE_USER}/mim @ ${BRANCH} ${SHA}"
+
+      - name: 未配置令牌 SKIP 提示
+        if: steps.gitee.outputs.has_token == '0'
+        run: echo "::warning::未配置 GITEE_TOKEN，跳过 Gitee 镜像同步（不代表已同步）"

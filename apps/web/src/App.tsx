@@ -17,8 +17,6 @@ import {
 import type { LoginResult, Session, SessionChangeReason, UserInfo } from './api';
 // 登录页组件：按需登录统一入口，支持整屏与内嵌两种形态
 import { Login } from './views/Login';
-// 设置页组件
-import { Settings } from './views/Settings';
 // 功能模块页（商城目录，匿名可浏览，解锁动作才要求登录）
 import { Store } from './views/Store';
 // 商品列表页：商城配套的密集列表视图，支持搜索 / 筛选 / 加购
@@ -43,7 +41,7 @@ import { useAppRoute } from './router'; // 路径路由 hook：地址栏 /<view>
 import type { AppView } from './router';
 
 // 需登录方可使用的视图集合：均为收费或私密功能；匿名访问时在内容区内嵌登录卡片而非整站锁定
-const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'settings', 'products', 'cart', 'account']); // 商城目录匿名可浏览；聊天改为匿名只读演示（见 ChatPreview），不再整块替换为登录卡片
+const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'products', 'cart', 'account']); // 商城目录保持匿名可浏览；聊天为匿名只读演示（ChatPreview）；商品列表 / 购物车 / 个人中心 / 漫剧涉及个人数据或收费能力，需登录
 
 // 应用根组件：浏览类页面匿名可访问，仅使用收费功能模块时才要求登录（按需登录）
 export function App() {
@@ -130,7 +128,7 @@ export function App() {
     setLocalSession(updated);
   } // handleUserUpdated 结束
 
-  // 侧边导航项：顺序即展示顺序（商城 → 商品列表 → 购物车 → 个人中心 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天 → 设置）；匿名可见，点击收费视图时再要求登录
+  // 侧边导航项：顺序即展示顺序（商城 → 商品列表 → 购物车 → 个人中心 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天）；匿名可见，点击收费视图时再要求登录
   const navItems: Array<{ view: AppView; label: string }> = [
     // 功能模块商城（用户习惯称「商城」，导航以「商城」呈现便于查找）
     { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
@@ -138,8 +136,8 @@ export function App() {
     { view: 'products', label: locale === 'en-US' ? 'Products' : '商品列表' },
     // 购物车：待购模块与结算
     { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
-    // 个人中心：资料 / 权益 / 订单 / 账号安全
-    { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
+    // 个人中心：资料 / 权益 / 订单 / 账号与设置（仅在登录后出现在导航，匿名态不暴露个人区入口）
+    ...(session ? [{ view: 'account' as AppView, label: locale === 'en-US' ? 'Account & settings' : '个人中心与设置' }] : []),
     // 站点模块矩阵：按 45 类备注开发的模块目录
     { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单' },
     // 部署汇总：统一字段核对整体部署情况
@@ -148,8 +146,6 @@ export function App() {
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
-    // 设置页，文案走 i18n 词典
-    { view: 'settings', label: t(locale, 'nav.settings') },
   ]; // 导航项定义结束，数组顺序即侧栏展示顺序
 
   // 当前视图是否属于收费 / 私密功能：命中集合时匿名访客看到内嵌登录卡片
@@ -225,7 +221,7 @@ export function App() {
         {route.view === 'sites' && <Sites locale={locale} />}{/* 站点模块矩阵 */}
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
-        {/* 收费 / 私密视图（漫剧 / 聊天 / 设置）：匿名访问时以内容区内嵌登录卡片替代 */}
+        {/* 收费 / 私密视图（漫剧 / 商品列表 / 购物车 / 个人中心）：匿名访问时以内容区内嵌登录卡片替代 */}
         {gated && !session && (
           <Login embedded onLogin={handleLogin} notice={embeddedNotice} /> // 内嵌登录：保留侧栏导航上下文
         )}{/* 内嵌登录条件渲染结束 */}
@@ -237,10 +233,6 @@ export function App() {
         {route.view === 'chat' && !session && (
           <ChatPreview locale={locale} onSignIn={() => go({ view: 'login' })} /> // 只读演示，登录引导回到登录视图
         )}{/* 匿名聊天演示结束 */}
-        {/* 设置页：需要用户更新回调，仅已登录渲染 */}
-        {route.view === 'settings' && session && (
-          <Settings locale={locale} onUserUpdated={handleUserUpdated} /> // 设置页：传入用户信息更新回调
-        )}{/* 设置页表达式容器结束 */}
         {/* 登录伪视图：匿名时提供独立登录入口 */}
         {route.view === 'login' && !session && (
           <Login embedded onLogin={handleLogin} notice={gateNotice} /> // 独立登录入口：内嵌于主布局
