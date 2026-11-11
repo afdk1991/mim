@@ -10,6 +10,9 @@ PRAGMA foreign_keys = ON;
 -- ---------- identity 域 ----------
 CREATE TABLE IF NOT EXISTS users (
   id                TEXT PRIMARY KEY,
+  -- 对外可见的 Mim ID 号码（如 MIM-10000001）：注册时由序号表原子分配，
+  -- 与内部 uuidv7 主键解耦——主键不对外暴露、可迁移，号码供用户识别与客服引用。
+  member_no         TEXT,
   region            TEXT NOT NULL CHECK (region IN ('cn','global')),
   status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','pending_deletion','deleted')),
   display_name      TEXT NOT NULL DEFAULT '',
@@ -20,6 +23,16 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at        TEXT NOT NULL,
   deleted_at        TEXT
 );
+-- 注意：member_no 的唯一索引不写在这里。存量库执行本脚本时该列尚未补出，
+-- 直接建索引会报 no such column 导致启动失败；索引由 db.ts 的 ADDITIVE_INDEXES 在补列后创建。
+
+-- Mim ID 号码发号器：单行表保存下一个可分配序号，事务内「读 + 自增」保证不重号。
+CREATE TABLE IF NOT EXISTS member_no_sequence (
+  id       INTEGER PRIMARY KEY CHECK (id = 1), -- 固定单行，避免多行发号导致号段分叉
+  next_no  INTEGER NOT NULL                    -- 下一个待分配序号（落库只存数字，展示时加前缀）
+);
+-- 首个号码从 10000001 开始：八位、无前导零，肉眼即可与内部主键区分。
+INSERT OR IGNORE INTO member_no_sequence (id, next_no) VALUES (1, 10000001);
 
 CREATE TABLE IF NOT EXISTS identities (
   id          TEXT PRIMARY KEY,
@@ -323,6 +336,52 @@ CREATE TABLE IF NOT EXISTS login_failures (
   failures      INTEGER NOT NULL DEFAULT 0,
   locked_until  TEXT,
   updated_at    TEXT NOT NULL
+);
+
+-- ---------- OAuth 第三方身份（GitHub / Gitee / GitLab / Google / Apple / Microsoft / 微信 / QQ / 抖音）----------
+-- 独立于 identities 表：后者的 provider 约束只放行 phone/email，而 SQLite 无法修改既有 CHECK 约束。
+-- 一个 Mim 账号可绑定多个第三方身份，一个第三方身份全局只能归属一个账号（UNIQUE 保证）。
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+  id                TEXT PRIMARY KEY,                 -- 绑定记录主键（uuidv7）
+  user_id           TEXT NOT NULL REFERENCES users(id), -- 归属的 Mim 用户
+  provider          TEXT NOT NULL,                    -- 提供方标识，与后端注册表同名
+  provider_user_id  TEXT NOT NULL,                    -- 提供方侧稳定用户 ID（GitHub id / 微信 openid / 抖音 open_id）
+  union_id          TEXT,                             -- 提供方跨应用统一 ID（微信 unionid 等），可空
+  nickname          TEXT NOT NULL DEFAULT '',         -- 首次授权时抓取的昵称，仅作展示兜底
+  avatar_url        TEXT,                             -- 头像地址，仅作展示
+  email             TEXT,                             -- 提供方返回的邮箱（可能未验证，不用于自动合并）
+  raw_profile       TEXT NOT NULL DEFAULT '{}',       -- 提供方原始资料快照，便于排障与后续补字段
+  created_at        TEXT NOT NULL,                    -- 首次绑定时间
+  updated_at        TEXT NOT NULL,                    -- 最近一次授权刷新资料时间
+  UNIQUE (provider, provider_user_id)                 -- 同一提供方同一用户只能绑定一次
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_oauth_accounts_union
+  ON oauth_accounts(provider, union_id) WHERE union_id IS NOT NULL; -- unionid 唯一，避免同人开出第二个账号
+CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user ON oauth_accounts(user_id, provider); -- 个人中心按用户查已绑定列表
+
+-- OAuth 授权过程中的临时状态：state 诚实存摘要，防止库泄露后直接被复用发起 CSRF。
+CREATE TABLE IF NOT EXISTS oauth_states (
+  state_hash    TEXT PRIMARY KEY,                     -- sha256(state)，回传时按摘要查找
+  provider      TEXT NOT NULL,                        -- 发起授权的提供方
+  region        TEXT NOT NULL CHECK (region IN ('cn','global')), -- 新账号归属区域
+  mode          TEXT NOT NULL CHECK (mode IN ('login','bind')),  -- 登录（可建号）或绑定（须已登录）
+  link_user_id  TEXT,                                 -- 绑定模式下要挂载的目标用户
+  code_verifier TEXT,                                 -- PKCE verifier，仅标准 OAuth2/OIDC 提供方使用
+  redirect_uri  TEXT NOT NULL,                        -- 发起时固化的回调地址，换 token 必须逐字一致
+  return_to     TEXT,                                 -- 前端完成后的回跳路径（同源相对路径）
+  created_at    TEXT NOT NULL,
+  expires_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_states_expiry ON oauth_states(expires_at); -- 过期清理扫描
+
+-- 一次性登录票据：后端回调完成后 302 回前端，前端凭票据换正式令牌，
+-- 避免把 access/refresh token 直接暴露在浏览器地址栏与日志里。
+CREATE TABLE IF NOT EXISTS oauth_login_tickets (
+  ticket_hash  TEXT PRIMARY KEY,                      -- sha256(ticket)，明文只在 302 地址中出现一次
+  user_id      TEXT NOT NULL,                         -- 票据兑换的账号
+  created_at   TEXT NOT NULL,
+  expires_at   TEXT NOT NULL,
+  consumed_at  TEXT                                   -- 消费后置时间，保证一次性
 );
 
 -- ---------- ops 域 ----------

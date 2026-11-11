@@ -30,6 +30,14 @@
 | 支付宝开放平台 | 开放平台 SDK、OAuth2.0 | 支付宝授权登录 | `MIM_AUTH_ALIPAY_APP_ID` / `MIM_AUTH_ALIPAY_PRIVATE_KEY` / `MIM_AUTH_ALIPAY_PUBLIC_KEY` | P0 |
 | Google Identity | Google Sign-In SDK、OAuth2.0 / OIDC | 海外 Google 登录 | `MIM_AUTH_GOOGLE_CLIENT_ID` / `MIM_AUTH_GOOGLE_CLIENT_SECRET` | P0 |
 | Apple | Sign in with Apple（原生 / JS） | 海外 Apple 登录、App Store 强制项 | `MIM_AUTH_APPLE_SERVICE_ID` / `MIM_AUTH_APPLE_TEAM_ID` / `MIM_AUTH_APPLE_KEY_ID` / `MIM_AUTH_APPLE_PRIVATE_KEY` | P0 |
+| GitHub | OAuth 2.0 Web Flow（`oauth4webapi`） | 开发者账号登录、拉 `user/emails` 补邮箱 | `MIM_AUTH_GITHUB_CLIENT_ID` / `MIM_AUTH_GITHUB_CLIENT_SECRET` | P0 |
+| Gitee（码云） | OAuth 2.0（`oauth4webapi`） | 国内开发者账号登录 | `MIM_AUTH_GITEE_CLIENT_ID` / `MIM_AUTH_GITEE_CLIENT_SECRET` | P0 |
+| GitLab | OAuth 2.0（`oauth4webapi`，支持自建实例端点覆盖） | 企业与自建 GitLab 登录 | `MIM_AUTH_GITLAB_CLIENT_ID` / `MIM_AUTH_GITLAB_CLIENT_SECRET` | P1 |
+| Microsoft 身份平台 | Microsoft Entra ID v2.0（OIDC，`oauth4webapi`） | 海外企业 / 个人账号登录 | `MIM_AUTH_MICROSOFT_CLIENT_ID` / `MIM_AUTH_MICROSOFT_CLIENT_SECRET` | P0 |
+| QQ 互联 | QQ 登录（`graph.qq.com`，专用适配器：先换 `openid` 再拉资料） | 国内 QQ 登录 | `MIM_AUTH_QQ_APP_ID` / `MIM_AUTH_QQ_APP_KEY` | P1 |
+| 抖音开放平台 | 抖音网站应用授权（`open.douyin.com`，专用适配器：`client_key` + 逗号 scope + `data` 嵌套响应） | 国内抖音账号登录 | `MIM_AUTH_DOUYIN_CLIENT_KEY` / `MIM_AUTH_DOUYIN_CLIENT_SECRET` | P1 |
+
+> **2026-11-12 落地状态**：上表 9 家（微信 / Google / Apple / GitHub / Gitee / GitLab / Microsoft / QQ / 抖音）已全部进入代码实现，注册表在 `services/mim-api/src/oauth/providers.ts`，协议层 `oauth/client.ts`（标准实现依赖 `oauth4webapi@3.8.8`，微信 / QQ / 抖音走专用适配器，Apple 用 p8 现签 ES256 client_secret），绑定与一次性票据在 `oauth/accounts.ts`，端点在 `routes/oauth.ts`。公共配置：`MIM_OAUTH_CALLBACK_BASE`（后端对外基址，缺省取请求的 `x-forwarded-proto` + `host`）、`MIM_WEB_BASE_URL`（回调 302 的前端基址）。每家 provider 另支持 `MIM_AUTH_<ID>_REDIRECT_URI` / `_AUTHORIZE_URL` / `_TOKEN_URL` / `_PROFILE_URL` / `_JWKS_URL` 五个可选覆盖变量（自建 GitLab / GitHub Enterprise / 联合调试）；Apple 因平台回调形态特殊，示例模板中显式列出 `MIM_AUTH_APPLE_REDIRECT_URI`；回调地址默认 `${MIM_OAUTH_CALLBACK_BASE}/api/v1/auth/oauth/<id>/callback`。**凭证未配置时该家 `configured=false`，前端按钮置灰、接口返回 `AUTH_OAUTH_NOT_CONFIGURED(503)`，不得视为可用**。平台侧需登记的回调 URL 见 [05-runbook §第三方登录回调登记](./05-runbook.md)。支付宝仍仅用于支付场景，不承担登录。
 | 阿里云短信 | 短信服务 API（`@alicloud/dysmsapi20170525`） | 国内验证码 | `MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE` | P0 |
 | 腾讯云短信 | SMS API | 国内验证码备份通道 | `MIM_SMS_TENCENT_SECRET_ID` / `MIM_SMS_TENCENT_SECRET_KEY` / `MIM_SMS_TENCENT_SDK_APP_ID` | P1 |
 | 阿里云邮件推送 / AWS SES | 邮件 API（SES 走 `@aws-sdk/client-ses`） | 海外注册验证与通知邮件 | `MIM_EMAIL_ALIYUN_ACCESS_KEY` / `MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_REGION` / `MIM_EMAIL_SES_FROM_ADDRESS` | P0 |

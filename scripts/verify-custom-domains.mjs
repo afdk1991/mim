@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 上一行 shebang：指定 node 解释器，与仓库内其它校验脚本保持一致。
-// scripts/verify-custom-domains.mjs
+// 脚本：scripts/verify-custom-domains.mjs
 //
 // 校验「多平台自定义域名矩阵」：部署矩阵里每个平台的自定义域名是否都来自 DNSPod 导出（dnspod_records_2026-11-05_21-42-26.xls）的 mixm.top 主机记录，
 // 是否覆盖完整、无重复，是否与部署注册表（packages/core-domain/src/deploymentRegistry.json）一一对应，并且文档已同步登记。
@@ -63,7 +63,14 @@ const itemsById = new Map((REG.items ?? []).map((it) => [it.id, it]));
 // 平台目录索引：用于核对 platform_id 与矩阵成员身份。
 const platformsById = new Map((REG.platform_catalog ?? []).map((p) => [p.id, p]));
 
-check('D05 矩阵行为 10 个平台且含 Cloudflare Worker', matrix.length === 10, `rows=${matrix.length}`);
+// 覆盖口径：只看注册表中标记为矩阵成员的平台；同一平台可有多条归属行（如 Cloudflare Pages 与独立 Worker），按平台去重
+const inMatrixPlatformIds = (REG.platform_catalog ?? []).filter((p) => p.in_matrix).map((p) => p.id);
+const coveredPlatforms = new Set([
+  ...matrix.filter((m) => platformsById.get(m.platform_id)?.in_matrix).map((m) => m.platform_id),
+  ...(DOM.notApplicable ?? []).map((n) => n.platform_id),
+]);
+const missingPlatforms = inMatrixPlatformIds.filter((id) => !coveredPlatforms.has(id));
+check('D05 矩阵行与不适用说明合计覆盖 10 个平台', inMatrixPlatformIds.length === 10 && missingPlatforms.length === 0, `platforms=${inMatrixPlatformIds.length} rows=${matrix.length} na=${(DOM.notApplicable ?? []).length} missing=${missingPlatforms.join(',')}`);
 // 每行的 deployment_id 必须能在注册表里找到。
 const depOk = matrix.every((m) => itemsById.has(m.deployment_id));
 check('D06 每个矩阵行都指向注册表中真实存在的部署项', depOk, depOk ? '' : `missing=${matrix.filter((m) => !itemsById.has(m.deployment_id)).map((m) => m.deployment_id).join(',')}`);
@@ -72,13 +79,12 @@ const platOk = matrix.every((m) => platformsById.has(m.platform_id));
 check('D07 每个矩阵行的平台编码都在 platform_catalog 中', platOk, platOk ? '' : `bad=${matrix.filter((m) => !platformsById.has(m.platform_id)).map((m) => m.platform_id).join(',')}`);
 
 // 反向覆盖：矩阵成员的每个平台都必须有域名归属（矩阵行或 notApplicable 说明）。
-// matrix_platforms 在注册表里是「矩阵平台数量」，故按 platform_catalog 的 in_matrix 标记取平台清单。
-const matrixPlatforms = (REG.platform_catalog ?? []).filter((p) => p.in_matrix).map((p) => p.id);
+// matrix_platforms 在注册表里是「矩阵平台数量」，复用上方 inMatrixPlatformIds 清单。
 const matrixCount = REG.coverage?.matrix_platforms;
-check('D08a 注册表矩阵平台数量与 in_matrix 标记一致', matrixCount === matrixPlatforms.length, `coverage=${matrixCount} catalog=${matrixPlatforms.length}`);
+check('D08a 注册表矩阵平台数量与 in_matrix 标记一致', matrixCount === inMatrixPlatformIds.length, `coverage=${matrixCount} catalog=${inMatrixPlatformIds.length}`);
 const naIds = new Set((DOM.notApplicable ?? []).map((n) => n.platform_id));
-const mappedIds = new Set(matrix.map((m) => m.platform_id));
-const uncovered = matrixPlatforms.filter((id) => !mappedIds.has(id) && !naIds.has(id));
+const mappedIds = new Set(matrix.filter((m) => platformsById.get(m.platform_id)?.in_matrix).map((m) => m.platform_id));
+const uncovered = inMatrixPlatformIds.filter((id) => !mappedIds.has(id) && !naIds.has(id));
 check('D08 部署矩阵 10 个平台全部有自定义域名归属', uncovered.length === 0, uncovered.join(','));
 
 // ---------- 3. 域名合法性 ----------

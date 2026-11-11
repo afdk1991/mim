@@ -28,10 +28,11 @@ import { AppError, uuidv7 } from '@mim/core-domain'; // 统一业务异常 + 时
 import {
   SITE_CAPABILITY_KINDS, // 三类能力的状态机字典（catalog / manage / record）
   SITE_DOMAINS, // 19 个业务域，供前端筛选与后端汇总
-  SITE_MODULES, // 45 个去重入口静态契约
+  SITE_MODULES, // 44 个去重入口静态契约
   defaultSiteState, // 取能力默认状态（states 首项）
   findSiteCapability, // 按占位键 + 能力编码查功能点
   findSiteModule, // 按占位键查入口
+  implementationSummary, // 落地状态四态计数
   isSiteState, // 判断状态是否属于能力合法集合
   resolveEntryHost, // 解析入口占位标识的配置状态
   siteModulesRegistry, // 顶层元信息：去重口径 / 主机配置策略
@@ -188,10 +189,11 @@ export function createSitesRouter(deps: ApiDeps): Router {
       moduleBasis: siteModulesRegistry.moduleBasis, // 模块划分依据
       note_format: siteModulesRegistry.noteFormat, // 备注格式说明
       derivation: siteModulesRegistry.derivation, // 明确哪些内容属于实现推导
-      ...summary, // modules / capabilities / groups / blankRows / domains
-      placeholders: SITE_MODULES.length + 2, // 45 入口 + @ 根域名占位 + 空白占位
+      ...summary, // 字段：modules / capabilities / groups / blankRows / domains
+      placeholders: SITE_MODULES.length + 2, // 44 入口 + @ 根域名占位 + 空白占位
       configured, // 已由外部配置注入实际主机值的入口数，默认 0
       unconfigured: SITE_MODULES.length - configured, // 仍为占位状态的入口数
+      implementation: implementationSummary(SITE_MODULES), // 落地状态四态计数
       hostConfig: siteModulesRegistry.hostConfig, // 不补写具体主机值的策略
       items: row.total, // 库内业务条目总数
       by_status: byStatus, // 按状态分布
@@ -233,6 +235,7 @@ export function createSitesRouter(deps: ApiDeps): Router {
         adminRole: m.adminRole, // 后台管理职责
         apiRole: m.apiRole, // 接口职责
         related: m.related, // 相似模块关联与区分
+        implementation: m.implementation, // 落地状态映射（真实模块 / 视图 / 边界）
         capability_count: m.capabilities.length, // 功能点数量（恒为 3）
         item_count: itemStats(db, m.host).total, // 该入口当前业务条目数
       })); // 列表映射结束

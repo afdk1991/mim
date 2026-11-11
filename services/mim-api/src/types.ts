@@ -26,8 +26,22 @@ export interface ApiDeps { // 依赖注入容器：所有路由通过它拿能�
 export type Region = 'cn' | 'global'; // 数据驻留区域，决定账号归属与合规分区
 export type UserStatus = 'active' | 'pending_deletion' | 'deleted'; // 账号状态机：正常 / 注销冷静期 / 已删除
 
+/** users 表在鉴权与用户视图里使用的字段子集：member_no 为对外自动分配的 Mim ID 号码 */
+export interface UserRow { // 用户行最小视图，登录响应与个人中心共用
+  id: string; // 内部主键（uuidv7），用于所有关联表与令牌 sub
+  member_no: string | null; // 对外编号（MIM-10000001）；历史库补列前可能为 NULL，读到时需兜底
+  region: Region; // 所属地区，影响默认语言与时区
+  status: string; // 状态：active / pending_deletion / deleted
+  display_name: string; // 展示名
+  locale: string; // 语言偏好
+  timezone: string; // 时区偏好
+  deletion_scheduled_at: string | null; // 注销预约时间，供前端提示
+  created_at: string; // 注册时间
+} // UserRow 结束
+
 export interface AuthUser { // 鉴权通过后挂到 req.user 的最小用户视图
   id: string; // 用户主键，同时作为对象键首段
+  member_no: string | null; // 对外 Mim ID 号码，鉴权中间件一并带出，避免各路由重复查询
   region: Region; // 所属区域，用于区域化策略判断
   status: UserStatus; // 账号状态，pending_deletion 期间限制写操作
   display_name: string; // 展示名，前端界面直接使用

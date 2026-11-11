@@ -4,8 +4,12 @@
  * 与 v1 的区别：模块不再绑定任何具体主机值，改用可配置占位标识；备注「入口｜业务系统说明」为唯一划分依据；
  * 新增 19 个业务域、核心功能、职责边界、后台/接口职责与相似模块关联区分。
  */
-// 导入单一数据源 JSON：45 个去重入口 / 19 个业务域 / 135 个运行时能力 / 90 条演示数据。
+// 导入单一数据源 JSON：44 个去重入口 / 19 个业务域 / 132 个运行时能力 / 88 条演示数据。
 import registry from './siteModules.json';
+// 入口落地状态注册表：对照现有真实模块标注已落地 / 部分相邻 / 规划中 / 语义冲突
+import { implementationOf } from './entryImplementation.js';
+// 落地映射类型：状态、站内视图、外链、真实能力与边界说明
+import type { EntryImplementation } from './entryImplementation.js';
 
 // 单个功能点：每个模块固定三类能力（清单 / 管理 / 记录），状态机由 states 定义。
 export interface SiteCapability {
@@ -93,6 +97,8 @@ export interface SiteModule {
   apiRole: string;
   // 相似模块关联与区分。
   related: SiteRelation[];
+  // 落地状态映射：现有真实模块、可直达视图 / 外链与边界说明（实现推导层）。
+  implementation: EntryImplementation;
   // 该模块的三个运行时能力点。
   capabilities: SiteCapability[];
   // 该模块的两条演示数据。
@@ -261,10 +267,16 @@ export interface EntryHostResolution {
 export const siteModulesRegistry: SiteModulesRegistry = registry as unknown as SiteModulesRegistry;
 
 // 兼容别名补齐：JSON 只保留 entryKey / domain，避免把「具体主机值」写回数据本体；
-// host 与 group 在运行时指向占位键与业务域，供既有 /sites/:host 路由按占位标识寻址。
+// host 与 group 在运行时指向占位键与业务域，供既有 /sites/:host 路由按占位标识寻址；
+// implementation 由落地注册表按占位键合并，不改写 JSON 原始备注数据。
 function withCompatAliases(module: SiteModule): SiteModule {
-  // 返回浅拷贝并补齐两个别名，不修改 JSON 原始数据。
-  return { ...module, host: module.entryKey, group: module.domain };
+  // 返回浅拷贝并补齐别名与落地映射，不修改 JSON 原始数据。
+  return {
+    ...module, // 保留 JSON 原始字段
+    host: module.entryKey, // 兼容别名：短主机记录 = 占位键
+    group: module.domain, // 兼容别名：分组 = 业务域编码
+    implementation: implementationOf(module.entryKey), // 落地状态映射
+  };
 } // withCompatAliases 结束
 
 // 模块列表的只读别名：业务代码一律通过该常量读取，不直接碰 JSON。

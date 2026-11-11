@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 上一行 shebang：指定 node 解释器，与仓库内其它校验脚本保持一致。
-// scripts/verify-site-modules.mjs
+// 脚本：scripts/verify-site-modules.mjs
 //
 // 校验「统一入口配置清单」是否与用户给出的 45 类备注逐字一致、去重整理正确、
 // 不含任何具体主机值，并确认它真的被后端 API、数据库、前端视图与测试全链路消费。
@@ -42,12 +42,12 @@ function read(rel) {
   return existsSync(path) ? readFileSync(path, 'utf8') : '';
 } // read 结束
 
-// ---------- 1. 用户依据：45 类备注原文 + 本轮占位键（顺序与 mixm.top 工作表一致） ----------
-// 该表由用户 2026-11-09 消息逐字转录，每类备注在台账中出现两行，按「完全相同且用途一致按一项」去重为 45 条。
+// ---------- 1. 用户依据：44 类备注原文 + 本轮占位键（顺序与 mixm.top 工作表一致） ----------
+// 该表由用户 2026-11-09 消息逐字转录，每类备注在台账中出现两行，按「完全相同且用途一致按一项」去重；
+// 原序号 02 条目已按要求于 2026-11-12 移除，剩余 44 条。
 // 逐字比对的意义：任何人工改写、漏字、全角竖线替换都会让本脚本失败。
 const EXPECTED_NOTES = [
   ['PORTAL_ROOT', '核心根域名，主站基础入口｜主站统一跳转门户'],
-  ['PORTAL_SITE', '主站常规访问入口｜官方门户网站'],
   ['ADMIN_CONSOLE', '管理后台入口｜全站统一运营管理后台'],
   ['API_GATEWAY', '接口服务入口｜API 统一网关'],
   ['APP_API', 'APP 端接口入口｜移动端专属接口服务'],
@@ -93,12 +93,12 @@ const EXPECTED_NOTES = [
   ['SELLER_ADMIN', '个人卖家管理入口｜个人卖家店铺管理后台'],
 ]; // EXPECTED_NOTES 结束
 
-// 依据清单本身也做断言，防止有人误删期望行让「45 条」假通过。
-check('用户依据清单为 45 类', EXPECTED_NOTES.length === 45, `实际 ${EXPECTED_NOTES.length}`);
+// 依据清单本身也做断言，防止有人误删期望行让「44 条」假通过。
+check('用户依据清单为 44 类', EXPECTED_NOTES.length === 44, `实际 ${EXPECTED_NOTES.length}`);
 // 依据清单不得出现重复占位键。
-check('用户依据占位键无重复', new Set(EXPECTED_NOTES.map(([key]) => key)).size === 45, '存在重复占位键');
+check('用户依据占位键无重复', new Set(EXPECTED_NOTES.map(([key]) => key)).size === 44, '存在重复占位键');
 // 依据清单不得出现重复备注（完全相同且用途一致已按一项处理）。
-check('用户依据备注无重复', new Set(EXPECTED_NOTES.map(([, note]) => note)).size === 45, '存在未合并的重复备注');
+check('用户依据备注无重复', new Set(EXPECTED_NOTES.map(([, note]) => note)).size === 44, '存在未合并的重复备注');
 
 // ---------- 2. 共享清单：结构与逐条自洽 ----------
 // 读取单一数据源 JSON；格式错误直接终止，避免后续访问 undefined 产生噪声。
@@ -133,7 +133,7 @@ check('已清空列登记 6 列', Array.isArray(data.clearedColumns) && data.cle
 // 去重整理口径：@ 记录、空白字段、重复备注都必须按一项处理。
 const dedupe = data.dedupe ?? {};
 check('去重规则为完全相同且用途一致按一项', String(dedupe.rule).includes('完全相同且用途一致'), '规则漂移');
-check('90 行业务备注合并 45 项', dedupe.businessNoteRows === 90 && dedupe.duplicatePairs === 45 && dedupe.mergedEntries === 45, '重复备注未合并');
+check('88 行业务备注合并 44 项', dedupe.businessNoteRows === 88 && dedupe.duplicatePairs === 44 && dedupe.mergedEntries === 44, '重复备注未合并');
 check('@ 两行合并为 1 项根域名占位', JSON.stringify(dedupe.atRecordRows) === '[2,3]' && dedupe.atRecordMergedInto === 'AT_ROOT', '@ 记录未合并');
 check('11 行空白备注合并为 1 项', dedupe.blankNoteRows === 11 && dedupe.blankMergedInto === 'BLANK_UNSET', '空白字段未合并');
 check('@ 与空白占位均不补写具体主机值', data.atRecord?.hostValue === null && data.blankRecord?.hostValue === null, '占位项含具体值');
@@ -150,12 +150,12 @@ check('未配置时禁止推导真实域名', String(hostConfig.resolutionOfMiss
 const modules = Array.isArray(data.modules) ? data.modules : [];
 const domains = Array.isArray(data.domains) ? data.domains : [];
 const blanks = Array.isArray(data.blankRows) ? data.blankRows : [];
-// 去重后入口数量断言：45 类备注一一对应。
-check('清单入口 45 个', modules.length === 45, `实际 ${modules.length}`);
+// 去重后入口数量断言：44 类备注一一对应。
+check('清单入口 44 个', modules.length === 44, `实际 ${modules.length}`);
 // 业务域数量断言：19 组业务用途。
 check('业务域 19 个', domains.length === 19, `实际 ${domains.length}`);
-// 业务域入口数合计必须为 45，保证不遗漏清单中的业务用途。
-check('业务域入口数合计 45', domains.reduce((n, d) => n + (d.count ?? 0), 0) === 45, '业务域覆盖不全');
+// 业务域入口数合计必须为 44，保证不遗漏清单中的业务用途。
+check('业务域入口数合计 44', domains.reduce((n, d) => n + (d.count ?? 0), 0) === 44, '业务域覆盖不全');
 // 台账空备注原始行数。
 check('空备注行 13 行', blanks.length === 13, `实际 ${blanks.length}`);
 // 用户明确给出的开头两行 @ 必须标记为 givenByUser=true。
@@ -174,7 +174,7 @@ check('manage 状态机', JSON.stringify(kinds.manage?.states) === JSON.stringif
 // 记录状态机。
 check('record 状态机', JSON.stringify(kinds.record?.states) === JSON.stringify(['pending', 'done', 'archived']), '记录状态机漂移');
 
-// 逐项比对 45 条备注原文、占位键、行号与结构自洽性。
+// 逐项比对 44 条备注原文、占位键、行号与结构自洽性。
 const noteMismatches = [];
 const structureProblems = [];
 // 占位键集合：检测重复入口。
@@ -185,16 +185,16 @@ let capTotal = 0;
 let seedTotal = 0;
 // 相似模块关联总数累加器。
 let relationTotal = 0;
-// 序号计数：验证 01..45 连续。
+// 序号计数：验证条目序号与 xls 行序一致（02 移除后不重排，故不连续）。
 let seq = 0;
 // 业务域占位键并集：验证每个入口都归属某个业务域。
 const groupedKeys = new Set(domains.flatMap((d) => (Array.isArray(d.entryKeys) ? d.entryKeys : [])));
 // 遍历全部入口。
 for (const m of modules) {
-  // 序号自增，期望与两位序号一致。
+  // 序号自增，期望与两位序号一致（02 已移除，故实际序号跳过 02）。
   seq += 1;
-  // 期望的两位序号字符串。
-  const expectId = String(seq).padStart(2, '0');
+  // 期望的两位序号字符串：01 之后整体后移一位。
+  const expectId = seq === 1 ? '01' : String(seq + 1).padStart(2, '0');
   // 取同位置的用户依据条目。
   const expected = EXPECTED_NOTES[seq - 1];
   // 逐字比对备注原文与占位键。
@@ -212,8 +212,8 @@ for (const m of modules) {
   if (m.note !== `${m.entry}｜${m.system}`) structureProblems.push(`${expectId} note 与 entry/system 不自洽`);
   // 来源工作表锁定 mixm.top，仅作行号溯源。
   if (m.sheet !== 'mixm.top') structureProblems.push(`${expectId} sheet 漂移`);
-  // 行号必须是连续两个数字，且与台账第 4–93 行对应。
-  if (!Array.isArray(m.rows) || m.rows.length !== 2 || m.rows[0] !== 2 * seq + 2 || m.rows[1] !== 2 * seq + 3) {
+  // 行号必须是连续两个数字，且与台账行号（序号 n → 2n+2 / 2n+3）对应。
+  if (!Array.isArray(m.rows) || m.rows.length !== 2 || m.rows[0] !== 2 * Number(m.id) + 2 || m.rows[1] !== 2 * Number(m.id) + 3) {
     // 记录行号问题。
     structureProblems.push(`${expectId} rows 漂移 ${JSON.stringify(m.rows)}`);
   } // 行号校验结束
@@ -292,16 +292,16 @@ for (const m of modules) {
 }
 check('相似模块关联无悬空引用', dangling.length === 0, dangling.slice(0, 3).join('; '));
 
-// 45 条备注逐字一致断言（一次性汇总差异）。
-check('45 条备注逐字一致', noteMismatches.length === 0, noteMismatches.slice(0, 3).join('; '));
+// 44 条备注逐字一致断言（一次性汇总差异）。
+check('44 条备注逐字一致', noteMismatches.length === 0, noteMismatches.slice(0, 3).join('; '));
 // 结构自洽断言（一次性汇总问题）。
 check('入口字段 / 行号 / 业务域 / 占位标识 / 状态机自洽', structureProblems.length === 0, structureProblems.slice(0, 3).join('; '));
-// 功能点总数断言：45 × 3。
-check('功能点共 135 个', capTotal === 135, `实际 ${capTotal}`);
-// 演示数据总数断言：45 × 2。
-check('演示数据共 90 条', seedTotal === 90, `实际 ${seedTotal}`);
+// 功能点总数断言：44 × 3。
+check('功能点共 132 个', capTotal === 132, `实际 ${capTotal}`);
+// 演示数据总数断言：44 × 2。
+check('演示数据共 88 条', seedTotal === 88, `实际 ${seedTotal}`);
 // 关联条数断言：每条至少 1 个相似模块区分。
-check('相似模块关联不少于 45 条', relationTotal >= 45, `实际 ${relationTotal}`);
+check('相似模块关联不少于 44 条', relationTotal >= 44, `实际 ${relationTotal}`);
 // 清单全文不得出现任何具体主机值（除来源说明与工作表名）。
 const concrete = read('packages/core-domain/src/siteModules.json')
   .split('\n')
@@ -313,10 +313,15 @@ check('清单不含具体主机值', concrete.length === 0, concrete.slice(0, 2)
 const barrel = read('packages/core-domain/src/index.ts');
 // 断言导出语句存在。
 check('core-domain 导出 siteModules', barrel.includes("export * from './siteModules.js'"), 'barrel 缺导出');
+// 落地状态注册表必须由 barrel 导出，供后端汇总与前端徽标共用。
+check('core-domain 导出 entryImplementation', barrel.includes("export * from './entryImplementation.js'"), '落地映射未导出');
 // 类型化封装必须提供查询、状态机与占位解析工具函数。
 const wrapper = read('packages/core-domain/src/siteModules.ts');
 // 断言关键导出齐备。
 check('封装层提供完整工具函数', ['findSiteModule', 'findSiteCapability', 'isSiteState', 'defaultSiteState', 'siteModulesSummary', 'resolveEntryHost', 'entryHostTemplate'].every((fn) => wrapper.includes(`export function ${fn}`)), '工具函数缺失');
+// 落地注册表：四态计数与按占位键取映射必须齐备。
+const implFile = read('packages/core-domain/src/entryImplementation.ts');
+check('落地注册表提供四态计数与查询', implFile.includes('implementationOf') && implFile.includes('implementationSummary') && implFile.includes("'implemented'") && implFile.includes("'conflict'"), '落地映射缺失');
 // 封装层必须导入同名 JSON，保证单一数据源。
 check('封装层消费清单 JSON', wrapper.includes("from './siteModules.json'"), '未引用 JSON');
 // 封装层不得把具体主机值写回数据本体。
@@ -348,6 +353,8 @@ check('后端覆盖 6 组运行时端点', routePaths.every((p) => route.include
 check('写操作挂鉴权与幂等', (route.match(/router\.post\([^\n]*requireAuth, idempotency/g) ?? []).length === 2, '写路径门禁缺失');
 // 运行时路由不得再引用 fqdn 具体主机值字段。
 check('运行时接口不含 fqdn', !route.includes('m.fqdn') && route.includes('m.placeholder'), '仍引用具体主机值');
+// 运行时路由必须透出落地状态映射与四态汇总。
+check('sites 路由透出落地状态', route.includes('implementation: m.implementation') && route.includes('implementationSummary'), '落地状态未透出');
 
 // 清单路由必须覆盖六个只读端点。
 const entryRoute = read('services/mim-api/src/routes/entries.ts');
@@ -355,6 +362,8 @@ const entryPaths = ['/entries/overview', '/entries/domains', '/entries/placehold
 check('清单路由覆盖 6 个只读端点', entryPaths.every((p) => entryRoute.includes(p)), '清单端点缺失');
 check('清单路由静态路径先于动态参数', entryRoute.indexOf("router.get('/entries/overview'") < entryRoute.indexOf("router.get('/entries/:entryKey'"), '注册顺序错误');
 check('清单路由不回显具体主机值', entryRoute.includes('resolveEntryHost') && !entryRoute.includes('hostValue:'), '配置状态泄露风险');
+// 清单路由同样透出落地状态映射与四态汇总。
+check('entries 路由透出落地状态', entryRoute.includes('implementation: m.implementation') && entryRoute.includes('implementationSummary'), '落地状态未透出');
 // 应用装配必须挂载两个路由。
 const appTs = read('services/mim-api/src/app.ts');
 // 断言导入与挂载两处都在。
@@ -380,13 +389,13 @@ check('router 登记 sites 视图', routerTs.includes("| 'sites'") && routerTs.i
 // 应用根组件必须新增导航项与渲染分支。
 const appTsx = read('apps/web/src/App.tsx');
 // 断言导入、导航与渲染三处齐备。
-check('App 接入清单视图', appTsx.includes("import { Sites }") && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites locale={locale} />'), '视图未接入');
-// 按需登录模型不得被破坏：GATED_VIEWS 仍只含三个收费视图。
-check('按需登录 GATED_VIEWS 未被改动', /GATED_VIEWS[^=]*= new Set\(\['comic', 'products', 'cart', 'account'\]\)/.test(appTsx), '门禁集合漂移');
+check('App 接入清单视图并注入直达回调', appTsx.includes("import { Sites }") && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites') && appTsx.includes('onOpenView'), '视图未接入');
+// 按需登录模型不得被破坏：GATED_VIEWS 只含商品列表 / 购物车 / 个人中心三个收费视图（漫剧放映厅匿名可看）。
+check('按需登录 GATED_VIEWS 未被改动', /GATED_VIEWS[^=]*= new Set\(\['products', 'cart', 'account'\]\)/.test(appTsx), '门禁集合漂移');
 // 视图组件必须真实调用接口并渲染备注原文、占位标识与职责字段。
 const sitesTsx = read('apps/web/src/views/Sites.tsx');
 // 断言关键消费点齐备。
-check('视图消费清单 / 占位标识 / 职责 / 关联', ['api.entries.overview()', 'api.entries.placeholders()', 'api.sites.overview()', 'api.sites.list(', 'api.sites.detail(', 'm.note', 'm.placeholder', 'm.coreFunctions', 'm.responsibility', 'm.adminRole', 'm.apiRole', 'm.related'].every((s) => sitesTsx.includes(s)), '视图未消费清单字段');
+check('视图消费清单 / 占位标识 / 职责 / 关联 / 落地状态', ['api.entries.overview()', 'api.entries.placeholders()', 'api.sites.overview()', 'api.sites.list(', 'api.sites.detail(', 'm.note', 'm.placeholder', 'm.coreFunctions', 'm.responsibility', 'm.adminRole', 'm.apiRole', 'm.related', 'm.implementation', 'realFeatures', 'boundary'].every((s) => sitesTsx.includes(s)), '视图未消费清单字段');
 // 匿名浏览、写操作引导登录的按需登录模型必须在视图内保持。
 check('视图匿名可浏览且写操作引导登录', sitesTsx.includes('getSession()') && sitesTsx.includes("navigate({ view: 'login' })"), '按需登录模型缺失');
 // 视图不得展示任何具体域名。
@@ -401,14 +410,14 @@ const tplText = read('config/entry-hosts.example.json');
 let tpl = {};
 try { tpl = JSON.parse(tplText); } catch { /* 解析失败由后续断言报告 */ }
 const tplHosts = tpl.hosts ?? {};
-check('配置模板存在且为 45 个键', Object.keys(tplHosts).length === 45, `实际 ${Object.keys(tplHosts).length}`);
+check('配置模板存在且为 44 个键', Object.keys(tplHosts).length === 44, `实际 ${Object.keys(tplHosts).length}`);
 check('配置模板值全为空，不含具体主机值', Object.values(tplHosts).every((v) => v === '') && !/\.mixm\.top|https?:\/\//.test(tplText), '模板含具体值');
 check('配置模板键与清单一一对应', modules.every((m) => Object.prototype.hasOwnProperty.call(tplHosts, m.envKey)), '模板键漂移');
 // 可读清单文档必须存在且覆盖 19 个业务域。
 const catalog = read('docs/统一入口配置清单-20261109.md');
 check('统一入口配置清单文档存在', catalog.length > 0, '缺清单文档');
 check('清单文档覆盖 19 个业务域', domains.every((d) => catalog.includes(`\`${d.code}\``)), '文档业务域不全');
-check('清单文档逐项列出 45 个占位键', modules.every((m) => catalog.includes(`\`${m.entryKey}\``)), '文档入口不全');
+check('清单文档逐项列出 44 个占位键', modules.every((m) => catalog.includes(`\`${m.entryKey}\``)), '文档入口不全');
 check('清单文档声明不补写具体主机值', catalog.includes('不补写未提供的具体主机值'), '缺约束声明');
 
 // 根 package.json 必须提供两个校验脚本入口。

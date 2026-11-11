@@ -5,7 +5,6 @@
   "_rule": "未配置时入口仍可按占位键寻址，但不得推导为任何真实域名",
   "hosts": {
     "MIM_HOST_PORTAL_ROOT": "",
-    "MIM_HOST_PORTAL_SITE": "",
     "MIM_HOST_ADMIN_CONSOLE": "",
     "MIM_HOST_API_GATEWAY": "",
     "MIM_HOST_APP_API": "",

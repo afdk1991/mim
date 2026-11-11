@@ -9,17 +9,20 @@ import type { Locale } from '@mim/i18n';
 import * as echarts from 'echarts';
 // 接口客户端、错误文案翻译器与会话读取工具（判断匿名态）
 import { api, errorText, getSession } from '../api';
-// 清单响应类型：能力点、业务条目与业务域
-import type { SiteCapability, SiteItem } from '../api';
+// 清单响应类型：能力点、业务条目、业务域与落地状态
+import type { EntryImplementation, EntryImplementationStatus, SiteCapability, SiteItem } from '../api';
 // 通用异步加载钩子：统一处理 loading / error / reload
 import { useAsync } from '../hooks';
-// 编程式跳转：匿名访客点击写操作时跳登录伪视图
+// 编程式跳转：匿名访客点击写操作时跳登录伪视图；视图标识类型供直达按钮收窄
 import { navigate } from '../router';
+import type { AppView } from '../router';
 
-// 组件对外契约：清单文案跟随全局语言
+// 组件对外契约：清单文案跟随全局语言；onOpenView 供已落地 / 相邻入口直达站内真实模块
 interface Props {
   // 当前界面语言
   locale: Locale;
+  // 站内视图跳转回调：由 App 注入统一 go，避免清单视图自行持有路由状态
+  onOpenView: (view: AppView) => void;
 } // Props 结束
 
 // 业务域编码到英文名的映射，覆盖用户清单的 19 组业务用途
@@ -94,6 +97,32 @@ function stateText(locale: Locale, status: string): string {
   return STATE_LABEL[status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? status;
 } // stateText 结束
 
+// 落地状态文案：四态与共享契约 implementation.status 一一对应，中英双语
+const IMPL_LABEL: Record<EntryImplementationStatus, { zh: string; en: string }> = {
+  // 已有完整对应模块，可直达使用
+  implemented: { zh: '已落地', en: 'Built' },
+  // 存在相邻真实能力，但缺该入口完整规格 / 独立界面
+  partial: { zh: '部分相邻', en: 'Partial' },
+  // 当前无对应实现，保留规划占位
+  planned: { zh: '规划中', en: 'Planned' },
+  // 现有同名 / 相邻实现与备注语义冲突，需按边界区分
+  conflict: { zh: '语义冲突', en: 'Conflict' },
+}; // IMPL_LABEL 结束
+
+// 落地状态徽标样式：绿=已落地，紫=部分相邻，灰=规划中，橙棕=语义冲突
+const IMPL_BADGE: Record<EntryImplementationStatus, string> = {
+  implemented: 'role-editor', // 绿色
+  partial: 'role-viewer', // 紫色
+  planned: '', // 默认灰
+  conflict: 'role-conflict', // 淡橙警示底表达语义冲突
+}; // IMPL_BADGE 结束
+
+// 按当前语言取落地状态文案，未知状态回退原始状态码
+function implText(locale: Locale, status: string): string {
+  // 查表命中按语言取值，否则原样返回
+  return IMPL_LABEL[status as EntryImplementationStatus]?.[locale === 'en-US' ? 'en' : 'zh'] ?? status;
+} // implText 结束
+
 // 入口状态分布饼图：把 by_status 计数画成 ECharts 环形图，标签走 stateText 翻译；无数据不渲染容器。
 function StatusPieChart({ byStatus, locale }: { byStatus: Record<string, number>; locale: Locale }) {
   const hostRef = useRef<HTMLDivElement | null>(null); // 图表挂载容器
@@ -142,8 +171,8 @@ function formatTime(locale: Locale, iso: string): string {
   return date.toLocaleString(locale === 'en-US' ? 'en-US' : 'zh-CN', { hour12: false });
 } // formatTime 结束
 
-// 统一入口配置清单：45 个去重入口逐项可查、职责与关联可展开、业务条目可新增与流转
-export function Sites({ locale }: Props) {
+// 统一入口配置清单：44 个去重入口逐项可查、职责与关联可展开、已落地模块可直达、业务条目可新增与流转
+export function Sites({ locale, onOpenView }: Props) {
   // 是否已登录：匿名态跳过写操作，改为展示登录后操作引导
   const authed = Boolean(getSession());
   // 全站汇总：入口 / 能力 / 业务域 / 占位状态 / 条目与状态分布
@@ -267,6 +296,17 @@ export function Sites({ locale }: Props) {
       setBusy(null);
     } // try/catch/finally 结束
   } // handleCreate 结束
+
+  // 进入已落地 / 相邻模块：优先站内视图直达，其次独立后台外链；规划中入口无直达
+  function openModule(impl: EntryImplementation) {
+    // 站内视图优先：收窄为 AppView 后交给 App 统一跳转
+    if (impl.view) {
+      onOpenView(impl.view as AppView);
+      return; // 已跳转，不再走外链
+    }
+    // 独立后台等站外路径：整页跳转（/admin/）
+    if (impl.href) window.location.href = impl.href;
+  } // openModule 结束
 
   // 状态流转：把指定条目推进到目标状态
   async function handleTransition(host: string, item: SiteItem, status: string) {
@@ -502,11 +542,14 @@ export function Sites({ locale }: Props) {
             // 返回单张模块卡片
             return (
               <section key={m.id} className="panel site-card">{/* 卡片容器：以入口序号为唯一 key */}
-                <div className="panel-head">{/* 卡片头部：占位键 + 业务域徽标 */}
+                <div className="panel-head">{/* 卡片头部：占位键 + 业务域徽标 + 落地状态徽标 */}
                   <h3>{m.entryKey}</h3>{/* 稳定入口标识（占位键），不是具体主机值 */}
                   <span className="badge">{/* 业务域徽标 */}
                     {locale === 'en-US' ? (DOMAIN_EN[m.domain] ?? m.domain) : groupName}{/* 业务域文案 */}
                   </span>{/* 业务域徽标结束 */}
+                  <span className={`badge ${IMPL_BADGE[m.implementation.status] ?? ''}`}>{/* 落地状态徽标 */}
+                    {implText(locale, m.implementation.status)}{/* 落地状态文案 */}
+                  </span>{/* 落地状态徽标结束 */}
                 </div>{/* 卡片头部结束 */}
                 <p className="site-system">{m.system}</p>{/* 备注后半段：业务系统/模块说明 */}
                 <p className="muted site-note">{m.note}</p>{/* 备注原文，作为唯一比对基准 */}
@@ -533,10 +576,23 @@ export function Sites({ locale }: Props) {
                   <strong>{locale === 'en-US' ? 'Boundary: ' : '职责边界：'}</strong>
                   {m.responsibility.outOfScope.join(locale === 'en-US' ? '; ' : '；')}{/* 明确排除的范围 */}
                 </p>{/* 职责边界结束 */}
-                <div className="row">{/* 操作行：数量信息 + 展开按钮 */}
+                <div className="row">{/* 操作行：数量信息 + 直达按钮 + 展开按钮 */}
                   <span className="muted">{/* 功能点与条目数 */}
                     {m.capability_count} {locale === 'en-US' ? 'capabilities' : '个功能点'} · {m.item_count} {locale === 'en-US' ? 'items' : '条记录'}{/* 数量文案 */}
                   </span>{/* 数量结束 */}
+                  {(m.implementation.view || m.implementation.href) && ( // 已有真实模块可直达才展示入口按钮
+                    <button
+                      // 直达按钮：主色小按钮
+                      type="button"
+                      className="btn primary small"
+                      // 点击进入对应站内视图或独立后台
+                      onClick={() => openModule(m.implementation)}
+                    >
+                      {m.implementation.status === 'conflict' // 冲突入口文案区分：查看相邻实现
+                        ? locale === 'en-US' ? 'View adjacent' : '查看相邻实现'
+                        : locale === 'en-US' ? 'Open module' : '进入模块'}{/* 按钮文案 */}
+                    </button> // 直达按钮结束
+                  )}{/* 直达条件渲染结束 */}
                   <button
                     // 展开按钮
                     type="button"
@@ -583,6 +639,28 @@ export function Sites({ locale }: Props) {
                       <li>{locale === 'en-US' ? 'Admin: ' : '后台管理：'}{m.adminRole}</li>
                       <li>{locale === 'en-US' ? 'API: ' : '接口职责：'}{m.apiRole}</li>
                     </ul>{/* 两项职责结束 */}
+                    {m.implementation.realFeatures.length > 0 && ( // 已有真实能力才渲染已落地功能区块
+                      <>
+                        <p className="site-detail-title">{/* 已落地功能小节标题 */}
+                          {locale === 'en-US' ? 'Implemented features' : '已落地功能'}
+                        </p>{/* 标题结束 */}
+                        <ul className="plain-list entry-functions">{/* 现有真实能力清单 */}
+                          {m.implementation.realFeatures.map((fn) => ( // 逐条渲染真实能力
+                            <li key={fn}>{fn}</li> // 能力说明
+                          ))}{/* 真实能力遍历结束 */}
+                        </ul>{/* 真实能力清单结束 */}
+                        <p className="muted entry-boundary">{/* 对齐 / 冲突边界说明 */}
+                          <strong>{locale === 'en-US' ? 'Boundary: ' : '落地边界：'}</strong>
+                          {m.implementation.boundary}{/* 边界文案 */}
+                        </p>{/* 边界说明结束 */}
+                      </>
+                    )}{/* 已落地功能条件渲染结束 */}
+                    {m.implementation.status === 'planned' && ( // 规划中入口：明确标注尚无实现，不展示演示条目冒充
+                      <p className="muted entry-boundary">{/* 规划中空态说明 */}
+                        <strong>{locale === 'en-US' ? 'Planned: ' : '规划中：'}</strong>
+                        {m.implementation.boundary}
+                      </p>
+                    )}{/* 规划中条件渲染结束 */}
                     <p className="site-detail-title">{/* 相似模块关联与区分小节标题 */}
                       {locale === 'en-US' ? 'Related entries & distinctions' : '相似模块关联与区分'}
                     </p>{/* 小节标题结束 */}
@@ -638,6 +716,8 @@ export function Sites({ locale }: Props) {
                           ))}{/* 能力说明遍历结束 */}
                         </ul>{/* 能力说明清单结束 */}
 
+                        {m.implementation.status !== 'planned' ? ( // 已落地 / 相邻 / 冲突入口才展示业务条目与新建表单
+                        <>
                         <p className="site-detail-title">{locale === 'en-US' ? 'Items' : '业务条目'}</p>{/* 小节标题 */}
                         {itemsState.loading && <p className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</p>}{/* 条目加载态 */}
                         {itemsState.error !== null && <p className="error">{errorText(locale, itemsState.error)}</p>}{/* 条目加载失败 */}
@@ -748,6 +828,10 @@ export function Sites({ locale }: Props) {
                             {locale === 'en-US' ? 'Sign in to edit' : '登录后操作'}{/* 引导文案 */}
                           </button> // 引导按钮结束
                         )}{/* 新建区域条件渲染结束 */}
+                        </>
+                        ) : ( // 规划中入口：不展示演示条目与新建表单，明确标注尚无业务记录
+                          <p className="muted">{locale === 'en-US' ? 'This entry is planned; no business records yet.' : '该入口规划中，暂无业务条目。'}</p>
+                        )}{/* 条目区条件分支结束 */}
                       </>
                     )}{/* 详情数据渲染结束 */}
                   </div> // 详情容器结束

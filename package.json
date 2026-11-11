@@ -1,6 +1,6 @@
 {
   "name": "mim",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "description": "Mim 产品底座（Headless 中台 + 多端薄壳）。apps/ 多端薄壳，packages/ 共享包，services/ 后端服务，scripts/ 校验脚本。",

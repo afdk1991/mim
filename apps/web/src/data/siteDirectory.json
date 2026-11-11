@@ -50,36 +50,6 @@
       "reasonCode": "NO_SPEC"
     },
     {
-      "id": "02",
-      "host": "www",
-      "entry": "主站常规访问入口",
-      "system": "官方门户网站",
-      "note": "主站常规访问入口｜官方门户网站",
-      "sources": [
-        {
-          "sheet": "laal.top",
-          "rows": [
-            "6",
-            "7"
-          ]
-        },
-        {
-          "sheet": "mixm.top",
-          "rows": [
-            "6",
-            "7"
-          ]
-        }
-      ],
-      "alignment": "partial",
-      "implementation": "apps/web/src/views/Store.tsx",
-      "resolution": "data-driven",
-      "reasonCode": "CONTRACT_DRIVES_UI",
-      "portalLabel": "主站常规访问入口 · www · 官方门户网站 ·",
-      "portalHref": "https://www.mixm.top",
-      "hrefOrigin": "existing-implementation（xls 记录值列已清空，备注未提供解析目标）"
-    },
-    {
       "id": "03",
       "host": "admin",
       "entry": "管理后台入口",

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 统一入口配置清单专项校验：核对用户列出的 19 组业务用途是否被 45 个入口完整覆盖，
+// 统一入口配置清单专项校验：核对用户列出的 19 组业务用途是否被 44 个入口完整覆盖，
 // 并验证「完全相同且用途一致按一项」的去重结果、可配置占位标识与不补写具体主机值。
 // 零第三方依赖、只读项目内文件；不读取 xls 本体。
 //
@@ -26,13 +26,13 @@ function read(rel) { // 读取仓库内 UTF-8 文本，缺失返回空串
 } // read 结束
 
 const data = JSON.parse(read('packages/core-domain/src/siteModules.json')); // 单一权威清单
-const modules = data.modules ?? []; // 45 个去重入口
+const modules = data.modules ?? []; // 44 个去重入口
 const domains = data.domains ?? []; // 19 个业务域
 
 // ---------- 1. 用户清单的 19 组业务用途 → 业务域编码 ----------
 // 该表逐组来自用户 2026-11-09 消息中的业务用途清单，用于验证「不遗漏清单中的业务用途」。
 const EXPECTED_DOMAINS = [
-  ['portal', 2], // 主站门户与跳转
+  ['portal', 1], // 主站跳转与分发
   ['admin', 1], // 管理后台
   ['gateway', 2], // API / APP 网关
   ['identity', 2], // 认证权限与单点登录
@@ -60,7 +60,7 @@ check('每组业务用途的入口数正确', EXPECTED_DOMAINS.every(([code, cou
   const d = domains.find((x) => x.code === code); // 定位业务域
   return d && d.count === count && d.entryKeys.length === count; // 域内入口数一致
 }), '业务用途覆盖数量漂移'); // 数量检查
-check('业务域入口数合计 45 且全部落在清单内', domains.reduce((n, d) => n + d.count, 0) === 45 &&
+check('业务域入口数合计 44 且全部落在清单内', domains.reduce((n, d) => n + d.count, 0) === 44 &&
   domains.every((d) => d.entryKeys.every((k) => modules.some((m) => m.entryKey === k))), '入口归属漂移'); // 归属检查
 check('每个入口恰好归属一个业务域', modules.every((m) =>
   domains.filter((d) => d.entryKeys.includes(m.entryKey)).length === 1), '存在重复归属'); // 唯一归属检查
@@ -68,7 +68,7 @@ check('每个入口恰好归属一个业务域', modules.every((m) =>
 // ---------- 2. 用户清单关键词逐组核对（防止业务用途被名义覆盖、实际遗漏） ----------
 // 关键词组来自用户消息原文，逐一在「备注原文 + 业务系统说明 + 核心功能 + 职责」里搜索。
 const KEYWORD_GROUPS = [
-  ['主站门户与跳转', ['主站统一跳转门户', '官方门户网站']],
+  ['主站门户与跳转', ['主站统一跳转门户']],
   ['管理后台', ['全站统一运营管理后台']],
   ['API / APP 网关', ['API 统一网关', '移动端专属接口服务']],
   ['认证权限与单点登录', ['统一身份认证与权限中心', '统一单点登录页']],
@@ -105,7 +105,7 @@ check('19 组业务用途关键词组齐备', KEYWORD_GROUPS.length === 19, `实
 // 用户要求明确「相似模块之间的关联与区分」，逐组抽查最易混淆的边界。
 const byKey = new Map(modules.map((m) => [m.entryKey, m])); // 占位键索引
 const RELATION_PAIRS = [
-  ['PORTAL_ROOT', 'PORTAL_SITE'], // 根域名跳转 vs 门户内容
+  ['PORTAL_ROOT', 'NAVIGATION'], // 根域名一次跳转 vs 资源导航站
   ['AUTH_CENTER', 'SSO_LOGIN'], // 认证能力 vs 登录页
   ['MEMBER_CENTER', 'MEMBER_ADMIN'], // 前台自助 vs 后台管理
   ['MALL_B2C', 'MULTI_MERCHANT'], // 自营零售 vs 多商户
@@ -134,12 +134,12 @@ check('15 组易混淆相似模块均有关联与区分', relationProblems.lengt
 
 // ---------- 4. 去重整理与可配置占位标识 ----------
 const dedupe = data.dedupe ?? {}; // 整理口径
-check('重复备注 45 对合并为 45 项', dedupe.businessNoteRows === 90 && dedupe.duplicatePairs === 45 && dedupe.mergedEntries === 45, '重复备注未合并'); // 重复备注
+check('重复备注 44 对合并为 44 项', dedupe.businessNoteRows === 88 && dedupe.duplicatePairs === 44 && dedupe.mergedEntries === 44, '重复备注未合并'); // 重复备注
 check('@ 两行合并为 1 项且不建业务模块', dedupe.atRecordRows?.length === 2 && dedupe.atRecordRows[0] === 2 &&
   data.atRecord?.occurrences === 2 && !modules.some((m) => m.entryKey === 'AT_ROOT'), '@ 记录未整理'); // @ 记录
 check('11 行空白字段合并为 1 项且不建业务模块', dedupe.blankNoteRows === 11 &&
   data.blankRecord?.occurrences === 11 && !modules.some((m) => m.entryKey === 'BLANK_UNSET'), '空白字段未整理'); // 空白字段
-check('45 个入口占位标识格式统一', modules.every((m) => m.placeholder === `{{HOST:${m.entryKey}}}` &&
+check('44 个入口占位标识格式统一', modules.every((m) => m.placeholder === `{{HOST:${m.entryKey}}}` &&
   m.envKey === `MIM_HOST_${m.entryKey}` && m.hostValue === null), '占位标识漂移'); // 占位格式
 check('清单无具体主机值字段（无 host / fqdn）', modules.every((m) => !('host' in m) && !('fqdn' in m)), '残留具体主机值字段'); // 字段检查
 check('空备注行无具体主机值', (data.blankRows ?? []).every((b) => b.hostValue === null && !('host' in b)), '空备注行含具体值'); // 空行检查
@@ -148,7 +148,7 @@ check('空备注行无具体主机值', (data.blankRows ?? []).every((b) => b.ho
 let tpl = {}; // 模板对象
 try { tpl = JSON.parse(read('config/entry-hosts.example.json')); } catch { /* 解析失败由后续断言报告 */ } // 读取模板
 const hosts = tpl.hosts ?? {}; // 模板键值
-check('配置模板 45 键且值全为空', Object.keys(hosts).length === 45 && Object.values(hosts).every((v) => v === ''), '模板含具体值'); // 模板值
+check('配置模板 44 键且值全为空', Object.keys(hosts).length === 44 && Object.values(hosts).every((v) => v === ''), '模板含具体值'); // 模板值
 check('配置模板键与入口 envKey 一一对应', modules.every((m) => Object.prototype.hasOwnProperty.call(hosts, m.envKey)), '模板键漂移'); // 模板键
 
 // ---------- 5. 命名、业务说明与整体结构一致 ----------
@@ -163,7 +163,7 @@ check('实现推导声明覆盖职责与关联字段', String(data.derivation).i
 
 // 可读清单文档与交付说明存在，且逐项列出 45 个占位键。
 const catalog = read('docs/统一入口配置清单-20261109.md'); // 可读清单
-check('可读清单文档逐项列出 45 个占位键', modules.every((m) => catalog.includes(`\`${m.entryKey}\``)), '文档入口不全'); // 文档覆盖
+check('可读清单文档逐项列出 44 个占位键', modules.every((m) => catalog.includes(`\`${m.entryKey}\``)), '文档入口不全'); // 文档覆盖
 check('可读清单文档覆盖 19 个业务域标题', domains.every((d) => catalog.includes(`\`${d.code}\``)), '文档业务域不全'); // 文档域覆盖
 check('交付说明文档存在', existsSync(join(ROOT, 'docs/统一入口配置清单与模块化实现说明-20261109.md')), '缺交付说明'); // 交付文档
 

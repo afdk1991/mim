@@ -29,6 +29,22 @@ export const ERROR_CODES = [
   'AUTH_ACCOUNT_LOCKED',
   // 刷新令牌无效或已被轮换失效，需重新登录
   'AUTH_REFRESH_INVALID',
+  // 第三方登录提供方未配置 client_id / client_secret，入口不可用
+  'AUTH_OAUTH_NOT_CONFIGURED',
+  // OAuth 回调的 state 缺失、过期或与发起记录不匹配（防 CSRF 校验失败）
+  'AUTH_OAUTH_STATE_INVALID',
+  // 用户在提供方页面取消授权，或提供方返回 error 参数
+  'AUTH_OAUTH_DENIED',
+  // 向提供方换 token 或拉取用户资料失败（上游超时、返回格式异常）
+  'AUTH_OAUTH_EXCHANGE_FAILED',
+  // 该第三方身份已绑定到另一个 Mim 账号，须先解绑
+  'AUTH_OAUTH_ALREADY_BOUND',
+  // 解绑会移除账号最后一个可用登录方式，拒绝执行以免账号被锁死
+  'AUTH_OAUTH_LAST_METHOD',
+  // 一次性登录票据无效、过期或已被消费
+  'AUTH_OAUTH_TICKET_INVALID',
+  // Mim ID 号码段耗尽，无法为新注册用户发号
+  'MEMBER_NO_EXHAUSTED',
   // 账号主体不存在（可能已注销或从未注册）
   'ACCOUNT_NOT_FOUND',
   // 账号注册地区与当前请求地区不一致，拒绝跨区登录
@@ -93,6 +109,22 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_ACCOUNT_LOCKED: 423,
   // 刷新令牌失效需重新认证 401
   AUTH_REFRESH_INVALID: 401,
+  // 第三方登录未配置凭证：能力存在但环境不具备，用 503
+  AUTH_OAUTH_NOT_CONFIGURED: 503,
+  // state 校验失败属客户端回调参数问题，用 400
+  AUTH_OAUTH_STATE_INVALID: 400,
+  // 用户主动取消授权：400 让前端回到登录页提示重试
+  AUTH_OAUTH_DENIED: 400,
+  // 上游换 token / 拉资料失败：502 区分「我方无问题」
+  AUTH_OAUTH_EXCHANGE_FAILED: 502,
+  // 第三方身份被其他账号占用：409 让前端提示先解绑
+  AUTH_OAUTH_ALREADY_BOUND: 409,
+  // 最后一个登录方式不允许移除：409 状态冲突
+  AUTH_OAUTH_LAST_METHOD: 409,
+  // 登录票据无效：401 要求重新发起授权
+  AUTH_OAUTH_TICKET_INVALID: 401,
+  // 号码段耗尽属服务端容量问题：503
+  MEMBER_NO_EXHAUSTED: 503,
   // 账号不存在 404，避免泄露多余信息
   ACCOUNT_NOT_FOUND: 404,
   // 跨区访问被拒绝 403

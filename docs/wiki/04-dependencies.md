@@ -12,6 +12,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `zod` | ^4.6.7 | 运行时 | 请求体/查询参数校验（`validate.ts` 统一 `parse`） |
 | `jsonwebtoken` | ^9.0.3 | 运行时 | JWT 访问令牌 + refresh 轮换 |
 | `bcryptjs` | ^3.0.2 | 运行时 | 密码哈希（global 邮箱密码登录） |
+| `oauth4webapi` | ^3.8.8 | 运行时 | 第三方登录标准协议实现（2026-11-12）：PKCE S256 授权跳转、authorization code 交换、ID Token/JWKS 校验、`ClientSecretBasic` / `ClientSecretPost` / `nopkce`；GitHub / Gitee / GitLab / Google / Microsoft / Apple 走本标准实现，微信 / QQ / 抖音因协议差异另走专用适配器 |
 | `better-sqlite3` | ^13.0.3 | 运行时 | 嵌入式 SQLite 持久化（单库替代 PostgreSQL 规划） |
 | `cors` | ^2.8.6 | 运行时 | 跨域白名单中间件：托管平台（GitHub Pages / Cloudflare / Vercel / Render）以独立域名直连 API 时放行来源；`MIM_CORS_ORIGINS` 为空则不挂载，自建同源部署行为不变 |
 | `@mim/core-domain` | workspace:* | 运行时 | 领域层：状态机、错误码 |

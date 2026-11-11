@@ -29,18 +29,8 @@ import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结�
 import { requireAuth } from '../middleware.js'; // 登出接口需要已登录身份
 import { parse } from '../validate.js'; // zod 校验失败时统一转换为 AppError
 import { addSeconds } from '../utils.js'; // ISO 时间字符串加减秒
-import type { ApiDeps, Region } from '../types.js'; // 路由依赖与地区枚举类型
-
-export interface UserRow { // users 表在鉴权流程中使用的字段子集
-  id: string; // 用户主键
-  region: Region; // 所属地区（cn/global），影响默认语言与时区
-  status: string; // active/deleted 等，决定能否登录
-  display_name: string; // 展示名
-  locale: string; // 语言偏好
-  timezone: string; // 时区偏好
-  deletion_scheduled_at: string | null; // 注销预约时间，供前端提示
-  created_at: string; // 注册时间
-} // 结束 UserRow，覆盖登录响应所需字段
+import type { ApiDeps, Region, UserRow } from '../types.js'; // 路由依赖、地区枚举与用户行类型
+import { createUser, ensureMemberNo, readUser } from '../identity.js'; // 统一建号 + Mim ID 发号 + 缺号兜底
 
 interface CodeRow { // verification_codes 表在校验时用到的字段
   id: string; // 验证码记录主键
@@ -105,6 +95,7 @@ const registerBody = z.object({ // 注册请求体
 function userPayload(row: UserRow) { // 对外输出的用户视图，剔除内部字段
   return { // 用户视图对象
     id: row.id, // 用户 ID
+    member_no: row.member_no, // 自动分配的 Mim ID 号码，前端在注册成功与个人中心展示
     region: row.region, // 地区
     status: row.status, // 账号状态
     display_name: row.display_name, // 展示名
@@ -178,41 +169,26 @@ function findOrCreateUser(deps: ApiDeps, region: Region, provider: string, ident
     .get(region, provider, identifier) as { user_id: string } | undefined; // 未命中即需要注册
 
   if (identity) { // 身份已存在分支
-    const row = deps.db.prepare('SELECT * FROM users WHERE id = ?').get(identity.user_id) as // 读取用户详情
-      | UserRow // 命中用户
-      | undefined; // 用户缺失
+    const row = readUser(deps.db, identity.user_id); // 读取用户详情（含 member_no）
     if (!row) throw new AppError('ACCOUNT_NOT_FOUND', 'account not found'); // 身份存在但用户缺失，属数据不一致
     if (row.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account has been deleted'); // 已注销账号禁止登录
-    return row; // 返回现有用户
+    return ensureMemberNo(deps.db, row, clockOf(deps)); // 历史用户缺号时当场补发，保证登录响应一定有编号
   } // 结束身份已存在分支
 
   const now = clockOf(deps); // 新用户创建时间
-  const userId = uuidv7(); // 预生成用户主键供两表共用
-  const insertUser = deps.db.prepare( // 预编译用户插入
-    `INSERT INTO users (id, region, status, display_name, locale, timezone, created_at, updated_at)
-     VALUES (?, ?, 'active', '', ?, ?, ?, ?)`,
-  ); // 状态固定 active，展示名留空待用户完善
-  const insertIdentity = deps.db.prepare( // 预编译身份插入
-    `INSERT INTO identities (id, user_id, region, provider, identifier, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ); // 写入登录身份
-  deps.db.transaction(() => { // 用户与身份必须同时创建，避免产生孤立身份
-    insertUser.run( // 写入用户
-      userId, // 用户主键
-      region, // 地区
-      region === 'cn' ? 'zh-CN' : 'en-US', // 按地区给默认语言
-      region === 'cn' ? 'Asia/Shanghai' : 'UTC', // 按地区给默认时区
-      now, // 创建时间
-      now, // 更新时间
-    ); // 结束用户写入
-    insertIdentity.run(uuidv7(), userId, region, provider, identifier, now); // 绑定身份到新用户
+  return deps.db.transaction(() => { // 用户与身份必须同时创建，避免产生孤立身份
+    const created = createUser(deps.db, { region, now }); // 唯一建号入口：内部已自动分配 Mim ID 号码
+    deps.db // 身份写入起点
+      .prepare( // 预编译身份插入
+        `INSERT INTO identities (id, user_id, region, provider, identifier, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ) // 结束预编译
+      .run(uuidv7(), created.id, region, provider, identifier, now); // 绑定身份到新用户
+    return created; // 交出含号码的新用户
   })(); // 执行事务
-
-  const row = deps.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow; // 回读落库结果，确保返回真实数据
-  return row; // 返回新用户
 } // 结束 findOrCreateUser
 
-function finishLogin( // 登录收尾：记录设备并签发双令牌，供各登录分支复用
+export function finishLogin( // 登录收尾：记录设备并签发双令牌，供各登录分支复用（OAuth 路由也导用它）
   deps: ApiDeps, // 依赖容器
   user: UserRow, // 已确认可用的用户
   device: { platform: string; name?: string } | undefined, // 客户端上报的设备信息（可空）
@@ -387,35 +363,21 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     } // 结束占用检查
 
     const now = clockOf(deps); // 注册时间
-    const userId = uuidv7(); // 预生成用户主键供两表共用
     const displayName = (body.display_name ?? '').trim().slice(0, 64); // 展示名可选，限幅避免超长
-    deps.db.transaction(() => { // 用户 / 身份 / 口令三表必须同时写入
-      deps.db // 用户写入起点
-        .prepare( // 预编译用户插入
-          `INSERT INTO users (id, region, status, display_name, locale, timezone, created_at, updated_at)
-           VALUES (?, ?, 'active', ?, ?, ?, ?, ?)`,
-        ) // 结束预编译
-        .run( // 绑定参数
-          userId, // 用户主键
-          body.region, // 地区
-          displayName, // 展示名
-          body.region === 'cn' ? 'zh-CN' : 'en-US', // 默认语言随地区
-          body.region === 'cn' ? 'Asia/Shanghai' : 'UTC', // 默认时区随地区
-          now, // 创建时间
-          now, // 更新时间
-        ); // 结束用户写入
+    const user = deps.db.transaction(() => { // 用户 / 身份 / 口令三表必须同时写入
+      const created = createUser(deps.db, { region: body.region, display_name: displayName, now }); // 建号并自动分配 Mim ID 号码
       deps.db // 身份写入起点
         .prepare( // 预编译身份插入
           `INSERT INTO identities (id, user_id, region, provider, identifier, created_at)
            VALUES (?, ?, ?, ?, ?, ?)`,
         ) // 结束预编译
-        .run(uuidv7(), userId, body.region, identity.provider, identity.identifier, now); // 绑定唯一身份
+        .run(uuidv7(), created.id, body.region, identity.provider, identity.identifier, now); // 绑定唯一身份
       deps.db // 口令写入起点：credentials 表已存在，kind=password 区分于其他凭据
         .prepare('INSERT INTO credentials (id, user_id, kind, secret_hash, created_at) VALUES (?, ?, ?, ?, ?)') // 预编译凭据插入
-        .run(uuidv7(), userId, 'password', hashPassword(body.password), now); // 只存 bcrypt 摘要，绝不留明文
-    })(); // 执行事务，任一失败即整体回滚
+        .run(uuidv7(), created.id, 'password', hashPassword(body.password), now); // 只存 bcrypt 摘要，绝不留明文
+      return created; // 交出含号码的新用户，供统一登录收尾
+    })(); // 执行事务，任一失败即整体回滚（号码随事务一起回滚，不浪费号段）
 
-    const user = deps.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow; // 回读落库结果
     res.status(201).json(finishLogin(deps, user, body.device)); // 注册即登录：直接下发令牌，省一次往返
   }); // 结束 POST /auth/register 处理
 
@@ -453,7 +415,9 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
 
     deps.db.prepare('DELETE FROM login_failures WHERE identifier = ?').run(key); // 成功后清零失败计数
 
-    const user = findOrCreateUser(deps, body.region, identity.provider, identity.identifier); // 按身份查找或创建用户（自建账号已存在）
+    // 管理员口令登录时没有 identities 行（account 为空），必须先判空再取 user_id，避免未处理异常冒成 500
+    const existingUser = account ? readUser(deps.db, account.user_id) : undefined; // 已有自建身份则按 user_id 读行
+    const user = existingUser ?? findOrCreateUser(deps, body.region, identity.provider, identity.identifier); // 缺失则走统一建号（自动发号）
     res.json(finishLogin(deps, user, body.device)); // 统一收尾：设备 + 双令牌 + 用户视图
   }); // 结束 POST /auth/password 处理
 
@@ -466,9 +430,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     if (!session || session.revoked_at || Date.parse(session.expires_at) <= Date.parse(now)) { // 三重失效判定
       throw new AppError('AUTH_REFRESH_INVALID', 'refresh token is invalid or expired'); // 已吊销/过期/不存在统一拒绝
     } // 结束有效性判断
-    const user = deps.db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id) as // 读取会话归属用户
-      | UserRow // 命中用户
-      | undefined; // 用户缺失
+    const user = readUser(deps.db, session.user_id); // 读取会话归属用户（含 Mim ID 号码）
     if (!user || user.status === 'deleted') { // 用户不可用分支
       throw new AppError('AUTH_REFRESH_INVALID', 'account is not available'); // 用户缺失或已注销不允许续期
     } // 结束用户可用性判断

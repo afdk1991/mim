@@ -29,8 +29,8 @@ import { Profile } from './views/Profile';
 import { Sites } from './views/Sites';
 // 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
 import { Deployments } from './views/Deployments';
-// 漫剧 AI 剧工作台
-import { ComicWorkbench } from './views/ComicWorkbench';
+// 漫剧 AI 剧模块外壳：放映厅（匿名可看片）+ 创作工作台（登录后使用）
+import { ComicStudio } from './views/ComicStudio';
 // IM 聊天 + 视频通话
 import { Chat } from './views/Chat';
 // 聊天只读演示页：匿名访客看到完整聊天布局与示例消息，输入区禁用并引导登录
@@ -41,7 +41,7 @@ import { useAppRoute } from './router'; // 路径路由 hook：地址栏 /<view>
 import type { AppView } from './router';
 
 // 需登录方可使用的视图集合：均为收费或私密功能；匿名访问时在内容区内嵌登录卡片而非整站锁定
-const GATED_VIEWS: ReadonlySet<AppView> = new Set(['comic', 'products', 'cart', 'account']); // 商城目录保持匿名可浏览；聊天为匿名只读演示（ChatPreview）；商品列表 / 购物车 / 个人中心 / 漫剧涉及个人数据或收费能力，需登录
+const GATED_VIEWS: ReadonlySet<AppView> = new Set(['products', 'cart', 'account']); // 漫剧模块已改为「放映厅匿名可看 + 工作台登录后使用」，不再整页拦截；聊天为匿名只读演示（ChatPreview）
 
 // 应用根组件：浏览类页面匿名可访问，仅使用收费功能模块时才要求登录（按需登录）
 export function App() {
@@ -218,15 +218,17 @@ export function App() {
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
         {/* 站点模块矩阵：45 类备注驱动的模块目录，浏览匿名可访问 */}
-        {route.view === 'sites' && <Sites locale={locale} />}{/* 站点模块矩阵 */}
+        {route.view === 'sites' && <Sites locale={locale} onOpenView={(view) => go({ view })} />}{/* 站点模块矩阵：清单内的跳转由 App 统一注入 */}
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
         {/* 收费 / 私密视图（漫剧 / 商品列表 / 购物车 / 个人中心）：匿名访问时以内容区内嵌登录卡片替代 */}
         {gated && !session && (
           <Login embedded onLogin={handleLogin} notice={embeddedNotice} /> // 内嵌登录：保留侧栏导航上下文
         )}{/* 内嵌登录条件渲染结束 */}
-        {/* 漫剧 AI 剧工作台：分镜与剧集编辑，仅已登录渲染 */}
-        {route.view === 'comic' && session && <ComicWorkbench locale={locale} />}{/* 漫剧 AI 剧工作台 */}
+        {/* 漫剧 AI 剧模块：放映厅匿名可看片，创作工作台在模块内按需登录 */}
+        {route.view === 'comic' && (
+          <ComicStudio locale={locale} hasSession={!!session} onSignIn={() => go({ view: 'login' })} />
+        )}{/* 漫剧模块渲染结束 */}
         {/* IM 聊天 + 视频通话：会话列表 + 消息 + 视频通话，仅已登录渲染 */}
         {route.view === 'chat' && session && <Chat locale={locale} />}{/* 聊天视图 */}
         {/* 匿名聊天只读演示：展示完整聊天布局与示例消息，输入区禁用，登录后才可收发 */}

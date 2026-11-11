@@ -10,6 +10,7 @@ import type { Db } from './types.js'; // 数据库句柄类型，供 loadPermiss
 
 interface AuthRow { // 鉴权从库中读出的用户行结构
   id: string; // 用户唯一 ID
+  member_no: string | null; // 对外 Mim ID 号码；历史库补列前可能为 NULL
   region: 'cn' | 'global'; // 区域，决定可用模块与身份类型
   status: 'active' | 'pending_deletion' | 'deleted'; // 账号状态，注销宽限期内限制大部分接口
   display_name: string; // 昵称，供路由直接返回
@@ -48,7 +49,7 @@ function resolveBearerUser(req: Request): AuthRow { // 内部辅助：令牌 →
   } // 头格式校验结束
   const payload = verifyAccessToken(match[1], req.deps.jwtSecret); // 校验签名与过期时间，失败抛 AUTH_UNAUTHORIZED
   const row = req.deps.db // 从库中加载最新用户行，使注销等状态变更即时生效（不信任令牌内快照）
-    .prepare('SELECT id, region, status, display_name, locale, timezone FROM users WHERE id = ?') // 只选鉴权与展示所需字段
+    .prepare('SELECT id, member_no, region, status, display_name, locale, timezone FROM users WHERE id = ?') // 只选鉴权与展示所需字段
     .get(payload.sub) as AuthRow | undefined; // 按令牌 sub 精确查询单行，查不到为 undefined
   if (!row || row.status === 'deleted') { // 用户不存在或已软删除时令牌即失效
     throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 统一 401，避免区分「不存在」与「已删除」

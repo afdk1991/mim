@@ -404,6 +404,11 @@ code { /* 行内代码/令牌展示 */
   color: #7a55c9; /* 紫色文字表达受限权限 */
 } /* 只读徽标结束 */
 
+.badge.role-conflict { /* 语义冲突徽标：淡橙警示底 */
+  background: #fdeee6; /* 淡橙底 */
+  color: #c2571a; /* 橙棕文字表达边界冲突 */
+} /* 冲突徽标结束 */
+
 .segmented { /* 分段控件外壳 */
   display: inline-flex; /* 宽度随内容，不占满一行 */
   padding: 3px; /* 内边距形成凹槽感 */
@@ -484,6 +489,107 @@ code { /* 行内代码/令牌展示 */
   color: var(--primary); /* 主色文字便于识别验证码 */
   font-size: 13px; /* 略小正文 */
 } /* 验证码块结束 */
+
+/* ---------- 第三方登录与 Mim ID ---------- */
+.oauth-section { /* 登录卡片底部的第三方登录区 */
+  display: flex; /* 纵向排列分隔线与按钮网格 */
+  flex-direction: column; /* 自上而下 */
+  gap: 12px; /* 区块间距 */
+} /* 第三方登录区结束 */
+
+.oauth-divider { /* 「或使用第三方账号」分隔线 */
+  display: flex; /* 左右线条与文字同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 线条与文字间距 */
+  color: var(--text-muted); /* 次要文字色 */
+  font-size: 12px; /* 小号辅助文案 */
+} /* 分隔线结束 */
+
+.oauth-divider::before, /* 分隔线左段 */
+.oauth-divider::after { /* 分隔线右段 */
+  content: ''; /* 伪元素需要内容占位 */
+  flex: 1; /* 均分剩余宽度 */
+  height: 1px; /* 细线 */
+  background: var(--border); /* 与卡片边框同色 */
+} /* 伪元素结束 */
+
+.oauth-grid { /* 第三方按钮网格 */
+  display: grid; /* 自适应列宽 */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 小屏自动折行 */
+  gap: 8px; /* 按钮间距 */
+} /* 网格结束 */
+
+.oauth-btn { /* 单个第三方按钮 */
+  display: flex; /* 名称与状态徽标同行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+  gap: 6px; /* 名称与徽标间距 */
+  font-size: 13px; /* 比主按钮略小，避免抢视觉焦点 */
+} /* 第三方按钮结束 */
+
+.oauth-badge { /* 「未配置」「跳转中」徽标 */
+  padding: 1px 6px; /* 紧凑内边距 */
+  border-radius: 999px; /* 胶囊形 */
+  background: #f1f3f9; /* 浅灰底 */
+  color: var(--text-muted); /* 次要文字色 */
+  font-size: 11px; /* 更小字号 */
+} /* 徽标结束 */
+
+.member-no-block { /* 注册成功后的 Mim ID 展示块 */
+  display: flex; /* 纵向排列标题、号码与说明 */
+  flex-direction: column; /* 自上而下 */
+  gap: 6px; /* 行间距 */
+  padding: 14px 16px; /* 内留白 */
+  border: 1px dashed var(--primary); /* 虚线强调「这是新分配的编号」 */
+  border-radius: 10px; /* 统一圆角 */
+  background: #f5f7ff; /* 淡蓝底 */
+} /* 展示块结束 */
+
+.member-no { /* Mim ID 号码本身 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; /* 等宽字体让数字对齐 */
+  font-size: 24px; /* 放大作为视觉焦点 */
+  letter-spacing: 1px; /* 略微松开字符 */
+  color: var(--primary); /* 品牌色 */
+} /* 号码结束 */
+
+.member-line { /* 个人中心里的 Mim ID 行 */
+  display: flex; /* 标签与号码同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 6px; /* 标签与号码间距 */
+} /* 号码行结束 */
+
+.oauth-list { /* 已绑定的第三方身份列表 */
+  margin: 0; /* 去掉默认列表缩进 */
+  padding: 0; /* 去掉默认内边距 */
+  list-style: none; /* 不显示项目符号 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 自上而下 */
+  gap: 8px; /* 行间距 */
+} /* 列表结束 */
+
+.oauth-list li { /* 单条绑定记录 */
+  display: flex; /* 名称、资料、时间、操作同行 */
+  align-items: center; /* 垂直居中 */
+  gap: 12px; /* 列间距 */
+  padding: 10px 12px; /* 行内留白 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 10px; /* 统一圆角 */
+  background: var(--surface); /* 白底 */
+} /* 绑定行结束 */
+
+.oauth-name { /* 提供方名称 */
+  min-width: 88px; /* 对齐不同长度的名称 */
+  font-weight: 600; /* 稍加粗，作为行首 */
+} /* 名称结束 */
+
+.oauth-bindings { /* 账号与设置分区里的第三方绑定区块 */
+  display: flex; /* 纵向排列说明、列表与按钮 */
+  flex-direction: column; /* 自上而下 */
+  gap: 10px; /* 区块间距 */
+  margin-top: 18px; /* 与上方注销区隔开 */
+  padding-top: 18px; /* 配合上边框形成分区 */
+  border-top: 1px solid var(--border); /* 分区分割线 */
+} /* 绑区块结束 */
 
 /* ---------- 项目 ---------- */
 .project-list { /* 项目列表 */
@@ -1406,6 +1512,11 @@ code { /* 行内代码/令牌展示 */
 .entry-relations li { /* 单条关联 */
   padding: 3px 0; /* 逐条留白 */
 } /* 单条关联结束 */
+.entry-boundary { /* 落地边界 / 规划说明段落 */
+  margin: 6px 0 12px; /* 上下留白，与相邻清单拉开 */
+  font-size: 13px; /* 次要信息字号 */
+  line-height: 1.6; /* 边界说明较长，加大行高 */
+} /* 边界段落结束 */
 
 /* ---------- 商城分类树改造（2026-11-10）：左侧两级导航 + 筛选条 + 分页 ---------- */
 .store-layout { /* 商城两栏布局：导航固定宽度，列表自适应 */
@@ -2181,3 +2292,260 @@ code { /* 行内代码/令牌展示 */
   gap: 12px; /* 间距 */
   align-items: flex-start; /* 按钮不撑满 */
 } /* 账号安全结束 */
+
+/* ---------- 漫剧 / AI 剧放映厅 ---------- */
+
+.comic-studio { /* 模块外壳：分段 + 内容 */
+  display: flex; /* 纵向堆叠 */
+  flex-direction: column; /* 上下排列 */
+  gap: 18px; /* 分段与内容间距 */
+} /* 模块外壳结束 */
+
+.comic-segment { /* 放映厅 / 创作工作台分段 */
+  display: inline-flex; /* 按钮并排 */
+  align-self: flex-start; /* 不撑满整行 */
+  gap: 4px; /* 按钮间距 */
+  padding: 4px; /* 内衬，形成胶囊底 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 999px; /* 胶囊圆角 */
+  background: var(--surface); /* 跟随主题表面色 */
+} /* 分段容器结束 */
+
+.segment-item { /* 分段按钮 */
+  padding: 7px 18px; /* 舒适点击区域 */
+  border: none; /* 无边框 */
+  border-radius: 999px; /* 胶囊 */
+  background: transparent; /* 未选中透明 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 13px; /* 正文偏小 */
+  font-weight: 500; /* 中等字重 */
+  cursor: pointer; /* 手型光标 */
+} /* 分段按钮结束 */
+
+.segment-item.active { /* 选中态 */
+  background: var(--primary); /* 品牌主色 */
+  color: #fff; /* 反白 */
+} /* 选中态结束 */
+
+.theater { /* 放映厅根容器 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 22px; /* 区块间距 */
+} /* 放映厅结束 */
+
+.theater-head { /* 顶部标题行 */
+  display: flex; /* 左右排布 */
+  align-items: flex-start; /* 顶部对齐 */
+  justify-content: space-between; /* 标题与操作分开 */
+  gap: 16px; /* 最小间距 */
+} /* 标题行结束 */
+
+.theater-title { /* 页面标题 */
+  margin: 0 0 4px; /* 仅保留底部间距 */
+  font-size: 22px; /* 主标题字号 */
+} /* 标题结束 */
+
+.theater-stage { /* 播放区：画面 + 侧栏 */
+  display: grid; /* 网格布局 */
+  grid-template-columns: minmax(0, 1fr) 280px; /* 左侧自适应，右侧固定 */
+  gap: 16px; /* 两栏间距 */
+  padding: 16px; /* 内衬 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 14px; /* 圆角 */
+  background: var(--surface); /* 表面色 */
+} /* 播放区结束 */
+
+.theater-player-wrap { /* 播放器与当前片名 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 10px; /* 间距 */
+  min-width: 0; /* 允许网格收缩 */
+} /* 播放器容器结束 */
+
+.theater-player { /* 原生视频播放器 */
+  width: 100%; /* 撑满 */
+  max-height: 62vh; /* 避免竖屏片源过高 */
+  border-radius: 10px; /* 圆角 */
+  background: #000; /* 黑底，加载时也像影院 */
+} /* 播放器结束 */
+
+.theater-now { /* 当前片名条 */
+  display: flex; /* 左右 */
+  align-items: baseline; /* 基线对齐 */
+  justify-content: space-between; /* 标题与副标题分开 */
+  gap: 12px; /* 间距 */
+} /* 当前片名结束 */
+
+.theater-now-title { /* 当前集标题 */
+  font-weight: 600; /* 加粗 */
+} /* 结束 */
+
+.theater-now-sub { /* 所属作品 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小字 */
+} /* 结束 */
+
+.theater-side { /* 右侧信息栏 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 18px; /* 区块间距 */
+  min-width: 0; /* 允许收缩 */
+} /* 侧栏结束 */
+
+.theater-side-title { /* 侧栏区块标题 */
+  margin: 0 0 8px; /* 仅底部间距 */
+  font-size: 14px; /* 小标题 */
+  font-weight: 600; /* 加粗 */
+  display: flex; /* 标题与徽标并排 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 间距 */
+} /* 结束 */
+
+.theater-episodes { /* 剧集列表 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 6px; /* 按钮间距 */
+} /* 结束 */
+
+.theater-ep { /* 单集按钮 */
+  display: flex; /* 左右 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 名称与时长分开 */
+  gap: 10px; /* 间距 */
+  padding: 9px 11px; /* 内衬 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 8px; /* 圆角 */
+  background: var(--surface); /* 表面色 */
+  color: inherit; /* 继承文字色 */
+  font-size: 13px; /* 小字 */
+  text-align: left; /* 左对齐 */
+  cursor: pointer; /* 手型 */
+} /* 结束 */
+
+.theater-ep.active { /* 当前集 */
+  border-color: var(--primary); /* 主色描边 */
+  box-shadow: 0 0 0 1px var(--primary); /* 主色高亮 */
+} /* 结束 */
+
+.theater-kind { /* 形态徽标 */
+  padding: 2px 8px; /* 内衬 */
+  border-radius: 999px; /* 胶囊 */
+  background: color-mix(in srgb, var(--primary) 12%, transparent); /* 主色淡底 */
+  color: var(--primary); /* 主色文字 */
+  font-size: 11px; /* 极小字 */
+  font-weight: 500; /* 中等字重 */
+} /* 结束 */
+
+.theater-meta { /* 作品信息 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 4px; /* 间距 */
+} /* 结束 */
+
+.theater-tags { /* 标签行 */
+  display: flex; /* 横排 */
+  flex-wrap: wrap; /* 可换行 */
+  gap: 6px; /* 间距 */
+  margin-top: 6px; /* 与说明分开 */
+} /* 结束 */
+
+.theater-tag { /* 单个标签 */
+  padding: 2px 8px; /* 内衬 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 999px; /* 胶囊 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 11px; /* 极小字 */
+} /* 结束 */
+
+.theater-section { /* 片库 / 我的作品区块 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 10px; /* 间距 */
+} /* 结束 */
+
+.theater-grid { /* 作品网格 */
+  display: grid; /* 网格 */
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 自适应列宽 */
+  gap: 14px; /* 间距 */
+} /* 结束 */
+
+.theater-card { /* 作品卡片 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  padding: 0; /* 图片贴边 */
+  overflow: hidden; /* 圆角裁切 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 12px; /* 圆角 */
+  background: var(--surface); /* 表面色 */
+  color: inherit; /* 继承文字色 */
+  text-align: left; /* 左对齐 */
+  cursor: pointer; /* 手型 */
+} /* 结束 */
+
+.theater-card.active { /* 当前选中作品 */
+  border-color: var(--primary); /* 主色描边 */
+  box-shadow: 0 0 0 1px var(--primary); /* 主色高亮 */
+} /* 结束 */
+
+.theater-cover { /* 封面图 */
+  width: 100%; /* 撑满 */
+  aspect-ratio: 3 / 2; /* 封面裁成横版，网格更整齐 */
+  object-fit: cover; /* 裁切填充 */
+  display: block; /* 去掉行内间隙 */
+} /* 结束 */
+
+.theater-card-body { /* 卡片文字区 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 3px; /* 紧凑间距 */
+  padding: 12px 14px 14px; /* 内衬 */
+} /* 结束 */
+
+.theater-card-title { /* 卡片标题 */
+  font-size: 15px; /* 字号 */
+  font-weight: 600; /* 加粗 */
+} /* 结束 */
+
+.theater-card-meta { /* 卡片底部元信息 */
+  display: flex; /* 左右 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 分开 */
+  gap: 8px; /* 间距 */
+  margin-top: 6px; /* 与标题分开 */
+  font-size: 11px; /* 极小字 */
+} /* 结束 */
+
+.theater-card-mine { /* 我的成片卡片：无封面，用更高内衬 */
+  min-height: 104px; /* 保持卡片高度一致 */
+  justify-content: center; /* 文字垂直居中 */
+} /* 结束 */
+
+.theater-empty { /* 空态 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  align-items: flex-start; /* 左对齐 */
+  gap: 10px; /* 间距 */
+} /* 结束 */
+
+.theater-login { /* 工作台登录引导卡片 */
+  max-width: 560px; /* 控制阅读宽度 */
+  margin: 24px auto; /* 居中 */
+  padding: 24px; /* 内衬 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 14px; /* 圆角 */
+  background: var(--surface); /* 表面色 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  gap: 12px; /* 间距 */
+} /* 结束 */
+
+@media (max-width: 860px) { /* 窄屏：播放区改为上下堆叠 */
+  .theater-stage { /* 单栏 */
+    grid-template-columns: minmax(0, 1fr); /* 只保留一列 */
+  } /* 结束 */
+  .theater-head { /* 标题与按钮换行 */
+    flex-direction: column; /* 纵向 */
+    align-items: stretch; /* 按钮撑满 */
+  } /* 结束 */
+} /* 媒体查询结束 */
+

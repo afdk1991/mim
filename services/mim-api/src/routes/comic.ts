@@ -507,8 +507,74 @@ function buildMockSuggestions( // 按建议类型产出候选数组，纯内存�
   return items; // 返回全部候选，由调用方包进 suggestion 信封
 } // mock 建议适配器结束
 
+/** 放映厅演示片库：随仓库发布的静态演示片源，用于匿名访客验收「看片」链路 */
+const SHOWCASE_WORKS = [ // 两部开放授权演示片，覆盖动画漫剧与自然短片两类放映形态
+  { // 奇幻动画（漫剧演示）
+    id: 'showcase.stardust', // 稳定标识，前端用作选中态与进度键
+    title: '星尘之约', // 演示标题
+    subtitle: '开放授权动画演示片源', // 副标题：明确标注为演示内容
+    kind: 'comic-drama', // 漫剧形态
+    region: 'global', // 内容分区
+    tags: ['奇幻', '动画', '演示片源'], // 标签，前端展示
+    cover: '/demo/stardust-cover.jpg', // 封面图（构建产物内静态资源）
+    episodes: [{ no: 1, title: '预告片 · 星尘之约', src: '/demo/stardust-ep1.mp4', duration_sec: 52 }], // 可播放片源
+  }, // 奇幻动画演示结束
+  { // 自然短片（AI 剧占位演示）
+    id: 'showcase.bloom', // 稳定标识
+    title: '花间序曲', // 演示标题
+    subtitle: '开放授权自然短片演示片源', // 副标题
+    kind: 'ai-drama', // AI 剧形态（演示位）
+    region: 'cn', // 内容分区
+    tags: ['治愈', '微距', '演示片源'], // 标签
+    cover: '/demo/bloom-cover.jpg', // 封面
+    episodes: [{ no: 1, title: '正片 · 花间序曲', src: '/demo/bloom-ep1.mp4', duration_sec: 5 }], // 可播放片源
+  }, // 自然短片演示结束
+]; // 演示片库结束
+
 export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外部注入 db / clock，便于测试替换
   const router = Router(); // 独立子路由，由 app 统一挂载
+
+  // ---------- 放映厅（公开可看，先于鉴权中间件注册） ----------
+
+  router.get('/comic/showcase', (req, res) => { // 匿名可访问的演示片库，供访客直接看漫剧 / AI 剧
+    // 片源与封面保持相对路径，由前端 resolvePublicUrl 按部署方式补源：
+    // 同源部署（生产自建 / 本地开发）直接落在本站静态目录，跨源托管（GitHub Pages 等）补 API 源。
+    res.json({ items: SHOWCASE_WORKS, updated_at: clockOf(deps) }); // 统一信封 + 生成时间，便于前端判断新鲜度
+  }); // 演示片库路由结束
+
+  router.get('/comic/theater', requireAuth, async (req, res) => { // 登录用户的作品放映列表（仅本人可见，不校验模块权益）
+    const user = req.user!; // requireAuth 已保证登录
+    const storage = deps.storage; // 存储适配器，用于签发播放地址
+    if (!storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 无存储无法签发播放地址
+    const rows = deps.db // 取本人名下所有工程里已有产物的成片，按更新时间倒序
+      .prepare( // 预编译查询：一次取出成片与最新版本键，避免 N+1
+        `SELECT f.id, f.title, f.status, f.updated_at, v.version_no, v.object_key, v.duration_sec,
+                p.title AS project_title
+           FROM comic_films f
+           JOIN comic_projects p ON p.id = f.project_id
+           LEFT JOIN film_versions v ON v.film_id = f.id
+          WHERE p.owner_user_id = ? AND p.deleted_at IS NULL AND f.deleted_at IS NULL AND v.object_key IS NOT NULL
+          GROUP BY f.id
+          ORDER BY f.updated_at DESC
+          LIMIT 60`, // 最多 60 部，避免首屏过大
+      ) // 预编译结束
+      .all(user.id) as Array<{ id: string; title: string; status: string; updated_at: string; version_no: number; object_key: string; duration_sec: number | null; project_title: string }>; // 结果行类型
+    const items = await Promise.all(rows.map(async (row) => { // 逐部签发播放地址（本地存储为 HMAC 签名，S3 为 SigV4）
+      const presigned = await storage.presignDownload({ key: row.object_key, mime: 'video/mp4', expires_seconds: 3600 }); // 1 小时有效
+      return { // 前端直接放进 <video src>
+        id: row.id, // 成片 ID
+        title: row.title, // 成片标题
+        project_title: row.project_title, // 所属工程，便于分组
+        status: row.status, // 状态（published / reviewing 等）
+        version_no: row.version_no, // 当前播放版本
+        duration_sec: row.duration_sec, // 时长，未知为 null
+        src: presigned.url, // 预签名播放地址
+        updated_at: row.updated_at, // 更新时间
+      }; // 条目结束
+    })); // 并发签发结束
+    res.json({ items }); // 返回作品列表
+  }); // 我的放映厅路由结束
+
   // 鉴权按命名空间生效：未匹配到 /comic* 的请求直接放行到后续 router，避免未知路径被误拦成 401
   router.use('/comic', requireAuth); // 先校验登录态，req.user 在此之后必有值
   router.use('/comic', requireEntitlement(MODULE_CODE)); // 再校验 comic.workbench 模块权益，未购买即 403
@@ -990,7 +1056,7 @@ export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外
   }); // 任务详情接口结束
 
   // 状态迁移由编排控制面驱动（ai-orchestrator 接入后由其消费队列调用）
-  router.post('/comic/jobs/:id/start', idempotency, (req, res) => { // queued → running
+  router.post('/comic/jobs/:id/start', idempotency, (req, res) => { // queued 转 running
     const user = req.user!; // 登录用户
     const job = findJob(deps.db, user.id, pathParam(req, 'id')); // 归属校验
     if (job.status !== 'queued') { // 只有排队中的任务能开跑
@@ -1005,7 +1071,7 @@ export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) }); // 回读最新状态返回
   }); // 启动任务接口结束
 
-  router.post('/comic/jobs/:id/complete', idempotency, (req, res) => { // running → succeeded
+  router.post('/comic/jobs/:id/complete', idempotency, (req, res) => { // running 转 succeeded
     const body = parse(completeJobBody, req.body ?? {}); // 请求体可能为空，兜底成空对象
     const user = req.user!; // 登录用户
     const job = findJob(deps.db, user.id, pathParam(req, 'id')); // 归属校验
@@ -1036,7 +1102,7 @@ export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) }); // 返回更新后的任务
   }); // 完成任务接口结束
 
-  router.post('/comic/jobs/:id/fail', idempotency, (req, res) => { // running → failed
+  router.post('/comic/jobs/:id/fail', idempotency, (req, res) => { // running 转 failed
     const body = parse(failJobBody, req.body); // 校验失败原因码
     const user = req.user!; // 登录用户
     const job = findJob(deps.db, user.id, pathParam(req, 'id')); // 归属校验
@@ -1054,7 +1120,7 @@ export function createComicRouter(deps: ApiDeps): Router { // 工厂函数：外
     res.json({ job: jobPayload(findJob(deps.db, user.id, job.id)) }); // 返回失败后的任务视图
   }); // 失败上报接口结束
 
-  router.post('/comic/jobs/:id/cancel', idempotency, (req, res) => { // queued / running → canceled
+  router.post('/comic/jobs/:id/cancel', idempotency, (req, res) => { // queued / running 转 canceled
     const user = req.user!; // 登录用户
     const job = findJob(deps.db, user.id, pathParam(req, 'id')); // 归属校验
     if (job.status !== 'queued' && job.status !== 'running') { // 只有未终结的任务可取消

@@ -27,6 +27,7 @@ export function createMeRouter(deps: ApiDeps): Router { // 工厂函数：接收
     res.json({ // 直接以 JSON 返回，响应结构由前端契约消费
       user: { // 只暴露安全字段，不返回密码哈希、手机号等敏感信息
         id: user.id, // 用户唯一 ID，前端用作本地缓存键
+        member_no: user.member_no, // 自动分配的 Mim ID 号码，个人中心展示与客服引用
         region: user.region, // 区域（cn/global），决定前端可用的模块与身份类型
         status: user.status, // 账号状态（active/pending_deletion），前端据此展示注销提示
         display_name: user.display_name, // 昵称，用于页面展示
@@ -58,7 +59,7 @@ export function createMeRouter(deps: ApiDeps): Router { // 工厂函数：接收
     deps.db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values); // 动态拼装 SET 列表执行更新，WHERE 按主键精确命中单行
 
     const row = deps.db // 更新后回查数据库，确保响应与落库结果严格一致
-      .prepare('SELECT id, region, status, display_name, locale, timezone FROM users WHERE id = ?') // 只查可对外字段，避免把敏感列带出
+      .prepare('SELECT id, member_no, region, status, display_name, locale, timezone FROM users WHERE id = ?') // 只查可对外字段，避免把敏感列带出
       .get(req.user!.id); // 按当前登录用户 ID 取单行
     res.json({ user: row }); // 返回更新后的完整用户视图
   }); // PATCH /me 路由结束

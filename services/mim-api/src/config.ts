@@ -31,6 +31,16 @@ export const LOGIN_LOCK_AFTER_FAILURES = 5; // 连续 5 次密码错误即锁定
 export const LOGIN_LOCK_MINUTES = 15; // 锁定 15 分钟后自动解锁，避免永久误锁
 export const DELETION_GRACE_DAYS = 7; // 注销冷静期 7 天，期内可撤销删除
 
+/** Mim ID 号码：对外可见的用户编号，注册时自动分配，与内部 uuidv7 主键解耦 */
+export const MEMBER_NO_PREFIX = 'MIM'; // 号码前缀，展示为 MIM-10000001
+export const MEMBER_NO_START = 10_000_001; // 首个序号：八位、无前导零，便于肉眼识别
+export const MEMBER_NO_MAX = 99_999_999; // 序号上限：超出后拒绝发号，避免号码位数漂移破坏既有引用
+
+/** OAuth 第三方登录：授权 state 与一次性登录票据的有效期 */
+export const OAUTH_STATE_TTL_SECONDS = 600; // 授权链接 10 分钟有效，覆盖用户在提供方页面停留与二次验证
+export const OAUTH_TICKET_TTL_SECONDS = 300; // 回调票据 5 分钟有效，只在 302 与一次兑换之间存活
+export const OAUTH_HTTP_TIMEOUT_MS = 10_000; // 调用提供方 token / userinfo 的超时，避免外部挂起拖死请求
+
 /** 写操作必须携带 Idempotency-Key（08 §3.3）；auth 端点天然非幂等，已豁免 */
 export const REQUIRE_IDEMPOTENCY = true; // 全局开关：控制写路由是否强制幂等键，便于灰度或本地调试关闭
 

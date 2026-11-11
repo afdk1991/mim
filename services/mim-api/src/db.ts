@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统�
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
 import type { Db } from './types.js'; // 仅引入数据库连接类型，编译期擦除不产生运行时代码
+import { backfillMemberNos } from './identity.js'; // 存量用户补发 Mim ID 号码（幂等，仅对 NULL 行生效）
 
 const SCHEMA_PATH = fileURLToPath(new URL('./schema.sql', import.meta.url)); // 以模块自身位置解析 schema.sql 绝对路径，保证任意工作目录下都能找到建表脚本
 
@@ -34,6 +35,7 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'module_categories', column: 'name_en', definition: 'TEXT' }, // 分类英文名（英文站点导航 / 接口 name_en 字段）
   { table: 'im_messages', column: 'reply_to_id', definition: 'TEXT' }, // 引用回复的目标消息 ID（2026-11-11 聊天增强）
   { table: 'im_messages', column: 'reply_excerpt', definition: 'TEXT' }, // 被引用消息的快照摘要（发送时固化）
+  { table: 'users', column: 'member_no', definition: 'TEXT' }, // 对外 Mim ID 号码（2026-11-12 注册自动分配编号）
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
 // 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
@@ -41,6 +43,10 @@ const ADDITIVE_INDEXES: ReadonlyArray<{ name: string; sql: string }> = [ // 只�
   { // 渠道交易号全局唯一（NULL 不参与）：同一笔渠道交易重复回调不能结算出第二张单／第二份权益
     name: 'uq_module_orders_txn', // 索引名，与 wiki 记录一致
     sql: "CREATE UNIQUE INDEX IF NOT EXISTS uq_module_orders_txn ON module_orders(channel_txn_id) WHERE channel_txn_id IS NOT NULL", // 部分唯一索引：人工结算（NULL）不受约束
+  }, // 索引定义结束
+  { // Mim ID 号码全局唯一：发号器已保证不重号，唯一索引是最后一道防线（人工补数据也会被挡）
+    name: 'uq_users_member_no', // 与 identity.ts 的发号逻辑配套
+    sql: 'CREATE UNIQUE INDEX IF NOT EXISTS uq_users_member_no ON users(member_no) WHERE member_no IS NOT NULL', // 部分唯一：补列前历史行为 NULL，不参与约束
   }, // 索引定义结束
 ]; // 清单结束：新增依赖后加列的索引请加在这里，不要写进 schema.sql
 
@@ -106,6 +112,8 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedCategoryModules(db); // 按分类树展开写入 205 个二级模块（cn/global 双区），实现「二级条目即模块」
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
+  const backfilled = backfillMemberNos(db); // 历史用户补发 Mim ID 号码；新库为空操作
+  if (backfilled > 0) console.log(`[db] member_no backfilled: ${backfilled} users`); // 补号必须留痕，便于核对号码连续性
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束
 
@@ -139,8 +147,8 @@ export function seedSiteModules(db: Db): void { // 入口清单种子入口，�
           item.title, // 演示条目标题
           item.detail, // 演示条目说明，明确标注非真实业务数据
           item.status, // 初始状态，取值落在该能力 states 内
-          now, // created_at
-          now, // updated_at
+          now, // 创建时间
+          now, // 更新时间
         ); // run 结束
         align.run(module.entryKey, id, module.entryKey); // 存量 v1 行按主键迁移，保留用户状态流转
       } // 演示条目循环结束
@@ -537,8 +545,8 @@ export function seedRbac(db: Db): void { // RBAC 种子入口，随 createDataba
         permission.code, // 权限码，如 module:write
         JSON.stringify(permission.name), // 多语言名称序列化落库
         '{}', // 内置权限暂无描述，保留空对象以便后台后续补充
-        now, // created_at
-        now, // updated_at
+        now, // 创建时间
+        now, // 更新时间
       ); // run 结束
     } // 权限点循环结束
     for (const role of RBAC_ROLES) { // 逐条写入内置角色
@@ -546,8 +554,8 @@ export function seedRbac(db: Db): void { // RBAC 种子入口，随 createDataba
         role.code, // 角色码，如 operator
         JSON.stringify(role.name), // 多语言名称
         JSON.stringify(role.description), // 多语言描述
-        now, // created_at
-        now, // updated_at
+        now, // 创建时间
+        now, // 更新时间
       ); // run 结束
       for (const permissionCode of role.permissions) { // 逐条补齐该角色的基线权限
         insertRolePermission.run(role.code, permissionCode, now); // 已存在则忽略，保证幂等

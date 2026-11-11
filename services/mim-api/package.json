@@ -1,6 +1,6 @@
 {
   "name": "@mim/api",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -32,6 +32,7 @@
     "jsonwebtoken": "^9.0.3",
     "marked": "^18.2.0",
     "mustache": "^4.2.0",
+    "oauth4webapi": "3.8.8",
     "qrcode": "^1.5.4",
     "semver": "^7.7.2",
     "sharp": "^0.35.5",

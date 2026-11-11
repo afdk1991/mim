@@ -66,6 +66,22 @@
 
 PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮箱/微信（微信禁用输入框），`submitLogin()` 空值报错、非空显示演示成功文案。
 
+### 3.1 已落地的注册 / 登录链路（2026-11-12）
+
+| 链路 | 入口 | 首登是否自动建号 | Mim ID |
+|---|---|---|---|
+| 自助注册 | `POST /auth/register`（region + 通道标识 + 口令 + 可选展示名） | 是，注册即建号 | 响应 `user.member_no`，前端注册成功卡片先展示号码再进入工作台 |
+| 验证码首登 | `POST /auth/code` → `POST /auth/login` | 是，首次校验通过的标识自动建号 | `user.member_no` |
+| 密码首登 | `POST /auth/password`（管理员口令或自建账号口令） | 是（无 identities 行时走统一建号） | `user.member_no` |
+| 第三方首登 | `POST /auth/oauth/:provider/authorize` → 回调 → `POST /auth/oauth/exchange` | 是，无绑定记录时 `createUserFromOAuth` 建号并写 `oauth_accounts` | 票据换回的 `user.member_no` |
+
+- **Mim ID 规则**：对外编号 `MIM-<8 位补零>`（起始 `MIM-10000001`，上限 `99_999_999`），由 `member_no_sequence` 单行表在事务内自增分配，与内部 uuidv7 主键解耦；唯一索引 `uq_users_member_no`；历史用户由启动时 `backfillMemberNos` 按 `created_at ASC, id ASC` 补齐，登录时 `ensureMemberNo` 再兜底一次，保证任何登录响应都带号码。发号耗尽抛 `MEMBER_NO_EXHAUSTED(503)`。
+- **第三方登录 9 家**：GitHub / Gitee / GitLab / Google / Apple / Microsoft（global）与微信 / QQ / 抖音（cn，按 `region` 过滤）。标准 OIDC 走 `oauth4webapi@3.8.8`（PKCE S256 + state + ID Token 校验），微信 / QQ / 抖音走专用适配器。安全模型：`state` 只存 sha256（10 分钟、回调即删）；正式令牌不进地址栏，回调只带 300 秒一次性票据，`POST /auth/oauth/exchange` 换取 session。
+- **绑定约束**：同一第三方身份（`provider + provider_user_id`，有 unionid 的再加 `union_id` 唯一）不可绑到两个 Mim 账号（409 `AUTH_OAUTH_ALREADY_BOUND`）；解绑后若该用户已无任何登录方式则拒绝（409 `AUTH_OAUTH_LAST_METHOD`）。
+- **未配置即不可用**：`GET /auth/oauth/providers` 的 `configured` 由每家凭证变量是否齐备决定；未配置的提供方前端置灰、授权端点返回 503 `AUTH_OAUTH_NOT_CONFIGURED`。
+
+PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮箱/微信（微信禁用输入框），`submitLogin()` 空值报错、非空显示演示成功文案。
+
 **当前获取功能使用权的唯一方式**：功能模块商城的一次性解锁（`one_time`，见 §5.1 / §11.11），服务端 `entitlements` 为唯一鉴权依据。
 
 ## 5. FR-03 核心 SaaS 工作区（2026-11-04 重定义：功能模块商城 + 漫剧 AI 剧）
@@ -232,7 +248,9 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 | 登出 | `auth.ts` `POST /auth/logout` | —（401 自动登出） | ✅ |
 | 我的信息 | `me.ts` `GET /me` / `PATCH /me` | `Settings.tsx` | ✅ |
 | 账号注销（冷静期） | `me.ts` `POST /me/deletion` + `POST /me/cancel-deletion` | `Settings.tsx` | ✅ |
-| 第三方登录 / 账号合并 | — | — | ❌ TBD |
+| Mim ID 自动分配 | `identity.ts`（`allocateMemberNo` / `createUser` / `backfillMemberNos` / `ensureMemberNo`） | `Login.tsx` 注册成功卡片、`Profile.tsx` 资料与账号安全区 | ✅（`MIM-10000001` 起，事务内自增，唯一索引 `uq_users_member_no`，历史用户启动回填 + 登录兜底） |
+| 第三方登录（9 家） | `routes/oauth.ts` + `oauth/providers.ts` / `oauth/client.ts` / `oauth/accounts.ts` | `Login.tsx`（登录按钮）、`Profile.tsx`（绑定 / 解绑） | ✅（GitHub / Gitee / GitLab / Google / Apple / Microsoft / 微信 / QQ / 抖音；未配置凭证置灰，`AUTH_OAUTH_NOT_CONFIGURED`） |
+| 第三方账号合并 | — | — | ❌ TBD（当前策略是「同一第三方身份不可绑两个账号」，不自动合并） |
 
 ### 11.9 审计与合规模块（FR-06）
 

@@ -10,9 +10,9 @@
     "rule": "完全相同且用途一致的条目按一项处理",
     "sourceRows": 104,
     "headerRows": 1,
-    "businessNoteRows": 90,
-    "duplicatePairs": 45,
-    "mergedEntries": 45,
+    "businessNoteRows": 88,
+    "duplicatePairs": 44,
+    "mergedEntries": 44,
     "atRecordRows": [
       2,
       3
@@ -20,7 +20,7 @@
     "atRecordMergedInto": "AT_ROOT",
     "blankNoteRows": 11,
     "blankMergedInto": "BLANK_UNSET",
-    "note": "业务备注每类连续重复两行（短主机记录行 + 全限定主机行），备注文字与用途完全一致，合并为 45 项；两行 @ 记录无备注且用途一致，合并为 1 项根域名占位；其余 11 行空白备注合并为 1 项空白占位。"
+    "note": "业务备注每类连续重复两行（短主机记录行 + 全限定主机行），备注文字与用途完全一致，合并为 44 项（原序号 02 条目已按要求移除，序号保留 xls 行序不重排）；两行 @ 记录无备注且用途一致，合并为 1 项根域名占位；其余 11 行空白备注合并为 1 项空白占位。"
   },
   "atRecord": {
     "entryKey": "AT_ROOT",
@@ -91,12 +91,11 @@
   "domains": [
     {
       "code": "portal",
-      "name": "主站门户与跳转",
-      "description": "根域名跳转分发与官方门户内容承载",
-      "count": 2,
+      "name": "主站跳转与分发",
+      "description": "根域名跳转分发",
+      "count": 1,
       "entryKeys": [
-        "PORTAL_ROOT",
-        "PORTAL_SITE"
+        "PORTAL_ROOT"
       ]
     },
     {
@@ -303,10 +302,10 @@
         5
       ],
       "domain": "portal",
-      "domainName": "主站门户与跳转",
+      "domainName": "主站跳转与分发",
       "coreFunctions": [
         "根域名访问的统一跳转与分发规则",
-        "按来源/场景把根域名导向门户、移动端或业务入口",
+        "按来源/场景把根域名导向移动端或业务入口",
         "跳转命中记录与异常回退策略"
       ],
       "responsibility": {
@@ -315,19 +314,13 @@
           "入口分发规则的配置"
         ],
         "outOfScope": [
-          "不承载门户页面内容",
+          "不承载页面内容",
           "不实现业务系统登录与鉴权"
         ]
       },
       "adminRole": "配置跳转目标、分发比例与回退链路，查看命中与异常记录",
-      "apiRole": "对外提供跳转决策与入口清单查询接口，供门户与网关消费",
+      "apiRole": "对外提供跳转决策与入口清单查询接口，供网关与导航站消费",
       "related": [
-        {
-          "entryId": "02",
-          "entryKey": "PORTAL_SITE",
-          "relation": "similar",
-          "distinction": "同为门户入口；本模块只做根域名跳转分发，官方门户网站承载实际页面内容"
-        },
         {
           "entryId": "12",
           "entryKey": "NAVIGATION",
@@ -381,108 +374,6 @@
           "title": "路由配置·待处理",
           "status": "pending",
           "detail": "演示数据：主站统一跳转门户的入口路由配置待办条目，可推进状态。"
-        }
-      ]
-    },
-    {
-      "id": "02",
-      "entryKey": "PORTAL_SITE",
-      "placeholder": "{{HOST:PORTAL_SITE}}",
-      "envKey": "MIM_HOST_PORTAL_SITE",
-      "hostValue": null,
-      "note": "主站常规访问入口｜官方门户网站",
-      "entry": "主站常规访问入口",
-      "system": "官方门户网站",
-      "sheet": "mixm.top",
-      "rows": [
-        6,
-        7
-      ],
-      "domain": "portal",
-      "domainName": "主站门户与跳转",
-      "coreFunctions": [
-        "官方门户首页与栏目内容展示",
-        "站点公告、产品信息与对外入口聚合",
-        "门户内容发布与上下架管理"
-      ],
-      "responsibility": {
-        "inScope": [
-          "官方对外内容承载与展示",
-          "门户栏目与公告维护"
-        ],
-        "outOfScope": [
-          "不负责账号体系与交易流程",
-          "不承载各业务系统内部页面"
-        ]
-      },
-      "adminRole": "维护门户栏目、公告、推荐位与内容上下架",
-      "apiRole": "提供门户内容读取接口与对外入口索引，供导航站与移动端 H5 引用",
-      "related": [
-        {
-          "entryId": "01",
-          "entryKey": "PORTAL_ROOT",
-          "relation": "similar",
-          "distinction": "根域名只做跳转，本模块承载实际门户内容"
-        },
-        {
-          "entryId": "22",
-          "entryKey": "MOBILE_H5",
-          "relation": "similar",
-          "distinction": "移动端 H5 精简版官网是本模块的移动端裁剪视图，不另立内容体系"
-        },
-        {
-          "entryId": "12",
-          "entryKey": "NAVIGATION",
-          "relation": "similar",
-          "distinction": "导航站只做链接聚合，门户站提供内容本体"
-        }
-      ],
-      "capabilities": [
-        {
-          "code": "catalog",
-          "name": "站点栏目",
-          "itemKind": "栏目",
-          "description": "清单：登记并查看该系统的资源清单，可归档（官方门户网站）",
-          "states": [
-            "active",
-            "archived"
-          ]
-        },
-        {
-          "code": "manage",
-          "name": "内容发布",
-          "itemKind": "内容",
-          "description": "管理：发起并处理该系统的业务事项，状态可推进或归档（官方门户网站）",
-          "states": [
-            "pending",
-            "active",
-            "archived"
-          ]
-        },
-        {
-          "code": "record",
-          "name": "访问记录",
-          "itemKind": "访问记录",
-          "description": "记录：记录该系统的运行或操作流水，可标记完成或归档（官方门户网站）",
-          "states": [
-            "pending",
-            "done",
-            "archived"
-          ]
-        }
-      ],
-      "seed": [
-        {
-          "capability": "catalog",
-          "title": "栏目·示例",
-          "status": "active",
-          "detail": "演示数据：官方门户网站的站点栏目初始条目，非真实业务数据。"
-        },
-        {
-          "capability": "manage",
-          "title": "内容·待处理",
-          "status": "pending",
-          "detail": "演示数据：官方门户网站的内容发布待办条目，可推进状态。"
         }
       ]
     },
@@ -1426,12 +1317,6 @@
       "adminRole": "维护分类、链接、可达性检测与推荐位",
       "apiRole": "提供导航目录读取接口，链接目标为可配置占位标识",
       "related": [
-        {
-          "entryId": "02",
-          "entryKey": "PORTAL_SITE",
-          "relation": "similar",
-          "distinction": "门户站提供内容本体，导航站只做链接聚合"
-        },
         {
           "entryId": "01",
           "entryKey": "PORTAL_ROOT",
@@ -2417,12 +2302,6 @@
           "distinction": "全功能移动端站点提供完整业务，本模块仅精简官网"
         },
         {
-          "entryId": "02",
-          "entryKey": "PORTAL_SITE",
-          "relation": "similar",
-          "distinction": "PC 门户站是内容主体，本模块是其移动端裁剪"
-        },
-        {
           "entryId": "05",
           "entryKey": "APP_API",
           "relation": "similar",
@@ -2817,12 +2696,6 @@
           "entryKey": "ADMIN_CONSOLE",
           "relation": "similar",
           "distinction": "全站运营后台面向平台治理，本模块面向员工日常协同"
-        },
-        {
-          "entryId": "02",
-          "entryKey": "PORTAL_SITE",
-          "relation": "similar",
-          "distinction": "官方门户网站面向公众，本模块面向企业内部"
         },
         {
           "entryId": "09",

@@ -16,8 +16,6 @@ import type { CartSummary } from '../api';
 import { useAsync } from '../hooks';
 // 引入编程式跳转：匿名访客点击「登录后解锁」时跳转登录伪视图
 import { navigate } from '../router';
-// 引入站点入口契约的门户条目：备注「主站常规访问入口｜官方门户网站」的数据化落点
-import { PORTAL_ENTRY } from '../data/siteDirectory';
 
 // 组件对外契约：商城文案跟随全局语言
 interface Props {
@@ -885,23 +883,7 @@ export function Store({ locale }: Props) {
           ))}{/* 结束一级分类遍历 */}
         </aside>{/* 分类导航结束 */}
 
-        <div className="store-main">{/* 右侧主区：入口卡片 + 搜索 + 筛选 + 列表 + 分页 */}
-          <section className="panel">{/* 主站入口卡片：文案与链接改由站点入口契约（xls 备注）驱动，渲染结果与改造前逐字一致 */}
-            <p className="muted">{/* 单行信息串：名称 · 主机 · 说明 · 链接，格式与用户确认稿一致 */}
-              {PORTAL_ENTRY.label}{' '}{/* 文案取自契约 www 条目，分隔点后的空格让链接与上文留出呼吸 */}
-              <a
-                // 主站外链：指向官方门户网站
-                href={PORTAL_ENTRY.href}
-                // 新窗口打开，避免跳出当前商城会话
-                target="_blank"
-                // 禁传 referrer/ opener，防止目标站拿到本页引用与 window.opener
-                rel="noopener noreferrer"
-              >
-                {PORTAL_ENTRY.href}{/* 链接文案与地址一致，所见即所得 */}
-              </a>{/* 主站链接结束 */}
-            </p>{/* 信息串结束 */}
-          </section>{/* 主站入口卡片结束 */}
-
+        <div className="store-main">{/* 右侧主区：搜索 + 筛选 + 列表 + 分页 */}
           <form className="form inline" onSubmit={submitSearch}>{/* 搜索行：提交制，避免按键即请求 */}
             <label className="grow">{/* 关键词输入：占满剩余宽度 */}
               {locale === 'en-US' ? 'Search modules' : '搜索模块'}{/* 字段标签 */}

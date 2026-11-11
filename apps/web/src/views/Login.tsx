@@ -1,5 +1,5 @@
-// 引入 useState / useEffect：维护登录表单状态，并在挂载时查询可用登录方式
-import { useEffect, useState } from 'react';
+// 引入 useState / useEffect / useRef：维护登录表单状态、消费第三方回调参数，并防止票据被重复兑换
+import { useEffect, useRef, useState } from 'react';
 // 引入 FormEvent 类型：为表单提交处理函数的入参做类型标注
 import type { FormEvent } from 'react';
 // 引入 t 函数：按当前 locale 从 i18n 词条表取文案
@@ -8,8 +8,31 @@ import { t } from '@mim/i18n';
 import type { Locale } from '@mim/i18n';
 // 引入接口客户端、错误文案翻译器、会话持久化工具
 import { api, errorText, setSession } from '../api';
-// 引入登录相关类型：登录结果、身份提供方、账号区域
-import type { LoginResult, Provider, Region } from '../api';
+// 引入登录相关类型：登录结果、身份提供方、账号区域、第三方提供方
+import type { LoginResult, OAuthProviderInfo, Provider, Region } from '../api';
+
+/** 从地址栏移除 OAuth 回传参数：票据与错误码都只消费一次，刷新不应重放 */
+function clearOAuthParams(): void {
+  const url = new URL(window.location.href); // 当前地址
+  for (const key of ['oauth_ticket', 'oauth_error', 'return_to']) url.searchParams.delete(key); // 逐个删除
+  window.history.replaceState(null, '', url.pathname + url.search + url.hash); // 原地替换，不新增历史
+} // clearOAuthParams 结束
+
+/** 把后端 OAuth 错误码翻译成当前语言的可读提示 */
+function oauthErrorText(locale: Locale, code: string): string {
+  const table: Record<string, [string, string]> = { // [中文, 英文]
+    AUTH_OAUTH_NOT_CONFIGURED: ['该第三方登录尚未在本部署配置，请联系管理员', 'This provider is not configured on this deployment.'],
+    AUTH_OAUTH_STATE_INVALID: ['授权链接已过期或被重复使用，请重新发起', 'The authorization link expired. Please start again.'],
+    AUTH_OAUTH_DENIED: ['已取消第三方授权', 'Authorization was cancelled.'],
+    AUTH_OAUTH_EXCHANGE_FAILED: ['第三方平台返回异常，请稍后重试', 'The provider returned an error. Please retry.'],
+    AUTH_OAUTH_ALREADY_BOUND: ['该第三方账号已绑定到其他 Mim 账号', 'This third-party account is linked to another Mim account.'],
+    AUTH_OAUTH_LAST_METHOD: ['至少需要保留一种登录方式', 'Keep at least one sign-in method.'],
+    AUTH_OAUTH_TICKET_INVALID: ['登录票据已失效，请重新登录', 'The sign-in ticket is invalid. Please sign in again.'],
+  }; // 映射表结束
+  const pair = table[code]; // 命中映射
+  if (!pair) return code; // 未知码原样显示，便于排障
+  return locale === 'en-US' ? pair[1] : pair[0]; // 按语言取一侧
+} // oauthErrorText 结束
 
 // 组件对外契约：登录成功后把结果回调给上层
 interface Props {
@@ -45,10 +68,48 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [error, setError] = useState<string | null>(null);
   // 部署可用登录方式：用于在验证码通道未配置时给出明确提示，避免用户反复触发 503
   const [channels, setChannels] = useState<{ sms: boolean; email: boolean; password: boolean; register: boolean } | null>(null);
+  // 第三方登录提供方清单：含未配置凭证的项，前端据此置灰而不是隐藏
+  const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
+  // 正在跳转的第三方提供方：只禁用被点击的那一个，允许用户改点别家
+  const [oauthBusy, setOauthBusy] = useState<string | null>(null);
+  // 第三方回调错误码：由 ?oauth_error= 带回，展示为可读文案
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  // 注册成功但尚未进入工作台：先展示自动分配的 Mim ID，用户确认后再切换视图
+  const [registered, setRegistered] = useState<LoginResult | null>(null);
+  // 票据只消费一次：开发环境 StrictMode 会让挂载 effect 跑两遍，重复兑换必然 401
+  const oauthHandled = useRef(false);
 
   // 挂载时查一次通道能力；失败静默降级，不阻塞登录主流程
   useEffect(() => {
     api.authChannels().then(setChannels).catch(() => setChannels(null));
+  }, []);
+
+  // 区域变化时重新拉提供方清单：中国区与海外区可用项不同
+  useEffect(() => {
+    api.oauthProviders(region).then((result) => setOauthProviders(result.providers)).catch(() => setOauthProviders([]));
+  }, [region]);
+
+  // 挂载时消费第三方回调参数：票据换会话 / 错误码展示；处理完立即从地址栏移除，避免刷新重放
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorCode = params.get('oauth_error');
+    const ticket = params.get('oauth_ticket');
+    if (errorCode) {
+      setOauthError(errorCode); // 展示失败原因（如 AUTH_OAUTH_STATE_INVALID）
+      clearOAuthParams(); // 清掉参数，刷新不再提示
+      return; // 错误优先，不再尝试兑换
+    }
+    if (!ticket || oauthHandled.current) return; // 无票据或已处理
+    oauthHandled.current = true; // 标记已消费，防止重复兑换
+    setBusy(true); // 兑换期间禁用提交
+    api.oauthExchange(ticket)
+      .then((result) => {
+        setSession(result); // 写入本地会话
+        clearOAuthParams(); // 清理地址栏
+        onLogin(result); // 切换为已登录视图
+      })
+      .catch((err) => setOauthError(errorText(locale, err))) // 票据过期等失败提示
+      .finally(() => setBusy(false)); // 恢复按钮
   }, []);
 
   // 由区域推导身份提供方：中国区走手机号，Global 区走邮箱
@@ -66,8 +127,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     : ''; // gateText 计算结束
 
   // 切换区域：整体清空已填内容，避免手机号被当作邮箱提交
-  function switchRegion(next: Region) {
-    // 写入目标区域
+  function switchRegion(next: Region) {    // 写入目标区域
     setRegion(next);
     // 清空账号标识，因为两种区域的标识格式完全不同
     setIdentifier('');
@@ -96,6 +156,22 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     // 清空旧错误提示
     setError(null);
   }
+
+  // 发起第三方授权：先向后端要授权地址，再整页跳转到提供方
+  async function startOAuth(providerId: string) {
+    if (oauthBusy) return; // 已有跳转在途，忽略重复点击
+    setOauthError(null); // 清空旧错误
+    setOauthBusy(providerId); // 只禁用被点的按钮
+    try {
+      // 由后端生成 state / PKCE 并记录，前端只负责跳转
+      const result = await api.oauthAuthorize(providerId, { region, mode: 'login', return_to: '/account' });
+      window.location.assign(result.authorization_url); // 交给浏览器完成授权页
+    } catch (err) {
+      // 未配置凭证、网络异常等在这里暴露
+      setOauthError(errorText(locale, err));
+      setOauthBusy(null); // 失败后恢复可点
+    } // try 结束
+  } // startOAuth 结束
 
   // 发送验证码：由验证码模式下的「发送验证码」按钮触发
   async function sendCode() {
@@ -150,6 +226,11 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 // 用户填写的验证码，去空格后提交
                 code: code.trim(),
               });
+      // 注册模式先停在成功面板：把自动分配的 Mim ID 展示给用户，再进入工作台
+      if (mode === 'register') {
+        setRegistered(result); // 暂存结果，等用户确认
+        return; // 不在这里写会话，避免直接跳走看不到号码
+      }
       // 把令牌写入本地会话存储，供后续接口自动携带
       setSession(result);
       // 通知上层登录成功，触发视图切换
@@ -162,6 +243,39 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
       setBusy(false);
     }
   }
+
+  // 注册成功：先展示服务端自动分配的 Mim ID，用户确认后再进入工作台
+  if (registered) {
+    return (
+      <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>
+        <div className="auth-card">
+          <div className="auth-head">
+            <h1>{t(locale, 'app.name')}</h1>
+          </div>
+          <p className="auth-notice" role="status">{locale === 'en-US' ? 'Account created.' : '账号创建成功'}</p>
+          <div className="member-no-block">
+            <span>{locale === 'en-US' ? 'Your Mim ID' : '你的 Mim ID 号码'}</span>
+            <strong className="member-no">{registered.user.member_no}</strong>
+            <span className="hint">
+              {locale === 'en-US'
+                ? 'This number is your public identity in Mim. Keep it for support and sharing.'
+                : '该号码是你的对外身份标识，可随时在个人中心查看。'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn primary block"
+            onClick={() => {
+              setSession(registered); // 用户确认后才写入会话
+              onLogin(registered); // 进入工作台
+            }}
+          >
+            {locale === 'en-US' ? 'Enter Mim' : '进入 Mim'}
+          </button>
+        </div>
+      </div>
+    );
+  } // 注册成功面板结束
 
   // 渲染登录页：整屏独立展示，或以 embedded 模式内嵌到主布局内容区
   return (
@@ -334,6 +448,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           )}{/* 结束开发态回显 */}
 
           {error && <p className="error">{error}</p>}{/* 错误提示：仅在 error 非空时渲染 */}
+          {oauthError && <p className="error">{oauthError}</p>}{/* 第三方登录错误：票据失效 / 授权被拒 / 未配置 */}
 
           {mode === 'code' && channels && !(provider === 'phone' ? channels.sms : channels.email) && ( // 通道未配置时明确引导改用密码或注册
             <p className="hint">{locale === 'en-US' ? 'Verification channel is not configured on this deployment. Use password or sign up instead.' : '当前部署未配置该验证码通道，请改用密码登录或注册。'}</p>
@@ -347,6 +462,30 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 : t(locale, 'auth.login')}{/* 按钮文案结束 */}
           </button>{/* 结束提交按钮 */}
         </form>{/* 结束登录表单 */}
+
+        {oauthProviders.length > 0 && ( // 第三方登录区：9 家全部展示，未配置凭证的置灰
+          <div className="oauth-section">
+            <div className="oauth-divider"><span>{locale === 'en-US' ? 'Or continue with' : '或使用第三方账号'}</span></div>
+            <div className="oauth-grid">
+              {oauthProviders
+                .filter((item) => item.region === 'both' || item.region === region) // 只展示当前区域可用项
+                .map((item) => (
+                  <button
+                    key={item.id} // 提供方标识唯一
+                    type="button" // 不触发表单提交
+                    className="btn ghost oauth-btn"
+                    disabled={!item.configured || oauthBusy !== null} // 未配置或已有跳转在途时禁用
+                    title={item.configured ? undefined : (locale === 'en-US' ? 'Credentials not configured on this deployment' : '该提供方尚未在本部署配置凭证')}
+                    onClick={() => void startOAuth(item.id)} // 发起授权并整页跳转
+                  >
+                    <span>{locale === 'en-US' ? item.label_en : item.label}</span>
+                    {!item.configured && <span className="oauth-badge">{locale === 'en-US' ? 'N/A' : '未配置'}</span>}
+                    {oauthBusy === item.id && <span className="oauth-badge">{t(locale, 'common.loading')}</span>}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}{/* 第三方登录区结束 */}
       </div>{/* 结束登录卡片 */}
     </div>
   );

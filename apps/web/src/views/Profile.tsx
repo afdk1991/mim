@@ -7,7 +7,7 @@ import type { Locale } from '@mim/i18n';
 // 引入接口集合与错误文案翻译
 import { api, errorText } from '../api';
 // 引入用户信息类型：资料保存成功后回传上层刷新全局显示
-import type { UserInfo } from '../api';
+import type { OAuthProviderInfo, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
 
@@ -39,6 +39,9 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const [busy, setBusy] = useState(false); // 提交中间态
   const [error, setError] = useState<string | null>(null); // 错误提示
   const [message, setMessage] = useState<string | null>(null); // 成功提示
+  const bindings = useAsync(() => api.oauthBindings(), []); // 已绑定的第三方身份
+  const [providers, setProviders] = useState<OAuthProviderInfo[]>([]); // 可绑定的第三方清单
+  const [linking, setLinking] = useState<string | null>(null); // 正在跳转的提供方
 
   const user = me.data?.user; // 当前用户
 
@@ -49,6 +52,48 @@ export function Profile({ locale, onUserUpdated }: Props) {
     setLocaleValue(user.locale === 'en-US' ? 'en-US' : 'zh-CN'); // 语言收敛为两种合法值
     setTimezone(user.timezone); // 时区
   }, [user]);
+
+  // 拉取第三方提供方清单（随账号区域变化）
+  useEffect(() => {
+    api.oauthProviders(user?.region).then((result) => setProviders(result.providers)).catch(() => setProviders([])); // 失败静默降级
+  }, [user?.region]);
+
+  // 回调带回 ?oauth_bound=provider 时提示绑定成功，并立即清掉参数避免刷新重复提示
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const bound = url.searchParams.get('oauth_bound');
+    if (!bound) return; // 无绑定回传
+    setTab('security'); // 直接落在账号与设置分区
+    setMessage(isZh ? '第三方账号绑定成功' : 'Third-party account linked'); // 成功提示
+    url.searchParams.delete('oauth_bound'); // 清理参数
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash); // 原地替换
+  }, []);
+
+  /** 发起绑定：跳转到提供方授权页，完成后由后端回调并回到本页 */
+  async function linkProvider(providerId: string) {
+    setError(null); // 清空旧错误
+    setLinking(providerId); // 只禁用当前按钮
+    try {
+      const result = await api.oauthAuthorize(providerId, { mode: 'bind', region: user?.region, return_to: '/account' }); // 绑定模式必须带登录态
+      window.location.assign(result.authorization_url); // 交给浏览器跳转
+    } catch (err) {
+      setError(errorText(locale, err)); // 未配置或网络失败
+      setLinking(null); // 恢复可点
+    } // try 结束
+  } // linkProvider 结束
+
+  /** 解绑：服务端保证至少保留一种登录方式 */
+  async function unlinkProvider(providerId: string) {
+    setError(null); // 清空旧错误
+    setMessage(null); // 清空旧提示
+    try {
+      await api.unlinkOAuth(providerId); // 删除绑定
+      bindings.reload(); // 刷新列表
+      setMessage(isZh ? '已解除绑定' : 'Unlinked'); // 成功提示
+    } catch (err) {
+      setError(errorText(locale, err)); // AUTH_OAUTH_LAST_METHOD 等
+    } // try 结束
+  } // unlinkProvider 结束
 
   /** 保存资料三项 */
   async function save(event: FormEvent) {
@@ -124,7 +169,8 @@ export function Profile({ locale, onUserUpdated }: Props) {
             <label>{isZh ? '时区' : 'Timezone'}
               <input value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder="Asia/Shanghai" />
             </label>
-            <p className="hint">{isZh ? `账号 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Account ${user?.id.slice(0, 8) ?? '-'} · ${user?.region ?? '-'} · ${user?.status ?? '-'}`}</p>
+            <p className="hint member-line">{isZh ? 'Mim ID：' : 'Mim ID: '}<strong className="member-no">{user?.member_no ?? '-'}</strong></p>
+            <p className="hint">{isZh ? `内部 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Internal ID ${user?.id.slice(0, 8) ?? '-'} · ${user?.region ?? '-'} · ${user?.status ?? '-'}`}</p>
             <button type="submit" className="btn primary" disabled={busy}>{busy ? (isZh ? '保存中…' : 'Saving…') : isZh ? '保存资料' : 'Save'}</button>
           </form>
         )
@@ -212,8 +258,9 @@ export function Profile({ locale, onUserUpdated }: Props) {
           <p className="hint">
             {isZh ? '登录凭据由服务端签发 JWT，退出登录会吊销 refresh_token；注销账号进入冷静期，期内可撤销。' : 'Sessions are JWT based; signing out revokes the refresh token.'}
           </p>
+          <p className="hint member-line">{isZh ? 'Mim ID：' : 'Mim ID: '}<strong className="member-no">{user?.member_no ?? '-'}</strong></p>
           <p className="hint">
-            {isZh ? `账号 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Account ${user?.id.slice(0, 8) ?? '-'} · ${user?.region === 'cn' ? 'CN' : 'Global'} · ${user?.status ?? '-'}`}
+            {isZh ? `内部 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Internal ID ${user?.id.slice(0, 8) ?? '-'} · ${user?.region === 'cn' ? 'CN' : 'Global'} · ${user?.status ?? '-'}`}
           </p>
           <p className="hint">
             {isZh ? '注销后账号进入冷静期，到期执行删除；冷静期内可随时撤销。删除后资料与权益不可恢复。' : 'Deletion enters a cooling-off period; you can cancel it before it executes.'}
@@ -235,6 +282,57 @@ export function Profile({ locale, onUserUpdated }: Props) {
               {isZh ? '申请注销账号' : 'Request deletion'}
             </button>
           )}
+
+          {/* 第三方登录绑定：绑定后可一键登录，解绑受「至少保留一种方式」约束 */}
+          <div className="oauth-bindings">
+            <h2>{isZh ? '第三方登录' : 'Third-party sign-in'}</h2>
+            <p className="hint">
+              {isZh
+                ? '绑定后可用对应平台一键登录；解绑时服务端会校验至少保留一种可用登录方式。'
+                : 'Link providers for one-tap sign-in. At least one sign-in method must remain.'}
+            </p>
+            {bindings.loading ? (
+              <div className="hint">{isZh ? '加载中…' : 'Loading…'}</div>
+            ) : (
+              <ul className="oauth-list">
+                {(bindings.data?.accounts ?? []).length === 0 ? (
+                  <li className="hint">{isZh ? '尚未绑定任何第三方账号。' : 'No linked accounts yet.'}</li>
+                ) : null}
+                {(bindings.data?.accounts ?? []).map((account) => {
+                  const spec = providers.find((item) => item.id === account.provider); // 取展示名
+                  return (
+                    <li key={account.provider}>
+                      <span className="oauth-name">{spec ? (isZh ? spec.label : spec.label_en) : account.provider}</span>
+                      <span className="hint">{account.nickname}{account.email ? ` · ${account.email}` : ''}</span>
+                      <span className="hint">{new Date(account.created_at).toLocaleDateString()}</span>
+                      <button type="button" className="btn ghost" disabled={linking !== null} onClick={() => void unlinkProvider(account.provider)}>
+                        {isZh ? '解绑' : 'Unlink'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {bindings.error ? <div className="chat-error">{errorText(locale, bindings.error)}</div> : null}
+            <div className="oauth-grid">
+              {providers
+                .filter((item) => item.configured && !(bindings.data?.accounts ?? []).some((account) => account.provider === item.id)) // 只列可绑定且未绑定的
+                .map((item) => (
+                  <button key={item.id} type="button" className="btn ghost oauth-btn" disabled={linking !== null} onClick={() => void linkProvider(item.id)}>
+                    {linking === item.id
+                      ? (isZh ? '跳转中…' : 'Redirecting…')
+                      : (isZh ? `绑定 ${item.label}` : `Link ${item.label_en}`)}
+                  </button>
+                ))}
+            </div>
+            {providers.some((item) => !item.configured) ? (
+              <p className="hint">
+                {isZh
+                  ? `本部署还有 ${providers.filter((item) => !item.configured).length} 家提供方未配置凭证；补齐环境变量后会自动出现在这里。`
+                  : `${providers.filter((item) => !item.configured).length} provider(s) are not configured on this deployment.`}
+              </p>
+            ) : null}
+          </div>
         </section>
       ) : null}
     </div>

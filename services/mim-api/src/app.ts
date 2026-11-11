@@ -4,6 +4,7 @@ import express from 'express'; // Express 本体，用于创建应用与挂载 J
 import cors from 'cors'; // 跨域中间件，托管平台以独立域名直连 API 时必需
 import type { Express, NextFunction, Request, Response } from 'express'; // 仅类型引用，用于给工厂与中间件签名标注
 import { createAuthRouter } from './routes/auth.js'; // 公开鉴权路由：验证码 / 登录 / 刷新
+import { createOAuthRouter } from './routes/oauth.js'; // 第三方登录：授权 / 回调 / 票据兑换 / 绑定解绑
 import { createCatalogRouter } from './routes/catalog.js'; // 商城路由：模块列表公开，权益接口内部鉴权
 import { createImRouter } from './routes/im.js'; // 即时通讯：会话/消息/用户搜索，需登录
 import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内部统一 requireAuth
@@ -21,6 +22,9 @@ import { createStorage } from './storage.js'; // 存储适配器工厂，按 env
 import { createOrchestrator } from './orchestrator.js'; // 生成任务编排器工厂，会启动后台 worker
 import { createNotifyChannels } from './notify.js'; // 验证码通知通道工厂（短信 / 邮件）
 import type { ApiDeps } from './types.js'; // 依赖容器类型
+
+/** 对外声明的服务版本：默认与 package.json 的 semver 一致，部署时可注入 MIM_SERVICE_VERSION 覆盖 */
+const SERVICE_VERSION = (process.env.MIM_SERVICE_VERSION ?? '0.0.1').trim(); // 健康检查回显，便于线上核对版本
 
 export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可传入替身依赖，生产传入真实 db
   // 未注入 storage / orchestrator / notify 时按 env 构造默认实例（测试可显式注入替身）
@@ -61,7 +65,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use(express.json({ limit: '1mb' })); // 全局 JSON 解析，限 1mb 防大包打爆内存；此后注册的路由才有 req.body
 
   app.get('/health', (_req, res) => { // 健康检查：必须早于鉴权路由，供负载均衡与 CI 探活
-    res.json({ status: 'ok', service: 'mim-api', version: '0.0.0' }); // 返回最小静态响应，不查库以免探活放大故障
+    res.json({ status: 'ok', service: 'mim-api', version: SERVICE_VERSION }); // 返回最小静态响应，不查库以免探活放大故障
   }); // 健康检查路由结束
 
   // 就绪探针：/health 只证明进程活着，/ready 还要确认依赖可用，部署与负载均衡据此决定是否放流量
@@ -80,6 +84,8 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 
   // 公开路由：验证码/登录/刷新
   app.use('/api/v1', createAuthRouter(resolved)); // 登录端点无 token，必须注册在受保护路由之前才不会被拦成 401
+  // 第三方登录：授权入口公开，绑定/解绑在 router 内部按需 requireAuth
+  app.use('/api/v1', createOAuthRouter(resolved)); // 必须在全局 requireAuth 之前挂载，否则匿名发起授权会被拦成 401
 
   // 商城路由：GET /modules 公开；POST /entitlements + GET /me/entitlements 内部 requireAuth
   app.use('/api/v1', createCatalogRouter(resolved)); // 公开与受保护端点混装，鉴权下沉到 router 内部按路径处理

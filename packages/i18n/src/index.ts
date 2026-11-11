@@ -212,6 +212,22 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_ACCOUNT_LOCKED: '登录失败次数过多，账号已临时锁定',
     // 会话失效，要求重新登录
     AUTH_REFRESH_INVALID: '登录状态已失效，请重新登录',
+    // 第三方登录未配置凭证：提示换用其它登录方式
+    AUTH_OAUTH_NOT_CONFIGURED: '该第三方登录暂未配置，请改用其他方式',
+    // 授权链接已失效或来源不可信
+    AUTH_OAUTH_STATE_INVALID: '授权已过期，请重新发起登录',
+    // 用户取消授权
+    AUTH_OAUTH_DENIED: '已取消第三方授权',
+    // 上游换令牌或取资料失败
+    AUTH_OAUTH_EXCHANGE_FAILED: '第三方登录失败，请稍后重试',
+    // 身份已被其他账号绑定
+    AUTH_OAUTH_ALREADY_BOUND: '该第三方账号已绑定其他 Mim 账号，请先解绑',
+    // 不允许移除最后一个登录方式
+    AUTH_OAUTH_LAST_METHOD: '这是账号最后一个登录方式，不能解绑',
+    // 登录票据失效
+    AUTH_OAUTH_TICKET_INVALID: '登录凭证已失效，请重新发起登录',
+    // 号码段耗尽
+    MEMBER_NO_EXHAUSTED: '账号编号资源已用尽，请联系管理员',
     // 账号不存在
     ACCOUNT_NOT_FOUND: '账号不存在',
     // 地区不匹配，说明账号归属限制
@@ -272,6 +288,22 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_ACCOUNT_LOCKED: 'Too many failed sign-ins, account temporarily locked',
     // 会话失效
     AUTH_REFRESH_INVALID: 'Session expired, please sign in again',
+    // 第三方登录未配置
+    AUTH_OAUTH_NOT_CONFIGURED: 'This sign-in provider is not configured, use another method',
+    // 授权 state 失效
+    AUTH_OAUTH_STATE_INVALID: 'Authorization expired, start the sign-in again',
+    // 用户取消授权
+    AUTH_OAUTH_DENIED: 'Third-party authorization was cancelled',
+    // 上游失败
+    AUTH_OAUTH_EXCHANGE_FAILED: 'Third-party sign-in failed, please try again later',
+    // 身份已被占用
+    AUTH_OAUTH_ALREADY_BOUND: 'This third-party account is linked to another Mim account',
+    // 最后一个登录方式
+    AUTH_OAUTH_LAST_METHOD: 'This is the last sign-in method and cannot be unlinked',
+    // 票据失效
+    AUTH_OAUTH_TICKET_INVALID: 'Sign-in ticket expired, start over',
+    // 号码耗尽
+    MEMBER_NO_EXHAUSTED: 'Account numbers are exhausted, contact the administrator',
     // 账号不存在
     ACCOUNT_NOT_FOUND: 'Account not found',
     // 地区不匹配

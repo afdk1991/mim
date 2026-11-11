@@ -1,6 +1,6 @@
 // 站点入口契约：把 DNSPod 导出表格中的备注逐项固化为项目内可校验的数据。
 // 数据本体在同名 JSON 中，本模块只负责类型约束与对外取值，不产生任何业务行为。
-import contract from './siteDirectory.json'; // 导入单一数据源：46 类业务备注 + 15 行空备注行的取证结果
+import contract from './siteDirectory.json'; // 导入单一数据源：45 类业务备注 + 15 行空备注行的取证结果
 
 // 单条备注的来源定位：工作表名称 + 表内行号，便于回查原始 xls。
 export interface SiteSource {
@@ -32,12 +32,6 @@ export interface SiteEntry {
   resolution: string;
   // 未决原因码，释义见 JSON 的 reasonCodes 字段。
   reasonCode: string;
-  // 仅 www 条目具备：门户卡片文案，与改造前渲染结果逐字一致。
-  portalLabel?: string;
-  // 仅 www 条目具备：门户卡片链接，沿用现有实现值而非备注推导。
-  portalHref?: string;
-  // 仅 www 条目具备：链接来源说明，标明记录值列已清空。
-  hrefOrigin?: string;
 } // 站点条目结构结束
 
 // 空备注行：无功能描述，仅保留表内位置供后续确认。
@@ -72,7 +66,7 @@ export interface SiteDirectory {
   clearedColumnEffect: string;
   // 未决原因码到中文释义的映射。
   reasonCodes: Record<string, string>;
-  // 46 类业务备注的逐项契约。
+  // 46 类业务备注的逐项契约（原序号 02 条目已按要求移除，剩 45 类）。
   entries: SiteEntry[];
   // 15 行空备注的位置与状态。
   blankRows: SiteBlankRow[];
@@ -80,14 +74,3 @@ export interface SiteDirectory {
 
 // JSON 是静态取证数据，用显式接口约束形状，避免数组字面量联合类型限制可选字段访问。
 export const siteDirectory: SiteDirectory = contract as unknown as SiteDirectory;
-
-// 取出 www 门户条目：备注「主站常规访问入口｜官方门户网站」对应的既有 UI 落点。
-const portalEntry = siteDirectory.entries.find((item) => item.id === '02'); // 按固定序号取，避免受主机记录重复影响
-
-// 门户卡片的对外取值：契约数据优先，缺失时回落到改造前的硬编码值，保证零行为变化。
-export const PORTAL_ENTRY = {
-  // 卡片文案：与改造前「主站常规访问入口 · www · 官方门户网站 ·」逐字一致。
-  label: portalEntry?.portalLabel ?? '主站常规访问入口 · www · 官方门户网站 ·',
-  // 卡片链接：xls 记录值列已清空，故沿用现有实现值，不从备注推导。
-  href: portalEntry?.portalHref ?? 'https://www.mixm.top',
-}; // 门户取值结束

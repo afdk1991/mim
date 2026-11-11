@@ -19,7 +19,24 @@ export interface UserInfo { // 当前登录用户的核心资料（登录响应�
   locale: string; // 原始语言标签（如 zh-CN），交给 normalizeLocale 归一
   timezone: string; // IANA 时区名，用于把服务端 UTC 时间渲染成本地时间
   deletion_scheduled_at?: string | null; // 注销预约时间；仅注销流程中有值，其余为 null/缺省
+  member_no: string; // 对外 Mim ID 号码（MIM-10000001 形态），与内部 uuid 主键解耦
 } // UserInfo 结构结束
+
+export interface OAuthProviderInfo { // 第三方登录提供方（含是否已在当前部署配置好凭证）
+  id: string; // 路由标识，如 github / wechat
+  label: string; // 中文展示名
+  label_en: string; // 英文展示名
+  region: 'cn' | 'global' | 'both'; // 适用区域
+  configured: boolean; // 当前部署是否已配置凭证；未配置时前端置灰
+} // OAuthProviderInfo 结束
+
+export interface OAuthBinding { // 已绑定的第三方身份（仅展示字段）
+  provider: string; // 提供方标识
+  nickname: string; // 提供方昵称
+  avatar_url: string | null; // 头像
+  email: string | null; // 邮箱
+  created_at: string; // 绑定时间
+} // OAuthBinding 结束
 
 export interface Session { // 本地会话快照：登录成功后整体持久化
   access_token: string; // 短期访问令牌，随每个请求以 Bearer 形式发送
@@ -382,6 +399,30 @@ export interface FilmVersion { // 成片的一个版本（对应一次视频产�
   created_at: string; // 创建时间
 } // FilmVersion 结束
 
+/** 放映厅演示作品：匿名可看，片源由静态站托管（服务端返回绝对地址） */
+export interface ShowcaseWork { // 一部演示作品
+  id: string; // 稳定标识
+  title: string; // 标题
+  subtitle: string; // 副标题
+  kind: 'comic-drama' | 'ai-drama'; // 漫剧 / AI 剧形态
+  region: 'cn' | 'global'; // 内容分区
+  tags: string[]; // 标签
+  cover: string; // 封面绝对地址
+  episodes: Array<{ no: number; title: string; src: string; duration_sec: number }>; // 可播放剧集
+} // ShowcaseWork 结束
+
+/** 我的放映厅条目：登录后由服务端签发播放地址（有效期 1 小时） */
+export interface TheaterItem { // 一部本人成片
+  id: string; // 成片 ID
+  title: string; // 成片标题
+  project_title: string; // 所属工程
+  status: string; // 成片状态
+  version_no: number; // 播放版本
+  duration_sec: number | null; // 时长
+  src: string; // 预签名播放地址
+  updated_at: string; // 更新时间
+} // TheaterItem 结束
+
 // ---------- 成片导出（对齐 routes/comic.ts 的 POST /comic/films/:id/export） ----------
 
 export type FilmExportFormat = 'mp4' | 'mov'; // 导出容器格式：mp4 走原片直下，mov 需服务端 ffmpeg 转码
@@ -566,9 +607,21 @@ export interface EntryRelation { // 相似入口关联与区分
   domainName?: string | null; // 关联入口业务域（详情端点补充）
 } // EntryRelation 结束
 
+// 落地状态四态：已落地 / 部分相邻 / 规划中 / 语义冲突
+export type EntryImplementationStatus = 'implemented' | 'partial' | 'planned' | 'conflict';
+
+export interface EntryImplementation { // 入口落地映射：现有真实模块与边界说明
+  status: EntryImplementationStatus; // 落地状态
+  view: string | null; // 站内可直达视图标识（对齐 AppView）；无则 null
+  href: string | null; // 站外路径（独立后台等）；无则 null
+  realFeatures: string[]; // 现有真实能力清单
+  boundary: string; // 对齐 / 冲突边界说明
+} // EntryImplementation 结束
+
 export interface EntryModule { // 统一入口配置清单中的一项
   id: string; // 两位序号
   entryKey: string; // 稳定入口标识（占位键），不是具体主机值
+  implementation: EntryImplementation; // 落地状态映射（真实模块 / 视图 / 边界）
   placeholder: string; // 可配置占位标识
   envKey: string; // 运行期配置注入键
   configured: boolean; // 是否已由外部配置注入实际主机值
@@ -640,6 +693,7 @@ export interface SiteOverview { // 全站汇总响应
   unconfigured: number; // 仍为占位状态的入口数
   items: number; // 库内业务条目总数
   by_status: Record<string, number>; // 按状态分布
+  implementation: Record<EntryImplementationStatus, number>; // 落地状态四态计数
 } // SiteOverview 结束
 
 export interface EntryOverview { // 清单总览响应
@@ -657,6 +711,7 @@ export interface EntryOverview { // 清单总览响应
   placeholders: number; // 占位标识总数
   configured: number; // 已配置数
   unconfigured: number; // 未配置数
+  implementation: Record<EntryImplementationStatus, number>; // 落地状态四态计数
   dedupe: Record<string, unknown>; // @ / 空白 / 重复备注整理结果
   atRecord: Record<string, unknown>; // @ 合并后的占位项
   blankRecord: Record<string, unknown>; // 空白字段合并后的占位项
@@ -684,7 +739,7 @@ export interface DeploymentDelivery { // 交付链路：含远端 HEAD / 本地�
 } // DeploymentDelivery 结束
 
 export interface DeploymentResult { // 部署结果；null 由前端按空数据渲染
-  verdict: string; // PASS / DEGRADED / FAIL / NOT_TESTED / EMPTY
+  verdict: string; // 判定枚举：PASS / DEGRADED / FAIL / NOT_TESTED / EMPTY
   http_code: string | null; // HTTP 状态码
   latency_ms: number | null; // 耗时（毫秒）
   bytes: number | null; // 响应体字节数
@@ -704,7 +759,7 @@ export interface DeploymentItem { // 单个部署项：所有同类项共用这�
   aliases: string[]; // 归并的历史别名
   platform_id: string; // 平台编码
   platform: string; // 平台展示名
-  layer: string; // production / distribution / source
+  layer: string; // 层级枚举：production / distribution / source
   kind: string; // 载体类型
   repository: DeploymentRepository; // 仓库标识
   entry_url: string | null; // 部署入口
@@ -805,6 +860,35 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   authChannels() { // 查询当前部署可用的登录方式，用于登录页隐藏不可用入口
     return request<{ sms: boolean; email: boolean; password: boolean; register: boolean }>('/auth/channels', { auth: false, idempotency: false }); // 公开只读接口
   }, // authChannels 结束
+
+  oauthProviders(region?: Region) { // 第三方登录提供方清单（含凭证配置状态）
+    const query = region ? `?region=${region}` : ''; // 区域过滤：中国区只看国内可用项
+    return request<{ providers: OAuthProviderInfo[] }>(`/auth/oauth/providers${query}`, { auth: false, idempotency: false }); // 公开只读接口
+  }, // oauthProviders 结束
+
+  oauthAuthorize(provider: string, payload: { region?: Region; mode?: 'login' | 'bind'; return_to?: string }) { // 生成授权跳转地址
+    return request<{ provider: string; authorization_url: string; state: string; expires_in: number; mode: 'login' | 'bind' }>( // 响应结构
+      `/auth/oauth/${encodeURIComponent(provider)}/authorize`, // 按提供方发起
+      { method: 'POST', body: payload, auth: payload.mode === 'bind', idempotency: false }, // 绑定模式必须带登录态
+    ); // 请求调用结束
+  }, // oauthAuthorize 结束
+
+  oauthExchange(ticket: string) { // 用回调带回的一次性票据换正式会话
+    return request<LoginResult>('/auth/oauth/exchange', { // 与账号登录同一响应形状
+      method: 'POST', // 写操作（票据会被消费）
+      body: { ticket, device: { platform: 'web', name: '浏览器' } }, // 补默认设备标识
+      auth: false, // 兑换时还没有令牌
+      idempotency: false, // 票据本身一次性
+    }); // 请求调用结束
+  }, // oauthExchange 结束
+
+  oauthBindings() { // 当前账号已绑定的第三方身份
+    return request<{ accounts: OAuthBinding[] }>('/me/oauth', { idempotency: false }); // 需登录
+  }, // oauthBindings 结束
+
+  unlinkOAuth(provider: string) { // 解绑第三方身份（服务端保证至少留一种登录方式）
+    return request<{ ok: true; removed: boolean }>(`/me/oauth/${encodeURIComponent(provider)}`, { method: 'DELETE' }); // 写操作自动带幂等键
+  }, // unlinkOAuth 结束
 
   login(payload: { // 验证码登录
     region: Region; // 区域
@@ -1008,7 +1092,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ // 返回订单对象
         order: { // 订单视图
           id: string; // 订单主键，取消订单要用
-          status: string; // pending / paid / cancelled
+          status: string; // 订单状态：pending / paid / cancelled
           currency: string; // 结算币种
           amount_minor: number; // 成交金额（分）
           channel: string; // 结算渠道；当前为 manual 人工结算
@@ -1046,6 +1130,12 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   // ---------- 漫剧 AI 剧（comic，契约对齐 services/mim-api/src/routes/comic.ts）----------
 
   comic: { // 漫剧业务：项目、角色、分镜、任务、成片
+    showcase() { // 放映厅演示片库：匿名可看，不携带鉴权也可调用
+      return request<{ items: ShowcaseWork[]; updated_at: string }>('/comic/showcase', { idempotency: false, auth: false }); // 公开只读
+    }, // showcase 结束
+    theater() { // 我的放映厅：本人成片 + 最新版本播放地址（需登录，不要求模块权益）
+      return request<{ items: TheaterItem[] }>('/comic/theater', { idempotency: false }); // 登录后由服务端签发播放 URL
+    }, // theater 结束
     listProjects() { // 列出我的项目
       return request<{ items: ComicProject[] }>('/comic/projects', { idempotency: false }); // 只读 GET，默认带鉴权
     }, // listProjects 结束

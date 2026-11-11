@@ -1,10 +1,10 @@
-/** 契约测试：站点模块（45 个去重入口驱动）——目录 / 详情 / 能力点 / 业务条目 / 鉴权 / 幂等 / 状态流转 */
+/** 契约测试：站点模块（44 个去重入口驱动）——目录 / 详情 / 能力点 / 业务条目 / 鉴权 / 幂等 / 状态流转 */
 
 import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例编排：每例重建内存库
 import request from 'supertest'; // supertest 进程内驱动 Express，无需监听真实端口
 import type { Express } from 'express'; // 仅类型导入，用于标注全局 app
 import { createApp } from '../src/app.js'; // 唯一装配入口，保证中间件挂载顺序与生产一致
-import { createDatabase } from '../src/db.js'; // 内存库工厂，启动即写入 45 模块演示数据
+import { createDatabase } from '../src/db.js'; // 内存库工厂，启动即写入 44 模块演示数据
 import { SITE_MODULES } from '@mim/core-domain'; // 共享注册表，作为断言基准
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，长度满足强度校验
@@ -37,26 +37,28 @@ beforeEach(() => { // 每例前置：重建内存库与应用
 }); // beforeEach 结束
 
 describe('站点模块注册表与公开目录', () => { // 浏览类端点匿名可访问
-  it('overview 返回 45 入口 / 135 能力 / 19 业务域 / 47 占位标识 / 90 演示条目', async () => { // 注册表规模断言
+  it('overview 返回 44 入口 / 132 能力 / 19 业务域 / 46 占位标识 / 88 演示条目与落地四态计数', async () => { // 注册表规模断言
     const res = await request(app).get('/api/v1/sites/overview'); // 公开汇总
     expect(res.status).toBe(200); // 200
-    expect(res.body.modules).toBe(45); // 45 类业务备注
-    expect(res.body.capabilities).toBe(135); // 每模块 3 个功能点
+    expect(res.body.modules).toBe(44); // 44 类业务备注
+    expect(res.body.capabilities).toBe(132); // 每模块 3 个功能点
     expect(res.body.domains).toBe(19); // 19 个业务域
     expect(res.body.groups).toBe(19); // 兼容字段同值
-    expect(res.body.placeholders).toBe(47); // 45 入口 + @ 根域名 + 空白占位
+    expect(res.body.placeholders).toBe(46); // 44 入口 + @ 根域名 + 空白占位
     expect(res.body.configured).toBe(0); // 未提供具体主机值，默认全未配置
     expect(res.body.schema).toBe('mim.site-modules.v2'); // v2 契约
     expect(res.body.blankRows).toBe(13); // mixm.top 工作表 13 行空备注
-    expect(res.body.items).toBe(90); // 每模块 2 条演示数据
+    expect(res.body.items).toBe(88); // 每模块 2 条演示数据
     expect(res.body.source).toContain('主机记录与备注'); // 依据说明
     expect(res.body.moduleBasis).toContain('业务系统'); // 模块划分依据
+    // 落地状态四态计数：已落地 4 / 部分相邻 19 / 规划中 19 / 语义冲突 2，合计 44
+    expect(res.body.implementation).toEqual({ implemented: 4, partial: 19, planned: 19, conflict: 2 });
   }); // overview 用例结束
 
-  it('GET /sites 返回 45 模块且每条备注原文与共享注册表逐字一致', async () => { // 零漂移断言
+  it('GET /sites 返回 44 模块且每条备注原文与共享注册表逐字一致', async () => { // 零漂移断言
     const res = await request(app).get('/api/v1/sites'); // 公开列表
     expect(res.status).toBe(200); // 200
-    expect(res.body.total).toBe(45); // 全量
+    expect(res.body.total).toBe(44); // 全量
     expect(res.body.domains.length).toBe(19); // 19 个业务域清单
     for (const module of SITE_MODULES) { // 逐条比对备注原文
       const row = res.body.modules.find((m: { entryKey: string }) => m.entryKey === module.entryKey); // 按占位键定位
@@ -72,6 +74,9 @@ describe('站点模块注册表与公开目录', () => { // 浏览类端点匿�
       expect(row.rows).toEqual(module.rows); // 表内行号一致
       expect(row.capability_count).toBe(3); // 三个功能点
       expect(row.item_count).toBe(2); // 两条演示数据
+      // 落地映射随列表透出：状态合法、视图为 null 或已登记视图、边界说明非空
+      expect(['implemented', 'partial', 'planned', 'conflict']).toContain(row.implementation.status);
+      expect(row.implementation.boundary).toBeTruthy();
     } // 比对循环结束
   }); // 零漂移用例结束
 
@@ -166,7 +171,7 @@ describe('写操作鉴权 / 幂等 / 状态流转', () => { // 写路径
     const token = await login('13800000002'); // 取令牌
     const payload = { capability: 'record', title: '阅读记录' }; // 固定请求体
     const first = await request(app).post('/api/v1/sites/BLOG/items') // 首次
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-create-dup') // 幂等键
       .send(payload); // 请求体
     expect(first.status).toBe(201); // 201
@@ -183,18 +188,18 @@ describe('写操作鉴权 / 幂等 / 状态流转', () => { // 写路径
   it('非法能力 / 非法状态 / 空标题返回 400 VALIDATION_FAILED', async () => { // 入参校验
     const token = await login('13800000003'); // 取令牌
     const badCap = await request(app).post('/api/v1/sites/BLOG/items') // 非法能力
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-bad-cap') // 幂等键
       .send({ capability: 'nope', title: 'x' }); // 请求体
     expect(badCap.status).toBe(400); // 400
     expect(badCap.body.code).toBe('VALIDATION_FAILED'); // 统一错误码
     const badStatus = await request(app).post('/api/v1/sites/BLOG/items') // 非法状态
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-bad-status') // 幂等键
       .send({ capability: 'catalog', title: 'x', status: 'pending' }); // catalog 不含 pending
     expect(badStatus.status).toBe(400); // 400
     const emptyTitle = await request(app).post('/api/v1/sites/BLOG/items') // 空标题
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-empty-title') // 幂等键
       .send({ capability: 'catalog', title: '   ' }); // zod trim 后为空
     expect(emptyTitle.status).toBe(400); // 400
@@ -203,28 +208,28 @@ describe('写操作鉴权 / 幂等 / 状态流转', () => { // 写路径
   it('状态流转：pending → active → archived，归档为终态且同态 409', async () => { // 状态机
     const token = await login('13800000004'); // 取令牌
     const created = await request(app).post('/api/v1/sites/BLOG/items') // 新建管理条目
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-transition-create') // 幂等键
       .send({ capability: 'manage', title: '待审稿件' }); // 请求体
     const id = created.body.item.id as string; // 取条目主键
     const toActive = await request(app).post(`/api/v1/sites/BLOG/items/${id}/transition`) // 推进到 active
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-transition-1') // 幂等键
       .send({ status: 'active' }); // 目标状态
     expect(toActive.status).toBe(200); // 200
     expect(toActive.body.item.status).toBe('active'); // 状态已更新
     const same = await request(app).post(`/api/v1/sites/BLOG/items/${id}/transition`) // 同态重复
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-transition-same') // 新键
       .send({ status: 'active' }); // 当前已是 active
-    expect(same.status).toBe(409); // 409 CONFLICT
+    expect(same.status).toBe(409); // 409 冲突
     const toArchived = await request(app).post(`/api/v1/sites/BLOG/items/${id}/transition`) // 归档
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-transition-2') // 幂等键
       .send({ status: 'archived' }); // 目标状态
     expect(toArchived.status).toBe(200); // 200
     const revive = await request(app).post(`/api/v1/sites/BLOG/items/${id}/transition`) // 尝试复活
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-transition-3') // 幂等键
       .send({ status: 'active' }); // 目标状态
     expect(revive.status).toBe(409); // 归档终态拒绝
@@ -234,17 +239,17 @@ describe('写操作鉴权 / 幂等 / 状态流转', () => { // 写路径
   it('跨模块引用条目返回 404，非法目标状态返回 400', async () => { // 作用域与校验
     const token = await login('13800000005'); // 取令牌
     const created = await request(app).post('/api/v1/sites/BLOG/items') // 在 BLOG 占位键下新建
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-scope-create') // 幂等键
       .send({ capability: 'manage', title: '作用域条目' }); // 请求体
     const id = created.body.item.id as string; // 取主键
     const cross = await request(app).post(`/api/v1/sites/news/items/${id}/transition`) // 用 news 路径操作 blog 条目
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-scope-cross') // 幂等键
       .send({ status: 'active' }); // 目标状态
     expect(cross.status).toBe(404); // 404，作用域隔离生效
     const badStatus = await request(app).post(`/api/v1/sites/BLOG/items/${id}/transition`) // 非法目标状态
-      .set('Authorization', `Bearer ${token}`) // Bearer
+      .set('Authorization', `Bearer ${token}`) // Bearer 令牌
       .set('Idempotency-Key', 'site-scope-bad') // 幂等键
       .send({ status: 'done' }); // manage 能力不含 done
     expect(badStatus.status).toBe(400); // 400
@@ -253,7 +258,7 @@ describe('写操作鉴权 / 幂等 / 状态流转', () => { // 写路径
 
   it('每个模块的演示数据都落在合法能力与该能力状态集合内', () => { // 种子数据自洽
     const rows = db.prepare('SELECT host, capability, status FROM site_module_items WHERE created_by = ?').all('system') as Array<{ host: string; capability: string; status: string }>; // 取全部演示行
-    expect(rows.length).toBe(90); // 45 模块 × 2 条
+    expect(rows.length).toBe(88); // 44 模块 × 2 条
     for (const row of rows) { // 逐行校验
       const module = SITE_MODULES.find((m) => m.host === row.host); // 定位模块
       expect(module).toBeTruthy(); // 占位键必须已登记

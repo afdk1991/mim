@@ -29,16 +29,6 @@
       "ttl": 600
     },
     {
-      "host": "www",
-      "fqdn": "www.mixm.top",
-      "xls_rows": [
-        6,
-        7
-      ],
-      "remark": "主站常规访问入口｜官方门户网站",
-      "ttl": 600
-    },
-    {
       "host": "admin",
       "fqdn": "admin.mixm.top",
       "xls_rows": [
@@ -515,25 +505,6 @@
       "next_steps": []
     },
     {
-      "platform_id": "github-pages",
-      "deployment_id": "pages.github",
-      "platform": "GitHub Pages",
-      "custom_domain": "www.mixm.top",
-      "dns_host": "www",
-      "xls_rows": [
-        6,
-        7
-      ],
-      "xls_remark": "主站常规访问入口｜官方门户网站",
-      "status": "pending_dns",
-      "status_note": "DNSPod 无 www 解析；平台侧亦未绑定自定义域名",
-      "evidence": "2026-11-11 nslookup www.mixm.top -> 无 A 记录",
-      "next_steps": [
-        "在 DNSPod 为 www 添加 CNAME -> afdk1991.github.io",
-        "在 GitHub 仓库 Settings -> Pages 绑定 www.mixm.top 并启用 HTTPS"
-      ]
-    },
-    {
       "platform_id": "cloudflare",
       "deployment_id": "pages.cloudflare",
       "platform": "Cloudflare Pages",
@@ -684,11 +655,17 @@
       "deployment_id": "packages.ghcr",
       "platform": "GitHub Packages (ghcr)",
       "reason": "容器镜像仓库不支持自定义域名（域名固定 ghcr.io），不参与自定义域名矩阵"
+    },
+    {
+      "platform_id": "github-pages",
+      "deployment_id": "pages.github",
+      "platform": "GitHub Pages",
+      "reason": "不绑定自定义域名：GitHub Pages 使用平台默认域 afdk1991.github.io/mim/，原 www 主机记录需求已按要求取消"
     }
   ],
   "pendingActions": [
-    "在 DNSPod 控制台为 www / portal / m / api / test / store / dev / shop 添加解析记录（本次导出的 45 类主机记录里，记录类型与记录值两列全为空，说明这些记录尚未真正创建）",
-    "每个第三方平台（GitHub Pages / Cloudflare Pages / Vercel / Sealos / IGA）需在对应控制台绑定自定义域名并签发证书",
+    "在 DNSPod 控制台为 portal / m / api / test / store / dev / shop 添加解析记录（本次导出的主机记录里，记录类型与记录值两列全为空，说明这些记录尚未真正创建）",
+    "每个第三方平台（Cloudflare Pages / Vercel / Sealos / IGA）需在对应控制台绑定自定义域名并签发证书",
     "生产 CVM 的 nginx 证书目前只覆盖已配置的域名（2026-11-11 探测未配置主机名严格 TLS 校验失败），新域名指向 CVM 时需单独签发证书"
   ]
 }

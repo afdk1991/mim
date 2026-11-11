@@ -1,10 +1,10 @@
-/** 契约测试：统一入口配置清单（45 个去重入口 / 19 个业务域 / 可配置占位标识） */
+/** 契约测试：统一入口配置清单（44 个去重入口 / 19 个业务域 / 可配置占位标识） */
 
 import { beforeEach, describe, expect, it } from 'vitest'; // vitest 用例编排：每例重建内存库
 import request from 'supertest'; // supertest 进程内驱动 Express，无需监听真实端口
 import type { Express } from 'express'; // 仅类型导入，用于标注全局 app
 import { createApp } from '../src/app.js'; // 唯一装配入口，保证中间件挂载顺序与生产一致
-import { createDatabase } from '../src/db.js'; // 内存库工厂，启动即写入 45 入口演示数据
+import { createDatabase } from '../src/db.js'; // 内存库工厂，启动即写入 44 入口演示数据
 import { SITE_DOMAINS, SITE_MODULES } from '@mim/core-domain'; // 共享清单，作为断言基准
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，长度满足强度校验
@@ -18,27 +18,29 @@ beforeEach(() => { // 每例前置：重建内存库与应用
 }); // beforeEach 结束
 
 describe('统一入口配置清单：规模与去重整理', () => { // 清单总览与整理口径
-  it('overview 返回 45 入口 / 19 业务域 / 123 关联 / 47 占位标识，且全部未配置', async () => {
+  it('overview 返回 44 入口 / 19 业务域 / 116 关联 / 46 占位标识与落地四态计数，且全部未配置', async () => {
     const res = await request(app).get('/api/v1/entries/overview'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.schema).toBe('mim.site-modules.v2'); // v2 契约
-    expect(res.body.entries).toBe(45); // 去重后业务入口
+    expect(res.body.entries).toBe(44); // 去重后业务入口
     expect(res.body.domains).toBe(19); // 19 组业务用途
-    expect(res.body.capabilities).toBe(135); // 运行时功能点
-    expect(res.body.relations).toBe(123); // 相似模块关联条数
-    expect(res.body.placeholders).toBe(47); // 45 入口 + @ 根域名 + 空白占位
+    expect(res.body.capabilities).toBe(132); // 运行时功能点
+    expect(res.body.relations).toBe(116); // 相似模块关联条数
+    expect(res.body.placeholders).toBe(46); // 44 入口 + @ 根域名 + 空白占位
     expect(res.body.configured).toBe(0); // 未提供具体主机值
-    expect(res.body.unconfigured).toBe(45); // 全部仍为占位状态
+    expect(res.body.unconfigured).toBe(44); // 全部仍为占位状态
+    // 落地状态四态计数：已落地 4 / 部分相邻 19 / 规划中 19 / 语义冲突 2
+    expect(res.body.implementation).toEqual({ implemented: 4, partial: 19, planned: 19, conflict: 2 });
   }); // overview 用例结束
 
-  it('去重口径：90 行业务备注合并 45 项，@ 两行与 11 行空白各合并为 1 项', async () => {
+  it('去重口径：88 行业务备注合并 44 项，@ 两行与 11 行空白各合并为 1 项', async () => {
     const res = await request(app).get('/api/v1/entries/overview'); // 公开只读
     expect(res.status).toBe(200); // 200
     const d = res.body.dedupe; // 整理结果
     expect(d.rule).toContain('完全相同且用途一致'); // 合并规则原文
-    expect(d.businessNoteRows).toBe(90); // 原始业务备注行
-    expect(d.duplicatePairs).toBe(45); // 每类重复两行
-    expect(d.mergedEntries).toBe(45); // 合并后入口数
+    expect(d.businessNoteRows).toBe(88); // 原始业务备注行
+    expect(d.duplicatePairs).toBe(44); // 每类重复两行
+    expect(d.mergedEntries).toBe(44); // 合并后入口数
     expect(d.atRecordRows).toEqual([2, 3]); // @ 两行
     expect(d.atRecordMergedInto).toBe('AT_ROOT'); // @ 合并占位键
     expect(d.blankNoteRows).toBe(11); // 其余空白行
@@ -57,14 +59,14 @@ describe('统一入口配置清单：规模与去重整理', () => { // 清单�
 }); // 规模与整理分组结束
 
 describe('统一入口配置清单：业务域与职责', () => { // 19 域覆盖与职责元数据
-  it('domains 返回 19 个业务域，入口数合计 45 且编码唯一', async () => {
+  it('domains 返回 19 个业务域，入口数合计 44 且编码唯一', async () => {
     const res = await request(app).get('/api/v1/entries/domains'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(19); // 19 组业务用途
     const codes = res.body.domains.map((d: { code: string }) => d.code); // 编码清单
     expect(new Set(codes).size).toBe(19); // 编码不重复
     const sum = res.body.domains.reduce((n: number, d: { count: number }) => n + d.count, 0); // 入口数合计
-    expect(sum).toBe(45); // 完整覆盖，不遗漏
+    expect(sum).toBe(44); // 完整覆盖，不遗漏
     for (const d of res.body.domains) { // 逐域核对
       expect(d.name).toBeTruthy(); // 业务域名
       expect(d.description).toBeTruthy(); // 覆盖说明
@@ -72,10 +74,10 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
     } // 逐域循环结束
   }); // domains 用例结束
 
-  it('GET /entries 返回 45 项，每项备注逐字一致且职责/后台/接口/关联齐备', async () => {
+  it('GET /entries 返回 44 项，每项备注逐字一致且职责/后台/接口/关联/落地映射齐备', async () => {
     const res = await request(app).get('/api/v1/entries'); // 公开只读
     expect(res.status).toBe(200); // 200
-    expect(res.body.total).toBe(45); // 全量
+    expect(res.body.total).toBe(44); // 全量
     for (const module of SITE_MODULES) { // 逐条比对
       const row = res.body.entries.find((e: { entryKey: string }) => e.entryKey === module.entryKey); // 按占位键定位
       expect(row).toBeTruthy(); // 不得缺项
@@ -90,6 +92,9 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
       expect(row.adminRole).toBeTruthy(); // 后台管理职责
       expect(row.apiRole).toBeTruthy(); // 接口职责
       expect(row.related.length).toBeGreaterThan(0); // 相似模块关联与区分
+      // 落地映射：状态合法、边界说明非空
+      expect(['implemented', 'partial', 'planned', 'conflict']).toContain(row.implementation.status);
+      expect(row.implementation.boundary).toBeTruthy();
     } // 比对循环结束
   }); // 清单逐项用例结束
 
@@ -128,23 +133,23 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
 }); // 业务域与职责分组结束
 
 describe('统一入口配置清单：可配置占位标识', () => { // 占位配置与模板
-  it('placeholders 返回 47 项，45 个业务入口 + @ 根域名 + 空白占位', async () => {
+  it('placeholders 返回 46 项，44 个业务入口 + @ 根域名 + 空白占位', async () => {
     const res = await request(app).get('/api/v1/entries/placeholders'); // 公开只读
     expect(res.status).toBe(200); // 200
-    expect(res.body.total).toBe(47); // 占位标识总数
+    expect(res.body.total).toBe(46); // 占位标识总数
     expect(res.body.configured).toBe(0); // 默认全部未配置
-    expect(res.body.items.filter((i: { kind: string }) => i.kind === 'entry').length).toBe(45); // 业务入口
+    expect(res.body.items.filter((i: { kind: string }) => i.kind === 'entry').length).toBe(44); // 业务入口
     expect(res.body.items.filter((i: { kind: string }) => i.kind === 'placeholder').length).toBe(2); // 两个非模块占位
     expect(res.body.items.find((i: { entryKey: string }) => i.entryKey === 'AT_ROOT')).toBeTruthy(); // @ 合并项
     expect(res.body.items.find((i: { entryKey: string }) => i.entryKey === 'BLANK_UNSET')).toBeTruthy(); // 空白合并项
   }); // 占位清单用例结束
 
-  it('config 模板 45 个键全部空值，不含任何具体主机值', async () => {
+  it('config 模板 44 个键全部空值，不含任何具体主机值', async () => {
     const res = await request(app).get('/api/v1/entries/config'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.schema).toBe('mim.entry-hosts.v1'); // 模板版本
     const hosts = res.body.hosts; // 模板键值
-    expect(Object.keys(hosts).length).toBe(45); // 45 个注入键
+    expect(Object.keys(hosts).length).toBe(44); // 44 个注入键
     for (const [key, value] of Object.entries(hosts)) { // 逐键校验
       expect(key.startsWith('MIM_HOST_')).toBe(true); // 前缀一致
       expect(value).toBe(''); // 值恒为空，不补写具体主机值
@@ -156,7 +161,7 @@ describe('统一入口配置清单：可配置占位标识', () => { // 占位�
     const rows = db.prepare('SELECT DISTINCT host FROM site_module_items').all() as Array<{ host: string }>; // 库内隔离键
     const keys = new Set(SITE_MODULES.map((m) => m.entryKey)); // 合法占位键
     for (const row of rows) expect(keys.has(row.host)).toBe(true); // 全部为占位键
-    expect(rows.length).toBe(45); // 45 个入口各 2 条演示数据
+    expect(rows.length).toBe(44); // 44 个入口各 2 条演示数据
     const res = await request(app).get('/api/v1/sites/BLOG/items'); // 按占位键读取条目
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(2); // 两条演示数据
@@ -172,7 +177,7 @@ describe('统一入口配置清单：只读边界', () => { // 清单端点不�
     const put = await request(app).put('/api/v1/entries/config').send({ hosts: {} }); // 尝试覆盖模板
     expect(put.status).toBe(404); // 无写路由
     const after = await request(app).get('/api/v1/entries/overview'); // 复查清单
-    expect(after.body.entries).toBe(45); // 规模未变
+    expect(after.body.entries).toBe(44); // 规模未变
   }); // 只读边界用例结束
 }); // 只读边界分组结束
 

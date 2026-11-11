@@ -24,9 +24,10 @@ import { Router } from 'express'; // Express 路由容器，按 /api/v1 前缀�
 import { AppError } from '@mim/core-domain'; // 统一业务异常，未登记入口回 404
 import {
   SITE_DOMAINS, // 19 个业务域，供筛选与汇总
-  SITE_MODULES, // 45 个去重入口静态契约
-  entryHostTemplate, // 配置模板：45 个环境变量键，值全为空
+  SITE_MODULES, // 44 个去重入口静态契约
+  entryHostTemplate, // 配置模板：44 个环境变量键，值全为空
   findSiteModule, // 按占位键定位入口
+  implementationSummary, // 落地状态四态计数
   resolveEntryHost, // 解析占位标识的配置状态（不回显具体值）
   siteModulesRegistry, // 顶层元信息：去重口径 / @ 记录 / 空白字段 / 主机配置策略
   siteModulesSummary, // 规模汇总
@@ -68,6 +69,8 @@ function entryView(m: (typeof SITE_MODULES)[number]) {
     apiRole: m.apiRole,
     // 相似模块关联与区分。
     related: m.related,
+    // 落地状态映射：现有真实模块、可直达视图 / 外链与边界说明。
+    implementation: m.implementation,
     // 台账溯源行号（两行重复备注合并为一项后的位置）。
     rows: m.rows,
     // 来源工作表，仅作溯源。
@@ -99,9 +102,10 @@ export function createEntriesRouter(_deps: ApiDeps): Router {
       domains: summary.domains, // 业务域数（19）
       capabilities: summary.capabilities, // 运行时功能点数（135）
       relations: SITE_MODULES.reduce((n, m) => n + m.related.length, 0), // 相似模块关联条数
-      placeholders: entries.length + 2, // 45 入口 + @ 根域名占位 + 空白占位
+      placeholders: entries.length + 2, // 44 入口 + @ 根域名占位 + 空白占位
       configured, // 已配置入口数，默认 0
       unconfigured: entries.length - configured, // 未配置入口数
+      implementation: implementationSummary(SITE_MODULES), // 落地状态四态计数
       dedupe: reg.dedupe, // @ / 空白 / 重复备注的整理结果
       atRecord: reg.atRecord, // @ 合并后的占位项
       blankRecord: reg.blankRecord, // 空白字段合并后的占位项
