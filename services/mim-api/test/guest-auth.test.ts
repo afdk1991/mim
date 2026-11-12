@@ -28,7 +28,7 @@ describe('匿名访客会话', () => { // 免登录体验的核心入口
     expect(res.body.access_token).toBeTypeOf('string'); // 直接下发访问令牌
     expect(res.body.refresh_token).toBeTypeOf('string'); // 刷新令牌同时下发
     expect(res.body.user.is_guest).toBe(true); // 标记为匿名访客
-    expect(res.body.user.member_no).toMatch(/^MIM-\d{8}$/); // 访客同样自动分配 Mim ID 号码
+    expect(res.body.user.member_no).toMatch(/^\d+$/); // 访客同样自动分配纯数字 Mim ID 号码
     expect(res.body.user.region).toBe('cn'); // 缺省中国区
     expect(res.body.user.display_name).toBe('访客'); // 中文区展示名
   }); // 结束用例

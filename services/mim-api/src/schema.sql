@@ -10,8 +10,8 @@ PRAGMA foreign_keys = ON;
 -- ---------- identity 域 ----------
 CREATE TABLE IF NOT EXISTS users (
   id                TEXT PRIMARY KEY,
-  -- 对外可见的 Mim ID 号码（如 MIM-10000001）：注册时由序号表原子分配，
-  -- 与内部 uuidv7 主键解耦——主键不对外暴露、可迁移，号码供用户识别与客服引用。
+  -- 对外可见的 Mim ID 号码（纯数字，如 10000001；2026-11-12 起改为 QQ 号样式）：
+  -- 注册时由序号表原子分配，与内部 uuidv7 主键解耦——主键不对外暴露、可迁移，号码供用户识别与客服引用。
   member_no         TEXT,
   region            TEXT NOT NULL CHECK (region IN ('cn','global')),
   status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','pending_deletion','deleted')),
@@ -34,8 +34,23 @@ CREATE TABLE IF NOT EXISTS member_no_sequence (
   id       INTEGER PRIMARY KEY CHECK (id = 1), -- 固定单行，避免多行发号导致号段分叉
   next_no  INTEGER NOT NULL                    -- 下一个待分配序号（落库只存数字，展示时加前缀）
 );
--- 首个号码从 10000001 开始：八位、无前导零，肉眼即可与内部主键区分。
-INSERT OR IGNORE INTO member_no_sequence (id, next_no) VALUES (1, 10000001);
+-- 首个号码从 1 开始：号码空间是个位数起步的纯数字序列，靓号（豹子 / 顺子 / 回文等）由发号器跳过。
+INSERT OR IGNORE INTO member_no_sequence (id, next_no) VALUES (1, 1);
+
+-- Mim ID 号码迁移状态：一次性重排的开关，避免每次启动都重写全表号码。
+CREATE TABLE IF NOT EXISTS member_no_meta (
+  key   TEXT PRIMARY KEY, -- 迁移键，如 renumber_v1
+  value TEXT NOT NULL     -- 迁移状态值，done 表示已完成
+);
+
+-- Mim ID 改号审计：记录每轮重排的旧号 → 新号，供客服追溯与必要回滚（旧号可能已被用户对外告知）。
+CREATE TABLE IF NOT EXISTS member_no_history (
+  id         TEXT PRIMARY KEY, -- 审计行主键（uuidv7）
+  user_id    TEXT NOT NULL REFERENCES users(id), -- 归属用户
+  old_no     TEXT,             -- 重排前的旧号（首次发号可能为 NULL）
+  new_no     TEXT NOT NULL,    -- 重排后的新号
+  created_at TEXT NOT NULL     -- 重排时间
+);
 
 CREATE TABLE IF NOT EXISTS identities (
   id          TEXT PRIMARY KEY,
@@ -603,6 +618,86 @@ CREATE TABLE IF NOT EXISTS community_purchases (
   created_at   TEXT NOT NULL,
   UNIQUE (user_id, thread_id)
 );
+
+-- 帖子媒体：图集多图与视频地址，按 sort_order 顺序展示。
+CREATE TABLE IF NOT EXISTS community_thread_media (
+  id         TEXT PRIMARY KEY,
+  thread_id  TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL CHECK (kind IN ('image','video')),
+  url        TEXT NOT NULL,
+  poster_url TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_community_thread_media ON community_thread_media(thread_id, sort_order);
+
+-- 投票选项与投票记录：一人一票，可改投；结果实时按选项聚合。
+CREATE TABLE IF NOT EXISTS community_poll_options (
+  id         TEXT PRIMARY KEY,
+  thread_id  TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  label      TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS community_poll_votes (
+  thread_id  TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  option_id  TEXT NOT NULL REFERENCES community_poll_options(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (thread_id, user_id)
+);
+
+-- 收藏：复合主键防重复；列表按收藏时间倒序。
+CREATE TABLE IF NOT EXISTS community_favorites (
+  thread_id  TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (thread_id, user_id)
+);
+
+-- 评分：1–5 星，一人一帖一评，可修改。
+CREATE TABLE IF NOT EXISTS community_ratings (
+  thread_id TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  user_id   TEXT NOT NULL REFERENCES users(id),
+  rating    INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (thread_id, user_id)
+);
+
+-- 付费板块加入记录：price_cents > 0 的板块需先加入才能查看与发帖。
+CREATE TABLE IF NOT EXISTS community_board_memberships (
+  board_id   TEXT NOT NULL REFERENCES community_boards(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  amount_cents INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (board_id, user_id)
+);
+
+-- 内容举报：限流按 user_id + created_at 在路由层统计；status 供运营处理。
+CREATE TABLE IF NOT EXISTS content_reports (
+  id          TEXT PRIMARY KEY,
+  reporter_id TEXT NOT NULL REFERENCES users(id),
+  target_type TEXT NOT NULL CHECK (target_type IN ('thread','post','asset','product','user')),
+  target_id   TEXT NOT NULL,
+  reason      TEXT NOT NULL,
+  detail      TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','resolved','rejected')),
+  admin_note  TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_content_reports_status ON content_reports(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_content_reports_reporter ON content_reports(reporter_id, created_at DESC);
+
+-- 图形验证码：存答案摘要，10 分钟过期，一次性使用。
+CREATE TABLE IF NOT EXISTS captchas (
+  id          TEXT PRIMARY KEY,
+  answer_hash TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  used_at     TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_captchas_expiry ON captchas(expires_at);
 
 -- VIP 套餐：多级会员，duration_days 表示单次购买有效期。
 CREATE TABLE IF NOT EXISTS vip_plans (

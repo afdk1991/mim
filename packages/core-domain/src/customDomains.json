@@ -547,9 +547,9 @@
       ]
     },
     {
-      "platform_id": "sealos",
-      "deployment_id": "container.sealos",
-      "platform": "Sealos",
+      "platform_id": "cloudflare-worker",
+      "deployment_id": "worker.mim-api-edge",
+      "platform": "Cloudflare 独立 Worker",
       "custom_domain": "api.mixm.top",
       "dns_host": "api",
       "xls_rows": [
@@ -558,11 +558,11 @@
       ],
       "xls_remark": "接口服务入口｜API 统一网关",
       "status": "pending_dns",
-      "status_note": "DNSPod 无 api 解析；Sealos 仅暴露平台域 mim-i3ywsdfn.cloud.sealos.io",
+      "status_note": "DNSPod 无 api 解析；Sealos 付费容器已移出矩阵，API 第二入口改由免费 Worker mim-api-edge 承接",
       "evidence": "2026-11-11 nslookup api.mixm.top -> 无 A 记录",
       "next_steps": [
-        "在 DNSPod 为 api 添加 CNAME -> 平台 Ingress 域名",
-        "在 Sealos 应用 Ingress 增加 api.mixm.top 与证书"
+        "在 DNSPod 为 api 添加 CNAME -> mim-api-edge 的 workers.dev 路由",
+        "在 Cloudflare Worker 设置 Custom Domains 绑定 api.mixm.top 并签发证书"
       ]
     },
     {

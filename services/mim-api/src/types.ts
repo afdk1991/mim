@@ -29,7 +29,7 @@ export type UserStatus = 'active' | 'pending_deletion' | 'deleted'; // 账号状
 /** users 表在鉴权与用户视图里使用的字段子集：member_no 为对外自动分配的 Mim ID 号码 */
 export interface UserRow { // 用户行最小视图，登录响应与个人中心共用
   id: string; // 内部主键（uuidv7），用于所有关联表与令牌 sub
-  member_no: string | null; // 对外编号（MIM-10000001）；历史库补列前可能为 NULL，读到时需兜底
+  member_no: string | null; // 对外编号（纯数字，如 10000001）；历史库补列前可能为 NULL，读到时需兜底
   region: Region; // 所属地区，影响默认语言与时区
   status: string; // 状态：active / pending_deletion / deleted
   display_name: string; // 展示名

@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统�
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
 import type { Db } from './types.js'; // 仅引入数据库连接类型，编译期擦除不产生运行时代码
-import { backfillMemberNos } from './identity.js'; // 存量用户补发 Mim ID 号码（幂等，仅对 NULL 行生效）
+import { backfillMemberNos, renumberMemberNos } from './identity.js'; // 存量用户号码：一次性全量重排 + 缺号兜底补发
 
 const SCHEMA_PATH = fileURLToPath(new URL('./schema.sql', import.meta.url)); // 以模块自身位置解析 schema.sql 绝对路径，保证任意工作目录下都能找到建表脚本
 
@@ -117,7 +117,9 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedNavLinks(db); // 写入导航站默认目录（站内视图入口），幂等，不覆盖用户新增与已探测状态
   seedCommunity(db); // 写入社区板块 / 官方帖 / VIP 套餐 / 独立商品 / 卡密 / 优惠码，保证新库开箱可用
   seedCommerce(db); // 写入付费资产 / 主题 / 页面区块 / 徽章，保证商业中台开箱有内容
-  const backfilled = backfillMemberNos(db); // 历史用户补发 Mim ID 号码；新库为空操作
+  const renumbered = renumberMemberNos(db, new Date().toISOString()); // 存量用户一次性重排为纯数字 Mim ID（跳过全部靓号），幂等开关存在 member_no_meta
+  if (renumbered.length > 0) console.log(`[db] member_no renumbered: ${renumbered.length} users`); // 改号必须留痕，旧号同时写入 member_no_history
+  const backfilled = backfillMemberNos(db); // 缺号兜底补发（重排完成后通常为空操作）
   if (backfilled > 0) console.log(`[db] member_no backfilled: ${backfilled} users`); // 补号必须留痕，便于核对号码连续性
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束

@@ -19,7 +19,7 @@ export interface UserInfo { // 当前登录用户的核心资料（登录响应�
   locale: string; // 原始语言标签（如 zh-CN），交给 normalizeLocale 归一
   timezone: string; // IANA 时区名，用于把服务端 UTC 时间渲染成本地时间
   deletion_scheduled_at?: string | null; // 注销预约时间；仅注销流程中有值，其余为 null/缺省
-  member_no: string; // 对外 Mim ID 号码（MIM-10000001 形态），与内部 uuid 主键解耦
+  member_no: string; // 对外 Mim ID 号码（纯数字 QQ 号样式，如 10000001），与内部 uuid 主键解耦
   is_guest?: boolean; // 匿名访客会话标记：true 表示尚未绑定任何登录身份，可随时登录升级
 } // UserInfo 结构结束
 
@@ -1631,7 +1631,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     overview() { // 首页聚合：板块、统计、当前钱包与会员
       return request<{ boards: CommunityBoard[]; stats: { threads: number; views: number; likes: number }; wallet: WalletSnapshot; vip_level: number; vip: { plan_id: string; level: number; expires_at: string } | null }>('/community/overview', { idempotency: false });
     },
-    threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot'; q?: string; limit?: number } = {}) { // 帖子列表
+    threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating'; q?: string; limit?: number } = {}) { // 帖子列表
       const qs = new URLSearchParams();
       if (opts.board && opts.board !== 'all') qs.set('board', opts.board);
       if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind);
@@ -1642,9 +1642,9 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ items: CommunityThread[]; total: number; sort: string; vip_level: number }>(`/community/threads${suffix ? `?${suffix}` : ''}`, { idempotency: false });
     },
     thread(id: string) { // 帖子详情
-      return request<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean }>(`/community/threads/${encodeURIComponent(id)}`, { idempotency: false });
+      return request<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}`, { idempotency: false });
     },
-    createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number }) { // 发帖
+    createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number; media?: CommunityThreadMedia[]; poll_options?: string[] }) { // 发帖
       return request<{ thread_id: string }>('/community/threads', { method: 'POST', body: payload });
     },
     unlock(id: string) { // 解锁付费帖
@@ -1655,6 +1655,21 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     },
     like(id: string) { // 点赞开关
       return request<{ liked: boolean }>(`/community/threads/${encodeURIComponent(id)}/like`, { method: 'POST', body: {} });
+    },
+    favorite(id: string) { // 收藏开关
+      return request<{ favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}/favorite`, { method: 'POST', body: {} });
+    },
+    rate(id: string, rating: number) { // 评分 1–5 星
+      return request<{ ok: boolean; summary: { avg: number | null; count: number } }>(`/community/threads/${encodeURIComponent(id)}/rate`, { method: 'POST', body: { rating } });
+    },
+    vote(id: string, optionId: string) { // 投票
+      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(id)}/vote`, { method: 'POST', body: { option_id: optionId } });
+    },
+    joinBoard(slug: string) { // 加入付费板块
+      return request<{ joined: boolean; charged_cents: number; via?: string }>(`/community/boards/${encodeURIComponent(slug)}/join`, { method: 'POST', body: {} });
+    },
+    favorites() { // 我的收藏
+      return request<{ items: CommunityThread[] }>('/community/favorites', { idempotency: false });
     },
   },
 
@@ -1676,6 +1691,9 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     },
     redeem(code: string) { // 充值卡兑换
       return request<{ ok: boolean; amount_cents: number }>('/wallet/redeem', { method: 'POST', body: { code } });
+    },
+    transferPoints(payload: { to_member_no: string; points: number; note?: string }) { // 积分转给其他用户
+      return request<{ ok: boolean; points: number; to: string }>('/wallet/points/transfer', { method: 'POST', body: payload });
     },
   },
 
@@ -1856,9 +1874,32 @@ export interface CommunityBoard { // 论坛板块
   description: string; // 板块说明
   icon: string; // 图标
   thread_count: number; // 帖子数
+  price_cents: number; // 付费加入价格（0 为免费）
+  joined: number; // 是否已加入
 }
 
 export type ThreadKind = 'text' | 'video' | 'gallery' | 'series' | 'qa' | 'poll'; // 帖子形态
+
+export interface CommunityThreadMedia { // 帖子媒体
+  id?: string; // 主键（服务端返回）
+  kind: 'image' | 'video'; // 媒体类型
+  url: string; // 地址
+  poster_url?: string | null; // 视频封面
+  sort_order?: number; // 排序
+}
+
+export interface CommunityPollOption { // 投票选项
+  id: string; // 选项主键
+  label: string; // 选项文案
+  votes: number; // 票数
+  mine: number; // 我是否投了该选项
+}
+
+export interface CommunityPoll { // 投票聚合
+  options: CommunityPollOption[]; // 选项
+  total: number; // 总票数
+  my_option: string | null; // 我的选项
+}
 
 export interface CommunityThread { // 帖子列表项
   id: string; // 主键
@@ -1874,15 +1915,25 @@ export interface CommunityThread { // 帖子列表项
   last_activity_at: string; // 最后活跃
   board_slug: string; // 所属板块
   board_name: string; // 板块名称
+  board_price_cents?: number; // 板块加入价格（分）
+  board_joined?: number; // 是否已加入板块
   author_name: string | null; // 作者昵称（null 为官方）
   purchased: number; // 是否已购
+  favorited?: number; // 是否已收藏
+  favorite_count?: number; // 收藏数
+  rating_avg?: number | null; // 平均评分
+  rating_count?: number; // 评分数
   locked: boolean; // 是否锁定
 }
 
 export interface CommunityThreadDetail extends Omit<CommunityThread, 'locked'> { // 帖子详情
   body: string; // 正文（未解锁为空）
   locked: boolean; // 是否锁定
+  board_locked?: boolean; // 板块是否未加入
   author_name: string | null; // 作者昵称
+  media?: CommunityThreadMedia[]; // 图集 / 视频
+  poll?: CommunityPoll | null; // 投票
+  my_rating?: number | null; // 我的评分
 }
 
 export interface CommunityPost { // 回复

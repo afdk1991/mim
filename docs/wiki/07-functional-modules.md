@@ -75,7 +75,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 | 密码首登 | `POST /auth/password`（管理员口令或自建账号口令） | 是（无 identities 行时走统一建号） | `user.member_no` |
 | 第三方首登 | `POST /auth/oauth/:provider/authorize` → 回调 → `POST /auth/oauth/exchange` | 是，无绑定记录时 `createUserFromOAuth` 建号并写 `oauth_accounts` | 票据换回的 `user.member_no` |
 
-- **Mim ID 规则**：对外编号 `MIM-<8 位补零>`（起始 `MIM-10000001`，上限 `99_999_999`），由 `member_no_sequence` 单行表在事务内自增分配，与内部 uuidv7 主键解耦；唯一索引 `uq_users_member_no`；历史用户由启动时 `backfillMemberNos` 按 `created_at ASC, id ASC` 补齐，登录时 `ensureMemberNo` 再兜底一次，保证任何登录响应都带号码。发号耗尽抛 `MEMBER_NO_EXHAUSTED(503)`。
+- **Mim ID 规则（纯数字靓号制，2026-11-12 改造）**：对外编号为**纯数字**，从个位 `1` 起自然增长（上限 `9,999,999,999`），不再带 `MIM-` 前缀、不再补零；由 `member_no_sequence` 单行表在事务内自增分配，与内部 uuidv7 主键解耦；唯一索引 `uq_users_member_no` 兜底。发号器跳过全部靓号（规则见 `src/member-no.ts` 的 `classifyPremiumNo`）：豹子（`repeat`）、顺子（`ladder`）、回文（`palindrome`）、对子（`abab`）、整百整千（`round`）、谐音吉利（`pronounce`）、合法生日号（`birthday`），`1～99` 属短号段正常发放。存量由启动时 `renumberMemberNos` 按 `created_at ASC, id ASC` 一次性全量重排（`member_no_meta.renumber_v1=done` 开关 → 幂等，旧号写 `member_no_history`），登录时 `ensureMemberNo` 再兜底一次。发号耗尽或连续跳过超限抛 `MEMBER_NO_EXHAUSTED(503)`。
 - **第三方登录 9 家**：GitHub / Gitee / GitLab / Google / Apple / Microsoft（global）与微信 / QQ / 抖音（cn，按 `region` 过滤）。标准 OIDC 走 `oauth4webapi@3.8.8`（PKCE S256 + state + ID Token 校验），微信 / QQ / 抖音走专用适配器。安全模型：`state` 只存 sha256（10 分钟、回调即删）；正式令牌不进地址栏，回调只带 300 秒一次性票据，`POST /auth/oauth/exchange` 换取 session。
 - **绑定约束**：同一第三方身份（`provider + provider_user_id`，有 unionid 的再加 `union_id` 唯一）不可绑到两个 Mim 账号（409 `AUTH_OAUTH_ALREADY_BOUND`）；解绑后若该用户已无任何登录方式则拒绝（409 `AUTH_OAUTH_LAST_METHOD`）。
 - **未配置即不可用**：`GET /auth/oauth/providers` 的 `configured` 由每家凭证变量是否齐备决定；未配置的提供方前端置灰、授权端点返回 503 `AUTH_OAUTH_NOT_CONFIGURED`。
@@ -248,7 +248,7 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 | 登出 | `auth.ts` `POST /auth/logout` | —（401 自动登出） | ✅ |
 | 我的信息 | `me.ts` `GET /me` / `PATCH /me` | `Settings.tsx` | ✅ |
 | 账号注销（冷静期） | `me.ts` `POST /me/deletion` + `POST /me/cancel-deletion` | `Settings.tsx` | ✅ |
-| Mim ID 自动分配 | `identity.ts`（`allocateMemberNo` / `createUser` / `backfillMemberNos` / `ensureMemberNo`） | `Login.tsx` 注册成功卡片、`Profile.tsx` 资料与账号安全区 | ✅（`MIM-10000001` 起，事务内自增，唯一索引 `uq_users_member_no`，历史用户启动回填 + 登录兜底） |
+| Mim ID 自动分配（纯数字靓号制） | `identity.ts`（`allocateMemberNo` / `createUser` / `renumberMemberNos` / `backfillMemberNos` / `ensureMemberNo`）+ `member-no.ts`（`classifyPremiumNo`） | `Login.tsx` 注册成功卡片、`Profile.tsx` 资料与账号安全区、`CommerceCenter.tsx` 私信寻人 | ✅（`1` 起纯数字自增，七类靓号全部预留，存量按注册顺序全量重排并写审计表，唯一索引 `uq_users_member_no`） |
 | 第三方登录（9 家） | `routes/oauth.ts` + `oauth/providers.ts` / `oauth/client.ts` / `oauth/accounts.ts` | `Login.tsx`（登录按钮）、`Profile.tsx`（绑定 / 解绑） | ✅（GitHub / Gitee / GitLab / Google / Apple / Microsoft / 微信 / QQ / 抖音；未配置凭证置灰，`AUTH_OAUTH_NOT_CONFIGURED`） |
 | 第三方账号合并 | — | — | ❌ TBD（当前策略是「同一第三方身份不可绑两个账号」，不自动合并） |
 

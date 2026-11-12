@@ -105,7 +105,7 @@ export function createGrowthRouter(deps: ApiDeps): Router {
   /** 发送私信：按 Mim ID 找人，禁止发给自己。 */
   router.post('/messages', (req, res) => {
     const userId = req.user!.id;
-    const body = parse(z.object({ to_member_no: z.string().min(6).max(20), content: z.string().min(1).max(800) }), req.body);
+    const body = parse(z.object({ to_member_no: z.string().regex(/^\d{1,10}$/), content: z.string().min(1).max(800) }), req.body); // 收件人必须是纯数字 Mim ID（1～10 位）
     const target = deps.db.prepare('SELECT id, status FROM users WHERE member_no = ?').get(body.to_member_no) as { id: string; status: string } | undefined;
     if (!target || target.status !== 'active') throw new AppError('NOT_FOUND', '收件人不存在');
     if (target.id === userId) throw new AppError('VALIDATION_FAILED', '不能给自己发私信');

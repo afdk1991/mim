@@ -384,7 +384,7 @@ export function CommerceCenter({ locale }: Props) { // 导出页面组件
           <section className="panel">
             <div className="panel-head"><h3>{tr(locale, '站内私信', 'Direct messages')}</h3><span className="muted">{tr(locale, '归属地', 'Region')}: {ip?.region_code ?? '—'}</span></div>
             <div className="form inline">
-              <label>{tr(locale, '对方 Mim ID', 'Recipient ID')}<input value={messageDraft.to} onChange={(event) => setMessageDraft({ ...messageDraft, to: event.target.value })} placeholder="MIM-10000001" /></label>
+              <label>{tr(locale, '对方 Mim ID', 'Recipient ID')}<input value={messageDraft.to} onChange={(event) => setMessageDraft({ ...messageDraft, to: event.target.value })} placeholder="100001" inputMode="numeric" /></label>
               <label className="grow">{tr(locale, '内容', 'Message')}<input value={messageDraft.content} onChange={(event) => setMessageDraft({ ...messageDraft, content: event.target.value })} /></label>
               <button type="button" className="btn primary" disabled={busy} onClick={() => void run(async () => { await api.commerce.sendMessage({ to_member_no: messageDraft.to, content: messageDraft.content }); setMessageDraft({ to: '', content: '' }); await loadGrowth(); }, tr(locale, '私信已发送', 'Message sent'))}>{tr(locale, '发送', 'Send')}</button>
             </div>
