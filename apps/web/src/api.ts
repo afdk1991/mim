@@ -1712,6 +1712,126 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     },
   },
 
+  // ---------- 商业化中台（commerce）：资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 国际化 ----------
+
+  commerce: { // 商业化二期：与 services/mim-api 新路由一一对应
+    assets(opts: { kind?: string; q?: string } = {}) { // 资产列表
+      const qs = new URLSearchParams(); // 查询串
+      if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind); // 类型过滤
+      if (opts.q) qs.set('q', opts.q); // 关键词
+      const suffix = qs.toString(); // 序列化
+      return request<{ items: PaidAsset[]; vip_level: number }>(`/assets${suffix ? `?${suffix}` : ''}`, { idempotency: false });
+    },
+    asset(code: string) { // 资产详情（未解锁只回试读）
+      return request<{ asset: PaidAssetDetail }>(`/assets/${encodeURIComponent(code)}`, { idempotency: false });
+    },
+    purchaseAsset(code: string) { // 余额购买
+      return request<{ ok: boolean; charged_cents: number; via: string }>(`/assets/${encodeURIComponent(code)}/purchase`, { method: 'POST', body: {} });
+    },
+    createAsset(payload: { code: string; kind: PaidAssetKind; title: string; summary: string; body: string; price_cents: number; cover_url?: string; file_url?: string; vip_free?: boolean }) { // 作者发布
+      return request<{ ok: boolean; code: string }>('/assets', { method: 'POST', body: payload });
+    },
+    channels() { // 支付渠道配置状态
+      return request<{ channels: PaymentChannel[] }>('/payments/channels', { idempotency: false });
+    },
+    createIntent(payload: { purpose: 'shop_order' | 'vip' | 'asset' | 'recharge'; ref_id: string; provider: PaymentProvider; amount_cents?: number }) { // 创建支付意图
+      return request<{ intent: PaymentIntent; next: { provider: string; pay_url?: string; qr_text?: string; note?: string } }>('/payments/intents', { method: 'POST', body: payload });
+    },
+    cancelIntent(id: string) { // 取消未支付
+      return request<{ ok: boolean }>(`/payments/intents/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} });
+    },
+    offlineConfirm(id: string) { // 运营线下确认
+      return request<{ ok: boolean; status: string }>(`/payments/intents/${encodeURIComponent(id)}/offline-confirm`, { method: 'POST', body: {} });
+    },
+    ship(orderId: string, payload: { carrier: string; tracking_no: string; status?: string; events?: Array<{ text: string }> }) { // 发货
+      return request<{ ok: boolean; status: string }>(`/shop/orders/${encodeURIComponent(orderId)}/ship`, { method: 'POST', body: payload });
+    },
+    shipment(orderId: string) { // 物流轨迹
+      return request<{ shipment: Shipment | null }>(`/shop/orders/${encodeURIComponent(orderId)}/shipment`, { idempotency: false });
+    },
+    applyAfterSales(orderId: string, payload: { kind: 'refund' | 'return'; reason: string }) { // 申请售后
+      return request<{ ok: boolean; id: string; amount_cents: number }>(`/shop/orders/${encodeURIComponent(orderId)}/after-sales`, { method: 'POST', body: payload });
+    },
+    myAfterSales() { // 我的售后
+      return request<{ items: AfterSale[] }>('/after-sales/mine', { idempotency: false });
+    },
+    reviewAfterSales(id: string, payload: { approve: boolean; note?: string }) { // 运营审核
+      return request<{ ok: boolean; status: string }>(`/after-sales/${encodeURIComponent(id)}/review`, { method: 'POST', body: payload });
+    },
+    reviewOrder(orderId: string, payload: { rating: number; content: string }) { // 订单评价
+      return request<{ ok: boolean }>(`/shop/orders/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: payload });
+    },
+    productReviews(code: string) { // 商品评价聚合
+      return request<{ summary: { count: number; avg: number }; items: ProductReview[] }>(`/shop/products/${encodeURIComponent(code)}/reviews`, { idempotency: false });
+    },
+    withdrawals() { // 我的提现
+      return request<{ items: Withdrawal[]; balance_cents: number }>('/wallet/withdrawals', { idempotency: false });
+    },
+    applyWithdrawal(payload: { amount_cents: number; channel: 'alipay' | 'wechat' | 'bank'; account: string }) { // 申请提现
+      return request<{ ok: boolean; id: string; status: string; amount_cents: number }>('/wallet/withdrawals', { method: 'POST', body: payload });
+    },
+    reviewWithdrawal(id: string, payload: { action: 'approve' | 'paid' | 'reject'; note?: string }) { // 运营审核
+      return request<{ ok: boolean; status: string }>(`/withdrawals/${encodeURIComponent(id)}/review`, { method: 'POST', body: payload });
+    },
+    earnings() { // 创作者收益
+      return request<{ items: CreatorEarning[]; summary: { pending: number; settled: number } }>('/earnings', { idempotency: false });
+    },
+    settleEarnings() { // 待结算转余额
+      return request<{ ok: boolean; settled_cents: number; count: number }>('/earnings/settle', { method: 'POST', body: {} });
+    },
+    financeSummary() { // 平台资金汇总
+      return request<{ wallets: { users: number; balance: number }; withdrawals: Array<{ status: string; count: number; amount: number }>; earnings: Array<{ status: string; count: number; amount: number }>; orders: { count: number; amount: number } }>('/admin/finance/summary', { idempotency: false });
+    },
+    appearance() { // 外观与页面
+      return request<{ settings: { theme?: ThemeSettings; locales?: I18nSettings; site?: Record<string, unknown> }; pages: Array<{ page: string; blocks: number }> }>('/appearance', { idempotency: false });
+    },
+    updateAppearance(key: 'theme' | 'locales' | 'site', value: Record<string, unknown>) { // 更新设置
+      return request<{ ok: boolean; key: string }>('/appearance/settings', { method: 'PUT', body: { key, value } });
+    },
+    page(page: string) { // 页面区块
+      return request<{ page: string; blocks: PageBlock[] }>(`/pages/${encodeURIComponent(page)}`, { idempotency: false });
+    },
+    createBlock(page: string, payload: { kind: string; sort_order?: number; config?: Record<string, unknown> }) { // 新建区块
+      return request<{ ok: boolean; id: string }>(`/pages/${encodeURIComponent(page)}/blocks`, { method: 'POST', body: payload });
+    },
+    updateBlock(page: string, id: string, payload: { config?: Record<string, unknown>; sort_order?: number; enabled?: boolean }) { // 修改区块
+      return request<{ ok: boolean }>(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'PUT', body: payload });
+    },
+    deleteBlock(page: string, id: string) { // 删除区块
+      return request<{ ok: boolean }>(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+    reorderBlocks(page: string, ids: string[]) { // 批量排序
+      return request<{ ok: boolean; count: number }>(`/pages/${encodeURIComponent(page)}/reorder`, { method: 'PUT', body: { ids } });
+    },
+    growth() { // 我的等级 / 徽章
+      return request<GrowthSnapshot>('/me/growth', { idempotency: false });
+    },
+    syncGrowth() { // 徽章自动发放
+      return request<{ ok: boolean; awarded: string[] }>('/me/growth/sync', { method: 'POST', body: {} });
+    },
+    messages(box: 'inbox' | 'sent' = 'inbox') { // 私信
+      return request<{ box: string; items: DirectMessage[]; unread: number }>(`/messages?box=${box}`, { idempotency: false });
+    },
+    sendMessage(payload: { to_member_no: string; content: string }) { // 发私信
+      return request<{ ok: boolean; id: string }>('/messages', { method: 'POST', body: payload });
+    },
+    readMessage(id: string) { // 标记已读
+      return request<{ ok: boolean }>(`/messages/${encodeURIComponent(id)}/read`, { method: 'POST', body: {} });
+    },
+    ip() { // IP 归属地
+      return request<{ region_code: string; ip_hash_prefix: string; note: string }>('/me/ip', { idempotency: false });
+    },
+    i18nSettings() { // 语言分离配置
+      return request<{ settings: I18nSettings; provider_configured: boolean }>('/i18n/settings', { idempotency: false });
+    },
+    updateI18n(payload: { front: 'zh-CN' | 'en-US'; admin: 'zh-CN' | 'en-US'; machine_translation: boolean }) { // 更新语言
+      return request<{ ok: boolean; settings: I18nSettings }>('/i18n/settings', { method: 'PUT', body: payload });
+    },
+    translate(text: string, target: 'zh-CN' | 'en-US') { // 机器翻译
+      return request<{ translated_text: string; provider: string; cached: boolean; translated: boolean }>('/i18n/translate', { method: 'POST', body: { text, target } });
+    },
+  },
+
   // ---------- 统一搜索（search）：五来源聚合检索，浏览公开 ----------
 
   search: { // 统一搜索：路径 /search
@@ -1894,3 +2014,146 @@ export interface SearchScopeCount { // 来源文档数
   label: string; // 中文组名
   count: number; // 文档数
 } // SearchScopeCount 结束
+
+// ---------- 商业化中台共享类型，与 services/mim-api 新路由响应一一对应 ----------
+
+export type PaidAssetKind = 'article' | 'download' | 'gallery' | 'video'; // 四类付费资产
+
+export interface PaidAsset { // 资产列表项
+  code: string; // 业务编码
+  kind: PaidAssetKind; // 类型
+  title: string; // 标题
+  summary: string; // 简介
+  cover_url: string | null; // 封面
+  price_cents: number; // 价格（分）
+  vip_free: boolean; // VIP 免费
+  views: number; // 浏览
+  sales: number; // 销量
+  updated_at: string; // 更新时间
+  unlocked: boolean; // 当前用户是否可读
+}
+
+export interface PaidAssetDetail extends PaidAsset { // 详情
+  body: string; // 正文 / 试读
+  file_url: string | null; // 文件地址（未解锁为 null）
+}
+
+export type PaymentProvider = 'alipay' | 'wechat' | 'manual' | 'sandbox'; // 支付渠道
+
+export interface PaymentChannel { // 渠道状态
+  id: PaymentProvider; // 渠道
+  label: string; // 展示名
+  configured: boolean; // 是否配置
+  note: string; // 说明
+}
+
+export interface PaymentIntent { // 支付意图
+  id: string; // 主键
+  purpose: string; // 用途
+  ref_id: string; // 关联对象
+  provider: string; // 渠道
+  amount_cents: number; // 金额
+  status: string; // 状态
+  pay_url: string | null; // 支付链接
+  qr_text: string | null; // 二维码内容
+  created_at: string; // 创建时间
+}
+
+export interface Shipment { // 物流
+  carrier: string; // 承运商
+  tracking_no: string; // 单号
+  status: string; // 状态
+  events: Array<{ text: string; at: string }>; // 轨迹
+  updated_at: string; // 更新时间
+}
+
+export interface AfterSale { // 售后
+  id: string; // 主键
+  order_id: string; // 订单
+  kind: 'refund' | 'return'; // 类型
+  reason: string; // 原因
+  amount_cents: number; // 金额
+  status: string; // 状态
+  admin_note: string; // 审核备注
+  created_at: string; // 创建时间
+}
+
+export interface ProductReview { // 商品评价
+  id: string; // 主键
+  rating: number; // 星级
+  content: string; // 内容
+  created_at: string; // 时间
+  display_name: string; // 评价人
+}
+
+export interface Withdrawal { // 提现单
+  id: string; // 主键
+  amount_cents: number; // 金额
+  channel: string; // 渠道
+  account: string; // 收款账号
+  status: string; // 状态
+  admin_note: string; // 审核备注
+  created_at: string; // 申请时间
+  processed_at: string | null; // 处理时间
+}
+
+export interface CreatorEarning { // 创作者收益
+  id: string; // 主键
+  source_type: string; // 来源类型
+  source_id: string; // 来源编号
+  gross_cents: number; // 毛收入
+  platform_fee_cents: number; // 平台抽成
+  net_cents: number; // 净收入
+  status: string; // 状态
+  created_at: string; // 时间
+}
+
+export interface ThemeSettings { // 主题
+  accent?: string; // 主色
+  background?: string; // 背景
+  nav_layout?: string; // 导航布局
+  list_style?: string; // 列表样式
+  radius?: number; // 圆角
+}
+
+export interface I18nSettings { // 语言配置
+  front: 'zh-CN' | 'en-US'; // 前台语言
+  admin: 'zh-CN' | 'en-US'; // 后台语言
+  supported: string[]; // 支持语言
+  machine_translation: boolean; // 是否启用机器翻译
+}
+
+export interface PageBlock { // 页面区块
+  id: string; // 主键
+  page: string; // 页面
+  kind: string; // 区块类型
+  sort_order: number; // 排序
+  config_json: string; // 原始配置
+  config: Record<string, unknown>; // 解析后配置
+  updated_at: string; // 更新时间
+}
+
+export interface GrowthBadge { // 徽章
+  code: string; // 编码
+  name: string; // 名称
+  description: string; // 说明
+  icon: string; // 图标
+  awarded: number; // 是否已获得
+  awarded_at: string | null; // 获得时间
+}
+
+export interface GrowthSnapshot { // 成长快照
+  level: number; // 等级
+  next_points: number; // 下一级所需积分
+  stats: { points: number; orders: number; assets: number; checkins: number; vip_level: number }; // 统计
+  badges: GrowthBadge[]; // 徽章
+}
+
+export interface DirectMessage { // 私信
+  id: string; // 主键
+  content: string; // 内容
+  read_at: string | null; // 已读时间
+  created_at: string; // 时间
+  peer_member_no: string; // 对方 Mim ID
+  peer_name: string; // 对方昵称
+}

@@ -12,6 +12,7 @@ export type AppView =
   | 'navigation' // 导航站（全站资源目录 + 可达性状态 + 推荐位）
   | 'search' // 统一搜索（模块 / 入口 / 导航 / 社区 / 商品）
   | 'community' // 社区与变现（论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
+  | 'commerce' // 商业化中台（资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 翻译）
   | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
   | 'login'; // 未登录专用的登录伪视图
@@ -34,6 +35,7 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   navigation: 'navigation', // 导航站（原名即功能名，保持不变）
   search: 'search', // 统一搜索（与功能名一致）
   community: 'community', // 社区与变现（论坛 + 知识付费 + VIP + 钱包 + 独立商城）
+  commerce: 'commerce', // 商业化中台（资产 / 履约 / 资金 / 外观 / 成长）
   comic: 'comic-studio', // 漫剧 AI 剧工作台
   chat: 'chat', // 聊天（原名即功能名，保持不变）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）

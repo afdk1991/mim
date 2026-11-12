@@ -116,6 +116,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
   seedNavLinks(db); // 写入导航站默认目录（站内视图入口），幂等，不覆盖用户新增与已探测状态
   seedCommunity(db); // 写入社区板块 / 官方帖 / VIP 套餐 / 独立商品 / 卡密 / 优惠码，保证新库开箱可用
+  seedCommerce(db); // 写入付费资产 / 主题 / 页面区块 / 徽章，保证商业中台开箱有内容
   const backfilled = backfillMemberNos(db); // 历史用户补发 Mim ID 号码；新库为空操作
   if (backfilled > 0) console.log(`[db] member_no backfilled: ${backfilled} users`); // 补号必须留痕，便于核对号码连续性
   return db; // 返回已完成初始化的连接
@@ -508,6 +509,8 @@ export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺�
   { code: 'user:read', name: { 'zh-CN': '查看用户', 'en-US': 'Read users' } }, // 查询用户列表与详情
   { code: 'rbac:read', name: { 'zh-CN': '查看角色权限', 'en-US': 'Read roles' } }, // 读取角色、权限与授权关系
   { code: 'rbac:write', name: { 'zh-CN': '管理角色权限', 'en-US': 'Manage roles' } }, // 增删角色、改权限、改用户角色
+  { code: 'commerce:write', name: { 'zh-CN': '处理交易与资金', 'en-US': 'Manage commerce' } }, // 发货、售后审核、提现审核等交易侧写操作
+  { code: 'appearance:write', name: { 'zh-CN': '管理外观与页面', 'en-US': 'Manage appearance' } }, // 主题、导航、配色与页面区块配置
 ] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
 
 /** 权限点编码联合类型：路由调用处传错字符串会在编译期报错 */
@@ -533,6 +536,8 @@ export const RBAC_ROLES = [ // 内置角色数组，同样决定后台展示顺�
       'entitlement:revoke', // 允许回收权益
       'user:read', // 需要按用户查权益
       'rbac:read', // 需要知道自己持有哪些权限
+      'commerce:write', // 需要发货、审售后与审提现
+      'appearance:write', // 需要维护首页与论坛的外观配置
     ] as const, // 断言常量，元素类型须落在 RbacPermissionCode 内
   }, // operator 结束
   { // 只读观察者：仅供审计与客服查询
@@ -690,6 +695,128 @@ export function seedCommunity(db: Db): void {
     insertWalletCard.run('wallet-card-demo-500', 'MIM-DEMO-500', 50000, now);
     insertCoupon.run('coupon-mim10', 'MIM10', 'fixed', 1000, 5000, 100); // 优惠码表无 created_at 列，SQL 仅 6 个占位符
     insertCoupon.run('coupon-vip20', 'VIP20', 'percent', 20, 3000, 100); // 同上，避免多传一个参数导致种子整体回滚
+  });
+  seed();
+}
+
+/**
+ * 商业化二期种子：付费资产、站点外观、页面区块、徽章。
+ * 全部 INSERT OR IGNORE，便于运营在后台改过配置后重启不被覆盖。
+ */
+export function seedCommerce(db: Db): void {
+  const now = new Date().toISOString(); // 同批种子共用时间戳
+  const insertAsset = db.prepare(
+    `INSERT OR IGNORE INTO paid_assets
+       (id, code, kind, title, summary, body, cover_url, file_url, price_cents, vip_free, author_id, status, views, sales, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'published', ?, ?, ?, ?)`,
+  );
+  const insertSetting = db.prepare('INSERT OR IGNORE INTO site_settings (key, value, updated_at) VALUES (?, ?, ?)');
+  const insertBlock = db.prepare(
+    `INSERT OR IGNORE INTO page_blocks (id, page, kind, sort_order, config_json, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+  );
+  const insertBadge = db.prepare(
+    `INSERT OR IGNORE INTO badges (id, code, name, description, icon, rule_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const seed = db.transaction(() => {
+    const assets: Array<[string, string, string, string, string, string, string, string | null, number, number, number, number]> = [
+      [
+        'asset-paid-store',
+        'paid-article-store',
+        'article',
+        '付费阅读：独立商城的六层结构与最小实现',
+        '商品、订单、支付、履约、售后、资金六层拆解，附卡密与优惠码实现。',
+        '这是一篇付费长文。\n\n第一层商品：实物、自动发货、人工发货三类，价格与库存分列。\n第二层订单：下单即锁定金额，优惠码只改应付，不改商品原价。\n第三层支付：余额、支付宝、微信三条通道，回调必须验签。\n第四层履约：卡密一码一用，实物写物流单，人工发货留远程排期。\n第五层售后：退款原路退回，退货先审后收。\n第六层资金：平台抽成与创作者分成必须分账记账，提现走人工审核。',
+        '/catalog/store.jpg',
+        null,
+        1900,
+        1,
+        460,
+        28,
+      ],
+      [
+        'asset-download-kit',
+        'paid-download-kit',
+        'download',
+        'Mim 部署工具包（Nginx + systemd + 备份脚本）',
+        '一套可直接复用的生产部署脚本，含健康检查、回滚与 SQLite 备份。',
+        '购买后可下载 mim-deploy-kit.zip。工具包包含：nginx 站点模板、systemd 单元、SQLite 热备份脚本、发布回滚脚本。',
+        '/catalog/server.jpg',
+        '/downloads/mim-deploy-kit.zip',
+        2900,
+        0,
+        320,
+        16,
+      ],
+      [
+        'asset-gallery-covers',
+        'paid-gallery-covers',
+        'gallery',
+        '19 张分类封面与 205 条模块视觉规范',
+        '3:2 封面、分类角标、价格角标与 900×1180 参数长图源文件。',
+        '/catalog/dev.jpg\n/catalog/tools.jpg\n/catalog/store.jpg\n/catalog/ai.jpg\n/catalog/frontier.jpg\n/catalog/wechat.jpg\n/catalog/game.jpg\n/catalog/plugin.jpg\n/catalog/misc.jpg',
+        '/catalog/frontier.jpg',
+        '/downloads/mim-covers.zip',
+        3900,
+        1,
+        210,
+        9,
+      ],
+      [
+        'asset-video-comic',
+        'paid-video-comic',
+        'video',
+        '漫剧 AI 成片：从分镜到导出的完整演示',
+        '28 分钟演示，覆盖剧本拆场、角色一致性、镜头运动与成片导出。',
+        '付费视频：分镜设计、角色一致性、镜头运动、配音与成片导出全链路演示。',
+        '/catalog/ai.jpg',
+        '/downloads/mim-comic-demo.mp4',
+        4900,
+        1,
+        180,
+        7,
+      ],
+      [
+        'asset-open-tools',
+        'open-source-tools',
+        'download',
+        '自研工具与开源项目合集（免费）',
+        'Quick Build WP、数据库换域名插件、流盾 WAF 的说明与仓库地址。',
+        '免费资源：Quick Build WP 一键装宝塔与环境；数据库批量替换 / 换域名插件；流盾 WAF 开源防护。仓库地址见社区「自研工具」板块。',
+        '/catalog/tools.jpg',
+        '/downloads/mim-open-tools.md',
+        0,
+        0,
+        900,
+        64,
+      ],
+    ];
+    for (const [id, code, kind, title, summary, body, cover, file, price, vipFree, views, sales] of assets) {
+      insertAsset.run(id, code, kind, title, summary, body, cover, file, price, vipFree, views, sales, now, now);
+    }
+    insertSetting.run('theme', JSON.stringify({ accent: '#0f766e', background: '#f8fafc', nav_layout: 'top', list_style: 'card', radius: 14 }), now);
+    insertSetting.run('locales', JSON.stringify({ front: 'zh-CN', admin: 'zh-CN', supported: ['zh-CN', 'en-US'], machine_translation: false }), now);
+    insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: '跨平台商业级项目', footer: 'Mim · 开源与商业化并行' }), now);
+    const blocks: Array<[string, string, string, number, string]> = [
+      ['block-home-hero', 'home', 'hero', 1, JSON.stringify({ title: 'Mim 商业中台', subtitle: '知识付费、独立商城、社区与资金结算', cta: { label: '进入商城', href: '/marketplace' } })],
+      ['block-home-features', 'home', 'features', 2, JSON.stringify({ items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] })],
+      ['block-home-announce', 'home', 'announcements', 3, JSON.stringify({ source: '/api/v1/community/threads?board=announce&limit=3' })],
+      ['block-forum-tabs', 'forum', 'tabs', 1, JSON.stringify({ tabs: ['最新', '热门', '精华', '公告'] })],
+      ['block-store-grid', 'store', 'product_grid', 1, JSON.stringify({ source: '/api/v1/shop/products', columns: 3 })],
+    ];
+    for (const [id, page, kind, sort, config] of blocks) {
+      insertBlock.run(id, page, kind, sort, config, now, now);
+    }
+    const badges: Array<[string, string, string, string, string, string, number]> = [
+      ['badge-newcomer', 'newcomer', '新同学', '完成首次登录', '🌱', JSON.stringify({ type: 'login' }), 1],
+      ['badge-checkin', 'checkin-7', '签到达人', '累计签到 7 天', '📅', JSON.stringify({ type: 'checkin', days: 7 }), 2],
+      ['badge-first-order', 'first-order', '首单成就', '完成第一笔订单', '🧾', JSON.stringify({ type: 'order', count: 1 }), 3],
+      ['badge-creator', 'creator', '创作者', '发布付费资产或付费帖', '✍️', JSON.stringify({ type: 'asset', count: 1 }), 4],
+      ['badge-vip', 'vip', 'VIP 会员', '开通任意 VIP 套餐', '👑', JSON.stringify({ type: 'vip', level: 1 }), 5],
+    ];
+    for (const [id, code, name, description, icon, rule, sort] of badges) {
+      insertBadge.run(id, code, name, description, icon, rule, sort);
+    }
   });
   seed();
 }

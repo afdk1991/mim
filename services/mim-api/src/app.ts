@@ -19,6 +19,13 @@ import { createEntriesRouter } from './routes/entries.js'; // 统一入口配置
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
 import { createNavigationRouter } from './routes/navigation.js'; // 导航站：链接目录 + 可达性探测，浏览公开 / 写操作与探测需登录
 import { createSearchRouter } from './routes/search.js'; // 统一搜索：模块 / 入口 / 导航 / 社区 / 商品，浏览公开、索引重建需权限
+import { createAssetsRouter } from './routes/assets.js'; // 付费资产：阅读 / 下载 / 图库 / 视频
+import { createPaymentsRouter } from './routes/payments.js'; // 支付：渠道、意图、回调与线下确认
+import { createFulfillmentRouter } from './routes/fulfillment.js'; // 履约：发货、物流、售后与评价
+import { createFinanceRouter } from './routes/finance.js'; // 资金：提现、创作者收益与汇总
+import { createAppearanceRouter } from './routes/appearance.js'; // 外观：主题、导航、页面区块
+import { createGrowthRouter } from './routes/growth.js'; // 成长：等级、徽章、私信与归属地
+import { createI18nRouter } from './routes/i18n.js'; // 国际化：机器翻译与前后台语言分离
 import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -115,6 +122,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
 app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation/summary 与 /navigation/links 公开，写操作与探测在 router 内鉴权
   app.use('/api/v1', createSearchRouter(resolved)); // 统一搜索：/search 与 /search/summary 公开，/search/reindex 在 router 内鉴权
+  app.use('/api/v1', createPaymentsRouter(resolved)); // 支付回调必须公开；其余端点在 router 内逐个挂鉴权
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配
@@ -124,6 +132,12 @@ app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation
     createAiRouter(resolved), // ai 编排控制面：能力自检与手动触发任务
     createImRouter(resolved), // IM 即时通讯：会话列表/消息历史/用户搜索/已读
     createCartRouter(resolved), // 商城购物车：加购 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单）
+    createAssetsRouter(resolved), // 付费资产：浏览、详情、购买与作者发布
+    createFulfillmentRouter(resolved), // 交易履约：发货 / 轨迹 / 售后 / 评价（先于社区挂载，避免 /shop 前缀鉴权提前拦截运营令牌）
+    createFinanceRouter(resolved), // 资金：提现 / 收益 / 平台汇总
+    createAppearanceRouter(resolved), // 外观：主题 / 语言 / 页面区块
+    createGrowthRouter(resolved), // 成长：等级 / 徽章 / 私信 / IP 归属地
+    createI18nRouter(resolved), // 国际化：翻译与语言分离
     createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
   ]) { // 路由数组结束，进入逐个注册循环
     app.use('/api/v1', router); // 统一 /api/v1 前缀；鉴权按命名空间在 router 内部生效

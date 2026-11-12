@@ -353,4 +353,20 @@ FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `servi
 
 ---
 
-_本页为产品功能视角文档，随 PRD 草案（V0.0.0-preview）同步演进；所有 TBD/Assumption 项待 PRD 确认后更新。_
+## 13. 商业化二期（V0.0.5，2026-11-12）
+
+| 能力 | 落地口径 | 边界 |
+|---|---|---|
+| 付费资产四件套 | `paid_assets` 支持 article / download / gallery / video；未解锁只回 220 字试读且隐藏 `file_url`；余额、VIP 免费、已购、作者四路解锁；作者 70% 分成 | 未接独立资源库后台批量导入，暂由作者发布接口逐条写入 |
+| 支付通道 | 支付宝当面付 RSA2 预下单、微信 Native、人工转账、沙箱 HMAC；金额一律服务端按资产 / VIP / 订单 / 充值规则计算 | 虎皮椒 / 讯虎 / PayPal / Stripe 未接；缺商户凭证时明确 `PROVIDER_NOT_CONFIGURED` |
+| 物流与售后 | `shipments` 运单与轨迹、`after_sales` 申请 / 审核 / 退款关单、`product_reviews` 一单一评与评分聚合 | 只写本地轨迹，未接快递查询供应商 |
+| 资金 | 提现先冻结扣余额（最低 10 元）、驳回退回、通过可标记打款；创作者收益 `pending → settled`；平台汇总 | 实名、风控、对账与人工审核仍需运营流程承接 |
+| 外观与页面搭建 | `site_settings` 白名单（theme / locales / site）、`page_blocks` CRUD 与批量排序，首页 / 论坛 / 商城种子区块 | 拖拽编排 UI 未做，当前为按钮上下移动 |
+| 成长 / 私信 / IP | 等级 `min(10, 1 + floor(points/300) + floor(orders/3))`、5 枚徽章自动发放、按 Mim ID 私信与已读、IP 只存哈希 + 粗粒度国家码 | 无邮件 / 推送通知；IP 归属地不做精确定位 |
+| 国际化 | 百度翻译适配 + `translation_cache` 去重、前后台语言分离 | 未配置供应商时 503；已知文案仍走本地词典 |
+
+接口、表结构与 env 明细见 [商业化二期落地说明](../../docs/商业化二期落地说明-20261112.md) 与 [08](./08-dev-implementation.md)。
+
+---
+
+_本页为产品功能视角文档，随 PRD 草案（V0.0.5-preview）同步演进；所有 TBD/Assumption 项待 PRD 确认后更新。_

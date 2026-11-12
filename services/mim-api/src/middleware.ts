@@ -85,7 +85,7 @@ export function idempotency(req: Request, res: Response, next: NextFunction): vo
     next(); // 非强制模式下降级为普通请求
     return; // 提前返回
   } // 缺失键分支结束
-  const userId = req.user?.id; // 幂等作用域绑定到用户，避免不同用户使用相同键互相干扰
+  const userId = req.user?.id ?? (req.adminBootstrap ? 'admin-bootstrap' : undefined); // 引导令牌无用户主体，用固定作用域承载运营幂等
   if (!userId) throw new AppError('AUTH_UNAUTHORIZED', 'idempotency requires an authenticated user'); // 未鉴权无法确定作用域，直接 401
 
   const db = req.deps.db; // 复用请求上已注入的数据库连接

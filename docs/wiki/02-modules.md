@@ -10,7 +10,9 @@
 |---|---|---|---|
 | `AGENTS.md` | 治理 | 定义 12 条协作铁律（含免费平台额度矩阵、全仓库逐行注释、全量远端同步与生产统一部署腾讯云自建服务器），对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
-| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 15 文件 / 211 例契约测试通过（2026-11-10 实测）；端口 8787 |
+| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 29 文件 / 407 例契约测试通过（2026-11-12 实测）；端口 8787 |
+| `services/mim-api/src/routes/assets.ts` / `payments.ts` / `fulfillment.ts` / `finance.ts` / `appearance.ts` / `growth.ts` / `i18n.ts` | 业务代码（后端） | **2026-11-12 新增（V0.0.5 商业化二期）**：付费资产、支付意图与回调、发货物流售后评价、提现与创作分成、主题与页面区块、成长徽章私信 IP、机器翻译与语言设置；支付内核在 `src/payments.ts` | 16 张商业化表 + `commerce.test.ts` 8 例契约测试；未配置供应商时返回 `PROVIDER_NOT_CONFIGURED` |
+| `apps/web/src/views/CommerceCenter.tsx` | 业务代码（前端） | **2026-11-12 新增（V0.0.5）**：`/commerce` 商业化中台，五页签覆盖资产 / 履约 / 资金 / 外观 / 成长国际化 | 资产筛选与购买、运单与售后、提现与收益、主题与区块排序、私信与翻译 |
 | `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅设置页）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
 | `packages/core-domain` | 共享包 | 错误码、状态机、UUIDv7；**2026-11-09 新增统一入口配置清单** `siteModules.json`（schema `mim.site-modules.v2`：44 去重入口 / 19 业务域 / 132 功能点 / 88 演示 / 116 关联；可配置占位标识、去重整理 `dedupe` 与 `hostConfig` 声明）；**2026-11-12 新增落地状态层** `entryImplementation.ts`（四态映射：已落地 / 部分相邻 / 规划中 / 语义冲突，含真实能力与边界说明）；`siteModules.ts`（类型约束、占位解析 `resolveEntryHost` / `entryHostTemplate`、状态机工具、落地映射合并） | 前后端共用单一事实源；统一入口配置清单与 `site_module_items` 的唯一数据源 |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |

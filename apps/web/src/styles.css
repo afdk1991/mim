@@ -3692,4 +3692,61 @@ code { /* 行内代码/令牌展示 */
   } /* 结束 */
 } /* 结束 */
 
+/* 商业化中台：资产卡片、发布表单、轨迹与徽章 */
+.commerce-grid { /* 资产卡片网格 */
+  display: grid; /* 网格 */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 自适应列宽 */
+  gap: 14px; /* 卡片间距 */
+  margin-top: 14px; /* 与上方表单单隔开 */
+} /* 结束 */
+.commerce-grid .panel { /* 单张资产卡 */
+  display: flex; /* 纵向排布 */
+  flex-direction: column; /* 纵向 */
+  gap: 8px; /* 内部间距 */
+} /* 结束 */
+.commerce-form { /* 作者发布表单 */
+  display: grid; /* 网格排布 */
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 自适应列宽 */
+  gap: 10px; /* 字段间距 */
+  margin-top: 12px; /* 与工具栏分开 */
+  padding-top: 12px; /* 内边距 */
+  border-top: 1px solid rgba(148, 163, 184, 0.25); /* 分隔线 */
+} /* 结束 */
+.commerce-form label { /* 表单字段 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 纵向 */
+  gap: 4px; /* 标签与输入间距 */
+  font-size: 13px; /* 小字号 */
+} /* 结束 */
+.commerce-form .check { /* 复选行 */
+  flex-direction: row; /* 横向 */
+  align-items: center; /* 垂直居中 */
+  gap: 6px; /* 间距 */
+} /* 结束 */
+.commerce-form input, /* 输入框 */
+.commerce-form select { /* 下拉框 */
+  padding: 8px 10px; /* 内边距 */
+  border-radius: 10px; /* 圆角 */
+  border: 1px solid rgba(148, 163, 184, 0.35); /* 边框 */
+  background: rgba(255, 255, 255, 0.9); /* 底色 */
+} /* 结束 */
+.commerce-track { /* 物流轨迹 */
+  margin-top: 8px; /* 上间距 */
+  padding: 10px 12px; /* 内边距 */
+  border-radius: 12px; /* 圆角 */
+  background: rgba(15, 118, 110, 0.06); /* 浅色底 */
+  font-size: 13px; /* 小字号 */
+} /* 结束 */
+.commerce-track ol { /* 轨迹列表 */
+  margin: 8px 0 0; /* 外边距 */
+  padding-left: 18px; /* 缩进 */
+} /* 结束 */
+.commerce-badges { /* 渠道 / 徽章行 */
+  display: flex; /* 横向 */
+  flex-wrap: wrap; /* 换行 */
+  gap: 8px; /* 间距 */
+  margin-top: 10px; /* 上间距 */
+} /* 结束 */
+
+
 

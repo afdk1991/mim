@@ -756,3 +756,204 @@ CREATE TABLE IF NOT EXISTS referrals (
   status           TEXT NOT NULL DEFAULT 'bound' CHECK (status IN ('bound','settled')),
   created_at       TEXT NOT NULL
 );
+
+-- ===== 商业化二期：数字资产 / 支付 / 物流售后 / 资金 / 外观 / 成长 / 国际化 =====
+
+-- 付费数字资产：article 付费阅读、download 付费下载、gallery 付费图库、video 付费视频。
+CREATE TABLE IF NOT EXISTS paid_assets (
+  id          TEXT PRIMARY KEY,
+  code        TEXT NOT NULL UNIQUE,
+  kind        TEXT NOT NULL CHECK (kind IN ('article','download','gallery','video')),
+  title       TEXT NOT NULL,
+  summary     TEXT NOT NULL DEFAULT '',
+  body        TEXT NOT NULL DEFAULT '',
+  cover_url   TEXT,
+  file_url    TEXT,
+  price_cents INTEGER NOT NULL DEFAULT 0,
+  vip_free    INTEGER NOT NULL DEFAULT 0,
+  author_id   TEXT REFERENCES users(id),
+  status      TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft','published','off')),
+  views       INTEGER NOT NULL DEFAULT 0,
+  sales       INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_paid_assets_kind ON paid_assets(kind, status, created_at DESC);
+
+-- 资产购买记录：同一用户同一资产只记一次，重复购买直接复用。
+CREATE TABLE IF NOT EXISTS asset_purchases (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  asset_id     TEXT NOT NULL REFERENCES paid_assets(id) ON DELETE CASCADE,
+  amount_cents INTEGER NOT NULL,
+  created_at   TEXT NOT NULL,
+  UNIQUE (user_id, asset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_asset_purchases_user ON asset_purchases(user_id, created_at DESC);
+
+-- 支付意图：一个订单 / 会员 / 资产 / 充值对应一条，金额由服务端按商品价格计算。
+CREATE TABLE IF NOT EXISTS payment_intents (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL REFERENCES users(id),
+  purpose        TEXT NOT NULL CHECK (purpose IN ('shop_order','vip','asset','recharge')),
+  ref_id         TEXT NOT NULL,
+  provider       TEXT NOT NULL CHECK (provider IN ('alipay','wechat','manual','sandbox')),
+  amount_cents   INTEGER NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','failed','cancelled')),
+  pay_url        TEXT,
+  qr_text        TEXT,
+  provider_txn_id TEXT,
+  expires_at     TEXT,
+  created_at     TEXT NOT NULL,
+  paid_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_user ON payment_intents(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_ref ON payment_intents(purpose, ref_id);
+
+-- 支付回调审计：每次第三方回调都落一条，便于对账与排查重复通知。
+CREATE TABLE IF NOT EXISTS payment_events (
+  id         TEXT PRIMARY KEY,
+  intent_id  TEXT NOT NULL REFERENCES payment_intents(id) ON DELETE CASCADE,
+  provider   TEXT NOT NULL,
+  event      TEXT NOT NULL,
+  payload    TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+-- 物流发货单：一个订单一条，events_json 存轨迹节点数组。
+CREATE TABLE IF NOT EXISTS shipments (
+  id          TEXT PRIMARY KEY,
+  order_id    TEXT NOT NULL UNIQUE REFERENCES shop_orders(id) ON DELETE CASCADE,
+  carrier     TEXT NOT NULL,
+  tracking_no TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','picked','transit','delivered','exception')),
+  events_json TEXT NOT NULL DEFAULT '[]',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+-- 售后申请：refund 仅退款、return 退货退款；审核通过后原路退回余额。
+CREATE TABLE IF NOT EXISTS after_sales (
+  id           TEXT PRIMARY KEY,
+  order_id     TEXT NOT NULL REFERENCES shop_orders(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  kind         TEXT NOT NULL CHECK (kind IN ('refund','return')),
+  reason       TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','completed')),
+  admin_note   TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_after_sales_user ON after_sales(user_id, created_at DESC);
+
+-- 商品评价：仅已购用户可评，一单一评。
+CREATE TABLE IF NOT EXISTS product_reviews (
+  id         TEXT PRIMARY KEY,
+  order_id   TEXT NOT NULL UNIQUE REFERENCES shop_orders(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL REFERENCES shop_products(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  rating     INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  content    TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_product ON product_reviews(product_id, created_at DESC);
+
+-- 提现申请：申请时先冻结扣减余额，驳回时退回；approved 后由运营线下打款。
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  amount_cents INTEGER NOT NULL,
+  channel      TEXT NOT NULL,
+  account      TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','paid','rejected')),
+  admin_note   TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  processed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_user ON withdrawals(user_id, created_at DESC);
+
+-- 创作者收益：资产 / 付费帖售出后按比例记账，settled 表示已进入可提现余额。
+CREATE TABLE IF NOT EXISTS creator_earnings (
+  id                 TEXT PRIMARY KEY,
+  user_id            TEXT NOT NULL REFERENCES users(id),
+  source_type        TEXT NOT NULL,
+  source_id          TEXT NOT NULL,
+  gross_cents        INTEGER NOT NULL,
+  platform_fee_cents INTEGER NOT NULL,
+  net_cents          INTEGER NOT NULL,
+  status             TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','settled')),
+  created_at         TEXT NOT NULL,
+  settled_at         TEXT,
+  UNIQUE (source_type, source_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_creator_earnings_user ON creator_earnings(user_id, created_at DESC);
+
+-- 站点设置：主题、导航、配色、前后台语言等键值配置，value 为 JSON 字符串。
+CREATE TABLE IF NOT EXISTS site_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- 页面区块：page 为 home/forum/store/...，config_json 由前端渲染器消费。
+CREATE TABLE IF NOT EXISTS page_blocks (
+  id          TEXT PRIMARY KEY,
+  page        TEXT NOT NULL,
+  kind        TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  config_json TEXT NOT NULL DEFAULT '{}',
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_page_blocks_page ON page_blocks(page, enabled, sort_order);
+
+-- 徽章定义与用户获得记录。
+CREATE TABLE IF NOT EXISTS badges (
+  id          TEXT PRIMARY KEY,
+  code        TEXT NOT NULL UNIQUE,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  icon        TEXT NOT NULL DEFAULT '🏅',
+  rule_json   TEXT NOT NULL DEFAULT '{}',
+  sort_order  INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS user_badges (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  badge_id   TEXT NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+  awarded_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, badge_id)
+);
+
+-- 站内私信：只存文本，read_at 为空表示未读。
+CREATE TABLE IF NOT EXISTS direct_messages (
+  id           TEXT PRIMARY KEY,
+  from_user_id TEXT NOT NULL REFERENCES users(id),
+  to_user_id   TEXT NOT NULL REFERENCES users(id),
+  content      TEXT NOT NULL,
+  read_at      TEXT,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_direct_messages_to ON direct_messages(to_user_id, read_at, created_at DESC);
+
+-- 用户网络信号：只存 IP 哈希与粗粒度地区码，不落明文 IP。
+CREATE TABLE IF NOT EXISTS user_signals (
+  user_id      TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  ip_hash      TEXT NOT NULL,
+  region_code  TEXT NOT NULL DEFAULT '',
+  last_seen_at TEXT NOT NULL
+);
+
+-- 机器翻译缓存：同源文 + 目标语言命中缓存，避免重复计费。
+CREATE TABLE IF NOT EXISTS translation_cache (
+  id              TEXT PRIMARY KEY,
+  source_hash     TEXT NOT NULL,
+  target_lang     TEXT NOT NULL,
+  source_text     TEXT NOT NULL,
+  translated_text TEXT NOT NULL,
+  provider        TEXT NOT NULL,
+  created_at      TEXT NOT NULL,
+  UNIQUE (source_hash, target_lang)
+);

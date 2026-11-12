@@ -33,6 +33,7 @@ import { Deployments } from './views/Deployments';
 import { Navigation } from './views/Navigation';
 import { Search } from './views/Search'; // 统一搜索视图：五来源聚合检索
 import { Community } from './views/Community';
+import { CommerceCenter } from './views/CommerceCenter'; // 商业化中台：资产 / 支付 / 履约 / 提现 / 外观 / 成长
 // 漫剧 AI 剧模块外壳：放映厅（匿名可看片）+ 创作工作台（登录后使用）
 import { ComicStudio } from './views/ComicStudio';
 // IM 聊天 + 视频通话
@@ -174,6 +175,8 @@ export function App() {
     { view: 'search', label: locale === 'en-US' ? 'Search' : '统一搜索' },
     // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区与商城' },
+    // 商业化中台：付费资产 / 交易履约 / 资金分成 / 外观页面 / 成长国际化
+    { view: 'commerce', label: locale === 'en-US' ? 'Commerce' : '商业化中台' },
     // 漫剧 AI 剧工作台
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
@@ -185,7 +188,8 @@ export function App() {
     route.view === 'products' ||
     route.view === 'cart' ||
     route.view === 'account' ||
-    route.view === 'community'; // 需要会话的功能视图（访客会话自动建立，社区资产接口同样需要令牌）
+    route.view === 'community' ||
+    route.view === 'commerce'; // 商业化中台接口需要令牌（访客会话同样可用）
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
@@ -264,6 +268,8 @@ export function App() {
         {route.view === 'search' && <Search locale={locale} />}{/* 统一搜索视图 */}
         {/* 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广，访客会话建立后直接可用 */}
         {route.view === 'community' && session && <Community locale={locale} />}{/* 社区与变现视图 */}
+        {/* 商业化中台：付费资产 / 履约 / 提现分成 / 页面搭建 / 成长私信 / 翻译 */}
+        {route.view === 'commerce' && session && <CommerceCenter locale={locale} />}{/* 商业化中台视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}
