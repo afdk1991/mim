@@ -13,6 +13,7 @@ import {
   LOGIN_LOCK_MINUTES, // 锁定时长（分钟）
   REFRESH_TTL_SECONDS, // 刷新令牌有效期
 } from '../config.js'; // 集中式认证参数，避免散落魔法数字
+import { consumeCaptcha } from '../security.js'; // 图形验证码一次性校验
 import {
   generateCode, // 生成数字验证码
   hashCode, // 验证码摘要，库内不存明文
@@ -51,6 +52,8 @@ const codeBody = z.object({ // 申请验证码的请求体
   region: z.enum(['cn', 'global']), // 地区决定短信/邮件通道与默认语言
   provider: z.enum(['phone', 'email']), // 通道类型
   identifier: z.string().min(1), // 手机号或邮箱，后续会归一化
+  captcha_id: z.string().max(80).optional(), // 图形验证码 id（MIM_CAPTCHA_REQUIRED=1 时必填）
+  captcha_code: z.string().max(20).optional(), // 图形验证码答案
 }); // 结束 codeBody schema
 
 const loginBody = codeBody.extend({ // 验证码登录在申请体基础上追加字段
@@ -248,6 +251,10 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
 
   router.post('/auth/code', async (req, res) => { // 申请验证码
     const body = parse(codeBody, req.body); // 校验请求体形状
+    if (deps.env.MIM_CAPTCHA_REQUIRED === '1') {
+      if (!body.captcha_id || !body.captcha_code) throw new AppError('VALIDATION_FAILED', '请先完成图形验证码');
+      if (!consumeCaptcha(deps.db, body.captcha_id, body.captcha_code)) throw new AppError('AUTH_CODE_INVALID', '图形验证码错误或已过期');
+    }
     const identity = normalizeIdentity(body.region, body.provider, body.identifier); // 归一化号码/邮箱，避免同号多形态
     const now = clockOf(deps); // 当前时间
     const windowStart = addSeconds(now, -CODE_RATE_WINDOW_MINUTES * 60); // 滑动窗口起点

@@ -837,7 +837,7 @@ export interface DeploymentOverview { // 全量汇总响应
 } // DeploymentOverview 结束
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
-  requestCode(region: Region, provider: Provider, identifier: string) { // 请求发送验证码（开发环境直接回传 dev_code）
+  requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
     return request<{ // 发码响应结构
       delivery: 'dev'; // 投递方式：当前仅开发态直返验证码
       dev_code: string; // 明文验证码，仅开发环境存在
@@ -845,8 +845,16 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       provider: Provider; // 回显凭证类型
       expires_in: number; // 验证码有效期（秒）
       note: string; // 提示文案，说明当前为开发模式
-    }>('/auth/code', { method: 'POST', body: { region, provider, identifier }, auth: false, idempotency: false }); // 公开接口免鉴权；重复发码无副作用，禁用幂等键
+    }>('/auth/code', { method: 'POST', body: { region, provider, identifier, captcha_id: captcha?.id, captcha_code: captcha?.code }, auth: false, idempotency: false }); // 公开接口免鉴权；重复发码无副作用，禁用幂等键
   }, // requestCode 结束
+
+  captcha() { // 图形验证码：返回 id 与 SVG
+    return request<{ id: string; svg: string; expires_at: string }>('/auth/captcha', { auth: false, idempotency: false });
+  },
+
+  securityStatus() { // 安全能力状态：是否强制验证码 / 是否启用内容审核
+    return request<{ captcha_required: boolean; content_audit: boolean }>('/security/status', { auth: false, idempotency: false });
+  },
 
   loginWithPassword(payload: { // 密码登录：手机号/邮箱 + 密码
     region: Region; // 区域

@@ -5,7 +5,7 @@ import { z } from 'zod'; // 入参校验
 import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 会话、幂等与运营权限
 import { parse } from '../validate.js'; // 校验错误翻译
-import { createIntent, fulfillIntent, paymentChannels, verifySandboxSignature, type PayIntentRow, type PayProvider } from '../payments.js'; // 支付内核
+import { createIntent, decryptWechatResource, fulfillIntent, paymentChannels, verifySandboxSignature, verifyWechatSignature, type PayIntentRow, type PayProvider } from '../payments.js'; // 支付内核
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const PROVIDERS: PayProvider[] = ['alipay', 'wechat', 'manual', 'sandbox']; // 可用渠道白名单
@@ -53,6 +53,7 @@ export function createPaymentsRouter(deps: ApiDeps): Router {
         purpose: z.enum(['shop_order', 'vip', 'asset', 'recharge']),
         ref_id: z.string().min(1).max(80),
         provider: z.enum(['alipay', 'wechat', 'manual', 'sandbox']),
+        channel: z.enum(['qr', 'wap', 'app']).optional(),
         amount_cents: z.number().int().min(0).max(200000).optional(),
       }),
       req.body,
@@ -60,8 +61,15 @@ export function createPaymentsRouter(deps: ApiDeps): Router {
     if (!PROVIDERS.includes(body.provider)) throw new AppError('VALIDATION_FAILED', '不支持的支付渠道');
     const amount = resolveAmount(deps, userId, body.purpose, body.ref_id, body.amount_cents);
     if (amount <= 0) throw new AppError('VALIDATION_FAILED', '该对象无需支付');
-    const result = await createIntent(deps, { userId, purpose: body.purpose, refId: body.ref_id, provider: body.provider, amountCents: amount });
-    res.status(201).json({ intent: result.intent, next: result.next });
+    const result = await createIntent(deps, {
+      userId,
+      purpose: body.purpose,
+      refId: body.ref_id,
+      provider: body.provider,
+      amountCents: amount,
+      channel: body.channel,
+    });
+    res.status(201).json({ intent: result.intent, next: result.next, pay_url: 'pay_url' in result ? result.pay_url : undefined });
   });
 
   /** 查询支付意图：仅本人可见。 */
@@ -87,6 +95,51 @@ export function createPaymentsRouter(deps: ApiDeps): Router {
     if (intent.provider !== 'manual') throw new AppError('VALIDATION_FAILED', '仅人工转账支付单可线下确认');
     fulfillIntent(deps, intent, req.adminBootstrap ? 'admin-bootstrap' : req.user!.id);
     res.json({ ok: true, status: 'paid' });
+  });
+
+  /** 微信支付回调：验签 + AES-GCM 解密 + 金额核对后履约；失败返回 FAIL 让微信重试。 */
+  router.post('/payments/wechat/notify', (req, res) => {
+    const rawBody = (req as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
+    const signatureOk = verifyWechatSignature(
+      deps.env,
+      {
+        timestamp: req.header('wechatpay-timestamp') ?? undefined,
+        nonce: req.header('wechatpay-nonce') ?? undefined,
+        signature: req.header('wechatpay-signature') ?? undefined,
+        serial: req.header('wechatpay-serial') ?? undefined,
+      },
+      rawBody,
+    );
+    if (!signatureOk) {
+      res.status(401).json({ code: 'FAIL', message: '签名验证失败' });
+      return;
+    }
+    try {
+      const body = req.body as {
+        resource?: { ciphertext: string; nonce: string; associated_data?: string; tag?: string };
+      };
+      if (!body.resource) throw new AppError('VALIDATION_FAILED', '回调缺少 resource');
+      const apiV3Key = deps.env.MIM_WECHAT_API_V3_KEY ?? '';
+      const payload = decryptWechatResource(apiV3Key, body.resource) as {
+        out_trade_no?: string;
+        trade_state?: string;
+        transaction_id?: string;
+        amount?: { total?: number };
+      };
+      if (payload.trade_state !== 'SUCCESS' || !payload.out_trade_no) {
+        res.json({ code: 'SUCCESS', message: '非成功状态已忽略' });
+        return;
+      }
+      const intent = deps.db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(payload.out_trade_no) as PayIntentRow | undefined;
+      if (!intent) throw new AppError('NOT_FOUND', '支付单不存在');
+      if (intent.provider !== 'wechat') throw new AppError('CONFLICT', '支付单渠道不匹配');
+      if (intent.amount_cents !== payload.amount?.total) throw new AppError('CONFLICT', '回调金额与支付单不一致');
+      fulfillIntent(deps, intent, `wechat-${payload.transaction_id ?? payload.out_trade_no}`);
+      res.json({ code: 'SUCCESS', message: '成功' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '回调处理失败';
+      res.status(400).json({ code: 'FAIL', message });
+    }
   });
 
   /** 沙箱回调：HMAC 验签通过才履约，未启用时 404。 */

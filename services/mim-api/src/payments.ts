@@ -1,6 +1,6 @@
 /** 支付适配层：渠道注册、下单、回调验签与履约分账 */
 
-import { createHmac, randomUUID, sign } from 'node:crypto'; // 沙箱 HMAC 与支付宝 RSA2 签名
+import { createDecipheriv, createHmac, randomBytes, randomUUID, sign, verify } from 'node:crypto'; // 沙箱 HMAC、支付宝/微信 RSA 签名与微信回调解密
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import type { ApiDeps } from './types.js'; // 依赖容器
 
@@ -28,11 +28,19 @@ const now = (deps: ApiDeps) => deps.now?.() ?? new Date().toISOString(); // 可�
 /** 渠道元数据：前端据此置灰与展示说明，不暴露任何密钥。 */
 export function paymentChannels(env: Record<string, string | undefined>) {
   const hasAlipay = !!(env.MIM_ALIPAY_APP_ID && env.MIM_ALIPAY_PRIVATE_KEY); // 应用 ID + 应用私钥
-  const hasWechat = !!(env.MIM_WECHAT_MCH_ID && env.MIM_WECHAT_API_V3_KEY && env.MIM_WECHAT_SERIAL_NO && env.MIM_WECHAT_PRIVATE_KEY); // 商户号 + APIv3 + 证书序列号 + 私钥
+  const hasWechat = !!(
+    env.MIM_WECHAT_APP_ID &&
+    env.MIM_WECHAT_MCH_ID &&
+    env.MIM_WECHAT_API_V3_KEY &&
+    env.MIM_WECHAT_SERIAL_NO &&
+    env.MIM_WECHAT_PRIVATE_KEY &&
+    env.MIM_WECHAT_NOTIFY_URL &&
+    env.MIM_WECHAT_PLATFORM_PUBLIC_KEY
+  ); // AppID + 商户号 + APIv3 + 证书序列号 + 私钥 + 回调 + 平台公钥
   return [
     { id: 'manual', label: '人工转账 / 线下收款', configured: true, note: '展示收款说明，运营确认后到账' },
     { id: 'alipay', label: '支付宝当面付', configured: hasAlipay, note: hasAlipay ? '已配置，可生成扫码订单' : '缺 MIM_ALIPAY_APP_ID / MIM_ALIPAY_PRIVATE_KEY' },
-    { id: 'wechat', label: '微信企业支付（Native）', configured: hasWechat, note: hasWechat ? '已配置' : '缺微信商户号、APIv3 密钥与证书私钥' },
+    { id: 'wechat', label: '微信企业支付（Native）', configured: hasWechat, note: hasWechat ? '已配置，可生成扫码订单并接收回调' : '缺 AppID / 商户号 / APIv3 密钥 / 证书私钥 / 回调地址 / 平台公钥' },
     { id: 'sandbox', label: '沙箱支付（仅测试）', configured: env.MIM_PAYMENT_SANDBOX === '1', note: '仅当 MIM_PAYMENT_SANDBOX=1 时可用' },
   ];
 }
@@ -76,10 +84,94 @@ async function createAlipay(env: Record<string, string | undefined>, intent: Pay
   return { qrText: body.qr_code };
 }
 
-/** 创建支付意图：金额由调用方按服务端价格计算，这里只做落库与渠道下单。 */
+/** 支付宝手机网站支付：返回可直接跳转的网关地址，供移动端唤起支付宝。 */
+function createAlipayWap(env: Record<string, string | undefined>, intent: PayIntentRow): { payUrl: string } {
+  if (!env.MIM_ALIPAY_APP_ID || !env.MIM_ALIPAY_PRIVATE_KEY) throw new AppError('PROVIDER_NOT_CONFIGURED', '支付宝渠道未配置');
+  const biz = JSON.stringify({
+    out_trade_no: intent.id,
+    total_amount: (intent.amount_cents / 100).toFixed(2),
+    subject: `Mim 订单 ${intent.id}`,
+    product_code: 'QUICK_WAP_WAY',
+  });
+  const params = alipaySignedParams(env, 'alipay.trade.wap.pay', biz);
+  const query = Object.entries(params)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+  return { payUrl: `https://openapi.alipay.com/gateway.do?${query}` };
+}
+
+/** 微信支付 v3 请求签名：METHOD\nURL\nTIMESTAMP\nNONCE\nBODY\n。 */
+function wechatAuthorization(env: Record<string, string | undefined>, method: string, path: string, body: string): string {
+  const mchid = env.MIM_WECHAT_MCH_ID ?? '';
+  const serialNo = env.MIM_WECHAT_SERIAL_NO ?? '';
+  const privateKey = (env.MIM_WECHAT_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const nonce = randomBytes(16).toString('hex');
+  const message = `${method}\n${path}\n${timestamp}\n${nonce}\n${body}\n`;
+  const signature = sign('RSA-SHA256', Buffer.from(message), privateKey).toString('base64');
+  return `WECHATPAY2-SHA256-RSA2048 mchid="${mchid}",nonce_str="${nonce}",timestamp="${timestamp}",serial_no="${serialNo}",signature="${signature}"`;
+}
+
+/** 微信 Native 下单：返回 code_url，前端渲染二维码。 */
+async function createWechatNative(env: Record<string, string | undefined>, intent: PayIntentRow): Promise<{ qrText: string }> {
+  const appid = env.MIM_WECHAT_APP_ID;
+  const mchid = env.MIM_WECHAT_MCH_ID;
+  const serialNo = env.MIM_WECHAT_SERIAL_NO;
+  const privateKey = env.MIM_WECHAT_PRIVATE_KEY;
+  const notifyUrl = env.MIM_WECHAT_NOTIFY_URL;
+  if (!appid || !mchid || !serialNo || !privateKey || !notifyUrl) throw new AppError('PROVIDER_NOT_CONFIGURED', '微信支付未配置 AppID / 商户号 / 证书 / 回调地址');
+  const path = '/v3/pay/transactions/native';
+  const body = JSON.stringify({
+    appid,
+    mchid,
+    description: `Mim 订单 ${intent.id}`,
+    out_trade_no: intent.id,
+    notify_url: notifyUrl,
+    amount: { total: intent.amount_cents, currency: 'CNY' },
+  });
+  const res = await fetch(`https://api.mch.weixin.qq.com${path}`, {
+    method: 'POST',
+    headers: {
+      authorization: wechatAuthorization(env, 'POST', path, body),
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body,
+  });
+  const json = (await res.json()) as { code_url?: string; message?: string; code?: string };
+  if (!res.ok || !json.code_url) throw new AppError('INTERNAL_ERROR', json.message ?? json.code ?? '微信下单失败');
+  return { qrText: json.code_url };
+}
+
+/** 微信回调验签：用平台公钥验证原始报文签名。 */
+export function verifyWechatSignature(
+  env: Record<string, string | undefined>,
+  headers: { timestamp?: string; nonce?: string; signature?: string; serial?: string },
+  rawBody: string,
+): boolean {
+  if (env.MIM_WECHAT_PLATFORM_SERIAL && headers.serial && env.MIM_WECHAT_PLATFORM_SERIAL !== headers.serial) return false;
+  const publicKey = (env.MIM_WECHAT_PLATFORM_PUBLIC_KEY ?? '').replace(/\\n/g, '\n');
+  if (!publicKey || !headers.timestamp || !headers.nonce || !headers.signature) return false;
+  const message = `${headers.timestamp}\n${headers.nonce}\n${rawBody}\n`;
+  return verify('RSA-SHA256', Buffer.from(message), publicKey, Buffer.from(headers.signature, 'base64'));
+}
+
+/** 微信回调资源解密：AES-256-GCM，key 为 APIv3 密钥。 */
+export function decryptWechatResource(
+  apiV3Key: string,
+  resource: { ciphertext: string; nonce: string; associated_data?: string },
+): Record<string, unknown> {
+  const key = Buffer.from(apiV3Key);
+  if (key.length !== 32) throw new AppError('PROVIDER_NOT_CONFIGURED', '微信 APIv3 密钥必须是 32 字节');
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(resource.nonce));
+  decipher.setAuthTag(Buffer.from((resource as { ciphertext: string; nonce: string; associated_data?: string; tag?: string }).tag ?? '', 'base64'));
+  if (resource.associated_data) decipher.setAAD(Buffer.from(resource.associated_data));
+  const plain = Buffer.concat([decipher.update(Buffer.from(resource.ciphertext, 'base64')), decipher.final()]);
+  return JSON.parse(plain.toString('utf8')) as Record<string, unknown>;
+}
 export async function createIntent(
   deps: ApiDeps,
-  input: { userId: string; purpose: PayPurpose; refId: string; provider: PayProvider; amountCents: number },
+  input: { userId: string; purpose: PayPurpose; refId: string; provider: PayProvider; amountCents: number; channel?: 'qr' | 'wap' | 'app' },
 ) {
   if (input.amountCents <= 0) throw new AppError('VALIDATION_FAILED', '支付金额必须大于 0');
   const id = `pay-${randomUUID()}`;
@@ -105,11 +197,21 @@ export async function createIntent(
     return { intent: { ...intent, qr_text: qr }, next: 'sandbox_confirm' as const };
   }
   if (input.provider === 'alipay') {
+    if (input.channel === 'wap' || input.channel === 'app') {
+      const result = createAlipayWap(deps.env, intent);
+      deps.db.prepare('UPDATE payment_intents SET qr_text = ? WHERE id = ?').run(result.payUrl, id);
+      return { intent: { ...intent, qr_text: result.payUrl }, next: 'redirect' as const, pay_url: result.payUrl };
+    }
     const result = await createAlipay(deps.env, intent);
     deps.db.prepare('UPDATE payment_intents SET qr_text = ? WHERE id = ?').run(result.qrText, id);
     return { intent: { ...intent, qr_text: result.qrText }, next: 'qrcode' as const };
   }
-  throw new AppError('PROVIDER_NOT_CONFIGURED', '微信 Native 支付需要商户证书，当前部署未配置');
+  if (input.provider === 'wechat') {
+    const result = await createWechatNative(deps.env, intent);
+    deps.db.prepare('UPDATE payment_intents SET qr_text = ? WHERE id = ?').run(result.qrText, id);
+    return { intent: { ...intent, qr_text: result.qrText }, next: 'qrcode' as const };
+  }
+  throw new AppError('PROVIDER_NOT_CONFIGURED', '不支持的支付渠道');
 }
 
 /** 校验沙箱回调签名：HMAC-SHA256(`${intent}.${amount}.${status}`)。 */

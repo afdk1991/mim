@@ -78,6 +78,26 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [registered, setRegistered] = useState<LoginResult | null>(null);
   // 票据只消费一次：开发环境 StrictMode 会让挂载 effect 跑两遍，重复兑换必然 401
   const oauthHandled = useRef(false);
+  // 图形验证码：服务端开启 MIM_CAPTCHA_REQUIRED 时，发码前必须先通过
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaSvg, setCaptchaSvg] = useState('');
+  const [captchaCode, setCaptchaCode] = useState('');
+
+  // 挂载时查安全状态；需要验证码时立即取一张
+  useEffect(() => {
+    api.securityStatus()
+      .then((status) => {
+        setCaptchaRequired(status.captcha_required);
+        if (status.captcha_required) {
+          api.captcha().then((item) => {
+            setCaptchaId(item.id);
+            setCaptchaSvg(item.svg);
+          }).catch(() => setCaptchaRequired(false));
+        }
+      })
+      .catch(() => setCaptchaRequired(false));
+  }, []);
 
   // 挂载时查一次通道能力；失败静默降级，不阻塞登录主流程
   useEffect(() => {
@@ -176,9 +196,21 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setError(null);
     try {
       // 调用后端下发验证码；trim 去掉首尾空格以通过服务端格式校验
-      const result = await api.requestCode(region, provider, identifier.trim());
+      const result = await api.requestCode(
+        region,
+        provider,
+        identifier.trim(),
+        captchaRequired ? { id: captchaId, code: captchaCode.trim() } : undefined,
+      );
       // 保存后端返回的开发态验证码；生产环境一般为 null 不展示
       setDevCode(result.dev_code);
+      // 验证码一次性使用，发送后立即换一张
+      if (captchaRequired) {
+        setCaptchaCode('');
+        const next = await api.captcha();
+        setCaptchaId(next.id);
+        setCaptchaSvg(next.svg);
+      }
     } catch (err) {
       // 把后端或网络异常翻译成当前语言的提示文案
       setError(errorText(locale, err));
@@ -405,6 +437,31 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           ) : (
             <label>{/* 验证码模式：验证码输入框与发送按钮同行 */}
               <span>{t(locale, 'auth.code')}</span>{/* 验证码标题，走 i18n */}
+              {captchaRequired && (
+                <div className="login-captcha">
+                  <span className="login-captcha-image" dangerouslySetInnerHTML={{ __html: captchaSvg }} />
+                  <input
+                    value={captchaCode}
+                    onChange={(event) => setCaptchaCode(event.target.value)}
+                    placeholder={locale === 'en-US' ? 'Image code' : '图形验证码'}
+                    maxLength={10}
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => {
+                      api.captcha().then((item) => {
+                        setCaptchaId(item.id);
+                        setCaptchaSvg(item.svg);
+                        setCaptchaCode('');
+                      }).catch((err) => setError(errorText(locale, err)));
+                    }}
+                  >
+                    换一张
+                  </button>
+                </div>
+              )}
               <div className="row">{/* 水平排列验证码输入框与发送按钮 */}
                 <input
                   // 受控值绑定 code

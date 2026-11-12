@@ -26,6 +26,7 @@ import { createFinanceRouter } from './routes/finance.js'; // 资金：提现、
 import { createAppearanceRouter } from './routes/appearance.js'; // 外观：主题、导航、页面区块
 import { createGrowthRouter } from './routes/growth.js'; // 成长：等级、徽章、私信与归属地
 import { createI18nRouter } from './routes/i18n.js'; // 国际化：机器翻译与前后台语言分离
+import { createSecurityRouter } from './routes/security.js'; // 安全：图形验证码、举报与运营处置
 import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -86,7 +87,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 
   // 对象收发端点必须先于 express.json 挂载：其 PUT 路由自带 raw 解析器，读取原始字节
   app.use('/api/v1', createMediaObjectRouter(resolved)); // 若排在 express.json 之后，请求流已被 JSON 解析器消费，raw 拿不到原始字节
-  app.use(express.json({ limit: '1mb' })); // 全局 JSON 解析，限 1mb 防大包打爆内存；此后注册的路由才有 req.body
+  app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { (req as { rawBody?: string }).rawBody = buf.toString('utf8'); } })); // 保留原始报文供微信回调验签.body
 
   app.get('/health', (_req, res) => { // 健康检查：必须早于鉴权路由，供负载均衡与 CI 探活
     res.json({ status: 'ok', service: 'mim-api', version: SERVICE_VERSION }); // 返回最小静态响应，不查库以免探活放大故障
@@ -123,6 +124,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation/summary 与 /navigation/links 公开，写操作与探测在 router 内鉴权
   app.use('/api/v1', createSearchRouter(resolved)); // 统一搜索：/search 与 /search/summary 公开，/search/reindex 在 router 内鉴权
   app.use('/api/v1', createPaymentsRouter(resolved)); // 支付回调必须公开；其余端点在 router 内逐个挂鉴权
+  app.use('/api/v1', createSecurityRouter(resolved)); // 验证码公开；举报端点内部挂 requireAuth / 运营权限
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配
