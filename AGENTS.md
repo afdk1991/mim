@@ -1243,5 +1243,7 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 | 顺带修复 | `packages/core-domain/src/customDomains.json` 第 551 行把已移出矩阵的 `container.sealos`（`api.mixm.top` 行）改为 `worker.mim-api-edge`，`status_note` / `next_steps` 同步为 Worker 口径；该失败在 `8c5d805` 即已存在，本轮由 19/20 转 20/20 | `verify-custom-domains` 前后对比 |
 | 平台矩阵 | 自建 200 / 0.050s / 5305B；Cloudflare Pages 200 / 1.060s / 5305B；GitHub Pages 200 / 0.404s / 5305B；Gitee 200 / 0.637s / 94532B；ghcr 401 / 1.151s / 73B（未鉴权属正常）；Worker `mim-api-edge.…workers.dev` 本机 000 / 21.3s；Vercel 000 / 21.1s | 本机 `curl -w`（2026-11-12 23:4x） |
 | 未做 | IGA Pages（需 `iga_token`，未测）；生产库逐行核对（无 SSH 私钥，以发号游标 + 本地副本互证替代）；浏览器端点按取号流程（改用 API 复验） | — |
+| 私信校验线上复验 | `POST /api/v1/messages` 传 `to_member_no=MIM-10000001` → 400 `VALIDATION_FAILED`（must match `/^\d{1,10}$/`）；传 `51` → 201 `{"ok":true}` | 本机 `curl` |
+| 第二次部署 | docs 提交 `4d0aa58` 双推后 run **`43250301037`** 五作业全绿（含「发布到生产服务器」），第三次访客建号得 `58`（纯数字连号） | `gh run view` + 本机 `curl` |
 
 **提交范围说明**：本轮只提交 Mim ID 相关 24 个文件；并行会话当轮的 `payments.ts` / `app.ts` / `routes/community.ts` / `routes/payments.ts` / `security.ts` / `routes/security.ts` 等未提交改动**未被带入**，仍留在工作树。
