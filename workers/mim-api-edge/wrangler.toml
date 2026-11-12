@@ -1,0 +1,10 @@
+# Cloudflare 独立 Worker：mim-api-edge
+# 入口域名 https://mim-api-edge.15726833367.workers.dev（账号子域 15726833367）
+# 用途：替代已下线且需付费的 Sealos 容器，作为 Mim API 的免费边缘入口（/health、/api/v1/*）。
+name = "mim-api-edge"
+main = "index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[observability]
+enabled = true

@@ -72,7 +72,8 @@
     {
       "id": "sealos",
       "name": "Sealos",
-      "in_matrix": true
+      "in_matrix": false,
+      "note": "2026-11-12 21:3x 用户决策「换免费平台」：Sealos 付费容器余额 0.00、应用列表 0 个，新应用按日约 ¥0.52 计费，与铁律九「只走免费方案」冲突，故移出矩阵；其 API 第二入口角色由 Cloudflare Worker mim-api-edge 承接。"
     },
     {
       "id": "cloudflare",
@@ -107,7 +108,8 @@
     {
       "id": "cloudflare-worker",
       "name": "Cloudflare 独立 Worker",
-      "in_matrix": false
+      "in_matrix": true,
+      "note": "2026-11-12 升为矩阵第 10 行：免费 Worker 已真实承载 mim-store（固定入口）与 mim-api-edge（API 边缘入口）两个载体。"
     },
     {
       "id": "gitlab",
@@ -173,7 +175,8 @@
     "newly_adopted_free_tier": 5,
     "dedup_note": "README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。",
     "added_note": "2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
-    "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。"
+    "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。",
+    "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行，矩阵平台数仍为 10。"
   },
   "excluded": [
     {
@@ -185,6 +188,11 @@
       "id": "excluded.vefaas",
       "name": "veFaaS",
       "reason": "无长期免费层，铁律九明确排除，不得重新引入"
+    },
+    {
+      "id": "excluded.sealos",
+      "name": "Sealos（付费容器）",
+      "reason": "2026-11-12 实测：cloud.sealos.io 已登录（Singapore / Private Team），余额 0.00、应用管理列表 0 个应用，原 mim-i3ywsdfn.cloud.sealos.io 实例已停服且不在该区域 / 团队；新建应用预估 ¥0.52/日，需余额 + ghcr 私有镜像拉取凭证。用户选择「换免费平台」，故永久移出矩阵，不再作为部署项。"
     }
   ],
   "items": [
@@ -728,71 +736,6 @@
       ]
     },
     {
-      "id": "container.sealos",
-      "name": "Sealos 容器服务（纯 API）",
-      "aliases": [
-        "Sealos",
-        "mim-i3ywsdfn.cloud.sealos.io",
-        "ns-i3ywsdfn",
-        "容器 + PVC"
-      ],
-      "platform_id": "sealos",
-      "platform": "Sealos",
-      "layer": "distribution",
-      "kind": "container_service",
-      "repository": {
-        "id": "ghcr:afdk1991/mim-api",
-        "url": "https://ghcr.io/afdk1991/mim-api",
-        "role": "容器镜像来源（Deployment 拉取）"
-      },
-      "entry_url": "https://mim-i3ywsdfn.cloud.sealos.io/health",
-      "delivery": {
-        "mode": "ci",
-        "ci_job": "platforms",
-        "ci_step": "Sealos",
-        "artifact": "deploy/sealos/mim.yaml",
-        "artifact_in_head": true,
-        "artifact_in_worktree": true,
-        "credential": "SEALOS_KUBECONFIG / SEALOS_DOMAIN / SEALOS_NAMESPACE / MIM_JWT_SECRET",
-        "modes": [
-          "ci-kubectl-apply"
-        ]
-      },
-      "status": "BROKEN",
-      "result": {
-        "verdict": "FAIL",
-        "http_code": "000",
-        "latency_ms": null,
-        "bytes": 0,
-        "evidence": "2026-11-12 22:5x 浏览器实测（bu 平面）：https://cloud.sealos.io/ 已处于登录态（区域 Singapore / Private Team / 余额 0.00），桌面正常；进入「应用管理」应用列表为 0 个（无任何已部署应用），说明 mim-i3ywsdfn.cloud.sealos.io 所属实例不在当前区域/团队内且已停服；本机与 CI 出口 /health 均 000。Sealos 运行应用按小时计费，当前余额 0.00，在不充值前提下无法重启原实例，重新部署亦需余额与 ghcr 私有镜像拉取凭证。",
-        "captured_at": "2026-11-12 22:25 +08:00"
-      },
-      "anomalies": [
-        {
-          "code": "LOGIN_REQUIRED",
-          "severity": "critical",
-          "message": "cloud.sealos.io 已登录（Singapore / Private Team，余额 0.00），但应用列表 0 个：原 mim 实例不在当前区域且已停服；恢复需充值或改用其他区域/团队重建，属付费与账号决策，非技术可自动修复项"
-        },
-        {
-          "code": "CREDENTIAL_MISSING",
-          "severity": "critical",
-          "message": "缺 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET，CI Sealos 步骤只能 SKIP"
-        },
-        {
-          "code": "SITE_DOWN",
-          "severity": "critical",
-          "message": "/health 双出口 000，站点当前不可访问"
-        }
-      ],
-      "missing_fields": [],
-      "sources": [
-        "curl https://mim-i3ywsdfn.cloud.sealos.io/health",
-        "git ls-tree HEAD",
-        ".github/workflows/deploy.yml step Sealos",
-        "AGENTS.md §9.1"
-      ]
-    },
-    {
       "id": "pages.iga",
       "name": "IGA Pages 前端静态站",
       "aliases": [
@@ -906,11 +849,6 @@
           "code": "DNS_POLLUTION",
           "severity": "info",
           "message": "本机 *.workers.dev 存在 DNS 污染 / 连接阻断，内容取证以 CI Runner 出口为准"
-        },
-        {
-          "code": "MATRIX_ROW_MISSING",
-          "severity": "info",
-          "message": "矩阵表未单列该 Worker，汇总中单列一行以避免遗漏"
         }
       ],
       "missing_fields": [],
@@ -1196,6 +1134,53 @@
         "用户决策 2026-11-10：全部采用免费层",
         "用户平台对比表（Render 免费层）",
         "render.yaml（新增）"
+      ]
+    },
+    {
+      "id": "worker.mim-api-edge",
+      "name": "Cloudflare 独立 Worker（mim-api-edge 免费 API 入口）",
+      "aliases": [
+        "mim-api-edge",
+        "mim-api-edge.15726833367.workers.dev",
+        "Sealos 替代入口"
+      ],
+      "platform_id": "cloudflare-worker",
+      "platform": "Cloudflare 独立 Worker",
+      "layer": "distribution",
+      "kind": "worker",
+      "repository": {
+        "id": null,
+        "url": null,
+        "role": "源码入仓 workers/mim-api-edge，由 GitHub Actions 用 wrangler 发布"
+      },
+      "entry_url": "https://mim-api-edge.15726833367.workers.dev",
+      "delivery": {
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Cloudflare Worker（mim-api-edge 免费 API 入口）",
+        "artifact": "workers/mim-api-edge",
+        "artifact_in_head": true,
+        "artifact_in_worktree": true,
+        "credential": "GH secret CLOUDFLARE_API_TOKEN（令牌 mim-ci-full：Cloudflare Pages 编辑 + Workers 脚本 编辑）",
+        "modes": [
+          "ci-wrangler-worker"
+        ]
+      },
+      "status": "UNVERIFIED",
+      "result": null,
+      "anomalies": [
+        {
+          "code": "EMPTY_RESULT",
+          "severity": "warning",
+          "message": "Worker 已入仓但尚未部署，等待本 run 的 CI 出口探测取证"
+        }
+      ],
+      "missing_fields": [
+        "http_code"
+      ],
+      "sources": [
+        "deploy.yml platforms 作业新增步骤",
+        "workers/mim-api-edge/index.js"
       ]
     }
   ]
