@@ -115,7 +115,6 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
   seedNavLinks(db); // 写入导航站默认目录（站内视图入口），幂等，不覆盖用户新增与已探测状态
-  seedCommunity(db); // 写入社区板块 / 官方帖 / VIP 套餐 / 独立商品 / 卡密 / 优惠码，保证新库开箱可用
   const backfilled = backfillMemberNos(db); // 历史用户补发 Mim ID 号码；新库为空操作
   if (backfilled > 0) console.log(`[db] member_no backfilled: ${backfilled} users`); // 补号必须留痕，便于核对号码连续性
   return db; // 返回已完成初始化的连接
@@ -608,88 +607,3 @@ export function seedRbac(db: Db): void { // RBAC 种子入口，随 createDataba
   }); // 事务函数准备完成
   seed(); // 执行事务
 } // seedRbac 结束
-
-/**
- * 社区与变现种子：板块、官方帖、VIP 套餐、独立商品、自动发货卡密、充值卡与优惠码。
- * 全部使用稳定主键 + INSERT OR IGNORE，重复启动不覆盖用户已产生的数据。
- */
-export function seedCommunity(db: Db): void {
-  const now = new Date().toISOString();
-  const insertBoard = db.prepare(
-    `INSERT OR IGNORE INTO community_boards (id, slug, name, description, icon, sort_order, price_cents, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-  );
-  const insertThread = db.prepare(
-    `INSERT OR IGNORE INTO community_threads
-       (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, created_at, updated_at, last_activity_at)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, ?, 0, ?, ?, ?)`,
-  );
-  const insertVip = db.prepare(
-    `INSERT OR IGNORE INTO vip_plans (id, code, name, level, price_cents, duration_days, perks, sort_order, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-  );
-  const insertProduct = db.prepare(
-    `INSERT OR IGNORE INTO shop_products (id, code, name, summary, kind, price_cents, cover_url, stock, delivery_note, status, sort_order, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-  );
-  const insertShopKey = db.prepare(
-    `INSERT OR IGNORE INTO shop_card_keys (id, product_id, code, status, created_at) VALUES (?, ?, ?, 'unused', ?)`,
-  );
-  const insertWalletCard = db.prepare(
-    `INSERT OR IGNORE INTO wallet_cards (id, code, amount_cents, status, created_at) VALUES (?, ?, ?, 'unused', ?)`,
-  );
-  const insertCoupon = db.prepare(
-    `INSERT OR IGNORE INTO coupons (id, code, kind, value, min_amount_cents, max_uses, used_count, active)
-     VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
-  );
-  const seed = db.transaction(() => {
-    const boards: Array<[string, string, string, string, string, number]> = [
-      ['board-general', 'general', '综合讨论', '产品、技术与任何值得聊的话题', '💬', 1],
-      ['board-open-source', 'open-source', '开源项目', '自研工具与开源项目发布、更新日志', '📦', 2],
-      ['board-tools', 'tools', '自研工具', 'Quick Build WP、换域名插件、流盾 WAF 等工具', '🛠️', 3],
-      ['board-paid', 'paid', '知识付费', '付费阅读、资源下载、图库与视频', '🔖', 4],
-      ['board-help', 'help', '求助答疑', '部署、支付、短信、CDN 与伪静态问题', '🆘', 5],
-      ['board-announce', 'announce', '公告', '产品公告、更新日志与推广计划', '📣', 6],
-    ];
-    for (const [id, slug, name, description, icon, sort] of boards) {
-      insertBoard.run(id, slug, name, description, icon, sort, now);
-    }
-    const threads: Array<[string, string, string, string, string, string, string | null, number, number, number, number]> = [
-      ['thread-store-visual', 'board-open-source', 'Mim 商城商品视觉改造全记录：19 张分类封面 + 参数详情图', '从纯文字卡片到封面、参数键值表与 900×1180 参数长图，附线上取证。', '商城改造的关键不是“有图”，而是让 205 条模块都能被同一套数据驱动视觉覆盖。\n\n做法：19 个一级分类各一张 3:2 封面；卡片左上分类角标、右上价格角标；详情首屏 11 项参数键值表 + 900×1180 SVG 参数图。\n\n线上实测：cards=12、封面 naturalWidth=768、specRows=11、参数图 900×1180。', 'text', '/catalog/dev.jpg', 0, 1280, 96, 5],
-      ['thread-quick-build', 'board-tools', 'Quick Build WP：宝塔 + 环境 + WordPress 一键装', '一条命令完成宝塔、LNMP 与 WordPress 初始化，附常见失败排查。', 'Quick Build WP 把建站最常见的三段工作合成一个可重放脚本：安装宝塔、拉起 LNMP、初始化 WordPress。\n\n失败排查顺序：先看 80/443 端口占用，再看 PHP 版本与伪静态，最后查数据库权限。', 'text', '/catalog/tools.jpg', 0, 890, 41, 2],
-      ['thread-paid-store', 'board-paid', '付费阅读：从 0 到 1 做一个能收款的独立商城', '商品类型、卡密、优惠码、物流、退款与分成的完整拆解。', '这篇是付费内容：把独立商城拆成商品、订单、支付、履约、售后、资金六层，并给出每层的最小可用实现。\n\n如果你只想先跑通，优先做“虚拟自动发货 + 卡密库存 + 余额扣款”，再接支付渠道。', 'text', '/catalog/store.jpg', 1900, 460, 28, 3],
-      ['thread-comic-demo', 'board-open-source', '漫剧 AI 剧成片演示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n放映厅可直接观看，创作工作台可复制同一条链路。', 'video', '/catalog/ai.jpg', 0, 720, 55, 4],
-      ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 350, 22, 3],
-      ['thread-guest-session', 'board-help', '访客会话如何承接购物车、聊天与漫剧？', '免登录体验的实现边界、限流与升级路径。', '访客进入站点时自动调用 POST /auth/guest，拿到与正式账号同形状的 access/refresh 双令牌；购物车、订单、聊天、漫剧都按同一用户路径工作。\n\n升级：登录 / 注册后用真实账号接管同一份数据，访客记录不丢。', 'qa', '/catalog/wechat.jpg', 0, 610, 37, 6],
-      ['thread-announce', 'board-announce', '2026-11-12 更新：全站免登录 + 商城商品视觉上线', '门禁解除、商品封面与参数详情图、访客交易链路。', '本轮更新：\n1. 全站移除“此功能需登录后使用”，访客会话自动建立。\n2. 商城卡片加封面、分类角标、价格角标；详情加 11 项参数表与参数长图。\n3. 访客可加购、解锁免费模块、进入结算。', 'text', '/catalog/misc.jpg', 0, 980, 64, 6],
-    ];
-    for (const [id, boardId, title, summary, body, kind, cover, price, views, likes, daysAgo] of threads) {
-      const created = new Date(Date.now() - daysAgo * 86400000).toISOString();
-      insertThread.run(id, boardId, title, summary, body, kind, cover, price, views, likes, created, created, created);
-    }
-    const vips: Array<[string, string, string, number, number, number, string, number]> = [
-      ['vip-monthly', 'vip-monthly', 'VIP 月卡', 1, 3000, 30, JSON.stringify(['付费帖 9 折', '每月 50 积分', '专属徽章']), 1],
-      ['vip-yearly', 'vip-yearly', 'VIP 年卡', 2, 29800, 365, JSON.stringify(['付费帖 8 折', '每月 200 积分', '专属徽章', '优先答疑']), 2],
-      ['vip-lifetime', 'vip-lifetime', 'VIP 终身', 3, 198000, 3650, JSON.stringify(['付费帖 7 折', '每月 500 积分', '终身徽章', '创作分成 +5%']), 3],
-    ];
-    for (const [id, code, name, level, price, days, perks, sort] of vips) {
-      insertVip.run(id, code, name, level, price, days, perks, sort);
-    }
-    const products: Array<[string, string, string, string, string, number, string, number, string, number]> = [
-      ['prod-keycap', 'mim-keycap', 'Mim 定制键帽', '铝合金阳极氧化，兼容 Cherry MX 轴体，附赠拔键器。', 'physical', 6900, '/catalog/plugin.jpg', 50, '顺丰陆运，48 小时内发出', 1],
-      ['prod-pixi', 'pixi-pack', 'Pixi 素材包（自动发卡密）', '500+ 游戏 UI 切片与音效，购买后立即显示下载卡密。', 'virtual_auto', 1900, '/catalog/game.jpg', 20, '支付成功立即发放卡密', 2],
-      ['prod-deploy', 'deploy-service', '远程部署指导（人工发货）', '1 对 1 远程协助：域名、HTTPS、Nginx、systemd 与日志排查。', 'virtual_manual', 19900, '/catalog/server.jpg', 10, '下单后 24 小时内联系排期', 3],
-    ];
-    for (const [id, code, name, summary, kind, price, cover, stock, note, sort] of products) {
-      insertProduct.run(id, code, name, summary, kind, price, cover, stock, note, sort, now);
-    }
-    for (let i = 1; i <= 3; i += 1) {
-      insertShopKey.run(`shop-key-pixi-${i}`, 'prod-pixi', `PIXI-MIM-${String(i).padStart(2, '0')}-2026`, now);
-    }
-    insertWalletCard.run('wallet-card-demo-100', 'MIM-DEMO-100', 10000, now);
-    insertWalletCard.run('wallet-card-demo-500', 'MIM-DEMO-500', 50000, now);
-    insertCoupon.run('coupon-mim10', 'MIM10', 'fixed', 1000, 5000, 100); // 优惠码表无 created_at 列，SQL 仅 6 个占位符
-    insertCoupon.run('coupon-vip20', 'VIP20', 'percent', 20, 3000, 100); // 同上，避免多传一个参数导致种子整体回滚
-  });
-  seed();
-}
