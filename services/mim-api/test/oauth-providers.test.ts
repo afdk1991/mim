@@ -23,7 +23,7 @@ function miniApp(deps: ApiDeps) { // 依赖显式注入
 } // miniApp 结束
 
 /** 期望的 14 家标识，顺序与注册表一致 */
-const EXPECTED_IDS = ['github', 'gitee', 'gitlab', 'google', 'microsoft', 'apple', 'wechat', 'qq', 'douyin', 'weibo', 'baidu', 'alipay', 'facebook', 'twitter'];
+const EXPECTED_IDS = ['github', 'gitee', 'gitlab', 'google', 'microsoft', 'apple', 'wechat', 'qq', 'douyin', 'weibo', 'baidu', 'alipay', 'facebook', 'twitter']; // 准备：构造本用例需要的输入或句柄
 
 describe('OAuth 注册表（14 家）', () => { // 注册表维度
   it('注册表包含 14 家且顺序固定', () => { // 清单完整性

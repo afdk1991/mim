@@ -870,7 +870,7 @@ function notifySignature(orderId: string, channel: string, txn: string, amount: 
 /** 当前秒级时间戳：保证落在服务端 ±300s 窗口内 */
 function nowSeconds(): number {
   // 取整到秒
-  return Math.floor(Date.now() / 1000);
+  return Math.floor(Date.now() / 1000); // 返回：交回本步骤结果供断言使用
 } // 结束 nowSeconds
 
 describe('渠道支付回调（POST /orders/:id/payment-notify）', () => { // 无商户凭证下可验证的在线支付接入层

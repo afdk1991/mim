@@ -52,7 +52,7 @@ describe('站点模块注册表与公开目录', () => { // 浏览类端点匿�
     expect(res.body.source).toContain('主机记录与备注'); // 依据说明
     expect(res.body.moduleBasis).toContain('业务系统'); // 模块划分依据
     // 落地状态四态计数：已落地 5 / 部分相邻 18 / 规划中 19 / 语义冲突 2，合计 44
-    expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 });
+    expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 }); // 断言：校验接口响应或状态符合冻结契约
   }); // overview 用例结束
 
   it('GET /sites 返回 44 模块且每条备注原文与共享注册表逐字一致', async () => { // 零漂移断言
@@ -75,8 +75,8 @@ describe('站点模块注册表与公开目录', () => { // 浏览类端点匿�
       expect(row.capability_count).toBe(3); // 三个功能点
       expect(row.item_count).toBe(2); // 两条演示数据
       // 落地映射随列表透出：状态合法、视图为 null 或已登记视图、边界说明非空
-      expect(['implemented', 'partial', 'planned', 'conflict']).toContain(row.implementation.status);
-      expect(row.implementation.boundary).toBeTruthy();
+      expect(['implemented', 'partial', 'planned', 'conflict']).toContain(row.implementation.status); // 断言：校验接口响应或状态符合冻结契约
+      expect(row.implementation.boundary).toBeTruthy(); // 断言：校验接口响应或状态符合冻结契约
     } // 比对循环结束
   }); // 零漂移用例结束
 

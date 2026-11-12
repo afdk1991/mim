@@ -22,19 +22,19 @@ async function login(identifier: string): Promise<Session> {
     region: 'cn', provider: 'phone', identifier, code: codeRes.body.dev_code, device: { platform: 'web', name: 'test' },
   });
   expect(loginRes.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-  return { token: loginRes.body.access_token as string, userId: loginRes.body.user.id as string };
+  return { token: loginRes.body.access_token as string, userId: loginRes.body.user.id as string }; // 返回：交回本步骤结果供断言使用
 }
 
 function authHeaders(token: string): Record<string, string> {
-  return { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  return { authorization: `Bearer ${token}`, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
 }
 
 function writeHeaders(token: string): Record<string, string> {
-  return { ...authHeaders(token), 'idempotency-key': randomUUID() };
+  return { ...authHeaders(token), 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
 }
 
 function adminHeaders(): Record<string, string> {
-  return { 'x-admin-token': ADMIN_TOKEN, 'content-type': 'application/json' };
+  return { 'x-admin-token': ADMIN_TOKEN, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
 }
 
 /** 后台整组写规则 */

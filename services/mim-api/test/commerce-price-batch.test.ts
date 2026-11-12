@@ -13,7 +13,7 @@ let app: Express; // 待测应用
 let db: ReturnType<typeof createDatabase>; // 内存库句柄
 
 function adminHeaders(): Record<string, string> { // 运营引导通道请求头
-  return { 'x-admin-token': ADMIN_TOKEN, 'content-type': 'application/json' };
+  return { 'x-admin-token': ADMIN_TOKEN, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
 }
 
 /** 读 cn 区模块当前生效价格（分）；无价返回 null */

@@ -18,11 +18,11 @@ beforeEach(() => {
 async function login(identifier = '13800000001'): Promise<Record<string, string>> {
   const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 构造：准备本用例需要的输入、句柄或期望值
   expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-  return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' };
+  return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
 }
 
 function writeHeaders(auth: Record<string, string>): Record<string, string> {
-  return { ...auth, 'idempotency-key': randomUUID() };
+  return { ...auth, 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
 }
 
 describe('社区与变现', () => {

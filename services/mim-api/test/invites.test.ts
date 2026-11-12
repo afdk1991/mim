@@ -53,7 +53,7 @@ describe('邀请码管理端点', () => { // 管理维度
   }); // beforeEach 结束
 
   it('批量生成 3 枚单次码；列表与统计回写正确；可禁用', async () => { // 生成 / 统计 / 禁用
-    const created = await request(app).post('/api/v1/admin/invites').set('x-admin-token', ADMIN_TOKEN)
+    const created = await request(app).post('/api/v1/admin/invites').set('x-admin-token', ADMIN_TOKEN) // 准备：构造本用例需要的输入或句柄
       .send({ count: 3, max_uses: 1, note: '灰度邀请' }); // 批量生成
     expect(created.status).toBe(201); // 创建成功
     expect(created.body.invites).toHaveLength(3); // 三枚码

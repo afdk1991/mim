@@ -30,7 +30,7 @@ describe('统一入口配置清单：规模与去重整理', () => { // 清单�
     expect(res.body.configured).toBe(0); // 未提供具体主机值
     expect(res.body.unconfigured).toBe(44); // 全部仍为占位状态
     // 落地状态四态计数：已落地 5 / 部分相邻 18 / 规划中 19 / 语义冲突 2
-    expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 });
+    expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 }); // 断言：校验接口响应或状态符合冻结契约
   }); // overview 用例结束
 
   it('去重口径：88 行业务备注合并 44 项，@ 两行与 11 行空白各合并为 1 项', async () => {
@@ -93,8 +93,8 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
       expect(row.apiRole).toBeTruthy(); // 接口职责
       expect(row.related.length).toBeGreaterThan(0); // 相似模块关联与区分
       // 落地映射：状态合法、边界说明非空
-      expect(['implemented', 'partial', 'planned', 'conflict']).toContain(row.implementation.status);
-      expect(row.implementation.boundary).toBeTruthy();
+      expect(['implemented', 'partial', 'planned', 'conflict']).toContain(row.implementation.status); // 断言：校验接口响应或状态符合冻结契约
+      expect(row.implementation.boundary).toBeTruthy(); // 断言：校验接口响应或状态符合冻结契约
     } // 比对循环结束
   }); // 清单逐项用例结束
 

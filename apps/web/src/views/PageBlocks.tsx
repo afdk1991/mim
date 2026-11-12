@@ -23,11 +23,11 @@ function Block({ block }: { block: PageBlock }) {
   const config = block.config ?? {};
   if (block.kind === 'hero') {
     return (
-      <section className="page-block hero"> // 区块 page-block
-        <h2>{String(config.title ?? 'Mim')}</h2> // 标题
+      <section className="page-block hero">
+        <h2>{String(config.title ?? 'Mim')}</h2>
         {config.subtitle ? <p className="muted">{String(config.subtitle)}</p> : null}
         {config.cta && typeof config.cta === 'object' ? (
-          <a className="btn primary" href={hrefOf((config.cta as Record<string, unknown>).href)}>{String((config.cta as Record<string, unknown>).label ?? '进入')}</a> // 链接
+          <a className="btn primary" href={hrefOf((config.cta as Record<string, unknown>).href)}>{String((config.cta as Record<string, unknown>).label ?? '进入')}</a>
         ) : null}
       </section>
     );
@@ -35,12 +35,12 @@ function Block({ block }: { block: PageBlock }) {
   if (block.kind === 'features') {
     const items = Array.isArray(config.items) ? (config.items as Array<Record<string, unknown>>) : [];
     return (
-      <section className="page-block"> // 区块 page-block
-        <div className="commerce-grid"> // 区块 commerce-grid
+      <section className="page-block">
+        <div className="commerce-grid">
           {items.map((item) => (
-            <article className="panel" key={String(item.title ?? Math.random())}> // 区块 panel
-              <div className="panel-head"><h3>{String(item.title ?? '')}</h3></div> // 区块 panel-head
-              <p className="muted">{String(item.text ?? '')}</p> // 区块 muted
+            <article className="panel" key={String(item.title ?? Math.random())}>
+              <div className="panel-head"><h3>{String(item.title ?? '')}</h3></div>
+              <p className="muted">{String(item.text ?? '')}</p>
             </article>
           ))}
         </div>
@@ -50,24 +50,24 @@ function Block({ block }: { block: PageBlock }) {
   if (block.kind === 'tabs') {
     const tabs = Array.isArray(config.tabs) ? config.tabs.map(String) : [];
     return (
-      <section className="page-block tabs"> // 区块 page-block
+      <section className="page-block tabs">
         {tabs.map((tab) => <span className="deploy-badge muted" key={tab}>{tab}</span>)}
       </section>
     );
   }
   if (block.kind === 'notice' || block.kind === 'announcements') {
     return (
-      <section className="page-block notice"> // 区块 page-block
-        <div className="panel-head"><h3>{String(config.title ?? (block.kind === 'notice' ? '公告' : '最新公告'))}</h3></div> // 区块 panel-head
-        <p className="muted">{String(config.text ?? config.subtitle ?? '产品公告、更新日志与推广计划见社区公告板块。')}</p> // 区块 muted
-        <a className="link" href={hrefOf('/community')}>查看社区公告</a> // 链接
+      <section className="page-block notice">
+        <div className="panel-head"><h3>{String(config.title ?? (block.kind === 'notice' ? '公告' : '最新公告'))}</h3></div>
+        <p className="muted">{String(config.text ?? config.subtitle ?? '产品公告、更新日志与推广计划见社区公告板块。')}</p>
+        <a className="link" href={hrefOf('/community')}>查看社区公告</a>
       </section>
     );
   }
   if (block.kind === 'button') {
     const variant = config.variant === 'ghost' ? 'ghost' : 'primary';
     return (
-      <section className="page-block block-button"> // 按钮区块
+      <section className="page-block block-button">
         <a className={`btn ${variant}`} href={hrefOf(config.href)}>{String(config.label ?? '查看详情')}</a>
       </section>
     );
@@ -75,7 +75,7 @@ function Block({ block }: { block: PageBlock }) {
   if (block.kind === 'image_text') {
     const align = config.align === 'right' ? 'right' : 'left';
     return (
-      <section className={`page-block image-text align-${align}`}> // 图文区块
+      <section className={`page-block image-text align-${align}`}>
         {config.image_url ? <img src={hrefOf(config.image_url)} alt={String(config.title ?? '')} loading="lazy" /> : null}
         <div className="image-text-body">
           {config.title ? <h3>{String(config.title)}</h3> : null}
@@ -87,7 +87,7 @@ function Block({ block }: { block: PageBlock }) {
   }
   if (block.kind === 'announcement') {
     return (
-      <section className="page-block notice"> // 公告区块：单条公告配置
+      <section className="page-block notice">
         <div className="panel-head">
           <h3>{String(config.title ?? '公告')}</h3>
           {config.pinned ? <span className="deploy-badge">置顶</span> : null}
@@ -100,8 +100,8 @@ function Block({ block }: { block: PageBlock }) {
     return <ProductGrid />;
   }
   return (
-    <section className="page-block"> // 区块 page-block
-      <div className="panel-head"><h3>{block.kind}</h3><span className="deploy-badge muted">区块</span></div> // 区块 panel-head
+    <section className="page-block">
+      <div className="panel-head"><h3>{block.kind}</h3><span className="deploy-badge muted">区块</span></div>
     </section>
   );
 }
@@ -116,13 +116,13 @@ function ProductGrid() {
   }, []);
   if (products.length === 0) return <section className="page-block"><p className="muted">商城商品加载中…</p></section>;
   return (
-    <section className="page-block"> // 区块 page-block
-      <div className="commerce-grid"> // 区块 commerce-grid
+    <section className="page-block">
+      <div className="commerce-grid">
         {products.map((product) => (
-          <a className="panel product" key={product.code} href={hrefOf('/products')}> // 链接
+          <a className="panel product" key={product.code} href={hrefOf('/products')}>
             {product.cover_url ? <img src={hrefOf(product.cover_url)} alt={product.name} loading="lazy" /> : null}
             <div className="panel-head"><h3>{product.name}</h3><span className="deploy-badge">{`¥${(product.price_cents / 100).toFixed(2)}`}</span></div>
-            <p className="muted">{product.summary}</p> // 区块 muted
+            <p className="muted">{product.summary}</p>
           </a>
         ))}
       </div>
@@ -157,14 +157,14 @@ export function PageBlocks({ page, locale = 'zh-CN' }: Props) {
   const orderedBlocks = [...blocks].sort((a, b) => a.sort_order - b.sort_order);
   const hasAnnouncementBlock = blocks.some((block) => block.kind === 'announcements');
   return (
-    <div className="page-blocks" data-page={page} data-locale={locale}> // 区块 page-blocks
+    <div className="page-blocks" data-page={page} data-locale={locale}>
       {orderedBlocks.map((block) => <Block block={block} key={block.id} />)}
       {hasAnnouncementBlock && announcements.length > 0 ? (
-        <section className="page-block"> // 区块 page-block
-          <div className="panel-head"><h3>社区公告</h3></div> // 区块 panel-head
-          <ul className="plain-list"> // 区块 plain-list
+        <section className="page-block">
+          <div className="panel-head"><h3>社区公告</h3></div>
+          <ul className="plain-list">
             {announcements.map((thread) => (
-              <li className="deploy-row" key={thread.id}> // 区块 deploy-row
+              <li className="deploy-row" key={thread.id}>
                 <a className="link" href={`${baseOf()}community?thread=${encodeURIComponent(thread.id)}`}>{thread.title}</a>
               </li>
             ))}

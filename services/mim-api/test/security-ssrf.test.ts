@@ -7,7 +7,7 @@ import { AppError } from '@mim/core-domain';
 import { assertSafeOutboundUrl, safeOutboundFetch } from '../src/security.js';
 
 /** 期望被拒绝的出站地址：协议非法 / 私网 / 环回 / 链路本地 / 元数据 / 编码 IP */
-const REJECTED = [
+const REJECTED = [ // 准备：构造本用例需要的输入或句柄
   'file:///etc/passwd', // 非 http(s) 协议
   'javascript:alert(1)', // 脚本协议
   'http://127.0.0.1/', // 环回 IPv4
@@ -30,39 +30,39 @@ const REJECTED = [
 describe('assertSafeOutboundUrl 拒绝内网 / 非法协议目标', () => {
   for (const target of REJECTED) {
     it(`拒绝 ${target}`, async () => {
-      await expect(assertSafeOutboundUrl(target)).rejects.toBeInstanceOf(AppError);
+      await expect(assertSafeOutboundUrl(target)).rejects.toBeInstanceOf(AppError); // 断言：校验接口响应或状态符合冻结契约
     });
   }
 });
 
 describe('safeOutboundFetch 出站前复核目标', () => {
   it('命中环回地址时在 fetch 前即拒绝，不发出请求', async () => {
-    const server = createServer((_req, res) => {
+    const server = createServer((_req, res) => { // 准备：构造本用例需要的输入或句柄
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('ok');
     });
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const port = (server.address() as AddressInfo).port;
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)); // 执行：等待异步操作返回后继续
+    const port = (server.address() as AddressInfo).port; // 准备：构造本用例需要的输入或句柄
     try {
       await expect(safeOutboundFetch(`http://127.0.0.1:${port}/`)).rejects.toBeInstanceOf(AppError);
     } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => server.close(() => resolve())); // 执行：等待异步操作返回后继续
     }
   });
 
   it('3xx 跳转到内网地址时逐跳复核并拒绝', async () => {
     // 首跳目标用本机回环地址：守卫在首跳即拦下私网目标；
     // 重定向 Location 为元数据地址，复核链路同样走私网判定。
-    const server = createServer((_req, res) => {
+    const server = createServer((_req, res) => { // 准备：构造本用例需要的输入或句柄
       res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' });
       res.end();
     });
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const port = (server.address() as AddressInfo).port;
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)); // 执行：等待异步操作返回后继续
+    const port = (server.address() as AddressInfo).port; // 准备：构造本用例需要的输入或句柄
     try {
       await expect(safeOutboundFetch(`http://127.0.0.1:${port}/`)).rejects.toBeInstanceOf(AppError);
     } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => server.close(() => resolve())); // 执行：等待异步操作返回后继续
     }
   });
 });

@@ -46,26 +46,26 @@ function setup(env: Record<string, string | undefined> = {}): Setup {
   const app = miniApp(deps); // 构造：准备本用例需要的输入、句柄或期望值
   const user = createUser(deps.db, { region: 'cn', now: '2026-11-13T08:00:00.000Z' }); // 构造：准备本用例需要的输入、句柄或期望值
   const token = issueAccessToken(user.id, user.region, deps.jwtSecret); // 构造：准备本用例需要的输入、句柄或期望值
-  return { deps, app, user, token };
+  return { deps, app, user, token }; // 返回：交回本步骤结果供断言使用
 }
 
 /** 引导通道管理端请求头 */
 function adminHeaders(): Record<string, string> {
-  return { 'x-admin-token': ADMIN_TOKEN };
+  return { 'x-admin-token': ADMIN_TOKEN }; // 返回：交回本步骤结果供断言使用
 }
 
 /** 管理端写操作请求头：叠幂等键（全局幂等中间件对写方法强制要求）。 */
 function adminWriteHeaders(): Record<string, string> {
-  return { ...adminHeaders(), 'idempotency-key': randomUUID() };
+  return { ...adminHeaders(), 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
 }
 
 describe('公开公告列表', () => {
   it('只回已发布且在有效期内的条目，置顶在前，字段严格匹配冻结契约', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/announcements'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(res.body.items).toHaveLength(2); // 种子：1 置顶已发布 + 1 普通已发布；草稿不可见
-    const [first, second] = res.body.items as Array<Record<string, unknown>>;
+    const [first, second] = res.body.items as Array<Record<string, unknown>>; // 准备：构造本用例需要的输入或句柄
     expect(Object.keys(first).sort()).toEqual(['body', 'id', 'pinned', 'published_at', 'title'].sort()); // 契约字段集合
     expect(first.pinned).toBe(true); // 置顶条目排第一
     expect(second.pinned).toBe(false); // 断言：校验响应字段与冻结契约一致
@@ -73,7 +73,7 @@ describe('公开公告列表', () => {
   });
 
   it('草稿与已过期公告不出现在公开列表', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     // 后台补一条草稿 + 一条已过期已发布
     await request(app) // 执行：等待接口或数据库操作返回
       .post('/api/v1/admin/content/announcements')
@@ -93,7 +93,7 @@ describe('公开公告列表', () => {
   });
 
   it('limit 参数截断列表', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/announcements?limit=1'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(res.body.items).toHaveLength(1); // 断言：校验响应字段与冻结契约一致
@@ -102,7 +102,7 @@ describe('公开公告列表', () => {
 
 describe('公开更新日志与版本聚合', () => {
   it('按语义版本倒序返回，字段严格匹配冻结契约', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/changelog'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     const versions = (res.body.items as Array<{ version: string }>).map((i) => i.version); // 构造：准备本用例需要的输入、句柄或期望值
@@ -112,7 +112,7 @@ describe('公开更新日志与版本聚合', () => {
   });
 
   it('语义版本排序：0.0.10 排在 0.0.8 之前', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     await request(app) // 执行：等待接口或数据库操作返回
       .post('/api/v1/admin/content/changelog')
       .set(adminWriteHeaders())
@@ -123,7 +123,7 @@ describe('公开更新日志与版本聚合', () => {
   });
 
   it('草稿更新日志不进入公开列表', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     await request(app) // 执行：等待接口或数据库操作返回
       .post('/api/v1/admin/content/changelog')
       .set(adminWriteHeaders())
@@ -134,11 +134,11 @@ describe('公开更新日志与版本聚合', () => {
   });
 
   it('按版本聚合视图：每版本一条代表条目 + 条目数，版本倒序', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/changelog/versions'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(res.body.items).toHaveLength(2); // 断言：校验响应字段与冻结契约一致
-    const [v8, v7] = res.body.items as Array<{ version: string; entry_count: number; latest_id: string }>;
+    const [v8, v7] = res.body.items as Array<{ version: string; entry_count: number; latest_id: string }>; // 准备：构造本用例需要的输入或句柄
     expect(v8.version).toBe('0.0.8'); // 断言：校验响应字段与冻结契约一致
     expect(v8.entry_count).toBe(1); // 断言：校验响应字段与冻结契约一致
     expect(v7.version).toBe('0.0.7'); // 断言：校验响应字段与冻结契约一致
@@ -148,7 +148,7 @@ describe('公开更新日志与版本聚合', () => {
 
 describe('公开推广计划', () => {
   it('只回进行中且在有效期内的计划，字段严格匹配冻结契约', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/promotions'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(res.body.items).toHaveLength(1); // 断言：校验响应字段与冻结契约一致
@@ -159,7 +159,7 @@ describe('公开推广计划', () => {
   });
 
   it('草稿与已过期计划不出现在公开列表', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     await request(app) // 执行：等待接口或数据库操作返回
       .post('/api/v1/admin/content/promotions')
       .set(adminWriteHeaders())
@@ -178,21 +178,21 @@ describe('公开推广计划', () => {
 
 describe('管理端鉴权门禁', () => {
   it('匿名访问管理端列表返回 401', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/admin/content/announcements'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(401); // 断言：校验响应字段与冻结契约一致
     expect(res.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言：校验响应字段与冻结契约一致
   });
 
   it('普通登录用户无运营内容权限返回 403', async () => {
-    const { app, token } = setup();
+    const { app, token } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/admin/content/announcements').set('Authorization', `Bearer ${token}`); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(403); // 断言：校验响应字段与冻结契约一致
     expect(res.body.code).toBe('FORBIDDEN'); // 断言：校验响应字段与冻结契约一致
   });
 
   it('引导令牌（x-admin-token）可访问管理端列表', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/admin/content/announcements').set(adminHeaders()); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(res.body.items.length).toBeGreaterThanOrEqual(3); // 三条公告种子全量可见（含草稿）
@@ -201,7 +201,7 @@ describe('管理端鉴权门禁', () => {
 
 describe('管理端 CRUD', () => {
   it('公告：新建 → 回读 → 更新 → 删除', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const create = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/admin/content/announcements')
       .set(adminWriteHeaders())
@@ -227,7 +227,7 @@ describe('管理端 CRUD', () => {
   });
 
   it('更新日志：新建 → 重复版本号 409 → 更新 → 删除', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const create = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/admin/content/changelog')
       .set(adminWriteHeaders())
@@ -254,7 +254,7 @@ describe('管理端 CRUD', () => {
   });
 
   it('推广计划：新建 → 更新状态 → 管理端可见统计字段 → 删除', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const create = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/admin/content/promotions')
       .set(adminWriteHeaders())
@@ -282,7 +282,7 @@ describe('管理端 CRUD', () => {
   });
 
   it('更新不存在的资源返回 404', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).patch('/api/v1/admin/content/announcements/no-such-id').set(adminWriteHeaders()).send({ title: 'x' }); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(404); // 断言：校验响应字段与冻结契约一致
     expect(res.body.code).toBe('NOT_FOUND'); // 断言：校验响应字段与冻结契约一致
@@ -291,7 +291,7 @@ describe('管理端 CRUD', () => {
 
 describe('推广点击：幂等去重与频控防刷', () => {
   it('同一幂等键重复点击只入账一次，click_count 不重复增加', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const first = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/promotions/promo-seed-launch/click')
       .set('idempotency-key', 'click-key-1');
@@ -308,7 +308,7 @@ describe('推广点击：幂等去重与频控防刷', () => {
   });
 
   it('滑动窗口频控：超过上限返回 429 RATE_LIMITED 并带 Retry-After', async () => {
-    const { app } = setup({ MIM_CONTENT_CLICK_MAX: '2', MIM_CONTENT_CLICK_WINDOW_SECONDS: '600' });
+    const { app } = setup({ MIM_CONTENT_CLICK_MAX: '2', MIM_CONTENT_CLICK_WINDOW_SECONDS: '600' }); // 准备：构造本用例需要的输入或句柄
     const ok1 = await request(app).post('/api/v1/promotions/promo-seed-launch/click'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(ok1.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     const ok2 = await request(app).post('/api/v1/promotions/promo-seed-launch/click'); // 构造：准备本用例需要的输入、句柄或期望值
@@ -320,7 +320,7 @@ describe('推广点击：幂等去重与频控防刷', () => {
   });
 
   it('点击非进行中 / 不存在的计划返回 404', async () => {
-    const { app } = setup();
+    const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const draft = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/admin/content/promotions')
       .set(adminWriteHeaders())

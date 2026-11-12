@@ -59,12 +59,12 @@ describe('页面区块公开只读', () => {
 
 describe('外观写操作权限门禁', () => {
   it('匿名更新设置返回 401', async () => {
-    const res = await request(app).put('/api/v1/appearance/settings').send({ key: 'theme', value: { accent: '#111111' } });
+    const res = await request(app).put('/api/v1/appearance/settings').send({ key: 'theme', value: { accent: '#111111' } }); // 准备：构造本用例需要的输入或句柄
     expect(res.status).toBe(401); // 未登录拒绝
   });
 
   it('引导令牌可更新主题，公开配置随之生效', async () => {
-    const put = await request(app)
+    const put = await request(app) // 准备：构造本用例需要的输入或句柄
       .put('/api/v1/appearance/settings')
       .set('x-admin-token', ADMIN_TOKEN)
       .set('Idempotency-Key', 'appearance-theme-1')
@@ -76,7 +76,7 @@ describe('外观写操作权限门禁', () => {
   });
 
   it('引导令牌可新建区块并按排序出现在公开清单', async () => {
-    const create = await request(app)
+    const create = await request(app) // 准备：构造本用例需要的输入或句柄
       .post('/api/v1/pages/home/blocks')
       .set('x-admin-token', ADMIN_TOKEN)
       .set('Idempotency-Key', 'appearance-block-1')

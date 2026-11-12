@@ -289,9 +289,9 @@ describe('media 域', () => { // describe media 域：预签名上传下载、�
       .post('/api/v1/media/presign/upload')
       .set(auth(owner, nextKey()))
       .send({ asset_type: 'image', mime: 'image/png' });
-    expect(presign.status).toBe(201);
-    const objectKey = presign.body.object_key as string;
-    await request(app)
+    expect(presign.status).toBe(201); // 断言：校验接口响应或状态符合冻结契约
+    const objectKey = presign.body.object_key as string; // 准备：构造本用例需要的输入或句柄
+    await request(app) // 执行：等待异步操作返回后继续
       .put(pathOf(presign.body.upload.url as string))
       .set('content-type', 'image/png')
       .send(png);

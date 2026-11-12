@@ -24,15 +24,15 @@ async function login(identifier: string): Promise<Session> { // 验证码 + 密�
     region: 'cn', provider: 'phone', identifier, code: codeRes.body.dev_code, device: { platform: 'web', name: 'test' },
   });
   expect(loginRes.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-  return { token: loginRes.body.access_token as string, userId: loginRes.body.user.id as string };
+  return { token: loginRes.body.access_token as string, userId: loginRes.body.user.id as string }; // 返回：交回本步骤结果供断言使用
 }
 
 function authHeaders(token: string): Record<string, string> { // 鉴权请求头（读）
-  return { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  return { authorization: `Bearer ${token}`, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
 }
 
 function writeHeaders(token: string): Record<string, string> { // 写请求头 + 幂等键（全局强制幂等）
-  return { ...authHeaders(token), 'idempotency-key': randomUUID() };
+  return { ...authHeaders(token), 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
 }
 
 /** 直接造钱包积分余额（不发见面礼，避免干扰断言） */
