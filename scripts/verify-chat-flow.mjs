@@ -195,7 +195,7 @@ const groupTitle = await waitFor(`(function () {
 check('新群出现在会话区且标题为群名', Boolean(groupTitle), groupTitle || '标题未命中'); // 断言
 
 // 4) 发图片：写一张最小 PNG 到磁盘，再用 CDP 塞进隐藏 file input（等价于用户选文件）
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX// 8×8 PNG 图片
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII=', 'base64'); // 8×8 PNG
 const pngPath = process.env.MIM_E2E_PNG || '.tmp/chat-e2e.png'; // 本地路径
 writeFileSync(pngPath, png); // 落盘（CDP 只能从磁盘选文件）
 await send('DOM.enable'); // 打开 DOM 域

@@ -132,6 +132,8 @@ check('首页真实渲染（#root + title）', boot && JSON.parse(boot).root && 
 
 // 3) 进入 /comic-studio（history 路径路由，漫剧 AI 剧的对外模块功能名），选中工程，切到成片标签
 await send('Page.navigate', { url: BASE + '/comic-studio' }); // 直达深链接
+// 外壳默认落在「放映厅」分段，先切到「创作工作台」分段，工作台组件才会挂载并拉取工程列表
+await waitUntil(() => evaluate(`(() => { const b = [...document.querySelectorAll('.segment-item')].find((x) => x.textContent?.trim() === '创作工作台'); if (!b) return null; b.click(); return 'ok'; })()`));
 const workbench = await waitUntil(() => evaluate(`document.body.innerText.includes('漫剧 AI 剧工作台') ? JSON.stringify({ ok: true, text: document.body.innerText.slice(0, 300) }) : null`)); // 等 React 与列表
 check('/comic-studio 深链接真实渲染', workbench && JSON.parse(workbench).ok, workbench ? JSON.parse(workbench).text.slice(0, 80) : 'no render'); // 断言深链接
 

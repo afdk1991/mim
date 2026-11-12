@@ -422,6 +422,10 @@ function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProp
   const hostRef = useRef<HTMLDivElement | null>(null);
   // 编辑器实例引用，卸载时据此销毁。
   const vditorRef = useRef<Vditor | null>(null);
+  // 实例内部子模块（工具栏/编辑区/预览）是否初始化完成。Vditor 的语言包与 lute 脚本经
+  // CDN 异步加载，init 完成前公开方法（getValue/destroy）访问的内部对象尚未就绪，
+  // 此时调用会抛未捕获异常并卸载整棵 React 子树，故用就绪标志拦截早期调用。
+  const readyRef = useRef(false);
   // 回调引用：避免实例持有过期闭包，每次渲染同步最新 onChange。
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -430,18 +434,38 @@ function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProp
   useEffect(() => {
     const host = hostRef.current; // 取挂载节点
     if (!host) return; // 容器未就绪时不建实例
-    const vd = new Vditor(host, { // 新建编辑器实例
-      value, // 初始 Markdown 文本
-      height: 260, // 编辑器总高度，适配面板纵向空间
-      placeholder, // 空内容占位提示
-      lang: locale === 'en-US' ? 'en_US' : 'zh_CN', // 编辑器内置语言映射
-      mode: 'sv', // 分屏预览：左侧编辑、右侧预览，便于核对排版
-      cache: { enable: false }, // 关闭 localStorage 缓存，避免跨工程/跨会话串内容
-      input: (markdown) => onChangeRef.current(markdown), // 输入后把最新 Markdown 回传父级
-    }); // 实例配置结束
+    let vd: Vditor | null = null;
+    try {
+      vd = new Vditor(host, { // 新建编辑器实例
+        value, // 初始 Markdown 文本
+        height: 260, // 编辑器总高度，适配面板纵向空间
+        placeholder, // 空内容占位提示
+        lang: locale === 'en-US' ? 'en_US' : 'zh_CN', // 编辑器内置语言映射
+        mode: 'sv', // 分屏预览：左侧编辑、右侧预览，便于核对排版
+        cache: { enable: false }, // 关闭 localStorage 缓存，避免跨工程/跨会话串内容
+        input: (markdown) => onChangeRef.current(markdown), // 输入后把最新 Markdown 回传父级
+        after: () => { // 异步初始化完成回调：此时内部子模块已就绪
+          readyRef.current = true; // 置就绪标志，放开回填 effect
+          // 初始化期间外部若已写入值，就绪后补一次回填，避免草稿丢失。
+          const current = vditorRef.current;
+          if (current) {
+            try {
+              if (value !== current.getValue()) current.setValue(value);
+            } catch { /* 就绪边界上读取失败，忽略等待下次变更 */ }
+          }
+        },
+      }); // 实例配置结束
+    } catch {
+      vd = null; // 初始化抛错时不留半成品实例
+    }
     vditorRef.current = vd; // 留存实例引用
     return () => { // 卸载或工程切换时清理
-      vd.destroy(); // 销毁编辑器，释放 DOM、事件与定时器
+      readyRef.current = false; // 先关闭就绪标志，避免清理途中再次回填
+      if (vditorRef.current) {
+        try {
+          vditorRef.current.destroy(); // 销毁编辑器，释放 DOM、事件与定时器；未就绪时内部对象为空，需兜底
+        } catch { /* 实例尚未初始化完成，无需销毁 */ }
+      }
       vditorRef.current = null; // 清空引用
     }; // 清理结束
     // 仅挂载一次：初始值由 value 提供，后续外部回填走下方同步 effect
@@ -451,7 +475,10 @@ function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProp
   // 外部值回填（如 AI 生成建议后写入）：与当前编辑器内容不同才 setValue，避免覆盖用户正在编辑的文本与光标。
   useEffect(() => {
     const vd = vditorRef.current; // 取实例
-    if (vd && value !== vd.getValue()) vd.setValue(value); // 比对一致则不重复写入
+    if (!vd || !readyRef.current) return; // 实例尚未初始化完成，跳过；就绪后由 after 回调补回填
+    try {
+      if (value !== vd.getValue()) vd.setValue(value); // 比对一致则不重复写入
+    } catch { /* 读取/写入在就绪边界上失败，等待下次变更再同步 */ }
   }, [value]); // 依赖外部受控值
 
   return <div ref={hostRef} className="script-editor" />; // 编辑器挂载容器
