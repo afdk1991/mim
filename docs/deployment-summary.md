@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T14:37:42.941Z
-- 本地 HEAD：`689c115`
+- 生成时间：2026-11-12T14:47:53.517Z
+- 本地 HEAD：`057faf2`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -72,7 +72,7 @@
 | `pages.vercel` | 🔴 critical | `CREDENTIAL_MISSING` | 缺 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI 无法发布 |
 | `pages.vercel` | 🔴 critical | `LOCAL_NETWORK_BLOCKED` | 本机到 vercel.com 登录页读取超时（GAC pipe read timed out），无法在本地登录创建 token |
 | `pages.vercel` | 🟡 warning | `STALE_ARTIFACT` | 线上产物 5182B 为历史版本，未同步本轮前端构建 |
-| `container.sealos` | 🔴 critical | `LOGIN_REQUIRED` | cloud.sealos.io 强制登录，未登录无法取得 kubeconfig / namespace |
+| `container.sealos` | 🔴 critical | `LOGIN_REQUIRED` | cloud.sealos.io 已登录（Singapore / Private Team，余额 0.00），但应用列表 0 个：原 mim 实例不在当前区域且已停服；恢复需充值或改用其他区域/团队重建，属付费与账号决策，非技术可自动修复项 |
 | `container.sealos` | 🔴 critical | `CREDENTIAL_MISSING` | 缺 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET，CI Sealos 步骤只能 SKIP |
 | `container.sealos` | 🔴 critical | `SITE_DOWN` | /health 双出口 000，站点当前不可访问 |
 | `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准 |
@@ -95,8 +95,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 689c115d69d04d228fa6badfb40f218072808d85 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 689c115d69d04d228fa6badfb40f218072808d85 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 057faf2b97c9862ca8d55e5212cd9e706362112e | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 057faf2b97c9862ca8d55e5212cd9e706362112e | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T14:37:42.941Z",
-  "head": "689c115",
+  "generated_at": "2026-11-12T14:47:53.517Z",
+  "head": "057faf2",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -105,14 +105,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "689c115d69d04d228fa6badfb40f218072808d85",
+      "hash": "057faf2b97c9862ca8d55e5212cd9e706362112e",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "689c115d69d04d228fa6badfb40f218072808d85",
+      "hash": "057faf2b97c9862ca8d55e5212cd9e706362112e",
       "exit": 0,
       "error": null
     }
@@ -926,14 +926,14 @@
         "http_code": "000",
         "latency_ms": null,
         "bytes": 0,
-        "evidence": "2026-11-12 22:2x 本轮复核：本机与 CI 出口对 `https://mim-i3ywsdfn.cloud.sealos.io/health` 均 000（CI 0.57s 内失败）。浏览器实测 `https://cloud.sealos.io/` 跳转 `https://cloud.sealos.io/signin`（需登录，页面仅有服务条款与「继续」）。仓库 secrets 无 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET；本机无 ~/.sealos 配置与 kubectl。",
+        "evidence": "2026-11-12 22:5x 浏览器实测（bu 平面）：https://cloud.sealos.io/ 已处于登录态（区域 Singapore / Private Team / 余额 0.00），桌面正常；进入「应用管理」应用列表为 0 个（无任何已部署应用），说明 mim-i3ywsdfn.cloud.sealos.io 所属实例不在当前区域/团队内且已停服；本机与 CI 出口 /health 均 000。Sealos 运行应用按小时计费，当前余额 0.00，在不充值前提下无法重启原实例，重新部署亦需余额与 ghcr 私有镜像拉取凭证。",
         "captured_at": "2026-11-12 22:25 +08:00"
       },
       "anomalies": [
         {
           "code": "LOGIN_REQUIRED",
           "severity": "critical",
-          "message": "cloud.sealos.io 强制登录，未登录无法取得 kubeconfig / namespace"
+          "message": "cloud.sealos.io 已登录（Singapore / Private Team，余额 0.00），但应用列表 0 个：原 mim 实例不在当前区域且已停服；恢复需充值或改用其他区域/团队重建，属付费与账号决策，非技术可自动修复项"
         },
         {
           "code": "CREDENTIAL_MISSING",
