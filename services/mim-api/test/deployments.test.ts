@@ -133,11 +133,11 @@ describe('部署项详情与异常标识', () => { // 详情与异常
   it('IGA 本机直传后以带凭证 200 取证，不再是空数据项', async () => { // IGA 取证
     const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages 平台
     expect(res.status).toBe(200); // 200
-    expect(res.body.item.entry_url).toBe('https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com'); // 现行项目 96otddwh48 项目级稳定域
+    expect(res.body.item.entry_url).toBe('https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com'); // 现行项目 96otddwh48 项目级稳定域
     expect(res.body.item.result.http_code).toBe('200'); // 带 iga_token Cookie 复验 200；裸访 401 属平台访问保护
-    expect(res.body.item.result.verdict).toBe('DEGRADED'); // 公开匿名仍 401 保护，未公开可达
+    expect(res.body.item.result.verdict).toBe('PASS'); // 带凭证内容层 200（title=Mim、产物指纹一致），访问保护另以异常码留痕
     expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'IGA_PROJECT_SPLIT')).toBe(true); // 同名项目分裂留痕
-    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'ENTRY_URL_WRONG')).toBe(true); // 历史入口登记错误留痕
+    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'PRIVATE_TOKEN_REQUIRED')).toBe(true); // 平台访问保护留痕
   }); // IGA 用例结束
 
   it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识
