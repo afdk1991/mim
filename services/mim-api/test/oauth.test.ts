@@ -95,18 +95,18 @@ describe('Mim ID 自动分配', () => { // 号码唯一性与连续性
   it('连续发号不重复且格式固定', () => { // 直接测发号器
     const numbers = Array.from({ length: 20 }, () => allocateMemberNo(db)); // 连续发 20 个
     expect(new Set(numbers).size).toBe(20); // 无重号
-    expect(numbers[0]).toBe('1'); // 首批号码从个位数起（QQ 号样式）
+    expect(numbers[0]).toBe('102'); // 1～99 短号段整段预留，100 整百、101 回文，首个可发号是 102
   }); // 结束用例
 
   it('注册即分配号码，/me 可读回', async () => { // 端到端
     const first = await request(app).post('/api/v1/auth/register').send({ region: 'cn', identifier: '13900000010', password: 'mim-pass-123' }); // 首个注册
     expect(first.status).toBe(201); // 注册成功
-    expect(first.body.user.member_no).toBe('1'); // 首个号码
+    expect(first.body.user.member_no).toBe('102'); // 首个号码（跳过 1～99 与 100/101）
     const token = first.body.access_token as string; // 取令牌
     const me = await request(app).get('/api/v1/me').set('Authorization', `Bearer ${token}`); // 读个人资料
-    expect(me.body.user.member_no).toBe('1'); // /me 同号
+    expect(me.body.user.member_no).toBe('102'); // /me 同号
     const second = await request(app).post('/api/v1/auth/register').send({ region: 'cn', identifier: '13900000011', password: 'mim-pass-123' }); // 第二个注册
-    expect(second.body.user.member_no).toBe('2'); // 连续递增
+    expect(second.body.user.member_no).toBe('103'); // 连续递增
   }); // 结束用例
 
   it('存量无号用户回填且幂等', () => { // 模拟历史库
@@ -114,7 +114,7 @@ describe('Mim ID 自动分配', () => { // 号码唯一性与连续性
     db.prepare("INSERT INTO users (id, region, status, display_name, locale, timezone, created_at, updated_at) VALUES ('u-old', 'cn', 'active', '旧用户', 'zh-CN', 'Asia/Shanghai', ?, ?)").run(now, now); // 不带 member_no 的历史行
     expect(backfillMemberNos(db)).toBe(1); // 首次补 1 个
     const row = db.prepare("SELECT member_no FROM users WHERE id = 'u-old'").get() as { member_no: string }; // 读回
-    expect(row.member_no).toBe('1'); // 已拿到纯数字号码（从个位起）
+    expect(row.member_no).toBe('102'); // 已拿到纯数字号码（短号段已预留）
     expect(backfillMemberNos(db)).toBe(0); // 再次调用不再补号
   }); // 结束用例
 }); // describe 结束
@@ -174,14 +174,14 @@ describe('GitHub 标准 OAuth 全流程', () => { // 授权 → 回调 → 票�
     expect(ticket).toBeTruthy(); // 有票据
     const exchanged = await request(app).post('/api/v1/auth/oauth/exchange').send({ ticket }); // 兑换会话
     expect(exchanged.status).toBe(200); // 兑换成功
-    expect(exchanged.body.user.member_no).toBe('1'); // 自动分配号码
+    expect(exchanged.body.user.member_no).toBe('102'); // 自动分配号码
     expect(exchanged.body.user.display_name).toBe('Octo Cat'); // 用提供方昵称作展示名
     const second = await authorize('github', 'global'); // 第二次授权
     const secondCallback = await request(app).get('/api/v1/auth/oauth/github/callback').query({ code: 'gh-code-2', state: second.body.state }); // 再次回调
     const secondTicket = new URL(secondCallback.headers.location as string).searchParams.get('oauth_ticket'); // 新票据
     const secondExchange = await request(app).post('/api/v1/auth/oauth/exchange').send({ ticket: secondTicket }); // 兑换
     expect(secondExchange.body.user.id).toBe(exchanged.body.user.id); // 同一账号
-    expect(secondExchange.body.user.member_no).toBe('1'); // 号码不变
+    expect(secondExchange.body.user.member_no).toBe('102'); // 号码不变
   }); // 结束用例
 
   it('state 无效时 302 回登录页并带错误码', async () => { // 防 CSRF
@@ -208,7 +208,7 @@ describe('微信自定义协议全流程', () => { // 非标准 OAuth2
     const ticket = new URL(callback.headers.location as string).searchParams.get('oauth_ticket') as string; // 票据
     const exchanged = await request(app).post('/api/v1/auth/oauth/exchange').send({ ticket }); // 兑换
     expect(exchanged.status).toBe(200); // 成功
-    expect(exchanged.body.user.member_no).toBe('1'); // 自动发号
+    expect(exchanged.body.user.member_no).toBe('102'); // 自动发号
     expect(exchanged.body.user.display_name).toBe('微信用户'); // 微信昵称
   }); // 结束用例
 

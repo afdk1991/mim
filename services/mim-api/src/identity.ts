@@ -7,7 +7,8 @@
  *   3. 发号时跳过靓号（豹子 / 顺子 / 回文 / ABAB / 整百 / 谐音 / 生日号），靓号留给运营定向授予；
  *   4. 所有建号入口（自助注册 / 验证码首登 / 密码首登 / 第三方 OAuth 首登）只走 createUser，
  *      避免各路由各写一遍 INSERT 导致某些入口漏发号码；
- *   5. 存量库由 renumberMemberNos 一次性重排为纯数字号，旧号写入 member_no_history 供追溯。
+ *   5. 存量库由 renumberMemberNos 一次性重排为纯数字号，旧号写入 member_no_history 供追溯；
+ *      号码规则改动时必须把 RENUMBER_KEY 升版（v1 → v2 …），否则启动开关为 done 不会重跑。
  */
 
 import { AppError, uuidv7 } from '@mim/core-domain'; // 统一业务异常 + 时间有序主键
@@ -60,8 +61,8 @@ export interface MemberNoChange {
   new_no: string; // 重排后的号码
 } // MemberNoChange 结束
 
-/** 重排开关在 member_no_meta 里的键名 */
-const RENUMBER_KEY = 'renumber_v1';
+/** 重排开关在 member_no_meta 里的键名：规则收紧（1～99 整段预留、新增重复段 / 阶梯对子 / 经典号）后升版到 v2，强制重跑一次 */
+const RENUMBER_KEY = 'renumber_v2';
 
 /**
  * 存量全量重排：把库内所有用户按注册顺序重排为纯数字号，并跳过全部靓号。
