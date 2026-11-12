@@ -32,7 +32,7 @@ beforeEach(() => {
 
 async function login(identifier: string): Promise<Record<string, string>> {
   const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD });
-  expect(res.status).toBe(200);
+  expect(res.status).toBe(200); // 登录助手：密码登录成功返回 200
   return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' };
 }
 
@@ -56,31 +56,31 @@ describe('社区二期：媒体 / 投票 / 收藏 / 评分', () => {
           { kind: 'image', url: '/demo/bloom-cover.jpg' },
         ],
       });
-    expect(create.status).toBe(201);
+    expect(create.status).toBe(201); // 图集帖创建成功返回 201
 
     const detail = await request(app).get(`/api/v1/community/threads/${create.body.thread_id}`).set(auth);
-    expect(detail.status).toBe(200);
-    expect(detail.body.thread.kind).toBe('gallery');
-    expect(detail.body.thread.media).toHaveLength(2);
-    expect(detail.body.thread.media[0].url).toBe('/demo/stardust-cover.jpg');
+    expect(detail.status).toBe(200); // 详情接口匿名带令牌读取得 200
+    expect(detail.body.thread.kind).toBe('gallery'); // 发帖时的 kind 原样回读为 gallery
+    expect(detail.body.thread.media).toHaveLength(2); // 媒体数组落库为 2 条
+    expect(detail.body.thread.media[0].url).toBe('/demo/stardust-cover.jpg'); // 首条媒体地址与提交值一致
 
     const favorite = await request(app).post(`/api/v1/community/threads/${create.body.thread_id}/favorite`).set(writeHeaders(auth)).send({});
-    expect(favorite.status).toBe(200);
-    expect(favorite.body.favorited).toBe(true);
+    expect(favorite.status).toBe(200); // 收藏动作返回 200
+    expect(favorite.body.favorited).toBe(true); // 收藏状态回读为 true
     const favorites = await request(app).get('/api/v1/community/favorites').set(auth);
-    expect(favorites.body.items.some((item: { id: string }) => item.id === create.body.thread_id)).toBe(true);
+    expect(favorites.body.items.some((item: { id: string }) => item.id === create.body.thread_id)).toBe(true); // 我的收藏列表包含刚收藏的帖子
 
     const rate = await request(app).post(`/api/v1/community/threads/${create.body.thread_id}/rate`).set(writeHeaders(auth)).send({ rating: 5 });
-    expect(rate.status).toBe(200);
-    expect(rate.body.summary.count).toBe(1);
+    expect(rate.status).toBe(200); // 五星评分返回 200
+    expect(rate.body.summary.count).toBe(1); // 评分聚合计数为 1 条
 
     const again = await request(app).get(`/api/v1/community/threads/${create.body.thread_id}`).set(auth);
-    expect(again.body.thread.my_rating).toBe(5);
-    expect(again.body.favorited).toBe(true);
+    expect(again.body.thread.my_rating).toBe(5); // 我的评分回读为 5 星
+    expect(again.body.favorited).toBe(true); // 同时回读到已收藏标记
 
     const byFavorites = await request(app).get('/api/v1/community/threads?sort=favorites').set(auth);
-    expect(byFavorites.status).toBe(200);
-    expect(byFavorites.body.items[0].id).toBe(create.body.thread_id);
+    expect(byFavorites.status).toBe(200); // 按收藏数排序的列表接口可用
+    expect(byFavorites.body.items[0].id).toBe(create.body.thread_id); // 收藏过的那篇帖子排在首位
   });
 
   it('投票帖创建选项、投票计票并支持改投；视频帖缺视频地址被拒', async () => {
@@ -95,23 +95,23 @@ describe('社区二期：媒体 / 投票 / 收藏 / 评分', () => {
         kind: 'poll',
         poll_options: ['微信支付', '板块权限', '图集视频'],
       });
-    expect(create.status).toBe(201);
+    expect(create.status).toBe(201); // 投票帖创建成功返回 201
 
     const detail = await request(app).get(`/api/v1/community/threads/${create.body.thread_id}`).set(auth);
-    expect(detail.body.thread.poll.options).toHaveLength(3);
+    expect(detail.body.thread.poll.options).toHaveLength(3); // 三个投票选项全部落库
     const option = detail.body.thread.poll.options[0];
 
     const vote = await request(app).post(`/api/v1/community/threads/${create.body.thread_id}/vote`).set(writeHeaders(auth)).send({ option_id: option.id });
-    expect(vote.status).toBe(200);
+    expect(vote.status).toBe(200); // 投票动作返回 200
     const afterVote = await request(app).get(`/api/v1/community/threads/${create.body.thread_id}`).set(auth);
-    expect(afterVote.body.thread.poll.total).toBe(1);
-    expect(afterVote.body.thread.poll.my_option).toBe(option.id);
+    expect(afterVote.body.thread.poll.total).toBe(1); // 投票总数计为 1
+    expect(afterVote.body.thread.poll.my_option).toBe(option.id); // 我的选择回读为刚投的选项
 
     const video = await request(app)
       .post('/api/v1/community/threads')
       .set(writeHeaders(auth))
       .send({ board_slug: 'general', title: '视频帖缺地址', body: '这是一篇缺少视频地址的视频帖，应该被校验拒绝。', kind: 'video' });
-    expect(video.status).toBe(400);
+    expect(video.status).toBe(400); // 视频帖缺少视频地址时被校验拒绝 400
   });
 });
 
@@ -120,26 +120,26 @@ describe('付费板块与积分转账', () => {
     db.prepare("UPDATE community_boards SET price_cents = 500 WHERE slug = 'paid'").run();
     const auth = await login('13800000023');
     const redeem = await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' });
-    expect(redeem.status).toBe(200);
+    expect(redeem.status).toBe(200); // 兑换码入账成功返回 200
 
     const blocked = await request(app)
       .post('/api/v1/community/threads')
       .set(writeHeaders(auth))
       .send({ board_slug: 'paid', title: '付费板块发帖', body: '未加入付费板块时发帖应被拒绝。' });
-    expect(blocked.status).toBe(403);
+    expect(blocked.status).toBe(403); // 未加入付费板块时发帖被拒 403
 
     const join = await request(app).post('/api/v1/community/boards/paid/join').set(writeHeaders(auth)).send({});
-    expect(join.status).toBe(201);
-    expect(join.body.charged_cents).toBe(500);
+    expect(join.status).toBe(201); // 加入付费板块返回 201
+    expect(join.body.charged_cents).toBe(500); // 加入时按板块定价扣款 500 分
 
     const created = await request(app)
       .post('/api/v1/community/threads')
       .set(writeHeaders(auth))
       .send({ board_slug: 'paid', title: '付费板块内帖', body: '加入后可以正常发帖，并且其他未加入用户看不到正文。' });
-    expect(created.status).toBe(201);
+    expect(created.status).toBe(201); // 加入后发帖成功返回 201
 
     const wallet = await request(app).get('/api/v1/wallet').set(auth);
-    expect(wallet.body.wallet.balance_cents).toBe(9500);
+    expect(wallet.body.wallet.balance_cents).toBe(9500); // 钱包余额为初始 10000 分扣除 500 分
   });
 
   it('积分转账按 Mim ID 到账，余额不足与转给自己被拒', async () => {
@@ -152,28 +152,28 @@ describe('付费板块与积分转账', () => {
       .post('/api/v1/wallet/points/transfer')
       .set(writeHeaders(sender))
       .send({ to_member_no: receiverNo, points: 40, note: '测试转账' });
-    expect(transfer.status).toBe(200);
-    expect(transfer.body.to).toBe(receiverNo);
+    expect(transfer.status).toBe(200); // 按 Mim ID 转账返回 200
+    expect(transfer.body.to).toBe(receiverNo); // 响应里的收款方就是目标 Mim ID
 
     const senderWallet = await request(app).get('/api/v1/wallet').set(sender);
-    expect(senderWallet.body.wallet.points).toBe(60);
+    expect(senderWallet.body.wallet.points).toBe(60); // 转出方积分由 100 减为 60
     const receiverWallet = await request(app).get('/api/v1/wallet').set(receiver);
-    expect(receiverWallet.body.wallet.points).toBe(140);
+    expect(receiverWallet.body.wallet.points).toBe(140); // 收款方积分由 100 增为 140
 
     const tooMuch = await request(app)
       .post('/api/v1/wallet/points/transfer')
       .set(writeHeaders(sender))
       .send({ to_member_no: receiverNo, points: 9999 });
-    expect(tooMuch.status).toBe(400);
+    expect(tooMuch.status).toBe(400); // 超额转账被拒 400
   });
 });
 
 describe('安全：验证码与举报', () => {
   it('验证码返回 SVG 与 id；举报超过 24 小时上限返回 429', async () => {
     const captcha = await request(app).get('/api/v1/auth/captcha');
-    expect(captcha.status).toBe(200);
-    expect(captcha.body.id).toMatch(/^cap-/);
-    expect(captcha.body.svg).toContain('<svg');
+    expect(captcha.status).toBe(200); // 验证码接口返回 200
+    expect(captcha.body.id).toMatch(/^cap-/); // 验证码 id 以 cap- 前缀返回
+    expect(captcha.body.svg).toContain('<svg'); // 验证码 SVG 内容包含 <svg 标签
 
     const auth = await login('13800000026');
     for (let i = 0; i < 5; i += 1) {
@@ -181,13 +181,33 @@ describe('安全：验证码与举报', () => {
         .post('/api/v1/reports')
         .set(writeHeaders(auth))
         .send({ target_type: 'thread', target_id: 'thread-paid-store', reason: '内容不适', detail: `第 ${i + 1} 次` });
-      expect(report.status).toBe(201);
+      expect(report.status).toBe(201); // 24 小时窗口内前 5 条举报均返回 201
     }
     const sixth = await request(app)
       .post('/api/v1/reports')
       .set(writeHeaders(auth))
       .send({ target_type: 'thread', target_id: 'thread-paid-store', reason: '内容不适' });
-    expect(sixth.status).toBe(429);
-    expect(sixth.body.error?.code ?? sixth.body.code).toBe('RATE_LIMITED');
+    expect(sixth.status).toBe(429); // 第 6 条举报被限流 429
+    expect(sixth.body.error?.code ?? sixth.body.code).toBe('RATE_LIMITED'); // 限流错误码为 RATE_LIMITED
   });
 });
+
+/*
+ * 运行方式：
+ *   pnpm --filter @mim/api exec vitest run test/community-phase2.test.ts
+ *
+ * 失败排查顺序：
+ *   1. 图集帖失败：检查 community_thread_media 建表与媒体 URL 是否以 / 开头；
+ *   2. 投票帖失败：检查 poll_options 是否在 2–10、vote 是否命中 option_id；
+ *   3. 付费板块失败：确认板块 price_cents=500、充值卡已兑换且余额足够；
+ *   4. 积分转账失败：确认 /me 返回 member_no 为纯数字而非 MIM- 前缀；
+ *   5. 验证码/举报失败：确认 captchas 表存在、举报窗口 24 小时且上限 5 条。
+ *
+ * 数据隔离：
+ *   每个用例在 beforeEach 重新 createDatabase(' :memory: ')，互不共享余额与帖子，
+ *   因此可以安全地修改板块价格、兑换充值卡、连续举报而不影响其他用例。
+ *
+ * 断言口径：
+ *   只断言接口真实返回值与数据库落库结果，不 mock 支付、审核或权限中间件；
+ *   外部供应商能力（微信、百度审核）不在本文件伪造成功，降级路径由单元测试覆盖。
+ */
