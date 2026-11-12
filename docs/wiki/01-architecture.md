@@ -127,7 +127,7 @@ PRD（Mim-PRD.html，V0.0.0-preview 草案）确定的核心产品决策是 **�
 | 数据 | `packages/core-domain/src/deploymentRegistry.json` | 9 矩阵平台 / 11 规范部署项 / 5 CI 作业 / 2 git 远端 / 6 候选排除项；统一 `snake_case` 字段 |
 | 共享包 | `packages/core-domain/src/deploymentRegistry.ts` | 类型约束、id 索引、五类过滤、`deploymentSummary()` 分布统计 |
 | 后端 | `services/mim-api/src/routes/deployments.ts` | `GET /deployments/overview`、`GET /deployments`、`GET /deployments/:id`，全部公开只读 |
-| 前端 | `apps/web/src/views/Deployments.tsx` | 9 列核对表 + 五类筛选 + 展开详情；空数据 / 失败 / 缺失分别标识 |
+| 前端 | `apps/web/src/views/Deployments.tsx` | 只保留 8 列核对表（规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明）；总览统计卡、分布图、筛选与展开详情已按用户指令删除；空数据 / 失败 / 缺失分别标识 |
 | 脚本 | `scripts/deployment-summary.mjs` / `verify-deployments.mjs` | 真实采集（git / 工件 / CI / 矩阵行数，可选 `--live` curl）→ 结构化产物；52 项一致性断言 |
 | 产物 | `docs/deployment-summary.{json,md}` | 机器可核对 JSON + 人工核对表 |
 
