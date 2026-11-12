@@ -130,13 +130,22 @@ describe('部署项详情与异常标识', () => { // 详情与异常
     expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'REMOTE_TIMEOUT_RECOVERED')).toBe(true); // 历史超时以恢复码留痕，不静默删除
   }); // 同步完成用例结束
 
-  it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识
+  it('IGA 入口修正后以 401 取证，不再是空数据项', async () => { // IGA 取证
     const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages 平台
+    expect(res.status).toBe(200); // 200
+    expect(res.body.item.entry_url).toBe('https://mim.preview.iga-pages.com'); // 真实预览域（原登记 preview.iga-pages.com 无 A 记录）
+    expect(res.body.item.result.http_code).toBe('401'); // 受访问保护，需 iga_token
+    expect(res.body.item.result.verdict).toBe('DEGRADED'); // 可达但内容层不可核验
+    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'ENTRY_URL_WRONG')).toBe(true); // 入口登记错误留痕
+  }); // IGA 用例结束
+
+  it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识
+    const res = await request(app).get('/api/v1/deployments/repo.gitlab'); // GitLab 镜像仓（尚未配置远端）
     expect(res.status).toBe(200); // 200
     expect(res.body.item.result).toBeNull(); // 明确 null，不填 0 / 不冒充成功
     expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'EMPTY_RESULT')).toBe(true); // 空数据异常
     expect(res.body.item.missing_fields).toContain('http_code'); // 缺失字段
-    expect(res.body.item.missing_fields).toContain('iga_token'); // 私有凭证缺失
+    expect(res.body.item.missing_fields).toContain('git_remote'); // 远端尚未配置
   }); // 空数据用例结束
 
   it('未登记的部署项 id 返回 404 NOT_FOUND 信封', async () => { // 非法 id
