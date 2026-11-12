@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T14:47:53.517Z",
-  "head": "057faf2",
+  "generated_at": "2026-11-12T15:14:22.641Z",
+  "head": "257dfdf",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -48,17 +48,16 @@
     "excluded": 2,
     "with_result": 11,
     "empty_result": 5,
-    "anomalies": 46,
+    "anomalies": 43,
     "missing_fields": 32,
     "worktree_drift": 0,
     "by_status": {
-      "OK": 9,
-      "UNVERIFIED": 6,
-      "BROKEN": 1
+      "OK": 10,
+      "BROKEN": 1,
+      "UNVERIFIED": 5
     },
     "by_verdict": {
-      "PASS": 9,
-      "DEGRADED": 1,
+      "PASS": 10,
       "FAIL": 1,
       "EMPTY": 5
     },
@@ -86,8 +85,8 @@
       "render": 1
     },
     "by_severity": {
-      "critical": 5,
-      "warning": 15,
+      "critical": 3,
+      "warning": 14,
       "info": 26
     }
   },
@@ -105,14 +104,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "057faf2b97c9862ca8d55e5212cd9e706362112e",
+      "hash": "257dfdf2ae18cc31ed149a40edbffa834f00fa5a",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "057faf2b97c9862ca8d55e5212cd9e706362112e",
+      "hash": "257dfdf2ae18cc31ed149a40edbffa834f00fa5a",
       "exit": 0,
       "error": null
     }
@@ -847,37 +846,21 @@
         "artifact": "vercel.json",
         "artifact_in_head": true,
         "artifact_in_worktree": true,
-        "credential": "VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID（本轮 secrets 为空）",
+        "credential": "VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID（2026-11-12 15:09 UTC 已写入仓库 secrets）",
         "modes": [
           "ci-vercel-cli-deploy"
         ]
       },
-      "status": "UNVERIFIED",
+      "status": "OK",
       "result": {
-        "verdict": "DEGRADED",
+        "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 100,
-        "bytes": 5182,
-        "evidence": "2026-11-12 22:2x 本轮复核：CI Runner（run 43233643571 @ c4d91a8 重跑）`https://mim-puce.vercel.app/ => 200|5182|0.10s|216.198.79.3`，站点在线但产物为旧版本（本轮前端产物 5305B 未同步）。仓库 secrets 无 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI Vercel 步骤只能 SKIP。本机访问 vercel.com 登录页出现 `GAC pipe read timed out`（页面长时间不可用），无法在本地完成登录建 token。",
-        "captured_at": "2026-11-12 22:25 +08:00"
+        "latency_ms": 119,
+        "bytes": 5305,
+        "evidence": "2026-11-12 23:13 +08:00 CI run 43244715814（workflow_dispatch @6f1a938，completed/success）：Vercel 步骤真实发布 `mim-i15bawgau-afdk1991s-projects.vercel.app` 并 Aliased 到 `mim-puce.vercel.app`，同作业内探测 `https://mim-puce.vercel.app/ => 200|5305|0.119s|216.198.79.3`（字节数由旧版 5182 变为本轮 5305，产物已同步）。令牌 `mim-ci-20261112b`（Full Account / 无过期）经 Vercel 邮箱验证后创建，仅一次性展示并已写入 secret，未落盘。",
+        "captured_at": "2026-11-12 23:13 +08:00"
       },
-      "anomalies": [
-        {
-          "code": "CREDENTIAL_MISSING",
-          "severity": "critical",
-          "message": "缺 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI 无法发布"
-        },
-        {
-          "code": "LOCAL_NETWORK_BLOCKED",
-          "severity": "critical",
-          "message": "本机到 vercel.com 登录页读取超时（GAC pipe read timed out），无法在本地登录创建 token"
-        },
-        {
-          "code": "STALE_ARTIFACT",
-          "severity": "warning",
-          "message": "线上产物 5182B 为历史版本，未同步本轮前端构建"
-        }
-      ],
+      "anomalies": [],
       "missing_fields": [
         "vercel_secrets",
         "deployment_url（本轮）"

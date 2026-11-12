@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T14:47:53.517Z
-- 本地 HEAD：`057faf2`
+- 生成时间：2026-11-12T15:14:22.641Z
+- 本地 HEAD：`257dfdf`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 11 | 本轮存在可信取证 |
 | 空数据 | 5 | result 为 null，明确标识而非填 0 |
-| 异常 | 46 | 🔴 5 / 🟡 15 / 🟢 26 |
+| 异常 | 43 | 🔴 3 / 🟡 14 / 🟢 26 |
 | 缺失信息 | 32 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -30,7 +30,7 @@
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | ✅ OK | ✅ PASS 200 / 5305B | CUSTOM_DOMAIN_ARTIFACT_LAG 等 4 项 |
 | `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
-| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | 🟡 DEGRADED 200 / 5182B | CREDENTIAL_MISSING 等 3 项 |
+| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | ✅ OK | ✅ PASS 200 / 5305B | — |
 | `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | 🔴 BROKEN | 🔴 FAIL 000 / 0B | LOGIN_REQUIRED 等 3 项 |
 | `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com | ✅ OK | ✅ PASS 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 3 项 |
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-store.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 5305B | DNS_POLLUTION 等 2 项 |
@@ -69,9 +69,6 @@
 | `pages.cloudflare` | 🟡 warning | `CF_CI_PROJECT_NAME_MISMATCH` | deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
 | `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | 历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
 | `pages.cloudflare` | 🟢 info | `CF_PROJECT_RENAMED_TO_MIM` | 2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim |
-| `pages.vercel` | 🔴 critical | `CREDENTIAL_MISSING` | 缺 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI 无法发布 |
-| `pages.vercel` | 🔴 critical | `LOCAL_NETWORK_BLOCKED` | 本机到 vercel.com 登录页读取超时（GAC pipe read timed out），无法在本地登录创建 token |
-| `pages.vercel` | 🟡 warning | `STALE_ARTIFACT` | 线上产物 5182B 为历史版本，未同步本轮前端构建 |
 | `container.sealos` | 🔴 critical | `LOGIN_REQUIRED` | cloud.sealos.io 已登录（Singapore / Private Team，余额 0.00），但应用列表 0 个：原 mim 实例不在当前区域且已停服；恢复需充值或改用其他区域/团队重建，属付费与账号决策，非技术可自动修复项 |
 | `container.sealos` | 🔴 critical | `CREDENTIAL_MISSING` | 缺 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET，CI Sealos 步骤只能 SKIP |
 | `container.sealos` | 🔴 critical | `SITE_DOWN` | /health 双出口 000，站点当前不可访问 |
@@ -95,8 +92,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 057faf2b97c9862ca8d55e5212cd9e706362112e | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 057faf2b97c9862ca8d55e5212cd9e706362112e | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 257dfdf2ae18cc31ed149a40edbffa834f00fa5a | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 257dfdf2ae18cc31ed149a40edbffa834f00fa5a | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
