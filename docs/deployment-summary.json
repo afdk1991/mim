@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T15:58:55.644Z",
-  "head": "a35f06a",
+  "generated_at": "2026-11-12T16:09:46.837Z",
+  "head": "7de5031",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -47,18 +47,18 @@
     "ci_jobs": 5,
     "deploy_ci_jobs": 4,
     "excluded": 3,
-    "with_result": 11,
-    "empty_result": 5,
+    "with_result": 12,
+    "empty_result": 4,
     "anomalies": 40,
-    "missing_fields": 30,
+    "missing_fields": 24,
     "worktree_drift": 0,
     "by_status": {
-      "OK": 11,
-      "UNVERIFIED": 5
+      "OK": 12,
+      "UNVERIFIED": 4
     },
     "by_verdict": {
-      "PASS": 11,
-      "EMPTY": 5
+      "PASS": 12,
+      "EMPTY": 4
     },
     "by_layer": {
       "source": 4,
@@ -102,14 +102,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "a35f06ad58bb1945ff4fe8d0f51a547ec2fb9eff",
+      "hash": "7de503176f9bf6eed160c405424108d1dd601320",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "a35f06ad58bb1945ff4fe8d0f51a547ec2fb9eff",
+      "hash": "7de503176f9bf6eed160c405424108d1dd601320",
       "exit": 0,
       "error": null
     }
@@ -1117,7 +1117,7 @@
         "url": "https://github.com/afdk1991/mim.git",
         "role": "CI 构建源（干净静态目录直传）"
       },
-      "entry_url": null,
+      "entry_url": "https://mim-web.netlify.app",
       "delivery": {
         "mode": "ci",
         "ci_job": "platforms",
@@ -1125,33 +1125,28 @@
         "artifact": "netlify.toml",
         "artifact_in_head": true,
         "artifact_in_worktree": true,
-        "credential": "NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID（待配置）",
+        "credential": "NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID 已写入仓库 secrets；CI 进入 apps/web/dist 用 netlify-cli 直传，发布目录 _redirects 顶端补 /api/* 反代到 mim.mixm.top",
         "modes": [
           "ci-netlify-cli-deploy"
         ]
       },
-      "status": "UNVERIFIED",
-      "result": null,
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 0,
+        "bytes": 5840,
+        "evidence": "2026-11-12 16:0x +08:00 本轮复核：NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID 已补齐，CI platforms 作业 Netlify 步骤真部署成功（非 SKIP）。本机取证 https://mim-web.netlify.app/ => 200|5840B|IPv6 2406:da18:b3d:e201::259，title=Mim，首页产物 assets/index-BuT7vqkW.js（CI 同源构建口径，指纹与注入生产 API 源的分发产物不同属既有设计）；/api/* 由发布目录 _redirects 反代到生产 mim.mixm.top。",
+        "captured_at": "2026-11-12 16:10 +08:00"
+      },
       "anomalies": [
-        {
-          "code": "EMPTY_RESULT",
-          "severity": "warning",
-          "message": "本轮未部署，result = null 空数据；已落地 netlify.toml（发布 apps/web/dist + SPA 回退），CI 步骤按 Vercel 同款 SKIP 模式待 secrets 接入"
-        },
         {
           "code": "ADOPTED_FREE_TIER_PENDING",
           "severity": "info",
-          "message": "已决策采用（免费层：300 构建分钟/月，2026-10 起新账号改 credit 制；表单 / A-B 测试等附加功能多）"
+          "message": "已决策采用（免费层：300 构建分钟/月，2026-10 起新账号改 credit 制；表单 / A-B 测试等附加功能多）；非矩阵成员，仅作额外免费分发点"
         }
       ],
-      "missing_fields": [
-        "http_code",
-        "latency_ms",
-        "bytes",
-        "NETLIFY_AUTH_TOKEN",
-        "NETLIFY_SITE_ID",
-        "deployment_url（本轮）"
-      ],
+      "missing_fields": [],
       "sources": [
         "用户决策 2026-11-10：全部采用免费层",
         "用户平台对比表（Netlify 免费层）",
@@ -1251,7 +1246,12 @@
         {
           "code": "EMPTY_RESULT",
           "severity": "warning",
-          "message": "本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤按 Vercel 同款 SKIP 模式待 secrets 接入"
+          "message": "本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP"
+        },
+        {
+          "code": "CI_RENDER_CREDENTIALS_MISSING",
+          "severity": "warning",
+          "message": "RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业"
         },
         {
           "code": "ADOPTED_FREE_TIER_PENDING",
