@@ -665,6 +665,12 @@
       "deployment_id": "pages.github",
       "platform": "GitHub Pages",
       "reason": "不绑定自定义域名：GitHub Pages 使用平台默认域 afdk1991.github.io/mim/，原 www 主机记录需求已按要求取消"
+    },
+    {
+      "platform_id": "netlify",
+      "deployment_id": "pages.netlify",
+      "platform": "Netlify",
+      "reason": "不绑定自定义域名：Netlify 使用平台默认域 mim-web.netlify.app，与 GitHub Pages 同类，不参与 mixm.top 自定义域名矩阵"
     }
   ],
   "pendingActions": [

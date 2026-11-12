@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T16:33:12.251Z
-- 本地 HEAD：`59fde44`
+- 生成时间：2026-11-12T16:50:29.470Z
+- 本地 HEAD：`5df4622`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -88,8 +88,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 59fde4471b9b78f2855719cc8c236fc1d22047bf | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 59fde4471b9b78f2855719cc8c236fc1d22047bf | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 5df46226348a214dd9748f0132b0406c7f04f996 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 5df46226348a214dd9748f0132b0406c7f04f996 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

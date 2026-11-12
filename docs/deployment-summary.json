@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T16:33:12.251Z",
-  "head": "59fde44",
+  "generated_at": "2026-11-12T16:50:29.470Z",
+  "head": "5df4622",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -103,14 +103,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "59fde4471b9b78f2855719cc8c236fc1d22047bf",
+      "hash": "5df46226348a214dd9748f0132b0406c7f04f996",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "59fde4471b9b78f2855719cc8c236fc1d22047bf",
+      "hash": "5df46226348a214dd9748f0132b0406c7f04f996",
       "exit": 0,
       "error": null
     }

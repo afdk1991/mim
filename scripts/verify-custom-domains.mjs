@@ -56,7 +56,7 @@ const rowsOk = Number.isInteger(maxRow) && hosts.every((h) => h.xls_rows.every((
 check('D04 主机记录行号在 mixm.top 工作表范围内', rowsOk, rowsOk ? '' : `maxRow=${maxRow}`);
 
 // ---------- 2. 矩阵行与注册表一一对应 ----------
-// 矩阵行：本轮 10 个平台 + Worker 的域名归属。
+// 矩阵行：本轮 11 个平台 + Worker 的域名归属。
 const matrix = DOM.matrix ?? [];
 // 注册表部署项索引：按 id 取，用于核对 deployment_id 真实存在。
 const itemsById = new Map((REG.items ?? []).map((it) => [it.id, it]));
@@ -70,7 +70,7 @@ const coveredPlatforms = new Set([
   ...(DOM.notApplicable ?? []).map((n) => n.platform_id),
 ]);
 const missingPlatforms = inMatrixPlatformIds.filter((id) => !coveredPlatforms.has(id));
-check('D05 矩阵行与不适用说明合计覆盖 10 个平台', inMatrixPlatformIds.length === 10 && missingPlatforms.length === 0, `platforms=${inMatrixPlatformIds.length} rows=${matrix.length} na=${(DOM.notApplicable ?? []).length} missing=${missingPlatforms.join(',')}`);
+check('D05 矩阵行与不适用说明合计覆盖 11 个平台', inMatrixPlatformIds.length === 11 && missingPlatforms.length === 0, `platforms=${inMatrixPlatformIds.length} rows=${matrix.length} na=${(DOM.notApplicable ?? []).length} missing=${missingPlatforms.join(',')}`);
 // 每行的 deployment_id 必须能在注册表里找到。
 const depOk = matrix.every((m) => itemsById.has(m.deployment_id));
 check('D06 每个矩阵行都指向注册表中真实存在的部署项', depOk, depOk ? '' : `missing=${matrix.filter((m) => !itemsById.has(m.deployment_id)).map((m) => m.deployment_id).join(',')}`);
@@ -85,7 +85,7 @@ check('D08a 注册表矩阵平台数量与 in_matrix 标记一致', matrixCount 
 const naIds = new Set((DOM.notApplicable ?? []).map((n) => n.platform_id));
 const mappedIds = new Set(matrix.filter((m) => platformsById.get(m.platform_id)?.in_matrix).map((m) => m.platform_id));
 const uncovered = inMatrixPlatformIds.filter((id) => !mappedIds.has(id) && !naIds.has(id));
-check('D08 部署矩阵 10 个平台全部有自定义域名归属', uncovered.length === 0, uncovered.join(','));
+check('D08 部署矩阵 11 个平台全部有自定义域名归属', uncovered.length === 0, uncovered.join(','));
 
 // ---------- 3. 域名合法性 ----------
 // 所有自定义域名必须落在本仓自有 zone 内。
