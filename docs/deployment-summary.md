@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T17:04:19.684Z
-- 本地 HEAD：`ca539f4`
+- 生成时间：2026-11-12T17:11:27.866Z
+- 本地 HEAD：`0dd2b9d`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -75,8 +75,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | ca539f4749ee3fd93ac34da9ef6e72ba0826a3af | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | ca539f4749ee3fd93ac34da9ef6e72ba0826a3af | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 0dd2b9def318f901e20c917bfcbbc493313aa542 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 0dd2b9def318f901e20c917bfcbbc493313aa542 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -117,4 +117,5 @@
 - AGENTS.md §0 / §9 表 / §9.1 / §10.1 / §12.2 / §12.3
 - README.md「多平台部署矩阵」与「站点与部署」
 - .github/workflows/deploy.yml（verify / deploy / pages / packages / platforms 五作业）
+- dnspod_records_2026-11-05_21-42-26.xls：sheet「全平台复验-20261113」/「候选未接入-20261113」（2026-11-13 01:25 +08:00 写入，取证 = CI run 43265614994 @9c8de49）
 
