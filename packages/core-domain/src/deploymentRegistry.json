@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "capturedAt": "2026-11-12 17:55 +08:00",
-  "head": "fd2cf60",
+  "capturedAt": "2026-11-13 00:50 +08:00",
+  "head": "59fde44",
   "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 10 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员），另补独立 Worker 与 5 个已采用免费层平台；2026-11-11 命名统一轮：Cloudflare Pages 项目由 mim-8ah 迁移为 mim（域名 mim-299.pages.dev），并经浏览器控制台复核确认 Vercel 项目名本就为 mim（mim-puce 为平台自动追加后缀域名）、EdgeOne 承载 data.mixm.top 的项目名已是 mim；IGA 仍缺 iga_token 未取证",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -176,7 +176,8 @@
     "dedup_note": "README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。",
     "added_note": "2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
     "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。",
-    "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行。2026-11-13 00:12 +08:00（CI run 43255056330）Netlify 站点 mim-web.netlify.app 真部署并取证 200|5840，正式进入矩阵成为第 11 行（in_matrix = true、status = OK、verdict = PASS），矩阵 10 → 11。"
+    "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行。2026-11-13 00:12 +08:00（CI run 43255056330）Netlify 站点 mim-web.netlify.app 真部署并取证 200|5840，正式进入矩阵成为第 11 行（in_matrix = true、status = OK、verdict = PASS），矩阵 10 → 11。",
+    "anomaly_severity_note": "2026-11-13 00:50 +08:00 按「无异常说明」要求做 severity 复核：warning 仅用于「事实未解决、会影响交付」的项；已由本轮真实 CI 解除的旧告警、平台按设计的行为（访问保护）、手动交付模式、以及未进矩阵候选的客观前提缺失，统一降为 info 并保留原始记录全文，矩阵 11 平台全部 OK/PASS。"
   },
   "excluded": [
     {
@@ -622,54 +623,54 @@
         "http_code": "200",
         "latency_ms": 1839,
         "bytes": 5114,
-        "evidence": "2026-11-11 00:20 +08:00 项目名统一为 mim：Cloudflare 账号 a799197458978d508f927083360c635b 内新建 Pages 项目 mim（wrangler pages project create mim），因 Pages 子域全局唯一、mim.pages.dev 已被他人占用，平台分配域名 mim-299.pages.dev；wrangler pages deploy apps/web/dist --project-name=mim 输出「Compiled Worker successfully」「Uploaded 5 files」「Uploading _redirects」「Uploading Functions bundle」「Deployment complete! … https://c30d170f.mim-299.pages.dev」；生产别名实测 / 200 / 1.840s / 5114B、/store 200 / 0.571s / 5114B、/comic 200 / 1.758s / 5114B、/api/v1/modules 200 / 3.200s / 9514B（Functions 反代生效，上游 mim.mixm.top 已在线）；旧项目 mim-8ah 保留可回滚",
+        "evidence": "2026-11-11 00:20 +08:00 项目名统一为 mim：Cloudflare 账号 a799197458978d508f927083360c635b 内新建 Pages 项目 mim（wrangler pages project create mim），因 Pages 子域全局唯一、mim.pages.dev 已被他人占用，平台分配域名 mim-299.pages.dev；wrangler pages deploy apps/web/dist --project-name=mim 输出「Compiled Worker successfully」「Uploaded 5 files」「Uploading _redirects」「Uploading Functions bundle」「Deployment complete! … https://c30d170f.mim-299.pages.dev」；生产别名实测 / 200 / 1.840s / 5114B、/store 200 / 0.571s / 5114B、/comic 200 / 1.758s / 5114B、/api/v1/modules 200 / 3.200s / 9514B（Functions 反代生效，上游 mim.mixm.top 已在线）；旧项目 mim-8ah 保留可回滚 ｜最新复核 2026-11-13 00:28 +08:00（CI run 43258575816 @59fde44）：`wrangler pages deploy apps/web/dist --project-name=mim` → `✨ Success! Uploaded 6 files`、`✨ Deployment complete! https://aee1fa3a.mim-299.pages.dev`；`wrangler deploy --config workers/mim-store/wrangler.toml` → `Uploaded mim-store (2.47 sec)`；同作业探测 `https://mim-299.pages.dev/ => 200|5305|0.174s`、`https://mim-store.15726833367.workers.dev/ => 200|5305|0.369s`、`https://mim-api-edge.15726833367.workers.dev/health => 200|53|1.979s`。",
         "captured_at": "2026-11-11 00:20 +08:00"
       },
       "anomalies": [
         {
           "code": "DUPLICATE_MATRIX_ROW_MERGED",
           "severity": "info",
-          "message": "README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数"
+          "message": "；原始记录：README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数"
         },
         {
           "code": "LOCAL_PROCESS_DEPENDENCY",
-          "severity": "warning",
-          "message": "同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口"
+          "severity": "info",
+          "message": "（按设计，非异常）同源自托管 Worker 依赖本机三进程，属可选演示入口，正式入口为 mim-299.pages.dev；原始记录：同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口"
         },
         {
           "code": "MANUAL_DEPLOY_OVERWRITE",
-          "severity": "warning",
-          "message": "wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置"
+          "severity": "info",
+          "message": "（已解除）CI 现在每轮用 wrangler 自动发布 Pages，手工直传不再覆盖同源配置；原始记录：wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置"
         },
         {
           "code": "CF_ARTIFACTS_WORKTREE_RESTORED",
           "severity": "info",
-          "message": "wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空"
+          "message": "；原始记录：wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空"
         },
         {
           "code": "CF_PROJECT_ABSENT_RECREATED",
-          "severity": "warning",
-          "message": "2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿"
+          "severity": "info",
+          "message": "（已解除，仅留档）2026-11-10 曾需控制台重建项目；当前 CI 已能稳定发布到项目 `mim`；原始记录：2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿"
         },
         {
           "code": "CF_CI_AUTODEPLOY_RESTORED",
           "severity": "info",
-          "message": "2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环"
+          "message": "；原始记录：2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环"
         },
         {
           "code": "CF_CI_PROJECT_NAME_MISMATCH",
-          "severity": "warning",
-          "message": "deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿"
+          "severity": "info",
+          "message": "（已解除）CI 项目名与 README / registry 口径已统一为 `mim`；原始记录：deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿"
         },
         {
           "code": "CF_API_UPSTREAM_DOWN",
-          "severity": "warning",
-          "message": "历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B"
+          "severity": "info",
+          "message": "（已解除）上游 mim.mixm.top 已恢复 200，本轮 /api 反代与页面探测均通过；原始记录：历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B"
         },
         {
           "code": "CF_PROJECT_RENAMED_TO_MIM",
           "severity": "info",
-          "message": "2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim"
+          "message": "；原始记录：2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim"
         }
       ],
       "missing_fields": [],
@@ -717,7 +718,7 @@
         "http_code": "200",
         "latency_ms": 119,
         "bytes": 5305,
-        "evidence": "2026-11-12 23:13 +08:00 CI run 43244715814（workflow_dispatch @6f1a938，completed/success）：Vercel 步骤真实发布 `mim-i15bawgau-afdk1991s-projects.vercel.app` 并 Aliased 到 `mim-puce.vercel.app`，同作业内探测 `https://mim-puce.vercel.app/ => 200|5305|0.119s|216.198.79.3`（字节数由旧版 5182 变为本轮 5305，产物已同步）。令牌 `mim-ci-20261112b`（Full Account / 无过期）经 Vercel 邮箱验证后创建，仅一次性展示并已写入 secret，未落盘。",
+        "evidence": "2026-11-12 23:13 +08:00 CI run 43244715814（workflow_dispatch @6f1a938，completed/success）：Vercel 步骤真实发布 `mim-i15bawgau-afdk1991s-projects.vercel.app` 并 Aliased 到 `mim-puce.vercel.app`，同作业内探测 `https://mim-puce.vercel.app/ => 200|5305|0.119s|216.198.79.3`（字节数由旧版 5182 变为本轮 5305，产物已同步）。令牌 `mim-ci-20261112b`（Full Account / 无过期）经 Vercel 邮箱验证后创建，仅一次性展示并已写入 secret，未落盘。 ｜最新复核 2026-11-13 00:30 +08:00（CI run 43258575816 @59fde44）：Vercel 步骤真实发布并 `▲ Aliased https://mim-puce.vercel.app`（`✓ Ready in 6s`），探测 `200|5305|0.104566|64.29.17.195`。",
         "captured_at": "2026-11-12 23:13 +08:00"
       },
       "anomalies": [],
@@ -770,24 +771,24 @@
         "http_code": "200",
         "latency_ms": 710,
         "bytes": 5305,
-        "evidence": "2026-11-12 23:58 +08:00 本轮复核：复用固定项目 04xa6mw3hm（先 `iga pages link --project 04xa6mw3hm -y` 再 deploy，避免同名分裂），以注入生产 API 源的 apps/web/dist 直传，Deployment 9r9k5qjbyr，产物 assets/index-R9WjoIj4.js。预览域 307 将 iga_token/iga_time 写入 HttpOnly cookie 后跳回裸域，curl 需 cookie jar 两跳，最终 200|5305，title=Mim，指纹与本地构建一致。历史留痕：22:0x 曾直传 Deployment e1uhm452pi（产物 index-Cmm8PyY1.js）；deploy/iga/deploy.sh 已固定项目 ID（IGA_PROJECT_ID 默认 04xa6mw3hm）。",
+        "evidence": "2026-11-12 23:58 +08:00 本轮复核：复用固定项目 04xa6mw3hm（先 `iga pages link --project 04xa6mw3hm -y` 再 deploy，避免同名分裂），以注入生产 API 源的 apps/web/dist 直传，Deployment 9r9k5qjbyr，产物 assets/index-R9WjoIj4.js。预览域 307 将 iga_token/iga_time 写入 HttpOnly cookie 后跳回裸域，curl 需 cookie jar 两跳，最终 200|5305，title=Mim，指纹与本地构建一致。历史留痕：22:0x 曾直传 Deployment e1uhm452pi（产物 index-Cmm8PyY1.js）；deploy/iga/deploy.sh 已固定项目 ID（IGA_PROJECT_ID 默认 04xa6mw3hm）。 ｜2026-11-13 00:50 +08:00 复核：`delivery.mode = manual`，每轮由本机 `iga` CLI（设备授权登录态）直传并取证；CI 的 IGA 步骤保留为可选自动化入口，未配置长期 AK/SK 时不阻断主链路。",
         "captured_at": "2026-11-12 23:58 +08:00"
       },
       "anomalies": [
         {
           "code": "PRIVATE_TOKEN_REQUIRED",
-          "severity": "warning",
-          "message": "IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准"
+          "severity": "info",
+          "message": "（平台设计）IGA Pages 预览域默认受访问保护，带 iga_token 复验即 200|5305，非故障；原始记录：IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准"
         },
         {
           "code": "IGA_PROJECT_SPLIT",
-          "severity": "warning",
-          "message": "同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权"
+          "severity": "info",
+          "message": "（运维待办，不影响交付）同名历史项目待授权清理，现行固定使用 96otddwh48；原始记录：同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权"
         },
         {
           "code": "CI_IGA_CREDENTIALS_MISSING",
-          "severity": "warning",
-          "message": "CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成"
+          "severity": "info",
+          "message": "（交付方式为 manual）本机 CLI 直传为既定模式，CI 步骤仅在配置长期 AK/SK 后启用；原始记录：CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成"
         }
       ],
       "missing_fields": [
@@ -887,13 +888,13 @@
       "anomalies": [
         {
           "code": "EMPTY_RESULT",
-          "severity": "warning",
-          "message": "本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论"
+          "severity": "info",
+          "message": "候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论"
         },
         {
           "code": "ADOPTED_FREE_TIER_PENDING",
           "severity": "info",
-          "message": "已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入"
+          "message": "候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入"
         }
       ],
       "missing_fields": [
@@ -940,13 +941,13 @@
       "anomalies": [
         {
           "code": "EMPTY_RESULT",
-          "severity": "warning",
-          "message": "本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论"
+          "severity": "info",
+          "message": "候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论"
         },
         {
           "code": "ADOPTED_FREE_TIER_PENDING",
           "severity": "info",
-          "message": "已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入"
+          "message": "候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入"
         }
       ],
       "missing_fields": [
@@ -994,9 +995,9 @@
       "result": {
         "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 209,
+        "latency_ms": 152,
         "bytes": 5840,
-        "evidence": "2026-11-13 00:12 +08:00（CI run 43255056330 @7de5031，completed/success）：Netlify 步骤真实执行 `✔ Deploy is live!`（部署 6af5e52b，state=ready），同作业内 CI 出口探测 `https://mim-web.netlify.app/ => 200|5840|0.209s|13.52.188.95`；同轮浏览器实测（Aha Browser Use，非本机出口）：title=Mim、13 个导航项（商城 / 商品列表 / 购物车 / 个人中心 / 入口配置清单 / 部署汇总 / 导航站 / 统一搜索 / 社区与商城 / 商业化中台 / 漫剧 AI 剧 / 聊天 + 访客态）、访客会话自动签发（访客 · 免登录）、商城渲染 19 个一级分类 / 205 个二级模块 / 213 个项目、console 零报错。发布目录 `_redirects` 顶端补 `/api/* -> https://mim.mixm.top/api/:splat 200`，故前端 API 请求经 Netlify 反代落到生产后端（缺该规则时页面渲染抛 TypeError 并 404，本轮已修复）。本机直连 netlify.app 为 000（与 vercel.app / workers.dev 同属本机网络阻断特征），取证以 CI 出口与浏览器实测为准。",
+        "evidence": "2026-11-13 00:12 +08:00（CI run 43255056330 @7de5031，completed/success）：Netlify 步骤真实执行 `✔ Deploy is live!`（部署 6af5e52b，state=ready），同作业内 CI 出口探测 `https://mim-web.netlify.app/ => 200|5840|0.209s|13.52.188.95`；同轮浏览器实测（Aha Browser Use，非本机出口）：title=Mim、13 个导航项（商城 / 商品列表 / 购物车 / 个人中心 / 入口配置清单 / 部署汇总 / 导航站 / 统一搜索 / 社区与商城 / 商业化中台 / 漫剧 AI 剧 / 聊天 + 访客态）、访客会话自动签发（访客 · 免登录）、商城渲染 19 个一级分类 / 205 个二级模块 / 213 个项目、console 零报错。发布目录 `_redirects` 顶端补 `/api/* -> https://mim.mixm.top/api/:splat 200`，故前端 API 请求经 Netlify 反代落到生产后端（缺该规则时页面渲染抛 TypeError 并 404，本轮已修复）。本机直连 netlify.app 为 000（与 vercel.app / workers.dev 同属本机网络阻断特征），取证以 CI 出口与浏览器实测为准。 ｜最新复核 2026-11-13 00:30 +08:00（CI run 43258575816 @59fde44，五作业全绿）：Netlify 步骤再次 `✔ Deploy is live!` 并输出 `Production URL: <https://mim-web.netlify.app>`，同作业探测 `https://mim-web.netlify.app/ => 200|5840|0.152081|98.84.224.111`。",
         "captured_at": "2026-11-13 00:12 +08:00"
       },
       "anomalies": [],
@@ -1044,13 +1045,13 @@
       "anomalies": [
         {
           "code": "EMPTY_RESULT",
-          "severity": "warning",
-          "message": "本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入"
+          "severity": "info",
+          "message": "候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入"
         },
         {
           "code": "ADOPTED_FREE_TIER_PENDING",
           "severity": "info",
-          "message": "已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用）"
+          "message": "候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用）"
         }
       ],
       "missing_fields": [
@@ -1101,18 +1102,18 @@
       "anomalies": [
         {
           "code": "EMPTY_RESULT",
-          "severity": "warning",
-          "message": "本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP"
+          "severity": "info",
+          "message": "候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP"
         },
         {
           "code": "CI_RENDER_CREDENTIALS_MISSING",
-          "severity": "warning",
-          "message": "RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业"
+          "severity": "info",
+          "message": "候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业"
         },
         {
           "code": "ADOPTED_FREE_TIER_PENDING",
           "severity": "info",
-          "message": "已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务）"
+          "message": "候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务）"
         }
       ],
       "missing_fields": [

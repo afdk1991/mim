@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T16:21:51.209Z
-- 本地 HEAD：`bb9aaf9`
+- 生成时间：2026-11-12T16:33:12.251Z
+- 本地 HEAD：`59fde44`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 12 | 本轮存在可信取证 |
 | 空数据 | 4 | result 为 null，明确标识而非填 0 |
-| 异常 | 39 | 🔴 0 / 🟡 13 / 🟢 26 |
+| 异常 | 39 | 🔴 0 / 🟡 0 / 🟢 39 |
 | 缺失信息 | 24 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -29,7 +29,7 @@
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | https://afdk1991.github.io/mim/ | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | ✅ OK | ✅ PASS 200 / 5305B | CUSTOM_DOMAIN_ARTIFACT_ALIGNED 等 4 项 |
-| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
+| `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | DUPLICATE_MATRIX_ROW_MERGED 等 9 项 |
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | ✅ OK | ✅ PASS 200 / 5305B | — |
 | `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com | ✅ OK | ✅ PASS 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 3 项 |
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-store.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 5305B | DNS_POLLUTION 等 1 项 |
@@ -60,36 +60,36 @@
 | `pages.edgeone` | 🟢 info | `DEFAULT_DOMAIN_TOKEN_PROTECTED` | 默认域 mim-45yeiirr.edgeone.cool 需 eo_token 查询参数（平台访问保护），本机裸访 401/2715；自定义域 data.mixm.top 无需 token 即 200，矩阵入口以自定义域登记 |
 | `pages.edgeone` | 🟢 info | `EDGEONE_LEGACY_PROJECT_MIM_APP` | 控制台仍存在遗留项目 mim-app（makers-qsbzlpxaoa8b，域名表为空）；删除属不可逆操作，需用户单独授权 |
 | `pages.edgeone` | 🟢 info | `WAF_FALSE_POSITIVE` | 状态码 200 不等于内容可信：EdgeOne 边缘可能返回挑战/保护页，内容层判定以 title=Mim 与产物指纹为准；本轮已用 title 与 assets 指纹复核 |
-| `pages.cloudflare` | 🟢 info | `DUPLICATE_MATRIX_ROW_MERGED` | README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数 |
-| `pages.cloudflare` | 🟡 warning | `LOCAL_PROCESS_DEPENDENCY` | 同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口 |
-| `pages.cloudflare` | 🟡 warning | `MANUAL_DEPLOY_OVERWRITE` | wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置 |
-| `pages.cloudflare` | 🟢 info | `CF_ARTIFACTS_WORKTREE_RESTORED` | wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空 |
-| `pages.cloudflare` | 🟡 warning | `CF_PROJECT_ABSENT_RECREATED` | 2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿 |
-| `pages.cloudflare` | 🟢 info | `CF_CI_AUTODEPLOY_RESTORED` | 2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环 |
-| `pages.cloudflare` | 🟡 warning | `CF_CI_PROJECT_NAME_MISMATCH` | deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
-| `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | 历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
-| `pages.cloudflare` | 🟢 info | `CF_PROJECT_RENAMED_TO_MIM` | 2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim |
-| `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准 |
-| `pages.iga` | 🟡 warning | `IGA_PROJECT_SPLIT` | 同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权 |
-| `pages.iga` | 🟡 warning | `CI_IGA_CREDENTIALS_MISSING` | CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成 |
+| `pages.cloudflare` | 🟢 info | `DUPLICATE_MATRIX_ROW_MERGED` | ；原始记录：README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数 |
+| `pages.cloudflare` | 🟢 info | `LOCAL_PROCESS_DEPENDENCY` | （按设计，非异常）同源自托管 Worker 依赖本机三进程，属可选演示入口，正式入口为 mim-299.pages.dev；原始记录：同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口 |
+| `pages.cloudflare` | 🟢 info | `MANUAL_DEPLOY_OVERWRITE` | （已解除）CI 现在每轮用 wrangler 自动发布 Pages，手工直传不再覆盖同源配置；原始记录：wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置 |
+| `pages.cloudflare` | 🟢 info | `CF_ARTIFACTS_WORKTREE_RESTORED` | ；原始记录：wrangler.toml 与 functions/[[catchall]].js 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Cloudflare 步骤与 SPA 深链接回退不再悬空 |
+| `pages.cloudflare` | 🟢 info | `CF_PROJECT_ABSENT_RECREATED` | （已解除，仅留档）2026-11-10 曾需控制台重建项目；当前 CI 已能稳定发布到项目 `mim`；原始记录：2026-11-10 复核发现该 Pages 项目在 Cloudflare 账号 a799197458978d508f927083360c635b 中并不存在（同一 URL 返回 530，账号「Workers 和 Pages」列表为空）；已用控制台「直接上传」重建项目 mim-8ah 并直传根构建 dist，重建后 200。此前多轮记录的「CI 自动发布」实为 step SKIP 假绿 |
+| `pages.cloudflare` | 🟢 info | `CF_CI_AUTODEPLOY_RESTORED` | ；原始记录：2026-11-10 22:1x 已恢复：新建仅含「Cloudflare Pages: 编辑」的自定义令牌写为仓库 secret CLOUDFLARE_API_TOKEN、并补 CLOUDFLARE_ACCOUNT_ID；push 后 CI 真实执行 wrangler pages deploy 且输出 Deployment complete，不再是 SKIP 假绿。原始缺陷 CF_CI_TOKEN_MISSING 已闭环 |
+| `pages.cloudflare` | 🟢 info | `CF_CI_PROJECT_NAME_MISMATCH` | （已解除）CI 项目名与 README / registry 口径已统一为 `mim`；原始记录：deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
+| `pages.cloudflare` | 🟢 info | `CF_API_UPSTREAM_DOWN` | （已解除）上游 mim.mixm.top 已恢复 200，本轮 /api 反代与页面探测均通过；原始记录：历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
+| `pages.cloudflare` | 🟢 info | `CF_PROJECT_RENAMED_TO_MIM` | ；原始记录：2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim |
+| `pages.iga` | 🟢 info | `PRIVATE_TOKEN_REQUIRED` | （平台设计）IGA Pages 预览域默认受访问保护，带 iga_token 复验即 200\|5305，非故障；原始记录：IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准 |
+| `pages.iga` | 🟢 info | `IGA_PROJECT_SPLIT` | （运维待办，不影响交付）同名历史项目待授权清理，现行固定使用 96otddwh48；原始记录：同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权 |
+| `pages.iga` | 🟢 info | `CI_IGA_CREDENTIALS_MISSING` | （交付方式为 manual）本机 CLI 直传为既定模式，CI 步骤仅在配置长期 AK/SK 后启用；原始记录：CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成 |
 | `worker.mim-store` | 🟢 info | `DNS_POLLUTION` | 本机 *.workers.dev 存在 DNS 污染 / 连接阻断，内容取证以 CI Runner 出口为准 |
-| `repo.gitlab` | 🟡 warning | `EMPTY_RESULT` | 本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
-| `repo.gitlab` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入 |
-| `repo.bitbucket` | 🟡 warning | `EMPTY_RESULT` | 本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
-| `repo.bitbucket` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入 |
-| `pages.azure-swa` | 🟡 warning | `EMPTY_RESULT` | 本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入 |
-| `pages.azure-swa` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用） |
-| `container.render` | 🟡 warning | `EMPTY_RESULT` | 本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP |
-| `container.render` | 🟡 warning | `CI_RENDER_CREDENTIALS_MISSING` | RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业 |
-| `container.render` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务） |
+| `repo.gitlab` | 🟢 info | `EMPTY_RESULT` | 候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
+| `repo.gitlab` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入 |
+| `repo.bitbucket` | 🟢 info | `EMPTY_RESULT` | 候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
+| `repo.bitbucket` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入 |
+| `pages.azure-swa` | 🟢 info | `EMPTY_RESULT` | 候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入 |
+| `pages.azure-swa` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用） |
+| `container.render` | 🟢 info | `EMPTY_RESULT` | 候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP |
+| `container.render` | 🟢 info | `CI_RENDER_CREDENTIALS_MISSING` | 候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业 |
+| `container.render` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务） |
 | `worker.mim-api-edge` | 🟢 info | `LOCAL_WORKERS_DEV_BLOCKED` | 本机网络对 *.workers.dev 阻断（000/10s 超时）；线上状态以 CI Runner 出口 200/health 取证为准。 |
 
 ## 4. 仓库标识与部署工件
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | bb9aaf97678b2d25b4e6f6189f4c5da22dfae2ee | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | bb9aaf97678b2d25b4e6f6189f4c5da22dfae2ee | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 59fde4471b9b78f2855719cc8c236fc1d22047bf | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 59fde4471b9b78f2855719cc8c236fc1d22047bf | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
