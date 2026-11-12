@@ -74,6 +74,8 @@ export function ComicTheater({ locale, hasSession, onSignIn, onOpenWorkbench }: 
   const [mineError, setMineError] = useState<string | null>(null); // 我的作品加载失败（不阻断演示播放）
   const [activeWorkId, setActiveWorkId] = useState<string | null>(null); // 当前选中演示作品
   const [activeEpisode, setActiveEpisode] = useState(0); // 当前集下标
+  const [kindFilter, setKindFilter] = useState<'all' | 'comic-drama' | 'ai-drama'>('all'); // 形态筛选：全部 / 漫剧 / AI 剧
+  const [query, setQuery] = useState(''); // 片库搜索词
   const [mineActiveId, setMineActiveId] = useState<string | null>(null); // 当前播放的本人成片
   const [resumeAt, setResumeAt] = useState(0); // 待恢复的播放位置（秒）
   const videoRef = useRef<HTMLVideoElement | null>(null); // 播放器引用，用于恢复进度
@@ -159,6 +161,29 @@ export function ComicTheater({ locale, hasSession, onSignIn, onOpenWorkbench }: 
       poster: activeWork.cover,
     };
   }, [activeMine, activeWork, activeEpisode]); // 依赖当前选择
+
+  // 片库筛选：形态 + 标题/标签搜索，结果仍保持服务端原始顺序
+  const filteredWorks = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return works.filter((work) => {
+      if (kindFilter !== 'all' && work.kind !== kindFilter) return false;
+      if (!q) return true;
+      return `${work.title} ${work.subtitle} ${work.tags.join(' ')}`.toLowerCase().includes(q);
+    });
+  }, [works, kindFilter, query]);
+
+  // 继续观看：本地有播放进度的作品，按进度倒序，最多展示 4 部
+  const continueItems = useMemo(() => {
+    const progress = readProgress();
+    return works
+      .map((work) => {
+        const first = work.episodes[0];
+        return { work, seconds: first ? progress[`show:${work.id}:${first.no}`] ?? 0 : 0 };
+      })
+      .filter((item) => item.seconds > 0)
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 4);
+  }, [works]);
 
   // 打开新播放源时：读出上次进度，等元数据加载后跳转
   useEffect(() => {
@@ -252,6 +277,11 @@ export function ComicTheater({ locale, hasSession, onSignIn, onOpenWorkbench }: 
               playsInline
               onLoadedMetadata={handleLoadedMetadata}
               onTimeUpdate={handleTimeUpdate}
+              onEnded={() => { // 播完自动进下一集；最后一集停在结尾
+                if (!activeMine && activeWork && activeEpisode + 1 < activeWork.episodes.length) {
+                  setActiveEpisode(activeEpisode + 1);
+                }
+              }}
               onPause={() => videoRef.current && source && writeProgress(source.key, videoRef.current.currentTime)}
             />
             <div className="theater-now">
@@ -323,11 +353,42 @@ export function ComicTheater({ locale, hasSession, onSignIn, onOpenWorkbench }: 
         </section>
       )}
 
-      {/* 演示片库网格：点击卡片切换作品 */}
+      {/* 继续观看：有本地进度的作品优先露出，点一下即可续播 */}
+      {continueItems.length > 0 && (
+        <section className="theater-section">
+          <h3 className="theater-side-title">{isZh ? '继续观看' : 'Continue watching'}</h3>
+          <div className="theater-continue">
+            {continueItems.map(({ work, seconds }) => (
+              <button key={work.id} type="button" className="theater-continue-card" onClick={() => selectWork(work)}>
+                <img className="theater-cover" src={work.cover} alt={work.title} loading="lazy" />
+                <span className="theater-card-body">
+                  <span className="theater-card-title">{work.title}</span>
+                  <span className="muted">{isZh ? '已看到 ' : 'At '}{formatTime(seconds)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 演示片库网格：形态筛选 + 搜索 + 点击卡片切换作品 */}
       <section className="theater-section">
-        <h3 className="theater-side-title">{isZh ? '演示片库' : 'Showcase'}</h3>
+        <div className="theater-toolbar">
+          <h3 className="theater-side-title">{isZh ? '演示片库' : 'Showcase'}</h3>
+          <div className="theater-chips" role="group" aria-label={isZh ? '按形态筛选' : 'Filter by kind'}>
+            {([
+              ['all', isZh ? '全部' : 'All'],
+              ['comic-drama', isZh ? '漫剧' : 'Comic'],
+              ['ai-drama', isZh ? 'AI 剧' : 'AI drama'],
+            ] as Array<['all' | 'comic-drama' | 'ai-drama', string]>).map(([key, label]) => (
+              <button key={key} type="button" className={kindFilter === key ? 'active' : ''} onClick={() => setKindFilter(key)}>{label}</button>
+            ))}
+          </div>
+          <input className="theater-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isZh ? '搜索作品 / 标签…' : 'Search title or tag…'} />
+        </div>
         <div className="theater-grid">
-          {works.map((work) => (
+          {filteredWorks.length === 0 && <p className="muted">{isZh ? '没有匹配的作品，换个关键词试试。' : 'No matching works. Try another keyword.'}</p>}
+          {filteredWorks.map((work) => (
             <button
               key={work.id}
               type="button"

@@ -2638,6 +2638,71 @@ code { /* 行内代码/令牌展示 */
   font-weight: 600; /* 加粗 */
 } /* 结束 */
 
+.theater-toolbar { /* 片库工具栏：标题 + 形态筛选 + 搜索 */
+  display: flex; /* 横向排列 */
+  align-items: center; /* 垂直居中 */
+  gap: 12px; /* 间距 */
+  flex-wrap: wrap; /* 窄屏换行 */
+} /* 结束 */
+
+.theater-toolbar .theater-side-title { /* 工具栏内的标题不再占满一行 */
+  margin: 0; /* 去掉默认外边距 */
+} /* 结束 */
+
+.theater-chips { /* 形态筛选按钮组 */
+  display: flex; /* 横向 */
+  gap: 6px; /* 按钮间距 */
+} /* 结束 */
+
+.theater-chips button { /* 单个筛选项 */
+  padding: 5px 12px; /* 紧凑内衬 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 999px; /* 胶囊形 */
+  background: var(--surface); /* 表面色 */
+  color: var(--muted); /* 次级文字色 */
+  font-size: 12px; /* 小字 */
+  cursor: pointer; /* 手型 */
+} /* 结束 */
+
+.theater-chips button.active { /* 当前筛选项 */
+  border-color: var(--primary); /* 主色描边 */
+  background: var(--primary); /* 主色底 */
+  color: #ffffff; /* 白字 */
+} /* 结束 */
+
+.theater-search { /* 片库搜索框 */
+  min-width: 200px; /* 最小宽度 */
+  flex: 1; /* 占据剩余空间 */
+  padding: 7px 10px; /* 内衬 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 8px; /* 圆角 */
+  background: var(--surface); /* 表面色 */
+  color: inherit; /* 继承文字色 */
+  font-size: 13px; /* 常规字号 */
+} /* 结束 */
+
+.theater-continue { /* 继续观看横向列表 */
+  display: flex; /* 横向 */
+  gap: 12px; /* 间距 */
+  overflow-x: auto; /* 超宽可横向滚动 */
+  padding-bottom: 4px; /* 给滚动条留位 */
+} /* 结束 */
+
+.theater-continue-card { /* 继续观看卡片 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 堆叠 */
+  flex: 0 0 220px; /* 固定宽度，不压缩 */
+  padding: 0; /* 图片贴边 */
+  overflow: hidden; /* 圆角裁切 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 12px; /* 圆角 */
+  background: var(--surface); /* 表面色 */
+  color: inherit; /* 继承文字色 */
+  text-align: left; /* 左对齐 */
+  cursor: pointer; /* 手型 */
+} /* 结束 */
+
+
 .theater-card-meta { /* 卡片底部元信息 */
   display: flex; /* 左右 */
   align-items: center; /* 垂直居中 */
