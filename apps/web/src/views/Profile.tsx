@@ -44,6 +44,12 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const [linking, setLinking] = useState<string | null>(null); // 正在跳转的提供方
 
   const user = me.data?.user; // 当前用户
+  const isGuest = !!user?.is_guest; // 访客没有正式账号凭据：账号与设置只在登录后的个人中心出现
+
+  // 访客若因回调落到账号设置分区，自动回到资料分区，避免出现空白页
+  useEffect(() => {
+    if (isGuest && tab === 'security') setTab('profile');
+  }, [isGuest, tab]);
 
   // 资料回填：拿到 /me 结果后同步到表单
   useEffect(() => {
@@ -146,7 +152,9 @@ export function Profile({ locale, onUserUpdated }: Props) {
           <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => setTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
           <button type="button" className={`tab${tab === 'entitlements' ? ' active' : ''}`} onClick={() => setTab('entitlements')}>{isZh ? '我的权益' : 'Entitlements'}</button>
           <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => setTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
-          <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => setTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
+          {!isGuest && (
+            <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => setTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
+          )}
         </nav>
       </header>
 
@@ -253,7 +261,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
       ) : null}
 
       {/* 分区四：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
-      {tab === 'security' ? (
+      {tab === 'security' && !isGuest ? (
         <section className="profile-security">
           <p className="hint">
             {isZh ? '登录凭据由服务端签发 JWT，退出登录会吊销 refresh_token；注销账号进入冷静期，期内可撤销。' : 'Sessions are JWT based; signing out revokes the refresh token.'}

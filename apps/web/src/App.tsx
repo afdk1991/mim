@@ -163,7 +163,7 @@ export function App() {
     // 购物车：待购模块与结算
     { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
     // 个人中心：资料 / 权益 / 订单 / 账号与设置（免登录体验下访客同样拥有个人区，随时可登录升级）
-    { view: 'account', label: locale === 'en-US' ? 'Account & settings' : '个人中心与设置' },
+    { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
     // 统一入口配置清单：按 44 个入口开发的模块目录
     { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单' },
     // 部署汇总：统一字段核对整体部署情况

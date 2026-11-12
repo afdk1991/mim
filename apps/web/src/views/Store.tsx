@@ -1,9 +1,8 @@
 // 商城视图：两级分类导航（19 个一级分类 / 205 个二级模块）+ 排序 / 开源许可 / 编程语言筛选 + 分页 + 我的权益与订单
 import { useEffect, useRef, useState } from 'react'; // 本地状态钩子：分类、排序、筛选项、分页、展开项、忙碌标记等；useRef/useEffect 供依赖链图挂载与销毁 G6 实例
 import type { FormEvent } from 'react'; // 表单事件类型：搜索行 onSubmit 入参（仅类型导入，不产生运行时开销）
-import { Graph } from '@antv/g6'; // 依赖链可视化：G6 v5 图实例，在详情面板内渲染「前置模块 → 当前模块」有向图
-import type { GraphData } from '@antv/g6'; // 图数据类型：nodes / edges 结构，与后端模块编码一一对应
-import * as echarts from 'echarts'; // 价格历史折线图：ECharts 6 在详情面板内绘制售价随生效时间的趋势线
+// G6 图与 ECharts 都是重依赖：仅在详情面板真正展开时动态加载，避免商城首屏为它们付出加载代价
+import type { Graph as GraphType, GraphData } from '@antv/g6'; // 图实例与图数据类型（类型导入不进入产物）
 // 引入 Locale 类型：约束语言取值为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
 // 引入核心域常量：排序枚举 / 48 项开源许可 / 87 种编程语言，与后端共用同一份定义避免口径漂移
@@ -321,7 +320,7 @@ interface DependencyGraphProps {
 
 function DependencyGraph({ currentCode, requires, unlocked, nameOf, locale }: DependencyGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null); // 画布挂载容器 ref
-  const graphRef = useRef<Graph | null>(null); // G6 实例引用，卸载时据此销毁释放 canvas
+  const graphRef = useRef<GraphType | null>(null); // G6 实例引用，卸载时据此销毁释放 canvas
 
   // 依赖快照键：Set 与数组每次渲染都是新引用，拼成排序字符串作为 effect 依赖，避免无关重渲染重建图
   const unlockedKey = [...unlocked].sort().join('|'); // 已解锁编码排序拼接
@@ -364,20 +363,27 @@ function DependencyGraph({ currentCode, requires, unlocked, nameOf, locale }: De
     const edges = requires.map((req) => ({ source: req, target: currentCode })); // 每条前置对应一条有向边
     const data: GraphData = { nodes: [currentNode, ...prerequisiteNodes], edges }; // 汇总图数据
 
-    const graph = new Graph({ // 新建 G6 实例
-      container, // 挂载到 ref 容器
-      width: container.clientWidth || 320, // 容器宽度兜底 320px
-      height: 168, // 画布固定高度，适配详情面板纵向空间
-      data, // 图数据
-      layout: { type: 'dagre' }, // 有向分层布局，一层前置即可清晰铺开
-      autoFit: 'view', // 视图自适应，避免节点被裁切
-      animation: false, // 静态预览关闭全局动画，减少首屏开销
-    }); // 实例配置结束
-    graphRef.current = graph; // 留存实例引用
-    void graph.render(); // render 为异步方法，不阻塞卸载清理
+    let disposed = false; // 组件卸载或依赖变化后不再创建图实例
+    void import('@antv/g6').then(({ Graph }) => { // 详情展开时才拉取 G6，避免首屏加载图引擎
+      if (disposed) return; // 已卸载则跳过
+      const graph = new Graph({ // 新建 G6 实例
+        container, // 挂载到 ref 容器
+        width: container.clientWidth || 320, // 容器宽度兜底 320px
+        height: 168, // 画布固定高度，适配详情面板纵向空间
+        data, // 图数据
+        layout: { type: 'dagre' }, // 有向分层布局，一层前置即可清晰铺开
+        autoFit: 'view', // 视图自适应，避免节点被裁切
+        animation: false, // 静态预览关闭全局动画，减少首屏开销
+      }); // 实例配置结束
+      graphRef.current = graph; // 留存实例引用
+      void graph.render(); // render 为异步方法，不阻塞卸载清理
+    }).catch(() => { // 图引擎加载失败不影响详情其余内容
+      graphRef.current = null;
+    });
 
     return () => { // 卸载或依赖变化前清理
-      graph.destroy(); // 销毁实例，释放 canvas 与事件监听
+      disposed = true; // 阻止尚未完成的动态加载继续建图
+      graphRef.current?.destroy(); // 销毁实例，释放 canvas 与事件监听
       graphRef.current = null; // 清空引用
     }; // 清理结束
   }, [currentCode, requiresKey, unlockedKey, locale]); // 依赖：当前编码 + 前置/解锁两个快照键 + 语言；原始集合/数组/函数引用每次渲染都变，不进依赖以免无关重建
@@ -396,7 +402,7 @@ interface PriceHistoryRow {
 // 价格历史折线图组件：用 ECharts 把各定价窗口的售价按生效时间串成趋势线，卸载时 dispose 释放实例。
 function PriceHistoryChart({ rows, locale }: { rows: PriceHistoryRow[]; locale: Locale }) {
   const hostRef = useRef<HTMLDivElement | null>(null); // 图表挂载容器
-  const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null); // ECharts 实例引用
+  const chartRef = useRef<{ resize: () => void; dispose: () => void } | null>(null); // ECharts 实例引用（只保留用到的两个方法）
 
   // 数据快照键：价格行数组每次渲染都是新引用，拼成串作为 effect 依赖，避免无关重渲染重建图表
   const rowsKey = rows.map((r) => `${r.effective_from}:${r.amount_minor}:${r.currency}`).join('|');
@@ -405,24 +411,32 @@ function PriceHistoryChart({ rows, locale }: { rows: PriceHistoryRow[]; locale: 
     const host = hostRef.current; // 取挂载节点
     if (!host || rows.length === 0) return; // 无容器或无数据时不建图
 
-    const chart = echarts.init(host); // 初始化 ECharts 实例
-    chartRef.current = chart; // 留存实例引用
-    const times = rows.map((row) => formatTime(locale, row.effective_from)); // x 轴：各窗口生效时间（按语言格式化）
-    const values = rows.map((row) => Number((row.amount_minor / 100).toFixed(2))); // y 轴：分转元后的售价
+    let disposed = false; // 卸载或数据变化后不再初始化图表
+    let chart: { setOption: (option: unknown) => void; resize: () => void; dispose: () => void } | null = null; // 动态加载后的实例
+    void import('echarts').then((echarts) => { // 详情出现价格历史时才拉取图表库
+      if (disposed) return; // 已卸载则跳过
+      chart = echarts.init(host); // 初始化 ECharts 实例
+      chartRef.current = chart; // 留存实例引用
+      const times = rows.map((row) => formatTime(locale, row.effective_from)); // x 轴：各窗口生效时间（按语言格式化）
+      const values = rows.map((row) => Number((row.amount_minor / 100).toFixed(2))); // y 轴：分转元后的售价
 
-    chart.setOption({ // 折线图配置
-      grid: { left: 44, right: 16, top: 16, bottom: 28 }, // 内边距，给坐标轴标签留位
-      tooltip: { trigger: 'axis' }, // 悬停按 x 轴刻度联动提示
-      xAxis: { type: 'category', data: times, axisLabel: { fontSize: 10 } }, // 类别轴：生效时间
-      yAxis: { type: 'value', axisLabel: { fontSize: 10 } }, // 数值轴：售价（元）
-      series: [{ type: 'line', data: values, smooth: true, symbolSize: 6 }], // 平滑折线 + 数据点
-    }); // 配置结束
+      chart.setOption({ // 折线图配置
+        grid: { left: 44, right: 16, top: 16, bottom: 28 }, // 内边距，给坐标轴标签留位
+        tooltip: { trigger: 'axis' }, // 悬停按 x 轴刻度联动提示
+        xAxis: { type: 'category', data: times, axisLabel: { fontSize: 10 } }, // 类别轴：生效时间
+        yAxis: { type: 'value', axisLabel: { fontSize: 10 } }, // 数值轴：售价（元）
+        series: [{ type: 'line', data: values, smooth: true, symbolSize: 6 }], // 平滑折线 + 数据点
+      }); // 配置结束
+    }).catch(() => { // 图表库加载失败时保留价格文字，不影响下单
+      chartRef.current = null;
+    });
 
-    const onResize = () => chart.resize(); // 窗口尺寸变化时自适应重排
+    const onResize = () => chartRef.current?.resize(); // 窗口尺寸变化时自适应重排
     window.addEventListener('resize', onResize); // 监听视口缩放
     return () => { // 卸载或数据变化前清理
+      disposed = true; // 阻止未完成的动态加载继续初始化
       window.removeEventListener('resize', onResize); // 移除缩放监听
-      chart.dispose(); // 销毁实例，释放 canvas 与事件
+      chart?.dispose(); // 销毁实例，释放 canvas 与事件
       chartRef.current = null; // 清空引用
     };
   }, [rowsKey, locale, rows.length]); // 依赖：价格快照键 + 语言 + 行数；原始数组引用不进依赖

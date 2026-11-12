@@ -5,8 +5,7 @@ import { useEffect, useRef, useState } from 'react'; // 本地状态钩子：搜
 import type { FormEvent } from 'react'; // 表单事件类型：搜索与新建表单的 onSubmit 入参
 // 语言类型：约束文案取值为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
-// ECharts：总览面板把入口状态分布画成饼图，卸载时 dispose 释放实例
-import * as echarts from 'echarts';
+// ECharts 体积较大：仅在入口总览面板实际渲染时动态加载，避免拖慢首屏
 // 接口客户端、错误文案翻译器与会话读取工具（判断匿名态）
 import { api, errorText, getSession } from '../api';
 // 清单响应类型：能力点、业务条目、业务域与落地状态
@@ -132,28 +131,36 @@ function StatusPieChart({ byStatus, locale }: { byStatus: Record<string, number>
   useEffect(() => { // 容器就绪且统计快照变化时（重新）绘图
     const host = hostRef.current; // 取挂载节点
     if (!host || dataKey === '') return; // 无容器或无数据时不建图
-    const chart = echarts.init(host); // 初始化 ECharts 实例
-    // 映射饼图数据：状态文案按当前语言翻译，未命中回退原始状态码
-    const data = Object.entries(byStatus).map(([status, value]) => ({
-      name: stateText(locale, status),
-      value,
-    }));
-    chart.setOption({ // 环形饼图配置
-      tooltip: { trigger: 'item' }, // 悬停扇区显示名称与占比
-      legend: { bottom: 0, textStyle: { fontSize: 10 } }, // 底部图例
-      series: [{
-        type: 'pie', // 饼图
-        radius: ['38%', '62%'], // 环形内外半径
-        center: ['50%', '46%'], // 居中偏上给图例留位
-        label: { fontSize: 10 }, // 扇区标签字号
-        data, // 扇区数据
-      }],
-    }); // 配置结束
-    const onResize = () => chart.resize(); // 视口缩放时自适应重排
+    let disposed = false; // 卸载后不再初始化图表
+    let chart: { setOption: (option: unknown) => void; resize: () => void; dispose: () => void } | null = null; // 动态加载后的实例
+    void import('echarts').then((echarts) => { // 真正需要画图时才拉取图表库
+      if (disposed) return;
+      chart = echarts.init(host); // 初始化 ECharts 实例
+      // 映射饼图数据：状态文案按当前语言翻译，未命中回退原始状态码
+      const data = Object.entries(byStatus).map(([status, value]) => ({
+        name: stateText(locale, status),
+        value,
+      }));
+      chart.setOption({ // 环形饼图配置
+        tooltip: { trigger: 'item' }, // 悬停扇区显示名称与占比
+        legend: { bottom: 0, textStyle: { fontSize: 10 } }, // 底部图例
+        series: [{
+          type: 'pie', // 饼图
+          radius: ['38%', '62%'], // 环形内外半径
+          center: ['50%', '46%'], // 居中偏上给图例留位
+          label: { fontSize: 10 }, // 扇区标签字号
+          data, // 扇区数据
+        }],
+      }); // 配置结束
+    }).catch(() => { // 图表库失败时保留文字统计
+      chart = null;
+    }); // 加载结束
+    const onResize = () => chart?.resize(); // 视口缩放时自适应重排
     window.addEventListener('resize', onResize);
     return () => { // 卸载或数据变化前清理
+      disposed = true; // 阻止未完成的加载继续初始化
       window.removeEventListener('resize', onResize); // 移除缩放监听
-      chart.dispose(); // 销毁实例，释放 canvas 与事件
+      chart?.dispose(); // 销毁实例，释放 canvas 与事件
     };
   }, [dataKey, locale, byStatus]); // 依赖：统计快照键 + 语言；原始对象引用不进依赖
 
