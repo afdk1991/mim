@@ -28,6 +28,7 @@ export function Cart({ locale }: Props) {
   const [busy, setBusy] = useState(false); // 结算进行中
   const [error, setError] = useState<string | null>(null); // 错误提示
   const [results, setResults] = useState<CartCheckoutResult[] | null>(null); // 最近一次结算结果
+  const [usePoints, setUsePoints] = useState(false); // 结算时是否用积分抵扣
 
   /** 重新拉取购物车 */
   async function refresh() {
@@ -75,7 +76,7 @@ export function Cart({ locale }: Props) {
     setError(null); // 清空旧错误
     setResults(null); // 清空旧结果
     try {
-      const result = await api.cart.checkout('manual'); // 当前唯一可用渠道为人工结算
+      const result = await api.cart.checkout('manual', { use_points: usePoints }); // 人工结算并按开关传积分抵扣
       setCart(result.cart); // 用响应覆盖剩余车
       setResults(result.results); // 展示逐条结果
     } catch (err) {
@@ -149,6 +150,7 @@ export function Cart({ locale }: Props) {
           ) : (
             <span>{isZh ? '本车全部可即时解锁' : 'All items unlock instantly'}</span>
           )}
+          <label className="hint"><input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} /> {isZh ? '使用积分抵扣' : 'Use points'}</label>
           <button type="button" className="btn primary" onClick={() => void checkout()} disabled={busy}>
             {busy ? (isZh ? '结算中…' : 'Checking out…') : isZh ? '去结算' : 'Checkout'}
           </button>
@@ -165,6 +167,7 @@ export function Cart({ locale }: Props) {
               {result.kind === 'unlocked' ? (isZh ? '已即时解锁 ✓' : 'unlocked ✓') : null}
               {result.kind === 'order' ? (isZh ? `已生成待结算订单 ${result.order?.id.slice(0, 8) ?? ''}` : `pending order ${result.order?.id.slice(0, 8) ?? ''}`) : null}
               {result.kind === 'skipped' ? (isZh ? `已跳过（${result.reason ?? 'unknown'}）` : `skipped (${result.reason ?? 'unknown'})`) : null}
+              {result.points_spent ? (isZh ? ` · 抵扣 ${result.points_spent} 积分 / ${money(locale, 'CNY', result.points_deduct_cents ?? 0)}` : ` · ${result.points_spent} points / ${money(locale, 'CNY', result.points_deduct_cents ?? 0)}`) : null}
             </div>
           ))}
           {results.some((result) => result.kind === 'order') ? (

@@ -30,6 +30,7 @@ import { clockOf } from '../domain.js'; // 可注入时钟，测试时可冻结�
 import { requireAuth } from '../middleware.js'; // 登出接口需要已登录身份
 import { parse } from '../validate.js'; // zod 校验失败时统一转换为 AppError
 import { addSeconds } from '../utils.js'; // ISO 时间字符串加减秒
+import { isInviteRequired, redeemInvite } from '../invitations.js'; // 注册门槛：开关判定与同事务核销
 import type { ApiDeps, Region, UserRow } from '../types.js'; // 路由依赖、地区枚举与用户行类型
 import { createUser, ensureMemberNo, readUser } from '../identity.js'; // 统一建号 + Mim ID 发号 + 缺号兜底
 
@@ -58,6 +59,7 @@ const codeBody = z.object({ // 申请验证码的请求体
 
 const loginBody = codeBody.extend({ // 验证码登录在申请体基础上追加字段
   code: z.string().regex(/^\d{6}$/), // 固定 6 位数字，避免把其他格式写进库
+  invite_code: z.string().max(32).optional(), // 注册门槛开启时，首登建号需凭有效邀请码
   device: z // 设备信息（可选）
     .object({ // 设备对象结构
       platform: z.string().min(1).max(32), // 设备平台（ios/android/web），长度限幅防滥用
@@ -86,6 +88,7 @@ const registerBody = z.object({ // 注册请求体
   provider: z.enum(['phone', 'email']).optional(), // 通道可选，缺省按地区推断
   identifier: z.string().min(1), // 手机号或邮箱，注册前统一归一化
   password: z.string().min(8).max(200), // 口令至少 8 位，长度上限避免超长输入拖慢哈希
+  invite_code: z.string().max(32).optional(), // 注册门槛开启时必填有效邀请码
   display_name: z.string().max(64).optional(), // 展示名可选，缺省沿用空串由用户后续完善
   device: z // 设备信息（可选），与登录一致的契约
     .object({ // 设备对象结构
@@ -201,7 +204,13 @@ function recordFailure(deps: ApiDeps, key: string, region: string, now: string):
     .run(key, region, failures, lockedUntil, now); // upsert：首次插入，后续只更新计数与锁定状态
 } // 结束 recordFailure
 
-function findOrCreateUser(deps: ApiDeps, region: Region, provider: string, identifier: string): UserRow { // 按身份查找用户，不存在则注册
+function findOrCreateUser(
+  deps: ApiDeps,
+  region: Region,
+  provider: string,
+  identifier: string,
+  onCreate?: (userId: string) => void, // 仅在新建账号事务内回调（如邀请码核销），与建号同事务
+): UserRow { // 按身份查找用户，不存在则注册
   const identity = deps.db // 身份查询起点
     .prepare('SELECT user_id FROM identities WHERE region = ? AND provider = ? AND identifier = ?') // 三元组唯一确定一个身份
     .get(region, provider, identifier) as { user_id: string } | undefined; // 未命中即需要注册
@@ -222,6 +231,7 @@ function findOrCreateUser(deps: ApiDeps, region: Region, provider: string, ident
          VALUES (?, ?, ?, ?, ?, ?)`,
       ) // 结束预编译
       .run(uuidv7(), created.id, region, provider, identifier, now); // 绑定身份到新用户
+    onCreate?.(created.id); // 新建事务内回调：邀请码核销与建号同生共死
     return created; // 交出含号码的新用户
   })(); // 执行事务
 } // 结束 findOrCreateUser
@@ -363,7 +373,16 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       .run(now, codeRow.id); // 保证一次性使用
     deps.db.prepare('DELETE FROM login_failures WHERE identifier = ?').run(key); // 成功后清零失败计数
 
-    const user = findOrCreateUser(deps, body.region, identity.provider, identity.identifier); // 首次登录自动注册
+    const gateRequired = isInviteRequired(deps.env); // 注册门槛是否开启（默认关闭，行为不变）
+    if (gateRequired && !(body.invite_code ?? '').trim()) { // 门槛开启且首登建号缺码
+      throw new AppError('AUTH_INVITE_REQUIRED', 'invitation code is required to register'); // 403 引导索取邀请码
+    } // 门槛前置校验结束
+    const user = findOrCreateUser( // 首次登录自动注册
+      deps, body.region, identity.provider, identity.identifier, // 常规入参
+      (userId) => { // 仅新建账号事务内核销，与建号同事务回滚
+        if (gateRequired) redeemInvite(deps.db, body.invite_code, identity.identifier, userId, now); // 条件扣减 + 写核销记录
+      }, // onCreate 回调结束
+    ); // findOrCreateUser 结束
 
     let deviceId: string | null = null; // 未传设备信息时保持为空
     if (body.device) { // 客户端上报了设备信息
@@ -423,9 +442,13 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       throw new AppError('AUTH_IDENTITY_EXISTS', 'account already registered', { field: 'identifier' }); // 409 让前端提示改用登录
     } // 结束占用检查
 
+    const gateRequired = isInviteRequired(deps.env); // 注册门槛是否开启（默认关闭，不破坏既有注册）
+    if (gateRequired && !(body.invite_code ?? '').trim()) { // 门槛开启但未带码
+      throw new AppError('AUTH_INVITE_REQUIRED', 'invitation code is required to register'); // 403 引导索取邀请码
+    } // 门槛前置校验结束
     const now = clockOf(deps); // 注册时间
     const displayName = (body.display_name ?? '').trim().slice(0, 64); // 展示名可选，限幅避免超长
-    const user = deps.db.transaction(() => { // 用户 / 身份 / 口令三表必须同时写入
+    const user = deps.db.transaction(() => { // 用户 / 身份 / 口令 / 邀请核销必须同时写入
       const created = createUser(deps.db, { region: body.region, display_name: displayName, now }); // 建号并自动分配 Mim ID 号码
       deps.db // 身份写入起点
         .prepare( // 预编译身份插入
@@ -436,6 +459,9 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       deps.db // 口令写入起点：credentials 表已存在，kind=password 区分于其他凭据
         .prepare('INSERT INTO credentials (id, user_id, kind, secret_hash, created_at) VALUES (?, ?, ?, ?, ?)') // 预编译凭据插入
         .run(uuidv7(), created.id, 'password', hashPassword(body.password), now); // 只存 bcrypt 摘要，绝不留明文
+      if (gateRequired) { // 门槛开启：邀请码与建号同事务核销，失败整体回滚
+        redeemInvite(deps.db, body.invite_code, identity.identifier, created.id, now); // 条件扣减 + 写核销记录
+      } // 核销结束
       return created; // 交出含号码的新用户，供统一登录收尾
     })(); // 执行事务，任一失败即整体回滚（号码随事务一起回滚，不浪费号段）
 

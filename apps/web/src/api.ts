@@ -603,6 +603,9 @@ export interface CartCheckoutResult {
   order?: { id: string; status: string; currency: string; amount_minor: number; module_code: string; module_name: Record<string, string> }; // kind=order 时存在
   entitlement_id?: string; // kind=unlocked 时存在
   reason?: string; // kind=skipped 时的原因
+  points_spent?: number; // 本单实际消耗积分
+  points_deduct_cents?: number; // 积分折抵金额（分）
+  payable_cents?: number; // 抵扣后应付金额（分）
 } // CartCheckoutResult 结束
 
 // ---------- 统一入口配置清单（entries / sites）共享类型 ----------
@@ -986,8 +989,8 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     clear() { // 清空购物车
       return request<{ ok: boolean; cart: CartSummary }>('/cart', { method: 'DELETE' }); // 写操作带幂等键
     }, // clear 结束
-    checkout(channel: 'manual' | 'alipay' | 'wechat' | 'stripe' = 'manual') { // 结算整车
-      return request<{ results: CartCheckoutResult[]; cart: CartSummary }>('/cart/checkout', { method: 'POST', body: { channel } }); // 返回逐条结果与剩余车
+    checkout(channel: 'manual' | 'alipay' | 'wechat' | 'stripe' = 'manual', options: { use_points?: boolean; points_to_use?: number } = {}) { // 结算整车，可选积分抵扣
+      return request<{ results: CartCheckoutResult[]; cart: CartSummary }>('/cart/checkout', { method: 'POST', body: { channel, ...options } }); // 返回逐条结果与剩余车
     }, // checkout 结束
   }, // cart 分组结束
 

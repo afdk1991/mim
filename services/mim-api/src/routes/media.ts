@@ -25,6 +25,7 @@ import { // 从存储层一次性引入四个工具与适配器类型，多行�
   type StorageAdapter, // 存储适配器接口，local 与 s3 两套实现共用同一契约
 } from '../storage.js'; // 存储层导入结束，后续只用这四个具名导出
 import { parse } from '../validate.js'; // 统一校验入口，zod 失败时抛 VALIDATION_FAILED
+import { assertSafeOutboundUrl } from '../security.js'; // 远程媒体地址 SSRF 校验（回源抓取前复核）
 import type { ApiDeps, Db } from '../types.js'; // 依赖容器与数据库连接类型
 
 /** 工作台的解锁模块编码（与 db.ts seedModules / comic 路由保持一致） */
@@ -137,6 +138,21 @@ function splatKey(req: Request): string { // 把通配段还原成完整对象�
   assertSafeObjectKey(key); // 拼接还原后再校验一次，防止绕过单段校验
   return key; // 返回校验通过的对象键
 } // splatKey 结束
+
+/**
+ * 远程媒体地址守卫：站内相对路径放行；http(s) 必须通过 SSRF 校验
+ * （协议白名单 / 私网环回 / 元数据 / 编码 IP / DNS 二次复核）。
+ * 回源抓取远程图片 / 视频前统一调用，避免服务端被诱导访问内网。
+ */
+export async function assertRemoteMediaUrl(url: string): Promise<void> {
+  if (/^\/(?!\/)/.test(url)) return;
+  if (!/^https?:\/\//i.test(url)) throw new AppError('VALIDATION_FAILED', '媒体地址必须是站内路径或 http(s) 地址');
+  try {
+    await assertSafeOutboundUrl(url);
+  } catch {
+    throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议');
+  }
+}
 
 /**
  * 对象收发端点（挂载在全局 JSON 解析之前）：

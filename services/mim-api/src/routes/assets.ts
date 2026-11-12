@@ -7,7 +7,7 @@ import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requireAuth } from '../middleware.js'; // 会话与写幂等
 import { parse } from '../validate.js'; // 校验错误翻译
 import { recordEarning } from '../payments.js'; // 作者分成记账
-import { assertPublicHttpUrl } from '../security.js'; // 媒体地址 SSRF 校验
+import { assertSafeOutboundUrl, auditText, auditImage } from '../security.js'; // 出站 SSRF 校验 + 内容审核钩子
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const now = () => new Date().toISOString(); // UTC 时间
@@ -30,12 +30,12 @@ function parseMedia(raw: unknown): Array<{ kind: 'image' | 'video'; url: string;
   }
 }
 
-/** 媒体地址校验：站内相对路径直接放行，http(s) 必须通过 SSRF 私网检查。 */
+/** 媒体地址校验：站内相对路径直接放行，http(s) 必须通过 SSRF 私网检查（协议白名单 + DNS 二次校验）。 */
 async function assertMediaUrl(url: string): Promise<void> {
   if (/^\/(?!\/)/.test(url)) return;
   if (!/^https?:\/\//i.test(url)) throw new AppError('VALIDATION_FAILED', '媒体地址必须是站内路径或 http(s) 地址');
   try {
-    await assertPublicHttpUrl(url);
+    await assertSafeOutboundUrl(url);
   } catch {
     throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议');
   }
@@ -222,6 +222,19 @@ export function createAssetsRouter(deps: ApiDeps): Router {
     for (const item of body.media) {
       await assertMediaUrl(item.url);
       if (item.poster_url) await assertMediaUrl(item.poster_url);
+    }
+    // 内容审核钩子：文本先过审；远程图片/封面再逐张过审。未配置密钥时 provider=none 放行，
+    // 上游故障按 MIM_AUDIT_FALLBACK 决定 open 放行 / closed 拒绝。
+    const textAudit = await auditText(deps.env, `${body.title}\n${body.summary}\n${body.body}`);
+    if (!textAudit.ok) throw new AppError('VALIDATION_FAILED', textAudit.reason ?? '内容未通过审核');
+    const remoteImages = [
+      body.cover_url,
+      ...body.media.map((item) => item.url),
+      ...body.media.map((item) => item.poster_url),
+    ].filter((u): u is string => typeof u === 'string' && Boolean(u) && /^https?:/i.test(u));
+    for (const imageUrl of remoteImages) {
+      const imageAudit = await auditImage(deps.env, imageUrl);
+      if (!imageAudit.ok) throw new AppError('VALIDATION_FAILED', imageAudit.reason ?? '图片未通过审核');
     }
     const mediaJson = JSON.stringify(body.media);
     const ts = now();

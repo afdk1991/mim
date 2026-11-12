@@ -23,10 +23,15 @@ export type OAuthProviderId =
   | 'microsoft' // Microsoft Entra ID / 个人账号
   | 'wechat' // 微信开放平台网站应用扫码
   | 'qq' // QQ 互联
-  | 'douyin'; // 抖音开放平台
+  | 'douyin' // 抖音开放平台
+  | 'weibo' // 微博开放平台
+  | 'baidu' // 百度账号授权
+  | 'alipay' // 支付宝授权登录
+  | 'facebook' // Facebook 登录
+  | 'twitter'; // Twitter（X）OAuth2 登录
 
 /** 协议实现类型：决定走通用客户端还是专用适配器 */
-export type OAuthFlavor = 'standard' | 'apple' | 'wechat' | 'qq' | 'douyin';
+export type OAuthFlavor = 'standard' | 'apple' | 'wechat' | 'qq' | 'douyin' | 'weibo' | 'alipay';
 
 /** 单个 provider 的静态定义 */
 export interface OAuthProviderSpec {
@@ -271,6 +276,116 @@ export const OAUTH_PROVIDERS: readonly OAuthProviderSpec[] = [
       raw, // 原始快照
     }), // mapProfile 结束
   }, // 抖音定义结束
+  { // 微博：开放平台 OAuth2，资料端点需回传 uid
+    id: 'weibo', // 路由段
+    label: '微博', // 展示名
+    labelEn: 'Weibo', // 英文展示名
+    region: 'cn', // 仅中国区
+    flavor: 'weibo', // 专用适配器（uid 二次换取）
+    issuer: 'https://open.weibo.com', // 占位
+    authorizeUrl: 'https://open.weibo.com/oauth2/authorize', // 授权页
+    tokenUrl: 'https://api.weibo.com/oauth2/access_token', // 令牌端点
+    profileUrl: 'https://api.weibo.com/2/users/show.json', // 资料端点
+    scopes: ['email'], // 读邮箱与基本资料
+    tokenAuth: 'post', // 占位：weibo 适配器自行拼表单
+    env: { clientId: ['MIM_AUTH_WEIBO_CLIENT_ID'], clientSecret: ['MIM_AUTH_WEIBO_CLIENT_SECRET'], redirectUri: ['MIM_AUTH_WEIBO_REDIRECT_URI'] }, // 凭证
+    mapProfile: (raw) => ({ // 微博字段：id/uid、screen_name、profile_image_url、email
+      providerUserId: first(raw, ['id', 'uid']), // 用户标识
+      nickname: first(raw, ['screen_name', 'name']), // 昵称
+      avatarUrl: first(raw, ['profile_image_url', 'profile_image_url_large']) || undefined, // 头像
+      email: first(raw, ['email']) || undefined, // 邮箱可能为空
+      raw, // 原始快照
+    }), // mapProfile 结束
+  }, // 微博定义结束
+  { // 百度：账号授权中心，标准 OAuth2 表单换 token
+    id: 'baidu', // 路由段
+    label: '百度', // 展示名
+    labelEn: 'Baidu', // 英文展示名
+    region: 'cn', // 仅中国区
+    flavor: 'standard', // 通用客户端处理
+    issuer: 'https://openapi.baidu.com', // 占位
+    authorizeUrl: 'https://openapi.baidu.com/oauth/2.0/authorize', // 授权页
+    tokenUrl: 'https://openapi.baidu.com/oauth/2.0/token', // 令牌端点
+    profileUrl: 'https://openapi.baidu.com/rest/2.0/user/getinfo', // 资料端点
+    scopes: ['basic'], // 基础资料
+    tokenAuth: 'post', // body 传 secret
+    env: { clientId: ['MIM_AUTH_BAIDU_CLIENT_ID'], clientSecret: ['MIM_AUTH_BAIDU_CLIENT_SECRET'], redirectUri: ['MIM_AUTH_BAIDU_REDIRECT_URI'] }, // 凭证
+    mapProfile: (raw) => ({ // 百度字段：openid/uid、username、portrait
+      providerUserId: first(raw, ['openid', 'uid']), // 用户标识
+      nickname: first(raw, ['username', 'realname']), // 昵称
+      avatarUrl: first(raw, ['portrait', 'profile_img_url']) || undefined, // 头像
+      email: first(raw, ['email']) || undefined, // 邮箱可能为空
+      raw, // 原始快照
+    }), // mapProfile 结束
+  }, // 百度定义结束
+  { // 支付宝：开放平台网关统一 method 调用，RSA2 签名由适配器按凭证拼装
+    id: 'alipay', // 路由段
+    label: '支付宝', // 展示名
+    labelEn: 'Alipay', // 英文展示名
+    region: 'cn', // 仅中国区
+    flavor: 'alipay', // 专用适配器（网关 method + 签名）
+    issuer: 'https://openauth.alipay.com', // 占位
+    authorizeUrl: 'https://openauth.alipay.com/oauth2/publicAppAuthorize.htm', // 授权页
+    tokenUrl: 'https://openapi.alipay.com/gateway.do', // 网关统一端点
+    profileUrl: 'https://openapi.alipay.com/gateway.do', // 资料也走网关
+    scopes: ['auth_user_info'], // 换取用户信息
+    tokenAuth: 'post', // 占位：alipay 适配器自行拼表单
+    env: { clientId: ['MIM_AUTH_ALIPAY_APP_ID'], clientSecret: ['MIM_AUTH_ALIPAY_PRIVATE_KEY'], redirectUri: ['MIM_AUTH_ALIPAY_REDIRECT_URI'] }, // 凭证：app_id + RSA2 私钥
+    mapProfile: (raw) => ({ // 支付宝字段：user_id、nick_name、avatar
+      providerUserId: first(raw, ['user_id', 'open_id']), // 买家开放标识
+      nickname: first(raw, ['nick_name', 'nickname']), // 昵称
+      avatarUrl: first(raw, ['avatar', 'avatar_url']) || undefined, // 头像
+      raw, // 原始快照
+    }), // mapProfile 结束
+  }, // 支付宝定义结束
+  { // Facebook：Graph API，公开资料 + 邮箱
+    id: 'facebook', // 路由段
+    label: 'Facebook', // 展示名
+    labelEn: 'Facebook', // 英文展示名
+    region: 'global', // 仅海外区
+    flavor: 'standard', // 通用客户端处理
+    issuer: 'https://www.facebook.com', // 占位
+    authorizeUrl: 'https://www.facebook.com/v19.0/dialog/oauth', // 授权页
+    tokenUrl: 'https://graph.facebook.com/v19.0/oauth/access_token', // 令牌端点
+    profileUrl: 'https://graph.facebook.com/v19.0/me?fields=id,name,email,picture', // 资料端点（显式声明字段）
+    scopes: ['public_profile', 'email'], // 基础资料 + 邮箱
+    tokenAuth: 'post', // body 传 secret
+    env: { clientId: ['MIM_AUTH_FACEBOOK_CLIENT_ID'], clientSecret: ['MIM_AUTH_FACEBOOK_CLIENT_SECRET'], redirectUri: ['MIM_AUTH_FACEBOOK_REDIRECT_URI'] }, // 凭证
+    mapProfile: (raw) => { // Facebook 头像嵌套在 picture.data.url 内
+      const picture = raw.picture && typeof raw.picture === 'object' ? (raw.picture as Record<string, unknown>) : {}; // 取 picture 对象
+      const data = picture.data && typeof picture.data === 'object' ? (picture.data as Record<string, unknown>) : {}; // 取 data 层
+      return { // 统一资料结构
+        providerUserId: first(raw, ['id']), // 用户 ID
+        nickname: first(raw, ['name']), // 姓名
+        email: first(raw, ['email']) || undefined, // 邮箱
+        avatarUrl: first(data, ['url']) || undefined, // 嵌套头像
+        raw, // 原始快照
+      }; // 返回结构结束
+    }, // mapProfile 结束
+  }, // Facebook 定义结束
+  { // Twitter（X）：OAuth2 PKCE，用户资料在 data 节点内，令牌端点走 Basic 认证
+    id: 'twitter', // 路由段
+    label: 'X', // 展示名
+    labelEn: 'Twitter', // 英文展示名
+    region: 'global', // 仅海外区
+    flavor: 'standard', // 通用客户端处理（PKCE + Basic）
+    issuer: 'https://twitter.com', // 占位
+    authorizeUrl: 'https://twitter.com/i/oauth2/authorize', // 授权页
+    tokenUrl: 'https://api.twitter.com/2/oauth2/token', // 令牌端点
+    profileUrl: 'https://api.twitter.com/2/users/me?user.fields=id,name,username,profile_image_url', // 资料端点（显式声明字段）
+    scopes: ['tweet.read', 'users.read', 'offline.access'], // 读资料与离线刷新
+    tokenAuth: 'basic', // X 令牌端点要求 HTTP Basic
+    env: { clientId: ['MIM_AUTH_TWITTER_CLIENT_ID'], clientSecret: ['MIM_AUTH_TWITTER_CLIENT_SECRET'], redirectUri: ['MIM_AUTH_TWITTER_REDIRECT_URI'] }, // 凭证
+    mapProfile: (raw) => { // X 资料包在 data 节点内
+      const data = raw.data && typeof raw.data === 'object' ? (raw.data as Record<string, unknown>) : {}; // 取 data 层
+      return { // 统一资料结构
+        providerUserId: first(data, ['id']), // 用户 ID
+        nickname: first(data, ['name', 'username']), // 姓名优先，退回 handle
+        avatarUrl: first(data, ['profile_image_url']) || undefined, // 头像
+        raw, // 原始快照
+      }; // 返回结构结束
+    }, // mapProfile 结束
+  }, // Twitter 定义结束
 ]; // provider 清单结束
 
 /** 按 id 查定义；未登记的 id 返回 undefined，由路由统一 404/400 */

@@ -1,6 +1,7 @@
 /** 请求 ID、鉴权、幂等回放与统一错误信封 */
 
-import { randomUUID, timingSafeEqual } from 'node:crypto'; // 引入 UUID 生成器与常量时间比较，后者防止令牌比较被计时侧信道猜解
+import { randomUUID, timingSafeEqual, createHash } from 'node:crypto'; // 引入 UUID 生成器与常量时间比较，后者防止令牌比较被计时侧信道猜解；createHash 用于 ETag 摘要
+import { verifyCaptcha, type CaptchaScene } from './security.js'; // 验证码统一校验适配器（按场景强制）
 import type { NextFunction, Request, Response } from 'express'; // 仅引入 Express 中间件类型，编译期擦除
 import { AppError, isAppError } from '@mim/core-domain'; // 引入统一业务异常与类型守卫，错误信封集中管理
 import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY } from './config.js'; // 引入幂等强制开关与管理令牌环境变量键名
@@ -316,3 +317,69 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     request_id: requestId, // 附带请求 ID 供排查
   }); // 响应体结束
 } // errorHandler 结束
+
+/**
+ * 验证码场景门禁工厂（安全加固包）：
+ *   - 按场景（register / login / report / post）读取配置，未强制或模式 off 时直接放行；
+ *   - 强制场景下从请求体提取验证码字段，交 verifyCaptcha 统一校验；
+ *   - 第三方模式缺凭证 / 上游不可用抛 503，答案错误 / 过期抛 400，由全局错误信封收口。
+ *
+ * 用法（由主控在对应路由前挂载，本包不改 app.ts）：
+ *   router.post('/auth/register', createCaptchaMiddleware('register'), handler);
+ */
+export function createCaptchaMiddleware(scene: CaptchaScene) { // 高阶工厂：按场景生成门禁
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await verifyCaptcha(req.deps.db, req.deps.env, scene, (req.body ?? {}) as Record<string, unknown>);
+      next(); // 校验通过，进入业务处理
+    } catch (err) {
+      next(err); // 交给全局错误处理器归一为标准信封
+    }
+  };
+} // createCaptchaMiddleware 结束
+
+/** 公共 GET 缓存头选项：maxAge 控制 Cache-Control，scope 区分 public / private */
+export interface CacheHeaderOptions {
+  /** 浏览器 / CDN 缓存秒数，缺省 60s */
+  maxAgeSeconds?: number;
+  /** public 可被 CDN 缓存，private 仅浏览器缓存；缺省 public */
+  scope?: 'public' | 'private';
+  /** 生效方法集合，缺省 GET / HEAD */
+  methods?: string[];
+}
+
+/**
+ * ETag / Cache-Control 中间件工厂（安全加固包，性能项）：
+ *   - 只对只读方法生效；响应体序列化后取 sha256 前 32 位生成弱 ETag；
+ *   - 命中 If-None-Match 时回 304（不发响应体）；
+ *   - 工厂导出，不在 app.ts 内默认挂载；主控按公开只读路由选择性启用。
+ *
+ * 挂载顺序：必须挂在业务路由之前（与其他全局中间件同层，先于 router.use 业务路由）。
+ */
+export function createCacheHeaderMiddleware(options: CacheHeaderOptions = {}) {
+  const maxAgeSeconds = options.maxAgeSeconds ?? 60; // 缺省缓存 60 秒
+  const scope = options.scope ?? 'public'; // 缺省公开可缓存
+  const methods = new Set(options.methods ?? ['GET', 'HEAD']); // 只处理只读方法
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!methods.has(req.method)) { // 写方法不打缓存头
+      next();
+      return;
+    }
+    const originalJson = res.json.bind(res); // 保留原始 json 输出方法
+    res.json = ((body: unknown) => { // 包装响应：算摘要 → 打 ETag / Cache-Control → 判 304
+      const payload = JSON.stringify(body ?? null); // 响应体序列化（与实际下发内容一致）
+      const etag = `W/"${createHash('sha256').update(payload).digest('hex').slice(0, 32)}"`; // 弱 ETag，取摘要前 32 位
+      res.setHeader('ETag', etag); // 回写摘要，供下次请求做条件请求
+      res.setHeader('Cache-Control', `${scope}, max-age=${maxAgeSeconds}`); // 缓存时效与可见性
+      const incoming = req.header('if-none-match'); // 读取客户端条件请求头
+      if (incoming && (incoming === etag || incoming === '*')) { // 摘要一致或客户端要求校验
+        res.status(304); // 资源未变更
+        res.removeHeader('Content-Type'); // 304 不携带响应体
+        res.end();
+        return body; // 保持 json 签名兼容，实际不再序列化下发
+      }
+      return originalJson(body); // 正常下发响应体
+    }) as Response['json'];
+    next(); // 进入业务路由
+  };
+} // createCacheHeaderMiddleware 结束

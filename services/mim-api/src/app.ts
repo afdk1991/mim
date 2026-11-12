@@ -27,7 +27,13 @@ import { createAppearanceRouter } from './routes/appearance.js'; // 外观：主
 import { createGrowthRouter } from './routes/growth.js'; // 成长：等级、徽章、私信与归属地
 import { createI18nRouter } from './routes/i18n.js'; // 国际化：机器翻译与前后台语言分离
 import { createSecurityRouter } from './routes/security.js'; // 安全：图形验证码、举报与运营处置
-import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
+import { createInviteAdminRouter } from './routes/invites.js'; // 邀请码：管理端生成与注册门槛核销
+import { createRealnameRouter } from './routes/realname.js'; // 实名认证：本人提交与人工审核队列
+import { createSsoRouter } from './routes/sso.js'; // 跨站 SSO：票据签发、兑换与登出广播
+import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
+import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
+import { createToolsRouter } from './routes/tools.js'; // 自研工具目录：公开浏览，管理端写操作挂权限
+import { createCacheHeaderMiddleware, createCaptchaMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套 + 缓存头 / 验证码门禁工厂
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
 import { createOrchestrator } from './orchestrator.js'; // 生成任务编排器工厂，会启动后台 worker
@@ -89,6 +95,9 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createMediaObjectRouter(resolved)); // 若排在 express.json 之后，请求流已被 JSON 解析器消费，raw 拿不到原始字节
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { (req as { rawBody?: string }).rawBody = buf.toString('utf8'); } })); // 保留原始报文供微信回调验签.body
 
+  // 公共只读端点缓存头：弱 ETag + Cache-Control + 304 命中，必须排在业务路由之前才能覆盖全部公开读接口
+  app.use('/api/v1', createCacheHeaderMiddleware({ maxAgeSeconds: 60, scope: 'public' })); // 私有端点由该中间件按 scope 跳过，避免把用户数据写进共享缓存
+
   app.get('/health', (_req, res) => { // 健康检查：必须早于鉴权路由，供负载均衡与 CI 探活
     res.json({ status: 'ok', service: 'mim-api', version: SERVICE_VERSION }); // 返回最小静态响应，不查库以免探活放大故障
   }); // 健康检查路由结束
@@ -108,6 +117,9 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   }); // 就绪探针结束
 
   // 公开路由：验证码/登录/刷新
+  // 验证码门禁前置：按场景拦截写入口；MIM_CAPTCHA_MODE=off（默认）时为空操作，保持 0.0.8 已上线行为
+  app.use('/api/v1/auth/register', createCaptchaMiddleware('register')); // 注册场景：开启后缺票据直接 400/403，未开启不改变行为
+  app.use('/api/v1/auth/login', createCaptchaMiddleware('login')); // 登录场景：同上，按 MIM_CAPTCHA_LOGIN 开关生效
   app.use('/api/v1', createAuthRouter(resolved)); // 登录端点无 token，必须注册在受保护路由之前才不会被拦成 401
   // 第三方登录：授权入口公开，绑定/解绑在 router 内部按需 requireAuth
   app.use('/api/v1', createOAuthRouter(resolved)); // 必须在全局 requireAuth 之前挂载，否则匿名发起授权会被拦成 401
@@ -124,7 +136,13 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation/summary 与 /navigation/links 公开，写操作与探测在 router 内鉴权
   app.use('/api/v1', createSearchRouter(resolved)); // 统一搜索：/search 与 /search/summary 公开，/search/reindex 在 router 内鉴权
   app.use('/api/v1', createPaymentsRouter(resolved)); // 支付回调必须公开；其余端点在 router 内逐个挂鉴权
+  app.use('/api/v1', createPaymentChannelRouter(resolved)); // 扩展渠道：第三方回调公开，下单/退款在 router 内挂 requireAuth + idempotency
   app.use('/api/v1', createSecurityRouter(resolved)); // 验证码公开；举报端点内部挂 requireAuth / 运营权限
+  app.use('/api/v1', createInviteAdminRouter(resolved)); // 邀请码管理端需管理员令牌；校验端点公开供注册前预检
+  app.use('/api/v1', createRealnameRouter(resolved)); // 本人端点内部 requireAuth；管理端点内部 requirePermission
+  app.use('/api/v1', createContentOpsRouter(resolved)); // 公开公告/更新日志/推广端点先挂；管理端点内部再挂权限
+  app.use('/api/v1', createToolsRouter(resolved)); // 自研工具公开目录先挂；/tools/manage 与写操作在 router 内鉴权
+  app.use('/api/v1', createSsoRouter(resolved)); // 票据签发要求登录态，兑换与登出广播保持公开
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配

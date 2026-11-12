@@ -45,6 +45,22 @@ export const ERROR_CODES = [
   'AUTH_OAUTH_LAST_METHOD',
   // 一次性登录票据无效、过期或已被消费
   'AUTH_OAUTH_TICKET_INVALID',
+  // 注册门槛开启，但请求未携带邀请码
+  'AUTH_INVITE_REQUIRED',
+  // 邀请码不存在、已禁用或与绑定身份不匹配
+  'AUTH_INVITE_INVALID',
+  // 邀请码已过有效期（区别于无效，便于前端提示重新索取）
+  'AUTH_INVITE_EXPIRED',
+  // 跨站 SSO 票据签名无效、过期或已被一次性消费
+  'AUTH_SSO_TICKET_INVALID',
+  // 票据目标站点不在本站 SSO 白名单内
+  'AUTH_SSO_SITE_FORBIDDEN',
+  // 实名记录不存在
+  'REALNAME_NOT_FOUND',
+  // 实名记录已提交（待审/已通过），不可重复提交
+  'REALNAME_ALREADY_SUBMITTED',
+  // 实名提交的姓名 / 证件号格式不合法
+  'REALNAME_INVALID',
   // Mim ID 号码段耗尽，无法为新注册用户发号
   'MEMBER_NO_EXHAUSTED',
   // 账号主体不存在（可能已注销或从未注册）
@@ -127,6 +143,22 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_OAUTH_LAST_METHOD: 409,
   // 登录票据无效：401 要求重新发起授权
   AUTH_OAUTH_TICKET_INVALID: 401,
+  // 注册门槛开启但缺邀请码：403 引导前端索取邀请码
+  AUTH_INVITE_REQUIRED: 403,
+  // 邀请码不存在 / 禁用 / 不匹配：400 参数问题
+  AUTH_INVITE_INVALID: 400,
+  // 邀请码过期：400 与无效区分，前端提示重新索取
+  AUTH_INVITE_EXPIRED: 400,
+  // SSO 票据无效：401 要求重新走跨站登录
+  AUTH_SSO_TICKET_INVALID: 401,
+  // SSO 站点不在白名单：403 拒绝跨站换取
+  AUTH_SSO_SITE_FORBIDDEN: 403,
+  // 实名记录不存在：404
+  REALNAME_NOT_FOUND: 404,
+  // 重复提交实名：409 状态冲突
+  REALNAME_ALREADY_SUBMITTED: 409,
+  // 实名格式非法：400
+  REALNAME_INVALID: 400,
   // 号码段耗尽属服务端容量问题：503
   MEMBER_NO_EXHAUSTED: 503,
   // 账号不存在 404，避免泄露多余信息

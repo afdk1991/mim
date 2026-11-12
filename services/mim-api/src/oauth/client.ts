@@ -127,6 +127,24 @@ export async function buildAuthorizeUrl(
     return { url: url.toString(), codeVerifier: null }; // 无 PKCE
   } // 抖音分支结束
 
+  if (spec.flavor === 'weibo') { // 微博标准参数名 client_id，无 PKCE
+    url.searchParams.set('client_id', creds.clientId); // 应用 ID
+    url.searchParams.set('redirect_uri', creds.redirectUri); // 回调地址
+    url.searchParams.set('response_type', 'code'); // 授权码模式
+    url.searchParams.set('scope', spec.scopes.join(',')); // 申请资料权限
+    url.searchParams.set('state', state); // 防 CSRF
+    return { url: url.toString(), codeVerifier: null }; // 无 PKCE
+  } // 微博分支结束
+
+  if (spec.flavor === 'alipay') { // 支付宝参数名 app_id
+    url.searchParams.set('app_id', creds.clientId); // 应用 ID
+    url.searchParams.set('redirect_uri', creds.redirectUri); // 回调地址
+    url.searchParams.set('scope', spec.scopes.join(',')); // 申请资料权限
+    url.searchParams.set('state', state); // 防 CSRF
+    url.searchParams.set('response_type', 'code'); // 授权码模式
+    return { url: url.toString(), codeVerifier: null }; // 无 PKCE
+  } // 支付宝分支结束
+
   // 标准 OAuth 2.0 / OIDC：带 PKCE 与 state
   const codeVerifier = oauth.generateRandomCodeVerifier(); // 高熵 verifier
   const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier); // S256 挑战值
@@ -272,6 +290,73 @@ async function exchangeDouyin(spec: OAuthProviderSpec, creds: ResolvedCredential
   return spec.mapProfile({ ...profileData, open_id: openId, union_id: tokenData.union_id }); // 合并标识后映射
 } // exchangeDouyin 结束
 
+/** 微博：POST 表单换令牌（回传 uid）→ GET 拉资料 */
+async function exchangeWeibo(spec: OAuthProviderSpec, creds: ResolvedCredentials, input: ExchangeInput): Promise<OAuthProfile> {
+  const body = new URLSearchParams({ // 微博令牌端点接受表单编码
+    client_id: creds.clientId, // 应用 ID
+    client_secret: creds.clientSecret, // 应用密钥
+    grant_type: 'authorization_code', // 固定授权码模式
+    code: input.code, // 授权码
+    redirect_uri: input.redirectUri, // 与发起时逐字一致
+  }); // body 构造结束
+  const tokenResponse = await timedFetch(creds.tokenUrl, { // 换令牌
+    method: 'POST', // 微博令牌端点 POST
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // 表单类型
+    body: body.toString(), // 序列化
+  }); // 请求结束
+  const tokenRaw = await readJson(tokenResponse); // 解析
+  if (tokenRaw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'weibo token rejected', { error: tokenRaw.error, error_description: tokenRaw.error_description }); // 微博失败字段
+  const accessToken = String(tokenRaw.access_token ?? ''); // 访问令牌
+  const uid = String(tokenRaw.uid ?? tokenRaw.user_id ?? ''); // 微博 uid
+  if (!accessToken || !uid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'weibo token response is incomplete'); // 关键字段缺失
+  const profileUrl = new URL(creds.profileUrl ?? creds.tokenUrl); // 资料端点
+  profileUrl.searchParams.set('access_token', accessToken); // 令牌
+  profileUrl.searchParams.set('uid', uid); // 用户标识
+  const raw = await readJson(await timedFetch(profileUrl.toString())); // 拉资料
+  if (raw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'weibo profile rejected', { error: raw.error, error_code: raw.error_code }); // 资料接口失败
+  return spec.mapProfile({ ...raw, uid }); // 合并 uid 后映射
+} // exchangeWeibo 结束
+
+/** 支付宝：网关统一 method 调用；RSA2 签名依赖商户私钥，未配置时由入口 503 拦截 */
+async function exchangeAlipay(spec: OAuthProviderSpec, creds: ResolvedCredentials, input: ExchangeInput): Promise<OAuthProfile> {
+  const common = new URLSearchParams({ // 网关公共参数
+    app_id: creds.clientId, // 应用 ID
+    charset: 'utf-8', // 字符集
+    sign_type: 'RSA2', // 签名算法
+    timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19), // yyyy-MM-dd HH:mm:ss
+    version: '1.0', // 网关协议版本
+    grant_type: 'authorization_code', // 授权码模式
+    code: input.code, // 授权码
+  }); // 公共参数结束
+  const tokenResponse = await timedFetch(creds.tokenUrl, { // 换令牌
+    method: 'POST', // 网关只接受 POST 表单
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // 表单类型
+    body: common.toString(), // 序列化（签名由具备商户私钥的部署环境补全）
+  }); // 请求结束
+  const tokenRaw = await readJson(tokenResponse); // 解析
+  const tokenEnvelope = (tokenRaw.alipay_system_oauth_token_response ?? tokenRaw) as Record<string, unknown>; // 令牌业务包
+  const accessToken = String(tokenEnvelope.access_token ?? ''); // 访问令牌
+  const openId = String(tokenEnvelope.user_id ?? ''); // 买家开放标识
+  if (!accessToken || !openId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'alipay token response is incomplete', { msg: tokenRaw.sub_msg ?? tokenRaw.msg }); // 关键字段缺失
+  const profileBody = new URLSearchParams({ // 资料请求公共参数
+    app_id: creds.clientId, // 应用 ID
+    charset: 'utf-8', // 字符集
+    sign_type: 'RSA2', // 签名算法
+    timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19), // 时间戳
+    version: '1.0', // 版本
+    method: 'alipay.user.info.share', // 资料 method
+    auth_token: accessToken, // 访问令牌
+  }); // body 构造结束
+  const profileResponse = await timedFetch(creds.profileUrl ?? creds.tokenUrl, { // 拉资料
+    method: 'POST', // 表单 POST
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // 表单类型
+    body: profileBody.toString(), // 序列化
+  }); // 请求结束
+  const profileRaw = await readJson(profileResponse); // 解析
+  const profileEnvelope = (profileRaw.alipay_user_info_share_response ?? profileRaw) as Record<string, unknown>; // 资料业务包
+  return spec.mapProfile({ ...profileEnvelope, user_id: openId }); // 合并标识后映射
+} // exchangeAlipay 结束
+
 /**
  * 回调换令牌并取资料。
  * 调用方负责先用 state 查库校验一次性与有效期；这里只做协议层交换。
@@ -289,6 +374,10 @@ export async function exchangeOAuthCode(
       return exchangeQq(spec, creds, input); // 交给专用适配器
     case 'douyin': // 抖音专用
       return exchangeDouyin(spec, creds, input); // 交给专用适配器
+    case 'weibo': // 微博专用
+      return exchangeWeibo(spec, creds, input); // 交给专用适配器
+    case 'alipay': // 支付宝专用
+      return exchangeAlipay(spec, creds, input); // 交给专用适配器
     default: // 标准 OIDC + Apple
       return exchangeStandard(spec, creds, env, input); // 走通用客户端
   } // switch 结束

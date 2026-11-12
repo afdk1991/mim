@@ -228,6 +228,22 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_OAUTH_LAST_METHOD: '这是账号最后一个登录方式，不能解绑',
     // 登录票据失效
     AUTH_OAUTH_TICKET_INVALID: '登录凭证已失效，请重新发起登录',
+    // 注册门槛开启但缺邀请码，提示使用邀请链接注册
+    AUTH_INVITE_REQUIRED: '本站已开启邀请注册，请填写邀请码',
+    // 邀请码不存在/禁用/身份不匹配
+    AUTH_INVITE_INVALID: '邀请码无效或不可用',
+    // 邀请码超过有效期
+    AUTH_INVITE_EXPIRED: '邀请码已过期，请向邀请人重新索取',
+    // 跨站 SSO 票据失效
+    AUTH_SSO_TICKET_INVALID: '跨站登录凭证已失效，请重新登录',
+    // 目标站点不在 SSO 白名单
+    AUTH_SSO_SITE_FORBIDDEN: '该站点未获授权使用统一登录',
+    // 实名记录不存在
+    REALNAME_NOT_FOUND: '实名认证记录不存在',
+    // 已提交过实名，不能重复提交
+    REALNAME_ALREADY_SUBMITTED: '实名认证已提交，请勿重复提交',
+    // 实名信息格式不合法
+    REALNAME_INVALID: '姓名或证件号码格式不正确',
     // 号码段耗尽
     MEMBER_NO_EXHAUSTED: '账号编号资源已用尽，请联系管理员',
     // 账号不存在
@@ -306,6 +322,22 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_OAUTH_LAST_METHOD: 'This is the last sign-in method and cannot be unlinked',
     // 票据失效
     AUTH_OAUTH_TICKET_INVALID: 'Sign-in ticket expired, start over',
+    // 邀请注册开启但缺邀请码
+    AUTH_INVITE_REQUIRED: 'Invite-only registration is enabled; enter an invite code',
+    // 邀请码无效
+    AUTH_INVITE_INVALID: 'Invite code is invalid or unavailable',
+    // 邀请码过期
+    AUTH_INVITE_EXPIRED: 'Invite code expired; request a new one from the inviter',
+    // SSO 票据失效
+    AUTH_SSO_TICKET_INVALID: 'Cross-site sign-in ticket expired, sign in again',
+    // SSO 站点不在白名单
+    AUTH_SSO_SITE_FORBIDDEN: 'This site is not authorized for unified sign-in',
+    // 实名记录不存在
+    REALNAME_NOT_FOUND: 'Real-name verification record not found',
+    // 实名已提交
+    REALNAME_ALREADY_SUBMITTED: 'Real-name verification already submitted',
+    // 实名格式非法
+    REALNAME_INVALID: 'Name or identity number format is invalid',
     // 号码耗尽
     MEMBER_NO_EXHAUSTED: 'Account numbers are exhausted, contact the administrator',
     // 账号不存在

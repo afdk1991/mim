@@ -256,7 +256,8 @@ describe('P1：付费图库/视频、站点配置、板块关注与问答采纳'
 
 describe('安全：验证码与举报', () => {
   it('验证码返回 SVG 与 id；举报超过 24 小时上限返回 429', async () => {
-    const captcha = await request(app).get('/api/v1/auth/captcha');
+    const captchaApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_CAPTCHA_MODE: 'image', MIM_CAPTCHA_REPORT: '1' } }); // 独立开启 report 验证码的 app
+    const captcha = await request(captchaApp).get('/api/v1/auth/captcha?scene=report'); // 按场景签发图形验证码
     expect(captcha.status).toBe(200); // 验证码接口返回 200
     expect(captcha.body.id).toMatch(/^cap-/); // 验证码 id 以 cap- 前缀返回
     expect(captcha.body.svg).toContain('<svg'); // 验证码 SVG 内容包含 <svg 标签

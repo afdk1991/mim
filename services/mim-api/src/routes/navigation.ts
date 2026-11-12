@@ -22,7 +22,6 @@ import { z } from 'zod'; // 声明式请求校验
 import { AppError, uuidv7 } from '@mim/core-domain'; // 统一异常 + 时间有序主键
 import {
   NAV_LINK_STATUSES, // 三态枚举，供查询参数校验
-  classifyProbe, // 探测结果判定：2xx/3xx 可达
   normalizeNavUrl, // 地址归一化：http(s) 或站内相对路径
   resolveProbeTarget, // 相对路径按 origin 补齐
   summarizeNavLinks, // 目录汇总口径
@@ -31,6 +30,7 @@ import type { NavLinkStatus, NavLinkView } from '@mim/core-domain'; // 状态与
 import { requireAuth, idempotency } from '../middleware.js'; // 登录门禁 + 幂等回放
 import { parse } from '../validate.js'; // zod 失败统一转 VALIDATION_FAILED
 import { nowIso, pathParam } from '../utils.js'; // 可注入时钟 + 严格路径参数
+import { probeOutbound } from '../navigationProbe.js'; // 出站探测：先过 SSRF 校验再发起 fetch
 import type { ApiDeps, Db } from '../types.js'; // 依赖容器与库类型
 
 /** nav_links 表行结构 */
@@ -100,32 +100,8 @@ const updateSchema = z.object({
   recommended: z.boolean().optional(),
 }).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' });
 
-/** 探测超时上限：外部站点不可达时不能拖住请求 */
-const PROBE_TIMEOUT_MS = 8000;
 /** 单次全目录探测上限：避免一次请求把大量外部调用串起来 */
 const BATCH_LIMIT = 50;
-
-/**
- * 对单条链接发起可达性探测：GET + 不跟随重定向（3xx 本身即视为目标存在）。
- * @param target 已补齐 origin 的绝对地址
- * @returns 状态、HTTP 码与耗时；网络异常记 broken，不冒充可达
- */
-async function probeLink(target: string): Promise<{ status: NavLinkStatus; httpStatus: number | null; latencyMs: number }> {
-  const started = Date.now(); // 计时起点
-  try {
-    const res = await fetch(target, { // 标准 fetch：服务端出网
-      method: 'GET', // GET 才能验证页面真实可达；HEAD 在部分站点被拒
-      redirect: 'manual', // 不跟随跳转，3xx 记录为可达
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS), // 超时中止，避免长时间挂起
-      headers: { 'user-agent': 'mim-navigation-probe/1.0' }, // 标明探测来源，便于对端日志识别
-    }); // fetch 结束
-    const latencyMs = Date.now() - started; // 耗时
-    try { await res.body?.cancel(); } catch { /* 主动丢弃响应体，避免连接悬挂 */ } // 不读正文：探测只关心可达性
-    return { status: classifyProbe(res.status, null), httpStatus: res.status, latencyMs }; // 按状态码判定
-  } catch (err) {
-    return { status: classifyProbe(null, (err as Error).message), httpStatus: null, latencyMs: Date.now() - started }; // 超时 / DNS / TLS 一律记失效
-  } // try 结束
-} // probeLink 结束
 
 /** 路由工厂：由 createApp 注入依赖后挂载 */
 export function createNavigationRouter(deps: ApiDeps): Router {
@@ -136,6 +112,15 @@ export function createNavigationRouter(deps: ApiDeps): Router {
   function origin(): string {
     return (deps.env?.MIM_PUBLIC_ORIGIN ?? 'https://mim.mixm.top').replace(/\/+$/, ''); // 去尾斜杠，避免拼出双斜杠
   } // origin 结束
+
+  /** 受信 origin 的 host:port：站内相对路径补齐后的自指目标据此跳过私网/环回复核 */
+  function trustedHost(): string {
+    try {
+      return new URL(origin()).host;
+    } catch {
+      return '';
+    }
+  } // trustedHost 结束
 
   /** 按主键取行，不存在直接 404 */
   function requireLink(id: string): NavLinkRow {
@@ -222,7 +207,7 @@ export function createNavigationRouter(deps: ApiDeps): Router {
   router.post('/navigation/links/:id/check', requireAuth, idempotency, async (req, res) => {
     const id = pathParam(req, 'id'); // 严格路径参数
     const row = requireLink(id); // 不存在 404
-    const result = await probeLink(resolveProbeTarget(row.url, origin())); // 探测：相对路径按 origin 补齐
+    const result = await probeOutbound(resolveProbeTarget(row.url, origin()), trustedHost()); // 探测：先过 SSRF 校验，相对路径按 origin 补齐
     const now = nowIso(deps.now); // 探测时间
     db.prepare( // 回写状态、HTTP 码、耗时与时间
       'UPDATE nav_links SET status = ?, http_status = ?, latency_ms = ?, last_checked_at = ?, updated_at = ? WHERE id = ?',
@@ -239,7 +224,7 @@ export function createNavigationRouter(deps: ApiDeps): Router {
     ); // prepare 结束
     const results: NavLinkView[] = []; // 探测结果
     for (const row of rows) { // 串行探测：外部站点不宜并发轰炸
-      const result = await probeLink(resolveProbeTarget(row.url, origin())); // 单条探测
+      const result = await probeOutbound(resolveProbeTarget(row.url, origin()), trustedHost()); // 单条探测（SSRF 校验在探针内完成）
       update.run(result.status, result.httpStatus, result.latencyMs, now, now, row.id); // 回写
       results.push(linkView(requireLink(row.id))); // 收集最新视图
     } // 循环结束

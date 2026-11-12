@@ -57,8 +57,8 @@ export function createAppearanceRouter(deps: ApiDeps): Router {
     res.json({ ok: true, key: body.key });
   });
 
-  /** 页面区块：按 page 返回启用区块，供前端渲染器消费。 */
-  router.get('/pages/:page', requireAuth, (req, res) => {
+  /** 页面区块：按 page 返回启用区块，公开只读，供前台渲染器匿名消费（写操作仍走权限门禁）。 */
+  router.get('/pages/:page', (req, res) => {
     const blocks = deps.db
       .prepare('SELECT id, page, kind, sort_order, config_json, updated_at FROM page_blocks WHERE page = ? AND enabled = 1 ORDER BY sort_order ASC')
       .all(req.params.page) as Array<Record<string, unknown> & { config_json: string }>;

@@ -50,6 +50,7 @@ import { idempotency, requireAuth, requirePermission } from '../middleware.js'; 
 import { parse } from '../validate.js'; // zod 校验失败统一转 AppError
 import { jsonParse, pathParam } from '../utils.js'; // 安全解析 JSON 列 + 严格路径参数提取
 import { handlerOfCapability } from '../capabilities.js'; // 模块真实能力执行层（Markdown / 二维码 / cron / JSON / 摘要 / 编解码）
+import { subjectFromUser, subjectFromRequest, blockedModuleIds, assertCategoryAllowed } from '../commerce/category-access.js'; // 分类级权限：主体解析 / 列表过滤 / 门禁断言
 import type { ApiDeps, Db } from '../types.js'; // 路由依赖与数据库抽象类型
 
 const MODULE_VISIBLE = new Set(['active']); // 对外可见状态白名单，隐藏 draft/offline 模块
@@ -197,6 +198,8 @@ export interface OrderRow { // 统一类型，避免各处 Record<string, unknow
   cancelled_at: string | null; // 取消时间
   module_code?: string; // 联表带出的模块编码
   module_name?: string; // 联表带出的模块多语言名称 JSON
+  points_spent?: number; // 本单消耗积分（商业化三期，缺省 0）
+  points_deduct_cents?: number; // 积分折抵金额（分，缺省 0）
 } // 结束 OrderRow
 
 /** 订单对外视图：只透出对账与展示所需字段，不暴露内部 module_id */
@@ -217,6 +220,7 @@ export function orderView(row: OrderRow) { // 入参为数据库行（可含模�
     paid_at: row.paid_at, // 结算时间
     cancelled_at: row.cancelled_at, // 取消时间
     ...(row.module_code === undefined ? {} : { module_code: row.module_code, module_name: nameMap }), // 列表场景补上模块信息
+    ...(row.points_spent ? { points_spent: row.points_spent, points_deduct_cents: row.points_deduct_cents ?? 0 } : {}), // 有积分抵扣才透出抵扣明细
   }; // 结束订单视图
 } // 结束 orderView
 
@@ -311,7 +315,9 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const pageSize = Math.min(100, Math.max(1, Number.parseInt(String(req.query.pageSize ?? '20'), 10) || 20)); // 每页 1–100 条，默认 20
 
     const visible = resolveActiveModules(db, region).filter((m) => MODULE_VISIBLE.has(m.status)); // 仅保留 active 模块，过滤草稿与归档
-    const filtered = visible.filter((m) => { // 叠加关键词、分类、许可、语言四类过滤
+    const blocked = blockedModuleIds(db, subjectFromRequest(db, req, deps.jwtSecret), visible); // 分类级权限：被 deny 的模块从列表剔除；无规则时集合为空，行为不变
+    const allowed = blocked.size > 0 ? visible.filter((m) => !blocked.has(m.id)) : visible; // 未配置 / 未命中即全量放行
+    const filtered = allowed.filter((m) => { // 叠加关键词、分类、许可、语言四类过滤
       if (q && !m.code.toLowerCase().includes(q) && !m.name_i18n.toLowerCase().includes(q)) return false; // 编码与名称都不命中即剔除
       if (category && category !== 'all') { // 分类过滤：'all' 等价于不过滤
         const slug = m.category_slug ?? ''; // 老数据可能为空
@@ -375,7 +381,9 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const limit = Math.min(20, Math.max(1, Number.parseInt(String(req.query.limit ?? '5'), 10) || 5)); // 条数 1–20，默认 5
 
     const visible = resolveActiveModules(db, region).filter((m) => MODULE_VISIBLE.has(m.status)); // 只统计上架模块
-    const scoped = visible.filter((m) => { // 先按分类收敛
+    const blocked = blockedModuleIds(db, subjectFromRequest(db, req, deps.jwtSecret), visible); // 分类级权限：热门列表同样剔除被 deny 模块
+    const allowed = blocked.size > 0 ? visible.filter((m) => !blocked.has(m.id)) : visible; // 无规则全量放行
+    const scoped = allowed.filter((m) => { // 先按分类收敛
       if (!category || category === 'all') return true; // 未传或 all 表示当前全站
       const slug = m.category_slug ?? ''; // 老数据可能没有分类
       return Boolean(slug) && (slug === category || slug.startsWith(`${category}-`)); // 二级精确或一级前缀
@@ -656,6 +664,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     if (!row) { // 模块不存在时
       throw new AppError('NOT_FOUND', 'module not found', { module_code: code, region }); // 明确 404 而非空对象
     } // 结束存在性判断
+    assertCategoryAllowed(db, subjectFromRequest(db, req, deps.jwtSecret), row.category_slug, { module_code: row.code, region }); // 分类级权限：被 deny 详情 403
 
     const price = activePrice(db, row.id, now); // 当前有效价格
     const prices = listPrices(db, row.id); // 全部历史价格
@@ -763,7 +772,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     // 1. 模块存在且 active
     const moduleRow = db // 模块查询起点
       .prepare( // 预编译：按编码 + 地区 + 未删除定位
-        `SELECT id, code, name_i18n, entitlements_required, unlock_mode, region, status
+        `SELECT id, code, name_i18n, entitlements_required, unlock_mode, region, status, category_slug
          FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
       ) // 结束预编译
       .get(body.module_code, user.region) as // 绑定模块码与用户地区
@@ -775,11 +784,13 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
           unlock_mode: string; // 解锁方式
           region: string; // 地区
           status: string; // 状态
+          category_slug: string | null; // 所属二级分类
         } // 结束模块行结构
       | undefined; // 未命中即 undefined
     if (!moduleRow) { // 模块不存在时
       throw new AppError('NOT_FOUND', 'module not found', { module_code: body.module_code }); // 模块不存在
     } // 结束存在性判断
+    assertCategoryAllowed(db, subjectFromUser(db, user), moduleRow.category_slug, { module_code: moduleRow.code, region: user.region }); // 分类级权限：被 deny 拦截解锁
     if (moduleRow.status !== 'active') { // 非 active 模块不允许解锁
       throw new AppError('FEATURE_NOT_AVAILABLE', 'module is not available for unlock', { // 明确不可用
         module_code: body.module_code, // 回传模块码便于前端提示
@@ -912,15 +923,16 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
 
     const moduleRow = db // 定位目标模块
       .prepare( // 预编译：按编码 + 用户区域 + 未删除定位
-        `SELECT id, code, name_i18n, entitlements_required, region, status
+        `SELECT id, code, name_i18n, entitlements_required, region, status, category_slug
          FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
       ) // 结束预编译
       .get(body.module_code, user.region) as // 绑定模块码与用户区域
-      | { id: string; code: string; name_i18n: string; entitlements_required: string; region: string; status: string }
+      | { id: string; code: string; name_i18n: string; entitlements_required: string; region: string; status: string; category_slug: string | null }
       | undefined; // 未命中即 undefined
     if (!moduleRow) { // 模块不存在
       throw new AppError('NOT_FOUND', 'module not found', { module_code: body.module_code }); // 404
     } // 结束存在性判断
+    assertCategoryAllowed(db, subjectFromUser(db, user), moduleRow.category_slug, { module_code: moduleRow.code, region: user.region }); // 分类级权限：被 deny 拦截下单
     if (moduleRow.status !== 'active') { // 仅供上架模块下单，草稿/下架不允许成交
       throw new AppError('FEATURE_NOT_AVAILABLE', 'module is not available for purchase', { module_code: body.module_code }); // 403
     } // 结束状态判断

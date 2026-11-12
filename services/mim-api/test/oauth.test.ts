@@ -121,7 +121,7 @@ describe('Mim ID 自动分配', () => { // 号码唯一性与连续性
 
 describe('provider 授权地址', () => { // 参数形状
   it('9 家 provider 全部登记且区域正确', () => { // 注册表完整性
-    expect(OAUTH_PROVIDERS.map((provider) => provider.id)).toEqual(['github', 'gitee', 'gitlab', 'google', 'microsoft', 'apple', 'wechat', 'qq', 'douyin']); // 清单与需求一致（顺序按注册表）
+    expect(OAUTH_PROVIDERS.map((provider) => provider.id)).toEqual(['github', 'gitee', 'gitlab', 'google', 'microsoft', 'apple', 'wechat', 'qq', 'douyin', 'weibo', 'baidu', 'alipay', 'facebook', 'twitter']); // 清单与需求一致（顺序按注册表）
     expect(OAUTH_PROVIDERS.find((provider) => provider.id === 'wechat')?.region).toBe('cn'); // 微信仅国内
     expect(OAUTH_PROVIDERS.find((provider) => provider.id === 'google')?.region).toBe('global'); // Google 仅海外
   }); // 结束用例

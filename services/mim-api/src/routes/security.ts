@@ -1,4 +1,4 @@
-/** 安全路由：图形验证码、内容举报与运营处置 */
+/** 安全路由：验证码适配层签发、内容举报（滑动窗口限频）、运营处置与索引巡检 */
 
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -6,38 +6,67 @@ import { z } from 'zod';
 import { AppError } from '@mim/core-domain';
 import { idempotency, requireAuth, requirePermission } from '../middleware.js';
 import { parse } from '../validate.js';
-import { createCaptcha, captchaHash } from '../security.js';
+import {
+  issueCaptcha,
+  verifyCaptcha,
+  captchaMode,
+  sceneCaptchaRequired,
+  captchaProvidersConfigured,
+  auditConfigured,
+  auditFallback,
+  inspectIndexes,
+  slidingWindow,
+  cacheOf,
+  type CaptchaScene,
+} from '../security.js';
 import type { ApiDeps } from '../types.js';
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
-const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000; // 举报频率窗口：24 小时
-const REPORT_LIMIT = 5; // 每个账号每 24 小时最多 5 条举报
+const REPORT_SCENES: CaptchaScene[] = ['register', 'login', 'report', 'post']; // 状态披露用全场景清单
+
+/** 举报限频：窗口（分钟）与上限均可由环境变量覆盖，缺省 24h / 5 条，按 用户+目标 滑动窗口 */
+function reportLimit(env: Record<string, string | undefined>): { limit: number; windowSeconds: number } {
+  const limit = Number(env.MIM_REPORT_LIMIT?.trim() || 5);
+  const windowMinutes = Number(env.MIM_REPORT_WINDOW_MINUTES?.trim() || 1440);
+  return { limit: Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 5, windowSeconds: Number.isFinite(windowMinutes) && windowMinutes > 0 ? Math.floor(windowMinutes * 60) : 86_400 };
+}
 
 export function createSecurityRouter(deps: ApiDeps): Router {
   const router = Router();
 
-  /** 公开能力状态：前端据此决定是否展示验证码与审核提示。 */
+  /** 公开能力状态：前端据此决定是否展示验证码与审核提示；如实回显当前模式 / 凭证齐备度 / 审核降级策略。 */
   router.get('/security/status', (_req, res) => {
+    const env = deps.env;
+    const mode = captchaMode(env);
+    const requiredScenes = REPORT_SCENES.filter((scene) => sceneCaptchaRequired(env, scene));
+    const providers = captchaProvidersConfigured(env);
+    const auditEnabled = auditConfigured(env);
     res.json({
-      captcha_required: deps.env.MIM_CAPTCHA_REQUIRED === '1',
-      content_audit: !!(deps.env.MIM_BAIDU_AUDIT_API_KEY && deps.env.MIM_BAIDU_AUDIT_SECRET_KEY),
+      // 兼容旧字段：任一强制场景即视为需要验证码；审核是否接入
+      captcha_required: requiredScenes.length > 0,
+      content_audit: auditEnabled,
+      captcha: {
+        mode,
+        required_scenes: requiredScenes,
+        providers: { image: true, slider: true, tencent: providers.tencent, geetest4: providers.geetest4 },
+      },
+      audit: { enabled: auditEnabled, provider: auditEnabled ? 'baidu' : 'none', fallback: auditFallback(env) },
     });
   });
 
-  /** 图形验证码：返回 SVG 与 id；每次生成都清理过期记录。 */
-  router.get('/auth/captcha', (_req, res) => {
-    const captcha = createCaptcha();
-    const ts = now();
-    deps.db.prepare('DELETE FROM captchas WHERE expires_at <= ?').run(ts);
-    deps.db
-      .prepare('INSERT INTO captchas (id, answer_hash, expires_at, used_at, created_at) VALUES (?, ?, ?, NULL, ?)')
-      .run(captcha.id, captchaHash(captcha.answer), captcha.expires_at, ts);
-    res.json({ id: captcha.id, svg: captcha.svg, expires_at: captcha.expires_at });
+  /** 验证码签发：按场景（register/login/report/post）走当前模式适配器；第三方缺凭证抛 503。 */
+  router.get('/auth/captcha', (req, res) => {
+    const sceneRaw = typeof req.query.scene === 'string' ? req.query.scene : 'login';
+    const scene: CaptchaScene = (REPORT_SCENES as string[]).includes(sceneRaw) ? (sceneRaw as CaptchaScene) : 'login';
+    const issue = issueCaptcha(deps.db, deps.env, scene);
+    res.json({ scene, ...issue });
   });
 
-  /** 提交举报：按账号限流，目标必须存在且不能举报自己。 */
-  router.post('/reports', requireAuth, idempotency, (req, res) => {
+  /** 提交举报：report 场景验证码（若强制）→ 用户+目标滑动窗口限频 → 目标存在性与自举报校验。 */
+  router.post('/reports', requireAuth, idempotency, async (req, res) => {
     const userId = req.user!.id;
+    // 先于 zod 剥离读取验证码字段；off / 场景未强制时 verifyCaptcha 直接放行
+    await verifyCaptcha(deps.db, deps.env, 'report', (req.body ?? {}) as Record<string, unknown>);
     const body = parse(
       z.object({
         target_type: z.enum(['thread', 'post', 'asset', 'product', 'user']),
@@ -47,9 +76,10 @@ export function createSecurityRouter(deps: ApiDeps): Router {
       }),
       req.body,
     );
-    const since = new Date(Date.now() - REPORT_WINDOW_MS).toISOString();
-    const recent = deps.db.prepare('SELECT COUNT(*) AS count FROM content_reports WHERE reporter_id = ? AND created_at > ?').get(userId, since) as { count: number };
-    if (recent.count >= REPORT_LIMIT) throw new AppError('RATE_LIMITED', `24 小时内最多提交 ${REPORT_LIMIT} 条举报`);
+    // 滑动窗口：维度 = 用户 + 目标类型 + 目标 ID；窗口与上限走环境变量，缺省 24h / 5 条
+    const { limit, windowSeconds } = reportLimit(deps.env);
+    const rate = await slidingWindow(cacheOf(deps.env), `report:${userId}:${body.target_type}:${body.target_id}`, limit, windowSeconds);
+    if (!rate.ok) throw new AppError('RATE_LIMITED', `窗口内最多提交 ${limit} 条举报`, { limit, reset_at: rate.resetAt });
     if (body.target_type === 'user' && body.target_id === userId) throw new AppError('VALIDATION_FAILED', '不能举报自己');
     const exists = (() => {
       if (body.target_type === 'thread') return !!deps.db.prepare('SELECT 1 AS ok FROM community_threads WHERE id = ?').get(body.target_id);
@@ -85,6 +115,11 @@ export function createSecurityRouter(deps: ApiDeps): Router {
       .prepare('SELECT id, reporter_id, target_type, target_id, reason, detail, status, admin_note, created_at FROM content_reports WHERE status = ? ORDER BY created_at ASC LIMIT 100')
       .all(status);
     res.json({ items });
+  });
+
+  /** 索引巡检：缺失索引建议与慢查询候选（只读，供 DBA / 运营复核执行计划）。 */
+  router.get('/security/index-audit', requirePermission('commerce:write'), (_req, res) => {
+    res.json(inspectIndexes(deps.db));
   });
 
   /** 运营处置：通过则隐藏目标内容，驳回只记录结论。 */
