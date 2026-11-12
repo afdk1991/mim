@@ -411,8 +411,11 @@ jobs:
           if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
             echo "SKIP: 缺少 NETLIFY_AUTH_TOKEN"; exit 0
           fi
-          npx --yes netlify-cli@latest deploy --prod \
-            --dir=apps/web/dist --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+          # 仓库是 pnpm monorepo，netlify-cli 在仓库根会检出多个项目并报
+          # 「Projects detected: @mim/admin, @mim/web …」，故先进入纯静态产物目录再部署，
+          # 让 CLI 只看到一个站点；--dir=. 即 apps/web/dist。
+          ( cd apps/web/dist && npx --yes netlify-cli@latest deploy --prod \
+            --dir=. --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN" )
 
       # Render：免费静态站点（750 实例小时/月，空闲休眠）。触发已存在服务的部署，缺凭证即 SKIP。
       - name: Render
@@ -450,6 +453,7 @@ jobs:
             https://github.com/afdk1991/mim \
             https://mim-store.15726833367.workers.dev/ \
             https://mim-45yeiirr.edgeone.cool/ \
+            https://mim-web.netlify.app/ \
             https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com/ ; do
             out=$(curl -k -s -o /dev/null -w '%{http_code}|%{size_download}|%{time_total}|%{remote_ip}' --max-time 20 "$url")
             echo "$url => $out"
