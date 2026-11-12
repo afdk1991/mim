@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T13:27:04.458Z
-- 本地 HEAD：`50a092a`
+- 生成时间：2026-11-12T14:24:30.145Z
+- 本地 HEAD：`99528d5`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,8 +15,8 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 11 | 本轮存在可信取证 |
 | 空数据 | 5 | result 为 null，明确标识而非填 0 |
-| 异常 | 54 | 🔴 3 / 🟡 19 / 🟢 32 |
-| 缺失信息 | 37 | 字段名或工件路径 |
+| 异常 | 46 | 🔴 5 / 🟡 15 / 🟢 26 |
+| 缺失信息 | 32 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -28,12 +28,12 @@
 | `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | https://mim.mixm.top | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 |
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | https://afdk1991.github.io/mim/ | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
-| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://mim-45yeiirr.edgeone.cool | 🟡 MANUAL | 🟡 DEGRADED 200 / —B | EDGEONE_CUSTOM_DOMAIN_NOT_BOUND 等 7 项 |
+| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | ✅ OK | ✅ PASS 200 / 5305B | CUSTOM_DOMAIN_ARTIFACT_LAG 等 4 项 |
 | `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
-| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | ✅ PASS 200 / 5182B | CONTENT_STALE 等 4 项 |
-| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | SEALOS_SERVICE_UNREACHABLE 等 5 项 |
-| `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com | ✅ OK | 🟡 DEGRADED 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 4 项 |
-| `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | manual — | https://mim-store.15726833367.workers.dev | 🟡 MANUAL | 🟡 DEGRADED 404 / 17B | ROOT_PATH_404 等 3 项 |
+| `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | 🟡 DEGRADED 200 / 5182B | CREDENTIAL_MISSING 等 3 项 |
+| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | 🔴 BROKEN | 🔴 FAIL 000 / 0B | LOGIN_REQUIRED 等 3 项 |
+| `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com | ✅ OK | ✅ PASS 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 3 项 |
+| `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-store.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 5305B | DNS_POLLUTION 等 2 项 |
 | `repo.gitlab` | — | GitLab 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
@@ -56,13 +56,10 @@
 | `pages.github` | 🟢 info | `DEEP_LINK_404_BY_DESIGN` | /mim/store 返回 404 + 5182B 为 dist/404.html 逐字节副本的平台能力上限，浏览器加载后 SPA 正常启动 |
 | `packages.ghcr` | 🟢 info | `AUTH_401_BY_DESIGN` | 未鉴权 401 为 ghcr 预期响应，不判定为部署失败 |
 | `packages.ghcr` | 🟢 info | `DOCKERFILE_WORKTREE_RESTORED` | Dockerfile 与 .dockerignore 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现镜像构建；CI job packages 不再悬空 |
-| `pages.edgeone` | 🔴 critical | `EDGEONE_CUSTOM_DOMAIN_NOT_BOUND` | 2026-11-12 21:23 控制台实测：mim 项目（makers-iygo4nrk22jr）域名管理仅默认域 mim-45yeiirr.edgeone.cool，data.mixm.top 未在该项目登记为自定义域；DNS 双解析器 NXDOMAIN。需先在控制台添加自定义域取得平台新 CNAME，再到 DNSPod 配置解析 |
-| `pages.edgeone` | 🔴 critical | `EDGEONE_DOMAIN_DNS_BROKEN` | 2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。21:23 控制台进一步确认项目未绑定该自定义域、DNSPod 记录已不存在，需控制台重取 CNAME + DNSPod 更新记录后复测 |
-| `pages.edgeone` | 🟡 warning | `WAF_FALSE_POSITIVE` | 200 + 981B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期 |
-| `pages.edgeone` | 🟢 info | `NO_CI_LINK` | 历史口径：最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站 |
-| `pages.edgeone` | 🟢 info | `EDGEONE_PROJECT_RENAMED_TO_MIM` | 2026-11-11 01:05 控制台实测：承载 data.mixm.top 的 EdgeOne Makers 项目名已是 `mim`；此前登记的「项目名 mim-app」为迁移前口径，registry 与文档已同步更正 |
-| `pages.edgeone` | 🟢 info | `EDGEONE_LEGACY_PROJECT_MIM_APP` | 控制台仍存在遗留项目 `mim-app`（makers-qsbzlpxaoa8b，2026-11-12 21:23 域名表为空、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权 |
-| `pages.edgeone` | 🟡 warning | `EDGEONE_DELIVERY_MODE_UNVERIFIED` | 控制台项目 `mim` 显示代码源 afdk1991/mim（main），与本文档「direct upload 直传」口径不一致；本轮未复验交付是否已改为 Git 连接，交付模式待复核 |
+| `pages.edgeone` | 🟡 warning | `CUSTOM_DOMAIN_ARTIFACT_LAG` | 2026-11-12 22:30 实测：data.mixm.top 首页仍引用 assets/index-Dmz7Z5Id.js，最新直传部署 dpbnaziq1hdm（产物 index-DzsHGdWK.js）尚未在自定义域生效；站点本身 200 可正常访问，仅产物版本滞后，待 EdgeOne 侧生效 / 清缓存后复测 |
+| `pages.edgeone` | 🟢 info | `DEFAULT_DOMAIN_TOKEN_PROTECTED` | 默认域 mim-45yeiirr.edgeone.cool 需 eo_token 查询参数（平台访问保护），本机裸访 401/2715；自定义域 data.mixm.top 无需 token 即 200，矩阵入口以自定义域登记 |
+| `pages.edgeone` | 🟢 info | `EDGEONE_LEGACY_PROJECT_MIM_APP` | 控制台仍存在遗留项目 mim-app（makers-qsbzlpxaoa8b，域名表为空）；删除属不可逆操作，需用户单独授权 |
+| `pages.edgeone` | 🟢 info | `WAF_FALSE_POSITIVE` | 状态码 200 不等于内容可信：EdgeOne 边缘可能返回挑战/保护页，内容层判定以 title=Mim 与产物指纹为准；本轮已用 title 与 assets 指纹复核 |
 | `pages.cloudflare` | 🟢 info | `DUPLICATE_MATRIX_ROW_MERGED` | README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数 |
 | `pages.cloudflare` | 🟡 warning | `LOCAL_PROCESS_DEPENDENCY` | 同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口 |
 | `pages.cloudflare` | 🟡 warning | `MANUAL_DEPLOY_OVERWRITE` | wrangler pages deploy 为手工直传；后续 CI 重发 Pages 会以 mim.mixm.top 的 VITE_API_ORIGIN 覆盖同源配置 |
@@ -72,22 +69,17 @@
 | `pages.cloudflare` | 🟡 warning | `CF_CI_PROJECT_NAME_MISMATCH` | deploy.yml 原写 --project-name=mim（与账号内实际项目 mim-8ah 不一致），且 wrangler.toml 的 name 也是 mim；首次真实调用时先被错误的 ACCOUNT_ID 拦下，修正后仍会命中不存在的项目。已把 CI 命令与 wrangler.toml 同时改为 mim-8ah，并去掉该步骤的 continue-on-error，避免「报错但仍 success」的假绿 |
 | `pages.cloudflare` | 🟡 warning | `CF_API_UPSTREAM_DOWN` | 历史留痕：/api/* 反代随 Functions 上线后，上游 mim.mixm.top 在 2026-11-10 22:18 仍不可用（/api/v1/modules 521）；上游于 2026-11-10 23:40 恢复（/health 200），Pages 侧 /api/v1/modules 实测由 521/502 转 200 / 2.491s / 9514B |
 | `pages.cloudflare` | 🟢 info | `CF_PROJECT_RENAMED_TO_MIM` | 2026-11-11 按用户「多平台项目名称统一为 Mim」指令，Pages 项目由 mim-8ah 迁移为 mim（项目名与项目名口径一致）；因 mim.pages.dev 子域全局唯一且已被他人占用，平台自动分配 mim-299.pages.dev。旧项目 mim-8ah 未删除，保留作回滚入口；CI 的 --project-name 与 wrangler.toml 的 name 已同步为 mim |
-| `pages.vercel` | 🟡 warning | `CONTENT_STALE` | 2026-11-12 复核：mim-puce.vercel.app 返回 200 但 5182B，其他静态站同轮为 5305B，产物明显落后；根因为 CI 步骤 `SKIP: 缺少 VERCEL_TOKEN`，需补齐 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID 后重跑或控制台手动重部署 |
-| `pages.vercel` | 🟡 warning | `CI_SKIP_FALSE_GREEN` | run 42862799970（2026-11-11 01:16）日志实证：Vercel 步骤输出 `SKIP: 缺少 VERCEL_TOKEN；exit 0`，该步骤可跳过，故「作业 success」不等于 Vercel 已部署；同 run 线上取证 `https://mim-puce.vercel.app/ => 200` 只能证明既有站点在线 |
-| `pages.vercel` | 🟢 info | `VERCEL_CONFIG_WORKTREE_RESTORED` | vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置 |
-| `pages.vercel` | 🟢 info | `VERCEL_PROJECT_NAME_ALREADY_MIM` | 2026-11-11 01:05 浏览器控制台实测：项目名本就是 `mim`（页签标题 `mim - Overview - Vercel`、面包屑 `mim`、生产部署别名 `mim-bochzr8hs-afdk1991s-projects.vercel.app`），`mim-puce` 只是 Vercel 在 `mim.vercel.app` 被占后自动追加的后缀域名；此前登记的「项目名 mim-puce / 待改名」为口径错误，已更正。设置页 Project Name 字段未取到（会话切换到 15726833367@139.com 账号后 /settings 返回 404），结论以概览页 + 部署别名双证据为准 |
-| `container.sealos` | 🔴 critical | `SEALOS_SERVICE_UNREACHABLE` | 2026-11-12 17:50 复核：本机 TLS 握手被重置、CI 出口 000，双出口均不可达；DNS 正常，故非解析问题。需 Sealos 控制台核查 Deployment / Ingress / 证书与实例状态 |
-| `container.sealos` | 🟢 info | `ROOT_404_BY_DESIGN` | 纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA |
-| `container.sealos` | 🟢 info | `SEALOS_MANIFEST_WORKTREE_RESTORED` | deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空 |
-| `container.sealos` | 🟢 info | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：Sealos 的命名空间 ns-i3ywsdfn 与域名 mim-i3ywsdfn.cloud.sealos.io 由平台分配、不可自选（Sealos Cloud 只授予该 ns 权限），应用内资源名（mim-api / mim-data / mim-secrets）已统一为 mim 前缀；无 SEALOS_KUBECONFIG 凭证，无法新建 ns-mim 命名空间来换域名 |
-| `container.sealos` | 🟡 warning | `SEALOS_CREDENTIAL_MISSING` | 2026-11-12 复核：Sealos 部署凭据（SEALOS_KUBECONFIG / SEALOS_DOMAIN / SEALOS_NAMESPACE / MIM_JWT_SECRET）未配置，CI step 恒 SKIP；补齐私有 secret 并重跑 platforms 作业前不得宣称 Sealos 已发布本轮产物。历史留痕：2026-11-09 23:03 curl /health 曾 200 / 1.111s / 53B（{"status":"ok"}），为旧版本快照，不代表本轮状态 |
-| `pages.iga` | 🟢 info | `ENTRY_URL_WRONG` | 历史留痕：2026-11-12 复核原登记 `preview.iga-pages.com` 无 A 记录；现行入口已改为新项目项目级稳定域（见 entry_url） |
-| `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | 裸访 307→401 / 2413B，需 iga_token（HttpOnly cookie）或预览口令；本机 CLI 登录态已于本轮设备授权恢复，内容层带凭证复验 200 |
-| `pages.iga` | 🟡 warning | `IGA_PROJECT_SPLIT` | 账号下同名 `mim` 分裂为两个项目：新 96otddwh48（upload_v2 直传型，现行权威入口，最新产物）与旧 fr95fuwu57（5 天前旧版本，类型不兼容 upload_v2 CLI，无法被直传更新，闲置待控制台核对清理）；删除旧项目不可逆，需用户在控制台授权 |
-| `pages.iga` | 🟢 info | `IGA_SCRIPT_WORKTREE_RESTORED` | deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空 |
-| `worker.mim-store` | 🟡 warning | `ROOT_PATH_404` | 2026-11-12 CI 实测：Worker 根路径 404 / 17B，仅证明 Worker 存活，未证明承载了可用页面；需确认预期入口路径（若只服务子路径，应在 entry_url 登记真实路径） |
-| `worker.mim-store` | 🟡 warning | `DNS_POLLUTION` | README 2026-11-09 取证载明本机 *.workers.dev 被 DNS 污染（156.233.67.243、443 不通），不作国内入口 |
-| `worker.mim-store` | 🟢 info | `MATRIX_ROW_MISSING` | 仅出现在 README 取证段落、矩阵表未列；因其域名与载体均不同于 pages.cloudflare，本汇总另列一行避免遗漏 |
+| `pages.vercel` | 🔴 critical | `CREDENTIAL_MISSING` | 缺 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI 无法发布 |
+| `pages.vercel` | 🔴 critical | `LOCAL_NETWORK_BLOCKED` | 本机到 vercel.com 登录页读取超时（GAC pipe read timed out），无法在本地登录创建 token |
+| `pages.vercel` | 🟡 warning | `STALE_ARTIFACT` | 线上产物 5182B 为历史版本，未同步本轮前端构建 |
+| `container.sealos` | 🔴 critical | `LOGIN_REQUIRED` | cloud.sealos.io 强制登录，未登录无法取得 kubeconfig / namespace |
+| `container.sealos` | 🔴 critical | `CREDENTIAL_MISSING` | 缺 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET，CI Sealos 步骤只能 SKIP |
+| `container.sealos` | 🔴 critical | `SITE_DOWN` | /health 双出口 000，站点当前不可访问 |
+| `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准 |
+| `pages.iga` | 🟡 warning | `IGA_PROJECT_SPLIT` | 同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权 |
+| `pages.iga` | 🟡 warning | `CI_IGA_CREDENTIALS_MISSING` | CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成 |
+| `worker.mim-store` | 🟢 info | `DNS_POLLUTION` | 本机 *.workers.dev 存在 DNS 污染 / 连接阻断，内容取证以 CI Runner 出口为准 |
+| `worker.mim-store` | 🟢 info | `MATRIX_ROW_MISSING` | 矩阵表未单列该 Worker，汇总中单列一行以避免遗漏 |
 | `repo.gitlab` | 🟡 warning | `EMPTY_RESULT` | 本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
 | `repo.gitlab` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入 |
 | `repo.bitbucket` | 🟡 warning | `EMPTY_RESULT` | 本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
@@ -103,8 +95,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 50a092a4569ef820311df8927649b62bbd6f1905 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 50a092a4569ef820311df8927649b62bbd6f1905 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 99528d5bb31eb1f7be4077913b811f1eb43c2bf6 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 99528d5bb31eb1f7be4077913b811f1eb43c2bf6 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -116,6 +108,7 @@
 | `vercel.json` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `deploy/sealos/mim.yaml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `deploy/iga/deploy.sh` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
+| `workers/mim-store` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `netlify.toml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `.github/workflows/azure-static-web-apps.yml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `render.yaml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |

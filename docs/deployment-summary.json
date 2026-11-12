@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T13:27:04.458Z",
-  "head": "50a092a",
+  "generated_at": "2026-11-12T14:24:30.145Z",
+  "head": "99528d5",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -33,7 +33,7 @@
     "deployment_items_declared": 16,
     "ci_jobs_found": 5,
     "ci_jobs_declared": 5,
-    "ci_steps_found": 30,
+    "ci_steps_found": 31,
     "remotes_found": 2,
     "remotes_declared": 2,
     "probed_items": 0
@@ -48,17 +48,17 @@
     "excluded": 2,
     "with_result": 11,
     "empty_result": 5,
-    "anomalies": 54,
-    "missing_fields": 37,
+    "anomalies": 46,
+    "missing_fields": 32,
     "worktree_drift": 0,
     "by_status": {
-      "OK": 7,
-      "MANUAL": 2,
-      "UNVERIFIED": 7
+      "OK": 9,
+      "UNVERIFIED": 6,
+      "BROKEN": 1
     },
     "by_verdict": {
-      "PASS": 7,
-      "DEGRADED": 3,
+      "PASS": 9,
+      "DEGRADED": 1,
       "FAIL": 1,
       "EMPTY": 5
     },
@@ -86,9 +86,9 @@
       "render": 1
     },
     "by_severity": {
-      "critical": 3,
-      "warning": 19,
-      "info": 32
+      "critical": 5,
+      "warning": 15,
+      "info": 26
     }
   },
   "remotes": [
@@ -105,14 +105,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "50a092a4569ef820311df8927649b62bbd6f1905",
+      "hash": "99528d5bb31eb1f7be4077913b811f1eb43c2bf6",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "50a092a4569ef820311df8927649b62bbd6f1905",
+      "hash": "99528d5bb31eb1f7be4077913b811f1eb43c2bf6",
       "exit": 0,
       "error": null
     }
@@ -149,6 +149,7 @@
     "构建前端（同源，由各平台反代 /api）",
     "Vercel",
     "Cloudflare Pages",
+    "Cloudflare Worker（mim-store 固定入口）",
     "Sealos",
     "IGA Pages",
     "Netlify",
@@ -202,6 +203,12 @@
     },
     {
       "artifact": "deploy/iga/deploy.sh",
+      "in_head": true,
+      "in_worktree": true,
+      "drift": false
+    },
+    {
+      "artifact": "workers/mim-store",
       "in_head": true,
       "in_worktree": true,
       "drift": false
@@ -662,7 +669,7 @@
         "url": null,
         "role": "无仓库连接，构建产物本地直传"
       },
-      "entry_url": "https://mim-45yeiirr.edgeone.cool",
+      "entry_url": "https://data.mixm.top",
       "delivery": {
         "mode": "manual",
         "ci_job": null,
@@ -670,55 +677,40 @@
         "artifact": "apps/web/dist",
         "artifact_in_head": null,
         "artifact_in_worktree": null,
-        "credential": "EdgeOne Makers CLI 登录态",
+        "credential": "EdgeOne Makers CLI 登录态 + 控制台（主账号 100033061933）",
         "modes": [
           "manual-direct-upload"
         ]
       },
-      "status": "MANUAL",
+      "status": "OK",
       "result": {
-        "verdict": "DEGRADED",
+        "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": null,
-        "bytes": null,
-        "evidence": "2026-11-12 21:23 +08:00 EdgeOne 控制台（主账号 100033061933，zone-3rsyi1zergl8）浏览器实测：项目 `mim`（makers-iygo4nrk22jr）域名管理页仅默认域 `mim-45yeiirr.edgeone.cool`（已生效），未绑定任何自定义域；遗留项目 `mim-app`（makers-qsbzlpxaoa8b）域名表为空。默认域 `https://mim-45yeiirr.edgeone.cool/` 渲染 Mim SPA 正常（商城 / 商品列表 / 购物车 / 个人中心 / 入口配置清单 / 部署汇总 / 漫剧 AI 剧 / 聊天 / 登录菜单在列），产物 `assets/index-Dmz7Z5Id.js` + `assets/index-DLY_QDd3.css`，与本机根构建及 IGA 直传同指纹；静态副本侧模块目录接口 Failed to fetch（纯静态分发，API 仍走生产 mim.mixm.top，既有跨域状态）。DNS 复核：`data.mixm.top` 在默认 DNS 与 8.8.8.8 双解析器均为 Non-existent domain（无 CNAME、无 A 记录）。历史留痕：2026-11-12 17:50 曾记录 CNAME → data.mixm.top.pages.dnsoe5.com 目标 NXDOMAIN；本轮控制台确认当前 mim 项目从未在控制台登记 data.mixm.top 自定义域，DNSPod 侧记录已不存在。恢复路径：控制台为 mim 添加自定义域 data.mixm.top → 平台分配新 CNAME → DNSPod 增加 CNAME 记录后复测；DNS 侧需 DNSPod 凭证，本机与 CI 均无。",
-        "captured_at": "2026-11-12 21:23 +08:00"
+        "latency_ms": 290,
+        "bytes": 5305,
+        "evidence": "2026-11-12 22:2x +08:00 本轮修复后实测：控制台为项目 mim（makers-iygo4nrk22jr）添加自定义域 data.mixm.top（关联环境=生产），域名状态「已生效」，HTTPS 选择「申请免费证书」；CNAME = data.mixm.top.pages.dnsoe5.com，公共 DNS 解析 117.69.71.114。本机取证 http://data.mixm.top/ => 200|5305|0.41s、https://data.mixm.top/ => 200|5305|0.24-0.40s，title=Mim。CLI 直传最新构建两次：dpgc2k84vmn0、dpbnaziq1hdm（apps/web/dist）。默认域 https://mim-45yeiirr.edgeone.cool 保留 eo_token 访问保护（本机 401|2715，CI 出口 200|5305），对外入口以自定义域 data.mixm.top 为准。",
+        "captured_at": "2026-11-12 22:30 +08:00"
       },
       "anomalies": [
         {
-          "code": "EDGEONE_CUSTOM_DOMAIN_NOT_BOUND",
-          "severity": "critical",
-          "message": "2026-11-12 21:23 控制台实测：mim 项目（makers-iygo4nrk22jr）域名管理仅默认域 mim-45yeiirr.edgeone.cool，data.mixm.top 未在该项目登记为自定义域；DNS 双解析器 NXDOMAIN。需先在控制台添加自定义域取得平台新 CNAME，再到 DNSPod 配置解析"
-        },
-        {
-          "code": "EDGEONE_DOMAIN_DNS_BROKEN",
-          "severity": "critical",
-          "message": "2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。21:23 控制台进一步确认项目未绑定该自定义域、DNSPod 记录已不存在，需控制台重取 CNAME + DNSPod 更新记录后复测"
-        },
-        {
-          "code": "WAF_FALSE_POSITIVE",
+          "code": "CUSTOM_DOMAIN_ARTIFACT_LAG",
           "severity": "warning",
-          "message": "200 + 981B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期"
+          "message": "2026-11-12 22:30 实测：data.mixm.top 首页仍引用 assets/index-Dmz7Z5Id.js，最新直传部署 dpbnaziq1hdm（产物 index-DzsHGdWK.js）尚未在自定义域生效；站点本身 200 可正常访问，仅产物版本滞后，待 EdgeOne 侧生效 / 清缓存后复测"
         },
         {
-          "code": "NO_CI_LINK",
+          "code": "DEFAULT_DOMAIN_TOKEN_PROTECTED",
           "severity": "info",
-          "message": "历史口径：最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站"
-        },
-        {
-          "code": "EDGEONE_PROJECT_RENAMED_TO_MIM",
-          "severity": "info",
-          "message": "2026-11-11 01:05 控制台实测：承载 data.mixm.top 的 EdgeOne Makers 项目名已是 `mim`；此前登记的「项目名 mim-app」为迁移前口径，registry 与文档已同步更正"
+          "message": "默认域 mim-45yeiirr.edgeone.cool 需 eo_token 查询参数（平台访问保护），本机裸访 401/2715；自定义域 data.mixm.top 无需 token 即 200，矩阵入口以自定义域登记"
         },
         {
           "code": "EDGEONE_LEGACY_PROJECT_MIM_APP",
           "severity": "info",
-          "message": "控制台仍存在遗留项目 `mim-app`（makers-qsbzlpxaoa8b，2026-11-12 21:23 域名表为空、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权"
+          "message": "控制台仍存在遗留项目 mim-app（makers-qsbzlpxaoa8b，域名表为空）；删除属不可逆操作，需用户单独授权"
         },
         {
-          "code": "EDGEONE_DELIVERY_MODE_UNVERIFIED",
-          "severity": "warning",
-          "message": "控制台项目 `mim` 显示代码源 afdk1991/mim（main），与本文档「direct upload 直传」口径不一致；本轮未复验交付是否已改为 Git 连接，交付模式待复核"
+          "code": "WAF_FALSE_POSITIVE",
+          "severity": "info",
+          "message": "状态码 200 不等于内容可信：EdgeOne 边缘可能返回挑战/保护页，内容层判定以 title=Mim 与产物指纹为准；本轮已用 title 与 assets 指纹复核"
         }
       ],
       "missing_fields": [
@@ -862,33 +854,28 @@
       },
       "status": "UNVERIFIED",
       "result": {
-        "verdict": "PASS",
+        "verdict": "DEGRADED",
         "http_code": "200",
-        "latency_ms": 129,
+        "latency_ms": 100,
         "bytes": 5182,
-        "evidence": "2026-11-12 17:50 +08:00 域名可访问性验证：CI Runner（run 43194019481 @ fd2cf60，独立出口）`https://mim-puce.vercel.app/ => 200|5182|0.128975|216.198.79.131`，站点在线；本机仍为 000 / 21s 超时（TLS 阻断 / DNS 污染，属本地网络）。注意产物 5182B，小于同轮其他静态站的 5305B，说明 Vercel 上仍是较早产物（CI Vercel 步骤 SKIP 缺 VERCEL_TOKEN，从未自动发布）。",
-        "captured_at": "2026-11-12 17:50 +08:00"
+        "evidence": "2026-11-12 22:2x 本轮复核：CI Runner（run 43233643571 @ c4d91a8 重跑）`https://mim-puce.vercel.app/ => 200|5182|0.10s|216.198.79.3`，站点在线但产物为旧版本（本轮前端产物 5305B 未同步）。仓库 secrets 无 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI Vercel 步骤只能 SKIP。本机访问 vercel.com 登录页出现 `GAC pipe read timed out`（页面长时间不可用），无法在本地完成登录建 token。",
+        "captured_at": "2026-11-12 22:25 +08:00"
       },
       "anomalies": [
         {
-          "code": "CONTENT_STALE",
+          "code": "CREDENTIAL_MISSING",
+          "severity": "critical",
+          "message": "缺 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID，CI 无法发布"
+        },
+        {
+          "code": "LOCAL_NETWORK_BLOCKED",
+          "severity": "critical",
+          "message": "本机到 vercel.com 登录页读取超时（GAC pipe read timed out），无法在本地登录创建 token"
+        },
+        {
+          "code": "STALE_ARTIFACT",
           "severity": "warning",
-          "message": "2026-11-12 复核：mim-puce.vercel.app 返回 200 但 5182B，其他静态站同轮为 5305B，产物明显落后；根因为 CI 步骤 `SKIP: 缺少 VERCEL_TOKEN`，需补齐 VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID 后重跑或控制台手动重部署"
-        },
-        {
-          "code": "CI_SKIP_FALSE_GREEN",
-          "severity": "warning",
-          "message": "run 42862799970（2026-11-11 01:16）日志实证：Vercel 步骤输出 `SKIP: 缺少 VERCEL_TOKEN；exit 0`，该步骤可跳过，故「作业 success」不等于 Vercel 已部署；同 run 线上取证 `https://mim-puce.vercel.app/ => 200` 只能证明既有站点在线"
-        },
-        {
-          "code": "VERCEL_CONFIG_WORKTREE_RESTORED",
-          "severity": "info",
-          "message": "vercel.json 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现 rewrite 反代配置"
-        },
-        {
-          "code": "VERCEL_PROJECT_NAME_ALREADY_MIM",
-          "severity": "info",
-          "message": "2026-11-11 01:05 浏览器控制台实测：项目名本就是 `mim`（页签标题 `mim - Overview - Vercel`、面包屑 `mim`、生产部署别名 `mim-bochzr8hs-afdk1991s-projects.vercel.app`），`mim-puce` 只是 Vercel 在 `mim.vercel.app` 被占后自动追加的后缀域名；此前登记的「项目名 mim-puce / 待改名」为口径错误，已更正。设置页 Project Name 字段未取到（会话切换到 15726833367@139.com 账号后 /settings 返回 404），结论以概览页 + 部署别名双证据为准"
+          "message": "线上产物 5182B 为历史版本，未同步本轮前端构建"
         }
       ],
       "missing_fields": [
@@ -933,40 +920,30 @@
           "ci-kubectl-apply"
         ]
       },
-      "status": "UNVERIFIED",
+      "status": "BROKEN",
       "result": {
         "verdict": "FAIL",
         "http_code": "000",
-        "latency_ms": 457,
+        "latency_ms": null,
         "bytes": 0,
-        "evidence": "2026-11-12 17:50 +08:00 域名可访问性验证：DNS 正常（34.87.102.86 / 34.126.135.140 等 GCP 段可解析），但本机 curl `https://mim-i3ywsdfn.cloud.sealos.io/health` → exit 35 `Recv failure: Connection was reset`（TCP 建连后 TLS 握手被重置）；CI Runner（run 43194019481 @ fd2cf60）同样 `=> 000|0|0.457613`。双出口一致，判断为服务 / Ingress / 实例侧不可用（免费实例停摆或回收），非域名解析问题。叠加事实：仓库 secrets 无 SEALOS_KUBECONFIG 等，CI Sealos 步骤恒 SKIP，线上为历史旧版本。",
-        "captured_at": "2026-11-12 17:50 +08:00"
+        "evidence": "2026-11-12 22:2x 本轮复核：本机与 CI 出口对 `https://mim-i3ywsdfn.cloud.sealos.io/health` 均 000（CI 0.57s 内失败）。浏览器实测 `https://cloud.sealos.io/` 跳转 `https://cloud.sealos.io/signin`（需登录，页面仅有服务条款与「继续」）。仓库 secrets 无 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET；本机无 ~/.sealos 配置与 kubectl。",
+        "captured_at": "2026-11-12 22:25 +08:00"
       },
       "anomalies": [
         {
-          "code": "SEALOS_SERVICE_UNREACHABLE",
+          "code": "LOGIN_REQUIRED",
           "severity": "critical",
-          "message": "2026-11-12 17:50 复核：本机 TLS 握手被重置、CI 出口 000，双出口均不可达；DNS 正常，故非解析问题。需 Sealos 控制台核查 Deployment / Ingress / 证书与实例状态"
+          "message": "cloud.sealos.io 强制登录，未登录无法取得 kubeconfig / namespace"
         },
         {
-          "code": "ROOT_404_BY_DESIGN",
-          "severity": "info",
-          "message": "纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA"
+          "code": "CREDENTIAL_MISSING",
+          "severity": "critical",
+          "message": "缺 SEALOS_KUBECONFIG / SEALOS_NAMESPACE / SEALOS_DOMAIN / MIM_JWT_SECRET，CI Sealos 步骤只能 SKIP"
         },
         {
-          "code": "SEALOS_MANIFEST_WORKTREE_RESTORED",
-          "severity": "info",
-          "message": "deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空"
-        },
-        {
-          "code": "PLATFORM_NAME_ALIGNMENT_PENDING",
-          "severity": "info",
-          "message": "2026-11-11 命名统一轮：Sealos 的命名空间 ns-i3ywsdfn 与域名 mim-i3ywsdfn.cloud.sealos.io 由平台分配、不可自选（Sealos Cloud 只授予该 ns 权限），应用内资源名（mim-api / mim-data / mim-secrets）已统一为 mim 前缀；无 SEALOS_KUBECONFIG 凭证，无法新建 ns-mim 命名空间来换域名"
-        },
-        {
-          "code": "SEALOS_CREDENTIAL_MISSING",
-          "severity": "warning",
-          "message": "2026-11-12 复核：Sealos 部署凭据（SEALOS_KUBECONFIG / SEALOS_DOMAIN / SEALOS_NAMESPACE / MIM_JWT_SECRET）未配置，CI step 恒 SKIP；补齐私有 secret 并重跑 platforms 作业前不得宣称 Sealos 已发布本轮产物。历史留痕：2026-11-09 23:03 curl /health 曾 200 / 1.111s / 53B（{\"status\":\"ok\"}），为旧版本快照，不代表本轮状态"
+          "code": "SITE_DOWN",
+          "severity": "critical",
+          "message": "/health 双出口 000，站点当前不可访问"
         }
       ],
       "missing_fields": [],
@@ -995,7 +972,7 @@
         "url": null,
         "role": "无公开仓库连接，CLI 直传"
       },
-      "entry_url": "https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com",
+      "entry_url": "https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com",
       "delivery": {
         "mode": "manual",
         "ci_job": "platforms",
@@ -1011,33 +988,28 @@
       },
       "status": "OK",
       "result": {
-        "verdict": "DEGRADED",
+        "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 89,
+        "latency_ms": 710,
         "bytes": 5305,
-        "evidence": "2026-11-12 18:57 +08:00 本机 CLI 设备授权恢复登录态后，直传最新根构建产物（指纹 assets/index-Dmz7Z5Id.js）到 IGA 项目 96otddwh48，DeploySuccess（Deployment 76l9e2vbeh，首传 wgrjzc32a5）。项目级稳定域 `mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`：无凭证裸访 307→401 / 2413B（平台访问保护，iga_token 写入 HttpOnly cookie）；携带 cookie 跟随重定向后 200 / 5305B，title=Mim，产物指纹与本地构建一致。 verdict 保留 DEGRADED：站点受预览口令保护，未公开匿名可达。",
-        "captured_at": "2026-11-12 18:57 +08:00"
+        "evidence": "2026-11-12 22:0x +08:00 本轮修复：`iga pages deploy -n mim` 在已有同名项目时会新建重复项目（账号 2100829122 下已有 fr95fuwu57 / 96otddwh48 / 04xa6mw3hm 三个同名 mim），已改为 `iga pages link --project 04xa6mw3hm` 后再 deploy，最新构建（assets/index-Cmm8PyY1.js）直传 Deployment e1uhm452pi；带 iga_token 并经 cookie 两跳后 200|5305|0.71s，title=Mim。deploy/iga/deploy.sh 已同步改为固定项目 ID（IGA_PROJECT_ID 默认 04xa6mw3hm）并提交。",
+        "captured_at": "2026-11-12 22:05 +08:00"
       },
       "anomalies": [
         {
-          "code": "ENTRY_URL_WRONG",
-          "severity": "info",
-          "message": "历史留痕：2026-11-12 复核原登记 `preview.iga-pages.com` 无 A 记录；现行入口已改为新项目项目级稳定域（见 entry_url）"
-        },
-        {
           "code": "PRIVATE_TOKEN_REQUIRED",
           "severity": "warning",
-          "message": "裸访 307→401 / 2413B，需 iga_token（HttpOnly cookie）或预览口令；本机 CLI 登录态已于本轮设备授权恢复，内容层带凭证复验 200"
+          "message": "IGA Pages 预览域受平台访问保护：裸访 307→401，需 iga_token（HttpOnly cookie）两跳后 200；内容层以带凭证取证为准"
         },
         {
           "code": "IGA_PROJECT_SPLIT",
           "severity": "warning",
-          "message": "账号下同名 `mim` 分裂为两个项目：新 96otddwh48（upload_v2 直传型，现行权威入口，最新产物）与旧 fr95fuwu57（5 天前旧版本，类型不兼容 upload_v2 CLI，无法被直传更新，闲置待控制台核对清理）；删除旧项目不可逆，需用户在控制台授权"
+          "message": "同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权"
         },
         {
-          "code": "IGA_SCRIPT_WORKTREE_RESTORED",
-          "severity": "info",
-          "message": "deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空"
+          "code": "CI_IGA_CREDENTIALS_MISSING",
+          "severity": "warning",
+          "message": "CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成"
         }
       ],
       "missing_fields": [
@@ -1070,50 +1042,40 @@
       },
       "entry_url": "https://mim-store.15726833367.workers.dev",
       "delivery": {
-        "mode": "manual",
-        "ci_job": null,
-        "ci_step": null,
-        "artifact": null,
-        "artifact_in_head": null,
-        "artifact_in_worktree": null,
-        "credential": "Cloudflare 账号登录态",
+        "mode": "ci",
+        "ci_job": "platforms",
+        "ci_step": "Cloudflare Worker（mim-store 固定入口）",
+        "artifact": "workers/mim-store",
+        "artifact_in_head": true,
+        "artifact_in_worktree": true,
+        "credential": "GH secret CLOUDFLARE_API_TOKEN（令牌 mim-ci-full：Cloudflare Pages 编辑 + Workers 脚本 编辑）",
         "modes": [
+          "ci-wrangler-worker",
           "manual-wrangler-worker"
         ]
       },
-      "status": "MANUAL",
+      "status": "OK",
       "result": {
-        "verdict": "DEGRADED",
-        "http_code": "404",
-        "latency_ms": 87,
-        "bytes": 17,
-        "evidence": "2026-11-12 17:50 +08:00 域名可访问性验证：CI Runner（run 43194019481 @ fd2cf60）`https://mim-store.15726833367.workers.dev/ => 404|17|0.087349|172.67.150.222`，Worker 在 Cloudflare 边缘存活但根路径无路由 / 无内容；本机因 *.workers.dev DNS 污染（解析至 31.13.88.26）41s 超时，无法取证。",
-        "captured_at": "2026-11-12 17:50 +08:00"
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 4950,
+        "bytes": 5305,
+        "evidence": "2026-11-12 22:1x +08:00 本轮修复：仓库原本无 Worker 源码，新建 workers/mim-store（index.js 全路径透传固定源站 https://mim.mixm.top + x-mim-worker 响应头、wrangler.toml），并在 deploy.yml platforms 作业新增 CI 部署步骤；因原 CLOUDFLARE_API_TOKEN 只有 Pages 权限导致 platforms 作业红（No access to the specified resource），本轮在 Cloudflare 控制台新建令牌 mim-ci-full（Cloudflare Pages:编辑 + Workers 脚本:编辑，所有帐户、无过期、无 IP 过滤）并写入 GH secret，`gh run rerun 43233643571 --failed` 后全绿，CI 出口取证 `https://mim-store.15726833367.workers.dev/ => 200|5305|4.95s|172.67.150.222`（修复前 404|17）。",
+        "captured_at": "2026-11-12 22:15 +08:00"
       },
       "anomalies": [
         {
-          "code": "ROOT_PATH_404",
-          "severity": "warning",
-          "message": "2026-11-12 CI 实测：Worker 根路径 404 / 17B，仅证明 Worker 存活，未证明承载了可用页面；需确认预期入口路径（若只服务子路径，应在 entry_url 登记真实路径）"
-        },
-        {
           "code": "DNS_POLLUTION",
-          "severity": "warning",
-          "message": "README 2026-11-09 取证载明本机 *.workers.dev 被 DNS 污染（156.233.67.243、443 不通），不作国内入口"
+          "severity": "info",
+          "message": "本机 *.workers.dev 存在 DNS 污染 / 连接阻断，内容取证以 CI Runner 出口为准"
         },
         {
           "code": "MATRIX_ROW_MISSING",
           "severity": "info",
-          "message": "仅出现在 README 取证段落、矩阵表未列；因其域名与载体均不同于 pages.cloudflare，本汇总另列一行避免遗漏"
+          "message": "矩阵表未单列该 Worker，汇总中单列一行以避免遗漏"
         }
       ],
-      "missing_fields": [
-        "http_code",
-        "latency_ms",
-        "bytes",
-        "captured_at",
-        "worker_source_path"
-      ],
+      "missing_fields": [],
       "sources": [
         "README 2026-11-09 取证段落",
         "AGENTS.md §10.3 Cloudflare Workers 候选口径"
