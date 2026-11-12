@@ -1135,6 +1135,25 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **结论**：13 个对外地址中 **9 个可达**、**3 个不可达**（`data.mixm.top` / Sealos `/health` / 旧登记 `preview.iga-pages.com`）、**1 个可达但内容异常**（Worker 根路径 404、Vercel 产物落后 5182B vs 5305B）。逐项证据与处置建议见 [docs/平台域名验证-20261112.md](./docs/平台域名验证-20261112.md)。修复动作（EdgeOne 重取 CNAME + DNSPod 更新、Sealos 控制台核查、补 Vercel / Sealos 凭据）均需外部控制台或私有凭据，本轮未擅自改动线上 DNS 与平台配置。
 
+#### 9.33 口径修正落库 + EdgeOne 补直传（2026-11-12 17:54 +08:00，HEAD `670674d`）
+
+**性质**：承接 §9.31 / §9.32，把凭据缺口口径修正落库并补齐直传型分发；本轮无业务代码改动，仅文档 / 注册表口径 + EdgeOne CLI 直传。提交 `670674d`（6 文件，79 insertions / 38 deletions），双推 `origin` / `gitee` 平齐。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 双远端（铁律十二） | `git ls-remote origin` = `670674d490defe5bddcdc39a8d31b6d2e2cb7134`；`git ls-remote gitee` = 同一 SHA；本地 0 ahead / 0 behind | `git ls-remote` |
+| CI 结论 | Deploy run **`43194417364`**（@ `670674d`）**completed success**，五作业全绿：质量门禁 / GitHub Packages(ghcr) / 发布到生产服务器 / 托管平台同步 / GitHub Pages；Azure SWA run **`43194417721`**（@ `670674d`）success | `gh run view --json conclusion,jobs` |
+| 生产权威终点 | `/health` **200 / 53B / 0.067s**，`version=0.0.2`；`/api/v1/entries/overview` **200 / 2872B**：44 入口 / 19 业务域 / 132 功能点 / 116 关联 / 46 占位，四态 `implemented 4 / partial 19 / planned 19 / conflict 2` | 本机 curl |
+| Cloudflare Pages | `/` **200 / 5305B / 1.53s**，产物 `index-BeEAfX9X.js`；platforms 作业日志 `✨ Compiled Worker successfully` → `Uploaded 4 files (25 already uploaded)` → `Deployment complete! https://0aab8886.mim-299.pages.dev` | 本机 curl + CI 日志（job `131102437821`） |
+| GitHub Pages | `/mim/` **200 / 5305B / 0.36s**，产物 `index-BS7IPmFY.js`（根构建注入 `VITE_API_ORIGIN`，与 CF 指纹不同属既有设计） | 本机 curl |
+| ghcr 镜像 | `latest` tag 指向 digest 版本含 tag `670674d490defe5bddcdc39a8d31b6d2e2cb7134`；packages 作业 success | `gh api users/afdk1991/packages/container/mim-api/versions` |
+| EdgeOne 补直传 | 本地根构建 `dist/` 30 文件（API=`mim.mixm.top`），`edgeone makers deploy dist -n mim --env production --skip-ai-gateway-sync` → Deployment **`dprcsooiriey`** `Deploy Success`，ProjectId `makers-iygo4nrk22jr`（正确 `mim` 项目；前一轮 `dp2z0vxmyw0w` 留痕）；临时域 `mim-45yeiirr.edgeone.cool` 去 token **401 / 2715B**（title=Tencent Edgeone，平台鉴权挑战页）；`data.mixm.top` 本机 exit 6 / CI 双 000（CNAME 目标 NXDOMAIN，见 §9.32），内容层本轮未复验 | CLI `--json` 输出 + curl |
+| 凭据 SKIP 平台（本轮 CI 分支实测） | Vercel `SKIP: 缺少 VERCEL_TOKEN`；Sealos `SKIP: 缺少 SEALOS_KUBECONFIG / SEALOS_NAMESPACE`；IGA `SKIP: 缺少 IGA_ACCESS_KEY / IGA_SECRET_KEY，且本机未登录`；Netlify `SKIP: 缺少 NETLIFY_AUTH_TOKEN`；Render `SKIP: 缺少 RENDER_API_KEY`；Gitee `Everything up-to-date` + `Gitee 镜像已同步：***/mim @ main 670674d` | platforms 作业 `131102437821` 日志 |
+| 注册表口径修正 | `container.sealos` 由 `OK / PASS` 更正为 **`UNVERIFIED / NOT_TESTED`**，历史 200 快照移入 anomaly `SEALOS_CREDENTIAL_MISSING`(warning) 留痕；重跑 `deployment-summary.mjs` 刷新 `docs/deployment-summary.{json,md}`（sealos 🟡 UNVERIFIED / 未测） | `deploymentRegistry.json` + 生成器 |
+| 门禁复跑 | `verify-deployments` **55/55**、`verify-custom-domains` **20/20**、`verify-site-modules` PASS、`verify-entry-manifest` PASS、`pnpm -r typecheck` 0、`npm run check` 退出 0 | 本轮命令回显 |
+
+**10 矩阵成员终态（@ `670674d`）**：✅ 真部署 / 同步——腾讯云自建、Cloudflare Pages、GitHub Pages、ghcr、GitHub 仓库、Gitee 镜像；⚠️ 直传已到项目但内容层未取证——EdgeOne；⚠️ 凭据缺失 SKIP（站点在线为旧版本或不可达）——Sealos、Vercel、IGA。凭据缺口清单同 §9.31，沙箱无法生成，需用户在仓库 secrets 补齐后重跑 platforms 作业。
+
 ---
 
 ---
