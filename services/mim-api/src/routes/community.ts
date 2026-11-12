@@ -96,10 +96,14 @@ function couponDiscount(deps: ApiDeps, code: string | undefined, amount: number)
   return { code: coupon.id, discount, couponId: coupon.id };
 }
 
+// 本路由承载的全部命名空间前缀：鉴权与幂等只挂在这些前缀上，
+// 避免裸 router.use 全局拦截穿过本 router 的其他命名空间（如后台 /admin）请求。
+const COMMUNITY_PREFIXES = ['/community', '/vip', '/wallet', '/shop', '/coupons', '/referral'];
+
 export function createCommunityRouter(deps: ApiDeps): Router {
   const router = Router();
-  router.use(requireAuth); // 社区与资产全部需要会话；访客会话同样可用
-  router.use(idempotency); // 写操作幂等，防重复扣款 / 重复发卡
+  router.use(COMMUNITY_PREFIXES, requireAuth); // 社区与资产全部需要会话；访客会话同样可用
+  router.use(COMMUNITY_PREFIXES, idempotency); // 写操作幂等，防重复扣款 / 重复发卡
 
   /** 社区首页聚合：板块、统计、当前会员与钱包。 */
   router.get('/community/overview', (req, res) => {
