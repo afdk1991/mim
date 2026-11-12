@@ -148,3 +148,18 @@ PRD（Mim-PRD.html，V0.0.0-preview 草案）确定的核心产品决策是 **�
 | 契约测试 | `services/mim-api/test/navigation.test.ts` | 9 例：公开目录与过滤、鉴权与非法地址、PATCH 校验、命中 / 未命中探测（本地 `node:http` 服务，不依赖外网）、全目录探测、种子重跑不重置状态 |
 
 设计约束：① 三态只允许 `ok` / `broken` / `unknown`，未探测不冒充可达；② 探测失败不抛 5xx，而是把失败写进 `status = broken` 供页面标记；③ 全目录探测串行执行并限量，避免对第三方站点并发轰炸；④ 种子只补缺，不覆盖用户改写与已有探测结果。
+
+## 10. 统一搜索 SEARCH（2026-11-12 新增）
+
+架构定位：**跨业务域只读聚合层**。它不新增业务表，也不写任何业务数据，只把模块商城（`modules`）、44 个统一入口（`SITE_MODULES`）、导航站（`nav_links`）、社区帖子（`community_threads`）、独立商城（`shop_products`）收敛成同一份 `SearchDocument`，对外提供统一检索与来源分组。任一来源表缺失或字段变化时只跳过该来源，不拖垮整次检索。
+
+| 层 | 工件 | 职责 |
+|---|---|---|
+| 检索内核 | `services/mim-api/src/search.ts` | `collectDocuments` 汇总五来源；`scoreOf` 计算匹配分（标题 140/120/95、副标题 +35、正文 +20）；`excerpt` 截取命中片段；`searchDocuments` 分组与每来源截断；`meiliConfig` / `reindexMeili` / `searchMeili` 为 Meilisearch 适配层 |
+| 文档契约 | 同上 `SearchDocument` | `id`（`<scope>:<主键>`，跨来源不撞键）、`scope`（module/entry/navigation/community/shop）、`title`、`subtitle`、`snippet`、`href`、`keywords`、`popularity`、`updated_at` |
+| 后端 | `services/mim-api/src/routes/search.ts` | `GET /search/summary`（各来源文档数 + 引擎）、`GET /search`（`q` 必填 ≤80、`scope` 支持 `all` / 单值 / 逗号多值、`limit` 每来源 1–30 默认 8）、`POST /search/reindex`（需 `module:read` 或超管引导令牌，未配置 503） |
+| 引擎策略 | 同上 | 配置 `MIM_MEILISEARCH_URL` / `MIM_MEILISEARCH_KEY`（索引名 `MIM_MEILISEARCH_INDEX`，默认 `mim_search`）时优先远端；远端报错 / 索引缺失 / 无命中自动降级 SQLite 本地检索，响应 `engine` 字段标明实际引擎 |
+| 前端 | `apps/web/src/views/Search.tsx` | `/search` 视图：关键词输入、六档来源页签、来源规模卡片、推荐词、命中 `<mark>` 高亮、按来源分组列表；结果标题直达对应视图或外部链接 |
+| 契约测试 | `services/mim-api/test/search.test.ts` | 7 例：多来源命中与分组、来源过滤、非法 scope、缺关键词、无命中、limit 截断、summary 入口数、Meili 不可达降级、未配置 reindex 503 / 未登录 401 |
+
+设计约束：① 搜索只读，不产生副作用，匿名可调用；② 远端搜索引擎失败必须降级而不是 5xx，基础设施故障不能变成产品不可用；③ 未配置 Meilisearch 时 `reindex` 明确 503，不伪造成功；④ 结果按来源分组并逐来源截断，避免单一大来源淹没其他来源；⑤ 社区 / 商品来源缺失时静默跳过，保证搜索在模块裁剪库上仍可用。
