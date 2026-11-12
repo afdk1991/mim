@@ -389,7 +389,11 @@ check('router 登记 sites 视图', routerTs.includes("| 'sites'") && routerTs.i
 // 应用根组件必须新增导航项与渲染分支。
 const appTsx = read('apps/web/src/App.tsx');
 // 断言导入、导航与渲染三处齐备。
-check('App 接入清单视图并注入直达回调', appTsx.includes("import { Sites }") && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites') && appTsx.includes('onOpenView'), '视图未接入');
+// 2026-11-13 视图改为路由级懒加载：静态 import 形态已不再是最优实现，故断言「静态导入」或「lazy(() => import('./views/Sites'))」二者之一，
+// 另外三处（路由项 view:'sites'、渲染 <Sites、直达回调 onOpenView）仍必须齐备——放宽的是加载方式，不是接线本身。
+const sitesDeclared = appTsx.includes("import { Sites }")
+  || /const\s+Sites\s*=\s*lazy\(\(\)\s*=>\s*import\(['"]\.\/views\/Sites['"]/.test(appTsx);
+check('App 接入清单视图并注入直达回调', sitesDeclared && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites') && appTsx.includes('onOpenView'), '视图未接入');
 // 免登录体验模型不得被破坏：需要会话的视图为商品列表 / 购物车 / 个人中心 / 社区（漫剧放映厅匿名可看），且旧的 GATED_VIEWS 门禁集合不得回退。
 const sessionBlock = appTsx.slice(appTsx.indexOf('const needsSession ='), appTsx.indexOf(';', appTsx.indexOf('const needsSession =')));
 check('免登录收费视图集合未漂移', !/GATED_VIEWS/.test(appTsx) && ['products', 'cart', 'account', 'community'].every((v) => sessionBlock.includes(`route.view === '${v}'`)), '收费视图集合漂移或门禁集合回退');
