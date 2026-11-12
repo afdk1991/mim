@@ -4,13 +4,23 @@ import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，S
 import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：44 个去重入口、19 个业务域、占位标识与运行时能力点
 import { NAV_LINK_SEEDS } from '@mim/core-domain'; // 全站资源导航站的默认链接种子（站内相对路径，不写具体域名）
 import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn, capabilityOfModule } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 模块能力绑定
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
-import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本、枚举 schema.d 域脚本
+import { dirname, join } from 'node:path'; // 取文件所在目录 / 拼接 schema.d 下的脚本路径
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
 import type { Db } from './types.js'; // 仅引入数据库连接类型，编译期擦除不产生运行时代码
 import { backfillMemberNos, renumberMemberNos } from './identity.js'; // 存量用户号码：一次性全量重排 + 缺号兜底补发
 
 const SCHEMA_PATH = fileURLToPath(new URL('./schema.sql', import.meta.url)); // 以模块自身位置解析 schema.sql 绝对路径，保证任意工作目录下都能找到建表脚本
+
+/**
+ * 域外挂建表目录：schema.d/*.sql 由各业务域自行持有 DDL，按文件名升序执行。
+ * 存在意义：并行开发时多个域各写各的文件，避免同改 schema.sql 产生冲突与合并事故。
+ * 脚本内的正常语句必须幂等（CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS / 幂等 INSERT）。
+ */
+const SCHEMA_DIR = fileURLToPath(new URL('./schema.d/', import.meta.url)); // 与 schema.sql 同级，构建时整目录搬运到 dist
+
+/** schema.d 里的补列指令行：`ALTER_ADD: 表 列 <列定义>`，列已存在则跳过，保证老库与新库同一结构 */
+const ALTER_ADD_RE = /^\s*ALTER_ADD:\s*([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s+(.+)$/; // 只放行合法标识符，列定义原样透传
 
 /** 允许出现在迁移语句里的标识符：只放行字母数字下划线，杜绝把外部字符串拼进 DDL */
 const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/; // 表名/列名都必须匹配该正则，避免 ALTER TABLE 被注入
@@ -38,6 +48,12 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'im_messages', column: 'reply_excerpt', definition: 'TEXT' }, // 被引用消息的快照摘要（发送时固化）
   { table: 'users', column: 'member_no', definition: 'TEXT' }, // 对外 Mim ID 号码（2026-11-12 注册自动分配编号）
   { table: 'users', column: 'is_guest', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 匿名访客标记（2026-11-12 免登录体验：访客自动建号）
+  { table: 'community_boards', column: 'visibility', definition: "TEXT NOT NULL DEFAULT 'public'" }, // 板块可见性：public / followers
+  { table: 'community_boards', column: 'post_min_level', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 发帖最低等级
+  { table: 'community_boards', column: 'created_by', definition: 'TEXT' }, // 用户自建板块创建者
+  { table: 'community_boards', column: 'moderator_id', definition: 'TEXT' }, // 板块版主
+  { table: 'community_threads', column: 'accepted_post_id', definition: 'TEXT' }, // 问答采纳的回复 ID
+  { table: 'paid_assets', column: 'media_json', definition: "TEXT NOT NULL DEFAULT '[]'" }, // 图库 / 视频媒体数组
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
 // 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
@@ -96,15 +112,47 @@ export function ensureAdditiveIndexes(db: Db): string[] {
   return applied; // 返回新建清单，空数组代表无需变更
 } // ensureAdditiveIndexes 结束
 
+/**
+ * 执行 schema.d/*.sql 域外挂脚本（按文件名升序，幂等）。
+ * 支持的指令行：`ALTER_ADD: 表 列 <列定义>` —— 列不存在时补列，随后执行脚本其余语句。
+ * 这样「新建库」与「存量库升级」走同一条路径，各域不必把列改到 migrateAdditiveColumns 清单里抢同一处。
+ */
+export function applyDomainSchema(db: Db): string[] { // 返回本轮新建的列清单，空数组代表无需变更
+  if (!existsSync(SCHEMA_DIR)) return []; // 目录不存在（未启用域脚本）时静默跳过
+  const applied: string[] = []; // 记录本轮补出来的列，便于启动日志留痕
+  const files = readdirSync(SCHEMA_DIR) // 枚举域脚本
+    .filter((name) => name.endsWith('.sql')) // 只认 .sql，忽略 README 等
+    .sort(); // 文件名前缀即执行顺序（域名前缀保证稳定）
+  for (const file of files) { // 逐脚本执行
+    const body = readFileSync(join(SCHEMA_DIR, file), 'utf8'); // 读原文
+    const rest: string[] = []; // 除指令行之外的正常 SQL
+    for (const line of body.split('\n')) { // 逐行扫描，只剥离指令行
+      const directive = line.match(ALTER_ADD_RE); // 命中补列指令
+      if (!directive) { rest.push(line); continue; } // 普通语句原样保留
+      const [, table, column, definition] = directive; // 解构出表 / 列 / 定义
+      const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>; // 读现有列
+      if (columns.length === 0) throw new Error(`ALTER_ADD target table not found: ${table}.${column}`); // 表不存在说明脚本写错，直接失败
+      if (columns.some((item) => item.name === column)) continue; // 已存在则跳过，保证重复启动幂等
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`); // 补列：旧行按 DEFAULT 填充
+      applied.push(`${table}.${column}`); // 留痕
+    }
+    const sql = rest.join('\n'); // 还原正常语句
+    if (sql.trim().length > 0) db.exec(sql); // 空脚本不执行，避免 better-sqlite3 抛错
+  }
+  return applied; // 返回补列清单
+} // applyDomainSchema 结束
+
 export function createDatabase(filename: string = ':memory:'): Db { // 创建数据库连接：默认内存库（测试用），传路径则落盘持久化
   if (filename !== ':memory:') { // 内存库没有文件系统目录，无需准备目录
     const dir = dirname(filename); // 取数据库文件所在目录
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true }); // 目录不存在则递归创建，避免首次启动因缺目录直接失败
-  } // 目录准备分支结束
+  } // 目录准备结束
   const db = new Database(filename); // 打开或创建数据库文件 / 内存库
   db.pragma('foreign_keys = ON'); // 开启外键约束，保证关联表引用完整性
   if (filename !== ':memory:') db.pragma('journal_mode = WAL'); // 落盘库启用 WAL，提升读写并发并降低写阻塞（内存库不支持）
   db.exec(readFileSync(SCHEMA_PATH, 'utf8')); // 执行建表脚本，全部 IF NOT EXISTS 以便每次启动幂等
+  const domainApplied = applyDomainSchema(db); // 各业务域的 schema.d 脚本：建新表 / 补新列，与主脚本同一幂等路径
+  if (domainApplied.length > 0) console.log(`[db] domain schema applied: ${domainApplied.join(', ')}`); // 域脚本改结构必须留痕
   const migrated = migrateAdditiveColumns(db); // 存量库补齐后加的列；全新建库时为空
   if (migrated.length > 0) console.log(`[db] additive migration applied: ${migrated.join(', ')}`); // 结构变更必须留痕，便于排查升级后的行为差异
   const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column
@@ -720,6 +768,8 @@ export function seedCommerce(db: Db): void {
   const insertBadge = db.prepare(
     `INSERT OR IGNORE INTO badges (id, code, name, description, icon, rule_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
+  // 存量图库 / 视频资产补媒体数组：只填空白行，运营已经改过的不覆盖。
+  const updateMedia = db.prepare("UPDATE paid_assets SET media_json = ? WHERE code = ? AND (media_json IS NULL OR media_json = '[]')");
   const seed = db.transaction(() => {
     const assets: Array<[string, string, string, string, string, string, string, string | null, number, number, number, number]> = [
       [
@@ -796,6 +846,24 @@ export function seedCommerce(db: Db): void {
     for (const [id, code, kind, title, summary, body, cover, file, price, vipFree, views, sales] of assets) {
       insertAsset.run(id, code, kind, title, summary, body, cover, file, price, vipFree, views, sales, now, now);
     }
+    // 付费图库：9 张分类封面作为可翻页图集
+    updateMedia.run(JSON.stringify([
+      { kind: 'image', url: '/catalog/dev.jpg' },
+      { kind: 'image', url: '/catalog/tools.jpg' },
+      { kind: 'image', url: '/catalog/store.jpg' },
+      { kind: 'image', url: '/catalog/ai.jpg' },
+      { kind: 'image', url: '/catalog/frontier.jpg' },
+      { kind: 'image', url: '/catalog/wechat.jpg' },
+      { kind: 'image', url: '/catalog/game.jpg' },
+      { kind: 'image', url: '/catalog/plugin.jpg' },
+      { kind: 'image', url: '/catalog/misc.jpg' },
+    ]), 'paid-gallery-covers');
+    // 付费视频：内置演示片源 + 封面，前台用 <video controls> 直接播放
+    updateMedia.run(JSON.stringify([
+      { kind: 'video', url: '/demo/stardust-ep1.mp4', poster_url: '/demo/stardust-cover.jpg' },
+      { kind: 'video', url: '/demo/bloom-ep1.mp4', poster_url: '/demo/bloom-cover.jpg' },
+    ]), 'paid-video-comic');
+    insertSetting.run('home', JSON.stringify({ view: 'store' }), now);
     insertSetting.run('theme', JSON.stringify({ accent: '#0f766e', background: '#f8fafc', nav_layout: 'top', list_style: 'card', radius: 14 }), now);
     insertSetting.run('locales', JSON.stringify({ front: 'zh-CN', admin: 'zh-CN', supported: ['zh-CN', 'en-US'], machine_translation: false }), now);
     insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: '跨平台商业级项目', footer: 'Mim · 开源与商业化并行' }), now);

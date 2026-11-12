@@ -1652,7 +1652,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     thread(id: string) { // 帖子详情
       return request<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}`, { idempotency: false });
     },
-    createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number; media?: CommunityThreadMedia[]; poll_options?: string[] }) { // 发帖
+    createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number; media?: CommunityThreadMedia[]; poll_options?: string[]; episodes?: Array<{ title: string; media_url: string; poster_url?: string }> }) { // 发帖
       return request<{ thread_id: string }>('/community/threads', { method: 'POST', body: payload });
     },
     unlock(id: string) { // 解锁付费帖
@@ -1675,6 +1675,18 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     },
     joinBoard(slug: string) { // 加入付费板块
       return request<{ joined: boolean; charged_cents: number; via?: string }>(`/community/boards/${encodeURIComponent(slug)}/join`, { method: 'POST', body: {} });
+    },
+    followBoard(slug: string) { // 关注 / 取消关注板块
+      return request<{ followed: boolean }>(`/community/boards/${encodeURIComponent(slug)}/follow`, { method: 'POST', body: {} });
+    },
+    createBoard(payload: { slug: string; name: string; description?: string; icon?: string; price_cents?: number; visibility?: 'public' | 'followers'; post_min_level?: number }) { // 创建板块
+      return request<{ ok: boolean; slug: string }>('/community/boards', { method: 'POST', body: payload });
+    },
+    acceptPost(threadId: string, postId: string) { // 问答采纳
+      return request<{ ok: boolean; accepted_post_id: string }>(`/community/threads/${encodeURIComponent(threadId)}/accept`, { method: 'POST', body: { post_id: postId } });
+    },
+    deleteThread(threadId: string) { // 作者 / 版主软删
+      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(threadId)}`, { method: 'DELETE' });
     },
     favorites() { // 我的收藏
       return request<{ items: CommunityThread[] }>('/community/favorites', { idempotency: false });
@@ -1741,6 +1753,9 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   // ---------- 商业化中台（commerce）：资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 国际化 ----------
 
   commerce: { // 商业化二期：与 services/mim-api 新路由一一对应
+    siteConfig() { // 公开站点启动配置（无需会话）
+      return request<{ home_view: 'store' | 'community'; theme: ThemeSettings; site: Record<string, unknown>; locales: I18nSettings | Record<string, never> }>('/site/config', { idempotency: false });
+    },
     assets(opts: { kind?: string; q?: string } = {}) { // 资产列表
       const qs = new URLSearchParams(); // 查询串
       if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind); // 类型过滤
@@ -1754,7 +1769,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     purchaseAsset(code: string) { // 余额购买
       return request<{ ok: boolean; charged_cents: number; via: string }>(`/assets/${encodeURIComponent(code)}/purchase`, { method: 'POST', body: {} });
     },
-    createAsset(payload: { code: string; kind: PaidAssetKind; title: string; summary: string; body: string; price_cents: number; cover_url?: string; file_url?: string; vip_free?: boolean }) { // 作者发布
+    createAsset(payload: { code: string; kind: PaidAssetKind; title: string; summary: string; body: string; price_cents: number; cover_url?: string; file_url?: string; vip_free?: boolean; media?: Array<{ kind: 'image' | 'video'; url: string; poster_url?: string }> }) { // 作者发布
       return request<{ ok: boolean; code: string }>('/assets', { method: 'POST', body: payload });
     },
     channels() { // 支付渠道配置状态
@@ -1811,7 +1826,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     appearance() { // 外观与页面
       return request<{ settings: { theme?: ThemeSettings; locales?: I18nSettings; site?: Record<string, unknown> }; pages: Array<{ page: string; blocks: number }> }>('/appearance', { idempotency: false });
     },
-    updateAppearance(key: 'theme' | 'locales' | 'site', value: Record<string, unknown>) { // 更新设置
+    updateAppearance(key: 'theme' | 'locales' | 'site' | 'home', value: Record<string, unknown>) { // 更新设置
       return request<{ ok: boolean; key: string }>('/appearance/settings', { method: 'PUT', body: { key, value } });
     },
     page(page: string) { // 页面区块
@@ -1884,6 +1899,10 @@ export interface CommunityBoard { // 论坛板块
   thread_count: number; // 帖子数
   price_cents: number; // 付费加入价格（0 为免费）
   joined: number; // 是否已加入
+  visibility: 'public' | 'followers'; // 可见性
+  post_min_level: number; // 发帖最低等级
+  followed: number; // 是否已关注
+  is_moderator: number; // 是否版主 / 创建者
 }
 
 export type ThreadKind = 'text' | 'video' | 'gallery' | 'series' | 'qa' | 'poll'; // 帖子形态
@@ -1925,6 +1944,8 @@ export interface CommunityThread { // 帖子列表项
   board_name: string; // 板块名称
   board_price_cents?: number; // 板块加入价格（分）
   board_joined?: number; // 是否已加入板块
+  board_visibility?: 'public' | 'followers'; // 板块可见性
+  board_followed?: number; // 是否已关注板块
   author_name: string | null; // 作者昵称（null 为官方）
   purchased: number; // 是否已购
   favorited?: number; // 是否已收藏
@@ -1934,12 +1955,27 @@ export interface CommunityThread { // 帖子列表项
   locked: boolean; // 是否锁定
 }
 
+export interface CommunityEpisode { // 剧集
+  id: string; // 主键
+  title: string; // 集标题
+  media_url: string; // 播放地址
+  poster_url: string | null; // 封面
+  sort_order: number; // 顺序
+}
+
 export interface CommunityThreadDetail extends Omit<CommunityThread, 'locked'> { // 帖子详情
   body: string; // 正文（未解锁为空）
   locked: boolean; // 是否锁定
   board_locked?: boolean; // 板块是否未加入
+  board_visibility?: 'public' | 'followers'; // 板块可见性
+  board_followed?: number; // 是否已关注板块
   author_name: string | null; // 作者昵称
+  author_id?: string | null; // 作者 ID
+  accepted_post_id?: string | null; // 问答采纳的回复
+  accepted_post?: { id: string; content: string; created_at: string; author_name: string | null } | null; // 采纳回复内容
+  can_moderate?: boolean; // 是否可删除
   media?: CommunityThreadMedia[]; // 图集 / 视频
+  episodes?: CommunityEpisode[]; // 剧集目录
   poll?: CommunityPoll | null; // 投票
   my_rating?: number | null; // 我的评分
 }
@@ -2095,6 +2131,7 @@ export interface PaidAsset { // 资产列表项
 export interface PaidAssetDetail extends PaidAsset { // 详情
   body: string; // 正文 / 试读
   file_url: string | null; // 文件地址（未解锁为 null）
+  media: Array<{ kind: 'image' | 'video'; url: string; poster_url: string | null }>; // 图库 / 视频媒体
 }
 
 export type PaymentProvider = 'alipay' | 'wechat' | 'manual' | 'sandbox'; // 支付渠道

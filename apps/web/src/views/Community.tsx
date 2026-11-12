@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Locale } from '@mim/i18n';
-import { api, errorText } from '../api';
+import { api, errorText, getSession } from '../api';
 import type {
   CommunityBoard,
   CommunityPost,
@@ -24,6 +24,8 @@ import type {
   WalletSnapshot,
   WalletTransaction,
 } from '../api';
+
+import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
 
 interface Props {
   locale: Locale;
@@ -84,6 +86,7 @@ export function Community({ locale }: Props) {
   const [stats, setStats] = useState({ threads: 0, views: 0, likes: 0 });
   const [wallet, setWallet] = useState<WalletSnapshot | null>(null);
   const [vipLevel, setVipLevel] = useState(0);
+  const [userLevel, setUserLevel] = useState(1);
   const [vipExpires, setVipExpires] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +108,9 @@ export function Community({ locale }: Props) {
   const [draftPrice, setDraftPrice] = useState('0');
   const [draftMedia, setDraftMedia] = useState('');
   const [draftPoll, setDraftPoll] = useState('');
+  const [draftEpisodes, setDraftEpisodes] = useState(''); // 剧集目录：每行「标题|视频地址」
+  const [boardOpen, setBoardOpen] = useState(false); // 创建板块表单
+  const [boardDraft, setBoardDraft] = useState({ slug: '', name: '', description: '', visibility: 'public' as 'public' | 'followers', minLevel: '0', price: '0' });
   const [reply, setReply] = useState('');;
 
   const [plans, setPlans] = useState<VipPlan[]>([]);
@@ -302,6 +308,64 @@ export function Community({ locale }: Props) {
     }
   }
 
+  async function followBoard(slug: string) {
+    try {
+      const result = await api.community.followBoard(slug);
+      setNotice(result.followed ? '已关注板块' : '已取消关注');
+      setBoard(slug);
+      await Promise.all([loadOverview(), loadThreads()]);
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  async function createBoard() {
+    if (!boardDraft.slug.trim() || !boardDraft.name.trim()) {
+      setError('板块 slug 与名称必填');
+      return;
+    }
+    try {
+      await api.community.createBoard({
+        slug: boardDraft.slug.trim(),
+        name: boardDraft.name.trim(),
+        description: boardDraft.description.trim(),
+        visibility: boardDraft.visibility,
+        post_min_level: Math.max(0, Number(boardDraft.minLevel) || 0),
+        price_cents: Math.max(0, Math.round(Number(boardDraft.price || '0') * 100)),
+      });
+      setBoardOpen(false);
+      setBoardDraft({ slug: '', name: '', description: '', visibility: 'public', minLevel: '0', price: '0' });
+      setNotice('板块已创建，你已成为版主');
+      await Promise.all([loadOverview(), loadThreads()]);
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  async function acceptPost(postId: string) {
+    if (!selected) return;
+    try {
+      await api.community.acceptPost(selected.thread.id, postId);
+      setNotice('已采纳该回复');
+      await openThread(selected.thread.id);
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  async function deleteThread() {
+    if (!selected) return;
+    try {
+      await api.community.deleteThread(selected.thread.id);
+      setSelected(null);
+      setNotice('帖子已删除');
+      await loadThreads();
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+
   async function transferPoints() {
     const points = Number(transferAmount);
     if (!transferTo.trim() || !Number.isInteger(points) || points <= 0) {
@@ -336,6 +400,12 @@ export function Community({ locale }: Props) {
         kind: draftKind === 'video' && /\.(mp4|mov|m3u8|webm)(\?|$)/i.test(url) ? ('video' as const) : ('image' as const),
         url,
       }));
+      const episodes = draftKind === 'series'
+        ? draftEpisodes.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+          const [title, mediaUrl] = line.split('|').map((part) => part.trim());
+          return { title: title || '未命名剧集', media_url: mediaUrl || '' };
+        }).filter((item) => item.media_url.length > 0)
+        : undefined;
       const created = await api.community.createThread({
         board_slug: draftBoard,
         title: draftTitle.trim(),
@@ -345,6 +415,7 @@ export function Community({ locale }: Props) {
         price_cents: Math.max(0, Math.round(Number(draftPrice || '0') * 100)),
         media,
         poll_options: draftKind === 'poll' ? pollLines : undefined,
+        episodes,
       });
       setDraftTitle('');
       setDraftSummary('');
@@ -352,6 +423,7 @@ export function Community({ locale }: Props) {
       setDraftPrice('0');
       setDraftMedia('');
       setDraftPoll('');
+      setDraftEpisodes('');
       setComposerOpen(false);
       setNotice('帖子已发布');
       await loadThreads();
@@ -454,18 +526,18 @@ export function Community({ locale }: Props) {
   const currentBoard = boards.find((b) => b.slug === board);
 
   return (
-    <section className="community-wrap">
-      <header className="community-hero">
-        <div>
-          <p className="community-kicker">COMMUNITY & CREATOR ECONOMY</p>
-          <h1>社区 · 知识付费 · 独立商城</h1>
-          <p className="community-sub">论坛、付费阅读、VIP、钱包积分、卡密商品与推广分成，全部走同一套账户与余额。</p>
+    <section className="community-wrap"> // 区块 community-wrap
+      <header className="community-hero"> // 区块 community-hero
+        <div> // 元素 div
+          <p className="community-kicker">COMMUNITY & CREATOR ECONOMY</p> // 区块 community-kicker
+          <h1>社区 · 知识付费 · 独立商城</h1> // 标题
+          <p className="community-sub">论坛、付费阅读、VIP、钱包积分、卡密商品与推广分成，全部走同一套账户与余额。</p> // 区块 community-sub
         </div>
-        <div className="community-hero-side">
-          <div className="community-stat"><span>帖子</span><strong>{stats.threads}</strong></div>
-          <div className="community-stat"><span>浏览</span><strong>{stats.views}</strong></div>
-          <div className="community-stat"><span>余额</span><strong>{wallet ? yuan(wallet.balance_cents) : '—'}</strong></div>
-          <div className="community-stat"><span>积分</span><strong>{wallet?.points ?? 0}</strong></div>
+        <div className="community-hero-side"> // 区块 community-hero-side
+          <div className="community-stat"><span>帖子</span><strong>{stats.threads}</strong></div> // 区块 community-stat
+          <div className="community-stat"><span>浏览</span><strong>{stats.views}</strong></div> // 区块 community-stat
+          <div className="community-stat"><span>余额</span><strong>{wallet ? yuan(wallet.balance_cents) : '—'}</strong></div> // 区块 community-stat
+          <div className="community-stat"><span>积分</span><strong>{wallet?.points ?? 0}</strong></div> // 区块 community-stat
           <div className={`community-vip-chip${vipLevel > 0 ? ' is-on' : ''}`}>
             {vipLevel > 0 ? `VIP ${vipLevel}${vipExpires ? ` · ${dateOnly(vipExpires)}` : ''}` : '未开通 VIP'}
           </div>
@@ -473,14 +545,14 @@ export function Community({ locale }: Props) {
       </header>
 
       {(error || notice) && (
-        <div className="community-flash">
+        <div className="community-flash"> // 区块 community-flash
           {error && <span className="is-error">{error}</span>}
           {notice && <span>{notice}</span>}
-          <button type="button" onClick={() => { setError(null); setNotice(null); }}>关闭</button>
+          <button type="button" onClick={() => { setError(null); setNotice(null); }}>关闭</button> // 按钮
         </div>
       )}
 
-      <nav className="community-tabs">
+      <nav className="community-tabs"> // 区块 community-tabs
         {([
           ['forum', '论坛'],
           ['vip', 'VIP 会员'],
@@ -488,17 +560,17 @@ export function Community({ locale }: Props) {
           ['shop', '独立商城'],
           ['referral', '推广分成'],
         ] as Array<[Tab, string]>).map(([key, label]) => (
-          <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
+          <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button> // 按钮
         ))}
       </nav>
 
       {loading && <div className="community-empty">正在加载社区数据…</div>}
 
       {!loading && tab === 'forum' && (
-        <div className="community-forum">
-          <div className="community-toolbar">
-            <div className="community-chips">
-              <button type="button" className={board === 'all' ? 'is-active' : ''} onClick={() => setBoard('all')}>全部</button>
+        <div className="community-forum"> // 区块 community-forum
+          <div className="community-toolbar"> // 区块 community-toolbar
+            <div className="community-chips"> // 区块 community-chips
+              <button type="button" className={board === 'all' ? 'is-active' : ''} onClick={() => setBoard('all')}>全部</button> // 按钮
               {boards.map((b) => (
                 <button
                   key={b.slug}
@@ -509,53 +581,92 @@ export function Community({ locale }: Props) {
                       void joinBoard(b.slug);
                       return;
                     }
+                    if (b.visibility === 'followers' && !b.followed && !b.is_moderator) {
+                      void followBoard(b.slug);
+                      return;
+                    }
                     setBoard(b.slug);
                   }}
-                  title={b.price_cents > 0 && !b.joined ? `付费板块：${yuan(b.price_cents)} 加入` : b.description}
+                  title={b.price_cents > 0 && !b.joined ? `付费板块：${yuan(b.price_cents)} 加入` : b.visibility === 'followers' && !b.followed ? '关注后可见' : b.description}
                 >
                   {b.icon} {b.name} <em>{b.thread_count}</em>
                   {b.price_cents > 0 && <span className="community-board-price">{b.joined ? '已加入' : yuan(b.price_cents)}</span>}
+                  {b.visibility === 'followers' && <span className="community-board-price">{b.followed ? '已关注' : '关注可见'}</span>}
+                  {b.is_moderator ? <span className="community-board-price">版主</span> : null}
                 </button>
               ))}
-              <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => setFavoritesOpen((v) => !v)}>我的收藏</button>
+              <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => setFavoritesOpen((v) => !v)}>我的收藏</button> // 按钮
             </div>
-            <div className="community-filters">
-              <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="all">全部形态</option>
+            <div className="community-filters"> // 区块 community-filters
+              <select value={kind} onChange={(e) => setKind(e.target.value)}> // 表单控件
+                <option value="all">全部形态</option> // 元素 option
                 {(Object.keys(KIND_LABEL) as ThreadKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
               </select>
-              <button type="button" className={sort === 'latest' ? 'is-active' : ''} onClick={() => setSort('latest')}>最新</button>
-              <button type="button" className={sort === 'hot' ? 'is-active' : ''} onClick={() => setSort('hot')}>热门</button>
-              <button type="button" className={sort === 'views' ? 'is-active' : ''} onClick={() => setSort('views')}>浏览</button>
-              <button type="button" className={sort === 'replies' ? 'is-active' : ''} onClick={() => setSort('replies')}>回帖</button>
-              <button type="button" className={sort === 'favorites' ? 'is-active' : ''} onClick={() => setSort('favorites')}>收藏</button>
-              <button type="button" className={sort === 'rating' ? 'is-active' : ''} onClick={() => setSort('rating')}>评分</button>
-              <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void loadThreads(); }} placeholder="搜索帖子…" />
-              <button type="button" onClick={() => void loadThreads()}>搜索</button>
-              <button type="button" className="is-primary" onClick={() => setComposerOpen((v) => !v)}>发帖</button>
+              <button type="button" className={sort === 'latest' ? 'is-active' : ''} onClick={() => setSort('latest')}>最新</button> // 按钮
+              <button type="button" className={sort === 'hot' ? 'is-active' : ''} onClick={() => setSort('hot')}>热门</button> // 按钮
+              <button type="button" className={sort === 'views' ? 'is-active' : ''} onClick={() => setSort('views')}>浏览</button> // 按钮
+              <button type="button" className={sort === 'replies' ? 'is-active' : ''} onClick={() => setSort('replies')}>回帖</button> // 按钮
+              <button type="button" className={sort === 'favorites' ? 'is-active' : ''} onClick={() => setSort('favorites')}>收藏</button> // 按钮
+              <button type="button" className={sort === 'rating' ? 'is-active' : ''} onClick={() => setSort('rating')}>评分</button> // 按钮
+              <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void loadThreads(); }} placeholder="搜索帖子…" /> // 表单控件
+              <button type="button" onClick={() => void loadThreads()}>搜索</button> // 按钮
+              <button type="button" className="is-primary" onClick={() => setComposerOpen((v) => !v)}>发帖</button> // 按钮
+              <button type="button" onClick={() => setBoardOpen((v) => !v)}>创建板块</button> // 按钮
             </div>
           </div>
 
+          {boardOpen && (
+            <div className="community-composer"> // 区块 community-composer
+              <div className="community-form-row"> // 区块 community-form-row
+                <label>slug // 元素 label
+                  <input value={boardDraft.slug} onChange={(e) => setBoardDraft({ ...boardDraft, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} placeholder="小写字母 / 数字 / 连字符" /> // 表单控件
+                </label>
+                <label>板块名称 // 元素 label
+                  <input value={boardDraft.name} onChange={(e) => setBoardDraft({ ...boardDraft, name: e.target.value })} placeholder="例如 摄影圈子" /> // 表单控件
+                </label>
+                <label>可见性 // 元素 label
+                  <select value={boardDraft.visibility} onChange={(e) => setBoardDraft({ ...boardDraft, visibility: e.target.value as 'public' | 'followers' })}> // 表单控件
+                    <option value="public">公开</option> // 元素 option
+                    <option value="followers">关注后可见</option> // 元素 option
+                  </select>
+                </label>
+                <label>发帖最低等级 // 元素 label
+                  <input value={boardDraft.minLevel} onChange={(e) => setBoardDraft({ ...boardDraft, minLevel: e.target.value })} inputMode="numeric" /> // 表单控件
+                </label>
+                <label>加入价格（元） // 元素 label
+                  <input value={boardDraft.price} onChange={(e) => setBoardDraft({ ...boardDraft, price: e.target.value })} inputMode="decimal" /> // 表单控件
+                </label>
+              </div>
+              <input value={boardDraft.description} onChange={(e) => setBoardDraft({ ...boardDraft, description: e.target.value })} placeholder="板块说明（可选）" /> // 表单控件
+              <div className="community-actions"> // 区块 community-actions
+                <button type="button" className="is-primary" onClick={() => void createBoard()}>创建</button> // 按钮
+                <button type="button" onClick={() => setBoardOpen(false)}>取消</button> // 按钮
+              </div>
+            </div>
+          )}
+
+          <PageBlocks page="forum" />{/* 论坛页区块：Tab 栏目 / 公告等由后台 page_blocks 组合 */} // 元素 pageblocks
+
           {composerOpen && (
-            <div className="community-composer">
-              <div className="community-form-row">
-                <label>板块
-                  <select value={draftBoard} onChange={(e) => setDraftBoard(e.target.value)}>
+            <div className="community-composer"> // 区块 community-composer
+              <div className="community-form-row"> // 区块 community-form-row
+                <label>板块 // 元素 label
+                  <select value={draftBoard} onChange={(e) => setDraftBoard(e.target.value)}> // 表单控件
                     {boards.map((b) => <option key={b.slug} value={b.slug}>{b.name}</option>)}
                   </select>
                 </label>
-                <label>形态
-                  <select value={draftKind} onChange={(e) => setDraftKind(e.target.value as ThreadKind)}>
+                <label>形态 // 元素 label
+                  <select value={draftKind} onChange={(e) => setDraftKind(e.target.value as ThreadKind)}> // 表单控件
                     {(Object.keys(KIND_LABEL) as ThreadKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
                   </select>
                 </label>
-                <label>付费价格（元，0 为免费）
-                  <input value={draftPrice} onChange={(e) => setDraftPrice(e.target.value)} inputMode="decimal" />
+                <label>付费价格（元，0 为免费） // 元素 label
+                  <input value={draftPrice} onChange={(e) => setDraftPrice(e.target.value)} inputMode="decimal" /> // 表单控件
                 </label>
               </div>
-              <input className="community-title-input" value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} placeholder="标题（4–80 字）" maxLength={80} />
-              <input value={draftSummary} onChange={(e) => setDraftSummary(e.target.value)} placeholder="摘要（可选）" maxLength={200} />
-              <textarea value={draftBody} onChange={(e) => setDraftBody(e.target.value)} placeholder="正文（至少 10 字）" rows={6} />
+              <input className="community-title-input" value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} placeholder="标题（4–80 字）" maxLength={80} /> // 表单控件
+              <input value={draftSummary} onChange={(e) => setDraftSummary(e.target.value)} placeholder="摘要（可选）" maxLength={200} /> // 表单控件
+              <textarea value={draftBody} onChange={(e) => setDraftBody(e.target.value)} placeholder="正文（至少 10 字）" rows={6} /> // 表单控件
               {(draftKind === 'gallery' || draftKind === 'video' || draftKind === 'series') && (
                 <textarea
                   value={draftMedia}
@@ -565,53 +676,56 @@ export function Community({ locale }: Props) {
                 />
               )}
               {draftKind === 'poll' && (
-                <textarea value={draftPoll} onChange={(e) => setDraftPoll(e.target.value)} placeholder="投票选项，每行一个（2–10 个）" rows={3} />
+                <textarea value={draftPoll} onChange={(e) => setDraftPoll(e.target.value)} placeholder="投票选项，每行一个（2–10 个）" rows={3} /> // 表单控件
               )}
-              <div className="community-actions">
-                <button type="button" className="is-primary" onClick={() => void createThread()}>发布</button>
-                <button type="button" onClick={() => setComposerOpen(false)}>取消</button>
+              {draftKind === 'series' && (
+                <textarea value={draftEpisodes} onChange={(e) => setDraftEpisodes(e.target.value)} placeholder="剧集目录，每行：集标题|视频地址（mp4 / m3u8）" rows={4} /> // 表单控件
+              )}
+              <div className="community-actions"> // 区块 community-actions
+                <button type="button" className="is-primary" onClick={() => void createThread()}>发布</button> // 按钮
+                <button type="button" onClick={() => setComposerOpen(false)}>取消</button> // 按钮
               </div>
             </div>
           )}
 
           {favoritesOpen && (
-            <div className="community-favorites">
-              <div className="community-section-head"><div><h3>我的收藏</h3><p>共 {favorites.length} 篇</p></div></div>
+            <div className="community-favorites"> // 区块 community-favorites
+              <div className="community-section-head"><div><h3>我的收藏</h3><p>共 {favorites.length} 篇</p></div></div> // 区块 community-section-head
               {favorites.length === 0 && <div className="community-empty">还没有收藏，详情页点「收藏」即可加入。</div>}
               {favorites.map((t) => (
-                <button key={t.id} type="button" className="community-favorite-row" onClick={() => void openThread(t.id)}>
-                  <span>{t.board_name}</span>
-                  <strong>{t.title}</strong>
-                  <em>{dateOnly((t as CommunityThread & { favorited_at?: string }).favorited_at ?? t.last_activity_at)}</em>
+                <button key={t.id} type="button" className="community-favorite-row" onClick={() => void openThread(t.id)}> // 按钮
+                  <span>{t.board_name}</span> // 元素 span
+                  <strong>{t.title}</strong> // 元素 strong
+                  <em>{dateOnly((t as CommunityThread & { favorited_at?: string }).favorited_at ?? t.last_activity_at)}</em> // 元素 em
                 </button>
               ))}
             </div>
           )}
 
-          <div className="community-list">
+          <div className="community-list"> // 区块 community-list
             {threads.length === 0 && <div className="community-empty">这个筛选下还没有帖子，发一篇试试。</div>}
             {threads.map((t) => (
-              <article key={t.id} className="community-card" onClick={() => void openThread(t.id)}>
-                <div className="community-cover">
+              <article key={t.id} className="community-card" onClick={() => void openThread(t.id)}> // 区块 community-card
+                <div className="community-cover"> // 区块 community-cover
                   {t.cover_url ? <img src={coverSrc(t.cover_url)} alt={t.title} loading="lazy" /> : <span>{KIND_LABEL[t.kind]}</span>}
                   <em className={`community-kind kind-${t.kind}`}>{KIND_LABEL[t.kind]}</em>
                   {t.price_cents > 0 && <em className="community-price">{yuan(t.price_cents)}</em>}
                 </div>
-                <div className="community-card-body">
-                  <div className="community-card-meta">
-                    <span>{t.board_name}</span>
-                    <span>{t.author_name || 'Mim 官方'}</span>
-                    <span>{dateOnly(t.last_activity_at)}</span>
+                <div className="community-card-body"> // 区块 community-card-body
+                  <div className="community-card-meta"> // 区块 community-card-meta
+                    <span>{t.board_name}</span> // 元素 span
+                    <span>{t.author_name || 'Mim 官方'}</span> // 元素 span
+                    <span>{dateOnly(t.last_activity_at)}</span> // 元素 span
                   </div>
-                  <h3>{t.title}{t.locked && <span className="community-lock">付费</span>}</h3>
-                  <p>{t.summary || '—'}</p>
-                  <div className="community-card-foot">
-                    <span>{t.views} 浏览</span>
-                    <span>{t.likes} 赞</span>
-                    <span>{t.reply_count} 回复</span>
+                  <h3>{t.title}{t.locked && <span className="community-lock">{t.board_visibility === 'followers' && !t.board_followed ? '关注可见' : '付费'}</span>}</h3> // 标题
+                  <p>{t.summary || '—'}</p> // 元素 p
+                  <div className="community-card-foot"> // 区块 community-card-foot
+                    <span>{t.views} 浏览</span> // 元素 span
+                    <span>{t.likes} 赞</span> // 元素 span
+                    <span>{t.reply_count} 回复</span> // 元素 span
                     {typeof t.favorite_count === 'number' && <span>{t.favorite_count} 收藏</span>}
                     {t.rating_avg ? <span>{t.rating_avg} 分</span> : null}
-                    <span className="community-more">查看 →</span>
+                    <span className="community-more">查看 →</span> // 区块 community-more
                   </div>
                 </div>
               </article>
@@ -619,22 +733,24 @@ export function Community({ locale }: Props) {
           </div>
 
           {selected && (
-            <div className="community-detail">
-              <div className="community-detail-head">
-                <div>
-                  <span className="community-card-meta">{selected.thread.board_name} · {KIND_LABEL[selected.thread.kind]} · {selected.thread.author_name || 'Mim 官方'}</span>
-                  <h2>{selected.thread.title}</h2>
-                  <p>{selected.thread.summary}</p>
+            <div className="community-detail"> // 区块 community-detail
+              <div className="community-detail-head"> // 区块 community-detail-head
+                <div> // 元素 div
+                  <span className="community-card-meta">{selected.thread.board_name} · {KIND_LABEL[selected.thread.kind]} · {selected.thread.author_name || 'Mim 官方'}</span> // 区块 community-card-meta
+                  <h2>{selected.thread.title}</h2> // 标题
+                  <p>{selected.thread.summary}</p> // 元素 p
+                  {selected.thread.board_locked ? <span className="community-lock">板块受限</span> : null}
                 </div>
-                <button type="button" onClick={() => setSelected(null)}>关闭</button>
+                <button type="button" onClick={() => setSelected(null)}>关闭</button> // 按钮
+                {selected.thread.can_moderate && <button type="button" className="is-danger" onClick={() => void deleteThread()}>删除</button>}
               </div>
               {selected.thread.cover_url && <img className="community-detail-cover" src={coverSrc(selected.thread.cover_url)} alt={selected.thread.title} />}
               {selected.unlocked && (selected.thread.media?.length ?? 0) > 0 && (
-                <div className="community-media">
+                <div className="community-media"> // 区块 community-media
                   {selected.thread.media!.map((item, index) => (
                     <div key={`${item.url}-${index}`} className={`community-media-item is-${item.kind}`}>
                       {item.kind === 'video' ? (
-                        <video src={coverSrc(item.url)} poster={item.poster_url ? coverSrc(item.poster_url) : undefined} controls playsInline preload="metadata" />
+                        <video src={coverSrc(item.url)} poster={item.poster_url ? coverSrc(item.poster_url) : undefined} controls playsInline preload="metadata" /> // 视频播放器
                       ) : (
                         <img src={coverSrc(item.url)} alt={`${selected.thread.title} ${index + 1}`} loading="lazy" />
                       )}
@@ -642,32 +758,43 @@ export function Community({ locale }: Props) {
                   ))}
                 </div>
               )}
+              {(selected.thread.episodes?.length ?? 0) > 0 && (
+                <div className="community-series"> // 区块 community-series
+                  <div className="community-section-head"><div><h3>剧集目录</h3><p>共 {selected.thread.episodes!.length} 集</p></div></div> // 区块 community-section-head
+                  {selected.thread.episodes!.map((episode, index) => (
+                    <div className="community-media-item is-video" key={episode.id}> // 区块 community-media-item
+                      <div className="community-card-meta"><span>第 {index + 1} 集</span><span>{episode.title}</span></div> // 区块 community-card-meta
+                      <video src={coverSrc(episode.media_url)} poster={episode.poster_url ? coverSrc(episode.poster_url) : undefined} controls playsInline preload="metadata" /> // 视频播放器
+                    </div>
+                  ))}
+                </div>
+              )}
               {selected.unlocked ? (
-                <div className="community-detail-body">
+                <div className="community-detail-body"> // 区块 community-detail-body
                   {selected.thread.poll && (
-                    <div className="community-poll">
-                      <div className="community-poll-head"><strong>投票</strong><span>{selected.thread.poll.total} 票</span></div>
+                    <div className="community-poll"> // 区块 community-poll
+                      <div className="community-poll-head"><strong>投票</strong><span>{selected.thread.poll.total} 票</span></div> // 区块 community-poll-head
                       {selected.thread.poll.options.map((option) => {
                         const percent = selected.thread.poll!.total > 0 ? Math.round((option.votes / selected.thread.poll!.total) * 100) : 0;
                         return (
                           <button key={option.id} type="button" className={`community-poll-option${option.mine ? ' is-mine' : ''}`} onClick={() => void vote(option.id)}>
                             <span className="community-poll-bar" style={{ width: `${percent}%` }} />
-                            <span className="community-poll-label">{option.label}{option.mine ? ' ✓' : ''}</span>
-                            <em>{option.votes} 票 · {percent}%</em>
+                            <span className="community-poll-label">{option.label}{option.mine ? ' ✓' : ''}</span> // 区块 community-poll-label
+                            <em>{option.votes} 票 · {percent}%</em> // 元素 em
                           </button>
                         );
                       })}
                     </div>
                   )}
                   {selected.thread.body.split('\n').filter(Boolean).map((line, i) => <p key={i}>{line}</p>)}
-                  <div className="community-detail-actions">
-                    <button type="button" className={selected.liked ? 'is-active' : ''} onClick={() => void toggleLike()}>
+                  <div className="community-detail-actions"> // 区块 community-detail-actions
+                    <button type="button" className={selected.liked ? 'is-active' : ''} onClick={() => void toggleLike()}> // 按钮
                       {selected.liked ? '已赞' : '点赞'} · {selected.thread.likes}
                     </button>
-                    <button type="button" className={selected.favorited ? 'is-active' : ''} onClick={() => void toggleFavorite()}>
+                    <button type="button" className={selected.favorited ? 'is-active' : ''} onClick={() => void toggleFavorite()}> // 按钮
                       {selected.favorited ? '已收藏' : '收藏'}
                     </button>
-                    <span className="community-rating">
+                    <span className="community-rating"> // 区块 community-rating
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button key={star} type="button" className={(selected.thread.my_rating ?? 0) >= star ? 'is-active' : ''} onClick={() => void rateThread(star)} aria-label={`${star} 星`}>
                           ★
@@ -675,33 +802,40 @@ export function Community({ locale }: Props) {
                       ))}
                       <em>{selected.thread.rating_avg ? `${selected.thread.rating_avg} 分` : '暂无评分'}{selected.thread.rating_count ? ` · ${selected.thread.rating_count} 人` : ''}</em>
                     </span>
-                    <span>{selected.thread.views} 浏览</span>
+                    <span>{selected.thread.views} 浏览</span> // 元素 span
                   </div>
-                  <div className="community-replies">
-                    <h4>回复 · {selected.posts.length}</h4>
+                  <div className="community-replies"> // 区块 community-replies
+                    <h4>回复 · {selected.posts.length}</h4> // 标题
                     {selected.posts.map((p) => (
-                      <div key={p.id} className="community-reply">
-                        <strong>{p.author_name || 'Mim 用户'}</strong>
-                        <span>{p.author_member_no || ''} · {dateOnly(p.created_at)}</span>
-                        <p>{p.content}</p>
+                      <div key={p.id} className={`community-reply${selected.thread.accepted_post_id === p.id ? ' is-accepted' : ''}`}>
+                        <strong>{p.author_name || 'Mim 用户'}</strong> // 元素 strong
+                        <span>{p.author_member_no || ''} · {dateOnly(p.created_at)}</span> // 元素 span
+                        <p>{p.content}</p> // 元素 p
+                        {selected.thread.kind === 'qa' && getSession()?.user.id === selected.thread.author_id && selected.thread.accepted_post_id !== p.id && (
+                          <button type="button" onClick={() => void acceptPost(p.id)}>采纳为答案</button> // 按钮
+                        )}
                       </div>
                     ))}
-                    <div className="community-reply-form">
-                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder="写下你的回复…" />
-                      <button type="button" className="is-primary" onClick={() => void submitReply()}>回复</button>
+                    <div className="community-reply-form"> // 区块 community-reply-form
+                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder="写下你的回复…" /> // 表单控件
+                      <button type="button" className="is-primary" onClick={() => void submitReply()}>回复</button> // 按钮
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="community-paywall">
-                  <strong>{selected.thread.board_locked ? '该板块需要加入后查看' : '这是一篇付费内容'}</strong>
-                  <p>{selected.thread.board_locked ? '加入板块后可阅读全部帖子与回复；VIP 会员可直接加入。' : '解锁后可阅读全文与全部回复；VIP 会员可直接查看。'}</p>
+                <div className="community-paywall"> // 区块 community-paywall
+                  <strong>{selected.thread.board_locked ? (selected.thread.board_visibility === 'followers' && !selected.thread.board_followed ? '该板块关注后可见' : '该板块需要加入后查看') : '这是一篇付费内容'}</strong> // 元素 strong
+                  <p>{selected.thread.board_locked ? (selected.thread.board_visibility === 'followers' && !selected.thread.board_followed ? '关注板块后可阅读全部帖子与回复。' : '加入板块后可阅读全部帖子与回复；VIP 会员可直接加入。') : '解锁后可阅读全文与全部回复；VIP 会员可直接查看。'}</p> // 元素 p
                   {selected.thread.board_locked ? (
-                    <button type="button" className="is-primary" onClick={() => void joinBoard(selected.thread.board_slug)}>
-                      {yuan(selected.thread.board_price_cents ?? 0)} 加入板块
-                    </button>
+                    selected.thread.board_visibility === 'followers' && !selected.thread.board_followed ? (
+                      <button type="button" className="is-primary" onClick={() => void followBoard(selected.thread.board_slug)}>关注板块</button> // 按钮
+                    ) : (
+                      <button type="button" className="is-primary" onClick={() => void joinBoard(selected.thread.board_slug)}> // 按钮
+                        {yuan(selected.thread.board_price_cents ?? 0)} 加入板块
+                      </button>
+                    )
                   ) : (
-                    <button type="button" className="is-primary" onClick={() => void unlockThread(selected.thread.id)}>
+                    <button type="button" className="is-primary" onClick={() => void unlockThread(selected.thread.id)}> // 按钮
                       {yuan(selected.thread.price_cents)} 解锁
                     </button>
                   )}
@@ -713,22 +847,22 @@ export function Community({ locale }: Props) {
       )}
 
       {!loading && tab === 'vip' && (
-        <div className="community-vip">
-          <div className="community-section-head">
-            <div>
-              <h2>VIP 会员</h2>
-              <p>付费帖直接查看、积分每月发放、专属徽章与答疑优先级。</p>
+        <div className="community-vip"> // 区块 community-vip
+          <div className="community-section-head"> // 区块 community-section-head
+            <div> // 元素 div
+              <h2>VIP 会员</h2> // 标题
+              <p>付费帖直接查看、积分每月发放、专属徽章与答疑优先级。</p> // 元素 p
             </div>
             {vipLevel > 0 && <span className="community-vip-current">当前 VIP {vipLevel}{vipExpires ? `，到期 ${dateOnly(vipExpires)}` : ''}</span>}
           </div>
-          <div className="community-plan-grid">
+          <div className="community-plan-grid"> // 区块 community-plan-grid
             {plans.map((p) => (
               <article key={p.code} className={`community-plan${vipLevel >= p.level ? ' is-current' : ''}`}>
-                <span className="community-plan-level">LV {p.level}</span>
-                <h3>{p.name}</h3>
-                <strong className="community-plan-price">{yuan(p.price_cents)}<small> / {p.duration_days} 天</small></strong>
-                <ul>{p.perks.map((perk) => <li key={perk}>{perk}</li>)}</ul>
-                <button type="button" className="is-primary" onClick={() => void subscribe(p.code)}>{vipLevel >= p.level ? '续费' : '开通'}</button>
+                <span className="community-plan-level">LV {p.level}</span> // 区块 community-plan-level
+                <h3>{p.name}</h3> // 标题
+                <strong className="community-plan-price">{yuan(p.price_cents)}<small> / {p.duration_days} 天</small></strong> // 区块 community-plan-price
+                <ul>{p.perks.map((perk) => <li key={perk}>{perk}</li>)}</ul> // 元素 ul
+                <button type="button" className="is-primary" onClick={() => void subscribe(p.code)}>{vipLevel >= p.level ? '续费' : '开通'}</button> // 按钮
               </article>
             ))}
           </div>
@@ -736,43 +870,43 @@ export function Community({ locale }: Props) {
       )}
 
       {!loading && tab === 'wallet' && wallet && (
-        <div className="community-wallet">
-          <div className="community-wallet-cards">
-            <div className="community-wallet-card">
-              <span>可用余额</span>
-              <strong>{yuan(wallet.balance_cents)}</strong>
-              <small>余额可用于付费帖、VIP 与商城下单</small>
+        <div className="community-wallet"> // 区块 community-wallet
+          <div className="community-wallet-cards"> // 区块 community-wallet-cards
+            <div className="community-wallet-card"> // 区块 community-wallet-card
+              <span>可用余额</span> // 元素 span
+              <strong>{yuan(wallet.balance_cents)}</strong> // 元素 strong
+              <small>余额可用于付费帖、VIP 与商城下单</small> // 元素 small
             </div>
-            <div className="community-wallet-card">
-              <span>积分</span>
-              <strong>{wallet.points}</strong>
-              <small>每日签到 +5 积分</small>
+            <div className="community-wallet-card"> // 区块 community-wallet-card
+              <span>积分</span> // 元素 span
+              <strong>{wallet.points}</strong> // 元素 strong
+              <small>每日签到 +5 积分</small> // 元素 small
             </div>
           </div>
-          <div className="community-wallet-actions">
-            <button type="button" className="is-primary" disabled={walletDetail?.checked_in_today} onClick={() => void checkin()}>
+          <div className="community-wallet-actions"> // 区块 community-wallet-actions
+            <button type="button" className="is-primary" disabled={walletDetail?.checked_in_today} onClick={() => void checkin()}> // 按钮
               {walletDetail?.checked_in_today ? '今天已签到' : '签到领 5 积分'}
             </button>
-            <div className="community-inline-form">
-              <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="输入充值卡密，如 MIM-DEMO-100" />
-              <button type="button" onClick={() => void redeem()}>兑换</button>
+            <div className="community-inline-form"> // 区块 community-inline-form
+              <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="输入充值卡密，如 MIM-DEMO-100" /> // 表单控件
+              <button type="button" onClick={() => void redeem()}>兑换</button> // 按钮
             </div>
-            <div className="community-inline-form">
-              <input value={transferTo} onChange={(e) => setTransferTo(e.target.value)} placeholder="接收方 Mim ID（数字）" />
-              <input value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} inputMode="numeric" placeholder="积分" />
-              <button type="button" onClick={() => void transferPoints()}>转积分</button>
+            <div className="community-inline-form"> // 区块 community-inline-form
+              <input value={transferTo} onChange={(e) => setTransferTo(e.target.value)} placeholder="接收方 Mim ID（数字）" /> // 表单控件
+              <input value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} inputMode="numeric" placeholder="积分" /> // 表单控件
+              <button type="button" onClick={() => void transferPoints()}>转积分</button> // 按钮
             </div>
           </div>
-          <p className="community-hint">演示卡密：<code>MIM-DEMO-100</code>（¥100）、<code>MIM-DEMO-500</code>（¥500），每张仅可使用一次。</p>
-          <div className="community-table">
-            <div className="community-table-head"><span>类型</span><span>金额</span><span>积分</span><span>说明</span><span>时间</span></div>
+          <p className="community-hint">演示卡密：<code>MIM-DEMO-100</code>（¥100）、<code>MIM-DEMO-500</code>（¥500），每张仅可使用一次。</p> // 区块 community-hint
+          <div className="community-table"> // 区块 community-table
+            <div className="community-table-head"><span>类型</span><span>金额</span><span>积分</span><span>说明</span><span>时间</span></div> // 区块 community-table-head
             {(walletDetail?.transactions ?? []).map((t) => (
-              <div key={t.id} className="community-table-row">
-                <span>{TX_KIND[t.kind]}</span>
-                <span className={t.amount_cents < 0 ? 'is-down' : t.amount_cents > 0 ? 'is-up' : ''}>{t.amount_cents === 0 ? '—' : yuan(t.amount_cents)}</span>
+              <div key={t.id} className="community-table-row"> // 区块 community-table-row
+                <span>{TX_KIND[t.kind]}</span> // 元素 span
+                <span className={t.amount_cents < 0 ? 'is-down' : t.amount_cents > 0 ? 'is-up' : ''}>{t.amount_cents === 0 ? '—' : yuan(t.amount_cents)}</span> // 元素 span
                 <span>{t.points > 0 ? `+${t.points}` : '—'}</span>
-                <span>{t.note}</span>
-                <span>{dateOnly(t.created_at)}</span>
+                <span>{t.note}</span> // 元素 span
+                <span>{dateOnly(t.created_at)}</span> // 元素 span
               </div>
             ))}
             {!walletDetail?.transactions.length && <div className="community-empty">还没有流水，先签到或用演示卡密充值。</div>}
@@ -781,61 +915,61 @@ export function Community({ locale }: Props) {
       )}
 
       {!loading && tab === 'shop' && (
-        <div className="community-shop">
-          <div className="community-section-head">
-            <div><h2>独立商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div>
+        <div className="community-shop"> // 区块 community-shop
+          <div className="community-section-head"> // 区块 community-section-head
+            <div><h2>独立商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div> // 元素 div
           </div>
-          <div className="community-shop-grid">
+          <div className="community-shop-grid"> // 区块 community-shop-grid
             {products.map((p) => (
-              <article key={p.code} className="community-product">
+              <article key={p.code} className="community-product"> // 区块 community-product
                 {p.cover_url && <img src={coverSrc(p.cover_url)} alt={p.name} loading="lazy" />}
-                <div className="community-product-body">
+                <div className="community-product-body"> // 区块 community-product-body
                   <span className={`community-product-kind kind-${p.kind}`}>{PRODUCT_KIND[p.kind]}</span>
-                  <h3>{p.name}</h3>
-                  <p>{p.summary}</p>
-                  <div className="community-product-meta"><strong>{yuan(p.price_cents)}</strong><span>可售 {p.available}</span></div>
-                  <small>{p.delivery_note}</small>
+                  <h3>{p.name}</h3> // 标题
+                  <p>{p.summary}</p> // 元素 p
+                  <div className="community-product-meta"><strong>{yuan(p.price_cents)}</strong><span>可售 {p.available}</span></div> // 区块 community-product-meta
+                  <small>{p.delivery_note}</small> // 元素 small
                   {buying === p.code ? (
-                    <div className="community-buy-form">
-                      <label>数量<input value={quantity} onChange={(e) => setQuantity(Math.min(10, Math.max(1, Number(e.target.value) || 1)))} inputMode="numeric" /></label>
-                      <label>优惠码<input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="MIM10 / VIP20" /></label>
+                    <div className="community-buy-form"> // 区块 community-buy-form
+                      <label>数量<input value={quantity} onChange={(e) => setQuantity(Math.min(10, Math.max(1, Number(e.target.value) || 1)))} inputMode="numeric" /></label> // 元素 label
+                      <label>优惠码<input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="MIM10 / VIP20" /></label> // 元素 label
                       {p.kind === 'physical' && (
                         <>
-                          <input value={shipName} onChange={(e) => setShipName(e.target.value)} placeholder="收货人" />
-                          <input value={shipPhone} onChange={(e) => setShipPhone(e.target.value)} placeholder="手机号" />
-                          <input value={shipAddress} onChange={(e) => setShipAddress(e.target.value)} placeholder="详细地址" />
+                          <input value={shipName} onChange={(e) => setShipName(e.target.value)} placeholder="收货人" /> // 表单控件
+                          <input value={shipPhone} onChange={(e) => setShipPhone(e.target.value)} placeholder="手机号" /> // 表单控件
+                          <input value={shipAddress} onChange={(e) => setShipAddress(e.target.value)} placeholder="详细地址" /> // 表单控件
                         </>
                       )}
-                      <div className="community-actions">
-                        <button type="button" className="is-primary" onClick={() => void placeOrder(p)}>确认下单</button>
-                        <button type="button" onClick={() => setBuying(null)}>取消</button>
+                      <div className="community-actions"> // 区块 community-actions
+                        <button type="button" className="is-primary" onClick={() => void placeOrder(p)}>确认下单</button> // 按钮
+                        <button type="button" onClick={() => setBuying(null)}>取消</button> // 按钮
                       </div>
                     </div>
                   ) : (
-                    <button type="button" className="is-primary" disabled={p.available <= 0} onClick={() => { setBuying(p.code); setQuantity(1); }}>{p.available <= 0 ? '已售罄' : '立即购买'}</button>
+                    <button type="button" className="is-primary" disabled={p.available <= 0} onClick={() => { setBuying(p.code); setQuantity(1); }}>{p.available <= 0 ? '已售罄' : '立即购买'}</button> // 按钮
                   )}
                 </div>
               </article>
             ))}
           </div>
           {lastOrder && (
-            <div className="community-order-result">
+            <div className="community-order-result"> // 区块 community-order-result
               订单 <code>{lastOrder.order_id.slice(0, 18)}…</code> 已创建，实付 {yuan(lastOrder.payable_cents)}。
               {lastOrder.delivery_kind === 'virtual_auto' ? ' 卡密见下方订单列表。' : ''}
             </div>
           )}
-          <h3 className="community-subhead">我的订单</h3>
-          <div className="community-orders">
+          <h3 className="community-subhead">我的订单</h3> // 标题
+          <div className="community-orders"> // 区块 community-orders
             {orders.length === 0 && <div className="community-empty">还没有订单。</div>}
             {orders.map((o) => (
-              <article key={o.id} className="community-order">
-                <div className="community-order-main">
-                  <strong>{o.product_name}</strong>
-                  <span>{ORDER_STATUS[o.status]} · {o.delivery_kind} · {dateOnly(o.created_at)}</span>
-                  <span>原价 {yuan(o.amount_cents)}，优惠 {yuan(o.discount_cents)}，实付 {yuan(o.payable_cents)}</span>
+              <article key={o.id} className="community-order"> // 区块 community-order
+                <div className="community-order-main"> // 区块 community-order-main
+                  <strong>{o.product_name}</strong> // 元素 strong
+                  <span>{ORDER_STATUS[o.status]} · {o.delivery_kind} · {dateOnly(o.created_at)}</span> // 元素 span
+                  <span>原价 {yuan(o.amount_cents)}，优惠 {yuan(o.discount_cents)}，实付 {yuan(o.payable_cents)}</span> // 元素 span
                   {o.delivered_content && <code>{o.delivered_content}</code>}
                 </div>
-                <div className="community-order-actions">
+                <div className="community-order-actions"> // 区块 community-order-actions
                   {o.status === 'paid' && <button type="button" onClick={() => void confirmOrder(o.id)}>确认收货</button>}
                   {o.status !== 'refunded' && o.status !== 'cancelled' && <button type="button" onClick={() => void refundOrder(o.id)}>退款</button>}
                 </div>
@@ -846,22 +980,22 @@ export function Community({ locale }: Props) {
       )}
 
       {!loading && tab === 'referral' && (
-        <div className="community-referral">
-          <div className="community-section-head"><div><h2>推广分成</h2><p>邀请码绑定后，被邀请人首单按实付 5% 返到你的余额。</p></div></div>
-          <div className="community-referral-grid">
-            <div className="community-ref-card">
-              <span>我的邀请码</span>
-              <strong>{referral?.code ?? '—'}</strong>
-              <button type="button" onClick={() => { if (referral) void navigator.clipboard?.writeText(referral.code); setNotice('邀请码已复制'); }}>复制</button>
+        <div className="community-referral"> // 区块 community-referral
+          <div className="community-section-head"><div><h2>推广分成</h2><p>邀请码绑定后，被邀请人首单按实付 5% 返到你的余额。</p></div></div> // 区块 community-section-head
+          <div className="community-referral-grid"> // 区块 community-referral-grid
+            <div className="community-ref-card"> // 区块 community-ref-card
+              <span>我的邀请码</span> // 元素 span
+              <strong>{referral?.code ?? '—'}</strong> // 元素 strong
+              <button type="button" onClick={() => { if (referral) void navigator.clipboard?.writeText(referral.code); setNotice('邀请码已复制'); }}>复制</button> // 按钮
             </div>
-            <div className="community-ref-card"><span>已邀请</span><strong>{referral?.invited.count ?? 0} 人</strong></div>
-            <div className="community-ref-card"><span>累计佣金</span><strong>{yuan(referral?.commission_cents ?? 0)}</strong></div>
+            <div className="community-ref-card"><span>已邀请</span><strong>{referral?.invited.count ?? 0} 人</strong></div> // 区块 community-ref-card
+            <div className="community-ref-card"><span>累计佣金</span><strong>{yuan(referral?.commission_cents ?? 0)}</strong></div> // 区块 community-ref-card
           </div>
-          <div className="community-inline-form">
-            <input value={bindCode} onChange={(e) => setBindCode(e.target.value)} placeholder="输入朋友的邀请码" />
-            <button type="button" onClick={() => void bindReferral()}>绑定邀请码</button>
+          <div className="community-inline-form"> // 区块 community-inline-form
+            <input value={bindCode} onChange={(e) => setBindCode(e.target.value)} placeholder="输入朋友的邀请码" /> // 表单控件
+            <button type="button" onClick={() => void bindReferral()}>绑定邀请码</button> // 按钮
           </div>
-          <p className="community-hint">当前板块：{currentBoard?.name ?? '全部'}。推广绑定仅一次，不能绑定自己的邀请码。</p>
+          <p className="community-hint">当前板块：{currentBoard?.name ?? '全部'}。推广绑定仅一次，不能绑定自己的邀请码。</p> // 区块 community-hint
         </div>
       )}
     </section>

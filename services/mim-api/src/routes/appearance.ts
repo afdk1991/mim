@@ -8,10 +8,29 @@ import { idempotency, requireAuth, requirePermission } from '../middleware.js'; 
 import { parse } from '../validate.js'; // 校验错误翻译
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
-const ALLOWED_SETTINGS = new Set(['theme', 'locales', 'site']); // 允许通过 API 修改的设置键
+const ALLOWED_SETTINGS = new Set(['theme', 'locales', 'site', 'home']); // 允许通过 API 修改的设置键
+
+/** 读单个 JSON 设置；缺失或脏数据时返回兜底值，供公开启动接口使用。 */
+function readSetting(deps: ApiDeps, key: string): Record<string, unknown> {
+  const row = deps.db.prepare('SELECT value FROM site_settings WHERE key = ?').get(key) as { value: string } | undefined;
+  if (!row) return {};
+  try {
+    const parsed: unknown = JSON.parse(row.value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
 
 export function createAppearanceRouter(deps: ApiDeps): Router {
   const router = Router();
+
+  /** 公开站点启动配置：免登录即可读首页指向、主题与语言，供前端根路径重定向与公共页面渲染。 */
+  router.get('/site/config', (_req, res) => {
+    const home = readSetting(deps, 'home');
+    const view = typeof home.view === 'string' && ['store', 'community'].includes(home.view) ? home.view : 'store';
+    res.json({ home_view: view, theme: readSetting(deps, 'theme'), site: readSetting(deps, 'site'), locales: readSetting(deps, 'locales') });
+  });
 
   /** 外观总览：主题、语言、站点信息与页面清单。 */
   router.get('/appearance', requireAuth, (_req, res) => {

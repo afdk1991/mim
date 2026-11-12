@@ -7,13 +7,43 @@ import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requireAuth } from '../middleware.js'; // 会话与写幂等
 import { parse } from '../validate.js'; // 校验错误翻译
 import { recordEarning } from '../payments.js'; // 作者分成记账
+import { assertPublicHttpUrl } from '../security.js'; // 媒体地址 SSRF 校验
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const now = () => new Date().toISOString(); // UTC 时间
 
+/** 解析资产媒体数组；历史行没有 media_json 或脏 JSON 时返回空数组，避免详情 500。 */
+function parseMedia(raw: unknown): Array<{ kind: 'image' | 'video'; url: string; poster_url: string | null }> {
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw); // 资产路由：解析与鉴权
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is { kind: 'image' | 'video'; url: string; poster_url?: string | null } => {
+        if (!item || typeof item !== 'object') return false;
+        const row = item as Record<string, unknown>; // 资产路由：解析与鉴权
+        return (row.kind === 'image' || row.kind === 'video') && typeof row.url === 'string' && row.url.length > 0;
+      })
+      .map((item) => ({ kind: item.kind, url: item.url, poster_url: typeof item.poster_url === 'string' ? item.poster_url : null }));
+  } catch {
+    return [];
+  }
+}
+
+/** 媒体地址校验：站内相对路径直接放行，http(s) 必须通过 SSRF 私网检查。 */
+async function assertMediaUrl(url: string): Promise<void> {
+  if (/^\/(?!\/)/.test(url)) return;
+  if (!/^https?:\/\//i.test(url)) throw new AppError('VALIDATION_FAILED', '媒体地址必须是站内路径或 http(s) 地址');
+  try {
+    await assertPublicHttpUrl(url);
+  } catch {
+    throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议');
+  }
+}
+
 /** 当前 VIP 等级：0 表示非会员。 */
 function vipLevel(deps: ApiDeps, userId: string): number {
-  const row = deps.db
+  const row = deps.db // 资产路由：解析与鉴权
     .prepare("SELECT level FROM vip_memberships WHERE user_id = ? AND status = 'active' AND expires_at > ? ORDER BY level DESC LIMIT 1")
     .get(userId, now()) as { level: number } | undefined;
   return row?.level ?? 0;
@@ -34,17 +64,17 @@ function hasAccess(deps: ApiDeps, userId: string, asset: { id: string; price_cen
 
 /** 钱包余额校验，不足时给出可识别原因。 */
 function requireBalance(deps: ApiDeps, userId: string, amount: number): void {
-  const wallet = deps.db.prepare('SELECT balance_cents, points FROM wallets WHERE user_id = ?').get(userId) as
+  const wallet = deps.db.prepare('SELECT balance_cents, points FROM wallets WHERE user_id = ?').get(userId) as // 资产路由：解析与鉴权
     | { balance_cents: number; points: number }
     | undefined;
-  const row = wallet ?? { balance_cents: 0, points: 100 };
+  const row = wallet ?? { balance_cents: 0, points: 100 }; // 资产路由：解析与鉴权
   if (!wallet) deps.db.prepare('INSERT INTO wallets (user_id, balance_cents, points, updated_at) VALUES (?, ?, ?, ?)').run(userId, 0, 100, now());
   if (row.balance_cents < amount) throw new AppError('VALIDATION_FAILED', '余额不足，请先充值或用卡密兑换', { reason: 'INSUFFICIENT_BALANCE', required_cents: amount, balance_cents: row.balance_cents });
 }
 
 /** 资产列表项：公开字段 + 当前用户是否已解锁。 */
 function listItem(deps: ApiDeps, userId: string, row: Record<string, unknown> & { id: string; price_cents: number; vip_free: number; author_id: string | null }) {
-  const access = hasAccess(deps, userId, row);
+  const access = hasAccess(deps, userId, row); // 资产路由：解析与鉴权
   return {
     code: row.code,
     kind: row.kind,
@@ -61,17 +91,17 @@ function listItem(deps: ApiDeps, userId: string, row: Record<string, unknown> & 
 }
 
 export function createAssetsRouter(deps: ApiDeps): Router {
-  const router = Router();
+  const router = Router(); // 资产路由：解析与鉴权
   router.use('/assets', requireAuth); // 与社区一致：访客会话同样可用
   router.use('/assets', idempotency); // 购买写操作防重复扣款
 
   /** 资产列表：按类型 / 关键词过滤。 */
-  router.get('/assets', (req, res) => {
-    const userId = req.user!.id;
-    const kind = typeof req.query.kind === 'string' && req.query.kind !== 'all' ? req.query.kind : '';
-    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    const where = ["status = 'published'"];
-    const args: unknown[] = [];
+  router.get('/assets', (req, res) => { // 资产路由：解析与鉴权
+    const userId = req.user!.id; // 资产路由：解析与鉴权
+    const kind = typeof req.query.kind === 'string' && req.query.kind !== 'all' ? req.query.kind : ''; // 资产路由：解析与鉴权
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 资产路由：解析与鉴权
+    const where = ["status = 'published'"]; // 资产路由：解析与鉴权
+    const args: unknown[] = []; // 资产路由：解析与鉴权
     if (kind) {
       where.push('kind = ?');
       args.push(kind);
@@ -80,16 +110,16 @@ export function createAssetsRouter(deps: ApiDeps): Router {
       where.push('(title LIKE ? OR summary LIKE ?)');
       args.push(`%${q}%`, `%${q}%`);
     }
-    const rows = deps.db
+    const rows = deps.db // 资产路由：解析与鉴权
       .prepare(`SELECT id, code, kind, title, summary, cover_url, price_cents, vip_free, author_id, views, sales, updated_at FROM paid_assets WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 60`)
       .all(...args) as Array<Record<string, unknown> & { id: string; price_cents: number; vip_free: number; author_id: string | null }>;
     res.json({ items: rows.map((row) => listItem(deps, userId, row)), vip_level: vipLevel(deps, userId) });
   });
 
   /** 我的资产：已购买的资产清单。 */
-  router.get('/assets/mine/list', (req, res) => {
-    const userId = req.user!.id;
-    const rows = deps.db
+  router.get('/assets/mine/list', (req, res) => { // 资产路由：解析与鉴权
+    const userId = req.user!.id; // 资产路由：解析与鉴权
+    const rows = deps.db // 资产路由：解析与鉴权
       .prepare(
         `SELECT a.code, a.kind, a.title, a.summary, a.cover_url, a.file_url, p.amount_cents, p.created_at
          FROM asset_purchases p JOIN paid_assets a ON a.id = p.asset_id
@@ -100,7 +130,7 @@ export function createAssetsRouter(deps: ApiDeps): Router {
   });
 
   /** 资产详情：未解锁时只给摘要，正文与文件地址隐藏。 */
-  router.get('/assets/:code', (req, res) => {
+  router.get('/assets/:code', (req, res) => { // 资产路由：解析与鉴权
     const userId = req.user!.id;
     const asset = deps.db.prepare("SELECT * FROM paid_assets WHERE code = ? AND status = 'published'").get(req.params.code) as
       | (Record<string, unknown> & { id: string; body: string; file_url: string | null; price_cents: number; vip_free: number; author_id: string | null })
@@ -124,6 +154,7 @@ export function createAssetsRouter(deps: ApiDeps): Router {
         unlocked: access,
         body: access ? asset.body : preview,
         file_url: access ? asset.file_url : null,
+        media: access ? parseMedia(asset.media_json) : [],
       },
     });
   });
@@ -166,7 +197,7 @@ export function createAssetsRouter(deps: ApiDeps): Router {
   });
 
   /** 作者发布资产：登录即可发布免费资源；付费资产需作者已开通（暂以登录代替）。 */
-  router.post('/assets', (req, res) => {
+  router.post('/assets', async (req, res) => {
     const userId = req.user!.id;
     const body = parse(
       z.object({
@@ -179,17 +210,27 @@ export function createAssetsRouter(deps: ApiDeps): Router {
         file_url: z.string().max(300).optional(),
         price_cents: z.number().int().min(0).max(1000000).default(0),
         vip_free: z.boolean().default(false),
+        media: z.array(z.object({ kind: z.enum(['image', 'video']), url: z.string().min(1).max(500), poster_url: z.string().max(500).optional() })).max(30).default([]),
       }),
       req.body,
     );
     if (deps.db.prepare('SELECT 1 AS ok FROM paid_assets WHERE code = ?').get(body.code)) throw new AppError('CONFLICT', '资产编码已存在');
+    if (body.kind === 'gallery' && body.media.length === 0) throw new AppError('VALIDATION_FAILED', '图库至少需要一张图片');
+    if (body.kind === 'video' && body.media.length === 0 && !body.file_url) throw new AppError('VALIDATION_FAILED', '付费视频需要视频地址');
+    if (body.cover_url) await assertMediaUrl(body.cover_url);
+    if (body.file_url && !/^\/(?!\/)/.test(body.file_url)) await assertMediaUrl(body.file_url);
+    for (const item of body.media) {
+      await assertMediaUrl(item.url);
+      if (item.poster_url) await assertMediaUrl(item.poster_url);
+    }
+    const mediaJson = JSON.stringify(body.media);
     const ts = now();
     deps.db
       .prepare(
-        `INSERT INTO paid_assets (id, code, kind, title, summary, body, cover_url, file_url, price_cents, vip_free, author_id, status, views, sales, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', 0, 0, ?, ?)`,
+        `INSERT INTO paid_assets (id, code, kind, title, summary, body, cover_url, file_url, media_json, price_cents, vip_free, author_id, status, views, sales, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', 0, 0, ?, ?)`,
       )
-      .run(`asset-${randomUUID()}`, body.code, body.kind, body.title, body.summary, body.body, body.cover_url ?? null, body.file_url ?? null, body.price_cents, body.vip_free ? 1 : 0, userId, ts, ts);
+      .run(`asset-${randomUUID()}`, body.code, body.kind, body.title, body.summary, body.body, body.cover_url ?? null, body.file_url ?? null, mediaJson, body.price_cents, body.vip_free ? 1 : 0, userId, ts, ts);
     res.status(201).json({ ok: true, code: body.code });
   });
 

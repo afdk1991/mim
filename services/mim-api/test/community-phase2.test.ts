@@ -168,6 +168,92 @@ describe('付费板块与积分转账', () => {
   });
 });
 
+describe('P1：付费图库/视频、站点配置、板块关注与问答采纳', () => {
+  it('付费图库未解锁不返回媒体，余额购买后返回 9 张封面图片', async () => {
+    const auth = await login('13800000021'); // 新用户：初始余额 0
+    await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 先充值 100 元
+    const locked = await request(app).get('/api/v1/assets/paid-gallery-covers').set(auth);
+    expect(locked.status).toBe(200); // 资产详情可读
+    expect(locked.body.asset.media).toHaveLength(0); // 未解锁时媒体数组为空，不泄漏图片
+
+    const buy = await request(app).post('/api/v1/assets/paid-gallery-covers/purchase').set(writeHeaders(auth)).send({});
+    expect(buy.status).toBe(201); // 余额购买成功
+    expect(buy.body.via).toBe('balance'); // 走余额扣款
+    expect(buy.body.charged_cents).toBe(3900); // 图库定价 ¥39
+
+    const unlocked = await request(app).get('/api/v1/assets/paid-gallery-covers').set(auth);
+    expect(unlocked.body.asset.unlocked).toBe(true); // 已解锁
+    expect(unlocked.body.asset.media).toHaveLength(9); // 种子补入 9 张图片
+    expect(unlocked.body.asset.media[0].kind).toBe('image'); // 图库媒体类型为 image
+  });
+
+  it('付费视频解锁后返回视频直链与封面', async () => {
+    const auth = await login('13800000022'); // 独立用户，钱包互不影响
+    await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 充值后再购买
+    await request(app).post('/api/v1/assets/paid-video-comic/purchase').set(writeHeaders(auth)).send({});
+    const detail = await request(app).get('/api/v1/assets/paid-video-comic').set(auth);
+    expect(detail.body.asset.media.length).toBeGreaterThanOrEqual(1); // 至少有 1 条视频媒体
+    expect(detail.body.asset.media[0].kind).toBe('video'); // 视频类型
+    expect(detail.body.asset.media[0].url).toMatch(/\.mp4$/); // 视频直链为 mp4
+  });
+
+  it('公开站点配置返回 home_view 且无需会话', async () => {
+    const config = await request(app).get('/api/v1/site/config'); // 匿名直接访问
+    expect(config.status).toBe(200); // 公开端点返回 200
+    expect(config.body.home_view).toBe('store'); // 默认首页为商城
+    expect(config.body.theme).toBeTruthy(); // 主题配置同时下发
+  });
+
+  it('followers 板块关注后才可见与可发帖', async () => {
+    db.prepare("UPDATE community_boards SET visibility = 'followers' WHERE slug = 'general'").run(); // 把通用板块改为关注可见
+    const auth = await login('13800000023');
+    const before = await request(app).get('/api/v1/community/threads?board=general').set(auth);
+    expect(before.body.items.every((item: { locked: number }) => item.locked === 1)).toBe(true); // 未关注时全部标记为锁定
+
+    const follow = await request(app).post('/api/v1/community/boards/general/follow').set(writeHeaders(auth)).send({});
+    expect(follow.status).toBe(200); // 关注接口成功
+    expect(follow.body.followed).toBe(true); // 关注状态为 true
+
+    const after = await request(app).get('/api/v1/community/threads?board=general').set(auth);
+    expect(after.body.items.every((item: { locked: number }) => item.locked === 0)).toBe(true); // 关注后解锁
+
+    const post = await request(app)
+      .post('/api/v1/community/threads')
+      .set(writeHeaders(auth))
+      .send({ board_slug: 'general', title: '关注后发帖成功', body: '关注板块之后即可正常发帖，验证关注门槛闭环。' });
+    expect(post.status).toBe(201); // 关注后发帖 201
+  });
+
+  it('问答帖仅提问者可采纳回复，详情回传采纳结果', async () => {
+    const author = await login('13800000024');
+    const helper = await login('13800000025');
+    const created = await request(app)
+      .post('/api/v1/community/threads')
+      .set(writeHeaders(author))
+      .send({ board_slug: 'help', title: '问答：如何配置支付', body: '请问微信支付需要配置哪些环境变量？', kind: 'qa' });
+    expect(created.status).toBe(201); // 问答帖创建成功
+
+    const reply = await request(app)
+      .post(`/api/v1/community/threads/${created.body.thread_id}/reply`)
+      .set(writeHeaders(helper))
+      .send({ content: '需要配置 APP_ID 与商户私钥，再把回调地址指向 /api/v1/payments/wechat/notify。' });
+    expect(reply.status).toBe(201); // 回复成功
+
+    const detail = await request(app).get(`/api/v1/community/threads/${created.body.thread_id}`).set(author);
+    const postId = detail.body.posts[0].id as string; // 取第一条回复 id
+
+    const forbidden = await request(app).post(`/api/v1/community/threads/${created.body.thread_id}/accept`).set(writeHeaders(helper)).send({ post_id: postId });
+    expect(forbidden.status).toBe(403); // 非提问者采纳被拒
+
+    const accept = await request(app).post(`/api/v1/community/threads/${created.body.thread_id}/accept`).set(writeHeaders(author)).send({ post_id: postId });
+    expect(accept.status).toBe(200); // 提问者采纳成功
+
+    const afterAccept = await request(app).get(`/api/v1/community/threads/${created.body.thread_id}`).set(author);
+    expect(afterAccept.body.thread.accepted_post_id).toBe(postId); // 详情回传采纳的回复 id
+    expect(afterAccept.body.thread.accepted_post.content).toContain('APP_ID'); // 采纳答案内容完整返回
+  });
+});
+
 describe('安全：验证码与举报', () => {
   it('验证码返回 SVG 与 id；举报超过 24 小时上限返回 429', async () => {
     const captcha = await request(app).get('/api/v1/auth/captcha');

@@ -3787,6 +3787,51 @@ code { /* 行内代码/令牌展示 */
 .community-media-item.is-video {
   grid-column: 1 / -1;
 }
+/* 付费图库 / 视频媒体网格（资产详情） */
+.commerce-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.commerce-media-item {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #0f172a;
+  display: block;
+}
+.commerce-media-item img,
+.commerce-media-item video {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+.commerce-media-item.is-video {
+  grid-column: 1 / -1;
+}
+/* 剧集目录：整宽播放器 */
+.community-series {
+  margin: 16px 0;
+}
+.community-series .community-media-item {
+  margin-bottom: 12px;
+}
+/* 问答采纳：被采纳回复高亮 */
+.community-accepted {
+  margin: 14px 0 18px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  background: rgba(15, 118, 110, 0.08);
+}
+.community-accepted p {
+  margin: 8px 0 0;
+}
+.community-reply.is-accepted {
+  border-left: 3px solid #0f766e;
+  background: rgba(15, 118, 110, 0.06);
+}
 .community-poll {
   margin: 14px 0 18px;
   padding: 14px;

@@ -41,7 +41,7 @@ import { Chat } from './views/Chat';
 // 聊天只读演示页：匿名访客看到完整聊天布局与示例消息，输入区禁用并引导登录
 import { ChatPreview } from './views/ChatPreview';
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
-import { useAppRoute } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
+import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
 import type { AppView } from './router';
 
@@ -61,6 +61,20 @@ export function App() {
 
   // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
   const locale: Locale = normalizeLocale(session?.user.locale);
+
+  // 「把论坛设为网站首页」：仅在访问站点根路径时按后台 site/config 的 home_view 决定落点，
+  // 深链接与站内导航一律不拦截，避免用户回不到自己点开的页面。
+  useEffect(() => {
+    const base = baseOf(); // 挂载前缀：根部署 '/'，GitHub Pages '/mim/'
+    const path = window.location.pathname.replace(/\/index\.html$/, '/'); // 归一化 index.html 直达
+    if (path !== base && path !== '/') return; // 非根路径不处理
+    let alive = true; // 组件卸载后不再跳转
+    void api.commerce.siteConfig().then((config) => {
+      if (alive && config.home_view === 'community') go({ view: 'community' }); // 后台把论坛设为首页
+    }).catch(() => { /* 配置不可达时保持默认商城首页 */ });
+    return () => { alive = false; }; // 清理
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 会话联动：订阅会话变更事件 + 启动时静默校验令牌有效性
   useEffect(() => {

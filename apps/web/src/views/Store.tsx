@@ -17,6 +17,7 @@ import { useAsync } from '../hooks';
 import { navigate } from '../router';
 // 商品视觉：分类封面图 + 按详情实时生成的「商品参数详情图」（SVG data URL）
 import { categoryCoverUrl, specPosterUrl } from '../catalogArt';
+import { PageBlocks } from './PageBlocks'; // 首页区块渲染器（消费后台 page_blocks）
 
 // 组件对外契约：商城文案跟随全局语言
 interface Props {
@@ -843,6 +844,8 @@ export function Store({ locale }: Props) {
             : '19 个一级分类、205 个二级模块；按模块一次性解锁'}{/* 规则说明文案结束 */}
         </p>{/* 结束说明文案 */}
       </header>{/* 结束页头 */}
+
+      <PageBlocks page="home" locale={locale} />{/* 首页区块：hero / 能力介绍 / 公告，由后台 page_blocks 自由组合 */}
 
       <div className="store-layout">{/* 两栏布局：左侧分类导航，右侧列表与筛选 */}
         <aside className="store-nav panel">{/* 分类导航：一级分类 + 可展开的二级条目 */}

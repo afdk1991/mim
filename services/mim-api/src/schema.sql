@@ -564,6 +564,13 @@ CREATE TABLE IF NOT EXISTS community_boards (
   icon          TEXT NOT NULL DEFAULT '',
   sort_order    INTEGER NOT NULL DEFAULT 0,
   price_cents   INTEGER NOT NULL DEFAULT 0,
+  -- public：所有人可读；followers：关注板块后才可读。版主与运营始终可读。
+  visibility    TEXT NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','followers')),
+  -- 发帖最低等级（1 起）；0 表示不限制。
+  post_min_level INTEGER NOT NULL DEFAULT 0,
+  -- 用户自建板块的创建者与版主；官方种子板块两者均为 NULL。
+  created_by    TEXT REFERENCES users(id),
+  moderator_id  TEXT REFERENCES users(id),
   created_at    TEXT NOT NULL
 );
 
@@ -583,6 +590,8 @@ CREATE TABLE IF NOT EXISTS community_threads (
   views            INTEGER NOT NULL DEFAULT 0,
   likes            INTEGER NOT NULL DEFAULT 0,
   reply_count      INTEGER NOT NULL DEFAULT 0,
+  -- 问答帖被提问者采纳的回复 ID；NULL 表示尚未采纳。
+  accepted_post_id TEXT,
   created_at       TEXT NOT NULL,
   updated_at       TEXT NOT NULL,
   last_activity_at TEXT NOT NULL
@@ -672,6 +681,26 @@ CREATE TABLE IF NOT EXISTS community_board_memberships (
   created_at TEXT NOT NULL,
   PRIMARY KEY (board_id, user_id)
 );
+
+-- 板块关注：followers 可见板块的准入记录；关注免费，取消关注立即失去可见性。
+CREATE TABLE IF NOT EXISTS community_board_follows (
+  board_id   TEXT NOT NULL REFERENCES community_boards(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (board_id, user_id)
+);
+
+-- 剧集目录：series 帖的每一集独立存媒体与标题，按 sort_order 播放。
+CREATE TABLE IF NOT EXISTS community_series_episodes (
+  id         TEXT PRIMARY KEY,
+  thread_id  TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  media_url  TEXT NOT NULL,
+  poster_url TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_community_series_episodes ON community_series_episodes(thread_id, sort_order);
 
 -- 内容举报：限流按 user_id + created_at 在路由层统计；status 供运营处理。
 CREATE TABLE IF NOT EXISTS content_reports (
@@ -864,6 +893,8 @@ CREATE TABLE IF NOT EXISTS paid_assets (
   body        TEXT NOT NULL DEFAULT '',
   cover_url   TEXT,
   file_url    TEXT,
+  -- 图库 / 视频资产的媒体数组：[{kind,url,poster_url}]，旧行空数组。
+  media_json  TEXT NOT NULL DEFAULT '[]',
   price_cents INTEGER NOT NULL DEFAULT 0,
   vip_free    INTEGER NOT NULL DEFAULT 0,
   author_id   TEXT REFERENCES users(id),

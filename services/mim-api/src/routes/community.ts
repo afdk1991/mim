@@ -50,11 +50,29 @@ function hasThreadAccess(deps: ApiDeps, userId: string, threadId: string, priceC
   return !!deps.db.prepare('SELECT 1 AS ok FROM community_purchases WHERE user_id = ? AND thread_id = ?').get(userId, threadId);
 }
 
-/** 板块访问：免费板块直接放行；付费板块需加入或 VIP。 */
-function hasBoardAccess(deps: ApiDeps, userId: string, boardId: string, boardPriceCents: number): boolean {
-  if (boardPriceCents <= 0) return true;
-  if (vipLevel(deps, userId) > 0) return true;
-  return !!deps.db.prepare('SELECT 1 AS ok FROM community_board_memberships WHERE board_id = ? AND user_id = ?').get(boardId, userId);
+/** 当前用户等级：与 growth 路由同一口径（积分 / 订单 / 签到），用于板块发帖门槛。 */
+function levelOfUser(deps: ApiDeps, userId: string): number {
+  const points = (deps.db.prepare('SELECT points FROM wallets WHERE user_id = ?').get(userId) as { points: number } | undefined)?.points ?? 0;
+  const orders = (deps.db.prepare('SELECT COUNT(*) AS count FROM shop_orders WHERE user_id = ?').get(userId) as { count: number } | undefined)?.count ?? 0;
+  return Math.min(10, 1 + Math.floor(points / 300) + Math.floor(orders / 3));
+}
+
+/** 板块访问：付费门槛 + followers 可见性；版主 / 创建者 / 运营不受关注限制。 */
+function hasBoardAccess(deps: ApiDeps, userId: string, boardId: string, boardPriceCents?: number): boolean {
+  const board = deps.db
+    .prepare('SELECT id, price_cents, visibility, created_by, moderator_id FROM community_boards WHERE id = ?')
+    .get(boardId) as { id: string; price_cents: number; visibility: string; created_by: string | null; moderator_id: string | null } | undefined;
+  if (!board) return false;
+  const price = boardPriceCents ?? board.price_cents;
+  if (price > 0 && vipLevel(deps, userId) === 0) {
+    const joined = deps.db.prepare('SELECT 1 AS ok FROM community_board_memberships WHERE board_id = ? AND user_id = ?').get(boardId, userId);
+    if (!joined) return false;
+  }
+  if (board.visibility === 'followers' && board.created_by !== userId && board.moderator_id !== userId) {
+    const followed = deps.db.prepare('SELECT 1 AS ok FROM community_board_follows WHERE board_id = ? AND user_id = ?').get(boardId, userId);
+    if (!followed) return false;
+  }
+  return true;
 }
 
 /** 钱包余额是否足够；不足抛带 details 的校验错误，前端可识别。 */
@@ -124,11 +142,14 @@ export function createCommunityRouter(deps: ApiDeps): Router {
     const boards = deps.db
       .prepare(
         `SELECT b.slug, b.name, b.description, b.icon, b.sort_order, b.price_cents,
+                b.visibility, b.post_min_level,
                 (SELECT COUNT(*) FROM community_board_memberships m WHERE m.board_id = b.id AND m.user_id = ?) AS joined,
-                (SELECT COUNT(*) FROM community_threads t WHERE t.board_id = b.id AND t.status = 'published') AS thread_count
+                (SELECT COUNT(*) FROM community_board_follows cf WHERE cf.board_id = b.id AND cf.user_id = ?) AS followed,
+                (SELECT COUNT(*) FROM community_threads t WHERE t.board_id = b.id AND t.status = 'published') AS thread_count,
+                CASE WHEN b.moderator_id = ? OR b.created_by = ? THEN 1 ELSE 0 END AS is_moderator
          FROM community_boards b ORDER BY b.sort_order ASC`,
       )
-      .all(userId);
+      .all(userId, userId, userId, userId);
     const stats = deps.db
       .prepare(`SELECT COUNT(*) AS threads, COALESCE(SUM(views), 0) AS views, COALESCE(SUM(likes), 0) AS likes FROM community_threads WHERE status = 'published'`)
       .get();
@@ -137,7 +158,7 @@ export function createCommunityRouter(deps: ApiDeps): Router {
     const vip = deps.db
       .prepare(`SELECT plan_id, level, expires_at FROM vip_memberships WHERE user_id = ? AND status = 'active' AND expires_at > ? ORDER BY level DESC LIMIT 1`)
       .get(userId, now()) as { plan_id: string; level: number; expires_at: string } | undefined;
-    res.json({ boards, stats, wallet, vip_level: level, vip: vip ?? null });
+    res.json({ boards, stats, wallet, vip_level: level, vip: vip ?? null, user_level: levelOfUser(deps, userId) });
   });
 
   /** 板块列表。 */
@@ -145,11 +166,14 @@ export function createCommunityRouter(deps: ApiDeps): Router {
     const boards = deps.db
       .prepare(
         `SELECT b.slug, b.name, b.description, b.icon, b.price_cents,
+                b.visibility, b.post_min_level,
                 (SELECT COUNT(*) FROM community_board_memberships m WHERE m.board_id = b.id AND m.user_id = ?) AS joined,
-                (SELECT COUNT(*) FROM community_threads t WHERE t.board_id = b.id AND t.status = 'published') AS thread_count
+                (SELECT COUNT(*) FROM community_board_follows cf WHERE cf.board_id = b.id AND cf.user_id = ?) AS followed,
+                (SELECT COUNT(*) FROM community_threads t WHERE t.board_id = b.id AND t.status = 'published') AS thread_count,
+                CASE WHEN b.moderator_id = ? OR b.created_by = ? THEN 1 ELSE 0 END AS is_moderator
          FROM community_boards b ORDER BY b.sort_order ASC`,
       )
-      .all(req.user!.id);
+      .all(req.user!.id, req.user!.id, req.user!.id, req.user!.id);
     res.json({ boards });
   });
 
@@ -193,13 +217,15 @@ export function createCommunityRouter(deps: ApiDeps): Router {
       .prepare(
         `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count,
                 t.created_at, t.last_activity_at, b.slug AS board_slug, b.name AS board_name, b.price_cents AS board_price_cents,
+                b.visibility AS board_visibility, b.post_min_level AS board_post_min_level,
                 u.display_name AS author_name,
                 (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
                 (SELECT COUNT(*) FROM community_favorites f WHERE f.thread_id = t.id AND f.user_id = ?) AS favorited,
                 (SELECT COUNT(*) FROM community_favorites f WHERE f.thread_id = t.id) AS favorite_count,
                 (SELECT ROUND(AVG(r.rating), 2) FROM community_ratings r WHERE r.thread_id = t.id) AS rating_avg,
                 (SELECT COUNT(*) FROM community_ratings r WHERE r.thread_id = t.id) AS rating_count,
-                (SELECT COUNT(*) FROM community_board_memberships m WHERE m.board_id = b.id AND m.user_id = ?) AS board_joined
+                (SELECT COUNT(*) FROM community_board_memberships m WHERE m.board_id = b.id AND m.user_id = ?) AS board_joined,
+                (SELECT COUNT(*) FROM community_board_follows cf WHERE cf.board_id = b.id AND cf.user_id = ?) AS board_followed
          FROM community_threads t
          JOIN community_boards b ON b.id = t.board_id
          LEFT JOIN users u ON u.id = t.author_id
@@ -207,13 +233,14 @@ export function createCommunityRouter(deps: ApiDeps): Router {
          ORDER BY ${order}
          LIMIT ?`,
       )
-      .all(userId, userId, userId, ...args, limit);
+      .all(userId, userId, userId, userId, ...args, limit);
     const level = vipLevel(deps, userId);
-    const items = (rows as Array<Record<string, unknown> & { price_cents: number; purchased: number; board_price_cents: number; board_joined: number }>).map((row) => ({
+    const items = (rows as Array<Record<string, unknown> & { price_cents: number; purchased: number; board_price_cents: number; board_joined: number; board_visibility: string; board_followed: number }>).map((row) => ({
       ...row,
       locked:
         (row.price_cents > 0 && row.purchased === 0 && level === 0) ||
-        (row.board_price_cents > 0 && row.board_joined === 0 && level === 0),
+        (row.board_price_cents > 0 && row.board_joined === 0 && level === 0) ||
+        (row.board_visibility === 'followers' && row.board_followed === 0),
     }));
     res.json({ items, total: items.length, sort, vip_level: level });
   });
@@ -225,16 +252,18 @@ export function createCommunityRouter(deps: ApiDeps): Router {
     const thread = deps.db
       .prepare(
         `SELECT t.*, b.slug AS board_slug, b.id AS board_id, b.name AS board_name, b.price_cents AS board_price_cents,
+                b.visibility AS board_visibility, b.created_by AS board_created_by, b.moderator_id AS board_moderator_id,
                 u.display_name AS author_name,
                 (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
                 (SELECT COUNT(*) FROM community_favorites f WHERE f.thread_id = t.id AND f.user_id = ?) AS favorited,
+                (SELECT COUNT(*) FROM community_board_follows cf WHERE cf.board_id = b.id AND cf.user_id = ?) AS board_followed,
                 (SELECT ROUND(AVG(r.rating), 2) FROM community_ratings r WHERE r.thread_id = t.id) AS rating_avg,
                 (SELECT COUNT(*) FROM community_ratings r WHERE r.thread_id = t.id) AS rating_count,
                 (SELECT rating FROM community_ratings r WHERE r.thread_id = t.id AND r.user_id = ?) AS my_rating
          FROM community_threads t JOIN community_boards b ON b.id = t.board_id LEFT JOIN users u ON u.id = t.author_id
          WHERE t.id = ? AND t.status = 'published'`,
       )
-      .get(userId, userId, userId, id) as
+      .get(userId, userId, userId, userId, id) as
       | (Record<string, unknown> & {
           price_cents: number;
           purchased: number;
@@ -242,6 +271,11 @@ export function createCommunityRouter(deps: ApiDeps): Router {
           board_price_cents: number;
           body: string;
           favorited: number;
+          board_followed: number;
+          board_created_by: string | null;
+          board_moderator_id: string | null;
+          author_id: string | null;
+          accepted_post_id: string | null;
         })
       | undefined;
     if (!thread) throw new AppError('NOT_FOUND', '帖子不存在');
@@ -272,6 +306,14 @@ export function createCommunityRouter(deps: ApiDeps): Router {
           )
           .all(id)
       : [];
+    const episodes = unlocked && thread.kind === 'series'
+      ? deps.db.prepare('SELECT id, title, media_url, poster_url, sort_order FROM community_series_episodes WHERE thread_id = ? ORDER BY sort_order ASC').all(id)
+      : [];
+    const acceptedPost = unlocked && thread.accepted_post_id
+      ? deps.db.prepare('SELECT p.id, p.content, p.created_at, u.display_name AS author_name FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ?').get(thread.accepted_post_id)
+      : null;
+    const canModerate =
+      userId === thread.board_moderator_id || userId === thread.board_created_by || userId === thread.author_id;
     res.json({
       thread: {
         ...thread,
@@ -280,6 +322,9 @@ export function createCommunityRouter(deps: ApiDeps): Router {
         locked: !unlocked,
         board_locked: !boardUnlocked,
         media: unlocked ? media : [],
+        episodes,
+        accepted_post: acceptedPost,
+        can_moderate: canModerate,
         poll: unlocked && options.length > 0 ? { options, total: (options as Array<{ votes: number }>).reduce((sum, option) => sum + option.votes, 0), my_option: myVote?.option_id ?? null } : null,
       },
       posts,
@@ -312,18 +357,24 @@ export function createCommunityRouter(deps: ApiDeps): Router {
           .max(12)
           .optional(),
         poll_options: z.array(z.string().min(1).max(60)).min(2).max(10).optional(),
+        episodes: z.array(z.object({ title: z.string().min(1).max(80), media_url: z.string().min(1).max(500), poster_url: z.string().max(500).optional() })).max(100).optional(),
       }),
       req.body,
     );
-    const board = deps.db.prepare('SELECT id, price_cents FROM community_boards WHERE slug = ?').get(body.board_slug) as
-      | { id: string; price_cents: number }
+    const board = deps.db.prepare('SELECT id, slug, price_cents, post_min_level FROM community_boards WHERE slug = ?').get(body.board_slug) as
+      | { id: string; slug: string; price_cents: number; post_min_level: number }
       | undefined;
     if (!board) throw new AppError('NOT_FOUND', '板块不存在');
-    if (!hasBoardAccess(deps, userId, board.id, board.price_cents)) throw new AppError('FORBIDDEN', '请先加入该付费板块');
+    if (!hasBoardAccess(deps, userId, board.id, board.price_cents)) throw new AppError('FORBIDDEN', '请先加入 / 关注该板块');
+    if (board.post_min_level > 0 && levelOfUser(deps, userId) < board.post_min_level) {
+      throw new AppError('FORBIDDEN', `该板块发帖需 Lv.${board.post_min_level}`, { reason: 'LEVEL_TOO_LOW', required_level: board.post_min_level });
+    }
     const kind = body.kind ?? 'text';
     const media = body.media ?? [];
+    const episodes = body.episodes ?? [];
     if ((kind === 'gallery' || kind === 'series') && !media.some((item) => item.kind === 'image')) throw new AppError('VALIDATION_FAILED', '图集/剧集至少需要一张图片');
     if (kind === 'video' && !media.some((item) => item.kind === 'video')) throw new AppError('VALIDATION_FAILED', '视频帖至少需要一个视频地址');
+    if (kind === 'series' && episodes.length === 0) throw new AppError('VALIDATION_FAILED', '剧集帖至少需要一集');
     if (kind === 'poll' && (!body.poll_options || body.poll_options.length < 2)) throw new AppError('VALIDATION_FAILED', '投票帖至少需要两个选项');
     for (const item of media) {
       if (!/^(https?:)?\//.test(item.url)) throw new AppError('VALIDATION_FAILED', '媒体地址必须是站内路径或 http(s) 地址');
@@ -332,6 +383,16 @@ export function createCommunityRouter(deps: ApiDeps): Router {
           await assertPublicHttpUrl(item.url);
         } catch {
           throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议');
+        }
+      }
+    }
+    for (const item of episodes) {
+      if (!/^(https?:)?\//.test(item.media_url)) throw new AppError('VALIDATION_FAILED', '剧集地址必须是站内路径或 http(s) 地址');
+      if (/^https?:/.test(item.media_url)) {
+        try {
+          await assertPublicHttpUrl(item.media_url);
+        } catch {
+          throw new AppError('VALIDATION_FAILED', '剧集地址不允许指向内网或非法协议');
         }
       }
     }
@@ -355,6 +416,11 @@ export function createCommunityRouter(deps: ApiDeps): Router {
         deps.db
           .prepare('INSERT INTO community_poll_options (id, thread_id, label, sort_order) VALUES (?, ?, ?, ?)')
           .run(`poll-${randomUUID()}`, id, label, index);
+      });
+      episodes.forEach((item, index) => {
+        deps.db
+          .prepare('INSERT INTO community_series_episodes (id, thread_id, title, media_url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`episode-${randomUUID()}`, id, item.title, item.media_url, item.poster_url ?? null, index, ts);
       });
     });
     tx();
@@ -507,6 +573,83 @@ export function createCommunityRouter(deps: ApiDeps): Router {
     });
     tx();
     res.status(201).json({ joined: true, charged_cents: charge, via: viaVip ? 'vip' : 'balance' });
+  });
+
+  /** 关注 / 取消关注板块：followers 可见板块的准入动作，同时用于普通板块订阅。 */
+  router.post('/community/boards/:slug/follow', (req, res) => {
+    const userId = req.user!.id;
+    const board = deps.db.prepare('SELECT id, name FROM community_boards WHERE slug = ?').get(req.params.slug) as { id: string; name: string } | undefined;
+    if (!board) throw new AppError('NOT_FOUND', '板块不存在');
+    const existing = deps.db.prepare('SELECT 1 AS ok FROM community_board_follows WHERE board_id = ? AND user_id = ?').get(board.id, userId);
+    if (existing) {
+      deps.db.prepare('DELETE FROM community_board_follows WHERE board_id = ? AND user_id = ?').run(board.id, userId);
+      return res.json({ followed: false });
+    }
+    deps.db.prepare('INSERT INTO community_board_follows (board_id, user_id, created_at) VALUES (?, ?, ?)').run(board.id, userId, now());
+    return res.json({ followed: true });
+  });
+
+  /** 创建板块：Lv.5 或 VIP 可建，每人最多 3 个；创建者自动成为版主。 */
+  router.post('/community/boards', (req, res) => {
+    const userId = req.user!.id;
+    const body = parse(
+      z.object({
+        slug: z.string().min(2).max(40).regex(/^[a-z0-9-]+$/, 'slug 只能是小写字母、数字与连字符'),
+        name: z.string().min(2).max(40),
+        description: z.string().max(200).default(''),
+        icon: z.string().max(8).default('🧩'),
+        price_cents: z.number().int().min(0).max(100000).default(0),
+        visibility: z.enum(['public', 'followers']).default('public'),
+        post_min_level: z.number().int().min(0).max(10).default(0),
+      }),
+      req.body,
+    );
+    if (vipLevel(deps, userId) === 0 && levelOfUser(deps, userId) < 5) {
+      throw new AppError('FORBIDDEN', '创建板块需 Lv.5 或 VIP 会员', { reason: 'BOARD_CREATE_FORBIDDEN' });
+    }
+    const created = deps.db.prepare('SELECT COUNT(*) AS count FROM community_boards WHERE created_by = ?').get(userId) as { count: number };
+    if (created.count >= 3) throw new AppError('VALIDATION_FAILED', '每人最多创建 3 个板块', { reason: 'BOARD_CREATE_LIMIT' });
+    if (deps.db.prepare('SELECT 1 AS ok FROM community_boards WHERE slug = ?').get(body.slug)) throw new AppError('CONFLICT', '板块 slug 已存在');
+    const maxSort = (deps.db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS max FROM community_boards').get() as { max: number }).max;
+    const ts = now();
+    deps.db
+      .prepare(
+        `INSERT INTO community_boards (id, slug, name, description, icon, sort_order, price_cents, visibility, post_min_level, created_by, moderator_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(`board-${randomUUID()}`, body.slug, body.name, body.description, body.icon, maxSort + 1, body.price_cents, body.visibility, body.post_min_level, userId, userId, ts);
+    res.status(201).json({ ok: true, slug: body.slug });
+  });
+
+  /** 问答采纳：仅提问者可采纳本贴的一条回复；重复采纳覆盖旧结果。 */
+  router.post('/community/threads/:id/accept', (req, res) => {
+    const userId = req.user!.id;
+    const body = parse(z.object({ post_id: z.string().min(1).max(80) }), req.body);
+    const thread = deps.db.prepare("SELECT id, author_id, kind FROM community_threads WHERE id = ? AND status = 'published'").get(req.params.id) as
+      | { id: string; author_id: string | null; kind: string }
+      | undefined;
+    if (!thread) throw new AppError('NOT_FOUND', '帖子不存在');
+    if (thread.author_id !== userId) throw new AppError('FORBIDDEN', '只有提问者可以采纳回复');
+    if (thread.kind !== 'qa') throw new AppError('VALIDATION_FAILED', '只有问答帖支持采纳');
+    const post = deps.db.prepare('SELECT id FROM community_posts WHERE id = ? AND thread_id = ?').get(body.post_id, thread.id);
+    if (!post) throw new AppError('NOT_FOUND', '回复不存在');
+    deps.db.prepare('UPDATE community_threads SET accepted_post_id = ?, updated_at = ? WHERE id = ?').run(body.post_id, now(), thread.id);
+    res.json({ ok: true, accepted_post_id: body.post_id });
+  });
+
+  /** 删除帖子：作者、版主或板块创建者可软删（status=hidden），保留数据可审计。 */
+  router.delete('/community/threads/:id', (req, res) => {
+    const userId = req.user!.id;
+    const row = deps.db
+      .prepare(
+        `SELECT t.id, t.author_id, b.created_by, b.moderator_id
+         FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE t.id = ?`,
+      )
+      .get(req.params.id) as { id: string; author_id: string | null; created_by: string | null; moderator_id: string | null } | undefined;
+    if (!row) throw new AppError('NOT_FOUND', '帖子不存在');
+    if (row.author_id !== userId && row.created_by !== userId && row.moderator_id !== userId) throw new AppError('FORBIDDEN', '只有作者或版主可以删除');
+    deps.db.prepare("UPDATE community_threads SET status = 'hidden', updated_at = ? WHERE id = ?").run(now(), row.id);
+    res.json({ ok: true });
   });
 
   /** 积分转账：按 Mim ID 转给其他用户，双方各记一条流水。 */
