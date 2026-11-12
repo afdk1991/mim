@@ -51,8 +51,8 @@ describe('站点模块注册表与公开目录', () => { // 浏览类端点匿�
     expect(res.body.items).toBe(88); // 每模块 2 条演示数据
     expect(res.body.source).toContain('主机记录与备注'); // 依据说明
     expect(res.body.moduleBasis).toContain('业务系统'); // 模块划分依据
-    // 落地状态四态计数：已落地 4 / 部分相邻 19 / 规划中 19 / 语义冲突 2，合计 44
-    expect(res.body.implementation).toEqual({ implemented: 4, partial: 19, planned: 19, conflict: 2 });
+    // 落地状态四态计数：已落地 5 / 部分相邻 18 / 规划中 19 / 语义冲突 2，合计 44
+    expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 });
   }); // overview 用例结束
 
   it('GET /sites 返回 44 模块且每条备注原文与共享注册表逐字一致', async () => { // 零漂移断言

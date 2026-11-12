@@ -29,8 +29,8 @@ describe('统一入口配置清单：规模与去重整理', () => { // 清单�
     expect(res.body.placeholders).toBe(46); // 44 入口 + @ 根域名 + 空白占位
     expect(res.body.configured).toBe(0); // 未提供具体主机值
     expect(res.body.unconfigured).toBe(44); // 全部仍为占位状态
-    // 落地状态四态计数：已落地 4 / 部分相邻 19 / 规划中 19 / 语义冲突 2
-    expect(res.body.implementation).toEqual({ implemented: 4, partial: 19, planned: 19, conflict: 2 });
+    // 落地状态四态计数：已落地 5 / 部分相邻 18 / 规划中 19 / 语义冲突 2
+    expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 });
   }); // overview 用例结束
 
   it('去重口径：88 行业务备注合并 44 项，@ 两行与 11 行空白各合并为 1 项', async () => {
