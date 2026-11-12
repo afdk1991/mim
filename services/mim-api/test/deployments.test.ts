@@ -18,18 +18,18 @@ beforeEach(() => { // 每例前置：重建内存库与应用
 }); // beforeEach 结束
 
 describe('部署汇总总览', () => { // 公开只读端点
-  it('overview 返回全量部署项 / 10 矩阵平台 / 5 CI 作业 / 4 部署作业 / 空数据项', async () => { // 规模断言
+  it('overview 返回全量部署项 / 11 矩阵平台 / 5 CI 作业 / 4 部署作业 / 空数据项', async () => { // 规模断言
     const res = await request(app).get('/api/v1/deployments/overview'); // 公开汇总
     expect(res.status).toBe(200); // 匿名 200
     expect(res.body.schema).toBe('mim.deployment-registry.v1'); // 契约版本
     expect(res.body.total).toBe(DEPLOYMENT_ITEMS.length); // 去重后的规范部署项（动态，与注册表零漂移）
-    expect(res.body.matrix_platforms).toBe(10); // 铁律九 10 平台（2026-11-10 起含 Gitee 镜像仓）
+    expect(res.body.matrix_platforms).toBe(11); // 铁律九 11 平台（2026-11-13 起 Netlify 接替退休的 Sealos）
     expect(res.body.ci_jobs).toBe(5); // deploy.yml 五作业
     expect(res.body.deploy_ci_jobs).toBe(4); // verify 为门禁，不计入
     expect(res.body.git_remotes).toBe(2); // origin + gitee 双远端
     expect(res.body.empty_result).toBe(DEPLOYMENT_ITEMS.filter((i) => i.result === null).length); // 空数据项（result=null）动态计数
     expect(res.body.with_result + res.body.empty_result).toBe(res.body.total); // 有取证 + 空数据 = 总数
-    expect(res.body.platforms.filter((p: { in_matrix: boolean }) => p.in_matrix)).toHaveLength(10); // 平台目录标记
+    expect(res.body.platforms.filter((p: { in_matrix: boolean }) => p.in_matrix)).toHaveLength(11); // 平台目录标记
     expect(res.body.excluded).toBe(DEPLOYMENT_EXCLUDED.length); // 候选池 / 排除项数量（数字，不与明细字段混淆）
     expect(res.body.excluded_items.length).toBe(DEPLOYMENT_EXCLUDED.length); // 排除项明细明确列出且不计入
     expect(res.body.ci_job_list).toHaveLength(5); // CI 作业明细与数字口径分离
