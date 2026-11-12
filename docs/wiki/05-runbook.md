@@ -427,7 +427,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 |---|---|---|---|
 | 腾讯云自建服务器（生产） | `mim.mixm.top` | `A \| mim \| 115.159.159.11`（TTL 600） | 正常（2026-11-01 16:44:49） |
 | 生产证书签发校验（Let's Encrypt DNS-01） | —（校验用，不提供访问） | `TXT \| _dnsauth.mim \| 20261101085017crjbxlenk4ad73ctm41heelf10vswxc`（TTL 600） | 正常（2026-11-01 16:50:18） |
-| 腾讯云 EdgeOne Pages | `data.mixm.top` | `CNAME \| data \| data.mixm.top.pages.dnsoe5.com.`（TTL 600） | 正常（2026-11-01 21:18:09） |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `CNAME \| data \| data.mixm.top.pages.dnsoe5.com.`（TTL 600） | ⚠️ 2026-11-12 复核：记录仍在，但**目标域 `data.mixm.top.pages.dnsoe5.com` 已 NXDOMAIN**（默认 DNS 与 8.8.8.8 双验证），`data.mixm.top` 因此无 A 记录、站点不可达；需 EdgeOne 控制台重取 CNAME 后更新本记录 |
 | Gitee（码云）镜像仓 | `gitee.com`（平台方域名） | 不经 DNSPod，`mixm.top` 下无对应记录；仓库路径 `mallwm_admin/mim` | 2026-11-10 22:20 实测 200 / 0.469s / 52034B |
 | GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 | 平台方域名（`*.github.io` / `*.cloud.sealos.io` / `*.pages.dev` / `ghcr.io` / `*.iga-pages.com` / `*.vercel.app` / `github.com`） | 不经 DNSPod，`mixm.top` 下无对应记录 | — |
 

@@ -1115,11 +1115,34 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **口径漂移更正**：注册表 / README 旧述 Sealos「`SEALOS_KUBECONFIG` 等已配置、CI 自动发布」与本轮 secrets 实测不符——本轮 7 个已配 secret 中无任何 `SEALOS_*`，Sealos step 实际 SKIP；历史 `2026-11-09 23:03 /health 200` 快照按铁律三保留为留痕，现状以本表为准。
 
+#### 9.32 全平台访问域名可访问性验证（2026-11-12 17:5x +08:00，HEAD `fd2cf60`）
+
+**性质**：用户指令「验证整个 `F:\合并项目\Mim` 项目所有平台访问域名」。本轮只做验证与登记修正，不改业务代码；取证采用**双出口**：本机（宁波，CST）`curl.exe -k --ssl-no-revoke` + `Resolve-DnsName`，以及 GitHub Runner 独立出口（run **`43194019481`** @ `fd2cf60`，五作业全 success）。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 取证覆盖 | `.github/workflows/deploy.yml`「线上取证」由 3 个 URL 扩为 **13 个平台域名**，输出 `code\|size\|time\|remote_ip` | 提交 `fd2cf60`，`origin` / `gitee` 双推 exit 0 |
+| 生产主站 | `/health` 200 / 53B、`/` 200 / 5305B、`/api/v1/modules` 200 / 10046B；`/marketplace` `/signin` `/deployments` 200、旧段 `/store` 301 → `/marketplace`、`/api/v1/health` 404（只暴露 `/health`） | 本机 curl（27–121ms）+ CI 出口同值 |
+| 静态分发 | `mim-299.pages.dev` 200 / 5305B；`afdk1991.github.io/mim/` 200 / 5305B；`mim-puce.vercel.app` 200 / **5182B**（本机 TLS 阻断，CI 取证） | 双出口 |
+| 源码 / 包 | `gitee.com/mallwm_admin/mim` 200；`github.com/afdk1991/mim` 200（本机 hosts 解析 `127.0.0.1`）；`ghcr.io/v2/` 401 / 73B（预期） | 本机 + CI |
+| **EdgeOne 入口失效** | `data.mixm.top` CNAME → `data.mixm.top.pages.dnsoe5.com`（TTL 10）仍存在，但**该目标在默认 DNS 与 `8.8.8.8` 下均 NXDOMAIN**，故 `data.mixm.top` 无 A 记录；本机 000 / 180ms、CI 000 / 0.26s。判断为 EdgeOne 侧分配的 CNAME 目标已被回收 / 变更（与 2026-11-11 项目名迁移时间点吻合），DNSPod 仍指旧目标 | `Resolve-DnsName` 双查 + 双出口 |
+| **Sealos 不可达** | DNS 正常（`34.87.102.86` 等 GCP 段）；本机 TLS `Recv failure: Connection was reset`（exit 35）、CI 000 / 0.46s。服务 / Ingress / 实例侧不可用，非解析问题；且 secrets 仍无 `SEALOS_*`，CI step 恒 SKIP | 本机 curl -v + CI |
+| **IGA 登记入口修正** | `preview.iga-pages.com` 与 `iga-pages.com` apex 均无 A 记录（双 000），登记入口本身不成立；真实入口为 **`mim.preview.iga-pages.com`**，实测 **401 / 2413B**（同 `fr95fuwu57.preview.iga-pages.com` 解析 `115.231.191.209`），即站点在线但受访问保护 | DNS + curl；`deploymentRegistry.json` 的 `entry_url` 已修正 |
+| **Worker 根路径 404** | CI 出口 `mim-store.15726833367.workers.dev/ => 404 / 17B / 172.67.150.222`（Worker 存活、无根路由）；本机 DNS 污染至 `31.13.88.26`，41s 超时 | CI 出口 |
+| 未解析自定义域 | `portal` / `m` / `api` / `test` / `store` / `dev` / `shop`.mixm.top 仍无 A/CNAME（`customDomains.json` 既有 pending） | `Resolve-DnsName` |
+| 登记修正（铁律七） | `deploymentRegistry.json`：`capturedAt` / `head` 刷新为 `2026-11-12 17:55` / `fd2cf60`；`pages.edgeone` 由 200/981B 改为 FAIL/000 + DNS 证据；`pages.vercel` 改为 PASS/200/5182B + `CONTENT_STALE`；`container.sealos` FAIL/000；`pages.iga` `entry_url` → `mim.preview.iga-pages.com` + 401 结果；`worker.mim-store` 404/17B | 文件本体 |
+| 门禁 | `yaml.safe_load` → `yaml_ok jobs=5`；`verify-deployments` **55/55**；`comment-check --strict` 0；`verify-custom-domains` 20/20（静态契约，不做 live 探测） | 本轮命令回显 |
+
+**结论**：13 个对外地址中 **9 个可达**、**3 个不可达**（`data.mixm.top` / Sealos `/health` / 旧登记 `preview.iga-pages.com`）、**1 个可达但内容异常**（Worker 根路径 404、Vercel 产物落后 5182B vs 5305B）。逐项证据与处置建议见 [docs/平台域名验证-20261112.md](./docs/平台域名验证-20261112.md)。修复动作（EdgeOne 重取 CNAME + DNSPod 更新、Sealos 控制台核查、补 Vercel / Sealos 凭据）均需外部控制台或私有凭据，本轮未擅自改动线上 DNS 与平台配置。
+
 ---
 
 ---
 
 若「必须引入第三方依赖」（铁律五）或「禁止只做本地预览、必须生产部署」（铁律八）与「AI 负责执行」（铁律一）在特定环境下冲突（如沙箱无网络、包管理器不可达、目标环境限制依赖数量、生产主机不可达），以铁律一（执行优先）为最高位：AI 可改用本地实现、精简功能或寻找替代方案，但执行时必须在报告中显式标注「已偏离铁律五 / 铁律八」并说明理由，便于用户回溯。
+
+
+
 
 
 
