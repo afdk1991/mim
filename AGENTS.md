@@ -31,6 +31,8 @@
 > **现行状态覆盖（2026-11-12 18:2x +08:00，免登录体验上线）**：全站**不再有「此功能需登录后使用」门禁**。前端启动时若本地无会话，自动调用 `POST /api/v1/auth/guest` 领取匿名访客会话（`users.is_guest=1`，同样自动分配 Mim ID、同样签发 access/refresh 双令牌），`/marketplace`、`/products`、`/cart`、`/account`、`/entry-catalog`、`/deployments`、`/comic-studio`（放映厅 + 创作工作台）、`/chat` 全部免登录直接可用；`/signin` 只承担「把访客升级为正式账号」。访客建号按 IP 限流 30 次/小时（超限 429 `AUTH_GUEST_RATE_LIMITED`）。**本文档下方所有「按需登录 / 内嵌登录卡片 / 只读演示」段落均为历史留痕，按铁律三保留，不得再当作现状引用**；现行口径以 [README.md](./README.md) 前端视图段与 [docs/wiki/05-runbook.md](./docs/wiki/05-runbook.md)「现行覆盖：免登录体验」行为准，实现与取证见 [docs/免登录体验-全站门禁解除-20261112.md](./docs/免登录体验-全站门禁解除-20261112.md)。本轮本地门禁：typecheck 0、api **25 文件 372 例**、`verify-auth-gate` 静态 **39/39** + 浏览器实测 **56/56**、`verify-deployments` 55/55、`verify-site-modules` 83/83、`verify-entry-manifest` 23/23；CI run **`43077258519`** 五作业全绿（含「发布到生产服务器」），线上 `POST /api/v1/auth/guest` 返回 `is_guest=true`、`MIM-10000010`，线上商城以访客身份加购 → 结算 → 权益 `active` 全通，线上浏览器实测 5 个原门禁视图 `.auth-wrap` 计数为 0、console 零报错。
 >
 > **现行状态覆盖（2026-11-12 23:5x +08:00，Mim ID 纯数字靓号制）**：对外编号 `users.member_no` 已由 `MIM-10000001`（前缀 + 8 位补零）改为**纯数字 QQ 号样式**（`1`、`2`、`3` … 上限 `9,999,999,999`），发号从个位起、位数随用户量自然增长；**七类靓号（豹子 / 顺子 / 回文 / ABAB / 整百整千 / 谐音吉利 / 生日号）全部预留、不再自动发放**，`1～99` 属短号段按注册顺序正常发放（若连个位号也预留，就与「从个位起发号」自相矛盾）。存量用户由启动期 `renumberMemberNos` 按 `created_at ASC, id ASC` **一次性全量重排**（`member_no_meta.renumber_v1=done` 开关 → 幂等；旧号逐条写 `member_no_history` 审计表；事务用 `immediate` 先拿写锁，多进程同时启动只会有一个真正改号）。**本文档下方所有形如 `MIM-100000xx` 的号码均为各轮交付当时的取证快照，按铁律三保留，不得再当作现状引用**。实现与取证见 [docs/Mim-ID-纯数字靓号制-20261112.md](./docs/Mim-ID-纯数字靓号制-20261112.md)；本轮本地门禁：typecheck 0、api **30 文件 / 422 例**、`comment-check --strict` 通过、`version-check` `0.0.6`、`env-check` 0；本地开发库副本（40 个存量用户）重排为 `1`～`40`、靓号占用 0、非纯数字残留 0、游标 `41`、审计 40 条，二次启动号码不变且审计不增。
+>
+> **已上线（2026-11-12 23:4x +08:00）**：提交 `9b66978` 已 `origin` / `gitee` 双推，Deploy run **`43249077730`** 五作业全绿（含「发布到生产服务器」）；线上 `/health` = `{"status":"ok","service":"mim-api","version":"0.0.6"}`，连续两次访客建号得 `51` / `52`（纯数字、连号，`GET /me` 回读一致），即生产 50 个存量用户已按注册顺序重排为 `1`～`50`。逐项证据见 [§9.32](#932-mim-id-纯数字靓号制2026-11-12-234x-0800)。
 
 **本轮体检边界（2026-11-10）**：按用户「全项目全面检查与修复」指令，做了三类**可逆**修复——① 把误删的 23 个部署工件从 HEAD 恢复到工作树（`git checkout -- .`）；② 把部署注册表里「工作树缺失」的过时口径改为「已恢复」并重生成核对表（`WORKTREE_ARTIFACT_*_RESTORED`）；③ 修正 `render.yaml`（蓝图 schema 由非法的 `static_sites:` 改为 `services: - type: web / runtime: static`，并补 `routes` 深链接回退）与 `azure-static-web-apps.yml`（补 `staticwebapp.config.json` 回退注入）。**不改任何铁律的约束语义**，未做 `git add / commit / push`、未删除任何文件、未触发任何线上部署。
 >
@@ -1221,3 +1223,25 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 **放映厅实现要点**：`ComicTheater.tsx` 新增 `kindFilter`（all / comic-drama / ai-drama）与 `query`，派生 `filteredWorks`；`continueItems` 读取本地看片进度，展示「继续观看」横向卡片；视频 `onEnded` 自动切下一集；`styles.css` 新增 `.theater-toolbar` / `.theater-chips` / `.theater-search` / `.theater-continue*`。
 
 **未做**：未新增第三部演示片（`apps/web/public/demo` 仅两套开放授权片源，避免用同一片源伪造多部作品）；GitHub Pages 22s 首载仍受本地链路限制，未再拆路由级 lazy load；并行会话的支付 / 履约 / 财务 / 成长 / i18n 未提交路由不在本轮提交范围，未纳入本次部署。
+
+---
+
+### 9.32 Mim ID 纯数字靓号制（2026-11-12 23:4x +08:00）
+
+**性质**：对外编号形态改造轮（按用户「彻底方案：从个位纯数字开始 + 全量重排 + 把所有靓号保留」）。提交 `9b66978`，`origin` 与 `gitee` 双推，Deploy run **`43249077730`** 五作业全绿（含「发布到生产服务器」）。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 号码形态 | `users.member_no` 由 `MIM-10000001`（前缀 + 8 位补零）改为**纯数字**，起点 `1`、上限 `9,999,999,999`；`MEMBER_NO_PREFIX` 已删除 | `config.ts`、`identity.ts`、`schema.sql` |
+| 靓号预留 | 七类判定收敛到 `src/member-no.ts` 的 `classifyPremiumNo`：repeat / ladder / palindrome / abab / round / pronounce / birthday；发号与重排统一跳过；`1～99` 短号段按注册顺序正常发放 | 单测 14 例 + 代码 |
+| 存量重排 | 启动期 `renumberMemberNos` 按 `created_at ASC, id ASC` 一次性全量重排；`immediate` 事务先拿写锁、号码列整体置 `NULL` 规避唯一索引中间态、旧号写 `member_no_history`、完成标记 `member_no_meta(renumber_v1)` → 重复启动返回空数组即幂等 | 本地库副本（40 用户 → `1`～`40`，审计 40 条，二次启动号码不变） |
+| 线上版本 | `/health` = `{"status":"ok","service":"mim-api","version":"0.0.6"}` | CI 作业日志「线上健康检查」+ 本机 `curl` |
+| 线上发号 | 连续两次 `POST /api/v1/auth/guest` 得 `member_no` = **`51`**、**`52`**（纯数字、连号）；`GET /me` 回读 `52` 一致 | 本机 `curl`（2026-11-12 23:4x） |
+| 推证存量已重排 | 游标从 `51` 起发号 ⇒ 生产 50 个存量用户已按注册顺序占用 `1`～`50`，与本地副本规则一致 | 同上 |
+| 本地门禁 | `pnpm -r typecheck` 0；api **30 文件 / 422 例全过**；`comment-check --strict` 通过；`version-check` `0.0.6`；`env-check` 188 变量 / missing 0 / extra 0；web / admin / api / 根 `dist` 四套构建 0 | 真实命令输出 |
+| 校验脚本 | `verify-deployments` 55/55、`verify-site-modules` 83/83、`verify-entry-manifest` 23/23、`verify-auth-gate` 39/39、`verify-site-directory` PASS、`verify-custom-domains` **20/20** | 真实命令输出 |
+| 顺带修复 | `packages/core-domain/src/customDomains.json` 第 551 行把已移出矩阵的 `container.sealos`（`api.mixm.top` 行）改为 `worker.mim-api-edge`，`status_note` / `next_steps` 同步为 Worker 口径；该失败在 `8c5d805` 即已存在，本轮由 19/20 转 20/20 | `verify-custom-domains` 前后对比 |
+| 平台矩阵 | 自建 200 / 0.050s / 5305B；Cloudflare Pages 200 / 1.060s / 5305B；GitHub Pages 200 / 0.404s / 5305B；Gitee 200 / 0.637s / 94532B；ghcr 401 / 1.151s / 73B（未鉴权属正常）；Worker `mim-api-edge.…workers.dev` 本机 000 / 21.3s；Vercel 000 / 21.1s | 本机 `curl -w`（2026-11-12 23:4x） |
+| 未做 | IGA Pages（需 `iga_token`，未测）；生产库逐行核对（无 SSH 私钥，以发号游标 + 本地副本互证替代）；浏览器端点按取号流程（改用 API 复验） | — |
+
+**提交范围说明**：本轮只提交 Mim ID 相关 24 个文件；并行会话当轮的 `payments.ts` / `app.ts` / `routes/community.ts` / `routes/payments.ts` / `security.ts` / `routes/security.ts` 等未提交改动**未被带入**，仍留在工作树。
