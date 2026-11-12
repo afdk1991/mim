@@ -40,7 +40,7 @@ function setup() { // 复用装配
 describe('实名认证（人工审核）', () => { // 实名维度
   it('提交后只存哈希与脱敏片段：库内查不到明文姓名与证件号', async () => { // 脱敏硬约束
     const { app, deps, token } = setup(); // 装配
-    const submit = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    const submit = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 构造：准备本用例需要的输入、句柄或期望值
       .send({ id_type: 'id_card', name: '张三', id_number: '110101199001011234' }); // 提交实名
     expect(submit.status).toBe(201); // 提交成功
     expect(submit.body.status).toBe('pending'); // 进入待审
@@ -58,7 +58,7 @@ describe('实名认证（人工审核）', () => { // 实名维度
 
   it('格式非法的姓名 / 证件号返回 400 REALNAME_INVALID', async () => { // 格式校验
     const { app, token } = setup(); // 装配
-    const res = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    const res = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 构造：准备本用例需要的输入、句柄或期望值
       .send({ id_type: 'id_card', name: '张三', id_number: 'abcdefghijklmnop' }); // 长度达标但格式非法的证件号
     expect(res.status).toBe(400); // 参数错误
     expect(res.body.code).toBe('REALNAME_INVALID'); // 明确错误码
@@ -66,9 +66,9 @@ describe('实名认证（人工审核）', () => { // 实名维度
 
   it('待审状态下重复提交返回 409 REALNAME_ALREADY_SUBMITTED', async () => { // 重复提交拦截
     const { app, token } = setup(); // 装配
-    await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 执行：等待接口或数据库操作返回
       .send({ id_type: 'id_card', name: '张三', id_number: '110101199001011234' }); // 首次提交
-    const duplicate = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    const duplicate = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 构造：准备本用例需要的输入、句柄或期望值
       .send({ id_type: 'id_card', name: '张三', id_number: '110101199001011234' }); // 重复提交
     expect(duplicate.status).toBe(409); // 状态冲突
     expect(duplicate.body.code).toBe('REALNAME_ALREADY_SUBMITTED'); // 明确错误码
@@ -76,7 +76,7 @@ describe('实名认证（人工审核）', () => { // 实名维度
 
   it('本人可查询审核状态与脱敏视图', async () => { // 状态查询
     const { app, token } = setup(); // 装配
-    await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 执行：等待接口或数据库操作返回
       .send({ id_type: 'id_card', name: '李四', id_number: '310101198505056789' }); // 提交
     const res = await request(app).get('/api/v1/auth/realname/status').set('Authorization', `Bearer ${token}`); // 查询本人状态
     expect(res.status).toBe(200); // 查询成功
@@ -87,7 +87,7 @@ describe('实名认证（人工审核）', () => { // 实名维度
 
   it('管理端队列可见待审记录；驳回 → 重新提交 → 通过，状态机完整流转', async () => { // 审核流转
     const { app, deps, token, user } = setup(); // 装配
-    await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 执行：等待接口或数据库操作返回
       .send({ id_type: 'id_card', name: '王五', id_number: '440101199202023456' }); // 提交待审
 
     const queue = await request(app).get('/api/v1/admin/realname/queue').set('x-admin-token', ADMIN_TOKEN); // 引导通道取队列
@@ -95,18 +95,18 @@ describe('实名认证（人工审核）', () => { // 实名维度
     expect(queue.body.queue).toHaveLength(1); // 一条待审
     const recordId = queue.body.queue[0].id as string; // 记录主键
 
-    const reject = await request(app).post(`/api/v1/admin/realname/${recordId}/review`).set('x-admin-token', ADMIN_TOKEN)
+    const reject = await request(app).post(`/api/v1/admin/realname/${recordId}/review`).set('x-admin-token', ADMIN_TOKEN) // 构造：准备本用例需要的输入、句柄或期望值
       .send({ decision: 'reject', reason: '证件照片不清晰，请重传' }); // 驳回
     expect(reject.status).toBe(200); // 审核成功
     expect(reject.body.status).toBe('rejected'); // 状态驳回
     expect(reject.body.reject_reason).toContain('不清晰'); // 原因回填
 
-    const resubmit = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`)
+    const resubmit = await request(app).post('/api/v1/auth/realname/submit').set('Authorization', `Bearer ${token}`) // 构造：准备本用例需要的输入、句柄或期望值
       .send({ id_type: 'id_card', name: '王五', id_number: '440101199202023456' }); // 驳回后重新提交
     expect(resubmit.status).toBe(201); // 允许重新进入待审
     expect(resubmit.body.status).toBe('pending'); // 回到待审
 
-    const approve = await request(app).post(`/api/v1/admin/realname/${recordId}/review`).set('x-admin-token', ADMIN_TOKEN)
+    const approve = await request(app).post(`/api/v1/admin/realname/${recordId}/review`).set('x-admin-token', ADMIN_TOKEN) // 构造：准备本用例需要的输入、句柄或期望值
       .send({ decision: 'approve' }); // 通过
     expect(approve.status).toBe(200); // 审核成功
     expect(approve.body.status).toBe('approved'); // 状态通过

@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import type { Locale } from '@mim/i18n';
 import { api, errorText, getSession } from '../api';
 import type {
+  BoardTab,
   CommunityBoard,
   CommunityPost,
   CommunityThread,
@@ -65,6 +66,27 @@ const TX_KIND: Record<WalletTransaction['kind'], string> = {
   points: '积分',
 };
 
+/** 板块内置默认 Tab：接口缺失 / 404 时回落这套栏目组合，保证论坛可按口径排序。 */
+const DEFAULT_BOARD_TABS: BoardTab[] = [
+  { key: 'latest', label: '最新', order: 10, visible: true, sort: 'latest' },
+  { key: 'hot', label: '热门', order: 20, visible: true, sort: 'hot' },
+  { key: 'recommend', label: '推荐指数', order: 30, visible: true, sort: 'recommend' },
+  { key: 'rating', label: '评分', order: 40, visible: true, sort: 'rating' },
+  { key: 'favorites', label: '收藏', order: 50, visible: true, sort: 'favorites' },
+];
+
+/** 归一化后端 Tab：兼容 sort_order/sort_by 与冻结契约 order/sort 两套字段名。 */
+function normalizeBoardTabs(raw: BoardTab[] | undefined): BoardTab[] {
+  if (!Array.isArray(raw)) return DEFAULT_BOARD_TABS;
+  return raw.map((tab, index) => ({
+    key: typeof tab.key === 'string' ? tab.key : '',
+    label: typeof tab.label === 'string' ? tab.label : tab.key,
+    order: tab.sort_order ?? tab.order ?? index,
+    visible: tab.visible !== false,
+    sort: tab.sort_by ?? tab.sort ?? tab.key,
+  })).filter((tab) => tab.key);
+}
+
 function yuan(cents: number): string {
   return `¥${(cents / 100).toFixed(2)}`;
 }
@@ -94,7 +116,9 @@ export function Community({ locale }: Props) {
 
   const [board, setBoard] = useState('all');
   const [kind, setKind] = useState('all');
-  const [sort, setSort] = useState<'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating'>('latest');
+  const [sort, setSort] = useState<'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating' | 'recommend'>('latest');
+  const [boardTabs, setBoardTabs] = useState<BoardTab[]>(DEFAULT_BOARD_TABS); // 板块栏目配置（回落内置默认）
+  const [tabsDirty, setTabsDirty] = useState(false); // 栏目显隐是否有待保存改动
   const [query, setQuery] = useState('');
   const [threads, setThreads] = useState<CommunityThread[]>([]);
   const [selected, setSelected] = useState<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean } | null>(null);
@@ -221,6 +245,48 @@ export function Community({ locale }: Props) {
       .then((data) => setFavorites(data.items))
       .catch((err) => setError(errorText(locale, err)));
   }, [favoritesOpen]);
+
+  // 板块栏目：切换板块时拉取 Tab 配置；接口缺失 / 404 回落内置默认 Tab，不报错。
+  useEffect(() => {
+    if (board === 'all') {
+      setBoardTabs(DEFAULT_BOARD_TABS);
+      setTabsDirty(false);
+      return;
+    }
+    let cancelled = false; // 卸载 / 切板块后丢弃过期结果
+    api.community
+      .boardTabs(board)
+      .then((data) => { if (!cancelled) { setBoardTabs(normalizeBoardTabs(data.tabs)); setTabsDirty(false); } })
+      .catch(() => { if (!cancelled) { setBoardTabs(DEFAULT_BOARD_TABS); setTabsDirty(false); } });
+    return () => { cancelled = true; };
+  }, [board]);
+
+  /** 待展示栏目：按 order / sort_order 升序，仅渲染可见项。 */
+  const visibleBoardTabs = [...boardTabs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).filter((tab) => tab.visible);
+
+  /** 切换栏目显隐（版主本地编辑，保存后落库）。 */
+  function toggleTabVisible(key: string) {
+    setBoardTabs((prev) => prev.map((tab) => (tab.key === key ? { ...tab, visible: !tab.visible } : tab)));
+    setTabsDirty(true);
+  }
+
+  /** 保存栏目组合：顺序 / 显隐 / 排序口径整体提交。 */
+  async function saveBoardTabs() {
+    if (board === 'all') return;
+    try {
+      await api.community.saveBoardTabs(board, boardTabs.map((tab) => ({
+        key: tab.key,
+        label: tab.label,
+        visible: tab.visible,
+        sort_order: tab.order,
+        sort_by: tab.sort,
+      })));
+      setTabsDirty(false);
+      setNotice(locale === 'en-US' ? 'Tabs saved' : '栏目已保存');
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
 
   async function openThread(id: string) {
     try {
@@ -524,6 +590,8 @@ export function Community({ locale }: Props) {
   }
 
   const currentBoard = boards.find((b) => b.slug === board);
+  /** 当前板块是否可管理栏目（版主 / 创建者）。 */
+  const canManageTabs = !!currentBoard?.is_moderator;
 
   return (
     <section className="community-wrap"> // 区块 community-wrap
@@ -597,6 +665,39 @@ export function Community({ locale }: Props) {
               ))}
               <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => setFavoritesOpen((v) => !v)}>我的收藏</button> // 按钮
             </div>
+            {/* 板块栏目：读后台 Tab 配置，按 order/visible/sort 渲染；版主可切换显隐并保存。接口缺失时回落内置默认 Tab。 */}
+            {board !== 'all' && (
+              <div className="community-chips board-tabs">
+                {visibleBoardTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={sort === tab.sort ? 'is-active' : ''}
+                    onClick={() => setSort(tab.sort as typeof sort)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                {canManageTabs && (
+                  <>
+                    {boardTabs.map((tab) => (
+                      <button
+                        key={`eye-${tab.key}`}
+                        type="button"
+                        className="board-tab-eye"
+                        title={`${tab.visible ? '隐藏' : '显示'} ${tab.label}`}
+                        onClick={() => toggleTabVisible(tab.key)}
+                      >
+                        {tab.visible ? '👁' : '🚫'}
+                      </button>
+                    ))}
+                    <button type="button" className="btn ghost small" disabled={!tabsDirty} onClick={() => void saveBoardTabs()}>
+                      {locale === 'en-US' ? 'Save tabs' : '保存栏目'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             <div className="community-filters"> // 区块 community-filters
               <select value={kind} onChange={(e) => setKind(e.target.value)}> // 表单控件
                 <option value="all">全部形态</option> // 元素 option
@@ -608,6 +709,7 @@ export function Community({ locale }: Props) {
               <button type="button" className={sort === 'replies' ? 'is-active' : ''} onClick={() => setSort('replies')}>回帖</button> // 按钮
               <button type="button" className={sort === 'favorites' ? 'is-active' : ''} onClick={() => setSort('favorites')}>收藏</button> // 按钮
               <button type="button" className={sort === 'rating' ? 'is-active' : ''} onClick={() => setSort('rating')}>评分</button> // 按钮
+              <button type="button" className={sort === 'recommend' ? 'is-active' : ''} onClick={() => setSort('recommend')}>推荐指数</button> // 推荐指数排序，对齐后端 recommend 口径
               <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void loadThreads(); }} placeholder="搜索帖子…" /> // 表单控件
               <button type="button" onClick={() => void loadThreads()}>搜索</button> // 按钮
               <button type="button" className="is-primary" onClick={() => setComposerOpen((v) => !v)}>发帖</button> // 按钮

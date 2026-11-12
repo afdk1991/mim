@@ -42,6 +42,11 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const bindings = useAsync(() => api.oauthBindings(), []); // 已绑定的第三方身份
   const [providers, setProviders] = useState<OAuthProviderInfo[]>([]); // 可绑定的第三方清单
   const [linking, setLinking] = useState<string | null>(null); // 正在跳转的提供方
+  const realname = useAsync(() => api.realname.status(), []); // 实名状态：未提交时 record 为 null
+  const [realName, setRealName] = useState(''); // 待提交的真实姓名
+  const [realIdType, setRealIdType] = useState<'id_card' | 'passport' | 'other'>('id_card'); // 证件类型
+  const [realIdNumber, setRealIdNumber] = useState(''); // 待提交的证件号
+  const [realBusy, setRealBusy] = useState(false); // 实名提交中间态
 
   const user = me.data?.user; // 当前用户
   const isGuest = !!user?.is_guest; // 访客没有正式账号凭据：账号与设置只在登录后的个人中心出现
@@ -100,6 +105,25 @@ export function Profile({ locale, onUserUpdated }: Props) {
       setError(errorText(locale, err)); // AUTH_OAUTH_LAST_METHOD 等
     } // try 结束
   } // unlinkProvider 结束
+
+  /** 提交实名：明文姓名与证件号只发往后端，页面不落本地存储 */
+  async function submitRealname(event: FormEvent) {
+    event.preventDefault(); // 阻止整页刷新
+    setError(null); // 清空旧错误
+    setMessage(null); // 清空旧提示
+    setRealBusy(true); // 禁用提交按钮
+    try {
+      await api.realname.submit({ id_type: realIdType, name: realName.trim(), id_number: realIdNumber.trim() }); // 后端只存摘要与后四位
+      setRealName(''); // 提交成功立即清空姓名输入
+      setRealIdNumber(''); // 提交成功立即清空证件号输入
+      realname.reload(); // 刷新审核状态
+      setMessage(isZh ? '实名资料已提交，等待审核' : 'Real-name submitted for review'); // 明确后续状态
+    } catch (err) {
+      setError(errorText(locale, err)); // REALNAME_INVALID / REALNAME_ALREADY_SUBMITTED 等
+    } finally {
+      setRealBusy(false); // 恢复按钮
+    } // try 结束
+  } // submitRealname 结束
 
   /** 保存资料三项 */
   async function save(event: FormEvent) {
@@ -290,6 +314,49 @@ export function Profile({ locale, onUserUpdated }: Props) {
               {isZh ? '申请注销账号' : 'Request deletion'}
             </button>
           )}
+
+          {/* 实名认证：本人提交，服务端仅保存摘要与后四位；待审/已通过不再展示表单 */}
+          <div className="realname-box">
+            <h2>{isZh ? '实名认证' : 'Identity verification'}</h2>
+            {realname.loading ? (
+              <div className="hint">{isZh ? '加载中…' : 'Loading…'}</div>
+            ) : realname.data?.record ? (
+              <div className="realname-status">
+                <p className="hint">
+                  {isZh ? '状态：' : 'Status: '}
+                  <span className={`tag${realname.data.record.status === 'approved' ? ' ok' : ''}`}>
+                    {realname.data.record.status === 'approved' ? (isZh ? '已通过' : 'Approved') : realname.data.record.status === 'pending' ? (isZh ? '审核中' : 'Pending') : (isZh ? '已驳回' : 'Rejected')}
+                  </span>
+                </p>
+                <p className="hint">{isZh ? '姓名：' : 'Name: '}{realname.data.record.name_masked}　{isZh ? '证件后四位：' : 'ID last 4: '}{realname.data.record.id_last4}</p>
+                {realname.data.record.reject_reason ? <p className="chat-error">{isZh ? '驳回原因：' : 'Reason: '}{realname.data.record.reject_reason}</p> : null}
+                {realname.data.record.status === 'rejected' ? (
+                  <p className="hint">{isZh ? '可在下方修改资料后重新提交。' : 'You can correct the details and resubmit below.'}</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="hint">{isZh ? '本部署未接入第三方核验，提交后进入人工审核。' : 'Manual review is used on this deployment.'}</p>
+            )}
+            {!realname.loading && (!realname.data?.record || realname.data.record.status === 'rejected') ? (
+              <form className="profile-form realname-form" onSubmit={submitRealname}>
+                <label>{isZh ? '证件类型' : 'Document type'}
+                  <select value={realIdType} onChange={(event) => setRealIdType(event.target.value as 'id_card' | 'passport' | 'other')}>
+                    <option value="id_card">{isZh ? '身份证' : 'ID card'}</option>
+                    <option value="passport">{isZh ? '护照' : 'Passport'}</option>
+                    <option value="other">{isZh ? '其他证件' : 'Other'}</option>
+                  </select>
+                </label>
+                <label>{isZh ? '真实姓名' : 'Legal name'}
+                  <input value={realName} onChange={(event) => setRealName(event.target.value)} minLength={2} maxLength={30} required autoComplete="name" />
+                </label>
+                <label>{isZh ? '证件号码' : 'Document number'}
+                  <input value={realIdNumber} onChange={(event) => setRealIdNumber(event.target.value)} maxLength={32} required autoComplete="off" />
+                </label>
+                <button type="submit" className="btn primary" disabled={realBusy}>{realBusy ? (isZh ? '提交中…' : 'Submitting…') : isZh ? '提交实名认证' : 'Submit for verification'}</button>
+              </form>
+            ) : null}
+            {realname.error ? <div className="chat-error">{errorText(locale, realname.error)}</div> : null}
+          </div>
 
           {/* 第三方登录绑定：绑定后可一键登录，解绑受「至少保留一种方式」约束 */}
           <div className="oauth-bindings">

@@ -64,6 +64,38 @@ function Block({ block }: { block: PageBlock }) {
       </section>
     );
   }
+  if (block.kind === 'button') {
+    const variant = config.variant === 'ghost' ? 'ghost' : 'primary';
+    return (
+      <section className="page-block block-button"> // 按钮区块
+        <a className={`btn ${variant}`} href={hrefOf(config.href)}>{String(config.label ?? '查看详情')}</a>
+      </section>
+    );
+  }
+  if (block.kind === 'image_text') {
+    const align = config.align === 'right' ? 'right' : 'left';
+    return (
+      <section className={`page-block image-text align-${align}`}> // 图文区块
+        {config.image_url ? <img src={hrefOf(config.image_url)} alt={String(config.title ?? '')} loading="lazy" /> : null}
+        <div className="image-text-body">
+          {config.title ? <h3>{String(config.title)}</h3> : null}
+          {config.body ? <p className="muted">{String(config.body)}</p> : null}
+          {config.href ? <a className="link" href={hrefOf(config.href)}>{String(config.link_label ?? '了解更多')}</a> : null}
+        </div>
+      </section>
+    );
+  }
+  if (block.kind === 'announcement') {
+    return (
+      <section className="page-block notice"> // 公告区块：单条公告配置
+        <div className="panel-head">
+          <h3>{String(config.title ?? '公告')}</h3>
+          {config.pinned ? <span className="deploy-badge">置顶</span> : null}
+        </div>
+        <p className="muted">{String(config.body ?? config.text ?? '')}</p>
+      </section>
+    );
+  }
   if (block.kind === 'product_grid') {
     return <ProductGrid />;
   }
@@ -121,10 +153,12 @@ export function PageBlocks({ page, locale = 'zh-CN' }: Props) {
     return () => { cancelled = true; };
   }, [page]);
   if (failed && blocks.length === 0) return null; // 区块接口不可用时整页照常渲染
+  // 前台按 sort_order 升序渲染（后端已排序，前端再兜底一次，防止乱序配置打乱版面）
+  const orderedBlocks = [...blocks].sort((a, b) => a.sort_order - b.sort_order);
   const hasAnnouncementBlock = blocks.some((block) => block.kind === 'announcements');
   return (
     <div className="page-blocks" data-page={page} data-locale={locale}> // 区块 page-blocks
-      {blocks.map((block) => <Block block={block} key={block.id} />)}
+      {orderedBlocks.map((block) => <Block block={block} key={block.id} />)}
       {hasAnnouncementBlock && announcements.length > 0 ? (
         <section className="page-block"> // 区块 page-block
           <div className="panel-head"><h3>社区公告</h3></div> // 区块 panel-head

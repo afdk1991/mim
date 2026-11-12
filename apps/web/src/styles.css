@@ -14,6 +14,7 @@
   --success: #1f8a5b; /* 成功色：已完成状态与成功提示 */
   --warning: #a86a10; /* 警告色：需留意但不阻断流程 */
   --radius: 10px; /* 卡片统一圆角，保持视觉一致性 */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; /* 字体族：后台主题可覆盖 */
   --shadow: 0 1px 2px rgba(20, 28, 45, 0.06), 0 8px 24px rgba(20, 28, 45, 0.05); /* 双层阴影：近距勾边 + 远距柔和投影 */
 } /* 设计令牌块结束 */
 
@@ -31,8 +32,7 @@ body { /* 页面基础排版 */
   margin: 0; /* 清除浏览器默认外边距，消除四周白边 */
   background: var(--bg); /* 应用全局底色 */
   color: var(--text); /* 继承主文字色，子元素无需重复声明 */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', /* 系统字体栈：优先原生界面字体，避免额外字体请求 */
-    'Microsoft YaHei', sans-serif; /* 中文回退末位：Windows 雅黑 → 通用无衬线 */
+  font-family: var(--font-family); /* 字体族走设计令牌，后台主题可整体覆盖 */
   font-size: 14px; /* 基准字号：紧凑的信息密度适合模块列表与工作台场景 */
   line-height: 1.5; /* 1.5 倍行高保证中文段落可读性 */
 } /* body 规则结束 */
@@ -3957,4 +3957,190 @@ code { /* 行内代码/令牌展示 */
 .login-captcha input {
   flex: 1;
   min-width: 120px;
+}
+
+/* ---------- 外观前台消费：列表样式变体（2026-11-13） ---------- */
+/* list：单列行式列表，商城 / 论坛 / 统一入口清单退化为纵向行 */
+.layout[data-list-style="list"] .cards,
+.layout[data-list-style="list"] .commerce-grid,
+.layout[data-list-style="list"] .tools-grid,
+.layout[data-list-style="list"] .promotions-grid,
+.layout[data-list-style="list"] .community-list {
+  grid-template-columns: 1fr; /* 单列纵向排布 */
+}
+/* compact：紧凑密度，收紧卡片间距与内边距 */
+.layout[data-list-style="compact"] .cards,
+.layout[data-list-style="compact"] .commerce-grid,
+.layout[data-list-style="compact"] .tools-grid,
+.layout[data-list-style="compact"] .promotions-grid,
+.layout[data-list-style="compact"] .community-list {
+  gap: 8px; /* 缩小卡片间距 */
+}
+.layout[data-list-style="compact"] .panel {
+  padding: 10px 12px; /* 收紧面板内边距 */
+}
+
+/* ---------- 页面区块：图文 / 按钮 ---------- */
+.image-text { /* 图文区块：图与文横向两栏，窄屏堆叠 */
+  display: grid;
+  grid-template-columns: minmax(160px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.image-text.align-right { /* 图在右 */
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 280px);
+}
+.image-text img { /* 区块配图 */
+  width: 100%;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+.image-text-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.block-button { /* 按钮区块 */
+  display: flex;
+  gap: 10px;
+}
+.board-tabs { /* 板块栏目胶囊组 */
+  margin: 6px 0;
+}
+.board-tab-eye { /* 版主显隐切换小按钮 */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ---------- 公告置顶条：跨两栏置顶，无数据时组件不渲染 ---------- */
+.announcement-bar {
+  grid-column: 1 / -1; /* 跨侧栏 + 内容区两栏置顶 */
+  display: flex; /* 横向排布 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 元素间距 */
+  padding: 8px 20px; /* 上下小、左右对齐内容区 */
+  background: var(--surface); /* 兜底底色 */
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface)); /* 主色淡底 */
+  border-bottom: 1px solid var(--border); /* 与内容区分隔 */
+  font-size: 13px; /* 弱化字号 */
+}
+.announcement-bar-label { /* 喇叭图标 */
+  flex: none; /* 不压缩 */
+}
+.announcement-bar-items { /* 多条公告横向排列，窄屏换行 */
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  min-width: 0;
+  color: var(--text-muted);
+}
+.announcement-bar-more { /* 「全部」链接靠右 */
+  margin-left: auto;
+  flex: none;
+}
+
+/* ---------- 内容栏目：公告 / 更新日志 / 推广计划 ---------- */
+.content-tabs { /* 栏目切换胶囊组 */
+  margin: 4px 0 8px;
+}
+.announcement-list { /* 公告纵向清单 */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.announcement-row { /* 单条公告 */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.changelog-timeline { /* 更新日志时间线：左轴 + 节点 */
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-left: 2px solid var(--border);
+}
+.changelog-entry { /* 单条版本记录 */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.changelog-entry::before { /* 时间线节点 */
+  content: '';
+  position: absolute;
+  left: -27px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.changelog-version { /* 版本号 + 日期一行 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.promotions-grid { /* 推广计划卡片网格，口径与资产卡片一致 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.promotion-card { /* 可点击卡片 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ---------- 自研工具发布页 ---------- */
+.tools-grid { /* 工具卡片网格 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.tool-card,
+.tool-detail { /* 工具卡片 / 详情面板 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tool-tags { /* 标签组 */
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tool-links { /* 下载 / 文档操作行 */
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.tool-version-list li { /* 版本记录条目 */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tool-form { /* 管理表单网格 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.tool-manage-list li { /* 管理清单行 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }

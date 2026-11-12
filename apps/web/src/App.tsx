@@ -1,5 +1,5 @@
-// React 状态与副作用钩子：会话状态、登录提示与启动静默校验
-import { useEffect, useState } from 'react';
+// React 状态与副作用钩子：会话状态、登录提示与启动静默校验；lazy/Suspense 做路由级懒加载
+import { lazy, Suspense, useEffect, useState } from 'react';
 // i18n 工具：语言归一化与文案取值
 import { normalizeLocale, t } from '@mim/i18n';
 // 仅类型导入：语言枚举
@@ -16,30 +16,30 @@ import {
 } from './api';
 // 仅类型导入：登录结果、会话、会话变更原因与用户信息结构
 import type { LoginResult, Session, SessionChangeReason, UserInfo } from './api';
-// 登录页组件：按需登录统一入口，支持整屏与内嵌两种形态
+// 登录页组件：按需登录统一入口，体积小保持 eager 引入
 import { Login } from './views/Login';
-// 功能模块页（商城目录，匿名可浏览，解锁动作才要求登录）
-import { Store } from './views/Store';
-// 商品列表页：商城配套的密集列表视图，支持搜索 / 筛选 / 加购
-import { Products } from './views/Products';
-// 购物车页：清单、移除、清空与结算
-import { Cart } from './views/Cart';
-// 个人中心：资料编辑 / 我的权益 / 我的订单 / 账号安全
-import { Profile } from './views/Profile';
-// 统一入口配置清单：44 个入口驱动的模块目录，访客会话免登录可浏览，规划中入口不提供直达
-import { Sites } from './views/Sites';
-// 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
-import { Deployments } from './views/Deployments';
-import { Navigation } from './views/Navigation';
-import { Search } from './views/Search'; // 统一搜索视图：五来源聚合检索
-import { Community } from './views/Community';
-import { CommerceCenter } from './views/CommerceCenter'; // 商业化中台：资产 / 支付 / 履约 / 提现 / 外观 / 成长
-// 漫剧 AI 剧模块外壳：放映厅（匿名可看片）+ 创作工作台（登录后使用）
-import { ComicStudio } from './views/ComicStudio';
-// IM 聊天 + 视频通话
-import { Chat } from './views/Chat';
-// 聊天只读演示页：匿名访客看到完整聊天布局与示例消息，输入区禁用并引导登录
-import { ChatPreview } from './views/ChatPreview';
+// 公告置顶条：轻量组件，随首屏加载
+import { AnnouncementBar } from './components/AnnouncementBar';
+// 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
+import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './appearance';
+import type { ResolvedTheme } from './appearance';
+
+// 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
+const Store = lazy(() => import('./views/Store').then((m) => ({ default: m.Store }))); // 功能模块页（商城目录）
+const Products = lazy(() => import('./views/Products').then((m) => ({ default: m.Products }))); // 商品列表
+const Cart = lazy(() => import('./views/Cart').then((m) => ({ default: m.Cart }))); // 购物车
+const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心
+const Sites = lazy(() => import('./views/Sites').then((m) => ({ default: m.Sites }))); // 统一入口配置清单
+const Deployments = lazy(() => import('./views/Deployments').then((m) => ({ default: m.Deployments }))); // 部署汇总
+const Navigation = lazy(() => import('./views/Navigation').then((m) => ({ default: m.Navigation }))); // 导航站
+const Search = lazy(() => import('./views/Search').then((m) => ({ default: m.Search }))); // 统一搜索
+const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
+const CommerceCenter = lazy(() => import('./views/CommerceCenter').then((m) => ({ default: m.CommerceCenter }))); // 商业化中台
+const ComicStudio = lazy(() => import('./views/ComicStudio').then((m) => ({ default: m.ComicStudio }))); // 漫剧 AI 剧模块
+const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
+const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
+const Tools = lazy(() => import('./views/Tools').then((m) => ({ default: m.Tools }))); // 自研工具发布目录
+const ContentHub = lazy(() => import('./views/ContentHub').then((m) => ({ default: m.ContentHub }))); // 公告 / 更新日志 / 推广计划栏目
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
@@ -58,20 +58,46 @@ export function App() {
   const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<模块功能名>）
   // 登录提示：null 默认无提示，expired 为登录态失效后的重登说明（免登录体验下不再有「需登录」提示）
   const [gateNotice, setGateNotice] = useState<'expired' | null>(null);
+  // 外观主题：后台下发配置清洗后的设计令牌；接口不可达或脏数据时回落默认外观，不白屏
+  const [theme, setTheme] = useState<ResolvedTheme>(DEFAULT_THEME);
 
   // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
   const locale: Locale = normalizeLocale(session?.user.locale);
 
-  // 「把论坛设为网站首页」：仅在访问站点根路径时按后台 site/config 的 home_view 决定落点，
-  // 深链接与站内导航一律不拦截，避免用户回不到自己点开的页面。
+  // 启动外观消费：拉取公开站点配置 → 清洗主题 → 注入 CSS 变量（主色 / 底色 / 圆角 / 字体 / 列表样式 / 导航项）；
+  // 任一环节失败都回落 DEFAULT_THEME，保证首帧有默认外观可用。
+  useEffect(() => {
+    let alive = true; // 卸载后不再写状态
+    void api.commerce.siteConfig().then((config) => {
+      if (!alive) return;
+      const resolved = resolveTheme(config.theme); // 逐项清洗脏数据
+      setTheme(resolved);
+      applyThemeVars(resolved); // 写入 :root CSS 变量与数据集
+    }).catch(() => { /* 离线 / 配置缺失：沿用默认外观 */ });
+    return () => { alive = false; };
+  }, []);
+
+  // 「把论坛设为网站首页」：仅在访问站点根路径时决定落点，深链接与站内导航一律不拦截。
+  // 优先读冻结契约 GET /community/home-setting；404 / 异常时回落 site/config 的 home_view；再失败保持门户首页。
   useEffect(() => {
     const base = baseOf(); // 挂载前缀：根部署 '/'，GitHub Pages '/mim/'
     const path = window.location.pathname.replace(/\/index\.html$/, '/'); // 归一化 index.html 直达
     if (path !== base && path !== '/') return; // 非根路径不处理
     let alive = true; // 组件卸载后不再跳转
-    void api.commerce.siteConfig().then((config) => {
-      if (alive && config.home_view === 'community') go({ view: 'community' }); // 后台把论坛设为首页
-    }).catch(() => { /* 配置不可达时保持默认商城首页 */ });
+    const decideHome = async (): Promise<'community' | 'portal'> => {
+      try {
+        const setting = await api.community.homeSetting(); // 冻结契约：论坛 / 门户开关
+        return setting.home === 'community' ? 'community' : 'portal';
+      } catch {
+        try {
+          const config = await api.commerce.siteConfig(); // 降级：旧版站点配置
+          return config.home_view === 'community' ? 'community' : 'portal';
+        } catch {
+          return 'portal'; // 再失败：保持现状门户首页
+        }
+      }
+    };
+    void decideHome().then((home) => { if (alive && home === 'community') go({ view: 'community' }); });
     return () => { alive = false; }; // 清理
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -169,8 +195,8 @@ export function App() {
     }); // then 结束
   } // retryGuestSession 结束
 
-  // 侧边导航项：顺序即展示顺序（商城 → 商品列表 → 购物车 → 个人中心 → 站点矩阵 → 部署汇总 → 漫剧 → 聊天）；匿名可见，点击收费视图时再要求登录
-  const navItems: Array<{ view: AppView; label: string }> = [
+  // 内置导航项：顺序即展示顺序；后台配置的 nav_items 按 view 覆盖文案 / 显隐，未覆盖的内置项原样保留
+  const navDefaults: Array<{ view: AppView; label: string }> = [
     // 功能模块商城（用户习惯称「商城」，导航以「商城」呈现便于查找）
     { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
     // 商品列表：商城配套的密集列表与加购入口
@@ -195,7 +221,13 @@ export function App() {
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
-  ]; // 导航项定义结束，数组顺序即侧栏展示顺序
+    // 自研工具发布目录：插件 / 脚本 / 防护工具
+    { view: 'tools', label: locale === 'en-US' ? 'Tools' : '自研工具' },
+    // 公告 / 更新日志 / 推广计划栏目
+    { view: 'content', label: locale === 'en-US' ? 'News' : '公告动态' },
+  ]; // 内置导航项定义结束
+  // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项
+  const navItems = mergeNavItems(navDefaults, theme.navItems).filter((item) => item.visible);
 
   // 主布局：左侧栏 + 右侧内容区；访客与正式账号共用同一骨架，登录只用于升级身份
   const needsSession =
@@ -207,8 +239,10 @@ export function App() {
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
-    // 布局容器
-    <div className="layout">
+    // 布局容器：data-list-style 把后台列表样式口径透传给列表变体选择器
+    <div className="layout" data-list-style={theme.listStyle} data-nav-layout={theme.navLayout}>
+      {/* 公告置顶条：无置顶公告时组件自身静默不渲染 */}
+      <AnnouncementBar locale={locale} onOpen={() => go({ view: 'content' })} />
       {/* 左侧导航栏 */}
       <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
         {/* 品牌区：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
@@ -227,8 +261,8 @@ export function App() {
               type="button"
               // 当前视图高亮 active
               className={`nav-item${route.view === item.view ? ' active' : ''}`}
-              // 点击切换视图
-              onClick={() => go({ view: item.view })}
+              // 点击切换视图（配置视图已在合并阶段按内置白名单收敛）
+              onClick={() => go({ view: item.view as AppView })}
             >
               {/* 导航文案 */}
               {item.label}{/* 导航文案，随语言切换 */}
@@ -263,6 +297,8 @@ export function App() {
 
       {/* 右侧内容区：商城匿名可浏览；收费 / 私密视图匿名时内嵌登录卡片 */}
       <main className="main">{/* 内容区容器：窄屏断点下与侧栏上下堆叠 */}
+        {/* Suspense 边界：懒加载视图独立 chunk，加载期展示统一占位，不阻塞骨架 */}
+        <Suspense fallback={<div className="page hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>}>
         {/* 功能模块页：匿名可浏览目录，解锁动作在页面内引导登录 */}
         {route.view === 'store' && <Store locale={locale} />}{/* 功能模块页 */}
         {/* 商品列表：密集列表 + 筛选 + 加购，仅已登录渲染（匿名由上方内嵌登录卡片接管） */}
@@ -284,6 +320,10 @@ export function App() {
         {route.view === 'community' && session && <Community locale={locale} />}{/* 社区与变现视图 */}
         {/* 商业化中台：付费资产 / 履约 / 提现分成 / 页面搭建 / 成长私信 / 翻译 */}
         {route.view === 'commerce' && session && <CommerceCenter locale={locale} />}{/* 商业化中台视图 */}
+        {/* 自研工具发布目录：公开浏览，管理端增删改在视图内按会话态展示 */}
+        {route.view === 'tools' && <Tools locale={locale} hasSession={!!session} />}{/* 工具目录视图 */}
+        {/* 公告 / 更新日志 / 推广计划栏目：公开只读，空数据静默隐藏 */}
+        {route.view === 'content' && <ContentHub locale={locale} />}{/* 内容栏目视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}
@@ -311,6 +351,7 @@ export function App() {
         {route.view === 'login' && session && !session.user.is_guest && (
           <div className="page"><p className="hint">{locale === 'en-US' ? 'Already signed in.' : '当前已登录，无需重复登录。'}</p></div> // 已登录提示
         )}{/* 已登录登录伪视图结束 */}
+        </Suspense>{/* 懒加载边界结束 */}
       </main>{/* 内容区结束 */}
     </div> // 布局容器结束，JSX 根元素到此闭合
   ); // 主布局渲染结束

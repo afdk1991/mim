@@ -39,6 +39,18 @@ export interface OAuthBinding { // 已绑定的第三方身份（仅展示字段
   created_at: string; // 绑定时间
 } // OAuthBinding 结束
 
+export interface RealnameRecord { // 实名记录对外视图：不含姓名 / 证件号明文
+  id: string; // 记录主键
+  status: 'pending' | 'approved' | 'rejected'; // 审核状态
+  provider: 'manual' | 'third_party'; // 审核通道
+  id_type: 'id_card' | 'passport' | 'other'; // 证件类型
+  name_masked: string; // 脱敏姓名
+  id_last4: string; // 证件号后四位
+  reject_reason: string | null; // 驳回原因
+  reviewed_at: string | null; // 审核时间
+  created_at: string; // 提交时间
+} // RealnameRecord 结束
+
 export interface Session { // 本地会话快照：登录成功后整体持久化
   access_token: string; // 短期访问令牌，随每个请求以 Bearer 形式发送
   refresh_token: string; // 长期刷新令牌，仅用于换新 access_token（轮换后必须覆盖写回）
@@ -880,6 +892,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     identifier: string; // 手机号或邮箱
     password: string; // 明文口令（≥8 位且含字母与数字），经 HTTPS 传输
     display_name?: string; // 展示名可选，缺省由服务端留空
+    invite_code?: string; // 注册门槛开启时必填的有效邀请码
     device?: { platform: string; name?: string }; // 设备信息，未传时兜底 web/浏览器
   }) { // 形参定义结束
     return request<LoginResult>('/auth/register', { // 注册成功即返回令牌，前端无需再登录一次
@@ -958,6 +971,15 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   me() { // 拉取当前用户资料
     return request<MeResponse>('/me'); // 默认带鉴权；失败会走统一错误处理
   }, // me 结束
+
+  realname: { // 实名认证：本人提交与状态查询
+    status() { // 查询本人最新审核状态；未提交返回 record=null
+      return request<{ record: RealnameRecord | null }>('/auth/realname/status', { idempotency: false }); // 只读 GET
+    }, // status 结束
+    submit(payload: { id_type: 'id_card' | 'passport' | 'other'; name: string; id_number: string }) { // 提交实名资料
+      return request<RealnameRecord>('/auth/realname/submit', { method: 'POST', body: payload }); // 明文只在传输中出现
+    }, // submit 结束
+  }, // realname 分组结束
 
   updateMe(payload: { display_name?: string; locale?: Locale; timezone?: string }) { // 局部更新资料，仅提交要改的字段
     return request<{ user: UserInfo }>('/me', { method: 'PATCH', body: payload }); // PATCH 语义为局部更新，写操作自动带幂等键
@@ -1642,7 +1664,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     overview() { // 首页聚合：板块、统计、当前钱包与会员
       return request<{ boards: CommunityBoard[]; stats: { threads: number; views: number; likes: number }; wallet: WalletSnapshot; vip_level: number; vip: { plan_id: string; level: number; expires_at: string } | null }>('/community/overview', { idempotency: false });
     },
-    threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating'; q?: string; limit?: number } = {}) { // 帖子列表
+    threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating' | 'recommend'; q?: string; limit?: number } = {}) { // 帖子列表
       const qs = new URLSearchParams();
       if (opts.board && opts.board !== 'all') qs.set('board', opts.board);
       if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind);
@@ -1693,6 +1715,15 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     },
     favorites() { // 我的收藏
       return request<{ items: CommunityThread[] }>('/community/favorites', { idempotency: false });
+    },
+    homeSetting() { // 论坛设为首页开关（公开；404 / 异常由前端回落现状门户）
+      return request<{ home: 'community' | 'portal' }>('/community/home-setting', { auth: false, idempotency: false });
+    },
+    boardTabs(slug: string) { // 板块 Tab 栏目配置（公开；接口缺失时前端回落内置默认 Tab）
+      return request<{ tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { auth: false, idempotency: false });
+    },
+    saveBoardTabs(slug: string, tabs: BoardTabInput[]) { // 版主 / 运营保存栏目组合（顺序 / 显隐 / 排序口径）
+      return request<{ ok: boolean; tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { method: 'PUT', body: { tabs } });
     },
   },
 
@@ -1890,6 +1921,47 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<SearchResponse>(`/search?${qs.toString()}`, { auth: false, idempotency: false }); // 公开只读
     }, // query 结束
   }, // search 分组结束
+
+  // ---------- 内容运营（content）：公告 / 更新日志 / 推广计划，公开只读；404 或空数组由前端静默隐藏 ----------
+
+  content: { // 内容栏目：路径 /announcements、/changelog、/promotions
+    announcements(limit = 10) { // 公告清单：置顶优先，失败由调用方静默隐藏
+      return request<{ items: AnnouncementItem[] }>(`/announcements?limit=${limit}`, { auth: false, idempotency: false });
+    },
+    changelog(limit = 20) { // 更新日志时间线：按版本 / 发布时间倒序
+      return request<{ items: ChangelogItem[] }>(`/changelog?limit=${limit}`, { auth: false, idempotency: false });
+    },
+    promotions() { // 推广计划卡片：进行中且在有效期内
+      return request<{ items: PromotionItem[] }>('/promotions', { auth: false, idempotency: false });
+    },
+  }, // content 分组结束
+
+  // ---------- 自研工具目录（tools）：公开浏览清单 / 详情；管理端增删改挂权限 ----------
+
+  tools: { // 工具发布页：路径 /tools
+    list(opts: { q?: string; tag?: string } = {}) { // 上线清单，支持关键词 / 标签
+      const qs = new URLSearchParams(); // 查询串
+      if (opts.q) qs.set('q', opts.q); // 关键词
+      if (opts.tag) qs.set('tag', opts.tag); // 标签
+      const suffix = qs.toString(); // 序列化
+      return request<{ items: ToolItem[] }>(`/tools${suffix ? `?${suffix}` : ''}`, { auth: false, idempotency: false });
+    },
+    detail(slug: string) { // 工具详情（版本记录 / 链接 / 标签）
+      return request<{ tool: ToolItem }>(`/tools/${encodeURIComponent(slug)}`, { auth: false, idempotency: false });
+    },
+    manage() { // 管理端全状态清单（含草稿 / 归档）
+      return request<{ items: ToolItem[] }>('/tools/manage', { idempotency: false });
+    },
+    create(payload: ToolUpsertPayload) { // 新建工具
+      return request<{ ok: boolean; tool: ToolItem }>('/tools', { method: 'POST', body: payload });
+    },
+    update(slug: string, payload: ToolUpsertPayload) { // 更新工具信息 / 版本记录 / 状态
+      return request<{ ok: boolean; tool: ToolItem }>(`/tools/${encodeURIComponent(slug)}`, { method: 'PUT', body: payload });
+    },
+    remove(slug: string) { // 删除工具
+      return request<{ ok: boolean }>(`/tools/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+    },
+  }, // tools 分组结束
 }; // api 对象结束
 
 // ---------- 社区与变现共享类型，与 routes/community.ts 响应一一对应 ----------
@@ -2211,8 +2283,10 @@ export interface ThemeSettings { // 主题
   accent?: string; // 主色
   background?: string; // 背景
   nav_layout?: string; // 导航布局
-  list_style?: string; // 列表样式
+  list_style?: string; // 列表样式：card / list / compact
   radius?: number; // 圆角
+  font?: string; // 字体族（CSS font-family 取值）
+  nav_items?: Array<{ view: string; label: string; icon?: string; visible?: boolean }>; // 后台配置的导航项（可选，缺省回落内置导航）
 }
 
 export interface I18nSettings { // 语言配置
@@ -2230,6 +2304,90 @@ export interface PageBlock { // 页面区块
   config_json: string; // 原始配置
   config: Record<string, unknown>; // 解析后配置
   updated_at: string; // 更新时间
+}
+
+// ---------- 内容运营共享类型：公告 / 更新日志 / 推广计划，与冻结响应契约一一对应 ----------
+
+export interface AnnouncementItem { // 公告条目
+  id: string; // 主键
+  title: string; // 标题
+  body: string; // 正文
+  pinned: boolean; // 是否置顶
+  published_at: string | null; // 发布时间
+}
+
+export interface ChangelogItem { // 更新日志条目
+  id: string; // 主键
+  version: string; // 语义版本号
+  title: string; // 标题
+  body: string; // 正文
+  published_at: string | null; // 发布时间
+}
+
+export interface PromotionItem { // 推广计划条目
+  id: string; // 主键
+  name: string; // 计划名称
+  summary: string; // 简介
+  target_url: string; // 落地页
+  starts_at: string | null; // 起始时间
+  ends_at: string | null; // 截止时间
+  status: string; // 状态
+}
+
+// ---------- 板块 Tab 栏目：兼容后端 sort_order/sort_by 与冻结契约 order/sort 两套字段名 ----------
+
+export interface BoardTab { // 板块 Tab 配置视图
+  key: string; // 栏目标识：latest / hot / recommend / rating / favorites ...
+  label: string; // 展示名
+  order?: number; // 展示顺序（冻结契约字段）
+  sort_order?: number; // 展示顺序（后端字段，优先于 order）
+  visible: boolean; // 是否展示
+  sort?: string; // 排序口径（冻结契约字段）
+  sort_by?: string; // 排序口径（后端字段，优先于 sort）
+}
+
+export interface BoardTabInput { // 保存栏目入参
+  key: string; // 栏目标识
+  label?: string; // 展示名
+  visible?: boolean; // 是否展示
+  sort_order?: number; // 展示顺序
+  sort_by?: string; // 排序口径
+}
+
+// ---------- 自研工具目录类型 ----------
+
+export interface ToolVersionNote { // 版本记录条目
+  version: string; // 语义版本号
+  title?: string; // 版本标题
+  notes?: string; // 更新说明
+  released_at?: string; // 发布时间
+}
+
+export interface ToolItem { // 工具清单 / 详情视图
+  id: string; // 主键
+  slug: string; // 对外短标识
+  name: string; // 名称
+  summary: string; // 一句话简介
+  version_notes: ToolVersionNote[]; // 版本记录
+  download_url: string; // 下载地址
+  doc_url: string; // 文档地址
+  tags: string[]; // 标签
+  status: string; // 状态：draft / active / archived
+  sort_order: number; // 展示顺序
+  created_at: string; // 创建时间
+  updated_at: string; // 更新时间
+}
+
+export interface ToolUpsertPayload { // 新建 / 更新工具入参
+  slug?: string; // 新建时必填；更新时不可改
+  name: string; // 名称
+  summary?: string; // 简介
+  version_notes?: ToolVersionNote[]; // 版本记录
+  download_url?: string; // 下载地址
+  doc_url?: string; // 文档地址
+  tags?: string[]; // 标签
+  status?: 'draft' | 'active' | 'archived'; // 状态
+  sort_order?: number; // 排序
 }
 
 export interface GrowthBadge { // 徽章

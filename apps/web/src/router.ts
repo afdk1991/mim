@@ -15,6 +15,8 @@ export type AppView =
   | 'commerce' // 商业化中台（资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 翻译）
   | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
+  | 'tools' // 自研工具发布目录
+  | 'content' // 公告 / 更新日志 / 推广计划栏目
   | 'login'; // 未登录专用的登录伪视图
 
 // 路由状态：仅需当前视图标识
@@ -38,6 +40,8 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   commerce: 'commerce', // 商业化中台（资产 / 履约 / 资金 / 外观 / 成长）
   comic: 'comic-studio', // 漫剧 AI 剧工作台
   chat: 'chat', // 聊天（原名即功能名，保持不变）
+  tools: 'tools', // 自研工具发布目录
+  content: 'announcements', // 公告 / 更新日志 / 推广计划栏目
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
 };
 

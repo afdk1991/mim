@@ -58,6 +58,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [password, setPassword] = useState('');
   // 注册模式下的展示名（可选），注册成功后作为用户昵称
   const [displayName, setDisplayName] = useState('');
+  // 邀请码：仅在注册模式展示；部署未开启注册门槛时留空即可
+  const [inviteCode, setInviteCode] = useState('');
   // 验证码输入值，仅在验证码登录模式下参与提交
   const [code, setCode] = useState('');
   // 开发态验证码回显：后端在非生产环境直接返回验证码，便于本地联调
@@ -238,6 +240,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               identifier: identifier.trim(),
               password,
               display_name: displayName.trim() || undefined,
+              invite_code: inviteCode.trim() || undefined, // 注册门槛开启时后端据此核销
             })
           // 密码模式：区域 + 账号标识 + 密码换取会话
           : mode === 'password'
@@ -415,6 +418,18 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               />{/* 昵称输入框结束 */}
             </label> // 结束昵称输入项
           )}{/* 结束注册昵称条件渲染 */}
+
+          {mode === 'register' && ( // 注册模式：邀请码入口；未开启门槛时可留空
+            <label>{/* 邀请码输入项 */}
+              <span>{locale === 'en-US' ? 'Invite code (if required)' : '邀请码（如站点已开启邀请注册）'}</span>{/* 邀请码标题 */}
+              <input
+                value={inviteCode} // 受控值
+                onChange={(event) => setInviteCode(event.target.value)} // 同步输入
+                maxLength={32} // 与后端校验上限一致
+                placeholder={locale === 'en-US' ? 'Optional until the site requires it' : '未开启邀请注册可留空'}
+              />{/* 邀请码输入框结束 */}
+            </label> // 结束邀请码输入项
+          )}{/* 结束注册邀请码条件渲染 */}
 
           {mode !== 'code' ? ( // 密码与注册模式共用密码输入框，验证码模式换成验证码行
             <label>{/* 密码输入项 */}
