@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T16:09:46.837Z
-- 本地 HEAD：`7de5031`
+- 生成时间：2026-11-12T16:21:51.209Z
+- 本地 HEAD：`bb9aaf9`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -9,13 +9,13 @@
 
 | 指标 | 数值 | 说明 |
 |---|---|---|
-| 矩阵平台 | 10 | 铁律九 10 个免费平台 |
+| 矩阵平台 | 11 | 铁律九 10 个免费平台 |
 | 规范部署项 | 16 | 去重后的部署仓库 + 部署项 |
 | git 远端 | 2 | gitee / origin |
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 12 | 本轮存在可信取证 |
 | 空数据 | 4 | result 为 null，明确标识而非填 0 |
-| 异常 | 40 | 🔴 0 / 🟡 13 / 🟢 27 |
+| 异常 | 39 | 🔴 0 / 🟡 13 / 🟢 26 |
 | 缺失信息 | 24 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -35,7 +35,7 @@
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-store.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 5305B | DNS_POLLUTION 等 1 项 |
 | `repo.gitlab` | — | GitLab 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
-| `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | https://mim-web.netlify.app | ✅ OK | ✅ PASS 200 / 5840B | ADOPTED_FREE_TIER_PENDING 等 1 项 |
+| `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | https://mim-web.netlify.app | ✅ OK | ✅ PASS 200 / 5840B | — |
 | `pages.azure-swa` | github:afdk1991/mim | Azure Static Web Apps / distribution | ci — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `container.render` | github:afdk1991/mim | Render / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 3 项 |
 | `worker.mim-api-edge` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-api-edge.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 53B | LOCAL_WORKERS_DEV_BLOCKED 等 1 项 |
@@ -77,7 +77,6 @@
 | `repo.gitlab` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入 |
 | `repo.bitbucket` | 🟡 warning | `EMPTY_RESULT` | 本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
 | `repo.bitbucket` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入 |
-| `pages.netlify` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：300 构建分钟/月，2026-10 起新账号改 credit 制；表单 / A-B 测试等附加功能多）；非矩阵成员，仅作额外免费分发点 |
 | `pages.azure-swa` | 🟡 warning | `EMPTY_RESULT` | 本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入 |
 | `pages.azure-swa` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用） |
 | `container.render` | 🟡 warning | `EMPTY_RESULT` | 本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP |
@@ -89,8 +88,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 7de503176f9bf6eed160c405424108d1dd601320 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 7de503176f9bf6eed160c405424108d1dd601320 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | bb9aaf97678b2d25b4e6f6189f4c5da22dfae2ee | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | bb9aaf97678b2d25b4e6f6189f4c5da22dfae2ee | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -109,7 +108,7 @@
 
 ## 5. 覆盖、去重与排除
 
-- 矩阵文档行数核对：AGENTS.md 10 行表格；README.md 27 行表格。
+- 矩阵文档行数核对：AGENTS.md 10 行表格；README.md 28 行表格。
 - 去重：README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。
 - 补齐：2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。
 - 排除：仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。

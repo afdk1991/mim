@@ -73,9 +73,9 @@ const modes = new Set(['ci', 'manual', 'push']);
 check('D01 契约 schema = mim.deployment-registry.v1', REG.schema === 'mim.deployment-registry.v1', REG.schema);
 // 部署项总数与覆盖口径一致。
 check('D02 部署项数 = coverage.deployment_items', items.length === REG.coverage?.deployment_items, `${items.length} vs ${REG.coverage?.deployment_items}`);
-// 10 平台矩阵口径（2026-11-10 起含 Gitee 镜像仓）。
+// 11 平台矩阵口径（2026-11-10 起含 Gitee 镜像仓；2026-11-13 起含 Netlify 站点，接替停服的 Sealos 席位）。
 const matrixPlatforms = (REG.platform_catalog ?? []).filter((p) => p.in_matrix).length;
-check('D03 平台目录 in_matrix = 10 且等于 coverage.matrix_platforms', matrixPlatforms === 10 && matrixPlatforms === REG.coverage?.matrix_platforms, String(matrixPlatforms));
+check('D03 平台目录 in_matrix = 11 且等于 coverage.matrix_platforms', matrixPlatforms === 11 && matrixPlatforms === REG.coverage?.matrix_platforms, String(matrixPlatforms));
 // CI 作业口径：5 个作业、4 个部署作业。
 check('D04 CI 作业 5 个、部署作业 4 个', REG.ci_jobs?.length === 5 && REG.ci_jobs.filter((j) => j.is_deploy).length === 4);
 // git 远端口径。

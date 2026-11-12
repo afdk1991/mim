@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T16:09:46.837Z",
-  "head": "7de5031",
+  "generated_at": "2026-11-12T16:21:51.209Z",
+  "head": "bb9aaf9",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -14,7 +14,7 @@
   ],
   "registry_path": "packages/core-domain/src/deploymentRegistry.json",
   "coverage": {
-    "matrix_platforms": 10,
+    "matrix_platforms": 11,
     "total_platforms": 16,
     "deployment_items": 16,
     "git_remotes": 2,
@@ -25,11 +25,11 @@
     "dedup_note": "README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。",
     "added_note": "2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
     "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。",
-    "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行，矩阵平台数仍为 10。"
+    "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行。2026-11-13 00:12 +08:00（CI run 43255056330）Netlify 站点 mim-web.netlify.app 真部署并取证 200|5840，正式进入矩阵成为第 11 行（in_matrix = true、status = OK、verdict = PASS），矩阵 10 → 11。"
   },
   "coverage_check": {
-    "matrix_platforms": 10,
-    "matrix_platforms_expected": 10,
+    "matrix_platforms": 11,
+    "matrix_platforms_expected": 11,
     "deployment_items": 16,
     "deployment_items_declared": 16,
     "ci_jobs_found": 5,
@@ -41,7 +41,7 @@
   },
   "summary": {
     "total": 16,
-    "matrix_platforms": 10,
+    "matrix_platforms": 11,
     "platform_catalog": 16,
     "git_remotes": 2,
     "ci_jobs": 5,
@@ -49,7 +49,7 @@
     "excluded": 3,
     "with_result": 12,
     "empty_result": 4,
-    "anomalies": 40,
+    "anomalies": 39,
     "missing_fields": 24,
     "worktree_drift": 0,
     "by_status": {
@@ -85,7 +85,7 @@
     "by_severity": {
       "critical": 0,
       "warning": 13,
-      "info": 27
+      "info": 26
     }
   },
   "remotes": [
@@ -102,14 +102,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "7de503176f9bf6eed160c405424108d1dd601320",
+      "hash": "bb9aaf97678b2d25b4e6f6189f4c5da22dfae2ee",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "7de503176f9bf6eed160c405424108d1dd601320",
+      "hash": "bb9aaf97678b2d25b4e6f6189f4c5da22dfae2ee",
       "exit": 0,
       "error": null
     }
@@ -250,7 +250,7 @@
     {
       "file": "README.md",
       "section": "### 多平台部署矩阵",
-      "table_rows": 27,
+      "table_rows": 28,
       "first_column": [
         "GitHub 仓库",
         "Gitee 仓库（码云 · 国内镜像，铁律九矩阵第 10 行）",
@@ -260,7 +260,8 @@
         "Cloudflare Pages / Workers",
         "Cloudflare Pages 同源自托管入口（`_worker.js` 高级模式）",
         "Vercel",
-        "Sealos",
+        "Netlify（铁律九矩阵第 11 行，接替停服的 Sealos 席位）",
+        "Sealos（已退休，不再作为部署项）",
         "IGA Pages",
         "腾讯云自建服务器",
         "腾讯云自建服务器（生产权威终点）",
@@ -1105,7 +1106,7 @@
       "name": "Netlify 前端静态站（免费层）",
       "aliases": [
         "Netlify",
-        "mim.netlify.app",
+        "mim-web.netlify.app",
         "纯静态免费候选"
       ],
       "platform_id": "netlify",
@@ -1134,23 +1135,19 @@
       "result": {
         "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 0,
+        "latency_ms": 209,
         "bytes": 5840,
-        "evidence": "2026-11-12 16:0x +08:00 本轮复核：NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID 已补齐，CI platforms 作业 Netlify 步骤真部署成功（非 SKIP）。本机取证 https://mim-web.netlify.app/ => 200|5840B|IPv6 2406:da18:b3d:e201::259，title=Mim，首页产物 assets/index-BuT7vqkW.js（CI 同源构建口径，指纹与注入生产 API 源的分发产物不同属既有设计）；/api/* 由发布目录 _redirects 反代到生产 mim.mixm.top。",
-        "captured_at": "2026-11-12 16:10 +08:00"
+        "evidence": "2026-11-13 00:12 +08:00（CI run 43255056330 @7de5031，completed/success）：Netlify 步骤真实执行 `✔ Deploy is live!`（部署 6af5e52b，state=ready），同作业内 CI 出口探测 `https://mim-web.netlify.app/ => 200|5840|0.209s|13.52.188.95`；同轮浏览器实测（Aha Browser Use，非本机出口）：title=Mim、13 个导航项（商城 / 商品列表 / 购物车 / 个人中心 / 入口配置清单 / 部署汇总 / 导航站 / 统一搜索 / 社区与商城 / 商业化中台 / 漫剧 AI 剧 / 聊天 + 访客态）、访客会话自动签发（访客 · 免登录）、商城渲染 19 个一级分类 / 205 个二级模块 / 213 个项目、console 零报错。发布目录 `_redirects` 顶端补 `/api/* -> https://mim.mixm.top/api/:splat 200`，故前端 API 请求经 Netlify 反代落到生产后端（缺该规则时页面渲染抛 TypeError 并 404，本轮已修复）。本机直连 netlify.app 为 000（与 vercel.app / workers.dev 同属本机网络阻断特征），取证以 CI 出口与浏览器实测为准。",
+        "captured_at": "2026-11-13 00:12 +08:00"
       },
-      "anomalies": [
-        {
-          "code": "ADOPTED_FREE_TIER_PENDING",
-          "severity": "info",
-          "message": "已决策采用（免费层：300 构建分钟/月，2026-10 起新账号改 credit 制；表单 / A-B 测试等附加功能多）；非矩阵成员，仅作额外免费分发点"
-        }
-      ],
+      "anomalies": [],
       "missing_fields": [],
       "sources": [
         "用户决策 2026-11-10：全部采用免费层",
-        "用户平台对比表（Netlify 免费层）",
-        "netlify.toml（新增）"
+        "用户决策 2026-11-12：选项 B —— 以免费平台替换停服的 Sealos",
+        "CI run 43255056330（@7de5031）platforms 作业日志：Deploy is live + 探测 200|5840|0.209s",
+        "浏览器实测 mim-web.netlify.app：13 导航项 / 19 一级分类 / 205 二级模块 / 213 项目 / console 零报错",
+        "netlify.toml + 发布目录 _redirects（/api 反代）"
       ]
     },
     {
