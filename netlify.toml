@@ -13,6 +13,14 @@
   NODE_VERSION = "22"
   PNPM_VERSION = "9.12.0"
 
+# API 反向代理：本站只托管前端薄壳，后端权威终点为腾讯云自建 mim.mixm.top。
+# 缺这条规则时前端请求 /api/v1/* 会落到 Netlify 的 404，页面渲染直接 TypeError。
+[[redirects]]
+  from = "/api/*"
+  to = "https://mim.mixm.top/api/:splat"
+  status = 200
+  force = true
+
 # SPA 深链接回退：所有未知路径返回 index.html，由前端路由接管
 [[redirects]]
   from = "/*"

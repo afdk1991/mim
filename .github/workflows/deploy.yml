@@ -414,8 +414,18 @@ jobs:
           # 仓库是 pnpm monorepo，netlify-cli 在仓库根会检出多个项目并报
           # 「Projects detected: @mim/admin, @mim/web …」，故先进入纯静态产物目录再部署，
           # 让 CLI 只看到一个站点；--dir=. 即 apps/web/dist。
-          ( cd apps/web/dist && npx --yes netlify-cli@latest deploy --prod \
-            --dir=. --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN" )
+          # 同时在发布目录的 _redirects 顶端补一条 /api 反向代理：Netlify 只托管前端薄壳，
+          # 没有 Cloudflare 那样的 functions 反代，缺这条规则时前端请求 /api/v1/* 会拿到
+          # Netlify 的 404，渲染阶段读 undefined.length 抛 TypeError（本轮实测）。
+          # 规则写在发布目录、随本次部署生效，不改动 apps/web/public/_redirects 本体，
+          # 避免影响 EdgeOne 等其它解析该文件的平台。
+          ( cd apps/web/dist
+            printf '/api/*  https://mim.mixm.top/api/:splat  200\n' > _redirects.netlify
+            cat _redirects.netlify _redirects > _redirects.tmp
+            mv _redirects.tmp _redirects
+            rm -f _redirects.netlify
+            npx --yes netlify-cli@latest deploy --prod \
+              --dir=. --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN" )
 
       # Render：免费静态站点（750 实例小时/月，空闲休眠）。触发已存在服务的部署，缺凭证即 SKIP。
       - name: Render
