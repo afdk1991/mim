@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T11:02:05.106Z",
-  "head": "568c2b2",
+  "generated_at": "2026-11-12T13:27:04.458Z",
+  "head": "50a092a",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -48,7 +48,7 @@
     "excluded": 2,
     "with_result": 11,
     "empty_result": 5,
-    "anomalies": 53,
+    "anomalies": 54,
     "missing_fields": 37,
     "worktree_drift": 0,
     "by_status": {
@@ -58,8 +58,8 @@
     },
     "by_verdict": {
       "PASS": 7,
-      "FAIL": 2,
-      "DEGRADED": 2,
+      "DEGRADED": 3,
+      "FAIL": 1,
       "EMPTY": 5
     },
     "by_layer": {
@@ -86,7 +86,7 @@
       "render": 1
     },
     "by_severity": {
-      "critical": 2,
+      "critical": 3,
       "warning": 19,
       "info": 32
     }
@@ -105,14 +105,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "568c2b2cd98c4f08f0578327c07bb2ec814b34eb",
+      "hash": "50a092a4569ef820311df8927649b62bbd6f1905",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "568c2b2cd98c4f08f0578327c07bb2ec814b34eb",
+      "hash": "50a092a4569ef820311df8927649b62bbd6f1905",
       "exit": 0,
       "error": null
     }
@@ -662,7 +662,7 @@
         "url": null,
         "role": "无仓库连接，构建产物本地直传"
       },
-      "entry_url": "https://data.mixm.top",
+      "entry_url": "https://mim-45yeiirr.edgeone.cool",
       "delivery": {
         "mode": "manual",
         "ci_job": null,
@@ -677,18 +677,23 @@
       },
       "status": "MANUAL",
       "result": {
-        "verdict": "FAIL",
-        "http_code": "000",
-        "latency_ms": 180,
-        "bytes": 0,
-        "evidence": "2026-11-12 17:50 +08:00 域名可访问性验证（docs/平台域名验证-20261112.md）：`Resolve-DnsName data.mixm.top -Type CNAME` 仍返回 CNAME → data.mixm.top.pages.dnsoe5.com（TTL 10），但该 CNAME 目标在默认 DNS 与 8.8.8.8（dns.google）下均为 Non-existent domain，导致 data.mixm.top 无 A 记录、全链路 NXDOMAIN；本机 curl 000 / 180ms，CI Runner（run 43194019481 @ fd2cf60）同样 `https://data.mixm.top/ => 000|0|0.256836`。双出口一致，排除本地网络因素。判断为 EdgeOne 侧为该自定义域分配的 CNAME 目标已被回收 / 变更（与 2026-11-11 项目名迁移到 mim 的时间点吻合），DNSPod 记录仍指向旧目标；需在 EdgeOne 控制台重取 CNAME 并在 DNSPod 更新。此前 2026-11-11 01:05 的 200 / 981B 为历史留痕。",
-        "captured_at": "2026-11-12 17:50 +08:00"
+        "verdict": "DEGRADED",
+        "http_code": "200",
+        "latency_ms": null,
+        "bytes": null,
+        "evidence": "2026-11-12 21:23 +08:00 EdgeOne 控制台（主账号 100033061933，zone-3rsyi1zergl8）浏览器实测：项目 `mim`（makers-iygo4nrk22jr）域名管理页仅默认域 `mim-45yeiirr.edgeone.cool`（已生效），未绑定任何自定义域；遗留项目 `mim-app`（makers-qsbzlpxaoa8b）域名表为空。默认域 `https://mim-45yeiirr.edgeone.cool/` 渲染 Mim SPA 正常（商城 / 商品列表 / 购物车 / 个人中心 / 入口配置清单 / 部署汇总 / 漫剧 AI 剧 / 聊天 / 登录菜单在列），产物 `assets/index-Dmz7Z5Id.js` + `assets/index-DLY_QDd3.css`，与本机根构建及 IGA 直传同指纹；静态副本侧模块目录接口 Failed to fetch（纯静态分发，API 仍走生产 mim.mixm.top，既有跨域状态）。DNS 复核：`data.mixm.top` 在默认 DNS 与 8.8.8.8 双解析器均为 Non-existent domain（无 CNAME、无 A 记录）。历史留痕：2026-11-12 17:50 曾记录 CNAME → data.mixm.top.pages.dnsoe5.com 目标 NXDOMAIN；本轮控制台确认当前 mim 项目从未在控制台登记 data.mixm.top 自定义域，DNSPod 侧记录已不存在。恢复路径：控制台为 mim 添加自定义域 data.mixm.top → 平台分配新 CNAME → DNSPod 增加 CNAME 记录后复测；DNS 侧需 DNSPod 凭证，本机与 CI 均无。",
+        "captured_at": "2026-11-12 21:23 +08:00"
       },
       "anomalies": [
         {
+          "code": "EDGEONE_CUSTOM_DOMAIN_NOT_BOUND",
+          "severity": "critical",
+          "message": "2026-11-12 21:23 控制台实测：mim 项目（makers-iygo4nrk22jr）域名管理仅默认域 mim-45yeiirr.edgeone.cool，data.mixm.top 未在该项目登记为自定义域；DNS 双解析器 NXDOMAIN。需先在控制台添加自定义域取得平台新 CNAME，再到 DNSPod 配置解析"
+        },
+        {
           "code": "EDGEONE_DOMAIN_DNS_BROKEN",
           "severity": "critical",
-          "message": "2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。需 EdgeOne 控制台重取 CNAME + DNSPod 更新记录后复测"
+          "message": "2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。21:23 控制台进一步确认项目未绑定该自定义域、DNSPod 记录已不存在，需控制台重取 CNAME + DNSPod 更新记录后复测"
         },
         {
           "code": "WAF_FALSE_POSITIVE",
@@ -708,7 +713,7 @@
         {
           "code": "EDGEONE_LEGACY_PROJECT_MIM_APP",
           "severity": "info",
-          "message": "控制台仍存在遗留项目 `mim-app`（默认域、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权"
+          "message": "控制台仍存在遗留项目 `mim-app`（makers-qsbzlpxaoa8b，2026-11-12 21:23 域名表为空、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权"
         },
         {
           "code": "EDGEONE_DELIVERY_MODE_UNVERIFIED",

@@ -311,7 +311,7 @@
         "url": null,
         "role": "无仓库连接，构建产物本地直传"
       },
-      "entry_url": "https://data.mixm.top",
+      "entry_url": "https://mim-45yeiirr.edgeone.cool",
       "delivery": {
         "mode": "manual",
         "ci_job": null,
@@ -324,19 +324,20 @@
       },
       "status": "MANUAL",
       "result": {
-        "verdict": "FAIL",
-        "http_code": "000",
-        "latency_ms": 180,
-        "bytes": 0,
-        "evidence": "2026-11-12 17:50 +08:00 域名可访问性验证（docs/平台域名验证-20261112.md）：`Resolve-DnsName data.mixm.top -Type CNAME` 仍返回 CNAME → data.mixm.top.pages.dnsoe5.com（TTL 10），但该 CNAME 目标在默认 DNS 与 8.8.8.8（dns.google）下均为 Non-existent domain，导致 data.mixm.top 无 A 记录、全链路 NXDOMAIN；本机 curl 000 / 180ms，CI Runner（run 43194019481 @ fd2cf60）同样 `https://data.mixm.top/ => 000|0|0.256836`。双出口一致，排除本地网络因素。判断为 EdgeOne 侧为该自定义域分配的 CNAME 目标已被回收 / 变更（与 2026-11-11 项目名迁移到 mim 的时间点吻合），DNSPod 记录仍指向旧目标；需在 EdgeOne 控制台重取 CNAME 并在 DNSPod 更新。此前 2026-11-11 01:05 的 200 / 981B 为历史留痕。",
-        "captured_at": "2026-11-12 17:50 +08:00"
+        "verdict": "DEGRADED",
+        "http_code": "200",
+        "latency_ms": null,
+        "bytes": null,
+        "evidence": "2026-11-12 21:23 +08:00 EdgeOne 控制台（主账号 100033061933，zone-3rsyi1zergl8）浏览器实测：项目 `mim`（makers-iygo4nrk22jr）域名管理页仅默认域 `mim-45yeiirr.edgeone.cool`（已生效），未绑定任何自定义域；遗留项目 `mim-app`（makers-qsbzlpxaoa8b）域名表为空。默认域 `https://mim-45yeiirr.edgeone.cool/` 渲染 Mim SPA 正常（商城 / 商品列表 / 购物车 / 个人中心 / 入口配置清单 / 部署汇总 / 漫剧 AI 剧 / 聊天 / 登录菜单在列），产物 `assets/index-Dmz7Z5Id.js` + `assets/index-DLY_QDd3.css`，与本机根构建及 IGA 直传同指纹；静态副本侧模块目录接口 Failed to fetch（纯静态分发，API 仍走生产 mim.mixm.top，既有跨域状态）。DNS 复核：`data.mixm.top` 在默认 DNS 与 8.8.8.8 双解析器均为 Non-existent domain（无 CNAME、无 A 记录）。历史留痕：2026-11-12 17:50 曾记录 CNAME → data.mixm.top.pages.dnsoe5.com 目标 NXDOMAIN；本轮控制台确认当前 mim 项目从未在控制台登记 data.mixm.top 自定义域，DNSPod 侧记录已不存在。恢复路径：控制台为 mim 添加自定义域 data.mixm.top → 平台分配新 CNAME → DNSPod 增加 CNAME 记录后复测；DNS 侧需 DNSPod 凭证，本机与 CI 均无。",
+        "captured_at": "2026-11-12 21:23 +08:00"
       },
       "anomalies": [
-        { "code": "EDGEONE_DOMAIN_DNS_BROKEN", "severity": "critical", "message": "2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。需 EdgeOne 控制台重取 CNAME + DNSPod 更新记录后复测" },
+        { "code": "EDGEONE_CUSTOM_DOMAIN_NOT_BOUND", "severity": "critical", "message": "2026-11-12 21:23 控制台实测：mim 项目（makers-iygo4nrk22jr）域名管理仅默认域 mim-45yeiirr.edgeone.cool，data.mixm.top 未在该项目登记为自定义域；DNS 双解析器 NXDOMAIN。需先在控制台添加自定义域取得平台新 CNAME，再到 DNSPod 配置解析" },
+        { "code": "EDGEONE_DOMAIN_DNS_BROKEN", "severity": "critical", "message": "2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。21:23 控制台进一步确认项目未绑定该自定义域、DNSPod 记录已不存在，需控制台重取 CNAME + DNSPod 更新记录后复测" },
         { "code": "WAF_FALSE_POSITIVE", "severity": "warning", "message": "200 + 981B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期" },
         { "code": "NO_CI_LINK", "severity": "info", "message": "历史口径：最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站" },
         { "code": "EDGEONE_PROJECT_RENAMED_TO_MIM", "severity": "info", "message": "2026-11-11 01:05 控制台实测：承载 data.mixm.top 的 EdgeOne Makers 项目名已是 `mim`；此前登记的「项目名 mim-app」为迁移前口径，registry 与文档已同步更正" },
-        { "code": "EDGEONE_LEGACY_PROJECT_MIM_APP", "severity": "info", "message": "控制台仍存在遗留项目 `mim-app`（默认域、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权" },
+        { "code": "EDGEONE_LEGACY_PROJECT_MIM_APP", "severity": "info", "message": "控制台仍存在遗留项目 `mim-app`（makers-qsbzlpxaoa8b，2026-11-12 21:23 域名表为空、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权" },
         { "code": "EDGEONE_DELIVERY_MODE_UNVERIFIED", "severity": "warning", "message": "控制台项目 `mim` 显示代码源 afdk1991/mim（main），与本文档「direct upload 直传」口径不一致；本轮未复验交付是否已改为 Git 连接，交付模式待复核" }
       ],
       "missing_fields": ["content_layer_e2e", "last_deployment_id（本轮）"],

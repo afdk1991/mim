@@ -315,7 +315,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | 平台 | 免费 | 状态 | 域名 | HTTP / 总耗时 / 连接 |
 |---|---|---|---|---|
 | 腾讯云自建服务器 | ✅（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / **0.065s** / 0.027s ⚡最快（`/health` 200 / 0.070s） |
-| 腾讯云 EdgeOne Pages | ✅ | ✅ 已同步（项目名 **`mim`**，2026-11-11 01:05 控制台复核；遗留项目 `mim-app` 无流量保留回滚；真实前端 `apps/web/dist`；curl 命中 WAF 挑战页，须有头浏览器取证） | `https://data.mixm.top` | curl 200 / 0.062s / 0.025s 但仅 **986B** 为 WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a`）；2026-11-11 01:05 实测 200 / **981B** / `server: edgeone makers`；最近一次有头取证（2026-11-06）：`title=Mim`、`assets/index-cpYhbG3w.js` + `assets/index-LqZ4J1V-.css`、`isWafChallenge=false` → 属实弹前端；**2026-11-07 01:48 复测：复用 profile 的 WAF 放行凭证已过期（约 17h），回落层 2 验证码页，CDP 合成点击 ×15 未通过，本轮真实内容未复验（铁律三如实记录）** |
+| 腾讯云 EdgeOne Pages | ⚠️ | 默认域在线、自定义域未绑定（项目名 **`mim`** = `makers-iygo4nrk22jr`；遗留 `mim-app` = `makers-qsbzlpxaoa8b` 域名表为空，保留回滚；真实前端 `apps/web/dist`） | 默认域 `https://mim-45yeiirr.edgeone.cool`；自定义域 `https://data.mixm.top` 未登记 | **2026-11-12 21:23 控制台复核**：mim 项目域名管理仅默认域 `mim-45yeiirr.edgeone.cool`（已生效），未绑定任何自定义域；默认域渲染 Mim SPA 正常，产物 `index-Dmz7Z5Id.js` + `index-DLY_QDd3.css`（与本机根构建 / IGA 直传同指纹），静态副本侧模块目录接口 Failed to fetch（纯静态分发，API 仍走生产 `mim.mixm.top`）。`data.mixm.top` 默认 DNS 与 8.8.8.8 双解析器均 NXDOMAIN（无 CNAME / 无 A）；恢复需控制台添加自定义域取得平台新 CNAME 后在 DNSPod 配置解析，DNS 侧凭证本机与 CI 均无。历史留痕：2026-11-11 01:05 实测 `data.mixm.top` 200 / 981B 为 WAF 人机校验页；2026-11-06 有头取证 `title=Mim`、`index-cpYhbG3w.js`、`isWafChallenge=false` |
 | GitHub Pages | ✅ | ✅ CI 自动发布 | `https://afdk1991.github.io/mim/` | 200 / 0.225s / 0.095s |
 | Sealos | ✅ | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 未配置，缺凭据未发布；容器 + PVC 模板 `deploy/sealos/mim.yaml` 在位；纯 API 容器，根路径 `/` 404 无路由）** | `https://mim-i3ywsdfn.cloud.sealos.io` | 历史留痕：`/` **404**（`route GET / not found`，属正常非故障）/ 0.281s / 0.101s；`/health` 200 / 0.283s / 0.096s（旧版本快照）；2026-11-12 本机 `/health` exit 35 连接重置，本轮未取得可信线上取证 |
 | Cloudflare Pages | ✅ | ✅ CI 自动发布（项目名 `mim`，含 /api 反代） | `https://mim-299.pages.dev` | 2026-11-11 实测 `/` 200 / 1.840s / 5114B、`/api/v1/modules` 200 / 3.200s / 9514B（历史 2026-11-07 快照为 200 / 1.172s / 0.166s，域名当时为 `mim-8ah.pages.dev`） |
@@ -427,7 +427,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 |---|---|---|---|
 | 腾讯云自建服务器（生产） | `mim.mixm.top` | `A \| mim \| 115.159.159.11`（TTL 600） | 正常（2026-11-01 16:44:49） |
 | 生产证书签发校验（Let's Encrypt DNS-01） | —（校验用，不提供访问） | `TXT \| _dnsauth.mim \| 20261101085017crjbxlenk4ad73ctm41heelf10vswxc`（TTL 600） | 正常（2026-11-01 16:50:18） |
-| 腾讯云 EdgeOne Pages | `data.mixm.top` | `CNAME \| data \| data.mixm.top.pages.dnsoe5.com.`（TTL 600） | ⚠️ 2026-11-12 复核：记录仍在，但**目标域 `data.mixm.top.pages.dnsoe5.com` 已 NXDOMAIN**（默认 DNS 与 8.8.8.8 双验证），`data.mixm.top` 因此无 A 记录、站点不可达；需 EdgeOne 控制台重取 CNAME 后更新本记录 |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `CNAME \| data \| data.mixm.top.pages.dnsoe5.com.`（TTL 600，2026-11-05 导出快照留痕） | ❌ 2026-11-12 21:23 复核：`data.mixm.top` 在默认 DNS 与 8.8.8.8 双解析器均 NXDOMAIN（无 CNAME、无 A 记录）；控制台 mim 项目（`makers-iygo4nrk22jr`）域名管理仅默认域 `mim-45yeiirr.edgeone.cool`，**未登记该自定义域**。恢复需先在控制台为 mim 添加 `data.mixm.top` 取得平台新 CNAME，再到 DNSPod 把本记录值改为新 CNAME；DNS 侧凭证本机与 CI 均无 |
 | Gitee（码云）镜像仓 | `gitee.com`（平台方域名） | 不经 DNSPod，`mixm.top` 下无对应记录；仓库路径 `mallwm_admin/mim` | 2026-11-10 22:20 实测 200 / 0.469s / 52034B |
 | GitHub Pages / Sealos / Cloudflare Pages / ghcr / IGA Pages / Vercel / GitHub 仓库 | 平台方域名（`*.github.io` / `*.cloud.sealos.io` / `*.pages.dev` / `ghcr.io` / `*.iga-pages.com` / `*.vercel.app` / `github.com`） | 不经 DNSPod，`mixm.top` 下无对应记录 | — |
 
@@ -444,7 +444,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 | 部署平台 | 自定义域名 | xls 主机 / 行号 | 状态 |
 |---|---|---|---|
 | 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 100 | live（`/health` 200 / 53B） |
-| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | live（`/` 200，校验通过后深链接正常） |
+| 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | pending_dns（2026-11-12 21:23 控制台复核：mim 项目未绑定该自定义域，双解析器 NXDOMAIN；默认域 `mim-45yeiirr.edgeone.cool` 在线、产物最新） |
 | GitHub Pages | `afdk1991.github.io/mim/`（平台默认域） | — | 不适用 |
 | Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | pending_dns |
 | Vercel | `m.mixm.top` | `m` / 46–47 | pending_dns |

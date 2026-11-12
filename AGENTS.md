@@ -1171,6 +1171,21 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **IGA 终态更新**：由「凭据缺失 SKIP + 未取证」升级为「**本机 CLI 直传最新产物并取得带凭证内容层 200 取证**；CI 自动化发布仍待 AK/SK secrets；旧项目分裂待控制台核对清理」。其余缺口（Vercel / Sealos / Netlify / Render 凭据、EdgeOne 自定义域 CNAME）状态同 §9.33，本轮未变动。
 
+#### 9.35 EdgeOne 控制台浏览器复核：自定义域未绑定，默认域在线（2026-11-12 21:23 +08:00，基线 `50a092a`）
+
+**性质**：承接 §9.33 / §9.34 遗留的 EdgeOne 自定义域未决项，本轮经浏览器登录腾讯云控制台只读复核；无业务代码改动，仅注册表 / 域名清单 / 文档口径同步。CLI 无域名绑定 / CNAME 查询子命令（`edgeone makers` 仅 `init/dev/generate-routes/env/link/deploy/create/claim`），故走控制台页面取证。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 登录态 | CLI 登录态与网页 Cookie 不共享；浏览器跳转 `cloud.tencent.com/login`，用户接管完成主账号 `100033061933`（root）扫码 / 登录后进入 Makers 控制台 `zone-3rsyi1zergl8` | 浏览器控制台页面 |
+| 项目盘点 | 账号下两个项目：`mim`（`makers-iygo4nrk22jr`，运行中，3h 前上传，现行权威）；遗留 `mim-app`（`makers-qsbzlpxaoa8b`，域名表为空、无流量，保留回滚；删除不可逆需单独授权） | 项目列表 + 域名管理页 |
+| 自定义域现状 | `mim` 项目域名管理页**仅默认域 `mim-45yeiirr.edgeone.cool`（已生效）**，未登记 `data.mixm.top` 或任何其他自定义域；`mim-app` 域名表为空。旧判断「CNAME 目标 `data.mixm.top.pages.dnsoe5.com` 被回收 / 变更」修正为：**当前 mim 项目从未在控制台登记该自定义域，DNSPod 侧记录已不存在** | 控制台域名管理表 |
+| 默认域内容层取证 | `https://mim-45yeiirr.edgeone.cool/` 渲染 Mim SPA 正常（商城 / 商品列表 / 购物车 / 个人中心与设置 / 入口配置清单 / 部署汇总 / 漫剧 AI 剧 / 聊天 / 登录菜单在列），产物 `assets/index-Dmz7Z5Id.js` + `assets/index-DLY_QDd3.css`，与本机根构建、IGA 直传同指纹；静态副本侧模块目录接口 `Failed to fetch`（纯静态分发，API 仍走生产 `mim.mixm.top`，既有跨域状态） | 有头浏览器读 `script[src]` + 页面文本 |
+| DNS 复核 | `data.mixm.top` 在默认 DNS 与 `8.8.8.8` 双解析器均 Non-existent domain（无 CNAME、无 A 记录）；本机 `nslookup` 报 `Non-existent domain` | `Resolve-DnsName` / `nslookup` 双解析器 |
+| 注册表 / 清单同步 | `pages.edgeone`：`entry_url` 改为默认域 `mim-45yeiirr.edgeone.cool`，verdict `DEGRADED`（默认域在线、自定义域未绑定）；新增 anomaly `EDGEONE_CUSTOM_DOMAIN_NOT_BOUND`；`customDomains.json` EdgeOne 行由 `live` 改 `pending_dns` 并补三步 `next_steps`；`verify-deployments` **55/55**、`verify-custom-domains` **20/20**；重跑 `deployment-summary.mjs` 刷新派生产物 | 文件本体 + 校验脚本 |
+
+**未决项（需控制台 / 私有凭证，本机不可闭环）**：① 在 EdgeOne 控制台为 `mim` 添加自定义域 `data.mixm.top`，取得平台分配的**新 CNAME 目标**（旧 `*.pages.dnsoe5.com` 已失效）；② 在 DNSPod 把 `data` 主机记录 CNAME 更新为新目标（需 DNSPod 凭证，本机与 CI 均无）；③ 解析生效后以有头浏览器过 WAF 校验复测内容层。平台侧添加自定义域条目可逆（可解绑），DNS 侧无凭证；本轮未在控制台创建待验证域名条目。
+
 ---
 
 ---

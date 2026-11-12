@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T11:02:05.106Z
-- 本地 HEAD：`568c2b2`
+- 生成时间：2026-11-12T13:27:04.458Z
+- 本地 HEAD：`50a092a`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 11 | 本轮存在可信取证 |
 | 空数据 | 5 | result 为 null，明确标识而非填 0 |
-| 异常 | 53 | 🔴 2 / 🟡 19 / 🟢 32 |
+| 异常 | 54 | 🔴 3 / 🟡 19 / 🟢 32 |
 | 缺失信息 | 37 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -28,7 +28,7 @@
 | `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | https://mim.mixm.top | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 |
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | https://afdk1991.github.io/mim/ | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
-| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | 🟡 MANUAL | 🔴 FAIL 000 / 0B | EDGEONE_DOMAIN_DNS_BROKEN 等 6 项 |
+| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://mim-45yeiirr.edgeone.cool | 🟡 MANUAL | 🟡 DEGRADED 200 / —B | EDGEONE_CUSTOM_DOMAIN_NOT_BOUND 等 7 项 |
 | `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | ✅ PASS 200 / 5182B | CONTENT_STALE 等 4 项 |
 | `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | SEALOS_SERVICE_UNREACHABLE 等 5 项 |
@@ -56,11 +56,12 @@
 | `pages.github` | 🟢 info | `DEEP_LINK_404_BY_DESIGN` | /mim/store 返回 404 + 5182B 为 dist/404.html 逐字节副本的平台能力上限，浏览器加载后 SPA 正常启动 |
 | `packages.ghcr` | 🟢 info | `AUTH_401_BY_DESIGN` | 未鉴权 401 为 ghcr 预期响应，不判定为部署失败 |
 | `packages.ghcr` | 🟢 info | `DOCKERFILE_WORKTREE_RESTORED` | Dockerfile 与 .dockerignore 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现镜像构建；CI job packages 不再悬空 |
-| `pages.edgeone` | 🔴 critical | `EDGEONE_DOMAIN_DNS_BROKEN` | 2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。需 EdgeOne 控制台重取 CNAME + DNSPod 更新记录后复测 |
+| `pages.edgeone` | 🔴 critical | `EDGEONE_CUSTOM_DOMAIN_NOT_BOUND` | 2026-11-12 21:23 控制台实测：mim 项目（makers-iygo4nrk22jr）域名管理仅默认域 mim-45yeiirr.edgeone.cool，data.mixm.top 未在该项目登记为自定义域；DNS 双解析器 NXDOMAIN。需先在控制台添加自定义域取得平台新 CNAME，再到 DNSPod 配置解析 |
+| `pages.edgeone` | 🔴 critical | `EDGEONE_DOMAIN_DNS_BROKEN` | 2026-11-12 17:50 复核：data.mixm.top 的 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已 NXDOMAIN（默认 DNS 与 8.8.8.8 双验证），站点入口整体不可用；本机与 CI 出口双 000。21:23 控制台进一步确认项目未绑定该自定义域、DNSPod 记录已不存在，需控制台重取 CNAME + DNSPod 更新记录后复测 |
 | `pages.edgeone` | 🟡 warning | `WAF_FALSE_POSITIVE` | 200 + 981B 为 WAF 挑战页，不等于内容正确；须复用已放行 Edge profile + 有头 CDP 复验，放行凭证会过期 |
 | `pages.edgeone` | 🟢 info | `NO_CI_LINK` | 历史口径：最近一次直传 Deployment dpu0n61jlos8（2026-11-08），非仓库连接，push main 不会自动刷新该站 |
 | `pages.edgeone` | 🟢 info | `EDGEONE_PROJECT_RENAMED_TO_MIM` | 2026-11-11 01:05 控制台实测：承载 data.mixm.top 的 EdgeOne Makers 项目名已是 `mim`；此前登记的「项目名 mim-app」为迁移前口径，registry 与文档已同步更正 |
-| `pages.edgeone` | 🟢 info | `EDGEONE_LEGACY_PROJECT_MIM_APP` | 控制台仍存在遗留项目 `mim-app`（默认域、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权 |
+| `pages.edgeone` | 🟢 info | `EDGEONE_LEGACY_PROJECT_MIM_APP` | 控制台仍存在遗留项目 `mim-app`（makers-qsbzlpxaoa8b，2026-11-12 21:23 域名表为空、无自定义域、无流量）；未删除以免影响回滚，删除属不可逆操作，需用户单独授权 |
 | `pages.edgeone` | 🟡 warning | `EDGEONE_DELIVERY_MODE_UNVERIFIED` | 控制台项目 `mim` 显示代码源 afdk1991/mim（main），与本文档「direct upload 直传」口径不一致；本轮未复验交付是否已改为 Git 连接，交付模式待复核 |
 | `pages.cloudflare` | 🟢 info | `DUPLICATE_MATRIX_ROW_MERGED` | README 曾将「同源自托管入口」另列一行，与本站同域名同载体，已合并为一行并用 delivery.modes 区分，避免重复计数 |
 | `pages.cloudflare` | 🟡 warning | `LOCAL_PROCESS_DEPENDENCY` | 同源自托管 Worker 依赖本机 API 8787 / 静态站 5188 / cloudflared 三进程在线，本机离线即 502，不能作为稳定生产入口 |
@@ -102,8 +103,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 568c2b2cd98c4f08f0578327c07bb2ec814b34eb | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 568c2b2cd98c4f08f0578327c07bb2ec814b34eb | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 50a092a4569ef820311df8927649b62bbd6f1905 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 50a092a4569ef820311df8927649b62bbd6f1905 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

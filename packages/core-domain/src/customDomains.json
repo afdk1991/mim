@@ -499,10 +499,14 @@
         104
       ],
       "xls_remark": "数据中心入口｜开放数据集平台",
-      "status": "live",
-      "status_note": "DNSPod CNAME -> data.mixm.top.pages.dnsoe5.com（61.170.82.52），EdgeOne 项目 mim 承载",
-      "evidence": "2026-11-11 实测 https://data.mixm.top/ -> 200（人机校验页开启时 curl 得 982B 校验脚本，浏览器过校验后深链接正常渲染）",
-      "next_steps": []
+      "status": "pending_dns",
+      "status_note": "2026-11-12 21:23 控制台复核：mim 项目（makers-iygo4nrk22jr）域名管理仅默认域 mim-45yeiirr.edgeone.cool（已生效、产物最新），未登记 data.mixm.top；该域默认 DNS 与 8.8.8.8 双解析器均 NXDOMAIN（无 CNAME / 无 A）。旧 CNAME 目标 data.mixm.top.pages.dnsoe5.com 已不存在",
+      "evidence": "2026-11-12 21:23 控制台实测：默认域 https://mim-45yeiirr.edgeone.cool/ 渲染 Mim SPA 正常，产物 index-Dmz7Z5Id.js + index-DLY_QDd3.css（与本机根构建 / IGA 直传同指纹）；data.mixm.top 双解析器 Non-existent domain",
+      "next_steps": [
+        "在 EdgeOne 控制台为 mim 项目（makers-iygo4nrk22jr）添加自定义域 data.mixm.top，取得平台分配的新 CNAME 目标",
+        "在 DNSPod 把 data 主机记录的 CNAME 更新为新目标（需 DNSPod 凭证，本机与 CI 均无）",
+        "解析生效后复测 data.mixm.top 内容层（有头浏览器过 WAF 校验）"
+      ]
     },
     {
       "platform_id": "cloudflare",
