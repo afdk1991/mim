@@ -428,18 +428,29 @@ jobs:
             -H "Authorization: Bearer $RENDER_API_KEY" \
             -H "Content-Type: application/json" -d '{}'
 
-      # 线上取证（铁律八）：在 Runner 侧验证各托管站点真实可访问。
-      # 本地网络对 *.vercel.app 存在 DNS 污染 / TCP 阻断，故以 CI 出口作为独立取证点。
-      - name: 线上取证（托管站点可访问性）
+      # 线上取证（铁律八 / 铁律九）：在 Runner 侧逐平台验证全部对外域名真实可访问。
+      # 本机网络对 *.vercel.app / *.workers.dev / cloud.sealos.io 存在 DNS 污染与 TLS 阻断，
+      # 故以 CI 出口作为独立取证点；`000` 代表 TCP/TLS/DNS 层未到达，不等同于 4xx/5xx。
+      - name: 线上取证（多平台域名可访问性）
         continue-on-error: true
         run: |
           set +e
           for url in \
             https://mim.mixm.top/health \
+            https://mim.mixm.top/ \
+            https://mim.mixm.top/api/v1/modules \
             https://mim-299.pages.dev/ \
-            https://mim-puce.vercel.app/ ; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url")
-            echo "$url => $code"
+            https://mim-puce.vercel.app/ \
+            https://data.mixm.top/ \
+            https://afdk1991.github.io/mim/ \
+            https://mim-i3ywsdfn.cloud.sealos.io/health \
+            https://ghcr.io/v2/ \
+            https://gitee.com/mallwm_admin/mim \
+            https://github.com/afdk1991/mim \
+            https://mim-store.15726833367.workers.dev/ \
+            https://preview.iga-pages.com/ ; do
+            out=$(curl -k -s -o /dev/null -w '%{http_code}|%{size_download}|%{time_total}|%{remote_ip}' --max-time 20 "$url")
+            echo "$url => $out"
           done
 
       # Gitee 镜像同步（铁律十二）：把「本次触发的同一个提交」推到国内镜像仓。
