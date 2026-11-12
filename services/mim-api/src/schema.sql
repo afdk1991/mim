@@ -518,3 +518,23 @@ CREATE TABLE IF NOT EXISTS site_module_items (
 CREATE INDEX IF NOT EXISTS idx_site_items_host_cap ON site_module_items(host, capability, status);
 CREATE INDEX IF NOT EXISTS idx_site_items_created ON site_module_items(created_at DESC);
 
+
+-- 全站资源导航站（NAVIGATION）：链接目录 + 可达性状态 + 最近一次探测取证。
+-- status 三态：ok 可达 / broken 失效 / unknown 未探测；探测结果与判定口径见 core-domain/src/navigation.ts。
+CREATE TABLE IF NOT EXISTS nav_links (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  url           TEXT NOT NULL,
+  group_name    TEXT NOT NULL DEFAULT '其他',
+  description   TEXT NOT NULL DEFAULT '',
+  recommended   INTEGER NOT NULL DEFAULT 0,
+  status        TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('ok','broken','unknown')),
+  http_status   INTEGER,
+  latency_ms    INTEGER,
+  last_checked_at TEXT,
+  created_by    TEXT NOT NULL DEFAULT 'system',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nav_links_group ON nav_links(group_name, recommended, name);
+CREATE INDEX IF NOT EXISTS idx_nav_links_status ON nav_links(status, last_checked_at DESC);

@@ -2,6 +2,7 @@
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
 import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：44 个去重入口、19 个业务域、占位标识与运行时能力点
+import { NAV_LINK_SEEDS } from '@mim/core-domain'; // 全站资源导航站的默认链接种子（站内相对路径，不写具体域名）
 import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn, capabilityOfModule } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 模块能力绑定
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本
 import { dirname } from 'node:path'; // 取文件所在目录，用于从数据库文件路径推导数据目录
@@ -113,6 +114,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedCategoryModules(db); // 按分类树展开写入 205 个二级模块（cn/global 双区），实现「二级条目即模块」
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
+  seedNavLinks(db); // 写入导航站默认目录（站内视图入口），幂等，不覆盖用户新增与已探测状态
   const backfilled = backfillMemberNos(db); // 历史用户补发 Mim ID 号码；新库为空操作
   if (backfilled > 0) console.log(`[db] member_no backfilled: ${backfilled} users`); // 补号必须留痕，便于核对号码连续性
   return db; // 返回已完成初始化的连接
@@ -163,6 +165,40 @@ export function seedSiteModules(db: Db): void { // 入口清单种子入口，�
   }); // 事务函数准备完成
   seed(); // 执行事务
 } // seedSiteModules 结束
+
+/**
+ * 导航站默认目录种子：把站内既有视图入口写入 nav_links。
+ * 幂等策略：主键 = `nav-seed-<序号>`，INSERT OR IGNORE 不覆盖用户改写与已有探测状态；
+ * 种子清单里已移除的条目按主键前缀清理（只删 created_by = system 的行，不碰用户新增）。
+ */
+export function seedNavLinks(db: Db): void { // 导航站种子入口，测试内存库同样会执行
+  const now = new Date().toISOString(); // 统一时间戳
+  const insert = db.prepare( // 预编译插入：只补缺失行
+    `INSERT OR IGNORE INTO nav_links
+       (id, name, url, group_name, description, recommended, status, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'unknown', 'system', ?, ?)`,
+  ); // prepare 结束
+  const validIds = NAV_LINK_SEEDS.map((_seed, index) => `nav-seed-${index + 1}`); // 当前种子主键集合
+  const removeOrphans = db.prepare( // 清理已从种子清单移除的条目，只按 system 归属与主键前缀限定
+    "DELETE FROM nav_links WHERE created_by = 'system' AND id LIKE 'nav-seed-%' AND id NOT IN (SELECT value FROM json_each(?))",
+  ); // prepare 结束
+  const seed = db.transaction(() => { // 同一事务，避免半套目录
+    NAV_LINK_SEEDS.forEach((item, index) => { // 逐条写入
+      insert.run( // 按占位符顺序绑定
+        `nav-seed-${index + 1}`, // 稳定主键，保证重复启动幂等
+        item.name, // 展示名
+        item.url, // 相对路径
+        item.group, // 分组
+        item.description, // 说明
+        item.recommended ? 1 : 0, // 推荐位标记
+        now, // 创建时间
+        now, // 更新时间
+      ); // run 结束
+    }); // 循环结束
+    removeOrphans.run(JSON.stringify(validIds)); // 幂等清理孤儿种子行
+  }); // 事务准备完成
+  seed(); // 执行事务
+} // seedNavLinks 结束
 
 /**
  * 功能模块商城种子：第 1 期上架一组真实模块（漫剧 AI 剧工作台 + 生成包三档 + AI 配音/剧本 + 素材扩容 + 模板包），

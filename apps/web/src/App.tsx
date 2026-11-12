@@ -30,6 +30,7 @@ import { Profile } from './views/Profile';
 import { Sites } from './views/Sites';
 // 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
 import { Deployments } from './views/Deployments';
+import { Navigation } from './views/Navigation';
 // 漫剧 AI 剧模块外壳：放映厅（匿名可看片）+ 创作工作台（登录后使用）
 import { ComicStudio } from './views/ComicStudio';
 // IM 聊天 + 视频通话
@@ -165,6 +166,8 @@ export function App() {
     { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单' },
     // 部署汇总：统一字段核对整体部署情况
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总' },
+    // 导航站：全站资源目录 + 可达性状态 + 推荐位
+    { view: 'navigation', label: locale === 'en-US' ? 'Navigation' : '导航站' },
     // 漫剧 AI 剧工作台
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
@@ -246,6 +249,7 @@ export function App() {
         {route.view === 'sites' && <Sites locale={locale} onOpenView={(view) => go({ view })} />}{/* 站点模块矩阵：清单内的跳转由 App 统一注入 */}
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
+        {route.view === 'navigation' && <Navigation locale={locale} />}{/* 导航站：目录 + 可达性 + 推荐位 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}

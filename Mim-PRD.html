@@ -270,6 +270,13 @@
 <!-- 交付物与取证边界说明 -->
 <p class="muted"><strong>交付物</strong>：<code>/deployments</code> 前端核对表、<code>/api/v1/deployments*</code> 三个公开只读端点、<code>docs/deployment-summary.{json,md}</code> 结构化结果、<code>scripts/deployment-summary.mjs</code> 生成器与 <code>scripts/verify-deployments.mjs</code> 校验器（52 项断言）。<strong>边界</strong>：汇总是核对工具，其通过不代表生产「已上线」；生产唯一权威终点仍为 <code>https://mim.mixm.top</code>（见运维铁律十二）。</p>
 
+<!-- 导航站小节标题：统一入口清单中 NAVIGATION 的业务模块落地 -->
+<h3>导航站（NAVIGATION 业务模块，2026-11-12 新增）</h3>
+<!-- 导航站需求：从目录条目升级为可运行功能 -->
+<p>统一入口清单中的 <strong>NAVIGATION（全站资源导航站）</strong> 由「目录登记」升级为可运行模块，交付三项能力：① <strong>链接目录与分类</strong>——收录站内视图与外部入口，按分组展示，支持名称 / 地址 / 说明关键词检索；② <strong>可达性检测与失效标记</strong>——由服务端发起真实 HTTP 探测（GET、不跟随跳转、8 秒超时），2xx / 3xx 记可达、4xx / 5xx 与网络异常记失效、未探测保持未知，并回写 HTTP 码、耗时与探测时间；③ <strong>推荐位</strong>——可标记 / 取消推荐，推荐条目在目录中优先展示。</p>
+<!-- 导航站交付物与边界 -->
+<p class="muted"><strong>交付物</strong>：<code>/navigation</code> 前端视图、<code>/api/v1/navigation*</code> 六个端点（目录与汇总公开，收录 / 修改 / 探测需登录 + 幂等键）、<code>nav_links</code> 表与 7 条站内视图种子、<code>packages/core-domain/src/navigation.ts</code> 共享判定口径、契约测试 9 例。<strong>边界</strong>：只维护目录与可达性状态，不承载被链系统的内容，不负责 DNS 解析或跳转决策（跳转由浏览器直接发起）；探测结果为运行时刻快照，不作为 SLA 结论。</p>
+
 <!-- 章节标题：4. 角色与对象模型 -->
 <h2>4. 角色与对象模型</h2>
 

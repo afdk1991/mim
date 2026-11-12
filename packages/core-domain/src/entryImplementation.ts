@@ -261,15 +261,16 @@ export const ENTRY_IMPLEMENTATION: Readonly<Record<string, EntryImplementation>>
   }, // SERVICE_GOVERNANCE 结束
 
   // ---------- 开发测试 / 工具 / 导航 / 低代码 / 语音 / 移动 / 内网 ----------
-  NAVIGATION: { // 全站资源导航站，相邻为侧边栏导航
-    status: 'partial', // 部分相邻：无独立导航站
-    view: 'store', // 直达商城目录
+  NAVIGATION: { // 全站资源导航站（2026-11-12 已落成独立视图 /navigation）
+    status: 'implemented', // 已落地：链接目录 + 服务端探测 + 失效标记 + 推荐位 + 检索均为真实功能
+    view: 'navigation', // 独立导航站视图
     href: null, // 无外链
-    realFeatures: [ // 已上线导航相邻能力
-      '侧边栏统一导航与业务视图直达', // 侧边栏导航直达
-      '深链接直达与前进后退', // 深链接与历史导航
+    realFeatures: [ // 已上线导航站能力
+      '全站资源链接目录与分组分类（GET /api/v1/navigation/links 支持 q / group / status 过滤）', // 目录与检索
+      '服务端可达性探测与失效标记（单条与全目录探测，回写 HTTP 码 / 耗时 / 探测时间）', // 探测闭环
+      '推荐位标记与目录三态汇总（可达 / 失效 / 未探测）', // 推荐位
     ],
-    boundary: '无独立导航站与书签 / 收藏管理。', // 导航站差距说明
+    boundary: '只维护链接目录与可达性状态，不承载被链系统的内容，不负责 DNS 解析或跳转决策（跳转由浏览器直接发起）。', // 导航站边界
   }, // NAVIGATION 结束
   GALE_TOOLS: { // 疾风引擎在线工具平台，相邻为商城工具型能力
     status: 'partial', // 部分相邻：无工具编排保存

@@ -132,3 +132,19 @@ PRD（Mim-PRD.html，V0.0.0-preview 草案）确定的核心产品决策是 **�
 | 产物 | `docs/deployment-summary.{json,md}` | 机器可核对 JSON + 人工核对表 |
 
 设计约束：① 所有同类项共用同一组字段，别名归并到 `aliases` 而非另起一行；② `result = null` 表示空数据，不以 0 或历史 200 填充；③ 工件区分 `artifact_in_head`（远端 HEAD）与 `artifact_in_worktree`（本地工作树）两个口径；④ 汇总 `PASS` 不等于生产「已上线」，生产唯一权威终点仍为 `https://mim.mixm.top`（铁律十二）。详见 [AGENTS.md §13](../../AGENTS.md)。
+
+## 9. 导航站 NAVIGATION（2026-11-12 新增）
+
+架构定位：**有状态业务模块**，是统一入口清单里 NAVIGATION 的真实落地——链接目录 + 服务端可达性探测 + 失效标记 + 推荐位 + 检索。职责边界：只维护目录与可达性状态，不承载被链系统内容，不负责 DNS 解析或跳转决策（跳转由浏览器直接发起）。
+
+| 层 | 工件 | 职责 |
+|---|---|---|
+| 数据表 | `services/mim-api/src/schema.sql` 的 `nav_links` | `id / name / url / group_name / description / recommended / status(ok\|broken\|unknown) / http_status / latency_ms / last_checked_at / created_by / created_at / updated_at`；两个索引：`(group_name, recommended, name)`、`(status, last_checked_at DESC)`；启动时 `CREATE TABLE IF NOT EXISTS` 幂等建表，存量库自动补齐 |
+| 共享包 | `packages/core-domain/src/navigation.ts` | 7 条站内视图种子 `NAV_LINK_SEEDS`、`normalizeNavUrl`（只接受 http(s) 或站内相对路径）、`resolveProbeTarget`（相对路径按 origin 补齐）、`classifyProbe`（2xx/3xx 可达）、`summarizeNavLinks`（三态 + 分组汇总） |
+| 种子 | `services/mim-api/src/db.ts` 的 `seedNavLinks` | 主键 `nav-seed-<n>`，`INSERT OR IGNORE` 不覆盖已探测状态；按主键前缀幂等清理已移除的种子行，只删 `created_by = system` |
+| 后端 | `services/mim-api/src/routes/navigation.ts` | `GET /navigation/summary`、`GET /navigation/links`（`q` / `group` / `status` / `recommended`）、`POST /navigation/links`、`PATCH /navigation/links/:id`、`POST /navigation/links/:id/check`、`POST /navigation/check`（上限 50 条、逐条串行） |
+| 探测口径 | 同上 `probeLink` | GET + `redirect: 'manual'` + 8 秒超时 + `user-agent: mim-navigation-probe/1.0`；2xx/3xx 记 `ok`，4xx/5xx 与网络异常记 `broken`，回写 HTTP 码 / 耗时 / 探测时间；origin 取 `MIM_PUBLIC_ORIGIN`，缺省 `https://mim.mixm.top` |
+| 前端 | `apps/web/src/views/Navigation.tsx` | `/navigation` 视图：三态概览、关键词检索、分组筛选、分组列表、单条与全量检测、推荐位切换、收录表单；写操作复用运行时访客 / 正式会话，目录公开可浏览 |
+| 契约测试 | `services/mim-api/test/navigation.test.ts` | 9 例：公开目录与过滤、鉴权与非法地址、PATCH 校验、命中 / 未命中探测（本地 `node:http` 服务，不依赖外网）、全目录探测、种子重跑不重置状态 |
+
+设计约束：① 三态只允许 `ok` / `broken` / `unknown`，未探测不冒充可达；② 探测失败不抛 5xx，而是把失败写进 `status = broken` 供页面标记；③ 全目录探测串行执行并限量，避免对第三方站点并发轰炸；④ 种子只补缺，不覆盖用户改写与已有探测结果。

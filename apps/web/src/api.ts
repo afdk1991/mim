@@ -1595,4 +1595,62 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       }>(`/deployments/${encodeURIComponent(id)}`, { auth: false, idempotency: false }); // 路径参数编码
     }, // detail 结束
   }, // deployments 分组结束
+
+  // ---------- 导航站（navigation）：链接目录 / 三态可达性 / 推荐位，浏览公开、写与探测需登录 ----------
+
+  navigation: { // 全站资源导航站：路径 /navigation
+    summary() { // 目录汇总：三态计数、分组计数、最近探测时间
+      return request<{ schema: string; summary: NavSummary }>('/navigation/summary', { auth: false, idempotency: false }); // 公开只读
+    }, // summary 结束
+    links(opts: { q?: string; group?: string; status?: string; recommended?: boolean } = {}) { // 链接目录，支持四类过滤
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      if (opts.q) qs.set('q', opts.q); // 关键词：名称 / 地址 / 说明
+      if (opts.group) qs.set('group', opts.group); // 分组
+      if (opts.status) qs.set('status', opts.status); // 三态
+      if (opts.recommended) qs.set('recommended', '1'); // 只看推荐位
+      const suffix = qs.toString(); // 无参数时空串
+      return request<{ schema: string; total: number; items: NavLink[]; summary: NavSummary }>(`/navigation/links${suffix ? `?${suffix}` : ''}`, { auth: false, idempotency: false }); // 公开只读
+    }, // links 结束
+    create(payload: { name: string; url: string; group?: string; description?: string; recommended?: boolean }) { // 收录一条入口
+      return request<{ item: NavLink }>('/navigation/links', { method: 'POST', body: payload }); // 写操作：自动带幂等键
+    }, // create 结束
+    update(id: string, payload: { name?: string; url?: string; group?: string; description?: string; recommended?: boolean }) { // 改名 / 分组 / 说明 / 推荐位 / 地址
+      return request<{ item: NavLink }>(`/navigation/links/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }); // 写操作：自动带幂等键
+    }, // update 结束
+    check(id: string) { // 单条可达性探测
+      return request<{ item: NavLink }>(`/navigation/links/${encodeURIComponent(id)}/check`, { method: 'POST', body: {} }); // 服务端探测并回写状态
+    }, // check 结束
+    checkAll() { // 全目录可达性探测
+      return request<{ schema: string; checked: number; items: NavLink[]; summary: NavSummary }>('/navigation/check', { method: 'POST', body: {} }); // 逐条串行探测
+    }, // checkAll 结束
+  }, // navigation 分组结束
 }; // api 对象结束
+
+// ---------- 导航站（navigation）共享类型，与 routes/navigation.ts 响应一一对应 ----------
+
+export type NavStatus = 'ok' | 'broken' | 'unknown'; // 三态可达性
+
+export interface NavLink { // 单条导航链接
+  id: string; // 主键
+  name: string; // 名称
+  url: string; // 相对路径或绝对地址
+  group: string; // 分组
+  description: string; // 说明
+  recommended: boolean; // 是否推荐位
+  status: NavStatus; // 可达性
+  http_status: number | null; // 最近探测 HTTP 码
+  latency_ms: number | null; // 最近探测耗时
+  last_checked_at: string | null; // 最近探测时间
+  created_by: string; // 创建者（system 为种子）
+  created_at: string; // 创建时间
+  updated_at: string; // 更新时间
+} // NavLink 结束
+
+export interface NavSummary { // 目录汇总
+  total: number; // 总数
+  ok: number; // 可达
+  broken: number; // 失效
+  unknown: number; // 未探测
+  groups: Array<{ name: string; count: number }>; // 分组计数
+  last_checked_at: string | null; // 最近探测时间
+} // NavSummary 结束
