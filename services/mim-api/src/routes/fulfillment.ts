@@ -6,6 +6,7 @@ import { z } from 'zod'; // 入参校验
 import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 鉴权与运营权限
 import { parse } from '../validate.js'; // 校验错误翻译
+import { queryShipment } from '../logistics.js'; // 可选快递100实时查询
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const now = () => new Date().toISOString(); // UTC 时间
@@ -65,8 +66,8 @@ export function createFulfillmentRouter(deps: ApiDeps): Router {
     res.status(201).json({ ok: true, status: body.status });
   });
 
-  /** 物流轨迹：本人或运营可查。 */
-  router.get('/shop/orders/:id/shipment', requireAuth, (req, res) => {
+  /** 物流轨迹：本人或运营可查；配置快递100时附带实时轨迹，失败不影响本地轨迹返回。 */
+  router.get('/shop/orders/:id/shipment', requireAuth, async (req, res) => {
     const userId = req.user!.id;
     const isOps = !!deps.db
       .prepare('SELECT 1 AS ok FROM user_roles ur JOIN role_permissions rp ON rp.role_code = ur.role_code WHERE ur.user_id = ? AND rp.permission_code = ?')
@@ -77,7 +78,9 @@ export function createFulfillmentRouter(deps: ApiDeps): Router {
       | { carrier: string; tracking_no: string; status: string; events_json: string; updated_at: string }
       | undefined;
     if (!shipment) return res.json({ shipment: null });
-    res.json({ shipment: { ...shipment, events: JSON.parse(shipment.events_json) as unknown[] } });
+    const localEvents = JSON.parse(shipment.events_json) as unknown[]; // 本地登记的轨迹
+    const live = await queryShipment(deps.env, shipment.carrier, shipment.tracking_no); // 可选实时查询，未配置不请求外网
+    res.json({ shipment: { ...shipment, events: localEvents, live } }); // live 字段标明供应商与错误，不伪造轨迹
   });
 
   /** 申请售后：仅已付款 / 已发货订单，金额取订单实付。 */

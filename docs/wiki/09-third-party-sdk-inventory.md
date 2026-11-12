@@ -299,5 +299,6 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | `MIM_BAIDU_TRANSLATE_APPID` / `MIM_BAIDU_TRANSLATE_KEY` | 百度翻译开放平台：机器翻译与前后台语言分离 | 百度翻译控制台申请；缺任一项时 `/i18n/translate` 返回 503 `PROVIDER_NOT_CONFIGURED`，已知文案仍走本地词典 | P1 |
 | `MIM_IP_HASH_SALT` | IP 归属地哈希盐：`user_signals.ip_hash` 只存 SHA-256(`${salt}:${ip}`)，不存明文 IP | 建议独立随机串；缺省回落 `MIM_JWT_SECRET`，轮换后历史哈希不可关联 | P1 |
 | `MIM_MEILISEARCH_URL` / `MIM_MEILISEARCH_KEY` / `MIM_MEILISEARCH_INDEX` | Meilisearch 实例地址、查询 / 管理密钥、索引名（默认 `mim_search`） | 自建或 Meilisearch Cloud 获取；未配置时统一搜索自动降级 SQLite，`POST /search/reindex` 返回 503 | P1 |
+| `MIM_KUAIDI100_CUSTOMER` / `MIM_KUAIDI100_KEY` | 快递100 实时查询：客户编号与授权密钥（签名 MD5(param+key+customer)） | 快递100 企业版控制台获取；未配置时 `GET /shop/orders/:id/shipment` 只返回本地轨迹，`live.provider=none`，不发起外网请求 | P1 |
 
 _登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）。新增第三方能力必须先更新本文件，再进入实现。_
