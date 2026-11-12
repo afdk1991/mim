@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-11T17:04:26.682Z
-- 本地 HEAD：`a32960d`
+- 生成时间：2026-11-12T09:43:36.504Z
+- 本地 HEAD：`f92c8bc`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 9 | 本轮存在可信取证 |
 | 空数据 | 7 | result 为 null，明确标识而非填 0 |
-| 异常 | 49 | 🔴 0 / 🟡 18 / 🟢 31 |
+| 异常 | 50 | 🔴 0 / 🟡 19 / 🟢 31 |
 | 缺失信息 | 41 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -31,7 +31,7 @@
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | 🟡 MANUAL | 🟡 DEGRADED 200 / 981B | WAF_FALSE_POSITIVE 等 5 项 |
 | `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | CI_SKIP_FALSE_GREEN 等 3 项 |
-| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | ✅ OK | ✅ PASS 200 / 53B | ROOT_404_BY_DESIGN 等 3 项 |
+| `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | 🟡 UNVERIFIED | 🟡 未测  / —B | SEALOS_CREDENTIAL_MISSING 等 4 项 |
 | `pages.iga` | — | IGA Pages / distribution | manual platforms | https://preview.iga-pages.com | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 4 项 |
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | manual — | https://mim-store.15726833367.workers.dev | 🟡 MANUAL | ⚪ 空数据 | EMPTY_RESULT 等 3 项 |
 | `repo.gitlab` | — | GitLab 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
@@ -76,6 +76,7 @@
 | `container.sealos` | 🟢 info | `ROOT_404_BY_DESIGN` | 纯 API 容器未注册根路由，/ 返回 404 与 /store 返回 route GET / not found 均属设计内，不托管商城 SPA |
 | `container.sealos` | 🟢 info | `SEALOS_MANIFEST_WORKTREE_RESTORED` | deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空 |
 | `container.sealos` | 🟢 info | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：Sealos 的命名空间 ns-i3ywsdfn 与域名 mim-i3ywsdfn.cloud.sealos.io 由平台分配、不可自选（Sealos Cloud 只授予该 ns 权限），应用内资源名（mim-api / mim-data / mim-secrets）已统一为 mim 前缀；无 SEALOS_KUBECONFIG 凭证，无法新建 ns-mim 命名空间来换域名 |
+| `container.sealos` | 🟡 warning | `SEALOS_CREDENTIAL_MISSING` | 2026-11-12 复核：Sealos 部署凭据（SEALOS_KUBECONFIG / SEALOS_DOMAIN / SEALOS_NAMESPACE / MIM_JWT_SECRET）未配置，CI step 恒 SKIP；补齐私有 secret 并重跑 platforms 作业前不得宣称 Sealos 已发布本轮产物。历史留痕：2026-11-09 23:03 curl /health 曾 200 / 1.111s / 53B（{"status":"ok"}），为旧版本快照，不代表本轮状态 |
 | `pages.iga` | 🟡 warning | `EMPTY_RESULT` | 本轮无任何探测取证（result = null 空数据），不以历史 200 冒充现状 |
 | `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | 入口需 iga_token 私有凭证，沙箱缺失；按铁律一如实标注未测 |
 | `pages.iga` | 🟢 info | `IGA_SCRIPT_WORKTREE_RESTORED` | deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空 |
@@ -98,8 +99,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | a32960d846d6b0ea43cac8bbdb7abfd50adc8a38 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | a32960d846d6b0ea43cac8bbdb7abfd50adc8a38 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | f92c8bcf30cf66e57351e61e12e463edc30e1b1d | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | f92c8bcf30cf66e57351e61e12e463edc30e1b1d | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

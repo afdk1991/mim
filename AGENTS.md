@@ -141,11 +141,11 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 腾讯云自建服务器 | ✅ 是（自有服务器） | ✅ 已上线（前后端 + SQLite） | `https://mim.mixm.top` | 200 / 0.061s ⚡最快（2026-11-08 18:14 本轮实测：`/health` 200 / 0.061s / 0.001s / LEN=53；首页 200 / 0.064s / 0.001s / LEN=5182，产物 `assets/index-D2UkZqM1.js` + `assets/index-CeRvh2Rf.css`；五条深链接 `/comic` 0.073s / `/store` 0.079s / `/chat` 0.071s / `/settings` 0.066s / `/login` 0.068s 全 200 / LEN=5182，nginx `try_files` 生效；`/admin/` 200 / 0.069s / LEN=1430；`/api/v1/modules` 200 / 0.076s / LEN=438；`/api/v1/site/overview` 404 / LEN=126；**导出路由匿名探测 `POST /api/v1/comic/films/does-not-exist/export` 返回 401 `AUTH_UNAUTHORIZED` 而非 404，证明路由在线**；生产 Edge CDP E2E 8/8——新 bundle 加载、`/store` 匿名渲染 8 个模块卡片、搜索 comic 命中漫剧工作台 → 详情面板「状态: 已上架 / 依赖链 / 价格历史」、`/comic` 匿名内嵌登录卡片、console 零报错；**本轮（2026-11-08 18:3x）商城种子由 1 个模块扩充为 8 个（含付费生成包与依赖链），`/api/v1/modules` 现返回 8 条、`/store` 不再显空**） |
 | 腾讯云 EdgeOne Pages | ✅ 是 | ✅ 已同步（**direct upload 直传型，非仓库连接**；最近一次 Deployment `dpu0n61jlos8`，2026-11-08，`git worktree` 干净树 HEAD `42b98bc` 构建产物，经 `edgeone makers deploy apps/web/dist -n mim-app --env production` 直传；**curl 命中 WAF 挑战页，须有头浏览器取证**） | `https://data.mixm.top` | 200 / 0.075s / 0.001s 但仅 985B 为 EdgeOne WAF 机器校验页（`EO_Bot_Ssid` / `_0x649a` 命中，本轮未做内容层复验；CI「托管平台同步」作业 success 作替代取证）；**2026-11-08 04:33 有头 Edge + CDP 人工放行后商城全链路通过**（历史留痕，放行凭证会过期）：`title=Mim`、`isWafChallenge=false`、搜索/详情/`/api/v1/modules` 200、console 零报错 |
 | GitHub Pages | ✅ 是 | ✅ CI 自动发布（**含 `?tads` / 裸问号归一化脚本，已实测**） | `https://afdk1991.github.io/mim/` | `/mim/` 200 / 0.867s / 0.001s / LEN=5182（产物 `assets/index-COy8rstl.js`，根构建注入 `VITE_API_ORIGIN` 与自建同源指纹不同属预期）；深链接 `/mim/store` 404 / 0.370s / LEN=5182 属 `404.html` 逐字节副本的预期设计，浏览器加载后 SPA 直接启动 |
-| Sealos | ✅ 是 | ✅ CI 自动发布（容器 + PVC；**纯 API 容器，根路径 `/` 404 无路由，`/health` 200**） | `https://mim-i3ywsdfn.cloud.sealos.io` | `/health` 200 / 0.718s / 0.001s / LEN=53（`{"status":"ok"}`；根路径 `/` 404 属纯 API 容器未注册根路由，本轮未重测；`/store` 等 Web 路由命中 API 返回 `route GET /store not found` 404 JSON 属预期——Sealos 为纯 API 容器，不托管商城 SPA；商城 SPA 仅在 `mim.mixm.top` / GitHub Pages / Cloudflare Pages 提供） |
+| Sealos | ✅ 是 | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 未配置，未发布本轮产物；容器 + PVC 模板 `deploy/sealos/mim.yaml` 在位；纯 API 容器，根路径 `/` 404 无路由）** | `https://mim-i3ywsdfn.cloud.sealos.io` | 历史留痕：`/health` 200 / 0.718s / 0.001s / LEN=53（`{"status":"ok"}`，旧版本快照；根路径 `/` 404 属纯 API 容器未注册根路由；`/store` 等 Web 路由命中 API 返回 404 JSON 属预期——Sealos 不托管商城 SPA）；2026-11-12 本机 `/health` exit 35 连接重置，本轮未取得可信线上取证 |
 | Cloudflare Pages | ✅ 是 | ✅ CI 自动发布（项目名 **`mim`**，2026-11-11 由 `mim-8ah` 迁移；含 `/api` 反代与 `?tads` / 裸问号归一化脚本；**`functions/[[catchall]].js` catch-all 修复深链接 404 已上线**） | `https://mim-299.pages.dev`（`mim.pages.dev` 子域被他人占用，平台自动分配后缀；旧 `mim-8ah.pages.dev` 保留回滚） | **2026-11-11 00:20 本轮实测**：`/` 200 / 1.840s / 5114B、`/store` 200 / 0.571s / 5114B、`/comic` 200 / 1.758s / 5114B、`/api/v1/modules` 200 / 3.200s / 9514B（Functions 反代生效）；历史 2026-11-08 快照为首页 200 / 1.384s / LEN=5182（产物 `index-D2UkZqM1.js` 与自建同指纹）、带 `Accept: text/html` 头深链接 `/store` 200 / 0.931s、`/comic` 200 / 0.842s、`/login` 200 / 1.526s，裸 curl `/store` 404 属预期（函数只对 html 导航重写） |
 | GitHub Packages (ghcr) | ✅ 是 | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 1.087s / 0.001s / LEN=73（未鉴权 401 `UNAUTHORIZED` 属正常；CI `packages` 作业 success 推送 `ghcr.io/afdk1991/mim-api:{latest,sha}`） |
-| IGA Pages | ✅ 是 | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本轮本机 curl 批次；CI「托管平台同步」作业 success |
-| Vercel | ✅ 是 | ✅ CI 取证通过（2026-11-06T13:15:10Z） | `https://mim-puce.vercel.app` | CI「托管平台同步」作业 success（本轮 run 42470091995）；本机 000 / 0.183s（curl exit 35：schannel `failed to receive handshake, SSL/TLS connection failed`），`nslookup` 解析至 2001::c73b:94ca / 216.198.79.3 / 64.29.17.3，属本机网络侧 TLS 阻断 |
+| IGA Pages | ✅ 是 | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` 未配置，未发布本轮产物）** | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 历史留痕：Project `fr95fuwu57` / Deploy `p4f5a4svqm`；2026-11-12 本机 exit 6 DNS 解析失败，内容层未取证 |
+| Vercel | ✅ 是 | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 未配置，未发布本轮产物；站点本身在线，线上为历史旧版本）** | `https://mim-puce.vercel.app` | CI 出口取证 `mim-puce.vercel.app/ => 200`（站点在线 ≠ 本轮产物已同步）；本机 exit 28 连接超时（既有本机对 vercel.app 的 DNS/TLS 阻断特征） |
 | GitHub 仓库 | ✅ 是 | ✅ 已同步（远端 main HEAD `3271204`，2026-11-08 18:14 `git ls-remote` 取证，本地 0 ahead / 0 behind） | `https://github.com/afdk1991/mim` | 本机 HTTPS 000（TLS 阻断，历史取证）；替代取证 `git ls-remote origin refs/heads/main` = `3271204` ✅，CI run 42470091995 五作业全绿（2026-11-08T10:07:48Z → 10:09:54Z） |
 | **Gitee（码云）**（2026-11-10 新增为第 10 行） | ✅ 是 | ✅ 已同步（源码国内镜像仓，远端 `gitee`；**无 CI 推送作业，按铁律十二每轮手工同推**） | `https://gitee.com/mallwm_admin/mim` | **200 / 0.469s / LEN=52034（2026-11-10 22:20 本轮实测）**：`curl https://gitee.com/mallwm_admin/mim` → 200 / 0.469s / 52034B，页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交；git 通道 `git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s），与本地 HEAD 一致（0 ahead / 0 behind）。矩阵成员身份与 `in_matrix` 标记见 `packages/core-domain/src/deploymentRegistry.json` |
 
@@ -1082,6 +1082,38 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 聊天访客态 | 生产 `/chat`：`session=true`、`loginGate=false`、无「此功能需登录后使用」，导航提供「+ 群聊」，`GET /im/users` 200（当前库内仅访客账号，无第二真人可建私聊，故未造测试群） | `probe-chat-final.mjs` / `probe-chat-users.mjs` |
 | 截图 | `.tmp/market-prod-final.png`（生产 1440×1100：左侧 19 分类、热门项目、商品封面卡、展开详情参数表）；`.tmp/market-pages.png`（Pages 同口径） | CDP `Page.captureScreenshot` |
 | 边界 | 本节的封面/参数图改动与并行访客会话是**两个独立提交**；生产「重试免登录会话」的修复来自 `ca45746`，不属本提交，已在取证中区分 | 如实登记 |
+
+#### 9.31 多平台同步复核：10 矩阵成员逐平台取证（2026-11-12 17:3x +08:00，HEAD `f92c8bc`）
+
+**性质**：用户指令「把整个 `F:\合并项目\Mim` 项目同步到多平台」。本轮为**复核 + 补齐直传型分发**轮，无业务代码改动；先复核本地门禁基线与双远端，再按铁律九逐平台取证 10 个矩阵成员，严格区分「真部署最新 / 凭据缺失 SKIP / 本机网络侧不可达」，不以 step `success` 或站点 200 冒充「本轮产物已上线」。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 本地门禁基线 | `pnpm -r typecheck` 0；`@mim/api` 契约测试 **25 文件 / 373 例全过**；`verify-site-modules` PASS、`verify-entry-manifest` PASS、`verify-deployments` **55/55**、`verify-auth-gate` 静态 **39/39**、`verify-custom-domains` **20/20**；`npm run check` 退出 0；根 `node scripts/build.mjs` 0（`dist/` 39 文件，404.html + 9 路径段回退目录） | 本轮真实命令回显 |
+| 双远端（铁律十二） | 本地与 `origin/main` 平齐；`git ls-remote origin` = `f92c8bcf30cf66e57351e61e12e463edc30e1b1d`；`git ls-remote gitee` = 同一 SHA；工作树仅两个约定排除项（`.edgeone/` 本地 CLI 绑定、空草稿 `新建 文本文档.txt`），无业务未提交改动 | `git status -sb`、`git ls-remote` |
+| CI 结论 | Deploy run **`43080078212`**（@ `f92c8bc`）**completed success**，五作业全绿：质量门禁 / GitHub Packages(ghcr) / 发布到生产服务器 / 托管平台同步 / GitHub Pages；Azure SWA run **`43080078213`**（@ `f92c8bc`）success | `gh run view 43080078212 --json jobs` |
+| 已配置 secrets | `CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_API_TOKEN`、`DEPLOY_HOST`、`DEPLOY_SSH_KEY`、`DEPLOY_USER`、`GITEE_TOKEN`、`GITEE_USER` | `gh api repos/afdk1991/mim/actions/secrets` |
+
+**10 矩阵成员逐项判定**（本机中国网络，`curl.exe --max-time 12`；不可达项附 curl exit code 网络侧证据）：
+
+| # | 平台 | 交付链路 / 凭据 | 本轮本机取证 | 判定 |
+|---|---|---|---|---|
+| 1 | 腾讯云自建 `mim.mixm.top` | CI `deploy` 作业，`DEPLOY_HOST/USER/KEY` 已配，真发布 | `/health` **200 / 53B / 0.19s**，`version=0.0.2`；`/api/v1/entries/overview` = 44 入口 / 19 业务域 / 132 功能点 / 116 关联 / 46 占位，落地四态 `implemented 4 / partial 19 / planned 19 / conflict 2`；CI 出口 `/health => 200` | ✅ **真部署，线上为本轮最新**（生产唯一权威终点） |
+| 2 | EdgeOne Pages `data.mixm.top` | MANUAL 直传型，无 CI step；CLI 已登录账号 `100033061933` | 本机 `data.mixm.top` **exit 6 DNS 解析失败**；本轮 CLI 直传 `dist/` 到承载线上域的项目 **`mim`**（ProjectId `makers-iygo4nrk22jr`，Deployment `dp2z0vxmyw0w`，`Deploy Success`）；默认临时域 `mim-45yeiirr.edgeone.cool` 去 token **401 / 2715B**（平台访问鉴权挑战页）；自定义域内容层本轮未复验（历史 WAF 人机校验，须有头浏览器 + 已过校验 profile） | ⚠️ **产物已直传到 `mim` 项目；自定义域本机不可达，内容层未取证**。注：首轮 CLI 误用 `-n mim-app` 落到遗留项目 `makers-qsbzlpxaoa8b`（Deployment `dp9eq93c7kt7`），随后已纠正到 `mim`；本地工作区映射 `pages-config.json` 已由 `mim-app` 改回 `mim` |
+| 3 | GitHub Pages `afdk1991.github.io/mim/` | CI `pages` 作业，`GITHUB_TOKEN` 自动 | **200 / 5305B / 1.70s**，产物 `index-D_54Ko-d.js` + `index-DLY_QDd3.css`（根构建注入 `VITE_API_ORIGIN`，指纹与同源站点不同属既有设计） | ✅ **CI 自动发布，本轮最新** |
+| 4 | Sealos `mim-i3ywsdfn.cloud.sealos.io` | CI `platforms` / Sealos step，`SEALOS_KUBECONFIG` **未配置** | 本机 `/health` **exit 35 连接被重置**；CI 日志 `SKIP: 缺少 SEALOS_KUBECONFIG / SEALOS_NAMESPACE`（`continue-on-error`，exit 0 计 success，**不代表已部署**）；线上为历史旧版本，本轮未刷新 | ⚠️ **凭据缺失 SKIP + 本机不可达** |
+| 5 | Cloudflare Pages `mim-299.pages.dev` | CI `platforms` / Cloudflare step，`CLOUDFLARE_API_TOKEN` 已配（非 continue-on-error，失败必红） | **200 / 5305B / 1.37s**，同源产物 `index-CjF1qstc.js`；日志 `wrangler 4.160.1` → `Uploading (29/29)` → `✨ Success! Uploaded 0 files (29 already uploaded)` → `Deployment complete! https://0ec01ea6.mim-299.pages.dev`；CI 出口 `mim-299.pages.dev/ => 200` | ✅ **CI 真部署，本轮最新** |
+| 6 | ghcr `ghcr.io/afdk1991/mim-api` | CI `packages` 作业，`GITHUB_TOKEN` 自动 | 未鉴权 **401 / 73B**（`UNAUTHORIZED` 属正常，非故障）；作业 @ `f92c8bc` build-push 成功（`Images: 6`），推 `latest` + `<sha>` 双 tag | ✅ **镜像已同步本轮提交** |
+| 7 | IGA Pages `preview.iga-pages.com` | CI `platforms` / IGA step，`IGA_ACCESS_KEY/SECRET_KEY` **未配置** | 本机 **exit 6 DNS 解析失败**；CI 日志 `SKIP: 缺少 IGA_ACCESS_KEY / IGA_SECRET_KEY，且本机未登录`；需 `iga_token` 私有凭证，内容层本轮未取证 | ⚠️ **凭据缺失 SKIP + 未取证** |
+| 8 | Vercel `mim-puce.vercel.app` | CI `platforms` / Vercel step，`VERCEL_TOKEN` **未配置** | 本机 **exit 28 连接超时 10s**（既有本机对 vercel.app 的 DNS/TLS 阻断特征）；CI 日志 `SKIP: 缺少 VERCEL_TOKEN`；**CI 出口取证 `mim-puce.vercel.app/ => 200`** —— 站点本身在线，但本轮未重新部署，线上为历史旧版本 | ⚠️ **凭据缺失 SKIP；站点在线 ≠ 本轮产物已同步** |
+| 9 | GitHub 仓库 `afdk1991/mim` | 源码远端 `origin` | `git ls-remote origin refs/heads/main` = `f92c8bc`，本地 0 ahead / 0 behind | ✅ **源码已同步** |
+| 10 | Gitee 镜像 `gitee.com/mallwm_admin/mim` | CI `platforms` / Gitee step，`GITEE_TOKEN` 已配；本地 `git push gitee` 兜底 | `git ls-remote gitee refs/heads/main` = `f92c8bc`；CI 日志 `Everything up-to-date` + `Gitee 镜像已同步：***/mim @ main f92c8bc` | ✅ **镜像已同步本轮提交** |
+
+**非矩阵登记分发项**：Azure Static Web Apps（独立 workflow `43080078213` @ `f92c8bc` success）；GitLab / Bitbucket / Netlify / Render / 独立 Worker `mim-store` 仍为 `UNVERIFIED` / `MANUAL`，不在铁律九 10 成员内。
+
+**客观凭据缺口（沙箱无法生成，需用户在仓库 secrets 补齐后重跑 CI）**：`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`；`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET`；`IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME`；`NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`；`RENDER_API_KEY` / `RENDER_SERVICE_ID`。补齐前对应平台 step 恒为 SKIP，不得据 step `success` 宣称已上线。
+
+**口径漂移更正**：注册表 / README 旧述 Sealos「`SEALOS_KUBECONFIG` 等已配置、CI 自动发布」与本轮 secrets 实测不符——本轮 7 个已配 secret 中无任何 `SEALOS_*`，Sealos step 实际 SKIP；历史 `2026-11-09 23:03 /health 200` 快照按铁律三保留为留痕，现状以本表为准。
 
 ---
 
