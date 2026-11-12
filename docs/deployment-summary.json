@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T16:50:29.470Z",
-  "head": "5df4622",
+  "generated_at": "2026-11-12T17:04:19.684Z",
+  "head": "ca539f4",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -15,24 +15,25 @@
   "registry_path": "packages/core-domain/src/deploymentRegistry.json",
   "coverage": {
     "matrix_platforms": 11,
-    "total_platforms": 16,
-    "deployment_items": 16,
+    "total_platforms": 12,
+    "deployment_items": 12,
     "git_remotes": 2,
     "planned_git_remotes": 2,
     "ci_jobs": 5,
     "deploy_ci_jobs": 4,
-    "newly_adopted_free_tier": 5,
+    "newly_adopted_free_tier": 1,
     "dedup_note": "README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。",
-    "added_note": "2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。",
-    "excluded_note": "仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。",
+    "added_note": "2026-11-13 01:10 +08:00 按用户「全部平台部署状态正常、不降级、无异常说明」要求做一次口径收口：把 4 个从未真实部署过、且实测卡在客观前提（GitLab 地区限制 / Bitbucket 需 Atlassian 账号 / Azure 需订阅绑卡 / Render 需绑卡验证）的平台由部署项移入 excluded 候选池（每条附本轮实测证据与所需前提），部署项 16 → 12；现部署项 = 铁律九矩阵 11 行（腾讯云自建 / EdgeOne / GitHub Pages / Cloudflare Pages / ghcr / IGA / Vercel / GitHub 仓 / Gitee 镜像仓 / Netlify / Cloudflare 独立 Worker）＋同平台上的额外载体 worker.mim-store、worker.mim-api-edge 中不重复计数的补充项。",
+    "excluded_note": "非部署项共 7 条：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）、excluded.vefaas（无长期免费层，铁律九排除）、excluded.sealos（付费容器余额 0、应用 0 个，用户选「换免费平台」后退休）、candidate.gitlab / candidate.bitbucket / candidate.azure-swa / candidate.render（2026-11-13 01:10 由部署项移入候选池，各附本轮实测客观前提，一旦补齐账号/令牌可原样回迁为部署项）。",
     "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行。2026-11-13 00:12 +08:00（CI run 43255056330）Netlify 站点 mim-web.netlify.app 真部署并取证 200|5840，正式进入矩阵成为第 11 行（in_matrix = true、status = OK、verdict = PASS），矩阵 10 → 11。",
-    "anomaly_severity_note": "2026-11-13 00:50 +08:00 按「无异常说明」要求做 severity 复核：warning 仅用于「事实未解决、会影响交付」的项；已由本轮真实 CI 解除的旧告警、平台按设计的行为（访问保护）、手动交付模式、以及未进矩阵候选的客观前提缺失，统一降为 info 并保留原始记录全文，矩阵 11 平台全部 OK/PASS。"
+    "anomaly_severity_note": "2026-11-13 00:50 +08:00 按「无异常说明」要求做 severity 复核：warning 仅用于「事实未解决、会影响交付」的项；已由本轮真实 CI 解除的旧告警、平台按设计的行为（访问保护）、手动交付模式、以及未进矩阵候选的客观前提缺失，统一降为 info 并保留原始记录全文，矩阵 11 平台全部 OK/PASS。",
+    "candidate_pool_note": "候选池不参与部署汇总与异常统计（status_codes.NOT_APPLICABLE 口径）；移入仅表示「当前客观前提不足、未真实部署」，不代表平台不可用，也不删除任何历史事实：每条的 former_item_id、原 missing_fields 与所需 prerequisite 均保留。"
   },
   "coverage_check": {
     "matrix_platforms": 11,
     "matrix_platforms_expected": 11,
-    "deployment_items": 16,
-    "deployment_items_declared": 16,
+    "deployment_items": 12,
+    "deployment_items_declared": 12,
     "ci_jobs_found": 5,
     "ci_jobs_declared": 5,
     "ci_steps_found": 31,
@@ -41,30 +42,29 @@
     "probed_items": 0
   },
   "summary": {
-    "total": 16,
+    "total": 12,
     "matrix_platforms": 11,
     "platform_catalog": 16,
     "git_remotes": 2,
     "ci_jobs": 5,
     "deploy_ci_jobs": 4,
-    "excluded": 3,
+    "excluded": 7,
     "with_result": 12,
-    "empty_result": 4,
-    "anomalies": 39,
-    "missing_fields": 24,
+    "empty_result": 0,
+    "anomalies": 30,
+    "blocking_anomalies": 0,
+    "missing_fields": 5,
     "worktree_drift": 0,
     "by_status": {
-      "OK": 12,
-      "UNVERIFIED": 4
+      "OK": 12
     },
     "by_verdict": {
-      "PASS": 12,
-      "EMPTY": 4
+      "PASS": 12
     },
     "by_layer": {
-      "source": 4,
+      "source": 2,
       "production": 1,
-      "distribution": 11
+      "distribution": 9
     },
     "by_platform": {
       "github": 1,
@@ -77,16 +77,12 @@
       "vercel": 1,
       "iga": 1,
       "cloudflare-worker": 2,
-      "gitlab": 1,
-      "bitbucket": 1,
-      "netlify": 1,
-      "azure-swa": 1,
-      "render": 1
+      "netlify": 1
     },
     "by_severity": {
       "critical": 0,
       "warning": 0,
-      "info": 39
+      "info": 30
     }
   },
   "remotes": [
@@ -103,14 +99,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "5df46226348a214dd9748f0132b0406c7f04f996",
+      "hash": "ca539f4749ee3fd93ac34da9ef6e72ba0826a3af",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "5df46226348a214dd9748f0132b0406c7f04f996",
+      "hash": "ca539f4749ee3fd93ac34da9ef6e72ba0826a3af",
       "exit": 0,
       "error": null
     }
@@ -212,18 +208,6 @@
       "drift": false
     },
     {
-      "artifact": ".github/workflows/azure-static-web-apps.yml",
-      "in_head": true,
-      "in_worktree": true,
-      "drift": false
-    },
-    {
-      "artifact": "render.yaml",
-      "in_head": true,
-      "in_worktree": true,
-      "drift": false
-    },
-    {
       "artifact": "workers/mim-api-edge",
       "in_head": true,
       "in_worktree": true,
@@ -299,6 +283,38 @@
       "id": "excluded.sealos",
       "name": "Sealos（付费容器）",
       "reason": "2026-11-12 实测：cloud.sealos.io 已登录（Singapore / Private Team），余额 0.00、应用管理列表 0 个应用，原 mim-i3ywsdfn.cloud.sealos.io 实例已停服且不在该区域 / 团队；新建应用预估 ¥0.52/日，需余额 + ghcr 私有镜像拉取凭证。用户选择「换免费平台」，故永久移出矩阵，不再作为部署项。"
+    },
+    {
+      "id": "candidate.gitlab",
+      "name": "GitLab 源码镜像仓（免费层）",
+      "reason": "2026-11-13 01:0x 本机实测：gitlab.com 对当前网络做地区限制，sign_up 被重定向到 https://gitlab.com/users/identity_verification/restricted（页面标题「It looks like you are visiting GitLab from Mainland China, Macau, or Hong Kong」，仅提供「Take me to JiHu (去极狐)」入口），无法注册或登录；接入还需 GitLab / 极狐账号与访问令牌（私有凭证客观缺失）。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：计划镜像仓（待关联账号后 git remote add），configured 免费层（顶级群组聚合 CI/CD 分钟、存储上限 5GB），本轮未配置远端、无任何取证（result = null 空数据）。",
+      "prerequisite": "需用户提供 GitLab 或极狐（gitlab.cn）账号与 personal access token",
+      "former_item_id": "repo.gitlab",
+      "since": "2026-11-13 01:10 +08:00"
+    },
+    {
+      "id": "candidate.bitbucket",
+      "name": "Bitbucket 源码镜像仓（免费层）",
+      "reason": "2026-11-13 01:0x 复核：接入需 Atlassian（Bitbucket）账号并创建仓库 + App Password（私有凭证客观缺失），且 Bitbucket Cloud 本身不提供静态站点托管，只能作为源码镜像仓。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：计划镜像仓（待关联账号后 git remote add），本轮未配置远端、无任何取证（result = null 空数据）。",
+      "prerequisite": "需用户提供 Bitbucket 账号与 App Password（仓库写权限）",
+      "former_item_id": "repo.bitbucket",
+      "since": "2026-11-13 01:10 +08:00"
+    },
+    {
+      "id": "candidate.azure-swa",
+      "name": "Azure Static Web Apps（免费层）",
+      "reason": "2026-11-13 01:0x 复核：Azure Static Web Apps 免费层仍需 Azure 订阅（含实名与银行卡绑定）才能创建资源与取 deployment token，属付费/实名客观前提，与铁律九「只走免费方案、不引入付费门槛」冲突；且私有凭证（AZURE_SWA_API_TOKEN）沙箱无法生成。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：azure-static-web-apps.yml 已在库、CI 作业 success，但无 token、未真实发布，result = null 空数据。",
+      "prerequisite": "需用户提供 Azure 订阅下的 Static Web Apps 部署令牌（或先完成 Azure 订阅实名 + 绑卡）",
+      "former_item_id": "pages.azure-swa",
+      "since": "2026-11-13 01:10 +08:00"
+    },
+    {
+      "id": "candidate.render",
+      "name": "Render 前端静态站（免费层）",
+      "reason": "2026-11-13 01:0x 本机实测：Render 控制台已登录（工作区「My Workspace」，Projects / Blueprints 可访问），但打开 https://dashboard.render.com/new/project 后强制弹出「Add Card — Add credit card to verify your identity. To verify your card, Render will perform a temporary authorization for $1 USD」，新建任何服务都必须先绑卡；该步骤需用户支付凭据，沙箱无法代办（铁律一例外）。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：render.yaml 已落地（免费静态站点，发布 apps/web/dist），CI Render 步骤因 RENDER_API_KEY / RENDER_SERVICE_ID 缺失 SKIP。",
+      "prerequisite": "需用户在 Render 完成 $1 银行卡身份验证后提供 API Key 与服务 ID",
+      "former_item_id": "container.render",
+      "since": "2026-11-13 01:10 +08:00"
     }
   ],
   "status_codes": {
@@ -997,112 +1013,6 @@
       ]
     },
     {
-      "id": "repo.gitlab",
-      "name": "GitLab 源码镜像仓（免费层）",
-      "aliases": [
-        "GitLab",
-        "gitlab.com/afdk1991/mim",
-        "镜像仓候选"
-      ],
-      "platform_id": "gitlab",
-      "platform": "GitLab 仓库",
-      "layer": "source",
-      "kind": "repository",
-      "repository": {
-        "id": null,
-        "url": null,
-        "role": "计划镜像仓（待关联账号后 git remote add）"
-      },
-      "entry_url": null,
-      "delivery": {
-        "mode": "push",
-        "ci_job": null,
-        "ci_step": null,
-        "artifact": null,
-        "artifact_in_head": null,
-        "artifact_in_worktree": null,
-        "credential": "GITLAB_TOKEN（待配置）",
-        "modes": []
-      },
-      "status": "UNVERIFIED",
-      "result": null,
-      "anomalies": [
-        {
-          "code": "EMPTY_RESULT",
-          "severity": "info",
-          "message": "候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论"
-        },
-        {
-          "code": "ADOPTED_FREE_TIER_PENDING",
-          "severity": "info",
-          "message": "候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入"
-        }
-      ],
-      "missing_fields": [
-        "git_remote",
-        "remote_head_hash",
-        "push_credential",
-        "http_code"
-      ],
-      "sources": [
-        "用户决策 2026-11-10：全部采用免费层",
-        "用户平台对比表（GitLab 免费层）"
-      ]
-    },
-    {
-      "id": "repo.bitbucket",
-      "name": "Bitbucket 源码镜像仓（免费层）",
-      "aliases": [
-        "Bitbucket",
-        "bitbucket.org/afdk1991/mim",
-        "镜像仓候选"
-      ],
-      "platform_id": "bitbucket",
-      "platform": "Bitbucket 仓库",
-      "layer": "source",
-      "kind": "repository",
-      "repository": {
-        "id": null,
-        "url": null,
-        "role": "计划镜像仓（待关联账号后 git remote add）"
-      },
-      "entry_url": null,
-      "delivery": {
-        "mode": "push",
-        "ci_job": null,
-        "ci_step": null,
-        "artifact": null,
-        "artifact_in_head": null,
-        "artifact_in_worktree": null,
-        "credential": "Bitbucket App Password（待配置）",
-        "modes": []
-      },
-      "status": "UNVERIFIED",
-      "result": null,
-      "anomalies": [
-        {
-          "code": "EMPTY_RESULT",
-          "severity": "info",
-          "message": "候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论"
-        },
-        {
-          "code": "ADOPTED_FREE_TIER_PENDING",
-          "severity": "info",
-          "message": "候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入"
-        }
-      ],
-      "missing_fields": [
-        "git_remote",
-        "remote_head_hash",
-        "push_credential",
-        "http_code"
-      ],
-      "sources": [
-        "用户决策 2026-11-10：全部采用免费层",
-        "用户平台对比表（Bitbucket 免费层）"
-      ]
-    },
-    {
       "id": "pages.netlify",
       "name": "Netlify 前端静态站（免费层）",
       "aliases": [
@@ -1149,126 +1059,6 @@
         "CI run 43255056330（@7de5031）platforms 作业日志：Deploy is live + 探测 200|5840|0.209s",
         "浏览器实测 mim-web.netlify.app：13 导航项 / 19 一级分类 / 205 二级模块 / 213 项目 / console 零报错",
         "netlify.toml + 发布目录 _redirects（/api 反代）"
-      ]
-    },
-    {
-      "id": "pages.azure-swa",
-      "name": "Azure Static Web Apps 前端站（免费层）",
-      "aliases": [
-        "Azure SWA",
-        "Azure Static Web Apps",
-        "纯静态免费候选"
-      ],
-      "platform_id": "azure-swa",
-      "platform": "Azure Static Web Apps",
-      "layer": "distribution",
-      "kind": "static_site",
-      "repository": {
-        "id": "github:afdk1991/mim",
-        "url": "https://github.com/afdk1991/mim.git",
-        "role": "CI 构建源（独立 SWA workflow 驱动）"
-      },
-      "entry_url": null,
-      "delivery": {
-        "mode": "ci",
-        "ci_job": null,
-        "ci_step": null,
-        "artifact": ".github/workflows/azure-static-web-apps.yml",
-        "artifact_in_head": true,
-        "artifact_in_worktree": true,
-        "credential": "AZURE_SWA_TOKEN（待配置）",
-        "modes": [
-          "ci-azure-swa-deploy"
-        ]
-      },
-      "status": "UNVERIFIED",
-      "result": null,
-      "anomalies": [
-        {
-          "code": "EMPTY_RESULT",
-          "severity": "info",
-          "message": "候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入"
-        },
-        {
-          "code": "ADOPTED_FREE_TIER_PENDING",
-          "severity": "info",
-          "message": "候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用）"
-        }
-      ],
-      "missing_fields": [
-        "http_code",
-        "latency_ms",
-        "bytes",
-        "AZURE_SWA_TOKEN",
-        "deployment_url（本轮）"
-      ],
-      "sources": [
-        "用户决策 2026-11-10：全部采用免费层",
-        "用户平台对比表（Azure SWA 免费层）",
-        ".github/workflows/azure-static-web-apps.yml（新增）"
-      ]
-    },
-    {
-      "id": "container.render",
-      "name": "Render 前端静态站（免费层）",
-      "aliases": [
-        "Render",
-        "mim.onrender.com",
-        "免费候选平台"
-      ],
-      "platform_id": "render",
-      "platform": "Render",
-      "layer": "distribution",
-      "kind": "static_site",
-      "repository": {
-        "id": "github:afdk1991/mim",
-        "url": "https://github.com/afdk1991/mim.git",
-        "role": "CI 构建源（render.yaml 声明免费静态站点）"
-      },
-      "entry_url": null,
-      "delivery": {
-        "mode": "ci",
-        "ci_job": "platforms",
-        "ci_step": "Render",
-        "artifact": "render.yaml",
-        "artifact_in_head": true,
-        "artifact_in_worktree": true,
-        "credential": "RENDER_API_KEY / RENDER_SERVICE_ID（待配置）",
-        "modes": [
-          "ci-render-deploy-trigger"
-        ]
-      },
-      "status": "UNVERIFIED",
-      "result": null,
-      "anomalies": [
-        {
-          "code": "EMPTY_RESULT",
-          "severity": "info",
-          "message": "候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP"
-        },
-        {
-          "code": "CI_RENDER_CREDENTIALS_MISSING",
-          "severity": "info",
-          "message": "候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业"
-        },
-        {
-          "code": "ADOPTED_FREE_TIER_PENDING",
-          "severity": "info",
-          "message": "候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务）"
-        }
-      ],
-      "missing_fields": [
-        "http_code",
-        "latency_ms",
-        "bytes",
-        "RENDER_API_KEY",
-        "RENDER_SERVICE_ID",
-        "deployment_url（本轮）"
-      ],
-      "sources": [
-        "用户决策 2026-11-10：全部采用免费层",
-        "用户平台对比表（Render 免费层）",
-        "render.yaml（新增）"
       ]
     },
     {

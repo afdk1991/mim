@@ -140,14 +140,15 @@ describe('部署项详情与异常标识', () => { // 详情与异常
     expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'PRIVATE_TOKEN_REQUIRED')).toBe(true); // 平台访问保护留痕
   }); // IGA 用例结束
 
-  it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识
-    const res = await request(app).get('/api/v1/deployments/repo.gitlab'); // GitLab 镜像仓（尚未配置远端）
-    expect(res.status).toBe(200); // 200
-    expect(res.body.item.result).toBeNull(); // 明确 null，不填 0 / 不冒充成功
-    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'EMPTY_RESULT')).toBe(true); // 空数据异常
-    expect(res.body.item.missing_fields).toContain('http_code'); // 缺失字段
-    expect(res.body.item.missing_fields).toContain('git_remote'); // 远端尚未配置
-  }); // 空数据用例结束
+  it('候选平台不是部署项：详情 404、空数据桶为 0', async () => { // 候选池口径
+    const candidate = await request(app).get('/api/v1/deployments/repo.gitlab'); // 2026-11-13 已由部署项移入候选池
+    expect(candidate.status).toBe(404); // 候选不在 /api/v1/deployments/:id 的可查集合内
+    expect(candidate.body.code).toBe('NOT_FOUND'); // 统一错误码
+    const overview = await request(app).get('/api/v1/deployments/overview'); // 汇总接口提供空数据桶统计
+    expect(overview.body.empty_result).toBe(0); // 部署项全部有取证，空数据桶为 0
+    expect(overview.body.with_result).toBe(DEPLOYMENT_ITEMS.length); // 有取证项等于部署项总数
+    expect(overview.body.excluded_items.some((e: { id: string }) => e.id === 'candidate.gitlab')).toBe(true); // 候选在排除项明细里留痕
+  }); // 候选池用例结束
 
   it('未登记的部署项 id 返回 404 NOT_FOUND 信封', async () => { // 非法 id
     const res = await request(app).get('/api/v1/deployments/not-a-deployment'); // 未登记 id

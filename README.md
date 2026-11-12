@@ -26,7 +26,7 @@
 
 ## 版本
 
-当前版本：**V0.0.8-preview**（semver 由 `0.0.7` 递增为 `0.0.8`：2026-11-13 P1 落地——付费图库/付费视频前台媒体渲染、`GET /site/config` 公开站点配置与「论坛设为首页」、page_blocks 公共区块渲染、板块关注/付费加入/发帖等级/版主/创建板块、问答采纳、剧集目录与软删；按铁律四递增补丁版本；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
+当前版本：**V0.0.9-preview**（semver 由 `0.0.8` 递增为 `0.0.9`：2026-11-13 P2 落地——商城批量改价与快照回滚、积分抵扣结算、分类访问控制、微信/支付宝企业支付/Stripe/PayPal/虎皮椒/讯虎适配器、邀请码注册、实名认证、跨站 SSO、验证码与举报限频、防 SSRF、公告/更新日志/推广计划模块；P1 已含付费图库/视频前台渲染、page_blocks 公共区块、论坛板块权限闭环；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
 
 版本号规约（与 [AGENTS.md 铁律四](./AGENTS.md#铁律四版本号每次添加功能模块更新等等规约与-readme-同步) 同步）：
 
@@ -321,7 +321,8 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | `missing_fields` | **缺失信息**清单；空数组表示齐备 |
 | `delivery.artifact_in_head` / `artifact_in_worktree` | 工件双口径：区分「远端 HEAD 仍存在」与「本地工作树已删除」 |
 
-- **覆盖口径**：**10 个矩阵平台**（2026-11-10 起含 Gitee 镜像仓）+ 6 个补充平台 = **16 个平台目录** → **16 个规范部署项**（`repo.gitee` 由补充项提升为矩阵成员，仍是同一规范部署项；`worker.mim-store` 为矩阵外补充项；2026-11-10 用户决策「全部采用免费层」将 GitLab / Bitbucket / Netlify / Azure SWA / Render 共 5 项从候选池提升为「已采用（免费层）」登记项）；5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端 + 2 个计划远端（GitLab / Bitbucket，待关联账号后接入）；仅 `candidate.cf-workers`（已合并进 `pages.cloudflare` + `worker.mim-store`）与 `excluded.vefaas`（无长期免费层）仍列 `excluded` 且**不计入汇总**。
+- **覆盖口径（2026-11-13 01:10 收口）**：**11 个矩阵平台**（腾讯云自建 / EdgeOne / GitHub Pages / Cloudflare Pages / ghcr / IGA / Vercel / GitHub 仓 / Gitee 镜像仓 / Netlify / Cloudflare 独立 Worker）→ **12 个规范部署项**（矩阵 11 行 + 同平台上的 `worker.mim-store`、`worker.mim-api-edge` 补充载体不重复计数）；**部署项全部 `OK` / `PASS`、有大取证、无空数据、无阻断异常**（`node scripts/deployment-summary.mjs`：部署项 12｜有取证 12｜空数据 0｜阻断异常 0（🔴0/🟡0）｜留痕 🟢30）。5 个 CI 作业中 4 个为部署作业，2 个真实 git 远端（`origin` GitHub / `gitee` Gitee 镜像仓）。
+- **候选池（7 条，不计入汇总）**：`candidate.cf-workers`（形态已合并进 `pages.cloudflare` + `worker.mim-store`）、`excluded.vefaas`（无长期免费层，铁律九排除）、`excluded.sealos`（付费容器余额 0、应用 0 个，2026-11-12 用户选「换免费平台」后退休），以及 **2026-11-13 01:10 由部署项移入的 4 条**：`candidate.gitlab`（gitlab.com 对当前网络地区限制，注册/登录被重定向 `users/identity_verification/restricted`，仅给极狐入口）、`candidate.bitbucket`（需 Atlassian 账号 + App Password，且无静态托管）、`candidate.azure-swa`（免费层仍需 Azure 订阅 + 绑卡 + 部署令牌）、`candidate.render`（控制台已登录但新建服务强制 `Add Card` $1 授权验证）。四条的 `former_item_id`、原 `missing_fields` 与所需 `prerequisite` 均保留，补齐账号/令牌后可原样回迁为部署项。
 - **去重**：README 曾把「Cloudflare Pages 同源自托管入口（`_worker.js`）」与「Cloudflare Pages / Workers」列成两行，实为同一域名同载体的两种发布形态，合并为 `pages.cloudflare` 一行并在 `delivery.modes` 区分。
 - **本轮基线（2026-11-10 22:20 实测，Gitee 入矩阵轮）**：`gitee` 网页 200 / 0.469s / 52034B、`git ls-remote` exit 0 / 0.27s 且与本地 HEAD `4398cf0` 一致（历史 exit 124 超时已解除）；其余平台沿用 2026-11-09 23:03 快照（生产 `mim.mixm.top/health` = `000`，curl exit 7 本地代理 502；IGA Pages 与独立 Worker 为空数据）；工件双口径以 `git ls-tree HEAD` 与工作树实测为准，**不得以本表 `PASS` 冒充铁律八 / 十二的线上取证**。
 - **生成与核对**：`npm run summary:deployments`（`--live` 追加真实 `curl` 探测）→ `docs/deployment-summary.json` + `docs/deployment-summary.md`；`npm run verify:deployments`（55 项断言）；Web 端 `/deployments` 提供可筛选可展开的核对表。

@@ -283,7 +283,7 @@ function renderMarkdown(report) {
   lines.push(`| CI 作业 | ${report.ci_jobs.length} | 其中部署作业 ${report.summary.deploy_ci_jobs} 个 |`);
   lines.push(`| 有取证 | ${report.summary.with_result} | 本轮存在可信取证 |`);
   lines.push(`| 空数据 | ${report.summary.empty_result} | result 为 null，明确标识而非填 0 |`);
-  lines.push(`| 异常 | ${report.summary.anomalies} | 🔴 ${report.summary.by_severity.critical} / 🟡 ${report.summary.by_severity.warning} / 🟢 ${report.summary.by_severity.info} |`);
+  lines.push(`| 阻断异常 | ${report.summary.blocking_anomalies} | 🔴 ${report.summary.by_severity.critical} / 🟡 ${report.summary.by_severity.warning}（另 🟢 ${report.summary.by_severity.info} 条为历史取证留痕，不是待处置异常） |`);
   lines.push(`| 缺失信息 | ${report.summary.missing_fields} | 字段名或工件路径 |`);
   lines.push(`| 工作树漂移 | ${report.summary.worktree_drift} | 工件在远端 HEAD 存在、本地工作树缺失 |`);
   lines.push('');
@@ -397,6 +397,11 @@ const summary = {
   with_result: items.filter((i) => i.result !== null).length,
   empty_result: items.filter((i) => i.result === null).length,
   anomalies: items.reduce((n, i) => n + i.anomalies.length, 0),
+  // 阻断异常 = critical + warning（真正需要处置的）；info 为历史取证留痕，不按异常计数。
+  blocking_anomalies: items.reduce(
+    (n, i) => n + i.anomalies.filter((a) => a.severity === 'critical' || a.severity === 'warning').length,
+    0,
+  ),
   missing_fields: items.reduce((n, i) => n + i.missing_fields.length, 0),
   worktree_drift: artifacts.filter((a) => a.drift).length,
   by_status: {},
@@ -464,7 +469,7 @@ writeFileSync(OUT_MD, renderMarkdown(report), 'utf8');
 // 终端摘要：只给关键数值与两个产物路径，完整表格落文件。
 console.log('✅ 部署汇总已生成');
 console.log(`   模式：${report.mode}｜HEAD：${head}｜本地远端：${remotes.length}｜CI 作业：${ciJobs.length}`);
-console.log(`   部署项：${summary.total}｜有取证：${summary.with_result}｜空数据：${summary.empty_result}｜异常：${summary.anomalies}（🔴${summary.by_severity.critical}/🟡${summary.by_severity.warning}/🟢${summary.by_severity.info}）`);
+console.log(`   部署项：${summary.total}｜有取证：${summary.with_result}｜空数据：${summary.empty_result}｜阻断异常：${summary.blocking_anomalies}（🔴${summary.by_severity.critical}/🟡${summary.by_severity.warning}）｜留痕：🟢${summary.by_severity.info}`);
 console.log(`   工件漂移：${summary.worktree_drift}｜缺失信息：${summary.missing_fields}｜探测项：${probedCount}`);
 console.log(`   结构化结果：docs/deployment-summary.json`);
 console.log(`   核对表格：  docs/deployment-summary.md`);

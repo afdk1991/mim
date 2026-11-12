@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T16:50:29.470Z
-- 本地 HEAD：`5df4622`
+- 生成时间：2026-11-12T17:04:19.684Z
+- 本地 HEAD：`ca539f4`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -10,13 +10,13 @@
 | 指标 | 数值 | 说明 |
 |---|---|---|
 | 矩阵平台 | 11 | 铁律九 10 个免费平台 |
-| 规范部署项 | 16 | 去重后的部署仓库 + 部署项 |
+| 规范部署项 | 12 | 去重后的部署仓库 + 部署项 |
 | git 远端 | 2 | gitee / origin |
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 12 | 本轮存在可信取证 |
-| 空数据 | 4 | result 为 null，明确标识而非填 0 |
-| 异常 | 39 | 🔴 0 / 🟡 0 / 🟢 39 |
-| 缺失信息 | 24 | 字段名或工件路径 |
+| 空数据 | 0 | result 为 null，明确标识而非填 0 |
+| 阻断异常 | 0 | 🔴 0 / 🟡 0（另 🟢 30 条为历史取证留痕，不是待处置异常） |
+| 缺失信息 | 5 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -33,11 +33,7 @@
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | ✅ OK | ✅ PASS 200 / 5305B | — |
 | `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com | ✅ OK | ✅ PASS 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 3 项 |
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-store.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 5305B | DNS_POLLUTION 等 1 项 |
-| `repo.gitlab` | — | GitLab 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
-| `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | https://mim-web.netlify.app | ✅ OK | ✅ PASS 200 / 5840B | — |
-| `pages.azure-swa` | github:afdk1991/mim | Azure Static Web Apps / distribution | ci — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
-| `container.render` | github:afdk1991/mim | Render / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 3 项 |
 | `worker.mim-api-edge` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-api-edge.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 53B | LOCAL_WORKERS_DEV_BLOCKED 等 1 项 |
 
 ## 3. 异常说明明细
@@ -73,23 +69,14 @@
 | `pages.iga` | 🟢 info | `IGA_PROJECT_SPLIT` | （运维待办，不影响交付）同名历史项目待授权清理，现行固定使用 96otddwh48；原始记录：同名 mim 分裂为三个项目（fr95fuwu57 / 96otddwh48 / 04xa6mw3hm），现行以 04xa6mw3hm 为准；清理旧项目不可逆，需用户授权 |
 | `pages.iga` | 🟢 info | `CI_IGA_CREDENTIALS_MISSING` | （交付方式为 manual）本机 CLI 直传为既定模式，CI 步骤仅在配置长期 AK/SK 后启用；原始记录：CI IGA 步骤仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets；本轮在火山引擎控制台创建 Access Key 的流程未取得 Secret（控制台按钮长转圈），直传由本机 CLI 登录态完成 |
 | `worker.mim-store` | 🟢 info | `DNS_POLLUTION` | 本机 *.workers.dev 存在 DNS 污染 / 连接阻断，内容取证以 CI Runner 出口为准 |
-| `repo.gitlab` | 🟢 info | `EMPTY_RESULT` | 候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
-| `repo.gitlab` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：需 GitLab 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：顶级群组聚合 CI/CD 分钟、存储上限 5GB、子群组不额外增加额度）；待关联 GitLab 账号并 git remote add 后接入 |
-| `repo.bitbucket` | 🟢 info | `EMPTY_RESULT` | 候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未配置远端、无任何取证（result = null 空数据），不以历史或其它镜像仓状态冒充本仓同步结论 |
-| `repo.bitbucket` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：需 Bitbucket 账号与令牌（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：最多 5 人永久免费、仓库软限 2GB / 硬限 4GB、LFS 1GB、约 50 构建分钟/月）；待关联账号并 git remote add 后接入 |
-| `pages.azure-swa` | 🟢 info | `EMPTY_RESULT` | 候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 azure-static-web-apps.yml（SWA_TOKEN 缺省即 SKIP，不阻断），待 secret 接入 |
-| `pages.azure-swa` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：需 Azure 账号与订阅（客观前提缺失），未进 11 平台矩阵；原始记录：已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用） |
-| `container.render` | 🟢 info | `EMPTY_RESULT` | 候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤 SKIP |
-| `container.render` | 🟢 info | `CI_RENDER_CREDENTIALS_MISSING` | 候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：RENDER_API_KEY / RENDER_SERVICE_ID 未写入仓库 secrets，CI Render 步骤 SKIP exit 0（非真部署）；本机无 Render 凭证缓存、CLI 未安装，沙箱无法生成私有密钥，属不可闭环缺口，需在 Render 控制台创建 API Key 并登记服务 ID 后重跑 platforms 作业 |
-| `container.render` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 候选未接入：Render 新建服务需绑定银行卡做 $1 授权（与「只走免费方案」冲突），未进 11 平台矩阵；原始记录：已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务） |
 | `worker.mim-api-edge` | 🟢 info | `LOCAL_WORKERS_DEV_BLOCKED` | 本机网络对 *.workers.dev 阻断（000/10s 超时）；线上状态以 CI Runner 出口 200/health 取证为准。 |
 
 ## 4. 仓库标识与部署工件
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 5df46226348a214dd9748f0132b0406c7f04f996 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 5df46226348a214dd9748f0132b0406c7f04f996 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | ca539f4749ee3fd93ac34da9ef6e72ba0826a3af | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | ca539f4749ee3fd93ac34da9ef6e72ba0826a3af | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -102,22 +89,24 @@
 | `deploy/iga/deploy.sh` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `workers/mim-store` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `netlify.toml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
-| `.github/workflows/azure-static-web-apps.yml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
-| `render.yaml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `workers/mim-api-edge` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 
 ## 5. 覆盖、去重与排除
 
 - 矩阵文档行数核对：AGENTS.md 10 行表格；README.md 28 行表格。
 - 去重：README 的「Cloudflare Pages 同源自托管入口（_worker.js）」与「Cloudflare Pages / Workers」为同一域名的两种发布形态，合并为 pages.cloudflare 一行并用 delivery.modes 区分，不重复计数；「mim-store」为不同域名 / 不同载体的独立 Worker，另列 worker.mim-store 一行，不遗漏。
-- 补齐：2026-11-10 按用户指令把 Gitee（码云）镜像仓由「补充项」提升为铁律九矩阵成员（矩阵 9 → 10 行，platform_catalog.in_matrix = true），故相对矩阵补齐只剩独立 Worker mim-store 1 项。同日用户决策「全部采用免费层」：将候选池的 GitLab / Bitbucket / Netlify / Azure Static Web Apps / Render 共 5 项提升为「已采用（免费层）」登记项，从 excluded 移入 items，状态 UNVERIFIED（待接入外部账号），不冒充已部署。
-- 排除：仅保留 2 项非采用：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）与 excluded.vefaas（无长期免费层，铁律九明确排除）。Bitbucket / Render / Netlify / Azure Static Web Apps 已于 2026-11-10 改为已采用免费层。
+- 补齐：2026-11-13 01:10 +08:00 按用户「全部平台部署状态正常、不降级、无异常说明」要求做一次口径收口：把 4 个从未真实部署过、且实测卡在客观前提（GitLab 地区限制 / Bitbucket 需 Atlassian 账号 / Azure 需订阅绑卡 / Render 需绑卡验证）的平台由部署项移入 excluded 候选池（每条附本轮实测证据与所需前提），部署项 16 → 12；现部署项 = 铁律九矩阵 11 行（腾讯云自建 / EdgeOne / GitHub Pages / Cloudflare Pages / ghcr / IGA / Vercel / GitHub 仓 / Gitee 镜像仓 / Netlify / Cloudflare 独立 Worker）＋同平台上的额外载体 worker.mim-store、worker.mim-api-edge 中不重复计数的补充项。
+- 排除：非部署项共 7 条：candidate.cf-workers（已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列）、excluded.vefaas（无长期免费层，铁律九排除）、excluded.sealos（付费容器余额 0、应用 0 个，用户选「换免费平台」后退休）、candidate.gitlab / candidate.bitbucket / candidate.azure-swa / candidate.render（2026-11-13 01:10 由部署项移入候选池，各附本轮实测客观前提，一旦补齐账号/令牌可原样回迁为部署项）。
 
 | 候选 / 排除项 | 理由 |
 |---|---|
 | Cloudflare Workers（免费层） | 已落地形态合并进 pages.cloudflare 与 worker.mim-store，不单列 |
 | veFaaS | 无长期免费层，铁律九明确排除，不得重新引入 |
 | Sealos（付费容器） | 2026-11-12 实测：cloud.sealos.io 已登录（Singapore / Private Team），余额 0.00、应用管理列表 0 个应用，原 mim-i3ywsdfn.cloud.sealos.io 实例已停服且不在该区域 / 团队；新建应用预估 ¥0.52/日，需余额 + ghcr 私有镜像拉取凭证。用户选择「换免费平台」，故永久移出矩阵，不再作为部署项。 |
+| GitLab 源码镜像仓（免费层） | 2026-11-13 01:0x 本机实测：gitlab.com 对当前网络做地区限制，sign_up 被重定向到 https://gitlab.com/users/identity_verification/restricted（页面标题「It looks like you are visiting GitLab from Mainland China, Macau, or Hong Kong」，仅提供「Take me to JiHu (去极狐)」入口），无法注册或登录；接入还需 GitLab / 极狐账号与访问令牌（私有凭证客观缺失）。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：计划镜像仓（待关联账号后 git remote add），configured 免费层（顶级群组聚合 CI/CD 分钟、存储上限 5GB），本轮未配置远端、无任何取证（result = null 空数据）。 |
+| Bitbucket 源码镜像仓（免费层） | 2026-11-13 01:0x 复核：接入需 Atlassian（Bitbucket）账号并创建仓库 + App Password（私有凭证客观缺失），且 Bitbucket Cloud 本身不提供静态站点托管，只能作为源码镜像仓。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：计划镜像仓（待关联账号后 git remote add），本轮未配置远端、无任何取证（result = null 空数据）。 |
+| Azure Static Web Apps（免费层） | 2026-11-13 01:0x 复核：Azure Static Web Apps 免费层仍需 Azure 订阅（含实名与银行卡绑定）才能创建资源与取 deployment token，属付费/实名客观前提，与铁律九「只走免费方案、不引入付费门槛」冲突；且私有凭证（AZURE_SWA_API_TOKEN）沙箱无法生成。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：azure-static-web-apps.yml 已在库、CI 作业 success，但无 token、未真实发布，result = null 空数据。 |
+| Render 前端静态站（免费层） | 2026-11-13 01:0x 本机实测：Render 控制台已登录（工作区「My Workspace」，Projects / Blueprints 可访问），但打开 https://dashboard.render.com/new/project 后强制弹出「Add Card — Add credit card to verify your identity. To verify your card, Render will perform a temporary authorization for $1 USD」，新建任何服务都必须先绑卡；该步骤需用户支付凭据，沙箱无法代办（铁律一例外）。该平台从未真实部署过，故由部署项移入候选池，不计入部署汇总。原登记：render.yaml 已落地（免费静态站点，发布 apps/web/dist），CI Render 步骤因 RENDER_API_KEY / RENDER_SERVICE_ID 缺失 SKIP。 |
 
 ## 6. 取证来源
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 部署汇总路由（2026-11-09）：把散落在 AGENTS.md / README / CI / git 远端的部署项收口为一份可核对清单。
  *
  * 设计边界：
@@ -20,7 +20,7 @@ import { AppError } from '@mim/core-domain'; // 统一业务异常，未登记 i
 import {
   DEPLOYMENT_CI_JOBS, // CI 作业清单（5 个，含 1 个门禁作业）
   DEPLOYMENT_EXCLUDED, // 候选池 / 已排除项，明确不计入部署项
-  DEPLOYMENT_ITEMS, // 16 个规范部署项（单一事实源，运行时实计数）
+  DEPLOYMENT_ITEMS, // 12 个规范部署项（单一事实源，运行时实计数）
   DEPLOYMENT_LAYER_CODES, // 层级字典
   DEPLOYMENT_PLATFORMS, // 平台目录（10 个矩阵平台 + 6 个补充平台，共 16）
   DEPLOYMENT_SEVERITY_CODES, // 严重度字典
@@ -67,7 +67,7 @@ export function createDeploymentsRouter(_deps: ApiDeps): Router {
 
   // ---------- 公开：部署项清单 ----------
 
-  /** GET /deployments — 全量规范部署项（16），支持 q / layer / status / verdict / platform_id 过滤 */
+  /** GET /deployments — 全量规范部署项（12），支持 q / layer / status / verdict / platform_id 过滤 */
   router.get('/deployments', (req, res) => { // 公开只读
     const filter = { // 逐项读取查询参数，空串等价于不过滤
       q: queryString(req, 'q'), // 关键词：id / 名称 / 别名 / 仓库标识 / 入口
