@@ -550,14 +550,14 @@
         "http_code": "200",
         "latency_ms": 290,
         "bytes": 5305,
-        "evidence": "2026-11-12 22:2x +08:00 本轮修复后实测：控制台为项目 mim（makers-iygo4nrk22jr）添加自定义域 data.mixm.top（关联环境=生产），域名状态「已生效」，HTTPS 选择「申请免费证书」；CNAME = data.mixm.top.pages.dnsoe5.com，公共 DNS 解析 117.69.71.114。本机取证 http://data.mixm.top/ => 200|5305|0.41s、https://data.mixm.top/ => 200|5305|0.24-0.40s，title=Mim。CLI 直传最新构建两次：dpgc2k84vmn0、dpbnaziq1hdm（apps/web/dist）。默认域 https://mim-45yeiirr.edgeone.cool 保留 eo_token 访问保护（本机 401|2715，CI 出口 200|5305），对外入口以自定义域 data.mixm.top 为准。",
-        "captured_at": "2026-11-12 22:30 +08:00"
+        "evidence": "2026-11-12 23:57 +08:00 本轮复核：以注入生产 API 源（VITE_API_ORIGIN=https://mim.mixm.top）的 apps/web/dist 重新构建（产物 assets/index-R9WjoIj4.js），edgeone makers deploy -n mim 复用现有项目 makers-iygo4nrk22jr 直传，Deployment dpd4qps1obbg，Deploy Success。自定义域 data.mixm.top 200，title=Mim，无 WAF 挑战页，首页指纹 = index-R9WjoIj4.js（与本地构建一致）；有头浏览器复验：SPA 完整渲染（商城导航/19 分类/访客身份/升级入口），/api/v1/* 全部打到生产 mim.mixm.top 且 status ok，console 零报错。CNAME = data.mixm.top.pages.dnsoe5.com，公共 DNS 解析 61.170.82.132。历史留痕：22:2x 曾两次直传 dpgc2k84vmn0、dpbnaziq1hdm，默认域 mim-45yeiirr.edgeone.cool 保留 eo_token 访问保护（本机裸访 401/2715），对外入口以自定义域 data.mixm.top 为准。",
+        "captured_at": "2026-11-12 23:57 +08:00"
       },
       "anomalies": [
         {
-          "code": "CUSTOM_DOMAIN_ARTIFACT_LAG",
-          "severity": "warning",
-          "message": "2026-11-12 22:30 实测：data.mixm.top 首页仍引用 assets/index-Dmz7Z5Id.js，最新直传部署 dpbnaziq1hdm（产物 index-DzsHGdWK.js）尚未在自定义域生效；站点本身 200 可正常访问，仅产物版本滞后，待 EdgeOne 侧生效 / 清缓存后复测"
+          "code": "CUSTOM_DOMAIN_ARTIFACT_ALIGNED",
+          "severity": "info",
+          "message": "2026-11-12 23:57 复测：data.mixm.top 首页指纹已对齐本轮直传产物 index-R9WjoIj4.js（Deployment dpd4qps1obbg），此前的产物滞后异常已解除；direct upload 型不随 CI 自动更新，后续基线变动需本机重新直传"
         },
         {
           "code": "DEFAULT_DOMAIN_TOKEN_PROTECTED",
@@ -575,10 +575,7 @@
           "message": "状态码 200 不等于内容可信：EdgeOne 边缘可能返回挑战/保护页，内容层判定以 title=Mim 与产物指纹为准；本轮已用 title 与 assets 指纹复核"
         }
       ],
-      "missing_fields": [
-        "content_layer_e2e",
-        "last_deployment_id（本轮）"
-      ],
+      "missing_fields": [],
       "sources": [
         "curl https://data.mixm.top/",
         "AGENTS.md §9 / §9.1 / WAF 假阳性判别规则",
@@ -773,8 +770,8 @@
         "http_code": "200",
         "latency_ms": 710,
         "bytes": 5305,
-        "evidence": "2026-11-12 22:0x +08:00 本轮修复：`iga pages deploy -n mim` 在已有同名项目时会新建重复项目（账号 2100829122 下已有 fr95fuwu57 / 96otddwh48 / 04xa6mw3hm 三个同名 mim），已改为 `iga pages link --project 04xa6mw3hm` 后再 deploy，最新构建（assets/index-Cmm8PyY1.js）直传 Deployment e1uhm452pi；带 iga_token 并经 cookie 两跳后 200|5305|0.71s，title=Mim。deploy/iga/deploy.sh 已同步改为固定项目 ID（IGA_PROJECT_ID 默认 04xa6mw3hm）并提交。",
-        "captured_at": "2026-11-12 22:05 +08:00"
+        "evidence": "2026-11-12 23:58 +08:00 本轮复核：复用固定项目 04xa6mw3hm（先 `iga pages link --project 04xa6mw3hm -y` 再 deploy，避免同名分裂），以注入生产 API 源的 apps/web/dist 直传，Deployment 9r9k5qjbyr，产物 assets/index-R9WjoIj4.js。预览域 307 将 iga_token/iga_time 写入 HttpOnly cookie 后跳回裸域，curl 需 cookie jar 两跳，最终 200|5305，title=Mim，指纹与本地构建一致。历史留痕：22:0x 曾直传 Deployment e1uhm452pi（产物 index-Cmm8PyY1.js）；deploy/iga/deploy.sh 已固定项目 ID（IGA_PROJECT_ID 默认 04xa6mw3hm）。",
+        "captured_at": "2026-11-12 23:58 +08:00"
       },
       "anomalies": [
         {
@@ -1166,21 +1163,27 @@
           "ci-wrangler-worker"
         ]
       },
-      "status": "UNVERIFIED",
-      "result": null,
+      "status": "OK",
+      "result": {
+        "verdict": "PASS",
+        "http_code": "200",
+        "latency_ms": 1418,
+        "bytes": 53,
+        "evidence": "2026-11-12 23:39 +08:00 CI 出口取证（Deploy run 43249614641 platforms 作业线上探测）：https://mim-api-edge.15726833367.workers.dev/health => 200|53|1.418s|104.21.0.102；Worker 将 /health 与 /api/v1/* 透传生产权威终点 https://mim.mixm.top，响应头 x-mim-worker=mim-api-edge。本机对 *.workers.dev 存在 DNS/TLS 阻断（000），以 CI Runner 出口作为独立取证点，不等同于本机不可达。",
+        "captured_at": "2026-11-12 23:39 +08:00"
+      },
       "anomalies": [
         {
-          "code": "EMPTY_RESULT",
-          "severity": "warning",
-          "message": "Worker 已入仓但尚未部署，等待本 run 的 CI 出口探测取证"
+          "code": "LOCAL_WORKERS_DEV_BLOCKED",
+          "severity": "info",
+          "message": "本机网络对 *.workers.dev 阻断（000/10s 超时）；线上状态以 CI Runner 出口 200/health 取证为准。"
         }
       ],
-      "missing_fields": [
-        "http_code"
-      ],
+      "missing_fields": [],
       "sources": [
         "deploy.yml platforms 作业新增步骤",
-        "workers/mim-api-edge/index.js"
+        "workers/mim-api-edge/index.js",
+        "gh run view 43249614641 platforms 作业线上探测日志"
       ]
     }
   ]

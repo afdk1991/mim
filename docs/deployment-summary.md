@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T15:19:44.360Z
-- 本地 HEAD：`e9c4cae`
+- 生成时间：2026-11-12T15:58:55.644Z
+- 本地 HEAD：`a35f06a`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -13,10 +13,10 @@
 | 规范部署项 | 16 | 去重后的部署仓库 + 部署项 |
 | git 远端 | 2 | gitee / origin |
 | CI 作业 | 5 | 其中部署作业 4 个 |
-| 有取证 | 10 | 本轮存在可信取证 |
-| 空数据 | 6 | result 为 null，明确标识而非填 0 |
-| 异常 | 40 | 🔴 0 / 🟡 15 / 🟢 25 |
-| 缺失信息 | 33 | 字段名或工件路径 |
+| 有取证 | 11 | 本轮存在可信取证 |
+| 空数据 | 5 | result 为 null，明确标识而非填 0 |
+| 异常 | 40 | 🔴 0 / 🟡 13 / 🟢 27 |
+| 缺失信息 | 30 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -28,7 +28,7 @@
 | `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | https://mim.mixm.top | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 |
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | https://afdk1991.github.io/mim/ | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
-| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | ✅ OK | ✅ PASS 200 / 5305B | CUSTOM_DOMAIN_ARTIFACT_LAG 等 4 项 |
+| `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | ✅ OK | ✅ PASS 200 / 5305B | CUSTOM_DOMAIN_ARTIFACT_ALIGNED 等 4 项 |
 | `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | ✅ OK | ✅ PASS 200 / 5305B | — |
 | `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com | ✅ OK | ✅ PASS 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 3 项 |
@@ -38,7 +38,7 @@
 | `pages.netlify` | github:afdk1991/mim | Netlify / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `pages.azure-swa` | github:afdk1991/mim | Azure Static Web Apps / distribution | ci — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `container.render` | github:afdk1991/mim | Render / distribution | ci platforms | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
-| `worker.mim-api-edge` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-api-edge.15726833367.workers.dev | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 1 项 |
+| `worker.mim-api-edge` | — | Cloudflare 独立 Worker / distribution | ci platforms | https://mim-api-edge.15726833367.workers.dev | ✅ OK | ✅ PASS 200 / 53B | LOCAL_WORKERS_DEV_BLOCKED 等 1 项 |
 
 ## 3. 异常说明明细
 
@@ -56,7 +56,7 @@
 | `pages.github` | 🟢 info | `DEEP_LINK_404_BY_DESIGN` | /mim/store 返回 404 + 5182B 为 dist/404.html 逐字节副本的平台能力上限，浏览器加载后 SPA 正常启动 |
 | `packages.ghcr` | 🟢 info | `AUTH_401_BY_DESIGN` | 未鉴权 401 为 ghcr 预期响应，不判定为部署失败 |
 | `packages.ghcr` | 🟢 info | `DOCKERFILE_WORKTREE_RESTORED` | Dockerfile 与 .dockerignore 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现镜像构建；CI job packages 不再悬空 |
-| `pages.edgeone` | 🟡 warning | `CUSTOM_DOMAIN_ARTIFACT_LAG` | 2026-11-12 22:30 实测：data.mixm.top 首页仍引用 assets/index-Dmz7Z5Id.js，最新直传部署 dpbnaziq1hdm（产物 index-DzsHGdWK.js）尚未在自定义域生效；站点本身 200 可正常访问，仅产物版本滞后，待 EdgeOne 侧生效 / 清缓存后复测 |
+| `pages.edgeone` | 🟢 info | `CUSTOM_DOMAIN_ARTIFACT_ALIGNED` | 2026-11-12 23:57 复测：data.mixm.top 首页指纹已对齐本轮直传产物 index-R9WjoIj4.js（Deployment dpd4qps1obbg），此前的产物滞后异常已解除；direct upload 型不随 CI 自动更新，后续基线变动需本机重新直传 |
 | `pages.edgeone` | 🟢 info | `DEFAULT_DOMAIN_TOKEN_PROTECTED` | 默认域 mim-45yeiirr.edgeone.cool 需 eo_token 查询参数（平台访问保护），本机裸访 401/2715；自定义域 data.mixm.top 无需 token 即 200，矩阵入口以自定义域登记 |
 | `pages.edgeone` | 🟢 info | `EDGEONE_LEGACY_PROJECT_MIM_APP` | 控制台仍存在遗留项目 mim-app（makers-qsbzlpxaoa8b，域名表为空）；删除属不可逆操作，需用户单独授权 |
 | `pages.edgeone` | 🟢 info | `WAF_FALSE_POSITIVE` | 状态码 200 不等于内容可信：EdgeOne 边缘可能返回挑战/保护页，内容层判定以 title=Mim 与产物指纹为准；本轮已用 title 与 assets 指纹复核 |
@@ -83,14 +83,14 @@
 | `pages.azure-swa` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：100GB 带宽/月、10 个应用；超额带宽不可用） |
 | `container.render` | 🟡 warning | `EMPTY_RESULT` | 本轮未部署，result = null 空数据；已落地 render.yaml（免费静态站点，发布 apps/web/dist），CI 步骤按 Vercel 同款 SKIP 模式待 secrets 接入 |
 | `container.render` | 🟢 info | `ADOPTED_FREE_TIER_PENDING` | 已决策采用（免费层：每工作区 750 免费实例小时/月，空闲休眠、冷启动慢，够跑一个常驻小服务） |
-| `worker.mim-api-edge` | 🟡 warning | `EMPTY_RESULT` | Worker 已入仓但尚未部署，等待本 run 的 CI 出口探测取证 |
+| `worker.mim-api-edge` | 🟢 info | `LOCAL_WORKERS_DEV_BLOCKED` | 本机网络对 *.workers.dev 阻断（000/10s 超时）；线上状态以 CI Runner 出口 200/health 取证为准。 |
 
 ## 4. 仓库标识与部署工件
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | e9c4cae32eaf894f08479922aefb08356af0d32f | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | e9c4cae32eaf894f08479922aefb08356af0d32f | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | a35f06ad58bb1945ff4fe8d0f51a547ec2fb9eff | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | a35f06ad58bb1945ff4fe8d0f51a547ec2fb9eff | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
@@ -105,7 +105,7 @@
 | `netlify.toml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `.github/workflows/azure-static-web-apps.yml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 | `render.yaml` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
-| `workers/mim-api-edge` | ❌ 缺失 | ✅ 存在 | ✅ 一致 |
+| `workers/mim-api-edge` | ✅ 存在 | ✅ 存在 | ✅ 一致 |
 
 ## 5. 覆盖、去重与排除
 
