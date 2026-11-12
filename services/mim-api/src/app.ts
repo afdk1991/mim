@@ -18,6 +18,7 @@ import { createSitesRouter } from './routes/sites.js'; // 站点模块运行时�
 import { createEntriesRouter } from './routes/entries.js'; // 统一入口配置清单：19 业务域 / 职责边界 / 关联区分 / 占位标识
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
 import { createNavigationRouter } from './routes/navigation.js'; // 导航站：链接目录 + 可达性探测，浏览公开 / 写操作与探测需登录
+import { createSearchRouter } from './routes/search.js'; // 统一搜索：模块 / 入口 / 导航 / 社区 / 商品，浏览公开、索引重建需权限
 import { errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -113,6 +114,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   // 部署汇总路由：三个端点全部公开只读，不查业务表、不提供写操作
   app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
 app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation/summary 与 /navigation/links 公开，写操作与探测在 router 内鉴权
+  app.use('/api/v1', createSearchRouter(resolved)); // 统一搜索：/search 与 /search/summary 公开，/search/reindex 在 router 内鉴权
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配

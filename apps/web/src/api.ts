@@ -1711,6 +1711,21 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ ok: boolean }>('/referral/bind', { method: 'POST', body: { code } });
     },
   },
+
+  // ---------- 统一搜索（search）：五来源聚合检索，浏览公开 ----------
+
+  search: { // 统一搜索：路径 /search
+    summary() { // 各来源可搜文档数与当前引擎
+      return request<{ schema: string; total: number; scopes: SearchScopeCount[]; engine: SearchEngine }>('/search/summary', { auth: false, idempotency: false }); // 公开只读
+    }, // summary 结束
+    query(opts: { q: string; scope?: string; limit?: number }) { // 关键词检索
+      const qs = new URLSearchParams(); // 安全拼接查询串
+      qs.set('q', opts.q); // 关键词必填
+      if (opts.scope && opts.scope !== 'all') qs.set('scope', opts.scope); // 来源过滤
+      if (opts.limit) qs.set('limit', String(opts.limit)); // 每来源条数
+      return request<SearchResponse>(`/search?${qs.toString()}`, { auth: false, idempotency: false }); // 公开只读
+    }, // query 结束
+  }, // search 分组结束
 }; // api 对象结束
 
 // ---------- 社区与变现共享类型，与 routes/community.ts 响应一一对应 ----------
@@ -1838,3 +1853,44 @@ export interface NavSummary { // 目录汇总
   groups: Array<{ name: string; count: number }>; // 分组计数
   last_checked_at: string | null; // 最近探测时间
 } // NavSummary 结束
+
+// ---------- 统一搜索（search）共享类型，与 routes/search.ts 响应一一对应 ----------
+
+export type SearchScope = 'module' | 'entry' | 'navigation' | 'community' | 'shop'; // 五个可检索来源
+export type SearchEngine = 'sqlite' | 'meilisearch'; // 当前实际使用的检索引擎
+
+export interface SearchHit { // 单条命中
+  id: string; // 全局键
+  scope: SearchScope; // 来源
+  title: string; // 标题
+  subtitle: string; // 副标题
+  snippet: string; // 命中片段
+  href: string; // 跳转地址
+  keywords: string; // 参与匹配的文本
+  popularity: number; // 热度
+  updated_at: string; // 更新时间
+  score: number; // 匹配分
+} // SearchHit 结束
+
+export interface SearchGroup { // 按来源分组的结果
+  scope: SearchScope; // 来源
+  label: string; // 中文组名
+  count: number; // 本组条数
+  items: SearchHit[]; // 命中条目
+} // SearchGroup 结束
+
+export interface SearchResponse { // 检索响应
+  schema: string; // 契约版本
+  query: string; // 原查询
+  scope: string; // 原来源参数
+  engine: SearchEngine; // 实际引擎
+  total: number; // 总命中
+  took_ms: number; // 耗时
+  groups: SearchGroup[]; // 分组结果
+} // SearchResponse 结束
+
+export interface SearchScopeCount { // 来源文档数
+  scope: SearchScope; // 来源
+  label: string; // 中文组名
+  count: number; // 文档数
+} // SearchScopeCount 结束

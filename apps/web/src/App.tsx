@@ -31,6 +31,7 @@ import { Sites } from './views/Sites';
 // 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
 import { Deployments } from './views/Deployments';
 import { Navigation } from './views/Navigation';
+import { Search } from './views/Search'; // 统一搜索视图：五来源聚合检索
 import { Community } from './views/Community';
 // 漫剧 AI 剧模块外壳：放映厅（匿名可看片）+ 创作工作台（登录后使用）
 import { ComicStudio } from './views/ComicStudio';
@@ -169,6 +170,8 @@ export function App() {
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总' },
     // 导航站：全站资源目录 + 可达性状态 + 推荐位
     { view: 'navigation', label: locale === 'en-US' ? 'Navigation' : '导航站' },
+    // 统一搜索：模块 / 入口 / 导航 / 社区 / 商品一站检索
+    { view: 'search', label: locale === 'en-US' ? 'Search' : '统一搜索' },
     // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区与商城' },
     // 漫剧 AI 剧工作台
@@ -257,6 +260,8 @@ export function App() {
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
         {route.view === 'navigation' && <Navigation locale={locale} />}{/* 导航站：目录 + 可达性 + 推荐位 */}
+        {/* 统一搜索：浏览公开，不需要会话；结果按来源分组 */}
+        {route.view === 'search' && <Search locale={locale} />}{/* 统一搜索视图 */}
         {/* 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广，访客会话建立后直接可用 */}
         {route.view === 'community' && session && <Community locale={locale} />}{/* 社区与变现视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
