@@ -76,7 +76,8 @@ export function excerpt(text: string, query: string, radius = 60): string {
 
 /** 组装一条文档：统一做去空白与长度裁剪，防止超大正文拖慢检索 */
 function doc(input: Omit<SearchDocument, 'keywords'> & { keywords?: string }): SearchDocument {
-  const keywords = [input.title, input.subtitle, input.snippet, input.keywords ?? ''].join(' '); // 全量匹配文本
+  // 摘要只用于展示，不进入 keywords：模块简介含「可在商城内一次性解锁」这类模板句，若参与匹配会让一个通用词命中全部条目
+  const keywords = [input.title, input.subtitle, input.keywords ?? ''].join(' '); // 全量匹配文本只取标题、副标题与显式检索字段
   return {
     ...input, // 保留调用方给的字段
     title: flatten(input.title), // 标题压平
@@ -116,7 +117,7 @@ function entryDocs(): SearchDocument[] {
     subtitle: `${item.domainName} · ${item.system}`, // 业务域 + 系统说明
     snippet: `${item.note} ${item.coreFunctions.join('；')}`, // 备注原文 + 核心功能
     href: '/entry-catalog', // 入口清单页
-    keywords: `${item.entryKey} ${item.domain} ${item.adminRole} ${item.apiRole}`, // 职责文本同样可搜
+    keywords: `${item.entryKey} ${item.domain} ${item.adminRole} ${item.apiRole} ${item.note} ${item.coreFunctions.join('；')}`, // 职责、备注与核心功能参与检索
     popularity: 0, // 静态条目无热度
     updated_at: '', // 静态条目无更新时间
   })); // 逐条映射
@@ -133,7 +134,7 @@ function navigationDocs(db: Db): SearchDocument[] {
     subtitle: `${row.group_name} · ${row.status}`, // 分组 + 可达性状态
     snippet: `${row.description} ${row.url}`, // 说明 + 地址
     href: row.url, // 直接跳转目标地址
-    keywords: row.url, // 地址参与检索
+    keywords: `${row.url} ${row.description}`, // 地址与说明参与检索
     popularity: row.status === 'ok' ? 1 : 0, // 可达链接优先
     updated_at: row.last_checked_at ?? '', // 最近探测时间
   })); // 逐行映射
@@ -156,7 +157,7 @@ function communityDocs(db: Db): SearchDocument[] {
       subtitle: `${row.board_name ?? '社区'} · ${row.kind}${row.price_cents > 0 ? ' · 付费' : ''}`, // 板块 / 形态 / 付费标记
       snippet: `${row.summary} ${row.body}`, // 摘要与正文
       href: '/community', // 社区视图（上线前的未知路径由路由安全回退）
-      keywords: row.summary, // 摘要已含于 snippet，这里补一次即可
+      keywords: `${row.summary} ${row.body}`, // 摘要与正文参与检索
       popularity: row.views + row.likes, // 浏览 + 点赞作为热度
       updated_at: row.created_at, // 创建时间（帖子暂无独立更新时间）
     })); // 逐行映射
@@ -179,7 +180,7 @@ function shopDocs(db: Db): SearchDocument[] {
       subtitle: `${row.kind} · ¥${(row.price_cents / 100).toFixed(2)}`, // 类型 + 价格
       snippet: row.summary, // 商品简介
       href: '/shop', // 商城视图（上线前的未知路径由路由安全回退）
-      keywords: `${row.code} ${row.kind}`, // 商品编码与类型
+      keywords: `${row.code} ${row.kind} ${row.summary}`, // 商品编码、类型与简介
       popularity: row.stock, // 库存仅作同分排序的稳定因子
       updated_at: row.created_at, // 创建时间
     })); // 逐行映射

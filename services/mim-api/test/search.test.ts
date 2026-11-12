@@ -79,6 +79,14 @@ describe('统一搜索公开检索', () => { // 浏览类端点匿名可用
     expect(entry.count).toBe(SITE_MODULES.length); // 44 个入口全部可搜
     expect(res.body.engine).toBe('sqlite'); // 默认引擎
   });
+
+  it('模块通用摘要句不参与匹配，标题未命中的模块不被带回', async () => {
+    const res = await request(app).get('/api/v1/search').query({ q: '商城', scope: 'module', limit: 30 }); // 只看模块
+    expect(res.status).toBe(200); // 200
+    const items = res.body.groups.flatMap((group: { items: Array<{ title: string }> }) => group.items); // 全部模块命中
+    expect(items.length).toBeGreaterThan(0); // 至少命中标题含「商城」的模块
+    expect(items.every((item: { title: string }) => item.title.includes('商城'))).toBe(true); // 不允许简介里的「可在商城内解锁」把无关模块带回
+  });
 }); // 公开检索用例结束
 
 describe('Meilisearch 配置与降级', () => { // 远端引擎的可用性与降级
