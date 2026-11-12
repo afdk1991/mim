@@ -1,0 +1,10 @@
+# Cloudflare 独立 Worker：mim-store
+# 入口域名 https://mim-store.15726833367.workers.dev（账号子域 15726833367）
+# 与根 wrangler.toml（Cloudflare Pages 项目 mim）分离，避免 Pages 与 Worker 配置互相干扰。
+name = "mim-store"
+main = "index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[observability]
+enabled = true

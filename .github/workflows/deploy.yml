@@ -367,6 +367,18 @@ jobs:
           # Pages 子域全局唯一，mim.pages.dev 已被他人占用，平台在建项时自动分配后缀。
           npx --yes wrangler@4 pages deploy apps/web/dist --project-name=mim --branch=main --commit-dirty=true
 
+      # 独立 Worker（mim-store）：根路径曾长期 404（Worker 在边缘存活但无根路由）。
+      # 源码入仓 workers/mim-store，由同一套 CLOUDFLARE_* 凭据部署，根路径改为透传生产站。
+      - name: Cloudflare Worker（mim-store 固定入口）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "SKIP: 缺少 CLOUDFLARE_API_TOKEN"; exit 0
+          fi
+          npx --yes wrangler@4 deploy --config workers/mim-store/wrangler.toml
+
       - name: Sealos
         continue-on-error: true
         env:
@@ -448,6 +460,7 @@ jobs:
             https://gitee.com/mallwm_admin/mim \
             https://github.com/afdk1991/mim \
             https://mim-store.15726833367.workers.dev/ \
+            https://mim-45yeiirr.edgeone.cool/ \
             https://preview.iga-pages.com/ ; do
             out=$(curl -k -s -o /dev/null -w '%{http_code}|%{size_download}|%{time_total}|%{remote_ip}' --max-time 20 "$url")
             echo "$url => $out"

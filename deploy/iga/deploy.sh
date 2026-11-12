@@ -41,6 +41,11 @@ pnpm --filter @mim/web build
 
 # IGA 以「当前工作目录」为纯静态产物根目录；monorepo 根目录会把源码一并上传，
 # 因此进入构建产物目录再部署。
-echo "==> 部署 apps/web/dist 到 IGA Pages 项目 $NAME"
+# 注意：`iga pages deploy --name <名字>` 在已有同名项目时不会复用，而是再建一个同名项目
+# （2026-11-12 实测：mim 名下已出现 fr95fuwu57 / 96otddwh48 / 04xa6mw3hm 三个项目）。
+# 要保证「项目名统一为 Mim」且部署落在同一个项目上，必须先 link 到固定项目 ID 再 deploy。
+PROJECT_ID="${IGA_PROJECT_ID:-04xa6mw3hm}"
 cd apps/web/dist
-iga pages deploy --name "$NAME" --scope "${IGA_SCOPE:-domestic}"
+echo "==> 链接 IGA Pages 项目 $PROJECT_ID 并部署当前目录"
+iga pages link --project "$PROJECT_ID" -y
+iga pages deploy --scope "${IGA_SCOPE:-domestic}"
