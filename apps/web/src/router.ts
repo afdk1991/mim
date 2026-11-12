@@ -10,6 +10,7 @@ export type AppView =
   | 'sites' // 统一入口配置清单（44 个入口驱动的模块目录）
   | 'deployments' // 部署汇总（所有部署仓库与部署项的效果 / 结果 / 异常）
   | 'navigation' // 导航站（全站资源目录 + 可达性状态 + 推荐位）
+  | 'community' // 社区与变现（论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
   | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
   | 'login'; // 未登录专用的登录伪视图
@@ -30,6 +31,7 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   sites: 'entry-catalog', // 入口配置清单（44 个入口驱动的模块目录）
   deployments: 'deployments', // 部署汇总（原名即功能名，保持不变）
   navigation: 'navigation', // 导航站（原名即功能名，保持不变）
+  community: 'community', // 社区与变现（论坛 + 知识付费 + VIP + 钱包 + 独立商城）
   comic: 'comic-studio', // 漫剧 AI 剧工作台
   chat: 'chat', // 聊天（原名即功能名，保持不变）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
@@ -54,6 +56,7 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   deployments: 'deployments', // 未改名（新旧一致）
   products: 'products', // 未改名（新旧一致）
   cart: 'cart', // 未改名（新旧一致）
+  forum: 'community', // 旧口径：论坛 / 社区 → community（同一视图的曾用名）
 };
 
 // 全部视图均为单段路径（如 /comic-studio），保证 vite base './' 下相对资源解析正确

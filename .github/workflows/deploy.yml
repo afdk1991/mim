@@ -461,7 +461,7 @@ jobs:
             https://github.com/afdk1991/mim \
             https://mim-store.15726833367.workers.dev/ \
             https://mim-45yeiirr.edgeone.cool/ \
-            https://preview.iga-pages.com/ ; do
+            https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com/ ; do
             out=$(curl -k -s -o /dev/null -w '%{http_code}|%{size_download}|%{time_total}|%{remote_ip}' --max-time 20 "$url")
             echo "$url => $out"
           done
