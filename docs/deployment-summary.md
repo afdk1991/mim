@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-12T09:52:16.265Z
-- 本地 HEAD：`670674d`
+- 生成时间：2026-11-12T11:02:05.106Z
+- 本地 HEAD：`568c2b2`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,8 +15,8 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 11 | 本轮存在可信取证 |
 | 空数据 | 5 | result 为 null，明确标识而非填 0 |
-| 异常 | 53 | 🔴 2 / 🟡 20 / 🟢 31 |
-| 缺失信息 | 41 | 字段名或工件路径 |
+| 异常 | 53 | 🔴 2 / 🟡 19 / 🟢 32 |
+| 缺失信息 | 37 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -32,7 +32,7 @@
 | `pages.cloudflare` | github:afdk1991/mim | Cloudflare Pages / Workers / distribution | ci platforms | https://mim-299.pages.dev/ | ✅ OK | ✅ PASS 200 / 5114B | LOCAL_PROCESS_DEPENDENCY 等 9 项 |
 | `pages.vercel` | github:afdk1991/mim | Vercel / distribution | ci platforms | https://mim-puce.vercel.app | 🟡 UNVERIFIED | ✅ PASS 200 / 5182B | CONTENT_STALE 等 4 项 |
 | `container.sealos` | ghcr:afdk1991/mim-api | Sealos / distribution | ci platforms | https://mim-i3ywsdfn.cloud.sealos.io/health | 🟡 UNVERIFIED | 🔴 FAIL 000 / 0B | SEALOS_SERVICE_UNREACHABLE 等 5 项 |
-| `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim.preview.iga-pages.com | 🟡 UNVERIFIED | 🟡 DEGRADED 401 / 2413B | ENTRY_URL_WRONG 等 4 项 |
+| `pages.iga` | — | IGA Pages / distribution | manual platforms | https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com | ✅ OK | 🟡 DEGRADED 200 / 5305B | PRIVATE_TOKEN_REQUIRED 等 4 项 |
 | `worker.mim-store` | — | Cloudflare 独立 Worker / distribution | manual — | https://mim-store.15726833367.workers.dev | 🟡 MANUAL | 🟡 DEGRADED 404 / 17B | ROOT_PATH_404 等 3 项 |
 | `repo.gitlab` | — | GitLab 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
 | `repo.bitbucket` | — | Bitbucket 仓库 / source | push — | — | 🟡 UNVERIFIED | ⚪ 空数据 | EMPTY_RESULT 等 2 项 |
@@ -80,10 +80,10 @@
 | `container.sealos` | 🟢 info | `SEALOS_MANIFEST_WORKTREE_RESTORED` | deploy/sealos/mim.yaml 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI Sealos 步骤不再悬空 |
 | `container.sealos` | 🟢 info | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：Sealos 的命名空间 ns-i3ywsdfn 与域名 mim-i3ywsdfn.cloud.sealos.io 由平台分配、不可自选（Sealos Cloud 只授予该 ns 权限），应用内资源名（mim-api / mim-data / mim-secrets）已统一为 mim 前缀；无 SEALOS_KUBECONFIG 凭证，无法新建 ns-mim 命名空间来换域名 |
 | `container.sealos` | 🟡 warning | `SEALOS_CREDENTIAL_MISSING` | 2026-11-12 复核：Sealos 部署凭据（SEALOS_KUBECONFIG / SEALOS_DOMAIN / SEALOS_NAMESPACE / MIM_JWT_SECRET）未配置，CI step 恒 SKIP；补齐私有 secret 并重跑 platforms 作业前不得宣称 Sealos 已发布本轮产物。历史留痕：2026-11-09 23:03 curl /health 曾 200 / 1.111s / 53B（{"status":"ok"}），为旧版本快照，不代表本轮状态 |
-| `pages.iga` | 🟡 warning | `ENTRY_URL_WRONG` | 2026-11-12 复核：原登记 entry_url `https://preview.iga-pages.com` 无 A 记录（apex 与 preview 均 NXDOMAIN），真实入口为 `<project>.preview.iga-pages.com`，已修正为 mim.preview.iga-pages.com |
-| `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | 入口返回 401 / 2413B，需 iga_token / 预览口令才能验证内容层；~/.iga/auth.json 刷新令牌失效，需重新 iga login |
+| `pages.iga` | 🟢 info | `ENTRY_URL_WRONG` | 历史留痕：2026-11-12 复核原登记 `preview.iga-pages.com` 无 A 记录；现行入口已改为新项目项目级稳定域（见 entry_url） |
+| `pages.iga` | 🟡 warning | `PRIVATE_TOKEN_REQUIRED` | 裸访 307→401 / 2413B，需 iga_token（HttpOnly cookie）或预览口令；本机 CLI 登录态已于本轮设备授权恢复，内容层带凭证复验 200 |
+| `pages.iga` | 🟡 warning | `IGA_PROJECT_SPLIT` | 账号下同名 `mim` 分裂为两个项目：新 96otddwh48（upload_v2 直传型，现行权威入口，最新产物）与旧 fr95fuwu57（5 天前旧版本，类型不兼容 upload_v2 CLI，无法被直传更新，闲置待控制台核对清理）；删除旧项目不可逆，需用户在控制台授权 |
 | `pages.iga` | 🟢 info | `IGA_SCRIPT_WORKTREE_RESTORED` | deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空 |
-| `pages.iga` | 🟡 warning | `PLATFORM_NAME_ALIGNMENT_PENDING` | 2026-11-11 命名统一轮：IGA 侧仅有 Project ID fr95fuwu57，项目展示名未在仓库内登记；改名需 iga_token 与控制台登录态（本轮均缺失），按铁律一如实标注未改 |
 | `worker.mim-store` | 🟡 warning | `ROOT_PATH_404` | 2026-11-12 CI 实测：Worker 根路径 404 / 17B，仅证明 Worker 存活，未证明承载了可用页面；需确认预期入口路径（若只服务子路径，应在 entry_url 登记真实路径） |
 | `worker.mim-store` | 🟡 warning | `DNS_POLLUTION` | README 2026-11-09 取证载明本机 *.workers.dev 被 DNS 污染（156.233.67.243、443 不通），不作国内入口 |
 | `worker.mim-store` | 🟢 info | `MATRIX_ROW_MISSING` | 仅出现在 README 取证段落、矩阵表未列；因其域名与载体均不同于 pages.cloudflare，本汇总另列一行避免遗漏 |
@@ -102,8 +102,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 670674d490defe5bddcdc39a8d31b6d2e2cb7134 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 670674d490defe5bddcdc39a8d31b6d2e2cb7134 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | 568c2b2cd98c4f08f0578327c07bb2ec814b34eb | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | 568c2b2cd98c4f08f0578327c07bb2ec814b34eb | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

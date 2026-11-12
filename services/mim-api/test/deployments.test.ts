@@ -130,13 +130,14 @@ describe('部署项详情与异常标识', () => { // 详情与异常
     expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'REMOTE_TIMEOUT_RECOVERED')).toBe(true); // 历史超时以恢复码留痕，不静默删除
   }); // 同步完成用例结束
 
-  it('IGA 入口修正后以 401 取证，不再是空数据项', async () => { // IGA 取证
+  it('IGA 本机直传后以带凭证 200 取证，不再是空数据项', async () => { // IGA 取证
     const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages 平台
     expect(res.status).toBe(200); // 200
-    expect(res.body.item.entry_url).toBe('https://mim.preview.iga-pages.com'); // 真实预览域（原登记 preview.iga-pages.com 无 A 记录）
-    expect(res.body.item.result.http_code).toBe('401'); // 受访问保护，需 iga_token
-    expect(res.body.item.result.verdict).toBe('DEGRADED'); // 可达但内容层不可核验
-    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'ENTRY_URL_WRONG')).toBe(true); // 入口登记错误留痕
+    expect(res.body.item.entry_url).toBe('https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com'); // 现行项目 96otddwh48 项目级稳定域
+    expect(res.body.item.result.http_code).toBe('200'); // 带 iga_token Cookie 复验 200；裸访 401 属平台访问保护
+    expect(res.body.item.result.verdict).toBe('DEGRADED'); // 公开匿名仍 401 保护，未公开可达
+    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'IGA_PROJECT_SPLIT')).toBe(true); // 同名项目分裂留痕
+    expect(res.body.item.anomalies.some((a: { code: string }) => a.code === 'ENTRY_URL_WRONG')).toBe(true); // 历史入口登记错误留痕
   }); // IGA 用例结束
 
   it('空数据项 result 为 null 且带 EMPTY_RESULT 异常与缺失字段', async () => { // 空数据标识

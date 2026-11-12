@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T09:52:16.265Z",
-  "head": "670674d",
+  "generated_at": "2026-11-12T11:02:05.106Z",
+  "head": "568c2b2",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -49,12 +49,12 @@
     "with_result": 11,
     "empty_result": 5,
     "anomalies": 53,
-    "missing_fields": 41,
+    "missing_fields": 37,
     "worktree_drift": 0,
     "by_status": {
-      "OK": 6,
+      "OK": 7,
       "MANUAL": 2,
-      "UNVERIFIED": 8
+      "UNVERIFIED": 7
     },
     "by_verdict": {
       "PASS": 7,
@@ -87,8 +87,8 @@
     },
     "by_severity": {
       "critical": 2,
-      "warning": 20,
-      "info": 31
+      "warning": 19,
+      "info": 32
     }
   },
   "remotes": [
@@ -105,14 +105,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "670674d490defe5bddcdc39a8d31b6d2e2cb7134",
+      "hash": "568c2b2cd98c4f08f0578327c07bb2ec814b34eb",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "670674d490defe5bddcdc39a8d31b6d2e2cb7134",
+      "hash": "568c2b2cd98c4f08f0578327c07bb2ec814b34eb",
       "exit": 0,
       "error": null
     }
@@ -977,9 +977,9 @@
       "name": "IGA Pages 前端静态站",
       "aliases": [
         "IGA Pages",
-        "preview.iga-pages.com",
-        "Project fr95fuwu57",
-        "Deploy p4f5a4svqm"
+        "Project 96otddwh48",
+        "Deploy 76l9e2vbeh",
+        "legacy fr95fuwu57 / p4f5a4svqm"
       ],
       "platform_id": "iga",
       "platform": "IGA Pages",
@@ -990,7 +990,7 @@
         "url": null,
         "role": "无公开仓库连接，CLI 直传"
       },
-      "entry_url": "https://mim.preview.iga-pages.com",
+      "entry_url": "https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com",
       "delivery": {
         "mode": "manual",
         "ci_job": "platforms",
@@ -998,49 +998,45 @@
         "artifact": "deploy/iga/deploy.sh",
         "artifact_in_head": true,
         "artifact_in_worktree": true,
-        "credential": "iga_token（私有凭证，本轮缺失）",
+        "credential": "本机 CLI 登录态已恢复（iga login 设备授权，Account 2100829122）；CI 仍需 IGA_ACCESS_KEY / IGA_SECRET_KEY secrets",
         "modes": [
           "ci-iga-cli",
           "manual-iga-cli"
         ]
       },
-      "status": "UNVERIFIED",
+      "status": "OK",
       "result": {
         "verdict": "DEGRADED",
-        "http_code": "401",
-        "latency_ms": 108,
-        "bytes": 2413,
-        "evidence": "2026-11-12 17:52 +08:00 域名可访问性验证：登记的 `https://preview.iga-pages.com` 与 `iga-pages.com` apex 均无 A 记录（本机 NXDOMAIN、CI 000），说明登记入口本身不成立；实测真实预览域为 `https://mim.preview.iga-pages.com`（与 fr95fuwu57.preview.iga-pages.com 同解析 115.231.191.209），返回 401 / 2413B，即站点在线但受访问保护（需 iga_token / 预览口令）。entry_url 已修正为 mim.preview.iga-pages.com。",
-        "captured_at": "2026-11-12 17:52 +08:00"
+        "http_code": "200",
+        "latency_ms": 89,
+        "bytes": 5305,
+        "evidence": "2026-11-12 18:57 +08:00 本机 CLI 设备授权恢复登录态后，直传最新根构建产物（指纹 assets/index-Dmz7Z5Id.js）到 IGA 项目 96otddwh48，DeploySuccess（Deployment 76l9e2vbeh，首传 wgrjzc32a5）。项目级稳定域 `mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`：无凭证裸访 307→401 / 2413B（平台访问保护，iga_token 写入 HttpOnly cookie）；携带 cookie 跟随重定向后 200 / 5305B，title=Mim，产物指纹与本地构建一致。 verdict 保留 DEGRADED：站点受预览口令保护，未公开匿名可达。",
+        "captured_at": "2026-11-12 18:57 +08:00"
       },
       "anomalies": [
         {
           "code": "ENTRY_URL_WRONG",
-          "severity": "warning",
-          "message": "2026-11-12 复核：原登记 entry_url `https://preview.iga-pages.com` 无 A 记录（apex 与 preview 均 NXDOMAIN），真实入口为 `<project>.preview.iga-pages.com`，已修正为 mim.preview.iga-pages.com"
+          "severity": "info",
+          "message": "历史留痕：2026-11-12 复核原登记 `preview.iga-pages.com` 无 A 记录；现行入口已改为新项目项目级稳定域（见 entry_url）"
         },
         {
           "code": "PRIVATE_TOKEN_REQUIRED",
           "severity": "warning",
-          "message": "入口返回 401 / 2413B，需 iga_token / 预览口令才能验证内容层；~/.iga/auth.json 刷新令牌失效，需重新 iga login"
+          "message": "裸访 307→401 / 2413B，需 iga_token（HttpOnly cookie）或预览口令；本机 CLI 登录态已于本轮设备授权恢复，内容层带凭证复验 200"
+        },
+        {
+          "code": "IGA_PROJECT_SPLIT",
+          "severity": "warning",
+          "message": "账号下同名 `mim` 分裂为两个项目：新 96otddwh48（upload_v2 直传型，现行权威入口，最新产物）与旧 fr95fuwu57（5 天前旧版本，类型不兼容 upload_v2 CLI，无法被直传更新，闲置待控制台核对清理）；删除旧项目不可逆，需用户在控制台授权"
         },
         {
           "code": "IGA_SCRIPT_WORKTREE_RESTORED",
           "severity": "info",
           "message": "deploy/iga/deploy.sh 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复；CI IGA 步骤不再悬空"
-        },
-        {
-          "code": "PLATFORM_NAME_ALIGNMENT_PENDING",
-          "severity": "warning",
-          "message": "2026-11-11 命名统一轮：IGA 侧仅有 Project ID fr95fuwu57，项目展示名未在仓库内登记；改名需 iga_token 与控制台登录态（本轮均缺失），按铁律一如实标注未改"
         }
       ],
       "missing_fields": [
-        "http_code",
-        "latency_ms",
-        "bytes",
-        "iga_token",
-        "captured_at"
+        "iga_token"
       ],
       "sources": [
         "AGENTS.md §9.1（IGA Pages 未测）",

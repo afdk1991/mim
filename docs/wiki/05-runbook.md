@@ -267,7 +267,7 @@ gh run watch          # 观察最近一次运行
 
 | 平台 | 状态 | 取证 / 阻塞原因 |
 |---|---|---|
-| IGA Pages | ✅ 已部署 | `iga login`（本机 SSO）→ `iga pages deploy --name mim --scope domestic` → Project ID `fr95fuwu57`、Deploy `p4f5a4svqm`；preview 域名为 token 门禁（307 下发 `iga_token` Cookie 后可达），`curl -c/-b` 带 Cookie 实测 200 / 476 字节；自有域名需控制台绑定（domestic scope 需 ICP 备案） |
+| IGA Pages | ✅ 本机直传最新产物 | 2026-11-12 18:57 `iga login --remote` 设备授权恢复登录态（Account `2100829122`）→ `cd apps/web/dist && iga pages deploy --name mim --scope domestic` → 现行项目 `96otddwh48`、Deploy `76l9e2vbeh`；项目级稳定域 `mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`，token 门禁（307 下发 `iga_token` HttpOnly Cookie），`curl -c/-b` 带 Cookie 实测 **200 / 5305B**、title=Mim、产物 `index-Dmz7Z5Id.js`；裸访 401 / 2413B。旧项目 `fr95fuwu57`（旧版本，类型不兼容 upload_v2 CLI）闲置待控制台核对清理；CI 自动化发布仍待 `IGA_ACCESS_KEY/SECRET_KEY/PROJECT_NAME` secrets |
 
 > IGA 脚本支持「本机 SSO 登录态复用」：CI 用 AK/SK，本机执行前只需 `iga login`，脚本内以 `whoami` 探测登录态；CLI 由脚本在缺省时自装（`@iga-pages/cli`），首建应用后把项目名写入 secret 即可自动发布。
 
@@ -320,7 +320,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | Sealos | ✅ | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 未配置，缺凭据未发布；容器 + PVC 模板 `deploy/sealos/mim.yaml` 在位；纯 API 容器，根路径 `/` 404 无路由）** | `https://mim-i3ywsdfn.cloud.sealos.io` | 历史留痕：`/` **404**（`route GET / not found`，属正常非故障）/ 0.281s / 0.101s；`/health` 200 / 0.283s / 0.096s（旧版本快照）；2026-11-12 本机 `/health` exit 35 连接重置，本轮未取得可信线上取证 |
 | Cloudflare Pages | ✅ | ✅ CI 自动发布（项目名 `mim`，含 /api 反代） | `https://mim-299.pages.dev` | 2026-11-11 实测 `/` 200 / 1.840s / 5114B、`/api/v1/modules` 200 / 3.200s / 9514B（历史 2026-11-07 快照为 200 / 1.172s / 0.166s，域名当时为 `mim-8ah.pages.dev`） |
 | GitHub Packages (ghcr) | ✅ | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 0.745s / 0.140s（未鉴权 401 属正常） |
-| IGA Pages | ✅ | ✅ 已部署（Project `fr95fuwu57` / Deploy `p4f5a4svqm`） | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 200（需 token）/ 未纳入本机 curl 批次 |
+| IGA Pages | ✅ | ✅ 本机直传最新产物（2026-11-12 18:57，项目 `96otddwh48` / Deploy `76l9e2vbeh`；旧 `fr95fuwu57` 闲置留痕）；CI 仍 SKIP 待 AK/SK secrets | `mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`（带 `iga_token` Cookie 访问） | 带 Cookie 200 / 5305B / title=Mim；裸访 401 / 2413B（访问保护） |
 | Vercel | ✅ | ✅ CI 取证通过（2026-11-06T13:15:10Z）；项目名 **`mim`**（2026-11-11 01:05 控制台复核，`mim-puce` 为 `mim.vercel.app` 被占后平台自动追加的后缀域名） | `https://mim-puce.vercel.app` | CI 记录 200；本机 000 / 20.006s（`--max-time 20` 截断）/ 0.000s（2026-11-07 01:48 实测 DNS 污染到 162.125.2.5（Dropbox 段地址，典型污染特征），TCP 连接即失败；2026-11-11 01:05 复测仍 20s 超时） |
 | GitHub 仓库 | ✅ | ✅ 已同步（HEAD `41a871d`，2026-11-07 提交） | `https://github.com/afdk1991/mim` | 本机 000 / 0.029s / 0.011s（curl exit 35：TLS 握手阻断，TCP 可连；仓库操作经 git push / gh CLI 取证 ✅） |
 | **Gitee（码云）镜像仓**（2026-11-10 入矩阵，第 10 行） | ✅ | ✅ 已同步（源码国内镜像仓，无 CI 推送作业，每轮手工 `git push gitee main`） | `https://gitee.com/mallwm_admin/mim` | **200 / 0.469s / 52034B（2026-11-10 22:20 实测）**：页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交；`git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s）与本地 HEAD 一致 |

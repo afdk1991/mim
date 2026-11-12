@@ -144,7 +144,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | Sealos | ✅ 是 | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET` 未配置，未发布本轮产物；容器 + PVC 模板 `deploy/sealos/mim.yaml` 在位；纯 API 容器，根路径 `/` 404 无路由）** | `https://mim-i3ywsdfn.cloud.sealos.io` | 历史留痕：`/health` 200 / 0.718s / 0.001s / LEN=53（`{"status":"ok"}`，旧版本快照；根路径 `/` 404 属纯 API 容器未注册根路由；`/store` 等 Web 路由命中 API 返回 404 JSON 属预期——Sealos 不托管商城 SPA）；2026-11-12 本机 `/health` exit 35 连接重置，本轮未取得可信线上取证 |
 | Cloudflare Pages | ✅ 是 | ✅ CI 自动发布（项目名 **`mim`**，2026-11-11 由 `mim-8ah` 迁移；含 `/api` 反代与 `?tads` / 裸问号归一化脚本；**`functions/[[catchall]].js` catch-all 修复深链接 404 已上线**） | `https://mim-299.pages.dev`（`mim.pages.dev` 子域被他人占用，平台自动分配后缀；旧 `mim-8ah.pages.dev` 保留回滚） | **2026-11-11 00:20 本轮实测**：`/` 200 / 1.840s / 5114B、`/store` 200 / 0.571s / 5114B、`/comic` 200 / 1.758s / 5114B、`/api/v1/modules` 200 / 3.200s / 9514B（Functions 反代生效）；历史 2026-11-08 快照为首页 200 / 1.384s / LEN=5182（产物 `index-D2UkZqM1.js` 与自建同指纹）、带 `Accept: text/html` 头深链接 `/store` 200 / 0.931s、`/comic` 200 / 0.842s、`/login` 200 / 1.526s，裸 curl `/store` 404 属预期（函数只对 html 导航重写） |
 | GitHub Packages (ghcr) | ✅ 是 | ✅ CI 自动推送镜像 | `ghcr.io/afdk1991/mim-api` | 401 / 1.087s / 0.001s / LEN=73（未鉴权 401 `UNAUTHORIZED` 属正常；CI `packages` 作业 success 推送 `ghcr.io/afdk1991/mim-api:{latest,sha}`） |
-| IGA Pages | ✅ 是 | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` 未配置，未发布本轮产物）** | `preview.iga-pages.com`（带 `iga_token` 访问 200） | 历史留痕：Project `fr95fuwu57` / Deploy `p4f5a4svqm`；2026-11-12 本机 exit 6 DNS 解析失败，内容层未取证 |
+| IGA Pages | ✅ 是 | ⚠️ **本机 CLI 直传已上线（2026-11-12 18:57 设备授权恢复登录态后直传最新产物到项目 `96otddwh48`，Deploy `76l9e2vbeh`）；CI 步骤仍 SKIP（`IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` secrets 未配置）** | `https://mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`（带 `iga_token` / cookie 访问） | 带凭证复验 **200 / 5305B**，title=Mim，产物 `assets/index-Dmz7Z5Id.js` 与本地构建一致；裸访 307→401 / 2413B 属平台访问保护。同名分裂：旧项目 `fr95fuwu57`（旧版本，类型不兼容 upload_v2 CLI，闲置待控制台核对清理） |
 | Vercel | ✅ 是 | ⚠️ **CI 步骤 SKIP（2026-11-12 复核：`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 未配置，未发布本轮产物；站点本身在线，线上为历史旧版本）** | `https://mim-puce.vercel.app` | CI 出口取证 `mim-puce.vercel.app/ => 200`（站点在线 ≠ 本轮产物已同步）；本机 exit 28 连接超时（既有本机对 vercel.app 的 DNS/TLS 阻断特征） |
 | GitHub 仓库 | ✅ 是 | ✅ 已同步（远端 main HEAD `3271204`，2026-11-08 18:14 `git ls-remote` 取证，本地 0 ahead / 0 behind） | `https://github.com/afdk1991/mim` | 本机 HTTPS 000（TLS 阻断，历史取证）；替代取证 `git ls-remote origin refs/heads/main` = `3271204` ✅，CI run 42470091995 五作业全绿（2026-11-08T10:07:48Z → 10:09:54Z） |
 | **Gitee（码云）**（2026-11-10 新增为第 10 行） | ✅ 是 | ✅ 已同步（源码国内镜像仓，远端 `gitee`；**无 CI 推送作业，按铁律十二每轮手工同推**） | `https://gitee.com/mallwm_admin/mim` | **200 / 0.469s / LEN=52034（2026-11-10 22:20 本轮实测）**：`curl https://gitee.com/mallwm_admin/mim` → 200 / 0.469s / 52034B，页面标题「mim: Mim - 跨平台商业级项目(GitHub 镜像)」、默认分支 `main`、129 次提交；git 通道 `git ls-remote gitee refs/heads/main` = `4398cf0`（exit 0 / 0.27s），与本地 HEAD 一致（0 ahead / 0 behind）。矩阵成员身份与 `in_matrix` 标记见 `packages/core-domain/src/deploymentRegistry.json` |
@@ -1111,7 +1111,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **非矩阵登记分发项**：Azure Static Web Apps（独立 workflow `43080078213` @ `f92c8bc` success）；GitLab / Bitbucket / Netlify / Render / 独立 Worker `mim-store` 仍为 `UNVERIFIED` / `MANUAL`，不在铁律九 10 成员内。
 
-**客观凭据缺口（沙箱无法生成，需用户在仓库 secrets 补齐后重跑 CI）**：`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`；`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET`；`IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME`；`NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`；`RENDER_API_KEY` / `RENDER_SERVICE_ID`。补齐前对应平台 step 恒为 SKIP，不得据 step `success` 宣称已上线。
+**客观凭据缺口（沙箱无法生成，需用户在仓库 secrets 补齐后重跑 CI）**：`VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`；`SEALOS_KUBECONFIG` / `SEALOS_DOMAIN` / `SEALOS_NAMESPACE` / `MIM_JWT_SECRET`；`IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME`（IGA 本机 CLI 登录态已于 §9.34 恢复并直传，CI 自动化发布仍待 AK/SK secrets）；`NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`；`RENDER_API_KEY` / `RENDER_SERVICE_ID`。补齐前对应平台 step 恒为 SKIP，不得据 step `success` 宣称已上线。
 
 **口径漂移更正**：注册表 / README 旧述 Sealos「`SEALOS_KUBECONFIG` 等已配置、CI 自动发布」与本轮 secrets 实测不符——本轮 7 个已配 secret 中无任何 `SEALOS_*`，Sealos step 实际 SKIP；历史 `2026-11-09 23:03 /health 200` 快照按铁律三保留为留痕，现状以本表为准。
 
@@ -1153,6 +1153,23 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 门禁复跑 | `verify-deployments` **55/55**、`verify-custom-domains` **20/20**、`verify-site-modules` PASS、`verify-entry-manifest` PASS、`pnpm -r typecheck` 0、`npm run check` 退出 0 | 本轮命令回显 |
 
 **10 矩阵成员终态（@ `670674d`）**：✅ 真部署 / 同步——腾讯云自建、Cloudflare Pages、GitHub Pages、ghcr、GitHub 仓库、Gitee 镜像；⚠️ 直传已到项目但内容层未取证——EdgeOne；⚠️ 凭据缺失 SKIP（站点在线为旧版本或不可达）——Sealos、Vercel、IGA。凭据缺口清单同 §9.31，沙箱无法生成，需用户在仓库 secrets 补齐后重跑 platforms 作业。
+
+#### 9.34 IGA 本机登录闭环 + 直传最新产物（2026-11-12 18:57 +08:00，HEAD `aaeb4f0`）
+
+**性质**：承接 §9.33 凭据缺口，本轮把 IGA 一项在本机闭环；无业务代码改动，仅 CLI 登录态恢复 + 直传 + 注册表 / 文档口径同步。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 登录态恢复 | `iga login --remote` 设备授权（设备码 300s 有效，用户浏览器完成火山引擎账号同意）；`iga whoami` = Account ID `2100829122`（root），凭证落 `~/.iga/auth.json`；此前 `Failed to refresh login credentials: OAuth request failed: invalid_request` 已解除 | CLI 回显 |
+| 项目盘点 | `iga pages ls`：`mim` / `fr95fuwu57`（DeploySuccess，旧部署 `p4f5a4svqm`，5d 前）；另有 `b-admin` / `9n0le5lyo9` 不属本项目，未触碰 | CLI 列表 |
+| 根构建 | `NODE_OPTIONS="" npm run build` 成功，`apps/web/dist` 30 文件，产物 `assets/index-Dmz7Z5Id.js` + `index-DLY_QDd3.css`，API=`https://mim.mixm.top` | 构建回显 |
+| 直传 | `cd apps/web/dist && iga pages deploy --name mim --scope domestic`：打包 11.18MB → TOS 上传完成 → **DeploySuccess**。首次 `--name mim` 未挂到旧项目而**新建 upload_v2 项目 `96otddwh48`**（Deployment `wgrjzc32a5`）；relink 旧项目 `fr95fuwu57` 后重发仍落 `96otddwh48`（Deployment `76l9e2vbeh`）——旧项目类型不兼容 upload_v2 CLI，无法被直传更新 | CLI `deploy` 输出 + `pages ls <id>` |
+| 内容层取证 | 新项目项目级稳定域 `mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`：裸访 307（`Set-Cookie: iga_token` HttpOnly）→ 根路径 **401 / 2413B**；cookie jar 跟随重定向后 **200 / 5305B**，`title=Mim`，产物 `index-Dmz7Z5Id.js` 与本地构建指纹一致 | 本机 curl（-L -c/-b jar） |
+| 项目分裂留痕 | 账号下同名 `mim` 两个项目：新 `96otddwh48`（upload_v2 直传型，现行权威入口，最新产物）；旧 `fr95fuwu57`（旧版本，闲置）。删除旧项目不可逆，需用户在火山引擎控制台授权，本轮未擅自删除 | 注册表 anomaly `IGA_PROJECT_SPLIT` |
+| CI 侧状态 | `IGA_ACCESS_KEY` / `IGA_SECRET_KEY` / `IGA_PROJECT_NAME` secrets 仍未配置，CI `platforms` 作业 IGA step 恒 SKIP；本机 CLI 登录态不进 CI，自动化发布仍需补 AK/SK secrets | `.github/workflows/deploy.yml` |
+| 注册表 / 派生产物 | `pages.iga`：status `OK` / verdict `DEGRADED`（公开匿名仍 401 保护），`entry_url` 改为新项目项目级稳定域；`verify-deployments` **55/55**；重跑 `deployment-summary.mjs` 刷新 `docs/deployment-summary.{json,md}` | 文件本体 + 校验脚本 |
+
+**IGA 终态更新**：由「凭据缺失 SKIP + 未取证」升级为「**本机 CLI 直传最新产物并取得带凭证内容层 200 取证**；CI 自动化发布仍待 AK/SK secrets；旧项目分裂待控制台核对清理」。其余缺口（Vercel / Sealos / Netlify / Render 凭据、EdgeOne 自定义域 CNAME）状态同 §9.33，本轮未变动。
 
 ---
 
