@@ -58,7 +58,7 @@ https://mim.mixm.top/site/www
 | 12 | 历史预览（已不在矩阵） | `https://mim-web-hcrop0f4.edgeone.cool` | 早期静态预览 | `#/<view>` | 带 `eo_token` 访问；本轮未探测 |
 | 13 | 站点地图 45 个子域 | `https://<host>.mixm.top`（如 `www` / `gy` / `mall`） | **DNS 元数据展示** | ⚪ **不是本项目前端入口** | 不探测：`nginx-mim.conf:9-12` 明确「45 子域由各自服务承载，不要加通配 server_name 吸收其流量」 |
 
-> **第 13 项是最常见的误解来源**：站点目录里每个模块卡片都显示一个 FQDN（如 `www.mixm.top`），但点击「进入模块」跳的是**站内 `#/site/www`**，不是那个域名。`SiteMap.tsx:170` 的 `https://${r.fqdn}` 只是逐条展示用的新标签外链。
+> **第 13 项是最常见的误解来源**：站点目录里每个模块卡片都显示一个 FQDN（如 `data.mixm.top`），但点击「进入模块」跳的是**站内 `#/site/<主机记录>`**，不是那个域名。`SiteMap.tsx:170` 的 `https://${r.fqdn}` 只是逐条展示用的新标签外链。
 
 ---
 

@@ -1,4 +1,4 @@
-// 统一入口配置清单视图：把去重后的 45 个入口按 19 个业务域呈现，含可配置占位标识、
+// 统一入口配置清单视图：把去重后的 44 个入口按 19 个业务域呈现，含可配置占位标识、
 // 核心功能、职责边界、后台/接口职责、相似入口关联区分，并保留运行时能力点与业务条目交互。
 // 用户未提供任何具体主机记录值，本视图不展示、不推导真实域名，只展示可配置占位标识。
 import { useEffect, useRef, useState } from 'react'; // 本地状态钩子：搜索词、筛选业务域、展开入口、表单输入、忙碌标记；ref/effect 供图表挂载与销毁
@@ -369,8 +369,8 @@ export function Sites({ locale, onOpenView }: Props) {
         <h1>{locale === 'en-US' ? 'Unified Entry Catalog' : '统一入口配置清单'}</h1>{/* 标题按语言切换 */}
         <p className="muted">{/* 说明一：划分依据与去重口径 */}
           {locale === 'en-US'
-            ? '45 deduplicated entries in 19 business domains, split by the note "entry | business system" pair. Duplicate notes, @ records and blank fields are merged by identical purpose.'
-            : '按备注「入口｜业务系统/模块说明」划分 45 个去重入口、19 个业务域；重复备注、@ 记录与空白字段按「完全相同且用途一致按一项」整理。'}{/* 说明一结束 */}
+            ? '44 deduplicated entries in 19 business domains, split by the note "entry | business system" pair. Duplicate notes, @ records and blank fields are merged by identical purpose.'
+            : '按备注「入口｜业务系统/模块说明」划分 44 个去重入口、19 个业务域；重复备注、@ 记录与空白字段按「完全相同且用途一致按一项」整理。'}{/* 说明一结束 */}
         </p>{/* 说明一结束 */}
         <p className="muted">{/* 说明二：不补写具体主机值 */}
           {locale === 'en-US'

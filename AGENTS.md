@@ -696,7 +696,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 |---|---|---|---|---|
 | 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 100 | 导出该行无备注 | **live**：`/health` 200 / 53B |
 | 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | 数据中心入口｜开放数据集平台 | **live**：`/` 200，人机校验后深链接正常渲染 |
-| GitHub Pages | `www.mixm.top` | `www` / 6–7 | 主站常规访问入口｜官方门户网站 | pending_dns |
+| GitHub Pages | `afdk1991.github.io/mim/`（平台默认域，不绑定自定义域名） | — | — | 不适用 |
 | Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | 门户首页入口｜企业内部统一门户 / 工作台 | pending_dns |
 | Vercel | `m.mixm.top` | `m` / 46–47 | 移动端适配入口｜移动端 H5 精简版官网 | pending_dns |
 | Sealos（纯 API 容器） | `api.mixm.top` | `api` / 10–11 | 接口服务入口｜API 统一网关 | pending_dns |

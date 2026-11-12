@@ -124,7 +124,7 @@ check('封装模块导入契约 JSON', wrapper.includes("from './siteDirectory.j
 // 商城组件：确认已不再提供主站门户入口卡片。
 const store = readFileSync(join(ROOT, 'apps/web/src/views/Store.tsx'), 'utf8');
 // 组件不得残留门户契约取值。
-check('Store.tsx 已移除门户入口卡片', !store.includes('PORTAL_ENTRY') && !store.includes('www.mixm.top'), '仍存在门户卡片或硬编码链接');
+check('Store.tsx 已移除门户入口卡片', !store.includes('PORTAL_ENTRY') && !store.includes('mixm.top'), '仍存在门户卡片或硬编码链接');
 // 组件不引入已删除的契约模块，避免悬空引用。
 check('Store.tsx 不引入站点入口契约', !store.includes("from '../data/siteDirectory'"), '存在悬空导入');
 

@@ -445,7 +445,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 |---|---|---|---|
 | 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 100 | live（`/health` 200 / 53B） |
 | 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | live（`/` 200，校验通过后深链接正常） |
-| GitHub Pages | `www.mixm.top` | `www` / 6–7 | pending_dns |
+| GitHub Pages | `afdk1991.github.io/mim/`（平台默认域） | — | 不适用 |
 | Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | pending_dns |
 | Vercel | `m.mixm.top` | `m` / 46–47 | pending_dns |
 | Sealos | `api.mixm.top` | `api` / 10–11 | pending_dns |
