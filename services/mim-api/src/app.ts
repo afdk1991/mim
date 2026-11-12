@@ -9,6 +9,7 @@ import { createCatalogRouter } from './routes/catalog.js'; // 商城路由：模
 import { createImRouter } from './routes/im.js'; // 即时通讯：会话/消息/用户搜索，需登录
 import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内部统一 requireAuth
 import { createCartRouter } from './routes/cart.js'; // 商城购物车：加购与结算（内部统一 requireAuth + 写操作幂等）
+import { createCommunityRouter } from './routes/community.js'; // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
 import { createComicRouter } from './routes/comic.js'; // 创作工程与分镜，内部统一 requireAuth
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
 import { createAiRouter } from './routes/ai.js'; // AI 编排控制面，内部统一 requireAuth
@@ -121,6 +122,7 @@ app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation
     createAiRouter(resolved), // ai 编排控制面：能力自检与手动触发任务
     createImRouter(resolved), // IM 即时通讯：会话列表/消息历史/用户搜索/已读
     createCartRouter(resolved), // 商城购物车：加购 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单）
+    createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
   ]) { // 路由数组结束，进入逐个注册循环
     app.use('/api/v1', router); // 统一 /api/v1 前缀；鉴权按命名空间在 router 内部生效
   } // for 结束：四个受保护 router 已依次挂载

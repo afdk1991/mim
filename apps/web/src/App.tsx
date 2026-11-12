@@ -31,6 +31,7 @@ import { Sites } from './views/Sites';
 // 部署汇总：所有部署仓库 / 部署项的状态、结果与异常，浏览匿名可访问
 import { Deployments } from './views/Deployments';
 import { Navigation } from './views/Navigation';
+import { Community } from './views/Community';
 // 漫剧 AI 剧模块外壳：放映厅（匿名可看片）+ 创作工作台（登录后使用）
 import { ComicStudio } from './views/ComicStudio';
 // IM 聊天 + 视频通话
@@ -168,6 +169,8 @@ export function App() {
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总' },
     // 导航站：全站资源目录 + 可达性状态 + 推荐位
     { view: 'navigation', label: locale === 'en-US' ? 'Navigation' : '导航站' },
+    // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
+    { view: 'community', label: locale === 'en-US' ? 'Community' : '社区与商城' },
     // 漫剧 AI 剧工作台
     { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
@@ -175,7 +178,11 @@ export function App() {
   ]; // 导航项定义结束，数组顺序即侧栏展示顺序
 
   // 主布局：左侧栏 + 右侧内容区；访客与正式账号共用同一骨架，登录只用于升级身份
-  const needsSession = route.view === 'products' || route.view === 'cart' || route.view === 'account'; // 需要会话的功能视图（访客会话自动建立）
+  const needsSession =
+    route.view === 'products' ||
+    route.view === 'cart' ||
+    route.view === 'account' ||
+    route.view === 'community'; // 需要会话的功能视图（访客会话自动建立，社区资产接口同样需要令牌）
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
@@ -250,6 +257,8 @@ export function App() {
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
         {route.view === 'navigation' && <Navigation locale={locale} />}{/* 导航站：目录 + 可达性 + 推荐位 */}
+        {/* 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广，访客会话建立后直接可用 */}
+        {route.view === 'community' && session && <Community locale={locale} />}{/* 社区与变现视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}
