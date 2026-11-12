@@ -1,8 +1,10 @@
 /**
- * 内容与链接安全工具：
- *   - 图形验证码：本地生成 SVG，答案只存摘要；
- *   - 内容审核：可选接入百度文本审核，未配置时放行并明确标记；
- *   - 远程链接校验：拒绝回环、私网、链路本地与云元数据地址，降低 SSRF 风险。
+ * 安全工具边界：
+ *   - createCaptcha 只负责生成题目与 SVG，不落库；落库与清理由路由层完成。
+ *   - captchaHash 统一大写后 sha256，数据库里永远没有明文答案。
+ *   - consumeCaptcha 是「一次性消费」：先校验摘要与过期，再写 used_at。
+ *   - auditText 在未配置百度审核时明确返回 provider=none，不伪装成已审核。
+ *   - assertPublicHttpUrl 先校验协议，再解析全部 A/AAAA 记录并逐个拒绝私网地址。
  */
 
 import { createHash, randomInt, randomUUID } from 'node:crypto';
