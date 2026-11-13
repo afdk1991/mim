@@ -113,6 +113,36 @@ code { /* 行内代码/令牌展示 */
   color: #fff; /* 主色底上用纯白保证对比度 */
 } /* 选中态结束 */
 
+.nav-group { /* 导航分组标题：交易 / 社区 / 创作 / 经营 / 站点 / 工具 */
+  margin: 10px 0 2px; /* 与上一组留出呼吸，与组内首项贴近 */
+  padding: 0 12px; /* 与导航按钮左内边距对齐，文字不参差 */
+  color: #8b95a7; /* 低对比度说明这是分组而非可点条目 */
+  font-size: 12px; /* 比导航文案小一号，弱化为标签 */
+  letter-spacing: 0.04em; /* 小字加一点字距，避免糊在一起 */
+} /* 分组标题结束 */
+
+.subnav { /* 合并入口条：上级页面顶部给被合并页面的直达入口 */
+  display: flex; /* 横向排布，条目多时可换行 */
+  flex-wrap: wrap; /* 窄屏自动换行，不挤出内容区 */
+  gap: 8px; /* 条目间距 */
+  margin-bottom: 12px; /* 与页面正文拉开，保持层级 */
+} /* 合并入口条结束 */
+
+.subnav-item { /* 合并入口按钮：低干扰的胶囊样式 */
+  padding: 6px 12px; /* 点击热区约 30px，比主导航轻 */
+  border: 1px solid var(--sidebar-hover); /* 描边区分于正文，不抢主色 */
+  border-radius: 999px; /* 胶囊形，视觉上明确是辅助入口 */
+  background: transparent; /* 默认无填充 */
+  color: var(--text-muted, #56607a); /* 次要文字色，缺省回落深灰蓝 */
+  font-size: 13px; /* 比正文小一号 */
+  cursor: pointer; /* 悬停提示可点 */
+} /* 合并入口按钮结束 */
+
+.subnav-item:hover { /* 悬停态 */
+  border-color: var(--primary); /* 描边转主色提示可点 */
+  color: var(--primary); /* 文字同转主色 */
+} /* 悬停态结束 */
+
 .sidebar-footer { /* 侧边栏底部用户区 */
   display: flex; /* 纵向排列用户信息与退出按钮 */
   flex-direction: column; /* 信息在上、按钮在下 */
