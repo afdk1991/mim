@@ -18,6 +18,7 @@ import { createSitesRouter } from './routes/sites.js'; // 站点模块运行时�
 import { createEntriesRouter } from './routes/entries.js'; // 统一入口配置清单：19 业务域 / 职责边界 / 关联区分 / 占位标识
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
 import { createNavigationRouter } from './routes/navigation.js'; // 导航站：链接目录 + 可达性探测，浏览公开 / 写操作与探测需登录
+import { createOrdersRouter } from './routes/orders.js'; // 统一交易域：三套订单合并后的只读视图，供个人中心 / 中台统一口径
 import { createSearchRouter } from './routes/search.js'; // 统一搜索：模块 / 入口 / 导航 / 社区 / 商品，浏览公开、索引重建需权限
 import { createAssetsRouter } from './routes/assets.js'; // 付费资产：阅读 / 下载 / 图库 / 视频
 import { createPaymentsRouter } from './routes/payments.js'; // 支付：渠道、意图、回调与线下确认
@@ -135,6 +136,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   // 部署汇总路由：三个端点全部公开只读，不查业务表、不提供写操作
   app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
 app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation/summary 与 /navigation/links 公开，写操作与探测在 router 内鉴权
+  app.use('/api/v1', createOrdersRouter(resolved)); // 统一订单只读：/orders 与 /orders/summary 均要求登录，旧订单路由保持原样
   app.use('/api/v1', createSearchRouter(resolved)); // 统一搜索：/search 与 /search/summary 公开，/search/reindex 在 router 内鉴权
   app.use('/api/v1', createPaymentsRouter(resolved)); // 支付回调必须公开；其余端点在 router 内逐个挂鉴权
   app.use('/api/v1', createPaymentChannelRouter(resolved)); // 扩展渠道：第三方回调公开，下单/退款在 router 内挂 requireAuth + idempotency
