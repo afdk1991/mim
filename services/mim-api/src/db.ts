@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系
 import type { Db } from './types.js'; // 仅引入数据库连接类型，编译期擦除不产生运行时代码
 import { backfillMemberNos, renumberMemberNos } from './identity.js'; // 存量用户号码：一次性全量重排 + 缺号兜底补发
 import { backfillUnifiedCommerce } from './commerce/unified.js'; // 统一交易域回填：三套历史订单 → orders / order_items（幂等）
+import { backfillUnifiedContentMessaging } from './content/unified.js'; // 统一内容/消息域回填：论坛/圈子 → content_items，IM/私信 → conversations + messages（幂等）
 
 const SCHEMA_PATH = fileURLToPath(new URL('./schema.sql', import.meta.url)); // 以模块自身位置解析 schema.sql 绝对路径，保证任意工作目录下都能找到建表脚本
 
@@ -176,6 +177,8 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedCommerce(db); // 写入付费资产 / 主题 / 页面区块 / 徽章，保证商业中台开箱有内容
   const unified = backfillUnifiedCommerce(db); // 统一交易域回填：把三套历史订单写进 orders（幂等，UNIQUE(source, source_id) 保证重复启动不加行）
   if (unified.orders > 0 || unified.items > 0) console.log(`[db] unified commerce backfilled: ${unified.orders} orders / ${unified.items} items / ${unified.products} products`); // 回填必须留痕，便于核对迁移结果
+  const unifiedContent = backfillUnifiedContentMessaging(db); // 统一内容与消息域回填：论坛/圈子内容 → content_items，IM/私信 → conversations + messages
+  if (unifiedContent.content > 0 || unifiedContent.messages > 0) console.log(`[db] unified content/messaging backfilled: ${unifiedContent.content} content / ${unifiedContent.conversations} conversations / ${unifiedContent.messages} messages`); // 同样留痕
   const renumbered = renumberMemberNos(db, new Date().toISOString()); // 存量用户一次性重排为纯数字 Mim ID（跳过全部靓号），幂等开关存在 member_no_meta
   if (renumbered.length > 0) console.log(`[db] member_no renumbered: ${renumbered.length} users`); // 改号必须留痕，旧号同时写入 member_no_history
   const backfilled = backfillMemberNos(db); // 缺号兜底补发（重排完成后通常为空操作）
