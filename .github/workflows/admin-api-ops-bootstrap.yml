@@ -1,0 +1,24 @@
+name: admin-api-ops-bootstrap
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  merge:
+    if: github.repository == 'afdk1991/mim'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Append admin ops re-export
+        run: |
+          if grep -q "api-ops" apps/admin/src/api.ts; then
+            echo "already merged"
+            exit 0
+          fi
+          printf '\nexport { request };\nexport * from '\''./api-ops'\'';\n' >> apps/admin/src/api.ts
+          git config user.name "mim-bot"
+          git config user.email "mim-bot@users.noreply.github.com"
+          git add apps/admin/src/api.ts
+          git commit -m "chore(admin): 接入运营域 API 模块"
+          git push
