@@ -266,7 +266,7 @@ function tr(locale: Locale, zh: string, en: string): string {
 export function Releases({ locale, onOpen }: Props) { // 导出函数 Releases：版本迭代页入口
   return (
     <div className="page">
-      <header className="page-header">
+      <header className="page-head">
         <h1>{tr(locale, '版本迭代', 'Release History')}</h1>
         <p className="muted">
           {tr(
