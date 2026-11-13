@@ -1316,4 +1316,6 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 
 **浏览器自测（本地 5188 反代 8787）**：`/marketplace` 渲染商城目录、`/community`、`/cart`、`/chat` 直达 URL 保持不变；`/forum` 经 `replaceState` 原地改写为 `/community`；console 仅访客建号前 401 预期拦截与本地静态脚本不代理 WS Upgrade 头导致的 IM WebSocket 502（生产 nginx 有专用 ws location，与本轮改动无关）。
 
+**CI 与线上取证**：提交 `e3736d2`，origin / gitee 双远端平齐；Deploy run `43435314763` 五作业全绿（质量门禁 1m29s、发布到生产服务器 1m47s、ghcr 镜像、GitHub Pages、托管平台同步 3m23s），Azure SWA run `43435314746` success。线上 `https://mim.mixm.top/health` 200 version `0.0.10`、`/api/v1/modules` total 213、`/admin/` 200 含 noindex；`/forum`、`/marketplace`、`/community` 深链接均 200（`/forum` 由前端 replaceState 改写 `/community`，裸 curl 无 JS 不发生跳转属预期）。
+
 **结论**：全仓不存在同方法同路径的重复路由、不存在指向同一视图的重复路径段、不存在重名组件 / 工厂 / 入口键 / 部署项；数据库 code 重复表象已确认为双区域设计。本轮仅清理前端旧段表内 4 条永不命中的同名死条目，未改任何对外新段、后端契约与数据库结构。
