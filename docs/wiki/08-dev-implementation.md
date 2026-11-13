@@ -451,6 +451,18 @@ WS URL 推导：host 为 `mim.mixm.top` 或 `localhost` 时同源连接；否则
 - `apps/web/src/styles.css`：新增 `.store-card*` / `.store-spec-*` 样式与 860px 单列响应式。
 - **验证**：本地 Edge CDP 首屏 12 张卡、封面 `naturalWidth=768`；详情 `specRows=11`、参数图 `900×1180`；`pnpm -r typecheck` 0、API 372 例、web 构建 0、根构建 0、各 verify 脚本全 PASS。
 
+### 8.9 商城商品视觉二次升级（2026-11-13）
+
+**背景**：在 8.8 的分类 JPG 封面 + 参数长图基础上，把详情视觉升级为逐商品独立矢量封面、三图画廊与全屏放大预览，仍不改后端契约、不改数据库。
+
+- `apps/web/src/catalogArt.ts`：
+  - `moduleCoverUrl()` 生成逐商品 1200×675 矢量封面 SVG（`GROUP_HUE` 分类色相 ± 稳定漂移、FNV 哈希字标、渐变 / 网格 / 光晕纹理），配色与字标由模块编码稳定生成，刷新不跳色；
+  - `moduleStoryUrl(input, 'feature' | 'delivery')` 生成两张详情说明面板（能力亮点：能力绑定 / 价格 / 状态；交付与依赖：解锁方式 / 前置依赖 / 区域）；
+  - `categoryCoverUrl()` / 19 张分类 JPG 转为早期遗留资源，视图不再调用；`categoryGroupSlug()` 仍被新矢量封面复用于分组色相。
+- `apps/web/src/views/Store.tsx`：详情画廊 `gallery`（封面 / 能力亮点 / 交付与依赖）+ `galleryIndex` 缩略切换 + `zoom` 全屏预览状态；主图、缩略图、参数长图均可点击放大，Esc / 遮罩 / 关闭按钮退出。
+- `apps/web/src/styles.css`：新增 `.store-gallery` / `.store-gallery-main` / `.store-gallery-thumbs` / `.store-gallery-thumb(.is-active)` / `.store-gallery-zoom` / `.store-spec-button` / `.image-zoom(.image-zoom-close)` / `.store-card-media` 等样式与窄屏上下排列响应式。
+- **验证**：本地 5188 静态服务反代 8787，浏览器实测画廊三图渲染、缩略切换主图 alt 与 SVG `naturalWidth=1200`、主图与参数长图放大遮罩弹出、Esc 关闭，console 0 错误；`pnpm -r typecheck` 5/6 Done、API 56 文件 669 例全过、web / admin 构建 0、verify 20/20 · 55/55 · 83/83 · 23/23 · 39/39、comment-check `--strict` 总体达标、version / env 门禁通过。
+
 ---
 
 _本页为开发实现规划草案，随代码落地逐节替换为「已实现」描述；修订时必须同步 [02-modules.md](./02-modules.md)、[04-dependencies.md](./04-dependencies.md)、[README.md](./README.md) 与根 README（铁律七）。_

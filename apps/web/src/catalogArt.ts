@@ -1,12 +1,12 @@
 /**
- * 商城商品视觉资源：分类封面图与「商品参数详情图」生成器。
+ * 商城商品视觉资源：逐商品矢量封面、详情说明面板与「商品参数详情图」生成器。
  *
- * 封面图：19 个一级分类各一张，构建期放在 `apps/web/public/catalog/<slug>.jpg`，
- * 用 `import.meta.env.BASE_URL` 拼路径，保证 GitHub Pages 的 `/mim/` 子路径与
- * 生产根路径都能正确命中（不要写死 `/catalog/...`）。
+ * 现行封面：`moduleCoverUrl()` 按模块编码实时生成 1200×675 SVG data URL（配色 / 字标 / 纹理
+ * 稳定哈希），不依赖后端图片字段；详情画廊另由 `moduleStoryUrl()` 生成能力亮点 / 交付依赖两张
+ * 说明面板，`specPosterUrl()` 生成 900×1180 参数长图。
  *
- * 参数图：不依赖后端图片字段，按模块详情实时生成 SVG（浏览器按 `<img>` 渲染），
- * 因此 205 条模块每条都有自己的一张「商品参数图」，且永远与接口数据一致。
+ * 遗留资源：早期 19 张分类 JPG（`apps/web/public/catalog/<slug>.jpg`）与 `categoryCoverUrl()`
+ * 已不再被商城视图调用，仅保留以兼容历史产物；`categoryGroupSlug()` 仍被新矢量封面复用于分组色相。
  */
 
 /** 分类封面映射：一级分类 slug → 静态图路径；缺图时回落到 misc 封面 */
@@ -29,7 +29,7 @@ export function categoryGroupSlug(categorySlug: string | null | undefined): stri
   return CATEGORY_COVER_SLUGS.has(group) ? group : 'misc';
 } // 代码块结束
 
-/** 分类封面 URL：相对 BASE_URL，兼容站点子路径部署 */
+/** 遗留：分类封面 URL（早期 19 张分类 JPG），商城视图已改用 moduleCoverUrl，保留以兼容历史产物 */
 export function categoryCoverUrl(categorySlug: string | null | undefined): string {
   // 基础路径可能以 / 结尾，也可能为空，统一补齐
   const base = import.meta.env.BASE_URL || './';
