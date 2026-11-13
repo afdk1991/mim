@@ -13,6 +13,7 @@ const ADMIN_TOKEN = 'test-admin-token'; // 超管引导令牌固定值，必须�
 const BUILTIN_PERMISSION_CODES = [ // 按字典序排列，便于与 API 返回顺序直接比对
   'appearance:write', // 外观 / 页面 / 语言设置
   'commerce:write', // 发货 / 售后 / 提现 / 离线确认
+  'content:write', // 公告 / 更新日志 / 推广计划维护与发布归档（域脚本 seed）
   'entitlement:grant', // 发放权益
   'entitlement:read', // 查看权益
   'entitlement:revoke', // 回收权益
@@ -124,7 +125,7 @@ describe('GET /admin/me 身份回显', () => { // 后台首屏需要知道自己
 }); // 身份回显分组结束
 
 describe('权限点与角色读取', () => { // 后台勾选矩阵的数据源，必须与种子完全一致
-  it('GET /admin/permissions 返回 10 个内置权限点且 builtin:true', async () => { // 权限点由种子维护，不允许后台新增
+  it('GET /admin/permissions 返回 11 个内置权限点且 builtin:true', async () => { // 权限点由种子维护（含域脚本追加的 content:write），不允许后台新增
     const res = await request(app) // 读取权限点
       .get('/api/v1/admin/permissions') // 权限点端点
       .set(adminHeaders()); // 引导令牌

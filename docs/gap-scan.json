@@ -1,0 +1,1006 @@
+{
+  "generatedAt": "2026-11-13T10:58:41.994Z",
+  "root": "F:\\合并项目\\Mim",
+  "overall": "PASS",
+  "assertions": {
+    "routes": {
+      "title": "A. 路由装配",
+      "status": "PASS",
+      "stats": {
+        "routeFiles": 30,
+        "factories": 31,
+        "unmounted": 0
+      },
+      "failures": [],
+      "warnings": []
+    },
+    "schema": {
+      "title": "B. 表结构接缝",
+      "status": "PASS",
+      "stats": {
+        "sqlFiles": 9,
+        "nonIdempotent": 0,
+        "badDirectives": 0,
+        "copiesSchemaD": true
+      },
+      "failures": [],
+      "warnings": []
+    },
+    "env": {
+      "title": "C. 环境变量登记",
+      "status": "WARN",
+      "stats": {
+        "sourceVars": 242,
+        "templateVars": 197,
+        "inventoryVars": 197,
+        "wildcardStems": 20,
+        "unregistered": 63,
+        "unregisteredAdapter": 0,
+        "unregisteredInternal": 63
+      },
+      "failures": [],
+      "warnings": [
+        {
+          "var": "MIM_AI_ALLOW_INSECURE_BASE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/orchestrator.ts",
+              "line": 153
+            },
+            {
+              "file": "services/mim-api/src/orchestrator.ts",
+              "line": 165
+            },
+            {
+              "file": "services/mim-api/src/orchestrator.ts",
+              "line": 185
+            },
+            {
+              "file": "services/mim-api/src/security.ts",
+              "line": 554
+            },
+            {
+              "file": "services/mim-api/src/security.ts",
+              "line": 566
+            }
+          ],
+          "locationCount": 6
+        },
+        {
+          "var": "MIM_AI_HOURLY_COST_LIMIT_MINOR",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/jobs.ts",
+              "line": 117
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 71
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_API_BASE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 76
+            },
+            {
+              "file": "scripts/perf-bench.mjs",
+              "line": 15
+            },
+            {
+              "file": "scripts/perf-bench.mjs",
+              "line": 32
+            },
+            {
+              "file": "scripts/perf-bench.mjs",
+              "line": 54
+            }
+          ],
+          "locationCount": 4
+        },
+        {
+          "var": "MIM_APP",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/deploymentRegistry.json",
+              "line": 609
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 77
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_CONTENT_CLICK_MAX",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/content/promotions.ts",
+              "line": 190
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 73
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_CONTENT_CLICK_WINDOW_SECONDS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/content/promotions.ts",
+              "line": 189
+            },
+            {
+              "file": "services/mim-api/src/content/promotions.ts",
+              "line": 250
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 72
+            }
+          ],
+          "locationCount": 3
+        },
+        {
+          "var": "MIM_CONTENT_CONVERSION_MAX",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/content/promotions.ts",
+              "line": 240
+            },
+            {
+              "file": "services/mim-api/src/content/promotions.ts",
+              "line": 251
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 74
+            }
+          ],
+          "locationCount": 3
+        },
+        {
+          "var": "MIM_DB_PATH",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/blueprints/infra.ts",
+              "line": 12
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 64
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_E2E_PNG",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 78
+            },
+            {
+              "file": "scripts/verify-chat-flow.mjs",
+              "line": 199
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_ENABLE_BACKUP_TIMER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 66
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 11
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 320
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 324
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 325
+            }
+          ],
+          "locationCount": 5
+        },
+        {
+          "var": "MIM_ENV_FILE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 65
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 166
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 166
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 167
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 168
+            }
+          ],
+          "locationCount": 41
+        },
+        {
+          "var": "MIM_FILM_REVIEW_SLA_HOURS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/jobs.ts",
+              "line": 147
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 70
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_GATE_API",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-chat-flow.mjs",
+              "line": 20
+            },
+            {
+              "file": "scripts/verify-chat-plus.mjs",
+              "line": 20
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_GATE_BASE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-auth-gate.mjs",
+              "line": 28
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_GATE_CDP",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-auth-gate.mjs",
+              "line": 30
+            },
+            {
+              "file": "scripts/verify-chat-flow.mjs",
+              "line": 18
+            },
+            {
+              "file": "scripts/verify-chat-plus.mjs",
+              "line": 18
+            }
+          ],
+          "locationCount": 3
+        },
+        {
+          "var": "MIM_GATE_PAGE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-chat-flow.mjs",
+              "line": 19
+            },
+            {
+              "file": "scripts/verify-chat-plus.mjs",
+              "line": 19
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_HOST_ADMIN_CONSOLE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 384
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_API_GATEWAY",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 492
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_APP_API",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 588
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_AUTH_CENTER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 690
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_B2B_TRADE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 4266
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_BI_DASHBOARD",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3270
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_BLOG",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 792
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_C2C_MARKET",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 4482
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_CLOUD_DRIVE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 996
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_CRAWLER_SCHEDULER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3072
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_DEV_PORTAL",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1194
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_DOWNLOAD_DIST",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3366
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_GALE_TOOLS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1674
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_HELP_CENTER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1770
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_IMAGE_ASSETS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1866
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_INTRANET_PORTAL",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2664
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_LOWCODE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1380
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MALL_B2C",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2064
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MARKETING",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2172
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MEMBER_ADMIN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3660
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MEMBER_CENTER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 894
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MOBILE_FULL",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2364
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MOBILE_H5",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2268
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_MULTI_MERCHANT",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2964
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_NAVIGATION",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1290
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_NEWS_PUBLISH",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2460
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_OPEN_DATA",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1098
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_OPS_MONITOR",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1578
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_PAYMENT_GATEWAY",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2562
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_PORTAL_ROOT",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 294
+            },
+            {
+              "file": "packages/core-domain/src/siteModules.ts",
+              "line": 68
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_HOST_SECURITY_CENTER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2760
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_SELF_MEDIA",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3960
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_SELLER_ADMIN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 4584
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_SERVICE_GOVERNANCE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 2862
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_SOURCE_GOODS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 4062
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_SSO_LOGIN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1968
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_SUPPLIER_ADMIN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 4374
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_TEST_ENV",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3564
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_TICKET_SUPPORT",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3468
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_UGC_VIDEO",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 1476
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_VIDEO_PLAYER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3762
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_VOD_LONG_VIDEO",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3174
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_VOICE_TOOLS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 4170
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_HOST_WORDPRESS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "packages/core-domain/src/siteModules.json",
+              "line": 3858
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_PERF_TARGET_MS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 68
+            },
+            {
+              "file": "scripts/perf-bench.mjs",
+              "line": 16
+            },
+            {
+              "file": "scripts/perf-bench.mjs",
+              "line": 33
+            },
+            {
+              "file": "scripts/perf-bench.mjs",
+              "line": 55
+            }
+          ],
+          "locationCount": 4
+        },
+        {
+          "var": "MIM_PUBLIC_ORIGIN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/routes/navigation.ts",
+              "line": 113
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 69
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_SERVICE_VERSION",
+          "internal": true,
+          "locations": [
+            {
+              "file": "services/mim-api/src/app.ts",
+              "line": 58
+            },
+            {
+              "file": "services/mim-api/src/app.ts",
+              "line": 59
+            },
+            {
+              "file": "scripts/gap-scan.mjs",
+              "line": 67
+            }
+          ],
+          "locationCount": 3
+        }
+      ]
+    },
+    "frontend": {
+      "title": "D. 前端接线",
+      "status": "WARN",
+      "stats": {
+        "viewFiles": 20,
+        "unregistered": 3,
+        "nested": 3,
+        "appViews": 16,
+        "segments": 16,
+        "missingSegments": 0
+      },
+      "failures": [],
+      "warnings": [
+        {
+          "file": "apps/web/src/views/ComicTheater.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/ComicWorkbench.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/PageBlocks.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        }
+      ]
+    },
+    "markers": {
+      "title": "E. 未完成标记",
+      "status": "WARN",
+      "stats": {
+        "hard": 0,
+        "notes": 12,
+        "total": 12
+      },
+      "failures": [],
+      "warnings": [
+        {
+          "file": "services/mim-api/src/capabilities.ts",
+          "line": 638,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "501: { name: 'Not Implemented', description: '功能未实现' }, // 5xx 服务端错误状态码"
+        },
+        {
+          "file": "services/mim-api/src/cdn.ts",
+          "line": 68,
+          "marker": "未实现",
+          "kind": "comment",
+          "text": "/** 缺失的必填变量名（已实现厂商）；未实现厂商单列原因 */"
+        },
+        {
+          "file": "services/mim-api/src/cdn.ts",
+          "line": 81,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "? 'CloudFront 刷新需 SigV4 签名，本包未实现，待主控接入 AWS SDK'"
+        },
+        {
+          "file": "services/mim-api/src/cdn.ts",
+          "line": 112,
+          "marker": "未实现",
+          "kind": "comment",
+          "text": "* 主动刷新指定 URL 清单。未配置 / 未实现 / 上游失败均返回 ok=false，"
+        },
+        {
+          "file": "apps/web/src/views/Store.tsx",
+          "line": 1349,
+          "marker": "未实现",
+          "kind": "comment",
+          "text": "if (!capability || !seed) { // 无能力：区分「导航条目未实现」与「交易型配套商品」"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 7,
+          "marker": "未实现",
+          "kind": "comment",
+          "text": "*   - realFeatures 只登记代码里确实存在的视图 / 路由 / 能力，未实现的流程不臆造；"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 79,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "boundary: '当前为单体 API 内的中间件层；独立网关的限流 / 配额 / 路由编排 / 鉴权代理尚未实现。', // 网关差距说明"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 88,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "boundary: '无独立移动端接口版本；设备绑定、推送与移动端专属协议尚未实现。', // 移动接口差距说明"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 111,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "boundary: '跨站联邦单点登录（SAML / OIDC 联邦）尚未实现；当前为站内统一登录入口。', // 联邦 SSO 差距说明"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 124,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "boundary: '会员等级体系与成长值尚未实现；权益来自模块商城订单履约。', // 会员体系差距说明"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 228,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "boundary: '无独立播放器页；播放列表、弹幕、倍速等播放器能力尚未实现。', // 播放器差距说明"
+        },
+        {
+          "file": "packages/core-domain/src/entryImplementation.ts",
+          "line": 250,
+          "marker": "未实现",
+          "kind": "string-note",
+          "text": "boundary: '无独立安全中心；攻击防护、审计日志与风控面板尚未实现。', // 安全中心差距说明"
+        }
+      ]
+    }
+  }
+}

@@ -6,6 +6,7 @@ import { z } from 'zod'; // 入参校验
 import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 鉴权与写权限
 import { parse } from '../validate.js'; // 校验错误翻译
+import { readPointsConfig } from '../commerce/config.js'; // 积分抵扣开关与兑换口径（公开只读，供前端决定是否展示抵扣面板）
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const ALLOWED_SETTINGS = new Set(['theme', 'locales', 'site', 'home']); // 允许通过 API 修改的设置键
@@ -25,11 +26,18 @@ function readSetting(deps: ApiDeps, key: string): Record<string, unknown> {
 export function createAppearanceRouter(deps: ApiDeps): Router {
   const router = Router();
 
-  /** 公开站点启动配置：免登录即可读首页指向、主题与语言，供前端根路径重定向与公共页面渲染。 */
+  /** 公开站点启动配置：免登录即可读首页指向、主题、语言与积分抵扣口径，供前端根路径重定向与公共页面渲染。 */
   router.get('/site/config', (_req, res) => {
     const home = readSetting(deps, 'home');
     const view = typeof home.view === 'string' && ['store', 'community'].includes(home.view) ? home.view : 'store';
-    res.json({ home_view: view, theme: readSetting(deps, 'theme'), site: readSetting(deps, 'site'), locales: readSetting(deps, 'locales') });
+    const points = readPointsConfig(deps.env); // 积分抵扣总开关 / 兑换比例 / 单笔上限；总开关关闭时前端整块隐藏抵扣面板
+    res.json({
+      home_view: view,
+      theme: readSetting(deps, 'theme'),
+      site: readSetting(deps, 'site'),
+      locales: readSetting(deps, 'locales'),
+      points_deduction: { enabled: points.enabled, points_per_yuan: points.pointsPerYuan, max_ratio_percent: points.maxRatioPercent },
+    });
   });
 
   /** 外观总览：主题、语言、站点信息与页面清单。 */

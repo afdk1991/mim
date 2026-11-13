@@ -301,4 +301,33 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | `MIM_MEILISEARCH_URL` / `MIM_MEILISEARCH_KEY` / `MIM_MEILISEARCH_INDEX` | Meilisearch 实例地址、查询 / 管理密钥、索引名（默认 `mim_search`） | 自建或 Meilisearch Cloud 获取；未配置时统一搜索自动降级 SQLite，`POST /search/reindex` 返回 503 | P1 |
 | `MIM_KUAIDI100_CUSTOMER` / `MIM_KUAIDI100_KEY` | 快递100 实时查询：客户编号与授权密钥（签名 MD5(param+key+customer)） | 快递100 企业版控制台获取；未配置时 `GET /shop/orders/:id/shipment` 只返回本地轨迹，`live.provider=none`，不发起外网请求 | P1 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）。新增第三方能力必须先更新本文件，再进入实现。_
+---
+
+## 16. 2026-11-13 增补适配器变量家族（通配登记）
+
+> 本轮新增的支付扩展渠道、验证码 / 审核适配器、社区 / 积分 / SSO / 实名等进程内模块配置，按家族以通配符 `MIM_<家族>_*` 登记；家族内任一具体变量名命中前缀即视为已登记（与 env-check 通配口径一致）。未配置时对应适配器 `configured=false` / 走本地降级，不生成假订单或假凭证。
+
+| 家族 / 提供方 | 用途 | 密钥 / 配置项（env，通配） | 优先级 |
+|---|---|---|---|
+| 虎皮椒聚合支付（hupijiao） | 微信 / 支付宝扫码收款，MD5 签名 | `MIM_HUPIJIAO_*`（APP_ID / APP_KEY / API_BASE / NOTIFY_URL / RETURN_URL） | P1 |
+| 讯虎聚合支付（xunhu） | HMAC-SHA256 通用聚合协议收款 | `MIM_XUNHU_*`（APP_ID / APP_KEY / API_BASE / NOTIFY_URL / RETURN_URL） | P1 |
+| PayPal | 国际卡 / 钱包，Orders v2 + Webhook 验签 | `MIM_PAYPAL_*`（CLIENT_ID / CLIENT_SECRET / WEBHOOK_ID / MODE / CURRENCY / RETURN_URL / CANCEL_URL / API_BASE） | P1 |
+| Stripe | PaymentIntent 国际卡 + Webhook HMAC | `MIM_STRIPE_*`（SECRET_KEY / WEBHOOK_SECRET / CURRENCY / RETURN_URL / API_BASE） | P1 |
+| 支付宝企业支付（alipay_ent） | 电脑网站 page.pay / 手机网站 wap.pay，RSA2 签名验签 | `MIM_ALIPAY_ENT_*`（APP_ID / PRIVATE_KEY / PUBLIC_KEY / NOTIFY_URL / RETURN_URL / GATEWAY / SANDBOX） | P1 |
+| 通用 OAuth 提供方扩展 | 微博 / 百度 / Facebook / Twitter 等新增 provider 及各家回调覆盖变量 | `MIM_AUTH_*`（CLIENT_ID / CLIENT_SECRET / REDIRECT_URI，前缀通配覆盖既有 14 家） | P1 |
+| 验证码门禁 | 模式与分场景开关；旧 `MIM_CAPTCHA_REQUIRED=1` 视为全场景强制 | `MIM_CAPTCHA_*`（MODE / REGISTER / LOGIN / REPORT / POST / REQUIRED） | P0 |
+| 腾讯防水墙（新版） | 滑块 / 短信验证码适配器凭证 | `MIM_TENCENT_CAPTCHA_*`（APP_ID / SECRET_KEY） | P0 |
+| 极验 GeeTest4 | 极验四代验证码适配器凭证 | `MIM_GEETEST4_CAPTCHA_*`（ID / KEY） | P0 |
+| 百度内容审核 | 文本 / 图片审核适配器凭证 | `MIM_BAIDU_AUDIT_*`（API_KEY / SECRET_KEY） | P1 |
+| 审核降级策略 | 上游审核故障时 open 放行 / closed 拒绝 | `MIM_AUDIT_*`（`MIM_AUDIT_FALLBACK`） | P1 |
+| Redis 缓存 | 配置 `MIM_REDIS_URL` 走真实 Redis；缺省降级内存实现（单副本） | `MIM_REDIS_*`（`MIM_REDIS_URL`） | P1 |
+| 举报频控 | 举报条数上限与滑动窗口（分钟） | `MIM_REPORT_*`（`MIM_REPORT_LIMIT` / `MIM_REPORT_WINDOW_MINUTES`） | P1 |
+| 社区模块配置 | 板块频控 / 审核开关 / 推荐权重 / 敏感词等进程内配置 | `MIM_COMMUNITY_*`（WINDOW_MINUTES / WINDOW_MAX / DAILY_MAX / TOTAL_MAX / BOARD_REVIEW / RECOMMEND_WEIGHTS / BLOCK_WORDS / CREATE_MIN_LEVEL / CREATE_MAX） | P1 |
+| 积分抵扣 | 抵扣开关 / 积分比例 / 抵扣上限比例 | `MIM_POINTS_*`（DEDUCTION_ENABLED / PER_YUAN / MAX_RATIO_PERCENT） | P1 |
+| 跨站 SSO | 票据签名密钥与允许站点白名单 | `MIM_SSO_*`（SECRET / ALLOWED_SITES） | P1 |
+| 实名认证 | 提供方（manual / third_party）与独立签名密钥 | `MIM_REALNAME_*`（PROVIDER / SECRET） | P1 |
+| 微信支付平台凭证扩展 | 平台证书序列号 / 平台公钥 / 通知地址 / 应用 ID（既有商户号 / V3 密钥 / 序列号 / 私钥见 §15） | `MIM_WECHAT_*`（APP_ID / NOTIFY_URL / PLATFORM_SERIAL / PLATFORM_PUBLIC_KEY） | P0 |
+| 注册邀请门槛 | `MIM_REGISTER_INVITE_REQUIRED=1` 时新账号必须凭有效邀请码注册 | `MIM_REGISTER_INVITE_REQUIRED`（精确项） | P1 |
+| 圈子模块配置 | 圈子创建门槛（最小用户等级 / 每用户可创建数量），缺省 0 / 1 | `MIM_CIRCLE_CREATE_*`（`MIM_CIRCLE_CREATE_MIN_LEVEL` / `MIM_CIRCLE_CREATE_MAX_PER_USER`） | P1 |
+
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。新增第三方能力必须先更新本文件，再进入实现。_

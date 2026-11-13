@@ -33,6 +33,7 @@ import { createSsoRouter } from './routes/sso.js'; // 跨站 SSO：票据签发�
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createToolsRouter } from './routes/tools.js'; // 自研工具目录：公开浏览，管理端写操作挂权限
+import { createCirclesRouter } from './routes/circles.js'; // 圈子：独立于板块的成员制社群，公开浏览 + 成员/圈主写操作
 import { createCacheHeaderMiddleware, createCaptchaMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套 + 缓存头 / 验证码门禁工厂
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -159,6 +160,7 @@ app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation
     createGrowthRouter(resolved), // 成长：等级 / 徽章 / 私信 / IP 归属地
     createI18nRouter(resolved), // 国际化：翻译与语言分离
     createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
+    createCirclesRouter(resolved), // 圈子：成员制社群（圈主 / 审核 / 成员上限 / 圈内动态与公告），与板块并存
   ]) { // 路由数组结束，进入逐个注册循环
     app.use('/api/v1', router); // 统一 /api/v1 前缀；鉴权按命名空间在 router 内部生效
   } // for 结束：四个受保护 router 已依次挂载

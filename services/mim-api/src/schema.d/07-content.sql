@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS announcements (
   body        TEXT NOT NULL DEFAULT '',
   level       TEXT NOT NULL DEFAULT 'info' CHECK (level IN ('info','warning','success','danger')),
   status      TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')),
+  published_at TEXT, -- 首次发布时间（ISO 时间戳）；发布端点仅在首次发布时写入，重发不覆盖
   starts_at   TEXT, -- 生效起始（ISO 时间戳）；NULL 表示立即生效
   ends_at     TEXT, -- 生效截止（ISO 时间戳，开区间）；NULL 表示长期有效
   pinned      INTEGER NOT NULL DEFAULT 0, -- 1 置顶，公开列表置顶在前
@@ -71,13 +72,26 @@ CREATE TABLE IF NOT EXISTS promotion_clicks (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_promotion_clicks_key ON promotion_clicks(promotion_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_promotion_clicks_visitor ON promotion_clicks(promotion_id, visitor_hash, created_at);
 
+-- 转化审计：与点击同口径的幂等去重 + 访客频控留痕；只统计转化次数，不记佣金、不做结算。
+CREATE TABLE IF NOT EXISTS promotion_conversions (
+  id               TEXT PRIMARY KEY,
+  promotion_id     TEXT NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+  idempotency_key  TEXT, -- 客户端幂等键；NULL 表示未携带（仅受频控约束）
+  visitor_hash     TEXT NOT NULL, -- 访客指纹哈希（口径同 promotion_clicks）
+  created_at       TEXT NOT NULL
+);
+
+-- 同一推广计划 + 幂等键只入账一次：重复转化回放首次结果，不重复计数。
+CREATE UNIQUE INDEX IF NOT EXISTS uq_promotion_conversions_key ON promotion_conversions(promotion_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_promotion_conversions_visitor ON promotion_conversions(promotion_id, visitor_hash, created_at);
+
 -- ===== 四、幂等种子（INSERT OR IGNORE：重复启动不覆盖运营已编辑内容）=====
 -- 公告三条：一条置顶已发布、一条普通已发布、一条草稿（公开列表不可见）。
-INSERT OR IGNORE INTO announcements (id, title, body, level, status, starts_at, ends_at, pinned, author_id, created_at, updated_at)
+INSERT OR IGNORE INTO announcements (id, title, body, level, status, published_at, starts_at, ends_at, pinned, author_id, created_at, updated_at)
 VALUES
-  ('ann-seed-welcome', '欢迎使用 Mim', 'Mim 是跨平台商业级项目，覆盖商城、社区、付费内容与创作工具。如有问题可在社区「求助答疑」板块反馈。', 'info', 'published', '2026-01-01T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 1, 'system', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
-  ('ann-seed-release', '0.0.8 版本已上线', '本轮上线内容运营包：公告、更新日志与推广计划；访客可浏览公开内容，运营在后台维护。', 'success', 'published', '2026-11-12T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 0, 'system', '2026-11-12T00:00:00.000Z', '2026-11-12T00:00:00.000Z'),
-  ('ann-seed-draft', '【草稿】待发布公告', '本条为草稿种子，公开列表不可见；运营在后台编辑发布后才会展示。', 'warning', 'draft', NULL, NULL, 0, 'system', '2026-11-13T00:00:00.000Z', '2026-11-13T00:00:00.000Z');
+  ('ann-seed-welcome', '欢迎使用 Mim', 'Mim 是跨平台商业级项目，覆盖商城、社区、付费内容与创作工具。如有问题可在社区「求助答疑」板块反馈。', 'info', 'published', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 1, 'system', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+  ('ann-seed-release', '0.0.8 版本已上线', '本轮上线内容运营包：公告、更新日志与推广计划；访客可浏览公开内容，运营在后台维护。', 'success', 'published', '2026-11-12T00:00:00.000Z', '2026-11-12T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 0, 'system', '2026-11-12T00:00:00.000Z', '2026-11-12T00:00:00.000Z'),
+  ('ann-seed-draft', '【草稿】待发布公告', '本条为草稿种子，公开列表不可见；运营在后台编辑发布后才会展示。', 'warning', 'draft', NULL, NULL, NULL, 0, 'system', '2026-11-13T00:00:00.000Z', '2026-11-13T00:00:00.000Z');
 
 -- 更新日志两条：0.0.7 / 0.0.8 各一条，均已发布。
 INSERT OR IGNORE INTO changelog_entries (id, version, title, body, changes, published_at, status, created_at, updated_at)
@@ -89,3 +103,34 @@ VALUES
 INSERT OR IGNORE INTO promotions (id, name, summary, target_url, code, starts_at, ends_at, status, budget_cents, click_count, conversion_count, created_at, updated_at)
 VALUES
   ('promo-seed-launch', '上线首月推广', '新用户首月体验引导：浏览模块商城与社区内容，解锁免费模块。', '/marketplace', 'MIM-LAUNCH', '2026-01-01T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 'active', 500000, 0, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+
+-- ===== 五、RBAC 权限点注册（幂等 INSERT OR IGNORE；只补不删）=====
+-- 表与列对齐 db.ts seedRbac：
+--   permissions(code PK, name_i18n, description_i18n, builtin, created_at, updated_at)
+--   roles(code PK, name_i18n, description_i18n, builtin, created_at, updated_at)
+--   role_permissions(role_code, permission_code, created_at, PK(role_code, permission_code))
+-- 说明：域脚本先于 seedRbac 执行，此处先占位内置 superadmin 角色行以解除 role_permissions 外键依赖；
+--       seedRbac 随后按基线 upsert 刷新角色名称与描述，不删除本包登记的授权关系。
+INSERT OR IGNORE INTO roles (code, name_i18n, description_i18n, builtin, created_at, updated_at)
+VALUES (
+  'superadmin',
+  '{"zh-CN":"超级管理员","en-US":"Super Admin"}',
+  '{"zh-CN":"拥有全部权限，可管理角色与用户授权","en-US":"Full access"}',
+  1,
+  '2026-11-13T00:00:00.000Z',
+  '2026-11-13T00:00:00.000Z'
+);
+
+INSERT OR IGNORE INTO permissions (code, name_i18n, description_i18n, builtin, created_at, updated_at)
+VALUES (
+  'content:write',
+  '{"zh-CN":"维护内容运营","en-US":"Manage content operations"}',
+  '{"zh-CN":"公告 / 更新日志 / 推广计划的维护、发布归档与转化回写","en-US":"Maintain announcements, changelog and promotions"}',
+  1,
+  '2026-11-13T00:00:00.000Z',
+  '2026-11-13T00:00:00.000Z'
+);
+
+-- 授予内置超管：重复启动不删除后台已回收的授权（OR IGNORE 只补不删）。
+INSERT OR IGNORE INTO role_permissions (role_code, permission_code, created_at)
+VALUES ('superadmin', 'content:write', '2026-11-13T00:00:00.000Z');

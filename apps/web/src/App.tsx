@@ -40,6 +40,7 @@ const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat })
 const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
 const Tools = lazy(() => import('./views/Tools').then((m) => ({ default: m.Tools }))); // 自研工具发布目录
 const ContentHub = lazy(() => import('./views/ContentHub').then((m) => ({ default: m.ContentHub }))); // 公告 / 更新日志 / 推广计划栏目
+const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
@@ -73,7 +74,11 @@ export function App() {
       const resolved = resolveTheme(config.theme); // 逐项清洗脏数据
       setTheme(resolved);
       applyThemeVars(resolved); // 写入 :root CSS 变量与数据集
-    }).catch(() => { /* 离线 / 配置缺失：沿用默认外观 */ });
+    }).catch(() => {
+      if (!alive) return;
+      setTheme(DEFAULT_THEME); // 离线 / 配置缺失：回落默认外观
+      applyThemeVars(DEFAULT_THEME); // 同步注入默认令牌，避免首帧停留在 CSS 兜底色
+    });
     return () => { alive = false; };
   }, []);
 
@@ -215,6 +220,8 @@ export function App() {
     { view: 'search', label: locale === 'en-US' ? 'Search' : '统一搜索' },
     // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区与商城' },
+    // 圈子：以人 / 兴趣 / 组织为中心的成员制社群，区别于论坛板块
+    { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子' },
     // 商业化中台：付费资产 / 交易履约 / 资金分成 / 外观页面 / 成长国际化
     { view: 'commerce', label: locale === 'en-US' ? 'Commerce' : '商业化中台' },
     // 漫剧 AI 剧工作台
@@ -322,8 +329,10 @@ export function App() {
         {route.view === 'commerce' && session && <CommerceCenter locale={locale} />}{/* 商业化中台视图 */}
         {/* 自研工具发布目录：公开浏览，管理端增删改在视图内按会话态展示 */}
         {route.view === 'tools' && <Tools locale={locale} hasSession={!!session} />}{/* 工具目录视图 */}
-        {/* 公告 / 更新日志 / 推广计划栏目：公开只读，空数据静默隐藏 */}
-        {route.view === 'content' && <ContentHub locale={locale} />}{/* 内容栏目视图 */}
+        {/* 公告 / 更新日志 / 推广计划栏目：公开只读，空数据静默隐藏；会话态展示管理端 CRUD */}
+        {route.view === 'content' && <ContentHub locale={locale} hasSession={!!session} />}{/* 内容栏目视图 */}
+        {/* 圈子：公开浏览清单；加入 / 审核 / 发动态公告在视图内按会话态与角色展示 */}
+        {route.view === 'circles' && <Circles locale={locale} hasSession={!!session} />}{/* 圈子视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}

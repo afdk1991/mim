@@ -28,6 +28,11 @@ ALTER_ADD: community_boards.create_max_per_user INTEGER NOT NULL DEFAULT 0
 -- 推荐指数：由浏览 / 回复 / 收藏 / 评分 + 时间衰减加权计算后回写；sort=recommend 按此列排序。
 ALTER_ADD: community_threads.recommend_score REAL NOT NULL DEFAULT 0
 
+-- 独立商城订单积分抵扣留痕（三期收口）：points_spent 本单消耗积分；points_deduct_cents 折抵金额（分）。
+-- 原始成交价 amount_cents 与优惠扣减 discount_cents 不变，抵扣额单列留痕，便于对账与退款回滚。
+ALTER_ADD: shop_orders.points_spent INTEGER NOT NULL DEFAULT 0
+ALTER_ADD: shop_orders.points_deduct_cents INTEGER NOT NULL DEFAULT 0
+
 -- ===== 二、新表：板块 Tab 栏目配置（按板块持久化的模块化组合）=====
 -- 缺省 Tab 由代码侧默认清单给出；本表只存被版主改动过的覆盖项，主键 (board_id, tab_key)。
 CREATE TABLE IF NOT EXISTS community_board_tab_configs (

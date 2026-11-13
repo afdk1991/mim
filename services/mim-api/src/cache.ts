@@ -169,21 +169,26 @@ class RedisCache implements CacheBackend { // 业务步骤：推进当前流程�
     if (this.connecting) return this.connecting; // 条件分支：仅在满足业务前置条件时继续
     this.connecting = new Promise<void>((resolve, reject) => { // 业务步骤：推进当前流程的下一项处理
       const { host, port, password, db } = this.options; // 解构依赖：从模块或上下文取出所需成员
+      let settled = false; // 连接承诺只收敛一次，避免 close 与 error 重复 reject
+      const failConnect = (err: Error): void => { // 连接期失败：排空 pending 并收敛连接承诺，避免后续重连永久挂起
+        this.failPending(err); // 业务步骤：推进当前流程的下一项处理
+        if (!settled) { settled = true; reject(err); } // 条件分支：仅在满足业务前置条件时继续
+      };
       const socket = createConnection({ host, port }, () => { // 保存 socket：承载本步骤的计算结果供后续使用
         // 握手阶段直接走低层写命令，避免 rawCommand 再次进入 connect() 形成自等待
         const authStep = password ? this.writeCommand(['AUTH', password]).then(() => undefined) : Promise.resolve(); // 保存 authStep：承载本步骤的计算结果供后续使用
         authStep // 业务步骤：推进当前流程的下一项处理
           .then(() => (db > 0 ? this.writeCommand(['SELECT', String(db)]).then(() => undefined) : undefined)) // 链式调用：在上一步结果上继续处理
-          .then(() => resolve()) // 链式调用：在上一步结果上继续处理
-          .catch(reject); // 链式调用：在上一步结果上继续处理
+          .then(() => { if (!settled) { settled = true; resolve(); } }) // 链式调用：先判收敛标记再 resolve
+          .catch(failConnect); // 链式调用：在上一步结果上继续处理
       }); // 结束函数体：本层作用域收尾
       socket.setNoDelay(true); // 业务步骤：推进当前流程的下一项处理
       socket.setTimeout(10_000); // 业务步骤：推进当前流程的下一项处理
       socket.on('data', (chunk) => this.onData(chunk)); // 业务步骤：推进当前流程的下一项处理
-      socket.on('error', (err) => this.failPending(err)); // 业务步骤：推进当前流程的下一项处理
+      socket.on('error', (err) => failConnect(err)); // 连接期错误：排空 pending + 收敛连接承诺
       socket.on('close', () => { // 业务步骤：推进当前流程的下一项处理
-        this.failPending(new Error('redis connection closed')); // 业务步骤：推进当前流程的下一项处理
         this.socket = null; // 业务步骤：推进当前流程的下一项处理
+        failConnect(new Error('redis connection closed')); // 业务步骤：推进当前流程的下一项处理
       }); // 结束函数体：本层作用域收尾
       socket.on('timeout', () => { // 业务步骤：推进当前流程的下一项处理
         socket.destroy(new Error('redis connection timed out')); // 业务步骤：推进当前流程的下一项处理
@@ -192,7 +197,7 @@ class RedisCache implements CacheBackend { // 业务步骤：推进当前流程�
     }); // 结束代码块：本层作用域收尾
     this.connecting.finally(() => { // 业务步骤：推进当前流程的下一项处理
       this.connecting = null; // 业务步骤：推进当前流程的下一项处理
-    }); // 结束函数体：本层作用域收尾
+    }).catch(() => { /* 派生承诺的拒绝已由 rawCommand 的 await 收口，此处避免未处理拒绝告警 */ });
     return this.connecting; // 返回结果：把本步骤产物交给调用方
   } // 结束代码块：本层作用域收尾
 
@@ -330,13 +335,96 @@ class RedisCache implements CacheBackend { // 业务步骤：推进当前流程�
 } // 结束代码块：本层作用域收尾
 
 // ---------------------------------------------------------------------------
+// Redis 断连自动降级内存：连接类失败后本进程内回落到 MemoryCache，不抛断连给业务
+// ---------------------------------------------------------------------------
+
+/** 判断是否为连接类错误（断连 / 不可达 / 超时）；协议层错误（错误回复）不在此列，不应触发降级 */
+function isConnectionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const message = err.message.toLowerCase();
+  return (
+    message.includes('closed') ||
+    message.includes('unavailable') ||
+    message.includes('timed out') ||
+    message.includes('timeout') ||
+    message.includes('econnreset') ||
+    message.includes('econnrefused') ||
+    message.includes('eai_again') ||
+    message.includes('enotfound') ||
+    message.includes('etimedout') ||
+    message.includes('socket hang up')
+  );
+}
+
+/** Redis + 内存回退包装：首次连接类失败后全程走内存后端，保证业务在 Redis 抖动时不中断 */
+class RedisFallbackCache implements CacheBackend {
+  private primary: RedisCache;
+  private fallback: MemoryCache;
+  private degraded = false;
+
+  constructor(rawUrl: string) {
+    this.primary = new RedisCache(rawUrl);
+    this.fallback = new MemoryCache();
+  }
+
+  get backend(): CacheBackendKind {
+    return this.degraded ? 'memory' : 'redis';
+  }
+
+  private async withFallback<T>(op: (backend: CacheBackend) => Promise<T>): Promise<T> {
+    if (this.degraded) return op(this.fallback);
+    try {
+      return await op(this.primary);
+    } catch (err) {
+      if (!isConnectionError(err)) throw err; // 协议层错误原样上抛，不误降级
+      this.degraded = true;
+      console.error(`[cache] redis unavailable, degrading to in-memory backend: ${err instanceof Error ? err.message : String(err)}`);
+      return op(this.fallback);
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    return this.withFallback((c) => c.get(key));
+  }
+
+  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    return this.withFallback((c) => c.set(key, value, ttlSeconds));
+  }
+
+  async incr(key: string): Promise<number> {
+    return this.withFallback((c) => c.incr(key));
+  }
+
+  async expire(key: string, ttlSeconds: number): Promise<void> {
+    return this.withFallback((c) => c.expire(key, ttlSeconds));
+  }
+
+  async del(key: string): Promise<void> {
+    return this.withFallback((c) => c.del(key));
+  }
+
+  async ping(): Promise<boolean> {
+    return this.withFallback((c) => c.ping());
+  }
+
+  async close(): Promise<void> {
+    try {
+      await this.primary.close();
+    } catch {
+      // 关闭阶段忽略连接层错误
+    }
+    await this.fallback.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 工厂与进程级单例
 // ---------------------------------------------------------------------------
 
 /** 按环境变量构造缓存后端；未配置 MIM_REDIS_URL 时降级为内存实现 */
 export function createCache(env: Record<string, string | undefined>): CacheBackend { // 定义函数 createCache：封装可复用业务步骤
   const redisUrl = env.MIM_REDIS_URL?.trim(); // 保存 redisUrl：承载本步骤的计算结果供后续使用
-  if (redisUrl) return new RedisCache(redisUrl); // 条件分支：仅在满足业务前置条件时继续
+  if (redisUrl) return new RedisFallbackCache(redisUrl); // 条件分支：仅在满足业务前置条件时继续
   return new MemoryCache(); // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 

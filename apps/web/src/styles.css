@@ -3959,6 +3959,45 @@ code { /* 行内代码/令牌展示 */
   min-width: 120px;
 }
 
+/* 滑动拼图验证码：背景轨道 + 可拖动缺口块，宽度与后端 300px 题目对齐 */
+.slider-captcha {
+  flex-direction: column;
+  align-items: stretch;
+}
+.slider-track {
+  position: relative;
+  width: 300px;
+  max-width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  touch-action: none;
+}
+.slider-bg {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.slider-bg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.slider-piece {
+  position: absolute;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.slider-piece:active {
+  cursor: grabbing;
+}
+.thirdparty-captcha .hint {
+  margin: 4px 0;
+}
+
 /* ---------- 外观前台消费：列表样式变体（2026-11-13） ---------- */
 /* list：单列行式列表，商城 / 论坛 / 统一入口清单退化为纵向行 */
 .layout[data-list-style="list"] .cards,

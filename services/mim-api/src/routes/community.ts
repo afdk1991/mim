@@ -6,7 +6,9 @@ import { z } from 'zod'; // 入参声明式校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { parse } from '../validate.js'; // 校验失败统一翻译
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 鉴权 / 权限门禁 / 写操作幂等
-import { auditText, assertPublicHttpUrl } from '../security.js'; // 内容审核与远程链接 SSRF 校验
+import { auditText, assertPublicHttpUrl, verifyCaptcha } from '../security.js'; // 内容审核 / 远程链接 SSRF / 场景验证码
+import { readPointsConfig } from '../commerce/config.js'; // 积分兑换比例与单笔上限配置
+import { computeDeduction, deductPoints, getPointsBalance } from '../commerce/points.js'; // 积分抵扣纯计算 + 事务扣减
 import type { ApiDeps } from '../types.js'; // 引入依赖：声明本文件使用的外部能力
 import { checkPostRateLimit, resolveQuota } from '../community/limits.js'; // 三期：发帖频控与配额
 import { loadWeights, refreshRecommendScore, saveWeights, DEFAULT_WEIGHTS } from '../community/recommend.js'; // 三期：推荐指数
@@ -546,6 +548,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         } // 结束代码块：本层作用域收尾
       } // 结束条件分支：本层作用域收尾
     } // 结束循环体：本层作用域收尾
+    await verifyCaptcha(deps.db, deps.env, 'post', (req.body ?? {}) as Record<string, unknown>); // 发帖场景验证码：读取原始请求体（解析后会剥离验证码字段）；开关关闭时为空操作，默认放行
     const audit = await auditText(deps.env, `${body.title}\n${body.summary ?? ''}\n${body.body}`); // 保存 audit：承载本步骤的计算结果供后续使用
     if (!audit.ok) throw new AppError('VALIDATION_FAILED', audit.reason ?? '内容未通过审核'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     const id = `thread-${randomUUID()}`; // 保存 id：承载本步骤的计算结果供后续使用
@@ -747,7 +750,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
   }); // 结束函数体：本层作用域收尾
 
   /** 创建板块：等级 / VIP 门槛 + 每人数量上限 + 重名 / 敏感词校验；需审核时进入 pending 队列。 */
-  router.post('/community/boards', (req, res) => { // 路由 POST /community/boards：注册入口并绑定鉴权与处理逻辑
+  router.post('/community/boards', async (req, res) => { // 路由 POST /community/boards：注册入口并绑定鉴权与处理逻辑
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const body = parse( // 保存 body：承载本步骤的计算结果供后续使用
       z.object({ // 业务步骤：推进当前流程的下一项处理
@@ -774,6 +777,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (dupName) throw new AppError('CONFLICT', '板块名称已存在', { reason: 'BOARD_NAME_DUPLICATE' }); // 业务拒绝 CONFLICT：以统一错误码终止当前请求
     const blocked = findBlockedWord(deps.env, `${body.name}\n${body.description}`); // 保存 blocked：承载本步骤的计算结果供后续使用
     if (blocked) throw new AppError('VALIDATION_FAILED', '板块名称或简介包含受限词，请修改后再提交', { reason: 'BOARD_BLOCKED_WORD', word: blocked }); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    const boardAudit = await auditText(deps.env, `${body.name}\n${body.description}`); // 板块名 / 简介接入内容审核；无远程凭证时 provider=none 放行
+    if (!boardAudit.ok) throw new AppError('VALIDATION_FAILED', boardAudit.reason ?? '板块名称或简介未通过审核'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     // paid 为对外口径：落库仍用 visibility=public + price_cents>0，付费准入由会员/关注链路判定。
     const visibility = body.visibility === 'paid' ? 'public' : body.visibility; // 保存 visibility：承载本步骤的计算结果供后续使用
     const priceCents = body.visibility === 'paid' ? Math.max(1, body.price_cents) : body.price_cents; // 保存 priceCents：承载本步骤的计算结果供后续使用
@@ -1036,6 +1041,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         product_code: z.string().min(1).max(60), // 对象字段：声明结构中的一项数据
         quantity: z.number().int().min(1).max(10).optional(), // 对象字段：声明结构中的一项数据
         coupon_code: z.string().max(40).optional(), // 对象字段：声明结构中的一项数据
+        use_points: z.boolean().optional(), // 是否使用积分抵扣；指定 points_to_use 视为开启
+        points_to_use: z.number().int().min(1).optional(), // 指定消耗积分；缺省按可抵扣上限最大化
         shipping: z // 对象字段：声明结构中的一项数据
           .object({ name: z.string().min(1).max(40), phone: z.string().min(5).max(30), address: z.string().min(5).max(200) }) // 链式调用：在上一步结果上继续处理
           .optional(), // 链式调用：在上一步结果上继续处理
@@ -1051,11 +1058,20 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (product.kind === 'physical' && product.stock < quantity) throw new AppError('VALIDATION_FAILED', '库存不足'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     const amount = product.price_cents * quantity; // 保存 amount：承载本步骤的计算结果供后续使用
     const coupon = couponDiscount(deps, body.coupon_code, amount); // 保存 coupon：承载本步骤的计算结果供后续使用
-    const payable = Math.max(0, amount - coupon.discount); // 保存 payable：承载本步骤的计算结果供后续使用
-    requireBalance(deps, userId, payable); // 业务步骤：推进当前流程的下一项处理
+    const afterCoupon = Math.max(0, amount - coupon.discount); // 优惠码之后的应付（积分段入参）
+    const pointsConfig = readPointsConfig(deps.env); // 积分兑换比例与单笔上限
+    const usePoints = body.use_points === true || body.points_to_use !== undefined; // 显式开启或指定积分量
+    const deduction = usePoints
+      ? computeDeduction({ amountCents: afterCoupon, pointsBalance: getPointsBalance(deps.db, userId), config: pointsConfig, pointsToUse: body.points_to_use })
+      : { deduct_cents: 0, points_spent: 0, payable_cents: afterCoupon, capped_by: 'none' as const }; // 未开启抵扣：全额应付
+    const payable = Math.max(0, deduction.payable_cents); // 抵扣后应付（分）；全额抵扣为 0 即即时完成
+    if (payable > 0) requireBalance(deps, userId, payable); // 业务步骤：推进当前流程的下一项处理
     const orderId = `order-${randomUUID()}`; // 保存 orderId：承载本步骤的计算结果供后续使用
     const tx = deps.db.transaction(() => { // 保存 tx：承载本步骤的计算结果供后续使用
-      debit(deps, userId, payable, 'shop_order', orderId, `购买 ${product.name}`); // 业务步骤：推进当前流程的下一项处理
+      if (deduction.points_spent > 0) { // 有抵扣才扣积分并写流水，与订单 / 余额扣款同事务
+        deductPoints(deps.db, { userId, points: deduction.points_spent, deductCents: deduction.deduct_cents, refType: 'shop_order', refId: orderId, note: `积分抵扣 ${product.name}`, now: now() });
+      }
+      if (payable > 0) debit(deps, userId, payable, 'shop_order', orderId, `购买 ${product.name}`); // 业务步骤：推进当前流程的下一项处理
       let status: 'paid' | 'delivered' = 'paid'; // 保存 status：承载本步骤的计算结果供后续使用
       let deliveredAt: string | null = null; // 保存 deliveredAt：承载本步骤的计算结果供后续使用
       let deliveredContent: string | null = null; // 保存 deliveredContent：承载本步骤的计算结果供后续使用
@@ -1077,8 +1093,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       } // 结束条件分支：本层作用域收尾
       deps.db // 业务步骤：推进当前流程的下一项处理
         .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
-          `INSERT INTO shop_orders (id, user_id, product_id, quantity, amount_cents, discount_cents, payable_cents, coupon_code, status, delivery_kind, delivered_content, shipping_json, created_at, paid_at, delivered_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO shop_orders (id, user_id, product_id, quantity, amount_cents, discount_cents, payable_cents, coupon_code, points_spent, points_deduct_cents, status, delivery_kind, delivered_content, shipping_json, created_at, paid_at, delivered_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ) // 调用结束：参数列表与链式调用收尾
         .run( // 执行写入：把参数落库并返回影响结果
           orderId, // 业务步骤：推进当前流程的下一项处理
@@ -1089,6 +1105,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
           coupon.discount, // 业务步骤：推进当前流程的下一项处理
           payable, // 业务步骤：推进当前流程的下一项处理
           body.coupon_code?.toUpperCase() ?? null, // 业务步骤：推进当前流程的下一项处理
+          deduction.points_spent, // 积分消耗留痕
+          deduction.deduct_cents, // 折抵金额留痕（分）
           status, // 业务步骤：推进当前流程的下一项处理
           deliveryKind, // 业务步骤：推进当前流程的下一项处理
           deliveredContent, // 业务步骤：推进当前流程的下一项处理
@@ -1114,7 +1132,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       } // 结束条件分支：本层作用域收尾
     }); // 结束函数体：本层作用域收尾
     tx(); // 业务步骤：推进当前流程的下一项处理
-    res.status(201).json({ order_id: orderId, payable_cents: payable, discount_cents: coupon.discount, delivery_kind: product.kind }); // 输出响应：把处理结果写回 HTTP 客户端
+    res.status(201).json({ order_id: orderId, payable_cents: payable, discount_cents: coupon.discount, delivery_kind: product.kind, points_spent: deduction.points_spent, points_deduct_cents: deduction.deduct_cents }); // 输出响应：既有字段不变，仅追加积分抵扣明细
   }); // 结束函数体：本层作用域收尾
 
   /** 我的订单。 */
@@ -1122,7 +1140,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const items = deps.db // 保存 items：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
-        `SELECT o.id, o.quantity, o.amount_cents, o.discount_cents, o.payable_cents, o.coupon_code, o.status, o.delivery_kind,
+        `SELECT o.id, o.quantity, o.amount_cents, o.discount_cents, o.payable_cents, o.coupon_code, o.points_spent, o.points_deduct_cents, o.status, o.delivery_kind,
                 o.delivered_content, o.created_at, o.delivered_at, p.code AS product_code, p.name AS product_name, p.cover_url
          FROM shop_orders o JOIN shop_products p ON p.id = o.product_id
          WHERE o.user_id = ? ORDER BY o.created_at DESC LIMIT 50`,

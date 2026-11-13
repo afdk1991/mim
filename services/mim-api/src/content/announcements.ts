@@ -13,6 +13,7 @@ export interface AnnouncementRow {
   body: string;
   level: 'info' | 'warning' | 'success' | 'danger';
   status: 'draft' | 'published' | 'archived';
+  published_at: string | null;
   starts_at: string | null;
   ends_at: string | null;
   pinned: number;
@@ -50,14 +51,14 @@ function validateWindow(startsAt: string | null, endsAt: string | null): void {
   }
 }
 
-/** 公开视图映射：pinned 归一为布尔，published_at 取生效起始，缺省回落创建时间。 */
+/** 公开视图映射：pinned 归一为布尔；published_at 优先取发布时间，回落生效起始，再回落创建时间。 */
 function toPublic(row: AnnouncementRow): PublicAnnouncement {
   return {
     id: row.id,
     title: row.title,
     body: row.body,
     pinned: row.pinned === 1,
-    published_at: row.starts_at ?? row.created_at,
+    published_at: row.published_at ?? row.starts_at ?? row.created_at,
   };
 }
 
@@ -65,12 +66,12 @@ function toPublic(row: AnnouncementRow): PublicAnnouncement {
 export function listPublicAnnouncements(db: Db, now: string, limit: number): PublicAnnouncement[] {
   const rows = db
     .prepare(
-      `SELECT id, title, body, level, status, starts_at, ends_at, pinned, author_id, created_at, updated_at
+      `SELECT id, title, body, level, status, published_at, starts_at, ends_at, pinned, author_id, created_at, updated_at
          FROM announcements
         WHERE status = 'published'
           AND (starts_at IS NULL OR starts_at <= ?)
           AND (ends_at IS NULL OR ends_at > ?)
-        ORDER BY pinned DESC, COALESCE(starts_at, created_at) DESC
+        ORDER BY pinned DESC, COALESCE(published_at, starts_at, created_at) DESC
         LIMIT ?`,
     )
     .all(now, now, limit) as AnnouncementRow[];
@@ -95,15 +96,17 @@ export function getAnnouncement(db: Db, id: string): AnnouncementRow {
 export function createAnnouncement(db: Db, input: AnnouncementInput, now: string, authorId: string | null): AnnouncementRow {
   validateWindow(input.starts_at, input.ends_at);
   const id = `ann-${uuidv7()}`;
+  const publishedAt = input.status === 'published' ? now : null; // 直接建为已发布时落首次发布时间
   db.prepare(
-    `INSERT INTO announcements (id, title, body, level, status, starts_at, ends_at, pinned, author_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO announcements (id, title, body, level, status, published_at, starts_at, ends_at, pinned, author_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.title,
     input.body,
     input.level,
     input.status,
+    publishedAt,
     input.starts_at,
     input.ends_at,
     input.pinned ? 1 : 0,
@@ -151,4 +154,31 @@ export function updateAnnouncement(db: Db, id: string, patch: AnnouncementPatch,
 export function deleteAnnouncement(db: Db, id: string): void {
   const changed = db.prepare('DELETE FROM announcements WHERE id = ?').run(id);
   if (changed.changes === 0) throw new AppError('NOT_FOUND', '公告不存在');
+}
+
+/**
+ * 发布公告：draft / archived → published；已是 published 抛 409。
+ * published_at 仅首次发布写入（COALESCE 保留历史发布时间，重发不覆盖）。
+ */
+export function publishAnnouncement(db: Db, id: string, now: string): AnnouncementRow {
+  const row = getAnnouncement(db, id);
+  if (row.status === 'published') {
+    throw new AppError('CONFLICT', '公告已是发布状态', { from: row.status, to: 'published' });
+  }
+  db.prepare(
+    `UPDATE announcements
+        SET status = 'published', published_at = COALESCE(published_at, ?), updated_at = ?
+      WHERE id = ?`,
+  ).run(now, now, id);
+  return getAnnouncement(db, id);
+}
+
+/** 归档公告：draft / published → archived；已是 archived 抛 409。 */
+export function archiveAnnouncement(db: Db, id: string, now: string): AnnouncementRow {
+  const row = getAnnouncement(db, id);
+  if (row.status === 'archived') {
+    throw new AppError('CONFLICT', '公告已是归档状态', { from: row.status, to: 'archived' });
+  }
+  db.prepare(`UPDATE announcements SET status = 'archived', updated_at = ? WHERE id = ?`).run(now, id);
+  return getAnnouncement(db, id);
 }

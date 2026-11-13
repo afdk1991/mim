@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import type { Locale } from '@mim/i18n';
 // 引入接口集合与错误文案翻译
 import { api, errorText } from '../api';
-// 引入购物车与结算结果类型
-import type { CartCheckoutResult, CartSummary } from '../api';
+// 引入购物车与结算结果类型、积分抵扣口径
+import type { CartCheckoutResult, CartSummary, PointsDeductionConfig } from '../api';
 // 引入路由跳转：继续挑选商品 / 去个人中心看订单
 import { navigate } from '../router';
 
@@ -20,6 +20,15 @@ function money(locale: Locale, currency: string, amountMinor: number): string {
   return `${symbol}${(amountMinor / 100).toFixed(2)}`; // 最小货币单位换算成主单位
 } // money 结束
 
+/** 积分抵扣预览：受积分余额与单笔比例上限双重约束；实际扣减以后端 computeDeduction 为准 */
+function previewDeduction(totalMinor: number, balance: number, cfg: PointsDeductionConfig) {
+  const byBalanceCents = Math.floor((balance / cfg.points_per_yuan) * 100); // 余额可折金额（分）
+  const byRatioCents = Math.floor((totalMinor * cfg.max_ratio_percent) / 100); // 单笔比例上限（分）
+  const deduct = Math.max(0, Math.min(byBalanceCents, byRatioCents, totalMinor)); // 取三者最小值
+  const pointsSpent = cfg.points_per_yuan > 0 ? Math.ceil((deduct / 100) * cfg.points_per_yuan) : 0; // 折算消耗积分
+  return { deduct_cents: deduct, points_spent: pointsSpent, payable_cents: Math.max(0, totalMinor - deduct) };
+} // previewDeduction 结束
+
 /** 购物车页：清单 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单） */
 export function Cart({ locale }: Props) {
   const isZh = locale !== 'en-US'; // 是否中文文案
@@ -28,19 +37,22 @@ export function Cart({ locale }: Props) {
   const [busy, setBusy] = useState(false); // 结算进行中
   const [error, setError] = useState<string | null>(null); // 错误提示
   const [results, setResults] = useState<CartCheckoutResult[] | null>(null); // 最近一次结算结果
-  const [usePoints, setUsePoints] = useState(false); // 结算时是否用积分抵扣
+  const [usePoints, setUsePoints] = useState(false); // 结算时是否用积分抵扣（默认不勾）
+  const [pointsBalance, setPointsBalance] = useState(0); // 钱包可用积分
+  const [pointsCfg, setPointsCfg] = useState<PointsDeductionConfig | null>(null); // 积分抵扣口径（公开只读）
 
-  /** 重新拉取购物车 */
+  /** 重新拉取购物车；并行拉钱包积分与站点抵扣口径，任一失败不阻断购物车主流程 */
   async function refresh() {
-    try {
-      const next = await api.cart.get(); // 只读接口
-      setCart(next); // 写入状态
+    const [cartP, walletP, cfgP] = await Promise.allSettled([api.cart.get(), api.wallet.get(), api.commerce.siteConfig()]);
+    if (cartP.status === 'fulfilled') {
+      setCart(cartP.value); // 写入最新车
       setError(null); // 清空旧错误
-    } catch (err) {
-      setError(errorText(locale, err)); // 展示错误
-    } finally {
-      setLoading(false); // 结束加载态
-    } // try 结束
+    } else {
+      setError(errorText(locale, cartP.reason)); // 展示购物车错误
+    }
+    if (walletP.status === 'fulfilled') setPointsBalance(walletP.value.wallet.points); // 积分余额回落 0
+    if (cfgP.status === 'fulfilled') setPointsCfg(cfgP.value.points_deduction ?? null); // 口径缺失回落默认
+    setLoading(false); // 结束加载态
   } // refresh 结束
 
   // 进入页面拉一次
@@ -76,7 +88,8 @@ export function Cart({ locale }: Props) {
     setError(null); // 清空旧错误
     setResults(null); // 清空旧结果
     try {
-      const result = await api.cart.checkout('manual', { use_points: usePoints }); // 人工结算并按开关传积分抵扣
+      // 人工结算；仅在抵扣面板可用且勾选时传 use_points，否则不带抵扣入参
+      const result = await api.cart.checkout('manual', { use_points: usePoints && deductionAvailable });
       setCart(result.cart); // 用响应覆盖剩余车
       setResults(result.results); // 展示逐条结果
     } catch (err) {
@@ -87,6 +100,15 @@ export function Cart({ locale }: Props) {
   } // checkout 结束
 
   const items = cart?.items ?? []; // 条目快捷引用
+  const totals = cart?.totals ?? []; // 合计快捷引用
+  const totalMinor = totals.reduce((sum, total) => sum + total.amount_minor, 0); // 应付合计（分，多币种先按首币种预览）
+  const totalCurrency = totals[0]?.currency ?? 'CNY'; // 预览币种
+  // 站点口径缺失时回落后端默认（100 积分=1 元、单笔上限 30%）；显式关闭或余额 0 时整块隐藏
+  const cfg: PointsDeductionConfig = pointsCfg ?? { enabled: true, points_per_yuan: 100, max_ratio_percent: 30 };
+  const deductionAvailable = cfg.enabled && pointsBalance > 0 && totalMinor > 0; // 抵扣面板是否展示
+  const preview = deductionAvailable && usePoints
+    ? previewDeduction(totalMinor, pointsBalance, cfg) // 勾选后按余额 / 比例上限预览抵扣
+    : { deduct_cents: 0, points_spent: 0, payable_cents: totalMinor }; // 未勾选：应付即合计
 
   return (
     <div className="page">
@@ -142,15 +164,32 @@ export function Cart({ locale }: Props) {
       {/* 合计与结算入口 */}
       {items.length > 0 ? (
         <section className="cart-foot">
-          {(cart?.totals ?? []).length > 0 ? (
+          {totals.length > 0 ? (
             <span>
               {isZh ? '待结算合计' : 'Total'}：
-              {(cart?.totals ?? []).map((total) => money(locale, total.currency, total.amount_minor)).join(' + ')}
+              {totals.map((total) => money(locale, total.currency, total.amount_minor)).join(' + ')}
             </span>
           ) : (
             <span>{isZh ? '本车全部可即时解锁' : 'All items unlock instantly'}</span>
           )}
-          <label className="hint"><input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} /> {isZh ? '使用积分抵扣' : 'Use points'}</label>
+          {deductionAvailable ? (
+            <div className="cart-points">
+              <label className="hint">
+                <input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} />{' '}
+                {isZh ? '使用积分抵扣' : 'Use points'}
+              </label>
+              <span className="hint">{isZh ? `可用积分 ${pointsBalance}` : `${pointsBalance} points available`}</span>
+              {usePoints ? (
+                <>
+                  <span className="hint">
+                    {isZh ? '本次抵扣' : 'Deduction'}：{money(locale, totalCurrency, preview.deduct_cents)}
+                    {isZh ? `（约 ${preview.points_spent} 积分）` : ` (~${preview.points_spent} pts)`}
+                  </span>
+                  <span className="hint">{isZh ? '应付' : 'Payable'}：{money(locale, totalCurrency, preview.payable_cents)}</span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           <button type="button" className="btn primary" onClick={() => void checkout()} disabled={busy}>
             {busy ? (isZh ? '结算中…' : 'Checking out…') : isZh ? '去结算' : 'Checkout'}
           </button>

@@ -38,6 +38,11 @@ jobs:
       - name: 密钥模板校验（09 清单 §0）
         run: node scripts/env-check.mjs
 
+      # 全仓缺口扫描：路由装配 / 表结构接缝 / 环境变量登记 / 前端接线 / 未完成标记。
+      # 只读仓库内文件，不依赖 Secret / 外部服务；存在硬缺口时退出 1 阻断发布。
+      - name: 全仓缺口扫描（路由装配 / 表结构接缝 / 环境变量 / 前端接线 / 未完成标记）
+        run: node scripts/gap-scan.mjs
+
       - name: 版本号校验（铁律四）
         run: node scripts/version-check.mjs
 
@@ -127,12 +132,104 @@ jobs:
           # 管理员密码登录口令：未配置时 deploy.sh 现场生成随机值（不再使用仓库内可查的固定口令）；
           # 配置为 Secret 后可在多机/重装场景复用同一口令，值绝不落到公开日志。
           MIM_AUTH_ADMIN_PASSWORD: ${{ secrets.MIM_AUTH_ADMIN_PASSWORD }}
+          # 2026-11-13 增补适配器变量家族（支付扩展 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名）。
+          # 未配置的 secret 在 runner 侧为空串，下方 [ -n ] 过滤后不传；追加名字本身是安全的。
+          # 支付扩展渠道：虎皮椒
+          MIM_HUPIJIAO_APP_ID: ${{ secrets.MIM_HUPIJIAO_APP_ID }}
+          MIM_HUPIJIAO_APP_KEY: ${{ secrets.MIM_HUPIJIAO_APP_KEY }}
+          MIM_HUPIJIAO_API_BASE: ${{ secrets.MIM_HUPIJIAO_API_BASE }}
+          MIM_HUPIJIAO_NOTIFY_URL: ${{ secrets.MIM_HUPIJIAO_NOTIFY_URL }}
+          MIM_HUPIJIAO_RETURN_URL: ${{ secrets.MIM_HUPIJIAO_RETURN_URL }}
+          # 支付扩展渠道：讯虎
+          MIM_XUNHU_APP_ID: ${{ secrets.MIM_XUNHU_APP_ID }}
+          MIM_XUNHU_APP_KEY: ${{ secrets.MIM_XUNHU_APP_KEY }}
+          MIM_XUNHU_API_BASE: ${{ secrets.MIM_XUNHU_API_BASE }}
+          MIM_XUNHU_NOTIFY_URL: ${{ secrets.MIM_XUNHU_NOTIFY_URL }}
+          MIM_XUNHU_RETURN_URL: ${{ secrets.MIM_XUNHU_RETURN_URL }}
+          # 支付扩展渠道：PayPal
+          MIM_PAYPAL_CLIENT_ID: ${{ secrets.MIM_PAYPAL_CLIENT_ID }}
+          MIM_PAYPAL_CLIENT_SECRET: ${{ secrets.MIM_PAYPAL_CLIENT_SECRET }}
+          MIM_PAYPAL_WEBHOOK_ID: ${{ secrets.MIM_PAYPAL_WEBHOOK_ID }}
+          MIM_PAYPAL_MODE: ${{ secrets.MIM_PAYPAL_MODE }}
+          MIM_PAYPAL_CURRENCY: ${{ secrets.MIM_PAYPAL_CURRENCY }}
+          MIM_PAYPAL_RETURN_URL: ${{ secrets.MIM_PAYPAL_RETURN_URL }}
+          MIM_PAYPAL_CANCEL_URL: ${{ secrets.MIM_PAYPAL_CANCEL_URL }}
+          MIM_PAYPAL_API_BASE: ${{ secrets.MIM_PAYPAL_API_BASE }}
+          # 支付扩展渠道：Stripe
+          MIM_STRIPE_SECRET_KEY: ${{ secrets.MIM_STRIPE_SECRET_KEY }}
+          MIM_STRIPE_WEBHOOK_SECRET: ${{ secrets.MIM_STRIPE_WEBHOOK_SECRET }}
+          MIM_STRIPE_CURRENCY: ${{ secrets.MIM_STRIPE_CURRENCY }}
+          MIM_STRIPE_RETURN_URL: ${{ secrets.MIM_STRIPE_RETURN_URL }}
+          MIM_STRIPE_API_BASE: ${{ secrets.MIM_STRIPE_API_BASE }}
+          # 支付扩展渠道：支付宝企业支付
+          MIM_ALIPAY_ENT_APP_ID: ${{ secrets.MIM_ALIPAY_ENT_APP_ID }}
+          MIM_ALIPAY_ENT_PRIVATE_KEY: ${{ secrets.MIM_ALIPAY_ENT_PRIVATE_KEY }}
+          MIM_ALIPAY_ENT_PUBLIC_KEY: ${{ secrets.MIM_ALIPAY_ENT_PUBLIC_KEY }}
+          MIM_ALIPAY_ENT_NOTIFY_URL: ${{ secrets.MIM_ALIPAY_ENT_NOTIFY_URL }}
+          MIM_ALIPAY_ENT_RETURN_URL: ${{ secrets.MIM_ALIPAY_ENT_RETURN_URL }}
+          MIM_ALIPAY_ENT_GATEWAY: ${{ secrets.MIM_ALIPAY_ENT_GATEWAY }}
+          MIM_ALIPAY_ENT_SANDBOX: ${{ secrets.MIM_ALIPAY_ENT_SANDBOX }}
+          # 验证码门禁：模式 / 分场景开关
+          MIM_CAPTCHA_MODE: ${{ secrets.MIM_CAPTCHA_MODE }}
+          MIM_CAPTCHA_REGISTER: ${{ secrets.MIM_CAPTCHA_REGISTER }}
+          MIM_CAPTCHA_LOGIN: ${{ secrets.MIM_CAPTCHA_LOGIN }}
+          MIM_CAPTCHA_REPORT: ${{ secrets.MIM_CAPTCHA_REPORT }}
+          MIM_CAPTCHA_POST: ${{ secrets.MIM_CAPTCHA_POST }}
+          MIM_CAPTCHA_REQUIRED: ${{ secrets.MIM_CAPTCHA_REQUIRED }}
+          # 验证码：腾讯防水墙（新版）/ 极验 GeeTest4
+          MIM_TENCENT_CAPTCHA_APP_ID: ${{ secrets.MIM_TENCENT_CAPTCHA_APP_ID }}
+          MIM_TENCENT_CAPTCHA_SECRET_KEY: ${{ secrets.MIM_TENCENT_CAPTCHA_SECRET_KEY }}
+          MIM_GEETEST4_CAPTCHA_ID: ${{ secrets.MIM_GEETEST4_CAPTCHA_ID }}
+          MIM_GEETEST4_CAPTCHA_KEY: ${{ secrets.MIM_GEETEST4_CAPTCHA_KEY }}
+          # 内容审核：百度智能云 + 故障降级策略
+          MIM_BAIDU_AUDIT_API_KEY: ${{ secrets.MIM_BAIDU_AUDIT_API_KEY }}
+          MIM_BAIDU_AUDIT_SECRET_KEY: ${{ secrets.MIM_BAIDU_AUDIT_SECRET_KEY }}
+          MIM_AUDIT_FALLBACK: ${{ secrets.MIM_AUDIT_FALLBACK }}
+          # 缓存 / 举报频控
+          MIM_REDIS_URL: ${{ secrets.MIM_REDIS_URL }}
+          MIM_REPORT_LIMIT: ${{ secrets.MIM_REPORT_LIMIT }}
+          MIM_REPORT_WINDOW_MINUTES: ${{ secrets.MIM_REPORT_WINDOW_MINUTES }}
+          # 社区模块配置
+          MIM_COMMUNITY_WINDOW_MINUTES: ${{ secrets.MIM_COMMUNITY_WINDOW_MINUTES }}
+          MIM_COMMUNITY_WINDOW_MAX: ${{ secrets.MIM_COMMUNITY_WINDOW_MAX }}
+          MIM_COMMUNITY_DAILY_MAX: ${{ secrets.MIM_COMMUNITY_DAILY_MAX }}
+          MIM_COMMUNITY_TOTAL_MAX: ${{ secrets.MIM_COMMUNITY_TOTAL_MAX }}
+          MIM_COMMUNITY_BOARD_REVIEW: ${{ secrets.MIM_COMMUNITY_BOARD_REVIEW }}
+          MIM_COMMUNITY_RECOMMEND_WEIGHTS: ${{ secrets.MIM_COMMUNITY_RECOMMEND_WEIGHTS }}
+          MIM_COMMUNITY_BLOCK_WORDS: ${{ secrets.MIM_COMMUNITY_BLOCK_WORDS }}
+          MIM_COMMUNITY_CREATE_MIN_LEVEL: ${{ secrets.MIM_COMMUNITY_CREATE_MIN_LEVEL }}
+          MIM_COMMUNITY_CREATE_MAX: ${{ secrets.MIM_COMMUNITY_CREATE_MAX }}
+          # 积分抵扣
+          MIM_POINTS_DEDUCTION_ENABLED: ${{ secrets.MIM_POINTS_DEDUCTION_ENABLED }}
+          MIM_POINTS_PER_YUAN: ${{ secrets.MIM_POINTS_PER_YUAN }}
+          MIM_POINTS_MAX_RATIO_PERCENT: ${{ secrets.MIM_POINTS_MAX_RATIO_PERCENT }}
+          # 跨站 SSO / 实名认证 / 注册邀请门槛 / 站点根地址
+          MIM_SSO_SECRET: ${{ secrets.MIM_SSO_SECRET }}
+          MIM_SSO_ALLOWED_SITES: ${{ secrets.MIM_SSO_ALLOWED_SITES }}
+          MIM_REALNAME_PROVIDER: ${{ secrets.MIM_REALNAME_PROVIDER }}
+          MIM_REALNAME_SECRET: ${{ secrets.MIM_REALNAME_SECRET }}
+          MIM_REGISTER_INVITE_REQUIRED: ${{ secrets.MIM_REGISTER_INVITE_REQUIRED }}
+          MIM_PUBLIC_BASE_URL: ${{ secrets.MIM_PUBLIC_BASE_URL }}
         run: |
           # 可选通道 secret 透传到远端 deploy.sh（%q 安全引用；未配置的 secret 为空则不传）
           ENV_ARGS=""
           for v in MIM_SMS_ALIYUN_ACCESS_KEY_ID MIM_SMS_ALIYUN_ACCESS_KEY_SECRET MIM_SMS_ALIYUN_SIGN_NAME MIM_SMS_ALIYUN_TEMPLATE_CODE \
                    MIM_EMAIL_SES_ACCESS_KEY_ID MIM_EMAIL_SES_SECRET_ACCESS_KEY MIM_EMAIL_SES_REGION MIM_EMAIL_SES_FROM_ADDRESS \
-                   MIM_ADMIN_TOKEN MIM_AUTH_ADMIN_PASSWORD; do
+                   MIM_ADMIN_TOKEN MIM_AUTH_ADMIN_PASSWORD \
+                   MIM_HUPIJIAO_APP_ID MIM_HUPIJIAO_APP_KEY MIM_HUPIJIAO_API_BASE MIM_HUPIJIAO_NOTIFY_URL MIM_HUPIJIAO_RETURN_URL \
+                   MIM_XUNHU_APP_ID MIM_XUNHU_APP_KEY MIM_XUNHU_API_BASE MIM_XUNHU_NOTIFY_URL MIM_XUNHU_RETURN_URL \
+                   MIM_PAYPAL_CLIENT_ID MIM_PAYPAL_CLIENT_SECRET MIM_PAYPAL_WEBHOOK_ID MIM_PAYPAL_MODE MIM_PAYPAL_CURRENCY MIM_PAYPAL_RETURN_URL MIM_PAYPAL_CANCEL_URL MIM_PAYPAL_API_BASE \
+                   MIM_STRIPE_SECRET_KEY MIM_STRIPE_WEBHOOK_SECRET MIM_STRIPE_CURRENCY MIM_STRIPE_RETURN_URL MIM_STRIPE_API_BASE \
+                   MIM_ALIPAY_ENT_APP_ID MIM_ALIPAY_ENT_PRIVATE_KEY MIM_ALIPAY_ENT_PUBLIC_KEY MIM_ALIPAY_ENT_NOTIFY_URL MIM_ALIPAY_ENT_RETURN_URL MIM_ALIPAY_ENT_GATEWAY MIM_ALIPAY_ENT_SANDBOX \
+                   MIM_CAPTCHA_MODE MIM_CAPTCHA_REGISTER MIM_CAPTCHA_LOGIN MIM_CAPTCHA_REPORT MIM_CAPTCHA_POST MIM_CAPTCHA_REQUIRED \
+                   MIM_TENCENT_CAPTCHA_APP_ID MIM_TENCENT_CAPTCHA_SECRET_KEY \
+                   MIM_GEETEST4_CAPTCHA_ID MIM_GEETEST4_CAPTCHA_KEY \
+                   MIM_BAIDU_AUDIT_API_KEY MIM_BAIDU_AUDIT_SECRET_KEY MIM_AUDIT_FALLBACK \
+                   MIM_REDIS_URL MIM_REPORT_LIMIT MIM_REPORT_WINDOW_MINUTES \
+                   MIM_COMMUNITY_WINDOW_MINUTES MIM_COMMUNITY_WINDOW_MAX MIM_COMMUNITY_DAILY_MAX MIM_COMMUNITY_TOTAL_MAX MIM_COMMUNITY_BOARD_REVIEW MIM_COMMUNITY_RECOMMEND_WEIGHTS MIM_COMMUNITY_BLOCK_WORDS MIM_COMMUNITY_CREATE_MIN_LEVEL MIM_COMMUNITY_CREATE_MAX \
+                   MIM_POINTS_DEDUCTION_ENABLED MIM_POINTS_PER_YUAN MIM_POINTS_MAX_RATIO_PERCENT \
+                   MIM_SSO_SECRET MIM_SSO_ALLOWED_SITES MIM_REALNAME_PROVIDER MIM_REALNAME_SECRET MIM_REGISTER_INVITE_REQUIRED \
+                   MIM_PUBLIC_BASE_URL; do
             val="${!v}"
             [ -n "$val" ] && ENV_ARGS="$ENV_ARGS $(printf '%s=%q' "$v" "$val")"
           done

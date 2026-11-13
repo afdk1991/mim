@@ -64,6 +64,7 @@ export function Tools({ locale, hasSession = false }: Props) {
   const [error, setError] = useState<string | null>(null); // 清单错误
   const [manageOpen, setManageOpen] = useState(false); // 管理面板展开态
   const [manageItems, setManageItems] = useState<ToolItem[]>([]); // 管理端全状态清单
+  const [adminAllowed, setAdminAllowed] = useState(false); // 管理清单拉取成功才放行入口；401/403/离线静默隐藏
   const [form, setForm] = useState<FormState>(EMPTY_FORM); // 表单草稿
   const [editingSlug, setEditingSlug] = useState<string | null>(null); // 正在编辑的工具 slug
   const [busy, setBusy] = useState(false); // 提交忙碌态
@@ -89,8 +90,9 @@ export function Tools({ locale, hasSession = false }: Props) {
     try {
       const data = await api.tools.manage();
       setManageItems(data.items);
+      setAdminAllowed(true); // 仅在管理清单可访问时展示管理入口
     } catch {
-      /* 无权限或离线时不展示管理清单，公开面不受影响 */
+      setAdminAllowed(false); // 无权限或离线时静默隐藏管理面板，公开面不受影响
     }
   }
 
@@ -263,7 +265,7 @@ export function Tools({ locale, hasSession = false }: Props) {
         </div>
       )}
 
-      {hasSession && (
+      {hasSession && adminAllowed && (
         <section className="panel tool-admin">
           <button type="button" className="btn ghost" onClick={() => { setManageOpen((v) => !v); void loadManage(); }}>
             {tr(locale, '管理工具', 'Manage tools')}

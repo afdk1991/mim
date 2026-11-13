@@ -13,7 +13,7 @@ import {
   LOGIN_LOCK_MINUTES, // 锁定时长（分钟）
   REFRESH_TTL_SECONDS, // 刷新令牌有效期
 } from '../config.js'; // 集中式认证参数，避免散落魔法数字
-import { consumeCaptcha } from '../security.js'; // 图形验证码一次性校验
+import { consumeCaptcha, cacheOf } from '../security.js'; // 图形验证码一次性校验 + 共享缓存后端（访客频控）
 import {
   generateCode, // 生成数字验证码
   hashCode, // 验证码摘要，库内不存明文
@@ -110,27 +110,8 @@ const guestBody = z.object({ // 访客建号请求体
 }); // 结束 guestBody schema
 
 /** 访客建号限流：同一 IP 每小时上限，避免脚本刷出大量空账号 */
-const GUEST_RATE_WINDOW_MS = 60 * 60 * 1000; // 统计窗口：1 小时
+const GUEST_RATE_WINDOW_SECONDS = 60 * 60; // 统计窗口：1 小时（缓存键 TTL 秒）
 const GUEST_RATE_MAX = 30; // 单 IP 窗口内最多建 30 个访客（正常用户只建 1 个）
-const guestHits = new Map<string, { count: number; resetAt: number }>(); // 进程内计数：单机部署足够，多实例时按实例独立计数
-
-/** 判断本次是否允许继续建访客号（纯内存计数，不写库） */
-function allowGuestCreate(ip: string): boolean { // 返回 false 表示触发限流
-  const now = Date.now(); // 限流用真实时间，避免依赖请求时钟
-  if (guestHits.size > 5000) { // 防止长期运行把 Map 撑大
-    for (const [key, value] of guestHits) { // 逐个清理已过窗口的记录
-      if (value.resetAt <= now) guestHits.delete(key); // 过期即删
-    } // 清理循环结束
-  } // 容量保护结束
-  const hit = guestHits.get(ip); // 读取本 IP 当前窗口
-  if (!hit || hit.resetAt <= now) { // 首次访问或窗口已重置
-    guestHits.set(ip, { count: 1, resetAt: now + GUEST_RATE_WINDOW_MS }); // 开新窗口
-    return true; // 放行
-  } // 窗口判断结束
-  if (hit.count >= GUEST_RATE_MAX) return false; // 超限拒绝
-  hit.count += 1; // 计数累加
-  return true; // 放行
-} // allowGuestCreate 结束
 
 function userPayload(row: UserRow) { // 对外输出的用户视图，剔除内部字段
   return { // 用户视图对象
@@ -258,6 +239,15 @@ export function finishLogin( // 登录收尾：记录设备并签发双令牌，
 
 export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
   const router = Router(); // 独立的 express 路由实例
+  const guestCache = cacheOf(deps.env); // 共享缓存后端：配 Redis 多实例共享计数，未配置则内存降级
+
+  /** 访客频控：缓存 incr + 窗口 TTL；窗口内超过上限返回 false（429）。键维度 = IP。 */
+  async function allowGuestCreate(ip: string): Promise<boolean> { // 返回 false 表示触发限流
+    const key = `guest:${ip}`; // 缓存键：按 IP 隔离
+    const count = await guestCache.incr(key); // 计数自增，键不存在从 0 起算
+    if (count === 1) await guestCache.expire(key, GUEST_RATE_WINDOW_SECONDS); // 首访开新窗口，TTL 到期自然清理
+    return count <= GUEST_RATE_MAX; // 超限拒绝
+  } // allowGuestCreate 结束
 
   router.post('/auth/code', async (req, res) => { // 申请验证码
     const body = parse(codeBody, req.body); // 校验请求体形状
@@ -408,12 +398,12 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     }); // 响应结束
   }); // 结束 GET /auth/channels 处理
 
-  router.post('/auth/guest', (req, res) => { // 匿名访客会话：免登录即可拿到完整可用会话（全站不再有「需登录」门禁）
+  router.post('/auth/guest', async (req, res) => { // 匿名访客会话：免登录即可拿到完整可用会话（全站不再有「需登录」门禁）
     const body = parse(guestBody, req.body ?? {}); // 请求体可空，只有地区与设备是可选项
     const ip = req.ip ?? 'unknown'; // 取客户端 IP 做限流维度
-    if (!allowGuestCreate(ip)) { // 触发限流
+    if (!(await allowGuestCreate(ip))) { // 触发限流
       throw new AppError('AUTH_GUEST_RATE_LIMITED', 'too many guest sessions, try again later', { // 限流错误
-        retry_after_seconds: GUEST_RATE_WINDOW_MS / 1000, // 告知多久后可重试
+        retry_after_seconds: GUEST_RATE_WINDOW_SECONDS, // 告知多久后可重试
       }); // 结束错误构造
     } // 限流判断结束
     const region = body.region ?? 'cn'; // 缺省按中国区，与站点默认区域一致

@@ -11,6 +11,64 @@ import type { ErrorCode } from '@mim/core-domain'; // 领域错误码类型，�
 export type Region = 'cn' | 'global'; // 区域维度：国内/海外，决定数据驻留与可用模块
 export type Provider = 'phone' | 'email'; // 凭证类型：手机号或邮箱
 
+// ---------- 验证码（与 services/mim-api/src/security.ts 适配器契约一一对应）----------
+
+/** 验证码模式：off 不校验；image 图形；slider 滑动拼图；tencent / geetest4 前端 SDK 取码、服务端二次校验 */
+export type CaptchaMode = 'off' | 'image' | 'slider' | 'tencent' | 'geetest4';
+/** 验证码强制场景：注册 / 登录 / 举报 / 发帖 */
+export type CaptchaScene = 'register' | 'login' | 'report' | 'post';
+
+/** 滑动拼图缺口几何信息（目标 x 不下发，前端只拿到可拖动的缺口形状） */
+export interface SliderGap {
+  y: number; // 缺口纵向位置
+  width: number; // 缺口宽度（px）
+  height: number; // 缺口高度（px）
+}
+
+/** 滑动拼图题目：背景 SVG + 缺口几何 + 过期时间 */
+export interface SliderChallenge {
+  id: string; // 题目主键，提交时随 slider_x 回传
+  expires_at: string; // 过期时间（ISO）
+  background: string; // 背景 SVG 字符串
+  gap: SliderGap; // 缺口几何
+}
+
+/** 验证码签发响应：off/未强制 required=false；image 带 svg；slider 带 slider；第三方仅回模式 */
+export interface CaptchaIssue {
+  scene: CaptchaScene; // 回显场景
+  required: boolean; // 本场景是否强制验证码
+  mode: CaptchaMode; // 当前生效模式
+  id?: string; // 题目主键（image / slider）
+  svg?: string; // 图形验证码 SVG（image）
+  slider?: SliderChallenge; // 滑动拼图题目（slider）
+  expires_at?: string; // 过期时间（ISO）
+}
+
+/** 安全能力状态：前端据此决定是否展示验证码与审核提示 */
+export interface SecurityStatus {
+  captcha_required: boolean; // 兼容旧字段：任一强制场景即视为需要验证码
+  content_audit: boolean; // 是否启用内容审核
+  captcha: {
+    mode: CaptchaMode; // 当前验证码模式
+    required_scenes: CaptchaScene[]; // 被环境变量强制的场景清单
+    providers: { image: boolean; slider: boolean; tencent: boolean; geetest4: boolean }; // 第三方凭证齐备度
+  };
+  audit: { enabled: boolean; provider: string; fallback: string };
+}
+
+/** 提交登录 / 注册时随请求体带上的验证码票据字段（按 mode 取对应一组；off 不带） */
+export interface CaptchaTicket {
+  captcha_id?: string; // image / slider 题目主键
+  captcha_code?: string; // image 图形答案
+  slider_x?: number; // slider 拼图落点 x 坐标（容差 ±12px）
+  ticket?: string; // 腾讯 TCaptcha 票据
+  randstr?: string; // 腾讯 TCaptcha 随机串
+  lot_number?: string; // 极验 4.0 批次号
+  captcha_output?: string; // 极验 4.0 输出
+  pass_token?: string; // 极验 4.0 通过令牌
+  gen_time?: string; // 极验 4.0 生成时间
+}
+
 export interface UserInfo { // 当前登录用户的核心资料（登录响应与 /me 共用同一形状）
   id: string; // 用户主键，本地缓存与埋点都用它标识身份
   region: Region; // 所属区域，服务端据此路由到对应数据中心
@@ -863,12 +921,12 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }>('/auth/code', { method: 'POST', body: { region, provider, identifier, captcha_id: captcha?.id, captcha_code: captcha?.code }, auth: false, idempotency: false }); // 公开接口免鉴权；重复发码无副作用，禁用幂等键
   }, // requestCode 结束
 
-  captcha() { // 图形验证码：返回 id 与 SVG
-    return request<{ id: string; svg: string; expires_at: string }>('/auth/captcha', { auth: false, idempotency: false });
+  captcha(scene: CaptchaScene = 'login') { // 按场景签发验证码题目：image 返回 SVG，slider 返回拼图背景与缺口，第三方模式仅回模式标识
+    return request<CaptchaIssue>('/auth/captcha?scene=' + encodeURIComponent(scene), { auth: false, idempotency: false });
   },
 
-  securityStatus() { // 安全能力状态：是否强制验证码 / 是否启用内容审核
-    return request<{ captcha_required: boolean; content_audit: boolean }>('/security/status', { auth: false, idempotency: false });
+  securityStatus() { // 安全能力状态：验证码模式 / 强制场景 / 第三方凭证齐备度 / 内容审核开关
+    return request<SecurityStatus>('/security/status', { auth: false, idempotency: false });
   },
 
   loginWithPassword(payload: { // 密码登录：手机号/邮箱 + 密码
@@ -877,7 +935,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     identifier: string; // 手机号或邮箱
     password: string; // 明文密码，经 HTTPS 传输，前端不做哈希
     device?: { platform: string; name?: string }; // 设备信息，未传时下面兜底为 web/浏览器
-  }) { // 形参定义结束
+  } & CaptchaTicket) { // 验证码票据字段按当前 mode 携带；off 模式不带
     return request<LoginResult>('/auth/password', { // 走统一请求层拿会话
       method: 'POST', // 登录属写操作
       body: { ...payload, device: payload.device ?? { platform: 'web', name: '浏览器' } }, // 展开原参数并补默认设备标识，便于服务端区分登录来源
@@ -894,7 +952,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     display_name?: string; // 展示名可选，缺省由服务端留空
     invite_code?: string; // 注册门槛开启时必填的有效邀请码
     device?: { platform: string; name?: string }; // 设备信息，未传时兜底 web/浏览器
-  }) { // 形参定义结束
+  } & CaptchaTicket) { // 验证码票据字段按当前 mode 携带；off 模式不带
     return request<LoginResult>('/auth/register', { // 注册成功即返回令牌，前端无需再登录一次
       method: 'POST', // 写操作
       body: { ...payload, device: payload.device ?? { platform: 'web', name: '浏览器' } }, // 补默认设备标识
@@ -951,7 +1009,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     identifier: string; // 手机号或邮箱
     code: string; // 收到的验证码
     device?: { platform: string; name?: string }; // 设备信息，未传时兜底 web/浏览器
-  }) { // 形参定义结束
+  } & CaptchaTicket) { // 验证码票据字段按当前 mode 携带；off 模式不带
     return request<LoginResult>('/auth/login', { // 换取会话
       method: 'POST', // 登录属写操作
       body: { ...payload, device: payload.device ?? { platform: 'web', name: '浏览器' } }, // 同样补默认设备信息
@@ -1787,8 +1845,8 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   // ---------- 商业化中台（commerce）：资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 国际化 ----------
 
   commerce: { // 商业化二期：与 services/mim-api 新路由一一对应
-    siteConfig() { // 公开站点启动配置（无需会话）
-      return request<{ home_view: 'store' | 'community'; theme: ThemeSettings; site: Record<string, unknown>; locales: I18nSettings | Record<string, never> }>('/site/config', { idempotency: false });
+    siteConfig() { // 公开站点启动配置（无需会话）；points_deduction 为积分抵扣开关与兑换口径，前端据此决定是否展示抵扣面板
+      return request<{ home_view: 'store' | 'community'; theme: ThemeSettings; site: Record<string, unknown>; locales: I18nSettings | Record<string, never>; points_deduction?: PointsDeductionConfig }>('/site/config', { idempotency: false });
     },
     assets(opts: { kind?: string; q?: string } = {}) { // 资产列表
       const qs = new URLSearchParams(); // 查询串
@@ -1934,6 +1992,47 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     promotions() { // 推广计划卡片：进行中且在有效期内
       return request<{ items: PromotionItem[] }>('/promotions', { auth: false, idempotency: false });
     },
+
+    // ===== 管理端 CRUD（复用 /admin/content/* 契约；挂 appearance:write 权限，无权限时前端静默隐藏）=====
+
+    manageAnnouncements() { // 公告管理清单（含草稿 / 归档）
+      return request<{ items: AnnouncementItem[] }>('/admin/content/announcements', { idempotency: false });
+    },
+    createAnnouncement(payload: AnnouncementUpsertPayload) { // 新建公告
+      return request<{ item: AnnouncementItem }>('/admin/content/announcements', { method: 'POST', body: payload });
+    },
+    updateAnnouncement(id: string, payload: Partial<AnnouncementUpsertPayload>) { // 更新公告
+      return request<{ item: AnnouncementItem }>(`/admin/content/announcements/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload });
+    },
+    deleteAnnouncement(id: string) { // 删除公告
+      return request<{ ok: boolean }>(`/admin/content/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+
+    manageChangelog() { // 更新日志管理清单（含草稿 / 归档）
+      return request<{ items: ChangelogItem[] }>('/admin/content/changelog', { idempotency: false });
+    },
+    createChangelog(payload: ChangelogUpsertPayload) { // 新建更新日志
+      return request<{ item: ChangelogItem }>('/admin/content/changelog', { method: 'POST', body: payload });
+    },
+    updateChangelog(id: string, payload: Partial<ChangelogUpsertPayload>) { // 更新更新日志
+      return request<{ item: ChangelogItem }>(`/admin/content/changelog/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload });
+    },
+    deleteChangelog(id: string) { // 删除更新日志
+      return request<{ ok: boolean }>(`/admin/content/changelog/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+
+    managePromotions() { // 推广计划管理清单（含点击 / 转化统计）
+      return request<{ items: PromotionItem[] }>('/admin/content/promotions', { idempotency: false });
+    },
+    createPromotion(payload: PromotionUpsertPayload) { // 新建推广计划
+      return request<{ item: PromotionItem }>('/admin/content/promotions', { method: 'POST', body: payload });
+    },
+    updatePromotion(id: string, payload: Partial<PromotionUpsertPayload>) { // 更新推广计划
+      return request<{ item: PromotionItem }>(`/admin/content/promotions/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload });
+    },
+    deletePromotion(id: string) { // 删除推广计划
+      return request<{ ok: boolean }>(`/admin/content/promotions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
   }, // content 分组结束
 
   // ---------- 自研工具目录（tools）：公开浏览清单 / 详情；管理端增删改挂权限 ----------
@@ -1962,6 +2061,54 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ ok: boolean }>(`/tools/${encodeURIComponent(slug)}`, { method: 'DELETE' });
     },
   }, // tools 分组结束
+
+  // ---------- 圈子（circles）：以人 / 兴趣 / 组织为中心的成员制社群，与板块 board 概念独立 ----------
+
+  circles: { // 圈子域：公开浏览 / 成员准入与互动 / 圈主管理
+    list(opts: { category?: string; visibility?: string; keyword?: string; page?: number; limit?: number } = {}) { // 圈子列表，支持分类 / 可见性 / 关键词过滤与分页
+      const qs = new URLSearchParams();
+      if (opts.category) qs.set('category', opts.category);
+      if (opts.visibility) qs.set('visibility', opts.visibility);
+      if (opts.keyword) qs.set('keyword', opts.keyword);
+      if (opts.page) qs.set('page', String(opts.page));
+      if (opts.limit) qs.set('limit', String(opts.limit));
+      const suffix = qs.toString();
+      return request<{ items: CircleSummary[]; total: number; page: number; limit: number }>(`/circles${suffix ? `?${suffix}` : ''}`, { auth: false, idempotency: false });
+    },
+    detail(slug: string) { // 圈子详情（成员数 / 我是否成员 / 我的角色）
+      return request<{ circle: CircleSummary }>(`/circles/${encodeURIComponent(slug)}`, { idempotency: false });
+    },
+    create(payload: CircleCreatePayload) { // 创建圈子；创建者自动成为 owner
+      return request<{ ok: boolean; circle: CircleSummary & { invite_code: string | null } }>('/circles', { method: 'POST', body: payload });
+    },
+    join(slug: string, inviteCode?: string) { // 加入：open 直入 / approve 待审 / invite 凭邀请码
+      return request<{ ok: boolean; status: 'pending' | 'active'; role: CircleRole; joined: boolean; via: string }>(`/circles/${encodeURIComponent(slug)}/join`, { method: 'POST', body: { invite_code: inviteCode } });
+    },
+    leave(slug: string) { // 退出圈子
+      return request<{ ok: boolean; left: boolean }>(`/circles/${encodeURIComponent(slug)}/leave`, { method: 'POST', body: {} });
+    },
+    members(slug: string) { // 成员名单（仅 active 成员可读；owner / admin 额外带回待审名单）
+      return request<{ items: CircleMember[]; pending: CircleMember[]; member_count: number }>(`/circles/${encodeURIComponent(slug)}/members`, { idempotency: false });
+    },
+    approve(slug: string, userId: string) { // 圈主 / 管理员通过待审成员
+      return request<{ ok: boolean; status: string }>(`/circles/${encodeURIComponent(slug)}/approve`, { method: 'POST', body: { user_id: userId } });
+    },
+    reject(slug: string, userId: string) { // 圈主 / 管理员拒绝待审成员
+      return request<{ ok: boolean; status: string }>(`/circles/${encodeURIComponent(slug)}/reject`, { method: 'POST', body: { user_id: userId } });
+    },
+    posts(slug: string) { // 圈内动态流
+      return request<{ items: CirclePost[] }>(`/circles/${encodeURIComponent(slug)}/posts`, { idempotency: false });
+    },
+    createPost(slug: string, body: string, threadId?: string | null) { // 发圈内动态
+      return request<{ ok: boolean; post: CirclePost }>(`/circles/${encodeURIComponent(slug)}/posts`, { method: 'POST', body: { body, thread_id: threadId ?? null } });
+    },
+    notices(slug: string) { // 圈内公告流
+      return request<{ items: CircleNotice[] }>(`/circles/${encodeURIComponent(slug)}/notices`, { idempotency: false });
+    },
+    createNotice(slug: string, body: string) { // 发圈内公告（仅 owner / admin）
+      return request<{ ok: boolean; notice: CircleNotice }>(`/circles/${encodeURIComponent(slug)}/notices`, { method: 'POST', body: { body } });
+    },
+  }, // circles 分组结束
 }; // api 对象结束
 
 // ---------- 社区与变现共享类型，与 routes/community.ts 响应一一对应 ----------
@@ -2061,6 +2208,66 @@ export interface CommunityPost { // 回复
   created_at: string; // 时间
   author_name: string | null; // 作者昵称
   author_member_no: string | null; // Mim ID
+}
+
+// ---------- 圈子（circles）共享类型，与 routes/circles.ts 响应一一对应 ----------
+
+export type CircleRole = 'owner' | 'admin' | 'member'; // 成员角色
+export type CircleJoinMode = 'open' | 'approve' | 'invite'; // 加入方式
+
+export interface CircleSummary { // 圈子列表项 / 详情投影
+  slug: string; // 对外标识
+  name: string; // 圈子名称
+  intro: string; // 简介
+  cover_url: string | null; // 封面
+  owner_id: string; // 圈主用户 ID
+  visibility: 'public' | 'private'; // 可见性
+  join_mode: CircleJoinMode; // 加入方式
+  member_limit: number; // 成员上限（0 不限）
+  category: string | null; // 分类
+  status: 'active' | 'archived'; // 状态
+  member_count: number; // active 成员数
+  i_am_member: boolean; // 当前用户是否已加入
+  my_role: CircleRole | null; // 当前用户角色
+}
+
+export interface CircleMember { // 成员名单项
+  user_id: string; // 用户 ID
+  role: CircleRole; // 角色
+  status: 'pending' | 'active' | 'left'; // 关系状态
+  joined_at: string; // 加入时间
+  name: string | null; // 展示名
+  member_no: string | null; // Mim ID
+}
+
+export interface CirclePost { // 圈内动态
+  id: string; // 主键
+  thread_id: string | null; // 关联板块帖（可空；纯圈内动态为 null）
+  author_id: string; // 作者 ID
+  body: string; // 正文
+  created_at: string; // 时间
+  author_name: string | null; // 作者昵称
+  author_member_no: string | null; // 作者 Mim ID
+}
+
+export interface CircleNotice { // 圈内公告
+  id: string; // 主键
+  author_id: string; // 发布者 ID
+  body: string; // 公告正文
+  created_at: string; // 时间
+  author_name: string | null; // 发布者昵称
+  author_member_no: string | null; // 发布者 Mim ID
+}
+
+export interface CircleCreatePayload { // 创建圈子入参
+  slug: string; // 标识
+  name: string; // 名称
+  intro?: string; // 简介
+  cover_url?: string | null; // 封面
+  visibility?: 'public' | 'private'; // 可见性
+  join_mode?: CircleJoinMode; // 加入方式
+  member_limit?: number; // 成员上限
+  category?: string | null; // 分类
 }
 
 export interface VipPlan { // 会员套餐
@@ -2308,12 +2515,23 @@ export interface PageBlock { // 页面区块
 
 // ---------- 内容运营共享类型：公告 / 更新日志 / 推广计划，与冻结响应契约一一对应 ----------
 
+/** 积分抵扣运行口径（公开只读；总开关关闭时前端整块隐藏抵扣面板） */
+export interface PointsDeductionConfig {
+  enabled: boolean; // 积分抵扣总开关
+  points_per_yuan: number; // 多少积分折抵 1 元
+  max_ratio_percent: number; // 单笔抵扣上限占应付金额的百分比（0–100）
+}
+
 export interface AnnouncementItem { // 公告条目
   id: string; // 主键
   title: string; // 标题
   body: string; // 正文
   pinned: boolean; // 是否置顶
   published_at: string | null; // 发布时间
+  level?: 'info' | 'warning' | 'success' | 'danger'; // 管理端：公告级别（公开清单缺省）
+  status?: 'draft' | 'published' | 'archived'; // 管理端：审核状态（公开清单缺省）
+  starts_at?: string | null; // 管理端：有效期起
+  ends_at?: string | null; // 管理端：有效期止
 }
 
 export interface ChangelogItem { // 更新日志条目
@@ -2322,6 +2540,8 @@ export interface ChangelogItem { // 更新日志条目
   title: string; // 标题
   body: string; // 正文
   published_at: string | null; // 发布时间
+  changes?: string[]; // 管理端：变更清单
+  status?: 'draft' | 'published' | 'archived'; // 管理端：审核状态（公开清单缺省）
 }
 
 export interface PromotionItem { // 推广计划条目
@@ -2332,6 +2552,41 @@ export interface PromotionItem { // 推广计划条目
   starts_at: string | null; // 起始时间
   ends_at: string | null; // 截止时间
   status: string; // 状态
+  code?: string | null; // 管理端：推广码
+  budget_cents?: number; // 管理端：预算（分，仅统计）
+}
+
+/** 公告管理入参（与 /admin/content/announcements 契约对齐） */
+export interface AnnouncementUpsertPayload {
+  title: string; // 标题（必填）
+  body?: string; // 正文
+  level?: 'info' | 'warning' | 'success' | 'danger'; // 级别
+  status?: 'draft' | 'published' | 'archived'; // 状态
+  starts_at?: string | null; // 有效期起
+  ends_at?: string | null; // 有效期止
+  pinned?: boolean; // 是否置顶
+}
+
+/** 更新日志管理入参（与 /admin/content/changelog 契约对齐） */
+export interface ChangelogUpsertPayload {
+  version: string; // 语义版本号（必填）
+  title: string; // 标题（必填）
+  body?: string; // 正文
+  changes?: string[]; // 变更清单
+  published_at?: string | null; // 发布时间
+  status?: 'draft' | 'published' | 'archived'; // 状态
+}
+
+/** 推广计划管理入参（与 /admin/content/promotions 契约对齐） */
+export interface PromotionUpsertPayload {
+  name: string; // 名称（必填）
+  summary?: string; // 简介
+  target_url?: string; // 落地页
+  code?: string | null; // 推广码
+  starts_at?: string | null; // 有效期起
+  ends_at?: string | null; // 有效期止
+  status?: 'draft' | 'active' | 'paused' | 'archived'; // 状态
+  budget_cents?: number; // 预算（分，仅统计）
 }
 
 // ---------- 板块 Tab 栏目：兼容后端 sort_order/sort_by 与冻结契约 order/sort 两套字段名 ----------

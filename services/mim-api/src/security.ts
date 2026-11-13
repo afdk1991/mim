@@ -543,6 +543,37 @@ export async function assertPublicHttpUrl(raw: string): Promise<void> { // 定�
   return assertSafeOutboundUrl(raw); // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 
+/** 厂商配置来源地址校验选项 */
+export interface ProviderBaseUrlOptions {
+  /** 显式放行 http 配置（仅本地 / 内网联调；缺省拒绝明文 http） */
+  allowInsecure?: boolean;
+}
+
+/**
+ * 校验 AI 厂商 baseUrl 这一「配置来源」地址：
+ * - 协议白名单：缺省只允许 https；`allowInsecure`（MIM_AI_ALLOW_INSECURE_BASE=1）时才放行 http；
+ * - 字面环回 / 私网 / 链路本地 / 元数据地址一律拒绝（防止配置被改成内网探测目标）；
+ * - 域名形式不做 DNS 解析：配置由部署方注入，仅拦截字面内网，域名解析后的私网由出站 fetch 链路复核。
+ */
+export function assertProviderBaseUrl(raw: string, opts?: ProviderBaseUrlOptions): void {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new AppError('VALIDATION_FAILED', 'invalid provider base url');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new AppError('VALIDATION_FAILED', 'unsupported provider base url protocol');
+  if (url.protocol === 'http:' && !opts?.allowInsecure) throw new AppError('VALIDATION_FAILED', 'insecure http provider base url is not allowed; set MIM_AI_ALLOW_INSECURE_BASE=1 to opt in');
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new AppError('VALIDATION_FAILED', 'private host is not allowed');
+  const normalizedV4 = normalizeIPv4Host(host);
+  if (normalizedV4) {
+    if (isPrivateIPv4(normalizedV4)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed');
+    return;
+  }
+  if (isIP(host) === 6 && isPrivateIPv6(host)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed');
+}
+
 const MAX_REDIRECTS = 5; // 保存 MAX_REDIRECTS：承载本步骤的计算结果供后续使用
 
 /**

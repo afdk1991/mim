@@ -561,6 +561,7 @@ export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺�
   { code: 'rbac:write', name: { 'zh-CN': '管理角色权限', 'en-US': 'Manage roles' } }, // 增删角色、改权限、改用户角色
   { code: 'commerce:write', name: { 'zh-CN': '处理交易与资金', 'en-US': 'Manage commerce' } }, // 发货、售后审核、提现审核等交易侧写操作
   { code: 'appearance:write', name: { 'zh-CN': '管理外观与页面', 'en-US': 'Manage appearance' } }, // 主题、导航、配色与页面区块配置
+  { code: 'content:write', name: { 'zh-CN': '维护内容运营', 'en-US': 'Manage content' } }, // 公告、更新日志、推广计划的维护与发布归档
 ] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
 
 /** 权限点编码联合类型：路由调用处传错字符串会在编译期报错 */

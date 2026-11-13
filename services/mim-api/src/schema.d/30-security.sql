@@ -8,3 +8,19 @@ CREATE INDEX IF NOT EXISTS idx_content_reports_scope
 -- 验证码题目批次清理：按创建时间辅助扫描过期 / 已消费题目（expires_at 已有单列索引）。
 CREATE INDEX IF NOT EXISTS idx_captchas_created
   ON captchas(created_at);
+
+-- CDN 主动刷新审计：记录每次 purge 的操作者 / 厂商 / 结果 / URL 清单（幂等建表）。
+CREATE TABLE IF NOT EXISTS cdn_purge_audit (
+  id TEXT PRIMARY KEY,
+  actor_id TEXT,
+  provider TEXT NOT NULL,
+  ok INTEGER NOT NULL,
+  configured INTEGER NOT NULL,
+  purged_json TEXT NOT NULL DEFAULT '[]',
+  error TEXT,
+  status INTEGER,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cdn_purge_created
+  ON cdn_purge_audit(created_at);

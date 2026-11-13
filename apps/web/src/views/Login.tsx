@@ -1,15 +1,28 @@
 // 引入 useState / useEffect / useRef：维护登录表单状态、消费第三方回调参数，并防止票据被重复兑换
 import { useEffect, useRef, useState } from 'react';
 // 引入 FormEvent 类型：为表单提交处理函数的入参做类型标注
-import type { FormEvent } from 'react';
+import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react';
 // 引入 t 函数：按当前 locale 从 i18n 词条表取文案
 import { t } from '@mim/i18n';
 // 引入 Locale 类型：把语言取值约束为 'zh-CN' | 'en-US'
 import type { Locale } from '@mim/i18n';
 // 引入接口客户端、错误文案翻译器、会话持久化工具
 import { api, errorText, setSession } from '../api';
-// 引入登录相关类型：登录结果、身份提供方、账号区域、第三方提供方
-import type { LoginResult, OAuthProviderInfo, Provider, Region } from '../api';
+// 引入登录相关类型：登录结果、身份提供方、账号区域、第三方提供方、验证码状态/题目/票据
+import type {
+  CaptchaIssue,
+  CaptchaScene,
+  CaptchaTicket,
+  LoginResult,
+  OAuthProviderInfo,
+  Provider,
+  Region,
+  SecurityStatus,
+} from '../api';
+
+/** 滑动拼图可拖动区间：与后端 SLIDER_WIDTH=300、缺口宽 42 对齐 */
+const SLIDER_TRACK_WIDTH = 300;
+const SLIDER_GAP_SIZE = 42;
 
 /** 从地址栏移除 OAuth 回传参数：票据与错误码都只消费一次，刷新不应重放 */
 function clearOAuthParams(): void {
@@ -80,26 +93,177 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [registered, setRegistered] = useState<LoginResult | null>(null);
   // 票据只消费一次：开发环境 StrictMode 会让挂载 effect 跑两遍，重复兑换必然 401
   const oauthHandled = useRef(false);
-  // 图形验证码：服务端开启 MIM_CAPTCHA_REQUIRED 时，发码前必须先通过
-  const [captchaRequired, setCaptchaRequired] = useState(false);
-  const [captchaId, setCaptchaId] = useState('');
-  const [captchaSvg, setCaptchaSvg] = useState('');
-  const [captchaCode, setCaptchaCode] = useState('');
+  // ===== 验证码闭环：按 security/status 下发的 mode 渲染 image / slider / 第三方 SDK；off 零影响 =====
+  const [security, setSecurity] = useState<SecurityStatus | null>(null); // 安全能力状态
+  const [issue, setIssue] = useState<CaptchaIssue | null>(null); // 当前场景题目
+  const [captchaCode, setCaptchaCode] = useState(''); // image 图形答案
+  const [sliderX, setSliderX] = useState<number | null>(null); // slider 拼图落点 x（px）
+  const [sliderDragging, setSliderDragging] = useState(false); // slider 拖拽中标记
+  const dragStartX = useRef(0); // 拖拽起点指针位置
+  const dragOffset = useRef(0); // 拖拽起点对应的拼图偏移
+  // 第三方 SDK 票据：tencent 用 ticket/randstr；geetest4 用 lot_number 四元组
+  const [ticket, setTicket] = useState('');
+  const [randstr, setRandstr] = useState('');
+  const [lotNumber, setLotNumber] = useState('');
+  const [captchaOutput, setCaptchaOutput] = useState('');
+  const [passToken, setPassToken] = useState('');
+  const [genTime, setGenTime] = useState('');
 
-  // 挂载时查安全状态；需要验证码时立即取一张
+  // 当前验证码场景：注册模式取 register，其余取 login
+  const captchaScene: CaptchaScene = mode === 'register' ? 'register' : 'login';
+  const captchaMode = security?.captcha.mode ?? 'off';
+  const captchaRequired = Boolean(security && security.captcha_required && captchaMode !== 'off');
+  // 第三方模式凭证未配置时隐藏而不是报错；后端缺凭证会 503，前端按 providers 兜底不渲染
+  const thirdPartyReady =
+    captchaMode === 'tencent' ? Boolean(security?.captcha.providers.tencent)
+    : captchaMode === 'geetest4' ? Boolean(security?.captcha.providers.geetest4)
+    : false;
+  const captchaVisible = captchaRequired && (captchaMode !== 'tencent' && captchaMode !== 'geetest4' || thirdPartyReady);
+
+  // 挂载时查安全能力状态；离线 / 接口异常回落 null，等价 off 模式，不打断登录
   useEffect(() => {
+    let alive = true;
     api.securityStatus()
-      .then((status) => {
-        setCaptchaRequired(status.captcha_required);
-        if (status.captcha_required) {
-          api.captcha().then((item) => {
-            setCaptchaId(item.id);
-            setCaptchaSvg(item.svg);
-          }).catch(() => setCaptchaRequired(false));
-        }
-      })
-      .catch(() => setCaptchaRequired(false));
+      .then((status) => { if (alive) setSecurity(status); })
+      .catch(() => { if (alive) setSecurity(null); });
+    return () => { alive = false; };
   }, []);
+
+  // 场景切换或强制状态变化时重新签发题目；一次性消费，失败回落 off 不阻塞主流程
+  useEffect(() => {
+    if (!captchaRequired) { setIssue(null); return; }
+    let alive = true;
+    api.captcha(captchaScene)
+      .then((item) => {
+        if (!alive) return;
+        setIssue(item);
+        setCaptchaCode('');
+        setSliderX(null);
+        setTicket(''); setRandstr(''); setLotNumber(''); setCaptchaOutput(''); setPassToken(''); setGenTime('');
+      })
+      .catch(() => { if (alive) { setIssue(null); setSecurity(null); } });
+    return () => { alive = false; };
+  }, [captchaScene, captchaRequired]);
+
+  /** 刷新验证码：image 换一张 SVG，slider 换一题拼图；第三方 SDK 重新拉起由其自身回调覆盖 */
+  async function refreshCaptcha() {
+    try {
+      const item = await api.captcha(captchaScene);
+      setIssue(item);
+      setCaptchaCode('');
+      setSliderX(null);
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  /** 按当前 mode 组装提交票据；off / 未强制时返回空对象，不携带任何验证码字段 */
+  function buildCaptchaTicket(): CaptchaTicket {
+    if (!captchaVisible || !issue) return {};
+    switch (captchaMode) {
+      case 'image': return { captcha_id: issue.id, captcha_code: captchaCode.trim() };
+      case 'slider': return { captcha_id: issue.id, slider_x: sliderX ?? undefined };
+      case 'tencent': return { ticket, randstr };
+      case 'geetest4': return { lot_number: lotNumber, captcha_output: captchaOutput, pass_token: passToken, gen_time: genTime };
+      default: return {};
+    }
+  }
+
+  /** 提交前校验验证码是否已完成；off / 未强制恒为 true，不打断 0.0.9 现网登录 */
+  function captchaReady(): boolean {
+    if (!captchaVisible) return true;
+    switch (captchaMode) {
+      case 'image': return Boolean(issue?.id && captchaCode.trim());
+      case 'slider': return sliderX !== null;
+      case 'tencent': return Boolean(ticket && randstr);
+      case 'geetest4': return Boolean(lotNumber && captchaOutput && passToken && genTime);
+      default: return true;
+    }
+  }
+
+  // ===== 滑动拼图拖拽：记录指针偏移作为 slider_x，提交时回传后端容差校验 =====
+  function onSliderDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!issue?.slider) return;
+    dragStartX.current = event.clientX;
+    dragOffset.current = sliderX ?? 0;
+    setSliderDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function onSliderMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!sliderDragging) return;
+    const next = Math.min(SLIDER_TRACK_WIDTH - SLIDER_GAP_SIZE, Math.max(0, dragOffset.current + (event.clientX - dragStartX.current)));
+    setSliderX(next);
+  }
+  function onSliderUp() {
+    setSliderDragging(false);
+  }
+
+  /** 渲染验证码交互区：按 mode 切换图形 / 拼图 / 第三方 SDK 占位；off 或未配置不输出任何节点 */
+  function renderCaptchaPanel() {
+    if (!captchaVisible) return null;
+    const zh = locale !== 'en-US';
+
+    if (captchaMode === 'image') {
+      return (
+        <div className="login-captcha">
+          {issue?.svg ? (
+            <span className="login-captcha-image" dangerouslySetInnerHTML={{ __html: issue.svg }} />
+          ) : null}
+          <input
+            value={captchaCode}
+            onChange={(event) => setCaptchaCode(event.target.value)}
+            placeholder={zh ? '图形验证码' : 'Image code'}
+            maxLength={10}
+            autoComplete="off"
+          />
+          <button type="button" className="btn ghost" onClick={() => void refreshCaptcha()}>
+            {zh ? '换一张' : 'Refresh'}
+          </button>
+        </div>
+      );
+    }
+
+    if (captchaMode === 'slider') {
+      const slider = issue?.slider;
+      return (
+        <div className="login-captcha slider-captcha">
+          <div className="slider-track" style={{ height: SLIDER_GAP_SIZE }}>
+            {slider?.background ? (
+              <span className="slider-bg" dangerouslySetInnerHTML={{ __html: slider.background }} />
+            ) : null}
+            {slider ? (
+              <button
+                type="button"
+                className="slider-piece"
+                style={{ top: slider.gap.y, left: sliderX ?? 0, width: slider.gap.width, height: slider.gap.height }}
+                onPointerDown={onSliderDown}
+                onPointerMove={onSliderMove}
+                onPointerUp={onSliderUp}
+                onPointerCancel={onSliderUp}
+                aria-label={zh ? '拖动拼图完成验证' : 'Drag the puzzle piece to verify'}
+              />
+            ) : null}
+          </div>
+          <button type="button" className="btn ghost" onClick={() => void refreshCaptcha()}>
+            {zh ? '刷新拼图' : 'Refresh puzzle'}
+          </button>
+        </div>
+      );
+    }
+
+    // tencent / geetest4：凭证已由后端 providers 披露为齐备。
+    // 真实接入时在此挂载 TCaptcha / 极验 4.0 JS 组件，回调把票据写回上方 state；
+    // 0.0.9 部署默认未配置第三方密钥，该分支不会渲染（providers=false 时整块隐藏）。
+    return (
+      <div className="login-captcha thirdparty-captcha">
+        <p className="hint">
+          {captchaMode === 'tencent'
+            ? zh ? '腾讯验证码组件待加载完成后在此弹出。' : 'Tencent captcha widget will mount here.'
+            : zh ? '极验验证码组件待加载完成后在此弹出。' : 'GeeTest v4 widget will mount here.'}
+        </p>
+      </div>
+    );
+  }
 
   // 挂载时查一次通道能力；失败静默降级，不阻塞登录主流程
   useEffect(() => {
@@ -198,20 +362,17 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setError(null);
     try {
       // 调用后端下发验证码；trim 去掉首尾空格以通过服务端格式校验
-      const result = await api.requestCode(
-        region,
-        provider,
-        identifier.trim(),
-        captchaRequired ? { id: captchaId, code: captchaCode.trim() } : undefined,
-      );
+      // 发码链路后端只消费图形验证码字段；slider / 第三方票据在登录 / 注册提交时随主请求携带
+      const imageTicket = captchaMode === 'image' && issue?.id
+        ? { id: issue.id, code: captchaCode.trim() }
+        : undefined;
+      const result = await api.requestCode(region, provider, identifier.trim(), imageTicket);
       // 保存后端返回的开发态验证码；生产环境一般为 null 不展示
       setDevCode(result.dev_code);
-      // 验证码一次性使用，发送后立即换一张
-      if (captchaRequired) {
+      // 图形验证码一次性使用，发送后立即换一张
+      if (captchaMode === 'image') {
         setCaptchaCode('');
-        const next = await api.captcha();
-        setCaptchaId(next.id);
-        setCaptchaSvg(next.svg);
+        await refreshCaptcha();
       }
     } catch (err) {
       // 把后端或网络异常翻译成当前语言的提示文案
@@ -226,10 +387,17 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   async function submit(event: FormEvent) {
     // 阻止浏览器默认提交导致的整页刷新
     event.preventDefault();
+    // 验证码未完成时阻断提交，避免把空票据发给后端
+    if (!captchaReady()) {
+      setError(locale === 'en-US' ? 'Please complete the security verification.' : '请先完成安全验证。');
+      return;
+    }
     // 标记请求中，提交按钮变灰并显示加载文案
     setBusy(true);
     // 提交前清空旧错误
     setError(null);
+    // 按当前 mode 组装票据；off / 未强制时为空对象，不携带任何验证码字段
+    const ticketPayload = buildCaptchaTicket();
     try {
       // 三选一发起认证请求，三条分支都返回统一的登录凭证
       const result =
@@ -241,10 +409,11 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               password,
               display_name: displayName.trim() || undefined,
               invite_code: inviteCode.trim() || undefined, // 注册门槛开启时后端据此核销
+              ...ticketPayload,
             })
           // 密码模式：区域 + 账号标识 + 密码换取会话
           : mode === 'password'
-            ? await api.loginWithPassword({ region, identifier: identifier.trim(), password })
+            ? await api.loginWithPassword({ region, identifier: identifier.trim(), password, ...ticketPayload })
             // 验证码模式：区域 + 提供方 + 账号标识 + 验证码换取会话
             : await api.login({
                 // 账号所属区域
@@ -255,6 +424,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 identifier: identifier.trim(),
                 // 用户填写的验证码，去空格后提交
                 code: code.trim(),
+                ...ticketPayload,
               });
       // 注册模式先停在成功面板：把自动分配的 Mim ID 展示给用户，再进入工作台
       if (mode === 'register') {
@@ -452,31 +622,6 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           ) : (
             <label>{/* 验证码模式：验证码输入框与发送按钮同行 */}
               <span>{t(locale, 'auth.code')}</span>{/* 验证码标题，走 i18n */}
-              {captchaRequired && (
-                <div className="login-captcha">
-                  <span className="login-captcha-image" dangerouslySetInnerHTML={{ __html: captchaSvg }} />
-                  <input
-                    value={captchaCode}
-                    onChange={(event) => setCaptchaCode(event.target.value)}
-                    placeholder={locale === 'en-US' ? 'Image code' : '图形验证码'}
-                    maxLength={10}
-                    autoComplete="off"
-                  />
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => {
-                      api.captcha().then((item) => {
-                        setCaptchaId(item.id);
-                        setCaptchaSvg(item.svg);
-                        setCaptchaCode('');
-                      }).catch((err) => setError(errorText(locale, err)));
-                    }}
-                  >
-                    换一张
-                  </button>
-                </div>
-              )}
               <div className="row">{/* 水平排列验证码输入框与发送按钮 */}
                 <input
                   // 受控值绑定 code
@@ -507,6 +652,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               </div>{/* 结束验证码行容器 */}
             </label> // 结束验证码输入项
           )}{/* 结束按模式切换凭证输入区 */}
+
+          {renderCaptchaPanel()}{/* 验证码交互区：image / slider / 第三方 SDK，off 模式不输出节点 */}
 
           {devCode && ( // 开发态验证码回显：仅在接口返回 dev_code 时出现
             <p className="dev-code">{/* 开发提示行，便于本地联调读取验证码 */}

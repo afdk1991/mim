@@ -1035,6 +1035,7 @@ export function Community({ locale }: Props) {
                     <div className="community-buy-form">
                       <label>数量<input value={quantity} onChange={(e) => setQuantity(Math.min(10, Math.max(1, Number(e.target.value) || 1)))} inputMode="numeric" /></label>
                       <label>优惠码<input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="MIM10 / VIP20" /></label>
+                      <small className="community-buy-note">余额 {wallet ? yuan(wallet.balance_cents) : '—'} · 积分 {wallet?.points ?? 0}（独立商城下单不支持积分抵扣，按余额与优惠码结算）</small>
                       {p.kind === 'physical' && (
                         <>
                           <input value={shipName} onChange={(e) => setShipName(e.target.value)} placeholder="收货人" />

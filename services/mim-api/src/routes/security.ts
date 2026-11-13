@@ -20,6 +20,7 @@ import {
   type CaptchaScene,
 } from '../security.js';
 import type { ApiDeps } from '../types.js';
+import { describeCdn, purgeCdn, type PurgeResult } from '../cdn.js';
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
 const REPORT_SCENES: CaptchaScene[] = ['register', 'login', 'report', 'post']; // 状态披露用全场景清单
@@ -33,6 +34,7 @@ function reportLimit(env: Record<string, string | undefined>): { limit: number; 
 
 export function createSecurityRouter(deps: ApiDeps): Router {
   const router = Router();
+  let lastPurge: PurgeResult | null = null; // 最近一次 CDN 刷新结果（进程内留存，持久审计见 cdn_purge_audit 表）
 
   /** 公开能力状态：前端据此决定是否展示验证码与审核提示；如实回显当前模式 / 凭证齐备度 / 审核降级策略。 */
   router.get('/security/status', (_req, res) => {
@@ -120,6 +122,35 @@ export function createSecurityRouter(deps: ApiDeps): Router {
   /** 索引巡检：缺失索引建议与慢查询候选（只读，供 DBA / 运营复核执行计划）。 */
   router.get('/security/index-audit', requirePermission('commerce:write'), (_req, res) => {
     res.json(inspectIndexes(deps.db));
+  });
+
+  /** CDN 配置与回源缓存契约状态：如实回显厂商 / 齐备度 / 策略清单 / 最近刷新结果。 */
+  router.get('/security/cdn', requirePermission('commerce:write'), (_req, res) => {
+    res.json({ ...describeCdn(deps.env), purge_last_result: lastPurge });
+  });
+
+  /** 主动刷新 CDN 缓存：需管理权限（commerce:write 等价管理门禁），结果落 cdn_purge_audit 审计表。 */
+  router.post('/security/cdn/purge', requireAuth, requirePermission('commerce:write'), idempotency, async (req, res) => {
+    const body = parse(z.object({ urls: z.array(z.string().url()).min(1) }), req.body);
+    const result = await purgeCdn(deps.env, body.urls);
+    lastPurge = result;
+    deps.db
+      .prepare(
+        `INSERT INTO cdn_purge_audit (id, actor_id, provider, ok, configured, purged_json, error, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        `cdn-purge-${randomUUID()}`,
+        req.user!.id,
+        result.provider,
+        result.ok ? 1 : 0,
+        result.configured ? 1 : 0,
+        JSON.stringify(result.purged),
+        result.error ?? null,
+        result.status ?? null,
+        now(),
+      );
+    res.status(result.ok ? 200 : result.configured ? 502 : 503).json(result);
   });
 
   /** 运营处置：通过则隐藏目标内容，驳回只记录结论。 */

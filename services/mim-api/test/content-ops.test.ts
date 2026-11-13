@@ -59,6 +59,25 @@ function adminWriteHeaders(): Record<string, string> {
   return { ...adminHeaders(), 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
 }
 
+/** 造一个持指定权限集合的用户并返回登录令牌；用于权限点兼容期断言。 */
+function tokenWithPermissions(deps: ApiDeps, permissions: string[]): string {
+  const user = createUser(deps.db, { region: 'cn', now: '2026-11-13T08:00:00.000Z' });
+  const roleCode = `role-${randomUUID()}`;
+  const now = '2026-11-13T08:00:00.000Z';
+  deps.db
+    .prepare("INSERT INTO roles (code, name_i18n, description_i18n, builtin, created_at, updated_at) VALUES (?, '{}', '{}', 0, ?, ?)")
+    .run(roleCode, now, now);
+  for (const permission of permissions) {
+    deps.db
+      .prepare('INSERT OR IGNORE INTO role_permissions (role_code, permission_code, created_at) VALUES (?, ?, ?)')
+      .run(roleCode, permission, now);
+  }
+  deps.db
+    .prepare('INSERT OR IGNORE INTO user_roles (user_id, role_code, granted_by, created_at) VALUES (?, ?, ?, ?)')
+    .run(user.id, roleCode, 'test', now);
+  return issueAccessToken(user.id, user.region, deps.jwtSecret);
+}
+
 describe('公开公告列表', () => {
   it('只回已发布且在有效期内的条目，置顶在前，字段严格匹配冻结契约', async () => {
     const { app } = setup(); // 准备：构造本用例需要的输入或句柄
@@ -331,5 +350,171 @@ describe('推广点击：幂等去重与频控防刷', () => {
     expect(paused.status).toBe(404); // 断言：校验响应字段与冻结契约一致
     const missing = await request(app).post('/api/v1/promotions/no-such-promo/click'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(missing.status).toBe(404); // 断言：校验响应字段与冻结契约一致
+  });
+});
+
+describe('管理端权限点：content:write 与 appearance:write 兼容期', () => {
+  it('SQL 种子已注册 content:write 并授予内置超管', async () => {
+    const { deps } = setup();
+    const permission = deps.db.prepare('SELECT code FROM permissions WHERE code = ?').get('content:write');
+    expect(permission).toBeTruthy();
+    const grant = deps.db
+      .prepare('SELECT 1 AS hit FROM role_permissions WHERE role_code = ? AND permission_code = ?')
+      .get('superadmin', 'content:write');
+    expect(grant).toBeTruthy();
+  });
+
+  it('仅持 content:write 的用户可访问管理端', async () => {
+    const { app, deps } = setup();
+    const token = tokenWithPermissions(deps, ['content:write']);
+    const res = await request(app).get('/api/v1/admin/content/announcements').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('仅持旧权限 appearance:write 的用户兼容期内仍可访问', async () => {
+    const { app, deps } = setup();
+    const token = tokenWithPermissions(deps, ['appearance:write']);
+    const res = await request(app).get('/api/v1/admin/content/announcements').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('两者都没有的用户返回 403', async () => {
+    const { app, deps } = setup();
+    const token = tokenWithPermissions(deps, ['module:read']); // 只读权限，不含内容运营
+    const res = await request(app).get('/api/v1/admin/content/announcements').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});
+
+describe('推广转化回写：幂等去重与频控防刷', () => {
+  it('同一幂等键重复转化只入账一次，conversion_count 不重复增加', async () => {
+    const { app } = setup();
+    const first = await request(app)
+      .post('/api/v1/promotions/promo-seed-launch/conversion')
+      .set('idempotency-key', 'conv-key-1');
+    expect(first.status).toBe(200);
+    expect(first.body.deduped).toBe(false);
+    expect(first.body.conversion_count).toBe(1);
+
+    const second = await request(app)
+      .post('/api/v1/promotions/promo-seed-launch/conversion')
+      .set('idempotency-key', 'conv-key-1');
+    expect(second.status).toBe(200);
+    expect(second.body.deduped).toBe(true); // 命中幂等回放
+    expect(second.body.conversion_count).toBe(1); // 计数不重复增加
+  });
+
+  it('滑动窗口频控：超过转化上限返回 429 RATE_LIMITED 并带 Retry-After', async () => {
+    const { app } = setup({ MIM_CONTENT_CONVERSION_MAX: '2', MIM_CONTENT_CLICK_WINDOW_SECONDS: '600' });
+    const ok1 = await request(app).post('/api/v1/promotions/promo-seed-launch/conversion');
+    expect(ok1.status).toBe(200);
+    const ok2 = await request(app).post('/api/v1/promotions/promo-seed-launch/conversion');
+    expect(ok2.status).toBe(200);
+    const limited = await request(app).post('/api/v1/promotions/promo-seed-launch/conversion');
+    expect(limited.status).toBe(429);
+    expect(limited.body.code).toBe('RATE_LIMITED');
+    expect(limited.headers['retry-after']).toBeTruthy();
+  });
+
+  it('上报非进行中 / 不存在的计划返回 404', async () => {
+    const { app } = setup();
+    const draft = await request(app)
+      .post('/api/v1/admin/content/promotions')
+      .set(adminWriteHeaders())
+      .send({ name: '暂停计划', status: 'paused' });
+    const pausedId = draft.body.item.id as string;
+
+    const paused = await request(app).post(`/api/v1/promotions/${pausedId}/conversion`);
+    expect(paused.status).toBe(404);
+    const missing = await request(app).post('/api/v1/promotions/no-such-promo/conversion');
+    expect(missing.status).toBe(404);
+  });
+});
+
+describe('公告与更新日志状态流转', () => {
+  it('公告：草稿 → 发布（写 published_at）→ 重复发布 409 → 归档 → 重复归档 409 → 重发保留原发布时间', async () => {
+    const { app } = setup();
+    const create = await request(app)
+      .post('/api/v1/admin/content/announcements')
+      .set(adminWriteHeaders())
+      .send({ title: '流转公告', body: 'x', status: 'draft' });
+    expect(create.status).toBe(201);
+    const id = create.body.item.id as string;
+
+    const publish = await request(app)
+      .post(`/api/v1/admin/content/announcements/${id}/publish`)
+      .set(adminWriteHeaders());
+    expect(publish.status).toBe(200);
+    expect(publish.body.item.status).toBe('published');
+    expect(publish.body.item.published_at).toBeTruthy();
+    const firstPublishedAt = publish.body.item.published_at as string;
+
+    const republish = await request(app)
+      .post(`/api/v1/admin/content/announcements/${id}/publish`)
+      .set(adminWriteHeaders());
+    expect(republish.status).toBe(409);
+    expect(republish.body.code).toBe('CONFLICT');
+
+    const archive = await request(app)
+      .post(`/api/v1/admin/content/announcements/${id}/archive`)
+      .set(adminWriteHeaders());
+    expect(archive.status).toBe(200);
+    expect(archive.body.item.status).toBe('archived');
+
+    const rearchive = await request(app)
+      .post(`/api/v1/admin/content/announcements/${id}/archive`)
+      .set(adminWriteHeaders());
+    expect(rearchive.status).toBe(409);
+
+    const republishAfterArchive = await request(app)
+      .post(`/api/v1/admin/content/announcements/${id}/publish`)
+      .set(adminWriteHeaders());
+    expect(republishAfterArchive.status).toBe(200);
+    expect(republishAfterArchive.body.item.status).toBe('published');
+    expect(republishAfterArchive.body.item.published_at).toBe(firstPublishedAt); // 重发不覆盖首次发布时间
+  });
+
+  it('更新日志：草稿 → 发布（写 published_at）→ 重复发布 409 → 归档 → 重复归档 409', async () => {
+    const { app } = setup();
+    const create = await request(app)
+      .post('/api/v1/admin/content/changelog')
+      .set(adminWriteHeaders())
+      .send({ version: '0.0.20', title: '流转版本', body: 'x', status: 'draft' });
+    expect(create.status).toBe(201);
+    const id = create.body.item.id as string;
+
+    const publish = await request(app)
+      .post(`/api/v1/admin/content/changelog/${id}/publish`)
+      .set(adminWriteHeaders());
+    expect(publish.status).toBe(200);
+    expect(publish.body.item.status).toBe('published');
+    expect(publish.body.item.published_at).toBeTruthy();
+
+    const republish = await request(app)
+      .post(`/api/v1/admin/content/changelog/${id}/publish`)
+      .set(adminWriteHeaders());
+    expect(republish.status).toBe(409);
+    expect(republish.body.code).toBe('CONFLICT');
+
+    const archive = await request(app)
+      .post(`/api/v1/admin/content/changelog/${id}/archive`)
+      .set(adminWriteHeaders());
+    expect(archive.status).toBe(200);
+    expect(archive.body.item.status).toBe('archived');
+
+    const rearchive = await request(app)
+      .post(`/api/v1/admin/content/changelog/${id}/archive`)
+      .set(adminWriteHeaders());
+    expect(rearchive.status).toBe(409);
+  });
+
+  it('对不存在的资源执行流转返回 404', async () => {
+    const { app } = setup();
+    const res = await request(app)
+      .post('/api/v1/admin/content/announcements/no-such-id/publish')
+      .set(adminWriteHeaders());
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('NOT_FOUND');
   });
 });

@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'; // com
 import { join } from 'node:path'; // compose 合成时拼接临时路径
 import { randomBytes } from 'node:crypto'; // compose 合成时生成唯一临时子目录名
 import { spawnSync } from 'node:child_process'; // compose 合成时同步调用 ffmpeg
+import { assertProviderBaseUrl, safeOutboundFetch } from './security.js'; // SSRF：厂商配置来源校验 + 上游回源受控 fetch
 
 const JOB_TYPES = ['text', 'image', 'video', 'tts', 'compose'] as const; // 任务类型白名单，作为路由与校验的唯一事实来源
 type JobType = (typeof JOB_TYPES)[number]; // 由常量数组反推字面量联合类型，保证 switch/映射表被类型检查覆盖
@@ -149,6 +150,7 @@ interface OpenAiCompatConfig { // 兼容网关所需的最小配置集合
   textModel: string; // 文本任务模型名
   imageModel: string; // 图片任务模型名
   ttsModel: string; // 语音合成模型名（兼容网关需支持 /audio/speech）
+  allowInsecure: boolean; // 是否显式放行 http 配置来源（MIM_AI_ALLOW_INSECURE_BASE=1）
 } // 结束 OpenAiCompatConfig
 
 function resolveOpenAiCompat(env: Record<string, string | undefined>): OpenAiCompatConfig | null { // 从环境变量解析兼容网关配置
@@ -160,6 +162,7 @@ function resolveOpenAiCompat(env: Record<string, string | undefined>): OpenAiCom
     textModel: (env.MIM_AI_TEXT_MODEL ?? '').trim() || 'gpt-4o-mini', // 未指定时用低成本默认模型
     imageModel: (env.MIM_AI_IMAGE_MODEL ?? '').trim() || 'dall-e-3', // 未指定时用通用文生图模型
     ttsModel: (env.MIM_AI_TTS_MODEL ?? '').trim() || 'tts-1', // 未指定时用 OpenAI 官方 TTS 模型；兼容网关如不支持会在调用时诚实失败
+    allowInsecure: (env.MIM_AI_ALLOW_INSECURE_BASE ?? '').trim() === '1', // 显式 opt-in 才放行 http 配置来源
   }; // 结束配置对象
 } // 结束 resolveOpenAiCompat
 
@@ -168,6 +171,7 @@ interface VideoProviderConfig { // 视频厂商所需的最小配置集合
   baseUrl: string; // 厂商 API 根地址（已去尾斜杠）
   apiKey: string; // 厂商凭证
   model: string; // 图生视频模型名
+  allowInsecure: boolean; // 是否显式放行 http 配置来源
 } // 结束 VideoProviderConfig
 
 function resolveVideoProvider(env: Record<string, string | undefined>): VideoProviderConfig | null { // 从环境变量解析独立视频厂商配置
@@ -178,6 +182,7 @@ function resolveVideoProvider(env: Record<string, string | undefined>): VideoPro
     baseUrl, // 已去尾斜杠的根地址
     apiKey, // 已裁剪的凭证
     model: (env.MIM_AI_VIDEO_MODEL ?? '').trim() || 'image-to-video', // 未指定时用通用图生视频模型名
+    allowInsecure: (env.MIM_AI_ALLOW_INSECURE_BASE ?? '').trim() === '1', // 显式 opt-in 才放行 http 配置来源
   }; // 结束配置对象
 } // 结束 resolveVideoProvider
 
@@ -375,6 +380,7 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
     jobType: JobType, // 已校验为 text/image 的任务类型
     job: JobRow, // 任务行，用于提取提示词与回填元数据
   ): Promise<{ body: Buffer; mime: string }> { // 返回真实模型产出的字节与 MIME
+    assertProviderBaseUrl(cfg.baseUrl, { allowInsecure: cfg.allowInsecure }); // 配置来源校验：https + 非内网，防配置被改成内网探测目标
     const prompt = promptOf(job); // 统一提取提示词
     if (jobType === 'text') { // 文本任务分支
       const data = (await openAiPost(cfg, '/chat/completions', { // 文本任务走 chat completions
@@ -422,8 +428,8 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
     if (first?.b64_json) { // 网关直接回 base64
       return { body: Buffer.from(first.b64_json, 'base64'), mime: 'image/png' }; // 直接解码为字节落盘
     } // 结束 base64 分支
-    if (first?.url) { // 网关只回 url
-      const img = await fetch(first.url, { signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS) }); // 回源拉取图片字节
+    if (first?.url) { // 网关只回 url：上游返回地址必须过 SSRF 守卫 + 受控 fetch（逐跳复核，禁止内网/环回/元数据/跳转内网）
+      const img = await safeOutboundFetch(first.url, { signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS) }); // 回源拉取图片字节
       if (!img.ok) throw new Error(`openai-compatible image fetch HTTP ${img.status}`); // 拉取失败即任务失败，不落残缺产物
       return { body: Buffer.from(await img.arrayBuffer()), mime: 'image/png' }; // 以字节形式写入对象存储
     } // 结束 url 分支
@@ -463,6 +469,7 @@ async function produceWithVideo(
   cfg: VideoProviderConfig, // 已解析的视频厂商配置
   job: JobRow, // 任务行，用于提取提示词与参考图
 ): Promise<{ body: Buffer; mime: string }> { // 返回视频字节与 MIME
+  assertProviderBaseUrl(cfg.baseUrl, { allowInsecure: cfg.allowInsecure }); // 配置来源校验：https + 非内网
   const prompt = promptOf(job); // 统一提取提示词
   let imageObjectKey: string | null = null; // 参考图对象键（图生视频需要）
   try { // 尝试从 payload 取参考图
@@ -498,8 +505,8 @@ async function produceWithVideo(
   if (item?.b64_json) { // 厂商直接回 base64 视频
     return { body: Buffer.from(item.b64_json, 'base64'), mime: 'video/mp4' }; // 解码为字节落盘
   } // 结束 base64 分支
-  if (item?.video_url) { // 厂商回视频 URL
-    const vid = await fetch(item.video_url, { signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS) }); // 回源拉取视频字节
+  if (item?.video_url) { // 厂商回视频 URL：上游返回地址走 SSRF 守卫 + 受控 fetch
+    const vid = await safeOutboundFetch(item.video_url, { signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS) }); // 回源拉取视频字节
     if (!vid.ok) throw new Error(`video provider fetch HTTP ${vid.status}`); // 拉取失败即任务失败
     return { body: Buffer.from(await vid.arrayBuffer()), mime: 'video/mp4' }; // 以字节形式写入对象存储
   } // 结束 url 分支

@@ -451,3 +451,112 @@ describe('真实提供方（openai 兼容协议，fetch 打桩）', () => { // d
     expect(assets.body.items).toEqual([]); // 断言无产物，失败不留半成品
   }); // 结束上游失败用例
 }); // 结束真实提供方分组
+
+describe('出站 SSRF 加固（orchestrator 四处出站）', () => { // describe：上游 URL 受控 fetch + 厂商配置来源校验
+  const IMG_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; // 1x1 透明 PNG base64
+
+  const OPENAI_ENV: Record<string, string> = { // 与真实提供方分组同形配置
+    MIM_AI_PROVIDER: 'openai',
+    MIM_AI_OPENAI_API_KEY: 'sk-test',
+    MIM_AI_BASE_URL: 'https://llm.example.test/v1',
+    MIM_AI_IMAGE_MODEL: 'test-image-model',
+  };
+
+  function stubImageUrl(upstreamUrl: string, imageResponse?: { status: number; body: Buffer }) { // 打桩：生成接口回上游 URL，回源按预设响应
+    const spy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/images/generations')) {
+        return new Response(JSON.stringify({ data: [{ url: upstreamUrl }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (imageResponse) {
+        return new Response(new Uint8Array(imageResponse.body), { status: imageResponse.status, headers: { 'content-type': 'image/png' } });
+      }
+      throw new Error(`unexpected outbound fetch to ${url}`);
+    });
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  async function runImageJob(session: Session, projectId: string): Promise<request.Response> { // 派发并触发 image 任务
+    const jobId = await dispatchJob(session, projectId, { job_type: 'image', payload: { prompt: '一张图' } });
+    return request(app).post(`/api/v1/ai/jobs/${jobId}/run`).set(auth(session, nextKey())).send({});
+  }
+
+  it('上游返回内网图片 URL → 任务失败，不向内网回源', async () => { // 内网字面地址拒绝
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    const session = await login('13900000061');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-内网图');
+    const spy = stubImageUrl('http://127.0.0.1/secret.png');
+
+    const run = await runImageJob(session, projectId);
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('failed');
+    expect(['VALIDATION_FAILED', 'INTERNAL_ERROR']).toContain(run.body.run.error_code);
+    expect(String(run.body.job.result.error)).toContain('private');
+    expect(spy).toHaveBeenCalledTimes(1); // 只调用了生成接口，回源请求未到达
+  });
+
+  it('回源 302 跳转内网元数据地址 → 逐跳复核拒绝', async () => { // 重定向到内网/元数据拒绝
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    const session = await login('13900000062');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-跳转内网');
+    const spy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/images/generations')) {
+        return new Response(JSON.stringify({ data: [{ url: 'http://203.0.113.10/a.png' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      // 回源首跳为公网文档地址；返回 302 跳转到云元数据地址，复核链路应拦截
+      return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } });
+    });
+    vi.stubGlobal('fetch', spy);
+
+    const run = await runImageJob(session, projectId);
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('failed');
+    expect(String(run.body.job.result.error)).toContain('private');
+  });
+
+  it('伪装图片扩展名的 file:// 协议地址被协议白名单拒绝', async () => { // 扩展名伪装不绕过协议校验
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    const session = await login('13900000063');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-伪装协议');
+    stubImageUrl('file:///etc/passwd.png');
+
+    const run = await runImageJob(session, projectId);
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('failed');
+    expect(['VALIDATION_FAILED', 'INTERNAL_ERROR']).toContain(run.body.run.error_code);
+  });
+
+  it('合法公网图片 URL 回源落盘成功（stub 网络）', async () => { // 公网字面 IP 放行并落盘
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
+    const session = await login('13900000064');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-公网图');
+    stubImageUrl('http://203.0.113.10/photo.png', { status: 200, body: Buffer.from(IMG_PNG, 'base64') });
+
+    const run = await runImageJob(session, projectId);
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('succeeded');
+    expect(run.body.job.result.mime).toBe('image/png');
+  });
+
+  it('厂商 baseUrl 指向环回地址 → 配置来源校验拒绝', async () => { // 配置被改成内网探测目标时拦截
+    const insecureEnv: Record<string, string> = { ...OPENAI_ENV, MIM_AI_BASE_URL: 'http://127.0.0.1:9000/v1' };
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: insecureEnv, storage });
+    const session = await login('13900000065');
+    grantEntitlement(session.userId);
+    const { projectId } = await setupStoryboardedProject(session, '编排-内网厂商');
+    const spy = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', spy);
+
+    const jobId = await dispatchJob(session, projectId, { job_type: 'text', payload: { prompt: 'hi' } });
+    const run = await request(app).post(`/api/v1/ai/jobs/${jobId}/run`).set(auth(session, nextKey())).send({});
+    expect(run.status).toBe(200);
+    expect(run.body.run.status).toBe('failed');
+    expect(run.body.run.error_code).toBe('VALIDATION_FAILED');
+  });
+}); // 结束出站 SSRF 加固分组

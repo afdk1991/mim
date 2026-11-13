@@ -235,3 +235,64 @@ export function recordClick(
   });
   return { deduped: false, clickCount: tx() };
 }
+
+/**
+ * 转化滑动窗口频控：窗口长度复用点击窗口配置，上限走 MIM_CONTENT_CONVERSION_MAX，缺省 600 秒内 10 次。
+ * 审计表为 promotion_conversions，口径与点击频控一致。
+ */
+export function checkConversionRateLimit(
+  db: Db,
+  env: Record<string, string | undefined>,
+  promotionId: string,
+  visitor: string,
+  now: string,
+): ClickRateViolation | null {
+  const windowSeconds = envInt(env, 'MIM_CONTENT_CLICK_WINDOW_SECONDS', 600);
+  const max = envInt(env, 'MIM_CONTENT_CONVERSION_MAX', 10);
+  if (max <= 0) return null; // 显式配 0 表示关闭频控（不建议生产关闭）
+  const windowStart = new Date(Date.parse(now) - windowSeconds * 1000).toISOString();
+  const recent = db
+    .prepare('SELECT COUNT(*) AS count FROM promotion_conversions WHERE promotion_id = ? AND visitor_hash = ? AND created_at > ?')
+    .get(promotionId, visitor, windowStart) as { count: number };
+  if (recent.count >= max) {
+    return { retryAfter: windowSeconds };
+  }
+  return null;
+}
+
+/**
+ * 入账一次转化：幂等键命中已有记录则回放不重复计数；否则落审计行并自增 conversion_count。
+ * 调用方须先完成 assertClickable 与 checkConversionRateLimit。
+ * @returns deduped=true 表示命中幂等回放；conversionCount 为入账后的最新累计转化数。
+ */
+export function recordConversion(
+  db: Db,
+  promotionId: string,
+  idempotencyKey: string | null,
+  visitor: string,
+  now: string,
+): { deduped: boolean; conversionCount: number } {
+  if (idempotencyKey) {
+    const existing = db
+      .prepare('SELECT 1 AS hit FROM promotion_conversions WHERE promotion_id = ? AND idempotency_key = ?')
+      .get(promotionId, idempotencyKey);
+    if (existing) {
+      const row = db.prepare('SELECT conversion_count FROM promotions WHERE id = ?').get(promotionId) as { conversion_count: number };
+      return { deduped: true, conversionCount: row.conversion_count };
+    }
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO promotion_conversions (id, promotion_id, idempotency_key, visitor_hash, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(`conv-${uuidv7()}`, promotionId, idempotencyKey, visitor, now);
+    const changed = db
+      .prepare('UPDATE promotions SET conversion_count = conversion_count + 1, updated_at = ? WHERE id = ?')
+      .run(now, promotionId);
+    if (changed.changes === 0) throw new AppError('NOT_FOUND', '推广计划不存在');
+    const row = db.prepare('SELECT conversion_count FROM promotions WHERE id = ?').get(promotionId) as { conversion_count: number };
+    return row.conversion_count;
+  });
+  return { deduped: false, conversionCount: tx() };
+}
