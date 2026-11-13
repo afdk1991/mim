@@ -23,6 +23,7 @@ import { AnnouncementBar } from './components/AnnouncementBar';
 // 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
 import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './appearance';
 import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或本地模块绑定
+import { APP_VERSION } from './version'; // 当前 semver：由构建期 package.json 注入
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Store = lazy(() => import('./views/Store').then((m) => ({ default: m.Store }))); // 功能模块页（商城目录）
@@ -40,6 +41,7 @@ const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat })
 const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
 const Tools = lazy(() => import('./views/Tools').then((m) => ({ default: m.Tools }))); // 自研工具发布目录
 const ContentHub = lazy(() => import('./views/ContentHub').then((m) => ({ default: m.ContentHub }))); // 公告 / 更新日志 / 推广计划栏目
+const Releases = lazy(() => import('./views/Releases').then((m) => ({ default: m.Releases }))); // 版本迭代：时间线 + 能力地图
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
@@ -232,6 +234,8 @@ export function App() {
     { view: 'tools', label: locale === 'en-US' ? 'Tools' : '自研工具' },
     // 公告 / 更新日志 / 推广计划栏目
     { view: 'content', label: locale === 'en-US' ? 'News' : '公告动态' },
+    // 版本迭代：把 V0.0.0 → 当前版本的完整时间线与能力地图放到前台
+    { view: 'releases', label: locale === 'en-US' ? `Releases V${APP_VERSION}` : `版本 V${APP_VERSION}` },
   ]; // 内置导航项定义结束
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项
   const navItems = mergeNavItems(navDefaults, theme.navItems).filter((item) => item.visible);
@@ -331,6 +335,8 @@ export function App() {
         {route.view === 'tools' && <Tools locale={locale} hasSession={!!session} />}{/* 工具目录视图 */}
         {/* 公告 / 更新日志 / 推广计划栏目：公开只读，空数据静默隐藏；会话态展示管理端 CRUD */}
         {route.view === 'content' && <ContentHub locale={locale} hasSession={!!session} />}{/* 内容栏目视图 */}
+        {/* 版本迭代：完整版本时间线 + 能力地图，公开可看 */}
+        {route.view === 'releases' && <Releases locale={locale} onOpen={(view) => go({ view })} />}{/* 版本迭代视图 */}
         {/* 圈子：公开浏览清单；加入 / 审核 / 发动态公告在视图内按会话态与角色展示 */}
         {route.view === 'circles' && <Circles locale={locale} hasSession={!!session} />}{/* 圈子视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}

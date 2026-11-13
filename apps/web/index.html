@@ -11,7 +11,7 @@
          注意：生产 nginx 的 CSP（script-src 'self'）会禁用本内联，届时多段深链接白屏维持现状、不回归；
          单段路径（/marketplace 等）不依赖本脚本，全部平台可用。 */
       (function () { // 立即执行：隔离内部变量，避免污染全局作用域
-        var views = ['marketplace', 'products', 'cart', 'account', 'entry-catalog', 'comic-studio', 'chat', 'settings', 'signin', 'deployments', 'store', 'sites', 'comic', 'login', 'profile']; // 对外路径段（模块功能名）+ 改名前的旧段；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
+        var views = ['marketplace', 'products', 'cart', 'account', 'entry-catalog', 'deployments', 'navigation', 'search', 'community', 'commerce', 'comic-studio', 'chat', 'tools', 'announcements', 'circles', 'releases', 'signin', 'settings', 'store', 'sites', 'comic', 'login', 'profile']; // 对外路径段（模块功能名）+ 改名前的旧段；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
         var href = location.href; // 完整地址：用于判断末位是否为 WAF 清理后残留的裸问号
         var search = location.search; // 查询串（含前导问号；无查询串时为空串）
         if (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?')) { // 命中 WAF 注入参数或裸问号两种异常形态
