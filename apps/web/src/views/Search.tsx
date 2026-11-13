@@ -113,7 +113,7 @@ export function Search({ locale }: Props) {
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{tr(locale, '统一搜索', 'Search')}</h1>
         <p className="muted">{/* 执行当前业务步骤 */}
-          {tr(locale, '一次输入同时检索功能模块、统一入口、导航链接、社区帖子与独立商城；配置 Meilisearch 时自动切换远端引擎，不可用时回退本地检索。', 'One query across modules, entries, navigation links, community threads and shop products. Meilisearch is used when configured, with automatic local fallback.')}
+          {tr(locale, '一次输入同时检索功能模块、统一入口、导航链接、社区帖子与社区商城；配置 Meilisearch 时自动切换远端引擎，不可用时回退本地检索。', 'One query across modules, entries, navigation links, community threads and community shop products. Meilisearch is used when configured, with automatic local fallback.')}
         </p>
       </header>
 
