@@ -8,21 +8,21 @@
 
 /** 解析环境变量词表：逗号分隔，去空白与空项，统一小写匹配。 */
 export function blockedWords(env: Record<string, string | undefined>): string[] {
-  return (env.MIM_COMMUNITY_BLOCK_WORDS ?? '')
-    .split(',')
-    .map((word) => word.trim().toLowerCase())
-    .filter(Boolean);
-}
+  return (env.MIM_COMMUNITY_BLOCK_WORDS ?? '') // 返回当前函数的处理结果
+    .split(',') // 执行当前业务步骤
+    .map((word) => word.trim().toLowerCase()) // 执行当前业务步骤
+    .filter(Boolean); // 执行当前业务步骤
+} // 代码块结束
 
 /**
  * 命中校验：返回命中的敏感词；未命中返回 null。
  * 匹配为小写子串包含，词表与待检文本都做归一化。
  */
 export function findBlockedWord(env: Record<string, string | undefined>, text: string): string | null {
-  const haystack = text.trim().toLowerCase();
-  if (!haystack) return null;
-  for (const word of blockedWords(env)) {
-    if (haystack.includes(word)) return word;
-  }
-  return null;
-}
+  const haystack = text.trim().toLowerCase(); // 常量 haystack：保存固定配置或一次性派生值
+  if (!haystack) return null; // 条件分支：按判断结果选择后续处理路径
+  for (const word of blockedWords(env)) { // 循环：逐项遍历集合并执行相同处理
+    if (haystack.includes(word)) return word; // 条件分支：按判断结果选择后续处理路径
+  } // 代码块结束
+  return null; // 返回当前函数的处理结果
+} // 代码块结束

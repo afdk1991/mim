@@ -17,7 +17,7 @@ export const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
   navigation: '导航链接', // 全站资源目录
   community: '社区帖子', // 论坛主题
   shop: '独立商城', // 实物 / 虚拟商品
-};
+}; // 代码块结束
 
 /** 一条检索文档：统一字段是先决条件，Meilisearch 与 SQLite 共用同一结构 */
 export interface SearchDocument {
@@ -30,12 +30,12 @@ export interface SearchDocument {
   keywords: string; // 参与匹配的全量文本（标题 + 副标题 + 摘要 + 标签）
   popularity: number; // 热度（浏览量 / Stars），仅用于同分排序
   updated_at: string; // 更新时间，仅用于同分排序
-}
+} // 代码块结束
 
 /** 单条命中结果：在文档基础上补充分数，便于前端解释排序 */
 export interface SearchHit extends SearchDocument {
   score: number; // 匹配分：标题命中高于摘要命中
-}
+} // 代码块结束
 
 /** 搜索结果分组 */
 export interface SearchGroup {
@@ -43,7 +43,7 @@ export interface SearchGroup {
   label: string; // 中文分组名
   count: number; // 本组命中数
   items: SearchHit[]; // 本组命中条目
-}
+} // 代码块结束
 
 /** 判断某张表是否存在：并行会话新增的表可能尚未合并到当前库，缺失时跳过该来源而不是整页报错 */
 function tableExists(db: Db, table: string): boolean {
@@ -78,7 +78,7 @@ export function excerpt(text: string, query: string, radius = 60): string {
 function doc(input: Omit<SearchDocument, 'keywords'> & { keywords?: string }): SearchDocument {
   // 摘要只用于展示，不进入 keywords：模块简介含「可在商城内一次性解锁」这类模板句，若参与匹配会让一个通用词命中全部条目
   const keywords = [input.title, input.subtitle, input.keywords ?? ''].join(' '); // 全量匹配文本只取标题、副标题与显式检索字段
-  return {
+  return { // 返回当前函数的处理结果
     ...input, // 保留调用方给的字段
     title: flatten(input.title), // 标题压平
     subtitle: flatten(input.subtitle), // 副标题压平
@@ -90,12 +90,12 @@ function doc(input: Omit<SearchDocument, 'keywords'> & { keywords?: string }): S
 /** 读取模块商城：只取中文区在售模块，按 code 去重（中文区即默认展示口径） */
 function moduleDocs(db: Db): SearchDocument[] {
   if (!tableExists(db, 'modules')) return []; // 老库或裁剪库没有该表时跳过
-  const rows = db.prepare(
+  const rows = db.prepare( // 常量 rows：保存固定配置或一次性派生值
     `SELECT code, name_i18n, summary_i18n, category_slug, license, language, stars, updated_at
        FROM modules
       WHERE region = 'cn' AND status = 'active' AND deleted_at IS NULL`,
   ).all() as Array<{ code: string; name_i18n: string; summary_i18n: string; category_slug: string | null; license: string | null; language: string | null; stars: number; updated_at: string }>; // 字段与 schema 对齐
-  return rows.map((row) => doc({
+  return rows.map((row) => doc({ // 返回当前函数的处理结果
     id: `module:${row.code}`, // 全局键带来源前缀
     scope: 'module', // 来源域
     title: zhOf(row.name_i18n) || row.code, // 多语言名称缺失时回退编码
@@ -110,7 +110,7 @@ function moduleDocs(db: Db): SearchDocument[] {
 
 /** 读取 44 个统一入口：直接用静态契约，保证搜索口径与入口清单永远一致 */
 function entryDocs(): SearchDocument[] {
-  return SITE_MODULES.map((item) => doc({
+  return SITE_MODULES.map((item) => doc({ // 返回当前函数的处理结果
     id: `entry:${item.entryKey}`, // 占位键作稳定主键
     scope: 'entry', // 来源域
     title: `${item.entry}（${item.entryKey}）`, // 入口描述 + 占位键，方便按关键字定位
@@ -127,7 +127,7 @@ function entryDocs(): SearchDocument[] {
 function navigationDocs(db: Db): SearchDocument[] {
   if (!tableExists(db, 'nav_links')) return []; // 表缺失则跳过
   const rows = db.prepare('SELECT id, name, url, group_name, description, status, last_checked_at FROM nav_links').all() as Array<{ id: string; name: string; url: string; group_name: string; description: string; status: string; last_checked_at: string | null }>; // 只取检索所需列
-  return rows.map((row) => doc({
+  return rows.map((row) => doc({ // 返回当前函数的处理结果
     id: `navigation:${row.id}`, // 全局键
     scope: 'navigation', // 来源域
     title: row.name, // 链接名称
@@ -143,14 +143,14 @@ function navigationDocs(db: Db): SearchDocument[] {
 /** 读取社区帖子：表由社区模块维护，缺表或字段变化都不能拖垮搜索 */
 function communityDocs(db: Db): SearchDocument[] {
   if (!tableExists(db, 'community_threads')) return []; // 表缺失则跳过
-  try {
-    const rows = db.prepare(
+  try { // 异常捕获起点：包裹可能抛出错误的操作
+    const rows = db.prepare( // 常量 rows：保存固定配置或一次性派生值
       `SELECT t.id, t.title, t.summary, t.body, t.kind, t.price_cents, t.views, t.likes, t.created_at, b.name AS board_name
          FROM community_threads t
          LEFT JOIN community_boards b ON b.id = t.board_id
         WHERE t.status = 'published'`,
     ).all() as Array<{ id: string; title: string; summary: string; body: string; kind: string; price_cents: number; views: number; likes: number; created_at: string; board_name: string | null }>; // 联表取板块名
-    return rows.map((row) => doc({
+    return rows.map((row) => doc({ // 返回当前函数的处理结果
       id: `community:${row.id}`, // 全局键
       scope: 'community', // 来源域
       title: row.title, // 帖子标题
@@ -161,7 +161,7 @@ function communityDocs(db: Db): SearchDocument[] {
       popularity: row.views + row.likes, // 浏览 + 点赞作为热度
       updated_at: row.created_at, // 创建时间（帖子暂无独立更新时间）
     })); // 逐行映射
-  } catch {
+  } catch { // 代码块结束
     return []; // 字段结构与预期不符时静默跳过，保证搜索整体可用
   } // try/catch 结束
 } // communityDocs 结束
@@ -169,11 +169,11 @@ function communityDocs(db: Db): SearchDocument[] {
 /** 读取独立商城商品 */
 function shopDocs(db: Db): SearchDocument[] {
   if (!tableExists(db, 'shop_products')) return []; // 表缺失则跳过
-  try {
-    const rows = db.prepare(
-      "SELECT id, code, name, summary, kind, price_cents, stock, status, created_at FROM shop_products WHERE status = 'active'",
+  try { // 异常捕获起点：包裹可能抛出错误的操作
+    const rows = db.prepare( // 常量 rows：保存固定配置或一次性派生值
+      "SELECT id, code, name, summary, kind, price_cents, stock, status, created_at FROM shop_products WHERE status = 'active'", // 执行当前业务步骤
     ).all() as Array<{ id: string; code: string; name: string; summary: string; kind: string; price_cents: number; stock: number; status: string; created_at: string }>; // 只取在售商品
-    return rows.map((row) => doc({
+    return rows.map((row) => doc({ // 返回当前函数的处理结果
       id: `shop:${row.id}`, // 全局键
       scope: 'shop', // 来源域
       title: row.name, // 商品名
@@ -184,7 +184,7 @@ function shopDocs(db: Db): SearchDocument[] {
       popularity: row.stock, // 库存仅作同分排序的稳定因子
       updated_at: row.created_at, // 创建时间
     })); // 逐行映射
-  } catch {
+  } catch { // 代码块结束
     return []; // 字段不一致时跳过
   } // try/catch 结束
 } // shopDocs 结束
@@ -192,13 +192,13 @@ function shopDocs(db: Db): SearchDocument[] {
 /** 汇总全部来源：任何单一来源异常都不应让整次搜索失败 */
 export function collectDocuments(db: Db): SearchDocument[] {
   const safe = (fn: () => SearchDocument[]): SearchDocument[] => { // 小包装：统一吞掉来源级异常
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       return fn(); // 正常执行
-    } catch {
+    } catch { // 代码块结束
       return []; // 单来源失败降级为空集
     } // try/catch 结束
   }; // safe 结束
-  return [
+  return [ // 返回当前函数的处理结果
     ...safe(() => moduleDocs(db)), // 模块
     ...safe(() => entryDocs()), // 入口
     ...safe(() => navigationDocs(db)), // 导航
@@ -224,22 +224,22 @@ function scoreOf(item: SearchDocument, query: string): number {
 
 /** 搜索并分组：每个来源单独截断 limit 条，避免某个大来源淹没其它来源 */
 export function searchDocuments(
-  documents: SearchDocument[],
-  query: string,
-  scopes: readonly SearchScope[],
-  limit: number,
-): SearchGroup[] {
+  documents: SearchDocument[], // 对象字段 documents：记录一项配置或数据
+  query: string, // 对象字段 query：记录一项配置或数据
+  scopes: readonly SearchScope[], // 对象字段 scopes：记录一项配置或数据
+  limit: number, // 对象字段 limit：记录一项配置或数据
+): SearchGroup[] { // 执行当前业务步骤
   const q = query.trim(); // 去掉首尾空白
   if (!q) return []; // 空查询不返回任何结果
   const groups: SearchGroup[] = []; // 结果收集
   for (const scope of scopes) { // 按固定顺序逐来源处理
-    const hits = documents
+    const hits = documents // 常量 hits：保存固定配置或一次性派生值
       .filter((item) => item.scope === scope) // 只看本来源
       .map((item) => ({ ...item, score: scoreOf(item, q) })) // 计算分数
       .filter((item) => item.score > 0) // 丢弃未命中
       .sort((a, b) => b.score - a.score || b.popularity - a.popularity || b.updated_at.localeCompare(a.updated_at)) // 分数 → 热度 → 更新时间
       .slice(0, limit); // 本来源截断
-    groups.push({
+    groups.push({ // 执行当前业务步骤
       scope, // 来源
       label: SEARCH_SCOPE_LABELS[scope], // 中文组名
       count: hits.length, // 本组条数
@@ -254,7 +254,7 @@ export interface MeiliConfig {
   url: string; // 实例地址，去掉尾斜杠
   index: string; // 索引名
   key: string; // API Key
-}
+} // 代码块结束
 
 /** 从环境变量解析 Meilisearch 配置：缺任一项返回 null，调用方走 SQLite */
 export function meiliConfig(env: Record<string, string | undefined>): MeiliConfig | null {
@@ -288,11 +288,11 @@ export async function reindexMeili(config: MeiliConfig, documents: SearchDocumen
 
 /** 用 Meilisearch 检索：失败或未命中时返回 null，由调用方降级到本地检索 */
 export async function searchMeili(
-  config: MeiliConfig,
-  query: string,
-  scopes: readonly SearchScope[],
-  limit: number,
-): Promise<SearchHit[] | null> {
+  config: MeiliConfig, // 对象字段 config：记录一项配置或数据
+  query: string, // 对象字段 query：记录一项配置或数据
+  scopes: readonly SearchScope[], // 对象字段 scopes：记录一项配置或数据
+  limit: number, // 对象字段 limit：记录一项配置或数据
+): Promise<SearchHit[] | null> { // 执行当前业务步骤
   const res = await fetch(`${config.url}/indexes/${encodeURIComponent(config.index)}/search`, { // 检索端点
     method: 'POST', // Meilisearch 统一用 POST 传查询
     headers: { 'content-type': 'application/json', authorization: `Bearer ${config.key}` }, // 请求头
@@ -301,7 +301,7 @@ export async function searchMeili(
   if (!res.ok) return null; // 上游异常 → 降级
   const body = (await res.json()) as { hits?: Array<Record<string, unknown>> }; // Meilisearch 返回 hits
   if (!Array.isArray(body.hits)) return null; // 结构异常 → 降级
-  return body.hits.map((hit) => ({
+  return body.hits.map((hit) => ({ // 返回当前函数的处理结果
     id: String(hit.id ?? ''), // 全局键
     scope: String(hit.scope ?? '') as SearchScope, // 来源
     title: String(hit.title ?? ''), // 标题

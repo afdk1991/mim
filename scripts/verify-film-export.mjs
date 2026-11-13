@@ -16,23 +16,23 @@ const BASE = 'http://127.0.0.1:5188'; // 本地静态站（同源反代 /api 到
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); // 轮询间隔
 
 async function getTarget() { // 等待浏览器 page target 就绪
-  for (let i = 0; i < 30; i += 1) {
+  for (let i = 0; i < 30; i += 1) { // 循环：逐项遍历集合并执行相同处理
     try { // CDP 可能尚未监听
       const list = await (await fetch(CDP + '/json/list')).json(); // 取 target 列表
       const page = list.find((t) => t.type === 'page'); // 取第一个页面
       if (page) return page; // 命中即返回
     } catch { /* 浏览器尚未就绪 */ }
     await sleep(400); // 稍后重试
-  }
+  } // 代码块结束
   throw new Error('Edge CDP 未就绪'); // 超时抛错
-}
+} // 代码块结束
 
 const target = await getTarget(); // 取调试目标
 const ws = new WebSocket(target.webSocketDebuggerUrl); // 建立 CDP WebSocket
 await new Promise((res, rej) => { // 等连接打开
-  ws.addEventListener('open', res, { once: true });
-  ws.addEventListener('error', rej, { once: true });
-});
+  ws.addEventListener('open', res, { once: true }); // 执行当前业务步骤
+  ws.addEventListener('error', rej, { once: true }); // 执行当前业务步骤
+}); // 代码块结束
 
 let seq = 0; // 命令序号
 const pending = new Map(); // 待响应命令
@@ -43,28 +43,28 @@ ws.addEventListener('message', (ev) => { // 统一分发 CDP 消息
   if (msg.id && pending.has(msg.id)) { // 命令响应
     pending.get(msg.id)(msg); // 唤醒等待方
     pending.delete(msg.id); // 清理
-    return;
-  }
+    return; // 返回当前函数的处理结果
+  } // 代码块结束
   if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') { // 控制台 error
-    consoleErrors.push(msg.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
-  }
+    consoleErrors.push(msg.params.args.map((a) => a.value ?? a.description ?? '').join(' ')); // 执行当前业务步骤
+  } // 代码块结束
   if (msg.method === 'Runtime.exceptionThrown') exceptions.push(msg.params.exceptionDetails.text); // 运行时异常
-});
+}); // 代码块结束
 
 function send(method, params = {}) { // 发送 CDP 命令
   const id = ++seq; // 递增序号
   return new Promise((resolve) => { // 等待同 id 响应
     pending.set(id, resolve); // 登记
     ws.send(JSON.stringify({ id, method, params })); // 发送
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 async function evaluate(expression) { // 在页面求值，返回字符串或 null
   const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); // 允许 await Promise
   if (r.result?.exceptionDetails) return null; // 上下文销毁或脚本异常，交给重试
   const v = r.result?.result?.value; // 取返回值
   return typeof v === 'string' ? v : null; // 统一按字符串处理
-}
+} // 代码块结束
 
 async function waitUntil(fn, timeout = 12000) { // 轮询直到条件成立
   const start = Date.now(); // 起始时间
@@ -72,15 +72,15 @@ async function waitUntil(fn, timeout = 12000) { // 轮询直到条件成立
     const v = await fn(); // 求值
     if (v) return v; // 命中返回
     await sleep(120); // 稍后重试
-  }
+  } // 代码块结束
   return null; // 超时返回 null
-}
+} // 代码块结束
 
 const checks = []; // 断言结果收集
 function check(name, ok, detail = '') { // 记录一条断言
   checks.push({ name, ok: Boolean(ok), detail }); // 入表
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' :: ' + detail : ''}`); // 实时输出
-}
+} // 代码块结束
 
 await send('Page.enable'); // 启用页面域
 await send('Runtime.enable'); // 启用运行时域

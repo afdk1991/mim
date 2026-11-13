@@ -78,7 +78,7 @@ export function Categories({ credential, permissions }: CategoriesProps) {
     if (!draft) return;
     setBusy(row.slug); // 标记忙碌
     setError(null); // 清空上次错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 组装差异字段
       const payload: { name?: string; name_en?: string | null; sort_order?: number } = {};
       // 中文名变化才下发
@@ -96,13 +96,13 @@ export function Categories({ credential, permissions }: CategoriesProps) {
       // 无任何变化则提示后结束
       if (Object.keys(payload).length === 0) {
         setMessage('没有改动');
-        return;
+        return; // 返回当前函数的处理结果
       } // 空改动分支结束
       // 调 PATCH
       await updateCategory(credential, row.slug, payload);
       // 成功后清掉该行草稿
       const next = { ...drafts };
-      delete next[row.slug];
+      delete next[row.slug]; // 执行当前业务步骤
       setDrafts(next);
       setMessage(`已保存：${row.slug}`);
       treeState.reload(); // 重新拉树，确保计数与新值一致
@@ -118,7 +118,7 @@ export function Categories({ credential, permissions }: CategoriesProps) {
   async function remove(row: CategoryItemView) {
     setBusy(row.slug); // 标记忙碌
     setError(null); // 清空错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调 DELETE
       await deleteCategory(credential, row.slug);
       setMessage(`已删除：${row.slug}`);
@@ -136,7 +136,7 @@ export function Categories({ credential, permissions }: CategoriesProps) {
     event.preventDefault(); // 阻止整页刷新
     setError(null); // 清空错误
     setBusy('create'); // 标记创建中
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调 POST：parent 为空即一级分类
       await createCategory(credential, {
         slug: form.slug.trim(), // 标识去掉首尾空白
@@ -160,12 +160,12 @@ export function Categories({ credential, permissions }: CategoriesProps) {
   if (treeState.loading) return <div className="page"><div className="muted">加载分类树…</div></div>;
   // 加载失败：给出可读原因与重试入口
   if (treeState.error) {
-    return (
-      <div className="page">
+    return ( // 返回当前函数的处理结果
+      <div className="page">{/* 执行当前业务步骤 */}
         <div className="error">{describeError(treeState.error)}</div>
         <button className="btn primary" type="button" onClick={() => treeState.reload()}>重试</button>
       </div>
-    );
+    ); // 执行当前业务步骤
   } // 错误分支结束
   // 数据缺失兜底
   if (!treeState.data) return null;
@@ -180,9 +180,9 @@ export function Categories({ credential, permissions }: CategoriesProps) {
     const dirty = drafts[row.slug] !== undefined;
     // 单行渲染
     return (
-      <div key={row.slug} className={level === 1 ? 'row cat-row-g1' : 'row cat-row-g2'}>
+      <div key={row.slug} className={level === 1 ? 'row cat-row-g1' : 'row cat-row-g2'}>{/* 执行当前业务步骤 */}
         <span className="cat-slug">{row.slug}</span>
-        <label className="field">
+        <label className="field">{/* 执行当前业务步骤 */}
           <span>中文名</span>
           <input
             value={valueOf(row, 'name')}
@@ -190,7 +190,7 @@ export function Categories({ credential, permissions }: CategoriesProps) {
             onChange={(event) => edit(row, 'name', event.target.value)}
           />
         </label>
-        <label className="field">
+        <label className="field">{/* 执行当前业务步骤 */}
           <span>英文名</span>
           <input
             value={valueOf(row, 'name_en')}
@@ -199,7 +199,7 @@ export function Categories({ credential, permissions }: CategoriesProps) {
             onChange={(event) => edit(row, 'name_en', event.target.value)}
           />
         </label>
-        <label className="field" style={{ maxWidth: 120 }}>
+        <label className="field" style={{ maxWidth: 120 }}>{/* 执行当前业务步骤 */}
           <span>排序</span>
           <input
             value={valueOf(row, 'sort_order')}
@@ -208,26 +208,26 @@ export function Categories({ credential, permissions }: CategoriesProps) {
           />
         </label>
         <span className="count">{row.module_count} 个模块</span>
-        <button className="btn" type="button" disabled={!canWrite || !dirty || rowBusy} onClick={() => save(row)}>
+        <button className="btn" type="button" disabled={!canWrite || !dirty || rowBusy} onClick={() => save(row)}>{/* 执行当前业务步骤 */}
           {rowBusy ? '保存中…' : '保存'}
         </button>
-        <button className="btn ghost" type="button" disabled={!canWrite || rowBusy} onClick={() => remove(row)}>
+        <button className="btn ghost" type="button" disabled={!canWrite || rowBusy} onClick={() => remove(row)}>{/* 执行当前业务步骤 */}
           删除
         </button>
       </div>
-    );
+    ); // 执行当前业务步骤
   } // renderRow 结束
 
   // 页面渲染
   return (
-    <div className="page">
-      <div className="page-head">
+    <div className="page">{/* 执行当前业务步骤 */}
+      <div className="page-head">{/* 执行当前业务步骤 */}
         <h2>分类导航</h2>
-        <div className="row">
-          <span className="count">
+        <div className="row">{/* 执行当前业务步骤 */}
+          <span className="count">{/* 执行当前业务步骤 */}
             共 {total_groups} 个一级分类 / {total_items} 个二级条目 · slug 与父级不可改（会打断模块归属）
           </span>
-          <button className="btn primary" type="button" disabled={!canWrite} onClick={() => setCreateOpen(!createOpen)}>
+          <button className="btn primary" type="button" disabled={!canWrite} onClick={() => setCreateOpen(!createOpen)}>{/* 执行当前业务步骤 */}
             {createOpen ? '收起新建' : '新建分类'}
           </button>
         </div>
@@ -237,32 +237,32 @@ export function Categories({ credential, permissions }: CategoriesProps) {
       {error && <div className="error">{error}</div>}
 
       {createOpen && (
-        <form className="panel" onSubmit={submitCreate}>
-          <div className="row">
-            <label className="field" style={{ maxWidth: 200 }}>
+        <form className="panel" onSubmit={submitCreate}>{/* 执行当前业务步骤 */}
+          <div className="row">{/* 执行当前业务步骤 */}
+            <label className="field" style={{ maxWidth: 200 }}>{/* 执行当前业务步骤 */}
               <span>slug（小写字母开头，可含数字与连字符）</span>
               <input value={form.slug} required onChange={(event) => setForm({ ...form, slug: event.target.value })} />
             </label>
-            <label className="field" style={{ maxWidth: 220 }}>
+            <label className="field" style={{ maxWidth: 220 }}>{/* 执行当前业务步骤 */}
               <span>中文名</span>
               <input value={form.name} required onChange={(event) => setForm({ ...form, name: event.target.value })} />
             </label>
-            <label className="field" style={{ maxWidth: 240 }}>
+            <label className="field" style={{ maxWidth: 240 }}>{/* 执行当前业务步骤 */}
               <span>英文名（选填）</span>
               <input value={form.name_en} onChange={(event) => setForm({ ...form, name_en: event.target.value })} />
             </label>
-            <label className="field" style={{ maxWidth: 240 }}>
+            <label className="field" style={{ maxWidth: 240 }}>{/* 执行当前业务步骤 */}
               <span>父分类（留空即一级）</span>
-              <select value={form.parent} onChange={(event) => setForm({ ...form, parent: event.target.value })}>
+              <select value={form.parent} onChange={(event) => setForm({ ...form, parent: event.target.value })}>{/* 执行当前业务步骤 */}
                 <option value="">（一级分类）</option>
                 {groups.map((group: CategoryGroupView) => (
-                  <option key={group.slug} value={group.slug}>
+                  <option key={group.slug} value={group.slug}>{/* 执行当前业务步骤 */}
                     {group.name}（{group.slug}）
                   </option>
                 ))}
               </select>
             </label>
-            <button className="btn primary" type="submit" disabled={busy !== null || !canWrite}>
+            <button className="btn primary" type="submit" disabled={busy !== null || !canWrite}>{/* 执行当前业务步骤 */}
               {busy === 'create' ? '创建中…' : '创建'}
             </button>
           </div>
@@ -270,9 +270,9 @@ export function Categories({ credential, permissions }: CategoriesProps) {
         </form>
       )}
 
-      <div className="panel">
+      <div className="panel">{/* 执行当前业务步骤 */}
         {groups.map((group: CategoryGroupView) => (
-          <div key={group.slug} className="cat-group">
+          <div key={group.slug} className="cat-group">{/* 执行当前业务步骤 */}
             {renderRow(group, 1)}
             {group.items.map((item: CategoryItemView) => renderRow(item, 2))}
           </div>

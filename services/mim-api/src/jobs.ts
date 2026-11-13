@@ -262,7 +262,7 @@ export function createJobs(options: CreateJobsOptions): Jobs { // 工厂：闭�
         failed += 1; // 计入失败数
         db.prepare(`DELETE FROM idempotency_keys WHERE key = ? AND user_id = ?`).run(key, SYSTEM_USER); // 回滚认领键，让下一轮能重新尝试
         logger.warn( // 记录到日志，便于定位是权限还是网络问题
-          `[jobs] asset-gc: failed to purge ${row.id} (${row.object_key}): ${err instanceof Error ? err.message : String(err)}`,
+          `[jobs] asset-gc: failed to purge ${row.id} (${row.object_key}): ${err instanceof Error ? err.message : String(err)}`, // 执行当前业务步骤
         ); // 告警结束
       } // try/catch 结束
     } // 处理循环结束

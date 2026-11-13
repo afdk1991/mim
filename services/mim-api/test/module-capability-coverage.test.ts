@@ -7,35 +7,35 @@ import { CAPABILITY_HANDLERS, handlerOfCapability } from '../src/capabilities.js
 /** 205 条模块编码集合：绑定编码必须命中其中一条 */
 const MODULE_CODES = new Set(buildCatalogModuleSeeds().map((seed) => seed.code)); // 取全部 205 条模块编码
 
-describe('商城能力覆盖度', () => {
+describe('商城能力覆盖度', () => { // 调用 describe 并处理其返回结果
   // 用例 1：清单非空且键唯一
   it('能力清单非空且键唯一', () => {
     expect(MODULE_CAPABILITIES.length).toBeGreaterThanOrEqual(27); // 本轮至少 27 条真实能力
     const keys = MODULE_CAPABILITIES.map((item) => item.key); // 全部键
     expect(new Set(keys).size).toBe(keys.length); // 不允许重复键
-  });
+  }); // 代码块结束
 
   // 用例 2：每条能力都有实现
   it('每条能力都能找到已注册 handler', () => {
-    for (const capability of MODULE_CAPABILITIES) {
+    for (const capability of MODULE_CAPABILITIES) { // 循环：逐项遍历集合并执行相同处理
       expect(CAPABILITY_HANDLERS[capability.key], `缺少 handler: ${capability.key}`).toBeTypeOf('function'); // 注册表必须命中
     } // 循环结束
-  });
+  }); // 代码块结束
 
   // 用例 3：绑定的模块编码都真实存在于分类树，且一个模块只绑一条能力
   it('绑定编码存在且未被重复绑定', () => {
     const bound = new Set<string>(); // 记录已绑定编码
-    for (const capability of MODULE_CAPABILITIES) {
-      for (const code of capability.module_codes) {
+    for (const capability of MODULE_CAPABILITIES) { // 循环：逐项遍历集合并执行相同处理
+      for (const code of capability.module_codes) { // 循环：逐项遍历集合并执行相同处理
         expect(MODULE_CODES.has(code), `未知模块编码: ${code}`).toBe(true); // 必须命中 205 条
         expect(bound.has(code), `模块被重复绑定: ${code}`).toBe(false); // 一对一绑定，避免同模块多能力歧义
         bound.add(code); // 登记
       } // 编码循环结束
     } // 能力循环结束
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束
 
-describe('能力执行层真实产出', () => {
+describe('能力执行层真实产出', () => { // 调用 describe 并处理其返回结果
   /** 小工具：调用能力并断言 output 非空 */
   async function run(key: string, text: string, options: Record<string, unknown> = {}): Promise<{ output: string; output_kind: string; meta: Record<string, unknown> }> {
     const handler = handlerOfCapability(key); // 取 handler
@@ -51,33 +51,33 @@ describe('能力执行层真实产出', () => {
     const ok = await run('json.format', '{"a":1}', { mode: 'pretty' }); // 准备：构造本用例需要的输入或句柄
     expect(ok.output).toContain('"a": 1'); // 缩进生效
     await expect(run('json.format', '{bad', { mode: 'pretty' })).rejects.toThrow(); // 非法 JSON 抛错
-  });
+  }); // 代码块结束
 
   // 编解码往返
   it('text.encode 往返一致', async () => {
     const encoded = await run('text.encode', 'Mim 办公', { op: 'base64', direction: 'encode' }); // 准备：构造本用例需要的输入或句柄
     const decoded = await run('text.encode', encoded.output, { op: 'base64', direction: 'decode' }); // 准备：构造本用例需要的输入或句柄
     expect(decoded.output).toBe('Mim 办公'); // 解码还原原文
-  });
+  }); // 代码块结束
 
   // 摘要固定值
   it('text.hash md5 与已知值一致', async () => {
     const result = await run('text.hash', 'mim', { algo: 'md5' }); // 准备：构造本用例需要的输入或句柄
     expect(result.output).toBe('8e7f86260c88346052cadd7d68514184'); // md5("mim") 已知值
-  });
+  }); // 代码块结束
 
   // Markdown 渲染并转义原始 HTML
   it('markdown.render 渲染标题并转义原始 HTML', async () => {
     const result = await run('markdown.render', '# 标题\n\n<script>alert(1)</script>', {}); // 准备：构造本用例需要的输入或句柄
     expect(result.output).toContain('<h1'); // 标题被解析
     expect(result.output).not.toContain('<script>'); // 原始 HTML 被转义
-  });
+  }); // 代码块结束
 
   // 二维码输出 dataURL
   it('qrcode.generate 输出 PNG dataURL', async () => {
-    const result = await run('qrcode.generate', 'https://mim.mixm.top', { size: 128 });
+    const result = await run('qrcode.generate', 'https://mim.mixm.top', { size: 128 }); // 常量 result：保存固定配置或一次性派生值
     expect(result.output.startsWith('data:image/png;base64,')).toBe(true); // PNG dataURL 数据
-  });
+  }); // 代码块结束
 
   // cron 解析返回未来时间
   it('cron.describe 返回未来触发时间', async () => {
@@ -85,7 +85,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { next: string[] }; // 解析输出
     expect(parsed.next).toHaveLength(2); // 两条
     expect(parsed.next[0]).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO 时间
-  });
+  }); // 代码块结束
 
   // 分词统计
   it('text.segment 统计汉字与单词', async () => {
@@ -93,7 +93,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { cjk: number; words: number }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.cjk).toBe(2); // 两个汉字
     expect(parsed.words).toBe(2); // 两个英文词
-  });
+  }); // 代码块结束
 
   // 卡号校验
   it('card.luhn 校验公开测试卡号', async () => {
@@ -101,7 +101,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { valid: boolean; brand: string }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.valid).toBe(true); // 合法测试卡号
     expect(parsed.brand).toBe('Visa'); // 识别为 Visa
-  });
+  }); // 代码块结束
 
   // CSV 转 JSON
   it('csv.json 把 CSV 转成对象数组', async () => {
@@ -109,21 +109,21 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { rows: Array<{ name: string; score: string }>; total: number }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.total).toBe(2); // 两行
     expect(parsed.rows[0].name).toBe('Alice'); // 字段映射
-  });
+  }); // 代码块结束
 
   // 模板渲染
   it('template.render 渲染 Mustache 模板', async () => {
     const result = await run('template.render', '{"template":"Hi {{name}}","data":{"name":"Mim"}}', {}); // 准备：构造本用例需要的输入或句柄
     expect(result.output).toBe('Hi Mim'); // 变量替换
-  });
+  }); // 代码块结束
 
   // URL 解析
   it('url.parse 拆出查询参数', async () => {
-    const result = await run('url.parse', 'https://mim.mixm.top/marketplace?tab=dev&q=json', {});
+    const result = await run('url.parse', 'https://mim.mixm.top/marketplace?tab=dev&q=json', {}); // 常量 result：保存固定配置或一次性派生值
     const parsed = JSON.parse(result.output) as { hostname: string; query: Record<string, string> }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.hostname).toBe('mim.mixm.top'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.query.tab).toBe('dev'); // 参数解析
-  });
+  }); // 代码块结束
 
   // CIDR 计算
   it('ip.cidr 计算网络与广播地址', async () => {
@@ -132,14 +132,14 @@ describe('能力执行层真实产出', () => {
     expect(parsed.network).toBe('192.168.1.0/24'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.broadcast).toBe('192.168.1.255'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.usable_hosts).toBe(254); // /24 可用主机数
-  });
+  }); // 代码块结束
 
   // SVG 图表
   it('chart.svg 生成 SVG', async () => {
     const result = await run('chart.svg', 'month,orders\n1月,120\n2月,180', { chart: 'bar' }); // 准备：构造本用例需要的输入或句柄
     expect(result.output_kind).toBe('html'); // 按 HTML 渲染
     expect(result.output).toContain('<svg'); // 真是 SVG
-  });
+  }); // 代码块结束
 
   // 报表
   it('report.table 生成 HTML 与 Markdown 两种表格', async () => {
@@ -147,7 +147,7 @@ describe('能力执行层真实产出', () => {
     expect(html.output).toContain('<table'); // 断言：校验接口响应或状态符合冻结契约
     const md = await run('report.table', 'module,price\ncomic,0', { format: 'markdown' }); // 准备：构造本用例需要的输入或句柄
     expect(md.output).toContain('| module | price |'); // Markdown 表头
-  });
+  }); // 代码块结束
 
   // 图片 dataURL
   it('image.dataurl 解析 dataURL 元信息', async () => {
@@ -155,7 +155,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { mime: string; bytes: number }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.mime).toBe('image/png'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.bytes).toBe(5); // "hello" 五字节
-  });
+  }); // 代码块结束
 
   // 日志分析
   it('log.stats 统计日志级别', async () => {
@@ -164,14 +164,14 @@ describe('能力执行层真实产出', () => {
     expect(parsed.total_lines).toBe(2); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.levels.some((item) => item.level === 'ERROR')).toBe(true); // 识别出 ERROR 级别
     expect(parsed.levels.some((item) => item.level === 'INFO')).toBe(true); // 识别出 INFO 级别
-  });
+  }); // 代码块结束
 
   // 验证码
   it('captcha.svg 输出 SVG dataURL 且返回答案', async () => {
     const result = await run('captcha.svg', '', { length: 4 }); // 准备：构造本用例需要的输入或句柄
     expect(result.output.startsWith('data:image/svg+xml')).toBe(true); // dataURL 数据
     expect(String(result.meta.answer)).toHaveLength(4); // 答案长度
-  });
+  }); // 代码块结束
 
   // 数学求值并拒绝赋值
   it('math.eval 求值且拒绝赋值语句', async () => {
@@ -179,7 +179,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { value: number }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.value).toBe(15); // 20*3/4
     await expect(run('math.eval', 'a = 3', {})).rejects.toThrow(); // 赋值被拒
-  });
+  }); // 代码块结束
 
   // JSON Schema 推导
   it('json.schema 推导对象 schema', async () => {
@@ -187,14 +187,14 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { type: string; properties: Record<string, { type: string }> }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.type).toBe('object'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.properties.count.type).toBe('integer'); // 整数细分
-  });
+  }); // 代码块结束
 
   // 参考文献
   it('cite.format 生成 GB/T 7714 期刊条目', async () => {
     const result = await run('cite.format', '{"authors":["张三","李四"],"title":"跨平台办公系统设计","year":"2026","journal":"软件学报","volume":"37","issue":"4","pages":"1-12"}', { type: 'journal' }); // 准备：构造本用例需要的输入或句柄
     expect(result.output).toContain('[J]'); // 期刊标识
     expect(result.output).toContain('软件学报'); // 刊名
-  });
+  }); // 代码块结束
 
   // YAML 互转
   it('yaml.json 解析 YAML', async () => {
@@ -202,7 +202,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { kind: string; metadata: { name: string } }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.kind).toBe('Service'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.metadata.name).toBe('mim-api'); // 断言：校验接口响应或状态符合冻结契约
-  });
+  }); // 代码块结束
 
   // JWT 解析
   it('jwt.decode 解析载荷并标注未验签', async () => {
@@ -211,14 +211,14 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { payload: { sub: string }; signature_verified: boolean }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.payload.sub).toBe('mim'); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.signature_verified).toBe(false); // 明确未验签
-  });
+  }); // 代码块结束
 
   // 文本差异
   it('diff.text 输出 unified diff', async () => {
     const result = await run('diff.text', '{"a":"line1\\nline2","b":"line1\\nline3"}', {}); // 准备：构造本用例需要的输入或句柄
     expect(result.output).toContain('-line2'); // 删除行
     expect(result.output).toContain('+line3'); // 新增行
-  });
+  }); // 代码块结束
 
   // 代码统计
   it('code.stats 统计代码行与注释行', async () => {
@@ -227,14 +227,14 @@ describe('能力执行层真实产出', () => {
     expect(parsed.comment_lines).toBe(1); // 一行注释
     expect(parsed.code_lines).toBe(2); // 两行代码
     expect(parsed.blank_lines).toBe(1); // 一行空行
-  });
+  }); // 代码块结束
 
   // SQL 格式化
   it('sql.format 大写关键字并换行', async () => {
     const result = await run('sql.format', 'select id,name from modules where status=1', { dialect: 'sql' }); // 准备：构造本用例需要的输入或句柄
     expect(result.output).toContain('SELECT'); // 关键字大写
     expect(result.output.split('\n').length).toBeGreaterThan(1); // 多行
-  });
+  }); // 代码块结束
 
   // 文本统计
   it('text.stats 统计字符与行数', async () => {
@@ -242,7 +242,7 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { cjk: number; lines: number }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.lines).toBe(2); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.cjk).toBeGreaterThan(5); // 多个汉字
-  });
+  }); // 代码块结束
 
   // 批量重命名预览
   it('file.rename 返回改名映射且不改磁盘', async () => {
@@ -250,5 +250,5 @@ describe('能力执行层真实产出', () => {
     const parsed = JSON.parse(result.output) as { items: Array<{ from: string; to: string }>; total: number }; // 准备：构造本用例需要的输入或句柄
     expect(parsed.total).toBe(2); // 断言：校验接口响应或状态符合冻结契约
     expect(parsed.items[0].to).toBe('1-a.txt'); // 序号 + 原名 + 扩展名
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束

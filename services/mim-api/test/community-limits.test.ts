@@ -374,119 +374,119 @@ describe('三期 8：每日上限与累计上限（环境变量配额）', () =>
   it('每日配额 MIM_COMMUNITY_DAILY_MAX=1：第二篇 429 DAILY，Retry-After 指向次日零点', async () => { // 用例「每日配额」：覆盖对应业务契约
     const dayDb = createDatabase(':memory:'); // 保存 dayDb：承载本步骤的计算结果供后续使用
     const dayApp = createApp({ // 保存 dayApp：每日上限 1、累计与窗口放开
-      db: dayDb,
-      jwtSecret: JWT_SECRET,
-      env: {
-        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN,
-        MIM_COMMUNITY_DAILY_MAX: '1', MIM_COMMUNITY_TOTAL_MAX: '200', MIM_COMMUNITY_WINDOW_MAX: '5',
-      },
-    });
-    const loginRes = await request(dayApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000021', password: ADMIN_PASSWORD });
-    const headers = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() };
-    const post = (title: string) =>
-      request(dayApp).post('/api/v1/community/threads').set({ ...headers, 'idempotency-key': randomUUID() })
-        .send({ board_slug: 'general', title, body: '正文内容用于验证每日配额上限是否生效。' });
+      db: dayDb, // 对象字段 db：记录一项配置或数据
+      jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
+      env: { // 对象字段 env：记录一项配置或数据
+        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, // 对象字段 MIM_AUTH_ADMIN_PASSWORD：记录一项配置或数据
+        MIM_COMMUNITY_DAILY_MAX: '1', MIM_COMMUNITY_TOTAL_MAX: '200', MIM_COMMUNITY_WINDOW_MAX: '5', // 对象字段 MIM_COMMUNITY_DAILY_MAX：记录一项配置或数据
+      }, // 代码块结束
+    }); // 代码块结束
+    const loginRes = await request(dayApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000021', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
+    const headers = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 headers：保存固定配置或一次性派生值
+    const post = (title: string) => // 常量 post：保存固定配置或一次性派生值
+      request(dayApp).post('/api/v1/community/threads').set({ ...headers, 'idempotency-key': randomUUID() }) // 调用 request 并处理其返回结果
+        .send({ board_slug: 'general', title, body: '正文内容用于验证每日配额上限是否生效。' }); // 执行当前业务步骤
 
-    const first = await post('每日配额帖一');
-    expect(first.status).toBe(201);
-    const second = await post('每日配额帖二');
-    expect(second.status).toBe(429);
-    expect(second.body.code).toBe('RATE_LIMITED');
-    expect(second.body.details.reason).toBe('DAILY');
-    expect(Number(second.headers['retry-after'])).toBeGreaterThan(0);
-    expect(second.body.details.retry_after).toBeGreaterThan(0);
-  });
+    const first = await post('每日配额帖一'); // 常量 first：保存固定配置或一次性派生值
+    expect(first.status).toBe(201); // 调用 expect 并处理其返回结果
+    const second = await post('每日配额帖二'); // 常量 second：保存固定配置或一次性派生值
+    expect(second.status).toBe(429); // 调用 expect 并处理其返回结果
+    expect(second.body.code).toBe('RATE_LIMITED'); // 调用 expect 并处理其返回结果
+    expect(second.body.details.reason).toBe('DAILY'); // 调用 expect 并处理其返回结果
+    expect(Number(second.headers['retry-after'])).toBeGreaterThan(0); // 调用 expect 并处理其返回结果
+    expect(second.body.details.retry_after).toBeGreaterThan(0); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 
   it('累计配额 MIM_COMMUNITY_TOTAL_MAX=1：第二篇 429 TOTAL', async () => { // 用例「累计配额」：覆盖对应业务契约
     const totalDb = createDatabase(':memory:'); // 保存 totalDb：承载本步骤的计算结果供后续使用
     const totalApp = createApp({ // 保存 totalApp：累计上限 1、每日与窗口放开
-      db: totalDb,
-      jwtSecret: JWT_SECRET,
-      env: {
-        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN,
-        MIM_COMMUNITY_DAILY_MAX: '200', MIM_COMMUNITY_TOTAL_MAX: '1', MIM_COMMUNITY_WINDOW_MAX: '5',
-      },
-    });
-    const loginRes = await request(totalApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000022', password: ADMIN_PASSWORD });
-    const headers = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() };
-    const post = (title: string) =>
-      request(totalApp).post('/api/v1/community/threads').set({ ...headers, 'idempotency-key': randomUUID() })
-        .send({ board_slug: 'general', title, body: '正文内容用于验证累计配额上限是否生效。' });
+      db: totalDb, // 对象字段 db：记录一项配置或数据
+      jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
+      env: { // 对象字段 env：记录一项配置或数据
+        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, // 对象字段 MIM_AUTH_ADMIN_PASSWORD：记录一项配置或数据
+        MIM_COMMUNITY_DAILY_MAX: '200', MIM_COMMUNITY_TOTAL_MAX: '1', MIM_COMMUNITY_WINDOW_MAX: '5', // 对象字段 MIM_COMMUNITY_DAILY_MAX：记录一项配置或数据
+      }, // 代码块结束
+    }); // 代码块结束
+    const loginRes = await request(totalApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000022', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
+    const headers = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 headers：保存固定配置或一次性派生值
+    const post = (title: string) => // 常量 post：保存固定配置或一次性派生值
+      request(totalApp).post('/api/v1/community/threads').set({ ...headers, 'idempotency-key': randomUUID() }) // 调用 request 并处理其返回结果
+        .send({ board_slug: 'general', title, body: '正文内容用于验证累计配额上限是否生效。' }); // 执行当前业务步骤
 
-    const first = await post('累计配额帖一');
-    expect(first.status).toBe(201);
-    const second = await post('累计配额帖二');
-    expect(second.status).toBe(429);
-    expect(second.body.details.reason).toBe('TOTAL');
-  });
+    const first = await post('累计配额帖一'); // 常量 first：保存固定配置或一次性派生值
+    expect(first.status).toBe(201); // 调用 expect 并处理其返回结果
+    const second = await post('累计配额帖二'); // 常量 second：保存固定配置或一次性派生值
+    expect(second.status).toBe(429); // 调用 expect 并处理其返回结果
+    expect(second.body.details.reason).toBe('TOTAL'); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 }); // 结束函数体：本层作用域收尾
 
 describe('三期 9：推荐权重环境变量 JSON 覆盖改变 recommend 排序', () => { // 用例「三期 9：权重 env 覆盖」：覆盖对应业务契约
   it('权重向回复倾斜后，回复多的帖子排在收藏多的帖子之前', async () => { // 用例「env 覆盖排序」：覆盖对应业务契约
     const wDb = createDatabase(':memory:'); // 保存 wDb：承载本步骤的计算结果供后续使用
     const wApp = createApp({ // 保存 wApp：回复权重 20、收藏权重 1（默认收藏 5 > 回复 3）
-      db: wDb,
-      jwtSecret: JWT_SECRET,
-      env: {
-        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD,
-        MIM_COMMUNITY_RECOMMEND_WEIGHTS: JSON.stringify({ replies: 20, favorites: 1 }),
-      },
-    });
-    const loginRes = await request(wApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000023', password: ADMIN_PASSWORD });
-    const auth = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() };
+      db: wDb, // 对象字段 db：记录一项配置或数据
+      jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
+      env: { // 对象字段 env：记录一项配置或数据
+        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, // 对象字段 MIM_AUTH_ADMIN_PASSWORD：记录一项配置或数据
+        MIM_COMMUNITY_RECOMMEND_WEIGHTS: JSON.stringify({ replies: 20, favorites: 1 }), // 对象字段 MIM_COMMUNITY_RECOMMEND_WEIGHTS：记录一项配置或数据
+      }, // 代码块结束
+    }); // 代码块结束
+    const loginRes = await request(wApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000023', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
+    const auth = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 auth：保存固定配置或一次性派生值
 
-    const replyThread = await request(wApp).post('/api/v1/community/threads').set(auth).send({ board_slug: 'general', title: '回复型帖子', body: '这篇帖子会收到一条回复，用于权重覆盖排序验证。' });
-    const favThread = await request(wApp).post('/api/v1/community/threads').set({ ...auth, 'idempotency-key': randomUUID() }).send({ board_slug: 'general', title: '收藏型帖子', body: '这篇帖子会被收藏，作为排序对照样本。' });
+    const replyThread = await request(wApp).post('/api/v1/community/threads').set(auth).send({ board_slug: 'general', title: '回复型帖子', body: '这篇帖子会收到一条回复，用于权重覆盖排序验证。' }); // 常量 replyThread：保存固定配置或一次性派生值
+    const favThread = await request(wApp).post('/api/v1/community/threads').set({ ...auth, 'idempotency-key': randomUUID() }).send({ board_slug: 'general', title: '收藏型帖子', body: '这篇帖子会被收藏，作为排序对照样本。' }); // 常量 favThread：保存固定配置或一次性派生值
 
-    await request(wApp).post(`/api/v1/community/threads/${replyThread.body.thread_id}/reply`).set({ ...auth, 'idempotency-key': randomUUID() }).send({ content: '回复一条，计入回复权重。' });
-    await request(wApp).post(`/api/v1/community/threads/${favThread.body.thread_id}/favorite`).set({ ...auth, 'idempotency-key': randomUUID() }).send({});
+    await request(wApp).post(`/api/v1/community/threads/${replyThread.body.thread_id}/reply`).set({ ...auth, 'idempotency-key': randomUUID() }).send({ content: '回复一条，计入回复权重。' }); // 异步等待：挂起至 Promise 落定后再继续
+    await request(wApp).post(`/api/v1/community/threads/${favThread.body.thread_id}/favorite`).set({ ...auth, 'idempotency-key': randomUUID() }).send({}); // 异步等待：挂起至 Promise 落定后再继续
 
-    const list = await request(wApp).get('/api/v1/community/threads?board=general&sort=recommend').set(auth);
-    expect(list.status).toBe(200);
-    const ids = list.body.items.map((t: { id: string }) => t.id);
+    const list = await request(wApp).get('/api/v1/community/threads?board=general&sort=recommend').set(auth); // 常量 list：保存固定配置或一次性派生值
+    expect(list.status).toBe(200); // 调用 expect 并处理其返回结果
+    const ids = list.body.items.map((t: { id: string }) => t.id); // 常量 ids：保存固定配置或一次性派生值
     expect(ids.indexOf(replyThread.body.thread_id)).toBeLessThan(ids.indexOf(favThread.body.thread_id)); // 回复权重更高，回复型帖子在前
-  });
+  }); // 代码块结束
 }); // 结束函数体：本层作用域收尾
 
 describe('三期 10：followers + paid 组合判定顺序', () => { // 用例「三期 10：组合判定」：覆盖对应业务契约
   it('先过付费门槛再过关注门槛：未加入且未关注锁定；仅关注仍锁定；仅加入仍锁定；两者齐备可读正文', async () => { // 用例「组合顺序」：覆盖对应业务契约
     db.prepare("UPDATE community_boards SET visibility = 'followers', price_cents = 1900 WHERE slug = 'paid'").run(); // 保存 paid：付费 + followers 双门槛
-    const author = await login('13810000024');
-    const authorId = (await request(app).get('/api/v1/me').set(author)).body.user.id as string;
-    const threadId = seedThread('paid', '付费关注双门槛帖', '这是付费且 followers 双门槛板块的完整正文。', authorId);
-    const board = db.prepare('SELECT id FROM community_boards WHERE slug = ?').get('paid') as { id: string };
+    const author = await login('13810000024'); // 常量 author：保存固定配置或一次性派生值
+    const authorId = (await request(app).get('/api/v1/me').set(author)).body.user.id as string; // 常量 authorId：保存固定配置或一次性派生值
+    const threadId = seedThread('paid', '付费关注双门槛帖', '这是付费且 followers 双门槛板块的完整正文。', authorId); // 常量 threadId：保存固定配置或一次性派生值
+    const board = db.prepare('SELECT id FROM community_boards WHERE slug = ?').get('paid') as { id: string }; // 常量 board：保存固定配置或一次性派生值
 
     // 访客 A：两者都不满足 → 锁定
     const guestA = await login('13810000025');
-    const neither = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestA);
-    expect(neither.body.thread.body).toBe('');
-    expect(neither.body.unlocked).toBe(false);
+    const neither = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestA); // 常量 neither：保存固定配置或一次性派生值
+    expect(neither.body.thread.body).toBe(''); // 调用 expect 并处理其返回结果
+    expect(neither.body.unlocked).toBe(false); // 调用 expect 并处理其返回结果
 
     // 访客 B：仅关注、未加入 → 付费门槛先拦截，仍锁定
     const guestB = await login('13810000026');
-    const follow = await request(app).post('/api/v1/community/boards/paid/follow').set(writeHeaders(guestB)).send({});
-    expect(follow.body.followed).toBe(true);
-    const followOnly = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestB);
-    expect(followOnly.body.thread.body).toBe('');
-    expect(followOnly.body.unlocked).toBe(false);
+    const follow = await request(app).post('/api/v1/community/boards/paid/follow').set(writeHeaders(guestB)).send({}); // 常量 follow：保存固定配置或一次性派生值
+    expect(follow.body.followed).toBe(true); // 调用 expect 并处理其返回结果
+    const followOnly = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestB); // 常量 followOnly：保存固定配置或一次性派生值
+    expect(followOnly.body.thread.body).toBe(''); // 调用 expect 并处理其返回结果
+    expect(followOnly.body.unlocked).toBe(false); // 调用 expect 并处理其返回结果
 
     // 访客 C：仅加入、未关注 → 关注门槛再拦截，仍锁定
     const guestC = await login('13810000027');
-    const guestCId = (await request(app).get('/api/v1/me').set(guestC)).body.user.id as string;
+    const guestCId = (await request(app).get('/api/v1/me').set(guestC)).body.user.id as string; // 常量 guestCId：保存固定配置或一次性派生值
     db.prepare('INSERT INTO community_board_memberships (board_id, user_id, amount_cents, created_at) VALUES (?, ?, 0, ?)').run(board.id, guestCId, new Date().toISOString()); // 直接落会员记录，绕开余额支付
-    const joinedOnly = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestC);
-    expect(joinedOnly.body.thread.body).toBe('');
-    expect(joinedOnly.body.unlocked).toBe(false);
+    const joinedOnly = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestC); // 常量 joinedOnly：保存固定配置或一次性派生值
+    expect(joinedOnly.body.thread.body).toBe(''); // 调用 expect 并处理其返回结果
+    expect(joinedOnly.body.unlocked).toBe(false); // 调用 expect 并处理其返回结果
 
     // 访客 D：会员 + 关注齐备 → 放行
     const guestD = await login('13810000028');
-    const guestDId = (await request(app).get('/api/v1/me').set(guestD)).body.user.id as string;
-    db.prepare('INSERT INTO community_board_memberships (board_id, user_id, amount_cents, created_at) VALUES (?, ?, 0, ?)').run(board.id, guestDId, new Date().toISOString());
-    await request(app).post('/api/v1/community/boards/paid/follow').set(writeHeaders(guestD)).send({});
-    const both = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestD);
-    expect(both.body.unlocked).toBe(true);
-    expect(both.body.thread.body).toContain('双门槛');
-  });
+    const guestDId = (await request(app).get('/api/v1/me').set(guestD)).body.user.id as string; // 常量 guestDId：保存固定配置或一次性派生值
+    db.prepare('INSERT INTO community_board_memberships (board_id, user_id, amount_cents, created_at) VALUES (?, ?, 0, ?)').run(board.id, guestDId, new Date().toISOString()); // 执行当前业务步骤
+    await request(app).post('/api/v1/community/boards/paid/follow').set(writeHeaders(guestD)).send({}); // 异步等待：挂起至 Promise 落定后再继续
+    const both = await request(app).get(`/api/v1/community/threads/${threadId}`).set(guestD); // 常量 both：保存固定配置或一次性派生值
+    expect(both.body.unlocked).toBe(true); // 调用 expect 并处理其返回结果
+    expect(both.body.thread.body).toContain('双门槛'); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 }); // 结束函数体：本层作用域收尾
 
 describe('三期 11：post 场景验证码开关驱动，默认空操作', () => { // 用例「三期 11：发帖验证码」：覆盖对应业务契约
@@ -494,22 +494,22 @@ describe('三期 11：post 场景验证码开关驱动，默认空操作', () =>
     // 默认应用（本文件 beforeEach）未开启验证码：既有发帖链路已在三期 2/6 用例中 201 放行，此处复核开关关闭为空操作。
     const onDb = createDatabase(':memory:'); // 保存 onDb：承载本步骤的计算结果供后续使用
     const onApp = createApp({ // 保存 onApp：image 模式 + post 场景强制
-      db: onDb,
-      jwtSecret: JWT_SECRET,
-      env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_CAPTCHA_MODE: 'image', MIM_CAPTCHA_POST: '1' },
-    });
-    const loginRes = await request(onApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000026', password: ADMIN_PASSWORD });
-    const auth = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() };
+      db: onDb, // 对象字段 db：记录一项配置或数据
+      jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
+      env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_CAPTCHA_MODE: 'image', MIM_CAPTCHA_POST: '1' }, // 对象字段 env：记录一项配置或数据
+    }); // 代码块结束
+    const loginRes = await request(onApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000026', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
+    const auth = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 auth：保存固定配置或一次性派生值
 
-    const missing = await request(onApp).post('/api/v1/community/threads').set(auth).send({ board_slug: 'general', title: '缺验证码帖子', body: '未携带验证码，应当被 post 场景校验拦截。' });
-    expect(missing.status).toBe(400);
-    expect(missing.body.code).toBe('AUTH_CODE_INVALID');
+    const missing = await request(onApp).post('/api/v1/community/threads').set(auth).send({ board_slug: 'general', title: '缺验证码帖子', body: '未携带验证码，应当被 post 场景校验拦截。' }); // 常量 missing：保存固定配置或一次性派生值
+    expect(missing.status).toBe(400); // 调用 expect 并处理其返回结果
+    expect(missing.body.code).toBe('AUTH_CODE_INVALID'); // 调用 expect 并处理其返回结果
 
     const captcha = createCaptcha(); // 本地造一条有效图形验证码
-    onDb.prepare('INSERT INTO captchas (id, answer_hash, expires_at, used_at, created_at) VALUES (?, ?, ?, NULL, ?)')
-      .run(captcha.id, captchaHash(captcha.answer), captcha.expires_at, new Date().toISOString());
-    const ok = await request(onApp).post('/api/v1/community/threads').set({ ...auth, 'idempotency-key': randomUUID() })
-      .send({ board_slug: 'general', title: '带验证码帖子', body: '携带一次性验证码答案，应当正常发出。', captcha_id: captcha.id, captcha_code: captcha.answer });
-    expect(ok.status).toBe(201);
-  });
+    onDb.prepare('INSERT INTO captchas (id, answer_hash, expires_at, used_at, created_at) VALUES (?, ?, ?, NULL, ?)') // 执行当前业务步骤
+      .run(captcha.id, captchaHash(captcha.answer), captcha.expires_at, new Date().toISOString()); // 执行当前业务步骤
+    const ok = await request(onApp).post('/api/v1/community/threads').set({ ...auth, 'idempotency-key': randomUUID() }) // 常量 ok：保存固定配置或一次性派生值
+      .send({ board_slug: 'general', title: '带验证码帖子', body: '携带一次性验证码答案，应当正常发出。', captcha_id: captcha.id, captcha_code: captcha.answer }); // 执行当前业务步骤
+    expect(ok.status).toBe(201); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 }); // 结束函数体：本层作用域收尾

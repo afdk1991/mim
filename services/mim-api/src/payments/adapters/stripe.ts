@@ -5,7 +5,7 @@ import type { ChannelAdapter, ExtIntentRow, NotifyPayload, RefundOutcome, Refund
 import { hmacSha256Hex, missingEnv, requireConfigured, secureEqualHex, trimBase, upstreamJson } from '../util.js'; // 引入依赖：声明本文件使用的外部能力
 
 const baseOf = (env: Record<string, string | undefined>): string => // 保存 baseOf：承载本步骤的计算结果供后续使用
-  trimBase(env.MIM_STRIPE_API_BASE?.trim() || 'https://api.stripe.com');
+  trimBase(env.MIM_STRIPE_API_BASE?.trim() || 'https://api.stripe.com'); // 调用 trimBase 并处理其返回结果
 
 const TOLERANCE_SECONDS = 300; // 时间戳漂移容忍 5 分钟，防重放
 

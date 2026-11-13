@@ -59,7 +59,7 @@ async function createAlipay(env: Record<string, string | undefined>, intent: Pay
   if (!env.MIM_ALIPAY_APP_ID || !env.MIM_ALIPAY_PRIVATE_KEY) throw new AppError('PROVIDER_NOT_CONFIGURED', '支付宝渠道未配置'); // 业务拒绝 PROVIDER_NOT_CONFIGURED：以统一错误码终止当前请求
   const biz = JSON.stringify({ out_trade_no: intent.id, total_amount: (intent.amount_cents / 100).toFixed(2), subject: `Mim 订单 ${intent.id}` }); // 保存 biz：承载本步骤的计算结果供后续使用
   const params = alipaySignedParams(env, 'alipay.trade.precreate', biz); // 保存 params：承载本步骤的计算结果供后续使用
-  const res = await fetch('https://openapi.alipay.com/gateway.do', {
+  const res = await fetch('https://openapi.alipay.com/gateway.do', { // 常量 res：保存固定配置或一次性派生值
     method: 'POST', // 对象字段：声明结构中的一项数据
     headers: { 'content-type': 'application/x-www-form-urlencoded;charset=utf-8' }, // 对象字段：声明结构中的一项数据
     body: new URLSearchParams(params), // 对象字段：声明结构中的一项数据
@@ -83,7 +83,7 @@ function createAlipayWap(env: Record<string, string | undefined>, intent: PayInt
   const query = Object.entries(params) // 保存 query：承载本步骤的计算结果供后续使用
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`) // 链式调用：在上一步结果上继续处理
     .join('&'); // 链式调用：在上一步结果上继续处理
-  return { payUrl: `https://openapi.alipay.com/gateway.do?${query}` };
+  return { payUrl: `https://openapi.alipay.com/gateway.do?${query}` }; // 返回当前函数的处理结果
 } // 结束代码块：本层作用域收尾
 
 /** 微信支付 v3 请求签名：METHOD\nURL\nTIMESTAMP\nNONCE\nBODY\n。 */
@@ -115,7 +115,7 @@ async function createWechatNative(env: Record<string, string | undefined>, inten
     notify_url: notifyUrl, // 对象字段：声明结构中的一项数据
     amount: { total: intent.amount_cents, currency: 'CNY' }, // 对象字段：声明结构中的一项数据
   }); // 结束代码块：本层作用域收尾
-  const res = await fetch(`https://api.mch.weixin.qq.com${path}`, {
+  const res = await fetch(`https://api.mch.weixin.qq.com${path}`, { // 常量 res：保存固定配置或一次性派生值
     method: 'POST', // 对象字段：声明结构中的一项数据
     headers: { // 对象字段：声明结构中的一项数据
       authorization: wechatAuthorization(env, 'POST', path, body), // 对象字段：声明结构中的一项数据

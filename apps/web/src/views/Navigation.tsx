@@ -49,21 +49,21 @@ export function Navigation({ locale }: Props) {
   const [group, setGroup] = useState('');
   // 新建表单字段
   const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [newGroup, setNewGroup] = useState('');
-  const [description, setDescription] = useState('');
-  const [recommended, setRecommended] = useState(false);
+  const [url, setUrl] = useState(''); // 赋值：更新变量 const 的取值
+  const [newGroup, setNewGroup] = useState(''); // 赋值：更新变量 const 的取值
+  const [description, setDescription] = useState(''); // 赋值：更新变量 const 的取值
+  const [recommended, setRecommended] = useState(false); // 赋值：更新变量 const 的取值
   // 忙碌标记：区分批量检测 / 单条检测 / 新建 / 推荐位切换，避免整页卡住
   const [busy, setBusy] = useState<string | null>(null);
   // 操作反馈
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // 赋值：更新变量 const 的取值
 
   // 目录：筛选变化即重新拉取（响应内同时带汇总）
   const list = useAsync(() => api.navigation.links({ q: applied || undefined, group: group || undefined }), [applied, group]);
   // 条目与汇总的兜底值
   const items: NavLink[] = list.data?.items ?? [];
-  const summary = list.data?.summary;
+  const summary = list.data?.summary; // 常量 summary：保存固定配置或一次性派生值
 
   // 提交检索
   function submitSearch(event: FormEvent) {
@@ -81,7 +81,7 @@ export function Navigation({ locale }: Props) {
     setBusy('create'); // 标记新建中
     setError(null); // 清旧错误
     setMessage(null); // 清旧提示
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.navigation.create({ // 调用收录接口
         name: name.trim(), // 名称
         url: url.trim(), // 地址（http(s) 或站内 / 开头）
@@ -104,7 +104,7 @@ export function Navigation({ locale }: Props) {
     setBusy('all'); // 标记批量探测
     setError(null); // 清旧错误
     setMessage(null); // 清旧提示
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.navigation.checkAll(); // 触发探测
       setMessage(tr(locale, `已探测 ${result.checked} 条：可达 ${result.summary.ok} / 失效 ${result.summary.broken}`, `Checked ${result.checked}: ${result.summary.ok} reachable / ${result.summary.broken} broken`)); // 结果提示
       list.reload(); // 刷新列表
@@ -119,7 +119,7 @@ export function Navigation({ locale }: Props) {
   async function checkOne(id: string) {
     setBusy(`check:${id}`); // 按主键标记，避免与其它操作互斥
     setError(null); // 清旧错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.navigation.check(id); // 探测并回写
       setMessage(tr(locale, `已探测：${result.item.name} → ${STATUS_META[result.item.status].zh}`, `Checked: ${result.item.name} → ${STATUS_META[result.item.status].en}`)); // 提示
       list.reload(); // 刷新
@@ -134,7 +134,7 @@ export function Navigation({ locale }: Props) {
   async function toggleRecommended(item: NavLink) {
     setBusy(`rec:${item.id}`); // 标记该条
     setError(null); // 清旧错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.navigation.update(item.id, { recommended: !item.recommended }); // 取反后写回
       list.reload(); // 刷新
     } catch (err) {
@@ -147,44 +147,44 @@ export function Navigation({ locale }: Props) {
   // 按分组聚合渲染：保持后端排序（分组名 + 推荐位优先 + 名称）
   const groups = Array.from(new Set(items.map((item) => item.group))); // 分组顺序取首次出现顺序
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{tr(locale, '导航站', 'Navigation')}</h1>
-        <p className="muted">
+        <p className="muted">{/* 执行当前业务步骤 */}
           {tr(locale, '全站资源链接目录与分类；服务端探测可达性并标记失效，推荐位优先展示。只维护目录与状态，不承载被链系统的内容。', 'Site-wide link directory with grouping; reachability is probed server-side and broken links are flagged. Only the directory and status are maintained here.')}
         </p>
       </header>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>{tr(locale, '目录概览', 'Directory overview')}</h3></div>
-        <div className="deploy-stats">
+        <div className="deploy-stats">{/* 执行当前业务步骤 */}
           <div className="deploy-stat"><span className="deploy-stat-value">{summary?.total ?? '—'}</span><span className="muted">{tr(locale, '链接总数', 'Links')}</span></div>
           <div className="deploy-stat"><span className="deploy-stat-value">{summary?.ok ?? '—'}</span><span className="muted">{tr(locale, '可达', 'Reachable')}</span></div>
           <div className="deploy-stat"><span className="deploy-stat-value">{summary?.broken ?? '—'}</span><span className="muted">{tr(locale, '失效', 'Broken')}</span></div>
           <div className="deploy-stat"><span className="deploy-stat-value">{summary?.unknown ?? '—'}</span><span className="muted">{tr(locale, '未探测', 'Untested')}</span></div>
           <div className="deploy-stat"><span className="deploy-stat-value">{summary?.groups.length ?? '—'}</span><span className="muted">{tr(locale, '分组', 'Groups')}</span></div>
         </div>
-        <p className="muted">
+        <p className="muted">{/* 执行当前业务步骤 */}
           {tr(locale, '最近探测', 'Last check')}: {shortTime(summary?.last_checked_at ?? null)}
           {' · '}
-          <button type="button" className="btn primary" disabled={busy === 'all'} onClick={checkAll}>
+          <button type="button" className="btn primary" disabled={busy === 'all'} onClick={checkAll}>{/* 执行当前业务步骤 */}
             {busy === 'all' ? tr(locale, '检测中…', 'Checking…') : tr(locale, '检测全部', 'Check all')}
           </button>
         </p>
       </section>
 
-      <form className="form inline" onSubmit={submitSearch}>
-        <label className="grow">
+      <form className="form inline" onSubmit={submitSearch}>{/* 执行当前业务步骤 */}
+        <label className="grow">{/* 执行当前业务步骤 */}
           {tr(locale, '搜索', 'Search')}
           <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={tr(locale, '名称 / 地址 / 说明', 'Name / URL / description')} />
         </label>
         <button type="submit" className="btn primary">{tr(locale, '检索', 'Search')}</button>
       </form>
 
-      <div className="deploy-columns">
+      <div className="deploy-columns">{/* 执行当前业务步骤 */}
         {(summary?.groups ?? []).map((g) => (
-          <button key={g.name} type="button" className={`btn ghost${group === g.name ? ' active' : ''}`} onClick={() => setGroup(group === g.name ? '' : g.name)}>
+          <button key={g.name} type="button" className={`btn ghost${group === g.name ? ' active' : ''}`} onClick={() => setGroup(group === g.name ? '' : g.name)}>{/* 执行当前业务步骤 */}
             {g.name} {g.count}
           </button>
         ))}
@@ -200,22 +200,22 @@ export function Navigation({ locale }: Props) {
         <p className="hint">{tr(locale, '没有匹配的链接。', 'No matching links.')}</p>
       ) : (
         groups.map((groupName) => (
-          <section className="panel" key={groupName}>
+          <section className="panel" key={groupName}>{/* 执行当前业务步骤 */}
             <div className="panel-head"><h3>{groupName}</h3></div>
-            <ul className="plain-list">
+            <ul className="plain-list">{/* 执行当前业务步骤 */}
               {items.filter((item) => item.group === groupName).map((item) => (
-                <li key={item.id} className="deploy-row">
+                <li key={item.id} className="deploy-row">{/* 执行当前业务步骤 */}
                   <a className="link" href={item.url} target="_blank" rel="noreferrer">{item.recommended ? '★ ' : ''}{item.name}</a>
                   <div className="muted"><code>{item.url}</code> · {item.description || '—'}</div>
-                  <div className="deploy-kv">
+                  <div className="deploy-kv">{/* 执行当前业务步骤 */}
                     <StatusBadge status={item.status} locale={locale} />
                     <span>{tr(locale, 'HTTP', 'HTTP')}: <code>{item.http_status ?? '—'}</code></span>
                     <span>{tr(locale, '耗时', 'Latency')}: {item.latency_ms === null ? '—' : `${item.latency_ms} ms`}</span>
                     <span>{tr(locale, '探测时间', 'Checked')}: {shortTime(item.last_checked_at)}</span>
-                    <button type="button" className="btn ghost" disabled={busy === `check:${item.id}`} onClick={() => checkOne(item.id)}>
+                    <button type="button" className="btn ghost" disabled={busy === `check:${item.id}`} onClick={() => checkOne(item.id)}>{/* 执行当前业务步骤 */}
                       {busy === `check:${item.id}` ? tr(locale, '检测中…', 'Checking…') : tr(locale, '检测', 'Check')}
                     </button>
-                    <button type="button" className="btn ghost" disabled={busy === `rec:${item.id}`} onClick={() => toggleRecommended(item)}>
+                    <button type="button" className="btn ghost" disabled={busy === `rec:${item.id}`} onClick={() => toggleRecommended(item)}>{/* 执行当前业务步骤 */}
                       {item.recommended ? tr(locale, '取消推荐', 'Unpin') : tr(locale, '设为推荐', 'Pin')}
                     </button>
                   </div>
@@ -223,38 +223,38 @@ export function Navigation({ locale }: Props) {
               ))}
             </ul>
           </section>
-        ))
+        )) // 执行当前业务步骤
       )}
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>{tr(locale, '收录入口', 'Add a link')}</h3></div>
-        <form className="form inline" onSubmit={createLink}>
-          <label>
+        <form className="form inline" onSubmit={createLink}>{/* 执行当前业务步骤 */}
+          <label>{/* 执行当前业务步骤 */}
             {tr(locale, '名称', 'Name')}
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder={tr(locale, '如：工作台', 'e.g. Workbench')} />
           </label>
-          <label className="grow">
+          <label className="grow">{/* 执行当前业务步骤 */}
             {tr(locale, '地址', 'URL')}
             <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder={tr(locale, 'https://… 或 /路径', 'https://… or /path')} />
           </label>
-          <label>
+          <label>{/* 执行当前业务步骤 */}
             {tr(locale, '分组', 'Group')}
             <input value={newGroup} onChange={(event) => setNewGroup(event.target.value)} placeholder={tr(locale, '选填，默认「其他」', 'optional, default “Other”')} />
           </label>
-          <label className="grow">
+          <label className="grow">{/* 执行当前业务步骤 */}
             {tr(locale, '说明', 'Description')}
             <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={tr(locale, '选填', 'optional')} />
           </label>
-          <label>
+          <label>{/* 执行当前业务步骤 */}
             <span>{tr(locale, '推荐位', 'Pin')}</span>
             <input type="checkbox" checked={recommended} onChange={(event) => setRecommended(event.target.checked)} />
           </label>
-          <button type="submit" className="btn primary" disabled={busy === 'create'}>
+          <button type="submit" className="btn primary" disabled={busy === 'create'}>{/* 执行当前业务步骤 */}
             {busy === 'create' ? tr(locale, '提交中…', 'Saving…') : tr(locale, '新建', 'Add')}
           </button>
         </form>
         <p className="muted">{tr(locale, '地址只接受 http(s) 或站内相对路径；站内相对路径探测时按当前环境 origin 补齐。', 'Only http(s) URLs or site-relative paths are accepted; relative paths are resolved against the runtime origin during probing.')}</p>
       </section>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Navigation 组件结束

@@ -22,7 +22,7 @@ import type {
 
 /** 滑动拼图可拖动区间：与后端 SLIDER_WIDTH=300、缺口宽 42 对齐 */
 const SLIDER_TRACK_WIDTH = 300;
-const SLIDER_GAP_SIZE = 42;
+const SLIDER_GAP_SIZE = 42; // 常量 SLIDER_GAP_SIZE：保存固定配置或一次性派生值
 
 /** 从地址栏移除 OAuth 回传参数：票据与错误码都只消费一次，刷新不应重放 */
 function clearOAuthParams(): void {
@@ -55,7 +55,7 @@ interface Props {
   embedded?: boolean;
   // 按需登录提示：required 为访问收费功能的登录说明，expired 为登录态失效后的重登说明，null 不展示
   notice?: 'required' | 'expired' | null;
-}
+} // 代码块结束
 
 // 登录页组件：同时支持「密码登录」与「验证码登录」两种模式，并作为按需登录的统一入口（整屏或内嵌）
 export function Login({ onLogin, embedded = false, notice = null }: Props) {
@@ -103,109 +103,109 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const dragOffset = useRef(0); // 拖拽起点对应的拼图偏移
   // 第三方 SDK 票据：tencent 用 ticket/randstr；geetest4 用 lot_number 四元组
   const [ticket, setTicket] = useState('');
-  const [randstr, setRandstr] = useState('');
-  const [lotNumber, setLotNumber] = useState('');
-  const [captchaOutput, setCaptchaOutput] = useState('');
-  const [passToken, setPassToken] = useState('');
-  const [genTime, setGenTime] = useState('');
+  const [randstr, setRandstr] = useState(''); // 赋值：更新变量 const 的取值
+  const [lotNumber, setLotNumber] = useState(''); // 赋值：更新变量 const 的取值
+  const [captchaOutput, setCaptchaOutput] = useState(''); // 赋值：更新变量 const 的取值
+  const [passToken, setPassToken] = useState(''); // 赋值：更新变量 const 的取值
+  const [genTime, setGenTime] = useState(''); // 赋值：更新变量 const 的取值
 
   // 当前验证码场景：注册模式取 register，其余取 login
   const captchaScene: CaptchaScene = mode === 'register' ? 'register' : 'login';
-  const captchaMode = security?.captcha.mode ?? 'off';
-  const captchaRequired = Boolean(security && security.captcha_required && captchaMode !== 'off');
+  const captchaMode = security?.captcha.mode ?? 'off'; // 常量 captchaMode：保存固定配置或一次性派生值
+  const captchaRequired = Boolean(security && security.captcha_required && captchaMode !== 'off'); // 常量 captchaRequired：保存固定配置或一次性派生值
   // 第三方模式凭证未配置时隐藏而不是报错；后端缺凭证会 503，前端按 providers 兜底不渲染
   const thirdPartyReady =
     captchaMode === 'tencent' ? Boolean(security?.captcha.providers.tencent)
     : captchaMode === 'geetest4' ? Boolean(security?.captcha.providers.geetest4)
     : false;
-  const captchaVisible = captchaRequired && (captchaMode !== 'tencent' && captchaMode !== 'geetest4' || thirdPartyReady);
+  const captchaVisible = captchaRequired && (captchaMode !== 'tencent' && captchaMode !== 'geetest4' || thirdPartyReady); // 常量 captchaVisible：保存固定配置或一次性派生值
 
   // 挂载时查安全能力状态；离线 / 接口异常回落 null，等价 off 模式，不打断登录
   useEffect(() => {
-    let alive = true;
+    let alive = true; // 可变变量 alive：运行过程中会被重新赋值
     api.securityStatus()
       .then((status) => { if (alive) setSecurity(status); })
       .catch(() => { if (alive) setSecurity(null); });
-    return () => { alive = false; };
+    return () => { alive = false; }; // 返回当前函数的处理结果
   }, []);
 
   // 场景切换或强制状态变化时重新签发题目；一次性消费，失败回落 off 不阻塞主流程
   useEffect(() => {
-    if (!captchaRequired) { setIssue(null); return; }
-    let alive = true;
+    if (!captchaRequired) { setIssue(null); return; } // 条件分支：按判断结果选择后续处理路径
+    let alive = true; // 可变变量 alive：运行过程中会被重新赋值
     api.captcha(captchaScene)
       .then((item) => {
-        if (!alive) return;
+        if (!alive) return; // 条件分支：按判断结果选择后续处理路径
         setIssue(item);
         setCaptchaCode('');
         setSliderX(null);
         setTicket(''); setRandstr(''); setLotNumber(''); setCaptchaOutput(''); setPassToken(''); setGenTime('');
-      })
+      }) // 代码块结束
       .catch(() => { if (alive) { setIssue(null); setSecurity(null); } });
-    return () => { alive = false; };
+    return () => { alive = false; }; // 返回当前函数的处理结果
   }, [captchaScene, captchaRequired]);
 
   /** 刷新验证码：image 换一张 SVG，slider 换一题拼图；第三方 SDK 重新拉起由其自身回调覆盖 */
   async function refreshCaptcha() {
-    try {
-      const item = await api.captcha(captchaScene);
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      const item = await api.captcha(captchaScene); // 常量 item：保存固定配置或一次性派生值
       setIssue(item);
       setCaptchaCode('');
       setSliderX(null);
     } catch (err) {
       setError(errorText(locale, err));
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   /** 按当前 mode 组装提交票据；off / 未强制时返回空对象，不携带任何验证码字段 */
   function buildCaptchaTicket(): CaptchaTicket {
-    if (!captchaVisible || !issue) return {};
-    switch (captchaMode) {
-      case 'image': return { captcha_id: issue.id, captcha_code: captchaCode.trim() };
-      case 'slider': return { captcha_id: issue.id, slider_x: sliderX ?? undefined };
-      case 'tencent': return { ticket, randstr };
-      case 'geetest4': return { lot_number: lotNumber, captcha_output: captchaOutput, pass_token: passToken, gen_time: genTime };
+    if (!captchaVisible || !issue) return {}; // 条件分支：按判断结果选择后续处理路径
+    switch (captchaMode) { // 执行当前业务步骤
+      case 'image': return { captcha_id: issue.id, captcha_code: captchaCode.trim() }; // switch 分支取值：命中后执行对应处理
+      case 'slider': return { captcha_id: issue.id, slider_x: sliderX ?? undefined }; // switch 分支取值：命中后执行对应处理
+      case 'tencent': return { ticket, randstr }; // switch 分支取值：命中后执行对应处理
+      case 'geetest4': return { lot_number: lotNumber, captcha_output: captchaOutput, pass_token: passToken, gen_time: genTime }; // switch 分支取值：命中后执行对应处理
       default: return {};
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   /** 提交前校验验证码是否已完成；off / 未强制恒为 true，不打断 0.0.9 现网登录 */
   function captchaReady(): boolean {
-    if (!captchaVisible) return true;
-    switch (captchaMode) {
-      case 'image': return Boolean(issue?.id && captchaCode.trim());
-      case 'slider': return sliderX !== null;
-      case 'tencent': return Boolean(ticket && randstr);
-      case 'geetest4': return Boolean(lotNumber && captchaOutput && passToken && genTime);
+    if (!captchaVisible) return true; // 条件分支：按判断结果选择后续处理路径
+    switch (captchaMode) { // 执行当前业务步骤
+      case 'image': return Boolean(issue?.id && captchaCode.trim()); // switch 分支取值：命中后执行对应处理
+      case 'slider': return sliderX !== null; // switch 分支取值：命中后执行对应处理
+      case 'tencent': return Boolean(ticket && randstr); // switch 分支取值：命中后执行对应处理
+      case 'geetest4': return Boolean(lotNumber && captchaOutput && passToken && genTime); // switch 分支取值：命中后执行对应处理
       default: return true;
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // ===== 滑动拼图拖拽：记录指针偏移作为 slider_x，提交时回传后端容差校验 =====
   function onSliderDown(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!issue?.slider) return;
+    if (!issue?.slider) return; // 条件分支：按判断结果选择后续处理路径
     dragStartX.current = event.clientX;
     dragOffset.current = sliderX ?? 0;
     setSliderDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }
-  function onSliderMove(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!sliderDragging) return;
-    const next = Math.min(SLIDER_TRACK_WIDTH - SLIDER_GAP_SIZE, Math.max(0, dragOffset.current + (event.clientX - dragStartX.current)));
+  } // 代码块结束
+  function onSliderMove(event: ReactPointerEvent<HTMLButtonElement>) { // 函数 onSliderMove：封装一段可复用的处理逻辑
+    if (!sliderDragging) return; // 条件分支：按判断结果选择后续处理路径
+    const next = Math.min(SLIDER_TRACK_WIDTH - SLIDER_GAP_SIZE, Math.max(0, dragOffset.current + (event.clientX - dragStartX.current))); // 常量 next：保存固定配置或一次性派生值
     setSliderX(next);
-  }
-  function onSliderUp() {
+  } // 代码块结束
+  function onSliderUp() { // 函数 onSliderUp：封装一段可复用的处理逻辑
     setSliderDragging(false);
-  }
+  } // 代码块结束
 
   /** 渲染验证码交互区：按 mode 切换图形 / 拼图 / 第三方 SDK 占位；off 或未配置不输出任何节点 */
   function renderCaptchaPanel() {
-    if (!captchaVisible) return null;
-    const zh = locale !== 'en-US';
+    if (!captchaVisible) return null; // 条件分支：按判断结果选择后续处理路径
+    const zh = locale !== 'en-US'; // 常量 zh：保存固定配置或一次性派生值
 
-    if (captchaMode === 'image') {
-      return (
-        <div className="login-captcha">
+    if (captchaMode === 'image') { // 条件分支：按判断结果选择后续处理路径
+      return ( // 返回当前函数的处理结果
+        <div className="login-captcha">{/* 执行当前业务步骤 */}
           {issue?.svg ? (
             <span className="login-captcha-image" dangerouslySetInnerHTML={{ __html: issue.svg }} />
           ) : null}
@@ -216,24 +216,24 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
             maxLength={10}
             autoComplete="off"
           />
-          <button type="button" className="btn ghost" onClick={() => void refreshCaptcha()}>
+          <button type="button" className="btn ghost" onClick={() => void refreshCaptcha()}>{/* 执行当前业务步骤 */}
             {zh ? '换一张' : 'Refresh'}
           </button>
         </div>
-      );
-    }
+      ); // 执行当前业务步骤
+    } // 代码块结束
 
-    if (captchaMode === 'slider') {
-      const slider = issue?.slider;
-      return (
-        <div className="login-captcha slider-captcha">
-          <div className="slider-track" style={{ height: SLIDER_GAP_SIZE }}>
+    if (captchaMode === 'slider') { // 条件分支：按判断结果选择后续处理路径
+      const slider = issue?.slider; // 常量 slider：保存固定配置或一次性派生值
+      return ( // 返回当前函数的处理结果
+        <div className="login-captcha slider-captcha">{/* 执行当前业务步骤 */}
+          <div className="slider-track" style={{ height: SLIDER_GAP_SIZE }}>{/* 执行当前业务步骤 */}
             {slider?.background ? (
               <span className="slider-bg" dangerouslySetInnerHTML={{ __html: slider.background }} />
             ) : null}
             {slider ? (
               <button
-                type="button"
+                type="button" // 赋值：更新变量 type 的取值
                 className="slider-piece"
                 style={{ top: slider.gap.y, left: sliderX ?? 0, width: slider.gap.width, height: slider.gap.height }}
                 onPointerDown={onSliderDown}
@@ -244,26 +244,26 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               />
             ) : null}
           </div>
-          <button type="button" className="btn ghost" onClick={() => void refreshCaptcha()}>
+          <button type="button" className="btn ghost" onClick={() => void refreshCaptcha()}>{/* 执行当前业务步骤 */}
             {zh ? '刷新拼图' : 'Refresh puzzle'}
           </button>
         </div>
-      );
-    }
+      ); // 执行当前业务步骤
+    } // 代码块结束
 
     // tencent / geetest4：凭证已由后端 providers 披露为齐备。
     // 真实接入时在此挂载 TCaptcha / 极验 4.0 JS 组件，回调把票据写回上方 state；
     // 0.0.9 部署默认未配置第三方密钥，该分支不会渲染（providers=false 时整块隐藏）。
     return (
-      <div className="login-captcha thirdparty-captcha">
-        <p className="hint">
+      <div className="login-captcha thirdparty-captcha">{/* 执行当前业务步骤 */}
+        <p className="hint">{/* 执行当前业务步骤 */}
           {captchaMode === 'tencent'
             ? zh ? '腾讯验证码组件待加载完成后在此弹出。' : 'Tencent captcha widget will mount here.'
             : zh ? '极验验证码组件待加载完成后在此弹出。' : 'GeeTest v4 widget will mount here.'}
         </p>
       </div>
-    );
-  }
+    ); // 执行当前业务步骤
+  } // 代码块结束
 
   // 挂载时查一次通道能力；失败静默降级，不阻塞登录主流程
   useEffect(() => {
@@ -277,14 +277,14 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
 
   // 挂载时消费第三方回调参数：票据换会话 / 错误码展示；处理完立即从地址栏移除，避免刷新重放
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const errorCode = params.get('oauth_error');
-    const ticket = params.get('oauth_ticket');
-    if (errorCode) {
+    const params = new URLSearchParams(window.location.search); // 常量 params：保存固定配置或一次性派生值
+    const errorCode = params.get('oauth_error'); // 常量 errorCode：保存固定配置或一次性派生值
+    const ticket = params.get('oauth_ticket'); // 常量 ticket：保存固定配置或一次性派生值
+    if (errorCode) { // 条件分支：按判断结果选择后续处理路径
       setOauthError(errorCode); // 展示失败原因（如 AUTH_OAUTH_STATE_INVALID）
       clearOAuthParams(); // 清掉参数，刷新不再提示
       return; // 错误优先，不再尝试兑换
-    }
+    } // 代码块结束
     if (!ticket || oauthHandled.current) return; // 无票据或已处理
     oauthHandled.current = true; // 标记已消费，防止重复兑换
     setBusy(true); // 兑换期间禁用提交
@@ -293,7 +293,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
         setSession(result); // 写入本地会话
         clearOAuthParams(); // 清理地址栏
         onLogin(result); // 切换为已登录视图
-      })
+      }) // 代码块结束
       .catch((err) => setOauthError(errorText(locale, err))) // 票据过期等失败提示
       .finally(() => setBusy(false)); // 恢复按钮
   }, []);
@@ -320,7 +320,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setDevCode(null);
     // 清空旧错误提示，避免误导用户
     setError(null);
-  }
+  } // 代码块结束
 
   // 切换登录方式：清空两种凭证，防止残留值被误提交
   function switchMode(next: 'password' | 'code' | 'register') {
@@ -336,14 +336,14 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setDevCode(null);
     // 清空旧错误提示
     setError(null);
-  }
+  } // 代码块结束
 
   // 发起第三方授权：先向后端要授权地址，再整页跳转到提供方
   async function startOAuth(providerId: string) {
     if (oauthBusy) return; // 已有跳转在途，忽略重复点击
     setOauthError(null); // 清空旧错误
     setOauthBusy(providerId); // 只禁用被点的按钮
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 由后端生成 state / PKCE 并记录，前端只负责跳转
       const result = await api.oauthAuthorize(providerId, { region, mode: 'login', return_to: '/account' });
       window.location.assign(result.authorization_url); // 交给浏览器完成授权页
@@ -360,28 +360,28 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setBusy(true);
     // 请求前清空旧错误，保证提示与本次请求对应
     setError(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调用后端下发验证码；trim 去掉首尾空格以通过服务端格式校验
       // 发码链路后端只消费图形验证码字段；slider / 第三方票据在登录 / 注册提交时随主请求携带
       const imageTicket = captchaMode === 'image' && issue?.id
         ? { id: issue.id, code: captchaCode.trim() }
         : undefined;
-      const result = await api.requestCode(region, provider, identifier.trim(), imageTicket);
+      const result = await api.requestCode(region, provider, identifier.trim(), imageTicket); // 常量 result：保存固定配置或一次性派生值
       // 保存后端返回的开发态验证码；生产环境一般为 null 不展示
       setDevCode(result.dev_code);
       // 图形验证码一次性使用，发送后立即换一张
       if (captchaMode === 'image') {
         setCaptchaCode('');
-        await refreshCaptcha();
-      }
+        await refreshCaptcha(); // 异步等待：挂起至 Promise 落定后再继续
+      } // 代码块结束
     } catch (err) {
       // 把后端或网络异常翻译成当前语言的提示文案
       setError(errorText(locale, err));
     } finally {
       // 无论成功失败都解除按钮禁用，允许重试
       setBusy(false);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 表单提交：按当前模式走密码登录或验证码登录
   async function submit(event: FormEvent) {
@@ -390,15 +390,15 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     // 验证码未完成时阻断提交，避免把空票据发给后端
     if (!captchaReady()) {
       setError(locale === 'en-US' ? 'Please complete the security verification.' : '请先完成安全验证。');
-      return;
-    }
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
     // 标记请求中，提交按钮变灰并显示加载文案
     setBusy(true);
     // 提交前清空旧错误
     setError(null);
     // 按当前 mode 组装票据；off / 未强制时为空对象，不携带任何验证码字段
     const ticketPayload = buildCaptchaTicket();
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 三选一发起认证请求，三条分支都返回统一的登录凭证
       const result =
         // 注册模式：账号 + 口令创建自建账号，注册成功即登录
@@ -410,7 +410,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               display_name: displayName.trim() || undefined,
               invite_code: inviteCode.trim() || undefined, // 注册门槛开启时后端据此核销
               ...ticketPayload,
-            })
+            }) // 代码块结束
           // 密码模式：区域 + 账号标识 + 密码换取会话
           : mode === 'password'
             ? await api.loginWithPassword({ region, identifier: identifier.trim(), password, ...ticketPayload })
@@ -430,7 +430,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
       if (mode === 'register') {
         setRegistered(result); // 暂存结果，等用户确认
         return; // 不在这里写会话，避免直接跳走看不到号码
-      }
+      } // 代码块结束
       // 把令牌写入本地会话存储，供后续接口自动携带
       setSession(result);
       // 通知上层登录成功，触发视图切换
@@ -441,29 +441,29 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     } finally {
       // 恢复提交按钮可用状态
       setBusy(false);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 注册成功：先展示服务端自动分配的 Mim ID，用户确认后再进入工作台
   if (registered) {
-    return (
-      <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>
-        <div className="auth-card">
-          <div className="auth-head">
+    return ( // 返回当前函数的处理结果
+      <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>{/* 执行当前业务步骤 */}
+        <div className="auth-card">{/* 执行当前业务步骤 */}
+          <div className="auth-head">{/* 执行当前业务步骤 */}
             <h1>{t(locale, 'app.name')}</h1>
           </div>
           <p className="auth-notice" role="status">{locale === 'en-US' ? 'Account created.' : '账号创建成功'}</p>
-          <div className="member-no-block">
+          <div className="member-no-block">{/* 执行当前业务步骤 */}
             <span>{locale === 'en-US' ? 'Your Mim ID' : '你的 Mim ID 号码'}</span>
             <strong className="member-no">{registered.user.member_no}</strong>
-            <span className="hint">
+            <span className="hint">{/* 执行当前业务步骤 */}
               {locale === 'en-US'
                 ? 'This number is your public identity in Mim. Keep it for support and sharing.'
                 : '该号码是你的对外身份标识，可随时在个人中心查看。'}
             </span>
           </div>
           <button
-            type="button"
+            type="button" // 赋值：更新变量 type 的取值
             className="btn primary block"
             onClick={() => {
               setSession(registered); // 用户确认后才写入会话
@@ -474,7 +474,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           </button>
         </div>
       </div>
-    );
+    ); // 执行当前业务步骤
   } // 注册成功面板结束
 
   // 渲染登录页：整屏独立展示，或以 embedded 模式内嵌到主布局内容区
@@ -678,9 +678,9 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
         </form>{/* 结束登录表单 */}
 
         {oauthProviders.length > 0 && ( // 第三方登录区：9 家全部展示，未配置凭证的置灰
-          <div className="oauth-section">
+          <div className="oauth-section">{/* 执行当前业务步骤 */}
             <div className="oauth-divider"><span>{locale === 'en-US' ? 'Or continue with' : '或使用第三方账号'}</span></div>
-            <div className="oauth-grid">
+            <div className="oauth-grid">{/* 执行当前业务步骤 */}
               {oauthProviders
                 .filter((item) => item.region === 'both' || item.region === region) // 只展示当前区域可用项
                 .map((item) => (
@@ -702,5 +702,5 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
         )}{/* 第三方登录区结束 */}
       </div>{/* 结束登录卡片 */}
     </div>
-  );
-}
+  ); // 执行当前业务步骤
+} // 代码块结束

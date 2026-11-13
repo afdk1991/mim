@@ -19,30 +19,30 @@ import type { Db } from '../types.js'; // 数据库连接类型
 export interface AccessSubject {
   userId: string | null; // 用户主键；匿名为 null
   roleCodes: string[]; // 角色码列表，来自 user_roles 实时查询
-}
+} // 代码块结束
 
 /** 规则行结构：与 category_access_rules 表一一对应 */
 export interface AccessRuleRow {
-  id: string;
-  subject_type: 'role' | 'user';
-  subject_id: string;
-  category_slug: string;
-  effect: 'allow' | 'deny';
-  created_at: string;
-  updated_at: string;
-}
+  id: string; // 对象字段 id：记录一项配置或数据
+  subject_type: 'role' | 'user'; // 对象字段 subject_type：记录一项配置或数据
+  subject_id: string; // 对象字段 subject_id：记录一项配置或数据
+  category_slug: string; // 对象字段 category_slug：记录一项配置或数据
+  effect: 'allow' | 'deny'; // 对象字段 effect：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  updated_at: string; // 对象字段 updated_at：记录一项配置或数据
+} // 代码块结束
 
 /** 读取用户持有的角色码；匿名 / 无角色返回空数组 */
 export function loadRoleCodes(db: Db, userId: string): string[] {
-  const rows = db.prepare('SELECT role_code FROM user_roles WHERE user_id = ?').all(userId) as Array<{ role_code: string }>;
+  const rows = db.prepare('SELECT role_code FROM user_roles WHERE user_id = ?').all(userId) as Array<{ role_code: string }>; // 常量 rows：保存固定配置或一次性派生值
   return rows.map((row) => row.role_code); // 拍平成字符串数组
-}
+} // 代码块结束
 
 /** 由请求用户构造访问主体；req.user 缺失时按匿名处理（公开列表场景） */
 export function subjectFromUser(db: Db, user: { id: string } | undefined | null): AccessSubject {
   if (!user) return { userId: null, roleCodes: [] }; // 匿名：无规则可命中，保持公开
   return { userId: user.id, roleCodes: loadRoleCodes(db, user.id) }; // 登录态：实时取角色，撤销即时生效
-}
+} // 代码块结束
 
 /**
  * 从请求构造主体：优先用 requireAuth 挂载的 req.user；
@@ -53,40 +53,40 @@ export function subjectFromRequest(db: Db, req: { user?: { id: string }; header(
   const header = req.header('authorization') ?? ''; // 取 Authorization 头
   const match = /^Bearer\s+(.+)$/i.exec(header); // 严格匹配 Bearer 方案
   if (!match) return { userId: null, roleCodes: [] }; // 无令牌按匿名
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     const payload = verifyAccessToken(match[1], jwtSecret); // 校验签名与过期
-    const row = db.prepare('SELECT id FROM users WHERE id = ? AND status != ?').get(payload.sub, 'deleted') as { id: string } | undefined;
+    const row = db.prepare('SELECT id FROM users WHERE id = ? AND status != ?').get(payload.sub, 'deleted') as { id: string } | undefined; // 常量 row：保存固定配置或一次性派生值
     if (!row) return { userId: null, roleCodes: [] }; // 用户不存在/已注销按匿名
     return subjectFromUser(db, { id: row.id }); // 解析成功按登录主体计算规则
-  } catch {
+  } catch { // 代码块结束
     return { userId: null, roleCodes: [] }; // 令牌无效不阻断公开浏览，规则按匿名放行
-  }
-}
+  } // 代码块结束
+} // 代码块结束
 
 /** 取某二级分类的一级父级 slug；查不到返回 null（老数据 / 脏数据按无父级处理） */
 export function resolveParentSlug(db: Db, childSlug: string | null): string | null {
   if (!childSlug) return null; // 无分类标识直接回落
-  const row = db
-    .prepare('SELECT p.slug AS parent_slug FROM module_categories c LEFT JOIN module_categories p ON p.id = c.parent_id WHERE c.slug = ?')
-    .get(childSlug) as { parent_slug: string | null } | undefined;
+  const row = db // 常量 row：保存固定配置或一次性派生值
+    .prepare('SELECT p.slug AS parent_slug FROM module_categories c LEFT JOIN module_categories p ON p.id = c.parent_id WHERE c.slug = ?') // 执行当前业务步骤
+    .get(childSlug) as { parent_slug: string | null } | undefined; // 注册 GET 路由 / 中间件处理器
   return row?.parent_slug ?? null; // 未命中父级返回 null
-}
+} // 代码块结束
 
 /** 该主体在库中的全部规则（用户级 + 角色级合并） */
 export function loadSubjectRules(db: Db, subject: AccessSubject): AccessRuleRow[] {
   if (!subject.userId && subject.roleCodes.length === 0) return []; // 匿名无规则
   const conditions: string[] = []; // 动态拼条件：用户一条 + 每个角色一条
   const params: Array<string> = []; // 与条件对齐的绑定参数
-  if (subject.userId) {
+  if (subject.userId) { // 条件分支：按判断结果选择后续处理路径
     conditions.push('(subject_type = ? AND subject_id = ?)'); // 用户级规则
-    params.push('user', subject.userId);
-  }
-  for (const roleCode of subject.roleCodes) {
+    params.push('user', subject.userId); // 执行当前业务步骤
+  } // 代码块结束
+  for (const roleCode of subject.roleCodes) { // 循环：逐项遍历集合并执行相同处理
     conditions.push('(subject_type = ? AND subject_id = ?)'); // 角色级规则
-    params.push('role', roleCode);
-  }
-  return db.prepare(`SELECT * FROM category_access_rules WHERE ${conditions.join(' OR ')}`).all(...params) as AccessRuleRow[];
-}
+    params.push('role', roleCode); // 执行当前业务步骤
+  } // 代码块结束
+  return db.prepare(`SELECT * FROM category_access_rules WHERE ${conditions.join(' OR ')}`).all(...params) as AccessRuleRow[]; // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 单条规则是否命中目标分类（二级精确 / 一级前缀 / 父级精确） */
 function ruleMatches(ruleSlug: string, childSlug: string | null, parentSlug: string | null): boolean {
@@ -94,8 +94,8 @@ function ruleMatches(ruleSlug: string, childSlug: string | null, parentSlug: str
   if (ruleSlug === childSlug) return true; // 二级精确命中
   if (parentSlug && ruleSlug === parentSlug) return true; // 一级精确命中
   if (childSlug.startsWith(`${ruleSlug}-`)) return true; // 一级前缀覆盖二级条目
-  return false;
-}
+  return false; // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 判定目标分类是否被该主体 deny；无规则 / 无 deny 均放行 */
 export function isCategoryBlocked(db: Db, subject: AccessSubject, categorySlug: string | null): boolean {
@@ -103,49 +103,49 @@ export function isCategoryBlocked(db: Db, subject: AccessSubject, categorySlug: 
   if (rules.length === 0) return false; // 未配置：现网公开行为
   const parentSlug = resolveParentSlug(db, categorySlug); // 解析父级用于一级规则匹配
   return rules.some((rule) => rule.effect === 'deny' && ruleMatches(rule.category_slug, categorySlug, parentSlug)); // deny 优先
-}
+} // 代码块结束
 
 /** 门禁断言：被 deny 时抛 FEATURE_NOT_AVAILABLE(403)，不泄漏「存在但被禁」与「不存在」的差异 */
 export function assertCategoryAllowed(db: Db, subject: AccessSubject, categorySlug: string | null, context: { module_code?: string; region?: string }): void {
-  if (isCategoryBlocked(db, subject, categorySlug)) {
-    throw new AppError('FEATURE_NOT_AVAILABLE', 'module category is not available for current account', {
+  if (isCategoryBlocked(db, subject, categorySlug)) { // 条件分支：按判断结果选择后续处理路径
+    throw new AppError('FEATURE_NOT_AVAILABLE', 'module category is not available for current account', { // 抛出错误：中断当前流程并向上层传递
       category_slug: categorySlug, // 回传分类标识便于前端提示
       ...context, // 附带模块码 / 区域等排查上下文
-    });
-  }
-}
+    }); // 代码块结束
+  } // 代码块结束
+} // 代码块结束
 
 /** 管理端：列出全部分类规则（按主体 + 分类排序，便于后台渲染） */
 export function listAllRules(db: Db): AccessRuleRow[] {
-  return db.prepare('SELECT * FROM category_access_rules ORDER BY subject_type ASC, subject_id ASC, category_slug ASC').all() as AccessRuleRow[];
-}
+  return db.prepare('SELECT * FROM category_access_rules ORDER BY subject_type ASC, subject_id ASC, category_slug ASC').all() as AccessRuleRow[]; // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 管理端：整组替换某主体的规则清单（先清后写，同事务；空清单即清空该主体规则） */
 export function replaceSubjectRules(db: Db, subject: { subject_type: 'role' | 'user'; subject_id: string }, rules: Array<{ category_slug: string; effect: 'allow' | 'deny' }>, now: string): AccessRuleRow[] {
   const collapsed = new Map<string, 'allow' | 'deny'>(); // 同 slug 去重：deny 优先，避免唯一键冲突
-  for (const rule of rules) {
-    const prev = collapsed.get(rule.category_slug);
-    collapsed.set(rule.category_slug, prev === 'deny' || rule.effect === 'deny' ? 'deny' : 'allow');
-  }
-  const tx = db.transaction(() => {
+  for (const rule of rules) { // 循环：逐项遍历集合并执行相同处理
+    const prev = collapsed.get(rule.category_slug); // 常量 prev：保存固定配置或一次性派生值
+    collapsed.set(rule.category_slug, prev === 'deny' || rule.effect === 'deny' ? 'deny' : 'allow'); // 执行当前业务步骤
+  } // 代码块结束
+  const tx = db.transaction(() => { // 常量 tx：保存固定配置或一次性派生值
     db.prepare('DELETE FROM category_access_rules WHERE subject_type = ? AND subject_id = ?').run(subject.subject_type, subject.subject_id); // 清掉该主体既有规则
     const insert = db.prepare( // 逐条 upsert 新规则
       `INSERT INTO category_access_rules (id, subject_type, subject_id, category_slug, effect, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
+    ); // 执行当前业务步骤
     for (const [categorySlug, effect] of collapsed) { // 写入去重后的规则集
-      insert.run(uuidv7(), subject.subject_type, subject.subject_id, categorySlug, effect, now, now);
-    }
-  });
-  tx();
+      insert.run(uuidv7(), subject.subject_type, subject.subject_id, categorySlug, effect, now, now); // 执行当前业务步骤
+    } // 代码块结束
+  }); // 代码块结束
+  tx(); // 调用 tx 并处理其返回结果
   return listAllRules(db).filter((rule) => rule.subject_type === subject.subject_type && rule.subject_id === subject.subject_id); // 回读该主体规则
-}
+} // 代码块结束
 
 /** 管理端：按主键删除单条规则；不存在返回 false */
 export function deleteRule(db: Db, ruleId: string): boolean {
-  const result = db.prepare('DELETE FROM category_access_rules WHERE id = ?').run(ruleId);
+  const result = db.prepare('DELETE FROM category_access_rules WHERE id = ?').run(ruleId); // 常量 result：保存固定配置或一次性派生值
   return result.changes > 0; // 是否实际删除
-}
+} // 代码块结束
 
 /**
  * 列表过滤：批量判定模块集合，返回被 deny 的模块主键集合。
@@ -162,6 +162,6 @@ export function blockedModuleIds(db: Db, subject: AccessSubject, modules: Array<
     if (childSlug) parentCache.set(childSlug, parentSlug); // 回填缓存
     const denied = rules.some((rule) => rule.effect === 'deny' && ruleMatches(rule.category_slug, childSlug, parentSlug)); // deny 优先
     if (denied) blocked.add(module.id); // 记录被拦截模块主键
-  }
+  } // 代码块结束
   return blocked; // 交调用方从列表中剔除
-}
+} // 代码块结束

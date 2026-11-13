@@ -1,10 +1,10 @@
 /** 安全加固包测试：出站 URL SSRF 防护（协议白名单 / 私网环回 / 元数据 / 编码 IP / 重定向复核） */
 
-import { describe, expect, it } from 'vitest';
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { AppError } from '@mim/core-domain';
-import { assertSafeOutboundUrl, safeOutboundFetch } from '../src/security.js';
+import { describe, expect, it } from 'vitest'; // 引入依赖、类型或本地模块绑定
+import { createServer } from 'node:http'; // 引入依赖、类型或本地模块绑定
+import type { AddressInfo } from 'node:net'; // 引入依赖、类型或本地模块绑定
+import { AppError } from '@mim/core-domain'; // 引入依赖、类型或本地模块绑定
+import { assertSafeOutboundUrl, safeOutboundFetch } from '../src/security.js'; // 引入依赖、类型或本地模块绑定
 
 /** 期望被拒绝的出站地址：协议非法 / 私网 / 环回 / 链路本地 / 元数据 / 编码 IP */
 const REJECTED = [ // 准备：构造本用例需要的输入或句柄
@@ -25,44 +25,44 @@ const REJECTED = [ // 准备：构造本用例需要的输入或句柄
   'http://[::1]/', // 环回 IPv6
   'http://[::ffff:127.0.0.1]/', // IPv4 映射私网 IPv6
   'http://[fd00::1]/', // 唯一本地 IPv6
-];
+]; // 执行当前业务步骤
 
-describe('assertSafeOutboundUrl 拒绝内网 / 非法协议目标', () => {
-  for (const target of REJECTED) {
-    it(`拒绝 ${target}`, async () => {
+describe('assertSafeOutboundUrl 拒绝内网 / 非法协议目标', () => { // 调用 describe 并处理其返回结果
+  for (const target of REJECTED) { // 循环：逐项遍历集合并执行相同处理
+    it(`拒绝 ${target}`, async () => { // 调用 it 并处理其返回结果
       await expect(assertSafeOutboundUrl(target)).rejects.toBeInstanceOf(AppError); // 断言：校验接口响应或状态符合冻结契约
-    });
-  }
-});
+    }); // 代码块结束
+  } // 代码块结束
+}); // 代码块结束
 
-describe('safeOutboundFetch 出站前复核目标', () => {
-  it('命中环回地址时在 fetch 前即拒绝，不发出请求', async () => {
+describe('safeOutboundFetch 出站前复核目标', () => { // 调用 describe 并处理其返回结果
+  it('命中环回地址时在 fetch 前即拒绝，不发出请求', async () => { // 调用 it 并处理其返回结果
     const server = createServer((_req, res) => { // 准备：构造本用例需要的输入或句柄
-      res.writeHead(200, { 'content-type': 'text/plain' });
-      res.end('ok');
-    });
+      res.writeHead(200, { 'content-type': 'text/plain' }); // 执行当前业务步骤
+      res.end('ok'); // 执行当前业务步骤
+    }); // 代码块结束
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)); // 执行：等待异步操作返回后继续
     const port = (server.address() as AddressInfo).port; // 准备：构造本用例需要的输入或句柄
-    try {
-      await expect(safeOutboundFetch(`http://127.0.0.1:${port}/`)).rejects.toBeInstanceOf(AppError);
-    } finally {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await expect(safeOutboundFetch(`http://127.0.0.1:${port}/`)).rejects.toBeInstanceOf(AppError); // 异步等待：挂起至 Promise 落定后再继续
+    } finally { // 代码块结束
       await new Promise<void>((resolve) => server.close(() => resolve())); // 执行：等待异步操作返回后继续
-    }
-  });
+    } // 代码块结束
+  }); // 代码块结束
 
-  it('3xx 跳转到内网地址时逐跳复核并拒绝', async () => {
+  it('3xx 跳转到内网地址时逐跳复核并拒绝', async () => { // 调用 it 并处理其返回结果
     // 首跳目标用本机回环地址：守卫在首跳即拦下私网目标；
     // 重定向 Location 为元数据地址，复核链路同样走私网判定。
     const server = createServer((_req, res) => { // 准备：构造本用例需要的输入或句柄
-      res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' });
-      res.end();
-    });
+      res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' }); // 执行当前业务步骤
+      res.end(); // 执行当前业务步骤
+    }); // 代码块结束
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)); // 执行：等待异步操作返回后继续
     const port = (server.address() as AddressInfo).port; // 准备：构造本用例需要的输入或句柄
-    try {
-      await expect(safeOutboundFetch(`http://127.0.0.1:${port}/`)).rejects.toBeInstanceOf(AppError);
-    } finally {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await expect(safeOutboundFetch(`http://127.0.0.1:${port}/`)).rejects.toBeInstanceOf(AppError); // 异步等待：挂起至 Promise 落定后再继续
+    } finally { // 代码块结束
       await new Promise<void>((resolve) => server.close(() => resolve())); // 执行：等待异步操作返回后继续
-    }
-  });
-});
+    } // 代码块结束
+  }); // 代码块结束
+}); // 代码块结束

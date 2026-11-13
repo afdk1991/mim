@@ -29,7 +29,7 @@ import { requireAuth } from '../middleware.js'; // 绑定/解绑需要登录态
 import { finishLogin } from './auth.js'; // 复用统一会话签发
 import { buildAuthorizeUrl, exchangeOAuthCode } from '../oauth/client.js'; // 授权链接与令牌交换
 import { findProvider, publicProviders, resolveCredentials } from '../oauth/providers.js'; // provider 注册表
-import {
+import { // 引入依赖、类型或本地模块绑定
   consumeLoginTicket, // 票据兑换
   createUserFromOAuth, // 首次第三方登录建号
   findOAuthAccount, // 按提供方身份查绑定

@@ -30,12 +30,12 @@ function check(name, ok, detail) {
 
 // 读取契约 JSON：格式错误会让本脚本以非零码退出，不静默吞掉。
 let data; // 契约对象，供后续所有断言使用。
-try {
+try { // 异常捕获起点：包裹可能抛出错误的操作
   // 按 UTF-8 读取并解析，中文备注与全角分隔符不会被破坏。
   data = JSON.parse(readFileSync(join(ROOT, 'apps/web/src/data/siteDirectory.json'), 'utf8'));
   // 解析成功即记录一项通过断言。
   check('契约 JSON 可解析', true, '');
-} catch (error) {
+} catch (error) { // 代码块结束
   // 解析失败时给出原因并终止，后续断言无对象可用。
   check('契约 JSON 可解析', false, String(error));
   // 直接退出，避免后续访问 undefined 产生噪声堆栈。

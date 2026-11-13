@@ -17,7 +17,7 @@
 
 import { Router } from 'express'; // Express 路由容器，按 /api/v1 前缀挂载
 import { AppError } from '@mim/core-domain'; // 统一业务异常，未登记 id 回 404 信封
-import {
+import { // 引入依赖、类型或本地模块绑定
   DEPLOYMENT_CI_JOBS, // CI 作业清单（5 个，含 1 个门禁作业）
   DEPLOYMENT_EXCLUDED, // 候选池 / 已排除项，明确不计入部署项
   DEPLOYMENT_ITEMS, // 12 个规范部署项（单一事实源，运行时实计数）
@@ -101,7 +101,7 @@ export function createDeploymentsRouter(_deps: ApiDeps): Router {
       schema: deploymentRegistry.schema, // 契约版本
       item, // 完整部署项（统一字段，result 可能为 null）
       related: DEPLOYMENT_ITEMS // 同平台的其它部署项，便于核对「同类项不遗漏 / 不重复」
-        .filter((other) => other.platform_id === item.platform_id && other.id !== item.id)
+        .filter((other) => other.platform_id === item.platform_id && other.id !== item.id) // 执行当前业务步骤
         .map((other) => ({ id: other.id, name: other.name, layer: other.layer })), // 只回显三项，避免响应体过大
       status_codes: DEPLOYMENT_STATUS_CODES, // 状态字典
       verdict_codes: DEPLOYMENT_VERDICT_CODES, // 结果字典

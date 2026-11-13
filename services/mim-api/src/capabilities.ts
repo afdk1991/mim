@@ -27,14 +27,14 @@ import type { BlueprintGroupMeta, ModuleBlueprint } from '@mim/core-domain'; // 
 export interface CapabilityInput {
   text: string; // 用户输入的文本主体（JSON / Markdown / 待编码文本 / cron 表达式等）
   options: Record<string, unknown>; // 能力私有选项（mode / algo / op / direction / size / count）
-}
+} // 代码块结束
 
 /** 能力调用结果：output 为可直接展示的字符串，output_kind 决定前端用哪种渲染方式 */
 export interface CapabilityResult {
   output: string; // 结果正文：纯文本 / JSON 字符串 / HTML / 图片 dataURL
   output_kind: 'text' | 'json' | 'html' | 'image'; // 输出形态，与 core-domain 定义保持一致
   meta: Record<string, unknown>; // 附加信息（字节数、算法、触发时间数量等），便于前端展示细节
-}
+} // 代码块结束
 
 /** 能力处理器签名：可能异步（二维码编码是 Promise），统一按异步处理 */
 export type CapabilityHandler = (input: CapabilityInput) => Promise<CapabilityResult>;
@@ -57,9 +57,9 @@ function optionInt(options: Record<string, unknown>, key: string, fallback: numb
 const jsonFormat: CapabilityHandler = async ({ text, options }) => { // JSON 能力入口
   const mode = optionString(options, 'mode', 'pretty'); // 模式：pretty / minify / validate
   let parsed: unknown; // 解析结果，三种模式都要先解析
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     parsed = JSON.parse(text); // 严格解析：非法 JSON 直接抛错
-  } catch (err) {
+  } catch (err) { // 代码块结束
     throw new AppError('VALIDATION_FAILED', `invalid JSON: ${(err as Error).message}`, { capability: 'json.format' }); // 转成统一校验失败错误
   } // 解析异常分支结束
   if (mode === 'minify') { // 压缩模式
@@ -133,9 +133,9 @@ const qrcodeGenerate: CapabilityHandler = async ({ text, options }) => { // 二�
 const cronDescribe: CapabilityHandler = async ({ text, options }) => { // cron 能力入口
   const count = optionInt(options, 'count', 5, 1, 20); // 触发次数夹在 1–20
   let interval; // 解析后的表达式对象
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     interval = CronExpressionParser.parse(text.trim()); // 按当前时间解析表达式
-  } catch (err) {
+  } catch (err) { // 代码块结束
     throw new AppError('VALIDATION_FAILED', `invalid cron expression: ${(err as Error).message}`, { capability: 'cron.describe' }); // 非法表达式统一转校验失败
   } // 解析异常分支结束
   const next: string[] = []; // 收集未来触发时间
@@ -149,7 +149,7 @@ const cronDescribe: CapabilityHandler = async ({ text, options }) => { // cron �
 
 /** 从输入文本解析 JSON：失败统一转成 VALIDATION_FAILED，避免各 handler 重复写 try/catch */
 function parseJsonInput(text: string, capability: string): unknown { // JSON 输入解析
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     return JSON.parse(text); // 严格解析
   } catch (err) { // 解析失败
     throw new AppError('VALIDATION_FAILED', `invalid JSON input: ${(err as Error).message}`, { capability }); // 统一错误码
@@ -160,7 +160,7 @@ function parseJsonInput(text: string, capability: string): unknown { // JSON 输
 function readCsvRows(text: string, options: Record<string, unknown>, capability: string): Array<Record<string, string>> { // CSV → 行对象
   const rawDelimiter = optionString(options, 'delimiter', ','); // 分隔符，默认逗号
   const delimiter = rawDelimiter === '\\t' ? '\t' : rawDelimiter; // 支持前端传字面量 \t 表示制表符
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     return parseCsvSync(text, { columns: true, skip_empty_lines: true, trim: true, delimiter, relax_column_count: true }) as Array<Record<string, string>>; // 同步解析成对象数组
   } catch (err) { // 解析失败
     throw new AppError('VALIDATION_FAILED', `invalid CSV: ${(err as Error).message}`, { capability }); // 统一错误码
@@ -241,7 +241,7 @@ const templateRender: CapabilityHandler = async ({ text }) => { // 模板渲染
     throw new AppError('VALIDATION_FAILED', 'field "template" is required', { capability: 'template.render' }); // 缺字段即拒绝
   } // 校验结束
   const data = (input.data ?? {}) as Record<string, unknown>; // 变量表，缺省空对象
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     const output = mustache.render(input.template, data); // mustache 渲染（默认转义 HTML 实体）
     return { output, output_kind: 'text', meta: { chars: output.length, vars: Object.keys(data).length } }; // 返回纯文本
   } catch (err) { // 模板语法错误
@@ -252,16 +252,16 @@ const templateRender: CapabilityHandler = async ({ text }) => { // 模板渲染
 /** URL 解析：拆出协议、主机、路径、查询参数（程序开发 / 网络开发包） */
 const urlParse: CapabilityHandler = async ({ text }) => { // URL 解析
   let parsed: URL; // 解析结果
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     parsed = new URL(text.trim()); // 需要带协议的完整 URL
   } catch (err) { // 非法 URL
     throw new AppError('VALIDATION_FAILED', `invalid URL: ${(err as Error).message}`, { capability: 'url.parse' }); // 统一错误
   } // try 结束
   const query: Record<string, string> = {}; // 查询参数展开
   parsed.searchParams.forEach((value, key) => { query[key] = value; }); // 同名参数后者覆盖，简化展示
-  const output = JSON.stringify(
-    { protocol: parsed.protocol, host: parsed.host, hostname: parsed.hostname, port: parsed.port, pathname: parsed.pathname, hash: parsed.hash, query, segments: parsed.pathname.split('/').filter(Boolean) },
-    null, 2,
+  const output = JSON.stringify( // 常量 output：保存固定配置或一次性派生值
+    { protocol: parsed.protocol, host: parsed.host, hostname: parsed.hostname, port: parsed.port, pathname: parsed.pathname, hash: parsed.hash, query, segments: parsed.pathname.split('/').filter(Boolean) }, // 执行当前业务步骤
+    null, 2, // 执行当前业务步骤
   ); // 结构化输出
   return { output, output_kind: 'json', meta: { params: Object.keys(query).length } }; // 返回结果
 }; // urlParse 结束
@@ -283,9 +283,9 @@ const ipCidr: CapabilityHandler = async ({ text }) => { // 网段计算
   const firstHost = prefix >= 31 ? ipv4ToString(network) : ipv4ToString((network + 1) >>> 0); // 首个可用地址
   const lastHost = prefix >= 31 ? ipv4ToString(broadcast) : ipv4ToString((broadcast - 1) >>> 0); // 末个可用地址
   const isPrivate = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ipv4ToString(ipNum)); // 私有网段判断
-  const output = JSON.stringify(
-    { input: text.trim(), ip: ipv4ToString(ipNum), prefix, mask: ipv4ToString(mask), network: `${ipv4ToString(network)}/${prefix}`, broadcast: ipv4ToString(broadcast), range: { first: firstHost, last: lastHost }, usable_hosts: usableHosts, private: isPrivate, cidr_block: ipv4ToString(network) },
-    null, 2,
+  const output = JSON.stringify( // 常量 output：保存固定配置或一次性派生值
+    { input: text.trim(), ip: ipv4ToString(ipNum), prefix, mask: ipv4ToString(mask), network: `${ipv4ToString(network)}/${prefix}`, broadcast: ipv4ToString(broadcast), range: { first: firstHost, last: lastHost }, usable_hosts: usableHosts, private: isPrivate, cidr_block: ipv4ToString(network) }, // 执行当前业务步骤
+    null, 2, // 执行当前业务步骤
   ); // 结构化结论
   return { output, output_kind: 'json', meta: { prefix, usable_hosts: usableHosts } }; // 返回结果
 }; // ipCidr 结束
@@ -408,7 +408,7 @@ const mathEval: CapabilityHandler = async ({ text, options }) => { // 数学求�
   } // 安全检查结束
   const precision = optionInt(options, 'precision', 6, 0, 12); // 保留小数位
   let value: unknown; // 计算结果
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     const parser = new ExpressionParser(); // 每次新建解析器，避免状态残留
     value = parser.evaluate(expression); // 求值
   } catch (err) { // 语法/数学错误
@@ -469,7 +469,7 @@ const citeFormat: CapabilityHandler = async ({ text, options }) => { // 文献�
 /** YAML 与 JSON 互转（云原生配置的日常体操） */
 const yamlJson: CapabilityHandler = async ({ text, options }) => { // YAML 与 JSON 互转
   const mode = optionString(options, 'mode', 'yaml2json'); // 取值：yaml2json / json2yaml
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     if (mode === 'json2yaml') { // JSON 转 YAML
       const parsed = parseJsonInput(text, 'yaml.json'); // 先解 JSON
       const output = stringifyYamlText(parsed); // 序列化为 YAML
@@ -488,7 +488,7 @@ const jwtDecode: CapabilityHandler = async ({ text }) => { // JWT 解析
   const parts = text.trim().split('.'); // 三段式
   if (parts.length !== 3) throw new AppError('VALIDATION_FAILED', 'expect a three-part JWT', { capability: 'jwt.decode' }); // 结构校验
   const decodePart = (part: string, name: string): Record<string, unknown> => { // base64url 解码
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const json = Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'); // 还原 base64 后转文本
       return JSON.parse(json) as Record<string, unknown>; // 解析对象
     } catch (err) { // 非法片段
@@ -537,7 +537,7 @@ const codeStats: CapabilityHandler = async ({ text, options }) => { // 代码行
 const sqlFormat: CapabilityHandler = async ({ text, options }) => { // SQL 格式化
   const dialect = optionString(options, 'dialect', 'sql'); // 方言：sql / mysql / postgresql / sqlite / tsql
   if (text.trim().length === 0) throw new AppError('VALIDATION_FAILED', 'empty SQL', { capability: 'sql.format' }); // 空输入拒绝
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     const output = formatSqlText(text, { language: dialect as 'sql', keywordCase: optionString(options, 'keywordCase', 'upper') as 'upper' }); // 格式化
     return { output, output_kind: 'text', meta: { dialect } }; // 返回
   } catch (err) { // 非法 SQL
@@ -729,7 +729,7 @@ const searchRank: CapabilityHandler = async ({ text }) => { // 检索排序入�
       score += positions; // 累加
       const pos = doc.indexOf(token); // 首次位置
       if (pos >= 0 && (firstHit < 0 || pos < firstHit)) firstHit = pos; // 更新首个命中
-    }
+    } // 代码块结束
     const start = Math.max(0, firstHit - 20); // 片段起点
     const snippet = firstHit < 0 ? doc.slice(0, 60) : doc.slice(start, start + 100); // 片段内容
     return { index, score, snippet, doc_length: doc.length }; // 单条结果
@@ -753,7 +753,7 @@ function topologicalOrder(nodes: Array<{ name: string; depends: string[] }>): { 
       if (!known.has(dep)) continue; // 缺失依赖不计入图
       indegree.set(node.name, (indegree.get(node.name) ?? 0) + 1); // 入度 +1
       children.get(dep)?.push(node.name); // dep → node 边
-    }
+    } // 代码块结束
   } // 建边结束
   const ready = nodes.filter((node) => (indegree.get(node.name) ?? 0) === 0).map((node) => node.name); // 初始无依赖节点
   const order: string[] = []; // 装配顺序
@@ -768,8 +768,8 @@ function topologicalOrder(nodes: Array<{ name: string; depends: string[] }>): { 
         const remain = (indegree.get(child) ?? 0) - 1; // 入度减一
         indegree.set(child, remain); // 写回
         if (remain === 0) next.push(child); // 入度归零即入下一层
-      }
-    }
+      } // 代码块结束
+    } // 代码块结束
     frontier = next; // 推进
   } // 层序结束
   const cycles = nodes.filter((node) => !order.includes(node.name)).map((node) => node.name); // 未出队即处于环中
@@ -807,7 +807,7 @@ const workflowCheck: CapabilityHandler = async ({ text }) => { // 工作流校�
     for (const next of step.next) { // 逐个后继
       if (!ids.has(next)) { dangling.push(`${step.id}->${next}`); continue; } // 悬空边记录
       incoming.set(next, (incoming.get(next) ?? 0) + 1); // 入度 +1
-    }
+    } // 代码块结束
   } // 统计结束
   const graph = topologicalOrder(steps.map((step) => ({ name: step.id, depends: [] }))); // 占位（保持返回结构一致）
   const queue = steps.filter((step) => (incoming.get(step.id) ?? 0) === 0).map((step) => step.id); // 入口节点
@@ -820,7 +820,7 @@ const workflowCheck: CapabilityHandler = async ({ text }) => { // 工作流校�
       if (!ids.has(next)) continue; // 跳过悬空边
       depth.set(next, Math.max(depth.get(next) ?? 0, (depth.get(id) ?? 0) + 1)); // 更新最长深度
       if (!visited.has(next)) { visited.add(next); queue.push(next); } // 首次访问入队
-    }
+    } // 代码块结束
   } // 遍历结束
   const unreachable = steps.map((step) => step.id).filter((id) => !visited.has(id)); // 从入口不可达
   const criticalPath = Math.max(0, ...depth.values()); // 最长链长度
@@ -848,7 +848,7 @@ const rbacCheck: CapabilityHandler = async ({ text }) => { // 权限校验入口
       const list = rolePerms.get(role); // 查表
       if (!list) { unknownRoles.push(role); continue; } // 未定义角色记录
       list.forEach((perm) => perms.add(perm)); // 并入
-    }
+    } // 代码块结束
     return { user, roles: owned, permissions: [...perms].sort(), granted: perms.has(required), unknown_roles: unknownRoles }; // 单用户结果
   }); // map 结束
   const grantedCount = checks.filter((item) => item.granted).length; // 授权人数
@@ -863,11 +863,11 @@ const codeGen: CapabilityHandler = async ({ text }) => { // 代码生成入口
   if (!template.trim()) throw new AppError('VALIDATION_FAILED', 'field "template" must not be empty', { capability: 'code.gen' }); // 空模板拒绝
   const data = input.data && typeof input.data === 'object' ? (input.data as Record<string, unknown>) : {}; // 渲染数据
   let rendered = ''; // 渲染结果
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     rendered = mustache.render(template, data); // 交给成熟模板引擎
   } catch (err) { // 模板语法错误
     throw new AppError('VALIDATION_FAILED', `template render failed: ${(err as Error).message}`, { capability: 'code.gen' }); // 统一错误
-  }
+  } // 代码块结束
   if (rendered.length > 20000) throw new AppError('VALIDATION_FAILED', 'rendered output exceeds 20000 characters', { capability: 'code.gen' }); // 限制长度
   return { output: rendered, output_kind: 'text', meta: { template_bytes: Buffer.byteLength(template, 'utf8'), output_bytes: Buffer.byteLength(rendered, 'utf8') } }; // 返回代码
 }; // codeGen 结束
@@ -897,12 +897,12 @@ const ruleEval: CapabilityHandler = async ({ text }) => { // 规则求值入口
     const when = String(row.when ?? '').trim(); // 条件表达式
     const then = String(row.then ?? '').trim(); // 命中结果
     if (!when) return { index, when, fired: false, error: 'empty expression' }; // 空条件视为未命中
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const value = new ExpressionParser().parse(when).evaluate(facts as Record<string, number>); // 只做数值/布尔求值
       return { index, when, then, fired: Boolean(value), value: Number.isFinite(value) ? value : null }; // 记录结果
     } catch (err) { // 表达式非法
       return { index, when, then, fired: false, error: (err as Error).message }; // 记录错误但不中断整批
-    }
+    } // 代码块结束
   }); // map 结束
   const fired = results.filter((item) => item.fired).map((item) => ({ when: item.when, then: item.then })); // 命中清单
   const errors = results.filter((item) => item.error).length; // 错误条数
@@ -926,7 +926,7 @@ const springConfig: CapabilityHandler = async ({ text }) => { // Spring 配置�
     spring: { // spring 段
       application: { name: name || 'application' }, // 应用名
       ...(ds.url || ds.user ? { datasource: { url: String(ds.url ?? ''), username: String(ds.user ?? '') } } : {}), // 按需挂数据源
-    },
+    }, // 代码块结束
   }; // 配置对象结束
   if (Array.isArray(input.profiles) && input.profiles.length > 0) config['spring.profiles'] = input.profiles.map((p) => String(p)); // 允许显式列 profile
   const output = stringifyYamlText(config, { lineWidth: 0 }); // 生成 YAML
@@ -950,7 +950,7 @@ const nodePkg: CapabilityHandler = async ({ text }) => { // package 体检入口
       const resolvable = Boolean(semver.validRange(spec)) || spec.startsWith('workspace:') || spec.startsWith('npm:') || spec.startsWith('file:') || spec.startsWith('link:'); // 允许 workspace / alias 形态
       deps.push({ section, name: depName, range: spec, resolvable }); // 记录明细
       if (!resolvable) issues.push(`${section}.${depName} 版本范围不可解析: ${spec}`); // 记入问题
-    }
+    } // 代码块结束
   } // 扫描结束
   const output = JSON.stringify({ name, version: validVersion ?? version, dependencies_checked: deps.length, issues, ok: issues.length === 0, dependencies: deps.slice(0, 100) }, null, 2); // 结构化输出
   return { output, output_kind: 'json', meta: { dependencies: deps.length, issues: issues.length } }; // 返回结果
@@ -975,7 +975,7 @@ const bpmnCheck: CapabilityHandler = async ({ text }) => { // 流程校验入口
     for (const next of node.out) { // 逐出边
       if (!ids.has(next)) { danglingCount += 1; continue; } // 悬空跳过
       incoming.set(next, (incoming.get(next) ?? 0) + 1); // 入度 +1
-    }
+    } // 代码块结束
   } // 统计结束
   const orphans = nodes.filter((node) => node.type !== 'start' && (incoming.get(node.id) ?? 0) === 0).map((node) => node.id); // 非开始且无入边即孤立
   const deadEnds = nodes.filter((node) => node.type !== 'end' && node.out.length === 0).map((node) => node.id); // 非结束且无出边
@@ -1184,7 +1184,7 @@ const vueSfc: CapabilityHandler = async ({ text }) => { // Vue 入口
   const emits = Array.isArray(input.emits) ? input.emits.map((e) => String(e)) : []; // emits 事件
   const propsBlock = props.length > 0 ? `const props = defineProps<{ ${props.map((p) => `${p}: string`).join('; ')} }>();` : 'const props = defineProps<Record<string, never>>();'; // props 声明
   const emitsBlock = emits.length > 0 ? `const emit = defineEmits<{ ${emits.map((e) => `(e: '${e}'): void`).join('; ')} }>();` : ''; // emits 声明
-  const output = [
+  const output = [ // 常量 output：保存固定配置或一次性派生值
     `<script setup lang="ts">`, // 脚本区
     propsBlock, // props 入参
     emitsBlock, // emits 事件
@@ -1224,7 +1224,7 @@ const angularCmp: CapabilityHandler = async ({ text }) => { // Angular 入口
   const className = name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('') + 'Component'; // 类名
   const inputs = Array.isArray(input.inputs) ? input.inputs.map((i) => String(i)) : []; // 输入
   const outputs = Array.isArray(input.outputs) ? input.outputs.map((o) => String(o)) : []; // 输出
-  const output = [
+  const output = [ // 常量 output：保存固定配置或一次性派生值
     `import { Component, input, output } from '@angular/core';`, // 依赖
     ``, // 空行
     `@Component({`, // 装饰器
@@ -1263,7 +1263,7 @@ const reactCmp: CapabilityHandler = async ({ text }) => { // React 入口
   const props = Array.isArray(input.props) ? input.props.map((p) => String(p)) : []; // props 入参
   const useMemo = Boolean(input.memo); // 是否 memo
   const propsType = props.length > 0 ? props.map((p) => `  ${p}?: string;`).join('\n') : '  // 无外部 props'; // 接口字段
-  const output = [
+  const output = [ // 常量 output：保存固定配置或一次性派生值
     `import type { JSX } from 'react';`, // 类型导入
     ``, // 空行
     `export interface ${name}Props {`, // 接口
@@ -1331,7 +1331,7 @@ const urlShort: CapabilityHandler = async ({ text }) => { // 短链入口
   for (let i = 0; i < 6; i++) { // 取 6 位
     const chunk = Number.parseInt(digest.slice(i * 8, i * 8 + 8), 16); // 8 位十六进制转数值
     code += alphabet[chunk % 62]; // 映射到字母表
-  }
+  } // 代码块结束
   const space = Math.pow(62, 6); // 6 位空间
   const collisionAt = Math.floor(Math.sqrt(2 * space * 0.01)); // 生日问题下 1% 碰撞所需条数
   return { output: JSON.stringify({ target: url.toString(), code, space, collision_notice: `约 ${collisionAt} 条后达到 1% 碰撞概率，建议入库前查重`, short_path: `/s/${code}` }, null, 2), output_kind: 'json', meta: { code } }; // 输出短码

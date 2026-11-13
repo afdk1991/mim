@@ -26,27 +26,27 @@ const checks = [];
 function check(name, ok, detail) { // 记录一条断言
   checks.push({ name, ok: Boolean(ok), detail: detail ?? null }); // 入表
   if (!ok) process.exitCode = 1; // 失败标记
-}
+} // 代码块结束
 
 /** 等待浏览器 page target 就绪 */
 async function getTarget() {
   for (let i = 0; i < 40; i += 1) { // 最多等 16 秒
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const list = await (await fetch(CDP + '/json/list')).json(); // 取 target 列表
       const page = list.find((t) => t.type === 'page'); // 取第一个页面
       if (page) return page; // 命中即返回
     } catch { /* 浏览器尚未就绪 */ }
     await sleep(400); // 稍后重试
-  }
+  } // 代码块结束
   throw new Error('Edge CDP 未就绪'); // 超时抛错
-}
+} // 代码块结束
 
 const target = await getTarget(); // 取调试目标
 const ws = new WebSocket(target.webSocketDebuggerUrl); // 建立 CDP WebSocket
 await new Promise((res, rej) => { // 等连接打开
   ws.addEventListener('open', res, { once: true }); // 打开
   ws.addEventListener('error', rej, { once: true }); // 失败
-});
+}); // 代码块结束
 
 let seq = 0; // 命令序号
 const pending = new Map(); // 待响应命令
@@ -56,12 +56,12 @@ ws.addEventListener('message', (ev) => { // 统一分发 CDP 消息
   if (msg.id && pending.has(msg.id)) { // 命令响应
     pending.get(msg.id)(msg); // 唤醒等待方
     pending.delete(msg.id); // 清理
-    return;
-  }
+    return; // 返回当前函数的处理结果
+  } // 代码块结束
   if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') { // 仅收集 error 级别
     consoleErrors.push(msg.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 200)); // 记入
-  }
-});
+  } // 代码块结束
+}); // 代码块结束
 
 /** 发送 CDP 命令并等响应 */
 function send(method, params = {}) {
@@ -69,15 +69,15 @@ function send(method, params = {}) {
   return new Promise((resolve) => { // 等待同 id 响应
     pending.set(id, resolve); // 登记
     ws.send(JSON.stringify({ id, method, params })); // 发送
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 /** 在页面上下文执行表达式，返回值走 JSON 序列化 */
 async function evaluate(expression) {
   const res = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); // 求值
   if (res.result?.exceptionDetails) throw new Error('页面脚本异常: ' + res.result.exceptionDetails.text); // 抛错
   return res.result?.result?.value; // 取值
-}
+} // 代码块结束
 
 /** 轮询直到表达式返回真值 */
 async function waitFor(expression, timeoutMs = 8000) {
@@ -86,9 +86,9 @@ async function waitFor(expression, timeoutMs = 8000) {
     const value = await evaluate(expression); // 求值
     if (value) return value; // 命中即返回
     await sleep(300); // 间隔
-  }
+  } // 代码块结束
   return null; // 超时
-}
+} // 代码块结束
 
 /** 以 React 受控组件可感知的方式写入 input 值 */
 const SET_INPUT = `(function (el, value) {
@@ -100,8 +100,8 @@ const SET_INPUT = `(function (el, value) {
 
 /** 按选择器点击元素（真实 DOM 事件，触发 React onClick） */
 async function click(selector) {
-  return evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true; })()`);
-}
+  return evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true; })()`); // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 造登录态：走验证码通道拿 dev_code（本地/预览环境开启），返回令牌与用户信息 */
 async function apiPost(path, body, token) {
@@ -109,7 +109,7 @@ async function apiPost(path, body, token) {
   let json = null; // 响应体
   try { json = await res.json(); } catch { json = null; } // 容错解析
   return { status: res.status, body: json }; // 返回
-}
+} // 代码块结束
 
 /** 用手机号登录（首登自动注册），返回 access_token */
 async function loginPhone(phone) {
@@ -119,7 +119,7 @@ async function loginPhone(phone) {
   const login = await apiPost('/auth/login', { region: 'cn', provider: 'phone', identifier: phone, code: devCode, device: { platform: 'web', name: 'chat-e2e' } }); // 登录
   if (!login.body?.access_token) throw new Error('登录失败: ' + JSON.stringify(login).slice(0, 200)); // 前置缺失
   return login.body; // 令牌与用户
-}
+} // 代码块结束
 
 const stamp = String(Date.now()).slice(-6); // 本轮唯一后缀，避免群名重复
 const groupName = 'E2E 群聊 ' + stamp; // 群名

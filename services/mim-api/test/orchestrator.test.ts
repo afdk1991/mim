@@ -456,107 +456,107 @@ describe('出站 SSRF 加固（orchestrator 四处出站）', () => { // describ
   const IMG_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; // 1x1 透明 PNG base64
 
   const OPENAI_ENV: Record<string, string> = { // 与真实提供方分组同形配置
-    MIM_AI_PROVIDER: 'openai',
-    MIM_AI_OPENAI_API_KEY: 'sk-test',
-    MIM_AI_BASE_URL: 'https://llm.example.test/v1',
-    MIM_AI_IMAGE_MODEL: 'test-image-model',
-  };
+    MIM_AI_PROVIDER: 'openai', // 对象字段 MIM_AI_PROVIDER：记录一项配置或数据
+    MIM_AI_OPENAI_API_KEY: 'sk-test', // 对象字段 MIM_AI_OPENAI_API_KEY：记录一项配置或数据
+    MIM_AI_BASE_URL: 'https://llm.example.test/v1', // 对象字段 MIM_AI_BASE_URL：记录一项配置或数据
+    MIM_AI_IMAGE_MODEL: 'test-image-model', // 对象字段 MIM_AI_IMAGE_MODEL：记录一项配置或数据
+  }; // 代码块结束
 
   function stubImageUrl(upstreamUrl: string, imageResponse?: { status: number; body: Buffer }) { // 打桩：生成接口回上游 URL，回源按预设响应
-    const spy = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/images/generations')) {
-        return new Response(JSON.stringify({ data: [{ url: upstreamUrl }] }), { status: 200, headers: { 'content-type': 'application/json' } });
-      }
-      if (imageResponse) {
-        return new Response(new Uint8Array(imageResponse.body), { status: imageResponse.status, headers: { 'content-type': 'image/png' } });
-      }
-      throw new Error(`unexpected outbound fetch to ${url}`);
-    });
-    vi.stubGlobal('fetch', spy);
-    return spy;
-  }
+    const spy = vi.fn(async (input: RequestInfo | URL) => { // 常量 spy：保存固定配置或一次性派生值
+      const url = String(input); // 常量 url：保存固定配置或一次性派生值
+      if (url.endsWith('/images/generations')) { // 条件分支：按判断结果选择后续处理路径
+        return new Response(JSON.stringify({ data: [{ url: upstreamUrl }] }), { status: 200, headers: { 'content-type': 'application/json' } }); // 返回当前函数的处理结果
+      } // 代码块结束
+      if (imageResponse) { // 条件分支：按判断结果选择后续处理路径
+        return new Response(new Uint8Array(imageResponse.body), { status: imageResponse.status, headers: { 'content-type': 'image/png' } }); // 返回当前函数的处理结果
+      } // 代码块结束
+      throw new Error(`unexpected outbound fetch to ${url}`); // 抛出错误：中断当前流程并向上层传递
+    }); // 代码块结束
+    vi.stubGlobal('fetch', spy); // 执行当前业务步骤
+    return spy; // 返回当前函数的处理结果
+  } // 代码块结束
 
   async function runImageJob(session: Session, projectId: string): Promise<request.Response> { // 派发并触发 image 任务
-    const jobId = await dispatchJob(session, projectId, { job_type: 'image', payload: { prompt: '一张图' } });
-    return request(app).post(`/api/v1/ai/jobs/${jobId}/run`).set(auth(session, nextKey())).send({});
-  }
+    const jobId = await dispatchJob(session, projectId, { job_type: 'image', payload: { prompt: '一张图' } }); // 常量 jobId：保存固定配置或一次性派生值
+    return request(app).post(`/api/v1/ai/jobs/${jobId}/run`).set(auth(session, nextKey())).send({}); // 返回当前函数的处理结果
+  } // 代码块结束
 
   it('上游返回内网图片 URL → 任务失败，不向内网回源', async () => { // 内网字面地址拒绝
-    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
-    const session = await login('13900000061');
-    grantEntitlement(session.userId);
-    const { projectId } = await setupStoryboardedProject(session, '编排-内网图');
-    const spy = stubImageUrl('http://127.0.0.1/secret.png');
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage }); // 赋值：更新变量 app 的取值
+    const session = await login('13900000061'); // 常量 session：保存固定配置或一次性派生值
+    grantEntitlement(session.userId); // 调用 grantEntitlement 并处理其返回结果
+    const { projectId } = await setupStoryboardedProject(session, '编排-内网图'); // 执行当前业务步骤
+    const spy = stubImageUrl('http://127.0.0.1/secret.png'); // 常量 spy：保存固定配置或一次性派生值
 
-    const run = await runImageJob(session, projectId);
-    expect(run.status).toBe(200);
-    expect(run.body.run.status).toBe('failed');
-    expect(['VALIDATION_FAILED', 'INTERNAL_ERROR']).toContain(run.body.run.error_code);
-    expect(String(run.body.job.result.error)).toContain('private');
+    const run = await runImageJob(session, projectId); // 常量 run：保存固定配置或一次性派生值
+    expect(run.status).toBe(200); // 调用 expect 并处理其返回结果
+    expect(run.body.run.status).toBe('failed'); // 调用 expect 并处理其返回结果
+    expect(['VALIDATION_FAILED', 'INTERNAL_ERROR']).toContain(run.body.run.error_code); // 调用 expect 并处理其返回结果
+    expect(String(run.body.job.result.error)).toContain('private'); // 调用 expect 并处理其返回结果
     expect(spy).toHaveBeenCalledTimes(1); // 只调用了生成接口，回源请求未到达
-  });
+  }); // 代码块结束
 
   it('回源 302 跳转内网元数据地址 → 逐跳复核拒绝', async () => { // 重定向到内网/元数据拒绝
-    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
-    const session = await login('13900000062');
-    grantEntitlement(session.userId);
-    const { projectId } = await setupStoryboardedProject(session, '编排-跳转内网');
-    const spy = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/images/generations')) {
-        return new Response(JSON.stringify({ data: [{ url: 'http://203.0.113.10/a.png' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
-      }
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage }); // 赋值：更新变量 app 的取值
+    const session = await login('13900000062'); // 常量 session：保存固定配置或一次性派生值
+    grantEntitlement(session.userId); // 调用 grantEntitlement 并处理其返回结果
+    const { projectId } = await setupStoryboardedProject(session, '编排-跳转内网'); // 执行当前业务步骤
+    const spy = vi.fn(async (input: RequestInfo | URL) => { // 常量 spy：保存固定配置或一次性派生值
+      const url = String(input); // 常量 url：保存固定配置或一次性派生值
+      if (url.endsWith('/images/generations')) { // 条件分支：按判断结果选择后续处理路径
+        return new Response(JSON.stringify({ data: [{ url: 'http://203.0.113.10/a.png' }] }), { status: 200, headers: { 'content-type': 'application/json' } }); // 返回当前函数的处理结果
+      } // 代码块结束
       // 回源首跳为公网文档地址；返回 302 跳转到云元数据地址，复核链路应拦截
       return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } });
-    });
-    vi.stubGlobal('fetch', spy);
+    }); // 代码块结束
+    vi.stubGlobal('fetch', spy); // 执行当前业务步骤
 
-    const run = await runImageJob(session, projectId);
-    expect(run.status).toBe(200);
-    expect(run.body.run.status).toBe('failed');
-    expect(String(run.body.job.result.error)).toContain('private');
-  });
+    const run = await runImageJob(session, projectId); // 常量 run：保存固定配置或一次性派生值
+    expect(run.status).toBe(200); // 调用 expect 并处理其返回结果
+    expect(run.body.run.status).toBe('failed'); // 调用 expect 并处理其返回结果
+    expect(String(run.body.job.result.error)).toContain('private'); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 
   it('伪装图片扩展名的 file:// 协议地址被协议白名单拒绝', async () => { // 扩展名伪装不绕过协议校验
-    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
-    const session = await login('13900000063');
-    grantEntitlement(session.userId);
-    const { projectId } = await setupStoryboardedProject(session, '编排-伪装协议');
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage }); // 赋值：更新变量 app 的取值
+    const session = await login('13900000063'); // 常量 session：保存固定配置或一次性派生值
+    grantEntitlement(session.userId); // 调用 grantEntitlement 并处理其返回结果
+    const { projectId } = await setupStoryboardedProject(session, '编排-伪装协议'); // 执行当前业务步骤
     stubImageUrl('file:///etc/passwd.png');
 
-    const run = await runImageJob(session, projectId);
-    expect(run.status).toBe(200);
-    expect(run.body.run.status).toBe('failed');
-    expect(['VALIDATION_FAILED', 'INTERNAL_ERROR']).toContain(run.body.run.error_code);
-  });
+    const run = await runImageJob(session, projectId); // 常量 run：保存固定配置或一次性派生值
+    expect(run.status).toBe(200); // 调用 expect 并处理其返回结果
+    expect(run.body.run.status).toBe('failed'); // 调用 expect 并处理其返回结果
+    expect(['VALIDATION_FAILED', 'INTERNAL_ERROR']).toContain(run.body.run.error_code); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 
   it('合法公网图片 URL 回源落盘成功（stub 网络）', async () => { // 公网字面 IP 放行并落盘
-    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage });
-    const session = await login('13900000064');
-    grantEntitlement(session.userId);
-    const { projectId } = await setupStoryboardedProject(session, '编排-公网图');
-    stubImageUrl('http://203.0.113.10/photo.png', { status: 200, body: Buffer.from(IMG_PNG, 'base64') });
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: OPENAI_ENV, storage }); // 赋值：更新变量 app 的取值
+    const session = await login('13900000064'); // 常量 session：保存固定配置或一次性派生值
+    grantEntitlement(session.userId); // 调用 grantEntitlement 并处理其返回结果
+    const { projectId } = await setupStoryboardedProject(session, '编排-公网图'); // 执行当前业务步骤
+    stubImageUrl('http://203.0.113.10/photo.png', { status: 200, body: Buffer.from(IMG_PNG, 'base64') }); // 调用 stubImageUrl 并处理其返回结果
 
-    const run = await runImageJob(session, projectId);
-    expect(run.status).toBe(200);
-    expect(run.body.run.status).toBe('succeeded');
-    expect(run.body.job.result.mime).toBe('image/png');
-  });
+    const run = await runImageJob(session, projectId); // 常量 run：保存固定配置或一次性派生值
+    expect(run.status).toBe(200); // 调用 expect 并处理其返回结果
+    expect(run.body.run.status).toBe('succeeded'); // 调用 expect 并处理其返回结果
+    expect(run.body.job.result.mime).toBe('image/png'); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 
   it('厂商 baseUrl 指向环回地址 → 配置来源校验拒绝', async () => { // 配置被改成内网探测目标时拦截
-    const insecureEnv: Record<string, string> = { ...OPENAI_ENV, MIM_AI_BASE_URL: 'http://127.0.0.1:9000/v1' };
-    app = createApp({ db, jwtSecret: JWT_SECRET, env: insecureEnv, storage });
-    const session = await login('13900000065');
-    grantEntitlement(session.userId);
-    const { projectId } = await setupStoryboardedProject(session, '编排-内网厂商');
-    const spy = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200, headers: { 'content-type': 'application/json' } }));
-    vi.stubGlobal('fetch', spy);
+    const insecureEnv: Record<string, string> = { ...OPENAI_ENV, MIM_AI_BASE_URL: 'http://127.0.0.1:9000/v1' }; // 常量 insecureEnv：保存固定配置或一次性派生值
+    app = createApp({ db, jwtSecret: JWT_SECRET, env: insecureEnv, storage }); // 赋值：更新变量 app 的取值
+    const session = await login('13900000065'); // 常量 session：保存固定配置或一次性派生值
+    grantEntitlement(session.userId); // 调用 grantEntitlement 并处理其返回结果
+    const { projectId } = await setupStoryboardedProject(session, '编排-内网厂商'); // 执行当前业务步骤
+    const spy = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200, headers: { 'content-type': 'application/json' } })); // 常量 spy：保存固定配置或一次性派生值
+    vi.stubGlobal('fetch', spy); // 执行当前业务步骤
 
-    const jobId = await dispatchJob(session, projectId, { job_type: 'text', payload: { prompt: 'hi' } });
-    const run = await request(app).post(`/api/v1/ai/jobs/${jobId}/run`).set(auth(session, nextKey())).send({});
-    expect(run.status).toBe(200);
-    expect(run.body.run.status).toBe('failed');
-    expect(run.body.run.error_code).toBe('VALIDATION_FAILED');
-  });
+    const jobId = await dispatchJob(session, projectId, { job_type: 'text', payload: { prompt: 'hi' } }); // 常量 jobId：保存固定配置或一次性派生值
+    const run = await request(app).post(`/api/v1/ai/jobs/${jobId}/run`).set(auth(session, nextKey())).send({}); // 常量 run：保存固定配置或一次性派生值
+    expect(run.status).toBe(200); // 调用 expect 并处理其返回结果
+    expect(run.body.run.status).toBe('failed'); // 调用 expect 并处理其返回结果
+    expect(run.body.run.error_code).toBe('VALIDATION_FAILED'); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
 }); // 结束出站 SSRF 加固分组

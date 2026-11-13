@@ -38,15 +38,15 @@ export interface ConversationListItem {
 
 /** 创建会话（direct 或 group）：同时写入成员表，返回会话 ID */
 export function createConversation(
-  db: Db,
-  params: {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  params: { // 对象字段 params：记录一项配置或数据
     type: 'direct' | 'group'; // 会话类型
     memberUserIds: string[]; // 初始成员列表（含创建者）
     title?: string; // 群标题（direct 忽略）
     ownerUserId?: string; // 群主（direct 可为空）
     now?: string; // 可注入时间戳，便于测试
-  },
-): string {
+  }, // 代码块结束
+): string { // 执行当前业务步骤
   const now = params.now ?? new Date().toISOString(); // 取当前时间或注入值
   const convId = uuidv7(); // 生成会话主键
   const title = params.type === 'group' ? (params.title ?? '群聊') : ''; // 群聊用传入标题，私聊留空
@@ -56,18 +56,18 @@ export function createConversation(
   db.prepare(
     `INSERT INTO im_conversations (id, type, title, owner_user_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(convId, params.type, title, owner, now, now);
+  ).run(convId, params.type, title, owner, now, now); // 执行当前业务步骤
 
   // 写入全部初始成员
   const insertMember = db.prepare(
     `INSERT INTO im_conversation_members (conversation_id, user_id, role, joined_at)
      VALUES (?, ?, ?, ?)`,
-  );
+  ); // 执行当前业务步骤
   // 遍历成员列表逐个插入；创建者在群聊中为 owner 角色，其余为 member
   for (const uid of params.memberUserIds) {
-    const role = params.type === 'group' && uid === owner ? 'owner' : 'member';
-    insertMember.run(convId, uid, role, now);
-  }
+    const role = params.type === 'group' && uid === owner ? 'owner' : 'member'; // 常量 role：保存固定配置或一次性派生值
+    insertMember.run(convId, uid, role, now); // 执行当前业务步骤
+  } // 代码块结束
   return convId; // 返回新会话 ID
 } // createConversation 结束
 
@@ -76,14 +76,14 @@ export function getOrCreateDirectConversation(db: Db, userA: string, userB: stri
   const pair = [userA, userB].sort(); // 排序后比较，保证 (A,B) 与 (B,A) 命中同一会话
   // 查找同时包含两人的 direct 会话：通过成员表自连接
   const row = db
-    .prepare(
+    .prepare( // 执行当前业务步骤
       `SELECT c.id FROM im_conversations c
          JOIN im_conversation_members m1 ON m1.conversation_id = c.id AND m1.user_id = ?
          JOIN im_conversation_members m2 ON m2.conversation_id = c.id AND m2.user_id = ?
         WHERE c.type = 'direct' AND c.deleted_at IS NULL
         LIMIT 1`,
-    )
-    .get(pair[0], pair[1]) as { id: string } | undefined;
+    ) // 执行当前业务步骤
+    .get(pair[0], pair[1]) as { id: string } | undefined; // 注册 GET 路由 / 中间件处理器
   // 已存在直接返回
   if (row) return row.id;
   // 不存在则新建
@@ -92,37 +92,37 @@ export function getOrCreateDirectConversation(db: Db, userA: string, userB: stri
 
 /** 判断某用户是否为会话成员 */
 export function isMember(db: Db, conversationId: string, userId: string): boolean {
-  const row = db
-    .prepare(
-      `SELECT 1 FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`,
-    )
-    .get(conversationId, userId);
+  const row = db // 常量 row：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
+      `SELECT 1 FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`, // 执行当前业务步骤
+    ) // 执行当前业务步骤
+    .get(conversationId, userId); // 注册 GET 路由 / 中间件处理器
   return !!row; // 查到即成员
 } // isMember 结束
 
 /** 取会话全部成员的用户 ID 列表 */
 export function getMemberUserIds(db: Db, conversationId: string): string[] {
-  const rows = db
-    .prepare(`SELECT user_id FROM im_conversation_members WHERE conversation_id = ?`)
-    .all(conversationId) as Array<{ user_id: string }>;
-  return rows.map((r) => r.user_id);
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare(`SELECT user_id FROM im_conversation_members WHERE conversation_id = ?`) // 执行当前业务步骤
+    .all(conversationId) as Array<{ user_id: string }>; // 注册 ALL 路由 / 中间件处理器
+  return rows.map((r) => r.user_id); // 返回当前函数的处理结果
 } // getMemberUserIds 结束
 
 /** 列出某用户的全部会话（按最后更新时间倒序），含最后一条消息与未读数 */
 export function listConversations(db: Db, userId: string): ConversationListItem[] {
   // 查该用户参与的所有会话基础信息；置顶会话排在最前，其次按最后更新时间倒序
   const convs = db
-    .prepare(
+    .prepare( // 执行当前业务步骤
       `SELECT c.id, c.type, c.title, c.avatar_object_key, c.updated_at,
               m.last_read_message_id, m.pinned, m.muted
          FROM im_conversations c
          JOIN im_conversation_members m ON m.conversation_id = c.id
         WHERE m.user_id = ? AND c.deleted_at IS NULL
         ORDER BY m.pinned DESC, c.updated_at DESC`,
-    )
-    .all(userId) as Array<
-    ConversationRow & { last_read_message_id: string | null; pinned: number; muted: number }
-  >;
+    ) // 执行当前业务步骤
+    .all(userId) as Array< // 注册 ALL 路由 / 中间件处理器
+    ConversationRow & { last_read_message_id: string | null; pinned: number; muted: number } // 执行当前业务步骤
+  >; // 执行当前业务步骤
 
   // 预编译：取会话最后一条消息
   const lastMsgStmt = db.prepare(
@@ -132,60 +132,60 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
       WHERE m.conversation_id = ? AND m.deleted_at IS NULL
       ORDER BY m.created_at DESC
       LIMIT 1`,
-  );
+  ); // 执行当前业务步骤
   // 预编译：统计未读消息数（大于 last_read_message_id 的非本人消息）
   const unreadStmt = db.prepare(
     `SELECT COUNT(*) AS n FROM im_messages
       WHERE conversation_id = ? AND deleted_at IS NULL
         AND sender_user_id != ?
         AND id > COALESCE(?, '')`, // last_read_message_id 作为参数传入；为空串时 id > '' 恒真（所有消息都未读）
-  );
+  ); // 执行当前业务步骤
 
   // 逐会话组装列表项
   return convs.map((c) => {
     // 取最后一条消息并映射为 MessageView
     const lastRow = lastMsgStmt.get(c.id) as (Record<string, unknown> & { sender_display_name: string }) | undefined;
-    const lastMessage: MessageView | null = lastRow ? rowToMessageView(lastRow) : null;
+    const lastMessage: MessageView | null = lastRow ? rowToMessageView(lastRow) : null; // 常量 lastMessage：保存固定配置或一次性派生值
 
     // 取私聊对方的用户 ID（用于前端按对方渲染头像与标题）
     let otherUserId: string | null = null;
-    if (c.type === 'direct') {
-      const other = db
-        .prepare(
-          `SELECT user_id FROM im_conversation_members WHERE conversation_id = ? AND user_id != ? LIMIT 1`,
-        )
-        .get(c.id, userId) as { user_id: string } | undefined;
-      otherUserId = other?.user_id ?? null;
+    if (c.type === 'direct') { // 条件分支：按判断结果选择后续处理路径
+      const other = db // 常量 other：保存固定配置或一次性派生值
+        .prepare( // 执行当前业务步骤
+          `SELECT user_id FROM im_conversation_members WHERE conversation_id = ? AND user_id != ? LIMIT 1`, // 执行当前业务步骤
+        ) // 执行当前业务步骤
+        .get(c.id, userId) as { user_id: string } | undefined; // 注册 GET 路由 / 中间件处理器
+      otherUserId = other?.user_id ?? null; // 赋值：更新变量 otherUserId 的取值
       // 私聊标题取对方显示名
       if (otherUserId) {
-        const u = db.prepare(`SELECT display_name FROM users WHERE id = ?`).get(otherUserId) as
-          | { display_name: string }
-          | undefined;
-        if (u) c.title = u.display_name || otherUserId.slice(0, 8);
-      }
-    }
+        const u = db.prepare(`SELECT display_name FROM users WHERE id = ?`).get(otherUserId) as // 常量 u：保存固定配置或一次性派生值
+          | { display_name: string } // 执行当前业务步骤
+          | undefined; // 执行当前业务步骤
+        if (u) c.title = u.display_name || otherUserId.slice(0, 8); // 条件分支：按判断结果选择后续处理路径
+      } // 代码块结束
+    } // 代码块结束
 
     // 统计未读数：传入已读游标，空串时全部未读
     const unread = unreadStmt.get(c.id, userId, c.last_read_message_id ?? '') as { n: number };
     // 统计成员数：群聊用于展示「N 人」，私聊固定 2
     const memberCount = (db
-      .prepare(`SELECT COUNT(*) AS n FROM im_conversation_members WHERE conversation_id = ?`)
-      .get(c.id) as { n: number }).n;
+      .prepare(`SELECT COUNT(*) AS n FROM im_conversation_members WHERE conversation_id = ?`) // 执行当前业务步骤
+      .get(c.id) as { n: number }).n; // 注册 GET 路由 / 中间件处理器
 
-    return {
-      id: c.id,
-      type: c.type,
-      title: c.title,
-      avatar_object_key: c.avatar_object_key,
-      other_user_id: otherUserId,
-      last_message: lastMessage,
-      unread_count: unread.n,
-      pinned: c.pinned === 1,
-      muted: c.muted === 1,
-      member_count: memberCount,
-      updated_at: c.updated_at,
-    };
-  });
+    return { // 返回当前函数的处理结果
+      id: c.id, // 对象字段 id：记录一项配置或数据
+      type: c.type, // 对象字段 type：记录一项配置或数据
+      title: c.title, // 对象字段 title：记录一项配置或数据
+      avatar_object_key: c.avatar_object_key, // 对象字段 avatar_object_key：记录一项配置或数据
+      other_user_id: otherUserId, // 对象字段 other_user_id：记录一项配置或数据
+      last_message: lastMessage, // 对象字段 last_message：记录一项配置或数据
+      unread_count: unread.n, // 对象字段 unread_count：记录一项配置或数据
+      pinned: c.pinned === 1, // 对象字段 pinned：记录一项配置或数据
+      muted: c.muted === 1, // 对象字段 muted：记录一项配置或数据
+      member_count: memberCount, // 对象字段 member_count：记录一项配置或数据
+      updated_at: c.updated_at, // 对象字段 updated_at：记录一项配置或数据
+    }; // 代码块结束
+  }); // 代码块结束
 } // listConversations 结束
 
 /** 单条消息的引用摘要：引用回复落库时固化，原消息被撤回后引用块仍可读 */
@@ -196,15 +196,15 @@ export interface QuotedMessage {
 
 /** 取可引用的消息：必须同会话、未撤回；不存在返回 undefined，由调用方回 400 */
 export function getQuotedMessage(db: Db, conversationId: string, messageId: string): QuotedMessage | undefined {
-  const row = db
-    .prepare(
+  const row = db // 常量 row：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT m.id, m.content_type, m.content, m.object_name, m.deleted_at, u.display_name
          FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
         WHERE m.id = ? AND m.conversation_id = ?`,
-    )
-    .get(messageId, conversationId) as
-    | { id: string; content_type: MessageContentType; content: string; object_name: string | null; deleted_at: string | null; display_name: string | null }
-    | undefined;
+    ) // 执行当前业务步骤
+    .get(messageId, conversationId) as // 注册 GET 路由 / 中间件处理器
+    | { id: string; content_type: MessageContentType; content: string; object_name: string | null; deleted_at: string | null; display_name: string | null } // 执行当前业务步骤
+    | undefined; // 执行当前业务步骤
   if (!row || row.deleted_at) return undefined; // 已撤回或不存在都不允许引用
   const sender = row.display_name || '成员'; // 发送者显示名，缺失用通用称谓
   const body = row.content_type === 'image' ? '[图片]' : row.content_type === 'file' ? `[文件] ${row.object_name ?? ''}` : row.content || '[消息]'; // 按类型生成可读摘要
@@ -213,8 +213,8 @@ export function getQuotedMessage(db: Db, conversationId: string, messageId: stri
 
 /** 创建消息并落库，返回完整 MessageView（含发送者显示名） */
 export function createMessage(
-  db: Db,
-  params: {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  params: { // 对象字段 params：记录一项配置或数据
     conversationId: string; // 所属会话
     senderUserId: string; // 发送者
     contentType: MessageContentType; // 内容类型
@@ -226,8 +226,8 @@ export function createMessage(
     replyToId?: string; // 引用回复的目标消息 ID
     replyExcerpt?: string; // 被引用消息的摘要快照
     now?: string; // 可注入时间
-  },
-): MessageView {
+  }, // 代码块结束
+): MessageView { // 执行当前业务步骤
   const now = params.now ?? new Date().toISOString(); // 取时间
   const msgId = uuidv7(); // 消息主键
   // 插入消息
@@ -236,89 +236,89 @@ export function createMessage(
        (id, conversation_id, sender_user_id, content_type, content,
         object_key, object_mime, object_name, object_size, reply_to_id, reply_excerpt, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?)`,
-  ).run(
-    msgId,
-    params.conversationId,
-    params.senderUserId,
-    params.contentType,
-    params.content ?? '',
-    params.objectKey ?? null,
-    params.objectMime ?? null,
-    params.objectName ?? null,
-    params.objectSize ?? null,
-    params.replyToId ?? null,
-    params.replyExcerpt ?? null,
-    now,
-    now,
-  );
+  ).run( // 执行当前业务步骤
+    msgId, // 执行当前业务步骤
+    params.conversationId, // 执行当前业务步骤
+    params.senderUserId, // 执行当前业务步骤
+    params.contentType, // 执行当前业务步骤
+    params.content ?? '', // 执行当前业务步骤
+    params.objectKey ?? null, // 执行当前业务步骤
+    params.objectMime ?? null, // 执行当前业务步骤
+    params.objectName ?? null, // 执行当前业务步骤
+    params.objectSize ?? null, // 执行当前业务步骤
+    params.replyToId ?? null, // 执行当前业务步骤
+    params.replyExcerpt ?? null, // 执行当前业务步骤
+    now, // 执行当前业务步骤
+    now, // 执行当前业务步骤
+  ); // 执行当前业务步骤
   // 同步刷新会话的 updated_at，使该会话在列表中置顶
   db.prepare(`UPDATE im_conversations SET updated_at = ? WHERE id = ?`).run(now, params.conversationId);
   // 查出完整消息视图（含发送者显示名）
   const row = db
-    .prepare(
+    .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
          FROM im_messages m JOIN users u ON u.id = m.sender_user_id
         WHERE m.id = ?`,
-    )
-    .get(msgId) as Record<string, unknown> & { sender_display_name: string };
-  return rowToMessageView(row);
+    ) // 执行当前业务步骤
+    .get(msgId) as Record<string, unknown> & { sender_display_name: string }; // 注册 GET 路由 / 中间件处理器
+  return rowToMessageView(row); // 返回当前函数的处理结果
 } // createMessage 结束
 
 /** 分页拉取某会话的历史消息：按 created_at 倒序，before 游标为消息 ID */
 export function listMessages(
-  db: Db,
-  conversationId: string,
-  opts: { before?: string; limit?: number } = {},
-): MessageView[] {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  conversationId: string, // 对象字段 conversationId：记录一项配置或数据
+  opts: { before?: string; limit?: number } = {}, // 对象字段 opts：记录一项配置或数据
+): MessageView[] { // 执行当前业务步骤
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200); // 限制在 1-200 之间，防过大
   // 有游标时取比游标更早的消息，无游标时取最新
   const rows = opts.before
-    ? (db
-        .prepare(
+    ? (db // 执行当前业务步骤
+        .prepare( // 执行当前业务步骤
           `SELECT m.*, u.display_name AS sender_display_name
              FROM im_messages m JOIN users u ON u.id = m.sender_user_id
             WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id < ?
             ORDER BY m.created_at DESC
             LIMIT ?`,
-        )
-        .all(conversationId, opts.before, limit) as Array<Record<string, unknown> & { sender_display_name: string }>)
-    : (db
-        .prepare(
+        ) // 执行当前业务步骤
+        .all(conversationId, opts.before, limit) as Array<Record<string, unknown> & { sender_display_name: string }>) // 注册 ALL 路由 / 中间件处理器
+    : (db // 执行当前业务步骤
+        .prepare( // 执行当前业务步骤
           `SELECT m.*, u.display_name AS sender_display_name
              FROM im_messages m JOIN users u ON u.id = m.sender_user_id
             WHERE m.conversation_id = ? AND m.deleted_at IS NULL
             ORDER BY m.created_at DESC
             LIMIT ?`,
-        )
-        .all(conversationId, limit) as Array<Record<string, unknown> & { sender_display_name: string }>);
+        ) // 执行当前业务步骤
+        .all(conversationId, limit) as Array<Record<string, unknown> & { sender_display_name: string }>); // 注册 ALL 路由 / 中间件处理器
   // 倒序查出来后再反转为正序，前端按时间从上到下展示
   return rows.map(rowToMessageView).reverse();
 } // listMessages 结束
 
 /** 定位拉取：以目标消息为中心取前后各半页，供会话内搜索点击后跳转（UUIDv7 主键天然按时间有序） */
 export function listMessagesAround(
-  db: Db,
-  conversationId: string,
-  messageId: string,
-  limit = 40,
-): MessageView[] {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  conversationId: string, // 对象字段 conversationId：记录一项配置或数据
+  messageId: string, // 对象字段 messageId：记录一项配置或数据
+  limit = 40, // 赋值：更新变量 limit 的取值
+): MessageView[] { // 执行当前业务步骤
   const total = Math.min(Math.max(limit ?? 40, 4), 200); // 限制总量，避免一次拉太多
   const half = Math.floor(total / 2); // 前后各半页
-  const beforeRows = db
-    .prepare(
+  const beforeRows = db // 常量 beforeRows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
          FROM im_messages m JOIN users u ON u.id = m.sender_user_id
         WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id < ?
         ORDER BY m.id DESC LIMIT ?`,
-    )
+    ) // 执行当前业务步骤
     .all(conversationId, messageId, half) as Array<Record<string, unknown> & { sender_display_name: string }>; // 目标之前的半页（倒序查）
-  const fromRows = db
-    .prepare(
+  const fromRows = db // 常量 fromRows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
          FROM im_messages m JOIN users u ON u.id = m.sender_user_id
         WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id >= ?
         ORDER BY m.id ASC LIMIT ?`,
-    )
+    ) // 执行当前业务步骤
     .all(conversationId, messageId, total - half) as Array<Record<string, unknown> & { sender_display_name: string }>; // 目标及其后的半页（正序查）
   return [...beforeRows.map(rowToMessageView).reverse(), ...fromRows.map(rowToMessageView)]; // 拼成从早到晚的正序列表
 } // listMessagesAround 结束
@@ -327,20 +327,20 @@ export function listMessagesAround(
 export function markConversationRead(db: Db, conversationId: string, userId: string, messageId: string): void {
   // 更新成员的已读游标
   db.prepare(
-    `UPDATE im_conversation_members SET last_read_message_id = ? WHERE conversation_id = ? AND user_id = ?`,
-  ).run(messageId, conversationId, userId);
+    `UPDATE im_conversation_members SET last_read_message_id = ? WHERE conversation_id = ? AND user_id = ?`, // 执行当前业务步骤
+  ).run(messageId, conversationId, userId); // 执行当前业务步骤
   // 把该会话中由他人发送、状态为 sent/delivered 的消息置为 read（简化模型：任一成员已读即标记）
   db.prepare(
     `UPDATE im_messages SET status = 'read', updated_at = ?
       WHERE conversation_id = ? AND status != 'read' AND sender_user_id != ?`,
-  ).run(new Date().toISOString(), conversationId, userId);
+  ).run(new Date().toISOString(), conversationId, userId); // 执行当前业务步骤
 } // markConversationRead 结束
 
 /** 按显示名或身份标识搜索用户（用于创建会话时选人），排除当前用户自身 */
 export function searchUsers(db: Db, query: string, limit: number, excludeUserId: string): Array<{ id: string; display_name: string; region: string }> {
   const q = `%${query.trim()}%`; // 前后加通配符做模糊匹配
-  const rows = db
-    .prepare(
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT DISTINCT u.id, u.display_name, u.region
          FROM users u
          LEFT JOIN identities i ON i.user_id = u.id
@@ -348,13 +348,13 @@ export function searchUsers(db: Db, query: string, limit: number, excludeUserId:
           AND (u.display_name LIKE ? OR i.identifier LIKE ?)
         ORDER BY u.display_name
         LIMIT ?`,
-    )
-    .all(excludeUserId, q, q, Math.min(Math.max(limit, 1), 50)) as Array<{
-    id: string;
-    display_name: string;
-    region: string;
-  }>;
-  return rows;
+    ) // 执行当前业务步骤
+    .all(excludeUserId, q, q, Math.min(Math.max(limit, 1), 50)) as Array<{ // 注册 ALL 路由 / 中间件处理器
+    id: string; // 对象字段 id：记录一项配置或数据
+    display_name: string; // 对象字段 display_name：记录一项配置或数据
+    region: string; // 对象字段 region：记录一项配置或数据
+  }>; // 代码块结束
+  return rows; // 返回当前函数的处理结果
 } // searchUsers 结束
 
 /** 单个会话的基础信息（群管理端点需要 type / owner 判断权限） */
@@ -367,16 +367,16 @@ export interface ConversationInfo {
 
 /** 取会话基础信息：不存在或已删除返回 undefined */
 export function getConversation(db: Db, conversationId: string): ConversationInfo | undefined {
-  return db
-    .prepare(`SELECT id, type, title, owner_user_id FROM im_conversations WHERE id = ? AND deleted_at IS NULL`)
-    .get(conversationId) as ConversationInfo | undefined;
+  return db // 返回当前函数的处理结果
+    .prepare(`SELECT id, type, title, owner_user_id FROM im_conversations WHERE id = ? AND deleted_at IS NULL`) // 执行当前业务步骤
+    .get(conversationId) as ConversationInfo | undefined; // 注册 GET 路由 / 中间件处理器
 } // getConversation 结束
 
 /** 取成员角色：非成员返回 null，用于「群主才能改名/踢人」这类判断 */
 export function getMemberRole(db: Db, conversationId: string, userId: string): 'owner' | 'admin' | 'member' | null {
-  const row = db
-    .prepare(`SELECT role FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`)
-    .get(conversationId, userId) as { role: 'owner' | 'admin' | 'member' } | undefined;
+  const row = db // 常量 row：保存固定配置或一次性派生值
+    .prepare(`SELECT role FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`) // 执行当前业务步骤
+    .get(conversationId, userId) as { role: 'owner' | 'admin' | 'member' } | undefined; // 注册 GET 路由 / 中间件处理器
   return row?.role ?? null; // 未入表即非成员
 } // getMemberRole 结束
 
@@ -390,21 +390,21 @@ export interface ConversationMember {
 
 /** 列出会话成员（按入群时间升序，群主天然排最前） */
 export function listMembers(db: Db, conversationId: string): ConversationMember[] {
-  const rows = db
-    .prepare(
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT m.user_id, m.role, m.joined_at, u.display_name
          FROM im_conversation_members m
          LEFT JOIN users u ON u.id = m.user_id
         WHERE m.conversation_id = ?
         ORDER BY m.joined_at ASC`,
-    )
-    .all(conversationId) as Array<{ user_id: string; role: ConversationMember['role']; joined_at: string; display_name: string | null }>;
-  return rows.map((row) => ({
-    user_id: row.user_id,
+    ) // 执行当前业务步骤
+    .all(conversationId) as Array<{ user_id: string; role: ConversationMember['role']; joined_at: string; display_name: string | null }>; // 注册 ALL 路由 / 中间件处理器
+  return rows.map((row) => ({ // 返回当前函数的处理结果
+    user_id: row.user_id, // 对象字段 user_id：记录一项配置或数据
     display_name: row.display_name || row.user_id.slice(0, 8), // 没设置显示名时回落 ID 前 8 位
-    role: row.role,
-    joined_at: row.joined_at,
-  }));
+    role: row.role, // 对象字段 role：记录一项配置或数据
+    joined_at: row.joined_at, // 对象字段 joined_at：记录一项配置或数据
+  })); // 代码块结束
 } // listMembers 结束
 
 /** 消息撤回结果：成功或被拒的具体原因，便于路由返回可读错误 */
@@ -415,16 +415,16 @@ export interface RecallResult {
 
 /** 撤回消息：仅发送者本人、且消息创建时间在窗口内（默认 2 分钟）可撤回；撤回即软删 */
 export function recallMessage(
-  db: Db,
-  params: { conversationId: string; messageId: string; userId: string; windowMs?: number; now?: string },
-): RecallResult {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  params: { conversationId: string; messageId: string; userId: string; windowMs?: number; now?: string }, // 对象字段 params：记录一项配置或数据
+): RecallResult { // 执行当前业务步骤
   const nowIso = params.now ?? new Date().toISOString(); // 当前时间
   const windowMs = params.windowMs ?? 120000; // 微信式 2 分钟窗口
-  const row = db
-    .prepare(`SELECT id, sender_user_id, created_at, deleted_at FROM im_messages WHERE id = ? AND conversation_id = ?`)
-    .get(params.messageId, params.conversationId) as
-    | { id: string; sender_user_id: string; created_at: string; deleted_at: string | null }
-    | undefined;
+  const row = db // 常量 row：保存固定配置或一次性派生值
+    .prepare(`SELECT id, sender_user_id, created_at, deleted_at FROM im_messages WHERE id = ? AND conversation_id = ?`) // 执行当前业务步骤
+    .get(params.messageId, params.conversationId) as // 注册 GET 路由 / 中间件处理器
+    | { id: string; sender_user_id: string; created_at: string; deleted_at: string | null } // 执行当前业务步骤
+    | undefined; // 执行当前业务步骤
   if (!row) return { ok: false, reason: 'not_found' }; // 消息不存在
   if (row.deleted_at) return { ok: false, reason: 'already_deleted' }; // 已撤回/已删除
   if (row.sender_user_id !== params.userId) return { ok: false, reason: 'not_owner' }; // 只能撤回自己发的
@@ -434,7 +434,7 @@ export function recallMessage(
   db.prepare(
     `UPDATE im_messages SET deleted_at = ?, content = '', object_key = NULL, object_mime = NULL, object_name = NULL, updated_at = ?
       WHERE id = ?`,
-  ).run(nowIso, nowIso, params.messageId);
+  ).run(nowIso, nowIso, params.messageId); // 执行当前业务步骤
   return { ok: true }; // 撤回成功
 } // recallMessage 结束
 
@@ -442,30 +442,30 @@ export function recallMessage(
 export function searchMessages(db: Db, conversationId: string, query: string, limit = 30): MessageView[] {
   const q = `%${query.trim()}%`; // 通配符包裹
   const cap = Math.min(Math.max(limit, 1), 100); // 条数上限，避免一次拉爆
-  const rows = db
-    .prepare(
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
          FROM im_messages m JOIN users u ON u.id = m.sender_user_id
         WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.content LIKE ?
         ORDER BY m.created_at DESC
         LIMIT ?`,
-    )
-    .all(conversationId, q, cap) as Array<Record<string, unknown> & { sender_display_name: string }>;
+    ) // 执行当前业务步骤
+    .all(conversationId, q, cap) as Array<Record<string, unknown> & { sender_display_name: string }>; // 注册 ALL 路由 / 中间件处理器
   return rows.map(rowToMessageView); // 倒序返回，前端按「最新命中在前」展示
 } // searchMessages 结束
 
 /** 群改名：同时刷新 updated_at，让该会话在列表里置顶 */
 export function renameConversation(db: Db, conversationId: string, title: string, now?: string): void {
   const nowIso = now ?? new Date().toISOString(); // 当前时间
-  db.prepare(`UPDATE im_conversations SET title = ?, updated_at = ? WHERE id = ?`).run(title, nowIso, conversationId);
+  db.prepare(`UPDATE im_conversations SET title = ?, updated_at = ? WHERE id = ?`).run(title, nowIso, conversationId); // 执行当前业务步骤
 } // renameConversation 结束
 
 /** 批量加入成员：已存在的成员忽略（INSERT OR IGNORE，避免重复入群报错） */
 export function addConversationMembers(db: Db, conversationId: string, userIds: string[], now?: string): number {
   const nowIso = now ?? new Date().toISOString(); // 当前时间
-  const stmt = db.prepare(
-    `INSERT OR IGNORE INTO im_conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)`,
-  );
+  const stmt = db.prepare( // 常量 stmt：保存固定配置或一次性派生值
+    `INSERT OR IGNORE INTO im_conversation_members (conversation_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)`, // 执行当前业务步骤
+  ); // 执行当前业务步骤
   let added = 0; // 实际新增人数
   for (const uid of userIds) added += stmt.run(conversationId, uid, nowIso).changes; // changes 为 0 表示已在群里
   if (added > 0) db.prepare(`UPDATE im_conversations SET updated_at = ? WHERE id = ?`).run(nowIso, conversationId); // 有新人则顶起会话
@@ -475,9 +475,9 @@ export function addConversationMembers(db: Db, conversationId: string, userIds: 
 /** 移除成员：同时清掉其已读游标，重新入群时从零开始统计未读 */
 export function removeConversationMember(db: Db, conversationId: string, userId: string, now?: string): boolean {
   const nowIso = now ?? new Date().toISOString(); // 当前时间
-  const result = db
-    .prepare(`DELETE FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`)
-    .run(conversationId, userId);
+  const result = db // 常量 result：保存固定配置或一次性派生值
+    .prepare(`DELETE FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`) // 执行当前业务步骤
+    .run(conversationId, userId); // 执行当前业务步骤
   if (result.changes > 0) db.prepare(`UPDATE im_conversations SET updated_at = ? WHERE id = ?`).run(nowIso, conversationId); // 退群也让会话在对方列表刷新
   return result.changes > 0; // 是否真的移除了
 } // removeConversationMember 结束
@@ -490,8 +490,8 @@ export function deleteConversationForUser(db: Db, conversationId: string, userId
   if (!role) return 'not_found'; // 非成员视作不存在，避免越权探测
   const nowIso = now ?? new Date().toISOString(); // 当前时间
   if (info.type === 'group' && role === 'owner') { // 群主解散：整条会话软删，消息按 deleted_at 过滤不再返回
-    db.prepare(`UPDATE im_conversations SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(nowIso, nowIso, conversationId);
-    return 'dissolved';
+    db.prepare(`UPDATE im_conversations SET deleted_at = ?, updated_at = ? WHERE id = ?`).run(nowIso, nowIso, conversationId); // 执行当前业务步骤
+    return 'dissolved'; // 返回当前函数的处理结果
   } // 解散分支结束
   removeConversationMember(db, conversationId, userId, nowIso); // 私聊/普通成员：只把自己移出
   return 'left'; // 返回「已退出」
@@ -499,43 +499,43 @@ export function deleteConversationForUser(db: Db, conversationId: string, userId
 
 /** 设置置顶 / 免打扰：按人独立，写成员表，不影响对方 */
 export function setConversationPreference(
-  db: Db,
-  conversationId: string,
-  userId: string,
-  patch: { pinned?: boolean; muted?: boolean },
-): void {
-  if (patch.pinned !== undefined) {
-    db.prepare(`UPDATE im_conversation_members SET pinned = ? WHERE conversation_id = ? AND user_id = ?`).run(patch.pinned ? 1 : 0, conversationId, userId);
+  db: Db, // 对象字段 db：记录一项配置或数据
+  conversationId: string, // 对象字段 conversationId：记录一项配置或数据
+  userId: string, // 对象字段 userId：记录一项配置或数据
+  patch: { pinned?: boolean; muted?: boolean }, // 对象字段 patch：记录一项配置或数据
+): void { // 执行当前业务步骤
+  if (patch.pinned !== undefined) { // 条件分支：按判断结果选择后续处理路径
+    db.prepare(`UPDATE im_conversation_members SET pinned = ? WHERE conversation_id = ? AND user_id = ?`).run(patch.pinned ? 1 : 0, conversationId, userId); // 执行当前业务步骤
   } // 置顶分支
-  if (patch.muted !== undefined) {
-    db.prepare(`UPDATE im_conversation_members SET muted = ? WHERE conversation_id = ? AND user_id = ?`).run(patch.muted ? 1 : 0, conversationId, userId);
+  if (patch.muted !== undefined) { // 条件分支：按判断结果选择后续处理路径
+    db.prepare(`UPDATE im_conversation_members SET muted = ? WHERE conversation_id = ? AND user_id = ?`).run(patch.muted ? 1 : 0, conversationId, userId); // 执行当前业务步骤
   } // 免打扰分支
 } // setConversationPreference 结束
 
 /** 设置成员角色：仅允许在 admin 与 member 之间切换（owner 变换走 transferOwnership） */
 export function setMemberRole(
-  db: Db,
-  conversationId: string,
-  userId: string,
-  role: 'admin' | 'member',
-): boolean {
-  const result = db
-    .prepare(`UPDATE im_conversation_members SET role = ? WHERE conversation_id = ? AND user_id = ? AND role != 'owner'`)
+  db: Db, // 对象字段 db：记录一项配置或数据
+  conversationId: string, // 对象字段 conversationId：记录一项配置或数据
+  userId: string, // 对象字段 userId：记录一项配置或数据
+  role: 'admin' | 'member', // 对象字段 role：记录一项配置或数据
+): boolean { // 执行当前业务步骤
+  const result = db // 常量 result：保存固定配置或一次性派生值
+    .prepare(`UPDATE im_conversation_members SET role = ? WHERE conversation_id = ? AND user_id = ? AND role != 'owner'`) // 执行当前业务步骤
     .run(role, conversationId, userId); // 群主行不允许被这条语句改写
   return result.changes > 0; // 返回是否真的变更
 } // setMemberRole 结束
 
 /** 转让群主：新群主升为 owner、原群主降为 member，并同步会话表的 owner_user_id */
 export function transferOwnership(
-  db: Db,
-  conversationId: string,
-  fromUserId: string,
-  toUserId: string,
-  now?: string,
-): boolean {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  conversationId: string, // 对象字段 conversationId：记录一项配置或数据
+  fromUserId: string, // 对象字段 fromUserId：记录一项配置或数据
+  toUserId: string, // 对象字段 toUserId：记录一项配置或数据
+  now?: string, // 执行当前业务步骤
+): boolean { // 执行当前业务步骤
   const nowIso = now ?? new Date().toISOString(); // 当前时间
-  const target = db
-    .prepare(`SELECT 1 FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`)
+  const target = db // 常量 target：保存固定配置或一次性派生值
+    .prepare(`SELECT 1 FROM im_conversation_members WHERE conversation_id = ? AND user_id = ?`) // 执行当前业务步骤
     .get(conversationId, toUserId); // 目标必须是现有成员
   if (!target) return false; // 非成员不能接任群主
   db.prepare(`UPDATE im_conversation_members SET role = 'member' WHERE conversation_id = ? AND user_id = ?`).run(conversationId, fromUserId); // 原群主降级
@@ -546,15 +546,15 @@ export function transferOwnership(
 
 /** 取单个用户的显示名（用于消息视图冗余展示） */
 export function getUserDisplayName(db: Db, userId: string): string {
-  const row = db.prepare(`SELECT display_name FROM users WHERE id = ?`).get(userId) as
-    | { display_name: string }
-    | undefined;
+  const row = db.prepare(`SELECT display_name FROM users WHERE id = ?`).get(userId) as // 常量 row：保存固定配置或一次性派生值
+    | { display_name: string } // 执行当前业务步骤
+    | undefined; // 执行当前业务步骤
   return row?.display_name || userId.slice(0, 8); // 缺显示名时回退到 ID 前 8 位
 } // getUserDisplayName 结束
 
 /** 把 DB 行映射为 MessageView：统一字段命名与空值处理 */
 function rowToMessageView(row: Record<string, unknown> & { sender_display_name: string }): MessageView {
-  return {
+  return { // 返回当前函数的处理结果
     id: String(row.id), // 消息 ID
     conversation_id: String(row.conversation_id), // 会话 ID
     sender_user_id: String(row.sender_user_id), // 发送者 ID
@@ -569,5 +569,5 @@ function rowToMessageView(row: Record<string, unknown> & { sender_display_name: 
     reply_excerpt: (row.reply_excerpt as string | null) ?? null, // 引用摘要快照
     status: row.status as MessageView['status'], // 投递状态
     created_at: String(row.created_at), // 创建时间
-  };
+  }; // 代码块结束
 } // rowToMessageView 结束

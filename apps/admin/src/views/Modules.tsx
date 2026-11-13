@@ -175,7 +175,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
   const state = useAsync(
     () => listModulesManage(credential, { q: applied || undefined, status: statusFilter || undefined }),
     [credential, applied, statusFilter],
-  );
+  ); // 执行当前业务步骤
   // 最近一次操作结果提示
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   // 当前正在执行的行级动作键（如 transition:code / delete:code），防重复提交
@@ -200,7 +200,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
   const detail = useAsync<ModuleDetail | null>(
     () => (priceTarget ? getModule(credential, priceTarget.code, priceTarget.region) : Promise.resolve(null)),
     [credential, priceTarget],
-  );
+  ); // 执行当前业务步骤
   // 价格表单字段值
   const [priceForm, setPriceForm] = useState<PriceFormState>(EMPTY_PRICE_FORM);
   // 正在编辑的价格行 ID：null 表示新增模式
@@ -347,7 +347,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
         });
         // 成功提示
         setNotice({ kind: 'success', text: `${panel.code} 已保存` });
-      } else {
+      } else { // 代码块结束
         // 新建：POST 全量字段
         const created = await createModule(credential, {
           // 模块编码去空白
@@ -486,7 +486,7 @@ export function Modules({ credential, permissions }: ModulesProps) {
         });
         // 成功提示
         setNotice({ kind: 'success', text: '价格行已更新' });
-      } else {
+      } else { // 代码块结束
         // 新增：POST 到模块价格集合
         await createModulePrice(credential, priceTarget.code, {
           // 币种

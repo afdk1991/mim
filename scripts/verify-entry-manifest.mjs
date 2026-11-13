@@ -54,40 +54,40 @@ const EXPECTED_DOMAINS = [
 ]; // EXPECTED_DOMAINS 结束
 
 check('用户业务用途清单为 19 组', EXPECTED_DOMAINS.length === 19, `实际 ${EXPECTED_DOMAINS.length}`); // 组数
-check('业务域数量 19 且编码一一对应', domains.length === 19 &&
+check('业务域数量 19 且编码一一对应', domains.length === 19 && // 调用 check 并处理其返回结果
   EXPECTED_DOMAINS.every(([code]) => domains.some((d) => d.code === code)), '业务域缺项或漂移'); // 编码覆盖
-check('每组业务用途的入口数正确', EXPECTED_DOMAINS.every(([code, count]) => {
+check('每组业务用途的入口数正确', EXPECTED_DOMAINS.every(([code, count]) => { // 调用 check 并处理其返回结果
   const d = domains.find((x) => x.code === code); // 定位业务域
   return d && d.count === count && d.entryKeys.length === count; // 域内入口数一致
 }), '业务用途覆盖数量漂移'); // 数量检查
-check('业务域入口数合计 44 且全部落在清单内', domains.reduce((n, d) => n + d.count, 0) === 44 &&
+check('业务域入口数合计 44 且全部落在清单内', domains.reduce((n, d) => n + d.count, 0) === 44 && // 调用 check 并处理其返回结果
   domains.every((d) => d.entryKeys.every((k) => modules.some((m) => m.entryKey === k))), '入口归属漂移'); // 归属检查
-check('每个入口恰好归属一个业务域', modules.every((m) =>
+check('每个入口恰好归属一个业务域', modules.every((m) => // 调用 check 并处理其返回结果
   domains.filter((d) => d.entryKeys.includes(m.entryKey)).length === 1), '存在重复归属'); // 唯一归属检查
 
 // ---------- 2. 用户清单关键词逐组核对（防止业务用途被名义覆盖、实际遗漏） ----------
 // 关键词组来自用户消息原文，逐一在「备注原文 + 业务系统说明 + 核心功能 + 职责」里搜索。
 const KEYWORD_GROUPS = [
-  ['主站门户与跳转', ['主站统一跳转门户']],
-  ['管理后台', ['全站统一运营管理后台']],
-  ['API / APP 网关', ['API 统一网关', '移动端专属接口服务']],
-  ['认证权限与单点登录', ['统一身份认证与权限中心', '统一单点登录页']],
-  ['用户 / 会员中心', ['会员工作台', '用户会员管理后台']],
-  ['博客 / 资讯 / 自媒体 / WordPress', ['官方博客系统', '新闻资讯发布系统', '自媒体资讯平台', 'WordPress 独立站点']],
-  ['云盘 / 图床 / 素材 / 下载分发', ['网盘系统', '公共图床', '软件源码下载分发站']],
-  ['电商与商贸', ['B2C 官方商城系统', '支付聚合网关', '对账系统', '营销活动管理平台', '多商户店铺系统',
-    'B2B 企业批发采购平台', 'C2C 个人闲置', '供应商后台管理系统', '货源商品库平台', '个人卖家店铺管理后台']],
-  ['视频', ['UGC 短视频动态社区', '长视频点播系统', '独立视频播放页']],
-  ['数据', ['开放数据集平台', '全站数据 BI 看板', '爬虫调度与数据采集平台']],
-  ['开发测试', ['开发环境门户', '接口文档', '测试环境统一入口']],
-  ['运维与安全', ['运维监控面板', '安全防护中心', '服务治理监控平台']],
-  ['工单与帮助', ['工单客服系统', '产品帮助文档中心']],
-  ['导航', ['全站资源导航站']],
-  ['低代码生成', ['低代码生成平台']],
-  ['疾风引擎工具', ['疾风引擎在线工具平台']],
-  ['语音工具', ['语音工具服务平台']],
-  ['移动端', ['移动端 H5 精简版官网', '全功能移动端站点']],
-  ['企业内部门户', ['企业内部统一门户']],
+  ['主站门户与跳转', ['主站统一跳转门户']], // 执行当前业务步骤
+  ['管理后台', ['全站统一运营管理后台']], // 执行当前业务步骤
+  ['API / APP 网关', ['API 统一网关', '移动端专属接口服务']], // 执行当前业务步骤
+  ['认证权限与单点登录', ['统一身份认证与权限中心', '统一单点登录页']], // 执行当前业务步骤
+  ['用户 / 会员中心', ['会员工作台', '用户会员管理后台']], // 执行当前业务步骤
+  ['博客 / 资讯 / 自媒体 / WordPress', ['官方博客系统', '新闻资讯发布系统', '自媒体资讯平台', 'WordPress 独立站点']], // 执行当前业务步骤
+  ['云盘 / 图床 / 素材 / 下载分发', ['网盘系统', '公共图床', '软件源码下载分发站']], // 执行当前业务步骤
+  ['电商与商贸', ['B2C 官方商城系统', '支付聚合网关', '对账系统', '营销活动管理平台', '多商户店铺系统', // 执行当前业务步骤
+    'B2B 企业批发采购平台', 'C2C 个人闲置', '供应商后台管理系统', '货源商品库平台', '个人卖家店铺管理后台']], // 执行当前业务步骤
+  ['视频', ['UGC 短视频动态社区', '长视频点播系统', '独立视频播放页']], // 执行当前业务步骤
+  ['数据', ['开放数据集平台', '全站数据 BI 看板', '爬虫调度与数据采集平台']], // 执行当前业务步骤
+  ['开发测试', ['开发环境门户', '接口文档', '测试环境统一入口']], // 执行当前业务步骤
+  ['运维与安全', ['运维监控面板', '安全防护中心', '服务治理监控平台']], // 执行当前业务步骤
+  ['工单与帮助', ['工单客服系统', '产品帮助文档中心']], // 执行当前业务步骤
+  ['导航', ['全站资源导航站']], // 执行当前业务步骤
+  ['低代码生成', ['低代码生成平台']], // 执行当前业务步骤
+  ['疾风引擎工具', ['疾风引擎在线工具平台']], // 执行当前业务步骤
+  ['语音工具', ['语音工具服务平台']], // 执行当前业务步骤
+  ['移动端', ['移动端 H5 精简版官网', '全功能移动端站点']], // 执行当前业务步骤
+  ['企业内部门户', ['企业内部统一门户']], // 执行当前业务步骤
 ]; // KEYWORD_GROUPS 结束
 
 // 依据文本：备注原文（唯一用户依据），不把实现推导内容当作覆盖证据。
@@ -104,7 +104,7 @@ check('19 组业务用途关键词组齐备', KEYWORD_GROUPS.length === 19, `实
 // ---------- 3. 相似模块关联与区分 ----------
 // 用户要求明确「相似模块之间的关联与区分」，逐组抽查最易混淆的边界。
 const byKey = new Map(modules.map((m) => [m.entryKey, m])); // 占位键索引
-const RELATION_PAIRS = [
+const RELATION_PAIRS = [ // 常量 RELATION_PAIRS：保存固定配置或一次性派生值
   ['PORTAL_ROOT', 'NAVIGATION'], // 根域名一次跳转 vs 资源导航站
   ['AUTH_CENTER', 'SSO_LOGIN'], // 认证能力 vs 登录页
   ['MEMBER_CENTER', 'MEMBER_ADMIN'], // 前台自助 vs 后台管理
@@ -135,11 +135,11 @@ check('15 组易混淆相似模块均有关联与区分', relationProblems.lengt
 // ---------- 4. 去重整理与可配置占位标识 ----------
 const dedupe = data.dedupe ?? {}; // 整理口径
 check('重复备注 44 对合并为 44 项', dedupe.businessNoteRows === 88 && dedupe.duplicatePairs === 44 && dedupe.mergedEntries === 44, '重复备注未合并'); // 重复备注
-check('@ 两行合并为 1 项且不建业务模块', dedupe.atRecordRows?.length === 2 && dedupe.atRecordRows[0] === 2 &&
+check('@ 两行合并为 1 项且不建业务模块', dedupe.atRecordRows?.length === 2 && dedupe.atRecordRows[0] === 2 && // 调用 check 并处理其返回结果
   data.atRecord?.occurrences === 2 && !modules.some((m) => m.entryKey === 'AT_ROOT'), '@ 记录未整理'); // @ 记录
-check('11 行空白字段合并为 1 项且不建业务模块', dedupe.blankNoteRows === 11 &&
+check('11 行空白字段合并为 1 项且不建业务模块', dedupe.blankNoteRows === 11 && // 调用 check 并处理其返回结果
   data.blankRecord?.occurrences === 11 && !modules.some((m) => m.entryKey === 'BLANK_UNSET'), '空白字段未整理'); // 空白字段
-check('44 个入口占位标识格式统一', modules.every((m) => m.placeholder === `{{HOST:${m.entryKey}}}` &&
+check('44 个入口占位标识格式统一', modules.every((m) => m.placeholder === `{{HOST:${m.entryKey}}}` && // 调用 check 并处理其返回结果
   m.envKey === `MIM_HOST_${m.entryKey}` && m.hostValue === null), '占位标识漂移'); // 占位格式
 check('清单无具体主机值字段（无 host / fqdn）', modules.every((m) => !('host' in m) && !('fqdn' in m)), '残留具体主机值字段'); // 字段检查
 check('空备注行无具体主机值', (data.blankRows ?? []).every((b) => b.hostValue === null && !('host' in b)), '空备注行含具体值'); // 空行检查
@@ -154,11 +154,11 @@ check('配置模板键与入口 envKey 一一对应', modules.every((m) => Objec
 // ---------- 5. 命名、业务说明与整体结构一致 ----------
 check('每个入口的 domainName 与业务域 name 一致', modules.every((m) =>
   domains.find((d) => d.code === m.domain)?.name === m.domainName), '业务域名漂移'); // 命名一致
-check('每个入口都有核心功能 / 职责边界 / 后台与接口职责', modules.every((m) =>
-  m.coreFunctions.length >= 3 && m.responsibility.inScope.length > 0 && m.responsibility.outOfScope.length > 0 &&
+check('每个入口都有核心功能 / 职责边界 / 后台与接口职责', modules.every((m) => // 调用 check 并处理其返回结果
+  m.coreFunctions.length >= 3 && m.responsibility.inScope.length > 0 && m.responsibility.outOfScope.length > 0 && // 执行当前业务步骤
   m.adminRole && m.apiRole), '职责元数据缺失'); // 职责齐备
 check('每个入口的备注原文与入口/系统两段自洽', modules.every((m) => m.note === `${m.entry}｜${m.system}`), '备注拆分漂移'); // 两段式
-check('实现推导声明覆盖职责与关联字段', String(data.derivation).includes('responsibility') &&
+check('实现推导声明覆盖职责与关联字段', String(data.derivation).includes('responsibility') && // 调用 check 并处理其返回结果
   String(data.derivation).includes('related') && String(data.derivation).includes('非备注原文'), '缺推导声明'); // 推导声明
 
 // 可读清单文档与交付说明存在，且逐项列出 45 个占位键。

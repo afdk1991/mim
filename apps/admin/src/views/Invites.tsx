@@ -63,9 +63,9 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
   const stats = listState.data?.stats; // 统计快照
   const invites = listState.data?.invites ?? []; // 码列表
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>邀请码管理</h1>
         <p className="muted">注册准入码：批量生成、绑定手机 / 邮箱、限制次数与有效期，并保留逐次核销审计。</p>
       </header>
@@ -74,15 +74,15 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 
-      <section className="cards">
+      <section className="cards">{/* 执行当前业务步骤 */}
         <div className="card"><div className="card-label">码总量</div><div className="card-value">{stats?.total ?? 0}</div></div>
         <div className="card"><div className="card-label">活跃码</div><div className="card-value">{stats?.active ?? 0}</div></div>
         <div className="card"><div className="card-label">核销次数</div><div className="card-value">{stats?.redemptions ?? 0}</div></div>
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>批量生成</h3></div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           <label>数量<input value={count} onChange={(event) => setCount(event.target.value)} inputMode="numeric" /></label>
           <label>每码可用次数<input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" /></label>
           <label>有效期（天）<input value={days} onChange={(event) => setDays(event.target.value)} inputMode="numeric" placeholder="0 表示长期" /></label>
@@ -90,33 +90,33 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
           <button type="button" className="btn primary" disabled={busy || !canWrite} onClick={() => void generate()}>{busy ? '生成中…' : '生成'}</button>
         </div>
         {generated.length > 0 && (
-          <div className="panel hint">
+          <div className="panel hint">{/* 执行当前业务步骤 */}
             <div className="panel-head"><h3>本次生成</h3><button type="button" className="btn ghost" onClick={() => void navigator.clipboard?.writeText(generated.join('\n'))}>复制全部</button></div>
             <div className="perm-grid">{generated.map((code) => <span className="perm-item" key={code}>{code}</span>)}</div>
           </div>
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>邀请码列表</h3><button type="button" className="btn ghost" onClick={listState.reload}>刷新</button></div>
         {listState.loading && <p className="muted">加载中…</p>}
         {Boolean(listState.error) && <p className="error">{describeError(listState.error)}</p>}
         {invites.length === 0 && !listState.loading ? <p className="empty">暂无邀请码</p> : null}
         {invites.length > 0 && (
-          <div className="table-wrap">
-            <table className="table">
+          <div className="table-wrap">{/* 执行当前业务步骤 */}
+            <table className="table">{/* 执行当前业务步骤 */}
               <thead><tr><th>邀请码</th><th>使用</th><th>状态</th><th>有效期</th><th>备注</th><th>操作</th></tr></thead>
-              <tbody>
+              <tbody>{/* 执行当前业务步骤 */}
                 {invites.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id}>{/* 执行当前业务步骤 */}
                     <td><strong>{row.code}</strong>{row.bound_identifier ? <div className="muted">绑定 {row.bound_identifier}</div> : null}</td>
                     <td>{row.used_count} / {row.max_uses}</td>
                     <td><span className={`badge ${row.status === 'active' ? 'success' : row.status === 'exhausted' ? 'warning' : 'danger'}`}>{row.status}</span></td>
                     <td>{row.expires_at ? row.expires_at.slice(0, 10) : '长期'}</td>
                     <td>{row.note ?? '—'}</td>
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       {row.status === 'active' && (
-                        <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void (async () => {
+                        <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void (async () => {{/* 执行当前业务步骤 */}
                           setBusy(true); // 操作中
                           setError(''); // 清空错误
                           try { // 业务步骤
@@ -139,15 +139,15 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>核销记录</h3></div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           <label className="grow">邀请码过滤<input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="留空查看全部" /></label>
           <button type="button" className="btn primary" disabled={busy || !canRead} onClick={() => void loadRedemptions()}>查询</button>
         </div>
         {redemptions.length === 0 ? <p className="empty">尚未查询或暂无记录</p> : (
-          <div className="table-wrap">
-            <table className="table">
+          <div className="table-wrap">{/* 执行当前业务步骤 */}
+            <table className="table">{/* 执行当前业务步骤 */}
               <thead><tr><th>邀请码</th><th>用户</th><th>注册标识</th><th>核销时间</th></tr></thead>
               <tbody>{redemptions.map((row) => <tr key={row.id}><td>{row.code}</td><td>{row.user_id}</td><td>{row.identifier ?? '—'}</td><td>{row.created_at.slice(0, 16)}</td></tr>)}</tbody>
             </table>
@@ -155,5 +155,5 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
         )}
       </section>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Invites 结束

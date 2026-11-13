@@ -11,7 +11,7 @@ export interface PointsConfig {
   enabled: boolean; // 积分抵扣总开关
   pointsPerYuan: number; // 多少积分折抵 1 元（1 元 = 100 分）；默认 100
   maxRatioPercent: number; // 单笔抵扣上限占应付金额的百分比（0–100）；默认 30
-}
+} // 代码块结束
 
 /** 读取整数环境变量：非法 / 越界回落默认值，避免脏环境把配置搞成 NaN */
 function readInt(env: Record<string, string | undefined>, key: string, fallback: number, min: number, max: number): number {
@@ -20,12 +20,12 @@ function readInt(env: Record<string, string | undefined>, key: string, fallback:
   const parsed = Number.parseInt(raw, 10); // 十进制整数解析
   if (Number.isNaN(parsed)) return fallback; // 非法形态回落默认，不抛错阻断启动
   return Math.min(max, Math.max(min, parsed)); // 夹到合法区间
-}
+} // 代码块结束
 
 /** 读取积分抵扣配置；env 缺省取 process.env，测试可注入替身环境 */
 export function readPointsConfig(env: Record<string, string | undefined> = process.env): PointsConfig {
   const enabled = (env.MIM_POINTS_DEDUCTION_ENABLED ?? '1').trim() !== '0'; // 显式 0 才关闭，其余取值视为开启
   const pointsPerYuan = readInt(env, 'MIM_POINTS_PER_YUAN', 100, 1, 1_000_000); // 兑换比例必须为正整数
   const maxRatioPercent = readInt(env, 'MIM_POINTS_MAX_RATIO_PERCENT', 30, 0, 100); // 抵扣比例 0–100，0 表示不可用积分
-  return { enabled, pointsPerYuan, maxRatioPercent };
-}
+  return { enabled, pointsPerYuan, maxRatioPercent }; // 返回当前函数的处理结果
+} // 代码块结束

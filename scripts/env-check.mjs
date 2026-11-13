@@ -52,19 +52,19 @@ let exitCode = 0;
 
 // 打印 ❌ 并标记违规
 function fail(msg) {
-  console.log(`❌ ${msg}`);
-  exitCode = 1;
-}
+  console.log(`❌ ${msg}`); // 向控制台输出运行日志或错误信息
+  exitCode = 1; // 赋值：更新变量 exitCode 的取值
+} // 代码块结束
 
 // 打印 ⚠️ 仅提示，不影响退出码
 function warn(msg) {
-  console.log(`⚠️  ${msg}`);
-}
+  console.log(`⚠️  ${msg}`); // 向控制台输出运行日志或错误信息
+} // 代码块结束
 
 // 打印 ✅ 通过项
 function ok(msg) {
-  console.log(`✅ ${msg}`);
-}
+  console.log(`✅ ${msg}`); // 向控制台输出运行日志或错误信息
+} // 代码块结束
 
 // 读取 .env.example 的逐行文本；文件缺失返回 null
 function readTemplateLines() {
@@ -72,7 +72,7 @@ function readTemplateLines() {
   if (!existsSync(TEMPLATE_PATH)) return null;
   // 读取全文并按 CRLF / LF 双兼容方式拆行
   return readFileSync(TEMPLATE_PATH, 'utf-8').split(/\r?\n/);
-}
+} // 代码块结束
 
 // 从模板行中抽取全部赋值项：{ lineNo, name, value }
 function collectAssignments(lines) {
@@ -88,10 +88,10 @@ function collectAssignments(lines) {
     const value = text.slice(text.indexOf('=') + 1).trim();
     // 记录行号、变量名、值
     out.push({ lineNo: idx + 1, name: m[1], value });
-  });
+  }); // 代码块结束
   // 返回全部赋值项
   return out;
-}
+} // 代码块结束
 
 // 从 09 清单中抽取具体变量集合 + 通配符前缀集合
 function readInventory() {
@@ -109,7 +109,7 @@ function readInventory() {
   for (const m of text.matchAll(INVENTORY_WILDCARD_RE)) stems.push(m[1]);
   // 返回两个集合
   return { vars, stems };
-}
+} // 代码块结束
 
 // 检查 .gitignore 是否覆盖 .env
 function checkGitignore() {
@@ -125,7 +125,7 @@ function checkGitignore() {
   const keepsExample = rules.includes('!.env.example');
   // 返回三项判定
   return { exists: true, coversEnv, keepsExample };
-}
+} // 代码块结束
 
 // 打印标题与输入文件
 console.log('=== Mim 密钥模板校验 (09 清单 §0) ===');
@@ -149,7 +149,7 @@ if (!lines) {
   console.log('❌ 密钥模板校验未通过');
   // 以失败码退出
   process.exit(exitCode);
-}
+} // 代码块结束
 
 // ---------- 2. 变量统计与去重 ----------
 // 抽取全部赋值项
@@ -168,10 +168,10 @@ console.log(`模板变量: total=${assignments.length} unique=${names.size}`);
 if (duplicates.length > 0) {
   // 报错并列出重复名
   fail(`存在重复变量: ${duplicates.join(', ')}`);
-} else {
+} else { // 代码块结束
   // 无重复：通过
   ok('变量名无重复');
-}
+} // 代码块结束
 
 // ---------- 3. 空值检查（密钥不入库） ----------
 // 过滤出真实赋值的项（空值占位是唯一允许形态）
@@ -182,10 +182,10 @@ if (nonEmpty.length > 0) {
   const detail = nonEmpty.map((a) => `L${a.lineNo}:${a.name}`).join(', ');
   // 报错
   fail(`模板存在非空赋值（禁止提交真实密钥）: ${detail}`);
-} else {
+} else { // 代码块结束
   // 全部为空值：通过
   ok('模板全部为空值占位（无真实密钥）');
-}
+} // 代码块结束
 
 // ---------- 4. 与 09 清单双向对齐 ----------
 // 读取清单
@@ -194,45 +194,45 @@ const inventory = readInventory();
 if (!inventory) {
   // 报错
   fail('未找到 docs/wiki/09-third-party-sdk-inventory.md（清单唯一真源缺失）');
-} else {
+} else { // 代码块结束
   // 清单有、模板无 → 漏落位
   const missingInTemplate = [...inventory.vars].filter((v) => !names.has(v));
   // 模板有、清单无 → 需进一步判断是否被通配符覆盖
   const notInInventory = [...names].filter((v) => !inventory.vars.has(v));
   // 被清单通配符覆盖的展开项（如 Stripe 月度/年度价格 ID）
   const coveredByWildcard = notInInventory.filter((v) =>
-    inventory.stems.some((stem) => v.startsWith(stem)),
-  );
+    inventory.stems.some((stem) => v.startsWith(stem)), // 执行当前业务步骤
+  ); // 执行当前业务步骤
   // 既不在清单、也不被通配符覆盖 → 真正的未登记变量
   const unregistered = notInInventory.filter((v) => !coveredByWildcard.includes(v));
 
   // 打印对齐统计
   console.log(
-    `清单对齐: inventory=${inventory.vars.size} missing=${missingInTemplate.length} ` +
-      `extra=${unregistered.length} wildcardCovered=${coveredByWildcard.length}`,
-  );
+    `清单对齐: inventory=${inventory.vars.size} missing=${missingInTemplate.length} ` + // 执行当前业务步骤
+      `extra=${unregistered.length} wildcardCovered=${coveredByWildcard.length}`, // 执行当前业务步骤
+  ); // 执行当前业务步骤
   // 漏落位变量：逐项报错
   if (missingInTemplate.length > 0) {
     // 报错并列出清单中有但模板缺失的变量
     fail(`模板缺少清单已登记变量: ${missingInTemplate.join(', ')}`);
-  } else {
+  } else { // 代码块结束
     // 全部落位：通过
     ok('清单登记变量已全部落位到模板');
-  }
+  } // 代码块结束
   // 通配符覆盖项：仅提示
   if (coveredByWildcard.length > 0) {
     // 提示这些变量由清单通配符覆盖
     warn(`以下变量由清单通配符覆盖: ${coveredByWildcard.join(', ')}`);
-  }
+  } // 代码块结束
   // 未登记变量：报错（违反「先登记后接入」）
   if (unregistered.length > 0) {
     // 报错并列出
     fail(`模板存在清单未登记变量: ${unregistered.join(', ')}`);
-  } else {
+  } else { // 代码块结束
     // 无未登记变量：通过
     ok('模板无清单外变量（先登记后接入合规）');
-  }
-}
+  } // 代码块结束
+} // 代码块结束
 
 // ---------- 5. 命名规范 ----------
 // 所有变量必须以 MIM_ 前缀开头
@@ -241,10 +241,10 @@ const badPrefix = [...names].filter((n) => !n.startsWith(NAME_PREFIX));
 if (badPrefix.length > 0) {
   // 报错并列出
   fail(`变量名缺少 ${NAME_PREFIX} 前缀: ${badPrefix.join(', ')}`);
-} else {
+} else { // 代码块结束
   // 全部合规：通过
   ok(`全部变量均使用 ${NAME_PREFIX} 前缀`);
-}
+} // 代码块结束
 
 // ---------- 6. .gitignore 覆盖检查（密钥不入库） ----------
 // 执行忽略规则检查
@@ -253,18 +253,18 @@ const gi = checkGitignore();
 if (!gi.exists) {
   // 报错
   fail('缺少 .gitignore（无法阻止 .env 误提交）');
-} else if (!gi.coversEnv) {
+} else if (!gi.coversEnv) { // 代码块结束
   // 存在但未忽略 .env：判违规
   fail('.gitignore 未包含 .env 忽略规则');
-} else {
+} else { // 代码块结束
   // 覆盖到位：通过
   ok('.gitignore 已忽略 .env');
   // 反向豁免缺失：仅提示（避免模板自身被误忽略）
   if (!gi.keepsExample) {
     // 提示
     warn('.gitignore 建议补充 !.env.example 反向豁免');
-  }
-}
+  } // 代码块结束
+} // 代码块结束
 
 // ---------- 7. 本地 .env 探测（只探测存在性，不读内容） ----------
 // 本地存在真实 .env
@@ -273,14 +273,14 @@ if (existsSync(ENV_PATH)) {
   if (gi.coversEnv) {
     // 提示
     console.log('ℹ️  本地 .env 存在，且已被 .gitignore 忽略');
-  } else {
+  } else { // 代码块结束
     // 未忽略：前面已判违规，这里再显式点名风险
     fail('本地 .env 存在且未被忽略，存在密钥泄露风险');
-  }
-} else {
+  } // 代码块结束
+} else { // 代码块结束
   // 不存在：无泄露风险
   console.log('ℹ️  本地未创建 .env（无泄露风险）');
-}
+} // 代码块结束
 
 // ---------- 8. 结论 ----------
 // 打印空行
@@ -289,10 +289,10 @@ console.log('');
 if (exitCode === 0) {
   // 通过
   console.log('✅ 密钥模板校验通过');
-} else {
+} else { // 代码块结束
   // 未通过
   console.log('❌ 密钥模板校验未通过，请根据上方提示修正');
-}
+} // 代码块结束
 
 // 以累计退出码结束进程
 process.exit(exitCode);

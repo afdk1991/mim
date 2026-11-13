@@ -45,12 +45,12 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   content: 'announcements', // 公告 / 更新日志 / 推广计划栏目
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
-};
+}; // 代码块结束
 
 // 路径段 → 视图的反向索引：由 VIEW_SEGMENTS 派生，保证正反两向永不走样
 const SEGMENT_VIEWS: ReadonlyMap<string, AppView> = new Map(
   (Object.keys(VIEW_SEGMENTS) as AppView[]).map((view) => [VIEW_SEGMENTS[view], view]), // [路径段, 视图] 二元组
-);
+); // 执行当前业务步骤
 
 // 改名前的旧路径段：线上旧链接、旧书签与外部引用仍需可达，
 // 命中后由 resolveSegment 原地改写为新路径（等价 301，不新增历史记录）。
@@ -67,7 +67,7 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   products: 'products', // 未改名（新旧一致）
   cart: 'cart', // 未改名（新旧一致）
   forum: 'community', // 旧口径：论坛 / 社区 → community（同一视图的曾用名）
-};
+}; // 代码块结束
 
 // 全部视图均为单段路径（如 /comic-studio），保证 vite base './' 下相对资源解析正确
 const VIEWS: AppView[] = Object.keys(VIEW_SEGMENTS) as AppView[]; // 视图全集：由映射表派生的唯一真源
@@ -84,14 +84,14 @@ let cachedBase: string | null = null; // null 表示尚未推断
 export function baseOf(): string {
   if (cachedBase !== null) return cachedBase; // 命中缓存直接返回
   let base = '/'; // 默认根部署
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     // 当前模块的绝对 URL，形如 https://host/mim/assets/index-xxx.js（dev 下为 /src/router.ts，不含 /assets/）
     const url = new URL(import.meta.url); // import.meta.url 由浏览器保证为绝对地址
     const idx = url.pathname.indexOf('/assets/'); // 定位产物资源目录
     if (idx >= 0) base = url.pathname.slice(0, idx + 1); // 保留尾斜杠：'/mim/' 或 '/'
-  } catch {
+  } catch { // 代码块结束
     base = '/'; // 非浏览器环境（测试 / SSR）兜底为根部署
-  }
+  } // 代码块结束
   cachedBase = base; // 写入缓存
   return base; // 返回推断结果
 } // baseOf 结束

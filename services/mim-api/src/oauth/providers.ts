@@ -419,10 +419,10 @@ function envFirst(env: Record<string, string | undefined>, keys: string[]): stri
  * @returns 凭证齐全时返回配置，否则 null（入口不可用，但不应让服务启动失败）
  */
 export function resolveCredentials(
-  spec: OAuthProviderSpec,
-  env: Record<string, string | undefined>,
-  backendBase: string,
-): ResolvedCredentials | null {
+  spec: OAuthProviderSpec, // 对象字段 spec：记录一项配置或数据
+  env: Record<string, string | undefined>, // 对象字段 env：记录一项配置或数据
+  backendBase: string, // 对象字段 backendBase：记录一项配置或数据
+): ResolvedCredentials | null { // 执行当前业务步骤
   const clientId = envFirst(env, spec.env.clientId); // 应用 ID
   const rawSecret = envFirst(env, spec.env.clientSecret); // 原始密钥（Apple 为私钥）
   if (!clientId || !rawSecret) return null; // 任一缺失即视为未配置
@@ -452,10 +452,10 @@ export interface PublicProviderInfo {
 
 /** 生成公开清单：按当前地区过滤，未配置的仍返回但标记 configured=false，前端可置灰或隐藏 */
 export function publicProviders(
-  env: Record<string, string | undefined>,
-  backendBase: string,
-  region?: Region,
-): PublicProviderInfo[] {
+  env: Record<string, string | undefined>, // 对象字段 env：记录一项配置或数据
+  backendBase: string, // 对象字段 backendBase：记录一项配置或数据
+  region?: Region, // 执行当前业务步骤
+): PublicProviderInfo[] { // 执行当前业务步骤
   return OAUTH_PROVIDERS.filter((spec) => !region || spec.region === 'both' || spec.region === region) // 区域过滤
     .map((spec) => ({ // 映射为公开结构
       id: spec.id, // 标识

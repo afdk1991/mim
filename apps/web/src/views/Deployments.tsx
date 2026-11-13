@@ -74,10 +74,10 @@ function ResultBadge({ result, locale }: { result: DeploymentResult | null; loca
   const v = VERDICT_STYLE[result.verdict] ?? { cls: 'muted', zh: result.verdict, en: result.verdict };
   // 返回徽标 + HTTP / 字节数，便于与 curl 输出直接核对
   return (
-    <span className={`deploy-badge ${v.cls}`}>
+    <span className={`deploy-badge ${v.cls}`}>{/* 执行当前业务步骤 */}
       {tr(locale, v.zh, v.en)} · {dash(result.http_code)} / {dash(result.bytes)}B
     </span>
-  );
+  ); // 执行当前业务步骤
 } // ResultBadge 结束
 
 // 渲染访问域名：只展示域名（省略协议与路径），点击在新窗口打开完整入口地址
@@ -86,16 +86,16 @@ function EntryLink({ entryUrl }: { entryUrl: string | null }) {
   if (!entryUrl) return <span className="muted">—</span>;
   // 解析失败（注册表里可能是非标准地址）时原样展示，不吞掉信息
   let host = entryUrl;
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     host = new URL(entryUrl).host; // 优先只展示主机（含端口），列宽可控
   } catch {
     host = entryUrl; // 解析失败保留原文
-  }
-  return (
-    <a className="link" href={entryUrl} target="_blank" rel="noreferrer" title={entryUrl}>
+  } // 代码块结束
+  return ( // 返回当前函数的处理结果
+    <a className="link" href={entryUrl} target="_blank" rel="noreferrer" title={entryUrl}>{/* 执行当前业务步骤 */}
       {host}
     </a>
-  );
+  ); // 执行当前业务步骤
 } // EntryLink 结束
 
 // 部署汇总主视图：仅一张 8 列核对表（规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明）
@@ -104,28 +104,28 @@ export function Deployments({ locale }: Props) {
   const list = useAsync(() => api.deployments.list(), []);
   // 清单加载失败：展示错误 + 重试入口，避免一次请求失败即永久空白
   if (list.error) {
-    return (
-      <div className="page">
+    return ( // 返回当前函数的处理结果
+      <div className="page">{/* 执行当前业务步骤 */}
         <p className="error">{errorText(locale, list.error)}</p>
         <p className="muted">{tr(locale, '无法连接部署汇总服务，请检查网络或接口可用性后重试。', 'Cannot reach the deployment summary service. Retry after checking connectivity.')}</p>
         <button type="button" className="btn primary" onClick={() => list.reload()}>{tr(locale, '重试', 'Retry')}</button>
       </div>
-    );
+    ); // 执行当前业务步骤
   } // 错误态结束
   // 清单数据，未返回时兜底为空数组
   const items: DeploymentItem[] = list.data?.items ?? [];
   // 主渲染：加载态 / 空态 / 8 列表格
   return (
-    <div className="page">
+    <div className="page">{/* 执行当前业务步骤 */}
       {list.loading ? (
         <p className="hint">{tr(locale, '加载中…', 'Loading…')}</p>
       ) : items.length === 0 ? (
         <p className="hint">{tr(locale, '暂无部署项。', 'No deployment items.')}</p>
       ) : (
-        <div className="deploy-table-wrap">
-          <table className="deploy-table">
-            <thead>
-              <tr>
+        <div className="deploy-table-wrap">{/* 执行当前业务步骤 */}
+          <table className="deploy-table">{/* 执行当前业务步骤 */}
+            <thead>{/* 执行当前业务步骤 */}
+              <tr>{/* 执行当前业务步骤 */}
                 <th>{tr(locale, '规范 ID / 名称', 'ID / Name')}</th>
                 <th>{tr(locale, '仓库标识', 'Repository')}</th>
                 <th>{tr(locale, '平台 / 层级', 'Platform / Layer')}</th>
@@ -136,10 +136,10 @@ export function Deployments({ locale }: Props) {
                 <th>{tr(locale, '异常说明', 'Anomalies')}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody>{/* 执行当前业务步骤 */}
               {items.map((item) => (
-                <tr key={item.id} className="deploy-row">
-                  <td>
+                <tr key={item.id} className="deploy-row">{/* 执行当前业务步骤 */}
+                  <td>{/* 执行当前业务步骤 */}
                     <code>{item.id}</code>
                     <div className="muted">{item.name}</div>
                   </td>
@@ -149,7 +149,7 @@ export function Deployments({ locale }: Props) {
                   <td><EntryLink entryUrl={item.entry_url} /></td>
                   <td><StatusBadge status={item.status} locale={locale} /></td>
                   <td><ResultBadge result={item.result} locale={locale} /></td>
-                  <td>
+                  <td>{/* 执行当前业务步骤 */}
                     {item.anomalies.length === 0
                       ? <span className="muted">—</span>
                       : <span className="deploy-badge warn">{item.anomalies.length} {tr(locale, '项', 'items')}</span>}
@@ -165,5 +165,5 @@ export function Deployments({ locale }: Props) {
         </div>
       )}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Deployments 组件结束

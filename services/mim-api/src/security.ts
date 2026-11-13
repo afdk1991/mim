@@ -89,7 +89,7 @@ export function createCaptcha(): { id: string; answer: string; svg: string; expi
     const y2 = randomInt(8, 48); // 保存 y2：承载本步骤的计算结果供后续使用
     return `<line x1="0" y1="${y1}" x2="160" y2="${y2}" stroke="#94a3b8" stroke-width="1" opacity="0.5"/>`; // 返回结果：把本步骤产物交给调用方
   }).join(''); // 结束代码块：本层作用域收尾
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="56" viewBox="0 0 160 56" role="img" aria-label="图形验证码"><rect width="160" height="56" fill="#f8fafc" rx="8"/>${lines}${chars}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="56" viewBox="0 0 160 56" role="img" aria-label="图形验证码"><rect width="160" height="56" fill="#f8fafc" rx="8"/>${lines}${chars}</svg>`; // 常量 svg：保存固定配置或一次性派生值
   return { id, answer, svg, expires_at: new Date(Date.now() + CAPTCHA_TTL_MS).toISOString() }; // 返回结果：把本步骤产物交给调用方
 } // 结束代码块：本层作用域收尾
 
@@ -136,7 +136,7 @@ export function createSliderCaptcha(): SliderChallenge & { answerX: number } { /
     return `<line x1="0" y1="${y1}" x2="${SLIDER_WIDTH}" y2="${y2}" stroke="#cbd5e1" stroke-width="1" opacity="0.4"/>`; // 返回结果：把本步骤产物交给调用方
   }).join(''); // 结束代码块：本层作用域收尾
   const background = // 保存 background：承载本步骤的计算结果供后续使用
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${SLIDER_WIDTH}" height="${SLIDER_HEIGHT}" viewBox="0 0 ${SLIDER_WIDTH} ${SLIDER_HEIGHT}" role="img" aria-label="滑动拼图">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${SLIDER_WIDTH}" height="${SLIDER_HEIGHT}" viewBox="0 0 ${SLIDER_WIDTH} ${SLIDER_HEIGHT}" role="img" aria-label="滑动拼图">` + // 执行当前业务步骤
     `<rect width="${SLIDER_WIDTH}" height="${SLIDER_HEIGHT}" fill="#e2e8f0" rx="10"/>${noise}` + // 业务步骤：推进当前流程的下一项处理
     `<rect x="0" y="${gapY}" width="${SLIDER_GAP_SIZE}" height="${SLIDER_GAP_SIZE}" fill="#94a3b8" opacity="0.35" rx="8"/>` + // 业务步骤：推进当前流程的下一项处理
     `</svg>`; // 业务步骤：推进当前流程的下一项处理
@@ -197,7 +197,7 @@ async function verifyTencent(env: Record<string, string | undefined>, ticket: st
   const secret = env.MIM_TENCENT_CAPTCHA_SECRET_KEY?.trim(); // 保存 secret：承载本步骤的计算结果供后续使用
   if (!appId || !secret) throw new AppError('PROVIDER_NOT_CONFIGURED', '腾讯验证码未配置密钥'); // 业务拒绝 PROVIDER_NOT_CONFIGURED：以统一错误码终止当前请求
   const params = new URLSearchParams({ aid: appId, AppSecretKey: secret, Ticket: ticket, Randstr: randstr }); // 保存 params：承载本步骤的计算结果供后续使用
-  const res = await fetch(`https://ssl.captcha.qq.com/ticket/verify?${params.toString()}`, {
+  const res = await fetch(`https://ssl.captcha.qq.com/ticket/verify?${params.toString()}`, { // 常量 res：保存固定配置或一次性派生值
     method: 'GET', // 对象字段：声明结构中的一项数据
     signal: AbortSignal.timeout(AUDIT_HTTP_TIMEOUT_MS), // 对象字段：声明结构中的一项数据
   }); // 结束函数体：本层作用域收尾
@@ -215,7 +215,7 @@ async function verifyGeetest4( // 定义函数 verifyGeetest4：封装可复用�
   const captchaKey = env.MIM_GEETEST4_CAPTCHA_KEY?.trim(); // 保存 captchaKey：承载本步骤的计算结果供后续使用
   if (!captchaId || !captchaKey) throw new AppError('PROVIDER_NOT_CONFIGURED', '极验验证码未配置密钥'); // 业务拒绝 PROVIDER_NOT_CONFIGURED：以统一错误码终止当前请求
   const json = await postJson( // 保存 json：承载本步骤的计算结果供后续使用
-    'https://gcaptcha4.geetest.com/captcha/v1/validate',
+    'https://gcaptcha4.geetest.com/captcha/v1/validate', // 执行当前业务步骤
     { // 业务步骤：推进当前流程的下一项处理
       captcha_id: captchaId, // 对象字段：声明结构中的一项数据
       lot_number: payload.lotNumber, // 对象字段：声明结构中的一项数据
@@ -345,7 +345,7 @@ export function auditConfigured(env: Record<string, string | undefined>): boolea
 /** 获取百度 access_token：client_credentials 模式，缓存 25 小时。 */
 async function baiduAccessToken(apiKey: string, secretKey: string): Promise<string | null> { // 定义函数 baiduAccessToken：封装可复用业务步骤
   if (baiduToken && baiduToken.expiresAt > Date.now()) return baiduToken.token; // 条件分支：仅在满足业务前置条件时继续
-  const url = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${encodeURIComponent(apiKey)}&client_secret=${encodeURIComponent(secretKey)}`;
+  const url = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${encodeURIComponent(apiKey)}&client_secret=${encodeURIComponent(secretKey)}`; // 常量 url：保存固定配置或一次性派生值
   const res = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(AUDIT_HTTP_TIMEOUT_MS) }); // 保存 res：承载本步骤的计算结果供后续使用
   if (!res.ok) return null; // 条件分支：仅在满足业务前置条件时继续
   const json = (await res.json()) as { access_token?: string; expires_in?: number }; // 保存 json：承载本步骤的计算结果供后续使用
@@ -373,7 +373,7 @@ export async function auditText(env: Record<string, string | undefined>, text: s
   } // 结束代码块：本层作用域收尾
   if (!token) return degrade(env, '内容审核服务不可用（token 换取失败）'); // 条件分支：仅在满足业务前置条件时继续
   try { // 异常保护：确保失败路径可回收资源
-    const res = await fetch(`https://aip.baidubce.com/rest/2.0/solution/v1/text_censor/v2/user_defined?access_token=${encodeURIComponent(token)}`, {
+    const res = await fetch(`https://aip.baidubce.com/rest/2.0/solution/v1/text_censor/v2/user_defined?access_token=${encodeURIComponent(token)}`, { // 常量 res：保存固定配置或一次性派生值
       method: 'POST', // 对象字段：声明结构中的一项数据
       headers: { 'content-type': 'application/x-www-form-urlencoded' }, // 对象字段：声明结构中的一项数据
       body: new URLSearchParams({ text }), // 对象字段：声明结构中的一项数据
@@ -401,7 +401,7 @@ export async function auditImage(env: Record<string, string | undefined>, imageU
   } // 结束代码块：本层作用域收尾
   if (!token) return degrade(env, '图片审核服务不可用（token 换取失败）'); // 条件分支：仅在满足业务前置条件时继续
   try { // 异常保护：确保失败路径可回收资源
-    const res = await fetch(`https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined?access_token=${encodeURIComponent(token)}`, {
+    const res = await fetch(`https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined?access_token=${encodeURIComponent(token)}`, { // 常量 res：保存固定配置或一次性派生值
       method: 'POST', // 对象字段：声明结构中的一项数据
       headers: { 'content-type': 'application/x-www-form-urlencoded' }, // 对象字段：声明结构中的一项数据
       body: new URLSearchParams({ imgUrl: imageUrl }), // 对象字段：声明结构中的一项数据
@@ -547,7 +547,7 @@ export async function assertPublicHttpUrl(raw: string): Promise<void> { // 定�
 export interface ProviderBaseUrlOptions {
   /** 显式放行 http 配置（仅本地 / 内网联调；缺省拒绝明文 http） */
   allowInsecure?: boolean;
-}
+} // 代码块结束
 
 /**
  * 校验 AI 厂商 baseUrl 这一「配置来源」地址：
@@ -556,23 +556,23 @@ export interface ProviderBaseUrlOptions {
  * - 域名形式不做 DNS 解析：配置由部署方注入，仅拦截字面内网，域名解析后的私网由出站 fetch 链路复核。
  */
 export function assertProviderBaseUrl(raw: string, opts?: ProviderBaseUrlOptions): void {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new AppError('VALIDATION_FAILED', 'invalid provider base url');
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new AppError('VALIDATION_FAILED', 'unsupported provider base url protocol');
-  if (url.protocol === 'http:' && !opts?.allowInsecure) throw new AppError('VALIDATION_FAILED', 'insecure http provider base url is not allowed; set MIM_AI_ALLOW_INSECURE_BASE=1 to opt in');
-  const host = url.hostname.replace(/^\[|\]$/g, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new AppError('VALIDATION_FAILED', 'private host is not allowed');
-  const normalizedV4 = normalizeIPv4Host(host);
-  if (normalizedV4) {
-    if (isPrivateIPv4(normalizedV4)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed');
-    return;
-  }
-  if (isIP(host) === 6 && isPrivateIPv6(host)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed');
-}
+  let url: URL; // 可变变量 url：运行过程中会被重新赋值
+  try { // 异常捕获起点：包裹可能抛出错误的操作
+    url = new URL(raw); // 赋值：更新变量 url 的取值
+  } catch { // 代码块结束
+    throw new AppError('VALIDATION_FAILED', 'invalid provider base url'); // 抛出错误：中断当前流程并向上层传递
+  } // 代码块结束
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new AppError('VALIDATION_FAILED', 'unsupported provider base url protocol'); // 条件分支：按判断结果选择后续处理路径
+  if (url.protocol === 'http:' && !opts?.allowInsecure) throw new AppError('VALIDATION_FAILED', 'insecure http provider base url is not allowed; set MIM_AI_ALLOW_INSECURE_BASE=1 to opt in'); // 条件分支：按判断结果选择后续处理路径
+  const host = url.hostname.replace(/^\[|\]$/g, ''); // 常量 host：保存固定配置或一次性派生值
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new AppError('VALIDATION_FAILED', 'private host is not allowed'); // 条件分支：按判断结果选择后续处理路径
+  const normalizedV4 = normalizeIPv4Host(host); // 常量 normalizedV4：保存固定配置或一次性派生值
+  if (normalizedV4) { // 条件分支：按判断结果选择后续处理路径
+    if (isPrivateIPv4(normalizedV4)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 条件分支：按判断结果选择后续处理路径
+    return; // 返回当前函数的处理结果
+  } // 代码块结束
+  if (isIP(host) === 6 && isPrivateIPv6(host)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 条件分支：按判断结果选择后续处理路径
+} // 代码块结束
 
 const MAX_REDIRECTS = 5; // 保存 MAX_REDIRECTS：承载本步骤的计算结果供后续使用
 

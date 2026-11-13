@@ -10,9 +10,9 @@ import type { AnnouncementItem } from '../api'; // 公告条目类型
 interface Props { // 组件参数
   locale: Locale; // 当前界面语言
   onOpen: () => void; // 点击「全部」跳转公告栏目页
-}
+} // 代码块结束
 
-export function AnnouncementBar({ locale, onOpen }: Props) {
+export function AnnouncementBar({ locale, onOpen }: Props) { // 导出函数 AnnouncementBar：对外暴露的调用入口
   const [items, setItems] = useState<AnnouncementItem[]>([]); // 置顶公告（最多 3 条）
 
   useEffect(() => {
@@ -21,20 +21,20 @@ export function AnnouncementBar({ locale, onOpen }: Props) {
       .announcements(5)
       .then((data) => { if (!cancelled) setItems(data.items.filter((item) => item.pinned).slice(0, 3)); })
       .catch(() => { /* 接口不可达时整条置顶条隐藏，不影响页面 */ });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; }; // 返回当前函数的处理结果
   }, []);
 
   if (items.length === 0) return null; // 无置顶公告不占位
 
-  return (
-    <div className="announcement-bar">
+  return ( // 返回当前函数的处理结果
+    <div className="announcement-bar">{/* 执行当前业务步骤 */}
       <span className="announcement-bar-label" aria-hidden="true">📢</span>
-      <div className="announcement-bar-items">
+      <div className="announcement-bar-items">{/* 执行当前业务步骤 */}
         {items.map((item) => <span key={item.id}>{item.title}</span>)}
       </div>
-      <button type="button" className="link announcement-bar-more" onClick={onOpen}>
+      <button type="button" className="link announcement-bar-more" onClick={onOpen}>{/* 执行当前业务步骤 */}
         {locale === 'en-US' ? 'All' : '全部'}
       </button>
     </div>
-  );
-}
+  ); // 执行当前业务步骤
+} // 代码块结束

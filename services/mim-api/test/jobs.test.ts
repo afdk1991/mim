@@ -64,7 +64,7 @@ function entitlementRow(id: string): { status: string; version: number } { // �
 /** 读取某权益的状态事件，断言任务确实留下了审计证据 */
 function eventRows(entitlementId: string): Array<{ from_status: string | null; to_status: string; reason: string | null; actor: string }> { // 事件关键列
   return db // 数据库句柄
-    .prepare(
+    .prepare( // 执行当前业务步骤
       `SELECT from_status, to_status, reason, actor
        FROM entitlement_events WHERE entitlement_id = ?
        ORDER BY created_at ASC, rowid ASC`, // 同秒写入时用 rowid 兜底稳定顺序

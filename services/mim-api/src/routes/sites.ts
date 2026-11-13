@@ -25,7 +25,7 @@
 import { Router } from 'express'; // Express 路由容器，按 /api/v1 前缀挂载
 import { z } from 'zod'; // 请求体声明式校验，与 catalog / comic 域保持一致
 import { AppError, uuidv7 } from '@mim/core-domain'; // 统一业务异常 + 时间有序主键
-import {
+import { // 引入依赖、类型或本地模块绑定
   SITE_CAPABILITY_KINDS, // 三类能力的状态机字典（catalog / manage / record）
   SITE_DOMAINS, // 19 个业务域，供前端筛选与后端汇总
   SITE_MODULES, // 44 个去重入口静态契约
@@ -115,7 +115,7 @@ function itemView(row: SiteItemRow) {
     created_at: row.created_at,
     // 最近更新时间。
     updated_at: row.updated_at,
-  };
+  }; // 代码块结束
 } // itemView 结束
 
 // 读取某模块下的条目：支持按能力与状态过滤，按创建时间倒序，保证列表稳定。
@@ -212,8 +212,8 @@ export function createSitesRouter(deps: ApiDeps): Router {
     const modules = SITE_MODULES // 从静态契约出发，不查库，保证列表完整
       .filter((m) => !domain || m.domain === domain || m.group === domain) // 业务域过滤，空串表示不过滤
       .filter((m) => !q || [ // 多字段包含匹配，覆盖占位标识与职责字段
-        m.entryKey, m.placeholder, m.system, m.entry, m.note, m.domainName,
-        ...m.coreFunctions, ...m.responsibility.inScope, ...m.responsibility.outOfScope,
+        m.entryKey, m.placeholder, m.system, m.entry, m.note, m.domainName, // 执行当前业务步骤
+        ...m.coreFunctions, ...m.responsibility.inScope, ...m.responsibility.outOfScope, // 执行当前业务步骤
       ].some((v) => String(v).toLowerCase().includes(q))) // 任一字段命中即保留
       .map((m) => ({ // 列表视图：入口定义 + 职责摘要 + 条目数，避免传输全部演示数据
         id: m.id, // 两位序号

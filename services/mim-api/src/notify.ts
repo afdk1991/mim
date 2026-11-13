@@ -70,7 +70,7 @@ export function createSesEmailChannel( // 构造海外邮件通道，凭证来�
           Message: { // 邮件内容容器
             Subject: { Data: 'Your Mim verification code', Charset: 'UTF-8' }, // 主题；声明 UTF-8 避免特殊字符乱码
             Body: { // 正文容器
-              Text: {
+              Text: { // 对象字段 Text：记录一项配置或数据
                 Data: `Your Mim verification code is ${code}. It expires in 5 minutes. If you did not request it, please ignore this email.`, // 纯文本正文：含验证码、有效期与防钓鱼提示
                 Charset: 'UTF-8', // 正文字符集
               }, // Text 正文结束

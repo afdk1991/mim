@@ -61,13 +61,13 @@ function inHead(rel) {
 const REG = JSON.parse(read('packages/core-domain/src/deploymentRegistry.json'));
 // 常用集合：避免每个断言重复构造。
 const items = REG.items ?? [];
-const platformIds = new Set((REG.platform_catalog ?? []).map((p) => p.id));
-const ciJobIds = new Set((REG.ci_jobs ?? []).map((j) => j.id));
-const statusCodes = new Set(Object.keys(REG.status_codes ?? {}));
-const verdictCodes = new Set(Object.keys(REG.verdict_codes ?? {}));
-const severityCodes = new Set(Object.keys(REG.severity_codes ?? {}));
-const layerCodes = new Set(Object.keys(REG.layer_codes ?? {}));
-const modes = new Set(['ci', 'manual', 'push']);
+const platformIds = new Set((REG.platform_catalog ?? []).map((p) => p.id)); // 常量 platformIds：保存固定配置或一次性派生值
+const ciJobIds = new Set((REG.ci_jobs ?? []).map((j) => j.id)); // 常量 ciJobIds：保存固定配置或一次性派生值
+const statusCodes = new Set(Object.keys(REG.status_codes ?? {})); // 常量 statusCodes：保存固定配置或一次性派生值
+const verdictCodes = new Set(Object.keys(REG.verdict_codes ?? {})); // 常量 verdictCodes：保存固定配置或一次性派生值
+const severityCodes = new Set(Object.keys(REG.severity_codes ?? {})); // 常量 severityCodes：保存固定配置或一次性派生值
+const layerCodes = new Set(Object.keys(REG.layer_codes ?? {})); // 常量 layerCodes：保存固定配置或一次性派生值
+const modes = new Set(['ci', 'manual', 'push']); // 常量 modes：保存固定配置或一次性派生值
 
 // 契约版本：防止读到旧格式却按新字段解析。
 check('D01 契约 schema = mim.deployment-registry.v1', REG.schema === 'mim.deployment-registry.v1', REG.schema);
@@ -75,7 +75,7 @@ check('D01 契约 schema = mim.deployment-registry.v1', REG.schema === 'mim.depl
 check('D02 部署项数 = coverage.deployment_items', items.length === REG.coverage?.deployment_items, `${items.length} vs ${REG.coverage?.deployment_items}`);
 // 11 平台矩阵口径（2026-11-10 起含 Gitee 镜像仓；2026-11-13 起含 Netlify 站点，接替停服的 Sealos 席位）。
 const matrixPlatforms = (REG.platform_catalog ?? []).filter((p) => p.in_matrix).length;
-check('D03 平台目录 in_matrix = 11 且等于 coverage.matrix_platforms', matrixPlatforms === 11 && matrixPlatforms === REG.coverage?.matrix_platforms, String(matrixPlatforms));
+check('D03 平台目录 in_matrix = 11 且等于 coverage.matrix_platforms', matrixPlatforms === 11 && matrixPlatforms === REG.coverage?.matrix_platforms, String(matrixPlatforms)); // 调用 check 并处理其返回结果
 // CI 作业口径：5 个作业、4 个部署作业。
 check('D04 CI 作业 5 个、部署作业 4 个', REG.ci_jobs?.length === 5 && REG.ci_jobs.filter((j) => j.is_deploy).length === 4);
 // git 远端口径。
@@ -83,8 +83,8 @@ check('D05 git 远端声明 = 2', REG.coverage?.git_remotes === 2, String(REG.co
 
 // 规范 id 唯一：这是「避免重复」的核心断言。
 const ids = items.map((i) => i.id);
-const dupIds = ids.filter((id, idx) => ids.indexOf(id) !== idx);
-check('D06 规范 id 全表唯一（无重复项）', dupIds.length === 0, dupIds.join(', '));
+const dupIds = ids.filter((id, idx) => ids.indexOf(id) !== idx); // 常量 dupIds：保存固定配置或一次性派生值
+check('D06 规范 id 全表唯一（无重复项）', dupIds.length === 0, dupIds.join(', ')); // 调用 check 并处理其返回结果
 // 平台编码合法。
 check('D07 platform_id 全部落在平台目录', items.every((i) => platformIds.has(i.platform_id)), items.filter((i) => !platformIds.has(i.platform_id)).map((i) => i.id).join(', '));
 // 层级合法。
@@ -105,19 +105,19 @@ check('D14 repository.id 为 null 或带命名空间冒号', items.every((i) => 
 check('D15 每项 sources 非空', items.every((i) => Array.isArray(i.sources) && i.sources.length > 0));
 // 空数据必须被清晰标识：result=null 时须有 EMPTY_RESULT 异常与 http_code 缺失项。
 const emptyItems = items.filter((i) => i.result === null);
-check('D16 空数据项均标注 EMPTY_RESULT 与缺失 http_code', emptyItems.every((i) => i.anomalies.some((a) => a.code === 'EMPTY_RESULT') && i.missing_fields.includes('http_code')), emptyItems.map((i) => i.id).join(', '));
+check('D16 空数据项均标注 EMPTY_RESULT 与缺失 http_code', emptyItems.every((i) => i.anomalies.some((a) => a.code === 'EMPTY_RESULT') && i.missing_fields.includes('http_code')), emptyItems.map((i) => i.id).join(', ')); // 调用 check 并处理其返回结果
 // 失败 / 阻断状态必须有异常说明，不允许静默失败。
 check('D17 BROKEN / FAIL 项均有异常说明', items.filter((i) => i.status === 'BROKEN' || i.result?.verdict === 'FAIL').every((i) => i.anomalies.length > 0));
 // 异常码在单项内唯一。
 check('D18 单项内异常码不重复', items.every((i) => new Set(i.anomalies.map((a) => a.code)).size === i.anomalies.length));
 // 别名不得撞上其它项的 id / name（否则说明重复计数）。
 const canonical = new Set([...ids, ...items.map((i) => i.name)]);
-const aliasClash = items.flatMap((i) => i.aliases.filter((a) => canonical.has(a)).map((a) => `${i.id}:${a}`));
-check('D19 别名不与其它项的规范名冲突', aliasClash.length === 0, aliasClash.join(', '));
+const aliasClash = items.flatMap((i) => i.aliases.filter((a) => canonical.has(a)).map((a) => `${i.id}:${a}`)); // 常量 aliasClash：保存固定配置或一次性派生值
+check('D19 别名不与其它项的规范名冲突', aliasClash.length === 0, aliasClash.join(', ')); // 调用 check 并处理其返回结果
 // 10 个矩阵平台每个至少有一个部署项（避免遗漏）。
 const covered = new Set(items.map((i) => i.platform_id));
-const missed = [...platformIds].filter((id) => REG.platform_catalog.find((p) => p.id === id)?.in_matrix && !covered.has(id));
-check('D20 10 个矩阵平台均有部署项覆盖（无遗漏）', missed.length === 0, missed.join(', '));
+const missed = [...platformIds].filter((id) => REG.platform_catalog.find((p) => p.id === id)?.in_matrix && !covered.has(id)); // 常量 missed：保存固定配置或一次性派生值
+check('D20 10 个矩阵平台均有部署项覆盖（无遗漏）', missed.length === 0, missed.join(', ')); // 调用 check 并处理其返回结果
 // 排除项不得与部署项 id 冲突。
 check('D21 候选 / 排除项 id 不与部署项冲突', (REG.excluded ?? []).every((e) => !ids.includes(e.id)));
 // 覆盖说明必须写明去重与补齐依据。
@@ -131,26 +131,26 @@ check('D23 关键异常码齐备', ['PRODUCTION_UNREACHABLE', 'WAF_FALSE_POSITIV
 // ---------- 2. 与真实仓库状态交叉核对 ----------
 // 共享包实现存在并导出汇总函数。
 const regTs = read('packages/core-domain/src/deploymentRegistry.ts');
-check('D24 共享包导出 deploymentSummary / listDeploymentItems / findDeploymentItem', ['deploymentSummary', 'listDeploymentItems', 'findDeploymentItem'].every((fn) => regTs.includes(fn)));
+check('D24 共享包导出 deploymentSummary / listDeploymentItems / findDeploymentItem', ['deploymentSummary', 'listDeploymentItems', 'findDeploymentItem'].every((fn) => regTs.includes(fn))); // 调用 check 并处理其返回结果
 // barrel 导出。
 check('D25 core-domain barrel 导出部署注册表', read('packages/core-domain/src/index.ts').includes("deploymentRegistry.js"));
 // 工件双口径声明与真实仓库一致；artifact_in_head 为 null 的构建产物不适用该口径，跳过核对。
 const artifactItems = items.filter((i) => i.delivery.artifact && i.delivery.artifact_in_head !== null);
-const artifactDrift = artifactItems.filter((i) => i.delivery.artifact_in_worktree !== has(i.delivery.artifact) || i.delivery.artifact_in_head !== inHead(i.delivery.artifact));
-check('D26 工件 in_head / in_worktree 声明与真实仓库一致', artifactDrift.length === 0, artifactDrift.map((i) => i.id).join(', '));
+const artifactDrift = artifactItems.filter((i) => i.delivery.artifact_in_worktree !== has(i.delivery.artifact) || i.delivery.artifact_in_head !== inHead(i.delivery.artifact)); // 常量 artifactDrift：保存固定配置或一次性派生值
+check('D26 工件 in_head / in_worktree 声明与真实仓库一致', artifactDrift.length === 0, artifactDrift.map((i) => i.id).join(', ')); // 调用 check 并处理其返回结果
 // 漂移项必须在异常里给出提示，避免静默悬空风险。
 const driftItems = artifactItems.filter((i) => i.delivery.artifact_in_head === true && i.delivery.artifact_in_worktree === false);
-check('D27 工作树漂移项均有 *_WORKTREE_MISSING 异常', driftItems.every((i) => i.anomalies.some((a) => /WORKTREE_MISSING|ARTIFACT_MISSING/.test(a.code))), driftItems.map((i) => i.id).join(', '));
+check('D27 工作树漂移项均有 *_WORKTREE_MISSING 异常', driftItems.every((i) => i.anomalies.some((a) => /WORKTREE_MISSING|ARTIFACT_MISSING/.test(a.code))), driftItems.map((i) => i.id).join(', ')); // 调用 check 并处理其返回结果
 // CI 步骤声明必须能在 deploy.yml 文本中找到。
 const ciText = read('.github/workflows/deploy.yml');
-const stepMissing = items.filter((i) => i.delivery.ci_step && !ciText.includes(i.delivery.ci_step)).map((i) => `${i.id}:${i.delivery.ci_step}`);
-check('D28 声明的 CI 步骤均存在于 deploy.yml', stepMissing.length === 0, stepMissing.join(', '));
+const stepMissing = items.filter((i) => i.delivery.ci_step && !ciText.includes(i.delivery.ci_step)).map((i) => `${i.id}:${i.delivery.ci_step}`); // 常量 stepMissing：保存固定配置或一次性派生值
+check('D28 声明的 CI 步骤均存在于 deploy.yml', stepMissing.length === 0, stepMissing.join(', ')); // 调用 check 并处理其返回结果
 // CI 作业声明必须与工作流一致。
 check('D29 ci_jobs 与 deploy.yml 作业一致', (REG.ci_jobs ?? []).every((j) => new RegExp(`^  ${j.id}:\\s*$`, 'm').test(ciText)));
 // git 远端真实数量与声明一致。
 const remoteOut = spawnSync('git', ['remote'], { cwd: ROOT, encoding: 'utf8', windowsHide: true });
-const remoteNames = (remoteOut.stdout ?? '').trim().split('\n').filter(Boolean);
-check('D30 真实 git 远端数 = coverage.git_remotes', remoteNames.length === REG.coverage?.git_remotes, remoteNames.join(', '));
+const remoteNames = (remoteOut.stdout ?? '').trim().split('\n').filter(Boolean); // 常量 remoteNames：保存固定配置或一次性派生值
+check('D30 真实 git 远端数 = coverage.git_remotes', remoteNames.length === REG.coverage?.git_remotes, remoteNames.join(', ')); // 调用 check 并处理其返回结果
 
 // ---------- 3. 后端 / 前端 / 测试全链路消费 ----------
 // 后端路由文件存在。
@@ -159,7 +159,7 @@ check('D31 后端部署汇总路由文件存在', has('services/mim-api/src/rout
 check('D32 app.ts 挂载 createDeploymentsRouter', read('services/mim-api/src/app.ts').includes('createDeploymentsRouter'));
 // 三个公开端点齐备。
 const routeText = read('services/mim-api/src/routes/deployments.ts');
-check('D33 后端三端点 overview / 列表 / 详情齐备', ['/deployments/overview', "router.get('/deployments'", "router.get('/deployments/:id'"].every((s) => routeText.includes(s)));
+check('D33 后端三端点 overview / 列表 / 详情齐备', ['/deployments/overview', "router.get('/deployments'", "router.get('/deployments/:id'"].every((s) => routeText.includes(s))); // 调用 check 并处理其返回结果
 // 后端复用共享包汇总函数，杜绝第二套口径。
 check('D34 后端复用共享包 deploymentSummary / listDeploymentItems', routeText.includes('deploymentSummary') && routeText.includes('listDeploymentItems'));
 // 契约测试存在。
@@ -172,16 +172,16 @@ check('D37 前端 api.ts 含 deployments 分组', read('apps/web/src/api.ts').in
 check('D38 前端 router.ts 注册 deployments 视图', read('apps/web/src/router.ts').includes("'deployments'"));
 // 根组件渲染与导航项存在。
 const appText = read('apps/web/src/App.tsx');
-check('D39 App.tsx 渲染并导航部署汇总视图', appText.includes('<Deployments') && appText.includes("view: 'deployments'"));
+check('D39 App.tsx 渲染并导航部署汇总视图', appText.includes('<Deployments') && appText.includes("view: 'deployments'")); // 调用 check 并处理其返回结果
 // 四个核心字段表头齐全，便于核对。
 const viewText = read('apps/web/src/views/Deployments.tsx');
-check('D40 前端表头含仓库标识 / 部署状态 / 部署结果 / 异常说明', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => viewText.includes(s)));
+check('D40 前端表头含仓库标识 / 部署状态 / 部署结果 / 异常说明', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => viewText.includes(s))); // 调用 check 并处理其返回结果
 // 表头 8 列规范：从 <thead> 里按顺序取出 <th> 文案，逐字比对文档口径
 const HEADER_SPEC = ['规范 ID / 名称', '仓库标识', '平台 / 层级', '交付链路', '访问域名', '部署状态', '部署结果', '异常说明'];
 const theadText = (viewText.match(/<thead>[\s\S]*?<\/thead>/) ?? [''])[0]; // 只截表头块，避免正文里的同名词干扰顺序
 const thTexts = [...theadText.matchAll(/<th>\{tr\(locale,\s*'([^']+)'/g)].map((m) => m[1]); // 抽取每个 <th> 的中文文案
-check('D53 前端表头为 8 列规范且顺序一致', thTexts.length === 8 && HEADER_SPEC.every((s, i) => thTexts[i] === s), thTexts.join(' / ') || '未取到表头');
-check('D54 前端提供访问域名列渲染（EntryLink）', viewText.includes('EntryLink') && viewText.includes('entry_url'));
+check('D53 前端表头为 8 列规范且顺序一致', thTexts.length === 8 && HEADER_SPEC.every((s, i) => thTexts[i] === s), thTexts.join(' / ') || '未取到表头'); // 调用 check 并处理其返回结果
+check('D54 前端提供访问域名列渲染（EntryLink）', viewText.includes('EntryLink') && viewText.includes('entry_url')); // 调用 check 并处理其返回结果
 // 空数据 / 失败 / 缺失三种标识必须在视图里彼此可区分。
 check('D41 前端区分空数据 / 失败 / 缺失三类标识', ['空数据', '失败', '缺失'].every((s) => viewText.includes(s)));
 // 样式类存在。
@@ -190,12 +190,12 @@ check('D42 样式表含部署汇总专用类', read('apps/web/src/styles.css').i
 check('D43 汇总生成器 / 校验器均存在', has('scripts/deployment-summary.mjs') && has('scripts/verify-deployments.mjs'));
 // package.json 注册两个脚本。
 const pkg = read('package.json');
-check('D44 package.json 注册 summary:deployments / verify:deployments', pkg.includes('summary:deployments') && pkg.includes('verify:deployments'));
+check('D44 package.json 注册 summary:deployments / verify:deployments', pkg.includes('summary:deployments') && pkg.includes('verify:deployments')); // 调用 check 并处理其返回结果
 
 // ---------- 4. 文档同步（铁律七）与结构化产物 ----------
 // README 同步。
 const readme = read('README.md');
-check('D45 README 同步部署汇总章节 / 端点 / 脚本', readme.includes('部署汇总') && readme.includes('/deployments/overview') && readme.includes('summary:deployments'));
+check('D45 README 同步部署汇总章节 / 端点 / 脚本', readme.includes('部署汇总') && readme.includes('/deployments/overview') && readme.includes('summary:deployments')); // 调用 check 并处理其返回结果
 // AGENTS.md 同步（不改铁律语义，追加章节）。
 check('D46 AGENTS.md 同步部署汇总口径', read('AGENTS.md').includes('部署汇总'));
 // Wiki 同步。
@@ -204,13 +204,13 @@ check('D47 Wiki 架构 / 模块 / runbook 同步', ['docs/wiki/01-architecture.m
 check('D48 Mim-PRD.html 同步部署汇总模块', read('Mim-PRD.html').includes('部署汇总'));
 // 结构化产物存在且 schema / 项数一致。
 const outJson = read('docs/deployment-summary.json');
-let report = null;
+let report = null; // 可变变量 report：运行过程中会被重新赋值
 try { report = outJson ? JSON.parse(outJson) : null; } catch { /* 解析失败按 null 处理，由下一条断言报告 */ }
-check('D49 结构化结果 docs/deployment-summary.json 可读且 schema 一致', Boolean(report) && report.schema === REG.schema);
-check('D50 结构化结果部署项数与契约一致', Boolean(report) && report.items?.length === items.length, report ? String(report.items?.length) : '产物缺失');
+check('D49 结构化结果 docs/deployment-summary.json 可读且 schema 一致', Boolean(report) && report.schema === REG.schema); // 调用 check 并处理其返回结果
+check('D50 结构化结果部署项数与契约一致', Boolean(report) && report.items?.length === items.length, report ? String(report.items?.length) : '产物缺失'); // 调用 check 并处理其返回结果
 // Markdown 核对表存在且四类核心字段齐全。
 const outMd = read('docs/deployment-summary.md');
-check('D51 核对表 docs/deployment-summary.md 含四列核心字段', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => outMd.includes(s)));
+check('D51 核对表 docs/deployment-summary.md 含四列核心字段', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => outMd.includes(s))); // 调用 check 并处理其返回结果
 // 核对表同样按 8 列规范输出（含访问域名），与前端表头口径一致。
 check('D55 核对表含 8 列规范表头（含访问域名）', outMd.includes('| 规范 ID | 仓库标识 | 平台 / 层级 | 交付链路 | 访问域名 | 部署状态 | 部署结果 | 异常说明 |'));
 // 核对表逐项覆盖（每个 id 都出现）。
@@ -221,6 +221,6 @@ check('D52 核对表逐项覆盖全部部署项', items.every((i) => outMd.inclu
 console.log(`\n${failures.length === 0 ? '✅' : '❌'} 部署汇总校验：${total - failures.length}/${total} PASS`);
 // 有失败项时逐条列出并退出 1。
 if (failures.length > 0) {
-  for (const f of failures) console.log(`   - ${f}`);
-  process.exit(1);
+  for (const f of failures) console.log(`   - ${f}`); // 循环：逐项遍历集合并执行相同处理
+  process.exit(1); // 执行当前业务步骤
 } // 失败分支结束

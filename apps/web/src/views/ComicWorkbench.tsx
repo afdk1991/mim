@@ -22,8 +22,8 @@ import {
   resolvePublicUrl,
   // FilmExportFormat / FilmExportResolution / FilmExportResult：导出面板的选项与结果类型。
   type FilmExportFormat,
-  type FilmExportResolution,
-  type FilmExportResult,
+  type FilmExportResolution, // 类型别名 FilmExportResolution：复用一份复合类型定义
+  type FilmExportResult, // 类型别名 FilmExportResult：复用一份复合类型定义
   // GenerationJob：生成任务实体，status 决定按钮显隐与是否开启轮询。
   type GenerationJob,
   // ListedAsset：产物列表项，含 object_key 与预签名 download_url，缩略图组件据此取键、失败回退原图。
@@ -248,7 +248,7 @@ export function ComicWorkbench({ locale }: Props) {
                   {/* 最近更新时间，按本地时区格式化 */}
                   <span className="muted small">{/* 更新时间：本地化字符串 */}{new Date(p.updated_at).toLocaleString()}</span>
                   <button
-                    type="button"
+                    type="button" // 赋值：更新变量 type 的取值
                     className="btn ghost danger small"
                     onClick={/* 内联删除处理：先阻止冒泡再删除 */ (e) => {
                       // 阻止冒泡，避免点删除时同时触发整行的选中事件。
@@ -287,7 +287,7 @@ export function ComicWorkbench({ locale }: Props) {
         </section>{/* 右栏结束 */}
       </div>{/* 分栏容器结束 */}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // 结束 ComicWorkbench 组件函数
 
 // ---------- 工程详情（创作 / 生成任务 / 成片 三个标签页） ----------
@@ -314,7 +314,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
     if (detailState.loading) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
     // 加载失败且无缓存数据：展示错误文案。
     return <div className="error">{errorText(locale, detailState.error)}</div>;
-  }
+  } // 代码块结束
 
   // 解构详情聚合结果：工程本体、角色列表、最新分镜（可能为空）。
   const { project, characters, latest_storyboard } = detailState.data;
@@ -360,7 +360,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
           // 单个标签按钮
           <button
             key={t}
-            type="button"
+            type="button" // 赋值：更新变量 type 的取值
             className={`btn ${tab === t ? 'primary' : 'ghost'}`}
             onClick={() => setTab(t)}
           >{/* 标签按钮：激活态高亮 */}
@@ -399,7 +399,7 @@ function ProjectDetail({ locale, projectId, onChange }: { locale: Locale; projec
         <FilmsTab locale={locale} projectId={projectId} projectStatus={project.status} onProjectChange={reloadAll} />
       )}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // 结束 ProjectDetail 组件函数
 
 // ---------- Markdown 脚本编辑器（Vditor 封装） ----------
@@ -414,7 +414,7 @@ interface ScriptEditorProps {
   locale: Locale;
   // 空内容占位提示。
   placeholder: string;
-}
+} // 代码块结束
 
 // Vditor 受控封装：挂载一次创建实例，外部值回填时比对后 setValue，卸载销毁释放 DOM 与事件监听。
 function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProps) {
@@ -434,8 +434,8 @@ function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProp
   useEffect(() => {
     const host = hostRef.current; // 取挂载节点
     if (!host) return; // 容器未就绪时不建实例
-    let vd: Vditor | null = null;
-    try {
+    let vd: Vditor | null = null; // 可变变量 vd：运行过程中会被重新赋值
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       vd = new Vditor(host, { // 新建编辑器实例
         value, // 初始 Markdown 文本
         height: 260, // 编辑器总高度，适配面板纵向空间
@@ -448,24 +448,24 @@ function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProp
           readyRef.current = true; // 置就绪标志，放开回填 effect
           // 初始化期间外部若已写入值，就绪后补一次回填，避免草稿丢失。
           const current = vditorRef.current;
-          if (current) {
-            try {
-              if (value !== current.getValue()) current.setValue(value);
+          if (current) { // 条件分支：按判断结果选择后续处理路径
+            try { // 异常捕获起点：包裹可能抛出错误的操作
+              if (value !== current.getValue()) current.setValue(value); // 条件分支：按判断结果选择后续处理路径
             } catch { /* 就绪边界上读取失败，忽略等待下次变更 */ }
-          }
-        },
+          } // 代码块结束
+        }, // 代码块结束
       }); // 实例配置结束
     } catch {
       vd = null; // 初始化抛错时不留半成品实例
-    }
+    } // 代码块结束
     vditorRef.current = vd; // 留存实例引用
     return () => { // 卸载或工程切换时清理
       readyRef.current = false; // 先关闭就绪标志，避免清理途中再次回填
-      if (vditorRef.current) {
-        try {
+      if (vditorRef.current) { // 条件分支：按判断结果选择后续处理路径
+        try { // 异常捕获起点：包裹可能抛出错误的操作
           vditorRef.current.destroy(); // 销毁编辑器，释放 DOM、事件与定时器；未就绪时内部对象为空，需兜底
         } catch { /* 实例尚未初始化完成，无需销毁 */ }
-      }
+      } // 代码块结束
       vditorRef.current = null; // 清空引用
     }; // 清理结束
     // 仅挂载一次：初始值由 value 提供，后续外部回填走下方同步 effect
@@ -476,7 +476,7 @@ function ScriptEditor({ value, onChange, locale, placeholder }: ScriptEditorProp
   useEffect(() => {
     const vd = vditorRef.current; // 取实例
     if (!vd || !readyRef.current) return; // 实例尚未初始化完成，跳过；就绪后由 after 回调补回填
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       if (value !== vd.getValue()) vd.setValue(value); // 比对一致则不重复写入
     } catch { /* 读取/写入在就绪边界上失败，等待下次变更再同步 */ }
   }, [value]); // 依赖外部受控值
@@ -628,7 +628,7 @@ function CreateTab({
         </div>
         {/* 添加按钮：两字段都有值时才可用 */}
         <button
-          type="button"
+          type="button" // 赋值：更新变量 type 的取值
           className="btn primary"
           disabled={charBusy || !charNameVal.trim() || !charPromptVal.trim()}
           onClick={handleAddCharacter}
@@ -715,7 +715,7 @@ function CreateTab({
         </div>{/* 编辑区容器结束 */}
       </section>{/* AI 建议区块结束 */}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // 结束 CreateTab 组件函数
 
 // ---------- 生成任务标签页：列表 / 创建 / 状态机操作 ----------
@@ -819,7 +819,7 @@ function JobsTab({
         locale === 'en-US'
           ? `Job queued: ${JOB_TYPE_LABEL[result.job.job_type]['en-US']}`
           : `任务已排队：${JOB_TYPE_LABEL[result.job.job_type]['zh-CN']}`,
-      );
+      ); // 执行当前业务步骤
       // 清空提示词，避免误把上一条提示词带到下一个任务。
       setPrompt('');
       // 刷新任务列表，让新任务立即出现。
@@ -876,7 +876,7 @@ function JobsTab({
       // 其它情况（如跳过）：展示后端给出说明或统一的「已跳过」文案。
       } else {
         setMessage(run.message ?? (locale === 'en-US' ? 'Skipped' : '已跳过'));
-      }
+      } // 代码块结束
       // 刷新任务列表，展示执行后的状态。
       reloadJobs();
       // 同步刷新工程详情与左侧列表。
@@ -918,8 +918,8 @@ function JobsTab({
             index: 1,
             description: locale === 'en-US' ? 'Opening shot: establish the scene.' : '开场镜头：交代故事场景。',
             dialogue: '',
-          },
-        ],
+          }, // 代码块结束
+        ], // 执行当前业务步骤
         confirm: true,
       });
       // 提示分镜已确认，用户可继续派发任务。
@@ -1074,7 +1074,7 @@ function JobsTab({
                   {/* 字段分隔符 */}
                   {' · '}
                   <button
-                    type="button"
+                    type="button" // 赋值：更新变量 type 的取值
                     className="btn ghost small"
                     onClick={() => handleDownload(job.result!.object_key as string)}
                   >{/* 下载产物按钮 */}
@@ -1127,7 +1127,7 @@ function JobsTab({
         </ul>{/* 任务列表结束 */}
       </section>
     </div> // 任务面板根容器渲染结束
-  );
+  ); // 执行当前业务步骤
 } // 结束 JobsTab 组件函数
 
 // ---------- 产物缩略图（鉴权缩略图端点 + 原图兜底） ----------
@@ -1147,21 +1147,21 @@ function AssetPreview({ asset }: { asset: ListedAsset }) {
         if (cancelled) return; // 已清理，丢弃结果避免泄漏
         objectUrl = URL.createObjectURL(blob); // 生成本地临时地址
         setThumbUrl(objectUrl); // 切到缩略图
-      })
+      }) // 代码块结束
       .catch(() => { /* 缩略图不可用（无权限/非图片/网络异常）时静默回退原图，不打断列表 */ });
-    return () => {
+    return () => { // 返回当前函数的处理结果
       cancelled = true; // 标记取消
       if (objectUrl) URL.revokeObjectURL(objectUrl); // 释放 BlobURL，避免内存泄漏
-    };
+    }; // 代码块结束
   }, [asset.object_key]); // 仅对象键变化时重新拉取
 
-  return (
+  return ( // 返回当前函数的处理结果
     <img
       src={thumbUrl ?? fallback} // 优先缩略图，未就绪/失败用原图兜底
       alt={asset.object_key}
       style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
     />
-  );
+  ); // 执行当前业务步骤
 } // AssetPreview 结束
 
 // ---------- 成片标签页：列表 / 创建 / 发布流 ----------
@@ -1354,7 +1354,7 @@ function FilmsTab({
             ))}{/* 结束源产物下拉项的遍历渲染 */}
           </select>
           <button
-            type="button"
+            type="button" // 赋值：更新变量 type 的取值
             className="btn primary"
             onClick={handleCreate}
             disabled={busy || !canCreate || !title.trim()}
@@ -1435,7 +1435,7 @@ function FilmsTab({
                   </button>
                 )}
                 <button
-                  type="button"
+                  type="button" // 赋值：更新变量 type 的取值
                   className="btn ghost small"
                   onClick={() => { // 打开版本面板时收起导出面板，保持单行只有一块展开区
                     setExportFilmId(null); // 互斥：清掉导出面板
@@ -1447,7 +1447,7 @@ function FilmsTab({
                 </button>
                 {/* 导出按钮：所有状态都可尝试导出，无产物时由后端返回可读错误 */}
                 <button
-                  type="button"
+                  type="button" // 赋值：更新变量 type 的取值
                   className="btn ghost small"
                   onClick={() => { // 打开导出面板时收起版本面板，避免两块表单互相挤压
                     setExpandedFilmId(null); // 互斥：清掉版本面板
@@ -1530,8 +1530,8 @@ function FilmsTab({
         </ul>
       </section>
     </div>
-  );
-}
+  ); // 执行当前业务步骤
+} // 代码块结束
 
 /** 成片导出面板：选格式/分辨率换取一次性预签名下载地址；未配置 ffmpeg 时提供原片直下降级 */
 function FilmExportPanel({ filmId, locale }: { filmId: string; locale: Locale }) {
@@ -1622,7 +1622,7 @@ function FilmExportPanel({ filmId, locale }: { filmId: string; locale: Locale })
         </select>
         {/* 导出动作：请求期间禁用防重复签发 */}
         <button
-          type="button"
+          type="button" // 赋值：更新变量 type 的取值
           className="btn primary small"
           onClick={() => void handleExport()}
           disabled={busy}
@@ -1637,7 +1637,7 @@ function FilmExportPanel({ filmId, locale }: { filmId: string; locale: Locale })
       {/* 一键降级：直接请求 mp4 + 1080p 原片直下，无需用户重新选表单 */}
       {transcodeUnavailable && ( /* 仅在转码不可用时出现 */
         <button
-          type="button"
+          type="button" // 赋值：更新变量 type 的取值
           className="btn ghost small"
           onClick={() => void handleExport({ format: 'mp4', resolution: '1080p' })}
           disabled={busy}
@@ -1668,8 +1668,8 @@ function FilmExportPanel({ filmId, locale }: { filmId: string; locale: Locale })
         </div>
       )}
     </div>
-  );
-}
+  ); // 执行当前业务步骤
+} // 代码块结束
 
 /** 成功 image 任务的内联预览：按需预签名 GET（URL 有 TTL，组件随任务行挂载时拉取一次） */
 function AssetThumb({ objectKey }: { objectKey: string }) {
@@ -1687,8 +1687,8 @@ function AssetThumb({ objectKey }: { objectKey: string }) {
         style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8 }}
       />
     </div>
-  );
-}
+  ); // 执行当前业务步骤
+} // 代码块结束
 
 /** 成片版本列表面板：展开时按 filmId 拉取（GET /comic/films/:id → versions），版本产物经预签名下载/播放 */
 function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale }) {
@@ -1715,12 +1715,12 @@ function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale 
 
   // 首次加载中：展示版本加载占位。
   if (state.loading && !state.data) {
-    return <p className="hint">{locale === 'en-US' ? 'Loading versions…' : '版本加载中…'}</p>;
-  }
+    return <p className="hint">{locale === 'en-US' ? 'Loading versions…' : '版本加载中…'}</p>; // 返回当前函数的处理结果
+  } // 代码块结束
   // 加载失败且无缓存数据：展示错误文案而非空白。
   if (state.error != null && !state.data) {
-    return <p className="error">{errorText(locale, state.error)}</p>;
-  }
+    return <p className="error">{errorText(locale, state.error)}</p>; // 返回当前函数的处理结果
+  } // 代码块结束
 
   // 版本数组：空数组兜底，保证下方 map 安全。
   const versions = state.data?.versions ?? [];
@@ -1772,5 +1772,5 @@ function FilmVersionsPanel({ filmId, locale }: { filmId: string; locale: Locale 
         )}
       </ul>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // 结束 FilmVersionsPanel 组件函数

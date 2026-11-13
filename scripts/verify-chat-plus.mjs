@@ -11,7 +11,7 @@
 // 断言读取页面渲染结果（引用块文案、下载链接、角色标签、高亮类名），而不是接口返回体。
 // 产物：.tmp/chat-plus-e2e.json（断言明细）、.tmp/chat-plus-e2e.png（截图）；失败时退出码 1。
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs'; // 引入依赖、类型或本地模块绑定
 
 mkdirSync('.tmp', { recursive: true }); // 新克隆仓库可能没有 .tmp 目录
 
@@ -31,7 +31,7 @@ function check(name, ok, detail) { // 记录一条断言
 /** 等待浏览器 page target 就绪 */
 async function getTarget() {
   for (let i = 0; i < 40; i += 1) { // 最多等 16 秒
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const list = await (await fetch(CDP + '/json/list')).json(); // 取 target 列表
       const page = list.find((t) => t.type === 'page'); // 取第一个页面
       if (page) return page; // 命中即返回
@@ -46,7 +46,7 @@ const ws = new WebSocket(target.webSocketDebuggerUrl); // 建立 CDP WebSocket
 await new Promise((res, rej) => { // 等连接打开
   ws.addEventListener('open', res, { once: true }); // 打开
   ws.addEventListener('error', rej, { once: true }); // 失败
-});
+}); // 代码块结束
 
 let seq = 0; // 命令序号
 const pending = new Map(); // 待响应命令
@@ -69,7 +69,7 @@ function send(method, params = {}) {
   return new Promise((resolve) => { // 等同 id 响应
     pending.set(id, resolve); // 登记
     ws.send(JSON.stringify({ id, method, params })); // 发送
-  });
+  }); // 代码块结束
 } // send 结束
 
 /** 在页面上下文执行表达式，返回值走 JSON 序列化 */
@@ -101,7 +101,7 @@ const SET_VALUE = `(function (el, value) {
 
 /** 按选择器点击元素（真实 DOM 事件，触发 React onClick） */
 async function click(selector) {
-  return evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true; })()`);
+  return evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true; })()`); // 返回当前函数的处理结果
 } // click 结束
 
 /** 按「选择器 + 文案」点击（同一类按钮有多个时按文案挑） */
@@ -117,22 +117,22 @@ async function clickByText(selector, text) {
 
 /** 写 input / textarea */
 async function setValue(selector, value) {
-  return evaluate(`(function () { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; return ${SET_VALUE}(el, ${JSON.stringify(value)}); })()`);
+  return evaluate(`(function () { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; return ${SET_VALUE}(el, ${JSON.stringify(value)}); })()`); // 返回当前函数的处理结果
 } // setValue 结束
 
 /** API 请求助手 */
 async function apiPost(path, body, token, idem) {
-  const res = await fetch(API + path, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      ...(token ? { authorization: 'Bearer ' + token } : {}),
-      ...(idem ? { 'idempotency-key': idem } : {}),
-    },
-    body: JSON.stringify(body),
-  });
+  const res = await fetch(API + path, { // 常量 res：保存固定配置或一次性派生值
+    method: 'POST', // 对象字段 method：记录一项配置或数据
+    headers: { // 对象字段 headers：记录一项配置或数据
+      'content-type': 'application/json', // 执行当前业务步骤
+      ...(token ? { authorization: 'Bearer ' + token } : {}), // 执行当前业务步骤
+      ...(idem ? { 'idempotency-key': idem } : {}), // 执行当前业务步骤
+    }, // 代码块结束
+    body: JSON.stringify(body), // 对象字段 body：记录一项配置或数据
+  }); // 代码块结束
   let json = null; // 响应体
-  try { json = await res.json(); } catch { json = null; }
+  try { json = await res.json(); } catch { json = null; } // 异常捕获起点：包裹可能抛出错误的操作
   return { status: res.status, body: json }; // 返回
 } // apiPost 结束
 
@@ -161,42 +161,42 @@ const sessionA = await loginPhone(phoneA); // 发起人 A
 
 // 媒体直传受模块权益门禁，先免费解锁（与 verify-chat-flow 一致）
 const unlock = await fetch(API + '/entitlements', {
-  method: 'POST',
-  headers: { 'content-type': 'application/json', authorization: 'Bearer ' + sessionA.access_token, 'idempotency-key': 'chat-plus-' + Date.now() },
-  body: JSON.stringify({ module_code: 'comic.workbench' }),
-});
-check('解锁媒体通道（comic.workbench）', unlock.status === 200 || unlock.status === 201 || unlock.status === 409, 'HTTP ' + unlock.status);
+  method: 'POST', // 对象字段 method：记录一项配置或数据
+  headers: { 'content-type': 'application/json', authorization: 'Bearer ' + sessionA.access_token, 'idempotency-key': 'chat-plus-' + Date.now() }, // 对象字段 headers：记录一项配置或数据
+  body: JSON.stringify({ module_code: 'comic.workbench' }), // 对象字段 body：记录一项配置或数据
+}); // 代码块结束
+check('解锁媒体通道（comic.workbench）', unlock.status === 200 || unlock.status === 201 || unlock.status === 409, 'HTTP ' + unlock.status); // 调用 check 并处理其返回结果
 
 // 造群与前置消息：群由 A 创建、B 先发一条「原始问题」，供 A 引用
 const created = await apiPost('/im/conversations', { type: 'group', name: groupName, member_user_ids: [sessionB.user.id] }, sessionA.access_token, 'chat-plus-group-' + Date.now());
-check('接口建群成功', created.status === 201, 'HTTP ' + created.status);
-const conversationId = created.body?.conversation_id;
-const bMessage = await apiPost(`/im/conversations/${conversationId}/messages`, { content_type: 'text', content: '原始问题：部署脚本在哪' }, sessionB.access_token, 'chat-plus-msg-' + Date.now());
-check('成员 B 发出被引用消息', bMessage.status === 201, 'HTTP ' + bMessage.status);
-const bMessageId = bMessage.body?.message?.id;
+check('接口建群成功', created.status === 201, 'HTTP ' + created.status); // 调用 check 并处理其返回结果
+const conversationId = created.body?.conversation_id; // 常量 conversationId：保存固定配置或一次性派生值
+const bMessage = await apiPost(`/im/conversations/${conversationId}/messages`, { content_type: 'text', content: '原始问题：部署脚本在哪' }, sessionB.access_token, 'chat-plus-msg-' + Date.now()); // 常量 bMessage：保存固定配置或一次性派生值
+check('成员 B 发出被引用消息', bMessage.status === 201, 'HTTP ' + bMessage.status); // 调用 check 并处理其返回结果
+const bMessageId = bMessage.body?.message?.id; // 常量 bMessageId：保存固定配置或一次性派生值
 
 // 上传一个文本文件并发成文件消息，供文件下载断言使用
 const presign = await apiPost('/media/presign/upload', { asset_type: 'text', mime: 'text/plain', size_bytes: 12 }, sessionA.access_token, 'chat-plus-up-' + Date.now());
-check('申请文件直传凭证', presign.status === 200 || presign.status === 201, 'HTTP ' + presign.status);
+check('申请文件直传凭证', presign.status === 200 || presign.status === 201, 'HTTP ' + presign.status); // 调用 check 并处理其返回结果
 console.log('presign response', presign.status, JSON.stringify(presign.body).slice(0, 240)); // 调试输出：确认响应字段名
 const upload = presign.body?.upload; // 上传描述
 const put = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: Buffer.from('mim-e2e-ok\n') }); // 直传字节
-check('文件直传成功', put.ok, 'HTTP ' + put.status);
-const fileMessage = await apiPost(
-  `/im/conversations/${conversationId}/messages`,
-  { content_type: 'file', object_key: presign.body.object_key, object_mime: 'text/plain', object_name: 'mim-e2e.txt', object_size: 12 },
-  sessionA.access_token,
-  'chat-plus-file-' + Date.now(),
-);
-check('文件消息落库', fileMessage.status === 201, 'HTTP ' + fileMessage.status);
+check('文件直传成功', put.ok, 'HTTP ' + put.status); // 调用 check 并处理其返回结果
+const fileMessage = await apiPost( // 常量 fileMessage：保存固定配置或一次性派生值
+  `/im/conversations/${conversationId}/messages`, // 执行当前业务步骤
+  { content_type: 'file', object_key: presign.body.object_key, object_mime: 'text/plain', object_name: 'mim-e2e.txt', object_size: 12 }, // 执行当前业务步骤
+  sessionA.access_token, // 执行当前业务步骤
+  'chat-plus-file-' + Date.now(), // 执行当前业务步骤
+); // 执行当前业务步骤
+check('文件消息落库', fileMessage.status === 201, 'HTTP ' + fileMessage.status); // 调用 check 并处理其返回结果
 
 // 注入发起人会话并打开聊天页
 await send('Page.navigate', { url: PAGE + '/chat' });
 await sleep(1200); // 等首帧
-await evaluate(`localStorage.setItem(${JSON.stringify(SESSION_KEY)}, ${JSON.stringify(JSON.stringify({ access_token: sessionA.access_token, refresh_token: sessionA.refresh_token, user: sessionA.user }))})`);
+await evaluate(`localStorage.setItem(${JSON.stringify(SESSION_KEY)}, ${JSON.stringify(JSON.stringify({ access_token: sessionA.access_token, refresh_token: sessionA.refresh_token, user: sessionA.user }))})`); // 异步等待：挂起至 Promise 落定后再继续
 await send('Page.reload'); // 重载带会话
-const ready = await waitFor(`!!document.querySelector('.chat-layout')`, 15000);
-check('进入聊天页并渲染聊天布局', Boolean(ready), PAGE + '/chat');
+const ready = await waitFor(`!!document.querySelector('.chat-layout')`, 15000); // 常量 ready：保存固定配置或一次性派生值
+check('进入聊天页并渲染聊天布局', Boolean(ready), PAGE + '/chat'); // 调用 check 并处理其返回结果
 
 // 打开测试群
 const opened = await waitFor(`(() => {
@@ -207,7 +207,7 @@ const opened = await waitFor(`(() => {
   item.click(); // 点开会话
   return false; // 交给下一轮确认
 })()`, 15000);
-check('会话列表出现测试群并可点开', Boolean(opened));
+check('会话列表出现测试群并可点开', Boolean(opened)); // 调用 check 并处理其返回结果
 
 // 1) 引用回复：点消息上的「引用」→ 输入框上方出现引用条 → 发送后气泡带引用块
 const quoteClicked = await waitFor(`(() => {
@@ -217,37 +217,37 @@ const quoteClicked = await waitFor(`(() => {
   btn.click(); // 进入引用态
   return false; // 下一轮确认
 })()`, 10000);
-check('点击消息「引用」进入引用态', Boolean(quoteClicked));
-const quoteText = await evaluate(`(() => { const bar = document.querySelector('.chat-reply-quote'); return bar ? bar.textContent.slice(0, 60) : ''; })()`);
-check('引用条展示被引用内容', quoteText.includes('部署脚本在哪'), quoteText || '空');
-await setValue('.chat-input textarea', '在 deploy/ 目录，脚本是 deploy/release.sh');
+check('点击消息「引用」进入引用态', Boolean(quoteClicked)); // 调用 check 并处理其返回结果
+const quoteText = await evaluate(`(() => { const bar = document.querySelector('.chat-reply-quote'); return bar ? bar.textContent.slice(0, 60) : ''; })()`); // 常量 quoteText：保存固定配置或一次性派生值
+check('引用条展示被引用内容', quoteText.includes('部署脚本在哪'), quoteText || '空'); // 调用 check 并处理其返回结果
+await setValue('.chat-input textarea', '在 deploy/ 目录，脚本是 deploy/release.sh'); // 异步等待：挂起至 Promise 落定后再继续
 await click('.chat-input .btn.primary'); // 发送
 const quotedBubble = await waitFor(`(() => {
   const bubbles = Array.from(document.querySelectorAll('.chat-msg.mine .chat-msg-quote')); // 自己的引用块
   const hit = bubbles.find((b) => b.textContent.includes('部署脚本在哪')); // 命中被引用原文
   return hit ? hit.textContent.slice(0, 60) : false; // 返回文案
 })()`, 10000);
-check('引用回复气泡内渲染引用块', Boolean(quotedBubble), quotedBubble || '未出现');
-const quoteCleared = await waitFor(`!(document.querySelector('.chat-reply-bar'))`, 5000);
-check('发送后引用态自动清除', Boolean(quoteCleared));
+check('引用回复气泡内渲染引用块', Boolean(quotedBubble), quotedBubble || '未出现'); // 调用 check 并处理其返回结果
+const quoteCleared = await waitFor(`!(document.querySelector('.chat-reply-bar'))`, 5000); // 常量 quoteCleared：保存固定配置或一次性派生值
+check('发送后引用态自动清除', Boolean(quoteCleared)); // 调用 check 并处理其返回结果
 
 // 2) 文件消息：气泡内有下载按钮且链接可访问
 const fileBubble = await waitFor(`(() => {
   const link = document.querySelector('.chat-file-download'); // 下载入口
   return link ? link.getAttribute('href') : false; // 返回直链
 })()`, 15000);
-check('文件气泡渲染下载按钮', Boolean(fileBubble), fileBubble ? 'href=' + String(fileBubble).slice(0, 40) : '未出现');
-if (fileBubble) {
+check('文件气泡渲染下载按钮', Boolean(fileBubble), fileBubble ? 'href=' + String(fileBubble).slice(0, 40) : '未出现'); // 调用 check 并处理其返回结果
+if (fileBubble) { // 条件分支：按判断结果选择后续处理路径
   const dl = await fetch(fileBubble); // 真访问下载直链
-  check('下载直链可访问（HTTP 200）', dl.ok, 'HTTP ' + dl.status);
+  check('下载直链可访问（HTTP 200）', dl.ok, 'HTTP ' + dl.status); // 调用 check 并处理其返回结果
 } // 文件校验结束
 
 // 3) 群管理：打开群信息 → 设管理员 → 邀请新成员
 await clickByText('.chat-header .btn', '群信息');
-const panelOpen = await waitFor(`!!document.querySelector('.chat-panel')`, 8000);
-check('打开群信息面板', Boolean(panelOpen));
-const rowsReady = await waitFor(`document.querySelectorAll('.chat-member-chip').length >= 2`, 10000);
-check('群成员列表加载完成', Boolean(rowsReady));
+const panelOpen = await waitFor(`!!document.querySelector('.chat-panel')`, 8000); // 常量 panelOpen：保存固定配置或一次性派生值
+check('打开群信息面板', Boolean(panelOpen)); // 调用 check 并处理其返回结果
+const rowsReady = await waitFor(`document.querySelectorAll('.chat-member-chip').length >= 2`, 10000); // 常量 rowsReady：保存固定配置或一次性派生值
+check('群成员列表加载完成', Boolean(rowsReady)); // 调用 check 并处理其返回结果
 const promoted = await evaluate(`(() => {
   const rows = Array.from(document.querySelectorAll('.chat-member-chip')); // 成员行
   const row = rows.find((r) => (r.querySelector('.chat-member-role') || {}).textContent !== '群主' && Array.from(r.querySelectorAll('button')).some((b) => b.textContent.includes('设管理员'))); // 首个非群主成员行（按角色列判定，避免「转让群主」按钮文案干扰）
@@ -256,12 +256,12 @@ const promoted = await evaluate(`(() => {
   btn.click(); // 提升
   return true; // 点击成功
 })()`);
-check('群主点击「设管理员」', Boolean(promoted));
+check('群主点击「设管理员」', Boolean(promoted)); // 调用 check 并处理其返回结果
 const roleLabel = await waitFor(`(() => {
   const roles = Array.from(document.querySelectorAll('.chat-member-role')); // 仅角色标签列
   return roles.some((r) => r.textContent.trim() === '管理员') ? 'admin' : false; // 角色标签已更新
 })()`, 10000);
-check('成员角色标签更新为管理员', Boolean(roleLabel));
+check('成员角色标签更新为管理员', Boolean(roleLabel)); // 调用 check 并处理其返回结果
 
 await setValue('.chat-panel-block input', phoneC); // 搜索待邀请成员
 const candidateClicked = await waitFor(`(() => {
@@ -272,7 +272,7 @@ const candidateClicked = await waitFor(`(() => {
   item.click(); // 勾选一次
   return false; // 交给下一轮确认勾选态
 })()`, 10000);
-check('加人搜索命中待邀请成员并勾选', Boolean(candidateClicked));
+check('加人搜索命中待邀请成员并勾选', Boolean(candidateClicked)); // 调用 check 并处理其返回结果
 const invited = await waitFor(`(() => {
   const rows = Array.from(document.querySelectorAll('.chat-panel-row')); // 面板信息行
   if (rows.some((r) => r.textContent.includes('成员 3 人'))) return true; // 已经是 3 人，幂等退出
@@ -281,7 +281,7 @@ const invited = await waitFor(`(() => {
   btn.click(); // 触发邀请
   return false; // 下一轮确认成员数
 })()`, 12000);
-check('邀请后群成员数变为 3', Boolean(invited));
+check('邀请后群成员数变为 3', Boolean(invited)); // 调用 check 并处理其返回结果
 console.log('invite debug', JSON.stringify(await evaluate(`(() => ({
   rows: Array.from(document.querySelectorAll('.chat-panel-row')).map((r) => r.textContent.trim()), // 面板信息行
   chips: document.querySelectorAll('.chat-member-chip').length, // 成员行数
@@ -296,8 +296,8 @@ await evaluate(`(() => {
   el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); // 模拟回车触发搜索
   return true; // 已派发
 })()`);
-const resultBar = await waitFor(`!!document.querySelector('.chat-msg-result-bar')`, 8000);
-check('搜索结果条出现', Boolean(resultBar));
+const resultBar = await waitFor(`!!document.querySelector('.chat-msg-result-bar')`, 8000); // 常量 resultBar：保存固定配置或一次性派生值
+check('搜索结果条出现', Boolean(resultBar)); // 调用 check 并处理其返回结果
 const jumped = await waitFor(`(() => {
   if (document.querySelector('.chat-msg.highlight')) return true; // 已高亮
   const btn = document.querySelector('.chat-msg-result-item'); // 第一条结果
@@ -305,14 +305,14 @@ const jumped = await waitFor(`(() => {
   btn.click(); // 点击定位
   return false; // 下一轮确认高亮
 })()`, 10000);
-check('点击搜索结果定位并高亮目标消息', Boolean(jumped));
+check('点击搜索结果定位并高亮目标消息', Boolean(jumped)); // 调用 check 并处理其返回结果
 
 // 截图与结果落盘
 const shot = await send('Page.captureScreenshot', { format: 'png' });
-if (shot.result?.data) writeFileSync('.tmp/chat-plus-e2e.png', Buffer.from(shot.result.data, 'base64'));
-check('页面无控制台 error', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
-writeFileSync('.tmp/chat-plus-e2e.json', JSON.stringify({ checks, conversationId, bMessageId: bMessageId ?? null }, null, 2));
-for (const c of checks) console.log((c.ok ? 'PASS ' : 'FAIL ') + c.name + (c.detail ? '  [' + c.detail + ']' : ''));
+if (shot.result?.data) writeFileSync('.tmp/chat-plus-e2e.png', Buffer.from(shot.result.data, 'base64')); // 条件分支：按判断结果选择后续处理路径
+check('页面无控制台 error', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | ')); // 调用 check 并处理其返回结果
+writeFileSync('.tmp/chat-plus-e2e.json', JSON.stringify({ checks, conversationId, bMessageId: bMessageId ?? null }, null, 2)); // 调用 writeFileSync 并处理其返回结果
+for (const c of checks) console.log((c.ok ? 'PASS ' : 'FAIL ') + c.name + (c.detail ? '  [' + c.detail + ']' : '')); // 循环：逐项遍历集合并执行相同处理
 const failed = checks.filter((c) => !c.ok).length; // 失败数
-console.log('TOTAL=' + checks.length + ' FAILED=' + failed);
+console.log('TOTAL=' + checks.length + ' FAILED=' + failed); // 向控制台输出运行日志或错误信息
 ws.close(); // 收尾关闭连接

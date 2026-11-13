@@ -63,61 +63,61 @@ const PURE_DIGITS = /^\d+$/;
 /** 短号段判定：1～2 位（1～99）整段预留，不再自动发放 */
 function isShort(text: string): boolean {
   return text.length <= 2; // 个位与十位号全部进靓号库
-}
+} // 代码块结束
 
 /** 全同数字判定：3 位起才算豹子号 */
 function isRepeat(text: string): boolean {
   return text.length >= 3 && /^(\d)\1+$/.test(text); // 逐位相同即豹子
-}
+} // 代码块结束
 
 /** 顺子判定：相邻位差全为 +1 或全为 -1（含 123、321、9876 这类倒顺） */
 function isLadder(text: string): boolean {
   if (text.length < 3) return false; // 3 位起判定
   const diffs: number[] = []; // 相邻位差集合
-  for (let index = 1; index < text.length; index += 1) {
+  for (let index = 1; index < text.length; index += 1) { // 循环：逐项遍历集合并执行相同处理
     diffs.push(Number(text[index]) - Number(text[index - 1])); // 逐位求差
   } // 逐位循环结束
   return diffs.every((diff) => diff === 1) || diffs.every((diff) => diff === -1); // 全递增或全递减
-}
+} // 代码块结束
 
 /** 回文判定：正读反读一致，3 位起判定 */
 function isPalindrome(text: string): boolean {
   if (text.length < 3) return false; // 两位号已在短号段口径里整段预留
   return text === text.split('').reverse().join(''); // 反转后逐字符相同
-}
+} // 代码块结束
 
 /** ABAB 判定：偶数位且两两重复（1212、1313、121212） */
 function isAbab(text: string): boolean {
   if (text.length < 4 || text.length % 2 !== 0) return false; // 至少 4 位且为偶数位
   return /^(\d{2})\1+$/.test(text); // 两位一组重复
-}
+} // 代码块结束
 
 /** 重复段判定：整串由同一个 2 位及以上片段重复构成（123123、12341234、123123123） */
 function isRepeatBlock(text: string): boolean {
   if (text.length < 4) return false; // 至少 4 位才有「段」的意义
-  for (let block = 2; block <= text.length / 2; block += 1) {
+  for (let block = 2; block <= text.length / 2; block += 1) { // 循环：逐项遍历集合并执行相同处理
     if (text.length % block !== 0) continue; // 不能整除的段长不可能整串重复
     if (text.slice(0, block).repeat(text.length / block) === text) return true; // 命中即重复段
   } // 段长枚举结束
   return false; // 非重复段
-}
+} // 代码块结束
 
 /** 阶梯对子判定：两两同数字、相邻对子连续（1122、112233、998877、11223344） */
 function isStaircase(text: string): boolean {
   if (text.length < 4 || text.length % 2 !== 0) return false; // 至少两组、成对
   const pairs: number[] = []; // 每对取一位代表
-  for (let index = 0; index < text.length; index += 2) {
+  for (let index = 0; index < text.length; index += 2) { // 循环：逐项遍历集合并执行相同处理
     if (text[index] !== text[index + 1]) return false; // 必须两两相同
     pairs.push(Number(text[index])); // 记录对子数字
   } // 逐对扫描结束
   const diffs = pairs.slice(1).map((value, index) => value - pairs[index]); // 相邻对子的差
   return diffs.every((diff) => diff === 1) || diffs.every((diff) => diff === -1); // 递增或递减阶梯
-}
+} // 代码块结束
 
 /** 整百 / 整千判定：末尾至少两个 0，3 位起（100、200、1000） */
 function isRound(text: string): boolean {
   return text.length >= 3 && text.endsWith('00'); // 末尾两个 0 即整百
-}
+} // 代码块结束
 
 /** 生日号判定：8 位且为 19xx / 20xx 的合法日期（19900101、20000101） */
 function isBirthday(text: string): boolean {
@@ -127,10 +127,10 @@ function isBirthday(text: string): boolean {
   const day = Number(text.slice(6, 8)); // 日
   if (month < 1 || month > 12 || day < 1 || day > 31) return false; // 月日粗筛
   const parsed = new Date(Date.UTC(year, month - 1, day)); // 用 UTC 构造避免本地时区偏移
-  return (
-    parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+  return ( // 返回当前函数的处理结果
+    parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day // 执行当前业务步骤
   ); // 构造回读一致才算合法日期（拦住 2 月 30 日这类）
-}
+} // 代码块结束
 
 /**
  * 判定一个号码属于哪类靓号。
@@ -152,9 +152,9 @@ export function classifyPremiumNo(input: number | string): PremiumReason | null 
   if (ICONIC_NUMBERS.includes(text)) return 'iconic'; // 经典号
   if (PRONOUNCE_SEGMENTS.some((segment) => text.includes(segment))) return 'pronounce'; // 谐音 / 吉利号
   return null; // 其余为普通号，可自动发放
-}
+} // 代码块结束
 
 /** 是否为靓号（发号器、迁移脚本与前端提示共用的布尔入口） */
 export function isPremiumMemberNo(input: number | string): boolean {
   return classifyPremiumNo(input) !== null; // 复用分类结果，避免两套判定
-}
+} // 代码块结束

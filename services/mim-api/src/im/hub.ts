@@ -16,7 +16,7 @@ interface ConnectionCtx {
   joinedAt: number; // 连接建立的时间戳（毫秒），用于连接时长统计与调试
 } // ConnectionCtx 结束
 
-export class ImHub {
+export class ImHub { // 执行当前业务步骤
   /** user_id → 该用户的全部在线连接集合 */
   private readonly connections = new Map<string, Set<WebSocket>>();
   /** WebSocket → 上下文 的反向映射，连接关闭时用它反查 userId */
@@ -38,15 +38,15 @@ export class ImHub {
   unregister(socket: WebSocket): string | null {
     // 从反向映射取出上下文，拿不到说明未注册过，直接返回 null
     const ctx = this.ctxBySocket.get(socket);
-    if (!ctx) return null;
+    if (!ctx) return null; // 条件分支：按判断结果选择后续处理路径
     // 取该用户的连接集合
     const set = this.connections.get(ctx.userId);
-    if (set) {
+    if (set) { // 条件分支：按判断结果选择后续处理路径
       // 从集合中移除当前连接
       set.delete(socket);
       // 集合为空时整体删除，避免 map 残留空集合造成「看似在线」的误判
       if (set.size === 0) this.connections.delete(ctx.userId);
-    }
+    } // 代码块结束
     // 返回用户 ID，供调用方广播 presence.offline 事件
     return ctx.userId;
   } // unregister 结束
@@ -55,7 +55,7 @@ export class ImHub {
   isOnline(userId: string): boolean {
     // 集合存在且非空即为在线
     const set = this.connections.get(userId);
-    return !!set && set.size > 0;
+    return !!set && set.size > 0; // 返回当前函数的处理结果
   } // isOnline 结束
 
   /** 给单个用户的所有在线连接发送一帧 */
@@ -69,7 +69,7 @@ export class ImHub {
     for (const socket of set) {
       // 仅向 OPEN 状态的连接发送，避免向已关闭的 socket 写导致抛错
       if (socket.readyState === socket.OPEN) socket.send(text);
-    }
+    } // 代码块结束
   } // sendToUser 结束
 
   /** 给一组用户（通常是同一会话的成员）广播同一帧，跳过发送者本人 */
@@ -80,8 +80,8 @@ export class ImHub {
     if (excludeUserId) targets.delete(excludeUserId);
     // 逐个用户投递
     for (const uid of targets) {
-      this.sendToUser(uid, frame);
-    }
+      this.sendToUser(uid, frame); // 执行当前业务步骤
+    } // 代码块结束
   } // broadcastToUsers 结束
 
   /** 当前在线用户总数（用于监控与 presence 聚合） */

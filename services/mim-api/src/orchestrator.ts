@@ -291,7 +291,7 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
       .prepare( // 预编译：started_at 为空也视为异常（抢占时必定写入），故一并回收
         `SELECT id, attempts FROM generation_jobs
          WHERE status = 'running' AND (started_at IS NULL OR started_at <= ?)`,
-      )
+      ) // 执行当前业务步骤
       .all(cutoff) as Array<{ id: string; attempts: number | null }>; // 候选任务：失联的 running 行
     const reclaimed: string[] = []; // 已放回队列的任务 ID
     const failed: string[] = []; // 超过回收上限、直接判失败的任务 ID
@@ -337,7 +337,7 @@ export function createOrchestrator(options: CreateOrchestratorOptions): Orchestr
       const result = reclaimStale(); // 执行回收
       if (result.reclaimed.length > 0 || result.failed.length > 0) { // 只有真的发生迁移才打日志，避免每 2 秒刷屏
         console.log( // 运维可见的回收明细
-          `[ai-orchestrator] stale reclaim: requeued ${result.reclaimed.length}, failed ${result.failed.length}`,
+          `[ai-orchestrator] stale reclaim: requeued ${result.reclaimed.length}, failed ${result.failed.length}`, // 执行当前业务步骤
         ); // 日志结束
       } // 日志判定结束
     } catch (err) { // 回收异常
@@ -648,7 +648,7 @@ async function produceWithCompose(
         `UPDATE generation_jobs SET status = 'succeeded', result = ?, finished_at = ?
          WHERE id = ? AND status = 'running'`,
       ).run( // 绑定结果 JSON 与完成时间
-        JSON.stringify({
+        JSON.stringify({ // 执行当前业务步骤
           provider, // 结果内记录提供方
           asset_id: assetId, // 便于前端直接跳转产物
           object_key: objectKey, // 便于前端直接下载

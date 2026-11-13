@@ -26,7 +26,7 @@ function previewDeduction(totalMinor: number, balance: number, cfg: PointsDeduct
   const byRatioCents = Math.floor((totalMinor * cfg.max_ratio_percent) / 100); // 单笔比例上限（分）
   const deduct = Math.max(0, Math.min(byBalanceCents, byRatioCents, totalMinor)); // 取三者最小值
   const pointsSpent = cfg.points_per_yuan > 0 ? Math.ceil((deduct / 100) * cfg.points_per_yuan) : 0; // 折算消耗积分
-  return { deduct_cents: deduct, points_spent: pointsSpent, payable_cents: Math.max(0, totalMinor - deduct) };
+  return { deduct_cents: deduct, points_spent: pointsSpent, payable_cents: Math.max(0, totalMinor - deduct) }; // 返回当前函数的处理结果
 } // previewDeduction 结束
 
 /** 购物车页：清单 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单） */
@@ -43,13 +43,13 @@ export function Cart({ locale }: Props) {
 
   /** 重新拉取购物车；并行拉钱包积分与站点抵扣口径，任一失败不阻断购物车主流程 */
   async function refresh() {
-    const [cartP, walletP, cfgP] = await Promise.allSettled([api.cart.get(), api.wallet.get(), api.commerce.siteConfig()]);
-    if (cartP.status === 'fulfilled') {
+    const [cartP, walletP, cfgP] = await Promise.allSettled([api.cart.get(), api.wallet.get(), api.commerce.siteConfig()]); // 赋值：更新变量 const 的取值
+    if (cartP.status === 'fulfilled') { // 条件分支：按判断结果选择后续处理路径
       setCart(cartP.value); // 写入最新车
       setError(null); // 清空旧错误
-    } else {
+    } else { // 代码块结束
       setError(errorText(locale, cartP.reason)); // 展示购物车错误
-    }
+    } // 代码块结束
     if (walletP.status === 'fulfilled') setPointsBalance(walletP.value.wallet.points); // 积分余额回落 0
     if (cfgP.status === 'fulfilled') setPointsCfg(cfgP.value.points_deduction ?? null); // 口径缺失回落默认
     setLoading(false); // 结束加载态
@@ -63,7 +63,7 @@ export function Cart({ locale }: Props) {
   /** 移除单个条目 */
   async function remove(code: string) {
     setError(null); // 清空旧错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.cart.remove(code); // 后端天然幂等
       setCart(result.cart); // 用响应里的最新车覆盖
     } catch (err) {
@@ -74,7 +74,7 @@ export function Cart({ locale }: Props) {
   /** 清空购物车 */
   async function clear() {
     setError(null); // 清空旧错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.cart.clear(); // 清空接口
       setCart(result.cart); // 更新为空车
     } catch (err) {
@@ -87,7 +87,7 @@ export function Cart({ locale }: Props) {
     setBusy(true); // 禁用按钮防重复
     setError(null); // 清空旧错误
     setResults(null); // 清空旧结果
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 人工结算；仅在抵扣面板可用且勾选时传 use_points，否则不带抵扣入参
       const result = await api.cart.checkout('manual', { use_points: usePoints && deductionAvailable });
       setCart(result.cart); // 用响应覆盖剩余车
@@ -106,15 +106,15 @@ export function Cart({ locale }: Props) {
   // 站点口径缺失时回落后端默认（100 积分=1 元、单笔上限 30%）；显式关闭或余额 0 时整块隐藏
   const cfg: PointsDeductionConfig = pointsCfg ?? { enabled: true, points_per_yuan: 100, max_ratio_percent: 30 };
   const deductionAvailable = cfg.enabled && pointsBalance > 0 && totalMinor > 0; // 抵扣面板是否展示
-  const preview = deductionAvailable && usePoints
+  const preview = deductionAvailable && usePoints // 常量 preview：保存固定配置或一次性派生值
     ? previewDeduction(totalMinor, pointsBalance, cfg) // 勾选后按余额 / 比例上限预览抵扣
     : { deduct_cents: 0, points_spent: 0, payable_cents: totalMinor }; // 未勾选：应付即合计
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{isZh ? '购物车' : 'Cart'}</h1>
-        <div className="products-pager">
+        <div className="products-pager">{/* 执行当前业务步骤 */}
           <button type="button" className="btn ghost" onClick={() => navigate({ view: 'products' })}>{isZh ? '继续挑选' : 'Browse products'}</button>
           <button type="button" className="btn ghost" onClick={() => void clear()} disabled={items.length === 0}>{isZh ? '清空' : 'Clear'}</button>
         </div>
@@ -126,36 +126,36 @@ export function Cart({ locale }: Props) {
 
       {/* 清单：逐条展示模块、价格与已拥有状态 */}
       {items.length > 0 ? (
-        <table className="products-table">
-          <thead>
-            <tr>
+        <table className="products-table">{/* 执行当前业务步骤 */}
+          <thead>{/* 执行当前业务步骤 */}
+            <tr>{/* 执行当前业务步骤 */}
               <th>{isZh ? '模块' : 'Module'}</th>
               <th>{isZh ? '价格' : 'Price'}</th>
               <th>{isZh ? '状态' : 'Status'}</th>
               <th>{isZh ? '操作' : 'Action'}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody>{/* 执行当前业务步骤 */}
             {items.map((item) => {
               const name = item.name[locale] ?? item.name['zh-CN'] ?? item.module_code; // 名称按语言回落
-              return (
-                <tr key={item.module_code}>
-                  <td>
+              return ( // 返回当前函数的处理结果
+                <tr key={item.module_code}>{/* 执行当前业务步骤 */}
+                  <td>{/* 执行当前业务步骤 */}
                     <div className="products-name">{name}</div>
                     <div className="products-code">{item.module_code}</div>
                   </td>
                   <td>{item.free ? (isZh ? '免费' : 'Free') : item.price ? money(locale, item.price.currency, item.price.amount_minor) : '-'}</td>
-                  <td>
+                  <td>{/* 执行当前业务步骤 */}
                     {item.owned ? <span className="tag ok">{isZh ? '已拥有' : 'Owned'}</span> : null}
                     {!item.available ? <span className="tag">{isZh ? '已下架' : 'Offline'}</span> : null}
                     {item.free && !item.owned && item.available ? <span className="tag ok">{isZh ? '结算即解锁' : 'Unlocks on checkout'}</span> : null}
                     {!item.free && item.available && !item.owned ? <span className="tag">{isZh ? '生成待结算订单' : 'Creates pending order'}</span> : null}
                   </td>
-                  <td>
+                  <td>{/* 执行当前业务步骤 */}
                     <button type="button" className="btn ghost" onClick={() => void remove(item.module_code)}>{isZh ? '移除' : 'Remove'}</button>
                   </td>
                 </tr>
-              );
+              ); // 执行当前业务步骤
             })}
           </tbody>
         </table>
@@ -163,9 +163,9 @@ export function Cart({ locale }: Props) {
 
       {/* 合计与结算入口 */}
       {items.length > 0 ? (
-        <section className="cart-foot">
+        <section className="cart-foot">{/* 执行当前业务步骤 */}
           {totals.length > 0 ? (
-            <span>
+            <span>{/* 执行当前业务步骤 */}
               {isZh ? '待结算合计' : 'Total'}：
               {totals.map((total) => money(locale, total.currency, total.amount_minor)).join(' + ')}
             </span>
@@ -173,15 +173,15 @@ export function Cart({ locale }: Props) {
             <span>{isZh ? '本车全部可即时解锁' : 'All items unlock instantly'}</span>
           )}
           {deductionAvailable ? (
-            <div className="cart-points">
-              <label className="hint">
-                <input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} />{' '}
+            <div className="cart-points">{/* 执行当前业务步骤 */}
+              <label className="hint">{/* 执行当前业务步骤 */}
+                <input type="checkbox" checked={usePoints} onChange={(event) => setUsePoints(event.target.checked)} />{' '}{/* 执行当前业务步骤 */}
                 {isZh ? '使用积分抵扣' : 'Use points'}
               </label>
               <span className="hint">{isZh ? `可用积分 ${pointsBalance}` : `${pointsBalance} points available`}</span>
               {usePoints ? (
-                <>
-                  <span className="hint">
+                <>{/* 执行当前业务步骤 */}
+                  <span className="hint">{/* 执行当前业务步骤 */}
                     {isZh ? '本次抵扣' : 'Deduction'}：{money(locale, totalCurrency, preview.deduct_cents)}
                     {isZh ? `（约 ${preview.points_spent} 积分）` : ` (~${preview.points_spent} pts)`}
                   </span>
@@ -190,7 +190,7 @@ export function Cart({ locale }: Props) {
               ) : null}
             </div>
           ) : null}
-          <button type="button" className="btn primary" onClick={() => void checkout()} disabled={busy}>
+          <button type="button" className="btn primary" onClick={() => void checkout()} disabled={busy}>{/* 执行当前业务步骤 */}
             {busy ? (isZh ? '结算中…' : 'Checking out…') : isZh ? '去结算' : 'Checkout'}
           </button>
         </section>
@@ -198,10 +198,10 @@ export function Cart({ locale }: Props) {
 
       {/* 结算结果：逐条说明成功 / 跳过原因 */}
       {results ? (
-        <section className="cart-results">
+        <section className="cart-results">{/* 执行当前业务步骤 */}
           {" "}
           {results.map((result) => (
-            <div key={result.module_code} className="hint">
+            <div key={result.module_code} className="hint">{/* 执行当前业务步骤 */}
               {result.module_code}：
               {result.kind === 'unlocked' ? (isZh ? '已即时解锁 ✓' : 'unlocked ✓') : null}
               {result.kind === 'order' ? (isZh ? `已生成待结算订单 ${result.order?.id.slice(0, 8) ?? ''}` : `pending order ${result.order?.id.slice(0, 8) ?? ''}`) : null}
@@ -215,5 +215,5 @@ export function Cart({ locale }: Props) {
         </section>
       ) : null}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Cart 结束

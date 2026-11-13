@@ -13,8 +13,8 @@ import type { Db } from './types.js'; // 数据库句柄类型
 
 /** 证件类型与审核状态，与 schema.d 约束保持一致 */
 export type RealnameIdType = 'id_card' | 'passport' | 'other';
-export type RealnameStatus = 'pending' | 'approved' | 'rejected';
-export type RealnameProvider = 'manual' | 'third_party';
+export type RealnameStatus = 'pending' | 'approved' | 'rejected'; // 导出类型 RealnameStatus：跨模块共享的类型定义
+export type RealnameProvider = 'manual' | 'third_party'; // 导出类型 RealnameProvider：跨模块共享的类型定义
 
 /** 提交入参：原始姓名与证件号只在内存中参与哈希，不落库 */
 export interface RealnameSubmitInput {
@@ -104,13 +104,13 @@ export function providerOf(env: Record<string, string | undefined>): RealnamePro
  * 明文姓名与证件号仅在本函数内存中参与哈希与脱敏，写完即弃。
  */
 export function submitRealname(
-  db: Db,
-  secret: string,
-  env: Record<string, string | undefined>,
-  userId: string,
-  input: RealnameSubmitInput,
-  now: string,
-): RealnameView {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  secret: string, // 对象字段 secret：记录一项配置或数据
+  env: Record<string, string | undefined>, // 对象字段 env：记录一项配置或数据
+  userId: string, // 对象字段 userId：记录一项配置或数据
+  input: RealnameSubmitInput, // 对象字段 input：记录一项配置或数据
+  now: string, // 对象字段 now：记录一项配置或数据
+): RealnameView { // 执行当前业务步骤
   const { name, idNumber } = validate(input); // 格式校验 + 归一化
   const existing = findRecord(db, userId); // 查既有记录
   if (existing && (existing.status === 'pending' || existing.status === 'approved')) { // 待审或已通过不可重复提交
@@ -165,13 +165,13 @@ export function listPendingRealnames(db: Db, limit = 50): Array<RealnameView & {
 
 /** 管理端审核：通过 / 驳回；驳回必须带原因 */
 export function reviewRealname(
-  db: Db,
-  recordId: string,
-  decision: 'approve' | 'reject',
-  reason: string | null,
-  reviewerId: string,
-  now: string,
-): RealnameView {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  recordId: string, // 对象字段 recordId：记录一项配置或数据
+  decision: 'approve' | 'reject', // 对象字段 decision：记录一项配置或数据
+  reason: string | null, // 对象字段 reason：记录一项配置或数据
+  reviewerId: string, // 对象字段 reviewerId：记录一项配置或数据
+  now: string, // 对象字段 now：记录一项配置或数据
+): RealnameView { // 执行当前业务步骤
   const row = db.prepare('SELECT * FROM realname_records WHERE id = ?').get(recordId) as Record<string, unknown> | undefined; // 按主键查
   if (!row) throw new AppError('REALNAME_NOT_FOUND', 'realname record not found', { id: recordId }); // 不存在
   if (row.status !== 'pending') throw new AppError('CONFLICT', 'realname record is not pending', { status: row.status }); // 非待审不可改判

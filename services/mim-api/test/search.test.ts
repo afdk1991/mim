@@ -30,7 +30,7 @@ beforeEach(() => { // 每例重建库与应用
 }); // beforeEach 结束
 
 describe('统一搜索公开检索', () => { // 浏览类端点匿名可用
-  it('关键词命中多个来源并按来源分组', async () => {
+  it('关键词命中多个来源并按来源分组', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/search').query({ q: '商城' }); // 中文关键词
     expect(res.status).toBe(200); // 200
     expect(res.body.schema).toBe('mim.search.v1'); // 契约版本
@@ -43,66 +43,66 @@ describe('统一搜索公开检索', () => { // 浏览类端点匿名可用
       expect(group.count).toBe(group.items.length); // 计数与条目一致
       expect(group.items.every((item) => item.score > 0)).toBe(true); // 命中项分数为正
     } // 分组循环结束
-  });
+  }); // 代码块结束
 
-  it('scope 过滤只返回指定来源，非法 scope 返回 400', async () => {
+  it('scope 过滤只返回指定来源，非法 scope 返回 400', async () => { // 调用 it 并处理其返回结果
     const onlyEntry = await request(app).get('/api/v1/search').query({ q: '导航', scope: 'entry' }); // 只看入口
     expect(onlyEntry.status).toBe(200); // 200
     expect(onlyEntry.body.groups.every((group: { scope: string }) => group.scope === 'entry')).toBe(true); // 来源唯一
     const bad = await request(app).get('/api/v1/search').query({ q: 'x', scope: 'unknown' }); // 非法来源
     expect(bad.status).toBe(400); // 400
-  });
+  }); // 代码块结束
 
-  it('缺少关键词返回 400，无命中返回空分组', async () => {
+  it('缺少关键词返回 400，无命中返回空分组', async () => { // 调用 it 并处理其返回结果
     const missing = await request(app).get('/api/v1/search'); // 不带 q
     expect(missing.status).toBe(400); // 400
     const none = await request(app).get('/api/v1/search').query({ q: 'zzzz-no-such-keyword-9999' }); // 必然无命中
     expect(none.status).toBe(200); // 200
     expect(none.body.total).toBe(0); // 总数为 0
     expect(none.body.groups).toEqual([]); // 不返回空分组
-  });
+  }); // 代码块结束
 
-  it('limit 限制每个来源的条数并截取命中片段', async () => {
+  it('limit 限制每个来源的条数并截取命中片段', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/search').query({ q: 'a', scope: 'module', limit: 2 }); // 英文单字母，命中量大
     expect(res.status).toBe(200); // 200
     for (const group of res.body.groups as Array<{ items: Array<{ snippet: string }> }>) { // 逐组断言
       expect(group.items.length).toBeLessThanOrEqual(2); // 每来源不超过 limit
       expect(group.items.every((item) => item.snippet.length > 0)).toBe(true); // 片段非空
     } // 循环结束
-  });
+  }); // 代码块结束
 
-  it('summary 回传全部来源文档数，入口数与静态契约一致', async () => {
+  it('summary 回传全部来源文档数，入口数与静态契约一致', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/search/summary'); // 来源汇总
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBeGreaterThan(0); // 有可搜文档
     const entry = res.body.scopes.find((item: { scope: string }) => item.scope === 'entry'); // 入口来源
     expect(entry.count).toBe(SITE_MODULES.length); // 44 个入口全部可搜
     expect(res.body.engine).toBe('sqlite'); // 默认引擎
-  });
+  }); // 代码块结束
 
-  it('模块通用摘要句不参与匹配，标题未命中的模块不被带回', async () => {
+  it('模块通用摘要句不参与匹配，标题未命中的模块不被带回', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/search').query({ q: '商城', scope: 'module', limit: 30 }); // 只看模块
     expect(res.status).toBe(200); // 200
     const items = res.body.groups.flatMap((group: { items: Array<{ title: string }> }) => group.items); // 全部模块命中
     expect(items.length).toBeGreaterThan(0); // 至少命中标题含「商城」的模块
     expect(items.every((item: { title: string }) => item.title.includes('商城'))).toBe(true); // 不允许简介里的「可在商城内解锁」把无关模块带回
-  });
+  }); // 代码块结束
 }); // 公开检索用例结束
 
 describe('Meilisearch 配置与降级', () => { // 远端引擎的可用性与降级
-  it('配置了但实例不可达时自动降级 SQLite 并返回结果', async () => {
+  it('配置了但实例不可达时自动降级 SQLite 并返回结果', async () => { // 调用 it 并处理其返回结果
     const configured = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_MEILISEARCH_URL: 'http://127.0.0.1:9', MIM_MEILISEARCH_KEY: 'test-key' } }); // 指向关闭端口
     const res = await request(configured).get('/api/v1/search').query({ q: '商城' }); // 触发远端失败
     expect(res.status).toBe(200); // 搜索本身仍成功
     expect(res.body.engine).toBe('sqlite'); // 已降级
     expect(res.body.total).toBeGreaterThan(0); // 本地结果可用
-  });
+  }); // 代码块结束
 
-  it('未配置时重建索引返回 503，未登录返回 401', async () => {
+  it('未配置时重建索引返回 503，未登录返回 401', async () => { // 调用 it 并处理其返回结果
     const noAuth = await request(app).post('/api/v1/search/reindex').send({}); // 无令牌
     expect(noAuth.status).toBe(401); // 401
     const token = await login('13800000010'); // 普通用户
     const notConfigured = await request(app).post('/api/v1/search/reindex').set('Authorization', `Bearer ${token}`).send({}); // 有令牌但未配置
     expect([401, 403, 503]).toContain(notConfigured.status); // 普通用户可能先被权限拦下；未配置时为 503
-  });
+  }); // 代码块结束
 }); // Meili 用例结束

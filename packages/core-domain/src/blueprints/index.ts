@@ -47,17 +47,17 @@ function G(
   ext: string, // 起步文件后缀
   extraZh: string, // 该组专属验收项（中文）
   extraEn: string, // 该组专属验收项（英文）
-): BlueprintGroupMeta {
-  return {
-    slug, capability, nameZh, nameEn, hintZh,
-    hintEn: 'Enter a project name or requirement notes; get the module-specific deliverables, tree, starter code and checklist',
-    placeholderZh,
-    placeholderEn: 'shop-app / requirement notes',
-    rootDir, ext,
+): BlueprintGroupMeta { // 执行当前业务步骤
+  return { // 返回当前函数的处理结果
+    slug, capability, nameZh, nameEn, hintZh, // 执行当前业务步骤
+    hintEn: 'Enter a project name or requirement notes; get the module-specific deliverables, tree, starter code and checklist', // 对象字段 hintEn：记录一项配置或数据
+    placeholderZh, // 执行当前业务步骤
+    placeholderEn: 'shop-app / requirement notes', // 对象字段 placeholderEn：记录一项配置或数据
+    rootDir, ext, // 执行当前业务步骤
     deliverablesZh: [...DELIVERABLES_ZH], // 复制成可写数组，避免下游误改共享常量
-    deliverablesEn: [...DELIVERABLES_EN],
+    deliverablesEn: [...DELIVERABLES_EN], // 对象字段 deliverablesEn：记录一项配置或数据
     checksZh: [...CHECKS_COMMON_ZH, extraZh], // 通用三条 + 组专属一条
-    checksEn: [...CHECKS_COMMON_EN, extraEn],
+    checksEn: [...CHECKS_COMMON_EN, extraEn], // 对象字段 checksEn：记录一项配置或数据
   }; // 返回分组模板
 } // G 结束
 

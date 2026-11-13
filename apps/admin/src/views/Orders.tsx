@@ -118,11 +118,11 @@ export function Orders({ credential, permissions }: OrdersProps) {
             limit: PAGE_SIZE,
             // 当前偏移
             offset,
-          })
+          }) // 代码块结束
         : Promise.resolve(null),
     // 任一条件变化重新拉取
     [credential, canRead, applied, statusFilter, regionFilter, offset],
-  );
+  ); // 执行当前业务步骤
 
   // 结算表单：目标订单 ID
   const [settleId, setSettleId] = useState('');
@@ -142,7 +142,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
 
   // 当前页订单与总数：无权限或加载前按空处理
   const rows = listState.data?.orders ?? [];
-  const total = listState.data?.total ?? 0;
+  const total = listState.data?.total ?? 0; // 常量 total：保存固定配置或一次性派生值
 
   // 提交搜索：把输入值落到 applied 并回到第一页
   function submitSearch(event: FormEvent) {
@@ -202,7 +202,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
     setReceipt(null);
     // 订单 ID 必填
     const id = settleId.trim();
-    if (!id) {
+    if (!id) { // 条件分支：按判断结果选择后续处理路径
       // 缺项提示
       setSettleError('请填写订单 ID');
       // 提前结束
@@ -210,7 +210,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
     } // 校验失败分支结束
     // 置为在途，禁用按钮
     setBusy(true);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调用结算接口：后端在同一事务内把订单置 paid 并发放权益
       const settled = await settleOrder(credential, id, settleReason.trim() || undefined);
       // 保存回执用于展示（含发放后的权益主键）
@@ -232,7 +232,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
     setExportError(null);
     // 置为在途，禁用导出按钮
     setExporting(true);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调导出端点：后端按同口径过滤生成 xlsx 流，返回 Blob 与建议文件名
       const { blob, filename } = await exportOrders(credential, {
         q: applied || undefined, // 已提交关键字，空则不携带
@@ -269,7 +269,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
         { label: '渠道交易号', value: receipt.channel_txn_id ?? '—' }, // 回调结算时才有值
         { label: '权益 ID', value: receipt.entitlement_id ?? '—' }, // 发放后的权益主键
         { label: '结算时间', value: receipt.paid_at ?? '—' }, // 结算时间
-      ]
+      ] // 执行当前业务步骤
     : []; // 无回执则不渲染
 
   // 渲染
@@ -314,7 +314,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
 
           {listState.loading ? <p className="muted">加载中…</p> : null}{/* 加载占位 */}
           {listState.error ? (// 加载失败提示
-            <div className="error">
+            <div className="error">{/* 执行当前业务步骤 */}
               {describeError(listState.error)}{/* 错误文案 */}
               <button className="btn ghost" type="button" onClick={() => listState.reload()}>重试</button>{/* 手动重拉 */}
             </div>
@@ -324,8 +324,8 @@ export function Orders({ credential, permissions }: OrdersProps) {
           ) : null}{/* 空态结束 */}
           {rows.length > 0 ? (// 有数据渲染表格
             <table className="table">{/* 表格容器 */}
-              <thead>
-                <tr>
+              <thead>{/* 执行当前业务步骤 */}
+                <tr>{/* 执行当前业务步骤 */}
                   <th>订单</th>{/* 订单号（短）与创建时间 */}
                   <th>用户</th>{/* 下单用户 */}
                   <th>模块</th>{/* 模块名与编码 */}
@@ -334,31 +334,31 @@ export function Orders({ credential, permissions }: OrdersProps) {
                   <th>操作</th>{/* 行级操作 */}
                 </tr>
               </thead>
-              <tbody>
+              <tbody>{/* 执行当前业务步骤 */}
                 {rows.map((row) => (// 逐行渲染订单
                   <tr key={row.id}>{/* 以订单主键为 key */}
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       <code>{row.id.slice(0, 8)}</code>{/* 短单号，等宽便于核对 */}
                       <div className="muted">{row.created_at}</div>{/* 下单时间副文案 */}
                     </td>
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       <code>{row.user_id}</code>{/* 用户 ID */}
                       {row.user_display_name ? <div className="muted">{row.user_display_name}</div> : null}{/* 展示名（有则显示） */}
                     </td>
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       {pickLocale(row.module_name, row.module_code)}{/* 模块展示名 */}
                       <div className="muted">{row.module_code}</div>{/* 模块编码副文案 */}
                     </td>
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       {formatAmount(row.amount_minor, row.currency)}{/* 金额 */}
                       <div className="muted">{CHANNEL_LABEL[row.channel] ?? row.channel}</div>{/* 渠道副文案，便于对账 */}
                       {row.channel_txn_id ? <div className="muted">交易号 {row.channel_txn_id}</div> : null}{/* 渠道交易号（回调结算才有） */}
                     </td>
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       <span className={`badge ${STATUS_BADGE[row.status] ?? 'builtin'}`}>{STATUS_LABEL[row.status] ?? row.status}</span>{/* 状态徽章 */}
                       {row.paid_at ? <div className="muted">{row.paid_at}</div> : null}{/* 结算时间（已结算才显示） */}
                     </td>
-                    <td>
+                    <td>{/* 执行当前业务步骤 */}
                       {canSettle && row.status === 'pending' ? (// 仅待结算且有权时给结算入口
                         <button className="btn ghost" type="button" onClick={() => fillSettle(row)}>填入结算</button>
                       ) : null}{/* 结算入口条件渲染结束 */}
@@ -370,7 +370,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
           ) : null}{/* 表格结束 */}
           <div className="pager">{/* 分页器 */}
             <button className="btn ghost" type="button" disabled={offset === 0} onClick={prevPage}>上一页</button>{/* 首页禁用 */}
-            <span className="muted">
+            <span className="muted">{/* 执行当前业务步骤 */}
               {total === 0 ? '0 / 0' : `${offset + 1}-${Math.min(offset + PAGE_SIZE, total)} / ${total}`}{/* 区间与总数 */}
             </span>
             <button className="btn ghost" type="button" disabled={offset + PAGE_SIZE >= total} onClick={nextPage}>下一页</button>{/* 末页禁用 */}
@@ -379,14 +379,14 @@ export function Orders({ credential, permissions }: OrdersProps) {
       )}{/* 列表区结束 */}
 
       <div className="panel">{/* 结算面板 */}
-        <div className="panel-head">
+        <div className="panel-head">{/* 执行当前业务步骤 */}
           <h3>结算订单</h3>{/* 面板标题 */}
         </div>
         {!canSettle ? (// 无 entitlement:grant 时降级
           <div className="hint">当前身份缺少 entitlement:grant 权限，无法结算订单</div>
         ) : (// 有权限渲染表单
           <form className="form" onSubmit={(event) => void submitSettle(event)}>{/* 结算表单 */}
-            <label className="field">
+            <label className="field">{/* 执行当前业务步骤 */}
               <span>订单 ID</span>{/* 字段名 */}
               <input
                 value={settleId}// 受控值
@@ -395,7 +395,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
                 disabled={busy}// 在途禁用
               />{/* 输入框结束 */}
             </label>
-            <label className="field">
+            <label className="field">{/* 执行当前业务步骤 */}
               <span>结算备注（写入权益审计事件）</span>{/* 字段名 */}
               <input
                 value={settleReason}// 受控值
@@ -405,7 +405,7 @@ export function Orders({ credential, permissions }: OrdersProps) {
               />{/* 输入框结束 */}
             </label>
             {settleError ? <div className="error">{settleError}</div> : null}{/* 失败提示 */}
-            <div className="row">
+            <div className="row">{/* 执行当前业务步骤 */}
               <button className="btn primary" type="submit" disabled={busy}>{/* 提交按钮 */}
                 {busy ? '结算中…' : '结算'}{/* 在途文案 */}
               </button>
@@ -426,10 +426,10 @@ export function Orders({ credential, permissions }: OrdersProps) {
           </form>
         )}{/* 结算区结束 */}
         {receiptRows.length > 0 ? (// 有回执时渲染结果表
-          <table className="table">
-            <tbody>
+          <table className="table">{/* 执行当前业务步骤 */}
+            <tbody>{/* 执行当前业务步骤 */}
               {receiptRows.map((row) => (// 逐字段渲染
-                <tr key={row.label}>
+                <tr key={row.label}>{/* 执行当前业务步骤 */}
                   <th>{row.label}</th>{/* 字段名 */}
                   <td><code>{row.value}</code></td>{/* 字段值，等宽便于复制 */}
                 </tr>
@@ -439,5 +439,5 @@ export function Orders({ credential, permissions }: OrdersProps) {
         ) : null}{/* 回执表结束 */}
       </div>{/* 结算面板结束 */}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Orders 组件结束

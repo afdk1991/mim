@@ -55,7 +55,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
           category_slug: target === 'module' && category.trim() ? category.trim() : undefined, // 分类仅模块有效
           codes: codes.split(/[\n,，]/).map((item) => item.trim()).filter(Boolean), // 编码清单
           include_inactive: includeInactive, // 是否含下架
-        },
+        }, // 代码块结束
         idempotency_key: batchKey(), // 批次幂等键
       });
       setNotice(`批次已执行：命中 ${batch.total}，改动 ${batch.changed}，跳过 ${batch.skipped}`); // 结果摘要
@@ -67,9 +67,9 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
     } // 业务步骤
   } // submit 结束
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>批量改价</h1>
         <p className="muted">模块与独立商城商品统一调价，事务化执行并保留改前快照，可按批次一键回滚。</p>
       </header>
@@ -78,49 +78,49 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>新建调价批次</h3></div>
-        <div className="form inline">
-          <label>目标
-            <select value={target} onChange={(event) => setTarget(event.target.value as PriceBatchTarget)}>
+        <div className="form inline">{/* 执行当前业务步骤 */}
+          <label>目标{/* 执行当前业务步骤 */}
+            <select value={target} onChange={(event) => setTarget(event.target.value as PriceBatchTarget)}>{/* 执行当前业务步骤 */}
               <option value="shop_product">独立商城商品</option>
               <option value="module">功能模块</option>
             </select>
           </label>
-          <label>模式
-            <select value={mode} onChange={(event) => setMode(event.target.value as PriceBatchMode)}>
+          <label>模式{/* 执行当前业务步骤 */}
+            <select value={mode} onChange={(event) => setMode(event.target.value as PriceBatchMode)}>{/* 执行当前业务步骤 */}
               <option value="percent">按百分比</option>
               <option value="amount">按金额（元）</option>
               <option value="fixed">固定价（元）</option>
             </select>
           </label>
           {mode !== 'fixed' && (
-            <label>方向
-              <select value={direction} onChange={(event) => setDirection(event.target.value as PriceBatchDirection)}>
+            <label>方向{/* 执行当前业务步骤 */}
+              <select value={direction} onChange={(event) => setDirection(event.target.value as PriceBatchDirection)}>{/* 执行当前业务步骤 */}
                 <option value="decrease">下调</option>
                 <option value="increase">上调</option>
               </select>
             </label>
           )}
-          <label>{mode === 'percent' ? '百分点' : '金额（元）'}
+          <label>{mode === 'percent' ? '百分点' : '金额（元）'}{/* 执行当前业务步骤 */}
             <input value={value} onChange={(event) => setValue(event.target.value)} inputMode="decimal" />
           </label>
         </div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           {target === 'module' && (
-            <label>区域
-              <select value={region} onChange={(event) => setRegion(event.target.value)}>
+            <label>区域{/* 执行当前业务步骤 */}
+              <select value={region} onChange={(event) => setRegion(event.target.value)}>{/* 执行当前业务步骤 */}
                 <option value="cn">cn</option>
                 <option value="global">global</option>
               </select>
             </label>
           )}
           {target === 'module' && (
-            <label>分类 slug
+            <label>分类 slug{/* 执行当前业务步骤 */}
               <input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="可留空" />
             </label>
           )}
-          <label className="grow">指定编码
+          <label className="grow">指定编码{/* 执行当前业务步骤 */}
             <input value={codes} onChange={(event) => setCodes(event.target.value)} placeholder="多个编码用逗号或换行分隔；留空按筛选条件全量" />
           </label>
           <label className="check"><input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} />含下架 / 归档</label>
@@ -129,29 +129,29 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         <p className="hint">0 价免费商品自动跳过；百分比只能 1–100；金额与固定价按元填写、后端按分落库。</p>
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>最近批次</h3><button type="button" className="btn ghost" onClick={batchesState.reload}>刷新</button></div>
         {batchesState.loading && <p className="muted">加载中…</p>}
         {Boolean(batchesState.error) && <p className="error">{describeError(batchesState.error)}</p>}
         {(batchesState.data ?? []).length === 0 && !batchesState.loading ? <p className="empty">暂无调价批次</p> : null}
         {(batchesState.data ?? []).map((batch) => (
-          <article className="panel" key={batch.id} style={{ marginBottom: 12 }}>
-            <div className="panel-head">
+          <article className="panel" key={batch.id} style={{ marginBottom: 12 }}>{/* 执行当前业务步骤 */}
+            <div className="panel-head">{/* 执行当前业务步骤 */}
               <h3>{batch.target_type === 'module' ? '模块' : '商品'} · {batch.mode} · {batch.direction}</h3>
               <span className={`badge ${batch.rolled_back_at ? 'danger' : 'success'}`}>{batch.rolled_back_at ? '已回滚' : '已生效'}</span>
             </div>
-            <div className="deploy-kv">
+            <div className="deploy-kv">{/* 执行当前业务步骤 */}
               <span>参数 {batch.value}{batch.mode === 'percent' ? '%' : ' 分'}</span>
               <span>命中 {batch.total} / 改动 {batch.changed} / 跳过 {batch.skipped}</span>
               <span>{batch.created_at.slice(0, 16)}</span>
             </div>
             {batch.items.length > 0 && (
-              <div className="table-wrap">
-                <table className="table">
+              <div className="table-wrap">{/* 执行当前业务步骤 */}
+                <table className="table">{/* 执行当前业务步骤 */}
                   <thead><tr><th>编码</th><th>改前</th><th>改后</th><th>结果</th></tr></thead>
-                  <tbody>
+                  <tbody>{/* 执行当前业务步骤 */}
                     {batch.items.map((item, index) => (
-                      <tr key={`${batch.id}-${item.target_id}-${index}`}>
+                      <tr key={`${batch.id}-${item.target_id}-${index}`}>{/* 执行当前业务步骤 */}
                         <td>{item.target_code ?? item.target_id}</td>
                         <td>{yuan(item.before_amount_minor, item.currency)}</td>
                         <td>{yuan(item.after_amount_minor, item.currency)}</td>
@@ -163,7 +163,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
               </div>
             )}
             {!batch.rolled_back_at && (
-              <button type="button" className="btn ghost" disabled={!canWrite || busy} onClick={() => void (async () => {
+              <button type="button" className="btn ghost" disabled={!canWrite || busy} onClick={() => void (async () => {{/* 执行当前业务步骤 */}
                 setBusy(true); // 回滚期间禁用按钮
                 setError(''); // 清空旧错误
                 try { // 业务步骤
@@ -181,5 +181,5 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         ))}
       </section>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // PriceBatches 结束

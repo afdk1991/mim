@@ -22,7 +22,7 @@
 
 import { Router } from 'express'; // Express 路由容器，按 /api/v1 前缀挂载
 import { AppError } from '@mim/core-domain'; // 统一业务异常，未登记入口回 404
-import {
+import { // 引入依赖、类型或本地模块绑定
   SITE_DOMAINS, // 19 个业务域，供筛选与汇总
   SITE_MODULES, // 44 个去重入口静态契约
   entryHostTemplate, // 配置模板：44 个环境变量键，值全为空
@@ -75,7 +75,7 @@ function entryView(m: (typeof SITE_MODULES)[number]) {
     rows: m.rows,
     // 来源工作表，仅作溯源。
     sheet: m.sheet,
-  };
+  }; // 代码块结束
 } // entryView 结束
 
 // 路由工厂：与其余域一致，由 createApp 注入 deps 后统一挂载。
@@ -178,8 +178,8 @@ export function createEntriesRouter(_deps: ApiDeps): Router {
     const entries = SITE_MODULES // 从静态契约出发，不查库
       .filter((m) => !domain || m.domain === domain) // 业务域过滤，空串表示不过滤
       .filter((m) => !q || [ // 多字段包含匹配，覆盖清单所有可读字段
-        m.entryKey, m.placeholder, m.system, m.entry, m.note, m.domain, m.domainName,
-        ...m.coreFunctions, ...m.responsibility.inScope, ...m.responsibility.outOfScope,
+        m.entryKey, m.placeholder, m.system, m.entry, m.note, m.domain, m.domainName, // 执行当前业务步骤
+        ...m.coreFunctions, ...m.responsibility.inScope, ...m.responsibility.outOfScope, // 执行当前业务步骤
       ].some((v) => String(v).toLowerCase().includes(q))) // 任一字段命中即保留
       .map(entryView); // 转为清单视图
     res.json({ // 统一响应体

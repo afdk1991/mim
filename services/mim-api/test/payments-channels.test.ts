@@ -24,7 +24,7 @@ const ADMIN_TOKEN = 'test-admin-token'; // 保存 ADMIN_TOKEN：承载本步骤�
 const HP_ENV = { // 保存 HP_ENV：承载本步骤的计算结果供后续使用
   MIM_HUPIJIAO_APP_ID: 'app-hp-1', // 对象字段：声明结构中的一项数据
   MIM_HUPIJIAO_APP_KEY: 'hp-secret-key', // 对象字段：声明结构中的一项数据
-  MIM_HUPIJIAO_NOTIFY_URL: 'http://localhost/api/v1/payments/hupijiao/notify',
+  MIM_HUPIJIAO_NOTIFY_URL: 'http://localhost/api/v1/payments/hupijiao/notify', // 对象字段 MIM_HUPIJIAO_NOTIFY_URL：记录一项配置或数据
 }; // 结束代码块：本层作用域收尾
 
 const STRIPE_ENV = { // 保存 STRIPE_ENV：承载本步骤的计算结果供后续使用
@@ -53,7 +53,7 @@ function startStub(handler: (body: string, path: string) => unknown): Promise<{ 
     server.listen(0, '127.0.0.1', () => { // 业务步骤：推进当前流程的下一项处理
       const addr = server.address(); // 保存 addr：承载本步骤的计算结果供后续使用
       const port = typeof addr === 'object' && addr ? addr.port : 0; // 保存 port：承载本步骤的计算结果供后续使用
-      resolve({ server, base: `http://127.0.0.1:${port}` });
+      resolve({ server, base: `http://127.0.0.1:${port}` }); // 调用 resolve 并处理其返回结果
     }); // 结束函数体：本层作用域收尾
   }); // 结束函数体：本层作用域收尾
 } // 结束代码块：本层作用域收尾
@@ -340,7 +340,7 @@ describe('下单与退款（本地 stub 上游）', () => { // 用例「下单�
   it('虎皮椒下单 → 201 并落跳转串；退款成功 → 余额冲正，幂等回放不重复退款', async () => { // 用例「虎皮椒下单 → 201 并落跳转串；退款成功 → 余额冲正，幂等回放不重复退款」：覆盖对应业务契约
     const { server, base } = await startStub((_body, path) => { // 解构依赖：从模块或上下文取出所需成员
       if (path.includes('/payment/refund.html')) return { errcode: 0, out_refund_no: 'rf-1', refund_status: 'OD' }; // 条件分支：仅在满足业务前置条件时继续
-      return { errcode: 0, url: 'https://pay.example/hp', url_qrcode: 'qr://hp-1', openid: 'hp-order-1' };
+      return { errcode: 0, url: 'https://pay.example/hp', url_qrcode: 'qr://hp-1', openid: 'hp-order-1' }; // 返回当前函数的处理结果
     }); // 结束函数体：本层作用域收尾
     stub = server; // 赋值：更新当前作用域中的状态
     h = makeApp({ ...HP_ENV, MIM_HUPIJIAO_API_BASE: base, MIM_ADMIN_TOKEN: ADMIN_TOKEN }); // 赋值：更新当前作用域中的状态
@@ -351,7 +351,7 @@ describe('下单与退款（本地 stub 上游）', () => { // 用例「下单�
       .set({ authorization: `Bearer ${token}`, 'idempotency-key': randomUUID() }) // 链式调用：在上一步结果上继续处理
       .send({ purpose: 'recharge', ref_id: 'ref-1', provider: 'hupijiao', amount_cents: 1000 }); // 链式调用：在上一步结果上继续处理
     expect(created.status).toBe(201); // 断言：校验接口返回符合契约
-    expect(created.body.intent.pay_url).toBe('https://pay.example/hp');
+    expect(created.body.intent.pay_url).toBe('https://pay.example/hp'); // 调用 expect 并处理其返回结果
 
     // 直接把意图置为已支付并模拟入账，再走退款
     const intentId = created.body.intent.id as string; // 保存 intentId：承载本步骤的计算结果供后续使用

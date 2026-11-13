@@ -76,22 +76,22 @@ export interface PriceBatchView { // 业务步骤
 
 /** 提交一批调价：固定价方向固定 set，增减模式必须带方向 */
 export async function createPriceBatch(
-  credential: Credential,
-  payload: {
-    target_type: PriceBatchTarget;
-    mode: PriceBatchMode;
-    direction?: PriceBatchDirection;
-    value: number;
-    filter?: PriceBatchFilter;
-    idempotency_key: string;
-  },
-): Promise<PriceBatchView> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { // 对象字段 payload：记录一项配置或数据
+    target_type: PriceBatchTarget; // 对象字段 target_type：记录一项配置或数据
+    mode: PriceBatchMode; // 对象字段 mode：记录一项配置或数据
+    direction?: PriceBatchDirection; // 执行当前业务步骤
+    value: number; // 对象字段 value：记录一项配置或数据
+    filter?: PriceBatchFilter; // 执行当前业务步骤
+    idempotency_key: string; // 对象字段 idempotency_key：记录一项配置或数据
+  }, // 代码块结束
+): Promise<PriceBatchView> { // 执行当前业务步骤
   // POST 管理端批次端点，响应包裹 { batch }
   const data = await request<{ batch: PriceBatchView }>('/admin/commerce/price-batches', {
-    method: 'POST',
-    body: payload,
-    credential,
-  });
+    method: 'POST', // 对象字段 method：记录一项配置或数据
+    body: payload, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
   // 解包批次
   return data.batch; // 业务步骤
 } // createPriceBatch 结束
@@ -108,9 +108,9 @@ export async function listPriceBatches(credential: Credential): Promise<PriceBat
 export async function rollbackPriceBatch(credential: Credential, batchId: string): Promise<PriceBatchView> {
   // 路径编码 + POST 回滚，响应包裹 { batch }
   const data = await request<{ batch: PriceBatchView }>(
-    `/admin/commerce/price-batches/${encodeURIComponent(batchId)}/rollback`,
-    { method: 'POST', body: {}, credential },
-  );
+    `/admin/commerce/price-batches/${encodeURIComponent(batchId)}/rollback`, // 执行当前业务步骤
+    { method: 'POST', body: {}, credential }, // 执行当前业务步骤
+  ); // 执行当前业务步骤
   // 解包回滚后的批次
   return data.batch; // 业务步骤
 } // rollbackPriceBatch 结束
@@ -171,14 +171,14 @@ export interface InviteRedemption { // 业务步骤
 
 /** 生成邀请码：count 支持 1–100 批量 */
 export async function createInvites(
-  credential: Credential,
-  payload: { count?: number; max_uses?: number; expires_in_days?: number; bound_identifier?: string; note?: string },
-): Promise<Array<{ code: string; max_uses: number; expires_at: string | null }>> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { count?: number; max_uses?: number; expires_in_days?: number; bound_identifier?: string; note?: string }, // 对象字段 payload：记录一项配置或数据
+): Promise<Array<{ code: string; max_uses: number; expires_at: string | null }>> { // 执行当前业务步骤
   // POST 生成端点，响应 { count, invites }
   const data = await request<{ count: number; invites: Array<{ code: string; max_uses: number; expires_at: string | null }> }>(
-    '/admin/invites',
-    { method: 'POST', body: payload, credential },
-  );
+    '/admin/invites', // 执行当前业务步骤
+    { method: 'POST', body: payload, credential }, // 执行当前业务步骤
+  ); // 执行当前业务步骤
   // 返回本次生成清单
   return data.invites; // 业务步骤
 } // createInvites 结束
@@ -203,10 +203,10 @@ export async function listInviteRedemptions(credential: Credential, code?: strin
 export function disableInvite(credential: Credential, code: string): Promise<{ ok: boolean; code: string }> {
   // PATCH 指定码
   return request<{ ok: boolean; code: string }>(`/admin/invites/${encodeURIComponent(code)}/disable`, {
-    method: 'PATCH',
-    body: {},
-    credential,
-  });
+    method: 'PATCH', // 对象字段 method：记录一项配置或数据
+    body: {}, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
 } // disableInvite 结束
 
 // ── 实名审核 ──────────────────────────────────────────────────────────────
@@ -249,63 +249,63 @@ export async function listRealnameQueue(credential: Credential): Promise<Realnam
 
 /** 审核实名：通过 / 驳回，驳回原因必填 */
 export function reviewRealname(
-  credential: Credential,
-  recordId: string,
-  payload: { decision: 'approve' | 'reject'; reason?: string },
-): Promise<RealnameView> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  recordId: string, // 对象字段 recordId：记录一项配置或数据
+  payload: { decision: 'approve' | 'reject'; reason?: string }, // 对象字段 payload：记录一项配置或数据
+): Promise<RealnameView> { // 执行当前业务步骤
   // POST 审核端点
   return request<RealnameView>(`/admin/realname/${encodeURIComponent(recordId)}/review`, {
-    method: 'POST',
-    body: payload,
-    credential,
-  });
+    method: 'POST', // 对象字段 method：记录一项配置或数据
+    body: payload, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
 } // reviewRealname 结束
 
 // ── 内容运营：公告 / 更新日志 / 推广计划 ──────────────────────────────────
 
 /** 公告管理行（库内完整字段） */
 export interface AdminAnnouncement { // 业务步骤
-  id: string;
-  title: string;
-  body: string;
-  level: string;
-  status: string;
-  starts_at: string | null;
-  ends_at: string | null;
-  pinned: number;
-  author_id: string | null;
-  created_at: string;
-  updated_at: string;
+  id: string; // 对象字段 id：记录一项配置或数据
+  title: string; // 对象字段 title：记录一项配置或数据
+  body: string; // 对象字段 body：记录一项配置或数据
+  level: string; // 对象字段 level：记录一项配置或数据
+  status: string; // 对象字段 status：记录一项配置或数据
+  starts_at: string | null; // 对象字段 starts_at：记录一项配置或数据
+  ends_at: string | null; // 对象字段 ends_at：记录一项配置或数据
+  pinned: number; // 对象字段 pinned：记录一项配置或数据
+  author_id: string | null; // 对象字段 author_id：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  updated_at: string; // 对象字段 updated_at：记录一项配置或数据
 } // 业务步骤
 
 /** 更新日志管理行：changes 为 JSON 字符串 */
 export interface AdminChangelog { // 业务步骤
-  id: string;
-  version: string;
-  title: string;
-  body: string;
-  changes: string;
-  published_at: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
+  id: string; // 对象字段 id：记录一项配置或数据
+  version: string; // 对象字段 version：记录一项配置或数据
+  title: string; // 对象字段 title：记录一项配置或数据
+  body: string; // 对象字段 body：记录一项配置或数据
+  changes: string; // 对象字段 changes：记录一项配置或数据
+  published_at: string | null; // 对象字段 published_at：记录一项配置或数据
+  status: string; // 对象字段 status：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  updated_at: string; // 对象字段 updated_at：记录一项配置或数据
 } // 业务步骤
 
 /** 推广计划管理行：含点击 / 转化统计 */
 export interface AdminPromotion { // 业务步骤
-  id: string;
-  name: string;
-  summary: string;
-  target_url: string;
-  code: string | null;
-  starts_at: string | null;
-  ends_at: string | null;
-  status: string;
-  budget_cents: number;
-  click_count: number;
-  conversion_count: number;
-  created_at: string;
-  updated_at: string;
+  id: string; // 对象字段 id：记录一项配置或数据
+  name: string; // 对象字段 name：记录一项配置或数据
+  summary: string; // 对象字段 summary：记录一项配置或数据
+  target_url: string; // 对象字段 target_url：记录一项配置或数据
+  code: string | null; // 对象字段 code：记录一项配置或数据
+  starts_at: string | null; // 对象字段 starts_at：记录一项配置或数据
+  ends_at: string | null; // 对象字段 ends_at：记录一项配置或数据
+  status: string; // 对象字段 status：记录一项配置或数据
+  budget_cents: number; // 对象字段 budget_cents：记录一项配置或数据
+  click_count: number; // 对象字段 click_count：记录一项配置或数据
+  conversion_count: number; // 对象字段 conversion_count：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  updated_at: string; // 对象字段 updated_at：记录一项配置或数据
 } // 业务步骤
 
 /** 公告列表 */
@@ -318,9 +318,9 @@ export async function listAdminAnnouncements(credential: Credential): Promise<Ad
 
 /** 新建公告 */
 export async function createAnnouncement(
-  credential: Credential,
-  payload: { title: string; body?: string; level?: string; status?: string; pinned?: boolean; starts_at?: string | null; ends_at?: string | null },
-): Promise<AdminAnnouncement> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { title: string; body?: string; level?: string; status?: string; pinned?: boolean; starts_at?: string | null; ends_at?: string | null }, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminAnnouncement> { // 执行当前业务步骤
   // POST 管理端公告，响应包裹 { item }
   const data = await request<{ item: AdminAnnouncement }>('/admin/content/announcements', { method: 'POST', body: payload, credential });
   // 返回新行
@@ -329,16 +329,16 @@ export async function createAnnouncement(
 
 /** 更新公告 */
 export async function updateAnnouncement(
-  credential: Credential,
-  id: string,
-  payload: Partial<{ title: string; body: string; level: string; status: string; pinned: boolean; starts_at: string | null; ends_at: string | null }>,
-): Promise<AdminAnnouncement> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  id: string, // 对象字段 id：记录一项配置或数据
+  payload: Partial<{ title: string; body: string; level: string; status: string; pinned: boolean; starts_at: string | null; ends_at: string | null }>, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminAnnouncement> { // 执行当前业务步骤
   // PATCH 指定公告
   const data = await request<{ item: AdminAnnouncement }>(`/admin/content/announcements/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: payload,
-    credential,
-  });
+    method: 'PATCH', // 对象字段 method：记录一项配置或数据
+    body: payload, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
   // 返回更新行
   return data.item; // 业务步骤
 } // updateAnnouncement 结束
@@ -359,9 +359,9 @@ export async function listAdminChangelog(credential: Credential): Promise<AdminC
 
 /** 新建更新日志：changes 传字符串数组，落库由后端 JSON 化 */
 export async function createChangelog(
-  credential: Credential,
-  payload: { version: string; title: string; body?: string; changes?: string[]; published_at?: string | null; status?: string },
-): Promise<AdminChangelog> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { version: string; title: string; body?: string; changes?: string[]; published_at?: string | null; status?: string }, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminChangelog> { // 执行当前业务步骤
   // POST 管理端更新日志
   const data = await request<{ item: AdminChangelog }>('/admin/content/changelog', { method: 'POST', body: payload, credential });
   // 返回新行
@@ -370,16 +370,16 @@ export async function createChangelog(
 
 /** 更新更新日志 */
 export async function updateChangelog(
-  credential: Credential,
-  id: string,
-  payload: Partial<{ version: string; title: string; body: string; changes: string[]; published_at: string | null; status: string }>,
-): Promise<AdminChangelog> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  id: string, // 对象字段 id：记录一项配置或数据
+  payload: Partial<{ version: string; title: string; body: string; changes: string[]; published_at: string | null; status: string }>, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminChangelog> { // 执行当前业务步骤
   // PATCH 指定条目
   const data = await request<{ item: AdminChangelog }>(`/admin/content/changelog/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: payload,
-    credential,
-  });
+    method: 'PATCH', // 对象字段 method：记录一项配置或数据
+    body: payload, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
   // 返回更新行
   return data.item; // 业务步骤
 } // updateChangelog 结束
@@ -400,9 +400,9 @@ export async function listAdminPromotions(credential: Credential): Promise<Admin
 
 /** 新建推广计划 */
 export async function createPromotion(
-  credential: Credential,
-  payload: { name: string; summary?: string; target_url?: string; code?: string | null; starts_at?: string | null; ends_at?: string | null; status?: string; budget_cents?: number },
-): Promise<AdminPromotion> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { name: string; summary?: string; target_url?: string; code?: string | null; starts_at?: string | null; ends_at?: string | null; status?: string; budget_cents?: number }, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminPromotion> { // 执行当前业务步骤
   // POST 管理端推广计划
   const data = await request<{ item: AdminPromotion }>('/admin/content/promotions', { method: 'POST', body: payload, credential });
   // 返回新行
@@ -411,16 +411,16 @@ export async function createPromotion(
 
 /** 更新推广计划 */
 export async function updatePromotion(
-  credential: Credential,
-  id: string,
-  payload: Partial<{ name: string; summary: string; target_url: string; code: string | null; starts_at: string | null; ends_at: string | null; status: string; budget_cents: number }>,
-): Promise<AdminPromotion> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  id: string, // 对象字段 id：记录一项配置或数据
+  payload: Partial<{ name: string; summary: string; target_url: string; code: string | null; starts_at: string | null; ends_at: string | null; status: string; budget_cents: number }>, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminPromotion> { // 执行当前业务步骤
   // PATCH 指定计划
   const data = await request<{ item: AdminPromotion }>(`/admin/content/promotions/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: payload,
-    credential,
-  });
+    method: 'PATCH', // 对象字段 method：记录一项配置或数据
+    body: payload, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
   // 返回更新行
   return data.item; // 业务步骤
 } // updatePromotion 结束
@@ -435,26 +435,26 @@ export function deletePromotion(credential: Credential, id: string): Promise<{ o
 
 /** 工具版本记录 */
 export interface ToolVersionNote { // 业务步骤
-  version: string;
-  title?: string;
-  notes?: string;
-  released_at?: string;
+  version: string; // 对象字段 version：记录一项配置或数据
+  title?: string; // 执行当前业务步骤
+  notes?: string; // 执行当前业务步骤
+  released_at?: string; // 执行当前业务步骤
 } // 业务步骤
 
 /** 工具视图 */
 export interface AdminTool { // 业务步骤
-  id: string;
-  slug: string;
-  name: string;
-  summary: string;
-  version_notes: ToolVersionNote[];
-  download_url: string;
-  doc_url: string;
-  tags: string[];
-  status: string;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
+  id: string; // 对象字段 id：记录一项配置或数据
+  slug: string; // 对象字段 slug：记录一项配置或数据
+  name: string; // 对象字段 name：记录一项配置或数据
+  summary: string; // 对象字段 summary：记录一项配置或数据
+  version_notes: ToolVersionNote[]; // 对象字段 version_notes：记录一项配置或数据
+  download_url: string; // 对象字段 download_url：记录一项配置或数据
+  doc_url: string; // 对象字段 doc_url：记录一项配置或数据
+  tags: string[]; // 对象字段 tags：记录一项配置或数据
+  status: string; // 对象字段 status：记录一项配置或数据
+  sort_order: number; // 对象字段 sort_order：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  updated_at: string; // 对象字段 updated_at：记录一项配置或数据
 } // 业务步骤
 
 /** 工具管理清单：含草稿 / 归档 */
@@ -467,9 +467,9 @@ export async function listToolsManage(credential: Credential): Promise<AdminTool
 
 /** 新建工具 */
 export async function createTool(
-  credential: Credential,
-  payload: { slug: string; name: string; summary?: string; version_notes?: ToolVersionNote[]; download_url?: string; doc_url?: string; tags?: string[]; status?: string; sort_order?: number },
-): Promise<AdminTool> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { slug: string; name: string; summary?: string; version_notes?: ToolVersionNote[]; download_url?: string; doc_url?: string; tags?: string[]; status?: string; sort_order?: number }, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminTool> { // 执行当前业务步骤
   // POST 工具端点，响应 { ok, tool }
   const data = await request<{ ok: boolean; tool: AdminTool }>('/tools', { method: 'POST', body: payload, credential });
   // 返回工具
@@ -478,16 +478,16 @@ export async function createTool(
 
 /** 更新工具：slug 不可改 */
 export async function updateTool(
-  credential: Credential,
-  slug: string,
-  payload: Partial<{ name: string; summary: string; version_notes: ToolVersionNote[]; download_url: string; doc_url: string; tags: string[]; status: string; sort_order: number }>,
-): Promise<AdminTool> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  slug: string, // 对象字段 slug：记录一项配置或数据
+  payload: Partial<{ name: string; summary: string; version_notes: ToolVersionNote[]; download_url: string; doc_url: string; tags: string[]; status: string; sort_order: number }>, // 对象字段 payload：记录一项配置或数据
+): Promise<AdminTool> { // 执行当前业务步骤
   // PUT 指定 slug
   const data = await request<{ ok: boolean; tool: AdminTool }>(`/tools/${encodeURIComponent(slug)}`, {
-    method: 'PUT',
-    body: payload,
-    credential,
-  });
+    method: 'PUT', // 对象字段 method：记录一项配置或数据
+    body: payload, // 对象字段 body：记录一项配置或数据
+    credential, // 执行当前业务步骤
+  }); // 代码块结束
   // 返回工具
   return data.tool; // 业务步骤
 } // updateTool 结束
@@ -502,17 +502,17 @@ export function deleteTool(credential: Credential, slug: string): Promise<{ ok: 
 
 /** 待审板块行 */
 export interface PendingBoard { // 业务步骤
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  icon: string | null;
-  price_cents: number;
-  visibility: string;
-  status: string;
-  created_by: string | null;
-  created_at: string;
-  creator_name: string | null;
+  id: string; // 对象字段 id：记录一项配置或数据
+  slug: string; // 对象字段 slug：记录一项配置或数据
+  name: string; // 对象字段 name：记录一项配置或数据
+  description: string; // 对象字段 description：记录一项配置或数据
+  icon: string | null; // 对象字段 icon：记录一项配置或数据
+  price_cents: number; // 对象字段 price_cents：记录一项配置或数据
+  visibility: string; // 对象字段 visibility：记录一项配置或数据
+  status: string; // 对象字段 status：记录一项配置或数据
+  created_by: string | null; // 对象字段 created_by：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  creator_name: string | null; // 对象字段 creator_name：记录一项配置或数据
 } // 业务步骤
 
 /** 待审板块队列 */
@@ -567,11 +567,11 @@ export async function setCommunityReview(credential: Credential, required: boole
 
 /** 推荐指数权重：各因子权重 + 时间半衰期 */
 export interface RecommendWeights { // 业务步骤
-  views: number;
-  replies: number;
-  favorites: number;
-  rating: number;
-  halfLifeDays: number;
+  views: number; // 对象字段 views：记录一项配置或数据
+  replies: number; // 对象字段 replies：记录一项配置或数据
+  favorites: number; // 对象字段 favorites：记录一项配置或数据
+  rating: number; // 对象字段 rating：记录一项配置或数据
+  halfLifeDays: number; // 对象字段 halfLifeDays：记录一项配置或数据
 } // 业务步骤
 
 /** 读取推荐指数权重与默认值 */
@@ -590,11 +590,11 @@ export async function setRecommendWeights(credential: Credential, weights: Parti
 
 /** 板块 Tab 配置项 */
 export interface BoardTab { // 业务步骤
-  key: string;
-  label?: string;
-  visible?: boolean;
-  sort_order?: number;
-  sort_by?: string;
+  key: string; // 对象字段 key：记录一项配置或数据
+  label?: string; // 执行当前业务步骤
+  visible?: boolean; // 执行当前业务步骤
+  sort_order?: number; // 执行当前业务步骤
+  sort_by?: string; // 执行当前业务步骤
 } // 业务步骤
 
 /** 读取指定板块的 Tab 配置 */

@@ -15,7 +15,7 @@ import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { parse } from '../validate.js'; // zod 校验包装
 import { requireAuth } from '../middleware.js'; // 票据签发与登出需要登录态
 import { finishLogin } from './auth.js'; // 统一会话签发
-import {
+import { // 引入依赖、类型或本地模块绑定
   SSO_TICKET_TTL_SECONDS, // 票据有效期常量
   consumeSsoTicket, // 票据兑换
   isSiteAllowed, // 白名单判定

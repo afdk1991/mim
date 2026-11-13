@@ -7,8 +7,8 @@ import { createDatabase } from '../src/db.js'; // 内存库
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 测试签名密钥
 
-describe('P2 路由已接入主应用', () => {
-  it('实名状态 / 邀请码管理 / SSO 兑换返回业务错误而不是 404', async () => {
+describe('P2 路由已接入主应用', () => { // 调用 describe 并处理其返回结果
+  it('实名状态 / 邀请码管理 / SSO 兑换返回业务错误而不是 404', async () => { // 调用 it 并处理其返回结果
     const db = createDatabase(':memory:'); // 每次用例独立内存库
     const app = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 不注入任何外部通道
 
@@ -31,5 +31,5 @@ describe('P2 路由已接入主应用', () => {
 
     const tools = await request(app).get('/api/v1/tools'); // 自研工具公开目录
     expect(tools.status).toBe(200); // 证明工具路由已挂载
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束

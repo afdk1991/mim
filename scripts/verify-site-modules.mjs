@@ -47,50 +47,50 @@ function read(rel) {
 // 原序号 02 条目已按要求于 2026-11-12 移除，剩余 44 条。
 // 逐字比对的意义：任何人工改写、漏字、全角竖线替换都会让本脚本失败。
 const EXPECTED_NOTES = [
-  ['PORTAL_ROOT', '核心根域名，主站基础入口｜主站统一跳转门户'],
-  ['ADMIN_CONSOLE', '管理后台入口｜全站统一运营管理后台'],
-  ['API_GATEWAY', '接口服务入口｜API 统一网关'],
-  ['APP_API', 'APP 端接口入口｜移动端专属接口服务'],
-  ['AUTH_CENTER', '权限验证入口｜统一身份认证与权限中心'],
-  ['BLOG', '博客模块入口｜官方博客系统'],
-  ['MEMBER_CENTER', '用户中心入口｜用户个人中心 / 会员工作台'],
-  ['CLOUD_DRIVE', '云服务模块入口｜私有云盘 / 网盘系统'],
-  ['OPEN_DATA', '数据中心入口｜开放数据集平台'],
-  ['DEV_PORTAL', '开发测试入口｜开发环境门户 + 接口文档'],
-  ['NAVIGATION', '导航模块入口｜全站资源导航站'],
-  ['LOWCODE', '代码生成工具入口｜低代码生成平台'],
-  ['UGC_VIDEO', '视频动态模块入口｜UGC 短视频动态社区'],
-  ['OPS_MONITOR', '服务器支撑入口｜运维监控面板'],
-  ['GALE_TOOLS', '工具模块核心入口，疾风引擎承载节点｜疾风引擎在线工具平台'],
-  ['HELP_CENTER', '帮助中心入口｜产品帮助文档中心'],
-  ['IMAGE_ASSETS', '图片资源入口｜公共图床 + 素材资源站'],
-  ['SSO_LOGIN', '登录验证入口｜统一单点登录页'],
-  ['MALL_B2C', '电商商城入口｜B2C 官方商城系统'],
-  ['MARKETING', '营销模块入口｜营销活动管理平台'],
-  ['MOBILE_H5', '移动端适配入口｜移动端 H5 精简版官网'],
-  ['MOBILE_FULL', '移动终端专用入口｜全功能移动端站点'],
-  ['NEWS_PUBLISH', '资讯模块入口｜新闻资讯发布系统'],
-  ['PAYMENT_GATEWAY', '支付结算入口｜支付聚合网关 + 对账系统'],
-  ['INTRANET_PORTAL', '门户首页入口｜企业内部统一门户 / 工作台'],
-  ['SECURITY_CENTER', '安全防护入口｜安全防护中心'],
-  ['SERVICE_GOVERNANCE', '服务支撑入口｜服务治理监控平台'],
-  ['MULTI_MERCHANT', '线上店铺入口｜多商户店铺系统'],
-  ['CRAWLER_SCHEDULER', '数据采集入口｜爬虫调度与数据采集平台'],
-  ['VOD_LONG_VIDEO', '视频模块入口｜长视频点播系统'],
-  ['BI_DASHBOARD', '数据统计入口｜全站数据 BI 看板'],
-  ['DOWNLOAD_DIST', '资源存储 / 下载站点｜软件源码下载分发站'],
-  ['TICKET_SUPPORT', '技术支持入口｜工单客服系统'],
-  ['TEST_ENV', '测试环境入口｜测试环境统一入口'],
-  ['MEMBER_ADMIN', '用户管理入口｜用户会员管理后台'],
-  ['VIDEO_PLAYER', '视频播放入口｜独立视频播放页'],
-  ['WORDPRESS', 'WordPress 相关入口｜WordPress 独立站点'],
-  ['SELF_MEDIA', '新闻资讯入口｜自媒体资讯平台'],
-  ['SOURCE_GOODS', '商品资源入口｜货源商品库平台'],
-  ['VOICE_TOOLS', '语音相关入口｜语音工具服务平台'],
-  ['B2B_TRADE', 'B2B 大宗商贸平台主入口｜B2B 企业批发采购平台'],
-  ['SUPPLIER_ADMIN', '供应商入驻管理入口｜供应商后台管理系统'],
-  ['C2C_MARKET', 'C2C 个人交易市场入口｜C2C 个人闲置 / 商品交易平台'],
-  ['SELLER_ADMIN', '个人卖家管理入口｜个人卖家店铺管理后台'],
+  ['PORTAL_ROOT', '核心根域名，主站基础入口｜主站统一跳转门户'], // 执行当前业务步骤
+  ['ADMIN_CONSOLE', '管理后台入口｜全站统一运营管理后台'], // 执行当前业务步骤
+  ['API_GATEWAY', '接口服务入口｜API 统一网关'], // 执行当前业务步骤
+  ['APP_API', 'APP 端接口入口｜移动端专属接口服务'], // 执行当前业务步骤
+  ['AUTH_CENTER', '权限验证入口｜统一身份认证与权限中心'], // 执行当前业务步骤
+  ['BLOG', '博客模块入口｜官方博客系统'], // 执行当前业务步骤
+  ['MEMBER_CENTER', '用户中心入口｜用户个人中心 / 会员工作台'], // 执行当前业务步骤
+  ['CLOUD_DRIVE', '云服务模块入口｜私有云盘 / 网盘系统'], // 执行当前业务步骤
+  ['OPEN_DATA', '数据中心入口｜开放数据集平台'], // 执行当前业务步骤
+  ['DEV_PORTAL', '开发测试入口｜开发环境门户 + 接口文档'], // 执行当前业务步骤
+  ['NAVIGATION', '导航模块入口｜全站资源导航站'], // 执行当前业务步骤
+  ['LOWCODE', '代码生成工具入口｜低代码生成平台'], // 执行当前业务步骤
+  ['UGC_VIDEO', '视频动态模块入口｜UGC 短视频动态社区'], // 执行当前业务步骤
+  ['OPS_MONITOR', '服务器支撑入口｜运维监控面板'], // 执行当前业务步骤
+  ['GALE_TOOLS', '工具模块核心入口，疾风引擎承载节点｜疾风引擎在线工具平台'], // 执行当前业务步骤
+  ['HELP_CENTER', '帮助中心入口｜产品帮助文档中心'], // 执行当前业务步骤
+  ['IMAGE_ASSETS', '图片资源入口｜公共图床 + 素材资源站'], // 执行当前业务步骤
+  ['SSO_LOGIN', '登录验证入口｜统一单点登录页'], // 执行当前业务步骤
+  ['MALL_B2C', '电商商城入口｜B2C 官方商城系统'], // 执行当前业务步骤
+  ['MARKETING', '营销模块入口｜营销活动管理平台'], // 执行当前业务步骤
+  ['MOBILE_H5', '移动端适配入口｜移动端 H5 精简版官网'], // 执行当前业务步骤
+  ['MOBILE_FULL', '移动终端专用入口｜全功能移动端站点'], // 执行当前业务步骤
+  ['NEWS_PUBLISH', '资讯模块入口｜新闻资讯发布系统'], // 执行当前业务步骤
+  ['PAYMENT_GATEWAY', '支付结算入口｜支付聚合网关 + 对账系统'], // 执行当前业务步骤
+  ['INTRANET_PORTAL', '门户首页入口｜企业内部统一门户 / 工作台'], // 执行当前业务步骤
+  ['SECURITY_CENTER', '安全防护入口｜安全防护中心'], // 执行当前业务步骤
+  ['SERVICE_GOVERNANCE', '服务支撑入口｜服务治理监控平台'], // 执行当前业务步骤
+  ['MULTI_MERCHANT', '线上店铺入口｜多商户店铺系统'], // 执行当前业务步骤
+  ['CRAWLER_SCHEDULER', '数据采集入口｜爬虫调度与数据采集平台'], // 执行当前业务步骤
+  ['VOD_LONG_VIDEO', '视频模块入口｜长视频点播系统'], // 执行当前业务步骤
+  ['BI_DASHBOARD', '数据统计入口｜全站数据 BI 看板'], // 执行当前业务步骤
+  ['DOWNLOAD_DIST', '资源存储 / 下载站点｜软件源码下载分发站'], // 执行当前业务步骤
+  ['TICKET_SUPPORT', '技术支持入口｜工单客服系统'], // 执行当前业务步骤
+  ['TEST_ENV', '测试环境入口｜测试环境统一入口'], // 执行当前业务步骤
+  ['MEMBER_ADMIN', '用户管理入口｜用户会员管理后台'], // 执行当前业务步骤
+  ['VIDEO_PLAYER', '视频播放入口｜独立视频播放页'], // 执行当前业务步骤
+  ['WORDPRESS', 'WordPress 相关入口｜WordPress 独立站点'], // 执行当前业务步骤
+  ['SELF_MEDIA', '新闻资讯入口｜自媒体资讯平台'], // 执行当前业务步骤
+  ['SOURCE_GOODS', '商品资源入口｜货源商品库平台'], // 执行当前业务步骤
+  ['VOICE_TOOLS', '语音相关入口｜语音工具服务平台'], // 执行当前业务步骤
+  ['B2B_TRADE', 'B2B 大宗商贸平台主入口｜B2B 企业批发采购平台'], // 执行当前业务步骤
+  ['SUPPLIER_ADMIN', '供应商入驻管理入口｜供应商后台管理系统'], // 执行当前业务步骤
+  ['C2C_MARKET', 'C2C 个人交易市场入口｜C2C 个人闲置 / 商品交易平台'], // 执行当前业务步骤
+  ['SELLER_ADMIN', '个人卖家管理入口｜个人卖家店铺管理后台'], // 执行当前业务步骤
 ]; // EXPECTED_NOTES 结束
 
 // 依据清单本身也做断言，防止有人误删期望行让「44 条」假通过。
@@ -103,12 +103,12 @@ check('用户依据备注无重复', new Set(EXPECTED_NOTES.map(([, note]) => no
 // ---------- 2. 共享清单：结构与逐条自洽 ----------
 // 读取单一数据源 JSON；格式错误直接终止，避免后续访问 undefined 产生噪声。
 let data;
-try {
+try { // 异常捕获起点：包裹可能抛出错误的操作
   // 按 UTF-8 解析，中文备注与全角分隔符不会被破坏。
   data = JSON.parse(read('packages/core-domain/src/siteModules.json'));
   // 解析成功记录一项通过断言。
   check('清单 JSON 可解析', true, '');
-} catch (error) {
+} catch (error) { // 代码块结束
   // 解析失败给出原因并退出。
   check('清单 JSON 可解析', false, String(error));
   // 直接退出，后续断言无对象可用。
@@ -132,24 +132,24 @@ check('已清空列登记 6 列', Array.isArray(data.clearedColumns) && data.cle
 
 // 去重整理口径：@ 记录、空白字段、重复备注都必须按一项处理。
 const dedupe = data.dedupe ?? {};
-check('去重规则为完全相同且用途一致按一项', String(dedupe.rule).includes('完全相同且用途一致'), '规则漂移');
-check('88 行业务备注合并 44 项', dedupe.businessNoteRows === 88 && dedupe.duplicatePairs === 44 && dedupe.mergedEntries === 44, '重复备注未合并');
-check('@ 两行合并为 1 项根域名占位', JSON.stringify(dedupe.atRecordRows) === '[2,3]' && dedupe.atRecordMergedInto === 'AT_ROOT', '@ 记录未合并');
-check('11 行空白备注合并为 1 项', dedupe.blankNoteRows === 11 && dedupe.blankMergedInto === 'BLANK_UNSET', '空白字段未合并');
-check('@ 与空白占位均不补写具体主机值', data.atRecord?.hostValue === null && data.blankRecord?.hostValue === null, '占位项含具体值');
-check('空白行策略明确不引用台账主机值', String(data.blankRowPolicy).includes('不作为入口标识依据'), '缺空白行策略');
+check('去重规则为完全相同且用途一致按一项', String(dedupe.rule).includes('完全相同且用途一致'), '规则漂移'); // 调用 check 并处理其返回结果
+check('88 行业务备注合并 44 项', dedupe.businessNoteRows === 88 && dedupe.duplicatePairs === 44 && dedupe.mergedEntries === 44, '重复备注未合并'); // 调用 check 并处理其返回结果
+check('@ 两行合并为 1 项根域名占位', JSON.stringify(dedupe.atRecordRows) === '[2,3]' && dedupe.atRecordMergedInto === 'AT_ROOT', '@ 记录未合并'); // 调用 check 并处理其返回结果
+check('11 行空白备注合并为 1 项', dedupe.blankNoteRows === 11 && dedupe.blankMergedInto === 'BLANK_UNSET', '空白字段未合并'); // 调用 check 并处理其返回结果
+check('@ 与空白占位均不补写具体主机值', data.atRecord?.hostValue === null && data.blankRecord?.hostValue === null, '占位项含具体值'); // 调用 check 并处理其返回结果
+check('空白行策略明确不引用台账主机值', String(data.blankRowPolicy).includes('不作为入口标识依据'), '缺空白行策略'); // 调用 check 并处理其返回结果
 
 // 主机配置策略：占位模式 + 缺省 null + 不补写声明。
 const hostConfig = data.hostConfig ?? {};
-check('主机配置模式为 placeholder', hostConfig.mode === 'placeholder', '模式漂移');
-check('占位格式与注入前缀正确', hostConfig.format === '{{HOST:<ENTRY_KEY>}}' && hostConfig.envPrefix === 'MIM_HOST_', '格式漂移');
-check('缺省主机值为 null 且声明不补写', hostConfig.defaultValue === null && String(hostConfig.rule).includes('不补写'), '缺不补写声明');
-check('未配置时禁止推导真实域名', String(hostConfig.resolutionOfMissing).includes('不得推导'), '缺降级口径');
+check('主机配置模式为 placeholder', hostConfig.mode === 'placeholder', '模式漂移'); // 调用 check 并处理其返回结果
+check('占位格式与注入前缀正确', hostConfig.format === '{{HOST:<ENTRY_KEY>}}' && hostConfig.envPrefix === 'MIM_HOST_', '格式漂移'); // 调用 check 并处理其返回结果
+check('缺省主机值为 null 且声明不补写', hostConfig.defaultValue === null && String(hostConfig.rule).includes('不补写'), '缺不补写声明'); // 调用 check 并处理其返回结果
+check('未配置时禁止推导真实域名', String(hostConfig.resolutionOfMissing).includes('不得推导'), '缺降级口径'); // 调用 check 并处理其返回结果
 
 // 清单数组：缺项时后续逐项检查仍能给出明细。
 const modules = Array.isArray(data.modules) ? data.modules : [];
-const domains = Array.isArray(data.domains) ? data.domains : [];
-const blanks = Array.isArray(data.blankRows) ? data.blankRows : [];
+const domains = Array.isArray(data.domains) ? data.domains : []; // 常量 domains：保存固定配置或一次性派生值
+const blanks = Array.isArray(data.blankRows) ? data.blankRows : []; // 常量 blanks：保存固定配置或一次性派生值
 // 去重后入口数量断言：44 类备注一一对应。
 check('清单入口 44 个', modules.length === 44, `实际 ${modules.length}`);
 // 业务域数量断言：19 组业务用途。
@@ -176,7 +176,7 @@ check('record 状态机', JSON.stringify(kinds.record?.states) === JSON.stringif
 
 // 逐项比对 44 条备注原文、占位键、行号与结构自洽性。
 const noteMismatches = [];
-const structureProblems = [];
+const structureProblems = []; // 常量 structureProblems：保存固定配置或一次性派生值
 // 占位键集合：检测重复入口。
 const seenKeys = new Set();
 // 功能点总数累加器。
@@ -219,8 +219,8 @@ for (const m of modules) {
   } // 行号校验结束
   // 可配置占位标识：格式固定，且不得包含任何具体主机值。
   if (m.placeholder !== `{{HOST:${m.entryKey}}}`) structureProblems.push(`${expectId} 占位标识漂移 ${m.placeholder}`);
-  if (m.envKey !== `MIM_HOST_${m.entryKey}`) structureProblems.push(`${expectId} 注入键漂移 ${m.envKey}`);
-  if (m.hostValue !== null) structureProblems.push(`${expectId} 补写了具体主机值`);
+  if (m.envKey !== `MIM_HOST_${m.entryKey}`) structureProblems.push(`${expectId} 注入键漂移 ${m.envKey}`); // 条件分支：按判断结果选择后续处理路径
+  if (m.hostValue !== null) structureProblems.push(`${expectId} 补写了具体主机值`); // 条件分支：按判断结果选择后续处理路径
   // 不得残留 v1 的具体主机值字段。
   if ('fqdn' in m || 'host' in m) structureProblems.push(`${expectId} 残留具体主机值字段`);
   // 业务域归属：必须出现在某个业务域的 entryKeys 里。
@@ -231,18 +231,18 @@ for (const m of modules) {
   if (!owning || owning.code !== m.domain || owning.name !== m.domainName) structureProblems.push(`${expectId} domain 与业务域清单不一致`);
   // 核心功能：至少 3 条，且不得为空。
   const funcs = Array.isArray(m.coreFunctions) ? m.coreFunctions : [];
-  if (funcs.length < 3 || funcs.some((f) => !String(f).trim())) structureProblems.push(`${expectId} 核心功能缺失`);
+  if (funcs.length < 3 || funcs.some((f) => !String(f).trim())) structureProblems.push(`${expectId} 核心功能缺失`); // 条件分支：按判断结果选择后续处理路径
   // 职责边界：负责与不负责都要给出。
   if (!Array.isArray(m.responsibility?.inScope) || m.responsibility.inScope.length === 0 ||
-      !Array.isArray(m.responsibility?.outOfScope) || m.responsibility.outOfScope.length === 0) {
-    structureProblems.push(`${expectId} 职责边界不完整`);
+      !Array.isArray(m.responsibility?.outOfScope) || m.responsibility.outOfScope.length === 0) { // 执行当前业务步骤
+    structureProblems.push(`${expectId} 职责边界不完整`); // 执行当前业务步骤
   } // 职责边界校验结束
   // 后台管理职责与接口职责必须齐备。
   if (!m.adminRole || !m.apiRole) structureProblems.push(`${expectId} 后台/接口职责缺失`);
   // 相似模块关联与区分：至少 1 条，且每条都要有区分说明。
   const rels = Array.isArray(m.related) ? m.related : [];
-  relationTotal += rels.length;
-  if (rels.length === 0 || rels.some((r) => !r.distinction || !r.entryKey)) structureProblems.push(`${expectId} 关联区分缺失`);
+  relationTotal += rels.length; // 执行当前业务步骤
+  if (rels.length === 0 || rels.some((r) => !r.distinction || !r.entryKey)) structureProblems.push(`${expectId} 关联区分缺失`); // 条件分支：按判断结果选择后续处理路径
   // 功能点：每个模块恰好 3 个，编码固定为 catalog / manage / record。
   const caps = Array.isArray(m.capabilities) ? m.capabilities : [];
   // 累加功能点总数。
@@ -284,13 +284,13 @@ for (const m of modules) {
 
 // 关联目标必须指向清单内真实存在的入口（避免悬空引用）。
 const allKeys = new Set(modules.map((m) => m.entryKey));
-const dangling = [];
-for (const m of modules) {
-  for (const r of m.related ?? []) {
-    if (!allKeys.has(r.entryKey)) dangling.push(`${m.id}→${r.entryKey}`);
-  }
-}
-check('相似模块关联无悬空引用', dangling.length === 0, dangling.slice(0, 3).join('; '));
+const dangling = []; // 常量 dangling：保存固定配置或一次性派生值
+for (const m of modules) { // 循环：逐项遍历集合并执行相同处理
+  for (const r of m.related ?? []) { // 循环：逐项遍历集合并执行相同处理
+    if (!allKeys.has(r.entryKey)) dangling.push(`${m.id}→${r.entryKey}`); // 条件分支：按判断结果选择后续处理路径
+  } // 代码块结束
+} // 代码块结束
+check('相似模块关联无悬空引用', dangling.length === 0, dangling.slice(0, 3).join('; ')); // 调用 check 并处理其返回结果
 
 // 44 条备注逐字一致断言（一次性汇总差异）。
 check('44 条备注逐字一致', noteMismatches.length === 0, noteMismatches.slice(0, 3).join('; '));
@@ -304,9 +304,9 @@ check('演示数据共 88 条', seedTotal === 88, `实际 ${seedTotal}`);
 check('相似模块关联不少于 44 条', relationTotal >= 44, `实际 ${relationTotal}`);
 // 清单全文不得出现任何具体主机值（除来源说明与工作表名）。
 const concrete = read('packages/core-domain/src/siteModules.json')
-  .split('\n')
-  .filter((line) => /(\.mixm\.top|www\.|https?:\/\/)/.test(line) && !/"(source|scope|sheet)"/.test(line));
-check('清单不含具体主机值', concrete.length === 0, concrete.slice(0, 2).join('; '));
+  .split('\n') // 执行当前业务步骤
+  .filter((line) => /(\.mixm\.top|www\.|https?:\/\/)/.test(line) && !/"(source|scope|sheet)"/.test(line)); // 执行当前业务步骤
+check('清单不含具体主机值', concrete.length === 0, concrete.slice(0, 2).join('; ')); // 调用 check 并处理其返回结果
 
 // ---------- 3. 全链路消费：共享包 → 后端 → 前端 → 测试 → 脚本 ----------
 // 共享包 barrel 必须导出清单，否则 API 与 Web 都无法引用。
@@ -321,7 +321,7 @@ const wrapper = read('packages/core-domain/src/siteModules.ts');
 check('封装层提供完整工具函数', ['findSiteModule', 'findSiteCapability', 'isSiteState', 'defaultSiteState', 'siteModulesSummary', 'resolveEntryHost', 'entryHostTemplate'].every((fn) => wrapper.includes(`export function ${fn}`)), '工具函数缺失');
 // 落地注册表：四态计数与按占位键取映射必须齐备。
 const implFile = read('packages/core-domain/src/entryImplementation.ts');
-check('落地注册表提供四态计数与查询', implFile.includes('implementationOf') && implFile.includes('implementationSummary') && implFile.includes("'implemented'") && implFile.includes("'conflict'"), '落地映射缺失');
+check('落地注册表提供四态计数与查询', implFile.includes('implementationOf') && implFile.includes('implementationSummary') && implFile.includes("'implemented'") && implFile.includes("'conflict'"), '落地映射缺失'); // 调用 check 并处理其返回结果
 // 封装层必须导入同名 JSON，保证单一数据源。
 check('封装层消费清单 JSON', wrapper.includes("from './siteModules.json'"), '未引用 JSON');
 // 封装层不得把具体主机值写回数据本体。
@@ -358,23 +358,23 @@ check('sites 路由透出落地状态', route.includes('implementation: m.implem
 
 // 清单路由必须覆盖六个只读端点。
 const entryRoute = read('services/mim-api/src/routes/entries.ts');
-const entryPaths = ['/entries/overview', '/entries/domains', '/entries/placeholders', '/entries/config', "'/entries'", "'/entries/:entryKey'"];
-check('清单路由覆盖 6 个只读端点', entryPaths.every((p) => entryRoute.includes(p)), '清单端点缺失');
-check('清单路由静态路径先于动态参数', entryRoute.indexOf("router.get('/entries/overview'") < entryRoute.indexOf("router.get('/entries/:entryKey'"), '注册顺序错误');
-check('清单路由不回显具体主机值', entryRoute.includes('resolveEntryHost') && !entryRoute.includes('hostValue:'), '配置状态泄露风险');
+const entryPaths = ['/entries/overview', '/entries/domains', '/entries/placeholders', '/entries/config', "'/entries'", "'/entries/:entryKey'"]; // 常量 entryPaths：保存固定配置或一次性派生值
+check('清单路由覆盖 6 个只读端点', entryPaths.every((p) => entryRoute.includes(p)), '清单端点缺失'); // 调用 check 并处理其返回结果
+check('清单路由静态路径先于动态参数', entryRoute.indexOf("router.get('/entries/overview'") < entryRoute.indexOf("router.get('/entries/:entryKey'"), '注册顺序错误'); // 调用 check 并处理其返回结果
+check('清单路由不回显具体主机值', entryRoute.includes('resolveEntryHost') && !entryRoute.includes('hostValue:'), '配置状态泄露风险'); // 调用 check 并处理其返回结果
 // 清单路由同样透出落地状态映射与四态汇总。
 check('entries 路由透出落地状态', entryRoute.includes('implementation: m.implementation') && entryRoute.includes('implementationSummary'), '落地状态未透出');
 // 应用装配必须挂载两个路由。
 const appTs = read('services/mim-api/src/app.ts');
 // 断言导入与挂载两处都在。
 check('app 挂载 createSitesRouter', appTs.includes('createSitesRouter') && appTs.includes("app.use('/api/v1', createSitesRouter(resolved))"), '运行时路由未挂载');
-check('app 挂载 createEntriesRouter', appTs.includes('createEntriesRouter') && appTs.includes("app.use('/api/v1', createEntriesRouter(resolved))"), '清单路由未挂载');
+check('app 挂载 createEntriesRouter', appTs.includes('createEntriesRouter') && appTs.includes("app.use('/api/v1', createEntriesRouter(resolved))"), '清单路由未挂载'); // 调用 check 并处理其返回结果
 // 契约测试必须存在且覆盖清单与运行时。
 const testTs = read('services/mim-api/test/sites.test.ts');
 // 断言关键用例存在。
 check('运行时契约测试覆盖去重入口与状态流转', testTs.includes('去重入口') && testTs.includes('状态流转') && testTs.includes('幂等'), '测试覆盖不足');
-const entryTest = read('services/mim-api/test/entries.test.ts');
-check('清单契约测试覆盖 19 域 / 去重 / 占位配置', entryTest.includes('19') && entryTest.includes('dedupe') && entryTest.includes('config'), '清单测试缺失');
+const entryTest = read('services/mim-api/test/entries.test.ts'); // 常量 entryTest：保存固定配置或一次性派生值
+check('清单契约测试覆盖 19 域 / 去重 / 占位配置', entryTest.includes('19') && entryTest.includes('dedupe') && entryTest.includes('config'), '清单测试缺失'); // 调用 check 并处理其返回结果
 
 // 前端 API 客户端必须提供 sites 与 entries 两组方法。
 const apiTs = read('apps/web/src/api.ts');
@@ -392,11 +392,11 @@ const appTsx = read('apps/web/src/App.tsx');
 // 2026-11-13 视图改为路由级懒加载：静态 import 形态已不再是最优实现，故断言「静态导入」或「lazy(() => import('./views/Sites'))」二者之一，
 // 另外三处（路由项 view:'sites'、渲染 <Sites、直达回调 onOpenView）仍必须齐备——放宽的是加载方式，不是接线本身。
 const sitesDeclared = appTsx.includes("import { Sites }")
-  || /const\s+Sites\s*=\s*lazy\(\(\)\s*=>\s*import\(['"]\.\/views\/Sites['"]/.test(appTsx);
-check('App 接入清单视图并注入直达回调', sitesDeclared && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites') && appTsx.includes('onOpenView'), '视图未接入');
+  || /const\s+Sites\s*=\s*lazy\(\(\)\s*=>\s*import\(['"]\.\/views\/Sites['"]/.test(appTsx); // 执行当前业务步骤
+check('App 接入清单视图并注入直达回调', sitesDeclared && appTsx.includes("view: 'sites'") && appTsx.includes('<Sites') && appTsx.includes('onOpenView'), '视图未接入'); // 调用 check 并处理其返回结果
 // 免登录体验模型不得被破坏：需要会话的视图为商品列表 / 购物车 / 个人中心 / 社区（漫剧放映厅匿名可看），且旧的 GATED_VIEWS 门禁集合不得回退。
 const sessionBlock = appTsx.slice(appTsx.indexOf('const needsSession ='), appTsx.indexOf(';', appTsx.indexOf('const needsSession =')));
-check('免登录收费视图集合未漂移', !/GATED_VIEWS/.test(appTsx) && ['products', 'cart', 'account', 'community'].every((v) => sessionBlock.includes(`route.view === '${v}'`)), '收费视图集合漂移或门禁集合回退');
+check('免登录收费视图集合未漂移', !/GATED_VIEWS/.test(appTsx) && ['products', 'cart', 'account', 'community'].every((v) => sessionBlock.includes(`route.view === '${v}'`)), '收费视图集合漂移或门禁集合回退'); // 调用 check 并处理其返回结果
 // 视图组件必须真实调用接口并渲染备注原文、占位标识与职责字段。
 const sitesTsx = read('apps/web/src/views/Sites.tsx');
 // 断言关键消费点齐备。
@@ -412,24 +412,24 @@ check('样式补齐清单视图类', ['.entry-intake', '.entry-functions', '.ent
 
 // 可配置占位标识模板必须存在，且值全部为空。
 const tplText = read('config/entry-hosts.example.json');
-let tpl = {};
+let tpl = {}; // 可变变量 tpl：运行过程中会被重新赋值
 try { tpl = JSON.parse(tplText); } catch { /* 解析失败由后续断言报告 */ }
-const tplHosts = tpl.hosts ?? {};
-check('配置模板存在且为 44 个键', Object.keys(tplHosts).length === 44, `实际 ${Object.keys(tplHosts).length}`);
+const tplHosts = tpl.hosts ?? {}; // 常量 tplHosts：保存固定配置或一次性派生值
+check('配置模板存在且为 44 个键', Object.keys(tplHosts).length === 44, `实际 ${Object.keys(tplHosts).length}`); // 调用 check 并处理其返回结果
 check('配置模板值全为空，不含具体主机值', Object.values(tplHosts).every((v) => v === '') && !/\.mixm\.top|https?:\/\//.test(tplText), '模板含具体值');
-check('配置模板键与清单一一对应', modules.every((m) => Object.prototype.hasOwnProperty.call(tplHosts, m.envKey)), '模板键漂移');
+check('配置模板键与清单一一对应', modules.every((m) => Object.prototype.hasOwnProperty.call(tplHosts, m.envKey)), '模板键漂移'); // 调用 check 并处理其返回结果
 // 可读清单文档必须存在且覆盖 19 个业务域。
 const catalog = read('docs/统一入口配置清单-20261109.md');
-check('统一入口配置清单文档存在', catalog.length > 0, '缺清单文档');
-check('清单文档覆盖 19 个业务域', domains.every((d) => catalog.includes(`\`${d.code}\``)), '文档业务域不全');
-check('清单文档逐项列出 44 个占位键', modules.every((m) => catalog.includes(`\`${m.entryKey}\``)), '文档入口不全');
-check('清单文档声明不补写具体主机值', catalog.includes('不补写未提供的具体主机值'), '缺约束声明');
+check('统一入口配置清单文档存在', catalog.length > 0, '缺清单文档'); // 调用 check 并处理其返回结果
+check('清单文档覆盖 19 个业务域', domains.every((d) => catalog.includes(`\`${d.code}\``)), '文档业务域不全'); // 调用 check 并处理其返回结果
+check('清单文档逐项列出 44 个占位键', modules.every((m) => catalog.includes(`\`${m.entryKey}\``)), '文档入口不全'); // 调用 check 并处理其返回结果
+check('清单文档声明不补写具体主机值', catalog.includes('不补写未提供的具体主机值'), '缺约束声明'); // 调用 check 并处理其返回结果
 
 // 根 package.json 必须提供两个校验脚本入口。
 const pkg = read('package.json');
 // 断言脚本入口存在。
 check('package.json 提供 verify:site-modules', pkg.includes('"verify:site-modules"'), '缺脚本入口');
-check('package.json 提供 verify:entry-manifest', pkg.includes('"verify:entry-manifest"'), '缺清单校验入口');
+check('package.json 提供 verify:entry-manifest', pkg.includes('"verify:entry-manifest"'), '缺清单校验入口'); // 调用 check 并处理其返回结果
 // 既有 check 链必须保持原样，避免改变既有门禁退出条件。
 check('既有 check 链未改动', pkg.includes('"check": "node scripts/version-check.mjs && node scripts/env-check.mjs && node scripts/comment-check.mjs && node scripts/verify-custom-domains.mjs"'), 'check 链漂移');
 // 上一轮站点入口契约校验脚本必须仍在，历史成果不得被本轮覆盖。

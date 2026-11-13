@@ -1061,16 +1061,16 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const afterCoupon = Math.max(0, amount - coupon.discount); // 优惠码之后的应付（积分段入参）
     const pointsConfig = readPointsConfig(deps.env); // 积分兑换比例与单笔上限
     const usePoints = body.use_points === true || body.points_to_use !== undefined; // 显式开启或指定积分量
-    const deduction = usePoints
-      ? computeDeduction({ amountCents: afterCoupon, pointsBalance: getPointsBalance(deps.db, userId), config: pointsConfig, pointsToUse: body.points_to_use })
+    const deduction = usePoints // 常量 deduction：保存固定配置或一次性派生值
+      ? computeDeduction({ amountCents: afterCoupon, pointsBalance: getPointsBalance(deps.db, userId), config: pointsConfig, pointsToUse: body.points_to_use }) // 执行当前业务步骤
       : { deduct_cents: 0, points_spent: 0, payable_cents: afterCoupon, capped_by: 'none' as const }; // 未开启抵扣：全额应付
     const payable = Math.max(0, deduction.payable_cents); // 抵扣后应付（分）；全额抵扣为 0 即即时完成
     if (payable > 0) requireBalance(deps, userId, payable); // 业务步骤：推进当前流程的下一项处理
     const orderId = `order-${randomUUID()}`; // 保存 orderId：承载本步骤的计算结果供后续使用
     const tx = deps.db.transaction(() => { // 保存 tx：承载本步骤的计算结果供后续使用
       if (deduction.points_spent > 0) { // 有抵扣才扣积分并写流水，与订单 / 余额扣款同事务
-        deductPoints(deps.db, { userId, points: deduction.points_spent, deductCents: deduction.deduct_cents, refType: 'shop_order', refId: orderId, note: `积分抵扣 ${product.name}`, now: now() });
-      }
+        deductPoints(deps.db, { userId, points: deduction.points_spent, deductCents: deduction.deduct_cents, refType: 'shop_order', refId: orderId, note: `积分抵扣 ${product.name}`, now: now() }); // 调用 deductPoints 并处理其返回结果
+      } // 代码块结束
       if (payable > 0) debit(deps, userId, payable, 'shop_order', orderId, `购买 ${product.name}`); // 业务步骤：推进当前流程的下一项处理
       let status: 'paid' | 'delivered' = 'paid'; // 保存 status：承载本步骤的计算结果供后续使用
       let deliveredAt: string | null = null; // 保存 deliveredAt：承载本步骤的计算结果供后续使用

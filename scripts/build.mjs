@@ -56,10 +56,10 @@ function run(args, extraEnv = {}) {
     stdio: 'inherit', // 日志直通终端，便于 CI/控制台排障
     shell: true, // 允许 shell 解析，兼容 Windows 批处理
     env: { ...process.env, ...extraEnv }, // 合入额外环境变量（如 VITE_API_ORIGIN）
-  });
+  }); // 代码块结束
   // spawnSync 在命令不存在时 status 为 null，统一折算为 1（失败）
   return result.status ?? 1;
-}
+} // 代码块结束
 
 /**
  * 递归复制目录并返回复制的文件数。
@@ -78,19 +78,19 @@ function copyDir(src, dest) {
     const destPath = join(dest, name);
     // 目录：递归处理（先建目录，避免 copyFileSync 因父目录缺失报错）
     if (statSync(srcPath).isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
+      mkdirSync(destPath, { recursive: true }); // 调用 mkdirSync 并处理其返回结果
       // 累加子目录内的文件数
       n += copyDir(srcPath, destPath);
-    } else {
+    } else { // 代码块结束
       // 普通文件：直接覆盖复制
       copyFileSync(srcPath, destPath);
       // 文件计数 +1
       n += 1;
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
   // 返回本层累计文件数
   return n;
-}
+} // 代码块结束
 
 /**
  * 用指定源目录重建根 dist/（先清空，保持幂等）。
@@ -100,20 +100,20 @@ function copyDir(src, dest) {
 function emitDist(src, label) {
   // 源目录缺失说明上游步骤失败，直接报错退出，避免发布空站
   if (!existsSync(src)) {
-    console.error(`❌ 源目录不存在: ${src}`);
-    process.exit(1);
-  }
+    console.error(`❌ 源目录不存在: ${src}`); // 向控制台输出运行日志或错误信息
+    process.exit(1); // 执行当前业务步骤
+  } // 代码块结束
   // 清理旧产物，避免上一轮文件残留（幂等）
   if (existsSync(DIST)) {
-    rmSync(DIST, { recursive: true, force: true });
-  }
+    rmSync(DIST, { recursive: true, force: true }); // 调用 rmSync 并处理其返回结果
+  } // 代码块结束
   // 预建输出目录
   mkdirSync(DIST, { recursive: true });
   // 递归复制并统计
   const copied = copyDir(src, DIST);
   // 打印结果，便于 CI 日志核对
   console.log(`✅ 构建完成（${label}）: ${DIST} (${copied} 个文件)`);
-}
+} // 代码块结束
 
 /**
  * 确保 pnpm 可用：优先系统 pnpm，缺失时用 npx 临时拉取锁定版本。
@@ -126,8 +126,8 @@ function ensurePnpm() {
   if ((probe.status ?? 1) === 0) return { cmd: PNPM, prefix: [] };
   // 兜底：EdgeOne / 纯 npm 环境没有 pnpm，用 npx 临时拉取与 packageManager 一致的版本
   console.log('ℹ️ 未检测到 pnpm，回退 npx pnpm@9.12.0');
-  return { cmd: 'npx', prefix: ['--yes', 'pnpm@9.12.0'] };
-}
+  return { cmd: 'npx', prefix: ['--yes', 'pnpm@9.12.0'] }; // 返回当前函数的处理结果
+} // 代码块结束
 
 /**
  * 从 apps/web/src/router.ts 解析 SPA 对外路径段清单，避免构建脚本与前端路由两处手写清单漂移。
@@ -140,27 +140,27 @@ function readSpaPaths() {
   const routerPath = join(WEB_DIR, 'src', 'router.ts');
   // 源码缺失说明仓库结构异常，直接失败以免产出缺目录的部署
   if (!existsSync(routerPath)) {
-    console.error(`❌ 未找到路由源码: ${routerPath}`);
-    process.exit(1);
-  }
+    console.error(`❌ 未找到路由源码: ${routerPath}`); // 向控制台输出运行日志或错误信息
+    process.exit(1); // 执行当前业务步骤
+  } // 代码块结束
   // 读取源码文本，用正则抓 VIEW_SEGMENTS 的对象字面量
   const text = readFileSync(routerPath, 'utf8');
   // 匹配形如 `const VIEW_SEGMENTS: Record<AppView, string> = { store: 'marketplace', ... };`
   const match = text.match(/const VIEW_SEGMENTS[^=]*=\s*\{([\s\S]*?)\n\};/);
   // 未命中说明路由实现已改结构，宁可失败也不静默产出错误目录
   if (!match) {
-    console.error('❌ 未能从 apps/web/src/router.ts 解析 VIEW_SEGMENTS 映射表');
-    process.exit(1);
-  }
+    console.error('❌ 未能从 apps/web/src/router.ts 解析 VIEW_SEGMENTS 映射表'); // 向控制台输出运行日志或错误信息
+    process.exit(1); // 执行当前业务步骤
+  } // 代码块结束
   // 提取所有「键: '值'」中的值作为对外路径段
   const paths = [...match[1].matchAll(/:\s*'([^']+)'/g)].map((m) => m[1]);
   // 路径段为空同样视为解析失败，避免生成 0 个目录却静默通过
   if (paths.length === 0) {
-    console.error('❌ VIEW_SEGMENTS 解析结果为空，无法生成 SPA 深链接目录');
-    process.exit(1);
-  }
-  return paths;
-}
+    console.error('❌ VIEW_SEGMENTS 解析结果为空，无法生成 SPA 深链接目录'); // 向控制台输出运行日志或错误信息
+    process.exit(1); // 执行当前业务步骤
+  } // 代码块结束
+  return paths; // 返回当前函数的处理结果
+} // 代码块结束
 
 /**
  * 为不支持 SPA 前端路由重写的静态托管（EdgeOne Pages 等）生成回退产物：
@@ -175,9 +175,9 @@ function emitSpaFallback() {
   const indexHtml = join(DIST, 'index.html');
   // 入口缺失说明复制步骤失败，直接终止
   if (!existsSync(indexHtml)) {
-    console.error(`❌ 根 dist 缺少 index.html: ${indexHtml}`);
-    process.exit(1);
-  }
+    console.error(`❌ 根 dist 缺少 index.html: ${indexHtml}`); // 向控制台输出运行日志或错误信息
+    process.exit(1); // 执行当前业务步骤
+  } // 代码块结束
   // 生成 404.html 兜底页（与入口同内容）
   copyFileSync(indexHtml, join(DIST, '404.html'));
   // 逐个对外路径段建目录并放入同名入口副本（目录名即模块功能名，如 marketplace）
@@ -188,17 +188,17 @@ function emitSpaFallback() {
     mkdirSync(viewDir, { recursive: true });
     // 写入该路径段的入口副本
     copyFileSync(indexHtml, join(viewDir, 'index.html'));
-  }
+  } // 代码块结束
   // 输出取证日志，便于平台构建日志核对
   console.log(`✅ SPA 回退产物就绪: 404.html + ${readSpaPaths().length} 个路径段目录（${readSpaPaths().join(' / ')}）`);
-}
+} // 代码块结束
 
 // --site 模式：只复制 PRD 阅读页，供离线预览（不再用于任何生产托管平台）
 if (SITE_ONLY) {
   // 输出 site/ 内容到 dist/，与历史行为保持一致
   emitDist(SITE_SRC, 'PRD 阅读页 site → dist');
   process.exit(0); // 站点模式到此结束，不再构建前端
-}
+} // 代码块结束
 
 // 默认模式：构建真实前端 → 根 dist/
 const pnpm = ensurePnpm(); // 解析可用的 pnpm 入口
@@ -207,24 +207,24 @@ const pnpm = ensurePnpm(); // 解析可用的 pnpm 入口
 const installCode = run([pnpm.cmd, ...pnpm.prefix, 'install', '--filter', '@mim/web...', '--frozen-lockfile']);
 // 首次安装失败（如锁文件与 package.json 不一致）时降级为不校验锁文件重试一次
 if (installCode !== 0) {
-  console.warn('⚠️ 冻结锁文件安装失败，降级为普通安装重试');
+  console.warn('⚠️ 冻结锁文件安装失败，降级为普通安装重试'); // 向控制台输出运行日志或错误信息
   // 第二次安装：允许 pnpm 更新锁文件解析结果
   const retryCode = run([pnpm.cmd, ...pnpm.prefix, 'install', '--filter', '@mim/web...']);
   // 仍失败则终止，避免用残缺依赖继续构建
   if (retryCode !== 0) {
-    console.error('❌ 依赖安装失败');
-    process.exit(retryCode);
-  }
-}
+    console.error('❌ 依赖安装失败'); // 向控制台输出运行日志或错误信息
+    process.exit(retryCode); // 执行当前业务步骤
+  } // 代码块结束
+} // 代码块结束
 // 构建期 API 源：托管平台（EdgeOne）无同源后端，默认直连生产 API；可用 VITE_API_ORIGIN 覆盖
 const apiOrigin = (process.env.VITE_API_ORIGIN ?? 'https://mim.mixm.top').replace(/\/+$/, '');
 // 执行前端构建（tsc --noEmit + vite build），产物落在 apps/web/dist
 const buildCode = run([pnpm.cmd, ...pnpm.prefix, '--filter', '@mim/web', 'build'], { VITE_API_ORIGIN: apiOrigin });
 // 构建失败直接退出，阻断后续托管平台发布
 if (buildCode !== 0) {
-  console.error('❌ 前端构建失败');
-  process.exit(buildCode);
-}
+  console.error('❌ 前端构建失败'); // 向控制台输出运行日志或错误信息
+  process.exit(buildCode); // 执行当前业务步骤
+} // 代码块结束
 // 把真实前端产物同步到根 dist/，供 EdgeOne Pages 等 OutputDir=dist 的平台读取
 emitDist(WEB_DIST, `真实前端 apps/web/dist → dist，API=${apiOrigin}`);
 // 为不支持 SPA 重写的静态托管补齐回退载体（404.html + 每个视图一个同名目录）

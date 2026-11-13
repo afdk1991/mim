@@ -16,7 +16,7 @@ import { parse } from '../validate.js'; // zod 校验包装
 import { requireAuth } from '../middleware.js'; // 本人端点登录态
 import { requirePermission } from '../middleware.js'; // 管理端点 RBAC 门禁
 import { clockOf } from '../domain.js'; // 可注入时钟
-import {
+import { // 引入依赖、类型或本地模块绑定
   getMyRealname, // 本人状态查询
   listPendingRealnames, // 待审队列
   reviewRealname, // 审核流转

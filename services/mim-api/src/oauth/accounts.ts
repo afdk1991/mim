@@ -52,12 +52,12 @@ export function listOAuthAccounts(db: Db, userId: string): Array<Pick<OAuthAccou
 
 /** 写入或刷新绑定：同一 (provider, provider_user_id) 重复授权时只更新资料，不产生第二行 */
 export function upsertOAuthAccount(
-  db: Db,
-  userId: string,
-  spec: OAuthProviderSpec,
-  profile: OAuthProfile,
-  now: string,
-): void {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  userId: string, // 对象字段 userId：记录一项配置或数据
+  spec: OAuthProviderSpec, // 对象字段 spec：记录一项配置或数据
+  profile: OAuthProfile, // 对象字段 profile：记录一项配置或数据
+  now: string, // 对象字段 now：记录一项配置或数据
+): void { // 执行当前业务步骤
   const existing = findOAuthAccount(db, spec.id, profile.providerUserId); // 先查是否已绑定
   if (existing) { // 已绑定分支
     if (existing.user_id !== userId) { // 属于其他账号
@@ -109,12 +109,12 @@ export function upsertOAuthAccount(
  * 展示名优先用提供方昵称，没有则留空待用户完善。
  */
 export function createUserFromOAuth(
-  db: Db,
-  spec: OAuthProviderSpec,
-  profile: OAuthProfile,
-  region: Region,
-  now: string,
-): UserRow {
+  db: Db, // 对象字段 db：记录一项配置或数据
+  spec: OAuthProviderSpec, // 对象字段 spec：记录一项配置或数据
+  profile: OAuthProfile, // 对象字段 profile：记录一项配置或数据
+  region: Region, // 对象字段 region：记录一项配置或数据
+  now: string, // 对象字段 now：记录一项配置或数据
+): UserRow { // 执行当前业务步骤
   return db.transaction(() => { // 建号与绑定必须同生共死
     const user = createUser(db, { region, display_name: profile.nickname, now }); // 自动分配 Mim ID 号码
     upsertOAuthAccount(db, user.id, spec, profile, now); // 写入绑定

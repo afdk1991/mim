@@ -25,7 +25,7 @@ export interface ModuleCapabilitySeed {
   placeholder: { 'zh-CN': string; 'en-US': string }; // 输入框占位文案
   output_kind: ModuleCapabilityOutputKind; // 输出形态
   module_codes: readonly string[]; // 绑定的模块编码清单
-}
+} // 代码块结束
 
 /** 已实现的能力清单：按「程序开发」组的导航条目绑定，键与 `services/mim-api/src/capabilities.ts` 对齐 */
 export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组顺序即文档展示顺序

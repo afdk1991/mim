@@ -145,14 +145,14 @@ function splatKey(req: Request): string { // 把通配段还原成完整对象�
  * 回源抓取远程图片 / 视频前统一调用，避免服务端被诱导访问内网。
  */
 export async function assertRemoteMediaUrl(url: string): Promise<void> {
-  if (/^\/(?!\/)/.test(url)) return;
+  if (/^\/(?!\/)/.test(url)) return; // 条件分支：按判断结果选择后续处理路径
   if (!/^https?:\/\//i.test(url)) throw new AppError('VALIDATION_FAILED', '媒体地址必须是站内路径或 http(s) 地址');
-  try {
-    await assertSafeOutboundUrl(url);
-  } catch {
-    throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议');
-  }
-}
+  try { // 异常捕获起点：包裹可能抛出错误的操作
+    await assertSafeOutboundUrl(url); // 异步等待：挂起至 Promise 落定后再继续
+  } catch { // 代码块结束
+    throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议'); // 抛出错误：中断当前流程并向上层传递
+  } // 代码块结束
+} // 代码块结束
 
 /**
  * 对象收发端点（挂载在全局 JSON 解析之前）：

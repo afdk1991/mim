@@ -328,14 +328,14 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
  *   router.post('/auth/register', createCaptchaMiddleware('register'), handler);
  */
 export function createCaptchaMiddleware(scene: CaptchaScene) { // 高阶工厂：按场景生成门禁
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-    try {
-      await verifyCaptcha(req.deps.db, req.deps.env, scene, (req.body ?? {}) as Record<string, unknown>);
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => { // 返回当前函数的处理结果
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await verifyCaptcha(req.deps.db, req.deps.env, scene, (req.body ?? {}) as Record<string, unknown>); // 异步等待：挂起至 Promise 落定后再继续
       next(); // 校验通过，进入业务处理
-    } catch (err) {
+    } catch (err) { // 代码块结束
       next(err); // 交给全局错误处理器归一为标准信封
-    }
-  };
+    } // 代码块结束
+  }; // 代码块结束
 } // createCaptchaMiddleware 结束
 
 /** 公共 GET 缓存头选项：maxAge 控制 Cache-Control，scope 区分 public / private */
@@ -346,7 +346,7 @@ export interface CacheHeaderOptions {
   scope?: 'public' | 'private';
   /** 生效方法集合，缺省 GET / HEAD */
   methods?: string[];
-}
+} // 代码块结束
 
 /**
  * ETag / Cache-Control 中间件工厂（安全加固包，性能项）：
@@ -360,11 +360,11 @@ export function createCacheHeaderMiddleware(options: CacheHeaderOptions = {}) {
   const maxAgeSeconds = options.maxAgeSeconds ?? 60; // 缺省缓存 60 秒
   const scope = options.scope ?? 'public'; // 缺省公开可缓存
   const methods = new Set(options.methods ?? ['GET', 'HEAD']); // 只处理只读方法
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, res: Response, next: NextFunction): void => { // 返回当前函数的处理结果
     if (!methods.has(req.method)) { // 写方法不打缓存头
-      next();
-      return;
-    }
+      next(); // 调用 next 并处理其返回结果
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
     const originalJson = res.json.bind(res); // 保留原始 json 输出方法
     res.json = ((body: unknown) => { // 包装响应：算摘要 → 打 ETag / Cache-Control → 判 304
       const payload = JSON.stringify(body ?? null); // 响应体序列化（与实际下发内容一致）
@@ -375,11 +375,11 @@ export function createCacheHeaderMiddleware(options: CacheHeaderOptions = {}) {
       if (incoming && (incoming === etag || incoming === '*')) { // 摘要一致或客户端要求校验
         res.status(304); // 资源未变更
         res.removeHeader('Content-Type'); // 304 不携带响应体
-        res.end();
+        res.end(); // 执行当前业务步骤
         return body; // 保持 json 签名兼容，实际不再序列化下发
-      }
+      } // 代码块结束
       return originalJson(body); // 正常下发响应体
-    }) as Response['json'];
+    }) as Response['json']; // 代码块结束
     next(); // 进入业务路由
-  };
+  }; // 代码块结束
 } // createCacheHeaderMiddleware 结束

@@ -62,13 +62,13 @@ function highlight(text: string, query: string) {
 // 单条命中卡片
 function HitRow({ hit, query, locale }: { hit: SearchHit; query: string; locale: Locale }) {
   const external = /^https?:\/\//i.test(hit.href); // 外部链接新开标签
-  return (
-    <li className="deploy-row">
-      <a className="link" href={resolveHref(hit.href)} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined}>
+  return ( // 返回当前函数的处理结果
+    <li className="deploy-row">{/* 执行当前业务步骤 */}
+      <a className="link" href={resolveHref(hit.href)} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined}>{/* 执行当前业务步骤 */}
         {highlight(hit.title, query)}
       </a>
       <div className="muted">{highlight(hit.subtitle, query)}</div>
-      <div className="deploy-kv">
+      <div className="deploy-kv">{/* 执行当前业务步骤 */}
         <span className={`deploy-badge ${hit.score >= 95 ? 'ok' : 'muted'}`}>{hit.score >= 95 ? tr(locale, '高匹配', 'Strong') : tr(locale, '相关', 'Related')}</span>
         <span>{highlight(hit.snippet, query)}</span>
       </div>
@@ -108,37 +108,37 @@ export function Search({ locale }: Props) {
   const total = result.data?.total ?? 0; // 总命中
   const engine = result.data?.engine ?? summary.data?.engine ?? 'sqlite'; // 当前引擎
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{tr(locale, '统一搜索', 'Search')}</h1>
-        <p className="muted">
+        <p className="muted">{/* 执行当前业务步骤 */}
           {tr(locale, '一次输入同时检索功能模块、统一入口、导航链接、社区帖子与独立商城；配置 Meilisearch 时自动切换远端引擎，不可用时回退本地检索。', 'One query across modules, entries, navigation links, community threads and shop products. Meilisearch is used when configured, with automatic local fallback.')}
         </p>
       </header>
 
-      <form className="form inline" onSubmit={submit}>
-        <label className="grow">
+      <form className="form inline" onSubmit={submit}>{/* 执行当前业务步骤 */}
+        <label className="grow">{/* 执行当前业务步骤 */}
           {tr(locale, '关键词', 'Keyword')}
           <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={tr(locale, '如：商城 / 漫剧 / 部署', 'e.g. marketplace / comic / deploy')} />
         </label>
         <button type="submit" className="btn primary">{tr(locale, '搜索', 'Search')}</button>
       </form>
 
-      <div className="deploy-columns">
+      <div className="deploy-columns">{/* 执行当前业务步骤 */}
         {TABS.map((tab) => (
-          <button key={tab.value} type="button" className={`btn ghost${scope === tab.value ? ' active' : ''}`} onClick={() => setScope(tab.value)}>
+          <button key={tab.value} type="button" className={`btn ghost${scope === tab.value ? ' active' : ''}`} onClick={() => setScope(tab.value)}>{/* 执行当前业务步骤 */}
             {tr(locale, tab.zh, tab.en)}
           </button>
         ))}
       </div>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>{tr(locale, '可搜范围', 'Coverage')}</h3></div>
-        <div className="deploy-stats">
+        <div className="deploy-stats">{/* 执行当前业务步骤 */}
           <div className="deploy-stat"><span className="deploy-stat-value">{summary.data?.total ?? '—'}</span><span className="muted">{tr(locale, '文档总数', 'Documents')}</span></div>
           {(summary.data?.scopes ?? []).map((item) => (
-            <div className="deploy-stat" key={item.scope}>
+            <div className="deploy-stat" key={item.scope}>{/* 执行当前业务步骤 */}
               <span className="deploy-stat-value">{item.count}</span>
               <span className="muted">{tr(locale, item.label, item.scope)}</span>
             </div>
@@ -148,9 +148,9 @@ export function Search({ locale }: Props) {
       </section>
 
       {!applied && (
-        <section className="panel">
+        <section className="panel">{/* 执行当前业务步骤 */}
           <div className="panel-head"><h3>{tr(locale, '推荐搜索', 'Try searching')}</h3></div>
-          <div className="deploy-columns">
+          <div className="deploy-columns">{/* 执行当前业务步骤 */}
             {SUGGESTIONS.map((word) => (
               <button key={word} type="button" className="btn ghost" onClick={() => pick(word)}>{word}</button>
             ))}
@@ -166,17 +166,17 @@ export function Search({ locale }: Props) {
       )}
 
       {total > 0 && (
-        <p className="muted">
+        <p className="muted">{/* 执行当前业务步骤 */}
           {tr(locale, `「${applied}」共 ${total} 条命中`, `${total} results for “${applied}”`)} · {result.data?.took_ms ?? 0} ms
         </p>
       )}
 
       {groups.map((group) => (
-        <section className="panel" key={group.scope}>
-          <div className="panel-head">
+        <section className="panel" key={group.scope}>{/* 执行当前业务步骤 */}
+          <div className="panel-head">{/* 执行当前业务步骤 */}
             <h3>{tr(locale, group.label, group.scope)} <span className="muted">({group.count})</span></h3>
           </div>
-          <ul className="plain-list">
+          <ul className="plain-list">{/* 执行当前业务步骤 */}
             {group.items.map((hit) => (
               <HitRow key={hit.id} hit={hit} query={applied} locale={locale} />
             ))}

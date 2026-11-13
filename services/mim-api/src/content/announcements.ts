@@ -8,64 +8,64 @@ import type { Db } from '../types.js'; // 数据库连接类型
 
 /** 公告行（库内完整字段子集） */
 export interface AnnouncementRow {
-  id: string;
-  title: string;
-  body: string;
-  level: 'info' | 'warning' | 'success' | 'danger';
-  status: 'draft' | 'published' | 'archived';
-  published_at: string | null;
-  starts_at: string | null;
-  ends_at: string | null;
-  pinned: number;
-  author_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
+  id: string; // 对象字段 id：记录一项配置或数据
+  title: string; // 对象字段 title：记录一项配置或数据
+  body: string; // 对象字段 body：记录一项配置或数据
+  level: 'info' | 'warning' | 'success' | 'danger'; // 对象字段 level：记录一项配置或数据
+  status: 'draft' | 'published' | 'archived'; // 对象字段 status：记录一项配置或数据
+  published_at: string | null; // 对象字段 published_at：记录一项配置或数据
+  starts_at: string | null; // 对象字段 starts_at：记录一项配置或数据
+  ends_at: string | null; // 对象字段 ends_at：记录一项配置或数据
+  pinned: number; // 对象字段 pinned：记录一项配置或数据
+  author_id: string | null; // 对象字段 author_id：记录一项配置或数据
+  created_at: string; // 对象字段 created_at：记录一项配置或数据
+  updated_at: string; // 对象字段 updated_at：记录一项配置或数据
+} // 代码块结束
 
 /** 公开列表条目（冻结契约：id / title / body / pinned / published_at） */
 export interface PublicAnnouncement {
-  id: string;
-  title: string;
-  body: string;
-  pinned: boolean;
-  published_at: string;
-}
+  id: string; // 对象字段 id：记录一项配置或数据
+  title: string; // 对象字段 title：记录一项配置或数据
+  body: string; // 对象字段 body：记录一项配置或数据
+  pinned: boolean; // 对象字段 pinned：记录一项配置或数据
+  published_at: string; // 对象字段 published_at：记录一项配置或数据
+} // 代码块结束
 
 /** 新建 / 更新入参（zod 在路由层收口，业务层只认归一后的字段） */
 export interface AnnouncementInput {
-  title: string;
-  body: string;
-  level: 'info' | 'warning' | 'success' | 'danger';
-  status: 'draft' | 'published' | 'archived';
-  starts_at: string | null;
-  ends_at: string | null;
-  pinned: boolean;
-}
+  title: string; // 对象字段 title：记录一项配置或数据
+  body: string; // 对象字段 body：记录一项配置或数据
+  level: 'info' | 'warning' | 'success' | 'danger'; // 对象字段 level：记录一项配置或数据
+  status: 'draft' | 'published' | 'archived'; // 对象字段 status：记录一项配置或数据
+  starts_at: string | null; // 对象字段 starts_at：记录一项配置或数据
+  ends_at: string | null; // 对象字段 ends_at：记录一项配置或数据
+  pinned: boolean; // 对象字段 pinned：记录一项配置或数据
+} // 代码块结束
 
-export type AnnouncementPatch = Partial<AnnouncementInput>;
+export type AnnouncementPatch = Partial<AnnouncementInput>; // 导出类型 AnnouncementPatch：跨模块共享的类型定义
 
 /** 校验时间区间：两端都给时截止必须晚于起始。 */
 function validateWindow(startsAt: string | null, endsAt: string | null): void {
-  if (startsAt && endsAt && endsAt <= startsAt) {
-    throw new AppError('VALIDATION_FAILED', 'ends_at 必须晚于 starts_at', { field: 'ends_at' });
-  }
-}
+  if (startsAt && endsAt && endsAt <= startsAt) { // 条件分支：按判断结果选择后续处理路径
+    throw new AppError('VALIDATION_FAILED', 'ends_at 必须晚于 starts_at', { field: 'ends_at' }); // 抛出错误：中断当前流程并向上层传递
+  } // 代码块结束
+} // 代码块结束
 
 /** 公开视图映射：pinned 归一为布尔；published_at 优先取发布时间，回落生效起始，再回落创建时间。 */
 function toPublic(row: AnnouncementRow): PublicAnnouncement {
-  return {
-    id: row.id,
-    title: row.title,
-    body: row.body,
-    pinned: row.pinned === 1,
-    published_at: row.published_at ?? row.starts_at ?? row.created_at,
-  };
-}
+  return { // 返回当前函数的处理结果
+    id: row.id, // 对象字段 id：记录一项配置或数据
+    title: row.title, // 对象字段 title：记录一项配置或数据
+    body: row.body, // 对象字段 body：记录一项配置或数据
+    pinned: row.pinned === 1, // 对象字段 pinned：记录一项配置或数据
+    published_at: row.published_at ?? row.starts_at ?? row.created_at, // 对象字段 published_at：记录一项配置或数据
+  }; // 代码块结束
+} // 代码块结束
 
 /** 公开公告列表：草稿 / 归档 / 未生效 / 已过期一律不出现。 */
 export function listPublicAnnouncements(db: Db, now: string, limit: number): PublicAnnouncement[] {
-  const rows = db
-    .prepare(
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT id, title, body, level, status, published_at, starts_at, ends_at, pinned, author_id, created_at, updated_at
          FROM announcements
         WHERE status = 'published'
@@ -73,112 +73,112 @@ export function listPublicAnnouncements(db: Db, now: string, limit: number): Pub
           AND (ends_at IS NULL OR ends_at > ?)
         ORDER BY pinned DESC, COALESCE(published_at, starts_at, created_at) DESC
         LIMIT ?`,
-    )
-    .all(now, now, limit) as AnnouncementRow[];
-  return rows.map(toPublic);
-}
+    ) // 执行当前业务步骤
+    .all(now, now, limit) as AnnouncementRow[]; // 注册 ALL 路由 / 中间件处理器
+  return rows.map(toPublic); // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 管理端列表：全量状态，按置顶与创建时间倒序，供后台维护页消费。 */
 export function listAdminAnnouncements(db: Db): AnnouncementRow[] {
-  return db
-    .prepare('SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC, id DESC')
-    .all() as AnnouncementRow[];
-}
+  return db // 返回当前函数的处理结果
+    .prepare('SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC, id DESC') // 执行当前业务步骤
+    .all() as AnnouncementRow[]; // 注册 ALL 路由 / 中间件处理器
+} // 代码块结束
 
 /** 按主键取单行；不存在抛 NOT_FOUND。 */
 export function getAnnouncement(db: Db, id: string): AnnouncementRow {
-  const row = db.prepare('SELECT * FROM announcements WHERE id = ?').get(id) as AnnouncementRow | undefined;
-  if (!row) throw new AppError('NOT_FOUND', '公告不存在');
-  return row;
-}
+  const row = db.prepare('SELECT * FROM announcements WHERE id = ?').get(id) as AnnouncementRow | undefined; // 常量 row：保存固定配置或一次性派生值
+  if (!row) throw new AppError('NOT_FOUND', '公告不存在'); // 条件分支：按判断结果选择后续处理路径
+  return row; // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 新建公告；authorId 由路由层注入（登录用户 ID，引导通道记 system）。 */
 export function createAnnouncement(db: Db, input: AnnouncementInput, now: string, authorId: string | null): AnnouncementRow {
-  validateWindow(input.starts_at, input.ends_at);
-  const id = `ann-${uuidv7()}`;
+  validateWindow(input.starts_at, input.ends_at); // 调用 validateWindow 并处理其返回结果
+  const id = `ann-${uuidv7()}`; // 常量 id：保存固定配置或一次性派生值
   const publishedAt = input.status === 'published' ? now : null; // 直接建为已发布时落首次发布时间
-  db.prepare(
+  db.prepare( // 执行当前业务步骤
     `INSERT INTO announcements (id, title, body, level, status, published_at, starts_at, ends_at, pinned, author_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    input.title,
-    input.body,
-    input.level,
-    input.status,
-    publishedAt,
-    input.starts_at,
-    input.ends_at,
-    input.pinned ? 1 : 0,
-    authorId,
-    now,
-    now,
-  );
-  return getAnnouncement(db, id);
-}
+  ).run( // 执行当前业务步骤
+    id, // 执行当前业务步骤
+    input.title, // 执行当前业务步骤
+    input.body, // 执行当前业务步骤
+    input.level, // 执行当前业务步骤
+    input.status, // 执行当前业务步骤
+    publishedAt, // 执行当前业务步骤
+    input.starts_at, // 执行当前业务步骤
+    input.ends_at, // 执行当前业务步骤
+    input.pinned ? 1 : 0, // 执行当前业务步骤
+    authorId, // 执行当前业务步骤
+    now, // 执行当前业务步骤
+    now, // 执行当前业务步骤
+  ); // 执行当前业务步骤
+  return getAnnouncement(db, id); // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 局部更新公告；只更新入参出现的字段，updated_at 统一刷新。 */
 export function updateAnnouncement(db: Db, id: string, patch: AnnouncementPatch, now: string): AnnouncementRow {
   const existing = getAnnouncement(db, id); // 不存在先抛 404
   const merged: AnnouncementRow = { // 与存量行合并后做区间校验
-    ...existing,
-    ...patch,
+    ...existing, // 执行当前业务步骤
+    ...patch, // 执行当前业务步骤
     pinned: patch.pinned === undefined ? existing.pinned : patch.pinned ? 1 : 0, // 入参布尔归一为库内 0/1
-  };
-  validateWindow(merged.starts_at, merged.ends_at);
+  }; // 代码块结束
+  validateWindow(merged.starts_at, merged.ends_at); // 调用 validateWindow 并处理其返回结果
 
-  const fields: Array<keyof AnnouncementPatch> = [
-    'title',
-    'body',
-    'level',
-    'status',
-    'starts_at',
-    'ends_at',
-    'pinned',
-  ];
-  const assignments: string[] = [];
-  const params: Array<string | number | null> = [];
-  for (const field of fields) {
+  const fields: Array<keyof AnnouncementPatch> = [ // 常量 fields：保存固定配置或一次性派生值
+    'title', // 执行当前业务步骤
+    'body', // 执行当前业务步骤
+    'level', // 执行当前业务步骤
+    'status', // 执行当前业务步骤
+    'starts_at', // 执行当前业务步骤
+    'ends_at', // 执行当前业务步骤
+    'pinned', // 执行当前业务步骤
+  ]; // 执行当前业务步骤
+  const assignments: string[] = []; // 常量 assignments：保存固定配置或一次性派生值
+  const params: Array<string | number | null> = []; // 常量 params：保存固定配置或一次性派生值
+  for (const field of fields) { // 循环：逐项遍历集合并执行相同处理
     if (!(field in patch)) continue; // 未传入的字段保持原样
-    assignments.push(`${field} = ?`);
-    params.push(field === 'pinned' ? (patch.pinned ? 1 : 0) : (patch[field] as string | null));
-  }
+    assignments.push(`${field} = ?`); // 执行当前业务步骤
+    params.push(field === 'pinned' ? (patch.pinned ? 1 : 0) : (patch[field] as string | null)); // 执行当前业务步骤
+  } // 代码块结束
   if (assignments.length === 0) return existing; // 空补丁直接回读，不刷时间戳
-  assignments.push('updated_at = ?');
-  params.push(now, id);
-  db.prepare(`UPDATE announcements SET ${assignments.join(', ')} WHERE id = ?`).run(...params);
-  return getAnnouncement(db, id);
-}
+  assignments.push('updated_at = ?'); // 执行当前业务步骤
+  params.push(now, id); // 执行当前业务步骤
+  db.prepare(`UPDATE announcements SET ${assignments.join(', ')} WHERE id = ?`).run(...params); // 执行当前业务步骤
+  return getAnnouncement(db, id); // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 删除公告；不存在抛 NOT_FOUND。 */
 export function deleteAnnouncement(db: Db, id: string): void {
-  const changed = db.prepare('DELETE FROM announcements WHERE id = ?').run(id);
-  if (changed.changes === 0) throw new AppError('NOT_FOUND', '公告不存在');
-}
+  const changed = db.prepare('DELETE FROM announcements WHERE id = ?').run(id); // 常量 changed：保存固定配置或一次性派生值
+  if (changed.changes === 0) throw new AppError('NOT_FOUND', '公告不存在'); // 条件分支：按判断结果选择后续处理路径
+} // 代码块结束
 
 /**
  * 发布公告：draft / archived → published；已是 published 抛 409。
  * published_at 仅首次发布写入（COALESCE 保留历史发布时间，重发不覆盖）。
  */
 export function publishAnnouncement(db: Db, id: string, now: string): AnnouncementRow {
-  const row = getAnnouncement(db, id);
-  if (row.status === 'published') {
-    throw new AppError('CONFLICT', '公告已是发布状态', { from: row.status, to: 'published' });
-  }
-  db.prepare(
+  const row = getAnnouncement(db, id); // 常量 row：保存固定配置或一次性派生值
+  if (row.status === 'published') { // 条件分支：按判断结果选择后续处理路径
+    throw new AppError('CONFLICT', '公告已是发布状态', { from: row.status, to: 'published' }); // 抛出错误：中断当前流程并向上层传递
+  } // 代码块结束
+  db.prepare( // 执行当前业务步骤
     `UPDATE announcements
         SET status = 'published', published_at = COALESCE(published_at, ?), updated_at = ?
       WHERE id = ?`,
-  ).run(now, now, id);
-  return getAnnouncement(db, id);
-}
+  ).run(now, now, id); // 执行当前业务步骤
+  return getAnnouncement(db, id); // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 归档公告：draft / published → archived；已是 archived 抛 409。 */
 export function archiveAnnouncement(db: Db, id: string, now: string): AnnouncementRow {
-  const row = getAnnouncement(db, id);
-  if (row.status === 'archived') {
-    throw new AppError('CONFLICT', '公告已是归档状态', { from: row.status, to: 'archived' });
-  }
-  db.prepare(`UPDATE announcements SET status = 'archived', updated_at = ? WHERE id = ?`).run(now, id);
-  return getAnnouncement(db, id);
-}
+  const row = getAnnouncement(db, id); // 常量 row：保存固定配置或一次性派生值
+  if (row.status === 'archived') { // 条件分支：按判断结果选择后续处理路径
+    throw new AppError('CONFLICT', '公告已是归档状态', { from: row.status, to: 'archived' }); // 抛出错误：中断当前流程并向上层传递
+  } // 代码块结束
+  db.prepare(`UPDATE announcements SET status = 'archived', updated_at = ? WHERE id = ?`).run(now, id); // 执行当前业务步骤
+  return getAnnouncement(db, id); // 返回当前函数的处理结果
+} // 代码块结束

@@ -28,14 +28,14 @@ export function loadCredential(): Credential | null {
     if ((parsed.kind === 'token' || parsed.kind === 'bearer') && typeof parsed.value === 'string' && parsed.value.length > 0) {
       // 类型收窄后返回
       return { kind: parsed.kind, value: parsed.value };
-    }
+    } // 代码块结束
     // 结构不合法按未登录处理
     return null;
-  } catch {
+  } catch { // 代码块结束
     // 任何异常都视为无凭证
     return null;
-  }
-}
+  } // 代码块结束
+} // 代码块结束
 
 /** 写入或清除凭证；传 null 表示退出登录 */
 export function saveCredential(credential: Credential | null): void {
@@ -47,13 +47,13 @@ export function saveCredential(credential: Credential | null): void {
       window.localStorage.removeItem(CREDENTIAL_KEY);
       // 结束
       return;
-    }
+    } // 代码块结束
     // 写入序列化结果
     window.localStorage.setItem(CREDENTIAL_KEY, JSON.stringify(credential));
-  } catch {
+  } catch { // 代码块结束
     // 存储失败不阻断主流程：本次会话仍持有内存中的凭证
   }
-}
+} // 代码块结束
 
 /** 后端统一错误信封（扁平结构）：statusCode 由 HTTP 状态码提供，其余字段来自响应体 */
 export class ApiError extends Error {
@@ -80,8 +80,8 @@ export class ApiError extends Error {
     this.requestId = requestId;
     // 附加详情
     this.details = details;
-  }
-}
+  } // 代码块结束
+} // 代码块结束
 
 /** 单次请求的可选参数 */
 interface RequestOptions {
@@ -93,7 +93,7 @@ interface RequestOptions {
   credential?: Credential | null;
   // 附加自定义请求头（如管理端区域通道 x-region），在凭证注入后合并以避免覆盖认证头
   headers?: Record<string, string>;
-}
+} // 代码块结束
 
 /** 把任意异常转成可读文案：ApiError 取 message，其余兜底字符串化 */
 export function describeError(error: unknown): string {
@@ -103,7 +103,7 @@ export function describeError(error: unknown): string {
   if (error instanceof Error) return error.message;
   // 其他情况兜底
   return String(error);
-}
+} // 代码块结束
 
 /** 核心请求函数：负责拼 URL、注入凭证、解析错误信封与空响应 */
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -115,10 +115,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (options.credential?.kind === 'token') {
     // 引导令牌头名与后端 CORS allowedHeaders 保持一致
     headers['X-Admin-Token'] = options.credential.value;
-  } else if (options.credential?.kind === 'bearer') {
+  } else if (options.credential?.kind === 'bearer') { // 代码块结束
     // 标准 Bearer 方案
     headers.Authorization = `Bearer ${options.credential.value}`;
-  }
+  } // 代码块结束
   // 合并调用方自定义头：放在凭证注入之后，但不允许覆盖认证头，防止误把身份写丢
   if (options.headers) {
     // 逐个键合并
@@ -127,16 +127,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       if (key.toLowerCase() === 'authorization' || key.toLowerCase() === 'x-admin-token') continue;
       // 写入其余自定义头
       headers[key] = value;
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
   // 写操作补幂等键：后端在 REQUIRE_IDEMPOTENCY 打开时会强制要求，缺失会 400
   if ((options.method ?? 'GET') !== 'GET' && !headers['idempotency-key'] && !headers['Idempotency-Key']) {
     // crypto.randomUUID 仅在安全上下文可用（HTTPS / localhost），局域网 http 下退化为时间戳+随机数
     headers['idempotency-key'] =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' // 执行当前业务步骤
         ? crypto.randomUUID() // 现代浏览器安全上下文
         : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; // 兜底方案，仍保证低碰撞
-  }
+  } // 代码块结束
   // 发起请求
   const response = await fetch(`${BASE}${path}`, {
     // 默认 GET
@@ -145,7 +145,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers,
     // 只有带 body 时才序列化，避免 GET 请求出现空字符串体
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  }); // 代码块结束
   // 读取文本：204 或非 JSON 响应下也能安全处理
   const text = await response.text();
   // 尝试解析 JSON，失败则保留 null
@@ -154,12 +154,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (text.length > 0) {
     // 解析异常说明不是 JSON，按空处理让下面的错误分支兜底
     try {
-      payload = JSON.parse(text) as unknown;
-    } catch {
+      payload = JSON.parse(text) as unknown; // 赋值：更新变量 payload 的取值
+    } catch { // 代码块结束
       // 非 JSON 响应体忽略
       payload = null;
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
   // 非 2xx 一律构造 ApiError
   if (!response.ok) {
     // 取出扁平信封字段，缺失时给出可读兜底
@@ -176,11 +176,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       body.request_id ?? '',
       // 附加详情原样透出
       body.details,
-    );
-  }
+    ); // 执行当前业务步骤
+  } // 代码块结束
   // 空响应体（如 204）按 undefined 处理
   return (payload ?? undefined) as T;
-}
+} // 代码块结束
 
 // ── 认证 ──────────────────────────────────────────────────────────────────
 
@@ -200,7 +200,7 @@ export interface AuthUser {
   timezone: string;
   // 注销计划时间，null 表示未申请注销
   deletion_scheduled_at: string | null;
-}
+} // 代码块结束
 
 /** 登录响应：令牌三元组 + 用户主体 */
 interface LoginResponse {
@@ -214,7 +214,7 @@ interface LoginResponse {
   expires_in: number;
   // 用户主体
   user: AuthUser;
-}
+} // 代码块结束
 
 /** 账号密码登录：成功返回访问令牌与用户信息 */
 export function loginWithPassword(identifier: string, password: string, region: 'cn' | 'global' = 'cn'): Promise<LoginResponse> {
@@ -226,8 +226,8 @@ export function loginWithPassword(identifier: string, password: string, region: 
     body: { region, identifier, password, device: { platform: 'admin', name: 'Mim 管理后台' } },
     // 登录本身是匿名请求
     credential: null,
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 // ── 身份与权限 ────────────────────────────────────────────────────────────
 
@@ -241,13 +241,13 @@ export interface AdminIdentity {
   roles: string[];
   // 生效权限码（已排序）
   permissions: string[];
-}
+} // 代码块结束
 
 /** 查询当前身份：登录校验与首屏权限门禁都依赖它 */
 export function getAdminMe(credential: Credential): Promise<AdminIdentity> {
   // 读取身份端点
   return request<AdminIdentity>('/admin/me', { credential });
-}
+} // 代码块结束
 
 /** 权限点视图 */
 export interface PermissionView {
@@ -263,7 +263,7 @@ export interface PermissionView {
   created_at: string;
   // 更新时间
   updated_at: string;
-}
+} // 代码块结束
 
 /** 角色视图 */
 export interface RoleView {
@@ -281,7 +281,7 @@ export interface RoleView {
   created_at: string;
   // 更新时间
   updated_at: string;
-}
+} // 代码块结束
 
 /** 列出全部权限点 */
 export async function listPermissions(credential: Credential): Promise<PermissionView[]> {
@@ -289,7 +289,7 @@ export async function listPermissions(credential: Credential): Promise<Permissio
   const data = await request<{ permissions: PermissionView[] }>('/admin/permissions', { credential });
   // 直接取数组，视图无需再解构
   return data.permissions;
-}
+} // 代码块结束
 
 /** 列出全部角色 */
 export async function listRoles(credential: Credential): Promise<RoleView[]> {
@@ -297,7 +297,7 @@ export async function listRoles(credential: Credential): Promise<RoleView[]> {
   const data = await request<{ roles: RoleView[] }>('/admin/roles', { credential });
   // 返回数组
   return data.roles;
-}
+} // 代码块结束
 
 /** 新建角色的入参 */
 export interface RoleCreatePayload {
@@ -309,7 +309,7 @@ export interface RoleCreatePayload {
   description?: Record<string, string>;
   // 初始权限码
   permissions?: string[];
-}
+} // 代码块结束
 
 /** 新建角色：成功返回完整角色视图 */
 export async function createRole(credential: Credential, payload: RoleCreatePayload): Promise<RoleView> {
@@ -317,14 +317,14 @@ export async function createRole(credential: Credential, payload: RoleCreatePayl
   const data = await request<{ role: RoleView }>('/admin/roles', { method: 'POST', body: payload, credential });
   // 解包角色对象
   return data.role;
-}
+} // 代码块结束
 
 /** 修改角色名称/描述（内置角色后端会拒绝） */
 export async function updateRole(
-  credential: Credential,
-  code: string,
-  payload: { name?: Record<string, string>; description?: Record<string, string> },
-): Promise<RoleView> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  code: string, // 对象字段 code：记录一项配置或数据
+  payload: { name?: Record<string, string>; description?: Record<string, string> }, // 对象字段 payload：记录一项配置或数据
+): Promise<RoleView> { // 执行当前业务步骤
   // 角色码需编码，防止特殊字符破坏路径
   const data = await request<{ role: RoleView }>(`/admin/roles/${encodeURIComponent(code)}`, {
     // PATCH 局部更新
@@ -333,10 +333,10 @@ export async function updateRole(
     body: payload,
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 解包角色
   return data.role;
-}
+} // 代码块结束
 
 /** 删除角色：被用户引用时后端返回 409 */
 export function deleteRole(credential: Credential, code: string): Promise<{ code: string; deleted: boolean }> {
@@ -346,8 +346,8 @@ export function deleteRole(credential: Credential, code: string): Promise<{ code
     method: 'DELETE',
     // 携带凭证
     credential,
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 /** 整体替换角色权限：传空数组即清空 */
 export async function replaceRolePermissions(credential: Credential, code: string, permissions: string[]): Promise<string[]> {
@@ -359,10 +359,10 @@ export async function replaceRolePermissions(credential: Credential, code: strin
     body: { permissions },
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 返回后端落库后的最终权限集合
   return data.permissions;
-}
+} // 代码块结束
 
 // ── 用户与用户角色 ────────────────────────────────────────────────────────
 
@@ -386,7 +386,7 @@ export interface UserListRow {
   updated_at: string;
   // 已授予角色码
   roles: string[];
-}
+} // 代码块结束
 
 /** 用户列表分页结果 */
 export interface UserListPage {
@@ -398,13 +398,13 @@ export interface UserListPage {
   limit: number;
   // 偏移量
   offset: number;
-}
+} // 代码块结束
 
 /** 分页查询用户：q 同时匹配 ID / 展示名 / 登录标识 */
 export function listUsers(
-  credential: Credential,
-  query: { q?: string; limit?: number; offset?: number } = {},
-): Promise<UserListPage> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  query: { q?: string; limit?: number; offset?: number } = {}, // 对象字段 query：记录一项配置或数据
+): Promise<UserListPage> { // 执行当前业务步骤
   // 组装查询串，空值不写入避免后端把空串当条件
   const params = new URLSearchParams();
   // 关键字
@@ -417,7 +417,7 @@ export function listUsers(
   const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
   // 发起请求
   return request<UserListPage>(`/admin/users${suffix}`, { credential });
-}
+} // 代码块结束
 
 /** 用户角色授权行 */
 export interface UserRoleRow {
@@ -429,7 +429,7 @@ export interface UserRoleRow {
   granted_by: string;
   // 授权时间
   created_at: string;
-}
+} // 代码块结束
 
 /** 查询某用户的角色授权列表 */
 export async function listUserRoles(credential: Credential, userId: string): Promise<UserRoleRow[]> {
@@ -439,17 +439,17 @@ export async function listUserRoles(credential: Credential, userId: string): Pro
     `/admin/users/${encodeURIComponent(userId)}/roles`,
     // 携带凭证
     { credential },
-  );
+  ); // 执行当前业务步骤
   // 返回授权数组
   return data.roles;
-}
+} // 代码块结束
 
 /** 授予用户角色：首次 201、重复 200，两者都视为成功 */
 export function grantUserRole(
-  credential: Credential,
-  userId: string,
-  roleCode: string,
-): Promise<{ user_id: string; role_code: string; granted_by: string; created: boolean }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  userId: string, // 对象字段 userId：记录一项配置或数据
+  roleCode: string, // 对象字段 roleCode：记录一项配置或数据
+): Promise<{ user_id: string; role_code: string; granted_by: string; created: boolean }> { // 执行当前业务步骤
   // POST 到用户角色集合
   return request(`/admin/users/${encodeURIComponent(userId)}/roles`, {
     // 新增语义
@@ -458,23 +458,23 @@ export function grantUserRole(
     body: { role_code: roleCode },
     // 携带凭证
     credential,
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 /** 撤销用户角色 */
 export function revokeUserRole(
-  credential: Credential,
-  userId: string,
-  roleCode: string,
-): Promise<{ user_id: string; role_code: string; deleted: boolean }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  userId: string, // 对象字段 userId：记录一项配置或数据
+  roleCode: string, // 对象字段 roleCode：记录一项配置或数据
+): Promise<{ user_id: string; role_code: string; deleted: boolean }> { // 执行当前业务步骤
   // DELETE 精确到单个角色
   return request(`/admin/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleCode)}`, {
     // 删除方法
     method: 'DELETE',
     // 携带凭证
     credential,
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 // ── 功能模块与权益 ────────────────────────────────────────────────────────
 
@@ -496,7 +496,7 @@ export interface ModuleView {
   requires: string[];
   // 当前有效价格，null 表示免费或未定价
   current_price: { currency: string; amount_minor: number } | null;
-}
+} // 代码块结束
 
 /** 模块状态迁移目标，与后端枚举一致 */
 export type ModuleStatus = 'draft' | 'active' | 'archived';
@@ -507,25 +507,25 @@ export async function listModules(credential: Credential | null): Promise<Module
   const data = await request<{ modules: ModuleView[] }>('/modules', { credential });
   // 返回数组
   return data.modules;
-}
+} // 代码块结束
 
 /** 迁移模块状态：仅允许 draft→active→archived 单向流转 */
 export async function updateModuleStatus(
-  credential: Credential,
-  code: string,
-  status: ModuleStatus,
-  region?: string,
-): Promise<{ code: string; region: string; status: string; updated_at: string }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  code: string, // 对象字段 code：记录一项配置或数据
+  status: ModuleStatus, // 对象字段 status：记录一项配置或数据
+  region?: string, // 执行当前业务步骤
+): Promise<{ code: string; region: string; status: string; updated_at: string }> { // 执行当前业务步骤
   // PATCH 指定模块状态
   const data = await request<{ module: { code: string; region: string; status: string; updated_at: string } }>(
     // 目标路径
     `/modules/${encodeURIComponent(code)}/status`,
     // 局部更新
     { method: 'PATCH', body: { status, region }, credential },
-  );
+  ); // 执行当前业务步骤
   // 解包模块
   return data.module;
-}
+} // 代码块结束
 
 /** 管理端模块视图：在公开视图基础上补排序权重与时间戳 */
 export interface ModuleManageView extends ModuleView {
@@ -535,7 +535,7 @@ export interface ModuleManageView extends ModuleView {
   created_at: string;
   // 更新时间
   updated_at: string;
-}
+} // 代码块结束
 
 /** 价格行视图：与 module_prices 表结构对齐 */
 export interface ModulePrice {
@@ -549,7 +549,7 @@ export interface ModulePrice {
   effective_from: string;
   // 生效结束时间，null 表示长期有效
   effective_to: string | null;
-}
+} // 代码块结束
 
 /** 模块详情：公开详情端点为扁平响应（顶层即模块字段，无 module 包裹层） */
 export interface ModuleDetail extends ModuleView {
@@ -561,13 +561,13 @@ export interface ModuleDetail extends ModuleView {
   updated_at: string;
   // 全部历史价格（按生效时间倒序），供调价轨迹展示与管理端调价
   price_history: ModulePrice[];
-}
+} // 代码块结束
 
 /** 管理端模块全量列表：含 draft/archived，支持 q/status 过滤；区域走 x-region 头 */
 export async function listModulesManage(
-  credential: Credential,
-  query: { q?: string; status?: ModuleStatus; region?: string } = {},
-): Promise<ModuleManageView[]> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  query: { q?: string; status?: ModuleStatus; region?: string } = {}, // 对象字段 query：记录一项配置或数据
+): Promise<ModuleManageView[]> { // 执行当前业务步骤
   // 组装查询串，空值不写入避免后端把空串当条件
   const params = new URLSearchParams();
   // 关键字（编码/名称包含匹配）
@@ -584,10 +584,10 @@ export async function listModulesManage(
     credential,
     // 区域通道头
     headers: { 'x-region': region },
-  });
+  }); // 代码块结束
   // 返回模块数组
   return data.modules;
-}
+} // 代码块结束
 
 /** 模块详情：扁平响应，直接返回顶层对象 */
 export function getModule(credential: Credential, code: string, region?: string): Promise<ModuleDetail> {
@@ -597,8 +597,8 @@ export function getModule(credential: Credential, code: string, region?: string)
     credential,
     // 显式区域头，缺省时由后端按登录用户地区兜底
     headers: region ? { 'x-region': region } : undefined,
-  });
-}
+  }); // 代码块结束
+} // 代码块结束
 
 /** 新建模块的入参：code 区域内唯一，默认落 draft */
 export interface ModuleCreatePayload {
@@ -614,7 +614,7 @@ export interface ModuleCreatePayload {
   sort_order?: number;
   // 前置依赖模块码，选填
   requires?: string[];
-}
+} // 代码块结束
 
 /** 新建模块：成功返回 201 与完整模块视图 */
 export async function createModule(credential: Credential, payload: ModuleCreatePayload): Promise<ModuleManageView> {
@@ -622,7 +622,7 @@ export async function createModule(credential: Credential, payload: ModuleCreate
   const data = await request<{ module: ModuleManageView }>('/modules', { method: 'POST', body: payload, credential });
   // 解包模块
   return data.module;
-}
+} // 代码块结束
 
 /** 编辑模块的入参：仅文案/排序/依赖可改，状态走 /status 路由 */
 export interface ModuleUpdatePayload {
@@ -636,14 +636,14 @@ export interface ModuleUpdatePayload {
   requires?: string[];
   // 区域仅用于定位模块行，不参与更新
   region?: string;
-}
+} // 代码块结束
 
 /** 编辑模块：成功返回 200 与更新后的模块视图 */
 export async function updateModule(
-  credential: Credential,
-  code: string,
-  payload: ModuleUpdatePayload,
-): Promise<ModuleManageView> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  code: string, // 对象字段 code：记录一项配置或数据
+  payload: ModuleUpdatePayload, // 对象字段 payload：记录一项配置或数据
+): Promise<ModuleManageView> { // 执行当前业务步骤
   // PATCH 指定模块，响应包裹 { module }
   const data = await request<{ module: ModuleManageView }>(`/modules/${encodeURIComponent(code)}`, {
     // 局部更新
@@ -652,17 +652,17 @@ export async function updateModule(
     body: payload,
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 解包模块
   return data.module;
-}
+} // 代码块结束
 
 /** 软删除模块：active 须先归档；重复删除后端回放 200 */
 export async function deleteModule(
-  credential: Credential,
-  code: string,
-  region?: string,
-): Promise<{ code: string; region: string; deleted: boolean; deleted_at: string }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  code: string, // 对象字段 code：记录一项配置或数据
+  region?: string, // 执行当前业务步骤
+): Promise<{ code: string; region: string; deleted: boolean; deleted_at: string }> { // 执行当前业务步骤
   // 区域走查询串，与后端 query>header>cn 的解析顺序对齐
   const suffix = region ? `?region=${encodeURIComponent(region)}` : '';
   // DELETE 无请求体；响应包裹 { module: { code, region, deleted, deleted_at } }
@@ -671,10 +671,10 @@ export async function deleteModule(
     `/modules/${encodeURIComponent(code)}${suffix}`,
     // 删除方法 + 凭证
     { method: 'DELETE', credential },
-  );
+  ); // 执行当前业务步骤
   // 解包模块删除回执
   return data.module;
-}
+} // 代码块结束
 
 /** 新增价格行的入参：按时间窗口生效，支持多币种 */
 export interface ModulePricePayload {
@@ -686,15 +686,15 @@ export interface ModulePricePayload {
   effective_from?: string;
   // 生效结束时间（ISO 字符串），缺省表示长期有效
   effective_to?: string;
-}
+} // 代码块结束
 
 /** 新增价格行：成功返回 201 与价格行（含 module_code）；region 走 x-region 头定位模块 */
 export async function createModulePrice(
-  credential: Credential,
-  code: string,
-  payload: ModulePricePayload,
-  region?: string,
-): Promise<ModulePrice> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  code: string, // 对象字段 code：记录一项配置或数据
+  payload: ModulePricePayload, // 对象字段 payload：记录一项配置或数据
+  region?: string, // 执行当前业务步骤
+): Promise<ModulePrice> { // 执行当前业务步骤
   // POST 到模块价格集合，响应包裹 { price }
   const data = await request<{ price: ModulePrice }>(`/modules/${encodeURIComponent(code)}/prices`, {
     // 新增语义
@@ -705,18 +705,18 @@ export async function createModulePrice(
     credential,
     // 区域定位头：缺省时后端按 cn 兜底
     headers: region ? { 'x-region': region } : undefined,
-  });
+  }); // 代码块结束
   // 解包价格行
   return data.price;
-}
+} // 代码块结束
 
 /** 更新价格行：金额、币种、生效窗口均可改；effective_to 传 null 表示转为长期有效 */
 export async function updateModulePrice(
-  credential: Credential,
-  priceId: string,
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  priceId: string, // 对象字段 priceId：记录一项配置或数据
   // 先从 Partial 中剔除 effective_to 再以可空类型覆盖：直接交集会把 null 收窄掉
   payload: Partial<Omit<ModulePricePayload, 'effective_to'>> & { effective_to?: string | null },
-): Promise<ModulePrice> {
+): Promise<ModulePrice> { // 执行当前业务步骤
   // PUT 精确到价格行，响应包裹 { price }（注意后端回显的是 module_id 而非 module_code）
   const data = await request<{ price: ModulePrice }>(`/modules/prices/${encodeURIComponent(priceId)}`, {
     // 覆盖更新
@@ -725,26 +725,26 @@ export async function updateModulePrice(
     body: payload,
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 解包价格行
   return data.price;
-}
+} // 代码块结束
 
 /** 使价格行立即失效：后端软失效 effective_to = now，保留历史留痕；不存在或已过期返回 404 */
 export async function deleteModulePrice(
-  credential: Credential,
-  priceId: string,
-): Promise<{ id: string; effective_to: string; expired: boolean }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  priceId: string, // 对象字段 priceId：记录一项配置或数据
+): Promise<{ id: string; effective_to: string; expired: boolean }> { // 执行当前业务步骤
   // DELETE 无请求体，响应包裹 { price: { id, effective_to, expired } }
   const data = await request<{ price: { id: string; effective_to: string; expired: boolean } }>(
     // 目标路径精确到价格行
     `/modules/prices/${encodeURIComponent(priceId)}`,
     // 删除方法 + 凭证
     { method: 'DELETE', credential },
-  );
+  ); // 执行当前业务步骤
   // 解包价格行失效回执
   return data.price;
-}
+} // 代码块结束
 
 /** 权益视图 */
 export interface EntitlementView {
@@ -762,13 +762,13 @@ export interface EntitlementView {
   version: number;
   // 创建时间
   created_at: string;
-}
+} // 代码块结束
 
 /** 手工发放权益：已激活未过期时后端回放现有记录 */
 export async function grantEntitlement(
-  credential: Credential,
-  payload: { user_id: string; module_code: string; region?: string; expires_at?: string },
-): Promise<EntitlementView> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  payload: { user_id: string; module_code: string; region?: string; expires_at?: string }, // 对象字段 payload：记录一项配置或数据
+): Promise<EntitlementView> { // 执行当前业务步骤
   // POST 发放端点
   const data = await request<{ entitlement: EntitlementView }>('/entitlements/grant', {
     // 新增语义
@@ -777,27 +777,27 @@ export async function grantEntitlement(
     body: payload,
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 解包权益
   return data.entitlement;
-}
+} // 代码块结束
 
 /** 回收权益：已回收时后端回放当前状态 */
 export async function revokeEntitlement(
-  credential: Credential,
-  entitlementId: string,
-  reason?: string,
-): Promise<{ id: string; user_id: string; status: string; version: number; updated_at: string }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  entitlementId: string, // 对象字段 entitlementId：记录一项配置或数据
+  reason?: string, // 执行当前业务步骤
+): Promise<{ id: string; user_id: string; status: string; version: number; updated_at: string }> { // 执行当前业务步骤
   // POST 回收端点，路径参数为权益 ID
   const data = await request<{ entitlement: { id: string; user_id: string; status: string; version: number; updated_at: string } }>(
     // 目标路径
     `/entitlements/${encodeURIComponent(entitlementId)}/revoke`,
     // 请求体允许空对象
     { method: 'POST', body: reason ? { reason } : {}, credential },
-  );
+  ); // 执行当前业务步骤
   // 解包权益
   return data.entitlement;
-}
+} // 代码块结束
 
 /** 权益列表行：在权益视图基础上补模块多语言名、区域与更新时间 */
 export interface EntitlementListRow extends EntitlementView {
@@ -807,7 +807,7 @@ export interface EntitlementListRow extends EntitlementView {
   region: string;
   // 更新时间
   updated_at: string;
-}
+} // 代码块结束
 
 /** 权益列表分页结果 */
 export interface EntitlementListPage {
@@ -819,13 +819,13 @@ export interface EntitlementListPage {
   limit: number;
   // 偏移量
   offset: number;
-}
+} // 代码块结束
 
 /** 分页查询权益：q 匹配用户 ID / 模块码；status 过滤；region 留空表示跨区域 */
 export function listEntitlements(
-  credential: Credential,
-  query: { q?: string; status?: 'active' | 'expired' | 'revoked'; region?: string; limit?: number; offset?: number } = {},
-): Promise<EntitlementListPage> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  query: { q?: string; status?: 'active' | 'expired' | 'revoked'; region?: string; limit?: number; offset?: number } = {}, // 对象字段 query：记录一项配置或数据
+): Promise<EntitlementListPage> { // 执行当前业务步骤
   // 组装查询串，空值不写入避免后端把空串当条件
   const params = new URLSearchParams();
   // 关键字
@@ -842,7 +842,7 @@ export function listEntitlements(
   const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
   // 发起请求，响应已是分页信封
   return request<EntitlementListPage>(`/entitlements${suffix}`, { credential });
-}
+} // 代码块结束
 
 /** 权益审计事件视图 */
 export interface EntitlementEventView {
@@ -858,7 +858,7 @@ export interface EntitlementEventView {
   actor: string;
   // 事件时间
   created_at: string;
-}
+} // 代码块结束
 
 /** 查询某权益的状态流转审计事件（按写入顺序升序） */
 export async function listEntitlementEvents(credential: Credential, entitlementId: string): Promise<EntitlementEventView[]> {
@@ -868,10 +868,10 @@ export async function listEntitlementEvents(credential: Credential, entitlementI
     `/entitlements/${encodeURIComponent(entitlementId)}/events`,
     // 携带凭证
     { credential },
-  );
+  ); // 执行当前业务步骤
   // 返回事件数组
   return data.events;
-}
+} // 代码块结束
 
 // ── 商城订单（人工结算） ────────────────────────────────────────────────
 
@@ -909,7 +909,7 @@ export interface AdminOrderRow {
   paid_at: string | null;
   // 取消时间
   cancelled_at: string | null;
-}
+} // 代码块结束
 
 /** 管理端订单分页结果 */
 export interface AdminOrderPage {
@@ -921,13 +921,13 @@ export interface AdminOrderPage {
   limit: number;
   // 偏移量
   offset: number;
-}
+} // 代码块结束
 
 /** 拉取管理端订单列表：跨用户；status 过滤，q 匹配模块编码或用户 ID */
 export function listOrders(
-  credential: Credential,
-  query: { status?: 'pending' | 'paid' | 'cancelled'; region?: 'cn' | 'global'; q?: string; limit?: number; offset?: number } = {},
-): Promise<AdminOrderPage> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  query: { status?: 'pending' | 'paid' | 'cancelled'; region?: 'cn' | 'global'; q?: string; limit?: number; offset?: number } = {}, // 对象字段 query：记录一项配置或数据
+): Promise<AdminOrderPage> { // 执行当前业务步骤
   // 组装查询串，空值不写入
   const params = new URLSearchParams();
   // 状态过滤
@@ -944,13 +944,13 @@ export function listOrders(
   const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
   // 发起只读请求
   return request<AdminOrderPage>(`/orders/manage${suffix}`, { credential });
-}
+} // 代码块结束
 
 /** 导出订单清单 xlsx：与 /orders/manage 同口径过滤，返回二进制 Blob 与建议文件名，由视图触发浏览器下载 */
 export async function exportOrders(
-  credential: Credential,
-  query: { status?: 'pending' | 'paid' | 'cancelled'; region?: 'cn' | 'global'; q?: string } = {},
-): Promise<{ blob: Blob; filename: string }> {
+  credential: Credential, // 对象字段 credential：记录一项配置或数据
+  query: { status?: 'pending' | 'paid' | 'cancelled'; region?: 'cn' | 'global'; q?: string } = {}, // 对象字段 query：记录一项配置或数据
+): Promise<{ blob: Blob; filename: string }> { // 执行当前业务步骤
   // 组装过滤查询串，空值不写入
   const params = new URLSearchParams();
   // 状态过滤
@@ -966,34 +966,34 @@ export async function exportOrders(
   const headers: Record<string, string> = { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }; // 声明期望 xlsx
   // 凭证注入：token 走自定义头，bearer 走标准 Authorization（与 request 口径一致）
   if (credential.kind === 'token') headers['X-Admin-Token'] = credential.value;
-  else headers.Authorization = `Bearer ${credential.value}`;
+  else headers.Authorization = `Bearer ${credential.value}`; // 兜底分支：前面所有条件均不满足时执行
 
   const response = await fetch(`${BASE}/orders/export${suffix}`, { headers }); // GET 导出端点
 
   // 非 2xx：读 JSON 信封抛结构化错误，与列表/结算错误口径一致
   if (!response.ok) {
     const text = await response.text(); // 读取错误正文
-    let payload: unknown = null;
-    if (text.length > 0) {
+    let payload: unknown = null; // 可变变量 payload：运行过程中会被重新赋值
+    if (text.length > 0) { // 条件分支：按判断结果选择后续处理路径
       try { payload = JSON.parse(text); } catch { payload = null; } // 非 JSON 按空兜底
-    }
-    const body = (payload ?? {}) as { code?: string; message?: string; request_id?: string; details?: unknown };
-    throw new ApiError(
-      response.status,
-      body.code ?? 'HTTP_ERROR',
-      body.message ?? `request failed with status ${response.status}`,
-      body.request_id ?? '',
-      body.details,
-    );
-  }
+    } // 代码块结束
+    const body = (payload ?? {}) as { code?: string; message?: string; request_id?: string; details?: unknown }; // 常量 body：保存固定配置或一次性派生值
+    throw new ApiError( // 抛出错误：中断当前流程并向上层传递
+      response.status, // 执行当前业务步骤
+      body.code ?? 'HTTP_ERROR', // 执行当前业务步骤
+      body.message ?? `request failed with status ${response.status}`, // 执行当前业务步骤
+      body.request_id ?? '', // 执行当前业务步骤
+      body.details, // 执行当前业务步骤
+    ); // 执行当前业务步骤
+  } // 代码块结束
 
   const blob = await response.blob(); // 读取 xlsx 二进制
   // 从 Content-Disposition 解析建议文件名，缺失时兜底 orders.xlsx
   const disposition = response.headers.get('Content-Disposition') ?? '';
-  const match = /filename="?([^";]+)"?/i.exec(disposition);
-  const filename = match?.[1] ?? 'orders.xlsx';
-  return { blob, filename };
-}
+  const match = /filename="?([^";]+)"?/i.exec(disposition); // 常量 match：保存固定配置或一次性派生值
+  const filename = match?.[1] ?? 'orders.xlsx'; // 常量 filename：保存固定配置或一次性派生值
+  return { blob, filename }; // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 结算订单：后端在同一事务内把订单置 paid 并发放订单来源权益 */
 export async function settleOrder(credential: Credential, orderId: string, reason?: string): Promise<AdminOrderRow> {
@@ -1003,10 +1003,10 @@ export async function settleOrder(credential: Credential, orderId: string, reaso
     `/orders/${encodeURIComponent(orderId)}/settle`,
     // 写操作，原因可选
     { method: 'POST', body: reason ? { reason } : {}, credential },
-  );
+  ); // 执行当前业务步骤
   // 返回结算后的订单
   return data.order;
-}
+} // 代码块结束
 
 // ── 分类导航（两级分类树 CRUD）──────────────────────────────────────────────
 
@@ -1092,7 +1092,7 @@ export async function updateCategory(credential: Credential, slug: string, paylo
     body: payload,
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 解包分类行
   return data.category;
 } // updateCategory 结束
@@ -1105,10 +1105,10 @@ export async function deleteCategory(credential: Credential, slug: string): Prom
     method: 'DELETE',
     // 携带凭证
     credential,
-  });
+  }); // 代码块结束
   // 解包删除回执
   return data.category;
 } // deleteCategory 结束
 
-export { request };
-export * from './api-ops';
+export { request }; // 执行当前业务步骤
+export * from './api-ops'; // 执行当前业务步骤

@@ -135,12 +135,12 @@ function rejectForRow(row: InviteRow | undefined, now: string): never { // 统�
  * 条件 UPDATE 保证并发下不超发；失败抛明确错误码，事务随之回滚。
  */
 export function redeemInvite(
-  db: Db,
+  db: Db, // 对象字段 db：记录一项配置或数据
   code: string | undefined, // 请求体传入的码
   identifier: string | null, // 归一化注册标识（绑定码核对用）
   userId: string, // 本次注册的新用户
-  now: string,
-): void {
+  now: string, // 对象字段 now：记录一项配置或数据
+): void { // 执行当前业务步骤
   const trimmed = (code ?? '').trim(); // 去空白
   if (!trimmed) throw new AppError('AUTH_INVITE_REQUIRED', 'invitation code is required'); // 缺码走门槛码
   const row = getInviteByCode(db, trimmed); // 查码
@@ -163,6 +163,6 @@ export function redeemInvite(
   if (result.changes !== 1) rejectForRow(getInviteByCode(db, row.code), now); // 并发被抢走 / 状态变化，归类拒绝
 
   db.prepare( // 写核销记录
-    'INSERT INTO invitation_redemptions (id, invitation_id, user_id, identifier, created_at) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO invitation_redemptions (id, invitation_id, user_id, identifier, created_at) VALUES (?, ?, ?, ?, ?)', // 执行当前业务步骤
   ).run(uuidv7(), row.id, userId, identifier, now); // 绑定参数
 } // redeemInvite 结束

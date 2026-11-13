@@ -27,7 +27,7 @@ export interface UseImSocket {
   onFrame: (cb: (frame: ImFrame) => void) => () => void; // 注册帧回调，返回注销函数
   onMessage: (cb: (message: unknown) => void) => () => void; // 注册新消息回调
   onCall: (cb: (frame: ImFrame) => void) => () => void; // 注册通话信令回调
-}
+} // 代码块结束
 
 /** IM Socket Hook：管理连接生命周期并提供稳定的收发接口 */
 export function useImSocket(): UseImSocket {
@@ -37,8 +37,8 @@ export function useImSocket(): UseImSocket {
   const [state, setState] = useState<ConnectionState>('closed');
   // 回调注册表：用 ref 保存，保证 effect 内注册的回调能取到最新值
   const frameCbs = useRef<Set<(frame: ImFrame) => void>>(new Set());
-  const messageCbs = useRef<Set<(message: unknown) => void>>(new Set());
-  const callCbs = useRef<Set<(frame: ImFrame) => void>>(new Set());
+  const messageCbs = useRef<Set<(message: unknown) => void>>(new Set()); // 常量 messageCbs：保存固定配置或一次性派生值
+  const callCbs = useRef<Set<(frame: ImFrame) => void>>(new Set()); // 常量 callCbs：保存固定配置或一次性派生值
 
   // 建立连接的 effect：依赖令牌，令牌变化时重建
   useEffect(() => {
@@ -51,38 +51,38 @@ export function useImSocket(): UseImSocket {
       onFrame: (frame) => frameCbs.current.forEach((cb) => cb(frame)), // 广播给所有帧回调
       onMessage: (msg) => messageCbs.current.forEach((cb) => cb(msg)), // 广播新消息
       onCall: (frame) => callCbs.current.forEach((cb) => cb(frame)), // 广播通话信令
-    });
+    }); // 代码块结束
     socketRef.current = socket; // 保存到 ref
     socket.connect(); // 建立连接
     // 卸载时关闭连接，清理引用
     return () => {
-      socket.close();
-      socketRef.current = null;
-    };
+      socket.close(); // 执行当前业务步骤
+      socketRef.current = null; // 执行当前业务步骤
+    }; // 代码块结束
   }, []); // 空依赖：只在挂载时创建一次；令牌变化由登出流程整体重建
 
   // 稳定的发送方法：直接调用 socket.send
   const send = useCallback<UseImSocket['send']>((frame) => {
     return socketRef.current?.send(frame); // 无实例时返回 undefined
-  }, []);
+  }, []); // 代码块结束
 
   // 注册帧回调：返回注销函数，effect 清理时调用
   const onFrame = useCallback((cb: (frame: ImFrame) => void) => {
     frameCbs.current.add(cb); // 加入集合
     return () => frameCbs.current.delete(cb); // 返回注销函数
-  }, []);
+  }, []); // 代码块结束
 
   // 注册新消息回调
   const onMessage = useCallback((cb: (message: unknown) => void) => {
-    messageCbs.current.add(cb);
-    return () => messageCbs.current.delete(cb);
-  }, []);
+    messageCbs.current.add(cb); // 执行当前业务步骤
+    return () => messageCbs.current.delete(cb); // 返回当前函数的处理结果
+  }, []); // 代码块结束
 
   // 注册通话信令回调
   const onCall = useCallback((cb: (frame: ImFrame) => void) => {
-    callCbs.current.add(cb);
-    return () => callCbs.current.delete(cb);
-  }, []);
+    callCbs.current.add(cb); // 执行当前业务步骤
+    return () => callCbs.current.delete(cb); // 返回当前函数的处理结果
+  }, []); // 代码块结束
 
   // 返回给调用方的接口
   return {
@@ -93,5 +93,5 @@ export function useImSocket(): UseImSocket {
     onFrame, // 帧回调注册
     onMessage, // 消息回调注册
     onCall, // 通话回调注册
-  };
+  }; // 代码块结束
 } // useImSocket 结束

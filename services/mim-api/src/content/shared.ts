@@ -12,7 +12,7 @@ export function parseLimit(raw: unknown, fallback: number, max: number): number 
   const parsed = Number.parseInt(String(raw ?? ''), 10); // 空串 / 非数字均得 NaN
   if (!Number.isFinite(parsed)) return fallback; // 非法输入回落默认值
   return Math.min(Math.max(parsed, 1), max); // 下限 1、上限 max，避免超大列表拖慢查询
-}
+} // 代码块结束
 
 /** 读取整型环境变量；缺失 / 非法 / 负数时回落兜底值。 */
 export function envInt(env: Record<string, string | undefined>, key: string, fallback: number): number {
@@ -20,7 +20,7 @@ export function envInt(env: Record<string, string | undefined>, key: string, fal
   if (!raw) return fallback; // 未配置回落
   const parsed = Number.parseInt(raw, 10); // 十进制解析
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback; // 负数与 NaN 均回落
-}
+} // 代码块结束
 
 /**
  * 有效期判定：starts_at 为空表示立即生效，ends_at 为空表示长期有效；
@@ -30,7 +30,7 @@ export function isWithinWindow(startsAt: string | null | undefined, endsAt: stri
   if (startsAt && startsAt > now) return false; // 尚未到生效起始
   if (endsAt && endsAt <= now) return false; // 已过截止时间（开区间）
   return true; // 窗口内或无边界
-}
+} // 代码块结束
 
 /**
  * 访客指纹：登录用户取用户 ID（稳定身份）；匿名访客取 IP + UA 加盐哈希，
@@ -42,4 +42,4 @@ export function visitorHash(req: Request, deps: ApiDeps): string {
   const ua = req.header('user-agent') ?? ''; // 浏览器 / 客户端标识，辅助区分设备
   const salt = deps.env.MIM_IP_HASH_SALT ?? deps.jwtSecret; // 盐缺省回落 JWT 密钥，避免裸哈希被彩虹表反推
   return `v:${sha256(`${salt}:${forwarded}:${ua}`)}`; // 前缀区分用户 / 访客两类指纹
-}
+} // 代码块结束

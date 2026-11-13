@@ -75,18 +75,18 @@ const RENUMBER_KEY = 'renumber_v2';
  */
 export function renumberMemberNos(db: Db, now: string): MemberNoChange[] { // 启动期调用一次
   const run = db.transaction((): MemberNoChange[] => { // 整体事务：号码与审计要么全成、要么全不成
-    const flag = db.prepare('SELECT value FROM member_no_meta WHERE key = ?').get(RENUMBER_KEY) as
+    const flag = db.prepare('SELECT value FROM member_no_meta WHERE key = ?').get(RENUMBER_KEY) as // 常量 flag：保存固定配置或一次性派生值
       | { value: string } // 已记录过状态
       | undefined; // 首次运行
     if (flag?.value === 'done') return []; // 已完成：本次不再改号，避免每轮部署都把用户号码洗一遍
-    const rows = db.prepare('SELECT id, member_no, created_at FROM users ORDER BY created_at ASC, id ASC').all() as Array<{
+    const rows = db.prepare('SELECT id, member_no, created_at FROM users ORDER BY created_at ASC, id ASC').all() as Array<{ // 常量 rows：保存固定配置或一次性派生值
       id: string; // 用户主键
       member_no: string | null; // 旧号（可能为空或历史 MIM-xxxx 形态）
       created_at: string; // 注册时间，决定号码资历排序
     }>; // 读取全量用户：老用户先拿更短的号
     db.prepare('UPDATE users SET member_no = NULL').run(); // 先清空，避免旧号与新号的唯一索引在逐行改写时打架
     const insertHistory = db.prepare( // 审计行：旧号 → 新号
-      'INSERT INTO member_no_history (id, user_id, old_no, new_no, created_at) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO member_no_history (id, user_id, old_no, new_no, created_at) VALUES (?, ?, ?, ?, ?)', // 执行当前业务步骤
     ); // prepare 结束
     const assign = db.prepare('UPDATE users SET member_no = ?, updated_at = ? WHERE id = ?'); // 写回号码
     const changes: MemberNoChange[] = []; // 收集改号清单，供日志与测试断言
@@ -107,9 +107,9 @@ export function renumberMemberNos(db: Db, now: string): MemberNoChange[] { // �
       skipped = 0; // 成功分配后重置跳过计数
     } // 分配循环结束
     db.prepare('UPDATE member_no_sequence SET next_no = ? WHERE id = 1').run(cursor); // 游标对齐到重排结束位置
-    db.prepare('INSERT INTO member_no_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
-      RENUMBER_KEY,
-      'done',
+    db.prepare('INSERT INTO member_no_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run( // 执行当前业务步骤
+      RENUMBER_KEY, // 执行当前业务步骤
+      'done', // 执行当前业务步骤
     ); // 写入完成标记，保证重排只发生一次
     return changes; // 交出改号清单
   }); // 事务函数定义结束

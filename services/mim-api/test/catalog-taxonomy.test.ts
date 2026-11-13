@@ -44,7 +44,7 @@ describe('GET /taxonomy 分类导航树', () => { // 一级分组 + 二级条目
     expect(openharmony?.items[0].name_en).toBe('Button'); // 首条「按钮(Button)」→ Button
     expect(openharmony?.items[36].name_en).toBe('Gesture control'); // 末条「手势控制(Gesture)」→ Gesture control（顺带守住顺序不错位）
   }); // 结束英文名契约用例
-});
+}); // 代码块结束
 
 describe('模块英文名（双区）', () => { // 双区模块名走真实英文名
   it('en-US 名称取自英文清单，zh-CN 仍保留中文', async () => { // 两区名称分别校验
@@ -126,7 +126,7 @@ describe('GET /modules 分类与筛选', () => { // 分类过滤、排序、多�
     expect(miss.status).toBe(200); // 断言 200
     expect(miss.body.total).toBe(0); // 应无命中
   }); // 结束搜索叠加用例
-});
+}); // 代码块结束
 
 describe('GET /modules/hot 热门项目', () => { // 右侧「热门项目」卡片的数据契约
   it('默认今日窗口，返回条数受 limit 约束且热度降序', async () => { // 结构与排序同时校验
@@ -159,7 +159,7 @@ describe('GET /modules/hot 热门项目', () => { // 右侧「热门项目」卡
     const capped = await request(app).get('/api/v1/modules/hot?limit=999'); // 超过上限
     expect(capped.body.items.length).toBeLessThanOrEqual(20); // 上限被夹到 20
   }); // 结束分类联动用例
-});
+}); // 代码块结束
 
 describe('管理端分类树 CRUD（/categories）', () => { // 一级 / 二级分类的后台增删改查
   const ADMIN_TOKEN = 'test-admin-token-0123456789'; // 引导令牌：命中 MIM_ADMIN_TOKEN 即视为全权限
@@ -256,4 +256,4 @@ describe('GET /modules/:code 详情与列表字段同源', () => { // 详情页�
     expect(res.body.category_slug).toBe('ai-01'); // 已按 LEGACY_META 归入「人工智能」首条
     expect(res.body.license).toBe('MIT'); // 许可字段由种子补齐
   }); // 结束存量模块详情用例
-});
+}); // 代码块结束

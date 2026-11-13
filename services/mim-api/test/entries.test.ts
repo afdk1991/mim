@@ -18,7 +18,7 @@ beforeEach(() => { // 每例前置：重建内存库与应用
 }); // beforeEach 结束
 
 describe('统一入口配置清单：规模与去重整理', () => { // 清单总览与整理口径
-  it('overview 返回 44 入口 / 19 业务域 / 116 关联 / 46 占位标识与落地四态计数，且全部未配置', async () => {
+  it('overview 返回 44 入口 / 19 业务域 / 116 关联 / 46 占位标识与落地四态计数，且全部未配置', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/overview'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.schema).toBe('mim.site-modules.v2'); // v2 契约
@@ -33,7 +33,7 @@ describe('统一入口配置清单：规模与去重整理', () => { // 清单�
     expect(res.body.implementation).toEqual({ implemented: 5, partial: 18, planned: 19, conflict: 2 }); // 断言：校验接口响应或状态符合冻结契约
   }); // overview 用例结束
 
-  it('去重口径：88 行业务备注合并 44 项，@ 两行与 11 行空白各合并为 1 项', async () => {
+  it('去重口径：88 行业务备注合并 44 项，@ 两行与 11 行空白各合并为 1 项', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/overview'); // 公开只读
     expect(res.status).toBe(200); // 200
     const d = res.body.dedupe; // 整理结果
@@ -49,7 +49,7 @@ describe('统一入口配置清单：规模与去重整理', () => { // 清单�
     expect(res.body.blankRecord.hostValue).toBeNull(); // 空白占位不补写具体值
   }); // 去重用例结束
 
-  it('hostConfig 明确禁止补写具体主机值，缺省值恒为 null', async () => {
+  it('hostConfig 明确禁止补写具体主机值，缺省值恒为 null', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/overview'); // 公开只读
     expect(res.body.hostConfig.mode).toBe('placeholder'); // 占位模式
     expect(res.body.hostConfig.defaultValue).toBeNull(); // 无具体值
@@ -59,7 +59,7 @@ describe('统一入口配置清单：规模与去重整理', () => { // 清单�
 }); // 规模与整理分组结束
 
 describe('统一入口配置清单：业务域与职责', () => { // 19 域覆盖与职责元数据
-  it('domains 返回 19 个业务域，入口数合计 44 且编码唯一', async () => {
+  it('domains 返回 19 个业务域，入口数合计 44 且编码唯一', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/domains'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(19); // 19 组业务用途
@@ -74,7 +74,7 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
     } // 逐域循环结束
   }); // domains 用例结束
 
-  it('GET /entries 返回 44 项，每项备注逐字一致且职责/后台/接口/关联/落地映射齐备', async () => {
+  it('GET /entries 返回 44 项，每项备注逐字一致且职责/后台/接口/关联/落地映射齐备', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(44); // 全量
@@ -98,7 +98,7 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
     } // 比对循环结束
   }); // 清单逐项用例结束
 
-  it('q 与 domain 过滤生效，且相似模块关联指向真实存在的入口', async () => {
+  it('q 与 domain 过滤生效，且相似模块关联指向真实存在的入口', async () => { // 调用 it 并处理其返回结果
     const byNote = await request(app).get('/api/v1/entries?q=' + encodeURIComponent('官方博客系统')); // 按系统名搜索
     expect(byNote.body.total).toBe(1); // 命中唯一一条
     expect(byNote.body.entries[0].entryKey).toBe('BLOG'); // 博客入口
@@ -115,7 +115,7 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
     } // 入口循环结束
   }); // 过滤与关联用例结束
 
-  it('单入口详情返回关联解析结果与运行时能力点；未登记占位键 404', async () => {
+  it('单入口详情返回关联解析结果与运行时能力点；未登记占位键 404', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/BLOG'); // 公开详情
     expect(res.status).toBe(200); // 200
     expect(res.body.entry.entryKey).toBe('BLOG'); // 占位键
@@ -133,7 +133,7 @@ describe('统一入口配置清单：业务域与职责', () => { // 19 域覆�
 }); // 业务域与职责分组结束
 
 describe('统一入口配置清单：可配置占位标识', () => { // 占位配置与模板
-  it('placeholders 返回 46 项，44 个业务入口 + @ 根域名 + 空白占位', async () => {
+  it('placeholders 返回 46 项，44 个业务入口 + @ 根域名 + 空白占位', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/placeholders'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(46); // 占位标识总数
@@ -144,7 +144,7 @@ describe('统一入口配置清单：可配置占位标识', () => { // 占位�
     expect(res.body.items.find((i: { entryKey: string }) => i.entryKey === 'BLANK_UNSET')).toBeTruthy(); // 空白合并项
   }); // 占位清单用例结束
 
-  it('config 模板 44 个键全部空值，不含任何具体主机值', async () => {
+  it('config 模板 44 个键全部空值，不含任何具体主机值', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).get('/api/v1/entries/config'); // 公开只读
     expect(res.status).toBe(200); // 200
     expect(res.body.schema).toBe('mim.entry-hosts.v1'); // 模板版本
@@ -157,7 +157,7 @@ describe('统一入口配置清单：可配置占位标识', () => { // 占位�
     expect(JSON.stringify(hosts)).not.toContain('.mixm.top'); // 不得出现真实域名
   }); // 配置模板用例结束
 
-  it('运行时数据隔离键已迁移为占位键，旧短主机值不再被使用', async () => {
+  it('运行时数据隔离键已迁移为占位键，旧短主机值不再被使用', async () => { // 调用 it 并处理其返回结果
     const rows = db.prepare('SELECT DISTINCT host FROM site_module_items').all() as Array<{ host: string }>; // 库内隔离键
     const keys = new Set(SITE_MODULES.map((m) => m.entryKey)); // 合法占位键
     for (const row of rows) expect(keys.has(row.host)).toBe(true); // 全部为占位键
@@ -171,7 +171,7 @@ describe('统一入口配置清单：可配置占位标识', () => { // 占位�
 }); // 占位配置分组结束
 
 describe('统一入口配置清单：只读边界', () => { // 清单端点不接受写操作
-  it('清单端点全部只读，写操作返回 404，不产生副作用', async () => {
+  it('清单端点全部只读，写操作返回 404，不产生副作用', async () => { // 调用 it 并处理其返回结果
     const post = await request(app).post('/api/v1/entries').send({ entryKey: 'X' }); // 尝试写入清单
     expect(post.status).toBe(404); // 无写路由
     const put = await request(app).put('/api/v1/entries/config').send({ hosts: {} }); // 尝试覆盖模板

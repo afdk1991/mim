@@ -64,8 +64,8 @@ describe('部署项清单与过滤', () => { // 统一字段与过滤
     expect(res.body.total).toBe(DEPLOYMENT_ITEMS.length); // 全量
     expect(res.body.registry_total).toBe(DEPLOYMENT_ITEMS.length); // 与共享包一致
     const fields = [ // 统一字段清单，所有同类项必须齐备
-      'id', 'name', 'aliases', 'platform_id', 'platform', 'layer', 'kind',
-      'repository', 'entry_url', 'delivery', 'status', 'result', 'anomalies', 'missing_fields', 'sources',
+      'id', 'name', 'aliases', 'platform_id', 'platform', 'layer', 'kind', // 执行当前业务步骤
+      'repository', 'entry_url', 'delivery', 'status', 'result', 'anomalies', 'missing_fields', 'sources', // 执行当前业务步骤
     ]; // 字段数组结束
     for (const item of res.body.items) { // 逐项核对
       for (const field of fields) expect(item).toHaveProperty(field); // 字段不得缺失

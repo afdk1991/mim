@@ -20,7 +20,7 @@
 import { Router } from 'express'; // Express 路由容器
 import { z } from 'zod'; // 声明式请求校验
 import { AppError, uuidv7 } from '@mim/core-domain'; // 统一异常 + 时间有序主键
-import {
+import { // 引入依赖、类型或本地模块绑定
   NAV_LINK_STATUSES, // 三态枚举，供查询参数校验
   normalizeNavUrl, // 地址归一化：http(s) 或站内相对路径
   resolveProbeTarget, // 相对路径按 origin 补齐
@@ -61,44 +61,44 @@ interface NavLinkRow {
   created_at: string;
   // 更新时间
   updated_at: string;
-}
+} // 代码块结束
 
 /** 行 → 对外视图：数值位宽与布尔语义在这里收口 */
 function linkView(row: NavLinkRow): NavLinkView {
-  return {
-    id: row.id,
-    name: row.name,
-    url: row.url,
-    group: row.group_name,
-    description: row.description,
-    recommended: row.recommended === 1,
-    status: row.status,
-    http_status: row.http_status,
-    latency_ms: row.latency_ms,
-    last_checked_at: row.last_checked_at,
-    created_by: row.created_by,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
+  return { // 返回当前函数的处理结果
+    id: row.id, // 对象字段 id：记录一项配置或数据
+    name: row.name, // 对象字段 name：记录一项配置或数据
+    url: row.url, // 对象字段 url：记录一项配置或数据
+    group: row.group_name, // 对象字段 group：记录一项配置或数据
+    description: row.description, // 对象字段 description：记录一项配置或数据
+    recommended: row.recommended === 1, // 对象字段 recommended：记录一项配置或数据
+    status: row.status, // 对象字段 status：记录一项配置或数据
+    http_status: row.http_status, // 对象字段 http_status：记录一项配置或数据
+    latency_ms: row.latency_ms, // 对象字段 latency_ms：记录一项配置或数据
+    last_checked_at: row.last_checked_at, // 对象字段 last_checked_at：记录一项配置或数据
+    created_by: row.created_by, // 对象字段 created_by：记录一项配置或数据
+    created_at: row.created_at, // 对象字段 created_at：记录一项配置或数据
+    updated_at: row.updated_at, // 对象字段 updated_at：记录一项配置或数据
+  }; // 代码块结束
 } // linkView 结束
 
 /** 新增链接请求体 */
 const createSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  url: z.string().trim().min(1).max(2048),
-  group: z.string().trim().min(1).max(40).optional(),
-  description: z.string().trim().max(200).optional(),
-  recommended: z.boolean().optional(),
-});
+  name: z.string().trim().min(1).max(80), // 对象字段 name：记录一项配置或数据
+  url: z.string().trim().min(1).max(2048), // 对象字段 url：记录一项配置或数据
+  group: z.string().trim().min(1).max(40).optional(), // 对象字段 group：记录一项配置或数据
+  description: z.string().trim().max(200).optional(), // 对象字段 description：记录一项配置或数据
+  recommended: z.boolean().optional(), // 对象字段 recommended：记录一项配置或数据
+}); // 代码块结束
 
 /** 修改链接请求体：至少给一个字段，避免空更新 */
 const updateSchema = z.object({
-  name: z.string().trim().min(1).max(80).optional(),
-  url: z.string().trim().min(1).max(2048).optional(),
-  group: z.string().trim().min(1).max(40).optional(),
-  description: z.string().trim().max(200).optional(),
-  recommended: z.boolean().optional(),
-}).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' });
+  name: z.string().trim().min(1).max(80).optional(), // 对象字段 name：记录一项配置或数据
+  url: z.string().trim().min(1).max(2048).optional(), // 对象字段 url：记录一项配置或数据
+  group: z.string().trim().min(1).max(40).optional(), // 对象字段 group：记录一项配置或数据
+  description: z.string().trim().max(200).optional(), // 对象字段 description：记录一项配置或数据
+  recommended: z.boolean().optional(), // 对象字段 recommended：记录一项配置或数据
+}).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' }); // 代码块结束
 
 /** 单次全目录探测上限：避免一次请求把大量外部调用串起来 */
 const BATCH_LIMIT = 50;
@@ -115,11 +115,11 @@ export function createNavigationRouter(deps: ApiDeps): Router {
 
   /** 受信 origin 的 host:port：站内相对路径补齐后的自指目标据此跳过私网/环回复核 */
   function trustedHost(): string {
-    try {
-      return new URL(origin()).host;
-    } catch {
-      return '';
-    }
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      return new URL(origin()).host; // 返回当前函数的处理结果
+    } catch { // 代码块结束
+      return ''; // 返回当前函数的处理结果
+    } // 代码块结束
   } // trustedHost 结束
 
   /** 按主键取行，不存在直接 404 */
@@ -188,8 +188,8 @@ export function createNavigationRouter(deps: ApiDeps): Router {
     if (nextUrl === null) throw new AppError('VALIDATION_FAILED', 'invalid url', { url: body.url }); // 非法地址 400
     const now = nowIso(deps.now); // 更新时间
     db.prepare( // 逐字段落库，未传字段保持原值
-      `UPDATE nav_links SET name = ?, url = ?, group_name = ?, description = ?, recommended = ?, updated_at = ? WHERE id = ?`,
-    ).run(
+      `UPDATE nav_links SET name = ?, url = ?, group_name = ?, description = ?, recommended = ?, updated_at = ? WHERE id = ?`, // 执行当前业务步骤
+    ).run( // 执行当前业务步骤
       body.name ?? row.name, // 名称
       nextUrl, // 地址
       body.group ?? row.group_name, // 分组
@@ -210,7 +210,7 @@ export function createNavigationRouter(deps: ApiDeps): Router {
     const result = await probeOutbound(resolveProbeTarget(row.url, origin()), trustedHost()); // 探测：先过 SSRF 校验，相对路径按 origin 补齐
     const now = nowIso(deps.now); // 探测时间
     db.prepare( // 回写状态、HTTP 码、耗时与时间
-      'UPDATE nav_links SET status = ?, http_status = ?, latency_ms = ?, last_checked_at = ?, updated_at = ? WHERE id = ?',
+      'UPDATE nav_links SET status = ?, http_status = ?, latency_ms = ?, last_checked_at = ?, updated_at = ? WHERE id = ?', // 执行当前业务步骤
     ).run(result.status, result.httpStatus, result.latencyMs, now, now, id); // 单行更新
     res.json({ item: linkView(requireLink(id)) }); // 返回含最新状态的行
   }); // POST /navigation/links/:id/check 结束
@@ -220,7 +220,7 @@ export function createNavigationRouter(deps: ApiDeps): Router {
     const rows = db.prepare('SELECT * FROM nav_links ORDER BY group_name, name LIMIT ?').all(BATCH_LIMIT) as NavLinkRow[]; // 取前 N 条
     const now = nowIso(deps.now); // 本次批次时间
     const update = db.prepare( // 逐条回写
-      'UPDATE nav_links SET status = ?, http_status = ?, latency_ms = ?, last_checked_at = ?, updated_at = ? WHERE id = ?',
+      'UPDATE nav_links SET status = ?, http_status = ?, latency_ms = ?, last_checked_at = ?, updated_at = ? WHERE id = ?', // 执行当前业务步骤
     ); // prepare 结束
     const results: NavLinkView[] = []; // 探测结果
     for (const row of rows) { // 串行探测：外部站点不宜并发轰炸

@@ -21,7 +21,7 @@ const ORDER_PATH = '/payment/do.html'; // 发起付款（官方文档网关）
 const REFUND_PATH = '/payment/refund.html'; // 发起退款（官方文档网关）
 
 const baseOf = (env: Record<string, string | undefined>): string => // 保存 baseOf：承载本步骤的计算结果供后续使用
-  trimBase(env.MIM_HUPIJIAO_API_BASE?.trim() || 'https://api.xunhupay.com');
+  trimBase(env.MIM_HUPIJIAO_API_BASE?.trim() || 'https://api.xunhupay.com'); // 调用 trimBase 并处理其返回结果
 
 /** 签名：字典序 k=v 拼接后直接尾部拼接 APPSECRET，MD5 小写（官方 PHP SDK 同款） */
 function sign(params: Record<string, unknown>, secret: string): string { // 定义函数 sign：封装可复用业务步骤

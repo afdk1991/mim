@@ -253,7 +253,7 @@ function settleOrderTx(db: Db, input: SettleInput): string {
        VALUES (?, ?, NULL, 'active', ?, 'admin', ?)`,
     ).run(evtId, entId, input.reason, input.now); // 记录「由哪张订单结算而来」
     db.prepare( // 订单置为已结算，并记录渠道交易号（人工结算写 NULL）
-      `UPDATE module_orders SET status = 'paid', entitlement_id = ?, channel_txn_id = ?, paid_at = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE module_orders SET status = 'paid', entitlement_id = ?, channel_txn_id = ?, paid_at = ?, updated_at = ? WHERE id = ?`, // 执行当前业务步骤
     ).run(entId, input.channelTxnId, input.now, input.now, input.orderId); // 绑定权益主键、交易号、时间与订单主键
   }); // 结束事务定义
   tx(); // 执行事务
@@ -276,7 +276,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       .prepare('SELECT slug, name, name_en, parent_id, sort_order FROM module_categories WHERE level = 2 ORDER BY sort_order ASC') // 全量二级条目
       .all() as Array<{ slug: string; name: string; name_en: string | null; parent_id: string | null; sort_order: number }>; // 结果结构
     const counters = db // 每个二级分类下的可见模块数量
-      .prepare(
+      .prepare( // 执行当前业务步骤
         `SELECT category_slug AS slug, COUNT(*) AS total
          FROM modules
          WHERE region = ? AND deleted_at IS NULL AND status = 'active' AND category_slug IS NOT NULL
@@ -429,12 +429,12 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
       sort_order: number; // 展示权重
     }>; // 类型结束
     const counters = db // 每个二级分类下的 active 模块数（与公开树同口径，保证两处计数一致）
-      .prepare(
+      .prepare( // 执行当前业务步骤
         `SELECT category_slug AS slug, COUNT(*) AS total
          FROM modules
          WHERE region = ? AND deleted_at IS NULL AND status = 'active' AND category_slug IS NOT NULL
          GROUP BY category_slug`,
-      )
+      ) // 执行当前业务步骤
       .all(region) as Array<{ slug: string; total: number }>; // 聚合结果
     const countMap = new Map(counters.map((row) => [row.slug, row.total])); // 转 Map，组装时 O(1)
     const groups = rows // 一级分类
@@ -845,7 +845,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
 
     const ent = db // 回读权益结果
       .prepare( // 预编译：按主键取刚写入的行
-        `SELECT id, status, expires_at, version, created_at, updated_at FROM entitlements WHERE id = ?`,
+        `SELECT id, status, expires_at, version, created_at, updated_at FROM entitlements WHERE id = ?`, // 执行当前业务步骤
       ) // 结束预编译
       .get(entId) as { // 绑定权益主键
       id: string; // 权益主键
@@ -927,7 +927,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
          FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
       ) // 结束预编译
       .get(body.module_code, user.region) as // 绑定模块码与用户区域
-      | { id: string; code: string; name_i18n: string; entitlements_required: string; region: string; status: string; category_slug: string | null }
+      | { id: string; code: string; name_i18n: string; entitlements_required: string; region: string; status: string; category_slug: string | null } // 执行当前业务步骤
       | undefined; // 未命中即 undefined
     if (!moduleRow) { // 模块不存在
       throw new AppError('NOT_FOUND', 'module not found', { module_code: body.module_code }); // 404
@@ -962,7 +962,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
 
     const pending = db // 是否已有待结算订单：命中即回放，实现「点两次只生成一张单」
       .prepare( // 预编译：同一用户 + 同一模块 + pending
-        `SELECT * FROM module_orders WHERE user_id = ? AND module_id = ? AND status = 'pending'`,
+        `SELECT * FROM module_orders WHERE user_id = ? AND module_id = ? AND status = 'pending'`, // 执行当前业务步骤
       ) // 结束预编译
       .get(user.id, moduleRow.id) as OrderRow | undefined; // 命中行
     if (pending) { // 已有待结算订单直接回放
@@ -1227,8 +1227,8 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
          WHERE o.id = ?`,
       ) // 结束预编译
       .get(id) as // 命中行
-      | { id: string; user_id: string; module_id: string; region: string; currency: string; amount_minor: number;
-          status: string; channel: string; entitlement_id: string | null; module_code: string }
+      | { id: string; user_id: string; module_id: string; region: string; currency: string; amount_minor: number; // 执行当前业务步骤
+          status: string; channel: string; entitlement_id: string | null; module_code: string } // 对象字段 status：记录一项配置或数据
       | undefined; // 未命中
     if (!row) { // 订单不存在
       throw new AppError('NOT_FOUND', 'order not found', { order_id: id }); // 404
@@ -1279,7 +1279,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const id = pathParam(req, 'id'); // 严格提取订单主键
     const now = clockOf(deps); // 统一时间基准
     const body = parse( // 回调报文：渠道、交易号、实付金额
-      z.object({
+      z.object({ // 执行当前业务步骤
         channel: z.enum(['alipay', 'wechat', 'stripe']), // 在线渠道（manual 不走回调）
         channel_txn_id: z.string().min(1).max(128), // 渠道交易号，幂等依据
         amount_minor: z.number().int().positive(), // 实付金额（分）
@@ -1308,8 +1308,8 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
          FROM module_orders WHERE id = ?`,
       ) // 结束预编译
       .get(id) as // 命中行
-      | { id: string; user_id: string; module_id: string; status: string; channel: string; amount_minor: number;
-          entitlement_id: string | null; channel_txn_id: string | null }
+      | { id: string; user_id: string; module_id: string; status: string; channel: string; amount_minor: number; // 执行当前业务步骤
+          entitlement_id: string | null; channel_txn_id: string | null } // 对象字段 entitlement_id：记录一项配置或数据
       | undefined; // 未命中
     if (!row) { // 订单不存在
       throw new AppError('NOT_FOUND', 'order not found', { order_id: id }); // 404
@@ -1468,13 +1468,13 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const body = parse( // 校验并解析请求体
       z.object({ // 全部字段可选，但至少提供一项
         name: z.record(z.string(), z.string().min(1).max(120)) // 多语言名称可改
-          .refine((m) => Object.keys(m).length > 0, { message: 'name must have at least one locale' }).optional(),
+          .refine((m) => Object.keys(m).length > 0, { message: 'name must have at least one locale' }).optional(), // 执行当前业务步骤
         summary: z.record(z.string(), z.string().max(500)).optional(), // 多语言简介可改
         sort_order: z.number().int().min(0).max(100000).optional(), // 排序权重可改
         entitlements_required: z.array(z.string().min(1).max(64)).max(32).optional(), // 前置依赖可改
         region: z.string().min(1).max(16).optional(), // 可选地区覆盖，仅用于定位，不参与更新
       }).refine( // 至少一个可编辑字段
-        (v) => v.name !== undefined || v.summary !== undefined || v.sort_order !== undefined || v.entitlements_required !== undefined,
+        (v) => v.name !== undefined || v.summary !== undefined || v.sort_order !== undefined || v.entitlements_required !== undefined, // 执行当前业务步骤
         { message: 'at least one editable field must be provided' }, // 空更新直接 400，避免无意义写库
       ), // 结束请求体 schema
       req.body, // 原始请求体
@@ -1493,7 +1493,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     if (body.entitlements_required) { // 传入依赖时才校验存在性
       const placeholders = body.entitlements_required.map(() => '?').join(','); // 动态占位符
       const found = db // 查询同区域已存在依赖
-        .prepare(`SELECT code FROM modules WHERE region = ? AND code IN (${placeholders}) AND deleted_at IS NULL`)
+        .prepare(`SELECT code FROM modules WHERE region = ? AND code IN (${placeholders}) AND deleted_at IS NULL`) // 执行当前业务步骤
         .all(region, ...body.entitlements_required) as Array<{ code: string }>; // 命中依赖码
       const foundSet = new Set(found.map((f) => f.code)); // 转集合
       const missing = body.entitlements_required.filter((c) => !foundSet.has(c)); // 缺失项
@@ -1517,7 +1517,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     db.prepare(`UPDATE modules SET ${sets.join(', ')} WHERE id = ?`).run(...(params as never[])); // 动态字段全部来自白名单分支，无注入面
 
     const updated = db // 回读更新后的模块，保证响应与落库一致
-      .prepare('SELECT code, name_i18n, summary_i18n, unlock_mode, entitlements_required, region, status, sort_order, updated_at FROM modules WHERE id = ?')
+      .prepare('SELECT code, name_i18n, summary_i18n, unlock_mode, entitlements_required, region, status, sort_order, updated_at FROM modules WHERE id = ?') // 执行当前业务步骤
       .get(row.id) as { // 命中行类型
         code: string; name_i18n: string; summary_i18n: string; unlock_mode: string; // 编码与文案
         entitlements_required: string; region: string; status: string; sort_order: number; updated_at: string; // 依赖、地区、状态、排序、更新时间
@@ -1619,9 +1619,9 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
         currency: z.string().min(1).max(16).optional(), // 币种可改
         amount_minor: z.number().int().min(0).optional(), // 金额可改
         effective_from: z // 生效起始可改
-          .string().refine((v) => !Number.isNaN(Date.parse(v)), { message: 'effective_from must be a datetime string' }).optional(),
+          .string().refine((v) => !Number.isNaN(Date.parse(v)), { message: 'effective_from must be a datetime string' }).optional(), // 执行当前业务步骤
         effective_to: z // 生效结束可改
-          .string().refine((v) => !Number.isNaN(Date.parse(v)), { message: 'effective_to must be a datetime string' }).optional(),
+          .string().refine((v) => !Number.isNaN(Date.parse(v)), { message: 'effective_to must be a datetime string' }).optional(), // 执行当前业务步骤
       }), // 结束更新入参 schema
       req.body, // 原始请求体
     ); // 结束解析
@@ -1631,7 +1631,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     const existing = db // 定位待更新的价格行
       .prepare('SELECT id, module_id, currency, amount_minor, effective_from, effective_to FROM module_prices WHERE id = ?') // 仅取可更新字段
       .get(priceId) as // 命中行类型
-      | { id: string; module_id: string; currency: string; amount_minor: number; effective_from: string; effective_to: string | null }
+      | { id: string; module_id: string; currency: string; amount_minor: number; effective_from: string; effective_to: string | null } // 执行当前业务步骤
       | undefined; // 未命中
     if (!existing) { // 价格行不存在
       throw new AppError('NOT_FOUND', 'module price not found', { price_id: priceId }); // 404 便于定位
@@ -1652,7 +1652,7 @@ export function createCatalogRouter(deps: ApiDeps): Router { // 组装目录路�
     ).run(currency, amountMinor, effectiveFrom, effectiveTo, priceId); // 绑定更新后的值
 
     res.json({ // 200 返回更新后的价格行
-      price: {
+      price: { // 对象字段 price：记录一项配置或数据
         id: priceId, // 价格行主键
         module_id: existing.module_id, // 所属模块主键
         currency, // 更新后币种

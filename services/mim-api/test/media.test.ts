@@ -235,22 +235,22 @@ describe('media 域', () => { // describe media 域：预签名上传下载、�
     }).png().toBuffer(); // 编码为 PNG Buffer 作为上传源
 
     const presign = await request(app) // 申请上传预签名
-      .post('/api/v1/media/presign/upload')
-      .set(auth(session, nextKey()))
-      .send({ asset_type: 'image', mime: 'image/png' });
+      .post('/api/v1/media/presign/upload') // 注册 POST 路由 / 中间件处理器
+      .set(auth(session, nextKey())) // 执行当前业务步骤
+      .send({ asset_type: 'image', mime: 'image/png' }); // 执行当前业务步骤
     expect(presign.status).toBe(201); // 断言预签名成功
     const objectKey = presign.body.object_key as string; // 取对象键
 
     const uploaded = await request(app) // 真实上传 PNG 字节
-      .put(pathOf(presign.body.upload.url as string))
-      .set('content-type', 'image/png')
-      .send(png);
+      .put(pathOf(presign.body.upload.url as string)) // 注册 PUT 路由 / 中间件处理器
+      .set('content-type', 'image/png') // 执行当前业务步骤
+      .send(png); // 执行当前业务步骤
     expect(uploaded.status).toBe(204); // 断言落盘成功
 
     const thumb = await request(app) // 请求 120px 缩略图
-      .get('/api/v1/media/thumb')
-      .query({ object_key: objectKey, size: 120 })
-      .set(auth(session));
+      .get('/api/v1/media/thumb') // 注册 GET 路由 / 中间件处理器
+      .query({ object_key: objectKey, size: 120 }) // 执行当前业务步骤
+      .set(auth(session)); // 执行当前业务步骤
     expect(thumb.status).toBe(200); // 断言 200
     expect(thumb.headers['content-type']).toContain('image/webp'); // 断言输出类型为 WebP
     const thumbBody = Buffer.from(thumb.body); // 取响应字节做魔数校验
@@ -258,20 +258,20 @@ describe('media 域', () => { // describe media 域：预签名上传下载、�
     expect(thumbBody.subarray(8, 12).toString('ascii')).toBe('WEBP'); // 第 8~11 字节为 WEBP 标识
 
     const textPresign = await request(app) // 再造一个纯文本对象，验证类型守卫
-      .post('/api/v1/media/presign/upload')
-      .set(auth(session, nextKey()))
-      .send({ asset_type: 'text', mime: 'text/plain' });
+      .post('/api/v1/media/presign/upload') // 注册 POST 路由 / 中间件处理器
+      .set(auth(session, nextKey())) // 执行当前业务步骤
+      .send({ asset_type: 'text', mime: 'text/plain' }); // 执行当前业务步骤
     expect(textPresign.status).toBe(201); // 断言文本预签名成功
     const textKey = textPresign.body.object_key as string; // 取文本对象键
     await request(app) // 落盘文本字节
-      .put(pathOf(textPresign.body.upload.url as string))
-      .set('content-type', 'text/plain')
-      .send(Buffer.from('plain-text-payload'));
+      .put(pathOf(textPresign.body.upload.url as string)) // 注册 PUT 路由 / 中间件处理器
+      .set('content-type', 'text/plain') // 执行当前业务步骤
+      .send(Buffer.from('plain-text-payload')); // 执行当前业务步骤
 
     const nonImage = await request(app) // 对文本对象请求缩略图，应被类型守卫拒绝
-      .get('/api/v1/media/thumb')
-      .query({ object_key: textKey })
-      .set(auth(session));
+      .get('/api/v1/media/thumb') // 注册 GET 路由 / 中间件处理器
+      .query({ object_key: textKey }) // 执行当前业务步骤
+      .set(auth(session)); // 执行当前业务步骤
     expect(nonImage.status).toBe(400); // 断言 400
     expect(nonImage.body.code).toBe('VALIDATION_FAILED'); // 断言参数/类型错误码
   }); // 结束缩略图成功与类型守卫用例
@@ -280,26 +280,26 @@ describe('media 域', () => { // describe media 域：预签名上传下载、�
     const owner = await login('13900000042'); // 属主登录
     const other = await login('13900000043'); // 他人登录
     grantEntitlement(owner.userId); // 双方都授予权益，排除门禁因素
-    grantEntitlement(other.userId);
+    grantEntitlement(other.userId); // 调用 grantEntitlement 并处理其返回结果
 
     const png = await sharp({ // 造一张 40x40 蓝底 PNG
-      create: { width: 40, height: 40, channels: 3, background: { r: 0, g: 0, b: 255 } },
-    }).png().toBuffer();
+      create: { width: 40, height: 40, channels: 3, background: { r: 0, g: 0, b: 255 } }, // 对象字段 create：记录一项配置或数据
+    }).png().toBuffer(); // 代码块结束
     const presign = await request(app) // 属主上传
-      .post('/api/v1/media/presign/upload')
-      .set(auth(owner, nextKey()))
-      .send({ asset_type: 'image', mime: 'image/png' });
+      .post('/api/v1/media/presign/upload') // 注册 POST 路由 / 中间件处理器
+      .set(auth(owner, nextKey())) // 执行当前业务步骤
+      .send({ asset_type: 'image', mime: 'image/png' }); // 执行当前业务步骤
     expect(presign.status).toBe(201); // 断言：校验接口响应或状态符合冻结契约
     const objectKey = presign.body.object_key as string; // 准备：构造本用例需要的输入或句柄
     await request(app) // 执行：等待异步操作返回后继续
-      .put(pathOf(presign.body.upload.url as string))
-      .set('content-type', 'image/png')
-      .send(png);
+      .put(pathOf(presign.body.upload.url as string)) // 注册 PUT 路由 / 中间件处理器
+      .set('content-type', 'image/png') // 执行当前业务步骤
+      .send(png); // 执行当前业务步骤
 
     const cross = await request(app) // 他人拿属主键请求缩略图
-      .get('/api/v1/media/thumb')
-      .query({ object_key: objectKey })
-      .set(auth(other));
+      .get('/api/v1/media/thumb') // 注册 GET 路由 / 中间件处理器
+      .query({ object_key: objectKey }) // 执行当前业务步骤
+      .set(auth(other)); // 执行当前业务步骤
     expect(cross.status).toBe(404); // 断言 404，与下载预签名同一归属口径
   }); // 结束跨用户用例
 }); // 结束 media 域分组

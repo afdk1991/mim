@@ -14,7 +14,7 @@ import type { EntryImplementation, EntryImplementationStatus, SiteCapability, Si
 import { useAsync } from '../hooks';
 // 编程式跳转：匿名访客点击写操作时跳登录伪视图；视图标识类型供直达按钮收窄
 import { navigate } from '../router';
-import type { AppView } from '../router';
+import type { AppView } from '../router'; // 引入依赖、类型或本地模块绑定
 
 // 组件对外契约：清单文案跟随全局语言；onOpenView 供已落地 / 相邻入口直达站内真实模块
 interface Props {
@@ -134,7 +134,7 @@ function StatusPieChart({ byStatus, locale }: { byStatus: Record<string, number>
     let disposed = false; // 卸载后不再初始化图表
     let chart: { setOption: (option: unknown) => void; resize: () => void; dispose: () => void } | null = null; // 动态加载后的实例
     void import('echarts').then((echarts) => { // 真正需要画图时才拉取图表库
-      if (disposed) return;
+      if (disposed) return; // 条件分支：按判断结果选择后续处理路径
       chart = echarts.init(host); // 初始化 ECharts 实例
       // 映射饼图数据：状态文案按当前语言翻译，未命中回退原始状态码
       const data = Object.entries(byStatus).map(([status, value]) => ({
@@ -161,7 +161,7 @@ function StatusPieChart({ byStatus, locale }: { byStatus: Record<string, number>
       disposed = true; // 阻止未完成的加载继续初始化
       window.removeEventListener('resize', onResize); // 移除缩放监听
       chart?.dispose(); // 销毁实例，释放 canvas 与事件
-    };
+    }; // 代码块结束
   }, [dataKey, locale, byStatus]); // 依赖：统计快照键 + 语言；原始对象引用不进依赖
 
   if (dataKey === '') return null; // 无状态计数时不渲染容器
@@ -202,17 +202,17 @@ export function Sites({ locale, onOpenView }: Props) {
   const detail = useAsync(
     () => (expandedHost ? api.sites.detail(expandedHost) : Promise.resolve(null)),
     [expandedHost],
-  );
+  ); // 执行当前业务步骤
   // 当前能力下的业务条目：同时受展开模块与选中能力驱动
   const itemsState = useAsync(
     () => (expandedHost ? api.sites.listItems(expandedHost, { capability: activeCap ?? undefined }) : Promise.resolve(null)),
     [expandedHost, activeCap],
-  );
+  ); // 执行当前业务步骤
   // 模块列表：搜索词或分组变化即重新拉取
   const listState = useAsync(
     () => api.sites.list({ q: applied || undefined, group: group || undefined }),
     [applied, group],
-  );
+  ); // 执行当前业务步骤
   // 新建表单标题
   const [title, setTitle] = useState('');
   // 新建表单说明
@@ -280,7 +280,7 @@ export function Sites({ locale, onOpenView }: Props) {
     setError(null);
     // 清空旧提示
     setMessage(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调用新建接口；写操作由 request 自动带幂等键
       await api.sites.createItem(host, { capability: code, title: trimmed, detail: detailText.trim() });
       // 成功后清空标题，便于连续录入
@@ -310,7 +310,7 @@ export function Sites({ locale, onOpenView }: Props) {
     if (impl.view) {
       onOpenView(impl.view as AppView);
       return; // 已跳转，不再走外链
-    }
+    } // 代码块结束
     // 独立后台等站外路径：整页跳转（/admin/）
     if (impl.href) window.location.href = impl.href;
   } // openModule 结束
@@ -323,7 +323,7 @@ export function Sites({ locale, onOpenView }: Props) {
     setError(null);
     // 清空旧提示
     setMessage(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调用流转接口；后端校验目标状态是否属于该能力的 states
       await api.sites.transitionItem(host, item.id, status);
       // 按语言展示成功提示
@@ -341,22 +341,22 @@ export function Sites({ locale, onOpenView }: Props) {
 
   // 列表加载失败：展示错误 + 重试入口，避免一次请求失败即永久空白
   if (listState.error) {
-    return (
-      <div className="page">
-        <header className="page-head">
+    return ( // 返回当前函数的处理结果
+      <div className="page">{/* 执行当前业务步骤 */}
+        <header className="page-head">{/* 执行当前业务步骤 */}
           <h1>{locale === 'en-US' ? 'Unified Entry Catalog' : '统一入口配置清单'}</h1>
         </header>
         <p className="error">{errorText(locale, listState.error)}</p>
-        <p className="muted">
+        <p className="muted">{/* 执行当前业务步骤 */}
           {locale === 'en-US'
             ? 'Cannot reach the entry catalog service. Check your network or ad-blocker, then retry.'
             : '无法连接入口配置清单服务，请检查网络或广告拦截插件后重试。'}
         </p>
-        <button type="button" className="btn primary" onClick={() => listState.reload()}>
+        <button type="button" className="btn primary" onClick={() => listState.reload()}>{/* 执行当前业务步骤 */}
           {locale === 'en-US' ? 'Retry' : '重试'}
         </button>
       </div>
-    );
+    ); // 执行当前业务步骤
   } // 错误态结束
 
   // 从响应中取分组与模块，接口未返回时兜底为空数组
@@ -510,7 +510,7 @@ export function Sites({ locale, onOpenView }: Props) {
           {locale === 'en-US' ? 'Search' : '搜索'}{/* 按钮文案 */}
         </button>{/* 搜索按钮结束 */}
         {(applied || group) && ( // 有过滤条件时展示计数与清除入口
-          <>
+          <>{/* 执行当前业务步骤 */}
             <span className="count">{/* 命中计数 */}
               {locale === 'en-US' ? `${modules.length} result(s)` : `${modules.length} 个结果`}{/* 计数文案 */}
             </span>{/* 计数结束 */}
@@ -647,7 +647,7 @@ export function Sites({ locale, onOpenView }: Props) {
                       <li>{locale === 'en-US' ? 'API: ' : '接口职责：'}{m.apiRole}</li>
                     </ul>{/* 两项职责结束 */}
                     {m.implementation.realFeatures.length > 0 && ( // 已有真实能力才渲染已落地功能区块
-                      <>
+                      <>{/* 执行当前业务步骤 */}
                         <p className="site-detail-title">{/* 已落地功能小节标题 */}
                           {locale === 'en-US' ? 'Implemented features' : '已落地功能'}
                         </p>{/* 标题结束 */}
@@ -681,7 +681,7 @@ export function Sites({ locale, onOpenView }: Props) {
                     {detail.loading && <p className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</p>}{/* 详情加载态 */}
                     {detail.error !== null && <p className="error">{errorText(locale, detail.error)}</p>}{/* 详情加载失败 */}
                     {detail.data && detail.data.module.host === m.host && ( // 详情数据就绪且属于当前模块
-                      <>
+                      <>{/* 执行当前业务步骤 */}
                         <p className="site-detail-title">{locale === 'en-US' ? 'Capabilities' : '功能点'}</p>{/* 小节标题 */}
                         <div className="row site-cap-row">{/* 能力筛选按钮行 */}
                           <button
@@ -724,7 +724,7 @@ export function Sites({ locale, onOpenView }: Props) {
                         </ul>{/* 能力说明清单结束 */}
 
                         {m.implementation.status !== 'planned' ? ( // 已落地 / 相邻 / 冲突入口才展示业务条目与新建表单
-                        <>
+                        <>{/* 执行当前业务步骤 */}
                         <p className="site-detail-title">{locale === 'en-US' ? 'Items' : '业务条目'}</p>{/* 小节标题 */}
                         {itemsState.loading && <p className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</p>}{/* 条目加载态 */}
                         {itemsState.error !== null && <p className="error">{errorText(locale, itemsState.error)}</p>}{/* 条目加载失败 */}
@@ -775,7 +775,7 @@ export function Sites({ locale, onOpenView }: Props) {
                                     </div> // 操作行结束
                                   )}{/* 流转按钮条件渲染结束 */}
                                 </li> // 条目行结束
-                              );
+                              ); // 执行当前业务步骤
                             })}{/* 条目遍历结束 */}
                           </ul> // 条目清单结束
                         ))}{/* 条目空态 / 清单条件渲染结束 */}
@@ -844,7 +844,7 @@ export function Sites({ locale, onOpenView }: Props) {
                   </div> // 详情容器结束
                 )}{/* 展开态条件渲染结束 */}
               </section> // 卡片结束
-            );
+            ); // 执行当前业务步骤
           })}{/* 模块遍历结束 */}
         </div> // 卡片网格结束
       )}{/* 加载 / 空态 / 网格条件渲染结束 */}

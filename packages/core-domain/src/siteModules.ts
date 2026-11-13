@@ -276,7 +276,7 @@ function withCompatAliases(module: SiteModule): SiteModule {
     host: module.entryKey, // 兼容别名：短主机记录 = 占位键
     group: module.domain, // 兼容别名：分组 = 业务域编码
     implementation: implementationOf(module.entryKey), // 落地状态映射
-  };
+  }; // 代码块结束
 } // withCompatAliases 结束
 
 // 模块列表的只读别名：业务代码一律通过该常量读取，不直接碰 JSON。
@@ -346,7 +346,7 @@ export function resolveEntryHost(entryKey: string, env: Record<string, string | 
     envKey,
     // 是否已配置。
     configured,
-  };
+  }; // 代码块结束
 } // resolveEntryHost 结束
 
 // 生成配置模板：45 个环境变量键全部为空值，仓库内不写任何具体主机值。
@@ -373,5 +373,5 @@ export function siteModulesSummary(): { modules: number; capabilities: number; g
     blankRows: siteModulesRegistry.blankRows.length,
     // 业务域总数（v2 显式字段）。
     domains: SITE_DOMAINS.length,
-  };
+  }; // 代码块结束
 } // siteModulesSummary 结束

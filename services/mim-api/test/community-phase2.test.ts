@@ -12,50 +12,50 @@
  * 每个写请求都带独立 Idempotency-Key，避免幂等中间件把不同用例当成回放。
  */
 
-import { randomUUID } from 'node:crypto';
-import { beforeEach, describe, expect, it } from 'vitest';
-import request from 'supertest';
-import type { Express } from 'express';
-import { createApp } from '../src/app.js';
-import { createDatabase } from '../src/db.js';
-import type { Db } from '../src/types.js';
+import { randomUUID } from 'node:crypto'; // 引入依赖、类型或本地模块绑定
+import { beforeEach, describe, expect, it } from 'vitest'; // 引入依赖、类型或本地模块绑定
+import request from 'supertest'; // 引入依赖、类型或本地模块绑定
+import type { Express } from 'express'; // 引入依赖、类型或本地模块绑定
+import { createApp } from '../src/app.js'; // 引入依赖、类型或本地模块绑定
+import { createDatabase } from '../src/db.js'; // 引入依赖、类型或本地模块绑定
+import type { Db } from '../src/types.js'; // 引入依赖、类型或本地模块绑定
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 准备：构造本用例需要的输入或句柄
 const ADMIN_PASSWORD = 'testpass123'; // 准备：构造本用例需要的输入或句柄
 let app: Express; // 状态：保存跨步骤复用的值
 let db: Db; // 状态：保存跨步骤复用的值
 
-beforeEach(() => {
-  db = createDatabase(':memory:');
-  app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD } });
-});
+beforeEach(() => { // 调用 beforeEach 并处理其返回结果
+  db = createDatabase(':memory:'); // 赋值：更新变量 db 的取值
+  app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD } }); // 赋值：更新变量 app 的取值
+}); // 代码块结束
 
-async function login(identifier: string): Promise<Record<string, string>> {
+async function login(identifier: string): Promise<Record<string, string>> { // 函数 login：封装一段可复用的处理逻辑
   const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 准备：构造本用例需要的输入或句柄
   expect(res.status).toBe(200); // 登录助手：密码登录成功返回 200
   return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
-}
+} // 代码块结束
 
-function writeHeaders(auth: Record<string, string>): Record<string, string> {
+function writeHeaders(auth: Record<string, string>): Record<string, string> { // 函数 writeHeaders：封装一段可复用的处理逻辑
   return { ...auth, 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
-}
+} // 代码块结束
 
-describe('社区二期：媒体 / 投票 / 收藏 / 评分', () => {
-  it('图集帖写入媒体并在详情返回；收藏与评分写回聚合与排序', async () => {
+describe('社区二期：媒体 / 投票 / 收藏 / 评分', () => { // 调用 describe 并处理其返回结果
+  it('图集帖写入媒体并在详情返回；收藏与评分写回聚合与排序', async () => { // 调用 it 并处理其返回结果
     const auth = await login('13800000021'); // 准备：构造本用例需要的输入或句柄
     const create = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(auth))
-      .send({
-        board_slug: 'general',
-        title: '图集：Mim 封面精选',
-        body: '这是一篇图集帖，包含多张封面图片，用于验证媒体数组与详情渲染。',
-        kind: 'gallery',
-        media: [
-          { kind: 'image', url: '/demo/stardust-cover.jpg' },
-          { kind: 'image', url: '/demo/bloom-cover.jpg' },
-        ],
-      });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ // 执行当前业务步骤
+        board_slug: 'general', // 对象字段 board_slug：记录一项配置或数据
+        title: '图集：Mim 封面精选', // 对象字段 title：记录一项配置或数据
+        body: '这是一篇图集帖，包含多张封面图片，用于验证媒体数组与详情渲染。', // 对象字段 body：记录一项配置或数据
+        kind: 'gallery', // 对象字段 kind：记录一项配置或数据
+        media: [ // 对象字段 media：记录一项配置或数据
+          { kind: 'image', url: '/demo/stardust-cover.jpg' }, // 执行当前业务步骤
+          { kind: 'image', url: '/demo/bloom-cover.jpg' }, // 执行当前业务步骤
+        ], // 执行当前业务步骤
+      }); // 代码块结束
     expect(create.status).toBe(201); // 图集帖创建成功返回 201
 
     const detail = await request(app).get(`/api/v1/community/threads/${create.body.thread_id}`).set(auth); // 准备：构造本用例需要的输入或句柄
@@ -81,20 +81,20 @@ describe('社区二期：媒体 / 投票 / 收藏 / 评分', () => {
     const byFavorites = await request(app).get('/api/v1/community/threads?sort=favorites').set(auth); // 准备：构造本用例需要的输入或句柄
     expect(byFavorites.status).toBe(200); // 按收藏数排序的列表接口可用
     expect(byFavorites.body.items[0].id).toBe(create.body.thread_id); // 收藏过的那篇帖子排在首位
-  });
+  }); // 代码块结束
 
-  it('投票帖创建选项、投票计票并支持改投；视频帖缺视频地址被拒', async () => {
+  it('投票帖创建选项、投票计票并支持改投；视频帖缺视频地址被拒', async () => { // 调用 it 并处理其返回结果
     const auth = await login('13800000022'); // 准备：构造本用例需要的输入或句柄
     const create = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(auth))
-      .send({
-        board_slug: 'general',
-        title: '投票：下期想先做哪个功能',
-        body: '请选择你最希望优先上线的功能，投票结果会作为排期参考。',
-        kind: 'poll',
-        poll_options: ['微信支付', '板块权限', '图集视频'],
-      });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ // 执行当前业务步骤
+        board_slug: 'general', // 对象字段 board_slug：记录一项配置或数据
+        title: '投票：下期想先做哪个功能', // 对象字段 title：记录一项配置或数据
+        body: '请选择你最希望优先上线的功能，投票结果会作为排期参考。', // 对象字段 body：记录一项配置或数据
+        kind: 'poll', // 对象字段 kind：记录一项配置或数据
+        poll_options: ['微信支付', '板块权限', '图集视频'], // 对象字段 poll_options：记录一项配置或数据
+      }); // 代码块结束
     expect(create.status).toBe(201); // 投票帖创建成功返回 201
 
     const detail = await request(app).get(`/api/v1/community/threads/${create.body.thread_id}`).set(auth); // 准备：构造本用例需要的输入或句柄
@@ -108,24 +108,24 @@ describe('社区二期：媒体 / 投票 / 收藏 / 评分', () => {
     expect(afterVote.body.thread.poll.my_option).toBe(option.id); // 我的选择回读为刚投的选项
 
     const video = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(auth))
-      .send({ board_slug: 'general', title: '视频帖缺地址', body: '这是一篇缺少视频地址的视频帖，应该被校验拒绝。', kind: 'video' });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ board_slug: 'general', title: '视频帖缺地址', body: '这是一篇缺少视频地址的视频帖，应该被校验拒绝。', kind: 'video' }); // 执行当前业务步骤
     expect(video.status).toBe(400); // 视频帖缺少视频地址时被校验拒绝 400
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束
 
-describe('付费板块与积分转账', () => {
-  it('付费板块需先加入；加入扣余额后可见帖子并可发帖', async () => {
-    db.prepare("UPDATE community_boards SET price_cents = 500 WHERE slug = 'paid'").run();
+describe('付费板块与积分转账', () => { // 调用 describe 并处理其返回结果
+  it('付费板块需先加入；加入扣余额后可见帖子并可发帖', async () => { // 调用 it 并处理其返回结果
+    db.prepare("UPDATE community_boards SET price_cents = 500 WHERE slug = 'paid'").run(); // 执行当前业务步骤
     const auth = await login('13800000023'); // 准备：构造本用例需要的输入或句柄
     const redeem = await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 准备：构造本用例需要的输入或句柄
     expect(redeem.status).toBe(200); // 兑换码入账成功返回 200
 
     const blocked = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(auth))
-      .send({ board_slug: 'paid', title: '付费板块发帖', body: '未加入付费板块时发帖应被拒绝。' });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ board_slug: 'paid', title: '付费板块发帖', body: '未加入付费板块时发帖应被拒绝。' }); // 执行当前业务步骤
     expect(blocked.status).toBe(403); // 未加入付费板块时发帖被拒 403
 
     const join = await request(app).post('/api/v1/community/boards/paid/join').set(writeHeaders(auth)).send({}); // 准备：构造本用例需要的输入或句柄
@@ -133,25 +133,25 @@ describe('付费板块与积分转账', () => {
     expect(join.body.charged_cents).toBe(500); // 加入时按板块定价扣款 500 分
 
     const created = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(auth))
-      .send({ board_slug: 'paid', title: '付费板块内帖', body: '加入后可以正常发帖，并且其他未加入用户看不到正文。' });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ board_slug: 'paid', title: '付费板块内帖', body: '加入后可以正常发帖，并且其他未加入用户看不到正文。' }); // 执行当前业务步骤
     expect(created.status).toBe(201); // 加入后发帖成功返回 201
 
     const wallet = await request(app).get('/api/v1/wallet').set(auth); // 准备：构造本用例需要的输入或句柄
     expect(wallet.body.wallet.balance_cents).toBe(9500); // 钱包余额为初始 10000 分扣除 500 分
-  });
+  }); // 代码块结束
 
-  it('积分转账按 Mim ID 到账，余额不足与转给自己被拒', async () => {
+  it('积分转账按 Mim ID 到账，余额不足与转给自己被拒', async () => { // 调用 it 并处理其返回结果
     const sender = await login('13800000024'); // 准备：构造本用例需要的输入或句柄
     const receiver = await login('13800000025'); // 准备：构造本用例需要的输入或句柄
     const me = await request(app).get('/api/v1/me').set(receiver); // 准备：构造本用例需要的输入或句柄
     const receiverNo = me.body.user.member_no as string; // 准备：构造本用例需要的输入或句柄
 
     const transfer = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/wallet/points/transfer')
-      .set(writeHeaders(sender))
-      .send({ to_member_no: receiverNo, points: 40, note: '测试转账' });
+      .post('/api/v1/wallet/points/transfer') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(sender)) // 执行当前业务步骤
+      .send({ to_member_no: receiverNo, points: 40, note: '测试转账' }); // 执行当前业务步骤
     expect(transfer.status).toBe(200); // 按 Mim ID 转账返回 200
     expect(transfer.body.to).toBe(receiverNo); // 响应里的收款方就是目标 Mim ID
 
@@ -161,15 +161,15 @@ describe('付费板块与积分转账', () => {
     expect(receiverWallet.body.wallet.points).toBe(140); // 收款方积分由 100 增为 140
 
     const tooMuch = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/wallet/points/transfer')
-      .set(writeHeaders(sender))
-      .send({ to_member_no: receiverNo, points: 9999 });
+      .post('/api/v1/wallet/points/transfer') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(sender)) // 执行当前业务步骤
+      .send({ to_member_no: receiverNo, points: 9999 }); // 执行当前业务步骤
     expect(tooMuch.status).toBe(400); // 超额转账被拒 400
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束
 
-describe('P1：付费图库/视频、站点配置、板块关注与问答采纳', () => {
-  it('付费图库未解锁不返回媒体，余额购买后返回 9 张封面图片', async () => {
+describe('P1：付费图库/视频、站点配置、板块关注与问答采纳', () => { // 调用 describe 并处理其返回结果
+  it('付费图库未解锁不返回媒体，余额购买后返回 9 张封面图片', async () => { // 调用 it 并处理其返回结果
     const auth = await login('13800000021'); // 新用户：初始余额 0
     await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 先充值 100 元
     const locked = await request(app).get('/api/v1/assets/paid-gallery-covers').set(auth); // 准备：构造本用例需要的输入或句柄
@@ -185,9 +185,9 @@ describe('P1：付费图库/视频、站点配置、板块关注与问答采纳'
     expect(unlocked.body.asset.unlocked).toBe(true); // 已解锁
     expect(unlocked.body.asset.media).toHaveLength(9); // 种子补入 9 张图片
     expect(unlocked.body.asset.media[0].kind).toBe('image'); // 图库媒体类型为 image
-  });
+  }); // 代码块结束
 
-  it('付费视频解锁后返回视频直链与封面', async () => {
+  it('付费视频解锁后返回视频直链与封面', async () => { // 调用 it 并处理其返回结果
     const auth = await login('13800000022'); // 独立用户，钱包互不影响
     await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 充值后再购买
     await request(app).post('/api/v1/assets/paid-video-comic/purchase').set(writeHeaders(auth)).send({}); // 执行：等待异步操作返回后继续
@@ -195,16 +195,16 @@ describe('P1：付费图库/视频、站点配置、板块关注与问答采纳'
     expect(detail.body.asset.media.length).toBeGreaterThanOrEqual(1); // 至少有 1 条视频媒体
     expect(detail.body.asset.media[0].kind).toBe('video'); // 视频类型
     expect(detail.body.asset.media[0].url).toMatch(/\.mp4$/); // 视频直链为 mp4
-  });
+  }); // 代码块结束
 
-  it('公开站点配置返回 home_view 且无需会话', async () => {
+  it('公开站点配置返回 home_view 且无需会话', async () => { // 调用 it 并处理其返回结果
     const config = await request(app).get('/api/v1/site/config'); // 匿名直接访问
     expect(config.status).toBe(200); // 公开端点返回 200
     expect(config.body.home_view).toBe('store'); // 默认首页为商城
     expect(config.body.theme).toBeTruthy(); // 主题配置同时下发
-  });
+  }); // 代码块结束
 
-  it('followers 板块关注后才可见与可发帖', async () => {
+  it('followers 板块关注后才可见与可发帖', async () => { // 调用 it 并处理其返回结果
     db.prepare("UPDATE community_boards SET visibility = 'followers' WHERE slug = 'general'").run(); // 把通用板块改为关注可见
     const auth = await login('13800000023'); // 准备：构造本用例需要的输入或句柄
     const before = await request(app).get('/api/v1/community/threads?board=general').set(auth); // 准备：构造本用例需要的输入或句柄
@@ -218,25 +218,25 @@ describe('P1：付费图库/视频、站点配置、板块关注与问答采纳'
     expect(after.body.items.every((item: { locked: number }) => item.locked === 0)).toBe(true); // 关注后解锁
 
     const post = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(auth))
-      .send({ board_slug: 'general', title: '关注后发帖成功', body: '关注板块之后即可正常发帖，验证关注门槛闭环。' });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ board_slug: 'general', title: '关注后发帖成功', body: '关注板块之后即可正常发帖，验证关注门槛闭环。' }); // 执行当前业务步骤
     expect(post.status).toBe(201); // 关注后发帖 201
-  });
+  }); // 代码块结束
 
-  it('问答帖仅提问者可采纳回复，详情回传采纳结果', async () => {
+  it('问答帖仅提问者可采纳回复，详情回传采纳结果', async () => { // 调用 it 并处理其返回结果
     const author = await login('13800000024'); // 准备：构造本用例需要的输入或句柄
     const helper = await login('13800000025'); // 准备：构造本用例需要的输入或句柄
     const created = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/community/threads')
-      .set(writeHeaders(author))
-      .send({ board_slug: 'help', title: '问答：如何配置支付', body: '请问微信支付需要配置哪些环境变量？', kind: 'qa' });
+      .post('/api/v1/community/threads') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(author)) // 执行当前业务步骤
+      .send({ board_slug: 'help', title: '问答：如何配置支付', body: '请问微信支付需要配置哪些环境变量？', kind: 'qa' }); // 执行当前业务步骤
     expect(created.status).toBe(201); // 问答帖创建成功
 
     const reply = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post(`/api/v1/community/threads/${created.body.thread_id}/reply`)
-      .set(writeHeaders(helper))
-      .send({ content: '需要配置 APP_ID 与商户私钥，再把回调地址指向 /api/v1/payments/wechat/notify。' });
+      .post(`/api/v1/community/threads/${created.body.thread_id}/reply`) // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(helper)) // 执行当前业务步骤
+      .send({ content: '需要配置 APP_ID 与商户私钥，再把回调地址指向 /api/v1/payments/wechat/notify。' }); // 执行当前业务步骤
     expect(reply.status).toBe(201); // 回复成功
 
     const detail = await request(app).get(`/api/v1/community/threads/${created.body.thread_id}`).set(author); // 准备：构造本用例需要的输入或句柄
@@ -251,11 +251,11 @@ describe('P1：付费图库/视频、站点配置、板块关注与问答采纳'
     const afterAccept = await request(app).get(`/api/v1/community/threads/${created.body.thread_id}`).set(author); // 准备：构造本用例需要的输入或句柄
     expect(afterAccept.body.thread.accepted_post_id).toBe(postId); // 详情回传采纳的回复 id
     expect(afterAccept.body.thread.accepted_post.content).toContain('APP_ID'); // 采纳答案内容完整返回
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束
 
-describe('安全：验证码与举报', () => {
-  it('验证码返回 SVG 与 id；举报超过 24 小时上限返回 429', async () => {
+describe('安全：验证码与举报', () => { // 调用 describe 并处理其返回结果
+  it('验证码返回 SVG 与 id；举报超过 24 小时上限返回 429', async () => { // 调用 it 并处理其返回结果
     const captchaApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_CAPTCHA_MODE: 'image', MIM_CAPTCHA_REPORT: '1' } }); // 独立开启 report 验证码的 app
     const captcha = await request(captchaApp).get('/api/v1/auth/captcha?scene=report'); // 按场景签发图形验证码
     expect(captcha.status).toBe(200); // 验证码接口返回 200
@@ -263,21 +263,21 @@ describe('安全：验证码与举报', () => {
     expect(captcha.body.svg).toContain('<svg'); // 验证码 SVG 内容包含 <svg 标签
 
     const auth = await login('13800000026'); // 准备：构造本用例需要的输入或句柄
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 5; i += 1) { // 循环：逐项遍历集合并执行相同处理
       const report = await request(app) // 准备：构造本用例需要的输入或句柄
-        .post('/api/v1/reports')
-        .set(writeHeaders(auth))
-        .send({ target_type: 'thread', target_id: 'thread-paid-store', reason: '内容不适', detail: `第 ${i + 1} 次` });
+        .post('/api/v1/reports') // 注册 POST 路由 / 中间件处理器
+        .set(writeHeaders(auth)) // 执行当前业务步骤
+        .send({ target_type: 'thread', target_id: 'thread-paid-store', reason: '内容不适', detail: `第 ${i + 1} 次` }); // 执行当前业务步骤
       expect(report.status).toBe(201); // 24 小时窗口内前 5 条举报均返回 201
-    }
+    } // 代码块结束
     const sixth = await request(app) // 准备：构造本用例需要的输入或句柄
-      .post('/api/v1/reports')
-      .set(writeHeaders(auth))
-      .send({ target_type: 'thread', target_id: 'thread-paid-store', reason: '内容不适' });
+      .post('/api/v1/reports') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ target_type: 'thread', target_id: 'thread-paid-store', reason: '内容不适' }); // 执行当前业务步骤
     expect(sixth.status).toBe(429); // 第 6 条举报被限流 429
     expect(sixth.body.error?.code ?? sixth.body.code).toBe('RATE_LIMITED'); // 限流错误码为 RATE_LIMITED
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束
 
 /*
  * 运行方式：

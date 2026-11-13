@@ -130,7 +130,7 @@ function parseRedisUrl(raw: string): { host: string; port: number; password: str
   if (!trimmed) throw new Error('MIM_REDIS_URL is empty'); // 条件分支：仅在满足业务前置条件时继续
   let url: URL; // 保存 url：承载本步骤的计算结果供后续使用
   try { // 异常保护：确保失败路径可回收资源
-    url = trimmed.includes('://') ? new URL(trimmed) : new URL(`redis://${trimmed}`);
+    url = trimmed.includes('://') ? new URL(trimmed) : new URL(`redis://${trimmed}`); // 赋值：更新变量 url 的取值
   } catch { // 结束代码块：本层作用域收尾
     throw new Error(`invalid MIM_REDIS_URL: ${trimmed}`); // 抛出异常：中止非法路径并交给统一错误处理
   } // 结束代码块：本层作用域收尾
@@ -173,7 +173,7 @@ class RedisCache implements CacheBackend { // 业务步骤：推进当前流程�
       const failConnect = (err: Error): void => { // 连接期失败：排空 pending 并收敛连接承诺，避免后续重连永久挂起
         this.failPending(err); // 业务步骤：推进当前流程的下一项处理
         if (!settled) { settled = true; reject(err); } // 条件分支：仅在满足业务前置条件时继续
-      };
+      }; // 代码块结束
       const socket = createConnection({ host, port }, () => { // 保存 socket：承载本步骤的计算结果供后续使用
         // 握手阶段直接走低层写命令，避免 rawCommand 再次进入 connect() 形成自等待
         const authStep = password ? this.writeCommand(['AUTH', password]).then(() => undefined) : Promise.resolve(); // 保存 authStep：承载本步骤的计算结果供后续使用
@@ -340,82 +340,82 @@ class RedisCache implements CacheBackend { // 业务步骤：推进当前流程�
 
 /** 判断是否为连接类错误（断连 / 不可达 / 超时）；协议层错误（错误回复）不在此列，不应触发降级 */
 function isConnectionError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const message = err.message.toLowerCase();
-  return (
-    message.includes('closed') ||
-    message.includes('unavailable') ||
-    message.includes('timed out') ||
-    message.includes('timeout') ||
-    message.includes('econnreset') ||
-    message.includes('econnrefused') ||
-    message.includes('eai_again') ||
-    message.includes('enotfound') ||
-    message.includes('etimedout') ||
-    message.includes('socket hang up')
-  );
-}
+  if (!(err instanceof Error)) return false; // 条件分支：按判断结果选择后续处理路径
+  const message = err.message.toLowerCase(); // 常量 message：保存固定配置或一次性派生值
+  return ( // 返回当前函数的处理结果
+    message.includes('closed') || // 执行当前业务步骤
+    message.includes('unavailable') || // 执行当前业务步骤
+    message.includes('timed out') || // 执行当前业务步骤
+    message.includes('timeout') || // 执行当前业务步骤
+    message.includes('econnreset') || // 执行当前业务步骤
+    message.includes('econnrefused') || // 执行当前业务步骤
+    message.includes('eai_again') || // 执行当前业务步骤
+    message.includes('enotfound') || // 执行当前业务步骤
+    message.includes('etimedout') || // 执行当前业务步骤
+    message.includes('socket hang up') // 执行当前业务步骤
+  ); // 执行当前业务步骤
+} // 代码块结束
 
 /** Redis + 内存回退包装：首次连接类失败后全程走内存后端，保证业务在 Redis 抖动时不中断 */
 class RedisFallbackCache implements CacheBackend {
-  private primary: RedisCache;
-  private fallback: MemoryCache;
-  private degraded = false;
+  private primary: RedisCache; // 执行当前业务步骤
+  private fallback: MemoryCache; // 执行当前业务步骤
+  private degraded = false; // 执行当前业务步骤
 
-  constructor(rawUrl: string) {
-    this.primary = new RedisCache(rawUrl);
-    this.fallback = new MemoryCache();
-  }
+  constructor(rawUrl: string) { // 调用 constructor 并处理其返回结果
+    this.primary = new RedisCache(rawUrl); // 执行当前业务步骤
+    this.fallback = new MemoryCache(); // 执行当前业务步骤
+  } // 代码块结束
 
-  get backend(): CacheBackendKind {
-    return this.degraded ? 'memory' : 'redis';
-  }
+  get backend(): CacheBackendKind { // 执行当前业务步骤
+    return this.degraded ? 'memory' : 'redis'; // 返回当前函数的处理结果
+  } // 代码块结束
 
-  private async withFallback<T>(op: (backend: CacheBackend) => Promise<T>): Promise<T> {
-    if (this.degraded) return op(this.fallback);
-    try {
-      return await op(this.primary);
-    } catch (err) {
+  private async withFallback<T>(op: (backend: CacheBackend) => Promise<T>): Promise<T> { // 执行当前业务步骤
+    if (this.degraded) return op(this.fallback); // 条件分支：按判断结果选择后续处理路径
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      return await op(this.primary); // 返回当前函数的处理结果
+    } catch (err) { // 代码块结束
       if (!isConnectionError(err)) throw err; // 协议层错误原样上抛，不误降级
-      this.degraded = true;
-      console.error(`[cache] redis unavailable, degrading to in-memory backend: ${err instanceof Error ? err.message : String(err)}`);
-      return op(this.fallback);
-    }
-  }
+      this.degraded = true; // 执行当前业务步骤
+      console.error(`[cache] redis unavailable, degrading to in-memory backend: ${err instanceof Error ? err.message : String(err)}`); // 向控制台输出运行日志或错误信息
+      return op(this.fallback); // 返回当前函数的处理结果
+    } // 代码块结束
+  } // 代码块结束
 
-  async get(key: string): Promise<string | null> {
-    return this.withFallback((c) => c.get(key));
-  }
+  async get(key: string): Promise<string | null> { // 执行当前业务步骤
+    return this.withFallback((c) => c.get(key)); // 返回当前函数的处理结果
+  } // 代码块结束
 
-  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    return this.withFallback((c) => c.set(key, value, ttlSeconds));
-  }
+  async set(key: string, value: string, ttlSeconds?: number): Promise<void> { // 执行当前业务步骤
+    return this.withFallback((c) => c.set(key, value, ttlSeconds)); // 返回当前函数的处理结果
+  } // 代码块结束
 
-  async incr(key: string): Promise<number> {
-    return this.withFallback((c) => c.incr(key));
-  }
+  async incr(key: string): Promise<number> { // 执行当前业务步骤
+    return this.withFallback((c) => c.incr(key)); // 返回当前函数的处理结果
+  } // 代码块结束
 
-  async expire(key: string, ttlSeconds: number): Promise<void> {
-    return this.withFallback((c) => c.expire(key, ttlSeconds));
-  }
+  async expire(key: string, ttlSeconds: number): Promise<void> { // 执行当前业务步骤
+    return this.withFallback((c) => c.expire(key, ttlSeconds)); // 返回当前函数的处理结果
+  } // 代码块结束
 
-  async del(key: string): Promise<void> {
-    return this.withFallback((c) => c.del(key));
-  }
+  async del(key: string): Promise<void> { // 执行当前业务步骤
+    return this.withFallback((c) => c.del(key)); // 返回当前函数的处理结果
+  } // 代码块结束
 
-  async ping(): Promise<boolean> {
-    return this.withFallback((c) => c.ping());
-  }
+  async ping(): Promise<boolean> { // 执行当前业务步骤
+    return this.withFallback((c) => c.ping()); // 返回当前函数的处理结果
+  } // 代码块结束
 
-  async close(): Promise<void> {
-    try {
-      await this.primary.close();
-    } catch {
+  async close(): Promise<void> { // 执行当前业务步骤
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await this.primary.close(); // 异步等待：挂起至 Promise 落定后再继续
+    } catch { // 代码块结束
       // 关闭阶段忽略连接层错误
     }
-    await this.fallback.close();
-  }
-}
+    await this.fallback.close(); // 异步等待：挂起至 Promise 落定后再继续
+  } // 代码块结束
+} // 代码块结束
 
 // ---------------------------------------------------------------------------
 // 工厂与进程级单例

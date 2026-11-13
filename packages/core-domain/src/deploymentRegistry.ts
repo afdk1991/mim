@@ -244,19 +244,19 @@ export function listDeploymentItems(filter: DeploymentFilter = {}): DeploymentIt
     if (filter.platform_id && item.platform_id !== filter.platform_id) return false;
     // 结果结论：EMPTY 命中 result 为 null，其余命中 result.verdict。
     if (filter.verdict) {
-      if (filter.verdict === 'EMPTY') {
-        if (item.result !== null) return false;
-      } else if (item.result?.verdict !== filter.verdict) return false;
+      if (filter.verdict === 'EMPTY') { // 条件分支：按判断结果选择后续处理路径
+        if (item.result !== null) return false; // 条件分支：按判断结果选择后续处理路径
+      } else if (item.result?.verdict !== filter.verdict) return false; // 代码块结束
     } // 结果过滤结束
     // 关键词跨多字段包含匹配，覆盖名称异写与仓库标识。
     if (q) {
-      const haystack = [item.id, item.name, item.platform, ...item.aliases, item.repository.id ?? '', item.entry_url ?? '']
-        .join(' ').toLowerCase();
-      if (!haystack.includes(q)) return false;
+      const haystack = [item.id, item.name, item.platform, ...item.aliases, item.repository.id ?? '', item.entry_url ?? ''] // 常量 haystack：保存固定配置或一次性派生值
+        .join(' ').toLowerCase(); // 执行当前业务步骤
+      if (!haystack.includes(q)) return false; // 条件分支：按判断结果选择后续处理路径
     } // 关键词过滤结束
     // 全部条件通过。
     return true;
-  });
+  }); // 代码块结束
 } // listDeploymentItems 结束
 
 // 全量汇总：按状态 / 结果 / 层级 / 平台 / 严重度分布，供总览卡片与交付报告复用。
@@ -283,40 +283,40 @@ export function deploymentSummary() {
   let worktree_drift = 0;
   // 逐项累加，避免把数字硬编码进前后端两处。
   for (const item of DEPLOYMENT_ITEMS) {
-    by_status[item.status] = (by_status[item.status] ?? 0) + 1;
-    const verdict = item.result?.verdict ?? 'EMPTY';
-    by_verdict[verdict] = (by_verdict[verdict] ?? 0) + 1;
-    by_layer[item.layer] = (by_layer[item.layer] ?? 0) + 1;
-    by_platform[item.platform_id] = (by_platform[item.platform_id] ?? 0) + 1;
-    if (item.result === null) empty_result += 1;
-    else with_result += 1;
-    anomalies += item.anomalies.length;
-    missing_fields += item.missing_fields.length;
-    for (const a of item.anomalies) by_severity[a.severity] = (by_severity[a.severity] ?? 0) + 1;
-    if (item.delivery.artifact_in_head === true && item.delivery.artifact_in_worktree === false) worktree_drift += 1;
+    by_status[item.status] = (by_status[item.status] ?? 0) + 1; // 赋值：更新变量 by_status 的取值
+    const verdict = item.result?.verdict ?? 'EMPTY'; // 常量 verdict：保存固定配置或一次性派生值
+    by_verdict[verdict] = (by_verdict[verdict] ?? 0) + 1; // 赋值：更新变量 by_verdict 的取值
+    by_layer[item.layer] = (by_layer[item.layer] ?? 0) + 1; // 赋值：更新变量 by_layer 的取值
+    by_platform[item.platform_id] = (by_platform[item.platform_id] ?? 0) + 1; // 赋值：更新变量 by_platform 的取值
+    if (item.result === null) empty_result += 1; // 条件分支：按判断结果选择后续处理路径
+    else with_result += 1; // 兜底分支：前面所有条件均不满足时执行
+    anomalies += item.anomalies.length; // 执行当前业务步骤
+    missing_fields += item.missing_fields.length; // 执行当前业务步骤
+    for (const a of item.anomalies) by_severity[a.severity] = (by_severity[a.severity] ?? 0) + 1; // 循环：逐项遍历集合并执行相同处理
+    if (item.delivery.artifact_in_head === true && item.delivery.artifact_in_worktree === false) worktree_drift += 1; // 条件分支：按判断结果选择后续处理路径
   } // 汇总循环结束
   // 返回结构化汇总，字段与 API 响应一一对应。
   return {
-    schema: deploymentRegistry.schema,
-    captured_at: deploymentRegistry.capturedAt,
-    head: deploymentRegistry.head,
-    total: DEPLOYMENT_ITEMS.length,
-    matrix_platforms: deploymentRegistry.coverage.matrix_platforms,
-    platform_catalog: DEPLOYMENT_PLATFORMS.length,
-    git_remotes: deploymentRegistry.coverage.git_remotes,
-    ci_jobs: DEPLOYMENT_CI_JOBS.length,
-    deploy_ci_jobs: deploymentRegistry.coverage.deploy_ci_jobs,
-    excluded: DEPLOYMENT_EXCLUDED.length,
-    with_result,
-    empty_result,
-    anomalies,
-    missing_fields,
-    worktree_drift,
-    by_status,
-    by_verdict,
-    by_layer,
-    by_platform,
-    by_severity,
-    coverage: deploymentRegistry.coverage,
-  };
+    schema: deploymentRegistry.schema, // 对象字段 schema：记录一项配置或数据
+    captured_at: deploymentRegistry.capturedAt, // 对象字段 captured_at：记录一项配置或数据
+    head: deploymentRegistry.head, // 对象字段 head：记录一项配置或数据
+    total: DEPLOYMENT_ITEMS.length, // 对象字段 total：记录一项配置或数据
+    matrix_platforms: deploymentRegistry.coverage.matrix_platforms, // 对象字段 matrix_platforms：记录一项配置或数据
+    platform_catalog: DEPLOYMENT_PLATFORMS.length, // 对象字段 platform_catalog：记录一项配置或数据
+    git_remotes: deploymentRegistry.coverage.git_remotes, // 对象字段 git_remotes：记录一项配置或数据
+    ci_jobs: DEPLOYMENT_CI_JOBS.length, // 对象字段 ci_jobs：记录一项配置或数据
+    deploy_ci_jobs: deploymentRegistry.coverage.deploy_ci_jobs, // 对象字段 deploy_ci_jobs：记录一项配置或数据
+    excluded: DEPLOYMENT_EXCLUDED.length, // 对象字段 excluded：记录一项配置或数据
+    with_result, // 执行当前业务步骤
+    empty_result, // 执行当前业务步骤
+    anomalies, // 执行当前业务步骤
+    missing_fields, // 执行当前业务步骤
+    worktree_drift, // 执行当前业务步骤
+    by_status, // 执行当前业务步骤
+    by_verdict, // 执行当前业务步骤
+    by_layer, // 执行当前业务步骤
+    by_platform, // 执行当前业务步骤
+    by_severity, // 执行当前业务步骤
+    coverage: deploymentRegistry.coverage, // 对象字段 coverage：记录一项配置或数据
+  }; // 代码块结束
 } // deploymentSummary 结束

@@ -13,33 +13,33 @@ const ADMIN_TOKEN = 'test-admin-token'; // 运营引导令牌
 const SANDBOX_SECRET = 'sandbox-secret'; // 沙箱回调密钥
 let app: Express; // 状态：保存跨步骤复用的值
 
-beforeEach(() => {
-  app = createApp({
-    db: createDatabase(':memory:'),
-    jwtSecret: JWT_SECRET,
-    env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_PAYMENT_SANDBOX: '1', MIM_PAYMENT_SANDBOX_SECRET: SANDBOX_SECRET },
-  });
-});
+beforeEach(() => { // 调用 beforeEach 并处理其返回结果
+  app = createApp({ // 赋值：更新变量 app 的取值
+    db: createDatabase(':memory:'), // 对象字段 db：记录一项配置或数据
+    jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
+    env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_PAYMENT_SANDBOX: '1', MIM_PAYMENT_SANDBOX_SECRET: SANDBOX_SECRET }, // 对象字段 env：记录一项配置或数据
+  }); // 代码块结束
+}); // 代码块结束
 
 /** 登录并返回鉴权头；identifier 不同即不同用户。 */
 async function login(identifier = '13800000001'): Promise<Record<string, string>> {
   const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 构造：准备本用例需要的输入、句柄或期望值
   expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
   return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
-}
+} // 代码块结束
 
 /** 带幂等键的写请求头。 */
 function writeHeaders(auth: Record<string, string>): Record<string, string> {
   return { ...auth, 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
-}
+} // 代码块结束
 
 /** 运营请求头：走超管引导通道，不依赖角色表。 */
 function opsHeaders(): Record<string, string> {
   return { 'x-admin-token': ADMIN_TOKEN, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 返回：交回本步骤结果供断言使用
-}
+} // 代码块结束
 
-describe('商业化二期', () => {
-  it('付费资产种子齐备；未购买只给试读，购买后解锁正文', async () => {
+describe('商业化二期', () => { // 调用 describe 并处理其返回结果
+  it('付费资产种子齐备；未购买只给试读，购买后解锁正文', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const list = await request(app).get('/api/v1/assets').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(list.status).toBe(200); // 断言：校验响应字段与冻结契约一致
@@ -60,15 +60,15 @@ describe('商业化二期', () => {
     const unlocked = await request(app).get('/api/v1/assets/paid-article-store').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(unlocked.body.asset.unlocked).toBe(true); // 断言：校验响应字段与冻结契约一致
     expect(unlocked.body.asset.body).toContain('六层'); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('作者发布资产、他人购买后作者获得 70% 待结算收益', async () => {
+  it('作者发布资产、他人购买后作者获得 70% 待结算收益', async () => { // 调用 it 并处理其返回结果
     const author = await login('13800000001'); // 构造：准备本用例需要的输入、句柄或期望值
     const buyer = await login('13800000002'); // 构造：准备本用例需要的输入、句柄或期望值
     const created = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
-      .post('/api/v1/assets')
-      .set(writeHeaders(author))
-      .send({ code: 'author-kit', kind: 'download', title: '作者工具包', summary: '测试', body: '内容', price_cents: 500, file_url: '/f.zip' });
+      .post('/api/v1/assets') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(author)) // 执行当前业务步骤
+      .send({ code: 'author-kit', kind: 'download', title: '作者工具包', summary: '测试', body: '内容', price_cents: 500, file_url: '/f.zip' }); // 执行当前业务步骤
     expect(created.status).toBe(201); // 断言：校验响应字段与冻结契约一致
     await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(buyer)).send({ code: 'MIM-DEMO-100' }); // 执行：等待接口或数据库操作返回
     const buy = await request(app).post('/api/v1/assets/author-kit/purchase').set(writeHeaders(buyer)); // 构造：准备本用例需要的输入、句柄或期望值
@@ -76,9 +76,9 @@ describe('商业化二期', () => {
     const earnings = await request(app).get('/api/v1/earnings').set(author); // 构造：准备本用例需要的输入、句柄或期望值
     expect(earnings.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(earnings.body.summary.pending).toBe(350); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('沙箱支付：验签通过才充值，错误签名被 403 拒绝', async () => {
+  it('沙箱支付：验签通过才充值，错误签名被 403 拒绝', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const create = await request(app).post('/api/v1/payments/intents').set(writeHeaders(auth)).send({ purpose: 'recharge', ref_id: 'wallet', provider: 'sandbox', amount_cents: 1000 }); // 构造：准备本用例需要的输入、句柄或期望值
     expect(create.status).toBe(201); // 断言：校验响应字段与冻结契约一致
@@ -90,22 +90,22 @@ describe('商业化二期', () => {
     expect(ok.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     const wallet = await request(app).get('/api/v1/wallet').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(wallet.body.wallet.balance_cents).toBe(1000); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('发货、轨迹、评价、售后退款串成完整闭环', async () => {
+  it('发货、轨迹、评价、售后退款串成完整闭环', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 执行：等待接口或数据库操作返回
     const order = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
-      .post('/api/v1/shop/orders')
-      .set(writeHeaders(auth))
-      .send({ product_code: 'mim-keycap', quantity: 1, shipping: { name: '张三', phone: '13800000000', address: '宁波市测试路 1 号' } });
+      .post('/api/v1/shop/orders') // 注册 POST 路由 / 中间件处理器
+      .set(writeHeaders(auth)) // 执行当前业务步骤
+      .send({ product_code: 'mim-keycap', quantity: 1, shipping: { name: '张三', phone: '13800000000', address: '宁波市测试路 1 号' } }); // 执行当前业务步骤
     expect(order.status).toBe(201); // 断言：校验响应字段与冻结契约一致
     const orderId = order.body.order_id; // 构造：准备本用例需要的输入、句柄或期望值
 
     const ship = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
-      .post(`/api/v1/shop/orders/${orderId}/ship`)
-      .set(opsHeaders())
-      .send({ carrier: '顺丰', tracking_no: 'SF123456789', status: 'transit', events: [{ text: '已揽收' }] });
+      .post(`/api/v1/shop/orders/${orderId}/ship`) // 注册 POST 路由 / 中间件处理器
+      .set(opsHeaders()) // 执行当前业务步骤
+      .send({ carrier: '顺丰', tracking_no: 'SF123456789', status: 'transit', events: [{ text: '已揽收' }] }); // 执行当前业务步骤
     expect(ship.status).toBe(201); // 断言：校验响应字段与冻结契约一致
     const tracking = await request(app).get(`/api/v1/shop/orders/${orderId}/shipment`).set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(tracking.body.shipment.carrier).toBe('顺丰'); // 断言：校验响应字段与冻结契约一致
@@ -122,9 +122,9 @@ describe('商业化二期', () => {
     expect(approve.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     const orders = await request(app).get('/api/v1/shop/orders').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(orders.body.items.find((item: { id: string }) => item.id === orderId).status).toBe('refunded'); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('提现冻结余额、驳回退回、通过后可标记打款', async () => {
+  it('提现冻结余额、驳回退回、通过后可标记打款', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     await request(app).post('/api/v1/wallet/redeem').set(writeHeaders(auth)).send({ code: 'MIM-DEMO-100' }); // 执行：等待接口或数据库操作返回
     const apply = await request(app).post('/api/v1/wallet/withdrawals').set(writeHeaders(auth)).send({ amount_cents: 5000, channel: 'alipay', account: 'test@example.com' }); // 构造：准备本用例需要的输入、句柄或期望值
@@ -142,9 +142,9 @@ describe('商业化二期', () => {
     expect(approve.body.status).toBe('approved'); // 断言：校验响应字段与冻结契约一致
     const paid = await request(app).post(`/api/v1/withdrawals/${second.body.id}/review`).set(opsHeaders()).send({ action: 'paid' }); // 构造：准备本用例需要的输入、句柄或期望值
     expect(paid.body.status).toBe('paid'); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('外观设置与页面区块可读可改可排序', async () => {
+  it('外观设置与页面区块可读可改可排序', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const view = await request(app).get('/api/v1/appearance').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(view.status).toBe(200); // 断言：校验响应字段与冻结契约一致
@@ -158,9 +158,9 @@ describe('商业化二期', () => {
     expect(create.status).toBe(201); // 断言：校验响应字段与冻结契约一致
     const reorder = await request(app).put('/api/v1/pages/home/reorder').set(opsHeaders()).send({ ids: [create.body.id, 'block-home-hero'] }); // 构造：准备本用例需要的输入、句柄或期望值
     expect(reorder.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('成长等级、徽章同步、私信与 IP 归属地可用', async () => {
+  it('成长等级、徽章同步、私信与 IP 归属地可用', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const growth = await request(app).get('/api/v1/me/growth').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(growth.body.level).toBe(1); // 断言：校验响应字段与冻结契约一致
@@ -180,9 +180,9 @@ describe('商业化二期', () => {
     const ip = await request(app).get('/api/v1/me/ip').set(auth).set('cf-ipcountry', 'CN'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(ip.body.region_code).toBe('CN'); // 断言：校验响应字段与冻结契约一致
     expect(ip.body.ip_hash_prefix.length).toBe(12); // 断言：校验响应字段与冻结契约一致
-  });
+  }); // 代码块结束
 
-  it('翻译未配置时明确 503，前后台语言可分离', async () => {
+  it('翻译未配置时明确 503，前后台语言可分离', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const settings = await request(app).get('/api/v1/i18n/settings').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(settings.status).toBe(200); // 断言：校验响应字段与冻结契约一致
@@ -193,5 +193,5 @@ describe('商业化二期', () => {
     const translate = await request(app).post('/api/v1/i18n/translate').set(auth).send({ text: '你好', target: 'en-US' }); // 构造：准备本用例需要的输入、句柄或期望值
     expect(translate.status).toBe(503); // 断言：校验响应字段与冻结契约一致
     expect(translate.body.code).toBe('PROVIDER_NOT_CONFIGURED'); // 断言：校验响应字段与冻结契约一致
-  });
-});
+  }); // 代码块结束
+}); // 代码块结束

@@ -19,7 +19,7 @@ import { z } from 'zod'; // 查询参数声明式校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { requireAuth, requirePermission } from '../middleware.js'; // 登录门禁 + 权限门禁（超管令牌可走引导通道）
 import { parse } from '../validate.js'; // zod 失败统一转 VALIDATION_FAILED
-import {
+import { // 引入依赖、类型或本地模块绑定
   SEARCH_SCOPES, // 五个来源
   SEARCH_SCOPE_LABELS, // 来源中文名
   collectDocuments, // 汇总全部来源文档
@@ -52,7 +52,7 @@ function resolveScopes(raw: string | undefined): SearchScope[] {
 
 /** 把 Meilisearch 的平铺命中按来源重新分组，保持与本地检索一致的响应结构 */
 function groupHits(hits: SearchHit[], scopes: SearchScope[], limit: number): SearchGroup[] {
-  return scopes.map((scope) => {
+  return scopes.map((scope) => { // 返回当前函数的处理结果
     const items = hits.filter((hit) => hit.scope === scope).slice(0, limit); // 本来源截断
     return { scope, label: SEARCH_SCOPE_LABELS[scope], count: items.length, items }; // 组结构
   }).filter((group) => group.count > 0); // 空组不返回
@@ -65,7 +65,7 @@ export function createSearchRouter(deps: ApiDeps): Router {
   /** GET /search/summary — 各来源文档数量，便于前端展示「可搜范围」 */
   router.get('/search/summary', (_req, res) => {
     const documents = collectDocuments(deps.db); // 实时汇总
-    const scopes = SEARCH_SCOPES.map((scope) => ({
+    const scopes = SEARCH_SCOPES.map((scope) => ({ // 常量 scopes：保存固定配置或一次性派生值
       scope, // 来源
       label: SEARCH_SCOPE_LABELS[scope], // 中文名
       count: documents.filter((item) => item.scope === scope).length, // 该来源文档数
@@ -82,11 +82,11 @@ export function createSearchRouter(deps: ApiDeps): Router {
     const started = Date.now(); // 计时起点
     const config = meiliConfig(deps.env); // 是否配置远端引擎
     if (config) { // 配置了 Meilisearch
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const hits = await searchMeili(config, query.q, scopes, limit); // 远端检索
         if (hits && hits.length > 0) { // 有命中才采用，避免索引滞后时返回空结果
           const groups = groupHits(hits, scopes, limit); // 重新分组
-          res.json({
+          res.json({ // 执行当前业务步骤
             schema: 'mim.search.v1', // 契约版本
             query: query.q, // 原查询
             scope: query.scope ?? 'all', // 原来源参数
@@ -97,12 +97,12 @@ export function createSearchRouter(deps: ApiDeps): Router {
           }); // 响应结束
           return; // 已返回，不再走本地
         } // 命中判定结束
-      } catch {
+      } catch { // 代码块结束
         // 远端超时 / 鉴权失败 / 索引不存在：一律降级，不把基础设施故障暴露给用户
       } // try/catch 结束
     } // 远端分支结束
     const groups = searchDocuments(documents, query.q, scopes, limit); // 本地检索
-    res.json({
+    res.json({ // 执行当前业务步骤
       schema: 'mim.search.v1', // 契约版本
       query: query.q, // 原查询
       scope: query.scope ?? 'all', // 原来源参数

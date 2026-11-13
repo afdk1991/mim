@@ -77,7 +77,7 @@ export function Products({ locale }: Props) {
   /** 加购：成功后刷新购物车角标并标记该行 */
   async function addToCart(code: string) {
     setError(null); // 清空旧错误
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.cart.add(code); // 后端幂等：已在车中直接回放
       setCart(result.cart); // 更新角标
       setAdded(code); // 行内提示
@@ -89,19 +89,19 @@ export function Products({ locale }: Props) {
 
   // 定时清空关键词提示不需要额外逻辑：搜索按钮提交时直接改 keyword
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{isZh ? '商品列表' : 'Products'}</h1>
         {/* 购物车入口与角标 */}
-        <button type="button" className="btn ghost" onClick={() => navigate({ view: 'cart' })}>
+        <button type="button" className="btn ghost" onClick={() => navigate({ view: 'cart' })}>{/* 执行当前业务步骤 */}
           {isZh ? '购物车' : 'Cart'}
           {cart && cart.count > 0 ? <span className="cart-badge">{cart.count}</span> : null}
         </button>
       </header>
 
       {/* 筛选栏：关键词 / 分类 / 可购买性 / 排序 */}
-      <section className="products-filter">
+      <section className="products-filter">{/* 执行当前业务步骤 */}
         <form
           className="products-search"
           onSubmit={(event) => {
@@ -125,13 +125,13 @@ export function Products({ locale }: Props) {
             <option key={group.slug} value={group.slug}>{isZh ? group.name : group.name_en ?? group.name}</option>
           ))}
         </select>
-        <select value={availability} onChange={(event) => setAvailability(event.target.value as AvailabilityFilter)}>
+        <select value={availability} onChange={(event) => setAvailability(event.target.value as AvailabilityFilter)}>{/* 执行当前业务步骤 */}
           <option value="all">{isZh ? '全部商品' : 'All'}</option>
           <option value="free">{isZh ? '免费' : 'Free'}</option>
           <option value="paid">{isZh ? '付费' : 'Paid'}</option>
           <option value="owned">{isZh ? '已解锁' : 'Unlocked'}</option>
         </select>
-        <select value={sort} onChange={(event) => setSort(event.target.value as 'recommended' | 'stars' | 'updated')}>
+        <select value={sort} onChange={(event) => setSort(event.target.value as 'recommended' | 'stars' | 'updated')}>{/* 执行当前业务步骤 */}
           <option value="recommended">{isZh ? '推荐排序' : 'Recommended'}</option>
           <option value="stars">{isZh ? '按 Star' : 'By stars'}</option>
           <option value="updated">{isZh ? '按更新' : 'By updated'}</option>
@@ -143,9 +143,9 @@ export function Products({ locale }: Props) {
       {modules.error ? <div className="chat-error">{errorText(locale, modules.error)}</div> : null}
 
       {/* 密集列表：表格式，便于批量扫读与加购 */}
-      <table className="products-table">
-        <thead>
-          <tr>
+      <table className="products-table">{/* 执行当前业务步骤 */}
+        <thead>{/* 执行当前业务步骤 */}
+          <tr>{/* 执行当前业务步骤 */}
             <th>{isZh ? '模块' : 'Module'}</th>
             <th>{isZh ? '分类' : 'Category'}</th>
             <th>{isZh ? '价格' : 'Price'}</th>
@@ -153,48 +153,48 @@ export function Products({ locale }: Props) {
             <th>{isZh ? '操作' : 'Action'}</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody>{/* 执行当前业务步骤 */}
           {rows.map((row) => {
             const name = row.name[locale] ?? row.name['zh-CN'] ?? row.code; // 名称按当前语言回落
             const owned = ownedCodes.has(row.code); // 是否已解锁
             const free = !row.current_price || row.current_price.amount_minor === 0; // 是否免费
-            return (
-              <tr key={row.code}>
-                <td>
+            return ( // 返回当前函数的处理结果
+              <tr key={row.code}>{/* 执行当前业务步骤 */}
+                <td>{/* 执行当前业务步骤 */}
                   <div className="products-name">{name}</div>
                   <div className="products-code">{row.code}</div>
                 </td>
                 <td>{row.category_slug ?? '-'}</td>
                 <td>{priceText(locale, row.current_price)}</td>
-                <td>
+                <td>{/* 执行当前业务步骤 */}
                   {row.capability ? <span className="tag ok">{isZh ? '可用' : 'Ready'}</span> : row.code.startsWith('cat.') ? <span className="tag">{isZh ? '规划中' : 'Planned'}</span> : <span className="tag">{isZh ? '配套权益' : 'Add-on'}</span>}
                 </td>
-                <td>
+                <td>{/* 执行当前业务步骤 */}
                   {owned ? (
                     <span className="tag ok">{isZh ? '已解锁' : 'Unlocked'}</span>
                   ) : (
-                    <button type="button" className="btn ghost" onClick={() => void addToCart(row.code)} disabled={added === row.code}>
+                    <button type="button" className="btn ghost" onClick={() => void addToCart(row.code)} disabled={added === row.code}>{/* 执行当前业务步骤 */}
                       {added === row.code ? (isZh ? '已加入' : 'Added') : free ? (isZh ? '免费领取' : 'Get free') : (isZh ? '加入购物车' : 'Add to cart')}
                     </button>
                   )}
                 </td>
               </tr>
-            );
+            ); // 执行当前业务步骤
           })}
         </tbody>
       </table>
       {!modules.loading && rows.length === 0 ? <div className="hint">{isZh ? '没有符合条件的商品' : 'No products found'}</div> : null}
 
       {/* 分页：仅上一页 / 下一页，配合页码显示 */}
-      <div className="products-pager">
-        <button type="button" className="btn ghost" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+      <div className="products-pager">{/* 执行当前业务步骤 */}
+        <button type="button" className="btn ghost" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>{/* 执行当前业务步骤 */}
           {isZh ? '上一页' : 'Prev'}
         </button>
-        <span className="hint">
+        <span className="hint">{/* 执行当前业务步骤 */}
           {isZh ? `第 ${modules.data?.page ?? page} / ${Math.max(1, modules.data?.total_pages ?? 1)} 页` : `Page ${modules.data?.page ?? page} / ${Math.max(1, modules.data?.total_pages ?? 1)}`}
         </span>
         <button
-          type="button"
+          type="button" // 赋值：更新变量 type 的取值
           className="btn ghost"
           disabled={page >= (modules.data?.total_pages ?? 1)}
           onClick={() => setPage((value) => value + 1)}
@@ -203,5 +203,5 @@ export function Products({ locale }: Props) {
         </button>
       </div>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Products 结束

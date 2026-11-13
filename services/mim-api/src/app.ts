@@ -46,14 +46,14 @@ import { dirname, join } from 'node:path'; // 拼出 package.json 的相对路�
 
 /** 读取本包 package.json 的 version 作为健康检查默认版本；读取失败回落 0.0.0 */
 function readPackageVersion(): string {
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'); // src/ 与 dist/ 同为 mim-api 下一级，上级即包根
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: string }; // 解析清单，容错非 JSON
     return pkg.version ?? '0.0.0'; // 缺 version 字段时回落
-  } catch {
+  } catch { // 代码块结束
     return '0.0.0'; // 清单缺失或损坏时不阻断启动
-  }
-}
+  } // 代码块结束
+} // 代码块结束
 
 /** 对外声明的服务版本：默认取本包 package.json semver，部署时可注入 MIM_SERVICE_VERSION 覆盖 */
 const SERVICE_VERSION = (process.env.MIM_SERVICE_VERSION ?? readPackageVersion()).trim(); // 健康检查回显，便于线上核对版本

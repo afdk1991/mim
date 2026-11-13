@@ -101,7 +101,7 @@ function cartView(db: Db, userId: string, now: string) {
   return { items, totals, count: items.length, payable_count: items.filter((item) => !item.owned && !item.free && item.available).length }; // 汇总视图
 } // cartView 结束
 
-export function createCartRouter(deps: ApiDeps): Router {
+export function createCartRouter(deps: ApiDeps): Router { // 导出函数 createCartRouter：对外暴露的调用入口
   const router = Router(); // 独立 router，便于前缀挂载
   const db = deps.db; // 数据库句柄
 
@@ -111,7 +111,7 @@ export function createCartRouter(deps: ApiDeps): Router {
   router.get('/cart', (req, res) => {
     const now = clockOf(deps); // 统一时间基准
     res.json(cartView(db, req.user!.id, now)); // 返回组装视图
-  });
+  }); // 代码块结束
 
   /** POST /cart/items — 加购；重复加购回放既有条目 */
   router.post('/cart/items', idempotency, (req, res) => {
@@ -120,7 +120,7 @@ export function createCartRouter(deps: ApiDeps): Router {
     const now = clockOf(deps); // 时间基准
     const moduleRow = db // 定位模块
       .prepare( // 仅同区域、未删除模块可加购
-        `SELECT id, code, status, category_slug FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`,
+        `SELECT id, code, status, category_slug FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL`, // 执行当前业务步骤
       ) // 结束预编译
       .get(body.module_code, user.region) as { id: string; code: string; status: string; category_slug: string | null } | undefined; // 命中行
     if (!moduleRow) throw new AppError('NOT_FOUND', 'module not found', { module_code: body.module_code }); // 模块不存在
@@ -136,31 +136,31 @@ export function createCartRouter(deps: ApiDeps): Router {
     const id = uuidv7(); // 新条目主键
     db.prepare('INSERT INTO cart_items (id, user_id, module_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, user.id, moduleRow.id, now, now); // 落库
     res.status(201).json({ added: true, item_id: id, cart: cartView(db, user.id, now) }); // 新建结果
-  });
+  }); // 代码块结束
 
   /** DELETE /cart/items/:moduleCode — 移除单个 */
   router.delete('/cart/items/:moduleCode', (req, res) => {
     const moduleCode = req.params.moduleCode; // 路径参数即模块编码
     const user = req.user!; // 登录用户
     const row = db // 找同区域模块
-      .prepare('SELECT id FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL')
+      .prepare('SELECT id FROM modules WHERE code = ? AND region = ? AND deleted_at IS NULL') // 执行当前业务步骤
       .get(moduleCode, user.region) as { id: string } | undefined; // 命中行
     if (!row) throw new AppError('NOT_FOUND', 'module not found', { module_code: moduleCode }); // 模块不存在
     db.prepare('DELETE FROM cart_items WHERE user_id = ? AND module_id = ?').run(user.id, row.id); // 删除该条目（不存在时零影响，天然幂等）
     res.json({ ok: true, cart: cartView(db, user.id, clockOf(deps)) }); // 返回最新车
-  });
+  }); // 代码块结束
 
   /** DELETE /cart — 清空 */
   router.delete('/cart', idempotency, (req, res) => {
     const user = req.user!; // 登录用户
     db.prepare('DELETE FROM cart_items WHERE user_id = ?').run(user.id); // 清空本人车
     res.json({ ok: true, cart: cartView(db, user.id, clockOf(deps)) }); // 返回空车
-  });
+  }); // 代码块结束
 
   /** POST /cart/checkout — 结算：免费即时解锁，付费生成待结算订单；可选积分抵扣 */
   router.post('/cart/checkout', idempotency, (req, res) => {
     const body = parse( // 渠道可选：未接在线网关时按人工结算；积分抵扣可选
-      z.object({
+      z.object({ // 执行当前业务步骤
         channel: z.enum(['manual', 'alipay', 'wechat', 'stripe']).optional(), // 允许空体（缺省 manual）
         use_points: z.boolean().optional(), // 是否使用积分抵扣；指定 points_to_use 视为开启
         points_to_use: z.number().int().min(1).optional(), // 指定消耗积分；缺省按可抵扣上限最大化
@@ -183,7 +183,7 @@ export function createCartRouter(deps: ApiDeps): Router {
       if (hasActiveEntitlement(db, user.id, row.module_id, now)) { outcomes.push({ module_code, kind: 'skipped', reason: 'already_owned' }); processedIds.push(row.id); continue; } // 已拥有：移出车
       const price = currentPrice(db, row.module_id, now); // 当前价
       const moduleMeta = db // 取依赖与名称，用于依赖校验与订单视图
-        .prepare('SELECT name_i18n, entitlements_required FROM modules WHERE id = ?')
+        .prepare('SELECT name_i18n, entitlements_required FROM modules WHERE id = ?') // 执行当前业务步骤
         .get(row.module_id) as { name_i18n: string; entitlements_required: string }; // 模块元信息
       try { // 依赖缺失等业务错误按条目跳过，不中断整批结算
         assertDependenciesMet(db, { region: user.region, requiredCodes: jsonParse<string[]>(moduleMeta.entitlements_required) ?? [], userId: user.id, now }); // 与解锁/下单同一校验
@@ -212,22 +212,22 @@ export function createCartRouter(deps: ApiDeps): Router {
         continue; // 下一条
       } // 免费分支结束
       const pending = db // 已有待结算订单则回放，保证「点两次只生成一张单」
-        .prepare(`SELECT * FROM module_orders WHERE user_id = ? AND module_id = ? AND status = 'pending'`)
+        .prepare(`SELECT * FROM module_orders WHERE user_id = ? AND module_id = ? AND status = 'pending'`) // 执行当前业务步骤
         .get(user.id, row.module_id) as Parameters<typeof orderView>[0] | undefined; // 命中行
       if (pending) { // 回放既有订单
         outcomes.push({ // 复用订单视图；既有单无抵扣记录，抵扣字段归零
-          module_code, kind: 'order',
-          order: orderView({ ...pending, module_code, module_name: moduleMeta.name_i18n }),
-          points_spent: pending.points_spent ?? 0,
-          points_deduct_cents: pending.points_deduct_cents ?? 0,
-          payable_cents: Math.max(0, (pending.amount_minor ?? 0) - (pending.points_deduct_cents ?? 0)),
-        });
+          module_code, kind: 'order', // 执行当前业务步骤
+          order: orderView({ ...pending, module_code, module_name: moduleMeta.name_i18n }), // 对象字段 order：记录一项配置或数据
+          points_spent: pending.points_spent ?? 0, // 对象字段 points_spent：记录一项配置或数据
+          points_deduct_cents: pending.points_deduct_cents ?? 0, // 对象字段 points_deduct_cents：记录一项配置或数据
+          payable_cents: Math.max(0, (pending.amount_minor ?? 0) - (pending.points_deduct_cents ?? 0)), // 对象字段 payable_cents：记录一项配置或数据
+        }); // 代码块结束
         processedIds.push(row.id); // 已生成订单即视为已处理
         continue; // 下一条
       } // 回放结束
       // 积分抵扣：位于优惠码之后、余额/渠道之前；纯函数计算，受兑换比例 / 单笔上限 / 余额三重约束
       const deduction = usePoints
-        ? computeDeduction({ amountCents: price.amount_minor, pointsBalance, config: pointsConfig, pointsToUse: body.points_to_use })
+        ? computeDeduction({ amountCents: price.amount_minor, pointsBalance, config: pointsConfig, pointsToUse: body.points_to_use }) // 执行当前业务步骤
         : { deduct_cents: 0, points_spent: 0, payable_cents: price.amount_minor, capped_by: 'none' as const }; // 未开启抵扣：全额应付
       const payableMinor = deduction.payable_cents; // 抵扣后应付（分）
       const settledByPoints = payableMinor <= 0; // 全额抵扣：同事务内即时结算并发权益
@@ -242,18 +242,18 @@ export function createCartRouter(deps: ApiDeps): Router {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(orderId, user.id, row.module_id, user.region, price.currency, price.amount_minor, deduction.points_spent, deduction.deduct_cents, settledByPoints ? 'paid' : 'pending', channel, entId, settledByPoints ? now : null, now, now); // 落库
         if (deduction.points_spent > 0) { // 有抵扣才扣积分并写流水，与订单同事务
-          deductPoints(db, { userId: user.id, points: deduction.points_spent, deductCents: deduction.deduct_cents, refType: 'module_order', refId: orderId, note: `积分抵扣 ${module_code}`, now });
-        }
+          deductPoints(db, { userId: user.id, points: deduction.points_spent, deductCents: deduction.deduct_cents, refType: 'module_order', refId: orderId, note: `积分抵扣 ${module_code}`, now }); // 调用 deductPoints 并处理其返回结果
+        } // 代码块结束
         if (settledByPoints && entId && evtId) { // 全额抵扣：即时发放 active 权益并留事件
-          db.prepare(
+          db.prepare( // 执行当前业务步骤
             `INSERT INTO entitlements (id, user_id, module_id, source, source_id, status, version, created_at, updated_at)
              VALUES (?, ?, ?, 'admin', NULL, 'active', 1, ?, ?)`,
-          ).run(entId, user.id, row.module_id, now, now);
-          db.prepare(
+          ).run(entId, user.id, row.module_id, now, now); // 执行当前业务步骤
+          db.prepare( // 执行当前业务步骤
             `INSERT INTO entitlement_events (id, entitlement_id, from_status, to_status, reason, actor, created_at)
              VALUES (?, ?, NULL, 'active', 'cart_checkout_points_settled', 'system', ?)`,
-          ).run(evtId, entId, now);
-        }
+          ).run(evtId, entId, now); // 执行当前业务步骤
+        } // 代码块结束
       }); // 事务定义结束
       tx(); // 执行事务
       pointsBalance -= deduction.points_spent; // 滚动更新余额，供同车后续条目计算
@@ -288,7 +288,7 @@ export function createCartRouter(deps: ApiDeps): Router {
       db.prepare(`DELETE FROM cart_items WHERE user_id = ? AND id IN (${placeholders})`).run(user.id, ...processedIds); // 删除已处理
     } // 清理结束
     res.json({ results: outcomes, cart: cartView(db, user.id, now) }); // 返回逐条结果与剩余车
-  });
+  }); // 代码块结束
 
   return router; // 返回装配完成的路由
 } // createCartRouter 结束

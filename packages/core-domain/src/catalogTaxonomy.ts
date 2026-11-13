@@ -15,7 +15,7 @@ export interface CatalogGroupSeed {
   license: string; // 该组模块默认开源许可（演示口径，取值来自 LICENSE_OPTIONS）
   language: string; // 该组模块默认编程语言（演示口径，取值来自 LANGUAGE_OPTIONS）
   items: readonly string[]; // 二级条目名称清单，每一条会生成一个模块
-}
+} // 代码块结束
 
 /**
  * 19 个一级分类；顺序与用户给定的分类树一致（「全部推荐项目」是导航里的「全部」页签，
@@ -51,24 +51,24 @@ export const CATALOG_GROUP_TOTAL = CATALOG_GROUPS.length; // 当前应为 19
 
 /** 页面「开源许可」筛选项：48 项，顺序与用户给定清单一致 */
 export const LICENSE_OPTIONS: readonly string[] = [
-  'MulanPSL-2.0', '0BSD', 'AFL-3.0', 'AGPL-3.0', 'Apache-2.0', 'Artistic-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'BSD-3-Clause-Clear', 'BSD-4-Clause',
-  'BSL-1.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'CC0-1.0', 'CECILL-2.1', 'CERN-OHL-P-2.0', 'CERN-OHL-S-2.0', 'CERN-OHL-W-2.0', 'ECL-2.0', 'EPL-1.0',
-  'EPL-2.0', 'EUPL-1.1', 'EUPL-1.2', 'GFDL-1.3', 'GPL-2.0', 'GPL-3.0', 'ISC', 'LGPL-2.1', 'LGPL-3.0', 'LPPL-1.3c',
-  'MIT', 'MIT-0', 'MPL-2.0', 'MS-PL', 'MS-RL', 'MulanPSL-1.0', 'MulanPubL-1.0', 'MulanPubL-2.0', 'NCSA', 'ODbL-1.0',
-  'OFL-1.1', 'OSL-3.0', 'PostgreSQL', 'UPL-1.0', 'Unlicense', 'Vim', 'WTFPL', 'Zlib',
+  'MulanPSL-2.0', '0BSD', 'AFL-3.0', 'AGPL-3.0', 'Apache-2.0', 'Artistic-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'BSD-3-Clause-Clear', 'BSD-4-Clause', // 执行当前业务步骤
+  'BSL-1.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'CC0-1.0', 'CECILL-2.1', 'CERN-OHL-P-2.0', 'CERN-OHL-S-2.0', 'CERN-OHL-W-2.0', 'ECL-2.0', 'EPL-1.0', // 执行当前业务步骤
+  'EPL-2.0', 'EUPL-1.1', 'EUPL-1.2', 'GFDL-1.3', 'GPL-2.0', 'GPL-3.0', 'ISC', 'LGPL-2.1', 'LGPL-3.0', 'LPPL-1.3c', // 执行当前业务步骤
+  'MIT', 'MIT-0', 'MPL-2.0', 'MS-PL', 'MS-RL', 'MulanPSL-1.0', 'MulanPubL-1.0', 'MulanPubL-2.0', 'NCSA', 'ODbL-1.0', // 执行当前业务步骤
+  'OFL-1.1', 'OSL-3.0', 'PostgreSQL', 'UPL-1.0', 'Unlicense', 'Vim', 'WTFPL', 'Zlib', // 执行当前业务步骤
 ]; // 许可清单结束：合计 48 项
 
 /** 页面「编程语言」筛选项：87 项，顺序与用户给定清单一致 */
 export const LANGUAGE_OPTIONS: readonly string[] = [
-  'Java', 'JavaScript', 'HTML', 'CSS', 'Python', 'Shell', 'TypeScript', 'C', 'C++', 'C#',
-  'PHP', 'Go', 'Objective-C', 'Kotlin', 'Android', 'Ruby', 'PowerShell', 'Swift', 'Assembly', 'Dart',
-  'Rust', 'NodeJS', 'Lua', 'Perl', 'Matlab', 'HTML/CSS', 'C/C++', 'TeX/LaTeX', 'SQL', 'XML',
-  '汇编', '易语言', '微信', '其他', 'Scala', 'Groovy', 'Verilog', 'XSLT', 'R', 'QML',
-  'Pascal', 'Docker', 'CoffeeScript', 'FORTRAN', 'Erlang', 'Smalltalk', 'M', 'Emacs Lisp', 'ActionScript', 'VHDL',
-  'Delphi', 'Common Lisp', 'Scheme', 'Visual Basic', 'ASP', 'Clojure', 'LiveScript', 'Julia', 'Awk', 'Haskell',
-  'Elixir', 'Pawn', 'AutoHotkey', 'D', 'YAML', 'Standard ML', 'Coq', 'Logos', 'Ada', 'OCaml',
-  'Prolog', 'Puppet', 'Arduino', 'VimL', 'Haxe', 'Vala', 'Scilab', 'ColdFusion', 'Crystal', 'Racket',
-  'Lisp', 'Slash', 'Eiffel', 'eC', 'DOT', 'Zephir', 'Nemerle',
+  'Java', 'JavaScript', 'HTML', 'CSS', 'Python', 'Shell', 'TypeScript', 'C', 'C++', 'C#', // 执行当前业务步骤
+  'PHP', 'Go', 'Objective-C', 'Kotlin', 'Android', 'Ruby', 'PowerShell', 'Swift', 'Assembly', 'Dart', // 执行当前业务步骤
+  'Rust', 'NodeJS', 'Lua', 'Perl', 'Matlab', 'HTML/CSS', 'C/C++', 'TeX/LaTeX', 'SQL', 'XML', // 执行当前业务步骤
+  '汇编', '易语言', '微信', '其他', 'Scala', 'Groovy', 'Verilog', 'XSLT', 'R', 'QML', // 执行当前业务步骤
+  'Pascal', 'Docker', 'CoffeeScript', 'FORTRAN', 'Erlang', 'Smalltalk', 'M', 'Emacs Lisp', 'ActionScript', 'VHDL', // 执行当前业务步骤
+  'Delphi', 'Common Lisp', 'Scheme', 'Visual Basic', 'ASP', 'Clojure', 'LiveScript', 'Julia', 'Awk', 'Haskell', // 执行当前业务步骤
+  'Elixir', 'Pawn', 'AutoHotkey', 'D', 'YAML', 'Standard ML', 'Coq', 'Logos', 'Ada', 'OCaml', // 执行当前业务步骤
+  'Prolog', 'Puppet', 'Arduino', 'VimL', 'Haxe', 'Vala', 'Scilab', 'ColdFusion', 'Crystal', 'Racket', // 执行当前业务步骤
+  'Lisp', 'Slash', 'Eiffel', 'eC', 'DOT', 'Zephir', 'Nemerle', // 执行当前业务步骤
 ]; // 语言清单结束：合计 87 项
 
 /** 排序方式枚举：接口 sort 参数只接受这三个值 */
@@ -78,132 +78,132 @@ export const CATALOG_SORT_MODES = ['stars', 'recommended', 'updated'] as const; 
 export interface CatalogGroupEn {
   name: string; // 一级分类英文名
   items: readonly string[]; // 二级条目英文名，顺序与中文清单一一对应
-}
+} // 代码块结束
 
 /** 19 组英文名称：与中文清单同序，供 global 区模块名 / 英文站点导航使用 */
 export const CATALOG_GROUP_EN: Record<string, CatalogGroupEn> = {
-  frontier: {
-    name: 'Frontier technology',
-    items: ['Low-code', 'Research papers', 'Quantum computing', 'Web 3.0', 'Cloud native'],
-  },
-  openharmony: {
-    name: 'OpenHarmony',
-    items: [
-      'Button', 'Text box (EditText)', 'Layout', 'Graphics & images', 'Progress bar', 'Menu', 'Popup', 'Selector',
-      'Text component (TextView)', 'List component (ListView)', 'Loader (Loading)', 'Notification', 'View transition', 'Slider',
-      'Chart', 'Drawing component (Draw)', 'Counter', 'Animation', 'CAPTCHA', 'Multimedia', 'Barcode', 'Advanced UI components',
-      'Map', 'OpenHarmony gaming (Gaming)', 'Networking', 'Communication', 'Payment', 'Database', 'Hardware drivers',
-      'OpenHarmony tutorials & guides', 'OpenHarmony toolkit', 'OpenHarmony apps', 'HMS (Huawei Mobile Services)',
-      'Permissions', 'Toolkit', 'Low-level components', 'Gesture control',
-    ],
-  },
-  dev: {
-    name: 'Software development',
-    items: [
-      'Chinese/English word segmentation', 'Payment SDK', 'Security development', 'Common utility libraries', 'Excel toolkit',
-      'Barcode / QR code', 'Template engine', 'Graphical UI components & frameworks', 'Network development kit', 'Speech processing',
-      'Network tools', 'Network services', 'Data mining', 'Job / task scheduling', 'Programming & scripting languages',
-      'Cache components', 'Markdown toolkit', 'Search engine', 'Microservices', 'Workflow', 'Chart components',
-      'Permission management', 'Reporting tools', 'Code generators', 'IoC / AOP frameworks', 'Image processing', 'Rule engine',
-      'JSON tools', 'Logging toolkit', 'Spring Boot extensions', 'CAPTCHA', 'Algorithms & math computation', 'Node extensions',
-      'Process engine / tools', 'Animation development', 'Mobile communications', 'Tauri plugins',
-    ],
-  },
-  ai: {
-    name: 'Artificial intelligence',
-    items: [
-      'AI — artificial intelligence', 'VR / AR', 'Machine learning / deep learning', 'Computer vision / face recognition',
-      'Smart home', 'Natural language processing', 'Large language models', 'Inference frameworks', 'MCP', 'RAG knowledge base', 'Datasets',
-    ],
-  },
-  industry: {
-    name: 'Industrial software',
-    items: [
-      'Smart hardware', 'IoT / edge computing', 'In-vehicle apps', 'In-vehicle systems', 'Autonomous driving / drones', 'Robotics',
-      '5G / communications', 'Chip development', 'Privacy computing', 'Engineering software', 'CAD (computer-aided design)',
-      'CAE (computer-aided engineering)', 'MBSE (model-based systems engineering)', 'CAM (computer-aided manufacturing)',
-      'EDA (electronic design automation)',
-    ],
-  },
-  blockchain: { name: 'Blockchain', items: ['Digital currency', 'NFT'] },
-  wechat: {
-    name: 'WeChat development',
-    items: ['WeChat SDK', 'WeChat mini programs & mini games', 'WeChat apps', 'WeChat mini games'],
-  },
-  enterprise: {
-    name: 'Enterprise applications',
-    items: [
-      'Task & project management', 'Enterprise applications', 'BI — business intelligence',
-      'Finance · stocks & securities', 'GIS · maps · navigation · positioning',
-    ],
-  },
-  store: {
-    name: 'Site builders',
-    items: [
-      'CMS site builders', 'New retail · online stores', 'BBS forums & Q&A', 'Blog systems', 'Surveys & forms',
-      'SNS social systems', 'School & teaching management', 'Photo galleries', 'RSS & Atom tools',
-    ],
-  },
-  tools: {
-    name: 'Utilities',
-    items: [
-      'File management tools', 'Multimedia', 'Text editors', 'IM & chat', 'Application software',
-      'RPA — robotic process automation',
-    ],
-  },
-  web: {
-    name: 'Web development',
-    items: [
-      'Web frameworks', 'jQuery plugins', 'WebUI components & frameworks', 'JavaScript toolkits', 'RESTful projects',
-      'Admin dashboard frameworks', 'Website themes', 'Vue extensions', 'Web crawlers', 'OAuth · SSO · unified auth',
-      'Angular extensions', 'Bootstrap plugins', 'React components', 'RPC frameworks', 'API gateways · interface management',
-      'URL shorteners', 'layui components',
-    ],
-  },
-  devops: { name: 'DevOps · operations', items: ['Network administration tools', 'Monitoring systems', 'DevOps tools'] },
-  mobile: {
-    name: 'Mobile development',
-    items: [
-      'Android components & projects', 'iOS components', 'Mobile apps', 'Alipay mini programs', 'Baidu mini programs',
-      'PhoneGap · Cordova plugins', 'Cross-platform mobile development', 'Quick apps', 'TV development',
-      'uniapp open-source components',
-    ],
-  },
-  devtools: {
-    name: 'Developer tools',
-    items: [
-      'Version control systems', 'Development & debugging', 'Wiki & documentation tools', 'Build & deployment',
-      'Maven plugins', 'Gulp extensions', 'Testing tools', 'Code scanning & analysis',
-    ],
-  },
-  server: {
-    name: 'Server applications',
-    items: [
-      'Distributed services & frameworks', 'Message servers & queues', 'Docker-related', 'Containers & virtual machines',
-      'Nginx modules', 'Big data', 'Cloud computing', 'One-click installers', 'OpenResty extensions',
-      'System performance tuning', 'Serverless', 'Distributed storage',
-    ],
-  },
-  database: {
-    name: 'Databases',
-    items: ['Database SDKs', 'Database services', 'Database management & monitoring'],
-  },
-  game: { name: 'Games & entertainment', items: ['Games', 'Game development', '3D engines'] },
-  plugin: {
-    name: 'Plugins & extensions',
-    items: [
-      'Chrome extensions', 'WordPress plugins', 'Eclipse plugins', 'IDEA plugins', 'Firefox add-ons',
-      'Safari extensions', 'Visual Studio Code extensions', 'Jenkins plugins',
-    ],
-  },
-  misc: {
-    name: 'Other open source',
-    items: [
-      'Clone projects', 'Books · manuals · tutorials', 'ACM / OJ projects', 'Operating systems', 'Teaching management',
-      'Companion code for tutorials', 'RISC-V development', 'Bio · medical · health', '2020 charity hackathon',
-      'COVID-19 open-source projects',
-    ],
-  },
+  frontier: { // 对象字段 frontier：记录一项配置或数据
+    name: 'Frontier technology', // 对象字段 name：记录一项配置或数据
+    items: ['Low-code', 'Research papers', 'Quantum computing', 'Web 3.0', 'Cloud native'], // 对象字段 items：记录一项配置或数据
+  }, // 代码块结束
+  openharmony: { // 对象字段 openharmony：记录一项配置或数据
+    name: 'OpenHarmony', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Button', 'Text box (EditText)', 'Layout', 'Graphics & images', 'Progress bar', 'Menu', 'Popup', 'Selector', // 执行当前业务步骤
+      'Text component (TextView)', 'List component (ListView)', 'Loader (Loading)', 'Notification', 'View transition', 'Slider', // 执行当前业务步骤
+      'Chart', 'Drawing component (Draw)', 'Counter', 'Animation', 'CAPTCHA', 'Multimedia', 'Barcode', 'Advanced UI components', // 执行当前业务步骤
+      'Map', 'OpenHarmony gaming (Gaming)', 'Networking', 'Communication', 'Payment', 'Database', 'Hardware drivers', // 执行当前业务步骤
+      'OpenHarmony tutorials & guides', 'OpenHarmony toolkit', 'OpenHarmony apps', 'HMS (Huawei Mobile Services)', // 执行当前业务步骤
+      'Permissions', 'Toolkit', 'Low-level components', 'Gesture control', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  dev: { // 对象字段 dev：记录一项配置或数据
+    name: 'Software development', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Chinese/English word segmentation', 'Payment SDK', 'Security development', 'Common utility libraries', 'Excel toolkit', // 执行当前业务步骤
+      'Barcode / QR code', 'Template engine', 'Graphical UI components & frameworks', 'Network development kit', 'Speech processing', // 执行当前业务步骤
+      'Network tools', 'Network services', 'Data mining', 'Job / task scheduling', 'Programming & scripting languages', // 执行当前业务步骤
+      'Cache components', 'Markdown toolkit', 'Search engine', 'Microservices', 'Workflow', 'Chart components', // 执行当前业务步骤
+      'Permission management', 'Reporting tools', 'Code generators', 'IoC / AOP frameworks', 'Image processing', 'Rule engine', // 执行当前业务步骤
+      'JSON tools', 'Logging toolkit', 'Spring Boot extensions', 'CAPTCHA', 'Algorithms & math computation', 'Node extensions', // 执行当前业务步骤
+      'Process engine / tools', 'Animation development', 'Mobile communications', 'Tauri plugins', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  ai: { // 对象字段 ai：记录一项配置或数据
+    name: 'Artificial intelligence', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'AI — artificial intelligence', 'VR / AR', 'Machine learning / deep learning', 'Computer vision / face recognition', // 执行当前业务步骤
+      'Smart home', 'Natural language processing', 'Large language models', 'Inference frameworks', 'MCP', 'RAG knowledge base', 'Datasets', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  industry: { // 对象字段 industry：记录一项配置或数据
+    name: 'Industrial software', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Smart hardware', 'IoT / edge computing', 'In-vehicle apps', 'In-vehicle systems', 'Autonomous driving / drones', 'Robotics', // 执行当前业务步骤
+      '5G / communications', 'Chip development', 'Privacy computing', 'Engineering software', 'CAD (computer-aided design)', // 执行当前业务步骤
+      'CAE (computer-aided engineering)', 'MBSE (model-based systems engineering)', 'CAM (computer-aided manufacturing)', // 执行当前业务步骤
+      'EDA (electronic design automation)', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  blockchain: { name: 'Blockchain', items: ['Digital currency', 'NFT'] }, // 对象字段 blockchain：记录一项配置或数据
+  wechat: { // 对象字段 wechat：记录一项配置或数据
+    name: 'WeChat development', // 对象字段 name：记录一项配置或数据
+    items: ['WeChat SDK', 'WeChat mini programs & mini games', 'WeChat apps', 'WeChat mini games'], // 对象字段 items：记录一项配置或数据
+  }, // 代码块结束
+  enterprise: { // 对象字段 enterprise：记录一项配置或数据
+    name: 'Enterprise applications', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Task & project management', 'Enterprise applications', 'BI — business intelligence', // 执行当前业务步骤
+      'Finance · stocks & securities', 'GIS · maps · navigation · positioning', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  store: { // 对象字段 store：记录一项配置或数据
+    name: 'Site builders', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'CMS site builders', 'New retail · online stores', 'BBS forums & Q&A', 'Blog systems', 'Surveys & forms', // 执行当前业务步骤
+      'SNS social systems', 'School & teaching management', 'Photo galleries', 'RSS & Atom tools', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  tools: { // 对象字段 tools：记录一项配置或数据
+    name: 'Utilities', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'File management tools', 'Multimedia', 'Text editors', 'IM & chat', 'Application software', // 执行当前业务步骤
+      'RPA — robotic process automation', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  web: { // 对象字段 web：记录一项配置或数据
+    name: 'Web development', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Web frameworks', 'jQuery plugins', 'WebUI components & frameworks', 'JavaScript toolkits', 'RESTful projects', // 执行当前业务步骤
+      'Admin dashboard frameworks', 'Website themes', 'Vue extensions', 'Web crawlers', 'OAuth · SSO · unified auth', // 执行当前业务步骤
+      'Angular extensions', 'Bootstrap plugins', 'React components', 'RPC frameworks', 'API gateways · interface management', // 执行当前业务步骤
+      'URL shorteners', 'layui components', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  devops: { name: 'DevOps · operations', items: ['Network administration tools', 'Monitoring systems', 'DevOps tools'] }, // 对象字段 devops：记录一项配置或数据
+  mobile: { // 对象字段 mobile：记录一项配置或数据
+    name: 'Mobile development', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Android components & projects', 'iOS components', 'Mobile apps', 'Alipay mini programs', 'Baidu mini programs', // 执行当前业务步骤
+      'PhoneGap · Cordova plugins', 'Cross-platform mobile development', 'Quick apps', 'TV development', // 执行当前业务步骤
+      'uniapp open-source components', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  devtools: { // 对象字段 devtools：记录一项配置或数据
+    name: 'Developer tools', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Version control systems', 'Development & debugging', 'Wiki & documentation tools', 'Build & deployment', // 执行当前业务步骤
+      'Maven plugins', 'Gulp extensions', 'Testing tools', 'Code scanning & analysis', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  server: { // 对象字段 server：记录一项配置或数据
+    name: 'Server applications', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Distributed services & frameworks', 'Message servers & queues', 'Docker-related', 'Containers & virtual machines', // 执行当前业务步骤
+      'Nginx modules', 'Big data', 'Cloud computing', 'One-click installers', 'OpenResty extensions', // 执行当前业务步骤
+      'System performance tuning', 'Serverless', 'Distributed storage', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  database: { // 对象字段 database：记录一项配置或数据
+    name: 'Databases', // 对象字段 name：记录一项配置或数据
+    items: ['Database SDKs', 'Database services', 'Database management & monitoring'], // 对象字段 items：记录一项配置或数据
+  }, // 代码块结束
+  game: { name: 'Games & entertainment', items: ['Games', 'Game development', '3D engines'] }, // 对象字段 game：记录一项配置或数据
+  plugin: { // 对象字段 plugin：记录一项配置或数据
+    name: 'Plugins & extensions', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Chrome extensions', 'WordPress plugins', 'Eclipse plugins', 'IDEA plugins', 'Firefox add-ons', // 执行当前业务步骤
+      'Safari extensions', 'Visual Studio Code extensions', 'Jenkins plugins', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
+  misc: { // 对象字段 misc：记录一项配置或数据
+    name: 'Other open source', // 对象字段 name：记录一项配置或数据
+    items: [ // 对象字段 items：记录一项配置或数据
+      'Clone projects', 'Books · manuals · tutorials', 'ACM / OJ projects', 'Operating systems', 'Teaching management', // 执行当前业务步骤
+      'Companion code for tutorials', 'RISC-V development', 'Bio · medical · health', '2020 charity hackathon', // 执行当前业务步骤
+      'COVID-19 open-source projects', // 执行当前业务步骤
+    ], // 执行当前业务步骤
+  }, // 代码块结束
 }; // 英文名称表结束：19 组、205 条，与中文清单逐项同序
 
 /** 取一级分类英文名：缺失时回落中文名，保证渲染不断链 */
@@ -230,7 +230,7 @@ export interface CatalogModuleSeed {
   language: string; // 编程语言（演示口径）
   sort_order: number; // 排序权重：一级序号 × 100 + 二级序号
   stars: number; // 演示用「Star 数」：由序号的确定性算式得出，保证同一份数据每次结果一致
-}
+} // 代码块结束
 
 /**
  * 展开成模块种子清单：纯函数，服务端建库与测试共用，避免两处各自拼装编码。

@@ -83,9 +83,9 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
 
   const currentWeights = weights ?? weightsState.data?.weights ?? null; // 优先编辑态，其次已加载值
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>社区运营</h1>
         <p className="muted">板块审核、论坛首页、发帖审核开关、推荐指数与 Tab 栏目配置：全部落到公开端点即时生效。</p>
       </header>
@@ -94,26 +94,26 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>待审板块</h3><span className="muted">{(pendingState.data ?? []).length}</span><button type="button" className="btn ghost" onClick={pendingState.reload}>刷新</button></div>
         {pendingState.loading && <p className="muted">加载中…</p>}
         {(pendingState.data ?? []).length === 0 && !pendingState.loading ? <p className="empty">暂无待审板块</p> : null}
         {(pendingState.data ?? []).map((board) => (
-          <article className="deploy-row" key={board.id}>
-            <div className="deploy-kv">
+          <article className="deploy-row" key={board.id}>{/* 执行当前业务步骤 */}
+            <div className="deploy-kv">{/* 执行当前业务步骤 */}
               <strong>{board.icon ?? '📁'} {board.name}</strong>
               <span className="muted">/{board.slug} · 创建人 {board.creator_name ?? board.created_by ?? '—'}</span>
               <span className="badge warning">pending</span>
             </div>
             <p className="muted">{board.description || '无简介'} · 价格 {(board.price_cents / 100).toFixed(2)} 元 · 可见性 {board.visibility}</p>
-            <div className="deploy-columns">
+            <div className="deploy-columns">{/* 执行当前业务步骤 */}
               <button type="button" className="btn primary small" disabled={busy || !canWrite} onClick={() => void run(() => approveBoard(credential, board.slug), `已通过 ${board.slug}`, pendingState.reload)}>通过</button>
               <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => setRejecting({ slug: board.slug, note: '' })}>驳回</button>
             </div>
             {rejecting?.slug === board.slug && (
-              <div className="form inline" style={{ marginTop: 8 }}>
+              <div className="form inline" style={{ marginTop: 8 }}>{/* 执行当前业务步骤 */}
                 <label className="grow">驳回原因<input value={rejecting.note} onChange={(event) => setRejecting({ ...rejecting, note: event.target.value })} /></label>
-                <button type="button" className="btn primary" disabled={busy || !canWrite} onClick={() => void run(async () => {
+                <button type="button" className="btn primary" disabled={busy || !canWrite} onClick={() => void run(async () => {{/* 执行当前业务步骤 */}
                   await rejectBoard(credential, board.slug, rejecting.note); // 提交驳回
                   setRejecting(null); // 收起
                 }, `已驳回 ${board.slug}`, pendingState.reload)}>确认</button>
@@ -124,12 +124,12 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
         ))}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>论坛设为首页</h3></div>
         {homeState.loading ? <p className="muted">加载中…</p> : (
-          <div className="form inline">
-            <label>首页指向
-              <select value={homeState.data ?? 'portal'} disabled={busy || !canWrite} onChange={(event) => void run(() => setCommunityHome(credential, event.target.value as 'community' | 'portal'), '首页指向已更新', homeState.reload)}>
+          <div className="form inline">{/* 执行当前业务步骤 */}
+            <label>首页指向{/* 执行当前业务步骤 */}
+              <select value={homeState.data ?? 'portal'} disabled={busy || !canWrite} onChange={(event) => void run(() => setCommunityHome(credential, event.target.value as 'community' | 'portal'), '首页指向已更新', homeState.reload)}>{/* 执行当前业务步骤 */}
                 <option value="portal">门户首页（商城）</option>
                 <option value="community">论坛首页</option>
               </select>
@@ -139,22 +139,22 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>建板块审核</h3></div>
         {reviewState.loading ? <p className="muted">加载中…</p> : (
-          <label className="check">
+          <label className="check">{/* 执行当前业务步骤 */}
             <input type="checkbox" checked={reviewState.data ?? false} disabled={busy || !canWrite} onChange={(event) => void run(() => setCommunityReview(credential, event.target.checked), '审核开关已更新', reviewState.reload)} />
             新建板块必须经过运营审核后才上架
           </label>
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>推荐指数权重</h3><span className="muted">默认 {JSON.stringify(weightsState.data?.defaults ?? {})}</span></div>
         {currentWeights && (
-          <div className="form inline">
+          <div className="form inline">{/* 执行当前业务步骤 */}
             {(['views', 'replies', 'favorites', 'rating', 'halfLifeDays'] as const).map((key) => (
-              <label key={key}>{key}
+              <label key={key}>{key}{/* 执行当前业务步骤 */}
                 <input value={String(currentWeights[key])} inputMode="decimal" onChange={(event) => setWeights({ ...currentWeights, [key]: Number(event.target.value) || 0 })} />
               </label>
             ))}
@@ -164,14 +164,14 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>板块 Tab 配置</h3></div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           <label>板块 slug<input value={tabSlug} onChange={(event) => setTabSlug(event.target.value)} placeholder="例如 general" /></label>
           <button type="button" className="btn ghost" disabled={busy || !tabSlug.trim()} onClick={() => void loadTabs()}>读取配置</button>
         </div>
         {tabs && (
-          <>
+          <>{/* 执行当前业务步骤 */}
             <p className="muted">共 {tabs.length} 项，字段：key / label / visible / sort_order / sort_by。</p>
             <label className="field">Tab JSON<textarea value={tabsText} onChange={(event) => setTabsText(event.target.value)} rows={10} spellCheck={false} /></label>
             <button type="button" className="btn primary" disabled={busy || !canWrite} onClick={() => void saveTabs()}>保存 Tab 配置</button>
@@ -179,5 +179,5 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
         )}
       </section>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // CommunityAdmin 结束

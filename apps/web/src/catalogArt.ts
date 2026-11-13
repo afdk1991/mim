@@ -11,9 +11,9 @@
 
 /** 分类封面映射：一级分类 slug → 静态图路径；缺图时回落到 misc 封面 */
 const CATEGORY_COVER_SLUGS = new Set([
-  'frontier', 'openharmony', 'dev', 'ai', 'industry', 'blockchain', 'wechat', 'enterprise',
-  'store', 'tools', 'web', 'devops', 'mobile', 'devtools', 'server', 'database', 'game', 'plugin', 'misc',
-]);
+  'frontier', 'openharmony', 'dev', 'ai', 'industry', 'blockchain', 'wechat', 'enterprise', // 执行当前业务步骤
+  'store', 'tools', 'web', 'devops', 'mobile', 'devtools', 'server', 'database', 'game', 'plugin', 'misc', // 执行当前业务步骤
+]); // 执行当前业务步骤
 
 /**
  * 由二级分类 slug（如 `ai-01` / `store-02`）取一级分类 slug。
@@ -27,16 +27,16 @@ export function categoryGroupSlug(categorySlug: string | null | undefined): stri
   const group = categorySlug.replace(/-\d{2}$/, '');
   // 不在已知 19 组内则回落 misc
   return CATEGORY_COVER_SLUGS.has(group) ? group : 'misc';
-}
+} // 代码块结束
 
 /** 分类封面 URL：相对 BASE_URL，兼容站点子路径部署 */
 export function categoryCoverUrl(categorySlug: string | null | undefined): string {
   // 基础路径可能以 / 结尾，也可能为空，统一补齐
   const base = import.meta.env.BASE_URL || './';
-  const normalized = base.endsWith('/') ? base : `${base}/`;
+  const normalized = base.endsWith('/') ? base : `${base}/`; // 常量 normalized：保存固定配置或一次性派生值
   // 以 BASE_URL 为基准拼静态图路径
   return `${normalized}catalog/${categoryGroupSlug(categorySlug)}.jpg`;
-}
+} // 代码块结束
 
 /** 参数图所需字段：与 Store 详情接口字段同名，便于直接传值 */
 export interface SpecPosterInput {
@@ -53,63 +53,63 @@ export interface SpecPosterInput {
   requiresText: string; // 依赖文案
   capabilityText: string; // 能力说明
   locale: 'zh-CN' | 'en-US'; // 语言
-}
+} // 代码块结束
 
 /** XML 转义：商品名等用户可见文本可能含 & < >，直接插入 SVG 会破坏文档 */
 function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
+  return value // 返回当前函数的处理结果
+    .replace(/&/g, '&amp;') // 执行当前业务步骤
+    .replace(/</g, '&lt;') // 执行当前业务步骤
+    .replace(/>/g, '&gt;') // 执行当前业务步骤
+    .replace(/"/g, '&quot;') // 执行当前业务步骤
+    .replace(/'/g, '&apos;'); // 执行当前业务步骤
+} // 代码块结束
 
 /** 按字符宽度粗略截断，避免长文案溢出参数图右边界 */
 function clip(value: string, max: number): string {
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
-}
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value; // 返回当前函数的处理结果
+} // 代码块结束
 
 /**
  * 生成「商品参数详情图」的 data URL（SVG）。
  * 900×1180，深色卡片风格，含标题、编码、参数键值表、价格、依赖与能力说明。
  */
 export function specPosterUrl(input: SpecPosterInput): string {
-  const zh = input.locale !== 'en-US';
-  const rows: Array<[string, string]> = [
-    [zh ? '模块编码' : 'Module code', input.code],
-    [zh ? '所属分类' : 'Category', input.categoryName],
-    [zh ? '一级分类' : 'Group', input.groupName],
-    [zh ? '开源许可' : 'License', input.license ?? '—'],
-    [zh ? '编程语言' : 'Language', input.language ?? '—'],
-    [zh ? 'Star 数' : 'Stars', `★ ${input.stars}`],
-    [zh ? '区域' : 'Region', input.region],
-    [zh ? '上架状态' : 'Status', input.statusText],
-    [zh ? '解锁方式' : 'Unlock mode', zh ? '一次性买断' : 'One-time purchase'],
-    [zh ? '价格' : 'Price', input.priceText],
-    [zh ? '前置依赖' : 'Requires', input.requiresText],
-    [zh ? '能力绑定' : 'Capability', input.capabilityText],
-  ];
+  const zh = input.locale !== 'en-US'; // 常量 zh：保存固定配置或一次性派生值
+  const rows: Array<[string, string]> = [ // 常量 rows：保存固定配置或一次性派生值
+    [zh ? '模块编码' : 'Module code', input.code], // 执行当前业务步骤
+    [zh ? '所属分类' : 'Category', input.categoryName], // 执行当前业务步骤
+    [zh ? '一级分类' : 'Group', input.groupName], // 执行当前业务步骤
+    [zh ? '开源许可' : 'License', input.license ?? '—'], // 执行当前业务步骤
+    [zh ? '编程语言' : 'Language', input.language ?? '—'], // 执行当前业务步骤
+    [zh ? 'Star 数' : 'Stars', `★ ${input.stars}`], // 执行当前业务步骤
+    [zh ? '区域' : 'Region', input.region], // 执行当前业务步骤
+    [zh ? '上架状态' : 'Status', input.statusText], // 执行当前业务步骤
+    [zh ? '解锁方式' : 'Unlock mode', zh ? '一次性买断' : 'One-time purchase'], // 执行当前业务步骤
+    [zh ? '价格' : 'Price', input.priceText], // 执行当前业务步骤
+    [zh ? '前置依赖' : 'Requires', input.requiresText], // 执行当前业务步骤
+    [zh ? '能力绑定' : 'Capability', input.capabilityText], // 执行当前业务步骤
+  ]; // 执行当前业务步骤
 
-  const title = clip(input.name, 22);
-  const subtitle = clip(input.code, 34);
-  const rowHeight = 68;
-  const tableTop = 268;
-  const width = 900;
-  const height = tableTop + rows.length * rowHeight + 96;
+  const title = clip(input.name, 22); // 常量 title：保存固定配置或一次性派生值
+  const subtitle = clip(input.code, 34); // 常量 subtitle：保存固定配置或一次性派生值
+  const rowHeight = 68; // 常量 rowHeight：保存固定配置或一次性派生值
+  const tableTop = 268; // 常量 tableTop：保存固定配置或一次性派生值
+  const width = 900; // 常量 width：保存固定配置或一次性派生值
+  const height = tableTop + rows.length * rowHeight + 96; // 常量 height：保存固定配置或一次性派生值
 
-  const rowSvg = rows
-    .map(([label, value], index) => {
-      const y = tableTop + index * rowHeight;
-      const fill = index % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.015)';
+  const rowSvg = rows // 常量 rowSvg：保存固定配置或一次性派生值
+    .map(([label, value], index) => { // 执行当前业务步骤
+      const y = tableTop + index * rowHeight; // 常量 y：保存固定配置或一次性派生值
+      const fill = index % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.015)'; // 常量 fill：保存固定配置或一次性派生值
       return `
     <g>
       <rect x="56" y="${y}" width="${width - 112}" height="${rowHeight - 8}" rx="14" fill="${fill}"/>
       <text x="82" y="${y + 40}" fill="#8ea3c8" font-size="22">${escapeXml(label)}</text>
       <text x="${width - 82}" y="${y + 40}" text-anchor="end" fill="#f2f6ff" font-size="24" font-weight="600">${escapeXml(clip(value, 30))}</text>
     </g>`;
-    })
-    .join('');
+    }) // 代码块结束
+    .join(''); // 执行当前业务步骤
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
@@ -137,4 +137,4 @@ export function specPosterUrl(input: SpecPosterInput): string {
 
   // encodeURIComponent 避免 # 等字符截断 data URL
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
+} // 代码块结束

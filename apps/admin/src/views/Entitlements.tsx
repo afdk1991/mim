@@ -115,18 +115,18 @@ export function Entitlements({ credential, permissions }: EntitlementsProps) {
             limit: PAGE_SIZE,
             // 当前偏移
             offset,
-          })
+          }) // 代码块结束
         : Promise.resolve(null),
     // 依赖：凭证 / 权限 / 已提交关键词 / 状态 / 区域 / 偏移，任一变化重新请求
     [credential, canRead, applied, statusFilter, regionFilter, offset],
-  );
+  ); // 执行当前业务步骤
   // 当前展开的审计事件行：null 表示全部收起
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // 展开行的审计事件：随展开目标变化重新拉取，收起时回 null
   const events = useAsync<EntitlementEventView[] | null>(
     () => (expandedId ? listEntitlementEvents(credential, expandedId) : Promise.resolve(null)),
     [credential, expandedId],
-  );
+  ); // 执行当前业务步骤
 
   // ── 发放表单状态 ──
   const [grantUserId, setGrantUserId] = useState(''); // 发放表单：目标用户 ID

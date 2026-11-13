@@ -11,7 +11,7 @@ interface Props { // 入参
 
 /** 把「版本|标题|说明|日期」逐行文本解析为版本记录 */
 function parseNotes(text: string): ToolVersionNote[] { // 业务步骤
-  return text
+  return text // 返回当前函数的处理结果
     .split('\n') // 每行一条
     .map((line) => line.trim()) // 去空白
     .filter(Boolean) // 丢弃空行
@@ -123,9 +123,9 @@ export function ToolsAdmin({ credential, permissions }: Props) { // 业务步骤
     } // 业务步骤
   } // remove 结束
 
-  return (
-    <div className="page">
-      <header className="page-head">
+  return ( // 返回当前函数的处理结果
+    <div className="page">{/* 执行当前业务步骤 */}
+      <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>自研工具与开源项目</h1>
         <p className="muted">对外发布：下载包、文档、版本记录与标签；草稿不外露，归档保留历史。</p>
       </header>
@@ -134,27 +134,27 @@ export function ToolsAdmin({ credential, permissions }: Props) { // 业务步骤
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>{editing ? `编辑 ${editing}` : '新建工具'}</h3>{editing ? <button type="button" className="btn ghost" onClick={() => { setEditing(null); setForm({ slug: '', name: '', summary: '', download_url: '', doc_url: '', tags: '', status: 'active', sort_order: '0', notes: '' }); }}>退出编辑</button> : null}</div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           <label>slug<input value={form.slug} disabled={Boolean(editing)} onChange={(event) => setForm({ ...form, slug: event.target.value })} placeholder="quick-build-wp" /></label>
           <label>名称<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label>状态
-            <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+          <label>状态{/* 执行当前业务步骤 */}
+            <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{/* 执行当前业务步骤 */}
               <option value="active">已发布</option><option value="draft">草稿</option><option value="archived">归档</option>
             </select>
           </label>
           <label>排序<input value={form.sort_order} onChange={(event) => setForm({ ...form, sort_order: event.target.value })} inputMode="numeric" /></label>
         </div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           <label className="grow">摘要<input value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} /></label>
           <label className="grow">标签<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="宝塔, WordPress, 一键部署" /></label>
         </div>
-        <div className="form inline">
+        <div className="form inline">{/* 执行当前业务步骤 */}
           <label className="grow">下载地址<input value={form.download_url} onChange={(event) => setForm({ ...form, download_url: event.target.value })} /></label>
           <label className="grow">文档地址<input value={form.doc_url} onChange={(event) => setForm({ ...form, doc_url: event.target.value })} /></label>
         </div>
-        <label className="field">版本记录（每行 版本 | 标题 | 说明 | 日期）
+        <label className="field">版本记录（每行 版本 | 标题 | 说明 | 日期）{/* 执行当前业务步骤 */}
           <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} rows={4} />
         </label>
         {editing
@@ -162,15 +162,15 @@ export function ToolsAdmin({ credential, permissions }: Props) { // 业务步骤
           : <button type="button" className="btn primary" disabled={busy || !canWrite || form.slug.trim().length === 0 || form.name.trim().length === 0} onClick={() => void create()}>创建工具</button>}
       </section>
 
-      <section className="panel">
+      <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>工具清单</h3><span className="muted">{(listState.data ?? []).length}</span><button type="button" className="btn ghost" onClick={listState.reload}>刷新</button></div>
         {listState.loading && <p className="muted">加载中…</p>}
         {Boolean(listState.error) && <p className="error">{describeError(listState.error)}</p>}
         {(listState.data ?? []).length === 0 && !listState.loading ? <p className="empty">暂无工具</p> : null}
         {(listState.data ?? []).map((tool) => (
-          <article className="deploy-row" key={tool.id}>
-            <div>
-              <div className="deploy-kv">
+          <article className="deploy-row" key={tool.id}>{/* 执行当前业务步骤 */}
+            <div>{/* 执行当前业务步骤 */}
+              <div className="deploy-kv">{/* 执行当前业务步骤 */}
                 <strong>{tool.name}</strong>
                 <span className={`badge ${tool.status === 'active' ? 'success' : 'warning'}`}>{tool.status}</span>
                 <span className="muted">/{tool.slug} · 排序 {tool.sort_order}</span>
@@ -178,7 +178,7 @@ export function ToolsAdmin({ credential, permissions }: Props) { // 业务步骤
               <p className="muted">{tool.summary || '无摘要'}</p>
               {tool.tags.length > 0 && <div className="perm-grid">{tool.tags.map((tag) => <span className="perm-item" key={tag}>{tag}</span>)}</div>}
             </div>
-            <div className="deploy-columns">
+            <div className="deploy-columns">{/* 执行当前业务步骤 */}
               {tool.doc_url ? <a className="btn ghost small" href={tool.doc_url} target="_blank" rel="noreferrer">文档</a> : null}
               {tool.download_url ? <a className="btn ghost small" href={tool.download_url} target="_blank" rel="noreferrer">下载</a> : null}
               <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => load(tool)}>编辑</button>
@@ -188,5 +188,5 @@ export function ToolsAdmin({ credential, permissions }: Props) { // 业务步骤
         ))}
       </section>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // ToolsAdmin 结束

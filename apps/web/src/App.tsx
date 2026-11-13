@@ -22,7 +22,7 @@ import { Login } from './views/Login';
 import { AnnouncementBar } from './components/AnnouncementBar';
 // 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
 import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './appearance';
-import type { ResolvedTheme } from './appearance';
+import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或本地模块绑定
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Store = lazy(() => import('./views/Store').then((m) => ({ default: m.Store }))); // 功能模块页（商城目录）
@@ -69,17 +69,17 @@ export function App() {
   // 任一环节失败都回落 DEFAULT_THEME，保证首帧有默认外观可用。
   useEffect(() => {
     let alive = true; // 卸载后不再写状态
-    void api.commerce.siteConfig().then((config) => {
-      if (!alive) return;
+    void api.commerce.siteConfig().then((config) => { // 执行当前业务步骤
+      if (!alive) return; // 条件分支：按判断结果选择后续处理路径
       const resolved = resolveTheme(config.theme); // 逐项清洗脏数据
       setTheme(resolved);
       applyThemeVars(resolved); // 写入 :root CSS 变量与数据集
     }).catch(() => {
-      if (!alive) return;
+      if (!alive) return; // 条件分支：按判断结果选择后续处理路径
       setTheme(DEFAULT_THEME); // 离线 / 配置缺失：回落默认外观
       applyThemeVars(DEFAULT_THEME); // 同步注入默认令牌，避免首帧停留在 CSS 兜底色
     });
-    return () => { alive = false; };
+    return () => { alive = false; }; // 返回当前函数的处理结果
   }, []);
 
   // 「把论坛设为网站首页」：仅在访问站点根路径时决定落点，深链接与站内导航一律不拦截。
@@ -89,20 +89,20 @@ export function App() {
     const path = window.location.pathname.replace(/\/index\.html$/, '/'); // 归一化 index.html 直达
     if (path !== base && path !== '/') return; // 非根路径不处理
     let alive = true; // 组件卸载后不再跳转
-    const decideHome = async (): Promise<'community' | 'portal'> => {
-      try {
+    const decideHome = async (): Promise<'community' | 'portal'> => { // 常量 decideHome：保存固定配置或一次性派生值
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const setting = await api.community.homeSetting(); // 冻结契约：论坛 / 门户开关
-        return setting.home === 'community' ? 'community' : 'portal';
+        return setting.home === 'community' ? 'community' : 'portal'; // 返回当前函数的处理结果
       } catch {
-        try {
+        try { // 异常捕获起点：包裹可能抛出错误的操作
           const config = await api.commerce.siteConfig(); // 降级：旧版站点配置
-          return config.home_view === 'community' ? 'community' : 'portal';
+          return config.home_view === 'community' ? 'community' : 'portal'; // 返回当前函数的处理结果
         } catch {
           return 'portal'; // 再失败：保持现状门户首页
-        }
-      }
-    };
-    void decideHome().then((home) => { if (alive && home === 'community') go({ view: 'community' }); });
+        } // 代码块结束
+      } // 代码块结束
+    }; // 代码块结束
+    void decideHome().then((home) => { if (alive && home === 'community') go({ view: 'community' }); }); // 执行当前业务步骤
     return () => { alive = false; }; // 清理
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,11 +141,11 @@ export function App() {
   useEffect(() => {
     if (getSession()) return; // 已有会话（正式账号或访客）无需再建号
     let cancelled = false; // 组件卸载后不再改状态，避免卸载后 setState 警告
-    void ensureGuestSession().then((ok) => {
+    void ensureGuestSession().then((ok) => { // 执行当前业务步骤
       if (cancelled || !ok) return; // 建号失败（离线 / 限流）保留只读降级界面，可由用户点击重试
       setLocalSession(getSession()); // 会话已由 ensureGuestSession 写入内存与 localStorage
     }); // then 结束
-    return () => {
+    return () => { // 返回当前函数的处理结果
       cancelled = true; // 标记已卸载
     }; // 清理函数结束
   }, []); // 仅挂载时尝试一次，登录成功后会走会话变更事件
@@ -279,7 +279,7 @@ export function App() {
         {/* 侧边栏底部：已登录显示用户区与退出，匿名显示登录入口 */}
         <div className="sidebar-footer">{/* 吸底容器：margin-top:auto 把它推到侧栏底部 */}
           {session ? ( // 有会话分支（访客或正式账号）：显示身份 + 登录升级 / 退出
-            <>
+            <>{/* 执行当前业务步骤 */}
               {/* 显示名，缺失时回退到 id 前 8 位 */}
               <span className="user-name">{session.user.display_name || session.user.id.slice(0, 8)}</span>{/* 显示名，缺失时回退到 id 前 8 位 */}
               {/* 身份标识：访客显式标注「免登录」，正式账号显示区域 */}

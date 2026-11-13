@@ -17,7 +17,7 @@ import { parse } from '../validate.js'; // zod 校验包装
 import { requirePermission } from '../middleware.js'; // 管理端点 RBAC 门禁
 import { clockOf } from '../domain.js'; // 可注入时钟
 import { addDays } from '../utils.js'; // 有效期按天换算
-import {
+import { // 引入依赖、类型或本地模块绑定
   createInvite, // 建码
   disableInvite, // 禁用
   invitationStats, // 汇总统计

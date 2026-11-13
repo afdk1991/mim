@@ -3,7 +3,7 @@
 
 import type { Locale } from '@mim/i18n'; // 语言类型：zh-CN / en-US
 
-interface Props {
+interface Props { // 接口 Props：约束对象的字段与类型形态
   locale: Locale; // 当前语言
   onSignIn: () => void; // 点击登录引导：由上层切到登录视图
 } // Props 结束
@@ -27,7 +27,7 @@ const DEMO_MESSAGES = [
 /** 渲染匿名只读聊天页 */
 export function ChatPreview({ locale, onSignIn }: Props) {
   const isZh = locale !== 'en-US'; // 中文判断，文案随语言切换
-  return (
+  return ( // 返回当前函数的处理结果
     <div className="chat-layout chat-preview">{/* 复用真实聊天布局，保持视觉一致 */}
       <aside className="chat-sidebar">{/* 左侧会话栏 */}
         <div className="chat-search">{/* 搜索区：匿名态禁用输入，避免产生「能搜」的误解 */}
@@ -37,8 +37,8 @@ export function ChatPreview({ locale, onSignIn }: Props) {
           {DEMO_CONVERSATIONS.map((c, index) => ( // 逐条渲染示例会话
             <div key={c.id} className={`chat-conv-item${index === 0 ? ' active' : ''}`}>{/* 首条高亮，模拟选中态 */}
               <span className="chat-avatar">{c.title.slice(0, 1)}</span>{/* 头像：取标题首字 */}
-              <span className="chat-conv-body">
-                <span className="chat-conv-title">
+              <span className="chat-conv-body">{/* 执行当前业务步骤 */}
+                <span className="chat-conv-title">{/* 执行当前业务步骤 */}
                   {c.title}{/* 会话标题 */}
                   <span className="chat-conv-meta">({c.members})</span>{/* 成员数 */}
                 </span>
@@ -62,7 +62,7 @@ export function ChatPreview({ locale, onSignIn }: Props) {
           {DEMO_MESSAGES.map((m) => ( // 逐条渲染示例消息
             <div key={m.id} className={`chat-msg ${m.mine ? 'mine' : 'theirs'}`}>{/* 气泡位置按是否本人区分 */}
               <span className="chat-msg-sender">{m.sender}</span>{/* 发送者名 */}
-              <div className="chat-msg-bubble">
+              <div className="chat-msg-bubble">{/* 执行当前业务步骤 */}
                 {m.quote && <span className="chat-msg-quote">{m.quote}</span>}{/* 引用块：展示被引用摘要 */}
                 <span className="chat-msg-text">{m.text}</span>{/* 正文 */}
               </div>
@@ -79,5 +79,5 @@ export function ChatPreview({ locale, onSignIn }: Props) {
         </div>
       </section>
     </div>
-  );
+  ); // 执行当前业务步骤
 } // ChatPreview 结束

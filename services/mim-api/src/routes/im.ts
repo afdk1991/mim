@@ -15,30 +15,30 @@ import { z } from 'zod'; // 参数校验
 import { parse } from '../validate.js'; // 统一校验包装
 import { requireAuth } from '../middleware.js'; // 鉴权中间件
 import type { ApiDeps } from '../types.js'; // 依赖注入
-import {
-  addConversationMembers,
-  createConversation,
-  createMessage,
-  deleteConversationForUser,
-  getConversation,
-  getMemberRole,
-  getMemberUserIds,
-  getOrCreateDirectConversation,
-  getQuotedMessage,
-  isMember,
-  listConversations,
-  listMembers,
-  listMessages,
-  listMessagesAround,
-  markConversationRead,
-  recallMessage,
-  removeConversationMember,
-  renameConversation,
-  searchMessages,
-  searchUsers,
-  setConversationPreference,
-  setMemberRole,
-  transferOwnership,
+import { // 引入依赖、类型或本地模块绑定
+  addConversationMembers, // 执行当前业务步骤
+  createConversation, // 执行当前业务步骤
+  createMessage, // 执行当前业务步骤
+  deleteConversationForUser, // 执行当前业务步骤
+  getConversation, // 执行当前业务步骤
+  getMemberRole, // 执行当前业务步骤
+  getMemberUserIds, // 执行当前业务步骤
+  getOrCreateDirectConversation, // 执行当前业务步骤
+  getQuotedMessage, // 执行当前业务步骤
+  isMember, // 执行当前业务步骤
+  listConversations, // 执行当前业务步骤
+  listMembers, // 执行当前业务步骤
+  listMessages, // 执行当前业务步骤
+  listMessagesAround, // 执行当前业务步骤
+  markConversationRead, // 执行当前业务步骤
+  recallMessage, // 执行当前业务步骤
+  removeConversationMember, // 执行当前业务步骤
+  renameConversation, // 执行当前业务步骤
+  searchMessages, // 执行当前业务步骤
+  searchUsers, // 执行当前业务步骤
+  setConversationPreference, // 执行当前业务步骤
+  setMemberRole, // 执行当前业务步骤
+  transferOwnership, // 执行当前业务步骤
 } from '../im/db.js'; // 数据访问层
 import type { MessageContentType } from '../im/protocol.js'; // 消息内容类型
 
@@ -63,7 +63,7 @@ export function createImRouter(deps: ApiDeps): Router {
     const userId = req.user!.id; // 从鉴权中间件取当前用户 ID
     const items = listConversations(deps.db, userId); // 拉取列表
     res.json({ items }); // 返回列表
-  });
+  }); // 代码块结束
 
   /** POST /im/conversations — 创建会话
    *  body: { type:'direct', target_user_id } 或 { type:'group', name, member_user_ids }
@@ -72,47 +72,47 @@ export function createImRouter(deps: ApiDeps): Router {
     const userId = req.user!.id; // 当前用户 ID
     // 校验请求体
     const body = parse(
-      z.object({
+      z.object({ // 执行当前业务步骤
         type: z.enum(['direct', 'group']), // 会话类型
         target_user_id: z.string().optional(), // direct 时的对方 ID
         name: z.string().min(1).max(50).optional(), // group 时的群名
         member_user_ids: z.array(z.string()).min(1).max(499).optional(), // group 时的成员列表
-      }),
-      req.body,
-    );
+      }), // 代码块结束
+      req.body, // 执行当前业务步骤
+    ); // 执行当前业务步骤
     let conversationId: string; // 最终会话 ID
-    if (body.type === 'direct') {
+    if (body.type === 'direct') { // 条件分支：按判断结果选择后续处理路径
       // 私聊：必须有 target_user_id，且不能是自己
       if (!body.target_user_id) return res.status(400).json({ error: 'direct 会话需要 target_user_id' });
-      if (body.target_user_id === userId) return res.status(400).json({ error: '不能与自己创建私聊' });
+      if (body.target_user_id === userId) return res.status(400).json({ error: '不能与自己创建私聊' }); // 条件分支：按判断结果选择后续处理路径
       // 复用已有会话或新建
       conversationId = getOrCreateDirectConversation(deps.db, userId, body.target_user_id);
-    } else {
+    } else { // 代码块结束
       // 群聊：成员列表必须包含自己，去重
       const memberIds = Array.from(new Set([userId, ...(body.member_user_ids ?? [])]));
-      if (memberIds.length < 2) return res.status(400).json({ error: '群聊至少需要 2 人' });
-      conversationId = createConversation(deps.db, {
-        type: 'group',
-        memberUserIds: memberIds,
-        title: body.name,
-        ownerUserId: userId,
-      });
-    }
+      if (memberIds.length < 2) return res.status(400).json({ error: '群聊至少需要 2 人' }); // 条件分支：按判断结果选择后续处理路径
+      conversationId = createConversation(deps.db, { // 赋值：更新变量 conversationId 的取值
+        type: 'group', // 对象字段 type：记录一项配置或数据
+        memberUserIds: memberIds, // 对象字段 memberUserIds：记录一项配置或数据
+        title: body.name, // 对象字段 title：记录一项配置或数据
+        ownerUserId: userId, // 对象字段 ownerUserId：记录一项配置或数据
+      }); // 代码块结束
+    } // 代码块结束
     // 返回会话 ID 与完整列表项
     const items = listConversations(deps.db, userId);
-    const item = items.find((c) => c.id === conversationId);
-    res.status(201).json({ conversation_id: conversationId, conversation: item });
-  });
+    const item = items.find((c) => c.id === conversationId); // 常量 item：保存固定配置或一次性派生值
+    res.status(201).json({ conversation_id: conversationId, conversation: item }); // 执行当前业务步骤
+  }); // 代码块结束
 
   /** GET /im/conversations/:id — 会话详情（含成员列表，前端群信息面板使用） */
   router.get('/im/conversations/:id', (req, res) => {
     const userId = req.user!.id; // 当前用户
     const conversationId = req.params.id; // 会话 ID
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     const conversation = getConversation(deps.db, conversationId); // 基础信息
-    if (!conversation) return res.status(404).json({ error: '会话不存在' });
+    if (!conversation) return res.status(404).json({ error: '会话不存在' }); // 条件分支：按判断结果选择后续处理路径
     res.json({ conversation, members: listMembers(deps.db, conversationId) }); // 一并返回成员，减少前端请求次数
-  });
+  }); // 代码块结束
 
   /** PATCH /im/conversations/:id — 群改名（仅群主/管理员） */
   router.patch('/im/conversations/:id', (req, res) => {
@@ -120,21 +120,21 @@ export function createImRouter(deps: ApiDeps): Router {
     const conversationId = req.params.id; // 会话 ID
     const body = parse(z.object({ title: z.string().min(1).max(50) }), req.body); // 新群名
     const info = getConversation(deps.db, conversationId); // 会话信息
-    if (!info) return res.status(404).json({ error: '会话不存在' });
-    if (info.type !== 'group') return res.status(400).json({ error: '只有群聊可以改名' });
+    if (!info) return res.status(404).json({ error: '会话不存在' }); // 条件分支：按判断结果选择后续处理路径
+    if (info.type !== 'group') return res.status(400).json({ error: '只有群聊可以改名' }); // 条件分支：按判断结果选择后续处理路径
     const role = getMemberRole(deps.db, conversationId, userId); // 角色
-    if (role !== 'owner' && role !== 'admin') return res.status(403).json({ error: '只有群主或管理员可以改名' });
+    if (role !== 'owner' && role !== 'admin') return res.status(403).json({ error: '只有群主或管理员可以改名' }); // 条件分支：按判断结果选择后续处理路径
     renameConversation(deps.db, conversationId, body.title.trim()); // 落库
     res.json({ ok: true, title: body.title.trim() }); // 回包
-  });
+  }); // 代码块结束
 
   /** GET /im/conversations/:id/members — 群成员列表 */
   router.get('/im/conversations/:id/members', (req, res) => {
     const userId = req.user!.id; // 当前用户
     const conversationId = req.params.id; // 会话 ID
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     res.json({ items: listMembers(deps.db, conversationId) }); // 成员清单
-  });
+  }); // 代码块结束
 
   /** POST /im/conversations/:id/members — 邀请入群（仅群主/管理员，单次最多 50 人） */
   router.post('/im/conversations/:id/members', (req, res) => {
@@ -142,14 +142,14 @@ export function createImRouter(deps: ApiDeps): Router {
     const conversationId = req.params.id; // 会话 ID
     const body = parse(z.object({ user_ids: z.array(z.string()).min(1).max(50) }), req.body); // 待邀请用户
     const info = getConversation(deps.db, conversationId); // 会话信息
-    if (!info) return res.status(404).json({ error: '会话不存在' });
-    if (info.type !== 'group') return res.status(400).json({ error: '只有群聊可以加人' });
+    if (!info) return res.status(404).json({ error: '会话不存在' }); // 条件分支：按判断结果选择后续处理路径
+    if (info.type !== 'group') return res.status(400).json({ error: '只有群聊可以加人' }); // 条件分支：按判断结果选择后续处理路径
     const role = getMemberRole(deps.db, conversationId, userId); // 角色
-    if (role !== 'owner' && role !== 'admin') return res.status(403).json({ error: '只有群主或管理员可以加人' });
+    if (role !== 'owner' && role !== 'admin') return res.status(403).json({ error: '只有群主或管理员可以加人' }); // 条件分支：按判断结果选择后续处理路径
     const added = addConversationMembers(deps.db, conversationId, Array.from(new Set(body.user_ids))); // 批量入群
     if (added > 0) pushMembersChanged(conversationId); // 有新人入群才广播
     res.status(201).json({ ok: true, added }); // 返回实际新增人数
-  });
+  }); // 代码块结束
 
   /** DELETE /im/conversations/:id/members/:userId — 退群或群主踢人 */
   router.delete('/im/conversations/:id/members/:userId', (req, res) => {
@@ -157,18 +157,18 @@ export function createImRouter(deps: ApiDeps): Router {
     const conversationId = req.params.id; // 会话 ID
     const targetId = req.params.userId; // 被移除的成员
     const info = getConversation(deps.db, conversationId); // 会话信息
-    if (!info) return res.status(404).json({ error: '会话不存在' });
-    if (info.type !== 'group') return res.status(400).json({ error: '私聊不支持移除成员' });
+    if (!info) return res.status(404).json({ error: '会话不存在' }); // 条件分支：按判断结果选择后续处理路径
+    if (info.type !== 'group') return res.status(400).json({ error: '私聊不支持移除成员' }); // 条件分支：按判断结果选择后续处理路径
     const role = getMemberRole(deps.db, conversationId, userId); // 自己的角色
-    if (!role) return res.status(403).json({ error: '非会话成员' });
+    if (!role) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     if (targetId === info.owner_user_id) return res.status(400).json({ error: '不能移除群主' }); // 群主不能被踢
-    if (targetId !== userId && role !== 'owner' && role !== 'admin') {
+    if (targetId !== userId && role !== 'owner' && role !== 'admin') { // 条件分支：按判断结果选择后续处理路径
       return res.status(403).json({ error: '只有群主或管理员可以踢人' }); // 其余人只能自己退
-    }
+    } // 代码块结束
     const removed = removeConversationMember(deps.db, conversationId, targetId); // 移除
     if (removed) pushMembersChanged(conversationId); // 移除成功则广播
     res.json({ ok: removed }); // 回包
-  });
+  }); // 代码块结束
 
   /** PATCH /im/conversations/:id/members/:userId — 设 / 撤管理员（仅群主） */
   router.patch('/im/conversations/:id/members/:userId', (req, res) => {
@@ -185,7 +185,7 @@ export function createImRouter(deps: ApiDeps): Router {
     if (!changed) return res.status(404).json({ error: '成员不存在' }); // 目标非成员
     pushMembersChanged(conversationId); // 广播角色变化
     res.json({ ok: true, role: body.role }); // 回包
-  });
+  }); // 代码块结束
 
   /** POST /im/conversations/:id/transfer — 转让群主（仅群主，目标必须是现有成员） */
   router.post('/im/conversations/:id/transfer', (req, res) => {
@@ -201,63 +201,63 @@ export function createImRouter(deps: ApiDeps): Router {
     if (!ok) return res.status(404).json({ error: '目标成员不存在' }); // 目标非成员
     pushMembersChanged(conversationId); // 广播群主变更
     res.json({ ok: true, owner_user_id: body.user_id }); // 回包
-  });
+  }); // 代码块结束
 
   /** PATCH /im/conversations/:id/preferences — 置顶 / 免打扰（按人独立） */
   router.patch('/im/conversations/:id/preferences', (req, res) => {
     const userId = req.user!.id; // 当前用户
     const conversationId = req.params.id; // 会话 ID
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     const body = parse(z.object({ pinned: z.boolean().optional(), muted: z.boolean().optional() }), req.body); // 两个开关都可选
-    if (body.pinned === undefined && body.muted === undefined) return res.status(400).json({ error: '至少提供一个开关' });
+    if (body.pinned === undefined && body.muted === undefined) return res.status(400).json({ error: '至少提供一个开关' }); // 条件分支：按判断结果选择后续处理路径
     setConversationPreference(deps.db, conversationId, userId, body); // 写入成员表
     res.json({ ok: true, pinned: body.pinned, muted: body.muted }); // 回包
-  });
+  }); // 代码块结束
 
   /** DELETE /im/conversations/:id — 删除会话：群主解散 / 成员退群 / 私聊移除自己 */
   router.delete('/im/conversations/:id', (req, res) => {
     const userId = req.user!.id; // 当前用户
     const conversationId = req.params.id; // 会话 ID
     const result = deleteConversationForUser(deps.db, conversationId, userId); // 按角色决定处理方式
-    if (result === 'not_found') return res.status(404).json({ error: '会话不存在' });
+    if (result === 'not_found') return res.status(404).json({ error: '会话不存在' }); // 条件分支：按判断结果选择后续处理路径
     res.json({ ok: true, result }); // dissolved 或 left
-  });
+  }); // 代码块结束
 
   /** GET /im/conversations/:id/messages — 分页拉取历史消息
    *  query: before?（消息 ID 游标） around?（定位消息 ID） limit?（1-200，默认 50）
    */
   router.get('/im/conversations/:id/messages', (req, res) => {
-    const userId = req.user!.id;
-    const conversationId = req.params.id;
+    const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
+    const conversationId = req.params.id; // 常量 conversationId：保存固定配置或一次性派生值
     // 非成员拒绝访问
     if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
     // 解析分页参数
     const before = typeof req.query.before === 'string' ? req.query.before : undefined;
     const around = typeof req.query.around === 'string' ? req.query.around : undefined; // 定位：搜索结果点击跳转
-    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
+    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined; // 常量 limit：保存固定配置或一次性派生值
     const items = around ? listMessagesAround(deps.db, conversationId, around, limit) : listMessages(deps.db, conversationId, { before, limit }); // 定位模式取目标前后各半页
     res.json({ items }); // 返回消息列表（正序）
-  });
+  }); // 代码块结束
 
   /** GET /im/conversations/:id/messages/search?q= — 会话内消息搜索（按内容模糊匹配） */
   router.get('/im/conversations/:id/messages/search', (req, res) => {
     const userId = req.user!.id; // 当前用户
     const conversationId = req.params.id; // 会话 ID
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 搜索词
     if (!q) return res.json({ items: [] }); // 空词返回空结果
     const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 30; // 条数
     res.json({ items: searchMessages(deps.db, conversationId, q, limit) }); // 结果按时间倒序
-  });
+  }); // 代码块结束
 
   /** POST /im/conversations/:id/messages — HTTP 方式发消息（兜底，前端也可用 WS 发） */
   router.post('/im/conversations/:id/messages', (req, res) => {
-    const userId = req.user!.id;
-    const conversationId = req.params.id;
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
+    const conversationId = req.params.id; // 常量 conversationId：保存固定配置或一次性派生值
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     // 校验消息体
     const body = parse(
-      z.object({
+      z.object({ // 执行当前业务步骤
         content_type: z.enum(['text', 'image', 'file']), // 内容类型
         content: z.string().max(10000).optional(), // 文本内容
         object_key: z.string().optional(), // 媒体对象键
@@ -265,83 +265,83 @@ export function createImRouter(deps: ApiDeps): Router {
         object_name: z.string().optional(), // 原始文件名
         object_size: z.number().int().nonnegative().optional(), // 文件大小
         reply_to_id: z.string().optional(), // 引用回复的目标消息 ID
-      }),
-      req.body,
-    );
+      }), // 代码块结束
+      req.body, // 执行当前业务步骤
+    ); // 执行当前业务步骤
     // 文本不能为空
     if (body.content_type === 'text' && !body.content?.trim()) {
-      return res.status(400).json({ error: '文本消息不能为空' });
-    }
+      return res.status(400).json({ error: '文本消息不能为空' }); // 返回当前函数的处理结果
+    } // 代码块结束
     // 图片/文件必须有 object_key
     if ((body.content_type === 'image' || body.content_type === 'file') && !body.object_key) {
-      return res.status(400).json({ error: '图片/文件消息必须携带 object_key' });
-    }
+      return res.status(400).json({ error: '图片/文件消息必须携带 object_key' }); // 返回当前函数的处理结果
+    } // 代码块结束
     // 引用回复：必须引用同会话且未撤回的消息，摘要在此固化
     const quoted = body.reply_to_id ? getQuotedMessage(deps.db, conversationId, body.reply_to_id) : undefined; // 解析被引用消息
     if (body.reply_to_id && !quoted) return res.status(400).json({ error: '被引用的消息不存在或已撤回' }); // 非法引用直接拒绝
     // 落库
     const message = createMessage(deps.db, {
-      conversationId,
-      senderUserId: userId,
-      contentType: body.content_type as MessageContentType,
-      content: body.content,
-      objectKey: body.object_key,
-      objectMime: body.object_mime,
-      objectName: body.object_name,
-      objectSize: body.object_size,
+      conversationId, // 执行当前业务步骤
+      senderUserId: userId, // 对象字段 senderUserId：记录一项配置或数据
+      contentType: body.content_type as MessageContentType, // 对象字段 contentType：记录一项配置或数据
+      content: body.content, // 对象字段 content：记录一项配置或数据
+      objectKey: body.object_key, // 对象字段 objectKey：记录一项配置或数据
+      objectMime: body.object_mime, // 对象字段 objectMime：记录一项配置或数据
+      objectName: body.object_name, // 对象字段 objectName：记录一项配置或数据
+      objectSize: body.object_size, // 对象字段 objectSize：记录一项配置或数据
       replyToId: quoted?.id, // 引用目标 ID
       replyExcerpt: quoted?.excerpt, // 引用摘要快照
-    });
+    }); // 代码块结束
     // 实时推送走 WebSocket 通道（见 im/ws.ts），HTTP 兜底仅落库并返回消息对象
     res.status(201).json({ message });
-  });
+  }); // 代码块结束
 
   /** POST /im/conversations/:id/messages/:messageId/recall — 撤回消息（2 分钟内，仅本人） */
   router.post('/im/conversations/:id/messages/:messageId/recall', (req, res) => {
     const userId = req.user!.id; // 当前用户
     const conversationId = req.params.id; // 会话 ID
     const messageId = req.params.messageId; // 目标消息
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     const result = recallMessage(deps.db, { conversationId, messageId, userId, windowMs: RECALL_WINDOW_MS }); // 数据层判定
-    if (!result.ok) {
+    if (!result.ok) { // 条件分支：按判断结果选择后续处理路径
       // 不同失败原因给不同状态码，前端可据此提示「已超时」「不是你的消息」等
       const status = result.reason === 'not_found' ? 404 : result.reason === 'not_owner' ? 403 : 400;
-      const message = {
-        not_found: '消息不存在',
-        not_owner: '只能撤回自己发送的消息',
-        expired: '超过 2 分钟，无法撤回',
-        already_deleted: '消息已撤回',
-      }[result.reason ?? 'not_found'];
-      return res.status(status).json({ error: message, reason: result.reason });
-    }
+      const message = { // 常量 message：保存固定配置或一次性派生值
+        not_found: '消息不存在', // 对象字段 not_found：记录一项配置或数据
+        not_owner: '只能撤回自己发送的消息', // 对象字段 not_owner：记录一项配置或数据
+        expired: '超过 2 分钟，无法撤回', // 对象字段 expired：记录一项配置或数据
+        already_deleted: '消息已撤回', // 对象字段 already_deleted：记录一项配置或数据
+      }[result.reason ?? 'not_found']; // 代码块结束
+      return res.status(status).json({ error: message, reason: result.reason }); // 返回当前函数的处理结果
+    } // 代码块结束
     // 广播给同会话在线成员：客户端据此把该消息从界面移除
     const members = getMemberUserIds(deps.db, conversationId);
-    deps.imHub?.broadcastToUsers(members, {
-      type: 'message.recall',
-      payload: { conversation_id: conversationId, message_id: messageId, operator_user_id: userId },
-    });
+    deps.imHub?.broadcastToUsers(members, { // 执行当前业务步骤
+      type: 'message.recall', // 对象字段 type：记录一项配置或数据
+      payload: { conversation_id: conversationId, message_id: messageId, operator_user_id: userId }, // 对象字段 payload：记录一项配置或数据
+    }); // 代码块结束
     res.json({ ok: true }); // 撤回成功
-  });
+  }); // 代码块结束
 
   /** POST /im/conversations/:id/read — 标记会话已读到指定消息 */
   router.post('/im/conversations/:id/read', (req, res) => {
-    const userId = req.user!.id;
-    const conversationId = req.params.id;
-    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' });
+    const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
+    const conversationId = req.params.id; // 常量 conversationId：保存固定配置或一次性派生值
+    if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     const body = parse(z.object({ message_id: z.string() }), req.body); // 已读到的消息 ID
-    markConversationRead(deps.db, conversationId, userId, body.message_id);
-    res.json({ ok: true });
-  });
+    markConversationRead(deps.db, conversationId, userId, body.message_id); // 调用 markConversationRead 并处理其返回结果
+    res.json({ ok: true }); // 执行当前业务步骤
+  }); // 代码块结束
 
   /** GET /im/users?q= — 搜索用户（用于创建会话选人），排除自己 */
   router.get('/im/users', (req, res) => {
-    const userId = req.user!.id;
-    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
+    const q = typeof req.query.q === 'string' ? req.query.q : ''; // 常量 q：保存固定配置或一次性派生值
     if (!q.trim()) return res.json({ items: [] }); // 空查询返回空
-    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 20;
-    const items = searchUsers(deps.db, q, limit, userId);
-    res.json({ items });
-  });
+    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 20; // 常量 limit：保存固定配置或一次性派生值
+    const items = searchUsers(deps.db, q, limit, userId); // 常量 items：保存固定配置或一次性派生值
+    res.json({ items }); // 执行当前业务步骤
+  }); // 代码块结束
 
   return router; // 返回路由
 } // createImRouter 结束

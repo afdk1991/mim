@@ -20,7 +20,7 @@ const ORDER_PATH = '/api/order/create'; // 通用聚合下单路径，可按渠�
 const REFUND_PATH = '/api/refund'; // 通用聚合退款路径
 
 const baseOf = (env: Record<string, string | undefined>): string => // 保存 baseOf：承载本步骤的计算结果供后续使用
-  trimBase(env.MIM_XUNHU_API_BASE?.trim() || 'https://api.xunhu-pay.example');
+  trimBase(env.MIM_XUNHU_API_BASE?.trim() || 'https://api.xunhu-pay.example'); // 调用 trimBase 并处理其返回结果
 
 /** HMAC-SHA256：canonical 串以密钥做 HMAC，hex 输出 */
 function sign(params: Record<string, unknown>, secret: string): string { // 定义函数 sign：封装可复用业务步骤

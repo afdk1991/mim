@@ -23,7 +23,7 @@ import { PageBlocks } from './PageBlocks'; // 首页区块渲染器（消费后�
 interface Props {
   // 当前界面语言
   locale: Locale;
-}
+} // 代码块结束
 
 // 排序方式类型：与后端 sort 参数取值一致
 type CatalogSort = 'stars' | 'recommended' | 'updated';
@@ -152,7 +152,7 @@ interface ModuleCard {
   stars: number; // Star 数（Stars 排序依据）
   capability: string | null; // 真实能力键；null 表示该模块功能规划中（不给解锁入口）
   current_price: { currency: string; amount_minor: number } | null; // 当前售价；null 表示免费模块
-}
+} // 代码块结束
 
 // 模块详情类型：由接口方法返回类型推导，字段与后端保持一致、不易漂移
 type ModuleDetail = Awaited<ReturnType<typeof api.catalog.getModule>>;
@@ -166,7 +166,7 @@ function pick(locale: Locale, map: Record<string, string> | undefined, fallback 
   if (!map) return fallback;
   // 优先当前语言，其次中文、英文，再退化为任意一种语言，最后用兜底值
   return map[locale] ?? map['zh-CN'] ?? map['en-US'] ?? Object.values(map)[0] ?? fallback;
-}
+} // 代码块结束
 
 // 分类名称：英文站点优先用接口的 name_en，缺失才回落中文名（不做空文案兜底，便于暴露翻译缺口）
 function categoryName(locale: Locale, name: string, nameEn: string | null | undefined): string {
@@ -174,7 +174,7 @@ function categoryName(locale: Locale, name: string, nameEn: string | null | unde
   if (locale !== 'en-US') return name;
   // 英文站点优先英文名，未登记时回落中文名
   return nameEn && nameEn.trim().length > 0 ? nameEn : name;
-}
+} // 代码块结束
 
 // 权益状态文案：与后端枚举一一对应，中英双语
 const ENT_STATUS_LABEL: Record<string, { zh: string; en: string }> = {
@@ -233,7 +233,7 @@ function formatTime(locale: Locale, iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   // 按当前语言输出本地时间，关闭 12 小时制避免歧义
   return date.toLocaleString(locale === 'en-US' ? 'en-US' : 'zh-CN', { hour12: false });
-}
+} // 代码块结束
 
 // 搜索帮助浮窗条目：固定 12 条，与用户给定的清单逐条对应（纯静态文案，不依赖接口）
 const SEARCH_HELP: Array<{ zh: string; en: string; href: string }> = [
@@ -270,7 +270,7 @@ interface FilterPopProps {
   options: readonly string[]; // 全部可选项
   selected: string[]; // 已选项
   onChange: (next: string[]) => void; // 选择变化回调，由父组件触发列表重拉
-}
+} // 代码块结束
 
 // 可折叠多选筛选面板：默认收起，展开后是带滚动条的复选框清单，避免 48/87 项撑爆页面
 function FilterPop({ locale, title, options, selected, onChange }: FilterPopProps) {
@@ -278,7 +278,7 @@ function FilterPop({ locale, title, options, selected, onChange }: FilterPopProp
   function toggle(value: string) {
     // 命中则过滤掉，未命中则追加到末尾
     onChange(selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value]);
-  }
+  } // 代码块结束
   // 返回筛选面板
   return (
     <details className="filter-pop">{/* 折叠容器：点击摘要行展开选项清单 */}
@@ -301,13 +301,13 @@ function FilterPop({ locale, title, options, selected, onChange }: FilterPopProp
           </label> // 单选项结束
         ))}{/* 结束选项遍历 */}
         {selected.length > 0 && ( // 有选择时提供「清空」入口
-          <button type="button" className="btn ghost small" onClick={() => onChange([])}>
+          <button type="button" className="btn ghost small" onClick={() => onChange([])}>{/* 执行当前业务步骤 */}
             {locale === 'en-US' ? 'Clear' : '清空'}{/* 清空文案 */}
           </button> // 清空按钮结束
         )}{/* 结束清空入口 */}
       </div>{/* 选项容器结束 */}
     </details> // 折叠容器结束
-  );
+  ); // 执行当前业务步骤
 } // FilterPop 结束
 
 // 依赖链图组件：用 G6 v5 在详情面板内把「前置模块 → 当前模块」渲染成有向小图；已解锁前置绿色、未解锁灰色、当前模块蓝色
@@ -317,9 +317,9 @@ interface DependencyGraphProps {
   unlocked: Set<string>; // 已解锁模块编码集合
   nameOf: (code: string) => string; // 编码 → 展示名解析（与列表同一口径，跨页依赖回落编码）
   locale: Locale; // 界面语言（无障碍标签随语言切换）
-}
+} // 代码块结束
 
-function DependencyGraph({ currentCode, requires, unlocked, nameOf, locale }: DependencyGraphProps) {
+function DependencyGraph({ currentCode, requires, unlocked, nameOf, locale }: DependencyGraphProps) { // 函数 DependencyGraph：封装一段可复用的处理逻辑
   const containerRef = useRef<HTMLDivElement | null>(null); // 画布挂载容器 ref
   const graphRef = useRef<GraphType | null>(null); // G6 实例引用，卸载时据此销毁释放 canvas
 
@@ -398,7 +398,7 @@ interface PriceHistoryRow {
   effective_to: string | null; // 窗口结束时间，空表示至今有效
   currency: string; // 币种
   amount_minor: number; // 金额（分）
-}
+} // 代码块结束
 
 // 价格历史折线图组件：用 ECharts 把各定价窗口的售价按生效时间串成趋势线，卸载时 dispose 释放实例。
 function PriceHistoryChart({ rows, locale }: { rows: PriceHistoryRow[]; locale: Locale }) {
@@ -439,7 +439,7 @@ function PriceHistoryChart({ rows, locale }: { rows: PriceHistoryRow[]; locale: 
       window.removeEventListener('resize', onResize); // 移除缩放监听
       chart?.dispose(); // 销毁实例，释放 canvas 与事件
       chartRef.current = null; // 清空引用
-    };
+    }; // 代码块结束
   }, [rowsKey, locale, rows.length]); // 依赖：价格快照键 + 语言 + 行数；原始数组引用不进依赖
 
   if (rows.length === 0) return null; // 无定价记录时不渲染容器
@@ -477,22 +477,22 @@ export function Store({ locale }: Props) {
   const modulesState = useAsync(
     () => api.catalog.getModules({ q: applied || undefined, category, sort, licenses, languages, page, pageSize: PAGE_SIZE }),
     [applied, category, sort, licenses.join(','), languages.join(','), page],
-  );
+  ); // 执行当前业务步骤
   // 拉取右侧「热门项目」：跟随当前分类与今日/本周时间窗，取前 5 条
   const hotState = useAsync(
     () => api.catalog.getHotModules({ range: hotRange, category, limit: 5 }),
     [hotRange, category],
-  );
+  ); // 执行当前业务步骤
   // 拉取当前用户已购权益，用于在卡片上标注「已解锁」；匿名时不发请求、权益视为空，登录态变化时重新拉取
   const entState = useAsync(() => (authed ? api.catalog.getMyEntitlements() : Promise.resolve(null)), [authed]);  // 拉取我的订单：付费模块下单后在这里展示「待结算 / 已结算 / 已取消」并提供取消入口；匿名时不发请求
-  const ordersState = useAsync(() => (authed ? api.catalog.getMyOrders() : Promise.resolve(null)), [authed]);
+  const ordersState = useAsync(() => (authed ? api.catalog.getMyOrders() : Promise.resolve(null)), [authed]); // 常量 ordersState：保存固定配置或一次性派生值
   // 当前展开详情的模块编码：null 表示全部收起
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
   // 展开项的详情（含历史价格与依赖链）：随展开目标变化重新拉取，收起时回 null 不发请求
   const detail = useAsync<ModuleDetail | null>(
     () => (expandedCode ? api.catalog.getModule(expandedCode) : Promise.resolve(null)),
     [expandedCode],
-  );
+  ); // 执行当前业务步骤
   // 正在解锁的模块编码：用于只禁用被点击的那一个按钮
   const [busyCode, setBusyCode] = useState<string | null>(null);
   // 工具面板输入文本：切换模块时清空，避免把上一个模块的输入带过去
@@ -554,7 +554,7 @@ export function Store({ locale }: Props) {
     } // 二级匹配结束
     // 兜底回显原始 slug，便于排查脏数据
     return category;
-  }
+  } // 代码块结束
 
   // 任意二级 slug 的展示名：详情页显示模块归属，与当前筛选状态无关
   function categoryLabelOf(slug: string | null): string {
@@ -569,14 +569,14 @@ export function Store({ locale }: Props) {
     } // 遍历结束
     // 兜底回显原始 slug，便于排查脏数据
     return slug;
-  }
+  } // 代码块结束
 
   // 切换分类：同时回到第 1 页，避免停留在越界页
   function selectCategory(next: string) {    // 设置当前分类
     setCategory(next);
     // 重置分页
     setPage(1);
-  }
+  } // 代码块结束
 
   // 点击一级分类：既作为筛选条件，又切换二级条目的展开态
   function toggleGroup(slug: string) {
@@ -584,7 +584,7 @@ export function Store({ locale }: Props) {
     selectCategory(slug);
     // 展开态取反
     setOpenGroups((current) => (current.includes(slug) ? current.filter((item) => item !== slug) : [...current, slug]));
-  }
+  } // 代码块结束
 
   // 按模块编码解析展示名：当前页里有就用多语言名称，没有（如跨页依赖）则退化为编码本身
   function nameOf(code: string): string {
@@ -592,13 +592,13 @@ export function Store({ locale }: Props) {
     const found = modules.find((item) => item.code === code);
     // 命中则按语言挑名称，缺失退回编码
     return found ? pick(locale, found.name, code) : code;
-  }
+  } // 代码块结束
 
   // 是否付费模块：有价格且金额大于 0 才必须走下单结算；免费/未定价模块仍直接解锁
   function isPaid(item: ModuleCard): boolean {
     // current_price 为 null 视为免费，金额 0 同样视为免费
     return Boolean(item.current_price && item.current_price.amount_minor > 0);
-  }
+  } // 代码块结束
 
   // 提交搜索：把输入框值落到 applied，触发目录重新拉取
   function submitSearch(event: FormEvent) {
@@ -608,7 +608,7 @@ export function Store({ locale }: Props) {
     setApplied(keyword.trim());
     // 搜索同样回到第 1 页
     setPage(1);
-  }
+  } // 代码块结束
 
   // 清空全部筛选（保留搜索词以外的分类、排序、许可、语言）
   function resetFilters() {
@@ -622,7 +622,7 @@ export function Store({ locale }: Props) {
     setLanguages([]);
     // 回到第 1 页
     setPage(1);
-  }
+  } // 代码块结束
 
   // 切换详情展开：再次点击同一卡片即收起
   function toggleDetail(code: string) {
@@ -633,7 +633,7 @@ export function Store({ locale }: Props) {
     setToolOption('');
     setToolError(null);
     setToolResult(null);
-  }
+  } // 代码块结束
 
   // 调用当前模块绑定的真实能力：门禁（登录 / 已上架 / 有实现 / 已解锁）全部由服务端判定
   async function handleInvoke(code: string, capability: string) {
@@ -641,20 +641,20 @@ export function Store({ locale }: Props) {
     setToolBusy(true);
     setToolError(null);
     setToolResult(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 按能力定义组选项：组合值（op:direction）拆成两个字段，数字类转 Number
       const spec = CAPABILITY_OPTIONS[capability];
-      const options: Record<string, string | number | boolean> = {};
-      if (spec) {
+      const options: Record<string, string | number | boolean> = {}; // 常量 options：保存固定配置或一次性派生值
+      if (spec) { // 条件分支：按判断结果选择后续处理路径
         const value = toolOption || spec.items[0].value; // 未选时用第一个默认项
-        if (spec.optionKey === 'op:direction') {
+        if (spec.optionKey === 'op:direction') { // 条件分支：按判断结果选择后续处理路径
           const [op, direction] = value.split(':'); // 组合值拆分
           options.op = op; // 编码方式
           options.direction = direction; // 方向
-        } else {
+        } else { // 代码块结束
           options[spec.optionKey] = spec.numeric ? Number(value) : value; // 其余能力单字段下发
-        }
-      }
+        } // 代码块结束
+      } // 代码块结束
       // 发起调用：输入文本原样提交，服务端限长并校验
       const result = await api.catalog.invokeModule(code, toolText, options);
       // 只保留渲染需要的字段，并带上模块码用于隔离
@@ -665,8 +665,8 @@ export function Store({ locale }: Props) {
     } finally {
       // 无论成功失败都退出执行态
       setToolBusy(false);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 加入购物车：已在车中由后端回放（added=false），成功后刷新角标
   async function handleAddToCart(code: string) {
@@ -676,7 +676,7 @@ export function Store({ locale }: Props) {
     setError(null);
     // 清空旧提示
     setMessage(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 加购接口：同名模块重复加购不产生重复条目
       const result = await api.cart.add(code);
       // 用响应里的最新购物车覆盖角标
@@ -690,15 +690,15 @@ export function Store({ locale }: Props) {
           : locale === 'en-US'
             ? 'Already in cart'
             : '已在购物车中',
-      );
+      ); // 执行当前业务步骤
     } catch (err) {
       // 已解锁（409）或未上架等业务错误统一翻译
       setError(errorText(locale, err));
     } finally {
       // 解除按钮忙碌态
       setBusyCode(null);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 解锁指定模块：一次性买断，成功后刷新权益列表
   async function handleUnlock(code: string) {
@@ -708,7 +708,7 @@ export function Store({ locale }: Props) {
     setError(null);
     // 清空旧成功提示
     setMessage(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调用解锁接口；后端校验前置依赖与区域可用性
       await api.catalog.unlockModule(code);
       // 按语言展示解锁成功提示
@@ -731,16 +731,16 @@ export function Store({ locale }: Props) {
               ? `Unlock prerequisites first: ${missing.map(nameOf).join(', ')}` // 英文引导：列出缺失前置模块名
               : `缺少前置模块，请先解锁：${missing.map(nameOf).join('、')}` // 中文引导：顿号连接缺失模块名
             : errorText(locale, err), // 无清单时用通用翻译
-        );
-      } else {
+        ); // 执行当前业务步骤
+      } else { // 代码块结束
         // 其它失败（区域不可用、网络异常等）展示通用可读文案
         setError(errorText(locale, err));
-      }
+      } // 代码块结束
     } finally {
       // 解除按钮加载态，允许操作其它模块
       setBusyCode(null);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 付费模块下单：金额由后端按下单时刻价格快照；重复点击会回放同一张待结算订单
   async function handlePurchase(code: string) {
@@ -750,7 +750,7 @@ export function Store({ locale }: Props) {
     setError(null);
     // 清空旧提示
     setMessage(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 下单：免费模块会被后端拒绝（400），付费模块返回 pending 订单
       const result = await api.catalog.createOrder(code);
       // 展示订单号前 8 位与金额，便于用户凭单号对账（当前为人工结算）
@@ -760,7 +760,7 @@ export function Store({ locale }: Props) {
         locale === 'en-US'
           ? `Order ${result.order.id.slice(0, 8)} created (${amount} ${result.order.currency}); unlock activates after settlement`
           : `已生成订单 ${result.order.id.slice(0, 8)}（${amount} ${result.order.currency}），结算后自动解锁`,
-      );
+      ); // 执行当前业务步骤
       // 刷新订单列表，让面板与卡片徽标立即反映待结算状态
       ordersState.reload();
     } catch (err) {
@@ -774,8 +774,8 @@ export function Store({ locale }: Props) {
     } finally {
       // 解除按钮加载态
       setBusyCode(null);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 取消待结算订单：取消后可重新下单；已结算订单后端禁止取消
   async function handleCancelOrder(id: string) {
@@ -785,7 +785,7 @@ export function Store({ locale }: Props) {
     setError(null);
     // 清空旧提示
     setMessage(null);
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       // 调用取消接口
       await api.catalog.cancelOrder(id);
       // 成功提示
@@ -798,30 +798,30 @@ export function Store({ locale }: Props) {
     } finally {
       // 解除忙碌态
       setBusyCode(null);
-    }
-  }
+    } // 代码块结束
+  } // 代码块结束
 
   // 首屏加载态：只渲染一行提示，避免空白页面
   if (loading) return <div className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>;
   // 目录加载失败：展示错误 + 排查提示 + 重试入口，避免一次请求失败即永久空白且无恢复路径
   if (modulesState.error) {
-    return (
-      <div className="page">
-        <header className="page-head">
+    return ( // 返回当前函数的处理结果
+      <div className="page">{/* 执行当前业务步骤 */}
+        <header className="page-head">{/* 执行当前业务步骤 */}
           <h1>{locale === 'en-US' ? 'Module Store' : '功能模块商城'}</h1>
         </header>
         <p className="error">{errorText(locale, modulesState.error)}</p>
-        <p className="muted">
+        <p className="muted">{/* 执行当前业务步骤 */}
           {locale === 'en-US'
             ? 'Cannot reach the catalog service. Check your network or ad-blocker, then retry.'
             : '无法连接模块目录服务，请检查网络或广告拦截插件后重试。'}
         </p>
-        <button type="button" className="btn primary" onClick={() => modulesState.reload()}>
+        <button type="button" className="btn primary" onClick={() => modulesState.reload()}>{/* 执行当前业务步骤 */}
           {locale === 'en-US' ? 'Retry' : '重试'}
         </button>
       </div>
-    );
-  }
+    ); // 执行当前业务步骤
+  } // 代码块结束
 
   // 渲染商城页面
   return (
@@ -830,10 +830,10 @@ export function Store({ locale }: Props) {
       <header className="page-head">{/* 页头：标题 + 解锁规则说明 */}
         <h1>{locale === 'en-US' ? 'Module Store' : '功能模块商城'}</h1>{/* 标题：按语言切换中英文 */}
         <div className="products-pager">{/* 配套入口：商品列表 / 购物车（角标显示待购数量） */}
-          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'products' })}>
+          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'products' })}>{/* 执行当前业务步骤 */}
             {locale === 'en-US' ? 'Products' : '商品列表'}
           </button>
-          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'cart' })}>
+          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'cart' })}>{/* 执行当前业务步骤 */}
             {locale === 'en-US' ? 'Cart' : '购物车'}
             {cart && cart.count > 0 ? <span className="cart-badge">{cart.count}</span> : null}
           </button>
@@ -874,7 +874,7 @@ export function Store({ locale }: Props) {
                 // 点击处理
                 onClick={() => toggleGroup(group.slug)}
               >
-                <span>
+                <span>{/* 执行当前业务步骤 */}
                   {openGroups.includes(group.slug) ? '▾' : '▸'} {categoryName(locale, group.name, group.name_en)}{/* 展开指示 + 分类名（按语言取中英文） */}
                 </span>
                 <span className="count">{group.count}</span>{/* 该分类模块数 */}
@@ -919,7 +919,7 @@ export function Store({ locale }: Props) {
               {locale === 'en-US' ? 'Search' : '搜索'}{/* 按钮文案 */}
             </button>{/* 搜索按钮结束 */}
             {applied !== '' && ( // 已应用过滤时展示结果计数与清除入口
-              <>
+              <>{/* 执行当前业务步骤 */}
                 <span className="count">{/* 命中计数 */}
                   {locale === 'en-US' ? `${total} result(s)` : `${total} 个结果`}{/* 计数文案 */}
                 </span>{/* 计数结束 */}
@@ -956,7 +956,7 @@ export function Store({ locale }: Props) {
                 {locale === 'en-US' ? 'Category' : '当前分类'}: {categoryLabel()}{/* 当前分类名 */}
               </span>{/* 分类提示结束 */}
               {(category !== 'all' || licenses.length > 0 || languages.length > 0 || sort !== 'recommended') && ( // 有任意筛选时提供重置
-                <button type="button" className="btn ghost small" onClick={resetFilters}>
+                <button type="button" className="btn ghost small" onClick={resetFilters}>{/* 执行当前业务步骤 */}
                   {locale === 'en-US' ? 'Reset filters' : '重置筛选'}{/* 重置文案 */}
                 </button> // 重置按钮结束
               )}{/* 结束重置入口 */}
@@ -989,13 +989,13 @@ export function Store({ locale }: Props) {
               {(licenses.length > 0 || languages.length > 0) && ( // 已选条件以芯片形式回显
                 <span className="row chips">{/* 芯片容器 */}
                   {licenses.map((option) => ( // 逐许可渲染
-                    <span key={`l-${option}`} className="chip">
+                    <span key={`l-${option}`} className="chip">{/* 执行当前业务步骤 */}
                       {option}{/* 许可名 */}
                       <button type="button" onClick={() => { setLicenses(licenses.filter((item) => item !== option)); setPage(1); }}>×</button>{/* 移除 */}
                     </span> // 芯片结束
                   ))}{/* 结束许可芯片 */}
                   {languages.map((option) => ( // 逐语言渲染
-                    <span key={`g-${option}`} className="chip">
+                    <span key={`g-${option}`} className="chip">{/* 执行当前业务步骤 */}
                       {option}{/* 语言名 */}
                       <button type="button" onClick={() => { setLanguages(languages.filter((item) => item !== option)); setPage(1); }}>×</button>{/* 移除 */}
                     </span> // 芯片结束
@@ -1087,7 +1087,7 @@ export function Store({ locale }: Props) {
                         </span>{/* 到期时间结束 */}
                       </span>{/* 右侧结束 */}
                     </li> // 单行权益结束
-                  );
+                  ); // 执行当前业务步骤
                 })}{/* 结束权益遍历 */}
               </ul>{/* 权益清单结束 */}
             </section> // 权益面板结束
@@ -1133,7 +1133,7 @@ export function Store({ locale }: Props) {
                         )}{/* 结束取消入口 */}
                       </span>{/* 右侧结束 */}
                     </li> // 订单行结束
-                  );
+                  ); // 执行当前业务步骤
                 })}{/* 结束订单遍历 */}
               </ul>{/* 订单清单结束 */}
             </section> // 订单面板结束
@@ -1150,7 +1150,7 @@ export function Store({ locale }: Props) {
                   : '本区暂无可用模块。'}{/* 区域空态 */}
             </p> // 空态结束
           ) : (
-            <>
+            <>{/* 执行当前业务步骤 */}
               <div className="cards">{/* 卡片网格容器 */}
                 {modules.map((m) => { // 逐个模块渲染卡片
                   // 是否已拥有该模块：决定隐藏解锁按钮并显示徽标
@@ -1263,7 +1263,7 @@ export function Store({ locale }: Props) {
                           {detail.loading && <p className="hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</p>}{/* 详情加载态 */}
                           {detail.error !== null && <p className="error">{errorText(locale, detail.error)}</p>}{/* 详情加载失败：用布尔判断避免渲染 unknown */}
                           {detail.data && ( // 详情数据就绪
-                            <>
+                            <>{/* 执行当前业务步骤 */}
                               <p className="muted">{/* 状态与区域行 */}
                                 {locale === 'en-US' ? 'Status' : '状态'}: {MODULE_STATUS_LABEL[detail.data.status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? detail.data.status}
                                 {' · '}{/* 分隔符 */}
@@ -1285,9 +1285,9 @@ export function Store({ locale }: Props) {
                                 const priceText = data.current_price // 价格文案与卡片同口径
                                   ? `${(data.current_price.amount_minor / 100).toFixed(2)} ${data.current_price.currency}`
                                   : locale === 'en-US' ? 'Free' : '免费';
-                                const requiresText = data.requires.length > 0 ? data.requires.map(nameOf).join(locale === 'en-US' ? ', ' : '、') : (locale === 'en-US' ? 'None' : '无');
-                                const capabilityText = data.capability ?? (data.code.startsWith('cat.') ? (locale === 'en-US' ? 'Planned' : '功能规划中') : (locale === 'en-US' ? 'Add-on entitlement' : '配套权益商品'));
-                                const statusText = MODULE_STATUS_LABEL[data.status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? data.status;
+                                const requiresText = data.requires.length > 0 ? data.requires.map(nameOf).join(locale === 'en-US' ? ', ' : '、') : (locale === 'en-US' ? 'None' : '无'); // 常量 requiresText：保存固定配置或一次性派生值
+                                const capabilityText = data.capability ?? (data.code.startsWith('cat.') ? (locale === 'en-US' ? 'Planned' : '功能规划中') : (locale === 'en-US' ? 'Add-on entitlement' : '配套权益商品')); // 常量 capabilityText：保存固定配置或一次性派生值
+                                const statusText = MODULE_STATUS_LABEL[data.status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? data.status; // 常量 statusText：保存固定配置或一次性派生值
                                 // 参数行：详情页以键值表完整展示，避免只有一行逗号文案
                                 const specRows: Array<[string, string]> = [
                                   [locale === 'en-US' ? 'Module code' : '模块编码', data.code],
@@ -1301,14 +1301,14 @@ export function Store({ locale }: Props) {
                                   [locale === 'en-US' ? 'Price' : '价格', priceText],
                                   [locale === 'en-US' ? 'Requires' : '前置依赖', requiresText],
                                   [locale === 'en-US' ? 'Capability' : '能力绑定', capabilityText],
-                                ];
-                                return (
-                                  <>
+                                ]; // 执行当前业务步骤
+                                return ( // 返回当前函数的处理结果
+                                  <>{/* 执行当前业务步骤 */}
                                     <div className="store-detail-hero">{/* 商品封面 + 参数表并排，详情区第一屏就能看到图 */}
                                       <img src={categoryCoverUrl(data.category_slug)} alt={`${title} ${locale === 'en-US' ? 'cover' : '商品封面'}`} loading="lazy" />{/* 与卡片同一张分类封面 */}
                                       <dl className="store-spec-grid">{/* 参数键值表 */}
                                         {specRows.map(([label, value]) => (
-                                          <div key={label} className="store-spec-row">
+                                          <div key={label} className="store-spec-row">{/* 执行当前业务步骤 */}
                                             <dt>{label}</dt>{/* 参数名 */}
                                             <dd>{value}</dd>{/* 参数值 */}
                                           </div>
@@ -1337,7 +1337,7 @@ export function Store({ locale }: Props) {
                                       loading="lazy"
                                     />{/* 可保存/可右键另存的参数长图 */}
                                   </>
-                                );
+                                ); // 执行当前业务步骤
                               })()}{/* 商品详情视觉块结束 */}
                               <div>{/* 工具区块：登记了能力的模块可真正执行；未登记则标注「功能规划中」 */}
                                 <p className="store-detail-title">{locale === 'en-US' ? 'Tool' : '工具'}{/* 小节标题 */}</p>
@@ -1357,12 +1357,12 @@ export function Store({ locale }: Props) {
                                     ); // 规划中提示结束
                                   } // 无能力分支结束
                                   return ( // 有能力：按是否已解锁决定给工具还是给提示
-                                    <>
+                                    <>{/* 执行当前业务步骤 */}
                                       <p className="muted">{seed.hint[locale === 'en-US' ? 'en-US' : 'zh-CN']}{/* 能力说明，来自 core-domain 同一份定义 */}</p>
                                       {!owned ? ( // 未解锁：只提示先解锁，不暴露调用入口
                                         <p className="muted">{locale === 'en-US' ? 'Unlock this module to use its tool.' : '解锁本模块后即可使用该工具。'}</p>
                                       ) : ( // 已解锁：渲染输入 + 执行 + 结果
-                                        <>
+                                        <>{/* 执行当前业务步骤 */}
                                           {spec && ( // 有能力私有参数时给下拉
                                             <label className="filter-inline">{/* 复用筛选行样式，视觉上与商城一致 */}
                                               {locale === 'en-US' ? 'Option' : '选项'}
@@ -1415,7 +1415,7 @@ export function Store({ locale }: Props) {
                                               <div className="store-tool-html" dangerouslySetInnerHTML={{ __html: toolResult.output }} />
                                             ) : ( // 文本 / JSON：等宽字体预格式展示
                                               <pre className="store-tool-output">{toolResult.output}</pre>
-                                            )
+                                            ) // 执行当前业务步骤
                                           )}{/* 结果展示结束 */}
                                         </>
                                       )}{/* 已解锁分支结束 */}
@@ -1480,7 +1480,7 @@ export function Store({ locale }: Props) {
                         </div> // 详情容器结束
                       )}{/* 结束展开态条件渲染 */}
                     </section> // 结束模块卡片
-                  );
+                  ); // 执行当前业务步骤
                 })}{/* 结束模块遍历 */}
               </div>{/* 结束卡片网格 */}
 
@@ -1560,4 +1560,4 @@ export function Store({ locale }: Props) {
     </div>
     // 商城页渲染结束，返回 JSX 元素
   );
-}
+} // 代码块结束

@@ -3,7 +3,7 @@
 import { Router } from 'express'; // 路由容器，按前缀挂载到 /api/v1
 import { z } from 'zod'; // 请求体校验，统一挡掉非法输入
 import { AppError, uuidv7 } from '@mim/core-domain'; // 业务错误码 + 时间有序主键
-import {
+import { // 引入依赖、类型或本地模块绑定
   ACCESS_TTL_SECONDS, // 访问令牌有效期，用于返回 expires_in
   CODE_MAX_ATTEMPTS, // 单个验证码允许的错误尝试次数
   CODE_RATE_LIMIT, // 滑动窗口内允许的验证码申请次数
@@ -14,7 +14,7 @@ import {
   REFRESH_TTL_SECONDS, // 刷新令牌有效期
 } from '../config.js'; // 集中式认证参数，避免散落魔法数字
 import { consumeCaptcha, cacheOf } from '../security.js'; // 图形验证码一次性校验 + 共享缓存后端（访客频控）
-import {
+import { // 引入依赖、类型或本地模块绑定
   generateCode, // 生成数字验证码
   hashCode, // 验证码摘要，库内不存明文
   hashPassword, // 账号密码哈希，自建账号注册时写入
@@ -185,11 +185,11 @@ function recordFailure(deps: ApiDeps, key: string, region: string, now: string):
     .run(key, region, failures, lockedUntil, now); // upsert：首次插入，后续只更新计数与锁定状态
 } // 结束 recordFailure
 
-function findOrCreateUser(
-  deps: ApiDeps,
-  region: Region,
-  provider: string,
-  identifier: string,
+function findOrCreateUser( // 函数 findOrCreateUser：封装一段可复用的处理逻辑
+  deps: ApiDeps, // 对象字段 deps：记录一项配置或数据
+  region: Region, // 对象字段 region：记录一项配置或数据
+  provider: string, // 对象字段 provider：记录一项配置或数据
+  identifier: string, // 对象字段 identifier：记录一项配置或数据
   onCreate?: (userId: string) => void, // 仅在新建账号事务内回调（如邀请码核销），与建号同事务
 ): UserRow { // 按身份查找用户，不存在则注册
   const identity = deps.db // 身份查询起点
@@ -251,10 +251,10 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
 
   router.post('/auth/code', async (req, res) => { // 申请验证码
     const body = parse(codeBody, req.body); // 校验请求体形状
-    if (deps.env.MIM_CAPTCHA_REQUIRED === '1') {
-      if (!body.captcha_id || !body.captcha_code) throw new AppError('VALIDATION_FAILED', '请先完成图形验证码');
-      if (!consumeCaptcha(deps.db, body.captcha_id, body.captcha_code)) throw new AppError('AUTH_CODE_INVALID', '图形验证码错误或已过期');
-    }
+    if (deps.env.MIM_CAPTCHA_REQUIRED === '1') { // 条件分支：按判断结果选择后续处理路径
+      if (!body.captcha_id || !body.captcha_code) throw new AppError('VALIDATION_FAILED', '请先完成图形验证码'); // 条件分支：按判断结果选择后续处理路径
+      if (!consumeCaptcha(deps.db, body.captcha_id, body.captcha_code)) throw new AppError('AUTH_CODE_INVALID', '图形验证码错误或已过期'); // 条件分支：按判断结果选择后续处理路径
+    } // 代码块结束
     const identity = normalizeIdentity(body.region, body.provider, body.identifier); // 归一化号码/邮箱，避免同号多形态
     const now = clockOf(deps); // 当前时间
     const windowStart = addSeconds(now, -CODE_RATE_WINDOW_MINUTES * 60); // 滑动窗口起点

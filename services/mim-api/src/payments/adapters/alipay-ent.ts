@@ -13,7 +13,7 @@ import { // 引入依赖：声明本文件使用的外部能力
   yuanToCents, // 业务步骤：推进当前流程的下一项处理
 } from '../util.js'; // 结束代码块：本层作用域收尾
 
-const defaultGateway = 'https://openapi.alipay.com/gateway.do';
+const defaultGateway = 'https://openapi.alipay.com/gateway.do'; // 常量 defaultGateway：保存固定配置或一次性派生值
 
 const gatewayOf = (env: Record<string, string | undefined>): string => // 保存 gatewayOf：承载本步骤的计算结果供后续使用
   (env.MIM_ALIPAY_ENT_GATEWAY ?? '').trim() || defaultGateway; // 业务步骤：推进当前流程的下一项处理

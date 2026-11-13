@@ -23,7 +23,7 @@ export interface SliderGap {
   y: number; // 缺口纵向位置
   width: number; // 缺口宽度（px）
   height: number; // 缺口高度（px）
-}
+} // 代码块结束
 
 /** 滑动拼图题目：背景 SVG + 缺口几何 + 过期时间 */
 export interface SliderChallenge {
@@ -31,7 +31,7 @@ export interface SliderChallenge {
   expires_at: string; // 过期时间（ISO）
   background: string; // 背景 SVG 字符串
   gap: SliderGap; // 缺口几何
-}
+} // 代码块结束
 
 /** 验证码签发响应：off/未强制 required=false；image 带 svg；slider 带 slider；第三方仅回模式 */
 export interface CaptchaIssue {
@@ -42,19 +42,19 @@ export interface CaptchaIssue {
   svg?: string; // 图形验证码 SVG（image）
   slider?: SliderChallenge; // 滑动拼图题目（slider）
   expires_at?: string; // 过期时间（ISO）
-}
+} // 代码块结束
 
 /** 安全能力状态：前端据此决定是否展示验证码与审核提示 */
 export interface SecurityStatus {
   captcha_required: boolean; // 兼容旧字段：任一强制场景即视为需要验证码
   content_audit: boolean; // 是否启用内容审核
-  captcha: {
+  captcha: { // 对象字段 captcha：记录一项配置或数据
     mode: CaptchaMode; // 当前验证码模式
     required_scenes: CaptchaScene[]; // 被环境变量强制的场景清单
     providers: { image: boolean; slider: boolean; tencent: boolean; geetest4: boolean }; // 第三方凭证齐备度
-  };
-  audit: { enabled: boolean; provider: string; fallback: string };
-}
+  }; // 代码块结束
+  audit: { enabled: boolean; provider: string; fallback: string }; // 对象字段 audit：记录一项配置或数据
+} // 代码块结束
 
 /** 提交登录 / 注册时随请求体带上的验证码票据字段（按 mode 取对应一组；off 不带） */
 export interface CaptchaTicket {
@@ -67,7 +67,7 @@ export interface CaptchaTicket {
   captcha_output?: string; // 极验 4.0 输出
   pass_token?: string; // 极验 4.0 通过令牌
   gen_time?: string; // 极验 4.0 生成时间
-}
+} // 代码块结束
 
 export interface UserInfo { // 当前登录用户的核心资料（登录响应与 /me 共用同一形状）
   id: string; // 用户主键，本地缓存与埋点都用它标识身份
@@ -922,12 +922,12 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   }, // requestCode 结束
 
   captcha(scene: CaptchaScene = 'login') { // 按场景签发验证码题目：image 返回 SVG，slider 返回拼图背景与缺口，第三方模式仅回模式标识
-    return request<CaptchaIssue>('/auth/captcha?scene=' + encodeURIComponent(scene), { auth: false, idempotency: false });
-  },
+    return request<CaptchaIssue>('/auth/captcha?scene=' + encodeURIComponent(scene), { auth: false, idempotency: false }); // 返回当前函数的处理结果
+  }, // 代码块结束
 
   securityStatus() { // 安全能力状态：验证码模式 / 强制场景 / 第三方凭证齐备度 / 内容审核开关
-    return request<SecurityStatus>('/security/status', { auth: false, idempotency: false });
-  },
+    return request<SecurityStatus>('/security/status', { auth: false, idempotency: false }); // 返回当前函数的处理结果
+  }, // 代码块结束
 
   loginWithPassword(payload: { // 密码登录：手机号/邮箱 + 密码
     region: Region; // 区域
@@ -1098,7 +1098,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       languages?: string[]; // 语言多选
       page?: number; // 页码，从 1 起
       pageSize?: number; // 每页条数
-    } = {}) {
+    } = {}) { // 代码块结束
       // 逐项拼接查询串：空值一律不下发，避免缓存键被空参数污染
       const params: string[] = []; // 查询参数收集器
       if (opts.q) params.push(`q=${encodeURIComponent(opts.q)}`); // 关键词经编码防注入
@@ -1420,17 +1420,17 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       // 非 2xx：读 JSON 信封抛结构化错误，与列表/下载错误口径一致；缩略图失败由视图回退原图，不阻断列表
       if (!res.ok) {
         const text = await res.text(); // 读取错误正文
-        let payload: unknown = null;
+        let payload: unknown = null; // 可变变量 payload：运行过程中会被重新赋值
         if (text) { try { payload = JSON.parse(text); } catch { payload = null; } } // 非 JSON 按空兜底
-        const body = (payload ?? {}) as { code?: string; message?: string; request_id?: string; details?: unknown };
-        throw new ApiError(
+        const body = (payload ?? {}) as { code?: string; message?: string; request_id?: string; details?: unknown }; // 常量 body：保存固定配置或一次性派生值
+        throw new ApiError( // 抛出错误：中断当前流程并向上层传递
           body.code ?? 'INTERNAL_ERROR', // 业务错误码兜底
           body.message ?? res.statusText, // 错误文案兜底
           res.status, // HTTP 状态码
           body.details, // 详情原样透出
           body.request_id, // 请求 ID 追踪
-        );
-      }
+        ); // 执行当前业务步骤
+      } // 代码块结束
       return res.blob(); // 返回 WebP 二进制，由调用方生成 BlobURL 喂给 <img>
     }, // thumbBlob 结束
   }, // media 分组结束
@@ -1468,7 +1468,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       if (opts.around) qs.set('around', opts.around); // 定位：取该消息前后各半页（搜索结果跳转用）
       if (opts.limit) qs.set('limit', String(opts.limit)); // 条数限制
       const suffix = qs.toString(); // 无参数时空串
-      return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages${suffix ? `?${suffix}` : ''}`, { auth: true, idempotency: false });
+      return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages${suffix ? `?${suffix}` : ''}`, { auth: true, idempotency: false }); // 返回当前函数的处理结果
     }, // listMessages 结束
     /** POST /im/conversations/:id/messages：HTTP 方式发消息（兜底；实时通道走 WebSocket） */
     sendMessage(conversationId: string, body: { content_type: ImMessageContentType; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number; reply_to_id?: string }) {
@@ -1476,23 +1476,23 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // sendMessage 结束
     /** POST /im/conversations/:id/read：标记已读到指定消息 */
     markRead(conversationId: string, messageId: string) {
-      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/read`, { method: 'POST', body: { message_id: messageId }, auth: true, idempotency: false });
+      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/read`, { method: 'POST', body: { message_id: messageId }, auth: true, idempotency: false }); // 返回当前函数的处理结果
     }, // markRead 结束
     /** GET /im/users?q=：搜索用户（创建会话时选人） */
     searchUsers(q: string, limit = 20) {
       const suffix = new URLSearchParams({ q, limit: String(limit) }).toString(); // 拼接查询串
-      return request<{ items: ImUser[] }>(`/im/users?${suffix}`, { auth: true, idempotency: false });
+      return request<{ items: ImUser[] }>(`/im/users?${suffix}`, { auth: true, idempotency: false }); // 返回当前函数的处理结果
     }, // searchUsers 结束
     /** GET /im/conversations/:id：会话详情 + 成员列表 */
     getConversation(conversationId: string) {
-      return request<{ conversation: { id: string; type: ImConversationType; title: string; owner_user_id: string | null }; members: ImMember[] }>(
+      return request<{ conversation: { id: string; type: ImConversationType; title: string; owner_user_id: string | null }; members: ImMember[] }>( // 返回当前函数的处理结果
         `/im/conversations/${encodeURIComponent(conversationId)}`, // 会话 ID 编码
         { auth: true, idempotency: false }, // 只读
       ); // 请求结束
     }, // getConversation 结束
     /** PATCH /im/conversations/:id：群改名（仅群主/管理员） */
     renameConversation(conversationId: string, title: string) {
-      return request<{ ok: boolean; title: string }>(`/im/conversations/${encodeURIComponent(conversationId)}`, {
+      return request<{ ok: boolean; title: string }>(`/im/conversations/${encodeURIComponent(conversationId)}`, { // 返回当前函数的处理结果
         method: 'PATCH', // 局部更新
         body: { title }, // 新群名
         auth: true, // 需登录
@@ -1500,11 +1500,11 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // renameConversation 结束
     /** GET /im/conversations/:id/members：群成员列表 */
     listMembers(conversationId: string) {
-      return request<{ items: ImMember[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/members`, { auth: true, idempotency: false });
+      return request<{ items: ImMember[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/members`, { auth: true, idempotency: false }); // 返回当前函数的处理结果
     }, // listMembers 结束
     /** POST /im/conversations/:id/members：邀请入群 */
     addMembers(conversationId: string, userIds: string[]) {
-      return request<{ ok: boolean; added: number }>(`/im/conversations/${encodeURIComponent(conversationId)}/members`, {
+      return request<{ ok: boolean; added: number }>(`/im/conversations/${encodeURIComponent(conversationId)}/members`, { // 返回当前函数的处理结果
         method: 'POST', // 新增
         body: { user_ids: userIds }, // 待邀请用户
         auth: true, // 需登录
@@ -1512,21 +1512,21 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // addMembers 结束
     /** DELETE /im/conversations/:id/members/:userId：退群或踢人 */
     removeMember(conversationId: string, userId: string) {
-      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(userId)}`, {
+      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(userId)}`, { // 返回当前函数的处理结果
         method: 'DELETE', // 移除成员
         auth: true, // 需登录
       }); // 请求结束
     }, // removeMember 结束
     /** PATCH /im/conversations/:id/members/:userId：设 / 撤管理员（仅群主） */
     setMemberRole(conversationId: string, userId: string, role: 'admin' | 'member') {
-      return request<{ ok: boolean; role: 'admin' | 'member' }>(
+      return request<{ ok: boolean; role: 'admin' | 'member' }>( // 返回当前函数的处理结果
         `/im/conversations/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(userId)}`, // 成员端点
         { method: 'PATCH', body: { role }, auth: true }, // 局部更新角色
       ); // 请求结束
     }, // setMemberRole 结束
     /** POST /im/conversations/:id/transfer：转让群主（仅群主） */
     transferOwnership(conversationId: string, userId: string) {
-      return request<{ ok: boolean; owner_user_id: string }>(`/im/conversations/${encodeURIComponent(conversationId)}/transfer`, {
+      return request<{ ok: boolean; owner_user_id: string }>(`/im/conversations/${encodeURIComponent(conversationId)}/transfer`, { // 返回当前函数的处理结果
         method: 'POST', // 转让动作
         body: { user_id: userId }, // 接任者
         auth: true, // 需登录
@@ -1534,7 +1534,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // transferOwnership 结束
     /** PATCH /im/conversations/:id/preferences：置顶 / 免打扰 */
     setPreference(conversationId: string, patch: { pinned?: boolean; muted?: boolean }) {
-      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/preferences`, {
+      return request<{ ok: boolean }>(`/im/conversations/${encodeURIComponent(conversationId)}/preferences`, { // 返回当前函数的处理结果
         method: 'PATCH', // 局部更新
         body: patch, // 开关
         auth: true, // 需登录
@@ -1542,7 +1542,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // setPreference 结束
     /** DELETE /im/conversations/:id：删除会话（群主解散 / 成员退群 / 私聊移除自己） */
     deleteConversation(conversationId: string) {
-      return request<{ ok: boolean; result: 'dissolved' | 'left' }>(`/im/conversations/${encodeURIComponent(conversationId)}`, {
+      return request<{ ok: boolean; result: 'dissolved' | 'left' }>(`/im/conversations/${encodeURIComponent(conversationId)}`, { // 返回当前函数的处理结果
         method: 'DELETE', // 删除
         auth: true, // 需登录
       }); // 请求结束
@@ -1550,14 +1550,14 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     /** GET /im/conversations/:id/messages/search?q=：会话内消息搜索 */
     searchMessages(conversationId: string, q: string, limit = 30) {
       const suffix = new URLSearchParams({ q, limit: String(limit) }).toString(); // 查询串
-      return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages/search?${suffix}`, {
+      return request<{ items: ImMessage[] }>(`/im/conversations/${encodeURIComponent(conversationId)}/messages/search?${suffix}`, { // 返回当前函数的处理结果
         auth: true, // 需登录
         idempotency: false, // 只读
       }); // 请求结束
     }, // searchMessages 结束
     /** POST /im/conversations/:id/messages/:messageId/recall：撤回消息（2 分钟内，仅本人） */
     recallMessage(conversationId: string, messageId: string) {
-      return request<{ ok: boolean }>(
+      return request<{ ok: boolean }>( // 返回当前函数的处理结果
         `/im/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/recall`, // 消息撤回端点
         { method: 'POST', body: {}, auth: true }, // 写操作
       ); // 请求结束
@@ -1579,24 +1579,24 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       if (opts.q) qs.set('q', opts.q); // 关键词：占位键 / 系统名 / 备注原文 / 职责字段
       if (opts.domain) qs.set('domain', opts.domain); // 业务域编码
       const suffix = qs.toString(); // 无参数时空串
-      return request<{ schema: string; domains: EntryDomain[]; total: number; entries: EntryModule[] }>(
+      return request<{ schema: string; domains: EntryDomain[]; total: number; entries: EntryModule[] }>( // 返回当前函数的处理结果
         `/entries${suffix ? `?${suffix}` : ''}`, // 参数经 URLSearchParams 编码，防注入
         { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束
     }, // list 结束
     detail(entryKey: string) { // 单入口详情：关联解析 + 运行时能力点
-      return request<{ entry: EntryModule; hostConfig: Record<string, unknown>; capabilities: SiteCapability[] }>(
+      return request<{ entry: EntryModule; hostConfig: Record<string, unknown>; capabilities: SiteCapability[] }>( // 返回当前函数的处理结果
         `/entries/${encodeURIComponent(entryKey)}`, // 占位键编码；公开只读
         { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束
     }, // detail 结束
     placeholders() { // 46 个占位标识及其配置状态
-      return request<{ total: number; configured: number; items: Array<{ entryKey: string; placeholder: string; envKey: string; configured: boolean; kind: string; system: string }> }>(
+      return request<{ total: number; configured: number; items: Array<{ entryKey: string; placeholder: string; envKey: string; configured: boolean; kind: string; system: string }> }>( // 返回当前函数的处理结果
         '/entries/placeholders', { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束
     }, // placeholders 结束
     config() { // 可配置占位标识模板（值恒为空，不回传具体主机值）
-      return request<{ schema: string; template: string; format: string; envPrefix: string; rule: string; resolutionOfMissing: string; hosts: Record<string, string> }>(
+      return request<{ schema: string; template: string; format: string; envPrefix: string; rule: string; resolutionOfMissing: string; hosts: Record<string, string> }>( // 返回当前函数的处理结果
         '/entries/config', { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束
     }, // config 结束
@@ -1613,13 +1613,13 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       if (opts.domain) qs.set('domain', opts.domain); // 业务域编码（新口径）
       else if (opts.group) qs.set('domain', opts.group); // 兼容旧调用：group 值按业务域处理
       const suffix = qs.toString(); // 无参数时空串
-      return request<{ domains: EntryDomain[]; groups: SiteGroup[]; total: number; modules: SiteModuleSummary[] }>(
+      return request<{ domains: EntryDomain[]; groups: SiteGroup[]; total: number; modules: SiteModuleSummary[] }>( // 返回当前函数的处理结果
         `/sites${suffix ? `?${suffix}` : ''}`, // 参数经 URLSearchParams 编码，防注入
         { auth: false, idempotency: false }, // 公开只读
       ); // 请求结束
     }, // list 结束
     detail(host: string) { // 单模块详情：备注原文、行号、能力点与条目统计
-      return request<{
+      return request<{ // 返回当前函数的处理结果
         module: SiteModuleDetail; // 完整模块定义
         capability_kinds: Record<string, { name: string; states: string[]; description: string }>; // 能力状态机字典
         stats: { total: number; byCapability: Record<string, number>; byStatus: Record<string, number> }; // 条目统计
@@ -1630,7 +1630,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       if (opts.capability) qs.set('capability', opts.capability); // 按能力过滤
       if (opts.status) qs.set('status', opts.status); // 按状态过滤
       const suffix = qs.toString(); // 无参数时空串
-      return request<{ host: string; items: SiteItem[]; total: number }>(
+      return request<{ host: string; items: SiteItem[]; total: number }>( // 返回当前函数的处理结果
         `/sites/${encodeURIComponent(host)}/items${suffix ? `?${suffix}` : ''}`, // 路径参数编码
         { auth: false, idempotency: false }, // 公开只读：浏览匿名可访问
       ); // 请求结束
@@ -1663,7 +1663,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       if (opts.verdict) qs.set('verdict', opts.verdict); // 结果（EMPTY 命中空数据项）
       if (opts.platform_id) qs.set('platform_id', opts.platform_id); // 平台编码
       const suffix = qs.toString(); // 无参数时空串
-      return request<{
+      return request<{ // 返回当前函数的处理结果
         schema: string; // 契约版本
         captured_at: string; // 取证时间
         filters: Record<string, string>; // 过滤条件回显
@@ -1676,7 +1676,7 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       }>(`/deployments${suffix ? `?${suffix}` : ''}`, { auth: false, idempotency: false }); // 公开只读
     }, // list 结束
     detail(id: string) { // 单项详情：仓库标识、交付链路、结果、异常、缺失信息、同类项
-      return request<{
+      return request<{ // 返回当前函数的处理结果
         schema: string; // 契约版本
         item: DeploymentItem; // 完整部署项
         related: Array<{ id: string; name: string; layer: string }>; // 同平台同类项
@@ -1720,250 +1720,250 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
 
   community: { // 社区论坛与知识付费
     overview() { // 首页聚合：板块、统计、当前钱包与会员
-      return request<{ boards: CommunityBoard[]; stats: { threads: number; views: number; likes: number }; wallet: WalletSnapshot; vip_level: number; vip: { plan_id: string; level: number; expires_at: string } | null }>('/community/overview', { idempotency: false });
-    },
+      return request<{ boards: CommunityBoard[]; stats: { threads: number; views: number; likes: number }; wallet: WalletSnapshot; vip_level: number; vip: { plan_id: string; level: number; expires_at: string } | null }>('/community/overview', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating' | 'recommend'; q?: string; limit?: number } = {}) { // 帖子列表
-      const qs = new URLSearchParams();
-      if (opts.board && opts.board !== 'all') qs.set('board', opts.board);
-      if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind);
-      if (opts.sort) qs.set('sort', opts.sort);
-      if (opts.q) qs.set('q', opts.q);
-      if (opts.limit) qs.set('limit', String(opts.limit));
-      const suffix = qs.toString();
-      return request<{ items: CommunityThread[]; total: number; sort: string; vip_level: number }>(`/community/threads${suffix ? `?${suffix}` : ''}`, { idempotency: false });
-    },
+      const qs = new URLSearchParams(); // 常量 qs：保存固定配置或一次性派生值
+      if (opts.board && opts.board !== 'all') qs.set('board', opts.board); // 条件分支：按判断结果选择后续处理路径
+      if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind); // 条件分支：按判断结果选择后续处理路径
+      if (opts.sort) qs.set('sort', opts.sort); // 条件分支：按判断结果选择后续处理路径
+      if (opts.q) qs.set('q', opts.q); // 条件分支：按判断结果选择后续处理路径
+      if (opts.limit) qs.set('limit', String(opts.limit)); // 条件分支：按判断结果选择后续处理路径
+      const suffix = qs.toString(); // 常量 suffix：保存固定配置或一次性派生值
+      return request<{ items: CommunityThread[]; total: number; sort: string; vip_level: number }>(`/community/threads${suffix ? `?${suffix}` : ''}`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     thread(id: string) { // 帖子详情
-      return request<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}`, { idempotency: false });
-    },
+      return request<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number; media?: CommunityThreadMedia[]; poll_options?: string[]; episodes?: Array<{ title: string; media_url: string; poster_url?: string }> }) { // 发帖
-      return request<{ thread_id: string }>('/community/threads', { method: 'POST', body: payload });
-    },
+      return request<{ thread_id: string }>('/community/threads', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     unlock(id: string) { // 解锁付费帖
-      return request<{ unlocked: boolean; charged_cents: number; via?: string }>(`/community/threads/${encodeURIComponent(id)}/unlock`, { method: 'POST', body: {} });
-    },
+      return request<{ unlocked: boolean; charged_cents: number; via?: string }>(`/community/threads/${encodeURIComponent(id)}/unlock`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     reply(id: string, content: string) { // 回复
-      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(id)}/reply`, { method: 'POST', body: { content } });
-    },
+      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(id)}/reply`, { method: 'POST', body: { content } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     like(id: string) { // 点赞开关
-      return request<{ liked: boolean }>(`/community/threads/${encodeURIComponent(id)}/like`, { method: 'POST', body: {} });
-    },
+      return request<{ liked: boolean }>(`/community/threads/${encodeURIComponent(id)}/like`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     favorite(id: string) { // 收藏开关
-      return request<{ favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}/favorite`, { method: 'POST', body: {} });
-    },
+      return request<{ favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}/favorite`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     rate(id: string, rating: number) { // 评分 1–5 星
-      return request<{ ok: boolean; summary: { avg: number | null; count: number } }>(`/community/threads/${encodeURIComponent(id)}/rate`, { method: 'POST', body: { rating } });
-    },
+      return request<{ ok: boolean; summary: { avg: number | null; count: number } }>(`/community/threads/${encodeURIComponent(id)}/rate`, { method: 'POST', body: { rating } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     vote(id: string, optionId: string) { // 投票
-      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(id)}/vote`, { method: 'POST', body: { option_id: optionId } });
-    },
+      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(id)}/vote`, { method: 'POST', body: { option_id: optionId } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     joinBoard(slug: string) { // 加入付费板块
-      return request<{ joined: boolean; charged_cents: number; via?: string }>(`/community/boards/${encodeURIComponent(slug)}/join`, { method: 'POST', body: {} });
-    },
+      return request<{ joined: boolean; charged_cents: number; via?: string }>(`/community/boards/${encodeURIComponent(slug)}/join`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     followBoard(slug: string) { // 关注 / 取消关注板块
-      return request<{ followed: boolean }>(`/community/boards/${encodeURIComponent(slug)}/follow`, { method: 'POST', body: {} });
-    },
+      return request<{ followed: boolean }>(`/community/boards/${encodeURIComponent(slug)}/follow`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     createBoard(payload: { slug: string; name: string; description?: string; icon?: string; price_cents?: number; visibility?: 'public' | 'followers'; post_min_level?: number }) { // 创建板块
-      return request<{ ok: boolean; slug: string }>('/community/boards', { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; slug: string }>('/community/boards', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     acceptPost(threadId: string, postId: string) { // 问答采纳
-      return request<{ ok: boolean; accepted_post_id: string }>(`/community/threads/${encodeURIComponent(threadId)}/accept`, { method: 'POST', body: { post_id: postId } });
-    },
+      return request<{ ok: boolean; accepted_post_id: string }>(`/community/threads/${encodeURIComponent(threadId)}/accept`, { method: 'POST', body: { post_id: postId } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     deleteThread(threadId: string) { // 作者 / 版主软删
-      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(threadId)}`, { method: 'DELETE' });
-    },
+      return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(threadId)}`, { method: 'DELETE' }); // 返回当前函数的处理结果
+    }, // 代码块结束
     favorites() { // 我的收藏
-      return request<{ items: CommunityThread[] }>('/community/favorites', { idempotency: false });
-    },
+      return request<{ items: CommunityThread[] }>('/community/favorites', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     homeSetting() { // 论坛设为首页开关（公开；404 / 异常由前端回落现状门户）
-      return request<{ home: 'community' | 'portal' }>('/community/home-setting', { auth: false, idempotency: false });
-    },
+      return request<{ home: 'community' | 'portal' }>('/community/home-setting', { auth: false, idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     boardTabs(slug: string) { // 板块 Tab 栏目配置（公开；接口缺失时前端回落内置默认 Tab）
-      return request<{ tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { auth: false, idempotency: false });
-    },
+      return request<{ tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { auth: false, idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     saveBoardTabs(slug: string, tabs: BoardTabInput[]) { // 版主 / 运营保存栏目组合（顺序 / 显隐 / 排序口径）
-      return request<{ ok: boolean; tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { method: 'PUT', body: { tabs } });
-    },
-  },
+      return request<{ ok: boolean; tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { method: 'PUT', body: { tabs } }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   vip: { // 会员
     plans() { // 套餐列表
-      return request<{ plans: VipPlan[] }>('/vip/plans', { idempotency: false });
-    },
+      return request<{ plans: VipPlan[] }>('/vip/plans', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     subscribe(code: string) { // 开通 / 续费
-      return request<{ ok: boolean; level: number; expires_at: string }>('/vip/subscribe', { method: 'POST', body: { code } });
-    },
-  },
+      return request<{ ok: boolean; level: number; expires_at: string }>('/vip/subscribe', { method: 'POST', body: { code } }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   wallet: { // 钱包
     get() { // 余额 / 积分 / 签到 / 流水
-      return request<{ wallet: WalletSnapshot; checked_in_today: boolean; transactions: WalletTransaction[]; vip_level: number }>('/wallet', { idempotency: false });
-    },
+      return request<{ wallet: WalletSnapshot; checked_in_today: boolean; transactions: WalletTransaction[]; vip_level: number }>('/wallet', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     checkin() { // 每日签到
-      return request<{ ok: boolean; points: number }>('/wallet/checkin', { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean; points: number }>('/wallet/checkin', { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     redeem(code: string) { // 充值卡兑换
-      return request<{ ok: boolean; amount_cents: number }>('/wallet/redeem', { method: 'POST', body: { code } });
-    },
+      return request<{ ok: boolean; amount_cents: number }>('/wallet/redeem', { method: 'POST', body: { code } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     transferPoints(payload: { to_member_no: string; points: number; note?: string }) { // 积分转给其他用户
-      return request<{ ok: boolean; points: number; to: string }>('/wallet/points/transfer', { method: 'POST', body: payload });
-    },
-  },
+      return request<{ ok: boolean; points: number; to: string }>('/wallet/points/transfer', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   shop: { // 独立商城
     products() { // 商品列表
-      return request<{ products: ShopProduct[] }>('/shop/products', { idempotency: false });
-    },
+      return request<{ products: ShopProduct[] }>('/shop/products', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     order(payload: { product_code: string; quantity?: number; coupon_code?: string; shipping?: { name: string; phone: string; address: string } }) { // 下单
-      return request<{ order_id: string; payable_cents: number; discount_cents: number; delivery_kind: string }>('/shop/orders', { method: 'POST', body: payload });
-    },
+      return request<{ order_id: string; payable_cents: number; discount_cents: number; delivery_kind: string }>('/shop/orders', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     orders() { // 我的订单
-      return request<{ items: ShopOrder[] }>('/shop/orders', { idempotency: false });
-    },
+      return request<{ items: ShopOrder[] }>('/shop/orders', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     confirm(id: string) { // 确认收货 / 完成人工发货
-      return request<{ ok: boolean }>(`/shop/orders/${encodeURIComponent(id)}/confirm`, { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean }>(`/shop/orders/${encodeURIComponent(id)}/confirm`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     refund(id: string) { // 退款
-      return request<{ ok: boolean; refunded_cents: number }>(`/shop/orders/${encodeURIComponent(id)}/refund`, { method: 'POST', body: {} });
-    },
-  },
+      return request<{ ok: boolean; refunded_cents: number }>(`/shop/orders/${encodeURIComponent(id)}/refund`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   coupon: { // 优惠码
     validate(code: string, amount_cents: number) { // 预校验
-      return request<{ valid: boolean; discount_cents: number }>('/coupons/validate', { method: 'POST', body: { code, amount_cents } });
-    },
-  },
+      return request<{ valid: boolean; discount_cents: number }>('/coupons/validate', { method: 'POST', body: { code, amount_cents } }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   referral: { // 推广
     get() { // 我的邀请码与佣金
-      return request<{ code: string; invited: { count: number; commission: number }; commission_cents: number }>('/referral', { idempotency: false });
-    },
+      return request<{ code: string; invited: { count: number; commission: number }; commission_cents: number }>('/referral', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     bind(code: string) { // 绑定邀请码
-      return request<{ ok: boolean }>('/referral/bind', { method: 'POST', body: { code } });
-    },
-  },
+      return request<{ ok: boolean }>('/referral/bind', { method: 'POST', body: { code } }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   // ---------- 商业化中台（commerce）：资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 国际化 ----------
 
   commerce: { // 商业化二期：与 services/mim-api 新路由一一对应
     siteConfig() { // 公开站点启动配置（无需会话）；points_deduction 为积分抵扣开关与兑换口径，前端据此决定是否展示抵扣面板
-      return request<{ home_view: 'store' | 'community'; theme: ThemeSettings; site: Record<string, unknown>; locales: I18nSettings | Record<string, never>; points_deduction?: PointsDeductionConfig }>('/site/config', { idempotency: false });
-    },
+      return request<{ home_view: 'store' | 'community'; theme: ThemeSettings; site: Record<string, unknown>; locales: I18nSettings | Record<string, never>; points_deduction?: PointsDeductionConfig }>('/site/config', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     assets(opts: { kind?: string; q?: string } = {}) { // 资产列表
       const qs = new URLSearchParams(); // 查询串
       if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind); // 类型过滤
       if (opts.q) qs.set('q', opts.q); // 关键词
       const suffix = qs.toString(); // 序列化
-      return request<{ items: PaidAsset[]; vip_level: number }>(`/assets${suffix ? `?${suffix}` : ''}`, { idempotency: false });
-    },
+      return request<{ items: PaidAsset[]; vip_level: number }>(`/assets${suffix ? `?${suffix}` : ''}`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     asset(code: string) { // 资产详情（未解锁只回试读）
-      return request<{ asset: PaidAssetDetail }>(`/assets/${encodeURIComponent(code)}`, { idempotency: false });
-    },
+      return request<{ asset: PaidAssetDetail }>(`/assets/${encodeURIComponent(code)}`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     purchaseAsset(code: string) { // 余额购买
-      return request<{ ok: boolean; charged_cents: number; via: string }>(`/assets/${encodeURIComponent(code)}/purchase`, { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean; charged_cents: number; via: string }>(`/assets/${encodeURIComponent(code)}/purchase`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     createAsset(payload: { code: string; kind: PaidAssetKind; title: string; summary: string; body: string; price_cents: number; cover_url?: string; file_url?: string; vip_free?: boolean; media?: Array<{ kind: 'image' | 'video'; url: string; poster_url?: string }> }) { // 作者发布
-      return request<{ ok: boolean; code: string }>('/assets', { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; code: string }>('/assets', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     channels() { // 支付渠道配置状态
-      return request<{ channels: PaymentChannel[] }>('/payments/channels', { idempotency: false });
-    },
+      return request<{ channels: PaymentChannel[] }>('/payments/channels', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     createIntent(payload: { purpose: 'shop_order' | 'vip' | 'asset' | 'recharge'; ref_id: string; provider: PaymentProvider; amount_cents?: number }) { // 创建支付意图
-      return request<{ intent: PaymentIntent; next: { provider: string; pay_url?: string; qr_text?: string; note?: string } }>('/payments/intents', { method: 'POST', body: payload });
-    },
+      return request<{ intent: PaymentIntent; next: { provider: string; pay_url?: string; qr_text?: string; note?: string } }>('/payments/intents', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     cancelIntent(id: string) { // 取消未支付
-      return request<{ ok: boolean }>(`/payments/intents/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean }>(`/payments/intents/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     offlineConfirm(id: string) { // 运营线下确认
-      return request<{ ok: boolean; status: string }>(`/payments/intents/${encodeURIComponent(id)}/offline-confirm`, { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean; status: string }>(`/payments/intents/${encodeURIComponent(id)}/offline-confirm`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     ship(orderId: string, payload: { carrier: string; tracking_no: string; status?: string; events?: Array<{ text: string }> }) { // 发货
-      return request<{ ok: boolean; status: string }>(`/shop/orders/${encodeURIComponent(orderId)}/ship`, { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; status: string }>(`/shop/orders/${encodeURIComponent(orderId)}/ship`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     shipment(orderId: string) { // 物流轨迹
-      return request<{ shipment: Shipment | null }>(`/shop/orders/${encodeURIComponent(orderId)}/shipment`, { idempotency: false });
-    },
+      return request<{ shipment: Shipment | null }>(`/shop/orders/${encodeURIComponent(orderId)}/shipment`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     applyAfterSales(orderId: string, payload: { kind: 'refund' | 'return'; reason: string }) { // 申请售后
-      return request<{ ok: boolean; id: string; amount_cents: number }>(`/shop/orders/${encodeURIComponent(orderId)}/after-sales`, { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; id: string; amount_cents: number }>(`/shop/orders/${encodeURIComponent(orderId)}/after-sales`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     myAfterSales() { // 我的售后
-      return request<{ items: AfterSale[] }>('/after-sales/mine', { idempotency: false });
-    },
+      return request<{ items: AfterSale[] }>('/after-sales/mine', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     reviewAfterSales(id: string, payload: { approve: boolean; note?: string }) { // 运营审核
-      return request<{ ok: boolean; status: string }>(`/after-sales/${encodeURIComponent(id)}/review`, { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; status: string }>(`/after-sales/${encodeURIComponent(id)}/review`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     reviewOrder(orderId: string, payload: { rating: number; content: string }) { // 订单评价
-      return request<{ ok: boolean }>(`/shop/orders/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean }>(`/shop/orders/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     productReviews(code: string) { // 商品评价聚合
-      return request<{ summary: { count: number; avg: number }; items: ProductReview[] }>(`/shop/products/${encodeURIComponent(code)}/reviews`, { idempotency: false });
-    },
+      return request<{ summary: { count: number; avg: number }; items: ProductReview[] }>(`/shop/products/${encodeURIComponent(code)}/reviews`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     withdrawals() { // 我的提现
-      return request<{ items: Withdrawal[]; balance_cents: number }>('/wallet/withdrawals', { idempotency: false });
-    },
+      return request<{ items: Withdrawal[]; balance_cents: number }>('/wallet/withdrawals', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     applyWithdrawal(payload: { amount_cents: number; channel: 'alipay' | 'wechat' | 'bank'; account: string }) { // 申请提现
-      return request<{ ok: boolean; id: string; status: string; amount_cents: number }>('/wallet/withdrawals', { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; id: string; status: string; amount_cents: number }>('/wallet/withdrawals', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     reviewWithdrawal(id: string, payload: { action: 'approve' | 'paid' | 'reject'; note?: string }) { // 运营审核
-      return request<{ ok: boolean; status: string }>(`/withdrawals/${encodeURIComponent(id)}/review`, { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; status: string }>(`/withdrawals/${encodeURIComponent(id)}/review`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     earnings() { // 创作者收益
-      return request<{ items: CreatorEarning[]; summary: { pending: number; settled: number } }>('/earnings', { idempotency: false });
-    },
+      return request<{ items: CreatorEarning[]; summary: { pending: number; settled: number } }>('/earnings', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     settleEarnings() { // 待结算转余额
-      return request<{ ok: boolean; settled_cents: number; count: number }>('/earnings/settle', { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean; settled_cents: number; count: number }>('/earnings/settle', { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     financeSummary() { // 平台资金汇总
-      return request<{ wallets: { users: number; balance: number }; withdrawals: Array<{ status: string; count: number; amount: number }>; earnings: Array<{ status: string; count: number; amount: number }>; orders: { count: number; amount: number } }>('/admin/finance/summary', { idempotency: false });
-    },
+      return request<{ wallets: { users: number; balance: number }; withdrawals: Array<{ status: string; count: number; amount: number }>; earnings: Array<{ status: string; count: number; amount: number }>; orders: { count: number; amount: number } }>('/admin/finance/summary', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     appearance() { // 外观与页面
-      return request<{ settings: { theme?: ThemeSettings; locales?: I18nSettings; site?: Record<string, unknown> }; pages: Array<{ page: string; blocks: number }> }>('/appearance', { idempotency: false });
-    },
+      return request<{ settings: { theme?: ThemeSettings; locales?: I18nSettings; site?: Record<string, unknown> }; pages: Array<{ page: string; blocks: number }> }>('/appearance', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     updateAppearance(key: 'theme' | 'locales' | 'site' | 'home', value: Record<string, unknown>) { // 更新设置
-      return request<{ ok: boolean; key: string }>('/appearance/settings', { method: 'PUT', body: { key, value } });
-    },
+      return request<{ ok: boolean; key: string }>('/appearance/settings', { method: 'PUT', body: { key, value } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     page(page: string) { // 页面区块
-      return request<{ page: string; blocks: PageBlock[] }>(`/pages/${encodeURIComponent(page)}`, { idempotency: false });
-    },
+      return request<{ page: string; blocks: PageBlock[] }>(`/pages/${encodeURIComponent(page)}`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     createBlock(page: string, payload: { kind: string; sort_order?: number; config?: Record<string, unknown> }) { // 新建区块
-      return request<{ ok: boolean; id: string }>(`/pages/${encodeURIComponent(page)}/blocks`, { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; id: string }>(`/pages/${encodeURIComponent(page)}/blocks`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     updateBlock(page: string, id: string, payload: { config?: Record<string, unknown>; sort_order?: number; enabled?: boolean }) { // 修改区块
-      return request<{ ok: boolean }>(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'PUT', body: payload });
-    },
+      return request<{ ok: boolean }>(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'PUT', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     deleteBlock(page: string, id: string) { // 删除区块
-      return request<{ ok: boolean }>(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    },
+      return request<{ ok: boolean }>(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'DELETE' }); // 返回当前函数的处理结果
+    }, // 代码块结束
     reorderBlocks(page: string, ids: string[]) { // 批量排序
-      return request<{ ok: boolean; count: number }>(`/pages/${encodeURIComponent(page)}/reorder`, { method: 'PUT', body: { ids } });
-    },
+      return request<{ ok: boolean; count: number }>(`/pages/${encodeURIComponent(page)}/reorder`, { method: 'PUT', body: { ids } }); // 返回当前函数的处理结果
+    }, // 代码块结束
     growth() { // 我的等级 / 徽章
-      return request<GrowthSnapshot>('/me/growth', { idempotency: false });
-    },
+      return request<GrowthSnapshot>('/me/growth', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     syncGrowth() { // 徽章自动发放
-      return request<{ ok: boolean; awarded: string[] }>('/me/growth/sync', { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean; awarded: string[] }>('/me/growth/sync', { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     messages(box: 'inbox' | 'sent' = 'inbox') { // 私信
-      return request<{ box: string; items: DirectMessage[]; unread: number }>(`/messages?box=${box}`, { idempotency: false });
-    },
+      return request<{ box: string; items: DirectMessage[]; unread: number }>(`/messages?box=${box}`, { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     sendMessage(payload: { to_member_no: string; content: string }) { // 发私信
-      return request<{ ok: boolean; id: string }>('/messages', { method: 'POST', body: payload });
-    },
+      return request<{ ok: boolean; id: string }>('/messages', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     readMessage(id: string) { // 标记已读
-      return request<{ ok: boolean }>(`/messages/${encodeURIComponent(id)}/read`, { method: 'POST', body: {} });
-    },
+      return request<{ ok: boolean }>(`/messages/${encodeURIComponent(id)}/read`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
     ip() { // IP 归属地
-      return request<{ region_code: string; ip_hash_prefix: string; note: string }>('/me/ip', { idempotency: false });
-    },
+      return request<{ region_code: string; ip_hash_prefix: string; note: string }>('/me/ip', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     i18nSettings() { // 语言分离配置
-      return request<{ settings: I18nSettings; provider_configured: boolean }>('/i18n/settings', { idempotency: false });
-    },
+      return request<{ settings: I18nSettings; provider_configured: boolean }>('/i18n/settings', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     updateI18n(payload: { front: 'zh-CN' | 'en-US'; admin: 'zh-CN' | 'en-US'; machine_translation: boolean }) { // 更新语言
-      return request<{ ok: boolean; settings: I18nSettings }>('/i18n/settings', { method: 'PUT', body: payload });
-    },
+      return request<{ ok: boolean; settings: I18nSettings }>('/i18n/settings', { method: 'PUT', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
     translate(text: string, target: 'zh-CN' | 'en-US') { // 机器翻译
-      return request<{ translated_text: string; provider: string; cached: boolean; translated: boolean }>('/i18n/translate', { method: 'POST', body: { text, target } });
-    },
-  },
+      return request<{ translated_text: string; provider: string; cached: boolean; translated: boolean }>('/i18n/translate', { method: 'POST', body: { text, target } }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
 
   // ---------- 统一搜索（search）：五来源聚合检索，浏览公开 ----------
 
@@ -1984,14 +1984,14 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
 
   content: { // 内容栏目：路径 /announcements、/changelog、/promotions
     announcements(limit = 10) { // 公告清单：置顶优先，失败由调用方静默隐藏
-      return request<{ items: AnnouncementItem[] }>(`/announcements?limit=${limit}`, { auth: false, idempotency: false });
-    },
+      return request<{ items: AnnouncementItem[] }>(`/announcements?limit=${limit}`, { auth: false, idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     changelog(limit = 20) { // 更新日志时间线：按版本 / 发布时间倒序
-      return request<{ items: ChangelogItem[] }>(`/changelog?limit=${limit}`, { auth: false, idempotency: false });
-    },
+      return request<{ items: ChangelogItem[] }>(`/changelog?limit=${limit}`, { auth: false, idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
     promotions() { // 推广计划卡片：进行中且在有效期内
-      return request<{ items: PromotionItem[] }>('/promotions', { auth: false, idempotency: false });
-    },
+      return request<{ items: PromotionItem[] }>('/promotions', { auth: false, idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
 
     // ===== 管理端 CRUD（复用 /admin/content/* 契约；挂 appearance:write 权限，无权限时前端静默隐藏）=====
 
@@ -2520,7 +2520,7 @@ export interface PointsDeductionConfig {
   enabled: boolean; // 积分抵扣总开关
   points_per_yuan: number; // 多少积分折抵 1 元
   max_ratio_percent: number; // 单笔抵扣上限占应付金额的百分比（0–100）
-}
+} // 代码块结束
 
 export interface AnnouncementItem { // 公告条目
   id: string; // 主键
@@ -2532,7 +2532,7 @@ export interface AnnouncementItem { // 公告条目
   status?: 'draft' | 'published' | 'archived'; // 管理端：审核状态（公开清单缺省）
   starts_at?: string | null; // 管理端：有效期起
   ends_at?: string | null; // 管理端：有效期止
-}
+} // 代码块结束
 
 export interface ChangelogItem { // 更新日志条目
   id: string; // 主键
@@ -2542,7 +2542,7 @@ export interface ChangelogItem { // 更新日志条目
   published_at: string | null; // 发布时间
   changes?: string[]; // 管理端：变更清单
   status?: 'draft' | 'published' | 'archived'; // 管理端：审核状态（公开清单缺省）
-}
+} // 代码块结束
 
 export interface PromotionItem { // 推广计划条目
   id: string; // 主键
@@ -2554,7 +2554,7 @@ export interface PromotionItem { // 推广计划条目
   status: string; // 状态
   code?: string | null; // 管理端：推广码
   budget_cents?: number; // 管理端：预算（分，仅统计）
-}
+} // 代码块结束
 
 /** 公告管理入参（与 /admin/content/announcements 契约对齐） */
 export interface AnnouncementUpsertPayload {
@@ -2565,7 +2565,7 @@ export interface AnnouncementUpsertPayload {
   starts_at?: string | null; // 有效期起
   ends_at?: string | null; // 有效期止
   pinned?: boolean; // 是否置顶
-}
+} // 代码块结束
 
 /** 更新日志管理入参（与 /admin/content/changelog 契约对齐） */
 export interface ChangelogUpsertPayload {
@@ -2575,7 +2575,7 @@ export interface ChangelogUpsertPayload {
   changes?: string[]; // 变更清单
   published_at?: string | null; // 发布时间
   status?: 'draft' | 'published' | 'archived'; // 状态
-}
+} // 代码块结束
 
 /** 推广计划管理入参（与 /admin/content/promotions 契约对齐） */
 export interface PromotionUpsertPayload {
@@ -2587,7 +2587,7 @@ export interface PromotionUpsertPayload {
   ends_at?: string | null; // 有效期止
   status?: 'draft' | 'active' | 'paused' | 'archived'; // 状态
   budget_cents?: number; // 预算（分，仅统计）
-}
+} // 代码块结束
 
 // ---------- 板块 Tab 栏目：兼容后端 sort_order/sort_by 与冻结契约 order/sort 两套字段名 ----------
 
@@ -2599,7 +2599,7 @@ export interface BoardTab { // 板块 Tab 配置视图
   visible: boolean; // 是否展示
   sort?: string; // 排序口径（冻结契约字段）
   sort_by?: string; // 排序口径（后端字段，优先于 sort）
-}
+} // 代码块结束
 
 export interface BoardTabInput { // 保存栏目入参
   key: string; // 栏目标识
@@ -2607,7 +2607,7 @@ export interface BoardTabInput { // 保存栏目入参
   visible?: boolean; // 是否展示
   sort_order?: number; // 展示顺序
   sort_by?: string; // 排序口径
-}
+} // 代码块结束
 
 // ---------- 自研工具目录类型 ----------
 
@@ -2616,7 +2616,7 @@ export interface ToolVersionNote { // 版本记录条目
   title?: string; // 版本标题
   notes?: string; // 更新说明
   released_at?: string; // 发布时间
-}
+} // 代码块结束
 
 export interface ToolItem { // 工具清单 / 详情视图
   id: string; // 主键
@@ -2631,7 +2631,7 @@ export interface ToolItem { // 工具清单 / 详情视图
   sort_order: number; // 展示顺序
   created_at: string; // 创建时间
   updated_at: string; // 更新时间
-}
+} // 代码块结束
 
 export interface ToolUpsertPayload { // 新建 / 更新工具入参
   slug?: string; // 新建时必填；更新时不可改
@@ -2643,7 +2643,7 @@ export interface ToolUpsertPayload { // 新建 / 更新工具入参
   tags?: string[]; // 标签
   status?: 'draft' | 'active' | 'archived'; // 状态
   sort_order?: number; // 排序
-}
+} // 代码块结束
 
 export interface GrowthBadge { // 徽章
   code: string; // 编码
@@ -2652,14 +2652,14 @@ export interface GrowthBadge { // 徽章
   icon: string; // 图标
   awarded: number; // 是否已获得
   awarded_at: string | null; // 获得时间
-}
+} // 代码块结束
 
 export interface GrowthSnapshot { // 成长快照
   level: number; // 等级
   next_points: number; // 下一级所需积分
   stats: { points: number; orders: number; assets: number; checkins: number; vip_level: number }; // 统计
   badges: GrowthBadge[]; // 徽章
-}
+} // 代码块结束
 
 export interface DirectMessage { // 私信
   id: string; // 主键
@@ -2668,4 +2668,4 @@ export interface DirectMessage { // 私信
   created_at: string; // 时间
   peer_member_no: string; // 对方 Mim ID
   peer_name: string; // 对方昵称
-}
+} // 代码块结束

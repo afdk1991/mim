@@ -34,7 +34,7 @@ export interface BatchFilter {
   category_slug?: string; // 仅模块：一级 slug（前缀覆盖二级）或二级 slug（精确）
   codes?: string[]; // 显式编码清单（模块 code / 商品 code），与其它条件取交集
   include_inactive?: boolean; // 是否纳入下架 / 归档目标；缺省 false 只改在售
-}
+} // 代码块结束
 
 /** 批量改价请求（路由层校验后透传） */
 export interface BatchRequest {
@@ -45,7 +45,7 @@ export interface BatchRequest {
   filter: BatchFilter; // 筛选条件快照
   idempotencyKey: string; // 幂等键（操作人作用域内唯一）
   actorId: string; // 操作人用户 ID 或 bootstrap 标记
-}
+} // 代码块结束
 
 /** 批次明细视图 */
 export interface BatchItemView {
@@ -57,7 +57,7 @@ export interface BatchItemView {
   after_amount_minor: number | null; // 改后价格（分）
   skipped: boolean; // 是否按安全规则跳过
   reason: string | null; // 跳过原因
-}
+} // 代码块结束
 
 /** 批次对外视图 */
 export interface BatchView {
@@ -74,35 +74,35 @@ export interface BatchView {
   created_at: string; // 创建时间
   rolled_back_at: string | null; // 回滚时间；null 表示未回滚
   items: BatchItemView[]; // 明细快照
-}
+} // 代码块结束
 
 /** 入参形态校验：模式与方向必须匹配，参数落在合法区间 */
 function validateRequest(req: BatchRequest): void {
-  if (!Number.isInteger(req.value) || req.value < 0) {
+  if (!Number.isInteger(req.value) || req.value < 0) { // 条件分支：按判断结果选择后续处理路径
     throw new AppError('VALIDATION_FAILED', 'value must be a non-negative integer', { field: 'value' }); // 金额 / 比例均为非负整数
-  }
-  if (req.mode === 'fixed') {
+  } // 代码块结束
+  if (req.mode === 'fixed') { // 条件分支：按判断结果选择后续处理路径
     if (req.direction !== 'set') throw new AppError('VALIDATION_FAILED', 'fixed price mode requires direction=set'); // 固定价无增减方向
-  } else {
-    if (req.direction !== 'increase' && req.direction !== 'decrease') {
+  } else { // 代码块结束
+    if (req.direction !== 'increase' && req.direction !== 'decrease') { // 条件分支：按判断结果选择后续处理路径
       throw new AppError('VALIDATION_FAILED', `${req.mode} mode requires direction=increase|decrease`); // 增减模式必须带方向
-    }
-    if (req.mode === 'percent' && (req.value < 1 || req.value > 100)) {
+    } // 代码块结束
+    if (req.mode === 'percent' && (req.value < 1 || req.value > 100)) { // 条件分支：按判断结果选择后续处理路径
       throw new AppError('VALIDATION_FAILED', 'percent value must be between 1 and 100'); // 百分比区间
-    }
-  }
-}
+    } // 代码块结束
+  } // 代码块结束
+} // 代码块结束
 
 /** 按模式计算新价；结果夹到非负整数（分） */
 function applyMode(mode: BatchMode, direction: BatchDirection, value: number, oldPrice: number): number {
   if (mode === 'fixed') return value; // 固定价直接覆盖
-  if (mode === 'percent') {
+  if (mode === 'percent') { // 条件分支：按判断结果选择后续处理路径
     const factor = direction === 'increase' ? (100 + value) / 100 : (100 - value) / 100; // 上浮 / 下浮系数
     return Math.max(0, Math.round(oldPrice * factor)); // 四舍五入到分，不为负
-  }
+  } // 代码块结束
   // amount：固定金额加减
   return Math.max(0, direction === 'increase' ? oldPrice + value : oldPrice - value);
-}
+} // 代码块结束
 
 /** 目标候选行：统一成内部结构，模块与商品两条查询各自填充 */
 interface Candidate {
@@ -113,12 +113,12 @@ interface Candidate {
   current: number; // 当前价格（分）
   status: string; // 在售状态
   categorySlug: string | null; // 归属二级分类标识（商品为空）
-}
+} // 代码块结束
 
 /** 解析模块候选：当前生效价格行 + 模块状态 / 分类 / 区域 */
 function resolveModuleCandidates(db: Db, filter: BatchFilter, now: string): Candidate[] {
-  const rows = db
-    .prepare(
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT m.id, m.code, m.status, m.category_slug,
               p.id AS price_row_id, p.currency, p.amount_minor
          FROM modules m
@@ -126,80 +126,80 @@ function resolveModuleCandidates(db: Db, filter: BatchFilter, now: string): Cand
            AND p.effective_from <= ? AND (p.effective_to IS NULL OR p.effective_to >= ?)
         WHERE m.deleted_at IS NULL
           AND (? = '' OR m.region = ?)`,
-    )
-    .all(now, now, filter.region ?? '', filter.region ?? '') as Array<{
-      id: string; code: string; status: string; category_slug: string | null;
-      price_row_id: string | null; currency: string | null; amount_minor: number | null;
-    }>;
-  return rows.map((row) => ({
-    targetId: row.id, targetCode: row.code, currency: row.currency, priceRowId: row.price_row_id,
-    current: row.amount_minor ?? 0, status: row.status, categorySlug: row.category_slug,
-  }));
-}
+    ) // 执行当前业务步骤
+    .all(now, now, filter.region ?? '', filter.region ?? '') as Array<{ // 注册 ALL 路由 / 中间件处理器
+      id: string; code: string; status: string; category_slug: string | null; // 对象字段 id：记录一项配置或数据
+      price_row_id: string | null; currency: string | null; amount_minor: number | null; // 对象字段 price_row_id：记录一项配置或数据
+    }>; // 代码块结束
+  return rows.map((row) => ({ // 返回当前函数的处理结果
+    targetId: row.id, targetCode: row.code, currency: row.currency, priceRowId: row.price_row_id, // 对象字段 targetId：记录一项配置或数据
+    current: row.amount_minor ?? 0, status: row.status, categorySlug: row.category_slug, // 对象字段 current：记录一项配置或数据
+  })); // 代码块结束
+} // 代码块结束
 
 /** 解析独立商城商品候选 */
 function resolveShopCandidates(db: Db): Candidate[] {
-  const rows = db
-    .prepare('SELECT id, code, price_cents, status FROM shop_products')
-    .all() as Array<{ id: string; code: string; price_cents: number; status: string }>;
-  return rows.map((row) => ({ targetId: row.id, targetCode: row.code, currency: null, priceRowId: null, current: row.price_cents, status: row.status, categorySlug: null }));
-}
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare('SELECT id, code, price_cents, status FROM shop_products') // 执行当前业务步骤
+    .all() as Array<{ id: string; code: string; price_cents: number; status: string }>; // 注册 ALL 路由 / 中间件处理器
+  return rows.map((row) => ({ targetId: row.id, targetCode: row.code, currency: null, priceRowId: null, current: row.price_cents, status: row.status, categorySlug: null })); // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 按筛选条件收敛候选集；分类前缀 / 编码清单 / 在售状态三类过滤取交集 */
 function filterCandidates(candidates: Candidate[], filter: BatchFilter): Candidate[] {
   const codeSet = filter.codes && filter.codes.length > 0 ? new Set(filter.codes) : null; // 显式编码清单
   const category = filter.category_slug?.trim() ?? ''; // 分类过滤条件
-  return candidates.filter((item) => {
+  return candidates.filter((item) => { // 返回当前函数的处理结果
     if (codeSet && !codeSet.has(item.targetCode)) return false; // 编码不在清单内剔除
     if (!filter.include_inactive && item.status !== 'active') return false; // 缺省只改在售
-    if (category) {
+    if (category) { // 条件分支：按判断结果选择后续处理路径
       const slug = item.categorySlug ?? ''; // 商品无分类标识
       if (!slug || (slug !== category && !slug.startsWith(`${category}-`))) return false; // 二级精确 / 一级前缀
-    }
-    return true;
-  });
-}
+    } // 代码块结束
+    return true; // 返回当前函数的处理结果
+  }); // 代码块结束
+} // 代码块结束
 
 interface BatchHeaderRow { // 批次头表行结构
-  id: string; idempotency_key: string; actor_id: string; target_type: BatchTargetType;
-  mode: BatchMode; direction: BatchDirection; value: number; filter_json: string;
-  total: number; changed: number; skipped: number; created_at: string; rolled_back_at: string | null;
-}
+  id: string; idempotency_key: string; actor_id: string; target_type: BatchTargetType; // 对象字段 id：记录一项配置或数据
+  mode: BatchMode; direction: BatchDirection; value: number; filter_json: string; // 对象字段 mode：记录一项配置或数据
+  total: number; changed: number; skipped: number; created_at: string; rolled_back_at: string | null; // 对象字段 total：记录一项配置或数据
+} // 代码块结束
 
 interface BatchItemRow { // 批次明细表行结构
-  target_type: BatchTargetType; target_id: string; price_row_id: string | null; target_code: string | null;
-  currency: string | null; before_amount_minor: number | null; after_amount_minor: number | null;
-  skipped: number; reason: string | null;
-}
+  target_type: BatchTargetType; target_id: string; price_row_id: string | null; target_code: string | null; // 对象字段 target_type：记录一项配置或数据
+  currency: string | null; before_amount_minor: number | null; after_amount_minor: number | null; // 对象字段 currency：记录一项配置或数据
+  skipped: number; reason: string | null; // 对象字段 skipped：记录一项配置或数据
+} // 代码块结束
 
 /** 把库内批次行组装成对外视图（明细一并带出） */
 function toBatchView(db: Db, header: BatchHeaderRow): BatchView {
-  const items = db.prepare('SELECT * FROM price_batch_items WHERE batch_id = ? ORDER BY rowid ASC').all(header.id) as BatchItemRow[];
-  return {
-    id: header.id, idempotency_key: header.idempotency_key, target_type: header.target_type,
-    mode: header.mode, direction: header.direction, value: header.value,
-    filter: JSON.parse(header.filter_json) as BatchFilter,
-    total: header.total, changed: header.changed, skipped: header.skipped,
-    created_at: header.created_at, rolled_back_at: header.rolled_back_at,
-    items: items.map((item) => ({
-      target_type: item.target_type, target_id: item.target_id, target_code: item.target_code,
-      currency: item.currency, before_amount_minor: item.before_amount_minor, after_amount_minor: item.after_amount_minor,
-      skipped: item.skipped === 1, reason: item.reason,
-    })),
-  };
-}
+  const items = db.prepare('SELECT * FROM price_batch_items WHERE batch_id = ? ORDER BY rowid ASC').all(header.id) as BatchItemRow[]; // 常量 items：保存固定配置或一次性派生值
+  return { // 返回当前函数的处理结果
+    id: header.id, idempotency_key: header.idempotency_key, target_type: header.target_type, // 对象字段 id：记录一项配置或数据
+    mode: header.mode, direction: header.direction, value: header.value, // 对象字段 mode：记录一项配置或数据
+    filter: JSON.parse(header.filter_json) as BatchFilter, // 对象字段 filter：记录一项配置或数据
+    total: header.total, changed: header.changed, skipped: header.skipped, // 对象字段 total：记录一项配置或数据
+    created_at: header.created_at, rolled_back_at: header.rolled_back_at, // 对象字段 created_at：记录一项配置或数据
+    items: items.map((item) => ({ // 对象字段 items：记录一项配置或数据
+      target_type: item.target_type, target_id: item.target_id, target_code: item.target_code, // 对象字段 target_type：记录一项配置或数据
+      currency: item.currency, before_amount_minor: item.before_amount_minor, after_amount_minor: item.after_amount_minor, // 对象字段 currency：记录一项配置或数据
+      skipped: item.skipped === 1, reason: item.reason, // 对象字段 skipped：记录一项配置或数据
+    })), // 代码块结束
+  }; // 代码块结束
+} // 代码块结束
 
 /** 按主键取批次；不存在返回 null */
 export function getBatch(db: Db, batchId: string): BatchView | null {
-  const header = db.prepare('SELECT * FROM price_batches WHERE id = ?').get(batchId) as BatchHeaderRow | undefined;
-  return header ? toBatchView(db, header) : null;
-}
+  const header = db.prepare('SELECT * FROM price_batches WHERE id = ?').get(batchId) as BatchHeaderRow | undefined; // 常量 header：保存固定配置或一次性派生值
+  return header ? toBatchView(db, header) : null; // 返回当前函数的处理结果
+} // 代码块结束
 
 /** 批次列表（倒序，便于后台最近操作优先查看） */
 export function listBatches(db: Db, limit = 50): BatchView[] {
-  const headers = db.prepare('SELECT * FROM price_batches ORDER BY created_at DESC, rowid DESC LIMIT ?').all(limit) as BatchHeaderRow[];
-  return headers.map((header) => toBatchView(db, header));
-}
+  const headers = db.prepare('SELECT * FROM price_batches ORDER BY created_at DESC, rowid DESC LIMIT ?').all(limit) as BatchHeaderRow[]; // 常量 headers：保存固定配置或一次性派生值
+  return headers.map((header) => toBatchView(db, header)); // 返回当前函数的处理结果
+} // 代码块结束
 
 /**
  * 执行一批调价：校验 → 解析候选 → 事务内快照 / 计算 / 写入 / 留痕。
@@ -209,14 +209,14 @@ export function runPriceBatch(db: Db, req: BatchRequest, now: string): BatchView
   validateRequest(req); // 模式 / 方向 / 参数区间校验
 
   const replay = db // 幂等回放：同操作人同键已有批次
-    .prepare('SELECT * FROM price_batches WHERE actor_id = ? AND idempotency_key = ?')
-    .get(req.actorId, req.idempotencyKey) as BatchHeaderRow | undefined;
+    .prepare('SELECT * FROM price_batches WHERE actor_id = ? AND idempotency_key = ?') // 执行当前业务步骤
+    .get(req.actorId, req.idempotencyKey) as BatchHeaderRow | undefined; // 注册 GET 路由 / 中间件处理器
   if (replay) return toBatchView(db, replay); // 回放既有结果，不重复改价
 
   const candidates = filterCandidates( // 解析并收敛候选集
-    req.targetType === 'module' ? resolveModuleCandidates(db, req.filter, now) : resolveShopCandidates(db),
-    req.filter,
-  );
+    req.targetType === 'module' ? resolveModuleCandidates(db, req.filter, now) : resolveShopCandidates(db), // 执行当前业务步骤
+    req.filter, // 执行当前业务步骤
+  ); // 执行当前业务步骤
 
   const batchId = uuidv7(); // 批次主键
   const items: Array<{ row: BatchItemRow; after: number | null; priceRowId: string | null }> = []; // 待写明细 + 改动定位
@@ -225,71 +225,71 @@ export function runPriceBatch(db: Db, req: BatchRequest, now: string): BatchView
 
   for (const candidate of candidates) { // 逐条计算新价与跳过原因
     if (candidate.current <= 0) { // 0 价免费商品不参与调价，避免把免费品误改成付费
-      skipped += 1;
-      items.push({ row: { target_type: req.targetType, target_id: candidate.targetId, price_row_id: candidate.priceRowId, target_code: candidate.targetCode, currency: candidate.currency, before_amount_minor: 0, after_amount_minor: 0, skipped: 1, reason: 'free_zero_price' }, after: null, priceRowId: candidate.priceRowId });
-      continue;
-    }
+      skipped += 1; // 执行当前业务步骤
+      items.push({ row: { target_type: req.targetType, target_id: candidate.targetId, price_row_id: candidate.priceRowId, target_code: candidate.targetCode, currency: candidate.currency, before_amount_minor: 0, after_amount_minor: 0, skipped: 1, reason: 'free_zero_price' }, after: null, priceRowId: candidate.priceRowId }); // 执行当前业务步骤
+      continue; // 跳过本轮循环，直接进入下一次迭代
+    } // 代码块结束
     const after = applyMode(req.mode, req.direction, req.value, candidate.current); // 计算新价
     if (after === candidate.current) { // 计算结果与原价一致：记跳过，不产生无意义写入
-      skipped += 1;
-      items.push({ row: { target_type: req.targetType, target_id: candidate.targetId, price_row_id: candidate.priceRowId, target_code: candidate.targetCode, currency: candidate.currency, before_amount_minor: candidate.current, after_amount_minor: candidate.current, skipped: 1, reason: 'unchanged' }, after: null, priceRowId: candidate.priceRowId });
-      continue;
-    }
-    changed += 1;
-    items.push({ row: { target_type: req.targetType, target_id: candidate.targetId, price_row_id: candidate.priceRowId, target_code: candidate.targetCode, currency: candidate.currency, before_amount_minor: candidate.current, after_amount_minor: after, skipped: 0, reason: null }, after, priceRowId: candidate.priceRowId });
-  }
+      skipped += 1; // 执行当前业务步骤
+      items.push({ row: { target_type: req.targetType, target_id: candidate.targetId, price_row_id: candidate.priceRowId, target_code: candidate.targetCode, currency: candidate.currency, before_amount_minor: candidate.current, after_amount_minor: candidate.current, skipped: 1, reason: 'unchanged' }, after: null, priceRowId: candidate.priceRowId }); // 执行当前业务步骤
+      continue; // 跳过本轮循环，直接进入下一次迭代
+    } // 代码块结束
+    changed += 1; // 执行当前业务步骤
+    items.push({ row: { target_type: req.targetType, target_id: candidate.targetId, price_row_id: candidate.priceRowId, target_code: candidate.targetCode, currency: candidate.currency, before_amount_minor: candidate.current, after_amount_minor: after, skipped: 0, reason: null }, after, priceRowId: candidate.priceRowId }); // 执行当前业务步骤
+  } // 代码块结束
 
   const tx = db.transaction(() => { // 整批同一事务：快照、改价、留痕要么全成要么全回滚
     db.prepare( // 批次头表：模式 / 参数 / 筛选条件全量快照留痕
       `INSERT INTO price_batches (id, idempotency_key, actor_id, target_type, mode, direction, value, filter_json, total, changed, skipped, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(batchId, req.idempotencyKey, req.actorId, req.targetType, req.mode, req.direction, req.value, JSON.stringify(req.filter), candidates.length, changed, skipped, now);
+    ).run(batchId, req.idempotencyKey, req.actorId, req.targetType, req.mode, req.direction, req.value, JSON.stringify(req.filter), candidates.length, changed, skipped, now); // 执行当前业务步骤
 
     const insertItem = db.prepare( // 明细行：改前 / 改后快照
       `INSERT INTO price_batch_items (id, batch_id, target_type, target_id, price_row_id, target_code, currency, before_amount_minor, after_amount_minor, skipped, reason, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
+    ); // 执行当前业务步骤
     const updateModulePrice = db.prepare('UPDATE module_prices SET amount_minor = ? WHERE id = ?'); // 模块：改当前生效价格行
     const updateShopPrice = db.prepare('UPDATE shop_products SET price_cents = ? WHERE id = ?'); // 商品：直接改列
 
     for (const item of items) { // 逐条写明细并落新价
-      insertItem.run(`pbi-${uuidv7()}`, batchId, item.row.target_type, item.row.target_id, item.row.price_row_id, item.row.target_code, item.row.currency, item.row.before_amount_minor, item.row.after_amount_minor, item.row.skipped, item.row.reason, now);
+      insertItem.run(`pbi-${uuidv7()}`, batchId, item.row.target_type, item.row.target_id, item.row.price_row_id, item.row.target_code, item.row.currency, item.row.before_amount_minor, item.row.after_amount_minor, item.row.skipped, item.row.reason, now); // 执行当前业务步骤
       if (item.after === null) continue; // 跳过项不改价
-      if (req.targetType === 'module') {
+      if (req.targetType === 'module') { // 条件分支：按判断结果选择后续处理路径
         if (!item.priceRowId) continue; // 无生效价格行（免费模块）已在上面跳过，兜底防呆
         updateModulePrice.run(item.after, item.priceRowId); // 改模块价格行
-      } else {
+      } else { // 代码块结束
         updateShopPrice.run(item.after, item.row.target_id); // 改商品价格
-      }
-    }
-  });
+      } // 代码块结束
+    } // 代码块结束
+  }); // 代码块结束
   tx(); // 执行事务
   return getBatch(db, batchId)!; // 回读组装视图
-}
+} // 代码块结束
 
 /**
  * 回滚一批调价：按明细快照把非跳过项恢复到改前价格，整批同一事务。
  * 已回滚的批次重复回滚返回 409，避免二次恢复覆盖后续人工调价。
  */
 export function rollbackBatch(db: Db, batchId: string, now: string): BatchView {
-  const header = db.prepare('SELECT * FROM price_batches WHERE id = ?').get(batchId) as BatchHeaderRow | undefined;
+  const header = db.prepare('SELECT * FROM price_batches WHERE id = ?').get(batchId) as BatchHeaderRow | undefined; // 常量 header：保存固定配置或一次性派生值
   if (!header) throw new AppError('NOT_FOUND', 'price batch not found', { batch_id: batchId }); // 批次不存在
   if (header.rolled_back_at) throw new AppError('CONFLICT', 'price batch already rolled back', { batch_id: batchId, rolled_back_at: header.rolled_back_at }); // 重复回滚冲突
 
   const items = db.prepare('SELECT * FROM price_batch_items WHERE batch_id = ? AND skipped = 0').all(batchId) as BatchItemRow[]; // 只恢复实际改动项
-  const tx = db.transaction(() => {
+  const tx = db.transaction(() => { // 常量 tx：保存固定配置或一次性派生值
     const restoreModule = db.prepare('UPDATE module_prices SET amount_minor = ? WHERE id = ?'); // 恢复模块价格行
     const restoreShop = db.prepare('UPDATE shop_products SET price_cents = ? WHERE id = ?'); // 恢复商品价格
     for (const item of items) { // 逐条按快照恢复
       if (item.before_amount_minor === null) continue; // 无快照不恢复
-      if (item.target_type === 'module') {
+      if (item.target_type === 'module') { // 条件分支：按判断结果选择后续处理路径
         if (item.price_row_id) restoreModule.run(item.before_amount_minor, item.price_row_id); // 按价格行定位恢复
-      } else {
+      } else { // 代码块结束
         restoreShop.run(item.before_amount_minor, item.target_id); // 按商品主键恢复
-      }
-    }
+      } // 代码块结束
+    } // 代码块结束
     db.prepare('UPDATE price_batches SET rolled_back_at = ? WHERE id = ?').run(now, batchId); // 标记已回滚
-  });
-  tx();
+  }); // 代码块结束
+  tx(); // 调用 tx 并处理其返回结果
   return getBatch(db, batchId)!; // 回读最新视图
-}
+} // 代码块结束

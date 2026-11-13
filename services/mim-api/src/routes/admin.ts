@@ -84,11 +84,11 @@ const roleCreateSchema = z.object({
 
 /** 修改角色入参：至少提供 name 或 description 之一，避免空 PATCH 产生无意义写库 */
 const roleUpdateSchema = z
-  .object({
+  .object({ // 执行当前业务步骤
     name: i18nSchema.optional(), // 可选新名称
     description: i18nSchema.optional(), // 可选新描述
   }) // 基础对象定义结束
-  .refine((value) => value.name !== undefined || value.description !== undefined, {
+  .refine((value) => value.name !== undefined || value.description !== undefined, { // 执行当前业务步骤
     message: 'at least one of name / description is required', // 空 PATCH 视为参数错误而非静默成功
   }); // refine 结束
 
@@ -123,19 +123,19 @@ function toPermissionView(row: PermissionRow) {
 
 /** 查询单个角色的完整视图（含权限码集合）；不存在返回 null 由调用方决定错误码 */
 function loadRoleView(db: Db, code: string): RoleView | null {
-  const row = db
-    .prepare(
+  const row = db // 常量 row：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT code, name_i18n, description_i18n, builtin, created_at, updated_at
          FROM roles WHERE code = ?`, // 按主键精确取一行，避免全表扫描
-    )
+    ) // 执行当前业务步骤
     .get(code) as RoleRow | undefined; // get 返回 undefined 表示角色不存在
   if (!row) return null; // 不存在时提前返回，交由调用方抛 NOT_FOUND
-  const permissionRows = db
-    .prepare(
+  const permissionRows = db // 常量 permissionRows：保存固定配置或一次性派生值
+    .prepare( // 执行当前业务步骤
       `SELECT permission_code FROM role_permissions WHERE role_code = ? ORDER BY permission_code`, // 按权限码排序保证输出稳定
-    )
+    ) // 执行当前业务步骤
     .all(code) as Array<{ permission_code: string }>; // 只取权限码列，减少数据传输
-  return {
+  return { // 返回当前函数的处理结果
     code: row.code, // 角色码
     name: jsonParse<Record<string, string>>(row.name_i18n) ?? {}, // 名称 JSON 容错解析
     description: jsonParse<Record<string, string>>(row.description_i18n) ?? {}, // 描述 JSON 容错解析
@@ -149,7 +149,7 @@ function loadRoleView(db: Db, code: string): RoleView | null {
 /** 校验权限码是否全部存在，返回不存在的那部分（空数组代表全部合法） */
 function unknownPermissionCodes(db: Db, codes: string[]): string[] {
   if (codes.length === 0) return []; // 空集合无需查库，直接判定合法
-  const known = new Set(
+  const known = new Set( // 常量 known：保存固定配置或一次性派生值
     (db.prepare(`SELECT code FROM permissions`).all() as Array<{ code: string }>).map((row) => row.code), // 一次性取出全部已知权限码建集合
   ); // 集合查表为 O(1)，避免循环内逐条查库
   return codes.filter((code) => !known.has(code)); // 过滤出不存在的权限码
@@ -157,7 +157,7 @@ function unknownPermissionCodes(db: Db, codes: string[]): string[] {
 
 /** 取用户已授予的角色码列表 */
 function loadUserRoleCodes(db: Db, userId: string): string[] {
-  const rows = db
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
     .prepare(`SELECT role_code FROM user_roles WHERE user_id = ? ORDER BY role_code`) // 排序保证响应稳定便于断言
     .all(userId) as Array<{ role_code: string }>; // 只关心角色码
   return rows.map((row) => row.role_code); // 拍平成字符串数组
@@ -171,19 +171,19 @@ function userExists(db: Db, userId: string): boolean {
 
 /** 判断角色是否存在，返回其内置标记 */
 function loadRoleMeta(db: Db, code: string): { code: string; builtin: number } | null {
-  const row = db.prepare(`SELECT code, builtin FROM roles WHERE code = ?`).get(code) as
-    | { code: string; builtin: number }
+  const row = db.prepare(`SELECT code, builtin FROM roles WHERE code = ?`).get(code) as // 常量 row：保存固定配置或一次性派生值
+    | { code: string; builtin: number } // 执行当前业务步骤
     | undefined; // 只取判定所需的两列
   return row ?? null; // 统一 null 语义，避免 undefined 泄漏到调用方
 } // loadRoleMeta 结束
 
-export function createAdminRouter(deps: ApiDeps): Router {
+export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 createAdminRouter：对外暴露的调用入口
   const router = Router(); // 创建独立 Router，避免影响其它命名空间的路由注册顺序
   const db = deps.db; // 依赖提升为局部变量，处理器内少一次属性访问
 
   // ── 当前身份：给后台首屏回显「我是谁、我有哪些权限」 ────────────────────────────
 
-  router.get('/admin/me', requirePermission('rbac:read'), (req, res) => {
+  router.get('/admin/me', requirePermission('rbac:read'), (req, res) => { // 执行当前业务步骤
     // 三个内置角色均含 rbac:read，因此该端点对全部合法后台身份开放
     if (req.adminBootstrap === true) {
       // 超管引导通道（x-admin-token）没有对应真实用户，用内置全量权限代替
@@ -196,7 +196,7 @@ export function createAdminRouter(deps: ApiDeps): Router {
       return; // 引导通道分支处理完毕，直接返回
     } // if 结束：引导通道分支
     const user = req.user!; // requirePermission 已保证此处存在真实用户
-    res.json({
+    res.json({ // 执行当前业务步骤
       bootstrap: false, // 常规 Bearer 身份
       user, // 回显 AuthUser（不含敏感字段）
       roles: loadUserRoleCodes(db, user.id), // 该用户实际授予的角色
@@ -206,36 +206,36 @@ export function createAdminRouter(deps: ApiDeps): Router {
 
   // ── 权限点：只读，内置清单由种子维护 ──────────────────────────────────────────
 
-  router.get('/admin/permissions', requirePermission('rbac:read'), (_req, res) => {
-    const rows = db
-      .prepare(
+  router.get('/admin/permissions', requirePermission('rbac:read'), (_req, res) => { // 执行当前业务步骤
+    const rows = db // 常量 rows：保存固定配置或一次性派生值
+      .prepare( // 执行当前业务步骤
         `SELECT code, name_i18n, description_i18n, builtin, created_at, updated_at
            FROM permissions ORDER BY code`, // 按权限码排序，前端勾选矩阵顺序稳定
-      )
+      ) // 执行当前业务步骤
       .all() as PermissionRow[]; // 权限点总量很小，一次性全取
     res.json({ permissions: rows.map(toPermissionView) }); // 统一包一层 permissions 字段便于前端解构
   }); // GET /admin/permissions 结束
 
   // ── 角色：读列表 / 建 / 改 / 删 / 权限替换 ───────────────────────────────────
 
-  router.get('/admin/roles', requirePermission('rbac:read'), (_req, res) => {
-    const roleRows = db
-      .prepare(
+  router.get('/admin/roles', requirePermission('rbac:read'), (_req, res) => { // 执行当前业务步骤
+    const roleRows = db // 常量 roleRows：保存固定配置或一次性派生值
+      .prepare( // 执行当前业务步骤
         `SELECT code, name_i18n, description_i18n, builtin, created_at, updated_at
            FROM roles ORDER BY builtin DESC, code`, // 内置角色置顶，其余按字母序
-      )
+      ) // 执行当前业务步骤
       .all() as RoleRow[]; // 角色数量有限，全量返回
-    const mappingRows = db
+    const mappingRows = db // 常量 mappingRows：保存固定配置或一次性派生值
       .prepare(`SELECT role_code, permission_code FROM role_permissions`) // 一次取出全部映射，避免 N+1 查询
       .all() as RolePermissionRow[]; // 映射总量 = 角色数 × 权限数，规模很小
     const permissionMap = new Map<string, string[]>(); // 角色码 → 权限码数组
-    for (const mapping of mappingRows) {
+    for (const mapping of mappingRows) { // 循环：逐项遍历集合并执行相同处理
       // 逐条归档到对应角色
       const list = permissionMap.get(mapping.role_code) ?? []; // 不存在则初始化空数组
       list.push(mapping.permission_code); // 追加权限码
       permissionMap.set(mapping.role_code, list); // 回写映射
     } // for 结束：权限映射归集完毕
-    const roles: RoleView[] = roleRows.map((row) => ({
+    const roles: RoleView[] = roleRows.map((row) => ({ // 常量 roles：保存固定配置或一次性派生值
       code: row.code, // 角色码
       name: jsonParse<Record<string, string>>(row.name_i18n) ?? {}, // 名称 JSON 容错解析
       description: jsonParse<Record<string, string>>(row.description_i18n) ?? {}, // 描述 JSON 容错解析
@@ -247,29 +247,29 @@ export function createAdminRouter(deps: ApiDeps): Router {
     res.json({ roles }); // 统一包一层 roles 字段
   }); // GET /admin/roles 结束
 
-  router.post('/admin/roles', requirePermission('rbac:write'), (req, res) => {
+  router.post('/admin/roles', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const body = parse(roleCreateSchema, req.body); // 先校验入参形态，非法直接 400
-    if (loadRoleMeta(db, body.code)) {
+    if (loadRoleMeta(db, body.code)) { // 条件分支：按判断结果选择后续处理路径
       // 主键冲突（含与内置角色同名）统一按 CONFLICT 处理
       throw new AppError('CONFLICT', 'role code already exists', { code: body.code }); // 409 让前端提示换一个码
     } // if 结束：角色码占用检查
     const permissionCodes = [...new Set(body.permissions)]; // 去重，避免 PRIMARY KEY 冲突刷屏
     const unknown = unknownPermissionCodes(db, permissionCodes); // 校验权限码是否都已存在
-    if (unknown.length > 0) {
+    if (unknown.length > 0) { // 条件分支：按判断结果选择后续处理路径
       // 引用不存在的权限点属于入参错误，不是服务端故障
       throw new AppError('VALIDATION_FAILED', 'unknown permission codes', { unknown }); // 400 并回传非法清单
     } // if 结束：权限码合法性检查
     const now = clockOf(deps); // 统一时间源，事务内所有写入共用同一时刻
-    const createRole = db.transaction(() => {
+    const createRole = db.transaction(() => { // 常量 createRole：保存固定配置或一次性派生值
       // 角色与权限映射必须同批生效，避免出现「有角色无权限」的中间态
       db.prepare(
         `INSERT INTO roles (code, name_i18n, description_i18n, builtin, created_at, updated_at)
          VALUES (?, ?, ?, 0, ?, ?)`, // builtin 固定 0：后台创建的角色一律非内置
       ).run(body.code, JSON.stringify(body.name), JSON.stringify(body.description ?? {}), now, now); // 写入角色主体
-      const insertMapping = db.prepare(
+      const insertMapping = db.prepare( // 常量 insertMapping：保存固定配置或一次性派生值
         `INSERT OR IGNORE INTO role_permissions (role_code, permission_code, created_at) VALUES (?, ?, ?)`, // 已去重，OR IGNORE 仅作兜底
       ); // prepare 结束
-      for (const permissionCode of permissionCodes) {
+      for (const permissionCode of permissionCodes) { // 循环：逐项遍历集合并执行相同处理
         // 逐条建立角色与权限的映射
         insertMapping.run(body.code, permissionCode, now); // 绑定角色码、权限码与时间
       } // for 结束：权限映射写入完毕
@@ -278,26 +278,26 @@ export function createAdminRouter(deps: ApiDeps): Router {
     res.status(201).json({ role: loadRoleView(db, body.code) }); // 回传创建后的完整角色，前端免二次请求
   }); // POST /admin/roles 结束
 
-  router.patch('/admin/roles/:code', requirePermission('rbac:write'), (req, res) => {
+  router.patch('/admin/roles/:code', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const code = pathParam(req, 'code'); // 取路径参数并收敛为 string
     const meta = loadRoleMeta(db, code); // 先确认角色存在
-    if (!meta) {
+    if (!meta) { // 条件分支：按判断结果选择后续处理路径
       // 不存在与无权限要区分开，便于排障
       throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
     } // if 结束：角色存在性检查
-    if (meta.builtin === 1) {
+    if (meta.builtin === 1) { // 条件分支：按判断结果选择后续处理路径
       // 内置角色的名称与描述以代码种子为唯一真源，禁止后台改写
       throw new AppError('FORBIDDEN', 'builtin role cannot be modified', { role_code: code }); // 403
     } // if 结束：内置角色写保护
     const body = parse(roleUpdateSchema, req.body); // 校验至少提供一个可改字段
     const sets: string[] = ['updated_at = ?']; // SET 子句首项固定刷新更新时间
     const values: unknown[] = [clockOf(deps)]; // 与 SET 顺序对齐的占位值
-    if (body.name !== undefined) {
+    if (body.name !== undefined) { // 条件分支：按判断结果选择后续处理路径
       // 仅当显式提供名称时才写该列，未提供的字段保持原值
       sets.push('name_i18n = ?'); // 追加名称列
       values.push(JSON.stringify(body.name)); // 序列化多语言对象
     } // if 结束：名称更新分支
-    if (body.description !== undefined) {
+    if (body.description !== undefined) { // 条件分支：按判断结果选择后续处理路径
       // 描述同理，避免把未传字段误清空
       sets.push('description_i18n = ?'); // 追加描述列
       values.push(JSON.stringify(body.description)); // 序列化多语言对象
@@ -307,21 +307,21 @@ export function createAdminRouter(deps: ApiDeps): Router {
     res.json({ role: loadRoleView(db, code) }); // 回传更新后的完整角色
   }); // PATCH /admin/roles/:code 结束
 
-  router.delete('/admin/roles/:code', requirePermission('rbac:write'), (req, res) => {
+  router.delete('/admin/roles/:code', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const code = pathParam(req, 'code'); // 取路径参数
     const meta = loadRoleMeta(db, code); // 存在性 + 内置标记
-    if (!meta) {
+    if (!meta) { // 条件分支：按判断结果选择后续处理路径
       // 已删除或从未存在
       throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
     } // if 结束：角色存在性检查
-    if (meta.builtin === 1) {
+    if (meta.builtin === 1) { // 条件分支：按判断结果选择后续处理路径
       // 内置角色是系统基线，删除会导致种子与库不一致
       throw new AppError('FORBIDDEN', 'builtin role cannot be deleted', { role_code: code }); // 403
     } // if 结束：内置角色删除保护
-    const assignment = db
+    const assignment = db // 常量 assignment：保存固定配置或一次性派生值
       .prepare(`SELECT COUNT(*) AS total FROM user_roles WHERE role_code = ?`) // 统计仍被引用的授权数
       .get(code) as { total: number }; // COUNT 一定返回一行
-    if (assignment.total > 0) {
+    if (assignment.total > 0) { // 条件分支：按判断结果选择后续处理路径
       // 有用户仍在用该角色时删除会静默剥夺权限，必须显式拒绝
       throw new AppError('CONFLICT', 'role is still assigned to users', {
         role_code: code, // 回传冲突角色
@@ -332,41 +332,41 @@ export function createAdminRouter(deps: ApiDeps): Router {
     res.json({ code, deleted: true }); // 明确告知删除成功
   }); // DELETE /admin/roles/:code 结束
 
-  router.get('/admin/roles/:code/permissions', requirePermission('rbac:read'), (req, res) => {
+  router.get('/admin/roles/:code/permissions', requirePermission('rbac:read'), (req, res) => { // 执行当前业务步骤
     const code = pathParam(req, 'code'); // 取路径参数
-    if (!loadRoleMeta(db, code)) {
+    if (!loadRoleMeta(db, code)) { // 条件分支：按判断结果选择后续处理路径
       // 角色不存在时返回 404 而不是空数组，避免前端误以为权限被清空
       throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
     } // if 结束：角色存在性检查
     res.json({ role_code: code, permissions: loadRoleView(db, code)!.permissions }); // 复用视图函数，保证口径与列表一致
   }); // GET /admin/roles/:code/permissions 结束
 
-  router.put('/admin/roles/:code/permissions', requirePermission('rbac:write'), (req, res) => {
+  router.put('/admin/roles/:code/permissions', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const code = pathParam(req, 'code'); // 取路径参数
     const body = parse(rolePermissionsSchema, req.body); // 校验入参为字符串数组
     const meta = loadRoleMeta(db, code); // 存在性 + 内置标记
-    if (!meta) {
+    if (!meta) { // 条件分支：按判断结果选择后续处理路径
       // 角色不存在
       throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
     } // if 结束：角色存在性检查
-    if (code === 'superadmin') {
+    if (code === 'superadmin') { // 条件分支：按判断结果选择后续处理路径
       // 超管权限集合是最后的兜底通道，整体替换可能把管理员自己锁在门外
       throw new AppError('FORBIDDEN', 'superadmin permissions cannot be replaced', { role_code: code }); // 403
     } // if 结束：超管权限保护（operator / viewer 等内置角色允许按需调整）
     const permissionCodes = [...new Set(body.permissions)]; // 去重
     const unknown = unknownPermissionCodes(db, permissionCodes); // 校验权限码存在性
-    if (unknown.length > 0) {
+    if (unknown.length > 0) { // 条件分支：按判断结果选择后续处理路径
       // 引用不存在的权限点属参数错误
       throw new AppError('VALIDATION_FAILED', 'unknown permission codes', { unknown }); // 400
     } // if 结束：权限码合法性检查
     const now = clockOf(deps); // 统一时间源
-    const replacePermissions = db.transaction(() => {
+    const replacePermissions = db.transaction(() => { // 常量 replacePermissions：保存固定配置或一次性派生值
       // 先清空再写入，保证「整体替换」语义且不残留旧权限
       db.prepare(`DELETE FROM role_permissions WHERE role_code = ?`).run(code); // 删除该角色全部映射
-      const insertMapping = db.prepare(
+      const insertMapping = db.prepare( // 常量 insertMapping：保存固定配置或一次性派生值
         `INSERT OR IGNORE INTO role_permissions (role_code, permission_code, created_at) VALUES (?, ?, ?)`, // 已去重，OR IGNORE 仅兜底
       ); // prepare 结束
-      for (const permissionCode of permissionCodes) {
+      for (const permissionCode of permissionCodes) { // 循环：逐项遍历集合并执行相同处理
         // 逐条写入新映射
         insertMapping.run(code, permissionCode, now); // 绑定角色码、权限码与时间
       } // for 结束：新映射写入完毕
@@ -377,7 +377,7 @@ export function createAdminRouter(deps: ApiDeps): Router {
 
   // ── 用户：列表检索 + 角色授权 ───────────────────────────────────────────────
 
-  router.get('/admin/users', requirePermission('user:read'), (req, res) => {
+  router.get('/admin/users', requirePermission('user:read'), (req, res) => { // 执行当前业务步骤
     const query = parse(userListQuerySchema, req.query); // 校验并收敛 query 参数
     const keyword = query.q ?? ''; // 未提供时用空串占位，SQL 里据此短路
     const like = `%${keyword}%`; // LIKE 模糊匹配模式（SQLite 参数化绑定，注入无风险）
@@ -385,32 +385,32 @@ export function createAdminRouter(deps: ApiDeps): Router {
     const whereSql = `(? = '' OR u.id LIKE ? OR u.display_name LIKE ? OR EXISTS (
       SELECT 1 FROM identities i WHERE i.user_id = u.id AND i.identifier LIKE ?
     ))`; // 空关键字时恒真，等价于不过滤
-    const totalRow = db
+    const totalRow = db // 常量 totalRow：保存固定配置或一次性派生值
       .prepare(`SELECT COUNT(*) AS total FROM users u WHERE ${whereSql}`) // 先取总数供前端分页
       .get(keyword, like, like, like) as { total: number }; // 四个占位：keyword、id、display_name、identifier
-    const rows = db
-      .prepare(
+    const rows = db // 常量 rows：保存固定配置或一次性派生值
+      .prepare( // 执行当前业务步骤
         `SELECT u.id, u.region, u.status, u.display_name, u.locale, u.timezone, u.created_at, u.updated_at
            FROM users u WHERE ${whereSql}
           ORDER BY u.created_at DESC
           LIMIT ? OFFSET ?`, // 按注册时间倒序，新用户在前
-      )
+      ) // 执行当前业务步骤
       .all(keyword, like, like, like, query.limit, query.offset) as UserListRow[]; // 五个占位与上面顺序一致
     const roleMap = new Map<string, string[]>(); // 用户 ID → 角色码数组
-    if (rows.length > 0) {
+    if (rows.length > 0) { // 条件分支：按判断结果选择后续处理路径
       // 当前页有数据时才查授权表，避免空查询
       const placeholders = rows.map(() => '?').join(','); // 动态占位符数量与当页用户数一致
-      const roleRows = db
+      const roleRows = db // 常量 roleRows：保存固定配置或一次性派生值
         .prepare(`SELECT user_id, role_code FROM user_roles WHERE user_id IN (${placeholders}) ORDER BY role_code`) // 一次取回整页授权，规避 N+1
         .all(...rows.map((row) => row.id)) as Array<{ user_id: string; role_code: string }>; // 绑定当页所有用户 ID
-      for (const roleRow of roleRows) {
+      for (const roleRow of roleRows) { // 循环：逐项遍历集合并执行相同处理
         // 逐条归集到对应用户
         const list = roleMap.get(roleRow.user_id) ?? []; // 不存在则初始化
         list.push(roleRow.role_code); // 追加角色码
         roleMap.set(roleRow.user_id, list); // 回写映射
       } // for 结束：整页授权归集完毕
     } // if 结束：授权批量查询
-    res.json({
+    res.json({ // 执行当前业务步骤
       users: rows.map((row) => ({ ...row, roles: roleMap.get(row.id) ?? [] })), // 展开行数据并附加角色
       total: totalRow.total, // 满足关键字的全量条数
       limit: query.limit, // 回显生效的分页大小
@@ -418,39 +418,39 @@ export function createAdminRouter(deps: ApiDeps): Router {
     }); // 响应体结束
   }); // GET /admin/users 结束
 
-  router.get('/admin/users/:userId/roles', requirePermission('rbac:read'), (req, res) => {
+  router.get('/admin/users/:userId/roles', requirePermission('rbac:read'), (req, res) => { // 执行当前业务步骤
     const userId = pathParam(req, 'userId'); // 取路径参数
-    if (!userExists(db, userId)) {
+    if (!userExists(db, userId)) { // 条件分支：按判断结果选择后续处理路径
       // 用户不存在时返回 404，避免前端把「查无此人」当成「无任何角色」
       throw new AppError('NOT_FOUND', 'user not found', { user_id: userId }); // 404
     } // if 结束：用户存在性检查
-    const rows = db
-      .prepare(
+    const rows = db // 常量 rows：保存固定配置或一次性派生值
+      .prepare( // 执行当前业务步骤
         `SELECT user_id, role_code, granted_by, created_at FROM user_roles WHERE user_id = ? ORDER BY role_code`, // 排序保证输出稳定
-      )
+      ) // 执行当前业务步骤
       .all(userId) as UserRoleRow[]; // 单用户授权量很小
     res.json({ user_id: userId, roles: rows }); // 附带 granted_by / created_at 供审计
   }); // GET /admin/users/:userId/roles 结束
 
-  router.post('/admin/users/:userId/roles', requirePermission('rbac:write'), (req, res) => {
+  router.post('/admin/users/:userId/roles', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const userId = pathParam(req, 'userId'); // 取路径参数
     const body = parse(userRoleGrantSchema, req.body); // 校验 role_code 形态
-    if (!userExists(db, userId)) {
+    if (!userExists(db, userId)) { // 条件分支：按判断结果选择后续处理路径
       // 用户不存在时不允许写入悬空授权
       throw new AppError('NOT_FOUND', 'user not found', { user_id: userId }); // 404
     } // if 结束：用户存在性检查
-    if (!loadRoleMeta(db, body.role_code)) {
+    if (!loadRoleMeta(db, body.role_code)) { // 条件分支：按判断结果选择后续处理路径
       // 角色不存在时同样拒绝
       throw new AppError('NOT_FOUND', 'role not found', { role_code: body.role_code }); // 404
     } // if 结束：角色存在性检查
     const grantedBy = req.user?.id ?? 'bootstrap'; // 引导通道没有真实用户，用固定标记留痕
-    const result = db
-      .prepare(
+    const result = db // 常量 result：保存固定配置或一次性派生值
+      .prepare( // 执行当前业务步骤
         `INSERT OR IGNORE INTO user_roles (user_id, role_code, granted_by, created_at) VALUES (?, ?, ?, ?)`, // 重复授权不报错，天然幂等
-      )
+      ) // 执行当前业务步骤
       .run(userId, body.role_code, grantedBy, clockOf(deps)); // 写入授权记录
     const created = result.changes > 0; // changes 为 0 表示该授权已存在
-    res.status(created ? 201 : 200).json({
+    res.status(created ? 201 : 200).json({ // 执行当前业务步骤
       user_id: userId, // 被授权用户
       role_code: body.role_code, // 授予的角色
       granted_by: grantedBy, // 操作人留痕
@@ -458,13 +458,13 @@ export function createAdminRouter(deps: ApiDeps): Router {
     }); // 响应体结束
   }); // POST /admin/users/:userId/roles 结束
 
-  router.delete('/admin/users/:userId/roles/:roleCode', requirePermission('rbac:write'), (req, res) => {
+  router.delete('/admin/users/:userId/roles/:roleCode', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const userId = pathParam(req, 'userId'); // 取用户 ID
     const roleCode = pathParam(req, 'roleCode'); // 取角色码
-    const result = db
+    const result = db // 常量 result：保存固定配置或一次性派生值
       .prepare(`DELETE FROM user_roles WHERE user_id = ? AND role_code = ?`) // 精确删除单条授权
       .run(userId, roleCode); // 执行删除
-    if (result.changes === 0) {
+    if (result.changes === 0) { // 条件分支：按判断结果选择后续处理路径
       // 未删除任何行说明授权不存在，按 404 反馈而不是静默成功
       throw new AppError('NOT_FOUND', 'user role assignment not found', {
         user_id: userId, // 回传用户 ID
@@ -479,7 +479,7 @@ export function createAdminRouter(deps: ApiDeps): Router {
   /** POST /admin/commerce/price-batches — 提交一批调价；同幂等键重复提交回放既有批次 */
   router.post('/admin/commerce/price-batches', requirePermission('commerce:write'), (req, res) => {
     const body = parse( // 请求体校验：目标类型 / 模式 / 方向 / 参数 / 筛选条件 / 幂等键
-      z.object({
+      z.object({ // 执行当前业务步骤
         target_type: z.enum(['module', 'shop_product']), // 调价目标：模块或独立商城商品
         mode: z.enum(['fixed', 'percent', 'amount']), // 固定价 / 百分比 / 固定金额
         direction: z.enum(['set', 'increase', 'decrease']).optional(), // fixed 缺省 set；增减模式必填
@@ -489,11 +489,11 @@ export function createAdminRouter(deps: ApiDeps): Router {
           category_slug: z.string().min(1).max(64).optional(), // 仅模块：一级前缀或二级精确
           codes: z.array(z.string().min(1).max(64)).max(500).optional(), // 显式编码清单
           include_inactive: z.boolean().optional(), // 是否纳入下架目标；缺省只改在售
-        }).optional(),
+        }).optional(), // 代码块结束
         idempotency_key: z.string().min(1).max(120), // 批次幂等键（操作人作用域内唯一）
-      }),
-      req.body,
-    );
+      }), // 代码块结束
+      req.body, // 执行当前业务步骤
+    ); // 执行当前业务步骤
     const now = clockOf(deps); // 统一时间基准
     const batch = runPriceBatch(db, { // 调用服务层：事务内快照 / 计算 / 写入 / 留痕
       targetType: body.target_type, // 目标类型
@@ -503,7 +503,7 @@ export function createAdminRouter(deps: ApiDeps): Router {
       filter: body.filter ?? {}, // 筛选条件
       idempotencyKey: body.idempotency_key, // 幂等键
       actorId: req.user?.id ?? 'bootstrap', // 操作人；引导通道无 req.user 落 bootstrap 标记
-    }, now);
+    }, now); // 代码块结束
     res.status(201).json({ batch }); // 返回批次视图（含逐条快照）
   }); // POST /admin/commerce/price-batches 结束
 
@@ -536,16 +536,16 @@ export function createAdminRouter(deps: ApiDeps): Router {
   /** PUT /admin/category-access — 整组替换某主体（角色 / 用户）的分类规则；空清单即清空 */
   router.put('/admin/category-access', requirePermission('rbac:write'), (req, res) => {
     const body = parse( // 主体类型 + 主体标识 + 规则清单
-      z.object({
+      z.object({ // 执行当前业务步骤
         subject_type: z.enum(['role', 'user']), // role 按角色码，user 按用户 ID
         subject_id: z.string().min(1).max(64), // 角色码或用户 ID
         rules: z.array(z.object({ // 规则条目
           category_slug: z.string().min(1).max(64), // 一级或二级分类 slug
           effect: z.enum(['allow', 'deny']), // 放行 / 拦截；deny 优先
         })).max(200), // 单主体规则上限，防止脏数据膨胀
-      }),
-      req.body,
-    );
+      }), // 代码块结束
+      req.body, // 执行当前业务步骤
+    ); // 执行当前业务步骤
     const rules = replaceSubjectRules(db, { subject_type: body.subject_type, subject_id: body.subject_id }, body.rules, clockOf(deps)); // 同事务清后写
     res.json({ subject_type: body.subject_type, subject_id: body.subject_id, rules }); // 回读该主体最新规则
   }); // PUT 规则结束

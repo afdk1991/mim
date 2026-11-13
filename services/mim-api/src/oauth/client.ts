@@ -95,10 +95,10 @@ function nested(raw: Record<string, unknown>, key: string): Record<string, unkno
  * 标准提供方使用 PKCE(S256)；微信 / QQ / 抖音不支持 PKCE，只带 state。
  */
 export async function buildAuthorizeUrl(
-  spec: OAuthProviderSpec,
-  creds: ResolvedCredentials,
-  state: string,
-): Promise<AuthorizeUrlResult> {
+  spec: OAuthProviderSpec, // 对象字段 spec：记录一项配置或数据
+  creds: ResolvedCredentials, // 对象字段 creds：记录一项配置或数据
+  state: string, // 对象字段 state：记录一项配置或数据
+): Promise<AuthorizeUrlResult> { // 执行当前业务步骤
   const url = new URL(creds.authorizeUrl); // 统一用 URL 对象处理 query 编码（端点已支持环境变量覆盖）
   if (spec.flavor === 'wechat') { // 微信参数名为 appid，且必须带 #wechat_redirect 锚点
     url.searchParams.set('appid', creds.clientId); // 应用 ID
@@ -163,11 +163,11 @@ export async function buildAuthorizeUrl(
 
 /** 标准提供方：用 oauth4webapi 换令牌，再按 Bearer 拉资料 */
 async function exchangeStandard(
-  spec: OAuthProviderSpec,
-  creds: ResolvedCredentials,
-  env: Record<string, string | undefined>,
-  input: ExchangeInput,
-): Promise<OAuthProfile> {
+  spec: OAuthProviderSpec, // 对象字段 spec：记录一项配置或数据
+  creds: ResolvedCredentials, // 对象字段 creds：记录一项配置或数据
+  env: Record<string, string | undefined>, // 对象字段 env：记录一项配置或数据
+  input: ExchangeInput, // 对象字段 input：记录一项配置或数据
+): Promise<OAuthProfile> { // 执行当前业务步骤
   const as = authorizationServerOf(spec, creds); // 端点描述
   const client: oauth.Client = { client_id: creds.clientId }; // 客户端标识
   const secret = spec.flavor === 'apple' ? appleClientSecret(spec, creds, env) : creds.clientSecret; // Apple 动态签发
@@ -362,11 +362,11 @@ async function exchangeAlipay(spec: OAuthProviderSpec, creds: ResolvedCredential
  * 调用方负责先用 state 查库校验一次性与有效期；这里只做协议层交换。
  */
 export async function exchangeOAuthCode(
-  spec: OAuthProviderSpec,
-  creds: ResolvedCredentials,
-  env: Record<string, string | undefined>,
-  input: ExchangeInput,
-): Promise<OAuthProfile> {
+  spec: OAuthProviderSpec, // 对象字段 spec：记录一项配置或数据
+  creds: ResolvedCredentials, // 对象字段 creds：记录一项配置或数据
+  env: Record<string, string | undefined>, // 对象字段 env：记录一项配置或数据
+  input: ExchangeInput, // 对象字段 input：记录一项配置或数据
+): Promise<OAuthProfile> { // 执行当前业务步骤
   switch (spec.flavor) { // 按实现类型分流
     case 'wechat': // 微信专用
       return exchangeWechat(spec, creds, input); // 交给专用适配器

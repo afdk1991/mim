@@ -502,7 +502,7 @@ function buildMockSuggestions( // 按建议类型产出候选数组，纯内存�
         character_name: `角色${((i - 1) % 2) + 1}`, // 与对白相同的角色编号规则
         voice_profile: `沉稳·中低音·语速偏慢（候选 ${i}）`, // 音色描述，后续可直接喂给 TTS
       }); // 音色候选结束
-    }
+    } // 代码块结束
   } // 候选逐条产出完毕
   return items; // 返回全部候选，由调用方包进 suggestion 信封
 } // mock 建议适配器结束

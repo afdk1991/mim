@@ -7,7 +7,7 @@ import { centsToYuan, missingEnv, requireConfigured, trimBase, upstreamJson, yua
 const baseOf = (env: Record<string, string | undefined>): string => { // 保存 baseOf：承载本步骤的计算结果供后续使用
   const override = (env.MIM_PAYPAL_API_BASE ?? '').trim(); // 保存 override：承载本步骤的计算结果供后续使用
   if (override) return trimBase(override); // 条件分支：仅在满足业务前置条件时继续
-  return env.MIM_PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+  return env.MIM_PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com'; // 返回当前函数的处理结果
 }; // 结束函数体：本层作用域收尾
 
 function requiredKeys(): string[] { // 定义函数 requiredKeys：封装可复用业务步骤

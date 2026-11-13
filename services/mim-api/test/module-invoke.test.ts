@@ -21,7 +21,7 @@ beforeEach(() => { // 每例独立建库
 interface Session { // 登录会话契约
   token: string; // Bearer 令牌
   userId: string; // 用户主键
-}
+} // 代码块结束
 
 async function login(identifier: string): Promise<Session> { // 登录辅助：先取验证码再换令牌
   const codeRes = await request(app) // 申请验证码
@@ -54,7 +54,7 @@ function grant(moduleCode: string, userId: string): void {
 } // grant 结束
 
 describe('能力注册表与清单一致', () => { // 防止 core-domain 登记了能力却没有实现
-  it('每条登记能力的 key 都有对应 handler', () => {
+  it('每条登记能力的 key 都有对应 handler', () => { // 调用 it 并处理其返回结果
     for (const item of MODULE_CAPABILITIES) { // 逐条比对
       expect(CAPABILITY_HANDLERS[item.key], `缺少 handler: ${item.key}`).toBeTypeOf('function'); // 必须是函数
     } // 循环结束
@@ -62,7 +62,7 @@ describe('能力注册表与清单一致', () => { // 防止 core-domain 登记�
 }); // 分组结束
 
 describe('POST /modules/:code/invoke 门禁', () => { // 三层门禁逐条验证
-  it('未登录 → 401 AUTH_UNAUTHORIZED', async () => {
+  it('未登录 → 401 AUTH_UNAUTHORIZED', async () => { // 调用 it 并处理其返回结果
     const res = await request(app) // 匿名调用
       .post('/api/v1/modules/cat.dev-28/invoke') // JSON 工具
       .send({ text: '{"a":1}' }); // 合法输入
@@ -70,7 +70,7 @@ describe('POST /modules/:code/invoke 门禁', () => { // 三层门禁逐条验�
     expect(res.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言错误码
   }); // 用例结束
 
-  it('已登录但未解锁 → 403 FORBIDDEN', async () => {
+  it('已登录但未解锁 → 403 FORBIDDEN', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000031'); // 新用户，无任何权益
     const res = await request(app) // 带令牌调用
       .post('/api/v1/modules/cat.dev-28/invoke') // JSON 工具
@@ -80,7 +80,7 @@ describe('POST /modules/:code/invoke 门禁', () => { // 三层门禁逐条验�
     expect(res.body.code).toBe('FORBIDDEN'); // 断言错误码
   }); // 用例结束
 
-  it('原「规划中」模块现已具备真实能力（产出模块起盘蓝图）', async () => {
+  it('原「规划中」模块现已具备真实能力（产出模块起盘蓝图）', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000032'); // 登录
     grant('cat.store-03', session.userId); // 给权益，证明门禁放行后能真正产出内容
     const res = await request(app) // 调用 BBS 论坛模块
@@ -94,7 +94,7 @@ describe('POST /modules/:code/invoke 门禁', () => { // 三层门禁逐条验�
     expect(res.body.meta.module_code).toBe('cat.store-03'); // 元信息回显编码
   }); // 用例结束
 
-  it('输入超长 → 400 VALIDATION_FAILED', async () => {
+  it('输入超长 → 400 VALIDATION_FAILED', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000033'); // 登录
     grant('cat.dev-28', session.userId); // 解锁 JSON 工具
     const res = await request(app) // 调用
@@ -107,7 +107,7 @@ describe('POST /modules/:code/invoke 门禁', () => { // 三层门禁逐条验�
 }); // 分组结束
 
 describe('六种能力的真实输出', () => { // 每种能力跑一次端到端调用
-  it('json.format 格式化与压缩', async () => {
+  it('json.format 格式化与压缩', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000041'); // 登录
     grant('cat.dev-28', session.userId); // 解锁
     const pretty = await request(app) // 格式化
@@ -130,7 +130,7 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
     expect(bad.body.code).toBe('VALIDATION_FAILED'); // 断言错误码
   }); // 用例结束
 
-  it('text.encode 六向编解码（base64 / base64url / hex / url）', async () => {
+  it('text.encode 六向编解码（base64 / base64url / hex / url）', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000042'); // 登录
     grant('cat.dev-04', session.userId); // 解锁常用工具包
     const encoded = await request(app) // Base64 编码
@@ -161,7 +161,7 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
     expect(badOp.body.code).toBe('VALIDATION_FAILED'); // 断言错误码
   }); // 用例结束
 
-  it('text.hash 四种算法与非法算法', async () => {
+  it('text.hash 四种算法与非法算法', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000043'); // 登录
     grant('cat.dev-03', session.userId); // 解锁安全开发模块
     const sha256 = await request(app) // SHA-256 摘要
@@ -182,7 +182,7 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
     expect(bad.body.code).toBe('VALIDATION_FAILED'); // 断言错误码
   }); // 用例结束
 
-  it('markdown.render 输出 HTML', async () => {
+  it('markdown.render 输出 HTML', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000044'); // 登录
     grant('cat.dev-17', session.userId); // 解锁 Markdown 工具包
     const res = await request(app) // 渲染
@@ -195,7 +195,7 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
     expect(res.body.output).toContain('<strong>二</strong>'); // 加粗渲染
   }); // 用例结束
 
-  it('qrcode.generate 输出 PNG dataURL 且尺寸受夹紧', async () => {
+  it('qrcode.generate 输出 PNG dataURL 且尺寸受夹紧', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000045'); // 登录
     grant('cat.dev-06', session.userId); // 解锁二维码模块
     const res = await request(app) // 生成
@@ -208,7 +208,7 @@ describe('六种能力的真实输出', () => { // 每种能力跑一次端到�
     expect(res.body.meta.size).toBe(1024); // 尺寸被夹紧到上限
   }); // 用例结束
 
-  it('cron.describe 推算未来触发时间与非法表达式', async () => {
+  it('cron.describe 推算未来触发时间与非法表达式', async () => { // 调用 it 并处理其返回结果
     const session = await login('13900000046'); // 登录
     grant('cat.dev-14', session.userId); // 解锁任务调度模块
     const res = await request(app) // 解析

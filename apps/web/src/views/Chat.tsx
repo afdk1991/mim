@@ -35,12 +35,12 @@ const CHAT_EMOJIS = ['😀', '😄', '😅', '😂', '🤣', '😊', '😍', '�
 
 /** 格式化时间戳为 HH:mm */
 function formatTime(iso: string): string {
-  try {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
     const d = new Date(iso); // 解析 ISO 时间
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // 取时分
   } catch {
     return ''; // 解析失败返回空
-  }
+  } // 代码块结束
 } // formatTime 结束
 
 /** 图片气泡：按 object_key 向服务端申请下载签名，取到后内联渲染缩略图，点击可看原图
@@ -59,21 +59,21 @@ function ChatImageBubble({ objectKey, name, isZh }: { objectKey: string; name?: 
       .presignDownload(objectKey, 3600) // 申请 1 小时有效的下载签名
       .then((res) => {
         if (alive) setUrl(res.download.url); // 拿到直链
-      })
+      }) // 代码块结束
       .catch(() => {
         if (alive) setFailed(true); // 失败回退占位
       });
-    return () => {
+    return () => { // 返回当前函数的处理结果
       alive = false; // 清理标记
-    };
+    }; // 代码块结束
   }, [objectKey]); // 仅 object_key 变化时重新申请
   if (failed) return <span className="chat-image-fallback">{`[图片] ${name ?? ''}`}</span>; // 失败占位
   if (!url) return <span className="chat-image-loading">{isZh ? '图片加载中…' : 'Loading…'}</span>; // 加载中占位
-  return (
-    <a className="chat-image" href={url} target="_blank" rel="noreferrer" title={name ?? ''}>
+  return ( // 返回当前函数的处理结果
+    <a className="chat-image" href={url} target="_blank" rel="noreferrer" title={name ?? ''}>{/* 执行当前业务步骤 */}
       <img src={url} alt={name ?? (isZh ? '图片' : 'image')} loading="lazy" />{/* 缩略展示，点击开原图 */}
     </a>
-  );
+  ); // 执行当前业务步骤
 } // ChatImageBubble 结束
 
 /** 字节数格式化：文件气泡展示 1.2 MB 这类可读体积 */
@@ -82,7 +82,7 @@ function formatBytes(size: number | null | undefined): string {
   const units = ['B', 'KB', 'MB', 'GB']; // 单位阶梯
   let value = size; // 逐级换算
   let index = 0; // 当前单位下标
-  while (value >= 1024 && index < units.length - 1) {
+  while (value >= 1024 && index < units.length - 1) { // 循环：条件成立时重复执行循环体
     value /= 1024; // 换算到更大单位
     index += 1; // 单位前移
   } // 换算循环结束
@@ -103,29 +103,29 @@ function ChatFileBubble({ objectKey, name, size, isZh }: { objectKey: string; na
       .presignDownload(objectKey, 3600) // 申请 1 小时有效下载签名
       .then((res) => {
         if (alive) setUrl(res.download.url); // 拿到直链
-      })
+      }) // 代码块结束
       .catch(() => {
         if (alive) setFailed(true); // 失败回退
       });
-    return () => {
+    return () => { // 返回当前函数的处理结果
       alive = false; // 清理标记
-    };
+    }; // 代码块结束
   }, [objectKey]); // 仅对象键变化时重新申请
   const label = name ?? (isZh ? '文件' : 'file'); // 展示文件名
   if (failed) return <span className="chat-file-fallback">{`[文件] ${label}`}</span>; // 失败占位
-  return (
-    <span className="chat-file">
+  return ( // 返回当前函数的处理结果
+    <span className="chat-file">{/* 执行当前业务步骤 */}
       <span className="chat-file-name">{label}</span>{/* 文件名 */}
       {size ? <span className="chat-file-size">{formatBytes(size)}</span> : null}{/* 体积 */}
       {url ? (
-        <a className="btn ghost small chat-file-download" href={url} download={label} target="_blank" rel="noreferrer">
+        <a className="btn ghost small chat-file-download" href={url} download={label} target="_blank" rel="noreferrer">{/* 执行当前业务步骤 */}
           {isZh ? '下载' : 'Download'}
         </a>
       ) : (
         <span className="muted">{isZh ? '准备中…' : 'Preparing…'}</span>
       )}{/* 下载入口 */}
     </span>
-  );
+  ); // 执行当前业务步骤
 } // ChatFileBubble 结束
 
 /** 消息预览文本：列表里显示的摘要 */
@@ -151,7 +151,7 @@ export function Chat({ locale }: ChatProps) {
 
   // IM 实时套接字
   const im = useImSocket();
-  const { connected, send, onMessage, onCall, onFrame } = im;
+  const { connected, send, onMessage, onCall, onFrame } = im; // 执行当前业务步骤
 
   // ---------- 会话与消息状态 ----------
   const [conversations, setConversations] = useState<ImConversation[]>([]); // 会话列表
@@ -209,12 +209,12 @@ export function Chat({ locale }: ChatProps) {
 
   /** 拉取会话列表 */
   const loadConversations = useCallback(async () => {
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const res = await api.im.listConversations(); // 拉取列表
       setConversations(res.items); // 更新
     } catch {
       setError(isZh ? '加载会话失败' : 'Failed to load conversations'); // 失败提示
-    }
+    } // 代码块结束
   }, [isZh]); // loadConversations 结束
 
   // 挂载时加载一次
@@ -224,7 +224,7 @@ export function Chat({ locale }: ChatProps) {
 
   /** 打开某会话：拉消息、清搜索、标已读、载群成员 */
   const openConversation = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string) => { // 执行当前业务步骤
       setActiveId(conversationId); // 切换选中
       setMsgQuery(''); // 清会话内搜索
       setMsgResults(null); // 清搜索结果
@@ -232,16 +232,16 @@ export function Chat({ locale }: ChatProps) {
       setReplyTarget(null); // 清引用态，避免把上个会话的引用带过来
       setHighlightId(null); // 清高亮
       setUnreadAnchorId(null); // 清未读分割线
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.listMessages(conversationId, { limit: 50 }); // 最近 50 条
         setMessages(res.items); // 更新消息
         setHasMore(res.items.length >= 50); // 满 50 条才可能还有更早
         const unread = conversations.find((c) => c.id === conversationId)?.unread_count ?? 0; // 进入前的未读数
-        if (unread > 0 && res.items.length > unread) {
+        if (unread > 0 && res.items.length > unread) { // 条件分支：按判断结果选择后续处理路径
           setUnreadAnchorId(res.items[res.items.length - unread].id); // 未读起点：分割线插在该条之前
         } // 有未读且能定位才画分割线
         const last = res.items[res.items.length - 1]; // 最后一条
-        if (last) {
+        if (last) { // 条件分支：按判断结果选择后续处理路径
           // 标记已读并刷新列表，让未读角标消失
           await api.im.markRead(conversationId, last.id).catch(() => undefined);
           loadConversations();
@@ -249,7 +249,7 @@ export function Chat({ locale }: ChatProps) {
       } catch {
         setError(isZh ? '加载消息失败' : 'Failed to load messages'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [isZh, loadConversations, conversations],
   ); // openConversation 结束
 
@@ -257,7 +257,7 @@ export function Chat({ locale }: ChatProps) {
   const loadMore = useCallback(async () => {
     if (!activeId || messages.length === 0 || loadingMore) return; // 无会话 / 无消息 / 正在加载时不重复请求
     setLoadingMore(true); // 置加载中
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const res = await api.im.listMessages(activeId, { before: messages[0].id, limit: 50 }); // 取更早 50 条
       setMessages((prev) => [...res.items, ...prev]); // 拼到列表头部
       setHasMore(res.items.length >= 50); // 满页才继续可翻
@@ -272,9 +272,9 @@ export function Chat({ locale }: ChatProps) {
 
   // 新消息：追加到当前会话、标记已读、刷新列表
   useEffect(() => {
-    return onMessage((raw) => {
+    return onMessage((raw) => { // 返回当前函数的处理结果
       const msg = raw as ImMessage; // 断言为消息结构
-      if (msg.conversation_id === activeId) {
+      if (msg.conversation_id === activeId) { // 条件分支：按判断结果选择后续处理路径
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])); // 去重追加
         api.im.markRead(msg.conversation_id, msg.id).catch(() => undefined); // 标已读
         setTypingLabel(null); // 对方发来消息即清掉「正在输入」
@@ -285,15 +285,15 @@ export function Chat({ locale }: ChatProps) {
 
   // 帧事件：ack 回填消息 ID、撤回移除消息、输入中提示、已读状态
   useEffect(() => {
-    return onFrame((frame) => {
+    return onFrame((frame) => { // 返回当前函数的处理结果
       const payload = frame.payload as Record<string, unknown> | undefined; // 帧载荷
-      if (frame.type === 'ack' && frame.id) {
+      if (frame.type === 'ack' && frame.id) { // 条件分支：按判断结果选择后续处理路径
         const localId = pendingRef.current.get(frame.id); // 找到对应的乐观消息
         const serverId = typeof payload?.message_id === 'string' ? payload.message_id : undefined; // 服务端消息 ID
-        if (localId && serverId && payload?.ok !== false) {
+        if (localId && serverId && payload?.ok !== false) { // 条件分支：按判断结果选择后续处理路径
           pendingRef.current.delete(frame.id); // 用掉即删
           setMessages((prev) => prev.map((m) => (m.id === localId ? { ...m, id: serverId, status: 'sent' } : m))); // 替换临时 ID
-        } else if (localId) {
+        } else if (localId) { // 代码块结束
           pendingRef.current.delete(frame.id); // 发送失败：移除乐观消息并提示
           setMessages((prev) => prev.filter((m) => m.id !== localId));
           setError(isZh ? '发送失败，请重试' : 'Send failed, please retry');
@@ -301,16 +301,16 @@ export function Chat({ locale }: ChatProps) {
         loadConversations(); // 刷新摘要
         return; // ack 处理完
       } // ack 结束
-      if (frame.type === 'message.recall') {
+      if (frame.type === 'message.recall') { // 条件分支：按判断结果选择后续处理路径
         const mid = typeof payload?.message_id === 'string' ? payload.message_id : ''; // 被撤回的消息 ID
         if (mid) setMessages((prev) => prev.filter((m) => m.id !== mid)); // 从界面移除
         loadConversations(); // 摘要同步
         return; // 撤回处理完
       } // recall 结束
-      if (frame.type === 'typing') {
+      if (frame.type === 'typing') { // 条件分支：按判断结果选择后续处理路径
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 会话
         const uid = typeof payload?.user_id === 'string' ? payload.user_id : ''; // 输入者
-        if (convId === activeId && uid && uid !== currentUserId) {
+        if (convId === activeId && uid && uid !== currentUserId) { // 条件分支：按判断结果选择后续处理路径
           const who = conversations.find((c) => c.id === convId)?.title; // 群聊里用标题占位
           setTypingLabel(who ? (isZh ? '对方正在输入…' : 'Typing…') : isZh ? '对方正在输入…' : 'Typing…'); // 显示提示
           if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current); // 重置定时器
@@ -318,24 +318,24 @@ export function Chat({ locale }: ChatProps) {
         } // 只处理当前会话
         return; // typing 处理完
       } // typing 结束
-      if (frame.type === 'conversation.members') {
+      if (frame.type === 'conversation.members') { // 条件分支：按判断结果选择后续处理路径
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 发生变化的会话
-        if (convId === activeId) {
+        if (convId === activeId) { // 条件分支：按判断结果选择后续处理路径
           // 成员/角色变更：直接拉一次会话详情刷新群面板（避免依赖尚未定义的 openPanel）
           api.im
             .getConversation(convId)
             .then((res) => {
               setMembers(res.members); // 刷新成员列表
               setOwnerId(res.conversation.owner_user_id); // 刷新群主
-            })
+            }) // 代码块结束
             .catch(() => undefined); // 失败静默，面板保持旧数据
         } // 只处理当前会话
         loadConversations(); // 成员数可能变化，列表同步
         return; // 处理完
       } // conversation.members 结束
-      if (frame.type === 'message.read') {
+      if (frame.type === 'message.read') { // 条件分支：按判断结果选择后续处理路径
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 会话
-        if (convId === activeId) {
+        if (convId === activeId) { // 条件分支：按判断结果选择后续处理路径
           setMessages((prev) => prev.map((m) => (m.sender_user_id === currentUserId ? { ...m, status: 'read' } : m))); // 自己的消息统一标已读
         } // 只改当前会话
       } // read 结束
@@ -344,12 +344,12 @@ export function Chat({ locale }: ChatProps) {
 
   // 通话信令：来电邀请建通话，其余转发给 VideoCall
   useEffect(() => {
-    return onCall((frame) => {
-      if (frame.type === 'call.invite' && !callSession) {
-        const p = frame.payload as { from_user_id?: string; from_display_name?: string } | undefined;
-        if (p?.from_user_id) {
+    return onCall((frame) => { // 返回当前函数的处理结果
+      if (frame.type === 'call.invite' && !callSession) { // 条件分支：按判断结果选择后续处理路径
+        const p = frame.payload as { from_user_id?: string; from_display_name?: string } | undefined; // 常量 p：保存固定配置或一次性派生值
+        if (p?.from_user_id) { // 条件分支：按判断结果选择后续处理路径
           setCallSession({ mode: 'incoming', peerUserId: p.from_user_id, peerDisplayName: p.from_display_name ?? p.from_user_id });
-        }
+        } // 代码块结束
       } // 来电分支结束
       setCallSignal(frame); // 交给通话组件
     });
@@ -363,12 +363,12 @@ export function Chat({ locale }: ChatProps) {
 
   // 用户搜索防抖（建私聊 / 建群选人共用）
   useEffect(() => {
-    if (!searchQ.trim()) {
+    if (!searchQ.trim()) { // 条件分支：按判断结果选择后续处理路径
       setSearchResults([]); // 空关键词清空
-      return;
+      return; // 返回当前函数的处理结果
     } // 空词结束
-    const timer = window.setTimeout(async () => {
-      try {
+    const timer = window.setTimeout(async () => { // 常量 timer：保存固定配置或一次性派生值
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.searchUsers(searchQ.trim()); // 搜索
         setSearchResults(res.items); // 更新结果
       } catch {
@@ -380,12 +380,12 @@ export function Chat({ locale }: ChatProps) {
 
   // 群面板内「加人」搜索防抖：只在面板打开且有关键词时请求
   useEffect(() => {
-    if (!panelOpen || !inviteQ.trim()) {
+    if (!panelOpen || !inviteQ.trim()) { // 条件分支：按判断结果选择后续处理路径
       setInviteResults([]); // 未打开或无关键词清空
-      return;
+      return; // 返回当前函数的处理结果
     } // 提前返回
-    const timer = window.setTimeout(async () => {
-      try {
+    const timer = window.setTimeout(async () => { // 常量 timer：保存固定配置或一次性派生值
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.searchUsers(inviteQ.trim()); // 搜索用户
         setInviteResults(res.items); // 更新候选
       } catch {
@@ -399,18 +399,18 @@ export function Chat({ locale }: ChatProps) {
 
   /** 通过 WS 或 HTTP 发一条消息：返回是否成功 */
   const deliver = useCallback(
-    async (
+    async ( // 执行当前业务步骤
       body: { content_type: 'text' | 'image' | 'file'; content?: string; object_key?: string; object_mime?: string; object_name?: string; object_size?: number; reply_to_id?: string },
       optimistic: ImMessage,
     ) => {
       if (!activeId) return; // 无会话直接返回
       setMessages((prev) => [...prev, optimistic]); // 乐观追加
-      if (connected) {
+      if (connected) { // 条件分支：按判断结果选择后续处理路径
         const reqId = send({ type: 'message.send', payload: { conversation_id: activeId, ...body } }); // WS 发送（body 含 reply_to_id 引用目标）
         if (reqId) pendingRef.current.set(reqId, optimistic.id); // 记录请求序号，等 ack 回填
         return; // WS 分支结束
       } // connected 分支结束
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.sendMessage(activeId, body); // HTTP 兜底
         setMessages((prev) => prev.map((m) => (m.id === optimistic.id ? res.message : m))); // 用服务端对象替换
         loadConversations(); // 刷新摘要
@@ -418,7 +418,7 @@ export function Chat({ locale }: ChatProps) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id)); // 移除乐观消息
         setError(isZh ? '发送失败' : 'Send failed'); // 提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, connected, send, isZh, loadConversations],
   ); // deliver 结束
 
@@ -430,7 +430,7 @@ export function Chat({ locale }: ChatProps) {
     setError(null); // 清旧错误
     setDraft(''); // 清输入框
     const quoted = replyTarget; // 本次引用的消息
-    const optimistic: ImMessage = {
+    const optimistic: ImMessage = { // 常量 optimistic：保存固定配置或一次性派生值
       id: `pending-${Date.now()}`, // 临时 ID
       conversation_id: activeId, // 归属会话
       sender_user_id: currentUserId, // 发送者
@@ -441,7 +441,7 @@ export function Chat({ locale }: ChatProps) {
       reply_excerpt: quoted ? messagePreview(quoted).slice(0, 80) : null, // 引用摘要（本地先显示）
       status: 'sent', // 初始状态
       created_at: new Date().toISOString(), // 本地时间
-    };
+    }; // 代码块结束
     setReplyTarget(null); // 发送即清引用态
     await deliver({ content_type: 'text', content: text, ...(quoted ? { reply_to_id: quoted.id } : {}) }, optimistic); // 统一投递
     setSending(false); // 复位
@@ -449,21 +449,21 @@ export function Chat({ locale }: ChatProps) {
 
   /** 发送图片或文件：先直传拿到 object_key，再发消息 */
   const sendFile = useCallback(
-    async (file: File) => {
+    async (file: File) => { // 执行当前业务步骤
       if (!activeId) return; // 无会话不发
       const isImage = file.type.startsWith('image/'); // 是否图片
       const mime = file.type || 'application/octet-stream'; // MIME 兜底
       setSending(true); // 置发送中
       setError(null); // 清错误
-      try {
-        const presign = await api.media.presignUpload({
+      try { // 异常捕获起点：包裹可能抛出错误的操作
+        const presign = await api.media.presignUpload({ // 常量 presign：保存固定配置或一次性派生值
           asset_type: isImage ? 'image' : 'text', // 对象存储按 image / 通用文件归类
           mime, // 文件 MIME
           size_bytes: file.size, // 体积
         }); // 申请上传凭证
         const put = await fetch(presign.upload.url, { method: presign.upload.method, headers: presign.upload.headers, body: file }); // 直传字节
         if (!put.ok) throw new Error(`upload failed: ${put.status}`); // 直传失败即中止
-        const optimistic: ImMessage = {
+        const optimistic: ImMessage = { // 常量 optimistic：保存固定配置或一次性派生值
           id: `pending-${Date.now()}`, // 临时 ID
           conversation_id: activeId, // 会话
           sender_user_id: currentUserId, // 发送者
@@ -476,15 +476,15 @@ export function Chat({ locale }: ChatProps) {
           object_size: file.size, // 体积
           status: 'sent', // 初始状态
           created_at: new Date().toISOString(), // 时间
-        };
-        await deliver(
+        }; // 代码块结束
+        await deliver( // 异步等待：挂起至 Promise 落定后再继续
           {
             content_type: isImage ? 'image' : 'file', // 类型
             object_key: presign.object_key, // 对象键
             object_mime: mime, // MIME 类型
             object_name: file.name, // 文件名
             object_size: file.size, // 体积
-          },
+          }, // 代码块结束
           optimistic,
         ); // 投递消息
       } catch {
@@ -492,32 +492,32 @@ export function Chat({ locale }: ChatProps) {
       } finally {
         setSending(false); // 复位
       } // finally 结束
-    },
+    }, // 代码块结束
     [activeId, currentUserId, session, isZh, deliver],
   ); // sendFile 结束
 
   /** 撤回消息：仅自己且 2 分钟内 */
   const recall = useCallback(
-    async (msg: ImMessage) => {
+    async (msg: ImMessage) => { // 执行当前业务步骤
       if (!activeId) return; // 无会话
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         await api.im.recallMessage(activeId, msg.id); // 调后端
         setMessages((prev) => prev.filter((m) => m.id !== msg.id)); // 本地移除
         loadConversations(); // 刷新摘要
       } catch {
         setError(isZh ? '撤回失败（超过 2 分钟或不是本人消息）' : 'Recall failed'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, isZh, loadConversations],
   ); // recall 结束
 
   /** 会话内消息搜索 */
   const runMessageSearch = useCallback(async () => {
-    if (!activeId || !msgQuery.trim()) {
+    if (!activeId || !msgQuery.trim()) { // 条件分支：按判断结果选择后续处理路径
       setMsgResults(null); // 清空则退出搜索态
-      return;
+      return; // 返回当前函数的处理结果
     } // 空词结束
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const res = await api.im.searchMessages(activeId, msgQuery.trim()); // 搜索
       setMsgResults(res.items); // 展示结果
     } catch {
@@ -527,9 +527,9 @@ export function Chat({ locale }: ChatProps) {
 
   /** 搜索结果点击：围绕目标消息重载一段上下文，滚动到该条并短暂高亮 */
   const jumpToMessage = useCallback(
-    async (messageId: string) => {
+    async (messageId: string) => { // 执行当前业务步骤
       if (!activeId) return; // 无会话
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.listMessages(activeId, { around: messageId, limit: 40 }); // 目标前后各半页
         setMessages(res.items); // 替换为定位窗口
         setHasMore(res.items.length >= 40); // 仍可向前翻
@@ -542,14 +542,14 @@ export function Chat({ locale }: ChatProps) {
       } catch {
         setError(isZh ? '定位消息失败' : 'Failed to jump to message'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, isZh],
   ); // jumpToMessage 结束
 
   /** 邀请成员入群（可多选） */
   const inviteMembers = useCallback(async () => {
     if (!activeId || invitePick.length === 0) return; // 无会话 / 未选人
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.im.addMembers(activeId, invitePick); // 调后端加人
       setInvitePick([]); // 清勾选
       setInviteQ(''); // 清搜索
@@ -563,52 +563,52 @@ export function Chat({ locale }: ChatProps) {
 
   /** 踢出成员（群主 / 管理员） */
   const kickMember = useCallback(
-    async (userId: string) => {
+    async (userId: string) => { // 执行当前业务步骤
       if (!activeId) return; // 无会话
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         await api.im.removeMember(activeId, userId); // 移除
         await openPanel(); // 刷新面板
         await loadConversations(); // 刷新成员数
       } catch {
         setError(isZh ? '移除成员失败（仅群主/管理员可操作）' : 'Failed to remove member'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, isZh, loadConversations],
   ); // kickMember 结束
 
   /** 设 / 撤管理员（仅群主） */
   const changeRole = useCallback(
-    async (userId: string, role: 'admin' | 'member') => {
+    async (userId: string, role: 'admin' | 'member') => { // 执行当前业务步骤
       if (!activeId) return; // 无会话
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         await api.im.setMemberRole(activeId, userId, role); // 改角色
         await openPanel(); // 刷新面板
       } catch {
         setError(isZh ? '设置管理员失败（仅群主可操作）' : 'Failed to change role'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, isZh],
   ); // changeRole 结束
 
   /** 转让群主（仅群主） */
   const transferTo = useCallback(
-    async (userId: string) => {
+    async (userId: string) => { // 执行当前业务步骤
       if (!activeId) return; // 无会话
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         await api.im.transferOwnership(activeId, userId); // 转让
         await openPanel(); // 刷新面板
         await loadConversations(); // 标题等可能变化
       } catch {
         setError(isZh ? '转让群主失败' : 'Failed to transfer ownership'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, isZh, loadConversations],
   ); // transferTo 结束
 
 
-  const pickUser = useCallback(
-    async (user: ImUser) => {
-      try {
+  const pickUser = useCallback( // 常量 pickUser：保存固定配置或一次性派生值
+    async (user: ImUser) => { // 执行当前业务步骤
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.createConversation({ type: 'direct', target_user_id: user.id }); // 复用或新建
         setSearchQ(''); // 清搜索
         setSearchResults([]); // 清结果
@@ -616,7 +616,7 @@ export function Chat({ locale }: ChatProps) {
       } catch {
         setError(isZh ? '创建会话失败' : 'Failed to start chat'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [isZh, openConversation],
   ); // pickUser 结束
 
@@ -627,12 +627,12 @@ export function Chat({ locale }: ChatProps) {
 
   /** 创建群聊 */
   const createGroup = useCallback(async () => {
-    if (groupPick.length === 0) {
+    if (groupPick.length === 0) { // 条件分支：按判断结果选择后续处理路径
       setError(isZh ? '至少选择一位成员' : 'Pick at least one member'); // 校验
-      return;
+      return; // 返回当前函数的处理结果
     } // 校验结束
-    try {
-      const res = await api.im.createConversation({
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      const res = await api.im.createConversation({ // 常量 res：保存固定配置或一次性派生值
         type: 'group', // 群聊
         name: groupName.trim() || (isZh ? '新群聊' : 'New group'), // 群名兜底
         member_user_ids: groupPick, // 成员
@@ -652,7 +652,7 @@ export function Chat({ locale }: ChatProps) {
   /** 打开群信息面板：拉成员与群主 */
   const openPanel = useCallback(async () => {
     if (!activeId) return; // 无会话
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       const res = await api.im.getConversation(activeId); // 会话 + 成员
       setMembers(res.members); // 成员列表
       setOwnerId(res.conversation.owner_user_id); // 群主
@@ -666,7 +666,7 @@ export function Chat({ locale }: ChatProps) {
   /** 改建群名 */
   const renameGroup = useCallback(async () => {
     if (!activeId || !renameDraft.trim()) return; // 空名不改
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.im.renameConversation(activeId, renameDraft.trim()); // 提交
       await loadConversations(); // 刷新列表标题
       setPanelOpen(false); // 关面板
@@ -678,7 +678,7 @@ export function Chat({ locale }: ChatProps) {
   /** 退出群 / 解散群 / 删除私聊 */
   const leaveConversation = useCallback(async () => {
     if (!activeId) return; // 无会话
-    try {
+    try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.im.deleteConversation(activeId); // 后端按角色处理
       setActiveId(null); // 清选中
       setMessages([]); // 清消息
@@ -691,27 +691,27 @@ export function Chat({ locale }: ChatProps) {
 
   /** 置顶 / 免打扰切换 */
   const togglePreference = useCallback(
-    async (patch: { pinned?: boolean; muted?: boolean }) => {
+    async (patch: { pinned?: boolean; muted?: boolean }) => { // 执行当前业务步骤
       if (!activeId) return; // 无会话
-      try {
+      try { // 异常捕获起点：包裹可能抛出错误的操作
         await api.im.setPreference(activeId, patch); // 写入
         await loadConversations(); // 刷新
       } catch {
         setError(isZh ? '设置失败' : 'Failed to update'); // 失败提示
       } // try 结束
-    },
+    }, // 代码块结束
     [activeId, isZh, loadConversations],
   ); // togglePreference 结束
 
   // 回车发送；输入时按节流发 typing 帧
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) { // 条件分支：按判断结果选择后续处理路径
       e.preventDefault(); // 阻止换行
       void sendText(); // 发送
     } // 回车分支
   }; // handleKeyDown 结束
 
-  const handleDraftChange = (value: string) => {
+  const handleDraftChange = (value: string) => { // 常量 handleDraftChange：保存固定配置或一次性派生值
     setDraft(value); // 更新输入
     if (!activeId || !connected) return; // 无会话 / 未连接不发 typing
     const nowMs = Date.now(); // 当前时间
@@ -740,19 +740,19 @@ export function Chat({ locale }: ChatProps) {
   const isOwnerMe = myRole === 'owner'; // 是否群主
   const canManage = activeConversation?.type === 'group' && (isOwnerMe || myRole === 'admin'); // 群主与管理员可管理成员
 
-  return (
-    <div className="chat-layout">
+  return ( // 返回当前函数的处理结果
+    <div className="chat-layout">{/* 执行当前业务步骤 */}
       {/* 左侧：搜索 + 建群 + 会话列表 */}
-      <aside className="chat-sidebar">
-        <div className="chat-search">
+      <aside className="chat-sidebar">{/* 执行当前业务步骤 */}
+        <div className="chat-search">{/* 执行当前业务步骤 */}
           <input
-            type="text"
+            type="text" // 赋值：更新变量 type 的取值
             placeholder={isZh ? '搜索用户…' : 'Search users…'}
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
           />
           <button
-            type="button"
+            type="button" // 赋值：更新变量 type 的取值
             className="btn ghost chat-new-group"
             onClick={() => {
               setGroupMode((v) => !v); // 切换建群模式
@@ -766,20 +766,20 @@ export function Chat({ locale }: ChatProps) {
 
         {/* 建群表单：群名 + 勾选成员 */}
         {groupMode && (
-          <div className="chat-group-form">
+          <div className="chat-group-form">{/* 执行当前业务步骤 */}
             <input
-              type="text"
+              type="text" // 赋值：更新变量 type 的取值
               placeholder={isZh ? '群名称' : 'Group name'}
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
             />
             {groupPick.length > 0 && <p className="chat-hint">{isZh ? `已选 ${groupPick.length} 人` : `${groupPick.length} selected`}</p>}
             {searchResults.length > 0 && (
-              <div className="chat-search-results">
+              <div className="chat-search-results">{/* 执行当前业务步骤 */}
                 {searchResults.map((u) => (
                   <button
                     key={u.id}
-                    type="button"
+                    type="button" // 赋值：更新变量 type 的取值
                     className={`chat-user-item${groupPick.includes(u.id) ? ' picked' : ''}`}
                     onClick={() => toggleGroupPick(u.id)}
                   >
@@ -790,7 +790,7 @@ export function Chat({ locale }: ChatProps) {
                 ))}
               </div>
             )}
-            <button type="button" className="btn primary" onClick={createGroup} disabled={groupPick.length === 0}>
+            <button type="button" className="btn primary" onClick={createGroup} disabled={groupPick.length === 0}>{/* 执行当前业务步骤 */}
               {isZh ? '创建群聊' : 'Create group'}
             </button>
           </div>
@@ -798,86 +798,86 @@ export function Chat({ locale }: ChatProps) {
 
         {/* 私聊搜索结果（非建群模式） */}
         {!groupMode && searchQ.trim() !== '' && (
-          <div className="chat-search-results">
+          <div className="chat-search-results">{/* 执行当前业务步骤 */}
             {searchResults.length === 0 ? (
               <p className="chat-empty">{isZh ? '未找到用户' : 'No users found'}</p>
             ) : (
               searchResults.map((u) => (
-                <button key={u.id} type="button" className="chat-user-item" onClick={() => pickUser(u)}>
+                <button key={u.id} type="button" className="chat-user-item" onClick={() => pickUser(u)}>{/* 执行当前业务步骤 */}
                   <span className="chat-avatar">{(u.display_name || u.id).slice(0, 1)}</span>
                   <span className="chat-user-name">{u.display_name || u.id}</span>
                 </button>
-              ))
+              )) // 执行当前业务步骤
             )}
           </div>
         )}
 
         {/* 会话列表 */}
-        <div className="chat-conversations">
+        <div className="chat-conversations">{/* 执行当前业务步骤 */}
           {conversations.length === 0 ? (
             <p className="chat-empty">{isZh ? '还没有会话，搜索用户开始聊天' : 'No conversations yet'}</p>
           ) : (
             conversations.map((c) => (
               <button
                 key={c.id}
-                type="button"
+                type="button" // 赋值：更新变量 type 的取值
                 className={`chat-conv-item${c.id === activeId ? ' active' : ''}`}
                 onClick={() => void openConversation(c.id)}
               >
                 <span className="chat-avatar">{(c.title || '?').slice(0, 1)}</span>
-                <span className="chat-conv-body">
-                  <span className="chat-conv-title">
+                <span className="chat-conv-body">{/* 执行当前业务步骤 */}
+                  <span className="chat-conv-title">{/* 执行当前业务步骤 */}
                     {c.title}
                     {c.type === 'group' && <span className="chat-conv-meta">({c.member_count})</span>}
                     {c.pinned && <span className="chat-conv-flag">{isZh ? '置顶' : 'Pinned'}</span>}
                     {c.muted && <span className="chat-conv-flag">{isZh ? '免打扰' : 'Muted'}</span>}
                   </span>
-                  <span className="chat-conv-preview">
+                  <span className="chat-conv-preview">{/* 执行当前业务步骤 */}
                     {c.last_message ? messagePreview(c.last_message) : isZh ? '暂无消息' : 'No messages'}
                   </span>
                 </span>
                 {c.unread_count > 0 && <span className={`chat-badge${c.muted ? ' muted' : ''}`}>{c.muted ? '·' : c.unread_count}</span>}
               </button>
-            ))
+            )) // 执行当前业务步骤
           )}
         </div>
       </aside>
 
       {/* 右侧：消息区 + 输入 */}
-      <section className="chat-main">
+      <section className="chat-main">{/* 执行当前业务步骤 */}
         {activeConversation ? (
-          <>
-            <header className="chat-header">
+          <>{/* 执行当前业务步骤 */}
+            <header className="chat-header">{/* 执行当前业务步骤 */}
               <span className="chat-header-title">{activeConversation.title}</span>
               <span className="chat-header-status">{connected ? (isZh ? '已连接' : 'Connected') : isZh ? '未连接' : 'Offline'}</span>
               {/* 会话内消息搜索 */}
               <input
-                type="text"
+                type="text" // 赋值：更新变量 type 的取值
                 className="chat-msg-search"
                 placeholder={isZh ? '搜索聊天记录' : 'Search messages'}
                 value={msgQuery}
                 onChange={(e) => setMsgQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void runMessageSearch(); // 回车即搜
-                  if (e.key === 'Escape') {
+                  if (e.key === 'Escape') { // 条件分支：按判断结果选择后续处理路径
                     setMsgQuery(''); // Esc 清空
                     setMsgResults(null);
                   } // Esc 分支
                 }}
               />
-              <button type="button" className="btn ghost" onClick={() => void togglePreference({ pinned: !activeConversation.pinned })}>
+              <button type="button" className="btn ghost" onClick={() => void togglePreference({ pinned: !activeConversation.pinned })}>{/* 执行当前业务步骤 */}
                 {activeConversation.pinned ? (isZh ? '取消置顶' : 'Unpin') : isZh ? '置顶' : 'Pin'}
               </button>
-              <button type="button" className="btn ghost" onClick={() => void togglePreference({ muted: !activeConversation.muted })}>
+              <button type="button" className="btn ghost" onClick={() => void togglePreference({ muted: !activeConversation.muted })}>{/* 执行当前业务步骤 */}
                 {activeConversation.muted ? (isZh ? '取消免打扰' : 'Unmute') : isZh ? '免打扰' : 'Mute'}
               </button>
               {/* 群信息（群聊） / 视频通话（私聊） */}
               {activeConversation.type === 'group' ? (
-                <button type="button" className="btn ghost" onClick={() => void openPanel()}>
+                <button type="button" className="btn ghost" onClick={() => void openPanel()}>{/* 执行当前业务步骤 */}
                   {isZh ? '群信息' : 'Group info'}
                 </button>
               ) : (
-                <button type="button" className="btn ghost" onClick={handleVideoCall} disabled={!connected}>
+                <button type="button" className="btn ghost" onClick={handleVideoCall} disabled={!connected}>{/* 执行当前业务步骤 */}
                   {isZh ? '视频通话' : 'Video call'}
                 </button>
               )}
@@ -885,38 +885,38 @@ export function Chat({ locale }: ChatProps) {
 
             {/* 搜索结果条：点击任一条跳转到正文对应位置（围绕目标重载上下文 + 高亮） */}
             {msgResults && (
-              <div className="chat-msg-result-bar">
+              <div className="chat-msg-result-bar">{/* 执行当前业务步骤 */}
                 <span>{isZh ? `命中 ${msgResults.length} 条` : `${msgResults.length} matches`}</span>
                 {msgResults.slice(0, 20).map((m) => (
                   <button
                     key={m.id}
-                    type="button"
+                    type="button" // 赋值：更新变量 type 的取值
                     className="chat-msg-result-item"
                     onClick={() => void jumpToMessage(m.id)} // 定位并高亮
                   >
                     {formatTime(m.created_at)} · {messagePreview(m).slice(0, 24)}
                   </button>
                 ))}
-                <button type="button" className="btn ghost" onClick={() => setMsgResults(null)}>
+                <button type="button" className="btn ghost" onClick={() => setMsgResults(null)}>{/* 执行当前业务步骤 */}
                   {isZh ? '关闭' : 'Close'}
                 </button>
               </div>
             )}
 
-            <div className="chat-messages">
+            <div className="chat-messages">{/* 执行当前业务步骤 */}
               {hasMore && (
-                <button type="button" className="btn ghost chat-more" onClick={() => void loadMore()} disabled={loadingMore}>
+                <button type="button" className="btn ghost chat-more" onClick={() => void loadMore()} disabled={loadingMore}>{/* 执行当前业务步骤 */}
                   {loadingMore ? (isZh ? '加载中…' : 'Loading…') : isZh ? '加载更早消息' : 'Load earlier'}
                 </button>
               )}
               {messages.map((m) => {
                 const mine = m.sender_user_id === currentUserId; // 是否自己发的
                 const canRecall = mine && Date.now() - Date.parse(m.created_at) < RECALL_WINDOW_MS && !m.id.startsWith('pending-'); // 2 分钟内且已落库
-                return (
-                  <Fragment key={m.id}>
+                return ( // 返回当前函数的处理结果
+                  <Fragment key={m.id}>{/* 执行当前业务步骤 */}
                     {/* 未读分割线：进入会话前未读的第一条之前 */}
                     {unreadAnchorId === m.id && (
-                      <div className="chat-unread-divider">
+                      <div className="chat-unread-divider">{/* 执行当前业务步骤 */}
                         <span>{isZh ? '以下是新消息' : 'New messages'}</span>
                       </div>
                     )}
@@ -925,7 +925,7 @@ export function Chat({ locale }: ChatProps) {
                       className={`chat-msg ${mine ? 'mine' : 'theirs'}${highlightId === m.id ? ' highlight' : ''}`}
                     >
                       <span className="chat-msg-sender">{mine ? (isZh ? '我' : 'Me') : m.sender_display_name}</span>
-                      <div className="chat-msg-bubble">
+                      <div className="chat-msg-bubble">{/* 执行当前业务步骤 */}
                         {/* 引用块：展示被引用消息的固化摘要 */}
                         {m.reply_excerpt && <span className="chat-msg-quote">{m.reply_excerpt}</span>}
                         {m.content_type === 'text' ? (
@@ -935,30 +935,30 @@ export function Chat({ locale }: ChatProps) {
                             <ChatImageBubble objectKey={m.object_key} name={m.object_name ?? undefined} isZh={isZh} /> // 有对象键就内联预览
                           ) : (
                             <span>{`[图片] ${m.object_name ?? ''}`}</span> // 无 object_key（历史消息）回退文字
-                          )
+                          ) // 执行当前业务步骤
                         ) : m.object_key ? (
                           <ChatFileBubble objectKey={m.object_key} name={m.object_name ?? undefined} size={m.object_size} isZh={isZh} /> // 文件气泡带下载入口
                         ) : (
                           <span>{`[文件] ${m.object_name ?? ''}`}</span> // 旧消息无对象键，回退文字
                         )}
                       </div>
-                      <span className="chat-msg-time">
+                      <span className="chat-msg-time">{/* 执行当前业务步骤 */}
                         {formatTime(m.created_at)}
                         {mine && <span className={`chat-msg-status ${m.status}`}>{statusMark(m.status, isZh)}</span>}
                         {!m.id.startsWith('pending-') && (
-                          <button type="button" className="chat-reply-btn" onClick={() => setReplyTarget(m)}>
+                          <button type="button" className="chat-reply-btn" onClick={() => setReplyTarget(m)}>{/* 执行当前业务步骤 */}
                             {isZh ? '引用' : 'Quote'}
                           </button>
                         )}
                         {canRecall && (
-                          <button type="button" className="chat-recall" onClick={() => void recall(m)}>
+                          <button type="button" className="chat-recall" onClick={() => void recall(m)}>{/* 执行当前业务步骤 */}
                             {isZh ? '撤回' : 'Recall'}
                           </button>
                         )}
                       </span>
                     </div>
                   </Fragment>
-                );
+                ); // 执行当前业务步骤
               })}
               <div ref={messagesEndRef} />
             </div>
@@ -968,25 +968,25 @@ export function Chat({ locale }: ChatProps) {
 
             {/* 引用回复提示条：显示被引用内容，可一键取消 */}
             {replyTarget && (
-              <div className="chat-reply-bar">
+              <div className="chat-reply-bar">{/* 执行当前业务步骤 */}
                 <span className="chat-reply-quote">{messagePreview(replyTarget).slice(0, 60)}</span>
-                <button type="button" className="btn ghost small" onClick={() => setReplyTarget(null)}>
+                <button type="button" className="btn ghost small" onClick={() => setReplyTarget(null)}>{/* 执行当前业务步骤 */}
                   {isZh ? '取消引用' : 'Cancel'}
                 </button>
               </div>
             )}
 
-            <div className="chat-input">
+            <div className="chat-input">{/* 执行当前业务步骤 */}
               {/* 表情：纯本地插入，插入后聚焦仍留在文本域 */}
-              <button type="button" className="btn ghost chat-emoji-btn" onClick={() => setEmojiOpen((v) => !v)} disabled={sending}>
+              <button type="button" className="btn ghost chat-emoji-btn" onClick={() => setEmojiOpen((v) => !v)} disabled={sending}>{/* 执行当前业务步骤 */}
                 🙂
               </button>
               {emojiOpen && (
-                <div className="chat-emoji-picker">
+                <div className="chat-emoji-picker">{/* 执行当前业务步骤 */}
                   {CHAT_EMOJIS.map((e) => (
                     <button
                       key={e}
-                      type="button"
+                      type="button" // 赋值：更新变量 type 的取值
                       className="chat-emoji-item"
                       onClick={() => {
                         setDraft((prev) => `${prev}${e}`); // 追加到草稿
@@ -1005,12 +1005,12 @@ export function Chat({ locale }: ChatProps) {
                 rows={2}
               />
               {/* 图片/文件：走预签名直传 */}
-              <button type="button" className="btn ghost chat-attach" onClick={() => fileInputRef.current?.click()} disabled={sending}>
+              <button type="button" className="btn ghost chat-attach" onClick={() => fileInputRef.current?.click()} disabled={sending}>{/* 执行当前业务步骤 */}
                 {isZh ? '图片/文件' : 'Attach'}
               </button>
               <input
                 ref={fileInputRef}
-                type="file"
+                type="file" // 赋值：更新变量 type 的取值
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0]; // 取第一个文件
@@ -1018,7 +1018,7 @@ export function Chat({ locale }: ChatProps) {
                   e.target.value = ''; // 允许重复选同一文件
                 }}
               />
-              <button type="button" className="btn primary" onClick={() => void sendText()} disabled={sending || !draft.trim()}>
+              <button type="button" className="btn primary" onClick={() => void sendText()} disabled={sending || !draft.trim()}>{/* 执行当前业务步骤 */}
                 {isZh ? '发送' : 'Send'}
               </button>
             </div>
@@ -1031,27 +1031,27 @@ export function Chat({ locale }: ChatProps) {
 
       {/* 群信息面板 */}
       {panelOpen && activeConversation && (
-        <aside className="chat-panel">
-          <header>
+        <aside className="chat-panel">{/* 执行当前业务步骤 */}
+          <header>{/* 执行当前业务步骤 */}
             <span>{isZh ? '群信息' : 'Group info'}</span>
-            <button type="button" className="btn ghost" onClick={() => setPanelOpen(false)}>
+            <button type="button" className="btn ghost" onClick={() => setPanelOpen(false)}>{/* 执行当前业务步骤 */}
               {isZh ? '关闭' : 'Close'}
             </button>
           </header>
-          <div className="chat-panel-row">
+          <div className="chat-panel-row">{/* 执行当前业务步骤 */}
             <input type="text" value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} />
-            <button type="button" className="btn" onClick={() => void renameGroup()}>
+            <button type="button" className="btn" onClick={() => void renameGroup()}>{/* 执行当前业务步骤 */}
               {isZh ? '改名' : 'Rename'}
             </button>
           </div>
-          <div className="chat-panel-row">
+          <div className="chat-panel-row">{/* 执行当前业务步骤 */}
             <span>{isZh ? `成员 ${members.length} 人` : `${members.length} members`}</span>
           </div>
           {/* 邀请入群：群主 / 管理员可搜索选人 */}
           {canManage && (
-            <div className="chat-panel-block">
+            <div className="chat-panel-block">{/* 执行当前业务步骤 */}
               <input
-                type="text"
+                type="text" // 赋值：更新变量 type 的取值
                 placeholder={isZh ? '搜索用户，加入本群' : 'Search users to invite'}
                 value={inviteQ}
                 onChange={(e) => setInviteQ(e.target.value)}
@@ -1061,69 +1061,69 @@ export function Chat({ locale }: ChatProps) {
                 .map((u) => (
                   <button
                     key={u.id}
-                    type="button"
+                    type="button" // 赋值：更新变量 type 的取值
                     className={`chat-user-item${invitePick.includes(u.id) ? ' picked' : ''}`}
                     onClick={() =>
                       setInvitePick((prev) => (prev.includes(u.id) ? prev.filter((id) => id !== u.id) : [...prev, u.id]))
-                    }
+                    } // 代码块结束
                   >
                     <span className="chat-avatar">{(u.display_name || u.id).slice(0, 1)}</span>
                     <span className="chat-user-name">{u.display_name || u.id}</span>
                     <span className="chat-pick-mark">{invitePick.includes(u.id) ? '✓' : '+'}</span>
                   </button>
                 ))}
-              <button type="button" className="btn primary small" onClick={() => void inviteMembers()} disabled={invitePick.length === 0}>
+              <button type="button" className="btn primary small" onClick={() => void inviteMembers()} disabled={invitePick.length === 0}>{/* 执行当前业务步骤 */}
                 {isZh ? `邀请入群（${invitePick.length}）` : `Invite (${invitePick.length})`}
               </button>
             </div>
           )}
-          <div className="chat-member-list">
+          <div className="chat-member-list">{/* 执行当前业务步骤 */}
             {members.map((m) => {
               const isOwnerRow = m.user_id === ownerId; // 是否群主
               const canKick = canManage && m.user_id !== currentUserId && !isOwnerRow; // 群主/管理员可移除他人
-              return (
-                <div key={m.user_id} className="chat-member-chip">
+              return ( // 返回当前函数的处理结果
+                <div key={m.user_id} className="chat-member-chip">{/* 执行当前业务步骤 */}
                   <span className="chat-avatar">{(m.display_name || m.user_id).slice(0, 1)}</span>
                   <span className="chat-user-name">{m.display_name || m.user_id.slice(0, 8)}</span>
-                  <span className="chat-member-role">
+                  <span className="chat-member-role">{/* 执行当前业务步骤 */}
                     {m.role === 'owner' ? (isZh ? '群主' : 'Owner') : m.role === 'admin' ? (isZh ? '管理员' : 'Admin') : ''}
                   </span>
-                  <span className="chat-member-actions">
+                  <span className="chat-member-actions">{/* 执行当前业务步骤 */}
                     {/* 群主：设 / 撤管理员、转让群主 */}
                     {isOwnerMe && !isOwnerRow && (
-                      <>
+                      <>{/* 执行当前业务步骤 */}
                         {m.role === 'admin' ? (
-                          <button type="button" className="btn ghost small" onClick={() => void changeRole(m.user_id, 'member')}>
+                          <button type="button" className="btn ghost small" onClick={() => void changeRole(m.user_id, 'member')}>{/* 执行当前业务步骤 */}
                             {isZh ? '撤管理员' : 'Demote'}
                           </button>
                         ) : (
-                          <button type="button" className="btn ghost small" onClick={() => void changeRole(m.user_id, 'admin')}>
+                          <button type="button" className="btn ghost small" onClick={() => void changeRole(m.user_id, 'admin')}>{/* 执行当前业务步骤 */}
                             {isZh ? '设管理员' : 'Promote'}
                           </button>
                         )}
-                        <button type="button" className="btn ghost small" onClick={() => void transferTo(m.user_id)}>
+                        <button type="button" className="btn ghost small" onClick={() => void transferTo(m.user_id)}>{/* 执行当前业务步骤 */}
                           {isZh ? '转让群主' : 'Transfer'}
                         </button>
                       </>
                     )}
                     {/* 群主 / 管理员：移除成员 */}
                     {canKick && (
-                      <button type="button" className="btn ghost small" onClick={() => void kickMember(m.user_id)}>
+                      <button type="button" className="btn ghost small" onClick={() => void kickMember(m.user_id)}>{/* 执行当前业务步骤 */}
                         {isZh ? '移除' : 'Remove'}
                       </button>
                     )}
                     {/* 自己且在群里：退群 */}
                     {m.user_id === currentUserId && m.user_id !== ownerId && (
-                      <button type="button" className="btn ghost small" onClick={() => void leaveConversation()}>
+                      <button type="button" className="btn ghost small" onClick={() => void leaveConversation()}>{/* 执行当前业务步骤 */}
                         {isZh ? '退群' : 'Leave'}
                       </button>
                     )}
                   </span>
                 </div>
-              );
+              ); // 执行当前业务步骤
             })}
           </div>
-          <button type="button" className="btn danger" onClick={() => void leaveConversation()}>
+          <button type="button" className="btn danger" onClick={() => void leaveConversation()}>{/* 执行当前业务步骤 */}
             {isZh ? '删除并退出' : 'Delete & leave'}
           </button>
         </aside>
@@ -1134,5 +1134,5 @@ export function Chat({ locale }: ChatProps) {
         <VideoCall socket={im.socket} session={callSession} signal={callSignal} locale={locale} onEnded={handleCallEnded} />
       )}
     </div>
-  );
+  ); // 执行当前业务步骤
 } // Chat 结束
