@@ -242,6 +242,16 @@ export function App() {
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项；
   // hidden 项是「已合并进上级」的二级入口，页面保留但不上侧栏（后台显式配置 visible 不能把它强行拉回）
   const navItems = mergeNavItems(navDefaults, theme.navItems).filter((item) => item.visible && !item.hidden);
+  // 隐藏的二级入口落到哪个一级入口：用于「在 /products 时侧栏仍高亮商城」。
+  // 没有这张表时，隐藏页面的 route.view 不在侧栏里，active 计数为 0，用户会以为"没选中任何页面"。
+  const SUB_VIEW_PARENT: Partial<Record<AppView, AppView>> = {
+    products: 'store', // 商品列表 → 商城
+    circles: 'community', // 圈子 → 社区
+    sites: 'navigation', // 入口配置清单 → 导航站
+    deployments: 'releases', // 部署汇总 → 版本
+  }; // 二级 → 一级映射结束
+  // 侧栏高亮依据：当前在隐藏二级页时按上级高亮，其余按自身
+  const activeNavView: AppView = SUB_VIEW_PARENT[route.view] ?? route.view;
   // 合并后的二级入口：被收进上级的那几个页面不再占侧栏，但在上级页顶部给一条直达条，
   // 且从二级页也能一键回到上级，保证「合并」不会把入口变没（2026-11-13 导航收口配套）
   const subEntries: Array<{ view: AppView; label: string }> =
@@ -294,7 +304,7 @@ export function App() {
               // 普通按钮
               type="button"
               // 当前视图高亮 active
-              className={`nav-item${route.view === item.view ? ' active' : ''}`}
+              className={`nav-item${activeNavView === item.view ? ' active' : ''}`}
               // 点击切换视图（配置视图已在合并阶段按内置白名单收敛）
               onClick={() => go({ view: item.view as AppView })}
             >
