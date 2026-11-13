@@ -56,7 +56,8 @@ const SEGMENT_VIEWS: ReadonlyMap<string, AppView> = new Map(
 
 // 改名前的旧路径段：线上旧链接、旧书签与外部引用仍需可达，
 // 命中后由 resolveSegment 原地改写为新路径（等价 301，不新增历史记录）。
-// 已改名的四个视图之外的段（chat / settings / deployments）新名与旧名相同，写在表里只为口径完整。
+// 本表只收录「段名确实改过」的旧别名；未改名的段（chat / products / cart / deployments 等）
+// 已在 VIEW_SEGMENTS 新段表中直接命中，不在此重复登记，避免新旧段同名重复。
 const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   store: 'store', // 旧：商城 → marketplace
   sites: 'sites', // 旧：入口配置清单 → entry-catalog
@@ -64,10 +65,6 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   login: 'login', // 旧：登录 → signin
   profile: 'account', // 旧口径：个人中心 → account（新增视图同时兼容曾用名）
   settings: 'account', // 旧：独立「设置」页已并入个人中心，旧链接落到 /account，不再保留空设置页
-  chat: 'chat', // 未改名（新旧一致）
-  deployments: 'deployments', // 未改名（新旧一致）
-  products: 'products', // 未改名（新旧一致）
-  cart: 'cart', // 未改名（新旧一致）
   forum: 'community', // 旧口径：论坛 / 社区 → community（同一视图的曾用名）
 }; // 代码块结束
 

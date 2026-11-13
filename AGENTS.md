@@ -1291,3 +1291,29 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 | 遗留 / 不可闭环 | ① 私有凭证平台：Vercel `VERCEL_TOKEN/ORG_ID/PROJECT_ID`、Sealos `SEALOS_KUBECONFIG/DOMAIN/NAMESPACE/JWT_SECRET`、IGA-CI `IGA_ACCESS_KEY/SECRET_KEY/PROJECT_NAME`、Netlify `NETLIFY_AUTH_TOKEN/SITE_ID`、Render `RENDER_API_KEY/SERVICE_ID`；② entry-catalog planned 19 项 + conflict 2 项（`MALL_B2C` / `DOWNLOAD_DIST`）功能规格待拍板；③ EdgeOne 自定义域内容层复验须有头浏览器过校验 profile，CNAME 调整须控制台取新记录 + DNSPod 凭证；④ CDN CloudFront 刷新待 AWS SDK + SigV4 凭证；⑤ 19 张分类 JPG 遗留图片资源未删除（低风险，待后续统一清理） | 客观前提阻断，沙箱无法生成 |
 
 **结论**：入库基线的前后端路由、视图对接、数据库 schema / 迁移 / 种子 / 持久化 / 备份链路在本机与 CI 出口均核对闭合，无本机可补的悬空接口、半成品视图或缺列迁移；商城视觉二次升级已上线并取得线上取证。剩余未闭环项均受私有凭证、外部账号或未决规格阻断，不以本地绿灯冒充已上线。
+
+### 9.35 全仓路由 / 标识重名排查与冗余旧段清理（2026-11-13 21:4x +08:00）
+
+**性质**：按用户「整个项目不要出现重复名称路由等等」指令，全仓扫描前端路径段 / 视图标识 / 导航项 / API 命名空间 / 后端注册路径 / 权限码 / 部署项 ID / 入口键 / 词典键 / 组件与工厂名的重复与撞名；唯一可清理项为前端旧段表内 4 条永不命中的死条目。
+
+| 排查维度 | 样本 | 结果 |
+|---|---|---|
+| 前端新路径段 `VIEW_SEGMENTS` | 17 段 | 无重复；旧别名表与新段表无同名交集 |
+| 前端导航项 `view` / 文案 | navDefaults 16 项 | view 无重复、中文文案无重复，指向视图全部在册 |
+| 前端视图组件导出名 | web 21 / admin 14 | 无重名 |
+| 前端 API 命名空间键 | api.ts 28 组 | 无重复 |
+| i18n 词典键 | zh / en 各 39 键 | 无重复，两语言键集完全对齐 |
+| 后端路由注册 | 30 文件 / 298 条 | 同方法 + 归一化路径 0 重复；跨文件同方法同路径 0 竞争；52 处纯路径多方法均为同资源 RESTful GET/POST/PUT/DELETE |
+| 后端权限码 | 代码使用 10 个 | 全部在 permissions 表 11 条定义内，无未定义权限点 |
+| 后端路由工厂导出名 | 31 个 | 无重名 |
+| 部署注册表项 ID | 12 项 | 无重复 |
+| 入口清单 entryKey / code | 44 项 | 无重复，`verify-entry-manifest` 23/23 |
+| 数据库 modules.code | 本地库 426 行（cn 213 + global 213） | 约束 `UNIQUE(region, code)`，同区域内 code 唯一；跨区同名是 cn/global 双区域设计，非冲突；其余表 code 无重复 |
+
+**修复（可逆小改）**：`router.ts` 的 `LEGACY_SEGMENTS` 删除 4 条未改名死条目 `chat / deployments / products / cart`——它们段名与新段表完全相同，`resolveSegment` 先查新段 Map 即命中，旧条目永不执行，属新旧段同名冗余；删除后行为不变。`index.html` 前置规整脚本段清单补齐旧别名 `forum`，与旧段表对齐。真正改过名的旧别名 `store / sites / comic / login / profile / settings / forum` 全部保留。
+
+**门禁取证**：`pnpm -r typecheck` 5/6 Done；后端 `vitest` 56 文件 / 669 例全过；`@mim/web build` ✓（13.42s，404.html 生成）；`verify-auth-gate` 39/39、`verify-site-modules` 83/83、`verify-entry-manifest` 23/23、`verify-custom-domains` 20/20、`verify-deployments` 55/55；`version-check` ✅、`env-check` ✅、`comment-check --strict` 总体放行。
+
+**浏览器自测（本地 5188 反代 8787）**：`/marketplace` 渲染商城目录、`/community`、`/cart`、`/chat` 直达 URL 保持不变；`/forum` 经 `replaceState` 原地改写为 `/community`；console 仅访客建号前 401 预期拦截与本地静态脚本不代理 WS Upgrade 头导致的 IM WebSocket 502（生产 nginx 有专用 ws location，与本轮改动无关）。
+
+**结论**：全仓不存在同方法同路径的重复路由、不存在指向同一视图的重复路径段、不存在重名组件 / 工厂 / 入口键 / 部署项；数据库 code 重复表象已确认为双区域设计。本轮仅清理前端旧段表内 4 条永不命中的同名死条目，未改任何对外新段、后端契约与数据库结构。
