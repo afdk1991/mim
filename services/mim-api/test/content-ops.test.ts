@@ -83,12 +83,13 @@ describe('公开公告列表', () => { // 调用 describe 并处理其返回结�
     const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/announcements'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-    expect(res.body.items).toHaveLength(2); // 种子：1 置顶已发布 + 1 普通已发布；草稿不可见
+    expect(res.body.items).toHaveLength(14); // 种子：2 条置顶 + 12 条分域公告；草稿不可见
     const [first, second] = res.body.items as Array<Record<string, unknown>>; // 准备：构造本用例需要的输入或句柄
     expect(Object.keys(first).sort()).toEqual(['body', 'id', 'pinned', 'published_at', 'title'].sort()); // 契约字段集合
     expect(first.pinned).toBe(true); // 置顶条目排第一
-    expect(second.pinned).toBe(false); // 断言：校验响应字段与冻结契约一致
-    expect(first.id).toBe('ann-seed-welcome'); // 断言：校验响应字段与冻结契约一致
+    expect(second.pinned).toBe(true); // 两条置顶都在未置顶条目前
+    expect(first.id).toBe('ann-seed-project-map'); // 项目总览置顶且发布时间最新
+    expect(second.id).toBe('ann-seed-welcome'); // 欢迎公告保持置顶
   }); // 代码块结束
 
   it('草稿与已过期公告不出现在公开列表', async () => { // 调用 it 并处理其返回结果
@@ -108,7 +109,7 @@ describe('公开公告列表', () => { // 调用 describe 并处理其返回结�
     const titles = (res.body.items as Array<{ title: string }>).map((i) => i.title); // 构造：准备本用例需要的输入、句柄或期望值
     expect(titles).not.toContain('后台草稿'); // 断言：校验响应字段与冻结契约一致
     expect(titles).not.toContain('已过期公告'); // 断言：校验响应字段与冻结契约一致
-    expect(titles).toHaveLength(2); // 仍只有两条种子
+    expect(titles).toHaveLength(14); // 两个新增条目均被过滤，只剩 14 条已发布种子
   }); // 代码块结束
 
   it('limit 参数截断列表', async () => { // 调用 it 并处理其返回结果
