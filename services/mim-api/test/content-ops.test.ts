@@ -125,20 +125,20 @@ describe('公开更新日志与版本聚合', () => { // 调用 describe 并处�
     const res = await request(app).get('/api/v1/changelog'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     const versions = (res.body.items as Array<{ version: string }>).map((i) => i.version); // 构造：准备本用例需要的输入、句柄或期望值
-    expect(versions).toEqual(['0.0.8', '0.0.7']); // 语义版本倒序，非字典序
+    expect(versions).toEqual(['0.0.10', '0.0.9', '0.0.8', '0.0.7', '0.0.6', '0.0.5', '0.0.4', '0.0.3', '0.0.2', '0.0.1', '0.0.0']); // 语义版本倒序，非字典序；种子覆盖全部 11 个版本
     const first = res.body.items[0] as Record<string, unknown>; // 构造：准备本用例需要的输入、句柄或期望值
     expect(Object.keys(first).sort()).toEqual(['body', 'id', 'published_at', 'title', 'version'].sort()); // 断言：校验响应字段与冻结契约一致
   }); // 代码块结束
 
-  it('语义版本排序：0.0.10 排在 0.0.8 之前', async () => { // 调用 it 并处理其返回结果
+  it('语义版本排序：0.0.11 排在 0.0.10 之前', async () => { // 调用 it 并处理其返回结果
     const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     await request(app) // 执行：等待接口或数据库操作返回
       .post('/api/v1/admin/content/changelog') // 注册 POST 路由 / 中间件处理器
       .set(adminWriteHeaders()) // 执行当前业务步骤
-      .send({ version: '0.0.10', title: '第十个小版本', body: 'x', status: 'published', published_at: '2026-11-13T09:00:00.000Z' }); // 执行当前业务步骤
+      .send({ version: '0.0.11', title: '第十一个小版本', body: 'x', status: 'published', published_at: '2026-11-13T10:00:00.000Z' }); // 执行当前业务步骤
     const res = await request(app).get('/api/v1/changelog'); // 构造：准备本用例需要的输入、句柄或期望值
     const versions = (res.body.items as Array<{ version: string }>).map((i) => i.version); // 构造：准备本用例需要的输入、句柄或期望值
-    expect(versions).toEqual(['0.0.10', '0.0.8', '0.0.7']); // 断言：校验响应字段与冻结契约一致
+    expect(versions).toEqual(['0.0.11', '0.0.10', '0.0.9', '0.0.8', '0.0.7', '0.0.6', '0.0.5', '0.0.4', '0.0.3', '0.0.2', '0.0.1', '0.0.0']); // 断言：校验响应字段与冻结契约一致
   }); // 代码块结束
 
   it('草稿更新日志不进入公开列表', async () => { // 调用 it 并处理其返回结果
@@ -146,22 +146,22 @@ describe('公开更新日志与版本聚合', () => { // 调用 describe 并处�
     await request(app) // 执行：等待接口或数据库操作返回
       .post('/api/v1/admin/content/changelog') // 注册 POST 路由 / 中间件处理器
       .set(adminWriteHeaders()) // 执行当前业务步骤
-      .send({ version: '0.0.9', title: '未发布', body: 'x', status: 'draft' }); // 执行当前业务步骤
+      .send({ version: '0.0.99', title: '未发布', body: 'x', status: 'draft' }); // 执行当前业务步骤
     const res = await request(app).get('/api/v1/changelog'); // 构造：准备本用例需要的输入、句柄或期望值
     const versions = (res.body.items as Array<{ version: string }>).map((i) => i.version); // 构造：准备本用例需要的输入、句柄或期望值
-    expect(versions).not.toContain('0.0.9'); // 断言：校验响应字段与冻结契约一致
+    expect(versions).not.toContain('0.0.99'); // 断言：校验响应字段与冻结契约一致
   }); // 代码块结束
 
   it('按版本聚合视图：每版本一条代表条目 + 条目数，版本倒序', async () => { // 调用 it 并处理其返回结果
     const { app } = setup(); // 准备：构造本用例需要的输入或句柄
     const res = await request(app).get('/api/v1/changelog/versions'); // 构造：准备本用例需要的输入、句柄或期望值
     expect(res.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-    expect(res.body.items).toHaveLength(2); // 断言：校验响应字段与冻结契约一致
-    const [v8, v7] = res.body.items as Array<{ version: string; entry_count: number; latest_id: string }>; // 准备：构造本用例需要的输入或句柄
-    expect(v8.version).toBe('0.0.8'); // 断言：校验响应字段与冻结契约一致
-    expect(v8.entry_count).toBe(1); // 断言：校验响应字段与冻结契约一致
-    expect(v7.version).toBe('0.0.7'); // 断言：校验响应字段与冻结契约一致
-    expect(v7.latest_id).toBeTruthy(); // 断言：校验响应字段与冻结契约一致
+    expect(res.body.items).toHaveLength(11); // 断言：11 个版本各一条种子
+    const [v10, v9] = res.body.items as Array<{ version: string; entry_count: number; latest_id: string }>; // 准备：构造本用例需要的输入或句柄
+    expect(v10.version).toBe('0.0.10'); // 断言：校验响应字段与冻结契约一致
+    expect(v10.entry_count).toBe(1); // 断言：校验响应字段与冻结契约一致
+    expect(v9.version).toBe('0.0.9'); // 断言：校验响应字段与冻结契约一致
+    expect(v9.latest_id).toBeTruthy(); // 断言：校验响应字段与冻结契约一致
   }); // 代码块结束
 }); // 代码块结束
 
@@ -250,14 +250,14 @@ describe('管理端 CRUD', () => { // 调用 describe 并处理其返回结果
     const create = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/admin/content/changelog') // 注册 POST 路由 / 中间件处理器
       .set(adminWriteHeaders()) // 执行当前业务步骤
-      .send({ version: '0.0.9', title: '新版本', body: 'x', changes: ['修复问题'], status: 'published' }); // 执行当前业务步骤
+      .send({ version: '0.0.12', title: '新版本', body: 'x', changes: ['修复问题'], status: 'published' }); // 执行当前业务步骤
     expect(create.status).toBe(201); // 断言：校验响应字段与冻结契约一致
     const id = create.body.item.id as string; // 构造：准备本用例需要的输入、句柄或期望值
 
     const dup = await request(app) // 构造：准备本用例需要的输入、句柄或期望值
       .post('/api/v1/admin/content/changelog') // 注册 POST 路由 / 中间件处理器
       .set(adminWriteHeaders()) // 执行当前业务步骤
-      .send({ version: '0.0.9', title: '重复版本', body: 'x', status: 'draft' }); // 执行当前业务步骤
+      .send({ version: '0.0.12', title: '重复版本', body: 'x', status: 'draft' }); // 执行当前业务步骤
     expect(dup.status).toBe(409); // 断言：校验响应字段与冻结契约一致
     expect(dup.body.code).toBe('CONFLICT'); // 断言：校验响应字段与冻结契约一致
 

@@ -360,8 +360,8 @@ export function Releases({ locale, onOpen }: Props) { // 导出函数 Releases�
           <li className="wrap">
             {tr(
               locale,
-              '版本页数据是仓库事实，不跟随内容运营的更新日志种子；公告动态里的 0.0.7 / 0.0.8 只是运营条目，不代表完整版本历史。',
-              'This page reflects repository facts, not the content-operations changelog seeds. The 0.0.7 / 0.0.8 entries under News are editorial items, not the full history.',
+              '版本页与公告动态的更新日志使用同一套 11 个版本口径；列表按发布时间倒序，新增版本时两处同步维护。',
+              'This page and the changelog under News share the same 11 releases, newest first; both are updated together when a release is added.',
             )}
           </li>
         </ul>
