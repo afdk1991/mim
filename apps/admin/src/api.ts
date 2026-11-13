@@ -1109,3 +1109,6 @@ export async function deleteCategory(credential: Credential, slug: string): Prom
   // 解包删除回执
   return data.category;
 } // deleteCategory 结束
+
+export { request };
+export * from './api-ops';
