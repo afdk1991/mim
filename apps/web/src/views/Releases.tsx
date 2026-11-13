@@ -242,6 +242,10 @@ const RELEASES: ReleaseItem[] = [
   },
 ]; // 版本时间线结束
 
+// 时间线展示顺序：统一按发布时间倒序（最新版本置顶），与公告 / 更新日志的倒序口径一致。
+// 源数组保留按版本递增维护，避免每次新增版本时插到数组头部导致提交冲突。
+const RELEASES_DESC: ReleaseItem[] = [...RELEASES].reverse();
+
 // 能力地图：把用户要求的模块收敛到可直接打开的现有前台视图，避免“代码有、入口找不到”。
 const CAPABILITIES: CapabilityItem[] = [
   { labelZh: '知识付费四件套', labelEn: 'Paid content suite', descZh: '付费阅读 / 下载 / 图库 / 视频与未购隐藏', descEn: 'Paid articles, downloads, galleries and videos', view: 'community' },
@@ -271,13 +275,14 @@ export function Releases({ locale, onOpen }: Props) { // 导出函数 Releases�
         <p className="muted">
           {tr(
             locale,
-            `V0.0.0 → V${APP_VERSION}，共 11 个 semver 版本。仓库没有 V* git tag，版本以 package.json 递增提交与线上 /health 取证为准。`,
-            `V0.0.0 → V${APP_VERSION}, 11 semver releases. The repository has no V* git tags; versions are reconstructed from package.json bump commits and online /health evidence.`,
+            `V${APP_VERSION} → V0.0.0，共 11 个 semver 版本，按发布时间倒序排列。仓库没有 V* git tag，版本以 package.json 递增提交与线上 /health 取证为准。`,
+            `V${APP_VERSION} → V0.0.0, 11 semver releases, newest first. The repository has no V* git tags; versions are reconstructed from package.json bump commits and online /health evidence.`,
           )}
         </p>
         <div className="commerce-badges">
           <span className="badge">{tr(locale, `当前 V${APP_VERSION}`, `Current V${APP_VERSION}`)}</span>
           <span className="badge">{tr(locale, '11 个版本', '11 releases')}</span>
+          <span className="badge">{tr(locale, '按发布时间倒序', 'Newest first')}</span>
           <span className="badge">{tr(locale, '0.0.0 长期累积', '0.0.0 accumulated early work')}</span>
         </div>
       </header>
@@ -292,7 +297,7 @@ export function Releases({ locale, onOpen }: Props) { // 导出函数 Releases�
           )}
         </p>
         <ol className="changelog-timeline">
-          {RELEASES.map((item) => (
+          {RELEASES_DESC.map((item) => (
             <li key={item.version} className="changelog-entry">
               <div className="changelog-version">
                 <strong>{item.version}</strong>
