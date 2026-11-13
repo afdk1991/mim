@@ -38,6 +38,185 @@ export function categoryCoverUrl(categorySlug: string | null | undefined): strin
   return `${normalized}catalog/${categoryGroupSlug(categorySlug)}.jpg`;
 } // 代码块结束
 
+/** 一级分类色相：让不同分类的商品封面有稳定但可区分的品牌色，避免整站一个蓝 */
+const GROUP_HUE: Record<string, number> = {
+  frontier: 218, openharmony: 190, dev: 202, ai: 226, industry: 208, // 技术类偏冷蓝
+  blockchain: 268, wechat: 152, enterprise: 198, store: 24, tools: 282, // 商业与工具类拉开色相
+  web: 205, devops: 182, mobile: 212, devtools: 262, server: 194, // 开发运维类保持冷静
+  database: 220, game: 306, plugin: 176, misc: 210, // 娱乐与插件类补足差异
+}; // 分类色相表结束
+
+/** 字符串稳定哈希：同一商品每次渲染得到同一套配色与纹理，不因刷新跳色 */
+function hashString(value: string): number {
+  let hash = 2166136261; // FNV-1a 初始值
+  for (let index = 0; index < value.length; index += 1) { // 逐字符混合
+    hash ^= value.charCodeAt(index); // 异或当前字符
+    hash = Math.imul(hash, 16777619); // FNV 质数乘法
+  } // 遍历结束
+  return hash >>> 0; // 转无符号 32 位
+} // 哈希函数结束
+
+/** 取商品主色相：分类色相 ± 12°，同一分类下不同商品也有细微差异 */
+function hueOf(code: string, groupSlug: string): number {
+  const base = GROUP_HUE[groupSlug] ?? 210; // 未知分类回落品牌蓝
+  const drift = (hashString(code) % 25) - 12; // -12 ~ +12 的稳定漂移
+  return (base + drift + 360) % 360; // 归一化到 0~359
+} // 色相函数结束
+
+/** 商品字标：中文取前两个字，英文取单词首字母；不足两位时回落模块编码 */
+function monogramOf(name: string, code: string): string {
+  const cjk = name.match(/[\u4e00-\u9fa5]/g) ?? []; // 提取中文
+  if (cjk.length >= 2) return cjk.slice(0, 2).join(''); // 中文双字标
+  if (cjk.length === 1) return cjk[0]; // 单字中文
+  const latin = name.match(/[A-Za-z0-9]+/g) ?? []; // 提取英文单词
+  const initials = latin.map((word) => word[0]).join('').slice(0, 2).toUpperCase(); // 取首字母
+  if (initials.length >= 2) return initials; // 两字母标
+  return code.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'MI'; // 编码兜底
+} // 字标函数结束
+
+/** 标题裁切：中文按 11 字、英文按 26 字符，避免压到右侧图形 */
+function clipTitle(value: string): string {
+  const cjk = /[\u4e00-\u9fa5]/.test(value); // 是否中文标题
+  return clip(value, cjk ? 11 : 26); // 复用统一省略号逻辑
+} // 标题裁切结束
+
+/** 按固定字数把说明切成多行，供 SVG 文本逐行输出 */
+function wrapText(value: string, perLine: number, maxLines: number): string[] {
+  const lines: string[] = []; // 行缓冲
+  let rest = value.trim(); // 剩余文本
+  while (rest.length > 0 && lines.length < maxLines) { // 逐行截取
+    lines.push(rest.slice(0, perLine)); // 当前行
+    rest = rest.slice(perLine); // 剩余部分
+  } // 循环结束
+  if (rest.length > 0 && lines.length > 0) lines[lines.length - 1] = clip(`${lines[lines.length - 1]}…`, perLine + 1); // 末行省略
+  return lines; // 返回行数组
+} // 换行函数结束
+
+/** 商品封面输入：只依赖列表接口已有字段，不额外请求后端图片 */
+export interface ModuleArtInput {
+  code: string; // 模块编码
+  name: string; // 商品名
+  categorySlug: string | null; // 二级分类 slug
+  groupName: string; // 一级分类展示名
+  summary: string; // 商品简介
+  priceText: string; // 价格文案
+  locale: 'zh-CN' | 'en-US'; // 语言
+} // 封面输入结束
+
+/** 商品独立的矢量封面：1200×675，配色 / 字标 / 纹理均由模块编码稳定生成 */
+export function moduleCoverUrl(input: ModuleArtInput): string {
+  const zh = input.locale !== 'en-US'; // 是否中文
+  const group = categoryGroupSlug(input.categorySlug); // 一级分类 slug
+  const hue = hueOf(input.code, group); // 商品主色相
+  const hue2 = (hue + 38) % 360; // 辅助色相
+  const mark = escapeXml(monogramOf(input.name, input.code)); // 商品字标
+  const title = escapeXml(clipTitle(input.name)); // 商品标题
+  const summary = wrapText(input.summary, zh ? 22 : 42, 2).map((line, index) => (
+    `<text x="84" y="${452 + index * 40}" fill="rgba(235,243,255,0.66)" font-size="26">${escapeXml(line)}</text>`
+  )).join(''); // 简介两行
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="hsl(${hue} 58% 12%)"/>
+      <stop offset="0.52" stop-color="hsl(${hue2} 62% 18%)"/>
+      <stop offset="1" stop-color="hsl(${(hue + 18) % 360} 70% 9%)"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.24" r="0.62">
+      <stop offset="0" stop-color="hsl(${hue2} 92% 62%)" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="hsl(${hue2} 92% 62%)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="hsl(${hue2} 92% 66%)"/>
+      <stop offset="1" stop-color="hsl(${(hue + 70) % 360} 88% 60%)"/>
+    </linearGradient>
+    <pattern id="grid" width="54" height="54" patternUnits="userSpaceOnUse">
+      <path d="M54 0H0V54" fill="none" stroke="rgba(255,255,255,0.055)" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect width="1200" height="675" fill="url(#grid)"/>
+  <rect width="1200" height="675" fill="url(#glow)"/>
+  <circle cx="985" cy="220" r="238" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+  <circle cx="985" cy="220" r="178" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="2"/>
+  <path d="M80 540 C 300 470, 520 650, 760 560 S 1060 500, 1180 590" fill="none" stroke="url(#line)" stroke-width="3" opacity="0.34"/>
+  <rect x="84" y="70" width="188" height="42" rx="21" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.18)"/>
+  <text x="178" y="99" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700" letter-spacing="1">MIM STORE</text>
+  <text x="84" y="185" fill="rgba(255,255,255,0.62)" font-size="24" letter-spacing="2">${escapeXml(input.groupName)}</text>
+  <text x="84" y="292" fill="#ffffff" font-size="62" font-weight="800">${title}</text>
+  <text x="84" y="348" fill="rgba(235,243,255,0.56)" font-size="24" font-family="ui-monospace, Menlo, Consolas, monospace">${escapeXml(input.code)}</text>
+  ${summary}
+  <rect x="84" y="572" width="132" height="6" rx="3" fill="url(#line)"/>
+  <text x="84" y="616" fill="rgba(255,255,255,0.52)" font-size="22">${escapeXml(input.priceText)}</text>
+  <g>
+    <rect x="808" y="152" width="354" height="354" rx="58" fill="rgba(6,10,18,0.34)" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
+    <rect x="846" y="190" width="278" height="278" rx="42" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+    <circle cx="985" cy="329" r="92" fill="url(#line)" opacity="0.18"/>
+    <text x="985" y="356" text-anchor="middle" fill="#ffffff" font-size="88" font-weight="800" letter-spacing="4">${mark}</text>
+    <path d="M808 248h-26v-40M808 410h-26v40M1162 248h26v-40M1162 410h26v40" fill="none" stroke="hsl(${hue2} 92% 70%)" stroke-width="3" opacity="0.7"/>
+  </g>
+  <text x="1120" y="640" text-anchor="end" fill="rgba(255,255,255,0.30)" font-size="18" font-family="ui-monospace, Menlo, Consolas, monospace">#${(hashString(input.code) % 0xffffff).toString(16).toUpperCase().padStart(6, '0')}</text>
+</svg>`; // 封面 SVG
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; // 返回可直接渲染的图片地址
+} // 封面函数结束
+
+/** 详情画廊的说明面板类型：能力亮点 / 交付与依赖 */
+export type StoryPanelKind = 'feature' | 'delivery';
+
+/** 详情画廊说明图：同一套商品配色，输出能力亮点或交付信息，保证每件商品详情不是单图 */
+export function moduleStoryUrl(input: ModuleArtInput & { capabilityText: string; requiresText: string; statusText: string; region: string }, kind: StoryPanelKind): string {
+  const zh = input.locale !== 'en-US'; // 是否中文
+  const group = categoryGroupSlug(input.categorySlug); // 一级分类
+  const hue = hueOf(input.code, group); // 商品主色相
+  const title = escapeXml(clipTitle(input.name)); // 标题
+  const heading = kind === 'feature' ? (zh ? '能力亮点' : 'Capabilities') : (zh ? '交付与依赖' : 'Delivery & requirements'); // 面板标题
+  const summaryLines = wrapText(input.summary, zh ? 27 : 52, 3).map((line, index) => (
+    `<text x="84" y="${318 + index * 42}" fill="rgba(235,243,255,0.62)" font-size="27">${escapeXml(line)}</text>`
+  )).join(''); // 简介三行
+  const featureRows = [
+    [zh ? '能力绑定' : 'Capability', input.capabilityText],
+    [zh ? '价格' : 'Price', input.priceText],
+    [zh ? '上架状态' : 'Status', input.statusText],
+  ]; // 能力亮点行
+  const deliveryRows = [
+    [zh ? '解锁方式' : 'Unlock', zh ? '一次性买断' : 'One-time purchase'],
+    [zh ? '前置依赖' : 'Requires', input.requiresText],
+    [zh ? '区域' : 'Region', input.region],
+  ]; // 交付行
+  const rows = kind === 'feature' ? featureRows : deliveryRows; // 当前面板行
+  const rowSvg = rows.map(([label, value], index) => `
+    <g>
+      <rect x="${680 + index * 168}" y="500" width="152" height="112" rx="20" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.10)"/>
+      <text x="${756 + index * 168}" y="536" text-anchor="middle" fill="rgba(235,243,255,0.48)" font-size="18">${escapeXml(label)}</text>
+      <text x="${756 + index * 168}" y="578" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="600">${escapeXml(clip(value, 12))}</text>
+    </g>`).join(''); // 三张信息卡
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="hsl(${hue} 52% 11%)"/>
+      <stop offset="1" stop-color="hsl(${(hue + 44) % 360} 66% 20%)"/>
+    </linearGradient>
+    <pattern id="grid" width="54" height="54" patternUnits="userSpaceOnUse">
+      <path d="M54 0H0V54" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="hsl(${hue} 92% 68%)"/>
+      <stop offset="1" stop-color="hsl(${(hue + 70) % 360} 88% 62%)"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect width="1200" height="675" fill="url(#grid)"/>
+  <circle cx="1040" cy="120" r="210" fill="hsl(${hue} 90% 62%)" opacity="0.16"/>
+  <text x="84" y="118" fill="rgba(255,255,255,0.50)" font-size="20" font-family="ui-monospace, Menlo, Consolas, monospace">${escapeXml(input.code)}</text>
+  <text x="84" y="212" fill="#ffffff" font-size="54" font-weight="800">${heading}</text>
+  <text x="84" y="266" fill="rgba(255,255,255,0.82)" font-size="30" font-weight="600">${title}</text>
+  <rect x="84" y="286" width="96" height="4" rx="2" fill="url(#line)"/>
+  ${summaryLines}
+  ${rowSvg}
+  <text x="1116" y="640" text-anchor="end" fill="rgba(255,255,255,0.32)" font-size="18">Mim Store · ${zh ? '商品详情' : 'Product detail'}</text>
+</svg>`; // 说明面板 SVG
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; // 返回图片地址
+} // 说明图结束
+
 /** 参数图所需字段：与 Store 详情接口字段同名，便于直接传值 */
 export interface SpecPosterInput {
   name: string; // 商品名

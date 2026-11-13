@@ -15,8 +15,8 @@ import type { CartSummary } from '../api';
 import { useAsync } from '../hooks';
 // 引入编程式跳转：匿名访客在升级身份时跳转登录伪视图
 import { navigate } from '../router';
-// 商品视觉：分类封面图 + 按详情实时生成的「商品参数详情图」（SVG data URL）
-import { categoryCoverUrl, specPosterUrl } from '../catalogArt';
+// 商品视觉：每件商品独立矢量封面 + 详情多图画廊 + 按详情实时生成的「商品参数详情图」
+import { moduleCoverUrl, moduleStoryUrl, specPosterUrl } from '../catalogArt';
 import { PageBlocks } from './PageBlocks'; // 首页区块渲染器（消费后台 page_blocks）
 
 // 组件对外契约：商城文案跟随全局语言
@@ -488,6 +488,17 @@ export function Store({ locale }: Props) {
   const ordersState = useAsync(() => (authed ? api.catalog.getMyOrders() : Promise.resolve(null)), [authed]); // 常量 ordersState：保存固定配置或一次性派生值
   // 当前展开详情的模块编码：null 表示全部收起
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
+  // 详情画廊当前选中的图片序号：切换商品时回到首图，避免串图
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  // 图片放大预览：电商详情需要能看清参数图与封面细节，点击图片进入全屏
+  const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
+  // 放大预览的键盘退出：Esc 关闭，避免用户只能点遮罩
+  useEffect(() => {
+    if (!zoom) return; // 未打开不注册监听
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setZoom(null); }; // Esc 关闭
+    window.addEventListener('keydown', onKey); // 注册键盘监听
+    return () => window.removeEventListener('keydown', onKey); // 关闭或卸载时移除
+  }, [zoom]);
   // 展开项的详情（含历史价格与依赖链）：随展开目标变化重新拉取，收起时回 null 不发请求
   const detail = useAsync<ModuleDetail | null>(
     () => (expandedCode ? api.catalog.getModule(expandedCode) : Promise.resolve(null)),
@@ -628,6 +639,8 @@ export function Store({ locale }: Props) {
   function toggleDetail(code: string) {
     // 已展开则收起，否则展开该卡片并触发详情请求
     setExpandedCode((current) => (current === code ? null : code));
+    // 切换商品时画廊回到首图，避免把上一件商品的选图状态带过来
+    setGalleryIndex(0);
     // 工具面板按模块隔离：切换展开目标时清空输入与结果，避免串味
     setToolText('');
     setToolOption('');
@@ -1163,15 +1176,23 @@ export function Store({ locale }: Props) {
                   const expanded = expandedCode === m.code;
                   // 商品名：卡片标题、图片 alt 与参数图共用同一份展示名
                   const title = pick(locale, m.name, m.code);
-                  // 分类封面：19 个一级分类各一张，二级模块按一级 slug 复用
-                  const cover = categoryCoverUrl(m.category_slug);
+                  // 商品独立封面：同一分类下的不同模块也不再共用一张图
+                  const cover = moduleCoverUrl({
+                    code: m.code,
+                    name: title,
+                    categorySlug: m.category_slug,
+                    groupName: categoryLabelOf(m.category_slug).split(' / ')[0],
+                    summary: pick(locale, m.summary),
+                    priceText: price,
+                    locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                  });
                   // 一级分类展示名：同时作为图片角标
                   const groupName = categoryLabelOf(m.category_slug).split(' / ')[0];
                   // 返回单个模块卡片
                   return (
                     <section key={m.code} className={`panel store-card${expanded ? ' is-expanded' : ''}`}>{/* 卡片容器：展开时横跨整行，给参数表与参数图足够宽度 */}
                       <div className="store-card-media">{/* 商品封面区：图在上、信息在下，形成电商卡片视觉 */}
-                        <img src={cover} alt={`${title} ${locale === 'en-US' ? 'cover' : '商品封面'}`} loading="lazy" />{/* 商品分类封面图 */}
+                        <img src={cover} alt={`${title} ${locale === 'en-US' ? 'cover' : '商品封面'}`} width={1200} height={675} loading="eager" decoding="async" />{/* 商品独立封面图 */}
                         <span className="store-card-category">{groupName}</span>{/* 左上角分类角标 */}
                         <span className="store-card-price">{price}</span>{/* 右上角价格角标：免费 / 金额 */}
                       </div>{/* 封面区结束 */}
@@ -1288,6 +1309,21 @@ export function Store({ locale }: Props) {
                                 const requiresText = data.requires.length > 0 ? data.requires.map(nameOf).join(locale === 'en-US' ? ', ' : '、') : (locale === 'en-US' ? 'None' : '无'); // 常量 requiresText：保存固定配置或一次性派生值
                                 const capabilityText = data.capability ?? (data.code.startsWith('cat.') ? (locale === 'en-US' ? 'Planned' : '功能规划中') : (locale === 'en-US' ? 'Add-on entitlement' : '配套权益商品')); // 常量 capabilityText：保存固定配置或一次性派生值
                                 const statusText = MODULE_STATUS_LABEL[data.status]?.[locale === 'en-US' ? 'en' : 'zh'] ?? data.status; // 常量 statusText：保存固定配置或一次性派生值
+                                const specSrc = specPosterUrl({ // 参数长图只生成一次，画廊与放大预览共用
+                                  name: title,
+                                  code: data.code,
+                                  groupName,
+                                  categoryName: category,
+                                  license: data.license,
+                                  language: data.language,
+                                  stars: data.stars,
+                                  priceText,
+                                  region: data.region,
+                                  statusText,
+                                  requiresText,
+                                  capabilityText,
+                                  locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                                }); // 参数图生成结束
                                 // 参数行：详情页以键值表完整展示，避免只有一行逗号文案
                                 const specRows: Array<[string, string]> = [
                                   [locale === 'en-US' ? 'Module code' : '模块编码', data.code],
@@ -1302,10 +1338,93 @@ export function Store({ locale }: Props) {
                                   [locale === 'en-US' ? 'Requires' : '前置依赖', requiresText],
                                   [locale === 'en-US' ? 'Capability' : '能力绑定', capabilityText],
                                 ]; // 执行当前业务步骤
+                                // 详情画廊：封面 / 能力亮点 / 交付与依赖三张独立图，参数长图仍单独展示
+                                const gallery = [
+                                  {
+                                    key: 'cover',
+                                    label: locale === 'en-US' ? 'Cover' : '商品封面',
+                                    src: moduleCoverUrl({
+                                      code: data.code,
+                                      name: title,
+                                      categorySlug: data.category_slug,
+                                      groupName,
+                                      summary: pick(locale, data.summary),
+                                      priceText,
+                                      locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                                    }),
+                                  },
+                                  {
+                                    key: 'feature',
+                                    label: locale === 'en-US' ? 'Highlights' : '能力亮点',
+                                    src: moduleStoryUrl({
+                                      code: data.code,
+                                      name: title,
+                                      categorySlug: data.category_slug,
+                                      groupName,
+                                      summary: pick(locale, data.summary),
+                                      priceText,
+                                      locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                                      capabilityText,
+                                      requiresText,
+                                      statusText,
+                                      region: data.region,
+                                    }, 'feature'),
+                                  },
+                                  {
+                                    key: 'delivery',
+                                    label: locale === 'en-US' ? 'Delivery' : '交付与依赖',
+                                    src: moduleStoryUrl({
+                                      code: data.code,
+                                      name: title,
+                                      categorySlug: data.category_slug,
+                                      groupName,
+                                      summary: pick(locale, data.summary),
+                                      priceText,
+                                      locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                                      capabilityText,
+                                      requiresText,
+                                      statusText,
+                                      region: data.region,
+                                    }, 'delivery'),
+                                  },
+                                ];
+                                const activeShot = gallery[Math.min(galleryIndex, gallery.length - 1)] ?? gallery[0];
                                 return ( // 返回当前函数的处理结果
                                   <>{/* 执行当前业务步骤 */}
-                                    <div className="store-detail-hero">{/* 商品封面 + 参数表并排，详情区第一屏就能看到图 */}
-                                      <img src={categoryCoverUrl(data.category_slug)} alt={`${title} ${locale === 'en-US' ? 'cover' : '商品封面'}`} loading="lazy" />{/* 与卡片同一张分类封面 */}
+                                    <div className="store-detail-hero">{/* 商品画廊 + 参数表并排，详情区第一屏就能看到多张商品图 */}
+                                      <div className="store-gallery">
+                                        <button
+                                          type="button"
+                                          className="store-gallery-main"
+                                          onClick={() => setZoom({ src: activeShot.src, alt: `${title} ${activeShot.label}` })}
+                                          aria-label={locale === 'en-US' ? 'Zoom image' : '放大查看商品图'}
+                                        >
+                                          <img
+                                            src={activeShot.src}
+                                            alt={`${title} ${activeShot.label}`}
+                                            width={1200}
+                                            height={675}
+                                            loading="eager"
+                                            decoding="async"
+                                          />
+                                          <span className="store-gallery-zoom">{locale === 'en-US' ? 'Click to zoom' : '点击放大'}</span>
+                                        </button>
+                                        <div className="store-gallery-thumbs" role="tablist" aria-label={locale === 'en-US' ? 'Product images' : '商品图片'}>
+                                          {gallery.map((shot, index) => (
+                                            <button
+                                              key={shot.key}
+                                              type="button"
+                                              role="tab"
+                                              aria-selected={index === galleryIndex}
+                                              className={`store-gallery-thumb${index === galleryIndex ? ' is-active' : ''}`}
+                                              onClick={() => setGalleryIndex(index)}
+                                            >
+                                              <img src={shot.src} alt={shot.label} width={1200} height={675} loading="eager" decoding="async" />
+                                              <span>{shot.label}</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
                                       <dl className="store-spec-grid">{/* 参数键值表 */}
                                         {specRows.map(([label, value]) => (
                                           <div key={label} className="store-spec-row">{/* 执行当前业务步骤 */}
@@ -1314,28 +1433,28 @@ export function Store({ locale }: Props) {
                                           </div>
                                         ))}
                                       </dl>
-                                    </div>{/* 封面与参数表结束 */}
+                                    </div>{/* 画廊与参数表结束 */}
                                     <p className="store-detail-title">{locale === 'en-US' ? 'Product spec sheet' : '商品参数详情图'}</p>{/* 参数图小节标题 */}
-                                    <img
-                                      className="store-spec-image"
-                                      src={specPosterUrl({
-                                        name: title,
-                                        code: data.code,
-                                        groupName,
-                                        categoryName: category,
-                                        license: data.license,
-                                        language: data.language,
-                                        stars: data.stars,
-                                        priceText,
-                                        region: data.region,
-                                        statusText,
-                                        requiresText,
-                                        capabilityText,
-                                        locale: locale === 'en-US' ? 'en-US' : 'zh-CN',
+                                    <button
+                                      type="button"
+                                      className="store-spec-button"
+                                      onClick={() => setZoom({
+                                        src: specSrc,
+                                        alt: `${title} ${locale === 'en-US' ? 'spec sheet' : '商品参数详情图'}`,
                                       })}
-                                      alt={`${title} ${locale === 'en-US' ? 'spec sheet' : '商品参数详情图'}`}
-                                      loading="lazy"
-                                    />{/* 可保存/可右键另存的参数长图 */}
+                                      aria-label={locale === 'en-US' ? 'Zoom spec sheet' : '放大查看商品参数详情图'}
+                                    >
+                                      <img
+                                        className="store-spec-image"
+                                        src={specSrc}
+                                        alt={`${title} ${locale === 'en-US' ? 'spec sheet' : '商品参数详情图'}`}
+                                        width={900}
+                                        height={1180}
+                                        loading="eager"
+                                        decoding="async"
+                                      />
+                                      <span className="store-gallery-zoom">{locale === 'en-US' ? 'Click to zoom' : '点击放大'}</span>
+                                    </button>{/* 可保存/可右键另存的参数长图 */}
                                   </>
                                 ); // 执行当前业务步骤
                               })()}{/* 商品详情视觉块结束 */}
@@ -1557,7 +1676,21 @@ export function Store({ locale }: Props) {
             : (locale === 'en-US' ? 'Search help' : '搜索帮助')}{/* 收起态提示展开 */}
         </button>{/* 触发按钮结束 */}
       </div>{/* 搜索帮助浮窗结束 */}
+
+      {zoom && ( // 图片放大层：点击遮罩或关闭按钮退出，Esc 同样可关闭
+        <div
+          className="image-zoom"
+          role="dialog"
+          aria-modal="true"
+          aria-label={locale === 'en-US' ? 'Image preview' : '图片预览'}
+          onClick={() => setZoom(null)}
+        >
+          <button type="button" className="image-zoom-close" onClick={() => setZoom(null)} aria-label={locale === 'en-US' ? 'Close preview' : '关闭预览'}>×</button>
+          <img src={zoom.src} alt={zoom.alt} onClick={(event) => event.stopPropagation()} />
+        </div>
+      )}{/* 图片放大层结束 */}
     </div>
     // 商城页渲染结束，返回 JSX 元素
   );
 } // 代码块结束
+
