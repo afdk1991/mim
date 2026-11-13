@@ -86,7 +86,6 @@ export interface NavDefault {
   view: string; // 对象字段 view：记录一项配置或数据
   label: string; // 对象字段 label：记录一项配置或数据
   hidden?: boolean; // 合并进上级视图的一级入口：路由与页面保留，侧栏不再单独占一行（2026-11-13 导航收口）
-  group?: string; // 侧栏分组标题：同组连续项共用一个分组名，空值表示不分组
 } // 代码块结束
 
 /**

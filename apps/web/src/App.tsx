@@ -1,5 +1,5 @@
 // React 状态与副作用钩子：会话状态、登录提示与启动静默校验；lazy/Suspense 做路由级懒加载
-import { Fragment, lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 // i18n 工具：语言归一化与文案取值
 import { normalizeLocale, t } from '@mim/i18n';
 // 仅类型导入：语言枚举
@@ -202,36 +202,41 @@ export function App() {
     }); // then 结束
   } // retryGuestSession 结束
 
-  // 内置导航项：顺序即展示顺序；后台配置的 nav_items 按 view 覆盖文案 / 显隐，未覆盖的内置项原样保留
   // 内置导航项：顺序即展示顺序；后台配置的 nav_items 按 view 覆盖文案 / 显隐，未覆盖的内置项原样保留。
-  // 2026-11-13 导航收口（16 项一级 → 12 项 + 5 个分组）：把「同一件事的第二个入口」收进上级，
+  // 2026-11-13 导航收口（16 项一级 → 12 项平铺，无分组标题）：把「同一件事的第二个入口」收进上级，
   // 页面与路由全部保留（直链 / 搜索 / 站内跳转仍可达），只是不再各占一行侧栏。
-  const navDefaults: Array<{ view: AppView; label: string; hidden?: boolean; group?: string }> = [
-    // —— 交易与账户：商城 → 购物车 → 个人中心，一条主链路 ——
-    { view: 'store', label: locale === 'en-US' ? 'Store' : '商城', group: locale === 'en-US' ? 'Commerce' : '交易与账户' },
+  const navDefaults: Array<{ view: AppView; label: string; hidden?: boolean }> = [
+    // 商城：功能模块目录（分类 + 卡片 + 详情面板）
+    { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
     // 商品列表（原一级入口）：密集列表 + 加购，与「商城」同一批商品的另一种视图 → 合并进商城（hidden）
     { view: 'products', label: locale === 'en-US' ? 'Products' : '商品列表', hidden: true },
+    // 购物车：待购模块与结算
     { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
+    // 个人中心：资料 / 权益 / 订单 / 账号与设置
     { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
-    // —— 社区：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块 ——
-    { view: 'community', label: locale === 'en-US' ? 'Community' : '社区', group: locale === 'en-US' ? 'Community' : '社区' },
+    // 社区：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
+    { view: 'community', label: locale === 'en-US' ? 'Community' : '社区' },
     // 圈子（原一级入口）：成员制社群，已并入社区页的「圈子」板块 → hidden
     { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子', hidden: true },
-    // —— 创作与沟通：漫剧工作台 + IM / 视频通话 ——
-    { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧', group: locale === 'en-US' ? 'Create' : '创作与沟通' },
+    // 漫剧 AI 剧工作台
+    { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
+    // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
-    // —— 经营：商业化中台（资产 / 履约 / 资金 / 外观 / 成长 / 翻译）——
-    { view: 'commerce', label: locale === 'en-US' ? 'Commerce' : '商业化中台', group: locale === 'en-US' ? 'Operations' : '经营' },
-    // —— 站点与版本：导航站 / 统一搜索 / 版本时间线 ——
-    { view: 'navigation', label: locale === 'en-US' ? 'Navigation' : '导航站', group: locale === 'en-US' ? 'Site' : '站点与版本' },
+    // 商业化中台：付费资产 / 交易履约 / 资金分成 / 外观页面 / 成长国际化
+    { view: 'commerce', label: locale === 'en-US' ? 'Commerce' : '商业化中台' },
+    // 导航站：全站资源目录 + 可达性状态 + 推荐位
+    { view: 'navigation', label: locale === 'en-US' ? 'Navigation' : '导航站' },
     // 入口配置清单（原一级入口）：44 个入口的模块目录，已并入导航站的「入口清单」板块 → hidden
     { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单', hidden: true },
     // 部署汇总（原一级入口）：部署仓库 / 部署项核对表，已并入版本页的「部署汇总」板块 → hidden
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总', hidden: true },
+    // 统一搜索：模块 / 入口 / 导航 / 社区 / 商品一站检索
     { view: 'search', label: locale === 'en-US' ? 'Search' : '统一搜索' },
+    // 版本迭代：把 V0.0.0 → 当前版本的完整时间线与能力地图放到前台
     { view: 'releases', label: locale === 'en-US' ? `Releases V${APP_VERSION}` : `版本 V${APP_VERSION}` },
-    // —— 工具与内容：自研工具 / 公告动态 ——
-    { view: 'tools', label: locale === 'en-US' ? 'Tools' : '自研工具', group: locale === 'en-US' ? 'Tools & News' : '工具与内容' },
+    // 自研工具发布目录：插件 / 脚本 / 防护工具
+    { view: 'tools', label: locale === 'en-US' ? 'Tools' : '自研工具' },
+    // 公告 / 更新日志 / 推广计划栏目
     { view: 'content', label: locale === 'en-US' ? 'News' : '公告动态' },
   ]; // 内置导航项定义结束
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项；
@@ -281,25 +286,21 @@ export function App() {
         </div>{/* 品牌区结束 */}
         {/* 导航按钮列表 */}
         <nav className="nav">{/* 导航容器：按钮由 navItems 顺序决定 */}
-          {/* 遍历导航项：同一分组的第一项之前插入分组标题，跨组时自动重复 */}
-          {navItems.map((item, index) => (
-            <Fragment key={item.view}>
-              {/* 分组标题：仅在同组首项渲染，避免每项都重复标题 */}
-              {item.group && (index === 0 || navItems[index - 1].group !== item.group) ? (
-                <div className="nav-group">{item.group}</div>
-              ) : null}
-              <button
-                // 普通按钮
-                type="button"
-                // 当前视图高亮 active
-                className={`nav-item${route.view === item.view ? ' active' : ''}`}
-                // 点击切换视图（配置视图已在合并阶段按内置白名单收敛）
-                onClick={() => go({ view: item.view as AppView })}
-              >
-                {/* 导航文案 */}
-                {item.label}{/* 导航文案，随语言切换 */}
-              </button>{/* 单个导航按钮结束 */}
-            </Fragment> // 分组片段结束，回到 map 回调
+          {/* 遍历导航项：12 项平铺，不再渲染分组标题 */}
+          {navItems.map((item) => (
+            <button
+              // 导航项唯一键
+              key={item.view}
+              // 普通按钮
+              type="button"
+              // 当前视图高亮 active
+              className={`nav-item${route.view === item.view ? ' active' : ''}`}
+              // 点击切换视图（配置视图已在合并阶段按内置白名单收敛）
+              onClick={() => go({ view: item.view as AppView })}
+            >
+              {/* 导航文案 */}
+              {item.label}{/* 导航文案，随语言切换 */}
+            </button> // 单个导航按钮结束，回到 map 回调的表达式内部
           ))}{/* 导航项遍历结束 */}
         </nav>{/* 导航容器结束 */}
         {/* 侧边栏底部：已登录显示用户区与退出，匿名显示登录入口 */}
