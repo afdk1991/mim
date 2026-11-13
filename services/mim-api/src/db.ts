@@ -20,7 +20,7 @@ const SCHEMA_PATH = fileURLToPath(new URL('./schema.sql', import.meta.url)); // 
 const SCHEMA_DIR = fileURLToPath(new URL('./schema.d/', import.meta.url)); // 与 schema.sql 同级，构建时整目录搬运到 dist
 
 /** schema.d 里的补列指令行：`ALTER_ADD: 表 列 <列定义>`，列已存在则跳过，保证老库与新库同一结构 */
-const ALTER_ADD_RE = /^\s*ALTER_ADD:\s*([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s+(.+)$/; // 只放行合法标识符，列定义原样透传
+const ALTER_ADD_RE = /^\s*ALTER_ADD:\s*([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s+(.+?)\s*$/; // 只放行合法标识符，列定义原样透传；末尾 \s* 吃掉 CRLF 残留的 \r
 
 /** 允许出现在迁移语句里的标识符：只放行字母数字下划线，杜绝把外部字符串拼进 DDL */
 const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/; // 表名/列名都必须匹配该正则，避免 ALTER TABLE 被注入
@@ -126,12 +126,20 @@ export function applyDomainSchema(db: Db): string[] { // 返回本轮新建的�
   for (const file of files) { // 逐脚本执行
     const body = readFileSync(join(SCHEMA_DIR, file), 'utf8'); // 读原文
     const rest: string[] = []; // 除指令行之外的正常 SQL
-    for (const line of body.split('\n')) { // 逐行扫描，只剥离指令行
+    // 本脚本自身会新建的表：指令行指向这些表时，全新库执行到指令那一刻表还不存在，
+    // 此时跳过即可（列由下面的 CREATE TABLE 自带）；只有指向「非本脚本新建」的表才是真写错。
+    const createdHere = new Set(
+      Array.from(body.matchAll(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([A-Za-z_][A-Za-z0-9_]*)/gi)).map((m) => m[1]),
+    );
+    for (const line of body.split(/\r?\n/)) { // 逐行扫描，只剥离指令行；兼容 CRLF 检出（Windows 工作树），否则指令行漏匹配会在 exec 时报 ALTER_ADD 语法错
       const directive = line.match(ALTER_ADD_RE); // 命中补列指令
       if (!directive) { rest.push(line); continue; } // 普通语句原样保留
       const [, table, column, definition] = directive; // 解构出表 / 列 / 定义
       const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>; // 读现有列
-      if (columns.length === 0) throw new Error(`ALTER_ADD target table not found: ${table}.${column}`); // 表不存在说明脚本写错，直接失败
+      if (columns.length === 0) { // 表还不存在：两种情况要分开处理
+        if (createdHere.has(table)) continue; // 全新库：本脚本马上会建表并自带该列，跳过即可（存量库走到这里说明表存在，不受影响）
+        throw new Error(`ALTER_ADD target table not found: ${table}.${column}`); // 指向别处的表名写错，直接失败
+      }
       if (columns.some((item) => item.name === column)) continue; // 已存在则跳过，保证重复启动幂等
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`); // 补列：旧行按 DEFAULT 填充
       applied.push(`${table}.${column}`); // 留痕

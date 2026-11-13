@@ -4,6 +4,9 @@
 -- 边界：推广计划只做曝光点击统计，不记佣金、不做资金结算，与 referral_codes / referrals 邀请体系完全解耦。
 
 -- ===== 一、公告 announcements =====
+-- 存量库兼容：announcements 早于本轮已存在于生产库，CREATE TABLE IF NOT EXISTS 不会补列，
+-- 而下方种子 INSERT 显式写入 published_at；缺这段必在「升级已有库」时启动即失败（线上 502 根因）。
+ALTER_ADD: announcements.published_at TEXT
 -- 公开列表只回 status='published' 且在 [starts_at, ends_at) 有效期内的条目；置顶优先、发布时间倒序。
 CREATE TABLE IF NOT EXISTS announcements (
   id          TEXT PRIMARY KEY,
