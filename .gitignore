@@ -67,3 +67,5 @@ Thumbs.db
 
 .iga/
 .edgeone/
+# 索引巡检脚本运行时生成的临时入口（不提交）
+services/mim-api/.verify-indexes.runner.ts
