@@ -575,6 +575,7 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITEE_USER: ${{ secrets.GITEE_USER || 'mallwm_admin' }}
+          GIT_TERMINAL_PROMPT: "0"
         run: |
           set -uo pipefail
           if [ -z "$GITEE_TOKEN" ]; then
@@ -584,12 +585,12 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
           SHA="$(git rev-parse --short HEAD)"
           URL="https://${GITEE_USER}:${GITEE_TOKEN}@gitee.com/mallwm_admin/mim.git"
-          if git push "$URL" "HEAD:refs/heads/${BRANCH}"; then
+          if timeout 90 git push "$URL" "HEAD:refs/heads/${BRANCH}"; then
             echo "Gitee 镜像已同步：${GITEE_USER}/mim @ ${BRANCH} ${SHA}"
             exit 0
           fi
-          echo "推送被拒，检查远端是否已包含本次提交（并发推送场景）"
-          if git fetch "$URL" "$BRANCH" && git merge-base --is-ancestor HEAD FETCH_HEAD; then
+          echo "推送被拒或超时，检查远端是否已包含本次提交（并发推送 / 网络阻塞场景）"
+          if timeout 90 git fetch "$URL" "$BRANCH" && git merge-base --is-ancestor HEAD FETCH_HEAD; then
             echo "Gitee 远端已包含 ${SHA}（远端已推进到 $(git rev-parse --short FETCH_HEAD)），镜像视为已同步"
             exit 0
           fi
