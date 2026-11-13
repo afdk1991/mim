@@ -1,6 +1,6 @@
 /**
  * 社区论坛与变现中心（二期）：
- *   - Tab：论坛、VIP、钱包、商城、推广；状态全部收敛在组件内。
+ *   - Tab：论坛、VIP、钱包、社区商城、推广；状态全部收敛在组件内。
  *   - 论坛排序：最新 / 热度 / 浏览 / 回帖 / 收藏 / 评分六种。
  *   - 板块 chips 展示价格与 joined；付费未加入点击先 joinBoard。
  *   - 发帖按 kind 显示媒体地址或投票选项，并由后端做强校验。
@@ -598,8 +598,8 @@ export function Community({ locale }: Props) {
       <header className="community-hero">{/* 执行当前业务步骤 */}
         <div>{/* 执行当前业务步骤 */}
           <p className="community-kicker">COMMUNITY & CREATOR ECONOMY</p>
-          <h1>社区 · 知识付费 · 独立商城</h1>
-          <p className="community-sub">论坛、付费阅读、VIP、钱包积分、卡密商品与推广分成，全部走同一套账户与余额。</p>
+          <h1>社区 · 知识付费 · 社区商城</h1>
+          <p className="community-sub">论坛、付费阅读、VIP、钱包积分、实物与卡密商品（社区商城）、推广分成，全部走同一套账户与余额。</p>
         </div>
         <div className="community-hero-side">{/* 执行当前业务步骤 */}
           <div className="community-stat"><span>帖子</span><strong>{stats.threads}</strong></div>
@@ -625,7 +625,7 @@ export function Community({ locale }: Props) {
           ['forum', '论坛'],
           ['vip', 'VIP 会员'],
           ['wallet', '钱包 / 积分'],
-          ['shop', '独立商城'],
+          ['shop', '社区商城'],
           ['referral', '推广分成'],
         ] as Array<[Tab, string]>).map(([key, label]) => (
           <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
@@ -1019,7 +1019,7 @@ export function Community({ locale }: Props) {
       {!loading && tab === 'shop' && (
         <div className="community-shop">{/* 执行当前业务步骤 */}
           <div className="community-section-head">{/* 执行当前业务步骤 */}
-            <div><h2>独立商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div>
+            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码；与「商城」（功能模块商城）是两条独立商品线。</p></div>
           </div>
           <div className="community-shop-grid">{/* 执行当前业务步骤 */}
             {products.map((p) => (
@@ -1035,7 +1035,7 @@ export function Community({ locale }: Props) {
                     <div className="community-buy-form">{/* 执行当前业务步骤 */}
                       <label>数量<input value={quantity} onChange={(e) => setQuantity(Math.min(10, Math.max(1, Number(e.target.value) || 1)))} inputMode="numeric" /></label>
                       <label>优惠码<input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="MIM10 / VIP20" /></label>
-                      <small className="community-buy-note">余额 {wallet ? yuan(wallet.balance_cents) : '—'} · 积分 {wallet?.points ?? 0}（独立商城下单不支持积分抵扣，按余额与优惠码结算）</small>
+                      <small className="community-buy-note">余额 {wallet ? yuan(wallet.balance_cents) : '—'} · 积分 {wallet?.points ?? 0}（社区商城下单不支持积分抵扣，按余额与优惠码结算）</small>
                       {p.kind === 'physical' && (
                         <>{/* 执行当前业务步骤 */}
                           <input value={shipName} onChange={(e) => setShipName(e.target.value)} placeholder="收货人" />

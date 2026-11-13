@@ -249,7 +249,7 @@ const RELEASES_DESC: ReleaseItem[] = [...RELEASES].reverse();
 // 能力地图：把用户要求的模块收敛到可直接打开的现有前台视图，避免“代码有、入口找不到”。
 const CAPABILITIES: CapabilityItem[] = [
   { labelZh: '知识付费四件套', labelEn: 'Paid content suite', descZh: '付费阅读 / 下载 / 图库 / 视频与未购隐藏', descEn: 'Paid articles, downloads, galleries and videos', view: 'community' },
-  { labelZh: '独立商城', labelEn: 'Marketplace', descZh: '实物快递、自动发货、手动发货、购物车与订单', descEn: 'Physical goods, auto/manual delivery, cart and orders', view: 'store' },
+  { labelZh: '社区商城', labelEn: 'Shop', descZh: '实物快递、自动发货、手动发货、余额与优惠码结算', descEn: 'Physical goods, auto/manual delivery, balance and coupon checkout', view: 'community' },
   { labelZh: '营销与资金', labelEn: 'Marketing & funds', descZh: '优惠码、批量改价、VIP、余额、积分、卡密、返佣、分成', descEn: 'Coupons, bulk pricing, VIP, wallet, points, cards, referrals and revenue share', view: 'community' },
   { labelZh: '交易链路', labelEn: 'Payment & fulfillment', descZh: '支付渠道、物流、售后退款退货评价', descEn: 'Payment channels, logistics, after-sales and reviews', view: 'commerce' },
   { labelZh: '论坛', labelEn: 'Forum', descZh: '板块、付费加入、帖子形态、排序与板块权限', descEn: 'Boards, paid access, post types, sorting and permissions', view: 'community' },

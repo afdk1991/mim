@@ -27,7 +27,7 @@ const TABS: Array<{ value: ScopeTab; zh: string; en: string }> = [
   { value: 'entry', zh: '统一入口', en: 'Entries' }, // 入口清单
   { value: 'navigation', zh: '导航链接', en: 'Links' }, // 导航站
   { value: 'community', zh: '社区帖子', en: 'Community' }, // 论坛
-  { value: 'shop', zh: '独立商城', en: 'Shop' }, // 商城
+  { value: 'shop', zh: '社区商城', en: 'Shop' }, // 社区商城（实物 / 卡密）
 ]; // TABS 结束
 
 // 推荐关键词：首次进入没有查询时给用户一个起点
