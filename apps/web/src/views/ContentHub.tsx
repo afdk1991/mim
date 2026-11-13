@@ -36,6 +36,36 @@ function fmtDate(iso?: string | null): string {
   return Number.isNaN(time) ? '' : new Date(time).toISOString().slice(0, 10); // 返回当前函数的处理结果
 } // 代码块结束
 
+/** 从标题 / 正文中提取语义版本号；无版本号返回 null。 */
+function extractVersion(text?: string | null): number[] | null {
+  const match = (text ?? '').match(/v?(\d+)\.(\d+)\.(\d+)/i); // 兼容 V0.0.10 与 0.0.10
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null; // 主 / 次 / 补丁
+} // 代码块结束
+
+/** 版本号倒序比较：有版本号的在前，无版本号的排最后。 */
+function compareVersionDesc(a: string, b: string): number {
+  const va = extractVersion(a); // 常量 va：保存固定配置或一次性派生值
+  const vb = extractVersion(b); // 常量 vb：保存固定配置或一次性派生值
+  if (va && vb) { // 两边都有版本号：逐段比较
+    for (let i = 0; i < 3; i += 1) { // 主 / 次 / 补丁逐段比较
+      if (va[i] !== vb[i]) return vb[i] - va[i]; // 倒序：b 大则排前
+    } // 循环结束
+    return 0; // 版本相同
+  } // 代码块结束
+  if (va) return -1; // a 有版本号，排前
+  if (vb) return 1; // b 有版本号，排前
+  return 0; // 都没有版本号：交由时间兜底
+} // 代码块结束
+
+/** 通用倒序：先按版本号，再按时间；无版本号的条目排最后。 */
+function sortByVersionDesc<T>(items: T[], versionText: (item: T) => string, dateText: (item: T) => string): T[] {
+  return [...items].sort((a, b) => { // 不修改接口原始顺序
+    const byVersion = compareVersionDesc(versionText(a), versionText(b)); // 版本号优先
+    if (byVersion !== 0) return byVersion; // 版本不同直接返回
+    return dateText(b).localeCompare(dateText(a)); // 同版本 / 都无版本号时按时间倒序
+  }); // 排序结束
+} // 代码块结束
+
 /** 公告管理表单草稿。 */
 interface AnnForm {
   title: string;
@@ -318,17 +348,21 @@ export function ContentHub({ locale, hasSession = false }: Props) { // 导出函
     } // 代码块结束
   } // 代码块结束
 
+  const sortedAnnouncements = sortByVersionDesc(announcements, (item) => `${item.title} ${item.body ?? ''}`, (item) => item.published_at ?? item.starts_at ?? ''); // 公告：标题 / 正文中的版本号倒序
+  const sortedChangelog = sortByVersionDesc(changelog, (item) => item.version, (item) => item.published_at ?? ''); // 更新日志：版本号倒序
+  const sortedPromotions = sortByVersionDesc(promotions, (item) => `${item.name} ${item.summary ?? ''} ${item.target_url ?? ''}`, (item) => item.starts_at ?? ''); // 推广计划：名称 / 简介中的版本号倒序，无版本号按起始时间倒序
+
   const tabs: Array<{ key: ContentTab; label: string; count: number }> = [ // 常量 tabs：保存固定配置或一次性派生值
-    { key: 'announcements', label: tr(locale, '公告', 'Announcements'), count: announcements.length },
-    { key: 'changelog', label: tr(locale, '更新日志', 'Changelog'), count: changelog.length },
-    { key: 'promotions', label: tr(locale, '推广计划', 'Promotions'), count: promotions.length },
+    { key: 'announcements', label: tr(locale, '公告', 'Announcements'), count: sortedAnnouncements.length },
+    { key: 'changelog', label: tr(locale, '更新日志', 'Changelog'), count: sortedChangelog.length },
+    { key: 'promotions', label: tr(locale, '推广计划', 'Promotions'), count: sortedPromotions.length },
   ]; // 执行当前业务步骤
 
   return ( // 返回当前函数的处理结果
     <div className="page content-hub">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{tr(locale, '公告与动态', 'News & Updates')}</h1>
-        <p className="muted">{tr(locale, '产品公告、版本更新与推广计划统一收录于此。', 'Announcements, release notes and promotions in one place.')}</p>
+        <p className="muted">{tr(locale, '产品公告、版本更新与推广计划统一收录于此，三个栏目均按版本号倒序；无版本号的条目排在最后。', 'Announcements, release notes and promotions in one place. All three tabs are sorted by version, newest first; unversioned items come last.')}</p>
       </header>
 
       <nav className="community-chips content-tabs">{/* 执行当前业务步骤 */}
@@ -346,17 +380,17 @@ export function ContentHub({ locale, hasSession = false }: Props) { // 导出函
 
       {!loaded ? (
         <p className="hint">{tr(locale, '加载中…', 'Loading…')}</p>
-      ) : tab === 'announcements' && announcements.length === 0 ? (
+      ) : tab === 'announcements' && sortedAnnouncements.length === 0 ? (
         <div className="community-empty">{tr(locale, '暂无公告', 'No announcements')}</div>
-      ) : tab === 'changelog' && changelog.length === 0 ? (
+      ) : tab === 'changelog' && sortedChangelog.length === 0 ? (
         <div className="community-empty">{tr(locale, '暂无更新日志', 'No changelog entries')}</div>
-      ) : tab === 'promotions' && promotions.length === 0 ? (
+      ) : tab === 'promotions' && sortedPromotions.length === 0 ? (
         <div className="community-empty">{tr(locale, '暂无推广计划', 'No active promotions')}</div>
       ) : null}
 
-      {tab === 'announcements' && announcements.length > 0 && (
+      {tab === 'announcements' && sortedAnnouncements.length > 0 && (
         <ul className="plain-list announcement-list">{/* 执行当前业务步骤 */}
-          {announcements.map((item) => (
+          {sortedAnnouncements.map((item) => (
             <li className="panel announcement-row" key={item.id}>{/* 执行当前业务步骤 */}
               <div className="panel-head">{/* 执行当前业务步骤 */}
                 <h3>{item.title}</h3>
@@ -369,9 +403,9 @@ export function ContentHub({ locale, hasSession = false }: Props) { // 导出函
         </ul>
       )}
 
-      {tab === 'changelog' && changelog.length > 0 && (
+      {tab === 'changelog' && sortedChangelog.length > 0 && (
         <ol className="changelog-timeline">{/* 执行当前业务步骤 */}
-          {changelog.map((item) => (
+          {sortedChangelog.map((item) => (
             <li className="changelog-entry" key={item.id}>{/* 执行当前业务步骤 */}
               <div className="changelog-version">{/* 执行当前业务步骤 */}
                 <span className="deploy-badge">{item.version}</span>
@@ -384,9 +418,9 @@ export function ContentHub({ locale, hasSession = false }: Props) { // 导出函
         </ol>
       )}
 
-      {tab === 'promotions' && promotions.length > 0 && (
+      {tab === 'promotions' && sortedPromotions.length > 0 && (
         <div className="commerce-grid promotions-grid">{/* 执行当前业务步骤 */}
-          {promotions.map((item) => (
+          {sortedPromotions.map((item) => (
             <a className="panel promotion-card" key={item.id} href={item.target_url || undefined}>{/* 执行当前业务步骤 */}
               <div className="panel-head">{/* 执行当前业务步骤 */}
                 <h3>{item.name}</h3>
