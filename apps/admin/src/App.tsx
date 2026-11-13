@@ -1,30 +1,42 @@
 // 后台外壳组件：负责登录态、按权限过滤的导航与视图分发
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react'; // 业务步骤
 // 身份与错误类型：/admin/me 提供 bootstrap 标记与实时权限码
-import { ApiError, describeError, getAdminMe, loadCredential, saveCredential } from './api';
+import { ApiError, describeError, getAdminMe, loadCredential, saveCredential } from './api'; // 业务步骤
 // 仅需类型导入，避免把运行时值打进产物
-import type { AdminIdentity, Credential } from './api';
+import type { AdminIdentity, Credential } from './api'; // 业务步骤
 // 通用异步加载钩子：统一 loading / error / reload
-import { useAsync } from './hooks';
+import { useAsync } from './hooks'; // 业务步骤
 // 分类导航视图：两级分类树 CRUD（一级 19 + 二级 205）
-import { Categories } from './views/Categories';
+import { Categories } from './views/Categories'; // 业务步骤
 // 五个业务视图：概览、模块、权益、角色权限、用户
-import { Entitlements } from './views/Entitlements';
+import { Entitlements } from './views/Entitlements'; // 业务步骤
 // 登录页：无凭证时的唯一出口，被动退出提示也由它展示
-import { Login } from './views/Login';
+import { Login } from './views/Login'; // 业务步骤
 // 功能模块管理视图：模块状态流转
-import { Modules } from './views/Modules';
+import { Modules } from './views/Modules'; // 业务步骤
 // 商城订单视图：跨用户订单列表 + 人工结算
-import { Orders } from './views/Orders';
+import { Orders } from './views/Orders'; // 业务步骤
 // 概览视图：默认落地页，任何已登录身份可见
-import { Overview } from './views/Overview';
+import { Overview } from './views/Overview'; // 业务步骤
 // 角色与权限矩阵视图
-import { Roles } from './views/Roles';
+import { Roles } from './views/Roles'; // 业务步骤
 // 用户与授权管理视图
-import { Users } from './views/Users';
+import { Users } from './views/Users'; // 业务步骤
+// 批量改价：固定价 / 百分比 / 金额增减 + 批次回滚
+import { PriceBatches } from './views/PriceBatches'; // 业务步骤
+// 邀请码准入：批量生成、禁用与核销审计
+import { Invites } from './views/Invites'; // 业务步骤
+// 实名审核队列
+import { Realname } from './views/Realname'; // 业务步骤
+// 内容运营：公告 / 更新日志 / 推广计划
+import { ContentOps } from './views/ContentOps'; // 业务步骤
+// 自研工具与开源项目发布
+import { ToolsAdmin } from './views/ToolsAdmin'; // 业务步骤
+// 社区运营：板块审核 / 首页指向 / 推荐权重 / Tab 配置
+import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users';
+type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'tools' | 'communityAdmin';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -48,6 +60,18 @@ const NAV: NavItem[] = [
   { key: 'entitlements', label: '权益管理', permission: 'entitlement:read' },
   // 商城订单：人工结算入口，与权益管理同属 entitlement:read 可见
   { key: 'orders', label: '商城订单', permission: 'entitlement:read' },
+  // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
+  { key: 'priceBatches', label: '批量改价', permission: 'commerce:write' },
+  // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
+  { key: 'invites', label: '邀请码', permission: 'user:read' },
+  // 实名审核：读权限 user:read；审核按钮另需 rbac:write
+  { key: 'realname', label: '实名审核', permission: 'user:read' },
+  // 内容运营：公告 / 更新日志 / 推广计划
+  { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
+  // 自研工具发布
+  { key: 'tools', label: '自研工具', permission: 'appearance:write' },
+  // 社区运营
+  { key: 'communityAdmin', label: '社区运营', permission: 'appearance:write' },
   // 角色与权限：需要 rbac:read
   { key: 'roles', label: '角色与权限', permission: 'rbac:read' },
   // 用户与授权：需要 user:read
@@ -55,7 +79,7 @@ const NAV: NavItem[] = [
 ]; // 导航表结束：数组顺序即侧栏渲染顺序
 
 /** 应用根组件：只做「有无凭证」的二选一，具体逻辑全部下沉到 Console */
-export function App() {
+export function App() { // 业务步骤
   // 首屏从 localStorage 恢复凭证，避免刷新即掉登录
   const [credential, setCredential] = useState<Credential | null>(() => loadCredential());
   // 被动退出时携带给登录页的提示文案
@@ -66,9 +90,9 @@ export function App() {
     // 先持久化，刷新后仍保持登录
     saveCredential(next);
     // 清掉上一次的被动退出提示
-    setNotice(undefined);
+    setNotice(undefined); // 业务步骤
     // 切换到已登录分支
-    setCredential(next);
+    setCredential(next); // 业务步骤
   }, []); // 空依赖：登录回调引用稳定，子组件不会因重渲染重复订阅
 
   // 退出登录：主动退出无提示，凭证失效则带一句说明
@@ -76,9 +100,9 @@ export function App() {
     // 清除本地凭证
     saveCredential(null);
     // 记录提示文案
-    setNotice(message);
+    setNotice(message); // 业务步骤
     // 回到登录页
-    setCredential(null);
+    setCredential(null); // 业务步骤
   }, []); // 空依赖：退出回调同样保持引用稳定
 
   // 无凭证直接渲染登录页，此时不会发起任何鉴权请求
@@ -96,7 +120,7 @@ interface ConsoleProps {
 } // ConsoleProps 结束：凭证 + 退出回调即全部入参
 
 /** 主控台：拉取身份 → 过滤导航 → 渲染当前视图 */
-function Console({ credential, onLogout }: ConsoleProps) {
+function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
   // 当前视图；默认概览，权限不足时会自动回落
   const [view, setView] = useState<ViewKey>('overview');
   // 身份查询：凭证变化时重新校验，同时拿到最新权限
@@ -105,9 +129,9 @@ function Console({ credential, onLogout }: ConsoleProps) {
   // 凭证失效（401）时自动踢回登录页，避免用户卡在满屏报错上
   useEffect(() => {
     // 取出错误对象
-    const error = identityState.error;
+    const error = identityState.error; // 业务步骤
     // 仅 401 视为凭证失效；403 表示权限不足，应留在页面内提示
-    if (error instanceof ApiError && error.status === 401) {
+    if (error instanceof ApiError && error.status === 401) { // 业务步骤
       // 带提示文案退出，登录页会展示该消息
       onLogout('登录凭证已失效，请重新登录');
     } // 401 分支结束：非 401 错误不自动退出，留给页面内错误态处理
@@ -115,13 +139,13 @@ function Console({ credential, onLogout }: ConsoleProps) {
   }, [identityState.error, onLogout]);
 
   // 首屏身份校验中：给出轻量占位，避免闪现登录页
-  if (identityState.loading) {
+  if (identityState.loading) { // 业务步骤
     // 复用登录页的居中容器样式
     return <div className="login-wrap"><div className="login-card">正在校验身份…</div></div>;
   } // loading 分支结束：校验完成后重渲染进入后续分支
 
   // 身份查询失败：展示错误并允许手动退出重登
-  if (identityState.error) {
+  if (identityState.error) { // 业务步骤
     // 错误态同样居中展示
     return (
       <div className="login-wrap"> {/* 复用登录页居中容器，错误态与登录页视觉一致 */}
@@ -137,19 +161,19 @@ function Console({ credential, onLogout }: ConsoleProps) {
   } // error 分支结束
 
   // 极端情况：无错误也无数据，直接不渲染
-  if (!identityState.data) return null;
+  if (!identityState.data) return null; // 业务步骤
   // 收窄后的身份对象
-  const identity: AdminIdentity = identityState.data;
+  const identity: AdminIdentity = identityState.data; // 业务步骤
 
   // 侧栏可见项：permission 为 null 或命中当前权限集合
   const visible = NAV.filter((item) => item.permission === null || identity.permissions.includes(item.permission));
   // 当前视图若不可见（权限被回收），回落到概览，避免渲染空页面
   const activeKey: ViewKey = visible.some((item) => item.key === view) ? view : 'overview';
   // 侧栏底部身份描述：引导通道没有用户主体，单独标注
-  const subject = identity.bootstrap ? '引导令牌' : identity.user?.display_name ?? '未知用户';
+  const subject = identity.bootstrap ? '引导令牌' : identity.user?.display_name ?? '未知用户'; // 业务步骤
 
   // 视图分发：集中在一处便于对照权限
-  const content = renderView(activeKey, credential, identity);
+  const content = renderView(activeKey, credential, identity); // 业务步骤
 
   // 渲染三段式布局：侧栏 + 主区
   return (
@@ -188,7 +212,7 @@ function Console({ credential, onLogout }: ConsoleProps) {
 } // Console 组件结束
 
 /** 视图分发：key 已在调用方做过权限过滤，这里只做映射 */
-function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity) {
+function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity) { // 业务步骤
   // 概览：纯展示身份与权限统计
   if (key === 'overview') return <Overview identity={identity} />;
   // 模块：状态流转，需要 module:write 才能点按钮
@@ -203,6 +227,18 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'roles') return <Roles credential={credential} permissions={identity.permissions} />;
   // 用户：分页检索 + 角色授予撤销
   if (key === 'users') return <Users credential={credential} permissions={identity.permissions} />;
+  // 批量改价：提交批次与按快照回滚
+  if (key === 'priceBatches') return <PriceBatches credential={credential} permissions={identity.permissions} />;
+  // 邀请码：生成 / 列表 / 禁用 / 核销记录
+  if (key === 'invites') return <Invites credential={credential} permissions={identity.permissions} />;
+  // 实名审核：脱敏队列与通过 / 驳回
+  if (key === 'realname') return <Realname credential={credential} permissions={identity.permissions} />;
+  // 内容运营：公告 / 更新日志 / 推广计划
+  if (key === 'contentOps') return <ContentOps credential={credential} permissions={identity.permissions} />;
+  // 自研工具发布
+  if (key === 'tools') return <ToolsAdmin credential={credential} permissions={identity.permissions} />;
+  // 社区运营：板块审核、首页指向、审核开关、推荐权重、Tab 配置
+  if (key === 'communityAdmin') return <CommunityAdmin credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏
   return <Overview identity={identity} />;
-} // renderView 结束：五个视图分发完毕
+} // renderView 结束：全部视图分发完毕
