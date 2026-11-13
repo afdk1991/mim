@@ -1272,3 +1272,22 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 | 未做 | 生产库逐行核对（无 SSH 私钥，以发号游标 + 本地副本互证替代）；浏览器端点按取号流程（改用 API 复验）；IGA / Vercel 本机不可达（既有网络特征，CI 作业作替代取证） | — |
 
 **结论**：`1～99` 整段保留 + 三类好记号入池 + 靓号只人工授予三条指令均已落地并上线，线上 `0.0.7` 已按 `renumber_v2` 重排；后续任何号码规则调整，必须同时升 `RENUMBER_KEY` 并重跑门禁。
+
+### 9.34 全栈闭环复核 + 商城视觉二次升级文档同步（2026-11-13 20:4x +08:00）
+
+**性质**：按用户「补齐整个项目前后端、数据库存储等等」指令做全栈完整性核对，并把已入库的商城视觉二次升级补齐文档口径。代码三文件（`catalogArt.ts` / `Store.tsx` / `styles.css`）已由 `09fe593 feat(web): 商城每件商品独立封面与详情多图画廊，补图片放大与渲染性能` 入库双推；本轮 `0f8ca68` 仅同步 README / PRD / wiki / 代码注释口径，不改后端契约、不改数据库、不新增接口。
+
+| 项 | 本轮实测 | 取证方式 |
+|---|---|---|
+| 前后端对接 | 后端 `src/routes/` 30 个路由全部在 `app.ts` 挂载；隔离实例 8791 匿名 + 访客令牌探测公开 / 受保护 / 管理端端点，除 401 / 403 权限拦截外无 404 悬空路由、无 500；管理端真实前缀为 `/modules` `/entitlements` `/orders/manage` `/categories/manage` `/admin/realname/queue` `/tools/manage` `/admin/commerce/price-batches` 等（非 `/admin/modules` 猜测前缀） | 本地实例探测 + `apps/admin/src/api.ts` / `api-ops.ts` 逐路径核对 |
+| 数据库 / 存储 | 主 schema 87 表 + `schema.d/*.sql` 域外挂脚本 23 表；增量迁移三层（`ADDITIVE_COLUMNS` / `ADDITIVE_INDEXES` / `applyDomainSchema` 的 `ALTER_ADD:`）；better-sqlite3 同步驱动 + WAL 单文件；本地磁盘 / S3 双存储驱动，缺 S3 凭证诚实抛 `STORAGE_NOT_CONFIGURED` 503；备份 `deploy/backup-db.sh` 走 better-sqlite3 backup API、14 份轮转、timer 每日 03:00；种子幂等；`.env*` / `data/` / 本地库均被 gitignore，`git ls-files` 无 `.db` / `.env` 入库 | `db.ts` / `storage.ts` / `deploy/` 通读 + gitignore 核对 |
+| 未实现项定性 | 后端 501 / 503 均为诚实降级：S3 缺凭证、`catalog.ts` 未绑定能力返回 `FEATURE_NOT_AVAILABLE`（对应 planned 项）、CDN CloudFront 刷新待 AWS SDK + SigV4 凭证；无半截写一半的接口；前端 web 21 视图 / admin 15 视图源码内搜索「敬请期待 / 即将上线 / TODO / FIXME / 待开发」0 命中 | 源码检索 + 路由核对 |
+| 本地门禁 | `pnpm -r typecheck` 5/6 Done；后端 `npx vitest run` **56 文件 / 669 例全过**（29.52s）；`@mim/web build` ✓（Store chunk 43.50 kB）、`@mim/admin build` ✓；`verify-custom-domains` 20/20、`verify-deployments` 55/55、`verify-site-modules` 83/83、`verify-entry-manifest` 23/23、`verify-auth-gate` 静态 39/39；`version-check` ✅、`env-check` ✅、`comment-check --strict` 总体达标放行 | 真实命令输出 |
+| 浏览器自测 | 本地 5188 静态服务反代 8787：商城 213 模块渲染；详情画廊三张图（商品封面 / 能力亮点 / 交付与依赖），缩略切换后主图 alt 与 SVG `naturalWidth=1200`；主图与 900×1180 参数长图均可点击进入 `.image-zoom` 全屏遮罩，遮罩 / 关闭按钮 / Esc 三种方式退出；console 0 错误 | Aha Browser Use 点击级实测 |
+| 文档同步（铁律七） | `README.md` 商城行、`Mim-PRD.html` 商品视觉段、`docs/wiki/08-dev-implementation.md` §8.9、`catalogArt.ts` 文件头与 `categoryCoverUrl` 注释，统一为「逐商品矢量封面 + 三图画廊 + 全屏放大预览」口径；19 张分类 JPG 与 `categoryCoverUrl()` 标注为早期遗留资源（视图不再调用，`categoryGroupSlug()` 仍复用于分组色相）；db.ts 种子里的 `/catalog/*.jpg` 属社区帖子 / 独立商城商品媒体，仍在用，未改动 | 文档 diff |
+| 提交 / 双推 | `0f8ca68`（4 files，+22 / −10），`origin` 与 `gitee` 均 `09fe593..0f8ca68`；仅逐路径 stage 本轮文档与注释，未带入 `.tmp-*.err` / `vite.e2e.config.ts` / 草稿 txt | `git push` 输出 |
+| CI | Deploy run **`43426887333`**（head `0f8ca68`）五作业全绿：质量门禁 1m10s / ghcr 54s / GitHub Pages 37s / 托管平台同步 3m26s / 发布到生产服务器 1m41s；Azure SWA run `43426887471` success；上一提交 `09fe593` Deploy `43426153591` 五作业全绿 | `gh run view` |
+| 线上取证 | `GET /health` 200 / 0.075s，`{"status":"ok","service":"mim-api","version":"0.0.10"}`；`GET /api/v1/modules?page=1&pageSize=2` 200 / 0.062s，`total=213` | 本机 `curl.exe`（2026-11-13 20:4x） |
+| 遗留 / 不可闭环 | ① 私有凭证平台：Vercel `VERCEL_TOKEN/ORG_ID/PROJECT_ID`、Sealos `SEALOS_KUBECONFIG/DOMAIN/NAMESPACE/JWT_SECRET`、IGA-CI `IGA_ACCESS_KEY/SECRET_KEY/PROJECT_NAME`、Netlify `NETLIFY_AUTH_TOKEN/SITE_ID`、Render `RENDER_API_KEY/SERVICE_ID`；② entry-catalog planned 19 项 + conflict 2 项（`MALL_B2C` / `DOWNLOAD_DIST`）功能规格待拍板；③ EdgeOne 自定义域内容层复验须有头浏览器过校验 profile，CNAME 调整须控制台取新记录 + DNSPod 凭证；④ CDN CloudFront 刷新待 AWS SDK + SigV4 凭证；⑤ 19 张分类 JPG 遗留图片资源未删除（低风险，待后续统一清理） | 客观前提阻断，沙箱无法生成 |
+
+**结论**：入库基线的前后端路由、视图对接、数据库 schema / 迁移 / 种子 / 持久化 / 备份链路在本机与 CI 出口均核对闭合，无本机可补的悬空接口、半成品视图或缺列迁移；商城视觉二次升级已上线并取得线上取证。剩余未闭环项均受私有凭证、外部账号或未决规格阻断，不以本地绿灯冒充已上线。
