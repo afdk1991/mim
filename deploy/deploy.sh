@@ -22,6 +22,9 @@
 #   ADMIN_DIR   默认 /opt/mim/admin（管理后台静态根，nginx 的 /admin/ 指向此处）
 #   SERVICE     默认 mim-api
 #   DATA_DIR    默认 /var/lib/mim（SQLite 库落盘处，必须在 APP_DIR 之外且本脚本永不清空）
+#   BACKUP_DIR  默认 /var/backups/mim（部署前数据库快照目录，轮转只删过期备份）
+#   BACKUP_KEEP 默认 7（BACKUP_DIR 下保留的备份份数）
+#   MIM_DEPLOY_STOP_AFTER  仅演练用：data / sync 阶段完成后提前退出，生产勿设
 #   MIM_API_PORT 后端回环端口（API + WS 共用），默认 8787；旧变量 PORT_ 仍兼容
 #   MIM_WEB_HTTP_PORT   前端 HTTP 端口，默认 8080（同机 MixmAPP 占用 80/443）
 #   MIM_WEB_HTTPS_PORT  前端 HTTPS 端口，默认 8443
@@ -94,6 +97,75 @@ if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$APP_
   log "已登记 git safe.directory: $APP_DIR"
 fi
 
+# --- 1.5 数据安全区（建库目录 / 迁移历史真实目录 / 部署前备份；全程不删数据） ---
+# 顺序刻意放在代码同步之前：备份必须先于任何 git 操作完成，部署失败时才有可回退副本。
+# 本段对 $DATA_DIR 只做「创建 / 搬入 / 改属主 / 快照备份」，任何分支都不删除它；
+# 轮转只清理 $BACKUP_DIR 下的过期备份，绝不触碰库目录本身。
+DATA_LINK="$APP_DIR/services/mim-api/data"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/mim}"
+BACKUP_KEEP="${BACKUP_KEEP:-7}"
+DB_FILE="$DATA_DIR/mim.db"
+
+mkdir -p "$DATA_DIR" "$(dirname "$DATA_LINK")"
+chmod 750 "$DATA_DIR"
+
+# ① 历史部署留下的真实 data 目录（非符号链接）：库文件搬入 $DATA_DIR，原目录改名留档。
+#    只用 mv（同文件系统内原子），不 rm；目标已存在则停下人工比对，绝不覆盖。
+if [ -L "$DATA_LINK" ]; then
+  LINK_TARGET="$(readlink -f "$DATA_LINK")"
+  if [ "$LINK_TARGET" != "$(readlink -f "$DATA_DIR")" ]; then
+    die "$DATA_LINK 已指向 $LINK_TARGET（期望 $DATA_DIR），拒绝继续，请人工确认"
+  fi
+elif [ -e "$DATA_LINK" ]; then
+  LEGACY_DIR="${DATA_LINK}.legacy.$(date '+%Y%m%d-%H%M%S')"
+  log "数据目录迁移：$DATA_LINK → $DATA_DIR（原目录留档 $(basename "$LEGACY_DIR")）"
+  for f in mim.db mim.db-wal mim.db-shm; do
+    if [ -e "$DATA_LINK/$f" ]; then
+      if [ -e "$DATA_DIR/$f" ]; then
+        die "$DATA_DIR/$f 已存在，拒绝覆盖，请人工比对后迁移"
+      fi
+      mv "$DATA_LINK/$f" "$DATA_DIR/$f"
+    fi
+  done
+  mv "$DATA_LINK" "$LEGACY_DIR"
+fi
+if [ ! -L "$DATA_LINK" ]; then
+  ln -s "$DATA_DIR" "$DATA_LINK"
+fi
+if id -u "$RUN_USER" >/dev/null 2>&1; then
+  chown -R "$RUN_USER:$RUN_USER" "$DATA_DIR" 2>/dev/null || true
+fi
+
+# ② 部署前自动备份：优先复用 deploy/backup-db.sh（better-sqlite3 在线快照，WAL 安全）；
+#    脚本缺失或依赖未装好时退化为三件套文件级复制，保证总有可回退副本。
+BACKUP_STAMP="$(date '+%Y%m%d-%H%M%S')"
+if [ -f "$DB_FILE" ]; then
+  if [ -f "$APP_DIR/deploy/backup-db.sh" ] \
+     && DB_PATH="$DB_FILE" BACKUP_DIR="$BACKUP_DIR" KEEP="$BACKUP_KEEP" \
+        bash "$APP_DIR/deploy/backup-db.sh" >/dev/null 2>&1; then
+    log "部署前数据库备份完成：$BACKUP_DIR（保留最近 $BACKUP_KEEP 份）"
+  else
+    warn "在线备份不可用（缺脚本或依赖），退化为文件级复制"
+    mkdir -p "$BACKUP_DIR/$BACKUP_STAMP"
+    for f in mim.db mim.db-wal mim.db-shm; do
+      if [ -e "$DATA_DIR/$f" ]; then
+        cp -a "$DATA_DIR/$f" "$BACKUP_DIR/$BACKUP_STAMP/$f"
+      fi
+    done
+    log "部署前数据库备份（文件级）：$BACKUP_DIR/$BACKUP_STAMP"
+    # 轮转只发生在备份目录：按 mtime 倒序保留最近 BACKUP_KEEP 份
+    ls -1dt "$BACKUP_DIR"/* 2>/dev/null | tail -n +"$((BACKUP_KEEP + 1))" | xargs -r rm -rf || true
+  fi
+else
+  log "尚无 $DB_FILE（首次部署），跳过部署前备份"
+fi
+
+# ③ 演练早退开关（仅测试用）：生产部署不要设置该变量。
+if [ "${MIM_DEPLOY_STOP_AFTER:-}" = "data" ]; then
+  log "MIM_DEPLOY_STOP_AFTER=data，数据阶段完成即退出（演练模式）"
+  exit 0
+fi
+
 # --- 1. 代码同步 ---
 # 生产服务器到 github.com 的 HTTPS 被网络策略阻断（SSL timeout），
 # 因此统一走 SSH（22 端口可达），使用只读 deploy key。
@@ -112,23 +184,33 @@ case "$REPO_URL" in
 esac
 
 if [ ! -d "$APP_DIR/.git" ]; then
-  log "首次部署：克隆 $REPO_URL"
-  # 库文件在 $DATA_DIR（默认 /var/lib/mim）而非 APP_DIR 内，下面的清空不会影响 database；
-  # APP 侧的数据路径只是指向 $DATA_DIR 的符号链接，§5 会重建它。
-  mkdir -p "$(dirname "$APP_DIR")"
-  rm -rf "$APP_DIR"
-  git clone --depth 1 "$REPO_URL" "$APP_DIR"
-else
-  log "拉取 origin/main"
-  git -C "$APP_DIR" remote set-url origin "$REPO_URL"
-  ok=0
-  for attempt in 1 2 3; do
-    if git -C "$APP_DIR" fetch --prune origin main; then ok=1; break; fi
-    warn "git fetch 第 $attempt 次失败，5s 后重试"
-    sleep 5
-  done
-  [ "$ok" -eq 1 ] || die "git fetch 连续 3 次失败，请检查服务器到 github.com:22 的连通性"
+  # 绝不 `rm -rf "$APP_DIR"`：2026-11-15 这里真删过一次 mim.db（靠进程句柄才捞回来）。
+  # 现在改为「原地初始化」——只清理可再生的构建产物（dist / node_modules），
+  # data/、.mim-dev-secret 与其它运维文件一律保留，后续 fetch + reset 覆盖代码即可。
+  log "首次部署或目录不是 git 仓库：原地初始化（不清空目录）"
+  mkdir -p "$(dirname "$APP_DIR")" "$APP_DIR"
+  if [ -n "$(ls -A "$APP_DIR" 2>/dev/null || true)" ]; then
+    log "目录非空，仅清理可再生构建产物（dist / node_modules），保留数据目录与其它文件"
+    rm -rf "$APP_DIR"/node_modules \
+           "$APP_DIR"/apps/*/node_modules "$APP_DIR"/apps/*/dist \
+           "$APP_DIR"/services/*/node_modules "$APP_DIR"/services/*/dist
+  fi
+  if ! git -C "$APP_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    git -C "$APP_DIR" init --quiet
+  fi
+  git -C "$APP_DIR" remote add origin "$REPO_URL" 2>/dev/null \
+    || git -C "$APP_DIR" remote set-url origin "$REPO_URL"
 fi
+
+log "拉取 origin/main"
+git -C "$APP_DIR" remote set-url origin "$REPO_URL"
+ok=0
+for attempt in 1 2 3; do
+  if git -C "$APP_DIR" fetch --prune origin main; then ok=1; break; fi
+  warn "git fetch 第 $attempt 次失败，5s 后重试"
+  sleep 5
+done
+[ "$ok" -eq 1 ] || die "git fetch 连续 3 次失败，请检查服务器到 github.com:22 的连通性"
 
 # 精确检出目标提交（不留 origin/main 漂移）；目标提交缺失时单独按 SHA 获取
 if [ -n "$TARGET_REF" ]; then
@@ -142,7 +224,17 @@ else
   warn "未指定目标提交，发布 origin/main 最新"
   git -C "$APP_DIR" reset --hard origin/main
 fi
-git -C "$APP_DIR" clean -fd -e node_modules -e .mim-dev-secret -e 'services/*/data' -e dist
+# 只清理可再生的构建产物：用显式 pathspec 限定 dist，绝不对整个目录做 clean -fd。
+# 2026-11-15 演练实测：不带 pathspec 时 KEEP_ME.txt、services/mim-api/data.legacy.*
+# 这类运维文件会被当成 untracked 一起删掉；而 node_modules 保留可避免每次全量重装。
+git -C "$APP_DIR" clean -fdx -- 'apps/*/dist' 'services/*/dist' || true
+
+# 演练早退开关（仅测试用）：MIM_DEPLOY_STOP_AFTER=sync 在代码同步后退出，
+# 用于验证「非 git 目录原地初始化」不会清掉数据与运维文件；生产部署不要设置。
+if [ "${MIM_DEPLOY_STOP_AFTER:-}" = "sync" ]; then
+  log "MIM_DEPLOY_STOP_AFTER=sync，代码同步完成即退出（演练模式）"
+  exit 0
+fi
 
 cd "$APP_DIR"
 
@@ -194,40 +286,9 @@ mkdir -p "$ADMIN_DIR"
 rm -rf "$ADMIN_DIR"/*
 cp -R "$APP_DIR/apps/admin/dist/." "$ADMIN_DIR/"
 
-# --- 5. 数据目录、JWT 密钥与属主 ---
-# 库文件物理落在 APP_DIR 之外的 $DATA_DIR。本脚本对该目录只做「创建 / 搬入 / 改属主」，
-# 任何分支（含首次部署的 rm -rf "$APP_DIR"、git clean）都不会删除它。
-# config.ts 的 DATA_DIR 固定为 services/mim-api/data，不能改（避免与业务代码耦合），
-# 因此在 APP 侧用符号链接指向 $DATA_DIR：rm -rf "$APP_DIR" 只会删掉链接本身，
-# 库文件与 /var/lib/mim 毫发无损；每次部署在这里幂等重建链接。
-DATA_LINK="$APP_DIR/services/mim-api/data"
-mkdir -p "$DATA_DIR"
-chmod 750 "$DATA_DIR"
-if [ -L "$DATA_LINK" ]; then
-  LINK_TARGET="$(readlink -f "$DATA_LINK")"
-  [ "$LINK_TARGET" = "$(readlink -f "$DATA_DIR")" ] || {
-    printf '\033[31m[deploy]\033[0m %s 已指向 %s（期望 %s），拒绝继续，请人工确认\n' \
-      "$DATA_LINK" "$LINK_TARGET" "$DATA_DIR" >&2
-    exit 1
-  }
-elif [ -e "$DATA_LINK" ]; then
-  # 历史部署留下的真实目录：把库文件搬进 $DATA_DIR，原目录改名留档，最后建链接
-  LEGACY_DIR="${DATA_LINK}.legacy.$(date '+%Y%m%d-%H%M%S')"
-  log "数据目录迁移：$DATA_LINK → $DATA_DIR（原目录留档 $(basename "$LEGACY_DIR")）"
-  for f in mim.db mim.db-wal mim.db-shm; do
-    [ -e "$DATA_LINK/$f" ] || continue
-    if [ -e "$DATA_DIR/$f" ]; then
-      printf '\033[31m[deploy]\033[0m %s 已存在，拒绝覆盖，请人工比对后迁移\n' "$DATA_DIR/$f" >&2
-      exit 1
-    fi
-    mv "$DATA_LINK/$f" "$DATA_DIR/$f"
-  done
-  mv "$DATA_LINK" "$LEGACY_DIR"
-fi
-[ -L "$DATA_LINK" ] || ln -s "$DATA_DIR" "$DATA_LINK"
-if id -u "$RUN_USER" >/dev/null 2>&1; then
-  chown -R "$RUN_USER:$RUN_USER" "$DATA_DIR" 2>/dev/null || true
-fi
+# --- 5. JWT 密钥与属主 ---
+# 数据目录、APP 侧符号链接、历史目录迁移与部署前备份已在 §1.5 完成（先于任何 git 操作），
+# 这里不再重复任何数据目录逻辑，也不再对该目录做删除。
 mkdir -p "$APP_DIR/.mim-dev-secret"
 
 # JWT 密钥（生产必配）：systemd unit 以 EnvironmentFile=/opt/mim/mim-api.env 注入
@@ -372,7 +433,7 @@ fi
 # --- 5.5 数据库迁移（幂等，按文件名顺序执行；首次部署无 DB 时跳过） ---
 # 迁移脚本位于 deploy/migrations/*.cjs，均以 better-sqlite3 backup API 先备份再 DROP/重建，
 # 可反复重放。任一迁移失败即中止部署（set -e），避免把半迁移的库暴露给新代码。
-DB_FILE="$DATA_DIR/mim.db"
+# $DB_FILE 已在 §1.5 定义（=$DATA_DIR/mim.db），此处直接复用，避免两处口径漂移。
 if [ -f "$DB_FILE" ]; then
   log "执行数据库迁移（$APP_DIR/deploy/migrations）"
   shopt -s nullglob
