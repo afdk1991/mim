@@ -7,8 +7,8 @@
 #       → 发布静态产物到 /opt/mim/web、管理后台到 /opt/mim/admin
 #       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET / MIM_CORS_ORIGINS /
 #         MIM_AUTH_ADMIN_PASSWORD / MIM_ADMIN_TOKEN / 可选验证码通道密钥）
-#       → 执行 deploy/migrations/*.cjs（先备份、幂等可重放）→ 重启后端
-#       → 安装并启用每日备份 timer（§6.5，MIM_ENABLE_BACKUP_TIMER=0 可关闭）→ 健康检查
+#       → 执行 deploy/migrations/*.cjs（幂等可重放）→ 重启后端
+#       → 确保备份 timer 不存在（§6.5；项目策略：不保留任何数据库备份）→ 健康检查
 #
 # 用法（服务器上）：
 #   sudo bash /opt/mim/app/deploy/deploy.sh [目标提交]
@@ -22,8 +22,6 @@
 #   ADMIN_DIR   默认 /opt/mim/admin（管理后台静态根，nginx 的 /admin/ 指向此处）
 #   SERVICE     默认 mim-api
 #   DATA_DIR    默认 /var/lib/mim（SQLite 库落盘处，必须在 APP_DIR 之外且本脚本永不清空）
-#   BACKUP_DIR  默认 /var/backups/mim（部署前数据库快照目录，轮转只删过期备份）
-#   BACKUP_KEEP 默认 7（BACKUP_DIR 下保留的备份份数）
 #   MIM_DEPLOY_STOP_AFTER  仅演练用：data / sync 阶段完成后提前退出，生产勿设
 #   MIM_API_PORT 后端回环端口（API + WS 共用），默认 8787；旧变量 PORT_ 仍兼容
 #   MIM_WEB_HTTP_PORT   前端 HTTP 端口，默认 8080（同机 MixmAPP 占用 80/443）
@@ -97,13 +95,11 @@ if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$APP_
   log "已登记 git safe.directory: $APP_DIR"
 fi
 
-# --- 1.5 数据安全区（建库目录 / 迁移历史真实目录 / 部署前备份；全程不删数据） ---
-# 顺序刻意放在代码同步之前：备份必须先于任何 git 操作完成，部署失败时才有可回退副本。
-# 本段对 $DATA_DIR 只做「创建 / 搬入 / 改属主 / 快照备份」，任何分支都不删除它；
-# 轮转只清理 $BACKUP_DIR 下的过期备份，绝不触碰库目录本身。
+# --- 1.5 数据安全区（建库目录 / 迁移历史真实目录；全程不删数据、不生成备份） ---
+# 顺序刻意放在代码同步之前：任何 git 操作之前先确保库不落在会被清理的位置。
+# 本段对 $DATA_DIR 只做「创建 / 搬入 / 改属主」，任何分支都不删除它。
+# 项目策略（2026-11-15 明确）：不保留任何数据库备份，本脚本不生成备份文件。
 DATA_LINK="$APP_DIR/services/mim-api/data"
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/mim}"
-BACKUP_KEEP="${BACKUP_KEEP:-7}"
 DB_FILE="$DATA_DIR/mim.db"
 
 mkdir -p "$DATA_DIR" "$(dirname "$DATA_LINK")"
@@ -136,29 +132,8 @@ if id -u "$RUN_USER" >/dev/null 2>&1; then
   chown -R "$RUN_USER:$RUN_USER" "$DATA_DIR" 2>/dev/null || true
 fi
 
-# ② 部署前自动备份：优先复用 deploy/backup-db.sh（better-sqlite3 在线快照，WAL 安全）；
-#    脚本缺失或依赖未装好时退化为三件套文件级复制，保证总有可回退副本。
-BACKUP_STAMP="$(date '+%Y%m%d-%H%M%S')"
-if [ -f "$DB_FILE" ]; then
-  if [ -f "$APP_DIR/deploy/backup-db.sh" ] \
-     && DB_PATH="$DB_FILE" BACKUP_DIR="$BACKUP_DIR" KEEP="$BACKUP_KEEP" \
-        bash "$APP_DIR/deploy/backup-db.sh" >/dev/null 2>&1; then
-    log "部署前数据库备份完成：$BACKUP_DIR（保留最近 $BACKUP_KEEP 份）"
-  else
-    warn "在线备份不可用（缺脚本或依赖），退化为文件级复制"
-    mkdir -p "$BACKUP_DIR/$BACKUP_STAMP"
-    for f in mim.db mim.db-wal mim.db-shm; do
-      if [ -e "$DATA_DIR/$f" ]; then
-        cp -a "$DATA_DIR/$f" "$BACKUP_DIR/$BACKUP_STAMP/$f"
-      fi
-    done
-    log "部署前数据库备份（文件级）：$BACKUP_DIR/$BACKUP_STAMP"
-    # 轮转只发生在备份目录：按 mtime 倒序保留最近 BACKUP_KEEP 份
-    ls -1dt "$BACKUP_DIR"/* 2>/dev/null | tail -n +"$((BACKUP_KEEP + 1))" | xargs -r rm -rf || true
-  fi
-else
-  log "尚无 $DB_FILE（首次部署），跳过部署前备份"
-fi
+# ② 不生成任何备份（项目策略，用户明确要求）：部署失败时回退靠 git 回退代码后重跑，
+#    数据文件本身在任何分支都不会被本脚本删除或复制。
 
 # ③ 演练早退开关（仅测试用）：生产部署不要设置该变量。
 if [ "${MIM_DEPLOY_STOP_AFTER:-}" = "data" ]; then
@@ -287,7 +262,7 @@ rm -rf "$ADMIN_DIR"/*
 cp -R "$APP_DIR/apps/admin/dist/." "$ADMIN_DIR/"
 
 # --- 5. JWT 密钥与属主 ---
-# 数据目录、APP 侧符号链接、历史目录迁移与部署前备份已在 §1.5 完成（先于任何 git 操作），
+# 数据目录、APP 侧符号链接与历史目录迁移已在 §1.5 完成（先于任何 git 操作），
 # 这里不再重复任何数据目录逻辑，也不再对该目录做删除。
 mkdir -p "$APP_DIR/.mim-dev-secret"
 
@@ -468,25 +443,24 @@ systemctl daemon-reload
 systemctl enable "$SERVICE" >/dev/null 2>&1 || true
 systemctl restart "$SERVICE"
 
-# --- 6.5 每日数据库备份 timer（幂等安装；MIM_ENABLE_BACKUP_TIMER=0 可显式关闭） ---
-# 修复（2026-11-07）：backup-db.sh 虽已入库，但只写了「建议 cron」注释、从未被任何调度引用，
-# 备份链路等于不存在；这里把 service + timer 作为部署工件安装并 enable --now。
-# 备份脚本已改为复用项目自带 better-sqlite3，不再要求服务器安装 sqlite3 CLI。
-if [ "${MIM_ENABLE_BACKUP_TIMER:-1}" = "0" ]; then
-  log "MIM_ENABLE_BACKUP_TIMER=0，跳过备份 timer 安装"
-elif command -v systemctl >/dev/null 2>&1; then
-  # 先安装单元文件再 reload，保证每次部署都同步仓库内最新定义
-  cp "$APP_DIR/deploy/mim-backup.service" /etc/systemd/system/mim-backup.service
-  cp "$APP_DIR/deploy/mim-backup.timer" /etc/systemd/system/mim-backup.timer
-  systemctl daemon-reload
-  # timer 属辅助能力，启用失败只告警、不阻断主服务发布（set -e 下必须显式兜住）
-  if systemctl enable --now mim-backup.timer >/dev/null 2>&1; then
-    log "已启用 mim-backup.timer（每日 03:00，随机延迟 ≤5 分钟）"
+# --- 6.5 备份 timer 清理（项目策略：不保留任何数据库备份） ---
+# 2026-11-15 明确：本项目不做数据库备份。这里反向保证 mim-backup.timer /
+# mim-backup.service 及其 drop-in 一律不存在（含历史部署装上的旧单元），
+# 避免下次部署又把自动备份链路装回去。
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl disable --now mim-backup.timer >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/mim-backup.timer \
+        /etc/systemd/system/mim-backup.service
+  rm -rf /etc/systemd/system/mim-backup.timer.d \
+         /etc/systemd/system/mim-backup.service.d
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if systemctl list-unit-files 'mim-backup.*' --no-legend 2>/dev/null | grep -q .; then
+    warn "mim-backup 单元仍残留，请人工检查 /etc/systemd/system"
   else
-    warn "mim-backup.timer 启用失败，请检查 systemd；主服务发布不受影响"
+    log "已确认无 mim-backup timer / service（项目不保留备份）"
   fi
 else
-  warn "缺少 systemctl，跳过备份 timer 安装（非 systemd 主机）"
+  warn "缺少 systemctl，跳过备份 timer 清理（非 systemd 主机）"
 fi
 
 # --- 7. 健康检查（最多等 20s） ---
