@@ -32,6 +32,7 @@ import { // 引入依赖、类型或本地模块绑定
   listDeploymentItems, // 按条件过滤部署项
 } from '@mim/core-domain'; // 共享包单一数据源，前后端共用同一份部署口径
 import { pathParam } from '../utils.js'; // 严格路径参数提取
+import { requirePermission } from '../middleware.js'; // 运维数据门禁：部署项清单含内部条目数与异常，仅后台可见
 import type { ApiDeps } from '../types.js'; // 依赖容器类型，保持与其它路由工厂签名一致
 
 // 从查询串取字符串参数：非字符串一律回落空串，避免数组型参数污染过滤条件。
@@ -46,10 +47,14 @@ function queryString(req: { query: Record<string, unknown> }, key: string): stri
 export function createDeploymentsRouter(_deps: ApiDeps): Router {
   const router = Router(); // 独立路由实例
 
-  // ---------- 公开：全量汇总 ----------
+  // 2026-11-15 信息收口：部署汇总原本公开只读，会把内部部署项数量与异常暴露给访客；
+  // 现改为后台权限点 deployments:read 才可读，公开前端页面已下线（/deployments 301 → /community）。
+  router.use('/deployments', requirePermission('deployments:read')); // 覆盖 overview / 清单 / 详情三个端点
+
+  // ---------- 后台：全量汇总（权限点 deployments:read） ----------
 
   /** GET /deployments/overview — 统一字段的分布统计 + 覆盖口径 + 字典（须先于 /deployments/:id 注册） */
-  router.get('/deployments/overview', (_req, res) => { // 公开只读，匿名可访问
+  router.get('/deployments/overview', (_req, res) => { // 管理员可读，匿名 401
     res.json({ // 统一响应体：汇总（含 schema / captured_at / head）+ 口径 + 字典 + 作业 / 排除清单
       ...deploymentSummary(), // schema / captured_at / head / total / by_status / by_verdict / by_layer / by_platform / by_severity 等
       scope: deploymentRegistry.scope, // 覆盖范围说明
@@ -65,10 +70,10 @@ export function createDeploymentsRouter(_deps: ApiDeps): Router {
     }); // 响应结束
   }); // GET /deployments/overview 结束
 
-  // ---------- 公开：部署项清单 ----------
+  // ---------- 后台：部署项清单（权限点 deployments:read） ----------
 
   /** GET /deployments — 全量规范部署项（12），支持 q / layer / status / verdict / platform_id 过滤 */
-  router.get('/deployments', (req, res) => { // 公开只读
+  router.get('/deployments', (req, res) => { // 管理员可读，匿名 401
     const filter = { // 逐项读取查询参数，空串等价于不过滤
       q: queryString(req, 'q'), // 关键词：id / 名称 / 别名 / 仓库标识 / 入口
       layer: queryString(req, 'layer'), // 层级：production / distribution / source
@@ -90,10 +95,10 @@ export function createDeploymentsRouter(_deps: ApiDeps): Router {
     }); // 响应结束
   }); // GET /deployments 结束
 
-  // ---------- 公开：单项详情 ----------
+  // ---------- 后台：单项详情（权限点 deployments:read） ----------
 
   /** GET /deployments/:id — 单项完整视图（含异常说明与缺失信息清单） */
-  router.get('/deployments/:id', (req, res) => { // 公开只读
+  router.get('/deployments/:id', (req, res) => { // 管理员可读，匿名 401
     const id = pathParam(req, 'id'); // 严格取路径参数，非字符串一律 400
     const item = findDeploymentItem(id); // 按规范 id 查询
     if (!item) throw new AppError('NOT_FOUND', `deployment item not found: ${id}`, { id }); // 未登记 id 回 404 并回显

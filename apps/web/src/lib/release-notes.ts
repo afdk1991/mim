@@ -196,7 +196,7 @@ export const CAPABILITY_NOTES: readonly CapabilityNote[] = [
   { labelZh: '圈子', labelEn: 'Circles', descZh: '成员制社群，区别于论坛板块', descEn: 'Membership communities independent from forum boards' },
   { labelZh: '用户体系', labelEn: 'Accounts', descZh: '注册登录、14 家 OAuth、等级、签到、实名、邀请码', descEn: 'Sign-in, 14 OAuth providers, levels, check-in, verification and invites' },
   { labelZh: '内容运营', labelEn: 'Content operations', descZh: '公告、更新日志、社区动态、推广计划与转化回写（均在社区页「公告动态」页签）', descEn: 'Announcements, changelog, community feed and promotions (all in the community tab)' },
-  { labelZh: '版本与部署', labelEn: 'Releases & deployments', descZh: '版本迭代并入本页签更新日志；部署汇总仍在 /deployments', descEn: 'Release history merged into this changelog; deployment summary stays at /deployments' },
+  { labelZh: '版本与部署', labelEn: 'Releases & deployments', descZh: '版本迭代并入本页签更新日志；部署汇总属运维信息，仅后台可见', descEn: 'Release history merged into this changelog; deployment inventory is admin-only' },
 ]; // 能力地图结束
 
 /** 阅读口径：说明版本号与线上状态的关系，随版本页一起并入。 */

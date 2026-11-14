@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CartSummary, CartCheckoutResult, DeploymentItem, DeploymentOverview, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CartSummary, CartCheckoutResult, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -64,15 +64,6 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
   authChannels() { // 查询当前部署可用的登录方式，用于登录页隐藏不可用入口
     return request<{ sms: boolean; email: boolean; password: boolean; register: boolean }>('/auth/channels', { auth: false, idempotency: false }); // 公开只读接口
   }, // authChannels 结束
-
-  guest(region?: Region) { // 匿名访客会话：免登录体验入口，不绑定任何身份也拿到完整可用会话
-    return request<LoginResult>('/auth/guest', { // 与登录同形状的响应：令牌 + 用户视图
-      method: 'POST', // 建号属写操作
-      body: { region, device: { platform: 'web', name: '浏览器' } }, // 区域可空，服务端缺省中国区
-      auth: false, // 此时还没有令牌
-      idempotency: false, // 每次建号都是新访客，重复提交由服务端限流兜底
-    }); // 请求调用结束
-  }, // guest 结束
 
   oauthProviders(region?: Region) { // 第三方登录提供方清单（含凭证配置状态）
     const query = region ? `?region=${region}` : ''; // 区域过滤：中国区只看国内可用项
@@ -486,44 +477,6 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       ); // 请求结束
     }, // recallMessage 结束
   }, // im 分组结束
-
-  // ---------- 部署汇总（deployments）：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，全公开只读 ----------
-
-  deployments: { // 部署汇总：三个端点均匿名可访问，不提供写操作
-    overview() { // 全量汇总：状态 / 结果 / 层级 / 平台 / 严重度分布 + 覆盖口径 + 字典
-      return request<DeploymentOverview>('/deployments/overview', { auth: false, idempotency: false }); // 公开只读
-    }, // overview 结束
-    list(opts: { q?: string; layer?: string; status?: string; verdict?: string; platform_id?: string } = {}) { // 清单，支持五类过滤
-      const qs = new URLSearchParams(); // 安全拼接查询串
-      if (opts.q) qs.set('q', opts.q); // 关键词：id / 名称 / 别名 / 仓库标识 / 入口
-      if (opts.layer) qs.set('layer', opts.layer); // 层级
-      if (opts.status) qs.set('status', opts.status); // 部署状态
-      if (opts.verdict) qs.set('verdict', opts.verdict); // 结果（EMPTY 命中空数据项）
-      if (opts.platform_id) qs.set('platform_id', opts.platform_id); // 平台编码
-      const suffix = qs.toString(); // 无参数时空串
-      return request<{ // 返回当前函数的处理结果
-        schema: string; // 契约版本
-        captured_at: string; // 取证时间
-        filters: Record<string, string>; // 过滤条件回显
-        total: number; // 过滤后条数
-        registry_total: number; // 注册表总数（区分「无命中」与「无数据」）
-        items: DeploymentItem[]; // 部署项清单
-        status_codes: Record<string, string>; // 状态字典
-        verdict_codes: Record<string, string>; // 结果字典
-        severity_codes: Record<string, string>; // 严重度字典
-      }>(`/deployments${suffix ? `?${suffix}` : ''}`, { auth: false, idempotency: false }); // 公开只读
-    }, // list 结束
-    detail(id: string) { // 单项详情：仓库标识、交付链路、结果、异常、缺失信息、同类项
-      return request<{ // 返回当前函数的处理结果
-        schema: string; // 契约版本
-        item: DeploymentItem; // 完整部署项
-        related: Array<{ id: string; name: string; layer: string }>; // 同平台同类项
-        status_codes: Record<string, string>; // 状态字典
-        verdict_codes: Record<string, string>; // 结果字典
-        severity_codes: Record<string, string>; // 严重度字典
-      }>(`/deployments/${encodeURIComponent(id)}`, { auth: false, idempotency: false }); // 路径参数编码
-    }, // detail 结束
-  }, // deployments 分组结束
 
   // ---------- 社区与变现（community）：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广 ----------
 

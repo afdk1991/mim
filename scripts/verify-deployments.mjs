@@ -164,28 +164,25 @@ check('D33 后端三端点 overview / 列表 / 详情齐备', ['/deployments/ove
 check('D34 后端复用共享包 deploymentSummary / listDeploymentItems', routeText.includes('deploymentSummary') && routeText.includes('listDeploymentItems'));
 // 契约测试存在。
 check('D35 后端契约测试存在', has('services/mim-api/test/deployments.test.ts'));
-// 前端视图存在。
-check('D36 前端部署汇总视图存在', has('apps/web/src/views/Deployments.tsx'));
-// 前端 API 分组存在。
-check('D37 前端 api.ts 含 deployments 分组', (read('apps/web/src/api.ts') + read('apps/web/src/api/endpoints.ts')).includes('deployments: {')); // 2026-11-14 P1-A 拆分后端点对象位于 api/endpoints.ts，合并扫描
-// 路由视图标识存在。
-check('D38 前端 router.ts 注册 deployments 视图', read('apps/web/src/router.ts').includes("'deployments'"));
-// 根组件渲染与导航项存在。
+// 2026-11-15 信息收口：部署汇总属运维内部信息，公开前端页已下线，改为仅后台管理员可读。
+// 前端视图必须已删除（不得留壳）：文件不存在即通过。
+check('D36 公开前端部署汇总视图已下线', !has('apps/web/src/views/Deployments.tsx'));
+// 前端 API 分组必须已移除，避免页面下线但客户端仍留入口。
+check('D37 前端 api 分组已移除 deployments', !(read('apps/web/src/api.ts') + read('apps/web/src/api/endpoints.ts')).includes('deployments: {'));
+// 路由视图标识不得残留，否则深链接仍能渲染内部页面。
+check('D38 前端 router.ts 不再注册 deployments 视图', !read('apps/web/src/router.ts').includes("'deployments'"));
+// 根组件不得再渲染部署汇总，且旧地址回落到社区（legacy 改写）。
 const appText = read('apps/web/src/App.tsx');
-check('D39 App.tsx 渲染并导航部署汇总视图', appText.includes('<Deployments') && appText.includes("view: 'deployments'")); // 调用 check 并处理其返回结果
-// 四个核心字段表头齐全，便于核对。
-const viewText = read('apps/web/src/views/Deployments.tsx');
-check('D40 前端表头含仓库标识 / 部署状态 / 部署结果 / 异常说明', ['仓库标识', '部署状态', '部署结果', '异常说明'].every((s) => viewText.includes(s))); // 调用 check 并处理其返回结果
-// 表头 8 列规范：从 <thead> 里按顺序取出 <th> 文案，逐字比对文档口径
-const HEADER_SPEC = ['规范 ID / 名称', '仓库标识', '平台 / 层级', '交付链路', '访问域名', '部署状态', '部署结果', '异常说明'];
-const theadText = (viewText.match(/<thead>[\s\S]*?<\/thead>/) ?? [''])[0]; // 只截表头块，避免正文里的同名词干扰顺序
-const thTexts = [...theadText.matchAll(/<th>\{tr\(locale,\s*'([^']+)'/g)].map((m) => m[1]); // 抽取每个 <th> 的中文文案
-check('D53 前端表头为 8 列规范且顺序一致', thTexts.length === 8 && HEADER_SPEC.every((s, i) => thTexts[i] === s), thTexts.join(' / ') || '未取到表头'); // 调用 check 并处理其返回结果
-check('D54 前端提供访问域名列渲染（EntryLink）', viewText.includes('EntryLink') && viewText.includes('entry_url')); // 调用 check 并处理其返回结果
-// 空数据 / 失败 / 缺失三种标识必须在视图里彼此可区分。
-check('D41 前端区分空数据 / 失败 / 缺失三类标识', ['空数据', '失败', '缺失'].every((s) => viewText.includes(s)));
-// 样式类存在。
-check('D42 样式表含部署汇总专用类', read('apps/web/src/styles.css').includes('.deploy-'));
+const routerText = read('apps/web/src/router.ts');
+check('D39 App.tsx 不再渲染部署汇总且旧地址回落社区', !appText.includes('<Deployments') && !appText.includes("view: 'deployments'") && /deployments:\s*'community'/.test(routerText)); // 旧段原地改写到 /community
+// 后端三端点必须挂权限点，不能再对匿名开放。
+check('D40 后端三端点挂 deployments:read 权限点', routeText.includes("requirePermission('deployments:read')") && routeText.includes("router.use('/deployments'"));
+// 权限点本身必须已登记进 RBAC，否则管理员也无权读取。
+check('D41 RBAC 已登记 deployments:read', read('services/mim-api/src/db.ts').includes("'deployments:read'"));
+// 生产 nginx 对旧地址做 301，避免外部旧链接落到 404。
+check('D42 nginx 将 /deployments 301 到 /community', /location = \/deployments \{[\s\S]*?return 301 \/community;/.test(read('deploy/nginx-mim.conf')));
+check('D53 help.json 已移除部署汇总页面条目并登记旧地址回落', !/\[\"\/deployments\"/.test(read('help/content/help.json')) && read('help/content/help.json').includes('/deployments'));
+check('D54 release-notes 同步部署汇总口径', read('apps/web/src/lib/release-notes.ts').includes('部署汇总属运维信息，仅后台可见'));
 // 汇总生成器与校验器存在。
 check('D43 汇总生成器 / 校验器均存在', has('scripts/deployment-summary.mjs') && has('scripts/verify-deployments.mjs'));
 // package.json 注册两个脚本。

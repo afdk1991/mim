@@ -70,12 +70,6 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const [realBusy, setRealBusy] = useState(false); // 实名提交中间态
 
   const user = me.data?.user; // 当前用户
-  const isGuest = !!user?.is_guest; // 访客没有正式账号凭据：账号与设置只在登录后的个人中心出现
-
-  // 访客若因回调落到账号设置分区，自动回到资料分区，避免出现空白页
-  useEffect(() => {
-    if (isGuest && tab === 'security') selectTab('profile'); // 条件分支：按判断结果选择后续处理路径
-  }, [isGuest, tab]);
 
   // 资料回填：拿到 /me 结果后同步到表单
   useEffect(() => {
@@ -198,9 +192,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
           <button type="button" className={`tab${tab === 'entitlements' ? ' active' : ''}`} onClick={() => selectTab('entitlements')}>{isZh ? '我的权益' : 'Entitlements'}</button>
           <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => selectTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
           <button type="button" className={`tab${tab === 'cart' ? ' active' : ''}`} onClick={() => selectTab('cart')}>{isZh ? '购物车' : 'Cart'}</button>
-          {!isGuest && (
-            <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
-          )}
+          <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
         </nav>
       </header>
 
@@ -313,7 +305,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
       {tab === 'cart' ? <CartPanel locale={locale} /> : null}
 
       {/* 分区五：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
-      {tab === 'security' && !isGuest ? (
+      {tab === 'security' ? (
         <section className="profile-security">{/* 执行当前业务步骤 */}
           <p className="hint">{/* 执行当前业务步骤 */}
             {isZh ? '登录凭据由服务端签发 JWT，退出登录会吊销 refresh_token；注销账号进入冷静期，期内可撤销。' : 'Sessions are JWT based; signing out revokes the refresh token.'}

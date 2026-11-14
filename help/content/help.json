@@ -56,19 +56,18 @@
               "head": ["路径", "视图", "说明"],
               "rows": [
                 ["/community", "社区", "论坛、公告动态（含社区动态与更新日志）、圈子、VIP、钱包与社区商城"],
-                ["/circles", "圈子", "成员制社群（独立页面，与社区信息流分开）"],
+                ["/circles", "圈子", "成员制社群（独立功能，从社区页进入；侧栏不再单列）"],
                 ["/chat", "聊天", "IM 会话与视频通话"],
                 ["/account", "个人中心", "资料、权益、订单、购物车（?tab=cart）、账号设置"],
-                ["/deployments", "部署汇总", "各仓库与部署项的效果与异常"],
                 ["/checkout", "收银台", "支付意图二维码与状态轮询"],
                 ["/pay-return", "支付回跳", "支付结果三态承接页"],
-                ["/signin", "登录", "登录 / 注册入口"]
+                ["/signin", "登录", "登录入口（注册已关闭）"]
               ]
             },
             {
               "type": "note",
               "tone": "info",
-              "text": "旧路径段（/login、/profile、/settings、/forum）与已并入的 /announcements、/news、/releases、/cart 仍可访问：前端命中后原地改写为新地址（/cart 落到 /account?tab=cart），生产 nginx 同时做 301，二者互为兜底；根路径 / 与未知路径统一回落 /community。"
+              "text": "旧路径段（/login、/profile、/settings、/forum）与已并入的 /announcements、/news、/releases、/cart、/deployments 仍可访问：前端命中后原地改写为新地址（/cart 落到 /account?tab=cart，其余落到 /community），生产 nginx 同时做 301，二者互为兜底；根路径 / 与未知路径统一回落 /community。"
             }
           ]
         },

@@ -27,20 +27,62 @@ import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或�
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（含购物车页签）
-const Deployments = lazy(() => import('./views/Deployments').then((m) => ({ default: m.Deployments }))); // 部署汇总
 const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
 const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
-const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 const Checkout = lazy(() => import('./views/Checkout').then((m) => ({ default: m.Checkout }))); // 收银台：/checkout?intent=... 二维码 / 渠道唤起 / 轮询
 const PaymentReturn = lazy(() => import('./views/PaymentReturn').then((m) => ({ default: m.PaymentReturn }))); // 支付回跳承接：/pay-return?intent=... 三态结果
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
-import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
+import { useAppRoute, baseOf, navigatePath } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
 import type { AppView } from './router';
 
 // 前台语言本地兜底键：后端语言配置不可用 / 无后台写权限时，把前台偏好落到本地
 const FRONT_LOCALE_KEY = 'mim.locale.front';
+
+// 登录回跳目标暂存键：只存站内路径，登录成功后消费一次（sessionStorage 随标签页生命周期）
+const LOGIN_NEXT_KEY = 'mim.login.next';
+
+/** 是否为后台路径（/admin 或 /admin/...）：后台自带管理员校验，不参与全站登录守卫 */
+function isAdminPath(): boolean {
+  const base = baseOf();
+  let path = window.location.pathname;
+  if (base !== '/' && path.startsWith(base)) path = path.slice(base.length); // 剥离子路径部署前缀
+  const rel = path.replace(/^\/+/, ''); // 归一化为不带前导斜杠的相对路径
+  return rel === 'admin' || rel.startsWith('admin/');
+}
+
+/** 同站路径校验：仅接受以 / 开头的站内地址，挡掉外部协议、协议相对地址、反斜杠与后台路径 */
+function isSafeInternalPath(path: string): boolean {
+  if (!path.startsWith('/') || path.startsWith('//')) return false; // 拒绝相对 / 协议相对地址
+  if (path.includes('\\')) return false; // 反斜杠在部分浏览器会被当作斜杠，统一拒绝
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return false; // 拒绝 javascript: / https: 等外部协议
+  const rel = path.replace(/^\/+/, '');
+  return rel !== 'admin' && !rel.startsWith('admin/'); // 后台不接受前台回跳
+}
+
+/** 记录登录前目标；非安全路径、根路径与存储不可用时静默忽略 */
+function rememberLoginNext(path: string): void {
+  if (!isSafeInternalPath(path)) return;
+  const base = baseOf();
+  if (path === '/' || path === base || path === base.slice(0, -1)) return; // 根路径登录后直接回社区
+  try {
+    sessionStorage.setItem(LOGIN_NEXT_KEY, path);
+  } catch {
+    /* 隐私模式下存储不可用不阻断登录 */
+  }
+}
+
+/** 取出并清除登录前目标；脏值一律丢弃 */
+function takeLoginNext(): string | null {
+  try {
+    const next = sessionStorage.getItem(LOGIN_NEXT_KEY);
+    sessionStorage.removeItem(LOGIN_NEXT_KEY);
+    return next && isSafeInternalPath(next) ? next : null;
+  } catch {
+    return null;
+  }
+}
 
 /** 读取本地持久化的前台语言偏好；脏值 / 隐私模式回落 null */
 function readLocalFrontLocale(): Locale | null {
@@ -165,8 +207,7 @@ export function App() {
     setLocalSession(result);
     // 登录成功后清除登录提示
     setGateNotice(null);
-    // login 伪视图仅作登录中转，成功后回默认页；其余 hash 原地解锁
-    if (route.view === 'login') go({ view: 'community' });
+    // 回跳交给下方「已登录 + 登录页」effect：统一消费登录前目标并校验同站路径
   } // handleLogin 结束
 
   // 退出登录：先尽力调用后端登出，再清理本地会话并回到匿名可浏览的社区页
@@ -184,7 +225,7 @@ export function App() {
     setLocalSession(null);
     // 主动退出不显示「已失效」提示
     setGateNotice(null);
-    // 退出后停在未登录态：回到社区页，由登录引导承接需要身份的操作
+    // 退出后停在未登录态：回到社区页，全站守卫随即把用户带到登录页
     go({ view: 'community' });
     // 2026-11-15 口径变更：登出后不再补领访客会话，保持未登录态直到用户主动登录
   } // handleLogout 结束
@@ -215,17 +256,14 @@ export function App() {
     { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
     // 圈子（原一级入口）：成员制社群，已并入社区页的「圈子」板块 → hidden
     { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子', hidden: true },
-    // 部署汇总（原一级入口）：部署仓库 / 部署项核对表，已并入社区页的「部署汇总」板块 → hidden
-    { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总', hidden: true },
   ]; // 内置导航项定义结束
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项；
   // hidden 项是「已合并进上级」的二级入口，页面保留但不上侧栏（后台显式配置 visible 不能把它强行拉回）
   const navItems = mergeNavItems(navDefaults, theme.navItems).filter((item) => item.visible && !item.hidden);
-  // 隐藏的二级入口落到哪个一级入口：用于「在 /deployments 时侧栏仍高亮社区」。
+  // 隐藏的二级入口落到哪个一级入口：用于「在 /circles 时侧栏仍高亮社区」。
   // 没有这张表时，隐藏页面的 route.view 不在侧栏里，active 计数为 0，用户会以为"没选中任何页面"。
   const SUB_VIEW_PARENT: Partial<Record<AppView, AppView>> = {
     circles: 'community', // 圈子 → 社区
-    deployments: 'community', // 部署汇总 → 社区（版本页已并入社区，不再有独立版本页）
   }; // 二级 → 一级映射结束
   // 侧栏高亮依据：当前在隐藏二级页时按上级高亮，其余按自身
   const activeNavView: AppView = SUB_VIEW_PARENT[route.view] ?? route.view;
@@ -233,7 +271,7 @@ export function App() {
   // 2026-11-15 访客收敛：社区页顶部不再挂「圈子（成员制社群）」「部署汇总（N 个部署项）」，
   // 两者属于内部命名 / 运维条目数，入口改由社区页内对应板块承载；仅在二级页给一条「返回社区」。
   const subEntries: Array<{ view: AppView; label: string }> =
-    route.view === 'circles' || route.view === 'deployments'
+    route.view === 'circles'
       ? [{ view: 'community', label: locale === 'en-US' ? 'Back to Community' : '返回社区' }]
       : [];
 
@@ -247,6 +285,28 @@ export function App() {
     route.view === 'circles' ||
     route.view === 'checkout' || // 收银台按支付意图查单，需令牌
     route.view === 'payreturn'; // 回跳页按意图编号查单，需令牌
+
+  // 全站登录守卫（2026-11-15）：未登录访问任何站内页面都落到 /signin，登录成功后回到原目标。
+  // 单点集中在此，页面自身不再各写一遍；/admin 由后台自己的管理员校验承接，必须排除。
+  // 注意：前端守卫只是体验层，接口仍由后端门禁兜底，不能当作安全边界。
+  useEffect(() => {
+    if (authedSession) return; // 已登录直接放行
+    if (route.view === 'login') return; // 登录页是唯一公开例外（注册关闭提示也在该页）
+    if (isAdminPath()) return; // 后台路由不拦，交给 apps/admin 的管理员校验
+    // 记录登录前目标（含挂载前缀、查询串与 hash），登录成功后原样回跳
+    rememberLoginNext(window.location.pathname + window.location.search + window.location.hash);
+    // 直接给登录引导：不发起任何建号 / 访客请求
+    go({ view: 'login' });
+  }, [authedSession, route.view, go]);
+
+  // 已登录且停在登录页：消费登录前目标，校验同站路径后回跳；没有目标时回社区。
+  useEffect(() => {
+    if (!authedSession) return;
+    if (route.view !== 'login') return;
+    const next = takeLoginNext(); // 取一次即清除，避免下次登录串到旧目标
+    if (next) navigatePath(next); // 同站深链接：写地址栏并广播路由事件
+    else go({ view: 'community' });
+  }, [authedSession, route.view, go]);
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
@@ -320,8 +380,6 @@ export function App() {
         {route.view === 'account' && authedSession && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
-        {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
-        {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
         {/* 社区与变现：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广 */}
         {route.view === 'community' && authedSession && <Community locale={locale} hasSession />}{/* 社区与变现视图 */}
         {/* 圈子：成员制社群；加入 / 审核 / 发动态公告都需要登录态 */}
@@ -330,28 +388,16 @@ export function App() {
         {route.view === 'checkout' && authedSession && <Checkout locale={locale} />}{/* 收银台视图 */}
         {/* 支付回跳承接：/pay-return?intent=...，成功 / 处理中 / 失败三态 */}
         {route.view === 'payreturn' && authedSession && <PaymentReturn locale={locale} />}{/* 支付回跳视图 */}
-        {/* 未登录且该视图需要身份：给出登录引导，不再自动建访客号 */}
+        {/* 未登录且该视图需要身份：守卫会把用户送到 /signin，这里只留瞬时占位，不发起建号请求 */}
         {needsSession && !authedSession && (
           <div className="page">
-            <h1>{locale === 'en-US' ? 'Sign in required' : '需要登录'}</h1>
             <p className="hint">
-              {locale === 'en-US'
-                ? 'Registration is closed. Sign in with an existing account to use this page.'
-                : '全站注册已关闭，请使用已有账号登录后使用该功能。'}
+              {locale === 'en-US' ? 'Redirecting to sign in…' : '正在前往登录…'}
             </p>
-            <div>
-              <button type="button" className="btn primary" onClick={() => go({ view: 'login' })}>
-                {locale === 'en-US' ? 'Sign in' : '去登录'}
-              </button>
-            </div>
           </div>
         )}
         {/* IM 聊天 + 视频通话：会话列表 + 消息 + 视频通话，仅正式账号渲染 */}
         {route.view === 'chat' && authedSession && <Chat locale={locale} />}{/* 聊天视图 */}
-        {/* 未登录聊天只读演示：展示完整聊天布局与示例消息，输入区禁用，登录后才可收发 */}
-        {route.view === 'chat' && !authedSession && (
-          <ChatPreview locale={locale} onSignIn={() => go({ view: 'login' })} /> // 只读演示，登录引导回到登录视图
-        )}{/* 未登录聊天演示结束 */}
         {/* 登录伪视图：未登录时提供登录入口（注册已关闭，不再展示注册分段） */}
         {route.view === 'login' && !authedSession && (
           <Login embedded onLogin={handleLogin} notice={gateNotice} /> // 登录入口

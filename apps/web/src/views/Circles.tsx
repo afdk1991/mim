@@ -12,7 +12,7 @@ import type { CircleMember, CircleNotice, CirclePost, CircleSummary } from '../a
 
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
-  hasSession?: boolean; // 是否已有会话（访客 / 正式账号）；未登录时写操作静默引导
+  hasSession?: boolean; // 是否已有登录会话；未登录时写操作静默引导
 } // 代码块结束
 
 /** 按语言取文案。 */

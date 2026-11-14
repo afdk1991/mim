@@ -81,7 +81,7 @@ export interface UserInfo { // 当前登录用户的核心资料（登录响应�
   timezone: string; // IANA 时区名，用于把服务端 UTC 时间渲染成本地时间
   deletion_scheduled_at?: string | null; // 注销预约时间；仅注销流程中有值，其余为 null/缺省
   member_no: string; // 对外 Mim ID 号码（纯数字 QQ 号样式，如 10000001），与内部 uuid 主键解耦
-  is_guest?: boolean; // 匿名访客会话标记：true 表示尚未绑定任何登录身份，可随时登录升级
+  is_guest?: boolean; // 历史兼容字段：2026-11-15 起恒为 false，仅为读取存量响应保留
 } // UserInfo 结构结束
 
 export interface OAuthProviderInfo { // 第三方登录提供方（含是否已在当前部署配置好凭证）
@@ -223,100 +223,8 @@ export interface CartCheckoutResult {
   points_deduct_cents?: number; // 积分折抵金额（分）
   payable_cents?: number; // 抵扣后应付金额（分）
 } // CartCheckoutResult 结束
-// ---------- 部署汇总（deployments）共享类型，与 routes/deployments.ts 响应一一对应 ----------
+// ---------- 部署汇总共享类型已于 2026-11-15 随公开页面下线移除（运维数据仅后台可见） ----------
 
-export interface DeploymentRepository { // 仓库标识统一三字段
-  id: string | null; // 规范仓库标识，直传型部署为 null
-  url: string | null; // 仓库地址
-  role: string; // 该仓库在本部署项中的角色
-} // DeploymentRepository 结束
-
-export interface DeploymentDelivery { // 交付链路：含远端 HEAD / 本地工作树双口径
-  mode: 'ci' | 'manual' | 'push'; // 交付方式
-  ci_job: string | null; // 关联 CI 作业
-  ci_step: string | null; // 关联 CI 步骤
-  artifact: string | null; // 关键工件
-  artifact_in_head: boolean | null; // 工件是否仍在远端 HEAD
-  artifact_in_worktree: boolean | null; // 工件是否存在于本地工作树
-  credential: string | null; // 所需凭证
-  modes: string[]; // 同一部署项的多种发布形态（合并展示，避免重复计数）
-} // DeploymentDelivery 结束
-
-export interface DeploymentResult { // 部署结果；null 由前端按空数据渲染
-  verdict: string; // 判定枚举：PASS / DEGRADED / FAIL / NOT_TESTED / EMPTY
-  http_code: string | null; // HTTP 状态码
-  latency_ms: number | null; // 耗时（毫秒）
-  bytes: number | null; // 响应体字节数
-  evidence: string; // 取证原文与判读
-  captured_at: string | null; // 取证时间
-} // DeploymentResult 结束
-
-export interface DeploymentAnomaly { // 异常说明
-  code: string; // 异常码
-  severity: 'critical' | 'warning' | 'info'; // 严重度
-  message: string; // 说明与影响面
-} // DeploymentAnomaly 结束
-
-export interface DeploymentItem { // 单个部署项：所有同类项共用这一组统一字段
-  id: string; // 规范唯一键
-  name: string; // 统一名称
-  aliases: string[]; // 归并的历史别名
-  platform_id: string; // 平台编码
-  platform: string; // 平台展示名
-  layer: string; // 层级枚举：production / distribution / source
-  kind: string; // 载体类型
-  repository: DeploymentRepository; // 仓库标识
-  entry_url: string | null; // 部署入口
-  delivery: DeploymentDelivery; // 交付链路
-  status: string; // 部署状态
-  result: DeploymentResult | null; // 部署结果，null 为空数据
-  anomalies: DeploymentAnomaly[]; // 异常说明
-  missing_fields: string[]; // 缺失信息
-  sources: string[]; // 取证来源
-} // DeploymentItem 结束
-
-export interface DeploymentOverview { // 全量汇总响应
-  schema: string; // 契约版本
-  captured_at: string; // 取证时间
-  head: string; // 取证时本地 HEAD
-  scope: string; // 覆盖范围
-  sources: string[]; // 取证来源
-  total: number; // 部署项总数
-  matrix_platforms: number; // 矩阵平台数
-  platform_catalog: number; // 平台目录总数
-  git_remotes: number; // git 远端数
-  ci_jobs: number; // CI 作业数
-  deploy_ci_jobs: number; // 其中部署作业数
-  excluded: number; // 候选池 / 排除项数
-  with_result: number; // 有取证项数
-  empty_result: number; // 空数据项数
-  anomalies: number; // 异常总数
-  missing_fields: number; // 缺失信息总数
-  worktree_drift: number; // 工作树漂移项数
-  by_status: Record<string, number>; // 状态分布
-  by_verdict: Record<string, number>; // 结果分布
-  by_layer: Record<string, number>; // 层级分布
-  by_platform: Record<string, number>; // 平台分布
-  by_severity: Record<string, number>; // 严重度分布
-  status_codes: Record<string, string>; // 状态字典
-  verdict_codes: Record<string, string>; // 结果字典
-  severity_codes: Record<string, string>; // 严重度字典
-  layer_codes: Record<string, string>; // 层级字典
-  platforms: Array<{ id: string; name: string; in_matrix: boolean }>; // 平台目录
-  ci_job_list: Array<{ id: string; role: string; is_deploy: boolean }>; // CI 作业明细
-  excluded_items: Array<{ id: string; name: string; reason: string }>; // 候选池 / 排除项明细
-  field_spec: Record<string, string>; // 统一字段说明
-  coverage: { // 覆盖口径：解释平台数与部署项数为何不同
-    matrix_platforms: number; // 矩阵平台数
-    deployment_items: number; // 规范部署项数
-    git_remotes: number; // git 远端数
-    ci_jobs: number; // CI 作业数
-    deploy_ci_jobs: number; // 部署作业数
-    dedup_note: string; // 去重说明
-    added_note: string; // 补齐说明
-    excluded_note: string; // 排除说明
-  }; // coverage 结束
-} // DeploymentOverview 结束
 
 
 // ---------- 社区与变现共享类型，与 routes/community.ts 响应一一对应 ----------

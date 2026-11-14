@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 // 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 支付回跳深链接页
 export type AppView =
   | 'account' // 个人中心（资料 / 权益 / 订单 / 购物车 / 账号与设置）
-  | 'deployments' // 部署汇总（所有部署仓库与部署项的效果 / 结果 / 异常）
   | 'community' // 社区与变现（论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
   | 'chat' // IM 聊天 + 视频通话
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
@@ -22,7 +21,6 @@ export interface AppRoute {
 // 不再使用与功能名对不上的缩写段；已下线模块不再登记路径段，访问时按未知路径回落社区。
 export const VIEW_SEGMENTS: Record<AppView, string> = {
   account: 'account', // 个人中心（资料 / 权益 / 订单 / 购物车 / 账号与设置；原独立购物车页已并入）
-  deployments: 'deployments', // 部署汇总（原名即功能名，保持不变）
   community: 'community', // 社区与变现（论坛 + 公告动态 + 知识付费 + VIP + 钱包 + 独立商城）
   chat: 'chat', // 聊天（原名即功能名，保持不变）
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
@@ -49,6 +47,7 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   news: 'community', // 2026-11-15 资讯内容流并入社区「公告动态 → 社区动态」页签，旧链接原地改写为 /community
   releases: 'community', // 2026-11-15 版本记录并入社区「公告动态 → 更新日志」页签，旧链接原地改写为 /community
   cart: 'account', // 2026-11-15 购物车并入个人中心，旧链接改写为 /account?tab=cart（见 LEGACY_QUERY）
+  deployments: 'community', // 2026-11-15 部署汇总属运维内部信息，公开页面下线，旧链接原地回落到社区
 }; // 代码块结束
 
 // 旧地址需要落到「带参数的页签」时的补充查询串：目标视图本身不带子路径，

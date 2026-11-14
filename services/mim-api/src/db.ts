@@ -45,7 +45,7 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'im_messages', column: 'reply_to_id', definition: 'TEXT' }, // 引用回复的目标消息 ID（2026-11-11 聊天增强）
   { table: 'im_messages', column: 'reply_excerpt', definition: 'TEXT' }, // 被引用消息的快照摘要（发送时固化）
   { table: 'users', column: 'member_no', definition: 'TEXT' }, // 对外 Mim ID 号码（2026-11-12 注册自动分配编号）
-  { table: 'users', column: 'is_guest', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 匿名访客标记（2026-11-12 免登录体验：访客自动建号）
+  { table: 'users', column: 'is_guest', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 历史兼容列（2026-11-15 起不再写入，恒为 0）
   { table: 'community_boards', column: 'visibility', definition: "TEXT NOT NULL DEFAULT 'public'" }, // 板块可见性：public / followers
   { table: 'community_boards', column: 'post_min_level', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 发帖最低等级
   { table: 'community_boards', column: 'created_by', definition: 'TEXT' }, // 用户自建板块创建者
@@ -490,6 +490,7 @@ export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺�
   { code: 'commerce:write', name: { 'zh-CN': '处理交易与资金', 'en-US': 'Manage commerce' } }, // 发货、售后审核、提现审核等交易侧写操作
   { code: 'appearance:write', name: { 'zh-CN': '管理外观与页面', 'en-US': 'Manage appearance' } }, // 主题、导航、配色与页面区块配置
   { code: 'content:write', name: { 'zh-CN': '维护内容运营', 'en-US': 'Manage content' } }, // 公告、更新日志、推广计划的维护与发布归档
+  { code: 'deployments:read', name: { 'zh-CN': '查看部署汇总', 'en-US': 'Read deployments' } }, // 2026-11-15 运维数据收口：部署项清单仅后台可见，不再对访客公开
 ] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
 
 /** 权限点编码联合类型：路由调用处传错字符串会在编译期报错 */
@@ -644,8 +645,7 @@ export function seedCommunity(db: Db): void {
       ['thread-paid-store', 'board-paid', '付费阅读：从 0 到 1 做一个能收款的独立商城', '商品类型、卡密、优惠码、物流、退款与分成的完整拆解。', '这篇是付费内容：把独立商城拆成商品、订单、支付、履约、售后、资金六层，并给出每层的最小可用实现。\n\n如果你只想先跑通，优先做“虚拟自动发货 + 卡密库存 + 余额扣款”，再接支付渠道。', 'text', '/catalog/store.jpg', 1900, 460, 28, 3],
       ['thread-comic-demo', 'board-open-source', '漫剧 AI 剧成片演示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n放映厅可直接观看，创作工作台可复制同一条链路。', 'video', '/catalog/ai.jpg', 0, 720, 55, 4],
       ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 350, 22, 3],
-      ['thread-guest-session', 'board-help', '访客会话如何承接购物车、聊天与漫剧？', '免登录体验的实现边界、限流与升级路径。', '访客进入站点时自动调用 POST /auth/guest，拿到与正式账号同形状的 access/refresh 双令牌；购物车、订单、聊天、漫剧都按同一用户路径工作。\n\n升级：登录 / 注册后用真实账号接管同一份数据，访客记录不丢。', 'qa', '/catalog/wechat.jpg', 0, 610, 37, 6],
-      ['thread-announce', 'board-announce', '2026-11-12 更新：全站免登录 + 商城商品视觉上线', '门禁解除、商品封面与参数详情图、访客交易链路。', '本轮更新：\n1. 全站移除“此功能需登录后使用”，访客会话自动建立。\n2. 商城卡片加封面、分类角标、价格角标；详情加 11 项参数表与参数长图。\n3. 访客可加购、解锁免费模块、进入结算。', 'text', '/catalog/misc.jpg', 0, 980, 64, 6],
+      ['thread-announce', 'board-announce', '2026-11-12 更新：商城商品视觉上线', '商品封面与参数详情图上线记录。', '本轮更新：\n1. 商城卡片加封面、分类角标、价格角标。\n2. 商品详情加 11 项参数表与参数长图。\n3. 结算链路与积分抵扣口径统一。', 'text', '/catalog/misc.jpg', 0, 980, 64, 6],
     ];
     for (const [id, boardId, title, summary, body, kind, cover, price, views, likes, daysAgo] of threads) {
       const created = new Date(Date.now() - daysAgo * 86400000).toISOString();

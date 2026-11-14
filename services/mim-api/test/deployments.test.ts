@@ -8,18 +8,25 @@ import { createDatabase } from '../src/db.js'; // 内存库工厂，部署汇总
 import { DEPLOYMENT_ITEMS, DEPLOYMENT_EXCLUDED, deploymentSummary } from '@mim/core-domain'; // 共享注册表与汇总函数，作为断言基准
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，长度满足强度校验
+const ADMIN_TOKEN = 'test-admin-token'; // 部署汇总已收口为后台权限点 deployments:read，用例统一走超管引导令牌
+const ADMIN = { 'x-admin-token': ADMIN_TOKEN }; // 管理员请求头
 
 let app: Express; // 待测应用实例
 let db: ReturnType<typeof createDatabase>; // 与 app 同生命周期的数据库句柄
 
+/** 带管理员令牌的 GET：部署汇总不再对匿名开放，其余断言口径保持不变 */
+function get(path: string) {
+  return request(app).get(path).set(ADMIN);
+}
+
 beforeEach(() => { // 每例前置：重建内存库与应用
   db = createDatabase(':memory:'); // 内存库全新创建
-  app = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 不启用管理面，保持最小依赖
+  app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN } }); // 开启管理面引导通道
 }); // beforeEach 结束
 
 describe('部署汇总总览', () => { // 公开只读端点
   it('overview 返回全量部署项 / 11 矩阵平台 / 5 CI 作业 / 4 部署作业 / 空数据项', async () => { // 规模断言
-    const res = await request(app).get('/api/v1/deployments/overview'); // 公开汇总
+    const res = await get('/api/v1/deployments/overview'); // 公开汇总
     expect(res.status).toBe(200); // 匿名 200
     expect(res.body.schema).toBe('mim.deployment-registry.v1'); // 契约版本
     expect(res.body.total).toBe(DEPLOYMENT_ITEMS.length); // 去重后的规范部署项（动态，与注册表零漂移）
@@ -37,7 +44,7 @@ describe('部署汇总总览', () => { // 公开只读端点
   }); // overview 规模用例结束
 
   it('overview 各维度分布合计等于部署项总数', async () => { // 分布自洽
-    const res = await request(app).get('/api/v1/deployments/overview'); // 公开汇总
+    const res = await get('/api/v1/deployments/overview'); // 公开汇总
     const sum = (obj: Record<string, number>) => Object.values(obj).reduce((a, b) => a + b, 0); // 求和辅助
     expect(sum(res.body.by_status)).toBe(res.body.total); // 状态分布
     expect(sum(res.body.by_verdict)).toBe(res.body.total); // 结果分布（含 EMPTY 桶）
@@ -48,7 +55,7 @@ describe('部署汇总总览', () => { // 公开只读端点
   }); // 分布用例结束
 
   it('overview 提供统一字段字典与说明', async () => { // 字典完整性
-    const res = await request(app).get('/api/v1/deployments/overview'); // 公开汇总
+    const res = await get('/api/v1/deployments/overview'); // 公开汇总
     expect(Object.keys(res.body.status_codes)).toContain('BROKEN'); // 失败状态可标识
     expect(Object.keys(res.body.verdict_codes)).toContain('EMPTY'); // 空数据可标识
     expect(Object.keys(res.body.severity_codes)).toEqual(['critical', 'warning', 'info']); // 三级严重度
@@ -59,7 +66,7 @@ describe('部署汇总总览', () => { // 公开只读端点
 
 describe('部署项清单与过滤', () => { // 统一字段与过滤
   it('GET /deployments 返回全量部署项且每项字段统一、与共享注册表逐项一致', async () => { // 零漂移断言
-    const res = await request(app).get('/api/v1/deployments'); // 公开清单
+    const res = await get('/api/v1/deployments'); // 公开清单
     expect(res.status).toBe(200); // 200
     expect(res.body.total).toBe(DEPLOYMENT_ITEMS.length); // 全量
     expect(res.body.registry_total).toBe(DEPLOYMENT_ITEMS.length); // 与共享包一致
@@ -83,23 +90,23 @@ describe('部署项清单与过滤', () => { // 统一字段与过滤
   }); // 零漂移用例结束
 
   it('layer / status / verdict / platform_id / q 五类过滤均生效', async () => { // 过滤矩阵
-    const prod = await request(app).get('/api/v1/deployments?layer=production'); // 生产层
+    const prod = await get('/api/v1/deployments?layer=production'); // 生产层
     expect(prod.body.total).toBe(1); // 唯一生产权威终点
     expect(prod.body.items[0].id).toBe('server.tcloud'); // 腾讯云自建服务器
-    const broken = await request(app).get('/api/v1/deployments?status=BROKEN'); // 阻断态
+    const broken = await get('/api/v1/deployments?status=BROKEN'); // 阻断态
     expect(broken.body.items.every((i: { status: string }) => i.status === 'BROKEN')).toBe(true); // 全部命中
-    const empty = await request(app).get('/api/v1/deployments?verdict=EMPTY'); // 空数据
+    const empty = await get('/api/v1/deployments?verdict=EMPTY'); // 空数据
     expect(empty.body.total).toBe(DEPLOYMENT_ITEMS.filter((i) => i.result === null).length); // 空数据项动态计数
     expect(empty.body.items.every((i: { result: unknown }) => i.result === null)).toBe(true); // 明确 null
-    const github = await request(app).get('/api/v1/deployments?platform_id=github'); // 平台过滤
+    const github = await get('/api/v1/deployments?platform_id=github'); // 平台过滤
     expect(github.body.items.every((i: { platform_id: string }) => i.platform_id === 'github')).toBe(true); // 全部命中
-    const alias = await request(app).get('/api/v1/deployments?q=' + encodeURIComponent('data.mixm.top')); // 别名搜索
+    const alias = await get('/api/v1/deployments?q=' + encodeURIComponent('data.mixm.top')); // 别名搜索
     expect(alias.body.total).toBe(1); // 命中 EdgeOne 别名
     expect(alias.body.items[0].id).toBe('pages.edgeone'); // 归并到规范 id
   }); // 过滤用例结束
 
   it('过滤回显与空结果不混淆：无命中时 total=0 但 registry_total 仍为全量', async () => { // 空结果标识
-    const res = await request(app).get('/api/v1/deployments?q=not-exist-keyword-xyz'); // 无命中关键词
+    const res = await get('/api/v1/deployments?q=not-exist-keyword-xyz'); // 无命中关键词
     expect(res.status).toBe(200); // 200 而非 404
     expect(res.body.total).toBe(0); // 过滤结果为空
     expect(res.body.registry_total).toBe(DEPLOYMENT_ITEMS.length); // 注册表非空，属「无命中」而非「无数据」
@@ -109,7 +116,7 @@ describe('部署项清单与过滤', () => { // 统一字段与过滤
 
 describe('部署项详情与异常标识', () => { // 详情与异常
   it('GET /deployments/:id 返回完整字段与同平台同类项', async () => { // 详情
-    const res = await request(app).get('/api/v1/deployments/server.tcloud'); // 生产项
+    const res = await get('/api/v1/deployments/server.tcloud'); // 生产项
     expect(res.status).toBe(200); // 200
     expect(res.body.item.layer).toBe('production'); // 生产层
     expect(res.body.item.repository.id).toBe('github:afdk1991/mim'); // 仓库标识
@@ -122,7 +129,7 @@ describe('部署项详情与异常标识', () => { // 详情与异常
   }); // 详情用例结束
 
   it('已同步的镜像仓标注 PASS 并以恢复留痕保留历史超时', async () => { // 同步完成标识
-    const res = await request(app).get('/api/v1/deployments/repo.gitee'); // Gitee 镜像仓
+    const res = await get('/api/v1/deployments/repo.gitee'); // Gitee 镜像仓
     expect(res.status).toBe(200); // 200
     expect(res.body.item.status).toBe('OK'); // 2026-11-10 建仓并首次推送后由 UNVERIFIED 转为正常
     expect(res.body.item.result.verdict).toBe('PASS'); // 三方 hash 一致，非「本轮未测」
@@ -131,7 +138,7 @@ describe('部署项详情与异常标识', () => { // 详情与异常
   }); // 同步完成用例结束
 
   it('IGA 本机直传后以带凭证 200 取证，不再是空数据项', async () => { // IGA 取证
-    const res = await request(app).get('/api/v1/deployments/pages.iga'); // IGA Pages 平台
+    const res = await get('/api/v1/deployments/pages.iga'); // IGA Pages 平台
     expect(res.status).toBe(200); // 200
     expect(res.body.item.entry_url).toBe('https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com'); // 现行项目 96otddwh48 项目级稳定域
     expect(res.body.item.result.http_code).toBe('200'); // 带 iga_token Cookie 复验 200；裸访 401 属平台访问保护
@@ -141,29 +148,31 @@ describe('部署项详情与异常标识', () => { // 详情与异常
   }); // IGA 用例结束
 
   it('候选平台不是部署项：详情 404、空数据桶为 0', async () => { // 候选池口径
-    const candidate = await request(app).get('/api/v1/deployments/repo.gitlab'); // 2026-11-13 已由部署项移入候选池
+    const candidate = await get('/api/v1/deployments/repo.gitlab'); // 2026-11-13 已由部署项移入候选池
     expect(candidate.status).toBe(404); // 候选不在 /api/v1/deployments/:id 的可查集合内
     expect(candidate.body.code).toBe('NOT_FOUND'); // 统一错误码
-    const overview = await request(app).get('/api/v1/deployments/overview'); // 汇总接口提供空数据桶统计
+    const overview = await get('/api/v1/deployments/overview'); // 汇总接口提供空数据桶统计
     expect(overview.body.empty_result).toBe(0); // 部署项全部有取证，空数据桶为 0
     expect(overview.body.with_result).toBe(DEPLOYMENT_ITEMS.length); // 有取证项等于部署项总数
     expect(overview.body.excluded_items.some((e: { id: string }) => e.id === 'candidate.gitlab')).toBe(true); // 候选在排除项明细里留痕
   }); // 候选池用例结束
 
   it('未登记的部署项 id 返回 404 NOT_FOUND 信封', async () => { // 非法 id
-    const res = await request(app).get('/api/v1/deployments/not-a-deployment'); // 未登记 id
+    const res = await get('/api/v1/deployments/not-a-deployment'); // 未登记 id
     expect(res.status).toBe(404); // 404
     expect(res.body.code).toBe('NOT_FOUND'); // 统一错误码
     expect(res.body.request_id).toBeTruthy(); // 携带追踪 ID
   }); // 404 用例结束
 
-  it('三个端点均匿名可访问，且不产生写操作', async () => { // 只读模型
+  it('三端点未认证 401、管理员令牌可读，且不产生写操作', async () => { // 只读模型 + 权限收口
     const paths = ['/api/v1/deployments/overview', '/api/v1/deployments', '/api/v1/deployments/pages.github']; // 三端点
-    for (const path of paths) { // 逐个匿名请求
-      const res = await request(app).get(path); // 不带任何 Authorization 头
-      expect(res.status).toBe(200); // 200
+    for (const path of paths) { // 逐个请求
+      const anonymous = await request(app).get(path); // 不带任何 Authorization 头
+      expect(anonymous.status).toBe(401); // 运维数据不再对匿名开放
+      const ok = await get(path); // 带管理员令牌
+      expect(ok.status).toBe(200); // 有 deployments:read 才可读
     } // 循环结束
-    const write = await request(app).post('/api/v1/deployments').send({ id: 'x' }); // 试探写操作
+    const write = await request(app).post('/api/v1/deployments').set(ADMIN).send({ id: 'x' }); // 试探写操作
     expect(write.status).toBe(404); // 未注册写路由，统一 404 信封
   }); // 只读用例结束
 }); // 详情分组结束
