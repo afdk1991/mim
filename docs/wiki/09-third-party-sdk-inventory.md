@@ -87,49 +87,9 @@
 
 ---
 
-## 6. AI 能力（PRD P1 通用 AI；**漫剧生成 P0，自第 2 期起**）
+## 6. AI 能力（已于 2026-11-15 随创作工作台一并下线）
 
-通用大模型路由为 P1/P2；**漫剧 AI 剧（FR-03.2）所需的文生图 / 图生视频 / TTS 自第 2 期起为 P0**，未接入前第 1 期（AI 辅助创作工作台）不产出成片。
-
-| 提供方 | SDK / API 形态 | 用途 | 密钥 / 配置项（env） | 优先级 |
-|---|---|---|---|---|
-| OpenAI | REST API / 官方 SDK | 通用大模型 | `MIM_AI_OPENAI_API_KEY` / `MIM_AI_OPENAI_ORG_ID` | P1 |
-| Anthropic | Messages API | Claude 模型 | `MIM_AI_ANTHROPIC_API_KEY` | P1 |
-| Google Gemini | Generative Language API | 海外模型 | `MIM_AI_GEMINI_API_KEY` | P2 |
-| Azure OpenAI | Azure SDK / REST | 企业合规部署 | `MIM_AI_AZURE_OPENAI_ENDPOINT` / `MIM_AI_AZURE_OPENAI_KEY` | P2 |
-| 阿里云百炼 / 通义（含通义万相文生图） | DashScope SDK / API | 国内大模型 + 文生图 | `MIM_AI_DASHSCOPE_API_KEY` | P1（文生图：漫剧第 2 期 P0） |
-| 火山方舟（豆包 / Seedream 文生图 / Seedance 图生视频） | Ark SDK / API | 国内大模型 + 漫剧关键帧与分镜片段 | `MIM_AI_ARK_API_KEY` / `MIM_AI_ARK_ENDPOINT_ID` | P1（漫剧第 2 期 P0） |
-| 可灵 AI（Kling） | REST API（异步任务 + 结果回调/轮询） | 图生视频备选 | `MIM_AI_KLING_ACCESS_KEY` / `MIM_AI_KLING_SECRET_KEY` | 漫剧第 2 期 P1（备选通道） |
-| Runway | REST API | 海外图生视频 | `MIM_AI_RUNWAY_API_KEY` | 漫剧第 3 期 P1（海外） |
-| OpenAI Images（gpt-image） | Images API | 海外文生图备选 | 复用 `MIM_AI_OPENAI_API_KEY` | 漫剧第 3 期 P1（海外） |
-| 火山引擎语音合成 / Azure Speech / ElevenLabs | TTS API | 漫剧配音（`job_type=tts`） | `MIM_AI_TTS_ARK_APP_ID` / `MIM_AI_AZURE_SPEECH_KEY` + `MIM_AI_AZURE_SPEECH_REGION` / `MIM_AI_ELEVENLABS_API_KEY` | 漫剧第 2 期 P1 |
-| 百度文心 | 千帆 SDK / API | 国内备选 | `MIM_AI_QIANFAN_API_KEY` / `MIM_AI_QIANFAN_SECRET_KEY` | P2 |
-| 讯飞星火 | WebSocket API | 语音/文本备选 | `MIM_AI_SPARK_APP_ID` / `MIM_AI_SPARK_API_KEY` / `MIM_AI_SPARK_API_SECRET` | P2 |
-| LiteLLM（自建网关） | 开源模型路由 | 统一多模型接入与配额 | `MIM_AI_GATEWAY_MASTER_KEY` | P1 |
-
-**生成任务编排运行时配置（自研 `ai-orchestrator`，进程内模块，非第三方）**
-
-| 配置项（env） | 用途 | 默认值 | 优先级 |
-|---|---|---|---|
-| `MIM_AI_PROVIDER` | 任务执行使用的 AI 提供方标识（`mock` 为本地确定性产出；`openai` 为 OpenAI 兼容协议，凭证复用 `MIM_AI_OPENAI_API_KEY`） | `mock` | P0（第 2 期已接入 mock + openai） |
-| `MIM_AI_BASE_URL` | OpenAI 兼容端点（`MIM_AI_PROVIDER=openai` 时生效；可切换火山方舟 / DeepSeek / 百炼兼容模式） | `https://api.openai.com/v1` | P0 |
-| `MIM_AI_TEXT_MODEL` | 文本任务模型（方舟填推理接入点 ID） | `gpt-4o-mini` | P0 |
-| `MIM_AI_IMAGE_MODEL` | 图像任务模型（需支持 `b64_json` 或 `url` 返回） | `dall-e-3` | P0 |
-| `MIM_AI_TTS_MODEL` | 语音合成（TTS）模型；OpenAI 兼容网关不支持时任务诚实失败 | `tts-1` | 漫剧第 2 期 P1 |
-| `MIM_AI_VIDEO_BASE_URL` | 视频生成厂商端点（留空则 video 任务类型不可用） | 空（不启用） | 漫剧第 2 期 P1 |
-| `MIM_AI_VIDEO_API_KEY` | 视频生成厂商凭证（须与 `MIM_AI_VIDEO_BASE_URL` 同时配置） | 空（不启用） | 漫剧第 2 期 P1 |
-| `MIM_AI_VIDEO_MODEL` | 视频生成模型 | `image-to-video` | 漫剧第 2 期 P1 |
-| `MIM_FFMPEG_PATH` | ffmpeg 可执行文件路径；留空则 compose 合成与导出转码不可用 | 空（不启用） | 漫剧第 2 期 P1 |
-| `MIM_AI_WORKER` | 是否随 API 进程启动后台队列 worker（`1` 启用 / `0` 关闭，关闭后仅能由 `POST /ai/jobs/:id/run` 手动消费） | `1` | P0 |
-| `MIM_AI_WORKER_INTERVAL_MS` | worker 轮询间隔（毫秒） | `2000` | P0 |
-| `MIM_AI_JOB_COST_LIMIT_MINOR` | 单任务成本上限（分），超出即 `COST_LIMIT_EXCEEDED(402)` | `100000` | P0 |
-| `MIM_AI_DAILY_COST_LIMIT_MINOR` | 当日累计成本上限（分，按 `status='succeeded'` 求和） | `500000` | P0 |
-| `MIM_AI_ASSET_TTL_DAYS` | 原始生成产物保留天数（`compose` 成片长期保留） | `90` | P0 |
-| `MIM_AI_JOB_STALE_MS` | `running` 任务失联判定阈值（毫秒）：进程崩溃/重启后超过该时长即回收重跑 | `900000` | P0 |
-| `MIM_AI_JOB_MAX_RECLAIM` | 同一任务允许被回收重新入队的次数上限，超出即判 `JOB_STALE_TIMEOUT`（防毒任务反复烧配额） | `2` | P0 |
-| `MIM_ASSET_GC_BATCH` | `asset-gc` 定时任务单轮清理的过期产物条数上限 | `200` | P1 |
-
-> 所有 AI 调用必须经统一网关（模型路由、Prompt 版本、配额、内容审核），业务层不得直连厂商密钥。漫剧生成的**成本预检与额度扣减**在 `comic` / `ai-orchestrator` 内完成（`generation_jobs`），供应商选择与成本上限见 PRD OQ-08。
+> 漫剧生成、AI 编排与全部模型 / 语音 / 视频供应商凭证在 2026-11-15 的模块下线中移除：服务端不再读取对应变量，`.env.example` 也已清理。若未来重启 AI 能力，需同时补回实现、模板与本清单登记，避免清单与代码漂移。
 
 ---
 
@@ -142,16 +102,20 @@
 | 阿里云内容安全 / 腾讯云天御 | 内容安全 API | 云厂商一体化审核 | `MIM_MODERATION_ALIYUN_ACCESS_KEY` / `MIM_MODERATION_TENCENT_SECRET_ID` | P1 |
 | 腾讯防水墙 / 极验 | 验证码 SDK | 防刷、人机验证 | `MIM_CAPTCHA_TENCENT_APP_ID` / `MIM_CAPTCHA_GEETEST_ID` / `MIM_CAPTCHA_GEETEST_KEY` | P0 |
 
+**反向代理与来源 IP 配置（自研 API，进程内）**
+
+| 配置项（env） | 用途 | 默认值 | 优先级 |
+|---|---|---|---|
+| `MIM_TRUST_PROXY` | Express `trust proxy` 口径：`loopback` / 整数跳数 / 逗号分隔 CIDR / `false` / `true`；决定 `req.ip` 是否采信 `X-Forwarded-For`（登录失败锁定依赖真实来源 IP） | `loopback` | P0（安全） |
+
+
 ---
 
 ## 8. 存储、CDN 与基础设施
 
 | 提供方 | SDK / API 形态 | 用途 | 密钥 / 配置项（env） | 优先级 |
 |---|---|---|---|---|
-| 阿里云 OSS | OSS SDK / API | 国内对象存储 | `MIM_STORAGE_ALIYUN_OSS_ACCESS_KEY_ID` / `MIM_STORAGE_ALIYUN_OSS_ACCESS_KEY_SECRET` / `MIM_STORAGE_ALIYUN_OSS_BUCKET` | P0 |
-| 腾讯云 COS | COS SDK / API | 国内备选存储 | `MIM_STORAGE_TENCENT_SECRET_ID` / `MIM_STORAGE_TENCENT_SECRET_KEY` / `MIM_STORAGE_TENCENT_BUCKET` | P1 |
-| AWS S3 / Cloudflare R2 | S3 兼容 SDK | 海外对象存储 | `MIM_STORAGE_S3_ACCESS_KEY_ID` / `MIM_STORAGE_S3_SECRET_ACCESS_KEY` / `MIM_STORAGE_R2_ACCESS_KEY_ID` | P0 |
-| 七牛 / 又拍云 | 存储 + CDN SDK | CDN 加速与图片处理 | `MIM_STORAGE_QINIU_ACCESS_KEY` / `MIM_STORAGE_QINIU_SECRET_KEY` | P1 |
+| AWS S3 | S3 兼容 SDK | 海外对象存储（聊天 / 社区附件） | `MIM_STORAGE_S3_ACCESS_KEY_ID` / `MIM_STORAGE_S3_SECRET_ACCESS_KEY` | P0 |
 | Cloudflare CDN / 阿里云 CDN | CDN API | 静态资源加速 | `MIM_CDN_CLOUDFLARE_API_TOKEN` / `MIM_CDN_ALIYUN_ACCESS_KEY` | P1 |
 
 **对象存储准入运行时配置（自研 `media` 域，进程内模块）**
@@ -164,8 +128,6 @@
 | `MIM_STORAGE_S3_REGION` | S3 区域 | 无（`s3` 模式下必填；R2 填 `auto`，AWS 填如 `us-east-1`） | P0 |
 | `MIM_STORAGE_S3_BUCKET` | 存储桶名（须为私有桶） | 无（`s3` 模式下必填；缺项启动即抛 `STORAGE_CONFIG_INVALID`） | P0 |
 | `MIM_STORAGE_S3_FORCE_PATH_STYLE` | 路径风格（MinIO 需 `1`） | `0` | P0 |
-| `MIM_STORAGE_PUBLIC_PREFIX` | 公有读对象前缀（仅该前缀免签名可读，其余对象仍强制签名） | `public/` | P0（图床视图） |
-| `MIM_STORAGE_PUBLIC_BASE_URL` | 公有读对象稳定直链基线（CDN 或公网域名） | 无（缺值时直传接口抛 `STORAGE_CONFIG_INVALID`，不退回签名地址） | P0（图床视图） |
 | `MIM_PUBLIC_BASE_URL` | 对外公开基址（本地驱动预签名 URL 拼接） | 请求 Host | P0 |
 
 > 预签名 URL 的有效期默认 900 秒、上限 7 天；`object_key` 归属校验统一 404，不泄露他人资源存在性。
@@ -304,10 +266,7 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | `MIM_WECHAT_MCH_ID` / `MIM_WECHAT_API_V3_KEY` / `MIM_WECHAT_SERIAL_NO` / `MIM_WECHAT_PRIVATE_KEY` | 微信企业支付 Native：商户号、APIv3 密钥、证书序列号、商户私钥 | 微信支付商户平台获取；四项缺一即 `PROVIDER_NOT_CONFIGURED`，不生成假二维码 | P0 |
 | `MIM_MANUAL_PAY_ACCOUNT` | 人工转账 / 线下收款展示的收款说明 | 运营填写，可由后台文案替代；不含真实密钥 | P2 |
 | `MIM_PAYMENT_SANDBOX` / `MIM_PAYMENT_SANDBOX_SECRET` | 沙箱支付开关与 HMAC-SHA256 回调密钥，仅测试 / 预发启用 | 生产必须留空或 `0`；密钥用 `openssl rand -hex 32` 生成，回调 `x-mim-signature` 验签 | P2 |
-| `MIM_BAIDU_TRANSLATE_APPID` / `MIM_BAIDU_TRANSLATE_KEY` | 百度翻译开放平台：机器翻译与前后台语言分离 | 百度翻译控制台申请；缺任一项时 `/i18n/translate` 返回 503 `PROVIDER_NOT_CONFIGURED`，已知文案仍走本地词典 | P1 |
-| `MIM_IP_HASH_SALT` | IP 归属地哈希盐：`user_signals.ip_hash` 只存 SHA-256(`${salt}:${ip}`)，不存明文 IP | 建议独立随机串；缺省回落 `MIM_JWT_SECRET`，轮换后历史哈希不可关联 | P1 |
-| `MIM_MEILISEARCH_URL` / `MIM_MEILISEARCH_KEY` / `MIM_MEILISEARCH_INDEX` | Meilisearch 实例地址、查询 / 管理密钥、索引名（默认 `mim_search`） | 自建或 Meilisearch Cloud 获取；未配置时统一搜索自动降级 SQLite，`POST /search/reindex` 返回 503 | P1 |
-| `MIM_KUAIDI100_CUSTOMER` / `MIM_KUAIDI100_KEY` | 快递100 实时查询：客户编号与授权密钥（签名 MD5(param+key+customer)） | 快递100 企业版控制台获取；未配置时 `GET /shop/orders/:id/shipment` 只返回本地轨迹，`live.provider=none`，不发起外网请求 | P1 |
+| `MIM_IP_HASH_SALT` | IP 归属地哈希盐：来源 IP 只存 SHA-256(`${salt}:${ip}`)，不存明文 IP | 建议独立随机串；缺省回落 `MIM_JWT_SECRET`，轮换后历史哈希不可关联 | P1 |
 
 ---
 
