@@ -2,15 +2,22 @@
 <html lang="zh-CN"><!-- 根元素：lang 声明简体中文，影响断行规则、字体回退与读屏发音 -->
   <head><!-- 头部区：只放元信息，不渲染可见内容 -->
     <meta charset="UTF-8" /><!-- 字符编码：显式 UTF-8，须落在最前 1024 字节内，故置于一切脚本之前 -->
+    <!-- 基础地址（2026-11-15 P0 白屏修复）：相对资源一律按站点根解析到 /assets/…，
+         与当前地址有几段路径、是否带尾斜杠完全无关；这样即使下面那段内联脚本被 CSP 拦掉，
+         也不会再把 ./assets 解析成 /comic/detail/assets 而去请求不存在的模块。 -->
+    <base href="/" /><!-- 必须是文档里第一个使用 URL 的元素之前；根部署恒为 "/"，子路径部署由下面的内联脚本改写 -->
     <script>
       /* 地址栏前置规整：必须在任何相对路径资源（spa.js / assets）之前执行，replaceState 后相对解析才按新地址生效。
          职责一：清理 EdgeOne WAF 注入的 ?tads —— 抢在 WAF 自带清理（只删 ?tads 本体、残留裸问号）之前整体移除查询串，
                  避免地址栏留下 https://host/? 的裸问号形态。
-         职责二：折叠多段深链接 —— vite base './' 的产物以相对路径引用 assets，多段路径（如 /comic/detail/123）会把
-                 ./assets 解析到错误目录导致资源 404 白屏，故在资源加载前用 replaceState 折叠为单段地址。
-         注意：生产 nginx 的 CSP（script-src 'self'）会禁用本内联，届时多段深链接白屏维持现状、不回归；
-         单段路径（/marketplace 等）不依赖本脚本，全部平台可用。 */
+         职责二：折叠多段深链接 —— 纯做地址栏规整（旧链接兼容），资源定位已由上面的 <base href="/"> 兜住，
+                 故本脚本被 CSP 拦截时页面仍能正常渲染，不再白屏。
+         职责三：GitHub Pages 子路径（/mim/）部署时把基础地址改写为 /mim/，让同一份产物在子路径下也能取到资源。
+         注意：本脚本的内容哈希由构建自动计算并写入响应头（scripts/csp-inline-hash.mjs），改了内容不需要手工同步。 */
       (function () { // 立即执行：隔离内部变量，避免污染全局作用域
+        if (location.pathname === '/mim' || location.pathname.indexOf('/mim/') === 0) { // 仅 GitHub Pages 把产物挂在仓库名子路径 /mim/ 下；根部署（laal.top 等）不命中
+          document.querySelector('base').setAttribute('href', '/mim/'); // 基础地址跟随子路径，保证 ./assets 解析到 /mim/assets
+        } // 子路径部署兼容处理结束
         var views = ['marketplace', 'products', 'cart', 'account', 'entry-catalog', 'deployments', 'navigation', 'search', 'community', 'commerce', 'comic-studio', 'chat', 'tools', 'announcements', 'circles', 'releases', 'signin', 'settings', 'store', 'sites', 'comic', 'login', 'profile', 'forum']; // 对外路径段（模块功能名）+ 改名前的旧别名；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
         var href = location.href; // 完整地址：用于判断末位是否为 WAF 清理后残留的裸问号
         var search = location.search; // 查询串（含前导问号；无查询串时为空串）
@@ -21,21 +28,21 @@
         if (segs.length > 1) { // 仅多段路径需要折叠；根路径与单段路径（/store 等）保持原样
           var cut = 0; // 命中视图段时截到该段的下标；0 表示尚未命中
           for (var i = 0; i < segs.length; i++) { // 从头找第一个已知视图段
-            if (views.indexOf(segs[i]) >= 0) { cut = i + 1; break; } // 截到视图段为止：/mim/store/x → /mim/store，资源解析到 /mim/assets
+            if (views.indexOf(segs[i]) >= 0) { cut = i + 1; break; } // 截到视图段为止：/mim/store/x → /mim/store
           } // 视图段查找结束
           var folded; // 折叠后的路径
           if (cut > 0) { // 命中视图段：前缀（如 /mim）+ 视图段
-            folded = '/' + segs.slice(0, cut).join('/'); // 无尾斜杠：./assets 相对其上级目录（部署根）解析
+            folded = '/' + segs.slice(0, cut).join('/'); // 无尾斜杠：地址栏统一成单段形态（资源定位已由 base 保证，不依赖本行）
           } else if (segs[0] === 'mim') { // 未命中视图段且首段为 mim：唯一的子路径部署是 GitHub Pages 的 /mim/（仓库名）
-            folded = '/mim/'; // 带尾斜杠回到子路径根：./assets 解析到 /mim/assets，路由层把空视图回落为 store
+            folded = '/mim/'; // 带尾斜杠回到子路径根：路由层把空视图回落为 store
           } else { // 未命中视图段的根部署多段地址（如 /foo/bar）
-            folded = '/' + segs[0]; // 只保留首段且无尾斜杠：./assets 相对根目录解析，路由层把未知视图回落为 store
+            folded = '/' + segs[0]; // 只保留首段且无尾斜杠：路由层把未知视图回落为 store
           } // 折叠分支结束
           history.replaceState(null, '', folded + location.hash); // 原地改写地址：保留 hash，交由 router.ts 的旧 hash 链接兼容逻辑继续处理
         } // 多段折叠结束
-      })(); // 立即执行结束：此后的 spa.js 与 assets 均按规整后的地址解析
+      })(); // 立即执行结束：其后的 spa.js 与 assets 统一按 <base href> 解析
     </script><!-- 地址栏前置规整脚本结束 -->
-    <script src="%BASE_URL%spa.js"></script><!-- 地址归一化（外置脚本）：构建期 %BASE_URL% 被替换为 ./，随规整后的地址解析到部署根；外置是为绕开生产 CSP script-src 'self' 对内联脚本的禁用，让归一化在主站真实生效（登录拦截由 App 内按需执行，本脚本不做整页替换） -->
+    <script src="%BASE_URL%spa.js"></script><!-- 地址归一化（外置脚本）：构建期 %BASE_URL% 被替换为 ./，配合 <base href="/"> 恒解析到 /spa.js；外置是为绕开生产 CSP script-src 'self' 对内联脚本的禁用（登录拦截由 App 内按需执行，本脚本不做整页替换） -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><!-- 视口：移动端按设备宽度布局且初始不缩放，避免页面被整体缩小 -->
     <meta name="color-scheme" content="light dark" /><!-- 配色方案：声明同时支持浅/深色，浏览器可自动适配滚动条与原生控件 -->
     <title>Mim</title><!-- 标签页标题：仅产品名 -->
