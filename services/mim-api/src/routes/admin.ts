@@ -2,7 +2,9 @@
 
 import { Router } from 'express'; // 路由工厂：产出可挂到 /api/v1 的 Router 实例
 import { z } from 'zod'; // 声明式请求体校验，统一经 parse 转译为 VALIDATION_FAILED
-import { AppError } from '@mim/core-domain'; // 统一业务异常：错误码与 HTTP 状态码映射集中管理
+import { AppError, uuidv7 } from '@mim/core-domain'; // 统一业务异常 + 主键生成器（手工建号与口令行都要独立主键）
+import { hashPassword, normalizeIdentity } from '../auth.js'; // 口令慢哈希与身份归一，与自助注册同一口径
+import { createUser } from '../identity.js'; // 唯一建号入口，禁止绕过它直接写 users 表
 import { RBAC_PERMISSIONS } from '../db.js'; // 内置权限点清单：超管引导通道直接回显全量权限
 import { clockOf } from '../domain.js'; // 统一时钟：测试可注入固定时间，避免断言抖动
 import { loadPermissions, requirePermission } from '../middleware.js'; // 实时权限加载 + 细粒度权限门禁
@@ -473,6 +475,72 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     } // if 结束：删除结果检查
     res.json({ user_id: userId, role_code: roleCode, deleted: true }); // 明确告知回收成功
   }); // DELETE /admin/users/:userId/roles/:roleCode 结束
+
+  // ---------- 账号安全：后台手工建号 / 重置口令（仅超级管理员，注册关闭后的唯一入口） ----------
+
+  /** 口令强度与自助注册保持一致：8-128 位且同时含字母与数字 */
+  function assertPasswordStrength(password: string): void {
+    if (password.length < 8 || password.length > 128 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      throw new AppError('VALIDATION_FAILED', 'password must be 8-128 chars and contain both letters and digits', { field: 'password' });
+    } // 强度不足即 400，不落任何写操作
+  } // assertPasswordStrength 结束
+
+  /** POST /admin/users — 超管手工建号：指定标识与初始口令，可同时分配角色 */
+  router.post('/admin/users', requirePermission('rbac:write'), (req, res) => {
+    const body = parse( // 请求体校验：区域 / 身份类型 / 标识 / 初始口令 / 展示名 / 角色
+      z.object({
+        region: z.enum(['cn', 'global']).default('cn'), // 账号所属区域
+        provider: z.enum(['phone', 'email']).optional(), // 身份类型，缺省按区域推断
+        identifier: z.string().trim().min(3).max(160), // 手机号或邮箱
+        password: z.string().min(1).max(128), // 初始口令，强度由下方统一校验
+        display_name: z.string().trim().max(64).optional(), // 展示名，可空
+        role_codes: z.array(z.string().trim().min(1).max(64)).max(20).optional(), // 可分配角色
+      }),
+      req.body,
+    );
+    const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 与自助注册同一推断规则
+    const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一并校验号码 / 邮箱格式
+    assertPasswordStrength(body.password); // 口令强度不达标直接 400
+    const taken = db.prepare('SELECT user_id FROM identities WHERE region = ? AND provider = ? AND identifier = ?').get(body.region, identity.provider, identity.identifier) as { user_id: string } | undefined; // 同区域同类型标识唯一
+    if (taken) throw new AppError('AUTH_IDENTITY_EXISTS', 'account already registered', { field: 'identifier' }); // 冲突按业务码返回，避免 500
+    const roleCodes = [...new Set(body.role_codes ?? [])]; // 去重，保持调用方顺序
+    const missing = roleCodes.filter((code) => !db.prepare('SELECT 1 FROM roles WHERE code = ?').get(code)); // 角色必须存在
+    if (missing.length > 0) throw new AppError('NOT_FOUND', 'role not found', { role_codes: missing }); // 未知角色整体拒绝
+    const now = clockOf(deps); // 统一时钟
+    const grantedBy = req.user?.id ?? 'admin-bootstrap'; // 审计：登录超管记 user id，引导令牌记固定标记
+    const created = db.transaction(() => { // 建号 + 身份 + 口令 + 角色必须同事务
+      const user = createUser(db, { region: body.region, display_name: (body.display_name ?? '').trim(), now }); // 走唯一建号入口
+      db.prepare('INSERT INTO identities (id, user_id, region, provider, identifier, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(uuidv7(), user.id, body.region, identity.provider, identity.identifier, now); // 绑定登录身份
+      db.prepare("INSERT INTO credentials (id, user_id, kind, secret_hash, created_at) VALUES (?, ?, 'password', ?, ?)").run(uuidv7(), user.id, hashPassword(body.password), now); // 初始口令
+      const grant = db.prepare('INSERT OR IGNORE INTO user_roles (user_id, role_code, granted_by, created_at) VALUES (?, ?, ?, ?)'); // 角色授权幂等
+      for (const code of roleCodes) grant.run(user.id, code, grantedBy, now); // 可一次分配多个角色
+      return user; // 返回新建用户行
+    })();
+    res.status(201).json({ // 201：新账号已可登录
+      user: { id: created.id, member_no: created.member_no, region: created.region, display_name: created.display_name, status: created.status }, // 最小用户视图
+      roles: roleCodes, // 回显分配结果
+    });
+  }); // POST /admin/users 结束
+
+  /** POST /admin/users/:userId/password — 超管重置指定账号口令；重置即吊销该账号全部会话 */
+  router.post('/admin/users/:userId/password', requirePermission('rbac:write'), (req, res) => {
+    const userId = pathParam(req, 'userId'); // 路径参数收敛为字符串
+    if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) { // 账号必须存在
+      throw new AppError('NOT_FOUND', 'user not found', { user_id: userId }); // 404 而非静默成功
+    } // 存在性检查结束
+    const body = parse(z.object({ password: z.string().min(1).max(128) }), req.body); // 新口令
+    assertPasswordStrength(body.password); // 强度校验
+    const now = clockOf(deps); // 统一时钟
+    const revoked = db.transaction(() => { // 改口令 + 吊销会话同事务，避免改完还能用旧会话
+      const hash = hashPassword(body.password); // 慢哈希
+      const updated = db.prepare("UPDATE credentials SET secret_hash = ?, created_at = ? WHERE user_id = ? AND kind = 'password'").run(hash, now, userId); // 已有口令行则覆盖
+      if (updated.changes === 0) { // 账号此前只有验证码 / OAuth 身份
+        db.prepare("INSERT INTO credentials (id, user_id, kind, secret_hash, created_at) VALUES (?, ?, 'password', ?, ?)").run(uuidv7(), userId, hash, now); // 补一条口令凭据
+      } // 分支结束
+      return db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(now, userId).changes; // 强制重新登录
+    })();
+    res.json({ user_id: userId, password_updated: true, sessions_revoked: revoked }); // 回显吊销数量便于审计
+  }); // POST /admin/users/:userId/password 结束
 
   // ---------- 商业化三期：批量改价（模块 / 商城商品，三模式 + 快照回滚 + 审计留痕） ----------
 
