@@ -294,6 +294,7 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 跨站 SSO | 票据签名密钥与允许站点白名单 | `MIM_SSO_*`（SECRET / ALLOWED_SITES） | P1 |
 | 实名认证 | 提供方（manual / third_party）与独立签名密钥 | `MIM_REALNAME_*`（PROVIDER / SECRET） | P1 |
 | 微信支付平台凭证扩展 | 平台证书序列号 / 平台公钥 / 通知地址 / 应用 ID（既有商户号 / V3 密钥 / 序列号 / 私钥见 §15） | `MIM_WECHAT_*`（APP_ID / NOTIFY_URL / PLATFORM_SERIAL / PLATFORM_PUBLIC_KEY） | P0 |
+| 注册总开关 | 默认关闭；仅 `MIM_REGISTRATION_ENABLED=1` 才允许自助注册、验证码首登、OAuth 首登与免登录访客建号 | `MIM_REGISTRATION_ENABLED`（精确项） | P0 |
 | 注册邀请门槛 | `MIM_REGISTER_INVITE_REQUIRED=1` 时新账号必须凭有效邀请码注册 | `MIM_REGISTER_INVITE_REQUIRED`（精确项） | P1 |
 | 圈子模块配置 | 圈子创建门槛（最小用户等级 / 每用户可创建数量），缺省 0 / 1 | `MIM_CIRCLE_CREATE_*`（`MIM_CIRCLE_CREATE_MIN_LEVEL` / `MIM_CIRCLE_CREATE_MAX_PER_USER`） | P1 |
 | OIDC 联邦身份 | 标准授权码模式联邦登录（state / nonce 一次性、claims 校验；ID Token 签名验签与 SAML 2.0 未落地，见 `federation.ts` 文件头）；四项缺一即 `configured=false`、端点返回 503 | `MIM_OIDC_*`（`MIM_OIDC_ISSUER` / `MIM_OIDC_CLIENT_ID` / `MIM_OIDC_CLIENT_SECRET` / `MIM_OIDC_REDIRECT_URI`） | P1 |
