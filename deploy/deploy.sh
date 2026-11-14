@@ -21,6 +21,7 @@
 #   WEB_DIR     默认 /opt/mim/web
 #   ADMIN_DIR   默认 /opt/mim/admin（管理后台静态根，nginx 的 /admin/ 指向此处）
 #   SERVICE     默认 mim-api
+#   DATA_DIR    默认 /var/lib/mim（SQLite 库落盘处，必须在 APP_DIR 之外且本脚本永不清空）
 #   MIM_API_PORT 后端回环端口（API + WS 共用），默认 8787；旧变量 PORT_ 仍兼容
 #   MIM_WEB_HTTP_PORT   前端 HTTP 端口，默认 8080（同机 MixmAPP 占用 80/443）
 #   MIM_WEB_HTTPS_PORT  前端 HTTPS 端口，默认 8443
@@ -42,6 +43,18 @@ APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 ADMIN_DIR="${ADMIN_DIR:-/opt/mim/admin}"
 SERVICE="${SERVICE:-mim-api}"
+# 数据目录：SQLite 库落盘处，必须独立于 APP_DIR。
+# 背景（2026-11-15）：首次部署分支会 rm -rf "$APP_DIR" 再 clone，历史上曾把
+# services/mim-api/data/mim.db 一起删掉（当时是空库才没造成损失）。现在库物理落在
+# 本目录，APP 侧只保留一个符号链接，任何形式的发布清理都碰不到库文件。
+DATA_DIR="${DATA_DIR:-/var/lib/mim}"
+# 该断言在 die() 定义之前执行，故直接 printf + exit，不依赖函数
+case "$DATA_DIR" in
+  "$APP_DIR"/*|"$APP_DIR")
+    printf '\033[31m[deploy]\033[0m DATA_DIR=%s 位于 APP_DIR=%s 内，会被发布清理误删；请指向 APP_DIR 之外（默认 /var/lib/mim）\n' "$DATA_DIR" "$APP_DIR" >&2
+    exit 1
+    ;;
+esac
 # 端口三件套：前端 HTTP / 前端 HTTPS / 后端回环。三者全部可配，nginx 模板与健康检查
 # 统一从这三个变量渲染，禁止在配置里再写死 80/443/8787。
 MIM_WEB_HTTP_PORT="${MIM_WEB_HTTP_PORT:-8080}"
@@ -90,6 +103,8 @@ esac
 
 if [ ! -d "$APP_DIR/.git" ]; then
   log "首次部署：克隆 $REPO_URL"
+  # 库文件在 $DATA_DIR（默认 /var/lib/mim）而非 APP_DIR 内，下面的清空不会影响 database；
+  # APP 侧的数据路径只是指向 $DATA_DIR 的符号链接，§5 会重建它。
   mkdir -p "$(dirname "$APP_DIR")"
   rm -rf "$APP_DIR"
   git clone --depth 1 "$REPO_URL" "$APP_DIR"
@@ -170,7 +185,39 @@ rm -rf "$ADMIN_DIR"/*
 cp -R "$APP_DIR/apps/admin/dist/." "$ADMIN_DIR/"
 
 # --- 5. 数据目录、JWT 密钥与属主 ---
-mkdir -p "$APP_DIR/services/mim-api/data"
+# 库文件物理落在 APP_DIR 之外的 $DATA_DIR。本脚本对该目录只做「创建 / 搬入 / 改属主」，
+# 任何分支（含首次部署的 rm -rf "$APP_DIR"、git clean）都不会删除它。
+# config.ts 的 DATA_DIR 固定为 services/mim-api/data，不能改（避免与业务代码耦合），
+# 因此在 APP 侧用符号链接指向 $DATA_DIR：rm -rf "$APP_DIR" 只会删掉链接本身，
+# 库文件与 /var/lib/mim 毫发无损；每次部署在这里幂等重建链接。
+DATA_LINK="$APP_DIR/services/mim-api/data"
+mkdir -p "$DATA_DIR"
+chmod 750 "$DATA_DIR"
+if [ -L "$DATA_LINK" ]; then
+  LINK_TARGET="$(readlink -f "$DATA_LINK")"
+  [ "$LINK_TARGET" = "$(readlink -f "$DATA_DIR")" ] || {
+    printf '\033[31m[deploy]\033[0m %s 已指向 %s（期望 %s），拒绝继续，请人工确认\n' \
+      "$DATA_LINK" "$LINK_TARGET" "$DATA_DIR" >&2
+    exit 1
+  }
+elif [ -e "$DATA_LINK" ]; then
+  # 历史部署留下的真实目录：把库文件搬进 $DATA_DIR，原目录改名留档，最后建链接
+  LEGACY_DIR="${DATA_LINK}.legacy.$(date '+%Y%m%d-%H%M%S')"
+  log "数据目录迁移：$DATA_LINK → $DATA_DIR（原目录留档 $(basename "$LEGACY_DIR")）"
+  for f in mim.db mim.db-wal mim.db-shm; do
+    [ -e "$DATA_LINK/$f" ] || continue
+    if [ -e "$DATA_DIR/$f" ]; then
+      printf '\033[31m[deploy]\033[0m %s 已存在，拒绝覆盖，请人工比对后迁移\n' "$DATA_DIR/$f" >&2
+      exit 1
+    fi
+    mv "$DATA_LINK/$f" "$DATA_DIR/$f"
+  done
+  mv "$DATA_LINK" "$LEGACY_DIR"
+fi
+[ -L "$DATA_LINK" ] || ln -s "$DATA_DIR" "$DATA_LINK"
+if id -u "$RUN_USER" >/dev/null 2>&1; then
+  chown -R "$RUN_USER:$RUN_USER" "$DATA_DIR" 2>/dev/null || true
+fi
 mkdir -p "$APP_DIR/.mim-dev-secret"
 
 # JWT 密钥（生产必配）：systemd unit 以 EnvironmentFile=/opt/mim/mim-api.env 注入
@@ -315,7 +362,7 @@ fi
 # --- 5.5 数据库迁移（幂等，按文件名顺序执行；首次部署无 DB 时跳过） ---
 # 迁移脚本位于 deploy/migrations/*.cjs，均以 better-sqlite3 backup API 先备份再 DROP/重建，
 # 可反复重放。任一迁移失败即中止部署（set -e），避免把半迁移的库暴露给新代码。
-DB_FILE="$APP_DIR/services/mim-api/data/mim.db"
+DB_FILE="$DATA_DIR/mim.db"
 if [ -f "$DB_FILE" ]; then
   log "执行数据库迁移（$APP_DIR/deploy/migrations）"
   shopt -s nullglob
@@ -326,7 +373,7 @@ if [ -f "$DB_FILE" ]; then
   shopt -u nullglob
   # 迁移以 root 运行，可能产生 root 属主的 -wal/-shm，重启前归还给运行用户
   if id -u "$RUN_USER" >/dev/null 2>&1; then
-    chown -R "$RUN_USER:$RUN_USER" "$APP_DIR/services/mim-api/data" 2>/dev/null || true
+    chown -R "$RUN_USER:$RUN_USER" "$DATA_DIR" 2>/dev/null || true
   fi
 else
   warn "数据库文件尚不存在（首次部署），跳过迁移；应用启动时将按 schema.sql 建库"
