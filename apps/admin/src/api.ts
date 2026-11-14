@@ -476,6 +476,53 @@ export function revokeUserRole(
   }); // 代码块结束
 } // 代码块结束
 
+/** 后台手工建号入参：口令强度由后端统一校验（8-128 位且含字母与数字） */
+export interface AdminUserCreatePayload {
+  // 账号所属区域，决定缺省身份类型
+  region: 'cn' | 'global';
+  // 身份类型，缺省按区域推断（cn→phone，global→email）
+  provider?: 'phone' | 'email';
+  // 手机号或邮箱
+  identifier: string;
+  // 初始口令
+  password: string;
+  // 展示名，选填
+  display_name?: string;
+  // 初始角色码，可空
+  role_codes?: string[];
+} // AdminUserCreatePayload 结束
+
+/** 建号响应：最小用户视图 + 实际分配的角色 */
+export interface AdminUserCreated {
+  // 新账号关键字段；member_no 为自动分配的 Mim ID，历史库可能为 null
+  user: { id: string; member_no: string | null; region: string; display_name: string; status: string };
+  // 已分配角色码
+  roles: string[];
+} // AdminUserCreated 结束
+
+/** 后台手工建号：注册关闭后的唯一建号入口，需 rbac:write */
+export function createAdminUser(credential: Credential, payload: AdminUserCreatePayload): Promise<AdminUserCreated> {
+  // POST /admin/users，成功返回 201
+  return request<AdminUserCreated>('/admin/users', { method: 'POST', body: payload, credential });
+} // createAdminUser 结束
+
+/** 重置指定账号口令：后端同时吊销该账号全部会话，需 rbac:write */
+export function resetAdminUserPassword(
+  credential: Credential, // 对象字段 credential：当前后台凭证
+  userId: string, // 对象字段 userId：目标账号
+  password: string, // 对象字段 password：新口令明文
+): Promise<{ user_id: string; password_updated: boolean; sessions_revoked: number }> {
+  // POST /admin/users/:userId/password，路径参数需编码
+  return request(`/admin/users/${encodeURIComponent(userId)}/password`, {
+    // 写操作
+    method: 'POST',
+    // 请求体与后端 schema 一致
+    body: { password },
+    // 携带凭证
+    credential,
+  }); // 代码块结束
+} // resetAdminUserPassword 结束
+
 // ── 功能模块与权益 ────────────────────────────────────────────────────────
 
 /** 模块视图：公开目录端点对外结构 */
