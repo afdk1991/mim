@@ -365,6 +365,13 @@ export function createCacheHeaderMiddleware(options: CacheHeaderOptions = {}) {
       next(); // 调用 next 并处理其返回结果
       return; // 返回当前函数的处理结果
     } // 代码块结束
+    // 携带 Authorization 的请求是「当前登录用户的私有数据」：既不进共享缓存，也不允许浏览器复用旧响应。
+    // 否则 max-age=60 会让刚发出的消息在刷新后消失、未读角标不更新、断线重连补拉拿到旧列表。
+    if (req.header('authorization')) { // 已认证请求一律不缓存
+      res.setHeader('Cache-Control', 'private, no-store'); // 私有且禁止落盘缓存
+      next(); // 跳过 ETag / 304 逻辑，直接进入业务路由
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
     const originalJson = res.json.bind(res); // 保留原始 json 输出方法
     res.json = ((body: unknown) => { // 包装响应：算摘要 → 打 ETag / Cache-Control → 判 304
       const payload = JSON.stringify(body ?? null); // 响应体序列化（与实际下发内容一致）
