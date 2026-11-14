@@ -13,11 +13,12 @@
   NODE_VERSION = "22"
   PNPM_VERSION = "9.12.0"
 
-# API 反向代理：本站只托管前端薄壳，后端权威终点为腾讯云自建 api.laal.top。
+# API 反向代理：本站只托管前端薄壳，后端权威终点为腾讯云自建 api.laal.top:8443。
+# 443 归同机 MixmAPP，必须带 Mim 自己的 HTTPS 端口，否则会把请求打到错误站点。
 # 缺这条规则时前端请求 /api/v1/* 会落到 Netlify 的 404，页面渲染直接 TypeError。
 [[redirects]]
   from = "/api/*"
-  to = "https://api.laal.top/api/:splat"
+  to = "https://api.laal.top:8443/api/:splat"
   status = 200
   force = true
 

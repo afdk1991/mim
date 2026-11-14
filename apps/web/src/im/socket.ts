@@ -75,8 +75,9 @@ const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, '');
  * 直连生产 API（api.laal.top），而不是走同源 /api 反代。
  */
 function deriveWsUrl(token: string): string {
-  // 生产 API 域名：静态托管平台的 WS 必须直连此源
-  const PROD_ORIGIN = 'https://api.laal.top';
+  // 生产 API 域名：静态托管平台的 WS 必须直连此源。
+  // 同机共存端口：Mim 已从 443 切到 8443（443 归同机 MixmAPP），漏端口会连到错误站点。
+  const PROD_ORIGIN = 'https://api.laal.top:8443';
   // 优先用构建期指定的 API 源
   let origin = API_ORIGIN;
   if (!origin && typeof window !== 'undefined') { // 条件分支：按判断结果选择后续处理路径

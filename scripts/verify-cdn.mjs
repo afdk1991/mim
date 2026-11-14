@@ -11,10 +11,12 @@
  *
  * 用法：
  *   node scripts/verify-cdn.mjs
- *   MIM_CDN_BASE=https://laal.top MIM_CDN_PROBE_PATH=/ node scripts/verify-cdn.mjs
+ *   MIM_CDN_BASE=https://laal.top:8443 MIM_CDN_PROBE_PATH=/ node scripts/verify-cdn.mjs
  */
 
-const BASE = (process.env.MIM_CDN_BASE ?? 'https://laal.top').replace(/\/+$/, ''); // 常量 BASE：保存固定配置或一次性派生值
+// 探测基址默认取 Mim 的 HTTPS 端口（8443，443 归同机 MixmAPP），MIM_CDN_BASE 可整体覆盖
+const DEFAULT_PORT = process.env.MIM_WEB_HTTPS_PORT ?? '8443'; // 同机共存端口口径
+const BASE = (process.env.MIM_CDN_BASE ?? `https://laal.top:${DEFAULT_PORT}`).replace(/\/+$/, ''); // 常量 BASE：保存固定配置或一次性派生值
 const PATHNAME = process.env.MIM_CDN_PROBE_PATH ?? '/'; // 常量 PATHNAME：保存固定配置或一次性派生值
 const PROBE_URL = `${BASE}${PATHNAME.startsWith('/') ? PATHNAME : `/${PATHNAME}`}`; // 常量 PROBE_URL：保存固定配置或一次性派生值
 const TIMEOUT_MS = 10_000; // 常量 TIMEOUT_MS：保存固定配置或一次性派生值

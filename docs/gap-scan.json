@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T15:05:57.862Z",
+  "generatedAt": "2026-11-14T15:17:31.278Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -30,9 +30,9 @@
       "title": "C. 环境变量登记",
       "status": "WARN",
       "stats": {
-        "sourceVars": 251,
-        "templateVars": 214,
-        "inventoryVars": 214,
+        "sourceVars": 256,
+        "templateVars": 219,
+        "inventoryVars": 219,
         "wildcardStems": 22,
         "unregistered": 63,
         "unregisteredAdapter": 0,
@@ -217,15 +217,15 @@
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 320
+              "line": 353
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 324
+              "line": 357
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 325
+              "line": 358
             }
           ],
           "locationCount": 5
@@ -240,22 +240,22 @@
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 166
+              "line": 179
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 166
+              "line": 179
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 167
+              "line": 180
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 168
+              "line": 181
             }
           ],
-          "locationCount": 41
+          "locationCount": 49
         },
         {
           "var": "MIM_FILM_REVIEW_SLA_HOURS",
@@ -998,7 +998,7 @@
           "line": 228,
           "marker": "未实现",
           "kind": "string-note",
-          "text": "boundary: '无独立播放器页；播放列表、弹幕、倍速等播放器能力尚未实现。', // 播放器差距说明"
+          "text": "boundary: '独立播放器页 /watch/:kind/:id 已落地（选集 / 上一集下一集 / 本地进度记忆）；弹幕、倍速与 CDN 点播分发尚未实现。', // 播放器差距说明"
         },
         {
           "file": "packages/core-domain/src/entryImplementation.ts",

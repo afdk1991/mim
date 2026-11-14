@@ -2,7 +2,8 @@
 // 角色：替代原 Sealos 付费容器（余额 0、按日计费，与「只走免费方案」冲突）的
 // 第二 API 可达点。把 /health 与 /api/v1/* 透传到生产权威终点（腾讯云 CVM），
 // 使 API 在 Cloudflare 全球边缘存在一个真实可探测的免费入口。
-const ORIGIN = 'https://api.laal.top';
+// 端口：443 归同机 MixmAPP，Mim 的 API 在 8443，透传目标必须带端口。
+const ORIGIN = 'https://api.laal.top:8443';
 
 export default {
   async fetch(request) {

@@ -11,7 +11,8 @@
  *   node scripts/build.mjs          # 构建真实前端 → 根 dist/
  *
  * 环境变量：
- *   VITE_API_ORIGIN  前端调用的 API 源；未设置时默认生产 API 源为 https://api.laal.top。
+ *   VITE_API_ORIGIN  前端调用的 API 源；未设置时按 MIM_WEB_HTTPS_PORT（默认 8443）
+ *                    拼成 https://api.laal.top:8443。443 归同机 MixmAPP，不能再作默认值。
  *
  * 注：刻意不使用 fs.cpSync——本机 Node 在该 API 上出现 0xC0000409 崩溃，
  *     故采用 copyFileSync 手动递归复制，跨平台稳定。
@@ -216,8 +217,11 @@ if (installCode !== 0) {
     process.exit(retryCode); // 执行当前业务步骤
   } // 代码块结束
 } // 代码块结束
-// 构建期 API 源：托管平台（EdgeOne）无同源后端，默认直连生产 API；可用 VITE_API_ORIGIN 覆盖
-const apiOrigin = (process.env.VITE_API_ORIGIN ?? 'https://api.laal.top').replace(/\/+$/, '');
+// 构建期 API 源：托管平台（EdgeOne）无同源后端，默认直连生产 API；可用 VITE_API_ORIGIN 覆盖。
+// 端口口径与 deploy/nginx-mim.conf 的 __MIM_WEB_HTTPS_PORT__ 同源：默认 8443，可用
+// MIM_WEB_HTTPS_PORT 覆盖，避免静态站仍把 API 打到 MixmAPP 占用的 443。
+const WEB_HTTPS_PORT = process.env.MIM_WEB_HTTPS_PORT ?? '8443';
+const apiOrigin = (process.env.VITE_API_ORIGIN ?? `https://api.laal.top:${WEB_HTTPS_PORT}`).replace(/\/+$/, '');
 // 执行前端构建（tsc --noEmit + vite build），产物落在 apps/web/dist
 const buildCode = run([pnpm.cmd, ...pnpm.prefix, '--filter', '@mim/web', 'build'], { VITE_API_ORIGIN: apiOrigin });
 // 构建失败直接退出，阻断后续托管平台发布

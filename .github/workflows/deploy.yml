@@ -13,6 +13,15 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+# 同机共存端口口径（与 deploy/nginx-mim.conf、deploy/deploy.sh、deploy/bootstrap.sh 同名同默认值）：
+# 80/443 由同机 MixmAPP 持有，Mim 前端监听 8080/8443、后端回环 8787。
+# 探测地址统一带端口，避免 CI 仍去探 MixmAPP 的 443；仓库变量（Settings → Variables）
+# 配置 MIM_WEB_HTTPS_PORT / MIM_WEB_HTTP_PORT / MIM_API_PORT 即可整体切换，无需改本文件。
+env:
+  MIM_WEB_HTTP_PORT: ${{ vars.MIM_WEB_HTTP_PORT || '8080' }}
+  MIM_WEB_HTTPS_PORT: ${{ vars.MIM_WEB_HTTPS_PORT || '8443' }}
+  MIM_API_PORT: ${{ vars.MIM_API_PORT || '8787' }}
+
 jobs:
   verify:
     name: 质量门禁（类型检查 + 测试 + 前端构建）
@@ -72,7 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://laal.top
+      # 站点已从 443 切到 8443（443 归同机 MixmAPP），环境入口同步带端口
+      url: https://laal.top:${{ vars.MIM_WEB_HTTPS_PORT || '8443' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -210,6 +220,13 @@ jobs:
           MIM_REALNAME_SECRET: ${{ secrets.MIM_REALNAME_SECRET }}
           MIM_REGISTER_INVITE_REQUIRED: ${{ secrets.MIM_REGISTER_INVITE_REQUIRED }}
           MIM_PUBLIC_BASE_URL: ${{ secrets.MIM_PUBLIC_BASE_URL }}
+          # 同机共存端口口径：透传给远端 deploy.sh，与 nginx 模板占位符同源。
+          # 未配置仓库变量时用默认值（8080/8443/8787），不抢 MixmAPP 的 80/443。
+          MIM_WEB_HTTP_PORT: ${{ vars.MIM_WEB_HTTP_PORT || '8080' }}
+          MIM_WEB_HTTPS_PORT: ${{ vars.MIM_WEB_HTTPS_PORT || '8443' }}
+          MIM_API_PORT: ${{ vars.MIM_API_PORT || '8787' }}
+          MIM_TLS_CERTBOT: ${{ vars.MIM_TLS_CERTBOT || '0' }}
+          MIM_NGINX_TAKE_DEFAULT: ${{ vars.MIM_NGINX_TAKE_DEFAULT || '0' }}
         run: |
           # 可选通道 secret 透传到远端 deploy.sh（%q 安全引用；未配置的 secret 为空则不传）
           ENV_ARGS=""
@@ -229,7 +246,8 @@ jobs:
                    MIM_COMMUNITY_WINDOW_MINUTES MIM_COMMUNITY_WINDOW_MAX MIM_COMMUNITY_DAILY_MAX MIM_COMMUNITY_TOTAL_MAX MIM_COMMUNITY_BOARD_REVIEW MIM_COMMUNITY_RECOMMEND_WEIGHTS MIM_COMMUNITY_BLOCK_WORDS MIM_COMMUNITY_CREATE_MIN_LEVEL MIM_COMMUNITY_CREATE_MAX \
                    MIM_POINTS_DEDUCTION_ENABLED MIM_POINTS_PER_YUAN MIM_POINTS_MAX_RATIO_PERCENT \
                    MIM_SSO_SECRET MIM_SSO_ALLOWED_SITES MIM_REALNAME_PROVIDER MIM_REALNAME_SECRET MIM_REGISTER_INVITE_REQUIRED \
-                   MIM_PUBLIC_BASE_URL; do
+                   MIM_PUBLIC_BASE_URL \
+                   MIM_WEB_HTTP_PORT MIM_WEB_HTTPS_PORT MIM_API_PORT MIM_TLS_CERTBOT MIM_NGINX_TAKE_DEFAULT; do
             val="${!v}"
             [ -n "$val" ] && ENV_ARGS="$ENV_ARGS $(printf '%s=%q' "$v" "$val")"
           done
@@ -254,14 +272,16 @@ jobs:
       - name: 线上健康检查
         if: steps.creds.outputs.has_creds == '1'
         run: |
+          # 端口来自 workflow 级 env（默认 8443），不再默认探测 443 —— 443 是 MixmAPP，
+          # 探到 200 也不能证明 Mim 已上线。
           for i in $(seq 1 10); do
-            if curl -fsS --max-time 5 https://laal.top/health; then
-              echo "✅ 生产健康检查通过"
+            if curl -fsS --max-time 5 "https://laal.top:${MIM_WEB_HTTPS_PORT}/health"; then
+              echo "✅ 生产健康检查通过（https://laal.top:${MIM_WEB_HTTPS_PORT}）"
               exit 0
             fi
             sleep 5
           done
-          echo "❌ 生产健康检查失败"
+          echo "❌ 生产健康检查失败（https://laal.top:${MIM_WEB_HTTPS_PORT}/health）"
           exit 1
 
       # 独立管理后台路由断言：/admin（无斜杠）必须 301 到 /admin/，
@@ -272,14 +292,14 @@ jobs:
         if: steps.creds.outputs.has_creds == '1'
         run: |
           set -e
-          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 https://laal.top/admin)
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://laal.top:${MIM_WEB_HTTPS_PORT}/admin")
           if [ "$code" != "301" ]; then
             echo "❌ /admin 期望 301，实际 $code"
             exit 1
           fi
           echo "✅ /admin → 301"
 
-          body=$(curl -fsS --max-time 5 https://laal.top/admin/)
+          body=$(curl -fsS --max-time 5 "https://laal.top:${MIM_WEB_HTTPS_PORT}/admin/")
           echo "$body" | grep -q 'noindex' || { echo "❌ /admin/ 缺少 noindex，疑似落回用户端页面"; exit 1; }
           echo "$body" | grep -q 'assets/index-' || { echo "❌ /admin/ 未引用管理后台产物"; exit 1; }
           echo "✅ /admin/ 返回管理后台页面"
@@ -290,7 +310,7 @@ jobs:
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
             -X POST -H 'Content-Type: application/json' -d '{}' \
-            https://api.laal.top/api/v1/auth/code)
+            "https://api.laal.top:${MIM_WEB_HTTPS_PORT}/api/v1/auth/code")
           if [ "$code" != "400" ]; then
             echo "❌ /api/v1/auth/code 空体期望 400，实际 $code"
             exit 1
@@ -300,7 +320,7 @@ jobs:
           # 非法 JSON 属客户端错误，必须归一为 400，不得回 500
           bad=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
             -X POST -H 'Content-Type: application/json' --data-binary '{"region":' \
-            https://api.laal.top/api/v1/auth/code)
+            "https://api.laal.top:${MIM_WEB_HTTPS_PORT}/api/v1/auth/code")
           if [ "$bad" != "400" ]; then
             echo "❌ /api/v1/auth/code 非法 JSON 期望 400，实际 $bad"
             exit 1
@@ -345,7 +365,8 @@ jobs:
 
       - name: 构建前端（注入生产 API 源）
         env:
-          VITE_API_ORIGIN: https://api.laal.top
+          # API 子域同样改到 8443（443 归同机 MixmAPP）；端口可由仓库变量覆盖
+          VITE_API_ORIGIN: https://api.laal.top:${{ vars.MIM_WEB_HTTPS_PORT || '8443' }}
         run: pnpm --filter @mim/web build
 
       - uses: actions/configure-pages@v5
@@ -517,7 +538,7 @@ jobs:
           # 规则写在发布目录、随本次部署生效，不改动 apps/web/public/_redirects 本体，
           # 避免影响 EdgeOne 等其它解析该文件的平台。
           ( cd apps/web/dist
-            printf '/api/*  https://api.laal.top/api/:splat  200\n' > _redirects.netlify
+            printf '/api/*  https://api.laal.top:%s/api/:splat  200\n' "$MIM_WEB_HTTPS_PORT" > _redirects.netlify
             cat _redirects.netlify _redirects > _redirects.tmp
             mv _redirects.tmp _redirects
             rm -f _redirects.netlify
@@ -546,10 +567,12 @@ jobs:
         continue-on-error: true
         run: |
           set +e
+          # Mim 自有域名一律带端口探测；第三方平台（pages.dev / vercel / netlify 等）
+          # 仍按其自身默认 443/80 口径，不套用本机端口。
           for url in \
-            https://laal.top/health \
-            https://laal.top/ \
-            https://api.laal.top/api/v1/modules \
+            "https://laal.top:${MIM_WEB_HTTPS_PORT}/health" \
+            "https://laal.top:${MIM_WEB_HTTPS_PORT}/" \
+            "https://api.laal.top:${MIM_WEB_HTTPS_PORT}/api/v1/modules" \
             https://mim-299.pages.dev/ \
             https://mim-puce.vercel.app/ \
             https://data.laal.top/ \

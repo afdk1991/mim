@@ -21,7 +21,12 @@
 #   WEB_DIR     默认 /opt/mim/web
 #   ADMIN_DIR   默认 /opt/mim/admin（管理后台静态根，nginx 的 /admin/ 指向此处）
 #   SERVICE     默认 mim-api
-#   PORT_       默认 8787
+#   MIM_API_PORT 后端回环端口（API + WS 共用），默认 8787；旧变量 PORT_ 仍兼容
+#   MIM_WEB_HTTP_PORT   前端 HTTP 端口，默认 8080（同机 MixmAPP 占用 80/443）
+#   MIM_WEB_HTTPS_PORT  前端 HTTPS 端口，默认 8443
+#   MIM_TLS_CERTBOT     1=沿用 certbot --nginx 独占 80/443 的老路径；0（默认）=同机共存，
+#                       证书用 DNS-01 另行签发后由本脚本只引用既有 pem，不申请、不改 80 端口
+#   MIM_NGINX_TAKE_DEFAULT 1=删除 sites-enabled/default 独占机器；0（默认）=不动同机其它站点
 #   REPO_URL    默认 git@github.com:afdk1991/mim.git（SSH，见下方说明）
 #   DEPLOY_KEY  默认 /opt/mim/.ssh/deploy_key（只读 deploy key 私钥）
 #
@@ -37,7 +42,15 @@ APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 ADMIN_DIR="${ADMIN_DIR:-/opt/mim/admin}"
 SERVICE="${SERVICE:-mim-api}"
-PORT_="${PORT_:-8787}"
+# 端口三件套：前端 HTTP / 前端 HTTPS / 后端回环。三者全部可配，nginx 模板与健康检查
+# 统一从这三个变量渲染，禁止在配置里再写死 80/443/8787。
+MIM_WEB_HTTP_PORT="${MIM_WEB_HTTP_PORT:-8080}"
+MIM_WEB_HTTPS_PORT="${MIM_WEB_HTTPS_PORT:-8443}"
+MIM_API_PORT="${MIM_API_PORT:-${PORT_:-8787}}"
+PORT_="$MIM_API_PORT"
+# 同机共存默认值：不抢 default_server、不跑 certbot（80 端口归 MixmAPP）
+MIM_TLS_CERTBOT="${MIM_TLS_CERTBOT:-0}"
+MIM_NGINX_TAKE_DEFAULT="${MIM_NGINX_TAKE_DEFAULT:-0}"
 REPO_URL="${REPO_URL:-git@github.com:afdk1991/mim.git}"
 DEPLOY_KEY="${DEPLOY_KEY:-/opt/mim/.ssh/deploy_key}"
 RUN_USER="${RUN_USER:-mim}"
@@ -172,6 +185,17 @@ else
 fi
 chmod 600 "$MIM_ENV_FILE"
 
+# 后端监听端口：systemd 以 EnvironmentFile 注入 PORT（config.ts 读 process.env.PORT，缺省 8787）。
+# 与 nginx 反代的 __MIM_API_PORT__ 同源，改 MIM_API_PORT 即全链路一致，不会出现「nginx 反代
+# 新端口、后端仍听 8787」的半截状态。端口非机密，直接覆盖为本次解析值。
+if grep -q '^PORT=' "$MIM_ENV_FILE"; then
+  sed -i "s|^PORT=.*|PORT=${PORT_}|" "$MIM_ENV_FILE"
+  log "同步 $MIM_ENV_FILE（PORT=${PORT_}）"
+else
+  printf 'PORT=%s\n' "$PORT_" >> "$MIM_ENV_FILE"
+  log "补齐 $MIM_ENV_FILE（PORT=${PORT_}）"
+fi
+
 # 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel 等）以独立域名直连本 API 所必需。
 # 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_CORS_ORIGINS 环境变量可覆盖默认列表。
 CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://mim.mixm.top,https://data.mixm.top}"
@@ -181,6 +205,15 @@ else
   log "补齐 $MIM_ENV_FILE（MIM_CORS_ORIGINS=$CORS_DEFAULT）"
   printf 'MIM_CORS_ORIGINS=%s\n' "$CORS_DEFAULT" >> "$MIM_ENV_FILE"
 fi
+
+# 端口化后的同源 Origin：主站与 API 子域从 443 改到 8443 后，浏览器 Origin 会带端口，
+# 旧白名单不含带端口形态 → 跨域直连会被 CORS 拒绝。这里只做「缺则追加」，不覆盖既有自定义值。
+for PORTED_ORIGIN in "https://laal.top:${MIM_WEB_HTTPS_PORT}" "https://api.laal.top:${MIM_WEB_HTTPS_PORT}"; do
+  if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" && ! grep '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" | grep -Fq "$PORTED_ORIGIN"; then
+    sed -i "s|^MIM_CORS_ORIGINS=\(.*\)$|MIM_CORS_ORIGINS=\1,${PORTED_ORIGIN}|" "$MIM_ENV_FILE"
+    log "追加带端口 Origin 到 MIM_CORS_ORIGINS（$PORTED_ORIGIN）"
+  fi
+done
 
 # 管理员密码登录口令：生产短信/邮件通道未接入时，POST /api/v1/auth/password 是唯一可用登录入口。
 # 安全修复（2026-11-07）：禁止再写入仓库内可查的固定默认口令（原字面值已从全仓移除）。
@@ -381,12 +414,29 @@ if command -v nginx >/dev/null 2>&1; then
     fi
   }
 
-  log "安装 nginx 站点配置 → $NGINX_AVAILABLE（server_name $NGINX_DOMAIN）"
-  # 与 bootstrap.sh 同一 sed 规则：把模板域 laal.top 全量替换为实际域名。
-  # 必须全量替换（不再只改主站 server_name）：配置里还有 api / admin / center 等子域
-  # server_name 与 301 跳转目标，只改主站会让子域仍解析到模板域，切域后子域全断。
-  sed "s/laal\.top/${NGINX_DOMAIN}/g" \
-    "$APP_DIR/deploy/nginx-mim.conf" > "$NGINX_AVAILABLE"
+  # 同机共存下的 TLS 判定：只「引用既有证书」，不申请。证书由运维用 DNS-01 单独签发
+  # （80 端口归 MixmAPP，HTTP-01 不可用；--webroot 需要改 MixmAPP 的 nginx，跨站耦合）。
+  CERT_DIR="/etc/letsencrypt/live/${NGINX_DOMAIN}"
+  TLS_ENABLED=0
+  if [ -f "${CERT_DIR}/fullchain.pem" ] && [ -f "${CERT_DIR}/privkey.pem" ]; then
+    TLS_ENABLED=1
+    # GNU sed 替换右值用 \n 表示换行；片段直接内联，避免额外 include 文件与权限问题
+    TLS_CONF="listen ${MIM_WEB_HTTPS_PORT} ssl;\n    listen [::]:${MIM_WEB_HTTPS_PORT} ssl;\n    ssl_certificate ${CERT_DIR}/fullchain.pem;\n    ssl_certificate_key ${CERT_DIR}/privkey.pem;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    ssl_session_cache shared:MimTLS:10m;\n    ssl_session_timeout 10m;"
+  else
+    TLS_CONF="# TLS 未启用：${CERT_DIR} 缺少 fullchain.pem / privkey.pem（同机共存请用 DNS-01 签发后重跑本脚本）"
+  fi
+
+  log "安装 nginx 站点配置 → $NGINX_AVAILABLE（server_name $NGINX_DOMAIN，HTTP ${MIM_WEB_HTTP_PORT} / HTTPS ${MIM_WEB_HTTPS_PORT} / 后端 127.0.0.1:${PORT_}）"
+  # 与 bootstrap.sh 同一 sed 规则：域占位 + 端口占位 + TLS 片段三组替换。
+  # 必须全量替换域：配置里还有 api / admin / center 等子域 server_name 与 301 跳转目标，
+  # 只改主站会让子域仍解析到模板域，切域后子域全断。
+  # 端口必须走占位符：同机 MixmAPP 占用 80/443，Mim 固定 8080/8443，且可能因冲突再调整。
+  sed -e "s/laal\.top/${NGINX_DOMAIN}/g" \
+      -e "s|__MIM_WEB_HTTP_PORT__|${MIM_WEB_HTTP_PORT}|g" \
+      -e "s|__MIM_WEB_HTTPS_PORT__|${MIM_WEB_HTTPS_PORT}|g" \
+      -e "s|__MIM_API_PORT__|${PORT_}|g" \
+      -e "s|__MIM_TLS_CONF__|${TLS_CONF}|g" \
+      "$APP_DIR/deploy/nginx-mim.conf" > "$NGINX_AVAILABLE"
   chmod 644 "$NGINX_AVAILABLE"
 
   # 先校验纯 HTTP 配置语法，语法错误立即回滚（此时尚未动 TLS，风险最低）
@@ -395,49 +445,64 @@ if command -v nginx >/dev/null 2>&1; then
     die "nginx 配置语法校验失败，已回滚"
   fi
 
-  # 重新注入 TLS：证书已存在时 certbot 仅改写配置而不重新签发。
-  # SAN 清单 = 主站 + 本机 DNS 已可解析的绑定子域（api / admin / auth / center / dh / gy /
-  # login / mall / pay / video）。新域尚未建解析时把主机名塞给 certbot 会让 HTTP-01 挑战失败、
-  # 整次发布回滚，故先用 getent 探测，只把已解析的追加进 SAN；其余留 warning，DNS 就绪后
-  # 重跑本脚本会自动纳入（--expand 允许在既有证书上追加域名）。
-  CERT_DOMAINS=(-d "$NGINX_DOMAIN" -d "www.${NGINX_DOMAIN}")
-  for CERT_SUB in api admin auth center dh gy login mall pay video; do
-    if getent hosts "${CERT_SUB}.${NGINX_DOMAIN}" >/dev/null 2>&1; then
-      CERT_DOMAINS+=(-d "${CERT_SUB}.${NGINX_DOMAIN}")
+  # certbot 仅在同机独占模式（MIM_TLS_CERTBOT=1）下执行：它会对 80 端口做 HTTP-01 挑战
+  # 并改写 server 块加 --redirect，与 MixmAPP 抢 80/443，共存模式下必须禁用。
+  if [ "$MIM_TLS_CERTBOT" = "1" ]; then
+    # SAN 清单 = 主站 + 本机 DNS 已可解析的绑定子域（api / admin / auth / center / dh / gy /
+    # login / mall / pay / video）。新域尚未建解析时把主机名塞给 certbot 会让 HTTP-01 挑战失败、
+    # 整次发布回滚，故先用 getent 探测，只把已解析的追加进 SAN；其余留 warning，DNS 就绪后
+    # 重跑本脚本会自动纳入（--expand 允许在既有证书上追加域名）。
+    CERT_DOMAINS=(-d "$NGINX_DOMAIN" -d "www.${NGINX_DOMAIN}")
+    for CERT_SUB in api admin auth center dh gy login mall pay video; do
+      if getent hosts "${CERT_SUB}.${NGINX_DOMAIN}" >/dev/null 2>&1; then
+        CERT_DOMAINS+=(-d "${CERT_SUB}.${NGINX_DOMAIN}")
+      else
+        warn "证书跳过 ${CERT_SUB}.${NGINX_DOMAIN}（本机 DNS 无解析，解析就绪后重跑自动纳入）"
+      fi
+    done
+    if [ -d "/etc/letsencrypt/live/${NGINX_DOMAIN}" ] && command -v certbot >/dev/null 2>&1; then
+      log "certbot 注入 HTTPS（已有证书，--keep-until-expiring，SAN: ${CERT_DOMAINS[*]}）"
+      if ! certbot --nginx "${CERT_DOMAINS[@]}" --redirect --non-interactive \
+          --keep-until-expiring --expand --agree-tos -m "admin@${NGINX_DOMAIN}"; then
+        nginx_rollback
+        die "certbot 配置 HTTPS 失败，已回滚（线上 HTTPS 保持可用）"
+      fi
+      # certbot 改写后的配置必须再次校验
+      if ! nginx -t; then
+        nginx_rollback
+        die "certbot 改写后 nginx 校验失败，已回滚"
+      fi
     else
-      warn "证书跳过 ${CERT_SUB}.${NGINX_DOMAIN}（本机 DNS 无解析，解析就绪后重跑自动纳入）"
-    fi
-  done
-  if [ -d "/etc/letsencrypt/live/${NGINX_DOMAIN}" ] && command -v certbot >/dev/null 2>&1; then
-    log "certbot 注入 HTTPS（已有证书，--keep-until-expiring，SAN: ${CERT_DOMAINS[*]}）"
-    if ! certbot --nginx "${CERT_DOMAINS[@]}" --redirect --non-interactive \
-        --keep-until-expiring --expand --agree-tos -m "admin@${NGINX_DOMAIN}"; then
-      nginx_rollback
-      die "certbot 配置 HTTPS 失败，已回滚（线上 HTTPS 保持可用）"
-    fi
-    # certbot 改写后的配置必须再次校验
-    if ! nginx -t; then
-      nginx_rollback
-      die "certbot 改写后 nginx 校验失败，已回滚"
+      warn "未找到 ${NGINX_DOMAIN} 证书或 certbot，跳过 HTTPS 注入（仅 HTTP 生效）"
     fi
   else
-    warn "未找到 ${NGINX_DOMAIN} 证书或 certbot，跳过 HTTPS 注入（仅 HTTP 生效）"
+    warn "同机共存模式（MIM_TLS_CERTBOT=0）：跳过 certbot，不触碰 80/443；HTTPS 由 ${CERT_DIR} 既有证书承载（TLS_ENABLED=${TLS_ENABLED}）"
   fi
 
-  # 启用站点并停用默认站点，然后热加载
+  # 启用站点；default_server 归属同机既有站点（MixmAPP 占 80/443），共存模式不删 default
   ln -sfn "$NGINX_AVAILABLE" "$NGINX_ENABLED"
-  rm -f /etc/nginx/sites-enabled/default
+  if [ "$MIM_NGINX_TAKE_DEFAULT" = "1" ]; then
+    rm -f /etc/nginx/sites-enabled/default
+    log "已停用 default 站点（MIM_NGINX_TAKE_DEFAULT=1，独占机器模式）"
+  else
+    log "保留 /etc/nginx/sites-enabled/default（同机共存，80/443 归 MixmAPP）"
+  fi
   log "nginx -t && reload"
   nginx -t || { nginx_rollback; die "启用站点后 nginx 校验失败，已回滚"; }
   systemctl reload nginx || systemctl restart nginx
 
   # 断言 /admin/ 真实返回管理后台页面：以响应体含 noindex 为准。
-  # 不可用 `curl http://127.0.0.1/admin` 的 301 作为判据：certbot --redirect 会新增一个
-  # 80 端口 server 块，把任何 HTTP 请求都 301 到 HTTPS，该结果无法区分
-  # 「location = /admin 生效」与「整站强制 HTTPS」，属假阳性。
-  # 故用 --resolve 把域名指回本机 443 直取 HTTPS 内容（-k 忽略本机回环证书名差异）。
-  ADMIN_BODY="$(curl -k -s --max-time 5 --resolve "${NGINX_DOMAIN}:443:127.0.0.1" \
-    "https://${NGINX_DOMAIN}/admin/" || true)"
+  # 不可用 `curl http://127.0.0.1/admin` 的 301 作为判据：整站强制 HTTPS 时会 301，
+  # 该结果无法区分「location = /admin 生效」与「整站跳转」，属假阳性。
+  # 端口化后必须带新端口探测：--resolve 指回本机 8443 取 HTTPS；无证书时退化为
+  # Host 头直连本机 8080，保证共存且未签证书的机器也能得到真实判据。
+  if [ "$TLS_ENABLED" -eq 1 ]; then
+    ADMIN_BODY="$(curl -k -s --max-time 5 --resolve "${NGINX_DOMAIN}:${MIM_WEB_HTTPS_PORT}:127.0.0.1" \
+      "https://${NGINX_DOMAIN}:${MIM_WEB_HTTPS_PORT}/admin/" || true)"
+  else
+    ADMIN_BODY="$(curl -s --max-time 5 -H "Host: ${NGINX_DOMAIN}" \
+      "http://127.0.0.1:${MIM_WEB_HTTP_PORT}/admin/" || true)"
+  fi
   if printf '%s' "$ADMIN_BODY" | grep -q 'noindex'; then
     log "/admin/ 返回管理后台页面（noindex 命中），nginx 站点配置已生效"
   else
