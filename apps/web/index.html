@@ -25,21 +25,30 @@
           history.replaceState(null, '', location.pathname + location.hash); // 原地移除查询串：保留路径与 hash，不新增历史、不触发跳转
         } // 查询串清理结束：正常查询参数一律保留原样
         var segs = location.pathname.split('/').filter(Boolean); // 路径拆段并剔除空段（首尾斜杠产生的空串）
-        if (segs.length > 1) { // 仅多段路径需要折叠；根路径与单段路径（/store 等）保持原样
+        // 详情深链接必须原样保留：/community/post/:id 与 /community/news/:kind/:id 是可直接打开、
+        // 刷新与分享的独立页面，若在这里折叠成 /community，详情会退回列表且无法自恢复。
+        var keep = false; // true 表示命中需保留的多段详情深链接
+        if (segs.length > 1) { // 仅多段路径需要判定；根路径与单段路径保持原样
           var cut = 0; // 命中视图段时截到该段的下标；0 表示尚未命中
           for (var i = 0; i < segs.length; i++) { // 从头找第一个已知视图段
-            if (views.indexOf(segs[i]) >= 0) { cut = i + 1; break; } // 截到视图段为止：/mim/store/x → /mim/store
+            if (views.indexOf(segs[i]) >= 0) { // 命中视图段
+              cut = i + 1; // 截到视图段为止：/mim/store/x → /mim/store
+              keep = segs[i] === 'community' && (segs[i + 1] === 'post' || segs[i + 1] === 'news'); // 帖子 / 资讯详情深链接不折叠
+              break; // 只认第一个视图段
+            } // 视图段命中判定结束
           } // 视图段查找结束
-          var folded; // 折叠后的路径
-          if (cut > 0) { // 命中视图段：前缀（如 /mim）+ 视图段
-            folded = '/' + segs.slice(0, cut).join('/'); // 无尾斜杠：地址栏统一成单段形态（资源定位已由 base 保证，不依赖本行）
-          } else if (segs[0] === 'mim') { // 未命中视图段且首段为 mim：唯一的子路径部署是 GitHub Pages 的 /mim/（仓库名）
-            folded = '/mim/'; // 带尾斜杠回到子路径根：路由层把空视图回落为社区
-          } else { // 未命中视图段的根部署多段地址（如 /foo/bar）
-            folded = '/' + segs[0]; // 只保留首段且无尾斜杠：路由层把未知视图回落为社区
+          if (!keep) { // 非详情深链接才折叠地址
+            var folded; // 折叠后的路径
+            if (cut > 0) { // 命中视图段：前缀（如 /mim）+ 视图段
+              folded = '/' + segs.slice(0, cut).join('/'); // 无尾斜杠：地址栏统一成单段形态（资源定位已由 base 保证，不依赖本行）
+            } else if (segs[0] === 'mim') { // 未命中视图段且首段为 mim：唯一的子路径部署是 GitHub Pages 的 /mim/（仓库名）
+              folded = '/mim/'; // 带尾斜杠回到子路径根：路由层把空视图回落为社区
+            } else { // 未命中视图段的根部署多段地址（如 /foo/bar）
+              folded = '/' + segs[0]; // 只保留首段且无尾斜杠：路由层把未知视图回落为社区
+            } // 折叠分支结束
+            history.replaceState(null, '', folded + location.hash); // 原地改写地址：保留 hash，交由 router.ts 的旧 hash 链接兼容逻辑继续处理
           } // 折叠分支结束
-          history.replaceState(null, '', folded + location.hash); // 原地改写地址：保留 hash，交由 router.ts 的旧 hash 链接兼容逻辑继续处理
-        } // 多段折叠结束
+        } // 多段判定结束
       })(); // 立即执行结束：其后的 spa.js 与 assets 统一按 <base href> 解析
     </script><!-- 地址栏前置规整脚本结束 -->
     <script src="%BASE_URL%spa.js"></script><!-- 地址归一化（外置脚本）：构建期 %BASE_URL% 被替换为 ./，配合 <base href="/"> 恒解析到 /spa.js；外置是为绕开生产 CSP script-src 'self' 对内联脚本的禁用（登录拦截由 App 内按需执行，本脚本不做整页替换） -->
