@@ -1333,3 +1333,17 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 **CI 取证**：最新 Deploy run `43579051213`（api.ts 拆分提交）质量门禁 ✓ 1m19s、托管平台同步 ✓ 5m1s、ghcr ✓ 1m6s，唯「发布到生产服务器」✗ 17s，失败于「上传本次提交的部署脚本」：`Permission denied (publickey,password)` / `scp: Connection closed` / exit 255，与 11-13 同根因。
 
 **阻断前提（未变）**：沙箱无被授权的主机 SSH 私钥（本机 `mim_deploy` / `mixmapp_deploy` 两把 × root/ubuntu/deploy/admin 四用户均 publickey denied）、无腾讯云控制台 / tccli 凭证与环境变量，无法登录主机核对 nginx 站点、systemd `mim-api` 状态或切回 Mim 站点。代码、单测、清单一致性与静态分发（Pages / ghcr / Cloudflare 边缘）已闭环；生产主机侧待主机凭证恢复后重跑部署并复核站点归属。
+
+### 9.37 领航员接管审计：仓库侧全量收尾 + 双远端同步（2026-11-14 19:0x +08:00）
+
+**接管范围**：按用户指令「全量读取 Mim 项目 + 派出所有技能/MCP 专家/连接器接管整个项目」，本轮完成仓库侧全量盘点、门禁闭环核验与未提交批次收尾。
+
+**全量读取结论（项目档案）**：5 工作区（web/admin 前端、mim-api 后端、core-domain/i18n 共享包）；442 tracked 文件、228 ts/tsx、58 api 测试文件、12 verify + 2 check 脚本；两条 CI 工作流（deploy.yml / azure-static-web-apps.yml）；双远端 origin(github) + gitee(镜像)。版本口径 `0.0.10`，与 AGENTS.md §0 标注的 `V0.0.1-preview` 存在文档漂移（待 §9.38 统一）。
+
+**门禁闭环（本地实测，HEAD `ef71b65`）**：`pnpm -r typecheck` 5/5 0 错；`@mim/api` vitest **58 文件 / 676 例全过**；`verify-deployments` 55/55、`verify-site-modules` PASS、`verify-entry-manifest` PASS、`verify-auth-gate` 39/39、`verify-custom-domains` 20/20、`verify-indexes`/`verify-site-directory` PASS；version-check / env-check ✓、comment-check(strict) ✓；`@mim/web` 构建 ✓。
+
+**收尾动作（铁律七/十二）**：此前未提交（违反铁律七）的功能批次 `ef71b65`（40 文件 / +3632）已收尾入库——后端 federation 联邦 / referral 分润 / vip-pricing 会员定价 / shop-admin 路由与权限 + 2 份 schema.d 迁移；前端 web 的 Checkout/PaymentReturn/Player/QrCode/ShareCard + lib 5 模块 + router/api 端点类型 + 4 视图；admin 的 ShopCards/ShopCoupons/ShopProducts + api-shop-admin；并补 `.gitignore`（`_stage/` `reports/` `.tmp-*.err` `deploy-*.tgz`）。提交刻意排除构建产物（`.tgz`/`_stage`/`reports`/`.tmp-*.err`/笔记 txt）。**双远端已同步**：origin 与 gitee 均 = `ef71b65`（本轮 gitee 推送成功，先前会话的 401/SSH denied 已恢复）。
+
+**生产侧红线（未变，按铁律三如实标注，不冒充上线）**：`mim.mixm.top` 仍由 MixmAPP 接管（Mim 前后端均不在该域名服务）；CI「发布到生产服务器」仍 `publickey denied` 失败；沙箱无主机私钥/控制台凭证。Mim 当前**无对外生产站点**——代码与静态分发（Pages/ghcr/Cloudflare 边缘）已闭环，但权威生产终点缺位。
+
+**下一步（待用户授权方向）**：① 提供主机 SSH 私钥 / 腾讯云凭证以登录 `115.159.159.11` 复核 nginx 站点归属与 SQLite 保留情况，并按需切回 Mim；② 或经已连接连接器（edgeone-pages / cloudbase）将 Mim 前端+API 重新部署到可控免费平台，建立新的对外生产终点（需确认域名/平台选型，遵循铁律九/十免费矩阵）。
