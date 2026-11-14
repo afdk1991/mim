@@ -251,14 +251,10 @@ const CAPABILITIES: CapabilityItem[] = [
   { labelZh: '知识付费四件套', labelEn: 'Paid content suite', descZh: '付费阅读 / 下载 / 图库 / 视频与未购隐藏', descEn: 'Paid articles, downloads, galleries and videos', view: 'community' },
   { labelZh: '社区商城', labelEn: 'Shop', descZh: '实物快递、自动发货、手动发货、余额与优惠码结算', descEn: 'Physical goods, auto/manual delivery, balance and coupon checkout', view: 'community' },
   { labelZh: '营销与资金', labelEn: 'Marketing & funds', descZh: '优惠码、批量改价、VIP、余额、积分、卡密、返佣、分成', descEn: 'Coupons, bulk pricing, VIP, wallet, points, cards, referrals and revenue share', view: 'community' },
-  { labelZh: '交易链路', labelEn: 'Payment & fulfillment', descZh: '支付渠道、物流、售后退款退货评价', descEn: 'Payment channels, logistics, after-sales and reviews', view: 'commerce' },
   { labelZh: '论坛', labelEn: 'Forum', descZh: '板块、付费加入、帖子形态、排序与板块权限', descEn: 'Boards, paid access, post types, sorting and permissions', view: 'community' },
   { labelZh: '圈子', labelEn: 'Circles', descZh: '成员制社群，区别于论坛板块', descEn: 'Membership communities independent from forum boards', view: 'circles' },
-  { labelZh: '用户体系', labelEn: 'Accounts', descZh: '注册登录、14 家 OAuth、等级、徽章、签到、实名、邀请码', descEn: 'Sign-in, 14 OAuth providers, levels, badges, check-in, verification and invites', view: 'account' },
-  { labelZh: '搜索与多语言', labelEn: 'Search & i18n', descZh: '统一搜索、Meilisearch/SQLite 双引擎、前后台语言', descEn: 'Unified search, Meilisearch/SQLite engines and locale settings', view: 'search' },
-  { labelZh: '内容运营', labelEn: 'Content operations', descZh: '公告、更新日志、推广计划与转化回写', descEn: 'Announcements, changelog, promotions and conversion write-back', view: 'content' },
-  { labelZh: '自研工具', labelEn: 'In-house tools', descZh: 'Quick Build WP、换域名插件、流盾 WAF', descEn: 'Quick Build WP, domain replacement plugin and Liudun WAF', view: 'tools' },
-  { labelZh: '外观与页面', labelEn: 'Appearance & pages', descZh: '导航、配色、列表样式、页面区块', descEn: 'Navigation, palette, list styles and page blocks', view: 'commerce' },
+  { labelZh: '用户体系', labelEn: 'Accounts', descZh: '注册登录、14 家 OAuth、等级、签到、实名、邀请码', descEn: 'Sign-in, 14 OAuth providers, levels, check-in, verification and invites', view: 'account' },
+  { labelZh: '内容运营', labelEn: 'Content operations', descZh: '公告动态（社区页签）、更新日志、推广计划与转化回写', descEn: 'Announcements (community tab), changelog, promotions and conversion write-back', view: 'community' },
   { labelZh: '版本与部署', labelEn: 'Releases & deployments', descZh: '版本迭代、CI 与部署汇总', descEn: 'Release history, CI and deployment summary', view: 'deployments' },
 ]; // 能力地图结束
 

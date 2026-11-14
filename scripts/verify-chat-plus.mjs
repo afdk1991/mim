@@ -159,13 +159,7 @@ const sessionB = await loginPhone(phoneB); // 成员 B
 const sessionC = await loginPhone(phoneC); // 待邀请 C
 const sessionA = await loginPhone(phoneA); // 发起人 A
 
-// 媒体直传受模块权益门禁，先免费解锁（与 verify-chat-flow 一致）
-const unlock = await fetch(API + '/entitlements', {
-  method: 'POST', // 对象字段 method：记录一项配置或数据
-  headers: { 'content-type': 'application/json', authorization: 'Bearer ' + sessionA.access_token, 'idempotency-key': 'chat-plus-' + Date.now() }, // 对象字段 headers：记录一项配置或数据
-  body: JSON.stringify({ module_code: 'comic.workbench' }), // 对象字段 body：记录一项配置或数据
-}); // 代码块结束
-check('解锁媒体通道（comic.workbench）', unlock.status === 200 || unlock.status === 201 || unlock.status === 409, 'HTTP ' + unlock.status); // 调用 check 并处理其返回结果
+// 媒体直传已改为通用对象收发（不再有模块权益门禁）
 
 // 造群与前置消息：群由 A 创建、B 先发一条「原始问题」，供 A 引用
 const created = await apiPost('/im/conversations', { type: 'group', name: groupName, member_user_ids: [sessionB.user.id] }, sessionA.access_token, 'chat-plus-group-' + Date.now());

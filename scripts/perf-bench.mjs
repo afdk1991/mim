@@ -64,8 +64,6 @@ const HELP = `Mim API 性能基准
 // 公开只读端点清单：鉴权端点不在基准范围内（需登录态，另作专项压测）
 const ENDPOINTS = [
   { name: 'health', path: '/health' }, // 执行当前业务步骤
-  { name: 'navigation-summary', path: '/api/v1/navigation/summary' }, // 执行当前业务步骤
-  { name: 'navigation-links', path: '/api/v1/navigation/links' }, // 执行当前业务步骤
 ]; // 执行当前业务步骤
 
 function percentile(samples, p) { // 函数 percentile：封装一段可复用的处理逻辑

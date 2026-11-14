@@ -18,7 +18,7 @@
         if (location.pathname === '/mim' || location.pathname.indexOf('/mim/') === 0) { // 仅 GitHub Pages 把产物挂在仓库名子路径 /mim/ 下；根部署（laal.top 等）不命中
           document.querySelector('base').setAttribute('href', '/mim/'); // 基础地址跟随子路径，保证 ./assets 解析到 /mim/assets
         } // 子路径部署兼容处理结束
-        var views = ['marketplace', 'products', 'cart', 'account', 'entry-catalog', 'deployments', 'navigation', 'search', 'community', 'commerce', 'comic-studio', 'chat', 'tools', 'announcements', 'circles', 'releases', 'signin', 'settings', 'store', 'sites', 'comic', 'login', 'profile', 'forum']; // 对外路径段（模块功能名）+ 改名前的旧别名；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
+        var views = ['cart', 'account', 'deployments', 'community', 'chat', 'news', 'releases', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements']; // 对外路径段（模块功能名）+ 仍保留的旧别名；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
         var href = location.href; // 完整地址：用于判断末位是否为 WAF 清理后残留的裸问号
         var search = location.search; // 查询串（含前导问号；无查询串时为空串）
         if (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?')) { // 命中 WAF 注入参数或裸问号两种异常形态
@@ -34,9 +34,9 @@
           if (cut > 0) { // 命中视图段：前缀（如 /mim）+ 视图段
             folded = '/' + segs.slice(0, cut).join('/'); // 无尾斜杠：地址栏统一成单段形态（资源定位已由 base 保证，不依赖本行）
           } else if (segs[0] === 'mim') { // 未命中视图段且首段为 mim：唯一的子路径部署是 GitHub Pages 的 /mim/（仓库名）
-            folded = '/mim/'; // 带尾斜杠回到子路径根：路由层把空视图回落为 store
+            folded = '/mim/'; // 带尾斜杠回到子路径根：路由层把空视图回落为社区
           } else { // 未命中视图段的根部署多段地址（如 /foo/bar）
-            folded = '/' + segs[0]; // 只保留首段且无尾斜杠：路由层把未知视图回落为 store
+            folded = '/' + segs[0]; // 只保留首段且无尾斜杠：路由层把未知视图回落为社区
           } // 折叠分支结束
           history.replaceState(null, '', folded + location.hash); // 原地改写地址：保留 hash，交由 router.ts 的旧 hash 链接兼容逻辑继续处理
         } // 多段折叠结束

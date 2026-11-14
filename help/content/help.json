@@ -55,25 +55,15 @@
               "type": "table",
               "head": ["路径", "视图", "说明"],
               "rows": [
-                ["/marketplace", "商城目录", "匿名可浏览的商品与模块入口"],
-                ["/products", "商品列表", "密集列表页，支持加购"],
+                ["/community", "社区", "论坛、公告动态、圈子、VIP、钱包与社区商城"],
+                ["/circles", "圈子", "成员制社群"],
+                ["/chat", "聊天", "IM 会话与视频通话"],
                 ["/cart", "购物车", "清单 / 移除 / 清空 / 结算"],
                 ["/account", "个人中心", "资料、权益、订单、账号设置"],
-                ["/entry-catalog", "入口配置清单", "由入口清单驱动的模块目录"],
-                ["/deployments", "部署汇总", "各仓库与部署项的效果与异常"],
-                ["/navigation", "导航站", "全站资源目录与可达性状态"],
-                ["/search", "统一搜索", "模块 / 入口 / 导航 / 社区 / 商品"],
-                ["/community", "社区与变现", "论坛、付费阅读、VIP、钱包、独立商城"],
-                ["/commerce", "商业化中台", "资产、支付、履约、资金、外观、成长"],
-                ["/comic-studio", "漫剧工作台", "AI 剧生成与成片导出"],
-                ["/chat", "聊天", "IM 会话与视频通话"],
-                ["/tools", "自研工具", "工具发布目录"],
-                ["/announcements", "公告动态", "正式公告、更新日志、推广计划"],
                 ["/news", "社区资讯", "论坛主题 + 圈子动态 / 公告的统一内容流"],
                 ["/releases", "版本迭代", "版本时间线与能力地图"],
-                ["/circles", "圈子", "成员制社群"],
+                ["/deployments", "部署汇总", "各仓库与部署项的效果与异常"],
                 ["/checkout", "收银台", "支付意图二维码与状态轮询"],
-                ["/watch", "播放器", "/watch/:kind/:id 选集与进度记忆"],
                 ["/pay-return", "支付回跳", "支付结果三态承接页"],
                 ["/signin", "登录", "登录 / 注册入口"]
               ]
@@ -81,7 +71,7 @@
             {
               "type": "note",
               "tone": "info",
-              "text": "旧路径段（/store、/sites、/comic、/login、/profile、/settings、/forum）仍可访问：前端命中后原地改写为新路径，生产 nginx 同时做 301，二者互为兜底。"
+              "text": "旧路径段（/login、/profile、/settings、/forum）与已并入社区的 /announcements 仍可访问：前端命中后原地改写为新路径，生产 nginx 同时做 301，二者互为兜底；根路径 / 与未知路径统一回落 /community。"
             }
           ]
         },
@@ -163,7 +153,7 @@
               "items": [
                 "apps/web/dist：真实的 Vite 前端产物（GitHub Pages 等以它为上传源）。",
                 "dist/：前端产物副本 + index.html + 404.html（EdgeOne Pages 等平台的 OutputDir）。",
-                "dist/<路径段>/index.html：由 build.mjs 解析 VIEW_SEGMENTS 自动生成，保证 /marketplace、/news 等深链接刷新不 404。",
+                "dist/<路径段>/index.html：由 build.mjs 解析 VIEW_SEGMENTS 自动生成，保证 /community、/news 等深链接刷新不 404。",
                 "构建期接口源：VITE_API_ORIGIN，缺省指向生产 API。"
               ]
             },
@@ -277,9 +267,6 @@
               "type": "table",
               "head": ["旧路径", "新路径"],
               "rows": [
-                ["/store", "/marketplace"],
-                ["/sites", "/entry-catalog"],
-                ["/comic", "/comic-studio"],
                 ["/login", "/signin"],
                 ["/profile、/settings", "/account"],
                 ["/forum", "/community"]

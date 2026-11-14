@@ -30,13 +30,11 @@ import { Invites } from './views/Invites'; // 业务步骤
 import { Realname } from './views/Realname'; // 业务步骤
 // 内容运营：公告 / 更新日志 / 推广计划
 import { ContentOps } from './views/ContentOps'; // 业务步骤
-// 自研工具与开源项目发布
-import { ToolsAdmin } from './views/ToolsAdmin'; // 业务步骤
 // 社区运营：板块审核 / 首页指向 / 推荐权重 / Tab 配置
 import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'tools' | 'communityAdmin';
+type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -68,8 +66,6 @@ const NAV: NavItem[] = [
   { key: 'realname', label: '实名审核', permission: 'user:read' },
   // 内容运营：公告 / 更新日志 / 推广计划
   { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
-  // 自研工具发布
-  { key: 'tools', label: '自研工具', permission: 'appearance:write' },
   // 社区运营
   { key: 'communityAdmin', label: '社区运营', permission: 'appearance:write' },
   // 角色与权限：需要 rbac:read
@@ -235,8 +231,6 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'realname') return <Realname credential={credential} permissions={identity.permissions} />;
   // 内容运营：公告 / 更新日志 / 推广计划
   if (key === 'contentOps') return <ContentOps credential={credential} permissions={identity.permissions} />;
-  // 自研工具发布
-  if (key === 'tools') return <ToolsAdmin credential={credential} permissions={identity.permissions} />;
   // 社区运营：板块审核、首页指向、审核开关、推荐权重、Tab 配置
   if (key === 'communityAdmin') return <CommunityAdmin credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏

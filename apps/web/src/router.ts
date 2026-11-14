@@ -1,30 +1,17 @@
 // React 钩子：状态、副作用与稳定回调
 import { useCallback, useEffect, useState } from 'react';
 
-// 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 播放器 / 支付回跳深链接页
+// 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 支付回跳深链接页
 export type AppView =
-  | 'store' // 功能模块页
-  | 'products' // 商品列表（商城配套的密集列表页，含加购）
   | 'cart' // 购物车（清单 / 移除 / 清空 / 结算）
   | 'account' // 个人中心（资料 / 权益 / 订单 / 账号与设置）
-  | 'sites' // 统一入口配置清单（44 个入口驱动的模块目录）
   | 'deployments' // 部署汇总（所有部署仓库与部署项的效果 / 结果 / 异常）
-  | 'navigation' // 导航站（全站资源目录 + 可达性状态 + 推荐位）
-  | 'search' // 统一搜索（模块 / 入口 / 导航 / 社区 / 商品）
   | 'community' // 社区与变现（论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
-  | 'commerce' // 商业化中台（资产 / 支付 / 履约 / 资金 / 外观 / 成长 / 翻译）
-  | 'comic' // 漫剧 AI 剧工作台
   | 'chat' // IM 聊天 + 视频通话
-  | 'tools' // 自研工具发布目录
-  | 'content' // 公告 / 更新日志 / 推广计划栏目
   | 'news' // 资讯：全站统一内容流（论坛主题 + 圈子动态 / 公告）
-  | 'cloud' // 云存储：私有桶 + 短时签名（上传 / 下载 / 本人产物）
-  | 'img' // 图床：public/ 前缀公有读 + 稳定直链
-  | 'download' // 下载分发：软件 / 源码包私有桶 + 签名分发链接（承接 store 域）
   | 'releases' // 版本迭代：V0.0.0 → 当前版本时间线与能力地图
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
   | 'checkout' // 收银台：支付意图二维码 / 渠道唤起 / 状态轮询
-  | 'watch' // 独立播放器页：/watch/:kind/:id 选集与进度记忆
   | 'payreturn' // 支付回跳承接页：三态结果展示
   | 'login'; // 未登录专用的登录伪视图
 
@@ -35,30 +22,17 @@ export interface AppRoute {
 
 // 视图 → 地址栏路径段（模块功能名称，2026-11-11 全平台统一）：
 // 对外地址一律为 https://<域名>/<模块功能名>，与 App.tsx 导航文案一一对应，
-// 不再使用 store / comic / sites / login 这类与功能名对不上的缩写段。
+// 不再使用与功能名对不上的缩写段；已下线模块不再登记路径段，访问时按未知路径回落社区。
 export const VIEW_SEGMENTS: Record<AppView, string> = {
-  store: 'marketplace', // 商城目录（匿名可浏览）
-  products: 'products', // 商品列表（与功能名一致）
   cart: 'cart', // 购物车（与功能名一致）
   account: 'account', // 个人中心（与功能名一致；账号设置在此，不再单独设「设置」页）
-  sites: 'entry-catalog', // 入口配置清单（44 个入口驱动的模块目录）
   deployments: 'deployments', // 部署汇总（原名即功能名，保持不变）
-  navigation: 'navigation', // 导航站（原名即功能名，保持不变）
-  search: 'search', // 统一搜索（与功能名一致）
   community: 'community', // 社区与变现（论坛 + 知识付费 + VIP + 钱包 + 独立商城）
-  commerce: 'commerce', // 商业化中台（资产 / 履约 / 资金 / 外观 / 成长）
-  comic: 'comic-studio', // 漫剧 AI 剧工作台
   chat: 'chat', // 聊天（原名即功能名，保持不变）
-  tools: 'tools', // 自研工具发布目录
-  content: 'announcements', // 公告 / 更新日志 / 推广计划栏目
   news: 'news', // 资讯：全站统一内容流（对外路径段即功能名 /news）
-  cloud: 'cloud', // 云存储（对外路径段即功能名 /cloud；私有桶 + 短时签名）
-  img: 'img', // 图床（对外路径段 /img；仅 public/ 前缀公有读）
-  download: 'download', // 下载分发（对外路径段 /download；旧 /store 已归属商城，不复用该段）
   releases: 'releases', // 版本迭代（时间线与能力地图）
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
   checkout: 'checkout', // 收银台（支付意图二维码 / 渠道唤起）
-  watch: 'watch', // 独立播放器（/watch/:kind/:id）
   payreturn: 'pay-return', // 支付回跳承接页（/pay-return?intent=...）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
 }; // 代码块结束
@@ -70,19 +44,17 @@ const SEGMENT_VIEWS: ReadonlyMap<string, AppView> = new Map(
 
 // 改名前的旧路径段：线上旧链接、旧书签与外部引用仍需可达，
 // 命中后由 resolveSegment 原地改写为新路径（等价 301，不新增历史记录）。
-// 本表只收录「段名确实改过」的旧别名；未改名的段（chat / products / cart / deployments 等）
-// 已在 VIEW_SEGMENTS 新段表中直接命中，不在此重复登记，避免新旧段同名重复。
+// 本表只收录「段名确实改过且目标视图仍存在」的旧别名；已下线模块的旧段不再登记，
+// 统一按未知路径回落社区，避免把用户送回已删除页面。
 const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
-  store: 'store', // 旧：商城 → marketplace
-  sites: 'sites', // 旧：入口配置清单 → entry-catalog
-  comic: 'comic', // 旧：漫剧 AI 剧 → comic-studio
   login: 'login', // 旧：登录 → signin
   profile: 'account', // 旧口径：个人中心 → account（新增视图同时兼容曾用名）
   settings: 'account', // 旧：独立「设置」页已并入个人中心，旧链接落到 /account，不再保留空设置页
   forum: 'community', // 旧口径：论坛 / 社区 → community（同一视图的曾用名）
+  announcements: 'community', // 2026-11-15 公告动态并入社区：旧链接原地改写为 /community（生产 nginx 另有 301）
 }; // 代码块结束
 
-// 全部视图均为单段路径（如 /comic-studio），保证 vite base './' 下相对资源解析正确
+// 全部视图均为单段路径（如 /community），保证 vite base './' 下相对资源解析正确
 const VIEWS: AppView[] = Object.keys(VIEW_SEGMENTS) as AppView[]; // 视图全集：由映射表派生的唯一真源
 
 // 自定义路由事件名：pushState 不会触发 popstate，编程式导航后派发此事件通知 hook 更新
@@ -109,10 +81,10 @@ export function baseOf(): string {
   return base; // 返回推断结果
 } // baseOf 结束
 
-// 把地址栏路径剥离挂载前缀后拆段，返回全部非空段（深链接如 /watch/thread/:id 取多段）
+// 把地址栏路径剥离挂载前缀后拆段，返回全部非空段（深链接如 /circles/:id 取多段）
 export function pathSegments(): string[] {
   const base = baseOf(); // 挂载前缀
-  let path = window.location.pathname; // 当前路径，如 '/mim/store' 或 '/store'
+  let path = window.location.pathname; // 当前路径，如 '/mim/community' 或 '/community'
   if (base !== '/' && path.startsWith(base)) path = path.slice(base.length); // 剥离 '/mim/' 前缀
   else if (base !== '/' && path === base.slice(0, -1)) path = ''; // 无尾斜杠的 '/mim' 视为子路径根
   return path.split('/').filter(Boolean); // 全部非空段；空路径返回 []
@@ -143,30 +115,29 @@ function resolveSegment(seg: string): AppView | null {
   return legacy; // 返回旧段对应的视图
 } // resolveSegment 结束
 
-// 解析当前地址栏为路由：兼容旧 hash 链接（#/view）与未知路径（安全回退 store）
+// 解析当前地址栏为路由：兼容旧 hash 链接（#/view）与未知路径（安全回退社区）
 export function parseLocation(): AppRoute {
-  if (typeof window === 'undefined') return { view: 'store' }; // 非浏览器环境兜底
+  if (typeof window === 'undefined') return { view: 'community' }; // 非浏览器环境兜底
   // 旧 hash 链接兼容：改造前线上地址一律为 #/<view>，老书签 / 外链仍可能带 hash 进入
   const hashSeg = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)[0] ?? ''; // hash 首段
   if (hashSeg) { // 存在旧 hash 路径
     const hashView = VIEWS.find((v) => v === hashSeg) ?? null; // hash 段是老口径的视图标识，直接按视图名匹配
-    // 已知视图落到其新路径，已删除的旧页面（如 #/site/*）统一回退商城
-    const target = baseOf() + VIEW_SEGMENTS[hashView ?? 'store'];
+    // 已知视图落到其新路径，已删除的旧页面统一回退社区
+    const target = baseOf() + VIEW_SEGMENTS[hashView ?? 'community'];
     window.history.replaceState(null, '', target); // 原地改写为路径形式，不新增历史记录
-    return { view: hashView ?? 'store' }; // 返回匹配结果或安全回退
+    return { view: hashView ?? 'community' }; // 返回匹配结果或安全回退
   } // hash 兼容分支结束
   const segs = pathSegments(); // 全部路径段
-  // 多段深链接：/watch/:kind/:id 独立播放器；/pay/return 与 /pay-return 支付回跳承接
-  if (segs[0] === 'watch') return { view: 'watch' };
+  // 多段深链接：/pay/return 与 /pay-return 支付回跳承接
   if (segs[0] === 'pay' && segs[1] === 'return') return { view: 'payreturn' };
   if (segs[0] === 'pay-return') return { view: 'payreturn' };
   const view = resolveSegment(segs[0] ?? ''); // 新段直接命中；旧段命中并原地重定向
-  return view ? { view } : { view: 'store' }; // 未知路径与根路径都回落到商城目录
+  return view ? { view } : { view: 'community' }; // 未知路径与根路径都回落到社区
 } // parseLocation 结束
 
 // 由路由生成路径：所有导航入口统一走这里，保证链接格式一致（含子路径部署前缀）
 export function hrefOf(route: AppRoute): string {
-  return baseOf() + VIEW_SEGMENTS[route.view]; // 形如 '/marketplace' 或 '/mim/marketplace'
+  return baseOf() + VIEW_SEGMENTS[route.view]; // 形如 '/community' 或 '/mim/community'
 } // hrefOf 结束
 
 // 编程式跳转：pushState 写入路径并派发路由事件；同地址时直接返回（popstate 与事件均不触发）

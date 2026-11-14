@@ -46,17 +46,36 @@ const SCENE_ENV: Record<CaptchaScene, string> = { // 保存 SCENE_ENV：承载�
   post: 'MIM_CAPTCHA_POST', // 对象字段：声明结构中的一项数据
 }; // 结束代码块：本层作用域收尾
 
-/** 解析全局验证码模式；非法取值回落 off，避免把配置错误变成线上放行 */
-export function captchaMode(env: Record<string, string | undefined>): CaptchaMode { // 定义函数 captchaMode：封装可复用业务步骤
-  const raw = (env.MIM_CAPTCHA_MODE ?? '').trim().toLowerCase(); // 保存 raw：承载本步骤的计算结果供后续使用
-  return CAPTCHA_MODES.has(raw) ? (raw as CaptchaMode) : 'off'; // 返回结果：把本步骤产物交给调用方
+/** 是否生产环境：NODE_ENV=production 时验证码默认强制开启 */
+function isProductionEnv(env: Record<string, string | undefined>): boolean { // 定义函数 isProductionEnv：封装可复用业务步骤
+  return (env.NODE_ENV ?? '').trim().toLowerCase() === 'production'; // 严格等于 production 才按生产处理
 } // 结束函数体：本层作用域收尾
 
-/** 某场景是否强制验证码：模式 off 一律不强制；场景开关 1 才强制；旧 MIM_CAPTCHA_REQUIRED=1 视为全场景强制 */
+/**
+ * 解析全局验证码模式。
+ * 未配置或非法取值时：生产环境回落 image（自托管图形验证码，不依赖第三方凭证），非生产回落 off。
+ * 生产默认开启，避免「默认关闭」被原样带进线上；显式配置 off 仍视为运维的有意关闭。
+ */
+export function captchaMode(env: Record<string, string | undefined>): CaptchaMode { // 定义函数 captchaMode：封装可复用业务步骤
+  const raw = (env.MIM_CAPTCHA_MODE ?? '').trim().toLowerCase(); // 保存 raw：承载本步骤的计算结果供后续使用
+  if (CAPTCHA_MODES.has(raw)) return raw as CaptchaMode; // 显式合法取值优先
+  return isProductionEnv(env) ? 'image' : 'off'; // 生产默认开启，非生产默认关闭
+} // 结束函数体：本层作用域收尾
+
+/**
+ * 某场景是否强制验证码：
+ *   - 模式 off 一律不强制；
+ *   - 旧 MIM_CAPTCHA_REQUIRED=1 全场景强制；
+ *   - 场景开关 MIM_CAPTCHA_<SCENE>=1 强制，=0 显式关闭；
+ *   - 其余情况生产环境默认强制 register 与 login（登录口令链路必须带验证码）。
+ */
 export function sceneCaptchaRequired(env: Record<string, string | undefined>, scene: CaptchaScene): boolean { // 定义函数 sceneCaptchaRequired：封装可复用业务步骤
   if (captchaMode(env) === 'off') return false; // 条件分支：仅在满足业务前置条件时继续
   if ((env.MIM_CAPTCHA_REQUIRED ?? '').trim() === '1') return true; // 条件分支：仅在满足业务前置条件时继续
-  return (env[SCENE_ENV[scene]] ?? '').trim() === '1'; // 返回结果：把本步骤产物交给调用方
+  const sceneSwitch = (env[SCENE_ENV[scene]] ?? '').trim(); // 读取场景级开关
+  if (sceneSwitch === '1') return true; // 显式强制
+  if (sceneSwitch === '0') return false; // 显式关闭，保留运维退路
+  return isProductionEnv(env) && (scene === 'register' || scene === 'login'); // 生产默认强制注册与登录
 } // 结束函数体：本层作用域收尾
 
 /** 第三方验证码凭证是否齐备（仅用于状态披露，不泄漏密钥本身） */
@@ -543,37 +562,6 @@ export async function assertPublicHttpUrl(raw: string): Promise<void> { // 定�
   return assertSafeOutboundUrl(raw); // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 
-/** 厂商配置来源地址校验选项 */
-export interface ProviderBaseUrlOptions {
-  /** 显式放行 http 配置（仅本地 / 内网联调；缺省拒绝明文 http） */
-  allowInsecure?: boolean;
-} // 代码块结束
-
-/**
- * 校验 AI 厂商 baseUrl 这一「配置来源」地址：
- * - 协议白名单：缺省只允许 https；`allowInsecure`（MIM_AI_ALLOW_INSECURE_BASE=1）时才放行 http；
- * - 字面环回 / 私网 / 链路本地 / 元数据地址一律拒绝（防止配置被改成内网探测目标）；
- * - 域名形式不做 DNS 解析：配置由部署方注入，仅拦截字面内网，域名解析后的私网由出站 fetch 链路复核。
- */
-export function assertProviderBaseUrl(raw: string, opts?: ProviderBaseUrlOptions): void {
-  let url: URL; // 可变变量 url：运行过程中会被重新赋值
-  try { // 异常捕获起点：包裹可能抛出错误的操作
-    url = new URL(raw); // 赋值：更新变量 url 的取值
-  } catch { // 代码块结束
-    throw new AppError('VALIDATION_FAILED', 'invalid provider base url'); // 抛出错误：中断当前流程并向上层传递
-  } // 代码块结束
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new AppError('VALIDATION_FAILED', 'unsupported provider base url protocol'); // 条件分支：按判断结果选择后续处理路径
-  if (url.protocol === 'http:' && !opts?.allowInsecure) throw new AppError('VALIDATION_FAILED', 'insecure http provider base url is not allowed; set MIM_AI_ALLOW_INSECURE_BASE=1 to opt in'); // 条件分支：按判断结果选择后续处理路径
-  const host = url.hostname.replace(/^\[|\]$/g, ''); // 常量 host：保存固定配置或一次性派生值
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new AppError('VALIDATION_FAILED', 'private host is not allowed'); // 条件分支：按判断结果选择后续处理路径
-  const normalizedV4 = normalizeIPv4Host(host); // 常量 normalizedV4：保存固定配置或一次性派生值
-  if (normalizedV4) { // 条件分支：按判断结果选择后续处理路径
-    if (isPrivateIPv4(normalizedV4)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 条件分支：按判断结果选择后续处理路径
-    return; // 返回当前函数的处理结果
-  } // 代码块结束
-  if (isIP(host) === 6 && isPrivateIPv6(host)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 条件分支：按判断结果选择后续处理路径
-} // 代码块结束
-
 const MAX_REDIRECTS = 5; // 保存 MAX_REDIRECTS：承载本步骤的计算结果供后续使用
 
 /**
@@ -665,7 +653,6 @@ const EXPECTED_INDEXES: ReadonlyArray<{ table: string; columns: string[]; reason
   { table: 'content_reports', columns: ['reporter_id', 'target_type', 'target_id', 'created_at'], reason: '举报按 用户+目标 滑动窗口与我的举报列表' }, // 业务步骤：推进当前流程的下一项处理
   { table: 'community_threads', columns: ['board_id', 'status'], reason: '板块列表按板块 + 状态过滤（排序走 last_activity_at 既有索引）' }, // 业务步骤：推进当前流程的下一项处理
   { table: 'community_posts', columns: ['thread_id', 'created_at'], reason: '帖子回复按主题分组并按时间排序' }, // 业务步骤：推进当前流程的下一项处理
-  { table: 'nav_links', columns: ['group_name'], reason: '导航目录按分组过滤（状态过滤走既有 status 单列索引）' }, // 业务步骤：推进当前流程的下一项处理
   { table: 'paid_assets', columns: ['kind', 'status', 'created_at'], reason: '资产列表按类型 / 状态过滤并按时间倒序' }, // 业务步骤：推进当前流程的下一项处理
 ]; // 集合结束：数组或索引表达式收尾
 

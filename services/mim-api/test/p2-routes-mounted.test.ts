@@ -28,8 +28,5 @@ describe('P2 路由已接入主应用', () => { // 调用 describe 并处理其�
 
     const changelog = await request(app).get('/api/v1/changelog'); // 公开更新日志
     expect(changelog.status).toBe(200); // 证明更新日志端点不是 404
-
-    const tools = await request(app).get('/api/v1/tools'); // 自研工具公开目录
-    expect(tools.status).toBe(200); // 证明工具路由已挂载
   }); // 代码块结束
 }); // 代码块结束

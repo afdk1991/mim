@@ -4,7 +4,7 @@
 
 ## 项目主题
 
-**主题**：IM 即时通讯 + AI 漫剧创作 + 模块化商城，一套 Node/TypeScript 全栈、多平台发布的跨端协作平台。
+**主题**：IM 即时通讯 + 社区内容与社区商城，一套 Node/TypeScript 全栈、多平台发布的跨端协作平台。
 
 主题词与归属分类全部取自 [Gitee Explore](https://gitee.com/explore) 的真实分类（不自造分类名）：
 
@@ -13,8 +13,7 @@
 | 主 | IM即时通讯/聊天 | https://gitee.com/explore/im | `/chat` 单聊 / 群聊 / 引用回复 / 撤回 / 文件图片消息、WebRTC 视频通话 |
 | 主 | WEB应用开发 | https://gitee.com/explore/web-app-develop | `apps/web` SPA（深链接回退四件套）、`apps/admin` 管理端前端 |
 | 辅 | 后台管理框架 | https://gitee.com/explore/backend | `/admin/` 商城与订单运营视图、管理类 `/api/v1/*` |
-| 辅 | AI-人工智能 | https://gitee.com/explore/ai | 漫剧创作工作台、AI 剧本扩充、AI 配音合成、付费生成包 |
-| 辅 | 多媒体 | https://gitee.com/explore/multimedia | 漫剧成片渲染导出（MOV/720p 转码降级）、WebRTC 音视频链路、云存储扩容 |
+| 辅 | 多媒体 | https://gitee.com/explore/multimedia | WebRTC 音视频链路（聊天视频通话）、图片 / 文件消息的预签名收发 |
 
 分类与标杆项目对标、以及「Gitee 仓库无主题字段」的实测结论见 [docs/项目主题与Gitee-Explore分类映射-20261112.md](./docs/项目主题与Gitee-Explore分类映射-20261112.md)。
 
@@ -26,7 +25,7 @@
 
 ## 版本
 
-当前版本：**V0.0.11-preview**（semver 由 `0.0.10` 递增为 `0.0.11`：2026-11-14 建设收口——新增「社区资讯 `/news`」「私有云存储 `/cloud`」「图床 `/img`」「下载分发 `/download`」四个前台视图；后端硬化对象存储配置为私有桶 + 预签名基线（缺桶名/区域/密钥即 `STORAGE_CONFIG_INVALID`，不再静默降级），并为图床单独划出 `public/` 公有读前缀与稳定直链基线；新增零依赖静态文档站 `help/`（项目介绍 / 部署说明 / 常见问题，供 news / service / support / blog 复用）；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
+当前版本：**V0.0.11-preview**（2026-11-15 按产品要求下线 10 个功能模块——功能模块商城 `/marketplace`、云存储 `/cloud`、图床 `/img`、下载分发 `/download`、自研工具 `/tools`、统一搜索 `/search`、导航站 `/navigation`、商业化中台 `/commerce`、放映厅 `/watch`、创作工作台 `/comic-studio`，前端视图 / 路由 / 侧栏入口 / 后端接口 / 数据表一并删除；`/` 与未知路径回落 `/community`；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
 
 版本号规约（与 [AGENTS.md 铁律四](./AGENTS.md#铁律四版本号每次添加功能模块更新等等规约与-readme-同步) 同步）：
 
@@ -91,16 +90,16 @@ node scripts/comment-check.mjs
 pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`、`packages/*`）：
 
 ```
-apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块商城 / 商品列表 / 购物车 / 个人中心 / 站点矩阵 / 部署汇总 / 漫剧放映厅 + 创作工作台 / 即时通讯）
-apps/web/src/views/  # 24 个视图组件：20 个 AppView 视图（Store / Products / Cart / Account / Sites / Deployments / Navigation / Search / Community / Commerce / ComicStudio / Chat / Tools / ContentHub / Releases / Circles / Checkout / Player / PaymentReturn / Login），另含 ChatPreview / ComicTheater / ComicWorkbench / PageBlocks / Profile 等子组件
-apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；17 个视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户 / 订单 / 社区 / 内容运营 / 邀请码 / 价格批次 / 实名 / 工具 / 商城卡片 / 商城优惠券 / 商城商品 / 登录）
+apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：社区 / 购物车 / 个人中心 / 部署汇总 / 聊天 / 资讯 / 版本 / 圈子）
+apps/web/src/views/  # 14 个视图组件：11 个 AppView 视图（Cart / Profile / Community / Chat / ContentHub / News / Releases / Circles / Checkout / PaymentReturn / Login），另含 ChatPreview / PageBlocks 等子组件
+apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；16 个视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户 / 订单 / 社区 / 内容运营 / 邀请码 / 价格批次 / 实名 / 商城卡片 / 商城优惠券 / 商城商品 / 登录）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
-services/mim-api/src/routes/  # 38 个路由模块（37 个 routes/*.ts + payments/router.ts）：admin / ai / appearance / assets / auth / cart / catalog / circles / comic / community / content-ops / content-unified / deployments / entries / federation / finance / fulfill / growth / i18n / im / invites / me / media / navigation / oauth / orders / payments / realname / referral / referral-admin / search / security / shop-admin / sites / sso / tools / vip-pricing
+services/mim-api/src/routes/  # 26 个路由模块（25 个 routes/*.ts + payments/router.ts）：admin / appearance / auth / cart / catalog / circles / community / content-ops / content-unified / deployments / federation / im / invites / me / media / oauth / orders / payments / realname / referral / referral-admin / security / shop-admin / sso / vip-pricing
 services/mim-api/src/oauth/   # 第三方登录适配层：providers（14 家注册表）/ client（协议交换）/ accounts（绑定与一次性票据）
 services/mim-api/src/identity.ts  # 唯一建号入口：Mim ID 事务发号、历史用户回填、登录缺号兜底
-packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 站点模块注册表 siteModules / 部署汇总注册表 deploymentRegistry）
+packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 部署汇总注册表 deploymentRegistry）
 packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
-scripts/             # build / version-check / env-check / comment-check / verify-site-* / deployment-summary / verify-deployments
+scripts/             # build / version-check / env-check / comment-check / verify-auth-gate / deployment-summary / verify-deployments
 deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / migrations / sealos / iga）
 .github/workflows/   # CI/CD（deploy.yml 五作业：verify / deploy / pages / packages / platforms）
 site/                # PRD 可视化阅读载体（`npm run build:site` 离线副本，非生产站点）
@@ -111,34 +110,18 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 ### 前端视图（`apps/web/src/views`）
 
-站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，且路径段一律使用模块功能名称——`/marketplace`（商城）、`/products`（商品列表）、`/cart`（购物车）、`/account`（个人中心与设置）、`/entry-catalog`（入口配置清单）、`/deployments`（部署汇总）、`/navigation`（导航站）、`/search`（统一搜索）、`/comic-studio`（漫剧 AI 剧）、`/chat`（聊天）、`/signin`（登录），地址栏不再出现 `#/` 或 `?tads` 残留；旧 `#/xxx` 链接与改名前的旧段（`/store` `/sites` `/comic` `/login` `/settings` `/profile`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）。**2026-11-12 起「设置」不再是独立视图**：原设置页的账号资料、语言 / 时区、区域信息与注销操作全部并入 `/account` 的「账号与设置」分区，`/settings` 旧链接自动落到 `/account`；`/account` 入口常驻左侧导航（免登录体验下访客同样拥有个人区）。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**免登录体验（2026-11-12 起，取代原按需登录）**：全站不再出现「此功能需登录后使用」。前端启动时若本地无会话，自动调用 `POST /api/v1/auth/guest` 领取**匿名访客会话**（`users.is_guest=1`，同样自动分配 Mim ID 号码、同样签发 access/refresh 双令牌），此后商城目录 `/marketplace`、`/products`、`/cart`、`/account`、`/entry-catalog`、`/deployments`、`/comic-studio`（放映厅 + 创作工作台）、`/chat` 全部按可用路径渲染：加购、下单、解锁、订单、聊天收发、漫剧创作都可以直接操作，数据落在该访客账号。`/signin` 只用于把访客身份**升级为正式账号**（密码 / 验证码 / 注册 / 9 家第三方登录），登录后替换为正式会话，退出登录后重新加载页面又会自动回到免登录可用态。访客建号按 IP 限流（每小时 30 个，超限返回 429 `AUTH_GUEST_RATE_LIMITED`），会话结构校验、失效事件广播与 `/me` 启动静默校验见 [api.ts](./apps/web/src/api.ts)；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。功能模块商城页顶部保留一张 www 主站入口静态卡片。
+站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，且路径段一律使用模块功能名称——`/community`（社区）、`/circles`（圈子）、`/chat`（聊天）、`/cart`（购物车）、`/account`（个人中心与设置）、`/news`（社区资讯）、`/releases`（版本）、`/deployments`（部署汇总深链接）、`/checkout`（收银台）、`/pay-return`（支付回跳）、`/signin`（登录），根路径 `/` 与未知路径统一回落 `/community`；地址栏不再出现 `#/` 或 `?tads` 残留。旧 `#/xxx` 链接与改名前的旧段（`/login` `/settings` `/profile` `/forum`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）；已下线模块的旧段不再登记，访问时按未知路径回落社区，不会把用户送回已删除页面。**2026-11-12 起「设置」不再是独立视图**：原设置页的账号资料、语言 / 时区、区域信息与注销操作全部并入 `/account` 的「账号与设置」分区。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**免登录体验（2026-11-12 起）**：前端启动时若本地无会话，自动调用 `POST /api/v1/auth/guest` 领取匿名访客会话（`users.is_guest=1`，同样自动分配 Mim ID 号码、同样签发 access/refresh 双令牌），此后 `/community`、`/circles`、`/cart`、`/account`、`/deployments`、`/chat` 全部按可用路径渲染；`/signin` 只用于把访客身份**升级为正式账号**（密码 / 验证码 / 注册 / 第三方登录）。访客建号按 IP 限流（每小时 30 个，超限返回 429 `AUTH_GUEST_RATE_LIMITED`）。`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载角色 / 权限 / 用户角色 / 商城管理（模块创建、编辑、状态流转、软删除、定价行 CRUD）/ **分类导航（两级分类树 CRUD：`GET /categories/manage` 读树、`POST /categories` 新建、`PATCH /categories/:slug` 改名与排序、`DELETE /categories/:slug` 删除）** / 权益管理（列表过滤、发放、回收、审计事件时间线）/ **商城订单（跨用户订单列表 `GET /orders/manage` + 人工结算 `POST /orders/:id/settle`）**。
 
-**导航收口（2026-11-13，16 项一级 → 12 项平铺）**：侧栏把「同一件事的第二个入口」收进上级，页面与路由一条不删（直链、搜索、站内跳转全部照旧可达），只是不再各占一行；**不渲染分组标题，12 项按固定顺序平铺**：
+**导航收口（2026-11-15 模块下线后）**：侧栏不渲染分组标题，按固定顺序平铺 **6 项**——社区 · 聊天 · 个人中心 · 购物车 · 社区资讯 · 版本，外加侧栏底部的登录 / 退出入口；公告动态已并入社区页「公告动态」页签，不再单独占一行（旧链接 `/announcements` 由前端 `LEGACY_SEGMENTS` 与生产 nginx 301 统一落到 `/community`）；`圈子` 并入「社区」、`部署汇总` 并入「版本」，二者仅在上级页顶部保留直达条，深链接 `/circles`、`/deployments` 仍可直接访问并高亮上级。已下线的 10 个模块入口、路由、页面与后端接口全部移除，不再以隐藏项形式残留。
 
-- **合并 4 项**：`商品列表` 并入「商城」（同一批商品的密集列表视图，商城页顶部有「商品列表（列表视图）」直达条）；`圈子` 并入「社区」（成员制社群是社区的一个板块，社区页顶部有「圈子」直达条）；`入口配置清单` 并入「导航站」（站点页顶部有「入口配置清单（44 个入口）」直达条）；`部署汇总` 并入「版本」（版本页顶部有「部署汇总（12 个部署项）」直达条，二级页均提供「返回上级」）。
-- **改名 1 项**：`社区与商城` → **`社区`**（社区页内确有独立商城，但一级入口叫「社区与商城」会与「商城」重名混淆）。
-- **保留 12 项平铺顺序**：商城 · 购物车 · 个人中心 · 社区 · 漫剧 AI 剧 · 聊天 · 商业化中台 · 导航站 · 统一搜索 · 版本 · 自研工具 · 公告动态。
-- 实现口径：`App.tsx` 的 `navDefaults` 增加 `hidden` 可选字段，`appearance.ts` 的 `NavDefault` 同步扩展；`hidden` 项仍留在路由表与渲染分支里（`/products` `/circles` `/entry-catalog` `/deployments` 直链全部可用），只被侧栏过滤，后台 `nav_items` 的 `visible` 不能把它强行拉回。
-
-**两个商城的分工（2026-11-14 命名收口，消除「多个商城」歧义）**：项目里确实有两套商品，但**不是同一个商城的多个入口**，而是两条独立商品线，因此不合并、只做命名区分：
-
-- **商城**（侧栏入口，`/marketplace`）：**功能模块商城**——数字功能模块（19 个一级分类 / 205 个模块），一次性解锁、绑定权益、详情面板含依赖链与价格历史。
-- **社区商城**（社区页 `shop` 标签，原称「独立商城」）：实物快递 / 自动发卡密 / 人工发货三类商品，按余额与优惠码结算，下单走 `community.shop` 接口。
-- **商品列表**（`/products`）：商城内的密集列表视图，不是第三个商城。
-- 同名文案改造点：社区页 `h1` / `community-tabs` 标签 / 商城区块标题 / 余额提示 / `统一搜索` 的 `shop` 筛选标签 / 版本能力地图条目，统一为「社区商城」；侧栏「商城」保持原名。
+**商城范围（2026-11-15 收口）**：项目只在**社区页内**保留一套商城（`shop` 标签，原称「独立商城」）——实物快递 / 自动发卡密 / 人工发货三类商品，按余额与优惠码结算，下单走 `community.shop` 接口；功能模块商城（原 `/marketplace`）已随本次模块下线一并删除，其后端目录 / 购物车 / 订单 / 权益接口保留，仅服务于保留的 `/cart`、`/account` 与管理后台。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
 | 登录 | `Login.tsx` | 全站唯一登录入口：**账号密码登录**（自建账号 `POST /auth/register` + `POST /auth/password`，口令 bcrypt 存储）、**管理员口令登录**（同一 `/auth/password`，口令来自 `MIM_AUTH_ADMIN_PASSWORD`）、**验证码登录**（`/auth/code` + `/auth/login`，需短信/邮件通道凭证）、**第三方登录（2026-11-12）**（`GET /auth/oauth/providers` 拉 14 家清单 + 是否已配置 → `POST /auth/oauth/:provider/authorize` 取授权地址 → 回调 302 带一次性票据 → `POST /auth/oauth/exchange` 换会话；未配置凭证的提供方按钮置灰标注「未配置」）；**注册成功先展示自动分配的 Mim ID**（`user.member_no`，纯数字 QQ 号样式、无前缀不补零，自动发号自 `102` 起、靓号只人工授予）再进入工作台；登录页挂载时查 `GET /auth/channels` 并在通道未配置时直接提示改用密码或注册。匿名访问收费/私密视图时在内容区内嵌展示；**聊天 `/chat` 匿名态改为只读演示页**（`ChatPreview.tsx`：完整聊天布局 + 示例会话与消息 + 禁用输入区 + 登录引导），不再是一张空白登录卡片 |
-| 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：**两级分类树（2026-11-10 改造）**——左侧「全部推荐项目」+ 19 个一级分类（1 前沿技术 … 19 其他开源），点击一级展开其二级条目（共 205 条，二级条目一律作为功能模块入库，模块编码 `cat.<一级slug>-<两位序号>`，权重 `sort_order = 一级序×100 + 二级序`）；右侧搜索（`?q=` 提交制）、筛选面板（排序三档 `星星最高 / 最新推荐 / 最近更新`、开源许可 48 项、编程语言 87 项，均为多选并可一键清空）、分页条（`page` / `pageSize`，默认 20 条/页）、**商品视觉（2026-11-12 改造，2026-11-13 升级）**——卡片顶部渲染逐商品独立矢量封面（`catalogArt.ts` `moduleCoverUrl()` 生成 1200×675 SVG data URL，配色 / 字标 / 纹理由模块编码稳定哈希生成，不额外请求后端图片；早期 19 张分类 JPG `apps/web/public/catalog/<slug>.jpg` 为遗留资源），封面左上分类角标、右上价格角标；点击「详情」后卡片横跨整行，详情首屏为**画廊（商品封面 / 能力亮点 / 交付与依赖三张可切换缩略图，`moduleStoryUrl()` 生成两张说明面板）** + 11 项参数键值表（编码 / 分类 / 许可 / 语言 / Stars / 区域 / 状态 / 解锁方式 / 价格 / 前置依赖 / 能力绑定），画廊主图与下方 **900×1180「商品参数详情图」**（`specPosterUrl()`，按详情数据实时生成、每条各不相同、可右键另存）均可点击进入全屏放大预览（遮罩 / 关闭按钮 / Esc 退出），下方继续保留工具调用 / 依赖链 / 价格历史；卡片徽标（语言 + 许可 + `★ stars`）、**免费模块一次性解锁（`POST /entitlements`）、付费模块一律 402 `PAYMENT_REQUIRED` 引导下单（`POST /orders`，金额由服务端快照）**、「我的权益」区块（`GET /me/entitlements`）、**「我的订单」区块（`GET /orders`，待结算可 `POST /orders/:id/cancel`）**、**右下「搜索帮助」浮窗（固定 12 条帮助外链，可展开/收起）**、**「热门项目」卡片（今日 / 本周两档，`GET /modules/hot`，跟随当前分类，点击条目直达其所属分类）**、卡片上的待结算/已解锁徽标、前置依赖缺失时的引导提示；**2026-11-12 首屏优化**——G6 依赖链图与 ECharts 价格历史图改为动态 `import()`，仅在详情展开时加载，Web 入口 JS 由 3.39 MB 降至 843 KB（gzip 228 KB） |
 | 部署汇总（2026-11-09，2026-11-12 收敛为纯表格） | `Deployments.tsx` | 只保留 8 列传证核对表：规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明——访问域名可点击直达入口，缺失信息并入异常说明列；**空数据（⚪）、失败（🔴）、缺失（⚠）分别标识**，匿名只读；页面原总览统计卡、状态分布环形图、五类筛选、展开取证详情与覆盖排除说明已按用户指令全部删除；数据源 `packages/core-domain/src/deploymentRegistry.json` |
-| 导航站（2026-11-12） | `Navigation.tsx` | 全站资源链接目录：目录概览（链接总数 / 可达 / 失效 / 未探测 / 分组数 + 最近探测时间）、关键词检索、分组筛选项、按分组渲染链接列表、**三态徽标**（✅ 可达 / 🔴 失效 / ⚪ 未探测）与 HTTP 码 / 耗时 / 探测时间取证、单条「检测」与「检测全部」、「设为推荐 / 取消推荐」切换、收录入口表单（名称 / 地址 / 分组 / 说明 / 推荐位）；外部链接 `target=_blank` 直达，运行期自动带访客会话，链接目录公开可浏览；数据源 `nav_links` 表 + `packages/core-domain/src/navigation.ts` |
-| 统一搜索（2026-11-12） | `Search.tsx` | 跨五来源（功能模块 / 44 入口 / 导航链接 / 社区帖子 / 独立商城）聚合检索：关键词输入 + 六档来源页签（全部 / 功能模块 / 统一入口 / 导航链接 / 社区帖子 / 独立商城）、可搜规模卡片（各来源文档数 + 当前引擎）、推荐词、按来源分组的命中列表、关键词 `<mark>` 高亮、高匹配 / 相关徽标、耗时；结果标题直达对应视图或外部链接；引擎为 Meilisearch 时优先远端、失败自动回退 SQLite 并由接口 `engine` 字段标明 |
-| 站点矩阵（2026-11-09，2026-11-12 落地状态对齐） | `Sites.tsx` | 按 DNSPod `mixm.top` 44 类备注开发的模块目录：总览统计（44 模块 / 132 功能点 / 19 业务域 / 空备注行 / 条目数）、关键词搜索与业务域筛选、44 张卡片逐条展示备注原文与 xls 行号、**落地状态徽标**（已落地 / 部分相邻 / 规划中 / 语义冲突）与「进入模块 / 查看相邻实现」直达；展开查看 3 个功能点及状态机、已落地功能清单与边界说明；规划中入口隐藏演示条目与新建表单、显示规划空态；**登录后可新建条目并流转状态**（清单 `active→archived`、管理 `pending→active→archived`、记录 `pending→done→archived`，归档为终态），匿名只读并显示「登录后操作」引导；数据源 `packages/core-domain/src/siteModules.json` + 落地映射 `packages/core-domain/src/entryImplementation.ts` |
-| 漫剧放映厅 | `ComicTheater.tsx` / `ComicStudio.tsx` | **2026-11-12 新增**：`/comic-studio` 顶部「放映厅 / 创作工作台」分段，默认进放映厅；匿名可看内置演示片库（`GET /api/v1/comic/showcase`，2 部开放授权片源，静态站 `apps/web/public/demo/` 托管），原生 `<video>` 播放、作品网格选择、集数切换、`localStorage` 断点续播；**2026-11-12 增强**——「全部 / 漫剧 / AI 剧」形态筛选、片库搜索、按本地进度倒序的「继续观看」横向卡片、播完自动进下一集；登录后「我的作品」列出本人成片（`GET /api/v1/comic/theater` 签发 1 小时播放地址），可直接播放；创作工作台未登录时不再整页拦截，改为分段内登录引导 |
-| 漫剧 AI 剧 | `ComicWorkbench.tsx` | 工程 / 角色 / 分镜 / 生成任务 / 成片与版本全流程；**成片导出（2026-11-08）**：每个成片行新增「导出」面板，可选 MP4/MOV × 1080p/720p，`POST /comic/films/:id/export` 返回 1 小时有效的一次性预签名下载地址；MP4/1080p 直接下载原片，其它组合需服务端 `MIM_FFMPEG_PATH` 转码，未配置时前端显示本地化提示并提供「直接下载原片」一键降级；降级成功后表单回写实际格式/分辨率 |
 | 设置 | `Settings.tsx` / `Profile.tsx` | 资料、区域、语言与注销冷静期；**2026-11-12 归位**：设置不再是顶层导航入口，只作为登录后「个人中心」内的「账号与设置」页签；匿名访客的个人中心只保留「资料 / 我的权益 / 我的订单」，不再出现「此功能需登录后使用」的设置入口 |
 | 聊天 | `Chat.tsx` | 即时通讯与视频通话：会话列表、用户搜索、消息收发、WebRTC 视频通话（`VideoCall.tsx`），WS 端点 `/api/v1/im/ws`；**2026-11-11 增强**——引用回复（`reply_to_id` + 发送时固化 `reply_excerpt` 摘要快照，气泡内渲染引用块）、文件消息气泡（presign 下载直链 + 体积 + 下载按钮）、群管理（群主「设/撤管理员」「转让群主」、群主/管理员「移除」「邀请入群」、成员数实时刷新）、会话内搜索结果定位（`?around=` 按目标消息取上下文窗口 + 命中高亮）、未读分割线（`unread_count` 换算锚点，渲染「以下是新消息」）、表情选择器（20 个 Unicode 表情） |
 
@@ -152,9 +135,6 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | Mim ID（2026-11-12） | 无独立端点：`/auth/register`、`/auth/login`、`/auth/password`、`/auth/refresh`、`GET /me`、`GET /me/oauth` 的 `user.member_no` 字段 | 随登录态返回；号码由服务端在事务内发号，客户端只读 |
 | 商城 | `GET /taxonomy`（分类导航树：19 个一级分类 + 205 个二级条目，每个分组/条目带 `name`（中文）与 `name_en`（英文）以及各自的 active 模块数，英文站点凭 `name_en` 渲染导航）、`GET /modules`（支持 `?q=` 搜索、`?category=`（一级 slug 前缀命中 / 二级 slug 精确命中 / `all` 等价不过滤）、`?sort=`（`stars` / `recommended` / `updated`，非法值 400）、`?licenses=` / `?languages=`（逗号分隔多选）、`?page=` / `?pageSize=`（1–100，默认 20），响应带 `total / page / page_size / total_pages`）、`GET /modules/hot`（右侧「热门项目」：`?range=today|week`（24h / 168h，非法值 400）、`?category=`、`?limit=`（1–20，默认 5），热度 = stars + 窗口内新建加权，返回 `items[].hotness`）、`GET /modules/:code`（详情含价格历史、前置依赖、分类/许可/语言/stars） | 公开 |
 | 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（12 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 全部公开只读，不查业务表、无写端点 |
-| 导航站（2026-11-12） | `GET /navigation/summary`（三态计数 + 分组计数 + 最近探测时间）、`GET /navigation/links`（支持 `?q=` / `?group=` / `?status=ok\|broken\|unknown` / `?recommended=1`）、`POST /navigation/links`（收录链接，`url` 只接受 http(s) 或站内相对路径）、`PATCH /navigation/links/:id`（改名 / 分组 / 说明 / 推荐位 / 地址，至少一个字段）、`POST /navigation/links/:id/check`（单条可达性探测并回写状态）、`POST /navigation/check`（全目录探测，上限 50 条，逐条串行） | 浏览类公开；写与探测需登录 + `Idempotency-Key` |
-| 统一搜索（2026-11-12） | `GET /search/summary`（五来源文档数 + 当前引擎）、`GET /search`（`?q=` 必填、`?scope=all\|module\|entry\|navigation\|community\|shop`（支持逗号多值）、`?limit=` 每来源 1–30 默认 8；返回 `engine / total / took_ms / groups[]`，分组含 `scope / label / count / items[]`，条目含 `title / subtitle / snippet / href / popularity / score`）、`POST /search/reindex`（把当前全部文档推送到配置的 Meilisearch，未配置 503） | 检索与 summary 公开；reindex 需 `module:read`（或超管引导令牌） |
-| 站点模块（2026-11-09） | `GET /sites/overview`（全站汇总 + 落地四态计数）、`GET /sites`（44 模块列表，支持 `?q=` / `?domain=`，逐条带落地映射）、`GET /sites/:host`（备注原文 + 行号 + 能力点 + 统计 + 落地映射）、`GET /sites/:host/capabilities`、`GET /sites/:host/items`（支持 `?capability=` / `?status=`）、`POST /sites/:host/items`、`POST /sites/:host/items/:id/transition` | 浏览公开；两个写端点登录 + 幂等 |
 | 权益 | `POST /entitlements`（**付费模块返回 402 `PAYMENT_REQUIRED`**，免费模块 201）、`GET /me/entitlements` | 登录 + 幂等 |
 | 商城订单 | `POST /orders`（下单，金额服务端快照；同模块已有待付单回放 200）、`GET /orders`（我的订单，`status` 过滤 + 分页）、`POST /orders/:id/cancel` | 登录 + 幂等 |
 | 购物车（2026-11-11） | `GET /cart`（条目含 `owned / free / available / price / added_at`，`totals` 按币种累计、`payable_count` 排除免费与已拥有）、`POST /cart/items`（加购；重复加购回放 `{added:false}`）、`DELETE /cart/items/:moduleCode`（天然幂等）、`DELETE /cart`（清空）、`POST /cart/checkout`（逐条结算：免费模块同事务发权益并写 `entitlement_events`（`reason=cart_checkout`）、付费模块生成 `pending` 订单（已有待结算单则回放）、已下架 / 已拥有 / 缺依赖分别 `skipped` 并保留在车；成功条目统一移出车） | 登录（写端点 + 幂等） |
@@ -163,12 +143,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 商城管理 | `GET /modules/manage`（含 `category_slug / license / language / stars` 四字段）、`POST /modules`、`PATCH /modules/:code`、`PATCH /modules/:code/status`、`DELETE /modules/:code`、`POST /modules/:code/prices`、`PUT/DELETE /modules/prices/:id` | Bearer + `module:read` / `module:write` |
 | 权益管理 | `GET /entitlements`、`GET /entitlements/:id/events`、`POST /entitlements/grant`、`POST /entitlements/:id/revoke` | Bearer + `entitlement:read` / `entitlement:grant` / `entitlement:revoke` |
 | 账号 | `GET /me`、`PATCH /me`、`POST /me/deletion`、`POST /me/cancel-deletion` | 登录 |
-| 漫剧放映厅 | `GET /comic/showcase`（匿名）、`GET /comic/theater`（登录，不校验模块权益） | `showcase` 返回演示片库相对片源；`theater` 返回本人成片最新版本 + 1 小时预签名播放地址 |
-| 漫剧工程 | `GET/POST /comic/projects`、`GET/PATCH/DELETE /comic/projects/:id`、`POST /comic/projects/:id/{storyboard,characters,suggest}` | 登录 |
-| 生成任务 | `GET/POST /comic/projects/:id/jobs`、`GET /comic/jobs/:id`、`POST /comic/jobs/:id/{start,complete,fail,cancel,retry}` | 登录 |
-| 成片 | `GET/POST /comic/projects/:id/films`、`GET /comic/films/:id`、`POST /comic/films/:id/{versions,submit-review,publish,reject,archive}`、**`POST /comic/films/:id/export`**（导出：入参 `format: mp4\|mov` + `resolution: 720p\|1080p`，基于最新版本签发预签名下载地址；无产物 404、跨用户 404、转码不可用 403 且回显 `details.requested`，同键同体幂等） | 登录 |
-| 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`、`GET /media/presign/download`、`GET /media/assets`、**`GET /media/thumb`**（`object_key` + `size` 出 WebP 缩略图；归属/保留期校验，非图片 400，缓存 300s） | 对象端点凭签名免鉴权；`/media/thumb` 需登录 + `comic.workbench` 权益 |
-| AI 编排 | `GET /ai/capabilities`、`POST /ai/jobs/:id/run` | 登录 |
+| 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`（`asset_type` 必填）、`GET /media/presign/download` | 对象端点凭签名免鉴权；预签名需登录；供聊天附件与社区图集 / 视频帖使用 |
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
 | 管理分类 | `GET /categories/manage`（两级分类树 + 每组/每级 active 模块计数 + `name_en`）、`POST /categories`（带 `parent_slug` 建二级，否则建一级；二级 slug 必须以「父 slug-」开头，重复 slug 409，父分类不存在 404）、`PATCH /categories/:slug`（仅 `name` / `name_en`(nullable) / `sort_order`，至少一项否则 400）、`DELETE /categories/:slug`（有子级或有模块引用 409，成功为物理删除） | Bearer + `module:read` / `module:write`（`x-admin-token` 为超管引导通道） |
 | 即时通讯 | `GET/POST /im/conversations`、`GET/PATCH/DELETE /im/conversations/:id`（详情/改名/删除或解散）、`GET/POST /im/conversations/:id/members`、`DELETE /im/conversations/:id/members/:userId`、`PATCH /im/conversations/:id/preferences`（置顶/免打扰）、`GET /im/conversations/:id/messages`、`GET /im/conversations/:id/messages/search?q=`、`POST /im/conversations/:id/messages`、`POST /im/conversations/:id/messages/:messageId/recall`（2 分钟内仅本人）、`POST /im/conversations/:id/read`、`GET /im/users`、`WS /im/ws?token=<access_token>`（服务端帧含 `message.recall`） | 登录（WS 凭 query token） |
@@ -205,14 +180,11 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 | 入口 | 内容 |
 |---|---|
-| [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 / 10 漫剧状态机 |
+| [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 |
 | [docs/deployment-summary.md](./docs/deployment-summary.md) | 部署汇总核对表：11 矩阵平台 / 12 规范部署项逐项列出仓库标识、平台 / 层级、交付链路、访问域名、部署状态、部署结果、异常说明；含异常明细、工件双口径、覆盖去重与排除说明（另有 7 条候选 / 排除留痕不计入汇总） |
 | [docs/deployment-summary.json](./docs/deployment-summary.json) | 同上的结构化结果（机器可核对，schema `mim.deployment-registry.v1`） |
-| [docs/站点模块开发落地说明-20261109.md](./docs/站点模块开发落地说明-20261109.md) | 45 类备注驱动的站点模块开发交付说明：逐项落实清单、45×3 功能点、验证矩阵、U1–U8 未决项与同步清单 |
-| [docs/站点入口契约落地说明-20261109.md](./docs/站点入口契约落地说明-20261109.md) | 上一轮站点入口契约（仅登记、43 类未决）交付说明，与本轮成果并存 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
-| [docs/wiki/10-comic-state-machines.md](./docs/wiki/10-comic-state-machines.md) | 漫剧工程 / 生成任务 / 成片版本的状态机与迁移约束 |
 | [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.11-preview 口径，含 FR-01~06 功能规格与交互演示） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 

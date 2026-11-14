@@ -1,7 +1,8 @@
 /**
- * 内容栏目页：公告列表 / 更新日志时间线 / 推广计划卡片。
- * 三个公开接口独立拉取，任一 404 或返回空数组时静默隐藏对应栏目，不报错、不白屏。
- * 已登录运营可在本页对三栏目进行增删改（复用 /admin/content/* 契约，挂 appearance:write 权限）；
+ * 社区「公告动态」页签：公告列表 / 更新日志时间线 / 推广计划卡片。
+ * 2026-11-15 起由独立 /announcements 页面并入社区，数据源仍是 /content/* 三个公开接口，
+ * 不复制静态文案；任一接口失败或返回空数组时静默隐藏对应栏目，不报错、不白屏。
+ * 已登录运营可在本页签内增删改（复用 /admin/content/* 契约，挂 appearance:write 权限）；
  * 无会话或无权限时管理面板静默隐藏，公开面不受影响。
  */
 
@@ -118,7 +119,7 @@ function isoOrNull(raw: string): string | null {
   return raw.trim() ? raw.trim() : null; // 返回当前函数的处理结果
 } // 代码块结束
 
-export function ContentHub({ locale, hasSession = false }: Props) { // 导出函数 ContentHub：对外暴露的调用入口
+export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // 导出社区公告动态页签组件
   const [tab, setTab] = useState<ContentTab>('announcements'); // 当前公开栏目
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]); // 公告清单
   const [changelog, setChangelog] = useState<ChangelogItem[]>([]); // 更新日志
@@ -359,9 +360,9 @@ export function ContentHub({ locale, hasSession = false }: Props) { // 导出函
   ]; // 执行当前业务步骤
 
   return ( // 返回当前函数的处理结果
-    <div className="page content-hub">{/* 执行当前业务步骤 */}
+    <div className="content-hub">{/* 社区公告动态页签容器 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
-        <h1>{tr(locale, '公告与动态', 'News & Updates')}</h1>
+        <h2>{tr(locale, '公告与动态', 'News & Updates')}</h2>
         <p className="muted">{tr(locale, '产品公告、版本更新与推广计划统一收录于此，三个栏目均按版本号倒序；无版本号的条目排在最后。', 'Announcements, release notes and promotions in one place. All three tabs are sorted by version, newest first; unversioned items come last.')}</p>
       </header>
 

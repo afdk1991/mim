@@ -4,7 +4,7 @@
 
 ## 项目一句话概述
 
-Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号身份与漫剧 AI 剧工作台（FR-03 重定义版）的 P0 最小集；同时保留协作治理体系（AGENTS.md 十二条铁律；项目名称 Mim）、版本规约校验脚本与产品需求文档。
+Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号身份、即时通讯与社区内容（含社区商城）的 P0 最小集；同时保留协作治理体系（AGENTS.md 十二条铁律；项目名称 Mim）、版本规约校验脚本与产品需求文档。
 
 - 当前版本：**V0.0.11-preview**（预览通道，正式版未发布；6 包 semver 均 `0.0.11`）
 - 仓库性质：**pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`）
@@ -16,21 +16,16 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 |---|---|
 | [01-architecture.md](./01-architecture.md) | 项目整体架构：仓库现状分层 + PRD 目标产品架构 |
 | [02-modules.md](./02-modules.md) | 主要模块/文件职责清单（含 apps/services/packages 实况） |
-| [03-code-reference.md](./03-code-reference.md) | 仓库级脚本说明：`scripts/version-check.mjs`（§1–§6）与 `scripts/env-check.mjs`（§7）；另有 `serve-local.mjs` / `verify-film-export.mjs` 本地浏览器真渲染验证链（见 [08 §1.2](./08-dev-implementation.md)）；业务代码见 08 |
+| [03-code-reference.md](./03-code-reference.md) | 仓库级脚本说明：`scripts/version-check.mjs`（§1–§6）与 `scripts/env-check.mjs`（§7）；另有 `serve-local.mjs` 本地浏览器真渲染验证链（见 [08 §1.2](./08-dev-implementation.md)）；业务代码见 08 |
 | [04-dependencies.md](./04-dependencies.md) | 依赖关系（已安装依赖 / 工具链 / 规划中能力） |
 | [05-runbook.md](./05-runbook.md) | 运行方式：启动 API/Web、测试、构建、校验命令 |
 | [06-governance.md](./06-governance.md) | 治理规约：十二条铁律与版本号规则详解（含铁律十二远程仓库 / 生产终点） |
 | [07-functional-modules.md](./07-functional-modules.md) | 功能模块：PRD FR-01~06 需求、状态机、共享规则、实现状态 |
 | [08-dev-implementation.md](./08-dev-implementation.md) | 开发实现全景：目标架构 + §1.1「已实现 vs 规划」对照 |
 | [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md) | 第三方 SDK / API / API Key 全量清单（含北斗卫星导航专项） |
-| [10-comic-state-machines.md](./10-comic-state-machines.md) | 漫剧模块完整状态机：comic_projects / generation_jobs / comic_films 三套状态机、24 条路由转移对照、冒烟链路 |
 | [../security-default-config-audit-20261108.md](../security-default-config-audit-20261108.md) | 后台默认配置安全自查（2026-11-08）：G1–G14 逐项、六类分系统、资产台账、P0/P1/P2、留档模板 |
 | [../routing-url-hash-audit-20261108.md](../routing-url-hash-audit-20261108.md) | 线上域名访问地址与路由模式诊断（2026-11-08）：为何所有功能模块统一带 `/#`、四层根因取证、13 项域名台账、路径差异对照、改造清单与 V1–V12 验证标准 |
 | [../rewrite-vs-refactor-decision.md](../rewrite-vs-refactor-decision.md) | 现有模块「重新开发 vs 保留结构梳理」决策与实施方案（2026-11-09）：六维判定框架与硬门槛、模块 A 完整实现、B1–B14 行为冻结清单、调整项与验证矩阵、缺失上下文清单 |
-| [../站点模块开发落地说明-20261109.md](../站点模块开发落地说明-20261109.md) | v1「站点模块矩阵」开发交付说明（2026-11-09）：45 模块 / 135 功能点 / 7 端点 / 14 例测试 / 43 项校验、U1–U8 未决项 |
-| [../统一入口配置清单与模块化实现说明-20261109.md](../统一入口配置清单与模块化实现说明-20261109.md) | **本轮**统一入口配置清单交付说明（2026-11-09 23:35）：去重整理 / 可配置占位标识 / 19 业务域 / 职责边界与关联 / 79+23 项校验 / 15 文件 211 例测试 / U1–U7 未决项 |
-| [../统一入口配置清单-20261109.md](../统一入口配置清单-20261109.md) | 可读清单全表：44 入口 × 9 列（核心功能 / 职责边界 / 后台接口职责 / 相似模块关联与区分），另附落地状态四态（已落地 / 部分相邻 / 规划中 / 语义冲突） |
-| [../站点入口契约落地说明-20261109.md](../站点入口契约落地说明-20261109.md) | 上一轮「站点入口契约」交付说明（仅登记、43 类未决），与本轮开发成果并存 |
 
 ## 仓库速览
 
@@ -72,7 +67,6 @@ f:\合并项目\Mim
 
 - 想了解**项目要做什么** → 先读 [01-architecture.md](./01-architecture.md) 的「目标产品架构」一节
 - 想了解**产品要交付哪些功能、已实现到什么程度** → 读 [07-functional-modules.md](./07-functional-modules.md)
-- 想了解**漫剧工作台三套状态机与 24 条路由转移** → 读 [10-comic-state-machines.md](./10-comic-state-machines.md)
 - 想了解**开发怎么落地 / 当前代码与规划差在哪** → 读 [08-dev-implementation.md](./08-dev-implementation.md) §1.1
 - 想了解**仓库里现在有什么** → 读 [02-modules.md](./02-modules.md)
 - 想**启动应用 / 跑测试 / 跑校验** → 读 [05-runbook.md](./05-runbook.md) §6

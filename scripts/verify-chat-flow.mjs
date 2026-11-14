@@ -132,9 +132,7 @@ await send('Page.enable'); // 打开页面事件
 const sessionB = await loginPhone(phoneB); // 先注册成员账号
 const sessionA = await loginPhone(phoneA); // 再注册发起人账号
 
-// 媒体直传受模块权益门禁（comic.workbench 提供对象存储通道），E2E 前先免费解锁，否则发图会 403
-const unlock = await fetch(API + '/entitlements', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + sessionA.access_token, 'idempotency-key': 'chat-e2e-' + Date.now() }, body: JSON.stringify({ module_code: 'comic.workbench' }) }); // 解锁
-check('解锁媒体通道（comic.workbench）', unlock.status === 200 || unlock.status === 201 || unlock.status === 409, 'HTTP ' + unlock.status); // 记录
+// 媒体直传已改为通用对象收发（不再有模块权益门禁），E2E 可直接发图
 
 // 注入发起人会话（跳过登录页，聚焦聊天交互本身）
 await send('Page.navigate', { url: PAGE + '/chat' }); // 打开聊天页

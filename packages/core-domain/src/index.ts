@@ -7,13 +7,8 @@
 export * from './errors.js';
 // 聚合导出 UUIDv7 主键生成函数：时间有序，便于数据库顺序写入与按时间分页
 export * from './ids.js';
-// 聚合导出统一入口配置清单：45 个去重入口 / 19 个业务域 / 职责边界 / 关联区分 / 可配置占位标识 / 功能点状态机，前后端共用同一数据源
-export * from './siteModules.js';
-export * from './entryImplementation.js'; // 执行当前业务步骤
 // 聚合导出部署汇总注册表：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常 / 汇总统计，前后端共用同一数据源
 export * from './deploymentRegistry.js';
-// 聚合导出全站资源导航站契约：链接种子、地址归一化、探测目标解析、可达性判定与目录汇总
-export * from './navigation.js';
 // 聚合导出模块商城分类树与筛选项：19 个一级分类 / 205 个二级条目 / 48 项许可 / 87 种语言 / 排序枚举，服务端种子与前端导航共用
 export * from './catalogTaxonomy.js';
 // 聚合导出「模块 = 真实能力」清单：能力键 / 绑定模块编码 / 输入提示 / 输出形态，服务端 handler 与前端工具面板共用

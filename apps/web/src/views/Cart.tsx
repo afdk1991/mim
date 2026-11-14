@@ -115,7 +115,7 @@ export function Cart({ locale }: Props) {
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>{isZh ? '购物车' : 'Cart'}</h1>
         <div className="products-pager">{/* 执行当前业务步骤 */}
-          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'products' })}>{isZh ? '继续挑选' : 'Browse products'}</button>
+          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'community' })}>{isZh ? '继续挑选' : 'Browse products'}</button>
           <button type="button" className="btn ghost" onClick={() => void clear()} disabled={items.length === 0}>{isZh ? '清空' : 'Clear'}</button>
         </div>
       </header>

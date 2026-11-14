@@ -132,9 +132,9 @@ function ensurePnpm() {
 
 /**
  * 从 apps/web/src/router.ts 解析 SPA 对外路径段清单，避免构建脚本与前端路由两处手写清单漂移。
- * 2026-11-11 起视图标识与对外路径段解耦：对外地址一律用模块功能名称（如 /marketplace），
+ * 2026-11-11 起视图标识与对外路径段解耦：对外地址一律用模块功能名称（如 /community），
  * 因此这里解析的是 VIEW_SEGMENTS 映射表的值，而不是内部视图标识。
- * @returns {string[]} 路径段数组（如 ['marketplace', 'entry-catalog', ...]）
+ * @returns {string[]} 路径段数组（如 ['community', 'cart', ...]）
  */
 function readSpaPaths() {
   // 路由源码路径：路径段映射表定义在此
@@ -146,7 +146,7 @@ function readSpaPaths() {
   } // 代码块结束
   // 读取源码文本，用正则抓 VIEW_SEGMENTS 的对象字面量
   const text = readFileSync(routerPath, 'utf8');
-  // 匹配形如 `const VIEW_SEGMENTS: Record<AppView, string> = { store: 'marketplace', ... };`
+  // 匹配形如 `const VIEW_SEGMENTS: Record<AppView, string> = { community: 'community', ... };`
   const match = text.match(/const VIEW_SEGMENTS[^=]*=\s*\{([\s\S]*?)\n\};/);
   // 未命中说明路由实现已改结构，宁可失败也不静默产出错误目录
   if (!match) {
@@ -166,7 +166,7 @@ function readSpaPaths() {
 /**
  * 为不支持 SPA 前端路由重写的静态托管（EdgeOne Pages 等）生成回退产物：
  * 1) dist/404.html —— 与 index.html 逐字节一致的兜底页；
- * 2) dist/<view>/index.html —— 每个视图一个同名目录，使刷新 /marketplace、/chat 等深链接
+ * 2) dist/<view>/index.html —— 每个视图一个同名目录，使刷新 /community、/chat 等深链接
  *    能直接命中真实静态文件（实测这是 EdgeOne 上最可靠的深链接方案）。
  * 只作用于根 dist/（EdgeOne 的 OutputDir），不改动 apps/web/dist，
  * 避免 GitHub Pages 等以 apps/web/dist 为上传源、且会补斜杠的平台上相对资源解析失效。
@@ -181,9 +181,9 @@ function emitSpaFallback() {
   } // 代码块结束
   // 生成 404.html 兜底页（与入口同内容）
   copyFileSync(indexHtml, join(DIST, '404.html'));
-  // 逐个对外路径段建目录并放入同名入口副本（目录名即模块功能名，如 marketplace）
+  // 逐个对外路径段建目录并放入同名入口副本（目录名即模块功能名，如 community）
   for (const segment of readSpaPaths()) {
-    // 路径段目录绝对路径，如 dist/comic-studio
+    // 路径段目录绝对路径，如 dist/releases
     const viewDir = join(DIST, segment);
     // 递归建目录（已存在时幂等）
     mkdirSync(viewDir, { recursive: true });

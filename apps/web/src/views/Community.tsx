@@ -27,12 +27,14 @@ import type { // 引入依赖、类型或本地模块绑定
 } from '../api';
 
 import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
+import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
 
 interface Props { // 接口 Props：约束对象的字段与类型形态
   locale: Locale;
+  hasSession?: boolean; // 是否有登录会话：决定公告页签内的运营管理面板是否展示
 } // 代码块结束
 
-type Tab = 'forum' | 'vip' | 'wallet' | 'shop' | 'referral'; // 类型别名 Tab：复用一份复合类型定义
+type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral'; // 类型别名 Tab：复用一份复合类型定义
 
 const KIND_LABEL: Record<ThreadKind, string> = { // 常量 KIND_LABEL：保存固定配置或一次性派生值
   text: '图文',
@@ -102,7 +104,7 @@ function dateOnly(iso: string | null): string { // 函数 dateOnly：封装一�
 } // 代码块结束
 
 /** 社区与变现页 */
-export function Community({ locale }: Props) {
+export function Community({ locale, hasSession = false }: Props) {
   const [tab, setTab] = useState<Tab>('forum'); // 赋值：更新变量 const 的取值
   const [boards, setBoards] = useState<CommunityBoard[]>([]); // 赋值：更新变量 const 的取值
   const [stats, setStats] = useState({ threads: 0, views: 0, likes: 0 }); // 赋值：更新变量 const 的取值
@@ -623,6 +625,7 @@ export function Community({ locale }: Props) {
       <nav className="community-tabs">{/* 执行当前业务步骤 */}
         {([
           ['forum', '论坛'],
+          ['announcements', '公告动态'],
           ['vip', 'VIP 会员'],
           ['wallet', '钱包 / 积分'],
           ['shop', '社区商城'],
@@ -633,6 +636,8 @@ export function Community({ locale }: Props) {
       </nav>
 
       {loading && <div className="community-empty">正在加载社区数据…</div>}
+
+      {!loading && tab === 'announcements' && <AnnouncementsPanel locale={locale} hasSession={hasSession} />}
 
       {!loading && tab === 'forum' && (
         <div className="community-forum">{/* 执行当前业务步骤 */}

@@ -1,8 +1,6 @@
 /** SQLite 连接与结构迁移 */
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
-import { SITE_MODULES } from '@mim/core-domain'; // 统一入口配置清单：44 个去重入口、19 个业务域、占位标识与运行时能力点
-import { NAV_LINK_SEEDS } from '@mim/core-domain'; // 全站资源导航站的默认链接种子（站内相对路径，不写具体域名）
 import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn, capabilityOfModule } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 模块能力绑定
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本、枚举 schema.d 域脚本
 import { dirname, join } from 'node:path'; // 取文件所在目录 / 拼接 schema.d 下的脚本路径
@@ -37,8 +35,6 @@ const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/; // 表名/列名都必须匹配该�
  *   - 可空列表直接追加，旧行读出来是 NULL，语义即「尚未清理 / 尚未被回收」。
  */
 const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: string }> = [ // 只列真正需要向后兼容的列
-  { table: 'generation_jobs', column: 'attempts', definition: 'INTEGER NOT NULL DEFAULT 0' }, // 超时回收重试计数
-  { table: 'generation_assets', column: 'purged_at', definition: 'TEXT' }, // 过期产物字节清理时间
   { table: 'module_orders', column: 'channel_txn_id', definition: 'TEXT' }, // 外部渠道交易号（支付回调幂等依据）
   { table: 'modules', column: 'category_slug', definition: 'TEXT' }, // 模块所属二级分类标识（2026-11-10 分类树改造）
   { table: 'modules', column: 'license', definition: 'TEXT' }, // 模块开源许可（筛选维度，演示口径）
@@ -86,7 +82,7 @@ export function ensureColumn(db: Db, table: string, column: string, definition: 
 } // ensureColumn 结束
 
 /**
- * 批量补齐增量列，返回本次真正新增的列名（形如 `generation_jobs.attempts`）。
+ * 批量补齐增量列，返回本次真正新增的列名（形如 `modules.capability`）。
  * 全新建库时全部已存在，返回空数组，不做任何结构变更。
  */
 export function migrateAdditiveColumns(db: Db): string[] { // 启动期调用一次，随 createDatabase 执行
@@ -171,10 +167,8 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   seedCatalogCategories(db); // 写入模块分类树（19 个一级 + 205 个二级），导航与过滤依赖它
   seedCategoryModules(db); // 按分类树展开写入 205 个二级模块（cn/global 双区），实现「二级条目即模块」
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
-  seedSiteModules(db); // 写入入口配置清单演示数据，并把存量隔离键幂等迁移到占位标识
-  seedNavLinks(db); // 写入导航站默认目录（站内视图入口），幂等，不覆盖用户新增与已探测状态
   seedCommunity(db); // 写入社区板块 / 官方帖 / VIP 套餐 / 独立商品 / 卡密 / 优惠码，保证新库开箱可用
-  seedCommerce(db); // 写入付费资产 / 主题 / 页面区块 / 徽章，保证商业中台开箱有内容
+  seedCommerce(db); // 写入付费资产 / 主题 / 页面区块，保证保留模块开箱有内容
   const unified = backfillUnifiedCommerce(db); // 统一交易域回填：把三套历史订单写进 orders（幂等，UNIQUE(source, source_id) 保证重复启动不加行）
   if (unified.orders > 0 || unified.items > 0) console.log(`[db] unified commerce backfilled: ${unified.orders} orders / ${unified.items} items / ${unified.products} products`); // 回填必须留痕，便于核对迁移结果
   const unifiedContent = backfillUnifiedContentMessaging(db); // 统一内容与消息域回填：论坛/圈子内容 → content_items，IM/私信 → conversations + messages
@@ -185,86 +179,6 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   if (backfilled > 0) console.log(`[db] member_no backfilled: ${backfilled} users`); // 补号必须留痕，便于核对号码连续性
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束
-
-/**
- * 入口配置清单演示数据种子：把静态契约中每个入口的 seed 条目写入 site_module_items。
- * 主键由「入口序号 + 能力编码 + 序号」拼接而成，天然幂等；INSERT OR IGNORE 保证
- * 重复启动不会覆盖用户在演示条目上的状态流转，也不会产生重复行。
- *
- * v2 迁移：v1 曾用台账短主机记录作为数据隔离键，而本轮明确「不补写未提供的具体主机值」，
- * 故按稳定主键把存量演示条目的隔离键幂等改写为占位键；用户的状态流转与时间字段保持不变，
- * 语句中不含任何具体主机值字面量，也不依赖旧值的取值。
- */
-export function seedSiteModules(db: Db): void { // 入口清单种子入口，测试内存库同样会执行
-  const now = new Date().toISOString(); // 统一时间戳，保证同批数据 created_at / updated_at 一致
-  const insert = db.prepare( // 预编译插入语句，逐条绑定参数避免拼接 SQL
-    `INSERT OR IGNORE INTO site_module_items
-       (id, host, capability, title, detail, status, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'system', ?, ?)`, // created_by 固定 system，标识这是演示数据
-  ); // prepare 结束
-  const align = db.prepare( // 幂等迁移：把 v1 演示条目的隔离键改写为占位键，只按主键定位
-    'UPDATE site_module_items SET host = ? WHERE id = ? AND host <> ?', // host 列物理名保留，语义已变为占位键
-  ); // prepare 结束
-  const validKeys = SITE_MODULES.map((m) => m.entryKey); // 当前注册表占位键集合，用于识别已移除模块的孤儿演示行
-  const orphanPlaceholders = validKeys.map(() => '?').join(', '); // 动态 IN 列表占位符；键来自静态契约，不含外部输入
-  const removeOrphans = db.prepare( // 清理已从注册表移除的 system 演示条目；用户自建条目 created_by 非 system，不受影响
-    `DELETE FROM site_module_items WHERE created_by = 'system' AND host NOT IN (${orphanPlaceholders})`,
-  ); // prepare 结束
-  const seed = db.transaction(() => { // 包成事务：任一语句失败整体回滚，避免出现半套演示数据
-    for (const module of SITE_MODULES) { // 逐入口写入，模块定义仍以静态契约为准
-      for (const [index, item] of module.seed.entries()) { // 逐条演示条目写入
-        const id = `site-seed-${module.id}-${item.capability}-${index + 1}`; // 稳定主键，保证重复启动幂等
-        insert.run( // 按占位符顺序绑定九个参数
-          id, // 主键
-          module.entryKey, // 占位键作为数据隔离键，不是具体主机值
-          item.capability, // 能力编码：catalog / manage / record
-          item.title, // 演示条目标题
-          item.detail, // 演示条目说明，明确标注非真实业务数据
-          item.status, // 初始状态，取值落在该能力 states 内
-          now, // 创建时间
-          now, // 更新时间
-        ); // run 结束
-        align.run(module.entryKey, id, module.entryKey); // 存量 v1 行按主键迁移，保留用户状态流转
-      } // 演示条目循环结束
-    } // 入口循环结束
-    removeOrphans.run(...validKeys); // 幂等清理孤儿演示行（如已移除序号 02 的 PORTAL_SITE），只删 system 种子
-  }); // 事务函数准备完成
-  seed(); // 执行事务
-} // seedSiteModules 结束
-
-/**
- * 导航站默认目录种子：把站内既有视图入口写入 nav_links。
- * 幂等策略：主键 = `nav-seed-<序号>`，INSERT OR IGNORE 不覆盖用户改写与已有探测状态；
- * 种子清单里已移除的条目按主键前缀清理（只删 created_by = system 的行，不碰用户新增）。
- */
-export function seedNavLinks(db: Db): void { // 导航站种子入口，测试内存库同样会执行
-  const now = new Date().toISOString(); // 统一时间戳
-  const insert = db.prepare( // 预编译插入：只补缺失行
-    `INSERT OR IGNORE INTO nav_links
-       (id, name, url, group_name, description, recommended, status, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'unknown', 'system', ?, ?)`,
-  ); // prepare 结束
-  const validIds = NAV_LINK_SEEDS.map((_seed, index) => `nav-seed-${index + 1}`); // 当前种子主键集合
-  const removeOrphans = db.prepare( // 清理已从种子清单移除的条目，只按 system 归属与主键前缀限定
-    "DELETE FROM nav_links WHERE created_by = 'system' AND id LIKE 'nav-seed-%' AND id NOT IN (SELECT value FROM json_each(?))",
-  ); // prepare 结束
-  const seed = db.transaction(() => { // 同一事务，避免半套目录
-    NAV_LINK_SEEDS.forEach((item, index) => { // 逐条写入
-      insert.run( // 按占位符顺序绑定
-        `nav-seed-${index + 1}`, // 稳定主键，保证重复启动幂等
-        item.name, // 展示名
-        item.url, // 相对路径
-        item.group, // 分组
-        item.description, // 说明
-        item.recommended ? 1 : 0, // 推荐位标记
-        now, // 创建时间
-        now, // 更新时间
-      ); // run 结束
-    }); // 循环结束
-    removeOrphans.run(JSON.stringify(validIds)); // 幂等清理孤儿种子行
-  }); // 事务准备完成
-  seed(); // 执行事务
-} // seedNavLinks 结束
 
 /**
  * 功能模块商城种子：第 1 期上架一组真实模块（漫剧 AI 剧工作台 + 生成包三档 + AI 配音/剧本 + 素材扩容 + 模板包），
@@ -765,7 +679,7 @@ export function seedCommunity(db: Db): void {
 }
 
 /**
- * 商业化二期种子：付费资产、站点外观、页面区块、徽章。
+ * 商业化二期种子：付费资产、站点外观、页面区块。
  * 全部 INSERT OR IGNORE，便于运营在后台改过配置后重启不被覆盖。
  */
 export function seedCommerce(db: Db): void {
@@ -780,11 +694,8 @@ export function seedCommerce(db: Db): void {
     `INSERT OR IGNORE INTO page_blocks (id, page, kind, sort_order, config_json, enabled, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
   );
-  const insertBadge = db.prepare(
-    `INSERT OR IGNORE INTO badges (id, code, name, description, icon, rule_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  );
-  // 存量图库 / 视频资产补媒体数组：只填空白行，运营已经改过的不覆盖。
   const updateMedia = db.prepare("UPDATE paid_assets SET media_json = ? WHERE code = ? AND (media_json IS NULL OR media_json = '[]')");
+  // 存量图库 / 视频资产补媒体数组：只填空白行，运营已经改过的不覆盖。
   const seed = db.transaction(() => {
     const assets: Array<[string, string, string, string, string, string, string, string | null, number, number, number, number]> = [
       [
@@ -883,24 +794,13 @@ export function seedCommerce(db: Db): void {
     insertSetting.run('locales', JSON.stringify({ front: 'zh-CN', admin: 'zh-CN', supported: ['zh-CN', 'en-US'], machine_translation: false }), now);
     insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: '跨平台商业级项目', footer: 'Mim · 开源与商业化并行' }), now);
     const blocks: Array<[string, string, string, number, string]> = [
-      ['block-home-hero', 'home', 'hero', 1, JSON.stringify({ title: 'Mim 商业中台', subtitle: '知识付费、独立商城、社区与资金结算', cta: { label: '进入商城', href: '/marketplace' } })],
+      ['block-home-hero', 'home', 'hero', 1, JSON.stringify({ title: 'Mim 社区', subtitle: '知识付费、社区商城、论坛与资金结算', cta: { label: '进入社区', href: '/community' } })],
       ['block-home-features', 'home', 'features', 2, JSON.stringify({ items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] })],
       ['block-home-announce', 'home', 'announcements', 3, JSON.stringify({ source: '/api/v1/community/threads?board=announce&limit=3' })],
       ['block-forum-tabs', 'forum', 'tabs', 1, JSON.stringify({ tabs: ['最新', '热门', '精华', '公告'] })],
-      ['block-store-grid', 'store', 'product_grid', 1, JSON.stringify({ source: '/api/v1/shop/products', columns: 3 })],
     ];
     for (const [id, page, kind, sort, config] of blocks) {
       insertBlock.run(id, page, kind, sort, config, now, now);
-    }
-    const badges: Array<[string, string, string, string, string, string, number]> = [
-      ['badge-newcomer', 'newcomer', '新同学', '完成首次登录', '🌱', JSON.stringify({ type: 'login' }), 1],
-      ['badge-checkin', 'checkin-7', '签到达人', '累计签到 7 天', '📅', JSON.stringify({ type: 'checkin', days: 7 }), 2],
-      ['badge-first-order', 'first-order', '首单成就', '完成第一笔订单', '🧾', JSON.stringify({ type: 'order', count: 1 }), 3],
-      ['badge-creator', 'creator', '创作者', '发布付费资产或付费帖', '✍️', JSON.stringify({ type: 'asset', count: 1 }), 4],
-      ['badge-vip', 'vip', 'VIP 会员', '开通任意 VIP 套餐', '👑', JSON.stringify({ type: 'vip', level: 1 }), 5],
-    ];
-    for (const [id, code, name, description, icon, rule, sort] of badges) {
-      insertBadge.run(id, code, name, description, icon, rule, sort);
     }
   });
   seed();

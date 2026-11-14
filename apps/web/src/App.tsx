@@ -15,7 +15,7 @@ import {
   SESSION_CHANGED_EVENT, // 登录 / 退出 / 失效 / 跨标签页同步的统一事件名
 } from './api';
 // 仅类型导入：登录结果、会话、会话变更原因、用户信息与语言配置结构
-import type { I18nSettings, LoginResult, Session, SessionChangeReason, UserInfo } from './api';
+import type { LoginResult, Session, SessionChangeReason, UserInfo } from './api';
 // 本地新增界面文案字典（收银台 / 播放器 / 分享 / 语言切换）
 import { tr } from './lib/messages';
 // 登录页组件：按需登录统一入口，体积小保持 eager 引入
@@ -28,29 +28,16 @@ import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或�
 import { APP_VERSION } from './version'; // 当前 semver：由构建期 package.json 注入
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
-const Store = lazy(() => import('./views/Store').then((m) => ({ default: m.Store }))); // 功能模块页（商城目录）
-const Products = lazy(() => import('./views/Products').then((m) => ({ default: m.Products }))); // 商品列表
 const Cart = lazy(() => import('./views/Cart').then((m) => ({ default: m.Cart }))); // 购物车
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心
-const Sites = lazy(() => import('./views/Sites').then((m) => ({ default: m.Sites }))); // 统一入口配置清单
 const Deployments = lazy(() => import('./views/Deployments').then((m) => ({ default: m.Deployments }))); // 部署汇总
-const Navigation = lazy(() => import('./views/Navigation').then((m) => ({ default: m.Navigation }))); // 导航站
-const Search = lazy(() => import('./views/Search').then((m) => ({ default: m.Search }))); // 统一搜索
 const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
-const CommerceCenter = lazy(() => import('./views/CommerceCenter').then((m) => ({ default: m.CommerceCenter }))); // 商业化中台
-const ComicStudio = lazy(() => import('./views/ComicStudio').then((m) => ({ default: m.ComicStudio }))); // 漫剧 AI 剧模块
 const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
 const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
-const Tools = lazy(() => import('./views/Tools').then((m) => ({ default: m.Tools }))); // 自研工具发布目录
-const ContentHub = lazy(() => import('./views/ContentHub').then((m) => ({ default: m.ContentHub }))); // 公告 / 更新日志 / 推广计划栏目
 const News = lazy(() => import('./views/News').then((m) => ({ default: m.News }))); // 资讯：全站统一内容流（复用 /content/items）
-const Cloud = lazy(() => import('./views/Cloud').then((m) => ({ default: m.Cloud }))); // 云存储：私有桶 + 短时签名（复用 /media/*）
-const Img = lazy(() => import('./views/Img').then((m) => ({ default: m.Img }))); // 图床：public/ 前缀公有读 + 稳定直链
-const Download = lazy(() => import('./views/Download').then((m) => ({ default: m.Download }))); // 下载分发：软件 / 源码包私有桶 + 签名分发链接（承接 store 域）
 const Releases = lazy(() => import('./views/Releases').then((m) => ({ default: m.Releases }))); // 版本迭代：时间线 + 能力地图
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 const Checkout = lazy(() => import('./views/Checkout').then((m) => ({ default: m.Checkout }))); // 收银台：/checkout?intent=... 二维码 / 渠道唤起 / 轮询
-const Player = lazy(() => import('./views/Player').then((m) => ({ default: m.Player }))); // 独立播放器：/watch/:kind/:id 选集与进度记忆
 const PaymentReturn = lazy(() => import('./views/PaymentReturn').then((m) => ({ default: m.PaymentReturn }))); // 支付回跳承接：/pay-return?intent=... 三态结果
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
@@ -81,14 +68,14 @@ function writeLocalFrontLocale(locale: Locale): void {
 
 // 免登录体验：全站不再有「此功能需登录后使用」的门禁集合。
 // 匿名访客进入站点时后端自动签发一个访客会话（POST /auth/guest），
-// 商城下单、购物车、个人中心、聊天、漫剧工作台等全部按已登录路径工作；
+// 商城下单、购物车、个人中心、聊天等全部按已登录路径工作；
 // 访客可随时登录 / 注册，把身份升级为正式账号。
 
 // 应用根组件：所有视图免登录可用（访客会话自动建立），登录仅用于把身份升级为正式账号
 export function App() {
   // 会话状态：初始值从 localStorage 恢复（api.ts 已做结构校验），实现刷新后保持登录
   const [session, setLocalSession] = useState<Session | null>(getSession());
-  // 当前视图由地址栏路径驱动（对外路径段为模块功能名称，如 /marketplace）：根路径与未知路径经 parseLocation 回落到商城
+  // 当前视图由地址栏路径驱动（对外路径段为模块功能名称，如 /community）：根路径与未知路径经 parseLocation 回落到社区
   const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<模块功能名>）
   // 登录提示：null 默认无提示，expired 为登录态失效后的重登说明（免登录体验下不再有「需登录」提示）
   const [gateNotice, setGateNotice] = useState<'expired' | null>(null);
@@ -192,10 +179,10 @@ export function App() {
     // 登录成功后清除登录提示
     setGateNotice(null);
     // login 伪视图仅作登录中转，成功后回默认页；其余 hash 原地解锁
-    if (route.view === 'login') go({ view: 'store' });
+    if (route.view === 'login') go({ view: 'community' });
   } // handleLogin 结束
 
-  // 退出登录：先尽力调用后端登出，再清理本地会话并回到匿名可浏览的商城页
+  // 退出登录：先尽力调用后端登出，再清理本地会话并回到匿名可浏览的社区页
   async function handleLogout() {
     // try 包住远端登出：网络或鉴权失败都不应阻塞本地清理
     try {
@@ -210,8 +197,8 @@ export function App() {
     setLocalSession(null);
     // 主动退出不显示「已失效」提示
     setGateNotice(null);
-    // 退出后回到商城页：匿名可浏览，刷新与回退均安全
-    go({ view: 'store' });
+    // 退出后回到社区页：匿名可浏览，刷新与回退均安全
+    go({ view: 'community' });
   } // handleLogout 结束
 
   // 设置页更新用户信息后的回调：替换会话中的 user 并持久化
@@ -236,57 +223,33 @@ export function App() {
   // 内置导航项：顺序即展示顺序；后台配置的 nav_items 按 view 覆盖文案 / 显隐，未覆盖的内置项原样保留。
   // 2026-11-13 导航收口（16 项一级 → 12 项平铺，无分组标题）：把「同一件事的第二个入口」收进上级，
   // 页面与路由全部保留（直链 / 搜索 / 站内跳转仍可达），只是不再各占一行侧栏。
+  // 2026-11-15 侧栏收口：社区 · 聊天 · 个人中心 · 购物车 · 社区资讯 · 版本（公告动态已并入社区页签）。
+  // hidden 项是「已并入上级」的二级入口，页面保留但不上侧栏。
   const navDefaults: Array<{ view: AppView; label: string; hidden?: boolean }> = [
-    // 商城：功能模块目录（分类 + 卡片 + 详情面板）
-    { view: 'store', label: locale === 'en-US' ? 'Store' : '商城' },
-    // 商品列表（原一级入口）：密集列表 + 加购，与「商城」同一批商品的另一种视图 → 合并进商城（hidden）
-    { view: 'products', label: locale === 'en-US' ? 'Products' : '商品列表', hidden: true },
-    // 购物车：待购模块与结算
-    { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
-    // 个人中心：资料 / 权益 / 订单 / 账号与设置
-    { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
-    // 社区：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
+    // 社区：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区' },
-    // 圈子（原一级入口）：成员制社群，已并入社区页的「圈子」板块 → hidden
-    { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子', hidden: true },
-    // 漫剧 AI 剧工作台
-    { view: 'comic', label: locale === 'en-US' ? 'Comic Studio' : '漫剧 AI 剧' },
     // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
-    // 商业化中台：付费资产 / 交易履约 / 资金分成 / 外观页面 / 成长国际化
-    { view: 'commerce', label: locale === 'en-US' ? 'Commerce' : '商业化中台' },
-    // 导航站：全站资源目录 + 可达性状态 + 推荐位
-    { view: 'navigation', label: locale === 'en-US' ? 'Navigation' : '导航站' },
-    // 入口配置清单（原一级入口）：44 个入口的模块目录，已并入导航站的「入口清单」板块 → hidden
-    { view: 'sites', label: locale === 'en-US' ? 'Entry Catalog' : '入口配置清单', hidden: true },
+    // 个人中心：资料 / 权益 / 订单 / 账号与设置
+    { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
+    // 购物车：待购模块与结算
+    { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
+    // 圈子（原一级入口）：成员制社群，已并入社区页的「圈子」板块 → hidden
+    { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子', hidden: true },
     // 部署汇总（原一级入口）：部署仓库 / 部署项核对表，已并入版本页的「部署汇总」板块 → hidden
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总', hidden: true },
-    // 统一搜索：模块 / 入口 / 导航 / 社区 / 商品一站检索
-    { view: 'search', label: locale === 'en-US' ? 'Search' : '统一搜索' },
+    // 资讯：论坛主题 + 圈子动态 / 公告的统一内容流
+    { view: 'news', label: locale === 'en-US' ? 'Community feed' : '社区资讯' },
     // 版本迭代：把 V0.0.0 → 当前版本的完整时间线与能力地图放到前台
     { view: 'releases', label: locale === 'en-US' ? `Releases V${APP_VERSION}` : `版本 V${APP_VERSION}` },
-    // 自研工具发布目录：插件 / 脚本 / 防护工具
-    { view: 'tools', label: locale === 'en-US' ? 'Tools' : '自研工具' },
-    // 公告 / 更新日志 / 推广计划栏目
-    { view: 'content', label: locale === 'en-US' ? 'News' : '公告动态' },
-    // 资讯：论坛主题 + 圈子动态 / 公告的统一内容流（与「公告动态」是不同数据源，独立入口）
-    { view: 'news', label: locale === 'en-US' ? 'Community feed' : '社区资讯' },
-    // 云存储：私有桶 + 短时签名，登录后可用（上传 / 下载 / 本人产物）
-    { view: 'cloud', label: locale === 'en-US' ? 'Cloud' : '云存储' },
-    // 图床：public/ 前缀公有读，登录后可上传并取稳定直链
-    { view: 'img', label: locale === 'en-US' ? 'Image host' : '图床' },
-    // 下载分发：分发包走私有桶 + 短时签名链接（store 域的落点；/store 段已归属商城）
-    { view: 'download', label: locale === 'en-US' ? 'Downloads' : '下载分发' },
   ]; // 内置导航项定义结束
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项；
   // hidden 项是「已合并进上级」的二级入口，页面保留但不上侧栏（后台显式配置 visible 不能把它强行拉回）
   const navItems = mergeNavItems(navDefaults, theme.navItems).filter((item) => item.visible && !item.hidden);
-  // 隐藏的二级入口落到哪个一级入口：用于「在 /products 时侧栏仍高亮商城」。
+  // 隐藏的二级入口落到哪个一级入口：用于「在 /deployments 时侧栏仍高亮版本」。
   // 没有这张表时，隐藏页面的 route.view 不在侧栏里，active 计数为 0，用户会以为"没选中任何页面"。
   const SUB_VIEW_PARENT: Partial<Record<AppView, AppView>> = {
-    products: 'store', // 商品列表 → 商城
     circles: 'community', // 圈子 → 社区
-    sites: 'navigation', // 入口配置清单 → 导航站
     deployments: 'releases', // 部署汇总 → 版本
   }; // 二级 → 一级映射结束
   // 侧栏高亮依据：当前在隐藏二级页时按上级高亮，其余按自身
@@ -294,41 +257,30 @@ export function App() {
   // 合并后的二级入口：被收进上级的那几个页面不再占侧栏，但在上级页顶部给一条直达条，
   // 且从二级页也能一键回到上级，保证「合并」不会把入口变没（2026-11-13 导航收口配套）
   const subEntries: Array<{ view: AppView; label: string }> =
-    route.view === 'store'
-      ? [{ view: 'products', label: locale === 'en-US' ? 'Product list view' : '商品列表（列表视图）' }]
-      : route.view === 'products'
-        ? [{ view: 'store', label: locale === 'en-US' ? 'Back to Store' : '返回商城' }]
-        : route.view === 'community'
-          ? [{ view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子（成员制社群）' }]
-          : route.view === 'circles'
-            ? [{ view: 'community', label: locale === 'en-US' ? 'Back to Community' : '返回社区' }]
-            : route.view === 'navigation'
-              ? [{ view: 'sites', label: locale === 'en-US' ? 'Entry catalog' : '入口配置清单（44 个入口）' }]
-              : route.view === 'sites'
-                ? [{ view: 'navigation', label: locale === 'en-US' ? 'Back to Navigation' : '返回导航站' }]
-                : route.view === 'releases'
-                  ? [{ view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总（12 个部署项）' }]
-                  : route.view === 'deployments'
-                    ? [{ view: 'releases', label: locale === 'en-US' ? 'Back to Releases' : '返回版本' }]
-                    : [];
+    route.view === 'community'
+      ? [{ view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子（成员制社群）' }]
+      : route.view === 'circles'
+        ? [{ view: 'community', label: locale === 'en-US' ? 'Back to Community' : '返回社区' }]
+        : route.view === 'releases'
+          ? [{ view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总（12 个部署项）' }]
+          : route.view === 'deployments'
+            ? [{ view: 'releases', label: locale === 'en-US' ? 'Back to Releases' : '返回版本' }]
+            : [];
 
   // 主布局：左侧栏 + 右侧内容区；访客与正式账号共用同一骨架，登录只用于升级身份
   const needsSession =
-    route.view === 'products' ||
     route.view === 'cart' ||
     route.view === 'account' ||
     route.view === 'community' ||
-    route.view === 'commerce' || // 商业化中台接口需要令牌（访客会话同样可用）
     route.view === 'checkout' || // 收银台按支付意图查单，需令牌
-    route.view === 'payreturn' || // 回跳页按意图编号查单，需令牌
-    route.view === 'watch'; // 播放器拉帖 / 资产详情，需令牌
+    route.view === 'payreturn'; // 回跳页按意图编号查单，需令牌
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
     // 布局容器：data-list-style 把后台列表样式口径透传给列表变体选择器
     <div className="layout" data-list-style={theme.listStyle} data-nav-layout={theme.navLayout}>
       {/* 公告置顶条：无置顶公告时组件自身静默不渲染 */}
-      <AnnouncementBar locale={locale} onOpen={() => go({ view: 'content' })} />
+      <AnnouncementBar locale={locale} onOpen={() => go({ view: 'community' })} />
       {/* 左侧导航栏 */}
       <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
         {/* 品牌区：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
@@ -338,7 +290,7 @@ export function App() {
         </div>{/* 品牌区结束 */}
         {/* 导航按钮列表 */}
         <nav className="nav">{/* 导航容器：按钮由 navItems 顺序决定 */}
-          {/* 遍历导航项：12 项平铺，不再渲染分组标题 */}
+          {/* 遍历导航项：按 navDefaults 顺序平铺，不渲染分组标题 */}
           {navItems.map((item) => (
             <button
               // 导航项唯一键
@@ -381,7 +333,7 @@ export function App() {
         </div>{/* 侧边栏底部结束 */}
       </aside>{/* 侧边栏结束 */}
 
-      {/* 右侧内容区：商城匿名可浏览；收费 / 私密视图匿名时内嵌登录卡片 */}
+      {/* 右侧内容区：社区匿名可浏览；收费 / 私密视图匿名时内嵌登录卡片 */}
       <main className="main">{/* 内容区容器：窄屏断点下与侧栏上下堆叠 */}
         {/* 合并入口条：被收进上级的二级页面在此给直达 / 返回入口 */}
         {subEntries.length > 0 && (
@@ -395,49 +347,27 @@ export function App() {
         )}
         {/* Suspense 边界：懒加载视图独立 chunk，加载期展示统一占位，不阻塞骨架 */}
         <Suspense fallback={<div className="page hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>}>
-        {/* 功能模块页：匿名可浏览目录，解锁动作在页面内引导登录 */}
-        {route.view === 'store' && <Store locale={locale} />}{/* 功能模块页 */}
-        {/* 商品列表：密集列表 + 筛选 + 加购，仅已登录渲染（匿名由上方内嵌登录卡片接管） */}
-        {route.view === 'products' && session && <Products locale={locale} />}{/* 商品列表 */}
         {/* 购物车：清单 / 移除 / 清空 / 结算，仅已登录渲染 */}
         {route.view === 'cart' && session && <Cart locale={locale} />}{/* 购物车 */}
         {/* 个人中心：资料 / 权益 / 订单 / 账号安全，仅已登录渲染 */}
         {route.view === 'account' && session && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
-        {/* 统一入口配置清单：44 个入口驱动的模块目录，访客会话免登录可浏览 */}
-        {route.view === 'sites' && <Sites locale={locale} onOpenView={(view) => go({ view })} />}{/* 站点模块矩阵：清单内的跳转由 App 统一注入 */}
         {/* 部署汇总：统一字段展示所有部署仓库与部署项的效果 / 结果 / 异常 */}
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
-        {route.view === 'navigation' && <Navigation locale={locale} />}{/* 导航站：目录 + 可达性 + 推荐位 */}
-        {/* 统一搜索：浏览公开，不需要会话；结果按来源分组 */}
-        {route.view === 'search' && <Search locale={locale} />}{/* 统一搜索视图 */}
-        {/* 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广，访客会话建立后直接可用 */}
-        {route.view === 'community' && session && <Community locale={locale} />}{/* 社区与变现视图 */}
-        {/* 商业化中台：付费资产 / 履约 / 提现分成 / 页面搭建 / 成长私信 / 翻译 */}
-        {route.view === 'commerce' && session && <CommerceCenter locale={locale} />}{/* 商业化中台视图 */}
-        {/* 自研工具发布目录：公开浏览，管理端增删改在视图内按会话态展示 */}
-        {route.view === 'tools' && <Tools locale={locale} hasSession={!!session} />}{/* 工具目录视图 */}
-        {/* 公告 / 更新日志 / 推广计划栏目：公开只读，空数据静默隐藏；会话态展示管理端 CRUD */}
-        {route.view === 'content' && <ContentHub locale={locale} hasSession={!!session} />}{/* 内容栏目视图 */}
+        {/* 社区与变现：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广，访客会话建立后直接可用 */}
+        {route.view === 'community' && session && <Community locale={locale} hasSession={!!session} />}{/* 社区与变现视图 */}
         {/* 资讯：论坛主题 + 圈子动态 / 公告的统一内容流，公开只读，数据取已有 /content/items */}
         {route.view === 'news' && <News locale={locale} />}{/* 资讯视图 */}
-        {/* 云存储：私有桶 + 短时签名，未登录只显示登录提示，不请求鉴权接口 */}
-        {route.view === 'cloud' && <Cloud locale={locale} hasSession={!!session} />}{/* 云存储视图 */}
-        {/* 图床：public/ 前缀公有读，未登录只显示登录提示 */}
-        {route.view === 'img' && <Img locale={locale} hasSession={!!session} />}{/* 图床视图 */}
-        {route.view === 'download' && <Download locale={locale} hasSession={!!session} />}{/* 下载分发视图 */}
         {/* 版本迭代：完整版本时间线 + 能力地图，公开可看 */}
         {route.view === 'releases' && <Releases locale={locale} onOpen={(view) => go({ view })} />}{/* 版本迭代视图 */}
         {/* 圈子：公开浏览清单；加入 / 审核 / 发动态公告在视图内按会话态与角色展示 */}
         {route.view === 'circles' && <Circles locale={locale} hasSession={!!session} />}{/* 圈子视图 */}
         {/* 收银台：/checkout?intent=... 或 ?purpose=... 现场建单；二维码 / 渠道唤起 / 状态轮询 */}
         {route.view === 'checkout' && session && <Checkout locale={locale} />}{/* 收银台视图 */}
-        {/* 独立播放器：/watch/:kind/:id，选集 / 上一集下一集 / 本地进度记忆 */}
-        {route.view === 'watch' && session && <Player locale={locale} />}{/* 播放器视图 */}
         {/* 支付回跳承接：/pay-return?intent=...，成功 / 处理中 / 失败三态 */}
         {route.view === 'payreturn' && session && <PaymentReturn locale={locale} />}{/* 支付回跳视图 */}
-        {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
+        {/* 收费 / 私密视图（购物车 / 个人中心 / 社区）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}
             <p className="hint">{locale === 'en-US' ? 'Setting up your anonymous session…' : '正在建立免登录会话…'}</p>{/* 状态说明 */}
@@ -446,10 +376,6 @@ export function App() {
             </button> // 重试按钮结束
           </div> // 占位容器结束
         )}{/* 会话就绪占位结束 */}
-        {/* 漫剧 AI 剧模块：放映厅匿名可看片，创作工作台在模块内按需登录 */}
-        {route.view === 'comic' && (
-          <ComicStudio locale={locale} hasSession={!!session} onSignIn={() => go({ view: 'login' })} />
-        )}{/* 漫剧模块渲染结束 */}
         {/* IM 聊天 + 视频通话：会话列表 + 消息 + 视频通话，仅已登录渲染 */}
         {route.view === 'chat' && session && <Chat locale={locale} />}{/* 聊天视图 */}
         {/* 匿名聊天只读演示：展示完整聊天布局与示例消息，输入区禁用，登录后才可收发 */}

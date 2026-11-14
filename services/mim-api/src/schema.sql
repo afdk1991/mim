@@ -213,127 +213,6 @@ CREATE TABLE IF NOT EXISTS entitlement_events (
 );
 CREATE INDEX IF NOT EXISTS idx_entitlement_events_ent ON entitlement_events(entitlement_id, created_at);
 
--- ---------- comic 域（第 1 期：AI 辅助创作工作台，07 §12.1、08 §3.2）----------
-CREATE TABLE IF NOT EXISTS comic_projects (
-  id             TEXT PRIMARY KEY,
-  owner_user_id  TEXT NOT NULL,
-  region         TEXT NOT NULL CHECK (region IN ('cn','global')),
-  title          TEXT NOT NULL,
-  synopsis       TEXT,
-  status         TEXT NOT NULL DEFAULT 'draft'
-                 CHECK (status IN ('draft','storyboarded','generating','rendered','published','archived')),
-  version        INTEGER NOT NULL DEFAULT 1,
-  created_at     TEXT NOT NULL,
-  updated_at     TEXT NOT NULL,
-  deleted_at     TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_comic_projects_owner ON comic_projects(owner_user_id, status, created_at);
-
-CREATE TABLE IF NOT EXISTS comic_characters (
-  id                  TEXT PRIMARY KEY,
-  project_id          TEXT NOT NULL,
-  name                TEXT NOT NULL,
-  appearance_prompt   TEXT NOT NULL,
-  seed                INTEGER,
-  reference_asset_ids TEXT NOT NULL DEFAULT '[]',
-  voice_profile       TEXT,
-  version             INTEGER NOT NULL DEFAULT 1,
-  created_at          TEXT NOT NULL,
-  updated_at          TEXT NOT NULL,
-  deleted_at          TEXT
-);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_comic_characters_project_name
-  ON comic_characters(project_id, name) WHERE deleted_at IS NULL;
-
-CREATE TABLE IF NOT EXISTS storyboards (
-  id            TEXT PRIMARY KEY,
-  project_id    TEXT NOT NULL,
-  version_no    INTEGER NOT NULL,
-  shots         TEXT NOT NULL,
-  confirmed_at  TEXT,
-  created_by    TEXT NOT NULL,
-  created_at    TEXT NOT NULL
-);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_storyboards_project_version ON storyboards(project_id, version_no);
-CREATE INDEX IF NOT EXISTS idx_storyboards_project ON storyboards(project_id, created_at);
-
--- ---------- comic 域（第 2 期：生成任务编排 + 成片合成，07 §12.2、08 §3.2）----------
--- 失败重试新建 job（retry_of 指向原 job），历史 job 与产物永不覆盖；额度在 succeeded 时结算
-CREATE TABLE IF NOT EXISTS generation_jobs (
-  id                  TEXT PRIMARY KEY,
-  project_id          TEXT NOT NULL,
-  storyboard_id       TEXT,
-  job_type            TEXT NOT NULL CHECK (job_type IN ('text','image','video','tts','compose')),
-  status              TEXT NOT NULL DEFAULT 'queued'
-                      CHECK (status IN ('queued','running','succeeded','failed','canceled')),
-  retry_of            TEXT,
-  cost_estimate_minor INTEGER,
-  error_code          TEXT,
-  payload             TEXT NOT NULL DEFAULT '{}',
-  result              TEXT,
-  created_by          TEXT NOT NULL,
-  created_at          TEXT NOT NULL,
-  started_at          TEXT,
-  finished_at         TEXT,
-  -- 已被「超时回收」重新入队的次数：worker 崩溃/重启会把 running 任务放回 queued 并自增该列，
-  -- 超过 MIM_AI_JOB_MAX_RECLAIM 后直接判失败，防止同一个必然失败的任务无限重试
-  attempts            INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_generation_jobs_project ON generation_jobs(project_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_generation_jobs_status_type ON generation_jobs(status, job_type);
-
--- 生成产物登记（08 §5）：媒体对象统一登记 object_key / mime / 校验和 / 保留期；
--- 产物只追加不覆盖，过期由清理任务删除对象并把 expires_at 保留为审计证据
-CREATE TABLE IF NOT EXISTS generation_assets (
-  id            TEXT PRIMARY KEY,
-  job_id        TEXT NOT NULL,
-  project_id    TEXT NOT NULL,
-  asset_type    TEXT NOT NULL CHECK (asset_type IN ('text','image','video','audio','final')),
-  object_key    TEXT NOT NULL,
-  mime          TEXT NOT NULL,
-  duration_ms   INTEGER,
-  size_bytes    INTEGER,
-  checksum      TEXT NOT NULL,
-  expires_at    TEXT,
-  created_at    TEXT NOT NULL,
-  -- 对象字节被 asset-gc 定时任务清理的时间：置空表示仍占用存储，非空表示已删除但保留行作审计证据
-  purged_at     TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_generation_assets_job ON generation_assets(job_id, created_at);
--- 过期清理按 expires_at 扫描：没有该索引时 asset-gc 每轮都要全表扫，产物表一旦上万行就会拖慢库
-CREATE INDEX IF NOT EXISTS idx_generation_assets_expiry ON generation_assets(expires_at);
-CREATE INDEX IF NOT EXISTS idx_generation_assets_project ON generation_assets(project_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_generation_assets_object ON generation_assets(object_key);
-
--- 成片主体；current_version_id 指向最新已发布版本；版本只追加不覆盖
-CREATE TABLE IF NOT EXISTS comic_films (
-  id                  TEXT PRIMARY KEY,
-  project_id          TEXT NOT NULL,
-  title               TEXT NOT NULL,
-  status              TEXT NOT NULL DEFAULT 'draft'
-                      CHECK (status IN ('draft','reviewing','published','archived')),
-  current_version_id  TEXT,
-  review_note         TEXT,
-  version             INTEGER NOT NULL DEFAULT 1,
-  created_at          TEXT NOT NULL,
-  updated_at          TEXT NOT NULL,
-  deleted_at          TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_comic_films_project ON comic_films(project_id, status, created_at);
-
-CREATE TABLE IF NOT EXISTS film_versions (
-  id            TEXT PRIMARY KEY,
-  film_id       TEXT NOT NULL,
-  version_no    INTEGER NOT NULL,
-  object_key    TEXT,
-  duration_sec  INTEGER,
-  size_bytes    INTEGER,
-  published_at  TEXT,
-  created_by    TEXT NOT NULL,
-  created_at    TEXT NOT NULL
-);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_film_versions_film_version ON film_versions(film_id, version_no);
-
 -- ---------- 认证与会话辅助 ----------
 CREATE TABLE IF NOT EXISTS verification_codes (
   id           TEXT PRIMARY KEY,
@@ -512,47 +391,6 @@ CREATE INDEX IF NOT EXISTS idx_im_messages_conv_created ON im_messages(conversat
 CREATE INDEX IF NOT EXISTS idx_im_messages_sender ON im_messages(sender_user_id, created_at DESC);
 -- direct 会话的两人唯一性由应用层保证（按 sorted(user_id pair) 查询复用），
 -- 不在 DB 层做跨成员表的唯一约束，SQLite 无法表达。
-
--- ---------- site 域（统一入口配置清单，备注驱动，2026-11-09）----------
--- 入口定义本身是静态契约（packages/core-domain/src/siteModules.json），不落库；
--- 本表只持久化「入口 × 能力」下的业务条目，让每个备注对应的功能可运行、可交互。
--- host 列的物理名沿用历史结构，语义自 v2 起为「可配置占位标识键」（如 BLOG），
--- 不是具体主机值；用户未提供具体主机记录值，代码不补写、不推导真实域名。
--- capability 为三类能力之一，二者共同隔离数据。
-CREATE TABLE IF NOT EXISTS site_module_items (
-  id            TEXT PRIMARY KEY,
-  host          TEXT NOT NULL,
-  capability    TEXT NOT NULL CHECK (capability IN ('catalog','manage','record')),
-  title         TEXT NOT NULL,
-  detail        TEXT NOT NULL DEFAULT '',
-  status        TEXT NOT NULL,
-  created_by    TEXT NOT NULL DEFAULT 'system',
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_site_items_host_cap ON site_module_items(host, capability, status);
-CREATE INDEX IF NOT EXISTS idx_site_items_created ON site_module_items(created_at DESC);
-
-
--- 全站资源导航站（NAVIGATION）：链接目录 + 可达性状态 + 最近一次探测取证。
--- status 三态：ok 可达 / broken 失效 / unknown 未探测；探测结果与判定口径见 core-domain/src/navigation.ts。
-CREATE TABLE IF NOT EXISTS nav_links (
-  id            TEXT PRIMARY KEY,
-  name          TEXT NOT NULL,
-  url           TEXT NOT NULL,
-  group_name    TEXT NOT NULL DEFAULT '其他',
-  description   TEXT NOT NULL DEFAULT '',
-  recommended   INTEGER NOT NULL DEFAULT 0,
-  status        TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('ok','broken','unknown')),
-  http_status   INTEGER,
-  latency_ms    INTEGER,
-  last_checked_at TEXT,
-  created_by    TEXT NOT NULL DEFAULT 'system',
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_nav_links_group ON nav_links(group_name, recommended, name);
-CREATE INDEX IF NOT EXISTS idx_nav_links_status ON nav_links(status, last_checked_at DESC);
 
 -- ---------- community 域（社区论坛 / 会员 / 钱包 / 独立商城，2026-11-12）----------
 -- 板块：论坛首页的栏目与圈子入口；付费板块通过 price_cents > 0 表达。
@@ -958,48 +796,6 @@ CREATE TABLE IF NOT EXISTS shipments (
   updated_at  TEXT NOT NULL
 );
 
--- 售后申请：refund 仅退款、return 退货退款；审核通过后原路退回余额。
-CREATE TABLE IF NOT EXISTS after_sales (
-  id           TEXT PRIMARY KEY,
-  order_id     TEXT NOT NULL REFERENCES shop_orders(id) ON DELETE CASCADE,
-  user_id      TEXT NOT NULL REFERENCES users(id),
-  kind         TEXT NOT NULL CHECK (kind IN ('refund','return')),
-  reason       TEXT NOT NULL,
-  amount_cents INTEGER NOT NULL,
-  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','completed')),
-  admin_note   TEXT NOT NULL DEFAULT '',
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_after_sales_user ON after_sales(user_id, created_at DESC);
-
--- 商品评价：仅已购用户可评，一单一评。
-CREATE TABLE IF NOT EXISTS product_reviews (
-  id         TEXT PRIMARY KEY,
-  order_id   TEXT NOT NULL UNIQUE REFERENCES shop_orders(id) ON DELETE CASCADE,
-  product_id TEXT NOT NULL REFERENCES shop_products(id) ON DELETE CASCADE,
-  user_id    TEXT NOT NULL REFERENCES users(id),
-  rating     INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-  content    TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_product_reviews_product ON product_reviews(product_id, created_at DESC);
-
--- 提现申请：申请时先冻结扣减余额，驳回时退回；approved 后由运营线下打款。
-CREATE TABLE IF NOT EXISTS withdrawals (
-  id           TEXT PRIMARY KEY,
-  user_id      TEXT NOT NULL REFERENCES users(id),
-  amount_cents INTEGER NOT NULL,
-  channel      TEXT NOT NULL,
-  account      TEXT NOT NULL,
-  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','paid','rejected')),
-  admin_note   TEXT NOT NULL DEFAULT '',
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  processed_at TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_withdrawals_user ON withdrawals(user_id, created_at DESC);
-
 -- 创作者收益：资产 / 付费帖售出后按比例记账，settled 表示已进入可提现余额。
 CREATE TABLE IF NOT EXISTS creator_earnings (
   id                 TEXT PRIMARY KEY,
@@ -1023,7 +819,7 @@ CREATE TABLE IF NOT EXISTS site_settings (
   updated_at TEXT NOT NULL
 );
 
--- 页面区块：page 为 home/forum/store/...，config_json 由前端渲染器消费。
+-- 页面区块：page 为 forum 等前台页面标识，config_json 由前端渲染器消费。
 CREATE TABLE IF NOT EXISTS page_blocks (
   id          TEXT PRIMARY KEY,
   page        TEXT NOT NULL,
@@ -1036,23 +832,6 @@ CREATE TABLE IF NOT EXISTS page_blocks (
 );
 CREATE INDEX IF NOT EXISTS idx_page_blocks_page ON page_blocks(page, enabled, sort_order);
 
--- 徽章定义与用户获得记录。
-CREATE TABLE IF NOT EXISTS badges (
-  id          TEXT PRIMARY KEY,
-  code        TEXT NOT NULL UNIQUE,
-  name        TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  icon        TEXT NOT NULL DEFAULT '🏅',
-  rule_json   TEXT NOT NULL DEFAULT '{}',
-  sort_order  INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS user_badges (
-  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  badge_id   TEXT NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
-  awarded_at TEXT NOT NULL,
-  PRIMARY KEY (user_id, badge_id)
-);
-
 -- 站内私信：只存文本，read_at 为空表示未读。
 CREATE TABLE IF NOT EXISTS direct_messages (
   id           TEXT PRIMARY KEY,
@@ -1063,23 +842,3 @@ CREATE TABLE IF NOT EXISTS direct_messages (
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_direct_messages_to ON direct_messages(to_user_id, read_at, created_at DESC);
-
--- 用户网络信号：只存 IP 哈希与粗粒度地区码，不落明文 IP。
-CREATE TABLE IF NOT EXISTS user_signals (
-  user_id      TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  ip_hash      TEXT NOT NULL,
-  region_code  TEXT NOT NULL DEFAULT '',
-  last_seen_at TEXT NOT NULL
-);
-
--- 机器翻译缓存：同源文 + 目标语言命中缓存，避免重复计费。
-CREATE TABLE IF NOT EXISTS translation_cache (
-  id              TEXT PRIMARY KEY,
-  source_hash     TEXT NOT NULL,
-  target_lang     TEXT NOT NULL,
-  source_text     TEXT NOT NULL,
-  translated_text TEXT NOT NULL,
-  provider        TEXT NOT NULL,
-  created_at      TEXT NOT NULL,
-  UNIQUE (source_hash, target_lang)
-);

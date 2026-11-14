@@ -1,7 +1,6 @@
 /** 服务端共享类型与 Express 请求扩展 */
 
 import type { NotifyChannels } from './notify.js'; // 验证码通知通道的类型来源，仅用于 ApiDeps 字段声明
-import type { Orchestrator } from './orchestrator.js'; // 生成任务编排器类型，仅类型引用避免循环依赖
 import type { StorageAdapter } from './storage.js'; // 存储适配器类型，local / s3 两套实现共用该契约
 
 export type Db = import('better-sqlite3').Database; // 用 import() 类型直接取 better-sqlite3 的 Database，免去额外 import 语句
@@ -15,8 +14,6 @@ export interface ApiDeps { // 依赖注入容器：所有路由通过它拿能�
   now?: () => string; // 可选时钟：给了就返回固定时间，让保留期/过期逻辑可断言
   /** 对象存储适配器（media 域）；未注入时由 app 依据 env 构造默认实例 */
   storage?: StorageAdapter; // 可选存储：测试可传内存替身，生产由 app 按 env 装配
-  /** 生成任务编排器（ai-orchestrator 域）；未注入时由 app 依据 env 构造默认实例 */
-  orchestrator?: Orchestrator; // 可选编排器：缺失时相关路由返回 PROVIDER_NOT_CONFIGURED
   /** 验证码通知通道（短信/邮件）；未注入时由 app 依据 env 构造默认实例 */
   notify?: NotifyChannels; // 可选通知通道：缺失时登录验证码走本地日志下发
   /** IM 实时连接中心；由服务入口在挂载 WebSocket 后回填，HTTP 路由借此推送撤回等事件 */

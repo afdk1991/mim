@@ -29,7 +29,7 @@ export function createAppearanceRouter(deps: ApiDeps): Router { // 导出函数 
   /** 公开站点启动配置：免登录即可读首页指向、主题、语言与积分抵扣口径，供前端根路径重定向与公共页面渲染。 */
   router.get('/site/config', (_req, res) => {
     const home = readSetting(deps, 'home'); // 常量 home：保存固定配置或一次性派生值
-    const view = typeof home.view === 'string' && ['store', 'community'].includes(home.view) ? home.view : 'store'; // 常量 view：保存固定配置或一次性派生值
+    const view = typeof home.view === 'string' && ['store', 'community'].includes(home.view) ? home.view : 'community'; // 常量 view：保存固定配置或一次性派生值
     const points = readPointsConfig(deps.env); // 积分抵扣总开关 / 兑换比例 / 单笔上限；总开关关闭时前端整块隐藏抵扣面板
     res.json({ // 执行当前业务步骤
       home_view: view, // 对象字段 home_view：记录一项配置或数据
