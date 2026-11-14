@@ -84,6 +84,16 @@ if [ "$(id -u)" -ne 0 ]; then
   exec sudo -n bash "$0" "$@"
 fi
 
+# --- 0.5 git 可信目录登记 ---
+# §5 会把 $APP_DIR chown 给 RUN_USER，本脚本却以 root 运行 git；Git 2.35+ 会对
+# 「仓库属主 ≠ 当前用户」直接报 fatal: detected dubious ownership 并拒绝一切操作，
+# 表现为发布一开始就失败（fetch / reset / clean 全挂）。写 /etc/gitconfig（--system）
+# 让 root 与 workflow 里 `sudo -n git -C ... rev-parse HEAD` 校验步骤都能正常执行。
+if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR"; then
+  git config --system --add safe.directory "$APP_DIR"
+  log "已登记 git safe.directory: $APP_DIR"
+fi
+
 # --- 1. 代码同步 ---
 # 生产服务器到 github.com 的 HTTPS 被网络策略阻断（SSL timeout），
 # 因此统一走 SSH（22 端口可达），使用只读 deploy key。
