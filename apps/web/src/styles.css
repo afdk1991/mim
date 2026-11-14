@@ -24,7 +24,9 @@
   --card-pad-tight: 12px; /* 紧凑内边距 */
   --card-gap: 14px; /* 卡片之间与栅格间距 */
   --card-cover: 3 / 2; /* 封面统一比例 */
+  --card-min: 300px; /* 卡片网格最小列宽：列表 / 网格共用同一档 */
   --card-title-lines: 2; /* 标题最多两行 */
+  --card-summary-lines: 2; /* 摘要最多两行 */
 } /* 设计令牌块结束 */
 
 * { /* 通配选择器：统一盒模型 */
@@ -301,7 +303,7 @@ code { /* 行内代码/令牌展示 */
 
 .cards { /* 卡片网格 */
   display: grid; /* 栅格自动排版 */
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* 每列至少 300px，自适应列数 */
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr)); /* 列宽下限取全站统一值 */
   gap: var(--card-gap); /* 卡片间距：共享卡片规格 */
 } /* 卡片网格结束 */
 
@@ -3263,7 +3265,7 @@ code { /* 行内代码/令牌展示 */
 
 .community-list { /* 帖子列表 */
   display: grid; /* 网格 */
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); /* 自适应列 */
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr)); /* 列宽下限与全站卡片一致 */
   gap: var(--card-gap); /* 间距：共享卡片规格 */
 } /* 结束 */
 
@@ -3351,7 +3353,7 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 主方向 */
   gap: 7px; /* 间距 */
-  padding: 12px 14px 14px; /* 内边距 */
+  padding: var(--card-pad-tight); /* 内边距：全站卡片统一 */
 } /* 结束 */
 
 .community-card-meta { /* 元信息行 */
@@ -3367,8 +3369,8 @@ code { /* 行内代码/令牌展示 */
   font-size: 14px; /* 字号 */
   line-height: 1.4; /* 行高 */
   color: var(--text); /* 主文字 */
-  display: -webkit-box; /* 两行截断 */
-  -webkit-line-clamp: 2; /* 两行 */
+  display: -webkit-box; /* 标题截断 */
+  -webkit-line-clamp: var(--card-title-lines); /* 行数：全站统一 */
   -webkit-box-orient: vertical; /* 纵向 */
   overflow: hidden; /* 裁切 */
 } /* 结束 */
@@ -3378,8 +3380,8 @@ code { /* 行内代码/令牌展示 */
   font-size: 12px; /* 字号 */
   line-height: 1.55; /* 行高 */
   color: var(--text-muted); /* 次要色 */
-  display: -webkit-box; /* 两行截断 */
-  -webkit-line-clamp: 2; /* 两行 */
+  display: -webkit-box; /* 摘要截断 */
+  -webkit-line-clamp: var(--card-summary-lines); /* 行数：全站统一 */
   -webkit-box-orient: vertical; /* 纵向 */
   overflow: hidden; /* 裁切 */
 } /* 结束 */
@@ -3406,10 +3408,10 @@ code { /* 行内代码/令牌展示 */
   font-weight: 600; /* 加粗 */
 } /* 结束 */
 
-.community-detail { /* 帖子详情面板 */
-  padding: 18px; /* 内边距 */
+.community-detail { /* 帖子详情面板：与详情卡同规格 */
+  padding: var(--card-pad); /* 内边距：全站卡片统一 */
   border: 1px solid var(--border); /* 边框 */
-  border-radius: 14px; /* 圆角 */
+  border-radius: var(--card-radius-lg); /* 圆角：详情卡档位 */
   background: #fff; /* 白底 */
   box-shadow: var(--shadow); /* 投影 */
 } /* 结束 */
@@ -3436,7 +3438,7 @@ code { /* 行内代码/令牌展示 */
   width: 100%; /* 撑满 */
   max-height: 360px; /* 限高 */
   object-fit: cover; /* 裁切 */
-  border-radius: 10px; /* 圆角 */
+  border-radius: var(--card-radius-sm); /* 圆角：紧凑档位 */
   margin-top: 14px; /* 上间距 */
 } /* 结束 */
 
@@ -3935,7 +3937,7 @@ code { /* 行内代码/令牌展示 */
 /* 商业化中台：资产卡片、发布表单、轨迹与徽章 */
 .commerce-grid { /* 资产卡片网格 */
   display: grid; /* 网格 */
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 自适应列宽 */
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr)); /* 列宽下限取全站统一值 */
   gap: var(--card-gap); /* 卡片间距：共享卡片规格 */
   margin-top: var(--card-gap); /* 与上方表单单隔开 */
 } /* 结束 */
@@ -4369,7 +4371,7 @@ code { /* 行内代码/令牌展示 */
 }
 .promotions-grid { /* 推广计划卡片网格，口径与资产卡片一致 */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
   gap: var(--card-gap);
   margin-top: var(--card-gap);
 }
@@ -4384,7 +4386,7 @@ code { /* 行内代码/令牌展示 */
 /* ---------- 自研工具发布页 ---------- */
 .tools-grid { /* 工具卡片网格 */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
   gap: var(--card-gap);
   margin-top: var(--card-gap);
 }
