@@ -19,7 +19,7 @@
 │   scripts/env-check.mjs       09 清单 §0 密钥治理校验器    │
 ├─────────────────────────────────────────────────────────┤
 │ 交付层（生产链路）                                        │
-│   deploy/            bootstrap / deploy / nginx / systemd / backup-db / migrations│
+│   deploy/            bootstrap / deploy / nginx / systemd / migrations│
 │   .github/workflows/deploy.yml  push main 自动上线         │
 ├─────────────────────────────────────────────────────────┤
 │ 规划/参考层                                               │

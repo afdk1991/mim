@@ -6,10 +6,11 @@
  *       路由与前端视图同步移除；生产库需 DROP 残留表与索引，避免悬空数据与误用。
  *
  * 动作：
- *   1) better-sqlite3 backup API 生成一致性备份（WAL 安全，服务器无 sqlite3 CLI）
- *   2) DROP 9 张表：plans / plan_prices / subscriptions / subscription_events /
+ *   1) DROP 9 张表：plans / plan_prices / subscriptions / subscription_events /
  *      orders / payments / refunds / invoices / audit_logs（索引随表自动删除）
- *   3) 打印迁移前后取证，并断言残留表与索引为 0
+ *   2) 打印迁移前后取证，并断言残留表与索引为 0
+ *
+ * 备份策略（2026-11-15）：本项目不创建任何数据库备份，本脚本不生成备份文件。
  *
  * 用法（服务器上）：
  *   sudo -n node /opt/mim/app/deploy/migrations/2026-11-05-drop-billing-audit.cjs --apply
@@ -24,7 +25,6 @@ const path = require('path');
 const APPLY = process.argv.includes('--apply');
 const APP_DIR = process.env.APP_DIR || '/opt/mim/app';
 const DB_PATH = process.env.DB_PATH || path.join(APP_DIR, 'services/mim-api/data/mim.db');
-const BACKUP_DIR = process.env.BACKUP_DIR || '/var/backups/mim';
 
 const DROP_TABLES = [
   'plans',
@@ -57,16 +57,6 @@ function loadBetterSqlite3() {
     if (!hit) throw new Error('未找到 better-sqlite3，请检查依赖安装');
     return require(path.join(pnpmDir, hit, 'node_modules/better-sqlite3'));
   }
-}
-
-async function backup(db) {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const target = path.join(BACKUP_DIR, `mim-${stamp}.db`);
-  await db.backup(target);
-  const size = fs.statSync(target).size;
-  log(`✅ 备份完成：${target} (${(size / 1024 / 1024).toFixed(2)} MB)`);
-  return target;
 }
 
 function snapshot(db, label) {
@@ -104,8 +94,6 @@ async function main() {
     return;
   }
 
-  const backupFile = await backup(db);
-
   // 关闭外键约束，避免删除被引用的父表时报错
   db.pragma('foreign_keys = OFF');
   db.transaction(() => {
@@ -121,7 +109,6 @@ async function main() {
   const leftoverIdx = DROP_INDEXES.filter((i) => after.indexes.includes(i));
   if (leftoverIdx.length) throw new Error(`迁移后仍存在 billing/audit 索引：${leftoverIdx.join(', ')}`);
 
-  log(`✅ 备份文件：${backupFile}`);
   log(`✅ 迁移完成：${DROP_TABLES.length} 张表与 ${DROP_INDEXES.length} 个索引已清除`);
   db.close();
 }

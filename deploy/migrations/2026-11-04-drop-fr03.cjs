@@ -7,10 +7,12 @@
  *       同时 8 张内容域表已从仓库 schema.sql 删除，生产库需同步清理。
  *
  * 动作：
- *   1) 用 better-sqlite3 的 backup API 生成一致性备份（WAL 安全，服务器无 sqlite3 CLI）
- *   2) 重建 plans 表，去除 features 列（保留 id/name_zh/name_en/created_at 数据）
- *   3) DROP 8 张内容域表（索引随表自动删除）
- *   4) 打印迁移前后取证
+ *   1) 重建 plans 表，去除 features 列（保留 id/name_zh/name_en/created_at 数据）
+ *   2) DROP 8 张内容域表（索引随表自动删除）
+ *   3) 打印迁移前后取证
+ *
+ * 备份策略（2026-11-15）：本项目不创建任何数据库备份，本脚本不生成备份文件；
+ * 迁移前取证只读打印，失败需靠 git 回退代码后重放，不做还原点。
  *
  * 用法（服务器上）：
  *   sudo -n node /opt/mim/app/deploy/migrations/2026-11-04-drop-fr03.cjs --apply
@@ -23,7 +25,6 @@ const path = require('path');
 const APPLY = process.argv.includes('--apply');
 const APP_DIR = process.env.APP_DIR || '/opt/mim/app';
 const DB_PATH = process.env.DB_PATH || path.join(APP_DIR, 'services/mim-api/data/mim.db');
-const BACKUP_DIR = process.env.BACKUP_DIR || '/var/backups/mim';
 
 const CONTENT_TABLES = [
   'projects',
@@ -53,16 +54,6 @@ function loadBetterSqlite3() {
     if (!hit) throw new Error('未找到 better-sqlite3，请检查依赖安装');
     return require(path.join(pnpmDir, hit, 'node_modules/better-sqlite3'));
   }
-}
-
-async function backup(db) {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const target = path.join(BACKUP_DIR, `mim-${stamp}.db`);
-  await db.backup(target);
-  const size = fs.statSync(target).size;
-  log(`✅ 备份完成：${target} (${(size / 1024 / 1024).toFixed(2)} MB)`);
-  return target;
 }
 
 function snapshot(db, label) {
@@ -103,8 +94,6 @@ async function main() {
     db.close();
     return;
   }
-
-  const backupFile = await backup(db);
 
   db.pragma('foreign_keys = OFF');
   // legacy_alter_table = ON 防止 ALTER TABLE RENAME 把 plan_prices 的 FK 改写成 plans_old
@@ -187,7 +176,6 @@ async function main() {
   const residual = db.prepare("SELECT name FROM sqlite_master WHERE sql LIKE '%plans_old%'").all();
   if (residual.length) throw new Error(`迁移后仍存在 plans_old 悬空引用：${residual.map((r) => r.name).join(', ')}`);
 
-  log(`✅ 备份文件：${backupFile}`);
   log('✅ 迁移完成：plans 去 features；8 张内容域表与 5 个索引已清除');
   db.close();
 }

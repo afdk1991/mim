@@ -101,7 +101,7 @@ services/mim-api/src/identity.ts  # 唯一建号入口：Mim ID 事务发号、�
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 站点模块注册表 siteModules / 部署汇总注册表 deploymentRegistry）
 packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
 scripts/             # build / version-check / env-check / comment-check / verify-site-* / deployment-summary / verify-deployments
-deploy/              # 生产部署工件（bootstrap / deploy / backup-db / nginx / systemd / migrations / sealos / iga）
+deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / migrations / sealos / iga）
 .github/workflows/   # CI/CD（deploy.yml 五作业：verify / deploy / pages / packages / platforms）
 site/                # PRD 可视化阅读载体（`npm run build:site` 离线副本，非生产站点）
 docs/wiki/           # 结构化文档（01~10 + 首页 README）
@@ -238,13 +238,13 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（用户端静态根）+ `/opt/mim/admin`（管理后台静态根）+ systemd `mim-api`（端口 8787） |
 | 管理后台入口 | `https://mim.mixm.top/admin/`（`apps/admin` 构建产物；nginx `/admin/` location 独立 alias，与用户端静态根隔离；页面声明 `noindex, nofollow`） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
-| 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前先用 `better-sqlite3` backup 再幂等执行 |
+| 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前幂等执行；**项目不创建任何数据库备份** |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
 | 生产登录入口 | **免登录体验（2026-11-12 起，取代原按需登录，与上文前端视图口径一致）**：前端启动即自动领取匿名访客会话（`POST /api/v1/auth/guest`，`is_guest=1`、自动分配 Mim ID、同发双令牌），`/marketplace`、`/products`、`/cart`、`/account`、`/entry-catalog`、`/deployments`、`/comic-studio`、`/chat` 全部免登录可用；`/signin` 只用于把访客升级为正式账号，退出后重新加载自动回到免登录态。访客建号按 IP 限流（30 次/小时，429 `AUTH_GUEST_RATE_LIMITED`）。独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的全站门禁。登录页支持「密码登录 / 验证码登录 / 注册」三种方式：`POST /api/v1/auth/register` 自助建号（口令 bcrypt 存 `credentials(kind=password)`，注册即登录），`POST /api/v1/auth/password` 先比管理员口令 `MIM_AUTH_ADMIN_PASSWORD` 再比账号自身口令，`GET /api/v1/auth/channels` 下发各通道可用布尔值供登录页提示。验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
-| 手动重放 | `bash deploy/deploy.sh`（幂等）；`bash deploy/backup-db.sh`（在线备份 SQLite） |
+| 手动重放 | `bash deploy/deploy.sh`（幂等；项目不创建任何数据库备份） |
 | `site/index.html` / `site/prd.html` | PRD 可视化入口与副本，仅离线阅读，**不参与生产** |
 
 ### 多平台部署矩阵

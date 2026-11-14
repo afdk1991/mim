@@ -41,7 +41,7 @@
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
 | `site/index.html` | 静态站点（本地预览） | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
 | `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
-| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`backup-db.sh`（SQLite 备份）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
+| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
 | `.github/workflows/deploy.yml` | CI/CD | 铁律八执行器：push `main` → 质量门禁（typecheck/test/build）→ SSH 远程发布 → 线上健康检查 | 每次 `main` 变更自动上线生产 |
 | `.screenshots/` | 资产暂存 | 截图取证目录（含 `.tmp/` 临时帧与 `data-mixm-top-e2e.png`：`data.mixm.top` 有头 Edge + CDP 端到端取证截图） | 交付取证附件 |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~10 共 10 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单、漫剧状态机 | 与仓库资产一一对应的唯一文档入口 |
@@ -149,8 +149,9 @@ package.json (build) ──调用──> scripts/build.mjs ──构建并复制
 package.json (build:site) ──调用──> scripts/build.mjs --site ──复制──> dist/（site/ PRD 阅读页，仅离线预览）
 AGENTS.md (铁律八) ──强制──> .github/workflows/deploy.yml ──SSH──> deploy/deploy.sh ──构建/发布──> /opt/mim/web + systemd mim-api ──反代──> https://mim.mixm.top
 deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 + certbot HTTPS + 首发布
-deploy/backup-db.sh ──备份──> services/mim-api/data/mim.db（WAL 一致性快照）
 ```
+
+> **备份策略（2026-11-15 起）**：项目不创建任何数据库备份，仓库内不存在备份脚本；数据库落 `/var/lib/mim/mim.db`（APP_DIR 之外），部署脚本只做迁移与完整性校验，不生成备份文件。
 
 > **现状标注（2026-11-10）**：上图 `build:site`（site/ PRD 阅读页）与 `deploy/*` 生产链路条目为历史留痕——`site/`、`deploy/` 已从工作树移除（删除未提交、远端 HEAD 仍在）；提交删除后 CI `deploy` 作业将悬空（AGENTS.md §0 🔴 项），恢复或收敛须先获授权。
 
@@ -189,7 +190,6 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 | `deploy/deploy.sh` | 幂等发布：`git fetch`（SSH deploy key，服务器 HTTPS 到 github.com 被阻断）→ `reset --hard <目标 SHA>`（未传则 origin/main；CI 传 `$GITHUB_SHA` 防并发漂移）→ `pnpm install --prod=false` → `build:web` → 同步静态根 → 重启 `mim-api` → 健康轮询 → `nginx -t` + reload |
 | `deploy/nginx-mim.conf` | 站点模板（root / 反代 / 缓存 / 安全头 / gzip） |
 | `deploy/mim-api.service` | systemd 单元（`User=mim`，`Restart=always`，仅 `data/` 与 `.mim-dev-secret/` 可写） |
-| `deploy/backup-db.sh` | SQLite 一致性备份（`sqlite3 .backup`），保留最近 N 份 |
 | `.github/workflows/deploy.yml` | push `main` → 质量门禁 → 上传本次提交的 `deploy.sh` → SSH 执行 → 服务器 HEAD == 提交 SHA 校验 → 线上 `/health` 取证 |
 
 **生产事实（2026-11-04 取证，2026-11-05 更新）**：`curl https://mim.mixm.top/health` = 200；`mim-api` / `nginx` 均 active；`mim.db` 与 `.mim-dev-secret/jwt.key` 已在服务器落盘。

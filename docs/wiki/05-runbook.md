@@ -387,7 +387,6 @@ sudo -n bash /opt/mim/app/deploy/bootstrap.sh   # 需仓库已在 /opt/mim/app
 ```bash
 sudo -n bash /opt/mim/app/deploy/deploy.sh              # 手动重放发布（origin/main → install → build → 发布 → 健康轮询）
 sudo -n bash /opt/mim/app/deploy/deploy.sh <commit-sha>  # 精确重放到指定提交（CI 同款行为）
-bash /opt/mim/app/deploy/backup-db.sh          # SQLite 在线热备份（默认 /var/backups/mim，保留 14 份）
 systemctl status mim-api; journalctl -u mim-api -n 50    # 服务状态与日志
 ```
 

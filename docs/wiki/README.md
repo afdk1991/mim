@@ -58,7 +58,7 @@ f:\合并项目\Mim
 │   ├── core-domain/               # 错误码 / UUIDv7 / 统一入口配置清单（errors.ts / ids.ts / siteModules.*）
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
 ├── docs/wiki/                     # 本 Wiki 全部文档（01~10）
-├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / backup-db / migrations / sealos / iga）
+├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / migrations / sealos / iga）
 ├── .github/workflows/deploy.yml   # CI/CD：push main 自动上线 https://mim.mixm.top
 ├── scripts/
 │   ├── version-check.mjs          # 铁律四版本规约校验器
