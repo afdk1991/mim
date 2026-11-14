@@ -1131,6 +1131,26 @@ export interface PromotionItem { // 推广计划条目
   budget_cents?: number; // 管理端：预算（分，仅统计）
 } // 代码块结束
 
+/** 统一内容来源：论坛主题 / 圈内动态 / 圈内公告（与后端 content/unified.ts 的 ContentSource 一致） */
+export type ContentFeedSource = 'community_thread' | 'circle_post' | 'circle_notice';
+
+/** 统一内容流条目（对应后端 GET /content/items 的 items 元素） */
+export interface ContentFeedItem {
+  id: string; // 统一主键
+  source: ContentFeedSource; // 来源：论坛主题 / 圈内动态 / 圈内公告
+  source_id: string; // 源表主键
+  container_kind: 'board' | 'circle'; // 容器类型：板块 / 圈子
+  container_id: string; // 容器主键
+  author_id: string | null; // 作者用户 id，匿名 / 已删号为 null
+  kind: string; // 内容形态（text / video / notice 等）
+  title: string; // 标题
+  summary: string; // 摘要
+  body: string; // 正文
+  status: string; // 状态
+  created_at: string; // 发布时间
+  updated_at: string; // 更新时间
+} // 统一内容条目结束
+
 /** 公告管理入参（与 /admin/content/announcements 契约对齐） */
 export interface AnnouncementUpsertPayload {
   title: string; // 标题（必填）

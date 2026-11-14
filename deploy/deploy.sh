@@ -43,7 +43,7 @@ DEPLOY_KEY="${DEPLOY_KEY:-/opt/mim/.ssh/deploy_key}"
 RUN_USER="${RUN_USER:-mim}"
 # 站点域名：用于把仓库内 deploy/nginx-mim.conf 的 server_name 替换为实际域名，
 # 并驱动 certbot 重新注入 TLS 段（与 bootstrap.sh 的 sed 规则保持一致）。
-NGINX_DOMAIN="${NGINX_DOMAIN:-mim.mixm.top}"
+NGINX_DOMAIN="${NGINX_DOMAIN:-laal.top}"
 
 # 目标提交：CI 传入 $GITHUB_SHA；为空则跟随 origin/main
 TARGET_REF="${1:-}"
@@ -174,7 +174,7 @@ chmod 600 "$MIM_ENV_FILE"
 
 # 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel 等）以独立域名直连本 API 所必需。
 # 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_CORS_ORIGINS 环境变量可覆盖默认列表。
-CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top}"
+CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://mim.mixm.top,https://data.mixm.top}"
 if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE"; then
   log "$MIM_ENV_FILE 已含 MIM_CORS_ORIGINS，保留现有值"
 else
@@ -382,8 +382,10 @@ if command -v nginx >/dev/null 2>&1; then
   }
 
   log "安装 nginx 站点配置 → $NGINX_AVAILABLE（server_name $NGINX_DOMAIN）"
-  # 与 bootstrap.sh 同一 sed 规则：把仓库里的默认域名替换为实际域名
-  sed "s/server_name mim.mixm.top;/server_name ${NGINX_DOMAIN} www.${NGINX_DOMAIN};/" \
+  # 与 bootstrap.sh 同一 sed 规则：把模板域 laal.top 全量替换为实际域名。
+  # 必须全量替换（不再只改主站 server_name）：配置里还有 api / admin / center 等子域
+  # server_name 与 301 跳转目标，只改主站会让子域仍解析到模板域，切域后子域全断。
+  sed "s/laal\.top/${NGINX_DOMAIN}/g" \
     "$APP_DIR/deploy/nginx-mim.conf" > "$NGINX_AVAILABLE"
   chmod 644 "$NGINX_AVAILABLE"
 
@@ -393,11 +395,23 @@ if command -v nginx >/dev/null 2>&1; then
     die "nginx 配置语法校验失败，已回滚"
   fi
 
-  # 重新注入 TLS：证书已存在时 certbot 仅改写配置而不重新签发
+  # 重新注入 TLS：证书已存在时 certbot 仅改写配置而不重新签发。
+  # SAN 清单 = 主站 + 本机 DNS 已可解析的绑定子域（api / admin / auth / center / dh / gy /
+  # login / mall / pay / video）。新域尚未建解析时把主机名塞给 certbot 会让 HTTP-01 挑战失败、
+  # 整次发布回滚，故先用 getent 探测，只把已解析的追加进 SAN；其余留 warning，DNS 就绪后
+  # 重跑本脚本会自动纳入（--expand 允许在既有证书上追加域名）。
+  CERT_DOMAINS=(-d "$NGINX_DOMAIN" -d "www.${NGINX_DOMAIN}")
+  for CERT_SUB in api admin auth center dh gy login mall pay video; do
+    if getent hosts "${CERT_SUB}.${NGINX_DOMAIN}" >/dev/null 2>&1; then
+      CERT_DOMAINS+=(-d "${CERT_SUB}.${NGINX_DOMAIN}")
+    else
+      warn "证书跳过 ${CERT_SUB}.${NGINX_DOMAIN}（本机 DNS 无解析，解析就绪后重跑自动纳入）"
+    fi
+  done
   if [ -d "/etc/letsencrypt/live/${NGINX_DOMAIN}" ] && command -v certbot >/dev/null 2>&1; then
-    log "certbot 注入 HTTPS（已有证书，--keep-until-expiring）"
-    if ! certbot --nginx -d "$NGINX_DOMAIN" --redirect --non-interactive \
-        --keep-until-expiring --agree-tos -m "admin@${NGINX_DOMAIN}"; then
+    log "certbot 注入 HTTPS（已有证书，--keep-until-expiring，SAN: ${CERT_DOMAINS[*]}）"
+    if ! certbot --nginx "${CERT_DOMAINS[@]}" --redirect --non-interactive \
+        --keep-until-expiring --expand --agree-tos -m "admin@${NGINX_DOMAIN}"; then
       nginx_rollback
       die "certbot 配置 HTTPS 失败，已回滚（线上 HTTPS 保持可用）"
     fi

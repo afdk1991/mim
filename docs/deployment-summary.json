@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-12T17:11:27.866Z",
-  "head": "0dd2b9d",
+  "generated_at": "2026-11-14T11:09:29.637Z",
+  "head": "ef71b65",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -39,7 +39,7 @@
     "deployment_items_declared": 12,
     "ci_jobs_found": 5,
     "ci_jobs_declared": 5,
-    "ci_steps_found": 31,
+    "ci_steps_found": 32,
     "remotes_found": 2,
     "remotes_declared": 2,
     "probed_items": 0
@@ -102,14 +102,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "0dd2b9def318f901e20c917bfcbbc493313aa542",
+      "hash": "ef71b6539527f1178a8977ee6704af34f1412e73",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "0dd2b9def318f901e20c917bfcbbc493313aa542",
+      "hash": "ef71b6539527f1178a8977ee6704af34f1412e73",
       "exit": 0,
       "error": null
     }
@@ -124,6 +124,7 @@
   "ci_steps": [
     "安装依赖",
     "密钥模板校验（09 清单 §0）",
+    "全仓缺口扫描（路由装配 / 表结构接缝 / 环境变量 / 前端接线 / 未完成标记）",
     "版本号校验（铁律四）",
     "类型检查",
     "后端契约测试",

@@ -1212,7 +1212,7 @@ const crawlerPlan: CapabilityHandler = async ({ text }) => { // 爬虫入口
   const delayMs = 800; // 礼貌延迟
   const estimateSeconds = Math.ceil((pages * delayMs) / 1000); // 预计耗时
   const hasPageParam = [...url.searchParams.keys()].some((key) => /page|p|offset|start/i.test(key)); // 是否已有分页参数
-  const output = JSON.stringify({ normalized_url: url.toString(), pages, concurrency: 1, delay_ms: delayMs, estimated_seconds: estimateSeconds, page_param_detected: hasPageParam, robots_hint: `${url.origin}/robots.txt 需先读取并遵守 Disallow`, headers: { 'User-Agent': 'MimBot/0.0 (+https://mim.mixm.top)', 'Accept-Language': 'zh-CN,zh;q=0.9' } }, null, 2); // 计划
+  const output = JSON.stringify({ normalized_url: url.toString(), pages, concurrency: 1, delay_ms: delayMs, estimated_seconds: estimateSeconds, page_param_detected: hasPageParam, robots_hint: `${url.origin}/robots.txt 需先读取并遵守 Disallow`, headers: { 'User-Agent': 'MimBot/0.0 (+https://laal.top)', 'Accept-Language': 'zh-CN,zh;q=0.9' } }, null, 2); // 计划
   return { output, output_kind: 'json', meta: { pages, estimated_seconds: estimateSeconds } }; // 返回计划
 }; // crawlerPlan 结束
 

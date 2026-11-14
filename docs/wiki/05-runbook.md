@@ -46,7 +46,7 @@ Remove-Item Env:RELEASE_CHANNEL
 
 | 场景 | 预期输出要点 | 退出码 |
 |---|---|---|
-| 当前仓库现状（`package.json` 版本 `0.0.0`、无正式 tag） | `✅ 版本号 0.0.0 合法（V0.0.0）` + tag 段通过 | 0 |
+| 当前仓库现状（`package.json` 版本 `0.0.11`、无正式 tag） | `✅ 版本号 0.0.11 合法（V0.0.11）` + tag 段通过 | 0 |
 | `package.json` 写 `"version": "0.0.0-preview"` | ❌ 版本号不符合 semver（预发行后缀只允许走 RELEASE_CHANNEL，不进版本数字） | 1 |
 | `RELEASE_CHANNEL=preview` 且仓库已有 `V0.0.0` tag | ❌ 预览通道下已存在正式 tag | 1 |
 
@@ -339,9 +339,9 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 > 以上矩阵已升格为项目规则：[AGENTS.md 铁律九](../../AGENTS.md)——免费是硬约束，每轮部署须刷新本表取证。
 
-> 候选平台的免费额度与选型路由见 [AGENTS.md 铁律十](../../AGENTS.md)：远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render 750 实例小时/月、Cloudflare Workers 10 万请求/天）。**原候选托管平台相关内容已于 2026-11-09 全量删除，不得重新引入候选池**。**本表为已落地的 9 平台矩阵，铁律十为候选池与选型依据**；新增平台须先过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件。
+> 候选平台的免费额度与选型路由见 [AGENTS.md 铁律十](../../AGENTS.md)：远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render 750 实例小时/月、Cloudflare Workers 10 万请求/天）。**原候选托管平台相关内容已于 2026-11-09 全量删除，不得重新引入候选池**。**本表为已落地的 11 平台矩阵，铁律十为候选池与选型依据**；新增平台须先过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件。
 >
-> **生产权威终点（铁律十二，2026-11-09 补充）**：上述 9 平台仅为分发 / 镜像 / 可用性取证，**唯一生产上线终点为线上腾讯云自建服务器 `https://mim.mixm.top`**（nginx + systemd `mim-api` + SQLite WAL，前后端 + 数据库一体）；两个代码远端 `origin`（GitHub）与 `gitee`（Gitee）每轮须同轮全推并逐个 `git ls-remote` 取证。详见 [AGENTS.md §12](../../AGENTS.md)。
+> **生产权威终点（铁律十二，2026-11-09 补充）**：上述 11 平台仅为分发 / 镜像 / 可用性取证，**唯一生产上线终点为线上腾讯云自建服务器 `https://mim.mixm.top`**（nginx + systemd `mim-api` + SQLite WAL，前后端 + 数据库一体）；两个代码远端 `origin`（GitHub）与 `gitee`（Gitee）每轮须同轮全推并逐个 `git ls-remote` 取证。详见 [AGENTS.md §12](../../AGENTS.md)。
 
 > **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
 

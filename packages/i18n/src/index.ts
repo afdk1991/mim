@@ -268,6 +268,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     PAYMENT_NOTIFY_NOT_CONFIGURED: '支付回调密钥未配置，暂无法接收渠道通知',
     // 对象存储缺失
     STORAGE_NOT_CONFIGURED: '对象存储未配置',
+    // 对象存储配置不完整或自相矛盾（如指定 s3 却缺桶名 / 区域 / 密钥）
+    STORAGE_CONFIG_INVALID: '对象存储配置不完整，请补齐桶名、区域与访问密钥',
     // AI 提供方缺失
     PROVIDER_NOT_CONFIGURED: 'AI 模型提供方未配置',
     // 成本超限，说明限额维度
@@ -362,6 +364,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     PAYMENT_NOTIFY_NOT_CONFIGURED: 'Payment callback secret is not configured',
     // 存储未配置
     STORAGE_NOT_CONFIGURED: 'Object storage is not configured',
+    // 存储配置不完整：显式失败，不降级
+    STORAGE_CONFIG_INVALID: 'Object storage config is incomplete: bucket, region and credentials are required',
     // 模型提供方未配置
     PROVIDER_NOT_CONFIGURED: 'AI model provider is not configured',
     // 成本超限

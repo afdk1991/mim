@@ -415,7 +415,7 @@ function envFirst(env: Record<string, string | undefined>, keys: string[]): stri
 
 /**
  * 解析某 provider 的运行凭证。
- * @param backendBase 后端对外基址（如 https://mim.mixm.top），用于拼默认回调地址
+ * @param backendBase 后端对外基址（如 https://laal.top），用于拼默认回调地址
  * @returns 凭证齐全时返回配置，否则 null（入口不可用，但不应让服务启动失败）
  */
 export function resolveCredentials(

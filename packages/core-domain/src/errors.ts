@@ -85,6 +85,8 @@ export const ERROR_CODES = [
   'PAYMENT_NOTIFY_NOT_CONFIGURED',
   // 对象存储（S3/OSS）未配置，附件类能力不可用
   'STORAGE_NOT_CONFIGURED',
+  // 对象存储配置自相矛盾或不完整（如指定 s3 驱动却缺桶名/密钥/区域）：启动即失败，绝不静默降级
+  'STORAGE_CONFIG_INVALID',
   // AI 模型提供方未配置，生成类能力不可用
   'PROVIDER_NOT_CONFIGURED',
   // 超出单任务或当日的生成成本上限
@@ -183,6 +185,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   PAYMENT_NOTIFY_NOT_CONFIGURED: 503,
   // 存储未配置 503
   STORAGE_NOT_CONFIGURED: 503,
+  // 存储配置错误属于部署方配置缺陷（不是临时容量问题），用 500 与「服务未就绪」区分
+  STORAGE_CONFIG_INVALID: 500,
   // 模型提供方未配置 503
   PROVIDER_NOT_CONFIGURED: 503,
   // 成本超限用 402 Payment Required，提示需付费或等待额度重置

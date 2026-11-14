@@ -43,8 +43,15 @@ const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat })
 const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
 const Tools = lazy(() => import('./views/Tools').then((m) => ({ default: m.Tools }))); // 自研工具发布目录
 const ContentHub = lazy(() => import('./views/ContentHub').then((m) => ({ default: m.ContentHub }))); // 公告 / 更新日志 / 推广计划栏目
+const News = lazy(() => import('./views/News').then((m) => ({ default: m.News }))); // 资讯：全站统一内容流（复用 /content/items）
+const Cloud = lazy(() => import('./views/Cloud').then((m) => ({ default: m.Cloud }))); // 云存储：私有桶 + 短时签名（复用 /media/*）
+const Img = lazy(() => import('./views/Img').then((m) => ({ default: m.Img }))); // 图床：public/ 前缀公有读 + 稳定直链
+const Download = lazy(() => import('./views/Download').then((m) => ({ default: m.Download }))); // 下载分发：软件 / 源码包私有桶 + 签名分发链接（承接 store 域）
 const Releases = lazy(() => import('./views/Releases').then((m) => ({ default: m.Releases }))); // 版本迭代：时间线 + 能力地图
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
+const Checkout = lazy(() => import('./views/Checkout').then((m) => ({ default: m.Checkout }))); // 收银台：/checkout?intent=... 二维码 / 渠道唤起 / 轮询
+const Player = lazy(() => import('./views/Player').then((m) => ({ default: m.Player }))); // 独立播放器：/watch/:kind/:id 选集与进度记忆
+const PaymentReturn = lazy(() => import('./views/PaymentReturn').then((m) => ({ default: m.PaymentReturn }))); // 支付回跳承接：/pay-return?intent=... 三态结果
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
@@ -262,6 +269,14 @@ export function App() {
     { view: 'tools', label: locale === 'en-US' ? 'Tools' : '自研工具' },
     // 公告 / 更新日志 / 推广计划栏目
     { view: 'content', label: locale === 'en-US' ? 'News' : '公告动态' },
+    // 资讯：论坛主题 + 圈子动态 / 公告的统一内容流（与「公告动态」是不同数据源，独立入口）
+    { view: 'news', label: locale === 'en-US' ? 'Community feed' : '社区资讯' },
+    // 云存储：私有桶 + 短时签名，登录后可用（上传 / 下载 / 本人产物）
+    { view: 'cloud', label: locale === 'en-US' ? 'Cloud' : '云存储' },
+    // 图床：public/ 前缀公有读，登录后可上传并取稳定直链
+    { view: 'img', label: locale === 'en-US' ? 'Image host' : '图床' },
+    // 下载分发：分发包走私有桶 + 短时签名链接（store 域的落点；/store 段已归属商城）
+    { view: 'download', label: locale === 'en-US' ? 'Downloads' : '下载分发' },
   ]; // 内置导航项定义结束
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项；
   // hidden 项是「已合并进上级」的二级入口，页面保留但不上侧栏（后台显式配置 visible 不能把它强行拉回）
@@ -303,7 +318,10 @@ export function App() {
     route.view === 'cart' ||
     route.view === 'account' ||
     route.view === 'community' ||
-    route.view === 'commerce'; // 商业化中台接口需要令牌（访客会话同样可用）
+    route.view === 'commerce' || // 商业化中台接口需要令牌（访客会话同样可用）
+    route.view === 'checkout' || // 收银台按支付意图查单，需令牌
+    route.view === 'payreturn' || // 回跳页按意图编号查单，需令牌
+    route.view === 'watch'; // 播放器拉帖 / 资产详情，需令牌
 
   // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
   return (
@@ -402,10 +420,23 @@ export function App() {
         {route.view === 'tools' && <Tools locale={locale} hasSession={!!session} />}{/* 工具目录视图 */}
         {/* 公告 / 更新日志 / 推广计划栏目：公开只读，空数据静默隐藏；会话态展示管理端 CRUD */}
         {route.view === 'content' && <ContentHub locale={locale} hasSession={!!session} />}{/* 内容栏目视图 */}
+        {/* 资讯：论坛主题 + 圈子动态 / 公告的统一内容流，公开只读，数据取已有 /content/items */}
+        {route.view === 'news' && <News locale={locale} />}{/* 资讯视图 */}
+        {/* 云存储：私有桶 + 短时签名，未登录只显示登录提示，不请求鉴权接口 */}
+        {route.view === 'cloud' && <Cloud locale={locale} hasSession={!!session} />}{/* 云存储视图 */}
+        {/* 图床：public/ 前缀公有读，未登录只显示登录提示 */}
+        {route.view === 'img' && <Img locale={locale} hasSession={!!session} />}{/* 图床视图 */}
+        {route.view === 'download' && <Download locale={locale} hasSession={!!session} />}{/* 下载分发视图 */}
         {/* 版本迭代：完整版本时间线 + 能力地图，公开可看 */}
         {route.view === 'releases' && <Releases locale={locale} onOpen={(view) => go({ view })} />}{/* 版本迭代视图 */}
         {/* 圈子：公开浏览清单；加入 / 审核 / 发动态公告在视图内按会话态与角色展示 */}
         {route.view === 'circles' && <Circles locale={locale} hasSession={!!session} />}{/* 圈子视图 */}
+        {/* 收银台：/checkout?intent=... 或 ?purpose=... 现场建单；二维码 / 渠道唤起 / 状态轮询 */}
+        {route.view === 'checkout' && session && <Checkout locale={locale} />}{/* 收银台视图 */}
+        {/* 独立播放器：/watch/:kind/:id，选集 / 上一集下一集 / 本地进度记忆 */}
+        {route.view === 'watch' && session && <Player locale={locale} />}{/* 播放器视图 */}
+        {/* 支付回跳承接：/pay-return?intent=...，成功 / 处理中 / 失败三态 */}
+        {route.view === 'payreturn' && session && <PaymentReturn locale={locale} />}{/* 支付回跳视图 */}
         {/* 收费 / 私密视图（商品列表 / 购物车 / 个人中心）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}

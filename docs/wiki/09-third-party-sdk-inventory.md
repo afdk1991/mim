@@ -36,8 +36,14 @@
 | Microsoft 身份平台 | Microsoft Entra ID v2.0（OIDC，`oauth4webapi`） | 海外企业 / 个人账号登录 | `MIM_AUTH_MICROSOFT_CLIENT_ID` / `MIM_AUTH_MICROSOFT_CLIENT_SECRET` | P0 |
 | QQ 互联 | QQ 登录（`graph.qq.com`，专用适配器：先换 `openid` 再拉资料） | 国内 QQ 登录 | `MIM_AUTH_QQ_APP_ID` / `MIM_AUTH_QQ_APP_KEY` | P1 |
 | 抖音开放平台 | 抖音网站应用授权（`open.douyin.com`，专用适配器：`client_key` + 逗号 scope + `data` 嵌套响应） | 国内抖音账号登录 | `MIM_AUTH_DOUYIN_CLIENT_KEY` / `MIM_AUTH_DOUYIN_CLIENT_SECRET` | P1 |
+| 微博开放平台 | 微博 OAuth2.0（`api.weibo.com`，专用适配器） | 国内微博账号登录 | `MIM_AUTH_WEIBO_CLIENT_ID` / `MIM_AUTH_WEIBO_CLIENT_SECRET` | P1 |
+| 百度开放平台 | 百度 OAuth2.0（`openapi.baidu.com`，standard 通用客户端） | 国内百度账号登录 | `MIM_AUTH_BAIDU_CLIENT_ID` / `MIM_AUTH_BAIDU_CLIENT_SECRET` | P1 |
+| Facebook | Graph API v19.0（standard 通用客户端，头像嵌套 `picture.data.url`） | 海外 Facebook 登录 | `MIM_AUTH_FACEBOOK_CLIENT_ID` / `MIM_AUTH_FACEBOOK_CLIENT_SECRET` | P1 |
+| Twitter（X） | OAuth2 PKCE + HTTP Basic（`api.twitter.com/2`，资料包 `data` 节点） | 海外 X 登录 | `MIM_AUTH_TWITTER_CLIENT_ID` / `MIM_AUTH_TWITTER_CLIENT_SECRET` | P1 |
 
 > **2026-11-12 落地状态**：上表 9 家（微信 / Google / Apple / GitHub / Gitee / GitLab / Microsoft / QQ / 抖音）已全部进入代码实现，注册表在 `services/mim-api/src/oauth/providers.ts`，协议层 `oauth/client.ts`（标准实现依赖 `oauth4webapi@3.8.8`，微信 / QQ / 抖音走专用适配器，Apple 用 p8 现签 ES256 client_secret），绑定与一次性票据在 `oauth/accounts.ts`，端点在 `routes/oauth.ts`。公共配置：`MIM_OAUTH_CALLBACK_BASE`（后端对外基址，缺省取请求的 `x-forwarded-proto` + `host`）、`MIM_WEB_BASE_URL`（回调 302 的前端基址）。每家 provider 另支持 `MIM_AUTH_<ID>_REDIRECT_URI` / `_AUTHORIZE_URL` / `_TOKEN_URL` / `_PROFILE_URL` / `_JWKS_URL` 五个可选覆盖变量（自建 GitLab / GitHub Enterprise / 联合调试）；Apple 因平台回调形态特殊，示例模板中显式列出 `MIM_AUTH_APPLE_REDIRECT_URI`；回调地址默认 `${MIM_OAUTH_CALLBACK_BASE}/api/v1/auth/oauth/<id>/callback`。**凭证未配置时该家 `configured=false`，前端按钮置灰、接口返回 `AUTH_OAUTH_NOT_CONFIGURED(503)`，不得视为可用**。平台侧需登记的回调 URL 见 [05-runbook §第三方登录回调登记](./05-runbook.md)。支付宝仍仅用于支付场景，不承担登录。
+
+> **2026-11-14 落地状态更新（覆盖上一段的「9 家 / 支付宝不承担登录」口径，原文按铁律三保留）**：注册表 `OAUTH_PROVIDERS` 已扩至 **14 家登录 provider**（GitHub / Gitee / GitLab / Google / Microsoft / Apple / 微信 / QQ / 抖音 / **微博 / 百度 / 支付宝 / Facebook / Twitter(X)**）。适配器 flavor 分流共七种：`standard`（GitHub / Gitee / GitLab / Google / Microsoft / **百度 / Facebook / Twitter**）、`apple`、`wechat`、`qq`、`douyin`、**`weibo`（专用适配器）**、**`alipay`（专用适配器，`auth_user_info` scope，网关统一端点）**——即**支付宝已同时承担登录**（`MIM_AUTH_ALIPAY_APP_ID` + `MIM_AUTH_ALIPAY_PRIVATE_KEY` 作凭证），不再仅限支付场景。2026-11-12 段的其余口径（公共配置、五个可选覆盖变量、未配置置灰 `AUTH_OAUTH_NOT_CONFIGURED(503)`）继续有效。
 | 阿里云短信 | 短信服务 API（`@alicloud/dysmsapi20170525`） | 国内验证码 | `MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE` | P0 |
 | 腾讯云短信 | SMS API | 国内验证码备份通道 | `MIM_SMS_TENCENT_SECRET_ID` / `MIM_SMS_TENCENT_SECRET_KEY` / `MIM_SMS_TENCENT_SDK_APP_ID` | P1 |
 | 阿里云邮件推送 / AWS SES | 邮件 API（SES 走 `@aws-sdk/client-ses`） | 海外注册验证与通知邮件 | `MIM_EMAIL_ALIYUN_ACCESS_KEY` / `MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_REGION` / `MIM_EMAIL_SES_FROM_ADDRESS` | P0 |
@@ -155,9 +161,11 @@
 | `MIM_STORAGE_DRIVER` | 存储驱动（`local` 本地磁盘 / `s3` S3 兼容） | `local` | P0（第 2 期已接入） |
 | `MIM_STORAGE_LOCAL_DIR` | 本地驱动落盘根目录 | `<服务目录>/data/media` | P0 |
 | `MIM_STORAGE_S3_ENDPOINT` | S3 兼容端点（OSS / COS / R2 / MinIO；AWS 可留空） | 空 | P0 |
-| `MIM_STORAGE_S3_REGION` | S3 区域 | `auto`（留空时用 `auto`，AWS 可改为具体区域如 `us-east-1`） | P0 |
-| `MIM_STORAGE_S3_BUCKET` | 存储桶名 | 空（缺失则驱动视为未配置） | P0 |
+| `MIM_STORAGE_S3_REGION` | S3 区域 | 无（`s3` 模式下必填；R2 填 `auto`，AWS 填如 `us-east-1`） | P0 |
+| `MIM_STORAGE_S3_BUCKET` | 存储桶名（须为私有桶） | 无（`s3` 模式下必填；缺项启动即抛 `STORAGE_CONFIG_INVALID`） | P0 |
 | `MIM_STORAGE_S3_FORCE_PATH_STYLE` | 路径风格（MinIO 需 `1`） | `0` | P0 |
+| `MIM_STORAGE_PUBLIC_PREFIX` | 公有读对象前缀（仅该前缀免签名可读，其余对象仍强制签名） | `public/` | P0（图床视图） |
+| `MIM_STORAGE_PUBLIC_BASE_URL` | 公有读对象稳定直链基线（CDN 或公网域名） | 无（缺值时直传接口抛 `STORAGE_CONFIG_INVALID`，不退回签名地址） | P0（图床视图） |
 | `MIM_PUBLIC_BASE_URL` | 对外公开基址（本地驱动预签名 URL 拼接） | 请求 Host | P0 |
 
 > 预签名 URL 的有效期默认 900 秒、上限 7 天；`object_key` 归属校验统一 404，不泄露他人资源存在性。
@@ -329,5 +337,7 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 微信支付平台凭证扩展 | 平台证书序列号 / 平台公钥 / 通知地址 / 应用 ID（既有商户号 / V3 密钥 / 序列号 / 私钥见 §15） | `MIM_WECHAT_*`（APP_ID / NOTIFY_URL / PLATFORM_SERIAL / PLATFORM_PUBLIC_KEY） | P0 |
 | 注册邀请门槛 | `MIM_REGISTER_INVITE_REQUIRED=1` 时新账号必须凭有效邀请码注册 | `MIM_REGISTER_INVITE_REQUIRED`（精确项） | P1 |
 | 圈子模块配置 | 圈子创建门槛（最小用户等级 / 每用户可创建数量），缺省 0 / 1 | `MIM_CIRCLE_CREATE_*`（`MIM_CIRCLE_CREATE_MIN_LEVEL` / `MIM_CIRCLE_CREATE_MAX_PER_USER`） | P1 |
+| OIDC 联邦身份 | 标准授权码模式联邦登录（state / nonce 一次性、claims 校验；ID Token 签名验签与 SAML 2.0 未落地，见 `federation.ts` 文件头）；四项缺一即 `configured=false`、端点返回 503 | `MIM_OIDC_*`（`MIM_OIDC_ISSUER` / `MIM_OIDC_CLIENT_ID` / `MIM_OIDC_CLIENT_SECRET` / `MIM_OIDC_REDIRECT_URI`） | P1 |
+| 推广返佣结算 | 一级 / 二级佣金比例与归因保护期（缺省 5% / 关闭 / 7 天），进程内配置非第三方凭证 | `MIM_REFERRAL_*`（`MIM_REFERRAL_RATE` / `MIM_REFERRAL_L2_RATE` / `MIM_REFERRAL_PROTECT_DAYS`） | P1 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补 `MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订 `MIM_AUTH_ADMIN_PASSWORD`（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。2026-11-14 增补 OIDC 联邦身份与推广返佣结算两组变量登记（消除 gap-scan C 段 7 项未登记）。新增第三方能力必须先更新本文件，再进入实现。_

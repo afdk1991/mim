@@ -13,6 +13,10 @@
 | `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 29 文件 / 407 例契约测试通过（2026-11-12 实测）；端口 8787 |
 | `services/mim-api/src/routes/assets.ts` / `payments.ts` / `fulfillment.ts` / `finance.ts` / `appearance.ts` / `growth.ts` / `i18n.ts` | 业务代码（后端） | **2026-11-12 新增（V0.0.5 商业化二期）**：付费资产、支付意图与回调、发货物流售后评价、提现与创作分成、主题与页面区块、成长徽章私信 IP、机器翻译与语言设置；支付内核在 `src/payments.ts` | 16 张商业化表 + `commerce.test.ts` 8 例契约测试；未配置供应商时返回 `PROVIDER_NOT_CONFIGURED` |
 | `apps/web/src/views/CommerceCenter.tsx` | 业务代码（前端） | **2026-11-12 新增（V0.0.5）**：`/commerce` 商业化中台，五页签覆盖资产 / 履约 / 资金 / 外观 / 成长国际化 | 资产筛选与购买、运单与售后、提现与收益、主题与区块排序、私信与翻译 |
+| `apps/web/src/views/News.tsx` | 业务代码（前端） | **2026-11-14 新增（V0.0.11）**：`/news` 社区资讯，复用已存在的 `GET /content/items` 统一内容流（论坛主题 + 圈子动态 / 公告），按来源分页签过滤；未新增任何后端接口 | 只读列表 + 来源计数徽标 + 空态 / 失败态 |
+| `apps/web/src/views/Cloud.tsx` | 业务代码（前端） | **2026-11-14 新增（V0.0.11）**：`/cloud` 私有云存储，直传走 `/media/presign/upload`、下载走短时签名地址；列出本人已登记产物（`GET /media/assets`，`project_id` 可省略） | 私有桶 + 签名，无公有读分支 |
+| `apps/web/src/views/Img.tsx` | 业务代码（前端） | **2026-11-14 新增（V0.0.11）**：`/img` 图床，仅图片走 `POST /media/presign/public-upload`，对象键落在 `public/` 前缀并回显稳定直链 | 公有读仅限 `public/` 前缀，其余对象仍强制签名 |
+| `apps/web/src/views/Download.tsx` | 业务代码（前端） | **2026-11-14 新增（V0.0.11）**：`/download` 下载分发（承接 `store` 域；`/store` 段已归属商城），分发包私有直传后按 1h / 24h / 7d 签发分发链接，并支持对已有对象键重新签发 | 私有桶 + 签名；`MIME_EXT` 补 zip / gz / tar / apk / exe / dmg 以免后缀退化为 `.bin` |
 | `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅设置页）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
 | `packages/core-domain` | 共享包 | 错误码、状态机、UUIDv7；**2026-11-09 新增统一入口配置清单** `siteModules.json`（schema `mim.site-modules.v2`：44 去重入口 / 19 业务域 / 132 功能点 / 88 演示 / 116 关联；可配置占位标识、去重整理 `dedupe` 与 `hostConfig` 声明）；**2026-11-12 新增落地状态层** `entryImplementation.ts`（四态映射：已落地 / 部分相邻 / 规划中 / 语义冲突，含真实能力与边界说明）；`siteModules.ts`（类型约束、占位解析 `resolveEntryHost` / `entryHostTemplate`、状态机工具、落地映射合并） | 前后端共用单一事实源；统一入口配置清单与 `site_module_items` 的唯一数据源 |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
@@ -27,7 +31,7 @@
 | `services/mim-api/test/sites.test.ts` | 测试代码 | **2026-11-09 新增 / 本轮修订**：站点模块契约测试 14 例（占位键寻址 / 详情 / 过滤 / 404 / 鉴权 / 幂等 / 状态机 / 作用域隔离 / 种子自洽） | vitest + supertest 全通过 |
 | `services/mim-api/test/entries.test.ts` | 测试代码 | **2026-11-09 本轮新增**：统一入口配置清单契约测试 12 例（19 域 / 去重整理 / 占位配置 / 关联对称 / 全链路消费） | vitest + supertest 全通过 |
 | `scripts/build.mjs` | 可执行代码 | 根级构建脚本：默认构建真实前端并把 `apps/web/dist` 递归复制到根 `dist/`（EdgeOne Pages 等 OutputDir=dist 的平台同款链路）；`--site` 模式才把 `site/` 复制到 `dist/` | 根 `dist/index.html`（真实应用）+ `dist/assets/*`，供 `npm run build` 调用 |
-| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check`）；`packageManager: pnpm@9.12.0`；版本号 `0.0.0` 为 `version-check.mjs` 的校验源 | 零 dependencies，脚本转发到各 workspace |
+| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check`）；`packageManager: pnpm@9.12.0`；版本号 `0.0.11` 为 `version-check.mjs` 的校验源 | 零 dependencies，脚本转发到各 workspace |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `tsconfig.base.json` | 配置 | 声明 `apps/*`、`services/*`、`packages/*`；锁定依赖版本；共享 TS 编译基线 | 可复现安装与类型检查 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
 | `team-hiring-plan.md` | 技术/组织规划 | 约束→编制→分阶段落地→风险→成本 | 22–32 人全配 / 14–18 人最小可行方案 |
@@ -54,10 +58,10 @@
 6. **铁律六**：全角色全流程自动化——AI 承担所有人员职责，覆盖写码/补全/修复/梳理/BUG 排查/代码检查，每轮交付前必须检查
 7. **铁律七**：功能模块增删必须全量同步全部受影响工件，交付报告附同步清单
 8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），禁止以本地预览作为交付终点；无线上取证不得宣称「已上线」
-9. **铁律九**：多平台部署矩阵只走免费方案（**10 个平台**，2026-11-10 起含 Gitee 镜像仓），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证
+9. **铁律九**：多平台部署矩阵只走免费方案（**11 个平台**，2026-11-10 起含 Gitee 镜像仓、2026-11-13 起 Netlify 接替停服的 Sealos 成为第 11 行），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证
 10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核；**已移除的原候选托管平台相关内容全量删除，不得重新引入**
 11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」
-12. **铁律十二**：全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器——`origin`（GitHub）/ `gitee`（Gitee）每轮同轮全推并逐个取证；生产唯一权威终点 `https://mim.mixm.top`（nginx + systemd + SQLite），其余 9 平台仅为分发 / 镜像 / 取证；项目名称 **Mim**；V1–V6 取证矩阵见 [AGENTS.md §12](../../AGENTS.md)
+12. **铁律十二**：全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器——`origin`（GitHub）/ `gitee`（Gitee）每轮同轮全推并逐个取证；生产唯一权威终点 `https://mim.mixm.top`（nginx + systemd + SQLite），其余 10 个分发 / 镜像平台仅为分发 / 镜像 / 取证；项目名称 **Mim**；V1–V6 取证矩阵见 [AGENTS.md §12](../../AGENTS.md)
 
 **冲突裁决**：铁律五与铁律一冲突时（如沙箱无网络），执行优先，允许本地实现但必须在交付报告标注「已偏离铁律五」及理由。
 
@@ -160,8 +164,9 @@ deploy/backup-db.sh ──备份──> services/mim-api/data/mim.db（WAL 一�
 |---|---|
 | `apps/web` + `services/mim-api` | 实际功能代码；生产运行方式见 §7.1 与 [05-runbook.md](./05-runbook.md) §6 |
 | `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**） |
+| `help/index.html` + `help/content/help.json` | **2026-11-14 新增（V0.0.11）**：零依赖静态文档站（hash 路由 + 6 种内容块渲染器），内容与壳分离；`help.json` 的 `reuse` 段给出 `jsonPath` / `linkPattern` / 页面 id，供 news / service / support / blog 后续引用 | 项目介绍 / 部署说明 / 常见问题；`file://` 下 `fetch` 被禁，需静态服务打开 |
 | `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**） |
-| `package.json` | 版本号 `0.0.0`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`（真实前端 → 根 `dist/`）；`build:site` 为 PRD 阅读页离线构建；`build:web` / `deploy` / `deploy:bootstrap` 指向生产链路 |
+| `package.json` | 版本号 `0.0.11`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`（真实前端 → 根 `dist/`）；`build:site` 为 PRD 阅读页离线构建；`build:web` / `deploy` / `deploy:bootstrap` 指向生产链路 |
 | `scripts/build.mjs` | 默认：`pnpm --filter @mim/web build` → 把 `apps/web/dist` 递归复制到根 `dist/`；`--site`：把 `site/` 复制到根 `dist/`（PRD 离线阅读）。零第三方依赖 |
 
 两个 HTML 均**不含业务密钥**。
@@ -195,7 +200,7 @@ Express(mim-api) ──> SQLite /opt/mim/app/services/mim-api/data/mim.db（WAL�
 
 | 工件 | 作用 |
 |---|---|
-| `packages/core-domain/src/deploymentRegistry.json` | 单一事实源（schema `mim.deployment-registry.v1`）：11 个规范部署项，字段统一为仓库标识 / 部署状态 / 部署结果 / 异常说明 / 缺失信息 |
+| `packages/core-domain/src/deploymentRegistry.json` | 单一事实源（schema `mim.deployment-registry.v1`）：12 个规范部署项，字段统一为仓库标识 / 部署状态 / 部署结果 / 异常说明 / 缺失信息 |
 | `packages/core-domain/src/deploymentRegistry.ts` | 类型、id 索引、`listDeploymentItems()` 过滤、`deploymentSummary()` 汇总 |
 | `services/mim-api/src/routes/deployments.ts` | 3 个公开只读端点；`/deployments/overview` 须先于 `/deployments/:id` 注册 |
 | `services/mim-api/test/deployments.test.ts` | 10 例契约测试：规模 / 分布自洽 / 统一字段零漂移 / 五类过滤 / 空数据 / 404 / 匿名只读 |

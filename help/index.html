@@ -1,0 +1,320 @@
+<!DOCTYPE html><!-- 声明 HTML5 文档类型，让浏览器以标准模式渲染本页 -->
+<!-- 根元素：lang 标注页面主语言为简体中文，供屏幕阅读器与搜索引擎识别 -->
+<html lang="zh-CN">
+<!-- 文档头：集中声明编码、视口、标题、SEO 描述、图标与全站样式 -->
+<head>
+<!-- 字符编码声明放在最前，避免中文出现乱码 -->
+<meta charset="UTF-8" />
+
+<!-- 视口设置：宽度跟随设备并提供初始缩放比，保证移动端正确适配 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- 浏览器标签页标题；切页时由脚本按当前页标题改写 -->
+<title>Mim 文档站 · 使用与部署</title>
+<!-- SEO 描述：一句话概括文档站内容范围 -->
+<meta name="description" content="Mim 项目介绍、部署说明与常见问题。独立静态站，无构建步骤、无外部依赖。" />
+<!-- 站点图标：内联 SVG 数据 URI，省去一次图片请求，避免 404 -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111'/><text x='16' y='22' font-size='16' font-family='system-ui' font-weight='700' fill='%23fff' text-anchor='middle'>M</text></svg>" />
+<!-- 全站样式：设计令牌与组件样式内联，保持零外链、可离线打开 -->
+<style>
+  /* 设计令牌：与仓库既有静态站（site/index.html）同一套深色口径，便于统一换肤 */
+  :root{
+    /* 中性色四档：页面底色、卡片面板、次级面板、分割线 */
+    --bg:#0b0c0e; --panel:#12141a; --panel-2:#171a21; --line:#262a33;
+    /* 文字三级：主文本、次要说明、弱化信息 */
+    --fg:#eef1f6; --fg-dim:#9aa3b2; --fg-mute:#6b7484;
+    /* 品牌蓝、辅助薄荷绿、统一圆角与内容最大宽度 */
+    --accent:#4f8cff; --accent-2:#7ee0c0; --radius:12px; --maxw:1180px;
+  }
+  /* 全局重置：宽度按 border-box 计算，清掉浏览器默认外边距与内边距 */
+  *{box-sizing:border-box;margin:0;padding:0}
+  /* 锚点跳转平滑滚动，改善长文内定位体验 */
+  html{scroll-behavior:smooth}
+  /* 页面主体：深色底 + 主文字色 + 中英文混排字体栈 */
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    line-height:1.7; -webkit-font-smoothing:antialiased;
+  }
+  /* 链接继承文字色、去掉默认下划线，具体组件再定义悬停态 */
+  a{color:inherit;text-decoration:none}
+  /* 顶部导航：粘性固定 + 毛玻璃，滚动时保持品牌与版本可见 */
+  header{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);
+    background:rgba(11,12,14,.78);border-bottom:1px solid var(--line)}
+  /* 导航条：品牌居左、版本居右，固定 60px 高度 */
+  .nav{display:flex;align-items:center;justify-content:space-between;height:60px;
+    max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  /* 品牌区：图标与文字横向排列 */
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em}
+  /* 品牌方块图标：30px 圆角方块 + 蓝色渐变底 */
+  .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    background:linear-gradient(140deg,var(--accent),#2f5fbf);font-size:15px;font-weight:800;color:#fff}
+  /* 右侧元信息：等宽小字，避免抢占视觉重心 */
+  .meta{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--fg-dim)}
+  /* 版本徽标：胶囊描边 */
+  .badge{padding:3px 9px;border:1px solid var(--line);border-radius:999px;color:var(--fg-dim)}
+  /* 主体布局：左侧目录 + 右侧正文；小屏由媒体查询改为上下结构 */
+  .layout{max-width:var(--maxw);margin:0 auto;padding:28px 24px 64px;
+    display:grid;grid-template-columns:248px minmax(0,1fr);gap:40px;align-items:start}
+  /* 左侧目录：粘性定位，长文档滚动时目录始终可见 */
+  aside{position:sticky;top:84px}
+  /* 目录分组标题：弱化小字，区分「页面」与「章节」层级 */
+  .nav-group{margin-bottom:18px}
+  .nav-group > .nav-title{font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--fg-mute);margin-bottom:8px}
+  /* 页面级链接：稍大字号 + 中等字重 */
+  .nav-page{display:block;padding:6px 10px;border-radius:8px;font-size:14px;color:var(--fg-dim)}
+  .nav-page:hover{background:var(--panel);color:var(--fg)}
+  /* 当前页高亮：蓝色文字 + 面板底 */
+  .nav-page.is-active{background:var(--panel-2);color:var(--fg);font-weight:600}
+  /* 章节链接：缩进 + 更小字号，形成层级 */
+  .nav-sections{margin:4px 0 14px 10px;padding-left:10px;border-left:1px solid var(--line)}
+  .nav-section{display:block;padding:4px 8px;border-radius:6px;font-size:13px;color:var(--fg-mute)}
+  .nav-section:hover{color:var(--fg-dim)}
+  /* 正文卡片：面板底色 + 细边 + 大内边距，形成阅读容器 */
+  main{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:32px 34px;min-height:60vh}
+  /* 页面标题区：标题 + 摘要，底部留白分隔章节 */
+  .page-head{margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .page-head h1{font-size:26px;letter-spacing:.01em;margin-bottom:6px}
+  .page-head p{font-size:14px;color:var(--fg-dim)}
+  /* 章节：滚动锚点需要留出粘性头部的高度，避免标题被遮住 */
+  .section{margin-bottom:34px;scroll-margin-top:84px}
+  .section h2{font-size:18px;margin-bottom:12px;padding-left:10px;
+    border-left:3px solid var(--accent);line-height:1.4}
+  /* 正文段落与列表 */
+  .section p{font-size:14.5px;color:var(--fg-dim);margin-bottom:10px}
+  .section ul,.section ol{font-size:14.5px;color:var(--fg-dim);margin:0 0 12px 22px}
+  .section li{margin-bottom:6px}
+  /* 行内代码：等宽字体 + 次级面板底，避免与正文混淆 */
+  .section code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:6px;padding:1px 6px}
+  /* 代码块：独立面板 + 横向滚动，禁止换行破坏命令语义 */
+  .code{background:#0d0f13;border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;margin:0 0 14px;overflow-x:auto}
+  .code code{background:none;border:0;padding:0;color:#cfe1ff;white-space:pre;line-height:1.6}
+  /* 表格：允许横向滚动，窄屏下不挤压内容 */
+  .table-wrap{overflow-x:auto;margin:0 0 14px;border:1px solid var(--line);border-radius:10px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel-2);color:var(--fg);font-weight:600;white-space:nowrap}
+  td{color:var(--fg-dim)}
+  tr:last-child td{border-bottom:0}
+  /* 提示块：左侧色条区分信息与警告，语气靠颜色而非图标 */
+  .note{font-size:13.5px;padding:12px 14px;border-radius:10px;margin:0 0 14px;
+    border:1px solid var(--line);border-left:3px solid var(--fg-mute);background:var(--panel-2);color:var(--fg-dim)}
+  .note-info{border-left-color:var(--accent)}
+  .note-warn{border-left-color:#f5a524}
+  /* 状态区：加载中 / 失败 / 空内容统一复用 */
+  .state{font-size:14px;color:var(--fg-dim);padding:18px 0}
+  .state-error{color:#ff8b8b}
+  /* 页脚：内容复用说明，说明其它视图如何引用本站 */
+  footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;
+    font-size:12.5px;color:var(--fg-mute);line-height:1.8}
+  footer code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--fg-dim)}
+  /* 响应式：窄屏隐藏左侧目录，正文占满宽度并减小内边距 */
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr;gap:20px;padding-top:20px}
+    aside{position:static}
+    main{padding:22px 18px}
+  }
+</style>
+</head>
+<body>
+<!-- 顶部导航：品牌 + 版本 / 更新时间，全部来自 content/help.json -->
+<header>
+  <div class="nav">
+    <div class="brand"><span class="logo">M</span><span>Mim 文档站</span></div>
+    <div class="meta">
+      <span class="badge" id="version-badge">v—</span>
+      <span id="updated-at">—</span>
+    </div>
+  </div>
+</header>
+
+<!-- 主体：左侧目录由脚本按内容渲染，右侧正文按 hash 路由渲染 -->
+<div class="layout">
+  <!-- 目录容器：初始为空，脚本注入页面与章节链接 -->
+  <aside><nav id="toc" aria-label="文档目录"></nav></aside>
+  <!-- 正文容器：加载态 / 错误态 / 页面内容都渲染在这里 -->
+  <main id="content">
+    <p class="state" id="state">正在加载文档内容…</p>
+  </main>
+</div>
+
+<script>
+// ===== 文档站运行时：仅依赖浏览器原生 API，不需要任何构建工具或第三方库 =====
+
+// 内容源路径：与 index.html 同级的 content 目录；该文件同时供其他视图复用
+const CONTENT_URL = 'content/help.json';
+
+// 站内状态：内容、当前页、当前章节
+const state = { data: null, pageId: '', sectionId: '' };
+
+/** 创建元素并可选设置类名与文本，统一走 DOM API 以避免拼接 HTML 带来注入风险。 */
+function el(tag, className, text) {
+  const node = document.createElement(tag); // 新建元素节点
+  if (className) node.className = className; // 可选类名
+  if (text !== undefined && text !== null) node.textContent = String(text); // 文本统一按纯文本写入
+  return node; // 返回创建好的节点
+}
+
+/** 把 URL hash 解析为「页面 id + 章节 id」；无 hash 时回落到首页。 */
+function parseHash() {
+  const raw = decodeURIComponent(window.location.hash.replace(/^#\/?/, '')); // 去掉 #/ 前缀
+  const parts = raw.split('/').filter(Boolean); // 过滤空段，兼容尾斜杠
+  return { pageId: parts[0] || '', sectionId: parts[1] || '' }; // 首段为页面，次段为章节
+}
+
+/** 找到当前页面对象；id 不存在时回落首页，避免手改地址后白屏。 */
+function currentPage() {
+  const pages = state.data.pages; // 全部页面
+  const hit = pages.find((page) => page.id === state.pageId); // 精确匹配
+  return hit || pages.find((page) => page.id === state.data.site.home) || pages[0]; // 兜底到首页
+}
+
+/** 渲染单个内容块：支持段落 / 无序列表 / 有序列表 / 代码块 / 表格 / 提示六种类型。 */
+function renderBlock(block) {
+  if (block.type === 'p') return el('p', '', block.text); // 段落
+  if (block.type === 'ul' || block.type === 'ol') { // 列表
+    const list = el(block.type === 'ul' ? 'ul' : 'ol'); // 按类型创建列表
+    (block.items || []).forEach((item) => list.appendChild(el('li', '', item))); // 逐条写入
+    return list; // 返回列表节点
+  }
+  if (block.type === 'code') { // 代码块
+    const pre = el('pre', 'code'); // 外层保留滚动与底色
+    pre.appendChild(el('code', '', block.text)); // 内层放纯文本，保留换行
+    return pre; // 返回代码块
+  }
+  if (block.type === 'table') { // 表格：外层容器负责横向滚动
+    const wrap = el('div', 'table-wrap'); // 滚动容器
+    const table = el('table'); // 表格本体
+    const thead = el('thead'); // 表头
+    const headRow = el('tr'); // 表头行
+    (block.head || []).forEach((cell) => headRow.appendChild(el('th', '', cell))); // 逐列写入表头
+    thead.appendChild(headRow); // 表头行入表头
+    table.appendChild(thead); // 表头入表格
+    const tbody = el('tbody'); // 表体
+    (block.rows || []).forEach((row) => { // 逐行渲染
+      const tr = el('tr'); // 当前行
+      row.forEach((cell) => tr.appendChild(el('td', '', cell))); // 逐列写入单元格
+      tbody.appendChild(tr); // 行入表体
+    });
+    table.appendChild(tbody); // 表体入表格
+    wrap.appendChild(table); // 表格入滚动容器
+    return wrap; // 返回容器
+  }
+  if (block.type === 'note') { // 提示块：tone 决定左侧色条
+    return el('div', 'note ' + (block.tone === 'warn' ? 'note-warn' : 'note-info'), block.text);
+  }
+  return el('p', '', block.text || ''); // 未知类型按段落降级，保证内容不丢
+}
+
+/** 渲染目录：页面为一级，章节为二级；当前页高亮。 */
+function renderToc() {
+  const toc = document.getElementById('toc'); // 目录容器
+  toc.textContent = ''; // 清空上一轮内容
+  const group = el('div', 'nav-group'); // 单个分组，当前只有「文档」一组
+  group.appendChild(el('div', 'nav-title', '文档')); // 分组标题
+  state.data.pages.forEach((page) => { // 逐页渲染
+    const link = el('a', 'nav-page' + (page.id === state.pageId ? ' is-active' : ''), page.title); // 页面链接
+    link.href = '#/' + page.id; // hash 路由
+    if (page.id === state.pageId) link.setAttribute('aria-current', 'page'); // 无障碍当前项
+    group.appendChild(link); // 页面链接入分组
+    if (page.id !== state.pageId) return; // 非当前页不展开章节，保持目录紧凑
+    const subs = el('div', 'nav-sections'); // 章节容器
+    page.sections.forEach((section) => { // 逐章节渲染
+      const sub = el('a', 'nav-section', section.title); // 章节链接
+      sub.href = '#/' + page.id + '/' + section.id; // 二级 hash
+      subs.appendChild(sub); // 章节入容器
+    });
+    group.appendChild(subs); // 章节容器入分组
+  });
+  toc.appendChild(group); // 分组入目录
+}
+
+/** 渲染正文：标题区 + 各章节；指定章节时滚动到该章节。 */
+function renderPage() {
+  const content = document.getElementById('content'); // 正文容器
+  const page = currentPage(); // 当前页（已做兜底）
+  content.textContent = ''; // 清空上一轮内容
+
+  const head = el('div', 'page-head'); // 标题区
+  head.appendChild(el('h1', '', page.title)); // 页面标题
+  head.appendChild(el('p', '', page.summary || '')); // 页面摘要
+  content.appendChild(head); // 标题区入正文
+
+  page.sections.forEach((section) => { // 逐章节渲染
+    const box = el('section', 'section'); // 章节容器
+    box.id = section.id; // 章节锚点 id，供深链与目录使用
+    box.appendChild(el('h2', '', section.title)); // 章节标题
+    section.blocks.forEach((block) => box.appendChild(renderBlock(block))); // 逐块渲染
+    content.appendChild(box); // 章节入正文
+  });
+
+  const footer = el('footer'); // 页脚：说明内容复用方式
+  footer.appendChild(el('div', '', '内容复用：' + state.data.reuse.note)); // 复用说明
+  const linkLine = el('div'); // 链接格式说明行
+  linkLine.appendChild(el('code', '', state.data.reuse.jsonPath)); // 结构化内容路径
+  linkLine.appendChild(document.createTextNode(' · 深链格式 '));
+  linkLine.appendChild(el('code', '', state.data.reuse.linkPattern)); // 深链格式
+  footer.appendChild(linkLine); // 入页脚
+  content.appendChild(footer); // 页脚入正文
+
+  if (state.sectionId) { // 带章节 id 时滚动定位
+    const target = document.getElementById(state.sectionId); // 目标章节
+    if (target) target.scrollIntoView({ block: 'start' }); // 平滑滚动由 html 的 scroll-behavior 控制
+  } else { // 无章节 id 时回到页顶
+    window.scrollTo({ top: 0 }); // 切页后从顶部开始阅读
+  }
+}
+
+/** 重新解析 hash 并渲染：切换页面不整页刷新。 */
+function route() {
+  if (!state.data) return; // 内容尚未就绪时不处理
+  const next = parseHash(); // 解析目标
+  state.pageId = next.pageId; // 更新页面 id
+  state.sectionId = next.sectionId; // 更新章节 id
+  renderToc(); // 目录随当前页变化
+  renderPage(); // 渲染正文
+  const page = currentPage(); // 已兜底的当前页
+  document.title = page.title + ' · ' + state.data.site.name; // 同步标签页标题
+  // 地址栏与最终渲染页不一致时（如手改 hash 为不存在的页），显式改写为真实页面
+  if (state.pageId !== page.id) {
+    window.history.replaceState(null, '', '#/' + page.id);
+    state.pageId = page.id;
+    renderToc();
+  }
+}
+
+/** 展示错误：明确提示必须走 HTTP 打开，而不是让页面停在加载态。 */
+function renderError(err) {
+  const content = document.getElementById('content'); // 正文容器
+  content.textContent = ''; // 清空加载提示
+  const box = el('div', 'state state-error'); // 错误样式容器
+  box.appendChild(el('p', '', '文档内容加载失败：' + (err && err.message ? err.message : '未知错误'))); // 错误原因
+  box.appendChild(el('p', '', '若是直接双击打开 index.html，浏览器会因安全策略禁止读取本地 JSON；请用静态服务器预览，例如：'));
+  box.appendChild(el('pre', 'code', 'python -m http.server 4173 --directory help\n# 然后访问 http://localhost:4173'));
+  content.appendChild(box); // 入正文
+}
+
+/** 启动：拉取内容 → 填充版本信息 → 首次渲染 → 订阅 hash 变化。 */
+(async function boot() {
+  try {
+    const res = await fetch(CONTENT_URL, { cache: 'no-cache' }); // 相对路径读取，适配任意子目录部署
+    if (!res.ok) throw new Error('HTTP ' + res.status); // 非 2xx 视为失败
+    state.data = await res.json(); // 结构化内容
+    document.getElementById('version-badge').textContent = 'v' + state.data.site.version; // 版本徽标
+    document.getElementById('updated-at').textContent = '更新于 ' + state.data.site.updatedAt; // 更新时间
+    const initial = parseHash(); // 首次进入的 hash
+    state.pageId = initial.pageId || state.data.site.home; // 无 hash 时落到首页
+    state.sectionId = initial.sectionId; // 章节可选
+    route(); // 首次渲染
+    window.addEventListener('hashchange', route); // 目录点击与浏览器前进后退都走 hash
+  } catch (err) {
+    renderError(err); // 统一错误提示
+  }
+})();
+</script>
+</body>
+</html>

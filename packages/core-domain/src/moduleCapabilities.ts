@@ -65,7 +65,7 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     key: 'qrcode.generate', // 能力标识
     name: { 'zh-CN': '二维码生成', 'en-US': 'QR code generator' }, // 能力名
     hint: { 'zh-CN': '输入文本或链接，输出可保存的二维码图片', 'en-US': 'Enter text or a link to get a scannable QR image' }, // 使用提示
-    placeholder: { 'zh-CN': 'https://mim.mixm.top', 'en-US': 'https://mim.mixm.top' }, // 占位示例
+    placeholder: { 'zh-CN': 'https://laal.top', 'en-US': 'https://laal.top' }, // 占位示例
     output_kind: 'image', // 输出图片
     module_codes: ['cat.dev-06'], // 程序开发 / 条形码/二维码
   }, // 二维码生成结束
@@ -113,7 +113,7 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     key: 'url.parse', // 能力标识
     name: { 'zh-CN': 'URL 解析', 'en-US': 'URL parser' }, // 能力名
     hint: { 'zh-CN': '输入完整 URL（含协议），输出协议、主机、路径、查询参数与路径段', 'en-US': 'Enter a full URL to get its parts and query params' }, // 使用提示
-    placeholder: { 'zh-CN': 'https://mim.mixm.top/marketplace?tab=dev&q=json', 'en-US': 'https://mim.mixm.top/marketplace?tab=dev&q=json' }, // 占位
+    placeholder: { 'zh-CN': 'https://laal.top/marketplace?tab=dev&q=json', 'en-US': 'https://laal.top/marketplace?tab=dev&q=json' }, // 占位
     output_kind: 'json', // 结构化输出
     module_codes: ['cat.dev-09'], // 程序开发 / 网络开发包
   }, // URL 解析结束
@@ -513,7 +513,7 @@ export const MODULE_CAPABILITIES: readonly ModuleCapabilitySeed[] = [ // 数组�
     key: 'url.short', // 能力标识
     name: { 'zh-CN': '短链码生成', 'en-US': 'Short link code' }, // 能力名
     hint: { 'zh-CN': '输入原始长链，输出 6 位 Base62 短码与短链示例（含冲突提示）', 'en-US': 'Enter a long URL to get a 6-char Base62 code' }, // 使用提示
-    placeholder: { 'zh-CN': 'https://mim.mixm.top/products?group=dev', 'en-US': 'https://mim.mixm.top/products?group=dev' }, // 占位
+    placeholder: { 'zh-CN': 'https://laal.top/products?group=dev', 'en-US': 'https://laal.top/products?group=dev' }, // 占位
     output_kind: 'json', // 结构化输出
     module_codes: ['cat.web-16'], // WEB应用开发 / 短网址
   }, // 短链结束

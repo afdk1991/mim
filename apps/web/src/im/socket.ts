@@ -72,17 +72,17 @@ const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, '');
  *
  * 关键：Cloudflare Pages / GitHub Pages 等静态托管的 /api 反代只支持 HTTP，
  * 无法转发 WebSocket Upgrade。因此当页面运行在非生产域、非本地时，WS 必须
- * 直连生产 API（mim.mixm.top），而不是走同源 /api 反代。
+ * 直连生产 API（api.laal.top），而不是走同源 /api 反代。
  */
 function deriveWsUrl(token: string): string {
   // 生产 API 域名：静态托管平台的 WS 必须直连此源
-  const PROD_ORIGIN = 'https://mim.mixm.top';
+  const PROD_ORIGIN = 'https://api.laal.top';
   // 优先用构建期指定的 API 源
   let origin = API_ORIGIN;
   if (!origin && typeof window !== 'undefined') { // 条件分支：按判断结果选择后续处理路径
     const host = window.location.hostname; // 常量 host：保存固定配置或一次性派生值
     // 在生产域或本地：WS 走同源（与 HTTP API 同域）
-    if (host === 'mim.mixm.top' || host === 'localhost' || host === '127.0.0.1') {
+    if (host === 'laal.top' || host === 'www.laal.top' || host === 'api.laal.top' || host === 'mim.mixm.top' || host === 'localhost' || host === '127.0.0.1') {
       origin = window.location.origin; // 赋值：更新变量 origin 的取值
     } else { // 代码块结束
       // 静态托管平台（CF Pages / GitHub Pages 等）：WS 直连生产 API

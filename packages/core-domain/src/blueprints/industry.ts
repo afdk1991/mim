@@ -5,7 +5,7 @@ export const INDUSTRY_BLUEPRINTS: readonly ModuleBlueprint[] = [ // 数组顺序
   // 01 智能硬件：ESP32 固件骨架
   B('cat.industry-01', '智能硬件：ESP32 固件骨架——串口初始化 + WiFi 连接 + 周期上报。', 'C++ / Arduino / ESP32', "#include <WiFi.h>\nvoid setup() { Serial.begin(115200); WiFi.begin(\"SSID\", \"PASS\"); }\nvoid loop() { if (WiFi.status() == WL_CONNECTED) { Serial.println(WiFi.localIP()); } delay(5000); }"),
   // 02 IOT/边缘计算：EMQX 规则引擎
-  B('cat.industry-02', 'IOT/物联网/边缘计算：EMQX 规则——按温度阈值筛选并转发告警 webhook。', 'EMQX / SQL', "# EMQX 规则：温度超阈值转发告警\nSELECT payload.temp as temp, clientid FROM 'sensors/#' WHERE payload.temp > 35\n# 动作：webhook 到 https://mim.mixm.top/api/v1/alerts"),
+  B('cat.industry-02', 'IOT/物联网/边缘计算：EMQX 规则——按温度阈值筛选并转发告警 webhook。', 'EMQX / SQL', "# EMQX 规则：温度超阈值转发告警\nSELECT payload.temp as temp, clientid FROM 'sensors/#' WHERE payload.temp > 35\n# 动作：webhook 到 https://api.laal.top/api/v1/alerts"),
   // 03 车载应用：CarAppService 声明
   B('cat.industry-03', '车载应用：Android Automotive CarAppService 声明与会话创建入口。', 'Kotlin / Android Automotive', "<!-- AndroidManifest.xml -->\n<service android:name=\".MimCarAppService\" android:exported=\"true\">\n  <intent-filter><action android:name=\"androidx.car.app.CarAppService\"/></intent-filter>\n</service>\n<!-- 实现 createHostValidator() 与 onCreateSession()，用 CarAppSession 渲染模板 -->"),
   // 04 车载系统：DBC 信号定义

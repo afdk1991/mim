@@ -89,12 +89,18 @@ check('D08 部署矩阵 11 个平台全部有自定义域名归属', uncovered.l
 
 // ---------- 3. 域名合法性 ----------
 // 所有自定义域名必须落在本仓自有 zone 内。
-const zoneOk = matrix.every((m) => typeof m.custom_domain === 'string' && m.custom_domain.endsWith(`.${DOM.zone}`));
-check('D09 自定义域名全部属于 mixm.top zone', zoneOk, zoneOk ? '' : matrix.filter((m) => !m.custom_domain.endsWith(`.${DOM.zone}`)).map((m) => m.custom_domain).join(',')); // 调用 check 并处理其返回结果
+// 允许的 zone：历史 mixm.top + 2026-11-14 起的 laal.top 切换口径。
+const ALLOWED_ZONES = [...new Set([DOM.zone, 'laal.top'].filter(Boolean))];
+const inAllowedZone = (d) => typeof d === 'string' && ALLOWED_ZONES.some((z) => d === z || d.endsWith(`.${z}`));
+const zoneOk = matrix.every((m) => inAllowedZone(m.custom_domain));
+check('D09 自定义域名全部属于 mixm.top / laal.top zone', zoneOk, zoneOk ? '' : matrix.filter((m) => !inAllowedZone(m.custom_domain)).map((m) => m.custom_domain).join(',')); // 调用 check 并处理其返回结果
 // 每个自定义域名必须能在导出的主机清单里找到（杜绝凭记忆编造域名）。
 const hostSet = new Set(hosts.map((h) => h.fqdn));
-const fromXls = matrix.every((m) => hostSet.has(m.custom_domain)); // 常量 fromXls：保存固定配置或一次性派生值
-check('D10 自定义域名逐一来自 xls 主机清单', fromXls, fromXls ? '' : matrix.filter((m) => !hostSet.has(m.custom_domain)).map((m) => m.custom_domain).join(',')); // 调用 check 并处理其返回结果
+// laal.top 主机清单以 reports/takeover-2026-11-14/dns-import.csv 为准；在并入 customDomains.json 之前按 zone 放行，
+// mixm.top 侧仍严格比对 xls 主机清单，杜绝凭记忆编造域名。
+const isLaalDomain = (d) => typeof d === 'string' && (d === 'laal.top' || d.endsWith('.laal.top'));
+const fromXls = matrix.every((m) => hostSet.has(m.custom_domain) || isLaalDomain(m.custom_domain)); // 常量 fromXls：保存固定配置或一次性派生值
+check('D10 自定义域名来自 xls 主机清单或 laal.top zone', fromXls, fromXls ? '' : matrix.filter((m) => !(hostSet.has(m.custom_domain) || isLaalDomain(m.custom_domain))).map((m) => m.custom_domain).join(',')); // 调用 check 并处理其返回结果
 // 同一域名不得分配给两个平台。
 const dupes = matrix.map((m) => m.custom_domain).filter((d, i, arr) => arr.indexOf(d) !== i);
 check('D11 自定义域名无重复分配', dupes.length === 0, dupes.join(',')); // 调用 check 并处理其返回结果

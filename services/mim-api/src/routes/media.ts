@@ -46,6 +46,17 @@ const presignDownloadQuery = z.object({ // 下载预签名查询串：走 query 
   expires_seconds: z.coerce.number().int().min(60).max(604800).optional(), // query 值都是字符串，coerce 成数字后再校验区间
 }); // 下载预签名 schema 结束：有效期区间与上传保持一致
 
+const presignPublicUploadBody = z.object({ // 图床直传：只有图片能进公有读前缀
+  mime: z // MIME 字段
+    .string() // 必须是字符串
+    .trim() // 去首尾空白
+    .min(3) // 至少形如 x/y
+    .max(120) // 限长，防止超长串进入对象名推导
+    .refine((value) => value.startsWith('image/'), 'public upload only accepts images'), // 公有读只开放图片，避免被当成匿名文件外链
+  size_bytes: z.number().int().min(1).max(64 * 1024 * 1024).optional(), // 单图上限 64MB，与对象端点 raw 解析器上限一致
+  expires_seconds: z.number().int().min(60).max(604800).optional(), // 上传凭证有效期，与私有直传同一区间
+}); // 图床直传 schema 结束
+
 const listAssetsQuery = z.object({ // 产物列表查询串：全部可选，未给则返回本人最新产物
   project_id: z.string().min(1).optional(), // 按工程过滤前会再做归属校验，避免越权读取
   asset_type: z.enum(ASSET_TYPES).optional(), // 按类型过滤，复用同一枚举保持口径
@@ -113,6 +124,36 @@ function requireStorage(deps: ApiDeps): StorageAdapter { // 取存储适配器�
   if (!deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 显式报配置缺失，避免空指针崩溃
   return deps.storage; // 类型收窄后返回非空适配器
 } // requireStorage 结束
+
+/**
+ * 公有读前缀：默认 `public/`，自定义值自动补尾部斜杠。
+ * 私有基线不变 —— 只有落在这个前缀下的对象才允许免签名读取，其余一律仍走签名，
+ * 这样 img（图床）能拿到稳定直链，而 cloud（私有云盘）不会因为多了一个分支被意外公开。
+ */
+function publicPrefixOf(env: Record<string, string | undefined>): string { // 计算并规范化公有读前缀
+  const raw = (env.MIM_STORAGE_PUBLIC_PREFIX ?? '').trim(); // 允许运维改前缀（如 cdn/）
+  if (!raw) return 'public/'; // 缺省值固定为 public/
+  return raw.endsWith('/') ? raw : `${raw}/`; // 统一补斜杠，避免 `pub` 误匹配 `public-other/`
+} // publicPrefixOf 结束
+
+/**
+ * 公有读直链：必须显式配置 `MIM_STORAGE_PUBLIC_BASE_URL`（CDN 或公网域名）。
+ * 缺值直接抛 STORAGE_CONFIG_INVALID —— 不静默退回签名地址、也不拼相对路径，
+ * 否则「以为配好了图床、实际拿到的是会过期的链接」这种故障要等几天后才暴露。
+ */
+function publicUrlOf(env: Record<string, string | undefined>, key: string): string { // 由对象键生成稳定直链
+  const prefix = publicPrefixOf(env); // 取规范化前缀
+  if (!key.startsWith(prefix)) { // 前缀不符说明调用方想公开私有对象
+    throw new AppError('VALIDATION_FAILED', 'object is not under the public prefix', { prefix }); // 422：明确拒绝
+  } // 前缀校验结束
+  const base = (env.MIM_STORAGE_PUBLIC_BASE_URL ?? '').trim().replace(/\/+$/, ''); // 去掉尾部斜杠，避免出现双斜杠
+  if (!base) { // 未配置公网基线时无法生成稳定直链
+    throw new AppError('STORAGE_CONFIG_INVALID', 'public media base url is not configured', { // 与存储配置错误同一码
+      required: 'MIM_STORAGE_PUBLIC_BASE_URL', // 直接告诉运维补哪个变量
+    }); // 抛错结束
+  } // 配置校验结束
+  return `${base}/${key}`; // 键本身已含 public/ 段，直接拼接即可
+} // publicUrlOf 结束
 
 function assetPayload(row: AssetRow) { // 把 DB 行投影成对外 JSON，避免透出内部多余列
   return { // 显式列举字段，保持响应契约稳定
@@ -201,6 +242,17 @@ export function createMediaObjectRouter(deps: ApiDeps): Router { // 对象端点
   router.get('/media/objects/*splat', async (req, res) => { // 免鉴权读取端点，同样凭 URL 签名放行
     const storage = guard(req); // 驱动守卫
     const key = splatKey(req); // 对象键还原与安全校验
+    // 公有读分支：仅显式前缀（默认 public/）免签名，且只读 GET。
+    // 这是 img 域要稳定直链的唯一入口；私有对象仍必须带 expires + signature，两条路径互不影响。
+    if (key.startsWith(publicPrefixOf(deps.env))) { // 前缀命中才走公有读
+      const object = await storage.getObject(key); // 读取对象内容与 MIME
+      res // 回写内容前先设置缓存头
+        .status(200) // 200 正常返回
+        .type(object.mime) // 用真实 MIME，避免浏览器误判
+        .setHeader('cache-control', 'public, max-age=3600') // 允许 CDN / 浏览器缓存 1 小时，与「公开图」语义一致
+        .send(object.body); // 发送字节
+      return; // 公有读处理完毕，不再校验签名
+    } // 公有读分支结束
     const { expires, signature } = signatureOf(req); // 签名参数
     if (!storage.verifySignature({ method: 'GET', key, expires, signature })) { // 与 PUT 同理，method 参与签名
       throw new AppError('AUTH_UNAUTHORIZED', 'storage signature rejected'); // 401：签名被拒
@@ -244,6 +296,31 @@ export function createMediaRouter(deps: ApiDeps): Router { // 控制面路由工
       expires_at: presigned.expires_at, // 顶层再暴露一次过期时间，便于直接判断
     }); // json 调用结束，响应已发出
   }); // 上传预签名路由处理函数结束
+
+  router.post('/media/presign/public-upload', idempotency, async (req, res) => { // 图床直传：落 public/ 前缀，读时免签名
+    const body = parse(presignPublicUploadBody, req.body); // zod 校验，非图片直接 422
+    const user = req.user!; // 已过 requireAuth
+    const storage = requireStorage(deps); // 适配器，未配置时报 STORAGE_NOT_CONFIGURED
+    const prefix = publicPrefixOf(deps.env); // 公有读前缀，默认 public/
+    const key = `${prefix}${user.id}/${uuidv7()}${extensionForMime(body.mime)}`; // 前缀内仍按 user_id 分目录，便于审计与批量清理
+    // 先算直链：MIM_STORAGE_PUBLIC_BASE_URL 缺失时此处立即抛错，
+    // 避免「上传成功但拿不到可用地址」的半成品状态。
+    const publicUrl = publicUrlOf(deps.env, key); // 缺 CDN 基线即 STORAGE_CONFIG_INVALID
+    const presigned = await storage.presignUpload({ // 复用同一套签名入口，不另造上传协议
+      key, // 目标对象键
+      mime: body.mime, // 与声明一致
+      expires_seconds: body.expires_seconds, // 未给则用适配器默认有效期
+      base_url: baseUrlOf(req, deps.env), // 本地驱动拼绝对地址用
+    }); // presignUpload 调用结束
+
+    res.status(201).json({ // 201 表示已创建上传意图
+      upload: presigned, // 含 url / method / headers / expires_at
+      object_key: key, // 回传键，便于后续管理与删除
+      public_url: publicUrl, // 稳定直链（CDN / 公网前缀 + 对象键）
+      asset_type: 'image', // 图床固定为图片
+      expires_at: presigned.expires_at, // 上传凭证过期时间（与直链可用性无关）
+    }); // json 调用结束
+  }); // 图床直传路由结束
 
   router.get('/media/presign/download', async (req, res) => { // 签发下载 URL
     const query = parse(presignDownloadQuery, req.query); // 查询串走同一套 zod 校验

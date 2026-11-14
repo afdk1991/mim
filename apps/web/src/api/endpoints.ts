@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, ComicProject, ComicCharacter, StoryboardShot, Storyboard, SuggestKind, Suggestion, JobType, GenerationJob, Film, FilmVersion, ShowcaseWork, TheaterItem, FilmExportFormat, FilmExportResolution, FilmExportResult, AssetType, ListedAsset, PresignedUrl, AiCapabilities, RunJobResult, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CartSummary, CartCheckoutResult, SiteCapability, EntryModule, SiteModuleSummary, EntryDomain, SiteGroup, SiteModuleDetail, SiteItem, SiteOverview, EntryOverview, DeploymentItem, DeploymentOverview, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, NavLink, NavSummary, SearchEngine, SearchResponse, SearchScopeCount, PaidAssetKind, PaidAsset, PaidAssetDetail, PaymentProvider, PaymentChannel, PaymentIntent, Shipment, AfterSale, ProductReview, Withdrawal, CreatorEarning, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, ToolItem, ToolUpsertPayload, GrowthSnapshot, DirectMessage } from './types.js'; // 端点签名用到的类型仍定义在 api.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, ComicProject, ComicCharacter, StoryboardShot, Storyboard, SuggestKind, Suggestion, JobType, GenerationJob, Film, FilmVersion, ShowcaseWork, TheaterItem, FilmExportFormat, FilmExportResolution, FilmExportResult, AssetType, ListedAsset, PresignedUrl, AiCapabilities, RunJobResult, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CartSummary, CartCheckoutResult, SiteCapability, EntryModule, SiteModuleSummary, EntryDomain, SiteGroup, SiteModuleDetail, SiteItem, SiteOverview, EntryOverview, DeploymentItem, DeploymentOverview, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, NavLink, NavSummary, SearchEngine, SearchResponse, SearchScopeCount, PaidAssetKind, PaidAsset, PaidAssetDetail, PaymentProvider, PaymentChannel, PaymentIntent, Shipment, AfterSale, ProductReview, Withdrawal, CreatorEarning, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, ToolItem, ToolUpsertPayload, GrowthSnapshot, DirectMessage } from './types.js'; // 端点签名用到的类型仍定义在 api.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -494,6 +494,20 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
         expires_at: string; // 签名过期时间
       }>('/media/presign/upload', { method: 'POST', body: input }); // 写操作：由服务端签发凭证，客户端无法自行构造
     }, // presignUpload 结束
+    /** POST /media/presign/public-upload → 201；图床直传，对象落 public/ 前缀并返回稳定直链 */
+    presignPublicUpload(input: { // 申请图床直传凭证：只收图片
+      mime: string; // 必须是 image/*，服务端会再校验一次
+      size_bytes?: number; // 体积上限 64MB，用于提前拦截
+      expires_seconds?: number; // 期望上传凭证有效期
+    }) { // 形参定义结束
+      return request<{ // 图床直传响应
+        upload: PresignedUrl; // 直传地址与必需请求头
+        object_key: string; // 含 public/ 前缀的对象键
+        public_url: string; // 稳定直链（CDN 基线 + 对象键），不会过期
+        asset_type: 'image'; // 固定为图片
+        expires_at: string; // 上传凭证过期时间
+      }>('/media/presign/public-upload', { method: 'POST', body: input }); // 写操作，需鉴权与幂等键
+    }, // presignPublicUpload 结束
     /** GET /media/presign/download?object_key=…（服务端为 GET，非 POST） */
     presignDownload(objectKey: string, expiresSeconds?: number) { // 申请下载预签名地址
       const qs = new URLSearchParams({ object_key: objectKey }); // 用 URLSearchParams 自动编码对象键（含斜杠等特殊字符）
@@ -503,11 +517,13 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       ); // 请求调用结束
     }, // presignDownload 结束
     /** GET /media/assets?project_id=… → { items }，每项已附 download_url */
-    listAssets(projectId: string, opts: { asset_type?: AssetType; limit?: number } = {}) { // 列出项目产物，可选类型与条数过滤
-      const qs = new URLSearchParams({ project_id: projectId }); // project_id 为必填过滤条件
+    listAssets(projectId?: string, opts: { asset_type?: AssetType; limit?: number } = {}) { // 列出本人产物；projectId 缺省时返回全部工程（私有云盘视图用）
+      const qs = new URLSearchParams(); // 用 URLSearchParams 统一编码，避免手工拼串漏转义
+      if (projectId) qs.set('project_id', projectId); // 仅在指定工程时过滤；空串会触犯后端 min(1)，故不写入
       if (opts.asset_type) qs.set('asset_type', opts.asset_type); // 有类型才附加，保持查询串精简
       if (opts.limit !== undefined) qs.set('limit', String(opts.limit)); // 分页条数需转字符串，0 也要保留
-      return request<{ items: ListedAsset[] }>(`/media/assets?${qs.toString()}`); // 返回带 download_url 的产物列表
+      const suffix = qs.toString(); // 查询串可能为空（全部默认值），此时不带问号
+      return request<{ items: ListedAsset[] }>(`/media/assets${suffix ? `?${suffix}` : ''}`); // 返回带 download_url 的产物列表
     }, // listAssets 结束
     /** GET /media/thumb?object_key=…&size=…：带 Bearer 拉取 WebP 缩略图二进制，供产物列表内联预览；失败由调用方回退原图 */
     async thumbBlob(objectKey: string, size = 240): Promise<Blob> {
@@ -1106,6 +1122,11 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // 代码块结束
     promotions() { // 推广计划卡片：进行中且在有效期内
       return request<{ items: PromotionItem[] }>('/promotions', { auth: false, idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    feed(limit = 50, kind?: string) { // 全站统一内容流：论坛主题 + 圈内动态 + 圈内公告（复用已有 GET /content/items，公开只读）
+      const qs = new URLSearchParams({ limit: String(limit) }); // 条数上限：后端按同样口径兜底
+      if (kind) qs.set('kind', kind); // 可选：按内容形态过滤（text / video / notice）
+      return request<{ items: ContentFeedItem[]; total: number }>(`/content/items?${qs.toString()}`, { auth: false, idempotency: false }); // 公开只读，无需会话
     }, // 代码块结束
 
     // ===== 管理端 CRUD（复用 /admin/content/* 契约；挂 appearance:write 权限，无权限时前端静默隐藏）=====

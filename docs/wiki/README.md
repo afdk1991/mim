@@ -6,7 +6,7 @@
 
 Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号身份与漫剧 AI 剧工作台（FR-03 重定义版）的 P0 最小集；同时保留协作治理体系（AGENTS.md 十二条铁律；项目名称 Mim）、版本规约校验脚本与产品需求文档。
 
-- 当前版本：**V0.0.0-preview**（预览通道，正式版 V0.0.0 未发布）
+- 当前版本：**V0.0.11-preview**（预览通道，正式版未发布；6 包 semver 均 `0.0.11`）
 - 仓库性质：**pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`）
 - 第三方运行时依赖：React / Express / zod / jsonwebtoken / bcryptjs / better-sqlite3 等（完整清单与版本见 [04-dependencies.md](./04-dependencies.md) §1；规划中的 SDK 见 [09](./09-third-party-sdk-inventory.md)）
 
@@ -40,7 +40,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 f:\合并项目\Mim
 ├── AGENTS.md                      # 协作铁律（12 条，最高优先级约束）
 ├── README.md                      # 项目入口、版本规约、运行命令
-├── Mim-PRD.html                   # 产品需求文档（V0.0.0-preview 草案，含交互演示）
+├── Mim-PRD.html                   # 产品需求文档（V0.0.11-preview 草案，含 FR-01~06 功能规格与交互演示）
 ├── team-hiring-plan.md            # 技术架构约束分析与团队分阶段配置规划
 ├── package.json                   # 根 workspace 脚本（dev/test/typecheck/build/check）
 ├── pnpm-workspace.yaml            # workspace 边界（apps/* services/* packages/*）
@@ -51,9 +51,9 @@ f:\合并项目\Mim
 ├── 全平台小程序开发与分发-*.txt    # 参考调研：小程序全平台开发与分发
 ├── 全栈项目人员配置指南-*.txt      # 参考调研：全栈团队岗位与编制
 ├── apps/
-│   └── web/                       # Web 端（React 18 + Vite 6，5173；views/ 六个视图，含 Sites.tsx 统一入口配置清单）
+│   └── web/                       # Web 端（React 18 + Vite 6，5173；views/ 24 个视图组件 / 20 个 AppView，含 Sites.tsx 统一入口配置清单）
 ├── services/
-│   └── mim-api/                   # 后端 API（Express 5 + SQLite WAL + JWT + zod，8787）+ test/（15 文件）
+│   └── mim-api/                   # 后端 API（Express 5 + SQLite WAL + JWT + zod，8787）+ test/（58 文件 / 676 例，2026-11-14 实测）
 ├── packages/
 │   ├── core-domain/               # 错误码 / UUIDv7 / 统一入口配置清单（errors.ts / ids.ts / siteModules.*）
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
@@ -77,7 +77,7 @@ f:\合并项目\Mim
 - 想了解**仓库里现在有什么** → 读 [02-modules.md](./02-modules.md)
 - 想**启动应用 / 跑测试 / 跑校验** → 读 [05-runbook.md](./05-runbook.md) §6
 - 想**部署上线 / 查生产状态** → 读 [05-runbook.md](./05-runbook.md) §7（生产：<https://mim.mixm.top>）
-- 想**一次性核对所有部署仓库与部署项的效果 / 结果 / 异常** → 读 [../deployment-summary.md](../deployment-summary.md) 与 [05-runbook.md](./05-runbook.md) §8（生成器 + 52 项校验 + `/deployments` 视图）
+- 想**一次性核对所有部署仓库与部署项的效果 / 结果 / 异常** → 读 [../deployment-summary.md](../deployment-summary.md) 与 [05-runbook.md](./05-runbook.md) §8（生成器 + 55 项校验 + `/deployments` 视图）
 - 要**修改或运行校验脚本** → 读 [03-code-reference.md](./03-code-reference.md) + [05-runbook.md](./05-runbook.md)
 - 要**查第三方 SDK / API / Key** → 读 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)（占位模板见根目录 `.env.example`；改完跑 `node scripts/env-check.mjs` 校验一致性）
 - 在本仓库内**做任何协作改动前** → 必读 [06-governance.md](./06-governance.md)

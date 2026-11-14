@@ -73,6 +73,14 @@ const MIME_EXT: Record<string, string> = { // MIME → 扩展名，用于生成�
   'video/mp4': '.mp4', // MP4 视频
   'application/json': '.json', // 结构化 JSON 产物
   'text/plain': '.txt', // 纯文本
+  // 软件 / 源码分发包（/download 视图直传用）：不补这几项的话对象键会退化成 .bin，
+  // 下载时浏览器拿不到正确后缀，用户需要手工改名。
+  'application/zip': '.zip', // 通用压缩包 / 源码包
+  'application/gzip': '.gz', // gzip 单文件
+  'application/x-tar': '.tar', // tar 归档
+  'application/vnd.android.package-archive': '.apk', // Android 安装包
+  'application/x-msdownload': '.exe', // Windows 可执行文件
+  'application/x-apple-diskimage': '.dmg', // macOS 磁盘映像
 }; // 结束 MIME_EXT 映射
 
 const EXT_MIME: Record<string, string> = { // 扩展名 → MIME，读取时回填 Content-Type
@@ -84,6 +92,13 @@ const EXT_MIME: Record<string, string> = { // 扩展名 → MIME，读取时回�
   '.mp4': 'video/mp4', // MP4 格式
   '.json': 'application/json', // JSON 格式
   '.txt': 'text/plain', // 纯文本
+  // 分发包后缀 → MIME（与上方 MIME_EXT 保持双向一致）：客户端未带 Content-Type 时按后缀回填
+  '.zip': 'application/zip', // 压缩包
+  '.gz': 'application/gzip', // gzip
+  '.tar': 'application/x-tar', // tar
+  '.apk': 'application/vnd.android.package-archive', // Android 安装包
+  '.exe': 'application/x-msdownload', // Windows 可执行文件
+  '.dmg': 'application/x-apple-diskimage', // macOS 磁盘映像
 }; // 结束 EXT_MIME 映射
 
 export function extensionForMime(mime: string): string { // 由 MIME 推导对象键后缀
@@ -294,27 +309,51 @@ export function createStorage(options: CreateStorageOptions): StorageAdapter { /
   const bucket = (env.MIM_STORAGE_S3_BUCKET ?? '').trim(); // 桶名
   const accessKeyId = (env.MIM_STORAGE_S3_ACCESS_KEY_ID ?? '').trim(); // 访问密钥 ID
   const secretAccessKey = (env.MIM_STORAGE_S3_SECRET_ACCESS_KEY ?? '').trim(); // 访问密钥
-  const region = (env.MIM_STORAGE_S3_REGION ?? '').trim() || 'auto'; // 未指定区域时用 auto，兼容 R2 等端点
+  const region = (env.MIM_STORAGE_S3_REGION ?? '').trim(); // 区域：R2 填 auto，其它按厂商要求填具体区域
 
-  const s3Ready = Boolean(bucket && accessKeyId && secretAccessKey); // 三项齐全才认为 S3 可用
-  const driver: StorageDriver = // 计算最终驱动：显式配置优先，否则看 S3 凭证是否齐全
-    requested === 's3' || requested === 'local' ? (requested as StorageDriver) : s3Ready ? 's3' : 'local'; // 显式优先，否则有凭证走 S3，无凭证回落本地
+  // 驱动名只接受空 / local / s3。拼错（如 s3c、S3 以外的自定义名）必须启动即失败，
+  // 否则会被当成「未指定驱动」悄悄回落本地磁盘，运维会误以为数据已进桶。
+  if (requested && requested !== 'local' && requested !== 's3') { // 白名单外一律拒绝
+    throw new AppError('STORAGE_CONFIG_INVALID', 'unknown storage driver', { // 配置类错误用独立错误码，便于运维定位
+      MIM_STORAGE_DRIVER: requested, // 回显实际值，直接看出拼写问题
+      allowed: ['local', 's3'], // 同时给出合法取值
+    }); // 抛错结束：进程启动阶段就会失败，不会带病运行
+  } // 驱动名校验结束
 
-  if (driver === 's3') { // 走 S3 兼容链路
-    return new S3Storage( // 构造云驱动实例
-      s3Ready // 凭证齐全时才真正配置客户端
-        ? { // S3Options 字面量
-            endpoint: (env.MIM_STORAGE_S3_ENDPOINT ?? '').trim() || undefined, // 空串视为未配置
-            region, // 区域
-            bucket, // 桶名
-            accessKeyId, // 访问密钥 ID
-            secretAccessKey, // 访问密钥
-            forcePathStyle: (env.MIM_STORAGE_S3_FORCE_PATH_STYLE ?? '') === '1', // 显式 '1' 才启用 path-style
-          } // 结束 S3Options 字面量
-        : null, // 显式要求 s3 但凭证不全时传入 null，调用时报 STORAGE_NOT_CONFIGURED
-    ); // 结束 S3Storage 构造
+  // 私有桶基线：本服务不提供「公有读」降级路径，cloud / img / store 三个域的对象
+  // 一律由服务端签发短时 URL（本地驱动 HMAC、S3 驱动 SigV4）。因此这四项缺一不可。
+  const s3Fields: Record<string, string> = { // 变量名 → 实际值，用于一次性算出差哪几项
+    MIM_STORAGE_S3_BUCKET: bucket, // 桶名
+    MIM_STORAGE_S3_REGION: region, // 区域
+    MIM_STORAGE_S3_ACCESS_KEY_ID: accessKeyId, // 密钥 ID
+    MIM_STORAGE_S3_SECRET_ACCESS_KEY: secretAccessKey, // 密钥
+  }; // 字段表结束
+  const missing = Object.keys(s3Fields).filter((name) => !s3Fields[name]); // 缺失项，回显给运维逐个补齐
+  const present = Object.keys(s3Fields).filter((name) => Boolean(s3Fields[name])); // 已填项，用于识别「只配了一半」
+  const s3Ready = missing.length === 0; // 四项齐全才算真正可用
+
+  // 两种情形都必须硬失败，不得回落本地：
+  // 1) 显式 MIM_STORAGE_DRIVER=s3 —— 意图明确，缺项就是配错；
+  // 2) 未显式指定驱动，但已经填了任意一项 S3 变量 —— 说明在配桶，只是没配完。
+  // 只有「驱动留空且四项全空」才按本地磁盘运行（本地开发默认路径）。
+  if (requested === 's3' || (requested !== 'local' && present.length > 0)) { // 需要走对象存储的两种入口
+    if (!s3Ready) { // 缺项即报错，绝不静默降级
+      throw new AppError('STORAGE_CONFIG_INVALID', 'object storage config is incomplete', { // 明确告知缺哪几项
+        driver: 's3', // 期望驱动
+        missing, // 待补齐的变量名
+        present, // 已配置的变量名，便于核对是否填到了另一套（如阿里云 OSS / 腾讯 COS）前缀上
+      }); // 抛错结束
+    } // 配置完整性检查结束
+    return new S3Storage({ // 配置齐全才构造云驱动
+      endpoint: (env.MIM_STORAGE_S3_ENDPOINT ?? '').trim() || undefined, // 空串视为未配置（AWS 官方端点可留空）
+      region, // 区域
+      bucket, // 桶名
+      accessKeyId, // 访问密钥 ID
+      secretAccessKey, // 访问密钥
+      forcePathStyle: (env.MIM_STORAGE_S3_FORCE_PATH_STYLE ?? '') === '1', // 显式 '1' 才启用 path-style（MinIO 等）
+    }); // 结束 S3Storage 构造
   } // 结束 S3 分支
 
   const localDir = (env.MIM_STORAGE_LOCAL_DIR ?? '').trim() || join(fallbackDir, 'media'); // 默认落在 <fallbackDir>/media
-  return new LocalDiskStorage(localDir, jwtSecret); // 本地驱动复用 JWT 密钥做 HMAC 签名
+  return new LocalDiskStorage(localDir, jwtSecret); // 本地驱动复用 JWT 密钥做 HMAC 签名（同样只签短时 URL，不留公有读入口）
 } // 结束 createStorage

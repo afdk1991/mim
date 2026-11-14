@@ -17,7 +17,7 @@ export const INFRA_BLUEPRINTS: readonly ModuleBlueprint[] = [ // 数组顺序：
   // server-07 云计算：Terraform 实例
   B('cat.server-07', '云计算：Terraform 声明式创建云主机（实例规格 + 镜像 + 数量）。', 'Terraform / HCL', "resource \"tencentcloud_cvm_instance\" \"api\" {\n  instance_name = \"mim-api\"\n  instance_type = \"S5.MEDIUM4\"\n  image_id = \"img-pi0ii46r\"\n  count = 1\n}"),
   // server-08 一键安装包：安装脚本
-  B('cat.server-08', '一键安装包：幂等安装脚本（下载、托管服务、健康检查三步）。', 'Bash', "#!/usr/bin/env bash\nset -euo pipefail\ncurl -fsSL https://mim.mixm.top/install.sh | bash -s -- --prefix /opt/mim\nsystemctl enable --now mim-api\ncurl -fsS https://mim.mixm.top/health"),
+  B('cat.server-08', '一键安装包：幂等安装脚本（下载、托管服务、健康检查三步）。', 'Bash', "#!/usr/bin/env bash\nset -euo pipefail\ncurl -fsSL https://laal.top/install.sh | bash -s -- --prefix /opt/mim\nsystemctl enable --now mim-api\ncurl -fsS https://laal.top/health"),
   // server-09 OpenResty 扩展：Lua 注入
   B('cat.server-09', 'OpenResty 扩展：Lua 注入请求头并按路由直接返回内容。', 'OpenResty / Lua', "location /api/ {\n  access_by_lua_block { ngx.req.set_header(\"X-Trace-Id\", ngx.var.request_id) }\n  content_by_lua_block { ngx.say('mim ok') }\n}"),
   // server-10 系统性能优化：内核参数

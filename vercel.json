@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://mim.mixm.top/api/:path*"
+      "destination": "https://api.laal.top/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://mim.mixm.top/health"
+      "destination": "https://laal.top/health"
     },
     {
       "source": "/(.*)",

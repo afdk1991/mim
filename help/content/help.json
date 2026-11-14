@@ -1,0 +1,392 @@
+{
+  "site": {
+    "name": "Mim 文档站",
+    "title": "Mim 使用与部署文档",
+    "description": "Mim 项目介绍、部署说明与常见问题。独立静态站，无构建步骤、无外部依赖。",
+    "version": "0.0.11",
+    "updatedAt": "2026-11-14",
+    "home": "intro"
+  },
+  "reuse": {
+    "jsonPath": "content/help.json",
+    "linkPattern": "#/<pageId>[/<sectionId>]",
+    "pages": ["intro", "deploy", "faq"],
+    "note": "news / service / support / blog 等视图既可直接深链到「#/<pageId>/<sectionId>」，也可同源读取 content/help.json 复用同一份结构化内容，避免各处重复维护。页面 id 与章节 id 一经发布不再改名。"
+  },
+  "pages": [
+    {
+      "id": "intro",
+      "title": "项目介绍",
+      "summary": "Mim 是什么、由哪些前台视图组成、仓库怎么分、技术栈是什么。",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Mim 是什么",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "Mim 是一套全平台产品底座：Headless 中台负责业务与数据，多端薄壳负责呈现。同一套业务逻辑同时支撑 Web、小程序、App 与 PC 端，并覆盖国内与出海两个市场。"
+            },
+            {
+              "type": "ul",
+              "items": [
+                "前台 SPA（apps/web）：单页应用，所有模块以路径段区分，不做「一个子域一个站点」的拆分。",
+                "管理后台（apps/admin）：独立构建产物，由 nginx 挂在 /admin/ 静态根下，自身不带 URL 路由。",
+                "接口服务（services/mim-api）：Express + SQLite（WAL），对外统一前缀 /api/v1。",
+                "共享包（packages/i18n、packages/core-domain）：多语言文案与领域数据（含部署注册表）。"
+              ]
+            },
+            {
+              "type": "note",
+              "tone": "info",
+              "text": "全站 SPA 不按 host 分流：浏览器进入任意子域后，前端只读取 location.pathname 决定渲染哪个视图，未知路径统一回落到商城目录。因此子域的作用是「跳转到某个主站路径」，不是「渲染另一套内容」。"
+            }
+          ]
+        },
+        {
+          "id": "modules",
+          "title": "前台视图地图",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "对外地址一律使用模块功能名称（apps/web/src/router.ts 的 VIEW_SEGMENTS 为唯一真源），下表与之一一对应。"
+            },
+            {
+              "type": "table",
+              "head": ["路径", "视图", "说明"],
+              "rows": [
+                ["/marketplace", "商城目录", "匿名可浏览的商品与模块入口"],
+                ["/products", "商品列表", "密集列表页，支持加购"],
+                ["/cart", "购物车", "清单 / 移除 / 清空 / 结算"],
+                ["/account", "个人中心", "资料、权益、订单、账号设置"],
+                ["/entry-catalog", "入口配置清单", "由入口清单驱动的模块目录"],
+                ["/deployments", "部署汇总", "各仓库与部署项的效果与异常"],
+                ["/navigation", "导航站", "全站资源目录与可达性状态"],
+                ["/search", "统一搜索", "模块 / 入口 / 导航 / 社区 / 商品"],
+                ["/community", "社区与变现", "论坛、付费阅读、VIP、钱包、独立商城"],
+                ["/commerce", "商业化中台", "资产、支付、履约、资金、外观、成长"],
+                ["/comic-studio", "漫剧工作台", "AI 剧生成与成片导出"],
+                ["/chat", "聊天", "IM 会话与视频通话"],
+                ["/tools", "自研工具", "工具发布目录"],
+                ["/announcements", "公告动态", "正式公告、更新日志、推广计划"],
+                ["/news", "社区资讯", "论坛主题 + 圈子动态 / 公告的统一内容流"],
+                ["/releases", "版本迭代", "版本时间线与能力地图"],
+                ["/circles", "圈子", "成员制社群"],
+                ["/checkout", "收银台", "支付意图二维码与状态轮询"],
+                ["/watch", "播放器", "/watch/:kind/:id 选集与进度记忆"],
+                ["/pay-return", "支付回跳", "支付结果三态承接页"],
+                ["/signin", "登录", "登录 / 注册入口"]
+              ]
+            },
+            {
+              "type": "note",
+              "tone": "info",
+              "text": "旧路径段（/store、/sites、/comic、/login、/profile、/settings、/forum）仍可访问：前端命中后原地改写为新路径，生产 nginx 同时做 301，二者互为兜底。"
+            }
+          ]
+        },
+        {
+          "id": "repo",
+          "title": "仓库结构",
+          "blocks": [
+            {
+              "type": "table",
+              "head": ["目录", "职责"],
+              "rows": [
+                ["apps/web", "前台 SPA：视图、路由、接口客户端"],
+                ["apps/admin", "管理后台：独立构建，13 个管理视图"],
+                ["services/mim-api", "接口服务：路由、数据库、任务与存储"],
+                ["packages/i18n", "中英文文案与语言类型"],
+                ["packages/core-domain", "领域数据与部署注册表（deploymentRegistry.json）"],
+                ["scripts", "构建、门禁与校验脚本（build.mjs、check.mjs 等）"],
+                ["deploy", "nginx 配置、部署脚本与证书说明"],
+                ["help", "本文档站：纯静态产物，可独立托管"],
+                ["docs", "架构 / 模块 / 运维等 Wiki 与交付说明"],
+                ["reports", "各轮交付的过程与取证报告"]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "stack",
+          "title": "技术栈与门禁",
+          "blocks": [
+            {
+              "type": "ul",
+              "items": [
+                "语言与运行时：TypeScript、Node.js >= 20、pnpm 9.12 workspace。",
+                "前端：React + Vite，按视图懒加载；路由为自实现的最小路由（不使用 react-router）。",
+                "后端：Express + SQLite（WAL），路由按模块拆分到 services/mim-api/src/routes/。",
+                "门禁：pnpm typecheck（全仓）、pnpm test（接口测试）、pnpm check（版本 / 环境变量 / 注释 / 自定义域）。"
+              ]
+            },
+            {
+              "type": "note",
+              "tone": "warn",
+              "text": "任何新增功能模块都必须同步递增版本号（6 个 package.json 保持一致），否则 version-check 门禁会失败。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "title": "部署说明",
+      "summary": "本地开发、构建产物、文档站自身托管方式、环境变量与仍需外部凭据的断点。",
+      "sections": [
+        {
+          "id": "local",
+          "title": "本地开发",
+          "blocks": [
+            {
+              "type": "code",
+              "lang": "bash",
+              "text": "pnpm install\npnpm dev:web      # 前台 SPA\npnpm dev:admin    # 管理后台\npnpm dev:api      # 接口服务\npnpm typecheck    # 全仓类型检查\npnpm test         # 接口测试"
+            },
+            {
+              "type": "p",
+              "text": "本地未配置任何第三方密钥时，服务应降级到本地实现（如本地磁盘存储、SQLite 检索），而不是伪造调用或静默变成公有读。"
+            }
+          ]
+        },
+        {
+          "id": "build",
+          "title": "构建产物",
+          "blocks": [
+            {
+              "type": "code",
+              "lang": "bash",
+              "text": "pnpm build        # node scripts/build.mjs"
+            },
+            {
+              "type": "ul",
+              "items": [
+                "apps/web/dist：真实的 Vite 前端产物（GitHub Pages 等以它为上传源）。",
+                "dist/：前端产物副本 + index.html + 404.html（EdgeOne Pages 等平台的 OutputDir）。",
+                "dist/<路径段>/index.html：由 build.mjs 解析 VIEW_SEGMENTS 自动生成，保证 /marketplace、/news 等深链接刷新不 404。",
+                "构建期接口源：VITE_API_ORIGIN，缺省指向生产 API。"
+              ]
+            },
+            {
+              "type": "note",
+              "tone": "info",
+              "text": "新增一个前台视图后无需手工维护回退目录：只要在 VIEW_SEGMENTS 登记了路径段，下一次 build 会为它自动生成同名目录。"
+            }
+          ]
+        },
+        {
+          "id": "help-site",
+          "title": "本文档站如何托管",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "本目录是纯静态产物：只有一个 index.html 与一份 content/help.json，不需要 npm 依赖、不需要构建步骤。把整个目录作为静态根托管即可（nginx 静态根、对象存储静态托管、EdgeOne / GitHub Pages / Cloudflare Pages 均可）。"
+            },
+            {
+              "type": "code",
+              "lang": "bash",
+              "text": "# 本地预览（必须走 HTTP，file:// 下浏览器禁止 fetch）\npython -m http.server 4173 --directory help\n# 打开 http://localhost:4173"
+            },
+            {
+              "type": "note",
+              "tone": "warn",
+              "text": "待填外部信息：文档站域名（如 help.laal.top）需要 DNS 记录与证书；证书未签下前不要把它写进其他站点的正式外链。域名、NS、证书三项均属外部凭据，未提供时保持空位。"
+            },
+            {
+              "type": "p",
+              "text": "若最终决定不单独开子域，也可以由主站 nginx 直接把 /help/ 指向本目录，效果等价；两种方式都不需要改前端代码。"
+            }
+          ]
+        },
+        {
+          "id": "env",
+          "title": "环境变量与外部凭据",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "所有可配置项以仓库根目录的 .env.example 为唯一清单，复制为 .env（本地）或写入 CI Secret / 云 KMS（生产）。规则：模板里只允许空值与说明，禁止填写真实密钥后提交。"
+            },
+            {
+              "type": "table",
+              "head": ["类别", "变量前缀", "缺值时的行为"],
+              "rows": [
+                ["身份与第三方登录", "MIM_AUTH_*", "对应登录方式不出现或返回未配置，不影响其他链路"],
+                ["对象存储", "MIM_STORAGE_*", "私有桶三件套（端点 / 区域 / 桶名）与密钥缺一即显式报错，不降级公有读"],
+                ["CDN 与公开基址", "MIM_CDN_*、MIM_PUBLIC_BASE_URL", "签名链接改用请求推导，公开基址留空则不拼绝对地址"],
+                ["消息 / 推送 / 音视频", "MIM_IM_*、MIM_PUSH_*、MIM_RTC_*", "相关能力返回未配置"],
+                ["AI 与生成任务", "MIM_AI_*", "留空默认 mock，不发起真实计费调用"],
+                ["应用自有", "MIM_JWT_SECRET、MIM_ADMIN_TOKEN、MIM_CORS_ORIGINS", "生产必配；缺失时管理写接口拒绝而非放行"]
+              ]
+            },
+            {
+              "type": "note",
+              "tone": "warn",
+              "text": "以下步骤必须由用户提供外部凭据后才能继续，仓库内一律留空位、不写假值、不用假值试跑：① 对象存储桶名 / 区域 / AccessKey（cloud、img、store）；② 文档站与各子域的 DNS 记录及证书；③ CVM 的 SSH 发布凭据；④ 各托管平台的 API Token 与后台绑定权限。"
+            }
+          ]
+        },
+        {
+          "id": "prod",
+          "title": "生产拓扑",
+          "blocks": [
+            {
+              "type": "ul",
+              "items": [
+                "主站：腾讯云 CVM，nginx 托管前端静态产物，/api 反向代理到本机接口服务。",
+                "接口服务：systemd 单元 mim-api，SQLite WAL 落盘，健康检查 /health。",
+                "管理后台：nginx 静态根 /admin，与前台不同产物、不同权限域。",
+                "分发与镜像：其余免费平台（EdgeOne Pages、GitHub Pages、Cloudflare Pages、Netlify、Vercel、Gitee 镜像仓等）仅作分发，不承载权威数据。"
+              ]
+            },
+            {
+              "type": "p",
+              "text": "生产域名的唯一权威口径以仓库内最新的域名分配文档为准；子域一律 301 到主站路径，不各自渲染独立站点。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "faq",
+      "title": "常见问题",
+      "summary": "子域、旧链接、深链接刷新、接口不可用、内容流口径、扩展与版本规则。",
+      "sections": [
+        {
+          "id": "same-spa",
+          "title": "为什么不同子域打开是同一个站点？",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "因为前端只根据 location.pathname 决定视图，完全不读取 host。绑十个子域得到的仍是同一个应用，差别只在 nginx 把它 301 到哪个路径。"
+            },
+            {
+              "type": "p",
+              "text": "如需「某个子域看起来是独立站点」，正确做法是让该子域 301 到一个语义对应的路径（例如 news 子域 → /news），而不是期望前端按 host 渲染不同内容。"
+            }
+          ]
+        },
+        {
+          "id": "legacy-paths",
+          "title": "旧链接（/store、/sites、/comic、/login）为什么会被改写？",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "视图对外路径曾在 2026-11-11 统一为模块功能名。为保证旧书签与外部引用可达，前端保留一张旧段映射表：命中后把地址原地改写为新路径（replaceState，不新增历史记录），生产 nginx 同时做 301。"
+            },
+            {
+              "type": "table",
+              "head": ["旧路径", "新路径"],
+              "rows": [
+                ["/store", "/marketplace"],
+                ["/sites", "/entry-catalog"],
+                ["/comic", "/comic-studio"],
+                ["/login", "/signin"],
+                ["/profile、/settings", "/account"],
+                ["/forum", "/community"]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "spa-fallback",
+          "title": "深链接刷新 404 或白屏怎么办？",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "这是静态托管不支持 SPA 重写导致的。构建脚本已经为每个路径段生成同名目录与 404.html，平台侧只需把 OutputDir 指向根 dist/，或配置「所有未命中路径回落到 index.html」。"
+            },
+            {
+              "type": "ul",
+              "items": [
+                "根路径部署：直接使用 dist/。",
+                "子路径部署（如 GitHub Pages 的 /mim/）：上传 apps/web/dist，前端会自动推断挂载前缀。",
+                "不要给深链接目录强行补尾斜杠，否则相对资源路径会失效。"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "api-502",
+          "title": "接口 502 / 列表为空怎么排查？",
+          "blocks": [
+            {
+              "type": "ol",
+              "items": [
+                "先确认 /health 是否返回 ok，判断接口进程是否存活。",
+                "检查前端构建期的 VITE_API_ORIGIN 与运行期同源反代是否指向同一后端。",
+                "跨域直连的镜像站需要把自身来源加入 MIM_CORS_ORIGINS，否则浏览器会拦截请求（表现为列表为空而不是报错）。",
+                "无后端的静态平台（如纯 Netlify / Vercel 部署）必须把接口指向生产 API，平台本身不提供 /api。"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "news-vs-announcements",
+          "title": "「社区资讯」和「公告动态」有什么区别？",
+          "blocks": [
+            {
+              "type": "table",
+              "head": ["入口", "数据源", "内容"],
+              "rows": [
+                ["/announcements（公告动态）", "公告 / 更新日志 / 推广计划三个接口", "官方发布、版本说明、推广活动"],
+                ["/news（社区资讯）", "GET /content/items 统一内容流", "论坛主题、圈子动态、圈内公告"]
+              ]
+            },
+            {
+              "type": "p",
+              "text": "两者数据源不同，因此是两个独立视图而不是同一页面的两个标签；共用的是同一套列表样式与双语文案工具。"
+            }
+          ]
+        },
+        {
+          "id": "add-view",
+          "title": "如何新增一个前台视图？",
+          "blocks": [
+            {
+              "type": "ol",
+              "items": [
+                "新建 apps/web/src/views/X.tsx，按既有视图的 Props 约定接收 locale 等参数。",
+                "在 apps/web/src/router.ts 的 AppView 联合类型与 VIEW_SEGMENTS 中各登记一项（路径段用模块功能名）。",
+                "在 apps/web/src/App.tsx 增加懒加载 import、导航项与渲染分支。",
+                "跑 pnpm typecheck；构建时 build.mjs 会自动为新路径段生成 SPA 回退目录。"
+              ]
+            },
+            {
+              "type": "note",
+              "tone": "warn",
+              "text": "不要为新视图另开后端接口。先确认 services/mim-api/src/routes/ 下是否已有可复用的公开接口（例如统一内容流 /content/items），重复造接口会造成契约分裂。"
+            }
+          ]
+        },
+        {
+          "id": "version",
+          "title": "版本号怎么改？",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "按 semver 递增，且 6 个 package.json 必须同步。改完执行 pnpm check:version 校验；门禁失败会阻断构建。"
+            }
+          ]
+        },
+        {
+          "id": "media-sign",
+          "title": "为什么上传与图片要走签名？",
+          "blocks": [
+            {
+              "type": "p",
+              "text": "对象存储默认按私有桶设计：写入与控制面走服务端预签名，读取按需签发有时效的下载地址。私有桶可以随时收紧或撤销访问，公有读一旦误开则无法追溯已扩散的链接。"
+            },
+            {
+              "type": "ul",
+              "items": [
+                "私有桶：桶名、区域、端点、密钥四项缺一即显式报错，不静默降级为公有读。",
+                "公开资源（如站点图片）如需 CDN 加速，应由单独的公开前缀或独立桶承担，与私有桶分离。",
+                "签名有效期与上传大小上限由服务端配置，前端不得自行拼装签名参数。"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

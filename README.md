@@ -26,7 +26,7 @@
 
 ## 版本
 
-当前版本：**V0.0.10-preview**（semver 由 `0.0.9` 递增为 `0.0.10`：2026-11-13 P2 落地——商城批量改价与快照回滚、积分抵扣结算、分类访问控制、微信/支付宝企业支付/Stripe/PayPal/虎皮椒/讯虎适配器、邀请码注册、实名认证、跨站 SSO、验证码与举报限频、防 SSRF、公告/更新日志/推广计划模块；**前台同步上线邀请码注册输入、实名认证卡、公告/更新日志/推广与自研工具入口、主题外观消费**；P1 已含付费图库/视频前台渲染、page_blocks 公共区块、论坛板块权限闭环；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
+当前版本：**V0.0.11-preview**（semver 由 `0.0.10` 递增为 `0.0.11`：2026-11-14 建设收口——新增「社区资讯 `/news`」「私有云存储 `/cloud`」「图床 `/img`」「下载分发 `/download`」四个前台视图；后端硬化对象存储配置为私有桶 + 预签名基线（缺桶名/区域/密钥即 `STORAGE_CONFIG_INVALID`，不再静默降级），并为图床单独划出 `public/` 公有读前缀与稳定直链基线；新增零依赖静态文档站 `help/`（项目介绍 / 部署说明 / 常见问题，供 news / service / support / blog 复用）；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
 
 版本号规约（与 [AGENTS.md 铁律四](./AGENTS.md#铁律四版本号每次添加功能模块更新等等规约与-readme-同步) 同步）：
 
@@ -81,10 +81,10 @@ node scripts/comment-check.mjs
 6. **铁律六**：全角色全流程自动化——AI 承担所有人员职责，每轮交付前必须 BUG/代码检查。
 7. **铁律七**：功能模块增删必须全量同步，交付报告附同步清单。
 8. **铁律八**：任务完成后必须全自动化部署到远程生产环境（前后端 + 数据库），**禁止以本地预览作为交付终点**。
-9. **铁律九**：多平台部署矩阵只走免费方案（**10 个平台**：9 个原矩阵平台 + 2026-11-10 新增的 **Gitee（码云）** 镜像仓），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证。
+9. **铁律九**：多平台部署矩阵只走免费方案（**11 个平台**：9 个原矩阵平台 + 2026-11-10 新增的 **Gitee（码云）** 镜像仓 + 2026-11-13 接替停服 Sealos 的 **Netlify**），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证。
 10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核。**原候选托管平台相关内容已于 2026-11-09 按用户指令全量删除，不得重新引入。**
 11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」。
-12. **铁律十二**：**全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器**——两个远端（`origin` GitHub、`gitee` Gitee）每轮必须同轮全部推送并逐个 `git ls-remote` 取证；远程仓库只承担源码托管与镜像，**生产唯一权威终点为 `https://mim.mixm.top`**（nginx + systemd + SQLite，前后端 + 数据库一体上线），铁律九的 10 平台仅作分发 / 镜像 / 取证，不得替代「已上线」；交付须附 V1–V6 取证矩阵（详见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)）。
+12. **铁律十二**：**全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器**——两个远端（`origin` GitHub、`gitee` Gitee）每轮必须同轮全部推送并逐个 `git ls-remote` 取证；远程仓库只承担源码托管与镜像，**生产唯一权威终点为 `https://mim.mixm.top`**（nginx + systemd + SQLite，前后端 + 数据库一体上线），铁律九的 11 平台仅作分发 / 镜像 / 取证，不得替代「已上线」；交付须附 V1–V6 取证矩阵（详见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)）。
 
 ## 仓库结构
 
@@ -92,11 +92,11 @@ pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`�
 
 ```
 apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：功能模块商城 / 商品列表 / 购物车 / 个人中心 / 站点矩阵 / 部署汇总 / 漫剧放映厅 + 创作工作台 / 即时通讯）
-apps/web/src/views/  # Login / Store / Sites / Deployments / ComicWorkbench / Chat / Settings 七个视图组件
-apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户）
+apps/web/src/views/  # 24 个视图组件：20 个 AppView 视图（Store / Products / Cart / Account / Sites / Deployments / Navigation / Search / Community / Commerce / ComicStudio / Chat / Tools / ContentHub / Releases / Circles / Checkout / Player / PaymentReturn / Login），另含 ChatPreview / ComicTheater / ComicWorkbench / PageBlocks / Profile 等子组件
+apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；17 个视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户 / 订单 / 社区 / 内容运营 / 邀请码 / 价格批次 / 实名 / 工具 / 商城卡片 / 商城优惠券 / 商城商品 / 登录）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
-services/mim-api/src/routes/  # auth / oauth / catalog / me / comic / media / ai / im / admin / sites / deployments 十一个路由模块
-services/mim-api/src/oauth/   # 第三方登录适配层：providers（9 家注册表）/ client（协议交换）/ accounts（绑定与一次性票据）
+services/mim-api/src/routes/  # 38 个路由模块（37 个 routes/*.ts + payments/router.ts）：admin / ai / appearance / assets / auth / cart / catalog / circles / comic / community / content-ops / content-unified / deployments / entries / federation / finance / fulfill / growth / i18n / im / invites / me / media / navigation / oauth / orders / payments / realname / referral / referral-admin / search / security / shop-admin / sites / sso / tools / vip-pricing
+services/mim-api/src/oauth/   # 第三方登录适配层：providers（14 家注册表）/ client（协议交换）/ accounts（绑定与一次性票据）
 services/mim-api/src/identity.ts  # 唯一建号入口：Mim ID 事务发号、历史用户回填、登录缺号兜底
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 站点模块注册表 siteModules / 部署汇总注册表 deploymentRegistry）
 packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
@@ -131,7 +131,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
-| 登录 | `Login.tsx` | 全站唯一登录入口：**账号密码登录**（自建账号 `POST /auth/register` + `POST /auth/password`，口令 bcrypt 存储）、**管理员口令登录**（同一 `/auth/password`，口令来自 `MIM_AUTH_ADMIN_PASSWORD`）、**验证码登录**（`/auth/code` + `/auth/login`，需短信/邮件通道凭证）、**第三方登录（2026-11-12）**（`GET /auth/oauth/providers` 拉 9 家清单 → `POST /auth/oauth/:provider/authorize` 取授权地址 → 回调 302 带一次性票据 → `POST /auth/oauth/exchange` 换会话；未配置凭证的提供方按钮置灰标注「未配置」）；**注册成功先展示自动分配的 Mim ID**（`user.member_no`，形如 `MIM-10000001`）再进入工作台；登录页挂载时查 `GET /auth/channels` 并在通道未配置时直接提示改用密码或注册。匿名访问收费/私密视图时在内容区内嵌展示；**聊天 `/chat` 匿名态改为只读演示页**（`ChatPreview.tsx`：完整聊天布局 + 示例会话与消息 + 禁用输入区 + 登录引导），不再是一张空白登录卡片 |
+| 登录 | `Login.tsx` | 全站唯一登录入口：**账号密码登录**（自建账号 `POST /auth/register` + `POST /auth/password`，口令 bcrypt 存储）、**管理员口令登录**（同一 `/auth/password`，口令来自 `MIM_AUTH_ADMIN_PASSWORD`）、**验证码登录**（`/auth/code` + `/auth/login`，需短信/邮件通道凭证）、**第三方登录（2026-11-12）**（`GET /auth/oauth/providers` 拉 14 家清单 + 是否已配置 → `POST /auth/oauth/:provider/authorize` 取授权地址 → 回调 302 带一次性票据 → `POST /auth/oauth/exchange` 换会话；未配置凭证的提供方按钮置灰标注「未配置」）；**注册成功先展示自动分配的 Mim ID**（`user.member_no`，纯数字 QQ 号样式、无前缀不补零，自动发号自 `102` 起、靓号只人工授予）再进入工作台；登录页挂载时查 `GET /auth/channels` 并在通道未配置时直接提示改用密码或注册。匿名访问收费/私密视图时在内容区内嵌展示；**聊天 `/chat` 匿名态改为只读演示页**（`ChatPreview.tsx`：完整聊天布局 + 示例会话与消息 + 禁用输入区 + 登录引导），不再是一张空白登录卡片 |
 | 功能模块 | `Store.tsx` | 解锁后才可访问的模块商城：**两级分类树（2026-11-10 改造）**——左侧「全部推荐项目」+ 19 个一级分类（1 前沿技术 … 19 其他开源），点击一级展开其二级条目（共 205 条，二级条目一律作为功能模块入库，模块编码 `cat.<一级slug>-<两位序号>`，权重 `sort_order = 一级序×100 + 二级序`）；右侧搜索（`?q=` 提交制）、筛选面板（排序三档 `星星最高 / 最新推荐 / 最近更新`、开源许可 48 项、编程语言 87 项，均为多选并可一键清空）、分页条（`page` / `pageSize`，默认 20 条/页）、**商品视觉（2026-11-12 改造，2026-11-13 升级）**——卡片顶部渲染逐商品独立矢量封面（`catalogArt.ts` `moduleCoverUrl()` 生成 1200×675 SVG data URL，配色 / 字标 / 纹理由模块编码稳定哈希生成，不额外请求后端图片；早期 19 张分类 JPG `apps/web/public/catalog/<slug>.jpg` 为遗留资源），封面左上分类角标、右上价格角标；点击「详情」后卡片横跨整行，详情首屏为**画廊（商品封面 / 能力亮点 / 交付与依赖三张可切换缩略图，`moduleStoryUrl()` 生成两张说明面板）** + 11 项参数键值表（编码 / 分类 / 许可 / 语言 / Stars / 区域 / 状态 / 解锁方式 / 价格 / 前置依赖 / 能力绑定），画廊主图与下方 **900×1180「商品参数详情图」**（`specPosterUrl()`，按详情数据实时生成、每条各不相同、可右键另存）均可点击进入全屏放大预览（遮罩 / 关闭按钮 / Esc 退出），下方继续保留工具调用 / 依赖链 / 价格历史；卡片徽标（语言 + 许可 + `★ stars`）、**免费模块一次性解锁（`POST /entitlements`）、付费模块一律 402 `PAYMENT_REQUIRED` 引导下单（`POST /orders`，金额由服务端快照）**、「我的权益」区块（`GET /me/entitlements`）、**「我的订单」区块（`GET /orders`，待结算可 `POST /orders/:id/cancel`）**、**右下「搜索帮助」浮窗（固定 12 条帮助外链，可展开/收起）**、**「热门项目」卡片（今日 / 本周两档，`GET /modules/hot`，跟随当前分类，点击条目直达其所属分类）**、卡片上的待结算/已解锁徽标、前置依赖缺失时的引导提示；**2026-11-12 首屏优化**——G6 依赖链图与 ECharts 价格历史图改为动态 `import()`，仅在详情展开时加载，Web 入口 JS 由 3.39 MB 降至 843 KB（gzip 228 KB） |
 | 部署汇总（2026-11-09，2026-11-12 收敛为纯表格） | `Deployments.tsx` | 只保留 8 列传证核对表：规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明——访问域名可点击直达入口，缺失信息并入异常说明列；**空数据（⚪）、失败（🔴）、缺失（⚠）分别标识**，匿名只读；页面原总览统计卡、状态分布环形图、五类筛选、展开取证详情与覆盖排除说明已按用户指令全部删除；数据源 `packages/core-domain/src/deploymentRegistry.json` |
 | 导航站（2026-11-12） | `Navigation.tsx` | 全站资源链接目录：目录概览（链接总数 / 可达 / 失效 / 未探测 / 分组数 + 最近探测时间）、关键词检索、分组筛选项、按分组渲染链接列表、**三态徽标**（✅ 可达 / 🔴 失效 / ⚪ 未探测）与 HTTP 码 / 耗时 / 探测时间取证、单条「检测」与「检测全部」、「设为推荐 / 取消推荐」切换、收录入口表单（名称 / 地址 / 分组 / 说明 / 推荐位）；外部链接 `target=_blank` 直达，运行期自动带访客会话，链接目录公开可浏览；数据源 `nav_links` 表 + `packages/core-domain/src/navigation.ts` |
@@ -151,7 +151,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 第三方登录（2026-11-12） | `GET /auth/oauth/providers`（9 家清单 + 是否已配置，支持 `?region=cn\|global`）、`POST /auth/oauth/:provider/authorize`（下发授权地址与 state，`mode=login\|bind`）、`GET\|POST /auth/oauth/:provider/callback`（回调换资料 → 302 回前端带一次性票据或绑定结果）、`POST /auth/oauth/exchange`（票据换双令牌）、`GET /me/oauth`、`DELETE /me/oauth/:provider` | providers 公开；callback 公开（靠 state 校验）；绑定模式与 `/me/oauth*` 需登录；票据一次性、300 秒过期 |
 | Mim ID（2026-11-12） | 无独立端点：`/auth/register`、`/auth/login`、`/auth/password`、`/auth/refresh`、`GET /me`、`GET /me/oauth` 的 `user.member_no` 字段 | 随登录态返回；号码由服务端在事务内发号，客户端只读 |
 | 商城 | `GET /taxonomy`（分类导航树：19 个一级分类 + 205 个二级条目，每个分组/条目带 `name`（中文）与 `name_en`（英文）以及各自的 active 模块数，英文站点凭 `name_en` 渲染导航）、`GET /modules`（支持 `?q=` 搜索、`?category=`（一级 slug 前缀命中 / 二级 slug 精确命中 / `all` 等价不过滤）、`?sort=`（`stars` / `recommended` / `updated`，非法值 400）、`?licenses=` / `?languages=`（逗号分隔多选）、`?page=` / `?pageSize=`（1–100，默认 20），响应带 `total / page / page_size / total_pages`）、`GET /modules/hot`（右侧「热门项目」：`?range=today|week`（24h / 168h，非法值 400）、`?category=`、`?limit=`（1–20，默认 5），热度 = stars + 窗口内新建加权，返回 `items[].hotness`）、`GET /modules/:code`（详情含价格历史、前置依赖、分类/许可/语言/stars） | 公开 |
-| 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（11 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 全部公开只读，不查业务表、无写端点 |
+| 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（12 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 全部公开只读，不查业务表、无写端点 |
 | 导航站（2026-11-12） | `GET /navigation/summary`（三态计数 + 分组计数 + 最近探测时间）、`GET /navigation/links`（支持 `?q=` / `?group=` / `?status=ok\|broken\|unknown` / `?recommended=1`）、`POST /navigation/links`（收录链接，`url` 只接受 http(s) 或站内相对路径）、`PATCH /navigation/links/:id`（改名 / 分组 / 说明 / 推荐位 / 地址，至少一个字段）、`POST /navigation/links/:id/check`（单条可达性探测并回写状态）、`POST /navigation/check`（全目录探测，上限 50 条，逐条串行） | 浏览类公开；写与探测需登录 + `Idempotency-Key` |
 | 统一搜索（2026-11-12） | `GET /search/summary`（五来源文档数 + 当前引擎）、`GET /search`（`?q=` 必填、`?scope=all\|module\|entry\|navigation\|community\|shop`（支持逗号多值）、`?limit=` 每来源 1–30 默认 8；返回 `engine / total / took_ms / groups[]`，分组含 `scope / label / count / items[]`，条目含 `title / subtitle / snippet / href / popularity / score`）、`POST /search/reindex`（把当前全部文档推送到配置的 Meilisearch，未配置 503） | 检索与 summary 公开；reindex 需 `module:read`（或超管引导令牌） |
 | 站点模块（2026-11-09） | `GET /sites/overview`（全站汇总 + 落地四态计数）、`GET /sites`（44 模块列表，支持 `?q=` / `?domain=`，逐条带落地映射）、`GET /sites/:host`（备注原文 + 行号 + 能力点 + 统计 + 落地映射）、`GET /sites/:host/capabilities`、`GET /sites/:host/items`（支持 `?capability=` / `?status=`）、`POST /sites/:host/items`、`POST /sites/:host/items/:id/transition` | 浏览公开；两个写端点登录 + 幂等 |
@@ -185,7 +185,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，15 个测试文件 / 211 例，2026-11-09 23:35 实测）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，58 个测试文件 / 676 例，2026-11-14 19:0x 实测）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
@@ -206,14 +206,14 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | 入口 | 内容 |
 |---|---|
 | [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 / 10 漫剧状态机 |
-| [docs/deployment-summary.md](./docs/deployment-summary.md) | 部署汇总核对表：9 矩阵平台 / 11 规范部署项逐项列出仓库标识、平台 / 层级、交付链路、访问域名、部署状态、部署结果、异常说明；含异常明细、工件双口径、覆盖去重与排除说明 |
+| [docs/deployment-summary.md](./docs/deployment-summary.md) | 部署汇总核对表：11 矩阵平台 / 12 规范部署项逐项列出仓库标识、平台 / 层级、交付链路、访问域名、部署状态、部署结果、异常说明；含异常明细、工件双口径、覆盖去重与排除说明（另有 7 条候选 / 排除留痕不计入汇总） |
 | [docs/deployment-summary.json](./docs/deployment-summary.json) | 同上的结构化结果（机器可核对，schema `mim.deployment-registry.v1`） |
 | [docs/站点模块开发落地说明-20261109.md](./docs/站点模块开发落地说明-20261109.md) | 45 类备注驱动的站点模块开发交付说明：逐项落实清单、45×3 功能点、验证矩阵、U1–U8 未决项与同步清单 |
 | [docs/站点入口契约落地说明-20261109.md](./docs/站点入口契约落地说明-20261109.md) | 上一轮站点入口契约（仅登记、43 类未决）交付说明，与本轮成果并存 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
 | [docs/wiki/10-comic-state-machines.md](./docs/wiki/10-comic-state-machines.md) | 漫剧工程 / 生成任务 / 成片版本的状态机与迁移约束 |
-| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.0-preview，仅含登录交互演示） |
+| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.11-preview 口径，含 FR-01~06 功能规格与交互演示） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 
 ## 站点与部署
@@ -249,7 +249,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 ### 多平台部署矩阵
 
-> **层级定位（铁律十二 / 铁律九）**：本表 11 行为「1 个生产权威终点 + 10 个分发 / 镜像 / 源码层」，其中 10 行即铁律九的 10 个免费平台矩阵成员（2026-11-10 起 Gitee 镜像仓由「矩阵外补充项」提升为矩阵第 10 行）；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像与源码镜像仓均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
+> **层级定位（铁律十二 / 铁律九）**：本表为「1 个生产权威终点 + 铁律九的 11 个免费平台矩阵成员」，其中 11 行即铁律九的 11 个免费平台矩阵成员（2026-11-10 起 Gitee 镜像仓由「矩阵外补充项」提升为矩阵第 10 行；2026-11-13 Netlify 接替停服的 Sealos 成为第 11 行，Sealos 保留为退休留痕行；Cloudflare Pages 与其独立 Worker 为同行并列的两个规范部署项）；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像与源码镜像仓均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
 
 一套代码、一份前端产物（`vite base: './'`，可挂任意子路径），后端统一由 `services/mim-api` 提供。CI 在 push `main` 时并行触发下列链路；缺凭证的平台以 `SKIP` 跳过，不阻断主链路。代码远端为 `origin`（GitHub）与 `gitee`（Gitee），每轮须同轮全推；原候选托管平台已全量移除。
 
@@ -345,6 +345,10 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 
 
+
+## V0.0.11 六个「必须最先做」条目的不依赖凭据部分（2026-11-14）
+
+新增四个前台视图并接进 SPA 路由：`/news` 社区资讯（复用 `GET /content/items`，未新增接口）、`/cloud` 私有云存储、`/img` 图床、`/download` 下载分发（承接 `store` 域，`/store` 段仍归商城）。后端把对象存储配置硬化为私有桶 + 预签名基线：`s3` 驱动缺桶名 / 区域 / 密钥直接抛 `STORAGE_CONFIG_INVALID`，不再静默回落本地；图床单独划出 `public/` 公有读前缀与 `MIM_STORAGE_PUBLIC_BASE_URL` 稳定直链基线。新增零依赖静态文档站 `help/`（项目介绍 / 部署说明 / 常见问题，内容与壳分离、可被后续站点复用）。本轮不 commit、不部署，需用户补齐桶参数与 CDN 基线后才可上线。
 
 ## V0.0.10 管理端六入口（2026-11-13）
 

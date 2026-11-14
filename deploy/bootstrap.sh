@@ -9,14 +9,14 @@
 #   或先克隆仓库后：sudo bash /opt/mim/app/deploy/bootstrap.sh
 #
 # 环境变量（可选）：
-#   DOMAIN   默认 mim.mixm.top
+#   DOMAIN   默认 laal.top
 #   APP_DIR  默认 /opt/mim/app
 #   WEB_DIR  默认 /opt/mim/web
 #   RUN_USER 默认 mim
 
 set -euo pipefail
 
-DOMAIN="${DOMAIN:-mim.mixm.top}"
+DOMAIN="${DOMAIN:-laal.top}"
 APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 RUN_USER="${RUN_USER:-mim}"
@@ -86,7 +86,8 @@ git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 
 # --- 4. nginx 站点 ---
 log "安装 nginx 站点 $DOMAIN"
-sed "s/server_name mim.mixm.top;/server_name ${DOMAIN} www.${DOMAIN};/" \
+# 全量替换模板域：主站、api 子域与功能子域的 server_name / 跳转目标都跟随 DOMAIN
+sed "s/laal\.top/${DOMAIN}/g" \
   "$APP_DIR/deploy/nginx-mim.conf" > /etc/nginx/sites-available/mim.conf
 ln -sf /etc/nginx/sites-available/mim.conf /etc/nginx/sites-enabled/mim.conf
 rm -f /etc/nginx/sites-enabled/default

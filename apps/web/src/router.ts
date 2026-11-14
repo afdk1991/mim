@@ -17,6 +17,10 @@ export type AppView =
   | 'chat' // IM 聊天 + 视频通话
   | 'tools' // 自研工具发布目录
   | 'content' // 公告 / 更新日志 / 推广计划栏目
+  | 'news' // 资讯：全站统一内容流（论坛主题 + 圈子动态 / 公告）
+  | 'cloud' // 云存储：私有桶 + 短时签名（上传 / 下载 / 本人产物）
+  | 'img' // 图床：public/ 前缀公有读 + 稳定直链
+  | 'download' // 下载分发：软件 / 源码包私有桶 + 签名分发链接（承接 store 域）
   | 'releases' // 版本迭代：V0.0.0 → 当前版本时间线与能力地图
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
   | 'checkout' // 收银台：支付意图二维码 / 渠道唤起 / 状态轮询
@@ -47,6 +51,10 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   chat: 'chat', // 聊天（原名即功能名，保持不变）
   tools: 'tools', // 自研工具发布目录
   content: 'announcements', // 公告 / 更新日志 / 推广计划栏目
+  news: 'news', // 资讯：全站统一内容流（对外路径段即功能名 /news）
+  cloud: 'cloud', // 云存储（对外路径段即功能名 /cloud；私有桶 + 短时签名）
+  img: 'img', // 图床（对外路径段 /img；仅 public/ 前缀公有读）
+  download: 'download', // 下载分发（对外路径段 /download；旧 /store 已归属商城，不复用该段）
   releases: 'releases', // 版本迭代（时间线与能力地图）
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
   checkout: 'checkout', // 收银台（支付意图二维码 / 渠道唤起）

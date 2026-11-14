@@ -1,7 +1,7 @@
 // Cloudflare Worker：mim-store 固定入口
 // 角色：作为 Mim 的独立边缘入口，统一把请求透传到生产权威终点（腾讯云 CVM）。
 // 这样根路径不再返回 404，且 /api/* 等接口与生产保持同一份实现。
-const ORIGIN = 'https://mim.mixm.top';
+const ORIGIN = 'https://api.laal.top';
 
 export default {
   async fetch(request) {

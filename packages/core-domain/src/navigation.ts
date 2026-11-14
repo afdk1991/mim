@@ -61,7 +61,7 @@ export function normalizeNavUrl(raw: string): string | null {
 /**
  * 计算探测目标：相对路径按运行环境 origin 补齐；绝对地址原样使用。
  * @param url 库里存的地址
- * @param origin 运行环境对外 origin（如 https://mim.mixm.top），不含尾斜杠
+ * @param origin 运行环境对外 origin（如 https://laal.top），不含尾斜杠
  */
 export function resolveProbeTarget(url: string, origin: string): string {
   if (url.startsWith('/')) return `${origin.replace(/\/+$/, '')}${url}`; // 相对路径拼 origin

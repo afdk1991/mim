@@ -49,7 +49,7 @@ export const EXTENSION_BLUEPRINTS: readonly ModuleBlueprint[] = [ // 数组顺�
   // wechat-01 微信开发包：JS-SDK 签名
   B('cat.wechat-01', '微信开发包：JS-SDK 服务端签名串 + 前端 wx.config 接入。', 'JavaScript / 微信 JS-SDK', "// 服务端签名：sha1('jsapi_ticket=...&noncestr=...&timestamp=...&url=...')\n// 前端\n// wx.config({ appId, timestamp, nonceStr, signature, jsApiList: ['chooseImage', 'scanQRCode'] })"),
   // wechat-02 微信小程序/小游戏：app.json
-  B('cat.wechat-02', '微信小程序/小游戏：app.json 页面与窗口配置 + 首页请求示例。', 'JavaScript / 微信小程序', "{ \"pages\": [\"pages/index/index\"], \"window\": { \"navigationBarTitleText\": \"Mim\", \"navigationBarBackgroundColor\": \"#2f6feb\" }, \"sitemapLocation\": \"sitemap.json\" }\n// pages/index/index.js: Page({ data: { items: [] }, onLoad() { wx.request({ url: 'https://mim.mixm.top/api/v1/modules' }) } })"),
+  B('cat.wechat-02', '微信小程序/小游戏：app.json 页面与窗口配置 + 首页请求示例。', 'JavaScript / 微信小程序', "{ \"pages\": [\"pages/index/index\"], \"window\": { \"navigationBarTitleText\": \"Mim\", \"navigationBarBackgroundColor\": \"#2f6feb\" }, \"sitemapLocation\": \"sitemap.json\" }\n// pages/index/index.js: Page({ data: { items: [] }, onLoad() { wx.request({ url: 'https://api.laal.top/api/v1/modules' }) } })"),
   // wechat-03 微信应用：公众号消息回复
   B('cat.wechat-03', '微信应用：公众号服务器校验与被动回复 XML 消息组装。', 'PHP / 微信公众号', "// GET 校验 signature/timestamp/nonce/echostr；POST 解析 XML 后被动回复\nfunction reply($to, $from, $content) { return \"<xml><ToUserName>$from</ToUserName><FromUserName>$to</FromUserName><Content>$content</Content></xml>\"; }"),
   // wechat-04 微信小游戏：game.js 画布循环

@@ -119,8 +119,8 @@ try { // 异常捕获起点：包裹可能抛出错误的操作
 check('数据格式版本 v2', data.schema === 'mim.site-modules.v2', `实际 ${data.schema}`);
 // 清单标题必须明确「统一入口配置清单」。
 check('清单标题正确', String(data.title).includes('统一入口配置清单'), '标题漂移');
-// 取证范围必须明确为 mixm.top 工作表，防止混入 laal.top 的 gy 文案。
-check('取证范围仅 mixm.top', String(data.scope).includes('mixm.top') && !String(data.scope).includes('laal.top'), '范围声明漂移');
+// 取证范围必须声明 mixm.top 工作表；laal.top 为 2026-11-14 起的切换口径，允许同时出现。
+check('取证范围含 mixm.top', String(data.scope).includes('mixm.top'), '范围声明漂移');
 // 模块划分依据必须锁定备注两段式的后半段。
 check('模块划分依据为业务系统说明', String(data.moduleBasis).includes('业务系统'), '缺划分依据');
 // 备注格式说明必须保留「未提供具体主机值 / 功能规格」的事实。
@@ -435,7 +435,10 @@ check('既有 check 链未改动', pkg.includes('"check": "node scripts/version-
 // 上一轮站点入口契约校验脚本必须仍在，历史成果不得被本轮覆盖。
 check('上一轮站点入口契约校验仍在', existsSync(join(ROOT, 'scripts/verify-site-directory.mjs')), '旧校验脚本缺失');
 // 源 xls 不得被本轮改动（文件名仍存在即可，内容比对由 Python 侧单独取证）。
-check('源 xls 仍在仓库根', existsSync(join(ROOT, 'dnspod_records_2026-11-05_21-42-26.xls')), '源文件缺失');
+// 源表不得缺失：历史 DNSPod 导出（mixm.top）或 2026-11-14 起的 laal.top 适配表，二者至少其一在仓库根。
+const legacyXls = join(ROOT, 'dnspod_records_2026-11-05_21-42-26.xls');
+const laalXlsx = join(ROOT, '域名适配整个项目laal.top.xlsx');
+check('源 xls 仍在仓库根', existsSync(legacyXls) || existsSync(laalXlsx), '源文件缺失');
 
 // ---------- 汇总 ----------
 // 打印通过数与失败数，便于 CI 日志直接引用。

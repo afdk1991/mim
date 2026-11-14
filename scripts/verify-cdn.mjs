@@ -11,10 +11,10 @@
  *
  * 用法：
  *   node scripts/verify-cdn.mjs
- *   MIM_CDN_BASE=https://mim.mixm.top MIM_CDN_PROBE_PATH=/ node scripts/verify-cdn.mjs
+ *   MIM_CDN_BASE=https://laal.top MIM_CDN_PROBE_PATH=/ node scripts/verify-cdn.mjs
  */
 
-const BASE = (process.env.MIM_CDN_BASE ?? 'https://mim.mixm.top').replace(/\/+$/, ''); // 常量 BASE：保存固定配置或一次性派生值
+const BASE = (process.env.MIM_CDN_BASE ?? 'https://laal.top').replace(/\/+$/, ''); // 常量 BASE：保存固定配置或一次性派生值
 const PATHNAME = process.env.MIM_CDN_PROBE_PATH ?? '/'; // 常量 PATHNAME：保存固定配置或一次性派生值
 const PROBE_URL = `${BASE}${PATHNAME.startsWith('/') ? PATHNAME : `/${PATHNAME}`}`; // 常量 PROBE_URL：保存固定配置或一次性派生值
 const TIMEOUT_MS = 10_000; // 常量 TIMEOUT_MS：保存固定配置或一次性派生值

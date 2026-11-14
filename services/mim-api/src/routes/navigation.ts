@@ -110,7 +110,7 @@ export function createNavigationRouter(deps: ApiDeps): Router {
 
   /** 探测目标 origin：优先取运行环境配置，缺省落生产域名（仅用于补齐站内相对路径） */
   function origin(): string {
-    return (deps.env?.MIM_PUBLIC_ORIGIN ?? 'https://mim.mixm.top').replace(/\/+$/, ''); // 去尾斜杠，避免拼出双斜杠
+    return (deps.env?.MIM_PUBLIC_ORIGIN ?? 'https://laal.top').replace(/\/+$/, ''); // 去尾斜杠，避免拼出双斜杠
   } // origin 结束
 
   /** 受信 origin 的 host:port：站内相对路径补齐后的自指目标据此跳过私网/环回复核 */

@@ -219,13 +219,13 @@ export const ENTRY_IMPLEMENTATION: Readonly<Record<string, EntryImplementation>>
     boundary: '无 CDN 点播分发、转码队列管理与独立播放器分发站。', // 点播分发差距说明
   }, // VOD_LONG_VIDEO 结束
   VIDEO_PLAYER: { // 独立视频播放页，相邻为成片在线预览
-    status: 'partial', // 部分相邻：无独立播放器页
+    status: 'partial', // 部分相邻：有播放器页，无弹幕 / 倍速 / CDN 分发
     view: 'comic', // 直达漫剧工作台
     href: null, // 无外链
     realFeatures: [ // 已上线播放相邻能力
       '成片在线预览、会话内视频通话', // 在线预览与视频通话
     ], // 执行当前业务步骤
-    boundary: '无独立播放器页；播放列表、弹幕、倍速等播放器能力尚未实现。', // 播放器差距说明
+    boundary: '独立播放器页 /watch/:kind/:id 已落地（选集 / 上一集下一集 / 本地进度记忆）；弹幕、倍速与 CDN 点播分发尚未实现。', // 播放器差距说明
   }, // VIDEO_PLAYER 结束
 
   // ---------- 运维 / 安全 / 治理 ----------

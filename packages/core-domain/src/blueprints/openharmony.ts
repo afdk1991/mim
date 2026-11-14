@@ -51,7 +51,7 @@ export const OPENHARMONY_BLUEPRINTS: readonly ModuleBlueprint[] = [ // 数组顺
   // 24 游戏：定时器驱动的小球运动循环
   B('cat.openharmony-24', 'OpenHarmony 游戏：requestAnimationFrame 式循环（setInterval）+ Canvas 帧更新。', 'ArkTS / ArkUI', "@Entry\n@Component\nstruct MiniGame {\n  @State x: number = 0\n  aboutToAppear() { setInterval(() => { this.x = (this.x + 8) % 320 }, 16) }\n  build() { Stack() { Circle({ width: 24, height: 24 }).fill('#f97316').position({ x: this.x, y: 120 }) }.width(320).height(200) }\n}"),
   // 25 网络：HTTP 客户端 GET + 超时
-  B('cat.openharmony-25', '网络（Networking）：HTTP 客户端 GET 请求、超时与资源释放。', 'ArkTS / NetworkKit', "import { http } from '@kit.NetworkKit'\nexport async function getModules() {\n  const req = http.createHttp()\n  const res = await req.request('https://mim.mixm.top/api/v1/modules', { method: http.RequestMethod.GET, connectTimeout: 5000 })\n  req.destroy()\n  return JSON.parse(res.result as string)\n}"),
+  B('cat.openharmony-25', '网络（Networking）：HTTP 客户端 GET 请求、超时与资源释放。', 'ArkTS / NetworkKit', "import { http } from '@kit.NetworkKit'\nexport async function getModules() {\n  const req = http.createHttp()\n  const res = await req.request('https://api.laal.top/api/v1/modules', { method: http.RequestMethod.GET, connectTimeout: 5000 })\n  req.destroy()\n  return JSON.parse(res.result as string)\n}"),
   // 26 通讯：分布式设备发现与状态回调
   B('cat.openharmony-26', '通讯（Communication）：分布式设备发现与设备状态变化回调。', 'ArkTS / DistributedServiceKit', "import { deviceManager } from '@kit.DistributedServiceKit'\nconst dm = deviceManager.createDeviceManager('com.mim.app')\ndm.on('deviceStateChange', (data: deviceManager.DeviceStateChangeInfo) => { console.info(data.deviceId + ':' + data.action) })"),
   // 27 支付：IAP 三步流程（客户端下单 → 服务端验签 → 发放权益）
