@@ -606,8 +606,8 @@ export function seedCommunity(db: Db): void {
   );
   const insertThread = db.prepare(
     `INSERT OR IGNORE INTO community_threads
-       (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, created_at, updated_at, last_activity_at)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, ?, 0, ?, ?, ?)`,
+       (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, recommend_score, created_at, updated_at, last_activity_at)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, ?, 0, 0, ?, ?, ?)`, // recommend_score 显式写 0：分数只由真实互动产生，不随种子预置
   );
   const insertVip = db.prepare(
     `INSERT OR IGNORE INTO vip_plans (id, code, name, level, price_cents, duration_days, perks, sort_order, active)

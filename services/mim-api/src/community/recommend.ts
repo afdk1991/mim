@@ -123,3 +123,53 @@ export function refreshRecommendScore(deps: ApiDeps, threadId: string): void {
   ); // 执行当前业务步骤
   deps.db.prepare('UPDATE community_threads SET recommend_score = ? WHERE id = ?').run(score, threadId); // 执行当前业务步骤
 } // 代码块结束
+
+/**
+ * 全量对账：按当前公式重算所有帖子的推荐指数，只写回与现值不同的行。
+ * 用途：历史数据里存在「0 浏览却带着预置分数」的存量假数，启动时按公式纠正一次。
+ * 幂等：结果只取决于帖子当前的真实互动量，重复执行不会二次扣减 / 二次归零。
+ * @returns 本次实际修正的行数；0 表示本来就全部一致。
+ */
+export function reconcileRecommendScores(env: Record<string, string | undefined>, db: Db): number {
+  const weights = loadWeights(env, db); // 与互动回写同一套权重口径
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+      `SELECT t.id, t.recommend_score, t.views, t.reply_count, t.created_at,
+              (SELECT COUNT(*) FROM community_favorites f WHERE f.thread_id = t.id) AS favorite_count,
+              (SELECT ROUND(AVG(r.rating), 2) FROM community_ratings r WHERE r.thread_id = t.id) AS rating_avg,
+              (SELECT COUNT(*) FROM community_ratings r WHERE r.thread_id = t.id) AS rating_count
+         FROM community_threads t`,
+    ) // 调用结束：参数列表与链式调用收尾
+    .all() as Array<{ // 查询多行：读取列表供批量处理
+    id: string; // 对象字段：看清当前逻辑在做什么
+    recommend_score: number; // 对象字段：看清当前逻辑在做什么
+    views: number; // 对象字段：看清当前逻辑在做什么
+    reply_count: number; // 对象字段：看清当前逻辑在做什么
+    created_at: string; // 对象字段：看清当前逻辑在做什么
+    favorite_count: number; // 对象字段：看清当前逻辑在做什么
+    rating_avg: number | null; // 对象字段：看清当前逻辑在做什么
+    rating_count: number; // 对象字段：看清当前逻辑在做什么
+  }>; // 代码块结束
+  const update = db.prepare('UPDATE community_threads SET recommend_score = ? WHERE id = ?'); // 预编译 SQL：固定语句结构后绑定参数执行
+  let fixed = 0; // 记录修正条数，供启动日志留证
+  const apply = db.transaction(() => { // 单事务批量纠正，避免半途中断留下部分不一致
+    for (const row of rows) { // 逐帖重算
+      const score = computeScore( // 常量 score：保存固定配置或一次性派生值
+        { // 执行当前业务步骤
+          views: row.views, // 对象字段 views：记录一项配置或数据
+          replyCount: row.reply_count, // 对象字段 replyCount：记录一项配置或数据
+          favoriteCount: row.favorite_count, // 对象字段 favoriteCount：记录一项配置或数据
+          ratingAvg: row.rating_avg ?? 0, // 对象字段 ratingAvg：记录一项配置或数据
+          ratingCount: row.rating_count, // 对象字段 ratingCount：记录一项配置或数据
+          createdAt: row.created_at, // 对象字段 createdAt：记录一项配置或数据
+        }, // 代码块结束
+        weights, // 执行当前业务步骤
+      ); // 执行当前业务步骤
+      if (Math.abs(score - row.recommend_score) < 1e-9) continue; // 已一致则不写，保证重复执行零改动
+      update.run(score, row.id); // 执行写入：把参数落库并返回影响结果
+      fixed += 1; // 赋值：更新当前作用域中的状态
+    } // 遍历结束
+  }); // 结束函数体：本层作用域收尾
+  apply(); // 执行事务
+  return fixed; // 返回结果：把本步骤产物交给调用方
+} // 代码块结束

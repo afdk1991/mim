@@ -415,8 +415,11 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       deps.db.prepare('UPDATE community_threads SET views = views + 1 WHERE id = ?').run(id); // 预编译 SQL：固定语句结构后绑定参数执行
       refreshRecommendScore(deps, id); // 浏览量计入推荐指数
     } // 首次浏览分支结束
-    // 列表与详情同源：回读数据库当前值，避免响应里出现「写死 / 多加一次」的数字
-    const currentViews = (deps.db.prepare('SELECT views FROM community_threads WHERE id = ?').get(id) as { views: number }).views;
+    // 列表与详情同源：写入后一次性回读浏览量与推荐指数，避免「views 已 +1、分数还是写前快照」的短暂不自洽
+    const current = deps.db.prepare('SELECT views, recommend_score FROM community_threads WHERE id = ?').get(id) as {
+      views: number; // 真实浏览量（含本次首访）
+      recommend_score: number; // 与上面浏览量同一次读取的推荐指数
+    };
     const boardUnlocked = hasBoardAccess(deps, userId, thread.board_id, thread.board_price_cents); // 保存 boardUnlocked：承载本步骤的计算结果供后续使用
     // 板块会员准入 + 单帖已购两条解锁路径：付费帖可单独购买，不强制先加入板块；免费内容仍受板块门槛约束。
     const threadPaidUnlocked = thread.price_cents > 0 && hasThreadAccess(deps, userId, id, thread.price_cents); // 保存 threadPaidUnlocked：承载本步骤的计算结果供后续使用
@@ -456,7 +459,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ // 输出响应：把处理结果写回 HTTP 客户端
       thread: { // 对象字段：声明结构中的一项数据
         ...thread, // 链式调用：在上一步结果上继续处理
-        views: currentViews, // 浏览量：直接回读数据库，与列表页 / 总览同源
+        views: current.views, // 浏览量：直接回读数据库，与列表页 / 总览同源
+        recommend_score: current.recommend_score, // 推荐指数：与浏览量同一次回读，响应内自洽
         body: unlocked ? thread.body : '', // 对象字段：声明结构中的一项数据
         locked: !unlocked, // 对象字段：声明结构中的一项数据
         board_locked: !boardUnlocked, // 对象字段：声明结构中的一项数据
