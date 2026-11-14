@@ -93,6 +93,24 @@ export function pathSegments(): string[] {
   return path.split('/').filter(Boolean); // 全部非空段；空路径返回 []
 } // pathSegments 结束
 
+// 订阅地址栏多段路径：详情类深链接（/community/post/:id、/community/news/:kind/:id）
+// 需要在视图内部感知路径变化；pushState 不触发 popstate，故同时监听路由事件。
+export function usePathSegments(): string[] {
+  const [segments, setSegments] = useState<string[]>(() =>
+    typeof window === 'undefined' ? [] : pathSegments(),
+  );
+  useEffect(() => {
+    const onChange = () => setSegments(pathSegments()); // 地址变化后重新拆段
+    window.addEventListener('popstate', onChange); // 前进 / 后退
+    window.addEventListener(ROUTE_EVENT, onChange); // 编程式导航
+    return () => {
+      window.removeEventListener('popstate', onChange);
+      window.removeEventListener(ROUTE_EVENT, onChange);
+    };
+  }, []);
+  return segments;
+} // usePathSegments 结束
+
 // 兼容旧调用：取首个非空段
 function firstSegment(): string {
   return pathSegments()[0] ?? ''; // 首段；空路径返回空串

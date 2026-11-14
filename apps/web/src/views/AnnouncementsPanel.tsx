@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from 'react'; // 状态与副作用
+import { navigatePath, pathOf } from '../router'; // 资讯条目详情深链接
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { api, errorText } from '../api'; // 接口客户端与错误文案翻译
 import type { // 引入依赖、类型或本地模块绑定
@@ -27,6 +28,7 @@ import { CAPABILITY_NOTES, RELEASE_DETAILS, RELEASE_READING_NOTES } from '../lib
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
   hasSession?: boolean; // 是否已有会话；决定是否展示管理端
+  initialTab?: ContentTab; // 从条目详情返回时直接落到对应子页签
 } // 代码块结束
 
 type ContentTab = 'announcements' | 'changelog' | 'promotions' | 'feed'; // 内部栏目切换（feed 为原 /news 内容流）
@@ -138,8 +140,8 @@ function isoOrNull(raw: string): string | null {
   return raw.trim() ? raw.trim() : null; // 返回当前函数的处理结果
 } // 代码块结束
 
-export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // 导出社区公告动态页签组件
-  const [tab, setTab] = useState<ContentTab>('announcements'); // 当前公开栏目
+export function AnnouncementsPanel({ locale, hasSession = false, initialTab }: Props) { // 导出社区公告动态页签组件
+  const [tab, setTab] = useState<ContentTab>(initialTab ?? 'announcements'); // 当前公开栏目
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]); // 公告清单
   const [changelog, setChangelog] = useState<ChangelogItem[]>([]); // 更新日志
   const [promotions, setPromotions] = useState<PromotionItem[]>([]); // 推广计划
@@ -386,6 +388,11 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
     { key: 'feed', label: tr(locale, '社区动态', 'Community feed'), count: feed.length },
   ]; // 公开页签集合
 
+  /** 打开资讯条目独立详情页：地址栏变为 /community/news/<kind>/<id>，可分享、可刷新。 */
+  function openItem(kind: 'announcement' | 'changelog' | 'feed', id: string): void {
+    navigatePath(pathOf('community', `news/${kind}/${encodeURIComponent(id)}`)); // 进入详情深链接
+  } // openItem 结束
+
   return ( // 返回当前函数的处理结果
     <div className="content-hub">{/* 社区公告动态页签容器 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
@@ -421,7 +428,14 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
       {tab === 'announcements' && sortedAnnouncements.length > 0 && (
         <ul className="plain-list announcement-list">{/* 执行当前业务步骤 */}
           {sortedAnnouncements.map((item) => (
-            <li className="panel announcement-row" key={item.id}>{/* 执行当前业务步骤 */}
+            <li
+              className="panel announcement-row is-link"
+              key={item.id}
+              role="link"
+              tabIndex={0}
+              onClick={() => openItem('announcement', item.id)}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openItem('announcement', item.id); } }}
+            >
               <div className="panel-head">{/* 执行当前业务步骤 */}
                 <h3>{item.title}</h3>
                 {item.pinned ? <span className="deploy-badge">{tr(locale, '置顶', 'Pinned')}</span> : null}
@@ -440,7 +454,14 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
             const detail = RELEASE_DETAILS[versionKey(item.version)];
             const changes = detail ? (locale === 'en-US' ? detail.changesEn : detail.changesZh) : [];
             return (
-              <li className="changelog-entry" key={item.id}>{/* 执行当前业务步骤 */}
+              <li
+                className="changelog-entry is-link"
+                key={item.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => openItem('changelog', item.id)}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openItem('changelog', item.id); } }}
+              >
                 <div className="changelog-version">{/* 执行当前业务步骤 */}
                   <span className="deploy-badge">{item.version}</span>
                   {detail ? <span className="muted">{detail.date} · {detail.commit}</span> : null}
@@ -479,7 +500,14 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
       {tab === 'feed' && feed.length > 0 && (
         <ul className="plain-list announcement-list">{/* 原 /news 的全站内容流：论坛主题 / 圈子动态 / 圈内公告 */}
           {feed.map((item) => (
-            <li className="panel announcement-row" key={item.id}>{/* 单条动态 */}
+            <li
+              className="panel announcement-row is-link"
+              key={item.id}
+              role="link"
+              tabIndex={0}
+              onClick={() => openItem('feed', item.id)}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openItem('feed', item.id); } }}
+            >{/* 单条动态 */}
               <div className="panel-head">{/* 标题行 */}
                 <h3>{item.title}</h3>
                 <span className="deploy-badge">{feedSourceLabel(locale, item.source)}</span>{/* 来源徽标 */}

@@ -20,8 +20,8 @@ import type { LoginResult, Session, SessionChangeReason, UserInfo } from './api'
 import { tr } from './lib/messages';
 // 登录页组件：按需登录统一入口，体积小保持 eager 引入
 import { Login } from './views/Login';
-// 公告置顶条：轻量组件，随首屏加载
-import { AnnouncementBar } from './components/AnnouncementBar';
+// 公告置顶条已从全局外壳移除：置顶公告只在社区「公告动态」页签内展示，
+// 避免把内部命名（能力地图 / 版本号）与运营文案铺到每一个页面。
 // 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
 import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './appearance';
 import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或本地模块绑定
@@ -195,6 +195,10 @@ export function App() {
     setGateNotice(null);
     // 退出后回到社区页：匿名可浏览，刷新与回退均安全
     go({ view: 'community' });
+    // 登出后立即重新领访客会话：领取 effect 仅在挂载时执行一次，
+    // 不补这一步内容区会卡在「正在建立免登录会话…」，必须手动重试或刷新
+    const ok = await ensureGuestSession();
+    setLocalSession(ok ? getSession() : null); // 就绪后回填访客会话；失败保留重试占位
   } // handleLogout 结束
 
   // 设置页更新用户信息后的回调：替换会话中的 user 并持久化
@@ -244,17 +248,13 @@ export function App() {
   }; // 二级 → 一级映射结束
   // 侧栏高亮依据：当前在隐藏二级页时按上级高亮，其余按自身
   const activeNavView: AppView = SUB_VIEW_PARENT[route.view] ?? route.view;
-  // 合并后的二级入口：被收进上级的那几个页面不再占侧栏，但在上级页顶部给一条直达条，
-  // 且从二级页也能一键回到上级，保证「合并」不会把入口变没（2026-11-13 导航收口配套）
+  // 合并后的二级入口：被收进上级的页面不再占侧栏。
+  // 2026-11-15 访客收敛：社区页顶部不再挂「圈子（成员制社群）」「部署汇总（N 个部署项）」，
+  // 两者属于内部命名 / 运维条目数，入口改由社区页内对应板块承载；仅在二级页给一条「返回社区」。
   const subEntries: Array<{ view: AppView; label: string }> =
-    route.view === 'community'
-      ? [
-          { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子（成员制社群）' },
-          { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总（12 个部署项）' },
-        ]
-      : route.view === 'circles' || route.view === 'deployments'
-        ? [{ view: 'community', label: locale === 'en-US' ? 'Back to Community' : '返回社区' }]
-        : [];
+    route.view === 'circles' || route.view === 'deployments'
+      ? [{ view: 'community', label: locale === 'en-US' ? 'Back to Community' : '返回社区' }]
+      : [];
 
   // 主布局：左侧栏 + 右侧内容区；访客与正式账号共用同一骨架，登录只用于升级身份
   const needsSession =
@@ -267,8 +267,6 @@ export function App() {
   return (
     // 布局容器：data-list-style 把后台列表样式口径透传给列表变体选择器
     <div className="layout" data-list-style={theme.listStyle} data-nav-layout={theme.navLayout}>
-      {/* 公告置顶条：无置顶公告时组件自身静默不渲染 */}
-      <AnnouncementBar locale={locale} onOpen={() => go({ view: 'community' })} />
       {/* 左侧导航栏 */}
       <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
         {/* 品牌区：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
@@ -302,7 +300,7 @@ export function App() {
               {/* 显示名，缺失时回退到 id 前 8 位 */}
               <span className="user-name">{session.user.display_name || session.user.id.slice(0, 8)}</span>{/* 显示名，缺失时回退到 id 前 8 位 */}
               {/* 身份标识：访客显式标注「免登录」，正式账号显示区域 */}
-              <span className="user-region">{session.user.is_guest ? (locale === 'en-US' ? 'Guest · no sign-in' : '访客 · 免登录') : session.user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 身份标识结束 */}
+              <span className="user-region">{session.user.is_guest ? (locale === 'en-US' ? 'No sign-in' : '免登录') : session.user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 状态徽标：不再重复身份名，避免「访客」出现两次 */}
               {session.user.is_guest ? ( // 访客分支：不提供退出（退出后会立刻再建访客），改为登录升级入口
                 <button type="button" className="btn primary block" onClick={() => go({ view: 'login' })}>{/* 登录 / 注册升级按钮 */}
                   {locale === 'en-US' ? 'Sign in / Sign up' : '登录 / 注册正式账号'}{/* 升级文案 */}
@@ -355,7 +353,7 @@ export function App() {
             <p className="hint">{locale === 'en-US' ? 'Setting up your anonymous session…' : '正在建立免登录会话…'}</p>{/* 状态说明 */}
             <button type="button" className="btn ghost" onClick={retryGuestSession}>{/* 重试按钮 */}
               {locale === 'en-US' ? 'Retry' : '重试'}{/* 重试文案 */}
-            </button> // 重试按钮结束
+            </button>{/* 重试按钮结束 */}
           </div> // 占位容器结束
         )}{/* 会话就绪占位结束 */}
         {/* IM 聊天 + 视频通话：会话列表 + 消息 + 视频通话，仅已登录渲染 */}

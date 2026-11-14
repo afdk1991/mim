@@ -16,6 +16,15 @@
   --radius: 10px; /* 卡片统一圆角，保持视觉一致性 */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; /* 字体族：后台主题可覆盖 */
   --shadow: 0 1px 2px rgba(20, 28, 45, 0.06), 0 8px 24px rgba(20, 28, 45, 0.05); /* 双层阴影：近距勾边 + 远距柔和投影 */
+  /* ---------- 共享卡片规格（2026-11-15 统一）：宽度由栅格列决定，以下只约束内距 / 圆角 / 封面 / 间距 ---------- */
+  --card-radius: 12px; /* 标准卡片圆角 */
+  --card-radius-sm: 10px; /* 紧凑卡片圆角 */
+  --card-radius-lg: 16px; /* 主推 / 详情卡片圆角 */
+  --card-pad: 18px; /* 标准内边距 */
+  --card-pad-tight: 12px; /* 紧凑内边距 */
+  --card-gap: 14px; /* 卡片之间与栅格间距 */
+  --card-cover: 3 / 2; /* 封面统一比例 */
+  --card-title-lines: 2; /* 标题最多两行 */
 } /* 设计令牌块结束 */
 
 * { /* 通配选择器：统一盒模型 */
@@ -229,12 +238,51 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 纵向排列面板内的标题与内容 */
   flex-direction: column; /* 自上而下 */
   gap: 12px; /* 面板内部统一间距 */
-  padding: 18px; /* 内容与边框之间留白 */
+  padding: var(--card-pad); /* 内容与边框之间留白：全站卡片统一 */
   border: 1px solid var(--border); /* 细边框勾勒卡片边界 */
-  border-radius: var(--radius); /* 统一圆角 */
+  border-radius: var(--card-radius); /* 统一圆角 */
   background: var(--surface); /* 白底与页面底色区分 */
   box-shadow: var(--shadow); /* 统一阴影，形成轻微浮起感 */
 } /* 面板结束 */
+
+/* 共享卡片基底：按视觉层级选档，各页不再各写一套硬值 */
+.ui-card { /* 标准档 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 主方向 */
+  gap: var(--card-pad-tight); /* 内部间距 */
+  overflow: hidden; /* 裁掉封面溢出 */
+  border: 1px solid var(--border); /* 描边 */
+  border-radius: var(--card-radius); /* 标准圆角 */
+  background: var(--surface); /* 表面色 */
+  box-shadow: var(--shadow); /* 统一投影 */
+} /* 标准档结束 */
+.ui-card--tight { /* 紧凑档：列表行 / 小卡 */
+  border-radius: var(--card-radius-sm); /* 紧凑圆角 */
+  padding: var(--card-pad-tight); /* 紧凑内距 */
+} /* 紧凑档结束 */
+.ui-card--feature { /* 主推 / 详情档 */
+  border-radius: var(--card-radius-lg); /* 主推圆角 */
+  padding: var(--card-pad); /* 标准内距 */
+} /* 主推档结束 */
+.ui-card--link { /* 可点击卡片 */
+  cursor: pointer; /* 整卡可点 */
+  transition: transform 0.15s ease, box-shadow 0.15s ease; /* 悬停过渡 */
+} /* 可点击卡片结束 */
+.ui-card--link:hover, /* 悬停 */
+.ui-card--link:focus-visible { /* 键盘聚焦 */
+  transform: translateY(-2px); /* 轻微上浮 */
+  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.12); /* 加深投影 */
+  outline: none; /* 交由投影表达聚焦 */
+} /* 悬停结束 */
+.is-link { /* 可点击列表行 */
+  cursor: pointer; /* 手型 */
+  transition: box-shadow 0.15s ease, transform 0.15s ease; /* 过渡 */
+} /* 结束 */
+.is-link:hover, /* 悬停 */
+.is-link:focus-visible { /* 键盘聚焦 */
+  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.12); /* 加深投影 */
+  outline: none; /* 避免双重描边 */
+} /* 结束 */
 
 .panel.danger { /* 危险操作面板（如删除项目） */
   border-color: #f2caca; /* 淡红描边提示风险 */
@@ -254,7 +302,7 @@ code { /* 行内代码/令牌展示 */
 .cards { /* 卡片网格 */
   display: grid; /* 栅格自动排版 */
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* 每列至少 300px，自适应列数 */
-  gap: 16px; /* 卡片间距 */
+  gap: var(--card-gap); /* 卡片间距：共享卡片规格 */
 } /* 卡片网格结束 */
 
 .cards .store-card:not(.is-expanded) { /* 未展开的商品卡启用渲染隔离 */
@@ -2764,7 +2812,7 @@ code { /* 行内代码/令牌展示 */
 .theater-grid { /* 作品网格 */
   display: grid; /* 网格 */
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 自适应列宽 */
-  gap: 14px; /* 间距 */
+  gap: var(--card-gap); /* 间距：共享卡片规格 */
 } /* 结束 */
 
 .theater-card { /* 作品卡片 */
@@ -3186,7 +3234,7 @@ code { /* 行内代码/令牌展示 */
 .community-list { /* 帖子列表 */
   display: grid; /* 网格 */
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); /* 自适应列 */
-  gap: 14px; /* 间距 */
+  gap: var(--card-gap); /* 间距：共享卡片规格 */
 } /* 结束 */
 
 .community-card { /* 帖子卡片 */
@@ -3194,8 +3242,8 @@ code { /* 行内代码/令牌展示 */
   flex-direction: column; /* 主方向 */
   overflow: hidden; /* 裁掉封面溢出 */
   border: 1px solid var(--border); /* 边框 */
-  border-radius: 12px; /* 圆角 */
-  background: #fff; /* 白底 */
+  border-radius: var(--card-radius); /* 圆角：共享卡片规格 */
+  background: var(--surface); /* 表面色 */
   box-shadow: var(--shadow); /* 投影 */
   cursor: pointer; /* 整卡可点 */
   transition: transform 0.15s ease, box-shadow 0.15s ease; /* 悬停过渡 */
@@ -3208,7 +3256,7 @@ code { /* 行内代码/令牌展示 */
 
 .community-cover { /* 封面区 */
   position: relative; /* 角标定位 */
-  aspect-ratio: 3 / 2; /* 统一比例 */
+  aspect-ratio: var(--card-cover); /* 统一比例：共享卡片规格 */
   background: linear-gradient(135deg, #e8edf7, #cfd8ea); /* 无图兜底 */
   overflow: hidden; /* 裁切 */
 } /* 结束 */
@@ -3641,7 +3689,7 @@ code { /* 行内代码/令牌展示 */
 .community-shop-grid { /* 商品网格 */
   display: grid; /* 网格 */
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* 自适应 */
-  gap: 14px; /* 间距 */
+  gap: var(--card-gap); /* 间距：共享卡片规格 */
 } /* 结束 */
 
 .community-product { /* 商品卡 */
@@ -3858,8 +3906,8 @@ code { /* 行内代码/令牌展示 */
 .commerce-grid { /* 资产卡片网格 */
   display: grid; /* 网格 */
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 自适应列宽 */
-  gap: 14px; /* 卡片间距 */
-  margin-top: 14px; /* 与上方表单单隔开 */
+  gap: var(--card-gap); /* 卡片间距：共享卡片规格 */
+  margin-top: var(--card-gap); /* 与上方表单单隔开 */
 } /* 结束 */
 .commerce-grid .panel { /* 单张资产卡 */
   display: flex; /* 纵向排布 */
@@ -4292,8 +4340,8 @@ code { /* 行内代码/令牌展示 */
 .promotions-grid { /* 推广计划卡片网格，口径与资产卡片一致 */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
-  margin-top: 14px;
+  gap: var(--card-gap);
+  margin-top: var(--card-gap);
 }
 .promotion-card { /* 可点击卡片 */
   display: flex;
@@ -4307,8 +4355,8 @@ code { /* 行内代码/令牌展示 */
 .tools-grid { /* 工具卡片网格 */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-  margin-top: 14px;
+  gap: var(--card-gap);
+  margin-top: var(--card-gap);
 }
 .tool-card,
 .tool-detail { /* 工具卡片 / 详情面板 */
@@ -4361,3 +4409,33 @@ code { /* 行内代码/令牌展示 */
     scroll-behavior: auto !important; /* 禁止平滑滚动 */
   } /* 全局覆盖结束 */
 } /* 弱动效媒体查询结束 */
+/* ---------- 共享卡片规格：断点（1280 / 768 / 375 三档实测均不横向溢出） ---------- */
+@media (max-width: 1024px) { /* 平板横屏 / 小桌面 */
+  :root { --card-pad: 16px; --card-gap: 12px; } /* 收紧内距与间距 */
+} /* 断点结束 */
+@media (max-width: 768px) { /* 平板竖屏 */
+  :root { --card-pad: 14px; --card-pad-tight: 10px; --card-gap: 10px; } /* 再收紧一档 */
+} /* 断点结束 */
+@media (max-width: 480px) { /* 手机 */
+  :root { --card-pad: 12px; --card-gap: 8px; --card-radius: 10px; --card-radius-lg: 12px; } /* 手机档位 */
+  .cards, /* 通用卡片网格 */
+  .community-list, /* 帖子列表 */
+  .community-shop-grid, /* 商城商品 */
+  .commerce-grid, /* 资产 / 商品卡片 */
+  .promotions-grid, /* 推广计划 */
+  .theater-grid, /* 作品网格 */
+  .tools-grid { /* 工具卡片 */
+    grid-template-columns: minmax(0, 1fr); /* 单列，避免最小列宽把页面撑出横向滚动 */
+  } /* 单列结束 */
+} /* 断点结束 */
+
+/* ---------- 内容详情页（帖子 / 资讯条目） ---------- */
+.content-detail { gap: var(--card-pad); } /* 详情卡片内部节奏 */
+.content-detail-bar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; } /* 返回 / 分享 */
+.content-detail h1 { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.8rem); line-height: 1.3; } /* 标题层级 */
+.content-detail-link { color: var(--primary); font-weight: 600; text-decoration: none; } /* 关联入口 */
+.rich-body { display: flex; flex-direction: column; gap: 10px; line-height: 1.7; word-break: break-word; } /* 正文容器 */
+.rich-body p { margin: 0; } /* 段落零外边距 */
+.rich-body pre { overflow: auto; margin: 0; padding: var(--card-pad-tight); border-radius: var(--card-radius-sm); background: #0f172a; color: #e2e8f0; } /* 代码块 */
+.rich-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; } /* 等宽字体 */
+.rich-image { display: block; max-width: 100%; border-radius: var(--card-radius-sm); } /* 正文图片 */

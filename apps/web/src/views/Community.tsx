@@ -9,7 +9,7 @@
  *   - 写请求统一由 api 层带幂等键，错误经 errorText 本地化。
  */
 
-import { useEffect, useState } from 'react'; // 引入依赖、类型或本地模块绑定
+import { useEffect, useRef, useState } from 'react'; // 引入依赖、类型或本地模块绑定
 import type { Locale } from '@mim/i18n'; // 引入依赖、类型或本地模块绑定
 import { api, errorText, getSession } from '../api'; // 引入依赖、类型或本地模块绑定
 import type { // 引入依赖、类型或本地模块绑定
@@ -28,6 +28,8 @@ import type { // 引入依赖、类型或本地模块绑定
 
 import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
+import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
+import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
 
 interface Props { // 接口 Props：约束对象的字段与类型形态
   locale: Locale;
@@ -105,7 +107,16 @@ function dateOnly(iso: string | null): string { // 函数 dateOnly：封装一�
 
 /** 社区与变现页 */
 export function Community({ locale, hasSession = false }: Props) {
-  const [tab, setTab] = useState<Tab>('forum'); // 赋值：更新变量 const 的取值
+  // 多段深链接：/community/post/:id 论坛帖子详情、/community/news/:kind/:id 资讯条目详情。
+  // 视图仍由首段 community 命中，多出的段只决定视图内部渲染哪一层，刷新与直达均可用。
+  const segments = usePathSegments(); // 地址栏全部非空段
+  const postId = segments[0] === 'community' && segments[1] === 'post' ? (segments[2] ?? '') : ''; // 帖子 id
+  const newsKind = segments[0] === 'community' && segments[1] === 'news' ? (segments[2] ?? '') : ''; // 资讯形态
+  const newsId = newsKind ? (segments[3] ?? '') : ''; // 资讯条目 id
+  const listScrollRef = useRef(0); // 进入详情前的列表滚动位置
+  // 从资讯详情返回时带 ctab：直接打开「公告动态」并落到对应子页签
+  const initialContentTab = currentQuery().get('ctab');
+  const [tab, setTab] = useState<Tab>(initialContentTab ? 'announcements' : 'forum'); // 赋值：更新变量 const 的取值
   const [boards, setBoards] = useState<CommunityBoard[]>([]); // 赋值：更新变量 const 的取值
   const [stats, setStats] = useState({ threads: 0, views: 0, likes: 0 }); // 赋值：更新变量 const 的取值
   const [wallet, setWallet] = useState<WalletSnapshot | null>(null); // 赋值：更新变量 const 的取值
@@ -290,7 +301,7 @@ export function Community({ locale, hasSession = false }: Props) {
     } // 代码块结束
   } // 代码块结束
 
-  async function openThread(id: string) { // 函数 openThread：封装一段可复用的处理逻辑
+  async function loadThread(id: string) { // 仅拉取详情，不改地址栏（深链接刷新与卡片进入共用）
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const data = await api.community.thread(id); // 常量 data：保存固定配置或一次性派生值
       setSelected(data);
@@ -299,6 +310,44 @@ export function Community({ locale, hasSession = false }: Props) {
       setError(errorText(locale, err));
     } // 代码块结束
   } // 代码块结束
+
+  async function openThread(id: string) { // 卡片 / 收藏行点击：记录滚动位置后进入详情深链接
+    listScrollRef.current = window.scrollY; // 记下列表滚动位置
+    await loadThread(id); // 先取详情
+    navigatePath(pathOf('community', `post/${encodeURIComponent(id)}`)); // 地址栏变为 /community/post/:id
+  } // 代码块结束
+
+  function closeThread() { // 返回列表：回到 /community 并恢复原来的滚动位置与筛选状态
+    setSelected(null); // 清空详情
+    navigatePath(pathOf('community')); // 回到社区列表
+    const y = listScrollRef.current; // 原先的滚动位置
+    window.requestAnimationFrame(() => window.scrollTo(0, y)); // 等列表渲染后恢复
+  } // 代码块结束
+
+  async function copyShareLink() { // 分享 / 复制当前详情深链接
+    const url = window.location.href; // 当前地址
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await navigator.clipboard?.writeText(url); // 优先剪贴板
+      setNotice('链接已复制');
+    } catch {
+      setNotice(url); // 降级：把地址显示在提示条
+    } // 代码块结束
+  } // 代码块结束
+
+  // 深链接进入 /community/post/:id：地址栏粘贴或刷新时主动拉取详情，避免空白
+  useEffect(() => {
+    if (!postId) return; // 列表态不处理
+    if (selected?.thread.id === postId) return; // 已加载同一条
+    void loadThread(postId); // 拉取详情
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
+
+  // 从详情回到列表（关闭按钮或浏览器后退）：恢复列表滚动位置
+  useEffect(() => {
+    if (postId) return; // 仍在详情
+    const y = listScrollRef.current; // 进入详情前记住的位置
+    if (y > 0) window.requestAnimationFrame(() => window.scrollTo(0, y)); // 列表渲染后恢复
+  }, [postId]);
 
   async function unlockThread(id: string) { // 函数 unlockThread：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
@@ -425,7 +474,7 @@ export function Community({ locale, hasSession = false }: Props) {
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.deleteThread(selected.thread.id); // 异步等待：挂起至 Promise 落定后再继续
-      setSelected(null);
+      closeThread(); // 删除后回到列表并恢复滚动位置
       setNotice('帖子已删除');
       await loadThreads(); // 异步等待：挂起至 Promise 落定后再继续
     } catch (err) {
@@ -597,6 +646,11 @@ export function Community({ locale, hasSession = false }: Props) {
 
   return ( // 返回当前函数的处理结果
     <section className="community-wrap">{/* 执行当前业务步骤 */}
+      {newsId ? (
+        // 资讯条目独立详情页：深链接 /community/news/:kind/:id 直接可用
+        <ContentDetail locale={locale} kind={newsKind} id={newsId} />
+      ) : (
+        <>
       <header className="community-hero">{/* 执行当前业务步骤 */}
         <div>{/* 执行当前业务步骤 */}
           <p className="community-kicker">COMMUNITY & CREATOR ECONOMY</p>
@@ -637,10 +691,18 @@ export function Community({ locale, hasSession = false }: Props) {
 
       {loading && <div className="community-empty">正在加载社区数据…</div>}
 
-      {!loading && tab === 'announcements' && <AnnouncementsPanel locale={locale} hasSession={hasSession} />}
+      {!loading && tab === 'announcements' && (
+        <AnnouncementsPanel
+          locale={locale}
+          hasSession={hasSession}
+          initialTab={initialContentTab === 'changelog' ? 'changelog' : initialContentTab === 'feed' ? 'feed' : initialContentTab === 'promotions' ? 'promotions' : 'announcements'}
+        />
+      )}
 
       {!loading && tab === 'forum' && (
         <div className="community-forum">{/* 执行当前业务步骤 */}
+          {!postId && (
+            <>
           <div className="community-toolbar">{/* 执行当前业务步骤 */}
             <div className="community-chips">{/* 执行当前业务步骤 */}
               <button type="button" className={board === 'all' ? 'is-active' : ''} onClick={() => setBoard('all')}>全部</button>
@@ -838,8 +900,10 @@ export function Community({ locale, hasSession = false }: Props) {
               </article>
             ))}
           </div>
+            </>
+          )}
 
-          {selected && (
+          {selected && postId && (
             <div className="community-detail">{/* 执行当前业务步骤 */}
               <div className="community-detail-head">{/* 执行当前业务步骤 */}
                 <div>{/* 执行当前业务步骤 */}
@@ -848,7 +912,8 @@ export function Community({ locale, hasSession = false }: Props) {
                   <p>{selected.thread.summary}</p>
                   {selected.thread.board_locked ? <span className="community-lock">板块受限</span> : null}
                 </div>
-                <button type="button" onClick={() => setSelected(null)}>关闭</button>
+                <button type="button" onClick={closeThread}>← 返回列表</button>
+                <button type="button" onClick={() => void copyShareLink()}>复制链接</button>
                 {selected.thread.can_moderate && <button type="button" className="is-danger" onClick={() => void deleteThread()}>删除</button>}
               </div>
               {selected.thread.cover_url && <img className="community-detail-cover" src={coverSrc(selected.thread.cover_url)} alt={selected.thread.title} />}
@@ -893,7 +958,7 @@ export function Community({ locale, hasSession = false }: Props) {
                       })}
                     </div>
                   )}
-                  {selected.thread.body.split('\n').filter(Boolean).map((line, i) => <p key={i}>{line}</p>)}
+                  <RichBody text={selected.thread.body} />
                   <div className="community-detail-actions">{/* 执行当前业务步骤 */}
                     <button type="button" className={selected.liked ? 'is-active' : ''} onClick={() => void toggleLike()}>{/* 执行当前业务步骤 */}
                       {selected.liked ? '已赞' : '点赞'} · {selected.thread.likes}
@@ -1105,6 +1170,8 @@ export function Community({ locale, hasSession = false }: Props) {
           </div>
           <p className="community-hint">当前板块：{currentBoard?.name ?? '全部'}。推广绑定仅一次，不能绑定自己的邀请码。</p>
         </div>
+      )}
+        </>
       )}
     </section>
   ); // 执行当前业务步骤
