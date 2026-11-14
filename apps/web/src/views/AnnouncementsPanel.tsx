@@ -1,7 +1,10 @@
 /**
- * 社区「公告动态」页签：公告列表 / 更新日志时间线 / 推广计划卡片。
- * 2026-11-15 起由独立 /announcements 页面并入社区，数据源仍是 /content/* 三个公开接口，
+ * 社区「公告动态」页签：公告列表 / 更新日志时间线 / 推广计划卡片 / 社区动态。
+ * 2026-11-15 起由独立 /announcements 页面并入社区，数据源仍是 /content/* 公开接口，
  * 不复制静态文案；任一接口失败或返回空数组时静默隐藏对应栏目，不报错、不白屏。
+ * 同日 /news 的全站内容流并入「社区动态」子页签（仍走 GET /content/items），
+ * /releases 的版本补充信息（提交短哈希、线上状态、变化清单）、能力地图与阅读口径
+ * 并入「更新日志」子页签，避免内容随页面下线而丢失。
  * 已登录运营可在本页签内增删改（复用 /admin/content/* 契约，挂 appearance:write 权限）；
  * 无会话或无权限时管理面板静默隐藏，公开面不受影响。
  */
@@ -12,18 +15,21 @@ import { api, errorText } from '../api'; // 接口客户端与错误文案翻译
 import type { // 引入依赖、类型或本地模块绑定
   AnnouncementItem,
   ChangelogItem,
+  ContentFeedItem,
+  ContentFeedSource,
   PromotionItem,
   AnnouncementUpsertPayload,
   ChangelogUpsertPayload,
   PromotionUpsertPayload,
 } from '../api'; // 内容条目与管理入参类型
+import { CAPABILITY_NOTES, RELEASE_DETAILS, RELEASE_READING_NOTES } from '../lib/release-notes'; // 原版本页的静态补充信息
 
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
   hasSession?: boolean; // 是否已有会话；决定是否展示管理端
 } // 代码块结束
 
-type ContentTab = 'announcements' | 'changelog' | 'promotions'; // 内部栏目切换
+type ContentTab = 'announcements' | 'changelog' | 'promotions' | 'feed'; // 内部栏目切换（feed 为原 /news 内容流）
 
 /** 按语言取文案。 */
 function tr(locale: Locale, zh: string, en: string): string {
@@ -65,6 +71,19 @@ function sortByVersionDesc<T>(items: T[], versionText: (item: T) => string, date
     if (byVersion !== 0) return byVersion; // 版本不同直接返回
     return dateText(b).localeCompare(dateText(a)); // 同版本 / 都无版本号时按时间倒序
   }); // 排序结束
+} // 代码块结束
+
+/** 取版本号主.次.补丁三段作为补充信息索引键；无版本号返回空串。 */
+function versionKey(text?: string | null): string {
+  const match = (text ?? '').match(/v?(\d+)\.(\d+)\.(\d+)/i); // 兼容 V0.0.10 与 0.0.10
+  return match ? `${match[1]}.${match[2]}.${match[3]}` : ''; // 与 RELEASE_DETAILS 的键一致
+} // 代码块结束
+
+/** 全站内容流的来源徽标：三类来源在列表内可一眼区分。 */
+function feedSourceLabel(locale: Locale, source: ContentFeedSource): string {
+  if (source === 'community_thread') return tr(locale, '论坛主题', 'Forum thread'); // 论坛主题
+  if (source === 'circle_post') return tr(locale, '圈子动态', 'Circle post'); // 圈子动态
+  return tr(locale, '圈内公告', 'Circle notice'); // 圈内公告
 } // 代码块结束
 
 /** 公告管理表单草稿。 */
@@ -124,6 +143,7 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]); // 公告清单
   const [changelog, setChangelog] = useState<ChangelogItem[]>([]); // 更新日志
   const [promotions, setPromotions] = useState<PromotionItem[]>([]); // 推广计划
+  const [feed, setFeed] = useState<ContentFeedItem[]>([]); // 全站内容流（原 /news）
   const [loaded, setLoaded] = useState(false); // 首屏是否完成拉取（用于空态区分加载中）
 
   // ===== 管理端状态：仅在 hasSession 时拉取与渲染 =====
@@ -142,18 +162,21 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
   const [busy, setBusy] = useState(false); // 提交忙碌态
   const [notice, setNotice] = useState<string | null>(null); // 成功 / 失败提示
 
-  /** 并行拉取三个公开栏目；各自失败回落空数组，互不影响。 */
+  /** 并行拉取四个公开栏目；各自失败回落空数组，互不影响。 */
   useEffect(() => {
     let cancelled = false; // 可变变量 cancelled：运行过程中会被重新赋值
     void Promise.allSettled([ // 执行当前业务步骤
       api.content.announcements(20),
       api.content.changelog(30),
       api.content.promotions(),
-    ]).then(([ann, cl, promo]) => {
+      api.content.feed(60),
+    ]).then(([ann, cl, promo, feedRes]) => {
       if (cancelled) return; // 条件分支：按判断结果选择后续处理路径
       setAnnouncements(ann.status === 'fulfilled' ? ann.value.items : []);
       setChangelog(cl.status === 'fulfilled' ? cl.value.items : []);
       setPromotions(promo.status === 'fulfilled' ? promo.value.items : []);
+      // 内容流按发布时间倒序，与原 /news 页面一致
+      setFeed(feedRes.status === 'fulfilled' ? [...feedRes.value.items].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')) : []);
       setLoaded(true);
     });
     return () => { cancelled = true; }; // 返回当前函数的处理结果
@@ -353,17 +376,21 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
   const sortedChangelog = sortByVersionDesc(changelog, (item) => item.version, (item) => item.published_at ?? ''); // 更新日志：版本号倒序
   const sortedPromotions = sortByVersionDesc(promotions, (item) => `${item.name} ${item.summary ?? ''} ${item.target_url ?? ''}`, (item) => item.starts_at ?? ''); // 推广计划：名称 / 简介中的版本号倒序，无版本号按起始时间倒序
 
-  const tabs: Array<{ key: ContentTab; label: string; count: number }> = [ // 常量 tabs：保存固定配置或一次性派生值
+  const adminTabs: Array<{ key: ContentTab; label: string; count: number }> = [ // 可管理的三个栏目（内容流由论坛 / 圈子自身维护，不在此编辑）
     { key: 'announcements', label: tr(locale, '公告', 'Announcements'), count: sortedAnnouncements.length },
     { key: 'changelog', label: tr(locale, '更新日志', 'Changelog'), count: sortedChangelog.length },
     { key: 'promotions', label: tr(locale, '推广计划', 'Promotions'), count: sortedPromotions.length },
-  ]; // 执行当前业务步骤
+  ]; // 管理页签集合
+  const tabs: Array<{ key: ContentTab; label: string; count: number }> = [ // 公开页签：末尾追加原 /news 的社区动态
+    ...adminTabs,
+    { key: 'feed', label: tr(locale, '社区动态', 'Community feed'), count: feed.length },
+  ]; // 公开页签集合
 
   return ( // 返回当前函数的处理结果
     <div className="content-hub">{/* 社区公告动态页签容器 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h2>{tr(locale, '公告与动态', 'News & Updates')}</h2>
-        <p className="muted">{tr(locale, '产品公告、版本更新与推广计划统一收录于此，三个栏目均按版本号倒序；无版本号的条目排在最后。', 'Announcements, release notes and promotions in one place. All three tabs are sorted by version, newest first; unversioned items come last.')}</p>
+        <p className="muted">{tr(locale, '产品公告、版本更新、推广计划与全站动态统一收录于此；公告 / 更新日志 / 推广计划按版本号倒序，无版本号的条目排在最后，社区动态按发布时间倒序。', 'Announcements, release notes, promotions and the community feed in one place. The first three tabs are sorted by version, newest first; the feed is sorted by publish time.')}</p>
       </header>
 
       <nav className="community-chips content-tabs">{/* 执行当前业务步骤 */}
@@ -387,6 +414,8 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
         <div className="community-empty">{tr(locale, '暂无更新日志', 'No changelog entries')}</div>
       ) : tab === 'promotions' && sortedPromotions.length === 0 ? (
         <div className="community-empty">{tr(locale, '暂无推广计划', 'No active promotions')}</div>
+      ) : tab === 'feed' && feed.length === 0 ? (
+        <div className="community-empty">{tr(locale, '暂无社区动态', 'No community activity yet')}</div>
       ) : null}
 
       {tab === 'announcements' && sortedAnnouncements.length > 0 && (
@@ -406,17 +435,60 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
 
       {tab === 'changelog' && sortedChangelog.length > 0 && (
         <ol className="changelog-timeline">{/* 执行当前业务步骤 */}
-          {sortedChangelog.map((item) => (
-            <li className="changelog-entry" key={item.id}>{/* 执行当前业务步骤 */}
-              <div className="changelog-version">{/* 执行当前业务步骤 */}
-                <span className="deploy-badge">{item.version}</span>
-                {item.published_at ? <span className="muted">{fmtDate(item.published_at)}</span> : null}
+          {sortedChangelog.map((item) => {
+            // 原 /releases 页面独有补充：提交短哈希、线上状态、主要变化；按版本号对齐，缺失则只渲染日志正文
+            const detail = RELEASE_DETAILS[versionKey(item.version)];
+            const changes = detail ? (locale === 'en-US' ? detail.changesEn : detail.changesZh) : [];
+            return (
+              <li className="changelog-entry" key={item.id}>{/* 执行当前业务步骤 */}
+                <div className="changelog-version">{/* 执行当前业务步骤 */}
+                  <span className="deploy-badge">{item.version}</span>
+                  {detail ? <span className="muted">{detail.date} · {detail.commit}</span> : null}
+                  {item.published_at ? <span className="muted">{fmtDate(item.published_at)}</span> : null}
+                  {detail ? <span className="deploy-badge muted">{locale === 'en-US' ? detail.stateEn : detail.stateZh}</span> : null}
+                </div>
+                <h3>{item.title}</h3>
+                <p className="muted">{item.body}</p>
+                {changes.length > 0 && (
+                  <ul className="plain-list">{/* 主要变化清单 */}
+                    {changes.map((line) => <li className="muted" key={line}>{line}</li>)}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      {tab === 'changelog' && (
+        <section className="panel content-admin" aria-label={locale === 'en-US' ? 'Reading notes and capability map' : '阅读口径与能力地图'}>
+          <h3>{tr(locale, '阅读口径', 'Reading notes')}</h3>
+          <ul className="plain-list">
+            {RELEASE_READING_NOTES.map((note) => <li className="muted" key={note.zh}>{locale === 'en-US' ? note.en : note.zh}</li>)}
+          </ul>
+          <h3>{tr(locale, '能力地图', 'Capability map')}</h3>
+          <p className="muted">{tr(locale, '各能力入口统一走左侧导航与社区页签，这里只保留说明。', 'Entries live in the sidebar and community tabs; this list only describes them.')}</p>
+          <ul className="plain-list">
+            {CAPABILITY_NOTES.map((item) => (
+              <li key={item.labelZh} className="muted">{locale === 'en-US' ? `${item.labelEn}：${item.descEn}` : `${item.labelZh}：${item.descZh}`}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {tab === 'feed' && feed.length > 0 && (
+        <ul className="plain-list announcement-list">{/* 原 /news 的全站内容流：论坛主题 / 圈子动态 / 圈内公告 */}
+          {feed.map((item) => (
+            <li className="panel announcement-row" key={item.id}>{/* 单条动态 */}
+              <div className="panel-head">{/* 标题行 */}
+                <h3>{item.title}</h3>
+                <span className="deploy-badge">{feedSourceLabel(locale, item.source)}</span>{/* 来源徽标 */}
               </div>
-              <h3>{item.title}</h3>
-              <p className="muted">{item.body}</p>
+              <p className="muted">{item.summary || item.body}</p>{/* 摘要优先，无摘要回落正文 */}
+              <span className="muted">{fmtDate(item.created_at)}</span>{/* 发布日期 */}
             </li>
           ))}
-        </ol>
+        </ul>
       )}
 
       {tab === 'promotions' && sortedPromotions.length > 0 && (
@@ -450,7 +522,7 @@ export function AnnouncementsPanel({ locale, hasSession = false }: Props) { // �
             <>{/* 执行当前业务步骤 */}
               {notice && <p className={notice.includes('权限') || notice.includes('失败') || notice.includes('Error') ? 'error' : 'notice'}>{notice}</p>}
               <nav className="community-chips content-admin-tabs">{/* 执行当前业务步骤 */}
-                {tabs.map((item) => (
+                {adminTabs.map((item) => (
                   <button
                     key={item.key}
                     type="button" // 赋值：更新变量 type 的取值

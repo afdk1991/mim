@@ -1,3 +1,9 @@
+/**
+ * 购物车面板：2026-11-15 由独立 /cart 视图并入个人中心「购物车」页签。
+ * 状态与接口保持原样（GET /cart、DELETE /cart/:code、POST /cart/clear、POST /cart/checkout），
+ * 不复制数据：清单、移除、清空、积分抵扣与结算结果都在这里，/account?tab=cart 直接落在此面板。
+ */
+
 // 引入状态钩子：购物车数据、结算结果与提交中间态
 import { useEffect, useState } from 'react';
 // 引入语言类型
@@ -6,7 +12,7 @@ import type { Locale } from '@mim/i18n';
 import { api, errorText } from '../api';
 // 引入购物车与结算结果类型、积分抵扣口径
 import type { CartCheckoutResult, CartSummary, PointsDeductionConfig } from '../api';
-// 引入路由跳转：继续挑选商品 / 去个人中心看订单
+// 引入路由跳转：继续挑选商品 / 去订单
 import { navigate } from '../router';
 
 /** 组件契约：仅需语言 */
@@ -29,8 +35,8 @@ function previewDeduction(totalMinor: number, balance: number, cfg: PointsDeduct
   return { deduct_cents: deduct, points_spent: pointsSpent, payable_cents: Math.max(0, totalMinor - deduct) }; // 返回当前函数的处理结果
 } // previewDeduction 结束
 
-/** 购物车页：清单 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单） */
-export function Cart({ locale }: Props) {
+/** 购物车面板：清单 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单） */
+export function CartPanel({ locale }: Props) {
   const isZh = locale !== 'en-US'; // 是否中文文案
   const [cart, setCart] = useState<CartSummary | null>(null); // 购物车摘要
   const [loading, setLoading] = useState(true); // 首屏加载态
@@ -55,7 +61,7 @@ export function Cart({ locale }: Props) {
     setLoading(false); // 结束加载态
   } // refresh 结束
 
-  // 进入页面拉一次
+  // 进入页签拉一次
   useEffect(() => {
     void refresh(); // 忽略返回值，错误在 refresh 内部处理
   }, []); // 仅挂载时执行
@@ -111,14 +117,11 @@ export function Cart({ locale }: Props) {
     : { deduct_cents: 0, points_spent: 0, payable_cents: totalMinor }; // 未勾选：应付即合计
 
   return ( // 返回当前函数的处理结果
-    <div className="page">{/* 执行当前业务步骤 */}
-      <header className="page-head">{/* 执行当前业务步骤 */}
-        <h1>{isZh ? '购物车' : 'Cart'}</h1>
-        <div className="products-pager">{/* 执行当前业务步骤 */}
-          <button type="button" className="btn ghost" onClick={() => navigate({ view: 'community' })}>{isZh ? '继续挑选' : 'Browse products'}</button>
-          <button type="button" className="btn ghost" onClick={() => void clear()} disabled={items.length === 0}>{isZh ? '清空' : 'Clear'}</button>
-        </div>
-      </header>
+    <section className="cart-panel">{/* 购物车面板容器：由个人中心页签承载，不再自带页面标题 */}
+      <div className="products-pager">{/* 面板级操作 */}
+        <button type="button" className="btn ghost" onClick={() => navigate({ view: 'community' })}>{isZh ? '继续挑选' : 'Browse products'}</button>
+        <button type="button" className="btn ghost" onClick={() => void clear()} disabled={items.length === 0}>{isZh ? '清空' : 'Clear'}</button>
+      </div>
 
       {error ? <div className="chat-error">{error}</div> : null}
       {loading ? <div className="hint">{isZh ? '加载中…' : 'Loading…'}</div> : null}
@@ -210,10 +213,10 @@ export function Cart({ locale }: Props) {
             </div>
           ))}
           {results.some((result) => result.kind === 'order') ? (
-            <button type="button" className="btn ghost" onClick={() => navigate({ view: 'account' })}>{isZh ? '去个人中心查看订单' : 'View orders'}</button>
+            <button type="button" className="btn ghost" onClick={() => navigate({ view: 'account' })}>{isZh ? '去订单分区' : 'View orders'}</button>
           ) : null}
         </section>
       ) : null}
-    </div>
+    </section>
   ); // 执行当前业务步骤
-} // Cart 结束
+} // CartPanel 结束

@@ -183,7 +183,7 @@ function emitSpaFallback() {
   copyFileSync(indexHtml, join(DIST, '404.html'));
   // 逐个对外路径段建目录并放入同名入口副本（目录名即模块功能名，如 community）
   for (const segment of readSpaPaths()) {
-    // 路径段目录绝对路径，如 dist/releases
+    // 路径段目录绝对路径，如 dist/community
     const viewDir = join(DIST, segment);
     // 递归建目录（已存在时幂等）
     mkdirSync(viewDir, { recursive: true });

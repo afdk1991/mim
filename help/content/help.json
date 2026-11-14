@@ -55,13 +55,10 @@
               "type": "table",
               "head": ["路径", "视图", "说明"],
               "rows": [
-                ["/community", "社区", "论坛、公告动态、圈子、VIP、钱包与社区商城"],
-                ["/circles", "圈子", "成员制社群"],
+                ["/community", "社区", "论坛、公告动态（含社区动态与更新日志）、圈子、VIP、钱包与社区商城"],
+                ["/circles", "圈子", "成员制社群（独立页面，与社区信息流分开）"],
                 ["/chat", "聊天", "IM 会话与视频通话"],
-                ["/cart", "购物车", "清单 / 移除 / 清空 / 结算"],
-                ["/account", "个人中心", "资料、权益、订单、账号设置"],
-                ["/news", "社区资讯", "论坛主题 + 圈子动态 / 公告的统一内容流"],
-                ["/releases", "版本迭代", "版本时间线与能力地图"],
+                ["/account", "个人中心", "资料、权益、订单、购物车（?tab=cart）、账号设置"],
                 ["/deployments", "部署汇总", "各仓库与部署项的效果与异常"],
                 ["/checkout", "收银台", "支付意图二维码与状态轮询"],
                 ["/pay-return", "支付回跳", "支付结果三态承接页"],
@@ -71,7 +68,7 @@
             {
               "type": "note",
               "tone": "info",
-              "text": "旧路径段（/login、/profile、/settings、/forum）与已并入社区的 /announcements 仍可访问：前端命中后原地改写为新路径，生产 nginx 同时做 301，二者互为兜底；根路径 / 与未知路径统一回落 /community。"
+              "text": "旧路径段（/login、/profile、/settings、/forum）与已并入的 /announcements、/news、/releases、/cart 仍可访问：前端命中后原地改写为新地址（/cart 落到 /account?tab=cart），生产 nginx 同时做 301，二者互为兜底；根路径 / 与未知路径统一回落 /community。"
             }
           ]
         },
@@ -153,7 +150,7 @@
               "items": [
                 "apps/web/dist：真实的 Vite 前端产物（GitHub Pages 等以它为上传源）。",
                 "dist/：前端产物副本 + index.html + 404.html（EdgeOne Pages 等平台的 OutputDir）。",
-                "dist/<路径段>/index.html：由 build.mjs 解析 VIEW_SEGMENTS 自动生成，保证 /community、/news 等深链接刷新不 404。",
+                "dist/<路径段>/index.html：由 build.mjs 解析 VIEW_SEGMENTS 自动生成，保证 /community 等深链接刷新不 404。",
                 "构建期接口源：VITE_API_ORIGIN，缺省指向生产 API。"
               ]
             },
@@ -251,7 +248,7 @@
             },
             {
               "type": "p",
-              "text": "如需「某个子域看起来是独立站点」，正确做法是让该子域 301 到一个语义对应的路径（例如 news 子域 → /news），而不是期望前端按 host 渲染不同内容。"
+              "text": "如需「某个子域看起来是独立站点」，正确做法是让该子域 301 到一个语义对应的路径（例如 news 子域 → /community 的社区动态页签），而不是期望前端按 host 渲染不同内容。"
             }
           ]
         },
@@ -309,19 +306,19 @@
         },
         {
           "id": "news-vs-announcements",
-          "title": "「社区资讯」和「公告动态」有什么区别？",
+          "title": "「社区动态」和「更新日志」在社区哪里？",
           "blocks": [
             {
               "type": "table",
               "head": ["入口", "数据源", "内容"],
               "rows": [
-                ["/announcements（公告动态）", "公告 / 更新日志 / 推广计划三个接口", "官方发布、版本说明、推广活动"],
-                ["/news（社区资讯）", "GET /content/items 统一内容流", "论坛主题、圈子动态、圈内公告"]
+                ["/community → 公告动态", "公告 / 更新日志 / 推广计划三个接口", "官方发布、版本说明、推广活动"],
+                ["/community → 公告动态 → 社区动态", "GET /content/items 统一内容流", "论坛主题、圈子动态、圈内公告"]
               ]
             },
             {
               "type": "p",
-              "text": "两者数据源不同，因此是两个独立视图而不是同一页面的两个标签；共用的是同一套列表样式与双语文案工具。"
+              "text": "原先独立的 /announcements、/news、/releases 三个页面已于 2026-11-15 并入社区：公告与更新日志在「公告动态」页签，全站内容流在「社区动态」子页签，旧地址统一 301 到 /community。"
             }
           ]
         },

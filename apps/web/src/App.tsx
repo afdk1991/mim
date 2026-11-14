@@ -25,17 +25,13 @@ import { AnnouncementBar } from './components/AnnouncementBar';
 // 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
 import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './appearance';
 import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或本地模块绑定
-import { APP_VERSION } from './version'; // 当前 semver：由构建期 package.json 注入
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
-const Cart = lazy(() => import('./views/Cart').then((m) => ({ default: m.Cart }))); // 购物车
-const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心
+const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（含购物车页签）
 const Deployments = lazy(() => import('./views/Deployments').then((m) => ({ default: m.Deployments }))); // 部署汇总
 const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
 const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
 const ChatPreview = lazy(() => import('./views/ChatPreview').then((m) => ({ default: m.ChatPreview }))); // 聊天只读演示
-const News = lazy(() => import('./views/News').then((m) => ({ default: m.News }))); // 资讯：全站统一内容流（复用 /content/items）
-const Releases = lazy(() => import('./views/Releases').then((m) => ({ default: m.Releases }))); // 版本迭代：时间线 + 能力地图
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 const Checkout = lazy(() => import('./views/Checkout').then((m) => ({ default: m.Checkout }))); // 收银台：/checkout?intent=... 二维码 / 渠道唤起 / 轮询
 const PaymentReturn = lazy(() => import('./views/PaymentReturn').then((m) => ({ default: m.PaymentReturn }))); // 支付回跳承接：/pay-return?intent=... 三态结果
@@ -223,34 +219,28 @@ export function App() {
   // 内置导航项：顺序即展示顺序；后台配置的 nav_items 按 view 覆盖文案 / 显隐，未覆盖的内置项原样保留。
   // 2026-11-13 导航收口（16 项一级 → 12 项平铺，无分组标题）：把「同一件事的第二个入口」收进上级，
   // 页面与路由全部保留（直链 / 搜索 / 站内跳转仍可达），只是不再各占一行侧栏。
-  // 2026-11-15 侧栏收口：社区 · 聊天 · 个人中心 · 购物车 · 社区资讯 · 版本（公告动态已并入社区页签）。
+  // 2026-11-15 侧栏收口：社区 · 聊天 · 个人中心 · 社区资讯 · 版本（公告动态并入社区页签，购物车并入个人中心页签）。
   // hidden 项是「已并入上级」的二级入口，页面保留但不上侧栏。
   const navDefaults: Array<{ view: AppView; label: string; hidden?: boolean }> = [
     // 社区：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区' },
     // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
-    // 个人中心：资料 / 权益 / 订单 / 账号与设置
+    // 个人中心：资料 / 权益 / 订单 / 购物车 / 账号与设置
     { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
-    // 购物车：待购模块与结算
-    { view: 'cart', label: locale === 'en-US' ? 'Cart' : '购物车' },
     // 圈子（原一级入口）：成员制社群，已并入社区页的「圈子」板块 → hidden
     { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子', hidden: true },
-    // 部署汇总（原一级入口）：部署仓库 / 部署项核对表，已并入版本页的「部署汇总」板块 → hidden
+    // 部署汇总（原一级入口）：部署仓库 / 部署项核对表，已并入社区页的「部署汇总」板块 → hidden
     { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总', hidden: true },
-    // 资讯：论坛主题 + 圈子动态 / 公告的统一内容流
-    { view: 'news', label: locale === 'en-US' ? 'Community feed' : '社区资讯' },
-    // 版本迭代：把 V0.0.0 → 当前版本的完整时间线与能力地图放到前台
-    { view: 'releases', label: locale === 'en-US' ? `Releases V${APP_VERSION}` : `版本 V${APP_VERSION}` },
   ]; // 内置导航项定义结束
   // 合并后台导航配置：未知视图忽略，显隐与文案以后台配置为准，缺省回落内置项；
   // hidden 项是「已合并进上级」的二级入口，页面保留但不上侧栏（后台显式配置 visible 不能把它强行拉回）
   const navItems = mergeNavItems(navDefaults, theme.navItems).filter((item) => item.visible && !item.hidden);
-  // 隐藏的二级入口落到哪个一级入口：用于「在 /deployments 时侧栏仍高亮版本」。
+  // 隐藏的二级入口落到哪个一级入口：用于「在 /deployments 时侧栏仍高亮社区」。
   // 没有这张表时，隐藏页面的 route.view 不在侧栏里，active 计数为 0，用户会以为"没选中任何页面"。
   const SUB_VIEW_PARENT: Partial<Record<AppView, AppView>> = {
     circles: 'community', // 圈子 → 社区
-    deployments: 'releases', // 部署汇总 → 版本
+    deployments: 'community', // 部署汇总 → 社区（版本页已并入社区，不再有独立版本页）
   }; // 二级 → 一级映射结束
   // 侧栏高亮依据：当前在隐藏二级页时按上级高亮，其余按自身
   const activeNavView: AppView = SUB_VIEW_PARENT[route.view] ?? route.view;
@@ -258,18 +248,16 @@ export function App() {
   // 且从二级页也能一键回到上级，保证「合并」不会把入口变没（2026-11-13 导航收口配套）
   const subEntries: Array<{ view: AppView; label: string }> =
     route.view === 'community'
-      ? [{ view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子（成员制社群）' }]
-      : route.view === 'circles'
+      ? [
+          { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子（成员制社群）' },
+          { view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总（12 个部署项）' },
+        ]
+      : route.view === 'circles' || route.view === 'deployments'
         ? [{ view: 'community', label: locale === 'en-US' ? 'Back to Community' : '返回社区' }]
-        : route.view === 'releases'
-          ? [{ view: 'deployments', label: locale === 'en-US' ? 'Deployments' : '部署汇总（12 个部署项）' }]
-          : route.view === 'deployments'
-            ? [{ view: 'releases', label: locale === 'en-US' ? 'Back to Releases' : '返回版本' }]
-            : [];
+        : [];
 
   // 主布局：左侧栏 + 右侧内容区；访客与正式账号共用同一骨架，登录只用于升级身份
   const needsSession =
-    route.view === 'cart' ||
     route.view === 'account' ||
     route.view === 'community' ||
     route.view === 'checkout' || // 收银台按支付意图查单，需令牌
@@ -347,9 +335,7 @@ export function App() {
         )}
         {/* Suspense 边界：懒加载视图独立 chunk，加载期展示统一占位，不阻塞骨架 */}
         <Suspense fallback={<div className="page hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>}>
-        {/* 购物车：清单 / 移除 / 清空 / 结算，仅已登录渲染 */}
-        {route.view === 'cart' && session && <Cart locale={locale} />}{/* 购物车 */}
-        {/* 个人中心：资料 / 权益 / 订单 / 账号安全，仅已登录渲染 */}
+        {/* 个人中心：资料 / 权益 / 订单 / 购物车 / 账号安全，仅已登录渲染 */}
         {route.view === 'account' && session && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
@@ -357,17 +343,13 @@ export function App() {
         {route.view === 'deployments' && <Deployments locale={locale} />}{/* 部署汇总 */}
         {/* 社区与变现：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广，访客会话建立后直接可用 */}
         {route.view === 'community' && session && <Community locale={locale} hasSession={!!session} />}{/* 社区与变现视图 */}
-        {/* 资讯：论坛主题 + 圈子动态 / 公告的统一内容流，公开只读，数据取已有 /content/items */}
-        {route.view === 'news' && <News locale={locale} />}{/* 资讯视图 */}
-        {/* 版本迭代：完整版本时间线 + 能力地图，公开可看 */}
-        {route.view === 'releases' && <Releases locale={locale} onOpen={(view) => go({ view })} />}{/* 版本迭代视图 */}
         {/* 圈子：公开浏览清单；加入 / 审核 / 发动态公告在视图内按会话态与角色展示 */}
         {route.view === 'circles' && <Circles locale={locale} hasSession={!!session} />}{/* 圈子视图 */}
         {/* 收银台：/checkout?intent=... 或 ?purpose=... 现场建单；二维码 / 渠道唤起 / 状态轮询 */}
         {route.view === 'checkout' && session && <Checkout locale={locale} />}{/* 收银台视图 */}
         {/* 支付回跳承接：/pay-return?intent=...，成功 / 处理中 / 失败三态 */}
         {route.view === 'payreturn' && session && <PaymentReturn locale={locale} />}{/* 支付回跳视图 */}
-        {/* 收费 / 私密视图（购物车 / 个人中心 / 社区）：访客会话建立后直接可用，无需登录 */}
+        {/* 收费 / 私密视图（个人中心 / 社区）：访客会话建立后直接可用，无需登录 */}
         {needsSession && !session && ( // 会话尚未就绪（通常只在离线或建号失败时出现）
           <div className="page">{/* 降级占位：说明正在建立免登录会话并提供重试 */}
             <p className="hint">{locale === 'en-US' ? 'Setting up your anonymous session…' : '正在建立免登录会话…'}</p>{/* 状态说明 */}

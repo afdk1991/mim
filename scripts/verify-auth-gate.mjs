@@ -55,7 +55,7 @@ const app = read('apps/web/src/App.tsx'); // Web 应用根组件
 check('App 已移除 GATED_VIEWS 登录门禁集合', !/GATED_VIEWS/.test(app), '仍存在按视图拦截的登录门禁集合'); // 免登录体验核心
 check('App 启动自动领取访客会话', app.includes('ensureGuestSession'), '缺少启动自动建访客会话的钩子'); // 全站可用的前提
 check('App 不再以登录卡片替代功能页', !/gated && !session/.test(app), '仍存在匿名态内嵌登录卡片替代功能页'); // 门禁已拆除
-check('App 商品 / 购物车 / 个人中心直接渲染', /route\.view === 'products' && session/.test(app) && /route\.view === 'cart' && session/.test(app) && /route\.view === 'account' && session/.test(app), '功能页渲染条件漂移'); // 访客会话即可用
+check('App 个人中心直接渲染', /route\.view === 'account' && session/.test(app), '功能页渲染条件漂移'); // 访客会话即可用（购物车已并入个人中心页签）
 check('App 展示访客身份与登录升级入口', app.includes('is_guest') && app.includes('登录 / 注册正式账号'), '缺少访客标识或升级入口'); // 登录改为身份升级
 check('App 已移除整站锁定 early return', !/if \(!session\)[\s\S]{0,240}?return <Login/.test(app), '仍存在未登录整屏锁定分支'); // 不得回退到全站锁定
 check('App 登录提示不再有 required 态', !app.includes("'required' | 'expired'"), 'gateNotice 仍保留「需登录」提示类型'); // 提示模型已切换
@@ -263,7 +263,7 @@ async function live() {
   check('live 侧栏提供登录升级入口', String(footer).includes('登录 / 注册'), `实际：${footer}`); // 升级而非门禁
 
   // 逐个访问原本「需登录」的功能视图：均应渲染真实页面而非登录卡片
-  const gatedViews = ['products', 'cart', 'account', 'chat']; // 四个原门禁视图
+  const gatedViews = ['account', 'chat']; // 原门禁视图（购物车已并入个人中心页签）
   for (const view of gatedViews) { // 逐个导航
     await c.evaluate(`history.pushState(null,'','/${view}'); window.dispatchEvent(new Event('mim:route')); 'ok'`); // 编程式导航（router.ts 的 ROUTE_EVENT）
     const rendered = await c.waitUntil(async () => c.evaluate(`(document.querySelector('.layout') && !document.querySelector('.auth-wrap') && document.body.innerText.trim().length > 20 ? 'ok' : '')`), 8000); // 有内容且无登录卡片
@@ -300,7 +300,7 @@ async function live() {
   // 退出登录后刷新，应再次自动进入免登录可用态
   await c.evaluate(`Array.from(document.querySelectorAll('.sidebar-footer button')).find((b) => b.textContent.includes('退出'))?.click(); 'ok'`); // 真实 handleLogout
   await c.waitUntil(async () => c.evaluate(`(!localStorage.getItem('${SESSION_KEY}') ? 'out' : '')`), 10000); // 等待会话清除
-  await c.send('Page.navigate', { url: BASE + 'cart' }); // 重新加载购物车
+  await c.send('Page.navigate', { url: BASE + 'account?tab=cart' }); // 重新加载个人中心购物车页签
   const reGuest = await c.waitUntil(async () => c.evaluate(`(() => { const raw = localStorage.getItem('${SESSION_KEY}'); if (!raw) return ''; try { const s = JSON.parse(raw); return s.user && s.user.is_guest === true && !document.querySelector('.auth-wrap') ? 'reguest' : ''; } catch { return ''; } })()`), 15000); // 再次自动建访客
   check('live 退出登录后重新加载自动回到免登录可用态', reGuest === 'reguest', '未再次自动建访客会话'); // 门禁不会回弹
 

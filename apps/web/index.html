@@ -18,7 +18,7 @@
         if (location.pathname === '/mim' || location.pathname.indexOf('/mim/') === 0) { // 仅 GitHub Pages 把产物挂在仓库名子路径 /mim/ 下；根部署（laal.top 等）不命中
           document.querySelector('base').setAttribute('href', '/mim/'); // 基础地址跟随子路径，保证 ./assets 解析到 /mim/assets
         } // 子路径部署兼容处理结束
-        var views = ['cart', 'account', 'deployments', 'community', 'chat', 'news', 'releases', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements']; // 对外路径段（模块功能名）+ 仍保留的旧别名；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
+        var views = ['account', 'deployments', 'community', 'chat', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements', 'news', 'releases', 'cart']; // 对外路径段（模块功能名）+ 仍保留的旧别名（回落到社区 / 个人中心购物车页签）；与 src/router.ts 的 VIEW_SEGMENTS / LEGACY_SEGMENTS 保持一致
         var href = location.href; // 完整地址：用于判断末位是否为 WAF 清理后残留的裸问号
         var search = location.search; // 查询串（含前导问号；无查询串时为空串）
         if (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?')) { // 命中 WAF 注入参数或裸问号两种异常形态

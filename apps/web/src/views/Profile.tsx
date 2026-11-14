@@ -10,6 +10,8 @@ import { api, errorText } from '../api';
 import type { OAuthProviderInfo, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
+// 购物车面板：原独立 /cart 页并入「购物车」分区，状态与接口完全沿用
+import { CartPanel } from '../components/CartPanel';
 
 /** 组件契约：语言 + 用户更新回调 */
 interface Props {
@@ -17,8 +19,18 @@ interface Props {
   onUserUpdated: (user: UserInfo) => void; // 资料保存后同步全局用户态
 } // Props 结束
 
-/** 四个分区标识 */
-type Tab = 'profile' | 'entitlements' | 'orders' | 'security';
+/** 五个分区标识：购物车自 2026-11-15 起并入个人中心，旧地址 /cart 落到 /account?tab=cart */
+type Tab = 'profile' | 'entitlements' | 'orders' | 'cart' | 'security';
+
+/** 全部合法分区，用于校验地址栏 ?tab= 入参 */
+const TAB_IDS: readonly Tab[] = ['profile', 'entitlements', 'orders', 'cart', 'security'];
+
+/** 从地址栏 ?tab= 读取初始分区；非法值回落资料分区 */
+function initialTab(): Tab {
+  if (typeof window === 'undefined') return 'profile'; // 非浏览器环境兜底
+  const raw = new URLSearchParams(window.location.search).get('tab'); // 当前页签参数
+  return raw && (TAB_IDS as readonly string[]).includes(raw) ? (raw as Tab) : 'profile'; // 合法值直接采用
+} // initialTab 结束
 
 /** 金额格式化 */
 function money(currency: string, amountMinor: number): string {
@@ -26,10 +38,19 @@ function money(currency: string, amountMinor: number): string {
   return `${symbol}${(amountMinor / 100).toFixed(2)}`; // 分 → 主单位
 } // money 结束
 
-/** 个人中心：资料编辑 / 我的权益 / 我的订单 / 账号安全 四块 */
+/** 个人中心：资料编辑 / 我的权益 / 我的订单 / 购物车 / 账号安全 五块 */
 export function Profile({ locale, onUserUpdated }: Props) {
   const isZh = locale !== 'en-US'; // 是否中文文案
-  const [tab, setTab] = useState<Tab>('profile'); // 当前分区
+  const [tab, setTab] = useState<Tab>(() => initialTab()); // 当前分区：/account?tab=cart 直接落在购物车
+
+  /** 切换分区并把页签写进地址栏：?tab=cart 可分享、刷新不丢；资料分区不带参数保持地址干净 */
+  function selectTab(next: Tab) {
+    setTab(next); // 先切界面，地址栏随后同步
+    const url = new URL(window.location.href); // 保留其他查询参数（如 oauth_bound）
+    if (next === 'profile') url.searchParams.delete('tab'); // 默认分区不写参数
+    else url.searchParams.set('tab', next); // 其余分区显式写入
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash); // 原地替换，不新增历史
+  } // selectTab 结束
   const me = useAsync(() => api.me(), []); // 我的资料
   const entitlements = useAsync(() => api.catalog.getMyEntitlements(), []); // 我的权益
   const orders = useAsync(() => api.commerce.orders({ source: 'module' }), []); // 我的订单（统一只读接口，仅模块线）
@@ -53,7 +74,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
 
   // 访客若因回调落到账号设置分区，自动回到资料分区，避免出现空白页
   useEffect(() => {
-    if (isGuest && tab === 'security') setTab('profile'); // 条件分支：按判断结果选择后续处理路径
+    if (isGuest && tab === 'security') selectTab('profile'); // 条件分支：按判断结果选择后续处理路径
   }, [isGuest, tab]);
 
   // 资料回填：拿到 /me 结果后同步到表单
@@ -74,7 +95,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
     const url = new URL(window.location.href); // 常量 url：保存固定配置或一次性派生值
     const bound = url.searchParams.get('oauth_bound'); // 常量 bound：保存固定配置或一次性派生值
     if (!bound) return; // 无绑定回传
-    setTab('security'); // 直接落在账号与设置分区
+    setTab('security'); // 直接落在账号与设置分区（该回传只由账号设置发起，无需改写地址栏）
     setMessage(isZh ? '第三方账号绑定成功' : 'Third-party account linked'); // 成功提示
     url.searchParams.delete('oauth_bound'); // 清理参数
     window.history.replaceState(null, '', url.pathname + url.search + url.hash); // 原地替换
@@ -173,11 +194,12 @@ export function Profile({ locale, onUserUpdated }: Props) {
         <h1>{isZh ? '个人中心' : 'My account'}</h1>
         {/* 分区切换 */}
         <nav className="profile-tabs">{/* 执行当前业务步骤 */}
-          <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => setTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
-          <button type="button" className={`tab${tab === 'entitlements' ? ' active' : ''}`} onClick={() => setTab('entitlements')}>{isZh ? '我的权益' : 'Entitlements'}</button>
-          <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => setTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
+          <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => selectTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
+          <button type="button" className={`tab${tab === 'entitlements' ? ' active' : ''}`} onClick={() => selectTab('entitlements')}>{isZh ? '我的权益' : 'Entitlements'}</button>
+          <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => selectTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
+          <button type="button" className={`tab${tab === 'cart' ? ' active' : ''}`} onClick={() => selectTab('cart')}>{isZh ? '购物车' : 'Cart'}</button>
           {!isGuest && (
-            <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => setTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
+            <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
           )}
         </nav>
       </header>
@@ -287,7 +309,10 @@ export function Profile({ locale, onUserUpdated }: Props) {
         ) // 执行当前业务步骤
       ) : null}
 
-      {/* 分区四：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
+      {/* 分区四：购物车（原独立 /cart 页并入，清单 / 移除 / 清空 / 积分抵扣 / 结算全部沿用原状态与接口） */}
+      {tab === 'cart' ? <CartPanel locale={locale} /> : null}
+
+      {/* 分区五：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
       {tab === 'security' && !isGuest ? (
         <section className="profile-security">{/* 执行当前业务步骤 */}
           <p className="hint">{/* 执行当前业务步骤 */}

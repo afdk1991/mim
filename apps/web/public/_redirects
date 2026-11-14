@@ -1,6 +1,7 @@
 # SPA fallback for Pages platforms (EdgeOne Pages honors this file).
 # Any path not matching a static file is rewritten to index.html (HTTP 200),
-# so deep links like /community /cart /chat /news /releases /signin boot the SPA directly.
+# so deep links like /community /circles /deployments /account /chat /signin boot the SPA directly.
+# Legacy /cart /news /releases are rewritten once by the SPA router (to /account?tab=cart or /community).
 # Existing static files (assets, spa.js, ...) take precedence over this rule.
 # NOTE (verified 2026-11-08): Cloudflare Pages bypasses _redirects entirely once
 # a Functions bundle is attached, so the CF-side SPA fallback lives in
