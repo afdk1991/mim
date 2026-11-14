@@ -46,36 +46,17 @@ const SCENE_ENV: Record<CaptchaScene, string> = { // 保存 SCENE_ENV：承载�
   post: 'MIM_CAPTCHA_POST', // 对象字段：声明结构中的一项数据
 }; // 结束代码块：本层作用域收尾
 
-/** 是否生产环境：NODE_ENV=production 时验证码默认强制开启 */
-function isProductionEnv(env: Record<string, string | undefined>): boolean { // 定义函数 isProductionEnv：封装可复用业务步骤
-  return (env.NODE_ENV ?? '').trim().toLowerCase() === 'production'; // 严格等于 production 才按生产处理
-} // 结束函数体：本层作用域收尾
-
-/**
- * 解析全局验证码模式。
- * 未配置或非法取值时：生产环境回落 image（自托管图形验证码，不依赖第三方凭证），非生产回落 off。
- * 生产默认开启，避免「默认关闭」被原样带进线上；显式配置 off 仍视为运维的有意关闭。
- */
+/** 解析全局验证码模式；非法取值回落 off，避免把配置错误变成线上放行 */
 export function captchaMode(env: Record<string, string | undefined>): CaptchaMode { // 定义函数 captchaMode：封装可复用业务步骤
   const raw = (env.MIM_CAPTCHA_MODE ?? '').trim().toLowerCase(); // 保存 raw：承载本步骤的计算结果供后续使用
-  if (CAPTCHA_MODES.has(raw)) return raw as CaptchaMode; // 显式合法取值优先
-  return isProductionEnv(env) ? 'image' : 'off'; // 生产默认开启，非生产默认关闭
+  return CAPTCHA_MODES.has(raw) ? (raw as CaptchaMode) : 'off'; // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 
-/**
- * 某场景是否强制验证码：
- *   - 模式 off 一律不强制；
- *   - 旧 MIM_CAPTCHA_REQUIRED=1 全场景强制；
- *   - 场景开关 MIM_CAPTCHA_<SCENE>=1 强制，=0 显式关闭；
- *   - 其余情况生产环境默认强制 register 与 login（登录口令链路必须带验证码）。
- */
+/** 某场景是否强制验证码：模式 off 一律不强制；场景开关 1 才强制；旧 MIM_CAPTCHA_REQUIRED=1 视为全场景强制 */
 export function sceneCaptchaRequired(env: Record<string, string | undefined>, scene: CaptchaScene): boolean { // 定义函数 sceneCaptchaRequired：封装可复用业务步骤
   if (captchaMode(env) === 'off') return false; // 条件分支：仅在满足业务前置条件时继续
   if ((env.MIM_CAPTCHA_REQUIRED ?? '').trim() === '1') return true; // 条件分支：仅在满足业务前置条件时继续
-  const sceneSwitch = (env[SCENE_ENV[scene]] ?? '').trim(); // 读取场景级开关
-  if (sceneSwitch === '1') return true; // 显式强制
-  if (sceneSwitch === '0') return false; // 显式关闭，保留运维退路
-  return isProductionEnv(env) && (scene === 'register' || scene === 'login'); // 生产默认强制注册与登录
+  return (env[SCENE_ENV[scene]] ?? '').trim() === '1'; // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 
 /** 第三方验证码凭证是否齐备（仅用于状态披露，不泄漏密钥本身） */
