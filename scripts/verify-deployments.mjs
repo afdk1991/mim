@@ -167,7 +167,7 @@ check('D35 后端契约测试存在', has('services/mim-api/test/deployments.tes
 // 前端视图存在。
 check('D36 前端部署汇总视图存在', has('apps/web/src/views/Deployments.tsx'));
 // 前端 API 分组存在。
-check('D37 前端 api.ts 含 deployments 分组', read('apps/web/src/api.ts').includes('deployments: {'));
+check('D37 前端 api.ts 含 deployments 分组', (read('apps/web/src/api.ts') + read('apps/web/src/api/endpoints.ts')).includes('deployments: {')); // 2026-11-14 P1-A 拆分后端点对象位于 api/endpoints.ts，合并扫描
 // 路由视图标识存在。
 check('D38 前端 router.ts 注册 deployments 视图', read('apps/web/src/router.ts').includes("'deployments'"));
 // 根组件渲染与导航项存在。

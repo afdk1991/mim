@@ -377,7 +377,7 @@ const entryTest = read('services/mim-api/test/entries.test.ts'); // 常量 entry
 check('清单契约测试覆盖 19 域 / 去重 / 占位配置', entryTest.includes('19') && entryTest.includes('dedupe') && entryTest.includes('config'), '清单测试缺失'); // 调用 check 并处理其返回结果
 
 // 前端 API 客户端必须提供 sites 与 entries 两组方法。
-const apiTs = read('apps/web/src/api.ts');
+const apiTs = read('apps/web/src/api.ts') + read('apps/web/src/api/endpoints.ts'); // 2026-11-14 P1-A 拆分后，端点对象在 api/endpoints.ts，类型与桶导出仍在 api.ts，两处合并扫描保持原断言意图
 // 断言运行时接口方法齐备。
 check('前端 API 提供 sites 分组 6 方法', ['overview()', 'list(opts:', 'detail(host:', 'listItems(host:', 'createItem(host:', 'transitionItem(host:'].every((fn) => apiTs.includes(fn)), '方法缺失');
 // 断言清单接口方法齐备。
