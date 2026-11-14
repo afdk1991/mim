@@ -14,6 +14,7 @@ import { createComicRouter } from './routes/comic.js'; // 创作工程与分镜�
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
 import { createAiRouter } from './routes/ai.js'; // AI 编排控制面，内部统一 requireAuth
 import { createAdminRouter } from './routes/admin.js'; // RBAC 后台控制面：角色 / 权限 / 用户角色授权
+import { createShopAdminRouter } from './routes/shop-admin.js'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐 CRUD
 import { createSitesRouter } from './routes/sites.js'; // 站点模块运行时：44 个去重入口的能力点 / 业务条目
 import { createEntriesRouter } from './routes/entries.js'; // 统一入口配置清单：19 业务域 / 职责边界 / 关联区分 / 占位标识
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
@@ -32,6 +33,10 @@ import { createSecurityRouter } from './routes/security.js'; // 安全：图形�
 import { createInviteAdminRouter } from './routes/invites.js'; // 邀请码：管理端生成与注册门槛核销
 import { createRealnameRouter } from './routes/realname.js'; // 实名认证：本人提交与人工审核队列
 import { createSsoRouter } from './routes/sso.js'; // 跨站 SSO：票据签发、兑换与登出广播
+import { createFederationRouter } from './routes/federation.js'; // 联邦身份：OIDC 授权码模式客户端
+import { createVipPricingRouter } from './routes/vip-pricing.js'; // VIP 分级定价规则只读查询
+import { createReferralRouter } from './routes/referral.js'; // 返佣佣金明细自助查询（内部鉴权）
+import { createReferralAdminRouter } from './routes/referral-admin.js'; // 返佣到期结算管理端点（RBAC）
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createToolsRouter } from './routes/tools.js'; // 自研工具目录：公开浏览，管理端写操作挂权限
@@ -126,6 +131,8 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createAuthRouter(resolved)); // 登录端点无 token，必须注册在受保护路由之前才不会被拦成 401
   // 第三方登录：授权入口公开，绑定/解绑在 router 内部按需 requireAuth
   app.use('/api/v1', createOAuthRouter(resolved)); // 必须在全局 requireAuth 之前挂载，否则匿名发起授权会被拦成 401
+  app.use('/api/v1', createFederationRouter(resolved)); // 联邦 OIDC：status/login 公开，callback 兑换后回跳票据
+  app.use('/api/v1', createVipPricingRouter(resolved)); // VIP 定价规则只读查询，公开
 
   // 商城路由：GET /modules 公开；POST /entitlements + GET /me/entitlements 内部 requireAuth
   app.use('/api/v1', createCatalogRouter(resolved)); // 公开与受保护端点混装，鉴权下沉到 router 内部按路径处理
@@ -165,12 +172,15 @@ app.use('/api/v1', createNavigationRouter(resolved)); // 导航站：/navigation
     createI18nRouter(resolved), // 国际化：翻译与语言分离
     createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
     createCirclesRouter(resolved), // 圈子：成员制社群（圈主 / 审核 / 成员上限 / 圈内动态与公告），与板块并存
+    createReferralRouter(resolved), // 返佣：我的佣金明细与汇总（内部 requireAuth）
   ]) { // 路由数组结束，进入逐个注册循环
     app.use('/api/v1', router); // 统一 /api/v1 前缀；鉴权按命名空间在 router 内部生效
   } // for 结束：四个受保护 router 已依次挂载
 
   // 后台控制面（RBAC）：每个路由显式挂 requirePermission，未带凭证一律 401，带凭证但缺权限 403
   app.use('/api/v1', createAdminRouter(resolved)); // 不挂 idempotency：超管引导通道无 req.user，挂上会被幂等中间件前置拦截成 401
+  app.use('/api/v1', createShopAdminRouter(resolved)); // 商城后台写入面：同样走 RBAC 权限点 commerce:write，不挂全局幂等
+  app.use('/api/v1', createReferralAdminRouter(resolved)); // 返佣到期结算：RBAC commerce:write，独立文件不并入 admin.ts
 
   app.use(notFound); // 所有路由之后兜底：未命中即返回统一 404 信封
   app.use(errorHandler); // 必须最后挂：四参错误中间件只捕获其之前注册的链路抛错

@@ -22,12 +22,20 @@ import { AppError } from '@mim/core-domain'; // 统一业务异常，找不到�
 import { requireAuth } from '../middleware.js'; // 登录态校验：订单属于个人数据，不对外开放
 import { getUnifiedOrder, listUnifiedOrders, summarizeUnifiedOrders } from '../commerce/unified.js'; // 统一交易域查询
 import type { ApiDeps } from '../types.js'; // 依赖注入：只需要 db
+import type { UnifiedOrderSource } from '../commerce/unified.js'; // 来源产线枚举，用于校验查询参数
 
 /** limit 解析：非法值回落到默认 50，上限 200，避免一次拉出全库订单 */
 function parseLimit(raw: unknown): number {
   const value = Number(raw ?? 50); // 缺省 50
   if (!Number.isFinite(value) || value <= 0) return 50; // 非法输入用默认值，不抛错
   return Math.min(Math.floor(value), 200); // 封顶 200
+}
+
+/** source 过滤解析：缺省返回三源全部；非法产线值回 400，避免静默放宽过滤口径 */
+function parseSource(raw: unknown): UnifiedOrderSource | undefined {
+  if (raw === undefined || raw === '') return undefined; // 未传不过滤
+  if (raw === 'module' || raw === 'shop' || raw === 'asset') return raw; // 合法产线原样返回
+  throw new AppError('VALIDATION_FAILED', 'source must be one of module/shop/asset', { source: raw }); // 非法值显式拒绝
 }
 
 export function createOrdersRouter(deps: ApiDeps): Router {
@@ -37,7 +45,8 @@ export function createOrdersRouter(deps: ApiDeps): Router {
   router.get('/commerce/orders', (req, res) => {
     const user = req.user!; // requireAuth 已注入登录态
     const limit = parseLimit(req.query.limit); // 分页大小
-    const items = listUnifiedOrders(deps.db, user.id, limit); // 统一视图（含明细）
+    const source = parseSource(req.query.source); // 可选产线过滤：迁移期各页面保留原产线口径
+    const items = listUnifiedOrders(deps.db, user.id, { source, limit }); // 统一视图（含明细）
     res.json({ items, total: items.length, limit }); // 返回列表与条数，前端不必再合并三源
   });
 

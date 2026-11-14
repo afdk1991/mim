@@ -32,7 +32,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const [tab, setTab] = useState<Tab>('profile'); // 当前分区
   const me = useAsync(() => api.me(), []); // 我的资料
   const entitlements = useAsync(() => api.catalog.getMyEntitlements(), []); // 我的权益
-  const orders = useAsync(() => api.catalog.getMyOrders(), []); // 我的订单
+  const orders = useAsync(() => api.commerce.orders({ source: 'module' }), []); // 我的订单（统一只读接口，仅模块线）
   const [displayName, setDisplayName] = useState(''); // 昵称编辑值
   const [localeValue, setLocaleValue] = useState<Locale>('zh-CN'); // 语言编辑值
   const [timezone, setTimezone] = useState(''); // 时区编辑值
@@ -248,8 +248,8 @@ export function Profile({ locale, onUserUpdated }: Props) {
         orders.loading ? <div className="hint">{isZh ? '加载中…' : 'Loading…'}</div> : (
           <>{/* 执行当前业务步骤 */}
             {orders.error ? <div className="chat-error">{errorText(locale, orders.error)}</div> : null}
-            {(orders.data?.orders ?? []).length === 0 ? <div className="hint">{isZh ? '还没有订单。' : 'No orders yet.'}</div> : null}
-            {(orders.data?.orders ?? []).length > 0 ? (
+            {((orders.data?.items ?? []).length === 0) ? <div className="hint">{isZh ? '还没有订单。' : 'No orders yet.'}</div> : null}
+            {((orders.data?.items ?? []).length > 0) ? (
               <table className="products-table">{/* 执行当前业务步骤 */}
                 <thead>{/* 执行当前业务步骤 */}
                   <tr>{/* 执行当前业务步骤 */}
@@ -261,22 +261,25 @@ export function Profile({ locale, onUserUpdated }: Props) {
                   </tr>
                 </thead>
                 <tbody>{/* 执行当前业务步骤 */}
-                  {(orders.data?.orders ?? []).map((order) => (
+                  {(orders.data?.items ?? []).map((order) => {
+                    const first = order.items[0]; // 模块线一单一件，取首件快照名与编码
+                    return (
                     <tr key={order.id}>{/* 执行当前业务步骤 */}
                       <td>{/* 执行当前业务步骤 */}
-                        <div className="products-name">{order.module_name[locale] ?? order.module_name['zh-CN'] ?? order.module_code}</div>
-                        <div className="products-code">{order.module_code}</div>
+                        <div className="products-name">{first?.title ?? order.product_code ?? order.id}</div>
+                        <div className="products-code">{order.product_code ?? '—'}</div>
                       </td>
-                      <td>{money(order.currency, order.amount_minor)}</td>
+                      <td>{money(order.currency, order.total_cents)}</td>
                       <td><span className={`tag${order.status === 'paid' ? ' ok' : ''}`}>{order.status}</span></td>
                       <td>{new Date(order.created_at).toLocaleDateString()}</td>
                       <td>{/* 执行当前业务步骤 */}
                         {order.status === 'pending' ? (
-                          <button type="button" className="btn ghost" onClick={() => void cancelOrder(order.id)}>{isZh ? '取消' : 'Cancel'}</button>
+                          <button type="button" className="btn ghost" onClick={() => void cancelOrder(order.source_id)}>{isZh ? '取消' : 'Cancel'}</button>
                         ) : null}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             ) : null}

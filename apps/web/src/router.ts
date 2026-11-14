@@ -1,7 +1,7 @@
 // React 钩子：状态、副作用与稳定回调
 import { useCallback, useEffect, useState } from 'react';
 
-// 全部视图标识：8 个业务视图 + 登录伪视图（原「设置」已并入个人中心，不再单独成页）
+// 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 播放器 / 支付回跳深链接页
 export type AppView =
   | 'store' // 功能模块页
   | 'products' // 商品列表（商城配套的密集列表页，含加购）
@@ -19,6 +19,9 @@ export type AppView =
   | 'content' // 公告 / 更新日志 / 推广计划栏目
   | 'releases' // 版本迭代：V0.0.0 → 当前版本时间线与能力地图
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
+  | 'checkout' // 收银台：支付意图二维码 / 渠道唤起 / 状态轮询
+  | 'watch' // 独立播放器页：/watch/:kind/:id 选集与进度记忆
+  | 'payreturn' // 支付回跳承接页：三态结果展示
   | 'login'; // 未登录专用的登录伪视图
 
 // 路由状态：仅需当前视图标识
@@ -46,6 +49,9 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   content: 'announcements', // 公告 / 更新日志 / 推广计划栏目
   releases: 'releases', // 版本迭代（时间线与能力地图）
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
+  checkout: 'checkout', // 收银台（支付意图二维码 / 渠道唤起）
+  watch: 'watch', // 独立播放器（/watch/:kind/:id）
+  payreturn: 'pay-return', // 支付回跳承接页（/pay-return?intent=...）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
 }; // 代码块结束
 
@@ -95,14 +101,24 @@ export function baseOf(): string {
   return base; // 返回推断结果
 } // baseOf 结束
 
-// 把地址栏路径剥离挂载前缀后拆段，返回首个非空段；无段时返回空串
-function firstSegment(): string {
+// 把地址栏路径剥离挂载前缀后拆段，返回全部非空段（深链接如 /watch/thread/:id 取多段）
+export function pathSegments(): string[] {
   const base = baseOf(); // 挂载前缀
   let path = window.location.pathname; // 当前路径，如 '/mim/store' 或 '/store'
-  if (base !== '/' && path.startsWith(base)) path = path.slice(base.length); // 剥离 '/mim/' 前缀，余 'store'
+  if (base !== '/' && path.startsWith(base)) path = path.slice(base.length); // 剥离 '/mim/' 前缀
   else if (base !== '/' && path === base.slice(0, -1)) path = ''; // 无尾斜杠的 '/mim' 视为子路径根
-  return path.split('/').filter(Boolean)[0] ?? ''; // 取首个非空段；空路径返回空串
+  return path.split('/').filter(Boolean); // 全部非空段；空路径返回 []
+} // pathSegments 结束
+
+// 兼容旧调用：取首个非空段
+function firstSegment(): string {
+  return pathSegments()[0] ?? ''; // 首段；空路径返回空串
 } // firstSegment 结束
+
+// 读取当前查询串（收银台 / 回跳页按 intent 参数取支付意图）
+export function currentQuery(): URLSearchParams {
+  return new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
+}
 
 // 把路径段解析为视图：先按新路径段（模块功能名）精确匹配；未命中再查旧路径段，
 // 命中旧段时把地址原地改写为新路径（等价 301：保留查询串与 hash，不新增历史记录）。
@@ -131,8 +147,12 @@ export function parseLocation(): AppRoute {
     window.history.replaceState(null, '', target); // 原地改写为路径形式，不新增历史记录
     return { view: hashView ?? 'store' }; // 返回匹配结果或安全回退
   } // hash 兼容分支结束
-  const seg = firstSegment(); // 路径首段
-  const view = resolveSegment(seg); // 新段直接命中；旧段命中并原地重定向
+  const segs = pathSegments(); // 全部路径段
+  // 多段深链接：/watch/:kind/:id 独立播放器；/pay/return 与 /pay-return 支付回跳承接
+  if (segs[0] === 'watch') return { view: 'watch' };
+  if (segs[0] === 'pay' && segs[1] === 'return') return { view: 'payreturn' };
+  if (segs[0] === 'pay-return') return { view: 'payreturn' };
+  const view = resolveSegment(segs[0] ?? ''); // 新段直接命中；旧段命中并原地重定向
   return view ? { view } : { view: 'store' }; // 未知路径与根路径都回落到商城目录
 } // parseLocation 结束
 
@@ -149,6 +169,23 @@ export function navigate(route: AppRoute): void {
   window.history.pushState(null, '', next); // 写入历史，地址栏变为 /<view>
   window.dispatchEvent(new Event(ROUTE_EVENT)); // pushState 不触发 popstate，手动通知 hook
 } // navigate 结束
+
+// 编程式跳转任意站内深链接路径（含多段 / 查询串），绕过单段视图映射
+export function navigatePath(path: string): void {
+  if (typeof window === 'undefined') return; // 非浏览器环境直接忽略
+  if (window.location.pathname + window.location.search === path) return; // 同地址不重复写入
+  window.history.pushState(null, '', path); // 写入历史
+  window.dispatchEvent(new Event(ROUTE_EVENT)); // 手动通知 hook 重新解析
+} // navigatePath 结束
+
+// 由视图与深链接片段构造站内路径（含挂载前缀）
+export function pathOf(view: AppView, subPath = '', query = ''): string {
+  const base = baseOf(); // 挂载前缀
+  const prefix = base === '/' ? '' : base.replace(/\/$/, ''); // 子路径部署下去掉尾斜杠
+  const suffix = subPath ? `/${subPath.replace(/^\/+/, '')}` : ''; // 多段深链接
+  const qs = query ? `?${query.replace(/^\?/, '')}` : ''; // 查询串
+  return `${prefix}/${VIEW_SEGMENTS[view]}${suffix}${qs}`;
+} // pathOf 结束
 
 // 路由 hook：把地址栏路径变成 React 状态，并监听前进/后退（popstate）与编程式导航（ROUTE_EVENT）
 export function useAppRoute(): [AppRoute, (route: AppRoute) => void] {

@@ -22,17 +22,18 @@ export type UnifiedOrderSource = 'module' | 'shop' | 'asset';
 export interface UnifiedOrderItem {
   id: string; // 明细主键
   product_id: string; // 商品主键（回填时等于源商品主键）
+  product_code: string | null; // 商品业务编码（取自统一 products.code），前端寻址与回退展示用
   title: string; // 下单时商品名快照
   quantity: number; // 数量
   unit_price_cents: number; // 下单时单价（分）
 }
 
-/** 统一订单视图：对外 /api/v1/orders 直接返回该结构 */
+/** 统一订单视图：对外 /api/v1/commerce/orders 直接返回该结构 */
 export interface UnifiedOrder {
   id: string; // 统一订单主键
   user_id: string; // 下单用户
   source: UnifiedOrderSource; // 来源产线
-  source_id: string; // 源订单主键，便于回查旧表
+  source_id: string; // 源订单主键，便于回查旧表；旧履约 / 写路径仍按它定位源订单
   status: string; // 统一状态机取值
   channel: string; // 结算通道
   currency: string; // 结算币种
@@ -41,7 +42,16 @@ export interface UnifiedOrder {
   payable_cents: number; // 实付金额
   created_at: string; // 下单时间
   paid_at: string | null; // 支付完成时间
+  product_code: string | null; // 首件商品编码，与明细同源，供模块 / 商品列表回退展示
+  delivery_kind: string | null; // 实物线发货方式（旧 shop_orders.delivery_kind），仅 shop 来源有值，其余为 null
+  delivered_content: string | null; // 卡密 / 人工说明（旧 shop_orders.delivered_content），仅 shop 来源有值，其余为 null
   items: UnifiedOrderItem[]; // 订单明细
+}
+
+/** 统一订单列表查询选项：source 缺省返回三源全部，指定后只回该产线（迁移期保留各页面原口径） */
+export interface UnifiedOrderQuery {
+  source?: UnifiedOrderSource; // 来源产线过滤
+  limit?: number; // 分页大小，缺省由路由层解析
 }
 
 /** 回填结果计数：启动日志与测试断言共用 */
@@ -175,35 +185,63 @@ export function backfillUnifiedCommerce(db: Db, now: string = new Date().toISOSt
   return result; // 返回计数，调用方打印日志
 }
 
-/** 统一订单只读查询：按用户倒序取最近 N 条，并附带明细 */
-export function listUnifiedOrders(db: Db, userId: string, limit = 50): UnifiedOrder[] {
+/** 订单主体原始行：不含明细与派生展示字段，组装视图前的最小字段集 */
+type RawOrderRow = Pick<UnifiedOrder, 'id' | 'user_id' | 'source' | 'source_id' | 'status' | 'channel' | 'currency' | 'total_cents' | 'discount_cents' | 'payable_cents' | 'created_at' | 'paid_at'>;
+
+/** 实物线履约展示字段：迁移期只读回源 shop_orders 取发货方式与卡密说明；旧表冻结只读后该回源可移除 */
+function shopFulfillment(db: Db, sourceId: string): { delivery_kind: string | null; delivered_content: string | null } {
+  const row = db
+    .prepare('SELECT delivery_kind, delivered_content FROM shop_orders WHERE id = ?') // 只读查询，不改动旧表
+    .get(sourceId) as { delivery_kind: string | null; delivered_content: string | null } | undefined; // 命中行或空
+  return row ?? { delivery_kind: null, delivered_content: null }; // 回源落空时两个展示字段均为 null
+}
+
+/** 组装一条统一订单视图：挂明细、首件商品编码与实物线履约展示字段 */
+function assembleOrder(db: Db, row: RawOrderRow): UnifiedOrder {
+  const items = db
+    .prepare(
+      `SELECT i.id, i.product_id, p.code AS product_code, i.title, i.quantity, i.unit_price_cents
+         FROM order_items i LEFT JOIN products p ON p.id = i.product_id
+        WHERE i.order_id = ? ORDER BY i.id`,
+    ) // 联统一商品表带出业务编码，供前端寻址与回退展示
+    .all(row.id) as UnifiedOrderItem[]; // 明细行
+  const fulfillment = row.source === 'shop' ? shopFulfillment(db, row.source_id) : { delivery_kind: null, delivered_content: null }; // 仅实物线回源取履约展示字段
+  return { // 统一订单视图
+    ...row, // 主体字段原样带出
+    product_code: items[0]?.product_code ?? null, // 首件商品编码，缺省 null
+    delivery_kind: fulfillment.delivery_kind, // 发货方式（shop 来源）
+    delivered_content: fulfillment.delivered_content, // 卡密 / 人工说明（shop 来源）
+    items, // 明细列表
+  };
+}
+
+/** 统一订单只读查询：按用户倒序取最近 N 条，并附带明细；source 缺省返回三源全部 */
+export function listUnifiedOrders(db: Db, userId: string, query: UnifiedOrderQuery = {}): UnifiedOrder[] {
+  const limit = query.limit ?? 50; // 分页大小缺省 50
+  const where: string[] = ['o.user_id = ?']; // 归属过滤为必填条件
+  const params: unknown[] = [userId]; // 与 where 占位符顺序一致的绑定参数
+  if (query.source) { where.push('o.source = ?'); params.push(query.source); } // 指定产线时追加过滤，保留各页面原口径
   const rows = db
     .prepare(
-      `SELECT id, user_id, source, source_id, status, channel, currency, total_cents, discount_cents,
-              payable_cents, created_at, paid_at
-         FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
+      `SELECT o.id, o.user_id, o.source, o.source_id, o.status, o.channel, o.currency, o.total_cents, o.discount_cents,
+              o.payable_cents, o.created_at, o.paid_at
+         FROM orders o WHERE ${where.join(' AND ')} ORDER BY o.created_at DESC LIMIT ?`,
     )
-    .all(userId, limit) as Array<Omit<UnifiedOrder, 'items'>>; // 先取订单主体
-  const itemsOf = db.prepare(
-    `SELECT id, product_id, title, quantity, unit_price_cents FROM order_items WHERE order_id = ? ORDER BY id`,
-  ); // 明细查询语句复用一份，避免循环里重复编译
-  return rows.map((row) => ({ ...row, items: itemsOf.all(row.id) as UnifiedOrderItem[] })); // 组装视图
+    .all(...params, limit) as RawOrderRow[]; // 先取订单主体
+  return rows.map((row) => assembleOrder(db, row)); // 逐条组装视图
 }
 
 /** 单笔统一订单：找不到或不属于当前用户时返回 null，路由据此回 404（不泄露他人订单是否存在） */
 export function getUnifiedOrder(db: Db, orderId: string, userId: string): UnifiedOrder | null {
   const row = db
     .prepare(
-      `SELECT id, user_id, source, source_id, status, channel, currency, total_cents, discount_cents,
-              payable_cents, created_at, paid_at
-         FROM orders WHERE id = ? AND user_id = ?`,
+      `SELECT o.id, o.user_id, o.source, o.source_id, o.status, o.channel, o.currency, o.total_cents, o.discount_cents,
+              o.payable_cents, o.created_at, o.paid_at
+         FROM orders o WHERE o.id = ? AND o.user_id = ?`,
     )
-    .get(orderId, userId) as Omit<UnifiedOrder, 'items'> | undefined; // 主体行
+    .get(orderId, userId) as RawOrderRow | undefined; // 主体行
   if (!row) return null; // 不存在或越权
-  const items = db
-    .prepare(`SELECT id, product_id, title, quantity, unit_price_cents FROM order_items WHERE order_id = ? ORDER BY id`)
-    .all(orderId) as UnifiedOrderItem[]; // 明细
-  return { ...row, items }; // 合并返回
+  return assembleOrder(db, row); // 合并明细与履约展示字段
 }
 
 /** 统一订单汇总：给「个人中心 / 商业化中台」提供一条口径，不再让前端自己合并三源 */

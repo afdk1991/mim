@@ -1112,3 +1112,4 @@ export async function deleteCategory(credential: Credential, slug: string): Prom
 
 export { request }; // 执行当前业务步骤
 export * from './api-ops'; // 执行当前业务步骤
+export * from './api-shop-admin'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐

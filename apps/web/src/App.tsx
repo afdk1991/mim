@@ -14,8 +14,10 @@ import {
   verifySession, // 用 /me 静默校验本地会话是否仍有效
   SESSION_CHANGED_EVENT, // 登录 / 退出 / 失效 / 跨标签页同步的统一事件名
 } from './api';
-// 仅类型导入：登录结果、会话、会话变更原因与用户信息结构
-import type { LoginResult, Session, SessionChangeReason, UserInfo } from './api';
+// 仅类型导入：登录结果、会话、会话变更原因、用户信息与语言配置结构
+import type { I18nSettings, LoginResult, Session, SessionChangeReason, UserInfo } from './api';
+// 本地新增界面文案字典（收银台 / 播放器 / 分享 / 语言切换）
+import { tr } from './lib/messages';
 // 登录页组件：按需登录统一入口，体积小保持 eager 引入
 import { Login } from './views/Login';
 // 公告置顶条：轻量组件，随首屏加载
@@ -47,6 +49,28 @@ const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.C
 import { useAppRoute, baseOf } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
 import type { AppView } from './router';
+
+// 前台语言本地兜底键：后端语言配置不可用 / 无后台写权限时，把前台偏好落到本地
+const FRONT_LOCALE_KEY = 'mim.locale.front';
+
+/** 读取本地持久化的前台语言偏好；脏值 / 隐私模式回落 null */
+function readLocalFrontLocale(): Locale | null {
+  try {
+    const raw = localStorage.getItem(FRONT_LOCALE_KEY);
+    return raw ? normalizeLocale(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 写入本地前台语言偏好；存储不可用时静默忽略 */
+function writeLocalFrontLocale(locale: Locale): void {
+  try {
+    localStorage.setItem(FRONT_LOCALE_KEY, locale);
+  } catch {
+    /* 存储不可用不阻断切换 */
+  }
+}
 
 // 免登录体验：全站不再有「此功能需登录后使用」的门禁集合。
 // 匿名访客进入站点时后端自动签发一个访客会话（POST /auth/guest），

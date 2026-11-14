@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, ComicProject, ComicCharacter, StoryboardShot, Storyboard, SuggestKind, Suggestion, JobType, GenerationJob, Film, FilmVersion, ShowcaseWork, TheaterItem, FilmExportFormat, FilmExportResolution, FilmExportResult, AssetType, ListedAsset, PresignedUrl, AiCapabilities, RunJobResult, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CartSummary, CartCheckoutResult, SiteCapability, EntryModule, SiteModuleSummary, EntryDomain, SiteGroup, SiteModuleDetail, SiteItem, SiteOverview, EntryOverview, DeploymentItem, DeploymentOverview, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, NavLink, NavSummary, SearchEngine, SearchResponse, SearchScopeCount, PaidAssetKind, PaidAsset, PaidAssetDetail, PaymentProvider, PaymentChannel, PaymentIntent, Shipment, AfterSale, ProductReview, Withdrawal, CreatorEarning, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, ToolItem, ToolUpsertPayload, GrowthSnapshot, DirectMessage } from './types.js'; // 端点签名用到的类型仍定义在 api.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, ComicProject, ComicCharacter, StoryboardShot, Storyboard, SuggestKind, Suggestion, JobType, GenerationJob, Film, FilmVersion, ShowcaseWork, TheaterItem, FilmExportFormat, FilmExportResolution, FilmExportResult, AssetType, ListedAsset, PresignedUrl, AiCapabilities, RunJobResult, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CartSummary, CartCheckoutResult, SiteCapability, EntryModule, SiteModuleSummary, EntryDomain, SiteGroup, SiteModuleDetail, SiteItem, SiteOverview, EntryOverview, DeploymentItem, DeploymentOverview, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, NavLink, NavSummary, SearchEngine, SearchResponse, SearchScopeCount, PaidAssetKind, PaidAsset, PaidAssetDetail, PaymentProvider, PaymentChannel, PaymentIntent, Shipment, AfterSale, ProductReview, Withdrawal, CreatorEarning, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, ToolItem, ToolUpsertPayload, GrowthSnapshot, DirectMessage } from './types.js'; // 端点签名用到的类型仍定义在 api.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -967,8 +967,23 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     channels() { // 支付渠道配置状态
       return request<{ channels: PaymentChannel[] }>('/payments/channels', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
+    orders(opts: { source?: UnifiedOrderSource } = {}) { // 我的统一订单列表（只读）；source 缺省返回三源全部，指定后只回该产线
+      const qs = new URLSearchParams(); // 查询串构造器
+      if (opts.source) qs.set('source', opts.source); // 产线过滤参数
+      const suffix = qs.toString(); // 序列化查询串
+      return request<{ items: UnifiedOrder[]; total: number; limit: number }>(`/commerce/orders${suffix ? `?${suffix}` : ''}`, { idempotency: false }); // 只读 GET，无需幂等键
+    }, // 代码块结束
+    order(id: string) { // 单笔统一订单详情（只读）；跨用户由服务端按 404 处理
+      return request<{ order: UnifiedOrder }>(`/commerce/orders/${encodeURIComponent(id)}`, { idempotency: false }); // 只读 GET
+    }, // 代码块结束
+    orderSummary() { // 我的统一订单汇总（只读）：总数 / 已支付 / 待支付 / 已退款 / 实付合计
+      return request<{ summary: UnifiedOrderSummary }>('/commerce/orders/summary', { idempotency: false }); // 只读 GET
+    }, // 代码块结束
     createIntent(payload: { purpose: 'shop_order' | 'vip' | 'asset' | 'recharge'; ref_id: string; provider: PaymentProvider; amount_cents?: number }) { // 创建支付意图
       return request<{ intent: PaymentIntent; next: { provider: string; pay_url?: string; qr_text?: string; note?: string } }>('/payments/intents', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    getIntent(id: string) { // 查询支付意图状态（仅本人可见）：收银台 / 回跳页轮询使用
+      return request<{ intent: PaymentIntent }>(`/payments/intents/${encodeURIComponent(id)}`, { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
     cancelIntent(id: string) { // 取消未支付
       return request<{ ok: boolean }>(`/payments/intents/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }); // 返回当前函数的处理结果

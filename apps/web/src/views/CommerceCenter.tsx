@@ -15,8 +15,8 @@ import type { // 引入依赖、类型或本地模块绑定
   PaidAssetKind,
   PaymentChannel,
   Shipment,
-  ShopOrder,
   ThemeSettings,
+  UnifiedOrder,
   Withdrawal,
 } from '../api'; // 共享类型
 
@@ -54,7 +54,7 @@ export function CommerceCenter({ locale }: Props) { // 导出页面组件
   const [publishOpen, setPublishOpen] = useState(false); // 发布表单
   const [draft, setDraft] = useState({ code: '', kind: 'article' as PaidAssetKind, title: '', summary: '', body: '', price: '19', file: '', media: '', vip: false }); // 发布草稿（media：每行一个媒体地址）
 
-  const [orders, setOrders] = useState<ShopOrder[]>([]); // 赋值：更新变量 const 的取值
+  const [orders, setOrders] = useState<UnifiedOrder[]>([]); // 赋值：更新变量 const 的取值
   const [shipments, setShipments] = useState<Record<string, Shipment | null>>({}); // 赋值：更新变量 const 的取值
   const [reviewing, setReviewing] = useState<{ id: string; rating: number; content: string } | null>(null); // 赋值：更新变量 const 的取值
   const [afterOpen, setAfterOpen] = useState<{ id: string; kind: 'refund' | 'return'; reason: string } | null>(null); // 赋值：更新变量 const 的取值
@@ -102,8 +102,8 @@ export function CommerceCenter({ locale }: Props) { // 导出页面组件
     setAssets(data.items); // 写入
   } // loadAssets 结束
 
-  async function loadOrders() { // 拉订单与售后
-    const [list, after] = await Promise.all([api.shop.orders(), api.commerce.myAfterSales()]); // 并行
+  async function loadOrders() { // 拉订单与售后；订单读取走统一只读接口（实物线），售后记录仍走旧接口
+    const [list, after] = await Promise.all([api.commerce.orders({ source: 'shop' }), api.commerce.myAfterSales()]); // 并行
     setOrders(list.items); // 订单
     setAfterSales(after.items); // 售后
   } // loadOrders 结束
@@ -266,17 +266,17 @@ export function CommerceCenter({ locale }: Props) { // 导出页面组件
               {orders.map((order) => (
                 <li className="deploy-row" key={order.id}>{/* 执行当前业务步骤 */}
                   <div className="deploy-kv">{/* 执行当前业务步骤 */}
-                    <span>{order.product_name ?? order.product_code}</span>
-                    <span>{yuan(order.amount_cents)}</span>
+                    <span>{order.items[0]?.title ?? order.product_code}</span>
+                    <span>{yuan(order.total_cents)}</span>
                     <span className="deploy-badge muted">{ORDER_STATUS[order.status] ?? order.status}</span>
                   </div>
                   <div className="deploy-columns">{/* 执行当前业务步骤 */}
-                    <button type="button" className="btn ghost small" onClick={() => void run(async () => { const data = await api.commerce.shipment(order.id); setShipments({ ...shipments, [order.id]: data.shipment }); })}>{tr(locale, '查物流', 'Tracking')}</button>
+                    <button type="button" className="btn ghost small" onClick={() => void run(async () => { const data = await api.commerce.shipment(order.source_id); setShipments({ ...shipments, [order.id]: data.shipment }); })}>{tr(locale, '查物流', 'Tracking')}</button>
                     {order.status !== 'pending' && order.status !== 'refunded' && (
-                      <button type="button" className="btn ghost small" onClick={() => setReviewing({ id: order.id, rating: 5, content: '' })}>{tr(locale, '评价', 'Review')}</button>
+                      <button type="button" className="btn ghost small" onClick={() => setReviewing({ id: order.source_id, rating: 5, content: '' })}>{tr(locale, '评价', 'Review')}</button>
                     )}
                     {order.status === 'paid' || order.status === 'delivered' ? (
-                      <button type="button" className="btn ghost small" onClick={() => setAfterOpen({ id: order.id, kind: 'refund', reason: '' })}>{tr(locale, '申请售后', 'After-sales')}</button>
+                      <button type="button" className="btn ghost small" onClick={() => setAfterOpen({ id: order.source_id, kind: 'refund', reason: '' })}>{tr(locale, '申请售后', 'After-sales')}</button>
                     ) : null}
                   </div>
                   {shipments[order.id] ? (

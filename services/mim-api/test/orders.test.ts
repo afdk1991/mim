@@ -56,6 +56,35 @@ describe('统一交易域：回填与只读视图', () => {
     expect(res.body.items.every((item: { id: string }) => item.id.startsWith('uo_'))).toBe(true); // 主键可追溯到来源
   });
 
+  it('source 过滤只回该产线订单；实物线履约展示字段从旧表只读回源，非法 source 回 400', async () => {
+    const { token, userId } = await guest(); // 建一个访客会话
+    const moduleRow = db.prepare('SELECT id, region FROM modules LIMIT 1').get() as { id: string; region: string }; // 取一个种子模块
+    db.prepare(
+      `INSERT INTO module_orders (id, user_id, module_id, region, currency, amount_minor, status, channel, created_at, updated_at, paid_at)
+       VALUES ('mo-filter-1', ?, ?, ?, 'CNY', 1200, 'paid', 'alipay', '2026-11-01T00:00:00.000Z', '2026-11-01T00:01:00.000Z', '2026-11-01T00:01:00.000Z')`,
+    ).run(userId, moduleRow.id, moduleRow.region); // 模块线：已支付
+    const shopRow = db.prepare('SELECT id, price_cents FROM shop_products LIMIT 1').get() as { id: string; price_cents: number }; // 取一个种子商品
+    db.prepare(
+      `INSERT INTO shop_orders (id, user_id, product_id, quantity, amount_cents, discount_cents, payable_cents, status, delivery_kind, delivered_content, created_at, paid_at)
+       VALUES ('so-filter-1', ?, ?, 1, ?, 0, ?, 'delivered', 'virtual_auto', 'CARD-KEY-2026', '2026-11-02T00:00:00.000Z', '2026-11-02T00:00:30.000Z')`,
+    ).run(userId, shopRow.id, shopRow.price_cents, shopRow.price_cents); // 实物线：带发货方式与卡密说明
+    backfillUnifiedCommerce(db); // 启动期回填（这两条在首次启动后才插入，需手动补回填）
+    const shopOnly = await request(app).get('/api/v1/commerce/orders?source=shop').set('Authorization', `Bearer ${token}`); // 只取实物线
+    expect(shopOnly.status).toBe(200); // 登录后可读
+    expect(shopOnly.body.items).toHaveLength(1); // 只剩实物线一笔
+    expect(shopOnly.body.items[0].source).toBe('shop'); // 产线标记正确
+    expect(shopOnly.body.items[0].delivery_kind).toBe('virtual_auto'); // 发货方式从旧表只读回源
+    expect(shopOnly.body.items[0].delivered_content).toBe('CARD-KEY-2026'); // 卡密说明从旧表只读回源
+    expect(shopOnly.body.items[0].product_code).not.toBeNull(); // 商品编码来自统一商品表
+    const moduleOnly = await request(app).get('/api/v1/commerce/orders?source=module').set('Authorization', `Bearer ${token}`); // 只取模块线
+    expect(moduleOnly.status).toBe(200); // 可读
+    expect(moduleOnly.body.items).toHaveLength(1); // 只剩模块线一笔
+    expect(moduleOnly.body.items[0].source).toBe('module'); // 产线标记正确
+    const bad = await request(app).get('/api/v1/commerce/orders?source=bogus').set('Authorization', `Bearer ${token}`); // 非法产线值
+    expect(bad.status).toBe(400); // 显式拒绝，不静默放宽过滤
+    expect(bad.body.code).toBe('VALIDATION_FAILED'); // 统一校验错误信封
+  });
+
   it('回填幂等：重复执行不新增行，也不改动既有订单', async () => {
     const { userId } = await guest(); // 用户
     db.prepare(

@@ -856,6 +856,47 @@ export interface ShopOrder { // 商城订单
   cover_url: string | null; // 封面
 }
 
+// ---------- 统一交易域（commerce/orders）只读视图，与服务端 commerce/unified.ts 一一对应 ----------
+
+/** 统一订单来源产线：module 数字模块 / shop 实物卡密 / asset 付费资产 */
+export type UnifiedOrderSource = 'module' | 'shop' | 'asset';
+
+export interface UnifiedOrderItem { // 统一订单明细行
+  id: string; // 明细主键
+  product_id: string; // 商品主键
+  product_code: string | null; // 商品业务编码，寻址与回退展示用
+  title: string; // 下单时商品名快照
+  quantity: number; // 数量
+  unit_price_cents: number; // 下单时单价（分）
+}
+
+export interface UnifiedOrder { // 统一订单视图
+  id: string; // 统一订单主键（uo_<source>_<source_id>）
+  user_id: string; // 下单用户
+  source: UnifiedOrderSource; // 来源产线
+  source_id: string; // 源订单主键；旧履约 / 写路径仍按它定位源订单
+  status: string; // 统一状态机取值
+  channel: string; // 结算通道
+  currency: string; // 结算币种
+  total_cents: number; // 原价合计
+  discount_cents: number; // 优惠合计
+  payable_cents: number; // 实付金额
+  created_at: string; // 下单时间
+  paid_at: string | null; // 支付完成时间
+  product_code: string | null; // 首件商品编码
+  delivery_kind: string | null; // 实物线发货方式，仅 shop 来源有值
+  delivered_content: string | null; // 卡密 / 人工说明，仅 shop 来源有值
+  items: UnifiedOrderItem[]; // 订单明细
+}
+
+export interface UnifiedOrderSummary { // 统一订单汇总口径
+  total: number; // 订单总数
+  paid: number; // 已支付（含已发货）
+  pending: number; // 待支付
+  refunded: number; // 已退款
+  payable_cents: number; // 实付合计（分）
+}
+
 // ---------- 导航站（navigation）共享类型，与 routes/navigation.ts 响应一一对应 ----------
 
 export type NavStatus = 'ok' | 'broken' | 'unknown'; // 三态可达性

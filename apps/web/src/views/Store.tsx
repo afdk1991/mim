@@ -485,7 +485,7 @@ export function Store({ locale }: Props) {
   ); // 执行当前业务步骤
   // 拉取当前用户已购权益，用于在卡片上标注「已解锁」；匿名时不发请求、权益视为空，登录态变化时重新拉取
   const entState = useAsync(() => (authed ? api.catalog.getMyEntitlements() : Promise.resolve(null)), [authed]);  // 拉取我的订单：付费模块下单后在这里展示「待结算 / 已结算 / 已取消」并提供取消入口；匿名时不发请求
-  const ordersState = useAsync(() => (authed ? api.catalog.getMyOrders() : Promise.resolve(null)), [authed]); // 常量 ordersState：保存固定配置或一次性派生值
+  const ordersState = useAsync(() => (authed ? api.commerce.orders({ source: 'module' }) : Promise.resolve(null)), [authed]); // 拉取我的订单：统一只读接口（模块线），付费模块下单后在这里展示「待结算 / 已结算 / 已取消」并提供取消入口；匿名时不发请求
   // 当前展开详情的模块编码：null 表示全部收起
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
   // 详情画廊当前选中的图片序号：切换商品时回到首图，避免串图
@@ -542,9 +542,9 @@ export function Store({ locale }: Props) {
   // 我的权益列表：仅登录态有数据
   const entitlements = entState.data?.entitlements ?? [];
   // 我的订单列表：仅登录态有数据
-  const orders = ordersState.data?.orders ?? [];
+  const orders = ordersState.data?.items ?? [];
   // 待结算订单按模块编码索引：卡片据此提示「已有待结算订单」，避免用户重复下单
-  const pendingOrders = new Map(orders.filter((order) => order.status === 'pending').map((order) => [order.module_code, order]));
+  const pendingOrders = new Map(orders.filter((order) => order.status === 'pending').map((order) => [order.product_code ?? '', order]));
   // 三个接口任一仍在加载即视为整体加载中（匿名态权益/订单请求立即完成，不阻塞），避免出现半屏数据
   const loading = modulesState.loading || entState.loading || ordersState.loading;
 
@@ -1119,12 +1119,12 @@ export function Store({ locale }: Props) {
                   // 状态徽标修饰类：未知状态回退默认样式
                   const badgeClass = ORDER_STATUS_BADGE[order.status] ?? '';
                   // 金额文案：分转元并保留两位
-                  const amount = (order.amount_minor / 100).toFixed(2);
+                  const amount = (order.total_cents / 100).toFixed(2);
                   // 返回单行订单
                   return (
                     <li key={order.id}>{/* 以订单主键作为 key */}
                       <span>{/* 左侧：模块名 + 订单号前 8 位（便于对账） */}
-                        {nameOf(order.module_code)}{/* 模块展示名 */}
+                        {nameOf(order.product_code ?? '')}{/* 模块展示名 */}
                         <span className="muted">（{order.id.slice(0, 8)}）</span>{/* 短单号 */}
                       </span>{/* 左侧结束 */}
                       <span className="row">{/* 右侧：金额 + 状态 + 取消入口 */}
@@ -1138,8 +1138,8 @@ export function Store({ locale }: Props) {
                             className="btn ghost small"
                             // 取消中禁用，避免重复点击
                             disabled={busyCode === `order:${order.id}`}
-                            // 点击取消该订单
-                            onClick={() => handleCancelOrder(order.id)}
+                            // 点击取消该订单：旧取消路由按源订单主键定位，故传 source_id
+                            onClick={() => handleCancelOrder(order.source_id)}
                           >
                             {locale === 'en-US' ? 'Cancel' : '取消'}{/* 取消按钮文案 */}
                           </button> // 取消按钮结束

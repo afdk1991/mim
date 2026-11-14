@@ -18,9 +18,9 @@ import type { // 引入依赖、类型或本地模块绑定
   CommunityPost,
   CommunityThread,
   CommunityThreadDetail,
-  ShopOrder,
   ShopProduct,
   ThreadKind,
+  UnifiedOrder,
   VipPlan,
   WalletSnapshot,
   WalletTransaction,
@@ -49,7 +49,7 @@ const PRODUCT_KIND: Record<ShopProduct['kind'], string> = { // 常量 PRODUCT_KI
   virtual_manual: '虚拟 · 人工发货',
 }; // 代码块结束
 
-const ORDER_STATUS: Record<ShopOrder['status'], string> = { // 常量 ORDER_STATUS：保存固定配置或一次性派生值
+const ORDER_STATUS: Record<string, string> = { // 常量 ORDER_STATUS：保存固定配置或一次性派生值
   pending: '待支付',
   paid: '已支付',
   delivered: '已发货',
@@ -146,7 +146,7 @@ export function Community({ locale }: Props) {
   const [favorites, setFavorites] = useState<CommunityThread[]>([]); // 赋值：更新变量 const 的取值
 
   const [products, setProducts] = useState<ShopProduct[]>([]); // 赋值：更新变量 const 的取值
-  const [orders, setOrders] = useState<ShopOrder[]>([]); // 赋值：更新变量 const 的取值
+  const [orders, setOrders] = useState<UnifiedOrder[]>([]); // 赋值：更新变量 const 的取值
   const [buying, setBuying] = useState<string | null>(null); // 赋值：更新变量 const 的取值
   const [quantity, setQuantity] = useState(1); // 赋值：更新变量 const 的取值
   const [coupon, setCoupon] = useState(''); // 赋值：更新变量 const 的取值
@@ -198,7 +198,7 @@ export function Community({ locale }: Props) {
 
   async function loadShop() { // 函数 loadShop：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      const [p, o] = await Promise.all([api.shop.products(), api.shop.orders()]); // 赋值：更新变量 const 的取值
+      const [p, o] = await Promise.all([api.shop.products(), api.commerce.orders({ source: 'shop' })]); // 赋值：更新变量 const 的取值（商品目录走旧接口，订单读取切统一只读接口）
       setProducts(p.products);
       setOrders(o.items);
     } catch (err) {
@@ -1067,14 +1067,14 @@ export function Community({ locale }: Props) {
             {orders.map((o) => (
               <article key={o.id} className="community-order">{/* 执行当前业务步骤 */}
                 <div className="community-order-main">{/* 执行当前业务步骤 */}
-                  <strong>{o.product_name}</strong>
-                  <span>{ORDER_STATUS[o.status]} · {o.delivery_kind} · {dateOnly(o.created_at)}</span>
-                  <span>原价 {yuan(o.amount_cents)}，优惠 {yuan(o.discount_cents)}，实付 {yuan(o.payable_cents)}</span>
+                  <strong>{o.items[0]?.title ?? o.product_code ?? o.id}</strong>
+                  <span>{ORDER_STATUS[o.status] ?? o.status} · {o.delivery_kind ?? ''} · {dateOnly(o.created_at)}</span>
+                  <span>原价 {yuan(o.total_cents)}，优惠 {yuan(o.discount_cents)}，实付 {yuan(o.payable_cents)}</span>
                   {o.delivered_content && <code>{o.delivered_content}</code>}
                 </div>
                 <div className="community-order-actions">{/* 执行当前业务步骤 */}
-                  {o.status === 'paid' && <button type="button" onClick={() => void confirmOrder(o.id)}>确认收货</button>}
-                  {o.status !== 'refunded' && o.status !== 'cancelled' && <button type="button" onClick={() => void refundOrder(o.id)}>退款</button>}
+                  {o.status === 'paid' && <button type="button" onClick={() => void confirmOrder(o.source_id)}>确认收货</button>}
+                  {o.status !== 'refunded' && o.status !== 'cancelled' && <button type="button" onClick={() => void refundOrder(o.source_id)}>退款</button>}
                 </div>
               </article>
             ))}
