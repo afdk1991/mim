@@ -20,12 +20,13 @@
 #   APP_DIR     默认 /opt/mim/app
 #   WEB_DIR     默认 /opt/mim/web
 #   ADMIN_DIR   默认 /opt/mim/admin（管理后台静态根，nginx 的 /admin/ 指向此处）
+#   HELP_DIR    默认 /opt/mim/help（文档站静态根，nginx 的 help.<域名> 指向此处）
 #   SERVICE     默认 mim-api
 #   DATA_DIR    默认 /var/lib/mim（SQLite 库落盘处，必须在 APP_DIR 之外且本脚本永不清空）
 #   MIM_DEPLOY_STOP_AFTER  仅演练用：data / sync 阶段完成后提前退出，生产勿设
 #   MIM_API_PORT 后端回环端口（API + WS 共用），默认 8787；旧变量 PORT_ 仍兼容
-#   MIM_WEB_HTTP_PORT   前端 HTTP 端口，默认 8080（同机 MixmAPP 占用 80/443）
-#   MIM_WEB_HTTPS_PORT  前端 HTTPS 端口，默认 8443
+#   MIM_WEB_HTTP_PORT   前端 HTTP 端口，默认 8088（同机 MixmAPP 占用 80/443）
+#   MIM_WEB_HTTPS_PORT  前端 HTTPS 端口，默认 443（与 MixmAPP 共享监听，不抢 default_server）
 #   MIM_TLS_CERTBOT     1=沿用 certbot --nginx 独占 80/443 的老路径；0（默认）=同机共存，
 #                       证书用 DNS-01 另行签发后由本脚本只引用既有 pem，不申请、不改 80 端口
 #   MIM_NGINX_TAKE_DEFAULT 1=删除 sites-enabled/default 独占机器；0（默认）=不动同机其它站点
@@ -43,6 +44,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 ADMIN_DIR="${ADMIN_DIR:-/opt/mim/admin}"
+HELP_DIR="${HELP_DIR:-/opt/mim/help}"
 SERVICE="${SERVICE:-mim-api}"
 # 数据目录：SQLite 库落盘处，必须独立于 APP_DIR。
 # 背景（2026-11-15）：首次部署分支会 rm -rf "$APP_DIR" 再 clone，历史上曾把
@@ -58,8 +60,8 @@ case "$DATA_DIR" in
 esac
 # 端口三件套：前端 HTTP / 前端 HTTPS / 后端回环。三者全部可配，nginx 模板与健康检查
 # 统一从这三个变量渲染，禁止在配置里再写死 80/443/8787。
-MIM_WEB_HTTP_PORT="${MIM_WEB_HTTP_PORT:-8080}"
-MIM_WEB_HTTPS_PORT="${MIM_WEB_HTTPS_PORT:-8443}"
+MIM_WEB_HTTP_PORT="${MIM_WEB_HTTP_PORT:-8088}"
+MIM_WEB_HTTPS_PORT="${MIM_WEB_HTTPS_PORT:-443}"
 MIM_API_PORT="${MIM_API_PORT:-${PORT_:-8787}}"
 PORT_="$MIM_API_PORT"
 # 同机共存默认值：不抢 default_server、不跑 certbot（80 端口归 MixmAPP）
@@ -261,6 +263,13 @@ mkdir -p "$ADMIN_DIR"
 rm -rf "$ADMIN_DIR"/*
 cp -R "$APP_DIR/apps/admin/dist/." "$ADMIN_DIR/"
 
+# 文档站：仓库 help/ 是纯静态目录（index.html + content/help.json），没有构建步骤，
+# 整目录原样发布到 nginx 的 help.<域名> 静态根，与用户端 / 管理后台产物互不覆盖。
+log "发布文档站静态产物 → $HELP_DIR"
+mkdir -p "$HELP_DIR"
+rm -rf "$HELP_DIR"/*
+cp -R "$APP_DIR/help/." "$HELP_DIR/"
+
 # --- 5. JWT 密钥与属主 ---
 # 数据目录、APP 侧符号链接与历史目录迁移已在 §1.5 完成（先于任何 git 操作），
 # 这里不再重复任何数据目录逻辑，也不再对该目录做删除。
@@ -299,14 +308,16 @@ else
   printf 'MIM_CORS_ORIGINS=%s\n' "$CORS_DEFAULT" >> "$MIM_ENV_FILE"
 fi
 
-# 端口化后的同源 Origin：主站与 API 子域从 443 改到 8443 后，浏览器 Origin 会带端口，
-# 旧白名单不含带端口形态 → 跨域直连会被 CORS 拒绝。这里只做「缺则追加」，不覆盖既有自定义值。
-for PORTED_ORIGIN in "https://laal.top:${MIM_WEB_HTTPS_PORT}" "https://api.laal.top:${MIM_WEB_HTTPS_PORT}"; do
-  if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" && ! grep '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" | grep -Fq "$PORTED_ORIGIN"; then
-    sed -i "s|^MIM_CORS_ORIGINS=\(.*\)$|MIM_CORS_ORIGINS=\1,${PORTED_ORIGIN}|" "$MIM_ENV_FILE"
-    log "追加带端口 Origin 到 MIM_CORS_ORIGINS（$PORTED_ORIGIN）"
-  fi
-done
+# 端口化后的同源 Origin：HTTPS 端口取默认 443 时浏览器 Origin 不带端口（上面的默认列表已覆盖），
+# 只有被仓库变量覆盖成非 443（如历史 8443）才会带端口，此时才需要追加，避免写入永远匹配不上的 :443。
+if [ "${MIM_WEB_HTTPS_PORT}" != "443" ]; then
+  for PORTED_ORIGIN in "https://laal.top:${MIM_WEB_HTTPS_PORT}" "https://api.laal.top:${MIM_WEB_HTTPS_PORT}"; do
+    if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" && ! grep '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" | grep -Fq "$PORTED_ORIGIN"; then
+      sed -i "s|^MIM_CORS_ORIGINS=\(.*\)$|MIM_CORS_ORIGINS=\1,${PORTED_ORIGIN}|" "$MIM_ENV_FILE"
+      log "追加带端口 Origin 到 MIM_CORS_ORIGINS（$PORTED_ORIGIN）"
+    fi
+  done
+fi
 
 # 管理员密码登录口令：生产短信/邮件通道未接入时，POST /api/v1/auth/password 是唯一可用登录入口。
 # 安全修复（2026-11-07）：禁止再写入仓库内可查的固定默认口令（原字面值已从全仓移除）。
@@ -406,8 +417,9 @@ else
 fi
 
 # --- 5.5 数据库迁移（幂等，按文件名顺序执行；首次部署无 DB 时跳过） ---
-# 迁移脚本位于 deploy/migrations/*.cjs，均以 better-sqlite3 backup API 先备份再 DROP/重建，
-# 可反复重放。任一迁移失败即中止部署（set -e），避免把半迁移的库暴露给新代码。
+# 迁移脚本位于 deploy/migrations/*.cjs，均为幂等可重放。**本项目不创建任何数据库备份**：
+# 迁移不回滚、不生成备份文件，数据丢失不可恢复，执行前须自行确认影响面。
+# 任一迁移失败即中止部署（set -e），避免把半迁移的库暴露给新代码。
 # $DB_FILE 已在 §1.5 定义（=$DATA_DIR/mim.db），此处直接复用，避免两处口径漂移。
 if [ -f "$DB_FILE" ]; then
   log "执行数据库迁移（$APP_DIR/deploy/migrations）"
@@ -522,7 +534,8 @@ if command -v nginx >/dev/null 2>&1; then
   # 与 bootstrap.sh 同一 sed 规则：域占位 + 端口占位 + TLS 片段三组替换。
   # 必须全量替换域：配置里还有 api / admin / center 等子域 server_name 与 301 跳转目标，
   # 只改主站会让子域仍解析到模板域，切域后子域全断。
-  # 端口必须走占位符：同机 MixmAPP 占用 80/443，Mim 固定 8080/8443，且可能因冲突再调整。
+  # 端口必须走占位符：同机 MixmAPP 占用 80/443（Mim 在 443 上与其共享监听、不抢 default_server），
+  # HTTP 回退口 8088，且可能因冲突再调整。
   sed -e "s/laal\.top/${NGINX_DOMAIN}/g" \
       -e "s|__MIM_WEB_HTTP_PORT__|${MIM_WEB_HTTP_PORT}|g" \
       -e "s|__MIM_WEB_HTTPS_PORT__|${MIM_WEB_HTTPS_PORT}|g" \
@@ -586,8 +599,8 @@ if command -v nginx >/dev/null 2>&1; then
   # 断言 /admin/ 真实返回管理后台页面：以响应体含 noindex 为准。
   # 不可用 `curl http://127.0.0.1/admin` 的 301 作为判据：整站强制 HTTPS 时会 301，
   # 该结果无法区分「location = /admin 生效」与「整站跳转」，属假阳性。
-  # 端口化后必须带新端口探测：--resolve 指回本机 8443 取 HTTPS；无证书时退化为
-  # Host 头直连本机 8080，保证共存且未签证书的机器也能得到真实判据。
+  # 端口化后必须带新端口探测：--resolve 指回本机 ${MIM_WEB_HTTPS_PORT}（默认 443）取 HTTPS；无证书时退化为
+  # Host 头直连本机 ${MIM_WEB_HTTP_PORT}（默认 8088），保证共存且未签证书的机器也能得到真实判据。
   if [ "$TLS_ENABLED" -eq 1 ]; then
     ADMIN_BODY="$(curl -k -s --max-time 5 --resolve "${NGINX_DOMAIN}:${MIM_WEB_HTTPS_PORT}:127.0.0.1" \
       "https://${NGINX_DOMAIN}:${MIM_WEB_HTTPS_PORT}/admin/" || true)"

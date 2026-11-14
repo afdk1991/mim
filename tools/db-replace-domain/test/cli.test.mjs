@@ -4,7 +4,7 @@
  * 数据库批量替换 / 换域名测试（node:test，零新增依赖，不联网）：
  *   1. 普通 URL 与 http/https、www/非 www 变体替换；
  *   2. PHP 序列化字符串长度按字节重算（域名变长不破坏反序列化）；
- *   3. apply 前生成 .bak 备份；
+ *   3. apply 替换落盘且不生成任何备份文件；
  *   4. dry-run 不改文件；
  *   5. apply 后二次 apply 幂等（无新增改动）；
  *   6. SQLite 库模式：dry-run 只读、apply 写回、二次 apply 幂等。
@@ -94,7 +94,7 @@ test('dry-run 不改文件，只输出预览摘要', () => {
   assert.equal(existsSync(`${sql}.bak`), false, 'dry-run 不得生成备份');
 });
 
-test('apply 生成 .bak 备份，替换落盘且序列化长度正确', () => {
+test('apply 替换落盘，serialized 长度正确且不生成备份文件', () => {
   const dir = tempDir();
   const sql = join(dir, 'dump.sql');
   writeFileSync(sql, SAMPLE, 'utf8');
@@ -102,8 +102,8 @@ test('apply 生成 .bak 备份，替换落盘且序列化长度正确', () => {
   const r = runCli(['--input', sql, '--from', FROM, '--to', TO, '--apply']);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.json.dryRun, false);
-  assert.ok(r.json.backup.created, '应创建 .bak');
-  assert.equal(readFileSync(`${sql}.bak`, 'utf8'), SAMPLE, '备份必须是原始内容');
+  assert.equal(r.json.backup, undefined, '不应返回备份信息');
+  assert.equal(existsSync(`${sql}.bak`), false, '不得生成 .bak 备份');
 
   const after = readFileSync(sql, 'utf8');
   assert.ok(after.includes(`https://${TO}`));
@@ -147,7 +147,7 @@ test('SQLite 模式：dry-run 只读，apply 写回，二次 apply 幂等', () =
   // apply：写回
   const apply = runCli(['--input', dbPath, '--from', FROM, '--to', TO, '--apply']);
   assert.equal(apply.status, 0, apply.stderr);
-  assert.ok(apply.json.backup.created);
+  assert.equal(existsSync(`${dbPath}.bak`), false, '不得生成 .bak 备份');
   const check2 = new DatabaseSync(dbPath, { readOnly: true });
   const row2 = check2.prepare('SELECT body FROM posts WHERE id=1').get();
   check2.close();

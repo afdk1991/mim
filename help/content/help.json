@@ -180,7 +180,7 @@
             {
               "type": "note",
               "tone": "warn",
-              "text": "待填外部信息：文档站域名（如 help.laal.top）需要 DNS 记录与证书；证书未签下前不要把它写进其他站点的正式外链。域名、NS、证书三项均属外部凭据，未提供时保持空位。"
+              "text": "现网已上线：https://help.laal.top（443，静态根 /opt/mim/help，由 deploy/deploy.sh 随发布同步）。证书由 laal.top 的泛域名 *.laal.top 覆盖，无需为文档站单独签发；可作为正式外链引用。"
             },
             {
               "type": "p",
