@@ -1321,3 +1321,15 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 **生产主机侧异常与阻断（2026-11-13 22:1x +08:00 复测）**：提交 `43b3b08`（CI 守卫）Deploy run `43438813684` 质量门禁、GitHub Pages、ghcr、托管平台同步（3m16s）均 ✓，唯「发布到生产服务器」两轮失败——① 首轮远程发布在 `vite build` transforming 约 5 分钟后 SSH `Connection reset by peer` / `Broken pipe`（exit 255）；② rerun 后 `scp`/`ssh` 直接 `Permission denied (publickey,password)`，未走到远程脚本。主机侧探测：ICMP 通、22 端口 TCP 可连（sshd 监听中）、443 端口连续两次 TCP 不通，本机 HTTPS 直连 `000`（2.1s 快速失败）。判读：主机在线、SSH 端口开放，但 nginx / mim-api 服务侧未监听（或 443 防火墙拦截），且 Runner 部署公钥被拒（疑 fail2ban 封禁 Runner IP，或 `authorized_keys` / sshd 状态变化）。**阻断前提**：沙箱无主机 SSH 私钥与云控制台（tccli）凭证，无法登录主机重启 `nginx`/`mim-api`、校验 `authorized_keys` 或解封 fail2ban；此轮不宣称生产已上线，代码与静态分发（Pages / ghcr / Cloudflare 边缘）已闭环，生产主机侧待主机凭证恢复后重跑部署。
 
 **结论**：全仓不存在同方法同路径的重复路由、不存在指向同一视图的重复路径段、不存在重名组件 / 工厂 / 入口键 / 部署项；数据库 code 重复表象已确认为双区域设计。本轮仅清理前端旧段表内 4 条永不命中的同名死条目，未改任何对外新段、后端契约与数据库结构。
+
+### 9.36 全项目完成度复核：仓库侧门禁闭环，生产域名被 MixmAPP 接管（2026-11-14 17:0x +08:00）
+
+**仓库侧门禁（本地实测，HEAD `1387c53`，三端 origin / gitee 平齐）**：`pnpm -r typecheck` 5/5 Done 0 错；`@mim/api` vitest **58 文件 / 675 例全过**；`@mim/web` 构建 ✓（产物 `index-sdgam9Sb.js`）；`verify-deployments` 55/55、`verify-site-modules` 83/83、`verify-entry-manifest` 23/23、`verify-custom-domains` 20/20、`verify-auth-gate` **39/39**；version-check / env-check ✓，comment-check 总体 baseline 通过（`catalogArt.ts` 62.8% 单文件偏低属既有基线）。
+
+**本轮闭环缺口**：P1-A 把 `apps/web/src/api.ts` 拆为 `api/request.ts`（会话/请求核心）、`api/endpoints.ts`（22 域端点）、`api/types.ts`（类型），旧 `api.ts` 收敛为桶导出壳；`verify-auth-gate.mjs` 静态断言原先只读旧单文件，导致 7 条会话链路断言（SESSION_KEY / isValidSession / parseSession / expired 广播 / storage 同步 / verifySession / guest 封装）误报失败。已将脚本改为聚合读取拆分后四文件，断言恢复 39/39；代码本身无缺失，符号均在 `request.ts`。
+
+**生产现状变更（较 11-13 22:1x 快照）**：`115.159.159.11` 的 443 端口 TCP 已恢复监听，但 `https://mim.mixm.top/` 与 `/admin/` 返回的是 **MixmAPP 前端 SPA**（`window.__MIXMAPP_API_BASE__="/mixmapp/api/v1"`、`<title>MixmAPP</title>`、`/assets/uni.e9d47b7e.css`），非 Mim 前端。Mim 业务端点 `/api/v1/modules|navigation/summary|entries/overview|sites/overview|search/summary` 全部 404；`/mixmapp/api/v1/me` 返回 401 `UNAUTHORIZED`「请先登录」。信封比对：线上为嵌套 `{"error":{code,message:"未找到路由 ...",requestId}}`（camelCase `requestId`、中文 message），本地 Mim 后端 `notFound` 为扁平 `{code,message:"route METHOD url not found",request_id}`（snake_case、英文 message）——两者结构不同，判定线上 `/api` 由 **MixmAPP 后端**接管，Mim 前端与后端均未在该域名下对外服务。Mim 后端进程是否仍在主机运行、nginx 站点配置如何被覆盖、SQLite 数据是否保留，均需登录主机核对。
+
+**CI 取证**：最新 Deploy run `43579051213`（api.ts 拆分提交）质量门禁 ✓ 1m19s、托管平台同步 ✓ 5m1s、ghcr ✓ 1m6s，唯「发布到生产服务器」✗ 17s，失败于「上传本次提交的部署脚本」：`Permission denied (publickey,password)` / `scp: Connection closed` / exit 255，与 11-13 同根因。
+
+**阻断前提（未变）**：沙箱无被授权的主机 SSH 私钥（本机 `mim_deploy` / `mixmapp_deploy` 两把 × root/ubuntu/deploy/admin 四用户均 publickey denied）、无腾讯云控制台 / tccli 凭证与环境变量，无法登录主机核对 nginx 站点、systemd `mim-api` 状态或切回 Mim 站点。代码、单测、清单一致性与静态分发（Pages / ghcr / Cloudflare 边缘）已闭环；生产主机侧待主机凭证恢复后重跑部署并复核站点归属。
