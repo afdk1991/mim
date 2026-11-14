@@ -292,7 +292,13 @@ export function createImRouter(deps: ApiDeps): Router {
       replyToId: quoted?.id, // 引用目标 ID
       replyExcerpt: quoted?.excerpt, // 引用摘要快照
     }); // 代码块结束
-    // 实时推送走 WebSocket 通道（见 im/ws.ts），HTTP 兜底仅落库并返回消息对象
+    // HTTP 兜底发送同样要实时推送：否则发送方 WS 掉线时，在线接收方只能刷新后才看到消息
+    const members = getMemberUserIds(deps.db, conversationId); // 会话全部成员
+    deps.imHub?.broadcastToUsers(members, { type: 'message.new', payload: { message } }, userId); // 推给除发送者外的在线成员
+    const hasOnlineReceiver = members.some((m) => m !== userId && deps.imHub?.isOnline(m)); // 是否存在在线接收方
+    if (hasOnlineReceiver) { // 条件分支：按判断结果选择后续处理路径
+      deps.imHub?.sendToUser(userId, { type: 'message.delivered', payload: { conversation_id: conversationId, message_id: message.id } }); // 给发送者回投递回执
+    } // 代码块结束
     res.status(201).json({ message });
   }); // 代码块结束
 
@@ -330,6 +336,12 @@ export function createImRouter(deps: ApiDeps): Router {
     if (!isMember(deps.db, conversationId, userId)) return res.status(403).json({ error: '非会话成员' }); // 条件分支：按判断结果选择后续处理路径
     const body = parse(z.object({ message_id: z.string() }), req.body); // 已读到的消息 ID
     markConversationRead(deps.db, conversationId, userId, body.message_id); // 调用 markConversationRead 并处理其返回结果
+    // HTTP 已读也要广播回执，否则对方只能等下次发消息才知道你已读
+    const members = getMemberUserIds(deps.db, conversationId); // 会话全部成员
+    deps.imHub?.broadcastToUsers(members, { // 执行当前业务步骤
+      type: 'message.read', // 已读事件
+      payload: { conversation_id: conversationId, reader_id: userId, message_id: body.message_id }, // 读者与游标
+    }); // 代码块结束
     res.json({ ok: true }); // 执行当前业务步骤
   }); // 代码块结束
 

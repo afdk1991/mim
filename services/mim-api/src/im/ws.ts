@@ -25,9 +25,10 @@ import type { // 引入依赖、类型或本地模块绑定
   TypingPayload, // 执行当前业务步骤
 } from './protocol.js'; // 协议类型
 
-/** 把 IM WebSocket 挂到一个 HTTP server 上；返回 ImHub 供 HTTP 路由推送事件用 */
-export function attachImWebSocket(server: HttpServer, deps: ApiDeps): ImHub {
-  const hub = new ImHub(); // 新建连接管理中心
+/** 把 IM WebSocket 挂到一个 HTTP server 上；返回 ImHub 供 HTTP 路由推送事件用
+ *  hub 可由外部先创建并注入依赖容器：createApp 会浅拷贝依赖，晚于 createApp 挂载会导致 HTTP 路由读不到 hub
+ */
+export function attachImWebSocket(server: HttpServer, deps: ApiDeps, hub: ImHub = new ImHub()): ImHub {
   const wss = new WebSocketServer({ noServer: true }); // 不自动监听端口，由外部 server 的 upgrade 事件驱动
 
   // 处理升级请求：校验 token → 建立 WS 连接
@@ -193,11 +194,11 @@ async function handleMessageSend(
   // 广播给同会话其它在线成员
   const members = getMemberUserIds(deps.db, p.conversation_id);
   hub.broadcastToUsers(members, { type: 'message.new', payload: { message } }, userId); // 执行当前业务步骤
-  // 对在线接收方标记 delivered（简化：只要对方在线即视为已投递）
-  for (const m of members) {
-    if (m !== userId && hub.isOnline(m)) { // 条件分支：按判断结果选择后续处理路径
-      hub.sendToUser(m, { type: 'message.delivered', payload: { message_id: message.id } }); // 执行当前业务步骤
-    } // 代码块结束
+  // 投递回执发给发送者本人（简化：只要有一个接收方在线即视为已投递）
+  // 原实现把 delivered 帧发给了接收方，发送方永远看不到「已送达」，属于回执方向错误
+  const hasOnlineReceiver = members.some((m) => m !== userId && hub.isOnline(m)); // 是否存在在线接收方
+  if (hasOnlineReceiver) { // 条件分支：按判断结果选择后续处理路径
+    hub.sendToUser(userId, { type: 'message.delivered', payload: { conversation_id: p.conversation_id, message_id: message.id } }); // 通知发送者已送达
   } // 代码块结束
 } // handleMessageSend 结束
 

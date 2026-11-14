@@ -162,10 +162,21 @@ export function Chat({ locale }: ChatProps) {
   const [draft, setDraft] = useState(''); // 输入框文本
   const [sending, setSending] = useState(false); // 发送中
   const [error, setError] = useState<string | null>(null); // 错误提示
+  const [loadingConversations, setLoadingConversations] = useState(true); // 会话列表首次加载中
+  const [loadingMessages, setLoadingMessages] = useState(false); // 当前会话消息加载中
   const messagesEndRef = useRef<HTMLDivElement | null>(null); // 滚动锚点
+  const skipScrollRef = useRef(false); // 加载更早消息时跳过自动滚到底，避免把用户甩到最下面
 
   // 发送请求序号 → 本地乐观消息 ID，ack 回来后据此替换
   const pendingRef = useRef<Map<string, string>>(new Map());
+  // 会话列表快照：给回调取「进入前未读数」，避免把 conversations 放进依赖导致回调反复重建
+  const conversationsRef = useRef<ImConversation[]>([]);
+  // 当前会话快照：实时回调与重连补拉都要读最新值，不能依赖闭包里的旧 state
+  const activeIdRef = useRef<string | null>(null);
+  // 打开会话的请求序号：快速切换会话时丢弃过期响应，防止 A 的消息渲染到 B 窗口
+  const openSeqRef = useRef(0);
+  // 是否已经历过首次连接成功：用于区分「首连」与「断线重连」，只在重连时补拉
+  const openedOnceRef = useRef(false);
 
   // ---------- 搜索与建群 ----------
   const [searchQ, setSearchQ] = useState(''); // 用户搜索关键词（建私聊 / 加群选人共用）
@@ -212,8 +223,11 @@ export function Chat({ locale }: ChatProps) {
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const res = await api.im.listConversations(); // 拉取列表
       setConversations(res.items); // 更新
+      conversationsRef.current = res.items; // 同步快照，供回调读取最新未读数
     } catch {
       setError(isZh ? '加载会话失败' : 'Failed to load conversations'); // 失败提示
+    } finally {
+      setLoadingConversations(false); // 无论成功失败都结束首次加载态
     } // 代码块结束
   }, [isZh]); // loadConversations 结束
 
@@ -222,35 +236,59 @@ export function Chat({ locale }: ChatProps) {
     loadConversations();
   }, [loadConversations]);
 
-  /** 打开某会话：拉消息、清搜索、标已读、载群成员 */
+  // 卸载时清掉「正在输入」定时器，避免组件销毁后仍触发 setState
+  useEffect(() => () => {
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current); // 清理残留定时器
+  }, []);
+
+  /** 标记已读：优先走 WS（服务端会向发送方广播已读回执），WS 不可用再走 HTTP；本地先清掉角标 */
+  const markRead = useCallback(
+    (conversationId: string, messageId: string) => {
+      // 本地立即清零未读，避免角标一直挂着等接口回来
+      setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)));
+      conversationsRef.current = conversationsRef.current.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c));
+      if (connected) { // 条件分支：按判断结果选择后续处理路径
+        const reqId = send({ type: 'message.read', payload: { conversation_id: conversationId, message_id: messageId } }); // WS 已读帧
+        if (reqId) return; // WS 已发出：等服务端广播回执后再刷新列表
+      } // connected 分支结束
+      api.im.markRead(conversationId, messageId).catch(() => undefined); // HTTP 兜底（服务端同样会广播回执）
+    }, // 代码块结束
+    [connected, send],
+  ); // markRead 结束
+
+  /** 打开某会话：拉消息、清搜索、标已读 */
   const openConversation = useCallback(
     async (conversationId: string) => { // 执行当前业务步骤
+      const seq = ++openSeqRef.current; // 本次打开请求序号
+      const unreadBefore = conversationsRef.current.find((c) => c.id === conversationId)?.unread_count ?? 0; // 进入前未读数（用快照，避免依赖旧闭包）
       setActiveId(conversationId); // 切换选中
+      activeIdRef.current = conversationId; // 同步快照，实时回调立即生效
       setMsgQuery(''); // 清会话内搜索
       setMsgResults(null); // 清搜索结果
       setPanelOpen(false); // 关群面板
       setReplyTarget(null); // 清引用态，避免把上个会话的引用带过来
       setHighlightId(null); // 清高亮
       setUnreadAnchorId(null); // 清未读分割线
+      setMessages([]); // 先清空，避免加载期间显示上一个会话的消息
+      setHasMore(false); // 重置翻页标记
+      setLoadingMessages(true); // 进入消息加载态
       try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.listMessages(conversationId, { limit: 50 }); // 最近 50 条
+        if (seq !== openSeqRef.current) return; // 已切到其它会话：丢弃过期响应
         setMessages(res.items); // 更新消息
         setHasMore(res.items.length >= 50); // 满 50 条才可能还有更早
-        const unread = conversations.find((c) => c.id === conversationId)?.unread_count ?? 0; // 进入前的未读数
-        if (unread > 0 && res.items.length > unread) { // 条件分支：按判断结果选择后续处理路径
-          setUnreadAnchorId(res.items[res.items.length - unread].id); // 未读起点：分割线插在该条之前
+        if (unreadBefore > 0 && res.items.length >= unreadBefore) { // 条件分支：按判断结果选择后续处理路径
+          setUnreadAnchorId(res.items[res.items.length - unreadBefore].id); // 未读起点：分割线插在该条之前
         } // 有未读且能定位才画分割线
         const last = res.items[res.items.length - 1]; // 最后一条
-        if (last) { // 条件分支：按判断结果选择后续处理路径
-          // 标记已读并刷新列表，让未读角标消失
-          await api.im.markRead(conversationId, last.id).catch(() => undefined);
-          loadConversations();
-        } // 有消息才标记
+        if (last) markRead(conversationId, last.id); // 标记已读（本地立即清角标）
       } catch {
-        setError(isZh ? '加载消息失败' : 'Failed to load messages'); // 失败提示
+        if (seq === openSeqRef.current) setError(isZh ? '加载消息失败' : 'Failed to load messages'); // 失败提示
+      } finally {
+        if (seq === openSeqRef.current) setLoadingMessages(false); // 结束加载态
       } // try 结束
     }, // 代码块结束
-    [isZh, loadConversations, conversations],
+    [isZh, markRead],
   ); // openConversation 结束
 
   /** 加载更早消息：以当前第一条为游标向前翻页 */
@@ -259,6 +297,7 @@ export function Chat({ locale }: ChatProps) {
     setLoadingMore(true); // 置加载中
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const res = await api.im.listMessages(activeId, { before: messages[0].id, limit: 50 }); // 取更早 50 条
+      skipScrollRef.current = true; // 前置插入：本次渲染不要自动滚到底
       setMessages((prev) => [...res.items, ...prev]); // 拼到列表头部
       setHasMore(res.items.length >= 50); // 满页才继续可翻
     } catch {
@@ -274,14 +313,14 @@ export function Chat({ locale }: ChatProps) {
   useEffect(() => {
     return onMessage((raw) => { // 返回当前函数的处理结果
       const msg = raw as ImMessage; // 断言为消息结构
-      if (msg.conversation_id === activeId) { // 条件分支：按判断结果选择后续处理路径
+      if (msg.conversation_id === activeIdRef.current) { // 条件分支：按判断结果选择后续处理路径
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])); // 去重追加
-        api.im.markRead(msg.conversation_id, msg.id).catch(() => undefined); // 标已读
         setTypingLabel(null); // 对方发来消息即清掉「正在输入」
+        if (msg.sender_user_id !== currentUserId) markRead(msg.conversation_id, msg.id); // 只有别人发的才需要标已读
       } // 属于当前会话才追加
-      loadConversations(); // 无论如何刷新列表摘要
+      loadConversations(); // 无论如何刷新列表摘要（未读角标依赖它）
     });
-  }, [onMessage, activeId, loadConversations]);
+  }, [onMessage, currentUserId, markRead, loadConversations]);
 
   // 帧事件：ack 回填消息 ID、撤回移除消息、输入中提示、已读状态
   useEffect(() => {
@@ -310,9 +349,8 @@ export function Chat({ locale }: ChatProps) {
       if (frame.type === 'typing') { // 条件分支：按判断结果选择后续处理路径
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 会话
         const uid = typeof payload?.user_id === 'string' ? payload.user_id : ''; // 输入者
-        if (convId === activeId && uid && uid !== currentUserId) { // 条件分支：按判断结果选择后续处理路径
-          const who = conversations.find((c) => c.id === convId)?.title; // 群聊里用标题占位
-          setTypingLabel(who ? (isZh ? '对方正在输入…' : 'Typing…') : isZh ? '对方正在输入…' : 'Typing…'); // 显示提示
+        if (convId === activeIdRef.current && uid && uid !== currentUserId) { // 条件分支：按判断结果选择后续处理路径
+          setTypingLabel(isZh ? '对方正在输入…' : 'Typing…'); // 显示提示
           if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current); // 重置定时器
           typingTimerRef.current = window.setTimeout(() => setTypingLabel(null), 3000); // 3 秒无新事件即清除
         } // 只处理当前会话
@@ -320,7 +358,7 @@ export function Chat({ locale }: ChatProps) {
       } // typing 结束
       if (frame.type === 'conversation.members') { // 条件分支：按判断结果选择后续处理路径
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 发生变化的会话
-        if (convId === activeId) { // 条件分支：按判断结果选择后续处理路径
+        if (convId === activeIdRef.current) { // 条件分支：按判断结果选择后续处理路径
           // 成员/角色变更：直接拉一次会话详情刷新群面板（避免依赖尚未定义的 openPanel）
           api.im
             .getConversation(convId)
@@ -333,14 +371,27 @@ export function Chat({ locale }: ChatProps) {
         loadConversations(); // 成员数可能变化，列表同步
         return; // 处理完
       } // conversation.members 结束
+      if (frame.type === 'message.delivered') { // 条件分支：按判断结果选择后续处理路径
+        const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 会话
+        const mid = typeof payload?.message_id === 'string' ? payload.message_id : ''; // 已投递的消息
+        if (convId === activeIdRef.current && mid) { // 条件分支：按判断结果选择后续处理路径
+          setMessages((prev) => prev.map((m) => (m.id === mid && m.status === 'sent' ? { ...m, status: 'delivered' } : m))); // 状态只升不降
+        } // 只改当前会话
+        return; // 处理完
+      } // delivered 结束
       if (frame.type === 'message.read') { // 条件分支：按判断结果选择后续处理路径
         const convId = typeof payload?.conversation_id === 'string' ? payload.conversation_id : ''; // 会话
-        if (convId === activeId) { // 条件分支：按判断结果选择后续处理路径
-          setMessages((prev) => prev.map((m) => (m.sender_user_id === currentUserId ? { ...m, status: 'read' } : m))); // 自己的消息统一标已读
-        } // 只改当前会话
+        const reader = typeof payload?.reader_id === 'string' ? payload.reader_id : ''; // 谁读的
+        if (convId === activeIdRef.current && reader && reader !== currentUserId) { // 条件分支：按判断结果选择后续处理路径
+          setMessages((prev) => prev.map((m) => (m.sender_user_id === currentUserId ? { ...m, status: 'read' } : m))); // 对方已读：自己的消息统一标已读
+        } // 只改当前会话，且不处理自己发出的已读回执
+        if (convId === activeIdRef.current && reader === currentUserId) loadConversations(); // 自己已读：刷新列表清角标
       } // read 结束
+      if (frame.type === 'error' && frame.error?.code === 'UNAUTHORIZED') { // 条件分支：按判断结果选择后续处理路径
+        setError(isZh ? '登录已过期，请重新登录' : 'Session expired, please sign in again'); // 停止重连后给明确提示
+      } // error 结束
     });
-  }, [onFrame, activeId, currentUserId, conversations, isZh, loadConversations]);
+  }, [onFrame, currentUserId, isZh, loadConversations]);
 
   // 通话信令：来电邀请建通话，其余转发给 VideoCall
   useEffect(() => {
@@ -358,8 +409,38 @@ export function Chat({ locale }: ChatProps) {
   // 消息变化后滚动到底（加载更早时不强制跳到底部会造成跳动，这里只在追加时滚）
   useEffect(() => {
     if (highlightId) return; // 搜索定位时不抢滚动，交给定位逻辑
+    if (skipScrollRef.current) { // 前置插入更早消息：保持当前阅读位置
+      skipScrollRef.current = false; // 只跳过这一次
+      return; // 不滚到底
+    } // 跳过分支结束
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, highlightId]);
+
+  // 断线重连补偿：重连成功后重拉会话列表与当前会话最近消息，补齐断线期间错过的内容
+  useEffect(() => {
+    if (im.state !== 'open') return; // 未连上不处理
+    if (!openedOnceRef.current) { // 首次连接成功：正常流程已加载，不做补拉
+      openedOnceRef.current = true; // 标记已首连
+      return; // 结束
+    } // 首连分支结束
+    pendingRef.current.clear(); // 丢弃断线前未拿到 ack 的临时记录
+    setMessages((prev) => prev.filter((m) => !m.id.startsWith('pending-'))); // 同步移除乐观幽灵消息，等服务端结果回填
+    void (async () => {
+      await loadConversations(); // 先补会话列表（未读角标也会随之纠正）
+      const convId = activeIdRef.current; // 当前打开的会话
+      if (!convId) return; // 没开会话则只补列表
+      try { // 异常捕获起点：包裹可能抛出错误的操作
+        const res = await api.im.listMessages(convId, { limit: 50 }); // 重拉最近 50 条
+        if (activeIdRef.current !== convId) return; // 期间已切换会话：丢弃
+        setMessages(res.items); // 用服务端结果覆盖，顺带清掉 pending- 幽灵消息
+        setHasMore(res.items.length >= 50); // 重置翻页标记
+        const last = res.items[res.items.length - 1]; // 最新一条
+        if (last) markRead(convId, last.id); // 补标已读，避免角标卡住
+      } catch {
+        // 补拉失败：保留现有消息，等待下次重连或手动操作
+      } // try 结束
+    })(); // 异步自执行
+  }, [im.state, loadConversations, markRead]);
 
   // 用户搜索防抖（建私聊 / 建群选人共用）
   useEffect(() => {
@@ -407,8 +488,11 @@ export function Chat({ locale }: ChatProps) {
       setMessages((prev) => [...prev, optimistic]); // 乐观追加
       if (connected) { // 条件分支：按判断结果选择后续处理路径
         const reqId = send({ type: 'message.send', payload: { conversation_id: activeId, ...body } }); // WS 发送（body 含 reply_to_id 引用目标）
-        if (reqId) pendingRef.current.set(reqId, optimistic.id); // 记录请求序号，等 ack 回填
-        return; // WS 分支结束
+        if (reqId) { // 条件分支：按判断结果选择后续处理路径
+          pendingRef.current.set(reqId, optimistic.id); // 记录请求序号，等 ack 回填
+          return; // WS 确实发出去了才结束
+        } // reqId 分支结束
+        // send 返回 undefined：连接在状态更新后刚断开，继续走 HTTP 兜底，绝不能静默丢消息
       } // connected 分支结束
       try { // 异常捕获起点：包裹可能抛出错误的操作
         const res = await api.im.sendMessage(activeId, body); // HTTP 兜底
@@ -612,12 +696,13 @@ export function Chat({ locale }: ChatProps) {
         const res = await api.im.createConversation({ type: 'direct', target_user_id: user.id }); // 复用或新建
         setSearchQ(''); // 清搜索
         setSearchResults([]); // 清结果
+        await loadConversations(); // 先把新会话并入列表，否则 activeConversation 查不到会停留在空面板
         await openConversation(res.conversation_id); // 直接打开
       } catch {
         setError(isZh ? '创建会话失败' : 'Failed to start chat'); // 失败提示
       } // try 结束
     }, // 代码块结束
-    [isZh, openConversation],
+    [isZh, loadConversations, openConversation],
   ); // pickUser 结束
 
   /** 勾选/取消勾选建群成员 */
@@ -681,6 +766,7 @@ export function Chat({ locale }: ChatProps) {
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.im.deleteConversation(activeId); // 后端按角色处理
       setActiveId(null); // 清选中
+      activeIdRef.current = null; // 同步快照，避免重连补拉去请求已删除会话
       setMessages([]); // 清消息
       setPanelOpen(false); // 关面板
       await loadConversations(); // 刷新列表
@@ -814,7 +900,9 @@ export function Chat({ locale }: ChatProps) {
 
         {/* 会话列表 */}
         <div className="chat-conversations">{/* 执行当前业务步骤 */}
-          {conversations.length === 0 ? (
+          {loadingConversations && conversations.length === 0 ? (
+            <p className="chat-hint">{isZh ? '会话加载中…' : 'Loading conversations…'}</p>
+          ) : conversations.length === 0 ? (
             <p className="chat-empty">{isZh ? '还没有会话，搜索用户开始聊天' : 'No conversations yet'}</p>
           ) : (
             conversations.map((c) => (
@@ -909,6 +997,12 @@ export function Chat({ locale }: ChatProps) {
                   {loadingMore ? (isZh ? '加载中…' : 'Loading…') : isZh ? '加载更早消息' : 'Load earlier'}
                 </button>
               )}
+              {loadingMessages && messages.length === 0 && (
+                <p className="chat-hint">{isZh ? '消息加载中…' : 'Loading messages…'}</p>
+              )}
+              {!loadingMessages && messages.length === 0 && (
+                <p className="chat-empty">{isZh ? '暂无消息，发一条打个招呼吧' : 'No messages yet'}</p>
+              )}
               {messages.map((m) => {
                 const mine = m.sender_user_id === currentUserId; // 是否自己发的
                 const canRecall = mine && Date.now() - Date.parse(m.created_at) < RECALL_WINDOW_MS && !m.id.startsWith('pending-'); // 2 分钟内且已落库
@@ -920,6 +1014,10 @@ export function Chat({ locale }: ChatProps) {
                         <span>{isZh ? '以下是新消息' : 'New messages'}</span>
                       </div>
                     )}
+                    {/* 系统消息：居中提示，不套气泡，也没有发送者与操作按钮 */}
+                    {m.content_type === 'system' ? (
+                      <div className="chat-system-msg">{m.content}</div>
+                    ) : (
                     <div
                       id={`msg-${m.id}`}
                       className={`chat-msg ${mine ? 'mine' : 'theirs'}${highlightId === m.id ? ' highlight' : ''}`}
@@ -957,6 +1055,7 @@ export function Chat({ locale }: ChatProps) {
                         )}
                       </span>
                     </div>
+                    )}
                   </Fragment>
                 ); // 执行当前业务步骤
               })}
@@ -1026,7 +1125,12 @@ export function Chat({ locale }: ChatProps) {
         ) : (
           <div className="chat-placeholder">{isZh ? '选择一个会话或搜索用户开始聊天' : 'Select a conversation or search users'}</div>
         )}
-        {error && <div className="chat-error">{error}</div>}
+        {error && (
+          <div className="chat-error">
+            <span>{error}</span>
+            <button type="button" className="chat-error-close" onClick={() => setError(null)} aria-label={isZh ? '关闭' : 'Dismiss'}>×</button>
+          </div>
+        )}
       </section>
 
       {/* 群信息面板 */}

@@ -1586,12 +1586,26 @@ code { /* 行内代码/令牌展示 */
 } /* 占位结束 */
 
 .chat-error { /* 错误提示条 */
+  display: flex; /* 文案与关闭按钮同行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 关闭按钮靠右 */
+  gap: 12px; /* 文案与按钮间距 */
   padding: 8px 20px; /* 内边距 */
   background: rgba(214, 69, 69, 0.1); /* 红色淡背景 */
   color: var(--danger); /* 红色文字 */
   font-size: 13px;
   border-top: 1px solid var(--border); /* 顶部分隔线 */
 } /* 错误条结束 */
+
+.chat-error-close { /* 错误条关闭按钮 */
+  flex: none; /* 不参与压缩 */
+  border: none; /* 去边框 */
+  background: transparent; /* 透明底 */
+  color: var(--danger); /* 与文案同色 */
+  font-size: 16px; /* 点击区域更明显 */
+  line-height: 1; /* 单行紧凑 */
+  cursor: pointer; /* 手型光标 */
+} /* 关闭按钮结束 */
 
 /* ---------- 视频通话浮窗 ---------- */
 .video-call-float { /* 视频通话浮窗 */
@@ -2350,6 +2364,22 @@ code { /* 行内代码/令牌展示 */
   height: 1px; /* 细线 */
   background: var(--border); /* 边框色 */
 } /* 横线结束 */
+
+.chat-system-msg { /* 系统消息：居中胶囊提示 */
+  align-self: center; /* 在纵向 flex 中居中 */
+  max-width: 80%; /* 过宽时换行 */
+  padding: 4px 10px; /* 胶囊内边距 */
+  border-radius: 999px; /* 圆角胶囊 */
+  background: rgba(0, 0, 0, 0.05); /* 淡灰底 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小字号 */
+  text-align: center; /* 文案居中 */
+} /* 系统消息结束 */
+
+.chat-messages .chat-hint { /* 消息区加载/提示文案 */
+  padding: 16px 12px; /* 上下留白 */
+  text-align: center; /* 居中 */
+} /* 消息区提示结束 */
 
 .chat-file { /* 文件气泡内容 */
   display: flex; /* 名称 + 体积 + 下载同行 */

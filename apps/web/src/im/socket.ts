@@ -205,6 +205,10 @@ export class ImSocket {
         if (p?.message) this.handlers.onMessage?.(p.message); // 条件分支：按判断结果选择后续处理路径
         break; // 跳出当前循环或 switch 分支
       } // 代码块结束
+      case 'error': // 服务端协议错误：鉴权失败必须停止重连，否则会无限 1008 循环
+        if (frame.error?.code === 'UNAUTHORIZED') this.closedByUser = true; // 令牌失效：交给上层提示重新登录
+        break; // 其它错误只透传给 onFrame
+
       case 'call.invite': // switch 分支取值：命中后执行对应处理
       case 'call.offer': // switch 分支取值：命中后执行对应处理
       case 'call.answer': // switch 分支取值：命中后执行对应处理

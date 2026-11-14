@@ -130,7 +130,7 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
        FROM im_messages m
        JOIN users u ON u.id = m.sender_user_id
       WHERE m.conversation_id = ? AND m.deleted_at IS NULL
-      ORDER BY m.created_at DESC
+      ORDER BY m.id DESC
       LIMIT 1`,
   ); // 执行当前业务步骤
   // 预编译：统计未读消息数（大于 last_read_message_id 的非本人消息）
@@ -278,7 +278,7 @@ export function listMessages(
           `SELECT m.*, u.display_name AS sender_display_name
              FROM im_messages m JOIN users u ON u.id = m.sender_user_id
             WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id < ?
-            ORDER BY m.created_at DESC
+            ORDER BY m.id DESC
             LIMIT ?`,
         ) // 执行当前业务步骤
         .all(conversationId, opts.before, limit) as Array<Record<string, unknown> & { sender_display_name: string }>) // 注册 ALL 路由 / 中间件处理器
@@ -287,7 +287,7 @@ export function listMessages(
           `SELECT m.*, u.display_name AS sender_display_name
              FROM im_messages m JOIN users u ON u.id = m.sender_user_id
             WHERE m.conversation_id = ? AND m.deleted_at IS NULL
-            ORDER BY m.created_at DESC
+            ORDER BY m.id DESC
             LIMIT ?`,
         ) // 执行当前业务步骤
         .all(conversationId, limit) as Array<Record<string, unknown> & { sender_display_name: string }>); // 注册 ALL 路由 / 中间件处理器
@@ -329,11 +329,12 @@ export function markConversationRead(db: Db, conversationId: string, userId: str
   db.prepare(
     `UPDATE im_conversation_members SET last_read_message_id = ? WHERE conversation_id = ? AND user_id = ?`, // 执行当前业务步骤
   ).run(messageId, conversationId, userId); // 执行当前业务步骤
-  // 把该会话中由他人发送、状态为 sent/delivered 的消息置为 read（简化模型：任一成员已读即标记）
+  // 把该会话中由他人发送、且不晚于游标的消息置为 read（简化模型：任一成员已读即标记）
+  // 必须加 id <= 游标：否则并发到达的新消息会被误标已读，发送方看到错误的「已读」回执
   db.prepare(
     `UPDATE im_messages SET status = 'read', updated_at = ?
-      WHERE conversation_id = ? AND status != 'read' AND sender_user_id != ?`,
-  ).run(new Date().toISOString(), conversationId, userId); // 执行当前业务步骤
+      WHERE conversation_id = ? AND status != 'read' AND sender_user_id != ? AND id <= ?`,
+  ).run(new Date().toISOString(), conversationId, userId, messageId); // 执行当前业务步骤
 } // markConversationRead 结束
 
 /** 按显示名或身份标识搜索用户（用于创建会话时选人），排除当前用户自身 */
