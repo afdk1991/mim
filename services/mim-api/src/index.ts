@@ -8,12 +8,14 @@ import { createJobs } from './jobs.js'; // 引入后台定时任务工厂（权�
 import { createStorage } from './storage.js'; // 引入存储驱动工厂（本地目录或对象存储）
 import { attachImWebSocket } from './im/ws.js'; // 引入 IM WebSocket 接入层，负责实时消息与视频信令
 import { ImHub } from './im/hub.js'; // 引入连接中心：需在 createApp 之前注入，HTTP 路由才能复用同一实例广播
-import { reconcileRecommendScores } from './community/recommend.js'; // 推荐指数全量对账：纠正存量「0 浏览却有预置分数」的假数
+import { reconcileLikeCounts, reconcileRecommendScores } from './community/recommend.js'; // 推荐指数与点赞数对账：纠正存量假数，按真实互动重算
 import type { ApiDeps } from './types.js'; // 依赖容器类型：显式标注后才能回填 imHub 字段
 
 const db = createDatabase(DB_PATH); // 按配置路径打开持久化 SQLite，启动即完成建表与种子写入
 const reconciledScores = reconcileRecommendScores(process.env, db); // 每次启动按公式重算一次：幂等，只写回与真实互动不一致的行
 if (reconciledScores > 0) console.log(`[community] recommend_score reconciled: ${reconciledScores} rows`); // 有修正才留痕，便于核对存量假分已清零
+const reconciledLikes = reconcileLikeCounts(db); // 每次启动按真实点赞记录重算一次：幂等，只写回与记录条数不一致的行
+if (reconciledLikes > 0) console.log(`[community] likes reconciled: ${reconciledLikes} rows`); // 有修正才留痕，便于核对种子假赞已清零
 const jwtSecret = loadJwtSecret(); // 加载签名密钥；缺失时由 config 层决定回退开发密钥或直接报错
 const storage = createStorage({ env: process.env, jwtSecret, fallbackDir: DATA_DIR }); // 依据环境变量选择存储驱动，未配置远端时落本地数据目录
 const jobs = createJobs({ db, env: process.env }); // 装配后台定时任务，复用同一数据库实例

@@ -607,7 +607,7 @@ export function seedCommunity(db: Db): void {
   const insertThread = db.prepare(
     `INSERT OR IGNORE INTO community_threads
        (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, recommend_score, created_at, updated_at, last_activity_at)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, ?, 0, 0, ?, ?, ?)`, // recommend_score 显式写 0：分数只由真实互动产生，不随种子预置
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, 0, 0, 0, ?, ?, ?)`, // likes / recommend_score 显式写 0：二者只由真实互动（点赞记录 / 浏览等）产生，不随种子预置
   );
   const insertVip = db.prepare(
     `INSERT OR IGNORE INTO vip_plans (id, code, name, level, price_cents, duration_days, perks, sort_order, active)
@@ -639,17 +639,17 @@ export function seedCommunity(db: Db): void {
     for (const [id, slug, name, description, icon, sort] of boards) {
       insertBoard.run(id, slug, name, description, icon, sort, now);
     }
-    const threads: Array<[string, string, string, string, string, string, string | null, number, number, number, number]> = [
-      ['thread-store-visual', 'board-open-source', 'Mim 商城商品视觉改造全记录：19 张分类封面 + 参数详情图', '从纯文字卡片到封面、参数键值表与 900×1180 参数长图，附线上取证。', '商城改造的关键不是“有图”，而是让 205 条模块都能被同一套数据驱动视觉覆盖。\n\n做法：19 个一级分类各一张 3:2 封面；卡片左上分类角标、右上价格角标；详情首屏 11 项参数键值表 + 900×1180 SVG 参数图。\n\n线上实测：cards=12、封面 naturalWidth=768、specRows=11、参数图 900×1180。', 'text', '/catalog/dev.jpg', 0, 0, 96, 5],
-      ['thread-quick-build', 'board-tools', 'Quick Build WP：宝塔 + 环境 + WordPress 一键装', '一条命令完成宝塔、LNMP 与 WordPress 初始化，附常见失败排查。', 'Quick Build WP 把建站最常见的三段工作合成一个可重放脚本：安装宝塔、拉起 LNMP、初始化 WordPress。\n\n失败排查顺序：先看 80/443 端口占用，再看 PHP 版本与伪静态，最后查数据库权限。', 'text', '/catalog/tools.jpg', 0, 0, 41, 2],
-      ['thread-paid-store', 'board-paid', '付费阅读：从 0 到 1 做一个能收款的独立商城', '商品类型、卡密、优惠码、物流、退款与分成的完整拆解。', '这篇是付费内容：把独立商城拆成商品、订单、支付、履约、售后、资金六层，并给出每层的最小可用实现。\n\n如果你只想先跑通，优先做“虚拟自动发货 + 卡密库存 + 余额扣款”，再接支付渠道。', 'text', '/catalog/store.jpg', 1900, 0, 28, 3],
-      ['thread-comic-demo', 'board-open-source', '漫剧 AI 剧成片演示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n放映厅可直接观看，创作工作台可复制同一条链路。', 'video', '/catalog/ai.jpg', 0, 0, 55, 4],
-      ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 0, 22, 3],
-      ['thread-announce', 'board-announce', '2026-11-12 更新：商城商品视觉上线', '商品封面与参数详情图上线记录。', '本轮更新：\n1. 商城卡片加封面、分类角标、价格角标。\n2. 商品详情加 11 项参数表与参数长图。\n3. 结算链路与积分抵扣口径统一。', 'text', '/catalog/misc.jpg', 0, 0, 64, 6],
+    const threads: Array<[string, string, string, string, string, string, string | null, number, number, number]> = [
+      ['thread-store-visual', 'board-open-source', 'Mim 商城商品视觉改造全记录：19 张分类封面 + 参数详情图', '从纯文字卡片到封面、参数键值表与 900×1180 参数长图，附线上取证。', '商城改造的关键不是“有图”，而是让 205 条模块都能被同一套数据驱动视觉覆盖。\n\n做法：19 个一级分类各一张 3:2 封面；卡片左上分类角标、右上价格角标；详情首屏 11 项参数键值表 + 900×1180 SVG 参数图。\n\n线上实测：cards=12、封面 naturalWidth=768、specRows=11、参数图 900×1180。', 'text', '/catalog/dev.jpg', 0, 0, 5],
+      ['thread-quick-build', 'board-tools', 'Quick Build WP：宝塔 + 环境 + WordPress 一键装', '一条命令完成宝塔、LNMP 与 WordPress 初始化，附常见失败排查。', 'Quick Build WP 把建站最常见的三段工作合成一个可重放脚本：安装宝塔、拉起 LNMP、初始化 WordPress。\n\n失败排查顺序：先看 80/443 端口占用，再看 PHP 版本与伪静态，最后查数据库权限。', 'text', '/catalog/tools.jpg', 0, 0, 2],
+      ['thread-paid-store', 'board-paid', '付费阅读：从 0 到 1 做一个能收款的独立商城', '商品类型、卡密、优惠码、物流、退款与分成的完整拆解。', '这篇是付费内容：把独立商城拆成商品、订单、支付、履约、售后、资金六层，并给出每层的最小可用实现。\n\n如果你只想先跑通，优先做“虚拟自动发货 + 卡密库存 + 余额扣款”，再接支付渠道。', 'text', '/catalog/store.jpg', 1900, 0, 3],
+      ['thread-comic-demo', 'board-open-source', '漫剧 AI 剧成片演示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n放映厅可直接观看，创作工作台可复制同一条链路。', 'video', '/catalog/ai.jpg', 0, 0, 4],
+      ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 0, 3],
+      ['thread-announce', 'board-announce', '2026-11-12 更新：商城商品视觉上线', '商品封面与参数详情图上线记录。', '本轮更新：\n1. 商城卡片加封面、分类角标、价格角标。\n2. 商品详情加 11 项参数表与参数长图。\n3. 结算链路与积分抵扣口径统一。', 'text', '/catalog/misc.jpg', 0, 0, 6],
     ];
-    for (const [id, boardId, title, summary, body, kind, cover, price, views, likes, daysAgo] of threads) {
+    for (const [id, boardId, title, summary, body, kind, cover, price, views, daysAgo] of threads) {
       const created = new Date(Date.now() - daysAgo * 86400000).toISOString();
-      insertThread.run(id, boardId, title, summary, body, kind, cover, price, views, likes, created, created, created);
+      insertThread.run(id, boardId, title, summary, body, kind, cover, price, views, created, created, created);
     }
     const vips: Array<[string, string, string, number, number, number, string, number]> = [
       ['vip-monthly', 'vip-monthly', 'VIP 月卡', 1, 3000, 30, JSON.stringify(['付费帖 9 折', '每月 50 积分', '专属徽章']), 1],

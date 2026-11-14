@@ -173,3 +173,30 @@ export function reconcileRecommendScores(env: Record<string, string | undefined>
   apply(); // 执行事务
   return fixed; // 返回结果：把本步骤产物交给调用方
 } // 代码块结束
+
+/**
+ * 全量对账：按真实点赞记录（community_thread_likes）重算每个帖子的 likes。
+ * 用途：种子帖曾预置点赞数（0 浏览却带几十个赞），启动时按真实记录纠正一次；无记录即 0。
+ * 幂等：结果只取决于点赞记录条数，重复执行不会二次扣减 / 二次累加。
+ * @returns 本次实际修正的行数；0 表示本来就全部一致。
+ */
+export function reconcileLikeCounts(db: Db): number {
+  const rows = db // 常量 rows：保存固定配置或一次性派生值
+    .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+      `SELECT t.id, t.likes,
+              (SELECT COUNT(*) FROM community_thread_likes l WHERE l.thread_id = t.id) AS real_likes
+         FROM community_threads t`,
+    ) // 调用结束：参数列表与链式调用收尾
+    .all() as Array<{ id: string; likes: number; real_likes: number }>; // 查询多行：读取列表供批量处理
+  const update = db.prepare('UPDATE community_threads SET likes = ? WHERE id = ?'); // 预编译 SQL：固定语句结构后绑定参数执行
+  let fixed = 0; // 记录修正条数，供启动日志留证
+  const apply = db.transaction(() => { // 单事务批量纠正，避免半途中断留下部分不一致
+    for (const row of rows) { // 逐帖比对
+      if (row.real_likes === row.likes) continue; // 已一致则不写，保证重复执行零改动
+      update.run(row.real_likes, row.id); // 执行写入：把参数落库并返回影响结果
+      fixed += 1; // 赋值：更新当前作用域中的状态
+    } // 遍历结束
+  }); // 结束函数体：本层作用域收尾
+  apply(); // 执行事务
+  return fixed; // 返回结果：把本步骤产物交给调用方
+} // 代码块结束
