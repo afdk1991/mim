@@ -28,7 +28,7 @@ const LIVE = process.argv.includes('--live'); // 默认只跑静态检查，适�
 const BASE = process.env.MIM_GATE_BASE ?? 'http://127.0.0.1:5188/'; // 可用环境变量覆盖
 // CDP 端点：Edge --remote-debugging-port=9222
 const CDP = process.env.MIM_GATE_CDP ?? 'http://127.0.0.1:9222'; // 可用环境变量覆盖
-// 会话键：与 apps/web/src/api.ts 的 SESSION_KEY 保持一致（live 场景注入/清除会话用）
+// 会话键：与 apps/web/src/api/request.ts 的 SESSION_KEY 保持一致（live 场景注入/清除会话用）
 const SESSION_KEY = 'mim.session.v1'; // 免登录体验下仍是前端唯一会话键
 // 断言结果累加器：每项含名称、通过与明细
 const checks = []; // 最终统一打印并据此决定退出码
@@ -70,7 +70,13 @@ check('router 推断子路径部署前缀', router.includes('baseOf') && router.
 check('router 兼容旧 hash 链接', router.includes('location.hash') && router.includes('replaceState'), '缺少旧 hash 原地改写'); // 老书签 / 外链不 404
 
 // API 客户端：会话结构校验、失效广播、跨标签页同步、静默校验与访客建号
-const api = read('apps/web/src/api.ts'); // 读取完整源码
+// P1-A 拆分后 api.ts 仅为桶导出壳，会话/请求核心在 api/request.ts、端点在 api/endpoints.ts、类型在 api/types.ts，断言需聚合读取三处
+const api = [
+  read('apps/web/src/api.ts'),
+  read('apps/web/src/api/request.ts'),
+  read('apps/web/src/api/endpoints.ts'),
+  read('apps/web/src/api/types.ts'),
+].join('\n'); // 聚合拆分后的全部 API 客户端源码
 check('api 导出会话键', api.includes('export const SESSION_KEY'), '前端会话键缺失'); // 键一致性
 check('api 校验会话结构', api.includes('isValidSession') && api.includes('function parseSession'), '脏数据不得被当作已登录'); // 防伪造
 check('api 失效时广播重登提示', api.includes("clearSession('expired')") && api.includes('SESSION_CHANGED_EVENT'), '401 续期失败必须触发失效广播'); // 失效联动
