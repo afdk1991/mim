@@ -14,9 +14,9 @@ import { createApp } from '../src/app.js'; // 引入依赖：声明本文件使�
 import { createDatabase } from '../src/db.js'; // 引入依赖：声明本文件使用的外部能力
 import type { Db } from '../src/types.js'; // 引入依赖：声明本文件使用的外部能力
 import { createCaptcha, captchaHash } from '../src/security.js'; // 图形验证码造数（post 场景开关验证）
+import { loginHeaders } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 保存 JWT_SECRET：承载本步骤的计算结果供后续使用
-const ADMIN_PASSWORD = 'testpass123'; // 保存 ADMIN_PASSWORD：承载本步骤的计算结果供后续使用
 const ADMIN_TOKEN = 'test-admin-token-0123456789'; // 保存 ADMIN_TOKEN：承载本步骤的计算结果供后续使用
 let app: Express; // 保存 app：承载本步骤的计算结果供后续使用
 let db: Db; // 保存 db：承载本步骤的计算结果供后续使用
@@ -26,14 +26,12 @@ beforeEach(() => { // 业务步骤：推进当前流程的下一项处理
   app = createApp({ // 赋值：更新当前作用域中的状态
     db, // 业务步骤：推进当前流程的下一项处理
     jwtSecret: JWT_SECRET, // 对象字段：声明结构中的一项数据
-    env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN }, // 对象字段：声明结构中的一项数据
+    env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN }, // 对象字段：声明结构中的一项数据
   }); // 结束代码块：本层作用域收尾
 }); // 结束函数体：本层作用域收尾
 
 async function login(identifier: string): Promise<Record<string, string>> { // 定义函数 login：封装可复用业务步骤
-  const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 保存 res：承载本步骤的计算结果供后续使用
-  expect(res.status).toBe(200); // 断言：校验接口返回符合契约
-  return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' }; // 返回结果：把本步骤产物交给调用方
+  return loginHeaders(app, identifier); // 注册真实账号后走口令登录
 } // 结束代码块：本层作用域收尾
 
 function writeHeaders(auth: Record<string, string>): Record<string, string> { // 定义函数 writeHeaders：封装可复用业务步骤
@@ -198,10 +196,10 @@ describe('三期 3：创建板块限制（门槛 / 数量 / 重名 / 敏感词 /
     const blockedApp = createApp({ // 保存 blockedApp：承载本步骤的计算结果供后续使用
       db: db2, // 对象字段：声明结构中的一项数据
       jwtSecret: JWT_SECRET, // 对象字段：声明结构中的一项数据
-      env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_COMMUNITY_BLOCK_WORDS: '违禁词' }, // 对象字段：声明结构中的一项数据
+      env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_COMMUNITY_BLOCK_WORDS: '违禁词' }, // 对象字段：声明结构中的一项数据
     }); // 结束代码块：本层作用域收尾
-    const auth = await request(blockedApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000006', password: ADMIN_PASSWORD }); // 保存 auth：承载本步骤的计算结果供后续使用
-    const headers = { authorization: `Bearer ${auth.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 保存 headers：承载本步骤的计算结果供后续使用
+    const auth = await loginHeaders(blockedApp, '13810000006'); // 注册后口令登录
+    const headers = { ...auth, 'idempotency-key': randomUUID() }; // 保存 headers：承载本步骤的计算结果供后续使用
     const me = await request(blockedApp).get('/api/v1/me').set(headers); // 保存 me：承载本步骤的计算结果供后续使用
     elevateUserPoints(db2, me.body.user.id); // 业务步骤：推进当前流程的下一项处理
 
@@ -218,10 +216,9 @@ describe('三期 3：创建板块限制（门槛 / 数量 / 重名 / 敏感词 /
     const reviewApp = createApp({ // 保存 reviewApp：承载本步骤的计算结果供后续使用
       db: db3, // 对象字段：声明结构中的一项数据
       jwtSecret: JWT_SECRET, // 对象字段：声明结构中的一项数据
-      env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_COMMUNITY_BOARD_REVIEW: '1' }, // 对象字段：声明结构中的一项数据
+      env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN, MIM_COMMUNITY_BOARD_REVIEW: '1' }, // 对象字段：声明结构中的一项数据
     }); // 结束代码块：本层作用域收尾
-    const authRes = await request(reviewApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000007', password: ADMIN_PASSWORD }); // 保存 authRes：承载本步骤的计算结果供后续使用
-    const auth = { authorization: `Bearer ${authRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 保存 auth：承载本步骤的计算结果供后续使用
+    const auth = { ...(await loginHeaders(reviewApp, '13810000007')), 'idempotency-key': randomUUID() }; // 保存 auth：承载本步骤的计算结果供后续使用
     const me = await request(reviewApp).get('/api/v1/me').set(auth); // 保存 me：承载本步骤的计算结果供后续使用
     elevateUserPoints(db3, me.body.user.id); // 业务步骤：推进当前流程的下一项处理
 
@@ -237,8 +234,7 @@ describe('三期 3：创建板块限制（门槛 / 数量 / 重名 / 敏感词 /
     const ownEntry = creatorList.body.boards.find((b: { slug: string }) => b.slug === 'pending-club'); // 保存 ownEntry：承载本步骤的计算结果供后续使用
     expect(ownEntry).toBeTruthy(); // 断言：校验接口返回符合契约
     expect(ownEntry.status).toBe('pending'); // 断言：校验接口返回符合契约
-    const otherRes = await request(reviewApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000011', password: ADMIN_PASSWORD }); // 保存 otherRes：承载本步骤的计算结果供后续使用
-    const otherAuth = { authorization: `Bearer ${otherRes.body.access_token}`, 'content-type': 'application/json' }; // 保存 otherAuth：承载本步骤的计算结果供后续使用
+    const otherAuth = await loginHeaders(reviewApp, '13810000011'); // 注册后口令登录
     const otherList = await request(reviewApp).get('/api/v1/community/boards').set(otherAuth); // 保存 otherList：承载本步骤的计算结果供后续使用
     expect(otherList.body.boards.some((b: { slug: string }) => b.slug === 'pending-club')).toBe(false); // 断言：校验接口返回符合契约
 
@@ -377,12 +373,11 @@ describe('三期 8：每日上限与累计上限（环境变量配额）', () =>
       db: dayDb, // 对象字段 db：记录一项配置或数据
       jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
       env: { // 对象字段 env：记录一项配置或数据
-        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, // 对象字段 MIM_AUTH_ADMIN_PASSWORD：记录一项配置或数据
+        MIM_ADMIN_TOKEN: ADMIN_TOKEN, // 对象字段 MIM_ADMIN_TOKEN：记录一项配置或数据
         MIM_COMMUNITY_DAILY_MAX: '1', MIM_COMMUNITY_TOTAL_MAX: '200', MIM_COMMUNITY_WINDOW_MAX: '5', // 对象字段 MIM_COMMUNITY_DAILY_MAX：记录一项配置或数据
       }, // 代码块结束
     }); // 代码块结束
-    const loginRes = await request(dayApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000021', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
-    const headers = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 headers：保存固定配置或一次性派生值
+    const headers = { ...(await loginHeaders(dayApp, '13810000021')), 'idempotency-key': randomUUID() }; // 常量 headers：保存固定配置或一次性派生值
     const post = (title: string) => // 常量 post：保存固定配置或一次性派生值
       request(dayApp).post('/api/v1/community/threads').set({ ...headers, 'idempotency-key': randomUUID() }) // 调用 request 并处理其返回结果
         .send({ board_slug: 'general', title, body: '正文内容用于验证每日配额上限是否生效。' }); // 执行当前业务步骤
@@ -403,12 +398,11 @@ describe('三期 8：每日上限与累计上限（环境变量配额）', () =>
       db: totalDb, // 对象字段 db：记录一项配置或数据
       jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
       env: { // 对象字段 env：记录一项配置或数据
-        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_ADMIN_TOKEN: ADMIN_TOKEN, // 对象字段 MIM_AUTH_ADMIN_PASSWORD：记录一项配置或数据
+        MIM_ADMIN_TOKEN: ADMIN_TOKEN, // 对象字段 MIM_ADMIN_TOKEN：记录一项配置或数据
         MIM_COMMUNITY_DAILY_MAX: '200', MIM_COMMUNITY_TOTAL_MAX: '1', MIM_COMMUNITY_WINDOW_MAX: '5', // 对象字段 MIM_COMMUNITY_DAILY_MAX：记录一项配置或数据
       }, // 代码块结束
     }); // 代码块结束
-    const loginRes = await request(totalApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000022', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
-    const headers = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 headers：保存固定配置或一次性派生值
+    const headers = { ...(await loginHeaders(totalApp, '13810000022')), 'idempotency-key': randomUUID() }; // 常量 headers：保存固定配置或一次性派生值
     const post = (title: string) => // 常量 post：保存固定配置或一次性派生值
       request(totalApp).post('/api/v1/community/threads').set({ ...headers, 'idempotency-key': randomUUID() }) // 调用 request 并处理其返回结果
         .send({ board_slug: 'general', title, body: '正文内容用于验证累计配额上限是否生效。' }); // 执行当前业务步骤
@@ -428,12 +422,10 @@ describe('三期 9：推荐权重环境变量 JSON 覆盖改变 recommend 排序
       db: wDb, // 对象字段 db：记录一项配置或数据
       jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
       env: { // 对象字段 env：记录一项配置或数据
-        MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, // 对象字段 MIM_AUTH_ADMIN_PASSWORD：记录一项配置或数据
         MIM_COMMUNITY_RECOMMEND_WEIGHTS: JSON.stringify({ replies: 20, favorites: 1 }), // 对象字段 MIM_COMMUNITY_RECOMMEND_WEIGHTS：记录一项配置或数据
       }, // 代码块结束
     }); // 代码块结束
-    const loginRes = await request(wApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000023', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
-    const auth = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 auth：保存固定配置或一次性派生值
+    const auth = { ...(await loginHeaders(wApp, '13810000023')), 'idempotency-key': randomUUID() }; // 常量 auth：保存固定配置或一次性派生值
 
     const replyThread = await request(wApp).post('/api/v1/community/threads').set(auth).send({ board_slug: 'general', title: '回复型帖子', body: '这篇帖子会收到一条回复，用于权重覆盖排序验证。' }); // 常量 replyThread：保存固定配置或一次性派生值
     const favThread = await request(wApp).post('/api/v1/community/threads').set({ ...auth, 'idempotency-key': randomUUID() }).send({ board_slug: 'general', title: '收藏型帖子', body: '这篇帖子会被收藏，作为排序对照样本。' }); // 常量 favThread：保存固定配置或一次性派生值
@@ -496,10 +488,9 @@ describe('三期 11：post 场景验证码开关驱动，默认空操作', () =>
     const onApp = createApp({ // 保存 onApp：image 模式 + post 场景强制
       db: onDb, // 对象字段 db：记录一项配置或数据
       jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
-      env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_CAPTCHA_MODE: 'image', MIM_CAPTCHA_POST: '1' }, // 对象字段 env：记录一项配置或数据
+      env: { MIM_CAPTCHA_MODE: 'image', MIM_CAPTCHA_POST: '1' }, // 对象字段 env：记录一项配置或数据
     }); // 代码块结束
-    const loginRes = await request(onApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13810000026', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
-    const auth = { authorization: `Bearer ${loginRes.body.access_token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }; // 常量 auth：保存固定配置或一次性派生值
+    const auth = { ...(await loginHeaders(onApp, '13810000026')), 'idempotency-key': randomUUID() }; // 常量 auth：保存固定配置或一次性派生值
 
     const missing = await request(onApp).post('/api/v1/community/threads').set(auth).send({ board_slug: 'general', title: '缺验证码帖子', body: '未携带验证码，应当被 post 场景校验拦截。' }); // 常量 missing：保存固定配置或一次性派生值
     expect(missing.status).toBe(400); // 调用 expect 并处理其返回结果

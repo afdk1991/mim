@@ -218,7 +218,7 @@ describe('验证码通道（短信/邮件供应商接入）', () => { // describ
   it('生产环境 + 短信通道已配置：201 无 dev_code，可用真实下发的码登录', async () => { // 用例：生产环境配置短信通道后正常下发，并可用真实码登录
     let sent: { identifier: string; code: string } | undefined; // 记录供应商实际收到的标识与验证码
     const app = channelApp( // 用生产环境与假短信通道建应用
-      { NODE_ENV: 'production' }, // 打开生产环境开关，进入真实通道分支
+      { NODE_ENV: 'production', MIM_CAPTCHA_MODE: 'off' }, // 本用例只验证短信投递，验证码门禁由安全测试单独覆盖
       { sms: { send: async (id, code) => { sent = { identifier: id, code }; } } }, // 假供应商只记录参数，不打真实网络
     ); // 结束应用构造
     const codeRes = await request(app) // 发起验证码请求
@@ -301,8 +301,11 @@ describe('密码登录（验证码通道未接入时的生产入口）', () => {
     return createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env }); // 注入内存库与指定环境变量，口令由 env 决定是否可用
   } // 结束 passwordApp 定义
 
-  it('口令正确：200 签发令牌且可访问 /me', async () => { // 用例：口令正确时签发令牌，并能访问受保护接口
-    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD }); // 配置管理员口令后建应用
+  it('口令正确：白名单内已存在账号 200 签发令牌且可访问 /me', async () => { // 用例：口令正确时签发令牌，并能访问受保护接口
+    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD, MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13800000041' }); // 配置口令 + 白名单后建应用
+    await request(app) // 先注册真实账号，管理员口令不具备自动建号能力
+      .post('/api/v1/auth/register') // 注册端点
+      .send({ region: 'cn', identifier: '13800000041', password: 'account-pass-123' }); // 自助注册建立账号
     const res = await request(app) // 发起密码登录
       .post('/api/v1/auth/password') // 密码登录端点
       .send({ region: 'cn', identifier: '13800000041', password: PASSWORD }); // 提交区域、标识与正确口令
@@ -320,7 +323,11 @@ describe('密码登录（验证码通道未接入时的生产入口）', () => {
   }); // 结束口令正确用例
 
   it('口令错误：401 AUTH_PASSWORD_INVALID', async () => { // 用例：口令错误返回 401，而不是 403 或 500
-    const res = await request(passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD })) // 构建配置了口令的应用并直接发起请求
+    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD, MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13800000042' }); // 白名单内已存在账号
+    await request(app) // 先注册真实账号
+      .post('/api/v1/auth/register') // 注册端点
+      .send({ region: 'cn', identifier: '13800000042', password: 'account-pass-123' }); // 建立账号但不用该口令登录
+    const res = await request(app) // 构建配置了口令的应用并直接发起请求
       .post('/api/v1/auth/password') // 密码登录端点
       .send({ region: 'cn', identifier: '13800000042', password: 'wrong-pass' }); // 提交错误口令
     expect(res.status).toBe(401); // 断言 401，语义是凭证无效

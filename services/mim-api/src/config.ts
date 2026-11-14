@@ -28,6 +28,7 @@ export const CODE_LENGTH = 6; // 6 位数字，长度与用户输入体验及穷
 export const CODE_RATE_LIMIT = 5; // 同一标识 10 分钟内最多发 5 条，抑制短信轰炸
 export const CODE_RATE_WINDOW_MINUTES = 10; // 限流滑动窗口长度，单位为分钟
 export const LOGIN_LOCK_AFTER_FAILURES = 5; // 连续 5 次密码错误即锁定账号
+export const LOGIN_IP_LOCK_AFTER_FAILURES = 20; // 同一来源 IP 跨账号累计 20 次失败即锁定（阈值高于单账号，容忍 NAT 后多用户）
 export const LOGIN_LOCK_MINUTES = 15; // 锁定 15 分钟后自动解锁，避免永久误锁
 export const DELETION_GRACE_DAYS = 7; // 注销冷静期 7 天，期内可撤销删除
 
@@ -60,6 +61,19 @@ export const ADMIN_TOKEN_ENV_KEY = 'MIM_ADMIN_TOKEN'; // 只导出键名常量�
 
 /** 后台定时任务总开关：默认开启；多副本部署只让一个实例消费时设 MIM_JOBS=0 */
 export const JOBS_ENABLED = (process.env.MIM_JOBS ?? '1') !== '0'; // 显式 0 才关闭，其余取值均视为开启，避免拼写错误导致任务静默不跑
+
+/**
+ * 注册总开关：所有新建账号路径（自助注册 / 验证码首登 / OAuth 首登 / 免登录访客）的唯一闸门。
+ * 仅显式 MIM_REGISTRATION_ENABLED=1 才开启；未配置或任何其它取值一律视为关闭。
+ * 统一在服务端判定，前端隐藏入口只是体验优化，无法绕过。
+ */
+export const REGISTRATION_ENABLED_ENV_KEY = 'MIM_REGISTRATION_ENABLED'; // 只导出键名常量，避免多处手写字符串拼错
+
+/** 读取注册开关：优先请求级 env（测试可注入），其次进程环境，缺省关闭 */
+export function isRegistrationEnabled(env: Record<string, string | undefined>): boolean {
+  const raw = env[REGISTRATION_ENABLED_ENV_KEY] ?? process.env[REGISTRATION_ENABLED_ENV_KEY]; // 请求级配置优先
+  return (raw ?? '').trim() === '1'; // 只有显式 1 才放行
+} // isRegistrationEnabled 结束
 
 /**
  * JWT 密钥加载（优先级从高到低）：

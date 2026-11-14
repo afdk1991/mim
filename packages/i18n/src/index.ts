@@ -200,6 +200,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_CODE_RATE_LIMITED: '验证码发送过于频繁，请稍后再试',
     // 访客建号频控，语义与验证码频控一致
     AUTH_GUEST_RATE_LIMITED: '访客账号创建过于频繁，请稍后再试',
+    // 注册总开关关闭
+    AUTH_REGISTER_DISABLED: '注册已关闭，暂时无法创建新账号',
     // 通道未配置，避免暴露运维细节
     AUTH_CHANNEL_NOT_CONFIGURED: '验证码通道未配置，请稍后再试',
     // 上游下发失败，提示重试而非报错码
@@ -296,6 +298,8 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_CODE_RATE_LIMITED: 'Too many code requests, try again later',
     // 访客建号频控
     AUTH_GUEST_RATE_LIMITED: 'Too many guest accounts created, try again later',
+    // 注册总开关关闭
+    AUTH_REGISTER_DISABLED: 'Registration is closed; new accounts cannot be created',
     // 通道未配置
     AUTH_CHANNEL_NOT_CONFIGURED: 'Verification channel is not configured, please try again later',
     // 下发失败

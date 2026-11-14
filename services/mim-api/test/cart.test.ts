@@ -6,21 +6,19 @@ import request from 'supertest'; // 真实 HTTP
 import type { Express } from 'express'; // 类型
 import { createApp } from '../src/app.js'; // 应用工厂
 import { createDatabase } from '../src/db.js'; // 内存库工厂
+import { loginHeaders } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 测试密钥
-const ADMIN_PASSWORD = 'testpass123'; // 测试口令
 
 let app: Express; // 每个用例重建
 
 beforeEach(() => { // 调用 beforeEach 并处理其返回结果
-  app = createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD } }); // 全新内存库
+  app = createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env: {} }); // 全新内存库
 }); // 代码块结束
 
-/** 登录并返回鉴权头 */
+/** 登录并返回鉴权头（注册真实账号后走口令登录） */
 async function login(identifier = '13800000001'): Promise<Record<string, string>> {
-  const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 口令登录
-  expect(res.status).toBe(200); // 必须成功
-  return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' }; // 鉴权头
+  return loginHeaders(app, identifier); // 先建号再登录，替代已移除的管理员口令自动建号
 } // login 结束
 
 /** 写操作鉴权头：幂等中间件强制要求 Idempotency-Key */

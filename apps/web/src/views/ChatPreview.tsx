@@ -52,9 +52,9 @@ export function ChatPreview({ locale, onSignIn }: Props) {
 
       <section className="chat-main">{/* 右侧消息区 */}
         <header className="chat-preview-banner">{/* 顶部说明条：会话尚未就绪时的降级提示 */}
-          <span>{isZh ? '正在建立免登录会话：就绪后即可直接创建会话、收发消息、传文件与群管理。' : 'Setting up your anonymous session — chat, files and groups unlock automatically once it is ready.'}</span>
-          <button type="button" className="btn primary small" onClick={onSignIn}>{/* 重试 / 登录按钮 */}
-            {isZh ? '重试 / 登录' : 'Retry / Sign in'}
+          <span>{isZh ? '当前未登录：登录后即可创建会话、收发消息、传文件与群管理。' : 'You are not signed in — sign in to create chats, send messages, share files and manage groups.'}</span>
+          <button type="button" className="btn primary small" onClick={onSignIn}>{/* 登录按钮 */}
+            {isZh ? '登录' : 'Sign in'}
           </button>
         </header>
 

@@ -156,32 +156,6 @@ export async function verifySession(): Promise<boolean> { // true 保持解锁�
   } // try/catch 结束
 } // verifySession 结束
 
-/**
- * 免登录体验：本地没有会话时自动向服务端领一个匿名访客会话。
- * 有了访客会话，商城下单、购物车、个人中心、聊天、漫剧工作台等原先「需登录」的功能
- * 全部按已登录路径工作，界面不再出现任何登录门禁；用户随时可以登录升级为正式账号。
- */
-export async function ensureGuestSession(): Promise<boolean> { // true 表示当前已有可用会话（访客或正式）
-  if (current) return true; // 已有会话（含正式登录与游客）直接复用，不再建号
-  try { // 网络不可用时不能让整页阻塞在门禁上
-    const result = await request<LoginResult>('/auth/guest', { // 直接走请求核心，不经 endpoints.ts，避免 request ↔ endpoints 运行时环依赖
-      method: 'POST', // 建号属写操作
-      body: { device: { platform: 'web', name: '浏览器' } }, // 区域走服务端缺省（中国区）；请求体形状与原 api.guest() 一致
-      auth: false, // 此时还没有令牌
-      idempotency: false, // 每次建号都是新访客，重复提交由服务端限流兜底
-    }); // 请求调用结束
-    setSession(result, 'login'); // 与登录同一条广播路径，界面立即进入可用态
-    return true; // 访客会话就绪
-  } catch { // 建号失败（限流 / 离线 / 服务端异常）
-    return false; // 调用方保留只读降级界面
-  } // try/catch 结束
-} // ensureGuestSession 结束
-
-/** 当前是否为匿名访客会话（前端据此显示「访客」标签与登录升级入口） */
-export function isGuestSession(): boolean { // 正式登录用户同样可能保留旧 is_guest 标记，以服务端回传为准
-  return Boolean(current?.user.is_guest); // 未登录时为 false
-} // isGuestSession 结束
-
 function newKey(): string { // 生成幂等键，服务端据此去重重复提交
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') { // 优先用原生 UUID，熵高且几乎无碰撞
     return crypto.randomUUID(); // 返回标准 v4 UUID

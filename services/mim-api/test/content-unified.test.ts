@@ -6,6 +6,7 @@ import type { Express } from 'express'; // 应用类型
 import { createApp } from '../src/app.js'; // 装配入口
 import { createDatabase } from '../src/db.js'; // 内存库工厂
 import { backfillUnifiedContentMessaging } from '../src/content/unified.js'; // 回填函数
+import { registerTestAccount } from './_auth-helper.js'; // 访客建号已停用，改用自助注册建独立账号
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥
 const ADMIN_TOKEN = 'test-admin-token'; // 管理令牌
@@ -18,16 +19,17 @@ beforeEach(() => { // 每例重建
   app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN } }); // 装配
 });
 
-/** 领访客令牌 */
-async function guest() {
-  const res = await request(app).post('/api/v1/auth/guest').send({}); // 公开端点
-  expect(res.status).toBe(200); // 必成功
-  return { token: res.body.access_token as string, userId: res.body.user.id as string }; // 令牌与用户 id
+let userSeq = 0; // 账号序号：保证同一应用内手机号唯一
+
+/** 建一个独立正式账号：访客建号已停用，统一走自助注册 */
+async function newUser() {
+  const identifier = `138${String(10_000_000 + (userSeq += 1))}`; // 11 位手机号
+  return registerTestAccount(app, identifier); // 返回令牌与用户 id
 }
 
 describe('统一内容与消息域', () => {
   it('内容流把论坛主题与圈内动态合并成一个列表，公开可读', async () => {
-    const { userId } = await guest(); // 需要一个已有用户做圈主
+    const { userId } = await newUser(); // 需要一个已有用户做圈主
     db.prepare(`INSERT INTO circles (id, slug, name, owner_id, created_at) VALUES ('c-test-1', 'test-circle', '测试圈子', ?, '2026-11-06T00:00:00.000Z')`).run(userId); // 建一个圈子
     db.prepare(`INSERT INTO circle_posts (id, circle_id, author_id, body, created_at) VALUES ('cp-test-1', 'c-test-1', ?, '圈内第一条动态', '2026-11-07T00:00:00.000Z')`).run(userId); // 圈内动态
     const backfill = backfillUnifiedContentMessaging(db); // 回填
@@ -45,8 +47,8 @@ describe('统一内容与消息域', () => {
   });
 
   it('IM 会话与裸私信合并为同一会话列表，会话内消息按成员权限放行', async () => {
-    const alice = await guest(); // 用户 A
-    const bob = await guest(); // 用户 B
+    const alice = await newUser(); // 用户 A
+    const bob = await newUser(); // 用户 B
     db.prepare(`INSERT INTO im_conversations (id, type, title, owner_user_id, created_at, updated_at) VALUES ('ic-test-1', 'direct', '', ?, '2026-11-08T00:00:00.000Z', '2026-11-08T00:01:00.000Z')`).run(alice.userId); // IM 会话
     db.prepare(`INSERT INTO im_conversation_members (conversation_id, user_id, joined_at) VALUES ('ic-test-1', ?, '2026-11-08T00:00:00.000Z')`).run(alice.userId); // A 在会话里
     db.prepare(`INSERT INTO im_conversation_members (conversation_id, user_id, joined_at) VALUES ('ic-test-1', ?, '2026-11-08T00:00:00.000Z')`).run(bob.userId); // B 在会话里
@@ -62,7 +64,7 @@ describe('统一内容与消息域', () => {
     expect(messages.status).toBe(200); // 成员可读
     expect(messages.body.items).toHaveLength(1); // 一条消息
     expect(messages.body.items[0].source).toBe('im'); // 来源正确
-    const stranger = await guest(); // 会话外用户
+    const stranger = await newUser(); // 会话外用户
     const denied = await request(app).get(`/api/v1/messaging/conversations/${imConversation.id}/messages`).set('Authorization', `Bearer ${stranger.token}`); // 越权读
     expect(denied.status).toBe(404); // 非成员与不存在同响应
     const anon = await request(app).get('/api/v1/messaging/conversations'); // 未登录
@@ -70,7 +72,7 @@ describe('统一内容与消息域', () => {
   });
 
   it('回填幂等：重复执行不新增内容、会话与消息', async () => {
-    const user = await guest(); // 用户
+    const user = await newUser(); // 用户
     db.prepare(`INSERT INTO circles (id, slug, name, owner_id, created_at) VALUES ('c-idem-1', 'idem-circle', '幂等圈子', ?, '2026-11-10T00:00:00.000Z')`).run(user.userId); // 圈子
     db.prepare(`INSERT INTO circle_notices (id, circle_id, author_id, body, created_at) VALUES ('cn-idem-1', 'c-idem-1', ?, '公告', '2026-11-10T00:00:00.000Z')`).run(user.userId); // 公告
     const first = backfillUnifiedContentMessaging(db); // 第一次

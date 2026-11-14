@@ -117,6 +117,40 @@ describe('slider 模式 + login 场景强制', () => { // 调用 describe 并处
   }); // 代码块结束
 }); // 代码块结束
 
+describe('生产环境默认强制开启（SEC-01：默认不再关闭）', () => { // 生产默认开启回归
+  it('NODE_ENV=production 未配置模式：模式默认 image，注册/登录/口令登录缺票一律 400', async () => { // 默认强制
+    const app = makeApp({ NODE_ENV: 'production' }); // 只给生产环境标记
+    const register = await request(app).post('/api/v1/auth/register').send(REGISTER_BODY); // 注册缺验证码
+    expect(register.status).toBe(400); // 被验证码拦截
+    expect(register.body.code).toBe('AUTH_CODE_INVALID'); // 统一验证码错误码
+    const login = await request(app).post('/api/v1/auth/login').send(LOGIN_BODY); // 验证码登录缺验证码
+    expect(login.status).toBe(400); // 被拦截
+    expect(login.body.code).toBe('AUTH_CODE_INVALID'); // 统一错误码
+    const password = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000071', password: 'abc12345' }); // 口令登录缺验证码
+    expect(password.status).toBe(400); // 口令链路同样被拦截
+    expect(password.body.code).toBe('AUTH_CODE_INVALID'); // 统一错误码
+    const status = await request(app).get('/api/v1/security/status'); // 只读状态披露
+    expect(status.body.captcha.mode).toBe('image'); // 生产默认 image
+    expect(status.body.captcha.required_scenes).toEqual(expect.arrayContaining(['register', 'login'])); // 默认强制注册与登录
+  }); // 结束用例
+
+  it('生产环境显式 MIM_CAPTCHA_MODE=off：运维有意关闭后放行', async () => { // 显式关闭仍生效
+    const app = makeApp({ NODE_ENV: 'production', MIM_CAPTCHA_MODE: 'off' }); // 显式关闭
+    const register = await request(app).post('/api/v1/auth/register').send(REGISTER_BODY); // 注册不带验证码
+    expect(register.status).toBe(201); // 放行
+    const status = await request(app).get('/api/v1/security/status'); // 状态披露
+    expect(status.body.captcha.mode).toBe('off'); // 如实回显 off
+    expect(status.body.captcha.required_scenes).toEqual([]); // 不再有任何强制场景
+  }); // 结束用例
+
+  it('生产环境 MIM_CAPTCHA_LOGIN=0：仅登录场景关闭，注册仍强制', async () => { // 场景级开关
+    const app = makeApp({ NODE_ENV: 'production', MIM_CAPTCHA_LOGIN: '0' }); // 显式关闭登录场景
+    const status = await request(app).get('/api/v1/security/status'); // 状态披露
+    expect(status.body.captcha.required_scenes).toContain('register'); // 注册仍强制
+    expect(status.body.captcha.required_scenes).not.toContain('login'); // 登录已关闭
+  }); // 结束用例
+}); // 代码块结束
+
 describe('off 模式：零拦截，不回归 0.0.9 现网行为', () => { // 调用 describe 并处理其返回结果
   it('注册不带验证码直接成功；status 回显 mode=off、required_scenes 为空', async () => { // 调用 it 并处理其返回结果
     const app = makeApp({}); // 常量 app：保存固定配置或一次性派生值

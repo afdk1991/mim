@@ -5,9 +5,9 @@ import request from 'supertest'; // 真实 HTTP 请求
 import type { Express } from 'express'; // 仅类型
 import { createApp } from '../src/app.js'; // 应用工厂
 import { createDatabase } from '../src/db.js'; // 内存数据库工厂
+import { registerTestAccount } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 测试 JWT 密钥
-const ADMIN_PASSWORD = 'testpass123'; // 测试管理员口令
 
 let app: Express; // 每个用例重建，避免状态残留
 
@@ -16,15 +16,13 @@ beforeEach(() => {
   app = createApp({ // 赋值：更新变量 app 的取值
     db: createDatabase(':memory:'), // 全新内存库
     jwtSecret: JWT_SECRET, // 固定密钥
-    env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD }, // 启用密码登录便于造用户
+    env: {}, // 登录走自助注册 + 口令
   }); // 代码块结束
 }); // 代码块结束
 
-/** 用手机号登录并返回令牌与用户 ID */
+/** 注册并口令登录，返回令牌与用户 ID */
 async function login(identifier: string): Promise<{ token: string; userId: string }> {
-  const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 密码登录
-  expect(res.status).toBe(200); // 必须成功
-  return { token: res.body.access_token, userId: res.body.user.id }; // 返回令牌与 ID
+  return registerTestAccount(app, identifier); // 先建号再登录，替代已移除的管理员口令自动建号
 } // login 结束
 
 /** 创建群聊辅助：返回会话 ID */

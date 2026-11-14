@@ -63,16 +63,13 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [locale, setLocale] = useState<Locale>('zh-CN');
   // 账号区域状态，默认中国区；决定账号标识用手机号还是邮箱
   const [region, setRegion] = useState<Region>('cn');
-  // 登录方式状态，默认密码登录；验证码模式需先发送验证码，注册模式创建自建账号
-  const [mode, setMode] = useState<'password' | 'code' | 'register'>('password');
+  // 登录方式状态，默认密码登录；验证码模式需先发送验证码。
+  // 2026-11-15 起全站关闭注册，注册分段与注册表单已移除，前端只保留登录两种方式。
+  const [mode, setMode] = useState<'password' | 'code'>('password');
   // 账号标识输入值：中国区为手机号，Global 区为邮箱
   const [identifier, setIdentifier] = useState('');
-  // 密码输入值，密码登录与注册模式共用
+  // 密码输入值，密码登录使用
   const [password, setPassword] = useState('');
-  // 注册模式下的展示名（可选），注册成功后作为用户昵称
-  const [displayName, setDisplayName] = useState('');
-  // 邀请码：仅在注册模式展示；部署未开启注册门槛时留空即可
-  const [inviteCode, setInviteCode] = useState('');
   // 验证码输入值，仅在验证码登录模式下参与提交
   const [code, setCode] = useState('');
   // 开发态验证码回显：后端在非生产环境直接返回验证码，便于本地联调
@@ -89,8 +86,6 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [oauthBusy, setOauthBusy] = useState<string | null>(null);
   // 第三方回调错误码：由 ?oauth_error= 带回，展示为可读文案
   const [oauthError, setOauthError] = useState<string | null>(null);
-  // 注册成功但尚未进入工作台：先展示自动分配的 Mim ID，用户确认后再切换视图
-  const [registered, setRegistered] = useState<LoginResult | null>(null);
   // 票据只消费一次：开发环境 StrictMode 会让挂载 effect 跑两遍，重复兑换必然 401
   const oauthHandled = useRef(false);
   // ===== 验证码闭环：按 security/status 下发的 mode 渲染 image / slider / 第三方 SDK；off 零影响 =====
@@ -109,8 +104,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [passToken, setPassToken] = useState(''); // 赋值：更新变量 const 的取值
   const [genTime, setGenTime] = useState(''); // 赋值：更新变量 const 的取值
 
-  // 当前验证码场景：注册模式取 register，其余取 login
-  const captchaScene: CaptchaScene = mode === 'register' ? 'register' : 'login';
+  // 当前验证码场景：注册已关闭，登录页只使用 login 场景
+  const captchaScene: CaptchaScene = 'login';
   const captchaMode = security?.captcha.mode ?? 'off'; // 常量 captchaMode：保存固定配置或一次性派生值
   const captchaRequired = Boolean(security && security.captcha_required && captchaMode !== 'off'); // 常量 captchaRequired：保存固定配置或一次性派生值
   // 第三方模式凭证未配置时隐藏而不是报错；后端缺凭证会 503，前端按 providers 兜底不渲染
@@ -323,15 +318,13 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   } // 代码块结束
 
   // 切换登录方式：清空两种凭证，防止残留值被误提交
-  function switchMode(next: 'password' | 'code' | 'register') {
+  function switchMode(next: 'password' | 'code') {
     // 写入目标登录方式
     setMode(next);
     // 清空验证码，切回密码模式后不再复用
     setCode('');
     // 清空密码，切到验证码模式后不再复用
     setPassword('');
-    // 清空展示名，避免把登录态残留昵称带进注册
-    setDisplayName('');
     // 清空开发态验证码回显
     setDevCode(null);
     // 清空旧错误提示
@@ -399,38 +392,22 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     // 按当前 mode 组装票据；off / 未强制时为空对象，不携带任何验证码字段
     const ticketPayload = buildCaptchaTicket();
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      // 三选一发起认证请求，三条分支都返回统一的登录凭证
-      const result =
-        // 注册模式：账号 + 口令创建自建账号，注册成功即登录
-        mode === 'register'
-          ? await api.register({
-              region,
-              identifier: identifier.trim(),
-              password,
-              display_name: displayName.trim() || undefined,
-              invite_code: inviteCode.trim() || undefined, // 注册门槛开启时后端据此核销
-              ...ticketPayload,
-            }) // 代码块结束
-          // 密码模式：区域 + 账号标识 + 密码换取会话
-          : mode === 'password'
-            ? await api.loginWithPassword({ region, identifier: identifier.trim(), password, ...ticketPayload })
-            // 验证码模式：区域 + 提供方 + 账号标识 + 验证码换取会话
-            : await api.login({
-                // 账号所属区域
-                region,
-                // 身份提供方：手机号或邮箱
-                provider,
-                // 账号标识，去空格后提交
-                identifier: identifier.trim(),
-                // 用户填写的验证码，去空格后提交
-                code: code.trim(),
-                ...ticketPayload,
-              });
-      // 注册模式先停在成功面板：把自动分配的 Mim ID 展示给用户，再进入工作台
-      if (mode === 'register') {
-        setRegistered(result); // 暂存结果，等用户确认
-        return; // 不在这里写会话，避免直接跳走看不到号码
-      } // 代码块结束
+      // 二选一发起登录请求（注册已关闭）：密码模式或验证码模式，均返回统一凭证
+      const result = mode === 'password'
+        // 密码模式：区域 + 账号标识 + 密码换取会话
+        ? await api.loginWithPassword({ region, identifier: identifier.trim(), password, ...ticketPayload })
+        // 验证码模式：区域 + 提供方 + 账号标识 + 验证码换取会话
+        : await api.login({
+            // 账号所属区域
+            region,
+            // 身份提供方：手机号或邮箱
+            provider,
+            // 账号标识，去空格后提交
+            identifier: identifier.trim(),
+            // 用户填写的验证码，去空格后提交
+            code: code.trim(),
+            ...ticketPayload,
+          });
       // 把令牌写入本地会话存储，供后续接口自动携带
       setSession(result);
       // 通知上层登录成功，触发视图切换
@@ -443,39 +420,6 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
       setBusy(false);
     } // 代码块结束
   } // 代码块结束
-
-  // 注册成功：先展示服务端自动分配的 Mim ID，用户确认后再进入工作台
-  if (registered) {
-    return ( // 返回当前函数的处理结果
-      <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>{/* 执行当前业务步骤 */}
-        <div className="auth-card">{/* 执行当前业务步骤 */}
-          <div className="auth-head">{/* 执行当前业务步骤 */}
-            <h1>{t(locale, 'app.name')}</h1>
-          </div>
-          <p className="auth-notice" role="status">{locale === 'en-US' ? 'Account created.' : '账号创建成功'}</p>
-          <div className="member-no-block">{/* 执行当前业务步骤 */}
-            <span>{locale === 'en-US' ? 'Your Mim ID' : '你的 Mim ID 号码'}</span>
-            <strong className="member-no">{registered.user.member_no}</strong>
-            <span className="hint">{/* 执行当前业务步骤 */}
-              {locale === 'en-US'
-                ? 'This number is your public identity in Mim. Keep it for support and sharing.'
-                : '该号码是你的对外身份标识，可随时在个人中心查看。'}
-            </span>
-          </div>
-          <button
-            type="button" // 赋值：更新变量 type 的取值
-            className="btn primary block"
-            onClick={() => {
-              setSession(registered); // 用户确认后才写入会话
-              onLogin(registered); // 进入工作台
-            }}
-          >
-            {locale === 'en-US' ? 'Enter Mim' : '进入 Mim'}
-          </button>
-        </div>
-      </div>
-    ); // 执行当前业务步骤
-  } // 注册成功面板结束
 
   // 渲染登录页：整屏独立展示，或以 embedded 模式内嵌到主布局内容区
   return (
@@ -544,17 +488,9 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           >
             {t(locale, 'auth.modeCode')}{/* 验证码模式文案，走 i18n */}
           </button>{/* 结束验证码登录按钮 */}
-          <button
-            // 注册按钮：普通按钮，创建自建账号（不依赖短信/邮箱通道）
-            type="button"
-            // 当前为注册模式时高亮
-            className={mode === 'register' ? 'active' : ''}
-            // 切到注册模式并清空已填凭证
-            onClick={() => switchMode('register')}
-          >
-            {locale === 'en-US' ? 'Sign up' : '注册'}{/* 注册入口文案 */}
-          </button>{/* 结束注册按钮 */}
         </div>{/* 结束登录方式分段控件 */}
+        {/* 2026-11-15 全站关闭注册：注册分段已移除，这里留一行说明，避免用户继续找入口 */}
+        <p className="hint">{locale === 'en-US' ? 'Registration is currently closed. Sign in with an existing account.' : '注册功能已关闭，请使用已有账号登录。'}</p>
 
         <form className="form" onSubmit={submit}>{/* 登录表单：提交统一由 submit 处理 */}
           <label>{/* 账号输入项：标题随身份提供方变化 */}
@@ -573,37 +509,9 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
             />{/* 账号输入框结束 */}
           </label>{/* 结束账号输入项 */}
 
-          {mode === 'register' && ( // 注册模式：可选昵称，留空则回退为账号前 8 位展示
-            <label>{/* 昵称输入项 */}
-              <span>{locale === 'en-US' ? 'Display name (optional)' : '昵称（可选）'}</span>{/* 昵称标题 */}
-              <input
-                // 受控值绑定 displayName
-                value={displayName}
-                // 每次输入同步回状态
-                onChange={(event) => setDisplayName(event.target.value)}
-                // 最多 64 位，与后端校验上限一致
-                maxLength={64}
-                // 昵称非必填
-                placeholder={locale === 'en-US' ? 'Your name' : '可留空'}
-              />{/* 昵称输入框结束 */}
-            </label> // 结束昵称输入项
-          )}{/* 结束注册昵称条件渲染 */}
-
-          {mode === 'register' && ( // 注册模式：邀请码入口；未开启门槛时可留空
-            <label>{/* 邀请码输入项 */}
-              <span>{locale === 'en-US' ? 'Invite code (if required)' : '邀请码（如站点已开启邀请注册）'}</span>{/* 邀请码标题 */}
-              <input
-                value={inviteCode} // 受控值
-                onChange={(event) => setInviteCode(event.target.value)} // 同步输入
-                maxLength={32} // 与后端校验上限一致
-                placeholder={locale === 'en-US' ? 'Optional until the site requires it' : '未开启邀请注册可留空'}
-              />{/* 邀请码输入框结束 */}
-            </label> // 结束邀请码输入项
-          )}{/* 结束注册邀请码条件渲染 */}
-
-          {mode !== 'code' ? ( // 密码与注册模式共用密码输入框，验证码模式换成验证码行
+          {mode !== 'code' ? ( // 密码模式展示密码输入框，验证码模式换成验证码行
             <label>{/* 密码输入项 */}
-              <span>{mode === 'register' ? (locale === 'en-US' ? 'Password (min 8, letters + digits)' : '设置密码（至少 8 位，含字母与数字）') : t(locale, 'auth.password')}</span>{/* 标题随模式切换 */}
+              <span>{t(locale, 'auth.password')}</span>{/* 标题 */}
               <input
                 // 受控值绑定 password
                 value={password}
@@ -611,10 +519,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 onChange={(event) => setPassword(event.target.value)}
                 // 密码类型，输入内容以圆点显示
                 type="password"
-                // 注册提示浏览器生成新密码，登录提示填充当前密码
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                // 注册要求至少 8 位，登录保持后端最小 1 位校验
-                minLength={mode === 'register' ? 8 : 1}
+                // 登录提示填充当前密码
+                autoComplete="current-password"
                 // 必填
                 required
               />{/* 密码输入框结束 */}
@@ -664,16 +570,14 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           {error && <p className="error">{error}</p>}{/* 错误提示：仅在 error 非空时渲染 */}
           {oauthError && <p className="error">{oauthError}</p>}{/* 第三方登录错误：票据失效 / 授权被拒 / 未配置 */}
 
-          {mode === 'code' && channels && !(provider === 'phone' ? channels.sms : channels.email) && ( // 通道未配置时明确引导改用密码或注册
-            <p className="hint">{locale === 'en-US' ? 'Verification channel is not configured on this deployment. Use password or sign up instead.' : '当前部署未配置该验证码通道，请改用密码登录或注册。'}</p>
+          {mode === 'code' && channels && !(provider === 'phone' ? channels.sms : channels.email) && ( // 通道未配置时明确引导改用密码登录
+            <p className="hint">{locale === 'en-US' ? 'Verification channel is not configured on this deployment. Use password sign-in instead.' : '当前部署未配置该验证码通道，请改用密码登录。'}</p>
           )}{/* 通道提示结束 */}
 
           <button type="submit" className="btn primary block" disabled={busy}>{/* 提交按钮：请求中禁用 */}
-            {busy // 忙碌时显示加载文案，否则按模式显示「注册 / 登录」
+            {busy // 忙碌时显示加载文案，否则显示「登录」
               ? t(locale, 'common.loading')
-              : mode === 'register'
-                ? (locale === 'en-US' ? 'Create account' : '注册并登录')
-                : t(locale, 'auth.login')}{/* 按钮文案结束 */}
+              : t(locale, 'auth.login')}{/* 按钮文案结束 */}
           </button>{/* 结束提交按钮 */}
         </form>{/* 结束登录表单 */}
 

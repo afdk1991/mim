@@ -5,6 +5,7 @@ import request from 'supertest'; // supertest 在进程内驱动 Express，无�
 import type { Express } from 'express'; // Express 类型，用于标注被测应用
 import { createApp } from '../src/app.js'; // 唯一装配入口
 import { createDatabase } from '../src/db.js'; // 建库函数，:memory: 保证每例干净
+import { LOGIN_IP_LOCK_AFTER_FAILURES } from '../src/config.js'; // IP 维度阈值，避免测试硬编码漂移
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥，满足强度校验
 
@@ -81,10 +82,50 @@ describe('账号口令登录', () => { // 注册后可用账号 + 口令登录
     expect(res.body.code).toBe('AUTH_PASSWORD_NOT_CONFIGURED'); // 指向缺失的环境变量
   }); // 结束用例
 
-  it('管理员口令仍可登录未注册标识（保留原最小可用入口）', async () => { // 兼容既有部署
-    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret' } }); // 注入管理员口令
-    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000006', password: 'admin-secret' }); // 用管理员口令
-    expect(res.status).toBe(200); // 仍可登录并自动建号
-    expect(res.body.user.region).toBe('cn'); // 用户按请求区域创建
+  it('管理员口令只对白名单内、已存在的账号生效', async () => { // SEC-01：口令不再对任意标识生效
+    await register('13900000007', 'mim-pass-789'); // 先建立真实账号
+    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000007' } }); // 口令 + 白名单
+    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000007', password: 'admin-secret' }); // 白名单内账号
+    expect(res.status).toBe(200); // 允许登录
+    expect(res.body.user.region).toBe('cn'); // 用户按请求区域返回
+  }); // 结束用例
+
+  it('白名单外的已存在账号，管理员口令一律 401', async () => { // SEC-01：口令不对任意账号标识成立
+    await register('13900000008', 'mim-pass-789'); // 账号真实存在但不在白名单
+    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000099' } }); // 白名单只含其他标识
+    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000008', password: 'admin-secret' }); // 正确口令但非白名单
+    expect(res.status).toBe(401); // 拒绝
+    expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 统一错误码，不泄露配置细节
+  }); // 结束用例
+
+  it('不存在的标识：一律失败且不建号', async () => { // SEC-01：管理员口令不具备自动建号能力
+    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000009' } }); // 标识已列入白名单但未注册
+    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000009', password: 'admin-secret' }); // 正确口令 + 白名单
+    expect(res.status).toBe(401); // 不存在标识必须失败
+    expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 与口令错误同码，避免标识枚举
+    const row = db.prepare('SELECT COUNT(*) AS n FROM identities WHERE identifier = ?').get('13900000009') as { n: number }; // 核查是否偷偷建号
+    expect(row.n).toBe(0); // 绝不建号
+  }); // 结束用例
+
+  it('同一标识连续失败 5 次后锁定（423 AUTH_ACCOUNT_LOCKED）', async () => { // 标识维度失败计数
+    await register('13900000010', 'mim-pass-789'); // 先建立账号
+    for (let i = 0; i < 5; i += 1) { // 连续 5 次错误口令
+      const bad = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000010', password: 'wrong-pass' });
+      expect(bad.status).toBe(401); // 前 5 次均为认证失败
+    } // 循环结束
+    const locked = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000010', password: 'mim-pass-789' }); // 第 6 次即使口令正确
+    expect(locked.status).toBe(423); // 也必须被锁定拦截
+    expect(locked.body.code).toBe('AUTH_ACCOUNT_LOCKED'); // 明确锁定错误码
+  }); // 结束用例
+
+  it('同一来源 IP 跨账号累计失败 20 次后锁定（423 AUTH_ACCOUNT_LOCKED）', async () => { // IP 维度失败计数
+    const ipApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret' } }); // 配置口令入口，确保失败路径返回 401
+    for (let i = 0; i < LOGIN_IP_LOCK_AFTER_FAILURES; i += 1) { // 每次换一个从未存在的标识，避免触发标识维度锁定
+      const bad = await request(ipApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: `1391000${String(i).padStart(4, '0')}`, password: 'wrong-pass' });
+      expect(bad.status).toBe(401); // 单次失败仍是 401
+    } // 循环结束
+    const locked = await request(ipApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13919999999', password: 'wrong-pass' }); // 全新标识、同一 IP
+    expect(locked.status).toBe(423); // IP 维度锁定生效
+    expect(locked.body.code).toBe('AUTH_ACCOUNT_LOCKED'); // 明确锁定错误码
   }); // 结束用例
 }); // describe 结束

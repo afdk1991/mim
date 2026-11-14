@@ -6,6 +6,7 @@ import type { Express } from 'express'; // 应用类型
 import { createApp } from '../src/app.js'; // 唯一装配入口
 import { createDatabase } from '../src/db.js'; // 内存库工厂（内部已执行统一交易域回填）
 import { backfillUnifiedCommerce } from '../src/commerce/unified.js'; // 回填函数，用于幂等断言
+import { registerTestAccount } from './_auth-helper.js'; // 访客建号已停用，改用自助注册建独立账号
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥
 const ADMIN_TOKEN = 'test-admin-token'; // 管理引导令牌，与其他用例口径一致
@@ -18,16 +19,17 @@ beforeEach(() => { // 每例重建，避免用例间订单互相污染
   app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_ADMIN_TOKEN: ADMIN_TOKEN } }); // 装配应用
 });
 
-/** 领取访客令牌：统一订单接口要求登录态，访客会话同样持有自己的订单 */
-async function guest() {
-  const res = await request(app).post('/api/v1/auth/guest').send({}); // 公开端点
-  expect(res.status).toBe(200); // 免登录体验下必成功
-  return { token: res.body.access_token as string, userId: res.body.user.id as string }; // 返回令牌与用户 id
+let userSeq = 0; // 账号序号：保证同一应用内手机号唯一
+
+/** 建一个独立正式账号：访客建号已停用，统一走自助注册 */
+async function newUser() {
+  const identifier = `139${String(10_000_000 + (userSeq += 1))}`; // 11 位手机号
+  return registerTestAccount(app, identifier); // 复用注册辅助：返回令牌与用户 id
 }
 
 describe('统一交易域：回填与只读视图', () => {
   it('三套历史订单回填后，GET /orders 一次返回三条来源不同的订单', async () => {
-    const { token, userId } = await guest(); // 建一个访客会话
+    const { token, userId } = await newUser(); // 建一个独立账号
     const moduleRow = db.prepare('SELECT id, region FROM modules LIMIT 1').get() as { id: string; region: string }; // 取一个种子模块（模块表不带币种列，结算币种由下单快照决定）
     db.prepare(
       `INSERT INTO module_orders (id, user_id, module_id, region, currency, amount_minor, status, channel, created_at, updated_at, paid_at)
@@ -57,7 +59,7 @@ describe('统一交易域：回填与只读视图', () => {
   });
 
   it('source 过滤只回该产线订单；实物线履约展示字段从旧表只读回源，非法 source 回 400', async () => {
-    const { token, userId } = await guest(); // 建一个访客会话
+    const { token, userId } = await newUser(); // 建一个独立账号
     const moduleRow = db.prepare('SELECT id, region FROM modules LIMIT 1').get() as { id: string; region: string }; // 取一个种子模块
     db.prepare(
       `INSERT INTO module_orders (id, user_id, module_id, region, currency, amount_minor, status, channel, created_at, updated_at, paid_at)
@@ -86,7 +88,7 @@ describe('统一交易域：回填与只读视图', () => {
   });
 
   it('回填幂等：重复执行不新增行，也不改动既有订单', async () => {
-    const { userId } = await guest(); // 用户
+    const { userId } = await newUser(); // 用户
     db.prepare(
       `INSERT INTO asset_purchases (id, user_id, asset_id, amount_cents, created_at)
        SELECT 'ap-idem-1', ?, id, 100, '2026-11-04T00:00:00.000Z' FROM paid_assets LIMIT 1`,
@@ -100,8 +102,8 @@ describe('统一交易域：回填与只读视图', () => {
   });
 
   it('汇总口径与跨用户隔离：他人订单按 404 处理，不泄露存在性', async () => {
-    const owner = await guest(); // 订单所有者
-    const stranger = await guest(); // 另一个访客
+    const owner = await newUser(); // 订单所有者
+    const stranger = await newUser(); // 另一个独立账号
     db.prepare(
       `INSERT INTO asset_purchases (id, user_id, asset_id, amount_cents, created_at)
        SELECT 'ap-own-1', ?, id, 300, '2026-11-05T00:00:00.000Z' FROM paid_assets LIMIT 1`,

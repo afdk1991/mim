@@ -406,8 +406,17 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (thread.board_status !== 'active' && thread.board_created_by !== userId && thread.board_moderator_id !== userId && thread.author_id !== userId) { // 条件分支：仅在满足业务前置条件时继续
       throw new AppError('NOT_FOUND', '帖子不存在'); // 待审核 / 被驳回板块的帖子对普通访客不可见
     } // 结束条件分支：本层作用域收尾
-    deps.db.prepare('UPDATE community_threads SET views = views + 1 WHERE id = ?').run(id); // 预编译 SQL：固定语句结构后绑定参数执行
-    refreshRecommendScore(deps, id); // 浏览量计入推荐指数
+    // 浏览计数：同一账号对同一帖子只计一次（终身），刷新 / 反复进入不重复累加。
+    // 先用 INSERT OR IGNORE 抢去重账本的主键，只有真正插入成功时才 +1，避免并发下双计。
+    const firstView = deps.db
+      .prepare('INSERT OR IGNORE INTO community_thread_views (thread_id, user_id, created_at) VALUES (?, ?, ?)')
+      .run(id, userId, new Date().toISOString()).changes > 0; // 首次浏览标记
+    if (firstView) { // 只有首次浏览才写浏览量
+      deps.db.prepare('UPDATE community_threads SET views = views + 1 WHERE id = ?').run(id); // 预编译 SQL：固定语句结构后绑定参数执行
+      refreshRecommendScore(deps, id); // 浏览量计入推荐指数
+    } // 首次浏览分支结束
+    // 列表与详情同源：回读数据库当前值，避免响应里出现「写死 / 多加一次」的数字
+    const currentViews = (deps.db.prepare('SELECT views FROM community_threads WHERE id = ?').get(id) as { views: number }).views;
     const boardUnlocked = hasBoardAccess(deps, userId, thread.board_id, thread.board_price_cents); // 保存 boardUnlocked：承载本步骤的计算结果供后续使用
     // 板块会员准入 + 单帖已购两条解锁路径：付费帖可单独购买，不强制先加入板块；免费内容仍受板块门槛约束。
     const threadPaidUnlocked = thread.price_cents > 0 && hasThreadAccess(deps, userId, id, thread.price_cents); // 保存 threadPaidUnlocked：承载本步骤的计算结果供后续使用
@@ -447,7 +456,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ // 输出响应：把处理结果写回 HTTP 客户端
       thread: { // 对象字段：声明结构中的一项数据
         ...thread, // 链式调用：在上一步结果上继续处理
-        views: (thread.views as number) + 1, // 对象字段：声明结构中的一项数据
+        views: currentViews, // 浏览量：直接回读数据库，与列表页 / 总览同源
         body: unlocked ? thread.body : '', // 对象字段：声明结构中的一项数据
         locked: !unlocked, // 对象字段：声明结构中的一项数据
         board_locked: !boardUnlocked, // 对象字段：声明结构中的一项数据

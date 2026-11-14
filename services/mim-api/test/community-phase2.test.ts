@@ -19,21 +19,19 @@ import type { Express } from 'express'; // 引入依赖、类型或本地模块�
 import { createApp } from '../src/app.js'; // 引入依赖、类型或本地模块绑定
 import { createDatabase } from '../src/db.js'; // 引入依赖、类型或本地模块绑定
 import type { Db } from '../src/types.js'; // 引入依赖、类型或本地模块绑定
+import { loginHeaders } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 准备：构造本用例需要的输入或句柄
-const ADMIN_PASSWORD = 'testpass123'; // 准备：构造本用例需要的输入或句柄
 let app: Express; // 状态：保存跨步骤复用的值
 let db: Db; // 状态：保存跨步骤复用的值
 
 beforeEach(() => { // 调用 beforeEach 并处理其返回结果
   db = createDatabase(':memory:'); // 赋值：更新变量 db 的取值
-  app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD } }); // 赋值：更新变量 app 的取值
+  app = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 赋值：更新变量 app 的取值
 }); // 代码块结束
 
 async function login(identifier: string): Promise<Record<string, string>> { // 函数 login：封装一段可复用的处理逻辑
-  const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 准备：构造本用例需要的输入或句柄
-  expect(res.status).toBe(200); // 登录助手：密码登录成功返回 200
-  return { authorization: `Bearer ${res.body.access_token}`, 'content-type': 'application/json' }; // 返回：交回本步骤结果供断言使用
+  return loginHeaders(app, identifier); // 注册真实账号后走口令登录
 } // 代码块结束
 
 function writeHeaders(auth: Record<string, string>): Record<string, string> { // 函数 writeHeaders：封装一段可复用的处理逻辑

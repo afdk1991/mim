@@ -21,7 +21,7 @@ import type { NextFunction, Request, Response } from 'express'; // 回调处理�
 import { z } from 'zod'; // 请求体校验
 import * as oauth from 'oauth4webapi'; // 仅用其高熵 state 生成函数
 import { AppError } from '@mim/core-domain'; // 统一业务异常
-import { OAUTH_STATE_TTL_SECONDS } from '../config.js'; // 授权状态有效期
+import { OAUTH_STATE_TTL_SECONDS, isRegistrationEnabled } from '../config.js'; // 授权状态有效期 + 注册总开关
 import { clockOf } from '../domain.js'; // 可注入时钟
 import { sha256 } from '../auth.js'; // state 只存摘要
 import { parse } from '../validate.js'; // zod 校验包装
@@ -211,6 +211,9 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
           if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 已注销不允许登录
           upsertOAuthAccount(deps.db, user.id, spec, profile, now); // 刷新昵称 / 头像
         } else { // 首次第三方登录
+          if (!isRegistrationEnabled(deps.env)) { // 注册总开关关闭：不允许 OAuth 首登自动建号
+            throw new AppError('AUTH_REGISTER_DISABLED', 'registration is disabled'); // 由外层 catch 302 回登录页并带错误码
+          } // 开关判定结束
           user = createUserFromOAuth(deps.db, spec, profile, record.region, now); // 建号 + 绑定（自动分配号码）
         } // 分支结束
         const ticket = issueLoginTicket(deps.db, user.id, now); // 一次性票据

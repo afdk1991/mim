@@ -5,35 +5,26 @@ import request from 'supertest'; // 对 Express app 发起真实 HTTP 请求
 import type { Express } from 'express'; // 仅类型
 import { createApp } from '../src/app.js'; // 应用工厂
 import { createDatabase } from '../src/db.js'; // 内存数据库工厂
+import { registerTestAccount } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 // 测试用 JWT 密钥
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 准备：构造本用例需要的输入或句柄
-// 测试用管理员口令（密码登录入口）
-const ADMIN_PASSWORD = 'testpass123'; // 准备：构造本用例需要的输入或句柄
 
 // 每个用例前重建 app，保证 case 间无状态残留
 let app: Express; // 状态：保存跨步骤复用的值
 
-// 钩子：为每个 it 准备一个全新的内存库 app 实例，env 注入管理员口令以启用密码登录
+// 钩子：为每个 it 准备一个全新的内存库 app 实例
 beforeEach(() => {
   app = createApp({ // 赋值：更新变量 app 的取值
     db: createDatabase(':memory:'), // 对象字段 db：记录一项配置或数据
     jwtSecret: JWT_SECRET, // 对象字段 jwtSecret：记录一项配置或数据
-    env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD }, // 启用密码登录，便于测试创建用户
+    env: {}, // 登录走自助注册 + 口令
   }); // 代码块结束
 }); // 代码块结束
 
-// 辅助：用指定手机号登录并拿到 access_token；密码登录会自动创建用户
+// 辅助：注册并口令登录，拿到 access_token；不再依赖管理员口令自动建号
 async function login(identifier: string): Promise<{ token: string; userId: string }> {
-  const res = await request(app).post('/api/v1/auth/password').send({ // 准备：构造本用例需要的输入或句柄
-    region: 'cn', // 国内通道
-    identifier, // 手机号
-    password: ADMIN_PASSWORD, // 管理员口令
-  }); // 代码块结束
-  expect(res.status).toBe(200); // 登录必须成功
-  expect(res.body.access_token).toBeTruthy(); // 必须返回访问令牌
-  expect(res.body.user.id).toBeTruthy(); // 必须返回用户 ID
-  return { token: res.body.access_token, userId: res.body.user.id }; // 返回：交回本步骤结果供断言使用
+  return registerTestAccount(app, identifier); // 先建号再登录
 } // 代码块结束
 
 // IM 域契约测试集合

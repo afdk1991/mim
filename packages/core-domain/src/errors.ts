@@ -29,6 +29,8 @@ export const ERROR_CODES = [
   'AUTH_ACCOUNT_LOCKED',
   // 匿名访客自动建号过于频繁，触发频控（同 IP / 设备短时间大量建号）
   'AUTH_GUEST_RATE_LIMITED',
+  // 注册总开关已关闭，任何新建账号路径（含访客、验证码首登、OAuth 首登）一律拒绝
+  'AUTH_REGISTER_DISABLED',
   // 刷新令牌无效或已被轮换失效，需重新登录
   'AUTH_REFRESH_INVALID',
   // 第三方登录提供方未配置 client_id / client_secret，入口不可用
@@ -117,6 +119,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_CODE_RATE_LIMITED: 429,
   // 访客建号频控同样用 429，客户端退避语义与验证码频控一致
   AUTH_GUEST_RATE_LIMITED: 429,
+  // 注册已关闭：403 明确表达「不允许创建账号」，与 500 区分
+  AUTH_REGISTER_DISABLED: 403,
   // 通道未配置属服务端能力缺失，用 503 表示暂时不可用
   AUTH_CHANNEL_NOT_CONFIGURED: 503,
   // 上游下发失败属网关错误，用 502 区分「我方无问题」

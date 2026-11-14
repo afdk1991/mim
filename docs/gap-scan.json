@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T18:36:52.456Z",
+  "generatedAt": "2026-11-14T19:57:26.240Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -18,7 +18,7 @@
       "title": "B. 表结构接缝",
       "status": "PASS",
       "stats": {
-        "sqlFiles": 13,
+        "sqlFiles": 14,
         "nonIdempotent": 0,
         "badDirectives": 0,
         "copiesSchemaD": true
@@ -30,13 +30,13 @@
       "title": "C. 环境变量登记",
       "status": "WARN",
       "stats": {
-        "sourceVars": 189,
-        "templateVars": 168,
-        "inventoryVars": 219,
+        "sourceVars": 190,
+        "templateVars": 169,
+        "inventoryVars": 163,
         "wildcardStems": 22,
-        "unregistered": 20,
+        "unregistered": 21,
         "unregisteredAdapter": 0,
-        "unregisteredInternal": 20
+        "unregisteredInternal": 21
       },
       "failures": [],
       "warnings": [
@@ -61,6 +61,21 @@
             }
           ],
           "locationCount": 1
+        },
+        {
+          "var": "MIM_AI_WORKER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-chat-flow.mjs",
+              "line": 5
+            },
+            {
+              "file": "scripts/verify-chat-plus.mjs",
+              "line": 5
+            }
+          ],
+          "locationCount": 2
         },
         {
           "var": "MIM_API_BASE",
@@ -174,23 +189,23 @@
           "locations": [
             {
               "file": "deploy/deploy.sh",
-              "line": 25
+              "line": 26
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 139
+              "line": 141
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 140
-            },
-            {
-              "file": "deploy/deploy.sh",
-              "line": 207
+              "line": 142
             },
             {
               "file": "deploy/deploy.sh",
               "line": 209
+            },
+            {
+              "file": "deploy/deploy.sh",
+              "line": 211
             }
           ],
           "locationCount": 6
@@ -231,19 +246,19 @@
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 272
+              "line": 281
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 272
+              "line": 281
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 273
+              "line": 282
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 274
+              "line": 283
             }
           ],
           "locationCount": 49
@@ -378,17 +393,21 @@
       "title": "D. 前端接线",
       "status": "WARN",
       "stats": {
-        "viewFiles": 14,
-        "unregistered": 2,
-        "nested": 2,
-        "appViews": 11,
-        "segments": 11,
+        "viewFiles": 12,
+        "unregistered": 3,
+        "nested": 3,
+        "appViews": 8,
+        "segments": 8,
         "missingSegments": 0
       },
       "failures": [],
       "warnings": [
         {
           "file": "apps/web/src/views/AnnouncementsPanel.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/ContentDetail.tsx",
           "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
         },
         {
@@ -402,8 +421,8 @@
       "status": "WARN",
       "stats": {
         "hard": 0,
-        "notes": 5,
-        "total": 5
+        "notes": 4,
+        "total": 4
       },
       "failures": [],
       "warnings": [
@@ -434,13 +453,6 @@
           "marker": "未实现",
           "kind": "comment",
           "text": "* 主动刷新指定 URL 清单。未配置 / 未实现 / 上游失败均返回 ok=false，"
-        },
-        {
-          "file": "apps/web/src/views/Releases.tsx",
-          "line": 322,
-          "marker": "未实现",
-          "kind": "string-note",
-          "text": "'如果某个能力在导航里找不到，从下面直接进入对应视图。这里只列已有前台页面的能力，不把未实现页面伪装成入口。',"
         }
       ]
     }

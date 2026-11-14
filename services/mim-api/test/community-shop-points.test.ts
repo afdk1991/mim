@@ -15,9 +15,9 @@ import type { Express } from 'express'; // 应用类型
 import { createApp } from '../src/app.js'; // 装配入口
 import { createDatabase } from '../src/db.js'; // 内存库工厂
 import type { Db } from '../src/types.js'; // 数据库连接类型
+import { registerTestAccount } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥
-const ADMIN_PASSWORD = 'testpass123'; // 运营引导口令
 const PRODUCT = 'pixi-pack'; // 自动发卡商品：1900 分，库存卡密 3 张
 
 let app: Express; // 待测应用
@@ -25,13 +25,11 @@ let db: Db; // 内存库句柄
 
 beforeEach(() => { // 每例重建内存库；默认配置：100 积分 = 1 元，单笔上限 30%
   db = createDatabase(':memory:'); // 赋值：更新变量 db 的取值
-  app = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD } }); // 赋值：更新变量 app 的取值
+  app = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 赋值：更新变量 app 的取值
 }); // 代码块结束
 
-async function login(identifier: string): Promise<{ token: string; userId: string }> { // 密码登录同款流程
-  const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier, password: ADMIN_PASSWORD }); // 常量 res：保存固定配置或一次性派生值
-  expect(res.status).toBe(200); // 调用 expect 并处理其返回结果
-  return { token: res.body.access_token as string, userId: res.body.user.id as string }; // 返回当前函数的处理结果
+async function login(identifier: string): Promise<{ token: string; userId: string }> { // 注册 + 口令登录
+  return registerTestAccount(app, identifier); // 先建号再登录，替代已移除的管理员口令自动建号
 } // 代码块结束
 
 function writeHeaders(token: string): Record<string, string> { // 写请求头 + 幂等键
@@ -118,10 +116,10 @@ describe('shop 积分抵扣 · 正常抵扣与边界', () => { // 调用 describ
 
   it('开关 MIM_POINTS_DEDUCTION_ENABLED=0：整段跳过，积分不动、应付不变', async () => { // 调用 it 并处理其返回结果
     const offDb = createDatabase(':memory:'); // 常量 offDb：保存固定配置或一次性派生值
-    const offApp = createApp({ db: offDb, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_POINTS_DEDUCTION_ENABLED: '0' } }); // 常量 offApp：保存固定配置或一次性派生值
-    const loginRes = await request(offApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13820000005', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
-    const token = loginRes.body.access_token as string; // 常量 token：保存固定配置或一次性派生值
-    const userId = loginRes.body.user.id as string; // 常量 userId：保存固定配置或一次性派生值
+    const offApp = createApp({ db: offDb, jwtSecret: JWT_SECRET, env: { MIM_POINTS_DEDUCTION_ENABLED: '0' } }); // 常量 offApp：保存固定配置或一次性派生值
+    const session = await registerTestAccount(offApp, '13820000005'); // 注册后口令登录
+    const token = session.token; // 常量 token：访问令牌
+    const userId = session.userId; // 常量 userId：用户主键
     offDb.prepare('INSERT INTO wallets (user_id, balance_cents, points, updated_at) VALUES (?, 20000, 5000, ?)').run(userId, new Date().toISOString()); // 执行当前业务步骤
 
     const order = await request(offApp).post('/api/v1/shop/orders').set({ authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }).send({ product_code: PRODUCT, use_points: true }); // 常量 order：保存固定配置或一次性派生值
@@ -137,10 +135,10 @@ describe('shop 积分抵扣 · 正常抵扣与边界', () => { // 调用 describ
 describe('shop 积分抵扣 · 全额抵扣即时完成', () => { // 调用 describe 并处理其返回结果
   it('上限放开且积分充足：应付 0，订单即时结算并发卡密，不生成待支付死单', async () => { // 调用 it 并处理其返回结果
     const fullDb = createDatabase(':memory:'); // 常量 fullDb：保存固定配置或一次性派生值
-    const fullApp = createApp({ db: fullDb, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: ADMIN_PASSWORD, MIM_POINTS_MAX_RATIO_PERCENT: '100' } }); // 常量 fullApp：保存固定配置或一次性派生值
-    const loginRes = await request(fullApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13820000006', password: ADMIN_PASSWORD }); // 常量 loginRes：保存固定配置或一次性派生值
-    const token = loginRes.body.access_token as string; // 常量 token：保存固定配置或一次性派生值
-    const userId = loginRes.body.user.id as string; // 常量 userId：保存固定配置或一次性派生值
+    const fullApp = createApp({ db: fullDb, jwtSecret: JWT_SECRET, env: { MIM_POINTS_MAX_RATIO_PERCENT: '100' } }); // 常量 fullApp：保存固定配置或一次性派生值
+    const session = await registerTestAccount(fullApp, '13820000006'); // 注册后口令登录
+    const token = session.token; // 常量 token：访问令牌
+    const userId = session.userId; // 常量 userId：用户主键
     fullDb.prepare('INSERT INTO wallets (user_id, balance_cents, points, updated_at) VALUES (?, 0, 19000, ?)').run(userId, new Date().toISOString()); // 执行当前业务步骤
 
     const order = await request(fullApp).post('/api/v1/shop/orders').set({ authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() }).send({ product_code: PRODUCT, use_points: true }); // 常量 order：保存固定配置或一次性派生值
