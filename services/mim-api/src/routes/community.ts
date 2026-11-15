@@ -1,6 +1,6 @@
 /** 社区与变现路由：论坛 / 付费阅读 / VIP / 钱包积分 / 独立商城 / 优惠码 / 推广分成 */
 
-import { Router, type Request } from 'express'; // Express 路由容器 + 请求类型（本地推导公网基址）
+import { Router } from 'express'; // Express 路由容器
 import { randomUUID } from 'node:crypto'; // 稳定主键生成
 import { z } from 'zod'; // 入参声明式校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
@@ -17,16 +17,7 @@ import { DEFAULT_TABS, loadBoardTabs, saveBoardTabs, SORT_BY_KEYS, type TabInput
 import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewEnabled, type HomeView } from '../community/settings.js'; // 三期：首页指向与审核开关
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
 import { assertSafeObjectKey, mimeForObjectKey } from '../storage.js'; // 附件对象键安全校验（禁止路径穿越）+ 后缀推导 MIME
-
-/** 附件签名下载的公网基址：优先显式配置，其次按反代头 / Host 推导；与媒体域同一口径。 */
-function publicBaseUrl(req: Request, env: Record<string, string | undefined>): string | undefined { // 定义函数 publicBaseUrl：把请求还原成外部可访问的源
-  const configured = (env.MIM_PUBLIC_BASE_URL ?? '').trim(); // 显式配置优先
-  if (configured) return configured; // 配了就直接用
-  const forwardedHost = (req.get('x-forwarded-host') ?? '').split(',')[0]!.trim(); // 反代改写后的主机名
-  const forwardedProto = (req.get('x-forwarded-proto') ?? '').split(',')[0]!.trim(); // 反代改写后的协议
-  const host = forwardedHost || req.get('host'); // 无代理头时回落 Host
-  return host ? `${forwardedProto || req.protocol}://${host}` : undefined; // 推导不出返回 undefined，交给存储层回落
-} // 结束函数体：本层作用域收尾
+import { baseUrlOf } from './media.js'; // 附件签名下载复用媒体域的公网基址推导，避免两套口径并存
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
 
@@ -606,7 +597,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const presigned = await storage.presignDownload({ // 生成短时签名地址（local 走 HMAC，s3 走 SigV4）
       key: attachment.url, // 对象键：列名沿用历史 url，但存的是键不是公开直链
       expires_seconds: 300, // 5 分钟有效：足够点击下载，又不会被长期转发
-      base_url: publicBaseUrl(req, deps.env), // 与媒体域同一套公网基址推导
+      base_url: baseUrlOf(req, deps.env), // 与媒体域共用同一套公网基址推导
     }); // presignDownload 调用结束
     res.json({ // 只回签名地址与展示元数据，不回对象键
       download: presigned, // 含 url / method / headers / expires_at
@@ -1116,7 +1107,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         cover_url: z.string().max(500).nullable().optional(), // 封面（null 表示清空）
         price_cents: z.number().int().min(0).max(100000).optional(), // 付费定价（0 = 免费）
         media: z.array(z.object({ kind: z.enum(['image', 'video']), url: z.string().min(1).max(500) })).max(12).optional(), // 媒体整组替换
-        attachments: z.array(z.object({ name: z.string().min(1).max(120), url: z.string().min(1).max(500), size_bytes: z.number().int().min(0).max(2_000_000_000).optional() })).max(6).optional(), // 附件整组替换
+        attachments: z.array(z.object({ name: z.string().min(1).max(120), object_key: z.string().min(1).max(512), mime: z.string().min(1).max(160).optional(), size_bytes: z.number().int().min(0).max(2_000_000_000).optional() })).max(6).optional(), // 附件整组替换：与发帖同一口径（对象键 + 归属校验）
       }), // 结束代码块：本层作用域收尾
       req.body, // 读取请求：取得入参、身份或上下文
     ); // 调用结束：参数列表与链式调用收尾
@@ -1132,9 +1123,16 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (body.media) { // 逐个校验媒体地址，防止把内网地址写进帖子
       for (const item of body.media) if (!item.url.startsWith('/')) await assertPublicHttpUrl(item.url); // 相对路径走站内资源，绝对地址走 SSRF 校验
     } // 结束条件分支：本层作用域收尾
-    if (body.attachments) { // 附件同理
-      for (const item of body.attachments) if (!item.url.startsWith('/')) await assertPublicHttpUrl(item.url); // 相对路径走站内资源，绝对地址走 SSRF 校验
-    } // 结束条件分支：本层作用域收尾
+    const nextAttachments = body.attachments ?? []; // 未传表示保持原附件，传空数组表示清空
+    if (nextAttachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 与发帖一致：无存储不允许挂附件
+    for (const item of nextAttachments) { // 附件入库前校验：键安全 + 归属 + 对象真实存在
+      assertSafeObjectKey(item.object_key); // 先挡路径穿越
+      if (!item.object_key.startsWith(`${userId}/`)) throw new AppError('FORBIDDEN', '附件不属于当前账号', { object_key: item.object_key }); // 首段必须是本人 user_id
+      const head = await deps.storage!.headObject(item.object_key); // 探测对象是否真的上传完成
+      if (!head) throw new AppError('VALIDATION_FAILED', '附件尚未上传完成或已失效', { object_key: item.object_key }); // 不存在的对象不允许入库
+      item.size_bytes = head.size_bytes; // 大小以存储实测为准，避免客户端虚报
+      item.mime = item.mime ?? mimeForObjectKey(item.object_key); // MIME 缺省按对象键后缀推导
+    } // 结束循环体：本层作用域收尾
     const ts = now(); // 保存 ts：承载本步骤的计算结果供后续使用
     deps.db.transaction(() => { // 单事务：帖子字段与媒体 / 附件要么一起生效，要么一起回滚
       deps.db // 业务步骤：推进当前流程的下一项处理
@@ -1146,12 +1144,12 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
           deps.db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, sort_order) VALUES (?, ?, ?, ?, ?)').run(`media-${randomUUID()}`, row.id, item.kind, item.url, index); // 执行写入：把参数落库并返回影响结果
         }); // 结束代码块：本层作用域收尾
       } // 结束条件分支：本层作用域收尾
-      if (body.attachments) { // 整组替换附件
+      if (body.attachments) { // 整组替换附件：口径与发帖一致，url 列继续存对象键
         deps.db.prepare('DELETE FROM community_thread_attachments WHERE thread_id = ?').run(row.id); // 先清空
-        body.attachments.forEach((item, index) => { // 按入参顺序写回
+        nextAttachments.forEach((item, index) => { // 按入参顺序写回
           deps.db // 业务步骤：推进当前流程的下一项处理
-            .prepare('INSERT INTO community_thread_attachments (id, thread_id, name, url, size_bytes, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
-            .run(`att-${randomUUID()}`, row.id, item.name, item.url, item.size_bytes ?? 0, index, ts); // 执行写入：把参数落库并返回影响结果
+            .prepare('INSERT INTO community_thread_attachments (id, thread_id, name, url, mime, size_bytes, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
+            .run(`att-${randomUUID()}`, row.id, item.name, item.object_key, item.mime ?? '', item.size_bytes ?? 0, index, ts); // url 列存对象键，下载时再签短时地址
         }); // 结束代码块：本层作用域收尾
       } // 结束条件分支：本层作用域收尾
     })(); // 立即执行事务

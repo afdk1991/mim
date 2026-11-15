@@ -132,6 +132,13 @@ function dateOnly(iso: string | null): string { // 函数 dateOnly：封装一�
   return iso ? iso.slice(0, 10) : ''; // 返回当前函数的处理结果
 } // 代码块结束
 
+function formatSize(bytes: number): string { // 函数 formatSize：把字节数转成附件列表可读的大小
+  if (!bytes || bytes <= 0) return '未知大小'; // 0 表示服务端未记录，直接提示未知
+  if (bytes < 1024) return `${bytes} B`; // 不足 1KB 按字节展示
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; // 不足 1MB 按 KB 展示
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`; // 其余按 MB 展示
+} // 代码块结束
+
 /** 社区与变现页 */
 export function Community({ locale, hasSession = false, onRequireLogin }: Props) {
   // 多段深链接：/community/post/:id 论坛帖子详情、/community/news/:kind/:id 资讯条目详情。
@@ -173,6 +180,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [draftMedia, setDraftMedia] = useState(''); // 赋值：更新变量 const 的取值
   const [draftPoll, setDraftPoll] = useState(''); // 赋值：更新变量 const 的取值
   const [draftEpisodes, setDraftEpisodes] = useState(''); // 剧集目录：每行「标题|视频地址」
+  const [draftAttachments, setDraftAttachments] = useState<Array<{ name: string; object_key: string; mime: string; size_bytes: number }>>([]); // 已上传待随帖提交的附件
+  const [attachmentBusy, setAttachmentBusy] = useState(false); // 附件上传中，防重复点击
   const [boardOpen, setBoardOpen] = useState(false); // 创建板块表单
   const [boardDraft, setBoardDraft] = useState({ slug: '', name: '', description: '', visibility: 'public' as 'public' | 'followers', minLevel: '0', price: '0' }); // 赋值：更新变量 const 的取值
   const [reply, setReply] = useState('');; // 赋值：更新变量 const 的取值
@@ -657,6 +666,36 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       setError(errorText(locale, err));
     } // 代码块结束
   } // 代码块结束
+  /** 上传附件：复用媒体预签名直传，拿到 object_key 后由发帖接口落库（下载时再签短时地址） */
+  async function uploadAttachment(file: File) { // 函数 uploadAttachment：附件只上传不直链
+    if (!requireSession()) return; // 上传必须登录
+    if (draftAttachments.length >= 6) { setError('单帖最多 6 个附件'); return; } // 与服务端上限保持一致
+    setAttachmentBusy(true); // 进入上传态
+    setError(null); // 清空旧错误
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      const mime = file.type || 'application/octet-stream'; // MIME 兜底，避免空类型
+      const presign = await api.media.presignUpload({ asset_type: 'final', mime, size_bytes: file.size }); // 复用媒体域上传凭证（final = 通用产物）
+      const put = await fetch(presign.upload.url, { method: presign.upload.method, headers: presign.upload.headers, body: file }); // 按服务端签名直传字节
+      if (!put.ok) throw new Error(`附件上传失败：${put.status}`); // 直传失败即中止
+      setDraftAttachments((prev) => [...prev, { name: file.name, object_key: presign.object_key, mime, size_bytes: file.size }].slice(0, 6)); // 记录对象键，提交时才写库
+    } catch (err) { // 异常捕获：统一转成用户可读提示
+      setError(errorText(locale, err)); // 复用现有错误文案映射
+    } finally { // 无论成败都要复位上传态
+      setAttachmentBusy(false); // 退出上传态
+    } // 代码块结束
+  } // 代码块结束
+
+  /** 申请附件下载：服务端按帖子权限签发 5 分钟地址，前端只负责打开 */
+  async function downloadAttachment(attachmentId: string) { // 函数 downloadAttachment：绝不拼公开直链
+    if (!postId) return; // 详情 id 缺失时不发请求
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      const result = await api.community.downloadAttachment(postId, attachmentId); // 拿签名地址
+      window.open(result.download.url, '_blank', 'noopener'); // 新标签打开签名地址触发下载
+    } catch (err) { // 异常捕获：未登录 / 未解锁 / 对象缺失统一提示
+      setError(errorText(locale, err)); // 复用现有错误文案映射
+    } // 代码块结束
+  } // 代码块结束
+
   async function createThread() { // 函数 createThread：封装一段可复用的处理逻辑
     if (!requireSession()) return; // 发帖必须登录
     if (!draftTitle.trim() || !draftBody.trim()) { // 条件分支：按判断结果选择后续处理路径
@@ -692,7 +731,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         media,
         poll_options: draftKind === 'poll' ? pollLines : undefined,
         episodes,
-      });
+        attachments: draftAttachments.length > 0 ? draftAttachments : undefined, // 附件随帖提交，服务端校验归属与存在性
+      }); // 发帖请求结束
       setDraftTitle('');
       setDraftSummary('');
       setDraftBody('');
@@ -700,6 +740,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       setDraftMedia('');
       setDraftPoll('');
       setDraftEpisodes('');
+      setDraftAttachments([]); // 发布成功清空附件暂存
       setComposerOpen(false);
       setNotice('帖子已发布');
       await loadThreads(); // 异步等待：挂起至 Promise 落定后再继续
@@ -1034,6 +1075,28 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               {draftKind === 'series' && (
                 <textarea value={draftEpisodes} onChange={(e) => setDraftEpisodes(e.target.value)} placeholder="剧集目录，每行：集标题|视频地址（mp4 / m3u8）" rows={4} />
               )}
+              <div className="community-attachment-picker">{/* 附件位：上传后仅展示元数据，下载时服务端按帖子权限签名 */}
+                <label className="community-attachment-add">
+                  {attachmentBusy ? '上传中…' : '+ 添加附件'}
+                  <input
+                    type="file"
+                    disabled={attachmentBusy}
+                    onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadAttachment(file); e.target.value = ''; }}
+                  />
+                </label>
+                <em>支持文档 / 压缩包等任意文件，单个最大 64MB，最多 6 个</em>
+              </div>
+              {draftAttachments.length > 0 && (
+                <ul className="community-attachment-draft">
+                  {draftAttachments.map((item) => (
+                    <li key={item.object_key}>
+                      <span>{item.name}</span>
+                      <em>{formatSize(item.size_bytes)}</em>
+                      <button type="button" onClick={() => setDraftAttachments((prev) => prev.filter((x) => x.object_key !== item.object_key))}>移除</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="community-actions">{/* 执行当前业务步骤 */}
                 <button type="button" className="is-primary" onClick={() => void createThread()}>发布</button>
                 <button type="button" onClick={() => setComposerOpen(false)}>取消</button>
@@ -1126,6 +1189,18 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                         <img src={coverSrc(item.url)} alt={`${selected.thread.title} ${index + 1}`} loading="lazy" />
                       )}
                     </div>
+                  ))}
+                </div>
+              )}
+              {(selected.unlocked && (selected.thread.attachments?.length ?? 0) > 0) && (
+                <div className="community-attachments">{/* 附件位：与正文同受解锁闸门约束 */}
+                  <div className="community-section-head"><div><h3>附件</h3><p>共 {selected.thread.attachments!.length} 个文件</p></div></div>
+                  {selected.thread.attachments!.map((item) => (
+                    <button key={item.id} type="button" className="community-attachment-row" onClick={() => void downloadAttachment(item.id)}>
+                      <span className="community-attachment-name">{item.name}</span>
+                      <em>{formatSize(item.size_bytes)}</em>
+                      <span className="community-attachment-dl">下载</span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1346,7 +1421,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       {!loading && tab === 'shop' && (
         <div className="community-shop">{/* 执行当前业务步骤 */}
           <div className="community-section-head">{/* 执行当前业务步骤 */}
-            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码；与「商城」（功能模块商城）是两条独立商品线。</p></div>
+            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div>
           </div>
           <div className="community-shop-grid">{/* 执行当前业务步骤 */}
             {products.map((p) => (

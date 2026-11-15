@@ -224,6 +224,14 @@ export interface CommunityThreadMedia { // 帖子媒体
   sort_order?: number; // 排序
 }
 
+export interface ThreadAttachmentMeta { // 帖子附件（可下载文件）：与已上线的详情返回字段同名同形
+  id: string; // 附件主键
+  name: string; // 展示文件名
+  mime: string; // 文件 MIME
+  size_bytes: number; // 文件大小（字节），0 表示未知
+  sort_order: number; // 排序
+}
+
 export interface CommunityPollOption { // 投票选项
   id: string; // 选项主键
   label: string; // 选项文案
@@ -284,6 +292,7 @@ export interface CommunityThreadDetail extends Omit<CommunityThread, 'locked'> {
   accepted_post?: { id: string; content: string; created_at: string; author_name: string | null } | null; // 采纳回复内容
   can_moderate?: boolean; // 是否可删除
   media?: CommunityThreadMedia[]; // 图集 / 视频
+  attachments?: ThreadAttachmentMeta[]; // 附件位（未解锁时为空）
   episodes?: CommunityEpisode[]; // 剧集目录
   poll?: CommunityPoll | null; // 投票
   my_rating?: number | null; // 我的评分

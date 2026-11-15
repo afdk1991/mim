@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -303,8 +303,11 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     thread(id: string) { // 帖子详情
       return request<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean }>(`/community/threads/${encodeURIComponent(id)}`, { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
-    createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number; media?: CommunityThreadMedia[]; poll_options?: string[]; episodes?: Array<{ title: string; media_url: string; poster_url?: string }> }) { // 发帖
+    createThread(payload: { board_slug: string; title: string; summary?: string; body: string; kind?: string; cover_url?: string; price_cents?: number; media?: CommunityThreadMedia[]; poll_options?: string[]; episodes?: Array<{ title: string; media_url: string; poster_url?: string }>; attachments?: Array<{ name: string; object_key: string; mime?: string; size_bytes?: number }> }) { // 发帖（附件先走上传预签名拿 object_key）
       return request<{ thread_id: string }>('/community/threads', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    downloadAttachment(threadId: string, attachmentId: string) { // 按帖子权限申请附件短时下载地址
+      return request<{ download: PresignedUrl; attachment: ThreadAttachmentMeta; expires_at: string }>(`/community/threads/${encodeURIComponent(threadId)}/attachments/${encodeURIComponent(attachmentId)}/download`, { idempotency: false }); // 只读 GET：拿签名 URL，不直接下发对象键
     }, // 代码块结束
     unlock(id: string) { // 解锁付费帖
       return request<{ unlocked: boolean; charged_cents: number; via?: string }>(`/community/threads/${encodeURIComponent(id)}/unlock`, { method: 'POST', body: {} }); // 返回当前函数的处理结果

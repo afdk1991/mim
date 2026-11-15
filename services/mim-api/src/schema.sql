@@ -363,6 +363,20 @@ CREATE TABLE IF NOT EXISTS community_thread_media (
 );
 CREATE INDEX IF NOT EXISTS idx_community_thread_media ON community_thread_media(thread_id, sort_order);
 
+-- 帖子附件：正文之外的可下载文件，复用媒体对象存储；url 列存对象键（不是公开直链），
+-- 下载一律由服务端按帖子权限签发短时地址。与 community_thread_media（图片/视频）分开存放。
+CREATE TABLE IF NOT EXISTS community_thread_attachments (
+  id         TEXT PRIMARY KEY,                                       -- 附件主键
+  thread_id  TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE, -- 归属帖子，删帖时附件一并清理
+  name       TEXT NOT NULL,                                          -- 展示文件名（浏览器另存为默认名）
+  url        TEXT NOT NULL,                                          -- 对象存储键（签名下载时使用，绝不直接下发）
+  mime       TEXT NOT NULL DEFAULT '',                               -- 文件 MIME，展示与下载提示用
+  size_bytes INTEGER NOT NULL DEFAULT 0,                             -- 文件大小（字节），0 表示未知
+  sort_order INTEGER NOT NULL DEFAULT 0,                             -- 展示顺序
+  created_at TEXT NOT NULL                                           -- 上传时间
+);
+CREATE INDEX IF NOT EXISTS ix_community_attachments_thread ON community_thread_attachments(thread_id, sort_order);
+
 -- 投票选项与投票记录：一人一票，可改投；结果实时按选项聚合。
 CREATE TABLE IF NOT EXISTS community_poll_options (
   id         TEXT PRIMARY KEY,

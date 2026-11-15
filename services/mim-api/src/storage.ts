@@ -81,6 +81,15 @@ const MIME_EXT: Record<string, string> = { // MIME → 扩展名，用于生成�
   'application/vnd.android.package-archive': '.apk', // Android 安装包
   'application/x-msdownload': '.exe', // Windows 可执行文件
   'application/x-apple-diskimage': '.dmg', // macOS 磁盘映像
+  // 帖子附件常用文档类型（下载位）：对象键带正确后缀，浏览器另存为时文件名才可读。
+  'application/pdf': '.pdf', // PDF 文档
+  'application/msword': '.doc', // Word 97-2003
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx', // Word 新版
+  'application/vnd.ms-excel': '.xls', // Excel 97-2003
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx', // Excel 新版
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx', // PowerPoint 新版
+  'text/csv': '.csv', // CSV 表格
+  'text/markdown': '.md', // Markdown 文本
 }; // 结束 MIME_EXT 映射
 
 const EXT_MIME: Record<string, string> = { // 扩展名 → MIME，读取时回填 Content-Type
@@ -99,6 +108,15 @@ const EXT_MIME: Record<string, string> = { // 扩展名 → MIME，读取时回�
   '.apk': 'application/vnd.android.package-archive', // Android 安装包
   '.exe': 'application/x-msdownload', // Windows 可执行文件
   '.dmg': 'application/x-apple-diskimage', // macOS 磁盘映像
+  // 帖子附件常用文档后缀 → MIME（与上方 MIME_EXT 双向一致）：客户端未带 Content-Type 时按后缀回填
+  '.pdf': 'application/pdf', // PDF 文档
+  '.doc': 'application/msword', // Word 97-2003
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // Word 新版
+  '.xls': 'application/vnd.ms-excel', // Excel 97-2003
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // Excel 新版
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', // PowerPoint 新版
+  '.csv': 'text/csv', // CSV 表格
+  '.md': 'text/markdown', // Markdown 文本
 }; // 结束 EXT_MIME 映射
 
 export function extensionForMime(mime: string): string { // 由 MIME 推导对象键后缀

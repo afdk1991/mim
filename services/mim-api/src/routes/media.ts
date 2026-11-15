@@ -48,7 +48,7 @@ function assertOwnedKey(userId: string, key: string): void { // 统一的对象�
 } // assertOwnedKey 结束
 
 /** 本地驱动拼绝对地址；优先 MIM_PUBLIC_BASE_URL，其次按请求 host 推导（反代后仍是公网域名） */
-function baseUrlOf(req: Request, env: Record<string, string | undefined>): string | undefined { // 计算预签名 URL 的公网基址
+export function baseUrlOf(req: Request, env: Record<string, string | undefined>): string | undefined { // 计算预签名 URL 的公网基址；社区附件签名下载复用同一口径
   const configured = (env.MIM_PUBLIC_BASE_URL ?? '').trim(); // 显式配置优先，适配反代后 host 被改写的情况
   if (configured) return configured; // 配了就直用，完全不强依赖请求头
   // 反代（本地 serve-local 等）无法透传 Host（fetch 禁止设置），改由 X-Forwarded-* 还原对外地址；

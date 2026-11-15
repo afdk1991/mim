@@ -7,7 +7,7 @@
  */
 
 import { request } from './request.js'; // 统一请求出口
-import type { CommunityPost, CommunityThread, CommunityThreadDetail } from './types.js'; // 复用列表 / 详情 / 回复既有类型
+import type { CommunityPost, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta } from './types.js'; // 复用列表 / 详情 / 回复 / 附件元数据既有类型（附件命名与详情返回一致）
 
 /** 帖子列表分页：服务端已按 pinned DESC 排序，total 用于「加载更多」。 */
 export interface ThreadListPage { // 列表分页响应
@@ -27,15 +27,6 @@ export interface ThreadExtras { // 帖子扩展列
   attachments?: ThreadAttachmentMeta[]; // 附件清单（不含对象键）
 }
 
-/** 附件元数据：只有展示信息，下载要走签名地址。 */
-export interface ThreadAttachmentMeta { // 附件元数据
-  id: string; // 附件主键
-  name: string; // 文件名
-  mime: string; // MIME
-  size_bytes: number; // 字节数
-  sort_order: number; // 展示顺序
-}
-
 /** 帖子详情分页响应：回复分页与锁定态都在根上。 */
 export interface ThreadDetailPage { // 详情响应
   thread: CommunityThreadDetail & ThreadExtras; // 帖子（含置顶 / 锁定回复 / 可编辑）
@@ -48,7 +39,6 @@ export interface ThreadDetailPage { // 详情响应
   post_offset?: number; // 回复偏移
   reply_locked?: boolean; // 锁定回复（根级同名冗余，便于直接读取）
   can_edit?: boolean; // 作者可编辑
-  attachments?: ThreadAttachmentMeta[]; // 附件清单
 }
 
 /** 搜索结果项：snippet 已由服务端转义并插入 <mark>。 */
