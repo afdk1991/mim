@@ -1,7 +1,6 @@
 /** SQLite 连接与结构迁移 */
 
 import Database from 'better-sqlite3'; // 引入 better-sqlite3 同步驱动，SQLite 读写走同步 API 便于事务内顺序执行
-import { CATALOG_GROUPS, buildCatalogModuleSeeds, catalogGroupNameEn, catalogItemNameEn, capabilityOfModule } from '@mim/core-domain'; // 模块商城分类树与二级模块种子（19 组 / 205 条）+ 模块能力绑定
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'; // 文件系统工具：判断目录是否存在、递归建目录、读取建表脚本、枚举 schema.d 域脚本
 import { dirname, join } from 'node:path'; // 取文件所在目录 / 拼接 schema.d 下的脚本路径
 import { fileURLToPath } from 'node:url'; // 把 import.meta.url 转成文件系统路径，满足 ESM 下的路径解析
@@ -35,13 +34,6 @@ const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/; // 表名/列名都必须匹配该�
  *   - 可空列表直接追加，旧行读出来是 NULL，语义即「尚未清理 / 尚未被回收」。
  */
 const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: string }> = [ // 只列真正需要向后兼容的列
-  { table: 'module_orders', column: 'channel_txn_id', definition: 'TEXT' }, // 外部渠道交易号（支付回调幂等依据）
-  { table: 'modules', column: 'category_slug', definition: 'TEXT' }, // 模块所属二级分类标识（2026-11-10 分类树改造）
-  { table: 'modules', column: 'license', definition: 'TEXT' }, // 模块开源许可（筛选维度，演示口径）
-  { table: 'modules', column: 'language', definition: 'TEXT' }, // 模块编程语言（筛选维度，演示口径）
-  { table: 'modules', column: 'stars', definition: 'INTEGER NOT NULL DEFAULT 0' }, // Star 数（「Stars」排序依据，确定性演示值）
-  { table: 'modules', column: 'capability', definition: 'TEXT' }, // 真实能力键（2026-11-11「模块=真实能力」改造）；NULL 表示功能规划中
-  { table: 'module_categories', column: 'name_en', definition: 'TEXT' }, // 分类英文名（英文站点导航 / 接口 name_en 字段）
   { table: 'im_messages', column: 'reply_to_id', definition: 'TEXT' }, // 引用回复的目标消息 ID（2026-11-11 聊天增强）
   { table: 'im_messages', column: 'reply_excerpt', definition: 'TEXT' }, // 被引用消息的快照摘要（发送时固化）
   { table: 'users', column: 'member_no', definition: 'TEXT' }, // 对外 Mim ID 号码（2026-11-12 注册自动分配编号）
@@ -56,10 +48,6 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
 
 // 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
 const ADDITIVE_INDEXES: ReadonlyArray<{ name: string; sql: string }> = [ // 只放列由 ADDITIVE_COLUMNS 补出来的索引
-  { // 渠道交易号全局唯一（NULL 不参与）：同一笔渠道交易重复回调不能结算出第二张单／第二份权益
-    name: 'uq_module_orders_txn', // 索引名，与 wiki 记录一致
-    sql: "CREATE UNIQUE INDEX IF NOT EXISTS uq_module_orders_txn ON module_orders(channel_txn_id) WHERE channel_txn_id IS NOT NULL", // 部分唯一索引：人工结算（NULL）不受约束
-  }, // 索引定义结束
   { // Mim ID 号码全局唯一：发号器已保证不重号，唯一索引是最后一道防线（人工补数据也会被挡）
     name: 'uq_users_member_no', // 与 identity.ts 的发号逻辑配套
     sql: 'CREATE UNIQUE INDEX IF NOT EXISTS uq_users_member_no ON users(member_no) WHERE member_no IS NOT NULL', // 部分唯一：补列前历史行为 NULL，不参与约束
@@ -82,7 +70,7 @@ export function ensureColumn(db: Db, table: string, column: string, definition: 
 } // ensureColumn 结束
 
 /**
- * 批量补齐增量列，返回本次真正新增的列名（形如 `modules.capability`）。
+ * 批量补齐增量列，返回本次真正新增的列名（形如 `shop_products.delivery_note`）。
  * 全新建库时全部已存在，返回空数组，不做任何结构变更。
  */
 export function migrateAdditiveColumns(db: Db): string[] { // 启动期调用一次，随 createDatabase 执行
@@ -164,7 +152,7 @@ export function ensureOrderSourceCommunity(db: Db): boolean {
       db.exec(`CREATE TABLE orders_source_migrate (
         id             TEXT PRIMARY KEY,
         user_id        TEXT NOT NULL REFERENCES users(id),
-        source         TEXT NOT NULL CHECK (source IN ('module','shop','asset','community')),
+        source         TEXT NOT NULL CHECK (source IN ('shop','asset','community')),
         source_id      TEXT NOT NULL,
         status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','delivered','refunded','cancelled')),
         channel        TEXT NOT NULL DEFAULT 'manual',
@@ -207,9 +195,6 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   if (migrated.length > 0) console.log(`[db] additive migration applied: ${migrated.join(', ')}`); // 结构变更必须留痕，便于排查升级后的行为差异
   const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column
   if (indexed.length > 0) console.log(`[db] additive index created: ${indexed.join(', ')}`); // 同样留痕，便于确认回调幂等约束已生效
-  seedModules(db); // 写入模块商城基础数据，保证新库启动即有可售模块
-  seedCatalogCategories(db); // 写入模块分类树（19 个一级 + 205 个二级），导航与过滤依赖它
-  seedCategoryModules(db); // 按分类树展开写入 205 个二级模块（cn/global 双区），实现「二级条目即模块」
   seedRbac(db); // 写入内置权限点与内置角色，保证首启即有可用的 RBAC 基线
   seedCommunity(db); // 写入社区板块 / 官方帖 / VIP 套餐 / 独立商品 / 卡密 / 优惠码，保证新库开箱可用
   seedCommerce(db); // 写入付费资产 / 主题 / 页面区块，保证保留模块开箱有内容
@@ -224,310 +209,8 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   return db; // 返回已完成初始化的连接
 } // createDatabase 结束
 
-/**
- * 功能模块商城种子：第 1 期上架一组真实模块（漫剧 AI 剧工作台 + 生成包三档 + AI 配音/剧本 + 素材扩容 + 模板包），
- * cn / global 双区各一套，按区域独立币种定价；幂等 upsert，重复执行不会产生重复行。
- */
-export function seedModules(db: Db): void { // 模块种子入口
-  const now = new Date().toISOString(); // 统一时间戳，保证同批数据 created_at / updated_at 一致
-
-  // 单条价格定义：币种 + 最小货币单位金额（避免浮点误差）
-  type PriceDef = { currency: 'CNY' | 'USD'; amount_minor: number };
-  // 模块定义：code 稳定、双语名称/简介、排序、前置依赖、按区域可选价格
-  interface SeedModule {
-    code: string; // 模块业务编码，权限校验时按此值匹配
-    sortOrder: number; // 展示排序权重，数字越小越靠前
-    requires: string[]; // 前置依赖模块编码，空数组表示无前置
-    nameI18n: Record<string, string>; // 多语言名称
-    summaryI18n: Record<string, string>; // 多语言简介
-    price?: { cn?: PriceDef; global?: PriceDef }; // 按区域独立币种定价；缺省即免费
-  } // SeedModule 接口结束
-
-  const defs: SeedModule[] = [ // 第 1 期上架模块清单
-    { // 漫剧创作工作台：核心入口，免费
-      code: 'comic.workbench', // 模块编码
-      sortOrder: 10, // 排序权重
-      requires: [], // 无前置依赖
-      nameI18n: { 'zh-CN': '漫剧创作工作台', 'en-US': 'Comic Creation Workbench' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '剧本、分镜、角色一致性与对白由 AI 建议，人工确认后导出创作工程。', // 中文简介
-        'en-US': 'AI-assisted script, storyboard, character consistency and dialogue, confirmed by humans before export.', // 英文简介
-      }, // summaryI18n 结束
-    }, // comic.workbench 结束
-    { // 漫剧生成包·基础版：付费，无前置
-      code: 'comic.genpack.basic', // 模块编码
-      sortOrder: 20, // 排序权重
-      requires: [], // 无前置依赖
-      nameI18n: { 'zh-CN': '漫剧生成包·基础版', 'en-US': 'Comic Generation Pack · Basic' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '为漫剧工作台提供基础 AI 生成额度：文生图、图生视频与 TTS 配音。', // 中文简介
-        'en-US': 'Base AI generation quota for the workbench: text-to-image, image-to-video and TTS dubbing.', // 英文简介
-      }, // summaryI18n 结束
-      price: { cn: { currency: 'CNY', amount_minor: 9900 }, global: { currency: 'USD', amount_minor: 1499 } }, // ¥99.00 / $14.99
-    }, // comic.genpack.basic 结束
-    { // 漫剧生成包·专业版：付费，依赖基础版
-      code: 'comic.genpack.pro', // 模块编码
-      sortOrder: 30, // 排序权重
-      requires: ['comic.genpack.basic'], // 前置：基础版
-      nameI18n: { 'zh-CN': '漫剧生成包·专业版', 'en-US': 'Comic Generation Pack · Pro' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '在基础版之上提升额度与并发，解锁高清成片与批量导出。', // 中文简介
-        'en-US': 'Higher quota and concurrency on top of Basic, unlocking HD output and batch export.', // 英文简介
-      }, // summaryI18n 结束
-      price: { cn: { currency: 'CNY', amount_minor: 29900 }, global: { currency: 'USD', amount_minor: 4299 } }, // ¥299.00 / $42.99
-    }, // comic.genpack.pro 结束
-    { // 漫剧生成包·团队版：付费，依赖专业版
-      code: 'comic.genpack.team', // 模块编码
-      sortOrder: 40, // 排序权重
-      requires: ['comic.genpack.pro'], // 前置：专业版
-      nameI18n: { 'zh-CN': '漫剧生成包·团队版', 'en-US': 'Comic Generation Pack · Team' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '面向小团队的共享额度与协作席位，支持成员管理与用量分摊。', // 中文简介
-        'en-US': 'Shared quota and seats for small teams, with member management and usage split.', // 英文简介
-      }, // summaryI18n 结束
-      price: { cn: { currency: 'CNY', amount_minor: 99900 }, global: { currency: 'USD', amount_minor: 13999 } }, // ¥999.00 / $139.99
-    }, // comic.genpack.team 结束
-    { // AI 配音合成：付费，无前置
-      code: 'ai.dubbing', // 模块编码
-      sortOrder: 50, // 排序权重
-      requires: [], // 无前置依赖
-      nameI18n: { 'zh-CN': 'AI 配音合成', 'en-US': 'AI Dubbing Studio' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '多语种、多音色的 AI 配音与情感语调控制，导出字幕对齐音频。', // 中文简介
-        'en-US': 'Multilingual, multi-voice AI dubbing with emotional prosody and subtitle-aligned export.', // 英文简介
-      }, // summaryI18n 结束
-      price: { cn: { currency: 'CNY', amount_minor: 19900 }, global: { currency: 'USD', amount_minor: 2899 } }, // ¥199.00 / $28.99
-    }, // ai.dubbing 结束
-    { // AI 剧本扩写：免费，无前置
-      code: 'ai.script', // 模块编码
-      sortOrder: 60, // 排序权重
-      requires: [], // 无前置依赖
-      nameI18n: { 'zh-CN': 'AI 剧本扩写', 'en-US': 'AI Script Expansion' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '基于角色设定与世界观，自动扩写分镜对白与桥段，保持一致性。', // 中文简介
-        'en-US': 'Auto-expand storyboard dialogue and beats from character and world settings while staying consistent.', // 英文简介
-      }, // summaryI18n 结束
-    }, // ai.script 结束
-    { // 素材云存储扩容：付费，无前置
-      code: 'media.storage', // 模块编码
-      sortOrder: 70, // 排序权重
-      requires: [], // 无前置依赖
-      nameI18n: { 'zh-CN': '素材云存储扩容', 'en-US': 'Media Storage Add-on' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '为工程素材与成片提供额外云存储空间，按容量一次性购买。', // 中文简介
-        'en-US': 'Additional cloud storage for assets and films, purchased once by capacity.', // 英文简介
-      }, // summaryI18n 结束
-      price: { cn: { currency: 'CNY', amount_minor: 4900 }, global: { currency: 'USD', amount_minor: 699 } }, // ¥49.00 / $6.99
-    }, // media.storage 结束
-    { // 分镜模板包：免费，无前置
-      code: 'template.pack', // 模块编码
-      sortOrder: 80, // 排序权重
-      requires: [], // 无前置依赖
-      nameI18n: { 'zh-CN': '分镜模板包', 'en-US': 'Storyboard Template Pack' }, // 多语言名称
-      summaryI18n: { // 多语言简介
-        'zh-CN': '精选分镜与镜头模板，一键套用到新工程，加速起步。', // 中文简介
-        'en-US': 'Curated storyboard and shot templates applied to new projects in one click.', // 英文简介
-      }, // summaryI18n 结束
-    }, // template.pack 结束
-  ]; // defs 结束
-
-  /**
-   * 存量 8 个模块的归类口径（2026-11-10 分类树改造时新增）：
-   * 用户要求「现有模块保留并归类」，故不删不并，只补上二级分类与筛选属性；
-   * 未列出的模块统一落到 `misc`（其他开源）。
-   */
-  const LEGACY_META: Record<string, { category: string; license: string; language: string; stars: number }> = {
-    'comic.workbench': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 8900 }, // 漫剧工作台归入「AI-人工智能」
-    'comic.genpack.basic': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 7200 }, // 生成包基础版同属 AI 组
-    'comic.genpack.pro': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 6400 }, // 生成包专业版同属 AI 组
-    'comic.genpack.team': { category: 'ai-01', license: 'MIT', language: 'TypeScript', stars: 5100 }, // 生成包团队版同属 AI 组
-    'ai.dubbing': { category: 'ai-06', license: 'MIT', language: 'Python', stars: 6700 }, // 配音合成归入「自然语言处理」
-    'ai.script': { category: 'ai-07', license: 'MIT', language: 'Python', stars: 5600 }, // 剧本扩写归入「大模型」
-    'media.storage': { category: 'server-12', license: 'Apache-2.0', language: 'Go', stars: 4300 }, // 素材存储归入「分布式存储系统」
-    'template.pack': { category: 'tools-03', license: 'MIT', language: 'JavaScript', stars: 3800 }, // 模板包归入「文本编辑」
-  }; // 归类映射结束
-
-  const REGIONS = ['cn', 'global'] as const; // 双区常量，类型收窄为联合类型
-
-  // 模块行 upsert：按 (region, code) 唯一键冲突时更新可变字段，实现「存在则更新、不存在则插入」
-  const upsertModule = db.prepare(
-    `INSERT INTO modules
-       (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-        region, status, sort_order, category_slug, license, language, stars, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'one_time', ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(region, code) DO UPDATE SET
-       name_i18n = excluded.name_i18n,
-       summary_i18n = excluded.summary_i18n,
-       unlock_mode = excluded.unlock_mode,
-       entitlements_required = excluded.entitlements_required,
-       status = excluded.status,
-       sort_order = excluded.sort_order,
-       category_slug = excluded.category_slug,
-       license = excluded.license,
-       language = excluded.language,
-       stars = excluded.stars,
-       updated_at = excluded.updated_at`,
-  ); // prepare 结束
-
-  // 价格行 upsert：按 id 唯一键冲突时刷新价格，避免重复写入多行历史价
-  const upsertPrice = db.prepare(
-    `INSERT INTO module_prices (id, module_id, currency, amount_minor, effective_from, effective_to, created_at)
-     VALUES (?, ?, ?, ?, ?, NULL, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       currency = excluded.currency,
-       amount_minor = excluded.amount_minor,
-       effective_from = excluded.effective_from,
-       created_at = excluded.created_at`,
-  ); // prepare 结束
-
-  const seed = db.transaction(() => { // 包成事务：任一写入失败则整体回滚，避免只写入半套数据
-    for (const def of defs) { // 逐模块
-      for (const region of REGIONS) { // 逐区域（cn / global 各一行）
-        const meta = LEGACY_META[def.code] ?? { category: 'misc-01', license: 'MIT', language: 'TypeScript', stars: 1000 }; // 未登记的模块落到「其他开源」并给默认属性
-        upsertModule.run( // 按占位符顺序绑定参数
-          `mod:${def.code}:${region}`, // 主键：模块 ID 拼区域后缀，保证跨区唯一
-          def.code, // 模块业务编码
-          JSON.stringify(def.nameI18n), // 多语言名称序列化为 JSON 文本落库
-          JSON.stringify(def.summaryI18n), // 多语言简介序列化为 JSON 文本落库
-          JSON.stringify(def.requires), // 前置依赖序列化为 JSON 数组，空数组表示无前置
-          region, // 区域值，参与唯一键与后续查询过滤
-          def.sortOrder, // 排序权重
-          meta.category, // 二级分类标识（归类口径见 LEGACY_META）
-          meta.license, // 开源许可
-          meta.language, // 编程语言
-          meta.stars, // Star 数
-          now, // created_at：仅首次插入生效，冲突更新时不变
-          now, // updated_at：每次 upsert 都会刷新
-        ); // run 调用结束
-        // 该区域有定价才写入价格行（免费模块不落价格，前端显示「免费」）
-        const price = def.price?.[region]; // 取本区域价格定义
-        if (price) { // 仅付费模块写价格
-          upsertPrice.run( // 写入/刷新价格行
-            `price:${def.code}:${region}`, // 价格行主键：模块 + 区域
-            `mod:${def.code}:${region}`, // 关联模块主键
-            price.currency, // 币种（CNY / USD）
-            price.amount_minor, // 金额（最小货币单位）
-            now, // 生效起始：种子时间，长期有效
-            now, // 创建时间
-          ); // run 调用结束
-        } // 价格写入结束
-      } // 区域循环结束
-    } // 模块循环结束
-  }); // 事务函数准备完成
-  seed(); // 执行事务，完成种子数据写入
-} // seedModules 结束
-
-/**
- * 分类树种子：把 core-domain 的 19 个一级分类与 205 个二级条目写入 module_categories。
- * 幂等策略与模块种子一致——按 slug 唯一键 upsert，重复启动只刷新名称/排序，不产生重复行；
- * 父键指向一级分类主键，保证导航查询可按 parent_id 直接组装两层结构。
- */
-export function seedCatalogCategories(db: Db): void { // 分类树种子入口，测试内存库同样执行
-  const now = new Date().toISOString(); // 统一时间戳，保证同批数据创建时间一致
-  // 分类行 upsert：slug 全局唯一，名称/排序变更随代码更新自动刷新
-  const upsert = db.prepare(
-    `INSERT INTO module_categories (id, parent_id, level, slug, name, name_en, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(slug) DO UPDATE SET
-       parent_id = excluded.parent_id,
-       level = excluded.level,
-       name = excluded.name,
-       name_en = excluded.name_en,
-       sort_order = excluded.sort_order,
-       updated_at = excluded.updated_at`,
-  ); // prepare 结束
-
-  const seed = db.transaction(() => { // 整棵树同一事务写入，失败即整体回滚
-    CATALOG_GROUPS.forEach((group, groupIndex) => { // 逐一级分类
-      const groupNo = groupIndex + 1; // 一级序号从 1 开始
-      upsert.run(`cat:${group.slug}`, null, 1, group.slug, group.name, catalogGroupNameEn(group.slug), groupNo, now, now); // 一级分类：parent_id 为空
-      group.items.forEach((item, itemIndex) => { // 逐二级条目
-        const itemNo = itemIndex + 1; // 二级序号从 1 开始
-        const itemSlug = `${group.slug}-${String(itemNo).padStart(2, '0')}`; // 二级标识，与模块编码共享同一规则
-        upsert.run( // 二级条目行
-          `cat:${itemSlug}`, // 主键
-          `cat:${group.slug}`, // 父键指回一级分类
-          2, // 层级
-          itemSlug, // 全局唯一 slug
-          item, // 条目中文名称
-          catalogItemNameEn(group.slug, itemIndex, item), // 条目英文名称（与中文逐项对齐，缺失回落中文）
-          groupNo * 100 + itemNo, // 排序权重与模块一致
-          now, // 创建时间
-          now, // 更新时间
-        ); // run 结束
-      }); // 二级遍历结束
-    }); // 一级遍历结束
-  }); // 事务定义结束
-  seed(); // 执行事务
-} // seedCatalogCategories 结束
-
-/**
- * 二级模块种子：把分类树里每个二级条目落成一个模块（cn/global 各一行，共 410 行）。
- * 语义口径（用户 2026-11-10 指令）：只有二级条目是「模块」，一级分类仅作导航；
- * 这些模块一律免费（不写价格行）、无前置依赖，许可/语言/Star 取自已确定的演示映射。
- */
-export function seedCategoryModules(db: Db): void { // 二级模块种子入口
-  const now = new Date().toISOString(); // 统一时间戳
-  const seeds = buildCatalogModuleSeeds(); // 由分类树展开 205 条模块定义
-  const REGIONS = ['cn', 'global'] as const; // 双区常量
-  // 模块行 upsert：与存量模块同表，靠 (region, code) 唯一键共存
-  const upsert = db.prepare(
-    `INSERT INTO modules
-       (id, code, name_i18n, summary_i18n, unlock_mode, entitlements_required,
-        region, status, sort_order, category_slug, license, language, stars, capability, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'one_time', '[]', ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(region, code) DO UPDATE SET
-       name_i18n = excluded.name_i18n,
-       summary_i18n = excluded.summary_i18n,
-       status = excluded.status,
-       sort_order = excluded.sort_order,
-       category_slug = excluded.category_slug,
-       license = excluded.license,
-       language = excluded.language,
-       stars = excluded.stars,
-       capability = excluded.capability,
-       updated_at = excluded.updated_at`,
-  ); // prepare 结束
-
-  const seed = db.transaction(() => { // 整批同一事务
-    for (const item of seeds) { // 逐条二级模块
-      // 名称与简介：中英文分别取分类树里的中文名与英文名，不再用中文占位
-      const nameI18n = JSON.stringify({ 'zh-CN': item.name, 'en-US': item.name_en }); // 多语言名称
-      const summaryI18n = JSON.stringify({ // 多语言简介
-        'zh-CN': `${item.name} 方向的模块化能力集合，可在商城内一次性解锁后使用。`, // 中文简介
-        'en-US': `Modular capability set for ${item.name_en}; unlock once in the store.`, // 英文简介取英文条目名
-      }); // 简介序列化结束
-      // 能力绑定：core-domain 里登记过的模块才有真实能力键，其余为「规划中」（NULL）
-      const capabilityKey = capabilityOfModule(item.code)?.key ?? null; // 未登记即 null，前端据此禁用解锁入口
-      for (const region of REGIONS) { // 逐个区域
-        upsert.run( // 写入模块行
-          `mod:${item.code}:${region}`, // 主键：模块码 + 区域
-          item.code, // 模块编码
-          nameI18n, // 名称 JSON
-          summaryI18n, // 简介 JSON
-          region, // 区域
-          item.sort_order, // 排序权重
-          item.item_slug, // 二级分类标识
-          item.license, // 许可
-          item.language, // 语言
-          item.stars, // Star 数
-          capabilityKey, // 真实能力键（可为 NULL）
-          now, // 创建时间
-          now, // 更新时间
-        ); // run 结束
-      } // 区域循环结束
-    } // 模块循环结束
-  }); // 事务定义结束
-  seed(); // 执行事务
-} // seedCategoryModules 结束
-
 /** 内置权限点清单：路由侧 requirePermission 与后台角色编辑页共用同一份定义 */
 export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺序
-  { code: 'module:read', name: { 'zh-CN': '查看模块', 'en-US': 'Read modules' } }, // 读取模块目录与详情
-  { code: 'module:write', name: { 'zh-CN': '变更模块状态', 'en-US': 'Change module status' } }, // 模块状态迁移 draft→active→archived
-  { code: 'entitlement:read', name: { 'zh-CN': '查看权益', 'en-US': 'Read entitlements' } }, // 查询任意用户的权益记录
-  { code: 'entitlement:grant', name: { 'zh-CN': '发放权益', 'en-US': 'Grant entitlements' } }, // 手工发放模块权益
-  { code: 'entitlement:revoke', name: { 'zh-CN': '回收权益', 'en-US': 'Revoke entitlements' } }, // 回收已发放权益
   { code: 'user:read', name: { 'zh-CN': '查看用户', 'en-US': 'Read users' } }, // 查询用户列表与详情
   { code: 'rbac:read', name: { 'zh-CN': '查看角色权限', 'en-US': 'Read roles' } }, // 读取角色、权限与授权关系
   { code: 'rbac:write', name: { 'zh-CN': '管理角色权限', 'en-US': 'Manage roles' } }, // 增删角色、改权限、改用户角色
@@ -549,17 +232,12 @@ export const RBAC_ROLES = [ // 内置角色数组，同样决定后台展示顺�
     description: { 'zh-CN': '拥有全部权限，可管理角色与用户授权', 'en-US': 'Full access including role and user administration' }, // 多语言描述
     permissions: RBAC_PERMISSIONS.map((p) => p.code), // 基线权限即全部权限点，后续新增权限点会自动补齐
   }, // superadmin 结束
-  { // 运营管理员：可改模块、发放与回收权益，不可改角色授权
+  { // 运营管理员：可处理交易与内容运营，不可改角色授权
     code: 'operator', // 角色码
     name: { 'zh-CN': '运营管理员', 'en-US': 'Operator' }, // 多语言名称
-    description: { 'zh-CN': '可变更模块状态、发放与回收权益，可查看用户', 'en-US': 'Change module status, grant/revoke entitlements, read users' }, // 多语言描述
+    description: { 'zh-CN': '可处理交易、内容与外观配置，可查看用户', 'en-US': 'Manage commerce, content and appearance, read users' }, // 多语言描述
     permissions: [ // 运营侧基线权限
-      'module:read', // 需要看到模块列表才能操作
-      'module:write', // 允许上架与归档模块
-      'entitlement:read', // 需要查看权益现状
-      'entitlement:grant', // 允许发放权益
-      'entitlement:revoke', // 允许回收权益
-      'user:read', // 需要按用户查权益
+      'user:read', // 需要按用户查业务记录
       'rbac:read', // 需要知道自己持有哪些权限
       'commerce:write', // 需要发货、审售后与审提现
       'appearance:write', // 需要维护首页与论坛的外观配置
@@ -569,10 +247,8 @@ export const RBAC_ROLES = [ // 内置角色数组，同样决定后台展示顺�
   { // 只读观察者：仅供审计与客服查询
     code: 'viewer', // 角色码
     name: { 'zh-CN': '只读观察员', 'en-US': 'Viewer' }, // 多语言名称
-    description: { 'zh-CN': '只读查看模块、权益与用户，不能产生任何写操作', 'en-US': 'Read-only access to modules, entitlements and users' }, // 多语言描述
+    description: { 'zh-CN': '只读查看用户与业务记录，不能产生任何写操作', 'en-US': 'Read-only access to users and business records' }, // 多语言描述
     permissions: [ // 只读基线权限
-      'module:read', // 查看模块
-      'entitlement:read', // 查看权益
       'user:read', // 查看用户
       'rbac:read', // 查看自己的角色与权限
     ] as const, // 断言常量
@@ -617,7 +293,7 @@ export function seedRbac(db: Db): void { // RBAC 种子入口，随 createDataba
   const seed = db.transaction(() => { // 包成事务：任一语句失败整体回滚，避免出现半套角色
     for (const permission of RBAC_PERMISSIONS) { // 逐条写入内置权限点
       upsertPermission.run( // 按占位符顺序绑定
-        permission.code, // 权限码，如 module:write
+        permission.code, // 权限码，如 commerce:write
         JSON.stringify(permission.name), // 多语言名称序列化落库
         '{}', // 内置权限暂无描述，保留空对象以便后台后续补充
         now, // 创建时间

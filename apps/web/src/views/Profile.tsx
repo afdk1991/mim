@@ -1,4 +1,4 @@
-// 引入状态钩子：资料表单、四个分区数据与提交中间态
+// 引入状态钩子：资料表单、账号设置数据与提交中间态
 import { useEffect, useState } from 'react';
 // 引入 FormEvent 类型
 import type { FormEvent } from 'react';
@@ -10,8 +10,6 @@ import { api, errorText } from '../api';
 import type { OAuthProviderInfo, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
-// 购物车面板：原独立 /cart 页并入「购物车」分区，状态与接口完全沿用
-import { CartPanel } from '../components/CartPanel';
 
 /** 组件契约：语言 + 用户更新回调 */
 interface Props {
@@ -19,11 +17,11 @@ interface Props {
   onUserUpdated: (user: UserInfo) => void; // 资料保存后同步全局用户态
 } // Props 结束
 
-/** 五个分区标识：购物车自 2026-11-15 起并入个人中心，旧地址 /cart 落到 /account?tab=cart */
-type Tab = 'profile' | 'entitlements' | 'orders' | 'cart' | 'security';
+/** 两个分区标识：资料编辑与账号安全 */
+type Tab = 'profile' | 'security';
 
 /** 全部合法分区，用于校验地址栏 ?tab= 入参 */
-const TAB_IDS: readonly Tab[] = ['profile', 'entitlements', 'orders', 'cart', 'security'];
+const TAB_IDS: readonly Tab[] = ['profile', 'security'];
 
 /** 从地址栏 ?tab= 读取初始分区；非法值回落资料分区 */
 function initialTab(): Tab {
@@ -32,36 +30,12 @@ function initialTab(): Tab {
   return raw && (TAB_IDS as readonly string[]).includes(raw) ? (raw as Tab) : 'profile'; // 合法值直接采用
 } // initialTab 结束
 
-/** 金额格式化 */
-function money(currency: string, amountMinor: number): string {
-  const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : `${currency} `; // 常见币种用符号
-  return `${symbol}${(amountMinor / 100).toFixed(2)}`; // 分 → 主单位
-} // money 结束
-
-/** 权益状态文案：内部枚举仅用于判断样式，界面不直接显示原始值 */
-function entitlementStatusText(status: string, isZh: boolean): string {
-  if (status === 'active') return isZh ? '生效中' : 'Active'; // 正常可用
-  if (status === 'expired') return isZh ? '已过期' : 'Expired'; // 到期失效
-  if (status === 'revoked') return isZh ? '已撤销' : 'Revoked'; // 人工撤销
-  return isZh ? '—' : '—'; // 未知取值不外显内部枚举
-} // entitlementStatusText 结束
-
-/** 订单状态文案：内部状态机不直接外显 */
-function orderStatusText(status: string, isZh: boolean): string {
-  if (status === 'pending') return isZh ? '待支付' : 'Pending'; // 待支付
-  if (status === 'paid') return isZh ? '已支付' : 'Paid'; // 已支付
-  if (status === 'delivered') return isZh ? '已交付' : 'Delivered'; // 已交付
-  if (status === 'refunded') return isZh ? '已退款' : 'Refunded'; // 已退款
-  if (status === 'cancelled') return isZh ? '已取消' : 'Cancelled'; // 已取消
-  return isZh ? '—' : '—'; // 未知取值不外显内部枚举
-} // orderStatusText 结束
-
-/** 个人中心：资料编辑 / 我的权益 / 我的订单 / 购物车 / 账号安全 五块 */
+/** 个人中心：资料编辑 / 账号与设置 两块 */
 export function Profile({ locale, onUserUpdated }: Props) {
   const isZh = locale !== 'en-US'; // 是否中文文案
-  const [tab, setTab] = useState<Tab>(() => initialTab()); // 当前分区：/account?tab=cart 直接落在购物车
+  const [tab, setTab] = useState<Tab>(() => initialTab()); // 当前分区
 
-  /** 切换分区并把页签写进地址栏：?tab=cart 可分享、刷新不丢；资料分区不带参数保持地址干净 */
+  /** 切换分区并把页签写进地址栏：?tab=security 可分享、刷新不丢；资料分区不带参数保持地址干净 */
   function selectTab(next: Tab) {
     setTab(next); // 先切界面，地址栏随后同步
     const url = new URL(window.location.href); // 保留其他查询参数（如 oauth_bound）
@@ -70,8 +44,6 @@ export function Profile({ locale, onUserUpdated }: Props) {
     window.history.replaceState(null, '', url.pathname + url.search + url.hash); // 原地替换，不新增历史
   } // selectTab 结束
   const me = useAsync(() => api.me(), []); // 我的资料
-  const entitlements = useAsync(() => api.catalog.getMyEntitlements(), []); // 我的权益
-  const orders = useAsync(() => api.commerce.orders({ source: 'module' }), []); // 我的订单（统一只读接口，仅模块线）
   const [displayName, setDisplayName] = useState(''); // 昵称编辑值
   const [localeValue, setLocaleValue] = useState<Locale>('zh-CN'); // 语言编辑值
   const [timezone, setTimezone] = useState(''); // 时区编辑值
@@ -175,17 +147,6 @@ export function Profile({ locale, onUserUpdated }: Props) {
     } // try 结束
   } // save 结束
 
-  /** 取消待结算订单 */
-  async function cancelOrder(id: string) {
-    setError(null); // 清空旧错误
-    try { // 异常捕获起点：包裹可能抛出错误的操作
-      await api.catalog.cancelOrder(id); // 取消接口
-      orders.reload(); // 刷新订单列表
-    } catch (err) {
-      setError(errorText(locale, err)); // 失败提示
-    } // try 结束
-  } // cancelOrder 结束
-
   /** 注销申请 / 撤销 */
   async function toggleDeletion(request: boolean) {
     setError(null); // 清空旧错误
@@ -207,9 +168,6 @@ export function Profile({ locale, onUserUpdated }: Props) {
         {/* 分区切换 */}
         <nav className="profile-tabs">{/* 执行当前业务步骤 */}
           <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => selectTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
-          <button type="button" className={`tab${tab === 'entitlements' ? ' active' : ''}`} onClick={() => selectTab('entitlements')}>{isZh ? '我的权益' : 'Entitlements'}</button>
-          <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => selectTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
-          <button type="button" className={`tab${tab === 'cart' ? ' active' : ''}`} onClick={() => selectTab('cart')}>{isZh ? '购物车' : 'Cart'}</button>
           <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
         </nav>
       </header>
@@ -239,87 +197,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
         ) // 执行当前业务步骤
       ) : null}
 
-      {/* 分区二：我的权益 */}
-      {tab === 'entitlements' ? (
-        entitlements.loading ? <div className="hint">{isZh ? '加载中…' : 'Loading…'}</div> : (
-          <>{/* 执行当前业务步骤 */}
-            {entitlements.error ? <div className="chat-error">{errorText(locale, entitlements.error)}</div> : null}
-            {(entitlements.data?.entitlements ?? []).length === 0 ? <div className="hint">{isZh ? '还没有解锁任何模块。' : 'No entitlements yet.'}</div> : null}
-            {(entitlements.data?.entitlements ?? []).length > 0 ? (
-              <table className="products-table">{/* 执行当前业务步骤 */}
-                <thead>{/* 执行当前业务步骤 */}
-                  <tr>{/* 执行当前业务步骤 */}
-                    <th>{isZh ? '模块' : 'Module'}</th>
-                    <th>{isZh ? '状态' : 'Status'}</th>
-                    <th>{isZh ? '到期' : 'Expires'}</th>
-                    <th>{isZh ? '获得时间' : 'Granted'}</th>
-                  </tr>
-                </thead>
-                <tbody>{/* 执行当前业务步骤 */}
-                  {(entitlements.data?.entitlements ?? []).map((item) => (
-                    <tr key={item.id}>{/* 执行当前业务步骤 */}
-                      <td>{/* 执行当前业务步骤 */}
-                        <div className="products-name">{item.module_name[locale] ?? item.module_name['zh-CN'] ?? (isZh ? '模块服务' : 'Module')}</div>
-                      </td>
-                      <td><span className={`tag${item.status === 'active' ? ' ok' : ''}`}>{entitlementStatusText(item.status, isZh)}</span></td>
-                      <td>{item.expires_at ?? (isZh ? '永久' : 'Permanent')}</td>
-                      <td>{new Date(item.created_at).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
-          </>
-        ) // 执行当前业务步骤
-      ) : null}
-
-      {/* 分区三：我的订单 */}
-      {tab === 'orders' ? (
-        orders.loading ? <div className="hint">{isZh ? '加载中…' : 'Loading…'}</div> : (
-          <>{/* 执行当前业务步骤 */}
-            {orders.error ? <div className="chat-error">{errorText(locale, orders.error)}</div> : null}
-            {((orders.data?.items ?? []).length === 0) ? <div className="hint">{isZh ? '还没有订单。' : 'No orders yet.'}</div> : null}
-            {((orders.data?.items ?? []).length > 0) ? (
-              <table className="products-table">{/* 执行当前业务步骤 */}
-                <thead>{/* 执行当前业务步骤 */}
-                  <tr>{/* 执行当前业务步骤 */}
-                    <th>{isZh ? '模块' : 'Module'}</th>
-                    <th>{isZh ? '金额' : 'Amount'}</th>
-                    <th>{isZh ? '状态' : 'Status'}</th>
-                    <th>{isZh ? '下单时间' : 'Created'}</th>
-                    <th>{isZh ? '操作' : 'Action'}</th>
-                  </tr>
-                </thead>
-                <tbody>{/* 执行当前业务步骤 */}
-                  {(orders.data?.items ?? []).map((order) => {
-                    const first = order.items[0]; // 模块线一单一件，取首件快照名与编码
-                    return (
-                    <tr key={order.id}>{/* 执行当前业务步骤 */}
-                      <td>{/* 执行当前业务步骤 */}
-                        <div className="products-name">{first?.title ?? (isZh ? '订单' : 'Order')}</div>
-                      </td>
-                      <td>{money(order.currency, order.total_cents)}</td>
-                      <td><span className={`tag${order.status === 'paid' ? ' ok' : ''}`}>{orderStatusText(order.status, isZh)}</span></td>
-                      <td>{new Date(order.created_at).toLocaleDateString()}</td>
-                      <td>{/* 执行当前业务步骤 */}
-                        {order.status === 'pending' ? (
-                          <button type="button" className="btn ghost" onClick={() => void cancelOrder(order.source_id)}>{isZh ? '取消' : 'Cancel'}</button>
-                        ) : null}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : null}
-          </>
-        ) // 执行当前业务步骤
-      ) : null}
-
-      {/* 分区四：购物车（原独立 /cart 页并入，清单 / 移除 / 清空 / 积分抵扣 / 结算全部沿用原状态与接口） */}
-      {tab === 'cart' ? <CartPanel locale={locale} /> : null}
-
-      {/* 分区五：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
+      {/* 分区二：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
       {tab === 'security' ? (
         <section className="profile-security">{/* 执行当前业务步骤 */}
           <p className="hint">{/* 执行当前业务步骤 */}

@@ -15,12 +15,7 @@ const BUILTIN_PERMISSION_CODES = [ // 按字典序排列，便于与 API 返回�
   'commerce:write', // 发货 / 售后 / 提现 / 离线确认
   'content:write', // 公告 / 更新日志 / 推广计划维护与发布归档（域脚本 seed）
   'deployments:read', // 部署汇总（2026-11-15 运维数据收口，仅后台可见）
-  'entitlement:grant', // 发放权益
-  'entitlement:read', // 查看权益
-  'entitlement:revoke', // 回收权益
   'messaging:write', // 发送系统私信（成长私信）
-  'module:read', // 查看模块
-  'module:write', // 变更模块状态
   'rbac:read', // 查看角色权限
   'rbac:write', // 变更角色权限
   'user:read', // 查看用户
@@ -95,9 +90,7 @@ describe('GET /admin/me 身份回显', () => { // 后台首屏需要知道自己
     expect(res.body.bootstrap).toBe(false); // 断言非引导通道
     expect(res.body.user.id).toBe(session.userId); // 断言回显当前用户
     expect(res.body.roles).toEqual(['viewer']); // 断言实际授予角色
-    expect(res.body.permissions).toEqual([ // viewer 的四条只读权限，按字典序排序
-      'entitlement:read', // 查看权益
-      'module:read', // 查看模块
+    expect(res.body.permissions).toEqual([ // viewer 的两条只读权限，按字典序排序
       'rbac:read', // 查看角色权限
       'user:read', // 查看用户
     ]); // 权限断言结束
@@ -146,7 +139,7 @@ describe('权限点与角色读取', () => { // 后台勾选矩阵的数据源�
     expect(roles.map((role) => role.code)).toEqual(['operator', 'superadmin', 'viewer']); // 全部内置时按角色码排序
     expect(roles.every((role) => role.builtin)).toBe(true); // 三个都是内置角色
     expect(roles.find((role) => role.code === 'superadmin')!.permissions).toHaveLength(BUILTIN_PERMISSION_CODES.length); // 超管全量权限
-    expect(roles.find((role) => role.code === 'viewer')!.permissions).toHaveLength(4); // 只读角色四条权限
+    expect(roles.find((role) => role.code === 'viewer')!.permissions).toHaveLength(2); // 只读角色两条权限
   }); // 角色列表用例结束
 
   it('GET /admin/roles/:code/permissions 不存在角色 → 404', async () => { // 参数化路由需对未知角色给 404
@@ -164,11 +157,11 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
     const res = await request(app) // 新建角色
       .post('/api/v1/admin/roles') // 角色集合端点
       .set(adminHeaders()) // 引导令牌
-      .send({ code: 'auditor', name: { 'zh-CN': '审计员' }, permissions: ['module:read', 'user:read'] }); // 合法入参
+      .send({ code: 'auditor', name: { 'zh-CN': '审计员' }, permissions: ['rbac:read', 'user:read'] }); // 合法入参
     expect(res.status).toBe(201); // 断言 201
     expect(res.body.role.code).toBe('auditor'); // 断言角色码
     expect(res.body.role.builtin).toBe(false); // 断言非内置
-    expect(res.body.role.permissions).toEqual(['module:read', 'user:read']); // 断言权限按码排序后一致
+    expect(res.body.role.permissions).toEqual(['rbac:read', 'user:read']); // 断言权限按码排序后一致
   }); // 新建用例结束
 
   it('POST /admin/roles 重复 code → 409 CONFLICT', async () => { // 主键冲突必须在事务前拦下
@@ -185,7 +178,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
     const res = await request(app) // 含伪造权限码
       .post('/api/v1/admin/roles') // 角色集合端点
       .set(adminHeaders()) // 引导令牌
-      .send({ code: 'auditor', name: { 'zh-CN': '审计员' }, permissions: ['module:read', 'nope:nope'] }); // 第二个码不存在
+      .send({ code: 'auditor', name: { 'zh-CN': '审计员' }, permissions: ['rbac:read', 'nope:nope'] }); // 第二个码不存在
     expect(res.status).toBe(400); // 断言 400
     expect(res.body.code).toBe('VALIDATION_FAILED'); // 校验类错误
     expect(res.body.details.unknown).toEqual(['nope:nope']); // 精确回显未知权限码
@@ -268,7 +261,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
     await request(app) // 建一个自建角色
       .post('/api/v1/admin/roles') // 角色集合端点
       .set(adminHeaders()) // 引导令牌
-      .send({ code: 'auditor', name: { 'zh-CN': '审计员' }, permissions: ['module:read'] }); // 带一条权限
+      .send({ code: 'auditor', name: { 'zh-CN': '审计员' }, permissions: ['user:read'] }); // 带一条权限
     const res = await request(app) // 删除
       .delete('/api/v1/admin/roles/auditor') // 角色端点
       .set(adminHeaders()); // 引导令牌
@@ -295,14 +288,14 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
     const res = await request(app) // 整体替换
       .put('/api/v1/admin/roles/operator/permissions') // 权限替换端点
       .set(adminHeaders()) // 引导令牌
-      .send({ permissions: ['module:read'] }); // 只保留一条
+      .send({ permissions: ['user:read'] }); // 只保留一条
     expect(res.status).toBe(200); // 断言 200
     expect(res.body.role_code).toBe('operator'); // 断言目标角色
-    expect(res.body.permissions).toEqual(['module:read']); // 断言替换结果
+    expect(res.body.permissions).toEqual(['user:read']); // 断言替换结果
     const read = await request(app) // 复查
       .get('/api/v1/admin/roles/operator/permissions') // 角色权限端点
       .set(adminHeaders()); // 引导令牌
-    expect(read.body.permissions).toEqual(['module:read']); // 断言落库生效
+    expect(read.body.permissions).toEqual(['user:read']); // 断言落库生效
   }); // operator 替换用例结束
 
   it('PUT /admin/roles/:code/permissions 未知权限 → 400；未知角色 → 404', async () => { // 两条错误路径都要覆盖
@@ -434,7 +427,7 @@ describe('细粒度权限：viewer 只读、无角色不可进后台', () => { /
     expect(write.body.details.permission).toBe('rbac:write'); // 断言缺失权限点
   }); // viewer 用例结束
 
-  it('operator 无 rbac:write：可读角色但不可建角色、不可替换 superadmin 权限', async () => { // 验证内置角色权限差异真实存在（operator 基线 10 条，不含 rbac:write）
+  it('operator 无 rbac:write：可读角色但不可建角色、不可替换 superadmin 权限', async () => { // 验证内置角色权限差异真实存在（operator 基线 5 条，不含 rbac:write）
     const session = await login('13900000042'); // 建用户
     await grantRole(session.userId, 'operator'); // 授予运营角色（基线权限不含 rbac:write）
     const read = await request(app) // 运营可读角色列表（含 rbac:read）

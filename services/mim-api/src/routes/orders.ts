@@ -31,16 +31,16 @@ function parseLimit(raw: unknown): number {
   return Math.min(Math.floor(value), 200); // 封顶 200
 }
 
-/** source 过滤解析：缺省返回四源全部；非法产线值回 400，避免静默放宽过滤口径 */
+/** source 过滤解析：缺省返回全部产线；非法产线值回 400，避免静默放宽过滤口径 */
 function parseSource(raw: unknown): UnifiedOrderSource | undefined {
   if (raw === undefined || raw === '') return undefined; // 未传不过滤
-  if (raw === 'module' || raw === 'shop' || raw === 'asset' || raw === 'community') return raw; // 合法产线原样返回
-  throw new AppError('VALIDATION_FAILED', 'source must be one of module/shop/asset/community', { source: raw }); // 非法值显式拒绝
+  if (raw === 'shop' || raw === 'asset' || raw === 'community') return raw; // 合法产线原样返回
+  throw new AppError('VALIDATION_FAILED', 'source must be one of shop/asset/community', { source: raw }); // 非法值显式拒绝
 }
 
 export function createOrdersRouter(deps: ApiDeps): Router {
   const router = Router(); // 独立 router，便于在 app 层按前缀挂载
-  router.use('/commerce/orders', requireAuth); // 统一订单全部要求登录；旧 /orders 仍由商城路由服务，不改动
+  router.use('/commerce/orders', requireAuth); // 统一订单全部要求登录
 
   router.get('/commerce/orders', (req, res) => {
     const user = req.user!; // requireAuth 已注入登录态

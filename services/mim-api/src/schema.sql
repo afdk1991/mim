@@ -97,121 +97,6 @@ CREATE TABLE IF NOT EXISTS account_merges (
   created_at        TEXT NOT NULL
 );
 
--- ---------- catalog 域（功能模块商城 / 解锁鉴权，07 §5.1、08 §3.2）----------
-CREATE TABLE IF NOT EXISTS modules (
-  id                    TEXT PRIMARY KEY,
-  code                  TEXT NOT NULL,
-  name_i18n             TEXT NOT NULL,
-  summary_i18n          TEXT NOT NULL,
-  unlock_mode           TEXT NOT NULL CHECK (unlock_mode = 'one_time'),
-  entitlements_required TEXT NOT NULL DEFAULT '[]',
-  region                TEXT NOT NULL CHECK (region IN ('cn','global')),
-  status                TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
-  sort_order            INTEGER NOT NULL DEFAULT 0,
-  category_slug         TEXT,
-  license               TEXT,
-  language              TEXT,
-  stars                 INTEGER NOT NULL DEFAULT 0,
-  capability            TEXT, -- 真实能力键（对应 @mim/core-domain 的 MODULE_CAPABILITIES.key）；NULL 表示该模块功能规划中
-  created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL,
-  deleted_at            TEXT,
-  UNIQUE (region, code)
-);
-CREATE INDEX IF NOT EXISTS idx_modules_region_status ON modules(region, status, sort_order);
-
--- 模块分类树：一级分类（parent_id 为空）+ 二级条目（parent_id 指向一级），导航与过滤都读这张表
-CREATE TABLE IF NOT EXISTS module_categories (
-  id         TEXT PRIMARY KEY,
-  parent_id  TEXT,
-  level      INTEGER NOT NULL CHECK (level IN (1,2)),
-  slug       TEXT NOT NULL UNIQUE,
-  name       TEXT NOT NULL,
-  name_en    TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY (parent_id) REFERENCES module_categories(id)
-);
-CREATE INDEX IF NOT EXISTS idx_module_categories_parent ON module_categories(level, sort_order);
-
-CREATE TABLE IF NOT EXISTS module_prices (
-  id              TEXT PRIMARY KEY,
-  module_id       TEXT NOT NULL,
-  currency        TEXT NOT NULL,
-  amount_minor    INTEGER NOT NULL CHECK (amount_minor >= 0),
-  effective_from  TEXT NOT NULL,
-  effective_to    TEXT,
-  created_at      TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_module_prices_module ON module_prices(module_id, currency, effective_from);
-
--- 商城订单：付费模块必须先下单并结算，结算成功才发权益（免费模块仍走 POST /entitlements 直接解锁）
-CREATE TABLE IF NOT EXISTS module_orders (
-  id              TEXT PRIMARY KEY, -- 订单主键（uuidv7，时间有序便于按创建顺序排查）
-  user_id         TEXT NOT NULL, -- 下单用户
-  module_id       TEXT NOT NULL, -- 目标模块；金额在下单时快照，后续调价不影响已存在订单
-  region          TEXT NOT NULL, -- 下单时用户所在区域，防止跨区串单
-  currency        TEXT NOT NULL, -- 结算币种（下单时从当前有效价格快照）
-  amount_minor    INTEGER NOT NULL CHECK (amount_minor > 0), -- 成交金额（分）；0 元订单无意义，免费模块不走订单
-  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','cancelled')), -- 订单状态机：待结算 / 已结算 / 已取消
-  channel         TEXT NOT NULL DEFAULT 'manual' CHECK (channel IN ('manual','alipay','wechat','stripe')), -- 结算渠道；默认人工结算，接入在线渠道后在创建订单时指定
-  channel_txn_id  TEXT, -- 外部渠道交易号（人工结算为 NULL）；回调幂等依据，同一交易号不得结算两张单
-  entitlement_id  TEXT, -- 结算后发放的权益主键，供订单与权益双向对账
-  created_at      TEXT NOT NULL, -- 下单时间
-  updated_at      TEXT NOT NULL, -- 最近状态变更时间
-  paid_at         TEXT, -- 结算完成时间，pending 为 NULL
-  cancelled_at    TEXT -- 取消时间，仅 cancelled 填充
-);
--- 同一用户同一模块同时只允许一笔待结算订单，避免重复下单产生多条待付记录
-CREATE UNIQUE INDEX IF NOT EXISTS uq_module_orders_pending
-  ON module_orders(user_id, module_id) WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_module_orders_user ON module_orders(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_module_orders_status ON module_orders(status, created_at);
--- 注意：channel_txn_id 属「后加列」，它的唯一索引不能在 schema.sql 里建——
--- 老库此时还没有该列，全量 exec 会直接报 no such column 导致进程启动失败；
--- 该索引由 db.ts 的 ADDITIVE_INDEXES 在补列之后创建（新建库同样会走这一步）。
-
--- 商城购物车：每用户每模块最多一行（模块属虚拟商品、不可重复购买，故不设数量列）
-CREATE TABLE IF NOT EXISTS cart_items (
-  id          TEXT PRIMARY KEY, -- 购物车条目主键（uuidv7，时间有序）
-  user_id     TEXT NOT NULL REFERENCES users(id), -- 归属用户；一个用户一份车
-  module_id   TEXT NOT NULL, -- 目标模块主键（与 modules.id 对应，跨区同码模块是不同行）
-  created_at  TEXT NOT NULL, -- 加购时间
-  updated_at  TEXT NOT NULL -- 最近一次加购/更新时间（重复加购时刷新）
-);
--- 同一用户同一模块只允许一条：重复加购走幂等回放，不产生重复条目
-CREATE UNIQUE INDEX IF NOT EXISTS uq_cart_items_user_module ON cart_items(user_id, module_id);
-CREATE INDEX IF NOT EXISTS idx_cart_items_user ON cart_items(user_id, created_at);
-
-CREATE TABLE IF NOT EXISTS entitlements (
-  id          TEXT PRIMARY KEY,
-  user_id     TEXT NOT NULL,
-  module_id   TEXT NOT NULL,
-  source      TEXT NOT NULL CHECK (source = 'admin'),
-  source_id   TEXT,
-  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','revoked')),
-  expires_at  TEXT,
-  version     INTEGER NOT NULL DEFAULT 1,
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
-);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_user_module_once
-  ON entitlements(user_id, module_id) WHERE source_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_user_module_source
-  ON entitlements(user_id, module_id, source_id) WHERE source_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_entitlements_user_status ON entitlements(user_id, status);
-
-CREATE TABLE IF NOT EXISTS entitlement_events (
-  id              TEXT PRIMARY KEY,
-  entitlement_id  TEXT NOT NULL,
-  from_status     TEXT,
-  to_status       TEXT NOT NULL,
-  reason          TEXT,
-  actor           TEXT NOT NULL CHECK (actor IN ('job','admin','system')),
-  created_at      TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_entitlement_events_ent ON entitlement_events(entitlement_id, created_at);
 
 -- ---------- 认证与会话辅助 ----------
 CREATE TABLE IF NOT EXISTS verification_codes (
@@ -295,7 +180,7 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
 );
 
 -- ---------- rbac 域（角色-权限-用户三角色模型，08 §3.4 / 07 §2.1）----------
--- 权限点：细粒度动作标识（如 module:write），由代码侧 requirePermission 按字符串匹配；
+-- 权限点：细粒度动作标识（如 commerce:write），由代码侧 requirePermission 按字符串匹配；
 -- 内置权限点在 db.ts seedRbac 中幂等写入，允许后台追加自定义权限点。
 CREATE TABLE IF NOT EXISTS permissions (
   code              TEXT PRIMARY KEY,
@@ -327,7 +212,7 @@ CREATE INDEX IF NOT EXISTS idx_role_permissions_permission ON role_permissions(p
 
 -- 用户-角色映射：一个用户可持多个角色，权限为各角色并集；
 -- granted_by 记录授予人（用户 ID 或 'bootstrap'/'system'），用于审计回溯。
--- 不对 user_id 建外键：与 entitlements 一致，用户软删除后保留授权历史便于审计。
+-- 不对 user_id 建外键：与用户授权记录一致，用户软删除后保留授权历史便于审计。
 CREATE TABLE IF NOT EXISTS user_roles (
   user_id           TEXT NOT NULL,
   role_code         TEXT NOT NULL REFERENCES roles(code) ON DELETE CASCADE,

@@ -25,12 +25,10 @@ function batchKey(): string { // 业务步骤
 export function PriceBatches({ credential, permissions }: Props) { // 业务步骤
   const canWrite = permissions.includes('commerce:write'); // 与后端 requirePermission 一致
   const batchesState = useAsync(() => (canWrite ? listPriceBatches(credential) : Promise.resolve<PriceBatchView[]>([])), [credential, canWrite]); // 最近批次
-  const [target, setTarget] = useState<PriceBatchTarget>('shop_product'); // 目标类型：商品更常用
+  const [target] = useState<PriceBatchTarget>('shop_product'); // 目标类型：仅独立商城商品
   const [mode, setMode] = useState<PriceBatchMode>('percent'); // 默认按百分比
   const [direction, setDirection] = useState<PriceBatchDirection>('decrease'); // 默认下调
   const [value, setValue] = useState('10'); // 默认 10%
-  const [region, setRegion] = useState('cn'); // 模块区域
-  const [category, setCategory] = useState(''); // 分类筛选
   const [codes, setCodes] = useState(''); // 显式编码，逗号或换行分隔
   const [includeInactive, setIncludeInactive] = useState(false); // 是否纳入下架目标
   const [notice, setNotice] = useState(''); // 成功提示
@@ -51,8 +49,6 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         direction: mode === 'fixed' ? 'set' : direction, // 固定价方向固定 set
         value: numeric, // 模式参数
         filter: {
-          region: target === 'module' ? region : undefined, // 区域仅模块有效
-          category_slug: target === 'module' && category.trim() ? category.trim() : undefined, // 分类仅模块有效
           codes: codes.split(/[\n,，]/).map((item) => item.trim()).filter(Boolean), // 编码清单
           include_inactive: includeInactive, // 是否含下架
         }, // 代码块结束
@@ -71,7 +67,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
     <div className="page">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>批量改价</h1>
-        <p className="muted">模块与独立商城商品统一调价，事务化执行并保留改前快照，可按批次一键回滚。</p>
+        <p className="muted">独立商城商品统一调价，事务化执行并保留改前快照，可按批次一键回滚。</p>
       </header>
 
       {!canWrite && <div className="panel error">当前账号缺少 commerce:write 权限，无法提交调价。</div>}
@@ -82,9 +78,8 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         <div className="panel-head"><h3>新建调价批次</h3></div>
         <div className="form inline">{/* 执行当前业务步骤 */}
           <label>目标{/* 执行当前业务步骤 */}
-            <select value={target} onChange={(event) => setTarget(event.target.value as PriceBatchTarget)}>{/* 执行当前业务步骤 */}
+            <select value={target} disabled>{/* 执行当前业务步骤 */}
               <option value="shop_product">独立商城商品</option>
-              <option value="module">功能模块</option>
             </select>
           </label>
           <label>模式{/* 执行当前业务步骤 */}
@@ -107,19 +102,6 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
           </label>
         </div>
         <div className="form inline">{/* 执行当前业务步骤 */}
-          {target === 'module' && (
-            <label>区域{/* 执行当前业务步骤 */}
-              <select value={region} onChange={(event) => setRegion(event.target.value)}>{/* 执行当前业务步骤 */}
-                <option value="cn">cn</option>
-                <option value="global">global</option>
-              </select>
-            </label>
-          )}
-          {target === 'module' && (
-            <label>分类 slug{/* 执行当前业务步骤 */}
-              <input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="可留空" />
-            </label>
-          )}
           <label className="grow">指定编码{/* 执行当前业务步骤 */}
             <input value={codes} onChange={(event) => setCodes(event.target.value)} placeholder="多个编码用逗号或换行分隔；留空按筛选条件全量" />
           </label>
@@ -137,7 +119,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         {(batchesState.data ?? []).map((batch) => (
           <article className="panel" key={batch.id} style={{ marginBottom: 12 }}>{/* 执行当前业务步骤 */}
             <div className="panel-head">{/* 执行当前业务步骤 */}
-              <h3>{batch.target_type === 'module' ? '模块' : '商品'} · {batch.mode} · {batch.direction}</h3>
+              <h3>商品 · {batch.mode} · {batch.direction}</h3>
               <span className={`badge ${batch.rolled_back_at ? 'danger' : 'success'}`}>{batch.rolled_back_at ? '已回滚' : '已生效'}</span>
             </div>
             <div className="deploy-kv">{/* 执行当前业务步骤 */}

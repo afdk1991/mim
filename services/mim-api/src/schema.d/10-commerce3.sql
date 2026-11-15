@@ -1,5 +1,5 @@
 -- ============================================================
--- 商业化三期（2026-11-13）：批量改价 / 积分抵扣 / 分类级权限
+-- 商业化三期（2026-11-13）：批量改价 / 积分抵扣
 -- 全部语句幂等；禁止 DROP / DELETE / 无条件 UPDATE。
 -- 已有表补列走 ALTER_ADD 指令行（加载器先补列再执行其余语句）。
 -- ============================================================
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS price_batches (
   id              TEXT PRIMARY KEY,
   idempotency_key TEXT NOT NULL,
   actor_id        TEXT NOT NULL,
-  target_type     TEXT NOT NULL CHECK (target_type IN ('module', 'shop_product')),
+  target_type     TEXT NOT NULL CHECK (target_type = 'shop_product'),
   mode            TEXT NOT NULL CHECK (mode IN ('fixed', 'percent', 'amount')),
   direction       TEXT NOT NULL CHECK (direction IN ('set', 'increase', 'decrease')),
   value           INTEGER NOT NULL,
@@ -42,25 +42,3 @@ CREATE TABLE IF NOT EXISTS price_batch_items (
   created_at          TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_price_batch_items_batch ON price_batch_items(batch_id);
-
--- ---------- 分类级权限规则 ----------
--- 在既有 RBAC 之上叠加分类维度：subject_type=role 按角色码、user 按用户 ID；
--- category_slug 命中一级 slug（前缀覆盖二级）或二级 slug（精确）；
--- effect=deny 优先于 allow；无任何规则命中时保持现网公开行为（兼容 0.0.6）。
-CREATE TABLE IF NOT EXISTS category_access_rules (
-  id            TEXT PRIMARY KEY,
-  subject_type  TEXT NOT NULL CHECK (subject_type IN ('role', 'user')),
-  subject_id    TEXT NOT NULL,
-  category_slug TEXT NOT NULL,
-  effect        TEXT NOT NULL CHECK (effect IN ('allow', 'deny')),
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  UNIQUE (subject_type, subject_id, category_slug)
-);
-CREATE INDEX IF NOT EXISTS idx_category_access_subject ON category_access_rules(subject_type, subject_id);
-
--- ---------- 模块订单补列：积分抵扣留痕 ----------
--- points_spent：本单消耗的积分；points_deduct_cents：积分折抵的金额（分）。
--- 订单原始成交价 amount_minor 不变，抵扣额单列留痕，便于对账与退款回滚。
-ALTER_ADD: module_orders.points_spent INTEGER NOT NULL DEFAULT 0
-ALTER_ADD: module_orders.points_deduct_cents INTEGER NOT NULL DEFAULT 0

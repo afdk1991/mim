@@ -11,12 +11,11 @@ import { loadPermissions, requirePermission } from '../middleware.js'; // 实时
 import { parse } from '../validate.js'; // zod 校验包装：失败抛 VALIDATION_FAILED 并透出 issues
 import { jsonParse, pathParam } from '../utils.js'; // JSON 文本容错解析 + 路径参数类型收敛
 import { runPriceBatch, listBatches, getBatch, rollbackBatch } from '../commerce/price-batch.js'; // 批量改价：执行 / 列表 / 回滚
-import { listAllRules, replaceSubjectRules, deleteRule } from '../commerce/category-access.js'; // 分类级权限规则管理
 import type { ApiDeps, Db } from '../types.js'; // 依赖容器与数据库连接类型，仅编译期引用
 
 /** permissions 表行结构：列名与 schema.sql 严格一一对应 */
 interface PermissionRow {
-  code: string; // 权限码，如 module:write
+  code: string; // 权限码，如 commerce:write
   name_i18n: string; // 多语言名称 JSON 文本
   description_i18n: string; // 多语言描述 JSON 文本
   builtin: number; // 1 表示内置权限点，后台不可删除
@@ -548,13 +547,11 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
   router.post('/admin/commerce/price-batches', requirePermission('commerce:write'), (req, res) => {
     const body = parse( // 请求体校验：目标类型 / 模式 / 方向 / 参数 / 筛选条件 / 幂等键
       z.object({ // 执行当前业务步骤
-        target_type: z.enum(['module', 'shop_product']), // 调价目标：模块或独立商城商品
+        target_type: z.literal('shop_product'), // 调价目标：仅独立商城商品
         mode: z.enum(['fixed', 'percent', 'amount']), // 固定价 / 百分比 / 固定金额
         direction: z.enum(['set', 'increase', 'decrease']).optional(), // fixed 缺省 set；增减模式必填
         value: z.number().int().min(0), // 模式参数：新价 / 百分点 / 金额（分），非负整数
         filter: z.object({ // 筛选条件快照，全部可选
-          region: z.string().min(1).max(16).optional(), // 仅模块：区域
-          category_slug: z.string().min(1).max(64).optional(), // 仅模块：一级前缀或二级精确
           codes: z.array(z.string().min(1).max(64)).max(500).optional(), // 显式编码清单
           include_inactive: z.boolean().optional(), // 是否纳入下架目标；缺省只改在售
         }).optional(), // 代码块结束
@@ -593,37 +590,6 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const id = pathParam(req, 'id'); // 批次主键
     res.json({ batch: rollbackBatch(db, id, clockOf(deps)) }); // 回滚后回读最新视图
   }); // POST 回滚结束
-
-  // ---------- 商业化三期：分类级权限规则（角色 / 用户 → 分类 allow / deny） ----------
-
-  /** GET /admin/category-access — 全部分类规则 */
-  router.get('/admin/category-access', requirePermission('rbac:write'), (_req, res) => {
-    res.json({ rules: listAllRules(db) }); // 全量规则供后台渲染
-  }); // GET 规则结束
-
-  /** PUT /admin/category-access — 整组替换某主体（角色 / 用户）的分类规则；空清单即清空 */
-  router.put('/admin/category-access', requirePermission('rbac:write'), (req, res) => {
-    const body = parse( // 主体类型 + 主体标识 + 规则清单
-      z.object({ // 执行当前业务步骤
-        subject_type: z.enum(['role', 'user']), // role 按角色码，user 按用户 ID
-        subject_id: z.string().min(1).max(64), // 角色码或用户 ID
-        rules: z.array(z.object({ // 规则条目
-          category_slug: z.string().min(1).max(64), // 一级或二级分类 slug
-          effect: z.enum(['allow', 'deny']), // 放行 / 拦截；deny 优先
-        })).max(200), // 单主体规则上限，防止脏数据膨胀
-      }), // 代码块结束
-      req.body, // 执行当前业务步骤
-    ); // 执行当前业务步骤
-    const rules = replaceSubjectRules(db, { subject_type: body.subject_type, subject_id: body.subject_id }, body.rules, clockOf(deps)); // 同事务清后写
-    res.json({ subject_type: body.subject_type, subject_id: body.subject_id, rules }); // 回读该主体最新规则
-  }); // PUT 规则结束
-
-  /** DELETE /admin/category-access/:id — 删除单条规则 */
-  router.delete('/admin/category-access/:id', requirePermission('rbac:write'), (req, res) => {
-    const id = pathParam(req, 'id'); // 规则主键
-    if (!deleteRule(db, id)) throw new AppError('NOT_FOUND', 'category access rule not found', { rule_id: id }); // 不存在 404
-    res.json({ id, deleted: true }); // 删除成功
-  }); // DELETE 规则结束
 
   return router; // 返回装配完成的管理面路由
 } // createAdminRouter 结束

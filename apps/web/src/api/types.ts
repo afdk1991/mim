@@ -194,38 +194,6 @@ export interface ImUser {
   region: string; // 区域
 } // ImUser 结束
 
-/** 购物车条目：模块信息 + 单价 + 已拥有 / 免费标记 */
-export interface CartItem {
-  module_code: string; // 模块编码
-  name: Record<string, string>; // 多语言名称
-  capability: string | null; // 真实能力键；null 表示功能规划中
-  status: string; // 模块状态
-  available: boolean; // 是否可结算（仅 active 为 true）
-  owned: boolean; // 是否已拥有（已拥有则结算时跳过）
-  free: boolean; // 是否免费（无价格行或 0 价）
-  price: { currency: string; amount_minor: number } | null; // 单价；免费为 null
-  added_at: string; // 加购时间
-} // CartItem 结束
-
-/** 购物车汇总视图 */
-export interface CartSummary {
-  items: CartItem[]; // 条目列表（最近加购在前）
-  totals: Array<{ currency: string; amount_minor: number }>; // 按币种合计（只算可支付项）
-  count: number; // 条目总数
-  payable_count: number; // 需要结算的条目数（排除免费与已拥有）
-} // CartSummary 结束
-
-/** 结算单条结果：订单 / 即时解锁 / 跳过 */
-export interface CartCheckoutResult {
-  module_code: string; // 模块编码
-  kind: 'order' | 'unlocked' | 'skipped'; // 结果类型
-  order?: { id: string; status: string; currency: string; amount_minor: number; module_code: string; module_name: Record<string, string> }; // kind=order 时存在
-  entitlement_id?: string; // kind=unlocked 时存在
-  reason?: string; // kind=skipped 时的原因
-  points_spent?: number; // 本单实际消耗积分
-  points_deduct_cents?: number; // 积分折抵金额（分）
-  payable_cents?: number; // 抵扣后应付金额（分）
-} // CartCheckoutResult 结束
 // ---------- 部署汇总共享类型已于 2026-11-15 随公开页面下线移除（运维数据仅后台可见） ----------
 
 
@@ -443,8 +411,8 @@ export interface ShopOrder { // 商城订单
 
 // ---------- 统一交易域（commerce/orders）只读视图，与服务端 commerce/unified.ts 一一对应 ----------
 
-/** 统一订单来源产线：module 数字模块 / shop 实物卡密 / asset 付费资产 */
-export type UnifiedOrderSource = 'module' | 'shop' | 'asset';
+/** 统一订单来源产线：shop 实物卡密 / asset 付费资产 */
+export type UnifiedOrderSource = 'shop' | 'asset';
 
 export interface UnifiedOrderItem { // 统一订单明细行
   id: string; // 明细主键

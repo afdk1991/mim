@@ -6,16 +6,8 @@ import { ApiError, describeError, getAdminMe, loadCredential, saveCredential } f
 import type { AdminIdentity, Credential } from './api'; // 业务步骤
 // 通用异步加载钩子：统一 loading / error / reload
 import { useAsync } from './hooks'; // 业务步骤
-// 分类导航视图：两级分类树 CRUD（一级 19 + 二级 205）
-import { Categories } from './views/Categories'; // 业务步骤
-// 五个业务视图：概览、模块、权益、角色权限、用户
-import { Entitlements } from './views/Entitlements'; // 业务步骤
 // 登录页：无凭证时的唯一出口，被动退出提示也由它展示
 import { Login } from './views/Login'; // 业务步骤
-// 功能模块管理视图：模块状态流转
-import { Modules } from './views/Modules'; // 业务步骤
-// 商城订单视图：跨用户订单列表 + 人工结算
-import { Orders } from './views/Orders'; // 业务步骤
 // 概览视图：默认落地页，任何已登录身份可见
 import { Overview } from './views/Overview'; // 业务步骤
 // 角色与权限矩阵视图
@@ -39,7 +31,7 @@ import { PageBuilder } from './views/PageBuilder'; // 业务步骤
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'withdrawals' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'growthDm';
+type ViewKey = 'overview' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'withdrawals' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'growthDm';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -55,14 +47,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   // 概览：任何已登录身份都能看
   { key: 'overview', label: '概览', permission: null },
-  // 模块管理：需要读权限才展示
-  { key: 'modules', label: '功能模块', permission: 'module:read' },
-  // 分类导航：两级分类树维护，与模块同属 module:read 可见
-  { key: 'categories', label: '分类导航', permission: 'module:read' },
-  // 权益管理：需要读权限才展示
-  { key: 'entitlements', label: '权益管理', permission: 'entitlement:read' },
-  // 商城订单：人工结算入口，与权益管理同属 entitlement:read 可见
-  { key: 'orders', label: '商城订单', permission: 'entitlement:read' },
   // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
   { key: 'priceBatches', label: '批量改价', permission: 'commerce:write' },
   // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
@@ -222,14 +206,6 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
 function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity) { // 业务步骤
   // 概览：纯展示身份与权限统计
   if (key === 'overview') return <Overview identity={identity} />;
-  // 模块：状态流转，需要 module:write 才能点按钮
-  if (key === 'modules') return <Modules credential={credential} permissions={identity.permissions} />;
-  // 分类导航：两级分类树增删改查，写操作需 module:write
-  if (key === 'categories') return <Categories credential={credential} permissions={identity.permissions} />;
-  // 权益：发放与回收
-  if (key === 'entitlements') return <Entitlements credential={credential} permissions={identity.permissions} />;
-  // 商城订单：列表 + 人工结算
-  if (key === 'orders') return <Orders credential={credential} permissions={identity.permissions} />;
   // 角色与权限：角色 CRUD + 权限矩阵
   if (key === 'roles') return <Roles credential={credential} permissions={identity.permissions} />;
   // 用户：分页检索 + 角色授予撤销

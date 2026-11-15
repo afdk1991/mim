@@ -1,6 +1,6 @@
 -- 统一交易域（2026-11-14 P0-A 第 1 步）：只新增、不修改、不删除任何既有表。
--- 背景：项目里原本有三套并行交易（modules + module_orders / shop_products + shop_orders /
--- paid_assets + asset_purchases），订单无法联合查询、退款对账要写三段、购物车只覆盖模块线。
+-- 背景：项目里原本有多套并行交易（shop_products + shop_orders / paid_assets + asset_purchases），
+-- 订单无法联合查询、退款对账要写多段、购物车只覆盖单一产线。
 -- 本脚本建立标准五表（products / orders / order_items / payments / fulfillments），
 -- 由 src/commerce/unified.ts 在启动期回填历史数据；旧表与旧接口保持原样继续服务，
 -- 双写与读切换放到后续提交，保证这一步可以被随时回滚（删表即回到旧路径）。
@@ -9,7 +9,7 @@
 
 CREATE TABLE IF NOT EXISTS products ( -- 统一商品：三条商品线共用一张表，用 kind 区分
   id             TEXT PRIMARY KEY, -- 商品主键；历史回填时直接复用源表主键，避免二次映射
-  kind           TEXT NOT NULL CHECK (kind IN ('module','physical','card','asset')), -- 商品类型：功能模块 / 实物 / 卡密 / 付费资产
+  kind           TEXT NOT NULL CHECK (kind IN ('physical','card','asset')), -- 商品类型：实物 / 卡密 / 付费资产
   code           TEXT, -- 源表业务编码（模块 code / 商品 code / 资产 code），用于对外寻址
   title          TEXT NOT NULL, -- 展示名快照；多语言模块取 zh-CN 文案，取不到则回落 code
   price_cents    INTEGER NOT NULL DEFAULT 0 CHECK (price_cents >= 0), -- 当前售价（分）；0 表示免费
@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS products ( -- 统一商品：三条商品线共用一
   created_at     TEXT NOT NULL -- 首次落库时间（ISO 字符串，与全库时间口径一致）
 ); -- products 定义结束
 
-CREATE TABLE IF NOT EXISTS orders ( -- 统一订单：三套历史订单回填后共用该表
+CREATE TABLE IF NOT EXISTS orders ( -- 统一订单：各产线历史订单回填后共用该表
   id             TEXT PRIMARY KEY, -- 订单主键；回填时为 uo_<source>_<源主键>，保证可追溯
   user_id        TEXT NOT NULL REFERENCES users(id), -- 下单用户
-  source         TEXT NOT NULL CHECK (source IN ('module','shop','asset','community')), -- 来源产线：模块 / 实物 / 付费资产 / 社区付费阅读
-  source_id      TEXT NOT NULL, -- 源订单主键（module_orders.id / shop_orders.id / asset_purchases.id / community_purchases.id）
-  status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','delivered','refunded','cancelled')), -- 统一状态机，兼容三条产线的最大集合
+  source         TEXT NOT NULL CHECK (source IN ('shop','asset','community')), -- 来源产线：实物 / 付费资产 / 社区付费阅读
+  source_id      TEXT NOT NULL, -- 源订单主键（shop_orders.id / asset_purchases.id / community_purchases.id）
+  status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','delivered','refunded','cancelled')), -- 统一状态机，兼容各产线的最大集合
   channel        TEXT NOT NULL DEFAULT 'manual', -- 结算通道：manual / alipay / wechat / stripe / wallet
   currency       TEXT NOT NULL DEFAULT 'CNY', -- 结算币种（下单时快照）
   total_cents    INTEGER NOT NULL DEFAULT 0 CHECK (total_cents >= 0), -- 订单原价合计

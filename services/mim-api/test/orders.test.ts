@@ -1,4 +1,4 @@
-/** 契约测试：统一交易域 —— 三套历史订单回填、统一只读接口、跨用户隔离、回填幂等 */
+/** 契约测试：统一交易域 —— 两套历史订单回填、统一只读接口、跨用户隔离、回填幂等 */
 
 import { beforeEach, describe, expect, it } from 'vitest'; // vitest 编排：每例重建内存库
 import request from 'supertest'; // 进程内驱动 Express
@@ -28,13 +28,8 @@ async function newUser() {
 }
 
 describe('统一交易域：回填与只读视图', () => {
-  it('三套历史订单回填后，GET /orders 一次返回三条来源不同的订单', async () => {
+  it('两套历史订单回填后，GET /orders 一次返回两条来源不同的订单', async () => {
     const { token, userId } = await newUser(); // 建一个独立账号
-    const moduleRow = db.prepare('SELECT id, region FROM modules LIMIT 1').get() as { id: string; region: string }; // 取一个种子模块（模块表不带币种列，结算币种由下单快照决定）
-    db.prepare(
-      `INSERT INTO module_orders (id, user_id, module_id, region, currency, amount_minor, status, channel, created_at, updated_at, paid_at)
-       VALUES ('mo-test-1', ?, ?, ?, 'CNY', 1200, 'paid', 'alipay', '2026-11-01T00:00:00.000Z', '2026-11-01T00:01:00.000Z', '2026-11-01T00:01:00.000Z')`,
-    ).run(userId, moduleRow.id, moduleRow.region); // 模块线：已支付
     const shopRow = db.prepare('SELECT id, price_cents FROM shop_products LIMIT 1').get() as { id: string; price_cents: number }; // 取一个种子商品
     db.prepare(
       `INSERT INTO shop_orders (id, user_id, product_id, quantity, amount_cents, discount_cents, payable_cents, status, created_at, paid_at)
@@ -45,13 +40,13 @@ describe('统一交易域：回填与只读视图', () => {
       `INSERT INTO asset_purchases (id, user_id, asset_id, amount_cents, created_at)
        VALUES ('ap-test-1', ?, ?, ?, '2026-11-03T00:00:00.000Z')`,
     ).run(userId, assetRow.id, Math.max(assetRow.price_cents, 100)); // 资产线：无状态列
-    const first = backfillUnifiedCommerce(db); // 手动回填（启动期已跑过一次，但那时这三条还不存在）
-    expect(first.orders).toBe(3); // 三条各自写一笔订单
-    expect(first.items).toBe(3); // 三条各写一条明细
+    const first = backfillUnifiedCommerce(db); // 手动回填（启动期已跑过一次，但那时这两条还不存在）
+    expect(first.orders).toBe(2); // 两条各自写一笔订单
+    expect(first.items).toBe(2); // 两条各写一条明细
     const res = await request(app).get('/api/v1/commerce/orders').set('Authorization', `Bearer ${token}`); // 统一订单列表（分配置目标 /orders 已被商城占用）
     expect(res.status).toBe(200); // 登录后可读
-    expect(res.body.items).toHaveLength(3); // 三条都在
-    expect(res.body.items.map((item: { source: string }) => item.source).sort()).toEqual(['asset', 'module', 'shop']); // 来源产线完整
+    expect(res.body.items).toHaveLength(2); // 两条都在
+    expect(res.body.items.map((item: { source: string }) => item.source).sort()).toEqual(['asset', 'shop']); // 来源产线完整
     const delivered = res.body.items.find((item: { source: string }) => item.source === 'shop'); // 实物线那条
     expect(delivered.status).toBe('delivered'); // 状态原样保留，不被归一成 paid
     expect(delivered.items[0].title.length).toBeGreaterThan(0); // 商品名快照非空
@@ -60,17 +55,12 @@ describe('统一交易域：回填与只读视图', () => {
 
   it('source 过滤只回该产线订单；实物线履约展示字段从旧表只读回源，非法 source 回 400', async () => {
     const { token, userId } = await newUser(); // 建一个独立账号
-    const moduleRow = db.prepare('SELECT id, region FROM modules LIMIT 1').get() as { id: string; region: string }; // 取一个种子模块
-    db.prepare(
-      `INSERT INTO module_orders (id, user_id, module_id, region, currency, amount_minor, status, channel, created_at, updated_at, paid_at)
-       VALUES ('mo-filter-1', ?, ?, ?, 'CNY', 1200, 'paid', 'alipay', '2026-11-01T00:00:00.000Z', '2026-11-01T00:01:00.000Z', '2026-11-01T00:01:00.000Z')`,
-    ).run(userId, moduleRow.id, moduleRow.region); // 模块线：已支付
     const shopRow = db.prepare('SELECT id, price_cents FROM shop_products LIMIT 1').get() as { id: string; price_cents: number }; // 取一个种子商品
     db.prepare(
       `INSERT INTO shop_orders (id, user_id, product_id, quantity, amount_cents, discount_cents, payable_cents, status, delivery_kind, delivered_content, created_at, paid_at)
        VALUES ('so-filter-1', ?, ?, 1, ?, 0, ?, 'delivered', 'virtual_auto', 'CARD-KEY-2026', '2026-11-02T00:00:00.000Z', '2026-11-02T00:00:30.000Z')`,
     ).run(userId, shopRow.id, shopRow.price_cents, shopRow.price_cents); // 实物线：带发货方式与卡密说明
-    backfillUnifiedCommerce(db); // 启动期回填（这两条在首次启动后才插入，需手动补回填）
+    backfillUnifiedCommerce(db); // 启动期回填（这条在首次启动后才插入，需手动补回填）
     const shopOnly = await request(app).get('/api/v1/commerce/orders?source=shop').set('Authorization', `Bearer ${token}`); // 只取实物线
     expect(shopOnly.status).toBe(200); // 登录后可读
     expect(shopOnly.body.items).toHaveLength(1); // 只剩实物线一笔
@@ -78,10 +68,6 @@ describe('统一交易域：回填与只读视图', () => {
     expect(shopOnly.body.items[0].delivery_kind).toBe('virtual_auto'); // 发货方式从旧表只读回源
     expect(shopOnly.body.items[0].delivered_content).toBe('CARD-KEY-2026'); // 卡密说明从旧表只读回源
     expect(shopOnly.body.items[0].product_code).not.toBeNull(); // 商品编码来自统一商品表
-    const moduleOnly = await request(app).get('/api/v1/commerce/orders?source=module').set('Authorization', `Bearer ${token}`); // 只取模块线
-    expect(moduleOnly.status).toBe(200); // 可读
-    expect(moduleOnly.body.items).toHaveLength(1); // 只剩模块线一笔
-    expect(moduleOnly.body.items[0].source).toBe('module'); // 产线标记正确
     const bad = await request(app).get('/api/v1/commerce/orders?source=bogus').set('Authorization', `Bearer ${token}`); // 非法产线值
     expect(bad.status).toBe(400); // 显式拒绝，不静默放宽过滤
     expect(bad.body.code).toBe('VALIDATION_FAILED'); // 统一校验错误信封

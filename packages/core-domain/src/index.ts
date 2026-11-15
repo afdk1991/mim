@@ -9,9 +9,3 @@ export * from './errors.js';
 export * from './ids.js';
 // 聚合导出部署汇总注册表：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常 / 汇总统计，前后端共用同一数据源
 export * from './deploymentRegistry.js';
-// 聚合导出模块商城分类树与筛选项：19 个一级分类 / 205 个二级条目 / 48 项许可 / 87 种语言 / 排序枚举，服务端种子与前端导航共用
-export * from './catalogTaxonomy.js';
-// 聚合导出「模块 = 真实能力」清单：能力键 / 绑定模块编码 / 输入提示 / 输出形态，服务端 handler 与前端工具面板共用
-export * from './moduleCapabilities.js';
-// 聚合导出「模块起盘蓝图」：143 条软件方向模块的交付定义（目标/技术栈/起步代码）与 17 个分组输出模板
-export * from './blueprints/index.js';

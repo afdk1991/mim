@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 // 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 支付回跳深链接页
 export type AppView =
-  | 'account' // 个人中心（资料 / 权益 / 订单 / 购物车 / 账号与设置）
+  | 'account' // 个人中心（资料 / 账号与设置）
   | 'community' // 社区与变现（论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
   | 'chat' // IM 聊天 + 视频通话
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
@@ -20,7 +20,7 @@ export interface AppRoute {
 // 对外地址一律为 https://<域名>/<模块功能名>，与 App.tsx 导航文案一一对应，
 // 不再使用与功能名对不上的缩写段；已下线模块不再登记路径段，访问时按未知路径回落社区。
 export const VIEW_SEGMENTS: Record<AppView, string> = {
-  account: 'account', // 个人中心（资料 / 权益 / 订单 / 购物车 / 账号与设置；原独立购物车页已并入）
+  account: 'account', // 个人中心（资料 / 账号与设置）
   community: 'community', // 社区与变现（论坛 + 公告动态 + 知识付费 + VIP + 钱包 + 独立商城）
   chat: 'chat', // 聊天（原名即功能名，保持不变）
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
@@ -42,19 +42,17 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   login: 'login', // 旧：登录 → signin
   profile: 'account', // 旧口径：个人中心 → account（新增视图同时兼容曾用名）
   settings: 'account', // 旧：独立「设置」页已并入个人中心，旧链接落到 /account，不再保留空设置页
+  cart: 'account', // 2026-11-15 购物车随模块商城删除：旧链接落到 /account，不再保留空购物车页
   forum: 'community', // 旧口径：论坛 / 社区 → community（同一视图的曾用名）
   announcements: 'community', // 2026-11-15 公告动态并入社区：旧链接原地改写为 /community（生产 nginx 另有 301）
   news: 'community', // 2026-11-15 资讯内容流并入社区「公告动态 → 社区动态」页签，旧链接原地改写为 /community
   releases: 'community', // 2026-11-15 版本记录并入社区「公告动态 → 更新日志」页签，旧链接原地改写为 /community
-  cart: 'account', // 2026-11-15 购物车并入个人中心，旧链接改写为 /account?tab=cart（见 LEGACY_QUERY）
   deployments: 'community', // 2026-11-15 部署汇总属运维内部信息，公开页面下线，旧链接原地回落到社区
 }; // 代码块结束
 
 // 旧地址需要落到「带参数的页签」时的补充查询串：目标视图本身不带子路径，
 // 仅靠 LEGACY_SEGMENTS 会落到个人中心首页签，故单独登记查询串，与原有查询串合并。
-const LEGACY_QUERY: Readonly<Record<string, string>> = {
-  cart: 'tab=cart', // 购物车页签：保证 /cart 直接打开购物车而不是资料页
-}; // 代码块结束
+const LEGACY_QUERY: Readonly<Record<string, string>> = {}; // 当前无需要补页签参数的旧地址
 
 // 全部视图均为单段路径（如 /community），保证 vite base './' 下相对资源解析正确
 const VIEWS: AppView[] = Object.keys(VIEW_SEGMENTS) as AppView[]; // 视图全集：由映射表派生的唯一真源
@@ -131,7 +129,7 @@ function resolveSegment(seg: string): AppView | null {
   if (!legacy) return null; // 未知段：交给调用方回退
   // 旧段命中：改写为新路径，查询串与 hash 原样保留（不丢 ?tads 清理后的其他参数）
   const search = window.location.search; // 原查询串（含前导问号；可能为空）
-  const legacyQuery = LEGACY_QUERY[seg]; // 需要补的页签参数（如 cart → tab=cart）
+  const legacyQuery = LEGACY_QUERY[seg]; // 需要补的页签参数（如旧页签别名 → tab=...）
   const qs = legacyQuery ? `?${legacyQuery}${search ? `&${search.slice(1)}` : ''}` : search; // 页签参数优先，原参数顺延
   const target = baseOf() + VIEW_SEGMENTS[legacy] + qs + window.location.hash;
   window.history.replaceState(null, '', target); // 原地替换，不新增浏览历史
@@ -145,7 +143,7 @@ export function parseLocation(): AppRoute {
   const hashSeg = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)[0] ?? ''; // hash 首段
   if (hashSeg) { // 存在旧 hash 路径
     const hashView = VIEWS.find((v) => v === hashSeg) ?? LEGACY_SEGMENTS[hashSeg] ?? null; // hash 段既可能是新视图名，也可能是旧段别名
-    const hashQuery = hashView && LEGACY_QUERY[hashSeg] ? `?${LEGACY_QUERY[hashSeg]}` : ''; // 旧段需带页签参数（如 #/cart）
+    const hashQuery = hashView && LEGACY_QUERY[hashSeg] ? `?${LEGACY_QUERY[hashSeg]}` : ''; // 旧段需要补页签参数的情况
     // 已知视图落到其新路径，已删除的旧页面统一回退社区
     const target = baseOf() + VIEW_SEGMENTS[hashView ?? 'community'] + hashQuery;
     window.history.replaceState(null, '', target); // 原地改写为路径形式，不新增历史记录

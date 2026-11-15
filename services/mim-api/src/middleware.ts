@@ -107,7 +107,6 @@ const FORCE_LOGIN_PUBLIC_PREFIXES = [ // 前缀匹配：整条登录链路保持
 
 const PAYMENT_NOTIFY_PATHS = [ // 第三方异步通知必须免登录：渠道服务端没有用户令牌，只能靠签名验真
   /^\/api\/v1\/payments\/[a-z0-9_]+\/notify$/, // 扩展渠道：微信 / 支付宝 / 沙箱 / 虎皮椒 / 讯虎等
-  /^\/api\/v1\/orders\/[^/]+\/payment-notify$/, // 商城订单回调：HMAC-SHA256 + 时间戳防重放
 ]; // 回调路径集合结束
 
 /**
@@ -120,9 +119,6 @@ const ANONYMOUS_READ_PATHS = new Set<string>([ // 精确匹配的公开读接口
   '/api/v1/community/overview', // 社区首页聚合：板块 / 统计 / 公开会员信息
   '/api/v1/community/boards', // 板块列表
   '/api/v1/community/threads', // 帖子列表
-  '/api/v1/taxonomy', // 站点分类树（公开元数据）
-  '/api/v1/modules', // 模块目录（公开）
-  '/api/v1/modules/hot', // 热门模块（公开）
   '/api/v1/vip/plans', // VIP 套餐（公开定价）
   '/api/v1/vip/prices', // VIP 分级定价规则（公开）
   '/api/v1/shop/products', // 独立商城商品列表（公开）
@@ -136,7 +132,6 @@ const ANONYMOUS_READ_PATHS = new Set<string>([ // 精确匹配的公开读接口
 const ANONYMOUS_READ_PATTERNS = [ // 带路径参数的公开读接口
   /^\/api\/v1\/community\/boards\/[^/]+\/tabs$/, // 板块自定义页签
   /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
-  /^\/api\/v1\/modules\/[^/]+$/, // 单个模块详情
   /^\/api\/v1\/pages\/[^/]+$/, // 站点自定义页面
 ]; // 匿名可读正则集合结束
 
@@ -247,63 +242,6 @@ export function idempotency(req: Request, res: Response, next: NextFunction): vo
   next(); // 占位成功，进入业务处理
 } // idempotency 结束
 
-interface ModuleRow { // 模块查询结果结构
-  id: string; // 模块主键，权益表按此关联
-  code: string; // 模块业务编码，如 comic.workbench
-  status: 'draft' | 'active' | 'archived'; // 模块状态，仅 active 可售卖与解锁
-} // ModuleRow 结束
-
-interface EntitlementRow { // 权益查询结果结构
-  id: string; // 权益主键
-  status: string; // 权益状态，当前已过滤为 active
-  expires_at: string | null; // 过期时间；null 表示长期有效
-} // EntitlementRow 结束
-
-/**
- * 功能模块解锁门禁（07 §12.1）：用户须在所属区域持有该模块的有效权益。
- * 模块缺失 / 非 active / 无有效权益统一返回 FEATURE_NOT_AVAILABLE(403)，
- * 不泄漏「模块存在但未购买」与「模块不存在」的差异。
- */
-export function requireEntitlement(moduleCode: string) { // 高阶中间件工厂：按模块编码生成门禁
-  return (req: Request, _res: Response, next: NextFunction): void => { // 返回实际执行的中间件
-    const user = req.user; // 依赖前置 requireAuth 注入的用户
-    if (!user) throw new AppError('AUTH_UNAUTHORIZED', 'entitlement check requires an authenticated user'); // 未登录无法判定权益，直接 401
-    const now = req.deps.now ? req.deps.now() : new Date().toISOString(); // 取当前时间（可注入时钟），用于权益过期判断
-
-    const moduleRow = req.deps.db // 在本区查找该模块
-      .prepare( // 准备查询语句
-        // 说明：按「编码 + 区域」定位未删除的模块，避免跨区误放行
-        `SELECT id, code, status FROM modules
-         WHERE code = ? AND region = ? AND deleted_at IS NULL`, // 条件：编码匹配、区域匹配、未被软删除
-      ) // prepare 调用结束
-      .get(moduleCode, user.region) as ModuleRow | undefined; // 绑定编码与用户区域
-    if (!moduleRow || moduleRow.status !== 'active') { // 模块不存在或未上架
-      throw new AppError('FEATURE_NOT_AVAILABLE', 'feature module is not available', { // 403 且不区分「不存在」与「未购买」
-        module_code: moduleCode, // 回传模块编码，便于前端提示
-        region: user.region, // 回传区域，便于排查是否跨区访问
-      }); // 异常构造结束
-    } // 模块可用性校验结束
-
-    const entitlement = req.deps.db // 查询该用户对该模块的有效权益
-      .prepare( // 准备查询语句
-        // 说明：只取未过期的 active 权益，并取最新一条
-        `SELECT id, status, expires_at FROM entitlements
-         WHERE user_id = ? AND module_id = ? AND status = 'active'
-           AND (expires_at IS NULL OR expires_at > ?)
-         ORDER BY created_at DESC
-         LIMIT 1`, // 条件：本人 + 该模块 + 已生效未过期；按创建时间倒序取最近一条
-      ) // prepare 调用结束
-      .get(user.id, moduleRow.id, now) as EntitlementRow | undefined; // 绑定用户 ID、模块主键与当前时间
-    if (!entitlement) { // 无有效权益即拒绝
-      throw new AppError('FEATURE_NOT_AVAILABLE', 'feature module is not unlocked', { // 与模块缺失使用同一错误码，避免信息泄露
-        module_code: moduleCode, // 回传模块编码
-        region: user.region, // 回传区域
-      }); // 异常构造结束
-    } // 权益校验结束
-
-    next(); // 校验通过，进入业务处理
-  }; // 中间件函数结束
-} // requireEntitlement 结束
 
 /**
  * 超管引导令牌校验（`x-admin-token` vs `MIM_ADMIN_TOKEN`）。

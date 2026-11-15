@@ -1253,7 +1253,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       {!loading && tab === 'shop' && (
         <div className="community-shop">{/* 执行当前业务步骤 */}
           <div className="community-section-head">{/* 执行当前业务步骤 */}
-            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码；与「商城」（功能模块商城）是两条独立商品线。</p></div>
+            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div>
           </div>
           <div className="community-shop-grid">{/* 执行当前业务步骤 */}
             {products.map((p) => (

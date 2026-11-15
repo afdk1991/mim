@@ -381,7 +381,7 @@ describe('管理端权限点：content:write 与 appearance:write 兼容期', ()
 
   it('两者都没有的用户返回 403', async () => { // 调用 it 并处理其返回结果
     const { app, deps } = setup(); // 执行当前业务步骤
-    const token = tokenWithPermissions(deps, ['module:read']); // 只读权限，不含内容运营
+    const token = tokenWithPermissions(deps, ['user:read']); // 只读权限，不含内容运营
     const res = await request(app).get('/api/v1/admin/content/announcements').set('Authorization', `Bearer ${token}`); // 常量 res：保存固定配置或一次性派生值
     expect(res.status).toBe(403); // 调用 expect 并处理其返回结果
     expect(res.body.code).toBe('FORBIDDEN'); // 调用 expect 并处理其返回结果

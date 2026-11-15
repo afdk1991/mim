@@ -44,8 +44,8 @@ describe('强制登录总开关', () => {
 
 describe('业务接口门禁（MIM_FORCE_LOGIN=1）', () => {
   it('匿名可读公开接口，写操作与私密读仍 401', async () => {
-    const modules = await request(guarded).get('/api/v1/modules');
-    expect(modules.status).toBe(200); // 公开目录匿名可读
+    const products = await request(guarded).get('/api/v1/shop/products');
+    expect(products.status).toBe(200); // 独立商城商品匿名可读
 
     const boards = await request(guarded).get('/api/v1/community/boards');
     expect(boards.status).toBe(200); // 板块列表匿名可读
@@ -63,9 +63,6 @@ describe('业务接口门禁（MIM_FORCE_LOGIN=1）', () => {
 
     const like = await request(guarded).post('/api/v1/community/threads/t_1/like').send({});
     expect(like.status).toBe(401); // 读详情的路径 + 写方法 → 仍被拦住
-
-    const cart = await request(guarded).get('/api/v1/cart');
-    expect(cart.status).toBe(401); // 购物车属私密读
 
     const me = await request(guarded).get('/api/v1/me');
     expect(me.status).toBe(401); // 个人中心属私密读
@@ -98,8 +95,8 @@ describe('业务接口门禁（MIM_FORCE_LOGIN=1）', () => {
 
   it('MIM_FORCE_LOGIN=0 时恢复匿名读', async () => {
     const open = createApp({ db, jwtSecret: JWT_SECRET, env: OPEN_ENV });
-    const modules = await request(open).get('/api/v1/modules');
-    expect(modules.status).toBe(200); // 旧模型下公开目录仍可读
+    const products = await request(open).get('/api/v1/shop/products');
+    expect(products.status).toBe(200); // 旧模型下公开商品仍可读
   });
 });
 
@@ -109,10 +106,6 @@ describe('支付回调免登录', () => {
     expect(res.status).not.toBe(401); // 未被门禁拦下；具体错误由回调自身验签决定
   });
 
-  it('商城订单回调不要求登录', async () => {
-    const res = await request(guarded).post('/api/v1/orders/ord_1/payment-notify').send({});
-    expect(res.status).not.toBe(401); // 未配置密钥时返回 503，同样证明门禁已放行
-  });
 });
 
 describe('后台豁免与管理员身份单独校验', () => {
@@ -127,7 +120,7 @@ describe('后台豁免与管理员身份单独校验', () => {
     expect(res.status).toBe(200);
     expect(res.body.bootstrap).toBe(true);
     expect(res.body.roles).toContain('superadmin');
-    expect(res.body.permissions.length).toBe(13); // 与 RBAC_PERMISSIONS 一致（含 messaging:write）
+    expect(res.body.permissions.length).toBe(8); // 与 RBAC_PERMISSIONS 一致（模块商城 4 个权限点已删除）
   });
 
   it('超管可手工建号：指定标识 / 初始口令 / 角色，建完即可登录', async () => {

@@ -5,8 +5,8 @@ import { request } from './api'; // 统一请求层（含凭证注入与错误�
 
 // ── 批量改价（商业化三期）────────────────────────────────────────────────
 
-/** 调价目标：功能模块或独立商城商品 */
-export type PriceBatchTarget = 'module' | 'shop_product'; // 业务步骤
+/** 调价目标：独立商城商品 */
+export type PriceBatchTarget = 'shop_product'; // 业务步骤
 /** 调价模式：固定价 / 百分比 / 固定金额 */
 export type PriceBatchMode = 'fixed' | 'percent' | 'amount'; // 业务步骤
 /** 调价方向：固定 / 上调 / 下调 */
@@ -14,10 +14,6 @@ export type PriceBatchDirection = 'set' | 'increase' | 'decrease'; // 业务步�
 
 /** 批量改价筛选条件：全部可选，后端按在售集合取交集 */
 export interface PriceBatchFilter { // 业务步骤
-  // 仅模块：区域
-  region?: string;
-  // 仅模块：一级或二级分类 slug
-  category_slug?: string;
   // 显式目标编码清单
   codes?: string[];
   // 是否纳入下架 / 归档目标

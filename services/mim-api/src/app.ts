@@ -5,11 +5,9 @@ import cors from 'cors'; // 跨域中间件，托管平台以独立域名直连 
 import type { Express, NextFunction, Request, Response } from 'express'; // 仅类型引用，用于给工厂与中间件签名标注
 import { createAuthRouter } from './routes/auth.js'; // 公开鉴权路由：验证码 / 登录 / 刷新
 import { createOAuthRouter } from './routes/oauth.js'; // 第三方登录：授权 / 回调 / 票据兑换 / 绑定解绑
-import { createCatalogRouter } from './routes/catalog.js'; // 商城路由：模块列表公开，权益接口内部鉴权
 import { createImRouter } from './routes/im.js'; // 即时通讯：会话/消息/用户搜索，需登录
 import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内部统一 requireAuth
 import { createWalletWithdrawalRouter } from './routes/wallet-withdrawals.js'; // 提现分成：可提现余额 / 申请 / 审核 / 到账（钱包结算层）
-import { createCartRouter } from './routes/cart.js'; // 商城购物车：加购与结算（内部统一 requireAuth + 写操作幂等）
 import { createCommunityRouter } from './routes/community.js'; // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
 import { createAssetsRouter } from './routes/assets.js'; // 付费资产：付费阅读 / 下载 / 图库 / 视频的浏览、解锁与分成（社区页依赖）
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
@@ -141,9 +139,6 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createFederationRouter(resolved)); // 联邦 OIDC：status/login 公开，callback 兑换后回跳票据
   app.use('/api/v1', createVipPricingRouter(resolved)); // VIP 定价规则只读查询，公开
 
-  // 商城路由：GET /modules 公开；POST /entitlements + GET /me/entitlements 内部 requireAuth
-  app.use('/api/v1', createCatalogRouter(resolved)); // 公开与受保护端点混装，鉴权下沉到 router 内部按路径处理
-
   // 部署汇总路由：三个端点全部公开只读，不查业务表、不提供写操作
   app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
   app.use('/api/v1', createContentUnifiedRouter(resolved)); // 统一内容与消息只读：/content/items 公开，/messaging/* 需登录
@@ -162,8 +157,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
     createMeRouter(resolved), // /me 前缀：个人资料、设置、注销
     createMediaRouter(resolved), // media 控制面：预签名（聊天/社区附件上传均依赖）
     createImRouter(resolved), // IM 即时通讯：会话列表/消息历史/用户搜索/已读
-    createCartRouter(resolved), // 商城购物车：加购 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单）
-    createAppearanceRouter(resolved), // 外观：site/config 与 pages 仍被购物车 / 社区页面区块使用
+    createAppearanceRouter(resolved), // 外观：site/config 与 pages 仍被社区页面区块使用
     createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
     createAssetsRouter(resolved), // 付费资产：付费阅读 / 下载 / 图库 / 视频的浏览、解锁与分成（社区页依赖，保留）
     createCirclesRouter(resolved), // 圈子：成员制社群（圈主 / 审核 / 成员上限 / 圈内动态与公告），与板块并存

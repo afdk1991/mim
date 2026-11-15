@@ -1,8 +1,7 @@
 /**
- * 统一交易域（2026-11-14 P0-A 第 1 步）：启动期把三套并行订单回填成一套，并提供统一只读查询。
+ * 统一交易域（2026-11-14 P0-A 第 1 步）：启动期把并行订单回填成一套，并提供统一只读查询。
  *
  * 现状（诊断文档 §1.1）：
- *   - 数字模块：module_orders + cart_items + entitlements
  *   - 实物 / 卡密：shop_products + shop_orders + shipments
  *   - 付费资产：paid_assets + asset_purchases
  *   - 社区付费阅读：community_threads.price_cents + community_purchases（2026-11-15 起直写本域）
@@ -11,14 +10,14 @@
  * 本文件边界（有意做小）：
  *   1. 回填幂等（UNIQUE(source, source_id) 保证重复启动不加行），并提供只读查询；
  *   2. 旧表与旧接口原样服务，不做读切换；社区付费阅读是本域第一条直写产线（扣费 / 解锁 / 落单同一事务），
- *      其余三条仍待逐条搬写路径；
+ *      其余两条仍待逐条搬写路径；
  *   3. 任何时刻删掉 50-unified-commerce.sql 建的五张表即可回到旧路径，回滚成本为零。
  */
 
 import type { Db } from '../types.js'; // 数据库类型（better-sqlite3 同步句柄）
 
 /** 统一订单来源产线：迁移期用于区分历史来源与后续写路径 */
-export type UnifiedOrderSource = 'module' | 'shop' | 'asset' | 'community';
+export type UnifiedOrderSource = 'shop' | 'asset' | 'community';
 
 /** 统一订单明细行 */
 export interface UnifiedOrderItem {
@@ -117,29 +116,7 @@ export function backfillUnifiedCommerce(db: Db, now: string = new Date().toISOSt
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ); // 明细行插入：主键固定为 uoi_<source>_<源主键>，重复启动不会加行
 
-  // ---- 产线一：数字功能模块（module_orders 联 modules 取编码与多语言名） ----
-  const moduleRows = db
-    .prepare(
-      `SELECT o.id AS id, o.user_id AS user_id, o.module_id AS product_id, m.code AS product_code,
-              m.name_i18n AS product_name, o.amount_minor AS amount_cents, 0 AS discount_cents,
-              o.amount_minor AS payable_cents, o.status AS status, o.channel AS channel,
-              o.currency AS currency, o.created_at AS created_at, o.paid_at AS paid_at
-         FROM module_orders o LEFT JOIN modules m ON m.id = o.module_id`,
-    )
-    .all() as Array<SourceOrderRow & { product_name: string | null }>; // 模块线：金额字段为 amount_minor
-  for (const row of moduleRows) { // 逐行回填
-    const source: UnifiedOrderSource = 'module'; // 标记来源产线
-    const status = normalizeStatus(row.status); // 状态归一
-    const productTitle = titleOf(row.product_name, row.product_code ?? row.product_id); // 多语言名 → 编码 → 主键
-    const productRun = insertProduct.run(row.product_id, 'module', row.product_code, productTitle, row.amount_cents, row.currency, '{}', row.created_at); // 商品行
-    result.products += productRun.changes; // 统计新写入
-    const orderRun = insertOrder.run(`uo_${source}_${row.id}`, row.user_id, source, row.id, status, row.channel, row.currency, row.amount_cents, 0, row.payable_cents, row.created_at, row.paid_at); // 订单行
-    result.orders += orderRun.changes; // 统计新写入
-    const itemRun = insertItem.run(`uoi_${source}_${row.id}`, `uo_${source}_${row.id}`, row.product_id, productTitle, 1, row.amount_cents, '{"delivery":"entitlement"}'); // 明细行
-    result.items += itemRun.changes; // 统计新写入
-  }
-
-  // ---- 产线二：实物 / 卡密（shop_orders 联 shop_products 取名与类型） ----
+  // ---- 产线一：实物 / 卡密（shop_orders 联 shop_products 取名与类型） ----
   const shopRows = db
     .prepare(
       `SELECT o.id AS id, o.user_id AS user_id, o.product_id AS product_id, p.code AS product_code,

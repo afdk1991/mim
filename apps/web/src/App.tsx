@@ -26,7 +26,7 @@ import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './ap
 import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或本地模块绑定
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
-const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（含购物车页签）
+const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
 const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
 const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
@@ -245,14 +245,14 @@ export function App() {
   // 内置导航项：顺序即展示顺序；后台配置的 nav_items 按 view 覆盖文案 / 显隐，未覆盖的内置项原样保留。
   // 2026-11-13 导航收口（16 项一级 → 12 项平铺，无分组标题）：把「同一件事的第二个入口」收进上级，
   // 页面与路由全部保留（直链 / 搜索 / 站内跳转仍可达），只是不再各占一行侧栏。
-  // 2026-11-15 侧栏收口：社区 · 聊天 · 个人中心 · 社区资讯 · 版本（公告动态并入社区页签，购物车并入个人中心页签）。
+  // 2026-11-15 侧栏收口：社区 · 聊天 · 个人中心 · 社区资讯 · 版本（公告动态并入社区页签）。
   // hidden 项是「已并入上级」的二级入口，页面保留但不上侧栏。
   const navDefaults: Array<{ view: AppView; label: string; hidden?: boolean }> = [
     // 社区：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区' },
     // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
-    // 个人中心：资料 / 权益 / 订单 / 购物车 / 账号与设置
+    // 个人中心：资料 / 账号与设置
     { view: 'account', label: locale === 'en-US' ? 'Account' : '个人中心' },
     // 圈子（原一级入口）：成员制社群，已并入社区页的「圈子」板块 → hidden
     { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子', hidden: true },
@@ -378,7 +378,7 @@ export function App() {
         )}
         {/* Suspense 边界：懒加载视图独立 chunk，加载期展示统一占位，不阻塞骨架 */}
         <Suspense fallback={<div className="page hint">{locale === 'en-US' ? 'Loading…' : '加载中…'}</div>}>
-        {/* 个人中心：资料 / 权益 / 订单 / 购物车 / 账号安全，仅正式账号渲染 */}
+        {/* 个人中心：资料 / 账号安全，仅正式账号渲染 */}
         {route.view === 'account' && authedSession && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
