@@ -44,6 +44,8 @@
 
 > **现行状态覆盖（2026-11-15，生产入口迁移至 laal.top）**：本段覆盖 §0 基线表及 2026-11-14 覆盖段中「Mim 当前无对外生产终点」的过时口径（原文按铁律三保留，不得再当作现状引用）。生产**唯一权威终点**已由 `mim.mixm.top` 迁至 **`https://laal.top`**（API `https://api.laal.top`，管理后台 `https://laal.top/admin/`）；旧 `mim.mixm.top` 已无 Mim 部署，现仅配置 301 → `laal.top`。§12.3、§13 表与 V2–V4 取证目标均以本段为准。
 >
+> **现行状态覆盖（2026-11-15，收尾：鉴权门禁重写 + 死文件清理）**：① `scripts/verify-auth-gate.mjs` 已按现行口径重写 —— 匿名可读路径必须 200、写操作必须 401、注册已关闭（`AUTH_REGISTER_DISABLED` 403）、`POST /api/v1/auth/guest` 必须不存在（404）、后台 RBAC 边界不受影响（无凭证 401）、深链接与刷新可用；校验方式为「静态断言 + tsx 进程内启动真实 API 的内存库实测」双层，**90/90 通过**，并已用「临时改坏白名单 → 88/90 失败 → 还原 → 90/90」实证其能抓到回退。原「访客自动建号」「商城解锁」相关的全部断言已删除，**不保留任何旧口径作为门禁**。② 死文件已删除（全仓确认无引用）：`apps/web/src/components/ShareCard.tsx`、`apps/web/src/lib/player.ts`、`apps/web/src/lib/share.ts`、`apps/admin/src/views/ShopCards.tsx`、`apps/admin/src/views/ShopCoupons.tsx`、`apps/admin/src/views/ShopProducts.tsx`。③ `apps/admin/src/api-shop-admin.ts` **保留**：仍被在途的「发货与售后」功能 `apps/admin/src/views/Shipments.tsx` 及 `apps/admin/src/api.ts` 的 `export * from './api-shop-admin'` 引用，待该功能合入后再评估删除。④ 本文件下方 §9 与 L1351 等历史段落中提及上述文件的描述均为各轮交付快照，按铁律三原样保留，**不得再当作现状引用**。
+>
 按用户「全项目全面检查与修复」指令，做了三类**可逆**修复——① 把误删的 23 个部署工件从 HEAD 恢复到工作树（`git checkout -- .`）；② 把部署注册表里「工作树缺失」的过时口径改为「已恢复」并重生成核对表（`WORKTREE_ARTIFACT_*_RESTORED`）；③ 修正 `render.yaml`（蓝图 schema 由非法的 `static_sites:` 改为 `services: - type: web / runtime: static`，并补 `routes` 深链接回退）与 `azure-static-web-apps.yml`（补 `staticwebapp.config.json` 回退注入）。**不改任何铁律的约束语义**，未做 `git add / commit / push`、未删除任何文件、未触发任何线上部署。
 >
 > **2026-11-09 18:08 补充**：按用户指令新增铁律十二（远程仓库全量同步 + 生产统一部署腾讯云自建服务器），并全量删除原候选托管平台的全部相关内容；原铁律一～十一的编号 / 标题 / 约束语义仍未改动，规则变更的同步清单见 §12.5。2026-11-09 18:50 按用户指令将项目名称统一为 **Mim**，全仓名称口径一致。
