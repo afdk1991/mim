@@ -47,29 +47,47 @@ code { /* 行内代码/令牌展示 */
 .layout { /* 应用整体两栏布局 */
   display: grid; /* 栅格布局便于固定侧边栏 + 自适应内容区 */
   grid-template-columns: 232px minmax(0, 1fr); /* 左栏固定 232px，右栏 minmax(0,1fr) 防止内容撑破 */
+  grid-template-rows: 1fr auto; /* 内容区占满剩余高度，页脚贴底 */
   min-height: 100%; /* 至少铺满视口，内容不足时也不留白底 */
 } /* 布局容器结束 */
 
-.sidebar { /* 左侧导航栏 */
+.sidebar { /* 左侧导航栏：浅色表面，吸顶常驻 */
+  position: sticky; /* 内容滚动时导航不动，模块入口始终可达 */
+  top: 0; /* 吸顶位置 */
+  grid-row: 1 / -1; /* 跨满内容区与页脚两行，边界一直到底 */
   display: flex; /* 纵向 flex 便于把用户区推到底部 */
   flex-direction: column; /* 品牌 → 导航 → 用户区自上而下排列 */
-  gap: 24px; /* 三大区块之间的呼吸空间 */
-  padding: 24px 18px; /* 上下留白大于左右，突出纵向分区 */
-  background: var(--sidebar); /* 深色底与内容区区分 */
-  color: var(--sidebar-strong); /* 深底上的浅色文字，保证对比度 */
+  gap: 22px; /* 三大区块之间的呼吸空间 */
+  height: 100vh; /* 固定一屏高，内部独立滚动 */
+  padding: 22px 14px 16px; /* 左右收紧，纵向留白保持一致 */
+  overflow-y: auto; /* 导航项超出时内部滚动，不影响内容区 */
+  background: var(--nav-bg); /* 浅色导航底：与内容区同族表面，靠描边分界 */
+  border-right: 1px solid var(--nav-line); /* 右侧细线替代深色块对比 */
+  color: var(--nav-text); /* 导航常规文字 */
 } /* 侧边栏结束 */
 
 .brand { /* 品牌区：2026-11-10 起只承载应用名 */
-  display: flex; /* 品牌区保持纵向 flex，后续若要再加一行副标题无需改结构 */
-  flex-direction: column; /* 纵向排列，当前仅一项 */
-  gap: 2px; /* 行间距 2px，与既有视觉一致 */
+  display: flex; /* 标记与文字横向排列 */
+  flex-direction: row; /* 横向排布 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 标记与文字间距 */
   padding: 0 6px; /* 与导航按钮文字左对齐的微调 */
 } /* 品牌区结束 */
 
+.brand::before { /* 品牌标记：主色圆角方块，替代深色栏的品牌锚点 */
+  content: ''; /* 伪元素需要内容占位 */
+  flex: 0 0 auto; /* 固定尺寸不参与伸缩 */
+  width: 26px; /* 标记宽度 */
+  height: 26px; /* 标记高度 */
+  border-radius: var(--radius-sm); /* 与控件同族圆角 */
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover)); /* 主色渐变，作为唯一高饱和点缀 */
+} /* 品牌标记结束 */
+
 .brand-name { /* 应用名 */
-  font-size: var(--fs-xl); /* 作为视觉锚点，明显大于正文 */
+  color: var(--nav-strong); /* 导航内最重的文字档 */
+  font-size: var(--fs-lg); /* 比正文大一档，作为品牌锚点 */
   font-weight: 700; /* 加粗强化品牌识别 */
-  letter-spacing: 0.02em; /* 轻微字距，提升大写/短词的精致度 */
+  letter-spacing: 0.01em; /* 轻微字距，提升短词的精致度 */
 } /* 应用名结束 */
 
 /* 应用标语样式已于 2026-11-10 随标语文案一并删除（品牌区仅保留应用名） */
@@ -77,27 +95,31 @@ code { /* 行内代码/令牌展示 */
 .nav { /* 导航按钮容器 */
   display: flex; /* 按钮纵向堆叠 */
   flex-direction: column; /* 一项一行，阅读顺序与展示顺序一致 */
-  gap: 4px; /* 按钮间距小而紧凑 */
+  gap: 2px; /* 按钮间距小而紧凑 */
 } /* 导航容器结束 */
 
 .nav-item { /* 单个导航按钮 */
-  padding: 9px 12px; /* 点击热区高度约 36px，兼顾触控与密度 */
+  padding: 10px 12px; /* 点击热区高度约 38px，兼顾触控与密度 */
   border: 0; /* 去掉按钮默认边框 */
   border-radius: var(--radius-sm); /* 圆角与整体卡片风格统一 */
   background: transparent; /* 默认无底色，仅文字可见 */
-  color: var(--sidebar-text); /* 深底上的次级浅灰文字 */
+  color: var(--nav-text); /* 导航常规文字档 */
   font-size: var(--fs-base); /* 与正文同号，导航不至于过小 */
+  font-weight: var(--fw-medium); /* 中等字重，浅底上比常规稍清晰 */
   text-align: left; /* 按钮默认居中，改为左对齐更像导航条目 */
   cursor: pointer; /* 悬停显示手型，提示可点击 */
+  transition: var(--transition); /* 悬停与选中切换走统一过渡 */
 } /* 导航按钮结束 */
 
 .nav-item:hover { /* 悬停态 */
-  background: var(--sidebar-hover); /* 提亮底色作为悬停反馈 */
+  background: var(--nav-hover); /* 浅灰底作为悬停反馈 */
+  color: var(--nav-strong); /* 文字提一档，强化可点感知 */
 } /* 悬停态结束 */
 
 .nav-item.active { /* 当前选中项 */
-  background: var(--primary); /* 主色填充，明确当前位置 */
-  color: var(--on-primary); /* 主色底上用纯白保证对比度 */
+  background: var(--nav-active-bg); /* 淡主色底，不再用饱和实心块 */
+  color: var(--nav-active-text); /* 主色文字与淡底配套 */
+  font-weight: var(--fw-semibold); /* 选中项字重再提一档 */
 } /* 选中态结束 */
 
 .subnav { /* 合并入口条：上级页面顶部给被合并页面的直达入口 */
@@ -109,9 +131,9 @@ code { /* 行内代码/令牌展示 */
 
 .subnav-item { /* 合并入口按钮：低干扰的胶囊样式 */
   padding: 6px 12px; /* 点击热区约 30px，比主导航轻 */
-  border: 1px solid var(--sidebar-hover); /* 描边区分于正文，不抢主色 */
+  border: 1px solid var(--nav-ring); /* 描边区分于正文，不抢主色 */
   border-radius: var(--radius-pill); /* 胶囊形，视觉上明确是辅助入口 */
-  background: transparent; /* 默认无填充 */
+  background: var(--surface); /* 浅色底与页面区分 */
   color: var(--text-muted); /* 次要文字色，走令牌 */
   font-size: var(--fs-sm); /* 比正文小一号 */
   cursor: pointer; /* 悬停提示可点 */
@@ -125,26 +147,130 @@ code { /* 行内代码/令牌展示 */
 .sidebar-footer { /* 侧边栏底部用户区 */
   display: flex; /* 纵向排列用户信息与退出按钮 */
   flex-direction: column; /* 信息在上、按钮在下 */
-  gap: 4px; /* 紧凑排布 */
+  gap: 6px; /* 紧凑排布 */
   margin-top: auto; /* 吸底：把用户区推到侧边栏最下方 */
-  padding: 14px 12px 0; /* 顶部留白区分导航区 */
-  border-top: 1px solid var(--sidebar-line); /* 极淡分隔线，深底上不抢眼 */
+  padding: 14px 6px 0; /* 顶部留白区分导航区 */
+  border-top: 1px solid var(--nav-line); /* 与导航区的分界线 */
 } /* 用户区结束 */
 
 .user-name { /* 当前登录用户显示名 */
-  font-weight: 600; /* 半粗，便于快速定位自己 */
+  color: var(--nav-strong); /* 导航内强调文字档 */
+  font-size: var(--fs-sm); /* 略小于正文，避免与导航抢层级 */
+  font-weight: var(--fw-semibold); /* 半粗，便于快速定位自己 */
   word-break: break-all; /* 长名/邮箱不换行会撑破侧栏，强制可断 */
 } /* 显示名结束 */
 
 .user-region { /* 用户所属区域标识 */
+  color: var(--nav-muted); /* 与区域标识等次要信息同一层级 */
   font-size: var(--fs-xs); /* 次要信息，弱化字号 */
-  color: var(--sidebar-muted); /* 与区域标识等次要信息同一层级 */
+  line-height: 1.4; /* 两行说明时保持可读 */
 } /* 区域标识结束 */
 
 .main { /* 右侧内容区 */
-  padding: 28px 32px 48px; /* 上方略小、底部更大，滚动时有呼吸感 */
+  grid-column: 2; /* 固定在右栏，与吸顶导航并排 */
+  grid-row: 1; /* 内容区独占第一行，页脚在第二行 */
+  padding: 32px 32px 40px; /* 上方略小、底部留白交给页脚 */
   min-width: 0; /* 允许 grid 子项收缩，防止宽表格/长串撑破布局 */
 } /* 内容区结束 */
+
+/* ---------- 页脚：全站页面级收尾 ---------- */
+.app-footer { /* 页脚：跟随内容区宽度，始终在页面最底部 */
+  grid-column: 2; /* 与内容区同列 */
+  grid-row: 2; /* 固定在第二行，内容不足时也贴底 */
+  padding: 0 32px 28px; /* 与内容区左右对齐 */
+} /* 页脚结束 */
+
+.footer-inner { /* 页脚内容行 */
+  display: flex; /* 品牌、说明与链接同一行 */
+  flex-wrap: wrap; /* 窄屏自动换行 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px 16px; /* 行内间距 */
+  max-width: 1040px; /* 与页面内容同宽 */
+  padding-top: 20px; /* 与内容区拉开 */
+  border-top: 1px solid var(--border-strong); /* 细分隔线收尾 */
+  color: var(--text-muted); /* 页脚整体弱化 */
+  font-size: var(--fs-xs); /* 页脚用小字号 */
+} /* 页脚内容结束 */
+
+.footer-brand { /* 页脚品牌名 */
+  color: var(--text-secondary); /* 比页脚说明略重 */
+  font-weight: var(--fw-semibold); /* 半粗作为行首 */
+} /* 页脚品牌结束 */
+
+.footer-note { /* 页脚副标题 */
+  color: var(--text-muted); /* 次要说明 */
+} /* 页脚副标题结束 */
+
+.footer-links { /* 页脚链接组 */
+  display: flex; /* 链接横向排列 */
+  flex-wrap: wrap; /* 窄屏换行 */
+  gap: 4px; /* 链接间距 */
+  margin-left: auto; /* 推到右侧，与品牌信息分开 */
+} /* 页脚链接组结束 */
+
+.footer-links button { /* 页脚文字按钮 */
+  padding: 4px 8px; /* 小热区 */
+  border: 0; /* 纯文字形态 */
+  border-radius: var(--radius-xs); /* 悬停底需要圆角 */
+  background: transparent; /* 默认透明 */
+  color: var(--text-muted); /* 与页脚同档 */
+  font-size: var(--fs-xs); /* 页脚统一小字号 */
+  cursor: pointer; /* 手型提示 */
+} /* 页脚按钮结束 */
+
+.footer-links button:hover { /* 页脚按钮悬停 */
+  background: var(--surface-2); /* 浅灰底反馈 */
+  color: var(--primary); /* 转主色提示可点 */
+} /* 页脚按钮悬停结束 */
+
+.footer-copy { /* 版权信息 */
+  color: var(--text-subtle); /* 最弱一档，不与链接争注意力 */
+} /* 版权结束 */
+
+/* ---------- 门禁页：需要登录 / 已登录的中间页 ---------- */
+.gate-shell { /* 门禁页容器 */
+  display: grid; /* 栅格便于居中 */
+  place-items: center; /* 双向居中 */
+  min-height: min(480px, calc(100vh - 260px)); /* 中屏有下限，短屏不出滚动 */
+} /* 门禁容器结束 */
+
+.gate-card { /* 门禁卡片：与登录卡片同一表面语言 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 自上而下 */
+  align-items: flex-start; /* 左对齐，读起来更像说明而不是弹窗 */
+  gap: 10px; /* 区块间距 */
+  width: min(420px, 100%); /* 限宽保证可读 */
+  padding: 28px; /* 与登录卡片同内距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: var(--radius-md); /* 与登录卡片同圆角 */
+  background: var(--surface); /* 一级表面 */
+  box-shadow: var(--shadow); /* 统一环境阴影 */
+} /* 门禁卡片结束 */
+
+.gate-mark { /* 卡片顶部标记 */
+  width: 26px; /* 与导航品牌标记同尺寸 */
+  height: 26px; /* 同尺寸 */
+  margin-bottom: 4px; /* 与标题拉开 */
+  border-radius: var(--radius-sm); /* 同族圆角 */
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover)); /* 主色渐变 */
+} /* 标记结束 */
+
+.gate-title { /* 门禁标题 */
+  margin: 0; /* 清掉默认外边距 */
+  color: var(--text); /* 主文字色 */
+  font-size: var(--fs-lg); /* 比正文大一档 */
+} /* 标题结束 */
+
+.gate-text { /* 门禁说明 */
+  margin: 0; /* 清掉默认外边距 */
+  color: var(--text-muted); /* 次要文字 */
+  font-size: var(--fs-sm); /* 比正文小一号 */
+  line-height: 1.65; /* 多行舒适 */
+} /* 说明结束 */
+
+.gate-card .btn { /* 门禁卡片按钮 */
+  margin-top: 6px; /* 与说明拉开 */
+} /* 按钮结束 */
 
 /* ---------- 页面通用 ---------- */
 .page { /* 各视图的页面容器 */
@@ -408,12 +534,15 @@ code { /* 行内代码/令牌展示 */
 } /* 整行按钮结束 */
 
 .sidebar .btn.ghost { /* 侧栏内的幽灵按钮 */
-  border-color: var(--sidebar-line-strong); /* 深底上改用半透明白描边 */
-  color: var(--sidebar-strong); /* 浅色文字保证深底可读 */
+  border-color: var(--nav-ring); /* 浅底上用中性描边 */
+  color: var(--nav-text); /* 导航常规文字色 */
+  font-size: var(--fs-sm); /* 比内容区按钮小半档，避免抢层级 */
 } /* 侧栏幽灵按钮结束 */
 
 .sidebar .btn.ghost:hover { /* 侧栏幽灵按钮悬停 */
-  background: var(--sidebar-hover); /* 用侧栏悬停底色反馈 */
+  border-color: var(--primary); /* 描边转主色 */
+  background: var(--nav-hover); /* 浅灰底反馈 */
+  color: var(--nav-strong); /* 文字提一档 */
 } /* 侧栏悬停结束 */
 
 .link { /* 文字链接按钮（如「切换语言」） */
@@ -499,10 +628,97 @@ code { /* 行内代码/令牌展示 */
   background: radial-gradient(circle at 20% 20%, var(--primary-soft) 0%, var(--bg) 45%); /* 左上柔光渐变，避免纯色单调 */
 } /* 登录容器结束 */
 
-.auth-wrap.embedded { /* 内嵌登录容器：主布局内容区内的登录卡片 */
-  min-height: 100%; /* 跟随内容区高度，不再强制一屏高，避免出现多余滚动条 */
+.auth-wrap.embedded { /* 内嵌登录容器：主布局内容区内的登录组合 */
+  display: grid; /* 左说明 + 右卡片两栏，填满内容区宽度 */
+  grid-template-columns: minmax(0, 380px) 400px; /* 说明列收窄到可读行宽，卡片固定 400px */
+  align-items: center; /* 两栏垂直居中 */
+  justify-content: center; /* 两栏作为一组居中，前后留白对称 */
+  justify-items: stretch; /* 横向按列宽铺开，不再收缩到内容宽度 */
+  gap: 40px; /* 说明与卡片之间的呼吸空间 */
+  max-width: 820px; /* 组宽上限：说明文字与卡片紧邻，不再出现中段空带 */
+  margin: 0 auto; /* 在内容区居中 */
+  min-height: min(620px, calc(100vh - 180px)); /* 有下限也有上限：不再只留一条空栏 */
+  padding: 24px 0 40px; /* 与页脚、导航留出安全距离 */
   background: none; /* 去掉整屏渐变背景，与内容区底色保持一致 */
 } /* 内嵌登录容器结束 */
+
+.auth-intro { /* 登录页左侧引导区：解释产品价值，填充原先的空栏 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 自上而下 */
+  gap: 14px; /* 区块间距 */
+  max-width: 460px; /* 限宽保证可读行宽 */
+} /* 引导区结束 */
+
+.auth-intro-kicker { /* 引导区小标 */
+  margin: 0; /* 清掉默认外边距 */
+  color: var(--primary); /* 主色小标 */
+  font-size: var(--fs-xs); /* 小字号 */
+  font-weight: 700; /* 加粗 */
+  letter-spacing: 0.16em; /* 字距拉开 */
+  text-transform: uppercase; /* 英文小标统一大写 */
+} /* 引导小标结束 */
+
+.auth-intro-title { /* 引导区主标题 */
+  margin: 0; /* 清掉默认外边距 */
+  color: var(--text); /* 主文字色 */
+  font-size: var(--fs-2xl); /* 与页面主标题同级 */
+  font-weight: var(--fw-semibold); /* 半粗 */
+  line-height: 1.25; /* 紧凑行高 */
+} /* 引导标题结束 */
+
+.auth-intro-text { /* 引导区说明 */
+  margin: 0; /* 清掉默认外边距 */
+  color: var(--text-muted); /* 次要文字 */
+  font-size: var(--fs-sm); /* 比正文小一号 */
+  line-height: 1.7; /* 多行更舒适 */
+} /* 引导说明结束 */
+
+.auth-intro-list { /* 引导区能力清单 */
+  display: grid; /* 网格排列 */
+  gap: 10px; /* 条目间距 */
+  margin: 4px 0 0; /* 与上文拉开 */
+  padding: 0; /* 去掉列表默认内缩 */
+  list-style: none; /* 去掉默认圆点，改用主色小圆点 */
+} /* 清单结束 */
+
+.auth-intro-list li { /* 单个能力条目 */
+  position: relative; /* 为前置圆点定位 */
+  padding-left: 20px; /* 给圆点留位 */
+  color: var(--text-secondary); /* 次级文字 */
+  font-size: var(--fs-sm); /* 与说明同字号 */
+  line-height: 1.6; /* 条目内行距 */
+} /* 条目结束 */
+
+.auth-intro-list li::before { /* 条目前置圆点 */
+  content: ''; /* 伪元素占位 */
+  position: absolute; /* 相对条目定位 */
+  top: 0.62em; /* 与首行文字中心对齐 */
+  left: 4px; /* 左缩进 */
+  width: 6px; /* 圆点宽度 */
+  height: 6px; /* 圆点高度 */
+  border-radius: 50%; /* 正圆 */
+  background: var(--primary); /* 主色点缀 */
+} /* 圆点结束 */
+
+.auth-intro-foot { /* 引导区脚注 */
+  margin: 6px 0 0; /* 与清单拉开 */
+  color: var(--text-subtle); /* 最弱一档 */
+  font-size: var(--fs-xs); /* 小字号 */
+} /* 脚注结束 */
+
+@media (max-width: 900px) { /* 中屏断点：登录两栏收为单栏 */
+  .auth-wrap.embedded { /* 内嵌登录容器 */
+    grid-template-columns: minmax(0, 1fr); /* 单列 */
+    justify-items: center; /* 卡片居中 */
+    gap: 0; /* 引导区隐藏后无需间距 */
+    min-height: 0; /* 取消最小高度，避免中屏出现空栏 */
+    padding: 12px 0 24px; /* 收紧上下留白 */
+  } /* 容器结束 */
+
+  .auth-intro { /* 引导区 */
+    display: none; /* 单列时让登录卡独占焦点 */
+  } /* 引导区结束 */
+} /* 中屏断点结束 */
 
 .auth-card { /* 登录卡片 */
   display: flex; /* 纵向排列标题与表单 */
@@ -1255,13 +1471,30 @@ code { /* 行内代码/令牌展示 */
 
 @media (max-width: 760px) { /* 窄屏断点：平板竖屏与手机改用单列布局 */
   .layout { /* 整体布局在窄屏下 */
-    grid-template-columns: 1fr; /* 取消侧栏固定宽度，改为单列上下堆叠 */
+    grid-template-columns: minmax(0, 1fr); /* 单列且强制可收缩，避免宽内容把整页撑出横向滚动 */
+    grid-template-rows: auto 1fr auto; /* 顶部导航 + 内容 + 页脚 */
   } /* 窄屏布局结束 */
 
   .sidebar { /* 窄屏侧边栏 */
+    position: static; /* 取消吸顶，跟随页面滚动 */
+    grid-row: auto; /* 不再跨行，回到第一行 */
+    height: auto; /* 高度交给内容 */
     gap: 14px; /* 区块间距收紧，节省纵向空间 */
     padding: 16px; /* 内边距减小，内容更宽 */
+    overflow: visible; /* 关闭内部滚动 */
+    border-right: 0; /* 单列下右侧分界线失去意义 */
+    border-bottom: 1px solid var(--nav-line); /* 改用底部分界线 */
   } /* 窄屏侧边栏结束 */
+
+  .app-footer { /* 窄屏页脚 */
+    grid-column: 1; /* 单列下占满整行 */
+    grid-row: auto; /* 交给自动排布，确保排在内容区之后 */
+    padding: 0 16px 24px; /* 与内容区留白对齐 */
+  } /* 窄屏页脚结束 */
+
+  .footer-links { /* 窄屏页脚链接 */
+    margin-left: 0; /* 取消右推，换行后左对齐 */
+  } /* 窄屏页脚链接结束 */
 
   .nav { /* 窄屏导航 */
     flex-direction: row; /* 导航改为横向排列 */
@@ -1269,12 +1502,29 @@ code { /* 行内代码/令牌展示 */
   } /* 窄屏导航结束 */
 
   .sidebar-footer { /* 窄屏用户区 */
-    flex-direction: row; /* 用户信息与退出按钮同行 */
+    flex-direction: row; /* 用户信息与按钮同行 */
+    flex-wrap: wrap; /* 放不下时换行，不压缩文字成竖排 */
     align-items: center; /* 垂直居中 */
+    gap: 8px 12px; /* 行内与换行间距 */
     margin-top: 0; /* 取消吸底，单列布局无需推到底部 */
   } /* 窄屏用户区结束 */
 
+  .sidebar-footer .user-region { /* 窄屏区域说明 */
+    display: none; /* 次要信息让位给登录入口 */
+  } /* 窄屏区域说明结束 */
+
+  .sidebar-footer .user-name { /* 窄屏用户名 */
+    white-space: nowrap; /* 单行显示，不再逐字折行 */
+  } /* 窄屏用户名结束 */
+
+  .sidebar-footer .btn { /* 窄屏用户区按钮 */
+    flex: 0 0 auto; /* 按内容宽度，不参与压缩 */
+    width: auto; /* 取消 block 的满宽 */
+  } /* 窄屏按钮结束 */
+
   .main { /* 窄屏内容区 */
+    grid-column: 1; /* 单列下占满整行 */
+    grid-row: auto; /* 回到自然流，接在导航下方 */
     padding: 20px 16px 36px; /* 收紧留白，把宽度让给内容 */
   } /* 窄屏内容区结束 */
 
@@ -2937,7 +3187,7 @@ code { /* 行内代码/令牌展示 */
   padding: 26px 28px; /* 内边距 */
   border: 1px solid var(--border); /* 细边框 */
   border-radius: var(--radius-lg); /* 大圆角 */
-  background: linear-gradient(135deg, var(--surface) 0%, var(--primary-soft) 60%, var(--primary-soft) 100%); /* 轻量品牌渐变 */
+  background: var(--surface); /* 与卡片同一表面语言：不再用独立的高饱和渐变块 */
   box-shadow: var(--shadow); /* 与卡片同层级的柔和投影 */
 } /* 结束 */
 
@@ -2978,7 +3228,7 @@ code { /* 行内代码/令牌展示 */
   gap: 2px; /* 紧凑 */
   padding: 8px 10px; /* 内边距 */
   border-radius: var(--radius-sm); /* 圆角 */
-  background: var(--surface); /* 半透明白 */
+  background: var(--surface-2); /* 二级表面：与白色 hero 拉开一档 */
   border: 1px solid var(--border); /* 细边框 */
 } /* 结束 */
 
@@ -2997,7 +3247,7 @@ code { /* 行内代码/令牌展示 */
   padding: 8px 12px; /* 内边距 */
   border-radius: var(--radius-pill); /* 胶囊 */
   border: 1px solid var(--border); /* 边框 */
-  background: var(--surface); /* 白底 */
+  background: var(--surface-2); /* 二级表面，与 hero 底区分 */
   color: var(--text-muted); /* 未开通灰 */
   font-size: var(--fs-xs); /* 字号 */
   text-align: center; /* 居中 */

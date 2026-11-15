@@ -422,10 +422,19 @@ export function App() {
         {route.view === 'payreturn' && authedSession && <PaymentReturn locale={locale} />}{/* 支付回跳视图 */}
         {/* 未登录且该视图需要身份：守卫会把用户送到 /signin，这里只留瞬时占位，不发起建号请求 */}
         {needsSession && !authedSession && (
-          <div className="page">
-            <p className="hint">
-              {locale === 'en-US' ? 'Redirecting to sign in…' : '正在前往登录…'}
-            </p>
+          <div className="gate-shell">{/* 门禁页：统一表面 + 明确出口，避免只剩一行裸文本 */}
+            <div className="gate-card">
+              <span className="gate-mark" aria-hidden="true" />{/* 主色标记，与导航品牌标记同族 */}
+              <h2 className="gate-title">{locale === 'en-US' ? 'Sign in required' : '需要登录后访问'}</h2>
+              <p className="gate-text">
+                {locale === 'en-US'
+                  ? 'This page belongs to your account. Sign in to continue; you will return here afterwards.'
+                  : '该页面属于账号内数据，登录后会自动回到这里。'}
+              </p>
+              <button type="button" className="btn primary" onClick={() => go({ view: 'login' })}>
+                {locale === 'en-US' ? 'Go to sign in' : '前往登录'}
+              </button>
+            </div>
           </div>
         )}
         {/* IM 聊天 + 视频通话：会话列表 + 消息 + 视频通话，仅正式账号渲染 */}
@@ -436,10 +445,43 @@ export function App() {
         )}{/* 登录伪视图结束 */}
         {/* 登录伪视图：正式账号已登录时提示无需重复登录 */}
         {route.view === 'login' && authedSession && (
-          <div className="page"><p className="hint">{locale === 'en-US' ? 'Already signed in.' : '当前已登录，无需重复登录。'}</p></div> // 已登录提示
+          <div className="gate-shell">{/* 已登录门禁页：与未登录门禁共用一套表面 */}
+            <div className="gate-card">
+              <span className="gate-mark" aria-hidden="true" />
+              <h2 className="gate-title">{locale === 'en-US' ? 'Already signed in' : '当前已登录'}</h2>
+              <p className="gate-text">
+                {locale === 'en-US' ? 'This account is ready. Head back to the community.' : '账号已就绪，无需重复登录，可以直接回到社区。'}
+              </p>
+              <button type="button" className="btn primary" onClick={() => go({ view: 'community' })}>
+                {locale === 'en-US' ? 'Back to Community' : '回到社区'}
+              </button>
+            </div>
+          </div>
         )}{/* 已登录登录伪视图结束 */}
         </Suspense>{/* 懒加载边界结束 */}
       </main>{/* 内容区结束 */}
+
+      {/* 页脚：全站统一的页面收尾，浏览页 / 登录页 / 门禁页共用同一套 */}
+      <footer className="app-footer">
+        <div className="footer-inner">
+          <span className="footer-brand">{t(locale, 'app.name')}</span>
+          <span className="footer-note">
+            {locale === 'en-US' ? 'Content, community and payments in one place.' : '内容、社区与交易一体化'}
+          </span>
+          <nav className="footer-links" aria-label={locale === 'en-US' ? 'Footer navigation' : '页脚导航'}>
+            <button type="button" onClick={() => go({ view: 'community' })}>
+              {locale === 'en-US' ? 'Community' : '社区'}
+            </button>
+            <button type="button" onClick={() => go({ view: 'circles' })}>
+              {locale === 'en-US' ? 'Circles' : '圈子'}
+            </button>
+            <button type="button" onClick={() => go({ view: authedSession ? 'account' : 'login' })}>
+              {authedSession ? (locale === 'en-US' ? 'Account' : '个人中心') : locale === 'en-US' ? 'Sign in' : '登录'}
+            </button>
+          </nav>
+          <span className="footer-copy">© {new Date().getFullYear()} Mim</span>
+        </div>
+      </footer>{/* 页脚结束 */}
     </div> // 布局容器结束，JSX 根元素到此闭合
   ); // 主布局渲染结束
 } // App 组件结束

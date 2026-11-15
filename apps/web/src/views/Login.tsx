@@ -427,6 +427,25 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   return (
     // 登录页外层容器：负责整屏居中与背景；embedded 时仅保留居中能力
     <div className={embedded ? 'auth-wrap embedded' : 'auth-wrap'}>
+      {embedded && ( // 内嵌模式补左侧引导区：填充原先的大面积空栏，并与登录卡形成主次
+        <section className="auth-intro">
+          <p className="auth-intro-kicker">MIM</p>
+          <h2 className="auth-intro-title">{locale === 'en-US' ? 'Pick up where you left off' : '登录后继续'}</h2>
+          <p className="auth-intro-text">
+            {locale === 'en-US'
+              ? 'One account covers the community, circles and payments.'
+              : '社区、圈子与交易共用同一个账号。'}
+          </p>
+          <ul className="auth-intro-list">
+            <li>{locale === 'en-US' ? 'Posts and comments, with saves and notifications' : '帖子与评论：收藏、追更与消息提醒'}</li>
+            <li>{locale === 'en-US' ? 'Circles and updates, with member-only access' : '圈子与动态：成员制社群的完整权限'}</li>
+            <li>{locale === 'en-US' ? 'Wallet and orders, with receipts in one place' : '钱包与订单：购买记录和收据一处可查'}</li>
+          </ul>
+          <p className="auth-intro-foot">
+            {locale === 'en-US' ? 'Contact the site administrator if you cannot sign in.' : '如无法登录，请联系站点管理员。'}
+          </p>
+        </section>
+      )}
       <div className="auth-card">{/* 登录卡片：承载标题、切换器与登录表单 */}
         <div className="auth-head">{/* 卡片头部：品牌信息 + 语言切换 */}
           <div>{/* 品牌信息：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
