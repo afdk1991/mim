@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { createDatabase } from '../src/db.js';
+import { alignLegacyCommerceTables, createDatabase } from '../src/db.js';
 
 const LEGACY_DROPS = [
   // 先删引用方（子表），再删父表，避免外键约束拦截
@@ -142,6 +142,23 @@ describe('订阅制老库升级到统一交易域', () => {
     const indexes = (upgraded.prepare("SELECT name FROM sqlite_master WHERE type='index'").all() as Array<{ name: string }>).map((i) => i.name);
     expect(indexes).toContain('ix_orders_source');
     upgraded.close();
+  }); // it 结束
+
+  it('结构混杂时抛错中止，不留任何副作用', () => {
+    createDatabase(file).close(); // 先得到统一表（payments 保持统一结构）
+    const mixed = new Database(file); // 只把 orders 退回订阅结构，构造混合形态
+    mixed.pragma('foreign_keys = OFF');
+    for (const sql of ['DROP TABLE IF EXISTS order_items', 'DROP TABLE IF EXISTS fulfillments', 'DROP TABLE IF EXISTS orders']) mixed.exec(sql);
+    mixed.exec(LEGACY_ORDERS_DDL);
+    mixed.prepare("INSERT INTO orders (id, user_id, plan_id, region, cycle, currency, amount_minor, status, driver, created_at, updated_at) VALUES ('ord-mixed', 'u1', 'pro', 'cn', 'monthly', 'CNY', 1900, 'paid', 'wechat', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')").run();
+    // orders=订阅结构 + payments=统一结构：守卫必须拒绝猜测，直接中止而不是删表
+    expect(() => alignLegacyCommerceTables(mixed)).toThrow(/结构混合/);
+    const cols = (mixed.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols).toContain('plan_id'); // 旧行原样还在
+    expect(cols).not.toContain('source'); // 没有被偷偷重建
+    const tables = (mixed.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>).map((t) => t.name);
+    expect(tables).not.toContain('legacy_archive_orders'); // 中止前不得产生归档表
+    mixed.close();
   }); // it 结束
 
   it('重复启动不再重建、归档不膨胀', () => {
