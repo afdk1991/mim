@@ -132,6 +132,7 @@ const ANONYMOUS_READ_PATHS = new Set<string>([ // 精确匹配的公开读接口
 const ANONYMOUS_READ_PATTERNS = [ // 带路径参数的公开读接口
   /^\/api\/v1\/community\/boards\/[^/]+\/tabs$/, // 板块自定义页签
   /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
+  /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 帖子附件签名下载：免费帖匿名可下，付费帖由路由内付费墙拦截
   /^\/api\/v1\/pages\/[^/]+$/, // 站点自定义页面
 ]; // 匿名可读正则集合结束
 

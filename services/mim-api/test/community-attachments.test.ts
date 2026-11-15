@@ -19,6 +19,7 @@ const PAID_THREAD = 'thread-paid-store'; // 种子付费帖：未购买不可读
 let app: Express; // 应用句柄
 let db: ReturnType<typeof createDatabase>; // 直接查库构造夹带场景
 let storageDir: string; // 每例独立存储目录
+let storage: StorageAdapter; // 存储实例复用：需另建「强制登录开启」的应用副本
 
 /** 把预签名绝对地址转成同源路径，便于 supertest 直接访问 */
 function pathOf(url: string): string {
@@ -41,7 +42,7 @@ async function uploadFile(auth: Record<string, string>, mime: string, body: Buff
 beforeEach(() => {
   db = createDatabase(':memory:');
   storageDir = mkdtempSync(join(tmpdir(), 'mim-attach-'));
-  const storage: StorageAdapter = createStorage({
+  storage = createStorage({
     env: { MIM_STORAGE_DRIVER: 'local', MIM_STORAGE_LOCAL_DIR: storageDir },
     jwtSecret: JWT_SECRET,
     fallbackDir: storageDir,
@@ -152,5 +153,47 @@ describe('帖子附件位', () => {
     const author = await request(app).get(`/api/v1/community/threads/${threadId}/attachments/${attachmentId}/download`).set(authorAuth);
     expect(author.status).toBe(200); // 作者本人不受付费墙限制
     expect(author.body.attachment.name).toBe('付费资料.pdf');
+  });
+
+  it('全站强制登录开启时：免费帖附件匿名可下，付费帖仍 403', async () => {
+    const guarded = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_FORCE_LOGIN: '1' }, storage }); // 复刻生产门禁
+    const authorAuth = await loginHeaders(app, '13700000208');
+    const freeKey = await uploadFile(authorAuth, 'text/plain', Buffer.from('force-login free attachment'));
+    const free = await request(app)
+      .post('/api/v1/community/threads')
+      .set({ ...authorAuth, 'idempotency-key': randomUUID() })
+      .send({
+        board_slug: 'general',
+        title: '强制登录下的免费附件帖',
+        body: '正文长度满足发帖校验要求，用于验证全站门禁下的免费帖附件下载。',
+        attachments: [{ name: '开放.txt', object_key: freeKey, mime: 'text/plain', size_bytes: 1 }],
+      });
+    expect(free.status).toBe(201);
+    const freeId = free.body.thread_id as string;
+    const freeAttachmentId = (db.prepare('SELECT id FROM community_thread_attachments WHERE thread_id = ?').get(freeId) as { id: string }).id;
+
+    const freeAnonymous = await request(guarded).get(`/api/v1/community/threads/${freeId}/attachments/${freeAttachmentId}/download`);
+    expect(freeAnonymous.status).toBe(200); // 全站门禁不得把免费帖附件挡成 401
+    const freeBytes = await request(guarded).get(pathOf(freeAnonymous.body.download.url as string));
+    expect(freeBytes.status).toBe(200); // 匿名拿到的签名地址可用
+    expect(freeBytes.text).toBe('force-login free attachment'); // 签名地址能取回原字节
+
+    const paidKey = await uploadFile(authorAuth, 'text/plain', Buffer.from('force-login paid attachment'));
+    const paid = await request(app)
+      .post('/api/v1/community/threads')
+      .set({ ...authorAuth, 'idempotency-key': randomUUID() })
+      .send({
+        board_slug: 'general', // 免费板块里的付费单帖：过得了板块准入也过不了付费墙
+        title: '强制登录下的付费附件帖',
+        body: '免费板块中的付费单帖，附件必须被同一道付费墙拦住。',
+        price_cents: 1900,
+        attachments: [{ name: '付费.txt', object_key: paidKey, mime: 'text/plain', size_bytes: 1 }],
+      });
+    expect(paid.status).toBe(201);
+    const paidId = paid.body.thread_id as string;
+    const paidAttachmentId = (db.prepare('SELECT id FROM community_thread_attachments WHERE thread_id = ?').get(paidId) as { id: string }).id;
+
+    const paidAnonymous = await request(guarded).get(`/api/v1/community/threads/${paidId}/attachments/${paidAttachmentId}/download`);
+    expect(paidAnonymous.status).toBe(403); // 过了全站门禁也必须被付费墙拦下
   });
 });
