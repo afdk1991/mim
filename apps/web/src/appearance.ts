@@ -20,17 +20,46 @@ export interface ResolvedTheme {
 
 /** 内置默认外观：与后端 20-appearance.sql 兜底种子同口径。 */
 export const DEFAULT_THEME: ResolvedTheme = {
-  accent: '#0f766e', // 对象字段 accent：记录一项配置或数据
-  background: '#f8fafc', // 对象字段 background：记录一项配置或数据
-  navLayout: 'top', // 对象字段 navLayout：记录一项配置或数据
-  listStyle: 'card', // 对象字段 listStyle：记录一项配置或数据
-  radius: 14, // 对象字段 radius：记录一项配置或数据
-  font: '', // 对象字段 font：记录一项配置或数据
-  navItems: [], // 对象字段 navItems：记录一项配置或数据
+  accent: '#3b6ef5', // 主色：与 tokens.css 浅色主色一致
+  background: '#f5f6f7', // 页面底色：与 tokens.css 浅色底一致
+  navLayout: 'top', // 导航布局口径
+  listStyle: 'card', // 列表样式：卡片
+  radius: 12, // 主圆角：与 tokens.css 一致
+  font: '', // 字体族：空串沿用系统字体栈
+  navItems: [], // 后台未配置导航项
 }; // 代码块结束
 
 const HEX_COLOR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?$/; // 3 / 6 / 8 位 HEX
 const LIST_STYLES = ['card', 'list', 'compact'] as const; // 合法列表样式枚举
+
+/** 解析 3 / 6 位 HEX 为 RGB 分量；带透明度的 8 位与非法值返回 null。 */
+function hexToRgb(value: string): [number, number, number] | null {
+  const hex = value.trim().replace(/^#/, ''); // 去掉井号，统一按无前缀处理
+  const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex; // 3 位补成 6 位
+  if (full.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(full)) return null; // 仅接受纯 6 位
+  return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16)]; // 拆出 R/G/B
+} // 代码块结束
+
+/** RGB 分量拼回 6 位 HEX。 */
+function rgbToHex(r: number, g: number, b: number): string {
+  const clamp = (n: number): string => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0'); // 取整并夹在 0–255
+  return `#${clamp(r)}${clamp(g)}${clamp(b)}`; // 拼成 #rrggbb
+} // 代码块结束
+
+/** 暗色主色：向白色混合约 35%，保证深底上的对比度。 */
+function liftForDark(accent: string): string {
+  const rgb = hexToRgb(accent); // 解析主色
+  if (!rgb) return accent; // 解析失败原样返回，交给 CSS 兜底
+  const ratio = 0.35; // 提亮比例：足够可见又不至于发白
+  return rgbToHex(rgb[0] + (255 - rgb[0]) * ratio, rgb[1] + (255 - rgb[1]) * ratio, rgb[2] + (255 - rgb[2]) * ratio); // 向白混合
+} // 代码块结束
+
+/** 把主色转成指定透明度的 rgba 字符串；解析失败返回空串由调用方跳过。 */
+function withAlpha(accent: string, alpha: number): string {
+  const rgb = hexToRgb(accent); // 解析主色
+  if (!rgb) return ''; // 无法解析时不写变量
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`; // 组合成 rgba
+} // 代码块结束
 
 /** 清洗单个颜色：非法值回落默认主色 / 底色。 */
 function safeColor(value: unknown, fallback: string): string {
@@ -67,14 +96,36 @@ export function resolveTheme(raw: ThemeSettings | null | undefined): ResolvedThe
   }; // 代码块结束
 } // 代码块结束
 
-/** 把清洗后的主题写入文档根 CSS 变量与数据集，供全站样式消费。 */
+/**
+ * 把清洗后的主题写入文档根的主题输入变量与数据集，供全站样式消费。
+ *
+ * 只写 --theme-* 输入变量：--primary / --bg / --radius 由 tokens.css 在
+ * :root 与 :root[data-theme='dark'] 两个分支里分别取值，因此运行期配置
+ * 不会再以浅色值把暗色下的底色与主色钉死。
+ */
 export function applyThemeVars(theme: ResolvedTheme): void {
   if (typeof document === 'undefined') return; // 非浏览器环境（测试 / SSR）跳过
   const root = document.documentElement; // 变量挂在 :root 上，全站继承
-  root.style.setProperty('--primary', theme.accent); // 主色：按钮 / 选中态 / 链接
-  root.style.setProperty('--primary-dark', theme.accent); // 主色加深版：悬停态沿用主色，避免脏配置产生低对比
-  root.style.setProperty('--bg', theme.background); // 页面底色
-  root.style.setProperty('--radius', `${theme.radius}px`); // 卡片圆角
+  root.style.setProperty('--theme-primary', theme.accent); // 浅色主色输入
+  root.style.setProperty('--theme-bg', theme.background); // 浅色底色输入（暗色另有 --theme-bg-dark 兜底）
+  root.style.setProperty('--theme-radius', `${theme.radius}px`); // 圆角输入
+  const isDefaultAccent = theme.accent.toLowerCase() === DEFAULT_THEME.accent; // 主色未自定义时交回令牌默认值
+  const darkAccent = isDefaultAccent ? '' : liftForDark(theme.accent); // 自定义主色派生出暗色提亮值
+  const darkSoft = isDefaultAccent ? '' : withAlpha(theme.accent, 0.16); // 暗色淡底
+  const darkRing = isDefaultAccent ? '' : withAlpha(theme.accent, 0.36); // 暗色焦点环
+  const lightSoft = isDefaultAccent ? '' : withAlpha(theme.accent, 0.1); // 浅色淡底
+  const lightRing = isDefaultAccent ? '' : withAlpha(theme.accent, 0.28); // 浅色焦点环
+  const derived: Array<[string, string]> = [
+    ['--theme-primary-dark', darkAccent],
+    ['--theme-primary-soft', lightSoft],
+    ['--theme-primary-soft-dark', darkSoft],
+    ['--theme-primary-ring', lightRing],
+    ['--theme-primary-ring-dark', darkRing],
+  ]; // 待写入的派生变量
+  for (const [name, value] of derived) {
+    if (value) root.style.setProperty(name, value); // 有派生值时写入
+    else root.style.removeProperty(name); // 默认主色则移除，回落到 tokens.css
+  }
   if (theme.font) root.style.setProperty('--font-family', theme.font); // 自定义字体族
   else root.style.removeProperty('--font-family'); // 未配置则回落系统字体栈
   root.dataset.listStyle = theme.listStyle; // 列表样式口径，供布局与列表容器变体选择器消费

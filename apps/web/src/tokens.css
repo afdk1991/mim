@@ -7,14 +7,28 @@
  *
  * 加载顺序：本文件必须在 styles.css 之前引入（见 main.tsx），
  * 保证页面样式里的 var() 都消费同一份令牌；运行期后台主题
- * （appearance.ts）仍可用内联 --primary / --bg / --radius 覆盖。
+ * （appearance.ts）只写 --theme-* 输入变量，明暗派生值由本文件按
+ * :root / :root[data-theme='dark'] 两个分支分别取值，避免内联样式钉死浅色值。
  */
 
 :root { /* 令牌根作用域：浅色为默认配色 */
   color-scheme: light; /* 声明浅色方案，让滚动条与原生控件跟随 */
 
+  /* ---------- 主题输入变量：运行期由 appearance.ts 写入，按主题分支取值 ----------
+     后台只写这里的输入变量（--theme-*），不再直接写 --primary / --bg / --radius；
+     明暗两套派生值都在令牌层声明，因此暗色不会被运行期的浅色配置钉死。 */
+  --theme-primary: #3b6ef5; /* 浅色主色输入：后台上报的主色写这里 */
+  --theme-primary-dark: #6f95ff; /* 暗色主色输入：后台主色派生的提亮值写这里 */
+  --theme-primary-soft: rgba(59, 110, 245, 0.1); /* 浅色主色淡底输入 */
+  --theme-primary-soft-dark: rgba(111, 149, 255, 0.16); /* 暗色主色淡底输入 */
+  --theme-primary-ring: rgba(59, 110, 245, 0.28); /* 浅色焦点环输入 */
+  --theme-primary-ring-dark: rgba(111, 149, 255, 0.36); /* 暗色焦点环输入 */
+  --theme-bg: #f5f6f7; /* 浅色底色输入 */
+  --theme-bg-dark: #292a2d; /* 暗色底色输入：暗色始终用令牌内深灰，不跟随后台浅色底 */
+  --theme-radius: 12px; /* 圆角输入：后台圆角档位写这里 */
+
   /* ---------- 中性色阶梯：底色 / 表面 / 文字 / 描边 ---------- */
-  --bg: #f5f6f7; /* 页面底色：浅灰，托起白色卡片形成层次 */
+  --bg: var(--theme-bg); /* 页面底色：浅灰，托起白色卡片形成层次 */
   --surface: #ffffff; /* 一级表面：卡片、面板、弹窗内容区 */
   --surface-2: #f6f7f8; /* 二级表面：表头、悬停底、弱化区块 */
   --surface-3: #eef0f3; /* 三级表面：徽标底、分段控件未选中底 */
@@ -28,12 +42,12 @@
   --border-hover: #c9ced9; /* 悬停描边：次按钮 hover 时加深一档 */
 
   /* ---------- 主色与状态色：单一主色 + 语义色 ---------- */
-  --primary: #3b6ef5; /* 品牌主色：主按钮、选中态、链接 */
+  --primary: var(--theme-primary); /* 品牌主色：主按钮、选中态、链接 */
   --primary-hover: #2f59c9; /* 主色悬停：加深一档，不做发光 */
   --primary-active: #274bb0; /* 主色按下：再加深一档 */
-  --primary-dark: #2f59c9; /* 兼容旧令牌：等同于 --primary-hover，页面无需改名 */
-  --primary-soft: rgba(59, 110, 245, 0.1); /* 主色淡底：选中行、标签底 */
-  --primary-ring: rgba(59, 110, 245, 0.28); /* 主色焦点环：键盘可见性 */
+  --primary-dark: var(--theme-primary); /* 兼容旧令牌：沿用配置主色，页面无需改名 */
+  --primary-soft: var(--theme-primary-soft); /* 主色淡底：选中行、标签底 */
+  --primary-ring: var(--theme-primary-ring); /* 主色焦点环：键盘可见性 */
   --on-primary: #ffffff; /* 主色底上的文字色 */
   --danger: #d64545; /* 危险色：删除、错误 */
   --danger-soft: rgba(214, 69, 69, 0.1); /* 危险淡底 */
@@ -57,7 +71,7 @@
   --sidebar-line-strong: rgba(255, 255, 255, 0.18); /* 侧栏强调描边：幽灵按钮 */
 
   /* ---------- 圆角阶梯：卡片较大、控件较小、标签胶囊 ---------- */
-  --radius: 12px; /* 主圆角：卡片与面板（后台主题可运行期覆盖） */
+  --radius: var(--theme-radius); /* 主圆角：卡片与面板（后台主题可运行期覆盖） */
   --radius-xs: 4px; /* 最小圆角：标签、行内码 */
   --radius-sm: 8px; /* 小圆角：输入框、小按钮 */
   --radius-md: 12px; /* 中圆角：常规卡片 */
@@ -122,7 +136,7 @@
   color-scheme: dark; /* 声明暗色方案，原生控件与滚动条同步 */
 
   /* ---------- 中性色：暗底抬升，文字降亮度对比 ---------- */
-  --bg: #292a2d; /* 页面底色：中性深灰，不用纯黑 */
+  --bg: var(--theme-bg-dark); /* 页面底色：中性深灰，不用纯黑；暗色不继承后台浅色底 */
   --surface: #323335; /* 一级表面：比底色亮一档 */
   --surface-2: #37383a; /* 二级表面：表头、悬停底 */
   --surface-3: #2d2e31; /* 三级表面：分段底、内嵌区块 */
@@ -136,11 +150,12 @@
   --border-hover: rgba(184, 184, 184, 0.32); /* 悬停描边：暗底需更亮才可见 */
 
   /* ---------- 主色与状态色：提亮保证暗底对比 ---------- */
-  --primary: #6f95ff; /* 主色：暗底提亮一档 */
+  --primary: var(--theme-primary-dark); /* 主色：取后台主色派生出的暗色亮度版本 */
   --primary-hover: #8aa8ff; /* 悬停再提亮 */
   --primary-active: #5b83f0; /* 按下回落 */
-  --primary-soft: rgba(111, 149, 255, 0.16); /* 主色淡底 */
-  --primary-ring: rgba(111, 149, 255, 0.36); /* 焦点环 */
+  --primary-dark: var(--theme-primary-dark); /* 兼容旧令牌：暗色下同样跟随配置主色 */
+  --primary-soft: var(--theme-primary-soft-dark); /* 主色淡底 */
+  --primary-ring: var(--theme-primary-ring-dark); /* 焦点环 */
   --on-primary: #10141c; /* 亮主色底上的深色文字 */
   --danger: #ff7a7a; /* 危险色提亮 */
   --danger-soft: rgba(255, 122, 122, 0.14); /* 危险淡底 */

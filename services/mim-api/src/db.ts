@@ -512,7 +512,27 @@ export function seedCommerce(db: Db): void {
       { kind: 'video', url: '/demo/bloom-ep1.mp4', poster_url: '/demo/bloom-cover.jpg' },
     ]), 'paid-video-comic');
     insertSetting.run('home', JSON.stringify({ view: 'store' }), now);
-    insertSetting.run('theme', JSON.stringify({ accent: '#0f766e', background: '#f8fafc', nav_layout: 'top', list_style: 'card', radius: 14 }), now);
+    insertSetting.run('theme', JSON.stringify({ accent: '#3b6ef5', background: '#f5f6f7', nav_layout: 'top', list_style: 'card', radius: 12 }), now);
+    // 存量库外观对齐：旧种子为 teal #0f766e / #f8fafc / 14px，只有这三个键仍是旧默认值时才同步到新令牌口径；
+    // 运营手动改过的颜色、圆角以及 nav_layout / list_style / font 等其他外观项一律保持原样，重复启动无副作用。
+    const themeRow = db.prepare("SELECT value FROM site_settings WHERE key = 'theme'").get() as { value: string } | undefined;
+    if (themeRow) {
+      try {
+        const parsed: unknown = JSON.parse(themeRow.value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const theme = parsed as Record<string, unknown>;
+          let changed = false;
+          if (theme.accent === '#0f766e') { theme.accent = '#3b6ef5'; changed = true; }
+          if (theme.background === '#f8fafc') { theme.background = '#f5f6f7'; changed = true; }
+          if (theme.radius === 14) { theme.radius = 12; changed = true; }
+          if (changed) {
+            db.prepare('UPDATE site_settings SET value = ?, updated_at = ? WHERE key = ?').run(JSON.stringify(theme), now, 'theme');
+          }
+        }
+      } catch {
+        // 脏 JSON 不处理：保持原值，避免把运营配置清空
+      }
+    }
     insertSetting.run('locales', JSON.stringify({ front: 'zh-CN', admin: 'zh-CN', supported: ['zh-CN', 'en-US'], machine_translation: false }), now);
     insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: '跨平台商业级项目', footer: 'Mim · 开源与商业化并行' }), now);
     const blocks: Array<[string, string, string, number, string]> = [

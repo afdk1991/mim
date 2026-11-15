@@ -11,7 +11,7 @@ CREATE INDEX IF NOT EXISTS idx_page_blocks_page_sort ON page_blocks(page, enable
 INSERT OR IGNORE INTO site_settings (key, value, updated_at)
 VALUES (
   'theme',
-  '{"accent":"#0f766e","background":"#f8fafc","nav_layout":"top","list_style":"card","radius":14,"font":"system-ui"}',
+  '{"accent":"#3b6ef5","background":"#f5f6f7","nav_layout":"top","list_style":"card","radius":12,"font":"system-ui"}',
   '2026-11-13T00:00:00.000Z'
 );
 
