@@ -545,3 +545,59 @@ export async function saveBoardTabs(credential: Credential, slug: string, tabs: 
   // 返回落库后的配置
   return data.tabs; // 业务步骤
 } // saveBoardTabs 结束
+
+// ── 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转 ──────────────────
+
+/** 管理端页面区块：比公开接口多 enabled，停用区块也要能读出来再编辑 */
+export interface AdminPageBlock { // 区块行
+  id: string; // 主键
+  page: string; // 页面标识
+  kind: string; // 区块类型
+  sort_order: number; // 排序
+  enabled: number; // 1 可见 / 0 停用
+  config: Record<string, unknown>; // 已解析配置
+  updated_at: string; // 更新时间
+} // AdminPageBlock 结束
+
+/** 读取页面全部区块（含停用） */
+export async function listPageBlocks(credential: Credential, page: string): Promise<AdminPageBlock[]> {
+  // 响应包裹 { page, blocks }
+  const data = await request<{ page: string; blocks: AdminPageBlock[] }>(`/pages/${encodeURIComponent(page)}/manage`, { credential });
+  // 返回区块清单
+  return data.blocks; // 业务步骤
+} // listPageBlocks 结束
+
+/** 新建区块：sort_order 省略时后端按 99 兜底 */
+export async function createPageBlock(
+  credential: Credential, // 凭证
+  page: string, // 页面标识
+  payload: { kind: string; sort_order?: number; config?: Record<string, unknown> }, // 新区块
+): Promise<string> {
+  // 响应包裹 { ok, id }
+  const data = await request<{ ok: boolean; id: string }>(`/pages/${encodeURIComponent(page)}/blocks`, { method: 'POST', body: payload, credential });
+  // 返回新区块主键，便于前端立即进入编辑
+  return data.id; // 业务步骤
+} // createPageBlock 结束
+
+/** 修改区块：配置 / 排序 / 启停三选一或组合 */
+export async function updatePageBlock(
+  credential: Credential, // 凭证
+  page: string, // 页面标识
+  id: string, // 区块主键
+  payload: { config?: Record<string, unknown>; sort_order?: number; enabled?: boolean }, // 改动字段
+): Promise<void> {
+  // PUT 局部更新，后端逐字段落库
+  await request(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'PUT', body: payload, credential });
+} // updatePageBlock 结束
+
+/** 删除区块 */
+export async function deletePageBlock(credential: Credential, page: string, id: string): Promise<void> {
+  // DELETE 指定区块
+  await request(`/pages/${encodeURIComponent(page)}/blocks/${encodeURIComponent(id)}`, { method: 'DELETE', credential });
+} // deletePageBlock 结束
+
+/** 批量排序：ids 的顺序即最终展示顺序 */
+export async function reorderPageBlocks(credential: Credential, page: string, ids: string[]): Promise<void> {
+  // PUT 全量顺序
+  await request(`/pages/${encodeURIComponent(page)}/reorder`, { method: 'PUT', body: { ids }, credential });
+} // reorderPageBlocks 结束

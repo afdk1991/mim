@@ -11,6 +11,16 @@ import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const ALLOWED_SETTINGS = new Set(['theme', 'locales', 'site', 'home']); // 允许通过 API 修改的设置键
 
+/** 解析区块配置；脏 JSON 回落空对象，避免单行坏数据把公开读取打成 500。 */
+function parseConfig(raw: string): Record<string, unknown> {
+  try { // 异常捕获起点：包裹可能抛出错误的操作
+    const parsed: unknown = JSON.parse(raw); // 常量 parsed：保存固定配置或一次性派生值
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}; // 仅接受对象形态
+  } catch { // 代码块结束
+    return {}; // 解析失败按空配置处理
+  } // 代码块结束
+} // 代码块结束
+
 /** 读单个 JSON 设置；缺失或脏数据时返回兜底值，供公开启动接口使用。 */
 function readSetting(deps: ApiDeps, key: string): Record<string, unknown> {
   const row = deps.db.prepare('SELECT value FROM site_settings WHERE key = ?').get(key) as { value: string } | undefined; // 常量 row：保存固定配置或一次性派生值
@@ -70,7 +80,15 @@ export function createAppearanceRouter(deps: ApiDeps): Router { // 导出函数 
     const blocks = deps.db // 常量 blocks：保存固定配置或一次性派生值
       .prepare('SELECT id, page, kind, sort_order, config_json, updated_at FROM page_blocks WHERE page = ? AND enabled = 1 ORDER BY sort_order ASC') // 执行当前业务步骤
       .all(req.params.page) as Array<Record<string, unknown> & { config_json: string }>; // 注册 ALL 路由 / 中间件处理器
-    res.json({ page: req.params.page, blocks: blocks.map((block) => ({ ...block, config: JSON.parse(block.config_json) as unknown })) }); // 执行当前业务步骤
+    res.json({ page: req.params.page, blocks: blocks.map((block) => ({ ...block, config: parseConfig(block.config_json) })) }); // 配置解析失败回落空对象
+  }); // 代码块结束
+
+  /** 管理端区块清单：含停用区块，供「页面搭建」调整顺序 / 文案 / 可见性与入口跳转。 */
+  router.get('/pages/:page/manage', requirePermission('appearance:write'), (req, res) => {
+    const blocks = deps.db // 常量 blocks：保存固定配置或一次性派生值
+      .prepare('SELECT id, page, kind, sort_order, config_json, enabled, updated_at FROM page_blocks WHERE page = ? ORDER BY sort_order ASC, updated_at ASC') // 停用区块也要返回，运营才能重新启用
+      .all(req.params.page) as Array<Record<string, unknown> & { config_json: string }>; // 收窄查询结果
+    res.json({ page: req.params.page, blocks: blocks.map((block) => ({ ...block, config: parseConfig(block.config_json) })) }); // 与公开接口同构，多一个 enabled 字段
   }); // 代码块结束
 
   /** 新建区块：运营可自由组合首页 / 论坛 / 商城。 */

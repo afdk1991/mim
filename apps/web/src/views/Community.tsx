@@ -854,6 +854,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             </div>
           )}
 
+          {!hasSession ? <PageBlocks page="home" /> : null}{/* 匿名访客首页装修：仅未登录展示，已登录用户既有界面保持不变 */}
           <PageBlocks page="forum" />{/* 论坛页区块：Tab 栏目 / 公告等由后台 page_blocks 组合 */}
 
           {composerOpen && (

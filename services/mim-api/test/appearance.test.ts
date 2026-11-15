@@ -55,6 +55,32 @@ describe('页面区块公开只读', () => { // 调用 describe 并处理其返�
     expect(res.status).toBe(200); // 200 而非 500
     expect(res.body.blocks).toEqual([]); // 空清单回落
   }); // 代码块结束
+
+  it('单行配置是脏 JSON 时回落空对象，不把公开接口打成 500', async () => { // 调用 it 并处理其返回结果
+    db.prepare("UPDATE page_blocks SET config_json = '{bad' WHERE id = 'block-home-hero'").run(); // 模拟坏数据
+    const res = await request(app).get('/api/v1/pages/home'); // 公开读取
+    expect(res.status).toBe(200); // 不抛 500
+    const hero = res.body.blocks.find((b: { id: string }) => b.id === 'block-home-hero'); // 定位损坏区块
+    expect(hero.config).toEqual({}); // 脏配置回落空对象
+  }); // 代码块结束
+}); // 代码块结束
+
+describe('页面搭建管理清单', () => { // 调用 describe 并处理其返回结果
+  it('匿名读取管理清单返回 401', async () => { // 调用 it 并处理其返回结果
+    const res = await request(app).get('/api/v1/pages/home/manage'); // 管理端清单
+    expect(res.status).toBe(401); // 未登录拒绝
+  }); // 代码块结束
+
+  it('管理令牌可读取含停用项的全量区块，公开接口只返回启用项', async () => { // 调用 it 并处理其返回结果
+    db.prepare("UPDATE page_blocks SET enabled = 0 WHERE id = 'block-home-features'").run(); // 模拟运营隐藏区块
+    const manage = await request(app).get('/api/v1/pages/home/manage').set('x-admin-token', ADMIN_TOKEN); // 管理端读取
+    expect(manage.status).toBe(200); // 有权限放行
+    const hidden = manage.body.blocks.find((b: { id: string }) => b.id === 'block-home-features'); // 定位隐藏区块
+    expect(hidden).toBeTruthy(); // 停用项仍返回
+    expect(hidden.enabled).toBe(0); // 可见性字段可供恢复
+    const publicList = await request(app).get('/api/v1/pages/home'); // 公开读取
+    expect(publicList.body.blocks.some((b: { id: string }) => b.id === 'block-home-features')).toBe(false); // 停用项不公开
+  }); // 代码块结束
 }); // 代码块结束
 
 describe('外观写操作权限门禁', () => { // 调用 describe 并处理其返回结果

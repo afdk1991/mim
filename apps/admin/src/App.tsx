@@ -32,9 +32,11 @@ import { Realname } from './views/Realname'; // 业务步骤
 import { ContentOps } from './views/ContentOps'; // 业务步骤
 // 社区运营：板块审核 / 首页指向 / 推荐权重 / Tab 配置
 import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
+// 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
+import { PageBuilder } from './views/PageBuilder'; // 业务步骤
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin';
+type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -68,6 +70,8 @@ const NAV: NavItem[] = [
   { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
   // 社区运营
   { key: 'communityAdmin', label: '社区运营', permission: 'appearance:write' },
+  // 页面搭建：复用 appearance:write，管理首页 / 论坛区块装修
+  { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
   // 角色与权限：需要 rbac:read
   { key: 'roles', label: '角色与权限', permission: 'rbac:read' },
   // 用户与授权：需要 user:read
@@ -233,6 +237,8 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'contentOps') return <ContentOps credential={credential} permissions={identity.permissions} />;
   // 社区运营：板块审核、首页指向、审核开关、推荐权重、Tab 配置
   if (key === 'communityAdmin') return <CommunityAdmin credential={credential} permissions={identity.permissions} />;
+  // 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
+  if (key === 'pageBuilder') return <PageBuilder credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏
   return <Overview identity={identity} />;
 } // renderView 结束：全部视图分发完毕

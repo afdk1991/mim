@@ -4471,3 +4471,23 @@ code { /* 行内代码/令牌展示 */
 .rich-body pre { overflow: auto; margin: 0; padding: var(--card-pad-tight); border-radius: var(--card-radius-sm); background: #0f172a; color: #e2e8f0; } /* 代码块 */
 .rich-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; } /* 等宽字体 */
 .rich-image { display: block; max-width: 100%; border-radius: var(--card-radius-sm); } /* 正文图片 */
+
+/* ---------- 页面区块（页面搭建消费）：仅匿名首页生效，论坛页保持原视觉 ---------- */
+.page-blocks-home { display: flex; flex-direction: column; gap: var(--card-gap); } /* 首页区块纵向节奏，与卡片间距一致 */
+.page-blocks-home .page-block { display: flex; flex-direction: column; gap: 10px; padding: var(--card-pad); border: 1px solid var(--border); border-radius: var(--card-radius-lg, 14px); background: var(--surface); } /* 统一区块容器规格 */
+.page-blocks-home .page-block h2, /* 头图主标题 */
+.page-blocks-home .page-block h3 { margin: 0; } /* 标题零外边距，避免与面板样式叠加 */
+.page-blocks-home .page-block.hero { background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(16, 185, 129, 0.08)); } /* 头图轻量渐层，不引入图片依赖 */
+.page-blocks-home .page-block.hero h2 { font-size: clamp(1.4rem, 2.6vw, 2rem); line-height: 1.25; } /* 头图标题层级 */
+.page-blocks-home .page-block.hero p { margin: 0; } /* 副标题零外边距 */
+.page-blocks-home .page-block.hero .btn { align-self: flex-start; } /* 按钮不拉伸满宽 */
+.page-blocks-home .page-block.tabs { flex-direction: row; flex-wrap: wrap; gap: 8px; } /* 栏目胶囊横排 */
+.page-blocks-home .page-block.image-text { flex-direction: row; align-items: center; gap: var(--card-gap); } /* 图文左右结构 */
+.page-blocks-home .page-block.image-text.align-right { flex-direction: row-reverse; } /* 右图左文 */
+.page-blocks-home .page-block.image-text img { width: 180px; max-width: 40%; border-radius: var(--card-radius-sm, 8px); object-fit: cover; } /* 图片尺寸受控 */
+.page-blocks-home .page-block.image-text .image-text-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; } /* 文案纵向排列，允许收缩 */
+@media (max-width: 640px) { /* 手机档位：图文改为上下 */
+  .page-blocks-home .page-block.image-text, /* 图文区块 */
+  .page-blocks-home .page-block.image-text.align-right { flex-direction: column; align-items: flex-start; } /* 统一改纵向，避免挤压文字 */
+  .page-blocks-home .page-block.image-text img { width: 100%; max-width: none; } /* 图片占满整行 */
+} /* 手机断点结束 */

@@ -10,6 +10,22 @@ interface Props { // 视图参数
   locale?: 'zh-CN' | 'en-US'; // 语言
 } // 代码块结束
 
+/** 首页内置默认区块：接口失败或后台清空配置时兜底，保证匿名访客不白屏 */
+const DEFAULT_HOME_BLOCKS: PageBlock[] = [
+  { // 头图：与后端初始种子保持一致
+    id: 'default-home-hero', page: 'home', kind: 'hero', sort_order: 1, config_json: '', updated_at: '', // 固定兜底标识
+    config: { title: 'Mim 社区', subtitle: '知识付费、社区商城、论坛与资金结算', cta: { label: '进入社区', href: '/community' } }, // 默认文案
+  }, // hero 结束
+  { // 特性卡片
+    id: 'default-home-features', page: 'home', kind: 'features', sort_order: 2, config_json: '', updated_at: '', // 固定兜底标识
+    config: { items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] }, // 默认卖点
+  }, // features 结束
+  { // 公告入口
+    id: 'default-home-announce', page: 'home', kind: 'announcements', sort_order: 3, config_json: '', updated_at: '', // 固定兜底标识
+    config: { title: '社区公告', href: '/community', link_label: '查看社区公告' }, // 默认入口
+  }, // announcements 结束
+]; // DEFAULT_HOME_BLOCKS 结束
+
 /** 站内链接补挂载前缀，外链原样返回。 */
 function hrefOf(raw: unknown): string {
   const value = typeof raw === 'string' ? raw : ''; // 常量 value：保存固定配置或一次性派生值
@@ -60,7 +76,7 @@ function Block({ block }: { block: PageBlock }) {
       <section className="page-block notice">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>{String(config.title ?? (block.kind === 'notice' ? '公告' : '最新公告'))}</h3></div>
         <p className="muted">{String(config.text ?? config.subtitle ?? '产品公告、更新日志与推广计划见社区公告板块。')}</p>
-        <a className="link" href={hrefOf('/community')}>查看社区公告</a>
+        <a className="link" href={hrefOf(config.href ?? '/community')}>{String(config.link_label ?? '查看社区公告')}</a>
       </section>
     ); // 执行当前业务步骤
   } // 代码块结束
@@ -146,18 +162,28 @@ function useAnnouncements(enabled: boolean): CommunityThread[] {
 export function PageBlocks({ page, locale = 'zh-CN' }: Props) {
   const [blocks, setBlocks] = useState<PageBlock[]>([]); // 赋值：更新变量 const 的取值
   const [failed, setFailed] = useState(false); // 赋值：更新变量 const 的取值
+  const [loaded, setLoaded] = useState(false); // 是否已完成首次读取，避免默认区块闪烁
   const announcements = useAnnouncements(page === 'home' || page === 'forum'); // 常量 announcements：保存固定配置或一次性派生值
   useEffect(() => {
     let cancelled = false; // 可变变量 cancelled：运行过程中会被重新赋值
-    void api.commerce.page(page).then((data) => { if (!cancelled) setBlocks(data.blocks); }).catch(() => { if (!cancelled) setFailed(true); }); // 执行当前业务步骤
+    setLoaded(false); // 切换页面时重新等待读取
+    setBlocks([]); // 清掉上一页区块，避免接口失败时串页
+    setFailed(false); // 重置失败标记
+    void api.commerce.page(page)
+      .then((data) => { if (!cancelled) setBlocks(data.blocks); }) // 正常返回配置
+      .catch(() => { if (!cancelled) setFailed(true); }) // 记录失败，用于区分页面兜底策略
+      .finally(() => { if (!cancelled) setLoaded(true); }); // 无论成功失败都结束首读
     return () => { cancelled = true; }; // 返回当前函数的处理结果
   }, [page]);
-  if (failed && blocks.length === 0) return null; // 区块接口不可用时整页照常渲染
+  if (!loaded) return null; // 首读未完成先不渲染，避免默认区块闪一下又被替换
+  if (failed && blocks.length === 0 && page !== 'home') return null; // 论坛等页面接口不可用时整页照常渲染
+  // 首页读不到配置或后台清空时用内置默认区块兜底；其余页面保持空渲染
+  const sourceBlocks = blocks.length > 0 ? blocks : page === 'home' ? DEFAULT_HOME_BLOCKS : [];
   // 前台按 sort_order 升序渲染（后端已排序，前端再兜底一次，防止乱序配置打乱版面）
-  const orderedBlocks = [...blocks].sort((a, b) => a.sort_order - b.sort_order);
-  const hasAnnouncementBlock = blocks.some((block) => block.kind === 'announcements'); // 常量 hasAnnouncementBlock：保存固定配置或一次性派生值
+  const orderedBlocks = [...sourceBlocks].sort((a, b) => a.sort_order - b.sort_order);
+  const hasAnnouncementBlock = sourceBlocks.some((block) => block.kind === 'announcements'); // 常量 hasAnnouncementBlock：保存固定配置或一次性派生值
   return ( // 返回当前函数的处理结果
-    <div className="page-blocks" data-page={page} data-locale={locale}>{/* 执行当前业务步骤 */}
+    <div className={`page-blocks${page === 'home' ? ' page-blocks-home' : ''}`} data-page={page} data-locale={locale}>{/* 仅首页启用新装修样式，论坛页保持原视觉 */}
       {orderedBlocks.map((block) => <Block block={block} key={block.id} />)}
       {hasAnnouncementBlock && announcements.length > 0 ? (
         <section className="page-block">{/* 执行当前业务步骤 */}
