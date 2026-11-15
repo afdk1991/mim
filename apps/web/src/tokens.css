@@ -31,15 +31,15 @@
   --bg: var(--theme-bg); /* 页面底色：浅灰，托起白色卡片形成层次 */
   --surface: #ffffff; /* 一级表面：卡片、面板、弹窗内容区 */
   --surface-2: #f6f7f8; /* 二级表面：表头、悬停底、弱化区块 */
-  --surface-3: #eef0f3; /* 三级表面：徽标底、分段控件未选中底 */
+  --surface-3: #eeeeee; /* 三级表面：徽标底、分段控件未选中底 */
   --text: #333333; /* 主文字：标题与关键信息 */
   --text-secondary: #4e5358; /* 正文文字：段落与卡片摘要 */
   --text-muted: #777777; /* 次要文字：说明、计数、元信息 */
   --text-subtle: #999999; /* 更弱文字：时间戳、占位提示 */
   --text-disabled: #b1b1b1; /* 禁用文字：不可用项与占位符 */
-  --border: #ebedf0; /* 常规描边：卡片、输入框、分割线 */
-  --border-strong: #e3e6ec; /* 强调描边：需要更清晰边界的分组 */
-  --border-hover: #c9ced9; /* 悬停描边：次按钮 hover 时加深一档 */
+  --border: rgba(50, 50, 50, 0.06); /* 常规描边：半透明极淡灰线，浅底不显硬边 */
+  --border-strong: rgba(50, 50, 50, 0.1); /* 强调描边：需要更清晰边界的分组 */
+  --border-hover: rgba(50, 50, 50, 0.18); /* 悬停描边：次按钮 hover 时加深一档 */
 
   /* ---------- 主色与状态色：单一主色 + 语义色 ---------- */
   --primary: var(--theme-primary); /* 品牌主色：主按钮、选中态、链接 */
@@ -98,9 +98,9 @@
   /* ---------- 阴影：柔和环境阴影，不叠加硬边 ---------- */
   --shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.04); /* 贴地阴影：输入框、分段底 */
   --shadow-sm: 0 0 10px rgba(116, 116, 116, 0.08); /* 环境阴影：列表卡片默认 */
-  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 18px rgba(17, 24, 39, 0.06); /* 标准卡片阴影 */
+  --shadow: 0 0 10px rgba(116, 116, 116, 0.08); /* 标准卡片阴影：单层环境光，边界交给留白而非描边 */
   --shadow-lg: 0 2px 4px rgba(17, 24, 39, 0.04), 0 16px 40px rgba(17, 24, 39, 0.1); /* 浮层阴影：弹窗、下拉 */
-  --shadow-hover: 0 4px 10px rgba(17, 24, 39, 0.06), 0 12px 28px rgba(17, 24, 39, 0.08); /* 悬停抬升阴影 */
+  --shadow-hover: 0 0 14px rgba(116, 116, 116, 0.16); /* 悬停阴影：只加深环境光，不做位移 */
 
   /* ---------- 字体与字号阶梯：12 / 13 / 14 / 16 / 18 / 22 / 28 ---------- */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; /* 中英文系统字体栈 */
@@ -113,7 +113,7 @@
   --fs-xl: 22px; /* 页面主标题 */
   --fs-2xl: 28px; /* 首屏大标题 */
   --lh-tight: 1.35; /* 紧凑行高：标题 */
-  --lh-base: 1.6; /* 基准行高：正文更易读 */
+  --lh-base: 1.45; /* 基准行高：正文紧凑但可读，列表信息密度更高 */
   --lh-loose: 1.75; /* 宽松行高：长段落 */
   --fw-normal: 400; /* 常规字重 */
   --fw-medium: 500; /* 中等字重：列表标题 */
@@ -132,21 +132,27 @@
 
   /* ---------- 动效：克制的颜色 / 阴影过渡 ---------- */
   --ease: cubic-bezier(0.28, 0.9, 0.34, 0.99); /* 标准缓动：先快后缓 */
-  --dur-fast: 180ms; /* 快速反馈：悬停、聚焦 */
-  --dur: 300ms; /* 常规过渡：卡片抬升、浮层出现 */
+  --dur-fast: 150ms; /* 快速反馈：悬停、聚焦 */
+  --dur: 200ms; /* 常规过渡：封面缩放、浮层出现 */
   --transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); /* 统一过渡集合 */
 
   /* ---------- 卡片规格：与上方圆角 / 间距共用，避免各处手写 ---------- */
   --card-radius: var(--radius); /* 标准卡片圆角 */
   --card-radius-sm: var(--radius-sm); /* 紧凑卡片圆角 */
   --card-radius-lg: var(--radius-lg); /* 主推 / 详情卡片圆角 */
-  --card-pad: 18px; /* 标准内边距：舒适密度 */
-  --card-pad-tight: 12px; /* 紧凑内边距 */
+  --card-pad: 16px; /* 标准内边距：面板级容器 */
+  --card-pad-tight: 10px; /* 紧凑内边距：列表卡片内容区 */
   --card-gap: 16px; /* 卡片之间与栅格间距 */
-  --card-cover: 3 / 2; /* 封面统一比例 */
+  --card-cover: 10 / 7; /* 封面统一比例：略低于 3:2，横向更舒展 */
   --card-min: 300px; /* 卡片网格最小列宽 */
   --card-title-lines: 2; /* 标题最多两行 */
   --card-summary-lines: 2; /* 摘要最多两行 */
+
+  /* ---------- 控件规格：按钮 / 输入框 / 标签统一形态 ---------- */
+  --control-h: 34px; /* 按钮与下拉高度：比输入框矮一档，形成主次 */
+  --field-h: 40px; /* 输入框高度：填充式控件需要更高热区 */
+  --control-radius: 4px; /* 控件圆角：小方圆角，区别于卡片的 12px */
+  --tag-radius: 4px; /* 标签圆角：与控件同族，避免全站胶囊化 */
 } /* 浅色令牌结束 */
 
 :root[data-theme='dark'] { /* 暗色令牌：显式切换才生效，不影响现有浅色默认 */
@@ -162,9 +168,9 @@
   --text-muted: #b4b6bb; /* 次要文字 */
   --text-subtle: #888a8f; /* 更弱文字 */
   --text-disabled: #636469; /* 禁用文字 */
-  --border: rgba(184, 184, 184, 0.12); /* 常规描边：暗底半透明更自然 */
-  --border-strong: rgba(184, 184, 184, 0.2); /* 强调描边 */
-  --border-hover: rgba(184, 184, 184, 0.32); /* 悬停描边：暗底需更亮才可见 */
+  --border: rgba(114, 114, 114, 0.1); /* 常规描边：暗底半透明更自然 */
+  --border-strong: rgba(114, 114, 114, 0.16); /* 强调描边 */
+  --border-hover: rgba(114, 114, 114, 0.28); /* 悬停描边：暗底需更亮才可见 */
 
   /* ---------- 主色与状态色：提亮保证暗底对比 ---------- */
   --primary: var(--theme-primary-dark); /* 主色：取后台主色派生出的暗色亮度版本 */
@@ -215,7 +221,7 @@
   /* ---------- 阴影：暗底用更高不透明度，避免看不见 ---------- */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28); /* 贴地阴影 */
   --shadow-sm: 0 0 12px rgba(0, 0, 0, 0.3); /* 环境阴影 */
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.32); /* 标准卡片阴影 */
+  --shadow: 0 0 10px rgba(24, 24, 24, 0.1); /* 标准卡片阴影：暗底单层环境光 */
   --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.44); /* 浮层阴影 */
-  --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.4); /* 悬停抬升阴影 */
+  --shadow-hover: 0 0 14px rgba(0, 0, 0, 0.34); /* 悬停阴影：只加深环境光 */
 } /* 暗色令牌结束 */
