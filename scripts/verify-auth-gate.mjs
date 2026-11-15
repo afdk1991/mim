@@ -7,7 +7,7 @@
  *   1. 匿名可读：白名单内的 GET / HEAD / OPTIONS 直接 200，不需要任何令牌；
  *   2. 写操作：同一路径的 POST / PUT / PATCH / DELETE 一律 401，白名单不能把写带出去；
  *   3. 注册已关闭：POST /api/v1/auth/register 返回 403 + AUTH_REGISTER_DISABLED；
- *   4. 无访客建号：/api/v1/auth/guest 不存在（404），前端也不再调用；
+ *   4. 无访客建号：/api/v1/auth/guest 不可用（路由已删除 → 404；或仅保留硬拒桩 → 403 AUTH_REGISTER_DISABLED），前端也不再调用；
  *   5. 后台边界：/api/v1/admin/* 不参与全站强制登录，但仍由 requirePermission 兜底 401；
  *   6. 深链接与刷新：路径路由 + 构建期 404.html / 平台 navigationFallback 回退。
  *
@@ -139,8 +139,13 @@ check(
   /AUTH_REGISTER_DISABLED:\s*403/.test(read('packages/core-domain/src/errors.ts')),
   '注册关闭错误码状态位漂移',
 );
-// 访客建号接口必须彻底不存在
-check('后端无 /auth/guest 路由', !authRoute.includes("'/auth/guest'"), '访客自动建号接口仍在');
+// 访客建号必须没有实现：路由已整体删除，或仅保留「注册关闭」硬拒桩（任何情况下都不得落库建号）
+const guestRouteDefined = authRoute.includes("'/auth/guest'");
+check(
+  '后端无访客自动建号实现',
+  !guestRouteDefined || /\/auth\/guest[\s\S]{0,400}?AUTH_REGISTER_DISABLED/.test(authRoute),
+  '访客建号路由仍在且没有走注册关闭硬拒',
+);
 // 渠道能力必须如实告诉前端注册已关闭
 check(
   '渠道能力上报 register=false',
@@ -305,7 +310,13 @@ async function probe(name, method, path, expect) {
 
 for (const path of READ_PATHS) await probe('匿名可读 ' + path + ' 返回 200', 'GET', path, 200);
 for (const item of WRITE_CASES) await probe('写操作 ' + item[0] + ' ' + item[1] + ' 返回 401', item[0], item[1], 401);
-await probe('访客建号 POST /api/v1/auth/guest 返回 404', 'POST', '/api/v1/auth/guest', 404);
+const guestRes = await request('POST', '/api/v1/auth/guest', '{}');
+const guestCode = codeOf(guestRes.body);
+results.push({
+  name: '访客建号 POST /api/v1/auth/guest 不可用（404 已删除 / 403 AUTH_REGISTER_DISABLED 硬拒）',
+  ok: guestRes.status === 404 || (guestRes.status === 403 && guestCode === 'AUTH_REGISTER_DISABLED'),
+  detail: 'status ' + guestRes.status + ' / code ' + String(guestCode),
+});
 await probe('未登录 GET /api/v1/me 返回 401', 'GET', '/api/v1/me', 401);
 await probe('后台 GET /api/v1/admin/me 返回 401', 'GET', '/api/v1/admin/me', 401);
 await probe('后台 GET /api/v1/admin/shop/products 返回 401', 'GET', '/api/v1/admin/shop/products', 401);
