@@ -30,7 +30,7 @@ import { createReferralAdminRouter } from './routes/referral-admin.js'; // 返�
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createCirclesRouter } from './routes/circles.js'; // 圈子：独立于板块的成员制社群，公开浏览 + 成员/圈主写操作
-import { createCacheHeaderMiddleware, createCaptchaMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套 + 缓存头 / 验证码门禁工厂
+import { createCacheHeaderMiddleware, createCaptchaMiddleware, createForceLoginMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套 + 缓存头 / 验证码门禁工厂
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
 import { createNotifyChannels } from './notify.js'; // 验证码通知通道工厂（短信 / 邮件）
@@ -101,6 +101,11 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   // 对象收发端点必须先于 express.json 挂载：其 PUT 路由自带 raw 解析器，读取原始字节
   app.use('/api/v1', createMediaObjectRouter(resolved)); // 若排在 express.json 之后，请求流已被 JSON 解析器消费，raw 拿不到原始字节
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { (req as { rawBody?: string }).rawBody = buf.toString('utf8'); } })); // 保留原始报文供微信回调验签.body
+  // 全站强制登录：集中门禁，默认开启（MIM_FORCE_LOGIN=0 关闭）；必须早于缓存头与全部业务路由
+  app.get('/api/v1/healthz', (_req, res) => { // 监控别名：语义同 /health，供只允许访问 /api 前缀的探针使用
+    res.json({ status: 'ok' }); // 最小静态响应：只回报存活状态，不暴露服务名与版本
+  }); // /api/v1/healthz 结束
+  app.use('/api/v1', createForceLoginMiddleware()); // 集中门禁：未认证一律 401，不签发任何临时身份
 
   // 公共只读端点缓存头：弱 ETag + Cache-Control + 304 命中，必须排在业务路由之前才能覆盖全部公开读接口
   app.use('/api/v1', createCacheHeaderMiddleware({ maxAgeSeconds: 60, scope: 'public' })); // 私有端点由该中间件按 scope 跳过，避免把用户数据写进共享缓存

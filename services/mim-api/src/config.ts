@@ -63,7 +63,7 @@ export const ADMIN_TOKEN_ENV_KEY = 'MIM_ADMIN_TOKEN'; // 只导出键名常量�
 export const JOBS_ENABLED = (process.env.MIM_JOBS ?? '1') !== '0'; // 显式 0 才关闭，其余取值均视为开启，避免拼写错误导致任务静默不跑
 
 /**
- * 注册总开关：所有新建账号路径（自助注册 / 验证码首登 / OAuth 首登 / 免登录访客）的唯一闸门。
+ * 注册总开关：所有新建账号路径（自助注册 / 验证码首登 / OAuth 首登）的唯一闸门。
  * 仅显式 MIM_REGISTRATION_ENABLED=1 才开启；未配置或任何其它取值一律视为关闭。
  * 统一在服务端判定，前端隐藏入口只是体验优化，无法绕过。
  */
@@ -74,6 +74,19 @@ export function isRegistrationEnabled(env: Record<string, string | undefined>): 
   const raw = env[REGISTRATION_ENABLED_ENV_KEY] ?? process.env[REGISTRATION_ENABLED_ENV_KEY]; // 请求级配置优先
   return (raw ?? '').trim() === '1'; // 只有显式 1 才放行
 } // isRegistrationEnabled 结束
+
+/**
+ * 全站强制登录总开关：除登录链路、第三方支付回调、健康检查与必要公开元数据外，
+ * 所有业务接口都要求有效认证。默认开启；仅显式 MIM_FORCE_LOGIN=0/false/off 关闭（测试与排障用）。
+ * 判定集中在 createForceLoginMiddleware，不在各路由散落 if。
+ */
+export const FORCE_LOGIN_ENV_KEY = 'MIM_FORCE_LOGIN'; // 只导出键名常量，避免多处手写字符串拼错
+
+/** 读取强制登录开关：缺省开启，只有显式关闭值才放行匿名访问 */
+export function isForceLoginEnabled(env: Record<string, string | undefined>): boolean {
+  const raw = (env[FORCE_LOGIN_ENV_KEY] ?? process.env[FORCE_LOGIN_ENV_KEY] ?? '').trim().toLowerCase(); // 请求级配置优先
+  return raw !== '0' && raw !== 'false' && raw !== 'off'; // 只有三种显式关闭值生效
+} // isForceLoginEnabled 结束
 
 /**
  * JWT 密钥加载（优先级从高到低）：

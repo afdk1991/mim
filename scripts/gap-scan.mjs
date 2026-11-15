@@ -73,6 +73,7 @@ const INTERNAL_ENV_VARS = new Set([
   'MIM_CONTENT_CLICK_MAX', // 内部推广点击上限
   'MIM_CONTENT_CONVERSION_MAX', // 内部转化频控上限
   'MIM_AI_ALLOW_INSECURE_BASE', // AI 厂商 baseUrl http 放行 opt-in 开关（安全内部开关）
+  'MIM_FORCE_LOGIN', // 全站门禁总开关：默认开启，仅排障时显式置 0 关闭（内部开关）
   'MIM_API_BASE', // perf-bench 脚本探测目标
   'MIM_APP', // 蓝图注册表 JSON 内的示例键名
   'MIM_E2E_PNG', // 端到端校验脚本截图路径
