@@ -1,6 +1,6 @@
 /** 社区与变现路由：论坛 / 付费阅读 / VIP / 钱包积分 / 独立商城 / 优惠码 / 推广分成 */
 
-import { Router } from 'express'; // Express 路由容器
+import { Router, type Request } from 'express'; // Express 路由容器 + 请求类型（本地推导公网基址）
 import { randomUUID } from 'node:crypto'; // 稳定主键生成
 import { z } from 'zod'; // 入参声明式校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
@@ -17,7 +17,16 @@ import { DEFAULT_TABS, loadBoardTabs, saveBoardTabs, SORT_BY_KEYS, type TabInput
 import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewEnabled, type HomeView } from '../community/settings.js'; // 三期：首页指向与审核开关
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
 import { assertSafeObjectKey, mimeForObjectKey } from '../storage.js'; // 附件对象键安全校验（禁止路径穿越）+ 后缀推导 MIME
-import { baseUrlOf } from './media.js'; // 复用媒体域的公网基址推导，附件签名下载点同一口径
+
+/** 附件签名下载的公网基址：优先显式配置，其次按反代头 / Host 推导；与媒体域同一口径。 */
+function publicBaseUrl(req: Request, env: Record<string, string | undefined>): string | undefined { // 定义函数 publicBaseUrl：把请求还原成外部可访问的源
+  const configured = (env.MIM_PUBLIC_BASE_URL ?? '').trim(); // 显式配置优先
+  if (configured) return configured; // 配了就直接用
+  const forwardedHost = (req.get('x-forwarded-host') ?? '').split(',')[0]!.trim(); // 反代改写后的主机名
+  const forwardedProto = (req.get('x-forwarded-proto') ?? '').split(',')[0]!.trim(); // 反代改写后的协议
+  const host = forwardedHost || req.get('host'); // 无代理头时回落 Host
+  return host ? `${forwardedProto || req.protocol}://${host}` : undefined; // 推导不出返回 undefined，交给存储层回落
+} // 结束函数体：本层作用域收尾
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
 
@@ -597,7 +606,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const presigned = await storage.presignDownload({ // 生成短时签名地址（local 走 HMAC，s3 走 SigV4）
       key: attachment.url, // 对象键：列名沿用历史 url，但存的是键不是公开直链
       expires_seconds: 300, // 5 分钟有效：足够点击下载，又不会被长期转发
-      base_url: baseUrlOf(req, deps.env), // 与媒体域同一套公网基址推导
+      base_url: publicBaseUrl(req, deps.env), // 与媒体域同一套公网基址推导
     }); // presignDownload 调用结束
     res.json({ // 只回签名地址与展示元数据，不回对象键
       download: presigned, // 含 url / method / headers / expires_at
