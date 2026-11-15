@@ -1,6 +1,6 @@
 # Mim
 
-> **项目名称：Mim**（用户 2026-11-09 18:50 统一定名）。仓库目录、npm scope `@mim/*`、仓库名 `mim` 与生产域名 `mim.mixm.top` 均与项目名称一致。协作铁律见 [AGENTS.md](./AGENTS.md)。
+> **项目名称：Mim**（用户 2026-11-09 18:50 统一定名）。仓库目录、npm scope `@mim/*`、仓库名 `mim` 均与项目名称一致；现役生产入口为 `https://laal.top`（API `https://api.laal.top`，后台 `https://laal.top/admin/`），旧域名 `mim.mixm.top` 已无 Mim 部署、仅 301 → `laal.top`。协作铁律见 [AGENTS.md](./AGENTS.md)。
 
 ## 项目主题
 
@@ -83,7 +83,7 @@ node scripts/comment-check.mjs
 9. **铁律九**：多平台部署矩阵只走免费方案（**11 个平台**：9 个原矩阵平台 + 2026-11-10 新增的 **Gitee（码云）** 镜像仓 + 2026-11-13 接替停服 Sealos 的 **Netlify**），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证。
 10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核。**原候选托管平台相关内容已于 2026-11-09 按用户指令全量删除，不得重新引入。**
 11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」。
-12. **铁律十二**：**全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器**——两个远端（`origin` GitHub、`gitee` Gitee）每轮必须同轮全部推送并逐个 `git ls-remote` 取证；远程仓库只承担源码托管与镜像，**生产唯一权威终点为 `https://mim.mixm.top`**（nginx + systemd + SQLite，前后端 + 数据库一体上线），铁律九的 11 平台仅作分发 / 镜像 / 取证，不得替代「已上线」；交付须附 V1–V6 取证矩阵（详见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)）。
+12. **铁律十二**：**全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器**——两个远端（`origin` GitHub、`gitee` Gitee）每轮必须同轮全部推送并逐个 `git ls-remote` 取证；远程仓库只承担源码托管与镜像，**生产唯一权威终点为 `https://laal.top`**（API `https://api.laal.top`；nginx + systemd + SQLite，前后端 + 数据库一体上线；旧 `mim.mixm.top` 仅 301 → `laal.top`），铁律九的 11 平台仅作分发 / 镜像 / 取证，不得替代「已上线」；交付须附 V1–V6 取证矩阵（详见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)）。
 
 ## 仓库结构
 
@@ -181,7 +181,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 ## 站点与部署
 
-> **生产环境已上线**：`https://mim.mixm.top`（前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。遵循 [铁律八](./AGENTS.md)，任务完成后由 CI 自动发布，**不以本地预览作为交付终点**。
+> **生产环境已上线**：`https://laal.top`（API `https://api.laal.top`，后台 `https://laal.top/admin/`；前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。旧 `mim.mixm.top` 已无 Mim 部署，仅 301 → `laal.top`。遵循 [铁律八](./AGENTS.md)，任务完成后由 CI 自动发布，**不以本地预览作为交付终点**。
 >
 > **2026-11-12 17:5x 全平台域名可访问性验证（现行状态）**：本机（宁波）+ CI Runner（run `43194019481` @ `fd2cf60`）双出口逐域名实测 13 个对外地址 —— **9 个可达**：`mim.mixm.top`（`/health` 200 / 53B、`/` 200 / 5305B、`/api/v1/modules` 200 / 10046B，`/marketplace` `/signin` `/deployments` 均 200，旧段 `/store` 301 → `/marketplace`）、`mim-299.pages.dev` 200 / 5305B、`afdk1991.github.io/mim/` 200 / 5305B、`mim-puce.vercel.app` 200 / 5182B（CI 出口；本机 TLS 阻断）、`gitee.com/mallwm_admin/mim` 200、`github.com/afdk1991/mim` 200、`ghcr.io/v2/` 401 / 73B（预期）；**3 个不可达**：`data.mixm.top`（CNAME 目标 `data.mixm.top.pages.dnsoe5.com` 在默认 DNS 与 `8.8.8.8` 下均 NXDOMAIN，本机与 CI 双 000，EdgeOne 入口整体失效）、`mim-i3ywsdfn.cloud.sealos.io/health`（本机 TLS `Connection was reset`、CI 000，DNS 正常）、`preview.iga-pages.com`（登记入口无 A 记录）；**1 个异常**：`mim-store.15726833367.workers.dev` 根路径 404 / 17B（Worker 存活但无根路由）。另修正一处登记错误：IGA 真实入口为 **`mim.preview.iga-pages.com`**（401 / 2413B，受访问保护），`preview.iga-pages.com` 本身不存在。7 个 `portal/m/api/test/store/dev/shop.mixm.top` 仍无解析（既有 pending）。逐项证据与处置建议见 [docs/平台域名验证-20261112.md](./docs/平台域名验证-20261112.md)。
 >
@@ -189,17 +189,17 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 >
 > **2026-11-11 00:20 多平台项目名统一为 Mim（现行状态）**：按用户「整个项目在多个平台项目名称全部统一为 Mim」指令，Cloudflare Pages 项目已由 `mim-8ah` 迁移为 **`mim`**（`wrangler pages project create mim` + `pages deploy --project-name=mim`），因 Pages 子域全局唯一、`mim.pages.dev` 已被他人占用，平台分配域名 **`https://mim-299.pages.dev`**；实测 `/` **200 / 1.840s / 5114B**、`/store` 200 / 0.571s、`/comic` 200 / 1.758s、`/api/v1/modules` **200 / 3.200s / 9514B**（Functions 反代生效）。旧项目 `mim-8ah` 保留作回滚。GitHub 仓库 / Gitee 仓库 / ghcr 包名早已为 `mim` / `mim-api`；Sealos（命名空间 `ns-i3ywsdfn`，平台分配不可自选）保持现状，Vercel / EdgeOne 两项经 01:05 复核确认**本就为 `mim`**（见上段），IGA（`fr95fuwu57`）**因缺令牌未取证**，逐项阻塞见 [AGENTS.md §9.15](./AGENTS.md)。**CI 复验**：push 触发的 run `42854147887` 中「托管平台同步」作业已用 `--project-name=mim` 云端真发（`Deployment complete! … https://cf70ccda.mim-299.pages.dev`），同一作业的线上取证 `mim-299.pages.dev/ => 200`、`mim.mixm.top/health => 200`、`mim-puce.vercel.app/ => 200`。
 >
-> **2026-11-10 23:40 生产上线取证（现行状态）**：`https://mim.mixm.top` 已真实在线 —— `/health` **200 / 0.071s / 53B**（`{"status":"ok","service":"mim-api","version":"0.0.0"}`）、`/` 200 / 5114B、`/api/v1/modules` 200 / 9514B、`/store` 与 `/comic` 200 / 5114B（`try_files` SPA 回落生效）、`/admin/` 200 / 1430B；Let's Encrypt 证书已签发（`ssl_verify_result=0`），`http://` 一律 **301** 跳 HTTPS；Cloudflare Pages 的 `/api` 反代随上游恢复（`https://mim-299.pages.dev/api/v1/modules` 实测 **200 / 3.200s / 9514B**）。主机构建与启动链路上修掉三个真实缺陷（esbuild banner `createRequire` 重名 `22d2d2b`、`sharp` 未设 external 被内联 `726f5bb`、启动期加载原生库致 SEGV → sharp 改按需加载 `f859114` + 主机 Node 升到 22.20.0）。取证明细见 [AGENTS.md §9.14](./AGENTS.md)。
+> **2026-11-10 23:40 生产上线取证（现行状态）**：`https://mim.mixm.top` 已真实在线 —— `/health` **200 / 0.071s / 53B**（`{"status":"ok","service":"mim-api","version":"0.0.0"}`）、`/` 200 / 5114B、`/api/v1/modules` 200 / 9514B、`/store` 与 `/comic` 200 / 5114B（`try_files` SPA 回落生效）、`/admin/` 200 / 1430B；Let's Encrypt 证书已签发（`ssl_verify_result=0`），`http://` 一律 **301** 跳 HTTPS；Cloudflare Pages 的 `/api` 反代随上游恢复（`https://mim-299.pages.dev/api/v1/modules` 实测 **200 / 3.200s / 9514B**）。主机构建与启动链路上修掉三个真实缺陷（esbuild banner `createRequire` 重名 `22d2d2b`、`sharp` 未设 external 被内联 `726f5bb`、启动期加载原生库致 SEGV → sharp 改按需加载 `f859114` + 主机 Node 升到 22.20.0）。取证明细见 [AGENTS.md §9.14](./AGENTS.md)。（注：该段为 2026-11-10 历史快照；2026-11-15 起生产入口已迁至 `https://laal.top`，`mim.mixm.top` 仅 301 → `laal.top`。）
 >
 > **2026-11-09 17:54 复核（现状标注，非历史数值改写）**：本机探测 `mim.mixm.top` 返回 `000`（curl exit 7，本地代理 `CONNECT tunnel failed, response 502`；DNS 正常解析 `115.159.159.11`），主机侧状态本轮无 SSH / `tccli` 凭据可验证；逐平台实测与「历史快照不得冒充现状」的阅读约定见 [AGENTS.md §0 / §9.1](./AGENTS.md)。
 >
-> **生产权威终点与双远端（铁律十二，2026-11-09 18:08 补充）**：本项目生产**唯一权威终点**为线上腾讯云自建服务器 `https://mim.mixm.top`（前后端 + SQLite 一体上线），下方 9 平台矩阵仅为分发 / 镜像 / 可用性取证，**任一平台的 200 均不得替代「已上线」**。代码远端共 2 个：`origin`（`https://github.com/afdk1991/mim.git`）与 `gitee`（`https://gitee.com/mallwm_admin/mim.git`），每轮交付须**同轮全推并逐个 `git ls-remote` 取证**；**已移除的原候选托管平台相关内容全量删除且不得重新引入**。取证矩阵 V1–V6 与适用边界见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)。
+> **生产权威终点与双远端（铁律十二，2026-11-15 更新入口）**：本项目生产**唯一权威终点**为线上腾讯云自建服务器 `https://laal.top`（API `https://api.laal.top`，前后端 + SQLite 一体上线；旧 `mim.mixm.top` 仅 301 → `laal.top`），下方 11 平台矩阵仅为分发 / 镜像 / 可用性取证，**任一平台的 200 均不得替代「已上线」**。代码远端共 2 个：`origin`（`https://github.com/afdk1991/mim.git`）与 `gitee`（`https://gitee.com/mallwm_admin/mim.git`），每轮交付须**同轮全推并逐个 `git ls-remote` 取证**；**已移除的原候选托管平台相关内容全量删除且不得重新引入**。取证矩阵 V1–V6 与适用边界见 [AGENTS.md §12](./AGENTS.md#铁律十二全量远程仓库同步与生产统一部署到线上腾讯云自建服务器)。
 
 | 项 | 说明 |
 |---|---|
-| 生产域名 | `https://mim.mixm.top`（HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`） |
+| 生产域名 | `https://laal.top`（API `https://api.laal.top`；HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`；旧 `mim.mixm.top` 仅 301） |
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（用户端静态根）+ `/opt/mim/admin`（管理后台静态根）+ systemd `mim-api`（端口 8787） |
-| 管理后台入口 | `https://mim.mixm.top/admin/`（`apps/admin` 构建产物；nginx `/admin/` location 独立 alias，与用户端静态根隔离；页面声明 `noindex, nofollow`） |
+| 管理后台入口 | `https://laal.top/admin/`（`apps/admin` 构建产物；nginx `/admin/` location 独立 alias，与用户端静态根隔离；页面声明 `noindex, nofollow`） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前幂等执行；**项目不创建任何数据库备份** |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
@@ -212,7 +212,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 ### 多平台部署矩阵
 
-> **层级定位（铁律十二 / 铁律九）**：本表为「1 个生产权威终点 + 铁律九的 11 个免费平台矩阵成员」，其中 11 行即铁律九的 11 个免费平台矩阵成员（2026-11-10 起 Gitee 镜像仓由「矩阵外补充项」提升为矩阵第 10 行；2026-11-13 Netlify 接替停服的 Sealos 成为第 11 行，Sealos 保留为退休留痕行；Cloudflare Pages 与其独立 Worker 为同行并列的两个规范部署项）；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://mim.mixm.top`。静态站直传、同源反代 Worker、容器镜像与源码镜像仓均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
+> **层级定位（铁律十二 / 铁律九）**：本表为「1 个生产权威终点 + 铁律九的 11 个免费平台矩阵成员」，其中 11 行即铁律九的 11 个免费平台矩阵成员（2026-11-10 起 Gitee 镜像仓由「矩阵外补充项」提升为矩阵第 10 行；2026-11-13 Netlify 接替停服的 Sealos 成为第 11 行，Sealos 保留为退休留痕行；Cloudflare Pages 与其独立 Worker 为同行并列的两个规范部署项）；生产唯一权威终点是表中「腾讯云自建服务器」一行的 `https://laal.top`（API `https://api.laal.top`；旧 `mim.mixm.top` 仅 301 → `laal.top`）。静态站直传、同源反代 Worker、容器镜像与源码镜像仓均不承担生产运行，缺少该行 `/health` 200 与关键接口取证时不得宣称「已上线」。
 
 一套代码、一份前端产物（`vite base: './'`，可挂任意子路径），后端统一由 `services/mim-api` 提供。CI 在 push `main` 时并行触发下列链路；缺凭证的平台以 `SKIP` 跳过，不阻断主链路。代码远端为 `origin`（GitHub）与 `gitee`（Gitee），每轮须同轮全推；原候选托管平台已全量移除。
 
@@ -225,13 +225,13 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | 腾讯云 EdgeOne Pages | 真实前端 `apps/web/dist` | 项目名 **`mim`**（2026-11-11 01:05 控制台实测；遗留项目 `mim-app` 仅默认域、无流量，保留回滚）；CLI 直传命令 `edgeone makers deploy dist -n mim --env production`（本机 `~/.edgeone/pages-config.json` 的 `workspaceToProject` 已映射 `F:\合并项目\Mim=mim`，对应 ProjectId `makers-iygo4nrk22jr`；遗留项目 `mim-app` = `makers-qsbzlpxaoa8b` 仅作回滚，勿用 `-n mim-app` 直传）；`apps/web/index.html` `<head>` 已内置 `?tads` / 裸问号归一化脚本；`data.mixm.top` 对 `curl` / 无头 UA 返回 WAF 混淆 JS，对**无头浏览器与全新 profile 的有头 Edge** 返回验证码页（`TEOCaptchaWidgetV1`），真实内容须复用**已通过过校验的** Edge user-data-dir + 有头模式 + CDP 取证（判定正则含 `EO_Bot_Ssid\|_0x649a\|TEOCaptchaWidgetV1\|正在验证连接安全性`） | ✅ 已同步（`data.mixm.top` 2026-11-11 01:05 实测 **200 / 981B / `server: edgeone makers`**，仅 WAF 人机校验页；内容层最近一次有头 Edge + CDP 取证（2026-11-06）`title=Mim` + `assets/index-cpYhbG3w.js`；2026-11-07 01:48 复测时放行凭证过期回落验证码页，需人工勾选一次复选框后恢复。控制台显示该项目已连代码源 `afdk1991/mim` `main`，交付方式是否已由直传改为 Git 连接**待复核**。**2026-11-12 复核**：CLI 直传本地同源构建 `dist/`（30 文件，API=`mim.mixm.top`）到项目 `mim`（`makers-iygo4nrk22jr`），最新 Deployment `dprcsooiriey` `Deploy Success`（前一轮 `dp2z0vxmyw0w` 留痕）；自定义域 `data.mixm.top` 本机 exit 6 / CI 双 000（CNAME 目标 NXDOMAIN），临时域去 token 401 平台鉴权挑战页（2715B，title=Tencent Edgeone），内容层本轮未复验。**2026-11-12 21:23 控制台复核**：登录主账号 `100033061933` 进入 Makers 控制台，mim 项目域名管理仅默认域 `mim-45yeiirr.edgeone.cool`（已生效），未绑定任何自定义域；默认域渲染 Mim SPA 正常，产物 `index-Dmz7Z5Id.js` + `index-DLY_QDd3.css`（与本机根构建 / IGA 直传同指纹），静态副本侧模块目录接口 Failed to fetch（纯静态分发，API 仍走生产 `mim.mixm.top`）；遗留 `mim-app`（`makers-qsbzlpxaoa8b`）域名表为空。`data.mixm.top` 双解析器 NXDOMAIN，需控制台添加自定义域取得新 CNAME 后在 DNSPod 配置解析） |
 | Cloudflare Pages / Workers | 前端 + `/api` 反代 + SPA 深链接回退 | `wrangler.toml`（`name = "mim"`）+ `functions/api/[[path]].js`（/api 反代）+ `functions/[[catchall]].js`（SPA 回退：Pages 挂载 Functions 后 `_redirects` 被整体旁路，深链接由 catch-all Function 200 重写 index.html；curl 取证须带 `Accept: text/html` 头，裸 curl 默认 `Accept: */*` 得 404 属按设计跳过），项目名 **`mim`**、域名 `https://mim-299.pages.dev`（旧 `mim-8ah` 保留回滚） | ✅ CI 自动发布（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 已配置；2026-11-11 项目名迁移后实测 `/`、`/store`、`/comic`、`/api/v1/modules` 全 200） |
 | Cloudflare Pages 同源自托管入口（`_worker.js` 高级模式） | 前端静态资源 + `/api`、`/health` 反代到本机同源站点（cloudflared 快速隧道回源），不依赖已失效的 `mim.mixm.top` | `.tmp/pages-src/_worker.js`（部署进 `mim` 项目）→ `wrangler pages deploy`；入口 `https://mim-299.pages.dev/store`；上游地址写在 `_worker.js` 的 `UPSTREAM` 常量，隧道地址变化后重发一次即可 | ✅ 2026-11-09 实测（本机中国网络 curl：`/health` 200/53B、`/api/v1/modules` 200/3411B 返回 8 模块、`/store` `/comic` `/settings` `/login` 均 200；Edge CDP 真实下单 E2E 5/5，截图 `store-pages.png`）。**依赖本机进程在线（API 8787 / 静态站 5188 / cloudflared）**，本机离线即 502 |
-| Vercel | 前端 + `/api` rewrite | 项目名 **`mim`**（控制台实测项目 `prj_vUKzS5yA2jKG5zJQRs3xv1HiY4Za`、团队 `team_Umjh5PlpJLquiNXoxAzHzNZT`），域名 `https://mim-puce.vercel.app`（`mim.vercel.app` 已被占用，`-puce` 为平台自动追加后缀）；`vercel.json`（rewrites 反代 `https://mim.mixm.top`） | ✅ **CI 自动发布**（2026-11-12 补齐 `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 三个 secrets）：run `43244715814` Vercel 步骤真实发布并 Aliased 到 `mim-puce.vercel.app`，同作业探测 `200|5305|0.119s`；本机直连 vercel.app 超时（本机网络侧阻断，不以本机结果否定线上） |
-| Netlify（铁律九矩阵第 11 行，接替停服的 Sealos 席位） | 前端静态站 + `/api` 反代 | 站点 **`mim-web`**（`SITE_ID=d1c93c6f-85b1-4714-bce6-673bd534b092`），入口 `https://mim-web.netlify.app`；CI `platforms` 作业 Netlify 步骤进入 `apps/web/dist` 用 `netlify-cli` 直传，并在发布目录 `_redirects` 顶端补 `/api/* -> https://mim.mixm.top/api/:splat 200`（`netlify.toml` 同规则） | ✅ **CI 自动发布**（2026-11-13 00:12 +08:00，run `43255056330`）：`✔ Deploy is live!` → 部署 `6af5e52b` `state=ready`，CI 出口探测 `https://mim-web.netlify.app/ => 200|5840|0.209s`；浏览器实测 title=Mim、13 个导航项、访客会话自动签发、商城 19 个一级分类 / 205 个二级模块 / 213 个项目、console 零报错。缺那条 `/api` 反代时页面会 404 + TypeError，本轮已修复 |
+| Vercel | 前端 + `/api` rewrite | 项目名 **`mim`**（控制台实测项目 `prj_vUKzS5yA2jKG5zJQRs3xv1HiY4Za`、团队 `team_Umjh5PlpJLquiNXoxAzHzNZT`），域名 `https://mim-puce.vercel.app`（`mim.vercel.app` 已被占用，`-puce` 为平台自动追加后缀）；`vercel.json`（rewrites 反代 `https://api.laal.top:8443`，`/health` 反代 `https://laal.top:8443`） | ✅ **CI 自动发布**（2026-11-12 补齐 `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 三个 secrets）：run `43244715814` Vercel 步骤真实发布并 Aliased 到 `mim-puce.vercel.app`，同作业探测 `200|5305|0.119s`；本机直连 vercel.app 超时（本机网络侧阻断，不以本机结果否定线上） |
+| Netlify（铁律九矩阵第 11 行，接替停服的 Sealos 席位） | 前端静态站 + `/api` 反代 | 站点 **`mim-web`**（`SITE_ID=d1c93c6f-85b1-4714-bce6-673bd534b092`），入口 `https://mim-web.netlify.app`；CI `platforms` 作业 Netlify 步骤进入 `apps/web/dist` 用 `netlify-cli` 直传，并在发布目录 `_redirects` 顶端补 `/api/* -> https://api.laal.top:8443/api/:splat 200`（`netlify.toml` 同规则） | ✅ **CI 自动发布**（2026-11-13 00:12 +08:00，run `43255056330`）：`✔ Deploy is live!` → 部署 `6af5e52b` `state=ready`，CI 出口探测 `https://mim-web.netlify.app/ => 200|5840|0.209s`；浏览器实测 title=Mim、13 个导航项、访客会话自动签发、商城 19 个一级分类 / 205 个二级模块 / 213 个项目、console 零报错。缺那条 `/api` 反代时页面会 404 + TypeError，本轮已修复 |
 | Sealos（已退休，不再作为部署项） | 容器 + PVC | 原 `https://mim-i3ywsdfn.cloud.sealos.io`（纯 API 容器，命名空间 `ns-i3ywsdfn` 由平台分配） | 🚫 **移出矩阵**：2026-11-12 实测 cloud.sealos.io（Singapore / Private Team）余额 0.00、应用列表 0 个，实例已停服；新建应用预估 ¥0.52/日，与「只走免费方案」冲突。用户选择「换免费平台」，席位由 Netlify 接替，登记见 `deploymentRegistry.json` 的 `excluded.excluded.sealos` 与 `coverage.sealos_retired_note` |
 | IGA Pages | 前端静态站 | `deploy/iga/deploy.sh`（`iga login` → `iga pages deploy --name mim --scope domestic`，项目名取自 `IGA_PROJECT_NAME`，缺省 **`mim`**） | ✅ **本机 CLI 直传最新产物**（2026-11-12 18:57 设备授权恢复登录态，Account `2100829122`）：项目 `96otddwh48` / Deployment `76l9e2vbeh`，项目级稳定域 `mim-96otddwh48-proj2y3ftluws1shahnh.preview.iga-pages.com`；带凭证复验 **200 / 5305B**、title=Mim、产物 `index-Dmz7Z5Id.js` 与本地一致，裸访 307→401 / 2413B 属平台访问保护。⚠️ CI 仍 SKIP（`IGA_ACCESS_KEY/SECRET_KEY/PROJECT_NAME` secrets 未配）；同名分裂：旧项目 `fr95fuwu57`（旧版本，类型不兼容 upload_v2 CLI，闲置待控制台核对清理，删除不可逆需授权） |
-| 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ **唯一生产权威终点（铁律十二）** `https://mim.mixm.top` |
+| 腾讯云自建服务器 | 前后端 + SQLite | `deploy/deploy.sh`（nginx + systemd + certbot） | ✅ **唯一生产权威终点（铁律十二）** `https://laal.top`（API `https://api.laal.top`；旧 `mim.mixm.top` 仅 301） |
 
-托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://mim.mixm.top,https://data.mixm.top`）。
+托管平台以独立域名直连 API 时，需在生产 `mim-api.env` 配置跨域白名单 `MIM_CORS_ORIGINS`（`deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top`）。
 
 #### 自定义域名（2026-11-11 按 DNSPod `mixm.top` 导出统一命名）
 
@@ -239,7 +239,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 | 平台 | 自定义域名 | 状态 |
 |---|---|---|
-| 腾讯云自建服务器（生产权威终点） | `https://mim.mixm.top` | ✅ 已解析并在线（`/health` 200 / 53B） |
+| 腾讯云自建服务器（生产权威终点） | `https://laal.top`（旧 `mim.mixm.top` 仅 301 → `laal.top`） | ✅ 已解析并在线（`https://laal.top/health` 200，2026-11-15 实测） |
 | 腾讯云 EdgeOne Pages | `https://data.mixm.top` | ❌ 2026-11-12 21:23 控制台复核：mim 项目（`makers-iygo4nrk22jr`）域名管理仅默认域 `mim-45yeiirr.edgeone.cool`（已生效、产物最新），**未登记 `data.mixm.top` 自定义域**；该域在默认 DNS 与 8.8.8.8 双解析器均 NXDOMAIN（无 CNAME / 无 A）。恢复需先在控制台为 mim 添加该自定义域取得平台新 CNAME，再到 DNSPod 配置解析；DNS 侧凭证本机与 CI 均无 |
 | GitHub Pages | `https://afdk1991.github.io/mim/`（平台默认域，不绑定自定义域名） | ✅ CI 自动发布 |
 | Cloudflare Pages | `https://portal.mixm.top` | ⏳ DNSPod 未解析 / 平台未绑定 |

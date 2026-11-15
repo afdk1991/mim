@@ -41,7 +41,7 @@
 | `全栈项目人员配置指南-20261022184502.txt` | 参考调研 | 岗位清单、JD、负责人方法论 | 岗位三档与 CTO 仪表盘参考 |
 | `site/index.html` | 静态站点（本地预览） | Mim 落地页（零外部依赖，内联 CSS/JS） | 本地预览产物 |
 | `site/prd.html` | 静态站点（本地预览） | `Mim-PRD.html` 的站点副本，供浏览器直接查阅 PRD | 本地预览 `/prd.html` |
-| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://mim.mixm.top` 前后端 + 数据库上线 |
+| `deploy/` | 运维工件 | 生产部署全套工件：`bootstrap.sh`（服务器一次性引导）、`deploy.sh`（幂等发布）、`nginx-mim.conf`（站点配置）、`mim-api.service`（systemd 单元）、`migrations/*.cjs`（发布前幂等迁移）、`sealos/`（托管平台容器清单）、`iga/`（IGA Pages 发布脚本） | `https://laal.top` 前后端 + 数据库上线（旧 `mim.mixm.top` 已改为 301 → `laal.top`） |
 | `.github/workflows/deploy.yml` | CI/CD | 铁律八执行器：push `main` → 质量门禁（typecheck/test/build）→ SSH 远程发布 → 线上健康检查 | 每次 `main` 变更自动上线生产 |
 | `.screenshots/` | 资产暂存 | 截图取证目录（含 `.tmp/` 临时帧与 `data-mixm-top-e2e.png`：`data.mixm.top` 有头 Edge + CDP 端到端取证截图） | 交付取证附件 |
 | `docs/wiki/*.md` | 文档 | 结构化 Wiki（01~10 共 10 篇 + 首页 README）：架构、模块、代码参考、依赖、运行、治理、功能、开发实现、第三方清单、漫剧状态机 | 与仓库资产一一对应的唯一文档入口 |
@@ -61,7 +61,7 @@
 9. **铁律九**：多平台部署矩阵只走免费方案（**11 个平台**，2026-11-10 起含 Gitee 镜像仓、2026-11-13 起 Netlify 接替停服的 Sealos 成为第 11 行），每轮部署必须逐平台刷新 HTTP / 耗时 / 连接取证；本机不可达须附网络侧证据与替代取证
 10. **铁律十**：免费平台额度矩阵与选型路由——远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render / Cloudflare Workers）的免费额度为准入依据；新平台须过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件并季度复核；**已移除的原候选托管平台相关内容全量删除，不得重新引入**
 11. **铁律十一**：全仓库逐行注释与解释——业务代码、脚本、CSS、HTML 每行须有中文解释；`scripts/comment-check.mjs` 为校验器（`--strict` 为 CI 门禁）；未全量达标时不得声称「已全量注释完成」
-12. **铁律十二**：全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器——`origin`（GitHub）/ `gitee`（Gitee）每轮同轮全推并逐个取证；生产唯一权威终点 `https://mim.mixm.top`（nginx + systemd + SQLite），其余 10 个分发 / 镜像平台仅为分发 / 镜像 / 取证；项目名称 **Mim**；V1–V6 取证矩阵见 [AGENTS.md §12](../../AGENTS.md)
+12. **铁律十二**：全量远程仓库同步 + 生产统一部署到线上腾讯云自建服务器——`origin`（GitHub）/ `gitee`（Gitee）每轮同轮全推并逐个取证；生产唯一权威终点 `https://laal.top`（API `https://api.laal.top`，nginx + systemd + SQLite；旧 `mim.mixm.top` 仅 301 → `laal.top`），其余 10 个分发 / 镜像平台仅为分发 / 镜像 / 取证；项目名称 **Mim**；V1–V6 取证矩阵见 [AGENTS.md §12](../../AGENTS.md)
 
 **冲突裁决**：铁律五与铁律一冲突时（如沙箱无网络），执行优先，允许本地实现但必须在交付报告标注「已偏离铁律五」及理由。
 
@@ -147,7 +147,7 @@ docs/wiki/README.md ──索引──> docs/wiki/01~10（其中 08 引用 07/01
 09-third-party-sdk-inventory.md ──密钥占位──> .env.example（变量名一一对应）
 package.json (build) ──调用──> scripts/build.mjs ──构建并复制──> dist/（真实前端 apps/web/dist，生产与 EdgeOne Pages 同款）
 package.json (build:site) ──调用──> scripts/build.mjs --site ──复制──> dist/（site/ PRD 阅读页，仅离线预览）
-AGENTS.md (铁律八) ──强制──> .github/workflows/deploy.yml ──SSH──> deploy/deploy.sh ──构建/发布──> /opt/mim/web + systemd mim-api ──反代──> https://mim.mixm.top
+AGENTS.md (铁律八) ──强制──> .github/workflows/deploy.yml ──SSH──> deploy/deploy.sh ──构建/发布──> /opt/mim/web + systemd mim-api ──反代──> https://laal.top
 deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 + certbot HTTPS + 首发布
 ```
 
@@ -159,7 +159,7 @@ deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 +
 
 ## 7. site/、构建脚本与业务代码 — 本地预览 vs 功能产品
 
-> 本仓库是**已上线生产的功能产品**：前端 `apps/web`、后端 `services/mim-api`、数据库 SQLite 三者共同部署在 `https://mim.mixm.top`（详见 §7.1）。根 `dist/` 由 `npm run build`（`scripts/build.mjs`）从真实前端 `apps/web/dist` 生成，EdgeOne Pages（`data.mixm.top`）与生产同源；`site/` 只是 PRD 的离线阅读副本，仅由 `npm run build:site` 产出，**不参与任何生产托管**。
+> 本仓库是**已上线生产的功能产品**：前端 `apps/web`、后端 `services/mim-api`、数据库 SQLite 三者共同部署在 `https://laal.top`（API `https://api.laal.top`，详见 §7.1）。根 `dist/` 由 `npm run build`（`scripts/build.mjs`）从真实前端 `apps/web/dist` 生成，EdgeOne Pages（`data.mixm.top`）与生产同源；`site/` 只是 PRD 的离线阅读副本，仅由 `npm run build:site` 产出，**不参与任何生产托管**。
 
 | 文件 | 说明 |
 |---|---|
@@ -175,7 +175,7 @@ deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 +
 ### 7.1 生产部署拓扑（铁律八）
 
 ```
-浏览器 ──HTTPS──> nginx（mim.mixm.top，Let's Encrypt）
+浏览器 ──HTTPS──> nginx（laal.top，Let's Encrypt）
                     ├── /                → /opt/mim/web（apps/web 构建产物，SPA fallback）
                     ├── /api/v1/*        → 127.0.0.1:8787（Express，systemd: mim-api）
                     └── /health          → 127.0.0.1:8787

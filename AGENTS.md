@@ -2,7 +2,7 @@
 
 > 本文件对在 Mim 仓库内工作的所有 AI 协作者（含本机 WorkBuddy 会话、CI、自动化）具有强制约束力。
 >
-> **项目名称：Mim**（用户 2026-11-09 18:50 统一定名，全仓名称口径一致）。仓库目录 `Mim`、npm scope `@mim/*`、仓库名 `afdk1991/mim` / `mallwm_admin/mim`、生产域名 `mim.mixm.top` 与项目名称保持一致，详见 [§12.1](#121-项目标识与适用边界)。
+> **项目名称：Mim**（用户 2026-11-09 18:50 统一定名，全仓名称口径一致）。仓库目录 `Mim`、npm scope `@mim/*`、仓库名 `afdk1991/mim` / `mallwm_admin/mim` 均为 Mim 系标识；现役生产入口为 `https://laal.top`（API `https://api.laal.top`，后台 `https://laal.top/admin/`），旧域名 `mim.mixm.top` 已无 Mim 部署、仅 301 → `laal.top`，详见 [§12.1](#121-项目标识与适用边界) 与 [§12.3](#123-生产唯一权威终点线上腾讯云自建服务器)。
 
 ## 0. 当前状态基线（2026-11-10 01:10 +08:00 复核）
 
@@ -42,6 +42,8 @@
 >
 > **现行状态覆盖（2026-11-15，模块收口 + 构建期 CSP 自动生成 + 零备份）**：① **模块口径以代码为准**：商城 / 商品列表 / 云存储 / 漫剧 / 工具目录 / 导航站 / 统一搜索 / 公告动态等页面与其后端路由已从代码删除，现行前端视图以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为唯一真源（`community` / `circles` / `chat` / `news` / `releases` / `deployments` / `cart` / `checkout` / `pay-return` / `signin` / `account`）；`/announcements` 并入 `/community`，仅保留旧链接改写。**本文档 §9 全部是各轮历史交付记录，凡涉及上述已删模块的描述一律作废，以当前代码为准。** ② **CSP 哈希不再手工同步**：构建期 `scripts/csp-inline-hash.mjs` 从 `apps/web/dist/index.html` 重算每个内联脚本的 SHA-256，生成 `apps/web/dist/mim-csp.conf`，生产 nginx 以 `include /opt/mim/web/mim-csp*.conf;` 引用；§9.17 / §9.20 里「重算哈希并手工同步 4 / 6 处」为历史留痕，**不得再照做**。③ **项目不创建任何数据库备份**：迁移脚本不调用 `db.backup()`、仓库无备份脚本 / systemd timer、`tools/db-replace-domain` 也不再生成 `.bak`，数据丢失不可恢复。
 
+> **现行状态覆盖（2026-11-15，生产入口迁移至 laal.top）**：本段覆盖 §0 基线表及 2026-11-14 覆盖段中「Mim 当前无对外生产终点」的过时口径（原文按铁律三保留，不得再当作现状引用）。生产**唯一权威终点**已由 `mim.mixm.top` 迁至 **`https://laal.top`**（API `https://api.laal.top`，管理后台 `https://laal.top/admin/`）；旧 `mim.mixm.top` 已无 Mim 部署，现仅配置 301 → `laal.top`。§12.3、§13 表与 V2–V4 取证目标均以本段为准。
+>
 按用户「全项目全面检查与修复」指令，做了三类**可逆**修复——① 把误删的 23 个部署工件从 HEAD 恢复到工作树（`git checkout -- .`）；② 把部署注册表里「工作树缺失」的过时口径改为「已恢复」并重生成核对表（`WORKTREE_ARTIFACT_*_RESTORED`）；③ 修正 `render.yaml`（蓝图 schema 由非法的 `static_sites:` 改为 `services: - type: web / runtime: static`，并补 `routes` 深链接回退）与 `azure-static-web-apps.yml`（补 `staticwebapp.config.json` 回退注入）。**不改任何铁律的约束语义**，未做 `git add / commit / push`、未删除任何文件、未触发任何线上部署。
 >
 > **2026-11-09 18:08 补充**：按用户指令新增铁律十二（远程仓库全量同步 + 生产统一部署腾讯云自建服务器），并全量删除原候选托管平台的全部相关内容；原铁律一～十一的编号 / 标题 / 约束语义仍未改动，规则变更的同步清单见 §12.5。2026-11-09 18:50 按用户指令将项目名称统一为 **Mim**，全仓名称口径一致。
@@ -573,7 +575,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | 项 | 口径 |
 |---|---|
 | 项目名称 | **Mim**（用户 2026-11-09 18:50 统一定名；全仓名称口径一致） |
-| 技术标识 | 仓库目录 `Mim`、npm scope `@mim/*`、仓库名 `afdk1991/mim` 与 `mallwm_admin/mim`、生产域名 `mim.mixm.top`，与项目名称一致，无需改名 |
+| 技术标识 | 仓库目录 `Mim`、npm scope `@mim/*`、仓库名 `afdk1991/mim` 与 `mallwm_admin/mim` 均为 Mim 系标识；生产入口 `https://laal.top`（API `https://api.laal.top`；旧 `mim.mixm.top` 仅 301 → `laal.top`），无需改名 |
 | 适用 | 本仓库所有 AI 协作者、CI、自动化；涉及代码托管、push、部署、上线、域名 / DNS、生产取证的**每一轮交付** |
 | 不适用 | 本地开发预览、单元测试、离线文档阅读（但仍不得作为交付终点，铁律八） |
 | 排除 | **已移除的候选托管平台及任何非清单代码托管 / CI 平台**，按用户 2026-11-09 指令全量删除（见 §10.1 删除留痕），不得重新进入候选池 |
@@ -594,13 +596,13 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 | 项 | 口径 |
 |---|---|
-| 主机 / 域名 | 腾讯云自建服务器（自有），`https://mim.mixm.top`；DNS A 记录 `115.159.159.11`（§9.1 取证），DNSPod 台账见 `dnspod_records_2026-11-05_21-42-26.xls` 与 [05-runbook.md §7.1.3 / §7.6](./docs/wiki/05-runbook.md) |
+| 主机 / 域名 | 腾讯云自建服务器（自有），`https://laal.top`（API `https://api.laal.top`；旧 `mim.mixm.top` 仅 301 → `laal.top`）；`laal.top` DNS A 记录 `115.159.159.11`（2026-11-15 实测），DNSPod 台账见 `dnspod_records_2026-11-05_21-42-26.xls` 与 [05-runbook.md §7.1.3 / §7.6](./docs/wiki/05-runbook.md) |
 | 运行形态 | 宿主机直部署：nginx（静态根 + `/api/v1` 反代 + SPA `try_files`）+ systemd `mim-api`（8787）+ SQLite WAL 持久化库 `/opt/mim/app/services/mim-api/data/mim.db`；**前后端 + 数据库一体上线** |
 | 服务器布局 | `/opt/mim/app`（git 仓库）/ `/opt/mim/web`（用户端静态根）/ `/opt/mim/admin`（管理后台静态根）/ `/opt/mim/mim-api.env`（运行期凭证） |
 | 代码同步通道 | 服务器 `https://github.com` 出网被阻断，改走 `git@github.com:22` + `/opt/mim/.ssh/deploy_key` 只读 Deploy Key |
 | 部署链路 | push `main`（双远端）→ GitHub Actions `.github/workflows/deploy.yml` → 类型检查 / 测试 / 构建 → SSH 幂等脚本发布 → systemd 重启 → `/health` 取证 |
 
-- **唯一性**：铁律九的 10 平台及其 200 响应**仅作分发 / 镜像 / 可用性取证**；静态站直传（EdgeOne / GitHub Pages / Cloudflare Pages）、同源反代 Worker、容器镜像（Sealos / ghcr）均属分发层，**任何一个都不得替代 `mim.mixm.top` 成为「已上线」依据**。
+- **唯一性**：铁律九的 10 平台及其 200 响应**仅作分发 / 镜像 / 可用性取证**；静态站直传（EdgeOne / GitHub Pages / Cloudflare Pages）、同源反代 Worker、容器镜像（Sealos / ghcr）均属分发层，**任何一个都不得替代 `laal.top` 成为「已上线」依据**。
 - **冲突裁决**：铁律八 / 九的「多平台发布」与本节「唯一生产终点」并列时，本节定义**交付终点**；铁律九仍完整约束「只走免费方案 + 逐平台取证」，两者并行不悖、不构成豁免。
 - **禁止**：禁止把本地预览、`npm run dev`、任一托管平台 200、CI job success 单独当作「已上线」；禁止引入付费方案（铁律九 / 十）。
 - **凭证边界**：生产 SSH 私钥、`MIM_AUTH_ADMIN_PASSWORD`、`tccli` 等属用户私有凭证；沙箱缺失时按铁律一「唯一例外」处置，附已尝试取证后如实标注偏离，**不得伪造健康检查或线上截图**。
@@ -611,9 +613,9 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 | # | 取证项 | 命令 / 方式 | 通过标准 |
 |---|---|---|---|
 | V1 | 双远端同步 | `git ls-remote origin refs/heads/main`、`git ls-remote gitee refs/heads/main` | 两端 hash 均 == 本地 HEAD |
-| V2 | 生产健康 | `curl -sS -o /dev/null -w "%{http_code}" https://mim.mixm.top/health` | HTTP 200 且响应 `{"status":"ok"}` |
-| V3 | 关键接口 | `curl https://mim.mixm.top/api/v1/modules` | HTTP 200 且返回有效模块列表 |
-| V4 | 真实渲染 | 有头 Edge + CDP 打开 `https://mim.mixm.top/store` | 模块卡片可见、console 零报错 |
+| V2 | 生产健康 | `curl -sS -o /dev/null -w "%{http_code}" https://laal.top/health` | HTTP 200 且响应 `{"status":"ok"}` |
+| V3 | 关键接口 | `curl https://api.laal.top/api/v1/modules` | HTTP 200 且返回有效模块列表 |
+| V4 | 真实渲染 | 有头 Edge + CDP 打开 `https://laal.top/`（旧 `/store` 链接 301 后仍可回放） | 模块卡片可见、console 零报错 |
 | V5 | 逐平台 | 铁律九 / §9.1 各入口 `curl` | 按轮刷新；本机 `000` 须附网络侧证据与替代取证 |
 | V6 | 本地门禁 | `pnpm -r typecheck`、`pnpm --filter @mim/api test`、`verify-auth-gate`、`comment-check --strict`、`npm run check` | 全 0 / 全 PASS |
 
@@ -642,7 +644,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 **13.5 工件双口径（本轮纠正）**：`deploy/*`、`Dockerfile`、`vercel.json`、`wrangler.toml`、`functions/*` 等 21 个路径为 **staged `D` 未提交**，`git ls-tree HEAD` 实测**仍在远端 HEAD `3b9b251`**，故 CI 当前**不会**因缺件失败；风险在「一旦提交删除即悬空」。汇总以 `artifact_in_head` / `artifact_in_worktree` 两个字段分别记录，不得混为一谈。
 
-**13.6 汇总不是部署取证**：`docs/deployment-summary.{json,md}` 与 `/deployments` 视图是**核对工具**，其 `PASS` 只证明采集与字段自洽，**不得**替代铁律八 / 十二的 V2–V4 线上取证，也不得据以宣称「已上线」；生产唯一权威终点仍为 §12.3 的 `https://mim.mixm.top`。
+**13.6 汇总不是部署取证**：`docs/deployment-summary.{json,md}` 与 `/deployments` 视图是**核对工具**，其 `PASS` 只证明采集与字段自洽，**不得**替代铁律八 / 十二的 V2–V4 线上取证，也不得据以宣称「已上线」；生产唯一权威终点仍为 §12.3 的 `https://laal.top`（API `https://api.laal.top`；旧 `mim.mixm.top` 仅 301）。
 
 **13.7 每轮同步清单（铁律七）**：部署项 / 平台 / 远端 / CI 作业发生变化时，同轮更新 `deploymentRegistry.json`、本文件 §13、`README.md`（版本 / 校验命令 / 仓库结构 / 前端视图 / 后端接口 / 站点与部署 / 文档索引）、`docs/wiki/{01-architecture,02-modules,05-runbook,README}.md`、`Mim-PRD.html`、`package.json` 脚本、生成器与校验器断言，并重新生成两份结构化产物。**不涉及**：依赖清单 / 锁文件（零第三方依赖）、semver 数字（`preview` 通道）、CI 部署语义。
 
@@ -706,7 +708,7 @@ AI 以项目全部角色（产品、架构、前端、后端、测试、运维�
 
 | 部署平台 | 自定义域名 | xls 主机 / 行号 | xls 备注 | 现状 |
 |---|---|---|---|---|
-| 腾讯云自建服务器（生产权威终点） | `mim.mixm.top` | `mim` / 100 | 导出该行无备注 | **live**：`/health` 200 / 53B |
+| 腾讯云自建服务器（生产权威终点） | `laal.top`（旧 `mim.mixm.top` 仅 301 → `laal.top`） | `laal.top` 工作表（根域；旧 `mim` / 100 已退役） | 导出该行无备注 | **live**：`https://laal.top/health` 200（2026-11-15 实测） |
 | 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | 数据中心入口｜开放数据集平台 | **live**：`/` 200，人机校验后深链接正常渲染 |
 | GitHub Pages | `afdk1991.github.io/mim/`（平台默认域，不绑定自定义域名） | — | — | 不适用 |
 | Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | 门户首页入口｜企业内部统一门户 / 工作台 | pending_dns |

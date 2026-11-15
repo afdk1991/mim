@@ -54,7 +54,7 @@ f:\合并项目\Mim
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
 ├── docs/wiki/                     # 本 Wiki 全部文档（01~10）
 ├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / migrations / sealos / iga）
-├── .github/workflows/deploy.yml   # CI/CD：push main 自动上线 https://mim.mixm.top
+├── .github/workflows/deploy.yml   # CI/CD：push main 自动上线 https://laal.top
 ├── scripts/
 │   ├── version-check.mjs          # 铁律四版本规约校验器
 │   ├── env-check.mjs              # 09 清单 §0 密钥模板校验器
@@ -70,7 +70,7 @@ f:\合并项目\Mim
 - 想了解**开发怎么落地 / 当前代码与规划差在哪** → 读 [08-dev-implementation.md](./08-dev-implementation.md) §1.1
 - 想了解**仓库里现在有什么** → 读 [02-modules.md](./02-modules.md)
 - 想**启动应用 / 跑测试 / 跑校验** → 读 [05-runbook.md](./05-runbook.md) §6
-- 想**部署上线 / 查生产状态** → 读 [05-runbook.md](./05-runbook.md) §7（生产：<https://mim.mixm.top>）
+- 想**部署上线 / 查生产状态** → 读 [05-runbook.md](./05-runbook.md) §7（生产：<https://laal.top>，API：<https://api.laal.top>）
 - 想**一次性核对所有部署仓库与部署项的效果 / 结果 / 异常** → 读 [../deployment-summary.md](../deployment-summary.md) 与 [05-runbook.md](./05-runbook.md) §8（生成器 + 55 项校验 + `/deployments` 视图）
 - 要**修改或运行校验脚本** → 读 [03-code-reference.md](./03-code-reference.md) + [05-runbook.md](./05-runbook.md)
 - 要**查第三方 SDK / API / Key** → 读 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)（占位模板见根目录 `.env.example`；改完跑 `node scripts/env-check.mjs` 校验一致性）

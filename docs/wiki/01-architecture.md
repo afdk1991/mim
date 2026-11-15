@@ -131,7 +131,7 @@ PRD（Mim-PRD.html，V0.0.11-preview 草案）确定的核心产品决策是 **�
 | 脚本 | `scripts/deployment-summary.mjs` / `verify-deployments.mjs` | 真实采集（git / 工件 / CI / 矩阵行数，可选 `--live` curl）→ 结构化产物；52 项一致性断言 |
 | 产物 | `docs/deployment-summary.{json,md}` | 机器可核对 JSON + 人工核对表 |
 
-设计约束：① 所有同类项共用同一组字段，别名归并到 `aliases` 而非另起一行；② `result = null` 表示空数据，不以 0 或历史 200 填充；③ 工件区分 `artifact_in_head`（远端 HEAD）与 `artifact_in_worktree`（本地工作树）两个口径；④ 汇总 `PASS` 不等于生产「已上线」，生产唯一权威终点仍为 `https://mim.mixm.top`（铁律十二）。详见 [AGENTS.md §13](../../AGENTS.md)。
+设计约束：① 所有同类项共用同一组字段，别名归并到 `aliases` 而非另起一行；② `result = null` 表示空数据，不以 0 或历史 200 填充；③ 工件区分 `artifact_in_head`（远端 HEAD）与 `artifact_in_worktree`（本地工作树）两个口径；④ 汇总 `PASS` 不等于生产「已上线」，生产唯一权威终点仍为 `https://laal.top`（API `https://api.laal.top`，铁律十二）。详见 [AGENTS.md §13](../../AGENTS.md)。
 
 ## 9. 导航站 NAVIGATION（2026-11-12 新增）
 

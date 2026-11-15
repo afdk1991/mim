@@ -41,12 +41,12 @@ gh run view <run-id> --json status,conclusion,jobs
 ## 阶段 4：线上取证（铁律八）
 
 ```powershell
-curl.exe -s -o NUL -w "%{http_code}" https://mim.mixm.top/health   # 期望 200
-curl.exe -s https://mim.mixm.top/api/v1/modules                    # 关键接口结构与数据
+curl.exe -s -o NUL -w "%{http_code}" https://laal.top/health   # 期望 200
+curl.exe -s https://api.laal.top/api/v1/modules                # 关键接口结构与数据
 ```
 
 - 本轮改动涉及的接口逐条 curl 取证（含鉴权接口用真实 token 走浏览器或 curl 验证）。
-- 前端页面变更需浏览器实际打开 `https://mim.mixm.top` 验证渲染与交互。
+- 前端页面变更需浏览器实际打开 `https://laal.top` 验证渲染与交互。
 - 取证输出贴入交付报告；无取证不得宣称「已上线」。
 
 ## 多提交场景

@@ -300,7 +300,7 @@ fi
 
 # 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel 等）以独立域名直连本 API 所必需。
 # 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_CORS_ORIGINS 环境变量可覆盖默认列表。
-CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://mim.mixm.top,https://data.mixm.top}"
+CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top}"
 if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE"; then
   log "$MIM_ENV_FILE 已含 MIM_CORS_ORIGINS，保留现有值"
 else

@@ -19,7 +19,7 @@
 | --- | --- | --- |
 | Node.js | 22 及以上（需要全局 `fetch`、全局 `WebSocket`、`node:sqlite`） | `node --version` |
 | 浏览器 | 本机安装 Chrome 或 Edge；也可用 `MIM_EVIDENCE_BROWSER` 指定可执行文件 | 直接运行脚本，报"未找到 Chrome/Edge"即为缺失 |
-| 目标版本 | 目标环境已部署**包含社区路由**的版本 | `curl -sk -o NUL -w "%{http_code}" "https://mim.mixm.top/api/v1/community/threads?limit=1"` 应为 `200` |
+| 目标版本 | 目标环境已部署**包含社区路由**的版本 | `curl -sk -o NUL -w "%{http_code}" "https://laal.top/api/v1/community/threads?limit=1"` 应为 `200` |
 | 同源托管 | `/admin/` 必须由同一反向代理指向 admin 静态站点（nginx 常见做法） | 浏览器打开 `https://<站点>/admin/` 应看到「Mim 管理后台」登录卡片 |
 | 网络 | 能访问目标站点的 HTML、`/api/v1/*`、以及媒体域名（不影响判定，只影响页面渲染速度） | — |
 
@@ -35,7 +35,7 @@
 
 | 变量 | 必需 | 默认值 | 用途 |
 | --- | --- | --- | --- |
-| `MIM_EVIDENCE_WEB_BASE` | 否 | `https://mim.mixm.top` | 前端站点根地址，用于页面层验收 |
+| `MIM_EVIDENCE_WEB_BASE` | 否 | `https://laal.top` | 前端站点根地址，用于页面层验收 |
 | `MIM_EVIDENCE_API_BASE` | 否 | `${WEB_BASE}/api/v1` | API 根地址；跨域部署（如 `https://api.example.com/api/v1`）时单独指定 |
 | `MIM_EVIDENCE_BROWSER` | 否 | 自动探测 | Chrome / Edge 可执行文件绝对路径 |
 | `MIM_EVIDENCE_CDP` | 否 | 空 | 复用已存在的 CDP 端点（如 `http://127.0.0.1:9222`），此时不自动启动浏览器 |
@@ -60,14 +60,14 @@ node scripts/verify-anonymous-evidence.mjs
 指定环境（预发 / 自建域名 / 本地）：
 
 ```powershell
-$env:MIM_EVIDENCE_WEB_BASE = "https://mim.mixm.top"
+$env:MIM_EVIDENCE_WEB_BASE = "https://laal.top"
 node scripts/verify-anonymous-evidence.mjs
 ```
 
 完整取证（认证缓存头 + 精确污染检查）：
 
 ```powershell
-$env:MIM_EVIDENCE_WEB_BASE  = "https://mim.mixm.top"
+$env:MIM_EVIDENCE_WEB_BASE  = "https://laal.top"
 $env:MIM_EVIDENCE_DB_PATH   = "services/mim-api/data/mim.db"   # 目标环境真实库文件
 $env:MIM_EVIDENCE_AUTH_TOKEN = "<普通用户 Bearer，勿写入仓库>"
 node scripts/verify-anonymous-evidence.mjs
@@ -76,8 +76,8 @@ node scripts/verify-anonymous-evidence.mjs
 跨域 API：
 
 ```powershell
-$env:MIM_EVIDENCE_WEB_BASE = "https://mim.mixm.top"
-$env:MIM_EVIDENCE_API_BASE = "https://api.mim.mixm.top/api/v1"
+$env:MIM_EVIDENCE_WEB_BASE = "https://laal.top"
+$env:MIM_EVIDENCE_API_BASE = "https://api.laal.top/api/v1"
 node scripts/verify-anonymous-evidence.mjs
 ```
 

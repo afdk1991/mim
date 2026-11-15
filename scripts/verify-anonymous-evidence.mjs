@@ -24,7 +24,7 @@
  *   MIM_EVIDENCE_WEB_BASE=http://127.0.0.1:5188 node scripts/verify-anonymous-evidence.mjs
  *
  * 环境变量（全部可选，详见 docs/anonymous-evidence.md）：
- *   MIM_EVIDENCE_WEB_BASE      前端站点根地址，默认 https://mim.mixm.top
+ *   MIM_EVIDENCE_WEB_BASE      前端站点根地址，默认 https://laal.top
  *   MIM_EVIDENCE_API_BASE      API 根地址，默认 ${WEB_BASE}/api/v1
  *   MIM_EVIDENCE_BROWSER       浏览器可执行文件路径，默认自动探测 Chrome/Edge
  *   MIM_EVIDENCE_CDP           复用已存在的 CDP 地址（如 http://127.0.0.1:9222），不自动启动浏览器
@@ -45,7 +45,7 @@ import { join } from 'node:path'; // 拼临时用户目录路径
 
 // ---------- 配置：全部来自环境变量，缺省值只包含公开地址与超时 ----------
 
-const WEB_BASE = (process.env.MIM_EVIDENCE_WEB_BASE || 'https://mim.mixm.top').replace(/\/+$/, ''); // 前端站点根地址，去掉尾部斜杠避免拼出双斜杠
+const WEB_BASE = (process.env.MIM_EVIDENCE_WEB_BASE || 'https://laal.top').replace(/\/+$/, ''); // 前端站点根地址，去掉尾部斜杠避免拼出双斜杠
 const API_BASE = (process.env.MIM_EVIDENCE_API_BASE || `${WEB_BASE}/api/v1`).replace(/\/+$/, ''); // API 根地址，默认与站点同源反代
 const AUTH_TOKEN = (process.env.MIM_EVIDENCE_AUTH_TOKEN || '').trim(); // 普通用户令牌：仅用于认证响应头检查，不打印
 const ADMIN_TOKEN = (process.env.MIM_EVIDENCE_ADMIN_TOKEN || process.env.MIM_ADMIN_TOKEN || '').trim(); // 超管引导令牌：仅用于 users 基线，不打印

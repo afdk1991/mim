@@ -389,7 +389,7 @@ IM 域复用现有 Express HTTP server 的 `upgrade` 事件挂载 WebSocket，�
 
 ### 8.3 WebSocket 协议
 
-- **端点**：`wss://mim.mixm.top/api/v1/im/ws?token=<access_token>`
+- **端点**：`wss://laal.top/api/v1/im/ws?token=<access_token>`（生产域同源；静态托管直连 `wss://api.laal.top:8443/api/v1/im/ws`）
 - **鉴权**：query.token 经 `verifyAccessToken` 校验；失败时完成 101 握手后发 `error` 帧（code=UNAUTHORIZED）并以 close code 1008 关闭（nginx 要求 upgrade 请求返回 101，否则回 502）
 - **心跳**：客户端 25s 发 `ping`，服务端回 `pong`；10s 超时断开
 - **重连**：前端指数退避 0.5s→10s
@@ -421,7 +421,7 @@ IM 域复用现有 Express HTTP server 的 `upgrade` 事件挂载 WebSocket，�
 | `apps/web/src/views/Chat.tsx` | 聊天页：左侧会话列表+用户搜索，右侧消息气泡+输入框 |
 | `apps/web/src/components/VideoCall.tsx` | 视频通话浮动窗口 |
 
-WS URL 推导：host 为 `mim.mixm.top` 或 `localhost` 时同源连接；否则直连 `wss://mim.mixm.top`（Cloudflare Pages 等静态托管无法反代 WS）。
+WS URL 推导：host 为 `laal.top` / `www.laal.top` / `api.laal.top` / `mim.mixm.top`（兼容旧域）/ `localhost` / `127.0.0.1` 时同源连接；否则直连生产 API `wss://api.laal.top:8443`（Cloudflare Pages 等静态托管无法反代 WS）。
 
 ### 8.6 部署配置
 
