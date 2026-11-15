@@ -1,7 +1,15 @@
 // 登录视图：管理员令牌（超管引导通道）与账号密码（RBAC 通道）两种入口
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 // 复用统一 API 客户端与凭证持久化函数，避免各视图重复处理鉴权细节
-import { describeError, getAdminMe, loginWithPassword, saveCredential, type Credential } from '../api';
+import {
+  describeError,
+  fetchLoginCaptcha,
+  getAdminMe,
+  loginWithPassword,
+  saveCredential,
+  type Credential,
+  type LoginCaptcha,
+} from '../api';
 
 // 登录模式：token 走 x-admin-token 自定义头，password 走 /auth/password 换 JWT
 type Mode = 'token' | 'password';
@@ -24,10 +32,38 @@ export function Login({ onDone, notice }: LoginProps) {
   const [identifier, setIdentifier] = useState('');
   // 密码输入框
   const [password, setPassword] = useState('');
+  // 登录场景验证码题目；null 表示尚未取到
+  const [captcha, setCaptcha] = useState<LoginCaptcha | null>(null);
+  // 用户填写的验证码答案
+  const [captchaCode, setCaptchaCode] = useState('');
   // 错误提示；空串表示无错误
   const [error, setError] = useState('');
   // 提交中标记，用于禁用按钮防重复点击
   const [busy, setBusy] = useState(false);
+
+  // 重新取一张验证码：登录失败后必须换题，避免复用已被消费的票据
+  async function refreshCaptcha() {
+    // 清空已填答案
+    setCaptchaCode('');
+    // 取题失败不阻断页面，只记录错误；提交时会再暴露真实失败原因
+    try {
+      // 匿名取题：生产环境 login 场景强制 image 模式
+      const issue = await fetchLoginCaptcha();
+      // 写入题目
+      setCaptcha(issue);
+    } catch (err) { // 取题失败兜底
+      // 清空题目，避免渲染残缺面板
+      setCaptcha(null);
+      // 提示取题失败
+      setError(describeError(err));
+    } // try/catch 结束
+  } // refreshCaptcha 结束
+
+  // 首屏取一次验证码题目，保证切到账号页签即可见题
+  useEffect(() => {
+    // 忽略组件卸载后的 setState 警告：题目请求很快，这里直接调用即可
+    void refreshCaptcha();
+  }, []); // 空依赖：仅挂载时执行一次
 
   // 提交处理：先得到候选凭证，再调 /admin/me 验证身份，成功才持久化
   async function submit(event: React.FormEvent) {
@@ -50,8 +86,17 @@ export function Login({ onDone, notice }: LoginProps) {
         // 组装令牌凭证
         candidate = { kind: 'token', value };
       } else { // 分支二入口：账号密码模式（JWT Bearer 通道）
-        // 分支二：账号密码模式，先换访问令牌
-        const session = await loginWithPassword(identifier.trim(), password);
+        // 生产强制 login 场景验证码：缺答案时不发请求，直接给出可读提示
+        if (captcha?.required && captcha.mode === 'image' && !captchaCode.trim()) {
+          // 中断并提示
+          throw new Error('请输入图形验证码');
+        } // 验证码前置校验结束
+        // 分支二：账号密码模式，先换访问令牌；有题目时一并提交票据
+        const session = await loginWithPassword(
+          identifier.trim(),
+          password,
+          captcha?.required && captcha.id ? { id: captcha.id, code: captchaCode.trim() } : undefined,
+        );
         // 组装 Bearer 凭证
         candidate = { kind: 'bearer', value: session.access_token };
       } // 两条分支都收敛到 candidate，后续校验逻辑共用
@@ -64,6 +109,8 @@ export function Login({ onDone, notice }: LoginProps) {
     } catch (err) { // 任一步失败都在此统一兜底提示
       // 把异常统一格式化为可读文案
       setError(describeError(err));
+      // 账号通道失败后换一张验证码：原票据可能已被消费，无法复用
+      if (mode === 'password' && captcha?.required) void refreshCaptcha();
     } finally { // finally 保证 busy 一定复位，避免按钮卡死在提交态
       // 无论成败都退出提交态
       setBusy(false);
@@ -148,6 +195,31 @@ export function Login({ onDone, notice }: LoginProps) {
                 onChange={(event) => setPassword(event.target.value)} // 输入即写入 password
               /> {/* 密码输入框结束 */}
             </label> {/* 密码字段结束 */}
+            {captcha?.required && captcha.mode === 'image' ? ( // 生产强制 login 场景：渲染图形验证码
+              <div className="login-captcha">
+                <div // 题目图：点击即可换一张
+                  className="login-captcha-image"
+                  onClick={() => { void refreshCaptcha(); }}
+                  title="点击换一张"
+                  dangerouslySetInnerHTML={{ __html: captcha.svg ?? '' }}
+                />
+                <input // 验证码答案输入框
+                  value={captchaCode}
+                  autoComplete="off"
+                  placeholder="图形验证码"
+                  onChange={(event) => setCaptchaCode(event.target.value)}
+                />
+                <button // 换题按钮：显式声明非提交按钮
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => { void refreshCaptcha(); }}
+                >
+                  换一张
+                </button>
+              </div>
+            ) : captcha?.required ? ( // 强制验证码但模式未被本页支持：明确提示而不是静默失败
+              <p className="hint">当前登录要求 {captcha.mode} 验证码，本页暂不支持，请改用管理员令牌通道。</p>
+            ) : null}
             <p className="hint">账号需已被授予含 rbac:read 的角色，否则将被拒绝进入。</p> {/* 权限提示：无 rbac:read 将被 /admin/me 校验拒绝 */}
             <button className="btn primary" type="submit" disabled={busy}> {/* 登录提交按钮，busy 时禁用 */}
               {busy ? '登录中…' : '登录'} {/* 按提交态切换按钮文案 */}

@@ -177,7 +177,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(59, 110, 245
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; } /* 全屏居中 */ 
 .login-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; } /* 登录卡片 */ 
 .login-title { font-size: 18px; font-weight: 700; } /* 登录标题 */ 
-.login-sub { color: var(--text-muted); font-size: 12px; margin: 4px 0 18px; } /* 登录副标题 */ 
+.login-sub { color: var(--text-muted); font-size: 12px; margin: 4px 0 18px; } /* 登录副标题 */
+/* 登录图形验证码：生产 login 场景强制，题目图 + 输入框 + 换一张 */
+.login-captcha { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; } /* 验证码行 */
+.login-captcha-image { display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden; background: #f8fafc; border: 1px solid var(--border); cursor: pointer; } /* 题目图容器，点击换题 */
+.login-captcha-image svg { display: block; width: 160px; height: 56px; } /* SVG 固定尺寸 */
+.login-captcha input { flex: 1; min-width: 120px; } /* 答案输入框占满剩余宽度 */ 
 
 /* 页签 */ 
 .tabs { display: flex; gap: 6px; margin-bottom: 14px; } /* 页签容器 */ 

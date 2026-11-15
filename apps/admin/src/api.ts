@@ -216,14 +216,55 @@ interface LoginResponse {
   user: AuthUser;
 } // 代码块结束
 
+/** 登录图形验证码：生产环境强制 login 场景，缺票据会被后端 400 拒绝 */
+export interface LoginCaptcha {
+  // 本场景是否强制验证码
+  required: boolean;
+  // 验证码模式：off / image / slider / tencent / geetest4
+  mode: string;
+  // 题目 ID（image / slider 模式存在）
+  id?: string;
+  // 图形验证码 SVG（image 模式存在）
+  svg?: string;
+  // 过期时间（ISO 字符串）
+  expires_at?: string;
+}
+
+/** 取登录场景验证码题目：匿名接口，不受全站强制登录门禁影响 */
+export function fetchLoginCaptcha(): Promise<LoginCaptcha> {
+  // 场景参数固定 login，与后端 createCaptchaMiddleware('login') 对齐
+  return request<LoginCaptcha>('/auth/captcha?scene=login', { credential: null });
+}
+
+/** 账号密码登录所需的验证码票据 */
+export interface LoginCaptchaTicket {
+  // 题目 ID
+  id: string;
+  // 用户填写的答案
+  code: string;
+}
+
 /** 账号密码登录：成功返回访问令牌与用户信息 */
-export function loginWithPassword(identifier: string, password: string, region: 'cn' | 'global' = 'cn'): Promise<LoginResponse> {
+export function loginWithPassword(
+  identifier: string,
+  password: string,
+  captcha?: LoginCaptchaTicket,
+): Promise<LoginResponse> {
+  // 邮箱身份只存在于 global 区域，手机号只存在于 cn；按标识形态选择，避免服务端按 cn 推断成非法手机号
+  const isEmail = identifier.includes('@');
   // 调用密码登录端点，device 标记来源便于后端审计
   return request<LoginResponse>('/auth/password', {
     // POST 提交凭证
     method: 'POST',
-    // 请求体字段与 auth.ts 的 passwordBody 一致
-    body: { region, identifier, password, device: { platform: 'admin', name: 'Mim 管理后台' } },
+    // 请求体字段与 auth.ts 的 passwordBody 一致；验证码字段名与后端 verifyCaptcha 约定一致
+    body: {
+      region: isEmail ? 'global' : 'cn',
+      provider: isEmail ? 'email' : 'phone',
+      identifier,
+      password,
+      ...(captcha ? { captcha_id: captcha.id, captcha_code: captcha.code } : {}),
+      device: { platform: 'admin', name: 'Mim 管理后台' },
+    },
     // 登录本身是匿名请求
     credential: null,
   }); // 代码块结束
