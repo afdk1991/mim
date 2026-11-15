@@ -141,6 +141,27 @@ function formatSize(bytes: number): string { // 函数 formatSize：把字节数
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`; // 其余按 MB 展示
 } // 代码块结束
 
+/** 列表骨架：结构与 .community-card 一致（10:7 封面 + 元信息 / 两行标题 / 摘要 / 数据行），加载完成后原位替换不跳动。 */
+function ThreadSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="community-skeleton-card">
+          <div className="skeleton community-skeleton-cover" />
+          <div className="community-skeleton-body">
+            <span className="skeleton skeleton-line short" />
+            <span className="skeleton skeleton-line tall" />
+            <span className="skeleton skeleton-line tall mid" />
+            <span className="skeleton skeleton-line thin" />
+            <span className="skeleton skeleton-line thin mid" />
+            <span className="skeleton skeleton-line short" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+} // ThreadSkeleton 结束
+
 /** 社区与变现页 */
 export function Community({ locale, hasSession = false, onRequireLogin }: Props) {
   // 多段深链接：/community/post/:id 论坛帖子详情、/community/news/:kind/:id 资讯条目详情。
@@ -194,6 +215,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [postsTotal, setPostsTotal] = useState(0); // 详情回复总数（服务端分页口径）
   const [listTotal, setListTotal] = useState(0); // 列表命中总数（加载更多）
   const [listBusy, setListBusy] = useState(false); // 列表加载更多中
+  const [listLoading, setListLoading] = useState(true); // 列表首屏 / 筛选加载中：用于骨架占位，避免空态先闪一下
+  const [listFailed, setListFailed] = useState(false); // 列表加载失败：与「筛选后为空」区分，给出重试入口
   const [searchOpen, setSearchOpen] = useState(false); // 全文搜索面板
   const [moderationOpen, setModerationOpen] = useState(false); // 版主举报工作台
 
@@ -259,13 +282,18 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   } // 代码块结束
 
   async function loadThreads() { // 函数 loadThreads：封装一段可复用的处理逻辑
+    setListLoading(true); // 进入加载态：首次 / 换筛选都先占位，加载完成后原位替换
+    setListFailed(false); // 重试时清掉上一次的失败标记
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const data = await api.community.threads({ board, kind, sort, q: query, limit: 40 }); // 常量 data：保存固定配置或一次性派生值
       setThreads(data.items);
       setListTotal(data.total);
       setError(null);
     } catch (err) {
+      setListFailed(true); // 失败与空结果分开：空列表不显示重试，失败才显示
       setError(errorText(locale, err));
+    } finally {
+      setListLoading(false); // 结束加载态
     } // 代码块结束
   } // 代码块结束
 
@@ -973,7 +1001,11 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         ))}
       </nav>
 
-      {loading && <div className="community-empty">正在加载社区数据…</div>}
+      {loading && (
+        <div className="community-list" role="status" aria-label="正在加载社区数据">
+          <ThreadSkeleton />
+        </div>
+      )}
 
       {!loading && tab === 'announcements' && (
         <AnnouncementsPanel
@@ -1241,9 +1273,27 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             </div>
           )}
 
-          <div className="community-list">{/* 执行当前业务步骤 */}
-            {threads.length === 0 && <div className="community-empty">这个筛选下还没有帖子，发一篇试试。</div>}
-            {threads.map((t) => (
+          {threads.length === 0 && listLoading && (
+            <div className="community-list" role="status" aria-label="正在加载帖子列表">
+              <ThreadSkeleton />
+            </div>
+          )}
+          {threads.length === 0 && !listLoading && listFailed && (
+            <div className="community-empty">
+              <strong>帖子列表加载失败</strong>
+              <span>网络或服务暂时不可用，请稍后重试。</span>
+              <button type="button" className="btn small" onClick={() => void loadThreads()}>重试</button>
+            </div>
+          )}
+          {threads.length === 0 && !listLoading && !listFailed && (
+            <div className="community-empty">
+              <strong>这个筛选下还没有帖子</strong>
+              <span>换个板块或排序，也可以发一篇试试。</span>
+            </div>
+          )}
+          {threads.length > 0 && (
+            <div className="community-list">{/* 执行当前业务步骤 */}
+              {threads.map((t) => (
               <article key={t.id} className="community-card" onClick={() => void openThread(t.id)}>{/* 执行当前业务步骤 */}
                 <div className="community-cover">{/* 执行当前业务步骤 */}
                   {t.cover_url ? <img src={coverSrc(t.cover_url)} alt={t.title} loading="lazy" /> : <span>{KIND_LABEL[t.kind]}</span>}
@@ -1269,7 +1319,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 </div>
               </article>
             ))}
-          </div>
+            </div>
+          )}
           {listTotal > threads.length && (
             <button type="button" className="community-more community-load-more" disabled={listBusy} onClick={() => void loadMoreThreads()}>
               {listBusy ? '加载中…' : `加载更多（${threads.length}/${listTotal}）`}

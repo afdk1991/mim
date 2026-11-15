@@ -147,7 +147,8 @@ function backPath(kind: string): string {
 /** 资讯条目详情页。 */
 export function ContentDetail({ locale, kind, id }: Props) {
   const [item, setItem] = useState<DetailItem | null>(null); // 归一化后的条目
-  const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading'); // 加载状态
+  const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'failed'>('loading'); // 加载状态：失败与「条目不存在」分开，失败可重试
+  const [attempt, setAttempt] = useState(0); // 重试计数：变化时重新触发加载
 
   useEffect(() => {
     let alive = true; // 卸载后不再写状态
@@ -195,10 +196,10 @@ export function ContentDetail({ locale, kind, id }: Props) {
       setItem(next);
       setState('ready');
     }).catch(() => {
-      if (alive) setState('missing'); // 接口失败按缺失处理，给出返回入口
+      if (alive) setState('failed'); // 接口失败：给出重试，而不是误报「条目不存在」
     });
     return () => { alive = false; }; // 清理
-  }, [kind, id, locale]);
+  }, [kind, id, locale, attempt]);
 
   /** 复制当前深链接；剪贴板不可用时降级提示地址。 */
   async function copyLink() {
@@ -217,10 +218,29 @@ export function ContentDetail({ locale, kind, id }: Props) {
         <button type="button" onClick={() => navigatePath(backPath(kind))}>{tr(locale, '← 返回列表', '← Back to list')}</button>
         <button type="button" onClick={() => void copyLink()}>{tr(locale, '复制链接', 'Copy link')}</button>
       </div>
-      {state === 'loading' && <div className="community-empty">{tr(locale, '正在加载内容…', 'Loading…')}</div>}
+      {state === 'loading' && (
+        <div className="detail-skeleton" role="status" aria-label={tr(locale, '正在加载内容', 'Loading content')}>
+          <span className="skeleton skeleton-line short" />
+          <span className="skeleton skeleton-line heading" />
+          <span className="skeleton skeleton-line mid" />
+          <span className="skeleton skeleton-line" />
+          <span className="skeleton skeleton-line" />
+          <span className="skeleton skeleton-line thin mid" />
+          <span className="skeleton skeleton-line thin" />
+          <span className="skeleton skeleton-line thin mid" />
+        </div>
+      )}
       {state === 'missing' && (
         <div className="community-empty">
-          {tr(locale, '条目不存在或已下线。', 'This entry does not exist or has been removed.')}
+          <strong>{tr(locale, '条目不存在或已下线', 'This entry does not exist or has been removed')}</strong>
+          <span>{tr(locale, '返回列表看看其他内容。', 'Go back to the list for other content.')}</span>
+        </div>
+      )}
+      {state === 'failed' && (
+        <div className="community-empty">
+          <strong>{tr(locale, '内容加载失败', 'Failed to load')}</strong>
+          <span>{tr(locale, '网络或服务暂时不可用，请稍后重试。', 'The network or service is unavailable. Please try again.')}</span>
+          <button type="button" className="btn small" onClick={() => setAttempt((n) => n + 1)}>{tr(locale, '重试', 'Retry')}</button>
         </div>
       )}
       {state === 'ready' && item && (

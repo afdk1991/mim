@@ -350,7 +350,7 @@ export function SearchPanel(props: { // 搜索面板
         <button type="button" className="is-primary" disabled={busy} onClick={() => void run(0, false)}>{busy ? '搜索中…' : '搜索'}</button>
       </div>
       {error && <p className="mim-cm-error">{error}</p>}
-      {searched && !error && <p className="mim-cm-hint">共 {total} 条命中</p>}
+      {searched && !error && items.length > 0 && <p className="mim-cm-hint">共 {total} 条命中</p>}
       {items.map((item) => (
         <button key={item.id} type="button" className="mim-cm-hit" onClick={() => props.onOpenThread(item.id)}>
           <span className="mim-cm-hit-meta">{item.board_name} · {item.views} 浏览 · {item.reply_count} 回复{item.locked ? ' · 付费' : ''}</span>
@@ -358,7 +358,12 @@ export function SearchPanel(props: { // 搜索面板
           <span className="mim-cm-hit-snippet" dangerouslySetInnerHTML={{ __html: item.snippet }} />
         </button>
       ))}
-      {searched && items.length === 0 && !error && <p className="mim-cm-empty">没有找到相关帖子</p>}
+      {searched && items.length === 0 && !error && (
+        <div className="mim-cm-empty">
+          <strong>没有找到相关帖子</strong>
+          <span>换个关键词，或缩短搜索词再试一次。</span>
+        </div>
+      )}
       {items.length > 0 && items.length < total && (
         <button type="button" className="mim-cm-row" disabled={busy} onClick={() => void run(items.length, true)}>加载更多（{items.length}/{total}）</button>
       )}
@@ -519,18 +524,20 @@ export function CommunityMoreStyles() { // 样式表
 .mim-cm-field input, .mim-cm-field textarea, .mim-cm-field select, .mim-cm-search-row input { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 7px 9px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); font: inherit; }
 .mim-cm-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 8px; }
 .mim-cm-row { display: block; width: 100%; text-align: left; margin: 0 0 6px; }
-.mim-cm-search { padding: 10px; border-radius: var(--radius-sm); background: var(--surface-2); margin-bottom: 10px; }
-.mim-cm-search-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.mim-cm-search-row input { flex: 1 1 220px; margin-top: 0; }
+.mim-cm-search { padding: var(--card-pad-tight); border-radius: var(--card-radius-sm); background: var(--surface-2); margin-bottom: var(--card-pad-tight); }
+.mim-cm-search-row { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+.mim-cm-search-row input { flex: 1 1 220px; margin-top: 0; height: var(--field-h); min-height: var(--field-h); padding: 0 10px; border-color: transparent; border-radius: var(--control-radius); background: var(--surface); }
+.mim-cm-search-row button { height: var(--control-h); border-radius: var(--control-radius); }
 .mim-cm-hit { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 9px; margin-top: 8px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
 .mim-cm-hit-meta { color: var(--text-muted); font-size: var(--fs-xs); }
 .mim-cm-hit-snippet { color: var(--text); font-size: var(--fs-sm); }
 .mim-cm-hit-snippet mark { background: var(--amber-border); color: inherit; padding: 0 1px; }
 .mim-cm-hint { color: var(--text-muted); font-size: var(--fs-xs); margin: 6px 0 0; }
-.mim-cm-empty { color: var(--text-subtle); font-size: var(--fs-sm); margin: 8px 0; }
+.mim-cm-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px 16px; border-radius: var(--card-radius-sm); background: var(--surface-3); color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); text-align: center; margin: 8px 0; }
+.mim-cm-empty strong { color: var(--text); font-size: var(--fs-base); font-weight: var(--fw-semibold); }
 .mim-cm-error { color: var(--danger); font-size: var(--fs-sm); margin: 6px 0; }
 .mim-cm-tools { position: relative; display: inline-block; }
-.mim-cm-quote { margin: 4px 0; padding: 5px 8px; border-left: 3px solid var(--primary-ring); background: var(--primary-soft); color: var(--text-secondary); font-size: var(--fs-xs); }
+.mim-cm-quote { margin: 8px 0; padding: 8px 12px; border-left: 3px solid var(--primary-ring); border-radius: 0 var(--card-radius-sm) var(--card-radius-sm) 0; background: var(--primary-soft); color: var(--text-secondary); font-size: var(--fs-xs); line-height: var(--lh-base); }
 .mim-cm-reply-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
 .mim-cm-reply-actions button { font-size: var(--fs-xs); }
 .mim-cm-report { padding: 9px; margin-top: 8px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
