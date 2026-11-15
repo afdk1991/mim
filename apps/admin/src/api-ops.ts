@@ -597,3 +597,27 @@ export async function reorderPageBlocks(credential: Credential, page: string, id
   // PUT 全量顺序
   await request(`/pages/${encodeURIComponent(page)}/reorder`, { method: 'PUT', body: { ids }, credential });
 } // reorderPageBlocks 结束
+
+// ── 外观设置：主色 / 圆角 / 暗色开关（复用 site_settings 的 theme 键） ──────────
+
+/** 外观总览响应：settings 为全部 site_settings 键值，pages 为启用区块统计 */
+export interface AppearanceOverview {
+  settings: Record<string, unknown>; // 设置键 → 已解析值
+  pages: Array<{ page: string; blocks: number }>; // 各页面启用区块数
+} // AppearanceOverview 结束
+
+/** 读取外观总览：GET /appearance 需登录，写权限另由按钮控制 */
+export function getAppearanceOverview(credential: Credential): Promise<AppearanceOverview> {
+  // 原样返回 settings 与 pages，调用方按需取 theme
+  return request<AppearanceOverview>('/appearance', { credential });
+} // getAppearanceOverview 结束
+
+/** 保存单个外观设置键：value 必须是 JSON 对象，后端只接受白名单键 */
+export async function saveAppearanceSetting(
+  credential: Credential, // 凭证
+  key: string, // 设置键（theme / locales / site / home）
+  value: Record<string, unknown>, // 完整对象，调用方负责合并保留未编辑字段
+): Promise<void> {
+  // PUT 幂等写入，成功返回 { ok, key }
+  await request(`/appearance/settings`, { method: 'PUT', body: { key, value }, credential });
+} // saveAppearanceSetting 结束

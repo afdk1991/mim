@@ -217,7 +217,7 @@ export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺�
   { code: 'commerce:write', name: { 'zh-CN': '处理交易与资金', 'en-US': 'Manage commerce' } }, // 发货、售后审核、提现审核等交易侧写操作
   { code: 'appearance:write', name: { 'zh-CN': '管理外观与页面', 'en-US': 'Manage appearance' } }, // 主题、导航、配色与页面区块配置
   { code: 'content:write', name: { 'zh-CN': '维护内容运营', 'en-US': 'Manage content' } }, // 公告、更新日志、推广计划的维护与发布归档
-  { code: 'messaging:write', name: { 'zh-CN': '发送系统私信', 'en-US': 'Send system direct messages' } }, // 成长私信：按条件向用户投递系统身份的一对一私信
+  { code: 'messaging:write', name: { 'zh-CN': '发送系统私信', 'en-US': 'Send system direct messages' } }, // 成长私信：按条件挑选用户并发送系统身份私信（含群发幂等台账）
   { code: 'deployments:read', name: { 'zh-CN': '查看部署汇总', 'en-US': 'Read deployments' } }, // 2026-11-15 运维数据收口：部署项清单仅后台可见，不再对访客公开
 ] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
 
@@ -512,7 +512,7 @@ export function seedCommerce(db: Db): void {
       { kind: 'video', url: '/demo/bloom-ep1.mp4', poster_url: '/demo/bloom-cover.jpg' },
     ]), 'paid-video-comic');
     insertSetting.run('home', JSON.stringify({ view: 'store' }), now);
-    insertSetting.run('theme', JSON.stringify({ accent: '#3b6ef5', background: '#f5f6f7', nav_layout: 'top', list_style: 'card', radius: 12 }), now);
+    insertSetting.run('theme', JSON.stringify({ accent: '#3b6ef5', background: '#f5f6f7', nav_layout: 'top', list_style: 'card', radius: 12, mode: 'light' }), now);
     // 存量库外观对齐：旧种子为 teal #0f766e / #f8fafc / 14px，只有这三个键仍是旧默认值时才同步到新令牌口径；
     // 运营手动改过的颜色、圆角以及 nav_layout / list_style / font 等其他外观项一律保持原样，重复启动无副作用。
     const themeRow = db.prepare("SELECT value FROM site_settings WHERE key = 'theme'").get() as { value: string } | undefined;

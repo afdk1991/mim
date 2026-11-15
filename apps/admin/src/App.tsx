@@ -20,18 +20,22 @@ import { PriceBatches } from './views/PriceBatches'; // 业务步骤
 import { Invites } from './views/Invites'; // 业务步骤
 // 实名审核队列
 import { Realname } from './views/Realname'; // 业务步骤
-import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
 // 内容运营：公告 / 更新日志 / 推广计划
 import { ContentOps } from './views/ContentOps'; // 业务步骤
 // 社区运营：板块审核 / 首页指向 / 推荐权重 / Tab 配置
 import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 // 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
 import { PageBuilder } from './views/PageBuilder'; // 业务步骤
+// 外观：主色 / 圆角档位 / 默认明暗，复用 appearance:write
+import { Appearance } from './views/Appearance'; // 业务步骤
+// 发货与售后：待发货录单、物流推进、售后审批
+import { Shipments } from './views/Shipments'; // 业务步骤
 // 成长私信：按条件或指定用户发送系统身份私信
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
+import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'withdrawals' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'growthDm';
+type ViewKey = 'overview' | 'shipments' | 'withdrawals' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -47,20 +51,24 @@ interface NavItem {
 const NAV: NavItem[] = [
   // 概览：任何已登录身份都能看
   { key: 'overview', label: '概览', permission: null },
+  // 发货与售后：后端 commerce:write 才可操作，导航同权限过滤
+  { key: 'shipments', label: '发货与售后', permission: 'commerce:write' },
+  // 提现审核：申请队列与到账处理，复用 commerce:write
+  { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
   // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
   { key: 'priceBatches', label: '批量改价', permission: 'commerce:write' },
   // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
   { key: 'invites', label: '邀请码', permission: 'user:read' },
   // 实名审核：读权限 user:read；审核按钮另需 rbac:write
   { key: 'realname', label: '实名审核', permission: 'user:read' },
-  // 提现审核：申请队列与到账处理，复用 commerce:write
-  { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
   // 内容运营：公告 / 更新日志 / 推广计划
   { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
   // 社区运营
   { key: 'communityAdmin', label: '社区运营', permission: 'appearance:write' },
   // 页面搭建：复用 appearance:write，管理首页 / 论坛区块装修
   { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
+  // 外观：主色 / 圆角 / 默认明暗，紧跟页面搭建
+  { key: 'appearance', label: '外观', permission: 'appearance:write' },
   // 成长私信：发送系统身份私信，需要 messaging:write
   { key: 'growthDm', label: '成长私信', permission: 'messaging:write' },
   // 角色与权限：需要 rbac:read
@@ -206,6 +214,10 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
 function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity) { // 业务步骤
   // 概览：纯展示身份与权限统计
   if (key === 'overview') return <Overview identity={identity} />;
+  // 发货与售后：待发货录单、物流推进、售后审批
+  if (key === 'shipments') return <Shipments credential={credential} permissions={identity.permissions} />;
+  // 提现审核：申请队列、通过 / 驳回 / 标记到账、创作分成结算
+  if (key === 'withdrawals') return <Withdrawals credential={credential} permissions={identity.permissions} />;
   // 角色与权限：角色 CRUD + 权限矩阵
   if (key === 'roles') return <Roles credential={credential} permissions={identity.permissions} />;
   // 用户：分页检索 + 角色授予撤销
@@ -216,14 +228,14 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'invites') return <Invites credential={credential} permissions={identity.permissions} />;
   // 实名审核：脱敏队列与通过 / 驳回
   if (key === 'realname') return <Realname credential={credential} permissions={identity.permissions} />;
-  // 提现审核：申请队列、通过 / 驳回 / 标记到账、创作分成结算
-  if (key === 'withdrawals') return <Withdrawals credential={credential} permissions={identity.permissions} />;
   // 内容运营：公告 / 更新日志 / 推广计划
   if (key === 'contentOps') return <ContentOps credential={credential} permissions={identity.permissions} />;
   // 社区运营：板块审核、首页指向、审核开关、推荐权重、Tab 配置
   if (key === 'communityAdmin') return <CommunityAdmin credential={credential} permissions={identity.permissions} />;
   // 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
   if (key === 'pageBuilder') return <PageBuilder credential={credential} permissions={identity.permissions} />;
+  // 外观：主色 / 圆角档位 / 默认明暗
+  if (key === 'appearance') return <Appearance credential={credential} permissions={identity.permissions} />;
   // 成长私信：按条件或指定用户发送系统身份私信
   if (key === 'growthDm') return <GrowthDm credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏
