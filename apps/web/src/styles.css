@@ -824,14 +824,14 @@ code { /* 行内代码/令牌展示 */
   margin-top: 10px; /* 与操作行拉开距离，避免挤压按钮 */
   padding: 12px; /* 详情区内留白 */
   border: 1px solid var(--border); /* 细边框勾勒详情区边界 */
-  border-radius: 8px; /* 圆角略小于卡片，形成嵌套层次 */
+  border-radius: var(--radius-sm); /* 圆角略小于卡片，形成嵌套层次 */
   background: var(--bg); /* 页面底色与白色卡片区分，提示这是卡片内的二级区域 */
-  font-size: 13px; /* 略小正文，详情为附属信息 */
+  font-size: var(--fs-sm); /* 略小正文，详情为附属信息 */
 } /* 详情容器结束 */
 
 .store-detail-title { /* 详情区小节标题（工具 / 依赖链 / 价格历史） */
   margin: 0; /* 清除 p 默认外边距，间距交给父容器 gap */
-  font-size: 12px; /* 小字号弱化层级，不抢详情内容 */
+  font-size: var(--fs-xs); /* 小字号弱化层级，不抢详情内容 */
   font-weight: 600; /* 半粗保证作为小节锚点仍可辨识 */
   color: var(--text-muted); /* 次要色表达「区块标签」而非正文 */
 } /* 小节标题结束 */
@@ -847,7 +847,7 @@ code { /* 行内代码/令牌展示 */
   position: relative; /* 为分类 / 价格角标提供定位基准 */
   aspect-ratio: 16 / 9; /* 与 1200×675 的商品独立封面一致，避免两侧裁切文字 */
   overflow: hidden; /* 裁切图片溢出 */
-  background: #0b1220; /* 图片加载前深色底，避免白块闪烁 */
+  background: var(--media-bg); /* 图片加载前深色底，避免白块闪烁 */
 } /* 封面容器结束 */
 
 .store-card-media img { /* 分类封面图 */
@@ -867,11 +867,11 @@ code { /* 行内代码/令牌展示 */
   position: absolute; /* 浮在封面图上 */
   top: 10px; /* 距顶 10px */
   padding: 4px 10px; /* 角标内边距 */
-  border-radius: 999px; /* 胶囊形 */
-  font-size: 12px; /* 角标小字 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  font-size: var(--fs-xs); /* 角标小字 */
   font-weight: 600; /* 半粗保证可读 */
-  color: #fff; /* 白字 */
-  background: rgba(11, 18, 32, 0.66); /* 半透明深色底，任何图上都可读 */
+  color: var(--on-media); /* 白字 */
+  background: var(--media-chip); /* 半透明深色底，任何图上都可读 */
   backdrop-filter: blur(6px); /* 轻背景模糊，提升层次 */
 } /* 角标公共样式结束 */
 
@@ -881,7 +881,7 @@ code { /* 行内代码/令牌展示 */
 
 .store-card-price { /* 价格角标靠右 */
   right: 10px; /* 右侧定位 */
-  background: rgba(59, 108, 255, 0.86); /* 品牌蓝底突出价格 */
+  background: var(--primary); /* 品牌蓝底突出价格 */
 } /* 价格角标结束 */
 
 .store-card > :not(.store-card-media) { /* 封面以外的卡片内容补回左右内边距 */
@@ -918,10 +918,10 @@ code { /* 行内代码/令牌展示 */
   display: block; /* 去除按钮默认行内间隙 */
   width: 100%; /* 撑满画廊列宽 */
   padding: 0; /* 清除按钮默认内边距 */
-  border: 1px solid rgba(255,255,255,0.08); /* 细边框与深色封面过渡 */
-  border-radius: 12px; /* 圆角与详情区一致 */
+  border: 1px solid var(--media-line); /* 细边框与深色封面过渡 */
+  border-radius: var(--radius-md); /* 圆角与详情区一致 */
   overflow: hidden; /* 裁切内部图片 */
-  background: #0b1220; /* 图片加载前深色底，避免白闪 */
+  background: var(--media-bg); /* 图片加载前深色底，避免白闪 */
   cursor: zoom-in; /* 提示可放大 */
   aspect-ratio: 16 / 9; /* 与 1200×675 封面一致，固定高度不抖动 */
 } /* 主图按钮结束 */
@@ -943,11 +943,11 @@ code { /* 行内代码/令牌展示 */
   right: 10px; /* 距右 10px */
   bottom: 10px; /* 距底 10px */
   padding: 4px 10px; /* 胶囊内边距 */
-  border-radius: 999px; /* 胶囊形 */
-  background: rgba(4, 9, 18, 0.72); /* 半透明深底 */
-  border: 1px solid rgba(255,255,255,0.18); /* 细边框 */
-  color: #eaf1ff; /* 浅色文字 */
-  font-size: 12px; /* 小字提示 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  background: var(--media-chip); /* 半透明深底 */
+  border: 1px solid var(--media-line); /* 细边框 */
+  color: var(--on-media); /* 浅色文字 */
+  font-size: var(--fs-xs); /* 小字提示 */
   pointer-events: none; /* 不拦截主图点击 */
 } /* 放大角标结束 */
 
@@ -961,10 +961,10 @@ code { /* 行内代码/令牌展示 */
   position: relative; /* 为文字标签提供定位 */
   display: block; /* 去除行内间隙 */
   padding: 0; /* 清除按钮内边距 */
-  border: 1px solid rgba(255,255,255,0.08); /* 默认细边框 */
-  border-radius: 10px; /* 圆角 */
+  border: 1px solid var(--media-line); /* 默认细边框 */
+  border-radius: var(--radius-sm); /* 圆角 */
   overflow: hidden; /* 裁切图片 */
-  background: #0b1220; /* 加载前深色底 */
+  background: var(--media-bg); /* 加载前深色底 */
   cursor: pointer; /* 可点击 */
   aspect-ratio: 16 / 9; /* 缩略图比例 */
 } /* 缩略图结束 */
@@ -979,8 +979,8 @@ code { /* 行内代码/令牌展示 */
 } /* 缩略图图片结束 */
 
 .store-gallery-thumb.is-active { /* 当前选中缩略图 */
-  border-color: var(--accent, #2f9e8f); /* 主色描边 */
-  box-shadow: 0 0 0 1px var(--accent, #2f9e8f) inset; /* 内描边增强选中态 */
+  border-color: var(--primary); /* 主色描边 */
+  box-shadow: 0 0 0 1px var(--primary) inset; /* 内描边增强选中态 */
 } /* 选中态结束 */
 
 .store-gallery-thumb.is-active img,
@@ -993,10 +993,10 @@ code { /* 行内代码/令牌展示 */
   left: 6px; /* 距左 6px */
   bottom: 6px; /* 距底 6px */
   padding: 2px 6px; /* 小胶囊内边距 */
-  border-radius: 999px; /* 胶囊形 */
-  background: rgba(4, 9, 18, 0.7); /* 半透明底 */
-  color: #eaf1ff; /* 浅色文字 */
-  font-size: 11px; /* 小字 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  background: var(--media-chip); /* 半透明底 */
+  color: var(--on-media); /* 浅色文字 */
+  font-size: var(--fs-xs); /* 小字 */
   line-height: 1.4; /* 行高 */
 } /* 缩略图标签结束 */
 
@@ -1022,7 +1022,7 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   justify-content: center; /* 水平居中 */
   padding: 32px; /* 四周留白 */
-  background: rgba(3, 7, 15, 0.9); /* 深色半透明遮罩 */
+  background: var(--media-scrim); /* 深色半透明遮罩 */
   backdrop-filter: blur(6px); /* 背景虚化 */
   cursor: zoom-out; /* 点击遮罩关闭 */
 } /* 预览遮罩结束 */
@@ -1033,8 +1033,8 @@ code { /* 行内代码/令牌展示 */
   width: auto; /* 保持原始比例 */
   height: auto; /* 保持原始比例 */
   object-fit: contain; /* 不裁切 */
-  border-radius: 12px; /* 圆角 */
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55); /* 悬浮阴影 */
+  border-radius: var(--radius-md); /* 圆角 */
+  box-shadow: var(--shadow-lg); /* 悬浮阴影 */
   cursor: default; /* 图片本身不显示关闭手势 */
 } /* 预览大图结束 */
 
@@ -1044,11 +1044,11 @@ code { /* 行内代码/令牌展示 */
   right: 22px; /* 距右 22px */
   width: 42px; /* 按钮宽度 */
   height: 42px; /* 按钮高度 */
-  border-radius: 999px; /* 圆形 */
-  border: 1px solid rgba(255,255,255,0.22); /* 细边框 */
-  background: rgba(255,255,255,0.08); /* 半透明底 */
-  color: #ffffff; /* 白色符号 */
-  font-size: 24px; /* 符号大小 */
+  border-radius: var(--radius-pill); /* 圆形 */
+  border: 1px solid var(--media-line); /* 细边框 */
+  background: var(--media-chip); /* 半透明底 */
+  color: var(--on-media); /* 浅色符号 */
+  font-size: var(--fs-xl); /* 符号大小 */
   line-height: 1; /* 垂直居中 */
   cursor: pointer; /* 可点击 */
 } /* 关闭按钮结束 */
@@ -1068,7 +1068,7 @@ code { /* 行内代码/令牌展示 */
   grid-template-columns: 1fr; /* 一行一个参数 */
   gap: 0; /* 行间用分隔线，不留额外间距 */
   border: 1px solid var(--border); /* 表格外框 */
-  border-radius: 10px; /* 圆角 */
+  border-radius: var(--radius-sm); /* 圆角 */
   overflow: hidden; /* 裁掉行分隔线出头 */
 } /* 参数表结束 */
 
@@ -1086,13 +1086,13 @@ code { /* 行内代码/令牌展示 */
 } /* 最后一行结束 */
 
 .store-spec-row dt { /* 参数名 */
-  font-size: 12px; /* 小字标签 */
+  font-size: var(--fs-xs); /* 小字标签 */
   color: var(--text-muted); /* 次要色 */
 } /* 参数名结束 */
 
 .store-spec-row dd { /* 参数值 */
   margin: 0; /* 清除 dd 默认缩进 */
-  font-size: 13px; /* 正文大小 */
+  font-size: var(--fs-sm); /* 正文大小 */
   font-weight: 600; /* 半粗突出值 */
   word-break: break-all; /* 长编码强制折行 */
 } /* 参数值结束 */
@@ -1102,8 +1102,8 @@ code { /* 行内代码/令牌展示 */
   height: auto; /* 按 SVG 原始比例 */
   display: block; /* 独占一行 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 10px; /* 圆角 */
-  background: #0b1220; /* 加载前深色底 */
+  border-radius: var(--radius-sm); /* 圆角 */
+  background: var(--media-bg); /* 加载前深色底 */
 } /* 参数图结束 */
 
 
@@ -1113,11 +1113,11 @@ code { /* 行内代码/令牌展示 */
   max-height: 240px; /* 限高，超长结果内部滚动 */
   overflow: auto; /* 长行横向滚动 */
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* 等宽字体便于核对摘要与 JSON */
-  font-size: 12px; /* 小一号，避免结果区视觉过重 */
+  font-size: var(--fs-xs); /* 小一号，避免结果区视觉过重 */
   line-height: 1.5; /* 行距保证可读 */
   white-space: pre-wrap; /* 保留换行同时允许折行 */
   word-break: break-all; /* 超长无空格串（摘要 / Base64）强制折行 */
-  background: rgba(0, 0, 0, 0.03); /* 浅底与正文区分 */
+  background: var(--surface-2); /* 浅底与正文区分 */
   border: 1px solid var(--border); /* 细边框勾勒结果边界 */
   border-radius: var(--radius); /* 与卡片圆角一致 */
 } /* 文本结果结束 */
@@ -1128,14 +1128,14 @@ code { /* 行内代码/令牌展示 */
   overflow: auto; /* 内容超长可滚动 */
   border: 1px solid var(--border); /* 细边框 */
   border-radius: var(--radius); /* 圆角 */
-  font-size: 13px; /* 略小于正文，避免抢主标题 */
+  font-size: var(--fs-sm); /* 略小于正文，避免抢主标题 */
   line-height: 1.6; /* 段落行距 */
 } /* HTML 结果结束 */
 
 .store-tool-html h1, /* Markdown 一级标题：缩小默认字号，避免撑破详情面板 */
 .store-tool-html h2,
 .store-tool-html h3 {
-  font-size: 14px; /* 统一收敛为小节标题级别 */
+  font-size: var(--fs-base); /* 统一收敛为小节标题级别 */
   margin: 8px 0 4px; /* 压缩段落间距 */
 } /* 标题样式结束 */
 
