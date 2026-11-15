@@ -177,7 +177,75 @@ CI 里可直接用退出码判定，`SKIP` 不会让流水线变红，但会在�
 
 ---
 
-## 7. 取证留档
+## 7. 图库 / 视频（gallery）匿名可读契约
+
+图库与视频列表属于**匿名可读**，登录只用于收藏与发帖。路径与判据以本节为准，不要凭记忆拼路径。
+
+### 7.1 正确路径
+
+| 用途 | 方法与完整路径 | 匿名期望 |
+| --- | --- | --- |
+| 图库 / 视频列表 | `GET /api/v1/community/gallery/items` | `200` |
+| 图库聚合（按帖 / 按作者） | `GET /api/v1/community/gallery/collections` | `200` |
+| 收藏 / 取消收藏（写操作） | `POST` / `DELETE /api/v1/community/gallery/items/:mediaId/favorite` | `401`（必须登录） |
+
+`gallery` 段**必须**挂在 `/api/v1/community` 下；少写 `/community` 的 `/api/v1/gallery/items` 不存在对应路由。
+
+### 7.2 列表参数（items）
+
+| 参数 | 取值 | 说明 |
+| --- | --- | --- |
+| `q` | 文本 | 标题 / 摘要关键字 |
+| `kind` | `image` \| `video` | 图库取图片、视频页取视频 |
+| `author_id` | 用户 ID | 按作者过滤 |
+| `thread_id` | 帖子 ID | 按原帖过滤 |
+| `favorited` | `1` / `true` / `yes` | 只看我收藏的（需登录才有效） |
+| `sort` | `latest`（默认） \| `oldest` \| `favorites` | 排序 |
+| `limit` | 1–60，默认 24 | 每页条数 |
+| `offset` | ≥0，默认 0 | 偏移 |
+
+响应：`{ items, total, offset, limit, sort, vip_level }`。`items[]` 每条含
+`id / thread_id / kind / mime / size_bytes / duration_seconds / width / height / created_at / thread_title / thread_summary / author_id / author_name / board_slug / board_name / locked / url / poster_url / favorited / favorite_count`。
+
+### 7.3 聚合参数（collections）
+
+`group=thread|author`（默认 `thread`）、`kind`、`q`、`limit`、`offset`；响应 `{ collections, total, offset, limit, group }`。
+
+### 7.4 匿名可读判据
+
+1. 方法必须是 `GET` / `HEAD` / `OPTIONS`（`middleware.ts` 的 `SAFE_METHODS`）。
+2. 路径命中 `middleware.ts` 的 `ANONYMOUS_READ_PATTERNS`：
+   - `/^\/api\/v1\/community\/gallery\/items$/`
+   - `/^\/api\/v1\/community\/gallery\/collections$/`
+3. 命中后走 `optionalAuth`：不带令牌按匿名继续；带过期 / 伪造令牌也不报 401，个人化字段回落 `false`。
+4. 付费墙在路由内判定：锁定项 `locked: true`，`url` 与 `poster_url` 一律输出空串；匿名 `collections` 不返回锁定帖分组。
+
+### 7.5 踩坑：401 不等于白名单漏项
+
+请求不存在的 `/api/v1/gallery/items`（少 `/community`）时，全局门禁在路由匹配**之前**执行，返回：
+
+```json
+{"code":"AUTH_UNAUTHORIZED","message":"missing bearer token","request_id":"..."}
+```
+
+状态码是 `401` 而不是 `404`。**不要据此判定「图库被强制登录挡住」或「白名单漏项」**，先核对路径是否完整、是否带 `/community`。
+
+### 7.6 生产取证样例（匿名，不带 Authorization / Cookie）
+
+| URL | 状态码 | 关键字段 |
+| --- | --- | --- |
+| `https://api.laal.top/api/v1/community/gallery/items` | `200` | `items: []`、`total: 0`、`limit: 24`、`vip_level: 0` |
+| `https://api.laal.top/api/v1/community/gallery/items?kind=image&sort=latest&limit=2&offset=0` | `200` | `total: 0`、`limit: 2`、`sort: "latest"` |
+| `https://api.laal.top/api/v1/community/gallery/items?kind=video&sort=latest&limit=2&offset=0` | `200` | `total: 0`、`limit: 2`、`sort: "latest"` |
+| `https://api.laal.top/api/v1/community/gallery/collections?group=author&kind=image&limit=2` | `200` | `collections: []`、`total: 0`、`group: "author"` |
+| `https://api.laal.top/api/v1/gallery/items`（错误路径对照） | `401` | `code: "AUTH_UNAUTHORIZED"`、`message: "missing bearer token"` |
+
+> 线上 `community_thread_media` 当前为空，故 `items` 为 `[]`；「锁定项 `url` 为空」由契约测试覆盖：
+> [community-gallery.test.ts](../services/mim-api/test/community-gallery.test.ts) 断言匿名请求 `gallery/items` 时锁定项 `locked === true` 且 `url === ''`，并在 `MIM_FORCE_LOGIN=1` 下断言列表与聚合仍为 `200`。
+
+---
+
+## 8. 取证留档
 
 建议把以下内容一起贴到工单 / 发布记录：
 
