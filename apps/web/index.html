@@ -3,14 +3,14 @@
   <head><!-- 头部区：只放元信息，不渲染可见内容 -->
     <meta charset="UTF-8" /><!-- 字符编码：显式 UTF-8，须落在最前 1024 字节内，故置于一切脚本之前 -->
     <!-- 基础地址：相对资源一律按站点根解析，避免多段路径下把 ./assets 解析到错误目录 -->
-    <base href="/" /><!-- 根部署恒为 "/"，子路径部署由下方内联脚本改写 -->
+    <base href="/" /><!-- 默认站点根；下方内联脚本会在需要时改写 -->
     <script>
       /* 地址栏前置规整：必须在相对路径资源加载前执行，保证按规整后的地址解析资源 */
-      (function () { // 立即执行：隔离内部变量，避免污染全局作用域
-        if (location.pathname === '/mim' || location.pathname.indexOf('/mim/') === 0) { // 子路径部署兼容
-          document.querySelector('base').setAttribute('href', '/mim/'); // 基础地址跟随子路径
-        } // 子路径部署兼容处理结束
-        var views = ['account', 'deployments', 'community', 'chat', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements', 'news', 'releases', 'cart']; // 对外路径段与旧别名，和 src/router.ts 保持一致
+      (function () { // 立即执行：避免污染全局作用域
+        if (location.pathname === '/mim' || location.pathname.indexOf('/mim/') === 0) { // 子路径访问兼容
+          document.querySelector('base').setAttribute('href', '/mim/'); // 基础地址跟随该前缀
+        } // 子路径访问兼容处理结束
+        var views = ['account', 'deployments', 'community', 'chat', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements', 'news', 'releases', 'cart']; // 需识别的路径段与旧别名
         var href = location.href; // 完整地址：用于判断末位是否残留裸问号
         var search = location.search; // 查询串（含前导问号；无查询串时为空串）
         if (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?')) { // 命中异常查询串形态
@@ -31,9 +31,9 @@
             var folded; // 折叠后的路径
             if (cut > 0) { // 命中视图段：前缀 + 视图段
               folded = '/' + segs.slice(0, cut).join('/'); // 地址栏统一成单段形态
-            } else if (segs[0] === 'mim') { // 未命中视图段且首段为 mim：子路径根
-              folded = '/mim/'; // 带尾斜杠回到子路径根
-            } else { // 未命中视图段的根部署多段地址
+            } else if (segs[0] === 'mim') { // 首段为 mim：回到该前缀根
+              folded = '/mim/'; // 带尾斜杠回到该前缀根
+            } else { // 未命中视图段的多段地址
               folded = '/' + segs[0]; // 只保留首段且无尾斜杠
             } // 折叠分支结束
             history.replaceState(null, '', folded + location.hash); // 原地改写地址，保留 hash
