@@ -1305,7 +1305,7 @@ code { /* 行内代码/令牌展示 */
   padding: 8px 12px; /* 内边距 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 统一圆角 */
-  font-size: 14px; /* 与正文一致 */
+  font-size: var(--fs-base); /* 与正文一致 */
   outline: none; /* 去除默认聚焦描边 */
 } /* 搜索输入框结束 */
 
@@ -1358,7 +1358,7 @@ code { /* 行内代码/令牌展示 */
 } /* 悬停结束 */
 
 .chat-conv-item.active { /* 当前选中会话 */
-  background: rgba(59, 110, 245, 0.08); /* 主色淡背景 */
+  background: var(--primary-soft); /* 主色淡背景 */
 } /* 选中态结束 */
 
 .chat-avatar { /* 头像占位：首字母圆形 */
@@ -1367,11 +1367,11 @@ code { /* 行内代码/令牌展示 */
   height: 36px;
   border-radius: 50%; /* 圆形 */
   background: var(--primary); /* 主色背景 */
-  color: #fff; /* 白色文字 */
+  color: var(--on-primary); /* 白色文字 */
   display: flex; /* 居中首字母 */
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 600;
 } /* 头像结束 */
 
@@ -1385,7 +1385,7 @@ code { /* 行内代码/令牌展示 */
 
 .chat-conv-title { /* 会话标题 */
   font-weight: 600; /* 半粗 */
-  font-size: 14px;
+  font-size: var(--fs-base);
   white-space: nowrap; /* 不换行 */
   overflow: hidden; /* 溢出隐藏 */
   text-overflow: ellipsis; /* 省略号 */
@@ -1393,7 +1393,7 @@ code { /* 行内代码/令牌展示 */
 
 .chat-conv-preview { /* 最后消息预览 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1404,10 +1404,10 @@ code { /* 行内代码/令牌展示 */
   min-width: 18px; /* 最小宽度 */
   height: 18px;
   padding: 0 5px; /* 水平内边距 */
-  border-radius: 9px; /* 胶囊形 */
+  border-radius: var(--radius-sm); /* 胶囊形 */
   background: var(--danger); /* 红色 */
-  color: #fff; /* 白字 */
-  font-size: 11px;
+  color: var(--on-primary); /* 白字 */
+  font-size: var(--fs-xs);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1416,7 +1416,7 @@ code { /* 行内代码/令牌展示 */
 .chat-empty { /* 空状态文案 */
   padding: 20px 12px; /* 内边距 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 13px;
+  font-size: var(--fs-sm);
   text-align: center; /* 居中 */
 } /* 空状态结束 */
 
@@ -1438,12 +1438,12 @@ code { /* 行内代码/令牌展示 */
 
 .chat-header-title { /* 会话标题 */
   font-weight: 600; /* 半粗 */
-  font-size: 16px;
+  font-size: var(--fs-md);
 } /* 标题结束 */
 
 .chat-header-status { /* 连接状态 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px;
+  font-size: var(--fs-xs);
 } /* 状态结束 */
 
 .chat-messages { /* 消息列表容器 */
@@ -1472,14 +1472,14 @@ code { /* 行内代码/令牌展示 */
 } /* 对方消息结束 */
 
 .chat-msg-sender { /* 发送者名 */
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted); /* 次要色 */
   margin-bottom: 4px; /* 与气泡间距 */
 } /* 发送者名结束 */
 
 .chat-msg-bubble { /* 消息气泡 */
   padding: 10px 14px; /* 内边距 */
-  border-radius: 12px; /* 圆角 */
+  border-radius: var(--radius-md); /* 圆角 */
   background: var(--surface); /* 白色 */
   border: 1px solid var(--border); /* 边框 */
   word-break: break-word; /* 长词换行 */
@@ -1488,7 +1488,7 @@ code { /* 行内代码/令牌展示 */
 
 .chat-msg.mine .chat-msg-bubble { /* 自己的气泡主色背景 */
   background: var(--primary); /* 主色 */
-  color: #fff; /* 白字 */
+  color: var(--on-primary); /* 白字 */
   border-color: var(--primary);
 } /* 自己气泡结束 */
 
@@ -1501,19 +1501,19 @@ code { /* 行内代码/令牌展示 */
   display: block; /* 去掉行内基线空隙 */
   max-width: 100%; /* 不超容器 */
   max-height: 240px; /* 高度上限，保持列表节奏 */
-  border-radius: 10px; /* 与气泡圆角呼应 */
+  border-radius: var(--radius-sm); /* 与气泡圆角呼应 */
   object-fit: cover; /* 等比裁切不变形 */
   cursor: zoom-in; /* 暗示可放大查看 */
 } /* 缩略图结束 */
 
 .chat-image-loading,
 .chat-image-fallback { /* 加载中与失败占位 */
-  font-size: 13px; /* 与气泡正文一致 */
+  font-size: var(--fs-sm); /* 与气泡正文一致 */
   opacity: 0.75; /* 弱化存在感 */
 } /* 占位结束 */
 
 .chat-msg-time { /* 消息时间 */
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-top: 4px;
 } /* 时间结束 */
@@ -1534,8 +1534,8 @@ code { /* 行内代码/令牌展示 */
   gap: 12px; /* 最小间距，窄屏下也不挤在一起 */
   padding: 10px 20px; /* 与消息区左右内边距对齐 */
   border-bottom: 1px solid var(--border); /* 与消息区分隔 */
-  background: var(--surface-soft, #f7f8fa); /* 淡底突出这是提示条 */
-  font-size: 13px; /* 小于正文，弱化提示层级 */
+  background: var(--surface-2); /* 淡底突出这是提示条 */
+  font-size: var(--fs-sm); /* 小于正文，弱化提示层级 */
   color: var(--text-muted); /* 次要文字色 */
 } /* 说明条结束 */
 
@@ -1546,7 +1546,7 @@ code { /* 行内代码/令牌展示 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
   font-family: inherit; /* 继承字体 */
-  font-size: 14px;
+  font-size: var(--fs-base);
   outline: none; /* 去默认描边 */
 } /* 文本域结束 */
 
@@ -1560,7 +1560,7 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   justify-content: center; /* 水平居中 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 14px;
+  font-size: var(--fs-base);
 } /* 占位结束 */
 
 .chat-error { /* 错误提示条 */
@@ -1569,9 +1569,9 @@ code { /* 行内代码/令牌展示 */
   justify-content: space-between; /* 关闭按钮靠右 */
   gap: 12px; /* 文案与按钮间距 */
   padding: 8px 20px; /* 内边距 */
-  background: rgba(214, 69, 69, 0.1); /* 红色淡背景 */
+  background: var(--danger-soft); /* 红色淡背景 */
   color: var(--danger); /* 红色文字 */
-  font-size: 13px;
+  font-size: var(--fs-sm);
   border-top: 1px solid var(--border); /* 顶部分隔线 */
 } /* 错误条结束 */
 
@@ -1580,7 +1580,7 @@ code { /* 行内代码/令牌展示 */
   border: none; /* 去边框 */
   background: transparent; /* 透明底 */
   color: var(--danger); /* 与文案同色 */
-  font-size: 16px; /* 点击区域更明显 */
+  font-size: var(--fs-md); /* 点击区域更明显 */
   line-height: 1; /* 单行紧凑 */
   cursor: pointer; /* 手型光标 */
 } /* 关闭按钮结束 */
@@ -2137,18 +2137,18 @@ code { /* 行内代码/令牌展示 */
   padding: 8px 12px; /* 与搜索框一致 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
-  font-size: 14px; /* 正文字号 */
+  font-size: var(--fs-base); /* 正文字号 */
   outline: none; /* 去默认描边 */
 } /* 群名输入框结束 */
 
 .chat-hint { /* 已选人数等辅助提示 */
   margin: 0; /* 去掉段落默认外边距 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 辅助提示结束 */
 
 .chat-user-item.picked { /* 建群模式下已勾选的用户项 */
-  background: rgba(59, 110, 245, 0.1); /* 主色淡底提示已选 */
+  background: var(--primary-soft); /* 主色淡底提示已选 */
 } /* 已勾选态结束 */
 
 .chat-pick-mark { /* 勾选标记（+ / ✓） */
@@ -2161,16 +2161,16 @@ code { /* 行内代码/令牌展示 */
   margin-left: 6px; /* 与群名间隔 */
   color: var(--text-muted); /* 次要色 */
   font-weight: 400; /* 不加粗 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 成员数后缀结束 */
 
 .chat-conv-flag { /* 置顶 / 免打扰小标签 */
   margin-left: 6px; /* 与标题间隔 */
   padding: 0 4px; /* 左右内边距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 4px; /* 小圆角 */
+  border-radius: var(--radius-xs); /* 小圆角 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
   font-weight: 400; /* 不加粗 */
 } /* 状态标签结束 */
 
@@ -2184,7 +2184,7 @@ code { /* 行内代码/令牌展示 */
   padding: 6px 10px; /* 紧凑内边距 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
   outline: none; /* 去默认描边 */
 } /* 会话内搜索框结束 */
 
@@ -2196,7 +2196,7 @@ code { /* 行内代码/令牌展示 */
   border-bottom: 1px solid var(--border); /* 与消息区分隔 */
   background: var(--surface); /* 白底 */
   overflow-x: auto; /* 命中项过多时横向滚动 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 搜索结果条结束 */
 
 .chat-msg-result-item { /* 单条命中结果 */
@@ -2206,7 +2206,7 @@ code { /* 行内代码/令牌展示 */
   border-radius: var(--radius); /* 圆角 */
   background: var(--bg); /* 浅灰底 */
   cursor: pointer; /* 可点击 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 命中项结束 */
 
 .chat-more { /* 「加载更早消息」按钮 */
@@ -2217,7 +2217,7 @@ code { /* 行内代码/令牌展示 */
 .chat-msg-status { /* 自己消息的投递状态 */
   margin-left: 6px; /* 与时间间隔 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
 } /* 状态结束 */
 
 .chat-msg-status.read { /* 已读状态用主色强调 */
@@ -2230,14 +2230,14 @@ code { /* 行内代码/令牌展示 */
   border: none; /* 无边框 */
   background: none; /* 透明底 */
   color: var(--danger); /* 红色提示可撤销 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
   cursor: pointer; /* 可点击 */
 } /* 撤回按钮结束 */
 
 .chat-typing { /* 「对方正在输入」提示 */
   padding: 0 16px 6px; /* 与输入框拉开 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 输入中提示结束 */
 
 .chat-attach { /* 图片/文件按钮 */
@@ -2257,7 +2257,7 @@ code { /* 行内代码/令牌展示 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
   background: var(--surface); /* 白底 */
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12); /* 浮层阴影 */
+  box-shadow: var(--shadow-lg); /* 浮层阴影 */
   overflow-y: auto; /* 成员多时滚动 */
   z-index: 40; /* 置于消息区之上 */
 } /* 群信息面板结束 */
@@ -2280,7 +2280,7 @@ code { /* 行内代码/令牌展示 */
   padding: 6px 10px; /* 紧凑内边距 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
   outline: none; /* 去描边 */
 } /* 改名输入框结束 */
 
@@ -2295,13 +2295,13 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 8px; /* 间距 */
   padding: 4px 0; /* 上下留白 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
 } /* 成员行结束 */
 
 .chat-member-role { /* 成员角色标签 */
   margin-left: auto; /* 推到右侧 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
 } /* 角色标签结束 */
 
 /* ---------- 聊天增强（2026-11-11）：引用回复 / 文件下载 / 搜索定位 / 未读分割 / 表情 / 群管理 ---------- */
@@ -2310,18 +2310,18 @@ code { /* 行内代码/令牌展示 */
   display: block; /* 独占一行，位于正文之上 */
   margin-bottom: 6px; /* 与正文留出间隔 */
   padding: 4px 8px; /* 引用块内边距 */
-  border-left: 3px solid var(--primary, #4f46e5); /* 左侧主色竖线标识引用 */
-  border-radius: 4px; /* 小圆角 */
-  background: rgba(0, 0, 0, 0.06); /* 浅底与正文区分 */
+  border-left: 3px solid var(--primary); /* 左侧主色竖线标识引用 */
+  border-radius: var(--radius-xs); /* 小圆角 */
+  background: var(--surface-3); /* 浅底与正文区分 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px; /* 小于正文 */
+  font-size: var(--fs-xs); /* 小于正文 */
   line-height: 1.4; /* 行高 */
   white-space: pre-wrap; /* 保留换行并自动折行 */
   word-break: break-word; /* 长串强制换行 */
 } /* 引用块结束 */
 
 .chat-msg.highlight .chat-msg-bubble { /* 搜索定位后的高亮 */
-  outline: 2px solid var(--primary, #4f46e5); /* 主色描边强调目标消息 */
+  outline: 2px solid var(--primary); /* 主色描边强调目标消息 */
   outline-offset: 2px; /* 描边外扩，避免压住文字 */
   transition: outline-color 0.3s ease; /* 柔和过渡 */
 } /* 高亮结束 */
@@ -2332,7 +2332,7 @@ code { /* 行内代码/令牌展示 */
   gap: 8px; /* 线文间距 */
   margin: 10px 0; /* 上下留白 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
 } /* 分割线容器结束 */
 
 .chat-unread-divider::before,
@@ -2347,10 +2347,10 @@ code { /* 行内代码/令牌展示 */
   align-self: center; /* 在纵向 flex 中居中 */
   max-width: 80%; /* 过宽时换行 */
   padding: 4px 10px; /* 胶囊内边距 */
-  border-radius: 999px; /* 圆角胶囊 */
-  background: rgba(0, 0, 0, 0.05); /* 淡灰底 */
+  border-radius: var(--radius-pill); /* 圆角胶囊 */
+  background: var(--surface-3); /* 淡灰底 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
   text-align: center; /* 文案居中 */
 } /* 系统消息结束 */
 
@@ -2362,19 +2362,19 @@ code { /* 行内代码/令牌展示 */
   max-width: 86%; /* 卡片宽度上限 */
   padding: 12px 14px; /* 卡片内边距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 12px; /* 卡片圆角 */
-  background: var(--surface, #fff); /* 卡片底色 */
+  border-radius: var(--radius-md); /* 卡片圆角 */
+  background: var(--surface); /* 卡片底色 */
   text-align: left; /* 正文左对齐 */
 } /* 成长私信卡片结束 */
 
 .chat-system-msg-sender { /* 发件方：固定系统身份 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
   font-weight: 600; /* 加粗强调 */
   color: var(--text-muted); /* 次要色 */
 } /* 发件方结束 */
 
 .chat-system-msg-body { /* 私信正文 */
-  font-size: 14px; /* 正文字号 */
+  font-size: var(--fs-base); /* 正文字号 */
   line-height: 1.6; /* 行高 */
   color: var(--text); /* 正文色 */
   white-space: pre-wrap; /* 保留换行 */
@@ -2382,19 +2382,19 @@ code { /* 行内代码/令牌展示 */
 
 .chat-system-msg-link { /* 跳转按钮 */
   padding: 5px 12px; /* 按钮内边距 */
-  border-radius: 999px; /* 胶囊按钮 */
-  background: var(--brand, #2f6fed); /* 品牌色底 */
-  color: #fff; /* 白字 */
-  font-size: 13px; /* 按钮字号 */
+  border-radius: var(--radius-pill); /* 胶囊按钮 */
+  background: var(--primary); /* 主色底 */
+  color: var(--on-primary); /* 白字 */
+  font-size: var(--fs-sm); /* 按钮字号 */
   text-decoration: none; /* 去掉下划线 */
 } /* 跳转按钮结束 */
 
 .chat-system-badge { /* 系统会话在头部的身份徽标 */
   padding: 3px 10px; /* 徽标内边距 */
-  border-radius: 999px; /* 胶囊造型 */
-  background: rgba(0, 0, 0, 0.05); /* 淡灰底 */
+  border-radius: var(--radius-pill); /* 胶囊造型 */
+  background: var(--surface-3); /* 淡灰底 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 身份徽标结束 */
 
 .chat-messages .chat-hint { /* 消息区加载/提示文案 */
@@ -2407,7 +2407,7 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 8px; /* 元素间距 */
   flex-wrap: wrap; /* 窄气泡内换行 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
 } /* 文件气泡结束 */
 
 .chat-file-name { /* 文件名 */
@@ -2419,12 +2419,12 @@ code { /* 行内代码/令牌展示 */
 
 .chat-file-size { /* 文件体积 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
 } /* 体积结束 */
 
 .chat-file-download { /* 下载按钮 */
   padding: 2px 8px; /* 紧凑内边距 */
-  font-size: 12px; /* 小字号 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 下载按钮结束 */
 
 .chat-file-fallback { /* 下载签名失败时的占位 */
@@ -2438,13 +2438,13 @@ code { /* 行内代码/令牌展示 */
   border: none; /* 无边框 */
   background: none; /* 无底色 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字号 */
+  font-size: var(--fs-xs); /* 极小字号 */
   cursor: pointer; /* 手型光标 */
 } /* 小操作按钮结束 */
 
 .chat-reply-btn:hover,
 .chat-recall:hover { /* 悬停强调 */
-  color: var(--primary, #4f46e5); /* 主色 */
+  color: var(--primary); /* 主色 */
 } /* 悬停结束 */
 
 .chat-reply-bar { /* 输入框上方的引用提示条 */
@@ -2454,8 +2454,8 @@ code { /* 行内代码/令牌展示 */
   gap: 8px; /* 间距 */
   padding: 6px 12px; /* 内边距 */
   border-top: 1px solid var(--border); /* 与消息区分隔 */
-  background: rgba(0, 0, 0, 0.03); /* 浅底 */
-  font-size: 12px; /* 小字号 */
+  background: var(--surface-2); /* 浅底 */
+  font-size: var(--fs-xs); /* 小字号 */
 } /* 引用条结束 */
 
 .chat-reply-quote { /* 引用条内文案 */
@@ -2468,7 +2468,7 @@ code { /* 行内代码/令牌展示 */
 
 .chat-emoji-btn { /* 表情按钮 */
   flex: 0 0 auto; /* 不压缩 */
-  font-size: 16px; /* 图标稍大 */
+  font-size: var(--fs-md); /* 图标稍大 */
 } /* 表情按钮结束 */
 
 .chat-emoji-picker { /* 表情面板 */
@@ -2482,7 +2482,7 @@ code { /* 行内代码/令牌展示 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
   background: var(--surface); /* 白底 */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); /* 浮层阴影 */
+  box-shadow: var(--shadow); /* 浮层阴影 */
   z-index: 30; /* 高于输入区 */
 } /* 表情面板结束 */
 
@@ -2490,13 +2490,13 @@ code { /* 行内代码/令牌展示 */
   padding: 4px; /* 点击区域 */
   border: none; /* 无边框 */
   background: none; /* 无底色 */
-  font-size: 18px; /* 表情字号 */
+  font-size: var(--fs-lg); /* 表情字号 */
   cursor: pointer; /* 手型 */
 } /* 表情结束 */
 
 .chat-emoji-item:hover { /* 悬停反馈 */
-  background: rgba(0, 0, 0, 0.06); /* 浅底 */
-  border-radius: 4px; /* 圆角 */
+  background: var(--surface-3); /* 浅底 */
+  border-radius: var(--radius-xs); /* 圆角 */
 } /* 悬停结束 */
 
 .chat-panel-block { /* 面板内加人区块 */
@@ -2511,7 +2511,7 @@ code { /* 行内代码/令牌展示 */
   padding: 6px 10px; /* 紧凑内边距 */
   border: 1px solid var(--border); /* 边框 */
   border-radius: var(--radius); /* 圆角 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
   outline: none; /* 去描边 */
 } /* 加人搜索框结束 */
 
@@ -2529,15 +2529,15 @@ code { /* 行内代码/令牌展示 */
 .tag { /* 状态标签 */
   display: inline-block; /* 内容宽度自适应 */
   padding: 1px 8px; /* 胶囊内边距 */
-  border-radius: 999px; /* 胶囊圆角 */
-  background: #eef1f7; /* 中性底色 */
-  font-size: 12px; /* 小字号 */
+  border-radius: var(--radius-pill); /* 胶囊圆角 */
+  background: var(--surface-3); /* 中性底色 */
+  font-size: var(--fs-xs); /* 小字号 */
   color: var(--text-muted); /* 次要色 */
 } /* 标签结束 */
 
 .tag.ok { /* 成功 / 可用状态标签 */
-  background: #e7f6ec; /* 浅绿底 */
-  color: #1a7f37; /* 深绿字 */
+  background: var(--success-soft); /* 浅绿底 */
+  color: var(--success); /* 深绿字 */
 } /* 可用标签结束 */
 
 .profile-tabs { /* 个人中心分区切换 */
@@ -2549,11 +2549,11 @@ code { /* 行内代码/令牌展示 */
 .tab { /* 分区按钮 */
   padding: 6px 12px; /* 内边距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 999px; /* 胶囊 */
+  border-radius: var(--radius-pill); /* 胶囊 */
   background: transparent; /* 透明底 */
   color: var(--text-muted); /* 默认弱化 */
   cursor: pointer; /* 手型 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
 } /* 分区按钮结束 */
 
 .tab.active { /* 当前分区 */
@@ -2573,7 +2573,7 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 标题在上输入在下 */
   gap: 6px; /* 间距 */
-  font-size: 13px; /* 小字号 */
+  font-size: var(--fs-sm); /* 小字号 */
   color: var(--text-muted); /* 标签弱化 */
 } /* 字段结束 */
 
@@ -2581,7 +2581,7 @@ code { /* 行内代码/令牌展示 */
 .profile-form select { /* 下拉 */
   padding: 9px 12px; /* 内边距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 8px; /* 圆角 */
+  border-radius: var(--radius-sm); /* 圆角 */
   background: var(--surface); /* 跟随主题 */
   color: inherit; /* 继承文字色 */
 } /* 输入控件结束 */
@@ -2607,24 +2607,24 @@ code { /* 行内代码/令牌展示 */
   gap: 4px; /* 按钮间距 */
   padding: 4px; /* 内衬，形成胶囊底 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 999px; /* 胶囊圆角 */
+  border-radius: var(--radius-pill); /* 胶囊圆角 */
   background: var(--surface); /* 跟随主题表面色 */
 } /* 分段容器结束 */
 
 .segment-item { /* 分段按钮 */
   padding: 7px 18px; /* 舒适点击区域 */
   border: none; /* 无边框 */
-  border-radius: 999px; /* 胶囊 */
+  border-radius: var(--radius-pill); /* 胶囊 */
   background: transparent; /* 未选中透明 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 13px; /* 正文偏小 */
+  font-size: var(--fs-sm); /* 正文偏小 */
   font-weight: 500; /* 中等字重 */
   cursor: pointer; /* 手型光标 */
 } /* 分段按钮结束 */
 
 .segment-item.active { /* 选中态 */
   background: var(--primary); /* 品牌主色 */
-  color: #fff; /* 反白 */
+  color: var(--on-primary); /* 反白 */
 } /* 选中态结束 */
 
 .theater { /* 放映厅根容器 */
@@ -2642,7 +2642,7 @@ code { /* 行内代码/令牌展示 */
 
 .theater-title { /* 页面标题 */
   margin: 0 0 4px; /* 仅保留底部间距 */
-  font-size: 22px; /* 主标题字号 */
+  font-size: var(--fs-xl); /* 主标题字号 */
 } /* 标题结束 */
 
 .theater-stage { /* 播放区：画面 + 侧栏 */
@@ -2651,7 +2651,7 @@ code { /* 行内代码/令牌展示 */
   gap: 16px; /* 两栏间距 */
   padding: 16px; /* 内衬 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 14px; /* 圆角 */
+  border-radius: var(--radius-md); /* 圆角 */
   background: var(--surface); /* 表面色 */
 } /* 播放区结束 */
 
@@ -2665,8 +2665,8 @@ code { /* 行内代码/令牌展示 */
 .theater-player { /* 原生视频播放器 */
   width: 100%; /* 撑满 */
   max-height: 62vh; /* 避免竖屏片源过高 */
-  border-radius: 10px; /* 圆角 */
-  background: #000; /* 黑底，加载时也像影院 */
+  border-radius: var(--radius-sm); /* 圆角 */
+  background: var(--media-bg); /* 黑底，加载时也像影院 */
 } /* 播放器结束 */
 
 .theater-now { /* 当前片名条 */
@@ -2682,7 +2682,7 @@ code { /* 行内代码/令牌展示 */
 
 .theater-now-sub { /* 所属作品 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 12px; /* 小字 */
+  font-size: var(--fs-xs); /* 小字 */
 } /* 结束 */
 
 .theater-side { /* 右侧信息栏 */
@@ -2694,7 +2694,7 @@ code { /* 行内代码/令牌展示 */
 
 .theater-side-title { /* 侧栏区块标题 */
   margin: 0 0 8px; /* 仅底部间距 */
-  font-size: 14px; /* 小标题 */
+  font-size: var(--fs-base); /* 小标题 */
   font-weight: 600; /* 加粗 */
   display: flex; /* 标题与徽标并排 */
   align-items: center; /* 垂直居中 */
@@ -2714,10 +2714,10 @@ code { /* 行内代码/令牌展示 */
   gap: 10px; /* 间距 */
   padding: 9px 11px; /* 内衬 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 8px; /* 圆角 */
+  border-radius: var(--radius-sm); /* 圆角 */
   background: var(--surface); /* 表面色 */
   color: inherit; /* 继承文字色 */
-  font-size: 13px; /* 小字 */
+  font-size: var(--fs-sm); /* 小字 */
   text-align: left; /* 左对齐 */
   cursor: pointer; /* 手型 */
 } /* 结束 */
@@ -2729,10 +2729,10 @@ code { /* 行内代码/令牌展示 */
 
 .theater-kind { /* 形态徽标 */
   padding: 2px 8px; /* 内衬 */
-  border-radius: 999px; /* 胶囊 */
+  border-radius: var(--radius-pill); /* 胶囊 */
   background: color-mix(in srgb, var(--primary) 12%, transparent); /* 主色淡底 */
   color: var(--primary); /* 主色文字 */
-  font-size: 11px; /* 极小字 */
+  font-size: var(--fs-xs); /* 极小字 */
   font-weight: 500; /* 中等字重 */
 } /* 结束 */
 
@@ -2752,9 +2752,9 @@ code { /* 行内代码/令牌展示 */
 .theater-tag { /* 单个标签 */
   padding: 2px 8px; /* 内衬 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 999px; /* 胶囊 */
+  border-radius: var(--radius-pill); /* 胶囊 */
   color: var(--text-muted); /* 次要色 */
-  font-size: 11px; /* 极小字 */
+  font-size: var(--fs-xs); /* 极小字 */
 } /* 结束 */
 
 .theater-section { /* 片库 / 我的作品区块 */
@@ -2775,7 +2775,7 @@ code { /* 行内代码/令牌展示 */
   padding: 0; /* 图片贴边 */
   overflow: hidden; /* 圆角裁切 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 12px; /* 圆角 */
+  border-radius: var(--radius-md); /* 圆角 */
   background: var(--surface); /* 表面色 */
   color: inherit; /* 继承文字色 */
   text-align: left; /* 左对齐 */
@@ -2802,7 +2802,7 @@ code { /* 行内代码/令牌展示 */
 } /* 结束 */
 
 .theater-card-title { /* 卡片标题 */
-  font-size: 15px; /* 字号 */
+  font-size: var(--fs-base); /* 字号 */
   font-weight: 600; /* 加粗 */
 } /* 结束 */
 
@@ -2835,7 +2835,7 @@ code { /* 行内代码/令牌展示 */
 .theater-chips button.active { /* 当前筛选项 */
   border-color: var(--primary); /* 主色描边 */
   background: var(--primary); /* 主色底 */
-  color: #ffffff; /* 白字 */
+  color: var(--on-primary); /* 白字 */
 } /* 结束 */
 
 .theater-search { /* 片库搜索框 */
@@ -2843,10 +2843,10 @@ code { /* 行内代码/令牌展示 */
   flex: 1; /* 占据剩余空间 */
   padding: 7px 10px; /* 内衬 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 8px; /* 圆角 */
+  border-radius: var(--radius-sm); /* 圆角 */
   background: var(--surface); /* 表面色 */
   color: inherit; /* 继承文字色 */
-  font-size: 13px; /* 常规字号 */
+  font-size: var(--fs-sm); /* 常规字号 */
 } /* 结束 */
 
 .theater-continue { /* 继续观看横向列表 */
@@ -2863,7 +2863,7 @@ code { /* 行内代码/令牌展示 */
   padding: 0; /* 图片贴边 */
   overflow: hidden; /* 圆角裁切 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 12px; /* 圆角 */
+  border-radius: var(--radius-md); /* 圆角 */
   background: var(--surface); /* 表面色 */
   color: inherit; /* 继承文字色 */
   text-align: left; /* 左对齐 */
@@ -2877,7 +2877,7 @@ code { /* 行内代码/令牌展示 */
   justify-content: space-between; /* 分开 */
   gap: 8px; /* 间距 */
   margin-top: 6px; /* 与标题分开 */
-  font-size: 11px; /* 极小字 */
+  font-size: var(--fs-xs); /* 极小字 */
 } /* 结束 */
 
 .theater-card-mine { /* 我的成片卡片：无封面，用更高内衬 */
@@ -2897,7 +2897,7 @@ code { /* 行内代码/令牌展示 */
   margin: 24px auto; /* 居中 */
   padding: 24px; /* 内衬 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 14px; /* 圆角 */
+  border-radius: var(--radius-md); /* 圆角 */
   background: var(--surface); /* 表面色 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 堆叠 */
