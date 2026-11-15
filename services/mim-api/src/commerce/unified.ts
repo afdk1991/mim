@@ -5,18 +5,20 @@
  *   - 数字模块：module_orders + cart_items + entitlements
  *   - 实物 / 卡密：shop_products + shop_orders + shipments
  *   - 付费资产：paid_assets + asset_purchases
- * 三套订单表导致「我的订单 / 退款 / 对账 / GMV」都要写三段并手工合并。
+ *   - 社区付费阅读：community_threads.price_cents + community_purchases（2026-11-15 起直写本域）
+ * 多套订单表导致「我的订单 / 退款 / 对账 / GMV」都要写多段并手工合并。
  *
  * 本文件边界（有意做小）：
- *   1. 只做回填（幂等，UNIQUE(source, source_id) 保证重复启动不加行）与只读查询；
- *   2. 三套旧表与旧接口原样服务，不做双写、不做读切换——后续提交再逐条搬写路径；
+ *   1. 回填幂等（UNIQUE(source, source_id) 保证重复启动不加行），并提供只读查询；
+ *   2. 旧表与旧接口原样服务，不做读切换；社区付费阅读是本域第一条直写产线（扣费 / 解锁 / 落单同一事务），
+ *      其余三条仍待逐条搬写路径；
  *   3. 任何时刻删掉 50-unified-commerce.sql 建的五张表即可回到旧路径，回滚成本为零。
  */
 
 import type { Db } from '../types.js'; // 数据库类型（better-sqlite3 同步句柄）
 
 /** 统一订单来源产线：迁移期用于区分历史来源与后续写路径 */
-export type UnifiedOrderSource = 'module' | 'shop' | 'asset';
+export type UnifiedOrderSource = 'module' | 'shop' | 'asset' | 'community';
 
 /** 统一订单明细行 */
 export interface UnifiedOrderItem {
@@ -48,7 +50,7 @@ export interface UnifiedOrder {
   items: UnifiedOrderItem[]; // 订单明细
 }
 
-/** 统一订单列表查询选项：source 缺省返回三源全部，指定后只回该产线（迁移期保留各页面原口径） */
+/** 统一订单列表查询选项：source 缺省返回四源全部，指定后只回该产线（迁移期保留各页面原口径） */
 export interface UnifiedOrderQuery {
   source?: UnifiedOrderSource; // 来源产线过滤
   limit?: number; // 分页大小，缺省由路由层解析
@@ -96,7 +98,7 @@ function normalizeStatus(raw: string): string {
 }
 
 /**
- * 启动期回填：把三套历史订单写进统一五表。
+ * 启动期回填：把四套历史订单写进统一五表。
  * 幂等依据是 orders 的 UNIQUE(source, source_id)，以及 products / order_items 的固定主键；
  * 因此每次进程启动都跑一遍也只会写入缺失行，不会重复也不会覆盖用户后续修改。
  */
@@ -181,12 +183,79 @@ export function backfillUnifiedCommerce(db: Db, now: string = new Date().toISOSt
     result.items += itemRun.changes; // 统计新写入
   }
 
+  // ---- 产线四：社区付费阅读（community_purchases 联 community_threads，余额一次买断） ----
+  const communityRows = db
+    .prepare(
+      `SELECT p.id AS purchase_id, p.user_id AS user_id, p.thread_id AS thread_id, p.amount_cents AS price_cents,
+              p.created_at AS created_at, t.title AS thread_title, t.board_id AS board_id
+         FROM community_purchases p JOIN community_threads t ON t.id = p.thread_id
+        WHERE p.amount_cents > 0`, // 0 元记录来自 VIP / 作者放行，不是交易
+    )
+    .all() as Array<CommunityPurchaseInput>;
+  for (const row of communityRows) { // 与写路径共用同一落单函数，避免两套字段口径
+    const written = recordCommunityPurchase(db, row);
+    result.products += written.products;
+    result.orders += written.orders;
+    result.items += written.items;
+  }
+
   void now; // 回填不依赖当前时间（各行用源表自己的 created_at），保留参数只为将来按时间窗迁移
   return result; // 返回计数，调用方打印日志
 }
 
 /** 订单主体原始行：不含明细与派生展示字段，组装视图前的最小字段集 */
 type RawOrderRow = Pick<UnifiedOrder, 'id' | 'user_id' | 'source' | 'source_id' | 'status' | 'channel' | 'currency' | 'total_cents' | 'discount_cents' | 'payable_cents' | 'created_at' | 'paid_at'>;
+/** 社区付费阅读落单入参：由解锁端点或启动回填提供，一次写入即一条完整交易 */
+export interface CommunityPurchaseInput {
+  purchase_id: string; // community_purchases 主键，派生统一订单 / 支付 / 履约主键
+  user_id: string; // 购买人
+  thread_id: string; // 帖子主键（同时作为统一商品主键）
+  thread_title: string; // 帖子标题快照
+  board_id: string; // 所属板块，写入商品 meta 便于按板块对账
+  price_cents: number; // 实付金额（分）
+  created_at: string; // 成交时间
+}
+
+/** 统一交易域写入计数：解锁端点忽略，启动回填累加 */
+export interface CommunityPurchaseWrite {
+  order_id: string; // 统一订单主键
+  products: number; // 新写入商品行数
+  orders: number; // 新写入订单行数
+  items: number; // 新写入明细行数
+}
+
+/**
+ * 社区付费帖购买落单：商品 / 订单 / 明细 / 支付 / 履约一次写齐。
+ * 调用方必须与钱包扣款、community_purchases 写入处在同一事务内，保证「扣费 / 解锁 / 落单」原子。
+ * 全部 INSERT OR IGNORE 且主键由 purchase_id 派生，重复调用不会加行。
+ */
+export function recordCommunityPurchase(db: Db, input: CommunityPurchaseInput): CommunityPurchaseWrite {
+  const orderId = `uo_community_${input.purchase_id}`; // 订单主键按源记录派生，天然幂等
+  const productRun = db.prepare(
+    `INSERT OR IGNORE INTO products (id, kind, code, title, price_cents, currency, stock, status, meta_json, created_at)
+     VALUES (?, 'asset', ?, ?, ?, 'CNY', 0, 'active', ?, ?)`,
+  ).run(input.thread_id, input.thread_id, input.thread_title, input.price_cents,
+    JSON.stringify({ thread_id: input.thread_id, board_id: input.board_id }), input.created_at); // 付费帖按内容资产归类
+  const orderRun = db.prepare(
+    `INSERT OR IGNORE INTO orders (id, user_id, source, source_id, status, channel, currency, total_cents, discount_cents, payable_cents, created_at, paid_at)
+     VALUES (?, ?, 'community', ?, 'paid', 'wallet', 'CNY', ?, 0, ?, ?, ?)`,
+  ).run(orderId, input.user_id, input.purchase_id, input.price_cents, input.price_cents, input.created_at, input.created_at); // 余额一次结清，无折扣
+  const itemRun = db.prepare(
+    `INSERT OR IGNORE INTO order_items (id, order_id, product_id, title, quantity, unit_price_cents, meta_json)
+     VALUES (?, ?, ?, ?, 1, ?, '{"delivery":"content"}')`,
+  ).run(`uoi_community_${input.purchase_id}`, orderId, input.thread_id, input.thread_title, input.price_cents);
+  db.prepare(
+    `INSERT OR IGNORE INTO payments (id, order_id, provider, status, amount_cents, refunded_cents, created_at)
+     VALUES (?, ?, 'wallet', 'paid', ?, 0, ?)`,
+  ).run(`pay_community_${input.purchase_id}`, orderId, input.price_cents, input.created_at); // 支付流水与余额扣减一一对应
+  db.prepare(
+    `INSERT OR IGNORE INTO fulfillments (id, order_id, kind, payload_json, created_at)
+     VALUES (?, ?, 'entitlement', ?, ?)`,
+  ).run(`ful_community_${input.purchase_id}`, orderId,
+    JSON.stringify({ thread_id: input.thread_id, purchase_id: input.purchase_id }), input.created_at); // 履约即阅读权
+  return { order_id: orderId, products: productRun.changes, orders: orderRun.changes, items: itemRun.changes };
+}
+
 
 /** 实物线履约展示字段：迁移期只读回源 shop_orders 取发货方式与卡密说明；旧表冻结只读后该回源可移除 */
 function shopFulfillment(db: Db, sourceId: string): { delivery_kind: string | null; delivered_content: string | null } {

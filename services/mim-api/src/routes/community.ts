@@ -8,6 +8,7 @@ import { parse } from '../validate.js'; // 校验失败统一翻译
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 鉴权 / 权限门禁 / 写操作幂等
 import { auditText, assertPublicHttpUrl, verifyCaptcha } from '../security.js'; // 内容审核 / 远程链接 SSRF / 场景验证码
 import { readPointsConfig } from '../commerce/config.js'; // 积分兑换比例与单笔上限配置
+import { recordCommunityPurchase } from '../commerce/unified.js'; // 付费阅读落单统一交易域
 import { computeDeduction, deductPoints, getPointsBalance } from '../commerce/points.js'; // 积分抵扣纯计算 + 事务扣减
 import type { ApiDeps } from '../types.js'; // 引入依赖：声明本文件使用的外部能力
 import { checkPostRateLimit, resolveQuota } from '../community/limits.js'; // 三期：发帖频控与配额
@@ -50,9 +51,10 @@ function vipLevel(deps: ApiDeps, userId: string): number {  const row = deps.db 
   return row?.level ?? 0; // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 
-/** 当前用户是否有权查看某帖：免费 / 已购 / VIP。 */
+/** 当前用户是否有权查看某帖：免费 / 作者本人 / 已购 / VIP。 */
 function hasThreadAccess(deps: ApiDeps, userId: string, threadId: string, priceCents: number): boolean { // 定义函数 hasThreadAccess：封装可复用业务步骤
   if (priceCents <= 0) return true; // 条件分支：仅在满足业务前置条件时继续
+  if (deps.db.prepare('SELECT 1 AS ok FROM community_threads WHERE id = ? AND author_id = ?').get(threadId, userId)) return true; // 作者本人无需购买
   if (vipLevel(deps, userId) > 0) return true; // 条件分支：仅在满足业务前置条件时继续
   return !!deps.db.prepare('SELECT 1 AS ok FROM community_purchases WHERE user_id = ? AND thread_id = ?').get(userId, threadId); // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
@@ -339,7 +341,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
         `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count,
                 t.recommend_score,
-                t.created_at, t.last_activity_at, b.slug AS board_slug, b.name AS board_name, b.price_cents AS board_price_cents,
+                t.created_at, t.last_activity_at, t.author_id, b.slug AS board_slug, b.name AS board_name, b.price_cents AS board_price_cents,
                 b.visibility AS board_visibility, b.post_min_level AS board_post_min_level,
                 u.display_name AS author_name,
                 (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
@@ -358,13 +360,13 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       ) // 调用结束：参数列表与链式调用收尾
       .all(userId, userId, userId, userId, ...args, limit); // 查询多行：读取列表供批量处理
     const level = vipLevel(deps, userId); // 保存 level：承载本步骤的计算结果供后续使用
-    const items = (rows as Array<Record<string, unknown> & { price_cents: number; purchased: number; board_price_cents: number; board_joined: number; board_visibility: string; board_followed: number }>).map((row) => ({ // 保存 items：承载本步骤的计算结果供后续使用
-      ...row, // 链式调用：在上一步结果上继续处理
-      locked: // 对象字段：声明结构中的一项数据
-        (row.price_cents > 0 && row.purchased === 0 && level === 0) || // 业务步骤：推进当前流程的下一项处理
-        (row.board_price_cents > 0 && row.board_joined === 0 && level === 0) || // 业务步骤：推进当前流程的下一项处理
-        (row.board_visibility === 'followers' && row.board_followed === 0), // 业务步骤：推进当前流程的下一项处理
-    })); // 结束函数体：本层作用域收尾
+    const items = (rows as Array<Record<string, unknown> & { price_cents: number; purchased: number; board_price_cents: number; board_joined: number; board_visibility: string; board_followed: number; author_id: string | null }>).map((row) => { // 保存 items：承载本步骤的计算结果供后续使用
+      const boardOpen = // 与详情 hasBoardAccess 同口径：付费板块需已加入或 VIP；followers 板块需已关注
+        !(row.board_price_cents > 0 && row.board_joined === 0 && level === 0) && // 付费板块门槛
+        !(row.board_visibility === 'followers' && row.board_followed === 0); // 关注可见板块门槛
+      const threadOpen = row.price_cents > 0 && (row.purchased > 0 || level > 0 || row.author_id === userId); // 单帖已购 / VIP / 作者本人
+      return { ...row, locked: !boardOpen && !threadOpen }; // 与详情 unlocked = boardUnlocked || threadPaidUnlocked 严格同源，避免列表标锁但详情可读
+    }); // 结束函数体：本层作用域收尾
     res.json({ items, total: items.length, sort, vip_level: level }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束代码块：本层作用域收尾
 
@@ -593,28 +595,32 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.status(201).json({ thread_id: id }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束代码块：本层作用域收尾
 
-  /** 解锁付费帖：余额扣款；VIP 直接放行。 */
+  /** 解锁付费帖：作者 / VIP 直接放行；余额扣款与解锁凭据、统一订单同一事务落库。 */
   router.post('/community/threads/:id/unlock', (req, res) => { // 路由 POST /community/threads/:id/unlock：注册入口并绑定鉴权与处理逻辑
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
     const thread = deps.db // 保存 thread：承载本步骤的计算结果供后续使用
-      .prepare('SELECT t.price_cents, b.id AS board_id, b.price_cents AS board_price_cents FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE t.id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
-      .get(id) as { price_cents: number; board_id: string; board_price_cents: number } | undefined; // 查询单行：读取一条记录供判定使用
+      .prepare('SELECT t.price_cents, t.author_id, t.title, b.id AS board_id, b.price_cents AS board_price_cents FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE t.id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(id) as { price_cents: number; author_id: string | null; title: string; board_id: string; board_price_cents: number } | undefined; // 查询单行：读取一条记录供判定使用
     if (!thread) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    if (thread.author_id === userId) return res.json({ unlocked: true, charged_cents: 0, via: 'author' }); // 作者读自己的帖不收费
     // 免费帖须先满足板块准入；付费帖允许单独购买解锁，不强制先加入板块。
     if (thread.price_cents <= 0 && !hasBoardAccess(deps, userId, thread.board_id, thread.board_price_cents)) throw new AppError('FORBIDDEN', '请先加入该付费板块'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
     if (thread.price_cents <= 0) return res.json({ unlocked: true, charged_cents: 0 }); // 条件分支：仅在满足业务前置条件时继续
     if (deps.db.prepare('SELECT 1 AS ok FROM community_purchases WHERE user_id = ? AND thread_id = ?').get(userId, id)) // 条件分支：仅在满足业务前置条件时继续
-      return res.json({ unlocked: true, charged_cents: 0 }); // 返回结果：把本步骤产物交给调用方
+      return res.json({ unlocked: true, charged_cents: 0, via: 'owned' }); // 已购直接放行，不重复扣费
     if (vipLevel(deps, userId) > 0) { // 条件分支：仅在满足业务前置条件时继续
       deps.db.prepare('INSERT INTO community_purchases (id, user_id, thread_id, amount_cents, created_at) VALUES (?, ?, ?, 0, ?)').run(`cp-${randomUUID()}`, userId, id, now()); // 预编译 SQL：固定语句结构后绑定参数执行
       return res.json({ unlocked: true, charged_cents: 0, via: 'vip' }); // 返回结果：把本步骤产物交给调用方
     } // 结束条件分支：本层作用域收尾
     const price = thread.price_cents; // 保存 price：承载本步骤的计算结果供后续使用
-    requireBalance(deps, userId, price); // 业务步骤：推进当前流程的下一项处理
+    requireBalance(deps, userId, price); // 余额不足在开事务前抛出，避免无谓回滚
+    const ts = now(); // 保存 ts：成交时间四处复用，保证口径一致
+    const purchaseId = `cp-${randomUUID()}`; // 购买记录主键，同时派生统一订单 / 支付 / 履约主键
     const tx = deps.db.transaction(() => { // 保存 tx：承载本步骤的计算结果供后续使用
-      debit(deps, userId, price, 'community_thread', id, '解锁付费帖'); // 业务步骤：推进当前流程的下一项处理
-      deps.db.prepare('INSERT INTO community_purchases (id, user_id, thread_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?)').run(`cp-${randomUUID()}`, userId, id, price, now()); // 预编译 SQL：固定语句结构后绑定参数执行
+      debit(deps, userId, price, 'community_thread', id, '解锁付费帖'); // 余额扣减走唯一钱包账本
+      deps.db.prepare('INSERT INTO community_purchases (id, user_id, thread_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?)').run(purchaseId, userId, id, price, ts); // 解锁凭据（永久可读）
+      recordCommunityPurchase(deps.db, { purchase_id: purchaseId, user_id: userId, thread_id: id, thread_title: thread.title, board_id: thread.board_id, price_cents: price, created_at: ts }); // 订单 / 明细 / 支付 / 履约同事务写入统一交易域
     }); // 结束函数体：本层作用域收尾
     tx(); // 业务步骤：推进当前流程的下一项处理
     res.json({ unlocked: true, charged_cents: price }); // 输出响应：把处理结果写回 HTTP 客户端

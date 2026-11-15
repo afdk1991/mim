@@ -2,8 +2,10 @@
 -- 背景：项目里原本有三套并行交易（modules + module_orders / shop_products + shop_orders /
 -- paid_assets + asset_purchases），订单无法联合查询、退款对账要写三段、购物车只覆盖模块线。
 -- 本脚本建立标准五表（products / orders / order_items / payments / fulfillments），
--- 由 src/commerce/unified.ts 在启动期回填历史数据；三套旧表与旧接口保持原样继续服务，
+-- 由 src/commerce/unified.ts 在启动期回填历史数据；旧表与旧接口保持原样继续服务，
 -- 双写与读切换放到后续提交，保证这一步可以被随时回滚（删表即回到旧路径）。
+-- 2026-11-15 付费阅读接入：社区帖购买直写本域（source = 'community'），
+-- orders.source 的 CHECK 随之扩容；存量库由 db.ts 的 ensureOrderSourceCommunity 原地重建约束（只放宽 CHECK，不动列与数据）。
 
 CREATE TABLE IF NOT EXISTS products ( -- 统一商品：三条商品线共用一张表，用 kind 区分
   id             TEXT PRIMARY KEY, -- 商品主键；历史回填时直接复用源表主键，避免二次映射
@@ -21,8 +23,8 @@ CREATE TABLE IF NOT EXISTS products ( -- 统一商品：三条商品线共用一
 CREATE TABLE IF NOT EXISTS orders ( -- 统一订单：三套历史订单回填后共用该表
   id             TEXT PRIMARY KEY, -- 订单主键；回填时为 uo_<source>_<源主键>，保证可追溯
   user_id        TEXT NOT NULL REFERENCES users(id), -- 下单用户
-  source         TEXT NOT NULL CHECK (source IN ('module','shop','asset')), -- 来源产线，迁移期用于区分写路径
-  source_id      TEXT NOT NULL, -- 源订单主键（module_orders.id / shop_orders.id / asset_purchases.id）
+  source         TEXT NOT NULL CHECK (source IN ('module','shop','asset','community')), -- 来源产线：模块 / 实物 / 付费资产 / 社区付费阅读
+  source_id      TEXT NOT NULL, -- 源订单主键（module_orders.id / shop_orders.id / asset_purchases.id / community_purchases.id）
   status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','delivered','refunded','cancelled')), -- 统一状态机，兼容三条产线的最大集合
   channel        TEXT NOT NULL DEFAULT 'manual', -- 结算通道：manual / alipay / wechat / stripe / wallet
   currency       TEXT NOT NULL DEFAULT 'CNY', -- 结算币种（下单时快照）

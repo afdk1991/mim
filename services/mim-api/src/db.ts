@@ -148,6 +148,49 @@ export function applyDomainSchema(db: Db): string[] { // 返回本轮新建的�
   return applied; // 返回补列清单
 } // applyDomainSchema 结束
 
+/**
+ * 统一订单来源约束扩容（2026-11-15 付费阅读）：orders.source 需要接纳 'community'。
+ * SQLite 改不了既有 CHECK，按官方 12 步法重建表；关外键是为了让 DROP TABLE 的隐式 DELETE
+ * 不触发 order_items / payments / fulfillments 的级联删除，重建后再按原主键挂回。
+ * 新库由 50-unified-commerce.sql 直接建出含 community 的表，这里检测到后跳过（幂等）。
+ * @returns 是否真的执行了重建
+ */
+export function ensureOrderSourceCommunity(db: Db): boolean {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'orders'").get() as { sql: string } | undefined; // 读建表原文
+  if (!row || row.sql.includes("'community'")) return false; // 表不存在（未启用域脚本）或已扩容：无需处理
+  db.pragma('foreign_keys = OFF'); // 重建期间关外键，避免删父表时级联清掉明细 / 支付 / 履约
+  try {
+    db.transaction(() => { // 建表 → 拷数据 → 删旧表 → 改名，全程原子
+      db.exec(`CREATE TABLE orders_source_migrate (
+        id             TEXT PRIMARY KEY,
+        user_id        TEXT NOT NULL REFERENCES users(id),
+        source         TEXT NOT NULL CHECK (source IN ('module','shop','asset','community')),
+        source_id      TEXT NOT NULL,
+        status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','delivered','refunded','cancelled')),
+        channel        TEXT NOT NULL DEFAULT 'manual',
+        currency       TEXT NOT NULL DEFAULT 'CNY',
+        total_cents    INTEGER NOT NULL DEFAULT 0 CHECK (total_cents >= 0),
+        discount_cents INTEGER NOT NULL DEFAULT 0 CHECK (discount_cents >= 0),
+        payable_cents  INTEGER NOT NULL DEFAULT 0 CHECK (payable_cents >= 0),
+        created_at     TEXT NOT NULL,
+        paid_at        TEXT,
+        UNIQUE (source, source_id)
+      )`); // 与 50-unified-commerce.sql 的 orders 完全同构，仅 CHECK 多一个 community
+      db.exec(`INSERT INTO orders_source_migrate (id, user_id, source, source_id, status, channel, currency,
+                 total_cents, discount_cents, payable_cents, created_at, paid_at)
+               SELECT id, user_id, source, source_id, status, channel, currency,
+                      total_cents, discount_cents, payable_cents, created_at, paid_at FROM orders`); // 原样搬数据
+      db.exec('DROP TABLE orders'); // 旧约束随表一起消失
+      db.exec('ALTER TABLE orders_source_migrate RENAME TO orders'); // 子表按表名引用，改回原名即恢复关联
+      db.exec('CREATE INDEX IF NOT EXISTS ix_orders_user_created ON orders (user_id, created_at DESC)'); // 重建索引
+      db.exec('CREATE INDEX IF NOT EXISTS ix_orders_source ON orders (source, source_id)'); // 重建索引
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON'); // 无论成败都恢复外键约束
+  }
+  return true;
+}
+
 export function createDatabase(filename: string = ':memory:'): Db { // 创建数据库连接：默认内存库（测试用），传路径则落盘持久化
   if (filename !== ':memory:') { // 内存库没有文件系统目录，无需准备目录
     const dir = dirname(filename); // 取数据库文件所在目录
@@ -159,6 +202,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   db.exec(readFileSync(SCHEMA_PATH, 'utf8')); // 执行建表脚本，全部 IF NOT EXISTS 以便每次启动幂等
   const domainApplied = applyDomainSchema(db); // 各业务域的 schema.d 脚本：建新表 / 补新列，与主脚本同一幂等路径
   if (domainApplied.length > 0) console.log(`[db] domain schema applied: ${domainApplied.join(', ')}`); // 域脚本改结构必须留痕
+  if (ensureOrderSourceCommunity(db)) console.log('[db] orders.source widened: community'); // 存量库放宽 CHECK，必须留痕
   const migrated = migrateAdditiveColumns(db); // 存量库补齐后加的列；全新建库时为空
   if (migrated.length > 0) console.log(`[db] additive migration applied: ${migrated.join(', ')}`); // 结构变更必须留痕，便于排查升级后的行为差异
   const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column

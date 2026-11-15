@@ -31,11 +31,11 @@ function parseLimit(raw: unknown): number {
   return Math.min(Math.floor(value), 200); // 封顶 200
 }
 
-/** source 过滤解析：缺省返回三源全部；非法产线值回 400，避免静默放宽过滤口径 */
+/** source 过滤解析：缺省返回四源全部；非法产线值回 400，避免静默放宽过滤口径 */
 function parseSource(raw: unknown): UnifiedOrderSource | undefined {
   if (raw === undefined || raw === '') return undefined; // 未传不过滤
-  if (raw === 'module' || raw === 'shop' || raw === 'asset') return raw; // 合法产线原样返回
-  throw new AppError('VALIDATION_FAILED', 'source must be one of module/shop/asset', { source: raw }); // 非法值显式拒绝
+  if (raw === 'module' || raw === 'shop' || raw === 'asset' || raw === 'community') return raw; // 合法产线原样返回
+  throw new AppError('VALIDATION_FAILED', 'source must be one of module/shop/asset/community', { source: raw }); // 非法值显式拒绝
 }
 
 export function createOrdersRouter(deps: ApiDeps): Router {
