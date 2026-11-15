@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'; // 引入依赖、类
 import request from 'supertest'; // 引入：声明测试所需依赖
 import type { Express } from 'express'; // 引入：声明测试所需依赖
 import { createApp } from '../src/app.js'; // 引入依赖、类型或本地模块绑定
-import { createDatabase } from '../src/db.js'; // 引入依赖、类型或本地模块绑定
+import { createDatabase, seedCommunity } from '../src/db.js'; // 引入依赖、类型或本地模块绑定
 import { loginHeaders } from './_auth-helper.js'; // 注册 + 口令登录辅助（SEC-01）
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 构造：准备本用例需要的输入、句柄或期望值
@@ -47,6 +47,29 @@ describe('社区与变现', () => { // 调用 describe 并处理其返回结果
     const products = await request(app).get('/api/v1/shop/products').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(products.body.products).toHaveLength(3); // 断言：校验响应字段与冻结契约一致
     expect(products.body.products.find((p: { code: string }) => p.code === 'pixi-pack').available).toBe(3); // 断言：校验响应字段与冻结契约一致
+  }); // 代码块结束
+
+  it('公告板块旧「全站免登录」文案在再播种后对齐当前强制登录口径', () => { // 存量库校正只针对旧种子原文
+    const db = createDatabase(':memory:'); // 独立内存库，避免影响本组共享 app
+    db.prepare("UPDATE community_threads SET title = ?, summary = ?, body = ? WHERE id = 'thread-announce'").run( // 还原线上旧公告帖
+      '2026-11-12 更新：全站免登录 + 商城商品视觉上线', // 旧标题
+      '门禁解除、商品封面与参数详情图、访客交易链路。', // 旧摘要
+      '本轮更新：\n1. 全站移除“此功能需登录后使用”，访客会话自动建立。', // 旧正文：校正按标题+摘要命中，正文片段足够
+    );
+    seedCommunity(db); // 模拟服务重启再播种
+    const row = db.prepare("SELECT title, summary, body FROM community_threads WHERE id = 'thread-announce'").get() as { title: string; summary: string; body: string }; // 读回公告帖
+    expect(row.title).not.toContain('免登录'); // 标题不再宣称免登录
+    expect(row.summary).not.toContain('访客'); // 摘要不再描述访客交易
+    expect(row.body).not.toContain('访客'); // 正文同步校正
+  }); // 代码块结束
+
+  it('运营改过的公告帖不会被种子校正覆盖', () => { // 只有旧标题 + 旧摘要同时命中才替换
+    const db = createDatabase(':memory:'); // 独立内存库
+    db.prepare("UPDATE community_threads SET title = ?, summary = ? WHERE id = 'thread-announce'").run('运营自定义公告', '运营自定义摘要'); // 模拟运营改名
+    seedCommunity(db); // 再播种
+    const row = db.prepare("SELECT title, summary FROM community_threads WHERE id = 'thread-announce'").get() as { title: string; summary: string }; // 读回
+    expect(row.title).toBe('运营自定义公告'); // 标题保持运营版本
+    expect(row.summary).toBe('运营自定义摘要'); // 摘要保持运营版本
   }); // 代码块结束
 
   it('付费帖未解锁隐藏正文；充值卡兑换后可解锁并读到正文，余额正确扣减', async () => { // 调用 it 并处理其返回结果

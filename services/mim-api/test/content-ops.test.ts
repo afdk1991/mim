@@ -9,7 +9,7 @@ import express from 'express'; // 组装 mini app
 import type { Express } from 'express'; // 引入：声明测试所需依赖
 import { beforeEach, describe, expect, it } from 'vitest'; // 引入依赖、类型或本地模块绑定
 import request from 'supertest'; // 引入：声明测试所需依赖
-import { createDatabase } from '../src/db.js'; // 内存库（含 schema.d 种子）
+import { applyDomainSchema, createDatabase } from '../src/db.js'; // 内存库（含 schema.d 种子）+ 域脚本重跑
 import { createUser } from '../src/identity.js'; // 造普通用户
 import { issueAccessToken } from '../src/auth.js'; // 造登录态令牌
 import { createContentOpsRouter } from '../src/routes/content-ops.js'; // 被测路由工厂
@@ -517,5 +517,16 @@ describe('公告与更新日志状态流转', () => { // 调用 describe 并处�
       .set(adminWriteHeaders()); // 执行当前业务步骤
     expect(res.status).toBe(404); // 调用 expect 并处理其返回结果
     expect(res.body.code).toBe('NOT_FOUND'); // 调用 expect 并处理其返回结果
+  }); // 代码块结束
+}); // 代码块结束
+
+describe('账号公告注册口径', () => { // 自助注册默认关闭后的文案校正
+  it('账号公告不再宣称游客注册，旧正文随域脚本重跑对齐', () => { // 只替换旧种子原文
+    const db = createDatabase(':memory:'); // 内存库：已执行 schema.d 种子
+    db.prepare("UPDATE announcements SET body = ? WHERE id = 'ann-seed-account'").run('支持自定义用户名注册与游客注册，用户名不得冒用官方或他人身份。可使用账号口令登录，也可在个人中心绑定第三方账号、手机或邮箱；部分登录方式需先完成绑定后使用。'); // 还原线上旧正文
+    applyDomainSchema(db); // 模拟重启再执行域脚本
+    const row = db.prepare("SELECT body FROM announcements WHERE id = 'ann-seed-account'").get() as { body: string }; // 读回账号公告
+    expect(row.body).not.toContain('游客注册'); // 不再出现游客注册
+    expect(row.body).toContain('暂不开放自助注册'); // 与注册总开关关闭一致
   }); // 代码块结束
 }); // 代码块结束
