@@ -24,9 +24,15 @@ function writeHeaders(auth: Record<string, string>): Record<string, string> { //
 } // 代码块结束
 
 describe('社区与变现', () => { // 调用 describe 并处理其返回结果
-  it('匿名访问社区接口返回 401', async () => { // 调用 it 并处理其返回结果
-    const res = await request(app).get('/api/v1/community/overview'); // 构造：准备本用例需要的输入、句柄或期望值
-    expect(res.status).toBe(401); // 断言：校验响应字段与冻结契约一致
+  it('匿名可读社区公开接口，写操作仍 401', async () => { // 调用 it 并处理其返回结果
+    const guarded = createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env: { MIM_FORCE_LOGIN: '1' } }); // 显式开启门禁
+    const overview = await request(guarded).get('/api/v1/community/overview'); // 匿名读社区首页
+    expect(overview.status).toBe(200); // 匿名可读
+    expect(overview.body.wallet).toMatchObject({ balance_cents: 0, points: 0 }); // 匿名不建钱包行
+    const threads = await request(guarded).get('/api/v1/community/threads'); // 匿名读帖子列表
+    expect(threads.status).toBe(200); // 匿名可读
+    const write = await request(guarded).post('/api/v1/community/threads').send({}); // 同一前缀下的写操作
+    expect(write.status).toBe(401); // 写操作仍要求登录
   }); // 代码块结束
 
   it('种子数据齐备：6 板块 / 6 帖 / 3 VIP / 3 商品 / 2 优惠码，新用户 100 积分', async () => { // 调用 it 并处理其返回结果
@@ -34,7 +40,7 @@ describe('社区与变现', () => { // 调用 describe 并处理其返回结果
     const overview = await request(app).get('/api/v1/community/overview').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(overview.status).toBe(200); // 断言：校验响应字段与冻结契约一致
     expect(overview.body.boards).toHaveLength(6); // 断言：校验响应字段与冻结契约一致
-    expect(overview.body.stats.threads).toBe(6); // 断言：校验响应字段与冻结契约一致（免登录种子帖已随访客机制移除）
+    expect(overview.body.stats.threads).toBe(6); // 断言：校验响应字段与冻结契约一致（免登录概念已删除，对应种子帖同步移除）
     expect(overview.body.wallet.points).toBe(100); // 断言：校验响应字段与冻结契约一致
     const plans = await request(app).get('/api/v1/vip/plans').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(plans.body.plans).toHaveLength(3); // 断言：校验响应字段与冻结契约一致

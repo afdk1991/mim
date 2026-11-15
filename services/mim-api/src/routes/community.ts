@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'; // 稳定主键生成
 import { z } from 'zod'; // 入参声明式校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { parse } from '../validate.js'; // 校验失败统一翻译
-import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 鉴权 / 权限门禁 / 写操作幂等
+import { idempotency, optionalAuth, requireAuth, requirePermission } from '../middleware.js'; // 鉴权 / 可选鉴权 / 权限门禁 / 写操作幂等
 import { auditText, assertPublicHttpUrl, verifyCaptcha } from '../security.js'; // 内容审核 / 远程链接 SSRF / 场景验证码
 import { readPointsConfig } from '../commerce/config.js'; // 积分兑换比例与单笔上限配置
 import { recordCommunityPurchase } from '../commerce/unified.js'; // 付费阅读落单统一交易域
@@ -251,12 +251,28 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ ok: true, weights: loadWeights(deps.env, deps.db) }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
-  router.use(COMMUNITY_PREFIXES, requireAuth); // 社区与资产全部需要会话；访客会话同样可用
+  // 匿名可读白名单：只放 GET 的列表 / 详情，写操作仍逐条走 requireAuth。
+  // 路径按完整 originalUrl 匹配（router.use 带前缀注册后 req.path 会被裁剪，不能用于这里）。
+  const ANONYMOUS_READ_PATTERNS = [
+    /^\/api\/v1\/community\/overview$/, // 社区首页聚合
+    /^\/api\/v1\/community\/boards$/, // 板块列表
+    /^\/api\/v1\/community\/threads$/, // 帖子列表
+    /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
+    /^\/api\/v1\/vip\/plans$/, // VIP 套餐
+    /^\/api\/v1\/shop\/products$/, // 商城商品列表
+  ];
+  router.use(COMMUNITY_PREFIXES, (req, res, next) => { // 按「方法 + 路径」分流：读放行、写要登录
+    const method = req.method.toUpperCase(); // 统一大写，避免大小写绕过
+    const pathname = req.originalUrl.split('?')[0] ?? ''; // 去掉查询串
+    const publicRead = (method === 'GET' || method === 'HEAD') && ANONYMOUS_READ_PATTERNS.some((pattern) => pattern.test(pathname)); // 仅安全方法命中白名单才放行
+    if (publicRead) { optionalAuth(req, res, next); return; } // 匿名放行；带令牌时保留个人化字段
+    requireAuth(req, res, next); // 其余（全部写操作 + 私密读）仍要求会话
+  });
   router.use(COMMUNITY_PREFIXES, idempotency); // 写操作幂等，防重复扣款 / 重复发卡
 
   /** 社区首页聚合：板块、统计、当前会员与钱包。 */
   router.get('/community/overview', (req, res) => { // 路由 GET /community/overview：注册入口并绑定鉴权与处理逻辑
-    const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
+    const userId = req.user?.id ?? ''; // 匿名可读：无会话时用空串，个人化字段自然回落为 0
     const boards = deps.db // 保存 boards：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
         `SELECT b.slug, b.name, b.description, b.icon, b.sort_order, b.price_cents,
@@ -273,7 +289,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const stats = deps.db // 保存 stats：承载本步骤的计算结果供后续使用
       .prepare(`SELECT COUNT(*) AS threads, COALESCE(SUM(views), 0) AS views, COALESCE(SUM(likes), 0) AS likes FROM community_threads WHERE status = 'published'`) // 预编译 SQL：固定语句结构后绑定参数执行
       .get(); // 查询单行：读取一条记录供判定使用
-    const wallet = ensureWallet(deps, userId); // 保存 wallet：承载本步骤的计算结果供后续使用
+    const wallet = userId ? ensureWallet(deps, userId) : { user_id: '', balance_cents: 0, points: 0 }; // 匿名不建钱包行，返回只读零值快照
     const level = vipLevel(deps, userId); // 保存 level：承载本步骤的计算结果供后续使用
     const vip = deps.db // 保存 vip：承载本步骤的计算结果供后续使用
       .prepare(`SELECT plan_id, level, expires_at FROM vip_memberships WHERE user_id = ? AND status = 'active' AND expires_at > ? ORDER BY level DESC LIMIT 1`) // 预编译 SQL：固定语句结构后绑定参数执行
@@ -283,6 +299,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
 
   /** 板块列表。 */
   router.get('/community/boards', (req, res) => { // 路由 GET /community/boards：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user?.id ?? ''; // 匿名可读：无会话时 joined / followed / is_moderator 回落为 0
     const boards = deps.db // 保存 boards：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
         `SELECT b.slug, b.name, b.description, b.icon, b.price_cents,
@@ -295,13 +312,13 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
          WHERE b.status = 'active' OR b.created_by = ? OR b.moderator_id = ?
          ORDER BY b.sort_order ASC`,
       ) // 调用结束：参数列表与链式调用收尾
-      .all(req.user!.id, req.user!.id, req.user!.id, req.user!.id, req.user!.id, req.user!.id); // 查询多行：读取列表供批量处理
+      .all(userId, userId, userId, userId, userId, userId); // 查询多行：读取列表供批量处理
     res.json({ boards }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
   /** 帖子列表：板块 / 形态 / 排序 / 关键词 / 分页。 */
   router.get('/community/threads', (req, res) => { // 路由 GET /community/threads：注册入口并绑定鉴权与处理逻辑
-    const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
+    const userId = req.user?.id ?? ''; // 匿名可读：无会话时个人化过滤回落为空用户
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 保存 q：承载本步骤的计算结果供后续使用
     const board = typeof req.query.board === 'string' && req.query.board !== 'all' ? req.query.board : ''; // 保存 board：承载本步骤的计算结果供后续使用
     const kind = typeof req.query.kind === 'string' && req.query.kind !== 'all' ? req.query.kind : ''; // 保存 kind：承载本步骤的计算结果供后续使用
@@ -372,7 +389,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
 
   /** 帖子详情：未解锁时隐藏正文与回复。 */
   router.get('/community/threads/:id', (req, res) => { // 路由 GET /community/threads/:id：注册入口并绑定鉴权与处理逻辑
-    const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
+    const userId = req.user?.id ?? ''; // 匿名可读：无会话时购买 / 收藏 / 点赞等个人化字段回落为 false
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
     const thread = deps.db // 保存 thread：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
@@ -410,7 +427,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     } // 结束条件分支：本层作用域收尾
     // 浏览计数：同一账号对同一帖子只计一次（终身），刷新 / 反复进入不重复累加。
     // 先用 INSERT OR IGNORE 抢去重账本的主键，只有真正插入成功时才 +1，避免并发下双计。
-    const firstView = deps.db
+    const firstView = userId !== '' && deps.db // 匿名单次浏览不写去重账本，避免空用户键污染
       .prepare('INSERT OR IGNORE INTO community_thread_views (thread_id, user_id, created_at) VALUES (?, ?, ?)')
       .run(id, userId, new Date().toISOString()).changes > 0; // 首次浏览标记
     if (firstView) { // 只有首次浏览才写浏览量

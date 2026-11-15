@@ -278,20 +278,22 @@ export function App() {
   // 当前有效会话：2026-11-15 起不再自动建访客号，旧访客会话也按未登录处理。
   // 只有正式账号才算登录态，界面据此决定侧栏形态与需要身份的内容区。
   const authedSession = session && !session.user.is_guest ? session : null;
-  // 需要登录才能使用的视图：未登录时统一展示登录引导，而不是自动建号或空白
+  // 需要登录才能使用的视图：未登录时统一展示登录引导，而不是自动建号或空白。
+  // 2026-11-15 门禁口径调整：社区列表 / 帖子详情改为匿名可读，不再列入这里；
+  // 社区内的发帖、评论、点赞等互动由页面自身拦截并引导登录。
   const needsSession =
     route.view === 'account' ||
-    route.view === 'community' ||
     route.view === 'circles' ||
     route.view === 'checkout' || // 收银台按支付意图查单，需令牌
     route.view === 'payreturn'; // 回跳页按意图编号查单，需令牌
 
-  // 全站登录守卫（2026-11-15）：未登录访问任何站内页面都落到 /signin，登录成功后回到原目标。
+  // 登录守卫（2026-11-15）：需要身份的页面未登录时落到 /signin，登录成功后回到原目标。
   // 单点集中在此，页面自身不再各写一遍；/admin 由后台自己的管理员校验承接，必须排除。
   // 注意：前端守卫只是体验层，接口仍由后端门禁兜底，不能当作安全边界。
   useEffect(() => {
     if (authedSession) return; // 已登录直接放行
     if (route.view === 'login') return; // 登录页是唯一公开例外（注册关闭提示也在该页）
+    if (route.view === 'community') return; // 匿名可读：社区列表与帖子详情不跳登录
     if (isAdminPath()) return; // 后台路由不拦，交给 apps/admin 的管理员校验
     // 记录登录前目标（含挂载前缀、查询串与 hash），登录成功后原样回跳
     rememberLoginNext(window.location.pathname + window.location.search + window.location.hash);
@@ -380,8 +382,17 @@ export function App() {
         {route.view === 'account' && authedSession && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
-        {/* 社区与变现：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广 */}
-        {route.view === 'community' && authedSession && <Community locale={locale} hasSession />}{/* 社区与变现视图 */}
+        {/* 社区与变现：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；列表与详情匿名可读，互动引导登录 */}
+        {route.view === 'community' && (
+          <Community
+            locale={locale}
+            hasSession={!!authedSession}
+            onRequireLogin={() => { // 社区内互动未登录：记录当前位置后去登录，成功后回到原页面
+              rememberLoginNext(window.location.pathname + window.location.search + window.location.hash);
+              go({ view: 'login' });
+            }}
+          />
+        )}{/* 社区与变现视图 */}
         {/* 圈子：成员制社群；加入 / 审核 / 发动态公告都需要登录态 */}
         {route.view === 'circles' && authedSession && <Circles locale={locale} hasSession />}{/* 圈子视图 */}
         {/* 收银台：/checkout?intent=... 或 ?purpose=... 现场建单；二维码 / 渠道唤起 / 状态轮询 */}

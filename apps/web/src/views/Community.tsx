@@ -33,7 +33,8 @@ import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router';
 
 interface Props { // 接口 Props：约束对象的字段与类型形态
   locale: Locale;
-  hasSession?: boolean; // 是否有登录会话：决定公告页签内的运营管理面板是否展示
+  hasSession?: boolean; // 是否有登录会话：决定公告页签内的运营管理面板与互动入口是否可用
+  onRequireLogin?: () => void; // 互动前未登录时的引导入口：由 App 负责跳转登录页
 } // 代码块结束
 
 type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral'; // 类型别名 Tab：复用一份复合类型定义
@@ -106,7 +107,7 @@ function dateOnly(iso: string | null): string { // 函数 dateOnly：封装一�
 } // 代码块结束
 
 /** 社区与变现页 */
-export function Community({ locale, hasSession = false }: Props) {
+export function Community({ locale, hasSession = false, onRequireLogin }: Props) {
   // 多段深链接：/community/post/:id 论坛帖子详情、/community/news/:kind/:id 资讯条目详情。
   // 视图仍由首段 community 命中，多出的段只决定视图内部渲染哪一层，刷新与直达均可用。
   const segments = usePathSegments(); // 地址栏全部非空段
@@ -171,12 +172,29 @@ export function Community({ locale, hasSession = false }: Props) {
   const [referral, setReferral] = useState<{ code: string; invited: { count: number; commission: number }; commission_cents: number } | null>(null); // 赋值：更新变量 const 的取值
   const [bindCode, setBindCode] = useState(''); // 赋值：更新变量 const 的取值
 
+  /** 未登录时统一拦下写动作：不发请求，只提示并引导去登录页（浏览不受影响） */
+  function requireSession(): boolean {
+    if (hasSession) return true; // 已登录直接放行
+    setNotice(locale === 'en-US' ? 'Sign in before interacting.' : '请先登录后再互动。'); // 非阻断提示
+    onRequireLogin?.(); // 交给 App 跳登录，并保留登录后回跳
+    return false; // 调用方据此提前返回，避免发出匿名写请求
+  }
+
+  /** 切换页签：钱包 / 商城 / 推广属于私密读，匿名点击先引导登录，不发 401 请求 */
+  function switchTab(next: Tab) {
+    if ((next === 'wallet' || next === 'shop' || next === 'referral') && !hasSession) { // 私密读页签
+      requireSession(); // 引导登录
+      return; // 不切换页签
+    }
+    setTab(next); // 公开页签（论坛 / 公告 / VIP 套餐）直接切换
+  }
+
   async function loadOverview() { // 函数 loadOverview：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const data = await api.community.overview(); // 常量 data：保存固定配置或一次性派生值
       setBoards(data.boards);
       setStats(data.stats);
-      setWallet(data.wallet);
+      setWallet(hasSession ? data.wallet : null); // 匿名返回的是零值快照，不当作余额展示
       setVipLevel(data.vip_level);
       setVipExpires(data.vip?.expires_at ?? null);
       setError(null);
@@ -246,18 +264,19 @@ export function Community({ locale, hasSession = false }: Props) {
   }, [board, kind, sort]);
 
   useEffect(() => {
+    if (!hasSession) return; // 钱包 / 订单 / 推广都是私密读，匿名不发请求
     if (tab === 'wallet') void loadWallet(); // 条件分支：按判断结果选择后续处理路径
     if (tab === 'shop') void loadShop(); // 条件分支：按判断结果选择后续处理路径
     if (tab === 'referral') void loadReferral(); // 条件分支：按判断结果选择后续处理路径
-  }, [tab]);
+  }, [tab, hasSession]);
 
   useEffect(() => {
-    if (!favoritesOpen) return; // 条件分支：按判断结果选择后续处理路径
+    if (!favoritesOpen || !hasSession) return; // 收藏是私密读，匿名不请求
     api.community
       .favorites()
       .then((data) => setFavorites(data.items))
       .catch((err) => setError(errorText(locale, err)));
-  }, [favoritesOpen]);
+  }, [favoritesOpen, hasSession]);
 
   // 板块栏目：切换板块时拉取 Tab 配置；接口缺失 / 404 回落内置默认 Tab，不报错。
   useEffect(() => {
@@ -285,6 +304,7 @@ export function Community({ locale, hasSession = false }: Props) {
 
   /** 保存栏目组合：顺序 / 显隐 / 排序口径整体提交。 */
   async function saveBoardTabs() {
+    if (!requireSession()) return; // 匿名不提交栏目配置
     if (board === 'all') return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.saveBoardTabs(board, boardTabs.map((tab) => ({ // 异步等待：挂起至 Promise 落定后再继续
@@ -350,6 +370,7 @@ export function Community({ locale, hasSession = false }: Props) {
   }, [postId]);
 
   async function unlockThread(id: string) { // 函数 unlockThread：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 解锁是付费写操作，匿名先登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.community.unlock(id); // 常量 result：保存固定配置或一次性派生值
       setNotice(result.via === 'vip' ? 'VIP 权益直接解锁' : result.charged_cents > 0 ? `已扣 ${yuan(result.charged_cents)} 解锁` : '已解锁');
@@ -360,6 +381,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function submitReply() { // 函数 submitReply：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 评论必须登录
     if (!selected || !reply.trim()) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.reply(selected.thread.id, reply.trim()); // 异步等待：挂起至 Promise 落定后再继续
@@ -372,6 +394,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function toggleLike() { // 函数 toggleLike：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 点赞必须登录
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.community.like(selected.thread.id); // 常量 result：保存固定配置或一次性派生值
@@ -382,6 +405,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function toggleFavorite() { // 函数 toggleFavorite：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 收藏必须登录
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.community.favorite(selected.thread.id); // 常量 result：保存固定配置或一次性派生值
@@ -394,6 +418,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function rateThread(rating: number) { // 函数 rateThread：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 评分必须登录
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.rate(selected.thread.id, rating); // 异步等待：挂起至 Promise 落定后再继续
@@ -405,6 +430,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function vote(optionId: string) { // 函数 vote：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 投票必须登录
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.vote(selected.thread.id, optionId); // 异步等待：挂起至 Promise 落定后再继续
@@ -415,6 +441,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function joinBoard(slug: string) { // 函数 joinBoard：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 加入板块必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.community.joinBoard(slug); // 常量 result：保存固定配置或一次性派生值
       setNotice(result.charged_cents > 0 ? `已扣 ${yuan(result.charged_cents)} 加入板块` : '已加入板块');
@@ -426,6 +453,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function followBoard(slug: string) { // 函数 followBoard：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 关注板块必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.community.followBoard(slug); // 常量 result：保存固定配置或一次性派生值
       setNotice(result.followed ? '已关注板块' : '已取消关注');
@@ -437,6 +465,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function createBoard() { // 函数 createBoard：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 创建板块必须登录
     if (!boardDraft.slug.trim() || !boardDraft.name.trim()) { // 条件分支：按判断结果选择后续处理路径
       setError('板块 slug 与名称必填');
       return; // 返回当前函数的处理结果
@@ -460,6 +489,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function acceptPost(postId: string) { // 函数 acceptPost：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 采纳答案必须登录
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.acceptPost(selected.thread.id, postId); // 异步等待：挂起至 Promise 落定后再继续
@@ -471,6 +501,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function deleteThread() { // 函数 deleteThread：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 删除帖子必须登录
     if (!selected) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.community.deleteThread(selected.thread.id); // 异步等待：挂起至 Promise 落定后再继续
@@ -484,6 +515,7 @@ export function Community({ locale, hasSession = false }: Props) {
 
 
   async function transferPoints() { // 函数 transferPoints：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 转积分必须登录
     const points = Number(transferAmount); // 常量 points：保存固定配置或一次性派生值
     if (!transferTo.trim() || !Number.isInteger(points) || points <= 0) { // 条件分支：按判断结果选择后续处理路径
       setError('请填写接收方 Mim ID 与正整数积分');
@@ -500,6 +532,7 @@ export function Community({ locale, hasSession = false }: Props) {
     } // 代码块结束
   } // 代码块结束
   async function createThread() { // 函数 createThread：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 发帖必须登录
     if (!draftTitle.trim() || !draftBody.trim()) { // 条件分支：按判断结果选择后续处理路径
       setError('标题与正文必填');
       return; // 返回当前函数的处理结果
@@ -551,6 +584,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function subscribe(code: string) { // 函数 subscribe：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 开通 VIP 必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.vip.subscribe(code); // 常量 result：保存固定配置或一次性派生值
       setNotice(`开通成功，VIP ${result.level} 到期 ${dateOnly(result.expires_at)}`);
@@ -561,6 +595,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function checkin() { // 函数 checkin：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 签到必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.wallet.checkin(); // 常量 result：保存固定配置或一次性派生值
       setNotice(`签到 +${result.points} 积分`);
@@ -571,6 +606,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function redeem() { // 函数 redeem：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 兑换必须登录
     if (!redeemCode.trim()) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.wallet.redeem(redeemCode.trim()); // 常量 result：保存固定配置或一次性派生值
@@ -583,6 +619,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function placeOrder(product: ShopProduct) { // 函数 placeOrder：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 下单支付必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const payload: { product_code: string; quantity: number; coupon_code?: string; shipping?: { name: string; phone: string; address: string } } = { // 常量 payload：保存固定配置或一次性派生值
         product_code: product.code,
@@ -609,6 +646,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function confirmOrder(id: string) { // 函数 confirmOrder：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 确认收货必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.shop.confirm(id); // 异步等待：挂起至 Promise 落定后再继续
       setNotice('已确认收货');
@@ -619,6 +657,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function refundOrder(id: string) { // 函数 refundOrder：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 退款申请必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.shop.refund(id); // 常量 result：保存固定配置或一次性派生值
       setNotice(`已退款 ${yuan(result.refunded_cents)} 到余额`);
@@ -629,6 +668,7 @@ export function Community({ locale, hasSession = false }: Props) {
   } // 代码块结束
 
   async function bindReferral() { // 函数 bindReferral：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 绑定推广码必须登录
     if (!bindCode.trim()) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await api.referral.bind(bindCode.trim()); // 异步等待：挂起至 Promise 落定后再继续
@@ -685,7 +725,7 @@ export function Community({ locale, hasSession = false }: Props) {
           ['shop', '社区商城'],
           ['referral', '推广分成'],
         ] as Array<[Tab, string]>).map(([key, label]) => (
-          <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
+          <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => switchTab(key)}>{label}</button>
         ))}
       </nav>
 
@@ -730,7 +770,7 @@ export function Community({ locale, hasSession = false }: Props) {
                   {b.is_moderator ? <span className="community-board-price">版主</span> : null}
                 </button>
               ))}
-              <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => setFavoritesOpen((v) => !v)}>我的收藏</button>
+              <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; setFavoritesOpen((v) => !v); }}>我的收藏</button>
             </div>
             {/* 板块栏目：读后台 Tab 配置，按 order/visible/sort 渲染；版主可切换显隐并保存。接口缺失时回落内置默认 Tab。 */}
             {board !== 'all' && (
@@ -779,8 +819,8 @@ export function Community({ locale, hasSession = false }: Props) {
               <button type="button" className={sort === 'recommend' ? 'is-active' : ''} onClick={() => setSort('recommend')}>推荐指数</button>
               <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void loadThreads(); }} placeholder="搜索帖子…" />
               <button type="button" onClick={() => void loadThreads()}>搜索</button>
-              <button type="button" className="is-primary" onClick={() => setComposerOpen((v) => !v)}>发帖</button>
-              <button type="button" onClick={() => setBoardOpen((v) => !v)}>创建板块</button>
+              <button type="button" className="is-primary" onClick={() => { if (!requireSession()) return; setComposerOpen((v) => !v); }}>发帖</button>
+              <button type="button" onClick={() => { if (!requireSession()) return; setBoardOpen((v) => !v); }}>创建板块</button>
             </div>
           </div>
 

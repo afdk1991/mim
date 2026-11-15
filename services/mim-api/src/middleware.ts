@@ -4,7 +4,7 @@ import { randomUUID, timingSafeEqual, createHash } from 'node:crypto'; // 引入
 import { verifyCaptcha, type CaptchaScene } from './security.js'; // 验证码统一校验适配器（按场景强制）
 import type { NextFunction, Request, Response } from 'express'; // 仅引入 Express 中间件类型，编译期擦除
 import { AppError, isAppError } from '@mim/core-domain'; // 引入统一业务异常与类型守卫，错误信封集中管理
-import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY } from './config.js'; // 引入幂等强制开关与管理令牌环境变量键名
+import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY, isForceLoginEnabled } from './config.js'; // 引入幂等强制开关、管理令牌键名与强制登录开关
 import { sha256, verifyAccessToken } from './auth.js'; // 引入请求指纹哈希与访问令牌校验
 import type { RbacPermissionCode } from './db.js'; // 权限点联合类型，保证 requirePermission 调用处拼写错误在编译期暴露
 import type { Db } from './types.js'; // 数据库句柄类型，供 loadPermissions 声明参数
@@ -50,7 +50,7 @@ function resolveBearerUser(req: Request): AuthRow { // 内部辅助：令牌 →
   } // 头格式校验结束
   const payload = verifyAccessToken(match[1], req.deps.jwtSecret); // 校验签名与过期时间，失败抛 AUTH_UNAUTHORIZED
   const row = req.deps.db // 从库中加载最新用户行，使注销等状态变更即时生效（不信任令牌内快照）
-    .prepare('SELECT id, member_no, region, status, display_name, locale, timezone, is_guest FROM users WHERE id = ?') // 只选鉴权与展示所需字段（含访客标记）
+    .prepare('SELECT id, member_no, region, status, display_name, locale, timezone, is_guest FROM users WHERE id = ?') // 只选鉴权与展示所需字段（is_guest 为历史兼容列）
     .get(payload.sub) as AuthRow | undefined; // 按令牌 sub 精确查询单行，查不到为 undefined
   if (!row || row.status === 'deleted') { // 用户不存在或已软删除时令牌即失效
     throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 统一 401，避免区分「不存在」与「已删除」
@@ -66,6 +66,119 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   req.user = resolveBearerUser(req); // 复用统一解析逻辑，保持与 requirePermission 同一安全水位
   next(); // 通过鉴权，进入业务处理
 } // requireAuth 结束
+
+/** 安全方法集合：只有读语义的方法才可能进入「匿名可读」白名单 */
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * 可选鉴权：有有效 Bearer 令牌就解析出用户，无令牌 / 令牌失效一律按匿名继续。
+ * 只挂载在「匿名可读」的公开接口上，让 `liked` / `favorited` / `joined` 等个人化字段
+ * 在登录后仍然生效；公开读不能因为本地令牌过期就变成 401。
+ */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void { // 中间件：身份可有可无
+  const header = req.header('authorization') ?? ''; // 先看是否携带 Authorization，避免无谓解析
+  if (!header) { next(); return; } // 匿名请求直接放行
+  try { // 令牌无效不应打断公开读
+    req.user = resolveBearerUser(req); // 复用统一校验：签名 / 过期 / 用户有效性 / 注销冷静期
+  } catch { // 过期、伪造或用户已删除
+    /* 公开接口按匿名处理，个人化字段回落为 false */
+  } // try/catch 结束
+  next(); // 继续业务处理
+} // optionalAuth 结束
+
+/**
+ * 门禁口径（2026-11-15 调整）：匿名可读、登录才能互动。
+ * 除登录链路、第三方支付回调、健康检查与公开读白名单外，其余接口仍要求有效凭证
+ * （Bearer JWT 或超管引导令牌）。开关只有一个：MIM_FORCE_LOGIN（默认开启，显式 0/false/off 关闭）。
+ */
+const FORCE_LOGIN_PUBLIC_PATHS = new Set<string>([ // 精确匹配的公开路径
+  '/api/v1/healthz', // 监控探活别名
+  '/api/v1/site/config', // 登录页渲染所需的站点名称 / 主题等公开元数据
+  '/api/v1/security/status', // 登录页据此决定是否渲染验证码
+]); // 公开路径集合结束
+
+const FORCE_LOGIN_PUBLIC_PREFIXES = [ // 前缀匹配：整条登录链路保持公开
+  '/api/v1/auth/', // 登录 / 注册关闭提示 / 验证码 / OAuth 与 OIDC 回调 / SSO 兑换
+  // 后台管理接口不走「全站强制登录」这道门，改由每个路由自己的 requirePermission 单独校验
+  // （Bearer JWT + RBAC 权限点，或 x-admin-token 超管引导通道）。
+  // 这样后台在冷启动、只有一个账号时仍可进入；未认证访问仍由 requirePermission 返回 401。
+  '/api/v1/admin/',
+]; // 公开前缀结束
+
+const PAYMENT_NOTIFY_PATHS = [ // 第三方异步通知必须免登录：渠道服务端没有用户令牌，只能靠签名验真
+  /^\/api\/v1\/payments\/[a-z0-9_]+\/notify$/, // 扩展渠道：微信 / 支付宝 / 沙箱 / 虎皮椒 / 讯虎等
+  /^\/api\/v1\/orders\/[^/]+\/payment-notify$/, // 商城订单回调：HMAC-SHA256 + 时间戳防重放
+]; // 回调路径集合结束
+
+/**
+ * 匿名可读白名单：按「方法 + 路径」双判定，只放安全方法。
+ * 同一个路径的 POST / PUT / DELETE 不会被这条白名单带出去——读要放、写要拦。
+ */
+const ANONYMOUS_READ_PATHS = new Set<string>([ // 精确匹配的公开读接口
+  '/api/v1/community/home-setting', // 社区首页运营配置
+  '/api/v1/community/recommend-weights', // 推荐指数权重（只读）
+  '/api/v1/community/overview', // 社区首页聚合：板块 / 统计 / 公开会员信息
+  '/api/v1/community/boards', // 板块列表
+  '/api/v1/community/threads', // 帖子列表
+  '/api/v1/taxonomy', // 站点分类树（公开元数据）
+  '/api/v1/modules', // 模块目录（公开）
+  '/api/v1/modules/hot', // 热门模块（公开）
+  '/api/v1/vip/plans', // VIP 套餐（公开定价）
+  '/api/v1/vip/prices', // VIP 分级定价规则（公开）
+  '/api/v1/shop/products', // 独立商城商品列表（公开）
+  '/api/v1/content/items', // 统一内容只读视图（公开信息流）
+  '/api/v1/announcements', // 公告
+  '/api/v1/changelog', // 更新日志
+  '/api/v1/changelog/versions', // 更新日志版本列表
+  '/api/v1/promotions', // 推广计划公开页
+]); // 匿名可读精确路径集合结束
+
+const ANONYMOUS_READ_PATTERNS = [ // 带路径参数的公开读接口
+  /^\/api\/v1\/community\/boards\/[^/]+\/tabs$/, // 板块自定义页签
+  /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
+  /^\/api\/v1\/modules\/[^/]+$/, // 单个模块详情
+  /^\/api\/v1\/pages\/[^/]+$/, // 站点自定义页面
+]; // 匿名可读正则集合结束
+
+/** 判定请求是否属于强制登录下的公开白名单（集中一处，避免各路由散落例外） */
+export function isPublicUnderForceLogin(method: string, pathname: string): boolean {
+  if (FORCE_LOGIN_PUBLIC_PATHS.has(pathname)) return true; // 健康检查与必要公开元数据
+  if (FORCE_LOGIN_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true; // 登录链路
+  return method === 'POST' && PAYMENT_NOTIFY_PATHS.some((pattern) => pattern.test(pathname)); // 支付回调：靠渠道签名验真，不能要求登录
+} // isPublicUnderForceLogin 结束
+
+/** 判定是否为「匿名可读」的公开读接口：必须是安全方法，且路径精确命中白名单 */
+export function isAnonymousRead(method: string, pathname: string): boolean {
+  if (!SAFE_METHODS.has(method.toUpperCase())) return false; // 写方法一律不放行
+  if (ANONYMOUS_READ_PATHS.has(pathname)) return true; // 精确路径
+  return ANONYMOUS_READ_PATTERNS.some((pattern) => pattern.test(pathname)); // 带参数路径
+} // isAnonymousRead 结束
+
+/** 门禁中间件：匿名可读放行，其余接口未认证一律 401，不签发任何临时身份 */
+export function createForceLoginMiddleware() { // 工厂：便于测试挂载与替换
+  return (req: Request, res: Response, next: NextFunction): void => { // 返回实际中间件
+    if (!isForceLoginEnabled(req.deps.env)) { // 开关关闭时恢复旧的按路由鉴权模型
+      next(); // 直接放行
+      return; // 提前返回
+    } // 开关判定结束
+    const pathname = req.originalUrl.split('?')[0] ?? ''; // 去掉查询串，仅按路径匹配
+    if (isPublicUnderForceLogin(req.method, pathname)) { // 登录链路 / 支付回调 / 健康检查 / 公开元数据
+      next(); // 公开接口不要求凭证
+      return; // 提前返回
+    } // 公开白名单判定结束
+    if (isAnonymousRead(req.method, pathname)) { // 匿名可读：GET 列表 / 详情放行，写方法在上一行已被排除
+      optionalAuth(req, res, next); // 带令牌时解析身份，保持个人化字段可用
+      return; // 提前返回
+    } // 匿名可读判定结束
+    if (adminTokenMatches(req)) { // 超管引导令牌等同有效认证，保住冷启动通道
+      req.adminBootstrap = true; // 标记来源，下游审计可区分
+      next(); // 放行
+      return; // 提前返回
+    } // 引导通道结束
+    req.user = resolveBearerUser(req); // 无令牌 / 令牌无效 → AUTH_UNAUTHORIZED(401)
+    next(); // 通过门禁
+  }; // 中间件结束
+} // createForceLoginMiddleware 结束
 
 /**
  * 写操作幂等：同 Key 同请求体回放首次响应；同 Key 不同请求体 409；
