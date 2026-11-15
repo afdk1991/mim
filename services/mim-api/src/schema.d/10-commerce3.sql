@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS price_batches (
 -- ---------- 批量改价：改前 / 改后快照明细 ----------
 -- 每条命中目标一行：before/after 快照供「回滚到上一批」与审计追溯；
 -- skipped=1 表示按安全规则未改动（如 0 价免费商品不参与调价），reason 记录原因。
+-- 老库的 price_batch_items 是先于 price_row_id 创建的：CREATE TABLE IF NOT EXISTS 会静默跳过整表，
+-- 必须靠 ALTER_ADD 补列，否则批量改价写入报 no such column: price_row_id。
+ALTER_ADD: price_batch_items.price_row_id TEXT
 CREATE TABLE IF NOT EXISTS price_batch_items (
   id                  TEXT PRIMARY KEY,
   batch_id            TEXT NOT NULL REFERENCES price_batches(id),

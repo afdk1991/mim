@@ -179,6 +179,75 @@ export function ensureOrderSourceCommunity(db: Db): boolean {
   return true;
 }
 
+/** 旧订阅制 orders 的特征列（2026-11-13 统一交易域之前的本地快照） */
+const LEGACY_ORDER_COLUMNS = ['plan_id', 'amount_minor', 'driver'] as const; // 三列同时存在且没有 source/source_id，才认定是旧订阅结构
+
+/** 旧订阅制 payments 的特征列 */
+const LEGACY_PAYMENT_COLUMNS = ['driver', 'amount_minor', 'provider_txn_id'] as const; // 三列同时存在且没有 provider/amount_cents，才认定是旧订阅结构
+
+/** 读取表名对应的列名集合；表不存在返回空集合 */
+function columnSet(db: Db, table: string): Set<string> { // 结构判定统一走 PRAGMA，避免解析 DDL 文本
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>; // 列定义列表
+  return new Set(rows.map((row) => row.name)); // 转成集合便于 O(1) 判定
+} // columnSet 结束
+
+/**
+ * 把「订阅制时代」的 orders / payments 原地升级为统一交易域结构。
+ *
+ * 背景：本地 data/mim.db 是早期快照，orders 还是 16 列订阅结构（plan_id / amount_minor / driver，没有 source）。
+ * schema.d 的 CREATE TABLE IF NOT EXISTS 遇到同名旧表会整表跳过，随后 50-unified-commerce.sql 在旧 orders 上
+ * 建 `ix_orders_source ON orders(source, source_id)` 时直接报 `no such column: source`，进程启动即失败。
+ *
+ * 处理原则：
+ *   - 只认「严格旧签名」：orders 有 plan_id/amount_minor/driver 且无 source/source_id，payments 有 driver/amount_minor/provider_txn_id 且无 provider/amount_cents；
+ *     其它任何混合结构一律抛错中止，绝不猜测性 DROP。
+ *   - 旧行无法映射到统一交易域（订阅计划在现行代码里已无对应源订单），整行 JSON 归档到 legacy_archive_orders / legacy_archive_payments 后再重建空表。
+ *   - 已是统一表时直接返回 false，重复启动无副作用；重建后由 50-unified-commerce.sql 负责建表与索引，避免 DDL 两处维护。
+ * @returns 是否真的执行了重建
+ */
+export function alignLegacyCommerceTables(db: Db): boolean {
+  const ordersSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'orders'").get() as { sql: string } | undefined; // 读 orders 建表原文
+  if (!ordersSql) return false; // 表不存在（全新库 / 尚未由域脚本建表）：交给 50-unified-commerce.sql
+  const orderCols = columnSet(db, 'orders'); // 现有 orders 列
+  const paymentCols = columnSet(db, 'payments'); // 现有 payments 列（表不存在时为空集合）
+  const hasPayments = paymentCols.size > 0; // payments 是否存在
+  const legacyOrders = !orderCols.has('source') && !orderCols.has('source_id') && LEGACY_ORDER_COLUMNS.every((col) => orderCols.has(col)); // 严格旧签名
+  if (!legacyOrders) { // orders 不是旧订阅结构：理论上已是统一表
+    if (hasPayments && !paymentCols.has('provider') && !paymentCols.has('amount_cents') && LEGACY_PAYMENT_COLUMNS.every((col) => paymentCols.has(col))) {
+      throw new Error('[db] orders 已是统一结构但 payments 仍是订阅结构：结构混合，已中止升级，请归档本地库后重建'); // 混合结构不动手
+    }
+    return false; // 已是统一结构：幂等返回
+  }
+  const legacyPayments = hasPayments && !paymentCols.has('provider') && !paymentCols.has('amount_cents') && LEGACY_PAYMENT_COLUMNS.every((col) => paymentCols.has(col)); // 严格旧签名
+  if (hasPayments && !legacyPayments) {
+    throw new Error('[db] orders 是订阅结构但 payments 不是：结构混合，已中止升级，请归档本地库后重建'); // 不猜测性删除
+  }
+  const archivedAt = new Date().toISOString(); // 归档时间统一取一次，便于对照
+  db.exec('CREATE TABLE IF NOT EXISTS legacy_archive_orders (id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, archived_at TEXT NOT NULL)'); // 旧订单整行归档
+  db.exec('CREATE TABLE IF NOT EXISTS legacy_archive_payments (id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, archived_at TEXT NOT NULL)'); // 旧支付整行归档
+  const archiveAll = (table: 'orders' | 'payments'): number => { // 把旧表所有行原样序列化归档
+    const rows = db.prepare(`SELECT * FROM ${table}`).all() as Array<Record<string, unknown>>; // 读取旧行
+    const insert = db.prepare(`INSERT OR REPLACE INTO legacy_archive_${table} (id, payload_json, archived_at) VALUES (?, ?, ?)`); // 幂等写入归档表
+    for (const row of rows) insert.run(String(row.id), JSON.stringify(row), archivedAt); // 整行 JSON 保留所有旧字段
+    return rows.length; // 返回归档行数
+  }; // archiveAll 结束
+  const archivedOrders = archiveAll('orders'); // 订单先归档
+  const archivedPayments = hasPayments ? archiveAll('payments') : 0; // 支付表不存在时无需归档
+  const unifiedSql = readFileSync(join(SCHEMA_DIR, '50-unified-commerce.sql'), 'utf8'); // 重建 DDL 直接复用域脚本，避免两处维护
+  db.pragma('foreign_keys = OFF'); // 关外键：DROP 旧表不能级联清掉 order_items / fulfillments
+  try {
+    db.transaction(() => { // 删旧表 + 建统一表必须原子完成
+      if (hasPayments) db.exec('DROP TABLE payments'); // 先删引用 orders 的子表
+      db.exec('DROP TABLE orders'); // 再删父表
+      db.exec(unifiedSql); // 按当前统一交易域 DDL 重建 orders / payments / order_items / fulfillments / products 与索引
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON'); // 无论成败都恢复外键约束
+  }
+  console.log(`[db] legacy subscription commerce rebuilt: archived ${archivedOrders} orders / ${archivedPayments} payments -> legacy_archive_orders/payments`); // 重建与归档必须留痕
+  return true; // 告知调用方发生了结构变更
+} // alignLegacyCommerceTables 结束
+
 export function createDatabase(filename: string = ':memory:'): Db { // 创建数据库连接：默认内存库（测试用），传路径则落盘持久化
   if (filename !== ':memory:') { // 内存库没有文件系统目录，无需准备目录
     const dir = dirname(filename); // 取数据库文件所在目录
@@ -188,6 +257,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   db.pragma('foreign_keys = ON'); // 开启外键约束，保证关联表引用完整性
   if (filename !== ':memory:') db.pragma('journal_mode = WAL'); // 落盘库启用 WAL，提升读写并发并降低写阻塞（内存库不支持）
   db.exec(readFileSync(SCHEMA_PATH, 'utf8')); // 执行建表脚本，全部 IF NOT EXISTS 以便每次启动幂等
+  alignLegacyCommerceTables(db); // 先处理订阅制老库：否则域脚本在旧 orders 上建 source 索引会直接崩溃
   const domainApplied = applyDomainSchema(db); // 各业务域的 schema.d 脚本：建新表 / 补新列，与主脚本同一幂等路径
   if (domainApplied.length > 0) console.log(`[db] domain schema applied: ${domainApplied.join(', ')}`); // 域脚本改结构必须留痕
   if (ensureOrderSourceCommunity(db)) console.log('[db] orders.source widened: community'); // 存量库放宽 CHECK，必须留痕

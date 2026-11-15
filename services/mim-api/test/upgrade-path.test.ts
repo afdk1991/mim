@@ -75,3 +75,82 @@ describe('存量库升级路径', () => {
     upgraded.close();
   });
 });
+
+// 订阅制时代的 orders / payments 是另一条更早的历史分支：表已存在但列完全是另一套。
+// CREATE TABLE IF NOT EXISTS 会整表跳过，50-unified-commerce.sql 随后在旧 orders 上建 source 索引会直接报
+// no such column: source —— 本地快照起不来就是这条路径。这里钉死「原地重建 + 旧行归档 + 幂等」。
+const LEGACY_ORDERS_DDL = `CREATE TABLE orders (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, plan_id TEXT NOT NULL, region TEXT NOT NULL,
+  cycle TEXT NOT NULL CHECK (cycle IN ('monthly','yearly')), currency TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL, status TEXT NOT NULL CHECK (status IN ('pending','paid','failed','closed','refunded')),
+  driver TEXT NOT NULL, provider_ref TEXT, idempotency_key TEXT, version INTEGER NOT NULL DEFAULT 1,
+  paid_at TEXT, closed_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+)`;
+
+const LEGACY_PAYMENTS_DDL = `CREATE TABLE payments (
+  id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id), driver TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, status TEXT NOT NULL,
+  provider_txn_id TEXT, created_at TEXT NOT NULL
+)`;
+
+describe('订阅制老库升级到统一交易域', () => {
+  let dir = '';
+  let file = '';
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'mim-legacy-commerce-'));
+    file = join(dir, 'mim.sqlite');
+  }); // beforeEach 结束
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); // Windows 句柄释放有延迟，重试避免 EBUSY
+  }); // afterEach 结束
+
+  const downgrade = () => { // 把新库退回订阅制形态，并留一条旧订单 / 旧支付作为归档样本
+    createDatabase(file).close(); // 先得到一份完整新库
+    const legacy = new Database(file); // 直接改结构
+    legacy.pragma('foreign_keys = OFF');
+    for (const sql of ['DROP TABLE IF EXISTS order_items', 'DROP TABLE IF EXISTS fulfillments', 'DROP TABLE IF EXISTS payments', 'DROP TABLE IF EXISTS orders']) legacy.exec(sql);
+    legacy.exec(LEGACY_ORDERS_DDL);
+    legacy.exec(LEGACY_PAYMENTS_DDL);
+    legacy.prepare("INSERT INTO orders (id, user_id, plan_id, region, cycle, currency, amount_minor, status, driver, created_at, updated_at) VALUES ('ord-legacy', 'u1', 'pro', 'cn', 'monthly', 'CNY', 1900, 'paid', 'wechat', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')").run();
+    legacy.prepare("INSERT INTO payments (id, order_id, driver, amount_minor, currency, status, created_at) VALUES ('pay-legacy', 'ord-legacy', 'wechat', 1900, 'CNY', 'paid', '2026-01-01T00:00:00Z')").run();
+    legacy.close();
+  }; // downgrade 结束
+
+  it('重开时原地重建为统一表，旧行整行归档且不丢字段', () => {
+    downgrade();
+    const upgraded = createDatabase(file); // 历史上这里会崩在 no such column: source
+    const orderCols = (upgraded.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
+    expect(orderCols).toContain('source');
+    expect(orderCols).toContain('source_id');
+    expect(orderCols).toContain('payable_cents');
+    expect(orderCols).not.toContain('plan_id');
+    const payCols = (upgraded.prepare('PRAGMA table_info(payments)').all() as Array<{ name: string }>).map((c) => c.name);
+    expect(payCols).toContain('provider');
+    expect(payCols).toContain('amount_cents');
+    expect(payCols).not.toContain('driver');
+    // 旧行不能映射到统一交易域，必须原样进归档表，统一表保持干净
+    expect((upgraded.prepare('SELECT COUNT(*) AS n FROM orders').get() as { n: number }).n).toBe(0);
+    expect((upgraded.prepare('SELECT COUNT(*) AS n FROM payments').get() as { n: number }).n).toBe(0);
+    const archived = upgraded.prepare("SELECT payload_json FROM legacy_archive_orders WHERE id='ord-legacy'").get() as { payload_json: string } | undefined;
+    expect(archived).toBeTruthy();
+    expect(JSON.parse(archived!.payload_json).plan_id).toBe('pro');
+    const archivedPay = upgraded.prepare("SELECT payload_json FROM legacy_archive_payments WHERE id='pay-legacy'").get() as { payload_json: string } | undefined;
+    expect(archivedPay).toBeTruthy();
+    expect(JSON.parse(archivedPay!.payload_json).provider_txn_id).toBeNull();
+    const indexes = (upgraded.prepare("SELECT name FROM sqlite_master WHERE type='index'").all() as Array<{ name: string }>).map((i) => i.name);
+    expect(indexes).toContain('ix_orders_source');
+    upgraded.close();
+  }); // it 结束
+
+  it('重复启动不再重建、归档不膨胀', () => {
+    downgrade();
+    createDatabase(file).close(); // 第一次：执行重建
+    const again = createDatabase(file); // 第二次：必须命中「已是统一表」直接返回
+    expect((again.prepare('SELECT COUNT(*) AS n FROM legacy_archive_orders').get() as { n: number }).n).toBe(1);
+    expect((again.prepare('SELECT COUNT(*) AS n FROM legacy_archive_payments').get() as { n: number }).n).toBe(1);
+    expect((again.prepare('SELECT COUNT(*) AS n FROM orders').get() as { n: number }).n).toBe(0);
+    again.close();
+  }); // it 结束
+});
