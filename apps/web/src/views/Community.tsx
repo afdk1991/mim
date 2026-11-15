@@ -860,9 +860,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         <>
       <header className="community-hero">{/* 执行当前业务步骤 */}
         <div>{/* 执行当前业务步骤 */}
-          <p className="community-kicker">COMMUNITY & CREATOR ECONOMY</p>
-          <h1>社区 · 知识付费 · 社区商城</h1>
-          <p className="community-sub">论坛、付费阅读、VIP、钱包积分、实物与卡密商品（社区商城）、推广分成，全部走同一套账户与余额。</p>
+          <p className="community-kicker">MIM COMMUNITY</p>
+          <h1>Mim 社区</h1>
+          <p className="community-sub">在这里发布图文、视频与图集作品，开通付费阅读，逛逛社区商城，和同好一起交流。</p>
         </div>
         <div className="community-hero-side">{/* 执行当前业务步骤 */}
           <div className="community-stat"><span>帖子</span><strong>{stats.threads}</strong></div>
