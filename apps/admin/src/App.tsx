@@ -6,6 +6,10 @@ import { ApiError, describeError, getAdminMe, loadCredential, saveCredential } f
 import type { AdminIdentity, Credential } from './api'; // 业务步骤
 // 通用异步加载钩子：统一 loading / error / reload
 import { useAsync } from './hooks'; // 业务步骤
+// 明暗切换：与前台共用 localStorage 键，侧栏提供入口避免管理员无路可退
+import { currentThemeMode, setThemeMode } from './theme'; // 业务步骤
+// 明暗类型：仅类型导入，避免运行时冗余
+import type { ThemeMode } from './theme'; // 业务步骤
 // 登录页：无凭证时的唯一出口，被动退出提示也由它展示
 import { Login } from './views/Login'; // 业务步骤
 // 概览视图：默认落地页，任何已登录身份可见
@@ -118,6 +122,15 @@ interface ConsoleProps {
 function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
   // 当前视图；默认概览，权限不足时会自动回落
   const [view, setView] = useState<ViewKey>('overview');
+  // 当前明暗：以已写入的 data-theme 为准，按钮文案显示切换目标
+  const [mode, setMode] = useState<ThemeMode>(() => currentThemeMode());
+
+  // 切换明暗：立即写入 data-theme 并持久化，与前台共用同一偏好
+  function toggleMode() {
+    const next: ThemeMode = mode === 'dark' ? 'light' : 'dark'; // 目标模式取反
+    setThemeMode(next); // 先切页面并落盘，避免存储异常时没有反馈
+    setMode(next); // 同步按钮文案
+  } // toggleMode 结束
   // 身份查询：凭证变化时重新校验，同时拿到最新权限
   const identityState = useAsync(() => getAdminMe(credential), [credential]);
 
@@ -196,6 +209,8 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
           <div className="muted">{subject}</div> {/* 渲染身份主体文案 */}
           {/* 区域标记：cn / global，引导通道无区域时显示 all */}
           <div className="muted">{identity.user?.region ?? 'all'}</div> {/* 渲染区域标记 */}
+          {/* 明暗切换：与前台共用偏好，后台也能自行切回浅色 */}
+          <button className="btn ghost" type="button" onClick={toggleMode}>{mode === 'dark' ? '浅色模式' : '暗色模式'}</button> {/* 点击即写入 data-theme 并持久化 */}
           {/* 退出登录：清除凭证回登录页 */}
           <button className="btn ghost" type="button" onClick={() => onLogout()}>退出登录</button> {/* 主动退出：无提示直接回登录页 */}
         </div> {/* 身份区结束 */}

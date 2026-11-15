@@ -8,7 +8,11 @@ import { App } from './App';
 import './tokens.css';
 // 全局样式：由 Vite 打包注入，保证主题变量与布局类在首屏即生效
 import './styles.css';
+// 明暗偏好：与前台共用本地存储键，渲染前先落到 <html data-theme>
+import { applyThemeMode, readStoredMode } from './theme';
 
+// 首帧前写入明暗：放在渲染之前，避免先闪一下浅色再被切成暗色
+applyThemeMode(readStoredMode());
 // 取挂载节点：对应 index.html 中预留的 #root
 const container = document.getElementById('root');
 // 挂载点缺失说明模板与代码不匹配，直接抛错避免静默白屏
