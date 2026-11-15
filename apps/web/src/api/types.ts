@@ -448,7 +448,22 @@ export interface UnifiedOrder { // 统一订单视图
   product_code: string | null; // 首件商品编码
   delivery_kind: string | null; // 实物线发货方式，仅 shop 来源有值
   delivered_content: string | null; // 卡密 / 人工说明，仅 shop 来源有值
+  shipping: { carrier: string; tracking_no: string; status: string; updated_at: string } | null; // 物流单，未发货为 null
+  after_sales_status: string | null; // 最近一条售后申请状态
   items: UnifiedOrderItem[]; // 订单明细
+}
+
+/** 售后申请：用户对已付款订单发起，后台可同意（退款入余额）或驳回 */
+export interface AfterSalesRequest { // 售后申请视图
+  id: string; // 申请主键
+  order_id: string; // 关联商城订单
+  kind: 'refund_only' | 'return_refund' | 'repair'; // 申请类型
+  reason: string; // 申请理由
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'; // 处理状态
+  admin_note: string | null; // 后台备注
+  handled_at: string | null; // 处理时间
+  created_at: string; // 申请时间
+  product_name?: string; // 商品名（列表接口会联表带出）
 }
 
 export interface UnifiedOrderSummary { // 统一订单汇总口径
@@ -488,6 +503,7 @@ export interface ThemeSettings { // 主题
   nav_layout?: string; // 导航布局
   list_style?: string; // 列表样式：card / list / compact
   radius?: number; // 圆角
+  mode?: string; // 站点默认明暗：light / dark（访客可在前台自行覆盖）
   font?: string; // 字体族（CSS font-family 取值）
   nav_items?: Array<{ view: string; label: string; icon?: string; visible?: boolean }>; // 后台配置的导航项（可选，缺省回落内置导航）
 }

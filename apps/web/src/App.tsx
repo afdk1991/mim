@@ -22,8 +22,8 @@ import { Login } from './views/Login';
 // 公告置顶条已从全局外壳移除：置顶公告只在社区「公告动态」页签内展示，
 // 避免把内部命名（能力地图 / 版本号）与运营文案铺到每一个页面。
 // 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
-import { DEFAULT_THEME, applyThemeVars, mergeNavItems, resolveTheme } from './appearance';
-import type { ResolvedTheme } from './appearance'; // 引入依赖、类型或本地模块绑定
+import { DEFAULT_THEME, applyThemeMode, applyThemeVars, currentThemeMode, mergeNavItems, readStoredMode, resolveTheme, setThemeMode } from './appearance';
+import type { ResolvedTheme, ThemeMode } from './appearance'; // 引入依赖、类型或本地模块绑定
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
@@ -116,6 +116,12 @@ export function App() {
   const [gateNotice, setGateNotice] = useState<'expired' | null>(null);
   // 外观主题：后台下发配置清洗后的设计令牌；接口不可达或脏数据时回落默认外观，不白屏
   const [theme, setTheme] = useState<ResolvedTheme>(DEFAULT_THEME);
+  // 明暗：访客本地偏好优先；首帧就应用，避免已选暗色的用户先看到浅色闪屏
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    const stored = readStoredMode(); // 读取已保存的访客选择
+    if (stored) applyThemeMode(stored); // 有偏好立即生效
+    return stored ?? 'light'; // 未选择时先按浅色，等站点配置返回再纠正
+  });
 
   // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
   const locale: Locale = normalizeLocale(session?.user.locale);
@@ -128,11 +134,13 @@ export function App() {
       if (!alive) return; // 条件分支：按判断结果选择后续处理路径
       const resolved = resolveTheme(config.theme); // 逐项清洗脏数据
       setTheme(resolved);
-      applyThemeVars(resolved); // 写入 :root CSS 变量与数据集
+      applyThemeVars(resolved); // 写入 :root CSS 变量与数据集（含明暗口径）
+      setMode(currentThemeMode()); // 同步按钮状态：本地偏好优先于站点默认
     }).catch(() => {
       if (!alive) return; // 条件分支：按判断结果选择后续处理路径
       setTheme(DEFAULT_THEME); // 离线 / 配置缺失：回落默认外观
       applyThemeVars(DEFAULT_THEME); // 同步注入默认令牌，避免首帧停留在 CSS 兜底色
+      setMode(currentThemeMode()); // 同步按钮状态
     });
     return () => { alive = false; }; // 返回当前函数的处理结果
   }, []);
@@ -229,6 +237,13 @@ export function App() {
     go({ view: 'community' });
     // 2026-11-15 口径变更：登出后不再补领访客会话，保持未登录态直到用户主动登录
   } // handleLogout 结束
+
+  // 明暗切换：立即应用并持久化到 localStorage，刷新后保持
+  function toggleMode() {
+    const next: ThemeMode = mode === 'dark' ? 'light' : 'dark'; // 在两种模式间翻转
+    setThemeMode(next); // 写 data-theme + 本地存储
+    setMode(next); // 同步按钮文案
+  } // toggleMode 结束
 
   // 设置页更新用户信息后的回调：替换会话中的 user 并持久化
   function handleUserUpdated(next: UserInfo) {
@@ -361,6 +376,12 @@ export function App() {
               </button>{/* 登录入口按钮结束 */}
             </> // 未登录片段结束
           )}{/* 底部按登录态分支结束 */}
+          {/* 明暗切换：匿名与已登录都可用，偏好只存本地 */}
+          <button type="button" className="btn ghost block" onClick={toggleMode}>
+            {mode === 'dark'
+              ? (locale === 'en-US' ? 'Light mode' : '浅色模式')
+              : (locale === 'en-US' ? 'Dark mode' : '暗色模式')}
+          </button>
         </div>{/* 侧边栏底部结束 */}
       </aside>{/* 侧边栏结束 */}
 

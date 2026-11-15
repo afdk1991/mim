@@ -7,6 +7,12 @@
 
 import type { ThemeSettings } from './api'; // 后台主题设置原始结构
 
+/** 明暗主题：站点默认值与访客本地偏好共用同一口径。 */
+export type ThemeMode = 'light' | 'dark';
+
+/** 访客明暗偏好的本地存储键：只存 light / dark，不跟账号绑定。 */
+const MODE_KEY = 'mim.theme.mode';
+
 /** 清洗后的主题视图：全部字段都有安全兜底值。 */
 export interface ResolvedTheme {
   accent: string; // 主色（合法 HEX）
@@ -15,8 +21,41 @@ export interface ResolvedTheme {
   listStyle: 'card' | 'list' | 'compact'; // 列表样式：卡片 / 单行列表 / 紧凑密度
   radius: number; // 圆角（px，0–32）
   font: string; // 字体族（空串表示沿用系统字体栈）
+  mode: ThemeMode; // 站点默认明暗：访客未手动切换时生效
   navItems: Array<{ view: string; label: string; icon?: string; visible: boolean }>; // 后台配置导航项
 } // 代码块结束
+
+/** 读取访客手动选择的明暗；无记录或存储不可用返回 null。 */
+export function readStoredMode(): ThemeMode | null {
+  try {
+    const raw = localStorage.getItem(MODE_KEY); // 仅认 light / dark 两个字面量
+    return raw === 'dark' || raw === 'light' ? raw : null; // 脏值当作未选择
+  } catch {
+    return null; // 隐私模式下读取失败不阻断
+  }
+} // readStoredMode 结束
+
+/** 把明暗写到 <html data-theme>：tokens.css 的暗色分支只认 dark。 */
+export function applyThemeMode(mode: ThemeMode): void {
+  if (typeof document === 'undefined') return; // 非浏览器环境跳过
+  document.documentElement.dataset.theme = mode; // light 时选择器不命中，回落浅色
+} // applyThemeMode 结束
+
+/** 当前生效明暗：以已写入的 data-theme 为准，供切换按钮显示对向文案。 */
+export function currentThemeMode(): ThemeMode {
+  if (typeof document === 'undefined') return 'light'; // 非浏览器环境按浅色
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'; // 只有 dark 视为暗色
+} // currentThemeMode 结束
+
+/** 访客手动切换明暗：立即生效并写入本地，刷新后保持。 */
+export function setThemeMode(mode: ThemeMode): void {
+  applyThemeMode(mode); // 先切页面，避免存储异常时无反馈
+  try {
+    localStorage.setItem(MODE_KEY, mode); // 持久化偏好
+  } catch {
+    /* 存储不可用时仅本次生效，不阻断切换 */
+  }
+} // setThemeMode 结束
 
 /** 内置默认外观：与后端 20-appearance.sql 兜底种子同口径。 */
 export const DEFAULT_THEME: ResolvedTheme = {
@@ -26,6 +65,7 @@ export const DEFAULT_THEME: ResolvedTheme = {
   listStyle: 'card', // 列表样式：卡片
   radius: 12, // 主圆角：与 tokens.css 一致
   font: '', // 字体族：空串沿用系统字体栈
+  mode: 'light', // 站点默认浅色
   navItems: [], // 后台未配置导航项
 }; // 代码块结束
 
@@ -92,6 +132,7 @@ export function resolveTheme(raw: ThemeSettings | null | undefined): ResolvedThe
     listStyle, // 执行当前业务步骤
     radius, // 执行当前业务步骤
     font: typeof t.font === 'string' ? t.font.trim() : '', // 对象字段 font：记录一项配置或数据
+    mode: t.mode === 'dark' ? 'dark' : 'light', // 站点默认明暗：只认 dark，其余回落浅色
     navItems, // 执行当前业务步骤
   }; // 代码块结束
 } // 代码块结束
@@ -102,10 +143,14 @@ export function resolveTheme(raw: ThemeSettings | null | undefined): ResolvedThe
  * 只写 --theme-* 输入变量：--primary / --bg / --radius 由 tokens.css 在
  * :root 与 :root[data-theme='dark'] 两个分支里分别取值，因此运行期配置
  * 不会再以浅色值把暗色下的底色与主色钉死。
+ *
+ * 明暗口径：访客手动选择（localStorage）优先，否则用后台下发的站点默认值；
+ * 结果写 <html data-theme>，由 tokens.css 的暗色分支接管。
  */
 export function applyThemeVars(theme: ResolvedTheme): void {
   if (typeof document === 'undefined') return; // 非浏览器环境（测试 / SSR）跳过
   const root = document.documentElement; // 变量挂在 :root 上，全站继承
+  applyThemeMode(readStoredMode() ?? theme.mode); // 本地偏好优先，其次站点默认
   root.style.setProperty('--theme-primary', theme.accent); // 浅色主色输入
   root.style.setProperty('--theme-bg', theme.background); // 浅色底色输入（暗色另有 --theme-bg-dark 兜底）
   root.style.setProperty('--theme-radius', `${theme.radius}px`); // 圆角输入
