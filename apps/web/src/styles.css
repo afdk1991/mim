@@ -40,7 +40,7 @@ h2 { /* 面板/小节标题 */
 
 code { /* 行内代码/令牌展示 */
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* 等宽字体，便于对齐与辨认字符 */
-  font-size: 12px; /* 略小于正文，避免等宽字过宽撑破布局 */
+  font-size: var(--fs-xs); /* 略小于正文，避免等宽字过宽撑破布局 */
 } /* code 结束 */
 
 /* ---------- 布局 ---------- */
@@ -67,7 +67,7 @@ code { /* 行内代码/令牌展示 */
 } /* 品牌区结束 */
 
 .brand-name { /* 应用名 */
-  font-size: 20px; /* 作为视觉锚点，明显大于正文 */
+  font-size: var(--fs-xl); /* 作为视觉锚点，明显大于正文 */
   font-weight: 700; /* 加粗强化品牌识别 */
   letter-spacing: 0.02em; /* 轻微字距，提升大写/短词的精致度 */
 } /* 应用名结束 */
@@ -110,10 +110,10 @@ code { /* 行内代码/令牌展示 */
 .subnav-item { /* 合并入口按钮：低干扰的胶囊样式 */
   padding: 6px 12px; /* 点击热区约 30px，比主导航轻 */
   border: 1px solid var(--sidebar-hover); /* 描边区分于正文，不抢主色 */
-  border-radius: 999px; /* 胶囊形，视觉上明确是辅助入口 */
+  border-radius: var(--radius-pill); /* 胶囊形，视觉上明确是辅助入口 */
   background: transparent; /* 默认无填充 */
-  color: var(--text-muted, #56607a); /* 次要文字色，缺省回落深灰蓝 */
-  font-size: 13px; /* 比正文小一号 */
+  color: var(--text-muted); /* 次要文字色，走令牌 */
+  font-size: var(--fs-sm); /* 比正文小一号 */
   cursor: pointer; /* 悬停提示可点 */
 } /* 合并入口按钮结束 */
 
@@ -137,7 +137,7 @@ code { /* 行内代码/令牌展示 */
 } /* 显示名结束 */
 
 .user-region { /* 用户所属区域标识 */
-  font-size: 12px; /* 次要信息，弱化字号 */
+  font-size: var(--fs-xs); /* 次要信息，弱化字号 */
   color: var(--sidebar-muted); /* 与区域标识等次要信息同一层级 */
 } /* 区域标识结束 */
 
@@ -164,7 +164,7 @@ code { /* 行内代码/令牌展示 */
 
 .muted { /* 次要说明文字 */
   color: var(--text-muted); /* 用弱化色表达「非重点」 */
-  font-size: 13px; /* 略小于正文 */
+  font-size: var(--fs-sm); /* 略小于正文 */
 } /* muted 结束 */
 
 .hint, /* 提示文案 */
@@ -180,10 +180,10 @@ code { /* 行内代码/令牌展示 */
   min-width: 24px; /* 个位数也保持圆形胶囊观感 */
   height: 24px; /* 固定高度，与文字行高协调 */
   padding: 0 8px; /* 多位数时自动变宽 */
-  border-radius: 999px; /* 胶囊圆角 */
+  border-radius: var(--radius-pill); /* 胶囊圆角 */
   background: var(--surface-3); /* 浅灰底，弱化存在感 */
   color: var(--text-muted); /* 次要文字色 */
-  font-size: 12px; /* 小字号，作为附属信息 */
+  font-size: var(--fs-xs); /* 小字号，作为附属信息 */
   font-weight: 600; /* 加粗弥补小字号的可读性 */
 } /* 数量徽标结束 */
 
@@ -311,7 +311,7 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 标签文字与输入控件纵向组合 */
   flex-direction: column; /* 文字在上、控件在下 */
   gap: 5px; /* 文字与控件贴近 */
-  font-size: 12px; /* 标签小字号，弱化于输入内容 */
+  font-size: var(--fs-xs); /* 标签小字号，弱化于输入内容 */
   color: var(--text-muted); /* 次要色，突出输入值 */
 } /* 标签结束 */
 
@@ -395,7 +395,7 @@ code { /* 行内代码/令牌展示 */
 .btn.small { /* 小尺寸按钮（行内操作） */
   height: 30px; /* 降低高度，避免列表行被撑高 */
   padding: 0 10px; /* 左右收紧 */
-  font-size: 12px; /* 小字号配合紧凑行高 */
+  font-size: var(--fs-xs); /* 小字号配合紧凑行高 */
 } /* 小按钮结束 */
 
 .btn.block { /* 撑满整行的按钮 */
@@ -416,7 +416,7 @@ code { /* 行内代码/令牌展示 */
   border: 0; /* 去掉边框 */
   background: none; /* 去掉底色 */
   color: var(--primary); /* 主色文字表达可点击 */
-  font-size: 12px; /* 次要操作用小字号 */
+  font-size: var(--fs-xs); /* 次要操作用小字号 */
   cursor: pointer; /* 手型提示 */
 } /* 链接按钮结束 */
 
@@ -466,23 +466,23 @@ code { /* 行内代码/令牌展示 */
   display: inline-flex; /* 宽度随内容，不占满一行 */
   padding: 3px; /* 内边距形成凹槽感 */
   border: 1px solid var(--border); /* 外描边 */
-  border-radius: 999px; /* 胶囊外壳 */
-  background: #fff; /* 白底与页面区分 */
+  border-radius: var(--radius-pill); /* 胶囊外壳 */
+  background: var(--surface); /* 白底与页面区分 */
 } /* 分段外壳结束 */
 
 .segmented button { /* 分段内单个选项 */
   padding: 6px 14px; /* 点击区域足够大 */
   border: 0; /* 去掉默认边框，由外壳统一描边 */
-  border-radius: 999px; /* 与外壳同心圆角 */
+  border-radius: var(--radius-pill); /* 与外壳同心圆角 */
   background: transparent; /* 未选中透明 */
   color: var(--text-muted); /* 未选中弱化 */
-  font-size: 13px; /* 与按钮字号一致 */
+  font-size: var(--fs-sm); /* 与按钮字号一致 */
   cursor: pointer; /* 手型提示 */
 } /* 分段选项结束 */
 
 .segmented button.active { /* 选中的分段选项 */
   background: var(--primary); /* 主色填充表示当前选中 */
-  color: #fff; /* 白字保证对比度 */
+  color: var(--on-primary); /* 白字保证对比度 */
 } /* 选中段结束 */
 
 /* ---------- 登录 ---------- */
@@ -491,7 +491,7 @@ code { /* 行内代码/令牌展示 */
   place-items: center; /* 水平垂直同时居中卡片 */
   min-height: 100vh; /* 至少一屏高，卡片居中不受内容高度影响 */
   padding: 24px; /* 小屏时留出安全边距 */
-  background: radial-gradient(circle at 20% 20%, #eef2ff 0%, var(--bg) 45%); /* 左上柔光渐变，避免纯色单调 */
+  background: radial-gradient(circle at 20% 20%, var(--primary-soft) 0%, var(--bg) 45%); /* 左上柔光渐变，避免纯色单调 */
 } /* 登录容器结束 */
 
 .auth-wrap.embedded { /* 内嵌登录容器：主布局内容区内的登录卡片 */
@@ -506,7 +506,7 @@ code { /* 行内代码/令牌展示 */
   width: min(400px, 100%); /* 最多 400px，小屏自适应撑满 */
   padding: 28px; /* 卡片内留白 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 14px; /* 比普通卡片更大圆角，强调独立焦点 */
+  border-radius: var(--radius-md); /* 比普通卡片更大圆角，强调独立焦点 */
   background: var(--surface); /* 白底 */
   box-shadow: var(--shadow); /* 统一阴影 */
 } /* 登录卡片结束 */
@@ -519,7 +519,7 @@ code { /* 行内代码/令牌展示 */
 } /* 登录标题行结束 */
 
 .auth-head h1 { /* 登录页主标题 */
-  font-size: 24px; /* 登录页标题更大，作为视觉入口 */
+  font-size: var(--fs-xl); /* 登录页标题更大，作为视觉入口 */
 } /* 登录标题结束 */
 
 .auth-notice { /* 全站门禁提示：登录卡片内的锁定 / 失效说明 */
@@ -527,20 +527,20 @@ code { /* 行内代码/令牌展示 */
   padding: 10px 12px; /* 内边距形成独立提示块 */
   border: 1px solid var(--border); /* 细边框与卡片风格一致 */
   border-left: 3px solid var(--warning); /* 左侧强调条提示「当前受限」 */
-  border-radius: 8px; /* 小圆角，与验证码提示块统一 */
-  background: #fff8ec; /* 淡暖色底，区别于普通表单区 */
+  border-radius: var(--radius-sm); /* 小圆角，与验证码提示块统一 */
+  background: var(--premium-soft); /* 淡暖色底，区别于普通表单区 */
   color: var(--warning); /* 警告色文字，保证可读性 */
-  font-size: 13px; /* 略小于正文，作为辅助说明 */
+  font-size: var(--fs-sm); /* 略小于正文，作为辅助说明 */
   line-height: 1.5; /* 多行时保持舒适行距 */
 } /* 门禁提示结束 */
 
 .dev-code { /* 开发环境验证码展示块 */
   margin: 0; /* 清除默认外边距 */
   padding: 10px 12px; /* 内边距形成提示块 */
-  border-radius: 8px; /* 统一圆角 */
-  background: #eef2ff; /* 淡蓝底提示「开发用」 */
+  border-radius: var(--radius-sm); /* 统一圆角 */
+  background: var(--primary-soft); /* 淡蓝底提示「开发用」 */
   color: var(--primary); /* 主色文字便于识别验证码 */
-  font-size: 13px; /* 略小正文 */
+  font-size: var(--fs-sm); /* 略小正文 */
 } /* 验证码块结束 */
 
 /* ---------- 第三方登录与 Mim ID ---------- */
@@ -555,7 +555,7 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 10px; /* 线条与文字间距 */
   color: var(--text-muted); /* 次要文字色 */
-  font-size: 12px; /* 小号辅助文案 */
+  font-size: var(--fs-xs); /* 小号辅助文案 */
 } /* 分隔线结束 */
 
 .oauth-divider::before, /* 分隔线左段 */
@@ -577,15 +577,15 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   justify-content: center; /* 水平居中 */
   gap: 6px; /* 名称与徽标间距 */
-  font-size: 13px; /* 比主按钮略小，避免抢视觉焦点 */
+  font-size: var(--fs-sm); /* 比主按钮略小，避免抢视觉焦点 */
 } /* 第三方按钮结束 */
 
 .oauth-badge { /* 「未配置」「跳转中」徽标 */
   padding: 1px 6px; /* 紧凑内边距 */
-  border-radius: 999px; /* 胶囊形 */
-  background: #f1f3f9; /* 浅灰底 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  background: var(--surface-3); /* 浅灰底 */
   color: var(--text-muted); /* 次要文字色 */
-  font-size: 11px; /* 更小字号 */
+  font-size: var(--fs-xs); /* 更小字号 */
 } /* 徽标结束 */
 
 .member-no-block { /* 注册成功后的 Mim ID 展示块 */
@@ -594,13 +594,13 @@ code { /* 行内代码/令牌展示 */
   gap: 6px; /* 行间距 */
   padding: 14px 16px; /* 内留白 */
   border: 1px dashed var(--primary); /* 虚线强调「这是新分配的编号」 */
-  border-radius: 10px; /* 统一圆角 */
-  background: #f5f7ff; /* 淡蓝底 */
+  border-radius: var(--radius-sm); /* 统一圆角 */
+  background: var(--primary-soft); /* 淡蓝底 */
 } /* 展示块结束 */
 
 .member-no { /* Mim ID 号码本身 */
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; /* 等宽字体让数字对齐 */
-  font-size: 24px; /* 放大作为视觉焦点 */
+  font-size: var(--fs-xl); /* 放大作为视觉焦点 */
   letter-spacing: 1px; /* 略微松开字符 */
   color: var(--primary); /* 品牌色 */
 } /* 号码结束 */
@@ -626,7 +626,7 @@ code { /* 行内代码/令牌展示 */
   gap: 12px; /* 列间距 */
   padding: 10px 12px; /* 行内留白 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 10px; /* 统一圆角 */
+  border-radius: var(--radius-sm); /* 统一圆角 */
   background: var(--surface); /* 白底 */
 } /* 绑定行结束 */
 
@@ -670,7 +670,7 @@ code { /* 行内代码/令牌展示 */
 } /* 项目卡片结束 */
 
 .project-card:hover { /* 卡片悬停 */
-  border-color: #c9d3ea; /* 边框转淡蓝，暗示可进入 */
+  border-color: var(--border-strong); /* 边框转淡蓝，暗示可进入 */
 } /* 项目卡片悬停结束 */
 
 .project-card-main { /* 卡片左侧主体（名称 + 元信息） */
@@ -715,11 +715,11 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 10px; /* 元素间距 */
   padding: 8px 6px; /* 行内留白，扩大点击热区 */
-  border-radius: 8px; /* 悬停底色圆角不突兀 */
+  border-radius: var(--radius-sm); /* 悬停底色圆角不突兀 */
 } /* 任务行结束 */
 
 .task-row:hover { /* 任务行悬停 */
-  background: #f7f8fb; /* 极浅底反馈当前行 */
+  background: var(--surface-2); /* 极浅底反馈当前行 */
 } /* 任务行悬停结束 */
 
 .task-row.done .task-title { /* 已完成任务的标题 */
@@ -734,17 +734,17 @@ code { /* 行内代码/令牌展示 */
   justify-content: center; /* 横向居中 */
   width: 20px; /* 固定正方形 */
   height: 20px; /* 固定正方形 */
-  border: 1px solid #c9ced9; /* 未勾选时的灰色描边 */
-  border-radius: 6px; /* 小圆角，弱化方正感 */
-  background: #fff; /* 白底 */
+  border: 1px solid var(--border-strong); /* 未勾选时的灰色描边 */
+  border-radius: var(--radius-xs); /* 小圆角，弱化方正感 */
+  background: var(--surface); /* 白底 */
   color: var(--success); /* 勾号用成功色 */
-  font-size: 12px; /* 勾号大小与方框匹配 */
+  font-size: var(--fs-xs); /* 勾号大小与方框匹配 */
   cursor: pointer; /* 手型提示可切换 */
 } /* 勾选框结束 */
 
 .task-row.done .check { /* 已完成任务的勾选框 */
   border-color: var(--success); /* 边框转成功色 */
-  background: #e9f7f0; /* 淡绿底强化完成感 */
+  background: var(--success-soft); /* 淡绿底强化完成感 */
 } /* 已完成勾选框结束 */
 
 .check:disabled { /* 勾选框禁用（无编辑权限或子任务已锁定） */
@@ -760,7 +760,7 @@ code { /* 行内代码/令牌展示 */
 } /* 任务主体结束 */
 
 .task-title { /* 任务标题 */
-  font-size: 14px; /* 与正文一致，任务列表是核心内容 */
+  font-size: var(--fs-base); /* 与正文一致，任务列表是核心内容 */
   word-break: break-word; /* 长词可断，避免横向滚动 */
 } /* 任务标题结束 */
 
@@ -770,7 +770,7 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 4px; /* 元信息之间紧凑 */
   color: var(--text-muted); /* 弱化色表示附属信息 */
-  font-size: 12px; /* 小字号弱化层级 */
+  font-size: var(--fs-xs); /* 小字号弱化层级 */
 } /* 任务元信息结束 */
 
 .task-actions { /* 任务行右侧操作区 */
@@ -796,7 +796,7 @@ code { /* 行内代码/令牌展示 */
   justify-content: space-between; /* 内容左、操作右 */
   gap: 8px; /* 元素间距 */
   padding: 8px 0; /* 上下留白 */
-  border-bottom: 1px solid #f0f2f6; /* 极淡分隔线，形成行感 */
+  border-bottom: 1px solid var(--border); /* 极淡分隔线，形成行感 */
 } /* 列表项结束 */
 
 .plain-list li:last-child { /* 最后一项 */
@@ -810,8 +810,8 @@ code { /* 行内代码/令牌展示 */
 .token { /* 邀请码/令牌展示块 */
   flex: 1 1 220px; /* 至少 220px 并可伸展，兼顾长串展示 */
   padding: 4px 8px; /* 内边距使文字不贴边 */
-  border-radius: 6px; /* 小圆角块 */
-  background: #f4f6fa; /* 浅灰底标示「可复制的值」 */
+  border-radius: var(--radius-xs); /* 小圆角块 */
+  background: var(--surface-2); /* 浅灰底标示「可复制的值」 */
   color: var(--text-muted); /* 弱化色，避免与正文混淆 */
   word-break: break-all; /* 长串强制换行，不撑破布局 */
 } /* 令牌块结束 */
@@ -1196,7 +1196,7 @@ code { /* 行内代码/令牌展示 */
 } /* 统计项结束 */
 
 .site-stat-value { /* 统计数值：放大加粗，作为视觉锚点 */
-  font-size: 22px; /* 大字号突出规模 */
+  font-size: var(--fs-xl); /* 大字号突出规模 */
   font-weight: 600; /* 半粗，避免过于沉重 */
   color: var(--text); /* 主文本色 */
   line-height: 1.2; /* 收紧行高，与标签贴近 */
@@ -1205,14 +1205,14 @@ code { /* 行内代码/令牌展示 */
 
 .site-card .site-system { /* 模块卡片系统名：备注后半段，作为卡片副标题 */
   margin: 0 0 4px; /* 仅保留下间距，与备注原文分层 */
-  font-size: 14px; /* 略大于正文 */
+  font-size: var(--fs-base); /* 略大于正文 */
   font-weight: 600; /* 半粗区分于说明文字 */
   color: var(--text); /* 主文本色 */
 } /* 系统名结束 */
 
 .site-card .site-note { /* 模块卡片备注原文：完整展示「入口描述｜系统名」 */
   margin: 0 0 8px; /* 与下方元信息拉开距离 */
-  font-size: 12px; /* 小字号弱化，作为依据留痕 */
+  font-size: var(--fs-xs); /* 小字号弱化，作为依据留痕 */
   line-height: 1.5; /* 稍宽行高，长备注换行后仍易读 */
   word-break: break-all; /* 全角竖线与长英文串均可换行 */
 } /* 备注原文结束 */
@@ -1224,14 +1224,14 @@ code { /* 行内代码/令牌展示 */
   margin-top: 10px; /* 与卡片操作行拉开距离 */
   padding: 12px; /* 详情区内留白 */
   border: 1px solid var(--border); /* 细边框勾勒二级区域 */
-  border-radius: 8px; /* 圆角略小于卡片 */
+  border-radius: var(--radius-sm); /* 圆角略小于卡片 */
   background: var(--bg); /* 页面底色区分卡片与详情区 */
-  font-size: 13px; /* 略小正文，详情属附属信息 */
+  font-size: var(--fs-sm); /* 略小正文，详情属附属信息 */
 } /* 详情容器结束 */
 
 .site-detail-title { /* 详情区小节标题（功能点 / 业务条目 / 新建条目） */
   margin: 4px 0 0; /* 上方留白分隔小节，清除 p 默认外边距 */
-  font-size: 12px; /* 小字号弱化层级 */
+  font-size: var(--fs-xs); /* 小字号弱化层级 */
   font-weight: 600; /* 半粗保证作为锚点可辨识 */
   color: var(--text-muted); /* 次要色表达区块标签 */
 } /* 小节标题结束 */
@@ -1591,9 +1591,9 @@ code { /* 行内代码/令牌展示 */
   right: 24px; /* 距右 24px */
   bottom: 24px; /* 距底 24px */
   width: 360px; /* 宽度 */
-  background: #000; /* 黑色背景（视频未接通时） */
-  border-radius: 12px; /* 圆角 */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* 阴影 */
+  background: var(--media-bg); /* 黑色背景（视频未接通时） */
+  border-radius: var(--radius-md); /* 圆角 */
+  box-shadow: var(--shadow-lg); /* 阴影 */
   overflow: hidden; /* 裁掉超出圆角的内容 */
   z-index: 1000; /* 高层级，避免被遮挡 */
 } /* 浮窗结束 */
@@ -1602,9 +1602,9 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 名称 + 状态 */
   justify-content: space-between; /* 两端对齐 */
   padding: 10px 14px; /* 内边距 */
-  background: rgba(0, 0, 0, 0.6); /* 半透明黑 */
-  color: #fff; /* 白字 */
-  font-size: 13px;
+  background: var(--media-chip); /* 半透明黑 */
+  color: var(--on-media); /* 白字 */
+  font-size: var(--fs-sm);
 } /* 标题栏结束 */
 
 .video-call-name { /* 对方名称 */
@@ -1620,7 +1620,7 @@ code { /* 行内代码/令牌展示 */
   height: 240px; /* 固定高度 */
   object-fit: cover; /* 裁剪填充 */
   display: block; /* 消除行内间隙 */
-  background: #111; /* 未接通时深色 */
+  background: var(--media-bg); /* 未接通时深色 */
 } /* 远端视频结束 */
 
 .video-local { /* 本地视频（画中画） */
@@ -1629,16 +1629,16 @@ code { /* 行内代码/令牌展示 */
   bottom: 56px; /* 距底（留出按钮区） */
   width: 100px; /* 小窗宽度 */
   height: 70px; /* 小窗高度 */
-  border-radius: 6px; /* 圆角 */
-  border: 1px solid rgba(255, 255, 255, 0.4); /* 半透明白边框 */
+  border-radius: var(--radius-xs); /* 圆角 */
+  border: 1px solid var(--media-line); /* 半透明白边框 */
   object-fit: cover; /* 裁剪填充 */
 } /* 本地视频结束 */
 
 .video-call-error { /* 错误提示 */
   padding: 6px 14px; /* 内边距 */
   background: var(--danger); /* 红色背景 */
-  color: #fff; /* 白字 */
-  font-size: 12px;
+  color: var(--on-primary); /* 危险色底上的对比字 */
+  font-size: var(--fs-xs);
 } /* 错误提示结束 */
 
 .video-call-actions { /* 操作按钮区 */
@@ -1646,7 +1646,7 @@ code { /* 行内代码/令牌展示 */
   justify-content: center; /* 居中 */
   gap: 12px; /* 间距 */
   padding: 12px; /* 内边距 */
-  background: rgba(0, 0, 0, 0.6); /* 半透明黑底 */
+  background: var(--media-chip); /* 半透明黑底 */
 } /* 按钮区结束 */
 
 /* 聊天视图窄屏适配 */
@@ -1675,7 +1675,7 @@ code { /* 行内代码/令牌展示 */
   border-radius: var(--radius); /* 统一圆角 */
 } /* 统计项结束 */
 .deploy-stat-value { /* 统计数值：放大加粗作为视觉锚点 */
-  font-size: 20px; /* 放大字号 */
+  font-size: var(--fs-xl); /* 放大字号 */
   font-weight: 600; /* 半粗 */
   color: var(--text); /* 主文字色 */
 } /* 统计数值结束 */
@@ -1690,7 +1690,7 @@ code { /* 行内代码/令牌展示 */
 .deploy-table { /* 统一字段核对表：紧凑、可扫描 */
   width: 100%; /* 撑满容器 */
   border-collapse: collapse; /* 合并边框，避免双线 */
-  font-size: 13px; /* 略小字号提升信息密度 */
+  font-size: var(--fs-sm); /* 略小字号提升信息密度 */
 } /* 表格结束 */
 .deploy-table th, /* 表头单元格 */
 .deploy-table td { /* 数据单元格 */
@@ -1711,10 +1711,10 @@ code { /* 行内代码/令牌展示 */
   border-bottom: none; /* 避免与容器边框重叠 */
 } /* 末行结束 */
 .deploy-row:hover td { /* 行悬停：浅灰底提示可交互 */
-  background: #fafbfc; /* 极浅灰 */
+  background: var(--surface-2); /* 极浅灰 */
 } /* 悬停结束 */
 .deploy-row.expanded td { /* 展开行：主色淡底标记当前项 */
-  background: #f2f6ff; /* 主色极淡底 */
+  background: var(--primary-soft); /* 主色极淡底 */
 } /* 展开行结束 */
 .deploy-detail-row td { /* 详情行：不加悬停底色 */
   background: var(--surface); /* 白色表面 */
@@ -1723,7 +1723,7 @@ code { /* 行内代码/令牌展示 */
 .deploy-detail { /* 展开详情容器：左侧主色竖线 + 分区留白 */
   padding: 14px 18px; /* 内边距 */
   border-left: 3px solid var(--primary); /* 主色竖线标识展开归属 */
-  background: #fcfdff; /* 极浅蓝底 */
+  background: var(--surface-2); /* 极浅蓝底 */
 } /* 详情容器结束 */
 .deploy-section-title { /* 详情小节标题 */
   margin: 12px 0 6px; /* 上间距大于下间距 */
@@ -1743,9 +1743,9 @@ code { /* 行内代码/令牌展示 */
 } /* 缺失容器结束 */
 .deploy-missing code { /* 单个缺失字段标签 */
   padding: 2px 6px; /* 内边距 */
-  background: #fff5e6; /* 警告色浅底 */
-  border: 1px solid #f0d8ac; /* 警告色边框 */
-  border-radius: 4px; /* 小圆角 */
+  background: var(--premium-soft); /* 警告色浅底 */
+  border: 1px solid var(--premium-border); /* 警告色边框 */
+  border-radius: var(--radius-xs); /* 小圆角 */
   color: var(--warning); /* 警告色文字 */
 } /* 缺失标签结束 */
 .deploy-anomaly { /* 单条异常说明：徽标 + 异常码 + 说明 */
@@ -1758,8 +1758,8 @@ code { /* 行内代码/令牌展示 */
 .deploy-badge { /* 部署汇总通用徽标 */
   display: inline-block; /* 行内块，便于设内边距 */
   padding: 2px 8px; /* 内边距 */
-  border-radius: 999px; /* 胶囊状 */
-  font-size: 12px; /* 略小字号 */
+  border-radius: var(--radius-pill); /* 胶囊状 */
+  font-size: var(--fs-xs); /* 略小字号 */
   font-weight: 600; /* 半粗 */
   white-space: nowrap; /* 不换行 */
   border: 1px solid var(--border); /* 默认边框 */
@@ -1768,28 +1768,28 @@ code { /* 行内代码/令牌展示 */
 } /* 徽标结束 */
 .deploy-badge.ok { /* 通过 / 正常 / 设计内行为 */
   color: var(--success); /* 成功色文字 */
-  background: #eaf7f0; /* 成功色浅底 */
-  border-color: #bfe6cf; /* 成功色边框 */
+  background: var(--success-soft); /* 成功色浅底 */
+  border-color: var(--success-border); /* 成功色边框 */
 } /* 成功徽标结束 */
 .deploy-badge.warn { /* 警告 / 未取证 / 降级可用 */
   color: var(--warning); /* 警告色文字 */
-  background: #fff5e6; /* 警告色浅底 */
-  border-color: #f0d8ac; /* 警告色边框 */
+  background: var(--premium-soft); /* 警告色浅底 */
+  border-color: var(--premium-border); /* 警告色边框 */
 } /* 警告徽标结束 */
 .deploy-badge.fail { /* 阻断 / 失败 / 严重异常 */
   color: var(--danger); /* 危险色文字 */
-  background: #fdecec; /* 危险色浅底 */
-  border-color: #f3c2c2; /* 危险色边框 */
+  background: var(--danger-soft); /* 危险色浅底 */
+  border-color: var(--danger-border); /* 危险色边框 */
 } /* 失败徽标结束 */
 .deploy-badge.empty { /* 空数据：中性但明确可见 */
   color: var(--text-muted); /* 次要文字色 */
-  background: #eef0f4; /* 中性浅底 */
+  background: var(--surface-3); /* 中性浅底 */
   border-color: var(--border); /* 中性边框 */
 } /* 空数据徽标结束 */
 .deploy-badge.missing { /* 缺失信息标识 */
   color: var(--warning); /* 警告色文字 */
-  background: #fff5e6; /* 警告色浅底 */
-  border-color: #f0d8ac; /* 警告色边框 */
+  background: var(--premium-soft); /* 警告色浅底 */
+  border-color: var(--premium-border); /* 警告色边框 */
 } /* 缺失徽标结束 */
 .deploy-badge.muted { /* 未命中字典的未知值 */
   color: var(--text-muted); /* 次要文字色 */
@@ -1810,15 +1810,15 @@ code { /* 行内代码/令牌展示 */
   margin-bottom: 18px; /* 与下方筛选行拉开距离 */
 } /* 整理面板结束 */
 .entry-intake .plain-list li { /* 两个不建模块的占位项 */
-  font-size: 13px; /* 次要信息字号 */
+  font-size: var(--fs-sm); /* 次要信息字号 */
   color: var(--text-muted); /* 次要文字色 */
 } /* 占位项结束 */
 .entry-intake code { /* 占位标识等宽展示 */
-  font-size: 12px; /* 与次要信息一致 */
+  font-size: var(--fs-xs); /* 与次要信息一致 */
 } /* 占位标识结束 */
 .entry-functions { /* 核心功能与职责边界列表 */
   margin: 6px 0 10px; /* 上下留白，避免与相邻小节粘连 */
-  font-size: 13px; /* 略小于正文，卡片内可承载更多条目 */
+  font-size: var(--fs-sm); /* 略小于正文，卡片内可承载更多条目 */
 } /* 功能列表结束 */
 .entry-functions li { /* 单条功能/职责 */
   padding: 2px 0; /* 逐条留白 */
@@ -1826,7 +1826,7 @@ code { /* 行内代码/令牌展示 */
 } /* 单条结束 */
 .entry-boundary { /* 卡片上的职责边界摘要 */
   margin: 4px 0 10px; /* 与操作行拉开距离 */
-  font-size: 12px; /* 次要信息 */
+  font-size: var(--fs-xs); /* 次要信息 */
   line-height: 1.5; /* 长句可读 */
 } /* 边界摘要结束 */
 .entry-boundary strong { /* 边界前缀加粗 */
@@ -1840,11 +1840,11 @@ code { /* 行内代码/令牌展示 */
   margin-bottom: 10px; /* 与职责边界分开 */
 } /* 配置行结束 */
 .entry-config code { /* 可配置占位标识 */
-  font-size: 12px; /* 等宽小字 */
+  font-size: var(--fs-xs); /* 等宽小字 */
 } /* 占位标识结束 */
 .entry-relations { /* 相似模块关联与区分清单 */
   margin: 6px 0 12px; /* 上下留白 */
-  font-size: 13px; /* 次要信息字号 */
+  font-size: var(--fs-sm); /* 次要信息字号 */
   line-height: 1.6; /* 区分说明较长，加大行高 */
 } /* 关联清单结束 */
 .entry-relations li { /* 单条关联 */
@@ -1852,7 +1852,7 @@ code { /* 行内代码/令牌展示 */
 } /* 单条关联结束 */
 .entry-boundary { /* 落地边界 / 规划说明段落 */
   margin: 6px 0 12px; /* 上下留白，与相邻清单拉开 */
-  font-size: 13px; /* 次要信息字号 */
+  font-size: var(--fs-sm); /* 次要信息字号 */
   line-height: 1.6; /* 边界说明较长，加大行高 */
 } /* 边界段落结束 */
 
@@ -1877,11 +1877,11 @@ code { /* 行内代码/令牌展示 */
   width: 100%; /* 撑满导航宽度 */
   padding: 6px 8px; /* 行内留白 */
   border: 0; /* 去掉浏览器默认按钮边框 */
-  border-radius: 6px; /* 小圆角 */
+  border-radius: var(--radius-xs); /* 小圆角 */
   background: transparent; /* 默认透明，悬停再着色 */
   color: var(--text); /* 主文字色 */
   font: inherit; /* 继承全局字体，避免按钮字体变小 */
-  font-size: 13px; /* 导航字号略小于正文 */
+  font-size: var(--fs-sm); /* 导航字号略小于正文 */
   text-align: left; /* 名称左对齐 */
   cursor: pointer; /* 可点击提示 */
 } /* 导航项结束 */
@@ -1889,13 +1889,13 @@ code { /* 行内代码/令牌展示 */
   background: var(--bg); /* 极浅灰底 */
 } /* 悬停结束 */
 .store-nav-entry.active { /* 当前选中分类 */
-  background: #eef3ff; /* 主色极淡底 */
+  background: var(--primary-soft); /* 主色极淡底 */
   color: var(--primary); /* 主色文字 */
   font-weight: 600; /* 加粗强调 */
 } /* 选中态结束 */
 .store-nav-entry.sub { /* 二级条目：缩进一级 */
   padding-left: 22px; /* 缩进表达层级 */
-  font-size: 12px; /* 二级字号更小 */
+  font-size: var(--fs-xs); /* 二级字号更小 */
   color: var(--text-muted); /* 次要文字色 */
 } /* 二级条目结束 */
 .store-nav-group { /* 一级分类容器 */
@@ -1930,20 +1930,20 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 标签与控件同行 */
   align-items: center; /* 垂直居中 */
   gap: 6px; /* 标签与控件间距 */
-  font-size: 12px; /* 次要字号 */
+  font-size: var(--fs-xs); /* 次要字号 */
   color: var(--text-muted); /* 次要文字色 */
 } /* 内联字段结束 */
 .filter-inline select { /* 排序下拉 */
   padding: 4px 8px; /* 内边距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 6px; /* 小圆角 */
+  border-radius: var(--radius-xs); /* 小圆角 */
   background: var(--surface); /* 白色底 */
   color: var(--text); /* 主文字色 */
-  font-size: 12px; /* 与标签一致 */
+  font-size: var(--fs-xs); /* 与标签一致 */
 } /* 下拉结束 */
 .filter-pop { /* 多选筛选折叠面板 */
   position: relative; /* 为绝对定位的下拉体提供参照 */
-  font-size: 12px; /* 次要字号 */
+  font-size: var(--fs-xs); /* 次要字号 */
   color: var(--text-muted); /* 次要文字色 */
 } /* 折叠面板结束 */
 .filter-pop summary { /* 折叠摘要行 */
@@ -1952,7 +1952,7 @@ code { /* 行内代码/令牌展示 */
   gap: 6px; /* 标题与计数间距 */
   padding: 4px 10px; /* 内边距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 6px; /* 小圆角 */
+  border-radius: var(--radius-xs); /* 小圆角 */
   background: var(--surface); /* 白色底 */
   cursor: pointer; /* 可点击提示 */
   list-style: none; /* 去掉默认三角 */
@@ -1977,7 +1977,7 @@ code { /* 行内代码/令牌展示 */
   gap: 2px; /* 选项间距 */
   padding: 10px; /* 内边距 */
   border: 1px solid var(--border); /* 边框 */
-  border-radius: 8px; /* 圆角 */
+  border-radius: var(--radius-sm); /* 圆角 */
   background: var(--surface); /* 白色底 */
   box-shadow: var(--shadow); /* 浮层阴影 */
 } /* 下拉体结束 */
@@ -1986,7 +1986,7 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 6px; /* 勾选框与文字间距 */
   padding: 3px 4px; /* 行内留白 */
-  border-radius: 4px; /* 小圆角 */
+  border-radius: var(--radius-xs); /* 小圆角 */
   cursor: pointer; /* 整行可点 */
   color: var(--text); /* 主文字色 */
 } /* 复选项结束 */
@@ -2002,18 +2002,18 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 垂直居中 */
   gap: 4px; /* 文字与 × 间距 */
   padding: 2px 6px 2px 8px; /* 左多右少，视觉均衡 */
-  border: 1px solid #d6e0ff; /* 主色系浅边框 */
-  border-radius: 999px; /* 胶囊状 */
-  background: #eef3ff; /* 主色极淡底 */
+  border: 1px solid var(--primary-ring); /* 主色系浅边框 */
+  border-radius: var(--radius-pill); /* 胶囊状 */
+  background: var(--primary-soft); /* 主色极淡底 */
   color: var(--primary); /* 主色文字 */
-  font-size: 12px; /* 次要字号 */
+  font-size: var(--fs-xs); /* 次要字号 */
 } /* 芯片结束 */
 .chip button { /* 芯片移除按钮 */
   border: 0; /* 去边框 */
   background: transparent; /* 透明底 */
   color: inherit; /* 继承主色 */
   cursor: pointer; /* 可点击 */
-  font-size: 12px; /* 与芯片一致 */
+  font-size: var(--fs-xs); /* 与芯片一致 */
   line-height: 1; /* 紧凑 */
   padding: 0 2px; /* 极窄内边距 */
 } /* 移除按钮结束 */
@@ -2023,7 +2023,7 @@ code { /* 行内代码/令牌展示 */
   justify-content: center; /* 居中展示 */
   gap: 12px; /* 元素间距 */
   padding: 8px 0 4px; /* 上下留白 */
-  font-size: 12px; /* 次要字号 */
+  font-size: var(--fs-xs); /* 次要字号 */
 } /* 分页条结束 */
 @media (max-width: 960px) { /* 窄屏断点：导航折叠到顶部 */
   .store-layout { /* 窄屏两栏布局 */
@@ -2052,24 +2052,24 @@ code { /* 行内代码/令牌展示 */
   width: 100%; /* 撑满卡片宽度 */
   padding: 5px 6px; /* 行内留白，提升点击面积 */
   border: 0; /* 去边框，靠 hover 底色表达可点 */
-  border-radius: 6px; /* 圆角与面板一致 */
+  border-radius: var(--radius-xs); /* 圆角与面板一致 */
   background: transparent; /* 默认透明 */
   color: inherit; /* 继承正文色 */
   cursor: pointer; /* 可点击 */
-  font-size: 13px; /* 榜单字号略小于正文 */
+  font-size: var(--fs-sm); /* 榜单字号略小于正文 */
   text-align: left; /* 名称左对齐 */
 } /* 单条热门项结束 */
 .hot-item:hover { /* 悬停反馈 */
-  background: #f2f5ff; /* 主色极淡底 */
+  background: var(--primary-soft); /* 主色极淡底 */
 } /* 悬停结束 */
 .hot-rank { /* 名次徽标 */
   flex: 0 0 auto; /* 固定宽度，不参与伸缩 */
   min-width: 18px; /* 两位数名次也能放得下 */
   height: 18px; /* 方形徽标 */
-  border-radius: 4px; /* 小圆角 */
-  background: #eef3ff; /* 主色极淡底 */
+  border-radius: var(--radius-xs); /* 小圆角 */
+  background: var(--primary-soft); /* 主色极淡底 */
   color: var(--primary); /* 主色文字 */
-  font-size: 11px; /* 徽标小字 */
+  font-size: var(--fs-xs); /* 徽标小字 */
   line-height: 18px; /* 垂直居中 */
   text-align: center; /* 水平居中 */
 } /* 名次徽标结束 */
@@ -2088,10 +2088,10 @@ code { /* 行内代码/令牌展示 */
   max-height: 60vh; /* 超长时内部滚动 */
   overflow-y: auto; /* 纵向滚动 */
   padding: 12px 14px; /* 紧凑内边距 */
-  box-shadow: 0 12px 32px rgba(16, 24, 64, 0.18); /* 浮层阴影，与背景分层 */
+  box-shadow: var(--shadow-lg); /* 浮层阴影，与背景分层 */
 } /* 帮助面板结束 */
 .store-help-toggle { /* 右下角触发按钮 */
-  box-shadow: 0 8px 20px rgba(16, 24, 64, 0.2); /* 悬浮球质感 */
+  box-shadow: var(--shadow); /* 悬浮球质感 */
 } /* 触发按钮结束 */
 @media (max-width: 960px) { /* 窄屏断点：浮窗收窄并贴边 */
   .store-help { /* 窄屏浮窗 */
@@ -4201,10 +4201,10 @@ code { /* 行内代码/令牌展示 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: var(--surface-2);
+  border: 1px solid var(--border-hover);
 }
 .login-captcha-image svg {
   display: block;
@@ -4225,7 +4225,7 @@ code { /* 行内代码/令牌展示 */
   position: relative;
   width: 300px;
   max-width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   touch-action: none;
 }
@@ -4241,9 +4241,9 @@ code { /* 行内代码/令牌展示 */
 }
 .slider-piece {
   position: absolute;
-  border-radius: 8px;
-  background: rgba(37, 99, 235, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  border: 1px solid var(--on-media);
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -4307,7 +4307,7 @@ code { /* 行内代码/令牌展示 */
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 /* ---------- 公告置顶条：跨两栏置顶，无数据时组件不渲染 ---------- */
@@ -4320,7 +4320,7 @@ code { /* 行内代码/令牌展示 */
   background: var(--surface); /* 兜底底色 */
   background: color-mix(in srgb, var(--primary) 8%, var(--surface)); /* 主色淡底 */
   border-bottom: 1px solid var(--border); /* 与内容区分隔 */
-  font-size: 13px; /* 弱化字号 */
+  font-size: var(--fs-sm); /* 弱化字号 */
 }
 .announcement-bar-label { /* 喇叭图标 */
   flex: none; /* 不压缩 */
@@ -4443,9 +4443,9 @@ code { /* 行内代码/令牌展示 */
 
 /* ---------- 前端可访问性与弱动效（2026-11-13） ---------- */
 :where(a, button, input, select, textarea, [role="tab"]):focus-visible { /* 键盘焦点统一可见 */
-  outline: 2px solid var(--accent, #2f9e8f); /* 使用当前主题主色 */
+  outline: 2px solid var(--primary); /* 使用当前主题主色 */
   outline-offset: 2px; /* 焦点环不贴边 */
-  border-radius: 6px; /* 圆角与控件一致 */
+  border-radius: var(--radius-xs); /* 圆角与控件一致 */
 } /* 焦点样式结束 */
 
 @media (prefers-reduced-motion: reduce) { /* 系统开启「减少动态效果」时 */
@@ -4483,7 +4483,7 @@ code { /* 行内代码/令牌展示 */
 .content-detail-link { color: var(--primary); font-weight: 600; text-decoration: none; } /* 关联入口 */
 .rich-body { display: flex; flex-direction: column; gap: 10px; line-height: 1.7; word-break: break-word; } /* 正文容器 */
 .rich-body p { margin: 0; } /* 段落零外边距 */
-.rich-body pre { overflow: auto; margin: 0; padding: var(--card-pad-tight); border-radius: var(--card-radius-sm); background: #0f172a; color: #e2e8f0; } /* 代码块 */
+.rich-body pre { overflow: auto; margin: 0; padding: var(--card-pad-tight); border-radius: var(--card-radius-sm); background: var(--media-bg); color: var(--on-media); } /* 代码块：深底浅字，不随主题反转 */
 .rich-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; } /* 等宽字体 */
 .rich-image { display: block; max-width: 100%; border-radius: var(--card-radius-sm); } /* 正文图片 */
 
@@ -4492,7 +4492,7 @@ code { /* 行内代码/令牌展示 */
 .page-blocks-home .page-block { display: flex; flex-direction: column; gap: 10px; padding: var(--card-pad); border: 1px solid var(--border); border-radius: var(--card-radius-lg, 14px); background: var(--surface); } /* 统一区块容器规格 */
 .page-blocks-home .page-block h2, /* 头图主标题 */
 .page-blocks-home .page-block h3 { margin: 0; } /* 标题零外边距，避免与面板样式叠加 */
-.page-blocks-home .page-block.hero { background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(16, 185, 129, 0.08)); } /* 头图轻量渐层，不引入图片依赖 */
+.page-blocks-home .page-block.hero { background: linear-gradient(135deg, var(--primary-soft), var(--success-soft)); } /* 头图轻量渐层，不引入图片依赖 */
 .page-blocks-home .page-block.hero h2 { font-size: clamp(1.4rem, 2.6vw, 2rem); line-height: 1.25; } /* 头图标题层级 */
 .page-blocks-home .page-block.hero p { margin: 0; } /* 副标题零外边距 */
 .page-blocks-home .page-block.hero .btn { align-self: flex-start; } /* 按钮不拉伸满宽 */
