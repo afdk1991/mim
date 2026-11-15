@@ -217,10 +217,10 @@ code { /* 行内代码/令牌展示 */
   flex-direction: column; /* 自上而下 */
   gap: 12px; /* 面板内部统一间距 */
   padding: var(--card-pad); /* 内容与边框之间留白：全站卡片统一 */
-  border: 1px solid var(--border); /* 细边框勾勒卡片边界 */
+  border: 0; /* 卡片不描边：边界交给环境阴影与留白 */
   border-radius: var(--card-radius); /* 统一圆角 */
   background: var(--surface); /* 白底与页面底色区分 */
-  box-shadow: var(--shadow); /* 统一阴影，形成轻微浮起感 */
+  box-shadow: var(--shadow); /* 统一环境阴影，形成轻微浮起感 */
 } /* 面板结束 */
 
 /* 共享卡片基底：按视觉层级选档，各页不再各写一套硬值 */
@@ -229,7 +229,7 @@ code { /* 行内代码/令牌展示 */
   flex-direction: column; /* 主方向 */
   gap: var(--card-pad-tight); /* 内部间距 */
   overflow: hidden; /* 裁掉封面溢出 */
-  border: 1px solid var(--border); /* 描边 */
+  border: 0; /* 不描边：与卡片同一套环境阴影语言 */
   border-radius: var(--card-radius); /* 标准圆角 */
   background: var(--surface); /* 表面色 */
   box-shadow: var(--shadow); /* 统一投影 */
@@ -248,8 +248,7 @@ code { /* 行内代码/令牌展示 */
 } /* 可点击卡片结束 */
 .ui-card--link:hover, /* 悬停 */
 .ui-card--link:focus-visible { /* 键盘聚焦 */
-  transform: translateY(-2px); /* 轻微上浮 */
-  box-shadow: var(--shadow-hover); /* 加深投影：暗色下自动适配 */
+  box-shadow: var(--shadow-hover); /* 只加深环境光：卡片不位移，避免列表整体抖动 */
   outline: none; /* 交由投影表达聚焦 */
 } /* 悬停结束 */
 .is-link { /* 可点击列表行 */
@@ -321,15 +320,20 @@ code { /* 行内代码/令牌展示 */
 
 .form input, /* 文本输入框 */
 .form select { /* 下拉选择框 */
-  height: 36px; /* 统一控件高度，行内对齐更整齐 */
-  padding: 0 10px; /* 左右内边距，文字不贴边 */
-  border: 1px solid var(--border); /* 默认细边框 */
-  border-radius: var(--radius-sm); /* 与按钮圆角一致 */
-  background: var(--surface); /* 表面色：暗色下自动切换，不再写死白底 */
+  height: var(--field-h); /* 填充式控件统一高度 */
+  padding: 0 12px; /* 左右内边距，文字不贴边 */
+  border: 1px solid transparent; /* 默认无可见描边，靠填充底色界定 */
+  border-radius: var(--control-radius); /* 控件小方角 */
+  background: var(--bg); /* 填充式底色：比表面色低一档，输入区更明确 */
   color: var(--text); /* 输入文字用主文字色 */
   font-size: var(--fs-base); /* 与正文同号，避免移动端聚焦缩放 */
   outline: none; /* 关闭浏览器默认轮廓，改用下方 focus 阴影表达焦点 */
 } /* 输入控件结束 */
+
+.form input:hover, /* 输入框悬停 */
+.form select:hover { /* 下拉框悬停 */
+  border-color: var(--border-hover); /* 悬停时浮现一档描边，预告可输入 */
+} /* 悬停态结束 */
 
 .form input:focus, /* 输入框聚焦 */
 .form select:focus { /* 下拉框聚焦 */
@@ -350,20 +354,20 @@ code { /* 行内代码/令牌展示 */
 
 /* ---------- 按钮 ---------- */
 .btn { /* 通用按钮 */
-  height: 36px; /* 与输入控件等高，便于同行对齐 */
-  padding: 0 14px; /* 左右留白，触控区域足够 */
-  border: 1px solid var(--border); /* 默认描边式按钮 */
-  border-radius: var(--radius-sm); /* 统一圆角 */
-  background: var(--surface); /* 次按钮用表面色，暗色下自动切换 */
+  height: var(--control-h); /* 控件统一高度：比输入框矮一档 */
+  padding: 0 12px; /* 左右留白，触控区域足够 */
+  border: 1px solid transparent; /* 填充式按钮：默认无描边 */
+  border-radius: var(--control-radius); /* 控件小方角 */
+  background: var(--surface-3); /* 中性填充：浅色为 #eee、暗色为更深的 #2d2e31，两套都可见 */
   color: var(--text); /* 主文字色 */
-  font-size: var(--fs-sm); /* 略小于正文，按钮更紧凑 */
+  font-size: var(--fs-base); /* 与正文同号，按钮不显小气 */
   font-weight: var(--fw-medium); /* 中等字重提升可读性 */
   cursor: pointer; /* 手型提示可点击 */
   white-space: nowrap; /* 按钮文字不换行，避免高度跳动 */
 } /* 按钮基础结束 */
 
 .btn:hover:not(:disabled) { /* 悬停且可用时 */
-  border-color: var(--border-hover); /* 边框加深给出反馈 */
+  opacity: 0.82; /* 整体压暗一档：比换色更轻，手感统一 */
 } /* 按钮悬停结束 */
 
 .btn:disabled { /* 禁用态 */
@@ -380,6 +384,7 @@ code { /* 行内代码/令牌展示 */
 .btn.primary:hover:not(:disabled) { /* 主按钮悬停 */
   background: var(--primary-hover); /* 加深底色区分悬停 */
   border-color: var(--primary-hover); /* 边框同步加深，避免出现色差描边 */
+  opacity: 1; /* 主色本身已有明度反馈，不再叠加透明度 */
 } /* 主按钮悬停结束 */
 
 .btn.danger { /* 危险操作按钮（取消邀请/删除） */
@@ -2001,9 +2006,9 @@ code { /* 行内代码/令牌展示 */
   display: inline-flex; /* 文字与移除按钮同行 */
   align-items: center; /* 垂直居中 */
   gap: 4px; /* 文字与 × 间距 */
-  padding: 2px 6px 2px 8px; /* 左多右少，视觉均衡 */
+  padding: 2px 8px; /* 左右内边距 */
   border: 1px solid var(--primary-ring); /* 主色系浅边框 */
-  border-radius: var(--radius-pill); /* 胶囊状 */
+  border-radius: var(--tag-radius); /* 标签小方角 */
   background: var(--primary-soft); /* 主色极淡底 */
   color: var(--primary); /* 主色文字 */
   font-size: var(--fs-xs); /* 次要字号 */
@@ -2528,8 +2533,8 @@ code { /* 行内代码/令牌展示 */
 
 .tag { /* 状态标签 */
   display: inline-block; /* 内容宽度自适应 */
-  padding: 1px 8px; /* 胶囊内边距 */
-  border-radius: var(--radius-pill); /* 胶囊圆角 */
+  padding: 1px 7px; /* 标签内边距 */
+  border-radius: var(--tag-radius); /* 标签小方角：与控件同族 */
   background: var(--surface-3); /* 中性底色 */
   font-size: var(--fs-xs); /* 小字号 */
   color: var(--text-muted); /* 次要色 */
@@ -3073,17 +3078,17 @@ code { /* 行内代码/令牌展示 */
 } /* 结束 */
 
 .community-chips button { /* 板块按钮 */
-  padding: 7px 12px; /* 内边距 */
-  border: 1px solid var(--border); /* 边框 */
-  border-radius: var(--radius-pill); /* 胶囊 */
-  background: var(--surface); /* 白底 */
+  padding: 4px 8px; /* 内边距：贴近标签密度 */
+  border: 0; /* 不描边：与全站标签同一套形态 */
+  border-radius: var(--tag-radius); /* 标签小方角 */
+  background: var(--surface-3); /* 填充式中性底：未选中标签不抢主色 */
   color: var(--text-muted); /* 次要色 */
   font-size: var(--fs-xs); /* 字号 */
   cursor: pointer; /* 手型 */
 } /* 结束 */
 
 .community-chips button.is-active { /* 选中态 */
-  border-color: var(--primary); /* 主色边框 */
+  border-color: transparent; /* 无描边，选中完全由底色表达 */
   background: var(--primary-soft); /* 浅蓝底 */
   color: var(--primary); /* 主色文字 */
 } /* 结束 */
@@ -3103,12 +3108,13 @@ code { /* 行内代码/令牌展示 */
 
 .community-filters input, .community-filters select, .community-composer input, .community-composer textarea,
 .community-inline-form input, .community-buy-form input, .community-reply-form textarea { /* 统一输入样式 */
+  min-height: var(--field-h); /* 与全站输入框同高 */
   padding: 8px 10px; /* 内边距 */
-  border: 1px solid var(--border); /* 边框 */
-  border-radius: var(--radius-sm); /* 圆角 */
-  background: var(--surface); /* 白底 */
+  border: 1px solid transparent; /* 填充式：默认无可见描边 */
+  border-radius: var(--control-radius); /* 控件小方角 */
+  background: var(--bg); /* 填充底色与全站一致 */
   color: var(--text); /* 主文字 */
-  font-size: var(--fs-xs); /* 字号 */
+  font-size: var(--fs-sm); /* 字号 */
   font-family: inherit; /* 继承字体 */
 } /* 结束 */
 
@@ -3119,13 +3125,18 @@ code { /* 行内代码/令牌展示 */
 .community-filters button, .community-composer button, .community-reply-form button,
 .community-inline-form button, .community-buy-form button, .community-order-actions button,
 .community-ref-card button, .community-detail-head button { /* 通用小按钮 */
-  padding: 8px 12px; /* 内边距 */
-  border: 1px solid var(--border); /* 边框 */
-  border-radius: var(--radius-sm); /* 圆角 */
-  background: var(--surface); /* 白底 */
+  height: var(--control-h); /* 控件统一高度 */
+  padding: 0 12px; /* 内边距 */
+  border: 1px solid var(--border-strong); /* 描边保证可见 */
+  border-radius: var(--control-radius); /* 控件小方角 */
+  background: var(--surface); /* 表面色 */
   color: var(--text); /* 主文字 */
-  font-size: var(--fs-xs); /* 字号 */
+  font-size: var(--fs-sm); /* 字号 */
   cursor: pointer; /* 手型 */
+} /* 结束 */
+
+.community-filters button:hover { /* 筛选按钮悬停 */
+  opacity: 0.82; /* 与全站按钮一致的压暗反馈 */
 } /* 结束 */
 
 .community-filters button.is-active { /* 最新 / 热门选中 */
@@ -3195,17 +3206,16 @@ code { /* 行内代码/令牌展示 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 主方向 */
   overflow: hidden; /* 裁掉封面溢出 */
-  border: 1px solid var(--border); /* 边框 */
+  border: 0; /* 不描边：浅底上仅靠环境阴影分层 */
   border-radius: var(--card-radius); /* 圆角：共享卡片规格 */
   background: var(--surface); /* 表面色 */
   box-shadow: var(--shadow); /* 投影 */
   cursor: pointer; /* 整卡可点 */
-  transition: transform 0.15s ease, box-shadow 0.15s ease; /* 悬停过渡 */
+  transition: box-shadow var(--dur) var(--ease); /* 悬停只过渡阴影，不做位移 */
 } /* 结束 */
 
 .community-card:hover { /* 悬停 */
-  transform: translateY(-2px); /* 轻微上浮 */
-  box-shadow: var(--shadow); /* 加深投影 */
+  box-shadow: var(--shadow-hover); /* 环境光略微加深，卡片本身不移动 */
 } /* 结束 */
 
 .community-cover { /* 封面区 */
@@ -3220,6 +3230,11 @@ code { /* 行内代码/令牌展示 */
   height: 100%; /* 撑满 */
   object-fit: cover; /* 裁切填充 */
   display: block; /* 去基线间隙 */
+  transition: transform var(--dur) var(--ease); /* 悬停缩放走统一时长 */
+} /* 结束 */
+
+.community-card:hover .community-cover img { /* 悬停时的封面反馈 */
+  transform: scale(1.02); /* 只在封面内部轻微放大，卡片边界保持不动 */
 } /* 结束 */
 
 .community-cover > span { /* 无图占位 */
@@ -3278,7 +3293,7 @@ code { /* 行内代码/令牌展示 */
 .community-card-body { /* 卡片文字区 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 主方向 */
-  gap: 7px; /* 间距 */
+  gap: 6px; /* 间距：标题与摘要贴近，减少卡片内空白 */
   padding: var(--card-pad-tight); /* 内边距：全站卡片统一 */
 } /* 结束 */
 
@@ -3294,6 +3309,7 @@ code { /* 行内代码/令牌展示 */
   margin: 0; /* 去外边距 */
   font-size: var(--fs-base); /* 字号 */
   line-height: 1.4; /* 行高 */
+  font-weight: var(--fw-medium); /* 中等字重：列表标题不抢主标题 */
   color: var(--text); /* 主文字 */
   display: -webkit-box; /* 标题截断 */
   -webkit-line-clamp: var(--card-title-lines); /* 行数：全站统一 */
@@ -3304,7 +3320,7 @@ code { /* 行内代码/令牌展示 */
 .community-card p { /* 摘要 */
   margin: 0; /* 去外边距 */
   font-size: var(--fs-xs); /* 字号 */
-  line-height: 1.55; /* 行高 */
+  line-height: 1.45; /* 行高：与正文基准一致 */
   color: var(--text-muted); /* 次要色 */
   display: -webkit-box; /* 摘要截断 */
   -webkit-line-clamp: var(--card-summary-lines); /* 行数：全站统一 */
@@ -3336,7 +3352,7 @@ code { /* 行内代码/令牌展示 */
 
 .community-detail { /* 帖子详情面板：与详情卡同规格 */
   padding: var(--card-pad); /* 内边距：全站卡片统一 */
-  border: 1px solid var(--border); /* 边框 */
+  border: 0; /* 不描边：与卡片同一套环境阴影语言 */
   border-radius: var(--card-radius-lg); /* 圆角：详情卡档位 */
   background: var(--surface); /* 白底 */
   box-shadow: var(--shadow); /* 投影 */
