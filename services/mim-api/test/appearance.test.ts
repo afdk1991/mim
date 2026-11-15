@@ -101,6 +101,48 @@ describe('页面搭建管理清单', () => { // 调用 describe 并处理其返�
   }); // 代码块结束
 }); // 代码块结束
 
+describe('外观总览读取与写同口径（appearance:write）', () => { // 引导令牌与 Bearer 管理员都该能读，不能出现「能写不能读」
+  it('匿名读取总览返回 401', async () => { // 读接口不再是登录即放行，必须持有 appearance:write
+    const res = await request(app).get('/api/v1/appearance'); // 不带任何凭证
+    expect(res.status).toBe(401); // 未登录拒绝
+  }); // 代码块结束
+
+  it('引导令牌可读取当前主题配置', async () => { // 冷启动只有引导令牌，必须能读到现有配置
+    const res = await request(app).get('/api/v1/appearance').set('x-admin-token', ADMIN_TOKEN); // 引导通道
+    expect(res.status).toBe(200); // 放行
+    expect(res.body.settings.theme).toBeTruthy(); // 主题配置已返回
+    expect(Array.isArray(res.body.pages)).toBe(true); // 页面清单结构不变
+  }); // 代码块结束
+
+  it('Bearer 无角色 403；授予 operator 后可读，保存后读回一致', async () => { // 普通管理员走同一套 RBAC
+    const codeRes = await request(app).post('/api/v1/auth/code').send({ region: 'cn', provider: 'phone', identifier: '13800000091' }); // 申请验证码
+    expect(codeRes.status).toBe(201); // 验证码已创建
+    const loginRes = await request(app) // 用验证码换令牌
+      .post('/api/v1/auth/login') // 登录端点
+      .send({ region: 'cn', provider: 'phone', identifier: '13800000091', code: codeRes.body.dev_code, device: { platform: 'web', name: 'test' } }); // 登录入参
+    expect(loginRes.status).toBe(200); // 登录成功
+    const bearer = { Authorization: `Bearer ${loginRes.body.access_token as string}` }; // 仅带 Bearer
+    const denied = await request(app).get('/api/v1/appearance').set(bearer); // 未授权角色
+    expect(denied.status).toBe(403); // 缺 appearance:write
+    expect(denied.body.details.permission).toBe('appearance:write'); // 回显缺失权限点
+    const granted = await request(app) // 用引导通道授予运营角色
+      .post(`/api/v1/admin/users/${loginRes.body.user.id as string}/roles`) // 授权端点
+      .set('x-admin-token', ADMIN_TOKEN) // 引导令牌
+      .send({ role_code: 'operator' }); // 运营角色自带 appearance:write
+    expect(granted.status).toBe(201); // 首次授权
+    const read = await request(app).get('/api/v1/appearance').set(bearer); // Bearer 读取
+    expect(read.status).toBe(200); // 与写同口径放行
+    const saved = await request(app) // Bearer 保存主题
+      .put('/api/v1/appearance/settings') // 写接口
+      .set(bearer) // 仅带 Bearer
+      .set('Idempotency-Key', 'appearance-bearer-save-1') // 写操作必传幂等键
+      .send({ key: 'theme', value: { accent: '#0ea5e9', radius: 10, list_style: 'comfortable' } }); // 主题入参
+    expect(saved.status).toBe(200); // 保存成功
+    const readBack = await request(app).get('/api/v1/appearance').set(bearer); // 读回确认
+    expect(readBack.body.settings.theme.accent).toBe('#0ea5e9'); // 保存后读回一致
+  }); // 代码块结束
+}); // 代码块结束
+
 describe('外观写操作权限门禁', () => { // 调用 describe 并处理其返回结果
   it('匿名更新设置返回 401', async () => { // 调用 it 并处理其返回结果
     const res = await request(app).put('/api/v1/appearance/settings').send({ key: 'theme', value: { accent: '#111111' } }); // 准备：构造本用例需要的输入或句柄

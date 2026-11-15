@@ -4,7 +4,7 @@ import { Router } from 'express'; // 路由容器
 import { randomUUID } from 'node:crypto'; // 区块主键
 import { z } from 'zod'; // 入参校验
 import { AppError } from '@mim/core-domain'; // 业务异常
-import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 鉴权与写权限
+import { idempotency, requirePermission } from '../middleware.js'; // 鉴权：读写统一走 requirePermission（引导令牌与 Bearer 管理员同一口径）
 import { parse } from '../validate.js'; // 校验错误翻译
 import { readPointsConfig } from '../commerce/config.js'; // 积分抵扣开关与兑换口径（公开只读，供前端决定是否展示抵扣面板）
 import type { ApiDeps } from '../types.js'; // 依赖容器
@@ -50,8 +50,9 @@ export function createAppearanceRouter(deps: ApiDeps): Router { // 导出函数 
     }); // 代码块结束
   }); // 代码块结束
 
-  /** 外观总览：主题、语言、站点信息与页面清单。 */
-  router.get('/appearance', requireAuth, (_req, res) => {
+  /** 外观总览：主题、语言、站点信息与页面清单。读与写统一用 appearance:write，
+   *  使引导令牌（x-admin-token）与带 Bearer 的管理员都能读，避免出现「能写不能读」。 */
+  router.get('/appearance', requirePermission('appearance:write'), (_req, res) => {
     const rows = deps.db.prepare('SELECT key, value, updated_at FROM site_settings').all() as Array<{ key: string; value: string; updated_at: string }>; // 常量 rows：保存固定配置或一次性派生值
     const settings: Record<string, unknown> = {}; // 常量 settings：保存固定配置或一次性派生值
     for (const row of rows) { // 循环：逐项遍历集合并执行相同处理

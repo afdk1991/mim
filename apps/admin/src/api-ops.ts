@@ -606,7 +606,7 @@ export interface AppearanceOverview {
   pages: Array<{ page: string; blocks: number }>; // 各页面启用区块数
 } // AppearanceOverview 结束
 
-/** 读取外观总览：GET /appearance 需登录，写权限另由按钮控制 */
+/** 读取外观总览：GET /appearance 与写接口同口径，要求 appearance:write（引导令牌或 Bearer 管理员均可） */
 export function getAppearanceOverview(credential: Credential): Promise<AppearanceOverview> {
   // 原样返回 settings 与 pages，调用方按需取 theme
   return request<AppearanceOverview>('/appearance', { credential });
