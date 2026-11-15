@@ -4488,6 +4488,7 @@ code { /* 行内代码/令牌展示 */
 .rich-body pre { overflow: auto; margin: 0; padding: var(--card-pad-tight); border-radius: var(--card-radius-sm); background: var(--media-bg); color: var(--on-media); } /* 代码块：深底浅字，不随主题反转 */
 .rich-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; } /* 等宽字体 */
 .rich-image { display: block; max-width: 100%; border-radius: var(--card-radius-sm); } /* 正文图片 */
+.rich-video { display: block; width: 100%; max-height: 60vh; border-radius: var(--card-radius-sm); background: var(--media-bg); } /* 正文视频：整宽播放器，高度受控 */
 
 /* ---------- 页面区块（页面搭建消费）：仅匿名首页生效，论坛页保持原视觉 ---------- */
 .page-blocks-home { display: flex; flex-direction: column; gap: var(--card-gap); } /* 首页区块纵向节奏，与卡片间距一致 */
@@ -4508,3 +4509,176 @@ code { /* 行内代码/令牌展示 */
   .page-blocks-home .page-block.image-text.align-right { flex-direction: column; align-items: flex-start; } /* 统一改纵向，避免挤压文字 */
   .page-blocks-home .page-block.image-text img { width: 100%; max-width: none; } /* 图片占满整行 */
 } /* 手机断点结束 */
+
+/* ---------- 社区图库 / 视频（2026-11-15）：挂在社区层，只做浏览 / 检索 / 收藏 / 聚合 ---------- */
+.community-gallery { display: flex; flex-direction: column; gap: var(--card-gap); } /* 面板纵向节奏与卡片间距一致 */
+.community-gallery-count { flex: none; font-size: var(--fs-xs); color: var(--text-muted); } /* 总数不做换行压缩 */
+.community-gallery-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } /* 筛选行：窄屏自动换行 */
+.community-gallery-toolbar input { flex: 1 1 200px; min-width: 0; } /* 搜索框吃掉剩余宽度 */
+.community-gallery-toolbar select { flex: none; } /* 下拉保持内容宽 */
+.community-gallery-toolbar button { /* 排序 / 收藏开关 */
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+} /* 结束 */
+.community-gallery-toolbar button.is-active { /* 选中态沿用主色淡底 */
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+} /* 结束 */
+.community-gallery-grid { /* 媒体卡片：与社区卡片同一档最小列宽 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--card-gap);
+} /* 结束 */
+.community-gallery-card { /* 单条媒体 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+} /* 结束 */
+.community-gallery-card.is-locked { /* 锁定项只弱化，不隐藏标题与作者 */
+  opacity: 0.92;
+} /* 结束 */
+.community-gallery-media { /* 媒体区：固定比例避免图片高度参差 */
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-3);
+} /* 结束 */
+.community-gallery-media img,
+.community-gallery-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+} /* 结束 */
+.community-gallery-lock { /* 付费锁标按钮：整块可点，去原帖解锁 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--premium-soft);
+  color: var(--premium);
+  cursor: pointer;
+} /* 结束 */
+.community-gallery-lock span { font-size: var(--fs-xs); } /* 辅助说明 */
+.community-gallery-lock strong { font-size: var(--fs-sm); } /* 主提示 */
+.community-gallery-badge { /* 视频时长 / 分辨率徽标 */
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--media-bg);
+  color: var(--on-media);
+  font-size: var(--fs-xs);
+} /* 结束 */
+.community-gallery-body { /* 卡片文案区 */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--card-pad-tight);
+} /* 结束 */
+.community-gallery-title { /* 标题即入口：两行截断 */
+  display: -webkit-box;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+} /* 结束 */
+.community-gallery-body p { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); } /* 作者 · 板块 */
+.community-gallery-actions { /* 收藏行 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+} /* 结束 */
+.community-gallery-actions button { /* 收藏按钮 */
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+} /* 结束 */
+.community-gallery-collections { /* 按帖 / 按作者聚合 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--card-gap);
+} /* 结束 */
+.community-gallery-collection { /* 聚合卡：左封面右计数 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+} /* 结束 */
+.community-gallery-collection img,
+.community-gallery-collection-fallback {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  object-fit: cover;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+} /* 结束 */
+.community-gallery-collection div { display: flex; flex-direction: column; gap: 4px; min-width: 0; } /* 文案列可收缩 */
+.community-gallery-collection strong { /* 帖子标题 / 作者名 */
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+} /* 结束 */
+.community-gallery-collection em { font-size: var(--fs-xs); color: var(--text-muted); font-style: normal; } /* 计数 */
+.community-gallery-more { /* 加载更多：独立于卡片脚注，居中 */
+  align-self: center;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--primary);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+} /* 结束 */
+.community-media-meta { /* 详情播放器下的时长 / 分辨率 */
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+} /* 结束 */
+@media (max-width: 480px) { /* 手机档位：单列，避免最小列宽撑出横向滚动 */
+  .community-gallery-grid,
+  .community-gallery-collections { grid-template-columns: minmax(0, 1fr); }
+} /* 断点结束 */

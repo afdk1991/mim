@@ -20,6 +20,7 @@ import type { // 引入依赖、类型或本地模块绑定
   CommunityPost,
   CommunityThread,
   CommunityThreadDetail,
+  CommunityThreadMedia,
   ShopProduct,
   ThreadKind,
   UnifiedOrder,
@@ -32,6 +33,7 @@ import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公
 import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, SearchPanel, ThreadTools } from './CommunityMore'; // 社区互动补齐：通知 / 编辑治理 / 搜索 / 举报 / 楼中楼
 import { isPinned, listThreads, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 列表分页 / 楼中楼回复 / 回复锁定判定 / 回复分页
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
+import { CommunityGallery } from './CommunityGallery'; // 图库 / 视频页签（2026-11-15：挂在社区层，不恢复独立模块页）
 import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
 import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
 
@@ -41,7 +43,7 @@ interface Props { // 接口 Props：约束对象的字段与类型形态
   onRequireLogin?: () => void; // 互动前未登录时的引导入口：由 App 负责跳转登录页
 } // 代码块结束
 
-type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral'; // 类型别名 Tab：复用一份复合类型定义
+type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral' | 'gallery' | 'video'; // 类型别名 Tab：复用一份复合类型定义
 
 const KIND_LABEL: Record<ThreadKind, string> = { // 常量 KIND_LABEL：保存固定配置或一次性派生值
   text: '图文',
@@ -182,6 +184,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [draftEpisodes, setDraftEpisodes] = useState(''); // 剧集目录：每行「标题|视频地址」
   const [draftAttachments, setDraftAttachments] = useState<Array<{ name: string; object_key: string; mime: string; size_bytes: number }>>([]); // 已上传待随帖提交的附件
   const [attachmentBusy, setAttachmentBusy] = useState(false); // 附件上传中，防重复点击
+  const [draftUploads, setDraftUploads] = useState<CommunityThreadMedia[]>([]); // 已上传待随帖提交的图片 / 视频（对象键 + 元数据）
+  const [mediaBusy, setMediaBusy] = useState(false); // 媒体上传中，防重复点击
   const [boardOpen, setBoardOpen] = useState(false); // 创建板块表单
   const [boardDraft, setBoardDraft] = useState({ slug: '', name: '', description: '', visibility: 'public' as 'public' | 'followers', minLevel: '0', price: '0' }); // 赋值：更新变量 const 的取值
   const [reply, setReply] = useState('');; // 赋值：更新变量 const 的取值
@@ -685,6 +689,73 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     } // 代码块结束
   } // 代码块结束
 
+  /** 读取本地媒体的分辨率 / 时长：只在浏览器内探测，不读取文件内容上传。 */
+  function probeMedia(file: File): Promise<{ width: number; height: number; duration_seconds: number }> { // 定义函数 probeMedia
+    return new Promise((resolve) => { // 回调式 API 包装成 Promise
+      const url = URL.createObjectURL(file); // 本地临时地址
+      const done = (width: number, height: number, duration_seconds: number) => { URL.revokeObjectURL(url); resolve({ width, height, duration_seconds }); }; // 统一释放
+      if (file.type.startsWith('video/')) { // 视频：读元数据
+        const el = document.createElement('video'); // 离屏 video
+        el.preload = 'metadata'; // 只取元数据
+        el.onloadedmetadata = () => done(el.videoWidth, el.videoHeight, Math.round(el.duration || 0)); // 读取宽高与时长
+        el.onerror = () => done(0, 0, 0); // 探测失败不阻塞上传
+        el.src = url; // 绑定本地地址
+        return; // 结束
+      } // 结束条件分支
+      if (file.type.startsWith('image/')) { // 图片：读自然尺寸
+        const img = new Image(); // 离屏图片
+        img.onload = () => done(img.naturalWidth, img.naturalHeight, 0); // 读取宽高
+        img.onerror = () => done(0, 0, 0); // 探测失败不阻塞上传
+        img.src = url; // 绑定本地地址
+        return; // 结束
+      } // 结束条件分支
+      done(0, 0, 0); // 其他类型不探测
+    }); // 结束 Promise
+  } // 函数结束
+
+  /** 上传图片 / 视频：复用媒体预签名，提交时只带对象键与元数据，读接口再签短时地址。 */
+  async function uploadDraftMedia(file: File) { // 定义函数 uploadDraftMedia
+    if (!requireSession()) return; // 上传必须登录
+    if (draftUploads.length >= 12) { setError('单帖最多 12 个媒体'); return; } // 与服务端上限一致
+    const kind: CommunityThreadMedia['kind'] | null = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : null; // 只接受图片 / 视频
+    if (!kind) { setError('仅支持图片或视频文件'); return; } // 拒绝其他类型
+    if (file.size > 64 * 1024 * 1024) { setError('单个媒体不超过 64MB'); return; } // 与预签名上限一致
+    setMediaBusy(true); // 进入上传态
+    setError(null); // 清空旧错误
+    try { // 异常捕获起点
+      const mime = file.type || 'application/octet-stream'; // MIME 兜底
+      const probe = await probeMedia(file); // 读取时长 / 分辨率
+      const presign = await api.media.presignUpload({ asset_type: 'final', mime, size_bytes: file.size }); // 复用媒体域上传凭证
+      const put = await fetch(presign.upload.url, { method: presign.upload.method, headers: presign.upload.headers, body: file }); // 按签名直传字节
+      if (!put.ok) throw new Error(`媒体上传失败：${put.status}`); // 直传失败即中止
+      setDraftUploads((prev) => [...prev, { url: '', kind, object_key: presign.object_key, mime, size_bytes: file.size, ...probe }].slice(0, 12)); // 只记对象键与元数据；url 由读接口现签
+    } catch (err) { // 异常捕获
+      setError(errorText(locale, err)); // 统一文案
+    } finally { // 无论成败
+      setMediaBusy(false); // 退出上传态
+    } // 结束异常处理
+  } // 函数结束
+
+  /** 给已上传的视频补封面：同样走预签名，只记录 poster_key。 */
+  async function uploadDraftPoster(index: number, file: File) { // 定义函数 uploadDraftPoster
+    if (!requireSession()) return; // 上传必须登录
+    if (!file.type.startsWith('image/')) { setError('封面需要图片文件'); return; } // 封面只接受图片
+    if (file.size > 64 * 1024 * 1024) { setError('封面不超过 64MB'); return; } // 与预签名上限一致
+    setMediaBusy(true); // 进入上传态
+    setError(null); // 清空旧错误
+    try { // 异常捕获起点
+      const mime = file.type || 'image/jpeg'; // MIME 兜底
+      const presign = await api.media.presignUpload({ asset_type: 'final', mime, size_bytes: file.size }); // 预签名
+      const put = await fetch(presign.upload.url, { method: presign.upload.method, headers: presign.upload.headers, body: file }); // 直传
+      if (!put.ok) throw new Error(`封面上传失败：${put.status}`); // 直传失败即中止
+      setDraftUploads((prev) => prev.map((item, i) => (i === index ? { ...item, poster_key: presign.object_key } : item))); // 只更新目标视频
+    } catch (err) { // 异常捕获
+      setError(errorText(locale, err)); // 统一文案
+    } finally { // 无论成败
+      setMediaBusy(false); // 退出上传态
+    } // 结束异常处理
+  } // 函数结束
+
   /** 申请附件下载：服务端按帖子权限签发 5 分钟地址，前端只负责打开 */
   async function downloadAttachment(attachmentId: string) { // 函数 downloadAttachment：绝不拼公开直链
     if (!postId) return; // 详情 id 缺失时不发请求
@@ -711,10 +782,13 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean);
-      const media = mediaLines.map((url) => ({ // 常量 media：保存固定配置或一次性派生值
-        kind: draftKind === 'video' && /\.(mp4|mov|m3u8|webm)(\?|$)/i.test(url) ? ('video' as const) : ('image' as const),
-        url,
-      }));
+      const media: CommunityThreadMedia[] = [ // 媒体：直链与预签名直传两种来源合并提交
+        ...mediaLines.map((url) => ({ // 旧的文本地址仍兼容
+          kind: draftKind === 'video' && /\.(mp4|mov|m3u8|webm)(\?|$)/i.test(url) ? ('video' as const) : ('image' as const),
+          url,
+        })), // 结束映射
+        ...draftUploads, // 文件直传：对象键 + 时长 / 分辨率 / 封面
+      ]; // 结束合并
       const episodes = draftKind === 'series' // 常量 episodes：保存固定配置或一次性派生值
         ? draftEpisodes.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
           const [title, mediaUrl] = line.split('|').map((part) => part.trim()); // 赋值：更新变量 const 的取值
@@ -741,6 +815,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       setDraftPoll('');
       setDraftEpisodes('');
       setDraftAttachments([]); // 发布成功清空附件暂存
+      setDraftUploads([]); // 发布成功清空媒体暂存
       setComposerOpen(false);
       setNotice('帖子已发布');
       await loadThreads(); // 异步等待：挂起至 Promise 落定后再继续
@@ -886,6 +961,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       <nav className="community-tabs">{/* 执行当前业务步骤 */}
         {([
           ['forum', '论坛'],
+          ['gallery', '图库'],
+          ['video', '视频'],
           ['announcements', '公告动态'],
           ['vip', 'VIP 会员'],
           ['wallet', '钱包 / 积分'],
@@ -903,6 +980,16 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
           locale={locale}
           hasSession={hasSession}
           initialTab={initialContentTab === 'changelog' ? 'changelog' : initialContentTab === 'feed' ? 'feed' : initialContentTab === 'promotions' ? 'promotions' : 'announcements'}
+        />
+      )}
+
+      {!loading && (tab === 'gallery' || tab === 'video') && (
+        <CommunityGallery
+          locale={locale}
+          kind={tab === 'video' ? 'video' : 'image'}
+          hasSession={hasSession}
+          onOpenThread={(threadId) => { setTab('forum'); void openThread(threadId); }}
+          onRequireLogin={() => { if (onRequireLogin) onRequireLogin(); else requireSession(); }}
         />
       )}
 
@@ -1069,6 +1156,42 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   rows={3}
                 />
               )}
+              {(draftKind === 'gallery' || draftKind === 'video' || draftKind === 'text') && (
+                <div className="community-attachment-picker">{/* 媒体位：图片 / 视频走预签名直传，提交对象键与元数据 */}
+                  <label className="community-attachment-add">
+                    {mediaBusy ? '上传中…' : '+ 添加图片 / 视频'}
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      disabled={mediaBusy}
+                      onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadDraftMedia(file); e.target.value = ''; }}
+                    />
+                  </label>
+                  <em>单个最大 64MB，最多 12 个；视频会自动读取时长与分辨率，付费帖同样受解锁限制</em>
+                </div>
+              )}
+              {draftUploads.length > 0 && (
+                <ul className="community-attachment-draft">
+                  {draftUploads.map((item, index) => (
+                    <li key={String(item.object_key ?? index)}>
+                      <span>{item.kind === 'video' ? '视频' : '图片'}{item.duration_seconds ? ` · ${Math.floor(item.duration_seconds / 60)}:${String(item.duration_seconds % 60).padStart(2, '0')}` : ''}{item.width && item.height ? ` · ${item.width}×${item.height}` : ''}</span>
+                      <em>{formatSize(item.size_bytes ?? 0)}</em>
+                      {item.kind === 'video' && (
+                        <label className="community-attachment-add">
+                          {item.poster_key ? '已选封面' : '选封面'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={mediaBusy}
+                            onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadDraftPoster(index, file); e.target.value = ''; }}
+                          />
+                        </label>
+                      )}
+                      <button type="button" onClick={() => setDraftUploads((prev) => prev.filter((_, i) => i !== index))}>移除</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {draftKind === 'poll' && (
                 <textarea value={draftPoll} onChange={(e) => setDraftPoll(e.target.value)} placeholder="投票选项，每行一个（2–10 个）" rows={3} />
               )}
@@ -1184,7 +1307,16 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   {selected.thread.media!.map((item, index) => (
                     <div key={`${item.url}-${index}`} className={`community-media-item is-${item.kind}`}>{/* 执行当前业务步骤 */}
                       {item.kind === 'video' ? (
-                        <video src={coverSrc(item.url)} poster={item.poster_url ? coverSrc(item.poster_url) : undefined} controls playsInline preload="metadata" />
+                        <>
+                          <video src={coverSrc(item.url)} poster={item.poster_url ? coverSrc(item.poster_url) : undefined} controls playsInline preload="metadata" />
+                          {(item.duration_seconds || (item.width && item.height)) && (
+                            <div className="community-media-meta">
+                              {item.duration_seconds ? `${Math.floor(item.duration_seconds / 60)}:${String(item.duration_seconds % 60).padStart(2, '0')}` : ''}
+                              {item.duration_seconds && item.width && item.height ? ' · ' : ''}
+                              {item.width && item.height ? `${item.width}×${item.height}` : ''}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <img src={coverSrc(item.url)} alt={`${selected.thread.title} ${index + 1}`} loading="lazy" />
                       )}

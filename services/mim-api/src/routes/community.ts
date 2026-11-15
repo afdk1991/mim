@@ -21,6 +21,203 @@ import { baseUrlOf } from './media.js'; // 附件签名下载复用媒体域的�
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
 
+/** 图库 / 视频媒体入参：既支持站内路径与 http(s) 地址，也支持预签名直传后的对象键。 */
+const mediaInputSchema = z // 入参声明：与发帖 / 编辑共用同一套媒体口径
+  .object({ // 对象字段：声明结构中的一项数据
+    kind: z.enum(['image', 'video']), // 媒体类型：图片 / 视频
+    url: z.string().min(1).max(500).optional(), // 站内路径或 http(s) 直链
+    object_key: z.string().min(1).max(512).optional(), // 预签名直传后的对象键
+    poster_url: z.string().max(500).optional(), // 视频封面直链
+    poster_key: z.string().min(1).max(512).optional(), // 视频封面对象键
+    mime: z.string().max(160).optional(), // MIME：缺省按对象键后缀推导
+    size_bytes: z.number().int().min(0).max(2_000_000_000).optional(), // 体积：以存储实测为准
+    duration_seconds: z.number().int().min(0).max(86_400).optional(), // 视频时长（秒）
+    width: z.number().int().min(0).max(16_384).optional(), // 视频 / 图片宽度
+    height: z.number().int().min(0).max(16_384).optional(), // 视频 / 图片高度
+  }) // 结束代码块：本层作用域收尾
+  .refine((item) => !!item.url || !!item.object_key, { message: '媒体需要 url 或 object_key' }); // 必须二者其一，避免写入空媒体
+
+/** 媒体入参的 TypeScript 形态：从 zod schema 推导，避免两处手写漂移。 */
+type MediaInput = z.infer<typeof mediaInputSchema>; // 类型别名：复用校验声明
+
+/** 媒体落库行：对象键与元数据分离存储，读接口再按权限签短时地址。 */
+interface CommunityMediaRow { // 接口声明：约束落库字段
+  kind: 'image' | 'video'; // 媒体类型
+  url: string; // 外部 / 站内地址；对象键媒体此列为空串
+  poster_url: string | null; // 封面直链
+  storage_key: string | null; // 媒体对象键
+  poster_key: string | null; // 封面对象键
+  mime: string; // MIME
+  size_bytes: number; // 体积
+  duration_seconds: number; // 视频时长（秒）
+  width: number; // 宽度
+  height: number; // 高度
+} // 接口声明结束
+
+/** 图库列表行：媒体 + 原帖 + 板块 + 当前用户准入事实。 */
+interface GalleryMediaRow extends CommunityMediaRow { // 继承媒体落库字段
+  id: string; // 媒体主键
+  thread_id: string; // 原帖
+  sort_order: number; // 排序
+  created_at: string; // 上传时间
+  thread_title: string; // 原帖标题
+  thread_summary: string; // 原帖摘要
+  price_cents: number; // 单帖价格
+  author_id: string | null; // 作者
+  board_slug: string; // 板块 slug
+  board_name: string; // 板块名
+  board_price_cents: number; // 板块价格
+  board_visibility: string; // 板块可见性
+  author_name: string | null; // 作者名
+  purchased: number; // 是否已购
+  board_joined: number; // 是否已加入板块
+  board_followed: number; // 是否已关注板块
+  favorited: number; // 我是否已收藏
+  favorite_count: number; // 收藏总数
+} // 接口声明结束
+
+/** 图库聚合行：只保留分组与封面需要的字段。 */
+interface GalleryCollectionRow { // 接口声明：聚合查询结果
+  id: string; // 媒体主键
+  thread_id: string; // 原帖
+  kind: 'image' | 'video'; // 媒体类型
+  url: string; // 直链
+  poster_url: string | null; // 封面直链
+  storage_key: string | null; // 媒体对象键
+  poster_key: string | null; // 封面对象键
+  created_at: string; // 上传时间
+  thread_title: string; // 原帖标题
+  price_cents: number; // 单帖价格
+  author_id: string | null; // 作者
+  board_price_cents: number; // 板块价格
+  board_visibility: string; // 板块可见性
+  author_name: string | null; // 作者名
+  purchased: number; // 是否已购
+  board_joined: number; // 是否已加入板块
+  board_followed: number; // 是否已关注板块
+} // 接口声明结束
+
+/** 收藏校验行：媒体 + 付费墙判定字段。 */
+interface GalleryFavoriteRow { // 接口声明：收藏前校验
+  id: string; // 媒体主键
+  price_cents: number; // 单帖价格
+  author_id: string | null; // 作者
+  board_price_cents: number; // 板块价格
+  board_visibility: string; // 板块可见性
+  purchased: number; // 是否已购
+  board_joined: number; // 是否已加入板块
+  board_followed: number; // 是否已关注板块
+} // 接口声明结束
+
+/** 判断一个媒体引用是否对象键：站内路径 / 带协议地址之外的都按对象键处理。 */
+function isObjectRef(value: string | null | undefined): value is string { // 定义函数 isObjectRef：统一识别存储引用
+  if (!value) return false; // 空值不是对象键
+  return !value.startsWith('/') && !/^[a-z][a-z0-9+.-]*:/i.test(value); // 排除站内路径与 http(s)/data: 等协议地址
+} // 函数结束
+
+/** 校验媒体地址：站内路径直接放行，绝对地址统一走 SSRF 白名单。 */
+async function assertMediaUrl(raw: string, label: string) { // 定义函数 assertMediaUrl：封装媒体地址校验
+  if (raw.startsWith('/')) return; // 站内相对路径无需远程校验
+  void label; // 标签仅用于调用方可读性，这里无需参与校验
+  await assertPublicHttpUrl(raw); // 远程地址复用既有 SSRF 防护
+} // 函数结束
+
+/** 对象键归属与存在性校验：与附件同一口径，拒绝挂他人文件或凭空键。 */
+async function assertOwnedObjectKey(deps: ApiDeps, userId: string, key: string, label: string) { // 定义函数 assertOwnedObjectKey：封装对象键校验
+  assertSafeObjectKey(key); // 先挡路径穿越
+  if (!key.startsWith(`${userId}/`)) throw new AppError('FORBIDDEN', `${label}不属于当前账号`, { object_key: key }); // 首段必须是本人 user_id
+  if (!deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 无存储时显式报错
+  const head = await deps.storage.headObject(key); // 探测对象是否真的上传完成
+  if (!head) throw new AppError('VALIDATION_FAILED', `${label}尚未上传完成或已失效`, { object_key: key }); // 不存在的对象不允许入库
+  return head; // 返回存储实测元数据
+} // 函数结束
+
+/** 把媒体入参规范化为落库行：对象键媒体的体积 / MIME 以存储实测为准，避免客户端虚报。 */
+async function normalizeCommunityMedia(deps: ApiDeps, userId: string, items: MediaInput[]): Promise<CommunityMediaRow[]> { // 定义函数 normalizeCommunityMedia：统一媒体入库口径
+  const rows: CommunityMediaRow[] = []; // 结果集：按入参顺序落库
+  for (const item of items) { // 逐个媒体校验
+    let storageKey: string | null = null; // 默认无对象键
+    let sizeBytes = item.size_bytes ?? 0; // 客户端上报体积仅作缺省
+    let mime = item.mime ?? ''; // 客户端上报 MIME 仅作缺省
+    if (item.object_key) { // 直传媒体：校验对象键并回读真实元数据
+      const head = await assertOwnedObjectKey(deps, userId, item.object_key, '媒体'); // 复用附件校验口径
+      storageKey = item.object_key; // 记录对象键
+      sizeBytes = head.size_bytes ?? sizeBytes; // 以存储实测为准
+      mime = mime || mimeForObjectKey(item.object_key); // 缺省按后缀推导
+    } else if (item.url) { // 外链 / 站内地址媒体
+      await assertMediaUrl(item.url, '媒体'); // SSRF 校验
+    } // 结束条件分支：本层作用域收尾
+    let posterKey: string | null = null; // 默认无封面对象键
+    let posterUrl: string | null = null; // 默认无封面直链
+    if (item.poster_key) { // 封面直传
+      await assertOwnedObjectKey(deps, userId, item.poster_key, '视频封面'); // 封面同样要求归属本人且真实存在
+      posterKey = item.poster_key; // 记录封面对象键
+    } else if (item.poster_url) { // 封面外链
+      await assertMediaUrl(item.poster_url, '视频封面'); // SSRF 校验
+      posterUrl = item.poster_url; // 记录封面直链
+    } // 结束条件分支：本层作用域收尾
+    rows.push({ // 写回规范化行
+      kind: item.kind, // 媒体类型
+      url: item.url ?? '', // 对象键媒体 url 留空，避免把键当直链吐给前端
+      poster_url: posterUrl, // 封面直链
+      storage_key: storageKey, // 媒体对象键
+      poster_key: posterKey, // 封面对象键
+      mime: mime, // MIME
+      size_bytes: sizeBytes, // 体积
+      duration_seconds: item.duration_seconds ?? 0, // 时长
+      width: item.width ?? 0, // 宽度
+      height: item.height ?? 0, // 高度
+    }); // 调用结束：参数列表与链式调用收尾
+  } // 结束循环体：本层作用域收尾
+  return rows; // 返回规范化结果
+} // 函数结束
+
+/** 规范化帖子封面：支持对象键（上传封面）与站内 / 外链地址。 */
+async function normalizeCoverRef(deps: ApiDeps, userId: string, raw: string | null | undefined): Promise<string | null> { // 定义函数 normalizeCoverRef：统一封面口径
+  if (!raw) return null; // 空值表示无封面
+  if (isObjectRef(raw)) { // 对象键封面
+    await assertOwnedObjectKey(deps, userId, raw, '封面'); // 归属与存在性校验
+    return raw; // 原样存储对象键，列表 / 详情读出时再签地址
+  } // 结束条件分支：本层作用域收尾
+  await assertMediaUrl(raw, '封面'); // 站内 / 外链封面校验
+  return raw; // 返回合法引用
+} // 函数结束
+
+/** 把对象键引用换成短时签名地址；非对象键（站内 / 外链）原样返回。 */
+async function signObjectRef(deps: ApiDeps, req: Parameters<typeof baseUrlOf>[0], value: string | null): Promise<string> { // 定义函数 signObjectRef：统一签名出口
+  if (!value) return ''; // 空值直接返回空串
+  if (!isObjectRef(value)) return value; // 非对象键无需签名
+  const storage = deps.storage; // 取存储适配器
+  if (!storage) return ''; // 未配置存储时不暴露内部键
+  try { // 签名失败不应中断列表 / 详情
+    const presigned = await storage.presignDownload({ key: value, expires_seconds: 600, base_url: baseUrlOf(req as never, deps.env) }); // 10 分钟有效：覆盖一次浏览会话
+    return presigned.url; // 只回签名地址
+  } catch { // 对象被清理 / 存储故障
+    return ''; // 回落为空，前端显示占位
+  } // 结束异常分支
+} // 函数结束
+
+/** 图库媒体可见性：与帖子详情 / 附件严格同一口径（付费帖只认单帖解锁，免费帖才回落到板块准入）。 */
+function mediaAccess( // 定义函数 mediaAccess：图库读接口与收藏共用
+  row: { // 入参：帖子 / 板块 / 当前用户的准入事实
+    price_cents: number; // 单帖价格
+    purchased: number; // 是否已购
+    author_id: string | null; // 作者
+    board_price_cents: number; // 板块价格
+    board_joined: number; // 是否已加入板块
+    board_visibility: string; // 板块可见性
+    board_followed: number; // 是否已关注板块
+  }, // 入参声明结束
+  userId: string, // 当前用户；匿名传空串
+  level: number, // 当前 VIP 等级
+): boolean { // 返回是否可见
+  const threadPaidUnlocked = row.price_cents > 0 && (row.purchased > 0 || level > 0 || row.author_id === userId); // 单帖已购 / VIP / 作者本人
+  const boardUnlocked = // 板块准入：付费板块需已加入或 VIP；followers 板块需已关注
+    !(row.board_price_cents > 0 && row.board_joined === 0 && level === 0) && // 付费板块门槛
+    !(row.board_visibility === 'followers' && row.board_followed === 0); // 关注可见板块门槛
+  return row.price_cents > 0 ? threadPaidUnlocked : boardUnlocked; // 收费单帖不得因板块开放而放行
+} // 函数结束
+
 /** 确保当前用户有钱包行；新用户开箱即 0 余额、100 积分。 */
 function ensureWallet(deps: ApiDeps, userId: string) { // 定义函数 ensureWallet：封装可复用业务步骤
   const existing = deps.db.prepare('SELECT user_id, balance_cents, points FROM wallets WHERE user_id = ?').get(userId) as // 保存 existing：承载本步骤的计算结果供后续使用
@@ -294,6 +491,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
     /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 附件签名下载（免费帖访客可下，付费帖在处理函数内按解锁口径拦截）
     /^\/api\/v1\/community\/search$/, // 社区搜索（标题 / 摘要 / 正文）
+    /^\/api\/v1\/community\/gallery\/items$/, // 图库 / 视频列表：按帖子权限过滤，锁定项不下发地址
+    /^\/api\/v1\/community\/gallery\/collections$/, // 图库聚合：按帖 / 按作者分组
     /^\/api\/v1\/vip\/plans$/, // VIP 套餐
     /^\/api\/v1\/shop\/products$/, // 商城商品列表
   ];
@@ -353,7 +552,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
   }); // 结束函数体：本层作用域收尾
 
   /** 帖子列表：板块 / 形态 / 排序 / 关键词 / 分页。 */
-  router.get('/community/threads', (req, res) => { // 路由 GET /community/threads：注册入口并绑定鉴权与处理逻辑
+  router.get('/community/threads', async (req, res) => { // 路由 GET /community/threads：注册入口并绑定鉴权与处理逻辑
     const userId = req.user?.id ?? ''; // 匿名可读：无会话时个人化过滤回落为空用户
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 保存 q：承载本步骤的计算结果供后续使用
     const board = typeof req.query.board === 'string' && req.query.board !== 'all' ? req.query.board : ''; // 保存 board：承载本步骤的计算结果供后续使用
@@ -418,18 +617,20 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       ) // 调用结束：参数列表与链式调用收尾
       .all(userId, userId, userId, userId, ...args, limit, offset); // 查询多行：读取列表供批量处理
     const level = vipLevel(deps, userId); // 保存 level：承载本步骤的计算结果供后续使用
-    const items = (rows as Array<Record<string, unknown> & { price_cents: number; purchased: number; board_price_cents: number; board_joined: number; board_visibility: string; board_followed: number; author_id: string | null }>).map((row) => { // 保存 items：承载本步骤的计算结果供后续使用
+    const items = await Promise.all((rows as Array<Record<string, unknown> & { cover_url: string | null; price_cents: number; purchased: number; board_price_cents: number; board_joined: number; board_visibility: string; board_followed: number; author_id: string | null }>).map(async (row) => { // 保存 items：承载本步骤的计算结果供后续使用
       const boardOpen = // 与详情 hasBoardAccess 同口径：付费板块需已加入或 VIP；followers 板块需已关注
         !(row.board_price_cents > 0 && row.board_joined === 0 && level === 0) && // 付费板块门槛
         !(row.board_visibility === 'followers' && row.board_followed === 0); // 关注可见板块门槛
       const threadOpen = row.price_cents > 0 && (row.purchased > 0 || level > 0 || row.author_id === userId); // 单帖已购 / VIP / 作者本人
-      return { ...row, locked: !boardOpen && !threadOpen }; // 与详情 unlocked = boardUnlocked || threadPaidUnlocked 严格同源，避免列表标锁但详情可读
-    }); // 结束函数体：本层作用域收尾
+      const locked = !boardOpen && !threadOpen; // 与详情 unlocked = boardUnlocked || threadPaidUnlocked 严格同源
+      const cover = locked ? '' : await signObjectRef(deps, req, row.cover_url); // 锁帖不签发封面，避免对象键封面绕过付费墙
+      return { ...row, cover_url: cover, locked }; // 封面换成短时地址后下发
+    })); // 结束函数体：本层作用域收尾
     res.json({ items, total, offset, limit, sort, vip_level: level }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束代码块：本层作用域收尾
 
   /** 帖子详情：未解锁时隐藏正文与回复。 */
-  router.get('/community/threads/:id', (req, res) => { // 路由 GET /community/threads/:id：注册入口并绑定鉴权与处理逻辑
+  router.get('/community/threads/:id', async (req, res) => { // 路由 GET /community/threads/:id：注册入口并绑定鉴权与处理逻辑
     const userId = req.user?.id ?? ''; // 匿名可读：无会话时购买 / 收藏 / 点赞等个人化字段回落为 false
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
     const thread = deps.db // 保存 thread：承载本步骤的计算结果供后续使用
@@ -485,9 +686,26 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const threadPaidUnlocked = thread.price_cents > 0 && hasThreadAccess(deps, userId, id, thread.price_cents); // 保存 threadPaidUnlocked：承载本步骤的计算结果供后续使用
     const unlocked = boardUnlocked || threadPaidUnlocked; // 保存 unlocked：承载本步骤的计算结果供后续使用
     const liked = !!deps.db.prepare('SELECT 1 AS ok FROM community_thread_likes WHERE thread_id = ? AND user_id = ?').get(id, userId); // 保存 liked：承载本步骤的计算结果供后续使用
-    const media = deps.db // 保存 media：承载本步骤的计算结果供后续使用
-      .prepare('SELECT id, kind, url, poster_url, sort_order FROM community_thread_media WHERE thread_id = ? ORDER BY sort_order ASC') // 预编译 SQL：固定语句结构后绑定参数执行
-      .all(id); // 查询多行：读取列表供批量处理
+    // 媒体可见口径与附件完全一致：单帖收费只认单帖解锁，免费帖才回落到板块准入，防止付费墙被板块开放绕过。
+    const mediaVisible = thread.price_cents > 0 ? threadPaidUnlocked : boardUnlocked; // 保存 mediaVisible：承载本步骤的计算结果供后续使用
+    const mediaRows = deps.db // 保存 mediaRows：承载本步骤的计算结果供后续使用
+      .prepare('SELECT id, kind, url, poster_url, storage_key, poster_key, mime, size_bytes, duration_seconds, width, height, sort_order FROM community_thread_media WHERE thread_id = ? ORDER BY sort_order ASC') // 预编译 SQL：固定语句结构后绑定参数执行
+      .all(id) as Array<CommunityMediaRow & { id: string; sort_order: number }>; // 查询多行：读取列表供批量处理
+    const media = mediaVisible // 解锁才签发短时地址；对象键绝不直接回给前端
+      ? await Promise.all(mediaRows.map(async (item) => ({ // 逐个签名：媒体与封面分别换短时地址
+          id: item.id, // 媒体主键
+          kind: item.kind, // 图片 / 视频
+          url: item.storage_key ? await signObjectRef(deps, req, item.storage_key) : item.url, // 对象键媒体签发地址
+          poster_url: item.poster_key ? await signObjectRef(deps, req, item.poster_key) : (item.poster_url ?? ''), // 封面同理
+          mime: item.mime, // MIME：前端据此决定渲染方式
+          size_bytes: item.size_bytes, // 体积
+          duration_seconds: item.duration_seconds, // 视频时长
+          width: item.width, // 宽度
+          height: item.height, // 高度
+          sort_order: item.sort_order, // 排序
+        }))) // 结束签名映射
+      : []; // 锁帖不下发任何媒体地址
+    const coverUrl = mediaVisible ? await signObjectRef(deps, req, thread.cover_url as string | null) : ''; // 封面同样按可见性签发
     const options = deps.db // 保存 options：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
         `SELECT o.id, o.label,
@@ -532,7 +750,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         body: unlocked ? thread.body : '', // 对象字段：声明结构中的一项数据
         locked: !unlocked, // 对象字段：声明结构中的一项数据
         board_locked: !boardUnlocked, // 对象字段：声明结构中的一项数据
-        media: unlocked ? media : [], // 对象字段：声明结构中的一项数据
+        cover_url: coverUrl, // 封面：对象键按可见性签发，锁帖不外泄
+        media, // 媒体：严格付费墙口径，锁帖为空数组
         attachments, // 附件位：解锁后可见
         episodes, // 业务步骤：推进当前流程的下一项处理
         accepted_post: acceptedPost, // 对象字段：声明结构中的一项数据
@@ -621,13 +840,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         cover_url: z.string().max(300).optional(), // 对象字段：声明结构中的一项数据
         price_cents: z.number().int().min(0).max(100000).optional(), // 对象字段：声明结构中的一项数据
         media: z // 对象字段：声明结构中的一项数据
-          .array( // 链式调用：在上一步结果上继续处理
-            z.object({ // 业务步骤：推进当前流程的下一项处理
-              kind: z.enum(['image', 'video']), // 对象字段：声明结构中的一项数据
-              url: z.string().min(1).max(500), // 对象字段：声明结构中的一项数据
-              poster_url: z.string().max(500).optional(), // 对象字段：声明结构中的一项数据
-            }), // 结束代码块：本层作用域收尾
-          ) // 调用结束：参数列表与链式调用收尾
+          .array(mediaInputSchema) // 与编辑共用同一套媒体口径：地址 / 对象键 / 封面 / 时长 / 分辨率
           .max(12) // 链式调用：在上一步结果上继续处理
           .optional(), // 链式调用：在上一步结果上继续处理
         poll_options: z.array(z.string().min(1).max(60)).min(2).max(10).optional(), // 对象字段：声明结构中的一项数据
@@ -679,16 +892,12 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (kind === 'video' && !media.some((item) => item.kind === 'video')) throw new AppError('VALIDATION_FAILED', '视频帖至少需要一个视频地址'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     if (kind === 'series' && episodes.length === 0) throw new AppError('VALIDATION_FAILED', '剧集帖至少需要一集'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     if (kind === 'poll' && (!body.poll_options || body.poll_options.length < 2)) throw new AppError('VALIDATION_FAILED', '投票帖至少需要两个选项'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
-    for (const item of media) { // 循环处理：逐项完成批量数据操作
-      if (!/^(https?:)?\//.test(item.url)) throw new AppError('VALIDATION_FAILED', '媒体地址必须是站内路径或 http(s) 地址');
-      if (/^https?:/.test(item.url)) { // 条件分支：仅在满足业务前置条件时继续
-        try { // 异常保护：确保失败路径可回收资源
-          await assertPublicHttpUrl(item.url); // 等待异步结果：串行完成依赖操作
-        } catch { // 结束代码块：本层作用域收尾
-          throw new AppError('VALIDATION_FAILED', '媒体地址不允许指向内网或非法协议'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
-        } // 结束代码块：本层作用域收尾
-      } // 结束条件分支：本层作用域收尾
-    } // 结束循环体：本层作用域收尾
+    const mediaRows = await normalizeCommunityMedia(deps, userId, media); // 媒体统一规范化：外链走 SSRF，对象键走归属 + 存在性校验
+    // 未显式传封面时，自动把第一个视频封面作为帖子封面，列表卡片才不会空白。
+    const mediaCover = mediaRows.find((item) => item.poster_key || item.poster_url); // 找第一个可用封面
+    const coverUrl = body.cover_url === undefined // 未传封面
+      ? (mediaCover?.poster_key ?? mediaCover?.poster_url ?? null) // 回落到媒体封面
+      : await normalizeCoverRef(deps, userId, body.cover_url); // 显式封面同样校验归属 / 地址
     for (const item of episodes) { // 循环处理：逐项完成批量数据操作
       if (!/^(https?:)?\//.test(item.media_url)) throw new AppError('VALIDATION_FAILED', '剧集地址必须是站内路径或 http(s) 地址');
       if (/^https?:/.test(item.media_url)) { // 条件分支：仅在满足业务前置条件时继续
@@ -719,11 +928,11 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
           `INSERT INTO community_threads (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, created_at, updated_at, last_activity_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
         ) // 调用结束：参数列表与链式调用收尾
-        .run(id, board.id, userId, body.title, body.summary ?? '', body.body, kind, body.cover_url ?? null, body.price_cents ?? 0, ts, ts, ts); // 执行写入：把参数落库并返回影响结果
-      media.forEach((item, index) => { // 业务步骤：推进当前流程的下一项处理
+        .run(id, board.id, userId, body.title, body.summary ?? '', body.body, kind, coverUrl, body.price_cents ?? 0, ts, ts, ts); // 执行写入：把参数落库并返回影响结果
+      mediaRows.forEach((item, index) => { // 媒体与元数据一起落库，读接口再按权限签短时地址
         deps.db // 业务步骤：推进当前流程的下一项处理
-          .prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
-          .run(`media-${randomUUID()}`, id, item.kind, item.url, item.poster_url ?? null, index, ts); // 执行写入：把参数落库并返回影响结果
+          .prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, storage_key, poster_key, mime, size_bytes, duration_seconds, width, height, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
+          .run(`media-${randomUUID()}`, id, item.kind, item.url, item.poster_url, item.storage_key, item.poster_key, item.mime, item.size_bytes, item.duration_seconds, item.width, item.height, index, ts); // 执行写入：把参数落库并返回影响结果
       }); // 结束函数体：本层作用域收尾
       attachments.forEach((item, index) => { // 附件位写入：与帖子同事务，避免半成品帖
         deps.db // 业务步骤：推进当前流程的下一项处理
@@ -1106,9 +1315,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         title: z.string().min(4).max(80).optional(), // 标题
         summary: z.string().max(200).optional(), // 摘要
         body: z.string().min(10).max(8000).optional(), // 正文
-        cover_url: z.string().max(500).nullable().optional(), // 封面（null 表示清空）
+        cover_url: z.string().max(500).nullable().optional(), // 封面（null 表示清空；对象键走归属校验）
         price_cents: z.number().int().min(0).max(100000).optional(), // 付费定价（0 = 免费）
-        media: z.array(z.object({ kind: z.enum(['image', 'video']), url: z.string().min(1).max(500) })).max(12).optional(), // 媒体整组替换
+        media: z.array(mediaInputSchema).max(12).optional(), // 媒体整组替换：与发帖同一套口径（直链 / 对象键 + 元数据）
         attachments: z.array(z.object({ name: z.string().min(1).max(120), object_key: z.string().min(1).max(512), mime: z.string().min(1).max(160).optional(), size_bytes: z.number().int().min(0).max(2_000_000_000).optional() })).max(6).optional(), // 附件整组替换：与发帖同一口径（对象键 + 归属校验）
       }), // 结束代码块：本层作用域收尾
       req.body, // 读取请求：取得入参、身份或上下文
@@ -1122,9 +1331,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       const audit = await auditText(deps.env, `${nextTitle}\n${nextSummary}\n${nextBody}`); // 期待异步结果：把后续步骤挂到承诺完成之后
       if (!audit.ok) throw new AppError('VALIDATION_FAILED', audit.reason ?? '内容未通过审核'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     } // 结束条件分支：本层作用域收尾
-    if (body.media) { // 逐个校验媒体地址，防止把内网地址写进帖子
-      for (const item of body.media) if (!item.url.startsWith('/')) await assertPublicHttpUrl(item.url); // 相对路径走站内资源，绝对地址走 SSRF 校验
-    } // 结束条件分支：本层作用域收尾
+    const nextMedia = body.media ? await normalizeCommunityMedia(deps, userId, body.media) : null; // 媒体整组替换：与发帖共用规范化（对象键回读实测元数据）
+    const nextCover = body.cover_url === undefined ? row.cover_url : await normalizeCoverRef(deps, userId, body.cover_url); // 封面：未传保持原值，null 清空，对象键校验归属
     const nextAttachments = body.attachments ?? []; // 未传表示保持原附件，传空数组表示清空
     if (nextAttachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 与发帖一致：无存储不允许挂附件
     for (const item of nextAttachments) { // 附件入库前校验：键安全 + 归属 + 对象真实存在
@@ -1139,11 +1347,12 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     deps.db.transaction(() => { // 单事务：帖子字段与媒体 / 附件要么一起生效，要么一起回滚
       deps.db // 业务步骤：推进当前流程的下一项处理
         .prepare('UPDATE community_threads SET title = ?, summary = ?, body = ?, cover_url = ?, price_cents = ?, updated_at = ? WHERE id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
-        .run(nextTitle, nextSummary, nextBody, body.cover_url === undefined ? row.cover_url : body.cover_url, body.price_cents ?? row.price_cents, ts, row.id); // 执行写入：把参数落库并返回影响结果
-      if (body.media) { // 整组替换媒体
+        .run(nextTitle, nextSummary, nextBody, nextCover, body.price_cents ?? row.price_cents, ts, row.id); // 执行写入：把参数落库并返回影响结果
+      if (nextMedia) { // 整组替换媒体
         deps.db.prepare('DELETE FROM community_thread_media WHERE thread_id = ?').run(row.id); // 先清空
-        body.media.forEach((item, index) => { // 按入参顺序写回
-          deps.db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, sort_order) VALUES (?, ?, ?, ?, ?)').run(`media-${randomUUID()}`, row.id, item.kind, item.url, index); // 执行写入：把参数落库并返回影响结果
+        nextMedia.forEach((item, index) => { // 按入参顺序写回
+          deps.db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, storage_key, poster_key, mime, size_bytes, duration_seconds, width, height, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(`media-${randomUUID()}`, row.id, item.kind, item.url, item.poster_url, item.storage_key, item.poster_key, item.mime, item.size_bytes, item.duration_seconds, item.width, item.height, index, ts); // 全字段落库
         }); // 结束代码块：本层作用域收尾
       } // 结束条件分支：本层作用域收尾
       if (body.attachments) { // 整组替换附件：口径与发帖一致，url 列继续存对象键
@@ -1676,6 +1885,183 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       .run(`ref-${randomUUID()}`, inviter.user_id, userId, body.code.toUpperCase(), now()); // 执行写入：把参数落库并返回影响结果
     res.json({ ok: true }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
+
+  /** 图库 / 视频列表：复用帖子媒体表按用户视角聚合；锁定项保留标题与元数据，但不下发任何地址。 */
+  router.get('/community/gallery/items', async (req, res) => { // 路由 GET /community/gallery/items
+    const userId = req.user?.id ?? ''; // 匿名可读：无会话时个人化字段回落
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 关键词：标题 / 摘要 / 正文 / 作者
+    const kindRaw = typeof req.query.kind === 'string' ? req.query.kind : ''; // 媒体类型
+    const kind = kindRaw === 'image' || kindRaw === 'video' ? kindRaw : ''; // 非法值按全部处理
+    const authorId = typeof req.query.author_id === 'string' ? req.query.author_id : ''; // 按作者聚合筛选
+    const threadId = typeof req.query.thread_id === 'string' ? req.query.thread_id : ''; // 按帖聚合筛选
+    const favoritedOnly = ['1', 'true', 'yes'].includes(String(req.query.favorited ?? '')); // 只看我的收藏
+    const sort = ['latest', 'oldest', 'favorites'].includes(String(req.query.sort)) ? String(req.query.sort) : 'latest'; // 排序
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '24'), 10) || 24, 1), 60); // 单页上限 60
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 偏移
+    const level = vipLevel(deps, userId); // 当前 VIP 等级：与帖子解锁同源
+    const where: string[] = ["t.status = 'published'", "b.status = 'active'"]; // 只暴露已发布帖子与正常板块
+    const args: unknown[] = []; // 与 where 同步的参数
+    if (kind) { where.push('m.kind = ?'); args.push(kind); } // 类型筛选
+    if (authorId) { where.push('t.author_id = ?'); args.push(authorId); } // 作者筛选
+    if (threadId) { where.push('m.thread_id = ?'); args.push(threadId); } // 帖子筛选
+    if (q) { where.push('(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ? OR u.display_name LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); } // 关键词：正文与作者都参与命中
+    if (favoritedOnly) { where.push('EXISTS (SELECT 1 FROM gallery_favorites gf WHERE gf.media_id = m.id AND gf.user_id = ?)'); args.push(userId); } // 我的收藏
+    const order = // 排序：默认最新
+      sort === 'oldest' // 升序
+        ? 'm.created_at ASC' // 最早优先
+        : sort === 'favorites' // 收藏最多
+          ? '(SELECT COUNT(*) FROM gallery_favorites gf2 WHERE gf2.media_id = m.id) DESC, m.created_at DESC' // 收藏数优先
+          : 'm.created_at DESC'; // 最新优先
+    const from = // 复用同一张媒体表，不新建图库表
+      `FROM community_thread_media m
+       JOIN community_threads t ON t.id = m.thread_id
+       JOIN community_boards b ON b.id = t.board_id
+       LEFT JOIN users u ON u.id = t.author_id`;
+    const total = (deps.db.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${where.join(' AND ')}`).get(...args) as { n: number }).n; // 真分页总数
+    const rows = deps.db // 媒体 + 帖子 + 板块 + 个人准入事实一次取回
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT m.id, m.thread_id, m.kind, m.url, m.poster_url, m.storage_key, m.poster_key,
+                m.mime, m.size_bytes, m.duration_seconds, m.width, m.height, m.sort_order, m.created_at,
+                t.title AS thread_title, t.summary AS thread_summary, t.price_cents, t.author_id,
+                b.slug AS board_slug, b.name AS board_name, b.price_cents AS board_price_cents, b.visibility AS board_visibility,
+                u.display_name AS author_name,
+                (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
+                (SELECT COUNT(*) FROM community_board_memberships bm WHERE bm.board_id = b.id AND bm.user_id = ?) AS board_joined,
+                (SELECT COUNT(*) FROM community_board_follows bf WHERE bf.board_id = b.id AND bf.user_id = ?) AS board_followed,
+                (SELECT COUNT(*) FROM gallery_favorites gf WHERE gf.media_id = m.id AND gf.user_id = ?) AS favorited,
+                (SELECT COUNT(*) FROM gallery_favorites gf WHERE gf.media_id = m.id) AS favorite_count
+         ${from}
+         WHERE ${where.join(' AND ')}
+         ORDER BY ${order}
+         LIMIT ? OFFSET ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(userId, userId, userId, userId, ...args, limit, offset) as Array<GalleryMediaRow>; // 查询多行：读取列表供批量处理
+    const items = await Promise.all(rows.map(async (row) => { // 逐个签名：锁帖隐藏地址
+      const visible = mediaAccess(row, userId, level); // 与详情 / 附件同口径
+      return { // 输出结构：前端无需感知对象键
+        id: row.id, // 媒体主键
+        thread_id: row.thread_id, // 原帖：用于跳转
+        kind: row.kind, // 图片 / 视频
+        mime: row.mime, // MIME
+        size_bytes: row.size_bytes, // 体积
+        duration_seconds: row.duration_seconds, // 视频时长
+        width: row.width, // 宽度
+        height: row.height, // 高度
+        created_at: row.created_at, // 上传时间
+        thread_title: row.thread_title, // 原帖标题
+        thread_summary: row.thread_summary, // 原帖摘要
+        author_id: row.author_id, // 作者
+        author_name: row.author_name ?? '', // 作者名
+        board_slug: row.board_slug, // 板块 slug
+        board_name: row.board_name, // 板块名
+        locked: !visible, // 是否被付费墙拦住
+        url: visible ? (row.storage_key ? await signObjectRef(deps, req, row.storage_key) : row.url) : '', // 可见才签发
+        poster_url: visible ? (row.poster_key ? await signObjectRef(deps, req, row.poster_key) : (row.poster_url ?? '')) : '', // 封面同理
+        favorited: row.favorited > 0, // 我是否已收藏
+        favorite_count: row.favorite_count, // 收藏总数
+      }; // 结构结束
+    })); // 结束映射
+    res.json({ items, total, offset, limit, sort, vip_level: level }); // 输出响应
+  }); // 结束图库列表
+
+  /** 图库聚合：按帖 / 按作者分组，只聚合当前用户可见的媒体。 */
+  router.get('/community/gallery/collections', async (req, res) => { // 路由 GET /community/gallery/collections
+    const userId = req.user?.id ?? ''; // 匿名可读
+    const group = req.query.group === 'author' ? 'author' : 'thread'; // 分组维度
+    const kindRaw = typeof req.query.kind === 'string' ? req.query.kind : ''; // 媒体类型
+    const kind = kindRaw === 'image' || kindRaw === 'video' ? kindRaw : ''; // 非法值按全部处理
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 关键词
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '24'), 10) || 24, 1), 60); // 单页上限 60
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 偏移
+    const level = vipLevel(deps, userId); // VIP 等级
+    const where: string[] = ["t.status = 'published'", "b.status = 'active'"]; // 只聚合公开内容
+    const args: unknown[] = []; // 与 where 同步的参数
+    if (kind) { where.push('m.kind = ?'); args.push(kind); } // 类型筛选
+    if (q) { where.push('(t.title LIKE ? OR t.summary LIKE ? OR u.display_name LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`); } // 关键词
+    const rows = deps.db // 聚合前先取回准入事实：分组按用户可见性过滤
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT m.id, m.thread_id, m.kind, m.url, m.poster_url, m.storage_key, m.poster_key, m.created_at,
+                t.title AS thread_title, t.price_cents, t.author_id,
+                b.price_cents AS board_price_cents, b.visibility AS board_visibility,
+                u.display_name AS author_name,
+                (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
+                (SELECT COUNT(*) FROM community_board_memberships bm WHERE bm.board_id = b.id AND bm.user_id = ?) AS board_joined,
+                (SELECT COUNT(*) FROM community_board_follows bf WHERE bf.board_id = b.id AND bf.user_id = ?) AS board_followed
+         FROM community_thread_media m
+         JOIN community_threads t ON t.id = m.thread_id
+         JOIN community_boards b ON b.id = t.board_id
+         LEFT JOIN users u ON u.id = t.author_id
+         WHERE ${where.join(' AND ')}
+         ORDER BY m.created_at DESC
+         LIMIT 2000`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(userId, userId, userId, ...args) as Array<GalleryCollectionRow>; // 聚合上限 2000 条原始媒体
+    const groups = new Map<string, { key: string; label: string; thread_id: string; author_id: string | null; author_name: string; count: number; cover: GalleryCollectionRow; created_at: string }>(); // 分组累加器
+    for (const row of rows) { // 逐条累加
+      if (!mediaAccess({ ...row, purchased: row.purchased, board_joined: row.board_joined, board_followed: row.board_followed }, userId, level)) continue; // 不可见媒体不参与聚合
+      const key = group === 'author' ? (row.author_id ?? '') : row.thread_id; // 分组键
+      const existing = groups.get(key); // 已有分组
+      if (existing) { existing.count += 1; continue; } // 计数累加
+      groups.set(key, { // 首次出现：以最新媒体作为封面
+        key, // 分组键
+        label: group === 'author' ? (row.author_name ?? '未知作者') : row.thread_title, // 展示名
+        thread_id: row.thread_id, // 原帖
+        author_id: row.author_id, // 作者
+        author_name: row.author_name ?? '', // 作者名
+        count: 1, // 媒体数
+        cover: row, // 封面媒体
+        created_at: row.created_at, // 最新时间
+      }); // 写入分组
+    } // 结束循环
+    const all = [...groups.values()]; // 全部分组
+    const page = all.slice(offset, offset + limit); // 内存分页：分组后再切页
+    const collections = await Promise.all(page.map(async (item) => ({ // 逐个签发封面
+      key: item.key, // 分组键
+      label: item.label, // 展示名
+      thread_id: item.thread_id, // 原帖
+      author_id: item.author_id, // 作者
+      author_name: item.author_name, // 作者名
+      count: item.count, // 媒体数
+      created_at: item.created_at, // 最新时间
+      cover_url: item.cover.poster_key // 封面对象键
+        ? await signObjectRef(deps, req, item.cover.poster_key) // 优先封面
+        : item.cover.storage_key // 媒体对象键
+          ? await signObjectRef(deps, req, item.cover.storage_key) // 其次媒体本体
+          : (item.cover.poster_url || item.cover.url), // 直链原样返回
+    }))); // 结束映射
+    res.json({ collections, total: all.length, offset, limit, group }); // 输出响应
+  }); // 结束图库聚合
+
+  /** 收藏媒体：锁定的付费媒体不可收藏，避免把付费墙内容加进个人图库。 */
+  router.post('/community/gallery/items/:mediaId/favorite', (req, res) => { // 路由 POST /community/gallery/items/:mediaId/favorite
+    const userId = req.user!.id; // 收藏人
+    const row = deps.db // 取媒体与帖子准入事实
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT m.id, t.price_cents, t.author_id, t.status,
+                b.id AS board_id, b.price_cents AS board_price_cents, b.visibility AS board_visibility, b.status AS board_status,
+                (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
+                (SELECT COUNT(*) FROM community_board_memberships bm WHERE bm.board_id = b.id AND bm.user_id = ?) AS board_joined,
+                (SELECT COUNT(*) FROM community_board_follows bf WHERE bf.board_id = b.id AND bf.user_id = ?) AS board_followed
+           FROM community_thread_media m
+           JOIN community_threads t ON t.id = m.thread_id
+           JOIN community_boards b ON b.id = t.board_id
+          WHERE m.id = ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .get(userId, userId, userId, req.params.mediaId) as
+      | (GalleryFavoriteRow & { status: string; board_status: string }) // 命中行
+      | undefined; // 未命中
+    if (!row || row.status !== 'published' || row.board_status !== 'active') throw new AppError('NOT_FOUND', '媒体不存在'); // 已删 / 待审内容不可收藏
+    if (!mediaAccess(row, userId, vipLevel(deps, userId))) throw new AppError('FORBIDDEN', '未解锁的媒体不能收藏'); // 与阅读同一道付费墙
+    deps.db.prepare('INSERT OR IGNORE INTO gallery_favorites (user_id, media_id, created_at) VALUES (?, ?, ?)').run(userId, row.id, now()); // 幂等收藏
+    res.json({ ok: true, favorited: true }); // 输出响应
+  }); // 结束收藏
+
+  /** 取消收藏：只删自己的记录，天然幂等。 */
+  router.delete('/community/gallery/items/:mediaId/favorite', (req, res) => { // 路由 DELETE /community/gallery/items/:mediaId/favorite
+    const userId = req.user!.id; // 当前用户
+    deps.db.prepare('DELETE FROM gallery_favorites WHERE user_id = ? AND media_id = ?').run(userId, req.params.mediaId); // 只删本人收藏
+    res.json({ ok: true, favorited: false }); // 输出响应
+  }); // 结束取消收藏
 
   return router; // 返回结果：把本步骤产物交给调用方
 } // 结束代码块：本层作用域收尾

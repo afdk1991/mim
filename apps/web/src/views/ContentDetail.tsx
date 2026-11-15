@@ -11,6 +11,8 @@
 import { useEffect, useState } from 'react'; // 状态与副作用
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { api } from '../api'; // 接口客户端
+import { threadDetail } from '../api/community.js'; // 论坛帖子详情：内容流来源为 community_thread 时补齐媒体与付费墙口径
+import type { CommunityThreadMedia } from '../api'; // 帖子媒体（图片 / 视频 + 时长与分辨率）
 import { navigatePath, pathOf } from '../router'; // 站内导航与深链接构造
 
 /** 资讯类内容形态：公告 / 更新日志 / 统一内容流。 */
@@ -23,6 +25,8 @@ interface DetailItem {
   body: string; // 正文
   meta: string; // 元信息行（来源 / 版本 / 时间）
   link?: { label: string; path: string }; // 关联入口（如论坛原帖）
+  media?: CommunityThreadMedia[]; // 论坛来源的图片 / 视频（锁定帖为空）
+  priceCents?: number; // 原帖定价（分），用于锁定提示
 }
 
 interface Props {
@@ -53,9 +57,52 @@ function feedSourceLabel(locale: Locale, source: string): string {
 /** 正文里是否是图片地址（用于直接渲染图片）。 */
 const IMAGE_LINE = /^https?:\/\/\S+\.(?:png|jpe?g|gif|webp|svg)(?:\?\S*)?$/i;
 
-/** 单行富文本：图片直出，普通行内链接可点击，其余按纯文本。 */
+/** 正文里是否是视频地址（用于直接渲染播放器）。 */
+const VIDEO_LINE = /^https?:\/\/\S+\.(?:mp4|webm|mov|m4v)(?:\?\S*)?$/i;
+
+/** 媒体地址归一化：绝对地址原样用，站内相对路径补站点前缀。 */
+function mediaSrc(url: string): string {
+  if (!url) return ''; // 空串交给调用方按无地址处理
+  if (/^(https?:)?\//.test(url)) return url; // 绝对地址或协议相对地址直接可用
+  return `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}`; // 站内静态资源补 BASE_URL
+} // mediaSrc 结束
+
+/** 视频时长：秒 → m:ss；未知返回空串。 */
+function durationText(seconds?: number): string {
+  if (!seconds || seconds < 0) return ''; // 未知时长不展示
+  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`; // 归一化到 2 位秒
+} // durationText 结束
+
+/** 帖子媒体网格：图片直接展示，视频带封面、时长与分辨率。 */
+function ThreadMedia({ media, title }: { media: CommunityThreadMedia[]; title: string }) {
+  return (
+    <div className="community-media">
+      {media.map((item, index) => (
+        <div key={`${item.url}-${index}`} className={`community-media-item is-${item.kind}`}>
+          {item.kind === 'video' ? (
+            <>
+              <video src={mediaSrc(item.url)} poster={item.poster_url ? mediaSrc(item.poster_url) : undefined} controls playsInline preload="metadata" />
+              {(durationText(item.duration_seconds) || (item.width && item.height)) && (
+                <div className="community-media-meta">
+                  {[durationText(item.duration_seconds), item.width && item.height ? `${item.width}×${item.height}` : ''].filter(Boolean).join(' · ')}
+                </div>
+              )}
+            </>
+          ) : (
+            <img src={mediaSrc(item.url)} alt={`${title} ${index + 1}`} loading="lazy" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+} // ThreadMedia 结束
+
+/** 单行富文本：图片 / 视频直出，普通行内链接可点击，其余按纯文本。 */
 function RichLine({ line }: { line: string }) {
   const trimmed = line.trim(); // 去掉首尾空白
+  if (VIDEO_LINE.test(trimmed)) { // 视频直链
+    return <video className="rich-video" src={trimmed} controls playsInline preload="metadata" />; // 直接播放
+  } // 视频分支结束
   if (IMAGE_LINE.test(trimmed)) { // 图片直链
     return <img className="rich-image" src={trimmed} alt="" loading="lazy" />; // 直接展示图片
   } // 图片分支结束
@@ -119,7 +166,7 @@ export function ContentDetail({ locale, kind, id }: Props) {
         const { items } = await api.content.feed(100);
         const hit = items.find((entry) => entry.id === id);
         if (!hit) return null; // 条目不存在
-        return {
+        const detail: DetailItem = {
           id: hit.id,
           title: hit.title,
           body: hit.body || hit.summary,
@@ -128,7 +175,15 @@ export function ContentDetail({ locale, kind, id }: Props) {
           link: hit.source === 'community_thread'
             ? { label: tr(locale, '查看原帖与评论', 'Open thread and comments'), path: pathOf('community', `post/${encodeURIComponent(hit.source_id)}`) }
             : undefined,
-        };
+        }; // 详情收口
+        if (hit.source === 'community_thread') { // 原帖媒体：与帖子详情同一份付费墙口径
+          try { // 原帖不可读时退回内容流摘要，不影响正文展示
+            const page = await threadDetail(hit.source_id); // 详情已按解锁态隐藏锁定媒体
+            detail.media = page.thread.media ?? []; // 图片 / 视频（含时长与分辨率）
+            detail.priceCents = page.thread.price_cents ?? 0; // 用于锁定提示
+          } catch { /* 详情接口失败不阻断，保留摘要 */ }
+        } // 论坛来源结束
+        return detail; // 返回归一化条目
       } // 内容流分支结束
       return null; // 非法形态
     }; // load 结束
@@ -174,6 +229,13 @@ export function ContentDetail({ locale, kind, id }: Props) {
           <h1>{item.title}</h1>
           {item.link && (
             <a className="content-detail-link" href={item.link.path} onClick={(event) => { event.preventDefault(); navigatePath(item.link!.path); }}>{item.link.label} →</a>
+          )}
+          {(item.media?.length ?? 0) > 0 && <ThreadMedia media={item.media!} title={item.title} />}
+          {(item.media?.length ?? 0) === 0 && (item.priceCents ?? 0) > 0 && (
+            <div className="community-paywall">
+              <strong>{tr(locale, '这是一篇付费内容', 'This is paid content')}</strong>
+              <p>{tr(locale, '图片与视频已按付费墙隐藏，解锁原帖后可查看；作者与 VIP 会员免购。', 'Images and videos are hidden behind the paywall. Unlock the original thread to view them; authors and VIP members are exempt.')}</p>
+            </div>
           )}
           <RichBody text={item.body} />
         </>

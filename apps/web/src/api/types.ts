@@ -219,9 +219,17 @@ export type ThreadKind = 'text' | 'video' | 'gallery' | 'series' | 'qa' | 'poll'
 export interface CommunityThreadMedia { // 帖子媒体
   id?: string; // 主键（服务端返回）
   kind: 'image' | 'video'; // 媒体类型
-  url: string; // 地址
+  url: string; // 地址（服务端返回时必为短时签名地址）
   poster_url?: string | null; // 视频封面
   sort_order?: number; // 排序
+  object_key?: string; // 上传入参：预签名直传后的媒体对象键
+  poster_key?: string; // 上传入参：预签名直传后的封面对象键
+  mime?: string; // MIME（服务端以存储实测为准）
+  size_bytes?: number; // 体积
+  duration_seconds?: number; // 视频时长（秒）
+  width?: number; // 宽度
+  height?: number; // 高度
+  created_at?: string; // 上传时间
 }
 
 export interface ThreadAttachmentMeta { // 帖子附件（可下载文件）：与已上线的详情返回字段同名同形

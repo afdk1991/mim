@@ -133,6 +133,8 @@ const ANONYMOUS_READ_PATTERNS = [ // 带路径参数的公开读接口
   /^\/api\/v1\/community\/boards\/[^/]+\/tabs$/, // 板块自定义页签
   /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
   /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 帖子附件签名下载：免费帖匿名可下，付费帖由路由内付费墙拦截
+  /^\/api\/v1\/community\/gallery\/items$/, // 图库 / 视频列表：锁定项由路由内付费墙隐藏地址
+  /^\/api\/v1\/community\/gallery\/collections$/, // 图库聚合：按帖 / 按作者分组
   /^\/api\/v1\/pages\/[^/]+$/, // 站点自定义页面
 ]; // 匿名可读正则集合结束
 
