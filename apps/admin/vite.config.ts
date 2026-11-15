@@ -28,7 +28,7 @@ export default defineConfig({
   build: {
     // 产物目录，与部署脚本、CI 的发布路径约定一致
     outDir: 'dist',
-    // 生成 sourcemap：线上报错时可还原到原始 TSX 行号
-    sourcemap: true,
+    // 关闭 sourcemap：避免后台源码与内部字段名随产物公开，调试改用本地构建
+    sourcemap: false,
   }, // 构建配置结束
 }); // 配置结束

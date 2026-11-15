@@ -35,6 +35,14 @@ function previewDeduction(totalMinor: number, balance: number, cfg: PointsDeduct
   return { deduct_cents: deduct, points_spent: pointsSpent, payable_cents: Math.max(0, totalMinor - deduct) }; // 返回当前函数的处理结果
 } // previewDeduction 结束
 
+/** 结算跳过原因文案：内部原因码不直接外显给普通用户 */
+function skipReasonText(reason: string | undefined, isZh: boolean): string {
+  if (reason === 'module_not_active') return isZh ? '已下架' : 'Offline'; // 模块已下架
+  if (reason === 'already_owned') return isZh ? '已拥有' : 'Owned'; // 已拥有权益
+  if (reason === 'dependency_not_met' || reason?.startsWith('missing_dependency')) return isZh ? '缺少前置条件' : 'Prerequisite missing'; // 依赖未满足
+  return isZh ? '未处理' : 'Not processed'; // 其他兜底不外显内部原因码
+} // skipReasonText 结束
+
 /** 购物车面板：清单 / 移除 / 清空 / 结算（免费即时解锁，付费生成待结算订单） */
 export function CartPanel({ locale }: Props) {
   const isZh = locale !== 'en-US'; // 是否中文文案
@@ -140,12 +148,11 @@ export function CartPanel({ locale }: Props) {
           </thead>
           <tbody>{/* 执行当前业务步骤 */}
             {items.map((item) => {
-              const name = item.name[locale] ?? item.name['zh-CN'] ?? item.module_code; // 名称按语言回落
+              const name = item.name[locale] ?? item.name['zh-CN'] ?? (isZh ? '模块服务' : 'Module'); // 名称按语言回落，缺失时不外显内部编码
               return ( // 返回当前函数的处理结果
                 <tr key={item.module_code}>{/* 执行当前业务步骤 */}
                   <td>{/* 执行当前业务步骤 */}
                     <div className="products-name">{name}</div>
-                    <div className="products-code">{item.module_code}</div>
                   </td>
                   <td>{item.free ? (isZh ? '免费' : 'Free') : item.price ? money(locale, item.price.currency, item.price.amount_minor) : '-'}</td>
                   <td>{/* 执行当前业务步骤 */}
@@ -205,10 +212,10 @@ export function CartPanel({ locale }: Props) {
           {" "}
           {results.map((result) => (
             <div key={result.module_code} className="hint">{/* 执行当前业务步骤 */}
-              {result.module_code}：
+              {isZh ? '模块服务' : 'Module'}：
               {result.kind === 'unlocked' ? (isZh ? '已即时解锁 ✓' : 'unlocked ✓') : null}
-              {result.kind === 'order' ? (isZh ? `已生成待结算订单 ${result.order?.id.slice(0, 8) ?? ''}` : `pending order ${result.order?.id.slice(0, 8) ?? ''}`) : null}
-              {result.kind === 'skipped' ? (isZh ? `已跳过（${result.reason ?? 'unknown'}）` : `skipped (${result.reason ?? 'unknown'})`) : null}
+              {result.kind === 'order' ? (isZh ? '已生成待结算订单' : 'pending order created') : null}
+              {result.kind === 'skipped' ? (isZh ? `已跳过（${skipReasonText(result.reason, true)}）` : `skipped (${skipReasonText(result.reason, false)})`) : null}
               {result.points_spent ? (isZh ? ` · 抵扣 ${result.points_spent} 积分 / ${money(locale, 'CNY', result.points_deduct_cents ?? 0)}` : ` · ${result.points_spent} points / ${money(locale, 'CNY', result.points_deduct_cents ?? 0)}`) : null}
             </div>
           ))}

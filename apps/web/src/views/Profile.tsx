@@ -38,6 +38,24 @@ function money(currency: string, amountMinor: number): string {
   return `${symbol}${(amountMinor / 100).toFixed(2)}`; // 分 → 主单位
 } // money 结束
 
+/** 权益状态文案：内部枚举仅用于判断样式，界面不直接显示原始值 */
+function entitlementStatusText(status: string, isZh: boolean): string {
+  if (status === 'active') return isZh ? '生效中' : 'Active'; // 正常可用
+  if (status === 'expired') return isZh ? '已过期' : 'Expired'; // 到期失效
+  if (status === 'revoked') return isZh ? '已撤销' : 'Revoked'; // 人工撤销
+  return isZh ? '—' : '—'; // 未知取值不外显内部枚举
+} // entitlementStatusText 结束
+
+/** 订单状态文案：内部状态机不直接外显 */
+function orderStatusText(status: string, isZh: boolean): string {
+  if (status === 'pending') return isZh ? '待支付' : 'Pending'; // 待支付
+  if (status === 'paid') return isZh ? '已支付' : 'Paid'; // 已支付
+  if (status === 'delivered') return isZh ? '已交付' : 'Delivered'; // 已交付
+  if (status === 'refunded') return isZh ? '已退款' : 'Refunded'; // 已退款
+  if (status === 'cancelled') return isZh ? '已取消' : 'Cancelled'; // 已取消
+  return isZh ? '—' : '—'; // 未知取值不外显内部枚举
+} // orderStatusText 结束
+
 /** 个人中心：资料编辑 / 我的权益 / 我的订单 / 购物车 / 账号安全 五块 */
 export function Profile({ locale, onUserUpdated }: Props) {
   const isZh = locale !== 'en-US'; // 是否中文文案
@@ -216,7 +234,6 @@ export function Profile({ locale, onUserUpdated }: Props) {
               <input value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder="Asia/Shanghai" />
             </label>
             <p className="hint member-line">{isZh ? 'Mim ID：' : 'Mim ID: '}<strong className="member-no">{user?.member_no ?? '-'}</strong></p>
-            <p className="hint">{isZh ? `内部 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Internal ID ${user?.id.slice(0, 8) ?? '-'} · ${user?.region ?? '-'} · ${user?.status ?? '-'}`}</p>
             <button type="submit" className="btn primary" disabled={busy}>{busy ? (isZh ? '保存中…' : 'Saving…') : isZh ? '保存资料' : 'Save'}</button>
           </form>
         ) // 执行当前业务步骤
@@ -242,10 +259,9 @@ export function Profile({ locale, onUserUpdated }: Props) {
                   {(entitlements.data?.entitlements ?? []).map((item) => (
                     <tr key={item.id}>{/* 执行当前业务步骤 */}
                       <td>{/* 执行当前业务步骤 */}
-                        <div className="products-name">{item.module_name[locale] ?? item.module_name['zh-CN'] ?? item.module_code}</div>
-                        <div className="products-code">{item.module_code}</div>
+                        <div className="products-name">{item.module_name[locale] ?? item.module_name['zh-CN'] ?? (isZh ? '模块服务' : 'Module')}</div>
                       </td>
-                      <td><span className={`tag${item.status === 'active' ? ' ok' : ''}`}>{item.status}</span></td>
+                      <td><span className={`tag${item.status === 'active' ? ' ok' : ''}`}>{entitlementStatusText(item.status, isZh)}</span></td>
                       <td>{item.expires_at ?? (isZh ? '永久' : 'Permanent')}</td>
                       <td>{new Date(item.created_at).toLocaleDateString()}</td>
                     </tr>
@@ -280,11 +296,10 @@ export function Profile({ locale, onUserUpdated }: Props) {
                     return (
                     <tr key={order.id}>{/* 执行当前业务步骤 */}
                       <td>{/* 执行当前业务步骤 */}
-                        <div className="products-name">{first?.title ?? order.product_code ?? order.id}</div>
-                        <div className="products-code">{order.product_code ?? '—'}</div>
+                        <div className="products-name">{first?.title ?? (isZh ? '订单' : 'Order')}</div>
                       </td>
                       <td>{money(order.currency, order.total_cents)}</td>
-                      <td><span className={`tag${order.status === 'paid' ? ' ok' : ''}`}>{order.status}</span></td>
+                      <td><span className={`tag${order.status === 'paid' ? ' ok' : ''}`}>{orderStatusText(order.status, isZh)}</span></td>
                       <td>{new Date(order.created_at).toLocaleDateString()}</td>
                       <td>{/* 执行当前业务步骤 */}
                         {order.status === 'pending' ? (
@@ -308,19 +323,15 @@ export function Profile({ locale, onUserUpdated }: Props) {
       {tab === 'security' ? (
         <section className="profile-security">{/* 执行当前业务步骤 */}
           <p className="hint">{/* 执行当前业务步骤 */}
-            {isZh ? '登录凭据由服务端签发 JWT，退出登录会吊销 refresh_token；注销账号进入冷静期，期内可撤销。' : 'Sessions are JWT based; signing out revokes the refresh token.'}
+            {isZh ? '登录状态由服务端安全维护，退出登录后会话立即失效；注销账号进入冷静期，期内可撤销。' : 'Your session is secured by the server and ends immediately on sign-out.'}
           </p>
           <p className="hint member-line">{isZh ? 'Mim ID：' : 'Mim ID: '}<strong className="member-no">{user?.member_no ?? '-'}</strong></p>
           <p className="hint">{/* 执行当前业务步骤 */}
-            {isZh ? `内部 ID：${user?.id.slice(0, 8) ?? '-'}　区域：${user?.region === 'cn' ? '中国区' : 'Global'}　状态：${user?.status ?? '-'}` : `Internal ID ${user?.id.slice(0, 8) ?? '-'} · ${user?.region === 'cn' ? 'CN' : 'Global'} · ${user?.status ?? '-'}`}
-          </p>
-          <p className="hint">{/* 执行当前业务步骤 */}
             {isZh ? '注销后账号进入冷静期，到期执行删除；冷静期内可随时撤销。删除后资料与权益不可恢复。' : 'Deletion enters a cooling-off period; you can cancel it before it executes.'}
           </p>
-          <p className="hint">{/* 执行当前业务步骤 */}
-            {isZh ? `当前账号状态：${user?.status ?? '-'}` : `Status: ${user?.status ?? '-'}`}
-            {user?.deletion_scheduled_at ? `　${isZh ? '注销生效时间' : 'Deletion at'}：${new Date(user.deletion_scheduled_at).toLocaleString()}` : ''}
-          </p>
+          {user?.deletion_scheduled_at ? (
+            <p className="hint">{isZh ? `注销生效时间：${new Date(user.deletion_scheduled_at).toLocaleString()}` : `Deletion at: ${new Date(user.deletion_scheduled_at).toLocaleString()}`}</p>
+          ) : null}
           {user?.status === 'deleting' || user?.deletion_scheduled_at ? (
             <button type="button" className="btn primary" onClick={() => void toggleDeletion(false)}>{isZh ? '撤销注销申请' : 'Cancel deletion'}</button>
           ) : (

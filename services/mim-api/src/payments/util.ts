@@ -8,11 +8,12 @@ export function missingEnv(env: Record<string, string | undefined>, keys: string
   return keys.filter((key) => !(env[key] ?? '').trim()); // 返回当前函数的处理结果
 } // 代码块结束
 
-/** 凭证不齐时抛 503 PROVIDER_NOT_CONFIGURED，并在 details 指明缺失变量 */
+/** 凭证不齐时抛 503 PROVIDER_NOT_CONFIGURED；缺失变量名只写服务端日志，不进对外信封 */
 export function requireConfigured(env: Record<string, string | undefined>, keys: string[], label: string): void {
   const missing = missingEnv(env, keys); // 常量 missing：保存固定配置或一次性派生值
   if (missing.length > 0) { // 条件分支：按判断结果选择后续处理路径
-    throw new AppError('PROVIDER_NOT_CONFIGURED', `${label}渠道未配置`, { env: missing }); // 抛出错误：中断当前流程并向上层传递
+    console.warn(`[payments] ${label} 渠道缺少配置：${missing.join(', ')}`); // 服务端留痕：变量名不外发给调用方
+    throw new AppError('PROVIDER_NOT_CONFIGURED', `${label}渠道暂不可用`); // 对外只给通用文案，避免暴露配置项名称
   } // 代码块结束
 } // 代码块结束
 
@@ -97,7 +98,8 @@ export async function upstreamJson(
   try { // 异常捕获起点：包裹可能抛出错误的操作
     res = await fetch(url, { method: 'POST', headers: { 'content-type': contentType, ...headers }, body }); // 赋值：更新变量 res 的取值
   } catch (error) { // 代码块结束
-    throw new AppError('INTERNAL_ERROR', `上游渠道网络不可达: ${error instanceof Error ? error.message : String(error)}`); // 抛出错误：中断当前流程并向上层传递
+    console.error('[payments] 上游渠道网络不可达', error); // 服务端留痕：底层网络错误细节不外发
+    throw new AppError('INTERNAL_ERROR', '支付渠道暂时不可达，请稍后重试'); // 对外只给通用文案，避免暴露内部地址与错误细节
   } // 代码块结束
   const text = await res.text(); // 常量 text：保存固定配置或一次性派生值
   let json: unknown = null; // 可变变量 json：运行过程中会被重新赋值

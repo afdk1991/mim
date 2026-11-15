@@ -28,8 +28,8 @@ export default defineConfig({
   build: {
     // 产物目录，与部署脚本、CI 的发布路径约定一致
     outDir: 'dist',
-    // 生成 sourcemap：线上报错时可还原到原始 TSX 行号，便于定位
-    sourcemap: true,
+    // 关闭 sourcemap：避免生产环境公开还原源码、内部路径与注释，调试改用本地构建
+    sourcemap: false,
     // 人工分包：把稳定第三方与工作区共享包从视图 chunk 中剥离，避免两个 1MB+ 大共享 chunk；
     // 路由级 React.lazy 拆分保持不变，异步 chunk 仍按需加载
     rollupOptions: {

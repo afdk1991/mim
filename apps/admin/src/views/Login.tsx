@@ -164,11 +164,11 @@ export function Login({ onDone, notice }: LoginProps) {
                 type="password" // 掩码显示，防旁观者窥屏
                 value={token} // 受控绑定 token 状态
                 autoComplete="off" // 禁止浏览器自动保存令牌
-                placeholder="与服务端 MIM_ADMIN_TOKEN 一致" // 提示令牌来源：服务端环境变量
+                placeholder="请输入管理员令牌" // 仅提示输入内容，不暴露服务端配置项名称
                 onChange={(event) => setToken(event.target.value)} // 输入即写入 token
               /> {/* 令牌输入框结束 */}
             </label> {/* 令牌字段结束 */}
-            <p className="hint">引导令牌拥有全部权限，仅在首个超管账号建立前使用。</p> {/* 安全提示：说明引导令牌权限边界 */}
+            <p className="hint">令牌用于管理员身份验证。</p> {/* 中性提示：不暴露引导流程与权限边界 */}
             <button className="btn primary" type="submit" disabled={busy}> {/* 提交按钮，busy 时禁用防重复提交 */}
               {busy ? '验证中…' : '进入后台'} {/* 按提交态切换按钮文案 */}
             </button> {/* 提交按钮结束 */}

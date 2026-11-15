@@ -52,7 +52,7 @@ describe('公开能力', () => { // describe 公开能力：无需鉴权的端�
     const health = await request(app).get('/health'); // 直接 GET /health，不携带任何请求头
     expect(health.status).toBe(200); // 断言 200，探活路径必须恒可用
     expect(health.body.status).toBe('ok'); // 断言业务状态为 ok，供负载均衡与监控判定实例就绪
-    expect(health.body.service).toBe('mim-api'); // 断言服务名，避免多服务混布时探活串台
+    expect(health.body.service).toBeUndefined(); // 对外不再暴露服务名，避免内部标识泄露
   }); // 结束健康检查用例
 
   it('非法 JSON 请求体返回 400 VALIDATION_FAILED，而不是 500', async () => { // 用例：畸形 JSON 应被识别为请求体校验失败，而不是服务端异常

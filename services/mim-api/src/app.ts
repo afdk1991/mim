@@ -106,7 +106,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createCacheHeaderMiddleware({ maxAgeSeconds: 60, scope: 'public' })); // 私有端点由该中间件按 scope 跳过，避免把用户数据写进共享缓存
 
   app.get('/health', (_req, res) => { // 健康检查：必须早于鉴权路由，供负载均衡与 CI 探活
-    res.json({ status: 'ok', service: 'mim-api', version: SERVICE_VERSION }); // 返回最小静态响应，不查库以免探活放大故障
+    res.json({ status: 'ok' }); // 返回最小静态响应：不含服务名与版本，避免对外暴露内部标识
   }); // 健康检查路由结束
 
   // 就绪探针：/health 只证明进程活着，/ready 还要确认依赖可用，部署与负载均衡据此决定是否放流量

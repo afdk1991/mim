@@ -121,7 +121,7 @@ export function PaymentReturn({ locale }: Props) {
           {status === 'failed' && (
             <>
               <strong className="danger">{tr(locale, 'web.return.failed')}</strong>
-              <p className="hint">{intent.status}</p>
+              <p className="hint">{locale === 'en-US' ? 'Payment was not completed. You can try again.' : '支付未完成，可重新发起支付。'}</p>
               <button type="button" className="btn ghost" onClick={() => navigatePath(pathOf('checkout'))}>
                 {tr(locale, 'web.common.payNow')}
               </button>

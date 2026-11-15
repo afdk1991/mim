@@ -3,8 +3,7 @@
  * 2026-11-15 起由独立 /announcements 页面并入社区，数据源仍是 /content/* 公开接口，
  * 不复制静态文案；任一接口失败或返回空数组时静默隐藏对应栏目，不报错、不白屏。
  * 同日 /news 的全站内容流并入「社区动态」子页签（仍走 GET /content/items），
- * /releases 的版本补充信息（提交短哈希、线上状态、变化清单）、能力地图与阅读口径
- * 并入「更新日志」子页签，避免内容随页面下线而丢失。
+ * /releases 的版本记录并入「更新日志」子页签，避免内容随页面下线而丢失。
  * 已登录运营可在本页签内增删改（复用 /admin/content/* 契约，挂 appearance:write 权限）；
  * 无会话或无权限时管理面板静默隐藏，公开面不受影响。
  */
@@ -23,7 +22,6 @@ import type { // 引入依赖、类型或本地模块绑定
   ChangelogUpsertPayload,
   PromotionUpsertPayload,
 } from '../api'; // 内容条目与管理入参类型
-import { CAPABILITY_NOTES, RELEASE_DETAILS, RELEASE_READING_NOTES } from '../lib/release-notes'; // 原版本页的静态补充信息
 
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
@@ -75,17 +73,19 @@ function sortByVersionDesc<T>(items: T[], versionText: (item: T) => string, date
   }); // 排序结束
 } // 代码块结束
 
-/** 取版本号主.次.补丁三段作为补充信息索引键；无版本号返回空串。 */
-function versionKey(text?: string | null): string {
-  const match = (text ?? '').match(/v?(\d+)\.(\d+)\.(\d+)/i); // 兼容 V0.0.10 与 0.0.10
-  return match ? `${match[1]}.${match[2]}.${match[3]}` : ''; // 与 RELEASE_DETAILS 的键一致
-} // 代码块结束
-
 /** 全站内容流的来源徽标：三类来源在列表内可一眼区分。 */
 function feedSourceLabel(locale: Locale, source: ContentFeedSource): string {
   if (source === 'community_thread') return tr(locale, '论坛主题', 'Forum thread'); // 论坛主题
   if (source === 'circle_post') return tr(locale, '圈子动态', 'Circle post'); // 圈子动态
   return tr(locale, '圈内公告', 'Circle notice'); // 圈内公告
+} // 代码块结束
+
+/** 推广状态文案：内部状态机不直接外显给普通用户。 */
+function promoStatusText(locale: Locale, status: string): string {
+  if (status === 'active') return tr(locale, '进行中', 'Active'); // 正在投放
+  if (status === 'paused') return tr(locale, '已暂停', 'Paused'); // 暂停投放
+  if (status === 'archived') return tr(locale, '已结束', 'Ended'); // 已归档
+  return tr(locale, '—', '—'); // 未知取值不外显内部枚举
 } // 代码块结束
 
 /** 公告管理表单草稿。 */
@@ -450,9 +450,6 @@ export function AnnouncementsPanel({ locale, hasSession = false, initialTab }: P
       {tab === 'changelog' && sortedChangelog.length > 0 && (
         <ol className="changelog-timeline">{/* 执行当前业务步骤 */}
           {sortedChangelog.map((item) => {
-            // 原 /releases 页面独有补充：提交短哈希、线上状态、主要变化；按版本号对齐，缺失则只渲染日志正文
-            const detail = RELEASE_DETAILS[versionKey(item.version)];
-            const changes = detail ? (locale === 'en-US' ? detail.changesEn : detail.changesZh) : [];
             return (
               <li
                 className="changelog-entry is-link"
@@ -464,37 +461,14 @@ export function AnnouncementsPanel({ locale, hasSession = false, initialTab }: P
               >
                 <div className="changelog-version">{/* 执行当前业务步骤 */}
                   <span className="deploy-badge">{item.version}</span>
-                  {detail ? <span className="muted">{detail.date} · {detail.commit}</span> : null}
                   {item.published_at ? <span className="muted">{fmtDate(item.published_at)}</span> : null}
-                  {detail ? <span className="deploy-badge muted">{locale === 'en-US' ? detail.stateEn : detail.stateZh}</span> : null}
                 </div>
                 <h3>{item.title}</h3>
                 <p className="muted">{item.body}</p>
-                {changes.length > 0 && (
-                  <ul className="plain-list">{/* 主要变化清单 */}
-                    {changes.map((line) => <li className="muted" key={line}>{line}</li>)}
-                  </ul>
-                )}
               </li>
             );
           })}
         </ol>
-      )}
-
-      {tab === 'changelog' && (
-        <section className="panel content-admin" aria-label={locale === 'en-US' ? 'Reading notes and capability map' : '阅读口径与能力地图'}>
-          <h3>{tr(locale, '阅读口径', 'Reading notes')}</h3>
-          <ul className="plain-list">
-            {RELEASE_READING_NOTES.map((note) => <li className="muted" key={note.zh}>{locale === 'en-US' ? note.en : note.zh}</li>)}
-          </ul>
-          <h3>{tr(locale, '能力地图', 'Capability map')}</h3>
-          <p className="muted">{tr(locale, '各能力入口统一走左侧导航与社区页签，这里只保留说明。', 'Entries live in the sidebar and community tabs; this list only describes them.')}</p>
-          <ul className="plain-list">
-            {CAPABILITY_NOTES.map((item) => (
-              <li key={item.labelZh} className="muted">{locale === 'en-US' ? `${item.labelEn}：${item.descEn}` : `${item.labelZh}：${item.descZh}`}</li>
-            ))}
-          </ul>
-        </section>
       )}
 
       {tab === 'feed' && feed.length > 0 && (
@@ -525,7 +499,7 @@ export function AnnouncementsPanel({ locale, hasSession = false, initialTab }: P
             <a className="panel promotion-card" key={item.id} href={item.target_url || undefined}>{/* 执行当前业务步骤 */}
               <div className="panel-head">{/* 执行当前业务步骤 */}
                 <h3>{item.name}</h3>
-                <span className="deploy-badge muted">{item.status}</span>
+                <span className="deploy-badge muted">{promoStatusText(locale, item.status)}</span>
               </div>
               <p className="muted">{item.summary}</p>
               <span className="muted">{/* 执行当前业务步骤 */}
