@@ -5,11 +5,11 @@
  * 「配置即启用」接线一致性校验（零依赖，纯静态）。核对三处白名单是否同口径：
  *
  *  1. .github/workflows/deploy.yml
- *     - deploy job「远程发布」步骤 env: 段声明的 secret 名；
- *     - 同步骤 run 脚本里 `for v in ...; do` 透传循环列出的变量名。
+ *     - env: 段声明的 MIM_ 变量（secret 与 vars 两种来源都算已声明）；
+ *     - 步骤 run 脚本里 `for v in ...; do` 透传循环列出的变量名。
  *  2. deploy/deploy.sh
- *     - 既有 SMS / SES / ADMIN_TOKEN / AUTH_ADMIN_PASSWORD 段；
- *     - 本轮新增 ADAPTER_VARS 幂等写入段。
+ *     - 既有 SMS / SES / ADMIN_TOKEN 段与 ADAPTER_VARS 幂等写入段；
+ *     - 脚本顶部 `${MIM_X:-默认值}` 兜底的端口 / 同机开关变量。
  *  3. docs/wiki/09-third-party-sdk-inventory.md + .env.example
  *     - 透传变量必须已登记（精确名或前缀通配命中），避免「配了 secret 却没登记」漂移。
  *
@@ -37,9 +37,10 @@ function read(p) { // 函数 read：封装一段可复用的处理逻辑
 // --- 1. 解析 deploy.yml ---
 const yml = read(deployYml);
 
-// env: 段中 `NAME: ${{ secrets.NAME }}`（只纳入 MIM_ 前缀的业务变量；其它平台 Token 不参与本接线核对）
+// env: 段中 `NAME: ${{ secrets.NAME }}` 或 `NAME: ${{ vars.NAME || '默认值' }}`
+// 两者都是「已声明」：敏感值走 secret，端口 / 开关这类非机密配置走仓库变量。
 const envDeclared = new Set();
-for (const m of yml.matchAll(/^\s*(MIM_[A-Z0-9_]*):\s*\$\{\{\s*secrets\.[A-Z][A-Z0-9_]*\s*\}\}/gm)) { // 循环：逐项遍历集合并执行相同处理
+for (const m of yml.matchAll(/^\s*(MIM_[A-Z0-9_]*):\s*\$\{\{\s*(?:secrets|vars)\.[A-Za-z_][A-Za-z0-9_]*/gm)) { // 循环：逐项遍历集合并执行相同处理
   envDeclared.add(m[1]); // 执行当前业务步骤
 } // 代码块结束
 
@@ -63,8 +64,14 @@ if (smsLoop) { // 条件分支：按判断结果选择后续处理路径
   } // 代码块结束
 } // 代码块结束
 // 既有单独透传段
-for (const name of ['MIM_ADMIN_TOKEN', 'MIM_AUTH_ADMIN_PASSWORD']) {
+for (const name of ['MIM_ADMIN_TOKEN']) {
   if (sh.includes(`${name}:-`) || sh.includes(`$${name}`)) shNames.add(name); // 条件分支：按判断结果选择后续处理路径
+} // 代码块结束
+// 纯部署机本地变量：只决定「写哪个文件」，不属于应用运行配置，不参与透传核对
+const DEPLOY_LOCAL_VARS = new Set(['MIM_ENV_FILE']);
+// 脚本顶部端口 / 同机开关：`MIM_X="${MIM_X:-默认值}"` 直接兜底，无需进入循环
+for (const m of sh.matchAll(/^\s*(MIM_[A-Z0-9_]+)="\$\{\1:-/gm)) { // 循环：逐项遍历集合并执行相同处理
+  if (!DEPLOY_LOCAL_VARS.has(m[1])) shNames.add(m[1]); // 条件分支：按判断结果选择后续处理路径
 } // 代码块结束
 // 新增 ADAPTER_VARS 块
 const adapterBlock = sh.match(/ADAPTER_VARS="([\s\S]*?)"/);
