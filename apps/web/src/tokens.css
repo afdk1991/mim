@@ -1,0 +1,172 @@
+/**
+ * Mim 全站设计令牌（令牌层唯一来源）。
+ *
+ * 风格口径：卡片化布局、较大圆角、柔和环境阴影、浅色底 + 单一主色、
+ * 清晰的字号阶梯、克制的悬停过渡、舒适的信息密度。
+ * 只借鉴视觉规则，不引入任何第三方 UI 库，也不含任何外部素材。
+ *
+ * 加载顺序：本文件必须在 styles.css 之前引入（见 main.tsx），
+ * 保证页面样式里的 var() 都消费同一份令牌；运行期后台主题
+ * （appearance.ts）仍可用内联 --primary / --bg / --radius 覆盖。
+ */
+
+:root { /* 令牌根作用域：浅色为默认配色 */
+  color-scheme: light; /* 声明浅色方案，让滚动条与原生控件跟随 */
+
+  /* ---------- 中性色阶梯：底色 / 表面 / 文字 / 描边 ---------- */
+  --bg: #f5f6f7; /* 页面底色：浅灰，托起白色卡片形成层次 */
+  --surface: #ffffff; /* 一级表面：卡片、面板、弹窗内容区 */
+  --surface-2: #f6f7f8; /* 二级表面：表头、悬停底、弱化区块 */
+  --surface-3: #eef0f3; /* 三级表面：徽标底、分段控件未选中底 */
+  --text: #333333; /* 主文字：标题与关键信息 */
+  --text-secondary: #4e5358; /* 正文文字：段落与卡片摘要 */
+  --text-muted: #777777; /* 次要文字：说明、计数、元信息 */
+  --text-subtle: #999999; /* 更弱文字：时间戳、占位提示 */
+  --text-disabled: #b1b1b1; /* 禁用文字：不可用项与占位符 */
+  --border: #ebedf0; /* 常规描边：卡片、输入框、分割线 */
+  --border-strong: #e3e6ec; /* 强调描边：需要更清晰边界的分组 */
+  --border-hover: #c9ced9; /* 悬停描边：次按钮 hover 时加深一档 */
+
+  /* ---------- 主色与状态色：单一主色 + 语义色 ---------- */
+  --primary: #3b6ef5; /* 品牌主色：主按钮、选中态、链接 */
+  --primary-hover: #2f59c9; /* 主色悬停：加深一档，不做发光 */
+  --primary-active: #274bb0; /* 主色按下：再加深一档 */
+  --primary-dark: #2f59c9; /* 兼容旧令牌：等同于 --primary-hover，页面无需改名 */
+  --primary-soft: rgba(59, 110, 245, 0.1); /* 主色淡底：选中行、标签底 */
+  --primary-ring: rgba(59, 110, 245, 0.28); /* 主色焦点环：键盘可见性 */
+  --on-primary: #ffffff; /* 主色底上的文字色 */
+  --danger: #d64545; /* 危险色：删除、错误 */
+  --danger-soft: rgba(214, 69, 69, 0.1); /* 危险淡底 */
+  --danger-border: rgba(214, 69, 69, 0.28); /* 危险描边：危险按钮与面板边界 */
+  --success: #1f8a5b; /* 成功色：完成、通过 */
+  --success-soft: rgba(31, 138, 91, 0.1); /* 成功淡底 */
+  --warning: #a86a10; /* 警告色：需留意但不阻断 */
+  --warning-soft: rgba(168, 106, 16, 0.12); /* 警告淡底 */
+  --info: #2f6fed; /* 信息色：普通提示 */
+  --info-soft: rgba(47, 111, 237, 0.1); /* 信息淡底 */
+  --violet: #7a55c9; /* 紫色：受限权限等第三类语义 */
+  --violet-soft: #f1ecfb; /* 紫色淡底 */
+
+  /* ---------- 侧栏：保留深色栏形成强对比 ---------- */
+  --sidebar: #1d2433; /* 侧栏底色 */
+  --sidebar-text: #cfd6e4; /* 侧栏常规文字 */
+  --sidebar-strong: #eef1f7; /* 侧栏强调文字：品牌名与当前用户 */
+  --sidebar-muted: #8a93a6; /* 侧栏次要文字 */
+  --sidebar-hover: #2a3447; /* 侧栏悬停底 */
+  --sidebar-line: rgba(255, 255, 255, 0.08); /* 侧栏分割线 */
+  --sidebar-line-strong: rgba(255, 255, 255, 0.18); /* 侧栏强调描边：幽灵按钮 */
+
+  /* ---------- 圆角阶梯：卡片较大、控件较小、标签胶囊 ---------- */
+  --radius: 12px; /* 主圆角：卡片与面板（后台主题可运行期覆盖） */
+  --radius-xs: 4px; /* 最小圆角：标签、行内码 */
+  --radius-sm: 8px; /* 小圆角：输入框、小按钮 */
+  --radius-md: 12px; /* 中圆角：常规卡片 */
+  --radius-lg: 16px; /* 大圆角：主推卡、详情卡、弹窗 */
+  --radius-pill: 999px; /* 胶囊：标签、筛选、头像位 */
+
+  /* ---------- 阴影：柔和环境阴影，不叠加硬边 ---------- */
+  --shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.04); /* 贴地阴影：输入框、分段底 */
+  --shadow-sm: 0 0 10px rgba(116, 116, 116, 0.08); /* 环境阴影：列表卡片默认 */
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 18px rgba(17, 24, 39, 0.06); /* 标准卡片阴影 */
+  --shadow-lg: 0 2px 4px rgba(17, 24, 39, 0.04), 0 16px 40px rgba(17, 24, 39, 0.1); /* 浮层阴影：弹窗、下拉 */
+  --shadow-hover: 0 4px 10px rgba(17, 24, 39, 0.06), 0 12px 28px rgba(17, 24, 39, 0.08); /* 悬停抬升阴影 */
+
+  /* ---------- 字体与字号阶梯：12 / 13 / 14 / 16 / 18 / 22 / 28 ---------- */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; /* 中英文系统字体栈 */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* 等宽字体栈：代码与令牌 */
+  --fs-xs: 12px; /* 最小字号：标签、辅助说明 */
+  --fs-sm: 13px; /* 小字号：元信息、次要按钮 */
+  --fs-base: 14px; /* 基准字号：正文与列表主体 */
+  --fs-md: 16px; /* 中字号：小节标题、卡片标题 */
+  --fs-lg: 18px; /* 大字号：区块标题 */
+  --fs-xl: 22px; /* 页面主标题 */
+  --fs-2xl: 28px; /* 首屏大标题 */
+  --lh-tight: 1.35; /* 紧凑行高：标题 */
+  --lh-base: 1.6; /* 基准行高：正文更易读 */
+  --lh-loose: 1.75; /* 宽松行高：长段落 */
+  --fw-normal: 400; /* 常规字重 */
+  --fw-medium: 500; /* 中等字重：列表标题 */
+  --fw-semibold: 600; /* 半粗：卡片标题 */
+  --fw-bold: 700; /* 加粗：页面主标题 */
+
+  /* ---------- 间距节奏：4 的倍数，页面与卡片共用 ---------- */
+  --sp-1: 4px; /* 紧凑间隙 */
+  --sp-2: 8px; /* 图标与文字之间 */
+  --sp-3: 12px; /* 控件内边距 */
+  --sp-4: 16px; /* 卡片内边距 / 栅格间距 */
+  --sp-5: 20px; /* 区块间距 */
+  --sp-6: 24px; /* 大区块间距 */
+  --sp-8: 32px; /* 页面级留白 */
+  --page-max: 1200px; /* 内容最大宽度：宽屏不散架 */
+
+  /* ---------- 动效：克制的颜色 / 阴影过渡 ---------- */
+  --ease: cubic-bezier(0.28, 0.9, 0.34, 0.99); /* 标准缓动：先快后缓 */
+  --dur-fast: 180ms; /* 快速反馈：悬停、聚焦 */
+  --dur: 300ms; /* 常规过渡：卡片抬升、浮层出现 */
+  --transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); /* 统一过渡集合 */
+
+  /* ---------- 卡片规格：与上方圆角 / 间距共用，避免各处手写 ---------- */
+  --card-radius: var(--radius); /* 标准卡片圆角 */
+  --card-radius-sm: var(--radius-sm); /* 紧凑卡片圆角 */
+  --card-radius-lg: var(--radius-lg); /* 主推 / 详情卡片圆角 */
+  --card-pad: 18px; /* 标准内边距：舒适密度 */
+  --card-pad-tight: 12px; /* 紧凑内边距 */
+  --card-gap: 16px; /* 卡片之间与栅格间距 */
+  --card-cover: 3 / 2; /* 封面统一比例 */
+  --card-min: 300px; /* 卡片网格最小列宽 */
+  --card-title-lines: 2; /* 标题最多两行 */
+  --card-summary-lines: 2; /* 摘要最多两行 */
+} /* 浅色令牌结束 */
+
+:root[data-theme='dark'] { /* 暗色令牌：显式切换才生效，不影响现有浅色默认 */
+  color-scheme: dark; /* 声明暗色方案，原生控件与滚动条同步 */
+
+  /* ---------- 中性色：暗底抬升，文字降亮度对比 ---------- */
+  --bg: #292a2d; /* 页面底色：中性深灰，不用纯黑 */
+  --surface: #323335; /* 一级表面：比底色亮一档 */
+  --surface-2: #37383a; /* 二级表面：表头、悬停底 */
+  --surface-3: #2d2e31; /* 三级表面：分段底、内嵌区块 */
+  --text: #e5eef7; /* 主文字：避免纯白刺眼 */
+  --text-secondary: #c3cad3; /* 正文文字 */
+  --text-muted: #b4b6bb; /* 次要文字 */
+  --text-subtle: #888a8f; /* 更弱文字 */
+  --text-disabled: #636469; /* 禁用文字 */
+  --border: rgba(184, 184, 184, 0.12); /* 常规描边：暗底半透明更自然 */
+  --border-strong: rgba(184, 184, 184, 0.2); /* 强调描边 */
+  --border-hover: rgba(184, 184, 184, 0.32); /* 悬停描边：暗底需更亮才可见 */
+
+  /* ---------- 主色与状态色：提亮保证暗底对比 ---------- */
+  --primary: #6f95ff; /* 主色：暗底提亮一档 */
+  --primary-hover: #8aa8ff; /* 悬停再提亮 */
+  --primary-active: #5b83f0; /* 按下回落 */
+  --primary-soft: rgba(111, 149, 255, 0.16); /* 主色淡底 */
+  --primary-ring: rgba(111, 149, 255, 0.36); /* 焦点环 */
+  --on-primary: #10141c; /* 亮主色底上的深色文字 */
+  --danger: #ff7a7a; /* 危险色提亮 */
+  --danger-soft: rgba(255, 122, 122, 0.14); /* 危险淡底 */
+  --danger-border: rgba(255, 122, 122, 0.36); /* 危险描边 */
+  --success: #4cc38a; /* 成功色提亮 */
+  --success-soft: rgba(76, 195, 138, 0.14); /* 成功淡底 */
+  --warning: #e0a94f; /* 警告色提亮 */
+  --warning-soft: rgba(224, 169, 79, 0.16); /* 警告淡底 */
+  --info: #7aa2ff; /* 信息色提亮 */
+  --info-soft: rgba(122, 162, 255, 0.14); /* 信息淡底 */
+  --violet: #b49bf0; /* 紫色提亮：暗底保证对比 */
+  --violet-soft: rgba(180, 155, 240, 0.16); /* 紫色淡底 */
+
+  /* ---------- 侧栏：暗色下与内容区仍保持一档差异 ---------- */
+  --sidebar: #20242c; /* 侧栏底色 */
+  --sidebar-text: #cfd6e4; /* 侧栏常规文字 */
+  --sidebar-strong: #eef1f7; /* 侧栏强调文字 */
+  --sidebar-muted: #8a93a6; /* 侧栏次要文字 */
+  --sidebar-hover: #2b313c; /* 侧栏悬停底 */
+  --sidebar-line: rgba(255, 255, 255, 0.08); /* 侧栏分割线 */
+  --sidebar-line-strong: rgba(255, 255, 255, 0.18); /* 侧栏强调描边 */
+
+  /* ---------- 阴影：暗底用更高不透明度，避免看不见 ---------- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28); /* 贴地阴影 */
+  --shadow-sm: 0 0 12px rgba(0, 0, 0, 0.3); /* 环境阴影 */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.32); /* 标准卡片阴影 */
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.44); /* 浮层阴影 */
+  --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.4); /* 悬停抬升阴影 */
+} /* 暗色令牌结束 */

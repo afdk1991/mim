@@ -1,21 +1,4 @@
-/* 管理后台全局样式：复用用户端设计令牌，保证两端视觉语言一致 */
-:root { /* 设计令牌根作用域：所有变量在此集中声明 */ 
-  --bg: #f4f5f7; /* 页面底色：浅灰降低长时间盯屏的视觉疲劳 */ 
-  --surface: #ffffff; /* 卡片/面板底色：与页面底色形成层次 */ 
-  --sidebar: #1d2433; /* 侧栏深色底：管理端与用户端共用同一品牌色 */ 
-  --sidebar-muted: #8a93a6; /* 侧栏次要文字色：用于分组标题与说明 */ 
-  --sidebar-hover: #2a3447; /* 侧栏悬停底色：比底色略亮以表达可点击 */ 
-  --text: #1c2230; /* 主文字色：高对比保证可读性 */ 
-  --text-muted: #6b7280; /* 次要文字色：说明、时间戳、空态 */ 
-  --border: #e3e6ec; /* 分割线/描边色 */ 
-  --primary: #3b6ef5; /* 主色：主要按钮与激活态 */ 
-  --primary-dark: #2f59c9; /* 主色按下态 */ 
-  --danger: #d64545; /* 危险色：删除、归档、错误提示 */ 
-  --success: #1f8a5b; /* 成功色：上线成功、已激活 */ 
-  --warning: #a86a10; /* 警告色：待处理、需注意 */ 
-  --radius: 10px; /* 统一圆角 */ 
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06); /* 卡片阴影 */ 
-} /* 令牌结束 */ 
+/* 管理后台设计令牌已迁至 tokens.css（2026-11-15）：本文件只消费 var()，不再声明颜色 / 圆角 / 阴影 */
 
 /* 全局盒模型：宽度包含内边距与边框，避免布局溢出 */ 
 *, *::before, *::after { box-sizing: border-box; } /* 统一盒模型 */ 
@@ -23,15 +6,16 @@
 /* body 基础排版 */ 
 body { /* 页面主体 */ 
   margin: 0; /* 清除浏览器默认外边距 */ 
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; /* 中英文优先系统字体 */ 
+  font-family: var(--font-family); /* 字体族走设计令牌 */ 
   background: var(--bg); /* 页面底色 */ 
-  color: var(--text); /* 默认文字色 */ 
-  font-size: 14px; /* 基础字号：信息密度与可读性折中 */ 
-  line-height: 1.55; /* 行高：中文段落更易读 */ 
+  color: var(--text-secondary); /* 正文用次级文字色，标题单列主色 */ 
+  font-size: var(--fs-base); /* 基础字号：信息密度与可读性折中 */ 
+  line-height: var(--lh-base); /* 行高：中文段落更易读 */ 
+  transition: var(--transition); /* 切换明暗主题时颜色平滑过渡 */ 
 } /* body 结束 */ 
 
 /* 标题去除默认外边距，交由布局控制间距 */ 
-h1, h2, h3, h4 { margin: 0; font-weight: 600; } /* 标题统一字重 */ 
+h1, h2, h3, h4 { margin: 0; color: var(--text); font-weight: var(--fw-semibold); line-height: var(--lh-tight); } /* 标题统一字重与颜色层级 */ 
 
 /* 链接默认继承文字色，避免蓝色满屏 */ 
 a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */ 
@@ -124,6 +108,14 @@ a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } /* 横向行内控件 */ 
 .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; } /* 单个字段 */ 
 .field > span { font-size: 12px; color: var(--text-muted); } /* 字段标签 */ 
+.form.inline { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 10px; } /* 横向内联表单 */ 
+.form.inline label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); min-width: 140px; } /* 内联字段纵向排布 */ 
+.form label.grow { flex: 1; min-width: 200px; } /* 占满剩余宽度的字段 */ 
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; } /* 复选行 */ 
+.btn.small { padding: 4px 8px; font-size: 12px; } /* 小号按钮 */ 
+.deploy-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); } /* 台账行 */ 
+.deploy-kv { display: flex; flex-direction: column; gap: 4px; min-width: 220px; } /* 台账主信息 */ 
+.deploy-columns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } /* 横向多列块 */ 
 input, select, textarea { /* 表单控件统一外观 */ 
   padding: 7px 10px; /* 内边距 */ 
   border: 1px solid var(--border); /* 描边 */ 

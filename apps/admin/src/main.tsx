@@ -4,6 +4,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 // 应用根组件：登录态与视图切换都由它内部处理
 import { App } from './App';
+// 设计令牌：必须先于 styles.css 注入，保证页面样式里的 var() 全部命中
+import './tokens.css';
 // 全局样式：由 Vite 打包注入，保证主题变量与布局类在首屏即生效
 import './styles.css';
 

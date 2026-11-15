@@ -1,33 +1,5 @@
-:root { /* 全局设计令牌：颜色/圆角/阴影集中定义，换肤或调整质感只改这里 */
-  color-scheme: light; /* 声明浅色配色方案，浏览器据此渲染滚动条与原生控件 */
-  --bg: #f4f5f7; /* 页面底色：极浅灰，让白色卡片形成层次 */
-  --surface: #ffffff; /* 卡片/面板表面色 */
-  --sidebar: #1d2433; /* 侧边栏深色底，与内容区形成强对比 */
-  --sidebar-muted: #8a93a6; /* 侧边栏内的次要文字（区域标识、版本号等弱化信息） */
-  --sidebar-hover: #2a3447; /* 侧边栏悬停底色，比底色略亮一档 */
-  --text: #1c2230; /* 主文字色：近黑，保证正文可读性 */
-  --text-muted: #6b7280; /* 次要文字色：说明、计数、任务元信息 */
-  --border: #e3e6ec; /* 中性边框色，用于卡片与输入框描边 */
-  --primary: #3b6ef5; /* 品牌主色：主按钮、选中态、链接 */
-  --primary-dark: #2f59c9; /* 主色加深版：主按钮悬停 */
-  --danger: #d64545; /* 危险色：删除类操作与错误提示 */
-  --success: #1f8a5b; /* 成功色：已完成状态与成功提示 */
-  --warning: #a86a10; /* 警告色：需留意但不阻断流程 */
-  --radius: 10px; /* 卡片统一圆角，保持视觉一致性 */
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; /* 字体族：后台主题可覆盖 */
-  --shadow: 0 1px 2px rgba(20, 28, 45, 0.06), 0 8px 24px rgba(20, 28, 45, 0.05); /* 双层阴影：近距勾边 + 远距柔和投影 */
-  /* ---------- 共享卡片规格（2026-11-15 统一）：宽度由栅格列决定，以下只约束内距 / 圆角 / 封面 / 间距 ---------- */
-  --card-radius: 12px; /* 标准卡片圆角 */
-  --card-radius-sm: 10px; /* 紧凑卡片圆角 */
-  --card-radius-lg: 16px; /* 主推 / 详情卡片圆角 */
-  --card-pad: 18px; /* 标准内边距 */
-  --card-pad-tight: 12px; /* 紧凑内边距 */
-  --card-gap: 14px; /* 卡片之间与栅格间距 */
-  --card-cover: 3 / 2; /* 封面统一比例 */
-  --card-min: 300px; /* 卡片网格最小列宽：列表 / 网格共用同一档 */
-  --card-title-lines: 2; /* 标题最多两行 */
-  --card-summary-lines: 2; /* 摘要最多两行 */
-} /* 设计令牌块结束 */
+/* 全局设计令牌已迁至 tokens.css（2026-11-15）：本文件只消费 var()，不再声明颜色 / 圆角 / 阴影，
+   避免两处同名变量互相覆盖；后台主题仍可通过内联样式覆盖 --primary / --bg / --radius。 */
 
 * { /* 通配选择器：统一盒模型 */
   box-sizing: border-box; /* 宽高包含 padding 与 border，避免百分比/栅格布局横向溢出 */
@@ -42,24 +14,28 @@ body, /* 可见内容容器 */
 body { /* 页面基础排版 */
   margin: 0; /* 清除浏览器默认外边距，消除四周白边 */
   background: var(--bg); /* 应用全局底色 */
-  color: var(--text); /* 继承主文字色，子元素无需重复声明 */
+  color: var(--text-secondary); /* 正文用次级文字色：标题仍走主文字色，形成两档层级 */
   font-family: var(--font-family); /* 字体族走设计令牌，后台主题可整体覆盖 */
-  font-size: 14px; /* 基准字号：紧凑的信息密度适合模块列表与工作台场景 */
-  line-height: 1.5; /* 1.5 倍行高保证中文段落可读性 */
+  font-size: var(--fs-base); /* 基准字号走令牌：14px 兼顾信息密度与可读性 */
+  line-height: var(--lh-base); /* 1.6 倍行高：中文段落更舒适 */
+  -webkit-font-smoothing: antialiased; /* 细字重在浅底上更均匀，配合柔和阴影质感 */
+  transition: var(--transition); /* 切换明暗主题时颜色平滑过渡 */
 } /* body 规则结束 */
 
 h1, /* 一级标题 */
 h2 { /* 二级标题 */
   margin: 0; /* 移除标题默认外边距，间距统一交给布局 gap 控制 */
-  font-weight: 600; /* 统一半粗字重，避免默认 700 过重 */
+  color: var(--text); /* 标题回到主文字色，与正文拉开一档 */
+  font-weight: var(--fw-semibold); /* 统一半粗字重，避免默认 700 过重 */
+  line-height: var(--lh-tight); /* 标题用紧凑行高，多行也不松散 */
 } /* 标题基础样式结束 */
 
 h1 { /* 页面主标题 */
-  font-size: 22px; /* 与卡片正文形成明显层级差 */
+  font-size: var(--fs-xl); /* 22px：与卡片正文形成明显层级差 */
 } /* h1 结束 */
 
 h2 { /* 面板/小节标题 */
-  font-size: 15px; /* 仅比正文略大，保持界面克制 */
+  font-size: var(--fs-md); /* 16px：字号阶梯中一档，仅比正文略大，保持界面克制 */
 } /* h2 结束 */
 
 code { /* 行内代码/令牌展示 */
@@ -80,7 +56,7 @@ code { /* 行内代码/令牌展示 */
   gap: 24px; /* 三大区块之间的呼吸空间 */
   padding: 24px 18px; /* 上下留白大于左右，突出纵向分区 */
   background: var(--sidebar); /* 深色底与内容区区分 */
-  color: #eef1f7; /* 深底上的浅色文字，保证对比度 */
+  color: var(--sidebar-strong); /* 深底上的浅色文字，保证对比度 */
 } /* 侧边栏结束 */
 
 .brand { /* 品牌区：2026-11-10 起只承载应用名 */
@@ -107,10 +83,10 @@ code { /* 行内代码/令牌展示 */
 .nav-item { /* 单个导航按钮 */
   padding: 9px 12px; /* 点击热区高度约 36px，兼顾触控与密度 */
   border: 0; /* 去掉按钮默认边框 */
-  border-radius: 8px; /* 圆角与整体卡片风格统一 */
+  border-radius: var(--radius-sm); /* 圆角与整体卡片风格统一 */
   background: transparent; /* 默认无底色，仅文字可见 */
-  color: #cfd6e4; /* 深底上的次级浅灰文字 */
-  font-size: 14px; /* 与正文同号，导航不至于过小 */
+  color: var(--sidebar-text); /* 深底上的次级浅灰文字 */
+  font-size: var(--fs-base); /* 与正文同号，导航不至于过小 */
   text-align: left; /* 按钮默认居中，改为左对齐更像导航条目 */
   cursor: pointer; /* 悬停显示手型，提示可点击 */
 } /* 导航按钮结束 */
@@ -121,7 +97,7 @@ code { /* 行内代码/令牌展示 */
 
 .nav-item.active { /* 当前选中项 */
   background: var(--primary); /* 主色填充，明确当前位置 */
-  color: #fff; /* 主色底上用纯白保证对比度 */
+  color: var(--on-primary); /* 主色底上用纯白保证对比度 */
 } /* 选中态结束 */
 
 .subnav { /* 合并入口条：上级页面顶部给被合并页面的直达入口 */
@@ -152,7 +128,7 @@ code { /* 行内代码/令牌展示 */
   gap: 4px; /* 紧凑排布 */
   margin-top: auto; /* 吸底：把用户区推到侧边栏最下方 */
   padding: 14px 12px 0; /* 顶部留白区分导航区 */
-  border-top: 1px solid rgba(255, 255, 255, 0.08); /* 极淡分隔线，深底上不抢眼 */
+  border-top: 1px solid var(--sidebar-line); /* 极淡分隔线，深底上不抢眼 */
 } /* 用户区结束 */
 
 .user-name { /* 当前登录用户显示名 */
@@ -205,7 +181,7 @@ code { /* 行内代码/令牌展示 */
   height: 24px; /* 固定高度，与文字行高协调 */
   padding: 0 8px; /* 多位数时自动变宽 */
   border-radius: 999px; /* 胶囊圆角 */
-  background: #eef1f7; /* 浅灰底，弱化存在感 */
+  background: var(--surface-3); /* 浅灰底，弱化存在感 */
   color: var(--text-muted); /* 次要文字色 */
   font-size: 12px; /* 小字号，作为附属信息 */
   font-weight: 600; /* 加粗弥补小字号的可读性 */
@@ -216,22 +192,22 @@ code { /* 行内代码/令牌展示 */
 .warning { /* 警告提示条 */
   margin: 0; /* 清除段落默认外边距 */
   padding: 10px 12px; /* 内边距形成提示块 */
-  border-radius: 8px; /* 与卡片圆角体系一致 */
-  font-size: 13px; /* 略小正文，提示信息更紧凑 */
+  border-radius: var(--radius-sm); /* 与卡片圆角体系一致 */
+  font-size: var(--fs-sm); /* 略小正文，提示信息更紧凑 */
 } /* 提示条基础样式结束 */
 
 .error { /* 错误提示配色 */
-  background: #fdecec; /* 极浅红底 */
+  background: var(--danger-soft); /* 危险淡底：暗色下自动适配 */
   color: var(--danger); /* 危险色文字，突出失败 */
 } /* 错误提示结束 */
 
 .success { /* 成功提示配色 */
-  background: #e9f7f0; /* 极浅绿底 */
+  background: var(--success-soft); /* 成功淡底 */
   color: var(--success); /* 成功色文字 */
 } /* 成功提示结束 */
 
 .warning { /* 警告提示配色 */
-  background: #fdf3e3; /* 极浅橙底 */
+  background: var(--warning-soft); /* 警告淡底 */
   color: var(--warning); /* 警告色文字 */
 } /* 警告提示结束 */
 
@@ -268,26 +244,26 @@ code { /* 行内代码/令牌展示 */
 } /* 主推档结束 */
 .ui-card--link { /* 可点击卡片 */
   cursor: pointer; /* 整卡可点 */
-  transition: transform 0.15s ease, box-shadow 0.15s ease; /* 悬停过渡 */
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); /* 悬停过渡走统一令牌 */
 } /* 可点击卡片结束 */
 .ui-card--link:hover, /* 悬停 */
 .ui-card--link:focus-visible { /* 键盘聚焦 */
   transform: translateY(-2px); /* 轻微上浮 */
-  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.12); /* 加深投影 */
+  box-shadow: var(--shadow-hover); /* 加深投影：暗色下自动适配 */
   outline: none; /* 交由投影表达聚焦 */
 } /* 悬停结束 */
 .is-link { /* 可点击列表行 */
   cursor: pointer; /* 手型 */
-  transition: box-shadow 0.15s ease, transform 0.15s ease; /* 过渡 */
+  transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); /* 过渡走统一令牌 */
 } /* 结束 */
 .is-link:hover, /* 悬停 */
 .is-link:focus-visible { /* 键盘聚焦 */
-  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.12); /* 加深投影 */
+  box-shadow: var(--shadow-hover); /* 加深投影 */
   outline: none; /* 避免双重描边 */
 } /* 结束 */
 
 .panel.danger { /* 危险操作面板（如删除项目） */
-  border-color: #f2caca; /* 淡红描边提示风险 */
+  border-color: var(--danger-border); /* 危险描边提示风险 */
 } /* 危险面板结束 */
 
 .panel.done { /* 已完成面板 */
@@ -348,17 +324,17 @@ code { /* 行内代码/令牌展示 */
   height: 36px; /* 统一控件高度，行内对齐更整齐 */
   padding: 0 10px; /* 左右内边距，文字不贴边 */
   border: 1px solid var(--border); /* 默认细边框 */
-  border-radius: 8px; /* 与按钮圆角一致 */
-  background: #fff; /* 白底提高可辨识度 */
+  border-radius: var(--radius-sm); /* 与按钮圆角一致 */
+  background: var(--surface); /* 表面色：暗色下自动切换，不再写死白底 */
   color: var(--text); /* 输入文字用主文字色 */
-  font-size: 14px; /* 与正文同号，避免移动端聚焦缩放 */
+  font-size: var(--fs-base); /* 与正文同号，避免移动端聚焦缩放 */
   outline: none; /* 关闭浏览器默认轮廓，改用下方 focus 阴影表达焦点 */
 } /* 输入控件结束 */
 
 .form input:focus, /* 输入框聚焦 */
 .form select:focus { /* 下拉框聚焦 */
   border-color: var(--primary); /* 边框转主色，明确聚焦位置 */
-  box-shadow: 0 0 0 3px rgba(59, 110, 245, 0.15); /* 柔和外发光替代默认 outline，无障碍上仍可见焦点 */
+  box-shadow: 0 0 0 3px var(--primary-ring); /* 柔和焦点环替代默认 outline，无障碍上仍可见焦点 */
 } /* 聚焦态结束 */
 
 .row { /* 横向排列的一行控件 */
@@ -377,17 +353,17 @@ code { /* 行内代码/令牌展示 */
   height: 36px; /* 与输入控件等高，便于同行对齐 */
   padding: 0 14px; /* 左右留白，触控区域足够 */
   border: 1px solid var(--border); /* 默认描边式按钮 */
-  border-radius: 8px; /* 统一圆角 */
-  background: #fff; /* 白底次按钮 */
+  border-radius: var(--radius-sm); /* 统一圆角 */
+  background: var(--surface); /* 次按钮用表面色，暗色下自动切换 */
   color: var(--text); /* 主文字色 */
-  font-size: 13px; /* 略小于正文，按钮更紧凑 */
-  font-weight: 500; /* 中等字重提升可读性 */
+  font-size: var(--fs-sm); /* 略小于正文，按钮更紧凑 */
+  font-weight: var(--fw-medium); /* 中等字重提升可读性 */
   cursor: pointer; /* 手型提示可点击 */
   white-space: nowrap; /* 按钮文字不换行，避免高度跳动 */
 } /* 按钮基础结束 */
 
 .btn:hover:not(:disabled) { /* 悬停且可用时 */
-  border-color: #c9ced9; /* 边框加深给出反馈 */
+  border-color: var(--border-hover); /* 边框加深给出反馈 */
 } /* 按钮悬停结束 */
 
 .btn:disabled { /* 禁用态 */
@@ -398,17 +374,17 @@ code { /* 行内代码/令牌展示 */
 .btn.primary { /* 主操作按钮 */
   border-color: var(--primary); /* 边框与底色同为主色 */
   background: var(--primary); /* 主色填充，视觉权重最高 */
-  color: #fff; /* 白字保证对比度 */
+  color: var(--on-primary); /* 主色底上的对比色文字 */
 } /* 主按钮结束 */
 
 .btn.primary:hover:not(:disabled) { /* 主按钮悬停 */
-  background: var(--primary-dark); /* 加深底色区分悬停 */
-  border-color: var(--primary-dark); /* 边框同步加深，避免出现色差描边 */
+  background: var(--primary-hover); /* 加深底色区分悬停 */
+  border-color: var(--primary-hover); /* 边框同步加深，避免出现色差描边 */
 } /* 主按钮悬停结束 */
 
 .btn.danger { /* 危险操作按钮（取消邀请/删除） */
-  border-color: #f0bfbf; /* 淡红描边 */
-  background: #fff; /* 白底降低误触风险 */
+  border-color: var(--danger-border); /* 危险描边：暗色下自动提亮 */
+  background: var(--surface); /* 表面色降低误触风险 */
   color: var(--danger); /* 红字强调危险性 */
 } /* 危险按钮结束 */
 
@@ -427,8 +403,8 @@ code { /* 行内代码/令牌展示 */
 } /* 整行按钮结束 */
 
 .sidebar .btn.ghost { /* 侧栏内的幽灵按钮 */
-  border-color: rgba(255, 255, 255, 0.18); /* 深底上改用半透明白描边 */
-  color: #dfe5f0; /* 浅色文字保证深底可读 */
+  border-color: var(--sidebar-line-strong); /* 深底上改用半透明白描边 */
+  color: var(--sidebar-strong); /* 浅色文字保证深底可读 */
 } /* 侧栏幽灵按钮结束 */
 
 .sidebar .btn.ghost:hover { /* 侧栏幽灵按钮悬停 */
@@ -459,31 +435,31 @@ code { /* 行内代码/令牌展示 */
   align-items: center; /* 纵向居中 */
   height: 22px; /* 固定高度与文字基线协调 */
   padding: 0 8px; /* 左右留白 */
-  border-radius: 999px; /* 胶囊形 */
-  background: #eef1f7; /* 默认浅灰底 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  background: var(--surface-3); /* 默认浅灰底 */
   color: var(--text-muted); /* 默认次要文字色 */
-  font-size: 11px; /* 小字号，作为附属标签 */
-  font-weight: 600; /* 加粗弥补小字号 */
+  font-size: var(--fs-xs); /* 小字号，作为附属标签 */
+  font-weight: var(--fw-semibold); /* 加粗弥补小字号 */
 } /* 徽标结束 */
 
 .badge.role-owner { /* 所有者角色徽标 */
-  background: #e7edff; /* 淡蓝底对应主色体系 */
+  background: var(--primary-soft); /* 主色淡底对应权限体系 */
   color: var(--primary); /* 主色文字，权限最高最醒目 */
 } /* 所有者徽标结束 */
 
 .badge.role-editor { /* 编辑者角色徽标 */
-  background: #e9f7f0; /* 淡绿底 */
+  background: var(--success-soft); /* 成功淡底 */
   color: var(--success); /* 成功色文字表达可写 */
 } /* 编辑者徽标结束 */
 
 .badge.role-viewer { /* 只读角色徽标 */
-  background: #f1ecfb; /* 淡紫底 */
-  color: #7a55c9; /* 紫色文字表达受限权限 */
+  background: var(--violet-soft); /* 紫色淡底 */
+  color: var(--violet); /* 紫色文字表达受限权限 */
 } /* 只读徽标结束 */
 
 .badge.role-conflict { /* 语义冲突徽标：淡橙警示底 */
-  background: #fdeee6; /* 淡橙底 */
-  color: #c2571a; /* 橙棕文字表达边界冲突 */
+  background: var(--warning-soft); /* 警告淡底 */
+  color: var(--warning); /* 橙棕文字表达边界冲突 */
 } /* 冲突徽标结束 */
 
 .segmented { /* 分段控件外壳 */
@@ -2378,6 +2354,49 @@ code { /* 行内代码/令牌展示 */
   text-align: center; /* 文案居中 */
 } /* 系统消息结束 */
 
+.chat-system-msg-dm { /* 成长私信：系统身份卡片，与历史胶囊提示区分 */
+  display: flex; /* 纵向排布发件方、正文与跳转按钮 */
+  flex-direction: column; /* 自上而下 */
+  gap: 6px; /* 元素间距 */
+  align-items: flex-start; /* 内容左对齐 */
+  max-width: 86%; /* 卡片宽度上限 */
+  padding: 12px 14px; /* 卡片内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 12px; /* 卡片圆角 */
+  background: var(--surface, #fff); /* 卡片底色 */
+  text-align: left; /* 正文左对齐 */
+} /* 成长私信卡片结束 */
+
+.chat-system-msg-sender { /* 发件方：固定系统身份 */
+  font-size: 12px; /* 小字号 */
+  font-weight: 600; /* 加粗强调 */
+  color: var(--text-muted); /* 次要色 */
+} /* 发件方结束 */
+
+.chat-system-msg-body { /* 私信正文 */
+  font-size: 14px; /* 正文字号 */
+  line-height: 1.6; /* 行高 */
+  color: var(--text); /* 正文色 */
+  white-space: pre-wrap; /* 保留换行 */
+} /* 私信正文结束 */
+
+.chat-system-msg-link { /* 跳转按钮 */
+  padding: 5px 12px; /* 按钮内边距 */
+  border-radius: 999px; /* 胶囊按钮 */
+  background: var(--brand, #2f6fed); /* 品牌色底 */
+  color: #fff; /* 白字 */
+  font-size: 13px; /* 按钮字号 */
+  text-decoration: none; /* 去掉下划线 */
+} /* 跳转按钮结束 */
+
+.chat-system-badge { /* 系统会话在头部的身份徽标 */
+  padding: 3px 10px; /* 徽标内边距 */
+  border-radius: 999px; /* 胶囊造型 */
+  background: rgba(0, 0, 0, 0.05); /* 淡灰底 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小字号 */
+} /* 身份徽标结束 */
+
 .chat-messages .chat-hint { /* 消息区加载/提示文案 */
   padding: 16px 12px; /* 上下留白 */
   text-align: center; /* 居中 */
@@ -2506,103 +2525,6 @@ code { /* 行内代码/令牌展示 */
 
 
 
-/* ---------- 商品列表 / 购物车 / 个人中心 ---------- */
-
-.products-filter { /* 商品列表筛选栏 */
-  display: flex; /* 横向排列控件 */
-  flex-wrap: wrap; /* 窄屏换行 */
-  gap: 10px; /* 控件间距 */
-  align-items: center; /* 垂直居中 */
-} /* 筛选栏结束 */
-
-.products-search { /* 搜索表单：输入 + 按钮 */
-  display: flex; /* 同行 */
-  gap: 8px; /* 间距 */
-  flex: 1 1 260px; /* 允许伸展，窄屏独占一行 */
-} /* 搜索表单结束 */
-
-.products-search input { /* 搜索输入框 */
-  flex: 1; /* 撑满剩余宽度 */
-  padding: 9px 12px; /* 与通用输入一致的内边距 */
-  border: 1px solid var(--border); /* 细分隔线 */
-  border-radius: 8px; /* 圆角 */
-  background: var(--surface); /* 跟随主题背景 */
-  color: inherit; /* 继承文字色 */
-} /* 搜索输入框结束 */
-
-.products-filter select { /* 筛选下拉 */
-  padding: 9px 10px; /* 与输入框对齐 */
-  border: 1px solid var(--border); /* 细边框 */
-  border-radius: 8px; /* 圆角 */
-  background: var(--surface); /* 跟随主题 */
-  color: inherit; /* 继承文字色 */
-} /* 下拉结束 */
-
-.products-table { /* 密集列表表格 */
-  width: 100%; /* 占满内容宽 */
-  border-collapse: collapse; /* 单线边框 */
-  font-size: 13px; /* 小字号提升信息密度 */
-} /* 表格结束 */
-
-.products-table th { /* 表头 */
-  text-align: left; /* 左对齐 */
-  padding: 8px 10px; /* 单元格留白 */
-  border-bottom: 1px solid var(--border); /* 分隔线 */
-  color: var(--text-muted); /* 弱化表头 */
-  font-weight: 600; /* 略加粗 */
-} /* 表头结束 */
-
-.products-table td { /* 数据行 */
-  padding: 10px; /* 单元格留白 */
-  border-bottom: 1px solid var(--border); /* 行分隔线 */
-  vertical-align: middle; /* 垂直居中 */
-} /* 数据行结束 */
-
-.products-name { /* 模块名 */
-  font-weight: 600; /* 突出主信息 */
-} /* 模块名结束 */
-
-.products-code { /* 模块编码 */
-  color: var(--text-muted); /* 次要信息 */
-  font-size: 12px; /* 更小字号 */
-} /* 编码结束 */
-
-.products-pager { /* 分页 / 行内操作条 */
-  display: flex; /* 横向排列 */
-  align-items: center; /* 垂直居中 */
-  gap: 10px; /* 间距 */
-} /* 操作条结束 */
-
-.cart-badge { /* 购物车角标 */
-  display: inline-flex; /* 便于居中 */
-  align-items: center; /* 纵向居中 */
-  justify-content: center; /* 横向居中 */
-  min-width: 18px; /* 个位数保持圆形 */
-  height: 18px; /* 固定高度 */
-  margin-left: 6px; /* 与按钮文字分开 */
-  padding: 0 5px; /* 多位数自动变宽 */
-  border-radius: 999px; /* 胶囊 */
-  background: #2f6feb; /* 品牌蓝底 */
-  color: #fff; /* 白字 */
-  font-size: 11px; /* 小字号 */
-  font-weight: 700; /* 加粗 */
-} /* 角标结束 */
-
-.cart-foot { /* 购物车底部合计与结算 */
-  display: flex; /* 同行 */
-  align-items: center; /* 垂直居中 */
-  justify-content: space-between; /* 左合计右按钮 */
-  gap: 12px; /* 间距 */
-  padding-top: 12px; /* 与列表分开 */
-  border-top: 1px solid var(--border); /* 顶部分隔线 */
-} /* 合计栏结束 */
-
-.cart-results { /* 结算结果区 */
-  display: flex; /* 纵向 */
-  flex-direction: column; /* 逐条堆叠 */
-  gap: 6px; /* 条目间距 */
-  padding-top: 8px; /* 与上方分开 */
-} /* 结算结果结束 */
 
 .tag { /* 状态标签 */
   display: inline-block; /* 内容宽度自适应 */
@@ -2903,10 +2825,10 @@ code { /* 行内代码/令牌展示 */
 .theater-chips button { /* 单个筛选项 */
   padding: 5px 12px; /* 紧凑内衬 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: 999px; /* 胶囊形 */
+  border-radius: var(--radius-pill); /* 胶囊形标签 */
   background: var(--surface); /* 表面色 */
-  color: var(--muted); /* 次级文字色 */
-  font-size: 12px; /* 小字 */
+  color: var(--text-muted); /* 次级文字色 */
+  font-size: var(--fs-xs); /* 小字号，作为筛选标签 */
   cursor: pointer; /* 手型 */
 } /* 结束 */
 
@@ -4029,6 +3951,95 @@ code { /* 行内代码/令牌展示 */
 .community-media-item.is-video {
   grid-column: 1 / -1;
 }
+/* 帖子附件位：发帖选择器 / 暂存列表 / 详情下载行 */
+.community-attachment-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+.community-attachment-picker em {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: normal;
+}
+.community-attachment-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.6);
+  color: #cbd5f5;
+  font-size: 13px;
+  cursor: pointer;
+}
+.community-attachment-add input {
+  display: none;
+}
+.community-attachment-draft {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.community-attachment-draft li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.1);
+  font-size: 13px;
+}
+.community-attachment-draft li span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.community-attachment-draft li em {
+  color: #94a3b8;
+  font-style: normal;
+}
+.community-attachments {
+  margin: 16px 0;
+  display: grid;
+  gap: 8px;
+}
+.community-attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.55);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.community-attachment-row:hover {
+  border-color: rgba(96, 165, 250, 0.6);
+}
+.community-attachment-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.community-attachment-row em {
+  color: #94a3b8;
+  font-style: normal;
+  font-size: 12px;
+}
+.community-attachment-dl {
+  color: #60a5fa;
+  font-size: 13px;
+}
 /* 付费图库 / 视频媒体网格（资产详情） */
 .commerce-media {
   display: grid;
@@ -4449,7 +4460,7 @@ code { /* 行内代码/令牌展示 */
   :root { --card-pad: 14px; --card-pad-tight: 10px; --card-gap: 10px; } /* 再收紧一档 */
 } /* 断点结束 */
 @media (max-width: 480px) { /* 手机 */
-  :root { --card-pad: 12px; --card-gap: 8px; --card-radius: 10px; --card-radius-lg: 12px; } /* 手机档位 */
+  :root { --card-pad: 12px; --card-gap: 8px; } /* 手机档位：只收紧内距与间距，圆角沿用全局令牌 */
   .cards, /* 通用卡片网格 */
   .community-list, /* 帖子列表 */
   .community-shop-grid, /* 商城商品 */
