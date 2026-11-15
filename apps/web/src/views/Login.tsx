@@ -41,6 +41,8 @@ function oauthErrorText(locale: Locale, code: string): string {
     AUTH_OAUTH_ALREADY_BOUND: ['该第三方账号已绑定到其他 Mim 账号', 'This third-party account is linked to another Mim account.'],
     AUTH_OAUTH_LAST_METHOD: ['至少需要保留一种登录方式', 'Keep at least one sign-in method.'],
     AUTH_OAUTH_TICKET_INVALID: ['登录票据已失效，请重新登录', 'The sign-in ticket is invalid. Please sign in again.'],
+    // 全站注册关闭：第三方登录只服务于已绑定账号，未绑定时必须引导先登录再绑定
+    AUTH_REGISTER_DISABLED: ['该第三方账号尚未绑定 Mim 账号；请先用手机号或邮箱登录，再到「账号」页完成绑定', 'This third-party account is not linked to a Mim account. Sign in with phone or email first, then link it from your account page.'],
   }; // 映射表结束
   const pair = table[code]; // 命中映射
   if (!pair) return code; // 未知码原样显示，便于排障
@@ -568,7 +570,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           )}{/* 结束开发态回显 */}
 
           {error && <p className="error">{error}</p>}{/* 错误提示：仅在 error 非空时渲染 */}
-          {oauthError && <p className="error">{oauthError}</p>}{/* 第三方登录错误：票据失效 / 授权被拒 / 未配置 */}
+          {oauthError && <p className="error">{oauthErrorText(locale, oauthError)}</p>}{/* 第三方登录错误：回调带回码统一走本地化映射 */}
 
           {mode === 'code' && channels && !(provider === 'phone' ? channels.sms : channels.email) && ( // 通道未配置时明确引导改用密码登录
             <p className="hint">{locale === 'en-US' ? 'Verification channel is not configured on this deployment. Use password sign-in instead.' : '当前部署未配置该验证码通道，请改用密码登录。'}</p>

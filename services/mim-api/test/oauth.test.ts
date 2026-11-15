@@ -25,6 +25,7 @@ const CALLBACK_BASE = 'http://127.0.0.1:5999'; // 假回调基址，只用于拼
 
 let app: Express; // 待测应用
 let db: ReturnType<typeof createDatabase>; // 数据库句柄
+let baseEnv: Record<string, string>; // 提供方凭证基线：供「注册关闭」用例复用
 let fake: Server | null = null; // 假提供方服务端
 let fakeBase = ''; // 假服务端基址
 
@@ -70,7 +71,7 @@ async function stopFakeProvider(): Promise<void> {
 beforeEach(async () => { // 每例：全新库 + 全新应用 + 假提供方
   db = createDatabase(':memory:'); // 独立内存库
   await startFakeProvider(); // 启动假提供方
-  const env = { // 注入两份凭证，端点全部指向假服务端
+  baseEnv = { // 注入两份凭证，端点全部指向假服务端
     MIM_OAUTH_CALLBACK_BASE: CALLBACK_BASE, // 回调基址
     MIM_WEB_BASE_URL: 'http://127.0.0.1:5999', // 前端基址
     MIM_AUTH_GITHUB_CLIENT_ID: 'gh-client', // GitHub 客户端 ID
@@ -84,7 +85,7 @@ beforeEach(async () => { // 每例：全新库 + 全新应用 + 假提供方
     MIM_AUTH_WECHAT_TOKEN_URL: `${fakeBase}/wechat/token`, // 微信令牌端点
     MIM_AUTH_WECHAT_PROFILE_URL: `${fakeBase}/wechat/profile`, // 微信资料端点
   }; // env 结束
-  app = createApp({ db, jwtSecret: JWT_SECRET, env }); // 装配应用
+  app = createApp({ db, jwtSecret: JWT_SECRET, env: baseEnv }); // 装配应用
 }); // beforeEach 结束
 
 afterEach(async () => { // 每例后清理
@@ -239,5 +240,43 @@ describe('绑定与解绑', () => { // 账号安全规则
     const unlink = await request(app).delete('/api/v1/me/oauth/github').set('Authorization', `Bearer ${session.body.access_token}`); // 解绑唯一方式
     expect(unlink.status).toBe(409); // 拒绝
     expect(unlink.body.code).toBe('AUTH_OAUTH_LAST_METHOD'); // 专用错误码
+  }); // 结束用例
+}); // describe 结束
+
+describe('注册关闭后的第三方登录定位', () => { // 只服务绑定与登录，不得凭空建号
+  /** 注册关闭的应用：其余凭证与主应用共用，确保差异只有注册开关 */
+  function closedApp(): Express {
+    return createApp({ db, jwtSecret: JWT_SECRET, env: { ...baseEnv, MIM_REGISTRATION_ENABLED: '0' } }); // 显式关闭注册
+  } // closedApp 结束
+
+  it('未绑定的第三方身份被拒绝，且不写入用户与绑定', async () => { // 核心约束
+    const closed = closedApp(); // 注册关闭
+    const auth = await request(closed).post('/api/v1/auth/oauth/github/authorize').send({ region: 'global', mode: 'login' }); // 发起第三方登录
+    expect(auth.status).toBe(201); // 授权地址照常下发
+    const callback = await request(closed).get('/api/v1/auth/oauth/github/callback').query({ code: 'c', state: auth.body.state }); // 提供方回调
+    expect(callback.status).toBe(302); // 统一回前端登录页
+    const location = new URL(callback.headers.location as string); // 解析回跳地址
+    expect(location.searchParams.get('oauth_ticket')).toBeNull(); // 不下发会话票据
+    expect(location.searchParams.get('oauth_error')).toBe('AUTH_REGISTER_DISABLED'); // 明确拒绝原因
+    const users = db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }; // 用户表计数
+    const accounts = db.prepare('SELECT COUNT(*) AS n FROM oauth_accounts').get() as { n: number }; // 绑定表计数
+    expect(users.n).toBe(0); // 没有凭空建号
+    expect(accounts.n).toBe(0); // 也没有残留绑定
+  }); // 结束用例
+
+  it('存量账号完成绑定后，注册关闭下仍可第三方登录', async () => { // 正向路径
+    const created = await request(app).post('/api/v1/auth/register').send({ region: 'cn', identifier: '13900000030', password: 'mim-pass-123' }); // 开启态建存量账号
+    expect(created.status).toBe(201); // 建号成功
+    const closed = closedApp(); // 注册关闭
+    const bind = await request(closed).post('/api/v1/auth/oauth/github/authorize').set('Authorization', `Bearer ${created.body.access_token}`).send({ region: 'global', mode: 'bind' }); // 已登录发起绑定
+    expect(bind.status).toBe(201); // 绑定授权可下发
+    const bindCallback = await request(closed).get('/api/v1/auth/oauth/github/callback').query({ code: 'c', state: bind.body.state }); // 完成绑定
+    expect(new URL(bindCallback.headers.location as string).searchParams.get('oauth_bound')).toBe('github'); // 绑定成功回跳
+    const login = await request(closed).post('/api/v1/auth/oauth/github/authorize').send({ region: 'global', mode: 'login' }); // 同一身份发起登录
+    const loginCallback = await request(closed).get('/api/v1/auth/oauth/github/callback').query({ code: 'c2', state: login.body.state }); // 回调
+    const ticket = new URL(loginCallback.headers.location as string).searchParams.get('oauth_ticket') as string; // 一次性票据
+    const session = await request(closed).post('/api/v1/auth/oauth/exchange').send({ ticket }); // 兑换会话
+    expect(session.status).toBe(200); // 登录成功
+    expect(session.body.user.id).toBe(created.body.user.id); // 落到既有账号而非新建
   }); // 结束用例
 }); // describe 结束
