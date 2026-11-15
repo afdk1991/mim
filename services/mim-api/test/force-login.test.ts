@@ -127,7 +127,7 @@ describe('后台豁免与管理员身份单独校验', () => {
     expect(res.status).toBe(200);
     expect(res.body.bootstrap).toBe(true);
     expect(res.body.roles).toContain('superadmin');
-    expect(res.body.permissions.length).toBe(12); // 与 RBAC_PERMISSIONS 一致
+    expect(res.body.permissions.length).toBe(13); // 与 RBAC_PERMISSIONS 一致（含 messaging:write）
   });
 
   it('超管可手工建号：指定标识 / 初始口令 / 角色，建完即可登录', async () => {

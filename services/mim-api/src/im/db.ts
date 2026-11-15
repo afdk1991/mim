@@ -9,6 +9,7 @@
 import { uuidv7 } from '@mim/core-domain'; // 时间有序 UUID，作为会话与消息主键
 import type { Db } from '../types.js'; // 数据库连接类型
 import type { MessageContentType, MessageView } from './protocol.js'; // 消息类型与视图
+import { SYSTEM_DM_SENDER_ID, SYSTEM_DM_SENDER_NAME } from './protocol.js'; // 系统私信发送者常量
 
 /** 会话行结构（DB → 内存） */
 interface ConversationRow {
@@ -17,6 +18,7 @@ interface ConversationRow {
   title: string; // 会话标题（群名；私聊为空）
   owner_user_id: string | null; // 群主 ID（私聊为空）
   avatar_object_key: string | null; // 群头像对象键
+  system_kind: string | null; // 系统会话类型（普通会话为 null，成长私信为 growth）
   created_at: string; // 创建时间
   updated_at: string; // 最后更新时间
 } // ConversationRow 结束
@@ -28,6 +30,7 @@ export interface ConversationListItem {
   title: string; // 展示标题（私聊取对方显示名）
   avatar_object_key: string | null; // 头像对象键
   other_user_id?: string | null; // 私聊的对方用户 ID（群聊为 null）
+  system_kind: string | null; // 系统会话类型（普通会话为 null，前端据此隐藏通话等普通私聊操作）
   last_message: MessageView | null; // 最后一条消息（无消息时为 null）
   unread_count: number; // 当前用户未读消息数
   pinned: boolean; // 当前用户是否置顶该会话（来自成员表，按人独立）
@@ -113,7 +116,7 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
   // 查该用户参与的所有会话基础信息；置顶会话排在最前，其次按最后更新时间倒序
   const convs = db
     .prepare( // 执行当前业务步骤
-      `SELECT c.id, c.type, c.title, c.avatar_object_key, c.updated_at,
+      `SELECT c.id, c.type, c.title, c.avatar_object_key, c.system_kind, c.updated_at,
               m.last_read_message_id, m.pinned, m.muted
          FROM im_conversations c
          JOIN im_conversation_members m ON m.conversation_id = c.id
@@ -128,7 +131,7 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
   const lastMsgStmt = db.prepare(
     `SELECT m.*, u.display_name AS sender_display_name
        FROM im_messages m
-       JOIN users u ON u.id = m.sender_user_id
+       LEFT JOIN users u ON u.id = m.sender_user_id
       WHERE m.conversation_id = ? AND m.deleted_at IS NULL
       ORDER BY m.id DESC
       LIMIT 1`,
@@ -156,8 +159,11 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
         ) // 执行当前业务步骤
         .get(c.id, userId) as { user_id: string } | undefined; // 注册 GET 路由 / 中间件处理器
       otherUserId = other?.user_id ?? null; // 赋值：更新变量 otherUserId 的取值
-      // 私聊标题取对方显示名
-      if (otherUserId) {
+      // 系统会话（成长私信）标题固定为系统身份，不查用户表
+      if (c.system_kind) {
+        c.title = SYSTEM_DM_SENDER_NAME; // 展示为系统身份而非管理员个人账号
+      } else if (otherUserId) {
+        // 私聊标题取对方显示名
         const u = db.prepare(`SELECT display_name FROM users WHERE id = ?`).get(otherUserId) as // 常量 u：保存固定配置或一次性派生值
           | { display_name: string } // 执行当前业务步骤
           | undefined; // 执行当前业务步骤
@@ -178,6 +184,7 @@ export function listConversations(db: Db, userId: string): ConversationListItem[
       title: c.title, // 对象字段 title：记录一项配置或数据
       avatar_object_key: c.avatar_object_key, // 对象字段 avatar_object_key：记录一项配置或数据
       other_user_id: otherUserId, // 对象字段 other_user_id：记录一项配置或数据
+      system_kind: c.system_kind ?? null, // 对象字段 system_kind：系统会话标记透传给前端
       last_message: lastMessage, // 对象字段 last_message：记录一项配置或数据
       unread_count: unread.n, // 对象字段 unread_count：记录一项配置或数据
       pinned: c.pinned === 1, // 对象字段 pinned：记录一项配置或数据
@@ -225,6 +232,8 @@ export function createMessage(
     objectSize?: number; // 文件大小
     replyToId?: string; // 引用回复的目标消息 ID
     replyExcerpt?: string; // 被引用消息的摘要快照
+    linkUrl?: string; // 系统私信跳转地址（普通消息不传）
+    linkLabel?: string; // 系统私信跳转按钮文案（普通消息不传）
     now?: string; // 可注入时间
   }, // 代码块结束
 ): MessageView { // 执行当前业务步骤
@@ -234,8 +243,9 @@ export function createMessage(
   db.prepare(
     `INSERT INTO im_messages
        (id, conversation_id, sender_user_id, content_type, content,
-        object_key, object_mime, object_name, object_size, reply_to_id, reply_excerpt, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?)`,
+        object_key, object_mime, object_name, object_size, reply_to_id, reply_excerpt,
+        link_url, link_label, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?)`,
   ).run( // 执行当前业务步骤
     msgId, // 执行当前业务步骤
     params.conversationId, // 执行当前业务步骤
@@ -248,6 +258,8 @@ export function createMessage(
     params.objectSize ?? null, // 执行当前业务步骤
     params.replyToId ?? null, // 执行当前业务步骤
     params.replyExcerpt ?? null, // 执行当前业务步骤
+    params.linkUrl ?? null, // 系统私信跳转地址
+    params.linkLabel ?? null, // 系统私信跳转按钮文案
     now, // 执行当前业务步骤
     now, // 执行当前业务步骤
   ); // 执行当前业务步骤
@@ -257,7 +269,7 @@ export function createMessage(
   const row = db
     .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
-         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+         FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
         WHERE m.id = ?`,
     ) // 执行当前业务步骤
     .get(msgId) as Record<string, unknown> & { sender_display_name: string }; // 注册 GET 路由 / 中间件处理器
@@ -276,7 +288,7 @@ export function listMessages(
     ? (db // 执行当前业务步骤
         .prepare( // 执行当前业务步骤
           `SELECT m.*, u.display_name AS sender_display_name
-             FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+             FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
             WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id < ?
             ORDER BY m.id DESC
             LIMIT ?`,
@@ -285,7 +297,7 @@ export function listMessages(
     : (db // 执行当前业务步骤
         .prepare( // 执行当前业务步骤
           `SELECT m.*, u.display_name AS sender_display_name
-             FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+             FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
             WHERE m.conversation_id = ? AND m.deleted_at IS NULL
             ORDER BY m.id DESC
             LIMIT ?`,
@@ -307,7 +319,7 @@ export function listMessagesAround(
   const beforeRows = db // 常量 beforeRows：保存固定配置或一次性派生值
     .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
-         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+         FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
         WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id < ?
         ORDER BY m.id DESC LIMIT ?`,
     ) // 执行当前业务步骤
@@ -315,7 +327,7 @@ export function listMessagesAround(
   const fromRows = db // 常量 fromRows：保存固定配置或一次性派生值
     .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
-         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+         FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
         WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.id >= ?
         ORDER BY m.id ASC LIMIT ?`,
     ) // 执行当前业务步骤
@@ -446,7 +458,7 @@ export function searchMessages(db: Db, conversationId: string, query: string, li
   const rows = db // 常量 rows：保存固定配置或一次性派生值
     .prepare( // 执行当前业务步骤
       `SELECT m.*, u.display_name AS sender_display_name
-         FROM im_messages m JOIN users u ON u.id = m.sender_user_id
+         FROM im_messages m LEFT JOIN users u ON u.id = m.sender_user_id
         WHERE m.conversation_id = ? AND m.deleted_at IS NULL AND m.content LIKE ?
         ORDER BY m.created_at DESC
         LIMIT ?`,
@@ -554,12 +566,16 @@ export function getUserDisplayName(db: Db, userId: string): string {
 } // getUserDisplayName 结束
 
 /** 把 DB 行映射为 MessageView：统一字段命名与空值处理 */
-function rowToMessageView(row: Record<string, unknown> & { sender_display_name: string }): MessageView {
+function rowToMessageView(row: Record<string, unknown> & { sender_display_name: string | null }): MessageView {
+  // 系统私信发送者不在 users 表，LEFT JOIN 后显示名为空，用固定系统身份兜底
+  const fallbackName = String(row.sender_user_id) === SYSTEM_DM_SENDER_ID
+    ? SYSTEM_DM_SENDER_NAME
+    : String(row.sender_user_id).slice(0, 8);
   return { // 返回当前函数的处理结果
     id: String(row.id), // 消息 ID
     conversation_id: String(row.conversation_id), // 会话 ID
     sender_user_id: String(row.sender_user_id), // 发送者 ID
-    sender_display_name: row.sender_display_name || String(row.sender_user_id).slice(0, 8), // 发送者显示名
+    sender_display_name: row.sender_display_name || fallbackName, // 发送者显示名
     content_type: row.content_type as MessageContentType, // 内容类型
     content: String(row.content ?? ''), // 文本内容
     object_key: (row.object_key as string | null) ?? null, // 媒体对象键
@@ -568,6 +584,8 @@ function rowToMessageView(row: Record<string, unknown> & { sender_display_name: 
     object_size: (row.object_size as number | null) ?? null, // 文件大小
     reply_to_id: (row.reply_to_id as string | null) ?? null, // 引用回复目标消息 ID
     reply_excerpt: (row.reply_excerpt as string | null) ?? null, // 引用摘要快照
+    link_url: (row.link_url as string | null) ?? null, // 系统私信跳转地址
+    link_label: (row.link_label as string | null) ?? null, // 系统私信跳转按钮文案
     status: row.status as MessageView['status'], // 投递状态
     created_at: String(row.created_at), // 创建时间
   }; // 代码块结束

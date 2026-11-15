@@ -27,6 +27,7 @@ import { createFederationRouter } from './routes/federation.js'; // 联邦身份
 import { createVipPricingRouter } from './routes/vip-pricing.js'; // VIP 分级定价规则只读查询
 import { createReferralRouter } from './routes/referral.js'; // 返佣佣金明细自助查询（内部鉴权）
 import { createReferralAdminRouter } from './routes/referral-admin.js'; // 返佣到期结算管理端点（RBAC）
+import { createGrowthDmAdminRouter } from './routes/growth-dm-admin.js'; // 成长私信：系统身份私信群发（RBAC messaging:write）
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createCirclesRouter } from './routes/circles.js'; // 圈子：独立于板块的成员制社群，公开浏览 + 成员/圈主写操作
@@ -173,6 +174,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createAdminRouter(resolved)); // 不挂 idempotency：超管引导通道无 req.user，挂上会被幂等中间件前置拦截成 401
   app.use('/api/v1', createShopAdminRouter(resolved)); // 商城后台写入面：同样走 RBAC 权限点 commerce:write，不挂全局幂等
   app.use('/api/v1', createReferralAdminRouter(resolved)); // 返佣到期结算：RBAC commerce:write，独立文件不并入 admin.ts
+  app.use('/api/v1', createGrowthDmAdminRouter(resolved)); // 成长私信：复用 IM 会话，RBAC messaging:write
 
   app.use(notFound); // 所有路由之后兜底：未命中即返回统一 404 信封
   app.use(errorHandler); // 必须最后挂：四参错误中间件只捕获其之前注册的链路抛错

@@ -809,7 +809,7 @@ export function Chat({ locale }: ChatProps) {
   /** 发起视频通话（仅私聊） */
   const handleVideoCall = useCallback(() => {
     const conv = conversations.find((c) => c.id === activeId); // 当前会话
-    if (!conv || conv.type !== 'direct' || !conv.other_user_id) return; // 仅私聊可视频
+    if (!conv || conv.type !== 'direct' || !conv.other_user_id || conv.system_kind) return; // 仅普通私聊可视频
     setCallSignal(null); // 清旧信令
     setCallSession({ mode: 'outgoing', peerUserId: conv.other_user_id, peerDisplayName: conv.title }); // 发起
   }, [conversations, activeId]);
@@ -959,8 +959,10 @@ export function Chat({ locale }: ChatProps) {
               <button type="button" className="btn ghost" onClick={() => void togglePreference({ muted: !activeConversation.muted })}>{/* 执行当前业务步骤 */}
                 {activeConversation.muted ? (isZh ? '取消免打扰' : 'Unmute') : isZh ? '免打扰' : 'Mute'}
               </button>
-              {/* 群信息（群聊） / 视频通话（私聊） */}
-              {activeConversation.type === 'group' ? (
+              {/* 系统会话显示系统身份徽标；群聊显示群信息；普通私聊显示视频通话 */}
+              {activeConversation.system_kind ? (
+                <span className="chat-system-badge">{isZh ? '系统通知' : 'System'}</span>
+              ) : activeConversation.type === 'group' ? (
                 <button type="button" className="btn ghost" onClick={() => void openPanel()}>{/* 执行当前业务步骤 */}
                   {isZh ? '群信息' : 'Group info'}
                 </button>
@@ -1016,7 +1018,25 @@ export function Chat({ locale }: ChatProps) {
                     )}
                     {/* 系统消息：居中提示，不套气泡，也没有发送者与操作按钮 */}
                     {m.content_type === 'system' ? (
-                      <div className="chat-system-msg">{m.content}</div>
+                      // 成长私信（系统身份发送）渲染为带发件方与跳转按钮的卡片；历史系统提示保持胶囊样式
+                      m.sender_user_id.startsWith('system:') ? (
+                        <div className="chat-system-msg chat-system-msg-dm">
+                          <span className="chat-system-msg-sender">{m.sender_display_name}</span>
+                          <span className="chat-system-msg-body">{m.content}</span>
+                          {m.link_url && (
+                            <a
+                              className="chat-system-msg-link"
+                              href={m.link_url}
+                              target={m.link_url.startsWith('http') ? '_blank' : undefined}
+                              rel="noreferrer"
+                            >
+                              {m.link_label || (isZh ? '查看详情' : 'View details')}
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="chat-system-msg">{m.content}</div>
+                      )
                     ) : (
                     <div
                       id={`msg-${m.id}`}
@@ -1100,7 +1120,12 @@ export function Chat({ locale }: ChatProps) {
                 value={draft}
                 onChange={(e) => handleDraftChange(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isZh ? '输入消息，回车发送（Shift+Enter 换行）' : 'Type a message, Enter to send'}
+                placeholder={
+                  activeConversation.system_kind
+                    ? (isZh ? '系统私信不支持回复' : 'Replies are disabled for system messages')
+                    : (isZh ? '输入消息，回车发送（Shift+Enter 换行）' : 'Type a message, Enter to send')
+                }
+                disabled={Boolean(activeConversation.system_kind)}
                 rows={2}
               />
               {/* 图片/文件：走预签名直传 */}

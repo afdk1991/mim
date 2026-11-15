@@ -1198,6 +1198,84 @@ export async function deleteCategory(credential: Credential, slug: string): Prom
   return data.category;
 } // deleteCategory 结束
 
+// ── 成长私信（系统身份私信） ──────────────────────────────────────────────
+
+/** 受众筛选条件：与后端 GrowthDmAudience 对齐 */
+export interface GrowthDmAudienceInput {
+  user_ids?: string[]; // 指定用户
+  region?: 'cn' | 'global'; // 注册地区
+  created_after?: string; // 注册时间下界
+  created_before?: string; // 注册时间上界
+  query?: string; // 昵称 / Mim ID 关键词
+  limit?: number; // 单批上限
+} // 受众条件结束
+
+/** 受众预览回执 */
+export interface GrowthDmPreview {
+  count: number; // 命中人数
+  sample: Array<{ id: string; display_name: string; member_no: string | null; region: string }>; // 样本
+} // 预览回执结束
+
+/** 群发批次行 */
+export interface GrowthDmCampaignRow {
+  id: string; // 批次 ID
+  dedupe_key: string; // 幂等键
+  title: string; // 批次标题
+  body: string; // 正文
+  link_url: string | null; // 跳转地址
+  link_label: string | null; // 按钮文案
+  status: 'sending' | 'sent' | 'failed'; // 批次状态
+  target_count: number; // 命中人数
+  sent_count: number; // 成功人数
+  skipped_count: number; // 跳过人数
+  operator_id: string | null; // 发起人
+  created_at: string; // 创建时间
+  sent_at: string | null; // 完成时间
+} // 批次行结束
+
+/** 发送回执 */
+export interface GrowthDmSendResult {
+  duplicate: boolean; // 幂等命中
+  campaign: GrowthDmCampaignRow; // 批次台账
+  sent_count: number; // 本次实发人数
+} // 发送回执结束
+
+/** 预览受众：只读，不落库 */
+export function previewGrowthDm(credential: Credential, audience: GrowthDmAudienceInput): Promise<GrowthDmPreview> {
+  return request<GrowthDmPreview>('/admin/growth-dm/preview', {
+    method: 'POST', // 只读预览也走 POST，避免条件过长超出 URL
+    body: { audience }, // 受众条件
+    credential, // 携带凭证
+  });
+} // previewGrowthDm 结束
+
+/** 发送系统私信：dedupe_key 相同即幂等，重复提交不会二次发信 */
+export function sendGrowthDm(
+  credential: Credential,
+  payload: {
+    dedupe_key: string; // 幂等键
+    title: string; // 批次标题
+    body: string; // 正文
+    link_url?: string; // 跳转地址
+    link_label?: string; // 按钮文案
+    audience: GrowthDmAudienceInput; // 受众条件
+  },
+): Promise<GrowthDmSendResult> {
+  return request<GrowthDmSendResult>('/admin/growth-dm/send', {
+    method: 'POST', // 写操作
+    body: payload, // 请求体
+    credential, // 携带凭证
+  });
+} // sendGrowthDm 结束
+
+/** 最近群发批次台账 */
+export async function listGrowthDmCampaigns(credential: Credential, limit = 20): Promise<GrowthDmCampaignRow[]> {
+  const data = await request<{ campaigns: GrowthDmCampaignRow[] }>(`/admin/growth-dm/campaigns?limit=${limit}`, {
+    credential, // 携带凭证
+  });
+  return data.campaigns; // 解包数组
+} // listGrowthDmCampaigns 结束
+
 export { request }; // 执行当前业务步骤
 export * from './api-ops'; // 执行当前业务步骤
 export * from './api-shop-admin'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐

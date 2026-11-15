@@ -123,7 +123,15 @@ a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */
 .form { display: flex; flex-direction: column; gap: 10px; } /* 纵向表单流 */ 
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } /* 横向行内控件 */ 
 .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; } /* 单个字段 */ 
-.field > span { font-size: 12px; color: var(--text-muted); } /* 字段标签 */ 
+.field > span { font-size: 12px; color: var(--text-muted); } /* 字段标签 */
+.form.inline { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 10px; } /* 横向内联表单 */
+.form.inline label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); min-width: 140px; } /* 内联字段纵向排布 */
+.form label.grow { flex: 1; min-width: 200px; } /* 占满剩余宽度的字段 */
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; } /* 复选行 */
+.btn.small { padding: 4px 8px; font-size: 12px; } /* 小号按钮 */
+.deploy-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); } /* 台账行 */
+.deploy-kv { display: flex; flex-direction: column; gap: 4px; min-width: 220px; } /* 台账主信息 */
+.deploy-columns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } /* 横向多列块 */ 
 input, select, textarea { /* 表单控件统一外观 */ 
   padding: 7px 10px; /* 内边距 */ 
   border: 1px solid var(--border); /* 描边 */ 

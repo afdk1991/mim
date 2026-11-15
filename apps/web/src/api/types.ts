@@ -157,6 +157,8 @@ export interface ImMessage {
   object_size?: number | null; // 文件大小
   reply_to_id?: string | null; // 引用回复的目标消息 ID
   reply_excerpt?: string | null; // 被引用消息的摘要（发送时固化）
+  link_url?: string | null; // 系统私信跳转地址（普通消息为 null）
+  link_label?: string | null; // 系统私信跳转按钮文案
   status: ImMessageStatus; // 投递状态
   created_at: string; // 创建时间
 } // ImMessage 结束
@@ -168,6 +170,7 @@ export interface ImConversation {
   title: string; // 展示标题
   avatar_object_key?: string | null; // 头像对象键
   other_user_id?: string | null; // 私聊对方 ID（群聊为 null）
+  system_kind?: string | null; // 系统会话类型（普通会话为 null，成长私信为 growth）
   last_message: ImMessage | null; // 最后一条消息
   unread_count: number; // 未读数
   pinned: boolean; // 当前用户是否置顶

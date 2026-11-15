@@ -2378,6 +2378,49 @@ code { /* 行内代码/令牌展示 */
   text-align: center; /* 文案居中 */
 } /* 系统消息结束 */
 
+.chat-system-msg-dm { /* 成长私信：系统身份卡片，与历史胶囊提示区分 */
+  display: flex; /* 纵向排布发件方、正文与跳转按钮 */
+  flex-direction: column; /* 自上而下 */
+  gap: 6px; /* 元素间距 */
+  align-items: flex-start; /* 内容左对齐 */
+  max-width: 86%; /* 卡片宽度上限 */
+  padding: 12px 14px; /* 卡片内边距 */
+  border: 1px solid var(--border); /* 细边框 */
+  border-radius: 12px; /* 卡片圆角 */
+  background: var(--surface, #fff); /* 卡片底色 */
+  text-align: left; /* 正文左对齐 */
+} /* 成长私信卡片结束 */
+
+.chat-system-msg-sender { /* 发件方：固定系统身份 */
+  font-size: 12px; /* 小字号 */
+  font-weight: 600; /* 加粗强调 */
+  color: var(--text-muted); /* 次要色 */
+} /* 发件方结束 */
+
+.chat-system-msg-body { /* 私信正文 */
+  font-size: 14px; /* 正文字号 */
+  line-height: 1.6; /* 行高 */
+  color: var(--text); /* 正文色 */
+  white-space: pre-wrap; /* 保留换行 */
+} /* 私信正文结束 */
+
+.chat-system-msg-link { /* 跳转按钮 */
+  padding: 5px 12px; /* 按钮内边距 */
+  border-radius: 999px; /* 胶囊按钮 */
+  background: var(--brand, #2f6fed); /* 品牌色底 */
+  color: #fff; /* 白字 */
+  font-size: 13px; /* 按钮字号 */
+  text-decoration: none; /* 去掉下划线 */
+} /* 跳转按钮结束 */
+
+.chat-system-badge { /* 系统会话在头部的身份徽标 */
+  padding: 3px 10px; /* 徽标内边距 */
+  border-radius: 999px; /* 胶囊造型 */
+  background: rgba(0, 0, 0, 0.05); /* 淡灰底 */
+  color: var(--text-muted); /* 次要色 */
+  font-size: 12px; /* 小字号 */
+} /* 身份徽标结束 */
+
 .chat-messages .chat-hint { /* 消息区加载/提示文案 */
   padding: 16px 12px; /* 上下留白 */
   text-align: center; /* 居中 */

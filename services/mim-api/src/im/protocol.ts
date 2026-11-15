@@ -42,6 +42,12 @@ export type ServerFrameType =
 /** 消息内容类型：文本 / 图片 / 文件 / 系统提示 */
 export type MessageContentType = 'text' | 'image' | 'file' | 'system';
 
+/** 系统私信发送者伪 ID：不写入 users 表，避免系统身份出现在普通用户检索与后台用户列表中 */
+export const SYSTEM_DM_SENDER_ID = 'system:growth-dm';
+
+/** 系统私信发送者的展示名：会话标题与消息气泡统一显示为系统身份，而不是某位管理员个人账号 */
+export const SYSTEM_DM_SENDER_NAME = '成长私信';
+
 /** 消息投递状态：sent（已落库）→ delivered（已投递给在线接收方）→ read（对方已读） */
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
@@ -112,6 +118,8 @@ export interface MessageView {
   object_size?: number | null; // 文件大小
   reply_to_id?: string | null; // 引用回复的目标消息 ID（普通消息为 null）
   reply_excerpt?: string | null; // 被引用消息的摘要（发送时固化，便于渲染引用块）
+  link_url?: string | null; // 系统私信附带的跳转地址（普通消息为 null）
+  link_label?: string | null; // 跳转按钮文案（普通消息为 null）
   status: MessageStatus; // 投递状态
   created_at: string; // 创建时间（UTC ISO-8601）
 } // MessageView 结束

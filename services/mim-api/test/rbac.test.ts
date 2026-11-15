@@ -18,6 +18,7 @@ const BUILTIN_PERMISSION_CODES = [ // 按字典序排列，便于与 API 返回�
   'entitlement:grant', // 发放权益
   'entitlement:read', // 查看权益
   'entitlement:revoke', // 回收权益
+  'messaging:write', // 发送系统私信（成长私信）
   'module:read', // 查看模块
   'module:write', // 变更模块状态
   'rbac:read', // 查看角色权限
@@ -126,7 +127,7 @@ describe('GET /admin/me 身份回显', () => { // 后台首屏需要知道自己
 }); // 身份回显分组结束
 
 describe('权限点与角色读取', () => { // 后台勾选矩阵的数据源，必须与种子完全一致
-  it('GET /admin/permissions 返回 12 个内置权限点且 builtin:true', async () => { // 权限点由种子维护（含域脚本追加的 content:write 与 deployments:read），不允许后台新增
+  it('GET /admin/permissions 返回 13 个内置权限点且 builtin:true', async () => { // 权限点由种子维护（含域脚本追加的 content:write 与 deployments:read），不允许后台新增
     const res = await request(app) // 读取权限点
       .get('/api/v1/admin/permissions') // 权限点端点
       .set(adminHeaders()); // 引导令牌
@@ -433,7 +434,7 @@ describe('细粒度权限：viewer 只读、无角色不可进后台', () => { /
     expect(write.body.details.permission).toBe('rbac:write'); // 断言缺失权限点
   }); // viewer 用例结束
 
-  it('operator 无 rbac:write：可读角色但不可建角色、不可替换 superadmin 权限', async () => { // 验证内置角色权限差异真实存在（operator 基线 7 条，不含 rbac:write）
+  it('operator 无 rbac:write：可读角色但不可建角色、不可替换 superadmin 权限', async () => { // 验证内置角色权限差异真实存在（operator 基线 10 条，不含 rbac:write）
     const session = await login('13900000042'); // 建用户
     await grantRole(session.userId, 'operator'); // 授予运营角色（基线权限不含 rbac:write）
     const read = await request(app) // 运营可读角色列表（含 rbac:read）

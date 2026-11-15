@@ -534,6 +534,7 @@ export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺�
   { code: 'commerce:write', name: { 'zh-CN': '处理交易与资金', 'en-US': 'Manage commerce' } }, // 发货、售后审核、提现审核等交易侧写操作
   { code: 'appearance:write', name: { 'zh-CN': '管理外观与页面', 'en-US': 'Manage appearance' } }, // 主题、导航、配色与页面区块配置
   { code: 'content:write', name: { 'zh-CN': '维护内容运营', 'en-US': 'Manage content' } }, // 公告、更新日志、推广计划的维护与发布归档
+  { code: 'messaging:write', name: { 'zh-CN': '发送系统私信', 'en-US': 'Send system direct messages' } }, // 成长私信：按条件向用户投递系统身份的一对一私信
   { code: 'deployments:read', name: { 'zh-CN': '查看部署汇总', 'en-US': 'Read deployments' } }, // 2026-11-15 运维数据收口：部署项清单仅后台可见，不再对访客公开
 ] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
 
@@ -562,6 +563,7 @@ export const RBAC_ROLES = [ // 内置角色数组，同样决定后台展示顺�
       'rbac:read', // 需要知道自己持有哪些权限
       'commerce:write', // 需要发货、审售后与审提现
       'appearance:write', // 需要维护首页与论坛的外观配置
+      'messaging:write', // 需要向用户发送成长私信
     ] as const, // 断言常量，元素类型须落在 RbacPermissionCode 内
   }, // operator 结束
   { // 只读观察者：仅供审计与客服查询
