@@ -28,14 +28,12 @@ import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 import { PageBuilder } from './views/PageBuilder'; // 业务步骤
 // 外观：主色 / 圆角档位 / 默认明暗，复用 appearance:write
 import { Appearance } from './views/Appearance'; // 业务步骤
-// 发货与售后：待发货录单、物流推进、售后审批
-import { Shipments } from './views/Shipments'; // 业务步骤
 // 成长私信：按条件或指定用户发送系统身份私信
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
 import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'shipments' | 'withdrawals' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm';
+type ViewKey = 'overview' | 'withdrawals' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -51,8 +49,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   // 概览：任何已登录身份都能看
   { key: 'overview', label: '概览', permission: null },
-  // 发货与售后：后端 commerce:write 才可操作，导航同权限过滤
-  { key: 'shipments', label: '发货与售后', permission: 'commerce:write' },
   // 提现审核：申请队列与到账处理，复用 commerce:write
   { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
   // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
@@ -214,8 +210,6 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
 function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity) { // 业务步骤
   // 概览：纯展示身份与权限统计
   if (key === 'overview') return <Overview identity={identity} />;
-  // 发货与售后：待发货录单、物流推进、售后审批
-  if (key === 'shipments') return <Shipments credential={credential} permissions={identity.permissions} />;
   // 提现审核：申请队列、通过 / 驳回 / 标记到账、创作分成结算
   if (key === 'withdrawals') return <Withdrawals credential={credential} permissions={identity.permissions} />;
   // 角色与权限：角色 CRUD + 权限矩阵
