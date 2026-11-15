@@ -4143,7 +4143,9 @@ code { /* 行内代码/令牌展示 */
 .community-rating button {
   border: 0;
   background: transparent;
-  color: var(--text-disabled);
+  /* 未选中的星标是可点击控件：用次要文字色保证明暗两套主题下都高于 3:1 的可辨识度
+     （--text-disabled 在暗色下仅 2.14:1，星形轮廓会糊在卡片底色里） */
+  color: var(--text-muted);
   font-size: var(--fs-lg);
   padding: 0 2px;
   cursor: pointer;
