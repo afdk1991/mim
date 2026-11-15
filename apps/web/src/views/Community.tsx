@@ -43,7 +43,8 @@ interface Props { // 接口 Props：约束对象的字段与类型形态
   onRequireLogin?: () => void; // 互动前未登录时的引导入口：由 App 负责跳转登录页
 } // 代码块结束
 
-type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral' | 'gallery' | 'video'; // 类型别名 Tab：复用一份复合类型定义
+// 页签 id 与媒体 kind 对齐：图库页签是 image 视图，避免与帖子类型 gallery（图集）混淆
+type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral' | 'images' | 'video'; // 类型别名 Tab：复用一份复合类型定义
 
 const KIND_LABEL: Record<ThreadKind, string> = { // 常量 KIND_LABEL：保存固定配置或一次性派生值
   text: '图文',
@@ -989,7 +990,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       <nav className="community-tabs">{/* 执行当前业务步骤 */}
         {([
           ['forum', '论坛'],
-          ['gallery', '图库'],
+          ['images', '图库'],
           ['video', '视频'],
           ['announcements', '公告动态'],
           ['vip', 'VIP 会员'],
@@ -1015,8 +1016,10 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         />
       )}
 
-      {!loading && (tab === 'gallery' || tab === 'video') && (
+      {/* 图库 / 视频各自独立实例（key），筛选状态不串台 */}
+      {!loading && (tab === 'images' || tab === 'video') && (
         <CommunityGallery
+          key={tab}
           locale={locale}
           kind={tab === 'video' ? 'video' : 'image'}
           hasSession={hasSession}
