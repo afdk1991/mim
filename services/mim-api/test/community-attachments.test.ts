@@ -125,4 +125,32 @@ describe('帖子附件位', () => {
       });
     expect(created.status).toBe(403); // 归属校验失败：拒绝入库
   });
+
+  it('免费板块里的付费帖不因板块开放而放行附件：匿名 / 未购 403，作者 200', async () => {
+    const authorAuth = await loginHeaders(app, '13700000206'); // 付费单帖作者
+    const outsider = await loginHeaders(app, '13700000207'); // 已登录但未购买
+    const objectKey = await uploadFile(authorAuth, 'application/pdf', Buffer.from('%PDF-1.4 paid-in-free-board'));
+
+    const created = await request(app)
+      .post('/api/v1/community/threads')
+      .set({ ...authorAuth, 'idempotency-key': randomUUID() })
+      .send({
+        board_slug: 'general', // 免费公开板块：板块准入对匿名本来就成立
+        title: '免费板块中的付费帖',
+        body: '这篇帖子位于免费板块，但单帖收费，附件必须与正文同一道付费墙。',
+        price_cents: 1900,
+        attachments: [{ name: '付费资料.pdf', object_key: objectKey, mime: 'application/pdf', size_bytes: 1 }],
+      });
+    expect(created.status).toBe(201);
+    const threadId = created.body.thread_id as string;
+    const attachmentId = (db.prepare('SELECT id FROM community_thread_attachments WHERE thread_id = ?').get(threadId) as { id: string }).id;
+
+    const anonymous = await request(app).get(`/api/v1/community/threads/${threadId}/attachments/${attachmentId}/download`);
+    expect(anonymous.status).toBe(403); // 板块开放不等于单帖解锁：匿名不得拿到签名地址
+    const notBought = await request(app).get(`/api/v1/community/threads/${threadId}/attachments/${attachmentId}/download`).set(outsider);
+    expect(notBought.status).toBe(403); // 已登录未购同样拦下
+    const author = await request(app).get(`/api/v1/community/threads/${threadId}/attachments/${attachmentId}/download`).set(authorAuth);
+    expect(author.status).toBe(200); // 作者本人不受付费墙限制
+    expect(author.body.attachment.name).toBe('付费资料.pdf');
+  });
 });

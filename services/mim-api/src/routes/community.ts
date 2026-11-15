@@ -552,7 +552,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
   }); // 结束代码块：本层作用域收尾
 
   /**
-   * 附件签名下载：与帖子详情同一套解锁口径（板块准入 / 单帖已购 / 作者 / VIP）。
+   * 附件签名下载：免费帖匿名可下（与「读开放」一致），付费帖只认单帖解锁（已购 / 作者 / VIP）。
    * 只签发短时地址，不返回对象键；付费帖未解锁一律 403，附件与帖子权限绑定。
    */
   router.get('/community/threads/:id/attachments/:attachmentId/download', async (req, res) => { // 路由 GET /community/threads/:id/attachments/:attachmentId/download
@@ -584,7 +584,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     } // 结束条件分支：本层作用域收尾
     const boardUnlocked = hasBoardAccess(deps, userId, thread.board_id, thread.board_price_cents); // 板块准入（付费板块需加入 / VIP；followers 板块需关注）
     const threadPaidUnlocked = thread.price_cents > 0 && hasThreadAccess(deps, userId, thread.id, thread.price_cents); // 单帖已购 / 作者 / VIP
-    if (!boardUnlocked && !threadPaidUnlocked) throw new AppError('FORBIDDEN', '请先解锁该帖子后再下载附件'); // 未解锁：附件受同一道付费墙约束
+    // 付费帖只认单帖解锁：若沿用「板块准入或单帖解锁」，免费板块里的付费帖会被匿名访客绕过付费墙。
+    const downloadable = thread.price_cents > 0 ? threadPaidUnlocked : boardUnlocked; // 免费帖沿用板块准入（公开板块匿名可下），付费帖必须单帖已解锁
+    if (!downloadable) throw new AppError('FORBIDDEN', '请先解锁该帖子后再下载附件'); // 未解锁：附件受同一道付费墙约束
     const attachment = deps.db // 附件必须属于该帖子，防止跨帖借道
       .prepare('SELECT id, name, url, mime, size_bytes FROM community_thread_attachments WHERE id = ? AND thread_id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
       .get(req.params.attachmentId, thread.id) as // 查询单行：读取一条记录供判定使用
