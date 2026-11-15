@@ -535,15 +535,32 @@ export function seedCommerce(db: Db): void {
     }
     insertSetting.run('locales', JSON.stringify({ front: 'zh-CN', admin: 'zh-CN', supported: ['zh-CN', 'en-US'], machine_translation: false }), now);
     insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: '跨平台商业级项目', footer: 'Mim · 开源与商业化并行' }), now);
-    const blocks: Array<[string, string, string, number, string]> = [
-      ['block-home-hero', 'home', 'hero', 1, JSON.stringify({ title: 'Mim 社区', subtitle: '知识付费、社区商城、论坛与资金结算', cta: { label: '进入社区', href: '/community' } })],
-      ['block-home-features', 'home', 'features', 2, JSON.stringify({ items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] })],
-      ['block-home-announce', 'home', 'announcements', 3, JSON.stringify({ source: '/api/v1/community/threads?board=announce&limit=3' })],
-      ['block-forum-tabs', 'forum', 'tabs', 1, JSON.stringify({ tabs: ['最新', '热门', '精华', '公告'] })],
-    ];
-    for (const [id, page, kind, sort, config] of blocks) {
-      insertBlock.run(id, page, kind, sort, config, now, now);
-    }
+    const blocks: Array<[string, string, string, number, string]> = [ // 页面区块种子：文案全部面向访客，不使用内部口径
+      ['block-home-hero', 'home', 'hero', 1, JSON.stringify({ title: 'Mim 社区', subtitle: '分享图文、视频与图集作品，开通付费阅读，也能逛社区商城。', cta: { label: '进入社区', href: '/community' } })], // 首页头图：一句话说清这是什么、能做什么
+      ['block-home-features', 'home', 'features', 2, JSON.stringify({ items: [{ title: '付费内容', text: '图文、视频与图集作品，支持单篇解锁阅读' }, { title: '社区商城', text: '实物商品、自动发卡与人工发货' }, { title: '论坛互动', text: '按板块与圈子交流，可发帖、回帖和收藏' }] })], // 三张特性卡：改用访客能直接理解的运营文案
+      ['block-home-announce', 'home', 'announcements', 3, JSON.stringify({ source: '/api/v1/community/threads?board=announce&limit=3' })], // 公告入口：数据仍取社区公告板块
+      ['block-forum-tabs', 'forum', 'tabs', 1, JSON.stringify({ tabs: ['最新', '热门', '精华', '公告'] })], // 论坛页栏目
+    ]; // blocks 结束
+    for (const [id, page, kind, sort, config] of blocks) { // 逐块写入种子
+      insertBlock.run(id, page, kind, sort, config, now, now); // INSERT OR IGNORE：已存在则不覆盖
+    } // 循环结束
+    // 存量库首页文案对齐：旧种子把首屏标题写成「Mim 商业中台」等占位措辞，INSERT OR IGNORE 不会更新已有行。
+    // 只有区块配置仍与旧种子逐字一致时才替换；运营在后台改过的文案保持原样，重复启动无副作用。
+    const legacyHomeConfig: Record<string, string> = { // 旧种子原文：作为「未被运营改动过」的判定依据
+      'block-home-hero': JSON.stringify({ title: 'Mim 商业中台', subtitle: '知识付费、独立商城、社区与资金结算', cta: { label: '进入商城', href: '/marketplace' } }), // 旧首页头图
+      'block-home-features': JSON.stringify({ items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] }), // 旧特性卡
+    }; // legacyHomeConfig 结束
+    for (const [id, page, kind, sort, config] of blocks) { // 复用新种子作为对齐目标
+      if (!legacyHomeConfig[id]) continue; // 只处理有旧文案的首页区块
+      const row = db.prepare('SELECT config_json FROM page_blocks WHERE id = ?').get(id) as { config_json: string } | undefined; // 读当前存量配置
+      if (!row) continue; // 行不存在说明新种子已写入，无需对齐
+      try { // 脏 JSON 视为运营数据异常，保持原样
+        const same = JSON.stringify(JSON.parse(row.config_json)) === legacyHomeConfig[id]; // 结构化比对，忽略键序与空白
+        if (same) db.prepare('UPDATE page_blocks SET config_json = ?, updated_at = ? WHERE id = ?').run(config, now, id); // 命中旧种子才替换并刷新时间
+      } catch { // 解析失败不做任何写入
+        // 保持原值，避免把坏数据覆盖成默认文案
+      } // try/catch 结束
+    } // 对齐循环结束
   });
   seed();
 }

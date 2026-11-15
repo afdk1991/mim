@@ -14,11 +14,11 @@ interface Props { // 视图参数
 const DEFAULT_HOME_BLOCKS: PageBlock[] = [
   { // 头图：与后端初始种子保持一致
     id: 'default-home-hero', page: 'home', kind: 'hero', sort_order: 1, config_json: '', updated_at: '', // 固定兜底标识
-    config: { title: 'Mim 社区', subtitle: '知识付费、社区商城、论坛与资金结算', cta: { label: '进入社区', href: '/community' } }, // 默认文案
+    config: { title: 'Mim 社区', subtitle: '分享图文、视频与图集作品，开通付费阅读，也能逛社区商城。', cta: { label: '进入社区', href: '/community' } }, // 默认文案：与后端种子一致，面向访客
   }, // hero 结束
   { // 特性卡片
     id: 'default-home-features', page: 'home', kind: 'features', sort_order: 2, config_json: '', updated_at: '', // 固定兜底标识
-    config: { items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] }, // 默认卖点
+    config: { items: [{ title: '付费内容', text: '图文、视频与图集作品，支持单篇解锁阅读' }, { title: '社区商城', text: '实物商品、自动发卡与人工发货' }, { title: '论坛互动', text: '按板块与圈子交流，可发帖、回帖和收藏' }] }, // 默认卖点：与后端种子一致
   }, // features 结束
   { // 公告入口
     id: 'default-home-announce', page: 'home', kind: 'announcements', sort_order: 3, config_json: '', updated_at: '', // 固定兜底标识
@@ -75,7 +75,7 @@ function Block({ block }: { block: PageBlock }) {
     return ( // 返回当前函数的处理结果
       <section className="page-block notice">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>{String(config.title ?? (block.kind === 'notice' ? '公告' : '最新公告'))}</h3></div>
-        <p className="muted">{String(config.text ?? config.subtitle ?? '产品公告、更新日志与推广计划见社区公告板块。')}</p>
+        <p className="muted">{String(config.text ?? config.subtitle ?? '新版本、活动与站点通知都会在这里更新。')}</p>
         <a className="link" href={hrefOf(config.href ?? '/community')}>{String(config.link_label ?? '查看社区公告')}</a>
       </section>
     ); // 执行当前业务步骤

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'; // vitest 编排：�
 import request from 'supertest'; // 进程内驱动 Express
 import type { Express } from 'express'; // 应用类型
 import { createApp } from '../src/app.js'; // 唯一装配入口
-import { createDatabase } from '../src/db.js'; // 内存库工厂，种子自动写入
+import { createDatabase, seedCommerce } from '../src/db.js'; // 内存库工厂，种子自动写入；seedCommerce 用于模拟重启再播种
 
 const JWT_SECRET = 'test-secret-0123456789abcdef0123456789abcdef'; // 固定测试密钥
 const ADMIN_TOKEN = 'test-admin-token'; // 引导通道令牌，与注入 env 保持一致
@@ -62,6 +62,24 @@ describe('页面区块公开只读', () => { // 调用 describe 并处理其返�
     expect(res.status).toBe(200); // 不抛 500
     const hero = res.body.blocks.find((b: { id: string }) => b.id === 'block-home-hero'); // 定位损坏区块
     expect(hero.config).toEqual({}); // 脏配置回落空对象
+  }); // 代码块结束
+
+  it('存量库仍是旧占位文案时，再播种一次即对齐为面向访客的文案', async () => { // 模拟线上旧种子行 + 重启
+    db.prepare("UPDATE page_blocks SET config_json = ? WHERE id = 'block-home-hero'").run(JSON.stringify({ title: 'Mim 商业中台', subtitle: '知识付费、独立商城、社区与资金结算', cta: { label: '进入商城', href: '/marketplace' } })); // 旧种子原文
+    seedCommerce(db); // 模拟服务重启时的播种
+    const res = await request(app).get('/api/v1/pages/home'); // 匿名读取首页
+    const hero = res.body.blocks.find((b: { id: string }) => b.id === 'block-home-hero'); // 定位头图
+    expect(hero.config.title).toBe('Mim 社区'); // 标题已替换
+    expect(hero.config.cta.href).toBe('/community'); // CTA 指向社区而非旧商城路径
+    expect(JSON.stringify(hero.config)).not.toContain('商业中台'); // 占位词彻底消失
+  }); // 代码块结束
+
+  it('运营手改过的首页文案不会被播种对齐覆盖', async () => { // 幂等对齐只针对旧种子原文
+    const custom = { title: '我们自己的首页', subtitle: '运营手写文案', cta: { label: '去看看', href: '/community' } }; // 自定义配置
+    db.prepare("UPDATE page_blocks SET config_json = ? WHERE id = 'block-home-hero'").run(JSON.stringify(custom)); // 模拟运营编辑
+    seedCommerce(db); // 再播种
+    const row = db.prepare("SELECT config_json FROM page_blocks WHERE id = 'block-home-hero'").get() as { config_json: string }; // 读回配置
+    expect(JSON.parse(row.config_json)).toEqual(custom); // 原样保留
   }); // 代码块结束
 }); // 代码块结束
 
