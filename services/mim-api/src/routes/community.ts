@@ -16,6 +16,8 @@ import { loadWeights, refreshRecommendScore, saveWeights, DEFAULT_WEIGHTS } from
 import { DEFAULT_TABS, loadBoardTabs, saveBoardTabs, SORT_BY_KEYS, type TabInput } from '../community/tabs.js'; // 三期：板块 Tab 组合
 import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewEnabled, type HomeView } from '../community/settings.js'; // 三期：首页指向与审核开关
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
+import { assertSafeObjectKey, mimeForObjectKey } from '../storage.js'; // 附件对象键安全校验（禁止路径穿越）+ 后缀推导 MIME
+import { baseUrlOf } from './media.js'; // 复用媒体域的公网基址推导，附件签名下载点同一口径
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
 
@@ -92,6 +94,38 @@ function effectiveVisibility(board: { price_cents: number; visibility: string })
 /** 当前用户是否可管理该板块：创建者 / 版主本人，或后续由运营权限端点放行。 */
 function canModerateBoard(board: { created_by: string | null; moderator_id: string | null }, userId: string): boolean { // 定义函数 canModerateBoard：封装可复用业务步骤
   return board.created_by === userId || board.moderator_id === userId; // 返回结果：把本步骤产物交给调用方
+} // 结束代码块：本层作用域收尾
+
+/** 站内通知：落一条收件箱记录；自己触发自己、或收件人为空时直接跳过。 */
+function notify( // 定义函数 notify：封装可复用业务步骤
+  deps: ApiDeps, // 依赖容器：数据库等
+  input: { userId: string | null | undefined; kind: string; threadId?: string | null; postId?: string | null; actorId: string; content: string }, // 通知内容
+): void { // 函数体开始
+  if (!input.userId || input.userId === input.actorId) return; // 无需自通知
+  deps.db // 业务步骤：推进当前流程的下一项处理
+    .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+      `INSERT INTO community_notifications (id, user_id, kind, thread_id, post_id, actor_id, content, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, // 收件箱一行
+    ) // 调用结束：参数列表与链式调用收尾
+    .run(`notif-${randomUUID()}`, input.userId, input.kind, input.threadId ?? null, input.postId ?? null, input.actorId, input.content.slice(0, 120), now()); // 执行写入：把参数落库并返回影响结果
+} // 结束函数体：本层作用域收尾
+
+/** 把 LIKE 关键词转成可安全嵌入正则的字面量，用于搜索高亮片段。 */
+function escapeRegExp(value: string): string { // 定义函数 escapeRegExp：封装可复用业务步骤
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 返回结果：把本步骤产物交给调用方
+} // 结束代码块：本层作用域收尾
+
+/** 从正文中截取命中关键词的一段摘要，用 <mark> 标出命中词；未命中时回落标题 / 摘要。 */
+function buildSnippet(text: string, keyword: string, radius = 40): string { // 定义函数 buildSnippet：封装可复用业务步骤
+  const plain = text.replace(/\s+/g, ' ').trim(); // 压平空白，避免摘要里出现大段换行
+  if (!plain) return ''; // 空正文直接返回
+  const lower = plain.toLowerCase(); // 统一小写做不区分大小写匹配
+  const at = lower.indexOf(keyword.toLowerCase()); // 命中位置
+  const start = at < 0 ? 0 : Math.max(0, at - radius); // 命中点前留一段上下文
+  const slice = plain.slice(start, start + radius * 2 + keyword.length); // 截取片段
+  const html = slice.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] as string)); // 先转义，再插高亮标签
+  if (!keyword) return html; // 无关键词时只返回转义文本
+  return html.replace(new RegExp(escapeRegExp(keyword), 'gi'), (hit) => `<mark>${hit}</mark>`); // 高亮命中词
 } // 结束代码块：本层作用域收尾
 
 /** 建板块门槛：等级阈值与每人数量上限；板块配置为 0 时回落环境变量 / 内置默认。 */
@@ -258,6 +292,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     /^\/api\/v1\/community\/boards$/, // 板块列表
     /^\/api\/v1\/community\/threads$/, // 帖子列表
     /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
+    /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 附件签名下载（免费帖访客可下，付费帖在处理函数内按解锁口径拦截）
+    /^\/api\/v1\/community\/search$/, // 社区搜索（标题 / 摘要 / 正文）
     /^\/api\/v1\/vip\/plans$/, // VIP 套餐
     /^\/api\/v1\/shop\/products$/, // 商城商品列表
   ];
@@ -326,6 +362,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       ? String(req.query.sort) // 业务步骤：推进当前流程的下一项处理
       : 'latest'; // 业务步骤：推进当前流程的下一项处理
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '24'), 10) || 24, 1), 60); // 保存 limit：承载本步骤的计算结果供后续使用
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移：0 起算，非法值回落首页
     const where: string[] = ["t.status = 'published'", "(b.status = 'active' OR b.created_by = ? OR b.moderator_id = ?)"]; // 保存 where：承载本步骤的计算结果供后续使用
     const args: unknown[] = [userId, userId]; // 保存 args：承载本步骤的计算结果供后续使用
     if (board) { // 条件分支：仅在满足业务前置条件时继续
@@ -337,8 +374,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       args.push(kind); // 业务步骤：推进当前流程的下一项处理
     } // 结束条件分支：本层作用域收尾
     if (q) { // 条件分支：仅在满足业务前置条件时继续
-      where.push('(t.title LIKE ? OR t.summary LIKE ?)'); // 业务步骤：推进当前流程的下一项处理
-      args.push(`%${q}%`, `%${q}%`); // 业务步骤：推进当前流程的下一项处理
+      where.push('(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ?)'); // 标题 / 摘要 / 正文三处命中，避免只搜标题漏掉正文
+      args.push(`%${q}%`, `%${q}%`, `%${q}%`); // 业务步骤：推进当前流程的下一项处理
     } // 结束函数体：本层作用域收尾
     const order = // 保存 order：承载本步骤的计算结果供后续使用
       sort === 'hot' // 赋值：更新当前作用域中的状态
@@ -354,9 +391,13 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
                 : sort === 'recommend' // 业务步骤：推进当前流程的下一项处理
                   ? 't.recommend_score DESC, t.last_activity_at DESC' // 业务步骤：推进当前流程的下一项处理
                   : 't.last_activity_at DESC'; // 业务步骤：推进当前流程的下一项处理
+    const total = (deps.db // 真分页总数：与列表同 WHERE 同参数，避免两套口径漂移
+      .prepare(`SELECT COUNT(*) AS n FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE ${where.join(' AND ')}`) // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(...args) as { n: number }).n; // 查询单行：读取一条记录供判定使用
     const rows = deps.db // 保存 rows：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
         `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count,
+                t.pinned, t.locked AS reply_locked,
                 t.recommend_score,
                 t.created_at, t.last_activity_at, t.author_id, b.slug AS board_slug, b.name AS board_name, b.price_cents AS board_price_cents,
                 b.visibility AS board_visibility, b.post_min_level AS board_post_min_level,
@@ -372,10 +413,10 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
          JOIN community_boards b ON b.id = t.board_id
          LEFT JOIN users u ON u.id = t.author_id
          WHERE ${where.join(' AND ')}
-         ORDER BY ${order}
-         LIMIT ?`,
+         ORDER BY t.pinned DESC, ${order}
+         LIMIT ? OFFSET ?`,
       ) // 调用结束：参数列表与链式调用收尾
-      .all(userId, userId, userId, userId, ...args, limit); // 查询多行：读取列表供批量处理
+      .all(userId, userId, userId, userId, ...args, limit, offset); // 查询多行：读取列表供批量处理
     const level = vipLevel(deps, userId); // 保存 level：承载本步骤的计算结果供后续使用
     const items = (rows as Array<Record<string, unknown> & { price_cents: number; purchased: number; board_price_cents: number; board_joined: number; board_visibility: string; board_followed: number; author_id: string | null }>).map((row) => { // 保存 items：承载本步骤的计算结果供后续使用
       const boardOpen = // 与详情 hasBoardAccess 同口径：付费板块需已加入或 VIP；followers 板块需已关注
@@ -384,7 +425,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       const threadOpen = row.price_cents > 0 && (row.purchased > 0 || level > 0 || row.author_id === userId); // 单帖已购 / VIP / 作者本人
       return { ...row, locked: !boardOpen && !threadOpen }; // 与详情 unlocked = boardUnlocked || threadPaidUnlocked 严格同源，避免列表标锁但详情可读
     }); // 结束函数体：本层作用域收尾
-    res.json({ items, total: items.length, sort, vip_level: level }); // 输出响应：把处理结果写回 HTTP 客户端
+    res.json({ items, total, offset, limit, sort, vip_level: level }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束代码块：本层作用域收尾
 
   /** 帖子详情：未解锁时隐藏正文与回复。 */
@@ -458,15 +499,23 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const myVote = deps.db.prepare('SELECT option_id FROM community_poll_votes WHERE thread_id = ? AND user_id = ?').get(id, userId) as // 保存 myVote：承载本步骤的计算结果供后续使用
       | { option_id: string } // 业务步骤：推进当前流程的下一项处理
       | undefined; // 业务步骤：推进当前流程的下一项处理
+    const postLimit = Math.min(Math.max(parseInt(String(req.query.post_limit ?? '50'), 10) || 50, 1), 200); // 回复分页：单页上限 200，避免长楼一次拉爆
+    const postOffset = Math.max(parseInt(String(req.query.post_offset ?? '0'), 10) || 0, 0); // 回复分页偏移
+    const postsTotal = unlocked // 保存 postsTotal：仅解锁时统计，避免把锁帖的回复数量透给未购用户
+      ? (deps.db.prepare('SELECT COUNT(*) AS n FROM community_posts WHERE thread_id = ? AND deleted_at IS NULL').get(id) as { n: number }).n // 已删回复不计入
+      : 0; // 锁帖不外泄回复数
     const posts = unlocked // 保存 posts：承载本步骤的计算结果供后续使用
       ? deps.db // 业务步骤：推进当前流程的下一项处理
           .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
-            `SELECT p.id, p.content, p.created_at, u.display_name AS author_name, u.member_no AS author_member_no
+            `SELECT p.id, p.content, p.parent_id, p.author_id, p.created_at, u.display_name AS author_name, u.member_no AS author_member_no
              FROM community_posts p LEFT JOIN users u ON u.id = p.author_id
-             WHERE p.thread_id = ? ORDER BY p.created_at ASC LIMIT 200`,
+             WHERE p.thread_id = ? AND p.deleted_at IS NULL ORDER BY p.created_at ASC LIMIT ? OFFSET ?`,
           ) // 调用结束：参数列表与链式调用收尾
-          .all(id) // 查询多行：读取列表供批量处理
+          .all(id, postLimit, postOffset) // 查询多行：读取列表供批量处理
       : []; // 业务步骤：推进当前流程的下一项处理
+    const attachments = unlocked // 附件位：与媒体分开，仅解锁后下发；只回元数据，不回对象键
+      ? deps.db.prepare('SELECT id, name, mime, size_bytes, sort_order FROM community_thread_attachments WHERE thread_id = ? ORDER BY sort_order ASC').all(id) // 预编译 SQL：固定语句结构后绑定参数执行
+      : []; // 锁帖不暴露附件清单
     const episodes = unlocked && thread.kind === 'series' // 保存 episodes：承载本步骤的计算结果供后续使用
       ? deps.db.prepare('SELECT id, title, media_url, poster_url, sort_order FROM community_series_episodes WHERE thread_id = ? ORDER BY sort_order ASC').all(id) // 预编译 SQL：固定语句结构后绑定参数执行
       : []; // 业务步骤：推进当前流程的下一项处理
@@ -484,16 +533,77 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         locked: !unlocked, // 对象字段：声明结构中的一项数据
         board_locked: !boardUnlocked, // 对象字段：声明结构中的一项数据
         media: unlocked ? media : [], // 对象字段：声明结构中的一项数据
+        attachments, // 附件位：解锁后可见
         episodes, // 业务步骤：推进当前流程的下一项处理
         accepted_post: acceptedPost, // 对象字段：声明结构中的一项数据
         can_moderate: canModerate, // 对象字段：声明结构中的一项数据
+        can_edit: userId !== '' && userId === thread.author_id, // 作者可编辑自己的帖子
+        reply_locked: !!thread.locked, // 锁定后只读（与付费锁 locked 区分）
         poll: unlocked && options.length > 0 ? { options, total: (options as Array<{ votes: number }>).reduce((sum, option) => sum + option.votes, 0), my_option: myVote?.option_id ?? null } : null, // 对象字段：声明结构中的一项数据
       }, // 结束代码块：本层作用域收尾
       posts, // 业务步骤：推进当前流程的下一项处理
+      posts_total: postsTotal, // 回复总数：前端据此显示「加载更多」
+      post_limit: postLimit, // 当前页大小
+      post_offset: postOffset, // 当前页偏移
       liked, // 业务步骤：推进当前流程的下一项处理
       unlocked, // 业务步骤：推进当前流程的下一项处理
       favorited: !!thread.favorited, // 对象字段：声明结构中的一项数据
     }); // 结束函数体：本层作用域收尾
+  }); // 结束代码块：本层作用域收尾
+
+  /**
+   * 附件签名下载：与帖子详情同一套解锁口径（板块准入 / 单帖已购 / 作者 / VIP）。
+   * 只签发短时地址，不返回对象键；付费帖未解锁一律 403，附件与帖子权限绑定。
+   */
+  router.get('/community/threads/:id/attachments/:attachmentId/download', async (req, res) => { // 路由 GET /community/threads/:id/attachments/:attachmentId/download
+    const userId = req.user?.id ?? ''; // 匿名可访问：免费帖附件允许访客下载，付费帖会在此后按权限拦下
+    const thread = deps.db // 取帖子与板块的权限判定字段
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT t.id, t.price_cents, t.author_id, t.status,
+                b.id AS board_id, b.price_cents AS board_price_cents, b.status AS board_status,
+                b.created_by AS board_created_by, b.moderator_id AS board_moderator_id
+           FROM community_threads t JOIN community_boards b ON b.id = t.board_id
+          WHERE t.id = ? AND t.status = 'published'`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .get(req.params.id) as // 查询单行：读取一条记录供判定使用
+      | { // 业务步骤：推进当前流程的下一项处理
+          id: string; // 帖子主键
+          price_cents: number; // 单帖价格（0 表示免费）
+          author_id: string | null; // 作者
+          board_id: string; // 板块主键
+          board_price_cents: number; // 板块价格
+          board_status: string; // 板块审核状态
+          board_created_by: string | null; // 板块创建者
+          board_moderator_id: string | null; // 板块版主
+        } // 结束代码块：本层作用域收尾
+      | undefined; // 业务步骤：推进当前流程的下一项处理
+    if (!thread) throw new AppError('NOT_FOUND', '帖子不存在'); // 帖子不存在 / 未发布一律 404
+    // 待审核 / 被驳回板块的帖子只对创建者、版主、作者可见，与详情页保持同一可见性口径。
+    if (thread.board_status !== 'active' && thread.board_created_by !== userId && thread.board_moderator_id !== userId && thread.author_id !== userId) { // 条件分支：仅在满足业务前置条件时继续
+      throw new AppError('NOT_FOUND', '帖子不存在'); // 与详情一致：不暴露未上架板块内容
+    } // 结束条件分支：本层作用域收尾
+    const boardUnlocked = hasBoardAccess(deps, userId, thread.board_id, thread.board_price_cents); // 板块准入（付费板块需加入 / VIP；followers 板块需关注）
+    const threadPaidUnlocked = thread.price_cents > 0 && hasThreadAccess(deps, userId, thread.id, thread.price_cents); // 单帖已购 / 作者 / VIP
+    if (!boardUnlocked && !threadPaidUnlocked) throw new AppError('FORBIDDEN', '请先解锁该帖子后再下载附件'); // 未解锁：附件受同一道付费墙约束
+    const attachment = deps.db // 附件必须属于该帖子，防止跨帖借道
+      .prepare('SELECT id, name, url, mime, size_bytes FROM community_thread_attachments WHERE id = ? AND thread_id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(req.params.attachmentId, thread.id) as // 查询单行：读取一条记录供判定使用
+      | { id: string; name: string; url: string; mime: string; size_bytes: number } // 业务步骤：推进当前流程的下一项处理
+      | undefined; // 业务步骤：推进当前流程的下一项处理
+    if (!attachment) throw new AppError('NOT_FOUND', '附件不存在'); // 附件不存在或不归属该帖
+    const storage = deps.storage; // 取存储适配器（附件只存在于对象存储）
+    if (!storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 未配置存储时显式报错
+    if ((await storage.headObject(attachment.url)) === null) throw new AppError('NOT_FOUND', '附件不存在'); // 对象已被清理时不再签发地址
+    const presigned = await storage.presignDownload({ // 生成短时签名地址（local 走 HMAC，s3 走 SigV4）
+      key: attachment.url, // 对象键：列名沿用历史 url，但存的是键不是公开直链
+      expires_seconds: 300, // 5 分钟有效：足够点击下载，又不会被长期转发
+      base_url: baseUrlOf(req, deps.env), // 与媒体域同一套公网基址推导
+    }); // presignDownload 调用结束
+    res.json({ // 只回签名地址与展示元数据，不回对象键
+      download: presigned, // 含 url / method / headers / expires_at
+      attachment: { id: attachment.id, name: attachment.name, mime: attachment.mime, size_bytes: attachment.size_bytes }, // 附件元数据
+      expires_at: presigned.expires_at, // 顶层再暴露一次过期时间
+    }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束代码块：本层作用域收尾
 
   /** 发帖：支持文本 / 视频 / 图集 / 剧集 / 问答 / 投票与付费定价。 */
@@ -520,6 +630,12 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
           .optional(), // 链式调用：在上一步结果上继续处理
         poll_options: z.array(z.string().min(1).max(60)).min(2).max(10).optional(), // 对象字段：声明结构中的一项数据
         episodes: z.array(z.object({ title: z.string().min(1).max(80), media_url: z.string().min(1).max(500), poster_url: z.string().max(500).optional() })).max(100).optional(), // 对象字段：声明结构中的一项数据
+        attachments: z.array(z.object({ // 附件位：先经 /media/presign/upload 拿到 object_key，再随发帖提交
+          name: z.string().min(1).max(120), // 展示文件名（另存为默认名）
+          object_key: z.string().min(1).max(512), // 对象存储键，服务端校验必须属于本人
+          mime: z.string().min(1).max(160).optional(), // 文件 MIME，缺省按对象键后缀推导
+          size_bytes: z.number().int().min(0).max(2_000_000_000).optional(), // 声明大小，最终以存储实测为准
+        })).max(6).optional(), // 单帖最多 6 个附件
       }), // 结束代码块：本层作用域收尾
       req.body, // 读取请求：取得入参、身份或上下文
     ); // 调用结束：参数列表与链式调用收尾
@@ -556,6 +672,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const kind = body.kind ?? 'text'; // 保存 kind：承载本步骤的计算结果供后续使用
     const media = body.media ?? []; // 保存 media：承载本步骤的计算结果供后续使用
     const episodes = body.episodes ?? []; // 保存 episodes：承载本步骤的计算结果供后续使用
+    const attachments = body.attachments ?? []; // 保存 attachments：附件位先上传拿键，再随发帖入库
     if ((kind === 'gallery' || kind === 'series') && !media.some((item) => item.kind === 'image')) throw new AppError('VALIDATION_FAILED', '图集/剧集至少需要一张图片'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     if (kind === 'video' && !media.some((item) => item.kind === 'video')) throw new AppError('VALIDATION_FAILED', '视频帖至少需要一个视频地址'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     if (kind === 'series' && episodes.length === 0) throw new AppError('VALIDATION_FAILED', '剧集帖至少需要一集'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
@@ -580,6 +697,15 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         } // 结束代码块：本层作用域收尾
       } // 结束条件分支：本层作用域收尾
     } // 结束循环体：本层作用域收尾
+    if (attachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 有附件但存储未配置：直接拒绝，避免落库指向不存在的对象
+    for (const item of attachments) { // 附件校验：键安全 + 归属 + 对象真实存在，杜绝挂别人文件或凭空键
+      assertSafeObjectKey(item.object_key); // 先挡路径穿越
+      if (!item.object_key.startsWith(`${userId}/`)) throw new AppError('FORBIDDEN', '附件不属于当前账号', { object_key: item.object_key }); // 首段必须是本人 user_id
+      const head = await deps.storage!.headObject(item.object_key); // 探测对象是否真的上传完成
+      if (!head) throw new AppError('VALIDATION_FAILED', '附件尚未上传完成或已失效', { object_key: item.object_key }); // 不存在的对象不允许入库
+      item.size_bytes = head.size_bytes; // 大小以存储实测为准，避免客户端虚报
+      item.mime = item.mime ?? mimeForObjectKey(item.object_key); // MIME 缺省按对象键后缀推导
+    } // 结束循环体：本层作用域收尾
     await verifyCaptcha(deps.db, deps.env, 'post', (req.body ?? {}) as Record<string, unknown>); // 发帖场景验证码：读取原始请求体（解析后会剥离验证码字段）；开关关闭时为空操作，默认放行
     const audit = await auditText(deps.env, `${body.title}\n${body.summary ?? ''}\n${body.body}`); // 保存 audit：承载本步骤的计算结果供后续使用
     if (!audit.ok) throw new AppError('VALIDATION_FAILED', audit.reason ?? '内容未通过审核'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
@@ -596,6 +722,11 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         deps.db // 业务步骤：推进当前流程的下一项处理
           .prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
           .run(`media-${randomUUID()}`, id, item.kind, item.url, item.poster_url ?? null, index, ts); // 执行写入：把参数落库并返回影响结果
+      }); // 结束函数体：本层作用域收尾
+      attachments.forEach((item, index) => { // 附件位写入：与帖子同事务，避免半成品帖
+        deps.db // 业务步骤：推进当前流程的下一项处理
+          .prepare('INSERT INTO community_thread_attachments (id, thread_id, name, url, mime, size_bytes, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
+          .run(`att-${randomUUID()}`, id, item.name, item.object_key, item.mime ?? '', item.size_bytes ?? 0, index, ts); // url 列存对象键，下载时再签短时地址
       }); // 结束函数体：本层作用域收尾
       (body.poll_options ?? []).forEach((label, index) => { // 业务步骤：推进当前流程的下一项处理
         deps.db // 业务步骤：推进当前流程的下一项处理
@@ -649,26 +780,40 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
     const body = parse(z.object({ content: z.string().min(1).max(4000), parent_id: z.string().max(80).optional() }), req.body); // 保存 body：承载本步骤的计算结果供后续使用
     const thread = deps.db // 保存 thread：承载本步骤的计算结果供后续使用
-      .prepare('SELECT t.price_cents, b.id AS board_id, b.price_cents AS board_price_cents FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE t.id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
-      .get(id) as { price_cents: number; board_id: string; board_price_cents: number } | undefined; // 查询单行：读取一条记录供判定使用
+      .prepare('SELECT t.price_cents, t.author_id, t.locked, t.title, b.id AS board_id, b.price_cents AS board_price_cents FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE t.id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(id) as { price_cents: number; author_id: string; locked: number; title: string; board_id: string; board_price_cents: number } | undefined; // 查询单行：读取一条记录供判定使用
     if (!thread) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    if (thread.locked) throw new AppError('FORBIDDEN', '该帖已被锁定，暂不接受新回复'); // 版主锁定后只读
     if (!hasBoardAccess(deps, userId, thread.board_id, thread.board_price_cents)) throw new AppError('FORBIDDEN', '请先加入该付费板块'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
     if (!hasThreadAccess(deps, userId, id, thread.price_cents)) throw new AppError('FORBIDDEN', '请先解锁本帖'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
     const audit = await auditText(deps.env, body.content); // 保存 audit：承载本步骤的计算结果供后续使用
     if (!audit.ok) throw new AppError('VALIDATION_FAILED', audit.reason ?? '回复未通过审核'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    // 楼中楼：父回复必须属于本帖，避免跨帖串楼或伪造 parent_id 越权通知。
+    const parent = body.parent_id // 保存 parent：承载本步骤的计算结果供后续使用
+      ? (deps.db.prepare('SELECT id, author_id FROM community_posts WHERE id = ? AND thread_id = ? AND deleted_at IS NULL').get(body.parent_id, id) as // 查询单行：读取一条记录供判定使用
+          | { id: string; author_id: string } // 业务步骤：推进当前流程的下一项处理
+          | undefined) // 业务步骤：推进当前流程的下一项处理
+      : undefined; // 无父回复时为普通楼层
+    if (body.parent_id && !parent) throw new AppError('VALIDATION_FAILED', '被回复的楼层不存在'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     const ts = now(); // 保存 ts：承载本步骤的计算结果供后续使用
+    const postId = `post-${randomUUID()}`; // 回复主键：写库与通知复用同一值
     deps.db // 业务步骤：推进当前流程的下一项处理
       .prepare('INSERT INTO community_posts (id, thread_id, author_id, parent_id, content, created_at) VALUES (?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
-      .run(`post-${randomUUID()}`, id, userId, body.parent_id ?? null, body.content, ts); // 执行写入：把参数落库并返回影响结果
+      .run(postId, id, userId, body.parent_id ?? null, body.content, ts); // 执行写入：把参数落库并返回影响结果
     deps.db.prepare('UPDATE community_threads SET reply_count = reply_count + 1, last_activity_at = ? WHERE id = ?').run(ts, id); // 预编译 SQL：固定语句结构后绑定参数执行
     refreshRecommendScore(deps, id); // 回复计入推荐指数
-    res.status(201).json({ ok: true }); // 输出响应：把处理结果写回 HTTP 客户端
+    const preview = body.content.slice(0, 60); // 通知摘要
+    notify(deps, { userId: thread.author_id, kind: 'reply', threadId: id, postId, actorId: userId, content: preview }); // 通知楼主
+    if (parent) notify(deps, { userId: parent.author_id, kind: 'reply', threadId: id, postId, actorId: userId, content: preview }); // 通知被回复楼层作者
+    res.status(201).json({ ok: true, id: postId }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
   /** 点赞开关。 */
   router.post('/community/threads/:id/like', (req, res) => { // 路由 POST /community/threads/:id/like：注册入口并绑定鉴权与处理逻辑
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
+    const thread = deps.db.prepare('SELECT author_id, title FROM community_threads WHERE id = ?').get(id) as { author_id: string; title: string } | undefined; // 点赞通知需要楼主信息
+    if (!thread) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
     const existing = deps.db.prepare('SELECT 1 AS ok FROM community_thread_likes WHERE thread_id = ? AND user_id = ?').get(id, userId); // 保存 existing：承载本步骤的计算结果供后续使用
     if (existing) { // 条件分支：仅在满足业务前置条件时继续
       deps.db.prepare('DELETE FROM community_thread_likes WHERE thread_id = ? AND user_id = ?').run(id, userId); // 预编译 SQL：固定语句结构后绑定参数执行
@@ -678,6 +823,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     } // 结束条件分支：本层作用域收尾
     deps.db.prepare('INSERT INTO community_thread_likes (thread_id, user_id, created_at) VALUES (?, ?, ?)').run(id, userId, now()); // 预编译 SQL：固定语句结构后绑定参数执行
     deps.db.prepare('UPDATE community_threads SET likes = likes + 1 WHERE id = ?').run(id); // 预编译 SQL：固定语句结构后绑定参数执行
+    notify(deps, { userId: thread.author_id, kind: 'like', threadId: id, actorId: userId, content: thread.title }); // 点赞通知楼主（取消点赞不撤回，避免反复扰动）
     refreshRecommendScore(deps, id); // 业务步骤：推进当前流程的下一项处理
     return res.json({ liked: true }); // 返回结果：把本步骤产物交给调用方
   }); // 结束函数体：本层作用域收尾
@@ -687,6 +833,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
     if (!deps.db.prepare("SELECT 1 AS ok FROM community_threads WHERE id = ? AND status = 'published'").get(id)) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    const thread = deps.db.prepare('SELECT author_id, title FROM community_threads WHERE id = ?').get(id) as { author_id: string; title: string }; // 收藏通知需要楼主信息
     const existing = deps.db.prepare('SELECT 1 AS ok FROM community_favorites WHERE thread_id = ? AND user_id = ?').get(id, userId); // 保存 existing：承载本步骤的计算结果供后续使用
     if (existing) { // 条件分支：仅在满足业务前置条件时继续
       deps.db.prepare('DELETE FROM community_favorites WHERE thread_id = ? AND user_id = ?').run(id, userId); // 预编译 SQL：固定语句结构后绑定参数执行
@@ -694,21 +841,26 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       return res.json({ favorited: false }); // 返回结果：把本步骤产物交给调用方
     } // 结束条件分支：本层作用域收尾
     deps.db.prepare('INSERT INTO community_favorites (thread_id, user_id, created_at) VALUES (?, ?, ?)').run(id, userId, now()); // 预编译 SQL：固定语句结构后绑定参数执行
+    notify(deps, { userId: thread.author_id, kind: 'favorite', threadId: id, actorId: userId, content: thread.title }); // 收藏通知楼主
     refreshRecommendScore(deps, id); // 收藏计入推荐指数
     return res.json({ favorited: true }); // 返回结果：把本步骤产物交给调用方
   }); // 结束函数体：本层作用域收尾
 
-  /** 我的收藏。 */
+  /** 我的收藏（分页）。 */
   router.get('/community/favorites', (req, res) => { // 路由 GET /community/favorites：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 收藏归属人
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50); // 单页上限 50
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
+    const total = (deps.db.prepare("SELECT COUNT(*) AS n FROM community_favorites f JOIN community_threads t ON t.id = f.thread_id WHERE f.user_id = ? AND t.status = 'published'").get(userId) as { n: number }).n; // 收藏总数
     const items = deps.db // 保存 items：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
         `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count,
                 b.slug AS board_slug, b.name AS board_name, f.created_at AS favorited_at
          FROM community_favorites f JOIN community_threads t ON t.id = f.thread_id JOIN community_boards b ON b.id = t.board_id
-         WHERE f.user_id = ? AND t.status = 'published' ORDER BY f.created_at DESC LIMIT 50`,
+         WHERE f.user_id = ? AND t.status = 'published' ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
       ) // 调用结束：参数列表与链式调用收尾
-      .all(req.user!.id); // 查询多行：读取列表供批量处理
-    res.json({ items }); // 输出响应：把处理结果写回 HTTP 客户端
+      .all(userId, limit, offset); // 查询多行：读取列表供批量处理
+    res.json({ items, total, offset, limit }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
   /** 评分：1–5 星，一人一帖一条，可修改。 */
@@ -917,9 +1069,10 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (!thread) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
     if (thread.author_id !== userId) throw new AppError('FORBIDDEN', '只有提问者可以采纳回复'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
     if (thread.kind !== 'qa') throw new AppError('VALIDATION_FAILED', '只有问答帖支持采纳'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
-    const post = deps.db.prepare('SELECT id FROM community_posts WHERE id = ? AND thread_id = ?').get(body.post_id, thread.id); // 保存 post：承载本步骤的计算结果供后续使用
+    const post = deps.db.prepare('SELECT id, author_id FROM community_posts WHERE id = ? AND thread_id = ? AND deleted_at IS NULL').get(body.post_id, thread.id) as { id: string; author_id: string } | undefined; // 保存 post：承载本步骤的计算结果供后续使用
     if (!post) throw new AppError('NOT_FOUND', '回复不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
     deps.db.prepare('UPDATE community_threads SET accepted_post_id = ?, updated_at = ? WHERE id = ?').run(body.post_id, now(), thread.id); // 预编译 SQL：固定语句结构后绑定参数执行
+    notify(deps, { userId: post.author_id, kind: 'accept', threadId: thread.id, postId: post.id, actorId: userId, content: '你的回复被采纳为最佳答案' }); // 通知被采纳者
     res.json({ ok: true, accepted_post_id: body.post_id }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
@@ -936,6 +1089,274 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (row.author_id !== userId && row.created_by !== userId && row.moderator_id !== userId) throw new AppError('FORBIDDEN', '只有作者或版主可以删除'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
     deps.db.prepare("UPDATE community_threads SET status = 'hidden', updated_at = ? WHERE id = ?").run(now(), row.id); // 预编译 SQL：固定语句结构后绑定参数执行
     res.json({ ok: true }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 编辑帖子：作者本人可改标题 / 摘要 / 正文 / 封面 / 价格；媒体与附件整组替换。 */
+  router.patch('/community/threads/:id', async (req, res) => { // 路由 PATCH /community/threads/:id：作者编辑入口
+    const userId = req.user!.id; // 当前用户
+    const row = deps.db // 取帖子现有内容做「未传字段保持原值」的兜底
+      .prepare('SELECT id, author_id, title, summary, body, cover_url, price_cents FROM community_threads WHERE id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(req.params.id) as { id: string; author_id: string; title: string; summary: string; body: string; cover_url: string | null; price_cents: number } | undefined; // 查询单行：读取一条记录供判定使用
+    if (!row) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    if (row.author_id !== userId) throw new AppError('FORBIDDEN', '只有作者可以编辑'); // 非作者不许改
+    const body = parse( // 保存 body：承载本步骤的计算结果供后续使用
+      z.object({ // 业务步骤：推进当前流程的下一项处理
+        title: z.string().min(4).max(80).optional(), // 标题
+        summary: z.string().max(200).optional(), // 摘要
+        body: z.string().min(10).max(8000).optional(), // 正文
+        cover_url: z.string().max(500).nullable().optional(), // 封面（null 表示清空）
+        price_cents: z.number().int().min(0).max(100000).optional(), // 付费定价（0 = 免费）
+        media: z.array(z.object({ kind: z.enum(['image', 'video']), url: z.string().min(1).max(500) })).max(12).optional(), // 媒体整组替换
+        attachments: z.array(z.object({ name: z.string().min(1).max(120), url: z.string().min(1).max(500), size_bytes: z.number().int().min(0).max(2_000_000_000).optional() })).max(6).optional(), // 附件整组替换
+      }), // 结束代码块：本层作用域收尾
+      req.body, // 读取请求：取得入参、身份或上下文
+    ); // 调用结束：参数列表与链式调用收尾
+    const nextTitle = body.title ?? row.title; // 未传则保持原值
+    const nextSummary = body.summary ?? row.summary; // 未传则保持原值
+    const nextBody = body.body ?? row.body; // 未传则保持原值
+    const blocked = findBlockedWord(deps.env, `${nextTitle}\n${nextSummary}\n${nextBody}`); // 本地敏感词先过一遍
+    if (blocked) throw new AppError('VALIDATION_FAILED', `内容包含敏感词：${blocked}`, { reason: 'CONTENT_BLOCKED' }); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    if (body.title || body.summary || body.body) { // 只有文本变更才跑远程审核，避免纯媒体改动被审核阻塞
+      const audit = await auditText(deps.env, `${nextTitle}\n${nextSummary}\n${nextBody}`); // 期待异步结果：把后续步骤挂到承诺完成之后
+      if (!audit.ok) throw new AppError('VALIDATION_FAILED', audit.reason ?? '内容未通过审核'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    } // 结束条件分支：本层作用域收尾
+    if (body.media) { // 逐个校验媒体地址，防止把内网地址写进帖子
+      for (const item of body.media) if (!item.url.startsWith('/')) await assertPublicHttpUrl(item.url); // 相对路径走站内资源，绝对地址走 SSRF 校验
+    } // 结束条件分支：本层作用域收尾
+    if (body.attachments) { // 附件同理
+      for (const item of body.attachments) if (!item.url.startsWith('/')) await assertPublicHttpUrl(item.url); // 相对路径走站内资源，绝对地址走 SSRF 校验
+    } // 结束条件分支：本层作用域收尾
+    const ts = now(); // 保存 ts：承载本步骤的计算结果供后续使用
+    deps.db.transaction(() => { // 单事务：帖子字段与媒体 / 附件要么一起生效，要么一起回滚
+      deps.db // 业务步骤：推进当前流程的下一项处理
+        .prepare('UPDATE community_threads SET title = ?, summary = ?, body = ?, cover_url = ?, price_cents = ?, updated_at = ? WHERE id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+        .run(nextTitle, nextSummary, nextBody, body.cover_url === undefined ? row.cover_url : body.cover_url, body.price_cents ?? row.price_cents, ts, row.id); // 执行写入：把参数落库并返回影响结果
+      if (body.media) { // 整组替换媒体
+        deps.db.prepare('DELETE FROM community_thread_media WHERE thread_id = ?').run(row.id); // 先清空
+        body.media.forEach((item, index) => { // 按入参顺序写回
+          deps.db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, sort_order) VALUES (?, ?, ?, ?, ?)').run(`media-${randomUUID()}`, row.id, item.kind, item.url, index); // 执行写入：把参数落库并返回影响结果
+        }); // 结束代码块：本层作用域收尾
+      } // 结束条件分支：本层作用域收尾
+      if (body.attachments) { // 整组替换附件
+        deps.db.prepare('DELETE FROM community_thread_attachments WHERE thread_id = ?').run(row.id); // 先清空
+        body.attachments.forEach((item, index) => { // 按入参顺序写回
+          deps.db // 业务步骤：推进当前流程的下一项处理
+            .prepare('INSERT INTO community_thread_attachments (id, thread_id, name, url, size_bytes, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
+            .run(`att-${randomUUID()}`, row.id, item.name, item.url, item.size_bytes ?? 0, index, ts); // 执行写入：把参数落库并返回影响结果
+        }); // 结束代码块：本层作用域收尾
+      } // 结束条件分支：本层作用域收尾
+    })(); // 立即执行事务
+    refreshRecommendScore(deps, row.id); // 标题 / 正文变化会影响推荐分
+    res.json({ ok: true, title: nextTitle, summary: nextSummary, price_cents: body.price_cents ?? row.price_cents }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 版主治理：置顶 / 取消置顶 / 隐藏 / 恢复 / 锁定 / 解锁；作者可自行隐藏与锁定。 */
+  router.post('/community/threads/:id/moderate', (req, res) => { // 路由 POST /community/threads/:id/moderate：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 当前用户
+    const body = parse(z.object({ action: z.enum(['pin', 'unpin', 'hide', 'restore', 'lock', 'unlock']) }), req.body); // 治理动作
+    const row = deps.db // 取作者与板块管理者
+      .prepare('SELECT t.id, t.author_id, b.created_by, b.moderator_id FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE t.id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(req.params.id) as { id: string; author_id: string | null; created_by: string | null; moderator_id: string | null } | undefined; // 查询单行：读取一条记录供判定使用
+    if (!row) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    const isModerator = row.created_by === userId || row.moderator_id === userId; // 版主 / 板块创建者
+    const isAuthor = row.author_id === userId; // 作者本人
+    const authorAllowed = isAuthor && ['hide', 'lock', 'unlock'].includes(body.action); // 作者只能收自己的帖，不能置顶
+    if (!isModerator && !authorAllowed) throw new AppError('FORBIDDEN', '只有版主或作者可以执行该操作'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
+    const patch: Record<string, string> = { // 动作 → 列 / 值
+      pin: 'pinned = 1', // 置顶
+      unpin: 'pinned = 0', // 取消置顶
+      hide: "status = 'hidden'", // 隐藏（软删）
+      restore: "status = 'published'", // 恢复
+      lock: 'locked = 1', // 锁定回复
+      unlock: 'locked = 0', // 解除锁定
+    }; // 结束代码块：本层作用域收尾
+    deps.db.prepare(`UPDATE community_threads SET ${patch[body.action]}, updated_at = ? WHERE id = ?`).run(now(), row.id); // 执行治理动作
+    if (body.action === 'restore' || body.action === 'pin') refreshRecommendScore(deps, row.id); // 恢复后重算推荐分
+    res.json({ ok: true, action: body.action }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 删除回复：作者本人或版主可软删，回复数同步回退。 */
+  router.delete('/community/posts/:id', (req, res) => { // 路由 DELETE /community/posts/:id：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 当前用户
+    const row = deps.db // 取回复归属与板块管理者
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT p.id, p.thread_id, p.author_id, p.deleted_at, b.created_by, b.moderator_id
+         FROM community_posts p JOIN community_threads t ON t.id = p.thread_id JOIN community_boards b ON b.id = t.board_id
+         WHERE p.id = ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .get(req.params.id) as { id: string; thread_id: string; author_id: string; deleted_at: string | null; created_by: string | null; moderator_id: string | null } | undefined; // 查询单行：读取一条记录供判定使用
+    if (!row) throw new AppError('NOT_FOUND', '回复不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    if (row.author_id !== userId && row.created_by !== userId && row.moderator_id !== userId) throw new AppError('FORBIDDEN', '只有作者或版主可以删除回复'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
+    if (row.deleted_at) { res.json({ ok: true }); return; } // 已删幂等返回，避免重复扣回复数
+    deps.db.prepare('UPDATE community_posts SET deleted_at = ? WHERE id = ?').run(now(), row.id); // 软删：保留审计痕迹
+    deps.db.prepare('UPDATE community_threads SET reply_count = MAX(0, reply_count - 1) WHERE id = ?').run(row.thread_id); // 回复数回退
+    refreshRecommendScore(deps, row.thread_id); // 业务步骤：推进当前流程的下一项处理
+    res.json({ ok: true }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 举报：对帖子或回复提交，同一用户同一对象只保留一条待处理记录。 */
+  router.post('/community/reports', (req, res) => { // 路由 POST /community/reports：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 举报人
+    const body = parse( // 保存 body：承载本步骤的计算结果供后续使用
+      z.object({ // 业务步骤：推进当前流程的下一项处理
+        target_type: z.enum(['thread', 'post']), // 举报对象
+        target_id: z.string().min(1).max(80), // 对象主键
+        reason: z.enum(['spam', 'abuse', 'illegal', 'porn', 'other']), // 原因
+        detail: z.string().max(500).optional(), // 补充说明
+      }), // 结束代码块：本层作用域收尾
+      req.body, // 读取请求：取得入参、身份或上下文
+    ); // 调用结束：参数列表与链式调用收尾
+    let threadId: string | null = null; // 归属帖子
+    if (body.target_type === 'thread') { // 举报帖子
+      const thread = deps.db.prepare('SELECT id FROM community_threads WHERE id = ?').get(body.target_id); // 校验存在
+      if (!thread) throw new AppError('NOT_FOUND', '帖子不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+      threadId = body.target_id; // 帖子即归属
+    } else { // 举报回复
+      const post = deps.db.prepare('SELECT thread_id FROM community_posts WHERE id = ? AND deleted_at IS NULL').get(body.target_id) as { thread_id: string } | undefined; // 校验存在
+      if (!post) throw new AppError('NOT_FOUND', '回复不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+      threadId = post.thread_id; // 回复归属到帖子
+    } // 结束条件分支：本层作用域收尾
+    const thread = deps.db // 取板块以路由给版主
+      .prepare('SELECT board_id, title, author_id FROM community_threads WHERE id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(threadId) as { board_id: string; title: string; author_id: string | null }; // 查询单行：读取一条记录供判定使用
+    const duplicate = deps.db // 同一举报人对同一对象的待处理举报不重复入队
+      .prepare("SELECT 1 AS ok FROM community_reports WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND status = 'open'") // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(userId, body.target_type, body.target_id); // 查询单行：读取一条记录供判定使用
+    if (duplicate) { res.json({ ok: true, duplicate: true }); return; } // 幂等返回
+    const reportId = `report-${randomUUID()}`; // 举报主键
+    deps.db // 业务步骤：推进当前流程的下一项处理
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `INSERT INTO community_reports (id, reporter_id, target_type, target_id, thread_id, board_id, reason, detail, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .run(reportId, userId, body.target_type, body.target_id, threadId, thread.board_id, body.reason, body.detail ?? '', now()); // 执行写入：把参数落库并返回影响结果
+    const board = deps.db.prepare('SELECT moderator_id, created_by FROM community_boards WHERE id = ?').get(thread.board_id) as { moderator_id: string | null; created_by: string | null }; // 取板块管理者
+    notify(deps, { userId: board.moderator_id ?? board.created_by, kind: 'report', threadId, actorId: userId, content: `收到举报：${thread.title}` }); // 通知版主
+    res.status(201).json({ ok: true, id: reportId }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 举报工作台：版主按板块查看待处理 / 已处理举报。 */
+  router.get('/community/boards/:slug/reports', (req, res) => { // 路由 GET /community/boards/:slug/reports：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 当前用户
+    const board = deps.db.prepare('SELECT id FROM community_boards WHERE slug = ?').get(req.params.slug) as { id: string } | undefined; // 保存 board：承载本步骤的计算结果供后续使用
+    if (!board) throw new AppError('NOT_FOUND', '板块不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    const guard = deps.db.prepare('SELECT created_by, moderator_id FROM community_boards WHERE id = ?').get(board.id) as { created_by: string | null; moderator_id: string | null }; // 保存 guard：承载本步骤的计算结果供后续使用
+    if (!canModerateBoard(guard, userId)) throw new AppError('FORBIDDEN', '只有版主可以查看举报'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
+    const status = String(req.query.status ?? 'open'); // 默认只看待处理
+    if (!['open', 'resolved', 'dismissed'].includes(status)) throw new AppError('VALIDATION_FAILED', '未知的举报状态'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50); // 单页上限 50
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
+    const total = (deps.db.prepare('SELECT COUNT(*) AS n FROM community_reports WHERE board_id = ? AND status = ?').get(board.id, status) as { n: number }).n; // 总数
+    const items = deps.db // 保存 items：承载本步骤的计算结果供后续使用
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.thread_id, r.reason, r.detail, r.status, r.created_at,
+                t.title AS thread_title, u.display_name AS reporter_name
+         FROM community_reports r LEFT JOIN community_threads t ON t.id = r.thread_id LEFT JOIN users u ON u.id = r.reporter_id
+         WHERE r.board_id = ? AND r.status = ? ORDER BY r.created_at DESC LIMIT ? OFFSET ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(board.id, status, limit, offset); // 查询多行：读取列表供批量处理
+    res.json({ items, total, offset, limit, status }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 处理举报：忽略 / 隐藏帖子 / 删除回复，并回执举报人。 */
+  router.post('/community/reports/:id/resolve', (req, res) => { // 路由 POST /community/reports/:id/resolve：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 处理人
+    const body = parse(z.object({ action: z.enum(['dismiss', 'hide_thread', 'delete_post']) }), req.body); // 处理动作
+    const report = deps.db // 保存 report：承载本步骤的计算结果供后续使用
+      .prepare('SELECT id, reporter_id, target_type, target_id, thread_id, board_id, status FROM community_reports WHERE id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(req.params.id) as { id: string; reporter_id: string; target_type: string; target_id: string; thread_id: string | null; board_id: string | null; status: string } | undefined; // 查询单行：读取一条记录供判定使用
+    if (!report) throw new AppError('NOT_FOUND', '举报不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+    if (report.status !== 'open') throw new AppError('VALIDATION_FAILED', '该举报已处理'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    const board = deps.db.prepare('SELECT created_by, moderator_id FROM community_boards WHERE id = ?').get(report.board_id) as { created_by: string | null; moderator_id: string | null } | undefined; // 保存 board：承载本步骤的计算结果供后续使用
+    if (!board || !canModerateBoard(board, userId)) throw new AppError('FORBIDDEN', '只有版主可以处理举报'); // 业务拒绝 FORBIDDEN：以统一错误码终止当前请求
+    if (body.action === 'hide_thread' && report.thread_id) { // 隐藏帖子
+      deps.db.prepare("UPDATE community_threads SET status = 'hidden', updated_at = ? WHERE id = ?").run(now(), report.thread_id); // 预编译 SQL：固定语句结构后绑定参数执行
+    } // 结束条件分支：本层作用域收尾
+    if (body.action === 'delete_post' && report.target_type === 'post') { // 删除被举报回复
+      deps.db.prepare('UPDATE community_posts SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(now(), report.target_id); // 预编译 SQL：固定语句结构后绑定参数执行
+      if (report.thread_id) { // 回复数回退
+        deps.db.prepare('UPDATE community_threads SET reply_count = MAX(0, reply_count - 1) WHERE id = ?').run(report.thread_id); // 预编译 SQL：固定语句结构后绑定参数执行
+        refreshRecommendScore(deps, report.thread_id); // 业务步骤：推进当前流程的下一项处理
+      } // 结束条件分支：本层作用域收尾
+    } // 结束条件分支：本层作用域收尾
+    deps.db // 业务步骤：推进当前流程的下一项处理
+      .prepare('UPDATE community_reports SET status = ?, resolved_by = ?, resolution = ?, resolved_at = ? WHERE id = ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .run(body.action === 'dismiss' ? 'dismissed' : 'resolved', userId, body.action, now(), report.id); // 执行写入：把参数落库并返回影响结果
+    notify(deps, { userId: report.reporter_id, kind: 'report', threadId: report.thread_id, actorId: userId, content: body.action === 'dismiss' ? '你的举报经核实未违规' : '你的举报已处理' }); // 回执举报人
+    res.json({ ok: true, action: body.action }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 站内通知：分页列表 + 未读数。 */
+  router.get('/community/notifications', (req, res) => { // 路由 GET /community/notifications：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 收件人
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50); // 单页上限 50
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
+    const unreadOnly = String(req.query.unread ?? '') === '1'; // 只看未读
+    const where = unreadOnly ? 'n.user_id = ? AND n.read_at IS NULL' : 'n.user_id = ?'; // 条件拼接
+    const total = (deps.db.prepare(`SELECT COUNT(*) AS n FROM community_notifications n WHERE ${where}`).get(userId) as { n: number }).n; // 总数
+    const unread = (deps.db.prepare('SELECT COUNT(*) AS n FROM community_notifications WHERE user_id = ? AND read_at IS NULL').get(userId) as { n: number }).n; // 未读数
+    const items = deps.db // 保存 items：承载本步骤的计算结果供后续使用
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT n.id, n.kind, n.thread_id, n.post_id, n.actor_id, n.content, n.read_at, n.created_at,
+                u.display_name AS actor_name, t.title AS thread_title
+         FROM community_notifications n LEFT JOIN users u ON u.id = n.actor_id LEFT JOIN community_threads t ON t.id = n.thread_id
+         WHERE ${where} ORDER BY n.created_at DESC LIMIT ? OFFSET ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(userId, limit, offset); // 查询多行：读取列表供批量处理
+    res.json({ items, total, offset, limit, unread }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 标记通知已读：传 ids 只读指定几条，不传则全部已读。 */
+  router.post('/community/notifications/read', (req, res) => { // 路由 POST /community/notifications/read：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 收件人
+    const body = parse(z.object({ ids: z.array(z.string().min(1).max(80)).max(100).optional() }), req.body ?? {}); // 指定通知
+    const ts = now(); // 保存 ts：承载本步骤的计算结果供后续使用
+    if (body.ids && body.ids.length > 0) { // 精确标已读
+      const stmt = deps.db.prepare('UPDATE community_notifications SET read_at = ? WHERE user_id = ? AND id = ?'); // 预编译 SQL：固定语句结构后绑定参数执行
+      deps.db.transaction(() => { for (const id of body.ids!) stmt.run(ts, userId, id); })(); // 立即执行事务
+    } else { // 全部标已读
+      deps.db.prepare('UPDATE community_notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL').run(ts, userId); // 预编译 SQL：固定语句结构后绑定参数执行
+    } // 结束条件分支：本层作用域收尾
+    const unread = (deps.db.prepare('SELECT COUNT(*) AS n FROM community_notifications WHERE user_id = ? AND read_at IS NULL').get(userId) as { n: number }).n; // 回传剩余未读
+    res.json({ ok: true, unread }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 社区搜索：标题 / 摘要 / 正文全文匹配，返回高亮片段与分页。 */
+  router.get('/community/search', (req, res) => { // 路由 GET /community/search：注册入口并绑定鉴权与处理逻辑
+    const q = String(req.query.q ?? '').trim(); // 关键词
+    if (!q) throw new AppError('VALIDATION_FAILED', '请输入搜索关键词'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    const board = String(req.query.board ?? '').trim(); // 板块过滤
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50); // 单页上限 50
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
+    const where = ["t.status = 'published'", '(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ?)']; // 基础条件
+    const args: Array<string> = [`%${q}%`, `%${q}%`, `%${q}%`]; // 参数与占位符一一对应
+    if (board) { where.push('b.slug = ?'); args.push(board); } // 板块过滤
+    const total = (deps.db // 保存 total：承载本步骤的计算结果供后续使用
+      .prepare(`SELECT COUNT(*) AS n FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE ${where.join(' AND ')}`) // 预编译 SQL：固定语句结构后绑定参数执行
+      .get(...args) as { n: number }).n; // 查询单行：读取一条记录供判定使用
+    const rows = deps.db // 保存 rows：承载本步骤的计算结果供后续使用
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT t.id, t.title, t.summary, t.body, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count,
+                b.slug AS board_slug, b.name AS board_name
+         FROM community_threads t JOIN community_boards b ON b.id = t.board_id
+         WHERE ${where.join(' AND ')} ORDER BY t.last_activity_at DESC LIMIT ? OFFSET ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(...args, limit, offset) as Array<{ id: string; title: string; summary: string; body: string; kind: string; cover_url: string | null; price_cents: number; views: number; likes: number; reply_count: number; board_slug: string; board_name: string }>; // 查询多行：读取列表供批量处理
+    const items = rows.map((row) => ({ // 逐条生成摘要
+      id: row.id, // 主键
+      title: row.title, // 标题
+      kind: row.kind, // 类型
+      cover_url: row.cover_url, // 封面
+      price_cents: row.price_cents, // 定价（用于列表锁标）
+      views: row.views, // 浏览数
+      likes: row.likes, // 点赞数
+      reply_count: row.reply_count, // 回复数
+      board_slug: row.board_slug, // 板块
+      board_name: row.board_name, // 板块名
+      snippet: buildSnippet(row.body || row.summary || row.title, q), // 命中片段：正文优先
+      locked: row.price_cents > 0, // 付费帖在搜索结果里也标锁
+    })); // 结束代码块：本层作用域收尾
+    res.json({ items, total, offset, limit, q }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
   /** 积分转账：按 Mim ID 转给其他用户，双方各记一条流水。 */

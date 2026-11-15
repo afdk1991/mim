@@ -29,6 +29,8 @@ import type { // 引入依赖、类型或本地模块绑定
 } from '../api';
 
 import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
+import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, SearchPanel, ThreadTools } from './CommunityMore'; // 社区互动补齐：通知 / 编辑治理 / 搜索 / 举报 / 楼中楼
+import { isPinned, listThreads, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 列表分页 / 楼中楼回复 / 回复锁定判定 / 回复分页
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
 import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
 import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
@@ -174,6 +176,13 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [boardOpen, setBoardOpen] = useState(false); // 创建板块表单
   const [boardDraft, setBoardDraft] = useState({ slug: '', name: '', description: '', visibility: 'public' as 'public' | 'followers', minLevel: '0', price: '0' }); // 赋值：更新变量 const 的取值
   const [reply, setReply] = useState('');; // 赋值：更新变量 const 的取值
+  const [replyTo, setReplyTo] = useState(''); // 楼中楼：正在回复的楼层 id
+  const [replyToName, setReplyToName] = useState(''); // 楼中楼：被回复人昵称
+  const [postsTotal, setPostsTotal] = useState(0); // 详情回复总数（服务端分页口径）
+  const [listTotal, setListTotal] = useState(0); // 列表命中总数（加载更多）
+  const [listBusy, setListBusy] = useState(false); // 列表加载更多中
+  const [searchOpen, setSearchOpen] = useState(false); // 全文搜索面板
+  const [moderationOpen, setModerationOpen] = useState(false); // 版主举报工作台
 
   const [plans, setPlans] = useState<VipPlan[]>([]); // 赋值：更新变量 const 的取值
   const [walletDetail, setWalletDetail] = useState<{ checked_in_today: boolean; transactions: WalletTransaction[] } | null>(null); // 赋值：更新变量 const 的取值
@@ -240,11 +249,31 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const data = await api.community.threads({ board, kind, sort, q: query, limit: 40 }); // 常量 data：保存固定配置或一次性派生值
       setThreads(data.items);
+      setListTotal(data.total);
       setError(null);
     } catch (err) {
       setError(errorText(locale, err));
     } // 代码块结束
   } // 代码块结束
+
+  /** 列表加载更多：按 offset 取下一页，按 id 去重后追加（置顶项可能因新回复移动）。 */
+  async function loadMoreThreads() {
+    if (listBusy) return; // 防重复点击
+    setListBusy(true);
+    try {
+      const data = await listThreads({ board, kind, sort, q: query, limit: 40, offset: threads.length });
+      setThreads((prev) => {
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...data.items.filter((item) => !seen.has(item.id))];
+      });
+      setListTotal(data.total);
+      setError(null);
+    } catch (err) {
+      setError(errorText(locale, err));
+    } finally {
+      setListBusy(false);
+    }
+  }
 
   async function loadWallet() { // 函数 loadWallet：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
@@ -405,7 +434,10 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const data = await api.community.thread(id); // 常量 data：保存固定配置或一次性派生值
       setSelected(data);
+      setPostsTotal((data as { posts_total?: number }).posts_total ?? data.posts.length); // 回复总数（服务端分页口径）
       setReply('');
+      setReplyTo('');
+      setReplyToName('');
     } catch (err) {
       setError(errorText(locale, err));
     } // 代码块结束
@@ -464,14 +496,28 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     if (!requireSession()) return; // 评论必须登录
     if (!selected || !reply.trim()) return; // 条件分支：按判断结果选择后续处理路径
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      await api.community.reply(selected.thread.id, reply.trim()); // 异步等待：挂起至 Promise 落定后再继续
+      await postReply(selected.thread.id, reply.trim(), replyTo || undefined); // 异步等待：挂起至 Promise 落定后再继续
       setReply('');
+      setReplyTo('');
+      setReplyToName('');
       await openThread(selected.thread.id); // 异步等待：挂起至 Promise 落定后再继续
       setNotice('回复已发布');
     } catch (err) {
       setError(errorText(locale, err));
     } // 代码块结束
   } // 代码块结束
+
+  /** 回复加载更多：按 post_offset 取下一页并追加到当前详情。 */
+  async function loadMoreReplies() {
+    if (!selected) return;
+    try {
+      const data = await threadDetail(selected.thread.id, { post_limit: 50, post_offset: selected.posts.length });
+      setSelected({ ...selected, posts: [...selected.posts, ...data.posts.filter((item) => !selected.posts.some((row) => row.id === item.id))] });
+      setPostsTotal(data.posts_total ?? data.posts.length);
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
 
   async function toggleLike() { // 函数 toggleLike：封装一段可复用的处理逻辑
     if (!requireSession()) return; // 点赞必须登录
@@ -901,8 +947,25 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               <button type="button" onClick={() => void loadThreads()}>搜索</button>
               <button type="button" className="is-primary" onClick={() => { if (!requireSession()) return; setComposerOpen((v) => !v); }}>发帖</button>
               <button type="button" onClick={() => { if (!requireSession()) return; setBoardOpen((v) => !v); }}>创建板块</button>
+              <NotificationBell locale={locale} hasSession={hasSession} onOpenThread={(id) => void openThread(id)} />
+              <button type="button" className={searchOpen ? 'is-active' : ''} onClick={() => setSearchOpen((v) => !v)}>全文搜索</button>
+              {board !== 'all' && (
+                <button type="button" className={moderationOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; setModerationOpen((v) => !v); }}>举报处理</button>
+              )}
             </div>
           </div>
+          <CommunityMoreStyles />
+          {searchOpen && (
+            <SearchPanel locale={locale} board={board} onOpenThread={(id) => { setSearchOpen(false); void openThread(id); }} />
+          )}
+          {moderationOpen && board !== 'all' && (
+            <ModerationPanel
+              locale={locale}
+              boardSlug={board}
+              onNotice={(message) => setNotice(message)}
+              onError={(err) => setError(errorText(locale, err))}
+            />
+          )}
 
           {boardOpen && (
             <div className="community-composer">{/* 执行当前业务步骤 */}
@@ -1007,7 +1070,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                     <span>{t.author_name || 'Mim 官方'}</span>
                     <span>{dateOnly(t.last_activity_at)}</span>
                   </div>
-                  <h3>{t.title}{t.locked && <span className="community-lock">{t.board_visibility === 'followers' && !t.board_followed ? '关注可见' : '付费'}</span>}</h3>
+                  <h3>{isPinned(t) && <span className="community-lock">置顶</span>}{t.title}{t.locked && <span className="community-lock">{t.board_visibility === 'followers' && !t.board_followed ? '关注可见' : '付费'}</span>}</h3>
                   <p>{t.summary || '—'}</p>
                   <div className="community-card-foot">{/* 执行当前业务步骤 */}
                     <span>{t.views} 浏览</span>
@@ -1021,6 +1084,11 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               </article>
             ))}
           </div>
+          {listTotal > threads.length && (
+            <button type="button" className="community-more community-load-more" disabled={listBusy} onClick={() => void loadMoreThreads()}>
+              {listBusy ? '加载中…' : `加载更多（${threads.length}/${listTotal}）`}
+            </button>
+          )}
             </>
           )}
 
@@ -1036,6 +1104,16 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 <button type="button" onClick={closeThread}>← 返回列表</button>
                 <button type="button" onClick={() => void copyShareLink()}>复制链接</button>
                 {selected.thread.can_moderate && <button type="button" className="is-danger" onClick={() => void deleteThread()}>删除</button>}
+                {hasSession && (
+                  <ThreadTools
+                    locale={locale}
+                    thread={selected.thread}
+                    isModerator={!!boards.find((item) => item.slug === selected.thread.board_slug)?.is_moderator}
+                    onChanged={() => void openThread(selected.thread.id)}
+                    onNotice={(message) => setNotice(message)}
+                    onError={(err) => setError(errorText(locale, err))}
+                  />
+                )}
               </div>
               {selected.thread.cover_url && <img className="community-detail-cover" src={coverSrc(selected.thread.cover_url)} alt={selected.thread.title} />}
               {selected.unlocked && (selected.thread.media?.length ?? 0) > 0 && (
@@ -1098,21 +1176,36 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                     <span>{selected.thread.views} 浏览</span>
                   </div>
                   <div className="community-replies">{/* 执行当前业务步骤 */}
-                    <h4>回复 · {selected.posts.length}</h4>
+                    <h4>回复 · {Math.max(postsTotal, selected.posts.length)}</h4>
                     {selected.posts.map((p) => (
-                      <div key={p.id} className={`community-reply${selected.thread.accepted_post_id === p.id ? ' is-accepted' : ''}`}>{/* 执行当前业务步骤 */}
-                        <strong>{p.author_name || 'Mim 用户'}</strong>
-                        <span>{p.author_member_no || ''} · {dateOnly(p.created_at)}</span>
-                        <p>{p.content}</p>
-                        {selected.thread.kind === 'qa' && getSession()?.user.id === selected.thread.author_id && selected.thread.accepted_post_id !== p.id && (
-                          <button type="button" onClick={() => void acceptPost(p.id)}>采纳为答案</button>
-                        )}
-                      </div>
+                      <ReplyItem
+                        key={p.id}
+                        locale={locale}
+                        post={p}
+                        posts={selected.posts}
+                        isAccepted={selected.thread.accepted_post_id === p.id}
+                        canAccept={selected.thread.kind === 'qa' && getSession()?.user.id === selected.thread.author_id && selected.thread.accepted_post_id !== p.id}
+                        canModerate={!!selected.thread.can_moderate}
+                        currentUserId={getSession()?.user.id ?? ''}
+                        onAccept={() => void acceptPost(p.id)}
+                        onReply={(postId, authorName) => { if (!requireSession()) return; setReplyTo(postId); setReplyToName(authorName); }}
+                        onDeleted={() => void openThread(selected.thread.id)}
+                        onNotice={(message) => setNotice(message)}
+                        onError={(err) => setError(errorText(locale, err))}
+                      />
                     ))}
-                    <div className="community-reply-form">{/* 执行当前业务步骤 */}
-                      <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder="写下你的回复…" />
-                      <button type="button" className="is-primary" onClick={() => void submitReply()}>回复</button>
-                    </div>
+                    {postsTotal > selected.posts.length && (
+                      <button type="button" className="community-more" onClick={() => void loadMoreReplies()}>加载更多回复（{selected.posts.length}/{postsTotal}）</button>
+                    )}
+                    {replyLockedOf(selected.thread) ? (
+                      <p className="mim-cm-hint">该帖已被锁定，暂不接受新回复。</p>
+                    ) : (
+                      <div className="community-reply-form">{/* 执行当前业务步骤 */}
+                        {replyTo && <div className="mim-cm-quote">正在回复 @{replyToName} <button type="button" onClick={() => { setReplyTo(''); setReplyToName(''); }}>取消</button></div>}
+                        <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder={replyTo ? `回复 @${replyToName}…` : '写下你的回复…'} />
+                        <button type="button" className="is-primary" onClick={() => void submitReply()}>回复</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1253,7 +1346,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       {!loading && tab === 'shop' && (
         <div className="community-shop">{/* 执行当前业务步骤 */}
           <div className="community-section-head">{/* 执行当前业务步骤 */}
-            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div>
+            <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码；与「商城」（功能模块商城）是两条独立商品线。</p></div>
           </div>
           <div className="community-shop-grid">{/* 执行当前业务步骤 */}
             {products.map((p) => (
