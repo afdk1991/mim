@@ -250,18 +250,77 @@ else
 fi
 
 # --- 4. 发布静态产物 ---
+# 发版瞬间旧 hash 资源 404：历史实现是「先 rm -rf 整个静态根，再整目录复制」，
+# 已在浏览器里打开的页面在懒加载路由 chunk / 图片时，旧 hash 文件已经被删除 → 404。
+# 现在改为增量覆盖 + 版本清单保留：新产物先就位，再按「最近 N 个版本」求并集清理，
+# 保证上一版页面在新版发布后仍能加载它引用的资源。
+# 清单落在静态根之外（默认 /opt/mim/.releases），避免被 nginx 当静态文件直接下载。
+RELEASE_STATE_DIR="${RELEASE_STATE_DIR:-/opt/mim/.releases}"
+WEB_KEEP_RELEASES="${WEB_KEEP_RELEASES:-5}"
+
+# publish_static <源目录> <目标目录> <应用名> <保留版本数>
+publish_static() {
+  local src="$1" dst="$2" name="$3" keep="$4"
+  local hist="$RELEASE_STATE_DIR/$name"
+  local list keep_set
+
+  mkdir -p "$dst" "$hist"
+
+  # ① 先复制 hash 资源，再复制其它顶层文件，最后覆盖入口 HTML：
+  #    入口一旦更新就会立刻引用新资源，必须确保这些资源已经落地。
+  if [ -d "$src/assets" ]; then
+    mkdir -p "$dst/assets"
+    cp -R "$src/assets/." "$dst/assets/"
+  fi
+  find "$src" -mindepth 1 -maxdepth 1 ! -name assets ! -name index.html \
+    -exec cp -R {} "$dst/" \;
+  if [ -f "$src/index.html" ]; then
+    cp -f "$src/index.html" "$dst/index.html"
+  fi
+
+  # ② 记录本次产物实际包含的 hash 资源清单（以源目录为准，不把目标里的旧文件算进来）
+  list="$hist/$(date '+%Y%m%d-%H%M%S')-$$.list"
+  if [ -d "$src/assets" ]; then
+    (cd "$src/assets" && find . -type f -printf '%P\n' | sort) > "$list"
+  else
+    : > "$list"
+  fi
+
+  # ③ 只保留最近 keep 份清单（keep 至少为 1，0 会让下面把所有资源都删掉）
+  case "$keep" in
+    ''|*[!0-9]*|0) keep=1 ;;
+  esac
+  { ls -1t "$hist"/*.list 2>/dev/null || true; } \
+    | tail -n +$((keep + 1)) \
+    | while IFS= read -r old; do rm -f "$old"; done
+
+  # ④ 最近 keep 份清单的并集 = 必须保留的资源；其余旧 hash 文件可以安全删除
+  keep_set="$(mktemp)"
+  for f in $({ ls -1t "$hist"/*.list 2>/dev/null || true; } | head -n "$keep"); do
+    cat "$f"
+  done | sort -u > "$keep_set"
+  if [ -d "$dst/assets" ]; then
+    (cd "$dst/assets" && find . -type f -printf '%P\n') \
+      | while IFS= read -r rel; do
+          if ! grep -qxF "$rel" "$keep_set"; then
+            rm -f "$dst/assets/$rel"
+          fi
+        done
+    find "$dst/assets" -mindepth 1 -type d -empty -delete 2>/dev/null || true
+  fi
+  rm -f "$keep_set"
+
+  log "$name 发布完成（hash 资源保留最近 $keep 个版本）"
+}
+
 log "发布用户端静态产物 → $WEB_DIR"
-mkdir -p "$WEB_DIR"
-rm -rf "$WEB_DIR"/*
-cp -R "$APP_DIR/apps/web/dist/." "$WEB_DIR/"
+publish_static "$APP_DIR/apps/web/dist" "$WEB_DIR" web "$WEB_KEEP_RELEASES"
 
 # 管理后台：独立静态根 /opt/mim/admin，由 nginx 的 /admin/ location 提供。
 # 与用户端隔离的理由：① 若混入同一 root，admin/index.html 会覆盖用户端入口；
 # ② 用户端 `location /` 的 SPA 回退会把 /admin/* 吞成用户端 index.html。
 log "发布管理后台静态产物 → $ADMIN_DIR"
-mkdir -p "$ADMIN_DIR"
-rm -rf "$ADMIN_DIR"/*
-cp -R "$APP_DIR/apps/admin/dist/." "$ADMIN_DIR/"
+publish_static "$APP_DIR/apps/admin/dist" "$ADMIN_DIR" admin "$WEB_KEEP_RELEASES"
 
 # 文档站：仓库 help/ 是纯静态目录（index.html + content/help.json），没有构建步骤，
 # 整目录原样发布到 nginx 的 help.<域名> 静态根，与用户端 / 管理后台产物互不覆盖。
@@ -500,10 +559,15 @@ if command -v nginx >/dev/null 2>&1; then
   NGINX_ENABLED="/etc/nginx/sites-enabled/mim.conf"
   NGINX_BACKUP="${NGINX_AVAILABLE}.bak.$$"
 
-  # 有旧配置先备份：任何一步失败都用它一键回滚，保证线上 HTTPS 不中断
+  # 有旧配置先备份：任何一步失败都用它一键回滚，保证线上 HTTPS 不中断。
+  # 除本次运行用的回滚副本外，再在 /tmp 留一份「现场值」并打印回退命令，
+  # 便于配置改错后在部署脚本之外立即人工还原。
+  NGINX_SAFETY_BACKUP="/tmp/mim-nginx-pre-$(date '+%Y%m%d-%H%M%S').conf"
   if [ -f "$NGINX_AVAILABLE" ]; then
     cp -p "$NGINX_AVAILABLE" "$NGINX_BACKUP"
+    cp -p "$NGINX_AVAILABLE" "$NGINX_SAFETY_BACKUP"
     log "已备份现有 nginx 配置 → $NGINX_BACKUP"
+    log "现场配置另存 $NGINX_SAFETY_BACKUP；回退：cp -p $NGINX_SAFETY_BACKUP $NGINX_AVAILABLE && nginx -t && systemctl reload nginx"
   fi
 
   # 回滚函数：恢复备份与软链并 reload；无备份时只告警
@@ -519,7 +583,8 @@ if command -v nginx >/dev/null 2>&1; then
   }
 
   # 同机共存下的 TLS 判定：只「引用既有证书」，不申请。证书由运维用 DNS-01 单独签发
-  # （80 端口归 MixmAPP，HTTP-01 不可用；--webroot 需要改 MixmAPP 的 nginx，跨站耦合）。
+  # （80 端口与 MixmAPP 共享且默认站点不归 Mim，HTTP-01 不可靠；--webroot 需要改
+  #  MixmAPP 的 nginx，跨站耦合）。
   CERT_DIR="/etc/letsencrypt/live/${NGINX_DOMAIN}"
   TLS_ENABLED=0
   if [ -f "${CERT_DIR}/fullchain.pem" ] && [ -f "${CERT_DIR}/privkey.pem" ]; then
@@ -534,8 +599,8 @@ if command -v nginx >/dev/null 2>&1; then
   # 与 bootstrap.sh 同一 sed 规则：域占位 + 端口占位 + TLS 片段三组替换。
   # 必须全量替换域：配置里还有 api / admin / center 等子域 server_name 与 301 跳转目标，
   # 只改主站会让子域仍解析到模板域，切域后子域全断。
-  # 端口必须走占位符：同机 MixmAPP 占用 80/443（Mim 在 443 上与其共享监听、不抢 default_server），
-  # HTTP 回退口 8088，且可能因冲突再调整。
+  # 端口必须走占位符：同机 MixmAPP 占用 80/443（Mim 在 443 共享监听、不抢 default_server；
+  # 80 只按 server_name 精确匹配做 HTTP → HTTPS 301），HTTP 回退口 8088，且可能因冲突再调整。
   sed -e "s/laal\.top/${NGINX_DOMAIN}/g" \
       -e "s|__MIM_WEB_HTTP_PORT__|${MIM_WEB_HTTP_PORT}|g" \
       -e "s|__MIM_WEB_HTTPS_PORT__|${MIM_WEB_HTTPS_PORT}|g" \

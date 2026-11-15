@@ -2,6 +2,15 @@
 <html lang="zh-CN"><!-- 根元素：lang 声明简体中文，影响断行规则、字体回退与读屏发音 -->
   <head><!-- 头部区：只放元信息，不渲染可见内容 -->
     <meta charset="UTF-8" /><!-- 字符编码：显式 UTF-8，须落在最前 1024 字节内，故置于一切脚本之前 -->
+    <script>
+      /* 首帧主题：必须在任何样式表生效前写入 data-theme，避免暗色偏好用户先看到浅色一帧 */
+      (function () { // 立即执行：读取本地偏好并写到根元素
+        try { // 隐私模式 / 禁用存储时读取会抛错，按默认浅色处理
+          var mode = localStorage.getItem('mim.theme.mode'); // 与 appearance.ts 共用同一个键
+          if (mode === 'dark' || mode === 'light') document.documentElement.dataset.theme = mode; // 只接受明确值
+        } catch (e) { /* 读取失败不阻断渲染 */ }
+      })(); // 立即执行结束
+    </script><!-- 首帧主题脚本结束 -->
     <!-- 基础地址：相对资源一律按站点根解析，避免多段路径下把 ./assets 解析到错误目录 -->
     <base href="/" /><!-- 默认站点根；下方内联脚本会在需要时改写 -->
     <script>
