@@ -8,6 +8,7 @@ import { createOAuthRouter } from './routes/oauth.js'; // 第三方登录：授�
 import { createCatalogRouter } from './routes/catalog.js'; // 商城路由：模块列表公开，权益接口内部鉴权
 import { createImRouter } from './routes/im.js'; // 即时通讯：会话/消息/用户搜索，需登录
 import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内部统一 requireAuth
+import { createWalletWithdrawalRouter } from './routes/wallet-withdrawals.js'; // 提现分成：可提现余额 / 申请 / 审核 / 到账（钱包结算层）
 import { createCartRouter } from './routes/cart.js'; // 商城购物车：加购与结算（内部统一 requireAuth + 写操作幂等）
 import { createCommunityRouter } from './routes/community.js'; // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
 import { createAssetsRouter } from './routes/assets.js'; // 付费资产：付费阅读 / 下载 / 图库 / 视频的浏览、解锁与分成（社区页依赖）
@@ -157,6 +158,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 
   // 受保护路由（各 router 内部统一 requireAuth）
   for (const router of [ // 顺序注册：同名子路径时先注册者先匹配
+    createWalletWithdrawalRouter(resolved), // 提现分成必须先于社区路由：/wallet/withdrawals 自带登录 + 幂等，避免被社区 /wallet 前缀重复套一层
     createMeRouter(resolved), // /me 前缀：个人资料、设置、注销
     createMediaRouter(resolved), // media 控制面：预签名（聊天/社区附件上传均依赖）
     createImRouter(resolved), // IM 即时通讯：会话列表/消息历史/用户搜索/已读

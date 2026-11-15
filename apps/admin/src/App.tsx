@@ -28,6 +28,7 @@ import { PriceBatches } from './views/PriceBatches'; // 业务步骤
 import { Invites } from './views/Invites'; // 业务步骤
 // 实名审核队列
 import { Realname } from './views/Realname'; // 业务步骤
+import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
 // 内容运营：公告 / 更新日志 / 推广计划
 import { ContentOps } from './views/ContentOps'; // 业务步骤
 // 社区运营：板块审核 / 首页指向 / 推荐权重 / Tab 配置
@@ -38,7 +39,7 @@ import { PageBuilder } from './views/PageBuilder'; // 业务步骤
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'growthDm';
+type ViewKey = 'overview' | 'modules' | 'categories' | 'entitlements' | 'orders' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'withdrawals' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'growthDm';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -68,6 +69,8 @@ const NAV: NavItem[] = [
   { key: 'invites', label: '邀请码', permission: 'user:read' },
   // 实名审核：读权限 user:read；审核按钮另需 rbac:write
   { key: 'realname', label: '实名审核', permission: 'user:read' },
+  // 提现审核：申请队列与到账处理，复用 commerce:write
+  { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
   // 内容运营：公告 / 更新日志 / 推广计划
   { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
   // 社区运营
@@ -237,6 +240,8 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'invites') return <Invites credential={credential} permissions={identity.permissions} />;
   // 实名审核：脱敏队列与通过 / 驳回
   if (key === 'realname') return <Realname credential={credential} permissions={identity.permissions} />;
+  // 提现审核：申请队列、通过 / 驳回 / 标记到账、创作分成结算
+  if (key === 'withdrawals') return <Withdrawals credential={credential} permissions={identity.permissions} />;
   // 内容运营：公告 / 更新日志 / 推广计划
   if (key === 'contentOps') return <ContentOps credential={credential} permissions={identity.permissions} />;
   // 社区运营：板块审核、首页指向、审核开关、推荐权重、Tab 配置

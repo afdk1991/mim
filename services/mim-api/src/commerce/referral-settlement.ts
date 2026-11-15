@@ -60,7 +60,15 @@ function postWalletTransaction(
   now: string,
 ): void {
   ensureWallet(db, userId, now); // 先建行
-  db.prepare('UPDATE wallets SET balance_cents = balance_cents + ?, updated_at = ? WHERE user_id = ?').run(amountCents, now, userId); // 余额变动
+  // 推广佣金是「可提现余额」的来源之一：正数同步累加，冲正（负数）按同一口径回收，
+  // 并用 MAX/MIN 夹紧到 [0, 新余额]，保证 0 <= withdrawable_cents <= balance_cents 不变式。
+  db.prepare(
+    `UPDATE wallets SET
+       balance_cents = balance_cents + ?,
+       withdrawable_cents = MAX(0, MIN(withdrawable_cents + ?, balance_cents + ?)),
+       updated_at = ?
+     WHERE user_id = ?`,
+  ).run(amountCents, amountCents, amountCents, now, userId); // 余额与可提现余额同步变动
   db
     .prepare(
       `INSERT INTO wallet_transactions (id, user_id, kind, amount_cents, ref_type, ref_id, note, created_at)

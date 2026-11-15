@@ -12,6 +12,8 @@
 import { useEffect, useRef, useState } from 'react'; // 引入依赖、类型或本地模块绑定
 import type { Locale } from '@mim/i18n'; // 引入依赖、类型或本地模块绑定
 import { api, errorText, getSession } from '../api'; // 引入依赖、类型或本地模块绑定
+import { cancelWithdrawal, createWithdrawal, getWithdrawalOverview } from '../api/wallet-withdrawal'; // 提现：可提现余额口径与申请（钱包结算层）
+import type { WithdrawMethod, WithdrawalOverview } from '../api/wallet-withdrawal'; // 提现类型，全部金额为整数分
 import type { // 引入依赖、类型或本地模块绑定
   BoardTab,
   CommunityBoard,
@@ -70,6 +72,28 @@ const TX_KIND: Record<WalletTransaction['kind'], string> = { // 常量 TX_KIND�
   withdraw: '提现',
   points: '积分',
 }; // 代码块结束
+
+/** 提现状态文案：与后端 withdrawal_requests.status 一一对应 */
+const WITHDRAW_STATUS: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过 · 打款中',
+  rejected: '已驳回',
+  paid: '已到账',
+  cancelled: '已撤销',
+};
+
+/** 提现收款方式文案 */
+const WITHDRAW_METHOD: Record<string, string> = {
+  alipay: '支付宝',
+  wechat: '微信',
+  bank: '银行卡',
+};
+
+/** 收款账号脱敏：只保留首 2 位与末 4 位，列表页不展示完整账号 */
+function maskAccount(account: string): string {
+  if (account.length <= 6) return account; // 太短无法脱敏，原样返回
+  return `${account.slice(0, 2)}****${account.slice(-4)}`;
+}
 
 /** 板块内置默认 Tab：接口缺失 / 404 时回落这套栏目组合，保证论坛可按口径排序。 */
 const DEFAULT_BOARD_TABS: BoardTab[] = [
@@ -156,6 +180,13 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [redeemCode, setRedeemCode] = useState(''); // 赋值：更新变量 const 的取值
   const [transferTo, setTransferTo] = useState(''); // 赋值：更新变量 const 的取值
   const [transferAmount, setTransferAmount] = useState(''); // 赋值：更新变量 const 的取值
+  // ── 提现（钱包结算层）──
+  const [withdrawal, setWithdrawal] = useState<WithdrawalOverview | null>(null); // 可提现余额快照 + 申请记录
+  const [wdAmount, setWdAmount] = useState(''); // 提现金额输入（元，提交前换算成整数分）
+  const [wdMethod, setWdMethod] = useState<WithdrawMethod>('alipay'); // 收款方式
+  const [wdName, setWdName] = useState(''); // 收款人
+  const [wdAccount, setWdAccount] = useState(''); // 收款账号
+  const [wdBusy, setWdBusy] = useState(false); // 提交中，防重复点击
   const [favoritesOpen, setFavoritesOpen] = useState(false); // 赋值：更新变量 const 的取值
   const [favorites, setFavorites] = useState<CommunityThread[]>([]); // 赋值：更新变量 const 的取值
 
@@ -227,6 +258,55 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     } // 代码块结束
   } // 代码块结束
 
+  /** 读取可提现余额口径与申请记录（钱包结算层） */
+  async function loadWithdrawals() {
+    try {
+      setWithdrawal(await getWithdrawalOverview());
+    } catch (err) {
+      setError(errorText(locale, err));
+    }
+  }
+
+  /** 提交提现申请：界面输入「元」，这里换算成整数分，后端再做整数校验 */
+  async function submitWithdrawal() {
+    if (!requireSession()) return; // 未登录先引导登录
+    const yuanValue = Number(wdAmount.trim()); // 允许 "20" / "20.50" 两种写法
+    if (!Number.isFinite(yuanValue) || yuanValue <= 0) {
+      setNotice('请输入大于 0 的提现金额。');
+      return;
+    }
+    const amountCents = Math.round(yuanValue * 100); // 四舍五入到整数分，杜绝浮点尾差
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      setNotice('提现金额必须是有效的正整数分。');
+      return;
+    }
+    setWdBusy(true);
+    try {
+      await createWithdrawal({ amount_cents: amountCents, method: wdMethod, account_name: wdName.trim(), account_no: wdAccount.trim() });
+      setWdAmount('');
+      setNotice('提现申请已提交，等待后台审核。');
+      await Promise.all([loadWithdrawals(), loadWallet()]); // 刷新冻结额度与钱包卡
+    } catch (err) {
+      setNotice(errorText(locale, err));
+    } finally {
+      setWdBusy(false);
+    }
+  }
+
+  /** 撤销本人待审申请，释放冻结额度 */
+  async function revokeWithdrawal(id: string) {
+    setWdBusy(true);
+    try {
+      await cancelWithdrawal(id);
+      setNotice('申请已撤销。');
+      await Promise.all([loadWithdrawals(), loadWallet()]);
+    } catch (err) {
+      setNotice(errorText(locale, err));
+    } finally {
+      setWdBusy(false);
+    }
+  }
+
   async function loadShop() { // 函数 loadShop：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const [p, o] = await Promise.all([api.shop.products(), api.commerce.orders({ source: 'shop' })]); // 赋值：更新变量 const 的取值（商品目录走旧接口，订单读取切统一只读接口）
@@ -265,7 +345,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
 
   useEffect(() => {
     if (!hasSession) return; // 钱包 / 订单 / 推广都是私密读，匿名不发请求
-    if (tab === 'wallet') void loadWallet(); // 条件分支：按判断结果选择后续处理路径
+    if (tab === 'wallet') { void loadWallet(); void loadWithdrawals(); } // 钱包页同时拉余额流水与可提现口径
     if (tab === 'shop') void loadShop(); // 条件分支：按判断结果选择后续处理路径
     if (tab === 'referral') void loadReferral(); // 条件分支：按判断结果选择后续处理路径
   }, [tab, hasSession]);
@@ -1095,6 +1175,14 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               <strong>{wallet.points}</strong>
               <small>每日签到 +5 积分</small>
             </div>
+            <div className="community-wallet-card">{/* 可提现余额：充值余额与分成收益分开算，独立口径 */}
+              <span>可提现余额</span>
+              <strong>{yuan(withdrawal?.available_cents ?? 0)}</strong>
+              <small>
+                仅佣金与创作分成可提现，充值余额不可提现
+                {withdrawal && withdrawal.reserved_cents > 0 ? `，另有 ${yuan(withdrawal.reserved_cents)} 处理中` : ''}
+              </small>
+            </div>
           </div>
           <div className="community-wallet-actions">{/* 执行当前业务步骤 */}
             <button type="button" className="is-primary" disabled={walletDetail?.checked_in_today} onClick={() => void checkin()}>{/* 执行当前业务步骤 */}
@@ -1109,6 +1197,41 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               <input value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} inputMode="numeric" placeholder="积分" />
               <button type="button" onClick={() => void transferPoints()}>转积分</button>
             </div>
+          </div>
+          <h3 className="community-subhead">提现</h3>
+          <div className="community-inline-form">{/* 提现申请：金额按元输入，提交前换算成整数分 */}
+            <input value={wdAmount} onChange={(e) => setWdAmount(e.target.value)} inputMode="decimal" placeholder={`金额（元），最低 ${yuan(withdrawal?.min_withdraw_cents ?? 1000)}`} />
+            <select value={wdMethod} onChange={(e) => setWdMethod(e.target.value as WithdrawMethod)}>
+              {(withdrawal?.methods ?? [{ value: 'alipay' as WithdrawMethod, label: '支付宝' }]).map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <input value={wdName} onChange={(e) => setWdName(e.target.value)} placeholder="收款人姓名" />
+            <input value={wdAccount} onChange={(e) => setWdAccount(e.target.value)} placeholder="支付宝 / 微信 / 银行卡号" />
+            <button type="button" className="is-primary" disabled={wdBusy} onClick={() => void submitWithdrawal()}>
+              {wdBusy ? '提交中…' : '申请提现'}
+            </button>
+          </div>
+          <p className="community-hint">可提现余额只累计佣金与创作分成；充值余额仅用于站内消费，不可提现。同一时间只允许一笔处理中的申请。</p>
+          <h3 className="community-subhead">提现记录</h3>
+          <div className="community-table">{/* 执行当前业务步骤 */}
+            <div className="community-table-head"><span>金额</span><span>方式</span><span>收款账号</span><span>状态</span><span>时间</span></div>
+            {(withdrawal?.items ?? []).map((w) => (
+              <div key={w.id} className="community-table-row">
+                <span>{yuan(w.amount_cents)}</span>
+                <span>{WITHDRAW_METHOD[w.method] ?? w.method}</span>
+                <span>{maskAccount(w.account_no)}</span>
+                <span>
+                  {WITHDRAW_STATUS[w.status] ?? w.status}
+                  {w.status === 'rejected' && w.review_note ? `：${w.review_note}` : ''}
+                  {w.status === 'pending' && (
+                    <button type="button" disabled={wdBusy} onClick={() => void revokeWithdrawal(w.id)}>撤销</button>
+                  )}
+                </span>
+                <span>{dateOnly(w.created_at)}</span>
+              </div>
+            ))}
+            {!withdrawal?.items.length && <div className="community-empty">还没有提现申请。</div>}
           </div>
           <p className="community-hint">演示卡密：<code>MIM-DEMO-100</code>（¥100）、<code>MIM-DEMO-500</code>（¥500），每张仅可使用一次。</p>
           <div className="community-table">{/* 执行当前业务步骤 */}

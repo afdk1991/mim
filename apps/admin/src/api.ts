@@ -1279,3 +1279,4 @@ export async function listGrowthDmCampaigns(credential: Credential, limit = 20):
 export { request }; // 执行当前业务步骤
 export * from './api-ops'; // 执行当前业务步骤
 export * from './api-shop-admin'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐
+export * from './api-withdrawals'; // 提现审核：申请队列 / 审核 / 到账 / 创作分成结算
