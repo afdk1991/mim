@@ -49,6 +49,7 @@
   --primary-soft: var(--theme-primary-soft); /* 主色淡底：选中行、标签底 */
   --primary-ring: var(--theme-primary-ring); /* 主色焦点环：键盘可见性 */
   --on-primary: #ffffff; /* 主色底上的文字色 */
+  --on-dark: #f2f5fa; /* 深色面（遮罩角标、钱包卡）上的文字色：明暗两套都是浅色 */
   --danger: #d64545; /* 危险色：删除、错误 */
   --danger-soft: rgba(214, 69, 69, 0.1); /* 危险淡底 */
   --danger-border: rgba(214, 69, 69, 0.28); /* 危险描边：危险按钮与面板边界 */
@@ -60,6 +61,17 @@
   --info-soft: rgba(47, 111, 237, 0.1); /* 信息淡底 */
   --violet: #7a55c9; /* 紫色：受限权限等第三类语义 */
   --violet-soft: #f1ecfb; /* 紫色淡底 */
+  --success-border: rgba(31, 138, 91, 0.28); /* 成功描边：绿色提示条与标签边界 */
+  --warning-border: rgba(168, 106, 16, 0.28); /* 警告描边：锁定态与待处理提示 */
+  --info-border: rgba(47, 111, 237, 0.28); /* 信息描边：蓝色提示与链接边界 */
+  --premium: #8a5a00; /* 付费 / 会员金色文字 */
+  --premium-soft: #fff8e6; /* 付费金色淡底：会员卡与解锁提示 */
+  --premium-border: #e6c680; /* 付费金色描边 */
+  --amber: #f59e0b; /* 琥珀色：评分星标与高亮标记 */
+  --amber-soft: rgba(245, 158, 11, 0.16); /* 琥珀淡底：搜索命中高亮 */
+  --amber-border: rgba(245, 158, 11, 0.55); /* 琥珀描边：锁定态提示 */
+  --overlay: rgba(23, 32, 50, 0.78); /* 图片遮罩：封面上的功能角标底 */
+  --mask: rgba(0, 0, 0, 0.42); /* 弹层遮罩：弹出面板背后的压暗层 */
 
   /* ---------- 侧栏：保留深色栏形成强对比 ---------- */
   --sidebar: #1d2433; /* 侧栏底色 */
@@ -157,6 +169,7 @@
   --primary-soft: var(--theme-primary-soft-dark); /* 主色淡底 */
   --primary-ring: var(--theme-primary-ring-dark); /* 焦点环 */
   --on-primary: #10141c; /* 亮主色底上的深色文字 */
+  --on-dark: #f2f5fa; /* 深色面文字色：暗色下同样保持浅色，不跟 --on-primary 反转 */
   --danger: #ff7a7a; /* 危险色提亮 */
   --danger-soft: rgba(255, 122, 122, 0.14); /* 危险淡底 */
   --danger-border: rgba(255, 122, 122, 0.36); /* 危险描边 */
@@ -168,6 +181,17 @@
   --info-soft: rgba(122, 162, 255, 0.14); /* 信息淡底 */
   --violet: #b49bf0; /* 紫色提亮：暗底保证对比 */
   --violet-soft: rgba(180, 155, 240, 0.16); /* 紫色淡底 */
+  --success-border: rgba(76, 195, 138, 0.36); /* 成功描边：暗底提高不透明度 */
+  --warning-border: rgba(224, 169, 79, 0.36); /* 警告描边 */
+  --info-border: rgba(122, 162, 255, 0.36); /* 信息描边 */
+  --premium: #e0be86; /* 付费金色文字：暗底提亮 */
+  --premium-soft: rgba(224, 190, 134, 0.14); /* 付费金色淡底 */
+  --premium-border: rgba(224, 190, 134, 0.38); /* 付费金色描边 */
+  --amber: #fbbf24; /* 琥珀色：暗底星标与高亮 */
+  --amber-soft: rgba(251, 191, 36, 0.16); /* 琥珀淡底 */
+  --amber-border: rgba(251, 191, 36, 0.5); /* 琥珀描边 */
+  --overlay: rgba(0, 0, 0, 0.72); /* 图片遮罩：暗色下更深 */
+  --mask: rgba(0, 0, 0, 0.6); /* 弹层遮罩：暗色下更深 */
 
   /* ---------- 侧栏：暗色下与内容区仍保持一档差异 ---------- */
   --sidebar: #20242c; /* 侧栏底色 */
