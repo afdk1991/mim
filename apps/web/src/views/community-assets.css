@@ -1,0 +1,506 @@
+/* 付费资产域（列表 / 详情 / 我的资产）——只使用 tokens.css 已有令牌，不改共享样式文件 */
+
+.asset-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.asset-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.asset-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+.asset-head h1,
+.asset-detail-head h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.asset-sub {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.asset-head-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 按钮 */
+.asset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.asset-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.asset-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.asset-btn.primary {
+  border-color: transparent;
+  background: var(--primary-fill);
+  color: var(--on-primary);
+}
+
+.asset-btn.primary:hover {
+  background: var(--primary-hover);
+}
+
+.asset-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.asset-btn.ghost {
+  background: transparent;
+}
+
+.asset-link {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* 工具栏 */
+.asset-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.asset-toolbar input {
+  flex: 1 1 220px;
+  min-width: 180px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.asset-toolbar input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.asset-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.asset-filters button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.asset-filters button.is-on {
+  border-color: transparent;
+  background: var(--primary-soft);
+  color: var(--link);
+  font-weight: 600;
+}
+
+.asset-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.asset-error,
+.asset-ok {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.asset-error {
+  border: 1px solid var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.asset-ok {
+  border: 1px solid var(--success-border);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.asset-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 28px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* 列表卡片 */
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.asset-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.asset-card:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-strong);
+}
+
+.asset-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.asset-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  background: var(--media-bg);
+}
+
+.asset-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.asset-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--on-media);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.asset-badge {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--premium-soft);
+  border: 1px solid var(--premium-border);
+  color: var(--premium);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.asset-badge.is-unlocked {
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success);
+}
+
+.asset-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 14px;
+}
+
+.asset-kind {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.asset-title {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.asset-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.asset-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.asset-meta-wide {
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+
+/* 详情 */
+.asset-detail-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.asset-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.asset-detail-head h1 {
+  font-size: 21px;
+  line-height: 1.4;
+}
+
+.asset-detail-cover {
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--media-bg);
+}
+
+.asset-buy,
+.asset-owned {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--premium-border);
+  border-radius: var(--radius-md);
+  background: var(--premium-soft);
+}
+
+.asset-owned {
+  border-color: var(--success-border);
+  background: var(--success-soft);
+}
+
+.asset-owned strong {
+  color: var(--success);
+  font-size: 14px;
+}
+
+.asset-buy-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.asset-buy-price span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.asset-buy-price strong {
+  font-size: 20px;
+  color: var(--premium);
+}
+
+.asset-buy-actions,
+.asset-owned-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.asset-body {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.asset-locked-hint {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--premium-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.asset-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.asset-media img,
+.asset-media video {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--media-bg);
+}
+
+/* 我的资产 */
+.asset-mine {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.asset-mine-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.asset-mine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asset-mine-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.asset-mine-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 84px;
+  width: 84px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  background: var(--media-bg);
+  color: var(--on-media);
+  font-size: 11px;
+  overflow: hidden;
+}
+
+.asset-mine-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-mine-body {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.asset-mine-body strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.asset-mine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .asset-head,
+  .asset-detail {
+    padding: 16px;
+  }
+
+  .asset-mine-item {
+    align-items: flex-start;
+  }
+}

@@ -10,6 +10,8 @@ import { api, errorText } from '../api';
 import type { OAuthProviderInfo, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
+// 引入我的资产页签（付费资产域，2026-11-16）
+import { MyAssets } from './MyAssets';
 
 /** 组件契约：语言 + 用户更新回调 */
 interface Props {
@@ -17,11 +19,11 @@ interface Props {
   onUserUpdated: (user: UserInfo) => void; // 资料保存后同步全局用户态
 } // Props 结束
 
-/** 两个分区标识：资料编辑与账号安全 */
-type Tab = 'profile' | 'security';
+/** 三个分区标识：资料编辑、我的资产与账号安全 */
+type Tab = 'profile' | 'assets' | 'security';
 
 /** 全部合法分区，用于校验地址栏 ?tab= 入参 */
-const TAB_IDS: readonly Tab[] = ['profile', 'security'];
+const TAB_IDS: readonly Tab[] = ['profile', 'assets', 'security'];
 
 /** 从地址栏 ?tab= 读取初始分区；非法值回落资料分区 */
 function initialTab(): Tab {
@@ -168,6 +170,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
         {/* 分区切换 */}
         <nav className="profile-tabs">{/* 执行当前业务步骤 */}
           <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => selectTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
+          <button type="button" className={`tab${tab === 'assets' ? ' active' : ''}`} onClick={() => selectTab('assets')}>{isZh ? '我的资产' : 'My assets'}</button>
           <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
         </nav>
       </header>
@@ -197,7 +200,12 @@ export function Profile({ locale, onUserUpdated }: Props) {
         ) // 执行当前业务步骤
       ) : null}
 
-      {/* 分区二：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
+      {/* 分区二：我的资产（付费资产域，仅登录后可见；?tab=assets 可直达） */}
+      {tab === 'assets' ? (
+        <MyAssets locale={locale} />
+      ) : null}
+
+      {/* 分区三：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
       {tab === 'security' ? (
         <section className="profile-security">{/* 执行当前业务步骤 */}
           <p className="hint">{/* 执行当前业务步骤 */}

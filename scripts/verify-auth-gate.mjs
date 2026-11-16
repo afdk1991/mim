@@ -9,6 +9,7 @@
  *   3. 个人与交易：/me、/wallet、/shop/orders、/commerce/orders、/payments、/im 等一律 401，
  *      不得退化成 403 或静默成功；
  *   4. 付费预览契约：付费帖匿名可读但正文为空、locked=true、媒体为空；图库付费项 locked=true 且 url=''；
+ *      付费资产列表 / 详情匿名可读，但未购买者只拿到试读、file_url=null、media=[]，mine/list 仍 401；
  *   5. 注册开关：MIM_REGISTRATION_ENABLED 默认关闭（403 AUTH_REGISTER_DISABLED），打开后可真建号；
  *   6. 后台边界：/api/v1/admin/* 不参与全站门禁，仍由 requirePermission 兜底 401；
  *   7. 深链接与刷新：路径路由 + 构建期 404.html / 平台 navigationFallback 回退。
@@ -77,7 +78,6 @@ const AUTH_READ_PATHS = [
   '/api/v1/after-sales',
   '/api/v1/referral',
   '/api/v1/reports/mine',
-  '/api/v1/assets',
   '/api/v1/assets/mine/list',
   '/api/v1/community/favorites',
   '/api/v1/community/notifications',
@@ -102,7 +102,6 @@ const AUTH_READ_PREFIXES = [
   '/^\\/api\\/v1\\/after-sales\\//',
   '/^\\/api\\/v1\\/referral\\//',
   '/^\\/api\\/v1\\/reports\\//',
-  '/^\\/api\\/v1\\/assets\\//',
   '/^\\/api\\/v1\\/community\\/favorites/',
   '/^\\/api\\/v1\\/community\\/notifications/',
   '/^\\/api\\/v1\\/commerce\\/orders\\//',
@@ -313,6 +312,9 @@ const READ_PATHS = [
   '/api/v1/promotions',
   '/api/v1/community/gallery/items',
   '/api/v1/community/gallery/collections',
+  '/api/v1/assets',
+  '/api/v1/assets/open-source-tools',
+  '/api/v1/assets/paid-article-store',
 ];
 
 const AUTH_READ_PATHS = [
@@ -324,7 +326,7 @@ const AUTH_READ_PATHS = [
   '/api/v1/after-sales',
   '/api/v1/referral',
   '/api/v1/reports/mine',
-  '/api/v1/assets',
+  '/api/v1/assets/mine/list',
   '/api/v1/community/favorites',
   '/api/v1/community/notifications',
   '/api/v1/commerce/orders',
@@ -453,6 +455,35 @@ results.push({
   name: '图库免费媒体仍可正常下发地址',
   ok: !!freeItem && freeItem.locked === false && typeof freeItem.url === 'string' && freeItem.url.length > 0,
   detail: freeItem ? 'locked ' + String(freeItem.locked) + ' / url ' + String(freeItem.url) : '未找到 thread-quick-build 媒体',
+});
+
+// 付费资产：浏览匿名可读，但未购买者拿不到完整正文 / 文件地址 / 媒体（与付费帖、图库同一套付费墙）
+const paidAssetRes = await request('GET', '/api/v1/assets/paid-article-store');
+const paidAsset = paidAssetRes.body && paidAssetRes.body.asset ? paidAssetRes.body.asset : {};
+const paidAssetLen = typeof paidAsset.body === 'string' ? paidAsset.body.length : -1;
+results.push({
+  name: '付费资产匿名可读但只给试读（200 + unlocked:false + 正文≤220 + file_url null + media 空）',
+  ok:
+    paidAssetRes.status === 200 &&
+    paidAsset.unlocked === false &&
+    paidAssetLen >= 0 &&
+    paidAssetLen <= 220 &&
+    paidAsset.file_url === null &&
+    Array.isArray(paidAsset.media) &&
+    paidAsset.media.length === 0,
+  detail:
+    'status ' + paidAssetRes.status +
+    ' / unlocked ' + String(paidAsset.unlocked) +
+    ' / bodyLen ' + String(paidAssetLen) +
+    ' / file_url ' + String(paidAsset.file_url) +
+    ' / mediaLen ' + String(Array.isArray(paidAsset.media) ? paidAsset.media.length : -1),
+});
+const freeAssetRes = await request('GET', '/api/v1/assets/open-source-tools');
+const freeAsset = freeAssetRes.body && freeAssetRes.body.asset ? freeAssetRes.body.asset : {};
+results.push({
+  name: '免费资产匿名可读且直接解锁（200 + unlocked:true）',
+  ok: freeAssetRes.status === 200 && freeAsset.unlocked === true,
+  detail: 'status ' + freeAssetRes.status + ' / unlocked ' + String(freeAsset.unlocked),
 });
 
 const closedReg = await request('POST', '/api/v1/auth/register', JSON.stringify({ region: 'cn', provider: 'phone', identifier: '13900000001', password: 'test-pass-123' }));

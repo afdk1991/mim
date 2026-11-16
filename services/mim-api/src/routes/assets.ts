@@ -4,7 +4,7 @@ import { Router } from 'express'; // 路由容器
 import { randomUUID } from 'node:crypto'; // 购买记录主键
 import { z } from 'zod'; // 入参校验
 import { AppError } from '@mim/core-domain'; // 业务异常
-import { idempotency, requireAuth } from '../middleware.js'; // 会话与写幂等
+import { idempotency, optionalAuth, requireAuth } from '../middleware.js'; // 会话与写幂等（列表 / 详情匿名可读，用 optionalAuth）
 import { parse } from '../validate.js'; // 校验错误翻译
 import { recordEarning } from '../payments.js'; // 作者分成记账
 import { assertSafeOutboundUrl, auditText, auditImage } from '../security.js'; // 出站 SSRF 校验 + 内容审核钩子
@@ -92,12 +92,13 @@ function listItem(deps: ApiDeps, userId: string, row: Record<string, unknown> & 
 
 export function createAssetsRouter(deps: ApiDeps): Router { // 导出函数 createAssetsRouter：对外暴露的调用入口
   const router = Router(); // 资产路由：解析与鉴权
-  router.use('/assets', requireAuth); // 与社区一致：访客会话同样可用
-  router.use('/assets', idempotency); // 购买写操作防重复扣款
+  // 浏览（列表 / 详情）匿名可读：与社区付费帖、图库同一套付费墙，未购买者拿不到正文与文件地址。
+  // 购买、「我的资产」与作者发布仍要求登录；写路由按「先 requireAuth 再 idempotency」挂载，
+  // 因为 idempotency 需要 req.user 作为作用域，而 MIM_FORCE_LOGIN 关闭时门禁不会预先注入用户。
 
-  /** 资产列表：按类型 / 关键词过滤。 */
-  router.get('/assets', (req, res) => { // 资产路由：解析与鉴权
-    const userId = req.user!.id; // 资产路由：解析与鉴权
+  /** 资产列表：按类型 / 关键词过滤；匿名可读，登录后附带「是否已购」。 */
+  router.get('/assets', optionalAuth, (req, res) => { // 资产路由：解析与鉴权
+    const userId = req.user?.id ?? ''; // 匿名请求无用户：付费墙按未购买处理
     const kind = typeof req.query.kind === 'string' && req.query.kind !== 'all' ? req.query.kind : ''; // 资产路由：解析与鉴权
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 资产路由：解析与鉴权
     const where = ["status = 'published'"]; // 资产路由：解析与鉴权
@@ -117,7 +118,7 @@ export function createAssetsRouter(deps: ApiDeps): Router { // 导出函数 crea
   }); // 代码块结束
 
   /** 我的资产：已购买的资产清单。 */
-  router.get('/assets/mine/list', (req, res) => { // 资产路由：解析与鉴权
+  router.get('/assets/mine/list', requireAuth, (req, res) => { // 资产路由：解析与鉴权
     const userId = req.user!.id; // 资产路由：解析与鉴权
     const rows = deps.db // 资产路由：解析与鉴权
       .prepare( // 执行当前业务步骤
@@ -129,9 +130,9 @@ export function createAssetsRouter(deps: ApiDeps): Router { // 导出函数 crea
     res.json({ items: rows }); // 执行当前业务步骤
   }); // 代码块结束
 
-  /** 资产详情：未解锁时只给摘要，正文与文件地址隐藏。 */
-  router.get('/assets/:code', (req, res) => { // 资产路由：解析与鉴权
-    const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
+  /** 资产详情：未解锁时只给摘要，正文与文件地址隐藏；匿名可读。 */
+  router.get('/assets/:code', optionalAuth, (req, res) => { // 资产路由：解析与鉴权
+    const userId = req.user?.id ?? ''; // 匿名请求无用户：付费墙按未购买处理
     const asset = deps.db.prepare("SELECT * FROM paid_assets WHERE code = ? AND status = 'published'").get(req.params.code) as // 常量 asset：保存固定配置或一次性派生值
       | (Record<string, unknown> & { id: string; body: string; file_url: string | null; price_cents: number; vip_free: number; author_id: string | null }) // 执行当前业务步骤
       | undefined; // 执行当前业务步骤
@@ -160,7 +161,7 @@ export function createAssetsRouter(deps: ApiDeps): Router { // 导出函数 crea
   }); // 代码块结束
 
   /** 购买资产：余额支付；免费 / VIP 免费 / 已购直接成功。 */
-  router.post('/assets/:code/purchase', (req, res) => {
+  router.post('/assets/:code/purchase', requireAuth, idempotency, (req, res) => {
     const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
     const asset = deps.db.prepare("SELECT * FROM paid_assets WHERE code = ? AND status = 'published'").get(req.params.code) as // 常量 asset：保存固定配置或一次性派生值
       | { id: string; code: string; price_cents: number; vip_free: number; author_id: string | null } // 执行当前业务步骤
@@ -197,7 +198,7 @@ export function createAssetsRouter(deps: ApiDeps): Router { // 导出函数 crea
   }); // 代码块结束
 
   /** 作者发布资产：登录即可发布免费资源；付费资产需作者已开通（暂以登录代替）。 */
-  router.post('/assets', async (req, res) => {
+  router.post('/assets', requireAuth, idempotency, async (req, res) => {
     const userId = req.user!.id; // 常量 userId：保存固定配置或一次性派生值
     const body = parse( // 常量 body：保存固定配置或一次性派生值
       z.object({ // 执行当前业务步骤

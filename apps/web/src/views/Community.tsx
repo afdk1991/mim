@@ -35,6 +35,7 @@ import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, Sear
 import { isPinned, listThreads, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 列表分页 / 楼中楼回复 / 回复锁定判定 / 回复分页
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
 import { CommunityGallery } from './CommunityGallery'; // 图库 / 视频页签（2026-11-15：挂在社区层，不恢复独立模块页）
+import { CommunityAssets } from './CommunityAssets'; // 付费资产列表 / 详情（2026-11-16：社区层深链接，匿名可读）
 import { CommunityGuideBar, ReferralGuestPanel, ShopGuestNote, WalletGuestPanel } from './CommunityGuides'; // 八大板块指南条与匿名访客面板
 import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
 import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
@@ -204,6 +205,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const postId = segments[0] === 'community' && segments[1] === 'post' ? (segments[2] ?? '') : ''; // 帖子 id
   const newsKind = segments[0] === 'community' && segments[1] === 'news' ? (segments[2] ?? '') : ''; // 资讯形态
   const newsId = newsKind ? (segments[3] ?? '') : ''; // 资讯条目 id
+  // 付费资产：/community/assets 列表、/community/assets/:code 详情；挂在社区视图下才能匿名可读
+  const assetRoute = segments[0] === 'community' && segments[1] === 'assets'; // 是否资产深链接
+  const assetCode = assetRoute ? (segments[2] ?? '') : ''; // 资产编码；空串表示列表页
   const listScrollRef = useRef(0); // 进入详情前的列表滚动位置
   // 从资讯详情返回时带 ctab：直接打开「公告动态」并落到对应子页签
   const initialContentTab = currentQuery().get('ctab');
@@ -1033,10 +1037,13 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const canManageTabs = !!currentBoard?.is_moderator;
 
   return ( // 返回当前函数的处理结果
-    <section className="community-wrap" data-theme-section={newsId ? newsKind : tab}>{/* 板块色相作用域：随当前栏目切换整套派生色 */}
+    <section className="community-wrap" data-theme-section={newsId ? newsKind : assetRoute ? 'assets' : tab}>{/* 板块色相作用域：随当前栏目切换整套派生色 */}
       {newsId ? (
         // 资讯条目独立详情页：深链接 /community/news/:kind/:id 直接可用
         <ContentDetail locale={locale} kind={newsKind} id={newsId} />
+      ) : assetRoute ? (
+        // 付费资产：列表与详情匿名可读，购买与「我的资产」在组件内部按登录态引导
+        <CommunityAssets locale={locale} hasSession={hasSession} code={assetCode} onRequireLogin={onRequireLogin} />
       ) : (
         <>
       <header className="community-hero">{/* 执行当前业务步骤 */}
@@ -1073,6 +1080,11 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             ))}
           </div>
         ))}
+        {/* 付费资产是深链接视图（列表 / 详情各有地址），不占用页签状态，单独给一个入口 */}
+        <div className="community-tabs-group">
+          <span className="community-tabs-label">资产</span>
+          <button type="button" onClick={() => navigatePath(pathOf('community', 'assets'))}>付费资产</button>
+        </div>
       </nav>
 
       {/* 指南条：每个板块都能直达对应的规则 / 使用说明文章，文章本身落在 community_threads */}

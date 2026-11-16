@@ -129,8 +129,7 @@ const AUTH_REQUIRED_READ_PATHS = new Set<string>([ // 精确匹配
   '/api/v1/after-sales', // 售后单
   '/api/v1/referral', // 推广中心
   '/api/v1/reports/mine', // 我的举报
-  '/api/v1/assets', // 付费资产（解锁 / 下载前置）
-  '/api/v1/assets/mine/list', // 我拥有的资产
+  '/api/v1/assets/mine/list', // 我拥有的资产（列表与详情匿名可读，仅此项需登录）
   '/api/v1/community/favorites', // 我的收藏
   '/api/v1/community/notifications', // 通知
   '/api/v1/commerce/orders', // 统一订单
@@ -146,7 +145,8 @@ const AUTH_REQUIRED_READ_PREFIXES = [ // 带路径参数的需登录读接口
   /^\/api\/v1\/after-sales\//, // 售后详情
   /^\/api\/v1\/referral\//, // 推广佣金明细
   /^\/api\/v1\/reports\//, // 举报详情 / 运营列表
-  /^\/api\/v1\/assets\//, // 付费资产详情
+  // 付费资产列表 / 详情匿名可读（与社区付费帖、图库同一套付费墙，未解锁不下发正文与文件地址）；
+  // 「我的资产」/assets/mine/list 由上方精确清单拦截，购买为写方法默认拦截。
   /^\/api\/v1\/community\/favorites/, // 收藏列表与取消收藏
   /^\/api\/v1\/community\/notifications/, // 通知列表与已读
   /^\/api\/v1\/community\/boards\/[^/]+\/reports$/, // 板块举报（运营审阅）
