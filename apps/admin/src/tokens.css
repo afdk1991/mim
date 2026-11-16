@@ -42,12 +42,22 @@
   --violet-soft: #f1ecfb; /* 紫色淡底 */
 
   /* ---------- 侧栏 ---------- */
-  --sidebar: #1d2433; /* 侧栏深色底 */
+  --sidebar: #1d2433; /* 侧栏深色底：仅暗色主题回落用 */
   --sidebar-text: #cfd6e4; /* 侧栏常规文字 */
   --sidebar-strong: #eef1f7; /* 侧栏强调文字 */
   --sidebar-muted: #8a93a6; /* 侧栏次要文字 */
   --sidebar-hover: #2a3447; /* 侧栏悬停底 */
   --sidebar-line: rgba(255, 255, 255, 0.08); /* 侧栏分割线 */
+
+  /* ---------- 导航表面：与前台同一套浅色语言 ---------- */
+  --nav-bg: #ffffff; /* 导航底色：与内容区一级表面同族，靠描边分界 */
+  --nav-text: var(--text-secondary); /* 导航常规文字 */
+  --nav-strong: var(--text); /* 导航强调文字：品牌名与当前用户 */
+  --nav-muted: var(--text-muted); /* 导航次要文字 */
+  --nav-hover: var(--surface-2); /* 导航悬停底 */
+  --nav-active-bg: var(--primary-soft); /* 选中项淡主色底，不再实心填充 */
+  --nav-active-text: var(--primary); /* 选中项文字 */
+  --nav-line: rgba(50, 50, 50, 0.08); /* 导航与内容区的分界线 */
 
   /* ---------- 圆角阶梯 ---------- */
   --radius: 12px; /* 主圆角：卡片与面板 */
@@ -145,6 +155,9 @@
   --sidebar-muted: #8a93a6; /* 侧栏次要文字 */
   --sidebar-hover: #2b313c; /* 侧栏悬停底 */
   --sidebar-line: rgba(255, 255, 255, 0.08); /* 侧栏分割线 */
+  --nav-bg: #24262a; /* 导航底色：比内容区更沉，形成边界 */
+  --nav-hover: rgba(255, 255, 255, 0.06); /* 导航悬停底：暗底用透明白提亮 */
+  --nav-line: rgba(255, 255, 255, 0.08); /* 导航分界线 */
 
   /* ---------- 阴影 ---------- */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28); /* 贴地阴影 */

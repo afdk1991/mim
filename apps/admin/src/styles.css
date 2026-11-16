@@ -29,42 +29,63 @@ a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */
 
 /* 侧栏容器 */ 
 .sidebar { /* 左侧导航 */ 
-  background: var(--sidebar); /* 深色底 */ 
-  color: var(--sidebar-strong); /* 侧栏内文字统一取强调浅色 */ 
+  background: var(--nav-bg); /* 浅色导航底：与前台同一套表面语言，靠描边分界 */ 
+  color: var(--nav-text); /* 导航常规文字 */ 
   display: flex; /* 纵向弹性布局 */ 
   flex-direction: column; /* 从上到下：品牌、导航、底部身份 */ 
-  padding: 20px 14px; /* 内边距 */ 
+  padding: 22px 14px 16px; /* 内边距 */ 
   position: sticky; /* 滚动时固定 */ 
   top: 0; /* 贴顶 */ 
   height: 100vh; /* 占满视口 */ 
+  overflow-y: auto; /* 导航超出时内部滚动 */ 
+  border-right: 1px solid var(--nav-line); /* 右侧细线替代深色块对比 */ 
 } /* 侧栏结束 */ 
 
 /* 品牌区 */ 
-.brand { padding: 4px 8px 18px; } /* 品牌块内边距 */ 
-.brand-name { font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--sidebar-strong); } /* 品牌名 */ 
-.brand-tagline { color: var(--sidebar-muted); font-size: var(--fs-xs); margin-top: 2px; } /* 品牌副标题 */ 
+.brand { /* 品牌块 */ 
+  display: flex; /* 标记与文字横向排列 */ 
+  align-items: center; /* 垂直居中 */ 
+  gap: 10px; /* 标记与文字间距 */ 
+  padding: 0 6px 18px; /* 与导航按钮文字左对齐 */ 
+  color: var(--nav-strong); /* 导航内最重文字档 */ 
+  font-size: var(--fs-lg); /* 品牌字号 */ 
+  font-weight: var(--fw-bold); /* 加粗强化识别 */ 
+} /* 品牌块结束 */ 
+.brand::before { /* 品牌标记：主色圆角方块，与前台品牌区同族 */ 
+  content: ''; /* 伪元素占位 */ 
+  flex: 0 0 auto; /* 固定尺寸 */ 
+  width: 26px; /* 标记宽 */ 
+  height: 26px; /* 标记高 */ 
+  border-radius: var(--radius-sm); /* 同族圆角 */ 
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover)); /* 主色渐变 */ 
+} /* 品牌标记结束 */ 
+.brand-name { font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--nav-strong); } /* 品牌名 */ 
+.brand-tagline { color: var(--nav-muted); font-size: var(--fs-xs); margin-top: 2px; } /* 品牌副标题 */ 
 
 /* 导航清单 */ 
-.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; } /* 纵向排列并占据剩余空间 */ 
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; } /* 纵向排列并占据剩余空间 */ 
 .nav-item { /* 单个导航项 */ 
   display: block; /* 块级便于整行点击 */ 
   width: 100%; /* 占满侧栏宽度 */ 
   text-align: left; /* 文字左对齐 */ 
-  padding: 9px 10px; /* 内边距保证点击热区 */ 
+  padding: 10px 12px; /* 热区约 38px，兼顾触控与密度 */ 
   border: 0; /* 去除按钮默认边框 */ 
   border-radius: var(--radius-sm); /* 圆角走令牌 */ 
   background: transparent; /* 默认透明 */ 
-  color: var(--sidebar-text); /* 未激活文字色 */ 
-  font-size: var(--fs-sm); /* 导航字号 */ 
+  color: var(--nav-text); /* 未激活文字色 */ 
+  font-size: var(--fs-base); /* 导航字号与前台一致 */ 
+  font-weight: var(--fw-medium); /* 中等字重 */ 
+  font-family: inherit; /* 继承字体 */ 
   cursor: pointer; /* 手型光标表达可点击 */ 
+  transition: var(--transition); /* 悬停与选中切换走统一过渡 */ 
 } /* 导航项结束 */ 
-.nav-item:hover { background: var(--sidebar-hover); color: var(--sidebar-strong); } /* 悬停高亮 */ 
-.nav-item.active { background: var(--primary); color: var(--on-primary); } /* 激活项主色填充 */ 
+.nav-item:hover { background: var(--nav-hover); color: var(--nav-strong); } /* 悬停高亮 */ 
+.nav-item.active { background: var(--nav-active-bg); color: var(--nav-active-text); font-weight: var(--fw-semibold); } /* 激活项：淡主色底 + 主色字，不再实心填充 */ 
 
 /* 侧栏底部身份区 */ 
-.sidebar-footer { border-top: 1px solid var(--sidebar-line); padding-top: 12px; margin-top: 12px; } /* 分隔线与间距 */ 
-.user-name { color: var(--sidebar-strong); font-size: var(--fs-sm); word-break: break-all; } /* 身份名允许长 ID 换行 */ 
-.user-region { color: var(--sidebar-muted); font-size: var(--fs-xs); } /* 身份附加信息 */ 
+.sidebar-footer { border-top: 1px solid var(--nav-line); padding-top: 12px; margin-top: 12px; } /* 分隔线与间距 */ 
+.user-name { color: var(--nav-strong); font-size: var(--fs-sm); word-break: break-all; } /* 身份名允许长 ID 换行 */ 
+.user-region { color: var(--nav-muted); font-size: var(--fs-xs); } /* 身份附加信息 */ 
 
 /* 内容区 */ 
 .main { padding: 28px 32px 48px; min-width: 0; } /* 内边距 + 允许网格列收缩 */ 
@@ -91,14 +112,16 @@ a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */
 .warning { background: var(--warning-soft); color: var(--warning); } /* 警告：警告淡底 */ 
 
 /* 面板卡片 */ 
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-top: 16px; } /* 卡片统一外观 */ 
-.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; } /* 卡片标题行 */ 
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 18px 20px; margin-top: 14px; } /* 卡片统一外观：与前台同一档表面 */ 
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; } /* 卡片标题行 */ 
+.panel-head h3 { font-size: var(--fs-md); } /* 面板标题：与前台小节标题同档 */ 
 
 /* 指标卡片网格 */ 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; } /* 自适应列数 */ 
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; } /* 单卡外观 */ 
-.card-label { color: var(--text-muted); font-size: var(--fs-xs); } /* 卡片标签 */ 
-.card-value { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin-top: 4px; word-break: break-all; } /* 卡片主值 */ 
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px; } /* 自适应列数 */ 
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 16px 18px; transition: var(--transition); } /* 单卡外观：与前台卡片同套描边 / 圆角 / 阴影 */ 
+.card:hover { border-color: var(--border-hover); box-shadow: var(--shadow); } /* 悬停抬升：与前台卡片反馈一致 */ 
+.card-label { color: var(--text-muted); font-size: var(--fs-xs); letter-spacing: 0.02em; } /* 卡片标签 */ 
+.card-value { color: var(--text); font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin-top: 6px; line-height: var(--lh-tight); word-break: break-all; } /* 卡片主值 */ 
 
 /* 两栏分栏 */ 
 .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; } /* 自适应双栏 */ 
@@ -135,9 +158,10 @@ textarea { border-radius: var(--control-radius); } /* 多行文本只统一圆�
   display: inline-flex; /* 行内弹性布局 */ 
   align-items: center; /* 垂直居中 */ 
   gap: 6px; /* 图标与文字间距 */ 
-  padding: 7px 14px; /* 内边距 */ 
+  height: var(--control-h); /* 与前台同一套控件高度 */ 
+  padding: 0 14px; /* 内边距 */ 
   border: 1px solid var(--border); /* 默认描边 */ 
-  border-radius: var(--radius-sm); /* 圆角走令牌 */ 
+  border-radius: var(--control-radius); /* 控件圆角：与前台一致 */ 
   background: var(--surface); /* 默认表面色 */ 
   color: var(--text); /* 默认文字色 */ 
   font-size: var(--fs-sm); /* 字号 */ 
@@ -153,10 +177,13 @@ textarea { border-radius: var(--control-radius); } /* 多行文本只统一圆�
 .btn:disabled { opacity: 0.5; cursor: not-allowed; } /* 禁用态 */ 
 
 /* 表格 */ 
-.table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); } /* 表宽占满并合并边框 */ 
-.table th, .table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; } /* 单元格内边距与分隔 */ 
-.table th { color: var(--text-muted); font-weight: var(--fw-medium); font-size: var(--fs-xs); white-space: nowrap; } /* 表头弱化 */ 
+.table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-sm); } /* 表宽占满；separate 让表头圆角与底色生效 */ 
+.table th, .table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; } /* 单元格内边距与分隔 */ 
+.table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); color: var(--text-muted); font-weight: var(--fw-semibold); font-size: var(--fs-xs); white-space: nowrap; border-bottom: 1px solid var(--border-strong); } /* 表头：二级表面 + 强调描边，与前台表面阶梯一致 */ 
+.table thead th:first-child { border-top-left-radius: var(--radius-sm); } /* 表头左圆角 */ 
+.table thead th:last-child { border-top-right-radius: var(--radius-sm); } /* 表头右圆角 */ 
 .table tbody tr:hover { background: var(--surface-2); } /* 行悬停底色 */ 
+.table tbody tr:last-child td { border-bottom: 0; } /* 末行不再画线，避免与面板底边叠加 */ 
 .table td code { font-size: var(--fs-xs); } /* 单元格内代码字号 */ 
 
 /* 徽标 */ 
