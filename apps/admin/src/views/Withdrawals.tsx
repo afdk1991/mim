@@ -20,8 +20,8 @@ const STATUS_LABEL: Record<AdminWithdrawalStatus, string> = {
 
 const METHOD_LABEL: Record<string, string> = { alipay: '支付宝', wechat: '微信', bank: '银行卡' };
 
-/** 每页条数：与用户管理保持一致 */
-const PAGE_SIZE = 20;
+/** 每页条数：审核卡片信息密度高，单页 10 条避免长滚动 */
+const PAGE_SIZE = 10;
 
 /** 整数分转元展示，仅在渲染时做除法，不参与计算 */
 function yuan(cents: number): string {

@@ -26,8 +26,8 @@ interface Props { // 入参
 /** 页签类型 */
 type Tab = 'announcements' | 'changelog' | 'promotions'; // 三类内容
 
-/** 每页条数：与用户管理保持一致 */
-const PAGE_SIZE = 20;
+/** 每页条数：内容行占位较高，单页 10 条避免长滚动 */
+const PAGE_SIZE = 10;
 
 /** 金额分转元 */
 function yuan(value: number): string { // 业务步骤
