@@ -451,6 +451,11 @@ export function App() {
                   ? 'This page belongs to your account. Sign in to continue; you will return here afterwards.'
                   : '该页面属于账号内数据，登录后会自动回到这里。'}
               </p>
+              <ul className="gate-list">
+                <li>{locale === 'en-US' ? 'Profile and account security' : '个人资料与账号安全'}</li>
+                <li>{locale === 'en-US' ? 'Saves, follows and notifications' : '收藏、关注与消息通知'}</li>
+                <li>{locale === 'en-US' ? 'Orders, wallet and after-sales records' : '订单、钱包与售后记录'}</li>
+              </ul>
               <button type="button" className="btn primary" onClick={() => go({ view: 'login' })}>
                 {locale === 'en-US' ? 'Go to sign in' : '前往登录'}
               </button>
@@ -472,6 +477,11 @@ export function App() {
               <p className="gate-text">
                 {locale === 'en-US' ? 'This account is ready. Head back to the community.' : '账号已就绪，无需重复登录，可以直接回到社区。'}
               </p>
+              <ul className="gate-list">
+                <li>{locale === 'en-US' ? 'Community and circles' : '社区与圈子内容'}</li>
+                <li>{locale === 'en-US' ? 'Profile and account security' : '个人资料与账号安全'}</li>
+                <li>{locale === 'en-US' ? 'Orders, wallet and after-sales records' : '订单、钱包与售后记录'}</li>
+              </ul>
               <button type="button" className="btn primary" onClick={() => go({ view: 'community' })}>
                 {locale === 'en-US' ? 'Back to Community' : '回到社区'}
               </button>

@@ -624,6 +624,34 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           </div>
         )}{/* 第三方登录区结束 */}
       </div>{/* 结束登录卡片 */}
+      {embedded && ( // 内嵌模式补说明块：把登录卡下方的整条空带换成可读内容
+        <section className="auth-extras" aria-label={locale === 'en-US' ? 'Sign-in notes' : '登录说明'}>
+          <div className="auth-extra">
+            <strong>{locale === 'en-US' ? 'Account security' : '账号安全'}</strong>
+            <span>
+              {locale === 'en-US'
+                ? 'Password and one-time code both work; unusual sign-ins ask you to verify again.'
+                : '密码与验证码双通道登录，登录态异常时会要求重新验证。'}
+            </span>
+          </div>
+          <div className="auth-extra">
+            <strong>{locale === 'en-US' ? 'One account' : '同一账号'}</strong>
+            <span>
+              {locale === 'en-US'
+                ? 'Community, circles and payments share one account and one session.'
+                : '社区、圈子与交易共用同一个账号与登录态，无需重复注册。'}
+            </span>
+          </div>
+          <div className="auth-extra">
+            <strong>{locale === 'en-US' ? 'Need help' : '需要帮助'}</strong>
+            <span>
+              {locale === 'en-US'
+                ? 'Registration is closed. Contact the site administrator if you cannot sign in.'
+                : '注册已关闭；无法登录时请联系站点管理员处理。'}
+            </span>
+          </div>
+        </section>
+      )}
     </div>
   ); // 执行当前业务步骤
 } // 代码块结束
