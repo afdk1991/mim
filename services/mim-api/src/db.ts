@@ -667,6 +667,8 @@ export function seedCommerce(db: Db): void {
           const theme = parsed as Record<string, unknown>;
           let changed = false;
           if (theme.accent === '#0f766e') { theme.accent = '#3b6ef5'; changed = true; }
+          // 粉色主色 #f53dbb 压暗后配白字仅 3.76:1，不达 AA；回到品牌蓝保证浅色主按钮 ≥4.5:1
+          if (theme.accent === '#f53dbb') { theme.accent = '#3b6ef5'; changed = true; }
           if (theme.background === '#f8fafc') { theme.background = '#f5f6f7'; changed = true; }
           if (theme.radius === 14) { theme.radius = 12; changed = true; }
           if (changed) {

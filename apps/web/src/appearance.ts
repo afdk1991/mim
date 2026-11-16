@@ -101,6 +101,65 @@ function withAlpha(accent: string, alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`; // 组合成 rgba
 } // 代码块结束
 
+/** HSL 转 RGB；h 为角度，s / l 用 0–1 小数。 */
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s; // 色度
+  const hp = (((h % 360) + 360) % 360) / 60; // 色相落到 0–6 扇区
+  const x = c * (1 - Math.abs((hp % 2) - 1)); // 扇区次高分量
+  const m = l - c / 2; // 亮度偏移
+  let r = 0; // 红分量
+  let g = 0; // 绿分量
+  let b = 0; // 蓝分量
+  if (hp < 1) { r = c; g = x; }
+  else if (hp < 2) { r = x; g = c; }
+  else if (hp < 3) { g = c; b = x; }
+  else if (hp < 4) { g = x; b = c; }
+  else if (hp < 5) { r = x; b = c; }
+  else { r = c; b = x; }
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255]; // 补偏移并放大到 0–255
+} // 代码块结束
+
+/** WCAG 相对亮度。 */
+function relativeLuminance(rgb: [number, number, number]): number {
+  const channel = (value: number): number => {
+    const n = value / 255; // 归一化
+    return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); // 分段线性化
+  };
+  return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]); // 加权求和
+} // 代码块结束
+
+/** 两色对比度，返回 1–21。 */
+function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+  const la = relativeLuminance(a); // 色 A 亮度
+  const lb = relativeLuminance(b); // 色 B 亮度
+  const hi = Math.max(la, lb); // 较亮者
+  const lo = Math.min(la, lb); // 较暗者
+  return (hi + 0.05) / (lo + 0.05); // WCAG 比值
+} // 代码块结束
+
+/**
+ * 主按钮对比度兜底：浅色 --primary-fill 是按主色 88% + 深蓝 12% 压暗后的实际底色，
+ * 若其上的 --on-primary 文字不足 4.5:1，就把主色逐步压暗到刚好达标。
+ * 默认品牌蓝约 4.97:1，不会触发；只有运营配到过亮的主色（如粉 #f53dbb ≈3.8:1）时才生效。
+ */
+function ensureButtonContrast(accent: string): string {
+  const rgb = hexToRgb(accent); // 解析主色
+  if (!rgb) return accent; // 解析失败交回原值
+  const fillBase = hslToRgb(222, 0.45, 0.08); // 与 tokens.css 的 12% 深色混合项同口径
+  const onPrimary = hslToRgb(222, 1, 0.97); // 与浅色 --on-primary 同口径
+  let current: [number, number, number] = [rgb[0], rgb[1], rgb[2]]; // 从原主色开始
+  for (let step = 0; step < 40; step += 1) { // 最多压暗 40 档，足够覆盖极亮色
+    const fill: [number, number, number] = [
+      current[0] * 0.88 + fillBase[0] * 0.12, // 填充红
+      current[1] * 0.88 + fillBase[1] * 0.12, // 填充绿
+      current[2] * 0.88 + fillBase[2] * 0.12, // 填充蓝
+    ];
+    if (contrastRatio(fill, onPrimary) >= 4.6) break; // 留 0.1 安全余量，避免十六进制取整后掉到 4.5 以下
+    current = [current[0] * 0.9, current[1] * 0.9, current[2] * 0.9]; // 未达标继续压暗
+  }
+  return rgbToHex(current[0], current[1], current[2]); // 返回可安全承载白字的主色
+} // 代码块结束
+
 /** 清洗单个颜色：非法值回落默认主色 / 底色。 */
 function safeColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && HEX_COLOR.test(value.trim()) ? value.trim() : fallback; // 返回当前函数的处理结果
@@ -151,15 +210,17 @@ export function applyThemeVars(theme: ResolvedTheme): void {
   if (typeof document === 'undefined') return; // 非浏览器环境（测试 / SSR）跳过
   const root = document.documentElement; // 变量挂在 :root 上，全站继承
   applyThemeMode(readStoredMode() ?? theme.mode); // 本地偏好优先，其次站点默认
-  root.style.setProperty('--theme-primary', theme.accent); // 浅色主色输入
+  // 主按钮兜底：先确保浅色填充上的白字 ≥4.5:1，再写回主色输入
+  const accent = ensureButtonContrast(theme.accent); // 合规主色（默认蓝色不变）
+  root.style.setProperty('--theme-primary', accent); // 浅色主色输入
   root.style.setProperty('--theme-bg', theme.background); // 浅色底色输入（暗色另有 --theme-bg-dark 兜底）
   root.style.setProperty('--theme-radius', `${theme.radius}px`); // 圆角输入
-  const isDefaultAccent = theme.accent.toLowerCase() === DEFAULT_THEME.accent; // 主色未自定义时交回令牌默认值
-  const darkAccent = isDefaultAccent ? '' : liftForDark(theme.accent); // 自定义主色派生出暗色提亮值
-  const darkSoft = isDefaultAccent ? '' : withAlpha(theme.accent, 0.16); // 暗色淡底
-  const darkRing = isDefaultAccent ? '' : withAlpha(theme.accent, 0.36); // 暗色焦点环
-  const lightSoft = isDefaultAccent ? '' : withAlpha(theme.accent, 0.1); // 浅色淡底
-  const lightRing = isDefaultAccent ? '' : withAlpha(theme.accent, 0.28); // 浅色焦点环
+  const isDefaultAccent = accent.toLowerCase() === DEFAULT_THEME.accent; // 主色未自定义时交回令牌默认值
+  const darkAccent = isDefaultAccent ? '' : liftForDark(accent); // 自定义主色派生出暗色提亮值
+  const darkSoft = isDefaultAccent ? '' : withAlpha(accent, 0.16); // 暗色淡底
+  const darkRing = isDefaultAccent ? '' : withAlpha(accent, 0.36); // 暗色焦点环
+  const lightSoft = isDefaultAccent ? '' : withAlpha(accent, 0.1); // 浅色淡底
+  const lightRing = isDefaultAccent ? '' : withAlpha(accent, 0.28); // 浅色焦点环
   const derived: Array<[string, string]> = [
     ['--theme-primary-dark', darkAccent],
     ['--theme-primary-soft', lightSoft],

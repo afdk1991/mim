@@ -37,9 +37,20 @@ import { GrowthDm } from './views/GrowthDm'; // 业务步骤
 import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
 // 发货与售后：录单 → 签收推进 → 售后审批
 import { Shipments } from './views/Shipments'; // 发货售后工作台
+// 商品管理：商品全量台账、上架状态与单价维护
+import { Products } from './views/Products'; // 商品管理
+// 订单管理：全部商城订单只读总览与状态筛选
+import { Orders } from './views/Orders'; // 订单管理
+// 权益：会员套餐与权益清单维护
+import { Entitlements } from './views/Entitlements'; // 权益
+// 设置：站点名称 / 副标题 / 页脚文案
+import { Settings } from './views/Settings'; // 站点设置
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm';
+type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'settings';
+
+/** 侧栏分组键：四组折叠，组名与顺序即信息架构口径 */
+type NavGroupKey = 'content' | 'trade' | 'user' | 'site';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -51,35 +62,104 @@ interface NavItem {
   permission: string | null;
 } // NavItem 结束：key/label/permission 三元组即一个侧栏条目
 
-/** 导航表：顺序即侧栏顺序；权限码与后端 RBAC_PERMISSIONS 保持一致 */
-const NAV: NavItem[] = [
-  // 概览：任何已登录身份都能看
-  { key: 'overview', label: '概览', permission: null },
-  // 提现审核：申请队列与到账处理，复用 commerce:write
-  { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
-  // 发货与售后：复用 commerce:write，处理待发货订单与售后申请
-  { key: 'shipments', label: '发货与售后', permission: 'commerce:write' },
-  // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
-  { key: 'priceBatches', label: '批量改价', permission: 'commerce:write' },
-  // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
-  { key: 'invites', label: '邀请码', permission: 'user:read' },
-  // 实名审核：读权限 user:read；审核按钮另需 rbac:write
-  { key: 'realname', label: '实名审核', permission: 'user:read' },
-  // 内容运营：公告 / 更新日志 / 推广计划
-  { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
-  // 社区运营
-  { key: 'communityAdmin', label: '社区运营', permission: 'appearance:write' },
-  // 页面搭建：复用 appearance:write，管理首页 / 论坛区块装修
-  { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
-  // 外观：主色 / 圆角 / 默认明暗，紧跟页面搭建
-  { key: 'appearance', label: '外观', permission: 'appearance:write' },
-  // 成长私信：发送系统身份私信，需要 messaging:write
-  { key: 'growthDm', label: '成长私信', permission: 'messaging:write' },
-  // 角色与权限：需要 rbac:read
-  { key: 'roles', label: '角色与权限', permission: 'rbac:read' },
-  // 用户与授权：需要 user:read
-  { key: 'users', label: '用户', permission: 'user:read' },
-]; // 导航表结束：数组顺序即侧栏渲染顺序
+/** 侧栏分组：组内条目顺序即渲染顺序；权限码与后端 RBAC_PERMISSIONS 保持一致 */
+interface NavGroup {
+  // 分组键：用于持久化「最近使用组」
+  key: NavGroupKey;
+  // 分组标题
+  label: string;
+  // 组内条目
+  items: NavItem[];
+} // NavGroup 结束
+
+/** 概览独立于四组，固定在侧栏顶部，任何已登录身份可见 */
+const OVERVIEW: NavItem = { key: 'overview', label: '概览', permission: null };
+
+/** 四组折叠导航：内容 / 交易 / 用户 / 站点 */
+const NAV_GROUPS: NavGroup[] = [
+  {
+    key: 'content',
+    label: '内容',
+    items: [
+      // 内容运营：公告 / 更新日志 / 推广计划
+      { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
+      // 社区运营：板块审核、首页指向、推荐权重、Tab 配置
+      { key: 'communityAdmin', label: '社区运营', permission: 'appearance:write' },
+    ],
+  },
+  {
+    key: 'trade',
+    label: '交易',
+    items: [
+      // 商品管理：商品台账、上架状态与单价
+      { key: 'products', label: '商品管理', permission: 'commerce:write' },
+      // 订单管理：全部商城订单总览
+      { key: 'orders', label: '订单管理', permission: 'commerce:write' },
+      // 发货与售后：复用 commerce:write，处理待发货订单与售后申请
+      { key: 'shipments', label: '发货与售后', permission: 'commerce:write' },
+      // 提现审核：申请队列与到账处理，复用 commerce:write
+      { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
+      // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
+      { key: 'priceBatches', label: '批量改价', permission: 'commerce:write' },
+    ],
+  },
+  {
+    key: 'user',
+    label: '用户',
+    items: [
+      // 用户与授权：需要 user:read
+      { key: 'users', label: '用户', permission: 'user:read' },
+      // 角色与权限：需要 rbac:read
+      { key: 'roles', label: '角色与权限', permission: 'rbac:read' },
+      // 权益：会员套餐与权益清单
+      { key: 'entitlements', label: '权益', permission: 'commerce:write' },
+      // 实名审核：读权限 user:read；审核按钮另需 rbac:write
+      { key: 'realname', label: '实名审核', permission: 'user:read' },
+      // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
+      { key: 'invites', label: '邀请码', permission: 'user:read' },
+      // 成长私信：发送系统身份私信，需要 messaging:write
+      { key: 'growthDm', label: '成长私信', permission: 'messaging:write' },
+    ],
+  },
+  {
+    key: 'site',
+    label: '站点',
+    items: [
+      // 外观：主色 / 圆角 / 默认明暗
+      { key: 'appearance', label: '外观', permission: 'appearance:write' },
+      // 页面搭建：复用 appearance:write，管理首页 / 论坛区块装修
+      { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
+      // 设置：站点名称 / 副标题 / 页脚文案
+      { key: 'settings', label: '设置', permission: 'appearance:write' },
+    ],
+  },
+]; // NAV_GROUPS 结束：四组共 16 项，加上独立概览即完整后台入口
+
+/** 平铺索引：用于权限过滤与当前视图归属判断 */
+const NAV: NavItem[] = [OVERVIEW, ...NAV_GROUPS.flatMap((group) => group.items)];
+
+/** 「最近使用组」的本地存储键：只存分组键，缺省回落内容组 */
+const NAV_GROUP_KEY = 'mim.admin.nav.group.v1';
+
+/** 读取上次使用的分组；无记录或值非法时回落内容组 */
+function readLastGroup(): NavGroupKey {
+  try {
+    const raw = localStorage.getItem(NAV_GROUP_KEY);
+    if (raw === 'content' || raw === 'trade' || raw === 'user' || raw === 'site') return raw;
+  } catch {
+    // 隐私模式下读取失败不阻断，按缺省处理
+  }
+  return 'content';
+} // readLastGroup 结束
+
+/** 写入最近使用的分组：存储不可用时仅本次生效 */
+function persistLastGroup(group: NavGroupKey): void {
+  try {
+    localStorage.setItem(NAV_GROUP_KEY, group);
+  } catch {
+    // 存储不可用不影响导航
+  }
+} // persistLastGroup 结束
 
 /** 应用根组件：只做「有无凭证」的二选一，具体逻辑全部下沉到 Console */
 export function App() { // 业务步骤
@@ -128,6 +208,26 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
   const [view, setView] = useState<ViewKey>('overview');
   // 当前明暗：以已写入的 data-theme 为准，按钮文案显示切换目标
   const [mode, setMode] = useState<ThemeMode>(() => currentThemeMode());
+  // 展开的分组：默认只展开上次使用的组，其余收起
+  const [openGroups, setOpenGroups] = useState<Set<NavGroupKey>>(() => new Set<NavGroupKey>([readLastGroup()]));
+
+  /** 同步 details 原生开关到状态，并记录「最近使用组」 */
+  function syncGroup(group: NavGroupKey, open: boolean) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(group);
+      else next.delete(group);
+      return next;
+    });
+    if (open) persistLastGroup(group);
+  } // syncGroup 结束
+
+  /** 进入组内页面：切换视图并把该组记为最近使用 */
+  function openItem(item: NavItem, group: NavGroupKey) {
+    setView(item.key);
+    persistLastGroup(group);
+    setOpenGroups((prev) => (prev.has(group) ? prev : new Set(prev).add(group)));
+  } // openItem 结束
 
   // 切换明暗：立即写入 data-theme 并持久化，与前台共用同一偏好
   function toggleMode() {
@@ -149,6 +249,13 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
     } // 401 分支结束：非 401 错误不自动退出，留给页面内错误态处理
     // 依赖错误对象与退出回调（后者已用 useCallback 固定）
   }, [identityState.error, onLogout]);
+
+  // 当前视图所属分组自动展开：从概览或权限回落进入组内页时不会藏在收起项里
+  useEffect(() => {
+    const group = NAV_GROUPS.find((item) => item.items.some((child) => child.key === view));
+    if (!group) return;
+    setOpenGroups((prev) => (prev.has(group.key) ? prev : new Set(prev).add(group.key)));
+  }, [view]);
 
   // 首屏身份校验中：给出轻量占位，避免闪现登录页
   if (identityState.loading) { // 业务步骤
@@ -181,6 +288,13 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
   const visible = NAV.filter((item) => item.permission === null || identity.permissions.includes(item.permission));
   // 当前视图若不可见（权限被回收），回落到概览，避免渲染空页面
   const activeKey: ViewKey = visible.some((item) => item.key === view) ? view : 'overview';
+  // 概览独立于四组，固定在侧栏顶部
+  const overviewVisible = visible.some((item) => item.key === 'overview');
+  // 四组按权限过滤：组内全部条目不可见时整组隐藏
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => item.permission === null || identity.permissions.includes(item.permission)),
+  })).filter((group) => group.items.length > 0);
   // 侧栏底部身份描述：引导通道没有用户主体，单独标注
   const subject = identity.bootstrap ? '引导令牌' : identity.user?.display_name ?? '未知用户'; // 业务步骤
 
@@ -193,19 +307,44 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
       <aside className="sidebar"> {/* 左侧栏：品牌 + 导航 + 身份区 */}
         {/* 品牌区：与 web 端一致的命名 */}
         <div className="brand">Mim 管理后台</div> {/* 品牌标题 */}
-        <nav className="nav"> {/* 按权限过滤后的导航按钮列表 */}
-          {visible.map((item) => ( // 逐条渲染可见导航项
-            // 当前视图高亮：nav-item + active
+        <nav className="nav"> {/* 概览 + 四组折叠导航，组内按权限过滤 */}
+          {overviewVisible && ( // 概览固定在组外顶部
             <button
-              key={item.key} // React 列表 key：用视图键稳定标识导航项
-              type="button" // 显式声明类型，避免在表单上下文被当作提交按钮
-              className={item.key === activeKey ? 'nav-item active' : 'nav-item'} // 当前视图加 active 高亮
-              onClick={() => setView(item.key)} // 点击切换到对应视图
-              // 属性区收尾，下一行进入按钮子节点
+              type="button"
+              className={activeKey === 'overview' ? 'nav-item active' : 'nav-item'}
+              onClick={() => setView('overview')}
             >
-              {item.label} {/* 按钮文案：来自导航表的 label */}
-            </button> // 单个导航按钮结束（此处已回到 map 回调的 JS 上下文）
-          ))} {/* 导航项渲染完毕，回到 nav 子节点 */}
+              概览
+            </button>
+          )}
+          {groups.map((group) => { // 逐组渲染 details 折叠块
+            const open = openGroups.has(group.key); // 受控展开状态
+            return (
+              <details
+                key={group.key}
+                className="nav-group"
+                open={open}
+                onToggle={(event) => syncGroup(group.key, event.currentTarget.open)}
+              >
+                <summary className="nav-group-title" aria-expanded={open}>
+                  <span>{group.label}</span>
+                  <span className="nav-group-count">{group.items.length}</span>
+                </summary>
+                <div className="nav-group-items">
+                  {group.items.map((item) => ( // 组内条目：选中态与组内序号
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={item.key === activeKey ? 'nav-item active' : 'nav-item'}
+                      onClick={() => openItem(item, group.key)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            );
+          })}
         </nav> {/* 导航列表结束 */}
         {/* 底部身份区：主体 + 区域 + 退出 */}
         <div className="sidebar-footer"> {/* 侧栏底部容器 */}
@@ -253,6 +392,14 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'appearance') return <Appearance credential={credential} permissions={identity.permissions} />;
   // 成长私信：按条件或指定用户发送系统身份私信
   if (key === 'growthDm') return <GrowthDm credential={credential} permissions={identity.permissions} />;
+  // 商品管理：商品台账、上架状态与单价
+  if (key === 'products') return <Products credential={credential} permissions={identity.permissions} />;
+  // 订单管理：全部商城订单总览
+  if (key === 'orders') return <Orders credential={credential} permissions={identity.permissions} />;
+  // 权益：会员套餐与权益清单
+  if (key === 'entitlements') return <Entitlements credential={credential} permissions={identity.permissions} />;
+  // 设置：站点名称 / 副标题 / 页脚文案
+  if (key === 'settings') return <Settings credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏
   return <Overview identity={identity} />;
 } // renderView 结束：全部视图分发完毕

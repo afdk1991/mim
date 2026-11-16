@@ -35,6 +35,7 @@ export function Overview({ identity }: OverviewProps) {
         <h2>概览</h2> {/* 页面标题：与左侧导航「概览」同名，保持信息架构一致 */}
         <span className="count">权限每请求实时查库，变更后刷新即生效</span> {/* 说明文案：强调权限不落缓存，改授权后刷新即可验证 */}
       </div> {/* 页头结束 */}
+      <p className="page-desc">这里是管理后台的起点：查看当前身份、生效角色与权限范围，并从左侧「内容 / 交易 / 用户 / 站点」四组入口进入具体功能。</p> {/* 用途说明：一句话讲清概览能做什么 */}
       <div className="cards"> {/* 指标卡片区：四张卡片横向栅格排列 */}
         {cards.map((card) => ( // 遍历卡片数组逐张渲染；label 恒定唯一，可直接作 key
           // 单个指标卡片

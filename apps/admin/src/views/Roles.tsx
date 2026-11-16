@@ -215,6 +215,7 @@ export function Roles({ credential, permissions }: RolesProps) {
         <h2>角色与权限</h2> {/* 视图标题 */}
         <span className="count">{roles.length} 个角色 / {allPermissions.length} 个权限点</span> {/* 规模概览：角色数与权限点数 */}
       </div> {/* 页头结束 */}
+      <p className="page-desc">这里维护后台角色与权限矩阵：新建角色、按模块勾选权限点，并把角色授予用户；权限变更在下次请求即生效。</p> {/* 用途说明：一句话讲清本页能做什么 */}
       {error ? ( // 有错误时渲染错误条
         // 全局错误条
         <div className="error">{error}</div>

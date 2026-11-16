@@ -319,6 +319,8 @@ export function Users({ credential, permissions }: UsersProps) {
         <span className="count">{total} 位匹配用户</span> {/* 匹配总数：辅助判断是否需要调整关键词 */}
       </div> {/* 页头结束 */}
 
+      <p className="page-desc">这里按关键词检索账号，查看其角色、状态与注册信息，并授予或撤销角色；需要调整权限组合时先到「角色与权限」配置。</p> {/* 用途说明：一句话讲清本页能做什么 */}
+
       {!canWrite ? <p className="hint">当前身份缺少 rbac:write 权限，仅可查看用户与角色。</p> : null} {/* 只读提示：授予与撤销均需 rbac:write 权限 */}
 
       <form className="form" onSubmit={submitSearch}> {/* 搜索表单：提交时才应用关键词，避免逐字触发请求 */}

@@ -170,6 +170,8 @@ export function Shipments({ credential, permissions }: ShipmentsProps) {
         <span className="count">待发货 → 录入运单（已发货）→ 签收；售后退款退回钱包余额</span>
       </div>
 
+      <p className="page-desc">这里处理订单履约的完整链路：待发货订单录入运单后转为已发货，继续推进签收或标记异常，并在同一页审批售后退款。</p>
+
       {!canWrite ? (
         <div className="hint">当前身份缺少 commerce:write 权限，无法操作发货与售后</div>
       ) : (

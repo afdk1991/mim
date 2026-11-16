@@ -5062,7 +5062,9 @@ code { /* 行内代码/令牌展示 */
 .community-gallery-count { flex: none; font-size: var(--fs-xs); color: var(--text-muted); } /* 总数不做换行压缩 */
 .community-gallery-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } /* 筛选行：窄屏自动换行 */
 .community-gallery-toolbar input { flex: 1 1 200px; min-width: 0; } /* 搜索框吃掉剩余宽度 */
-.community-gallery-toolbar select { flex: none; } /* 下拉保持内容宽 */
+.community-gallery-toolbar select { flex: none; height: var(--field-h); padding: 0 10px; border: 1px solid var(--border); border-radius: var(--control-radius); background: var(--bg); color: var(--text); font-size: var(--fs-sm); } /* 下拉保持内容宽，并补令牌化控件外观 */
+.community-gallery-toolbar select option { background: var(--surface); color: var(--text); } /* 原生下拉项：覆盖系统默认黑字白底 */
+.community-gallery-toolbar select option:checked { background: var(--primary-soft); color: var(--link); } /* 选中项：主色淡底 + 链接色，保证对比度 */
 .community-gallery-toolbar button { /* 排序 / 收藏开关 */
   padding: 7px 14px;
   border-radius: var(--radius-sm);

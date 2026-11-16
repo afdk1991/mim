@@ -82,6 +82,48 @@ a { color: var(--link); text-decoration: none; } /* 链接基础样式：走文�
 .nav-item:hover { background: var(--nav-hover); color: var(--nav-strong); } /* 悬停高亮 */ 
 .nav-item.active { background: var(--nav-active-bg); color: var(--nav-active-text); font-weight: var(--fw-semibold); } /* 激活项：淡主色底 + 主色字，不再实心填充 */ 
 
+/* 折叠分组：四个 details 块，默认只展开最近使用的一组 */
+.nav-group { border-radius: var(--radius-sm); } /* 分组容器：无额外底色，靠标题行区分 */
+.nav-group-title { /* 分组标题行：整行可点，承担 details 的开关 */ 
+  display: flex; /* 标题与计数左右分置 */ 
+  align-items: center; /* 垂直居中 */ 
+  justify-content: space-between; /* 文字左、计数右 */ 
+  gap: 8px; /* 文字与计数间距 */ 
+  padding: 9px 12px; /* 与导航项同档热区 */ 
+  border-radius: var(--radius-sm); /* 圆角走令牌 */ 
+  color: var(--nav-muted); /* 组名用次要色，弱于组内条目 */ 
+  font-size: var(--fs-xs); /* 组名比条目小一档 */ 
+  font-weight: var(--fw-semibold); /* 半粗以区分层级 */ 
+  letter-spacing: 0.04em; /* 轻微字距，作为分区标题 */ 
+  cursor: pointer; /* 手型光标表达可展开 */ 
+  user-select: none; /* 连点不选中文字 */ 
+  list-style: none; /* 去掉某些浏览器默认的三角标记 */ 
+  transition: var(--transition); /* 悬停过渡 */ 
+} /* 分组标题结束 */ 
+.nav-group-title::-webkit-details-marker { display: none; } /* WebKit 默认三角：由自绘箭头替代 */ 
+.nav-group-title:hover { background: var(--nav-hover); color: var(--nav-strong); } /* 悬停高亮 */ 
+.nav-group-title::before { /* 自绘展开箭头 */ 
+  content: ''; /* 用边框拼出箭头 */ 
+  flex: 0 0 auto; /* 不参与伸缩 */ 
+  width: 6px; /* 箭头宽 */ 
+  height: 6px; /* 箭头高 */ 
+  margin-right: 2px; /* 与组名的间距 */ 
+  border-right: 1.5px solid currentColor; /* 右臂 */ 
+  border-bottom: 1.5px solid currentColor; /* 下臂 */ 
+  transform: rotate(-45deg); /* 收起态：指向右 */ 
+  transition: transform 0.15s ease; /* 展开时旋转 */ 
+} /* 箭头结束 */ 
+.nav-group[open] > .nav-group-title::before { transform: rotate(45deg); } /* 展开态：指向下 */ 
+.nav-group-title > span:first-child { flex: 1; } /* 组名占满剩余宽度，把计数推到右侧 */ 
+.nav-group-count { /* 组内条目数 */ 
+  color: var(--nav-muted); /* 与组名同色系 */ 
+  font-size: var(--fs-xs); /* 最小档 */ 
+  font-weight: var(--fw-medium); /* 计数不加粗 */ 
+  opacity: 0.8; /* 再弱一档，不与组名争焦点 */ 
+} /* 计数结束 */ 
+.nav-group-items { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 6px 10px; } /* 组内条目：左侧缩进体现归属 */ 
+.nav-group-items .nav-item { padding: 8px 12px; } /* 缩进后条目略收内边距，保持视觉平衡 */ 
+
 /* 侧栏底部身份区 */ 
 .sidebar-footer { border-top: 1px solid var(--nav-line); padding-top: 12px; margin-top: 12px; } /* 分隔线与间距 */ 
 .user-name { color: var(--nav-strong); font-size: var(--fs-sm); word-break: break-all; } /* 身份名允许长 ID 换行 */ 
@@ -92,6 +134,7 @@ a { color: var(--link); text-decoration: none; } /* 链接基础样式：走文�
 .page { max-width: 1180px; } /* 内容最大宽度，超宽屏不拉伸 */ 
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; } /* 标题行左右分置 */ 
 .page-head h2 { font-size: var(--fs-lg); } /* 页面标题字号 */ 
+.page-desc { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.7; margin: 0 0 14px; max-width: 78ch; } /* 页面用途说明：标题下一行，讲清这页能做什么 */ 
 
 /* 通用文字辅助 */ 
 .muted { color: var(--text-muted); } /* 次要文字 */ 

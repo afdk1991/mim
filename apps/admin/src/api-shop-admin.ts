@@ -320,8 +320,8 @@ export function deleteAdminVipPlan(credential: Credential, code: string): Promis
 
 // ── 发货与售后 ──────────────────────────────────────────────────────────────
 
-/** 发货筛选口径：待发货 / 已发货 / 已签收 / 待支付 / 已退款 */
-export type ShipmentFilter = 'to_ship' | 'shipped' | 'delivered' | 'pending_payment' | 'refunded';
+/** 发货筛选口径：待发货 / 已发货 / 已签收 / 待支付 / 已退款；all 由后端按全部处理 */
+export type ShipmentFilter = 'to_ship' | 'shipped' | 'delivered' | 'pending_payment' | 'refunded' | 'all';
 
 /** 物流单状态：与 shipments.status 的 CHECK 约束一致 */
 export type ShipmentStatus = 'pending' | 'picked' | 'transit' | 'delivered' | 'exception';
