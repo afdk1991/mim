@@ -20,6 +20,7 @@ import { clockOf } from '../domain.js'; // 统一时钟：测试可注入固定�
 import { requirePermission } from '../middleware.js'; // 细粒度权限门禁
 import { parse } from '../validate.js'; // zod 校验包装：失败抛 VALIDATION_FAILED 并透出 issues
 import { jsonParse, pathParam } from '../utils.js'; // JSON 文本容错解析 + 路径参数类型收敛
+import { auditActor, audited, writeAudit } from '../audit.js'; // 统一审计留痕：商品改价 / 套餐增删 / 卡密作废
 import type { ApiDeps, Db } from '../types.js'; // 依赖容器与数据库连接类型，仅编译期引用
 
 // ── 行结构与视图映射 ────────────────────────────────────────────────────────
@@ -378,7 +379,11 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
       } // 字段更新结束
       if (body.card_keys !== undefined) insertCardKeyBatch(db, existing.id, body.card_keys, now); // 追加卡密批次
     }); // 事务定义结束
-    updateProduct(); // 执行事务
+    if (body.price_cents !== undefined && body.price_cents !== existing.price_cents) { // 仅售价实际变化时才记改价审计，避免普通编辑刷屏
+      audited(db, auditActor(req), { action: 'product.price_change', targetType: 'product', targetId: code, detail: { from_cents: existing.price_cents, to_cents: body.price_cents } }, updateProduct); // 改价成功 / 失败都留痕
+    } else {
+      updateProduct(); // 非改价编辑保持原路径
+    } // 审计分支结束
     const updated = db.prepare('SELECT * FROM shop_products WHERE id = ?').get(existing.id) as ProductRow; // 回读
     const available = updated.kind === 'virtual_auto'
       ? (db.prepare("SELECT COUNT(*) AS n FROM shop_card_keys WHERE product_id = ? AND status = 'unused'").get(updated.id) as { n: number }).n
@@ -524,10 +529,10 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const dup = db.prepare('SELECT id FROM vip_plans WHERE code = ?').get(body.code) as { id: string } | undefined; // 唯一键预检
     if (dup) throw new AppError('CONFLICT', 'vip plan code already exists', { plan_code: body.code }); // 409
     const planId = uuidv7(); // 新套餐主键
-    db.prepare(
+    audited(db, auditActor(req), { action: 'plan.create', targetType: 'plan', targetId: body.code, detail: { name: body.name, price_cents: body.price_cents, duration_days: body.duration_days } }, () => db.prepare(
       `INSERT INTO vip_plans (id, code, name, level, price_cents, duration_days, perks, sort_order, active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(planId, body.code, body.name, body.level, body.price_cents, body.duration_days, JSON.stringify(body.perks), body.sort_order, body.active ? 1 : 0); // 写入主体
+    ).run(planId, body.code, body.name, body.level, body.price_cents, body.duration_days, JSON.stringify(body.perks), body.sort_order, body.active ? 1 : 0)); // 写入主体并留痕
     const created = db.prepare('SELECT * FROM vip_plans WHERE id = ?').get(planId) as PlanRow; // 回读
     res.status(201).json({ plan: planView(created) }); // 回传创建视图
   }); // POST 套餐结束
@@ -559,7 +564,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     if (memberships > 0) { // 仍有历史 / 生效会员
       throw new AppError('CONFLICT', 'vip plan is referenced by memberships', { plan_code: code, memberships }); // 409
     } // 引用保护结束
-    db.prepare('DELETE FROM vip_plans WHERE id = ?').run(existing.id); // 删除套餐
+    audited(db, auditActor(req), { action: 'plan.delete', targetType: 'plan', targetId: code, detail: { name: existing.name, price_cents: existing.price_cents } }, () => db.prepare('DELETE FROM vip_plans WHERE id = ?').run(existing.id)); // 删除并留痕
     res.json({ code, deleted: true }); // 明确告知删除成功
   }); // DELETE 套餐结束
 

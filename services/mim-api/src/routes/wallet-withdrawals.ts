@@ -35,6 +35,7 @@ import {
   withdrawalStatusSummary,
 } from '../commerce/withdrawal.js'; // 结算与状态机
 import type { WithdrawalStatus } from '../commerce/withdrawal.js'; // 状态联合类型
+import { auditActor, audited } from '../audit.js'; // 统一审计留痕：提现审核 / 驳回 / 打款
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 /** 提交申请请求体 */
@@ -124,19 +125,25 @@ export function createWalletWithdrawalRouter(deps: ApiDeps): Router {
 
   router.post('/admin/withdrawals/:id/approve', (req, res) => {
     const body = parse(approveBody, req.body);
-    const row = approveWithdrawal(deps, String(req.params.id), actorOf(req), body.note ?? '');
+    const id = String(req.params.id); // 提现申请主键
+    const row = audited(deps.db, auditActor(req), { action: 'withdrawal.approve', targetType: 'withdrawal', targetId: id, detail: { note: body.note ?? '' } }, // 审核通过留痕，不落收款账号
+      () => approveWithdrawal(deps, id, actorOf(req), body.note ?? '')); // 原业务逻辑
     res.json({ request: row });
   });
 
   router.post('/admin/withdrawals/:id/reject', (req, res) => {
     const body = parse(rejectBody, req.body);
-    const row = rejectWithdrawal(deps, String(req.params.id), actorOf(req), body.reason);
+    const id = String(req.params.id); // 提现申请主键
+    const row = audited(deps.db, auditActor(req), { action: 'withdrawal.reject', targetType: 'withdrawal', targetId: id, detail: { reason: body.reason } }, // 驳回留痕
+      () => rejectWithdrawal(deps, id, actorOf(req), body.reason)); // 原业务逻辑
     res.json({ request: row });
   });
 
   router.post('/admin/withdrawals/:id/paid', (req, res) => {
     const body = parse(paidBody, req.body);
-    const row = markWithdrawalPaid(deps, String(req.params.id), actorOf(req), body.payout_ref);
+    const id = String(req.params.id); // 提现申请主键
+    const row = audited(deps.db, auditActor(req), { action: 'withdrawal.paid', targetType: 'withdrawal', targetId: id, detail: { payout_ref: body.payout_ref } }, // 打款留痕，凭证号用于对账
+      () => markWithdrawalPaid(deps, id, actorOf(req), body.payout_ref)); // 原业务逻辑
     res.json({ request: row });
   });
 

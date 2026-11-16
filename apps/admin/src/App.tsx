@@ -45,9 +45,11 @@ import { Orders } from './views/Orders'; // 订单管理
 import { Entitlements } from './views/Entitlements'; // 权益
 // 设置：站点名称 / 副标题 / 页脚文案
 import { Settings } from './views/Settings'; // 站点设置
+// 审计流水：敏感操作的留痕查询（操作人 / 动作 / 对象 / 结果 / 时间）
+import { AuditLogs } from './views/AuditLogs'; // 审计流水
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'settings';
+type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'settings' | 'auditLogs';
 
 /** 侧栏分组键：四组折叠，组名与顺序即信息架构口径 */
 type NavGroupKey = 'content' | 'trade' | 'user' | 'site';
@@ -119,6 +121,8 @@ const NAV_GROUPS: NavGroup[] = [
       { key: 'invites', label: '邀请码', permission: 'user:read' },
       // 成长私信：发送系统身份私信，需要 messaging:write
       { key: 'growthDm', label: '成长私信', permission: 'messaging:write' },
+      // 审计流水：只读查询，复用 rbac:read（与后端查询端点同一权限点）
+      { key: 'auditLogs', label: '审计流水', permission: 'rbac:read' },
     ],
   },
   {
@@ -408,6 +412,8 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'entitlements') return <Entitlements credential={credential} permissions={identity.permissions} />;
   // 设置：站点名称 / 副标题 / 页脚文案
   if (key === 'settings') return <Settings credential={credential} permissions={identity.permissions} />;
+  // 审计流水：敏感操作留痕查询（只读）
+  if (key === 'auditLogs') return <AuditLogs credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏
   return <Overview identity={identity} onOpen={onOpen} />;
 } // renderView 结束：全部视图分发完毕

@@ -644,6 +644,88 @@ export async function listGrowthDmCampaigns(credential: Credential, limit = 20):
   return data.campaigns; // 解包数组
 } // listGrowthDmCampaigns 结束
 
+// ── 审计流水 ──────────────────────────────────────────────────────────────
+
+/** 审计流水行：对应 GET /admin/audit-logs 的 items；detail 已在服务端脱敏 */
+export interface AuditLogEntry {
+  // 审计主键
+  id: string;
+  // 操作人；引导令牌为 admin-bootstrap，系统动作为 null
+  actor_id: string | null;
+  // 操作人所属区域
+  region: string | null;
+  // 动作码，如 withdrawal.approve
+  action: string;
+  // 对象类型，如 user / product / plan / withdrawal
+  target_type: string;
+  // 对象主键或业务编码
+  target_id: string | null;
+  // 成功或失败
+  result: 'success' | 'failure';
+  // 已脱敏的操作明细
+  detail: Record<string, unknown>;
+  // 来源 IP，独立成列避免混入明细
+  ip: string | null;
+  // 服务端请求链路 ID
+  request_id: string | null;
+  // 发生时间（ISO-8601）
+  created_at: string;
+} // AuditLogEntry 结束
+
+/** 审计流水分页结果 */
+export interface AuditLogPage {
+  // 当前页流水
+  items: AuditLogEntry[];
+  // 匹配总数
+  total: number;
+  // 每页条数
+  limit: number;
+  // 偏移量
+  offset: number;
+} // AuditLogPage 结束
+
+/** 审计查询条件：全部可选，空值不写入查询串 */
+export interface AuditLogQuery {
+  // 动作码精确匹配
+  action?: string;
+  // 对象类型（可单独使用，按前缀匹配）
+  target_type?: string;
+  // 对象主键（与类型同时给出时精确匹配）
+  target_id?: string;
+  // 操作人精确匹配
+  actor_id?: string;
+  // 结果筛选
+  result?: 'success' | 'failure';
+  // 每页条数
+  limit?: number;
+  // 偏移量
+  offset?: number;
+} // AuditLogQuery 结束
+
+/** 查询审计流水：倒序返回，支持动作 / 对象 / 操作人 / 结果组合筛选 */
+export function listAuditLogs(credential: Credential, query: AuditLogQuery = {}): Promise<AuditLogPage> {
+  // 组装查询串
+  const params = new URLSearchParams();
+  // 逐项写入，避免把空串当筛选条件
+  if (query.action) params.set('action', query.action);
+  // 对象类型
+  if (query.target_type) params.set('target_type', query.target_type);
+  // 对象主键
+  if (query.target_id) params.set('target_id', query.target_id);
+  // 操作人
+  if (query.actor_id) params.set('actor_id', query.actor_id);
+  // 结果
+  if (query.result) params.set('result', query.result);
+  // 分页
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  // 偏移量
+  if (query.offset !== undefined) params.set('offset', String(query.offset));
+  // 无参数时不带问号
+  const suffix = params.toString().length > 0 ? `?${params.toString()}` : '';
+  // 发起请求
+  return request<AuditLogPage>(`/admin/audit-logs${suffix}`, { credential });
+} // listAuditLogs 结束
+
 export { request }; // 执行当前业务步骤
 export * from './api-ops'; // 执行当前业务步骤
 export * from './api-shop-admin'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐

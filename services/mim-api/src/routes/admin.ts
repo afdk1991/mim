@@ -11,6 +11,8 @@ import { loadPermissions, requirePermission } from '../middleware.js'; // 实时
 import { parse } from '../validate.js'; // zod 校验包装：失败抛 VALIDATION_FAILED 并透出 issues
 import { jsonParse, pathParam } from '../utils.js'; // JSON 文本容错解析 + 路径参数类型收敛
 import { runPriceBatch, listBatches, getBatch, rollbackBatch } from '../commerce/price-batch.js'; // 批量改价：执行 / 列表 / 回滚
+import { auditActor, audited, writeAudit } from '../audit.js'; // 统一审计留痕：操作人 / 动作 / 对象 / 结果
+import type { AuditLogRow } from '../audit.js'; // 审计查询行结构
 import type { ApiDeps, Db } from '../types.js'; // 依赖容器与数据库连接类型，仅编译期引用
 
 /** permissions 表行结构：列名与 schema.sql 严格一一对应 */
@@ -445,11 +447,11 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
       throw new AppError('NOT_FOUND', 'role not found', { role_code: body.role_code }); // 404
     } // if 结束：角色存在性检查
     const grantedBy = req.user?.id ?? 'bootstrap'; // 引导通道没有真实用户，用固定标记留痕
-    const result = db // 常量 result：保存固定配置或一次性派生值
+    const result = audited(db, auditActor(req), { action: 'admin.user.role_grant', targetType: 'user', targetId: userId, detail: { role_code: body.role_code } }, () => db // 授权写入与审计同属一次敏感操作
       .prepare( // 执行当前业务步骤
         `INSERT OR IGNORE INTO user_roles (user_id, role_code, granted_by, created_at) VALUES (?, ?, ?, ?)`, // 重复授权不报错，天然幂等
       ) // 执行当前业务步骤
-      .run(userId, body.role_code, grantedBy, clockOf(deps)); // 写入授权记录
+      .run(userId, body.role_code, grantedBy, clockOf(deps))); // 写入授权记录
     const created = result.changes > 0; // changes 为 0 表示该授权已存在
     res.status(created ? 201 : 200).json({ // 执行当前业务步骤
       user_id: userId, // 被授权用户
@@ -462,16 +464,16 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
   router.delete('/admin/users/:userId/roles/:roleCode', requirePermission('rbac:write'), (req, res) => { // 执行当前业务步骤
     const userId = pathParam(req, 'userId'); // 取用户 ID
     const roleCode = pathParam(req, 'roleCode'); // 取角色码
-    const result = db // 常量 result：保存固定配置或一次性派生值
-      .prepare(`DELETE FROM user_roles WHERE user_id = ? AND role_code = ?`) // 精确删除单条授权
-      .run(userId, roleCode); // 执行删除
-    if (result.changes === 0) { // 条件分支：按判断结果选择后续处理路径
-      // 未删除任何行说明授权不存在，按 404 反馈而不是静默成功
-      throw new AppError('NOT_FOUND', 'user role assignment not found', {
-        user_id: userId, // 回传用户 ID
-        role_code: roleCode, // 回传角色码
-      }); // 404 结束
-    } // if 结束：删除结果检查
+    const result = audited(db, auditActor(req), { action: 'admin.user.role_revoke', targetType: 'user', targetId: userId, detail: { role_code: roleCode } }, () => { // 撤销授权与审计同属一次敏感操作
+      const removed = db.prepare(`DELETE FROM user_roles WHERE user_id = ? AND role_code = ?`).run(userId, roleCode); // 精确删除单条授权
+      if (removed.changes === 0) { // 未删除任何行说明授权不存在
+        throw new AppError('NOT_FOUND', 'user role assignment not found', {
+          user_id: userId, // 回传用户 ID
+          role_code: roleCode, // 回传角色码
+        }); // 404 结束
+      } // 存在性检查结束
+      return removed; // 返回删除结果
+    }); // 审计包装结束
     res.json({ user_id: userId, role_code: roleCode, deleted: true }); // 明确告知回收成功
   }); // DELETE /admin/users/:userId/roles/:roleCode 结束
 
@@ -507,6 +509,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     if (missing.length > 0) throw new AppError('NOT_FOUND', 'role not found', { role_codes: missing }); // 未知角色整体拒绝
     const now = clockOf(deps); // 统一时钟
     const grantedBy = req.user?.id ?? 'admin-bootstrap'; // 审计：登录超管记 user id，引导令牌记固定标记
+    const actor = auditActor(req); // 操作人快照：只取 id / 区域 / 来源 IP
     const created = db.transaction(() => { // 建号 + 身份 + 口令 + 角色必须同事务
       const user = createUser(db, { region: body.region, display_name: (body.display_name ?? '').trim(), now }); // 走唯一建号入口
       db.prepare('INSERT INTO identities (id, user_id, region, provider, identifier, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(uuidv7(), user.id, body.region, identity.provider, identity.identifier, now); // 绑定登录身份
@@ -515,6 +518,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
       for (const code of roleCodes) grant.run(user.id, code, grantedBy, now); // 可一次分配多个角色
       return user; // 返回新建用户行
     })();
+    writeAudit(db, actor, { action: 'admin.user.create', targetType: 'user', targetId: created.id, detail: { region: body.region, provider: identity.provider, role_codes: roleCodes } }); // 建号留痕：不落标识、口令等敏感值
     res.status(201).json({ // 201：新账号已可登录
       user: { id: created.id, member_no: created.member_no, region: created.region, display_name: created.display_name, status: created.status }, // 最小用户视图
       roles: roleCodes, // 回显分配结果
@@ -530,14 +534,14 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const body = parse(z.object({ password: z.string().min(1).max(128) }), req.body); // 新口令
     assertPasswordStrength(body.password); // 强度校验
     const now = clockOf(deps); // 统一时钟
-    const revoked = db.transaction(() => { // 改口令 + 吊销会话同事务，避免改完还能用旧会话
+    const revoked = audited(db, auditActor(req), { action: 'admin.user.reset_password', targetType: 'user', targetId: userId }, () => db.transaction(() => { // 改口令 + 吊销会话同事务，避免改完还能用旧会话；成功 / 失败都留痕
       const hash = hashPassword(body.password); // 慢哈希
       const updated = db.prepare("UPDATE credentials SET secret_hash = ?, created_at = ? WHERE user_id = ? AND kind = 'password'").run(hash, now, userId); // 已有口令行则覆盖
       if (updated.changes === 0) { // 账号此前只有验证码 / OAuth 身份
         db.prepare("INSERT INTO credentials (id, user_id, kind, secret_hash, created_at) VALUES (?, ?, 'password', ?, ?)").run(uuidv7(), userId, hash, now); // 补一条口令凭据
       } // 分支结束
       return db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(now, userId).changes; // 强制重新登录
-    })();
+    })()); // 审计只记动作与对象，不落口令明文 / 哈希
     res.json({ user_id: userId, password_updated: true, sessions_revoked: revoked }); // 回显吊销数量便于审计
   }); // POST /admin/users/:userId/password 结束
 
@@ -590,6 +594,59 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const id = pathParam(req, 'id'); // 批次主键
     res.json({ batch: rollbackBatch(db, id, clockOf(deps)) }); // 回滚后回读最新视图
   }); // POST 回滚结束
+
+  // ---------- 审计查询：后台可查建号 / 重置口令 / 角色变更 / 提现审核 / 改价 / 套餐与卡密操作 ----------
+
+  /** 审计查询入参：全部可选，limit / offset 控制分页 */
+  const auditQuerySchema = z.object({
+    action: z.string().trim().min(1).max(80).optional(), // 动作码精确匹配
+    target_type: z.string().trim().min(1).max(40).optional(), // 对象类型
+    target_id: z.string().trim().min(1).max(120).optional(), // 对象主键 / 业务编码
+    actor_id: z.string().trim().min(1).max(120).optional(), // 操作人
+    result: z.enum(['success', 'failure']).optional(), // 结果
+    limit: z.coerce.number().int().min(1).max(200).optional().default(50), // 单页条数
+    offset: z.coerce.number().int().min(0).max(1_000_000).optional().default(0), // 偏移量
+  }); // auditQuerySchema 结束
+
+  /** GET /admin/audit-logs — 审计流水（倒序），按动作 / 对象 / 操作人 / 结果筛选 */
+  router.get('/admin/audit-logs', requirePermission('rbac:read'), (req, res) => {
+    const query = parse(auditQuerySchema, req.query); // 查询串校验：非法类型直接 400
+    const where: string[] = []; // WHERE 片段
+    const params: unknown[] = []; // 绑定值
+    if (query.action) { where.push('action = ?'); params.push(query.action); } // 动作精确匹配
+    if (query.actor_id) { where.push('user_id = ?'); params.push(query.actor_id); } // 操作人精确匹配
+    if (query.result) { where.push('result = ?'); params.push(query.result); } // 结果筛选
+    if (query.target_type && query.target_id) { where.push('target = ?'); params.push(`${query.target_type}:${query.target_id}`); } // 类型 + 主键精确匹配
+    if (query.target_type && !query.target_id) { where.push('target LIKE ?'); params.push(`${query.target_type}:%`); } // 只给类型时按前缀匹配
+    const clause = where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''; // 无筛选则全量
+    const total = (db.prepare(`SELECT COUNT(1) AS n FROM audit_logs${clause}`).get(...params) as { n: number }).n; // 总数
+    const rows = db.prepare(`SELECT * FROM audit_logs${clause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).all(...params, query.limit, query.offset) as AuditLogRow[]; // 倒序分页
+    res.json({
+      total, // 命中总数
+      limit: query.limit, // 回显分页参数
+      offset: query.offset, // 回显分页参数
+      items: rows.map((row) => { // 逐行转视图
+        const detail = jsonParse<Record<string, unknown>>(row.payload) ?? {}; // payload 容错解析
+        const ip = typeof detail._ip === 'string' ? detail._ip : null; // 来源 IP 单独提列
+        delete detail._ip; // 明细里不再重复
+        const target = row.target ?? ''; // 旧数据可能没有 target，统一按空串处理
+        const split = target.indexOf(':'); // target 格式 `类型:主键`
+        return {
+          id: row.id, // 审计主键
+          actor_id: row.user_id, // 操作人
+          region: row.region, // 区域
+          action: row.action, // 动作码
+          target_type: split >= 0 ? target.slice(0, split) : target, // 对象类型
+          target_id: split >= 0 ? target.slice(split + 1) : null, // 对象主键
+          result: row.result, // 结果
+          detail, // 已脱敏明细
+          ip, // 来源 IP
+          request_id: row.request_id, // 请求链路 ID
+          created_at: row.created_at, // 时间
+        }; // 视图对象结束
+      }), // map 结束
+    }); // 响应结束
+  }); // GET 审计流水结束
 
   return router; // 返回装配完成的管理面路由
 } // createAdminRouter 结束
