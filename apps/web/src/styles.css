@@ -272,7 +272,8 @@ code { /* 行内代码/令牌展示 */
 .gate-shell { /* 门禁页容器 */
   display: grid; /* 栅格便于居中 */
   place-items: center; /* 双向居中 */
-  min-height: min(480px, calc(100vh - 260px)); /* 中屏有下限，短屏不出滚动 */
+  min-height: calc(100vh - 190px); /* 占满内容区可用高度：卡片在整屏内居中，不再贴顶留下一条空带 */
+  padding: 16px 0 24px; /* 上下留出安全距离，配合居中略有压缩 */
 } /* 门禁容器结束 */
 
 .gate-card { /* 门禁卡片：与登录卡片同一表面语言 */
@@ -308,6 +309,35 @@ code { /* 行内代码/令牌展示 */
   font-size: var(--fs-sm); /* 比正文小一号 */
   line-height: 1.65; /* 多行舒适 */
 } /* 说明结束 */
+
+.gate-list { /* 门禁卡内的可访问项：把卡片下方的整条空带换成可读内容 */
+  display: grid; /* 逐条排列 */
+  gap: 8px; /* 条目间距 */
+  width: 100%; /* 占满卡片宽度，与左对齐的标题形成稳定块 */
+  margin: 2px 0 0; /* 与说明拉开 */
+  padding: 12px 0 0; /* 与说明之间用内距收口 */
+  border-top: 1px solid var(--border); /* 细线区隔说明与清单 */
+  list-style: none; /* 去掉默认圆点，改用主色小圆点 */
+} /* 清单结束 */
+
+.gate-list li { /* 单个可访问项 */
+  position: relative; /* 为前置圆点定位 */
+  padding-left: 18px; /* 给圆点留位 */
+  color: var(--text-secondary); /* 次级文字，比说明略重 */
+  font-size: var(--fs-sm); /* 与说明同档 */
+  line-height: 1.6; /* 条目内行距 */
+} /* 条目结束 */
+
+.gate-list li::before { /* 条目前置圆点 */
+  content: ''; /* 伪元素占位 */
+  position: absolute; /* 相对条目定位 */
+  top: 0.62em; /* 与首行文字中心对齐 */
+  left: 2px; /* 左缩进 */
+  width: 5px; /* 圆点宽度 */
+  height: 5px; /* 圆点高度 */
+  border-radius: 50%; /* 正圆 */
+  background: var(--primary); /* 主色点缀 */
+} /* 圆点结束 */
 
 .gate-card .btn { /* 门禁卡片按钮 */
   margin-top: 6px; /* 与说明拉开 */
@@ -685,11 +715,11 @@ code { /* 行内代码/令牌展示 */
   align-content: center; /* 整行也居中：消除卡片下方的整条空带 */
   justify-content: center; /* 两栏作为一组居中，前后留白对称 */
   justify-items: stretch; /* 横向按列宽铺开，不再收缩到内容宽度 */
-  gap: 40px; /* 说明与卡片之间的呼吸空间 */
+  gap: 20px 40px; /* 行间距给说明块，列间距给引导区与卡片 */
   max-width: 820px; /* 组宽上限：说明文字与卡片紧邻，不再出现中段空带 */
   margin: 0 auto; /* 在内容区居中 */
   min-height: calc(100vh - 140px); /* 占满内容区高度：登录组合在整屏内居中，不在页脚上方留一条空带 */
-  padding: 24px 0 40px; /* 与页脚、导航留出安全距离 */
+  padding: 24px 0; /* 与页脚、导航留出安全距离 */
   background: none; /* 去掉整屏渐变背景，与内容区底色保持一致 */
 } /* 内嵌登录容器结束 */
 
@@ -757,6 +787,35 @@ code { /* 行内代码/令牌展示 */
   font-size: var(--fs-xs); /* 小字号 */
 } /* 脚注结束 */
 
+.auth-extras { /* 登录组合下方的说明块：把卡片下面的整条空带换成可读内容 */
+  grid-column: 1 / -1; /* 跨满两列，与上方引导区 + 卡片形成一组 */
+  display: grid; /* 三块等宽排列 */
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* 三列均分，窄屏自动收为单列由断点处理 */
+  gap: 12px; /* 块间距 */
+} /* 说明块结束 */
+
+.auth-extra { /* 单块说明 */
+  display: flex; /* 标题与说明纵向排列 */
+  flex-direction: column; /* 自上而下 */
+  gap: 4px; /* 标题与说明的贴合间距 */
+  padding: 14px 16px; /* 与卡片内距同族，但更紧凑 */
+  border: 1px solid var(--border); /* 与卡片同一档描边 */
+  border-radius: var(--radius-sm); /* 小圆角，明显低于登录卡的层级 */
+  background: var(--surface-2); /* 次级表面：不抢登录卡的焦点 */
+} /* 单块说明结束 */
+
+.auth-extra strong { /* 说明标题 */
+  color: var(--text); /* 主文字色，与正文拉开 */
+  font-size: var(--fs-sm); /* 比正文小一号 */
+  font-weight: var(--fw-semibold); /* 半粗 */
+} /* 说明标题结束 */
+
+.auth-extra span { /* 说明正文 */
+  color: var(--text-muted); /* 次要文字 */
+  font-size: var(--fs-xs); /* 最小字号档 */
+  line-height: 1.65; /* 两行以上仍舒适 */
+} /* 说明正文结束 */
+
 @media (max-width: 900px) { /* 中屏断点：登录两栏收为单栏 */
   .auth-wrap.embedded { /* 内嵌登录容器 */
     grid-template-columns: minmax(0, 1fr); /* 单列 */
@@ -769,6 +828,10 @@ code { /* 行内代码/令牌展示 */
   .auth-intro { /* 引导区 */
     display: none; /* 单列时让登录卡独占焦点 */
   } /* 引导区结束 */
+
+  .auth-extras { /* 说明块 */
+    display: none; /* 单列时空间本就紧张，说明块让位给表单 */
+  } /* 说明块结束 */
 } /* 中屏断点结束 */
 
 .auth-card { /* 登录卡片 */
@@ -3707,23 +3770,43 @@ code { /* 行内代码/令牌展示 */
 .community-detail-body { /* 正文 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 主方向 */
-  gap: var(--card-pad); /* 正文 / 投票 / 工具栏 / 评论区共用 16px */
+  gap: var(--card-pad); /* 正文面 / 互动面 / 投票共用 16px */
   margin-top: var(--card-pad); /* 上间距 */
 } /* 结束 */
 
-.community-detail-body > p { /* 正文段落 */
-  margin: 0; /* 段间距交给容器 gap，避免两套规则叠加 */
-  font-size: var(--fs-base); /* 字号 */
-  line-height: var(--lh-loose); /* 长段落行高走令牌 */
-  color: var(--text); /* 主文字 */
+.community-detail-article { /* 正文面：一级表面，与互动面拆成两级 */
+  padding: var(--card-pad) calc(var(--card-pad) + 4px); /* 左右略宽，长文行长更稳定 */
+  border: 1px solid var(--border); /* 细描边：白底在白卡内也能看出独立一层 */
+  border-radius: var(--radius-md); /* 中圆角：常规卡片档 */
+  background: var(--surface); /* 一级表面 */
+  box-shadow: var(--shadow-xs); /* 贴地投影：只做一层微抬 */
+} /* 结束 */
+
+.community-detail-article .rich-body { /* 正文排版：字号与颜色同时从标题下探 */
+  gap: var(--sp-4); /* 段间距与行高一起放宽 */
+  color: var(--text-secondary); /* 比标题弱一档，但不再是 14px 次级灰 */
+  font-size: var(--fs-md); /* 16px：标题 22 → 正文 16，字号档次拉开 */
+  line-height: var(--lh-loose); /* 1.75 行高：长文可读性 */
+} /* 结束 */
+
+.community-detail-article .rich-body > div { /* 段落组 */
+  gap: var(--sp-4); /* 段与段之间 16px，不靠放大字号撑空间 */
+} /* 结束 */
+
+.community-detail-engage { /* 互动面：次级表面，承载工具栏与回复 */
+  display: flex; /* 纵向 */
+  flex-direction: column; /* 工具条在上、回复在下 */
+  gap: var(--card-pad-tight); /* 工具条与回复区的间距 */
+  padding: var(--card-pad-tight) var(--card-pad); /* 次级面内距比正文面收紧一档 */
+  border: 1px solid var(--border); /* 与正文面同一套描边语言 */
+  border-radius: var(--radius-md); /* 同一档圆角 */
+  background: var(--surface-2); /* 压一档底色，明确是次级表面 */
 } /* 结束 */
 
 .community-detail-actions { /* 点赞行 */
   display: flex; /* 横向 */
   align-items: center; /* 居中 */
   gap: var(--sp-2); /* 控件间距 8px */
-  padding-top: var(--card-pad-tight); /* 分割线下留白 */
-  border-top: 1px solid var(--border); /* 分割线 */
   font-size: var(--fs-xs); /* 字号 */
   color: var(--text-muted); /* 次要色 */
 } /* 结束 */

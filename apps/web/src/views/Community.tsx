@@ -1217,7 +1217,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             </div>
           )}
 
-          {!hasSession ? <PageBlocks page="home" /> : null}{/* 匿名访客首页装修：仅未登录展示，已登录用户既有界面保持不变 */}
+          {!hasSession ? <PageBlocks page="home" hideHero /> : null}{/* 匿名访客首页装修：hero 大卡与顶部聚合头重复，只保留聚合头 */}
           <PageBlocks page="forum" />{/* 论坛页区块：Tab 栏目 / 公告等由后台 page_blocks 组合 */}
 
           {composerOpen && (
@@ -1475,55 +1475,59 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                       })}
                     </div>
                   )}
-                  <RichBody text={selected.thread.body} />
-                  <div className="community-detail-actions">{/* 执行当前业务步骤 */}
-                    <button type="button" className={selected.liked ? 'is-active' : ''} onClick={() => void toggleLike()}>{/* 执行当前业务步骤 */}
-                      {selected.liked ? '已赞' : '点赞'} · {selected.thread.likes}
-                    </button>
-                    <button type="button" className={selected.favorited ? 'is-active' : ''} onClick={() => void toggleFavorite()}>{/* 执行当前业务步骤 */}
-                      {selected.favorited ? '已收藏' : '收藏'}
-                    </button>
-                    <span className="community-rating">{/* 执行当前业务步骤 */}
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button key={star} type="button" className={(selected.thread.my_rating ?? 0) >= star ? 'is-active' : ''} onClick={() => void rateThread(star)} aria-label={`${star} 星`}>{/* 执行当前业务步骤 */}
-                          ★
-                        </button>
-                      ))}
-                      <em>{selected.thread.rating_avg ? `${selected.thread.rating_avg} 分` : '暂无评分'}{selected.thread.rating_count ? ` · ${selected.thread.rating_count} 人` : ''}</em>
-                    </span>
-                    <span>{selected.thread.views} 浏览</span>
+                  <div className="community-detail-article">
+                    <RichBody text={selected.thread.body} />
                   </div>
-                  <div className="community-replies">{/* 执行当前业务步骤 */}
-                    <h4>回复 · {Math.max(postsTotal, selected.posts.length)}</h4>
-                    {selected.posts.map((p) => (
-                      <ReplyItem
-                        key={p.id}
-                        locale={locale}
-                        post={p}
-                        posts={selected.posts}
-                        isAccepted={selected.thread.accepted_post_id === p.id}
-                        canAccept={selected.thread.kind === 'qa' && getSession()?.user.id === selected.thread.author_id && selected.thread.accepted_post_id !== p.id}
-                        canModerate={!!selected.thread.can_moderate}
-                        currentUserId={getSession()?.user.id ?? ''}
-                        onAccept={() => void acceptPost(p.id)}
-                        onReply={(postId, authorName) => { if (!requireSession()) return; setReplyTo(postId); setReplyToName(authorName); }}
-                        onDeleted={() => void openThread(selected.thread.id)}
-                        onNotice={(message) => setNotice(message)}
-                        onError={(err) => setError(errorText(locale, err))}
-                      />
-                    ))}
-                    {postsTotal > selected.posts.length && (
-                      <button type="button" className="community-more" onClick={() => void loadMoreReplies()}>加载更多回复（{selected.posts.length}/{postsTotal}）</button>
-                    )}
-                    {replyLockedOf(selected.thread) ? (
-                      <p className="mim-cm-hint">该帖已被锁定，暂不接受新回复。</p>
-                    ) : (
-                      <div className="community-reply-form">{/* 执行当前业务步骤 */}
-                        {replyTo && <div className="mim-cm-quote">正在回复 @{replyToName} <button type="button" onClick={() => { setReplyTo(''); setReplyToName(''); }}>取消</button></div>}
-                        <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder={replyTo ? `回复 @${replyToName}…` : '写下你的回复…'} />
-                        <button type="button" className="is-primary" onClick={() => void submitReply()}>回复</button>
-                      </div>
-                    )}
+                  <div className="community-detail-engage">{/* 互动面：与正文面拉开一档，工具条与回复同处次级表面 */}
+                    <div className="community-detail-actions">{/* 执行当前业务步骤 */}
+                      <button type="button" className={selected.liked ? 'is-active' : ''} onClick={() => void toggleLike()}>{/* 执行当前业务步骤 */}
+                        {selected.liked ? '已赞' : '点赞'} · {selected.thread.likes}
+                      </button>
+                      <button type="button" className={selected.favorited ? 'is-active' : ''} onClick={() => void toggleFavorite()}>{/* 执行当前业务步骤 */}
+                        {selected.favorited ? '已收藏' : '收藏'}
+                      </button>
+                      <span className="community-rating">{/* 执行当前业务步骤 */}
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button key={star} type="button" className={(selected.thread.my_rating ?? 0) >= star ? 'is-active' : ''} onClick={() => void rateThread(star)} aria-label={`${star} 星`}>{/* 执行当前业务步骤 */}
+                            ★
+                          </button>
+                        ))}
+                        <em>{selected.thread.rating_avg ? `${selected.thread.rating_avg} 分` : '暂无评分'}{selected.thread.rating_count ? ` · ${selected.thread.rating_count} 人` : ''}</em>
+                      </span>
+                      <span>{selected.thread.views} 浏览</span>
+                    </div>
+                    <div className="community-replies">{/* 执行当前业务步骤 */}
+                      <h4>回复 · {Math.max(postsTotal, selected.posts.length)}</h4>
+                      {selected.posts.map((p) => (
+                        <ReplyItem
+                          key={p.id}
+                          locale={locale}
+                          post={p}
+                          posts={selected.posts}
+                          isAccepted={selected.thread.accepted_post_id === p.id}
+                          canAccept={selected.thread.kind === 'qa' && getSession()?.user.id === selected.thread.author_id && selected.thread.accepted_post_id !== p.id}
+                          canModerate={!!selected.thread.can_moderate}
+                          currentUserId={getSession()?.user.id ?? ''}
+                          onAccept={() => void acceptPost(p.id)}
+                          onReply={(postId, authorName) => { if (!requireSession()) return; setReplyTo(postId); setReplyToName(authorName); }}
+                          onDeleted={() => void openThread(selected.thread.id)}
+                          onNotice={(message) => setNotice(message)}
+                          onError={(err) => setError(errorText(locale, err))}
+                        />
+                      ))}
+                      {postsTotal > selected.posts.length && (
+                        <button type="button" className="community-more" onClick={() => void loadMoreReplies()}>加载更多回复（{selected.posts.length}/{postsTotal}）</button>
+                      )}
+                      {replyLockedOf(selected.thread) ? (
+                        <p className="mim-cm-hint">该帖已被锁定，暂不接受新回复。</p>
+                      ) : (
+                        <div className="community-reply-form">{/* 执行当前业务步骤 */}
+                          {replyTo && <div className="mim-cm-quote">正在回复 @{replyToName} <button type="button" onClick={() => { setReplyTo(''); setReplyToName(''); }}>取消</button></div>}
+                          <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder={replyTo ? `回复 @${replyToName}…` : '写下你的回复…'} />
+                          <button type="button" className="is-primary" onClick={() => void submitReply()}>回复</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
