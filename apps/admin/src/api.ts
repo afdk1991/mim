@@ -141,6 +141,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(`${BASE}${path}`, {
     // 默认 GET
     method: options.method ?? 'GET',
+    // 后台必须绕过 HTTP 缓存：公开读接口带 Cache-Control: max-age=60，删除 / 编辑后刷新列表会读到旧数据
+    cache: 'no-store',
     // 请求头
     headers,
     // 只有带 body 时才序列化，避免 GET 请求出现空字符串体
