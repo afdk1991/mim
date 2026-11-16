@@ -409,6 +409,18 @@ export function seedCommunity(db: Db): void {
        (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, recommend_score, created_at, updated_at, last_activity_at)
      VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, 0, 0, 0, ?, ?, ?)`, // likes / recommend_score 显式写 0：二者只由真实互动（点赞记录 / 浏览等）产生，不随种子预置
   );
+  // 图库 / 视频示例媒体：复用帖子媒体表，稳定主键 + INSERT OR IGNORE，避免重启重复插入
+  const insertMedia = db.prepare(
+    `INSERT OR IGNORE INTO community_thread_media
+       (id, thread_id, kind, url, poster_url, storage_key, poster_key, mime, size_bytes, duration_seconds, width, height, sort_order, created_at)
+     VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, 0, ?, 0, 0, ?, ?)`,
+  );
+  // 灰度公告：独立于社区帖子，公开列表按置顶 + 时间展示
+  const insertAnnouncement = db.prepare(
+    `INSERT OR IGNORE INTO announcements
+       (id, title, body, level, status, published_at, starts_at, ends_at, pinned, author_id, created_at, updated_at)
+     VALUES (?, ?, ?, 'warning', 'published', ?, ?, '2099-12-31T23:59:59.000Z', 1, 'system', ?, ?)`,
+  );
   const insertVip = db.prepare(
     `INSERT OR IGNORE INTO vip_plans (id, code, name, level, price_cents, duration_days, perks, sort_order, active)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
@@ -429,6 +441,7 @@ export function seedCommunity(db: Db): void {
   );
   const seed = db.transaction(() => {
     const boards: Array<[string, string, string, string, string, number]> = [
+      ['board-guides', 'guides', '使用指南', '各板块规则、玩法说明与常见问题', '📘', 0],
       ['board-general', 'general', '综合讨论', '产品、技术与任何值得聊的话题', '💬', 1],
       ['board-open-source', 'open-source', '开源项目', '自研工具与开源项目发布、更新日志', '📦', 2],
       ['board-tools', 'tools', '自研工具', 'Quick Build WP、换域名插件、流盾 WAF 等工具', '🛠️', 3],
@@ -450,11 +463,46 @@ export function seedCommunity(db: Db): void {
       ['thread-comic-demo', 'board-open-source', '漫剧 AI 剧成片演示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n放映厅可直接观看，创作工作台可复制同一条链路。', 'video', '/catalog/ai.jpg', 0, 0, 4],
       ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 0, 3],
       ['thread-announce', 'board-announce', announceTitle, announceSummary, announceBody, 'text', '/catalog/misc.jpg', 0, 0, 6],
+      // 八大板块使用指南：全部落在社区帖子体系内，匿名可读、可被搜索命中，正文不写内部实现与凭据
+      ['thread-guide-forum', 'board-guides', '论坛使用指南：发帖、提问与互动规则', '板块与圈子的区别、发帖步骤、提问与采纳、举报与删帖口径。', '论坛是 Mim 社区的主体内容区。当前分为使用指南、综合讨论、开源项目、自研工具、知识付费、求助答疑与公告七个板块。\n\n怎么发帖：登录后进入论坛页，选择板块，点「发帖」，填写标题、正文与可选图集或视频后发布。标题写清问题或结论，正文补充环境、操作步骤与报错原文。\n\n提问与采纳：求助类帖子可在回复中选择一条「采纳」，采纳后问题标记为已解决，方便后来人检索。\n\n互动规则：禁止广告、人身攻击与侵权内容；转载需注明来源。违规内容会被删除，重复违规会限制发帖。\n\n常见问题：匿名可以浏览和搜索帖子，发帖、回复与点赞需要登录；找不到板块时先用搜索，再到「求助答疑」发帖。\n\n当前为灰度测试版，规则与栏目可能继续调整。', 'text', '/catalog/misc.jpg', 0, 0, 0],
+      ['thread-guide-gallery', 'board-guides', '图库使用指南：浏览、检索、收藏与上传', '图库聚合什么、如何筛选与收藏、上传格式与付费帖可见性。', '图库把社区帖子里的图片媒体聚合成瀑布流，按最新上传排序，可按「帖子 / 作者」聚合浏览。\n\n浏览：匿名可直接查看公开图片；点开图片进入灯箱，可看到所属帖子标题与作者，点标题会跳回原帖。\n\n筛选：顶部支持按板块筛选；付费帖内的图片遵循原帖付费墙，未解锁只显示提示，不加载原图。\n\n收藏：登录后可收藏或取消收藏图片，收藏列表只对自己可见。\n\n上传：发帖时选择图片媒体上传，支持 JPG、PNG 与 WebP，单张建议不超过 5 MB；复用站内既有媒体链路，不额外保存副本。\n\n常见问题：看不到内容时先确认板块筛选是否过窄，或该帖子是否处于审核、下架状态。\n\n当前为灰度测试版，聚合方式与筛选维度可能调整。', 'text', '/catalog/frontier.jpg', 0, 0, 0],
+      ['thread-guide-video', 'board-guides', '视频使用指南：播放、上传与付费可见性', '视频如何播放、上传要填什么、付费帖视频何时可见。', '视频页聚合社区帖子里的视频媒体，卡片显示封面、时长与所属帖子。\n\n播放：点击卡片进入灯箱播放，支持暂停、进度与全屏；移动端使用内联播放，不自动全屏。\n\n上传：发帖时选择视频媒体，并上传封面；建议 MP4（H.264 + AAC），单个文件不超过 200 MB。\n\n付费可见性：付费帖内的视频与原帖一致，作者与 VIP 会员免购；未解锁时列表只显示封面与提示，不加载视频地址。\n\n常见问题：视频一直转圈时先检查网络并刷新页面；仍失败请在「求助答疑」反馈帖子链接与设备信息。\n\n当前为灰度测试版，转码与清晰度策略可能调整。', 'text', '/catalog/ai.jpg', 0, 0, 0],
+      ['thread-guide-announce', 'board-guides', '公告动态使用指南：公告、更新日志与推广计划', '四类信息的区别、置顶与有效期、如何查历史。', '公告动态集中展示四类信息：产品公告、更新日志、推广计划与社区动态。\n\n区别：公告用于临时通知，例如维护、灰度与活动；更新日志按版本记录功能变化；推广计划展示当前活动与合作；社区动态是社区内的最新帖子摘要。\n\n置顶与有效期：重要公告会置顶；过期公告自动从公开列表隐藏，历史仍可查询。\n\n查看：页签内可切换分类，列表按发布时间倒序；点击条目展开正文。\n\n提交：普通用户无需提交公告；发现问题或需要补充说明，请在「求助答疑」发帖。\n\n当前为灰度测试版，公告分类与展示顺序可能调整。', 'text', '/catalog/misc.jpg', 0, 0, 0],
+      ['thread-guide-vip', 'board-guides', 'VIP 会员权益与开通说明', '月卡、年卡、终身三档权益，开通续费、积分发放与到期口径。', 'VIP 分月卡、年卡、终身三档，权益按等级叠加，不影响普通内容的浏览与搜索。\n\n权益：付费帖折扣、每月积分、专属徽章与答疑优先级；终身档额外包含创作分成加成。具体额度以 VIP 页套餐卡片为准。\n\n开通与续费：登录后在「VIP 会员」页选择套餐，使用钱包余额支付；已有同级或更高等级时按钮显示「续费」，到期时间顺延。\n\n积分发放：每月按套餐额度发放，签到积分独立计算，可在「钱包 / 积分」查看流水。\n\n到期：到期未续费则恢复普通权益，已购买的付费内容仍可继续阅读。\n\n常见问题：支付成功但权益未更新时，先刷新页面；仍未到账请附订单号在「求助答疑」反馈。\n\n当前为灰度测试版，价格与权益可能调整，已开通周期内不受影响。', 'text', '/catalog/store.jpg', 0, 0, 1],
+      ['thread-guide-wallet', 'board-guides', '钱包、积分与提现规则', '余额与积分的区别、充值卡兑换、转积分、签到、提现门槛与到账口径。', '钱包分为「可用余额」「积分」「可提现余额」三个口径，互不混用。\n\n余额：用于付费帖、VIP 与社区商城下单，可通过充值卡兑换或推广分成获得。\n\n积分：每日签到 +5；可用于抵扣与转赠。转积分需填写接收方 Mim ID，提交后不可撤回。\n\n充值卡：在钱包页输入卡密兑换，一卡一次。演示卡密 MIM-DEMO-100 与 MIM-DEMO-500 仅用于功能演示。\n\n提现：只有佣金与创作分成进入「可提现余额」，充值余额不可提现；同一时间只允许一笔处理中的申请，可在提现记录中撤销或等待审核。\n\n常见问题：兑换失败先确认卡密未被使用；提现被驳回会在记录里显示原因。\n\n当前为灰度测试版，提现门槛与审核时效可能调整。', 'text', '/catalog/dev.jpg', 0, 0, 1],
+      ['thread-guide-shop', 'board-guides', '社区商城下单、发货与售后指引', '三类商品、结算顺序、卡密查看、确认收货与售后申请。', '社区商城提供实物快递、虚拟自动发货（卡密）与虚拟人工发货三类商品。\n\n下单：登录后选商品与数量，可填优惠码；结算按「优惠码 → 余额」的顺序扣减，商城订单暂不支持积分抵扣。\n\n发货：自动发货商品支付成功后立即显示卡密；人工发货商品由工作人员在 24 小时内联系；实物商品按商品页说明的时效发出。\n\n确认与售后：收到商品后可确认收货；有问题在订单上申请售后，支持仅退款、退货退款与维修三类，提交后由后台审批。\n\n示例说明：灰度期商品与卡密为演示数据，会在商品说明或订单内容中标注，不作为真实成交记录。\n\n常见问题：余额不足时先到钱包充值；卡密不显示时刷新订单列表。\n\n当前为灰度测试版，商品池与发货时效会继续调整。', 'text', '/catalog/store.jpg', 0, 0, 2],
+      ['thread-guide-referral', 'board-guides', '推广分成规则与结算说明', '邀请码绑定、返佣比例、结算入口、禁止行为与常见问题。', '推广分成用于奖励真实分享：邀请码绑定后，被邀请人首单按实付金额的 5% 返到邀请人的可提现余额。\n\n绑定：在「推广分成」页复制自己的邀请码发给朋友；新用户只能绑定一次，不能绑定自己的邀请码。\n\n结算：佣金在订单完成且过售后周期后入账，进入「可提现余额」，可在钱包页申请提现。\n\n统计：页面展示已邀请人数与累计佣金，明细以钱包流水为准。\n\n禁止行为：自邀、虚假交易、批量注册与诱导下单会被取消佣金并限制账号。\n\n常见问题：朋友忘记填邀请码时无法补绑；佣金未到账先确认订单是否已过售后周期。\n\n当前为灰度测试版，返佣比例与结算周期可能调整。', 'text', '/catalog/plugin.jpg', 0, 0, 2],
+      ['thread-newbie-start', 'board-general', '新手报到：Mim 能做什么、从哪里开始', '一页看懂社区、商城、付费内容与创作工具，附新手路径。', '第一次来 Mim，建议按下面的顺序逛：\n\n1. 先看「公告动态」了解当前灰度状态与功能边界。\n2. 到「论坛」翻使用指南板块，八个板块的规则都写在里面。\n3. 想找素材或灵感，去「图库」和「视频」，可按帖子或作者聚合。\n4. 需要买实物或卡密，进「社区商城」；余额与积分口径见「钱包 / 积分」。\n5. 想支持创作者，可开通「VIP 会员」或使用「推广分成」邀请朋友。\n\n发帖前先搜索，提问时写清环境与复现步骤。欢迎在「求助答疑」留下你的第一个问题。\n\n当前为灰度测试版，功能会持续补齐。', 'text', '/catalog/industry.jpg', 0, 0, 1],
+      // 图库 / 视频示例帖：媒体挂在帖子上，标题带【示例】前缀，避免被误认为真实作品
+      ['thread-demo-gallery', 'board-guides', '【示例】图库演示：三张站点视觉素材', '示例内容：用三张现有站点封面演示图库瀑布流、灯箱与原帖跳转。', '这是图库功能的示例内容，用于演示瀑布流、灯箱与原帖跳转，不代表真实作品发布。\n\n三张图来自站内已有的分类封面素材，仅作为演示数据挂在图库中。\n\n你可以点开任意一张查看灯箱，再点标题回到本帖。\n\n当前为灰度测试版；示例内容统一以【示例】前缀标注，后续可被运营替换为真实作品。', 'gallery', '/catalog/frontier.jpg', 0, 0, 1],
+      ['thread-demo-video', 'board-guides', '【示例】视频演示：两段漫剧演示片', '示例内容：用站内已有演示片验证视频卡片、封面、时长与播放。', '这是视频功能的示例内容，用于验证视频卡片、封面、时长与灯箱播放，不代表正式剧集上线。\n\n两段演示片均为站内已有的功能演示素材，仅作为示例数据挂载。\n\n点开卡片可播放；移动端为内联播放。\n\n当前为灰度测试版；示例内容统一以【示例】前缀标注，后续可被运营替换为正式作品。', 'video', '/catalog/ai.jpg', 0, 0, 1],
     ];
     for (const [id, boardId, title, summary, body, kind, cover, price, views, daysAgo] of threads) {
       const created = new Date(Date.now() - daysAgo * 86400000).toISOString();
       insertThread.run(id, boardId, title, summary, body, kind, cover, price, views, created, created, created);
     }
+    // 图库示例：三张站内分类封面挂在【示例】帖下，供匿名浏览、灯箱与原帖跳转
+    const demoMedia: Array<[string, string, string, string, string, string, number, number]> = [
+      ['media-demo-gallery-1', 'thread-demo-gallery', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 1],
+      ['media-demo-gallery-2', 'thread-demo-gallery', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 2],
+      ['media-demo-gallery-3', 'thread-demo-gallery', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 3],
+      // 视频示例：复用 public/demo 下已有演示片，封面同目录，避免外链与额外存储
+      ['media-demo-video-1', 'thread-demo-video', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 1],
+      ['media-demo-video-2', 'thread-demo-video', 'video', '/demo/bloom-ep1.mp4', '/demo/bloom-cover.jpg', 'video/mp4', 15, 2],
+    ];
+    for (const [id, threadId, kind, url, poster, mime, duration, sort] of demoMedia) {
+      insertMedia.run(id, threadId, kind, url, poster, mime, duration, sort, now);
+    }
+    // 灰度公告：置顶说明当前为灰度测试版，示例内容会明确标注，避免被当成正式运营数据
+    insertAnnouncement.run(
+      'ann-seed-gray-release',
+      '灰度测试版说明：功能可用，示例内容会标注',
+      '当前站点处于灰度测试版：论坛、图库、视频、公告动态、VIP 会员、钱包 / 积分、社区商城与推广分成八个板块均已开放浏览。\n\n灰度期内部分商品、卡密与媒体为演示数据，统一以【示例】前缀或正文说明标注，不作为真实成交记录。\n\n遇到问题请在社区「求助答疑」板块发帖，或查看「使用指南」中的规则文章。付款、提现等资金操作前请再次确认页面提示。',
+      '2026-11-16T00:00:00.000Z',
+      '2026-11-16T00:00:00.000Z',
+      now,
+      now,
+    );
     // 存量库口径校正：旧公告帖宣称「全站免登录」，与 2026-11-15 起的强制登录相反；仅旧标题 + 旧摘要同时命中才替换，运营改过的保持原样。
     const legacyAnnounceTitle = '2026-11-12 更新：全站免登录 + 商城商品视觉上线';
     const legacyAnnounceSummary = '门禁解除、商品封面与参数详情图、访客交易链路。';
