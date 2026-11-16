@@ -4,7 +4,7 @@ import { randomUUID, timingSafeEqual, createHash } from 'node:crypto'; // 引入
 import { verifyCaptcha, type CaptchaScene } from './security.js'; // 验证码统一校验适配器（按场景强制）
 import type { NextFunction, Request, Response } from 'express'; // 仅引入 Express 中间件类型，编译期擦除
 import { AppError, isAppError } from '@mim/core-domain'; // 引入统一业务异常与类型守卫，错误信封集中管理
-import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY, isForceLoginEnabled } from './config.js'; // 引入幂等强制开关、管理令牌键名与强制登录开关
+import { ADMIN_TOKEN_ENV_KEY, REQUIRE_IDEMPOTENCY, isForceLoginEnabled, isRegistrationEnabled } from './config.js'; // 引入幂等强制开关、管理令牌键名、强制登录开关与注册开关
 import { sha256, verifyAccessToken } from './auth.js'; // 引入请求指纹哈希与访问令牌校验
 import type { RbacPermissionCode } from './db.js'; // 权限点联合类型，保证 requirePermission 调用处拼写错误在编译期暴露
 import type { Db } from './types.js'; // 数据库句柄类型，供 loadPermissions 声明参数
@@ -404,9 +404,14 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
  *
  * 用法（由主控在对应路由前挂载，本包不改 app.ts）：
  *   router.post('/auth/register', createCaptchaMiddleware('register'), handler);
+ *
+ * 注册场景特例：注册开关关闭时直接放行本中间件，让注册路由稳定返回
+ * 403 AUTH_REGISTER_DISABLED；否则会先被验证码拦成「图形验证码错误」，
+ * 让用户与运维误判成验证码故障，也与「关闭态 403」契约不符。
  */
 export function createCaptchaMiddleware(scene: CaptchaScene) { // 高阶工厂：按场景生成门禁
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => { // 返回当前函数的处理结果
+    if (scene === 'register' && !isRegistrationEnabled(req.deps.env)) { next(); return; } // 注册已关闭：跳过验证码，交由注册路由给出 403 开关错误码
     try { // 异常捕获起点：包裹可能抛出错误的操作
       await verifyCaptcha(req.deps.db, req.deps.env, scene, (req.body ?? {}) as Record<string, unknown>); // 异步等待：挂起至 Promise 落定后再继续
       next(); // 校验通过，进入业务处理

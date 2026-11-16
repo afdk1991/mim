@@ -193,6 +193,13 @@ check(
   /register:\s*isRegistrationEnabled\(/.test(authRoute),
   '/auth/channels 未按注册开关上报能力',
 );
+// 注册关闭时验证码门禁必须让路：否则关闭态会被拦成「图形验证码错误」，
+// 既不符合「关闭态 403 AUTH_REGISTER_DISABLED」契约，也会让运维误判成验证码故障。
+check(
+  '注册关闭态先于验证码返回 403',
+  /scene === 'register' && !isRegistrationEnabled\([\s\S]{0,120}?next\(\)/.test(read('services/mim-api/src/middleware.ts')),
+  '验证码中间件未在注册关闭时让路，关闭态会返回验证码错误而不是 AUTH_REGISTER_DISABLED',
+);
 
 // ---------- 3. 前端：注册入口随开关、匿名可读、写操作引导登录 ---------- //
 const appWeb = read('apps/web/src/App.tsx'); // Web 根组件
