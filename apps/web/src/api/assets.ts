@@ -10,7 +10,7 @@
 import { request, resolvePublicUrl } from './request.js'; // 统一请求出口 + 相对地址补全
 
 /** 资产类型：与后端 kind 枚举一致。 */
-export type AssetKind = 'article' | 'download' | 'gallery' | 'video';
+export type AssetKind = 'article' | 'download' | 'gallery' | 'video'; // 付费阅读 / 下载资源 / 图集 / 视频
 
 /** 资产列表项：匿名可读，unlocked 表示当前身份是否已解锁。 */
 export interface AssetListItem {
@@ -25,21 +25,21 @@ export interface AssetListItem {
   sales: number; // 销量
   updated_at: string; // 更新时间
   unlocked: boolean; // 当前身份是否已解锁
-}
+} // AssetListItem 结束
 
 /** 资产媒体项：未解锁时服务端返回空数组。 */
 export interface AssetMedia {
   kind: 'image' | 'video'; // 媒体类型
   url: string; // 媒体地址
   poster_url: string | null; // 视频封面
-}
+} // AssetMedia 结束
 
 /** 资产详情：未解锁时 body 只含试读、file_url 为 null、media 为空。 */
-export interface AssetDetail extends AssetListItem {
+export interface AssetDetail extends AssetListItem { // 在列表项基础上追加正文与访问入口
   body: string; // 正文（未解锁为试读片段）
   file_url: string | null; // 下载地址（未解锁为 null）
   media: AssetMedia[]; // 图集 / 视频（未解锁为空）
-}
+} // AssetDetail 结束
 
 /** 我拥有的资产：附带访问方式（file_url）。 */
 export interface MyAssetItem {
@@ -51,20 +51,20 @@ export interface MyAssetItem {
   file_url: string | null; // 访问 / 下载地址
   amount_cents: number; // 实付金额（分）
   created_at: string; // 购买时间
-}
+} // MyAssetItem 结束
 
 /** 资产列表查询。 */
 export interface AssetQuery {
   kind?: AssetKind | ''; // 类型筛选
   q?: string; // 关键词
-}
+} // AssetQuery 结束
 
 /** 购买结果：via 标识免费 / 会员 / 已购 / 余额扣款。 */
 export interface AssetPurchaseResult {
   ok: boolean; // 是否成功
   charged_cents: number; // 实扣金额（分）
   via: 'free' | 'vip' | 'owned' | 'balance'; // 解锁途径
-}
+} // AssetPurchaseResult 结束
 
 /** 把查询对象拼成 query string：空值不参与。 */
 function toQuery(params: Record<string, string | undefined>): string {
@@ -75,29 +75,29 @@ function toQuery(params: Record<string, string | undefined>): string {
   }
   const text = search.toString(); // 序列化
   return text ? `?${text}` : ''; // 无参数时不留问号
-}
+} // toQuery 结束
 
 /** 资产列表：匿名可读，登录后 unlocked 反映个人解锁状态。 */
 export function fetchAssets(query: AssetQuery = {}): Promise<{ items: AssetListItem[]; vip_level: number }> {
-  return request<{ items: AssetListItem[]; vip_level: number }>(`/assets${toQuery({ kind: query.kind, q: query.q })}`, { idempotency: false });
-}
+  return request<{ items: AssetListItem[]; vip_level: number }>(`/assets${toQuery({ kind: query.kind, q: query.q })}`, { idempotency: false }); // GET 无副作用，不带幂等键
+} // fetchAssets 结束
 
 /** 资产详情：匿名可读，未解锁只返回试读。 */
 export function fetchAsset(code: string): Promise<{ asset: AssetDetail }> {
-  return request<{ asset: AssetDetail }>(`/assets/${encodeURIComponent(code)}`, { idempotency: false });
-}
+  return request<{ asset: AssetDetail }>(`/assets/${encodeURIComponent(code)}`, { idempotency: false }); // 编码 code，避免特殊字符破坏路径
+} // fetchAsset 结束
 
 /** 我的资产：需登录。 */
 export function fetchMyAssets(): Promise<{ items: MyAssetItem[] }> {
-  return request<{ items: MyAssetItem[] }>('/assets/mine/list', { idempotency: false });
-}
+  return request<{ items: MyAssetItem[] }>('/assets/mine/list', { idempotency: false }); // 401 由统一出口触发续期 / 登出
+} // fetchMyAssets 结束
 
 /** 余额购买：需登录；免费 / 会员 / 已购由服务端直接返回对应 via。 */
 export function purchaseAsset(code: string): Promise<AssetPurchaseResult> {
-  return request<AssetPurchaseResult>(`/assets/${encodeURIComponent(code)}/purchase`, { method: 'POST', body: {} });
-}
+  return request<AssetPurchaseResult>(`/assets/${encodeURIComponent(code)}/purchase`, { method: 'POST', body: {} }); // 写请求默认带幂等键，重复点击不重复扣款
+} // purchaseAsset 结束
 
 /** 封面 / 媒体 / 下载地址补全：站内相对路径按 API 源拼绝对地址。 */
 export function assetUrl(url: string | null): string {
-  return url ? resolvePublicUrl(url) : '';
-}
+  return url ? resolvePublicUrl(url) : ''; // 空值统一成空串，调用方不用判空
+} // assetUrl 结束
