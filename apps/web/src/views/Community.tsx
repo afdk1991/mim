@@ -35,6 +35,7 @@ import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, Sear
 import { isPinned, listThreads, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 列表分页 / 楼中楼回复 / 回复锁定判定 / 回复分页
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
 import { CommunityGallery } from './CommunityGallery'; // 图库 / 视频页签（2026-11-15：挂在社区层，不恢复独立模块页）
+import { CommunityGuideBar, ReferralGuestPanel, ShopGuestNote, WalletGuestPanel } from './CommunityGuides'; // 八大板块指南条与匿名访客面板
 import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
 import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
 
@@ -46,6 +47,19 @@ interface Props { // 接口 Props：约束对象的字段与类型形态
 
 // 页签 id 与媒体 kind 对齐：图库页签是 image 视图，避免与帖子类型 gallery（图集）混淆
 type Tab = 'forum' | 'announcements' | 'vip' | 'wallet' | 'shop' | 'referral' | 'images' | 'video'; // 类型别名 Tab：复用一份复合类型定义
+
+/** 八项页签按用途分两组：内容类在前，会员与交易类在后，窄屏换行时仍成组可读 */
+const TAB_GROUPS: Array<{ label: string; items: Array<[Tab, string]> }> = [
+  { label: '内容', items: [['forum', '论坛'], ['images', '图库'], ['video', '视频'], ['announcements', '公告动态']] },
+  { label: '会员与交易', items: [['vip', 'VIP 会员'], ['wallet', '钱包 / 积分'], ['shop', '社区商城'], ['referral', '推广分成']] },
+];
+
+/** 合法页签集合：用于校验 ?tab= 深链，非法值一律回落论坛 */
+const TAB_KEYS: Tab[] = ['forum', 'announcements', 'vip', 'wallet', 'shop', 'referral', 'images', 'video'];
+
+function isTab(value: string): value is Tab {
+  return (TAB_KEYS as string[]).includes(value);
+}
 
 const KIND_LABEL: Record<ThreadKind, string> = { // 常量 KIND_LABEL：保存固定配置或一次性派生值
   text: '图文',
@@ -193,7 +207,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const listScrollRef = useRef(0); // 进入详情前的列表滚动位置
   // 从资讯详情返回时带 ctab：直接打开「公告动态」并落到对应子页签
   const initialContentTab = currentQuery().get('ctab');
-  const [tab, setTab] = useState<Tab>(initialContentTab ? 'announcements' : 'forum'); // 赋值：更新变量 const 的取值
+  // ?tab= 深链：分享 / 刷新时直达对应板块，非法值回落论坛
+  const initialSectionTab = currentQuery().get('tab') ?? '';
+  const [tab, setTab] = useState<Tab>(initialContentTab ? 'announcements' : isTab(initialSectionTab) ? initialSectionTab : 'forum'); // 赋值：更新变量 const 的取值
   const [boards, setBoards] = useState<CommunityBoard[]>([]); // 赋值：更新变量 const 的取值
   const [stats, setStats] = useState({ threads: 0, views: 0, likes: 0 }); // 赋值：更新变量 const 的取值
   const [wallet, setWallet] = useState<WalletSnapshot | null>(null); // 赋值：更新变量 const 的取值
@@ -284,13 +300,16 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     return false; // 调用方据此提前返回，避免发出匿名写请求
   }
 
-  /** 切换页签：钱包 / 商城 / 推广属于私密读，匿名点击先引导登录，不发 401 请求 */
+  /** 切换页签：八个板块都允许匿名进入，数据类面板各自决定登录后的可见范围 */
   function switchTab(next: Tab) {
-    if ((next === 'wallet' || next === 'shop' || next === 'referral') && !hasSession) { // 私密读页签
-      requireSession(); // 引导登录
-      return; // 不切换页签
+    setTab(next); // 先切换页签，保证无会话时也能看到公开内容
+    // 同步 ?tab= 深链：刷新、分享与浏览器回退都能直达当前板块；帖子详情页不改写地址
+    if (!postId && !newsKind) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', next);
+      url.searchParams.delete('ctab');
+      window.history.replaceState(null, '', url.toString());
     }
-    setTab(next); // 公开页签（论坛 / 公告 / VIP 套餐）直接切换
   }
 
   async function loadOverview() { // 函数 loadOverview：封装一段可复用的处理逻辑
@@ -407,8 +426,10 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
 
   async function loadShop() { // 函数 loadShop：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      const [p, o, a] = await Promise.all([api.shop.products(), api.commerce.orders({ source: 'shop' }), api.shop.myAfterSales()]); // 商品目录走旧接口，订单读取切统一只读接口，售后读用户侧新接口
+      const p = await api.shop.products(); // 商品目录公开可读，匿名也能看到货架
       setProducts(p.products);
+      if (!hasSession) return; // 订单 / 售后是私密读，匿名不请求
+      const [o, a] = await Promise.all([api.commerce.orders({ source: 'shop' }), api.shop.myAfterSales()]); // 订单读取切统一只读接口，售后读用户侧新接口
       setOrders(o.items);
       setAfterSales(a.items);
     } catch (err) {
@@ -443,9 +464,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   }, [board, kind, sort]);
 
   useEffect(() => {
-    if (!hasSession) return; // 钱包 / 订单 / 推广都是私密读，匿名不发请求
+    if (tab === 'shop') void loadShop(); // 商城货架匿名可读，订单只在登录后补充
+    if (!hasSession) return; // 钱包 / 推广是私密读，匿名不发请求
     if (tab === 'wallet') { void loadWallet(); void loadWithdrawals(); } // 钱包页同时拉余额流水与可提现口径
-    if (tab === 'shop') void loadShop(); // 条件分支：按判断结果选择后续处理路径
     if (tab === 'referral') void loadReferral(); // 条件分支：按判断结果选择后续处理路径
   }, [tab, hasSession]);
 
@@ -1043,20 +1064,21 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         </div>
       )}
 
-      <nav className="community-tabs">{/* 执行当前业务步骤 */}
-        {([
-          ['forum', '论坛'],
-          ['images', '图库'],
-          ['video', '视频'],
-          ['announcements', '公告动态'],
-          ['vip', 'VIP 会员'],
-          ['wallet', '钱包 / 积分'],
-          ['shop', '社区商城'],
-          ['referral', '推广分成'],
-        ] as Array<[Tab, string]>).map(([key, label]) => (
-          <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => switchTab(key)}>{label}</button>
+      <nav className="community-tabs" aria-label="社区板块">{/* 八项分两组：内容 / 会员与交易 */}
+        {TAB_GROUPS.map((group) => (
+          <div key={group.label} className="community-tabs-group">
+            <span className="community-tabs-label">{group.label}</span>
+            {group.items.map(([key, label]) => (
+              <button key={key} type="button" className={tab === key ? 'is-active' : ''} onClick={() => switchTab(key)}>{label}</button>
+            ))}
+          </div>
         ))}
       </nav>
+
+      {/* 指南条：每个板块都能直达对应的规则 / 使用说明文章，文章本身落在 community_threads */}
+      {!postId && !newsKind && (
+        <CommunityGuideBar section={tab} onOpen={(threadId) => { setTab('forum'); void openThread(threadId); }} />
+      )}
 
       {loading && (
         <div className="community-list" role="status" aria-label="正在加载社区数据">
@@ -1577,7 +1599,15 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         </div>
       )}
 
-      {!loading && tab === 'wallet' && wallet && (
+      {/* 匿名访客：钱包金额不可见，但口径与规则必须可读，避免空白页 */}
+      {!loading && tab === 'wallet' && !hasSession && (
+        <WalletGuestPanel
+          onLogin={() => { if (onRequireLogin) onRequireLogin(); else requireSession(); }}
+          onOpenGuide={() => { setTab('forum'); void openThread('thread-guide-wallet'); }}
+        />
+      )}
+
+      {!loading && tab === 'wallet' && hasSession && wallet && (
         <div className="community-wallet">{/* 执行当前业务步骤 */}
           <div className="community-wallet-cards">{/* 执行当前业务步骤 */}
             <div className="community-wallet-card">{/* 执行当前业务步骤 */}
@@ -1670,7 +1700,12 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
           <div className="community-section-head">{/* 执行当前业务步骤 */}
             <div><h2>社区商城</h2><p>实物快递、自动发卡密、人工发货三类商品，统一走余额与优惠码。</p></div>
           </div>
+          {/* 匿名访客：货架公开，下单与订单需要登录 */}
+          {!hasSession && (
+            <ShopGuestNote onLogin={() => { if (onRequireLogin) onRequireLogin(); else requireSession(); }} />
+          )}
           <div className="community-shop-grid">{/* 执行当前业务步骤 */}
+            {products.length === 0 && <div className="community-empty">商品正在加载，稍后再看看。</div>}
             {products.map((p) => (
               <article key={p.code} className="community-product">{/* 执行当前业务步骤 */}
                 {p.cover_url && <img src={coverSrc(p.cover_url)} alt={p.name} loading="lazy" />}
@@ -1698,7 +1733,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                       </div>
                     </div>
                   ) : (
-                    <button type="button" className="is-primary" disabled={p.available <= 0} onClick={() => { setBuying(p.code); setQuantity(1); }}>{p.available <= 0 ? '已售罄' : '立即购买'}</button>
+                    <button type="button" className="is-primary" disabled={p.available <= 0} onClick={() => { if (!hasSession) { requireSession(); return; } setBuying(p.code); setQuantity(1); }}>{p.available <= 0 ? '已售罄' : hasSession ? '立即购买' : '登录后购买'}</button>
                   )}
                 </div>
               </article>
@@ -1710,6 +1745,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               {lastOrder.delivery_kind === 'virtual_auto' ? ' 卡密见下方订单列表。' : ''}
             </div>
           )}
+          {/* 订单与售后是私密数据，匿名只保留公开货架 */}
+          {hasSession && (
+            <>
           <h3 className="community-subhead">我的订单</h3>
           <div className="community-orders">{/* 执行当前业务步骤 */}
             {orders.length === 0 && <div className="community-empty">还没有订单。</div>}
@@ -1774,10 +1812,19 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               </article>
             ))}
           </div>
+            </>
+          )}
         </div>
       )}
 
-      {!loading && tab === 'referral' && (
+      {!loading && tab === 'referral' && !hasSession && (
+        <ReferralGuestPanel
+          onLogin={() => { if (onRequireLogin) onRequireLogin(); else requireSession(); }}
+          onOpenGuide={() => { setTab('forum'); void openThread('thread-guide-referral'); }}
+        />
+      )}
+
+      {!loading && tab === 'referral' && hasSession && (
         <div className="community-referral">{/* 执行当前业务步骤 */}
           <div className="community-section-head"><div><h2>推广分成</h2><p>邀请码绑定后，被邀请人首单按实付 5% 返到你的余额。</p></div></div>
           <div className="community-referral-grid">{/* 执行当前业务步骤 */}

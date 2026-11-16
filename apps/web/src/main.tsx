@@ -8,6 +8,8 @@ import { App } from './App';
 import './tokens.css';
 // 全局样式：由 Vite 打包注入，保证主题变量与布局类在首屏即生效
 import './styles.css';
+// 八大板块公共组件样式：指南条、分组标签与匿名规则清单，独立文件避免与视觉线改造冲突
+import './community-guides.css';
 
 // 取挂载节点：对应 index.html 中预留的 #root
 const container = document.getElementById('root');

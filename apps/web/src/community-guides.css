@@ -1,0 +1,112 @@
+/**
+ * 八大板块公共组件的补充样式。
+ * 只使用 tokens.css 中的设计令牌，不写死颜色，保证明暗主题与后台换肤都能跟随。
+ * 该文件独立于视觉线正在改造的 styles.css，避免并行改动互相覆盖。
+ */
+
+/* 页签分组容器：一组页签保持同一行，窄屏时整组换行，不让分组名与页签拆散 */
+.community-tabs-group {
+  display: flex; /* 组内横向排布 */
+  flex-wrap: wrap; /* 组内页签过多时允许换行 */
+  align-items: center; /* 与页签按钮垂直对齐 */
+  gap: 8px; /* 与 .community-tabs 保持同一间距 */
+}
+
+/* 页签栏的分组标签：把 8 个页签分成「内容」与「会员与交易」两组，避免一行堆满 */
+.community-tabs-label {
+  display: inline-flex; /* 与页签按钮同排 */
+  align-items: center; /* 垂直居中 */
+  padding: 0 6px; /* 左右留一点空隙 */
+  color: var(--text-subtle); /* 弱化文字，不抢页签焦点 */
+  font-size: var(--fs-xs); /* 最小字号，作为分组说明 */
+  letter-spacing: 0.04em; /* 轻微字距，提升小字可读性 */
+  white-space: nowrap; /* 分组名不换行 */
+}
+
+/* 指南条：标题 + 一句摘要 + 阅读全文，八个板块共用 */
+.community-guide-bar {
+  display: flex; /* 横向排布 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 两端对齐 */
+  gap: 16px; /* 文案与按钮间距 */
+  padding: 14px 16px; /* 与社区卡片同级内边距 */
+  border: 1px solid var(--border); /* 使用全局描边令牌 */
+  border-radius: var(--radius-md); /* 中圆角，与社区卡片一致 */
+  background: var(--surface); /* 一级表面色 */
+}
+
+/* 指南条的文案区：允许收缩，长标题换行不撑破布局 */
+.community-guide-copy {
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 标签、标题、摘要自上而下 */
+  gap: 4px; /* 紧凑间距 */
+  min-width: 0; /* 允许 flex 子项收缩 */
+}
+
+/* 指南条上的小标签 */
+.community-guide-tag {
+  align-self: flex-start; /* 不占满整行 */
+  padding: 2px 8px; /* 小胶囊内边距 */
+  border-radius: var(--radius-pill); /* 胶囊圆角 */
+  background: var(--primary-soft); /* 主色淡底 */
+  color: var(--primary); /* 主色文字 */
+  font-size: var(--fs-xs); /* 最小字号 */
+}
+
+/* 指南条标题 */
+.community-guide-copy strong {
+  color: var(--text); /* 主文字色 */
+  font-size: var(--fs-base); /* 与正文同级，避免压过页面标题 */
+}
+
+/* 指南条摘要 */
+.community-guide-copy small {
+  color: var(--text-muted); /* 次要文字色 */
+  font-size: var(--fs-xs); /* 最小字号 */
+}
+
+/* 指南条右侧按钮 */
+.community-guide-open {
+  flex: none; /* 不参与压缩 */
+  padding: 8px 14px; /* 与页签按钮接近的内边距 */
+  border: 1px solid var(--border-strong); /* 描边按钮 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  background: var(--surface-2); /* 二级表面色 */
+  color: var(--text); /* 主文字色 */
+  font-size: var(--fs-sm); /* 小字号 */
+  cursor: pointer; /* 手型 */
+}
+
+/* 悬停态：只提升描边与底色，不做位移，避免布局抖动 */
+.community-guide-open:hover {
+  border-color: var(--border-hover); /* 悬停描边 */
+  background: var(--surface-3); /* 悬停底色 */
+}
+
+/* 匿名规则速览：轻量列表，不引入新卡片层级 */
+.community-guest-rules {
+  margin: 0; /* 去掉默认外边距 */
+  padding-left: 18px; /* 给项目符号留位置 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 自上而下 */
+  gap: 6px; /* 条目间距 */
+  color: var(--text-secondary); /* 正文色 */
+  font-size: var(--fs-sm); /* 小字号 */
+}
+
+/* 窄屏：指南条改为上下排列，按钮占满整行，避免标题被挤成一条窄柱 */
+@media (max-width: 640px) {
+  .community-guide-bar {
+    align-items: flex-start; /* 文案从顶部开始 */
+    flex-direction: column; /* 上下结构 */
+  }
+
+  .community-guide-open {
+    width: 100%; /* 按钮铺满，便于触达 */
+  }
+
+  .community-tabs-label {
+    width: 100%; /* 分组标签独占一行，让 8 个页签自然分成两段 */
+    padding-top: 4px; /* 与上一段页签拉开距离 */
+  }
+}
