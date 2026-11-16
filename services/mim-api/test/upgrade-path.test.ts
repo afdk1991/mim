@@ -167,6 +167,45 @@ describe('订阅制老库升级到统一交易域', () => {
     upgraded.close(); // 释放句柄
   }); // 迁移主用例结束
 
+  // 2026-11-16 回归：本地早期快照未必带全 driver 列，旧签名不完整也必须兜住
+  it('orders 缺 source 且旧列签名不完整时同样重建，不再崩在 source 索引', () => {
+    createDatabase(file).close(); // 先得到一份完整新库作底
+    const partial = new Database(file); // 直接改结构，模拟更早期的半截订阅表
+    partial.pragma('foreign_keys = OFF'); // 关外键，允许删父表
+    for (const sql of ['DROP TABLE IF EXISTS order_items', 'DROP TABLE IF EXISTS fulfillments', 'DROP TABLE IF EXISTS payments', 'DROP TABLE IF EXISTS orders']) partial.exec(sql);
+    // 只有 plan_id / amount_minor，没有 driver：修复前旧守卫因签名不全直接跳过，
+    // 随后 50-unified-commerce.sql 在缺 source 的 orders 上建 ix_orders_source，启动崩在 no such column: source。
+    partial.exec('CREATE TABLE orders (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, plan_id TEXT NOT NULL, amount_minor INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)');
+    partial.prepare("INSERT INTO orders (id, user_id, plan_id, amount_minor, created_at) VALUES ('ord-partial', 'u1', 'pro', 1900, '2026-01-01T00:00:00Z')").run(); // 留一条旧行验证归档
+    partial.close(); // 释放句柄
+    const upgraded = createDatabase(file); // 修复前这里抛 SqliteError: no such column: source
+    const cols = (upgraded.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name); // 重建后的列
+    expect(cols).toContain('source'); // 统一域来源列已建出
+    expect(cols).toContain('source_id'); // 来源侧单号
+    const indexes = (upgraded.prepare("SELECT name FROM sqlite_master WHERE type='index'").all() as Array<{ name: string }>).map((i) => i.name); // 索引清单
+    expect(indexes).toContain('ix_orders_source'); // 关键索引建成功
+    expect((upgraded.prepare('SELECT COUNT(*) AS n FROM orders').get() as { n: number }).n).toBe(0); // 统一表保持干净
+    const archived = upgraded.prepare("SELECT payload_json FROM legacy_archive_orders WHERE id='ord-partial'").get() as { payload_json: string } | undefined; // 旧行归档
+    expect(archived).toBeTruthy(); // 归档存在
+    expect(JSON.parse(archived!.payload_json).plan_id).toBe('pro'); // 旧字段原样保留
+    upgraded.close(); // 释放句柄
+  }); // 半截订阅表回归结束
+
+  // 统一子表仍有数据时不得重建父表（否则级联删明细）
+  it('orders 非统一但 order_items 仍有数据时中止，不留副作用', () => {
+    createDatabase(file).close(); // 完整新库作底
+    const mixed = new Database(file); // 直接改结构
+    mixed.pragma('foreign_keys = OFF'); // 关外键，允许换表
+    for (const sql of ['DROP TABLE IF EXISTS order_items', 'DROP TABLE IF EXISTS payments', 'DROP TABLE IF EXISTS orders']) mixed.exec(sql);
+    mixed.exec(LEGACY_ORDERS_DDL); // 换回订阅制 orders
+    mixed.exec('CREATE TABLE order_items (id TEXT PRIMARY KEY)'); // 保留一张有数据的明细表
+    mixed.exec("INSERT INTO order_items (id) VALUES ('oi-1')"); // 一行明细
+    expect(() => alignLegacyCommerceTables(mixed)).toThrow(/order_items/); // 必须中止而不是级联清掉明细
+    const cols = (mixed.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name); // 中止后 orders 原样
+    expect(cols).toContain('plan_id'); // 旧表未被替换
+    mixed.close(); // 释放句柄
+  }); // 明细保护用例结束
+
   // 混杂结构必须中止而不是猜测
   it('结构混杂时抛错中止，不留任何副作用', () => {
     createDatabase(file).close(); // 先得到统一表（payments 保持统一结构）
@@ -188,14 +227,22 @@ describe('订阅制老库升级到统一交易域', () => {
     mixed.close(); // 释放句柄
   }); // 混杂用例结束
 
-  // 幂等用例：重复启动不重建、归档不膨胀
-  it('重复启动不再重建、归档不膨胀', () => {
+  // 幂等用例：重复启动不重建、归档不膨胀、生产结构原样保留
+  it('重复启动不再重建、归档不膨胀，生产结构原样保留', () => {
     downgrade(); // 造订阅制老库
-    createDatabase(file).close(); // 第一次：执行重建
+    const first = createDatabase(file); // 第一次：执行重建
+    // 记下重建后的 DDL，作为「生产库不会被再次改动」的对照
+    const ordersDdl = (first.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").get() as { sql: string }).sql;
+    const paymentsDdl = (first.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get() as { sql: string }).sql;
+    first.close(); // 释放句柄
     const again = createDatabase(file); // 第二次：必须命中「已是统一表」直接返回
+    expect(alignLegacyCommerceTables(again)).toBe(false); // 对齐逻辑不再动手
     expect((again.prepare('SELECT COUNT(*) AS n FROM legacy_archive_orders').get() as { n: number }).n).toBe(1); // 订单只归档一次
     expect((again.prepare('SELECT COUNT(*) AS n FROM legacy_archive_payments').get() as { n: number }).n).toBe(1); // 支付只归档一次
     expect((again.prepare('SELECT COUNT(*) AS n FROM orders').get() as { n: number }).n).toBe(0); // 统一表保持干净
+    // 结构必须逐字一致：第二次启动不得替换或重建 orders / payments
+    expect((again.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").get() as { sql: string }).sql).toBe(ordersDdl); // orders DDL 未变
+    expect((again.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='payments'").get() as { sql: string }).sql).toBe(paymentsDdl); // payments DDL 未变
     again.close(); // 释放句柄
   }); // 幂等用例结束
 }); // 用例组二结束

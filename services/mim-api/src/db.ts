@@ -179,9 +179,6 @@ export function ensureOrderSourceCommunity(db: Db): boolean {
   return true;
 }
 
-/** 旧订阅制 orders 的特征列（2026-11-13 统一交易域之前的本地快照） */
-const LEGACY_ORDER_COLUMNS = ['plan_id', 'amount_minor', 'driver'] as const; // 三列同时存在且没有 source/source_id，才认定是旧订阅结构
-
 /** 旧订阅制 payments 的特征列 */
 const LEGACY_PAYMENT_COLUMNS = ['driver', 'amount_minor', 'provider_txn_id'] as const; // 三列同时存在且没有 provider/amount_cents，才认定是旧订阅结构
 
@@ -199,8 +196,11 @@ function columnSet(db: Db, table: string): Set<string> { // 结构判定统一�
  * 建 `ix_orders_source ON orders(source, source_id)` 时直接报 `no such column: source`，进程启动即失败。
  *
  * 处理原则：
- *   - 只认「严格旧签名」：orders 有 plan_id/amount_minor/driver 且无 source/source_id，payments 有 driver/amount_minor/provider_txn_id 且无 provider/amount_cents；
- *     其它任何混合结构一律抛错中止，绝不猜测性 DROP。
+ *   - orders 是否统一只看 source / source_id 两列：缺任一列即视为「非统一结构」，无论旧列签名是否完整都走原地重建。
+ *     2026-11-16 复盘：此前要求 plan_id / amount_minor / driver 三列齐全才认旧表，缺 driver 的早期快照会绕过守卫，
+ *     继续交给 50-unified-commerce.sql 建 ix_orders_source，最终仍以 no such column: source 崩在 applyDomainSchema 的 db.exec。
+ *   - payments 仍按订阅签名识别；orders / payments 两侧结构不一致，或统一子表（order_items / fulfillments）仍有数据，
+ *     一律抛错中止，绝不猜测性 DROP。
  *   - 旧行无法映射到统一交易域（订阅计划在现行代码里已无对应源订单），整行 JSON 归档到 legacy_archive_orders / legacy_archive_payments 后再重建空表。
  *   - 已是统一表时直接返回 false，重复启动无副作用；重建后由 50-unified-commerce.sql 负责建表与索引，避免 DDL 两处维护。
  * @returns 是否真的执行了重建
@@ -211,16 +211,24 @@ export function alignLegacyCommerceTables(db: Db): boolean {
   const orderCols = columnSet(db, 'orders'); // 现有 orders 列
   const paymentCols = columnSet(db, 'payments'); // 现有 payments 列（表不存在时为空集合）
   const hasPayments = paymentCols.size > 0; // payments 是否存在
-  const legacyOrders = !orderCols.has('source') && !orderCols.has('source_id') && LEGACY_ORDER_COLUMNS.every((col) => orderCols.has(col)); // 严格旧签名
-  if (!legacyOrders) { // orders 不是旧订阅结构：理论上已是统一表
-    if (hasPayments && !paymentCols.has('provider') && !paymentCols.has('amount_cents') && LEGACY_PAYMENT_COLUMNS.every((col) => paymentCols.has(col))) {
+  const unifiedOrders = orderCols.has('source') && orderCols.has('source_id'); // 统一交易域的判定只看这两列，避免旧表换一副面孔就绕过守卫
+  const legacyPayments = hasPayments && !paymentCols.has('provider') && !paymentCols.has('amount_cents') && LEGACY_PAYMENT_COLUMNS.every((col) => paymentCols.has(col)); // 严格旧签名
+  if (unifiedOrders) { // 已是统一表（生产库走这条）
+    if (legacyPayments) {
       throw new Error('[db] orders 已是统一结构但 payments 仍是订阅结构：结构混合，已中止升级，请归档本地库后重建'); // 混合结构不动手
     }
-    return false; // 已是统一结构：幂等返回
+    return false; // 已是统一结构：幂等返回，不对生产库做任何 DDL
   }
-  const legacyPayments = hasPayments && !paymentCols.has('provider') && !paymentCols.has('amount_cents') && LEGACY_PAYMENT_COLUMNS.every((col) => paymentCols.has(col)); // 严格旧签名
   if (hasPayments && !legacyPayments) {
-    throw new Error('[db] orders 是订阅结构但 payments 不是：结构混合，已中止升级，请归档本地库后重建'); // 不猜测性删除
+    throw new Error('[db] orders 不是统一结构但 payments 也不是订阅结构：结构混合，已中止升级，请归档本地库后重建'); // 两侧结构不一致时不猜测性删除
+  }
+  const tableHasRows = (table: 'order_items' | 'fulfillments'): boolean => { // 统一子表若有数据，重建父表会级联清掉
+    const exists = db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) as { ok: number } | undefined; // 子表可能尚未创建
+    if (!exists) return false; // 不存在即无数据
+    return (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n > 0; // 只判断是否有行
+  }; // tableHasRows 结束
+  if (tableHasRows('order_items') || tableHasRows('fulfillments')) {
+    throw new Error('[db] orders 不是统一结构但 order_items/fulfillments 仍有数据：结构混合，已中止升级，请归档本地库后重建'); // 拒绝静默丢明细
   }
   const archivedAt = new Date().toISOString(); // 归档时间统一取一次，便于对照
   db.exec('CREATE TABLE IF NOT EXISTS legacy_archive_orders (id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, archived_at TEXT NOT NULL)'); // 旧订单整行归档
