@@ -136,7 +136,7 @@ export function GrowthDm({ credential, permissions }: Props) {
           复用现有 IM 会话：以系统身份向用户发送一对一私信，支持跳转与群发幂等。发件方固定显示为「成长私信」，不暴露管理员个人账号。
         </p>
       </header>
-      {!canWrite && <div className="panel error">当前账号缺少 messaging:write 权限，仅可查看批次台账。</div>}
+      {!canWrite && <div className="panel hint">当前账号缺少 messaging:write 权限，仅可查看批次台账。</div>}
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 

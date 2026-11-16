@@ -90,7 +90,7 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
         <p className="page-desc">板块审核、论坛首页、发帖审核开关、推荐指数与 Tab 栏目配置：全部落到公开端点即时生效。</p>
       </header>
 
-      {!canWrite && <div className="panel error">当前账号缺少 appearance:write 权限，运营操作不可用。</div>}
+      {!canWrite && <div className="panel hint">当前账号缺少 appearance:write 权限，运营操作不可用，仅可查看。</div>}
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 

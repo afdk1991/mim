@@ -81,7 +81,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
         <p className="page-desc">产品公告、更新日志与推广计划：草稿、发布、归档全流程可操作，公开端点立即生效。</p>
       </header>
 
-      {!canWrite && <div className="panel error">当前账号缺少 appearance:write 权限，仅可查看。</div>}
+      {!canWrite && <div className="panel hint">当前账号缺少 appearance:write 权限，仅可查看，不能新建或修改内容。</div>}
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 

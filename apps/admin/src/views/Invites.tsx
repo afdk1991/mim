@@ -70,7 +70,7 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
         <p className="page-desc">注册准入码：批量生成、绑定手机 / 邮箱、限制次数与有效期，并保留逐次核销审计。</p>
       </header>
 
-      {!canRead && <div className="panel error">当前账号缺少 user:read 权限。</div>}
+      {!canRead && <div className="panel hint">当前账号缺少 user:read 权限，无法查看邀请码。</div>}
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 
