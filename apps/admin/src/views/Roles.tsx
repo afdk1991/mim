@@ -142,6 +142,8 @@ export function Roles({ credential, permissions }: RolesProps) {
 
   // 删除角色
   async function remove(code: string) {
+    // 二次确认：删除不可撤销，被引用时后端会拒绝
+    if (!window.confirm(`确认删除角色「${code}」？删除后不可恢复。`)) return;
     // 清空提示
     setError(null); // 清掉旧错误
     setNotice(null); // 清掉旧成功提示
@@ -212,7 +214,7 @@ export function Roles({ credential, permissions }: RolesProps) {
   return (
     <div className="page"> {/* 页面根容器 */}
       <div className="page-head"> {/* 页头：标题 + 计数概览 */}
-        <h2>角色与权限</h2> {/* 视图标题 */}
+        <h1>角色与权限</h1> {/* 视图标题 */}
         <span className="count">{roles.length} 个角色 / {allPermissions.length} 个权限点</span> {/* 规模概览：角色数与权限点数 */}
       </div> {/* 页头结束 */}
       <p className="page-desc">这里维护后台角色与权限矩阵：新建角色、按模块勾选权限点，并把角色授予用户；权限变更在下次请求即生效。</p> {/* 用途说明：一句话讲清本页能做什么 */}
@@ -235,7 +237,7 @@ export function Roles({ credential, permissions }: RolesProps) {
         </div> {/* 面板头结束 */}
         {state.loading ? ( // 首屏加载分支
           // 首屏加载占位
-          <div className="empty">加载中…</div>
+          <p className="muted">加载中…</p>
         ) : state.error ? ( // 加载失败分支
           // 加载失败
           <div className="error">{describeError(state.error)}</div>

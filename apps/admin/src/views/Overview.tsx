@@ -37,7 +37,7 @@ export function Overview({ identity, onOpen }: OverviewProps) {
   return (
     <div className="page"> {/* 页面根容器：复用全局 .page 纵向布局与内边距 */}
       <div className="page-head"> {/* 页头行：标题与说明文字同行排列 */}
-        <h2>概览</h2> {/* 页面标题：与左侧导航「概览」同名，保持信息架构一致 */}
+        <h1>概览</h1> {/* 页面标题：与左侧导航「概览」同名，保持信息架构一致 */}
         <span className="count">权限每请求实时查库，变更后刷新即生效</span> {/* 说明文案：强调权限不落缓存，改授权后刷新即可验证 */}
       </div> {/* 页头结束 */}
       <p className="page-desc">这里是管理后台的起点：查看当前身份、生效角色与权限范围，并从左侧「内容 / 交易 / 用户 / 站点」四组入口进入具体功能。</p> {/* 用途说明：一句话讲清概览能做什么 */}

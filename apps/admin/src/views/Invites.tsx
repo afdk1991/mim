@@ -117,6 +117,7 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
                     <td>{/* 执行当前业务步骤 */}
                       {row.status === 'active' && (
                         <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void (async () => {{/* 执行当前业务步骤 */}
+                          if (!window.confirm(`确认禁用邀请码 ${row.code}？禁用后立即失效且不可恢复。`)) return; // 二次确认：破坏性操作
                           setBusy(true); // 操作中
                           setError(''); // 清空错误
                           try { // 业务步骤

@@ -173,7 +173,7 @@ export function Shipments({ credential, permissions }: ShipmentsProps) {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>发货与售后</h2>
+        <h1>发货与售后</h1>
         <span className="count">待发货 → 录入运单（已发货）→ 签收；售后退款退回钱包余额</span>
       </div>
 

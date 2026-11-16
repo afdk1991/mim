@@ -96,6 +96,9 @@ export function GrowthDm({ credential, permissions }: Props) {
       const audience = buildAudience();
       if (!audience) throw new Error('请先选择用户或填写至少一个筛选条件');
       if (!title.trim() || !body.trim()) throw new Error('标题与正文不能为空');
+      // 二次确认：群发不可撤回，先把受众规模告诉运营
+      const size = preview ? `预计 ${preview.count} 人` : mode === 'users' ? `指定 ${selected.length} 人` : '按当前筛选条件';
+      if (!window.confirm(`确认发送系统私信？受众：${size}。发送后不可撤回。`)) return;
       const result = await sendGrowthDm(credential, {
         dedupe_key: dedupeKey.trim(),
         title: title.trim(),
@@ -128,7 +131,7 @@ export function GrowthDm({ credential, permissions }: Props) {
   return (
     <div className="page">
       <header className="page-head">
-        <h2>成长私信</h2>
+        <h1>成长私信</h1>
         <p className="page-desc">
           复用现有 IM 会话：以系统身份向用户发送一对一私信，支持跳转与群发幂等。发件方固定显示为「成长私信」，不暴露管理员个人账号。
         </p>
@@ -208,6 +211,9 @@ export function GrowthDm({ credential, permissions }: Props) {
         <div className="panel-head"><h3>批次台账</h3><span className="muted">{campaignsState.data?.length ?? 0}</span></div>
         {campaignsState.loading && <p className="muted">加载中…</p>}
         {campaignsState.error !== null && <p className="error">{describeError(campaignsState.error)}</p>}
+        {!campaignsState.loading && campaignsState.error === null && (campaignsState.data ?? []).length === 0 ? (
+          <p className="empty">还没有发送记录，发送成功后批次会在此留账。</p>
+        ) : null}
         {(campaignsState.data ?? []).map((row) => (
           <div className="deploy-row" key={row.id}>
             <div className="deploy-kv">

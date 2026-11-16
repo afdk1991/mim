@@ -31,6 +31,19 @@ function yuan(value: number): string { // 业务步骤
   return `${(value / 100).toFixed(2)} 元`; // 推广预算展示
 } // yuan 结束
 
+/** 列表三态：加载中 / 失败 / 空，供三类内容复用，避免静默空列表 */
+function ListState({ loading, error, empty }: { loading: boolean; error: unknown; empty: boolean }) {
+  if (loading) return <p className="muted">加载中…</p>;
+  if (error) return <p className="error">列表加载失败：{describeError(error)}</p>;
+  if (empty) return <p className="empty">还没有记录，用上方表单新建一条即可。</p>;
+  return null;
+}
+
+/** 删除前的二次确认：破坏性操作不可撤销，统一走原生确认框 */
+function confirmDelete(kind: string, name: string): boolean {
+  return window.confirm(`确认删除${kind}「${name}」？删除后不可恢复。`);
+}
+
 /** 内容运营视图主体 */
 export function ContentOps({ credential, permissions }: Props) { // 业务步骤
   const canWrite = permissions.includes('appearance:write'); // 后端 content-ops 复用 appearance:write
@@ -73,9 +86,9 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
       {notice && <div className="panel hint">{notice}</div>}
 
       <div className="tabs">{/* 执行当前业务步骤 */}
-        <button type="button" className={`btn ghost${tab === 'announcements' ? ' active' : ''}`} onClick={() => setTab('announcements')}>公告</button>
-        <button type="button" className={`btn ghost${tab === 'changelog' ? ' active' : ''}`} onClick={() => setTab('changelog')}>更新日志</button>
-        <button type="button" className={`btn ghost${tab === 'promotions' ? ' active' : ''}`} onClick={() => setTab('promotions')}>推广计划</button>
+        <button type="button" className={`tab${tab === 'announcements' ? ' active' : ''}`} onClick={() => setTab('announcements')}>公告</button>
+        <button type="button" className={`tab${tab === 'changelog' ? ' active' : ''}`} onClick={() => setTab('changelog')}>更新日志</button>
+        <button type="button" className={`tab${tab === 'promotions' ? ' active' : ''}`} onClick={() => setTab('promotions')}>推广计划</button>
       </div>
 
       {tab === 'announcements' && (
@@ -106,7 +119,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
           </section>
           <section className="panel">{/* 执行当前业务步骤 */}
             <div className="panel-head"><h3>公告列表</h3><span className="muted">{(announcementsState.data ?? []).length}</span></div>
-            {announcementsState.loading && <p className="muted">加载中…</p>}
+            <ListState loading={announcementsState.loading} error={announcementsState.error} empty={(announcementsState.data ?? []).length === 0} />
             {(announcementsState.data ?? []).map((row: AdminAnnouncement) => (
               <div className="deploy-row" key={row.id}>{/* 执行当前业务步骤 */}
                 <div className="deploy-kv">{/* 执行当前业务步骤 */}
@@ -117,7 +130,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
                 <div className="deploy-columns">{/* 执行当前业务步骤 */}
                   {row.status !== 'published' && <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => updateAnnouncement(credential, row.id, { status: 'published' }), '公告已发布', announcementsState.reload)}>发布</button>}
                   {row.status === 'published' && <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => updateAnnouncement(credential, row.id, { status: 'archived' }), '公告已归档', announcementsState.reload)}>归档</button>}
-                  <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => deleteAnnouncement(credential, row.id), '公告已删除', announcementsState.reload)}>删除</button>
+                  <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => { if (confirmDelete('公告', row.title)) void run(() => deleteAnnouncement(credential, row.id), '公告已删除', announcementsState.reload); }}>删除</button>
                 </div>
               </div>
             ))}
@@ -153,7 +166,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
           </section>
           <section className="panel">{/* 执行当前业务步骤 */}
             <div className="panel-head"><h3>版本记录</h3><span className="muted">{(changelogState.data ?? []).length}</span></div>
-            {changelogState.loading && <p className="muted">加载中…</p>}
+            <ListState loading={changelogState.loading} error={changelogState.error} empty={(changelogState.data ?? []).length === 0} />
             {(changelogState.data ?? []).map((row: AdminChangelog) => (
               <div className="deploy-row" key={row.id}>{/* 执行当前业务步骤 */}
                 <div className="deploy-kv">{/* 执行当前业务步骤 */}
@@ -163,7 +176,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
                 </div>
                 <div className="deploy-columns">{/* 执行当前业务步骤 */}
                   {row.status !== 'published' && <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => updateChangelog(credential, row.id, { status: 'published' }), '更新日志已发布', changelogState.reload)}>发布</button>}
-                  <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => deleteChangelog(credential, row.id), '更新日志已删除', changelogState.reload)}>删除</button>
+                  <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => { if (confirmDelete('更新日志', `${row.version} ${row.title}`)) void run(() => deleteChangelog(credential, row.id), '更新日志已删除', changelogState.reload); }}>删除</button>
                 </div>
               </div>
             ))}
@@ -203,7 +216,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
           </section>
           <section className="panel">{/* 执行当前业务步骤 */}
             <div className="panel-head"><h3>推广计划列表</h3><span className="muted">{(promotionsState.data ?? []).length}</span></div>
-            {promotionsState.loading && <p className="muted">加载中…</p>}
+            <ListState loading={promotionsState.loading} error={promotionsState.error} empty={(promotionsState.data ?? []).length === 0} />
             {(promotionsState.data ?? []).map((row: AdminPromotion) => (
               <div className="deploy-row" key={row.id}>{/* 执行当前业务步骤 */}
                 <div className="deploy-kv">{/* 执行当前业务步骤 */}
@@ -214,7 +227,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
                 <div className="deploy-columns">{/* 执行当前业务步骤 */}
                   {row.status === 'active' ? <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => updatePromotion(credential, row.id, { status: 'paused' }), '推广计划已暂停', promotionsState.reload)}>暂停</button> : <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => updatePromotion(credential, row.id, { status: 'active' }), '推广计划已启用', promotionsState.reload)}>启用</button>}
                   {row.target_url ? <a className="btn ghost small" href={row.target_url} target="_blank" rel="noreferrer">落地页</a> : null}
-                  <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => void run(() => deletePromotion(credential, row.id), '推广计划已删除', promotionsState.reload)}>删除</button>
+                  <button type="button" className="btn ghost small" disabled={busy || !canWrite} onClick={() => { if (confirmDelete('推广计划', row.name)) void run(() => deletePromotion(credential, row.id), '推广计划已删除', promotionsState.reload); }}>删除</button>
                 </div>
               </div>
             ))}

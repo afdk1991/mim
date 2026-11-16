@@ -97,7 +97,8 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
       <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>待审板块</h3><span className="muted">{(pendingState.data ?? []).length}</span><button type="button" className="btn ghost" onClick={pendingState.reload}>刷新</button></div>
         {pendingState.loading && <p className="muted">加载中…</p>}
-        {(pendingState.data ?? []).length === 0 && !pendingState.loading ? <p className="empty">暂无待审板块</p> : null}
+        {Boolean(pendingState.error) && <p className="error">待审板块加载失败：{describeError(pendingState.error)}</p>}
+        {(pendingState.data ?? []).length === 0 && !pendingState.loading && !pendingState.error ? <p className="empty">暂无待审板块</p> : null}
         {(pendingState.data ?? []).map((board) => (
           <article className="deploy-row" key={board.id}>{/* 执行当前业务步骤 */}
             <div className="deploy-kv">{/* 执行当前业务步骤 */}
@@ -126,6 +127,7 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
 
       <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>论坛设为首页</h3></div>
+        {Boolean(homeState.error) && <p className="error">首页指向加载失败：{describeError(homeState.error)}</p>}
         {homeState.loading ? <p className="muted">加载中…</p> : (
           <div className="form inline">{/* 执行当前业务步骤 */}
             <label>首页指向{/* 执行当前业务步骤 */}
@@ -141,6 +143,7 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
 
       <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>建板块审核</h3></div>
+        {Boolean(reviewState.error) && <p className="error">审核开关加载失败：{describeError(reviewState.error)}</p>}
         {reviewState.loading ? <p className="muted">加载中…</p> : (
           <label className="check">{/* 执行当前业务步骤 */}
             <input type="checkbox" checked={reviewState.data ?? false} disabled={busy || !canWrite} onChange={(event) => void run(() => setCommunityReview(credential, event.target.checked), '审核开关已更新', reviewState.reload)} />
@@ -151,6 +154,8 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
 
       <section className="panel">{/* 执行当前业务步骤 */}
         <div className="panel-head"><h3>推荐指数权重</h3><span className="muted">默认 {JSON.stringify(weightsState.data?.defaults ?? {})}</span></div>
+        {weightsState.loading && <p className="muted">加载中…</p>}
+        {Boolean(weightsState.error) && <p className="error">推荐权重加载失败：{describeError(weightsState.error)}</p>}
         {currentWeights && (
           <div className="form inline">{/* 执行当前业务步骤 */}
             {(['views', 'replies', 'favorites', 'rating', 'halfLifeDays'] as const).map((key) => (

@@ -202,10 +202,12 @@ export function Users({ credential, permissions }: UsersProps) {
     } // catch 结束：失败已转为页面反馈
   }; // submitGrant 结束
 
-  // 撤销指定角色：按钮直接携带角色码，无需二次确认弹层
+  // 撤销指定角色：按钮直接携带角色码，破坏性操作需二次确认
   const revoke = async (roleCode: string): Promise<void> => {
     // 未选中用户时不应触发，作防御性返回
     if (!selected) return;
+    // 二次确认：撤销后该用户立即失去对应权限
+    if (!window.confirm(`确认撤销该用户的 ${roleCode} 角色？撤销后其相关权限立即失效。`)) return;
     // 调用删除接口
     try {
       // 执行撤销
@@ -315,7 +317,7 @@ export function Users({ credential, permissions }: UsersProps) {
   return ( // 返回整体 JSX：页头 + 搜索表单 + 操作反馈 + 左右分栏
     <div className="page"> {/* 页面容器：整页纵向流式布局 */}
       <div className="page-head"> {/* 页头行：标题 + 匹配计数 */}
-        <h2>用户与角色</h2> {/* 页面标题 */}
+        <h1>用户与角色</h1> {/* 页面标题 */}
         <span className="count">{total} 位匹配用户</span> {/* 匹配总数：辅助判断是否需要调整关键词 */}
       </div> {/* 页头结束 */}
 
