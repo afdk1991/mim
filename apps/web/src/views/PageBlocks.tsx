@@ -8,6 +8,7 @@ import { baseOf } from '../router'; // 引入依赖、类型或本地模块绑�
 interface Props { // 视图参数
   page: 'home' | 'forum' | string; // 页面标识
   locale?: 'zh-CN' | 'en-US'; // 语言
+  hideHero?: boolean; // 隐藏 hero 大卡：社区页顶部聚合头已展示同一组标题与副标题
 } // 代码块结束
 
 /** 首页内置默认区块：接口失败或后台清空配置时兜底，保证匿名访客不白屏 */
@@ -159,7 +160,7 @@ function useAnnouncements(enabled: boolean): CommunityThread[] {
 } // 代码块结束
 
 /** 页面区块入口。 */
-export function PageBlocks({ page, locale = 'zh-CN' }: Props) {
+export function PageBlocks({ page, locale = 'zh-CN', hideHero = false }: Props) {
   const [blocks, setBlocks] = useState<PageBlock[]>([]); // 赋值：更新变量 const 的取值
   const [failed, setFailed] = useState(false); // 赋值：更新变量 const 的取值
   const [loaded, setLoaded] = useState(false); // 是否已完成首次读取，避免默认区块闪烁
@@ -181,10 +182,12 @@ export function PageBlocks({ page, locale = 'zh-CN' }: Props) {
   const sourceBlocks = blocks.length > 0 ? blocks : page === 'home' ? DEFAULT_HOME_BLOCKS : [];
   // 前台按 sort_order 升序渲染（后端已排序，前端再兜底一次，防止乱序配置打乱版面）
   const orderedBlocks = [...sourceBlocks].sort((a, b) => a.sort_order - b.sort_order);
+  // 首页顶部聚合头已承担标题 / 副标题，hero 大卡不再重复渲染；其余卡片与公告照常
+  const visibleBlocks = hideHero ? orderedBlocks.filter((block) => block.kind !== 'hero') : orderedBlocks;
   const hasAnnouncementBlock = sourceBlocks.some((block) => block.kind === 'announcements'); // 常量 hasAnnouncementBlock：保存固定配置或一次性派生值
   return ( // 返回当前函数的处理结果
     <div className={`page-blocks${page === 'home' ? ' page-blocks-home' : ''}`} data-page={page} data-locale={locale}>{/* 仅首页启用新装修样式，论坛页保持原视觉 */}
-      {orderedBlocks.map((block) => <Block block={block} key={block.id} />)}
+      {visibleBlocks.map((block) => <Block block={block} key={block.id} />)}
       {hasAnnouncementBlock && announcements.length > 0 ? (
         <section className="page-block">{/* 执行当前业务步骤 */}
           <div className="panel-head"><h3>社区公告</h3></div>
