@@ -32,7 +32,9 @@ export function Orders({ credential }: Props) {
   const state = useAsync(() => listShipmentOrders(credential, 'all' as ShipmentFilter, 100), [credential]);
   const [keyword, setKeyword] = useState('');
 
-  const rows = (state.data ?? []).filter((row) => {
+  // 全量行：用于区分「确实没有订单」与「搜索无匹配」两种空态
+  const allRows = state.data ?? [];
+  const rows = allRows.filter((row) => {
     const q = keyword.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -67,7 +69,15 @@ export function Orders({ credential }: Props) {
 
         {state.loading ? <p className="muted">加载中…</p> : null}
         {state.error ? <div className="error">{describeError(state.error)}</div> : null}
-        {!state.loading && !state.error && rows.length === 0 ? <div className="empty">没有匹配的订单</div> : null}
+        {!state.loading && !state.error && rows.length === 0 ? (
+          allRows.length === 0 ? (
+            <div className="empty">
+              当前没有订单。商城还没有产生订单，用户下单后才会出现在这里；可先到「商品管理」确认商品已上架。
+            </div>
+          ) : (
+            <div className="empty">没有匹配的订单，换个关键词试试。</div>
+          )
+        ) : null}
 
         {rows.length > 0 ? (
           <table className="table">

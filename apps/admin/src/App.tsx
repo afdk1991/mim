@@ -229,6 +229,14 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
     setOpenGroups((prev) => (prev.has(group) ? prev : new Set(prev).add(group)));
   } // openItem 结束
 
+  /** 概览快捷入口：按目标视图归属分组复用 openItem，最近使用组与侧栏保持一致 */
+  function openFromOverview(view: ViewKey) {
+    const group = NAV_GROUPS.find((item) => item.items.some((child) => child.key === view));
+    const target = group?.items.find((item) => item.key === view);
+    if (group && target) openItem(target, group.key);
+    else setView(view);
+  } // openFromOverview 结束
+
   // 切换明暗：立即写入 data-theme 并持久化，与前台共用同一偏好
   function toggleMode() {
     const next: ThemeMode = mode === 'dark' ? 'light' : 'dark'; // 目标模式取反
@@ -299,7 +307,7 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
   const subject = identity.bootstrap ? '引导令牌' : identity.user?.display_name ?? '未知用户'; // 业务步骤
 
   // 视图分发：集中在一处便于对照权限
-  const content = renderView(activeKey, credential, identity); // 业务步骤
+  const content = renderView(activeKey, credential, identity, openFromOverview); // 业务步骤
 
   // 渲染三段式布局：侧栏 + 主区
   return (
@@ -365,9 +373,9 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
 } // Console 组件结束
 
 /** 视图分发：key 已在调用方做过权限过滤，这里只做映射 */
-function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity) { // 业务步骤
-  // 概览：纯展示身份与权限统计
-  if (key === 'overview') return <Overview identity={identity} />;
+function renderView(key: ViewKey, credential: Credential, identity: AdminIdentity, onOpen: (view: ViewKey) => void) { // 业务步骤
+  // 概览：身份统计 + 常用入口
+  if (key === 'overview') return <Overview identity={identity} onOpen={onOpen} />;
   // 提现审核：申请队列、通过 / 驳回 / 标记到账、创作分成结算
   if (key === 'withdrawals') return <Withdrawals credential={credential} permissions={identity.permissions} />;
   // 发货与售后：待发货录单、物流推进与售后审批
@@ -401,5 +409,5 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   // 设置：站点名称 / 副标题 / 页脚文案
   if (key === 'settings') return <Settings credential={credential} permissions={identity.permissions} />;
   // 兜底：理论上不可达，仍返回概览保证不白屏
-  return <Overview identity={identity} />;
+  return <Overview identity={identity} onOpen={onOpen} />;
 } // renderView 结束：全部视图分发完毕

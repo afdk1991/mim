@@ -45,7 +45,7 @@ export function Realname({ credential, permissions }: Props) { // 业务步骤
     <div className="page">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>实名审核</h1>
-        <p className="muted">证件明文不入库，仅展示脱敏姓名与证件后四位；按提交时间先到先审。</p>
+        <p className="page-desc">证件明文不入库，仅展示脱敏姓名与证件后四位；按提交时间先到先审。</p>
       </header>
 
       {!canRead && <div className="panel error">当前账号缺少 user:read 权限。</div>}

@@ -407,7 +407,7 @@ export function PageBuilder({ credential, permissions }: PageBuilderProps) {
     <div className="page">
       <header className="page-head">
         <h1>页面搭建</h1>
-        <p className="muted">复用外观配置与 appearance:write：调整首页 / 论坛区块的顺序、文案、可见性与入口跳转，保存后公开接口即时生效。</p>
+        <p className="page-desc">复用外观配置与 appearance:write：调整首页 / 论坛区块的顺序、文案、可见性与入口跳转，保存后公开接口即时生效。</p>
       </header>
       {!canWrite ? <div className="panel error">当前账号缺少 appearance:write 权限，页面搭建不可用。</div> : null}
       {error ? <div className="panel error">{error}</div> : null}

@@ -26,6 +26,13 @@ const FILTER_TABS: Array<{ value: ShipmentFilter; label: string }> = [
   { value: 'delivered', label: '已签收' },
 ];
 
+// 空态文案：按页签说明事实与下一步，避免误以为页面故障
+const EMPTY_HINT: Partial<Record<ShipmentFilter, string>> = {
+  to_ship: '当前没有待发货订单。商城产生已支付订单后会出现在这里；可到「订单管理」确认订单是否已支付。',
+  shipped: '当前没有已发货订单。在「待发货」页签录入运单后，订单会转到此处。',
+  delivered: '当前没有已签收订单。已发货订单标记签收后会出现在这里。',
+};
+
 // 物流状态中文名
 const SHIPMENT_STATUS_LABEL: Record<ShipmentStatus, string> = {
   pending: '待揽收',
@@ -197,7 +204,7 @@ export function Shipments({ credential, permissions }: ShipmentsProps) {
             {listState.loading ? <p className="muted">加载中…</p> : null}
             {listState.error ? <div className="error">{describeError(listState.error)}</div> : null}
             {!listState.loading && !listState.error && rows.length === 0 ? (
-              <div className="empty">当前页签没有订单</div>
+              <div className="empty">{EMPTY_HINT[filter] ?? '当前没有订单。'}</div>
             ) : null}
 
             {rows.length > 0 ? (
@@ -320,7 +327,7 @@ export function Shipments({ credential, permissions }: ShipmentsProps) {
             {afterSalesState.loading ? <p className="muted">加载中…</p> : null}
             {afterSalesState.error ? <div className="error">{describeError(afterSalesState.error)}</div> : null}
             {!afterSalesState.loading && !afterSalesState.error && afterSalesRows.length === 0 ? (
-              <div className="empty">没有售后申请</div>
+              <div className="empty">当前没有售后申请。用户对已支付订单发起退款或退货后，申请会出现在这里。</div>
             ) : null}
 
             {afterSalesRows.length > 0 ? (

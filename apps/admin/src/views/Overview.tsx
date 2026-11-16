@@ -5,10 +5,12 @@ import type { AdminIdentity } from '../api';
 interface OverviewProps {
   // 当前身份、角色与权限
   identity: AdminIdentity;
-} // OverviewProps 结束：仅一个 identity 字段，保持组件契约最小化
+  // 常用入口：点击后由外壳切换到对应视图（发布公告 / 查看订单）
+  onOpen: (view: 'contentOps' | 'orders') => void;
+} // OverviewProps 结束：身份 + 跳转回调，保持组件契约最小化
 
 // 概览组件：纯展示，无副作用
-export function Overview({ identity }: OverviewProps) {
+export function Overview({ identity, onOpen }: OverviewProps) {
   // 身份来源文案：引导通道与账号通道的权限计算方式不同，需明确区分
   const source = identity.bootstrap ? '引导令牌（超管通道）' : '账号登录（RBAC）';
   // 主体标识：引导通道没有真实用户
@@ -19,6 +21,9 @@ export function Overview({ identity }: OverviewProps) {
   const roleCount = identity.roles.length;
   // 权限点数量：与角色数量并列展示，并复用于下方空态分支判断，避免 JSX 里重复取 length
   const permissionCount = identity.permissions.length;
+  // 常用入口按权限显示：无对应写权限时不给死按钮
+  const canAppearance = identity.permissions.includes('appearance:write');
+  const canCommerce = identity.permissions.includes('commerce:write');
 
   // 指标卡片数据：抽到 TS 位置便于加注释
   const cards = [
@@ -36,6 +41,14 @@ export function Overview({ identity }: OverviewProps) {
         <span className="count">权限每请求实时查库，变更后刷新即生效</span> {/* 说明文案：强调权限不落缓存，改授权后刷新即可验证 */}
       </div> {/* 页头结束 */}
       <p className="page-desc">这里是管理后台的起点：查看当前身份、生效角色与权限范围，并从左侧「内容 / 交易 / 用户 / 站点」四组入口进入具体功能。</p> {/* 用途说明：一句话讲清概览能做什么 */}
+      <div className="row" style={{ marginBottom: 16 }}> {/* 常用入口：给首页一个可直接落地的动作，而不是只有文字 */}
+        {canAppearance ? (
+          <button className="btn primary" type="button" onClick={() => onOpen('contentOps')}>发布公告</button>
+        ) : null}
+        {canCommerce ? (
+          <button className="btn ghost" type="button" onClick={() => onOpen('orders')}>查看订单</button>
+        ) : null}
+      </div> {/* 常用入口结束 */}
       <div className="cards"> {/* 指标卡片区：四张卡片横向栅格排列 */}
         {cards.map((card) => ( // 遍历卡片数组逐张渲染；label 恒定唯一，可直接作 key
           // 单个指标卡片

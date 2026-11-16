@@ -110,7 +110,7 @@ export function Appearance({ credential, permissions }: Props) {
     <div className="page">
       <header className="page-head">
         <h1>外观</h1>
-        <p className="muted">调整站点主色、圆角与默认明暗；保存后前台刷新即生效，访客仍可自行切换明暗。</p>
+        <p className="page-desc">调整站点主色、圆角与默认明暗；保存后前台刷新即生效，访客仍可自行切换明暗。</p>
       </header>
       {!canWrite ? <div className="panel error">当前账号缺少 appearance:write 权限，只能查看不能保存。</div> : null}
       {error ? <div className="panel error">{error}</div> : null}

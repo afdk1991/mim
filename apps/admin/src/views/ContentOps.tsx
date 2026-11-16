@@ -65,7 +65,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
     <div className="page">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>内容运营</h1>
-        <p className="muted">产品公告、更新日志与推广计划：草稿、发布、归档全流程可操作，公开端点立即生效。</p>
+        <p className="page-desc">产品公告、更新日志与推广计划：草稿、发布、归档全流程可操作，公开端点立即生效。</p>
       </header>
 
       {!canWrite && <div className="panel error">当前账号缺少 appearance:write 权限，仅可查看。</div>}

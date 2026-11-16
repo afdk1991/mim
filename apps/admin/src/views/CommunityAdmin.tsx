@@ -87,7 +87,7 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
     <div className="page">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>社区运营</h1>
-        <p className="muted">板块审核、论坛首页、发帖审核开关、推荐指数与 Tab 栏目配置：全部落到公开端点即时生效。</p>
+        <p className="page-desc">板块审核、论坛首页、发帖审核开关、推荐指数与 Tab 栏目配置：全部落到公开端点即时生效。</p>
       </header>
 
       {!canWrite && <div className="panel error">当前账号缺少 appearance:write 权限，运营操作不可用。</div>}

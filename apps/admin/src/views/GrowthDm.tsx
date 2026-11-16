@@ -129,7 +129,7 @@ export function GrowthDm({ credential, permissions }: Props) {
     <div className="page">
       <header className="page-head">
         <h2>成长私信</h2>
-        <p className="muted">
+        <p className="page-desc">
           复用现有 IM 会话：以系统身份向用户发送一对一私信，支持跳转与群发幂等。发件方固定显示为「成长私信」，不暴露管理员个人账号。
         </p>
       </header>

@@ -67,7 +67,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
     <div className="page">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>批量改价</h1>
-        <p className="muted">独立商城商品统一调价，事务化执行并保留改前快照，可按批次一键回滚。</p>
+        <p className="page-desc">独立商城商品统一调价，事务化执行并保留改前快照，可按批次一键回滚。</p>
       </header>
 
       {!canWrite && <div className="panel error">当前账号缺少 commerce:write 权限，无法提交调价。</div>}

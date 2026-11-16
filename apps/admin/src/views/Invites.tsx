@@ -67,7 +67,7 @@ export function Invites({ credential, permissions }: Props) { // 业务步骤
     <div className="page">{/* 执行当前业务步骤 */}
       <header className="page-head">{/* 执行当前业务步骤 */}
         <h1>邀请码管理</h1>
-        <p className="muted">注册准入码：批量生成、绑定手机 / 邮箱、限制次数与有效期，并保留逐次核销审计。</p>
+        <p className="page-desc">注册准入码：批量生成、绑定手机 / 邮箱、限制次数与有效期，并保留逐次核销审计。</p>
       </header>
 
       {!canRead && <div className="panel error">当前账号缺少 user:read 权限。</div>}

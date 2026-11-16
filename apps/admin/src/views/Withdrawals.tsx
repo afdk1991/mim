@@ -61,7 +61,7 @@ export function Withdrawals({ credential, permissions }: Props) {
     <div className="page">
       <header className="page-head">
         <h1>提现审核</h1>
-        <p className="muted">可提现余额只累计佣金与创作分成，充值余额不可提现；通过时扣减余额并落提现流水，驳回已通过的申请会原路退回。</p>
+        <p className="page-desc">可提现余额只累计佣金与创作分成，充值余额不可提现；通过时扣减余额并落提现流水，驳回已通过的申请会原路退回。</p>
       </header>
 
       {!canWrite && <div className="panel hint">当前账号缺少 commerce:write 权限，只能查看队列。</div>}
