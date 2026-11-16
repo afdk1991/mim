@@ -99,8 +99,24 @@ export function Appearance({ credential, permissions }: Props) {
     }
   } // save 结束
 
-  if (loading) return <div className="page"><p className="hint">正在读取外观配置…</p></div>; // 首屏占位
-  if (!draft) return <div className="page"><p className="error">{error ?? '外观配置读取失败'}</p></div>; // 加载失败
+  if (loading) return (
+    <div className="page">
+      <header className="page-head">
+        <h1>外观</h1>
+        <p className="page-desc">调整站点主色、圆角与默认明暗；保存后前台刷新即生效，访客仍可自行切换明暗。</p>
+      </header>
+      <p className="muted">正在读取外观配置…</p>
+    </div>
+  ); // 首屏占位：保留页头，避免加载时页面无标题跳变
+  if (!draft) return (
+    <div className="page">
+      <header className="page-head">
+        <h1>外观</h1>
+        <p className="page-desc">调整站点主色、圆角与默认明暗；保存后前台刷新即生效，访客仍可自行切换明暗。</p>
+      </header>
+      <p className="error">{error ?? '外观配置读取失败'}</p>
+    </div>
+  ); // 加载失败：同样保留页头，错误可读
 
   const radiusOptions = RADIUS_STEPS.some((item) => item.value === draft.radius) // 存量库里可能是非档位值
     ? RADIUS_STEPS // 命中档位直接使用
@@ -112,7 +128,7 @@ export function Appearance({ credential, permissions }: Props) {
         <h1>外观</h1>
         <p className="page-desc">调整站点主色、圆角与默认明暗；保存后前台刷新即生效，访客仍可自行切换明暗。</p>
       </header>
-      {!canWrite ? <div className="panel error">当前账号缺少 appearance:write 权限，只能查看不能保存。</div> : null}
+      {!canWrite ? <div className="hint">当前账号缺少 appearance:write 权限，只能查看不能保存。</div> : null}
       {error ? <div className="panel error">{error}</div> : null}
       {notice ? <div className="panel hint">{notice}</div> : null}
 

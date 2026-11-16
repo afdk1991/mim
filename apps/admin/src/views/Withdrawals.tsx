@@ -113,7 +113,7 @@ export function Withdrawals({ credential, permissions }: Props) {
             {canWrite && (row.status === 'pending' || row.status === 'approved') && (
               <div className="deploy-columns">
                 {row.status === 'pending' && (
-                  <button type="button" className="btn primary small" disabled={busy} onClick={() => void run(async () => { await approveWithdrawal(credential, row.id); return `已通过 ${yuan(row.amount_cents)}`; })}>通过</button>
+                  <button type="button" className="btn primary small" disabled={busy} onClick={() => { if (window.confirm(`确认通过 ${row.display_name || row.user_id} 的 ${yuan(row.amount_cents)} 提现？通过后立即扣减可提现余额。`)) void run(async () => { await approveWithdrawal(credential, row.id); return `已通过 ${yuan(row.amount_cents)}`; }); }}>通过</button>
                 )}
                 {row.status === 'approved' && (
                   <button type="button" className="btn primary small" disabled={busy} onClick={() => setPaying({ id: row.id, ref: '' })}>标记到账</button>
@@ -148,10 +148,10 @@ export function Withdrawals({ credential, permissions }: Props) {
           type="button"
           className="btn primary"
           disabled={busy || !canWrite}
-          onClick={() => void run(async () => {
+          onClick={() => { if (!window.confirm('确认批量结算所有已过保护期的创作分成？结算后金额并入作者可提现余额。')) return; void run(async () => {
             const result = await settleCreatorEarnings(credential);
             return `已结算 ${result.settled} 笔，合计 ${yuan(result.total_cents)}`;
-          })}
+          }); }}
         >
           批量结算创作分成
         </button>

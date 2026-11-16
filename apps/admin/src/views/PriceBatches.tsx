@@ -70,7 +70,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         <p className="page-desc">独立商城商品统一调价，事务化执行并保留改前快照，可按批次一键回滚。</p>
       </header>
 
-      {!canWrite && <div className="panel error">当前账号缺少 commerce:write 权限，无法提交调价。</div>}
+      {!canWrite && <div className="panel hint">当前账号缺少 commerce:write 权限，无法提交调价。</div>}
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
 
@@ -115,7 +115,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
         <div className="panel-head"><h3>最近批次</h3><button type="button" className="btn ghost" onClick={batchesState.reload}>刷新</button></div>
         {batchesState.loading && <p className="muted">加载中…</p>}
         {Boolean(batchesState.error) && <p className="error">{describeError(batchesState.error)}</p>}
-        {(batchesState.data ?? []).length === 0 && !batchesState.loading ? <p className="empty">暂无调价批次</p> : null}
+        {(batchesState.data ?? []).length === 0 && !batchesState.loading && !batchesState.error ? <p className="empty">暂无调价批次</p> : null}
         {(batchesState.data ?? []).map((batch) => (
           <article className="panel" key={batch.id} style={{ marginBottom: 12 }}>{/* 执行当前业务步骤 */}
             <div className="panel-head">{/* 执行当前业务步骤 */}
@@ -146,6 +146,7 @@ export function PriceBatches({ credential, permissions }: Props) { // 业务步�
             )}
             {!batch.rolled_back_at && (
               <button type="button" className="btn ghost" disabled={!canWrite || busy} onClick={() => void (async () => {{/* 执行当前业务步骤 */}
+                if (!window.confirm('确认按该批次快照回滚商品价格？回滚后本批次不可再次执行。')) return; // 二次确认：价格回滚影响线上售卖
                 setBusy(true); // 回滚期间禁用按钮
                 setError(''); // 清空旧错误
                 try { // 业务步骤

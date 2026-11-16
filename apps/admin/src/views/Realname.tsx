@@ -48,7 +48,7 @@ export function Realname({ credential, permissions }: Props) { // 业务步骤
         <p className="page-desc">证件明文不入库，仅展示脱敏姓名与证件后四位；按提交时间先到先审。</p>
       </header>
 
-      {!canRead && <div className="panel error">当前账号缺少 user:read 权限。</div>}
+      {!canRead && <div className="panel hint">当前账号缺少 user:read 权限，无法查看申请队列。</div>}
       {!canReview && canRead && <div className="panel hint">当前账号可查看队列，但没有 rbac:write 权限，不能执行审核。</div>}
       {error && <div className="panel error">{error}</div>}
       {notice && <div className="panel hint">{notice}</div>}
@@ -57,7 +57,7 @@ export function Realname({ credential, permissions }: Props) { // 业务步骤
         <div className="panel-head"><h3>待审队列</h3><span className="muted">{queue.length} 条</span><button type="button" className="btn ghost" onClick={queueState.reload}>刷新</button></div>
         {queueState.loading && <p className="muted">加载中…</p>}
         {Boolean(queueState.error) && <p className="error">{describeError(queueState.error)}</p>}
-        {queue.length === 0 && !queueState.loading ? <p className="empty">暂无待审实名申请</p> : null}
+        {queue.length === 0 && !queueState.loading && !queueState.error ? <p className="empty">暂无待审实名申请</p> : null}
         {queue.map((row) => (
           <article className="panel" key={row.id} style={{ marginBottom: 12 }}>{/* 执行当前业务步骤 */}
             <div className="panel-head"><h3>{row.name_masked} · {ID_TYPE[row.id_type] ?? row.id_type}</h3><span className="badge warning">{row.status}</span></div>
