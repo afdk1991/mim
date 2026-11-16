@@ -398,7 +398,7 @@ function couponDiscount(deps: ApiDeps, code: string | undefined, amount: number)
 
 // 本路由承载的全部命名空间前缀：鉴权与幂等只挂在这些前缀上，
 // 避免裸 router.use 全局拦截穿过本 router 的其他命名空间（如后台 /admin）请求。
-const COMMUNITY_PREFIXES = ['/community', '/vip', '/wallet', '/shop', '/coupons', '/referral']; // 保存 COMMUNITY_PREFIXES：承载本步骤的计算结果供后续使用
+const COMMUNITY_PREFIXES = ['/community', '/vip', '/wallet', '/shop', '/coupons', '/referral', '/after-sales']; // 保存 COMMUNITY_PREFIXES：承载本步骤的计算结果供后续使用（/after-sales 为用户侧售后查询，同样要求登录）
 
 export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 createCommunityRouter：封装可复用业务步骤
   const router = Router(); // 保存 router：承载本步骤的计算结果供后续使用
@@ -1861,6 +1861,54 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     }); // 结束函数体：本层作用域收尾
     tx(); // 业务步骤：推进当前流程的下一项处理
     res.json({ ok: true, refunded_cents: order.payable_cents }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 售后申请：仅订单本人、仅已支付 / 已发货订单，同订单同类型未结案不可重复提交。 */
+  router.post('/shop/orders/:id/after-sales', (req, res) => { // 路由 POST /shop/orders/:id/after-sales：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
+    const body = parse( // 保存 body：承载本步骤的计算结果供后续使用
+      z.object({ // 业务步骤：推进当前流程的下一项处理
+        kind: z.enum(['refund_only', 'return_refund', 'repair']), // 售后类型：仅退款 / 退货退款 / 维修
+        reason: z.string().trim().min(1).max(120), // 申请原因：前端下拉选项
+        detail: z.string().trim().max(300).optional(), // 问题说明
+        evidence: z.string().trim().max(300).optional(), // 凭证说明文字（不传文件，只留文字描述）
+      }), // 结束代码块：本层作用域收尾
+      req.body, // 读取请求：取得入参、身份或上下文
+    ); // 调用结束：参数列表与链式调用收尾
+    const order = deps.db.prepare('SELECT status FROM shop_orders WHERE id = ? AND user_id = ?').get(req.params.id, userId) as // 保存 order：承载本步骤的计算结果供后续使用
+      | { status: string } // 业务步骤：推进当前流程的下一项处理
+      | undefined; // 业务步骤：推进当前流程的下一项处理
+    if (!order) throw new AppError('NOT_FOUND', '订单不存在'); // 非本人订单按不存在处理，不泄露他人订单
+    if (order.status !== 'paid' && order.status !== 'delivered') throw new AppError('CONFLICT', '仅已支付订单可申请售后', { status: order.status }); // 待支付 / 已退款 / 已取消一律拒绝
+    const duplicated = deps.db // 保存 duplicated：承载本步骤的计算结果供后续使用
+      .prepare("SELECT id FROM after_sales_requests WHERE order_id = ? AND kind = ? AND status IN ('pending', 'approved')") // 同订单同类型只允许存在一条未结案申请
+      .get(req.params.id, body.kind) as { id: string } | undefined; // 查询单行：命中即重复申请
+    if (duplicated) throw new AppError('CONFLICT', '同一订单该类型售后已提交，请勿重复申请', { id: duplicated.id }); // 业务拒绝 CONFLICT：以统一错误码终止当前请求
+    const reason = [body.reason, body.detail ? `说明：${body.detail}` : '', body.evidence ? `凭证说明：${body.evidence}` : ''] // 既有表只有 reason 一列，说明与凭证文字合并落库
+      .filter(Boolean) // 去掉空段
+      .join(' · '); // 用分隔符拼接，后台列表可直接阅读
+    const id = `as-${randomUUID()}`; // 售后申请主键
+    const ts = now(); // 统一时间戳
+    deps.db // 业务步骤：推进当前流程的下一项处理
+      .prepare('INSERT INTO after_sales_requests (id, order_id, user_id, kind, reason, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, \'pending\', ?, ?)') // 预编译 SQL：初始状态与后台审批状态机对齐
+      .run(id, req.params.id, userId, body.kind, reason, ts, ts); // 执行写入：把参数落库并返回影响结果
+    res.status(201).json({ id, status: 'pending' }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 我的售后：按用户返回最近 50 条，联表带出商品名与订单实付，供前端展示状态与处理结果。 */
+  router.get('/after-sales', (req, res) => { // 路由 GET /after-sales：注册入口并绑定鉴权与处理逻辑
+    const userId = req.user!.id; // 只读当前登录用户自己的申请
+    const items = deps.db // 保存 items：承载本步骤的计算结果供后续使用
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT a.id, a.order_id, a.kind, a.reason, a.status, a.admin_note, a.handled_at, a.created_at,
+                p.name AS product_name, o.payable_cents
+           FROM after_sales_requests a
+           JOIN shop_orders o ON o.id = a.order_id
+           LEFT JOIN shop_products p ON p.id = o.product_id
+          WHERE a.user_id = ? ORDER BY a.created_at DESC LIMIT 50`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(userId); // 查询多行：读取列表供批量处理
+    res.json({ items }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
   /** 优惠码预校验（不消耗次数）。 */

@@ -15,6 +15,7 @@ import { api, errorText, getSession } from '../api'; // 引入依赖、类型或
 import { cancelWithdrawal, createWithdrawal, getWithdrawalOverview } from '../api/wallet-withdrawal'; // 提现：可提现余额口径与申请（钱包结算层）
 import type { WithdrawMethod, WithdrawalOverview } from '../api/wallet-withdrawal'; // 提现类型，全部金额为整数分
 import type { // 引入依赖、类型或本地模块绑定
+  AfterSalesRequest,
   BoardTab,
   CommunityBoard,
   CommunityPost,
@@ -68,6 +69,24 @@ const ORDER_STATUS: Record<string, string> = { // 常量 ORDER_STATUS：保存�
   refunded: '已退款',
   cancelled: '已取消',
 }; // 代码块结束
+
+/** 售后类型文案：与 after_sales_requests.kind 一一对应 */
+const AFTER_SALES_KIND: Record<string, string> = {
+  refund_only: '仅退款',
+  return_refund: '退货退款',
+  repair: '维修',
+};
+
+/** 售后状态文案：与 after_sales_requests.status 一一对应 */
+const AFTER_SALES_STATUS: Record<string, string> = {
+  pending: '待处理',
+  approved: '已通过',
+  rejected: '已驳回',
+  cancelled: '已撤销',
+};
+
+/** 售后原因选项：提交时作为 reason 落库，后台可直接阅读 */
+const AFTER_SALES_REASONS = ['质量问题', '商品与描述不符', '未收到货', '少件或破损', '其他'];
 
 const TX_KIND: Record<WalletTransaction['kind'], string> = { // 常量 TX_KIND：保存固定配置或一次性派生值
   recharge: '充值',
@@ -245,6 +264,14 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [shipPhone, setShipPhone] = useState(''); // 赋值：更新变量 const 的取值
   const [shipAddress, setShipAddress] = useState(''); // 赋值：更新变量 const 的取值
   const [lastOrder, setLastOrder] = useState<{ order_id: string; payable_cents: number; delivery_kind: string } | null>(null); // 赋值：更新变量 const 的取值
+  // ── 售后（用户侧）──
+  const [afterSales, setAfterSales] = useState<AfterSalesRequest[]>([]); // 我的售后申请
+  const [asOrder, setAsOrder] = useState<string | null>(null); // 正在申请售后的订单 id
+  const [asKind, setAsKind] = useState<'refund_only' | 'return_refund' | 'repair'>('refund_only'); // 售后类型
+  const [asReason, setAsReason] = useState('质量问题'); // 申请原因（下拉选项）
+  const [asDetail, setAsDetail] = useState(''); // 问题说明
+  const [asEvidence, setAsEvidence] = useState(''); // 凭证说明文字（不上传文件）
+  const [asBusy, setAsBusy] = useState(false); // 提交中，防重复点击
 
   const [referral, setReferral] = useState<{ code: string; invited: { count: number; commission: number }; commission_cents: number } | null>(null); // 赋值：更新变量 const 的取值
   const [bindCode, setBindCode] = useState(''); // 赋值：更新变量 const 的取值
@@ -380,9 +407,10 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
 
   async function loadShop() { // 函数 loadShop：封装一段可复用的处理逻辑
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      const [p, o] = await Promise.all([api.shop.products(), api.commerce.orders({ source: 'shop' })]); // 赋值：更新变量 const 的取值（商品目录走旧接口，订单读取切统一只读接口）
+      const [p, o, a] = await Promise.all([api.shop.products(), api.commerce.orders({ source: 'shop' }), api.shop.myAfterSales()]); // 商品目录走旧接口，订单读取切统一只读接口，售后读用户侧新接口
       setProducts(p.products);
       setOrders(o.items);
+      setAfterSales(a.items);
     } catch (err) {
       setError(errorText(locale, err));
     } // 代码块结束
@@ -935,6 +963,34 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       await Promise.all([loadShop(), loadWallet()]); // 异步等待：挂起至 Promise 落定后再继续
     } catch (err) {
       setError(errorText(locale, err));
+    } // 代码块结束
+  } // 代码块结束
+
+  /** 提交售后申请：原因 + 说明 + 可选的凭证说明文字，落库后回到「我的售后」查看进度。 */
+  async function submitAfterSales() { // 函数 submitAfterSales：封装一段可复用的处理逻辑
+    if (!requireSession()) return; // 售后申请必须登录
+    if (!asOrder) return; // 未选择订单时不提交
+    if (asReason === '其他' && !asDetail.trim()) { // 其他原因必须补充说明
+      setError('选择「其他」时请填写问题说明'); // 本地前置校验，避免无效请求
+      return; // 提前返回：不发起请求
+    } // 代码块结束
+    setAsBusy(true); // 提交中：锁住按钮防重复
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await api.shop.afterSales(asOrder, { // 异步等待：挂起至 Promise 落定后再继续
+        kind: asKind, // 售后类型
+        reason: asReason, // 申请原因
+        detail: asDetail.trim() || undefined, // 问题说明
+        evidence: asEvidence.trim() || undefined, // 凭证说明文字
+      }); // 调用结束：参数列表与链式调用收尾
+      setNotice('售后申请已提交，等待后台处理'); // 成功提示
+      setAsOrder(null); // 关闭表单
+      setAsDetail(''); // 清空说明
+      setAsEvidence(''); // 清空凭证说明
+      await loadShop(); // 重新拉取订单与售后列表
+    } catch (err) {
+      setError(errorText(locale, err)); // 重复提交 / 状态不符等统一走本地化错误
+    } finally { // 异常收束：无论成败都执行清理
+      setAsBusy(false); // 解锁按钮
     } // 代码块结束
   } // 代码块结束
 
@@ -1659,11 +1715,57 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   <strong>{o.items[0]?.title ?? o.product_code ?? o.id}</strong>
                   <span>{ORDER_STATUS[o.status] ?? o.status} · {o.delivery_kind ?? ''} · {dateOnly(o.created_at)}</span>
                   <span>原价 {yuan(o.total_cents)}，优惠 {yuan(o.discount_cents)}，实付 {yuan(o.payable_cents)}</span>
+                  {o.after_sales_status && <span>售后：{AFTER_SALES_STATUS[o.after_sales_status] ?? o.after_sales_status}</span>}
                   {o.delivered_content && <code>{o.delivered_content}</code>}
                 </div>
                 <div className="community-order-actions">{/* 执行当前业务步骤 */}
                   {o.status === 'paid' && <button type="button" onClick={() => void confirmOrder(o.source_id)}>确认收货</button>}
+                  {(o.status === 'paid' || o.status === 'delivered') && (
+                    <button type="button" onClick={() => { if (!requireSession()) return; setAsOrder(asOrder === o.source_id ? null : o.source_id); setNotice(null); }}>申请售后</button>
+                  )}
                   {o.status !== 'refunded' && o.status !== 'cancelled' && <button type="button" onClick={() => void refundOrder(o.source_id)}>退款</button>}
+                </div>
+                {asOrder === o.source_id && (
+                  <div className="community-buy-form">
+                    <label>售后类型
+                      <select value={asKind} onChange={(e) => setAsKind(e.target.value as 'refund_only' | 'return_refund' | 'repair')}>
+                        <option value="refund_only">仅退款</option>
+                        <option value="return_refund">退货退款</option>
+                        <option value="repair">维修</option>
+                      </select>
+                    </label>
+                    <label>申请原因
+                      <select value={asReason} onChange={(e) => setAsReason(e.target.value)}>
+                        {AFTER_SALES_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+                      </select>
+                    </label>
+                    <label>问题说明
+                      <textarea value={asDetail} maxLength={300} placeholder="描述遇到的问题，便于后台核实" onChange={(e) => setAsDetail(e.target.value)} />
+                    </label>
+                    <label>凭证说明（选填）
+                      <input value={asEvidence} maxLength={300} placeholder="例如：已拍摄外包装破损照片，可联系客服提供" onChange={(e) => setAsEvidence(e.target.value)} />
+                    </label>
+                    <small className="community-buy-note">提交后由后台审批；同一订单同类型申请在处理完成前不能重复提交。</small>
+                    <div className="community-actions">
+                      <button type="button" className="is-primary" disabled={asBusy} onClick={() => void submitAfterSales()}>{asBusy ? '提交中…' : '提交申请'}</button>
+                      <button type="button" onClick={() => { setAsOrder(null); setAsDetail(''); setAsEvidence(''); }}>取消</button>
+                    </div>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+
+          <h3 className="community-subhead">我的售后</h3>
+          <div className="community-orders">
+            {afterSales.length === 0 && <div className="community-empty">还没有售后申请。</div>}
+            {afterSales.map((a) => (
+              <article key={a.id} className="community-order">
+                <div className="community-order-main">
+                  <strong>{a.product_name ?? a.order_id}</strong>
+                  <span>{AFTER_SALES_KIND[a.kind] ?? a.kind} · {AFTER_SALES_STATUS[a.status] ?? a.status} · {dateOnly(a.created_at)}</span>
+                  <span>申请内容：{a.reason}</span>
+                  {a.admin_note && <span>处理结果：{a.admin_note}{a.handled_at ? `（${dateOnly(a.handled_at)}）` : ''}</span>}
                 </div>
               </article>
             ))}

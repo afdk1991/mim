@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -384,8 +384,8 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     products() { // 商品列表
       return request<{ products: ShopProduct[] }>('/shop/products', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
-    order(payload: { product_code: string; quantity?: number; coupon_code?: string; shipping?: { name: string; phone: string; address: string } }) { // 下单
-      return request<{ order_id: string; payable_cents: number; discount_cents: number; delivery_kind: string }>('/shop/orders', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    order(payload: { product_code: string; quantity?: number; coupon_code?: string; shipping?: { name: string; phone: string; address: string }; pay_provider?: 'alipay' | 'wechat' | 'manual' | 'sandbox' }) { // 下单
+      return request<{ order_id: string; status: string; payable_cents: number; discount_cents: number; delivery_kind: string; pay_provider: string | null; pay_path: string | null }>('/shop/orders', { method: 'POST', body: payload }); // 返回当前函数的处理结果
     }, // 代码块结束
     orders() { // 我的订单
       return request<{ items: ShopOrder[] }>('/shop/orders', { idempotency: false }); // 返回当前函数的处理结果
@@ -395,6 +395,12 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // 代码块结束
     refund(id: string) { // 退款
       return request<{ ok: boolean; refunded_cents: number }>(`/shop/orders/${encodeURIComponent(id)}/refund`, { method: 'POST', body: {} }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    afterSales(id: string, payload: { kind: 'refund_only' | 'return_refund' | 'repair'; reason: string; detail?: string; evidence?: string }) { // 发起售后申请
+      return request<{ id: string; status: string }>(`/shop/orders/${encodeURIComponent(id)}/after-sales`, { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    myAfterSales() { // 我的售后申请列表
+      return request<{ items: AfterSalesRequest[] }>('/after-sales', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
   }, // 代码块结束
 
