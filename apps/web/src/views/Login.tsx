@@ -66,8 +66,9 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   // 账号区域状态，默认中国区；决定账号标识用手机号还是邮箱
   const [region, setRegion] = useState<Region>('cn');
   // 登录方式状态，默认密码登录；验证码模式需先发送验证码。
-  // 2026-11-15 起全站关闭注册，注册分段与注册表单已移除，前端只保留登录两种方式。
-  const [mode, setMode] = useState<'password' | 'code'>('password');
+  // 2026-11-16 起注册改为服务端开关（MIM_REGISTRATION_ENABLED）：register 分段仅在
+  // /auth/channels 上报 register=true 时出现，关闭态不显示入口（后端仍以 403 兜底）。
+  const [mode, setMode] = useState<'password' | 'code' | 'register'>('password');
   // 账号标识输入值：中国区为手机号，Global 区为邮箱
   const [identifier, setIdentifier] = useState('');
   // 密码输入值，密码登录使用
@@ -106,8 +107,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [passToken, setPassToken] = useState(''); // 赋值：更新变量 const 的取值
   const [genTime, setGenTime] = useState(''); // 赋值：更新变量 const 的取值
 
-  // 当前验证码场景：注册已关闭，登录页只使用 login 场景
-  const captchaScene: CaptchaScene = 'login';
+  // 当前验证码场景：注册分段打开时用 register 场景，否则统一走 login 场景
+  const captchaScene: CaptchaScene = mode === 'register' ? 'register' : 'login';
   const captchaMode = security?.captcha.mode ?? 'off'; // 常量 captchaMode：保存固定配置或一次性派生值
   const captchaRequired = Boolean(security && security.captcha_required && captchaMode !== 'off'); // 常量 captchaRequired：保存固定配置或一次性派生值
   // 第三方模式凭证未配置时隐藏而不是报错；后端缺凭证会 503，前端按 providers 兜底不渲染
@@ -321,8 +322,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setError(null);
   } // 代码块结束
 
-  // 切换登录方式：清空两种凭证，防止残留值被误提交
-  function switchMode(next: 'password' | 'code') {
+  // 切换登录 / 注册方式：清空两种凭证，防止残留值被误提交
+  function switchMode(next: 'password' | 'code' | 'register') {
     // 写入目标登录方式
     setMode(next);
     // 清空验证码，切回密码模式后不再复用
@@ -396,8 +397,11 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     // 按当前 mode 组装票据；off / 未强制时为空对象，不携带任何验证码字段
     const ticketPayload = buildCaptchaTicket();
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      // 二选一发起登录请求（注册已关闭）：密码模式或验证码模式，均返回统一凭证
-      const result = mode === 'password'
+      // 三分支：注册 / 密码登录 / 验证码登录，均返回统一凭证
+      const result = mode === 'register'
+        // 注册模式：账号 + 口令 + 图形验证码票据，成功后直接拿到会话
+        ? await api.register({ region, provider, identifier: identifier.trim(), password, ...ticketPayload })
+        : mode === 'password'
         // 密码模式：区域 + 账号标识 + 密码换取会话
         ? await api.loginWithPassword({ region, identifier: identifier.trim(), password, ...ticketPayload })
         // 验证码模式：区域 + 提供方 + 账号标识 + 验证码换取会话
@@ -511,9 +515,23 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           >
             {t(locale, 'auth.modeCode')}{/* 验证码模式文案，走 i18n */}
           </button>{/* 结束验证码登录按钮 */}
+          {channels?.register && ( // 注册分段只在服务端开关打开时出现，关闭态不显示入口
+            <button
+              // 注册按钮：普通按钮，避免触发表单提交
+              type="button"
+              // 当前为注册模式时高亮
+              className={mode === 'register' ? 'active' : ''}
+              // 点击切到注册模式并清空验证码
+              onClick={() => switchMode('register')}
+            >
+              {locale === 'en-US' ? 'Sign up' : '注册'}{/* 注册模式文案，跟随界面语言 */}
+            </button>
+          )}
         </div>{/* 结束登录方式分段控件 */}
-        {/* 2026-11-15 全站关闭注册：注册分段已移除，这里留一行说明，避免用户继续找入口 */}
-        <p className="hint">{locale === 'en-US' ? 'Registration is currently closed. Sign in with an existing account.' : '注册功能已关闭，请使用已有账号登录。'}</p>
+        {/* 注册入口受服务端开关控制：关闭时明确说明，避免用户继续找入口 */}
+        {channels && !channels.register && (
+          <p className="hint">{locale === 'en-US' ? 'Registration is currently closed. Sign in with an existing account.' : '注册功能已关闭，请使用已有账号登录。'}</p>
+        )}
 
         <form className="form" onSubmit={submit}>{/* 登录表单：提交统一由 submit 处理 */}
           <label>{/* 账号输入项：标题随身份提供方变化 */}
@@ -542,8 +560,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 onChange={(event) => setPassword(event.target.value)}
                 // 密码类型，输入内容以圆点显示
                 type="password"
-                // 登录提示填充当前密码
-                autoComplete="current-password"
+                // 登录提示填充当前密码；注册模式提示生成新密码
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 // 必填
                 required
               />{/* 密码输入框结束 */}
@@ -598,8 +616,10 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           )}{/* 通道提示结束 */}
 
           <button type="submit" className="btn primary block" disabled={busy}>{/* 提交按钮：请求中禁用 */}
-            {busy // 忙碌时显示加载文案，否则显示「登录」
+            {busy // 忙碌时显示加载文案，否则按当前模式显示「登录」或「注册」
               ? t(locale, 'common.loading')
+              : mode === 'register'
+              ? (locale === 'en-US' ? 'Create account' : '注册')
               : t(locale, 'auth.login')}{/* 按钮文案结束 */}
           </button>{/* 结束提交按钮 */}
         </form>{/* 结束登录表单 */}
