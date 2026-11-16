@@ -56,7 +56,7 @@ describe('社区完整性', () => {
 
     const first = await request(app).get(`${API}/threads?limit=2`).set(auth);
     expect(first.status).toBe(200);
-    expect(first.body.total).toBe(6); // 种子共 6 帖，total 是过滤后的总量而非本页条数
+    expect(first.body.total).toBe(17); // 种子共 17 帖（6 条原有 + 11 条指南/示例），total 是过滤后的总量而非本页条数
     expect(first.body.items).toHaveLength(2);
     expect(first.body.limit).toBe(2);
     expect(first.body.offset).toBe(0);

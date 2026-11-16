@@ -356,10 +356,10 @@ describe('三期 6：推荐指数与 rating / favorites 排序', () => { // 用�
 }); // 结束代码块：本层作用域收尾
 
 describe('三期 7：付费板块种子幂等写入真实价格', () => { // 用例「三期 7：付费板块种子幂等写入真实价格」：覆盖对应业务契约
-  it('种子付费板块 price_cents > 0，且不新增板块行数（仍为 6 个）', async () => { // 用例「种子付费板块 price_cents > 0，且不新增板块行数（仍为 6 个）」：覆盖对应业务契约
+  it('种子付费板块 price_cents > 0，且不新增板块行数（仍为 7 个）', async () => { // 用例「种子付费板块 price_cents > 0，且不新增板块行数（仍为 7 个）」：覆盖对应业务契约
     const auth = await login('13810000010'); // 保存 auth：承载本步骤的计算结果供后续使用
     const overview = await request(app).get('/api/v1/community/overview').set(auth); // 保存 overview：承载本步骤的计算结果供后续使用
-    expect(overview.body.boards).toHaveLength(6); // 断言：校验接口返回符合契约
+    expect(overview.body.boards).toHaveLength(7); // 断言：校验接口返回符合契约
     const paid = overview.body.boards.find((b: { slug: string }) => b.slug === 'paid'); // 保存 paid：承载本步骤的计算结果供后续使用
     expect(paid).toBeTruthy(); // 断言：校验接口返回符合契约
     expect(paid.price_cents).toBeGreaterThan(0); // 断言：校验接口返回符合契约

@@ -35,12 +35,12 @@ describe('社区与变现', () => { // 调用 describe 并处理其返回结果
     expect(write.status).toBe(401); // 写操作仍要求登录
   }); // 代码块结束
 
-  it('种子数据齐备：6 板块 / 6 帖 / 3 VIP / 3 商品 / 2 优惠码，新用户 100 积分', async () => { // 调用 it 并处理其返回结果
+  it('种子数据齐备：7 板块 / 17 帖 / 3 VIP / 3 商品 / 2 优惠码，新用户 100 积分', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const overview = await request(app).get('/api/v1/community/overview').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(overview.status).toBe(200); // 断言：校验响应字段与冻结契约一致
-    expect(overview.body.boards).toHaveLength(6); // 断言：校验响应字段与冻结契约一致
-    expect(overview.body.stats.threads).toBe(6); // 断言：校验响应字段与冻结契约一致（免登录概念已删除，对应种子帖同步移除）
+    expect(overview.body.boards).toHaveLength(7); // 使用指南板块 + 原有 6 个板块
+    expect(overview.body.stats.threads).toBe(17); // 6 条原有种子 + 11 条指南/示例帖
     expect(overview.body.wallet.points).toBe(100); // 断言：校验响应字段与冻结契约一致
     const plans = await request(app).get('/api/v1/vip/plans').set(auth); // 构造：准备本用例需要的输入、句柄或期望值
     expect(plans.body.plans).toHaveLength(3); // 断言：校验响应字段与冻结契约一致
