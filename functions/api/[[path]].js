@@ -6,7 +6,7 @@
 // 端口：上游走 443（api.laal.top 已按 SNI 分流接管 443）。历史口径「Mim API 在 8443」已废弃，
 // 该端口不可达，写死它会让本函数返回 521（Cloudflare 无法连接源站），切勿改回。
 
-const UPSTREAM = 'https://api.laal.top:8443';
+const UPSTREAM = 'https://api.laal.top';
 
 export async function onRequest(context) {
   const { request } = context;
