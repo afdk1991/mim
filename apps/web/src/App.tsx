@@ -282,6 +282,20 @@ export function App() {
   }; // 二级 → 一级映射结束
   // 侧栏高亮依据：当前在隐藏二级页时按上级高亮，其余按自身
   const activeNavView: AppView = SUB_VIEW_PARENT[route.view] ?? route.view;
+  // 浏览器标签标题：首页（社区）用主名 + 副标题全称，其余页面统一「页面名 - Mim」；
+  // 页面名与侧栏同源，收银台 / 支付结果 / 登录这类不入侧栏的伪视图单独补文案。
+  const extraPageLabels: Partial<Record<AppView, string>> = {
+    checkout: locale === 'en-US' ? 'Checkout' : '收银台',
+    payreturn: locale === 'en-US' ? 'Payment result' : '支付结果',
+    login: locale === 'en-US' ? 'Sign in' : '登录',
+  };
+  useEffect(() => {
+    const tagline = locale === 'en-US' ? 'Mim-Content, community and commerce' : 'Mim-内容、社区与交易一体化';
+    const pageLabel = route.view === 'community' // 首页例外：社区即站点首页，用全称而不是「社区 - Mim」
+      ? undefined
+      : navItems.find((item) => item.view === route.view)?.label ?? extraPageLabels[route.view];
+    document.title = pageLabel ? `${pageLabel} - Mim` : tagline; // 社区与未知视图都按首页全称
+  }, [route.view, locale, navItems]); // 视图 / 语言 / 后台导航文案变化时同步标题
   // 合并后的二级入口：被收进上级的页面不再占侧栏。
   // 2026-11-15 访客收敛：社区页顶部不再挂「圈子（成员制社群）」「部署汇总（N 个部署项）」，
   // 两者属于内部命名 / 运维条目数，入口改由社区页内对应板块承载；仅在二级页给一条「返回社区」。
@@ -331,10 +345,16 @@ export function App() {
     <div className="layout" data-list-style={theme.listStyle} data-nav-layout={theme.navLayout}>
       {/* 左侧导航栏 */}
       <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
-        {/* 品牌区：仅保留应用名（旧定位标语已按用户指令于 2026-11-10 删除） */}
-        <div className="brand">{/* 品牌区：应用名单独成组 */}
-          {/* 应用名（i18n） */}
-          <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名，走 i18n 词典 */}
+        {/* 品牌区：主名为主，副标题以小一号的弱文字跟在下方，两者不等权 */}
+        <div className="brand">{/* 品牌区：标记 + 主名 + 副标题 */}
+          <span className="brand-text">{/* 文字块：主名在上、副标题在下 */}
+            {/* 应用名（i18n） */}
+            <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名，走 i18n 词典 */}
+            {/* 副标题：站点全称的后半段，最小字号档 */}
+            <span className="brand-sub">
+              {locale === 'en-US' ? 'Content, community and commerce' : '内容、社区与交易一体化'}
+            </span>
+          </span>
         </div>{/* 品牌区结束 */}
         {/* 导航按钮列表 */}
         <nav className="nav">{/* 导航容器：按钮由 navItems 顺序决定 */}

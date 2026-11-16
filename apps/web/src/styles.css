@@ -91,6 +91,13 @@ code { /* 行内代码/令牌展示 */
   background: linear-gradient(135deg, var(--primary), var(--primary-hover)); /* 主色渐变，作为唯一高饱和点缀 */
 } /* 品牌标记结束 */
 
+.brand-text { /* 品牌文字块：主名在上、副标题在下，两档字号不并列等权 */
+  display: flex; /* 纵向排列两行文字 */
+  flex-direction: column; /* 主名第一行、副标题第二行 */
+  gap: 1px; /* 两行紧凑贴合，避免品牌区过高 */
+  min-width: 0; /* 允许副标题在窄侧栏内省略 */
+} /* 品牌文字块结束 */
+
 .brand-name { /* 应用名 */
   color: var(--nav-strong); /* 导航内最重的文字档 */
   font-size: var(--fs-lg); /* 比正文大一档，作为品牌锚点 */
@@ -98,7 +105,14 @@ code { /* 行内代码/令牌展示 */
   letter-spacing: 0.01em; /* 轻微字距，提升短词的精致度 */
 } /* 应用名结束 */
 
-/* 应用标语样式已于 2026-11-10 随标语文案一并删除（品牌区仅保留应用名） */
+.brand-sub { /* 品牌副标题：全称的后半段，最小字号档 */
+  color: var(--nav-muted); /* 最弱一档，不与主名争注意力 */
+  font-size: var(--fs-xs); /* 复用现有最小字号，不新增阶梯 */
+  line-height: 1.3; /* 单行紧凑 */
+  white-space: nowrap; /* 侧栏宽度固定，保持一行 */
+  overflow: hidden; /* 超长时裁切 */
+  text-overflow: ellipsis; /* 以省略号收尾 */
+} /* 副标题结束 */
 
 .nav { /* 导航按钮容器 */
   display: flex; /* 按钮纵向堆叠 */

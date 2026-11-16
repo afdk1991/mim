@@ -622,7 +622,24 @@ export function seedCommerce(db: Db): void {
       }
     }
     insertSetting.run('locales', JSON.stringify({ front: 'zh-CN', admin: 'zh-CN', supported: ['zh-CN', 'en-US'], machine_translation: false }), now);
-    insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: '跨平台商业级项目', footer: 'Mim · 开源与商业化并行' }), now);
+    insertSetting.run('site', JSON.stringify({ title: 'Mim', subtitle: 'Mim-内容、社区与交易一体化', footer: 'Mim · 开源与商业化并行' }), now);
+    // 站点副标题对齐：旧种子写的是「跨平台商业级项目」，INSERT OR IGNORE 对线上存量库不生效，
+    // 因此这里只在存量副标题仍是旧默认值时替换；运营手动改过的名称与副标题一律保持原样，重复启动无副作用。
+    const siteRow = db.prepare("SELECT value FROM site_settings WHERE key = 'site'").get() as { value: string } | undefined;
+    if (siteRow) {
+      try {
+        const parsed: unknown = JSON.parse(siteRow.value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const site = parsed as Record<string, unknown>;
+          if (site.subtitle === '跨平台商业级项目') {
+            site.subtitle = 'Mim-内容、社区与交易一体化';
+            db.prepare('UPDATE site_settings SET value = ?, updated_at = ? WHERE key = ?').run(JSON.stringify(site), now, 'site');
+          }
+        }
+      } catch {
+        // 脏 JSON 不处理：保持原值，避免把运营配置清空
+      }
+    }
     const blocks: Array<[string, string, string, number, string]> = [ // 页面区块种子：文案全部面向访客，不使用内部口径
       ['block-home-hero', 'home', 'hero', 1, JSON.stringify({ title: 'Mim 社区', subtitle: '分享图文、视频与图集作品，开通付费阅读，也能逛社区商城。', cta: { label: '进入社区', href: '/community' } })], // 首页头图：一句话说清这是什么、能做什么
       ['block-home-features', 'home', 'features', 2, JSON.stringify({ items: [{ title: '付费内容', text: '图文、视频与图集作品，支持单篇解锁阅读' }, { title: '社区商城', text: '实物商品、自动发卡与人工发货' }, { title: '论坛互动', text: '按板块与圈子交流，可发帖、回帖和收藏' }] })], // 三张特性卡：改用访客能直接理解的运营文案
