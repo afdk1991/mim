@@ -35,14 +35,24 @@ export interface WithdrawalSummary {
 
 /** 队列响应 */
 export interface WithdrawalQueue {
-  items: AdminWithdrawalRow[];
-  summary: WithdrawalSummary;
+  items: AdminWithdrawalRow[]; // 当前页
+  summary: WithdrawalSummary; // 各状态计数
+  total: number; // 过滤后总数，用于算页数
 }
 
-/** 拉取申请队列；status 为空表示全部 */
-export function listAdminWithdrawals(credential: Credential, status?: AdminWithdrawalStatus | ''): Promise<WithdrawalQueue> {
-  const suffix = status ? `?status=${encodeURIComponent(status)}` : ''; // 空状态不拼查询串
-  return request<WithdrawalQueue>(`/admin/withdrawals${suffix}`, { credential });
+/** 拉取申请队列；status 为空表示全部，page 缺省保持旧的全量首屏行为 */
+export async function listAdminWithdrawals(
+  credential: Credential,
+  status?: AdminWithdrawalStatus | '',
+  page?: { limit?: number; offset?: number },
+): Promise<WithdrawalQueue> {
+  const params = new URLSearchParams(); // 统一拼参，避免手工拼串漏编码
+  if (status) params.set('status', status); // 空状态不拼查询串
+  if (page?.limit !== undefined) params.set('limit', String(page.limit));
+  if (page?.offset) params.set('offset', String(page.offset));
+  const query = params.toString();
+  const data = await request<WithdrawalQueue>(`/admin/withdrawals${query ? `?${query}` : ''}`, { credential });
+  return { ...data, total: data.total ?? data.items.length }; // 旧服务缺 total 时按本页条数兜底
 }
 
 /** 审核通过：内部同步扣减余额与可提现余额并落提现流水（只扣一次） */

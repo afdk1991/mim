@@ -18,10 +18,11 @@ import { AppError, isAppError } from '@mim/core-domain'; // 统一业务异常 +
 import { idempotency, requirePermission } from '../middleware.js'; // 鉴权门禁与写幂等
 import { parse } from '../validate.js'; // 校验错误翻译
 import type { ApiDeps } from '../types.js'; // 依赖容器
-import { parseLimit, visitorHash } from '../content/shared.js'; // 分页解析与访客指纹
+import { parseLimit, visitorHash } from '../content/shared.js'; // 分页解析与访问者指纹
 import { pathParam } from '../utils.js'; // 安全路径参数：拒绝数组与缺失值
 import { // 引入依赖、类型或本地模块绑定
   archiveAnnouncement, // 执行当前业务步骤
+  countAdminAnnouncements, // 管理端总数
   createAnnouncement, // 执行当前业务步骤
   deleteAnnouncement, // 执行当前业务步骤
   listAdminAnnouncements, // 执行当前业务步骤
@@ -32,6 +33,7 @@ import { // 引入依赖、类型或本地模块绑定
 import { // 引入依赖、类型或本地模块绑定
   aggregateChangelogByVersion, // 执行当前业务步骤
   archiveChangelogEntry, // 执行当前业务步骤
+  countAdminChangelog, // 管理端总数
   createChangelogEntry, // 执行当前业务步骤
   deleteChangelogEntry, // 执行当前业务步骤
   listAdminChangelog, // 执行当前业务步骤
@@ -43,6 +45,7 @@ import { // 引入依赖、类型或本地模块绑定
   assertClickable, // 执行当前业务步骤
   checkClickRateLimit, // 执行当前业务步骤
   checkConversionRateLimit, // 执行当前业务步骤
+  countAdminPromotions, // 管理端总数
   createPromotion, // 执行当前业务步骤
   deletePromotion, // 执行当前业务步骤
   listAdminPromotions, // 执行当前业务步骤
@@ -82,6 +85,23 @@ function requireContentPermission(req: Request, res: Response, next: NextFunctio
 
 const DEFAULT_LIMIT = 20; // 公开列表缺省条数
 const MAX_LIMIT = 50; // 公开列表硬上限，防止超大列表拖慢查询
+
+/** 管理端列表缺省页大小：仅在显式传 limit 时启用分页，不传仍返回全量。 */
+const ADMIN_PAGE_LIMIT = 20;
+/** 管理端列表单页硬上限。 */
+const ADMIN_PAGE_MAX = 100;
+
+/** 可选分页上限：未传 limit 时返回 undefined，保持「不传即全量」的旧行为。 */
+function optionalLimit(raw: unknown): number | undefined {
+  const text = String(raw ?? '').trim(); // 空串与缺失一律视为未传
+  return text ? parseLimit(text, ADMIN_PAGE_LIMIT, ADMIN_PAGE_MAX) : undefined;
+} // 代码块结束
+
+/** 偏移量：非法值与负数统一回落 0。 */
+function readOffset(raw: unknown): number {
+  const parsed = Number.parseInt(String(raw ?? ''), 10); // 十进制解析
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+} // 代码块结束
 
 /** 公告入参：标题 / 正文 / 级别 / 状态 / 有效期 / 置顶。 */
 const announcementCreateSchema = z.object({
@@ -184,7 +204,7 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
 
   /**
    * 推广点击计数：公开端点，匿名可点。
-   * 幂等键（Idempotency-Key）同计划同键只入账一次；访客指纹做滑动窗口频控防刷。
+   * 幂等键（Idempotency-Key）同计划同键只入账一次；访问者指纹做滑动窗口频控防刷。
    * 本端点不走全局 idempotency 中间件（该中间件要求登录主体），去重在 promotion_clicks 表内完成。
    */
   router.post('/promotions/:id/click', (req, res) => {
@@ -209,7 +229,7 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
 
   /**
    * 转化回写：公开端点，匿名可上报。
-   * 与点击同口径：幂等键（Idempotency-Key）同计划同键只入账一次；访客指纹做滑动窗口频控防刷。
+   * 与点击同口径：幂等键（Idempotency-Key）同计划同键只入账一次；访问者指纹做滑动窗口频控防刷。
    * 只累计 conversion_count，不记佣金、不做资金结算；去重在 promotion_conversions 表内完成。
    */
   router.post('/promotions/:id/conversion', (req, res) => {
@@ -235,8 +255,9 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
   // ===== 管理端端点（工厂内挂 requirePermission；写操作叠 idempotency）=====
 
   // --- 公告管理 ---
-  router.get('/admin/content/announcements', requireContentPermission, (_req, res) => {
-    res.json({ items: listAdminAnnouncements(deps.db) }); // 执行当前业务步骤
+  router.get('/admin/content/announcements', requireContentPermission, (req, res) => {
+    const items = listAdminAnnouncements(deps.db, optionalLimit(req.query.limit), readOffset(req.query.offset));
+    res.json({ items, total: countAdminAnnouncements(deps.db) }); // 新增 total，旧字段 items 保持不变
   }); // 代码块结束
 
   router.post('/admin/content/announcements', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
@@ -282,8 +303,9 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
   }); // 代码块结束
 
   // --- 更新日志管理 ---
-  router.get('/admin/content/changelog', requireContentPermission, (_req, res) => {
-    res.json({ items: listAdminChangelog(deps.db) }); // 执行当前业务步骤
+  router.get('/admin/content/changelog', requireContentPermission, (req, res) => {
+    const items = listAdminChangelog(deps.db, optionalLimit(req.query.limit), readOffset(req.query.offset));
+    res.json({ items, total: countAdminChangelog(deps.db) }); // 新增 total，旧字段 items 保持不变
   }); // 代码块结束
 
   router.post('/admin/content/changelog', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
@@ -326,8 +348,9 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
   }); // 代码块结束
 
   // --- 推广计划管理（统计读取：click_count / conversion_count / budget_cents）---
-  router.get('/admin/content/promotions', requireContentPermission, (_req, res) => {
-    res.json({ items: listAdminPromotions(deps.db) }); // 执行当前业务步骤
+  router.get('/admin/content/promotions', requireContentPermission, (req, res) => {
+    const items = listAdminPromotions(deps.db, optionalLimit(req.query.limit), readOffset(req.query.offset));
+    res.json({ items, total: countAdminPromotions(deps.db) }); // 新增 total，旧字段 items 保持不变
   }); // 代码块结束
 
   router.post('/admin/content/promotions', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤

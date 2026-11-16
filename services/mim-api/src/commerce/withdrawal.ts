@@ -338,25 +338,26 @@ export function listUserWithdrawals(db: Db, userId: string, limit = 50): Withdra
     .all(userId, Math.min(Math.max(limit, 1), 200)) as WithdrawalRow[];
 }
 
-/** 后台队列：可按状态过滤，附带用户展示名与 Mim ID */
-export function listAdminWithdrawals(db: Db, status: WithdrawalStatus | '', limit = 100): AdminWithdrawalRow[] {
+/** 后台队列：可按状态过滤，附带用户展示名与 Mim ID；offset 用于真分页 */
+export function listAdminWithdrawals(db: Db, status: WithdrawalStatus | '', limit = 100, offset = 0): AdminWithdrawalRow[] {
   const capped = Math.min(Math.max(limit, 1), 300);
+  const start = Math.max(offset, 0);
   if (status) {
     return db
       .prepare(
         `SELECT w.*, u.display_name, u.member_no
          FROM withdrawal_requests w JOIN users u ON u.id = w.user_id
-         WHERE w.status = ? ORDER BY w.created_at DESC LIMIT ?`,
+         WHERE w.status = ? ORDER BY w.created_at DESC LIMIT ? OFFSET ?`,
       )
-      .all(status, capped) as AdminWithdrawalRow[];
+      .all(status, capped, start) as AdminWithdrawalRow[];
   }
   return db
     .prepare(
       `SELECT w.*, u.display_name, u.member_no
        FROM withdrawal_requests w JOIN users u ON u.id = w.user_id
-       ORDER BY w.created_at DESC LIMIT ?`,
+       ORDER BY w.created_at DESC LIMIT ? OFFSET ?`,
     )
-    .all(capped) as AdminWithdrawalRow[];
+    .all(capped, start) as AdminWithdrawalRow[];
 }
 
 /** 后台队列计数：各状态待处理量，用于顶部分类标签 */

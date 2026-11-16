@@ -78,11 +78,19 @@ export function listPublicAnnouncements(db: Db, now: string, limit: number): Pub
   return rows.map(toPublic); // 返回当前函数的处理结果
 } // 代码块结束
 
-/** 管理端列表：全量状态，按置顶与创建时间倒序，供后台维护页消费。 */
-export function listAdminAnnouncements(db: Db): AnnouncementRow[] {
-  return db // 返回当前函数的处理结果
-    .prepare('SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC, id DESC') // 执行当前业务步骤
-    .all() as AnnouncementRow[]; // 注册 ALL 路由 / 中间件处理器
+/** 管理端列表：全量状态，按置顶与创建时间倒序；limit 缺省时返回全量以保持旧契约。 */
+export function listAdminAnnouncements(db: Db, limit?: number, offset = 0): AnnouncementRow[] {
+  if (limit === undefined) { // 未传分页参数：沿用旧行为返回全量
+    return db.prepare('SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC, id DESC').all() as AnnouncementRow[];
+  }
+  return db
+    .prepare('SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC, id DESC LIMIT ? OFFSET ?')
+    .all(limit, Math.max(offset, 0)) as AnnouncementRow[];
+} // 代码块结束
+
+/** 管理端列表总数：供前端按页数拆分。 */
+export function countAdminAnnouncements(db: Db): number {
+  return (db.prepare('SELECT COUNT(*) AS total FROM announcements').get() as { total: number }).total;
 } // 代码块结束
 
 /** 按主键取单行；不存在抛 NOT_FOUND。 */

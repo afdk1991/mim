@@ -19,6 +19,7 @@ import { Router } from 'express'; // 路由容器
 import { z } from 'zod'; // 入参校验
 import { parse } from '../validate.js'; // 统一校验入口
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 登录 / 幂等 / RBAC
+import { parseLimit } from '../content/shared.js'; // 分页上限解析
 import {
   MIN_WITHDRAW_CENTS,
   WITHDRAW_METHODS,
@@ -56,6 +57,12 @@ const STATUS_VALUES: WithdrawalStatus[] = ['pending', 'approved', 'rejected', 'p
 function readStatusFilter(value: unknown): WithdrawalStatus | '' {
   const raw = typeof value === 'string' ? value.trim() : '';
   return (STATUS_VALUES as string[]).includes(raw) ? (raw as WithdrawalStatus) : '';
+}
+
+/** 偏移量：非法值与负数统一回落 0，缺省即第一页 */
+function readOffset(value: unknown): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 /** 操作人标识：引导令牌没有用户主体，统一记为 admin-bootstrap */
@@ -106,9 +113,12 @@ export function createWalletWithdrawalRouter(deps: ApiDeps): Router {
 
   router.get('/admin/withdrawals', (req, res) => {
     const status = readStatusFilter(req.query.status);
+    const limit = parseLimit(req.query.limit, 100, 300); // 缺省 100 与旧行为一致，上限 300 防止拉爆
+    const summary = withdrawalStatusSummary(deps.db);
     res.json({
-      items: listAdminWithdrawals(deps.db, status),
-      summary: withdrawalStatusSummary(deps.db),
+      items: listAdminWithdrawals(deps.db, status, limit, readOffset(req.query.offset)),
+      summary,
+      total: status ? summary[status] : Object.values(summary).reduce((sum, count) => sum + count, 0),
     });
   });
 

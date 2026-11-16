@@ -26,6 +26,9 @@ interface Props { // 入参
 /** 页签类型 */
 type Tab = 'announcements' | 'changelog' | 'promotions'; // 三类内容
 
+/** 每页条数：与用户管理保持一致 */
+const PAGE_SIZE = 20;
+
 /** 金额分转元 */
 function yuan(value: number): string { // 业务步骤
   return `${(value / 100).toFixed(2)} 元`; // 推广预算展示
@@ -44,6 +47,17 @@ function confirmDelete(kind: string, name: string): boolean {
   return window.confirm(`确认删除${kind}「${name}」？删除后不可恢复。`);
 }
 
+/** 分页器：上一页 / 区间文案 / 下一页，与用户管理保持一致 */
+function Pager({ offset, total, onChange }: { offset: number; total: number; onChange: (next: number) => void }) {
+  return (
+    <div className="pager">
+      <button className="btn ghost" type="button" disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - PAGE_SIZE))}>上一页</button>
+      <span className="muted">{total === 0 ? '0 / 0' : `${offset + 1}-${Math.min(offset + PAGE_SIZE, total)} / ${total}`}</span>
+      <button className="btn ghost" type="button" disabled={offset + PAGE_SIZE >= total} onClick={() => onChange(offset + PAGE_SIZE)}>下一页</button>
+    </div>
+  );
+}
+
 /** 内容运营视图主体 */
 export function ContentOps({ credential, permissions }: Props) { // 业务步骤
   const canWrite = permissions.includes('appearance:write'); // 后端 content-ops 复用 appearance:write
@@ -51,9 +65,18 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
   const [error, setError] = useState(''); // 错误提示
   const [notice, setNotice] = useState(''); // 成功提示
   const [busy, setBusy] = useState(false); // 操作中
-  const announcementsState = useAsync(() => listAdminAnnouncements(credential), [credential]); // 公告
-  const changelogState = useAsync(() => listAdminChangelog(credential), [credential]); // 更新日志
-  const promotionsState = useAsync(() => listAdminPromotions(credential), [credential]); // 推广
+  const [annOffset, setAnnOffset] = useState(0); // 公告当前页偏移
+  const [logOffset, setLogOffset] = useState(0); // 更新日志当前页偏移
+  const [promoOffset, setPromoOffset] = useState(0); // 推广计划当前页偏移
+  const announcementsState = useAsync(() => listAdminAnnouncements(credential, { limit: PAGE_SIZE, offset: annOffset }), [credential, annOffset]); // 公告
+  const changelogState = useAsync(() => listAdminChangelog(credential, { limit: PAGE_SIZE, offset: logOffset }), [credential, logOffset]); // 更新日志
+  const promotionsState = useAsync(() => listAdminPromotions(credential, { limit: PAGE_SIZE, offset: promoOffset }), [credential, promoOffset]); // 推广
+  const announcements = announcementsState.data?.items ?? []; // 公告当前页
+  const changelog = changelogState.data?.items ?? []; // 日志当前页
+  const promotions = promotionsState.data?.items ?? []; // 推广当前页
+  const announcementsTotal = announcementsState.data?.total ?? 0; // 公告总数
+  const changelogTotal = changelogState.data?.total ?? 0; // 日志总数
+  const promotionsTotal = promotionsState.data?.total ?? 0; // 推广总数
   const [annForm, setAnnForm] = useState({ title: '', body: '', level: 'info', status: 'published', pinned: false }); // 公告草稿
   const [logForm, setLogForm] = useState({ version: '', title: '', body: '', changes: '', status: 'published' }); // 日志草稿
   const [promoForm, setPromoForm] = useState({ name: '', summary: '', target_url: '', code: '', status: 'active', budget: '0' }); // 推广草稿
@@ -118,9 +141,9 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
             }, '公告已创建', announcementsState.reload)}>创建公告</button>
           </section>
           <section className="panel">{/* 执行当前业务步骤 */}
-            <div className="panel-head"><h3>公告列表</h3><span className="muted">{(announcementsState.data ?? []).length}</span></div>
-            <ListState loading={announcementsState.loading} error={announcementsState.error} empty={(announcementsState.data ?? []).length === 0} />
-            {(announcementsState.data ?? []).map((row: AdminAnnouncement) => (
+            <div className="panel-head"><h3>公告列表</h3><span className="muted">{announcementsTotal}</span></div>
+            <ListState loading={announcementsState.loading} error={announcementsState.error} empty={announcements.length === 0} />
+            {announcements.map((row: AdminAnnouncement) => (
               <div className="deploy-row" key={row.id}>{/* 执行当前业务步骤 */}
                 <div className="deploy-kv">{/* 执行当前业务步骤 */}
                   <span>{row.pinned ? '📌 ' : ''}{row.title}</span>
@@ -134,6 +157,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
                 </div>
               </div>
             ))}
+            <Pager offset={annOffset} total={announcementsTotal} onChange={setAnnOffset} />
           </section>
         </>
       )}
@@ -165,9 +189,9 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
             }, '更新日志已创建', changelogState.reload)}>创建</button>
           </section>
           <section className="panel">{/* 执行当前业务步骤 */}
-            <div className="panel-head"><h3>版本记录</h3><span className="muted">{(changelogState.data ?? []).length}</span></div>
-            <ListState loading={changelogState.loading} error={changelogState.error} empty={(changelogState.data ?? []).length === 0} />
-            {(changelogState.data ?? []).map((row: AdminChangelog) => (
+            <div className="panel-head"><h3>版本记录</h3><span className="muted">{changelogTotal}</span></div>
+            <ListState loading={changelogState.loading} error={changelogState.error} empty={changelog.length === 0} />
+            {changelog.map((row: AdminChangelog) => (
               <div className="deploy-row" key={row.id}>{/* 执行当前业务步骤 */}
                 <div className="deploy-kv">{/* 执行当前业务步骤 */}
                   <span><strong>{row.version}</strong> · {row.title}</span>
@@ -180,6 +204,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
                 </div>
               </div>
             ))}
+            <Pager offset={logOffset} total={changelogTotal} onChange={setLogOffset} />
           </section>
         </>
       )}
@@ -215,9 +240,9 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
             }, '推广计划已创建', promotionsState.reload)}>创建</button>
           </section>
           <section className="panel">{/* 执行当前业务步骤 */}
-            <div className="panel-head"><h3>推广计划列表</h3><span className="muted">{(promotionsState.data ?? []).length}</span></div>
-            <ListState loading={promotionsState.loading} error={promotionsState.error} empty={(promotionsState.data ?? []).length === 0} />
-            {(promotionsState.data ?? []).map((row: AdminPromotion) => (
+            <div className="panel-head"><h3>推广计划列表</h3><span className="muted">{promotionsTotal}</span></div>
+            <ListState loading={promotionsState.loading} error={promotionsState.error} empty={promotions.length === 0} />
+            {promotions.map((row: AdminPromotion) => (
               <div className="deploy-row" key={row.id}>{/* 执行当前业务步骤 */}
                 <div className="deploy-kv">{/* 执行当前业务步骤 */}
                   <span>{row.name}{row.code ? ` · ${row.code}` : ''}</span>
@@ -231,6 +256,7 @@ export function ContentOps({ credential, permissions }: Props) { // 业务步骤
                 </div>
               </div>
             ))}
+            <Pager offset={promoOffset} total={promotionsTotal} onChange={setPromoOffset} />
           </section>
         </>
       )}

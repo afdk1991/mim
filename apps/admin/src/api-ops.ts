@@ -304,12 +304,35 @@ export interface AdminPromotion { // 业务步骤
   updated_at: string; // 对象字段 updated_at：记录一项配置或数据
 } // 业务步骤
 
+/** 分页列表响应：items 为当前页，total 为过滤后总数（用于算页数） */
+export interface PagedList<T> { // 业务步骤
+  items: T[]; // 当前页数据
+  total: number; // 过滤后总数
+} // 业务步骤
+
+/** 分页参数：两者都缺省时后端保持旧的全量行为 */
+export interface PageParams { // 业务步骤
+  limit?: number; // 每页条数
+  offset?: number; // 起始偏移
+} // 业务步骤
+
+/** 拼分页查询串：只在显式传值时附加，避免改变旧调用 */
+function pageQuery(page?: PageParams): string {
+  const params = new URLSearchParams();
+  if (page?.limit !== undefined) params.set('limit', String(page.limit));
+  if (page?.offset) params.set('offset', String(page.offset));
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
 /** 公告列表 */
-export async function listAdminAnnouncements(credential: Credential): Promise<AdminAnnouncement[]> {
-  // 响应包裹 { items }
-  const data = await request<{ items: AdminAnnouncement[] }>('/admin/content/announcements', { credential });
-  // 返回数组
-  return data.items; // 业务步骤
+export async function listAdminAnnouncements(credential: Credential, page?: PageParams): Promise<PagedList<AdminAnnouncement>> {
+  // 响应包裹 { items, total }；旧服务缺 total 时按本页条数兜底
+  const data = await request<{ items: AdminAnnouncement[]; total?: number }>(
+    `/admin/content/announcements${pageQuery(page)}`,
+    { credential },
+  );
+  return { items: data.items, total: data.total ?? data.items.length };
 } // listAdminAnnouncements 结束
 
 /** 新建公告 */
@@ -346,11 +369,13 @@ export function deleteAnnouncement(credential: Credential, id: string): Promise<
 } // deleteAnnouncement 结束
 
 /** 更新日志列表 */
-export async function listAdminChangelog(credential: Credential): Promise<AdminChangelog[]> {
-  // 响应包裹 { items }
-  const data = await request<{ items: AdminChangelog[] }>('/admin/content/changelog', { credential });
-  // 返回数组
-  return data.items; // 业务步骤
+export async function listAdminChangelog(credential: Credential, page?: PageParams): Promise<PagedList<AdminChangelog>> {
+  // 响应包裹 { items, total }；旧服务缺 total 时按本页条数兜底
+  const data = await request<{ items: AdminChangelog[]; total?: number }>(
+    `/admin/content/changelog${pageQuery(page)}`,
+    { credential },
+  );
+  return { items: data.items, total: data.total ?? data.items.length };
 } // listAdminChangelog 结束
 
 /** 新建更新日志：changes 传字符串数组，落库由后端 JSON 化 */
@@ -387,11 +412,13 @@ export function deleteChangelog(credential: Credential, id: string): Promise<{ o
 } // deleteChangelog 结束
 
 /** 推广计划列表 */
-export async function listAdminPromotions(credential: Credential): Promise<AdminPromotion[]> {
-  // 响应包裹 { items }
-  const data = await request<{ items: AdminPromotion[] }>('/admin/content/promotions', { credential });
-  // 返回数组
-  return data.items; // 业务步骤
+export async function listAdminPromotions(credential: Credential, page?: PageParams): Promise<PagedList<AdminPromotion>> {
+  // 响应包裹 { items, total }；旧服务缺 total 时按本页条数兜底
+  const data = await request<{ items: AdminPromotion[]; total?: number }>(
+    `/admin/content/promotions${pageQuery(page)}`,
+    { credential },
+  );
+  return { items: data.items, total: data.total ?? data.items.length };
 } // listAdminPromotions 结束
 
 /** 新建推广计划 */

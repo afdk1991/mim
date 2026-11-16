@@ -81,9 +81,19 @@ export function listPublicPromotions(db: Db, now: string): PublicPromotion[] {
   return rows.map(toPublic); // 返回当前函数的处理结果
 } // 代码块结束
 
-/** 管理端列表：全量状态 + 统计计数，供后台推广页消费。 */
-export function listAdminPromotions(db: Db): PromotionRow[] {
-  return db.prepare('SELECT * FROM promotions ORDER BY created_at DESC, id DESC').all() as PromotionRow[]; // 返回当前函数的处理结果
+/** 管理端列表：全量状态 + 统计计数；limit 缺省时返回全量以保持旧契约。 */
+export function listAdminPromotions(db: Db, limit?: number, offset = 0): PromotionRow[] {
+  if (limit === undefined) { // 未传分页参数：沿用旧行为返回全量
+    return db.prepare('SELECT * FROM promotions ORDER BY created_at DESC, id DESC').all() as PromotionRow[];
+  }
+  return db
+    .prepare('SELECT * FROM promotions ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?')
+    .all(limit, Math.max(offset, 0)) as PromotionRow[];
+} // 代码块结束
+
+/** 管理端列表总数：供前端按页数拆分。 */
+export function countAdminPromotions(db: Db): number {
+  return (db.prepare('SELECT COUNT(*) AS total FROM promotions').get() as { total: number }).total;
 } // 代码块结束
 
 /** 按主键取单行；不存在抛 NOT_FOUND。 */
@@ -176,7 +186,7 @@ export function assertClickable(row: PromotionRow, now: string): void {
 } // 代码块结束
 
 /**
- * 滑动窗口频控：同一访客在窗口秒数内对同一计划的点击数超过上限即违规。
+ * 滑动窗口频控：同一访问者在窗口秒数内对同一计划的点击数超过上限即违规。
  * 窗口长度 / 上限走 MIM_ 环境变量，缺省 600 秒内 10 次。
  */
 export function checkClickRateLimit(

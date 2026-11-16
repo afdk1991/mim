@@ -20,6 +20,9 @@ const STATUS_LABEL: Record<AdminWithdrawalStatus, string> = {
 
 const METHOD_LABEL: Record<string, string> = { alipay: '支付宝', wechat: '微信', bank: '银行卡' };
 
+/** 每页条数：与用户管理保持一致 */
+const PAGE_SIZE = 20;
+
 /** 整数分转元展示，仅在渲染时做除法，不参与计算 */
 function yuan(cents: number): string {
   return `¥${(cents / 100).toFixed(2)}`;
@@ -29,7 +32,11 @@ function yuan(cents: number): string {
 export function Withdrawals({ credential, permissions }: Props) {
   const canWrite = permissions.includes('commerce:write'); // 审核写权限（后端同一权限点）
   const [status, setStatus] = useState<AdminWithdrawalStatus | ''>('pending'); // 默认只看待审
-  const queueState = useAsync(() => listAdminWithdrawals(credential, status), [credential, status]); // 队列
+  const [offset, setOffset] = useState(0); // 当前页偏移
+  const queueState = useAsync(
+    () => listAdminWithdrawals(credential, status, { limit: PAGE_SIZE, offset }),
+    [credential, status, offset],
+  ); // 队列
   const [rejecting, setRejecting] = useState<{ id: string; reason: string } | null>(null); // 驳回表单
   const [paying, setPaying] = useState<{ id: string; ref: string } | null>(null); // 到账凭证表单
   const [error, setError] = useState(''); // 错误
@@ -56,6 +63,7 @@ export function Withdrawals({ credential, permissions }: Props) {
 
   const queue = queueState.data?.items ?? []; // 当前筛选下的队列
   const summary = queueState.data?.summary; // 各状态计数
+  const total = queueState.data?.total ?? 0; // 当前筛选下的总数
 
   return (
     <div className="page">
@@ -82,7 +90,7 @@ export function Withdrawals({ credential, permissions }: Props) {
               key={value || 'all'}
               type="button"
               className={`tab${status === value ? ' active' : ''}`}
-              onClick={() => setStatus(value)}
+              onClick={() => { setStatus(value); setOffset(0); }} // 筛选变化重置到第一页
             >
               {value ? STATUS_LABEL[value] : '全部'}
             </button>
@@ -139,6 +147,12 @@ export function Withdrawals({ credential, permissions }: Props) {
             )}
           </article>
         ))}
+
+        <div className="pager">
+          <button className="btn ghost" type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>上一页</button>
+          <span className="muted">{total === 0 ? '0 / 0' : `${offset + 1}-${Math.min(offset + PAGE_SIZE, total)} / ${total}`}</span>
+          <button className="btn ghost" type="button" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>下一页</button>
+        </div>
       </section>
 
       <section className="panel">

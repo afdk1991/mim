@@ -101,15 +101,21 @@ export function aggregateChangelogByVersion(db: Db): ChangelogVersionGroup[] {
   return [...groups.values()].sort((a, b) => compareVersion(b.version, a.version)); // 返回当前函数的处理结果
 } // 代码块结束
 
-/** 管理端列表：全量状态，按版本倒序 + 时间倒序。 */
-export function listAdminChangelog(db: Db): ChangelogRow[] {
+/** 管理端列表：全量状态，按版本倒序 + 时间倒序；版本排序在内存完成，分页在排序后切片。 */
+export function listAdminChangelog(db: Db, limit?: number, offset = 0): ChangelogRow[] {
   const rows = db.prepare('SELECT * FROM changelog_entries ORDER BY created_at DESC, id DESC').all() as ChangelogRow[]; // 常量 rows：保存固定配置或一次性派生值
   rows.sort((a, b) => { // 执行当前业务步骤
     const byVersion = compareVersion(b.version, a.version); // 常量 byVersion：保存固定配置或一次性派生值
     if (byVersion !== 0) return byVersion; // 条件分支：按判断结果选择后续处理路径
     return (b.published_at ?? '').localeCompare(a.published_at ?? ''); // 返回当前函数的处理结果
   }); // 代码块结束
-  return rows; // 返回当前函数的处理结果
+  if (limit === undefined) return rows; // 未传分页参数：沿用旧行为返回全量
+  return rows.slice(Math.max(offset, 0), Math.max(offset, 0) + limit); // 排序后切片，保证跨页顺序稳定
+} // 代码块结束
+
+/** 管理端列表总数：总数与排序无关，直接计数。 */
+export function countAdminChangelog(db: Db): number {
+  return (db.prepare('SELECT COUNT(*) AS total FROM changelog_entries').get() as { total: number }).total;
 } // 代码块结束
 
 /** 按主键取单行；不存在抛 NOT_FOUND。 */
