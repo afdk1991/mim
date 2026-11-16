@@ -34,9 +34,17 @@ h1 { /* 页面主标题 */
   font-size: var(--fs-xl); /* 22px：与卡片正文形成明显层级差 */
 } /* h1 结束 */
 
-h2 { /* 面板/小节标题 */
-  font-size: var(--fs-md); /* 16px：字号阶梯中一档，仅比正文略大，保持界面克制 */
+h2 { /* 区块标题 */
+  font-size: var(--fs-lg); /* 18px：介于页面主标题与卡片标题之间，三级阶梯的中档 */
 } /* h2 结束 */
+
+h3 { /* 卡片 / 分组标题 */
+  margin: 0; /* 与 h1/h2 一致：间距交给容器 gap，避免各处手写 */
+  color: var(--text); /* 标题回到主文字色 */
+  font-size: var(--fs-md); /* 16px：三级阶梯的最下一档，仍比正文大一档 */
+  font-weight: var(--fw-semibold); /* 半粗，与 h1/h2 同字重 */
+  line-height: var(--lh-tight); /* 紧凑行高 */
+} /* h3 结束 */
 
 code { /* 行内代码/令牌展示 */
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* 等宽字体，便于对齐与辨认字符 */
@@ -227,6 +235,25 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-subtle); /* 最弱一档，不与链接争注意力 */
 } /* 版权结束 */
 
+.footer-beian { /* 备案信息：与版权同一行，最小字号 */
+  display: inline-flex; /* 号码与分隔点横向排布 */
+  flex-wrap: wrap; /* 窄屏允许折行 */
+  align-items: center; /* 垂直居中 */
+  gap: 6px; /* 号码与分隔点间距 */
+  color: var(--text-muted); /* 次要文字色，不做按钮形态 */
+  font-size: var(--fs-xs); /* 最小字号档 */
+} /* 备案信息结束 */
+
+.footer-beian a { /* 备案号链接 */
+  color: var(--text-muted); /* 与备案文本同档，不抢视觉焦点 */
+  text-decoration: none; /* 默认不带下划线，避免像操作按钮 */
+} /* 备案链接结束 */
+
+.footer-beian a:hover { /* 悬停态 */
+  color: var(--primary); /* 转主色提示可点 */
+  text-decoration: underline; /* 悬停补下划线 */
+} /* 悬停结束 */
+
 /* ---------- 门禁页：需要登录 / 已登录的中间页 ---------- */
 .gate-shell { /* 门禁页容器 */
   display: grid; /* 栅格便于居中 */
@@ -343,7 +370,7 @@ code { /* 行内代码/令牌展示 */
   flex-direction: column; /* 自上而下 */
   gap: 12px; /* 面板内部统一间距 */
   padding: var(--card-pad); /* 内容与边框之间留白：全站卡片统一 */
-  border: 0; /* 卡片不描边：边界交给环境阴影与留白 */
+  border: 1px solid var(--border); /* 可辨描边：白卡在白底上也有明确边界，不只依赖阴影 */
   border-radius: var(--card-radius); /* 统一圆角 */
   background: var(--surface); /* 白底与页面底色区分 */
   box-shadow: var(--shadow); /* 统一环境阴影，形成轻微浮起感 */
@@ -355,18 +382,22 @@ code { /* 行内代码/令牌展示 */
   flex-direction: column; /* 主方向 */
   gap: var(--card-pad-tight); /* 内部间距 */
   overflow: hidden; /* 裁掉封面溢出 */
-  border: 0; /* 不描边：与卡片同一套环境阴影语言 */
+  border: 1px solid var(--border); /* 与面板同一套描边语言，边界肉眼可辨 */
   border-radius: var(--card-radius); /* 标准圆角 */
   background: var(--surface); /* 表面色 */
-  box-shadow: var(--shadow); /* 统一投影 */
+  box-shadow: var(--shadow-sm); /* 比面板轻一档：列表卡片不抢主内容 */
 } /* 标准档结束 */
-.ui-card--tight { /* 紧凑档：列表行 / 小卡 */
+.ui-card--tight { /* 紧凑档：列表行 / 小卡，嵌在面板内时不再「白上叠白」 */
   border-radius: var(--card-radius-sm); /* 紧凑圆角 */
   padding: var(--card-pad-tight); /* 紧凑内距 */
+  background: var(--surface-2); /* 二级表面：嵌在白面板里读作内嵌块而非又一张白卡 */
+  box-shadow: none; /* 不再叠阴影，避免嵌套投影发灰 */
 } /* 紧凑档结束 */
 .ui-card--feature { /* 主推 / 详情档 */
   border-radius: var(--card-radius-lg); /* 主推圆角 */
   padding: var(--card-pad); /* 标准内距 */
+  border-color: var(--border-strong); /* 主推卡边界比列表卡再明确一档 */
+  box-shadow: var(--shadow); /* 抬到标准档之上，作为页面主内容 */
 } /* 主推档结束 */
 .ui-card--link { /* 可点击卡片 */
   cursor: pointer; /* 整卡可点 */
@@ -448,7 +479,7 @@ code { /* 行内代码/令牌展示 */
 .form select { /* 下拉选择框 */
   height: var(--field-h); /* 填充式控件统一高度 */
   padding: 0 12px; /* 左右内边距，文字不贴边 */
-  border: 1px solid transparent; /* 默认无可见描边，靠填充底色界定 */
+  border: 1px solid var(--border); /* 细边界：填充底之外再给一圈可见边 */
   border-radius: var(--control-radius); /* 控件小方角 */
   background: var(--bg); /* 填充式底色：比表面色低一档，输入区更明确 */
   color: var(--text); /* 输入文字用主文字色 */
@@ -598,31 +629,36 @@ code { /* 行内代码/令牌展示 */
 
 .segmented { /* 分段控件外壳 */
   display: inline-flex; /* 宽度随内容，不占满一行 */
-  padding: 3px; /* 内边距形成凹槽感 */
+  padding: 2px; /* 内衬形成凹槽感 */
   border: 1px solid var(--border); /* 外描边 */
-  border-radius: var(--radius-pill); /* 胶囊外壳 */
-  background: var(--surface); /* 白底与页面区分 */
+  border-radius: var(--control-radius); /* 与输入框 / 按钮同一套控件圆角 */
+  background: var(--surface-3); /* 凹槽底：比表面暗两档，白色选中项才能明确浮出 */
 } /* 分段外壳结束 */
 
 .segmented button { /* 分段内单个选项 */
-  padding: 6px 14px; /* 点击区域足够大 */
+  height: calc(var(--control-h) - 6px); /* 与按钮同档高度，外壳加衬后整体仍是一档控件高 */
+  padding: 0 14px; /* 横向热区 */
   border: 0; /* 去掉默认边框，由外壳统一描边 */
-  border-radius: var(--radius-pill); /* 与外壳同心圆角 */
+  border-radius: calc(var(--control-radius) - 1px); /* 与外框同心 */
   background: transparent; /* 未选中透明 */
   color: var(--text-muted); /* 未选中弱化 */
   font-size: var(--fs-sm); /* 与按钮字号一致 */
   cursor: pointer; /* 手型提示 */
+  transition: var(--transition); /* 切换走统一过渡 */
 } /* 分段选项结束 */
 
 .segmented button.active { /* 选中的分段选项 */
-  background: var(--primary); /* 主色填充表示当前选中 */
-  color: var(--on-primary); /* 白字保证对比度 */
+  background: var(--surface); /* 选中项抬成白色小面，不再大片主色填充 */
+  color: var(--primary); /* 主色文字表达当前项 */
+  box-shadow: var(--shadow-xs); /* 贴地投影让选中项浮出凹槽 */
+  font-weight: var(--fw-semibold); /* 字重再提一档 */
 } /* 选中段结束 */
 
 /* ---------- 登录 ---------- */
 .auth-wrap { /* 登录页整屏容器 */
   display: grid; /* 栅格便于双向居中 */
   place-items: center; /* 水平垂直同时居中卡片 */
+  align-content: center; /* 行高为 auto 时也要把整行压到中线上，否则只居中行内不居中容器 */
   min-height: 100vh; /* 至少一屏高，卡片居中不受内容高度影响 */
   padding: 24px; /* 小屏时留出安全边距 */
   background: radial-gradient(circle at 20% 20%, var(--primary-soft) 0%, var(--bg) 45%); /* 左上柔光渐变，避免纯色单调 */
@@ -632,6 +668,7 @@ code { /* 行内代码/令牌展示 */
   display: grid; /* 左说明 + 右卡片两栏，填满内容区宽度 */
   grid-template-columns: minmax(0, 380px) 400px; /* 说明列收窄到可读行宽，卡片固定 400px */
   align-items: center; /* 两栏垂直居中 */
+  align-content: center; /* 整行也居中：消除卡片下方的整条空带 */
   justify-content: center; /* 两栏作为一组居中，前后留白对称 */
   justify-items: stretch; /* 横向按列宽铺开，不再收缩到内容宽度 */
   gap: 40px; /* 说明与卡片之间的呼吸空间 */
@@ -766,42 +803,42 @@ code { /* 行内代码/令牌展示 */
 
 /* ---------- 第三方登录与 Mim ID ---------- */
 .oauth-section { /* 登录卡片底部的第三方登录区 */
-  display: flex; /* 纵向排列分隔线与按钮网格 */
+  display: flex; /* 纵向排列按钮行 */
   flex-direction: column; /* 自上而下 */
-  gap: 12px; /* 区块间距 */
+  gap: 10px; /* 区块间距 */
 } /* 第三方登录区结束 */
 
-.oauth-divider { /* 「或使用第三方账号」分隔线 */
-  display: flex; /* 左右线条与文字同行 */
-  align-items: center; /* 垂直居中 */
-  gap: 10px; /* 线条与文字间距 */
-  color: var(--text-muted); /* 次要文字色 */
-  font-size: var(--fs-xs); /* 小号辅助文案 */
-} /* 分隔线结束 */
-
-.oauth-divider::before, /* 分隔线左段 */
-.oauth-divider::after { /* 分隔线右段 */
-  content: ''; /* 伪元素需要内容占位 */
-  flex: 1; /* 均分剩余宽度 */
-  height: 1px; /* 细线 */
-  background: var(--border); /* 与卡片边框同色 */
-} /* 伪元素结束 */
-
-.oauth-grid { /* 第三方按钮网格 */
-  display: grid; /* 自适应列宽 */
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 小屏自动折行 */
+.oauth-grid { /* 第三方按钮行：只渲染已配置凭证的提供方 */
+  display: grid; /* 等宽按钮 */
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* 两列，按钮宽度一致 */
   gap: 8px; /* 按钮间距 */
 } /* 网格结束 */
 
 .oauth-btn { /* 单个第三方按钮 */
-  display: flex; /* 名称与状态徽标同行 */
+  display: flex; /* 图标与名称同行 */
   align-items: center; /* 垂直居中 */
   justify-content: center; /* 水平居中 */
-  gap: 6px; /* 名称与徽标间距 */
+  gap: 8px; /* 图标与文字间距 */
+  height: var(--field-h); /* 与上方输入框 / 主按钮同高 */
+  border-color: var(--border); /* 与输入框同一套描边 */
   font-size: var(--fs-sm); /* 比主按钮略小，避免抢视觉焦点 */
 } /* 第三方按钮结束 */
 
-.oauth-badge { /* 「未配置」「跳转中」徽标 */
+.oauth-btn .oauth-mark { /* 提供方标记位：无内建品牌图标时的中性字母标 */
+  display: inline-flex; /* 便于居中 */
+  align-items: center; /* 纵向居中 */
+  justify-content: center; /* 横向居中 */
+  flex: 0 0 auto; /* 不参与伸缩 */
+  width: 20px; /* 标记尺寸 */
+  height: 20px; /* 标记尺寸 */
+  border-radius: var(--radius-xs); /* 小方圆角，与控件同族 */
+  background: var(--surface-3); /* 中性底，不冒充品牌色 */
+  color: var(--text-secondary); /* 次要文字色 */
+  font-size: var(--fs-xs); /* 标记内小字 */
+  font-weight: var(--fw-semibold); /* 半粗保证可读 */
+} /* 提供方标记结束 */
+
+.oauth-badge { /* 「跳转中」徽标 */
   padding: 1px 6px; /* 紧凑内边距 */
   border-radius: var(--radius-pill); /* 胶囊形 */
   background: var(--surface-3); /* 浅灰底 */
@@ -2802,19 +2839,23 @@ code { /* 行内代码/令牌展示 */
 } /* 分区切换结束 */
 
 .tab { /* 分区按钮 */
-  padding: 6px 12px; /* 内边距 */
+  height: var(--control-h); /* 与按钮 / 输入框同档高度 */
+  padding: 0 12px; /* 横向热区 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: var(--radius-pill); /* 胶囊 */
-  background: transparent; /* 透明底 */
+  border-radius: var(--control-radius); /* 统一控件圆角，不再独立胶囊 */
+  background: var(--surface); /* 白底与页面底色区分 */
   color: var(--text-muted); /* 默认弱化 */
   cursor: pointer; /* 手型 */
   font-size: var(--fs-sm); /* 小字号 */
+  font-weight: var(--fw-medium); /* 常规档字重 */
+  transition: var(--transition); /* 切换走统一过渡 */
 } /* 分区按钮结束 */
 
 .tab.active { /* 当前分区 */
-  background: var(--surface); /* 高亮底色 */
-  color: inherit; /* 正常文字色 */
-  border-color: var(--text-muted); /* 边框强调 */
+  border-color: var(--primary); /* 主色描边表达当前项 */
+  background: var(--primary-soft); /* 淡主色底，与导航选中态同一语言 */
+  color: var(--primary); /* 主色文字 */
+  font-weight: var(--fw-semibold); /* 字重提一档 */
 } /* 高亮分区结束 */
 
 .profile-form { /* 资料表单 */
@@ -2834,11 +2875,12 @@ code { /* 行内代码/令牌展示 */
 
 .profile-form input, /* 文本输入 */
 .profile-form select { /* 下拉 */
-  padding: 9px 12px; /* 内边距 */
+  height: var(--field-h); /* 与登录页输入框同高 */
+  padding: 0 12px; /* 横向内距 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: var(--radius-sm); /* 圆角 */
-  background: var(--surface); /* 跟随主题 */
-  color: inherit; /* 继承文字色 */
+  border-radius: var(--control-radius); /* 统一控件圆角 */
+  background: var(--bg); /* 填充式底：与白色卡片区分开 */
+  color: var(--text); /* 主文字色，输入内容更清晰 */
 } /* 输入控件结束 */
 
 .profile-security { /* 账号安全分区 */
@@ -2859,27 +2901,31 @@ code { /* 行内代码/令牌展示 */
 .comic-segment { /* 放映厅 / 创作工作台分段 */
   display: inline-flex; /* 按钮并排 */
   align-self: flex-start; /* 不撑满整行 */
-  gap: 4px; /* 按钮间距 */
-  padding: 4px; /* 内衬，形成胶囊底 */
+  gap: 2px; /* 按钮间距 */
+  padding: 2px; /* 内衬，形成凹槽底 */
   border: 1px solid var(--border); /* 细边框 */
-  border-radius: var(--radius-pill); /* 胶囊圆角 */
-  background: var(--surface); /* 跟随主题表面色 */
+  border-radius: var(--control-radius); /* 与全站控件同一圆角 */
+  background: var(--surface-3); /* 凹槽底：暗两档，选中项更清楚 */
 } /* 分段容器结束 */
 
 .segment-item { /* 分段按钮 */
-  padding: 7px 18px; /* 舒适点击区域 */
+  height: calc(var(--control-h) - 6px); /* 与按钮同档高度 */
+  padding: 0 16px; /* 横向热区 */
   border: none; /* 无边框 */
-  border-radius: var(--radius-pill); /* 胶囊 */
+  border-radius: calc(var(--control-radius) - 1px); /* 与外框同心 */
   background: transparent; /* 未选中透明 */
   color: var(--text-muted); /* 次要色 */
   font-size: var(--fs-sm); /* 正文偏小 */
-  font-weight: 500; /* 中等字重 */
+  font-weight: var(--fw-medium); /* 中等字重 */
   cursor: pointer; /* 手型光标 */
+  transition: var(--transition); /* 切换走统一过渡 */
 } /* 分段按钮结束 */
 
 .segment-item.active { /* 选中态 */
-  background: var(--primary); /* 品牌主色 */
-  color: var(--on-primary); /* 反白 */
+  background: var(--surface); /* 选中项抬成白色小面，与分段控件同一语言 */
+  color: var(--primary); /* 主色文字 */
+  box-shadow: var(--shadow-xs); /* 贴地投影浮出凹槽 */
+  font-weight: var(--fw-semibold); /* 字重提一档 */
 } /* 选中态结束 */
 
 .theater { /* 放映厅根容器 */
@@ -4593,26 +4639,31 @@ code { /* 行内代码/令牌展示 */
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 8px 0;
+  margin: 0;
   flex-wrap: wrap;
 }
 .login-captcha-image {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  height: var(--field-h); /* 与输入框同高，验证码不再比输入框高出一截 */
+  border-radius: var(--control-radius); /* 与输入框同一控件圆角 */
   overflow: hidden;
   background: var(--surface-2);
-  border: 1px solid var(--border-hover);
+  border: 1px solid var(--border);
 }
 .login-captcha-image svg {
   display: block;
-  width: 160px;
-  height: 56px;
+  height: 100%; /* 按高度等比缩放，保持 160×56 的比例不拉伸 */
+  width: auto;
 }
 .login-captcha input {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 120px;
+}
+.login-captcha .btn {
+  flex: 0 0 auto;
+  height: var(--field-h); /* 「换一张」与同一行的输入框等高 */
 }
 
 /* 滑动拼图验证码：背景轨道 + 可拖动缺口块，宽度与后端 300px 题目对齐 */
@@ -4891,10 +4942,10 @@ code { /* 行内代码/令牌展示 */
 
 /* ---------- 页面区块（页面搭建消费）：仅匿名首页生效，论坛页保持原视觉 ---------- */
 .page-blocks-home { display: flex; flex-direction: column; gap: var(--card-gap); } /* 首页区块纵向节奏，与卡片间距一致 */
-.page-blocks-home .page-block { display: flex; flex-direction: column; gap: 10px; padding: var(--card-pad); border: 1px solid var(--border); border-radius: var(--card-radius-lg, 14px); background: var(--surface); } /* 统一区块容器规格 */
+.page-blocks-home .page-block { display: flex; flex-direction: column; gap: 10px; padding: var(--card-pad); border: 1px solid var(--border); border-radius: var(--card-radius-lg, 14px); background: var(--surface); box-shadow: var(--shadow-sm); } /* 统一区块容器规格：同一表面语言 + 轻投影 */
 .page-blocks-home .page-block h2, /* 头图主标题 */
 .page-blocks-home .page-block h3 { margin: 0; } /* 标题零外边距，避免与面板样式叠加 */
-.page-blocks-home .page-block.hero { background: linear-gradient(135deg, var(--primary-soft), var(--success-soft)); } /* 头图轻量渐层，不引入图片依赖 */
+.page-blocks-home .page-block.hero { padding: 26px 28px; border-color: var(--border-strong); background: linear-gradient(180deg, var(--primary-soft), var(--surface) 62%); box-shadow: var(--shadow); } /* 头图只用品牌蓝单色淡底收口，不再叠灰绿双色渐变；靠内距与阴影拉开主次 */
 .page-blocks-home .page-block.hero h2 { font-size: clamp(1.4rem, 2.6vw, 2rem); line-height: 1.25; } /* 头图标题层级 */
 .page-blocks-home .page-block.hero p { margin: 0; } /* 副标题零外边距 */
 .page-blocks-home .page-block.hero .btn { align-self: flex-start; } /* 按钮不拉伸满宽 */

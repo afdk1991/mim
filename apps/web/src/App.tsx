@@ -480,6 +480,16 @@ export function App() {
             </button>
           </nav>
           <span className="footer-copy">© {new Date().getFullYear()} Mim</span>
+          {/* 备案号：与版权同一行，最小字号 + 次要文字色，不做成按钮 */}
+          <span className="footer-beian">
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
+              苏ICP备2025161175号-1
+            </a>
+            <span aria-hidden="true">·</span>
+            <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener noreferrer">
+              苏公网安备32072202010512号
+            </a>
+          </span>
         </div>
       </footer>{/* 页脚结束 */}
     </div> // 布局容器结束，JSX 根元素到此闭合

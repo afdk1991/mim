@@ -297,6 +297,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
 
   // 由区域推导身份提供方：中国区走手机号，Global 区走邮箱
   const provider: Provider = region === 'cn' ? 'phone' : 'email';
+  // 第三方登录：只保留本部署真正配置好凭证的提供方；全部未配置时整块不渲染、不占位
+  const usableOAuth = oauthProviders.filter((item) => (item.region === 'both' || item.region === region) && item.configured);
   // 账号输入框标题：随提供方在「手机号 / 邮箱」文案之间切换
   const identifierLabel = provider === 'phone' ? t(locale, 'auth.phone') : t(locale, 'auth.email');
   // 登录提示文案：只有「登录态失效」一种提示，旧的功能门禁提示已移除
@@ -602,26 +604,22 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           </button>{/* 结束提交按钮 */}
         </form>{/* 结束登录表单 */}
 
-        {oauthProviders.length > 0 && ( // 第三方登录区：9 家全部展示，未配置凭证的置灰
+        {usableOAuth.length > 0 && ( // 第三方登录：只渲染已配置凭证的提供方，未配置时整块不出现
           <div className="oauth-section">{/* 执行当前业务步骤 */}
-            <div className="oauth-divider"><span>{locale === 'en-US' ? 'Or continue with' : '或使用第三方账号'}</span></div>
-            <div className="oauth-grid">{/* 执行当前业务步骤 */}
-              {oauthProviders
-                .filter((item) => item.region === 'both' || item.region === region) // 只展示当前区域可用项
-                .map((item) => (
-                  <button
-                    key={item.id} // 提供方标识唯一
-                    type="button" // 不触发表单提交
-                    className="btn ghost oauth-btn"
-                    disabled={!item.configured || oauthBusy !== null} // 未配置或已有跳转在途时禁用
-                    title={item.configured ? undefined : (locale === 'en-US' ? 'Credentials not configured on this deployment' : '该提供方尚未在本部署配置凭证')}
-                    onClick={() => void startOAuth(item.id)} // 发起授权并整页跳转
-                  >
-                    <span>{locale === 'en-US' ? item.label_en : item.label}</span>
-                    {!item.configured && <span className="oauth-badge">{locale === 'en-US' ? 'N/A' : '未配置'}</span>}
-                    {oauthBusy === item.id && <span className="oauth-badge">{t(locale, 'common.loading')}</span>}
-                  </button>
-                ))}
+            <div className="oauth-grid">{/* 等宽按钮行，不再用裸文本分隔线 */}
+              {usableOAuth.map((item) => (
+                <button
+                  key={item.id} // 提供方标识唯一
+                  type="button" // 不触发表单提交
+                  className="btn ghost oauth-btn"
+                  disabled={oauthBusy !== null} // 已有跳转在途时禁用，避免重复发起
+                  onClick={() => void startOAuth(item.id)} // 发起授权并整页跳转
+                >
+                  <span className="oauth-mark" aria-hidden="true">{(locale === 'en-US' ? item.label_en : item.label).slice(0, 1)}</span>
+                  <span>{locale === 'en-US' ? item.label_en : item.label}</span>
+                  {oauthBusy === item.id && <span className="oauth-badge">{t(locale, 'common.loading')}</span>}
+                </button>
+              ))}
             </div>
           </div>
         )}{/* 第三方登录区结束 */}
