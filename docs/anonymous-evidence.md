@@ -4,8 +4,9 @@
 
 脚本用无头 Chromium（Chrome / Edge）+ 直接 HTTP 探测，验证 Mim 在**完全未登录**时：
 
-- 该放行的读接口与页面正常放行；
-- 该拦截的写动作、私密读、管理接口被稳定拦截（401 + `AUTH_UNAUTHORIZED`）；
+- 公开内容（首页、社区列表、帖子正文、图库与视频、商品、公告）全部 `200`；
+- 付费内容只给预览：正文为空、`locked: true`、媒体 `url` 为空；
+- 写操作（发帖、评论、点赞、收藏、举报、上传、编辑删除）与资金动作（解锁、下单、支付、订单、提现、钱包、个人中心、通知）稳定 `401 + AUTH_UNAUTHORIZED`，不得退化成 `403` 或静默成功；
 - 已认证响应不会被公共缓存；
 - 整轮匿名浏览不会往库里写入用户或浏览去重记录。
 
@@ -111,6 +112,10 @@ Linux / macOS 把 `$env:X = "..."` 换成 `X=... node ...` 即可。
 | L2-8 | `GET /admin/users?limit=1&offset=0` | `401` + `code=AUTH_UNAUTHORIZED` + `Content-Type: application/json` + 响应体不是 HTML |
 | L2-9 | `GET /me`（带 Bearer） | `200`，证明令牌真实有效 |
 | L2-10 | `GET /community/threads?limit=1`（带 Bearer） | `200`，且 `Cache-Control` 同时含 `private` 与 `no-store`，且**不得**含 `public` + `max-age` |
+| L2-11 | `GET /community/gallery/items?limit=12`、`GET /community/gallery/collections` | 均 `200` |
+| L2-12 | 付费帖 `GET /community/threads/:id` | `200`，且 `body === ""`、`locked === true`、`media` 为空数组 |
+| L2-13 | 资金读：`GET /wallet`、`GET /shop/orders`、`GET /commerce/orders`、`GET /payments/channels` | 均 `401` + `code=AUTH_UNAUTHORIZED` |
+| L2-14 | 写操作：`POST /community/threads/:id/favorite`、`POST /security/reports`、`POST /media/presign` | 均 `401` |
 
 L2-3 / L2-4 是必须保留的对照组：同一个路径，GET 放行、POST 拦截，才能证明拦截发生在写入门禁而不是整条路由被禁。
 
@@ -214,21 +219,19 @@ CI 里可直接用退出码判定，`SKIP` 不会让流水线变红，但会在�
 ### 7.4 匿名可读判据
 
 1. 方法必须是 `GET` / `HEAD` / `OPTIONS`（`middleware.ts` 的 `SAFE_METHODS`）。
-2. 路径命中 `middleware.ts` 的 `ANONYMOUS_READ_PATTERNS`：
-   - `/^\/api\/v1\/community\/gallery\/items$/`
-   - `/^\/api\/v1\/community\/gallery\/collections$/`
-3. 命中后走 `optionalAuth`：不带令牌按匿名继续；带过期 / 伪造令牌也不报 401，个人化字段回落 `false`。
+2. 安全方法**默认放行**，只有命中 `middleware.ts` 的 `AUTH_REQUIRED_READ_PATHS` / `AUTH_REQUIRED_READ_PREFIXES`（个人中心、钱包、订单、支付、私信等）才要求登录。
+3. 放行后走 `optionalAuth`：不带令牌按匿名继续；带过期 / 伪造令牌也不报 401，个人化字段回落 `false`。
 4. 付费墙在路由内判定：锁定项 `locked: true`，`url` 与 `poster_url` 一律输出空串；匿名 `collections` 不返回锁定帖分组。
 
-### 7.5 踩坑：401 不等于白名单漏项
+### 7.5 踩坑：401 不等于路径写错
 
-请求不存在的 `/api/v1/gallery/items`（少 `/community`）时，全局门禁在路由匹配**之前**执行，返回：
+请求不存在的 `/api/v1/gallery/items`（少 `/community`）时，新口径下安全方法默认放行，会继续走到路由匹配并返回：
 
 ```json
-{"code":"AUTH_UNAUTHORIZED","message":"missing bearer token","request_id":"..."}
+{"code":"NOT_FOUND","message":"...","request_id":"..."}
 ```
 
-状态码是 `401` 而不是 `404`。**不要据此判定「图库被强制登录挡住」或「白名单漏项」**，先核对路径是否完整、是否带 `/community`。
+状态码是 `404`。**若这里拿到 `401`，说明门禁还没升级到默认放行模型**；先核对线上版本，再核对路径是否完整、是否带 `/community`。
 
 ### 7.6 生产取证样例（匿名，不带 Authorization / Cookie）
 
@@ -238,7 +241,7 @@ CI 里可直接用退出码判定，`SKIP` 不会让流水线变红，但会在�
 | `https://api.laal.top/api/v1/community/gallery/items?kind=image&sort=latest&limit=2&offset=0` | `200` | `total: 0`、`limit: 2`、`sort: "latest"` |
 | `https://api.laal.top/api/v1/community/gallery/items?kind=video&sort=latest&limit=2&offset=0` | `200` | `total: 0`、`limit: 2`、`sort: "latest"` |
 | `https://api.laal.top/api/v1/community/gallery/collections?group=author&kind=image&limit=2` | `200` | `collections: []`、`total: 0`、`group: "author"` |
-| `https://api.laal.top/api/v1/gallery/items`（错误路径对照） | `401` | `code: "AUTH_UNAUTHORIZED"`、`message: "missing bearer token"` |
+| `https://api.laal.top/api/v1/gallery/items`（错误路径对照） | `404` | `code: "NOT_FOUND"` |
 
 > 线上 `community_thread_media` 当前为空，故 `items` 为 `[]`；「锁定项 `url` 为空」由契约测试覆盖：
 > [community-gallery.test.ts](../services/mim-api/test/community-gallery.test.ts) 断言匿名请求 `gallery/items` 时锁定项 `locked === true` 且 `url === ''`，并在 `MIM_FORCE_LOGIN=1` 下断言列表与聚合仍为 `200`。
@@ -253,3 +256,51 @@ CI 里可直接用退出码判定，`SKIP` 不会让流水线变红，但会在�
 2. `退出码`；
 3. 本次使用的 `WEB_BASE` / `API_BASE` 与是否提供 DB、令牌（**不要贴令牌值**）；
 4. 若存在 `SKIP`，写明补齐计划（补库路径 / 补令牌 / 换低峰窗口）。
+
+---
+
+## 9. 注册开关（默认关闭，可上线后自行打开）
+
+注册不是死桩，由服务端环境开关控制，**默认关闭**。前端注册分段与 `/auth/channels` 的 `register` 字段都跟着开关走，关闭时整块不渲染。
+
+### 9.1 开关名与取值
+
+| 项 | 值 |
+| --- | --- |
+| 环境变量 | `MIM_REGISTRATION_ENABLED` |
+| 打开 | `MIM_REGISTRATION_ENABLED=1`（只认 `1`，其余任何值都视为关闭） |
+| 关闭（默认） | 不设置，或设为 `0` / 空串 |
+| 关闭态响应 | `POST /api/v1/auth/register` → `403` + `AUTH_REGISTER_DISABLED` |
+
+### 9.2 打开步骤（自建服务器）
+
+1. 编辑 API 环境文件 `/opt/mim/mim-api.env`，追加或改写一行：
+
+   ```ini
+   MIM_REGISTRATION_ENABLED=1
+   ```
+
+2. 重启 API（systemd 只在启动时读取 `EnvironmentFile`）：
+
+   ```bash
+   sudo systemctl restart mim-api
+   ```
+
+3. 验证：
+
+   ```bash
+   curl -s https://api.laal.top/api/v1/auth/channels | grep -o '"register":[a-z]*'
+   # 期望 "register":true
+   ```
+
+4. 前端**无需重新构建**：注册分段由 `Login.tsx` 在运行时按 `/auth/channels` 的 `register` 判断（`channels?.register`），不是构建期常量。
+
+### 9.3 回滚
+
+把 `MIM_REGISTRATION_ENABLED` 改回 `0`（或删掉该行）并 `sudo systemctl restart mim-api`。已注册账号不受影响，只是新注册入口立刻关闭。
+
+### 9.4 契约与测试
+
+- 代码级回归：`node scripts/verify-auth-gate.mjs`（关闭态 403 + `channels.register=false`；打开态真建号、`member_no` 为纯数字、口令登录可复用同一账号，测试库内用完即清）。
+- 单测：`services/mim-api/test/registration-closed.test.ts`（关闭态）与 `services/mim-api/test/registration-open.test.ts`（打开态）。
+- 两条路径共用 `createUser()`，与后台手工建号落到同一套用户与 Mim ID 号码规则。

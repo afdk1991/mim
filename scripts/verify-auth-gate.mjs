@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
  * scripts/verify-auth-gate.mjs
- * 鉴权边界回归校验（2026-11-15 口径）：匿名可读、写操作需登录、注册已关闭、无访客自动建号。
+ * 鉴权边界回归校验（2026-11-16 口径）：匿名默认可读、只拦个人与资金、写操作需登录、注册开关双态。
  *
- * 唯一真源：services/mim-api/src/middleware.ts 的 FORCE_LOGIN_* 与 ANONYMOUS_READ_* 常量。
- *   1. 匿名可读：白名单内的 GET / HEAD / OPTIONS 直接 200，不需要任何令牌；
- *   2. 写操作：同一路径的 POST / PUT / PATCH / DELETE 一律 401，白名单不能把写带出去；
- *   3. 注册已关闭：POST /api/v1/auth/register 返回 403 + AUTH_REGISTER_DISABLED；
- *   4. 无访客建号：/api/v1/auth/guest 不可用（路由已删除 → 404；或仅保留硬拒桩 → 403 AUTH_REGISTER_DISABLED），前端也不再调用；
- *   5. 后台边界：/api/v1/admin/* 不参与全站强制登录，但仍由 requirePermission 兜底 401；
- *   6. 深链接与刷新：路径路由 + 构建期 404.html / 平台 navigationFallback 回退。
+ * 唯一真源：services/mim-api/src/middleware.ts 的安全方法默认放行模型。
+ *   1. 匿名读：安全方法（GET / HEAD / OPTIONS）默认 200，只对 AUTH_REQUIRED_READ_* 显式拦截；
+ *   2. 写操作：POST / PUT / PATCH / DELETE 默认 401，只放行 ANONYMOUS_WRITE_EXCEPTIONS（支付回调、签名媒体）；
+ *   3. 个人与交易：/me、/wallet、/shop/orders、/commerce/orders、/payments、/im 等一律 401，
+ *      不得退化成 403 或静默成功；
+ *   4. 付费预览契约：付费帖匿名可读但正文为空、locked=true、媒体为空；图库付费项 locked=true 且 url=''；
+ *   5. 注册开关：MIM_REGISTRATION_ENABLED 默认关闭（403 AUTH_REGISTER_DISABLED），打开后可真建号；
+ *   6. 后台边界：/api/v1/admin/* 不参与全站门禁，仍由 requirePermission 兜底 401；
+ *   7. 深链接与刷新：路径路由 + 构建期 404.html / 平台 navigationFallback 回退。
  *
  * 校验分两层：
  *   - 静态断言：直接读源码与构建配置，零依赖、失败可定位到具体契约；
  *   - 运行时断言：用 @mim/api 自带的 tsx 在本进程内起一次性 API（内存库 + 随机端口），
- *     真实发请求核对状态码，避免「源码看着对、实际返回错」。
+ *     真实发请求核对状态码与响应体，避免「源码看着对、实际返回错」。
  *
  * 用法：node scripts/verify-auth-gate.mjs
  */
@@ -44,79 +46,106 @@ function check(name, ok, detail = '') {
   checks.push({ name, ok, detail }); // 不做即时抛出，保证一次跑完全部检查
 } // check 结束
 
-// ---------- 1. 后端门禁：匿名可读白名单只放安全方法 ---------- //
-const mw = read('services/mim-api/src/middleware.ts'); // 全站强制登录与匿名读白名单
-const appServer = read('services/mim-api/src/app.ts'); // 中间件挂载顺序
-
-// 安全方法集合必须是读语义，写方法不得进入白名单
-check(
-  '后端 SAFE_METHODS 仅含 GET / HEAD / OPTIONS',
-  /const SAFE_METHODS = new Set\(\['GET', 'HEAD', 'OPTIONS'\]\)/.test(mw),
-  '安全方法集合漂移，写方法可能被匿名放行',
-);
-// isAnonymousRead 必须在方法判定处直接拒绝写请求
-check(
-  '后端 isAnonymousRead 拒绝非安全方法',
-  /function isAnonymousRead[\s\S]{0,220}?!SAFE_METHODS\.has\(method\.toUpperCase\(\)\)[\s\S]{0,40}?return false/.test(mw),
-  '匿名读判定未先校验方法，POST/PUT/DELETE 可能漏过',
-);
-// 匿名可读精确路径：漏一条就意味着对应公开页面直接 401
-const ANON_PATHS = [
-  '/api/v1/community/home-setting',
-  '/api/v1/community/recommend-weights',
-  '/api/v1/community/overview',
-  '/api/v1/community/boards',
-  '/api/v1/community/threads',
-  '/api/v1/vip/plans',
-  '/api/v1/vip/prices',
-  '/api/v1/shop/products',
-  '/api/v1/content/items',
-  '/api/v1/announcements',
-  '/api/v1/changelog',
-  '/api/v1/changelog/versions',
-  '/api/v1/promotions',
-];
-// 正则转义：白名单路径里含 '/' 等字符，交给 RegExp 前必须先转义
+// 正则转义：把字面量路径转成可用于匹配源码的安全正则
 function escapeRe(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 仅转义正则元字符
 } // escapeRe 结束
 
-// 逐条核对，失败时能直接报出缺失路径；要求是真实条目而不是被注释掉的一行
-for (const path of ANON_PATHS) {
+// ---------- 1. 后端门禁：安全方法默认放行，只拦个人与资金 ---------- //
+const mw = read('services/mim-api/src/middleware.ts'); // 全站门禁与拦截 / 放行唯一清单
+const appServer = read('services/mim-api/src/app.ts'); // 中间件挂载顺序
+
+// 安全方法集合必须只含读语义，写方法不得进入该集合
+check(
+  '后端 SAFE_METHODS 仅含 GET / HEAD / OPTIONS',
+  /const SAFE_METHODS = new Set\(\['GET', 'HEAD', 'OPTIONS'\]\)/.test(mw),
+  '安全方法集合漂移，写方法可能被默认放行',
+);
+// isAnonymousRead 必须先排除写方法，再按「非个人 / 非资金」默认放行
+check(
+  '后端 isAnonymousRead 默认放行安全方法',
+  /function isAnonymousRead[\s\S]{0,260}?!SAFE_METHODS\.has\(method\.toUpperCase\(\)\)[\s\S]{0,80}?return !isAuthRequiredRead\(pathname\)/.test(mw),
+  '匿名读判定未按「安全方法默认放行 + 个人路径例外」实现',
+);
+// 个人 / 资金读路径的精确清单：漏一条就意味着对应数据对匿名开放
+const AUTH_READ_PATHS = [
+  '/api/v1/me',
+  '/api/v1/me/oauth',
+  '/api/v1/wallet',
+  '/api/v1/wallet/withdrawals',
+  '/api/v1/shop/orders',
+  '/api/v1/after-sales',
+  '/api/v1/referral',
+  '/api/v1/reports/mine',
+  '/api/v1/assets',
+  '/api/v1/assets/mine/list',
+  '/api/v1/community/favorites',
+  '/api/v1/community/notifications',
+  '/api/v1/commerce/orders',
+  '/api/v1/commerce/orders/summary',
+  '/api/v1/im/conversations',
+  '/api/v1/im/users',
+];
+// 逐条核对：要求是真实条目而不是被注释掉的一行
+for (const path of AUTH_READ_PATHS) {
   check(
-    `匿名读白名单登记 ${path}`,
+    `需登录读路径登记 ${path}`,
     new RegExp(`^\\s*'${escapeRe(path)}',`, 'm').test(mw),
-    '该公开读接口已从白名单丢失或被注释掉',
+    '该个人 / 资金读接口未登记，匿名可读会泄露个人数据或交易信息',
   );
 }
-// 带路径参数的公开读：正则少一条就会让详情页 / 图库 / 自定义页 401
-const ANON_PATTERNS = [
-  '/^\\/api\\/v1\\/community\\/boards\\/[^/]+\\/tabs$/',
-  '/^\\/api\\/v1\\/community\\/threads\\/[^/]+$/',
-  '/^\\/api\\/v1\\/community\\/threads\\/[^/]+\\/attachments\\/[^/]+\\/download$/',
-  '/^\\/api\\/v1\\/community\\/gallery\\/items$/',
-  '/^\\/api\\/v1\\/community\\/gallery\\/collections$/',
-  '/^\\/api\\/v1\\/pages\\/[^/]+$/',
+// 带路径参数的需登录读：少一条就会让订单详情 / 支付 / 私信被匿名读穿
+const AUTH_READ_PREFIXES = [
+  '/^\\/api\\/v1\\/me\\//',
+  '/^\\/api\\/v1\\/wallet\\//',
+  '/^\\/api\\/v1\\/shop\\/orders\\//',
+  '/^\\/api\\/v1\\/after-sales\\//',
+  '/^\\/api\\/v1\\/referral\\//',
+  '/^\\/api\\/v1\\/reports\\//',
+  '/^\\/api\\/v1\\/assets\\//',
+  '/^\\/api\\/v1\\/community\\/favorites/',
+  '/^\\/api\\/v1\\/community\\/notifications/',
+  '/^\\/api\\/v1\\/commerce\\/orders\\//',
+  '/^\\/api\\/v1\\/payments\\//',
+  '/^\\/api\\/v1\\/im\\//',
+  '/^\\/api\\/v1\\/messaging\\//',
 ];
 // 逐条核对正则文本，避免被随手删掉
-for (const pattern of ANON_PATTERNS) {
-  check(`匿名读白名单登记正则 ${pattern}`, mw.includes(pattern), '带参数公开读接口已从白名单丢失');
+for (const pattern of AUTH_READ_PREFIXES) {
+  check(`需登录读路径正则 ${pattern}`, mw.includes(pattern), '带参数的个人 / 资金读接口已从拦截清单丢失');
 }
-// 公开路径：健康检查与登录页渲染所需的公开元数据
-for (const path of ['/api/v1/healthz', '/api/v1/site/config', '/api/v1/security/status']) {
-  check(`强制登录公开路径 ${path}`, mw.includes(`'${path}'`), '登录页 / 探活依赖的公开路径被移除');
-}
-// 登录链路公开，后台改由 requirePermission 单独兜底
+// 匿名写例外：只允许渠道回调与签名媒体，且必须按方法精确匹配
 check(
-  '强制登录公开前缀含 auth 与 admin',
-  mw.includes("'/api/v1/auth/'") && mw.includes("'/api/v1/admin/'"),
-  '登录链路或后台前缀不再豁免，会与路由内鉴权重复拦截',
+  '匿名写例外登记支付回调 POST',
+  mw.includes('pattern: /^\\/api\\/v1\\/payments\\/[a-z0-9_]+\\/notify$/'),
+  '支付渠道异步通知会被写操作默认拦截误伤，扣款成功但订单不到账',
 );
-// 支付回调只允许 POST，不能顺手把 GET 也放出去
 check(
-  '支付回调仅 POST 免登录',
-  /method === 'POST' && PAYMENT_NOTIFY_PATHS\.some/.test(mw),
-  '支付回调的免登录条件未限定 POST',
+  '匿名写例外登记签名媒体 PUT / DELETE',
+  mw.includes('pattern: /^\\/api\\/v1\\/media\\/objects\\/.+$/') && /method: 'PUT'[\s\S]{0,200}?method: 'DELETE'/.test(mw),
+  '预签名上传 / 删除会被写操作默认拦截，媒体链路不可用',
+);
+check(
+  '匿名写例外按方法精确匹配',
+  /ANONYMOUS_WRITE_EXCEPTIONS\.some\(\(item\) => item\.method === upper/.test(mw),
+  '写例外未校验方法，可能把整条路径的所有写方法放开',
+);
+// 旧的白名单放行模型必须彻底作废，否则两套口径会互相掩盖
+check(
+  '旧匿名读白名单模型已移除',
+  !mw.includes('ANONYMOUS_READ_PATHS') && !mw.includes('ANONYMOUS_READ_PATTERNS'),
+  '旧 ANONYMOUS_READ_* 白名单仍存在，默认放行模型会被旧口径覆盖',
+);
+check(
+  '旧支付回调常量已并入匿名写例外',
+  !mw.includes('PAYMENT_NOTIFY_PATHS'),
+  '旧 PAYMENT_NOTIFY_PATHS 残留，支付回调放行出现第二个真源',
+);
+// 登录链路与后台前缀仍需在门禁公开清单里
+check(
+  '门禁公开前缀含 auth 与 admin',
+  mw.includes("'/api/v1/auth/'") && mw.includes("'/api/v1/admin/'"),
+  '登录链路或后台前缀不再豁免，匿名登录 / 后台校验会被门禁重复拦截',
 );
 // 中间件必须真实挂到 /api/v1 上，常量再对不挂载也没用
 check(
@@ -125,36 +154,49 @@ check(
   'createForceLoginMiddleware 未挂载到 /api/v1',
 );
 
-// ---------- 2. 注册已关闭 + 无访客建号 ---------- //
+// ---------- 2. 注册开关：默认关闭，打开后走完整注册流程 ---------- //
 const authRoute = read('services/mim-api/src/routes/auth.ts'); // 登录 / 注册路由
-// 注册关闭必须有显式闸门与专用错误码
+const configSrc = read('services/mim-api/src/config.ts'); // 开关读取实现
+// 开关名必须写死在代码里，文档与运维照着它操作
+check(
+  '注册开关名 MIM_REGISTRATION_ENABLED',
+  configSrc.includes("'MIM_REGISTRATION_ENABLED'"),
+  '注册开关名缺失或改名，运维无法在不翻代码的情况下打开注册',
+);
+// 默认关闭：只有显式 1 才开启，避免误配置把注册放开
+check(
+  '注册开关默认关闭且仅 1 打开',
+  /isRegistrationEnabled[\s\S]{0,400}?=== '1'/.test(configSrc),
+  '注册开关判定漂移，可能出现未配置即放开的危险默认值',
+);
+// 关闭态必须给出专用错误码，而不是笼统的参数错误
 check(
   '后端注册关闭闸门存在',
   authRoute.includes('assertRegistrationEnabled') && authRoute.includes('AUTH_REGISTER_DISABLED'),
   '注册关闭闸门或错误码缺失',
 );
-// 错误码必须是 403，避免被当成参数错误
+// 错误码必须是 403，避免被当成参数错误或被前端当成登录失效
 check(
   '错误码 AUTH_REGISTER_DISABLED 为 403',
   /AUTH_REGISTER_DISABLED:\s*403/.test(read('packages/core-domain/src/errors.ts')),
   '注册关闭错误码状态位漂移',
 );
-// 访客建号必须没有实现：路由已整体删除，或仅保留「注册关闭」硬拒桩（任何情况下都不得落库建号）
-const guestRouteDefined = authRoute.includes("'/auth/guest'");
+// 打开态必须复用与后台手工建号同一套建号入口（Mim ID 号码规则一致）
 check(
-  '后端无访客自动建号实现',
-  !guestRouteDefined || /\/auth\/guest[\s\S]{0,400}?AUTH_REGISTER_DISABLED/.test(authRoute),
-  '访客建号路由仍在且没有走注册关闭硬拒',
+  '打开态复用统一建号入口',
+  /\/auth\/register[\s\S]{0,2600}?createUser\(deps\.db/.test(authRoute),
+  '自助注册未走 createUser，可能与后台手工建号的号码规则分叉',
 );
-// 渠道能力必须如实告诉前端注册已关闭
+// 渠道能力必须如实上报开关状态，前端据此显示 / 隐藏注册入口
 check(
-  '渠道能力上报 register=false',
+  '渠道能力上报 register 开关态',
   /register:\s*isRegistrationEnabled\(/.test(authRoute),
   '/auth/channels 未按注册开关上报能力',
 );
 
-// ---------- 3. 前端：不再自动建号，匿名可读、写操作引导登录 ---------- //
+// ---------- 3. 前端：注册入口随开关、匿名可读、写操作引导登录 ---------- //
 const appWeb = read('apps/web/src/App.tsx'); // Web 根组件
+const loginView = read('apps/web/src/views/Login.tsx'); // 登录页
 const apiClient = [
   read('apps/web/src/api.ts'),
   read('apps/web/src/api/request.ts'),
@@ -174,17 +216,16 @@ check(
 check('未登录写操作跳登录页并记住来源', appWeb.includes('rememberLoginNext') && appWeb.includes("go({ view: 'login' })"), '登录守卫缺失，写操作会静默失败');
 check('退出登录回到匿名可读社区', /go\(\{ view: 'community' \}\)/.test(appWeb), '退出后落点不是匿名可读页面');
 check("登录提示只保留 'expired' 态", appWeb.includes("useState<'expired' | null>(null)") && !appWeb.includes("'required' | 'expired'"), '「需登录」旧提示类型仍在');
-check('前端展示注册已关闭说明', appWeb.includes('注册已关闭'), '登录页缺少注册关闭说明');
+check('登录页注册分段受 channels.register 控制', loginView.includes('channels?.register &&') && loginView.includes("mode === 'register'"), '注册入口未按服务端开关显示 / 隐藏');
+check('登录页注册调用统一注册接口', loginView.includes('api.register('), '注册分段存在但没有提交到 /auth/register');
+check('登录页关闭态提示注册已关闭', loginView.includes('注册功能已关闭'), '关闭态缺少说明，用户会反复找入口');
+check('登录页无「此功能需登录」旧口径', !loginView.includes('此功能需登录'), '旧功能门禁文案仍在');
+check('登录页无「全站已锁定」旧口径', !loginView.includes('全站已锁定'), '旧整站锁定文案仍在');
 check('App 订阅会话变更事件', appWeb.includes('SESSION_CHANGED_EVENT'), '缺少登录 / 退出 / 失效事件订阅');
 check('App 启动静默校验会话', appWeb.includes('verifySession'), '缺少 /me 启动校验');
 check('api 提供 /me 静默校验', apiClient.includes('export async function verifySession') && apiClient.includes("request<MeResponse>('/me'"), '启动校验必须打受保护接口');
 check('api 失效时广播重登提示', apiClient.includes("clearSession('expired')"), '401 续期失败必须触发失效广播');
 check('api 监听跨标签页 storage', apiClient.includes("addEventListener('storage'"), '其它标签页退出需同步');
-
-// 登录页不得再出现旧的「功能门禁」文案（注册关闭是唯一提示）
-const loginView = read('apps/web/src/views/Login.tsx'); // 登录页
-check('登录页无「此功能需登录」旧口径', !loginView.includes('此功能需登录'), '旧功能门禁文案仍在');
-check('登录页无「全站已锁定」旧口径', !loginView.includes('全站已锁定'), '旧整站锁定文案仍在');
 
 // ---------- 4. 后台鉴权边界不受匿名读影响 ---------- //
 const adminApp = read('apps/admin/src/App.tsx'); // 后台根组件
@@ -237,11 +278,12 @@ if (existsSync(distIndex)) {
 } // 产物存在才校验
 
 // ---------- 6. 运行时断言：真实起 API 发请求 ---------- //
-// 用一次性内存库 + 随机端口跑真实 Express，核对状态码而不是只读源码。
+// 用一次性内存库 + 随机端口跑真实 Express，核对状态码与响应体而不是只读源码。
 const RUNNER_REL = 'services/mim-api/.verify-auth-gate.runner.ts'; // 临时运行器：跑完即删
 const RUNNER_SRC = String.raw`import { createServer } from 'node:http';
 import { createDatabase } from './src/db.js';
 import { createApp } from './src/app.js';
+import { isAnonymousRead, isPublicUnderForceLogin } from './src/middleware.js';
 
 const READ_PATHS = [
   '/api/v1/healthz',
@@ -252,6 +294,8 @@ const READ_PATHS = [
   '/api/v1/community/overview',
   '/api/v1/community/boards',
   '/api/v1/community/threads',
+  '/api/v1/community/threads/thread-quick-build',
+  '/api/v1/community/boards/general/tabs',
   '/api/v1/vip/plans',
   '/api/v1/vip/prices',
   '/api/v1/shop/products',
@@ -264,19 +308,48 @@ const READ_PATHS = [
   '/api/v1/community/gallery/collections',
 ];
 
+const AUTH_READ_PATHS = [
+  '/api/v1/me',
+  '/api/v1/me/oauth',
+  '/api/v1/wallet',
+  '/api/v1/wallet/withdrawals',
+  '/api/v1/shop/orders',
+  '/api/v1/after-sales',
+  '/api/v1/referral',
+  '/api/v1/reports/mine',
+  '/api/v1/assets',
+  '/api/v1/community/favorites',
+  '/api/v1/community/notifications',
+  '/api/v1/commerce/orders',
+  '/api/v1/commerce/orders/summary',
+  '/api/v1/payments/channels',
+  '/api/v1/im/conversations',
+];
+
 const WRITE_CASES = [
-  ['POST', '/api/v1/community/boards'],
   ['POST', '/api/v1/community/threads'],
-  ['POST', '/api/v1/shop/products'],
-  ['POST', '/api/v1/vip/plans'],
-  ['POST', '/api/v1/announcements'],
-  ['POST', '/api/v1/content/items'],
-  ['PUT', '/api/v1/community/threads/verify-gate-id'],
-  ['DELETE', '/api/v1/community/threads/verify-gate-id'],
+  ['POST', '/api/v1/community/threads/thread-quick-build/posts'],
+  ['POST', '/api/v1/community/threads/thread-quick-build/like'],
+  ['POST', '/api/v1/community/threads/thread-quick-build/favorite'],
+  ['POST', '/api/v1/reports'],
+  ['POST', '/api/v1/media/presign/upload'],
+  ['POST', '/api/v1/payments/intents'],
+  ['POST', '/api/v1/commerce/orders'],
+  ['POST', '/api/v1/shop/orders'],
+  ['POST', '/api/v1/wallet/withdrawals'],
+  ['PATCH', '/api/v1/me'],
+  ['DELETE', '/api/v1/community/threads/thread-quick-build'],
 ];
 
 const env = { MIM_CAPTCHA_MODE: 'off' };
-const app = createApp({ db: createDatabase(':memory:'), jwtSecret: 'verify-auth-gate-local-secret', env });
+const db = createDatabase(':memory:');
+const now = new Date().toISOString();
+db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, sort_order, created_at, mime) VALUES (?, ?, ?, ?, NULL, 0, ?, ?)')
+  .run('gate-media-paid', 'thread-paid-store', 'image', '/catalog/gate-paid.png', now, 'image/png');
+db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, sort_order, created_at, mime) VALUES (?, ?, ?, ?, NULL, 0, ?, ?)')
+  .run('gate-media-free', 'thread-quick-build', 'image', '/catalog/gate-free.png', now, 'image/png');
+
+const app = createApp({ db, jwtSecret: 'verify-auth-gate-local-secret', env });
 const server = createServer(app);
 await new Promise(function (resolve) { server.listen(0, '127.0.0.1', function () { resolve(null); }); });
 const addr = server.address();
@@ -309,7 +382,119 @@ async function probe(name, method, path, expect) {
 }
 
 for (const path of READ_PATHS) await probe('匿名可读 ' + path + ' 返回 200', 'GET', path, 200);
+for (const path of AUTH_READ_PATHS) await probe('个人 / 交易读 ' + path + ' 返回 401', 'GET', path, 401);
 for (const item of WRITE_CASES) await probe('写操作 ' + item[0] + ' ' + item[1] + ' 返回 401', item[0], item[1], 401);
+
+const notify = await request('POST', '/api/v1/payments/sandbox/notify', '{}');
+results.push({
+  name: '匿名写例外 POST /api/v1/payments/sandbox/notify 不被 401 拦截',
+  ok: notify.status !== 401,
+  detail: 'status ' + notify.status,
+});
+// 门禁判定的直接证据：写例外必须在判定函数层面命中，才不会被写方法默认拦截
+results.push({
+  name: '门禁判定：签名媒体 PUT / DELETE 属公开写例外',
+  ok:
+    isPublicUnderForceLogin('PUT', '/api/v1/media/objects/gate-object') === true &&
+    isPublicUnderForceLogin('DELETE', '/api/v1/media/objects/gate-object') === true &&
+    isPublicUnderForceLogin('POST', '/api/v1/payments/sandbox/notify') === true,
+  detail: '写例外未在判定函数命中，签名媒体 / 支付回调会被默认拦成 401',
+});
+results.push({
+  name: '门禁判定：普通写方法仍默认拦截',
+  ok: isPublicUnderForceLogin('POST', '/api/v1/community/threads') === false && isAnonymousRead('POST', '/api/v1/community/threads') === false,
+  detail: '写默认拦截失效，匿名发帖会被放行',
+});
+// 签名媒体端点自己会因缺签名回 401（存储层校验），与门禁 401 必须区分：
+// 门禁拒绝的文案是 missing bearer token，能读到签名相关提示说明请求已穿过门禁。
+const signedPut = await request('PUT', '/api/v1/media/objects/gate-object', 'x');
+const signedPutMsg = signedPut.body && typeof signedPut.body.message === 'string' ? signedPut.body.message : '';
+results.push({
+  name: '匿名写例外 PUT /api/v1/media/objects/* 到达存储层而非被门禁拦截',
+  ok: signedPutMsg !== 'missing bearer token',
+  detail: 'status ' + signedPut.status + (signedPutMsg ? ' / ' + signedPutMsg : ''),
+});
+
+const paidDetail = await request('GET', '/api/v1/community/threads/thread-paid-store');
+const paidThread = paidDetail.body && paidDetail.body.thread ? paidDetail.body.thread : {};
+results.push({
+  name: '付费帖匿名可读但只给预览（200 + 正文为空 + locked:true）',
+  ok: paidDetail.status === 200 && paidThread.body === '' && paidThread.locked === true,
+  detail: 'status ' + paidDetail.status + ' / bodyLen ' + String(paidThread.body ? paidThread.body.length : -1) + ' / locked ' + String(paidThread.locked),
+});
+results.push({
+  name: '付费帖匿名预览不下发媒体（media 为空）',
+  ok: paidDetail.status === 200 && Array.isArray(paidThread.media) && paidThread.media.length === 0,
+  detail: 'mediaLen ' + String(Array.isArray(paidThread.media) ? paidThread.media.length : -1),
+});
+
+const gallery = await request('GET', '/api/v1/community/gallery/items?limit=60');
+const galleryItems = gallery.body && Array.isArray(gallery.body.items) ? gallery.body.items : [];
+const paidItem = galleryItems.find(function (item) { return item.thread_id === 'thread-paid-store'; });
+const freeItem = galleryItems.find(function (item) { return item.thread_id === 'thread-quick-build'; });
+results.push({
+  name: '图库匿名可读返回 200',
+  ok: gallery.status === 200 && Array.isArray(gallery.body && gallery.body.items),
+  detail: 'status ' + gallery.status,
+});
+results.push({
+  name: '图库付费媒体 locked:true 且 url 为空',
+  ok: !!paidItem && paidItem.locked === true && paidItem.url === '',
+  detail: paidItem ? 'locked ' + String(paidItem.locked) + ' / url ' + String(paidItem.url) : '未找到 thread-paid-store 媒体',
+});
+results.push({
+  name: '图库免费媒体仍可正常下发地址',
+  ok: !!freeItem && freeItem.locked === false && typeof freeItem.url === 'string' && freeItem.url.length > 0,
+  detail: freeItem ? 'locked ' + String(freeItem.locked) + ' / url ' + String(freeItem.url) : '未找到 thread-quick-build 媒体',
+});
+
+const closedReg = await request('POST', '/api/v1/auth/register', JSON.stringify({ region: 'cn', provider: 'phone', identifier: '13900000001', password: 'test-pass-123' }));
+results.push({
+  name: '注册关闭态 POST /api/v1/auth/register 返回 403 AUTH_REGISTER_DISABLED',
+  ok: closedReg.status === 403 && codeOf(closedReg.body) === 'AUTH_REGISTER_DISABLED',
+  detail: 'status ' + closedReg.status + ' / code ' + String(codeOf(closedReg.body)),
+});
+const closedChannels = await request('GET', '/api/v1/auth/channels');
+results.push({
+  name: '注册关闭态 channels.register=false',
+  ok: closedChannels.status === 200 && closedChannels.body && closedChannels.body.register === false,
+  detail: 'status ' + closedChannels.status + ' / register ' + String(closedChannels.body && closedChannels.body.register),
+});
+
+env.MIM_REGISTRATION_ENABLED = '1';
+const openChannels = await request('GET', '/api/v1/auth/channels');
+results.push({
+  name: '注册打开态 channels.register=true',
+  ok: openChannels.status === 200 && openChannels.body && openChannels.body.register === true,
+  detail: 'status ' + openChannels.status + ' / register ' + String(openChannels.body && openChannels.body.register),
+});
+const openReg = await request('POST', '/api/v1/auth/register', JSON.stringify({ region: 'cn', provider: 'phone', identifier: '13900000001', password: 'test-pass-123', display_name: '门禁注册验证' }));
+const createdId = openReg.body && openReg.body.user ? String(openReg.body.user.id) : '';
+const memberNo = openReg.body && openReg.body.user ? String(openReg.body.user.member_no) : '';
+results.push({
+  name: '注册打开态 POST /api/v1/auth/register 真建号并自动登录（201）',
+  ok: openReg.status === 201 && !!createdId && typeof openReg.body.access_token === 'string',
+  detail: 'status ' + openReg.status + ' / code ' + String(codeOf(openReg.body)),
+});
+results.push({
+  name: '注册打开态按 Mim ID 规则分配纯数字号码',
+  ok: /^\d+$/.test(memberNo),
+  detail: 'member_no ' + memberNo,
+});
+const relogin = await request('POST', '/api/v1/auth/password', JSON.stringify({ region: 'cn', provider: 'phone', identifier: '13900000001', password: 'test-pass-123' }));
+results.push({
+  name: '注册打开态建出的账号可用口令登录',
+  ok: relogin.status === 200 && relogin.body && relogin.body.user && String(relogin.body.user.id) === createdId,
+  detail: 'status ' + relogin.status,
+});
+if (createdId) {
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(createdId);
+  db.prepare('DELETE FROM credentials WHERE user_id = ?').run(createdId);
+  db.prepare('DELETE FROM identities WHERE user_id = ?').run(createdId);
+  db.prepare('DELETE FROM user_roles WHERE user_id = ?').run(createdId);
+  db.prepare('DELETE FROM users WHERE id = ?').run(createdId);
+}
+
 const guestRes = await request('POST', '/api/v1/auth/guest', '{}');
 const guestCode = codeOf(guestRes.body);
 results.push({
@@ -317,23 +502,8 @@ results.push({
   ok: guestRes.status === 404 || (guestRes.status === 403 && guestCode === 'AUTH_REGISTER_DISABLED'),
   detail: 'status ' + guestRes.status + ' / code ' + String(guestCode),
 });
-await probe('未登录 GET /api/v1/me 返回 401', 'GET', '/api/v1/me', 401);
 await probe('后台 GET /api/v1/admin/me 返回 401', 'GET', '/api/v1/admin/me', 401);
 await probe('后台 GET /api/v1/admin/shop/products 返回 401', 'GET', '/api/v1/admin/shop/products', 401);
-
-const registerRes = await request('POST', '/api/v1/auth/register', JSON.stringify({ provider: 'phone', identifier: '13800000000', code: '000000', password: 'verify-gate' }));
-results.push({
-  name: '注册 POST /api/v1/auth/register 返回 403 AUTH_REGISTER_DISABLED',
-  ok: registerRes.status === 403 && codeOf(registerRes.body) === 'AUTH_REGISTER_DISABLED',
-  detail: 'status ' + registerRes.status + ' / code ' + String(codeOf(registerRes.body)),
-});
-
-const channelsRes = await request('GET', '/api/v1/auth/channels');
-results.push({
-  name: '渠道能力 GET /api/v1/auth/channels 上报 register=false',
-  ok: channelsRes.status === 200 && channelsRes.body && channelsRes.body.register === false,
-  detail: 'status ' + channelsRes.status + ' / register ' + String(channelsRes.body && channelsRes.body.register),
-});
 
 server.close();
 console.log('__AUTH_GATE_RESULT__' + JSON.stringify(results));
@@ -380,5 +550,5 @@ const failed = checks.filter((item) => !item.ok);
 const passed = checks.length - failed.length;
 console.log(`\n=== 鉴权边界校验：${passed}/${checks.length} 通过（静态断言 + 内置 API 实测）===`);
 for (const item of failed) console.log(`FAIL  ${item.name}${item.detail ? ` —— ${item.detail}` : ''}`);
-if (failed.length === 0) console.log('全部通过：匿名可读 200、写操作 401、注册关闭、无访客建号、后台边界与深链接均符合当前口径。');
+if (failed.length === 0) console.log('全部通过：匿名读 200、个人 / 交易 401、写操作 401、付费预览 locked 且 url 为空、注册开关双态均符合当前口径。');
 process.exit(failed.length === 0 ? 0 : 1);

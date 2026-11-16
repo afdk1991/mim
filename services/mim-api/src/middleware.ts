@@ -67,7 +67,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   next(); // 通过鉴权，进入业务处理
 } // requireAuth 结束
 
-/** 安全方法集合：只有读语义的方法才可能进入「匿名可读」白名单 */
+/** 安全方法集合：读语义方法默认匿名放行，只对个人数据与资金路径例外拦截 */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
@@ -87,9 +87,10 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
 } // optionalAuth 结束
 
 /**
- * 门禁口径（2026-11-15 调整）：匿名可读、登录才能互动。
- * 除登录链路、第三方支付回调、健康检查与公开读白名单外，其余接口仍要求有效凭证
- * （Bearer JWT 或超管引导令牌）。开关只有一个：MIM_FORCE_LOGIN（默认开启，显式 0/false/off 关闭）。
+ * 门禁口径（2026-11-16 调整）：匿名默认可读，只拦「个人数据」与「钱」。
+ * 默认放行安全方法（GET / HEAD / OPTIONS），只对下方 AUTH_REQUIRED_READ_* 显式拦截；
+ * 写方法默认拦截，只放行下方 ANONYMOUS_WRITE_EXCEPTIONS 的匿名例外。
+ * 开关只有一个：MIM_FORCE_LOGIN（默认开启，显式 0/false/off 关闭）。
  */
 const FORCE_LOGIN_PUBLIC_PATHS = new Set<string>([ // 精确匹配的公开路径
   '/api/v1/healthz', // 监控探活别名
@@ -98,58 +99,81 @@ const FORCE_LOGIN_PUBLIC_PATHS = new Set<string>([ // 精确匹配的公开路�
 ]); // 公开路径集合结束
 
 const FORCE_LOGIN_PUBLIC_PREFIXES = [ // 前缀匹配：整条登录链路保持公开
-  '/api/v1/auth/', // 登录 / 注册关闭提示 / 验证码 / OAuth 与 OIDC 回调 / SSO 兑换
+  '/api/v1/auth/', // 登录 / 注册（开关见 MIM_REGISTRATION_ENABLED）/ 验证码 / OAuth 与 OIDC 回调 / SSO 兑换
   // 后台管理接口不走「全站强制登录」这道门，改由每个路由自己的 requirePermission 单独校验
   // （Bearer JWT + RBAC 权限点，或 x-admin-token 超管引导通道）。
   // 这样后台在冷启动、只有一个账号时仍可进入；未认证访问仍由 requirePermission 返回 401。
   '/api/v1/admin/',
 ]; // 公开前缀结束
 
-const PAYMENT_NOTIFY_PATHS = [ // 第三方异步通知必须免登录：渠道服务端没有用户令牌，只能靠签名验真
-  /^\/api\/v1\/payments\/[a-z0-9_]+\/notify$/, // 扩展渠道：微信 / 支付宝 / 沙箱 / 虎皮椒 / 讯虎等
-]; // 回调路径集合结束
+/**
+ * 写方法默认拦截，这里只登记确实无法要求登录的匿名例外：
+ * 渠道回调靠签名验真，签名媒体靠预签名 URL 验真，二者都没有用户令牌可用。
+ */
+const ANONYMOUS_WRITE_EXCEPTIONS: Array<{ method: string; pattern: RegExp }> = [
+  { method: 'POST', pattern: /^\/api\/v1\/payments\/[a-z0-9_]+\/notify$/ }, // 微信 / 支付宝 / 沙箱 / 虎皮椒 / 讯虎等渠道异步通知
+  { method: 'PUT', pattern: /^\/api\/v1\/media\/objects\/.+$/ }, // 签名媒体上传
+  { method: 'DELETE', pattern: /^\/api\/v1\/media\/objects\/.+$/ }, // 签名媒体删除
+]; // 匿名写例外结束
 
 /**
- * 匿名可读白名单：按「方法 + 路径」双判定，只放安全方法。
- * 同一个路径的 POST / PUT / DELETE 不会被这条白名单带出去——读要放、写要拦。
+ * 需要登录的读路径（个人数据 + 资金 / 交易）。
+ * 安全方法默认放行，只有命中这里的路径才要求有效凭证；新增个人中心 / 订单类接口时必须登记在此。
  */
-const ANONYMOUS_READ_PATHS = new Set<string>([ // 精确匹配的公开读接口
-  '/api/v1/community/home-setting', // 社区首页运营配置
-  '/api/v1/community/recommend-weights', // 推荐指数权重（只读）
-  '/api/v1/community/overview', // 社区首页聚合：板块 / 统计 / 公开会员信息
-  '/api/v1/community/boards', // 板块列表
-  '/api/v1/community/threads', // 帖子列表
-  '/api/v1/vip/plans', // VIP 套餐（公开定价）
-  '/api/v1/vip/prices', // VIP 分级定价规则（公开）
-  '/api/v1/shop/products', // 独立商城商品列表（公开）
-  '/api/v1/content/items', // 统一内容只读视图（公开信息流）
-  '/api/v1/announcements', // 公告
-  '/api/v1/changelog', // 更新日志
-  '/api/v1/changelog/versions', // 更新日志版本列表
-  '/api/v1/promotions', // 推广计划公开页
-]); // 匿名可读精确路径集合结束
+const AUTH_REQUIRED_READ_PATHS = new Set<string>([ // 精确匹配
+  '/api/v1/me', // 个人中心
+  '/api/v1/me/oauth', // 第三方账号绑定列表
+  '/api/v1/wallet', // 钱包余额
+  '/api/v1/wallet/withdrawals', // 提现记录
+  '/api/v1/shop/orders', // 商城订单
+  '/api/v1/after-sales', // 售后单
+  '/api/v1/referral', // 推广中心
+  '/api/v1/reports/mine', // 我的举报
+  '/api/v1/assets', // 付费资产（解锁 / 下载前置）
+  '/api/v1/assets/mine/list', // 我拥有的资产
+  '/api/v1/community/favorites', // 我的收藏
+  '/api/v1/community/notifications', // 通知
+  '/api/v1/commerce/orders', // 统一订单
+  '/api/v1/commerce/orders/summary', // 订单角标
+  '/api/v1/im/conversations', // 私信会话
+  '/api/v1/im/users', // 可私信用户
+]); // 需要登录的精确读路径结束
 
-const ANONYMOUS_READ_PATTERNS = [ // 带路径参数的公开读接口
-  /^\/api\/v1\/community\/boards\/[^/]+\/tabs$/, // 板块自定义页签
-  /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
-  /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 帖子附件签名下载：免费帖匿名可下，付费帖由路由内付费墙拦截
-  /^\/api\/v1\/community\/gallery\/items$/, // 图库 / 视频列表：锁定项由路由内付费墙隐藏地址
-  /^\/api\/v1\/community\/gallery\/collections$/, // 图库聚合：按帖 / 按作者分组
-  /^\/api\/v1\/pages\/[^/]+$/, // 站点自定义页面
-]; // 匿名可读正则集合结束
+const AUTH_REQUIRED_READ_PREFIXES = [ // 带路径参数的需登录读接口
+  /^\/api\/v1\/me\//, // 个人中心子资源（含 oauth 绑定）
+  /^\/api\/v1\/wallet\//, // 钱包 / 提现子资源
+  /^\/api\/v1\/shop\/orders\//, // 订单详情 / 售后
+  /^\/api\/v1\/after-sales\//, // 售后详情
+  /^\/api\/v1\/referral\//, // 推广佣金明细
+  /^\/api\/v1\/reports\//, // 举报详情 / 运营列表
+  /^\/api\/v1\/assets\//, // 付费资产详情
+  /^\/api\/v1\/community\/favorites/, // 收藏列表与取消收藏
+  /^\/api\/v1\/community\/notifications/, // 通知列表与已读
+  /^\/api\/v1\/community\/boards\/[^/]+\/reports$/, // 板块举报（运营审阅）
+  /^\/api\/v1\/commerce\/orders\//, // 统一订单详情 / 支付 / 取消
+  /^\/api\/v1\/payments\//, // 支付渠道、支付意图、对账（钱相关）
+  /^\/api\/v1\/im\//, // 私信
+  /^\/api\/v1\/messaging\//, // 统一消息
+]; // 需要登录的读路径正则结束
 
-/** 判定请求是否属于强制登录下的公开白名单（集中一处，避免各路由散落例外） */
+/** 判定请求是否命中门禁公开清单（登录链路 / 后台 / 健康检查 / 匿名写例外） */
 export function isPublicUnderForceLogin(method: string, pathname: string): boolean {
   if (FORCE_LOGIN_PUBLIC_PATHS.has(pathname)) return true; // 健康检查与必要公开元数据
-  if (FORCE_LOGIN_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true; // 登录链路
-  return method === 'POST' && PAYMENT_NOTIFY_PATHS.some((pattern) => pattern.test(pathname)); // 支付回调：靠渠道签名验真，不能要求登录
+  if (FORCE_LOGIN_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true; // 登录链路与后台
+  const upper = method.toUpperCase(); // 例外按方法精确匹配，避免把写方法整体放开
+  return ANONYMOUS_WRITE_EXCEPTIONS.some((item) => item.method === upper && item.pattern.test(pathname)); // 渠道回调 / 签名媒体
 } // isPublicUnderForceLogin 结束
 
-/** 判定是否为「匿名可读」的公开读接口：必须是安全方法，且路径精确命中白名单 */
+/** 判定读路径是否需要登录（个人数据 / 资金）；新增此类接口必须登记在唯一清单里 */
+export function isAuthRequiredRead(pathname: string): boolean {
+  if (AUTH_REQUIRED_READ_PATHS.has(pathname)) return true; // 精确路径
+  return AUTH_REQUIRED_READ_PREFIXES.some((pattern) => pattern.test(pathname)); // 带参数路径
+} // isAuthRequiredRead 结束
+
+/** 判定是否为「匿名可读」：安全方法默认放行，只有个人 / 资金读路径例外 */
 export function isAnonymousRead(method: string, pathname: string): boolean {
-  if (!SAFE_METHODS.has(method.toUpperCase())) return false; // 写方法一律不放行
-  if (ANONYMOUS_READ_PATHS.has(pathname)) return true; // 精确路径
-  return ANONYMOUS_READ_PATTERNS.some((pattern) => pattern.test(pathname)); // 带参数路径
+  if (!SAFE_METHODS.has(method.toUpperCase())) return false; // 写方法默认拦截，例外在上方的匿名写清单
+  return !isAuthRequiredRead(pathname); // 默认允许读，只拦个人数据与钱
 } // isAnonymousRead 结束
 
 /** 门禁中间件：匿名可读放行，其余接口未认证一律 401，不签发任何临时身份 */
