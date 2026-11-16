@@ -28,5 +28,11 @@ describe('P2 路由已接入主应用', () => { // 调用 describe 并处理其�
 
     const changelog = await request(app).get('/api/v1/changelog'); // 公开更新日志
     expect(changelog.status).toBe(200); // 证明更新日志端点不是 404
+
+    const shipmentOrders = await request(app).get('/api/v1/admin/shop/orders?status=to_ship'); // 后台发货工作台列表
+    expect(shipmentOrders.status).toBe(401); // 路由已挂载，缺令牌由权限中间件拦截而不是 404
+
+    const afterSales = await request(app).get('/api/v1/admin/after-sales'); // 后台售后申请列表
+    expect(afterSales.status).toBe(401); // 证明售后端点已挂载而非 404
   }); // 代码块结束
 }); // 代码块结束

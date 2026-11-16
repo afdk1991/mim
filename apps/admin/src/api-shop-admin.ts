@@ -317,3 +317,143 @@ export async function updateAdminVipPlan(
 export function deleteAdminVipPlan(credential: Credential, code: string): Promise<{ code: string; deleted: boolean }> {
   return request(`/admin/vip/plans/${encodeURIComponent(code)}`, { method: 'DELETE', credential });
 } // deleteAdminVipPlan 结束
+
+// ── 发货与售后 ──────────────────────────────────────────────────────────────
+
+/** 发货筛选口径：待发货 / 已发货 / 已签收 / 待支付 / 已退款 */
+export type ShipmentFilter = 'to_ship' | 'shipped' | 'delivered' | 'pending_payment' | 'refunded';
+
+/** 物流单状态：与 shipments.status 的 CHECK 约束一致 */
+export type ShipmentStatus = 'pending' | 'picked' | 'transit' | 'delivered' | 'exception';
+
+/** 收货信息快照：下单时写入 shop_orders.shipping_json */
+export interface ShippingSnapshot {
+  // 收件人
+  name: string;
+  // 联系电话
+  phone: string;
+  // 收货地址
+  address: string;
+} // ShippingSnapshot 结束
+
+/** 后台发货列表行：订单 + 物流 + 待处理售后计数 */
+export interface AdminShipmentOrderRow {
+  // 订单主键
+  id: string;
+  // 下单用户
+  user_id: string;
+  // 用户昵称
+  user_nickname: string | null;
+  // 购买数量
+  quantity: number;
+  // 实付金额（分）
+  payable_cents: number;
+  // 订单状态：pending / paid / delivered / refunded / cancelled
+  status: string;
+  // 发货方式：physical / virtual_auto / virtual_manual
+  delivery_kind: string;
+  // 商品编码
+  product_code: string;
+  // 商品名
+  product_name: string;
+  // 下单时间
+  created_at: string;
+  // 支付时间
+  paid_at: string | null;
+  // 签收时间
+  delivered_at: string | null;
+  // 发货单主键，null 表示尚未发货
+  shipment_id: string | null;
+  // 物流公司
+  carrier: string | null;
+  // 运单号
+  tracking_no: string | null;
+  // 物流状态
+  shipment_status: ShipmentStatus | null;
+  // 物流最后更新时间
+  shipped_at: string | null;
+  // 待处理售后申请数
+  after_sales_pending: number;
+  // 收货信息（由 shipping_json 摊平）
+  shipping: ShippingSnapshot | null;
+} // AdminShipmentOrderRow 结束
+
+/** 拉取发货工作台列表 */
+export async function listShipmentOrders(
+  credential: Credential,
+  status: ShipmentFilter,
+  limit = 50,
+): Promise<AdminShipmentOrderRow[]> {
+  const data = await request<{ items: AdminShipmentOrderRow[]; total: number }>(
+    `/admin/shop/orders?status=${encodeURIComponent(status)}&limit=${limit}`,
+    { credential },
+  );
+  return data.items;
+} // listShipmentOrders 结束
+
+/** 建发货单：填写物流公司与运单号，默认直接推进为中转（已发货） */
+export async function createShipment(
+  credential: Credential,
+  orderId: string,
+  payload: { carrier: string; tracking_no: string; status?: 'pending' | 'picked' | 'transit'; note?: string },
+): Promise<{ id: string; order_id: string; carrier: string; tracking_no: string; status: string }> {
+  const data = await request<{ shipment: { id: string; order_id: string; carrier: string; tracking_no: string; status: string } }>(
+    `/admin/shop/orders/${encodeURIComponent(orderId)}/shipments`,
+    { method: 'POST', body: payload, credential },
+  );
+  return data.shipment;
+} // createShipment 结束
+
+/** 推进物流状态；delivered 会同步订单为已签收 */
+export function updateShipment(
+  credential: Credential,
+  shipmentId: string,
+  payload: { status: ShipmentStatus; note?: string },
+): Promise<{ id: string; status: string; updated_at: string }> {
+  return request(`/admin/shipments/${encodeURIComponent(shipmentId)}`, { method: 'PATCH', body: payload, credential });
+} // updateShipment 结束
+
+/** 售后申请行：申请 + 订单 + 商品 + 用户 */
+export interface AdminAfterSalesRow {
+  // 申请主键
+  id: string;
+  // 关联订单
+  order_id: string;
+  // 申请人
+  user_id: string;
+  // 用户昵称
+  user_nickname: string | null;
+  // 申请类型：refund_only / return_refund / repair
+  kind: 'refund_only' | 'return_refund' | 'repair';
+  // 申请理由
+  reason: string;
+  // 处理状态：pending / approved / rejected / cancelled
+  status: string;
+  // 后台备注
+  admin_note: string | null;
+  // 处理时间
+  handled_at: string | null;
+  // 申请时间
+  created_at: string;
+  // 订单实付金额（分）
+  payable_cents: number;
+  // 订单状态
+  order_status: string;
+  // 商品名
+  product_name: string;
+} // AdminAfterSalesRow 结束
+
+/** 拉取售后列表：pending 默认只看待处理，all 看全部 */
+export async function listAfterSales(credential: Credential, status: 'pending' | 'all' = 'pending'): Promise<AdminAfterSalesRow[]> {
+  const data = await request<{ items: AdminAfterSalesRow[] }>(`/admin/after-sales?status=${status}`, { credential });
+  return data.items;
+} // listAfterSales 结束
+
+/** 处理售后：approve 会把实付金额退回用户余额并把订单置 refunded */
+export function handleAfterSales(
+  credential: Credential,
+  requestId: string,
+  payload: { action: 'approve' | 'reject'; note?: string },
+): Promise<{ id: string; status: string }> {
+  return request(`/admin/after-sales/${encodeURIComponent(requestId)}/handle`, { method: 'POST', body: payload, credential });
+} // handleAfterSales 结束

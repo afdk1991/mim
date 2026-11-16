@@ -563,5 +563,156 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     res.json({ code, deleted: true }); // 明确告知删除成功
   }); // DELETE 套餐结束
 
+  // ── 发货 ──────────────────────────────────────────────────────────────────
+
+  /** GET /admin/shop/orders — 订单列表：按发货 / 售后状态筛选，供后台待办视图 */
+  router.get('/admin/shop/orders', perm, (req, res) => {
+    const status = String(req.query.status ?? 'to_ship'); // 默认只看待发货
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50) || 50)); // 分页上限 200
+    const where: string[] = []; // 动态条件
+    if (status === 'to_ship') { // 已支付、实物、未建发货单
+      where.push("o.status = 'paid' AND o.delivery_kind = 'physical' AND s.id IS NULL");
+    } else if (status === 'shipped') { // 已建发货单、未签收
+      where.push("s.status IN ('pending','picked','transit')");
+    } else if (status === 'delivered') { // 已签收
+      where.push("s.status = 'delivered'");
+    } else if (status === 'pending_payment') { // 待支付
+      where.push("o.status = 'pending'");
+    } else if (status === 'refunded') { // 已退款
+      where.push("o.status = 'refunded'");
+    } // 其它值按全部处理
+    const rows = db.prepare(
+      `SELECT o.id, o.user_id, o.quantity, o.payable_cents, o.status, o.delivery_kind, o.shipping_json,
+              o.created_at, o.paid_at, o.delivered_at, p.code AS product_code, p.name AS product_name,
+              u.display_name AS user_nickname,
+              s.id AS shipment_id, s.carrier, s.tracking_no, s.status AS shipment_status, s.updated_at AS shipped_at,
+              (SELECT COUNT(*) FROM after_sales_requests a WHERE a.order_id = o.id AND a.status = 'pending') AS after_sales_pending
+         FROM shop_orders o
+         JOIN shop_products p ON p.id = o.product_id
+         LEFT JOIN users u ON u.id = o.user_id
+         LEFT JOIN shipments s ON s.order_id = o.id
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ORDER BY o.created_at DESC
+        LIMIT ? OFFSET ?`,
+    ).all(limit, Math.max(0, Number(req.query.offset ?? 0) || 0)) as Array<Record<string, unknown>>; // 订单 + 物流 + 售后计数
+    res.json({ items: rows.map(orderView), total: rows.length }); // 统一视图
+  });
+
+  /** POST /admin/shop/orders/:id/shipments — 填物流公司与单号，建发货单并推进为已发货 */
+  router.post('/admin/shop/orders/:id/shipments', perm, (req, res) => {
+    const body = parse(
+      z.object({
+        carrier: z.string().min(1).max(40), // 物流公司
+        tracking_no: z.string().min(1).max(80), // 运单号
+        status: z.enum(['pending', 'picked', 'transit']).optional(), // 默认中转
+        note: z.string().max(200).optional(), // 首个轨迹备注
+      }),
+      req.body,
+    );
+    const order = db.prepare('SELECT id, status, delivery_kind FROM shop_orders WHERE id = ?').get(pathParam(req, 'id')) as
+      | { id: string; status: string; delivery_kind: string }
+      | undefined;
+    if (!order) throw new AppError('NOT_FOUND', 'order not found');
+    if (order.delivery_kind !== 'physical') throw new AppError('VALIDATION_FAILED', 'only physical orders need shipment');
+    if (order.status !== 'paid' && order.status !== 'delivered') throw new AppError('CONFLICT', 'order is not in a shippable state', { status: order.status });
+    if (db.prepare('SELECT 1 AS ok FROM shipments WHERE order_id = ?').get(order.id)) throw new AppError('CONFLICT', 'shipment already exists for this order');
+    const now = clockOf(deps);
+    const id = uuidv7();
+    const status = body.status ?? 'transit';
+    db.prepare(
+      `INSERT INTO shipments (id, order_id, carrier, tracking_no, status, events_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, order.id, body.carrier, body.tracking_no, status, JSON.stringify([{ status, at: now, note: body.note ?? '已录入运单' }]), now, now);
+    res.status(201).json({ shipment: { id, order_id: order.id, carrier: body.carrier, tracking_no: body.tracking_no, status: status, created_at: now, updated_at: now } });
+  });
+
+  /** PATCH /admin/shipments/:id — 推进物流状态；delivered 同步订单为已签收 */
+  router.patch('/admin/shipments/:id', perm, (req, res) => {
+    const body = parse(
+      z.object({
+        status: z.enum(['pending', 'picked', 'transit', 'delivered', 'exception']),
+        note: z.string().max(200).optional(),
+      }),
+      req.body,
+    );
+    const shipment = db.prepare('SELECT * FROM shipments WHERE id = ?').get(pathParam(req, 'id')) as
+      | { id: string; order_id: string; status: string; events_json: string }
+      | undefined;
+    if (!shipment) throw new AppError('NOT_FOUND', 'shipment not found');
+    const now = clockOf(deps);
+    const events = jsonParse<Array<Record<string, unknown>>>(shipment.events_json) ?? []; // 容错解析历史轨迹
+    events.push({ status: body.status, at: now, note: body.note ?? '' });
+    db.transaction(() => {
+      db.prepare('UPDATE shipments SET status = ?, events_json = ?, updated_at = ? WHERE id = ?').run(body.status, JSON.stringify(events), now, shipment.id);
+      if (body.status === 'delivered') { // 签收 → 订单落 delivered
+        db.prepare("UPDATE shop_orders SET status = 'delivered', delivered_at = ? WHERE id = ? AND status = 'paid'").run(now, shipment.order_id);
+      } // 签收同步结束
+    })();
+    res.json({ id: shipment.id, status: body.status, updated_at: now });
+  });
+
+  // ── 售后 ──────────────────────────────────────────────────────────────────
+
+  /** GET /admin/after-sales — 售后申请列表，默认待处理 */
+  router.get('/admin/after-sales', perm, (req, res) => {
+    const status = String(req.query.status ?? 'pending');
+    const rows = db.prepare(
+      `SELECT a.*, o.payable_cents, o.status AS order_status, o.delivery_kind,
+              p.name AS product_name, u.display_name AS user_nickname
+         FROM after_sales_requests a
+         JOIN shop_orders o ON o.id = a.order_id
+         JOIN shop_products p ON p.id = o.product_id
+         LEFT JOIN users u ON u.id = a.user_id
+        ${status === 'all' ? '' : 'WHERE a.status = ?'}
+        ORDER BY a.created_at DESC LIMIT 200`,
+    ).all(...(status === 'all' ? [] : [status])) as Array<Record<string, unknown>>;
+    res.json({ items: rows });
+  });
+
+  /** POST /admin/after-sales/:id/handle — 同意即退款入余额；驳回仅留痕 */
+  router.post('/admin/after-sales/:id/handle', perm, (req, res) => {
+    const body = parse(
+      z.object({
+        action: z.enum(['approve', 'reject']),
+        note: z.string().max(300).optional(),
+      }),
+      req.body,
+    );
+    const request = db.prepare('SELECT * FROM after_sales_requests WHERE id = ?').get(pathParam(req, 'id')) as
+      | { id: string; order_id: string; user_id: string; status: string }
+      | undefined;
+    if (!request) throw new AppError('NOT_FOUND', 'after-sales request not found');
+    if (request.status !== 'pending') throw new AppError('CONFLICT', 'request already handled', { status: request.status });
+    const now = clockOf(deps);
+    db.transaction(() => {
+      db.prepare('UPDATE after_sales_requests SET status = ?, admin_note = ?, handled_by = ?, handled_at = ?, updated_at = ? WHERE id = ? AND status = \'pending\'')
+        .run(body.action === 'approve' ? 'approved' : 'rejected', body.note ?? null, req.user?.id ?? null, now, now, request.id);
+      if (body.action === 'approve') { // 同意退款：余额入账 + 订单置 refunded，保证只退一次
+        const order = db.prepare('SELECT status, payable_cents FROM shop_orders WHERE id = ?').get(request.order_id) as
+          | { status: string; payable_cents: number }
+          | undefined;
+        if (!order) throw new AppError('NOT_FOUND', 'order not found');
+        if (order.status === 'refunded') throw new AppError('CONFLICT', 'order already refunded');
+        db.prepare('INSERT OR IGNORE INTO wallets (user_id, balance_cents, points, updated_at) VALUES (?, 0, 0, ?)').run(request.user_id, now);
+        db.prepare('UPDATE wallets SET balance_cents = balance_cents + ?, updated_at = ? WHERE user_id = ?').run(order.payable_cents, now, request.user_id);
+        db.prepare(
+          `INSERT INTO wallet_transactions (id, user_id, kind, amount_cents, ref_type, ref_id, note, created_at)
+           VALUES (?, ?, 'refund', ?, 'shop_order', ?, ?, ?)`,
+        ).run(uuidv7(), request.user_id, order.payable_cents, request.order_id, `售后退款（申请 ${request.id}）`, now);
+        db.prepare("UPDATE shop_orders SET status = 'refunded' WHERE id = ?").run(request.order_id);
+      } // 退款分支结束
+    })();
+    res.json({ id: request.id, status: body.action === 'approve' ? 'approved' : 'rejected' });
+  });
+
   return router; // 返回装配完成的管理面路由
 } // createShopAdminRouter 结束
+
+/** 后台订单视图：把 shipping_json 与物流字段摊平，前端无需二次解析 */
+function orderView(row: Record<string, unknown>) {
+  return {
+    ...row,
+    shipping: row.shipping_json ? jsonParse<Record<string, unknown>>(String(row.shipping_json)) : null,
+  };
+}
+
