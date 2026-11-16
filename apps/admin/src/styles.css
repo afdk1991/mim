@@ -126,7 +126,9 @@ input, select, textarea { /* 表单控件统一外观 */
   font-family: inherit; /* 继承中文字体栈 */ 
   width: 100%; /* 占满字段容器 */ 
 } /* 控件结束 */ 
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-ring); outline-offset: 1px; border-color: var(--primary); } /* 聚焦可见性 */ 
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-ring); outline-offset: 1px; border-color: var(--primary); } /* 聚焦可见性 */
+input, select { height: var(--field-h); padding: 0 12px; border-radius: var(--control-radius); } /* 单行控件统一高度与圆角：与前台同一套规格 */
+textarea { border-radius: var(--control-radius); } /* 多行文本只统一圆角，高度随内容 */ 
 
 /* 按钮 */ 
 .btn { /* 基础按钮 */ 
@@ -178,8 +180,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-rin
 
 /* 页签 */ 
 .tabs { display: flex; gap: 6px; margin-bottom: 14px; } /* 页签容器 */ 
-.tab { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-muted); font-size: var(--fs-sm); cursor: pointer; font-family: inherit; } /* 页签按钮 */ 
-.tab.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); } /* 激活页签 */ 
+.tab { flex: 1; height: var(--control-h); padding: 0 12px; border: 1px solid var(--border); border-radius: var(--control-radius); background: var(--surface); color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--fw-medium); cursor: pointer; font-family: inherit; } /* 页签按钮：与前台同一套高度与圆角 */ 
+.tab.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); font-weight: var(--fw-semibold); } /* 激活页签：淡底 + 主色字，不再整块实心 */ 
 
 /* 权限勾选矩阵 */ 
 .perm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; } /* 权限点网格 */ 

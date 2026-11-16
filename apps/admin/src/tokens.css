@@ -17,9 +17,9 @@
   --text-muted: #777777; /* 次要文字：说明、时间戳 */
   --text-subtle: #999999; /* 更弱文字：占位提示 */
   --text-disabled: #b1b1b1; /* 禁用文字 */
-  --border: #ebedf0; /* 常规描边 */
-  --border-strong: #e3e6ec; /* 强调描边 */
-  --border-hover: #c9ced9; /* 悬停描边 */
+  --border: rgba(50, 50, 50, 0.09); /* 常规描边：与前台同值，浅底上刚好可辨 */
+  --border-strong: rgba(50, 50, 50, 0.14); /* 强调描边：卡片外框、页脚分隔 */
+  --border-hover: rgba(50, 50, 50, 0.24); /* 悬停描边：可交互元素抬升 */
 
   /* ---------- 主色与状态色 ---------- */
   --primary: #3b6ef5; /* 品牌主色：主按钮与激活态 */
@@ -59,10 +59,15 @@
 
   /* ---------- 阴影：柔和环境阴影 ---------- */
   --shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.04); /* 贴地阴影 */
-  --shadow-sm: 0 0 10px rgba(116, 116, 116, 0.08); /* 环境阴影 */
-  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 18px rgba(17, 24, 39, 0.06); /* 标准卡片阴影 */
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.05), 0 2px 6px rgba(17, 24, 39, 0.05); /* 轻卡阴影：与前台同值，白卡在灰底上浮起 */
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.05), 0 6px 16px rgba(17, 24, 39, 0.07); /* 标准卡片阴影：两级叠加以求可辨 */
   --shadow-lg: 0 2px 4px rgba(17, 24, 39, 0.04), 0 16px 40px rgba(17, 24, 39, 0.1); /* 浮层阴影 */
-  --shadow-hover: 0 4px 10px rgba(17, 24, 39, 0.06), 0 12px 28px rgba(17, 24, 39, 0.08); /* 悬停抬升阴影 */
+  --shadow-hover: 0 2px 4px rgba(17, 24, 39, 0.06), 0 10px 24px rgba(17, 24, 39, 0.11); /* 悬停抬升：与前台同值 */
+
+  /* ---------- 控件规格：与前台同值，后台表单不再是另一套形态 ---------- */
+  --control-h: 34px; /* 按钮与页签高度 */
+  --field-h: 40px; /* 输入框 / 下拉高度 */
+  --control-radius: 4px; /* 控件圆角：小方圆角，区别于卡片 12px */
 
   /* ---------- 字体与字号阶梯 ---------- */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; /* 中英文系统字体栈 */
@@ -112,8 +117,9 @@
   --text-muted: #b4b6bb; /* 次要文字 */
   --text-subtle: #888a8f; /* 更弱文字 */
   --text-disabled: #636469; /* 禁用文字 */
-  --border: rgba(184, 184, 184, 0.12); /* 常规描边 */
+  --border: rgba(184, 184, 184, 0.12); /* 常规描边：暗底需略强于浅色 */
   --border-strong: rgba(184, 184, 184, 0.2); /* 强调描边 */
+  --border-hover: rgba(184, 184, 184, 0.34); /* 悬停描边：暗色下需更明显 */
 
   /* ---------- 主色与状态色 ---------- */
   --primary: #6f95ff; /* 主色提亮 */
@@ -142,8 +148,8 @@
 
   /* ---------- 阴影 ---------- */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28); /* 贴地阴影 */
-  --shadow-sm: 0 0 12px rgba(0, 0, 0, 0.3); /* 环境阴影 */
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.32); /* 标准卡片阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.26), 0 2px 6px rgba(0, 0, 0, 0.24); /* 轻卡阴影：与前台同值 */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 16px rgba(0, 0, 0, 0.3); /* 标准卡片阴影：与前台同值 */
   --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.44); /* 浮层阴影 */
-  --shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.4); /* 悬停抬升阴影 */
+  --shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 10px 24px rgba(0, 0, 0, 0.4); /* 悬停抬升：与前台同值 */
 } /* 暗色令牌结束 */
