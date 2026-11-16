@@ -1,0 +1,184 @@
+/**
+ * 图库 / 视频面板新增件样式（2026-11-16）
+ *
+ * 只承载本轮新增：灯箱、作者入口、视频放大按钮、板块 / 时间筛选控件。
+ * 既有 .community-gallery* 规则仍在 styles.css，本文件由组件 import，避免改共享样式。
+ */
+
+/* 时间筛选：工具栏 input 默认吃满宽度，日期框改成内容宽 */
+.community-gallery-toolbar input[type='date'] {
+  flex: none;
+  width: 152px;
+}
+
+/* 图片放大入口：整块可点，保留原有图片比例 */
+.community-gallery-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+/* 视频放大按钮：浮在播放器右上角 */
+.community-gallery-expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--media-bg);
+  color: var(--on-media);
+  font-size: var(--fs-sm);
+  line-height: 1;
+  cursor: zoom-in;
+}
+
+/* 作者入口行：头像 + 名字可点，板块名保持纯文本 */
+.community-gallery-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.community-gallery-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 60%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.community-gallery-author:hover,
+.community-gallery-author:focus-visible {
+  color: var(--primary);
+}
+
+.community-gallery-author > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-gallery-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* 灯箱：独立浮层，点击遮罩关闭 */
+.community-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: var(--media-bg);
+  backdrop-filter: blur(2px);
+}
+
+.community-lightbox-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(1120px, 100%);
+  max-height: 100%;
+  margin: 0;
+}
+
+.community-lightbox-stage img,
+.community-lightbox-stage video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 140px);
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  background: var(--surface);
+}
+
+.community-lightbox-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--on-media);
+  font-size: var(--fs-sm);
+}
+
+.community-lightbox-caption strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-lightbox-caption span {
+  flex: none;
+  color: var(--on-media);
+  opacity: 0.75;
+}
+
+.community-lightbox-close,
+.community-lightbox-nav {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.community-lightbox-close {
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.community-lightbox-nav {
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 26px;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.community-lightbox-nav.is-prev { left: 20px; }
+.community-lightbox-nav.is-next { right: 20px; }
+
+@media (max-width: 480px) {
+  .community-lightbox { padding: 12px; } /* 手机档位收紧边距 */
+  .community-lightbox-nav { width: 36px; height: 36px; } /* 触控区略缩，避免遮住画面 */
+  .community-lightbox-nav.is-prev { left: 6px; }
+  .community-lightbox-nav.is-next { right: 6px; }
+  .community-gallery-toolbar input[type='date'] { flex: 1 1 130px; width: auto; } /* 窄屏两列铺满 */
+}

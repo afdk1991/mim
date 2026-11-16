@@ -1023,6 +1023,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
           locale={locale}
           kind={tab === 'video' ? 'video' : 'image'}
           hasSession={hasSession}
+          boards={boards}
           onOpenThread={(threadId) => { setTab('forum'); void openThread(threadId); }}
           onRequireLogin={() => { if (onRequireLogin) onRequireLogin(); else requireSession(); }}
         />

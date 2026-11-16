@@ -207,6 +207,54 @@ describe('图库 / 视频', () => {
     expect((collections.body.collections as Array<Record<string, unknown>>).find((item) => item.key === paidThreadId)).toBeUndefined(); // 匿名聚合不包含锁定帖
   });
 
+  it('图库筛选：板块与上传时间区间可叠加，作者聚合复用 collections 路由', async () => {
+    const author = await registerTestAccount(app, '13700000307');
+    const authorAuth = { authorization: `Bearer ${author.token}`, 'content-type': 'application/json' };
+    const imageKey = await uploadFile(authorAuth, 'image/png', Buffer.from('filter-image'));
+    const created = await request(app)
+      .post('/api/v1/community/threads')
+      .set({ ...authorAuth, 'idempotency-key': randomUUID() })
+      .send({
+        board_slug: 'general',
+        title: '筛选样本：板块与时间',
+        body: '用于验证图库的板块与上传时间区间筛选，以及作者聚合入口。',
+        media: [{ kind: 'image', object_key: imageKey }],
+      });
+    expect(created.status).toBe(201);
+    const threadId = created.body.thread_id as string;
+    const mediaId = mediaIdOf(threadId);
+    db.prepare('UPDATE community_thread_media SET created_at = ? WHERE id = ?').run('2026-01-02T10:00:00.000Z', mediaId);
+
+    // 作者聚合入口：collections 复用同一批筛选参数（此时帖子仍在公开板块，匿名可见）
+    const collections = await request(app).get(`/api/v1/community/gallery/collections?group=thread&author_id=${author.userId}&from=2026-01-01&to=2026-01-03`);
+    expect(collections.status).toBe(200);
+    expect((collections.body.collections as Array<Record<string, unknown>>).map((item) => item.key)).toContain(threadId);
+    const filteredOut = await request(app).get(`/api/v1/community/gallery/collections?group=thread&author_id=${author.userId}&from=2026-01-03`);
+    expect((filteredOut.body.collections as Array<Record<string, unknown>>).map((item) => item.key)).not.toContain(threadId);
+
+    db.prepare("UPDATE community_threads SET board_id = (SELECT id FROM community_boards WHERE slug = 'paid') WHERE id = ?").run(threadId);
+
+    const byBoard = await request(app).get('/api/v1/community/gallery/items?board_slug=paid&limit=60');
+    expect(byBoard.status).toBe(200);
+    expect((byBoard.body.items as Array<Record<string, unknown>>).every((item) => item.board_slug === 'paid')).toBe(true);
+    expect((byBoard.body.items as Array<Record<string, unknown>>).some((item) => item.id === mediaId)).toBe(true);
+
+    const otherBoard = await request(app).get('/api/v1/community/gallery/items?board_slug=general&limit=60');
+    expect((otherBoard.body.items as Array<Record<string, unknown>>).some((item) => item.id === mediaId)).toBe(false);
+
+    const inRange = await request(app).get('/api/v1/community/gallery/items?board_slug=paid&from=2026-01-01&to=2026-01-03&limit=60');
+    expect((inRange.body.items as Array<Record<string, unknown>>).some((item) => item.id === mediaId)).toBe(true);
+    const tooLate = await request(app).get('/api/v1/community/gallery/items?board_slug=paid&from=2026-01-03&limit=60');
+    expect((tooLate.body.items as Array<Record<string, unknown>>).some((item) => item.id === mediaId)).toBe(false);
+    const tooEarly = await request(app).get('/api/v1/community/gallery/items?board_slug=paid&to=2026-01-01&limit=60');
+    expect((tooEarly.body.items as Array<Record<string, unknown>>).some((item) => item.id === mediaId)).toBe(false);
+
+    const anonymous = await request(app).get('/api/v1/community/gallery/items?limit=60');
+    expect(anonymous.status).toBe(200); // 新筛选不影响匿名可读
+    const lockedRows = (anonymous.body.items as Array<Record<string, unknown>>).filter((item) => item.locked === true);
+    for (const row of lockedRows) expect(row.url).toBe(''); // 付费墙契约：锁定项地址仍为空
+  });
+
   it('全站强制登录开启时：图库匿名可读，锁定规则不变', async () => {
     db.prepare('INSERT INTO community_thread_media (id, thread_id, kind, url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(`media-${randomUUID()}`, PAID_THREAD, 'image', '/catalog/store.jpg', null, 0, new Date().toISOString()); // 种子付费帖补一条媒体，用于验证收藏门禁

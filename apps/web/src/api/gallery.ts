@@ -69,6 +69,9 @@ export interface GalleryQuery { // 查询条件
   kind?: 'image' | 'video' | ''; // 媒体类型
   author_id?: string; // 按作者
   thread_id?: string; // 按帖
+  board_slug?: string; // 按板块
+  from?: string; // 上传时间下界（YYYY-MM-DD 或 ISO）
+  to?: string; // 上传时间上界（YYYY-MM-DD 或 ISO）
   favorited?: boolean; // 只看我的收藏
   sort?: 'latest' | 'oldest' | 'favorites'; // 排序
   limit?: number; // 页长
@@ -93,6 +96,9 @@ export function fetchGalleryItems(query: GalleryQuery = {}): Promise<GalleryPage
     kind: query.kind, // 类型
     author_id: query.author_id, // 作者
     thread_id: query.thread_id, // 帖子
+    board_slug: query.board_slug, // 板块
+    from: query.from, // 时间下界
+    to: query.to, // 时间上界
     favorited: query.favorited, // 我的收藏
     sort: query.sort, // 排序
     limit: query.limit, // 页长
@@ -106,6 +112,10 @@ export function fetchGalleryCollections(group: 'thread' | 'author', query: Galle
     group, // 分组维度
     q: query.q, // 关键词
     kind: query.kind, // 类型
+    author_id: query.author_id, // 作者聚合入口
+    board_slug: query.board_slug, // 板块
+    from: query.from, // 时间下界
+    to: query.to, // 时间上界
     limit: query.limit, // 页长
     offset: query.offset, // 偏移
   })}`, { idempotency: false }); // 只读 GET

@@ -218,6 +218,17 @@ function mediaAccess( // 定义函数 mediaAccess：图库读接口与收藏共�
   return row.price_cents > 0 ? threadPaidUnlocked : boardUnlocked; // 收费单帖不得因板块开放而放行
 } // 函数结束
 
+/** 图库时间区间边界：支持 YYYY-MM-DD 与完整 ISO；纯日期按当天首 / 末毫秒补全。 */
+function galleryDateBound(raw: unknown, edge: 'start' | 'end'): string { // 定义函数 galleryDateBound：统一筛选边界口径
+  const value = typeof raw === 'string' ? raw.trim() : ''; // 非字符串与空值一律视为未筛选
+  if (!value) return ''; // 未传即不参与 where
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) { // 纯日期：本地口径按 UTC 整天覆盖
+    return `${value}T${edge === 'start' ? '00:00:00.000' : '23:59:59.999'}Z`; // 首 / 末毫秒
+  } // 结束条件分支
+  const parsed = new Date(value); // 完整时间串按 ISO 解析
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString(); // 非法值忽略，避免整段筛选失效
+} // 函数结束
+
 /** 确保当前用户有钱包行；新用户开箱即 0 余额、100 积分。 */
 function ensureWallet(deps: ApiDeps, userId: string) { // 定义函数 ensureWallet：封装可复用业务步骤
   const existing = deps.db.prepare('SELECT user_id, balance_cents, points FROM wallets WHERE user_id = ?').get(userId) as // 保存 existing：承载本步骤的计算结果供后续使用
@@ -1894,6 +1905,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const kind = kindRaw === 'image' || kindRaw === 'video' ? kindRaw : ''; // 非法值按全部处理
     const authorId = typeof req.query.author_id === 'string' ? req.query.author_id : ''; // 按作者聚合筛选
     const threadId = typeof req.query.thread_id === 'string' ? req.query.thread_id : ''; // 按帖聚合筛选
+    const boardSlug = typeof req.query.board_slug === 'string' ? req.query.board_slug.trim() : ''; // 按板块筛选
+    const dateFrom = galleryDateBound(req.query.from, 'start'); // 上传时间下界
+    const dateTo = galleryDateBound(req.query.to, 'end'); // 上传时间上界
     const favoritedOnly = ['1', 'true', 'yes'].includes(String(req.query.favorited ?? '')); // 只看我的收藏
     const sort = ['latest', 'oldest', 'favorites'].includes(String(req.query.sort)) ? String(req.query.sort) : 'latest'; // 排序
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '24'), 10) || 24, 1), 60); // 单页上限 60
@@ -1904,6 +1918,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (kind) { where.push('m.kind = ?'); args.push(kind); } // 类型筛选
     if (authorId) { where.push('t.author_id = ?'); args.push(authorId); } // 作者筛选
     if (threadId) { where.push('m.thread_id = ?'); args.push(threadId); } // 帖子筛选
+    if (boardSlug) { where.push('b.slug = ?'); args.push(boardSlug); } // 板块筛选
+    if (dateFrom) { where.push('m.created_at >= ?'); args.push(dateFrom); } // 时间下界
+    if (dateTo) { where.push('m.created_at <= ?'); args.push(dateTo); } // 时间上界
     if (q) { where.push('(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ? OR u.display_name LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); } // 关键词：正文与作者都参与命中
     if (favoritedOnly) { where.push('EXISTS (SELECT 1 FROM gallery_favorites gf WHERE gf.media_id = m.id AND gf.user_id = ?)'); args.push(userId); } // 我的收藏
     const order = // 排序：默认最新
@@ -1971,12 +1988,20 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const kindRaw = typeof req.query.kind === 'string' ? req.query.kind : ''; // 媒体类型
     const kind = kindRaw === 'image' || kindRaw === 'video' ? kindRaw : ''; // 非法值按全部处理
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 关键词
+    const authorId = typeof req.query.author_id === 'string' ? req.query.author_id : ''; // 作者聚合入口：只取该作者的内容
+    const boardSlug = typeof req.query.board_slug === 'string' ? req.query.board_slug.trim() : ''; // 按板块筛选
+    const dateFrom = galleryDateBound(req.query.from, 'start'); // 上传时间下界
+    const dateTo = galleryDateBound(req.query.to, 'end'); // 上传时间上界
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '24'), 10) || 24, 1), 60); // 单页上限 60
     const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 偏移
     const level = vipLevel(deps, userId); // VIP 等级
     const where: string[] = ["t.status = 'published'", "b.status = 'active'"]; // 只聚合公开内容
     const args: unknown[] = []; // 与 where 同步的参数
     if (kind) { where.push('m.kind = ?'); args.push(kind); } // 类型筛选
+    if (authorId) { where.push('t.author_id = ?'); args.push(authorId); } // 作者筛选
+    if (boardSlug) { where.push('b.slug = ?'); args.push(boardSlug); } // 板块筛选
+    if (dateFrom) { where.push('m.created_at >= ?'); args.push(dateFrom); } // 时间下界
+    if (dateTo) { where.push('m.created_at <= ?'); args.push(dateTo); } // 时间上界
     if (q) { where.push('(t.title LIKE ? OR t.summary LIKE ? OR u.display_name LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`); } // 关键词
     const rows = deps.db // 聚合前先取回准入事实：分组按用户可见性过滤
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
