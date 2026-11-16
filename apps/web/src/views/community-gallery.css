@@ -64,7 +64,7 @@
 
 .community-gallery-author:hover,
 .community-gallery-author:focus-visible {
-  color: var(--primary);
+  color: var(--link);
 }
 
 .community-gallery-author > span:last-child {

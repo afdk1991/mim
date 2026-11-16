@@ -1012,7 +1012,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const canManageTabs = !!currentBoard?.is_moderator;
 
   return ( // 返回当前函数的处理结果
-    <section className="community-wrap">{/* 执行当前业务步骤 */}
+    <section className="community-wrap" data-theme-section={newsId ? newsKind : tab}>{/* 板块色相作用域：随当前栏目切换整套派生色 */}
       {newsId ? (
         // 资讯条目独立详情页：深链接 /community/news/:kind/:id 直接可用
         <ContentDetail locale={locale} kind={newsKind} id={newsId} />

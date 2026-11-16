@@ -1,9 +1,15 @@
 /**
  * Mim 全站设计令牌（令牌层唯一来源）。
  *
- * 风格口径：卡片化布局、较大圆角、柔和环境阴影、浅色底 + 单一主色、
+ * 风格口径：卡片化布局、较大圆角、柔和环境阴影、全彩文字体系、
  * 清晰的字号阶梯、克制的悬停过渡、舒适的信息密度。
  * 只借鉴视觉规则，不引入任何第三方 UI 库，也不含任何外部素材。
+ *
+ * 全彩口径（2026-11-16）：所有文字都不再使用纯黑 / 纯灰 / 中性色。
+ * 颜色由 --theme-h（色相）/ --theme-s（饱和度）两个输入变量派生：
+ * 文字用同色相的不同明度 + 饱和度构成层级，八个内容板块各自覆盖色相，
+ * 品牌区与通用控件走基准色。派生值全部写在本文件的
+ * `:root, [data-theme-section]` 作用域里，组件内只消费语义令牌。
  *
  * 加载顺序：本文件必须在 styles.css 之前引入（见 main.tsx），
  * 保证页面样式里的 var() 都消费同一份令牌；运行期后台主题
@@ -27,78 +33,69 @@
   --theme-bg-dark: #292a2d; /* 暗色底色输入：暗色始终用令牌内深灰，不跟随后台浅色底 */
   --theme-radius: 12px; /* 圆角输入：后台圆角档位写这里 */
 
-  /* ---------- 中性色阶梯：底色 / 表面 / 文字 / 描边 ---------- */
-  --bg: var(--theme-bg); /* 页面底色：浅灰，托起白色卡片形成层次 */
-  --surface: #ffffff; /* 一级表面：卡片、面板、弹窗内容区 */
-  --surface-2: #f6f7f8; /* 二级表面：表头、悬停底、弱化区块 */
-  --surface-3: #eeeeee; /* 三级表面：徽标底、分段控件未选中底 */
-  --text: #333333; /* 主文字：标题与关键信息 */
-  --text-secondary: #4e5358; /* 正文文字：段落与卡片摘要 */
-  --text-muted: #777777; /* 次要文字：说明、计数、元信息 */
-  --text-subtle: #999999; /* 更弱文字：时间戳、占位提示 */
-  --text-disabled: #b1b1b1; /* 禁用文字：不可用项与占位符 */
-  --border: rgba(50, 50, 50, 0.09); /* 常规描边：白卡在白底上也要能看见一圈边，不能只靠阴影 */
-  --border-strong: rgba(50, 50, 50, 0.14); /* 强调描边：分组、hero 与嵌套块的边界 */
-  --border-hover: rgba(50, 50, 50, 0.24); /* 悬停描边：次按钮 hover 与输入框悬停时加深一档 */
+  /* ---------- 板块色相输入：默认基准色（品牌区与通用控件） ----------
+     内容板块在文件末尾用 [data-theme-section] 覆盖这两个输入，
+     该作用域内的文字 / 表面 / 描边会自动按新色相重新求解。 */
+  --theme-h: 222; /* 基准色相：品牌蓝 */
+  --theme-s: 62%; /* 基准饱和度 */
 
   /* ---------- 主色与状态色：单一主色 + 语义色 ---------- */
-  --primary: var(--theme-primary); /* 品牌主色：主按钮、选中态、链接 */
+  --primary: var(--theme-primary); /* 品牌主色：用于描边、图标与渐变等非文字场合 */
   --primary-hover: #2f59c9; /* 主色悬停：加深一档，不做发光 */
   --primary-active: #274bb0; /* 主色按下：再加深一档 */
   --primary-dark: var(--theme-primary); /* 兼容旧令牌：沿用配置主色，页面无需改名 */
   --primary-soft: var(--theme-primary-soft); /* 主色淡底：选中行、标签底 */
   --primary-ring: var(--theme-primary-ring); /* 主色焦点环：键盘可见性 */
-  --on-primary: #ffffff; /* 主色底上的文字色 */
-  --on-dark: #f2f5fa; /* 深色面（遮罩角标、钱包卡）上的文字色：明暗两套都是浅色 */
-  --danger: #d64545; /* 危险色：删除、错误 */
-  --danger-soft: rgba(214, 69, 69, 0.1); /* 危险淡底 */
-  --danger-border: rgba(214, 69, 69, 0.28); /* 危险描边：危险按钮与面板边界 */
-  --success: #1f8a5b; /* 成功色：完成、通过 */
-  --success-soft: rgba(31, 138, 91, 0.1); /* 成功淡底 */
-  --warning: #a86a10; /* 警告色：需留意但不阻断 */
-  --warning-soft: rgba(168, 106, 16, 0.12); /* 警告淡底 */
-  --info: #2f6fed; /* 信息色：普通提示 */
-  --info-soft: rgba(47, 111, 237, 0.1); /* 信息淡底 */
-  --violet: #7a55c9; /* 紫色：受限权限等第三类语义 */
+  --primary-fill: color-mix(in srgb, var(--primary) 88%, hsl(var(--theme-h) 45% 8%)); /* 主色填充：压暗 12%，保证浅色文字在其上仍有 5:1 以上对比 */
+  --link: hsl(var(--theme-h) 74% 36%); /* 链接与强调文字：同色相的最深可达档，白底对比 ≈ 8:1 */
+  --on-primary: hsl(var(--theme-h) 100% 97%); /* 主色填充上的文字：极浅的本色相，不用纯白 */
+  --on-dark: hsl(var(--theme-h) 55% 94%); /* 深色面（钱包卡、遮罩角标）上的文字 */
+  --danger: #c22a35; /* 危险色文字：删除、错误（白底 ≈ 5.7:1） */
+  --danger-soft: rgba(194, 42, 53, 0.1); /* 危险淡底 */
+  --danger-border: rgba(194, 42, 53, 0.28); /* 危险描边：危险按钮与面板边界 */
+  --success: #127a4c; /* 成功色文字：完成、通过（白底 ≈ 5.4:1） */
+  --success-soft: rgba(18, 122, 76, 0.1); /* 成功淡底 */
+  --warning: #8f5a05; /* 警告色文字：需留意但不阻断（白底 ≈ 5.8:1） */
+  --warning-soft: rgba(143, 90, 5, 0.12); /* 警告淡底 */
+  --info: #1f5fd0; /* 信息色文字：普通提示（白底 ≈ 5.8:1） */
+  --info-soft: rgba(31, 95, 208, 0.1); /* 信息淡底 */
+  --violet: #6a3fbe; /* 紫色文字：受限权限等第三类语义（白底 ≈ 6.8:1） */
   --violet-soft: #f1ecfb; /* 紫色淡底 */
-  --success-border: rgba(31, 138, 91, 0.28); /* 成功描边：绿色提示条与标签边界 */
-  --warning-border: rgba(168, 106, 16, 0.28); /* 警告描边：锁定态与待处理提示 */
-  --info-border: rgba(47, 111, 237, 0.28); /* 信息描边：蓝色提示与链接边界 */
-  --premium: #8a5a00; /* 付费 / 会员金色文字 */
+  --success-border: rgba(18, 122, 76, 0.28); /* 成功描边：绿色提示条与标签边界 */
+  --warning-border: rgba(143, 90, 5, 0.28); /* 警告描边：锁定态与待处理提示 */
+  --info-border: rgba(31, 95, 208, 0.28); /* 信息描边：蓝色提示与链接边界 */
+  --premium: #7a5200; /* 付费 / 会员金色文字（白底 ≈ 6.9:1） */
   --premium-soft: #fff8e6; /* 付费金色淡底：会员卡与解锁提示 */
   --premium-border: #e6c680; /* 付费金色描边 */
-  --amber: #f59e0b; /* 琥珀色：评分星标与高亮标记 */
+  --amber: #9a6206; /* 琥珀色文字：评分星标与高亮标记（白底 ≈ 5.1:1） */
   --amber-soft: rgba(245, 158, 11, 0.16); /* 琥珀淡底：搜索命中高亮 */
-  --amber-border: rgba(245, 158, 11, 0.55); /* 琥珀描边：锁定态提示 */
-  --overlay: rgba(23, 32, 50, 0.78); /* 图片遮罩：封面上的功能角标底 */
-  --mask: rgba(0, 0, 0, 0.42); /* 弹层遮罩：弹出面板背后的压暗层 */
+  --amber-border: rgba(154, 98, 6, 0.45); /* 琥珀描边：锁定态提示 */
+  --overlay: hsl(var(--theme-h) 45% 12% / 0.78); /* 图片遮罩：封面上的功能角标底 */
+  --mask: hsl(var(--theme-h) 40% 8% / 0.5); /* 弹层遮罩：弹出面板背后的压暗层 */
   --media-bg: #0b1220; /* 媒体占位底：商品图加载前与灯箱内衬，始终深色不随主题 */
   --media-scrim: rgba(3, 7, 15, 0.9); /* 灯箱遮罩：大图预览压暗层，比普通弹层更重 */
   --media-chip: rgba(4, 9, 18, 0.72); /* 图上角标底：封面上的形态 / 价格 / 页码胶囊 */
   --media-line: rgba(255, 255, 255, 0.14); /* 图上细线：媒体缩略图与符号按钮的描边 */
-  --on-media: #eaf1ff; /* 图上文字：深色媒体底上的浅字，明暗一致 */
+  --on-media: hsl(var(--theme-h) 100% 94%); /* 图上文字：深色媒体底上的浅字 */
 
   /* ---------- 侧栏：保留深色栏形成强对比 ---------- */
-  --sidebar: #1d2433; /* 侧栏底色 */
-  --sidebar-text: #cfd6e4; /* 侧栏常规文字 */
-  --sidebar-strong: #eef1f7; /* 侧栏强调文字：品牌名与当前用户 */
-  --sidebar-muted: #8a93a6; /* 侧栏次要文字 */
-  --sidebar-hover: #2a3447; /* 侧栏悬停底 */
-  --sidebar-line: rgba(255, 255, 255, 0.08); /* 侧栏分割线 */
-  --sidebar-line-strong: rgba(255, 255, 255, 0.18); /* 侧栏强调描边：幽灵按钮 */
+  --sidebar: hsl(var(--theme-h) 32% 14%); /* 侧栏底色：深色但带本板块色相 */
+  --sidebar-text: hsl(var(--theme-h) 26% 84%); /* 侧栏常规文字 */
+  --sidebar-strong: hsl(var(--theme-h) 38% 94%); /* 侧栏强调文字：品牌名与当前用户 */
+  --sidebar-muted: hsl(var(--theme-h) 18% 66%); /* 侧栏次要文字 */
+  --sidebar-hover: hsl(var(--theme-h) 30% 19%); /* 侧栏悬停底 */
+  --sidebar-line: hsl(var(--theme-h) 40% 96% / 0.1); /* 侧栏分割线 */
+  --sidebar-line-strong: hsl(var(--theme-h) 40% 96% / 0.22); /* 侧栏强调描边：幽灵按钮 */
 
-  /* ---------- 导航：浅色侧栏表面（2026-11-16 批次一） ----------
+  /* ---------- 导航：浅色侧栏表面 ----------
      与 --sidebar 分开命名：--sidebar 仍服务于钱包卡 / 媒体占位这类需要深色底的组件，
      导航改为浅色后不再复用那组深色值。 */
-  --nav-bg: #ffffff; /* 导航底色：与内容区一级表面同族，靠描边与内容区分 */
   --nav-text: var(--text-secondary); /* 导航常规文字 */
   --nav-strong: var(--text); /* 导航强调文字：品牌名与当前用户 */
   --nav-muted: var(--text-muted); /* 导航次要文字：区域标识与说明 */
   --nav-hover: var(--surface-2); /* 导航悬停底 */
   --nav-active-bg: var(--primary-soft); /* 选中项底色：淡主色，不再用饱和实心块 */
-  --nav-active-text: var(--primary); /* 选中项文字与图标 */
-  --nav-line: rgba(50, 50, 50, 0.08); /* 导航与内容区的分界线 */
-  --nav-ring: rgba(50, 50, 50, 0.14); /* 导航内幽灵按钮描边 */
+  --nav-active-text: var(--link); /* 选中项文字与图标：走文字安全档 */
 
   /* ---------- 圆角阶梯：卡片较大、控件较小、标签胶囊 ---------- */
   --radius: var(--theme-radius); /* 主圆角：卡片与面板（后台主题可运行期覆盖） */
@@ -168,22 +165,30 @@
   --tag-radius: 4px; /* 标签圆角：与控件同族，避免全站胶囊化 */
 } /* 浅色令牌结束 */
 
+/* ---------- 浅色派生色：按作用域内的 --theme-h / --theme-s 求解 ----------
+   :root 是基准色；[data-theme-section] 是内容板块作用域。
+   两个选择器共用同一组派生规则，板块只要覆盖色相输入，整套颜色自动换色。 */
+:root,
+[data-theme-section] {
+  --bg: color-mix(in srgb, var(--theme-bg) 94%, hsl(var(--theme-h) 62% 52%)); /* 页面底色：向板块色相偏一档，不再是中性灰 */
+  --surface: color-mix(in srgb, #ffffff 97%, hsl(var(--theme-h) 62% 52%)); /* 一级表面：白里透出色相 */
+  --surface-2: color-mix(in srgb, #ffffff 93%, hsl(var(--theme-h) 58% 52%)); /* 二级表面：表头、悬停底 */
+  --surface-3: color-mix(in srgb, #ffffff 88%, hsl(var(--theme-h) 52% 52%)); /* 三级表面：徽标底、分段未选中底 */
+  --text: hsl(var(--theme-h) calc(var(--theme-s) * 0.55) 25%); /* 主文字：同色相最深一档，白底对比 ≈ 12:1 */
+  --text-secondary: hsl(var(--theme-h) calc(var(--theme-s) * 0.6) 32%); /* 正文：白底对比 ≈ 9:1 */
+  --text-muted: hsl(var(--theme-h) calc(var(--theme-s) * 0.45) 38%); /* 次要文字：白底对比 ≈ 6:1 */
+  --text-subtle: hsl(var(--theme-h) calc(var(--theme-s) * 0.3) 41%); /* 更弱文字：白底对比 ≥ 4.7:1 */
+  --text-disabled: hsl(var(--theme-h) calc(var(--theme-s) * 0.25) 62%); /* 禁用文字：WCAG 豁免档 */
+  --border: hsl(var(--theme-h) 24% 38% / 0.18); /* 常规描边：带色相的细线 */
+  --border-strong: hsl(var(--theme-h) 24% 34% / 0.26); /* 强调描边：分组与嵌套块边界 */
+  --border-hover: hsl(var(--theme-h) 26% 30% / 0.42); /* 悬停描边：可交互元素抬升 */
+  --nav-bg: color-mix(in srgb, #ffffff 97%, hsl(var(--theme-h) 62% 52%)); /* 导航底色：与一级表面同族 */
+  --nav-line: hsl(var(--theme-h) 24% 38% / 0.14); /* 导航与内容区的分界线 */
+  --nav-ring: hsl(var(--theme-h) 24% 38% / 0.2); /* 导航内幽灵按钮描边 */
+} /* 浅色派生色结束 */
+
 :root[data-theme='dark'] { /* 暗色令牌：显式切换才生效，不影响现有浅色默认 */
   color-scheme: dark; /* 声明暗色方案，原生控件与滚动条同步 */
-
-  /* ---------- 中性色：暗底抬升，文字降亮度对比 ---------- */
-  --bg: var(--theme-bg-dark); /* 页面底色：中性深灰，不用纯黑；暗色不继承后台浅色底 */
-  --surface: #323335; /* 一级表面：比底色亮一档 */
-  --surface-2: #37383a; /* 二级表面：表头、悬停底 */
-  --surface-3: #2d2e31; /* 三级表面：分段底、内嵌区块 */
-  --text: #e5eef7; /* 主文字：避免纯白刺眼 */
-  --text-secondary: #c3cad3; /* 正文文字 */
-  --text-muted: #b4b6bb; /* 次要文字 */
-  --text-subtle: #888a8f; /* 更弱文字 */
-  --text-disabled: #636469; /* 禁用文字 */
-  --border: rgba(114, 114, 114, 0.12); /* 常规描边：暗底半透明更自然 */
-  --border-strong: rgba(114, 114, 114, 0.2); /* 强调描边：暗底需比浅色再提一档 */
-  --border-hover: rgba(114, 114, 114, 0.34); /* 悬停描边：暗底需更亮才可见 */
 
   /* ---------- 主色与状态色：提亮保证暗底对比 ---------- */
   --primary: var(--theme-primary-dark); /* 主色：取后台主色派生出的暗色亮度版本 */
@@ -192,50 +197,50 @@
   --primary-dark: var(--theme-primary-dark); /* 兼容旧令牌：暗色下同样跟随配置主色 */
   --primary-soft: var(--theme-primary-soft-dark); /* 主色淡底 */
   --primary-ring: var(--theme-primary-ring-dark); /* 焦点环 */
-  --on-primary: #10141c; /* 亮主色底上的深色文字 */
-  --on-dark: #f2f5fa; /* 深色面文字色：暗色下同样保持浅色，不跟 --on-primary 反转 */
-  --danger: #ff7a7a; /* 危险色提亮 */
-  --danger-soft: rgba(255, 122, 122, 0.14); /* 危险淡底 */
-  --danger-border: rgba(255, 122, 122, 0.36); /* 危险描边 */
-  --success: #4cc38a; /* 成功色提亮 */
-  --success-soft: rgba(76, 195, 138, 0.14); /* 成功淡底 */
-  --warning: #e0a94f; /* 警告色提亮 */
-  --warning-soft: rgba(224, 169, 79, 0.16); /* 警告淡底 */
-  --info: #7aa2ff; /* 信息色提亮 */
-  --info-soft: rgba(122, 162, 255, 0.14); /* 信息淡底 */
-  --violet: #b49bf0; /* 紫色提亮：暗底保证对比 */
-  --violet-soft: rgba(180, 155, 240, 0.16); /* 紫色淡底 */
-  --success-border: rgba(76, 195, 138, 0.36); /* 成功描边：暗底提高不透明度 */
-  --warning-border: rgba(224, 169, 79, 0.36); /* 警告描边 */
-  --info-border: rgba(122, 162, 255, 0.36); /* 信息描边 */
-  --premium: #e0be86; /* 付费金色文字：暗底提亮 */
-  --premium-soft: rgba(224, 190, 134, 0.14); /* 付费金色淡底 */
-  --premium-border: rgba(224, 190, 134, 0.38); /* 付费金色描边 */
-  --amber: #fbbf24; /* 琥珀色：暗底星标与高亮 */
-  --amber-soft: rgba(251, 191, 36, 0.16); /* 琥珀淡底 */
-  --amber-border: rgba(251, 191, 36, 0.5); /* 琥珀描边 */
-  --overlay: rgba(0, 0, 0, 0.72); /* 图片遮罩：暗色下更深 */
-  --mask: rgba(0, 0, 0, 0.6); /* 弹层遮罩：暗色下更深 */
-  --media-bg: #0b1220; /* 媒体占位底：暗色下同样是深色，保持图片区稳定 */
+  --primary-fill: color-mix(in srgb, var(--primary) 82%, hsl(var(--theme-h) 90% 96%)); /* 主色填充：暗色提亮，配深色文字 */
+  --link: hsl(var(--theme-h) 88% 74%); /* 链接与强调文字：暗底对比 ≥ 7:1 */
+  --on-primary: hsl(var(--theme-h) 55% 12%); /* 亮主色底上的文字：带本板块色相的深色，不用纯黑 */
+  --on-dark: hsl(var(--theme-h) 55% 94%); /* 深色面文字色：暗色下同样保持浅色 */
+  --danger: #ff8f8f; /* 危险色提亮：暗底 ≈ 6:1 */
+  --danger-soft: rgba(255, 143, 143, 0.14); /* 危险淡底 */
+  --danger-border: rgba(255, 143, 143, 0.36); /* 危险描边 */
+  --success: #5fd6a0; /* 成功色提亮 */
+  --success-soft: rgba(95, 214, 160, 0.14); /* 成功淡底 */
+  --warning: #ebb968; /* 警告色提亮 */
+  --warning-soft: rgba(235, 185, 104, 0.16); /* 警告淡底 */
+  --info: #94b4ff; /* 信息色提亮 */
+  --info-soft: rgba(148, 180, 255, 0.14); /* 信息淡底 */
+  --violet: #c4adff; /* 紫色提亮：暗底保证对比 */
+  --violet-soft: rgba(196, 173, 255, 0.16); /* 紫色淡底 */
+  --success-border: rgba(95, 214, 160, 0.36); /* 成功描边：暗底提高不透明度 */
+  --warning-border: rgba(235, 185, 104, 0.36); /* 警告描边 */
+  --info-border: rgba(148, 180, 255, 0.36); /* 信息描边 */
+  --premium: #eccb9a; /* 付费金色文字：暗底提亮 */
+  --premium-soft: rgba(236, 203, 154, 0.14); /* 付费金色淡底 */
+  --premium-border: rgba(236, 203, 154, 0.38); /* 付费金色描边 */
+  --amber: #ffcf5c; /* 琥珀色：暗底星标与高亮 */
+  --amber-soft: rgba(255, 207, 92, 0.16); /* 琥珀淡底 */
+  --amber-border: rgba(255, 207, 92, 0.5); /* 琥珀描边 */
+  --overlay: hsl(var(--theme-h) 45% 5% / 0.74); /* 图片遮罩：暗色下更深 */
+  --mask: hsl(var(--theme-h) 40% 4% / 0.62); /* 弹层遮罩：暗色下更深 */
+  --media-bg: #0a0f1a; /* 媒体占位底：暗色下同样是深色，保持图片区稳定 */
   --media-scrim: rgba(0, 0, 0, 0.92); /* 灯箱遮罩：暗色下再压深一档 */
   --media-chip: rgba(4, 9, 18, 0.78); /* 图上角标底：暗色下略提高不透明度 */
   --media-line: rgba(255, 255, 255, 0.18); /* 图上细线：暗色下提亮以便分辨 */
-  --on-media: #eaf1ff; /* 图上文字：保持浅色 */
+  --on-media: hsl(var(--theme-h) 100% 94%); /* 图上文字：保持浅色 */
 
   /* ---------- 侧栏：暗色下与内容区仍保持一档差异 ---------- */
-  --sidebar: #20242c; /* 侧栏底色 */
-  --sidebar-text: #cfd6e4; /* 侧栏常规文字 */
-  --sidebar-strong: #eef1f7; /* 侧栏强调文字 */
-  --sidebar-muted: #8a93a6; /* 侧栏次要文字 */
-  --sidebar-hover: #2b313c; /* 侧栏悬停底 */
-  --sidebar-line: rgba(255, 255, 255, 0.08); /* 侧栏分割线 */
-  --sidebar-line-strong: rgba(255, 255, 255, 0.18); /* 侧栏强调描边 */
+  --sidebar: hsl(var(--theme-h) 30% 11%); /* 侧栏底色 */
+  --sidebar-text: hsl(var(--theme-h) 26% 82%); /* 侧栏常规文字 */
+  --sidebar-strong: hsl(var(--theme-h) 38% 94%); /* 侧栏强调文字 */
+  --sidebar-muted: hsl(var(--theme-h) 18% 64%); /* 侧栏次要文字 */
+  --sidebar-hover: hsl(var(--theme-h) 28% 17%); /* 侧栏悬停底 */
+  --sidebar-line: hsl(var(--theme-h) 40% 96% / 0.1); /* 侧栏分割线 */
+  --sidebar-line-strong: hsl(var(--theme-h) 40% 96% / 0.22); /* 侧栏强调描边 */
 
   /* ---------- 导航：暗色下比内容表面再压深一档 ---------- */
-  --nav-bg: #24262a; /* 导航底色：比内容区底色更沉，形成边界 */
-  --nav-hover: rgba(255, 255, 255, 0.06); /* 导航悬停底：暗底用透明白提亮 */
-  --nav-line: rgba(255, 255, 255, 0.08); /* 导航分界线 */
-  --nav-ring: rgba(255, 255, 255, 0.16); /* 导航内幽灵按钮描边 */
+  --nav-hover: hsl(var(--theme-h) 30% 96% / 0.08); /* 导航悬停底：暗底用透明白提亮 */
+  --nav-ring: hsl(var(--theme-h) 30% 96% / 0.18); /* 导航内幽灵按钮描边 */
 
   /* ---------- 阴影：暗底用更高不透明度，避免看不见 ---------- */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.28); /* 贴地阴影 */
@@ -244,3 +249,33 @@
   --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.44); /* 浮层阴影 */
   --shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 10px 24px rgba(0, 0, 0, 0.4); /* 悬停阴影：只加深扩散 */
 } /* 暗色令牌结束 */
+
+/* ---------- 暗色派生色：与浅色同一套规则，改取暗底可读的明度 ---------- */
+:root[data-theme='dark'],
+:root[data-theme='dark'] [data-theme-section] {
+  --bg: color-mix(in srgb, var(--theme-bg-dark) 90%, hsl(var(--theme-h) 55% 46%)); /* 页面底色：深灰里透出板块色相 */
+  --surface: hsl(var(--theme-h) 14% 21%); /* 一级表面 */
+  --surface-2: hsl(var(--theme-h) 14% 24%); /* 二级表面 */
+  --surface-3: hsl(var(--theme-h) 14% 18%); /* 三级表面 */
+  --text: hsl(var(--theme-h) calc(var(--theme-s) * 0.5) 88%); /* 主文字：暗底对比 ≈ 11:1 */
+  --text-secondary: hsl(var(--theme-h) calc(var(--theme-s) * 0.45) 79%); /* 正文：≈ 8:1 */
+  --text-muted: hsl(var(--theme-h) calc(var(--theme-s) * 0.4) 71%); /* 次要文字：≈ 6:1 */
+  --text-subtle: hsl(var(--theme-h) calc(var(--theme-s) * 0.32) 64%); /* 更弱文字：≥ 4.6:1 */
+  --text-disabled: hsl(var(--theme-h) calc(var(--theme-s) * 0.2) 48%); /* 禁用文字 */
+  --border: hsl(var(--theme-h) 30% 80% / 0.14); /* 常规描边 */
+  --border-strong: hsl(var(--theme-h) 30% 82% / 0.22); /* 强调描边 */
+  --border-hover: hsl(var(--theme-h) 30% 86% / 0.36); /* 悬停描边 */
+  --nav-bg: hsl(var(--theme-h) 16% 17%); /* 导航底色：比内容区更沉 */
+  --nav-line: hsl(var(--theme-h) 30% 80% / 0.12); /* 导航分界线 */
+} /* 暗色派生色结束 */
+
+/* ---------- 板块主题色：八个内容板块各一套色相 ----------
+   组件只在容器上挂 data-theme-section，颜色仍全部由令牌派生。 */
+[data-theme-section='forum'] { --theme-h: 222; --theme-s: 62%; } /* 论坛：品牌蓝 */
+[data-theme-section='images'] { --theme-h: 274; --theme-s: 58%; } /* 图库：紫 */
+[data-theme-section='video'] { --theme-h: 344; --theme-s: 66%; } /* 视频：玫红 */
+[data-theme-section='announcements'] { --theme-h: 24; --theme-s: 72%; } /* 公告动态：橙 */
+[data-theme-section='vip'] { --theme-h: 41; --theme-s: 70%; } /* VIP 会员：金 */
+[data-theme-section='wallet'] { --theme-h: 158; --theme-s: 58%; } /* 钱包 / 积分：青绿 */
+[data-theme-section='shop'] { --theme-h: 318; --theme-s: 60%; } /* 社区商城：洋红 */
+[data-theme-section='referral'] { --theme-h: 190; --theme-s: 60%; } /* 推广分成：青 */

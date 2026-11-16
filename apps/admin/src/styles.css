@@ -18,7 +18,7 @@ body { /* 页面主体 */
 h1, h2, h3, h4 { margin: 0; color: var(--text); font-weight: var(--fw-semibold); line-height: var(--lh-tight); } /* 标题统一字重与颜色层级 */ 
 
 /* 链接默认继承文字色，避免蓝色满屏 */ 
-a { color: var(--primary); text-decoration: none; } /* 链接基础样式 */ 
+a { color: var(--link); text-decoration: none; } /* 链接基础样式：走文字安全档 */ 
 
 /* 两栏布局：固定侧栏 + 自适应内容区 */ 
 .layout { /* 应用外壳 */ 
@@ -170,10 +170,10 @@ textarea { border-radius: var(--control-radius); } /* 多行文本只统一圆�
   white-space: nowrap; /* 文案不折行 */ 
 } /* 按钮结束 */ 
 .btn:hover:not(:disabled) { border-color: var(--border-hover); } /* 悬停描边加深 */ 
-.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); } /* 主按钮 */ 
+.btn.primary { background: var(--primary-fill); border-color: var(--primary); color: var(--on-primary); } /* 主按钮：填充走压暗档，浅字仍达标 */ 
 .btn.primary:hover:not(:disabled) { background: var(--primary-dark); border-color: var(--primary-dark); } /* 主按钮按下态 */ 
 .btn.danger { color: var(--danger); border-color: var(--danger-border); } /* 危险按钮：文字红 */ 
-.btn.ghost { background: transparent; border-color: transparent; color: var(--primary); } /* 幽灵按钮 */ 
+.btn.ghost { background: transparent; border-color: transparent; color: var(--link); } /* 幽灵按钮：文字走链接安全档 */ 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; } /* 禁用态 */ 
 
 /* 表格 */ 
@@ -192,7 +192,7 @@ textarea { border-radius: var(--control-radius); } /* 多行文本只统一圆�
 .badge.draft { background: var(--warning-soft); color: var(--warning); } /* 草稿态徽标 */ 
 .badge.archived { background: var(--surface-3); color: var(--text-muted); } /* 归档态徽标 */ 
 .badge.danger { background: var(--danger-soft); color: var(--danger); } /* 危险态徽标 */ 
-.badge.builtin { background: var(--primary-soft); color: var(--primary); } /* 内置标记徽标 */ 
+.badge.builtin { background: var(--primary-soft); color: var(--link); } /* 内置标记徽标 */ 
 
 /* 登录页：无侧栏，居中卡片 */ 
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; } /* 全屏居中 */ 
@@ -208,7 +208,7 @@ textarea { border-radius: var(--control-radius); } /* 多行文本只统一圆�
 /* 页签 */ 
 .tabs { display: flex; gap: 6px; margin-bottom: 14px; } /* 页签容器 */ 
 .tab { flex: 1; height: var(--control-h); padding: 0 12px; border: 1px solid var(--border); border-radius: var(--control-radius); background: var(--surface); color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--fw-medium); cursor: pointer; font-family: inherit; } /* 页签按钮：与前台同一套高度与圆角 */ 
-.tab.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); font-weight: var(--fw-semibold); } /* 激活页签：淡底 + 主色字，不再整块实心 */ 
+.tab.active { border-color: var(--primary); background: var(--primary-soft); color: var(--link); font-weight: var(--fw-semibold); } /* 激活页签：淡底 + 链接色字，不再整块实心 */ 
 
 /* 权限勾选矩阵 */ 
 .perm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; } /* 权限点网格 */ 

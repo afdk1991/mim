@@ -163,7 +163,7 @@ code { /* 行内代码/令牌展示 */
 
 .subnav-item:hover { /* 悬停态 */
   border-color: var(--primary); /* 描边转主色提示可点 */
-  color: var(--primary); /* 文字同转主色 */
+  color: var(--link); /* 文字同转主色 */
 } /* 悬停态结束 */
 
 .sidebar-footer { /* 侧边栏底部用户区 */
@@ -242,7 +242,7 @@ code { /* 行内代码/令牌展示 */
 
 .footer-links button:hover { /* 页脚按钮悬停 */
   background: var(--surface-2); /* 浅灰底反馈 */
-  color: var(--primary); /* 转主色提示可点 */
+  color: var(--link); /* 转主色提示可点 */
 } /* 页脚按钮悬停结束 */
 
 .footer-copy { /* 版权信息 */
@@ -264,7 +264,7 @@ code { /* 行内代码/令牌展示 */
 } /* 备案链接结束 */
 
 .footer-beian a:hover { /* 悬停态 */
-  color: var(--primary); /* 转主色提示可点 */
+  color: var(--link); /* 转主色提示可点 */
   text-decoration: underline; /* 悬停补下划线 */
 } /* 悬停结束 */
 
@@ -336,7 +336,7 @@ code { /* 行内代码/令牌展示 */
   width: 5px; /* 圆点宽度 */
   height: 5px; /* 圆点高度 */
   border-radius: 50%; /* 正圆 */
-  background: var(--primary); /* 主色点缀 */
+  background: var(--primary-fill); /* 主色点缀 */
 } /* 圆点结束 */
 
 .gate-card .btn { /* 门禁卡片按钮 */
@@ -578,7 +578,7 @@ code { /* 行内代码/令牌展示 */
 
 .btn.primary { /* 主操作按钮 */
   border-color: var(--primary); /* 边框与底色同为主色 */
-  background: var(--primary); /* 主色填充，视觉权重最高 */
+  background: var(--primary-fill); /* 主色填充，视觉权重最高 */
   color: var(--on-primary); /* 主色底上的对比色文字 */
 } /* 主按钮结束 */
 
@@ -624,7 +624,7 @@ code { /* 行内代码/令牌展示 */
   padding: 0; /* 去掉内边距，纯文字形态 */
   border: 0; /* 去掉边框 */
   background: none; /* 去掉底色 */
-  color: var(--primary); /* 主色文字表达可点击 */
+  color: var(--link); /* 主色文字表达可点击 */
   font-size: var(--fs-xs); /* 次要操作用小字号 */
   cursor: pointer; /* 手型提示 */
 } /* 链接按钮结束 */
@@ -653,7 +653,7 @@ code { /* 行内代码/令牌展示 */
 
 .badge.role-owner { /* 所有者角色徽标 */
   background: var(--primary-soft); /* 主色淡底对应权限体系 */
-  color: var(--primary); /* 主色文字，权限最高最醒目 */
+  color: var(--link); /* 主色文字，权限最高最醒目 */
 } /* 所有者徽标结束 */
 
 .badge.role-editor { /* 编辑者角色徽标 */
@@ -693,7 +693,7 @@ code { /* 行内代码/令牌展示 */
 
 .segmented button.active { /* 选中的分段选项 */
   background: var(--surface); /* 选中项抬成白色小面，不再大片主色填充 */
-  color: var(--primary); /* 主色文字表达当前项 */
+  color: var(--link); /* 主色文字表达当前项 */
   box-shadow: var(--shadow-xs); /* 贴地投影让选中项浮出凹槽 */
   font-weight: var(--fw-semibold); /* 字重再提一档 */
 } /* 选中段结束 */
@@ -732,7 +732,7 @@ code { /* 行内代码/令牌展示 */
 
 .auth-intro-kicker { /* 引导区小标 */
   margin: 0; /* 清掉默认外边距 */
-  color: var(--primary); /* 主色小标 */
+  color: var(--link); /* 主色小标 */
   font-size: var(--fs-xs); /* 小字号 */
   font-weight: 700; /* 加粗 */
   letter-spacing: 0.16em; /* 字距拉开 */
@@ -778,7 +778,7 @@ code { /* 行内代码/令牌展示 */
   width: 6px; /* 圆点宽度 */
   height: 6px; /* 圆点高度 */
   border-radius: 50%; /* 正圆 */
-  background: var(--primary); /* 主色点缀 */
+  background: var(--primary-fill); /* 主色点缀 */
 } /* 圆点结束 */
 
 .auth-intro-foot { /* 引导区脚注 */
@@ -874,7 +874,7 @@ code { /* 行内代码/令牌展示 */
   padding: 10px 12px; /* 内边距形成提示块 */
   border-radius: var(--radius-sm); /* 统一圆角 */
   background: var(--primary-soft); /* 淡蓝底提示「开发用」 */
-  color: var(--primary); /* 主色文字便于识别验证码 */
+  color: var(--link); /* 主色文字便于识别验证码 */
   font-size: var(--fs-sm); /* 略小正文 */
 } /* 验证码块结束 */
 
@@ -937,7 +937,7 @@ code { /* 行内代码/令牌展示 */
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; /* 等宽字体让数字对齐 */
   font-size: var(--fs-xl); /* 放大作为视觉焦点 */
   letter-spacing: 1px; /* 略微松开字符 */
-  color: var(--primary); /* 品牌色 */
+  color: var(--link); /* 品牌色 */
 } /* 号码结束 */
 
 .member-line { /* 个人中心里的 Mim ID 行 */
@@ -1216,7 +1216,7 @@ code { /* 行内代码/令牌展示 */
 
 .store-card-price { /* 价格角标靠右 */
   right: 10px; /* 右侧定位 */
-  background: var(--primary); /* 品牌蓝底突出价格 */
+  background: var(--primary-fill); /* 品牌蓝底突出价格 */
 } /* 价格角标结束 */
 
 .store-card > :not(.store-card-media) { /* 封面以外的卡片内容补回左右内边距 */
@@ -1735,7 +1735,7 @@ code { /* 行内代码/令牌展示 */
   width: 36px;
   height: 36px;
   border-radius: 50%; /* 圆形 */
-  background: var(--primary); /* 主色背景 */
+  background: var(--primary-fill); /* 主色背景 */
   color: var(--on-primary); /* 白色文字 */
   display: flex; /* 居中首字母 */
   align-items: center;
@@ -1856,7 +1856,7 @@ code { /* 行内代码/令牌展示 */
 } /* 气泡结束 */
 
 .chat-msg.mine .chat-msg-bubble { /* 自己的气泡主色背景 */
-  background: var(--primary); /* 主色 */
+  background: var(--primary-fill); /* 主色 */
   color: var(--on-primary); /* 白字 */
   border-color: var(--primary);
 } /* 自己气泡结束 */
@@ -2259,7 +2259,7 @@ code { /* 行内代码/令牌展示 */
 } /* 悬停结束 */
 .store-nav-entry.active { /* 当前选中分类 */
   background: var(--primary-soft); /* 主色极淡底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
   font-weight: 600; /* 加粗强调 */
 } /* 选中态结束 */
 .store-nav-entry.sub { /* 二级条目：缩进一级 */
@@ -2331,7 +2331,7 @@ code { /* 行内代码/令牌展示 */
 } /* 去掉标记结束 */
 .filter-pop[open] summary { /* 展开态摘要 */
   border-color: var(--primary); /* 边框转主色 */
-  color: var(--primary); /* 文字转主色 */
+  color: var(--link); /* 文字转主色 */
 } /* 展开摘要结束 */
 .filter-pop-body { /* 选项清单下拉体 */
   position: absolute; /* 浮于列表之上，不挤压布局 */
@@ -2374,7 +2374,7 @@ code { /* 行内代码/令牌展示 */
   border: 1px solid var(--primary-ring); /* 主色系浅边框 */
   border-radius: var(--tag-radius); /* 标签小方角 */
   background: var(--primary-soft); /* 主色极淡底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
   font-size: var(--fs-xs); /* 次要字号 */
 } /* 芯片结束 */
 .chip button { /* 芯片移除按钮 */
@@ -2437,7 +2437,7 @@ code { /* 行内代码/令牌展示 */
   height: 18px; /* 方形徽标 */
   border-radius: var(--radius-xs); /* 小圆角 */
   background: var(--primary-soft); /* 主色极淡底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
   font-size: var(--fs-xs); /* 徽标小字 */
   line-height: 18px; /* 垂直居中 */
   text-align: center; /* 水平居中 */
@@ -2522,7 +2522,7 @@ code { /* 行内代码/令牌展示 */
 
 .chat-pick-mark { /* 勾选标记（+ / ✓） */
   margin-left: auto; /* 推到最右 */
-  color: var(--primary); /* 主色 */
+  color: var(--link); /* 主色 */
   font-weight: 600; /* 加粗 */
 } /* 勾选标记结束 */
 
@@ -2590,7 +2590,7 @@ code { /* 行内代码/令牌展示 */
 } /* 状态结束 */
 
 .chat-msg-status.read { /* 已读状态用主色强调 */
-  color: var(--primary); /* 主色 */
+  color: var(--link); /* 主色 */
 } /* 已读结束 */
 
 .chat-recall { /* 撤回按钮 */
@@ -2752,7 +2752,7 @@ code { /* 行内代码/令牌展示 */
 .chat-system-msg-link { /* 跳转按钮 */
   padding: 5px 12px; /* 按钮内边距 */
   border-radius: var(--radius-pill); /* 胶囊按钮 */
-  background: var(--primary); /* 主色底 */
+  background: var(--primary-fill); /* 主色底 */
   color: var(--on-primary); /* 白字 */
   font-size: var(--fs-sm); /* 按钮字号 */
   text-decoration: none; /* 去掉下划线 */
@@ -2813,7 +2813,7 @@ code { /* 行内代码/令牌展示 */
 
 .chat-reply-btn:hover,
 .chat-recall:hover { /* 悬停强调 */
-  color: var(--primary); /* 主色 */
+  color: var(--link); /* 主色 */
 } /* 悬停结束 */
 
 .chat-reply-bar { /* 输入框上方的引用提示条 */
@@ -2931,7 +2931,7 @@ code { /* 行内代码/令牌展示 */
 .tab.active { /* 当前分区 */
   border-color: var(--primary); /* 主色描边表达当前项 */
   background: var(--primary-soft); /* 淡主色底，与导航选中态同一语言 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
   font-weight: var(--fw-semibold); /* 字重提一档 */
 } /* 高亮分区结束 */
 
@@ -3000,7 +3000,7 @@ code { /* 行内代码/令牌展示 */
 
 .segment-item.active { /* 选中态 */
   background: var(--surface); /* 选中项抬成白色小面，与分段控件同一语言 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
   box-shadow: var(--shadow-xs); /* 贴地投影浮出凹槽 */
   font-weight: var(--fw-semibold); /* 字重提一档 */
 } /* 选中态结束 */
@@ -3109,7 +3109,7 @@ code { /* 行内代码/令牌展示 */
   padding: 2px 8px; /* 内衬 */
   border-radius: var(--radius-pill); /* 胶囊 */
   background: color-mix(in srgb, var(--primary) 12%, transparent); /* 主色淡底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
   font-size: var(--fs-xs); /* 极小字 */
   font-weight: 500; /* 中等字重 */
 } /* 结束 */
@@ -3212,7 +3212,7 @@ code { /* 行内代码/令牌展示 */
 
 .theater-chips button.active { /* 当前筛选项 */
   border-color: var(--primary); /* 主色描边 */
-  background: var(--primary); /* 主色底 */
+  background: var(--primary-fill); /* 主色底 */
   color: var(--on-primary); /* 白字 */
 } /* 结束 */
 
@@ -3318,7 +3318,7 @@ code { /* 行内代码/令牌展示 */
   margin: 0 0 6px; /* 下间距 */
   font-size: var(--fs-xs); /* 字号 */
   letter-spacing: 0.16em; /* 字距 */
-  color: var(--primary); /* 主色 */
+  color: var(--link); /* 主色 */
   font-weight: 700; /* 加粗 */
 } /* 结束 */
 
@@ -3463,7 +3463,7 @@ code { /* 行内代码/令牌展示 */
 .community-chips button.is-active { /* 选中态 */
   border-color: transparent; /* 无描边，选中完全由底色表达 */
   background: var(--primary-soft); /* 浅蓝底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
 } /* 结束 */
 
 .community-chips em { /* 计数 */
@@ -3516,12 +3516,12 @@ code { /* 行内代码/令牌展示 */
 
 .community-filters button.is-active { /* 最新 / 热门选中 */
   background: var(--primary-soft); /* 主色淡底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
 } /* 结束 */
 
 .community-wrap button.is-primary { /* 主按钮 */
   border-color: var(--primary); /* 主色边框 */
-  background: var(--primary); /* 主色底 */
+  background: var(--primary-fill); /* 主色底 */
   color: var(--on-primary); /* 白字 */
   font-weight: 600; /* 加粗 */
 } /* 结束 */
@@ -3639,7 +3639,7 @@ code { /* 行内代码/令牌展示 */
 } /* 结束 */
 
 .community-kind.kind-video { /* 视频 */
-  background: var(--primary); /* 主色 */
+  background: var(--primary-fill); /* 主色 */
   color: var(--on-primary); /* 主色底上的对比字 */
 } /* 结束 */
 
@@ -3712,7 +3712,7 @@ code { /* 行内代码/令牌展示 */
 
 .community-more { /* 查看详情 */
   margin-left: auto; /* 推右 */
-  color: var(--primary); /* 主色 */
+  color: var(--link); /* 主色 */
 } /* 结束 */
 
 .community-lock { /* 付费标记 */
@@ -3834,7 +3834,7 @@ code { /* 行内代码/令牌展示 */
 .community-detail-actions button.is-active { /* 已赞 / 已收藏 */
   border-color: transparent; /* 选中完全由底色表达 */
   background: var(--primary-soft); /* 主色淡底 */
-  color: var(--primary); /* 主色文字 */
+  color: var(--link); /* 主色文字 */
 } /* 结束 */
 
 .community-replies { /* 回复区 */
@@ -3967,7 +3967,7 @@ code { /* 行内代码/令牌展示 */
   padding: 2px 7px; /* 内边距 */
   border-radius: var(--radius-xs); /* 圆角 */
   background: var(--primary-soft); /* 浅蓝 */
-  color: var(--primary); /* 主色 */
+  color: var(--link); /* 主色 */
   font-size: var(--fs-xs); /* 字号 */
   font-weight: 700; /* 加粗 */
 } /* 结束 */
@@ -4636,7 +4636,7 @@ code { /* 行内代码/令牌展示 */
   justify-content: space-between;
   margin-bottom: 10px;
   font-size: var(--fs-sm);
-  color: var(--primary);
+  color: var(--link);
 }
 .community-poll-option {
   position: relative;
@@ -4720,7 +4720,7 @@ code { /* 行内代码/令牌展示 */
 }
 .community-favorite-row span {
   font-size: var(--fs-xs);
-  color: var(--primary);
+  color: var(--link);
 }
 .community-favorite-row strong {
   flex: 1;
@@ -4789,7 +4789,7 @@ code { /* 行内代码/令牌展示 */
 .slider-piece {
   position: absolute;
   border-radius: var(--radius-sm);
-  background: var(--primary);
+  background: var(--primary-fill);
   border: 1px solid var(--on-media);
   cursor: grab;
   user-select: none;
@@ -4924,7 +4924,7 @@ code { /* 行内代码/令牌展示 */
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--primary);
+  background: var(--primary-fill);
 }
 .changelog-version { /* 版本号 + 日期一行 */
   display: flex;
@@ -5027,7 +5027,7 @@ code { /* 行内代码/令牌展示 */
 .content-detail { gap: var(--card-pad); } /* 详情卡片内部节奏 */
 .content-detail-bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: space-between; } /* 返回 / 分享 */
 .content-detail h1 { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.8rem); line-height: var(--lh-tight); } /* 标题层级 */
-.content-detail-link { color: var(--primary); font-weight: 600; text-decoration: none; } /* 关联入口 */
+.content-detail-link { color: var(--link); font-weight: 600; text-decoration: none; } /* 关联入口 */
 .rich-body { display: flex; flex-direction: column; gap: var(--card-pad); line-height: var(--lh-loose); word-break: break-word; color: var(--text); } /* 正文容器：块间 16px、行高走宽松档 */
 .rich-body > div { display: flex; flex-direction: column; gap: var(--sp-3); } /* 行内段落：每段 12px，避免整段挤成一片 */
 .rich-body p { margin: 0; } /* 段落零外边距：段间距交给容器 */
@@ -5075,7 +5075,7 @@ code { /* 行内代码/令牌展示 */
 .community-gallery-toolbar button.is-active { /* 选中态沿用主色淡底 */
   border-color: var(--primary);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--link);
   font-weight: 600;
 } /* 结束 */
 .community-gallery-grid { /* 媒体卡片：与社区卡片同一档最小列宽 */
@@ -5216,7 +5216,7 @@ code { /* 行内代码/令牌展示 */
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-strong);
   background: var(--surface);
-  color: var(--primary);
+  color: var(--link);
   font-size: var(--fs-sm);
   cursor: pointer;
 } /* 结束 */
