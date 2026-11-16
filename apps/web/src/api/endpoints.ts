@@ -384,8 +384,8 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     products() { // 商品列表
       return request<{ products: ShopProduct[] }>('/shop/products', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
-    order(payload: { product_code: string; quantity?: number; coupon_code?: string; shipping?: { name: string; phone: string; address: string }; pay_provider?: 'alipay' | 'wechat' | 'manual' | 'sandbox' }) { // 下单
-      return request<{ order_id: string; status: string; payable_cents: number; discount_cents: number; delivery_kind: string; pay_provider: string | null; pay_path: string | null }>('/shop/orders', { method: 'POST', body: payload }); // 返回当前函数的处理结果
+    order(payload: { product_code: string; quantity?: number; coupon_code?: string; shipping?: { name: string; phone: string; address: string } }) { // 下单
+      return request<{ order_id: string; status: string; payable_cents: number; discount_cents: number; delivery_kind: string }>('/shop/orders', { method: 'POST', body: payload }); // 返回当前函数的处理结果
     }, // 代码块结束
     orders() { // 我的订单
       return request<{ items: ShopOrder[] }>('/shop/orders', { idempotency: false }); // 返回当前函数的处理结果
