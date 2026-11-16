@@ -1,506 +1,515 @@
 /* 付费资产域（列表 / 详情 / 我的资产）——只使用 tokens.css 已有令牌，不改共享样式文件 */
 
-.asset-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+/* ===== 页面外壳 ===== */
 
-.asset-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 22px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-}
+.asset-page { /* 页面根容器：头部 → 工具栏 → 提示 → 列表自上而下堆叠 */
+  display: flex; /* 用 flex 控制三段的间距，避免各区块各自写 margin */
+  flex-direction: column; /* 主轴纵向：后出现的区块自然排在下方 */
+  gap: 16px; /* 区块之间统一呼吸间距 */
+} /* .asset-page 结束 */
 
-.asset-kicker {
-  margin: 0 0 6px;
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  color: var(--text-muted);
-}
+.asset-head { /* 列表页头部卡片：左侧标题，右侧「返回社区 / 我的资产」 */
+  display: flex; /* 左右两栏布局 */
+  flex-wrap: wrap; /* 窄屏自动换行，右侧按钮不会挤出容器 */
+  align-items: flex-end; /* 按钮底部与标题区贴近，视觉上对齐说明文字 */
+  justify-content: space-between; /* 标题占左、操作占右 */
+  gap: 16px; /* 换行后行间距与列间距 */
+  padding: 20px 22px; /* 卡片内边距 */
+  border: 1px solid var(--border); /* 常规描边，与社区其它卡片同款 */
+  border-radius: var(--radius-lg); /* 大圆角，突出页面级区块 */
+  background: var(--surface); /* 卡片底色跟随主题表面色 */
+  box-shadow: var(--shadow-sm); /* 轻微投影，与既有卡片层级一致 */
+} /* .asset-head 结束 */
+
+.asset-kicker { /* 英文小标（MIM ASSETS）：装饰性文字 */
+  margin: 0 0 6px; /* 仅保留下间距，与主标题分开 */
+  font-size: 12px; /* 小号字，不与标题抢层级 */
+  letter-spacing: 0.14em; /* 拉开字距，做出机读标签感 */
+  color: var(--text-muted); /* 弱化颜色 */
+} /* .asset-kicker 结束 */
 
 .asset-head h1,
-.asset-detail-head h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: var(--text);
-}
+.asset-detail-head h1 { /* 列表页与详情页的主标题共用一套排版 */
+  margin: 0 0 6px; /* 压缩段前距、保留与副文案的间隔 */
+  font-size: 22px; /* 页面级标题字号 */
+  color: var(--text); /* 主文字色，保证对比度 */
+} /* 主标题结束 */
 
-.asset-sub {
-  margin: 0;
-  max-width: 62ch;
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-muted);
-}
+.asset-sub { /* 副标题 / 简介文案 */
+  margin: 0; /* 交给父级 gap 控制间距 */
+  max-width: 62ch; /* 限制行宽，长文案保持可读 */
+  font-size: 13px; /* 说明文字字号 */
+  line-height: 1.65; /* 行高放宽，多行中文不拥挤 */
+  color: var(--text-muted); /* 次级文字色 */
+} /* .asset-sub 结束 */
 
-.asset-head-side {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.asset-head-side { /* 头部右侧按钮组 */
+  display: flex; /* 横向排列按钮 */
+  flex-wrap: wrap; /* 极窄屏允许折行 */
+  gap: 8px; /* 按钮间距 */
+} /* .asset-head-side 结束 */
 
-/* 按钮 */
-.asset-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
+/* ===== 按钮体系（主按钮 / 描边按钮 / 文字链接）===== */
 
-.asset-btn:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
+.asset-btn { /* 三个页面共用的按钮基类 */
+  display: inline-flex; /* 让文字与图标垂直居中 */
+  align-items: center; /* 交叉轴居中 */
+  justify-content: center; /* 主轴居中，固定最小宽度时文字不偏 */
+  gap: 6px; /* 图标与文字间距 */
+  min-height: 34px; /* 最小点击高度，触屏也够用 */
+  padding: 0 14px; /* 左右内边距 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  border: 1px solid var(--border-strong); /* 默认为描边样式 */
+  background: var(--surface); /* 默认底色为表面色 */
+  color: var(--text-secondary); /* 默认文字为次级色 */
+  font-size: 13px; /* 与正文同级的字号 */
+  font-weight: 600; /* 半粗，按钮可读性更好 */
+  text-decoration: none; /* 用作 <a> 时不带下划线 */
+  cursor: pointer; /* 明确可点击 */
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; /* 悬停/聚焦过渡保持轻快 */
+} /* .asset-btn 结束 */
 
-.asset-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary-ring);
-}
+.asset-btn:hover { /* 悬停态：略微提亮，反馈「可点」 */
+  background: var(--surface-2); /* 二级表面色 */
+  color: var(--text); /* 文字提亮到主文字色 */
+} /* 悬停态结束 */
 
-.asset-btn.primary {
-  border-color: transparent;
-  background: var(--primary-fill);
-  color: var(--on-primary);
-}
+.asset-btn:focus-visible { /* 键盘聚焦环：不改变布局，只加光晕 */
+  outline: none; /* 去掉浏览器默认描边，避免与光晕叠加 */
+  box-shadow: 0 0 0 3px var(--primary-ring); /* 3px 主题色光环，满足可见性 */
+} /* 聚焦态结束 */
 
-.asset-btn.primary:hover {
-  background: var(--primary-hover);
-}
+.asset-btn.primary { /* 主按钮：余额购买 / 搜索等主操作 */
+  border-color: transparent; /* 实心按钮不描边 */
+  background: var(--primary-fill); /* 品牌主色填充 */
+  color: var(--on-primary); /* 主色上的反白文字 */
+} /* 主按钮结束 */
 
-.asset-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.asset-btn.primary:hover { /* 主按钮悬停：加深一档 */
+  background: var(--primary-hover); /* 主题提供的悬停色 */
+} /* 主按钮悬停结束 */
 
-.asset-btn.ghost {
-  background: transparent;
-}
+.asset-btn:disabled { /* 购买进行中等不可用态 */
+  opacity: 0.6; /* 整体降透明度，保留文字可读 */
+  cursor: not-allowed; /* 光标提示不可点击 */
+} /* 禁用态结束 */
 
-.asset-link {
-  margin-left: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--link);
-  font-size: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-}
+.asset-btn.ghost { /* 描边 / 透明按钮：次级操作 */
+  background: transparent; /* 透明底，落在卡片上仍协调 */
+} /* 透明按钮结束 */
 
-/* 工具栏 */
-.asset-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
+.asset-link { /* 行内文字链接（如「去充值」），嵌在提示句中 */
+  margin-left: 6px; /* 与前置文案留一点空隙 */
+  padding: 0; /* 清掉按钮默认内边距，贴合行内基线 */
+  border: 0; /* 去掉按钮边框 */
+  background: none; /* 去掉按钮底色 */
+  color: var(--link); /* 链接色，与站点其它链接一致 */
+  font-size: inherit; /* 跟随所在段落字号 */
+  font-weight: 600; /* 半粗以示可点 */
+  cursor: pointer; /* 可点击 */
+  text-decoration: underline; /* 链接语义：保留下划线 */
+} /* .asset-link 结束 */
 
-.asset-toolbar input {
-  flex: 1 1 220px;
-  min-width: 180px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 13px;
-}
+/* ===== 检索与类型筛选工具栏 ===== */
 
-.asset-toolbar input:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary-ring);
-}
+.asset-toolbar { /* 搜索框 + 搜索按钮 + 类型 chips 的一行工具条 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 窄屏折行，chips 不会被压缩成窄条 */
+  align-items: center; /* 各控件垂直居中对齐 */
+  gap: 10px; /* 控件间距 */
+  padding: 14px 16px; /* 工具条内边距 */
+  border: 1px solid var(--border); /* 描边，与卡片同层次 */
+  border-radius: var(--radius-md); /* 中圆角 */
+  background: var(--surface); /* 表面色底 */
+} /* .asset-toolbar 结束 */
 
-.asset-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
+.asset-toolbar input { /* 关键词输入框 */
+  flex: 1 1 220px; /* 优先占满剩余宽度，基准 220px */
+  min-width: 180px; /* 再窄也要保证可输入 */
+  min-height: 34px; /* 与按钮同高 */
+  padding: 0 12px; /* 左右内边距，文字不贴边 */
+  border: 1px solid var(--border-strong); /* 强描边，暗示可输入 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  background: var(--surface-2); /* 二级表面色，与工具条底区分 */
+  color: var(--text); /* 输入文字用主文字色 */
+  font-size: 13px; /* 与按钮同字号 */
+} /* 输入框结束 */
 
-.asset-filters button {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-}
+.asset-toolbar input:focus-visible { /* 键盘聚焦输入框 */
+  outline: none; /* 去掉默认描边，统一用光晕 */
+  box-shadow: 0 0 0 3px var(--primary-ring); /* 与按钮一致的聚焦光环 */
+} /* 输入框聚焦结束 */
 
-.asset-filters button.is-on {
-  border-color: transparent;
-  background: var(--primary-soft);
-  color: var(--link);
-  font-weight: 600;
-}
+.asset-filters { /* 类型筛选按钮组容器 */
+  display: flex; /* 横向排列 chips */
+  flex-wrap: wrap; /* 类型较多时自动折行 */
+  gap: 6px; /* chip 间距 */
+} /* .asset-filters 结束 */
 
-.asset-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
+.asset-filters button { /* 单个类型 chip */
+  min-height: 30px; /* 比主按钮略矮，区分层级 */
+  padding: 0 12px; /* 左右内边距 */
+  border: 1px solid var(--border); /* 未选中为描边 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  background: var(--surface-2); /* 未选中底色 */
+  color: var(--text-muted); /* 未选中为弱文字色 */
+  font-size: 12px; /* chip 用小字号 */
+  cursor: pointer; /* 可点击 */
+} /* 类型 chip 结束 */
+
+.asset-filters button.is-on { /* 当前选中的类型 */
+  border-color: transparent; /* 选中后去掉描边，靠底色区分 */
+  background: var(--primary-soft); /* 主题浅色底 */
+  color: var(--link); /* 与链接同色，强化「已选」 */
+  font-weight: 600; /* 加粗一档 */
+} /* 选中态结束 */
+
+/* ===== 提示 / 错误 / 空态 ===== */
+
+.asset-note { /* 普通提示行（VIP 说明、余额不足说明） */
+  margin: 0; /* 不额外撑开间距 */
+  font-size: 12px; /* 小号提示字 */
+  color: var(--text-muted); /* 弱化，不与主内容抢注意力 */
+} /* .asset-note 结束 */
 
 .asset-error,
-.asset-ok {
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-}
+.asset-ok { /* 结果条：错误与成功共用排版，仅配色不同 */
+  padding: 10px 14px; /* 条状内边距 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  font-size: 13px; /* 与正文同级字号 */
+} /* 结果条公共样式结束 */
 
-.asset-error {
-  border: 1px solid var(--danger-border);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
+.asset-error { /* 错误条：购买失败 / 拉取失败 */
+  border: 1px solid var(--danger-border); /* 危险色描边 */
+  background: var(--danger-soft); /* 危险色浅底 */
+  color: var(--danger); /* 危险色文字 */
+} /* .asset-error 结束 */
 
-.asset-ok {
-  border: 1px solid var(--success-border);
-  background: var(--success-soft);
-  color: var(--success);
-}
+.asset-ok { /* 成功条：购买成功、已解锁 */
+  border: 1px solid var(--success-border); /* 成功色描边 */
+  background: var(--success-soft); /* 成功色浅底 */
+  color: var(--success); /* 成功色文字 */
+} /* .asset-ok 结束 */
 
-.asset-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 28px 16px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  font-size: 13px;
-  text-align: center;
-}
+.asset-empty { /* 加载中 / 无结果 / 空列表占位 */
+  display: flex; /* 纵向排布标题与说明 */
+  flex-direction: column; /* 上下两行 */
+  gap: 6px; /* 两行之间的间距 */
+  padding: 28px 16px; /* 占位块内边距，避免过于局促 */
+  border: 1px dashed var(--border-strong); /* 虚线表示「非实体内容」 */
+  border-radius: var(--radius-md); /* 中圆角 */
+  color: var(--text-muted); /* 弱化文字 */
+  font-size: 13px; /* 与正文同级 */
+  text-align: center; /* 居中排布 */
+} /* .asset-empty 结束 */
 
-/* 列表卡片 */
-.asset-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
-}
+/* ===== 列表页卡片网格 ===== */
 
-.asset-card {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-xs);
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
-}
+.asset-grid { /* 资产卡片网格 */
+  display: grid; /* 栅格自动铺列 */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 每列至少 240px，随宽度自适应列数 */
+  gap: 14px; /* 卡片间距 */
+} /* .asset-grid 结束 */
 
-.asset-card:hover {
-  box-shadow: var(--shadow-hover);
-  border-color: var(--border-strong);
-}
+.asset-card { /* 单张资产卡片：整张可点，进入详情 */
+  display: flex; /* 纵向：封面在上、文字在下 */
+  flex-direction: column; /* 主轴纵向 */
+  padding: 0; /* 用子块自身内边距，避免封面留白 */
+  border: 1px solid var(--border); /* 默认描边 */
+  border-radius: var(--radius-md); /* 中圆角 */
+  background: var(--surface); /* 卡片底色 */
+  box-shadow: var(--shadow-xs); /* 极轻投影，网格更立体 */
+  text-align: left; /* 作为 <button> 时文字不居中 */
+  cursor: pointer; /* 整卡可点 */
+  overflow: hidden; /* 圆角裁切封面，避免直角溢出 */
+  transition: box-shadow 0.15s ease, border-color 0.15s ease; /* 悬停过渡 */
+} /* .asset-card 结束 */
 
-.asset-card:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--primary-ring);
-}
+.asset-card:hover { /* 悬停：抬升 + 描边加深 */
+  box-shadow: var(--shadow-hover); /* 悬停投影 */
+  border-color: var(--border-strong); /* 描边加深提示可点 */
+} /* 卡片悬停结束 */
 
-.asset-cover {
-  position: relative;
-  display: block;
-  aspect-ratio: 16 / 9;
-  background: var(--media-bg);
-}
+.asset-card:focus-visible { /* 键盘聚焦整卡 */
+  outline: none; /* 统一用光晕替代默认描边 */
+  box-shadow: 0 0 0 3px var(--primary-ring); /* 聚焦光环 */
+} /* 卡片聚焦结束 */
 
-.asset-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+.asset-cover { /* 封面容器：16:9 固定比例 */
+  position: relative; /* 为角标定位提供参照 */
+  display: block; /* 作为 span 也按块级排版 */
+  aspect-ratio: 16 / 9; /* 统一封面比例，网格对齐 */
+  background: var(--media-bg); /* 图片加载前的底色 */
+} /* .asset-cover 结束 */
 
-.asset-cover-fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  color: var(--on-media);
-  font-size: 13px;
-  letter-spacing: 0.08em;
-}
+.asset-cover img { /* 封面图片 */
+  width: 100%; /* 铺满容器宽度 */
+  height: 100%; /* 铺满容器高度 */
+  object-fit: cover; /* 裁切填充，避免变形 */
+  display: block; /* 去掉行内图片基线空隙 */
+} /* 封面图片结束 */
 
-.asset-badge {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  background: var(--premium-soft);
-  border: 1px solid var(--premium-border);
-  color: var(--premium);
-  font-size: 12px;
-  font-weight: 600;
-}
+.asset-cover-fallback { /* 无封面时的类型占位文字 */
+  display: flex; /* 便于居中 */
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+  width: 100%; /* 占满宽度 */
+  height: 100%; /* 占满高度 */
+  color: var(--on-media); /* 媒体底色上的反白色 */
+  font-size: 13px; /* 占位文字字号 */
+  letter-spacing: 0.08em; /* 拉开字距，弱化「占位」感 */
+} /* 封面占位结束 */
 
-.asset-badge.is-unlocked {
-  background: var(--success-soft);
-  border-color: var(--success-border);
-  color: var(--success);
-}
+.asset-badge { /* 封面右上角角标：价格或「已购」 */
+  position: absolute; /* 相对封面定位 */
+  right: 10px; /* 距右侧 10px */
+  top: 10px; /* 距顶部 10px */
+  padding: 3px 9px; /* 角标内边距 */
+  border-radius: var(--radius-pill); /* 胶囊形 */
+  background: var(--premium-soft); /* 默认为付费色浅底 */
+  border: 1px solid var(--premium-border); /* 付费色描边 */
+  color: var(--premium); /* 付费色文字 */
+  font-size: 12px; /* 角标字号 */
+  font-weight: 600; /* 加粗，缩略图里也读得清 */
+} /* .asset-badge 结束 */
 
-.asset-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px 14px;
-}
+.asset-badge.is-unlocked { /* 已购角标改用成功色 */
+  background: var(--success-soft); /* 成功色浅底 */
+  border-color: var(--success-border); /* 成功色描边 */
+  color: var(--success); /* 成功色文字 */
+} /* 已购角标结束 */
 
-.asset-kind {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
+.asset-card-body { /* 卡片文字区 */
+  display: flex; /* 纵向排列类型 / 标题 / 简介 / 元信息 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 6px; /* 各行间距 */
+  padding: 12px 14px 14px; /* 底部略多留白，视觉收口 */
+} /* .asset-card-body 结束 */
 
-.asset-title {
-  font-size: 15px;
-  color: var(--text);
-  line-height: 1.4;
-}
+.asset-kind { /* 类型标签文字（付费阅读 / 下载资源 …） */
+  font-size: 11px; /* 最小字号，仅作辅助信息 */
+  letter-spacing: 0.04em; /* 轻微字距，与标题区分 */
+  color: var(--text-muted); /* 弱化颜色 */
+} /* .asset-kind 结束 */
 
-.asset-summary {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-muted);
-}
+.asset-title { /* 资产标题 */
+  font-size: 15px; /* 卡片内最大字号 */
+  color: var(--text); /* 主文字色 */
+  line-height: 1.4; /* 两行标题也保持紧凑 */
+} /* .asset-title 结束 */
 
-.asset-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
+.asset-summary { /* 简介：最多两行，超出省略 */
+  display: -webkit-box; /* 启用行数截断所需的老式盒模型 */
+  -webkit-line-clamp: 2; /* 最多两行 */
+  -webkit-box-orient: vertical; /* 纵向排列行 */
+  overflow: hidden; /* 超出部分裁掉 */
+  font-size: 12.5px; /* 略小于标题 */
+  line-height: 1.6; /* 两行之间保持可读 */
+  color: var(--text-muted); /* 弱化颜色 */
+} /* .asset-summary 结束 */
 
-.asset-meta-wide {
-  margin-top: 8px;
-  font-size: 12.5px;
-}
+.asset-meta { /* 元信息行：价格 / 销量等 */
+  display: flex; /* 横向排列各项 */
+  flex-wrap: wrap; /* 项多时折行 */
+  gap: 10px; /* 项间距 */
+  font-size: 12px; /* 辅助信息字号 */
+  color: var(--text-secondary); /* 次级文字色 */
+} /* .asset-meta 结束 */
 
-/* 详情 */
-.asset-detail-top {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.asset-meta-wide { /* 详情页元信息：比卡片内更宽松一点 */
+  margin-top: 8px; /* 与标题 / 简介拉开距离 */
+  font-size: 12.5px; /* 略大于卡片内字号 */
+} /* .asset-meta-wide 结束 */
 
-.asset-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px 22px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-}
+/* ===== 详情页 ===== */
 
-.asset-detail-head h1 {
-  font-size: 21px;
-  line-height: 1.4;
-}
+.asset-detail-top { /* 详情页顶部返回条 */
+  display: flex; /* 横向排列返回 / 我的资产 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  gap: 8px; /* 按钮间距 */
+} /* .asset-detail-top 结束 */
 
-.asset-detail-cover {
-  width: 100%;
-  max-height: 360px;
-  object-fit: cover;
-  border-radius: var(--radius-md);
-  background: var(--media-bg);
-}
+.asset-detail { /* 详情主卡片 */
+  display: flex; /* 纵向排列头部 / 封面 / 购买区 / 正文 / 媒体 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 16px; /* 各段间距 */
+  padding: 20px 22px; /* 卡片内边距 */
+  border: 1px solid var(--border); /* 描边 */
+  border-radius: var(--radius-lg); /* 大圆角，与列表头部呼应 */
+  background: var(--surface); /* 卡片底色 */
+  box-shadow: var(--shadow-sm); /* 轻投影 */
+} /* .asset-detail 结束 */
+
+.asset-detail-head h1 { /* 详情页标题单独微调 */
+  font-size: 21px; /* 比列表页标题略小，因为上下文更聚焦 */
+  line-height: 1.4; /* 长标题保持紧凑 */
+} /* 详情标题结束 */
+
+.asset-detail-cover { /* 详情页大封面 */
+  width: 100%; /* 铺满卡片宽度 */
+  max-height: 360px; /* 限制高度，避免长图挤掉正文入口 */
+  object-fit: cover; /* 裁切填充 */
+  border-radius: var(--radius-md); /* 中圆角 */
+  background: var(--media-bg); /* 加载前底色 */
+} /* 详情封面结束 */
 
 .asset-buy,
-.asset-owned {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--premium-border);
-  border-radius: var(--radius-md);
-  background: var(--premium-soft);
-}
+.asset-owned { /* 购买区与「已拥有」区共用外框，仅配色不同 */
+  display: flex; /* 纵向排列价格与按钮 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 10px; /* 行间距 */
+  padding: 14px 16px; /* 区块内边距 */
+  border: 1px solid var(--premium-border); /* 默认为付费色描边 */
+  border-radius: var(--radius-md); /* 中圆角 */
+  background: var(--premium-soft); /* 付费色浅底，突出「需要购买」 */
+} /* 购买 / 已拥有公共框结束 */
 
-.asset-owned {
-  border-color: var(--success-border);
-  background: var(--success-soft);
-}
+.asset-owned { /* 已拥有：换成成功色，正向反馈 */
+  border-color: var(--success-border); /* 成功色描边 */
+  background: var(--success-soft); /* 成功色浅底 */
+} /* .asset-owned 结束 */
 
-.asset-owned strong {
-  color: var(--success);
-  font-size: 14px;
-}
+.asset-owned strong { /* 「已拥有该资产」提示文字 */
+  color: var(--success); /* 成功色，强化「已解锁」 */
+  font-size: 14px; /* 略大于正文 */
+} /* 已拥有提示结束 */
 
-.asset-buy-price {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
+.asset-buy-price { /* 价格行：标签 + 金额 */
+  display: flex; /* 横向排列 */
+  align-items: baseline; /* 小标签与大金额按基线对齐 */
+  gap: 10px; /* 标签与金额间距 */
+} /* .asset-buy-price 结束 */
 
-.asset-buy-price span {
-  font-size: 12px;
-  color: var(--text-muted);
-}
+.asset-buy-price span { /* 价格行的「解锁价格」标签 */
+  font-size: 12px; /* 小字号 */
+  color: var(--text-muted); /* 弱化 */
+} /* 价格标签结束 */
 
-.asset-buy-price strong {
-  font-size: 20px;
-  color: var(--premium);
-}
+.asset-buy-price strong { /* 金额本身 */
+  font-size: 20px; /* 全页最大字号，价格一眼可见 */
+  color: var(--premium); /* 付费色 */
+} /* 金额结束 */
 
 .asset-buy-actions,
-.asset-owned-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.asset-owned-actions { /* 按钮组：购买 / 下载 / 去我的资产 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  gap: 8px; /* 按钮间距 */
+} /* 按钮组结束 */
 
-.asset-body {
-  white-space: pre-wrap;
-  font-size: 14px;
-  line-height: 1.8;
-  color: var(--text-secondary);
-}
+.asset-body { /* 正文（已解锁为全文，未解锁为试读片段） */
+  white-space: pre-wrap; /* 保留服务端换行，纯文本也能分段 */
+  font-size: 14px; /* 正文可读字号 */
+  line-height: 1.8; /* 长文阅读行高 */
+  color: var(--text-secondary); /* 次级文字色，降低疲劳 */
+} /* .asset-body 结束 */
 
-.asset-locked-hint {
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px dashed var(--premium-border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 12.5px;
-}
+.asset-locked-hint { /* 未解锁提示：说明「以上为试读」 */
+  margin: 0; /* 交由父级 gap 控制间距 */
+  padding: 10px 14px; /* 提示条内边距 */
+  border: 1px dashed var(--premium-border); /* 虚线付费色，暗示「边界」 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  background: var(--surface-2); /* 二级表面色 */
+  color: var(--text-muted); /* 弱化文字 */
+  font-size: 12.5px; /* 提示字号 */
+} /* .asset-locked-hint 结束 */
 
-.asset-media {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
-}
+.asset-media { /* 图集 / 视频网格（仅已解锁渲染） */
+  display: grid; /* 栅格铺列 */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* 每列至少 200px */
+  gap: 10px; /* 媒体间距 */
+} /* .asset-media 结束 */
 
 .asset-media img,
-.asset-media video {
-  width: 100%;
-  border-radius: var(--radius-sm);
-  background: var(--media-bg);
-}
+.asset-media video { /* 网格内的图片与视频统一尺寸策略 */
+  width: 100%; /* 铺满格子宽度 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  background: var(--media-bg); /* 加载前底色 */
+} /* 媒体元素结束 */
 
-/* 我的资产 */
-.asset-mine {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+/* ===== 我的资产（个人中心页签）===== */
 
-.asset-mine-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
+.asset-mine { /* 页签根容器 */
+  display: flex; /* 纵向排列说明条与列表 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 14px; /* 两段间距 */
+} /* .asset-mine 结束 */
 
-.asset-mine-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.asset-mine-head { /* 说明文案 + 「去资产商店」按钮 */
+  display: flex; /* 左右排列 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 文案左、按钮右 */
+  gap: 10px; /* 折行后的间距 */
+} /* .asset-mine-head 结束 */
 
-.asset-mine-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-xs);
-}
+.asset-mine-list { /* 已购资产列表：去掉默认列表样式 */
+  display: flex; /* 纵向排列每一项 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 10px; /* 项间距 */
+  margin: 0; /* 清掉 ul 默认外边距 */
+  padding: 0; /* 清掉 ul 默认内边距 */
+  list-style: none; /* 去掉项目符号 */
+} /* .asset-mine-list 结束 */
 
-.asset-mine-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 84px;
-  width: 84px;
-  height: 56px;
-  border-radius: var(--radius-sm);
-  background: var(--media-bg);
-  color: var(--on-media);
-  font-size: 11px;
-  overflow: hidden;
-}
+.asset-mine-item { /* 单个已购资产行 */
+  display: flex; /* 横向：封面 / 文字 / 操作 */
+  flex-wrap: wrap; /* 窄屏折行，按钮落到下一行 */
+  align-items: center; /* 垂直居中 */
+  gap: 14px; /* 三块之间间距 */
+  padding: 12px 14px; /* 行内边距 */
+  border: 1px solid var(--border); /* 描边 */
+  border-radius: var(--radius-md); /* 中圆角 */
+  background: var(--surface); /* 表面色 */
+  box-shadow: var(--shadow-xs); /* 极轻投影 */
+} /* .asset-mine-item 结束 */
 
-.asset-mine-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.asset-mine-cover { /* 缩略封面（无图时显示类型名） */
+  display: flex; /* 便于占位文字居中 */
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+  flex: 0 0 84px; /* 固定宽度，不参与伸缩 */
+  width: 84px; /* 与 flex-basis 保持一致 */
+  height: 56px; /* 固定高度，行高统一 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  background: var(--media-bg); /* 媒体底色 */
+  color: var(--on-media); /* 占位文字反白 */
+  font-size: 11px; /* 占位文字最小号 */
+  overflow: hidden; /* 裁切图片圆角 */
+} /* .asset-mine-cover 结束 */
 
-.asset-mine-body {
-  display: flex;
-  flex: 1 1 220px;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
+.asset-mine-cover img { /* 缩略封面图片 */
+  width: 100%; /* 铺满 */
+  height: 100%; /* 铺满 */
+  object-fit: cover; /* 裁切填充 */
+} /* 缩略封面图片结束 */
 
-.asset-mine-body strong {
-  font-size: 14px;
-  color: var(--text);
-}
+.asset-mine-body { /* 行内文字区：类型 / 标题 / 简介 / 金额与时间 */
+  display: flex; /* 纵向排列 */
+  flex: 1 1 220px; /* 占据剩余宽度，窄屏可收缩到 220px 后折行 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: 4px; /* 行间距紧凑 */
+  min-width: 0; /* 允许内部长文本省略而不撑破容器 */
+} /* .asset-mine-body 结束 */
 
-.asset-mine-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.asset-mine-body strong { /* 已购资产标题 */
+  font-size: 14px; /* 行内最大字号 */
+  color: var(--text); /* 主文字色 */
+} /* 标题结束 */
 
-@media (max-width: 640px) {
+.asset-mine-actions { /* 行尾操作按钮组 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 窄屏折行 */
+  gap: 8px; /* 按钮间距 */
+} /* .asset-mine-actions 结束 */
+
+@media (max-width: 640px) { /* 窄屏适配：压缩留白、行内容顶部对齐 */
   .asset-head,
-  .asset-detail {
-    padding: 16px;
-  }
+  .asset-detail { /* 两张页面级卡片 */
+    padding: 16px; /* 手机端减少内边距，给内容更多宽度 */
+  } /* 卡片窄屏内边距结束 */
 
-  .asset-mine-item {
-    align-items: flex-start;
-  }
-}
+  .asset-mine-item { /* 已购资产行 */
+    align-items: flex-start; /* 折行后内容顶部对齐，避免封面悬空 */
+  } /* 已购资产行窄屏对齐结束 */
+} /* 媒体查询结束 */
