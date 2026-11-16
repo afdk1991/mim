@@ -188,12 +188,12 @@ export function Shipments({ credential, permissions }: ShipmentsProps) {
               <h3>发货任务</h3>
               <span className="muted">共 {rows.length} 条</span>
             </div>
-            <div className="row">
+            <div className="tabs">
               {FILTER_TABS.map((tab) => (
                 <button
                   key={tab.value}
                   type="button"
-                  className={tab.value === filter ? 'btn primary' : 'btn ghost'}
+                  className={`tab${tab.value === filter ? ' active' : ''}`}
                   onClick={() => setFilter(tab.value)}
                 >
                   {tab.label}

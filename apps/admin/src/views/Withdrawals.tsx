@@ -76,12 +76,12 @@ export function Withdrawals({ credential, permissions }: Props) {
           </span>
           <button type="button" className="btn ghost" onClick={queueState.reload}>刷新</button>
         </div>
-        <div className="deploy-columns" style={{ marginBottom: 10 }}>
+        <div className="tabs">
           {(['pending', 'approved', 'paid', 'rejected', ''] as Array<AdminWithdrawalStatus | ''>).map((value) => (
             <button
               key={value || 'all'}
               type="button"
-              className={`btn ${status === value ? 'primary' : 'ghost'} small`}
+              className={`tab${status === value ? ' active' : ''}`}
               onClick={() => setStatus(value)}
             >
               {value ? STATUS_LABEL[value] : '全部'}
@@ -91,7 +91,7 @@ export function Withdrawals({ credential, permissions }: Props) {
 
         {queueState.loading && <p className="muted">加载中…</p>}
         {Boolean(queueState.error) && <p className="error">{describeError(queueState.error)}</p>}
-        {queue.length === 0 && !queueState.loading ? <p className="empty">当前筛选下没有提现申请</p> : null}
+        {queue.length === 0 && !queueState.loading && !queueState.error ? <p className="empty">当前筛选下没有提现申请</p> : null}
 
         {queue.map((row) => (
           <article className="panel" key={row.id} style={{ marginBottom: 12 }}>

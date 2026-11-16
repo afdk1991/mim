@@ -134,6 +134,7 @@ a { color: var(--link); text-decoration: none; } /* 链接基础样式：走文�
 .page { max-width: 1180px; } /* 内容最大宽度，超宽屏不拉伸 */ 
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; } /* 标题行左右分置 */ 
 .page-head h2 { font-size: var(--fs-lg); } /* 页面标题字号 */ 
+.page-head h1 { font-size: var(--fs-lg); } /* 页面标题统一 h1 语义后，字号仍取原先的 18px 令牌，避免落到 UA 默认 28px */ 
 .page-desc { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.7; margin: 0 0 14px; max-width: 78ch; } /* 页面用途说明：标题下一行，讲清这页能做什么 */ 
 
 /* 通用文字辅助 */ 
