@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.laal.top:8443/api/:path*"
+      "destination": "https://api.laal.top/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://laal.top:8443/health"
+      "destination": "https://api.laal.top/health"
     },
     {
       "source": "/(.*)",

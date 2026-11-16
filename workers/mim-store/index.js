@@ -1,8 +1,9 @@
 // Cloudflare Worker：mim-store 固定入口
 // 角色：作为 Mim 的独立边缘入口，统一把请求透传到生产权威终点（腾讯云 CVM）。
 // 这样根路径不再返回 404，且 /api/* 等接口与生产保持同一份实现。
-// 端口：443 归同机 MixmAPP，Mim 的 API 在 8443，透传目标必须带端口。
-const ORIGIN = 'https://api.laal.top:8443';
+// 端口：上游走 443（api.laal.top 已按 SNI 分流接管 443）。历史口径「Mim API 在 8443」
+// 已废弃且该端口不可达，写死它会让 Worker 返回 500（无法连接源站），切勿改回。
+const ORIGIN = 'https://api.laal.top';
 
 export default {
   async fetch(request) {

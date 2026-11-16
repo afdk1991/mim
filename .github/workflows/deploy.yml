@@ -583,10 +583,18 @@ jobs:
       # 线上取证（铁律八 / 铁律九）：在 Runner 侧逐平台验证全部对外域名真实可访问。
       # 本机网络对 *.vercel.app / *.workers.dev 存在 DNS 污染与 TLS 阻断，
       # 故以 CI 出口作为独立取证点；`000` 代表 TCP/TLS/DNS 层未到达，不等同于 4xx/5xx。
-      - name: 线上取证（多平台域名可访问性）
-        continue-on-error: true
+      #
+      # 2026-11-16 修复「假绿」：上一版只有 continue-on-error + 仅探根路径，
+      # 于是「页面能打开、接口全断」的线上故障（镜像反代上游写死已不可达的 :8443，
+      # healthz 返回 521/500）在本作业里永远是绿的。现在分两段：
+      #   1) 根路径只打印状态码，不作判据（第三方域名可能 301/302/403，属正常噪音）；
+      #   2) 各镜像的 /api/v1/healthz 是强断言，必须 200，失败即 exit 1 让作业变红。
+      # 平台刚发布存在秒级传播延迟，故断言带 6 次 × 10s 重试；仍不通过才判失败。
+      - name: 线上取证（根路径状态码 + 各镜像 /api/v1/healthz 强断言）
         run: |
-          set +e
+          set -uo pipefail
+
+          echo "===== 根路径可访问性（仅取证，不作判据）====="
           # Mim 自有域名一律带端口探测；第三方平台（pages.dev / vercel / netlify 等）
           # 仍按其自身默认 443/80 口径，不套用本机端口。
           for url in \
@@ -605,9 +613,48 @@ jobs:
             https://mim-45yeiirr.edgeone.cool/ \
             https://mim-web.netlify.app/ \
             https://mim-04xa6mw3hm-e1uhm452pi.preview.iga-pages.com/ ; do
-            out=$(curl -k -s -o /dev/null -w '%{http_code}|%{size_download}|%{time_total}|%{remote_ip}' --max-time 20 "$url")
+            out=$(curl -k -s -o /dev/null -w '%{http_code}|%{size_download}|%{time_total}|%{remote_ip}' --max-time 20 "$url" || echo "curl-fail")
             echo "$url => $out"
           done
+
+          echo "===== /api/v1/healthz 断言（必须 200，失败即作业变红）====="
+          # 断言：生产权威终点 + 三个镜像站 + 两个 Worker 入口。
+          # GitHub Pages / EdgeOne / IGA 没有 /api 反代能力，不纳入强断言（仅在上方打印根路径）。
+          assert_healthz() {
+            name="$1"
+            url="$2"
+            attempt=1
+            code=""
+            while [ "$attempt" -le 6 ]; do
+              code=$(curl -k -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo "000")
+              if [ "$code" = "200" ]; then
+                echo "PASS ${name} ${url} => ${code}（第 ${attempt} 次）"
+                return 0
+              fi
+              echo "RETRY ${name} ${url} => ${code}（第 ${attempt}/6 次，10s 后重试）"
+              attempt=$((attempt + 1))
+              sleep 10
+            done
+            echo "::error::${name} 的 ${url} 连续 6 次未返回 200（最后一次 ${code}），接口链路未打通"
+            return 1
+          }
+
+          failed=0
+          for pair in \
+            "生产权威终点|https://api.laal.top/api/v1/healthz" \
+            "Cloudflare-Pages|https://mim-299.pages.dev/api/v1/healthz" \
+            "Netlify|https://mim-web.netlify.app/api/v1/healthz" \
+            "Vercel|https://mim-puce.vercel.app/api/v1/healthz" \
+            "Worker-mim-api-edge|https://mim-api-edge.15726833367.workers.dev/api/v1/healthz" \
+            "Worker-mim-store|https://mim-store.15726833367.workers.dev/api/v1/healthz" ; do
+            assert_healthz "${pair%%|*}" "${pair#*|}" || failed=1
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::存在镜像站 /api/v1/healthz 非 200，反代上游/部署有问题（页面可打开≠接口可用）"
+            exit 1
+          fi
+          echo "全部镜像 /api/v1/healthz 断言通过"
 
       # Gitee 镜像同步（铁律十二）：把「本次触发的同一个提交」推到国内镜像仓。
       # 令牌取自仓库 secret GITEE_TOKEN（Gitee 私人令牌，需 projects 权限）；
