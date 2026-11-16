@@ -61,7 +61,11 @@ export function createSecurityRouter(deps: ApiDeps): Router { // 导出函数 cr
     const sceneRaw = typeof req.query.scene === 'string' ? req.query.scene : 'login'; // 常量 sceneRaw：保存固定配置或一次性派生值
     const scene: CaptchaScene = (REPORT_SCENES as string[]).includes(sceneRaw) ? (sceneRaw as CaptchaScene) : 'login'; // 常量 scene：保存固定配置或一次性派生值
     const issue = issueCaptcha(deps.db, deps.env, scene); // 常量 issue：保存固定配置或一次性派生值
-    res.json({ scene, ...issue }); // 执行当前业务步骤
+    // 一次性票据不可缓存：全局缓存中间件会给 GET 打 public,max-age=60，浏览器 60 秒内只复用同一题，
+    // 导致「换一张」与失败后自动刷新拿回旧票据；此处绕过其 res.json 包装并显式 no-store。
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'); // 禁止浏览器与中间缓存保存验证码
+    res.setHeader('Pragma', 'no-cache'); // 兼容旧代理
+    res.type('application/json').send(JSON.stringify({ scene, ...issue })); // 直接下发，避免被缓存中间件覆盖头
   }); // 代码块结束
 
   /** 提交举报：report 场景验证码（若强制）→ 用户+目标滑动窗口限频 → 目标存在性与自举报校验。 */

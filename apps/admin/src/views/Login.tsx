@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 // 复用统一 API 客户端与凭证持久化函数，避免各视图重复处理鉴权细节
 import {
+  ApiError,
   describeError,
   fetchLoginCaptcha,
   getAdminMe,
@@ -21,6 +22,14 @@ interface LoginProps {
   // 被动退出时的提示文案（如凭证过期被踢回）
   notice?: string;
 } // 入参仅两项：成功回调 + 可选提示，保持组件边界最小
+
+// 登录页错误文案：验证码错误只给可操作的中文提示，不把内部错误码原样抛给用户
+function describeLoginError(error: unknown): string {
+  // 后端 AUTH_CODE_INVALID 对用户没有意义，统一换成「重输验证码」的指引
+  if (error instanceof ApiError && error.code === 'AUTH_CODE_INVALID') return '图形验证码错误或已过期，请重新输入';
+  // 其余错误沿用统一格式化，保留服务端已本地化的文案
+  return describeError(error);
+} // describeLoginError 结束
 
 // 登录组件：内部完成「先校验 → 再落盘 → 再回调」三步，避免坏凭证被写进 localStorage
 export function Login({ onDone, notice }: LoginProps) {
@@ -55,7 +64,7 @@ export function Login({ onDone, notice }: LoginProps) {
       // 清空题目，避免渲染残缺面板
       setCaptcha(null);
       // 提示取题失败
-      setError(describeError(err));
+      setError(describeLoginError(err));
     } // try/catch 结束
   } // refreshCaptcha 结束
 
@@ -108,7 +117,7 @@ export function Login({ onDone, notice }: LoginProps) {
       onDone(candidate);
     } catch (err) { // 任一步失败都在此统一兜底提示
       // 把异常统一格式化为可读文案
-      setError(describeError(err));
+      setError(describeLoginError(err));
       // 账号通道失败后换一张验证码：原票据可能已被消费，无法复用
       if (mode === 'password' && captcha?.required) void refreshCaptcha();
     } finally { // finally 保证 busy 一定复位，避免按钮卡死在提交态
