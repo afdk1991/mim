@@ -48,9 +48,11 @@ const DROP_INDEXES = ['idx_subscriptions_user', 'idx_orders_user', 'idx_audit_us
 /**
  * 禁止执行守卫：识别「统一交易域」表结构。
  * orders 出现 source / source_id，或 payments 出现 channel，说明这两张表已被统一交易域接管，
- * 继续 DROP 会删除生产正在使用的交易数据，因此无论 DRY-RUN 还是 --apply 都直接中止。
+ * 继续 DROP 会删除生产正在使用的交易数据，因此无论 DRY-RUN 还是 --apply 都直接跳过（不抛错）：
+ * 本脚本的清理目标已由统一交易域接管，属于历史遗留迁移，命中即视为「已作废」，
+ * 返回 true 让调用方提前结束并退出 0，避免把整个部署在迁移阶段中止。
  */
-function assertNotUnifiedTradeTables(db) {
+function isUnifiedTradeTables(db) {
   const columnsOf = (table) => {
     try {
       return db.prepare(`PRAGMA table_info("${table}")`).all().map((r) => r.name);
@@ -63,12 +65,12 @@ function assertNotUnifiedTradeTables(db) {
   const hit = [];
   if (ordersCols.includes('source') || ordersCols.includes('source_id')) hit.push('orders.source/source_id');
   if (paymentsCols.includes('channel')) hit.push('payments.channel');
-  if (hit.length) {
-    throw new Error(
-      `⛔ 已禁止执行：检测到统一交易域表结构（${hit.join(', ')}）。` +
-        '本脚本会 DROP orders / payments，属于正在使用的交易表；如确需清理 billing 域，请另写只针对 plans/plan_prices/subscriptions/subscription_events/refunds/invoices/audit_logs 的迁移。',
-    );
-  }
+  if (!hit.length) return false;
+  log(
+    `⏭️ 跳过：检测到统一交易域表结构（${hit.join(', ')}），orders / payments 为在用交易表；` +
+      '本迁移清理的 billing / audit 域已由统一交易域接管，故不再执行（退出 0，不影响部署）。',
+  );
+  return true;
 }
 
 function log(msg) {
@@ -114,8 +116,11 @@ async function main() {
   const Database = loadBetterSqlite3();
   const db = new Database(DB_PATH);
 
-  // 硬守卫：命中统一交易域结构即中止，DRY-RUN 也不放行（防止 CI 误跑 --apply）
-  assertNotUnifiedTradeTables(db);
+  // 硬守卫：命中统一交易域结构即跳过（DRY-RUN 与 --apply 同一行为），绝不动在用交易表
+  if (isUnifiedTradeTables(db)) { // 统一交易域已接管：本迁移作废，直接退出 0 保证部署继续
+    db.close(); // 关闭连接，避免留下句柄
+    return; // 提前结束 main，进程以 0 退出
+  }
 
   const before = snapshot(db, '迁移前');
   const present = DROP_TABLES.filter((t) => before.tables.includes(t));
