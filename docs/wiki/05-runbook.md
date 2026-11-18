@@ -245,6 +245,8 @@ gh run watch          # 观察最近一次运行
 | `packages` | `docker/build-push-action` 推 `ghcr.io/afdk1991/mim-api:latest` 与 `:${GITHUB_SHA}` | 无（`GITHUB_TOKEN` + `packages: write`） | 直接推送；镜像供 Sealos 等容器平台复用 |
 | `platforms` | Cloudflare / Vercel / Sealos / IGA 依次同步 | 见下表 | 每个 step `[ -z "$TOKEN" ] && exit 0`，打印 SKIP |
 
+> **Pages 作业重跑注意（2026-11-18 实测）**：`gh run rerun --failed` 复用同一 Run，首轮残留的 `github-pages` 工件不会自动清除；重跑再次上传后 `deploy-pages@v4` 会报 `Multiple artifacts named "github-pages"`（首轮工件未定稿时则报 `No artifacts named "github-pages" were found`）。重跑前先经 API 清理：`gh api repos/<owner>/<repo>/actions/runs/<run_id>/artifacts` 列出工件，对每个 `github-pages` 工件 `gh api -X DELETE repos/<owner>/<repo>/actions/artifacts/<id>` 删除，再 `gh run rerun <run_id> --failed`。
+
 | 平台 | 配置文件 | secret |
 |---|---|---|
 | Cloudflare Pages | `wrangler.toml` + `functions/api/[[path]].js`（/api 反代）+ `functions/[[catchall]].js`（SPA 深链接回退） | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
