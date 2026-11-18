@@ -363,7 +363,9 @@
         "腾讯云自建",
         "自建主站",
         "生产主站",
-        "mim.mixm.top",
+        "laal.top",
+        "api.laal.top",
+        "mim.mixm.top（旧域，仅 301 → laal.top）",
         "宿主机直部署"
       ],
       "platform_id": "tcloud",
@@ -375,7 +377,7 @@
         "url": "https://github.com/afdk1991/mim.git",
         "role": "服务器检出源（git@github.com:22 + 只读 deploy_key）"
       },
-      "entry_url": "https://mim.mixm.top",
+      "entry_url": "https://laal.top",
       "delivery": {
         "mode": "ci",
         "ci_job": "deploy",
@@ -392,10 +394,10 @@
       "result": {
         "verdict": "PASS",
         "http_code": "200",
-        "latency_ms": 71,
-        "bytes": 53,
-        "evidence": "2026-11-10 23:40 +08:00 本机实测：https://mim.mixm.top/health → 200 / 0.071s / 53B（{\"status\":\"ok\",\"service\":\"mim-api\",\"version\":\"0.0.0\"}）；/ 200 / 5114B；/api/v1/modules 200 / 9514B；/store、/comic 200 / 5114B；/admin/ 200 / 1430B；ssl_verify_result=0；http:// → 301。主机侧：腾讯云 CVM 115.159.159.11（Ubuntu 22.04.5、nginx 1.18.0、systemd mim-api、Node v22.20.0、4G swap），经腾讯云自动化助手取得 root 执行通道完成从零部署",
-        "captured_at": "2026-11-10 23:40 +08:00"
+        "latency_ms": 429,
+        "bytes": 15,
+        "evidence": "2026-11-18 23:xx +08:00 本机实测（生产入口已为 laal.top）：https://laal.top/health → 200 / 0.429s / 15B（{\"status\":\"ok\"}）；https://laal.top/ → 200 / 5509B；https://laal.top/admin/ → 200 / 2087B；https://api.laal.top/api/v1/healthz → 200 / 15B。CI Deploy run 44336238532（@d099112）五作业全绿，「发布到生产服务器」作业内远程发布 / 版本校验 / 健康检查（https://laal.top:443）/ 管理后台路由断言 / 认证接口抽查全部 success。主机侧：腾讯云 CVM 115.159.159.11（nginx 1.18.0、systemd mim-api、SQLite WAL）。历史留痕：旧入口 https://mim.mixm.top 自 2026-11-15 起不再承载 Mim，仅 301 → laal.top（本机对该旧域存在网络阻断特征，解析/请求返回 000，故旧域 301 以 nginx 配置与历史取证为准）",
+        "captured_at": "2026-11-18 23:xx +08:00"
       },
       "anomalies": [
         {
@@ -417,13 +419,19 @@
           "code": "NODE_22_11_SEGV_FIXED",
           "severity": "info",
           "message": "生产启动期曾因 Node 22.11.0 + esbuild 单文件产物触发 SEGV；已将主机 Node 升级至 v22.20.0 并把 sharp 改为按需加载，问题闭环"
+        },
+        {
+          "code": "LEGACY_DOMAIN_301",
+          "severity": "info",
+          "message": "现行口径：生产唯一权威终点为 https://laal.top（API https://api.laal.top，后台 https://laal.top/admin/）；旧域 mim.mixm.top 于 2026-11-15 起不再承载 Mim，仅配置 301 → laal.top，不得再作为生产入口引用"
         }
       ],
       "missing_fields": [
         "V4_browser_e2e"
       ],
       "sources": [
-        "curl https://mim.mixm.top/health",
+        "curl https://laal.top/health",
+        "curl https://api.laal.top/api/v1/healthz",
         "git ls-tree HEAD deploy/...",
         "git diff --cached --name-status",
         "AGENTS.md §12.3 / §12.4",

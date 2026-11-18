@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-14T11:09:29.637Z
-- 本地 HEAD：`ef71b65`
+- 生成时间：2026-11-18T15:55:03.539Z
+- 本地 HEAD：`d099112`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -15,7 +15,7 @@
 | CI 作业 | 5 | 其中部署作业 4 个 |
 | 有取证 | 12 | 本轮存在可信取证 |
 | 空数据 | 0 | result 为 null，明确标识而非填 0 |
-| 阻断异常 | 0 | 🔴 0 / 🟡 0（另 🟢 30 条为历史取证留痕，不是待处置异常） |
+| 阻断异常 | 0 | 🔴 0 / 🟡 0（另 🟢 31 条为历史取证留痕，不是待处置异常） |
 | 缺失信息 | 5 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
@@ -25,7 +25,7 @@
 |---|---|---|---|---|---|---|---|
 | `repo.github` | github:afdk1991/mim | GitHub 仓库 / source | push — | https://github.com/afdk1991/mim | ✅ OK | ✅ PASS — / —B | HTTPS_BLOCKED 等 1 项 |
 | `repo.gitee` | gitee:mallwm_admin/mim | Gitee（码云）镜像仓 / source | push — | https://gitee.com/mallwm_admin/mim | ✅ OK | ✅ PASS 200 / 52034B | REMOTE_TIMEOUT_RECOVERED 等 3 项 |
-| `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | https://mim.mixm.top | ✅ OK | ✅ PASS 200 / 53B | PRODUCTION_UNREACHABLE 等 4 项 |
+| `server.tcloud` | github:afdk1991/mim | 腾讯云自建服务器 / production | ci deploy | https://laal.top | ✅ OK | ✅ PASS 200 / 15B | PRODUCTION_UNREACHABLE 等 5 项 |
 | `pages.github` | github:afdk1991/mim | GitHub Pages / distribution | ci pages | https://afdk1991.github.io/mim/ | ✅ OK | ✅ PASS 200 / 5182B | SPA_FALLBACK_WORKTREE_RESTORED 等 2 项 |
 | `packages.ghcr` | ghcr:afdk1991/mim-api | GitHub Packages (ghcr) / distribution | ci packages | https://ghcr.io/v2/ | ✅ OK | ✅ PASS 401 / 73B | AUTH_401_BY_DESIGN 等 2 项 |
 | `pages.edgeone` | — | 腾讯云 EdgeOne Pages / distribution | manual — | https://data.mixm.top | ✅ OK | ✅ PASS 200 / 5305B | CUSTOM_DOMAIN_ARTIFACT_ALIGNED 等 4 项 |
@@ -48,6 +48,7 @@
 | `server.tcloud` | 🟢 info | `WORKTREE_ARTIFACT_MISSING` | deploy/ 全目录曾于 2026-11-08 从工作树移除（未提交，远端正品无损），2026-11-10 已由 git 恢复至 HEAD 状态；历史风险留痕，当前无悬空 |
 | `server.tcloud` | 🟢 info | `MISSING_HOST_CREDENTIALS` | 历史留痕：SSH 直连始终 Permission denied（实例被重装、host key 变更），已改用腾讯云自动化助手（云助手 root shell）作为主执行通道，本轮所有主机操作均经该通道完成 |
 | `server.tcloud` | 🟢 info | `NODE_22_11_SEGV_FIXED` | 生产启动期曾因 Node 22.11.0 + esbuild 单文件产物触发 SEGV；已将主机 Node 升级至 v22.20.0 并把 sharp 改为按需加载，问题闭环 |
+| `server.tcloud` | 🟢 info | `LEGACY_DOMAIN_301` | 现行口径：生产唯一权威终点为 https://laal.top（API https://api.laal.top，后台 https://laal.top/admin/）；旧域 mim.mixm.top 于 2026-11-15 起不再承载 Mim，仅配置 301 → laal.top，不得再作为生产入口引用 |
 | `pages.github` | 🟢 info | `SPA_FALLBACK_WORKTREE_RESTORED` | scripts/spa-404.mjs 与 apps/web/public/_redirects 曾于 2026-11-08 从工作树移除，2026-11-10 已恢复，本地可复现深链接 404.html 链路 |
 | `pages.github` | 🟢 info | `DEEP_LINK_404_BY_DESIGN` | /mim/store 返回 404 + 5182B 为 dist/404.html 逐字节副本的平台能力上限，浏览器加载后 SPA 正常启动 |
 | `packages.ghcr` | 🟢 info | `AUTH_401_BY_DESIGN` | 未鉴权 401 为 ghcr 预期响应，不判定为部署失败 |
@@ -75,8 +76,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | ef71b6539527f1178a8977ee6704af34f1412e73 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | ef71b6539527f1178a8977ee6704af34f1412e73 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | d099112bfaa1eb6d61714d08d4f433b1873883d3 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | d099112bfaa1eb6d61714d08d4f433b1873883d3 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|
