@@ -38,6 +38,7 @@ import { CommunityGallery } from './CommunityGallery'; // 图库 / 视频页签�
 import { CommunityAssets } from './CommunityAssets'; // 付费资产列表 / 详情（2026-11-16：社区层深链接，匿名可读）
 import { CommunityGuideBar, ReferralGuestPanel, ShopGuestNote, WalletGuestPanel } from './CommunityGuides'; // 八大板块指南条与匿名访客面板
 import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明 + 操作槽位
 import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
 
 interface Props { // 接口 Props：约束对象的字段与类型形态
@@ -1356,7 +1357,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
           {favoritesOpen && (
             <div className="community-favorites">{/* 执行当前业务步骤 */}
               <div className="community-section-head"><div><h3>我的收藏</h3><p>共 {favorites.length} 篇</p></div></div>
-              {favorites.length === 0 && <div className="community-empty">还没有收藏，详情页点「收藏」即可加入。</div>}
+              {favorites.length === 0 && (
+                <EmptyState kind="love" title="还没有收藏" hint="详情页点「收藏」即可加入。" />
+              )}
               {favorites.map((t) => (
                 <button key={t.id} type="button" className="community-favorite-row" onClick={() => void openThread(t.id)}>{/* 执行当前业务步骤 */}
                   <span>{t.board_name}</span>
@@ -1373,17 +1376,17 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             </div>
           )}
           {threads.length === 0 && !listLoading && listFailed && (
-            <div className="community-empty">
-              <strong>帖子列表加载失败</strong>
-              <span>网络或服务暂时不可用，请稍后重试。</span>
-              <button type="button" className="btn small" onClick={() => void loadThreads()}>重试</button>
-            </div>
+            <EmptyState
+              kind="set"
+              title="帖子列表加载失败"
+              hint="网络或服务暂时不可用，请稍后重试。"
+              action={(
+                <button type="button" className="btn small" onClick={() => void loadThreads()}>重试</button>
+              )}
+            />
           )}
           {threads.length === 0 && !listLoading && !listFailed && (
-            <div className="community-empty">
-              <strong>这个筛选下还没有帖子</strong>
-              <span>换个板块或排序，也可以发一篇试试。</span>
-            </div>
+            <EmptyState kind="post" title="这个筛选下还没有帖子" hint="换个板块或排序，也可以发一篇试试。" />
           )}
           {threads.length > 0 && (
             <div className="community-list">{/* 执行当前业务步骤 */}
@@ -1688,7 +1691,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 <span>{dateOnly(w.created_at)}</span>
               </div>
             ))}
-            {!withdrawal?.items.length && <div className="community-empty">还没有提现申请。</div>}
+            {!withdrawal?.items.length && <EmptyState kind="order" title="还没有提现申请" />}
           </div>
           <p className="community-hint">演示卡密：<code>MIM-DEMO-100</code>（¥100）、<code>MIM-DEMO-500</code>（¥500），每张仅可使用一次。</p>
           <div className="community-table">{/* 执行当前业务步骤 */}
@@ -1702,7 +1705,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 <span>{dateOnly(t.created_at)}</span>
               </div>
             ))}
-            {!walletDetail?.transactions.length && <div className="community-empty">还没有流水，先签到或用演示卡密充值。</div>}
+            {!walletDetail?.transactions.length && <EmptyState kind="money" title="还没有流水" hint="先签到或用演示卡密充值。" />}
           </div>
         </div>
       )}
@@ -1717,7 +1720,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             <ShopGuestNote onLogin={() => { if (onRequireLogin) onRequireLogin(); else requireSession(); }} />
           )}
           <div className="community-shop-grid">{/* 执行当前业务步骤 */}
-            {products.length === 0 && <div className="community-empty">商品正在加载，稍后再看看。</div>}
+            {products.length === 0 && <EmptyState kind="cart" title="商品正在加载" hint="稍后再看看。" />}
             {products.map((p) => (
               <article key={p.code} className="community-product">{/* 执行当前业务步骤 */}
                 {p.cover_url && <img src={coverSrc(p.cover_url)} alt={p.name} loading="lazy" />}
@@ -1762,7 +1765,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             <>
           <h3 className="community-subhead">我的订单</h3>
           <div className="community-orders">{/* 执行当前业务步骤 */}
-            {orders.length === 0 && <div className="community-empty">还没有订单。</div>}
+            {orders.length === 0 && <EmptyState kind="order" title="还没有订单" />}
             {orders.map((o) => (
               <article key={o.id} className="community-order">{/* 执行当前业务步骤 */}
                 <div className="community-order-main">{/* 执行当前业务步骤 */}
@@ -1812,7 +1815,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
 
           <h3 className="community-subhead">我的售后</h3>
           <div className="community-orders">
-            {afterSales.length === 0 && <div className="community-empty">还没有售后申请。</div>}
+            {afterSales.length === 0 && <EmptyState kind="order" title="还没有售后申请" />}
             {afterSales.map((a) => (
               <article key={a.id} className="community-order">
                 <div className="community-order-main">

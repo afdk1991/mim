@@ -835,6 +835,23 @@ code { /* 行内代码/令牌展示 */
   width: 100%; /* 占满父容器宽度，如侧栏退出按钮 */
 } /* 整行按钮结束 */
 
+.btn.outline { /* 描边按钮：次级操作，表面透明 + 主色细描边 */
+  border-color: var(--border-hover); /* 常规描边：悬停描边的弱一档 */
+  background: transparent; /* 透明底，不与幽灵按钮争层级 */
+  color: var(--text-secondary); /* 次级文字，弱于主按钮 */
+} /* 描边按钮结束 */
+
+.btn.outline:hover:not(:disabled) { /* 描边按钮悬停 */
+  border-color: var(--primary); /* 描边转主色，给出可点击反馈 */
+  color: var(--link); /* 文字提至链接色 */
+  opacity: 1; /* 描边档已有颜色反馈，不再叠加透明度压暗 */
+} /* 描边按钮悬停结束 */
+
+.btn.pill { /* 药丸按钮：全圆角，用于筛选 / 标签式操作 */
+  border-radius: var(--radius-pill); /* 胶囊圆角 */
+  padding: 0 16px; /* 药丸左右留白比方角按钮更宽 */
+} /* 药丸按钮结束 */
+
 .widget .btn.ghost { /* 右栏挂件内的幽灵按钮 */
   border-color: var(--nav-ring); /* 浅底上用中性描边 */
   color: var(--nav-text); /* 导航常规文字色 */
@@ -3837,11 +3854,12 @@ code { /* 行内代码/令牌展示 */
   background: var(--surface); /* 表面色 */
   box-shadow: var(--shadow); /* 投影 */
   cursor: pointer; /* 整卡可点 */
-  transition: box-shadow var(--dur) var(--ease); /* 悬停只过渡阴影，不做位移 */
+  transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); /* 悬停阴影与抬升走同一缓动 */
 } /* 结束 */
 
 .community-card:hover { /* 悬停 */
-  box-shadow: var(--shadow-hover); /* 环境光略微加深，卡片本身不移动 */
+  box-shadow: var(--shadow-hover); /* 环境光略微加深 */
+  transform: translateY(-2px); /* 整卡轻微抬升，与封面缩放形成双层反馈 */
 } /* 结束 */
 
 .community-cover { /* 封面区 */
@@ -3937,6 +3955,7 @@ code { /* 行内代码/令牌展示 */
   line-height: 1.4; /* 行高 */
   font-weight: var(--fw-medium); /* 中等字重：列表标题不抢主标题 */
   color: var(--text); /* 主文字 */
+  min-height: 2.8em; /* 锁两行高度：标题长短不齐时卡片基线仍对齐（zibll 等高口径） */
   display: -webkit-box; /* 标题截断 */
   -webkit-line-clamp: var(--card-title-lines); /* 行数：全站统一 */
   -webkit-box-orient: vertical; /* 纵向 */
@@ -4552,6 +4571,14 @@ code { /* 行内代码/令牌展示 */
 .community-empty .btn { /* 重试 / 引导按钮 */
   margin-top: var(--sp-1); /* 与说明留 4px */
 } /* 结束 */
+
+.empty-state-icon { /* 空态插图：统一尺寸居中，不随卡片宽度拉伸 */
+  width: 72px; /* 插图边长：空态视觉锚点，不大到抢标题层级 */
+  height: 72px; /* 正方形槽位，SVG 等比 containment */
+  object-fit: contain; /* 保持比例，不裁切变形 */
+  opacity: 0.9; /* 轻微降透明，与中性表面融合 */
+  margin-bottom: var(--sp-1); /* 与标题留 4px 间隙 */
+} /* 空态插图结束 */
 
 /* ---------- 骨架占位：纯 CSS，不引第三方库；尺寸贴合最终卡片，加载完成后不跳动 ---------- */
 .skeleton { /* 占位块 */

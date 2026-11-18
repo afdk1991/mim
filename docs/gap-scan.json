@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-18T15:19:52.041Z",
+  "generatedAt": "2026-11-18T16:19:50.217Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -106,7 +106,7 @@
           "locations": [
             {
               "file": "packages/core-domain/src/deploymentRegistry.json",
-              "line": 609
+              "line": 617
             },
             {
               "file": "scripts/gap-scan.mjs",
