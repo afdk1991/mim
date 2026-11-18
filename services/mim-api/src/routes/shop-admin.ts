@@ -515,6 +515,26 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     res.json({ card: cardView(updated) }); // 回传卡密视图
   }); // POST 卡密作废结束
 
+  /** DELETE /admin/cards/:code — 物理删除未使用或已作废卡密；已兑换不可删（资金已入账，台账必须保留） */
+  router.delete('/admin/cards/:code', perm, (req, res) => {
+    const code = pathParam(req, 'code'); // 取路径参数
+    const row = db.prepare('SELECT * FROM wallet_cards WHERE code = ?').get(code) as CardRow | undefined; // 按码精确取行
+    if (!row) throw new AppError('NOT_FOUND', 'card not found', { card_code: code }); // 404
+    if (row.status === 'used') { // 已兑换：对应一笔真实入账，删除会破坏对账
+      throw new AppError('CONFLICT', 'used card cannot be deleted', { card_code: code }); // 409
+    } // 已用保护结束
+    audited(db, auditActor(req), { // 删除属破坏性操作，必须留痕
+      action: 'card.delete',
+      targetType: 'card',
+      targetId: code,
+      detail: { amount_cents: row.amount_cents, voided: row.voided_at !== null, created_at: row.created_at }, // 只记台账摘要，不记兑换人
+    }, () => {
+      const info = db.prepare('DELETE FROM wallet_cards WHERE id = ?').run(row.id); // 物理清除
+      if (info.changes === 0) throw new AppError('NOT_FOUND', 'card not found', { card_code: code }); // 并发删除时保持 404 语义
+    }); // 审计包装结束
+    res.json({ code, deleted: true }); // 明确告知删除成功
+  }); // DELETE 卡密结束
+
   // ── VIP 套餐 ─────────────────────────────────────────────────────────────
 
   /** GET /admin/vip/plans — 套餐全量列表（含停用） */

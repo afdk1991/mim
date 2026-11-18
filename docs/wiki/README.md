@@ -6,7 +6,7 @@
 
 Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号身份、即时通讯与社区内容（含社区商城）的 P0 最小集；同时保留协作治理体系（AGENTS.md 十二条铁律；项目名称 Mim）、版本规约校验脚本与产品需求文档。
 
-- 当前版本：**V0.0.11-preview**（预览通道，正式版未发布；6 包 semver 均 `0.0.11`）
+- 当前版本：**V0.0.12-preview**（预览通道，正式版未发布；6 包 semver 均 `0.0.12`）
 - 仓库性质：**pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`）
 - 第三方运行时依赖：React / Express / zod / jsonwebtoken / bcryptjs / better-sqlite3 等（完整清单与版本见 [04-dependencies.md](./04-dependencies.md) §1；规划中的 SDK 见 [09](./09-third-party-sdk-inventory.md)）
 
@@ -35,7 +35,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 f:\合并项目\Mim
 ├── AGENTS.md                      # 协作铁律（12 条，最高优先级约束）
 ├── README.md                      # 项目入口、版本规约、运行命令
-├── Mim-PRD.html                   # 产品需求文档（V0.0.11-preview 草案，含 FR-01~06 功能规格与交互演示）
+├── Mim-PRD.html                   # 产品需求文档（V0.0.12-preview 草案，含 FR-01~06 功能规格与交互演示）
 ├── team-hiring-plan.md            # 技术架构约束分析与团队分阶段配置规划
 ├── package.json                   # 根 workspace 脚本（dev/test/typecheck/build/check）
 ├── pnpm-workspace.yaml            # workspace 边界（apps/* services/* packages/*）

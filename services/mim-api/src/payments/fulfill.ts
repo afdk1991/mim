@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'; // 引入依赖：声明本文件使�
 import { AppError } from '@mim/core-domain'; // 引入依赖：声明本文件使用的外部能力
 import type { ApiDeps } from '../types.js'; // 引入依赖：声明本文件使用的外部能力
 import type { ExtChannelId, ExtIntentRow } from './types.js'; // 引入依赖：声明本文件使用的外部能力
-import { recordEarning, type PayPurpose } from '../payments.js'; // 引入依赖：声明本文件使用的外部能力
+import { deliverShopOrder, recordEarning, type PayPurpose } from '../payments.js'; // 引入依赖：声明本文件使用的外部能力
 
 const now = (deps: ApiDeps): string => deps.now?.() ?? new Date().toISOString(); // 保存 now：承载本步骤的计算结果供后续使用
 
@@ -56,9 +56,10 @@ export function fulfillExtIntent(deps: ApiDeps, intent: ExtIntentRow, providerTx
   if (intent.status === 'paid') return { replayed: true }; // 条件分支：仅在满足业务前置条件时继续
   const ts = now(deps); // 保存 ts：承载本步骤的计算结果供后续使用
   const tx = deps.db.transaction(() => { // 保存 tx：承载本步骤的计算结果供后续使用
-    deps.db // 业务步骤：推进当前流程的下一项处理
+    const marked = deps.db // 抢占支付单：只有 pending → paid 成功的那一次回调才继续履约
       .prepare('UPDATE payment_ext_intents SET status = \'paid\', provider_txn_id = ?, paid_at = ? WHERE id = ? AND status = \'pending\'') // 预编译 SQL：固定语句结构后绑定参数执行
       .run(providerTxnId, ts, intent.id); // 执行写入：把参数落库并返回影响结果
+    if (marked.changes === 0) return; // 重放 / 并发回调：状态已落定，直接返回，不重复加钱 / 发权益
 
     if (intent.purpose === 'recharge') { // 条件分支：仅在满足业务前置条件时继续
       ensureWallet(deps, intent.user_id); // 业务步骤：推进当前流程的下一项处理
@@ -90,12 +91,7 @@ export function fulfillExtIntent(deps: ApiDeps, intent: ExtIntentRow, providerTx
         .prepare("INSERT INTO vip_memberships (id, user_id, plan_id, level, starts_at, expires_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?)") // 预编译 SQL：固定语句结构后绑定参数执行
         .run(`vip-${randomUUID()}`, intent.user_id, plan.id, plan.level, ts, expires, ts); // 执行写入：把参数落库并返回影响结果
     } else if (intent.purpose === 'shop_order') { // 其他分支：处理不满足前置条件的路径
-      const order = deps.db.prepare('SELECT status, payable_cents FROM shop_orders WHERE id = ?').get(intent.ref_id) as // 保存 order：承载本步骤的计算结果供后续使用
-        | { status: string; payable_cents: number } // 业务步骤：推进当前流程的下一项处理
-        | undefined; // 业务步骤：推进当前流程的下一项处理
-      if (!order) throw new AppError('NOT_FOUND', '订单不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
-      if (order.payable_cents !== intent.amount_cents) throw new AppError('CONFLICT', '支付金额与订单不一致'); // 业务拒绝 CONFLICT：以统一错误码终止当前请求
-      deps.db.prepare("UPDATE shop_orders SET status = 'paid', paid_at = ? WHERE id = ? AND status = 'pending'").run(ts, intent.ref_id); // 预编译 SQL：固定语句结构后绑定参数执行
+      deliverShopOrder(deps, intent.ref_id, intent.amount_cents); // 实物 → 待发货；自动发卡 → 直接交付；人工 → 待客服交付
     } // 结束条件分支：本层作用域收尾
     recordExtEvent(deps, intent.id, intent.provider, 'paid', { providerTxnId }); // 业务步骤：推进当前流程的下一项处理
   }); // 结束函数体：本层作用域收尾

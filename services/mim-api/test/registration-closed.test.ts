@@ -28,7 +28,7 @@ describe('注册总开关', () => {
     expect(isRegistrationEnabled({ MIM_REGISTRATION_ENABLED: '1' })).toBe(true); // 只有 1 开启
   });
 
-  it('关闭后：自助注册与访客建号均返回 AUTH_REGISTER_DISABLED(403)，channels.register=false', async () => {
+  it('关闭后：自助注册返回 AUTH_REGISTER_DISABLED(403)，访客接口已移除(404)，channels.register=false', async () => {
     const reg = await request(closed).post('/api/v1/auth/register').send({
       region: 'cn',
       provider: 'phone',
@@ -39,8 +39,7 @@ describe('注册总开关', () => {
     expect(reg.body.code).toBe('AUTH_REGISTER_DISABLED');
 
     const guest = await request(closed).post('/api/v1/auth/guest').send({});
-    expect(guest.status).toBe(403); // 访客建号永久停用
-    expect(guest.body.code).toBe('AUTH_REGISTER_DISABLED');
+    expect(guest.status).toBe(404); // 免登录建号接口已从路由表移除
 
     const channels = await request(closed).get('/api/v1/auth/channels');
     expect(channels.status).toBe(200);

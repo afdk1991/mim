@@ -1,7 +1,7 @@
 // React 状态与副作用钩子：会话状态、登录提示与启动静默校验；lazy/Suspense 做路由级懒加载
 import { lazy, Suspense, useEffect, useState } from 'react';
 // i18n 工具：语言归一化与文案取值
-import { normalizeLocale, t } from '@mim/i18n';
+import { normalizeLocale } from '@mim/i18n';
 // 仅类型导入：语言枚举
 import type { Locale } from '@mim/i18n';
 // api 命名空间、会话读写工具、会话变更事件与启动静默校验
@@ -24,6 +24,8 @@ import { Login } from './views/Login';
 // 外观解析与 CSS 变量注入：主题色 / 圆角 / 字体 / 列表样式 / 导航配置
 import { DEFAULT_THEME, applyThemeMode, applyThemeVars, currentThemeMode, mergeNavItems, readStoredMode, resolveTheme, setThemeMode } from './appearance';
 import type { ResolvedTheme, ThemeMode } from './appearance'; // 引入依赖、类型或本地模块绑定
+// 外壳组件：顶部横导航 + 1200px 两栏 + 多列页脚 + 移动端底部 Tab（外壳形态集中在这一个文件）
+import { Shell } from './Shell';
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
@@ -339,74 +341,24 @@ export function App() {
     else go({ view: 'community' });
   }, [authedSession, route.view, go]);
 
-  // 主布局：左侧栏 + 右侧内容区；匿名与已登录共用同一骨架，仅内容区与底部操作不同
+  // 主布局：外壳（顶部横导航 + 1200px 两栏 + 多列页脚）统一在 Shell 中组装，
+  // 这里只负责按路由选出当前视图；外壳形态回退时改 Shell.tsx 与 styles.css 即可。
   return (
-    // 布局容器：data-list-style 把后台列表样式口径透传给列表变体选择器
+    // 布局容器：data-list-style / data-nav-layout 仍把后台外观口径透传给列表与外壳选择器
     <div className="layout" data-list-style={theme.listStyle} data-nav-layout={theme.navLayout}>
-      {/* 左侧导航栏 */}
-      <aside className="sidebar">{/* 侧边栏：品牌 + 导航 + 底部用户区 */}
-        {/* 品牌区：主名为主，副标题以小一号的弱文字跟在下方，两者不等权 */}
-        <div className="brand">{/* 品牌区：标记 + 主名 + 副标题 */}
-          <span className="brand-text">{/* 文字块：主名在上、副标题在下 */}
-            {/* 应用名（i18n） */}
-            <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名，走 i18n 词典 */}
-            {/* 副标题：站点全称的后半段，最小字号档 */}
-            <span className="brand-sub">
-              {locale === 'en-US' ? 'Content, community and commerce' : '内容、社区与交易一体化'}
-            </span>
-          </span>
-        </div>{/* 品牌区结束 */}
-        {/* 导航按钮列表 */}
-        <nav className="nav">{/* 导航容器：按钮由 navItems 顺序决定 */}
-          {/* 遍历导航项：按 navDefaults 顺序平铺，不渲染分组标题 */}
-          {navItems.map((item) => (
-            <button
-              // 导航项唯一键
-              key={item.view}
-              // 普通按钮
-              type="button"
-              // 当前视图高亮 active
-              className={`nav-item${activeNavView === item.view ? ' active' : ''}`}
-              // 点击切换视图（配置视图已在合并阶段按内置白名单收敛）
-              onClick={() => go({ view: item.view as AppView })}
-            >
-              {/* 导航文案 */}
-              {item.label}{/* 导航文案，随语言切换 */}
-            </button> // 单个导航按钮结束，回到 map 回调的表达式内部
-          ))}{/* 导航项遍历结束 */}
-        </nav>{/* 导航容器结束 */}
-        {/* 侧边栏底部：登录后显示身份与退出；未登录只显示状态与登录入口（不再有访客身份） */}
-        <div className="sidebar-footer">{/* 吸底容器：margin-top:auto 把它推到侧栏底部 */}
-          {authedSession ? ( // 正式账号分支：显示身份与退出
-            <>{/* 已登录片段开始 */}
-              {/* 显示名，缺失时回退到 id 前 8 位 */}
-              <span className="user-name">{authedSession.user.display_name || authedSession.user.id.slice(0, 8)}</span>{/* 显示名，缺失时回退到 id 前 8 位 */}
-              {/* 区域徽标：只表达归属，不再出现「访客 / 免登录」这类旧身份 */}
-              <span className="user-region">{authedSession.user.region === 'cn' ? '中国区' : 'Global'}</span>{/* 区域徽标 */}
-              <button type="button" className="btn ghost block" onClick={handleLogout}>{/* 退出登录按钮 */}
-                {t(locale, 'action.logout')}{/* 退出文案，走 i18n 词典 */}
-              </button>{/* 退出按钮结束 */}
-            </> // 已登录片段结束
-          ) : ( // 未登录分支：不自动建号，给出登录入口与注册关闭说明
-            <>{/* 未登录片段开始 */}
-              <span className="user-name">{locale === 'en-US' ? 'Not signed in' : '未登录'}</span>{/* 未登录状态 */}
-              <span className="user-region">{locale === 'en-US' ? 'Registration is closed — use an existing account' : '注册已关闭，请使用已有账号登录'}</span>{/* 注册关闭说明 */}
-              <button type="button" className="btn primary block" onClick={() => go({ view: 'login' })}>{/* 登录入口按钮 */}
-                {locale === 'en-US' ? 'Sign in' : '登录'}{/* 登录按钮文案，随语言切换 */}
-              </button>{/* 登录入口按钮结束 */}
-            </> // 未登录片段结束
-          )}{/* 底部按登录态分支结束 */}
-          {/* 明暗切换：匿名与已登录都可用，偏好只存本地 */}
-          <button type="button" className="btn ghost block" onClick={toggleMode}>
-            {mode === 'dark'
-              ? (locale === 'en-US' ? 'Light mode' : '浅色模式')
-              : (locale === 'en-US' ? 'Dark mode' : '暗色模式')}
-          </button>
-        </div>{/* 侧边栏底部结束 */}
-      </aside>{/* 侧边栏结束 */}
-
+      <Shell
+        locale={locale} // 当前语言
+        mode={mode} // 当前明暗
+        onToggleMode={toggleMode} // 切换明暗
+        navItems={navItems} // 一级导航项
+        activeView={activeNavView} // 当前高亮视图
+        onNavigate={(view) => go({ view })} // 统一跳转入口
+        authedSession={authedSession} // 登录态
+        onLogout={handleLogout} // 退出登录
+        showSide={route.view !== 'login'} // 登录页整屏：关闭右栏挂件
+      >
       {/* 右侧内容区：社区匿名可浏览；收费 / 私密视图匿名时内嵌登录卡片 */}
-      <main className="main">{/* 内容区容器：窄屏断点下与侧栏上下堆叠 */}
+      <>{/* 视图内容片段：Shell 只负责外壳，不感知页面结构 */}
         {/* 合并入口条：被收进上级的二级页面在此给直达 / 返回入口 */}
         {subEntries.length > 0 && (
           <div className="subnav">
@@ -489,39 +441,9 @@ export function App() {
           </div>
         )}{/* 已登录登录伪视图结束 */}
         </Suspense>{/* 懒加载边界结束 */}
-      </main>{/* 内容区结束 */}
-
-      {/* 页脚：全站统一的页面收尾，浏览页 / 登录页 / 门禁页共用同一套 */}
-      <footer className="app-footer">
-        <div className="footer-inner">
-          <span className="footer-brand">{t(locale, 'app.name')}</span>
-          <span className="footer-note">
-            {locale === 'en-US' ? 'Content, community and payments in one place.' : '内容、社区与交易一体化'}
-          </span>
-          <nav className="footer-links" aria-label={locale === 'en-US' ? 'Footer navigation' : '页脚导航'}>
-            <button type="button" onClick={() => go({ view: 'community' })}>
-              {locale === 'en-US' ? 'Community' : '社区'}
-            </button>
-            <button type="button" onClick={() => go({ view: 'circles' })}>
-              {locale === 'en-US' ? 'Circles' : '圈子'}
-            </button>
-            <button type="button" onClick={() => go({ view: authedSession ? 'account' : 'login' })}>
-              {authedSession ? (locale === 'en-US' ? 'Account' : '个人中心') : locale === 'en-US' ? 'Sign in' : '登录'}
-            </button>
-          </nav>
-          <span className="footer-copy">© {new Date().getFullYear()} Mim</span>
-          {/* 备案号：与版权同一行，最小字号 + 次要文字色，不做成按钮 */}
-          <span className="footer-beian">
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">
-              苏ICP备2025161175号-1
-            </a>
-            <span aria-hidden="true">·</span>
-            <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener noreferrer">
-              苏公网安备32072202010512号
-            </a>
-          </span>
-        </div>
-      </footer>{/* 页脚结束 */}
+      </>{/* 视图内容片段结束：外壳的 main 由 Shell 渲染 */}
+      </Shell>{/* 外壳结束：顶部导航 / 两栏 / 页脚 / 底部 Tab 都在 Shell 内 */}
+      {/* 页脚：已迁入 Shell（多列：品牌 / 导航 / 更多 + 底部版权备案） */}
     </div> // 布局容器结束，JSX 根元素到此闭合
   ); // 主布局渲染结束
 } // App 组件结束

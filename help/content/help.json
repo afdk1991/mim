@@ -3,7 +3,7 @@
     "name": "Mim 文档站",
     "title": "Mim 使用与部署文档",
     "description": "Mim 项目介绍、部署说明与常见问题。独立静态站，无构建步骤、无外部依赖。",
-    "version": "0.0.11",
+    "version": "0.0.12",
     "updatedAt": "2026-11-14",
     "home": "intro"
   },

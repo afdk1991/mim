@@ -63,7 +63,7 @@ export const DEFAULT_THEME: ResolvedTheme = {
   background: '#f5f6f7', // 页面底色：与 tokens.css 浅色底一致
   navLayout: 'top', // 导航布局口径
   listStyle: 'card', // 列表样式：卡片
-  radius: 12, // 主圆角：与 tokens.css 一致
+  radius: 8, // 主圆角：与 tokens.css 的 --theme-radius 默认值一致（zibll 口径 8px）
   font: '', // 字体族：空串沿用系统字体栈
   mode: 'light', // 站点默认浅色
   navItems: [], // 后台未配置导航项

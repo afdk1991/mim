@@ -7,7 +7,6 @@ import { createAuthRouter } from './routes/auth.js'; // 公开鉴权路由：验
 import { createOAuthRouter } from './routes/oauth.js'; // 第三方登录：授权 / 回调 / 票据兑换 / 绑定解绑
 import { createImRouter } from './routes/im.js'; // 即时通讯：会话/消息/用户搜索，需登录
 import { createMeRouter } from './routes/me.js'; // 个人资料与设置，内部统一 requireAuth
-import { createWalletWithdrawalRouter } from './routes/wallet-withdrawals.js'; // 提现分成：可提现余额 / 申请 / 审核 / 到账（钱包结算层）
 import { createCommunityRouter } from './routes/community.js'; // 社区与变现：论坛 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广
 import { createAssetsRouter } from './routes/assets.js'; // 付费资产：付费阅读 / 下载 / 图库 / 视频的浏览、解锁与分成（社区页依赖）
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
@@ -26,32 +25,17 @@ import { createFederationRouter } from './routes/federation.js'; // 联邦身份
 import { createVipPricingRouter } from './routes/vip-pricing.js'; // VIP 分级定价规则只读查询
 import { createReferralRouter } from './routes/referral.js'; // 返佣佣金明细自助查询（内部鉴权）
 import { createReferralAdminRouter } from './routes/referral-admin.js'; // 返佣到期结算管理端点（RBAC）
+import { createWalletWithdrawalRouter } from './routes/wallet-withdrawals.js'; // 提现分成：可提现余额 / 申请 / 审核 / 到账（钱包结算层）
 import { createGrowthDmAdminRouter } from './routes/growth-dm-admin.js'; // 成长私信：系统身份私信群发（RBAC messaging:write）
+import { createGrowthRouter } from './routes/growth.js'; // 社区激励链：签到 / 积分流水 / 等级进度 / 徽章 + 后台规则配置（RBAC content:write）
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createCirclesRouter } from './routes/circles.js'; // 圈子：独立于板块的成员制社群，公开浏览 + 成员/圈主写操作
-import { createCacheHeaderMiddleware, createCaptchaMiddleware, createForceLoginMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪三件套 + 缓存头 / 验证码门禁工厂
+import { createCacheHeaderMiddleware, createCaptchaMiddleware, createForceLoginMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪 + 缓存头 / 验证码 / 强制登录门禁
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
 import { createNotifyChannels } from './notify.js'; // 验证码通知通道工厂（短信 / 邮件）
 import type { ApiDeps } from './types.js'; // 依赖容器类型
-import { readFileSync } from 'node:fs'; // 读取本包清单以取默认 semver 版本
-import { fileURLToPath } from 'node:url'; // 解析模块自身位置，兼容打包前后工作目录
-import { dirname, join } from 'node:path'; // 拼出 package.json 的相对路径
-
-/** 读取本包 package.json 的 version 作为健康检查默认版本；读取失败回落 0.0.0 */
-function readPackageVersion(): string {
-  try { // 异常捕获起点：包裹可能抛出错误的操作
-    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'); // src/ 与 dist/ 同为 mim-api 下一级，上级即包根
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: string }; // 解析清单，容错非 JSON
-    return pkg.version ?? '0.0.0'; // 缺 version 字段时回落
-  } catch { // 代码块结束
-    return '0.0.0'; // 清单缺失或损坏时不阻断启动
-  } // 代码块结束
-} // 代码块结束
-
-/** 对外声明的服务版本：默认取本包 package.json semver，部署时可注入 MIM_SERVICE_VERSION 覆盖 */
-const SERVICE_VERSION = (process.env.MIM_SERVICE_VERSION ?? readPackageVersion()).trim(); // 健康检查回显，便于线上核对版本
 
 /** 解析 trust proxy：只信任显式配置的可信代理，避免无条件信任 X-Forwarded-For 被伪造来源 IP */
 function resolveTrustProxy(env: ApiDeps['env']): boolean | number | string { // 定义函数 resolveTrustProxy：封装可复用业务步骤
@@ -101,6 +85,8 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   // 对象收发端点必须先于 express.json 挂载：其 PUT 路由自带 raw 解析器，读取原始字节
   app.use('/api/v1', createMediaObjectRouter(resolved)); // 若排在 express.json 之后，请求流已被 JSON 解析器消费，raw 拿不到原始字节
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { (req as { rawBody?: string }).rawBody = buf.toString('utf8'); } })); // 保留原始报文供微信回调验签.body
+  app.use(express.urlencoded({ extended: false, limit: '256kb' })); // 支付宝异步通知以 form-urlencoded 回传，需单独解析
+
   // 全站强制登录：集中门禁，默认开启（MIM_FORCE_LOGIN=0 关闭）；必须早于缓存头与全部业务路由
   app.get('/api/v1/healthz', (_req, res) => { // 监控别名：语义同 /health，供只允许访问 /api 前缀的探针使用
     res.json({ status: 'ok' }); // 最小静态响应：只回报存活状态，不暴露服务名与版本
@@ -163,7 +149,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
     createMeRouter(resolved), // /me 前缀：个人资料、设置、注销
     createMediaRouter(resolved), // media 控制面：预签名（聊天/社区附件上传均依赖）
     createImRouter(resolved), // IM 即时通讯：会话列表/消息历史/用户搜索/已读
-    createAppearanceRouter(resolved), // 外观：site/config 与 pages 仍被社区页面区块使用
+    createAppearanceRouter(resolved), // 外观：site/config 与 pages 仍被购物车 / 社区页面区块使用
     createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
     createAssetsRouter(resolved), // 付费资产：付费阅读 / 下载 / 图库 / 视频的浏览、解锁与分成（社区页依赖，保留）
     createCirclesRouter(resolved), // 圈子：成员制社群（圈主 / 审核 / 成员上限 / 圈内动态与公告），与板块并存
@@ -177,6 +163,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createShopAdminRouter(resolved)); // 商城后台写入面：同样走 RBAC 权限点 commerce:write，不挂全局幂等
   app.use('/api/v1', createReferralAdminRouter(resolved)); // 返佣到期结算：RBAC commerce:write，独立文件不并入 admin.ts
   app.use('/api/v1', createGrowthDmAdminRouter(resolved)); // 成长私信：复用 IM 会话，RBAC messaging:write
+  app.use('/api/v1', createGrowthRouter(resolved)); // 社区激励链：用户侧签到/流水/等级/徽章 + 管理侧规则配置，内部按端点各自鉴权
 
   app.use(notFound); // 所有路由之后兜底：未命中即返回统一 404 信封
   app.use(errorHandler); // 必须最后挂：四参错误中间件只捕获其之前注册的链路抛错

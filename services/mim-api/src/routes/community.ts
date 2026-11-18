@@ -18,6 +18,7 @@ import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewE
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
 import { assertSafeObjectKey, mimeForObjectKey } from '../storage.js'; // 附件对象键安全校验（禁止路径穿越）+ 后缀推导 MIME
 import { baseUrlOf } from './media.js'; // 附件签名下载复用媒体域的公网基址推导，避免两套口径并存
+import { performCheckin } from '../growth/service.js'; // 签到统一走激励链（签到+发分+等级+徽章同事务）
 
 const now = () => new Date().toISOString(); // 统一 UTC 时间
 
@@ -1669,23 +1670,12 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ wallet, checked_in_today: checked, transactions: tx, vip_level: vipLevel(deps, userId) }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
-  /** 签到：每天 +5 积分。 */
+  /** 签到：统一委托激励链服务，签到记录、积分发放、等级与徽章在同一事务内完成。 */
   router.post('/wallet/checkin', (req, res) => { // 路由 POST /wallet/checkin：注册入口并绑定鉴权与处理逻辑
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
-    ensureWallet(deps, userId); // 业务步骤：推进当前流程的下一项处理
-    const day = new Date().toISOString().slice(0, 10); // 保存 day：承载本步骤的计算结果供后续使用
-    try { // 异常保护：确保失败路径可回收资源
-      deps.db // 业务步骤：推进当前流程的下一项处理
-        .prepare('INSERT INTO checkins (id, user_id, day, points, created_at) VALUES (?, ?, ?, 5, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
-        .run(`ci-${randomUUID()}`, userId, day, now()); // 执行写入：把参数落库并返回影响结果
-    } catch { // 结束代码块：本层作用域收尾
-      throw new AppError('CONFLICT', '今天已经签到过了'); // 业务拒绝 CONFLICT：以统一错误码终止当前请求
-    } // 结束代码块：本层作用域收尾
-    deps.db.prepare('UPDATE wallets SET points = points + 5, updated_at = ? WHERE user_id = ?').run(now(), userId); // 预编译 SQL：固定语句结构后绑定参数执行
-    deps.db // 业务步骤：推进当前流程的下一项处理
-      .prepare(`INSERT INTO wallet_transactions (id, user_id, kind, points, note, created_at) VALUES (?, ?, 'points', 5, '每日签到', ?)`) // 预编译 SQL：固定语句结构后绑定参数执行
-      .run(`wt-${randomUUID()}`, userId, now()); // 执行写入：把参数落库并返回影响结果
-    res.json({ ok: true, points: 5 }); // 输出响应：把处理结果写回 HTTP 客户端
+    const result = performCheckin(deps.db, userId, now()); // 签到链路：重复签到不会重复发分
+    if (result.already_checked_in) throw new AppError('CONFLICT', '今天已经签到过了'); // 保持旧接口「重复签到 409」的既有契约
+    res.json({ ok: true, points: result.points_awarded, streak: result.streak, checkin: result }); // 保留 points 字段，附加连续天数与完整链路结果
   }); // 结束函数体：本层作用域收尾
 
   /** 充值卡兑换。 */

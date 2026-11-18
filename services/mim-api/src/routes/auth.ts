@@ -23,7 +23,6 @@ import { // 引入依赖、类型或本地模块绑定
   issueAccessToken, // 签发 JWT 访问令牌
   newOpaqueToken, // 生成不可预测的刷新令牌
   normalizeIdentity, // 手机号/邮箱归一化
-  secureEqual, // 定长时间比较，抵御计时攻击
   sha256, // 刷新令牌摘要
   verifyCode, // 校验验证码摘要
   verifyPassword, // 账号密码校验，自建账号登录时使用
@@ -70,7 +69,7 @@ const loginBody = codeBody.extend({ // 验证码登录在申请体基础上追�
     .optional(), // 设备信息整体可选，旧客户端不传也能登录
 }); // 结束 loginBody schema
 
-/** 密码登录：短信/邮件通道未接入时的可用入口，口令来自 MIM_AUTH_ADMIN_PASSWORD */
+/** 密码登录：账号自身口令（credentials.kind=password），不再有环境变量备用口令 */
 const passwordBody = z.object({ // 密码登录请求体
   region: z.enum(['cn', 'global']), // 地区
   provider: z.enum(['phone', 'email']).optional(), // 通道可选，缺省按地区推断
@@ -112,7 +111,7 @@ function userPayload(row: UserRow) { // 对外输出的用户视图，剔除内�
     region: row.region, // 地区
     status: row.status, // 账号状态
     display_name: row.display_name, // 展示名
-    is_guest: row.is_guest === 1, // 匿名访客标记：前端据此显示「访客」并引导登录升级
+    is_guest: row.is_guest === 1, // 历史兼容列：建号不再写入，新账号恒为 false，仅为存量数据读取保留
     locale: row.locale, // 语言偏好
     timezone: row.timezone, // 时区偏好
     deletion_scheduled_at: row.deletion_scheduled_at, // 注销预约时间
@@ -156,40 +155,6 @@ function ipFailureKey(ip: string): string { // 定义函数 ipFailureKey
 function clientIp(req: { ip?: string }): string { // 定义函数 clientIp
   return req.ip ?? 'unknown'; // 取不到时归并为 unknown，仍然计数而不是直接放行
 } // 结束 clientIp
-
-/**
- * 管理员口令白名单：MIM_AUTH_ADMIN_IDENTIFIERS 逗号分隔。
- * 支持 `cn:13900000000` / `global:admin@example.com`（限定地区）与裸标识（不限地区）。
- * 该口令只对白名单内账号生效，不再对任意标识成立。
- */
-function adminIdentifierSet(env: ApiDeps['env']): Set<string> { // 定义函数 adminIdentifierSet
-  const raw = (env.MIM_AUTH_ADMIN_IDENTIFIERS ?? '').trim(); // 读取白名单配置
-  const out = new Set<string>(); // 归一后的白名单
-  if (!raw) return out; // 未配置则没有任何标识可用管理员口令
-  for (const item of raw.split(',')) { // 逗号分隔多项
-    const entry = item.trim(); // 去掉两端空白
-    if (!entry) continue; // 跳过空项
-    const sep = entry.indexOf(':'); // 只按第一个冒号切分地区前缀
-    const head = sep > 0 ? entry.slice(0, sep).trim().toLowerCase() : ''; // 冒号前可能是地区
-    if (head === 'cn' || head === 'global') { // 显式地区前缀
-      const region = head as Region; // 收窄为业务地区枚举
-      const provider = region === 'cn' ? 'phone' : 'email'; // 地区决定通道，与登录默认推断一致
-      try { // 非法条目不应让整份白名单失效
-        const identity = normalizeIdentity(region, provider, entry.slice(sep + 1)); // 复用同一归一规则
-        out.add(`${region}:${identity.identifier}`); // 地区 + 归一标识
-      } catch { /* 单条格式错误直接忽略 */ } // 结束异常处理
-      continue; // 继续下一项
-    } // 结束显式地区分支
-    out.add(`*:${entry.toLowerCase()}`); // 裸标识不限地区
-  } // 结束遍历
-  return out; // 交出白名单
-} // 结束 adminIdentifierSet
-
-/** 标识是否被显式配置为管理员账号 */
-function isAdminIdentifier(env: ApiDeps['env'], region: Region, identifier: string): boolean { // 定义函数 isAdminIdentifier
-  const list = adminIdentifierSet(env); // 解析白名单
-  return list.has(`${region}:${identifier}`) || list.has(`*:${identifier.toLowerCase()}`); // 命中地区级或通配条目
-} // 结束 isAdminIdentifier
 
 function assertNotLocked(deps: ApiDeps, key: string | string[], now: string): void { // 登录前检查是否处于锁定期（账号维度 + IP 维度）
   const keys = Array.isArray(key) ? key : [key]; // 统一成数组，兼容单键调用
@@ -433,15 +398,10 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     res.json({ // 只暴露「是否可用」布尔值，不泄露任何凭证内容
       sms: Boolean(deps.notify?.sms), // 国内短信通道是否已装配凭证
       email: Boolean(deps.notify?.email), // 海外邮件通道是否已装配凭证
-      password: Boolean((deps.env.MIM_AUTH_ADMIN_PASSWORD ?? '').trim()), // 管理员口令入口是否可用
+      password: Boolean(deps.db.prepare("SELECT 1 FROM credentials WHERE kind = 'password' LIMIT 1").get()), // 有任一账号口令凭据即视为可用
       register: isRegistrationEnabled(deps.env), // 与后端闸门同源：关闭时前端不再展示注册入口
     }); // 响应结束
   }); // 结束 GET /auth/channels 处理
-
-  router.post('/auth/guest', (_req, _res) => { // 免登录访客建号已停用：不再落库建号
-    assertRegistrationEnabled(deps); // 与注册共用同一开关，关闭时返回明确业务错误码
-    throw new AppError('AUTH_REGISTER_DISABLED', 'guest sign-up is disabled'); // 即使显式开启注册，也不恢复访客建号
-  }); // 结束 POST /auth/guest 处理
 
   router.post('/auth/register', (req, res) => { // 自助注册：账号 + 口令一次完成注册与登录
     assertRegistrationEnabled(deps); // 注册总开关关闭时直接拒绝，不解析请求体
@@ -485,7 +445,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     res.status(201).json(finishLogin(deps, user, body.device)); // 注册即登录：直接下发令牌，省一次往返
   }); // 结束 POST /auth/register 处理
 
-  router.post('/auth/password', (req, res) => { // 密码登录：白名单管理员口令或账号自身口令
+  router.post('/auth/password', (req, res) => { // 密码登录：只校验账号自身口令，唯一入口
     const body = parse(passwordBody, req.body); // 校验请求体
     const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 未指定通道时按地区推断
     const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识
@@ -501,26 +461,13 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       ? (deps.db.prepare("SELECT secret_hash FROM credentials WHERE user_id = ? AND kind = 'password'").get(account.user_id) as { secret_hash: string } | undefined) // 命中即有自建口令
       : undefined; // 无身份则无凭据
 
-    // 管理员口令只对 MIM_AUTH_ADMIN_IDENTIFIERS 显式列出的账号生效；未列出的标识一律按普通账号口令校验
-    const expected = (deps.env.MIM_AUTH_ADMIN_PASSWORD ?? '').trim(); // 读取并裁剪管理员口令
-    const adminOk = expected.length > 0 // 未配置即不启用管理员口令
-      && isAdminIdentifier(deps.env, body.region, identity.identifier) // 必须是显式配置的管理标识
-      && secureEqual(body.password, expected); // 定长时间比较，抵御计时攻击
-    const accountOk = Boolean(credential) && verifyPassword(body.password, credential!.secret_hash); // 账号自身口令命中
-
-    // 管理员口令不具备建号能力：标识不存在时即使口令正确也按失败处理，绝不自动建号
-    const canLogin = Boolean(account) && (adminOk || accountOk); // 必须已有身份 + 任一有效口令
+    const canLogin = Boolean(account) // 必须已有身份
+      && Boolean(credential) // 必须已设置账号口令
+      && verifyPassword(body.password, credential!.secret_hash); // 账号自身口令命中
     if (!canLogin) { // 登录条件不成立
-      if (!expected && !credential) { // 完全没有可用口令入口
-        throw new AppError( // 抛出配置错误
-          'AUTH_PASSWORD_NOT_CONFIGURED', // 未配置即功能不可用
-          'password sign-in is not configured', // 明确提示
-          { env: 'MIM_AUTH_ADMIN_PASSWORD' }, // 指出缺失的环境变量
-        ); // 结束错误构造
-      } // 结束配置检查
       recordFailure(deps, key, body.region, now); // 计入账号维度失败
       recordFailure(deps, ipKey, '#ip', now, LOGIN_IP_LOCK_AFTER_FAILURES); // 计入来源 IP 维度失败
-      throw new AppError('AUTH_PASSWORD_INVALID', 'password is incorrect'); // 不回显口令是否命中
+      throw new AppError('AUTH_PASSWORD_INVALID', 'password is incorrect'); // 不回显账号是否存在或口令是否命中
     } // 结束口令校验
 
     clearFailures(deps, key, ipKey); // 成功后同时清零账号与来源 IP 的失败计数

@@ -5,7 +5,7 @@ import { z } from 'zod'; // 入参校验
 import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requireAuth, requirePermission } from '../middleware.js'; // 会话、幂等与运营权限
 import { parse } from '../validate.js'; // 校验错误翻译
-import { createIntent, decryptWechatResource, fulfillIntent, paymentChannels, verifySandboxSignature, verifyWechatSignature, type PayIntentRow, type PayProvider } from '../payments.js'; // 支付内核
+import { createIntent, decryptWechatResource, fulfillIntent, paymentChannels, verifyAlipaySignature, verifySandboxSignature, verifyWechatSignature, type PayIntentRow, type PayProvider } from '../payments.js'; // 支付内核
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const PROVIDERS: PayProvider[] = ['alipay', 'wechat', 'manual', 'sandbox']; // 可用渠道白名单
@@ -154,6 +154,41 @@ export function createPaymentsRouter(deps: ApiDeps): Router { // 导出函数 cr
     if (intent.amount_cents !== body.amount_cents) throw new AppError('CONFLICT', '回调金额与支付单不一致'); // 条件分支：按判断结果选择后续处理路径
     fulfillIntent(deps, intent, `sandbox-${body.intent_id}`); // 调用 fulfillIntent 并处理其返回结果
     res.json({ ok: true }); // 执行当前业务步骤
+  }); // 代码块结束
+
+  /** 支付宝异步通知：RSA2 验签 → 商户 / 金额核对 → 条件更新幂等履约；响应必须是纯文本 success。 */
+  router.post('/payments/alipay/notify', (req, res) => {
+    const params = (req.body ?? {}) as Record<string, string>; // 支付宝以 form-urlencoded 回传全部字段
+    const reply = (ok: boolean) => res.status(ok ? 200 : 400).type('text/plain').send(ok ? 'success' : 'failure'); // 支付宝只认 success，其余一律重试
+    const appId = deps.env.MIM_ALIPAY_APP_ID ?? ''; // 常量 appId：保存固定配置或一次性派生值
+    if (!appId) { // 条件分支：按判断结果选择后续处理路径
+      reply(false); // 未配置渠道时不接受回调
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
+    if (!verifyAlipaySignature(deps.env, params)) { // 签名不通过直接拒绝，避免伪造通知触发履约
+      reply(false); // 执行当前业务步骤
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
+    if (params.app_id && params.app_id !== appId) { // 条件分支：按判断结果选择后续处理路径
+      reply(false); // 执行当前业务步骤
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
+    if (params.trade_status !== 'TRADE_SUCCESS' && params.trade_status !== 'TRADE_FINISHED') { // 非成功状态：确认收到但不再重试
+      reply(true); // 执行当前业务步骤
+      return; // 返回当前函数的处理结果
+    } // 代码块结束
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      const intent = deps.db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(params.out_trade_no ?? '') as PayIntentRow | undefined; // 常量 intent：保存固定配置或一次性派生值
+      if (!intent) throw new AppError('NOT_FOUND', '支付单不存在'); // 条件分支：按判断结果选择后续处理路径
+      if (intent.provider !== 'alipay') throw new AppError('CONFLICT', '支付单渠道不匹配'); // 条件分支：按判断结果选择后续处理路径
+      const paidCents = Math.round(Number(params.total_amount) * 100); // 常量 paidCents：保存固定配置或一次性派生值
+      if (!Number.isFinite(paidCents) || paidCents !== intent.amount_cents) throw new AppError('CONFLICT', '回调金额与支付单不一致'); // 条件分支：按判断结果选择后续处理路径
+      fulfillIntent(deps, intent, `alipay-${params.trade_no ?? intent.id}`); // 重放安全：fulfillIntent 内部以 pending → paid 抢占
+      reply(true); // 执行当前业务步骤
+    } catch (error) { // 代码块结束
+      const message = error instanceof Error ? error.message : '回调处理失败'; // 常量 message：保存固定配置或一次性派生值
+      res.status(400).type('text/plain').send(`failure: ${message}`); // 让支付宝按退避策略重试
+    } // 代码块结束
   }); // 代码块结束
 
   /** 运营视角：待处理支付单与汇总。 */

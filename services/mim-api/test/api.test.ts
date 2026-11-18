@@ -294,21 +294,19 @@ describe('验证码通道（短信/邮件供应商接入）', () => { // describ
   }); // 结束开发环境用例
 }); // 结束验证码通道分组
 
-describe('密码登录（验证码通道未接入时的生产入口）', () => { // describe 密码登录：验证码通道未接入时的生产入口
-  const PASSWORD = 'test-admin-pass-2026'; // 固定的管理员口令，用于注入环境变量
-
-  function passwordApp(env: Record<string, string | undefined>): Express { // 构造只关心口令配置的应用
-    return createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env }); // 注入内存库与指定环境变量，口令由 env 决定是否可用
+describe('账号口令登录（唯一口令路径）', () => { // describe 账号口令登录
+  function passwordApp(env: Record<string, string | undefined> = {}): Express { // 构造只关心账号口令的应用
+    return createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env }); // 注入内存库与指定环境变量
   } // 结束 passwordApp 定义
 
-  it('口令正确：白名单内已存在账号 200 签发令牌且可访问 /me', async () => { // 用例：口令正确时签发令牌，并能访问受保护接口
-    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD, MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13800000041' }); // 配置口令 + 白名单后建应用
-    await request(app) // 先注册真实账号，管理员口令不具备自动建号能力
+  it('口令正确：已存在账号 200 签发令牌且可访问 /me', async () => { // 用例：账号自身口令登录后可访问受保护接口
+    const app = passwordApp(); // 空 env 也能登录：口令来自账号自身凭据
+    await request(app) // 先注册真实账号
       .post('/api/v1/auth/register') // 注册端点
       .send({ region: 'cn', identifier: '13800000041', password: 'account-pass-123' }); // 自助注册建立账号
     const res = await request(app) // 发起密码登录
       .post('/api/v1/auth/password') // 密码登录端点
-      .send({ region: 'cn', identifier: '13800000041', password: PASSWORD }); // 提交区域、标识与正确口令
+      .send({ region: 'cn', identifier: '13800000041', password: 'account-pass-123' }); // 提交区域、标识与正确口令
     expect(res.status).toBe(200); // 断言 200，口令校验通过
     expect(res.body.token_type).toBe('Bearer'); // 断言令牌类型为 Bearer，符合客户端拼装约定
     expect(res.body.access_token).toBeTruthy(); // 断言签发了访问令牌
@@ -323,22 +321,30 @@ describe('密码登录（验证码通道未接入时的生产入口）', () => {
   }); // 结束口令正确用例
 
   it('口令错误：401 AUTH_PASSWORD_INVALID', async () => { // 用例：口令错误返回 401，而不是 403 或 500
-    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: PASSWORD, MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13800000042' }); // 白名单内已存在账号
+    const app = passwordApp(); // 空 env
     await request(app) // 先注册真实账号
       .post('/api/v1/auth/register') // 注册端点
-      .send({ region: 'cn', identifier: '13800000042', password: 'account-pass-123' }); // 建立账号但不用该口令登录
-    const res = await request(app) // 构建配置了口令的应用并直接发起请求
+      .send({ region: 'cn', identifier: '13800000042', password: 'account-pass-123' }); // 建立账号
+    const res = await request(app) // 发起密码登录
       .post('/api/v1/auth/password') // 密码登录端点
       .send({ region: 'cn', identifier: '13800000042', password: 'wrong-pass' }); // 提交错误口令
     expect(res.status).toBe(401); // 断言 401，语义是凭证无效
     expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 断言口令无效错误码，便于前端提示重新输入
   }); // 结束口令错误用例
 
-  it('未配置口令：503 AUTH_PASSWORD_NOT_CONFIGURED', async () => { // 用例：未配置口令时明确返回服务未就绪
-    const res = await request(passwordApp({})) // env 为空即未配置管理员口令
+  it('环境变量口令已废弃：注入后仍按账号口令校验', async () => { // 用例：MIM_AUTH_ADMIN_PASSWORD 不再生效
+    const app = passwordApp({ MIM_AUTH_ADMIN_PASSWORD: 'test-admin-pass-2026', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13800000043' }); // 注入旧配置
+    await request(app) // 先注册真实账号
+      .post('/api/v1/auth/register') // 注册端点
+      .send({ region: 'cn', identifier: '13800000043', password: 'account-pass-123' }); // 账号口令与 env 口令不同
+    const envPw = await request(app) // 用旧环境变量口令登录
       .post('/api/v1/auth/password') // 密码登录端点
-      .send({ region: 'cn', identifier: '13800000043', password: PASSWORD }); // 即使口令参数正确也应被拒，因为服务端无口令可比
-    expect(res.status).toBe(503); // 断言 503，语义是能力未配置
-    expect(res.body.code).toBe('AUTH_PASSWORD_NOT_CONFIGURED'); // 断言未配置错误码，指导运维补齐环境变量
-  }); // 结束未配置用例
-}); // 结束密码登录分组
+      .send({ region: 'cn', identifier: '13800000043', password: 'test-admin-pass-2026' }); // 旧口令
+    expect(envPw.status).toBe(401); // 已不再被接受
+    expect(envPw.body.code).toBe('AUTH_PASSWORD_INVALID'); // 与普通口令错误同码
+    const accountPw = await request(app) // 用账号自身口令登录
+      .post('/api/v1/auth/password') // 密码登录端点
+      .send({ region: 'cn', identifier: '13800000043', password: 'account-pass-123' }); // 账号口令
+    expect(accountPw.status).toBe(200); // 唯一有效路径
+  }); // 结束环境变量废弃用例
+}); // 结束账号口令登录分组

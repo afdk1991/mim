@@ -6,7 +6,7 @@
 #       → 编译后端（esbuild → dist/index.js，并搬运 dist/schema.sql）
 #       → 发布静态产物到 /opt/mim/web、管理后台到 /opt/mim/admin
 #       → 幂等生成 /opt/mim/mim-api.env（MIM_JWT_SECRET / MIM_CORS_ORIGINS /
-#         MIM_AUTH_ADMIN_PASSWORD / MIM_ADMIN_TOKEN / 可选验证码通道密钥）
+#         MIM_ADMIN_TOKEN / 可选验证码通道密钥）
 #       → 执行 deploy/migrations/*.cjs（幂等可重放）→ 重启后端
 #       → 确保备份 timer 不存在（§6.5；项目策略：不保留任何数据库备份）→ 健康检查
 #
@@ -378,27 +378,15 @@ if [ "${MIM_WEB_HTTPS_PORT}" != "443" ]; then
   done
 fi
 
-# 管理员密码登录口令：生产短信/邮件通道未接入时，POST /api/v1/auth/password 是唯一可用登录入口。
-# 安全修复（2026-11-07）：禁止再写入仓库内可查的固定默认口令（原字面值已从全仓移除）。
-# 幂等优先级：① CI/运维透传同名变量非空 → 采用（覆盖现有值，支持口令轮换）；
-# ② env 文件已有值 → 保留；③ 两者皆无 → 现场生成随机口令写入 chmod 600 的 env 文件，且绝不回显到 CI 公开日志。
-if [ -n "${MIM_AUTH_ADMIN_PASSWORD:-}" ]; then
-  # CI Secret 透传路径：值来自 GitHub Actions secret，覆盖现有值以支持口令轮换
-  if grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
-    sed -i "s|^MIM_AUTH_ADMIN_PASSWORD=.*|MIM_AUTH_ADMIN_PASSWORD=${MIM_AUTH_ADMIN_PASSWORD}|" "$MIM_ENV_FILE"
-    log "更新 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 来自 CI Secret，值不回显）"
-  else
-    printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$MIM_AUTH_ADMIN_PASSWORD" >> "$MIM_ENV_FILE"
-    log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 来自 CI Secret，值不回显）"
+# 2026-11-15 口令收敛：管理员口令只保留账号自身（credentials.kind=password 的 bcrypt 哈希）。
+# 曾用的 MIM_AUTH_ADMIN_PASSWORD / MIM_AUTH_ADMIN_IDENTIFIERS 已从代码中移除，
+# 这里顺手清理旧 env 文件里的残留，避免「看起来还有两份口令」的误解。
+for DEPRECATED_ADMIN_VAR in MIM_AUTH_ADMIN_PASSWORD MIM_AUTH_ADMIN_IDENTIFIERS; do
+  if grep -q "^${DEPRECATED_ADMIN_VAR}=" "$MIM_ENV_FILE"; then
+    sed -i "/^${DEPRECATED_ADMIN_VAR}=/d" "$MIM_ENV_FILE"
+    log "移除 $MIM_ENV_FILE 中已废弃的 ${DEPRECATED_ADMIN_VAR}"
   fi
-elif grep -q '^MIM_AUTH_ADMIN_PASSWORD=' "$MIM_ENV_FILE"; then
-  log "$MIM_ENV_FILE 已含 MIM_AUTH_ADMIN_PASSWORD，保留现有值"
-else
-  # 兜底路径：base64 随机串去掉 /+= 特殊字符，避免 env 解析与 sed 替换歧义
-  AUTH_PASSWORD_GENERATED="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-24)"
-  printf 'MIM_AUTH_ADMIN_PASSWORD=%s\n' "$AUTH_PASSWORD_GENERATED" >> "$MIM_ENV_FILE"
-  log "补齐 $MIM_ENV_FILE（MIM_AUTH_ADMIN_PASSWORD 为现场随机值，请从该文件读取，日志不回显）"
-fi
+done
 
 # 超管引导令牌（RBAC bootstrap）：/api/v1/admin/* 与 catalog 管理写路由的双通道鉴权之一。
 # 缺失时这些端点会返回 403 FEATURE_NOT_AVAILABLE 'admin API is not enabled'，

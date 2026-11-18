@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T19:57:26.240Z",
+  "generatedAt": "2026-11-18T15:19:52.041Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -7,8 +7,8 @@
       "title": "A. 路由装配",
       "status": "PASS",
       "stats": {
-        "routeFiles": 26,
-        "factories": 27,
+        "routeFiles": 27,
+        "factories": 28,
         "unmounted": 0
       },
       "failures": [],
@@ -18,7 +18,7 @@
       "title": "B. 表结构接缝",
       "status": "PASS",
       "stats": {
-        "sqlFiles": 14,
+        "sqlFiles": 21,
         "nonIdempotent": 0,
         "badDirectives": 0,
         "copiesSchemaD": true
@@ -30,13 +30,13 @@
       "title": "C. 环境变量登记",
       "status": "WARN",
       "stats": {
-        "sourceVars": 190,
+        "sourceVars": 200,
         "templateVars": 169,
-        "inventoryVars": 163,
+        "inventoryVars": 165,
         "wildcardStems": 22,
-        "unregistered": 21,
+        "unregistered": 30,
         "unregisteredAdapter": 0,
-        "unregisteredInternal": 21
+        "unregisteredInternal": 30
       },
       "failures": [],
       "warnings": [
@@ -121,7 +121,7 @@
           "locations": [
             {
               "file": "services/mim-api/src/content/promotions.ts",
-              "line": 190
+              "line": 200
             },
             {
               "file": "scripts/gap-scan.mjs",
@@ -136,11 +136,11 @@
           "locations": [
             {
               "file": "services/mim-api/src/content/promotions.ts",
-              "line": 189
+              "line": 199
             },
             {
               "file": "services/mim-api/src/content/promotions.ts",
-              "line": 250
+              "line": 260
             },
             {
               "file": "scripts/gap-scan.mjs",
@@ -155,11 +155,11 @@
           "locations": [
             {
               "file": "services/mim-api/src/content/promotions.ts",
-              "line": 240
+              "line": 250
             },
             {
               "file": "services/mim-api/src/content/promotions.ts",
-              "line": 251
+              "line": 261
             },
             {
               "file": "scripts/gap-scan.mjs",
@@ -173,15 +173,11 @@
           "internal": true,
           "locations": [
             {
-              "file": "packages/core-domain/src/blueprints/infra.ts",
-              "line": 12
-            },
-            {
               "file": "scripts/gap-scan.mjs",
               "line": 64
             }
           ],
-          "locationCount": 2
+          "locationCount": 1
         },
         {
           "var": "MIM_DEPLOY_STOP_AFTER",
@@ -245,23 +241,182 @@
               "line": 65
             },
             {
-              "file": "deploy/deploy.sh",
-              "line": 281
+              "file": "scripts/verify-env-wiring.mjs",
+              "line": 71
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 281
+              "line": 340
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 282
+              "line": 340
             },
             {
               "file": "deploy/deploy.sh",
-              "line": 283
+              "line": 341
             }
           ],
-          "locationCount": 49
+          "locationCount": 44
+        },
+        {
+          "var": "MIM_EVIDENCE_ADMIN_TOKEN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 32
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 51
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_EVIDENCE_API_BASE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 28
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 49
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_EVIDENCE_AUTH_TOKEN",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 31
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 50
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 518
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 519
+            }
+          ],
+          "locationCount": 4
+        },
+        {
+          "var": "MIM_EVIDENCE_BROWSER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 29
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 53
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 191
+            }
+          ],
+          "locationCount": 3
+        },
+        {
+          "var": "MIM_EVIDENCE_CDP",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 30
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 54
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_EVIDENCE_DB_PATH",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 33
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 52
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 137
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 695
+            }
+          ],
+          "locationCount": 4
+        },
+        {
+          "var": "MIM_EVIDENCE_KEEP_BROWSER",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 35
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 56
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_EVIDENCE_TIMEOUT_MS",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 34
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 55
+            }
+          ],
+          "locationCount": 2
+        },
+        {
+          "var": "MIM_EVIDENCE_WEB_BASE",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 24
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 27
+            },
+            {
+              "file": "scripts/verify-anonymous-evidence.mjs",
+              "line": 48
+            }
+          ],
+          "locationCount": 3
         },
         {
           "var": "MIM_FILM_REVIEW_SLA_HOURS",
@@ -290,24 +445,9 @@
           "locationCount": 2
         },
         {
-          "var": "MIM_GATE_BASE",
-          "internal": true,
-          "locations": [
-            {
-              "file": "scripts/verify-auth-gate.mjs",
-              "line": 28
-            }
-          ],
-          "locationCount": 1
-        },
-        {
           "var": "MIM_GATE_CDP",
           "internal": true,
           "locations": [
-            {
-              "file": "scripts/verify-auth-gate.mjs",
-              "line": 30
-            },
             {
               "file": "scripts/verify-chat-flow.mjs",
               "line": 18
@@ -317,7 +457,7 @@
               "line": 18
             }
           ],
-          "locationCount": 3
+          "locationCount": 2
         },
         {
           "var": "MIM_GATE_PAGE",
@@ -373,16 +513,27 @@
           "internal": true,
           "locations": [
             {
-              "file": "services/mim-api/src/app.ts",
-              "line": 53
-            },
-            {
-              "file": "services/mim-api/src/app.ts",
-              "line": 54
-            },
-            {
               "file": "scripts/gap-scan.mjs",
               "line": 67
+            }
+          ],
+          "locationCount": 1
+        },
+        {
+          "var": "MIM_X",
+          "internal": true,
+          "locations": [
+            {
+              "file": "scripts/verify-env-wiring.mjs",
+              "line": 12
+            },
+            {
+              "file": "scripts/verify-env-wiring.mjs",
+              "line": 72
+            },
+            {
+              "file": "scripts/verify-env-wiring.mjs",
+              "line": 72
             }
           ],
           "locationCount": 3
@@ -393,11 +544,11 @@
       "title": "D. 前端接线",
       "status": "WARN",
       "stats": {
-        "viewFiles": 12,
-        "unregistered": 3,
-        "nested": 3,
-        "appViews": 8,
-        "segments": 8,
+        "viewFiles": 15,
+        "unregistered": 8,
+        "nested": 8,
+        "appViews": 7,
+        "segments": 7,
         "missingSegments": 0
       },
       "failures": [],
@@ -407,7 +558,27 @@
           "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
         },
         {
+          "file": "apps/web/src/views/CommunityAssets.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/CommunityGallery.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/CommunityGuides.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/CommunityMore.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
           "file": "apps/web/src/views/ContentDetail.tsx",
+          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
+        },
+        {
+          "file": "apps/web/src/views/MyAssets.tsx",
           "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
         },
         {
@@ -421,18 +592,11 @@
       "status": "WARN",
       "stats": {
         "hard": 0,
-        "notes": 4,
-        "total": 4
+        "notes": 7,
+        "total": 7
       },
       "failures": [],
       "warnings": [
-        {
-          "file": "services/mim-api/src/capabilities.ts",
-          "line": 638,
-          "marker": "未实现",
-          "kind": "string-note",
-          "text": "501: { name: 'Not Implemented', description: '功能未实现' }, // 5xx 服务端错误状态码"
-        },
         {
           "file": "services/mim-api/src/cdn.ts",
           "line": 68,
@@ -453,6 +617,34 @@
           "marker": "未实现",
           "kind": "comment",
           "text": "* 主动刷新指定 URL 清单。未配置 / 未实现 / 上游失败均返回 ok=false，"
+        },
+        {
+          "file": "services/mim-api/src/routes/vip-pricing.ts",
+          "line": 12,
+          "marker": "TODO",
+          "kind": "comment",
+          "text": "* 审计：统一 audit.ts 尚未入库，写接口处留了明确的 TODO 调用点，入库后按注释补一行即可。"
+        },
+        {
+          "file": "services/mim-api/src/routes/vip-pricing.ts",
+          "line": 108,
+          "marker": "TODO",
+          "kind": "comment",
+          "text": "// TODO(audit): 等 services/mim-api/src/audit.ts 入库后，把下面这一行"
+        },
+        {
+          "file": "services/mim-api/src/routes/vip-pricing.ts",
+          "line": 128,
+          "marker": "TODO",
+          "kind": "comment",
+          "text": "// TODO(audit): 等 services/mim-api/src/audit.ts 入库后，把下面这一行"
+        },
+        {
+          "file": "services/mim-api/src/routes/vip-pricing.ts",
+          "line": 138,
+          "marker": "TODO",
+          "kind": "comment",
+          "text": "// TODO(audit): 等 services/mim-api/src/audit.ts 入库后，把下面这一行"
         }
       ]
     }

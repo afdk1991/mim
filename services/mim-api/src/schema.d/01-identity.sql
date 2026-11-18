@@ -6,7 +6,7 @@
 -- 票据明文只在站点间跳转时出现一次，库内只存 sha256 摘要；consumed_at 非空即已兑换，防重放。
 CREATE TABLE IF NOT EXISTS sso_tickets (
   ticket_hash  TEXT PRIMARY KEY,                        -- sha256(ticket)，回传时按摘要查找
-  user_id      TEXT NOT NULL REFERENCES users(id),      -- 票据归属的正式用户（访客账号不可换 SSO 会话）
+  user_id      TEXT NOT NULL REFERENCES users(id),      -- 票据归属的正式用户（存量异常账号不可换 SSO 会话）
   site         TEXT NOT NULL,                           -- 目标站点标识（白名单内的 origin 或站点键）
   expires_at   TEXT NOT NULL,                            -- 过期时间（ISO-8601）
   consumed_at  TEXT,                                     -- 兑换时间，非空即一次性消费完成

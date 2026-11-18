@@ -52,7 +52,7 @@ function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const payload = verifyAccessToken(match[1], req.deps.jwtSecret); // 常量 payload：保存固定配置或一次性派生值
       const row = req.deps.db // 常量 row：保存固定配置或一次性派生值
-        .prepare('SELECT id, member_no, region, status, display_name, locale, timezone, is_guest FROM users WHERE id = ?') // 执行当前业务步骤
+        .prepare('SELECT id, member_no, region, status, display_name, locale, timezone, is_guest FROM users WHERE id = ?') // 执行当前业务步骤（is_guest 为历史兼容列）
         .get(payload.sub) as AuthUser | undefined; // 注册 GET 路由 / 中间件处理器
       if (row && row.status === 'active') req.user = row; // 条件分支：按判断结果选择后续处理路径
     } catch { // 代码块结束
@@ -108,7 +108,7 @@ export function createCirclesRouter(deps: ApiDeps): Router { // 导出函数 cre
   // 可选鉴权先挂：公开读链路识别登录态；不阻断匿名，强制门禁在受保护段再挂 requireAuth
   router.use(CIRCLE_PREFIXES, optionalAuth);
 
-  // ---- 公开只读端点：先于 requireAuth 注册，匿名访客可浏览公开圈子 ----
+  // ---- 公开只读端点：先于 requireAuth 注册，未登录用户可浏览公开圈子 ----
 
   /** 圈子列表：支持 category / visibility / keyword 过滤与分页；匿名仅看到公开投影。 */
   router.get('/circles', (req, res) => {

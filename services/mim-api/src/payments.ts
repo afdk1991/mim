@@ -237,12 +237,14 @@ export function recordEarning(deps: ApiDeps, userId: string | null, sourceType: 
     .run(`ce-${randomUUID()}`, userId, sourceType, sourceId, gross, fee, net, now(deps)); // 执行写入：把参数落库并返回影响结果
 } // 结束函数体：本层作用域收尾
 
-/** 履约：把已支付意图落到对应业务，幂等（已 paid 直接返回）。 */
+/** 履约：把已支付意图落到对应业务；以条件更新抢占支付单，重复 / 并发回调只履约一次。 */
 export function fulfillIntent(deps: ApiDeps, intent: PayIntentRow, providerTxnId: string | null): void { // 定义函数 fulfillIntent：封装可复用业务步骤
-  if (intent.status === 'paid') return; // 重复回调不重复发货
   const ts = now(deps); // 保存 ts：承载本步骤的计算结果供后续使用
   const tx = deps.db.transaction(() => { // 保存 tx：承载本步骤的计算结果供后续使用
-    deps.db.prepare("UPDATE payment_intents SET status = 'paid', provider_txn_id = ?, paid_at = ? WHERE id = ?").run(providerTxnId, ts, intent.id); // 预编译 SQL：固定语句结构后绑定参数执行
+    const marked = deps.db // 抢占支付单：只有 pending → paid 成功的那一次回调才继续履约
+      .prepare("UPDATE payment_intents SET status = 'paid', provider_txn_id = COALESCE(?, provider_txn_id), paid_at = ? WHERE id = ? AND status = 'pending'") // 预编译 SQL：固定语句结构后绑定参数执行
+      .run(providerTxnId, ts, intent.id); // 执行写入：把参数落库并返回影响结果
+    if (marked.changes === 0) return; // 重放 / 并发回调：状态已落定，直接返回，不重复发货
     if (intent.purpose === 'recharge') { // 条件分支：仅在满足业务前置条件时继续
       ensureWallet(deps, intent.user_id); // 业务步骤：推进当前流程的下一项处理
       deps.db.prepare('UPDATE wallets SET balance_cents = balance_cents + ?, updated_at = ? WHERE user_id = ?').run(intent.amount_cents, ts, intent.user_id); // 预编译 SQL：固定语句结构后绑定参数执行
@@ -273,16 +275,102 @@ export function fulfillIntent(deps: ApiDeps, intent: PayIntentRow, providerTxnId
         .prepare("INSERT INTO vip_memberships (id, user_id, plan_id, level, starts_at, expires_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?)") // 预编译 SQL：固定语句结构后绑定参数执行
         .run(`vip-${randomUUID()}`, intent.user_id, plan.id, plan.level, ts, expires, ts); // 执行写入：把参数落库并返回影响结果
     } else if (intent.purpose === 'shop_order') { // 其他分支：处理不满足前置条件的路径
-      const order = deps.db.prepare('SELECT status, payable_cents FROM shop_orders WHERE id = ?').get(intent.ref_id) as // 保存 order：承载本步骤的计算结果供后续使用
-        | { status: string; payable_cents: number } // 业务步骤：推进当前流程的下一项处理
-        | undefined; // 业务步骤：推进当前流程的下一项处理
-      if (!order) throw new AppError('NOT_FOUND', '订单不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
-      if (order.payable_cents !== intent.amount_cents) throw new AppError('CONFLICT', '支付金额与订单不一致'); // 业务拒绝 CONFLICT：以统一错误码终止当前请求
-      deps.db.prepare("UPDATE shop_orders SET status = 'paid', paid_at = ? WHERE id = ? AND status = 'pending'").run(ts, intent.ref_id); // 预编译 SQL：固定语句结构后绑定参数执行
+      deliverShopOrder(deps, intent.ref_id, intent.amount_cents); // 实物 → 待发货；自动发卡 → 直接交付；人工 → 待客服交付
     } // 结束条件分支：本层作用域收尾
     deps.db // 业务步骤：推进当前流程的下一项处理
       .prepare('INSERT INTO payment_events (id, intent_id, provider, event, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
       .run(`pe-${randomUUID()}`, intent.id, intent.provider, 'paid', providerTxnId ?? '', ts); // 执行写入：把参数落库并返回影响结果
   }); // 结束函数体：本层作用域收尾
   tx(); // 业务步骤：推进当前流程的下一项处理
+} // 结束函数体：本层作用域收尾
+
+/** 支付宝异步通知 RSA2 验签：剔除 sign / sign_type 后按字典序拼接原文。 */
+export function verifyAlipaySignature( // 定义函数 verifyAlipaySignature：封装可复用业务步骤
+  env: Record<string, string | undefined>, // 对象字段：声明结构中的一项数据
+  params: Record<string, string>, // 支付宝 POST 表单参数
+): boolean { // 调用结束：参数列表与链式调用收尾
+  const publicKey = (env.MIM_ALIPAY_PUBLIC_KEY ?? '').replace(/\\n/g, '\n'); // 保存 publicKey：承载本步骤的计算结果供后续使用
+  const signature = params.sign; // 保存 signature：承载本步骤的计算结果供后续使用
+  if (!publicKey || !signature) return false; // 未配置公钥或没有签名一律拒绝
+  const unsigned = Object.keys(params) // 保存 unsigned：承载本步骤的计算结果供后续使用
+    .filter((key) => key !== 'sign' && key !== 'sign_type' && params[key] !== undefined && params[key] !== '') // 链式调用：在上一步结果上继续处理
+    .sort() // 链式调用：在上一步结果上继续处理
+    .map((key) => `${key}=${params[key]}`) // 链式调用：在上一步结果上继续处理
+    .join('&'); // 链式调用：在上一步结果上继续处理
+  try { // 公钥格式错误按验签失败处理，不把异常透给回调方
+    return verify('RSA-SHA256', Buffer.from(unsigned), publicKey, Buffer.from(signature, 'base64')); // 返回结果：把本步骤产物交给调用方
+  } catch { // 结束代码块：本层作用域收尾
+    return false; // 返回结果：把本步骤产物交给调用方
+  } // 结束代码块：本层作用域收尾
+} // 结束函数体：本层作用域收尾
+
+/**
+ * 在线支付落定后的商城履约：抢占订单 → 扣积分 / 核销优惠码 / 推广分成 → 发卡或扣库存。
+ * 必须在支付事务内调用；订单已是 paid 时直接返回，重复回调不会二次发卡。
+ */
+export function deliverShopOrder(deps: ApiDeps, orderId: string, amountCents: number): void { // 定义函数 deliverShopOrder：封装可复用业务步骤
+  const ts = now(deps); // 保存 ts：承载本步骤的计算结果供后续使用
+  const order = deps.db // 保存 order：承载本步骤的计算结果供后续使用
+    .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+      `SELECT o.id, o.user_id, o.product_id, o.quantity, o.payable_cents, o.discount_cents, o.coupon_code,
+              o.points_spent, o.delivery_kind, p.name AS product_name
+         FROM shop_orders o JOIN shop_products p ON p.id = o.product_id
+        WHERE o.id = ?`,
+    ) // 调用结束：参数列表与链式调用收尾
+    .get(orderId) as // 查询单行：读取一条记录供判定使用
+    | { id: string; user_id: string; product_id: string; quantity: number; payable_cents: number; discount_cents: number; coupon_code: string | null; points_spent: number; delivery_kind: string; product_name: string } // 业务步骤：推进当前流程的下一项处理
+    | undefined; // 业务步骤：推进当前流程的下一项处理
+  if (!order) throw new AppError('NOT_FOUND', '订单不存在'); // 业务拒绝 NOT_FOUND：以统一错误码终止当前请求
+  if (order.payable_cents !== amountCents) throw new AppError('CONFLICT', '支付金额与订单不一致'); // 业务拒绝 CONFLICT：以统一错误码终止当前请求
+  const marked = deps.db // 抢占订单：pending → paid 只有一次成功
+    .prepare("UPDATE shop_orders SET status = 'paid', paid_at = ? WHERE id = ? AND status = 'pending'") // 预编译 SQL：固定语句结构后绑定参数执行
+    .run(ts, orderId); // 执行写入：把参数落库并返回影响结果
+  if (marked.changes === 0) return; // 已由其他回调履约：不重复扣积分 / 发卡 / 分成
+
+  if (order.points_spent > 0) { // 在线单的积分在支付成功后才真正扣除
+    const spent = deps.db // 保存 spent：承载本步骤的计算结果供后续使用
+      .prepare('UPDATE wallets SET points = points - ?, updated_at = ? WHERE user_id = ? AND points >= ?') // 预编译 SQL：固定语句结构后绑定参数执行
+      .run(order.points_spent, ts, order.user_id, order.points_spent); // 执行写入：把参数落库并返回影响结果
+    if (spent.changes === 0) throw new AppError('CONFLICT', '积分不足，无法完成支付履约'); // 业务拒绝 CONFLICT：整单回滚，支付单保持待履约
+    deps.db // 业务步骤：推进当前流程的下一项处理
+      .prepare(`INSERT INTO wallet_transactions (id, user_id, kind, points, ref_type, ref_id, note, created_at) VALUES (?, ?, 'points', ?, 'shop_order', ?, ?, ?)`) // 预编译 SQL：固定语句结构后绑定参数执行
+      .run(`wt-${randomUUID()}`, order.user_id, -order.points_spent, orderId, `积分抵扣 ${order.product_name}`, ts); // 执行写入：把参数落库并返回影响结果
+  } // 结束条件分支：本层作用域收尾
+
+  if (order.coupon_code) { // 优惠码在支付成功时核销，避免待支付单占用次数
+    const coupon = deps.db.prepare('SELECT id FROM coupons WHERE code = ?').get(order.coupon_code) as { id: string } | undefined; // 保存 coupon：承载本步骤的计算结果供后续使用
+    if (coupon) { // 条件分支：仅在满足业务前置条件时继续
+      deps.db.prepare('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?').run(coupon.id); // 预编译 SQL：固定语句结构后绑定参数执行
+      deps.db // 业务步骤：推进当前流程的下一项处理
+        .prepare('INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, discount_cents, created_at) VALUES (?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
+        .run(`cr-${randomUUID()}`, coupon.id, order.user_id, orderId, order.discount_cents, ts); // 执行写入：把参数落库并返回影响结果
+    } // 结束条件分支：本层作用域收尾
+  } // 结束条件分支：本层作用域收尾
+
+  const referral = deps.db // 推广分成：被邀请人首单，邀请人拿 5%
+    .prepare("SELECT id, inviter_id FROM referrals WHERE invitee_id = ? AND status = 'bound'") // 预编译 SQL：固定语句结构后绑定参数执行
+    .get(order.user_id) as { id: string; inviter_id: string } | undefined; // 查询单行：读取一条记录供判定使用
+  if (referral) { // 条件分支：仅在满足业务前置条件时继续
+    const commission = Math.round(order.payable_cents * 0.05); // 保存 commission：承载本步骤的计算结果供后续使用
+    deps.db.prepare("UPDATE referrals SET commission_cents = ?, status = 'settled' WHERE id = ?").run(commission, referral.id); // 预编译 SQL：固定语句结构后绑定参数执行
+    ensureWallet(deps, referral.inviter_id); // 业务步骤：推进当前流程的下一项处理
+    deps.db.prepare('UPDATE wallets SET balance_cents = balance_cents + ?, updated_at = ? WHERE user_id = ?').run(commission, ts, referral.inviter_id); // 预编译 SQL：固定语句结构后绑定参数执行
+    deps.db // 业务步骤：推进当前流程的下一项处理
+      .prepare("INSERT INTO wallet_transactions (id, user_id, kind, amount_cents, ref_type, ref_id, note, created_at) VALUES (?, ?, 'commission', ?, 'shop_order', ?, ?, ?)") // 预编译 SQL：固定语句结构后绑定参数执行
+      .run(`wt-${randomUUID()}`, referral.inviter_id, commission, orderId, `推广首单分成（订单 ${orderId}）`, ts); // 执行写入：把参数落库并返回影响结果
+  } // 结束条件分支：本层作用域收尾
+
+  if (order.delivery_kind === 'virtual_auto') { // 自动发卡：支付成功即交付卡密
+    const key = deps.db.prepare("SELECT id, code FROM shop_card_keys WHERE product_id = ? AND status = 'unused' LIMIT 1").get(order.product_id) as // 保存 key：承载本步骤的计算结果供后续使用
+      | { id: string; code: string } | undefined; // 查询单行：读取一条记录供判定使用
+    if (!key) throw new AppError('VALIDATION_FAILED', '该商品暂时缺货'); // 业务拒绝 VALIDATION_FAILED：整单回滚
+    const taken = deps.db.prepare("UPDATE shop_card_keys SET status = 'used', used_by = ?, used_at = ? WHERE id = ? AND status = 'unused'").run(order.user_id, ts, key.id); // 预编译 SQL：固定语句结构后绑定参数执行
+    if (taken.changes === 0) throw new AppError('CONFLICT', '卡密已被占用，请客服补发'); // 业务拒绝 CONFLICT：整单回滚
+    deps.db.prepare("UPDATE shop_orders SET status = 'delivered', delivered_content = ?, delivered_at = ? WHERE id = ?").run(key.code, ts, orderId); // 预编译 SQL：固定语句结构后绑定参数执行
+  } else { // 实物 / 人工：支付后进入待发货或待交付
+    deps.db.prepare('UPDATE shop_products SET stock = MAX(0, stock - ?) WHERE id = ?').run(order.quantity, order.product_id); // 预编译 SQL：固定语句结构后绑定参数执行
+    if (order.delivery_kind === 'virtual_manual') { // 条件分支：仅在满足业务前置条件时继续
+      deps.db.prepare('UPDATE shop_orders SET delivered_content = ? WHERE id = ?').run('支付成功，客服将在 24 小时内联系你安排交付。', orderId); // 预编译 SQL：固定语句结构后绑定参数执行
+    } // 结束条件分支：本层作用域收尾
+  } // 结束条件分支：本层作用域收尾
 } // 结束函数体：本层作用域收尾

@@ -32,10 +32,10 @@ describe('登录通道可用性', () => { // 通道能力查询：前端据此�
     expect(res.body).toEqual({ sms: false, email: false, password: false, register: true }); // 布尔能力清单
   }); // 结束用例
 
-  it('配置管理员口令后 password 变为可用', async () => { // 有口令场景
-    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret' } }); // 注入口令
-    const res = await request(appWithPassword).get('/api/v1/auth/channels'); // 查询能力
-    expect(res.body.password).toBe(true); // 管理员口令入口点亮
+  it('存在账号口令凭据后 password 变为可用', async () => { // 有口令场景
+    await register('13900000006', 'mim-pass-789'); // 先建立一个带口令的账号
+    const res = await request(app).get('/api/v1/auth/channels'); // 查询能力
+    expect(res.body.password).toBe(true); // 账号口令入口点亮
     expect(res.body.sms).toBe(false); // 短信仍需真实凭证
   }); // 结束用例
 }); // describe 结束
@@ -76,31 +76,25 @@ describe('账号口令登录', () => { // 注册后可用账号 + 口令登录
     expect(bad.body.code).toBe('AUTH_PASSWORD_INVALID'); // 不回显口令线索
   }); // 结束用例
 
-  it('既无管理员口令也无自建账号时返回 503 AUTH_PASSWORD_NOT_CONFIGURED', async () => { // 完全未配置
+  it('未注册标识一律 401 AUTH_PASSWORD_INVALID，不再有 503 配置态', async () => { // 无任何凭据
     const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000005', password: 'any-pass' }); // 未注册标识
-    expect(res.status).toBe(503); // 服务不可用
-    expect(res.body.code).toBe('AUTH_PASSWORD_NOT_CONFIGURED'); // 指向缺失的环境变量
+    expect(res.status).toBe(401); // 统一按认证失败处理
+    expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 不回显账号是否存在
   }); // 结束用例
 
-  it('管理员口令只对白名单内、已存在的账号生效', async () => { // SEC-01：口令不再对任意标识生效
+  it('环境变量 MIM_AUTH_ADMIN_PASSWORD 不再生效（只剩账号口令一条路径）', async () => { // 口令收敛
     await register('13900000007', 'mim-pass-789'); // 先建立真实账号
-    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000007' } }); // 口令 + 白名单
-    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000007', password: 'admin-secret' }); // 白名单内账号
-    expect(res.status).toBe(200); // 允许登录
-    expect(res.body.user.region).toBe('cn'); // 用户按请求区域返回
+    const appWithEnvPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000007' } }); // 旧的白名单 + 环境口令
+    const envPw = await request(appWithEnvPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000007', password: 'admin-secret' }); // 用旧环境口令
+    expect(envPw.status).toBe(401); // 已不再被接受
+    expect(envPw.body.code).toBe('AUTH_PASSWORD_INVALID'); // 与普通口令错误同码
+    const accountPw = await request(appWithEnvPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000007', password: 'mim-pass-789' }); // 账号自身口令
+    expect(accountPw.status).toBe(200); // 唯一有效路径
+    expect(accountPw.body.user.region).toBe('cn'); // 用户按请求区域返回
   }); // 结束用例
 
-  it('白名单外的已存在账号，管理员口令一律 401', async () => { // SEC-01：口令不对任意账号标识成立
-    await register('13900000008', 'mim-pass-789'); // 账号真实存在但不在白名单
-    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000099' } }); // 白名单只含其他标识
-    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000008', password: 'admin-secret' }); // 正确口令但非白名单
-    expect(res.status).toBe(401); // 拒绝
-    expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 统一错误码，不泄露配置细节
-  }); // 结束用例
-
-  it('不存在的标识：一律失败且不建号', async () => { // SEC-01：管理员口令不具备自动建号能力
-    const appWithPassword = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret', MIM_AUTH_ADMIN_IDENTIFIERS: 'cn:13900000009' } }); // 标识已列入白名单但未注册
-    const res = await request(appWithPassword).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000009', password: 'admin-secret' }); // 正确口令 + 白名单
+  it('不存在的标识：一律失败且不建号', async () => { // 口令不具备自动建号能力
+    const res = await request(app).post('/api/v1/auth/password').send({ region: 'cn', identifier: '13900000009', password: 'admin-secret' }); // 不存在的标识
     expect(res.status).toBe(401); // 不存在标识必须失败
     expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 与口令错误同码，避免标识枚举
     const row = db.prepare('SELECT COUNT(*) AS n FROM identities WHERE identifier = ?').get('13900000009') as { n: number }; // 核查是否偷偷建号
@@ -119,7 +113,7 @@ describe('账号口令登录', () => { // 注册后可用账号 + 口令登录
   }); // 结束用例
 
   it('同一来源 IP 跨账号累计失败 20 次后锁定（423 AUTH_ACCOUNT_LOCKED）', async () => { // IP 维度失败计数
-    const ipApp = createApp({ db, jwtSecret: JWT_SECRET, env: { MIM_AUTH_ADMIN_PASSWORD: 'admin-secret' } }); // 配置口令入口，确保失败路径返回 401
+    const ipApp = createApp({ db, jwtSecret: JWT_SECRET, env: {} }); // 失败路径本身即 401，无需额外口令配置
     for (let i = 0; i < LOGIN_IP_LOCK_AFTER_FAILURES; i += 1) { // 每次换一个从未存在的标识，避免触发标识维度锁定
       const bad = await request(ipApp).post('/api/v1/auth/password').send({ region: 'cn', identifier: `1391000${String(i).padStart(4, '0')}`, password: 'wrong-pass' });
       expect(bad.status).toBe(401); // 单次失败仍是 401

@@ -48,7 +48,7 @@ export function Orders({ credential }: Props) {
   return (
     <div className="page">
       <header className="page-head">
-        <h2>订单管理</h2>
+        <h1>订单管理</h1>
         <p className="page-desc">这里按时间倒序查看全部商城订单与支付状态；发货、签收与售后处理请进入「发货与售后」。</p>
       </header>
 

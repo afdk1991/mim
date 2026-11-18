@@ -13,8 +13,8 @@
 #   APP_DIR  默认 /opt/mim/app
 #   WEB_DIR  默认 /opt/mim/web
 #   RUN_USER 默认 mim
-#   MIM_WEB_HTTP_PORT  前端 HTTP 端口，默认 8080
-#   MIM_WEB_HTTPS_PORT 前端 HTTPS 端口，默认 8443
+#   MIM_WEB_HTTP_PORT  前端 HTTP 端口，默认 8088
+#   MIM_WEB_HTTPS_PORT 前端 HTTPS 端口，默认 443（与 MixmAPP 共享监听，不抢 default_server）
 #   MIM_API_PORT       后端回环端口（API + WS 共用），默认 8787
 #   MIM_TLS_CERTBOT    1=本脚本用 certbot --nginx 签证书（需独占 80/443）；0（默认）=同机共存，不签
 #   MIM_NGINX_TAKE_DEFAULT 1=删除 sites-enabled/default 独占机器；0（默认）=与 MixmAPP 共存
@@ -26,8 +26,8 @@ APP_DIR="${APP_DIR:-/opt/mim/app}"
 WEB_DIR="${WEB_DIR:-/opt/mim/web}"
 RUN_USER="${RUN_USER:-mim}"
 # 端口三件套与 deploy.sh 同名同默认值：两个脚本渲染同一份 nginx 模板，改一处口径即全链路一致
-MIM_WEB_HTTP_PORT="${MIM_WEB_HTTP_PORT:-8080}"
-MIM_WEB_HTTPS_PORT="${MIM_WEB_HTTPS_PORT:-8443}"
+MIM_WEB_HTTP_PORT="${MIM_WEB_HTTP_PORT:-8088}"
+MIM_WEB_HTTPS_PORT="${MIM_WEB_HTTPS_PORT:-443}"
 MIM_API_PORT="${MIM_API_PORT:-8787}"
 MIM_TLS_CERTBOT="${MIM_TLS_CERTBOT:-0}"
 MIM_NGINX_TAKE_DEFAULT="${MIM_NGINX_TAKE_DEFAULT:-0}"
@@ -100,7 +100,8 @@ git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 # --- 4. nginx 站点 ---
 log "安装 nginx 站点 $DOMAIN（HTTP ${MIM_WEB_HTTP_PORT} / HTTPS ${MIM_WEB_HTTPS_PORT} / 后端 127.0.0.1:${MIM_API_PORT}）"
 # 全量替换模板域：主站、api 子域与功能子域的 server_name / 跳转目标都跟随 DOMAIN
-# 端口与 TLS 片段同样走占位符：80/443 归同机 MixmAPP，Mim 只监听 8080/8443
+# 端口与 TLS 片段同样走占位符：80 归同机 MixmAPP，Mim 监听 8088；HTTPS 在 443 上与 MixmAPP
+# 共享监听（靠 server_name/SNI 区分），本脚本任何 server 块都不写 default_server
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
 if [ -f "${CERT_DIR}/fullchain.pem" ] && [ -f "${CERT_DIR}/privkey.pem" ]; then
   TLS_CONF="listen ${MIM_WEB_HTTPS_PORT} ssl;\n    listen [::]:${MIM_WEB_HTTPS_PORT} ssl;\n    ssl_certificate ${CERT_DIR}/fullchain.pem;\n    ssl_certificate_key ${CERT_DIR}/privkey.pem;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    ssl_session_cache shared:MimTLS:10m;\n    ssl_session_timeout 10m;"
@@ -139,7 +140,7 @@ bash "$APP_DIR/deploy/deploy.sh"
 # 同机共存（MIM_TLS_CERTBOT=0，默认）下 80 端口归 MixmAPP，HTTP-01 与 --webroot 都无法由
 # 本机独立完成（webroot 需改 MixmAPP 的 nginx，跨站耦合且易被其重载覆盖），因此这里不签证书。
 # 证书结论：用 DNS-01（DNSPod API 或手动 TXT）为 laal.top / *.laal.top 签发，落位到
-# /etc/letsencrypt/live/${DOMAIN}/ 后重跑 deploy.sh，TLS 片段会自动挂到 8443。
+# /etc/letsencrypt/live/${DOMAIN}/ 后重跑 deploy.sh，TLS 片段会自动挂到 443。
 if [ "$MIM_TLS_CERTBOT" != "1" ]; then
   warn "同机共存模式：跳过证书签发（结论见上，DNS-01 签发后重跑 deploy.sh 即可启用 ${MIM_WEB_HTTPS_PORT}）"
 elif [ ! -d "/etc/letsencrypt/live/${DOMAIN}" ]; then

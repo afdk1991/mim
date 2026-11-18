@@ -46,6 +46,8 @@ export interface UnifiedOrder {
   product_code: string | null; // 首件商品编码，与明细同源，供模块 / 商品列表回退展示
   delivery_kind: string | null; // 实物线发货方式（旧 shop_orders.delivery_kind），仅 shop 来源有值，其余为 null
   delivered_content: string | null; // 卡密 / 人工说明（旧 shop_orders.delivered_content），仅 shop 来源有值，其余为 null
+  shipping: { carrier: string; tracking_no: string; status: string; updated_at: string } | null; // 物流单（shipments 实时派生），未发货为 null
+  after_sales_status: string | null; // 最近一条售后申请状态，无申请为 null
   items: UnifiedOrderItem[]; // 订单明细
 }
 
@@ -180,8 +182,6 @@ export function backfillUnifiedCommerce(db: Db, now: string = new Date().toISOSt
   return result; // 返回计数，调用方打印日志
 }
 
-/** 订单主体原始行：不含明细与派生展示字段，组装视图前的最小字段集 */
-type RawOrderRow = Pick<UnifiedOrder, 'id' | 'user_id' | 'source' | 'source_id' | 'status' | 'channel' | 'currency' | 'total_cents' | 'discount_cents' | 'payable_cents' | 'created_at' | 'paid_at'>;
 /** 社区付费阅读落单入参：由解锁端点或启动回填提供，一次写入即一条完整交易 */
 export interface CommunityPurchaseInput {
   purchase_id: string; // community_purchases 主键，派生统一订单 / 支付 / 履约主键
@@ -233,13 +233,33 @@ export function recordCommunityPurchase(db: Db, input: CommunityPurchaseInput): 
   return { order_id: orderId, products: productRun.changes, orders: orderRun.changes, items: itemRun.changes };
 }
 
+/** 订单主体原始行：不含明细与派生展示字段，组装视图前的最小字段集 */
+type RawOrderRow = Pick<UnifiedOrder, 'id' | 'user_id' | 'source' | 'source_id' | 'status' | 'channel' | 'currency' | 'total_cents' | 'discount_cents' | 'payable_cents' | 'created_at' | 'paid_at'>;
 
 /** 实物线履约展示字段：迁移期只读回源 shop_orders 取发货方式与卡密说明；旧表冻结只读后该回源可移除 */
-function shopFulfillment(db: Db, sourceId: string): { delivery_kind: string | null; delivered_content: string | null } {
+function shopFulfillment(db: Db, sourceId: string): {
+  delivery_kind: string | null;
+  delivered_content: string | null;
+  shipping: { carrier: string; tracking_no: string; status: string; updated_at: string } | null;
+  after_sales_status: string | null;
+} {
   const row = db
     .prepare('SELECT delivery_kind, delivered_content FROM shop_orders WHERE id = ?') // 只读查询，不改动旧表
     .get(sourceId) as { delivery_kind: string | null; delivered_content: string | null } | undefined; // 命中行或空
-  return row ?? { delivery_kind: null, delivered_content: null }; // 回源落空时两个展示字段均为 null
+  // 物流单：order_id 唯一，未建单即未发货
+  const shipment = db
+    .prepare('SELECT carrier, tracking_no, status, updated_at FROM shipments WHERE order_id = ?')
+    .get(sourceId) as { carrier: string; tracking_no: string; status: string; updated_at: string } | undefined;
+  // 售后：取最近一条申请，用于前端展示「售后处理中 / 已同意 / 已驳回」
+  const afterSales = db
+    .prepare('SELECT status FROM after_sales_requests WHERE order_id = ? ORDER BY created_at DESC LIMIT 1')
+    .get(sourceId) as { status: string } | undefined;
+  return {
+    delivery_kind: row?.delivery_kind ?? null,
+    delivered_content: row?.delivered_content ?? null,
+    shipping: shipment ?? null,
+    after_sales_status: afterSales?.status ?? null,
+  }; // 回源落空时展示字段均为 null
 }
 
 /** 组装一条统一订单视图：挂明细、首件商品编码与实物线履约展示字段 */
@@ -251,12 +271,14 @@ function assembleOrder(db: Db, row: RawOrderRow): UnifiedOrder {
         WHERE i.order_id = ? ORDER BY i.id`,
     ) // 联统一商品表带出业务编码，供前端寻址与回退展示
     .all(row.id) as UnifiedOrderItem[]; // 明细行
-  const fulfillment = row.source === 'shop' ? shopFulfillment(db, row.source_id) : { delivery_kind: null, delivered_content: null }; // 仅实物线回源取履约展示字段
+  const fulfillment = row.source === 'shop' ? shopFulfillment(db, row.source_id) : { delivery_kind: null, delivered_content: null, shipping: null, after_sales_status: null }; // 仅实物线回源取履约展示字段
   return { // 统一订单视图
     ...row, // 主体字段原样带出
     product_code: items[0]?.product_code ?? null, // 首件商品编码，缺省 null
     delivery_kind: fulfillment.delivery_kind, // 发货方式（shop 来源）
     delivered_content: fulfillment.delivered_content, // 卡密 / 人工说明（shop 来源）
+    shipping: fulfillment.shipping, // 物流单（shop 来源）
+    after_sales_status: fulfillment.after_sales_status, // 最近售后状态（shop 来源）
     items, // 明细列表
   };
 }

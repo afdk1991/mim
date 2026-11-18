@@ -2,6 +2,11 @@
 /**
  * 2026-11-05 生产库迁移：移除 billing（套餐 / 订阅 / 订单 / 支付 / 退款 / 发票）与 audit 域
  *
+ * ⛔ 2026-11-15 起本脚本禁止执行（代码内已加硬守卫，命中即中止）：
+ *    统一交易域上线后，`orders` 与 `payments` 已不再属于 billing 域，
+ *    生产 `orders` 是 12 列统一表（含 source / source_id / channel / total_cents 等），
+ *    重放本脚本的 DROP 会直接删掉正在使用的交易表。守卫逻辑见 assertNotUnifiedTradeTables()。
+ *
  * 背景：产品决策移除「套餐 / 订阅（mock）/ 审计」全部能力，仓库 schema.sql 已删除对应表，
  *       路由与前端视图同步移除；生产库需 DROP 残留表与索引，避免悬空数据与误用。
  *
@@ -39,6 +44,32 @@ const DROP_TABLES = [
 ];
 
 const DROP_INDEXES = ['idx_subscriptions_user', 'idx_orders_user', 'idx_audit_user'];
+
+/**
+ * 禁止执行守卫：识别「统一交易域」表结构。
+ * orders 出现 source / source_id，或 payments 出现 channel，说明这两张表已被统一交易域接管，
+ * 继续 DROP 会删除生产正在使用的交易数据，因此无论 DRY-RUN 还是 --apply 都直接中止。
+ */
+function assertNotUnifiedTradeTables(db) {
+  const columnsOf = (table) => {
+    try {
+      return db.prepare(`PRAGMA table_info("${table}")`).all().map((r) => r.name);
+    } catch (_) {
+      return [];
+    }
+  };
+  const ordersCols = columnsOf('orders');
+  const paymentsCols = columnsOf('payments');
+  const hit = [];
+  if (ordersCols.includes('source') || ordersCols.includes('source_id')) hit.push('orders.source/source_id');
+  if (paymentsCols.includes('channel')) hit.push('payments.channel');
+  if (hit.length) {
+    throw new Error(
+      `⛔ 已禁止执行：检测到统一交易域表结构（${hit.join(', ')}）。` +
+        '本脚本会 DROP orders / payments，属于正在使用的交易表；如确需清理 billing 域，请另写只针对 plans/plan_prices/subscriptions/subscription_events/refunds/invoices/audit_logs 的迁移。',
+    );
+  }
+}
 
 function log(msg) {
   console.log(`[migrate ${new Date().toISOString()}] ${msg}`);
@@ -82,6 +113,9 @@ async function main() {
   log(`数据库：${DB_PATH}；模式：${APPLY ? 'APPLY（写入）' : 'DRY-RUN（只读）'}`);
   const Database = loadBetterSqlite3();
   const db = new Database(DB_PATH);
+
+  // 硬守卫：命中统一交易域结构即中止，DRY-RUN 也不放行（防止 CI 误跑 --apply）
+  assertNotUnifiedTradeTables(db);
 
   const before = snapshot(db, '迁移前');
   const present = DROP_TABLES.filter((t) => before.tables.includes(t));

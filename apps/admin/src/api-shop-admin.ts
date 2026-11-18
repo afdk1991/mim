@@ -243,6 +243,11 @@ export async function voidAdminCard(credential: Credential, code: string): Promi
   return data.card;
 } // voidAdminCard 结束
 
+/** 物理删除未使用或已作废卡密；已兑换由后端拒绝（409） */
+export async function deleteAdminCard(credential: Credential, code: string): Promise<void> {
+  await request<{ code: string; deleted: boolean }>(`/admin/cards/${encodeURIComponent(code)}`, { method: 'DELETE', credential });
+} // deleteAdminCard 结束
+
 // ── VIP 套餐 ────────────────────────────────────────────────────────────────
 
 /** VIP 套餐视图：与后端 planView 字段逐一对齐 */

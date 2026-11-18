@@ -6,179 +6,179 @@
  */
 
 /* 时间筛选：工具栏 input 默认吃满宽度，日期框改成内容宽 */
-.community-gallery-toolbar input[type='date'] {
-  flex: none;
-  width: 152px;
-}
+.community-gallery-toolbar input[type='date'] { /* 规则块开始 */
+  flex: none; /* flex 声明 */
+  width: 152px; /* width 声明 */
+} /* 规则块结束 */
 
 /* 图片放大入口：整块可点，保留原有图片比例 */
-.community-gallery-open {
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: zoom-in;
-}
+.community-gallery-open { /* 规则块开始 */
+  display: block; /* display 声明 */
+  width: 100%; /* width 声明 */
+  height: 100%; /* height 声明 */
+  padding: 0; /* padding 声明 */
+  border: 0; /* border 声明 */
+  background: transparent; /* background 声明 */
+  cursor: zoom-in; /* cursor 声明 */
+} /* 规则块结束 */
 
 /* 视频放大按钮：浮在播放器右上角 */
-.community-gallery-expand {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--media-bg);
-  color: var(--on-media);
-  font-size: var(--fs-sm);
-  line-height: 1;
-  cursor: zoom-in;
-}
+.community-gallery-expand { /* 规则块开始 */
+  position: absolute; /* position 声明 */
+  top: 8px; /* top 声明 */
+  right: 8px; /* right 声明 */
+  width: 30px; /* width 声明 */
+  height: 30px; /* height 声明 */
+  padding: 0; /* padding 声明 */
+  border: 0; /* border 声明 */
+  border-radius: var(--radius-pill); /* border-radius 声明 */
+  background: var(--media-bg); /* background 声明 */
+  color: var(--on-media); /* color 声明 */
+  font-size: var(--fs-sm); /* font-size 声明 */
+  line-height: 1; /* line-height 声明 */
+  cursor: zoom-in; /* cursor 声明 */
+} /* 规则块结束 */
 
 /* 作者入口行：头像 + 名字可点，板块名保持纯文本 */
-.community-gallery-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
+.community-gallery-meta { /* 规则块开始 */
+  display: flex; /* display 声明 */
+  align-items: center; /* align-items 声明 */
+  gap: 6px; /* gap 声明 */
+  margin: 0; /* margin 声明 */
+  font-size: var(--fs-xs); /* font-size 声明 */
+  color: var(--text-muted); /* color 声明 */
+} /* 规则块结束 */
 
-.community-gallery-author {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 60%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
+.community-gallery-author { /* 规则块开始 */
+  display: inline-flex; /* display 声明 */
+  align-items: center; /* align-items 声明 */
+  gap: 6px; /* gap 声明 */
+  max-width: 60%; /* max-width 声明 */
+  padding: 0; /* padding 声明 */
+  border: 0; /* border 声明 */
+  background: transparent; /* background 声明 */
+  color: var(--text-secondary); /* color 声明 */
+  font-size: var(--fs-xs); /* font-size 声明 */
+  cursor: pointer; /* cursor 声明 */
+} /* 规则块结束 */
 
 .community-gallery-author:hover,
-.community-gallery-author:focus-visible {
-  color: var(--link);
-}
+.community-gallery-author:focus-visible { /* 规则块开始 */
+  color: var(--link); /* color 声明 */
+} /* 规则块结束 */
 
-.community-gallery-author > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.community-gallery-author > span:last-child { /* 规则块开始 */
+  overflow: hidden; /* overflow 声明 */
+  text-overflow: ellipsis; /* text-overflow 声明 */
+  white-space: nowrap; /* white-space 声明 */
+} /* 规则块结束 */
 
-.community-gallery-avatar {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--surface-3);
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1;
-}
+.community-gallery-avatar { /* 规则块开始 */
+  display: inline-flex; /* display 声明 */
+  flex: none; /* flex 声明 */
+  align-items: center; /* align-items 声明 */
+  justify-content: center; /* justify-content 声明 */
+  width: 18px; /* width 声明 */
+  height: 18px; /* height 声明 */
+  border-radius: 50%; /* border-radius 声明 */
+  background: var(--surface-3); /* background 声明 */
+  color: var(--text-muted); /* color 声明 */
+  font-size: 10px; /* font-size 声明 */
+  line-height: 1; /* line-height 声明 */
+} /* 规则块结束 */
 
 /* 灯箱：独立浮层，点击遮罩关闭 */
-.community-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  background: var(--media-bg);
-  backdrop-filter: blur(2px);
-}
+.community-lightbox { /* 规则块开始 */
+  position: fixed; /* position 声明 */
+  inset: 0; /* inset 声明 */
+  z-index: 1200; /* z-index 声明 */
+  display: flex; /* display 声明 */
+  align-items: center; /* align-items 声明 */
+  justify-content: center; /* justify-content 声明 */
+  padding: 32px; /* padding 声明 */
+  background: var(--media-bg); /* background 声明 */
+  backdrop-filter: blur(2px); /* backdrop-filter 声明 */
+} /* 规则块结束 */
 
-.community-lightbox-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: min(1120px, 100%);
-  max-height: 100%;
-  margin: 0;
-}
+.community-lightbox-stage { /* 规则块开始 */
+  display: flex; /* display 声明 */
+  flex-direction: column; /* flex-direction 声明 */
+  gap: 10px; /* gap 声明 */
+  max-width: min(1120px, 100%); /* max-width 声明 */
+  max-height: 100%; /* max-height 声明 */
+  margin: 0; /* margin 声明 */
+} /* 规则块结束 */
 
 .community-lightbox-stage img,
-.community-lightbox-stage video {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100vh - 140px);
-  margin: 0 auto;
-  border-radius: var(--radius-sm);
-  object-fit: contain;
-  background: var(--surface);
-}
+.community-lightbox-stage video { /* 规则块开始 */
+  display: block; /* display 声明 */
+  max-width: 100%; /* max-width 声明 */
+  max-height: calc(100vh - 140px); /* max-height 声明 */
+  margin: 0 auto; /* margin 声明 */
+  border-radius: var(--radius-sm); /* border-radius 声明 */
+  object-fit: contain; /* object-fit 声明 */
+  background: var(--surface); /* background 声明 */
+} /* 规则块结束 */
 
-.community-lightbox-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--on-media);
-  font-size: var(--fs-sm);
-}
+.community-lightbox-caption { /* 规则块开始 */
+  display: flex; /* display 声明 */
+  align-items: center; /* align-items 声明 */
+  justify-content: space-between; /* justify-content 声明 */
+  gap: 12px; /* gap 声明 */
+  color: var(--on-media); /* color 声明 */
+  font-size: var(--fs-sm); /* font-size 声明 */
+} /* 规则块结束 */
 
-.community-lightbox-caption strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.community-lightbox-caption strong { /* 规则块开始 */
+  overflow: hidden; /* overflow 声明 */
+  text-overflow: ellipsis; /* text-overflow 声明 */
+  white-space: nowrap; /* white-space 声明 */
+} /* 规则块结束 */
 
-.community-lightbox-caption span {
-  flex: none;
-  color: var(--on-media);
-  opacity: 0.75;
-}
+.community-lightbox-caption span { /* 规则块开始 */
+  flex: none; /* flex 声明 */
+  color: var(--on-media); /* color 声明 */
+  opacity: 0.75; /* opacity 声明 */
+} /* 规则块结束 */
 
 .community-lightbox-close,
-.community-lightbox-nav {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
+.community-lightbox-nav { /* 规则块开始 */
+  position: absolute; /* position 声明 */
+  display: flex; /* display 声明 */
+  align-items: center; /* align-items 声明 */
+  justify-content: center; /* justify-content 声明 */
+  border: 0; /* border 声明 */
+  border-radius: 50%; /* border-radius 声明 */
+  background: var(--surface); /* background 声明 */
+  color: var(--text); /* color 声明 */
+  cursor: pointer; /* cursor 声明 */
+} /* 规则块结束 */
 
-.community-lightbox-close {
-  top: 20px;
-  right: 20px;
-  width: 40px;
-  height: 40px;
-  font-size: 22px;
-  line-height: 1;
-}
+.community-lightbox-close { /* 规则块开始 */
+  top: 20px; /* top 声明 */
+  right: 20px; /* right 声明 */
+  width: 40px; /* width 声明 */
+  height: 40px; /* height 声明 */
+  font-size: 22px; /* font-size 声明 */
+  line-height: 1; /* line-height 声明 */
+} /* 规则块结束 */
 
-.community-lightbox-nav {
-  top: 50%;
-  width: 44px;
-  height: 44px;
-  font-size: 26px;
-  line-height: 1;
-  transform: translateY(-50%);
-}
+.community-lightbox-nav { /* 规则块开始 */
+  top: 50%; /* top 声明 */
+  width: 44px; /* width 声明 */
+  height: 44px; /* height 声明 */
+  font-size: 26px; /* font-size 声明 */
+  line-height: 1; /* line-height 声明 */
+  transform: translateY(-50%); /* transform 声明 */
+} /* 规则块结束 */
 
 .community-lightbox-nav.is-prev { left: 20px; }
 .community-lightbox-nav.is-next { right: 20px; }
 
-@media (max-width: 480px) {
+@media (max-width: 480px) { /* 规则块开始 */
   .community-lightbox { padding: 12px; } /* 手机档位收紧边距 */
   .community-lightbox-nav { width: 36px; height: 36px; } /* 触控区略缩，避免遮住画面 */
   .community-lightbox-nav.is-prev { left: 6px; }
   .community-lightbox-nav.is-next { right: 6px; }
   .community-gallery-toolbar input[type='date'] { flex: 1 1 130px; width: auto; } /* 窄屏两列铺满 */
-}
+} /* 规则块结束 */

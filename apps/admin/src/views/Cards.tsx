@@ -1,8 +1,8 @@
-// 充值卡密管理：批量生成、用量统计、作废未兑换卡密；用户在前台充值页输入卡密兑换余额
+// 充值卡密管理：批量生成、用量统计、作废与物理删除；用户在前台充值页输入卡密兑换余额
 import { useState } from 'react'; // 批量生成表单与最近一批回显
 import { describeError } from '../api'; // 统一错误文案
 import type { Credential } from '../api'; // 凭证类型
-import { createAdminCardBatch, listAdminCards, voidAdminCard } from '../api-shop-admin'; // 卡密三类操作
+import { createAdminCardBatch, deleteAdminCard, listAdminCards, voidAdminCard } from '../api-shop-admin'; // 卡密四类操作
 import type { AdminCard } from '../api-shop-admin'; // 卡密视图类型
 import { useAsync } from '../hooks'; // 统一异步加载
 
@@ -93,9 +93,20 @@ export function Cards({ credential, permissions }: Props) {
     void run(() => voidAdminCard(credential, row.code), `卡密 ${row.code} 已作废`); // 执行作废
   }
 
+  /** 删除：物理清除不可恢复，要求手输完整卡密作为二次确认 */
+  function deleteCard(row: AdminCard) {
+    const typed = window.prompt(`删除为物理清除，记录不可恢复（作废可保留台账，删除不能）。\n确认删除卡密「${row.code}」？请输入完整卡密确认：`); // 二次确认
+    if (typed === null) return; // 用户取消
+    if (typed.trim() !== row.code) { // 输入不一致视为放弃，避免误删
+      setError('输入的卡密与原值不一致，已取消删除'); // 就地提示
+      return; // 不发请求
+    } // 校验结束
+    void run(() => deleteAdminCard(credential, row.code), `卡密 ${row.code} 已删除`); // 执行删除
+  }
+
   return (
     <>
-      {!canWrite ? <div className="hint">当前身份缺少 commerce:write 权限，只能查看卡密，不能生成或作废。</div> : null}
+      {!canWrite ? <div className="hint">当前身份缺少 commerce:write 权限，只能查看卡密，不能生成、作废或删除。</div> : null}
       {notice ? <div className="success">{notice}</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
@@ -153,6 +164,8 @@ export function Cards({ credential, permissions }: Props) {
           </span>
         </div>
 
+        <div className="hint">作废：保留台账并把卡密标记为不可兑换，可随时回查；删除：从数据库物理清除、不可恢复，仅未兑换或已作废的卡密可删（用于清理测试或探针记录）。删除会写入审计流水。</div>
+
         {state.loading ? <p className="muted">加载中…</p> : null}
         {state.error ? <p className="error">列表加载失败：{describeError(state.error)}</p> : null}
         {!state.loading && !state.error && cards.length === 0 ? (
@@ -192,15 +205,26 @@ export function Cards({ credential, permissions }: Props) {
                     <td>{row.created_at.slice(0, 16)}</td>
                     <td>
                       {canWrite ? (
-                        <button
-                          type="button"
-                          className="btn ghost small"
-                          disabled={busy || locked}
-                          title={locked ? '已兑换或已作废的卡密不能再次作废' : '作废后不可再兑换'}
-                          onClick={() => voidCard(row)}
-                        >
-                          作废
-                        </button>
+                        <div className="row" style={{ gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn ghost small"
+                            disabled={busy || locked}
+                            title={locked ? '已兑换或已作废的卡密不能再次作废' : '作废后不可再兑换'}
+                            onClick={() => voidCard(row)}
+                          >
+                            作废
+                          </button>
+                          <button
+                            type="button"
+                            className="btn danger small"
+                            disabled={busy || row.status === 'used'}
+                            title={row.status === 'used' ? '已兑换卡密对应真实入账，不能删除' : '物理清除，删除后不可恢复'}
+                            onClick={() => deleteCard(row)}
+                          >
+                            删除
+                          </button>
+                        </div>
                       ) : (
                         <span className="muted">—</span>
                       )}

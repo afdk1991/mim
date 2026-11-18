@@ -3,17 +3,17 @@
  *
  * 安全约定：
  *   - 票据与广播载荷都用 HMAC-SHA256 签名（`base64url(payload).base64url(signature)`），
- *     密钥优先取 MIM_SSO_SECRET，非生产回退 JWT 密钥；不与访客会话混用；
+ *     密钥优先取 MIM_SSO_SECRET，非生产回退 JWT 密钥；
  *   - 站点必须命中 MIM_SSO_ALLOWED_SITES 白名单（origin 或站点键，逗号分隔）；
  *   - 票据落库只存 sha256 摘要，兑换时同事务标记 consumed_at，保证一次性、防重放；
- *   - 兑换出会话的必须是正式用户：访客账号（is_guest=1）票据直接拒绝。
+ *   - 兑换出会话的必须是可用账号：存量标记异常（is_guest=1）的历史账号票据直接拒绝。
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'; // HMAC 签名、随机票据、常数时间比较
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { clockOf } from './domain.js'; // 可注入时钟
 import { sha256 } from './auth.js'; // 票据摘要只入库
-import { readUser } from './identity.js'; // 读用户行（含访客标记）
+import { readUser } from './identity.js'; // 读用户行（含历史兼容列 is_guest）
 import type { ApiDeps, UserRow } from './types.js'; // 依赖容器与用户类型
 
 /** SSO 票据有效期：5 分钟，覆盖站点间跳转与一次兑换 */
@@ -127,7 +127,7 @@ export function consumeSsoTicket(deps: ApiDeps, ticket: string, site: string | u
 
   const user = readUser(deps.db, String(payload.sub ?? '')); // 读归属用户行
   if (!user || user.status === 'deleted') throw new AppError('AUTH_SSO_TICKET_INVALID', 'account is not available'); // 不可用
-  if (user.is_guest === 1) throw new AppError('AUTH_SSO_TICKET_INVALID', 'guest account cannot exchange an sso session'); // 访客不得换正式 SSO 会话
+  if (user.is_guest === 1) throw new AppError('AUTH_SSO_TICKET_INVALID', 'account cannot exchange an sso session'); // 存量异常账号（历史兼容列）不得换正式 SSO 会话
   return user; // 交出正式用户
 } // consumeSsoTicket 结束
 

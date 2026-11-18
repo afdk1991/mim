@@ -25,7 +25,7 @@
 
 ## 版本
 
-当前版本：**V0.0.11-preview**（2026-11-15 按产品要求下线 10 个功能模块——功能模块商城 `/marketplace`、云存储 `/cloud`、图床 `/img`、下载分发 `/download`、自研工具 `/tools`、统一搜索 `/search`、导航站 `/navigation`、商业化中台 `/commerce`、放映厅 `/watch`、创作工作台 `/comic-studio`，前端视图 / 路由 / 侧栏入口 / 后端接口 / 数据表一并删除；`/` 与未知路径回落 `/community`；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
+当前版本：**V0.0.12-preview**（2026-11-17 新增社区激励链（签到 / 积分 / 等级 / 徽章）与支付履约重构（`pending→paid` 抢占、`deliverShopOrder` 自动发卡 / 人工交付 / 实物扣库存、支付宝异步通知 RSA2 验签）、后台真分页与卡密删除审计、前端外壳重做（顶部横导航 + 两栏 + 页脚 + 移动端底部 Tab）、账号体系收敛（移除访客建号与环境变量超管口令）；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
 
 版本号规约（与 [AGENTS.md 铁律四](./AGENTS.md#铁律四版本号每次添加功能模块更新等等规约与-readme-同步) 同步）：
 
@@ -176,7 +176,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | [docs/deployment-summary.json](./docs/deployment-summary.json) | 同上的结构化结果（机器可核对，schema `mim.deployment-registry.v1`） |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
-| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.11-preview 口径，含 FR-01~06 功能规格与交互演示） |
+| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.12-preview 口径，含 FR-01~06 功能规格与交互演示） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 
 ## 站点与部署

@@ -71,7 +71,7 @@ export function Settings({ credential, permissions }: Props) {
   return (
     <div className="page">
       <header className="page-head">
-        <h2>设置</h2>
+        <h1>设置</h1>
         <p className="page-desc">这里维护站点主名、副标题与页脚文案，保存后前台页头、浏览器标题与页脚会同步更新。</p>
       </header>
 

@@ -107,7 +107,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
   const [passToken, setPassToken] = useState(''); // 赋值：更新变量 const 的取值
   const [genTime, setGenTime] = useState(''); // 赋值：更新变量 const 的取值
 
-  // 当前验证码场景：注册分段打开时用 register 场景，否则统一走 login 场景
+  // 当前验证码场景：注册分段用 register，其余登录方式用 login
   const captchaScene: CaptchaScene = mode === 'register' ? 'register' : 'login';
   const captchaMode = security?.captcha.mode ?? 'off'; // 常量 captchaMode：保存固定配置或一次性派生值
   const captchaRequired = Boolean(security && security.captcha_required && captchaMode !== 'off'); // 常量 captchaRequired：保存固定配置或一次性派生值
@@ -322,7 +322,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     setError(null);
   } // 代码块结束
 
-  // 切换登录 / 注册方式：清空两种凭证，防止残留值被误提交
+  // 切换登录方式：清空两种凭证，防止残留值被误提交
   function switchMode(next: 'password' | 'code' | 'register') {
     // 写入目标登录方式
     setMode(next);
@@ -397,9 +397,10 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
     // 按当前 mode 组装票据；off / 未强制时为空对象，不携带任何验证码字段
     const ticketPayload = buildCaptchaTicket();
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      // 三分支：注册 / 密码登录 / 验证码登录，均返回统一凭证
+      // 按当前 mode 发起请求（注册开关打开时才有 register 分段）：
+      // 注册 → 建号并自动登录；密码 / 验证码 → 换取会话。三者返回同一 LoginResult。
       const result = mode === 'register'
-        // 注册模式：账号 + 口令 + 图形验证码票据，成功后直接拿到会话
+        // 注册：区域 + 账号标识 + 口令，后端校验后按与后台建号相同的 Mim ID 规则建号
         ? await api.register({ region, provider, identifier: identifier.trim(), password, ...ticketPayload })
         : mode === 'password'
         // 密码模式：区域 + 账号标识 + 密码换取会话
@@ -521,12 +522,12 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               type="button"
               // 当前为注册模式时高亮
               className={mode === 'register' ? 'active' : ''}
-              // 点击切到注册模式并清空验证码
+              // 点击切到注册模式并清空旧凭证
               onClick={() => switchMode('register')}
             >
-              {locale === 'en-US' ? 'Sign up' : '注册'}{/* 注册模式文案，跟随界面语言 */}
+              {locale === 'en-US' ? 'Sign up' : '注册'}{/* 注册分段文案 */}
             </button>
-          )}
+          )}{/* 结束注册分段按钮 */}
         </div>{/* 结束登录方式分段控件 */}
         {/* 注册入口受服务端开关控制：关闭时明确说明，避免用户继续找入口 */}
         {channels && !channels.register && (
@@ -560,7 +561,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 onChange={(event) => setPassword(event.target.value)}
                 // 密码类型，输入内容以圆点显示
                 type="password"
-                // 登录提示填充当前密码；注册模式提示生成新密码
+                // 登录提示填充当前密码；注册时提示浏览器生成新口令
                 autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 // 必填
                 required
@@ -665,9 +666,13 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           <div className="auth-extra">
             <strong>{locale === 'en-US' ? 'Need help' : '需要帮助'}</strong>
             <span>
-              {locale === 'en-US'
-                ? 'Registration is closed. Contact the site administrator if you cannot sign in.'
-                : '注册已关闭；无法登录时请联系站点管理员处理。'}
+              {channels?.register
+                ? (locale === 'en-US'
+                  ? 'Sign up with a phone number or email in this page, then use the same account everywhere.'
+                  : '可在本页用手机号或邮箱自助注册，注册后同一账号通用。')
+                : (locale === 'en-US'
+                  ? 'Registration is closed. Contact the site administrator if you cannot sign in.'
+                  : '注册已关闭；无法登录时请联系站点管理员处理。')}
             </span>
           </div>
         </section>

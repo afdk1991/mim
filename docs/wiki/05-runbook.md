@@ -46,7 +46,7 @@ Remove-Item Env:RELEASE_CHANNEL
 
 | 场景 | 预期输出要点 | 退出码 |
 |---|---|---|
-| 当前仓库现状（`package.json` 版本 `0.0.11`、无正式 tag） | `✅ 版本号 0.0.11 合法（V0.0.11）` + tag 段通过 | 0 |
+| 当前仓库现状（`package.json` 版本 `0.0.12`、无正式 tag） | `✅ 版本号 0.0.12 合法（V0.0.12）` + tag 段通过 | 0 |
 | `package.json` 写 `"version": "0.0.0-preview"` | ❌ 版本号不符合 semver（预发行后缀只允许走 RELEASE_CHANNEL，不进版本数字） | 1 |
 | `RELEASE_CHANNEL=preview` 且仓库已有 `V0.0.0` tag | ❌ 预览通道下已存在正式 tag | 1 |
 

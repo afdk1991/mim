@@ -6,7 +6,7 @@
  *   POST /auth/sso/exchange   他站凭票据换取正式会话（公开，票据本身承担鉴权）
  *   POST /auth/sso/logout     登录态签发登出广播签名载荷（需登录）
  *
- * 说明：票据兑换出的会话走 finishLogin，与账号口令 / OAuth 登录同一契约；访客账号不可兑换。
+ * 说明：票据兑换出的会话走 finishLogin，与账号口令 / OAuth 登录同一契约；存量异常账号不可兑换。
  */
 
 import { Router } from 'express'; // 独立路由实例

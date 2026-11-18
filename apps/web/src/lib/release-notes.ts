@@ -16,167 +16,167 @@ export interface ReleaseDetail { // 单个版本的静态补充信息
 
 /** 按版本号索引（不带 v 前缀，形如 0.0.10），便于与更新日志的版本号对齐。 */
 export const RELEASE_DETAILS: Readonly<Record<string, ReleaseDetail>> = {
-  '0.0.0': {
-    date: '2026-11-03',
-    commit: '2a4891d',
-    stateZh: '基础版本',
-    stateEn: 'Base version',
-    changesZh: [
-      '初始化 docs / scripts / site / 构建脚本。',
-      'RBAC、管理后台、商城付费闭环、成片导出、部署汇总、站点矩阵、统一入口等大量能力都在 0.0.0 阶段累积。',
-      '这一阶段没有逐功能升 semver，0.0.1 才是第一次真正递增。',
-    ],
-    changesEn: [
-      'Initialized docs, scripts, site and build tooling.',
-      'RBAC, admin console, marketplace checkout, film export, deployment summary, site matrix and entry catalog accumulated under 0.0.0.',
-      'Semver was not bumped per feature in this phase; 0.0.1 was the first real increment.',
-    ],
+  '0.0.0': { // 版本 0.0.0 的静态补充信息
+    date: '2026-11-03', // 该版本发布日期
+    commit: '2a4891d', // 递增提交短哈希
+    stateZh: '基础版本', // 中文线上状态
+    stateEn: 'Base version', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '初始化 docs / scripts / site / 构建脚本。', // 变化条目：初始化 docs / scripts / sit…
+      'RBAC、管理后台、商城付费闭环、成片导出、部署汇总、站点矩阵、统一入口等大量能力都在 0.0.0 阶段累积。', // 变化条目：RBAC、管理后台、商城付费闭环、成片导出、部署…
+      '这一阶段没有逐功能升 semver，0.0.1 才是第一次真正递增。', // 变化条目：这一阶段没有逐功能升 semver，0.0.1 …
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Initialized docs, scripts, site and build tooling.', // 变化条目：Initialized docs, script…
+      'RBAC, admin console, marketplace checkout, film export, deployment summary, site matrix and entry catalog accumulated under 0.0.0.', // 变化条目：RBAC, admin console, mar…
+      'Semver was not bumped per feature in this phase; 0.0.1 was the first real increment.', // 变化条目：Semver was not bumped pe…
+    ], // 英文变化清单结束
   },
-  '0.0.1': {
-    date: '2026-11-12',
-    commit: 'fc5b3a0',
-    stateZh: '首次 semver 递增',
-    stateEn: 'First semver increment',
-    changesZh: ['新增匿名看片与登录后「我的作品」播放。', '支持集数切换与断点续播。'],
-    changesEn: ['Anonymous watching plus “My Works” playback after sign-in.', 'Episode switching and resume playback.'],
+  '0.0.1': { // 版本 0.0.1 的静态补充信息
+    date: '2026-11-12', // 该版本发布日期
+    commit: 'fc5b3a0', // 递增提交短哈希
+    stateZh: '首次 semver 递增', // 中文线上状态
+    stateEn: 'First semver increment', // 英文线上状态
+    changesZh: ['新增匿名看片与登录后「我的作品」播放。', '支持集数切换与断点续播。'], // 中文主要变化清单开始
+    changesEn: ['Anonymous watching plus “My Works” playback after sign-in.', 'Episode switching and resume playback.'], // 英文主要变化清单开始
   },
-  '0.0.2': {
-    date: '2026-11-12',
-    commit: 'd258f41',
-    stateZh: '快速迭代',
-    stateEn: 'Fast iteration',
-    changesZh: [
-      '把统一入口标注为已落地 / 部分相邻 / 规划中 / 语义冲突四态。',
-      '前端入口目录展示落地徽标、已落地功能清单与边界说明。',
-    ],
-    changesEn: [
-      'Classified entries as implemented / adjacent / planned / semantic conflict.',
-      'Entry catalog now shows implementation badges, real feature lists and boundaries.',
-    ],
+  '0.0.2': { // 版本 0.0.2 的静态补充信息
+    date: '2026-11-12', // 该版本发布日期
+    commit: 'd258f41', // 递增提交短哈希
+    stateZh: '快速迭代', // 中文线上状态
+    stateEn: 'Fast iteration', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '把统一入口标注为已落地 / 部分相邻 / 规划中 / 语义冲突四态。', // 变化条目：把统一入口标注为已落地 / 部分相邻 / 规划中…
+      '前端入口目录展示落地徽标、已落地功能清单与边界说明。', // 变化条目：前端入口目录展示落地徽标、已落地功能清单与边界说…
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Classified entries as implemented / adjacent / planned / semantic conflict.', // 变化条目：Classified entries as im…
+      'Entry catalog now shows implementation badges, real feature lists and boundaries.', // 变化条目：Entry catalog now shows …
+    ], // 英文变化清单结束
   },
-  '0.0.3': {
-    date: '2026-11-12',
-    commit: '7e1e87c',
-    stateZh: '快速迭代',
-    stateEn: 'Fast iteration',
-    changesZh: [
-      '从目录条目升级为真实业务模块：链接目录、服务端可达性探测、失效标记、推荐位、检索。',
-      '新增 nav_links 表与 6 个导航端点（该模块已于 2026-11-15 下线）。',
-    ],
-    changesEn: [
-      'Upgraded from a directory entry to a real module: link catalog, probe, broken-link flags, recommendations and search.',
-      'Added the nav_links table and six navigation endpoints (removed on 2026-11-15).',
-    ],
+  '0.0.3': { // 版本 0.0.3 的静态补充信息
+    date: '2026-11-12', // 该版本发布日期
+    commit: '7e1e87c', // 递增提交短哈希
+    stateZh: '快速迭代', // 中文线上状态
+    stateEn: 'Fast iteration', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '从目录条目升级为真实业务模块：链接目录、服务端可达性探测、失效标记、推荐位、检索。', // 变化条目：从目录条目升级为真实业务模块：链接目录、服务端可…
+      '新增 nav_links 表与 6 个导航端点（该模块已于 2026-11-15 下线）。', // 变化条目：新增 nav_links 表与 6 个导航端点（…
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Upgraded from a directory entry to a real module: link catalog, probe, broken-link flags, recommendations and search.', // 变化条目：Upgraded from a director…
+      'Added the nav_links table and six navigation endpoints (removed on 2026-11-15).', // 变化条目：Added the nav_links tabl…
+    ], // 英文变化清单结束
   },
-  '0.0.4': {
-    date: '2026-11-12',
-    commit: '2bee64f',
-    stateZh: '线上曾实测 0.0.4',
-    stateEn: 'Observed online as 0.0.4',
-    changesZh: [
-      '五来源聚合：模块 / 入口 / 导航 / 社区 / 商城（统一搜索模块已于 2026-11-15 下线）。',
-      'Meilisearch 未配置时自动降级 SQLite。',
-      '验证 28 文件 / 398 例全过。',
-    ],
-    changesEn: [
-      'Five sources: modules, entries, navigation, community and marketplace (search removed on 2026-11-15).',
-      'Automatic SQLite fallback when Meilisearch is not configured.',
-      'Verified with 28 files / 398 tests.',
-    ],
+  '0.0.4': { // 版本 0.0.4 的静态补充信息
+    date: '2026-11-12', // 该版本发布日期
+    commit: '2bee64f', // 递增提交短哈希
+    stateZh: '线上曾实测 0.0.4', // 中文线上状态
+    stateEn: 'Observed online as 0.0.4', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '五来源聚合：模块 / 入口 / 导航 / 社区 / 商城（统一搜索模块已于 2026-11-15 下线）。', // 变化条目：五来源聚合：模块 / 入口 / 导航 / 社区 …
+      'Meilisearch 未配置时自动降级 SQLite。', // 变化条目：Meilisearch 未配置时自动降级 SQL…
+      '验证 28 文件 / 398 例全过。', // 变化条目：验证 28 文件 / 398 例全过。
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Five sources: modules, entries, navigation, community and marketplace (search removed on 2026-11-15).', // 变化条目：Five sources: modules, e…
+      'Automatic SQLite fallback when Meilisearch is not configured.', // 变化条目：Automatic SQLite fallbac…
+      'Verified with 28 files / 398 tests.', // 变化条目：Verified with 28 files /…
+    ], // 英文变化清单结束
   },
-  '0.0.5': {
-    date: '2026-11-12',
-    commit: 'e9c4cae',
-    stateZh: '线上曾实测 0.0.5',
-    stateEn: 'Observed online as 0.0.5',
-    changesZh: [
-      '16 张商业化表：付费阅读 / 下载 / 图库 / 视频四类资产。',
-      '支付意图与支付宝当面付 / 微信 Native / 人工 / 沙箱适配。',
-      '发货物流售后评价、提现与创作分成、主题 / 页面区块、成长徽章私信、百度翻译。',
-      '验证 29 文件 / 407 例全过。',
-    ],
-    changesEn: [
-      'Sixteen commerce tables and four paid asset kinds: article, download, gallery and video.',
-      'Payment intents with Alipay, WeChat Native, manual and sandbox adapters.',
-      'Shipping, after-sales, reviews, withdrawals, creator earnings, theme/page blocks, badges, DMs and translation.',
-      'Verified with 29 files / 407 tests.',
-    ],
+  '0.0.5': { // 版本 0.0.5 的静态补充信息
+    date: '2026-11-12', // 该版本发布日期
+    commit: 'e9c4cae', // 递增提交短哈希
+    stateZh: '线上曾实测 0.0.5', // 中文线上状态
+    stateEn: 'Observed online as 0.0.5', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '16 张商业化表：付费阅读 / 下载 / 图库 / 视频四类资产。', // 变化条目：16 张商业化表：付费阅读 / 下载 / 图库 …
+      '支付意图与支付宝当面付 / 微信 Native / 人工 / 沙箱适配。', // 变化条目：支付意图与支付宝当面付 / 微信 Native …
+      '发货物流售后评价、提现与创作分成、主题 / 页面区块、成长徽章私信、百度翻译。', // 变化条目：发货物流售后评价、提现与创作分成、主题 / 页面…
+      '验证 29 文件 / 407 例全过。', // 变化条目：验证 29 文件 / 407 例全过。
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Sixteen commerce tables and four paid asset kinds: article, download, gallery and video.', // 变化条目：Sixteen commerce tables …
+      'Payment intents with Alipay, WeChat Native, manual and sandbox adapters.', // 变化条目：Payment intents with Ali…
+      'Shipping, after-sales, reviews, withdrawals, creator earnings, theme/page blocks, badges, DMs and translation.', // 变化条目：Shipping, after-sales, r…
+      'Verified with 29 files / 407 tests.', // 变化条目：Verified with 29 files /…
+    ], // 英文变化清单结束
   },
-  '0.0.6': {
-    date: '2026-11-12',
-    commit: '9b66978',
-    stateZh: '线上曾实测 0.0.6',
-    stateEn: 'Observed online as 0.0.6',
-    changesZh: [
-      'Mim ID 改为 QQ 号样式纯数字号，存量全量重排并预留靓号。',
-      '同版本追加快递100 可选实时轨迹 74e78c0，未配置回退本地轨迹。',
-      '验证 31 文件 / 426 例全过。',
-    ],
-    changesEn: [
-      'Mim ID changed to numeric QQ-style IDs; existing users renumbered and premium IDs reserved.',
-      'Same version added optional Kuaidi100 live tracking via 74e78c0, falling back to local tracks.',
-      'Verified with 31 files / 426 tests.',
-    ],
+  '0.0.6': { // 版本 0.0.6 的静态补充信息
+    date: '2026-11-12', // 该版本发布日期
+    commit: '9b66978', // 递增提交短哈希
+    stateZh: '线上曾实测 0.0.6', // 中文线上状态
+    stateEn: 'Observed online as 0.0.6', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      'Mim ID 改为 QQ 号样式纯数字号，存量全量重排并预留靓号。', // 变化条目：Mim ID 改为 QQ 号样式纯数字号，存量全…
+      '同版本追加快递100 可选实时轨迹 74e78c0，未配置回退本地轨迹。', // 变化条目：同版本追加快递100 可选实时轨迹 74e78c…
+      '验证 31 文件 / 426 例全过。', // 变化条目：验证 31 文件 / 426 例全过。
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Mim ID changed to numeric QQ-style IDs; existing users renumbered and premium IDs reserved.', // 变化条目：Mim ID changed to numeri…
+      'Same version added optional Kuaidi100 live tracking via 74e78c0, falling back to local tracks.', // 变化条目：Same version added optio…
+      'Verified with 31 files / 426 tests.', // 变化条目：Verified with 31 files /…
+    ], // 英文变化清单结束
   },
-  '0.0.7': {
-    date: '2026-11-13',
-    commit: '3e74334',
-    stateZh: '线上有 0.0.7 取证',
-    stateEn: 'Online evidence for 0.0.7',
-    changesZh: [
-      '1–99 整段预留，发号起点改为 102。',
-      '新增重复段、阶梯对子、经典号三类判定，靓号由 7 类扩为 11 类。',
-      '重排开关升级为 renumber_v2，部署后再重排一次。',
-    ],
-    changesEn: [
-      'Reserved the entire 1–99 range; issuing now starts at 102.',
-      'Added repeated blocks, staircase pairs and iconic numbers; premium classes grew from 7 to 11.',
-      'Renumber switch upgraded to renumber_v2, causing one more renumber on deploy.',
-    ],
+  '0.0.7': { // 版本 0.0.7 的静态补充信息
+    date: '2026-11-13', // 该版本发布日期
+    commit: '3e74334', // 递增提交短哈希
+    stateZh: '线上有 0.0.7 取证', // 中文线上状态
+    stateEn: 'Online evidence for 0.0.7', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '1–99 整段预留，发号起点改为 102。', // 变化条目：1–99 整段预留，发号起点改为 102。
+      '新增重复段、阶梯对子、经典号三类判定，靓号由 7 类扩为 11 类。', // 变化条目：新增重复段、阶梯对子、经典号三类判定，靓号由 7…
+      '重排开关升级为 renumber_v2，部署后再重排一次。', // 变化条目：重排开关升级为 renumber_v2，部署后再…
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Reserved the entire 1–99 range; issuing now starts at 102.', // 变化条目：Reserved the entire 1–99…
+      'Added repeated blocks, staircase pairs and iconic numbers; premium classes grew from 7 to 11.', // 变化条目：Added repeated blocks, s…
+      'Renumber switch upgraded to renumber_v2, causing one more renumber on deploy.', // 变化条目：Renumber switch upgraded…
+    ], // 英文变化清单结束
   },
-  '0.0.8': {
-    date: '2026-11-13',
-    commit: '6dec1c4',
-    stateZh: '生产 run 43260913823 取证',
-    stateEn: 'Production run 43260913823',
-    changesZh: ['付费图库 / 视频前台渲染。', 'page_blocks 公共区块与论坛板块权限闭环。', '配套文档 5df4622 记录生产上线取证。'],
-    changesEn: [
-      'Paid gallery and video rendering on the frontend.',
-      'page_blocks public blocks and forum board permission closure.',
-      'Documentation commit 5df4622 recorded production evidence.',
-    ],
+  '0.0.8': { // 版本 0.0.8 的静态补充信息
+    date: '2026-11-13', // 该版本发布日期
+    commit: '6dec1c4', // 递增提交短哈希
+    stateZh: '生产 run 43260913823 取证', // 中文线上状态
+    stateEn: 'Production run 43260913823', // 英文线上状态
+    changesZh: ['付费图库 / 视频前台渲染。', 'page_blocks 公共区块与论坛板块权限闭环。', '配套文档 5df4622 记录生产上线取证。'], // 中文主要变化清单开始
+    changesEn: [ // 英文主要变化清单开始
+      'Paid gallery and video rendering on the frontend.', // 变化条目：Paid gallery and video r…
+      'page_blocks public blocks and forum board permission closure.', // 变化条目：page_blocks public block…
+      'Documentation commit 5df4622 recorded production evidence.', // 变化条目：Documentation commit 5df…
+    ], // 英文变化清单结束
   },
-  '0.0.9': {
-    date: '2026-11-13',
-    commit: '0dd2b9d',
-    stateZh: '线上实测 0.0.9',
-    stateEn: 'Observed online as 0.0.9',
-    changesZh: [
-      '商城资金、支付通道、邀请码、实名认证、跨站 SSO、内容运营、安全加固接入主应用。',
-      '前端入口由 31f5050 接通；验收文档 9eddf0c；后续 9adf6d3 补 P2 前台入口与线上取证。',
-      '验证 50 文件 / 601 例全过；CI run 43269427136 五作业全绿。',
-    ],
-    changesEn: [
-      'Marketplace funds, payment channels, invitations, real-name verification, cross-site SSO, content operations and security hardening integrated into the main app.',
-      'Frontend entries connected by 31f5050; acceptance doc 9eddf0c; 9adf6d3 added P2 UI and online evidence.',
-      'Verified with 50 files / 601 tests; CI run 43269427136 all five jobs green.',
-    ],
+  '0.0.9': { // 版本 0.0.9 的静态补充信息
+    date: '2026-11-13', // 该版本发布日期
+    commit: '0dd2b9d', // 递增提交短哈希
+    stateZh: '线上实测 0.0.9', // 中文线上状态
+    stateEn: 'Observed online as 0.0.9', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '商城资金、支付通道、邀请码、实名认证、跨站 SSO、内容运营、安全加固接入主应用。', // 变化条目：商城资金、支付通道、邀请码、实名认证、跨站 SS…
+      '前端入口由 31f5050 接通；验收文档 9eddf0c；后续 9adf6d3 补 P2 前台入口与线上取证。', // 变化条目：前端入口由 31f5050 接通；验收文档 9e…
+      '验证 50 文件 / 601 例全过；CI run 43269427136 五作业全绿。', // 变化条目：验证 50 文件 / 601 例全过；CI ru…
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'Marketplace funds, payment channels, invitations, real-name verification, cross-site SSO, content operations and security hardening integrated into the main app.', // 变化条目：Marketplace funds, payme…
+      'Frontend entries connected by 31f5050; acceptance doc 9eddf0c; 9adf6d3 added P2 UI and online evidence.', // 变化条目：Frontend entries connect…
+      'Verified with 50 files / 601 tests; CI run 43269427136 all five jobs green.', // 变化条目：Verified with 50 files /…
+    ], // 英文变化清单结束
   },
-  '0.0.10': {
-    date: '2026-11-13',
-    commit: '7e6dbf6',
-    stateZh: '当前线上 0.0.10',
-    stateEn: 'Current online 0.0.10',
-    changesZh: [
-      '六个包统一升至 0.0.10；补齐独立圈子、商城积分抵扣、可执行自研工具、CDN 回源契约、验证码强制、内容权限点、SSRF 与 Redis 修复。',
-      'c1a44de 合并远端后触发生产 P0：存量库缺 announcements.published_at 导致 API 全量 502；f9769e0 补列并兼容新库时序后恢复。',
-      '新增 test/upgrade-path.test.ts 覆盖老库升级与二次幂等；当前 56 文件 / 667+ 例全过，CI 43421667478 四作业 success。',
-    ],
-    changesEn: [
-      'All six packages bumped to 0.0.10; independent circles, marketplace points deduction, executable tools, CDN contract, enforced captcha, content permission, SSRF and Redis fixes.',
-      'c1a44de triggered a production P0 after merging: legacy databases lacked announcements.published_at, causing API-wide 502. f9769e0 added the column and fixed new-database ordering.',
-      'Added test/upgrade-path.test.ts for legacy upgrade and idempotent re-open; currently 56 files / 667+ tests pass, CI 43421667478 four jobs success.',
-    ],
+  '0.0.10': { // 版本 0.0.10 的静态补充信息
+    date: '2026-11-13', // 该版本发布日期
+    commit: '7e6dbf6', // 递增提交短哈希
+    stateZh: '当前线上 0.0.10', // 中文线上状态
+    stateEn: 'Current online 0.0.10', // 英文线上状态
+    changesZh: [ // 中文主要变化清单开始
+      '六个包统一升至 0.0.10；补齐独立圈子、商城积分抵扣、可执行自研工具、CDN 回源契约、验证码强制、内容权限点、SSRF 与 Redis 修复。', // 变化条目：六个包统一升至 0.0.10；补齐独立圈子、商城…
+      'c1a44de 合并远端后触发生产 P0：存量库缺 announcements.published_at 导致 API 全量 502；f9769e0 补列并兼容新库时序后恢复。', // 变化条目：c1a44de 合并远端后触发生产 P0：存量库…
+      '新增 test/upgrade-path.test.ts 覆盖老库升级与二次幂等；当前 56 文件 / 667+ 例全过，CI 43421667478 四作业 success。', // 变化条目：新增 test/upgrade-path.tes…
+    ], // 中文变化清单结束
+    changesEn: [ // 英文主要变化清单开始
+      'All six packages bumped to 0.0.10; independent circles, marketplace points deduction, executable tools, CDN contract, enforced captcha, content permission, SSRF and Redis fixes.', // 变化条目：All six packages bumped …
+      'c1a44de triggered a production P0 after merging: legacy databases lacked announcements.published_at, causing API-wide 502. f9769e0 added the column and fixed new-database ordering.', // 变化条目：c1a44de triggered a prod…
+      'Added test/upgrade-path.test.ts for legacy upgrade and idempotent re-open; currently 56 files / 667+ tests pass, CI 43421667478 four jobs success.', // 变化条目：Added test/upgrade-path.…
+    ], // 英文变化清单结束
   },
 }; // 版本补充信息结束
 
