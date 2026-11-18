@@ -243,7 +243,7 @@
   <tr><td>Sealos</td><td>容器 + PVC</td><td><code>deploy/sealos/mim.yaml</code></td></tr>
   <tr><td>veFaaS</td><td>容器函数</td><td><code>deploy/vefaas/deploy.sh</code></td></tr>
   <tr><td>IGA Pages</td><td>前端静态站</td><td><code>deploy/iga/deploy.sh</code></td></tr>
-  <tr><td>腾讯云自建服务器</td><td>前后端 + SQLite</td><td><code>deploy/deploy.sh</code>，<code>laal.top</code>（API <code>api.laal.top</code>；旧 <code>mim.mixm.top</code> 仅 301）</td></tr>
+  <tr><td>腾讯云自建服务器</td><td>前后端 + SQLite</td><td><code>deploy/deploy.sh</code>，<code>zy.laal.top</code>（API <code>api.laal.top</code>；旧 <code>mim.mixm.top</code> 仅 301）</td></tr>
 </table>
 
 <!-- 部署汇总小节标题：交付核对能力，非产品功能需求 -->
@@ -268,7 +268,7 @@
 <!-- 覆盖与去重说明：解释 9 平台与 11 部署项的差异 -->
 <p class="muted"><strong>覆盖与去重</strong>：补齐 Gitee 镜像仓与 <code>mim-store</code> 独立 Worker 两类同类项；README 曾将 Cloudflare 同源自托管入口另列一行，实为同一域名同载体的两种发布形态，已合并为一项并在 <code>delivery.modes</code> 区分；Bitbucket / Render / Netlify / Azure SWA / veFaaS 等属候选池或已排除，列入 <code>excluded</code> 但不计入汇总。</p>
 <!-- 交付物与取证边界说明 -->
-<p class="muted"><strong>交付物</strong>：<code>/deployments</code> 前端核对表、<code>/api/v1/deployments*</code> 三个公开只读端点、<code>docs/deployment-summary.{json,md}</code> 结构化结果、<code>scripts/deployment-summary.mjs</code> 生成器与 <code>scripts/verify-deployments.mjs</code> 校验器（52 项断言）。<strong>边界</strong>：汇总是核对工具，其通过不代表生产「已上线」；生产唯一权威终点仍为 <code>https://laal.top</code>（API <code>https://api.laal.top</code>；旧 <code>mim.mixm.top</code> 仅 301，见运维铁律十二）。</p>
+<p class="muted"><strong>交付物</strong>：<code>/deployments</code> 前端核对表、<code>/api/v1/deployments*</code> 三个公开只读端点、<code>docs/deployment-summary.{json,md}</code> 结构化结果、<code>scripts/deployment-summary.mjs</code> 生成器与 <code>scripts/verify-deployments.mjs</code> 校验器（52 项断言）。<strong>边界</strong>：汇总是核对工具，其通过不代表生产「已上线」；生产唯一权威终点仍为 <code>https://zy.laal.top</code>（API <code>https://api.laal.top</code>；旧 <code>mim.mixm.top</code> 仅 301，见运维铁律十二）。</p>
 
 <!-- 导航站小节标题：统一入口清单中 NAVIGATION 的业务模块落地 -->
 <h3>导航站（NAVIGATION 业务模块，2026-11-12 新增）</h3>
@@ -831,7 +831,7 @@ function submitLogin(){
 <!-- 协议规则清单 -->
 <ul>
   <!-- WS 端点 -->
-  <li>WebSocket 端点：<code>wss://laal.top/api/v1/im/ws?token=&lt;access_token&gt;</code>（生产域同源；静态托管直连 <code>wss://api.laal.top:8443/api/v1/im/ws</code>）</li>
+  <li>WebSocket 端点：<code>wss://zy.laal.top/api/v1/im/ws?token=&lt;access_token&gt;</code>（生产域同源；静态托管直连 <code>wss://api.laal.top:8443/api/v1/im/ws</code>）</li>
   <!-- 鉴权方式 -->
   <li>鉴权：query.token 经 JWT 校验；失败时完成 101 握手后发送 error 帧并以 close code 1008 关闭</li>
   <!-- 心跳机制 -->

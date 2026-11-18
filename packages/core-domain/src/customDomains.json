@@ -4,12 +4,12 @@
   "source": {
     "file": "dnspod_records_2026-11-05_21-42-26.xls",
     "sheets": [
-      "laal.top",
+      "zy.laal.top",
       "mixm.top"
     ],
     "zone_used": "mixm.top",
     "raw_rows": {
-      "laal.top": 93,
+      "zy.laal.top": 93,
       "mixm.top": 104
     },
     "note": "导出为 DNSPod 主机记录模板：记录类型与记录值两列全部为空，仅主机记录 / 线路 / TTL=600 / 备注有值，因此本表只确定「域名命名与平台归属」，解析值以 DNSPod 控制台现状为准"

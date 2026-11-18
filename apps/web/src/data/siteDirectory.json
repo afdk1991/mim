@@ -1,7 +1,7 @@
 {
   "schema": "mim.site-directory.v1",
   "source": "dnspod_records_2026-11-05_21-42-26.xls",
-  "scope": "laal.top + mixm.top 两个工作表全文（表头行不计入）",
+  "scope": "zy.laal.top + mixm.top 两个工作表全文（表头行不计入）",
   "capturedAt": "2026-11-09 22:16 +08:00",
   "noteFormat": "每条备注均为「入口描述｜系统名」两段式，未提供功能规格、输入输出、交互流程或行为约束",
   "clearedColumns": [
@@ -30,7 +30,7 @@
       "note": "核心根域名，主站基础入口｜主站统一跳转门户",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "4",
             "5"
@@ -57,7 +57,7 @@
       "note": "管理后台入口｜全站统一运营管理后台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "8",
             "9"
@@ -84,7 +84,7 @@
       "note": "接口服务入口｜API 统一网关",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "10",
             "11"
@@ -111,7 +111,7 @@
       "note": "APP 端接口入口｜移动端专属接口服务",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "12",
             "13"
@@ -138,7 +138,7 @@
       "note": "权限验证入口｜统一身份认证与权限中心",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "14",
             "15"
@@ -165,7 +165,7 @@
       "note": "博客模块入口｜官方博客系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "16",
             "17"
@@ -192,7 +192,7 @@
       "note": "用户中心入口｜用户个人中心 / 会员工作台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "18",
             "19"
@@ -219,7 +219,7 @@
       "note": "云服务模块入口｜私有云盘 / 网盘系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "20",
             "21"
@@ -246,7 +246,7 @@
       "note": "数据中心入口｜开放数据集平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "22",
             "23"
@@ -273,7 +273,7 @@
       "note": "开发测试入口｜开发环境门户 + 接口文档",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "24",
             "25"
@@ -300,7 +300,7 @@
       "note": "导航模块入口｜全站资源导航站",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "26",
             "27"
@@ -327,7 +327,7 @@
       "note": "代码生成工具入口｜低代码生成平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "28",
             "29"
@@ -354,7 +354,7 @@
       "note": "视频动态模块入口｜UGC 短视频动态社区",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "30",
             "31"
@@ -381,7 +381,7 @@
       "note": "服务器支撑入口｜运维监控面板",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "32",
             "33"
@@ -408,7 +408,7 @@
       "note": "工具模块入口｜在线工具集合平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "34",
             "35"
@@ -448,7 +448,7 @@
       "note": "帮助中心入口｜产品帮助文档中心",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "36",
             "37"
@@ -475,7 +475,7 @@
       "note": "图片资源入口｜公共图床 + 素材资源站",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "38",
             "39"
@@ -502,7 +502,7 @@
       "note": "登录验证入口｜统一单点登录页",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "40",
             "41"
@@ -529,7 +529,7 @@
       "note": "电商商城入口｜B2C 官方商城系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "42",
             "43"
@@ -556,7 +556,7 @@
       "note": "营销模块入口｜营销活动管理平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "44",
             "45"
@@ -583,7 +583,7 @@
       "note": "移动端适配入口｜移动端 H5 精简版官网",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "46",
             "47"
@@ -610,7 +610,7 @@
       "note": "移动终端专用入口｜全功能移动端站点",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "48",
             "49"
@@ -637,7 +637,7 @@
       "note": "资讯模块入口｜新闻资讯发布系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "50",
             "51"
@@ -664,7 +664,7 @@
       "note": "支付结算入口｜支付聚合网关 + 对账系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "52",
             "53"
@@ -691,7 +691,7 @@
       "note": "门户首页入口｜企业内部统一门户 / 工作台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "54",
             "55"
@@ -718,7 +718,7 @@
       "note": "安全防护入口｜安全防护中心",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "56",
             "57"
@@ -745,7 +745,7 @@
       "note": "服务支撑入口｜服务治理监控平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "58",
             "59"
@@ -772,7 +772,7 @@
       "note": "线上店铺入口｜多商户店铺系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "60",
             "61"
@@ -799,7 +799,7 @@
       "note": "数据采集入口｜爬虫调度与数据采集平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "62",
             "63"
@@ -826,7 +826,7 @@
       "note": "视频模块入口｜长视频点播系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "64",
             "65"
@@ -853,7 +853,7 @@
       "note": "数据统计入口｜全站数据 BI 看板",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "66",
             "67"
@@ -880,7 +880,7 @@
       "note": "资源存储 / 下载站点｜软件源码下载分发站",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "68",
             "69"
@@ -907,7 +907,7 @@
       "note": "技术支持入口｜工单客服系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "70",
             "71"
@@ -934,7 +934,7 @@
       "note": "测试环境入口｜测试环境统一入口",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "72",
             "73"
@@ -961,7 +961,7 @@
       "note": "用户管理入口｜用户会员管理后台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "74",
             "75"
@@ -988,7 +988,7 @@
       "note": "视频播放入口｜独立视频播放页",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "76",
             "77"
@@ -1015,7 +1015,7 @@
       "note": "WordPress 相关入口｜WordPress 独立站点",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "78",
             "79"
@@ -1042,7 +1042,7 @@
       "note": "新闻资讯入口｜自媒体资讯平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "80",
             "81"
@@ -1069,7 +1069,7 @@
       "note": "商品资源入口｜货源商品库平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "82",
             "83"
@@ -1096,7 +1096,7 @@
       "note": "语音相关入口｜语音工具服务平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "84",
             "85"
@@ -1123,7 +1123,7 @@
       "note": "B2B 大宗商贸平台主入口｜B2B 企业批发采购平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "86",
             "87"
@@ -1150,7 +1150,7 @@
       "note": "供应商入驻管理入口｜供应商后台管理系统",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "88",
             "89"
@@ -1177,7 +1177,7 @@
       "note": "C2C 个人交易市场入口｜C2C 个人闲置 / 商品交易平台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "90",
             "91"
@@ -1204,7 +1204,7 @@
       "note": "个人卖家管理入口｜个人卖家店铺管理后台",
       "sources": [
         {
-          "sheet": "laal.top",
+          "sheet": "zy.laal.top",
           "rows": [
             "92",
             "93"
@@ -1226,14 +1226,14 @@
   ],
   "blankRows": [
     {
-      "sheet": "laal.top",
+      "sheet": "zy.laal.top",
       "row": 2,
       "host": "@",
       "resolution": "unresolved",
       "reasonCode": "BLANK_NOTE"
     },
     {
-      "sheet": "laal.top",
+      "sheet": "zy.laal.top",
       "row": 3,
       "host": "@",
       "resolution": "unresolved",

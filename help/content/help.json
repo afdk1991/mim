@@ -176,7 +176,7 @@
             {
               "type": "note",
               "tone": "warn",
-              "text": "现网已上线：https://help.laal.top（443，静态根 /opt/mim/help，由 deploy/deploy.sh 随发布同步）。证书由 laal.top 的泛域名 *.laal.top 覆盖，无需为文档站单独签发；可作为正式外链引用。"
+              "text": "现网已上线：https://help.laal.top（443，静态根 /opt/mim/help，由 deploy/deploy.sh 随发布同步）。证书由 zy.laal.top 的泛域名 *.laal.top 覆盖，无需为文档站单独签发；可作为正式外链引用。"
             },
             {
               "type": "p",

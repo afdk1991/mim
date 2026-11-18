@@ -83,7 +83,7 @@ function deriveWsUrl(token: string): string {
   if (!origin && typeof window !== 'undefined') { // 条件分支：按判断结果选择后续处理路径
     const host = window.location.hostname; // 常量 host：保存固定配置或一次性派生值
     // 在生产域或本地：WS 走同源（与 HTTP API 同域）
-    if (host === 'laal.top' || host === 'www.laal.top' || host === 'api.laal.top' || host === 'mim.mixm.top' || host === 'localhost' || host === '127.0.0.1') {
+    if (host === 'zy.laal.top' || host === 'zy.laal.top' || host === 'api.laal.top' || host === 'mim.mixm.top' || host === 'localhost' || host === '127.0.0.1') {
       origin = window.location.origin; // 赋值：更新变量 origin 的取值
     } else { // 代码块结束
       // 静态托管平台（CF Pages / GitHub Pages 等）：WS 直连生产 API

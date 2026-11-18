@@ -359,7 +359,7 @@ fi
 
 # 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel 等）以独立域名直连本 API 所必需。
 # 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_CORS_ORIGINS 环境变量可覆盖默认列表。
-CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top}"
+CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://zy.laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top}"
 if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE"; then
   log "$MIM_ENV_FILE 已含 MIM_CORS_ORIGINS，保留现有值"
 else
@@ -370,7 +370,7 @@ fi
 # 端口化后的同源 Origin：HTTPS 端口取默认 443 时浏览器 Origin 不带端口（上面的默认列表已覆盖），
 # 只有被仓库变量覆盖成非 443（如历史 8443）才会带端口，此时才需要追加，避免写入永远匹配不上的 :443。
 if [ "${MIM_WEB_HTTPS_PORT}" != "443" ]; then
-  for PORTED_ORIGIN in "https://laal.top:${MIM_WEB_HTTPS_PORT}" "https://api.laal.top:${MIM_WEB_HTTPS_PORT}"; do
+  for PORTED_ORIGIN in "https://zy.laal.top:${MIM_WEB_HTTPS_PORT}" "https://api.laal.top:${MIM_WEB_HTTPS_PORT}"; do
     if grep -q '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" && ! grep '^MIM_CORS_ORIGINS=' "$MIM_ENV_FILE" | grep -Fq "$PORTED_ORIGIN"; then
       sed -i "s|^MIM_CORS_ORIGINS=\(.*\)$|MIM_CORS_ORIGINS=\1,${PORTED_ORIGIN}|" "$MIM_ENV_FILE"
       log "追加带端口 Origin 到 MIM_CORS_ORIGINS（$PORTED_ORIGIN）"

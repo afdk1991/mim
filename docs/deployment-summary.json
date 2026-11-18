@@ -1,7 +1,7 @@
 {
   "schema": "mim.deployment-registry.v1",
-  "generated_at": "2026-11-18T15:55:03.539Z",
-  "head": "d099112",
+  "generated_at": "2026-11-18T16:23:29.835Z",
+  "head": "607e974",
   "mode": "baseline",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
@@ -30,7 +30,7 @@
     "anomaly_severity_note": "2026-11-13 00:50 +08:00 按「无异常说明」要求做 severity 复核：warning 仅用于「事实未解决、会影响交付」的项；已由本轮真实 CI 解除的旧告警、平台按设计的行为（访问保护）、手动交付模式、以及未进矩阵候选的客观前提缺失，统一降为 info 并保留原始记录全文，矩阵 11 平台全部 OK/PASS。",
     "candidate_pool_note": "候选池不参与部署汇总与异常统计（status_codes.NOT_APPLICABLE 口径）；移入仅表示「当前客观前提不足、未真实部署」，不代表平台不可用，也不删除任何历史事实：每条的 former_item_id、原 missing_fields 与所需 prerequisite 均保留。",
     "latest_evidence_run": "CI run 43265614994（@9c8de49，completed/success，五作业全绿）：托管平台同步作业真实发布 Netlify（Production URL https://mim-web.netlify.app，Unique deploy 6af5f2761ffb5de0372620d1）、Vercel（未配置 token 时 SKIP，站点仍在线）、Cloudflare Pages / 两个 Worker、Gitee 镜像推送；同作业 curl 探测 13 个入口全部符合预期：mim.mixm.top 三入口 200、data.mixm.top 200、mim-45yeiirr.edgeone.cool 200、mim-299.pages.dev 200、mim-store / mim-api-edge Worker 200、GitHub Pages 200、github.com 200、gitee.com 200、ghcr.io 401（需鉴权属预期）、IGA 401（访问保护）、Vercel 200、Netlify 200。",
-    "evidence_xls_note": "2026-11-13 01:25 +08:00 已把本轮全平台探测写入 dnspod_records_2026-11-05_21-42-26.xls：新增 sheet「全平台复验-20261113」（15 行探测明细）与「候选未接入-20261113」（7 条非部署项事实与前置条件）；原 laal.top / mixm.top 两张 DNSPod 记录表未动。"
+    "evidence_xls_note": "2026-11-13 01:25 +08:00 已把本轮全平台探测写入 dnspod_records_2026-11-05_21-42-26.xls：新增 sheet「全平台复验-20261113」（15 行探测明细）与「候选未接入-20261113」（7 条非部署项事实与前置条件）；原 zy.laal.top / mixm.top 两张 DNSPod 记录表未动。"
   },
   "coverage_check": {
     "matrix_platforms": 11,
@@ -102,14 +102,14 @@
     {
       "name": "gitee",
       "ok": true,
-      "hash": "d099112bfaa1eb6d61714d08d4f433b1873883d3",
+      "hash": "607e97452e0371688e87c85b73f929e15b49fca7",
       "exit": 0,
       "error": null
     },
     {
       "name": "origin",
       "ok": true,
-      "hash": "d099112bfaa1eb6d61714d08d4f433b1873883d3",
+      "hash": "607e97452e0371688e87c85b73f929e15b49fca7",
       "exit": 0,
       "error": null
     }
@@ -485,9 +485,9 @@
         "腾讯云自建",
         "自建主站",
         "生产主站",
-        "laal.top",
+        "zy.laal.top",
         "api.laal.top",
-        "mim.mixm.top（旧域，仅 301 → laal.top）",
+        "mim.mixm.top（旧域，仅 301 → zy.laal.top）",
         "宿主机直部署"
       ],
       "platform_id": "tcloud",
@@ -499,7 +499,7 @@
         "url": "https://github.com/afdk1991/mim.git",
         "role": "服务器检出源（git@github.com:22 + 只读 deploy_key）"
       },
-      "entry_url": "https://laal.top",
+      "entry_url": "https://zy.laal.top",
       "delivery": {
         "mode": "ci",
         "ci_job": "deploy",
@@ -518,7 +518,7 @@
         "http_code": "200",
         "latency_ms": 429,
         "bytes": 15,
-        "evidence": "2026-11-18 23:xx +08:00 本机实测（生产入口已为 laal.top）：https://laal.top/health → 200 / 0.429s / 15B（{\"status\":\"ok\"}）；https://laal.top/ → 200 / 5509B；https://laal.top/admin/ → 200 / 2087B；https://api.laal.top/api/v1/healthz → 200 / 15B。CI Deploy run 44336238532（@d099112）五作业全绿，「发布到生产服务器」作业内远程发布 / 版本校验 / 健康检查（https://laal.top:443）/ 管理后台路由断言 / 认证接口抽查全部 success。主机侧：腾讯云 CVM 115.159.159.11（nginx 1.18.0、systemd mim-api、SQLite WAL）。历史留痕：旧入口 https://mim.mixm.top 自 2026-11-15 起不再承载 Mim，仅 301 → laal.top（本机对该旧域存在网络阻断特征，解析/请求返回 000，故旧域 301 以 nginx 配置与历史取证为准）",
+        "evidence": "2026-11-18 23:xx +08:00 本机实测（生产入口已为 zy.laal.top）：https://zy.laal.top/health → 200 / 0.429s / 15B（{\"status\":\"ok\"}）；https://zy.laal.top/ → 200 / 5509B；https://zy.laal.top/admin/ → 200 / 2087B；https://api.laal.top/api/v1/healthz → 200 / 15B。CI Deploy run 44336238532（@d099112）五作业全绿，「发布到生产服务器」作业内远程发布 / 版本校验 / 健康检查（https://zy.laal.top:443）/ 管理后台路由断言 / 认证接口抽查全部 success。主机侧：腾讯云 CVM 115.159.159.11（nginx 1.18.0、systemd mim-api、SQLite WAL）。历史留痕：旧入口 https://mim.mixm.top 自 2026-11-15 起不再承载 Mim，仅 301 → zy.laal.top（本机对该旧域存在网络阻断特征，解析/请求返回 000，故旧域 301 以 nginx 配置与历史取证为准）",
         "captured_at": "2026-11-18 23:xx +08:00"
       },
       "anomalies": [
@@ -545,14 +545,14 @@
         {
           "code": "LEGACY_DOMAIN_301",
           "severity": "info",
-          "message": "现行口径：生产唯一权威终点为 https://laal.top（API https://api.laal.top，后台 https://laal.top/admin/）；旧域 mim.mixm.top 于 2026-11-15 起不再承载 Mim，仅配置 301 → laal.top，不得再作为生产入口引用"
+          "message": "现行口径：生产唯一权威终点为 https://zy.laal.top（API https://api.laal.top，后台 https://zy.laal.top/admin/）；旧域 mim.mixm.top 于 2026-11-15 起不再承载 Mim，仅配置 301 → zy.laal.top，不得再作为生产入口引用"
         }
       ],
       "missing_fields": [
         "V4_browser_e2e"
       ],
       "sources": [
-        "curl https://laal.top/health",
+        "curl https://zy.laal.top/health",
         "curl https://api.laal.top/api/v1/healthz",
         "git ls-tree HEAD deploy/...",
         "git diff --cached --name-status",

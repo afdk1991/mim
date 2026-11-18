@@ -189,7 +189,7 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 
 ## 7. 生产部署（铁律八）
 
-> **生产环境已上线**：`https://laal.top`（API `https://api.laal.top`；前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。旧 `mim.mixm.top` 已无 Mim 部署，仅 301 → `laal.top`。本地预览不是交付终点。
+> **生产环境已上线**：`https://zy.laal.top`（API `https://api.laal.top`；前端 `apps/web` + 后端 `services/mim-api` + SQLite 持久化数据库）。旧 `mim.mixm.top` 已无 Mim 部署，仅 301 → `zy.laal.top`。本地预览不是交付终点。
 
 ### 7.1 自动部署（默认路径）
 
@@ -205,17 +205,17 @@ deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/d
            → 断言本机 curl -k --resolve <域名>:443:127.0.0.1 https://<域名>/admin/ 含 noindex
              （不用 http://127.0.0.1/admin 的 301 判定：certbot --redirect 的 80 端口跳转块恒 301，属假阳性）
          → 校验服务器 HEAD == 本次提交 SHA（不一致即失败）
-         → curl https://laal.top/health（必须 200，最多重试 10 次）
-         → curl -o /dev/null -w '%{http_code}' https://laal.top/admin（必须 301）
-         → curl https://laal.top/admin/（必须含 noindex 与 assets/index-*，否则落回用户端页面）
-         → curl -o /dev/null -w '%{http_code}' https://laal.top/api/v1/plans（必须 404）
-         → curl -o /dev/null -w '%{http_code}' https://laal.top/api/v1/audit/logs（必须 404）
-         → curl -o /dev/null -w '%{http_code}' https://laal.top/api/v1/modules（必须 200）
-         → curl -o /dev/null -w '%{http_code}' https://laal.top/health（必须 200）
+         → curl https://zy.laal.top/health（必须 200，最多重试 10 次）
+         → curl -o /dev/null -w '%{http_code}' https://zy.laal.top/admin（必须 301）
+         → curl https://zy.laal.top/admin/（必须含 noindex 与 assets/index-*，否则落回用户端页面）
+         → curl -o /dev/null -w '%{http_code}' https://zy.laal.top/api/v1/plans（必须 404）
+         → curl -o /dev/null -w '%{http_code}' https://zy.laal.top/api/v1/audit/logs（必须 404）
+         → curl -o /dev/null -w '%{http_code}' https://zy.laal.top/api/v1/modules（必须 200）
+         → curl -o /dev/null -w '%{http_code}' https://zy.laal.top/health（必须 200）
          → curl -X POST -H 'Content-Type: application/json' -d '{}'
-           https://laal.top/api/v1/auth/code（空体必须 400）
+           https://zy.laal.top/api/v1/auth/code（空体必须 400）
          → curl -X POST -H 'Content-Type: application/json' --data-binary '{"region":'
-           https://laal.top/api/v1/auth/code（非法 JSON 必须 400，不得回 500）
+           https://zy.laal.top/api/v1/auth/code（非法 JSON 必须 400，不得回 500）
 ```
 
 生产安全开关与登录入口（CI 不跑，需合法请求体）：
@@ -289,7 +289,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 | 平台 | 前端 API 源 | 是否需要 `MIM_CORS_ORIGINS` | 说明 |
 |---|---|---|---|
-| 自建 `laal.top` | 同源（nginx 反代 `/api/`） | 否 | 不挂 CORS 中间件 |
+| 自建 `zy.laal.top` | 同源（nginx 反代 `/api/`） | 否 | 不挂 CORS 中间件 |
 | GitHub Pages `afdk1991.github.io` | 构建期注入 `VITE_API_ORIGIN=https://api.laal.top`（跨域直连） | **是** | 必须含 `https://afdk1991.github.io`（含 `/mim` 子路径同源） |
 | Cloudflare Pages `mim-299.pages.dev`（项目名 `mim`；旧 `mim-8ah` 保留回滚） | 相对 `/api`（同源） | 否 | `functions/api/[[path]].js` 已同源反代到 `api.laal.top` |
 | Vercel（项目名 `mim`，域名 `mim-puce.vercel.app`） | 相对 `/api`（同源） | 否 | `vercel.json` `rewrites` 已同源反代 |
@@ -297,7 +297,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 | Sealos `mim-i3ywsdfn.cloud.sealos.io` | — | — | **纯 API 容器，不托管 Web SPA**，`/store` 返回 JSON 404 属预期，非缺陷 |
 
 > 配置要点：`MIM_CORS_ORIGINS` 缺配时后端**完全不挂 CORS 中间件**，跨域直连的镜像站（如 GitHub Pages）浏览器会拦截 `/api/v1/modules` → 商城整页报错/空白。
-> `deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top`；其余镜像源（IGA 等）须按需追加。
+> `deploy/deploy.sh` 已幂等补齐 `https://afdk1991.github.io,https://zy.laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top`；其余镜像源（IGA 等）须按需追加。
 
 容器镜像说明：本机与 CI 均不使用 `pnpm deploy`（pnpm 9.12 实测报 `Unknown option: 'legacy'` 且目标路径拼接异常），
 `Dockerfile` 运行阶段直接搬运 pnpm 相对符号链接依赖树（builder 与 runtime 的 `WORKDIR` 同为 `/app`）。
@@ -341,7 +341,7 @@ gh secret set IGA_PROJECT_NAME --body "mim"
 
 > 候选平台的免费额度与选型路由见 [AGENTS.md 铁律十](../../AGENTS.md)：远程仓库 3 个（GitHub / Bitbucket / Gitee）、纯静态 5 个（GitHub Pages / Cloudflare Pages / Vercel / Netlify / Azure Static Web Apps）、后端动态 2 个（Render 750 实例小时/月、Cloudflare Workers 10 万请求/天）。**原候选托管平台相关内容已于 2026-11-09 全量删除，不得重新引入候选池**。**本表为已落地的 11 平台矩阵，铁律十为候选池与选型依据**；新增平台须先过「长期免费层 / 额度可承载 / 是否实名绑卡 / 复核日期与来源」四要件。
 >
-> **生产权威终点（铁律十二，2026-11-15 更新入口）**：上述 11 平台仅为分发 / 镜像 / 可用性取证，**唯一生产上线终点为线上腾讯云自建服务器 `https://laal.top`**（API `https://api.laal.top`；nginx + systemd `mim-api` + SQLite WAL，前后端 + 数据库一体），旧 `mim.mixm.top` 仅 301 → `laal.top`；两个代码远端 `origin`（GitHub）与 `gitee`（Gitee）每轮须同轮全推并逐个 `git ls-remote` 取证。详见 [AGENTS.md §12](../../AGENTS.md)。
+> **生产权威终点（铁律十二，2026-11-15 更新入口）**：上述 11 平台仅为分发 / 镜像 / 可用性取证，**唯一生产上线终点为线上腾讯云自建服务器 `https://zy.laal.top`**（API `https://api.laal.top`；nginx + systemd `mim-api` + SQLite WAL，前后端 + 数据库一体），旧 `mim.mixm.top` 仅 301 → `zy.laal.top`；两个代码远端 `origin`（GitHub）与 `gitee`（Gitee）每轮须同轮全推并逐个 `git ls-remote` 取证。详见 [AGENTS.md §12](../../AGENTS.md)。
 
 > **本机不可达两项属网络侧限制，不代表部署失败**：Vercel 存在 DNS 污染、github.com 存在 HTTPS 阻断；两者均有 CI 日志与 git/gh 侧取证。
 
@@ -413,7 +413,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 
 ## 7.6 DNS 资产（DNSPod mixm.top）与功能模块对应
 
-来源：`dnspod_records_2026-11-05_21-42-26.xls`（197 条，含 GBK 中文备注）。**口径更正（2026-11-11 实读）**：197 条 = 两个工作表原始行数之和（`laal.top` 93 + `mixm.top` 104，均含表头），逐行只有「主机记录 / 线路类型 / TTL 600 / 备注」有值，**记录类型与记录值两列全为空**，逐主机折叠后实为 46 条主机记录（44 类模块入口 + 根域 / 空白占位），即这是一份命名模板而非可直接导入的解析记录。结论（2026-11-06 全仓比对）：
+来源：`dnspod_records_2026-11-05_21-42-26.xls`（197 条，含 GBK 中文备注）。**口径更正（2026-11-11 实读）**：197 条 = 两个工作表原始行数之和（`zy.laal.top` 93 + `mixm.top` 104，均含表头），逐行只有「主机记录 / 线路类型 / TTL 600 / 备注」有值，**记录类型与记录值两列全为空**，逐主机折叠后实为 46 条主机记录（44 类模块入口 + 根域 / 空白占位），即这是一份命名模板而非可直接导入的解析记录。结论（2026-11-06 全仓比对）：
 
 - **项目实际使用 3 条**：`mim`（生产主域）、`data`（EdgeOne Pages 真实前端站）、`_dnsauth.mim`（证书签发校验）；`cloud.mixm.top` DNS 在线但项目零引用；其余 193 条未使用。
 - **备注 ↔ 模块对应（40 种备注）**：仅 3 类直接命中——`auth` / `login` / `api` → FR-01 账号与身份 + `mim-api`；10 类部分沾边（`admin` / `center` / `user` / `dy` / `sp` / `video` / `yy` / `img` / `secure` / `portal`）；27 类无对应（`pay` 无对应域；电商 7 类、资讯 4 类、工具 4 类、移动端 3 类等与当前「功能模块商城 + 漫剧 AI 剧」范围无关）。
@@ -442,7 +442,7 @@ npm run check        # version-check + env-check + comment-check（退出码 0 =
 
 | 部署平台 | 自定义域名 | xls 主机 / 行号 | 状态 |
 |---|---|---|---|
-| 腾讯云自建服务器（生产权威终点） | `laal.top`（旧 `mim.mixm.top` 仅 301 → `laal.top`） | `laal.top` 工作表（根域） | live（`https://laal.top/health` 200，2026-11-15 实测） |
+| 腾讯云自建服务器（生产权威终点） | `zy.laal.top`（旧 `mim.mixm.top` 仅 301 → `zy.laal.top`） | `zy.laal.top` 工作表（根域） | live（`https://zy.laal.top/health` 200，2026-11-15 实测） |
 | 腾讯云 EdgeOne Pages | `data.mixm.top` | `data` / 22–23、104 | pending_dns（2026-11-12 21:23 控制台复核：mim 项目未绑定该自定义域，双解析器 NXDOMAIN；默认域 `mim-45yeiirr.edgeone.cool` 在线、产物最新） |
 | GitHub Pages | `afdk1991.github.io/mim/`（平台默认域） | — | 不适用 |
 | Cloudflare Pages | `portal.mixm.top` | `portal` / 54–55 | pending_dns |

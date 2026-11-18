@@ -97,7 +97,7 @@ jobs:
     environment:
       name: production
       # 生产入口：443 与同机 MixmAPP 共享监听，靠 server_name/SNI 区分，Mim 不抢 default_server
-      url: https://laal.top:${{ vars.MIM_WEB_HTTPS_PORT || '443' }}
+      url: https://zy.laal.top:${{ vars.MIM_WEB_HTTPS_PORT || '443' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -289,13 +289,13 @@ jobs:
           # 注意 443 是同机共享端口，探到 200 必须同时校验响应体/路径确属 Mim（见下方 /health 断言），
           # 不能只凭「443 有 200」判断 Mim 已上线。
           for i in $(seq 1 10); do
-            if curl -fsS --max-time 5 "https://laal.top:${MIM_WEB_HTTPS_PORT}/health"; then
-              echo "✅ 生产健康检查通过（https://laal.top:${MIM_WEB_HTTPS_PORT}）"
+            if curl -fsS --max-time 5 "https://zy.laal.top:${MIM_WEB_HTTPS_PORT}/health"; then
+              echo "✅ 生产健康检查通过（https://zy.laal.top:${MIM_WEB_HTTPS_PORT}）"
               exit 0
             fi
             sleep 5
           done
-          echo "❌ 生产健康检查失败（https://laal.top:${MIM_WEB_HTTPS_PORT}/health）"
+          echo "❌ 生产健康检查失败（https://zy.laal.top:${MIM_WEB_HTTPS_PORT}/health）"
           exit 1
 
       # 独立管理后台路由断言：/admin（无斜杠）必须 301 到 /admin/，
@@ -306,14 +306,14 @@ jobs:
         if: steps.creds.outputs.has_creds == '1'
         run: |
           set -e
-          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://laal.top:${MIM_WEB_HTTPS_PORT}/admin")
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://zy.laal.top:${MIM_WEB_HTTPS_PORT}/admin")
           if [ "$code" != "301" ]; then
             echo "❌ /admin 期望 301，实际 $code"
             exit 1
           fi
           echo "✅ /admin → 301"
 
-          body=$(curl -fsS --max-time 5 "https://laal.top:${MIM_WEB_HTTPS_PORT}/admin/")
+          body=$(curl -fsS --max-time 5 "https://zy.laal.top:${MIM_WEB_HTTPS_PORT}/admin/")
           echo "$body" | grep -q 'noindex' || { echo "❌ /admin/ 缺少 noindex，疑似落回用户端页面"; exit 1; }
           echo "$body" | grep -q 'assets/index-' || { echo "❌ /admin/ 未引用管理后台产物"; exit 1; }
           echo "✅ /admin/ 返回管理后台页面"
@@ -598,8 +598,8 @@ jobs:
           # Mim 自有域名一律带端口探测；第三方平台（pages.dev / vercel / netlify 等）
           # 仍按其自身默认 443/80 口径，不套用本机端口。
           for url in \
-            "https://laal.top:${MIM_WEB_HTTPS_PORT}/health" \
-            "https://laal.top:${MIM_WEB_HTTPS_PORT}/" \
+            "https://zy.laal.top:${MIM_WEB_HTTPS_PORT}/health" \
+            "https://zy.laal.top:${MIM_WEB_HTTPS_PORT}/" \
             "https://api.laal.top:${MIM_WEB_HTTPS_PORT}/api/v1/shop/products" \
             https://mim-299.pages.dev/ \
             https://mim-puce.vercel.app/ \

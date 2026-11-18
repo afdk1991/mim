@@ -9,7 +9,7 @@
 #   或先克隆仓库后：sudo bash /opt/mim/app/deploy/bootstrap.sh
 #
 # 环境变量（可选）：
-#   DOMAIN   默认 laal.top
+#   DOMAIN   默认 laal.top（证书目录 live/laal.top，*.laal.top 泛域名覆盖 zy.laal.top）
 #   APP_DIR  默认 /opt/mim/app
 #   WEB_DIR  默认 /opt/mim/web
 #   RUN_USER 默认 mim
@@ -139,7 +139,7 @@ bash "$APP_DIR/deploy/deploy.sh"
 # --- 7. HTTPS（失败不阻断） ---
 # 同机共存（MIM_TLS_CERTBOT=0，默认）下 80 端口归 MixmAPP，HTTP-01 与 --webroot 都无法由
 # 本机独立完成（webroot 需改 MixmAPP 的 nginx，跨站耦合且易被其重载覆盖），因此这里不签证书。
-# 证书结论：用 DNS-01（DNSPod API 或手动 TXT）为 laal.top / *.laal.top 签发，落位到
+# 证书结论：用 DNS-01（DNSPod API 或手动 TXT）为 zy.laal.top / *.laal.top 签发，落位到
 # /etc/letsencrypt/live/${DOMAIN}/ 后重跑 deploy.sh，TLS 片段会自动挂到 443。
 if [ "$MIM_TLS_CERTBOT" != "1" ]; then
   warn "同机共存模式：跳过证书签发（结论见上，DNS-01 签发后重跑 deploy.sh 即可启用 ${MIM_WEB_HTTPS_PORT}）"
