@@ -10,7 +10,8 @@ import './tokens.css';
 import './styles.css';
 // 八大板块公共组件样式：指南条、分组标签与匿名规则清单，独立文件避免与视觉线改造冲突
 import './community-guides.css';
-import './styles-colorful.css'; /* 彩色叠加层：置于最后，保证覆盖既有排版顺序 */
+import './styles-colorful.css'; /* 彩色叠加层：置于倒数第二，保证覆盖既有排版顺序 */
+import './styles-polish.css'; /* 视觉精修层：全站令牌 / 排版 / 布局 / 组件统一打磨，必须最后引入才能覆盖前序样式 */
 
 // 取挂载节点：对应 index.html 中预留的 #root
 const container = document.getElementById('root');
