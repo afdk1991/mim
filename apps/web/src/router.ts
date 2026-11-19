@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 // 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 支付回跳深链接页
 export type AppView =
+  | 'home' // 门户首页：hero + 入口卡 + 精选帖（社区设置为论坛首页时由 App 内 effect 跳社区）
   | 'account' // 个人中心（资料 / 账号与设置）
   | 'community' // 社区与变现（论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
   | 'chat' // IM 聊天 + 视频通话
@@ -20,6 +21,7 @@ export interface AppRoute {
 // 对外地址一律为 https://<域名>/<模块功能名>，与 App.tsx 导航文案一一对应，
 // 不再使用与功能名对不上的缩写段；已下线模块不再登记路径段，访问时按未知路径回落社区。
 export const VIEW_SEGMENTS: Record<AppView, string> = {
+  home: 'home', // 门户首页（hero / 入口卡 / 精选）
   account: 'account', // 个人中心（资料 / 账号与设置）
   community: 'community', // 社区与变现（论坛 + 公告动态 + 知识付费 + VIP + 钱包 + 独立商城）
   chat: 'chat', // 聊天（原名即功能名，保持不变）
@@ -138,23 +140,23 @@ function resolveSegment(seg: string): AppView | null {
 
 // 解析当前地址栏为路由：兼容旧 hash 链接（#/view）与未知路径（安全回退社区）
 export function parseLocation(): AppRoute {
-  if (typeof window === 'undefined') return { view: 'community' }; // 非浏览器环境兜底
+  if (typeof window === 'undefined') return { view: 'home' }; // 非浏览器环境兜底
   // 旧 hash 链接兼容：改造前线上地址一律为 #/<view>，老书签 / 外链仍可能带 hash 进入
   const hashSeg = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)[0] ?? ''; // hash 首段
   if (hashSeg) { // 存在旧 hash 路径
     const hashView = VIEWS.find((v) => v === hashSeg) ?? LEGACY_SEGMENTS[hashSeg] ?? null; // hash 段既可能是新视图名，也可能是旧段别名
     const hashQuery = hashView && LEGACY_QUERY[hashSeg] ? `?${LEGACY_QUERY[hashSeg]}` : ''; // 旧段需要补页签参数的情况
     // 已知视图落到其新路径，已删除的旧页面统一回退社区
-    const target = baseOf() + VIEW_SEGMENTS[hashView ?? 'community'] + hashQuery;
+    const target = baseOf() + VIEW_SEGMENTS[hashView ?? 'home'] + hashQuery;
     window.history.replaceState(null, '', target); // 原地改写为路径形式，不新增历史记录
-    return { view: hashView ?? 'community' }; // 返回匹配结果或安全回退
+    return { view: hashView ?? 'home' }; // 返回匹配结果或安全回退
   } // hash 兼容分支结束
   const segs = pathSegments(); // 全部路径段
   // 多段深链接：/pay/return 与 /pay-return 支付回跳承接
   if (segs[0] === 'pay' && segs[1] === 'return') return { view: 'payreturn' };
   if (segs[0] === 'pay-return') return { view: 'payreturn' };
   const view = resolveSegment(segs[0] ?? ''); // 新段直接命中；旧段命中并原地重定向
-  return view ? { view } : { view: 'community' }; // 未知路径与根路径都回落到社区
+  return view ? { view } : { view: 'home' }; // 未知路径与根路径先落门户首页；「论坛设为首页」由 App 内 effect 按配置跳转社区
 } // parseLocation 结束
 
 // 由路由生成路径：所有导航入口统一走这里，保证链接格式一致（含子路径部署前缀）

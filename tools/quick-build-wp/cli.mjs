@@ -15,7 +15,7 @@
  *   --emit <out.sh>     生成可在 Linux 上执行的宝塔式安装脚本（幂等、支持 --dry-run）
  *   --verify <file.sh>  对脚本做静态自检，输出检查矩阵 JSON；未通过退出码 3
  *   --domain <域名>     站点域名，默认 example.com
- *   --php-version <ver> PHP 版本，默认 8.2
+ *   --php-version <ver> PHP 版本，默认 8.1
  *   --wp-version <ver>  WordPress 版本号，默认 latest
  *   --ssl               生成脚本默认开启 HTTPS 证书申请
  *
@@ -83,7 +83,7 @@ const __HELP__ = `Quick Build WP — WordPress 一键建站脚本生成器
 
 选项:
   --domain <域名>      站点域名，默认 example.com
-  --php-version <ver>  PHP 版本，默认 8.2
+  --php-version <ver>  PHP 版本，默认 8.1
   --wp-version <ver>   WordPress 版本号，默认 latest
   --ssl                生成脚本默认开启 HTTPS 证书申请
   --coexist            同机共存模式：复用既有 Nginx，不安装第二套 Web 服务，站点块不写 default_server

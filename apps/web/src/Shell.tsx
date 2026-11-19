@@ -54,8 +54,8 @@ function TabIcon({ view }: { view: string }) {
   return (
     // 图标容器：装饰性图形，屏幕阅读器跳过，尺寸由 CSS 可再收
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...ICON_STROKE}>
-      {/* 社区 = 首页：房子轮廓 */}
-      {view === 'community' && <><path d="M3.5 10.5 12 3.5l8.5 7" /><path d="M5.5 9.5V20h13V9.5" /></>}
+      {/* 首页 / 社区：房子轮廓 */}
+      {(view === 'community' || view === 'home') && <><path d="M3.5 10.5 12 3.5l8.5 7" /><path d="M5.5 9.5V20h13V9.5" /></>}
       {/* 聊天：对话气泡 */}
       {view === 'chat' && <path d="M4 5.5h16v11H8.5L4 20z" />}
       {/* 个人中心：头像轮廓 */}
@@ -65,7 +65,7 @@ function TabIcon({ view }: { view: string }) {
       {/* 登录：钥匙轮廓 */}
       {view === 'login' && <><circle cx="9" cy="12" r="3.2" /><path d="M12.2 12H21" /><path d="M18 12v3" /></>}
       {/* 兜底：未知视图给圆点占位，不出现空白 Tab */}
-      {!['community', 'chat', 'account', 'circles', 'login'].includes(view) && <circle cx="12" cy="12" r="4" />}
+      {!['home', 'community', 'chat', 'account', 'circles', 'login'].includes(view) && <circle cx="12" cy="12" r="4" />}
     </svg>
   ); // 图标返回结束
 } // TabIcon 结束

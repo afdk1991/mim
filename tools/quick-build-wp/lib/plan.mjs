@@ -14,7 +14,7 @@
  */
 export function buildPlan(opts = {}) {
   const domain = opts.domain || 'example.com';
-  const phpVersion = opts.phpVersion || '8.2';
+  const phpVersion = opts.phpVersion || '8.1'; // 默认对齐主机实测 PHP 8.1-FPM
   const wpVersion = opts.wpVersion || 'latest';
   const ssl = opts.ssl === true;
   const coexist = opts.coexist === true; // 同机共存：复用既有 Nginx，不安装第二套 Web 服务

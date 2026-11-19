@@ -31,12 +31,18 @@
 
 ## 四、前置条件与客观缺口（执行前必须逐项确认）
 
-1. **DNS**：`blog.laal.top` 当前在 `deploy/nginx-mim.conf` 中属「无实现、保持 NXDOMAIN」。需先在 DNSPod 加 A 记录 → `115.159.159.11`；本机无 DNS 控制台凭据，此步需在域名侧完成后取证。
-2. **SSH 通道**：本机无私钥；Mim 生产发布只走 CI secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`。WP 站安装要么经同一 SSH 通道在服务器侧执行脚本，要么在服务器控制台手工执行；本机无法直连主机验证。
-3. **主机资源**：同机现跑 Mim Node 服务 + MixmAPP；新增 MySQL 服务端 + PHP-FPM 需先评估内存 / 磁盘余量（MySQL 空闲约占数百 MB 常驻）。
-4. **授权子域接受度（待实测）**：授权绑定域名为 `laal.top`，`blog.laal.top` 子域名是否被主题授权校验接受为同一授权域，需在 WP 后台授权页实测；若校验只认裸域，则需改用独立域名或裸域路径方案，不能假定子域可用。
-5. **证书**：主机已有 `*.laal.top` 泛域名证书（`deploy/nginx-mim.conf` help 站注释已载明覆盖子域），WP 站复用该证书即可：执行前把 pem / key 路径经 `SSL_CERT` / `SSL_KEY` 环境变量传入，脚本跳过 certbot；留空则由脚本步骤 8 调 certbot 为子域单独申请。泛域名证书到期 / 续期口径沿用 Mim 现有方案。
-6. **PHP 版本兼容**：脚本按 PHP 8.2 装包；子比主题声明兼容 PHP 7.0–8.5，若主机 apt 源无 `php8.2-fpm`，需按发行版可用版本调整 `PHP_VERSION` 并重生成脚本。
+1. **DNS**：`blog.laal.top` 本地解析无 A / CNAME 记录；需先在 DNSPod 加 A 记录 → `115.159.159.11`，本机无 DNS 控制台凭据，此步需在域名侧完成后取证。**另注意**：主机已存在一套在线 WP `bbs.laal.top`（见下「2026-11-19 实测」），是否复用该站还是另建 `blog.laal.top` 共存站待拍板。
+2. **SSH 通道（2026-11-19 实测可用）**：本机私钥 `~/.ssh/mim_deploy_20261114` 可直连 `root@115.159.159.11`（hostname `VM-0-13-ubuntu`），只读盘点与站点块核对均可经此通道执行；CI secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` 仍为流水线发布通道。旧结论「本机无私钥、无法直连主机」作废。
+3. **主机资源（2026-11-19 实测）**：内存 total 1963MB / available 约 1015MB、Swap 2047MB；磁盘 50G 已用 9.6G、剩 38G；MariaDB 10.6.23 active、nginx 1.18.0。既有 WP 已占用一套 PHP-FPM / MySQL 库，另建第二套 WP 前需复核内存余量。
+4. **授权子域接受度（待实测）**：授权绑定域名为 `laal.top`，`bbs.laal.top` / `blog.laal.top` 子域名是否被主题授权校验接受为同一授权域，需在 WP 后台授权页实测；若校验只认裸域，则需改用独立域名或裸域路径方案，不能假定子域可用。
+5. **证书**：主机已有 `*.laal.top` 泛域名证书（`/etc/letsencrypt/live/laal.top`，SAN `DNS:*.laal.top, DNS:laal.top`），WP 站复用该证书即可：执行前把 pem / key 路径经 `SSL_CERT` / `SSL_KEY` 环境变量传入，脚本跳过 certbot；留空则由脚本步骤 8 调 certbot 为子域单独申请。既有 `bbs.laal.top` 另持有独立证书 `/etc/nginx/ssl/bbs.laal.top.crt`（CN=bbs.laal.top，有效期至 2027-02-16）。
+6. **PHP 版本兼容（2026-11-19 实测）**：主机运行 PHP **8.1**-FPM（socket `/run/php/php8.1-fpm.sock`），脚本默认 `PHP_VERSION=8.2` 口径需对齐为 8.1；子比主题声明兼容 PHP 7.0–8.5，8.1 在兼容区间内。
+
+### 2026-11-19 实测：既有 WP 已在 `bbs.laal.top` 上线
+
+- 目录 `/var/www/bbs.laal.top`，库 `bbs_wp`（`DB_USER=bbs_wp`，`DB_HOST=127.0.0.1`，表前缀 `wp_`）；主题 `zibll` V9.2，主机主题 1480 文件与本地包 `E:\迅雷下载\zibll-V9.2(1651)\zibll`（1480 文件，Version 9.2）一致；启用主题选项 `stylesheet=template=zibll`，`siteurl=https://bbs.laal.top`，管理员 `bbsadmin`，4 篇 publish + 1  draft，无启用插件。
+- 公网 `https://bbs.laal.top/` 200（37.4KB，zibll 9.2 CSS/JS 正常加载），`/wp-login.php` 200；前台未见未授权水印 / 盗版提示。
+- **未闭环项**：授权激活状态只能在 WP 后台授权页判定；本机无 `bbsadmin` 口令、主机无 wp-cli，主题授权核心为加密文件，选项表未留下可读的「激活成功」标志，故官方是否已放行该子域暂无法只读确认。
 
 ## 五、服务器侧执行步骤（授权后执行，本轮未动主机）
 
@@ -62,6 +68,6 @@
 
 ## 八、本轮未执行项与原因
 
-- 未在生产主机安装 MySQL / PHP-FPM / WP：本机无 SSH 私钥，且在同机生产环境新增数据库与运行时属结构性变更，需先确认第四节前置条件并获授权。
-- 未提交授权码、未把主题 PHP 源码纳入仓库；Mim 主站 CI 已随本轮前端批次正常发布（Deploy run `44349557983` 五作业全绿），但 **WP 站本身未在主机安装**——`blog.laal.top` 仍保持 NXDOMAIN，未新增 MySQL / PHP-FPM / WP 目录。
-- 前端对齐批次（空态插图、按钮档位、卡片等高与悬停）的门禁结果见本轮交付记录；其余延期项见缺口清单第三节。
+- 未在主机另建第二套 WP（`blog.laal.top`）：该子域 DNS 无记录、本机无 DNS 控制台凭据；是否复用既有 `bbs.laal.top` WP 待拍板。既有 `bbs.laal.top` WP 为前序批次所装，本轮仅做只读盘点，未改动其库 / 目录 / 配置。
+- 未提交授权码、未把主题 PHP 源码纳入仓库；授权码禁止写入仓库 / 远端 / 脚本 / CI secrets / 文档正文。WP 后台授权激活状态未闭环（缺 `bbsadmin` 登录态，见第四节实测段）。
+- 前端对齐批次（空态插图、按钮档位、卡片等高与悬停、数字分页、右栏挂件、作者卡、共享头像、门户首页）的门禁结果见本轮交付记录；其余延期项见缺口清单第三节。

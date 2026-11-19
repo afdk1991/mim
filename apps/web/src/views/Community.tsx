@@ -9,7 +9,8 @@
  *   - 写请求统一由 api 层带幂等键，错误经 errorText 本地化。
  */
 
-import { useEffect, useRef, useState } from 'react'; // 引入依赖、类型或本地模块绑定
+import { useEffect, useMemo, useRef, useState } from 'react'; // 引入依赖、类型或本地模块绑定
+import { Avatar } from '../components/Avatar.js'; // 共享头像：四档尺寸 + 角标槽
 import type { Locale } from '@mim/i18n'; // 引入依赖、类型或本地模块绑定
 import { api, errorText, getSession } from '../api'; // 引入依赖、类型或本地模块绑定
 import { cancelWithdrawal, createWithdrawal, getWithdrawalOverview } from '../api/wallet-withdrawal'; // 提现：可提现余额口径与申请（钱包结算层）
@@ -32,7 +33,7 @@ import type { // 引入依赖、类型或本地模块绑定
 
 import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
 import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, SearchPanel, ThreadTools } from './CommunityMore'; // 社区互动补齐：通知 / 编辑治理 / 搜索 / 举报 / 楼中楼
-import { isPinned, listThreads, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 列表分页 / 楼中楼回复 / 回复锁定判定 / 回复分页
+import { isPinned, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 楼中楼回复 / 回复锁定判定 / 回复分页
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
 import { CommunityGallery } from './CommunityGallery'; // 图库 / 视频页签（2026-11-15：挂在社区层，不恢复独立模块页）
 import { CommunityAssets } from './CommunityAssets'; // 付费资产列表 / 详情（2026-11-16：社区层深链接，匿名可读）
@@ -55,6 +56,19 @@ const TAB_GROUPS: Array<{ label: string; items: Array<[Tab, string]> }> = [
   { label: '内容', items: [['forum', '论坛'], ['images', '图库'], ['video', '视频'], ['announcements', '公告动态']] },
   { label: '会员与交易', items: [['vip', 'VIP 会员'], ['wallet', '钱包 / 积分'], ['shop', '社区商城'], ['referral', '推广分成']] },
 ];
+
+/** 数字分页窗口：总页数 ≤7 全列；否则首末页 + 当前页前后各一页，中间省略号折叠 */
+function pagerWindow(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1); // 短页全列
+  const pages: Array<number | '…'> = [1]; // 首页恒显
+  const lo = Math.max(2, current - 1); // 左邻页下限
+  const hi = Math.min(total - 1, current + 1); // 右邻页上限
+  if (lo > 2) pages.push('…'); // 左侧折叠
+  for (let i = lo; i <= hi; i++) pages.push(i); // 当前邻页
+  if (hi < total - 1) pages.push('…'); // 右侧折叠
+  pages.push(total); // 末页恒显
+  return pages;
+} // pagerWindow 结束
 
 /** 合法页签集合：用于校验 ?tab= 深链，非法值一律回落论坛 */
 const TAB_KEYS: Tab[] = ['forum', 'announcements', 'vip', 'wallet', 'shop', 'referral', 'images', 'video'];
@@ -238,6 +252,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [tabsDirty, setTabsDirty] = useState(false); // 栏目显隐是否有待保存改动
   const [query, setQuery] = useState(''); // 赋值：更新变量 const 的取值
   const [threads, setThreads] = useState<CommunityThread[]>([]); // 赋值：更新变量 const 的取值
+  const [hotThreads, setHotThreads] = useState<CommunityThread[]>([]); // 右栏热门帖：按热门排序取前 5
   // 帖子列表形态：grid 网格卡片 / list 左图右文横排；localStorage 持久化，默认网格（不改动后端排序口径）
   const [threadLayout, setThreadLayout] = useState<'grid' | 'list'>(() => {
     try { return localStorage.getItem('mim.community.layout') === 'list' ? 'list' : 'grid'; } // 读取上次选择
@@ -270,8 +285,10 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [replyTo, setReplyTo] = useState(''); // 楼中楼：正在回复的楼层 id
   const [replyToName, setReplyToName] = useState(''); // 楼中楼：被回复人昵称
   const [postsTotal, setPostsTotal] = useState(0); // 详情回复总数（服务端分页口径）
-  const [listTotal, setListTotal] = useState(0); // 列表命中总数（加载更多）
-  const [listBusy, setListBusy] = useState(false); // 列表加载更多中
+  const [listTotal, setListTotal] = useState(0); // 列表命中总数（数字分页口径）
+  const [listBusy, setListBusy] = useState(false); // 列表翻页加载中
+  const [page, setPage] = useState(1); // 当前页码（1 起算）
+  const PAGE_SIZE = 20; // 每页帖数：与数字分页器页长一致
   const [listLoading, setListLoading] = useState(true); // 列表首屏 / 筛选加载中：用于骨架占位，避免空态先闪一下
   const [listFailed, setListFailed] = useState(false); // 列表加载失败：与「筛选后为空」区分，给出重试入口
   const [searchOpen, setSearchOpen] = useState(false); // 全文搜索面板
@@ -349,13 +366,14 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     } // 代码块结束
   } // 代码块结束
 
-  async function loadThreads() { // 函数 loadThreads：封装一段可复用的处理逻辑
+  async function loadThreads(targetPage = 1) { // 函数 loadThreads：封装一段可复用的处理逻辑
     setListLoading(true); // 进入加载态：首次 / 换筛选都先占位，加载完成后原位替换
     setListFailed(false); // 重试时清掉上一次的失败标记
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      const data = await api.community.threads({ board, kind, sort, q: query, limit: 40 }); // 常量 data：保存固定配置或一次性派生值
+      const data = await api.community.threads({ board, kind, sort, q: query, limit: PAGE_SIZE, offset: (targetPage - 1) * PAGE_SIZE }); // 按页长与页码算偏移
       setThreads(data.items);
       setListTotal(data.total);
+      setPage(targetPage); // 记录当前页，分页器据此高亮
       setError(null);
     } catch (err) {
       setListFailed(true); // 失败与空结果分开：空列表不显示重试，失败才显示
@@ -365,17 +383,14 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     } // 代码块结束
   } // 代码块结束
 
-  /** 列表加载更多：按 offset 取下一页，按 id 去重后追加（置顶项可能因新回复移动）。 */
-  async function loadMoreThreads() {
-    if (listBusy) return; // 防重复点击
+  /** 翻页：页码夹在 1..totalPages 区间，加载中防重复点击。 */
+  async function goPage(next: number) {
+    const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE)); // 总页数：空列表回落 1
+    const target = Math.min(Math.max(next, 1), totalPages); // 边界收敛
+    if (target === page || listBusy) return; // 同页 / 加载中直接返回
     setListBusy(true);
     try {
-      const data = await listThreads({ board, kind, sort, q: query, limit: 40, offset: threads.length });
-      setThreads((prev) => {
-        const seen = new Set(prev.map((item) => item.id));
-        return [...prev, ...data.items.filter((item) => !seen.has(item.id))];
-      });
-      setListTotal(data.total);
+      await loadThreads(target);
       setError(null);
     } catch (err) {
       setError(errorText(locale, err));
@@ -481,8 +496,31 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   }, []);
 
   useEffect(() => {
-    if (tab === 'forum') void loadThreads(); // 条件分支：按判断结果选择后续处理路径
+    if (tab === 'forum') void loadThreads(1); // 条件分支：按判断结果选择后续处理路径
   }, [board, kind, sort]);
+
+  // 右栏热门帖：独立按热门排序取前 5，不随当前筛选切换；卸载后拒绝回写
+  useEffect(() => {
+    if (tab !== 'forum') return;
+    let alive = true;
+    api.community.threads({ sort: 'hot', limit: 5 })
+      .then((data) => { if (alive) setHotThreads(data.items); })
+      .catch(() => { /* 挂件失败不阻断主列表 */ });
+    return () => { alive = false; };
+  }, [tab]);
+
+  // 作者榜：在热门帖 + 当前页内按「点赞 + 回复」聚合取前 5；无公开作者档案接口，分数为前端侧口径
+  const authorRank = useMemo(() => {
+    const map = new Map<string, { name: string; posts: number; score: number }>(); // 聚合累加器
+    for (const t of [...hotThreads, ...threads]) {
+      const key = t.author_name ?? 'official'; // 列表项无作者 ID 字段，按昵称兜底聚合
+      const cur = map.get(key) ?? { name: t.author_name || 'Mim 官方', posts: 0, score: 0 };
+      cur.posts += 1;
+      cur.score += t.likes + t.reply_count; // 互动分：点赞 + 回复
+      map.set(key, cur);
+    }
+    return [...map.values()].sort((a, b) => b.score - a.score).slice(0, 5); // 按互动分降序取前 5
+  }, [hotThreads, threads]);
 
   useEffect(() => {
     if (tab === 'shop') void loadShop(); // 商城货架匿名可读，订单只在登录后补充
@@ -1141,6 +1179,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         <div className="community-forum">{/* 执行当前业务步骤 */}
           {!postId && (
             <>
+          <div className="community-main">
           <div className="community-toolbar">{/* 执行当前业务步骤 */}
             <div className="community-chips">{/* 执行当前业务步骤 */}
               <button type="button" className={board === 'all' ? 'is-active' : ''} onClick={() => setBoard('all')}>全部</button>
@@ -1430,7 +1469,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 </div>
                 <div className="community-card-body">{/* 执行当前业务步骤 */}
                   <div className="community-card-meta">{/* 执行当前业务步骤 */}
-                    <span>{t.board_name}</span>
+                    <span className="tag-sm">{t.board_name}</span>
                     <span>{t.author_name || 'Mim 官方'}</span>
                     <span>{dateOnly(t.last_activity_at)}</span>
                   </div>
@@ -1449,11 +1488,74 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             ))}
             </div>
           )}
-          {listTotal > threads.length && (
-            <button type="button" className="community-more community-load-more" disabled={listBusy} onClick={() => void loadMoreThreads()}>
-              {listBusy ? '加载中…' : `加载更多（${threads.length}/${listTotal}）`}
-            </button>
-          )}
+          {listTotal > 0 && Math.ceil(listTotal / PAGE_SIZE) > 1 && (() => {
+            const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE)); // 总页数
+            return (
+              <nav className="community-pager" aria-label="帖子分页">
+                <button type="button" disabled={page <= 1 || listBusy} onClick={() => void goPage(page - 1)}>上一页</button>
+                {pagerWindow(page, totalPages).map((p, idx) => p === '…' ? (
+                  <span key={`ellipsis-${idx}`} className="community-pager-ellipsis">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    className={p === page ? 'is-active' : ''}
+                    aria-current={p === page ? 'page' : undefined}
+                    disabled={listBusy}
+                    onClick={() => void goPage(p)}
+                  >{p}</button>
+                ))}
+                <button type="button" disabled={page >= totalPages || listBusy} onClick={() => void goPage(page + 1)}>下一页</button>
+              </nav>
+            );
+          })()}
+          </div>
+
+          <aside className="community-aside" aria-label="社区挂件">
+            <div className="community-widget">
+              <div className="community-widget-head"><h3>热门帖</h3></div>
+              {hotThreads.length === 0 && <p className="community-widget-empty">暂无热门内容</p>}
+              <ol className="community-widget-list">
+                {hotThreads.map((t, i) => (
+                  <li key={t.id}>
+                    <button type="button" className="community-widget-link" onClick={() => void openThread(t.id)}>
+                      <em className={`community-widget-rank rank-${i + 1}`}>{i + 1}</em>
+                      <span className="community-widget-title">{t.title}</span>
+                      <span className="community-widget-meta">{t.views} 浏览 · {t.reply_count} 回复</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="community-widget">
+              <div className="community-widget-head"><h3>板块导航</h3></div>
+              <ul className="community-widget-list">
+                {boards.map((b) => (
+                  <li key={b.slug}>
+                    <button type="button" className="community-widget-link" onClick={() => setBoard(b.slug)}>
+                      <span className="community-widget-title">{b.icon} {b.name}</span>
+                      <span className="community-widget-meta">{b.thread_count} 帖</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="community-widget">
+              <div className="community-widget-head"><h3>作者榜</h3></div>
+              {authorRank.length === 0 && <p className="community-widget-empty">暂无上榜作者</p>}
+              <ol className="community-widget-list">
+                {authorRank.map((a, i) => (
+                  <li key={`${a.name}-${i}`}>
+                    <div className="community-widget-link">
+                      <em className={`community-widget-rank rank-${i + 1}`}>{i + 1}</em>
+                      <span className="community-widget-title">{a.name}</span>
+                      <span className="community-widget-meta">{a.posts} 帖 · 互动 {a.score}</span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </aside>
             </>
           )}
 
@@ -1481,6 +1583,17 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 )}
               </div>
               {selected.thread.cover_url && <img className="community-detail-cover" src={coverSrc(selected.thread.cover_url)} alt={selected.thread.title} />}
+              <div className="community-author-card">
+                <Avatar name={selected.thread.author_name || 'Mim 官方'} size="xl" />
+                <div className="community-author-body">
+                  <div className="community-author-name">{selected.thread.author_name || 'Mim 官方'}</div>
+                  <div className="community-author-stats">
+                    <span>{selected.thread.views} 浏览</span>
+                    <span>{selected.thread.likes} 赞</span>
+                    <span>{selected.thread.reply_count} 回复</span>
+                  </div>
+                </div>
+              </div>
               {selected.unlocked && (selected.thread.media?.length ?? 0) > 0 && (
                 <div className="community-media">{/* 执行当前业务步骤 */}
                   {selected.thread.media!.map((item, index) => (

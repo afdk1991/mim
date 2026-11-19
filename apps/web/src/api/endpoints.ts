@@ -290,13 +290,14 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     overview() { // 首页聚合：板块、统计、当前钱包与会员
       return request<{ boards: CommunityBoard[]; stats: { threads: number; views: number; likes: number }; wallet: WalletSnapshot; vip_level: number; vip: { plan_id: string; level: number; expires_at: string } | null }>('/community/overview', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
-    threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating' | 'recommend'; q?: string; limit?: number } = {}) { // 帖子列表
+    threads(opts: { board?: string; kind?: string; sort?: 'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating' | 'recommend'; q?: string; limit?: number; offset?: number } = {}) { // 帖子列表
       const qs = new URLSearchParams(); // 常量 qs：保存固定配置或一次性派生值
       if (opts.board && opts.board !== 'all') qs.set('board', opts.board); // 条件分支：按判断结果选择后续处理路径
       if (opts.kind && opts.kind !== 'all') qs.set('kind', opts.kind); // 条件分支：按判断结果选择后续处理路径
       if (opts.sort) qs.set('sort', opts.sort); // 条件分支：按判断结果选择后续处理路径
       if (opts.q) qs.set('q', opts.q); // 条件分支：按判断结果选择后续处理路径
       if (opts.limit) qs.set('limit', String(opts.limit)); // 条件分支：按判断结果选择后续处理路径
+      if (opts.offset) qs.set('offset', String(opts.offset)); // 分页偏移：数字分页器按 (页码-1)*页长 传入
       const suffix = qs.toString(); // 常量 suffix：保存固定配置或一次性派生值
       return request<{ items: CommunityThread[]; total: number; sort: string; vip_level: number }>(`/community/threads${suffix ? `?${suffix}` : ''}`, { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束

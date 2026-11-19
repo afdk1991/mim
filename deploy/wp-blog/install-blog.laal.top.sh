@@ -5,7 +5,7 @@ set -euo pipefail
 
 # ---- 可配置变量（全部带默认值，可用环境变量覆盖）----
 DOMAIN="${DOMAIN:-blog.laal.top}"
-PHP_VERSION="${PHP_VERSION:-8.2}"
+PHP_VERSION="${PHP_VERSION:-8.1}"
 WP_VERSION="${WP_VERSION:-latest}"
 DB_NAME="${DB_NAME:-wp_$(printf '%s' "${DOMAIN}" | tr '.' '_')}"
 DB_USER="${DB_USER:-wp_user}"

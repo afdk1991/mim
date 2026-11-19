@@ -29,6 +29,7 @@ import { Shell } from './Shell';
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
+const Home = lazy(() => import('./views/Home').then((m) => ({ default: m.Home }))); // 门户首页（hero / 入口卡 / 精选帖）
 const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
 const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
@@ -265,6 +266,8 @@ export function App() {
   // 2026-11-15 侧栏收口：社区 · 聊天 · 个人中心 · 社区资讯 · 版本（公告动态并入社区页签）。
   // hidden 项是「已并入上级」的二级入口，页面保留但不上侧栏。
   const navDefaults: Array<{ view: AppView; label: string; hidden?: boolean }> = [
+    // 门户首页：hero + 入口卡 + 精选帖
+    { view: 'home', label: locale === 'en-US' ? 'Home' : '首页' },
     // 社区：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区' },
     // IM 聊天 + 视频通话
@@ -293,7 +296,7 @@ export function App() {
   };
   useEffect(() => {
     const tagline = locale === 'en-US' ? 'Mim-Content, community and commerce' : 'Mim-内容、社区与交易一体化';
-    const pageLabel = route.view === 'community' // 首页例外：社区即站点首页，用全称而不是「社区 - Mim」
+    const pageLabel = route.view === 'community' || route.view === 'home' // 首页例外：门户 / 社区即站点首页，用全称而不是「页面名 - Mim」
       ? undefined
       : navItems.find((item) => item.view === route.view)?.label ?? extraPageLabels[route.view];
     document.title = pageLabel ? `${pageLabel} - Mim` : tagline; // 社区与未知视图都按首页全称
@@ -325,6 +328,7 @@ export function App() {
     if (authedSession) return; // 已登录直接放行
     if (route.view === 'login') return; // 登录页是唯一公开例外（注册关闭提示也在该页）
     if (route.view === 'community') return; // 匿名可读：社区列表与帖子详情不跳登录
+    if (route.view === 'home') return; // 匿名可读：门户首页不跳登录
     if (isAdminPath()) return; // 后台路由不拦，交给 apps/admin 的管理员校验
     // 记录登录前目标（含挂载前缀、查询串与 hash），登录成功后原样回跳
     rememberLoginNext(window.location.pathname + window.location.search + window.location.hash);
@@ -375,6 +379,10 @@ export function App() {
         {route.view === 'account' && authedSession && (
           <Profile locale={locale} onUserUpdated={handleUserUpdated} /> // 个人中心：资料保存后同步全局用户态
         )}{/* 个人中心表达式容器结束 */}
+        {/* 门户首页：hero + 入口卡 + 精选帖，匿名可读 */}
+        {route.view === 'home' && (
+          <Home locale={locale} onNavigate={(view) => go({ view })} />
+        )}{/* 门户首页视图结束 */}
         {/* 社区与变现：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；列表与详情匿名可读，互动引导登录 */}
         {route.view === 'community' && (
           <Community
