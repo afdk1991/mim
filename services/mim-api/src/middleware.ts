@@ -108,12 +108,16 @@ const FORCE_LOGIN_PUBLIC_PREFIXES = [ // 前缀匹配：整条登录链路保持
 
 /**
  * 写方法默认拦截，这里只登记确实无法要求登录的匿名例外：
- * 渠道回调靠签名验真，签名媒体靠预签名 URL 验真，二者都没有用户令牌可用。
+ * 渠道回调靠签名验真，签名媒体靠预签名 URL 验真，二者都没有用户令牌可用；
+ * 推广点击 / 转化是匿名访客的统计上报（访问者指纹 + 幂等键去重，不记佣金、不做资金结算），
+ * 与 content-ops.ts 路由注释口径一致，故按精确后缀放行，其它 /promotions 写仍走登录与 RBAC。
  */
 const ANONYMOUS_WRITE_EXCEPTIONS: Array<{ method: string; pattern: RegExp }> = [
   { method: 'POST', pattern: /^\/api\/v1\/payments\/[a-z0-9_]+\/notify$/ }, // 微信 / 支付宝 / 沙箱 / 虎皮椒 / 讯虎等渠道异步通知
   { method: 'PUT', pattern: /^\/api\/v1\/media\/objects\/.+$/ }, // 签名媒体上传
   { method: 'DELETE', pattern: /^\/api\/v1\/media\/objects\/.+$/ }, // 签名媒体删除
+  { method: 'POST', pattern: /^\/api\/v1\/promotions\/[a-z0-9_-]+\/click$/ }, // 推广点击计数：匿名访客上报，指纹频控 + 幂等键去重
+  { method: 'POST', pattern: /^\/api\/v1\/promotions\/[a-z0-9_-]+\/conversion$/ }, // 推广转化回写：匿名访客上报，只累计 conversion_count
 ]; // 匿名写例外结束
 
 /**

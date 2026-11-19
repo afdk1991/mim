@@ -35,6 +35,27 @@ describe('社区与变现', () => { // 调用 describe 并处理其返回结果
     expect(write.status).toBe(401); // 写操作仍要求登录
   }); // 代码块结束
 
+  it('板块详情：匿名可读存在板块，不存在返回 404 而非 401（缺陷 D6 回归）', async () => {
+    const guarded = createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env: { MIM_FORCE_LOGIN: '1' } }); // 显式开启门禁
+    const ok = await request(guarded).get('/api/v1/community/boards/guides'); // 命中存在的板块
+    expect(ok.status).toBe(200); // 匿名公开读放行
+    expect(ok.body.board.slug).toBe('guides'); // 回显板块别名
+    const missing = await request(guarded).get('/api/v1/community/boards/does-not-exist'); // 不存在的 slug
+    expect(missing.status).toBe(404); // 404 不被鉴权中间件掩盖成 401
+  });
+
+  it('热榜对锁帖脱敏封面：未解锁付费帖 cover_url 为空串（缺陷 D5 回归）', async () => {
+    const guarded = createApp({ db: createDatabase(':memory:'), jwtSecret: JWT_SECRET, env: { MIM_FORCE_LOGIN: '1' } }); // 匿名访客视角
+    const res = await request(guarded).get('/api/v1/community/trending?limit=50'); // 读热榜（拉满候选窗口，确保低热度种子帖也在样本内）
+    expect(res.status).toBe(200); // 公开只读
+    const paid = res.body.items.find((item: { id: string }) => item.id === 'thread-paid-store'); // 1900 分付费帖
+    expect(paid).toBeTruthy(); // 热榜候选内
+    expect(paid.locked).toBe(true); // 匿名未解锁
+    expect(paid.cover_url).toBe(''); // 封面不随热榜透出
+    const free = res.body.items.find((item: { id: string }) => item.id === 'thread-guide-forum'); // 免费指南帖
+    expect(free.cover_url).not.toBe(''); // 免费帖封面正常下发
+  });
+
   it('种子数据齐备：7 板块 / 17 帖 / 3 VIP / 3 商品 / 2 优惠码，新用户 100 积分', async () => { // 调用 it 并处理其返回结果
     const auth = await login(); // 构造：准备本用例需要的输入、句柄或期望值
     const overview = await request(app).get('/api/v1/community/overview').set(auth); // 构造：准备本用例需要的输入、句柄或期望值

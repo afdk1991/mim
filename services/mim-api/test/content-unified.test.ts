@@ -71,6 +71,15 @@ describe('统一内容与消息域', () => {
     expect(anon.status).toBe(401); // 消息必须登录
   });
 
+  it('回填刷新已有条目：源帖改文案后统一流快照同步更新（缺陷 D1 回归）', () => {
+    db.prepare(`UPDATE content_items SET title = '旧标题快照', summary = '旧摘要快照', body = '旧正文快照' WHERE source = 'community_thread' AND source_id = 'thread-announce'`).run(); // 模拟线上遗留的旧快照行
+    backfillUnifiedContentMessaging(db); // 重启期再回填：UPSERT 必须把可变字段刷成源帖现行值
+    const row = db.prepare(`SELECT title, summary, body FROM content_items WHERE source = 'community_thread' AND source_id = 'thread-announce'`).get() as { title: string; summary: string; body: string }; // 读回统一流条目
+    expect(row.title).toBe('2026-11-12 更新：商城商品视觉上线'); // 标题与源帖一致，不再保留免登录旧文案
+    expect(row.summary).toBe('商品封面与参数详情图上线记录。'); // 摘要同步刷新
+    expect(row.body).toContain('商城卡片加封面'); // 正文同步刷新
+  });
+
   it('回填幂等：重复执行不新增内容、会话与消息', async () => {
     const user = await newUser(); // 用户
     db.prepare(`INSERT INTO circles (id, slug, name, owner_id, created_at) VALUES ('c-idem-1', 'idem-circle', '幂等圈子', ?, '2026-11-10T00:00:00.000Z')`).run(user.userId); // 圈子

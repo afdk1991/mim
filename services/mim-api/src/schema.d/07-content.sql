@@ -136,7 +136,7 @@ UPDATE changelog_entries SET title = '圈子、积分抵扣与工具升级', bod
 -- 推广计划一条：进行中，长期有效；预算仅作统计，不产生扣款。
 INSERT OR IGNORE INTO promotions (id, name, summary, target_url, code, starts_at, ends_at, status, budget_cents, click_count, conversion_count, created_at, updated_at)
 VALUES
-  ('promo-seed-launch', '上线首月推广', '新用户首月体验引导：浏览模块商城与社区内容，解锁免费模块。', '/marketplace', 'MIM-LAUNCH', '2026-01-01T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 'active', 500000, 0, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+  ('promo-seed-launch', '上线首月推广', '新用户首月体验引导：浏览社区动态与使用指南，了解 Mim 功能。', '/community', 'MIM-LAUNCH', '2026-01-01T00:00:00.000Z', '2099-12-31T23:59:59.000Z', 'active', 500000, 0, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
 
 -- ===== 五、RBAC 权限点注册（幂等 INSERT OR IGNORE；只补不删）=====
 -- 表与列对齐 db.ts seedRbac：

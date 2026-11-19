@@ -50,6 +50,7 @@ const LEGACY_SEGMENTS: Readonly<Record<string, AppView>> = {
   news: 'community', // 2026-11-15 资讯内容流并入社区「公告动态 → 社区动态」页签，旧链接原地改写为 /community
   releases: 'community', // 2026-11-15 版本记录并入社区「公告动态 → 更新日志」页签，旧链接原地改写为 /community
   deployments: 'community', // 2026-11-15 部署汇总属运维内部信息，公开页面下线，旧链接原地回落到社区
+  marketplace: 'community', // 2026-11-15 模块商城整块删除：旧商城段由推广卡片等历史外链带入，原地改写为社区，避免回落首页
 }; // 代码块结束
 
 // 旧地址需要落到「带参数的页签」时的补充查询串：目标视图本身不带子路径，

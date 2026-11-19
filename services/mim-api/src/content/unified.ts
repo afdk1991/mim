@@ -77,10 +77,24 @@ function dmKeyOf(a: string, b: string): string {
 /** 回填：内容（论坛主题 / 圈内动态 / 圈内公告）+ 消息（IM 会话与消息 / 裸私信） */
 export function backfillUnifiedContentMessaging(db: Db): ContentBackfillResult {
   const result: ContentBackfillResult = { content: 0, conversations: 0, messages: 0 }; // 计数器
-  const insertContent = db.prepare(
-    `INSERT OR IGNORE INTO content_items (id, source, source_id, container_kind, container_id, author_id, kind, title, summary, body, status, metrics_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ); // 内容插入：唯一键 (source, source_id) 保证幂等
+  // 内容回填改 UPSERT：源帖后续被编辑（改标题 / 摘要 / 正文 / 状态 / 计数）后，
+  // 统一内容流必须随启动回填同步刷新，不能再保留首次写入的旧快照（缺陷 D1）。
+  const upsertContent = db.prepare(
+    `INSERT INTO content_items (id, source, source_id, container_kind, container_id, author_id, kind, title, summary, body, status, metrics_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(source, source_id) DO UPDATE SET
+       container_kind = excluded.container_kind,
+       container_id   = excluded.container_id,
+       author_id      = excluded.author_id,
+       kind           = excluded.kind,
+       title          = excluded.title,
+       summary        = excluded.summary,
+       body           = excluded.body,
+       status         = excluded.status,
+       metrics_json   = excluded.metrics_json,
+       updated_at     = excluded.updated_at`,
+  ); // 内容写入：冲突时刷新可变字段，created_at 保留首次回填值
+  const contentExists = db.prepare(`SELECT 1 FROM content_items WHERE source = ? AND source_id = ?`); // 判重：区分新增与刷新，保证幂等计数口径不变
   const insertConversation = db.prepare(
     `INSERT OR IGNORE INTO conversations (id, source, source_id, type, title, owner_user_id, members_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -96,20 +110,26 @@ export function backfillUnifiedContentMessaging(db: Db): ContentBackfillResult {
     .all() as Array<{ id: string; board_id: string; author_id: string | null; title: string; summary: string; body: string; kind: string; status: string; views: number; likes: number; reply_count: number; created_at: string; updated_at: string }>; // 论坛线
   for (const row of threads) { // 逐行回填
     const metrics = JSON.stringify({ views: row.views, likes: row.likes, replies: row.reply_count }); // 计数集中到 metrics_json，避免为差异加列
-    result.content += insertContent.run(`ci_community_thread_${row.id}`, 'community_thread', row.id, 'board', row.board_id, row.author_id, row.kind, row.title, row.summary, row.body, row.status, metrics, row.created_at, row.updated_at).changes; // 写入
+    const existed = Boolean(contentExists.get('community_thread', row.id)); // 判重：已存在则本次为刷新，不计新增
+    upsertContent.run(`ci_community_thread_${row.id}`, 'community_thread', row.id, 'board', row.board_id, row.author_id, row.kind, row.title, row.summary, row.body, row.status, metrics, row.created_at, row.updated_at); // 写入或刷新
+    if (!existed) result.content += 1; // 仅首次落库计入新增，重复启动计数保持 0
   }
 
   // ---- 内容二：圈内动态（没有标题，kind 固定 post） ----
   const circlePosts = db.prepare(`SELECT id, circle_id, thread_id, author_id, body, created_at FROM circle_posts`).all() as Array<{ id: string; circle_id: string; thread_id: string | null; author_id: string; body: string; created_at: string }>; // 圈子动态
   for (const row of circlePosts) { // 逐行回填
     const metrics = JSON.stringify({ linked_thread: row.thread_id }); // 记录跨板块聚合的来源帖，迁移时可直接还原
-    result.content += insertContent.run(`ci_circle_post_${row.id}`, 'circle_post', row.id, 'circle', row.circle_id, row.author_id, 'post', '', '', row.body, 'published', metrics, row.created_at, row.created_at).changes; // 写入
+    const existed = Boolean(contentExists.get('circle_post', row.id)); // 判重：已存在则本次为刷新
+    upsertContent.run(`ci_circle_post_${row.id}`, 'circle_post', row.id, 'circle', row.circle_id, row.author_id, 'post', '', '', row.body, 'published', metrics, row.created_at, row.created_at); // 写入或刷新
+    if (!existed) result.content += 1; // 仅首次落库计入新增
   }
 
   // ---- 内容三：圈内公告 ----
   const notices = db.prepare(`SELECT id, circle_id, author_id, body, created_at FROM circle_notices`).all() as Array<{ id: string; circle_id: string; author_id: string; body: string; created_at: string }>; // 圈子公告
   for (const row of notices) { // 逐行回填
-    result.content += insertContent.run(`ci_circle_notice_${row.id}`, 'circle_notice', row.id, 'circle', row.circle_id, row.author_id, 'notice', '', '', row.body, 'published', '{}', row.created_at, row.created_at).changes; // 写入
+    const existed = Boolean(contentExists.get('circle_notice', row.id)); // 判重：已存在则本次为刷新
+    upsertContent.run(`ci_circle_notice_${row.id}`, 'circle_notice', row.id, 'circle', row.circle_id, row.author_id, 'notice', '', '', row.body, 'published', '{}', row.created_at, row.created_at); // 写入或刷新
+    if (!existed) result.content += 1; // 仅首次落库计入新增
   }
 
   // ---- 消息一：IM 会话（成员从 im_conversation_members 聚合） ----

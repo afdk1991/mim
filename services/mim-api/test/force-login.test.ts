@@ -108,6 +108,19 @@ describe('支付回调免登录', () => {
 
 });
 
+describe('推广统计匿名上报（缺陷 D2 回归）', () => {
+  it('点击 / 转化两个统计端点匿名放行，其它推广写仍 401', async () => {
+    const click = await request(guarded).post('/api/v1/promotions/promo-seed-launch/click').send({}); // 匿名访客上报点击
+    expect(click.status).toBe(200); // 不再被强制登录门禁拦成 401
+    expect(click.body.ok).toBe(true); // 处理器正常入账
+    const conversion = await request(guarded).post('/api/v1/promotions/promo-seed-launch/conversion').send({}); // 匿名访客上报转化
+    expect(conversion.status).toBe(200); // 同上豁免
+    expect(conversion.body.ok).toBe(true);
+    const adminWrite = await request(guarded).post('/api/v1/admin/content/promotions').send({}); // 管理端推广 CRUD 不在豁免范围
+    expect(adminWrite.status).toBe(401); // 仍要求登录 + RBAC 权限
+  });
+});
+
 describe('后台豁免与管理员身份单独校验', () => {
   it('未认证访问 /api/v1/admin/* 返回 401，而非白屏或放行', async () => {
     const res = await request(guarded).get('/api/v1/admin/me');
