@@ -10,3 +10,4 @@ export * from './bm25.js'; // BM25 相关性打分
 export * from './heat.js'; // 时间衰减热度
 export * from './mmr.js'; // 最大边际相关性重排
 export * from './rank.js'; // 时效衰减与综合排序分
+export * from './config.js'; // 参数配置：默认值 / 环境变量 / site_settings 持久化

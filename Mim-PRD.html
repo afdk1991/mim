@@ -10,7 +10,7 @@
 <!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 浏览器标签页标题 -->
-<title>Mim 全平台产品底座 PRD — V0.0.13-preview</title>
+<title>Mim 全平台产品底座 PRD — V0.0.14-preview</title>
 <!-- 内联样式表：本 PRD 文档的全部视觉样式 -->
 <style>
   /* CSS 自定义属性（设计令牌）：集中定义整页配色，便于统一修改 */
@@ -89,8 +89,8 @@
 <!-- 文档主标题 -->
 <h1>Mim 全平台产品底座 — 产品需求文档</h1>
 <!-- 元信息行：版本 / 通道 / 日期 / 状态（灰色弱提示样式） -->
-<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.13），故展示 V0.0.13-preview -->
-<p class="muted">版本：V0.0.13-preview　|　通道：preview　|　日期：2026-11-14（版本口径同步）　|　状态：草案</p>
+<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.14），故展示 V0.0.14-preview -->
+<p class="muted">版本：V0.0.14-preview　|　通道：preview　|　日期：2026-11-14（版本口径同步）　|　状态：草案</p>
 
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
@@ -840,8 +840,8 @@ function submitLogin(){
   <li>断线自动重连：指数退避 0.5s → 10s</li>
 </ul>
 
-<!-- 5.x 社区检索与排序（V0.0.13 自研算法） -->
-<h3>社区检索与排序（自研算法，V0.0.13）</h3>
+<!-- 5.x 社区检索与排序（V0.0.14 自研算法） -->
+<h3>社区检索与排序（自研算法，V0.0.14）</h3>
 <!-- 检索与排序能力清单 -->
 <ul>
   <!-- 分词口径 -->
@@ -852,8 +852,12 @@ function submitLogin(){
   <li><strong>兼容口径</strong>：<code>sort=latest</code> 回到旧「按最后活跃时间」排序，<code>total</code> 仍为全量命中数；<code>diversify=1</code> 启用 MMR 多样性重排（λ=0.7）</li>
   <!-- 热榜 -->
   <li><strong>社区热榜</strong>：<code>GET /community/trending</code>（匿名可读）按 <code>engagement/(ageHours+2)^1.5</code> 排序，<code>limit</code> 默认 10 / 上限 50、可选板块；响应标注 <code>algorithm: heat-v1</code></li>
+  <!-- 参数可配（V0.0.14 新增） -->
+  <li><strong>参数可配</strong>：权重与窗口持久化在 <code>site_settings</code>（键 <code>community_algorithm_weights</code>），运营可用 <code>GET/PUT /community/algorithm-weights</code> 读写（PUT 需 <code>appearance:write</code>，支持局部覆盖、越界自动夹取）；环境变量 <code>MIM_ALGORITHM_WEIGHTS</code> 优先级最高，改完即对下一次请求生效</li>
+  <!-- 窗口与前端入口 -->
+  <li><strong>窗口与入口</strong>：相关性候选窗口默认 5000 条（可配 50–20000）、热榜默认 500 条（10–5000），窗口内任意深翻页；社区搜索面板提供「相关度排序 / 最新优先」切换、去同质开关与热榜 Top5</li>
   <!-- 边界 -->
-  <li><strong>边界</strong>：相关性排序只在 200 条候选窗口内进行（深翻页用 <code>sort=latest</code>）；不提供同义词扩展、纠错与个性化</li>
+  <li><strong>边界</strong>：窗口内全量打分而非倒排索引；不提供同义词扩展、纠错与个性化</li>
 </ul>
 
 <!-- 章节标题：6. 共享规则 -->
@@ -948,7 +952,7 @@ function submitLogin(){
 <!-- 文档末尾分割线 -->
 <hr>
 <!-- 页脚：版本 / 草案声明 / 校验入口（版本规约见 AGENTS.md 铁律四，密钥治理见 09 清单 §0） -->
-<p class="muted" style="text-align:center;">Mim PRD · V0.0.13-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
+<p class="muted" style="text-align:center;">Mim PRD · V0.0.14-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
 
 <!-- 页面主体结束 -->
 </body>

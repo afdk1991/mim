@@ -13,7 +13,7 @@ import { computeDeduction, deductPoints, getPointsBalance } from '../commerce/po
 import type { ApiDeps } from '../types.js'; // 引入依赖：声明本文件使用的外部能力
 import { checkPostRateLimit, resolveQuota } from '../community/limits.js'; // 三期：发帖频控与配额
 import { loadWeights, refreshRecommendScore, saveWeights, DEFAULT_WEIGHTS } from '../community/recommend.js'; // 三期：推荐指数
-import { bm25Rank, blendScore, jaccard, mmrRerank, rankByHeat, tokenSet } from '../algorithms/index.js'; // 自研算法包：BM25 相关性 / 综合分 / 多样性重排 / 热度榜
+import { bm25Rank, blendScore, DEFAULT_ALGORITHM_WEIGHTS, jaccard, loadAlgorithmWeights, mmrRerank, rankByHeat, saveAlgorithmWeights, tokenSet } from '../algorithms/index.js'; // 自研算法包：BM25 / 综合分 / 多样性 / 热度 / 参数配置
 import { DEFAULT_TABS, loadBoardTabs, saveBoardTabs, SORT_BY_KEYS, type TabInput } from '../community/tabs.js'; // 三期：板块 Tab 组合
 import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewEnabled, type HomeView } from '../community/settings.js'; // 三期：首页指向与审核开关
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
@@ -495,11 +495,35 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ ok: true, weights: loadWeights(deps.env, deps.db) }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
-  // 匿名可读白名单：只放 GET 的列表 / 详情，写操作仍逐条走 requireAuth。
-  // 路径按完整 originalUrl 匹配（router.use 带前缀注册后 req.path 会被裁剪，不能用于这里）。
+  /**
+   * 算法参数读取：注册在匿名守卫之前，避免被 requireAuth 提前拦截；
+   * 只回显数值参数与来源，不含任何用户数据，匿名与登录用户均可对账。
+   */
+  router.get('/community/algorithm-weights', requirePermission('appearance:write'), (_req, res) => { // 路由 GET /community/algorithm-weights：运营只读
+    const loaded = loadAlgorithmWeights(deps.env, deps.db); // 读取生效参数与来源
+    res.json({ weights: loaded.weights, defaults: DEFAULT_ALGORITHM_WEIGHTS, source: loaded.source }); // 回显参数、默认值与来源
+  }); // 结束函数体：本层作用域收尾
+
+  /** 算法参数写入：局部覆盖并落 site_settings，幂等可重复提交；环境变量覆盖仍优先。 */
+  router.put('/community/algorithm-weights', requirePermission('appearance:write'), (req, res) => { // 路由 PUT：需要 appearance:write 权限
+    const body = parse( // 入参校验：只接受已知分段，未知字段直接拒绝
+      z.object({ // 允许多段局部提交
+        bm25: z.object({ k1: z.number(), b: z.number(), title: z.number(), summary: z.number(), body: z.number() }).partial().optional(), // BM25 段（可缺项）
+        rank: z.object({ halfLifeDays: z.number(), engagementWeight: z.number() }).partial().optional(), // 综合分段（可缺项）
+        heat: z.object({ likes: z.number(), replies: z.number(), views: z.number(), favorites: z.number(), gravity: z.number() }).partial().optional(), // 热度段（可缺项）
+        window: z.object({ search: z.number(), trending: z.number() }).partial().optional(), // 窗口段（可缺项）
+      }).strict(), // 拒绝未知字段，避免拼写错误静默失效
+      req.body, // 请求体
+    ); // 校验结束
+    const saved = saveAlgorithmWeights(deps.db, body, now()); // 合并 + 夹取 + 幂等 upsert
+    res.json({ weights: saved, source: loadAlgorithmWeights(deps.env, deps.db).source }); // 返回落库后的完整参数与生效来源
+  }); // 结束函数体：本层作用域收尾
+
+  // 匿名可读白名单：只放 GET 的列表 / 详情，写操作仍逐条走 requireAuth。  // 路径按完整 originalUrl 匹配（router.use 带前缀注册后 req.path 会被裁剪，不能用于这里）。
   const ANONYMOUS_READ_PATTERNS = [
     /^\/api\/v1\/community\/overview$/, // 社区首页聚合
     /^\/api\/v1\/community\/boards$/, // 板块列表
+    /^\/api\/v1\/community\/boards\/[^/]+$/, // 板块详情（匿名只读；不存在返回 404，不被鉴权掩盖）
     /^\/api\/v1\/community\/threads$/, // 帖子列表
     /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
     /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 附件签名下载（免费帖访客可下，付费帖在处理函数内按解锁口径拦截）
@@ -563,6 +587,30 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       ) // 调用结束：参数列表与链式调用收尾
       .all(userId, userId, userId, userId, userId, userId); // 查询多行：读取列表供批量处理
     res.json({ boards }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 板块详情：匿名只读，返回板块元信息；不存在或未上线返回 404（不被鉴权中间件掩盖成 401）。 */
+  router.get('/community/boards/:slug', (req, res) => { // 路由 GET /community/boards/:slug：注册入口并绑定鉴权
+    const slug = String(req.params.slug ?? '').trim(); // 板块别名，去首尾空白
+    const userId = req.user?.id ?? ''; // 匿名可读：无会话时个人化字段回落为空用户
+    const board = deps.db // 预编译查询：按 slug 取单板块元信息
+      .prepare(
+        `SELECT b.id, b.slug, b.name, b.description, b.icon, b.sort_order, b.price_cents,
+                b.visibility, b.post_min_level, b.status, b.created_by, b.moderator_id,
+                (SELECT COUNT(*) FROM community_threads t WHERE t.board_id = b.id AND t.status = 'published') AS thread_count,
+                (SELECT COUNT(*) FROM community_board_memberships m WHERE m.board_id = b.id AND m.user_id = ?) AS joined,
+                (SELECT COUNT(*) FROM community_board_follows cf WHERE cf.board_id = b.id AND cf.user_id = ?) AS followed,
+                CASE WHEN b.moderator_id = ? OR b.created_by = ? THEN 1 ELSE 0 END AS is_moderator
+         FROM community_boards b
+         WHERE b.slug = ?`,
+      ) // 命中板块后再校验可见性：未上线板块仅创建者 / 版主可见
+      .get(userId, userId, userId, userId, slug) as // 查询单行：读取一条记录供判定使用
+      | (Record<string, unknown> & { status: string; created_by: string | null; moderator_id: string | null })
+      | undefined; // 未命中落 undefined
+    if (!board || (board.status !== 'active' && board.created_by !== userId && board.moderator_id !== userId)) { // 条件分支：不存在或未上线
+      throw new AppError('NOT_FOUND', '板块不存在'); // 404：与帖子详情同一错误码口径
+    } // 可见性校验结束
+    res.json({ board }); // 输出板块元信息
   }); // 结束函数体：本层作用域收尾
 
   /** 帖子列表：板块 / 形态 / 排序 / 关键词 / 分页。 */
@@ -1554,9 +1602,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
   }); // 结束函数体：本层作用域收尾
 
   /**
-   * 社区搜索：默认按自研 BM25 相关性 + 时效衰减排序（标题权重 3、摘要 2、正文 1）。
+   * 社区搜索：默认按自研 BM25 相关性 + 时效衰减排序（字段权重与 BM25 参数可后台配置）。
    * sort=latest 回到「按最后活跃时间」的旧口径；diversify=1 追加 MMR 多样性重排，压制同板块刷屏。
-   * 相关性排序在候选窗口（默认 200 条）内进行，total 仍是全量命中数，保证前端总数与分页语义不变。
+   * 相关性排序在候选窗口内进行（默认 5000、可配置），窗口内支持任意深度的 offset/limit；total 仍是全量命中数。
    */
   router.get('/community/search', (req, res) => { // 路由 GET /community/search：注册入口并绑定鉴权与处理逻辑
     const q = String(req.query.q ?? '').trim(); // 关键词
@@ -1566,7 +1614,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
     const sort = String(req.query.sort ?? '') === 'latest' ? 'latest' : 'relevance'; // 默认相关性，保留旧口径逃生口
     const diversify = String(req.query.diversify ?? '') === '1'; // 多样性开关：默认关闭，避免改变既有排序预期
-    const CANDIDATE_LIMIT = 200; // 相关性排序的候选窗口上限，防止大表全量进内存
+    const loaded = loadAlgorithmWeights(deps.env, deps.db); // 读取生效算法参数与来源
+    const cfg = loaded.weights; // 简写
+    const CANDIDATE_LIMIT = cfg.window.search; // 候选窗口：后台可调，默认 5000 条
     const where = ["t.status = 'published'", '(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ?)']; // 基础条件：三处任一命中
     const args: Array<string> = [`%${q}%`, `%${q}%`, `%${q}%`]; // 参数与占位符一一对应
     if (board) { where.push('b.slug = ?'); args.push(board); } // 板块过滤
@@ -1589,14 +1639,14 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       const candidates = deps.db // 保存 candidates：承载本步骤的计算结果供后续使用
         .prepare(`${selectSql} ORDER BY t.last_activity_at DESC LIMIT ?`) // 预编译 SQL：固定语句结构后绑定参数执行
         .all(...args, CANDIDATE_LIMIT) as SearchRow[]; // 查询多行：读取列表供批量处理
-      const hits = bm25Rank(q, candidates.map((row) => ({ id: row.id, fields: [{ text: row.title, weight: 3 }, { text: row.summary ?? '', weight: 2 }, { text: row.body ?? '', weight: 1 }] }))); // 自研 BM25：标题权重最高
+      const hits = bm25Rank(q, candidates.map((row) => ({ id: row.id, fields: [{ text: row.title, weight: cfg.bm25.title }, { text: row.summary ?? '', weight: cfg.bm25.summary }, { text: row.body ?? '', weight: cfg.bm25.body }] })), { k1: cfg.bm25.k1, b: cfg.bm25.b }); // 自研 BM25：字段权重与参数取自配置
       relevanceOf = new Map(hits.map((hit) => [hit.id, hit.score])); // 主键 → 相关性分
       const nowMs = Date.now(); // 统一时间基准，避免逐行取 now 抖动
       const scored = candidates.map((row) => { // 逐行合成综合分
         const relevance = relevanceOf.get(row.id) ?? 0; // 取相关性分
         const created = Date.parse(row.created_at); // 解析发布时间
         const ageDays = Number.isFinite(created) ? Math.max(0, (nowMs - created) / 86_400_000) : 0; // 距今天数
-        return { row, relevance, score: blendScore({ relevance, ageDays, likes: row.likes, replies: row.reply_count }) }; // 相关性 + 时效 + 互动微调
+        return { row, relevance, score: blendScore({ relevance, ageDays, likes: row.likes, replies: row.reply_count }, { halfLifeDays: cfg.rank.halfLifeDays, engagementWeight: cfg.rank.engagementWeight }) }; // 相关性 + 时效 + 互动微调（参数可配置）
       }); // 合成结束
       scored.sort((left, right) => right.score - left.score || right.row.created_at.localeCompare(left.row.created_at)); // 综合分降序，同分新帖优先
       const ordered = diversify // 多样性分支
@@ -1619,46 +1669,60 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       locked: row.price_cents > 0, // 付费帖在搜索结果里也标锁
       relevance: relevanceOf.get(row.id) ?? 0, // 相关性分回显：0 表示 latest 分支或该行仅靠 LIKE 命中
     })); // 结束代码块：本层作用域收尾
-    res.json({ items, total, offset, limit, q, sort, diversify, candidate_limit: CANDIDATE_LIMIT }); // 输出响应：把处理结果写回 HTTP 客户端
+    res.json({ items, total, offset, limit, q, sort, diversify, candidate_limit: CANDIDATE_LIMIT, weights_source: loaded.source }); // 输出响应：标注候选窗口与参数来源
   }); // 结束函数体：本层作用域收尾
 
-  /** 社区热榜：自研热度算法（互动加权 / 年龄重力衰减），窗口 200 条内算热再取前 N。 */
+  /** 社区热榜：自研热度算法（互动加权 / 年龄重力衰减），窗口与权重均可后台配置。 */
   router.get('/community/trending', (req, res) => { // 路由 GET /community/trending：只读公开端点
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '10'), 10) || 10, 1), 50); // 单次上限 50
     const board = String(req.query.board ?? '').trim(); // 可选板块过滤
+    const loaded = loadAlgorithmWeights(deps.env, deps.db); // 读取生效算法参数与来源
+    const cfg = loaded.weights; // 简写
+    const windowSize = cfg.window.trending; // 热榜候选窗口：后台可调，默认 500 条
     const where = ["t.status = 'published'"]; // 只看已发布
     const args: Array<string> = []; // 占位参数
     if (board) { where.push('b.slug = ?'); args.push(board); } // 板块过滤
+    const trendingUserId = req.user?.id ?? ''; // 匿名可读：无会话时个人化过滤回落为空用户
+    const trendingLevel = vipLevel(deps, trendingUserId); // 与列表 / 详情同源的 VIP 等级，用于付费墙判定
     const rows = deps.db // 保存 rows：承载本步骤的计算结果供后续使用
       .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
-        `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count, t.created_at,
-                b.slug AS board_slug, b.name AS board_name,
+        `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count, t.created_at, t.author_id,
+                b.slug AS board_slug, b.name AS board_name, b.price_cents AS board_price_cents, b.visibility AS board_visibility,
+                (SELECT COUNT(*) FROM community_purchases p WHERE p.thread_id = t.id AND p.user_id = ?) AS purchased,
+                (SELECT COUNT(*) FROM community_board_memberships m WHERE m.board_id = b.id AND m.user_id = ?) AS board_joined,
+                (SELECT COUNT(*) FROM community_board_follows cf WHERE cf.board_id = b.id AND cf.user_id = ?) AS board_followed,
                 (SELECT COUNT(*) FROM community_favorites f WHERE f.thread_id = t.id) AS favorite_count
          FROM community_threads t JOIN community_boards b ON b.id = t.board_id
          WHERE ${where.join(' AND ')}
          ORDER BY t.last_activity_at DESC LIMIT ?`,
       ) // 调用结束：参数列表与链式调用收尾
-      .all(...args, 200) as Array<{ id: string; title: string; summary: string; kind: string; cover_url: string | null; price_cents: number; views: number; likes: number; reply_count: number; created_at: string; board_slug: string; board_name: string; favorite_count: number }>; // 查询多行：读取候选窗口
-    const heats = rankByHeat(rows.map((row) => ({ id: row.id, likes: row.likes, replies: row.reply_count, views: row.views, favorites: row.favorite_count, createdAt: row.created_at }))); // 自研热度排序
+      .all(trendingUserId, trendingUserId, trendingUserId, ...args, windowSize) as Array<{ id: string; title: string; summary: string; kind: string; cover_url: string | null; price_cents: number; views: number; likes: number; reply_count: number; created_at: string; author_id: string | null; board_slug: string; board_name: string; board_price_cents: number; board_visibility: string; purchased: number; board_joined: number; board_followed: number; favorite_count: number }>; // 查询多行：读取候选窗口
+    const heats = rankByHeat(rows.map((row) => ({ id: row.id, likes: row.likes, replies: row.reply_count, views: row.views, favorites: row.favorite_count, createdAt: row.created_at })), undefined, { likes: cfg.heat.likes, replies: cfg.heat.replies, views: cfg.heat.views, favorites: cfg.heat.favorites, gravity: cfg.heat.gravity }); // 自研热度排序（权重取自配置）
     const byId = new Map(rows.map((row) => [row.id, row])); // 主键 → 行，便于回查
     const items = heats.slice(0, limit).map((hit) => { // 取前 N 条并组装响应
       const row = byId.get(hit.id)!; // 回查业务行
+      const boardOpen = // 与列表 / 详情 hasBoardAccess 同口径：付费板块需已加入或 VIP；followers 板块需已关注
+        !(row.board_price_cents > 0 && row.board_joined === 0 && trendingLevel === 0) && // 付费板块门槛
+        !(row.board_visibility === 'followers' && row.board_followed === 0); // 关注可见板块门槛
+      const threadOpen = row.price_cents > 0 && (row.purchased > 0 || trendingLevel > 0 || row.author_id === trendingUserId); // 单帖已购 / VIP / 作者本人
+      const locked = !boardOpen && !threadOpen; // 与列表 locked、详情 unlocked 严格同源
       return { // 响应条目
         id: row.id, // 主键
         title: row.title, // 标题
         summary: row.summary ?? '', // 摘要
         kind: row.kind, // 类型
-        cover_url: row.cover_url, // 封面
+        cover_url: locked ? '' : row.cover_url, // 锁帖不回封面，避免对象键封面绕过付费墙（与列表 / 详情同一脱敏口径）
         price_cents: row.price_cents, // 定价
         views: row.views, // 浏览数
         likes: row.likes, // 点赞数
         reply_count: row.reply_count, // 回复数
         board_slug: row.board_slug, // 板块
         board_name: row.board_name, // 板块名
+        locked, // 是否锁定：前端据此隐藏封面与正文入口
         heat: hit.heat, // 热度分：可直接用于前端展示或对账
       }; // 条目结束
     }); // 组装结束
-    res.json({ items, limit, algorithm: 'heat-v1', window: 200 }); // 输出响应：标注算法版本与候选窗口
+    res.json({ items, limit, algorithm: 'heat-v1', window: windowSize, weights_source: loaded.source }); // 输出响应：标注算法版本、候选窗口与参数来源
   }); // 结束函数体：本层作用域收尾
 
   /** 积分转账：按 Mim ID 转给其他用户，双方各记一条流水。 */

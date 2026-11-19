@@ -108,6 +108,12 @@
 |---|---|---|---|
 | `MIM_TRUST_PROXY` | Express `trust proxy` 口径：`loopback` / 整数跳数 / 逗号分隔 CIDR / `false` / `true`；决定 `req.ip` 是否采信 `X-Forwarded-For`（登录失败锁定依赖真实来源 IP） | `loopback` | P0（安全） |
 
+**自研算法参数（零第三方依赖，进程内）**
+
+| 配置项（env） | 用途 | 默认值 | 优先级 |
+|---|---|---|---|
+| `MIM_ALGORITHM_WEIGHTS` | 搜索 / 热榜算法参数 JSON 覆盖：`bm25{k1,b,title,summary,body}`、`rank{halfLifeDays,engagementWeight}`、`heat{likes,replies,views,favorites,gravity}`、`window{search,trending}`；优先级高于后台 `site_settings`（键 `community_algorithm_weights`）与内置默认值，越界值被夹取 | 空（用默认值） | P1（排序口径） |
+
 
 ---
 

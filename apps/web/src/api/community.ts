@@ -55,6 +55,32 @@ export interface CommunitySearchItem { // 搜索命中
   board_name: string; // 板块名
   snippet: string; // 高亮摘要（HTML 安全）
   locked: boolean; // 是否付费
+  relevance?: number; // 相关性得分：仅相关性排序分支有值
+}
+
+/** 热榜项：heat 为自研热度算法得分。 */
+export interface CommunityTrendingItem { // 热榜一条
+  id: string; // 帖子主键
+  title: string; // 标题
+  summary: string; // 摘要
+  kind: string; // 形态
+  cover_url: string | null; // 封面
+  price_cents: number; // 定价
+  views: number; // 浏览
+  likes: number; // 点赞
+  reply_count: number; // 回复
+  board_slug: string; // 板块
+  board_name: string; // 板块名
+  heat: number; // 热度分
+}
+
+/** 热榜响应：window 为参与排序的候选窗口，算法可对账。 */
+export interface CommunityTrendingPage { // 热榜分页响应
+  items: CommunityTrendingItem[]; // 当前榜
+  limit: number; // 请求上限
+  algorithm: string; // 算法版本标识
+  window: number; // 候选窗口
+  weights_source?: string; // 参数来源：env / settings / default
 }
 
 /** 搜索结果分页。 */
@@ -140,10 +166,18 @@ export function threadDetail(id: string, opts: { post_limit?: number; post_offse
   ); // 请求结束
 }
 
-/** 全文搜索：标题 / 摘要 / 正文，返回 <mark> 高亮摘要。 */
-export function searchThreads(opts: { q: string; board?: string; limit?: number; offset?: number }) { // 搜索
+/** 全文搜索：默认相关性排序；sort=latest 回旧时间序，diversify=1 去同质。 */
+export function searchThreads(opts: { q: string; board?: string; limit?: number; offset?: number; sort?: 'relevance' | 'latest'; diversify?: boolean }) { // 搜索
   return request<CommunitySearchPage>( // 读接口不幂等
-    `/community/search${query({ q: opts.q, board: opts.board === 'all' ? undefined : opts.board, limit: opts.limit, offset: opts.offset })}`,
+    `/community/search${query({ q: opts.q, board: opts.board === 'all' ? undefined : opts.board, limit: opts.limit, offset: opts.offset, sort: opts.sort === 'latest' ? 'latest' : undefined, diversify: opts.diversify ? 1 : undefined })}`, // 只传非默认值，保持请求干净
+    { idempotency: false },
+  ); // 请求结束
+}
+
+/** 社区热榜：匿名只读，按自研热度算法排序。 */
+export function trendingThreads(opts: { limit?: number; board?: string } = {}) { // 热榜
+  return request<CommunityTrendingPage>( // 匿名可读
+    `/community/trending${query({ limit: opts.limit, board: opts.board === 'all' ? undefined : opts.board })}`, // 板块 all 不传
     { idempotency: false },
   ); // 请求结束
 }

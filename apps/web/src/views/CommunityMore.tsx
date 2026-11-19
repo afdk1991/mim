@@ -28,10 +28,12 @@ import { // 社区补齐端点
   replyLockedOf,
   resolveReport,
   searchThreads,
+  trendingThreads,
   updateThread,
   type CommunityNotification,
   type CommunityReportItem,
   type CommunitySearchItem,
+  type CommunityTrendingItem,
   type ThreadExtras,
 } from '../api/community.js';
 
@@ -331,7 +333,7 @@ export function ThreadTools(props: { // 工具条
   );
 } // 组件结束
 
-/** 全文搜索面板：命中标题 / 摘要 / 正文，片段由服务端高亮。 */
+/** 全文搜索面板：命中标题 / 摘要 / 正文，片段由服务端高亮；附排序切换与社区热榜。 */
 export function SearchPanel(props: { // 搜索面板
   locale: Locale; // 语言
   board: string; // 当前板块（all 表示全部）
@@ -343,13 +345,25 @@ export function SearchPanel(props: { // 搜索面板
   const [busy, setBusy] = useState(false); // 请求中
   const [searched, setSearched] = useState(false); // 是否已搜过
   const [error, setError] = useState<string | null>(null); // 错误
+  const [sort, setSort] = useState<'relevance' | 'latest'>('relevance'); // 排序口径：默认自研相关性
+  const [diversify, setDiversify] = useState(false); // 去同质开关：MMR 重排
+  const [trending, setTrending] = useState<CommunityTrendingItem[]>([]); // 社区热榜
+  const [trendingWindow, setTrendingWindow] = useState(0); // 热榜候选窗口（用于对账）
+
+  useEffect(() => { // 打开面板即拉热榜，失败静默（热榜只是增强入口）
+    let alive = true; // 卸载后丢弃异步结果
+    void trendingThreads({ limit: 5, board: props.board }) // 取前 5 条
+      .then((page) => { if (alive) { setTrending(page.items); setTrendingWindow(page.window); } }) // 成功写入
+      .catch(() => { if (alive) { setTrending([]); setTrendingWindow(0); } }); // 失败保持空态
+    return () => { alive = false; }; // 清理标记
+  }, [props.board]); // 板块变化时重取
 
   async function run(offset: number, append: boolean) { // 搜索 / 加载更多
     const keyword = q.trim(); // 去空白
     if (!keyword) { setError('请输入搜索关键词'); return; } // 空词不发请求
     setBusy(true); // 防重复
     try { // 捕获网络错误
-      const data = await searchThreads({ q: keyword, board: props.board, limit: 20, offset }); // 分页搜索
+      const data = await searchThreads({ q: keyword, board: props.board, limit: 20, offset, sort, diversify }); // 分页搜索（带排序口径）
       setItems((prev) => (append ? [...prev, ...data.items] : data.items)); // 追加或覆盖
       setTotal(data.total); // 同步总数
       setSearched(true); // 标记已搜
@@ -363,15 +377,33 @@ export function SearchPanel(props: { // 搜索面板
 
   return (
     <div className="mim-cm-search">
+      {trending.length > 0 && ( // 热榜：自研热度算法（互动加权 + 时间衰减）
+        <div className="mim-cm-trending">
+          <p className="mim-cm-hint">社区热榜 · 自研热度算法（窗口 {trendingWindow} 条）</p>
+          {trending.map((item, index) => (
+            <button key={item.id} type="button" className="mim-cm-hit" onClick={() => props.onOpenThread(item.id)}>
+              <span className="mim-cm-hit-meta">#{index + 1} · {item.board_name} · 热度 {item.heat}</span>
+              <strong>{item.title}</strong>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="mim-cm-search-row">
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void run(0, false); }} placeholder="全文搜索：标题 / 摘要 / 正文…" />
+        <select value={sort} onChange={(e) => { setSort(e.target.value === 'latest' ? 'latest' : 'relevance'); setItems([]); setSearched(false); }}>
+          <option value="relevance">相关度排序</option>
+          <option value="latest">最新优先</option>
+        </select>
+        <label className="mim-cm-check">
+          <input type="checkbox" checked={diversify} onChange={(e) => { setDiversify(e.target.checked); setItems([]); setSearched(false); }} />去同质
+        </label>
         <button type="button" className="is-primary" disabled={busy} onClick={() => void run(0, false)}>{busy ? '搜索中…' : '搜索'}</button>
       </div>
       {error && <p className="mim-cm-error">{error}</p>}
-      {searched && !error && items.length > 0 && <p className="mim-cm-hint">共 {total} 条命中</p>}
+      {searched && !error && items.length > 0 && <p className="mim-cm-hint">共 {total} 条命中（{sort === 'latest' ? '最新优先' : '相关度排序'}{diversify ? ' · 已去同质' : ''}）</p>}
       {items.map((item) => (
         <button key={item.id} type="button" className="mim-cm-hit" onClick={() => props.onOpenThread(item.id)}>
-          <span className="mim-cm-hit-meta">{item.board_name} · {item.views} 浏览 · {item.reply_count} 回复{item.locked ? ' · 付费' : ''}</span>
+          <span className="mim-cm-hit-meta">{item.board_name} · {item.views} 浏览 · {item.reply_count} 回复{item.locked ? ' · 付费' : ''}{item.relevance !== undefined && sort === 'relevance' ? ` · 相关度 ${item.relevance}` : ''}</span>
           <strong>{item.title}</strong>
           <span className="mim-cm-hit-snippet" dangerouslySetInnerHTML={{ __html: item.snippet }} />
         </button>
@@ -548,6 +580,9 @@ export function CommunityMoreStyles() { // 样式表
 .mim-cm-hit-meta { color: var(--text-muted); font-size: var(--fs-xs); }
 .mim-cm-hit-snippet { color: var(--text); font-size: var(--fs-sm); }
 .mim-cm-hit-snippet mark { background: var(--amber-border); color: inherit; padding: 0 1px; }
+.mim-cm-trending { margin-bottom: 8px; }
+.mim-cm-trending .mim-cm-hit { background: var(--primary-soft); }
+.mim-cm-check { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: var(--fs-xs); }
 .mim-cm-hint { color: var(--text-muted); font-size: var(--fs-xs); margin: 6px 0 0; }
 .mim-cm-error { color: var(--danger); font-size: var(--fs-sm); margin: 6px 0; }
 .mim-cm-tools { position: relative; display: inline-block; }
