@@ -462,7 +462,8 @@ export function seedCommunity(db: Db): void {
       ['thread-store-visual', 'board-open-source', 'Mim 商城商品视觉改造全记录：19 张分类封面 + 参数详情图', '从纯文字卡片到封面、参数键值表与 900×1180 参数长图，附线上取证。', '商城改造的关键不是“有图”，而是让 205 条模块都能被同一套数据驱动视觉覆盖。\n\n做法：19 个一级分类各一张 3:2 封面；卡片左上分类角标、右上价格角标；详情首屏 11 项参数键值表 + 900×1180 SVG 参数图。\n\n线上实测：cards=12、封面 naturalWidth=768、specRows=11、参数图 900×1180。', 'text', '/catalog/dev.jpg', 0, 0, 5],
       ['thread-quick-build', 'board-tools', 'Quick Build WP：宝塔 + 环境 + WordPress 一键装', '一条命令完成宝塔、LNMP 与 WordPress 初始化，附常见失败排查。', 'Quick Build WP 把建站最常见的三段工作合成一个可重放脚本：安装宝塔、拉起 LNMP、初始化 WordPress。\n\n失败排查顺序：先看 80/443 端口占用，再看 PHP 版本与伪静态，最后查数据库权限。', 'text', '/catalog/tools.jpg', 0, 0, 2],
       ['thread-paid-store', 'board-paid', '付费阅读：从 0 到 1 做一个能收款的独立商城', '商品类型、卡密、优惠码、物流、退款与分成的完整拆解。', '这篇是付费内容：把独立商城拆成商品、订单、支付、履约、售后、资金六层，并给出每层的最小可用实现。\n\n如果你只想先跑通，优先做“虚拟自动发货 + 卡密库存 + 余额扣款”，再接支付渠道。', 'text', '/catalog/store.jpg', 1900, 0, 3],
-      ['thread-comic-demo', 'board-open-source', '漫剧 AI 剧成片演示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n放映厅可直接观看，创作工作台可复制同一条链路。', 'video', '/catalog/ai.jpg', 0, 0, 4],
+      // 演示视频帖：标题 / 正文与生产现行文案对齐；正文不再指向已下线的放映厅 / 创作工作台，改为站内视频列表可直接观看的现行口径
+      ['thread-comic-demo', 'board-open-source', '演示视频成片展示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n可在社区视频列表直接观看，作为视频卡片、封面与播放链路的示例。', 'video', '/catalog/ai.jpg', 0, 0, 4],
       ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 0, 3],
       ['thread-announce', 'board-announce', announceTitle, announceSummary, announceBody, 'text', '/catalog/misc.jpg', 0, 0, 6],
       // 八大板块使用指南：全部落在社区帖子体系内，匿名可读、可被搜索命中，正文不写内部实现与凭据
@@ -477,7 +478,7 @@ export function seedCommunity(db: Db): void {
       ['thread-newbie-start', 'board-guides', '新手报到：Mim 能做什么、从哪里开始', '一页看懂社区、商城、付费内容与创作工具，附新手路径。', '第一次来 Mim，建议按下面的顺序逛：\n\n1. 先看「公告动态」了解当前灰度状态与功能边界。\n2. 到「论坛」翻使用指南板块，八个板块的规则都写在里面。\n3. 想找素材或灵感，去「图库」和「视频」，可按帖子或作者聚合。\n4. 需要买实物或卡密，进「社区商城」；余额与积分口径见「钱包 / 积分」。\n5. 想支持创作者，可开通「VIP 会员」或使用「推广分成」邀请朋友。\n\n发帖前先搜索，提问时写清环境与复现步骤。欢迎在「求助答疑」留下你的第一个问题。\n\n当前为灰度测试版，功能会持续补齐。', 'text', '/catalog/industry.jpg', 0, 0, 1],
       // 图库 / 视频示例帖：媒体挂在帖子上，标题带【示例】前缀，避免被误认为真实作品
       ['thread-demo-gallery', 'board-guides', '【示例】图库演示：三张站点视觉素材', '示例内容：用三张现有站点封面演示图库瀑布流、灯箱与原帖跳转。', '这是图库功能的示例内容，用于演示瀑布流、灯箱与原帖跳转，不代表真实作品发布。\n\n三张图来自站内已有的分类封面素材，仅作为演示数据挂在图库中。\n\n你可以点开任意一张查看灯箱，再点标题回到本帖。\n\n当前为灰度测试版；示例内容统一以【示例】前缀标注，后续可被运营替换为真实作品。', 'gallery', '/catalog/frontier.jpg', 0, 0, 1],
-      ['thread-demo-video', 'board-guides', '【示例】视频演示：两段漫剧演示片', '示例内容：用站内已有演示片验证视频卡片、封面、时长与播放。', '这是视频功能的示例内容，用于验证视频卡片、封面、时长与灯箱播放，不代表正式剧集上线。\n\n两段演示片均为站内已有的功能演示素材，仅作为示例数据挂载。\n\n点开卡片可播放；移动端为内联播放。\n\n当前为灰度测试版；示例内容统一以【示例】前缀标注，后续可被运营替换为正式作品。', 'video', '/catalog/ai.jpg', 0, 0, 1],
+      ['thread-demo-video', 'board-guides', '【示例】视频演示：两段演示短片', '示例内容：用站内已有演示片验证视频卡片、封面、时长与播放。', '这是视频功能的示例内容，用于验证视频卡片、封面、时长与灯箱播放，不代表正式剧集上线。\n\n两段演示片均为站内已有的功能演示素材，仅作为示例数据挂载。\n\n点开卡片可播放；移动端为内联播放。\n\n当前为灰度测试版；示例内容统一以【示例】前缀标注，后续可被运营替换为正式作品。', 'video', '/catalog/ai.jpg', 0, 0, 1],
     ];
     for (const [id, boardId, title, summary, body, kind, cover, price, views, daysAgo] of threads) {
       const created = new Date(Date.now() - daysAgo * 86400000).toISOString();
@@ -488,6 +489,8 @@ export function seedCommunity(db: Db): void {
       ['media-demo-gallery-1', 'thread-demo-gallery', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 1],
       ['media-demo-gallery-2', 'thread-demo-gallery', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 2],
       ['media-demo-gallery-3', 'thread-demo-gallery', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 3],
+      // 演示视频帖挂 1 条视频媒体：主键 / URL / 封面 / 时长与生产库 `media-fix-comic-demo-1` 逐字段一致，避免 kind=video 却无媒体的 medium 缺陷
+      ['media-fix-comic-demo-1', 'thread-comic-demo', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 1],
       // 视频示例：复用 public/demo 下已有演示片，封面同目录，避免外链与额外存储
       ['media-demo-video-1', 'thread-demo-video', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 1],
       ['media-demo-video-2', 'thread-demo-video', 'video', '/demo/bloom-ep1.mp4', '/demo/bloom-cover.jpg', 'video/mp4', 15, 2],
