@@ -41,8 +41,9 @@
 ### 2026-11-19 实测：既有 WP 已在 `bbs.laal.top` 上线
 
 - 目录 `/var/www/bbs.laal.top`，库 `bbs_wp`（`DB_USER=bbs_wp`，`DB_HOST=127.0.0.1`，表前缀 `wp_`）；主题 `zibll` V9.2，主机主题 1480 文件与本地包 `E:\迅雷下载\zibll-V9.2(1651)\zibll`（1480 文件，Version 9.2）一致；启用主题选项 `stylesheet=template=zibll`，`siteurl=https://bbs.laal.top`，管理员 `bbsadmin`，4 篇 publish + 1  draft，无启用插件。
-- 公网 `https://bbs.laal.top/` 200（37.4KB，zibll 9.2 CSS/JS 正常加载），`/wp-login.php` 200；前台未见未授权水印 / 盗版提示。
-- **未闭环项**：授权激活状态只能在 WP 后台授权页判定；本机无 `bbsadmin` 口令、主机无 wp-cli，主题授权核心为加密文件，选项表未留下可读的「激活成功」标志，故官方是否已放行该子域暂无法只读确认。
+- 公网 `https://bbs.laal.top/` 200（37.4KB，zibll 9.2 CSS/JS 正常加载），`/wp-login.php` 200；**页脚仍渲染未激活提示**：tooltip「完成主题授权后，此处内容会自动消失」+ 红色「购买正版授权」按钮（该提示在授权成功后消失）。
+- **授权核验（PHP CLI 只读探针，加载 WP 后反射 `ZibAut`）**：`is_aut=0`、`get_aut_time=false`、`get_aut_url='bbs.laal.top'`；选项表仅存 `zibll_code`（32 位已录入码），无授权结束时间 / 签名 / 激活记录选项；**结论：主题一致性 ✅，授权未激活 ❌**。激活入口为后台 AJAX `admin_curl_aut`（回调 `zib_admin_curl_aut`，仅 `wp_ajax_` 注册、无 `nopriv`）→ `ZibAut::curl_aut($code)`，需管理员会话 + nonce `zibll_theme_admin`；授权核心 `inc/code/code.php` / `update.php` 为加密防篡改文件。
+- **闭环阻断点（客观前置）**：① 缺 `bbsadmin` 后台口令（仓库 / env 全量检索 0 命中，本机无该凭据）；② 官方授权服务器是否接受 `bbs.laal.top` 子域为 `laal.top` 授权范围，须在后台授权页提交后由服务端判定。主机 PHP 8.1 CLI 在位、无 wp-cli；SSH root 通道可用。
 
 ## 五、服务器侧执行步骤（授权后执行，本轮未动主机）
 
@@ -69,5 +70,5 @@
 ## 八、本轮未执行项与原因
 
 - 未在主机另建第二套 WP（`blog.laal.top`）：该子域 DNS 无记录、本机无 DNS 控制台凭据；是否复用既有 `bbs.laal.top` WP 待拍板。既有 `bbs.laal.top` WP 为前序批次所装，本轮仅做只读盘点，未改动其库 / 目录 / 配置。
-- 未提交授权码、未把主题 PHP 源码纳入仓库；授权码禁止写入仓库 / 远端 / 脚本 / CI secrets / 文档正文。WP 后台授权激活状态未闭环（缺 `bbsadmin` 登录态，见第四节实测段）。
+- 未提交授权码、未把主题 PHP 源码纳入仓库；授权码禁止写入仓库 / 远端 / 脚本 / CI secrets / 文档正文。WP 授权激活未闭环：PHP CLI 只读探针判定 `is_aut=0`，闭环需 `bbsadmin` 后台登录态提交授权码（缺该口令，见第四节实测段）；本轮对既有 WP 的库 / 目录 / 配置未做任何写操作。
 - 前端对齐批次（空态插图、按钮档位、卡片等高与悬停、数字分页、右栏挂件、作者卡、共享头像、门户首页）的门禁结果见本轮交付记录；其余延期项见缺口清单第三节。
