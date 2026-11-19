@@ -3957,6 +3957,7 @@ code { /* 行内代码/令牌展示 */
 
 .community-list.is-list .community-card h3 { /* 横排标题不锁两行等高，随行高自然展开 */
   min-height: 0;
+  font-size: var(--fs-lg); /* 横排列表标题 18px，对齐 zibll 列表项标题档 */
 } /* 横排标题结束 */
 
 @media (max-width: 640px) { /* 手机横排：封面收窄、间距收紧 */
