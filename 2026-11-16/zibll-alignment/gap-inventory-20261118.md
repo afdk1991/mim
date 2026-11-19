@@ -26,6 +26,7 @@
 | 通知类别徽章图标：reply / accept / like / favorite / report 映射 `msg-*.svg` | 已落地（2026-11-19）：铃铛列表类别 chip 前置 16px 圆形徽章，未知类别回退系统图标 | `CommunityMore.tsx` `NOTIFY_ICON` / `.mim-cm-notify-icon` |
 | VIP 等级徽章：`vip-1.svg`（金）/ `vip-2.svg`（紫） | 已落地（2026-11-19）：社区 VIP 胶囊已开通时前置 16px 徽章，等级 ≥2 取紫色 vip-2，其余金色 vip-1；未开通不渲染 | `Community.tsx` `vipBadge` / `.community-vip-badge` |
 | 登录下划线输入 + 纯圆形社交按钮 | 已落地（2026-11-19）：`.auth-form` 作用域下划线输入；`.auth-card .oauth-btn` 44px 正圆、文字隐藏 + `aria-label` | `Login.tsx` `auth-form` / `oauth-name`；`styles.css` 登录作用域变体段 |
+| 社区列表横排形态 + 三分栏锁宽 | 已落地（2026-11-19）：工具栏网格/列表切换并 `localStorage` 持久化；列表态左图 190px 右文横排；网格态三分栏锁宽，中屏两列、手机单列 | `Community.tsx` `threadLayout` / `community-layout-toggle`；`styles.css` `.community-list.is-grid/.is-list` |
 
 ## 三、缺口清单与分批归属
 
@@ -35,8 +36,8 @@
 | 2 | 卡片标题等高 | 标题两行截断但未锁最小高度，摘要长短不齐时标题基线错落 | **已落地**：`community-card h3` `min-height: 2.8em` + 两行 clamp | — |
 | 3 | 卡片悬停反馈 | 仅阴影加深，卡片不抬升；封面已有 1.02 缩放 | **已落地**：卡片 hover `translateY(-2px)`，过渡集合纳入 transform；封面 1.02 缩放保留 | — |
 | 4 | 按钮四档层级 | 现有 primary / danger / ghost / small / block；缺描边档 `outline` 与药丸档 `pill` | **样式已落地**：`.btn.outline` / `.btn.pill` 两个纯样式档位已补，既有按钮不改类名 | 各页按需换用，下一批按场景落位 |
-| 5 | 列表横排形态（左图 190px + 右文三行） | 现仅上图下文网格 | — | 需先定视图切换（网格 / 列表）入口与后端排序口径，单列一批 |
-| 6 | 卡片三分栏锁宽 + 标题等高 | 网格 `auto-fill minmax(300px,1fr)`，未锁三分栏 | 本轮只锁标题等高 | 列宽节奏随横排形态一批调 |
+| 5 | 列表横排形态（左图 190px + 右文三行） | 现仅上图下文网格 | **已落地**（2026-11-19）：工具栏加网格/列表切换（`localStorage` 持久化，默认网格）；列表态卡片改左图 190px + 右文横排，窄屏封面收 120px；后端排序口径未改动 | — |
+| 6 | 卡片三分栏锁宽 + 标题等高 | 网格 `auto-fill minmax(300px,1fr)`，未锁三分栏 | **已落地**（2026-11-19）：网格态 `repeat(3, minmax(0,1fr))` 三等分栏，≤1024px 回落两列、≤640px 单列；标题等高沿用既有 `min-height: 2.8em` | — |
 | 7 | 详情页右栏 + 作者卡 | 详情单列；个人中心为表单页，无头图 / 头像 / 等级徽章 / 三列统计 / 内容列表 | — | 依赖后端资料字段（等级 / 徽章 / 统计）与 `Profile.tsx` 重构，单列一批 |
 | 8 | 数字分页 + 加载更多 | 仅「加载更多」 | — | 依赖后端分页游标 / 总页数口径确认 |
 | 9 | 头像 18/24/32/40 四档 + 角标槽 | 单尺寸圆形 | — | 随作者卡 / 评论项一批落地 |

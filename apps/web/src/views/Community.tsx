@@ -238,6 +238,16 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [tabsDirty, setTabsDirty] = useState(false); // 栏目显隐是否有待保存改动
   const [query, setQuery] = useState(''); // 赋值：更新变量 const 的取值
   const [threads, setThreads] = useState<CommunityThread[]>([]); // 赋值：更新变量 const 的取值
+  // 帖子列表形态：grid 网格卡片 / list 左图右文横排；localStorage 持久化，默认网格（不改动后端排序口径）
+  const [threadLayout, setThreadLayout] = useState<'grid' | 'list'>(() => {
+    try { return localStorage.getItem('mim.community.layout') === 'list' ? 'list' : 'grid'; } // 读取上次选择
+    catch { return 'grid'; } // 隐私模式 / 存储不可用时回落网格
+  });
+  /** 切换列表形态并写入本地存储；存储失败不影响主流程 */
+  function switchThreadLayout(next: 'grid' | 'list') {
+    setThreadLayout(next); // 写入目标形态
+    try { localStorage.setItem('mim.community.layout', next); } catch { /* 忽略 */ }
+  } // switchThreadLayout 结束
   const [selected, setSelected] = useState<{ thread: CommunityThreadDetail; posts: CommunityPost[]; liked: boolean; unlocked: boolean; favorited: boolean } | null>(null); // 赋值：更新变量 const 的取值
 
   const [composerOpen, setComposerOpen] = useState(false); // 赋值：更新变量 const 的取值
@@ -1160,6 +1170,20 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               ))}
               <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; setFavoritesOpen((v) => !v); }}>我的收藏</button>
             </div>
+            <div className="community-layout-toggle" role="group" aria-label="列表形态切换">{/* 网格 / 列表横排切换 */}
+              <button
+                type="button"
+                className={threadLayout === 'grid' ? 'is-active' : ''}
+                aria-pressed={threadLayout === 'grid'}
+                onClick={() => switchThreadLayout('grid')}
+              >网格</button>
+              <button
+                type="button"
+                className={threadLayout === 'list' ? 'is-active' : ''}
+                aria-pressed={threadLayout === 'list'}
+                onClick={() => switchThreadLayout('list')}
+              >列表</button>
+            </div>
             {/* 板块栏目：读后台 Tab 配置，按 order/visible/sort 渲染；版主可切换显隐并保存。接口缺失时回落内置默认 Tab。 */}
             {board !== 'all' && (
               <div className="community-chips board-tabs">{/* 执行当前业务步骤 */}
@@ -1396,7 +1420,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             <EmptyState kind="post" title="这个筛选下还没有帖子" hint="换个板块或排序，也可以发一篇试试。" />
           )}
           {threads.length > 0 && (
-            <div className="community-list">{/* 执行当前业务步骤 */}
+            <div className={`community-list${threadLayout === 'list' ? ' is-list' : ' is-grid'}`}>{/* 执行当前业务步骤 */}
               {threads.map((t) => (
               <article key={t.id} className="community-card" onClick={() => void openThread(t.id)}>{/* 执行当前业务步骤 */}
                 <div className="community-cover">{/* 执行当前业务步骤 */}

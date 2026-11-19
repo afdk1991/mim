@@ -3899,6 +3899,70 @@ code { /* 行内代码/令牌展示 */
   gap: var(--card-gap); /* 间距：共享卡片规格 */
 } /* 结束 */
 
+.community-layout-toggle { /* 网格 / 列表形态切换组：贴工具栏右侧 */
+  display: inline-flex; /* 横向 */
+  align-self: flex-start; /* 与筛选行顶端对齐 */
+  gap: 4px; /* 按钮间距 */
+  padding: 2px; /* 内嵌圈 */
+  border-radius: var(--tag-radius); /* 标签小方角 */
+  background: var(--surface-3); /* 中性底 */
+} /* 切换组结束 */
+
+.community-layout-toggle button { /* 切换按钮 */
+  padding: 3px 10px; /* 紧凑内边距 */
+  border: 0; /* 不描边 */
+  border-radius: var(--tag-radius); /* 小方角 */
+  background: transparent; /* 透明底 */
+  color: var(--text-muted); /* 次要文字 */
+  font-size: var(--fs-xs); /* 小字 */
+  cursor: pointer; /* 手型 */
+} /* 切换按钮结束 */
+
+.community-layout-toggle button.is-active { /* 当前形态选中态 */
+  background: var(--surface); /* 浮起一层 */
+  color: var(--link); /* 主色文字 */
+} /* 选中态结束 */
+
+.community-list.is-grid { /* 网格态：三分栏锁宽 */
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* 三等分栏，等宽 */
+} /* 网格三分栏结束 */
+
+@media (max-width: 1024px) { /* 中屏回落两列 */
+  .community-list.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+} /* 中屏结束 */
+
+@media (max-width: 640px) { /* 手机回落单列 */
+  .community-list.is-grid { grid-template-columns: 1fr; }
+} /* 手机结束 */
+
+.community-list.is-list { /* 列表横排态：单列纵向行 */
+  grid-template-columns: 1fr; /* 单行单列 */
+  gap: var(--card-pad-tight); /* 行间距收紧一档 */
+} /* 横排容器结束 */
+
+.community-list.is-list .community-card { /* 横排卡片：左图右文 */
+  flex-direction: row; /* 主方向横向 */
+} /* 横排卡片结束 */
+
+.community-list.is-list .community-cover { /* 左侧固定宽封面 */
+  flex: 0 0 190px; /* 不伸缩，宽 190px */
+  width: 190px; /* 封面宽 */
+  margin-right: 20px; /* 与文字区间距 */
+} /* 横排封面结束 */
+
+.community-list.is-list .community-card-body { /* 右侧文字区吃满剩余宽度 */
+  flex: 1; /* 填满 */
+  min-width: 0; /* 允许内部截断换行 */
+} /* 横排文字区结束 */
+
+.community-list.is-list .community-card h3 { /* 横排标题不锁两行等高，随行高自然展开 */
+  min-height: 0;
+} /* 横排标题结束 */
+
+@media (max-width: 640px) { /* 手机横排：封面收窄、间距收紧 */
+  .community-list.is-list .community-cover { flex-basis: 120px; width: 120px; margin-right: 12px; }
+} /* 手机横排结束 */
+
 .community-card { /* 帖子卡片 */
   display: flex; /* 纵向 */
   flex-direction: column; /* 主方向 */
