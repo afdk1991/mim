@@ -8,7 +8,7 @@ import { idempotency, requireAuth, requirePermission } from '../middleware.js'; 
 import { parse } from '../validate.js'; // 引入依赖：声明本文件使用的外部能力
 import type { ApiDeps } from '../types.js'; // 引入依赖：声明本文件使用的外部能力
 import type { ExtChannelId, ExtIntentRow } from './types.js'; // 引入依赖：声明本文件使用的外部能力
-import { channelMatrix, getAdapter } from './registry.js'; // 引入依赖：声明本文件使用的外部能力
+import { getAdapter } from './registry.js'; // 引入依赖：声明本文件使用的外部能力（渠道矩阵已由 routes/payments.ts 提供，此处不再引用 channelMatrix）
 import { // 引入依赖：声明本文件使用的外部能力
   createExtIntent, // 业务步骤：推进当前流程的下一项处理
   fulfillExtIntent, // 业务步骤：推进当前流程的下一项处理
@@ -69,10 +69,7 @@ function reverseRecharge(deps: ApiDeps, intent: ExtIntentRow): void { // 定义�
 export function createPaymentChannelRouter(deps: ApiDeps): Router { // 定义函数 createPaymentChannelRouter：封装可复用业务步骤
   const router = Router(); // 保存 router：承载本步骤的计算结果供后续使用
 
-  /** 九渠道矩阵：只回配置 / 沙箱状态，不回密钥 */
-  router.get('/payments/channels', requireAuth, (_req, res) => { // 路由 GET /payments/channels：注册入口并绑定鉴权与处理逻辑
-    res.json({ channels: channelMatrix(deps.env) }); // 输出响应：把处理结果写回 HTTP 客户端
-  }); // 结束函数体：本层作用域收尾
+  // GET /payments/channels 由 routes/payments.ts 注册（先挂载、口径已覆盖九渠道），此处不得重复注册
 
   /** 新渠道下单：鉴权 + 写操作幂等；未配置凭证返回 503，不伪造成功 */
   router.post('/payments/ext/intents', requireAuth, idempotency, async (req, res) => { // 路由 POST /payments/ext/intents：注册入口并绑定鉴权与处理逻辑

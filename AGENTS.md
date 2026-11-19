@@ -1416,3 +1416,5 @@ _本文件由用户于 2026-11-01 立规，2026-11-03 增补铁律六、七，20
 **本轮修正的既有缺口**：社区路由自带匿名白名单（`ANONYMOUS_READ_PATTERNS`）优先于全局 `SAFE_METHODS`，新增 `/community/trending` 未登记时返回 401（已实测 401 → 登记 `^/api/v1/community/trending$` → 200），该白名单是「读放行 / 写拦截」的第二道闸，后续新增只读端点必须同步登记。
 
 **未做与留待**：① 生产部署与线上 E2E：CI「发布到生产服务器」自 11-13 起因主机 SSH 公钥拒绝连续失败，本机两把私钥与四类用户全部 `Permission denied (publickey,password)`，无 tccli / 控制台凭证 —— 客观凭证阻断，不以本地门禁冒充「已上线」。② 全窗口相关性排序：需要把 BM25 倒排索引落表，本轮不做。③ 后台可调权重：本轮参数为常量，未做 `site_settings` 持久化。
+
+**同轮重复路由清理（2026-11-19）**：全仓扫描 `router\.(get|post|put|patch|delete)\('` 得 266 条注册，命中 2 组同名：① `GET /payments/channels` 真实重复（`routes/payments.ts:44` 与 `payments/router.ts:73` 各注册一次，两处都返回 `channelMatrix`，但 `createPaymentsRouter` 在 `app.ts` L138 先挂载，后者永远被遮蔽）；② `POST /auth/register` 仅出现在 `middleware.ts` 说明注释中，非注册。处置：删除 `payments/router.ts` 的重复注册并把 `channelMatrix` 从该文件 import 移除（保留 `getAdapter`），`test/payments-channels.test.ts` 改为按生产挂载顺序同时挂 `createPaymentsRouter`（先）与 `createPaymentChannelRouter`（后），14 例全过；清理后扫描 265 条注册、真实重复 0。复跑 `verify-auth-gate` **142/142**、`@mim/api` **51 文件 / 494 例全过**、`@mim/api` typecheck 0。

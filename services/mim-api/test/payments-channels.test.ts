@@ -11,7 +11,8 @@ import express from 'express'; // 引入依赖：声明本文件使用的外部�
 import request from 'supertest'; // 引入依赖：声明本文件使用的外部能力
 import type { Express } from 'express'; // 引入依赖：声明本文件使用的外部能力
 import { createDatabase } from '../src/db.js'; // 引入依赖：声明本文件使用的外部能力
-import { createPaymentChannelRouter } from '../src/payments/router.js'; // 引入依赖：声明本文件使用的外部能力
+import { createPaymentsRouter } from '../src/routes/payments.js'; // 主支付路由：/payments/channels 的唯一注册处（与生产挂载顺序一致）
+import { createPaymentChannelRouter } from '../src/payments/router.js'; // 扩展渠道子路由（不含 /payments/channels，避免重复注册）
 import { requestId, errorHandler, notFound } from '../src/middleware.js'; // 引入依赖：声明本文件使用的外部能力
 import { issueAccessToken } from '../src/auth.js'; // 引入依赖：声明本文件使用的外部能力
 import type { ApiDeps } from '../src/types.js'; // 引入依赖：声明本文件使用的外部能力
@@ -66,7 +67,8 @@ function makeApp(env: Record<string, string | undefined>): Harness { // 定义�
   app.use(requestId); // 业务步骤：推进当前流程的下一项处理
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { (req as { rawBody?: string }).rawBody = buf.toString('utf8'); } })); // 业务步骤：推进当前流程的下一项处理
   app.use((req, _res, next) => { req.deps = deps; next(); }); // 业务步骤：推进当前流程的下一项处理
-  app.use('/api/v1', createPaymentChannelRouter(deps)); // 业务步骤：推进当前流程的下一项处理
+  app.use('/api/v1', createPaymentsRouter(deps)); // 与 app.ts 同序：主支付路由先挂，/payments/channels 由它提供
+  app.use('/api/v1', createPaymentChannelRouter(deps)); // 扩展渠道子路由后挂，只承担 /payments/ext/* 与第三方回调
   app.use(notFound); // 业务步骤：推进当前流程的下一项处理
   app.use(errorHandler); // 业务步骤：推进当前流程的下一项处理
   return { app, db, deps }; // 返回结果：把本步骤产物交给调用方
