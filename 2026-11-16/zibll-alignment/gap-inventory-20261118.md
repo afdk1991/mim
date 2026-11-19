@@ -11,7 +11,7 @@
 | 素材性质 | WordPress 子比主题 V9.2：Requires WP ≥5.0、PHP 7.0–8.5；848 个 `.php`、31.7MB；`functions.php` 调用 `get_theme_file_path()`，`zib-author.php` 依赖 `$wp_query` / `add_filter` / `apply_filters` / `is_super_admin` | 本地包 `style.css` 头部、`functions.php`、`inc/functions/zib-author.php` |
 | Mim 栈 | Node/TS monorepo：`@mim/api` Express + better-sqlite3；`apps/web` Vite + React；仓库内 **0 个 `.php`、0 个 WP 核心文件**；本机无 `php` 命令 | 根 `package.json` `mim@0.0.12`；`services/mim-api/package.json` 依赖清单；递归扫描 |
 | 已复用素材 | `apps/web/public/zib/`：图标字体 4 个 + 空态 / 缩略图 / 头像 / VIP / 等级 / 消息分类 SVG·PNG 共 40 余件 | `apps/web/public/zib/` 目录清单 |
-| 已接线素材 | 仅 `zib/img/avatar-default.png` 被 `Shell.tsx` 引用；空态 SVG、缩略图、VIP 角标、消息图标、等级图均已复制未接线 | 全仓 `zib/img` / `zib/fonts` 引用检索 |
+| 已接线素材 | `avatar-default.png`（`Shell.tsx`）；空态 `null-*.svg` 经 `EmptyState` 接 25 处 / 9 视图；`msg-*.svg` 接通知类别徽章；`vip-1/vip-2.svg` 接社区 VIP 胶囊等级徽章。缩略图占位、`user-level-*.png` 等级图、草稿/待审徽章仍已复制未接线 | 全仓 `zib/img` / `zib/fonts` 引用检索 |
 | 授权边界 | 授权码 + 域名验证，绑 `laal.top`，有效期至 2026-12-16 24:00；授权码全仓 0 命中，未入库；不移植授权校验代码 | 全仓检索授权码；映射文档第五节 |
 
 ## 二、已落地项（无需返工）
@@ -24,15 +24,16 @@
 | 第三方登录按钮行：已配置提供方等宽排列 + 字母标 + 忙碌徽标 | 已落地 | `Login.tsx` `oauth-grid` / `oauth-btn` |
 | 登录内嵌左引导区：价值清单 + 安全说明卡 | 已落地 | `Login.tsx` `auth-intro` / `auth-extras` |
 | 通知类别徽章图标：reply / accept / like / favorite / report 映射 `msg-*.svg` | 已落地（2026-11-19）：铃铛列表类别 chip 前置 16px 圆形徽章，未知类别回退系统图标 | `CommunityMore.tsx` `NOTIFY_ICON` / `.mim-cm-notify-icon` |
+| VIP 等级徽章：`vip-1.svg`（金）/ `vip-2.svg`（紫） | 已落地（2026-11-19）：社区 VIP 胶囊已开通时前置 16px 徽章，等级 ≥2 取紫色 vip-2，其余金色 vip-1；未开通不渲染 | `Community.tsx` `vipBadge` / `.community-vip-badge` |
 
 ## 三、缺口清单与分批归属
 
 | # | 映射项 | 现状缺口 | 本轮（批次 2026-11-18） | 延期 / 前置依赖 |
 | --- | --- | --- | --- | --- |
 | 1 | 空态插图：null-*.svg 接入各空态面 | 9 个视图共 29 处 `.community-empty` / 同类空态均为纯文字；素材闲置 | 批次 2026-11-18：新增 `EmptyState` 共享组件，先接社区页 8 处。批次 2026-11-19：再接 Circles / ContentDetail / AnnouncementsPanel / CommunityGallery / CommunityAssets / MyAssets / CommunityMore 共 14 处。同日补接 Chat 视图 3 处（用户搜索无结果 / 会话列表空 / 消息区空），并清理不再使用的 `.chat-empty` 样式 | **已清零**：`EmptyState` 累计 25 处 / 9 个视图；剩余外观缺口见 #2–#13 |
-| 2 | 卡片标题等高 | 标题两行截断但未锁最小高度，摘要长短不齐时标题基线错落 | `community-card h3` 补 `min-height` 两档行高 | — |
-| 3 | 卡片悬停反馈 | 仅阴影加深，卡片不抬升；封面已有 1.02 缩放 | 卡片 hover 补 `translateY(-2px)`，过渡集合纳入 transform | — |
-| 4 | 按钮四档层级 | 现有 primary / danger / ghost / small / block；缺描边档 `outline` 与药丸档 `pill` | 补 `.btn.outline` / `.btn.pill` 两个纯样式档位，既有按钮不改类名 | 各页按需换用，下一批按场景落位 |
+| 2 | 卡片标题等高 | 标题两行截断但未锁最小高度，摘要长短不齐时标题基线错落 | **已落地**：`community-card h3` `min-height: 2.8em` + 两行 clamp | — |
+| 3 | 卡片悬停反馈 | 仅阴影加深，卡片不抬升；封面已有 1.02 缩放 | **已落地**：卡片 hover `translateY(-2px)`，过渡集合纳入 transform；封面 1.02 缩放保留 | — |
+| 4 | 按钮四档层级 | 现有 primary / danger / ghost / small / block；缺描边档 `outline` 与药丸档 `pill` | **样式已落地**：`.btn.outline` / `.btn.pill` 两个纯样式档位已补，既有按钮不改类名 | 各页按需换用，下一批按场景落位 |
 | 5 | 列表横排形态（左图 190px + 右文三行） | 现仅上图下文网格 | — | 需先定视图切换（网格 / 列表）入口与后端排序口径，单列一批 |
 | 6 | 卡片三分栏锁宽 + 标题等高 | 网格 `auto-fill minmax(300px,1fr)`，未锁三分栏 | 本轮只锁标题等高 | 列宽节奏随横排形态一批调 |
 | 7 | 详情页右栏 + 作者卡 | 详情单列；个人中心为表单页，无头图 / 头像 / 等级徽章 / 三列统计 / 内容列表 | — | 依赖后端资料字段（等级 / 徽章 / 统计）与 `Profile.tsx` 重构，单列一批 |

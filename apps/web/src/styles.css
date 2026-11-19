@@ -3628,6 +3628,10 @@ code { /* 行内代码/令牌展示 */
 
 .community-vip-chip { /* VIP 状态胶囊 */
   grid-column: 1 / -1; /* 跨两列 */
+  display: inline-flex; /* 徽章 + 文字横向排列 */
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 内容居中 */
+  gap: 6px; /* 徽章与文字间距 */
   padding: 8px 12px; /* 内边距 */
   border-radius: var(--radius-pill); /* 胶囊 */
   border: 1px solid var(--border); /* 边框 */
@@ -3636,6 +3640,13 @@ code { /* 行内代码/令牌展示 */
   font-size: var(--fs-xs); /* 字号 */
   text-align: center; /* 居中 */
 } /* 结束 */
+
+.community-vip-badge { /* VIP 等级徽章：16px 圆形，不随文字拉伸 */
+  width: 16px; /* 边长 */
+  height: 16px; /* 正方形槽位 */
+  border-radius: 50%; /* 圆形 */
+  object-fit: contain; /* 保持比例 */
+} /* 徽章结束 */
 
 .community-vip-chip.is-on { /* 已开通 */
   color: var(--premium); /* 金色文字 */

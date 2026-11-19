@@ -166,6 +166,12 @@ function coverSrc(url: string | null): string { // 函数 coverSrc：封装一�
   return `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}`;
 } // 代码块结束
 
+/** VIP 等级徽章：等级 ≥2 走紫色 vip-2，其余走金色 vip-1；路径按 BASE_URL 拼接兼容子路径部署。 */
+function vipBadge(level: number): string { // 等级 → 徽章素材
+  const file = level >= 2 ? 'vip-2.svg' : 'vip-1.svg'; // 高等级紫、普通等级金
+  return `${import.meta.env.BASE_URL}zib/img/${file}`; // 静态资源补前缀
+} // vipBadge 结束
+
 function dateOnly(iso: string | null): string { // 函数 dateOnly：封装一段可复用的处理逻辑
   return iso ? iso.slice(0, 10) : ''; // 返回当前函数的处理结果
 } // 代码块结束
@@ -1059,6 +1065,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
           <div className="community-stat"><span>余额</span><strong>{wallet ? yuan(wallet.balance_cents) : '—'}</strong></div>
           <div className="community-stat"><span>积分</span><strong>{wallet?.points ?? 0}</strong></div>
           <div className={`community-vip-chip${vipLevel > 0 ? ' is-on' : ''}`}>{/* 执行当前业务步骤 */}
+            {vipLevel > 0 && <img className="community-vip-badge" src={vipBadge(vipLevel)} alt="" aria-hidden="true" loading="lazy" />}
             {vipLevel > 0 ? `VIP ${vipLevel}${vipExpires ? ` · ${dateOnly(vipExpires)}` : ''}` : '未开通 VIP'}
           </div>
         </div>
