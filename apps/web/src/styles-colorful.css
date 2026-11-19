@@ -194,3 +194,62 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px
   .community-card, .community-chips > *, .btn { transition: none; } /* 降低动效偏好：关闭过渡 */
   .community-card:hover { transform: none; } /* 同时关掉位移，避免晕动 */
 }
+
+/* ---------- 4. 其它视图补齐（商城 / 购物车 / 结算 / 聊天 / 圈子 / 公告 / 资产 / 工具） ---------- */
+
+.page-block, .page-head, .panel, .panel-head { border-radius: 16px; } /* 通用区块圆角，与社区页对齐 */
+.page-head .page-desc { color: #5a6b8c; } /* 页面副标题冷灰蓝 */
+.panel-head { background: linear-gradient(96deg, #f5f8ff, #fdf4ff 60%, #f2fffb); } /* 面板标题行三色淡底 */
+.commerce-grid { gap: 14px; } /* 商城网格间距略放大，彩色卡片需要呼吸感 */
+
+.sort, .tab, .tabs > * { border-radius: 10px; } /* 排序与标签统一圆角 */
+.sort.is-active, .tab.is-active, .tab.active { background: linear-gradient(96deg, var(--cz-blue), var(--cz-indigo)); color: #fff; border-color: transparent; } /* 选中态蓝靛渐变 */
+
+.plain-list > *:nth-child(odd) { background: linear-gradient(90deg, #fbfdff, #fffdfa); } /* 通用列表奇行冷调 */
+.plain-list > *:nth-child(even) { background: linear-gradient(90deg, #fffaff, #f9fffb); } /* 通用列表偶行暖调 */
+.plain-list > *:hover { background: linear-gradient(90deg, #eef4ff, #fdf1ff 55%, #eafff7); } /* 悬停三色过渡 */
+
+.notice { border-radius: 14px; border-left: 4px solid var(--cz-amber); background: linear-gradient(96deg, #fffaf0, #fff6fb); color: #8a6100; } /* 公告条琥珀标记 */
+.announcement-row { border-radius: 12px; } /* 公告行圆角 */
+.announcement-row:hover { background: linear-gradient(90deg, #f4f9ff, #fdf3ff 60%, #f1fffa); } /* 公告行悬停彩底 */
+
+.chat-panel-row, .chat-user-item { border-radius: 12px; } /* 聊天面板与用户项圆角 */
+.chat-user-item.selected, .chat-user-item.is-on { background: linear-gradient(96deg, #eef4ff, #f9f0ff); box-shadow: inset 3px 0 0 var(--cz-indigo); } /* 选中会话左侧靛条 */
+.chat-user-name { color: var(--cz-indigo); font-weight: 700; } /* 会话用户名靛蓝加粗 */
+.chat-conv-flag { color: #b85400; font-weight: 700; } /* 会话标记橙 */
+.chat-system-msg { color: #0a7d7d; font-style: italic; } /* 系统消息青色斜体 */
+.chat-hint { color: #5a6b8c; } /* 聊天提示灰蓝 */
+.chat-error, .mim-cm-error, .asset-error { color: #c01a3c; } /* 聊天与消息错误红 */
+.chat-avatar { border-radius: 12px; box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.35); } /* 聊天头像紫描边 */
+
+.mim-cm-row, .mim-cm-field, .mim-cm-quote { border-radius: 12px; } /* 消息行与引用块圆角 */
+.mim-cm-hint { color: #0a7d7d; font-size: 12.5px; } /* 消息提示青色小字 */
+
+.community-widget, .community-widget-head, .community-wallet, .community-wallet-card, .community-paywall, .community-table { border-radius: 14px; } /* 社区侧小组件圆角统一 */
+.community-widget-title, .community-widget-link { color: var(--cz-blue); font-weight: 700; } /* 小组件标题与链接蓝 */
+.community-widget-meta, .community-widget-empty { color: #6b7691; } /* 小组件元信息灰蓝 */
+.community-widget-rank { color: var(--cz-pink); font-weight: 800; } /* 榜单名次粉色 */
+.community-paywall { border: 1px dashed #c4b6ff; background: linear-gradient(135deg, #f8f4ff, #eef7ff); color: #4b34c4; } /* 付费墙紫框淡底 */
+.community-wallet-card { border: 1px solid #e6ebf7; background: linear-gradient(160deg, #fff, #f6faff 60%, #fff7fd); } /* 钱包卡淡彩底 */
+.community-subhead, .community-section-head { color: var(--cz-indigo); font-weight: 750; } /* 小节标题靛蓝 */
+.community-empty, .asset-empty { color: #6b7691; } /* 空态灰蓝 */
+
+.asset-btn, .asset-kind { border-radius: 10px; } /* 资产按钮与类型标签圆角 */
+.asset-kind { background: linear-gradient(96deg, #eef4ff, #fdf4ff); color: #4b34c4; font-weight: 700; } /* 资产类型标签浅彩 */
+.asset-sub, .asset-meta { color: #5a6b8c; } /* 资产次级信息灰蓝 */
+
+.tool-form, .tool-manage-list, .content-admin-pane { border-radius: 14px; } /* 工具表单与目录圆角 */
+.tool-form input, .tool-form textarea { border-radius: 10px; } /* 工具表单输入框圆角 */
+
+.gate-card, .gate-shell { border-radius: 18px; } /* 门禁卡片圆角 */
+.gate-title { color: var(--cz-violet); font-weight: 800; } /* 门禁标题紫 */
+.gate-text, .gate-list { color: #414a63; } /* 门禁说明正文 */
+
+.tab, .tab-sm, .board, .kind { border-radius: 10px; } /* 各类标签圆角补齐 */
+.deploy-badge { border-radius: 999px; font-weight: 700; } /* 部署徽章药丸 */
+.deploy-row { border-radius: 12px; border: 1px solid #e6ebf7; } /* 部署行描边卡 */
+.skeleton, .skeleton-line { border-radius: 10px; background: linear-gradient(90deg, #eef2fb, #f7fbff 50%, #eef2fb); } /* 骨架屏冷色渐变 */
+.page-block.is-active, .item.is-active { box-shadow: inset 3px 0 0 var(--cz-indigo); } /* 激活项左侧靛条 */
+.footer-title { color: #dbe4ff; } /* 页脚标题浅色 */
+.footer-list, .footer-col { color: #9fb0d8; } /* 页脚链接灰蓝 */
+
