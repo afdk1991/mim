@@ -15,6 +15,8 @@
 > **2026-11-11 变更（商城 205 条全覆盖 + 聊天七项增强）**：① 商城侧为其余 143 条「软件方向」模块补「模块起盘蓝图」能力——`packages/core-domain/src/blueprints/` 新增 `types.ts` + 七份分组数据（openharmony 37 / ai 11 / industry 15 / enterprise-store 18 / platform 19 / infra 17 / extensions 26，共 143 条），`moduleCapabilities.ts` 由 62 条扩到 **79 条**（62 工具型 + 17 条 `catalog.<groupSlug>`），实现 205 条导航条目 100% 有真实能力；执行层 `services/mim-api/src/capabilities.ts` 新增 `createBlueprintHandler()` 与 17 个能力键注册，`routes/catalog.ts` 的 invoke 下发 `module_code` 供 handler 取条目专属数据（交付目标 / 技术栈 / 起步代码 + 分组目录树 / 交付物 / 验收清单）。编码规则踩坑记录：分类树真实编码为 `cat.<groupSlug>-<NN>`（OpenHarmony 组是 `cat.openharmony-01…37`，不是 `cat.open-01…`），本轮用脚本比对 7 个蓝图文件、能力清单与 205 条期望编码，批量修正 37 处 × 2 文件。② 聊天后端：`im_messages` 增 `reply_to_id` / `reply_excerpt`（`db.ts` 的 `ADDITIVE_COLUMNS` 让存量库自动补列）、`im/db.ts` 增 `getQuotedMessage` / `listMessagesAround` / `setMemberRole` / `transferOwnership`，`routes/im.ts` 增 `?around=` 查询、`PATCH …/members/:userId`、`POST …/transfer`，并新增 `conversation.members` 广播帧；前端 `Chat.tsx` 增引用 UI、文件气泡下载、群管理面板（设/撤管理员、转让群主、邀请入群、移除）、搜索结果定位高亮、未读分割线、表情选择器（`styles.css` 约 20 条配套规则）。③ 验证：`pnpm -r typecheck` 0（5/6 项目）、`pnpm --filter @mim/api test` **22 文件 / 347 例**、`comment-check --strict` 通过、`verify-deployments` 52/52、聊天点击级 E2E `verify:chat-flow` **15/15** 与新增 `verify:chat-plus` **23/23** 全 PASS。
 > **2026-11-12 变更（登录入口补齐：自助注册 / 账号口令 / 通道自检 / 聊天匿名只读）**：生产此前只有「验证码登录（短信/邮件通道未配凭证 → 503）」与「管理员口令」两条路，普通访客点开 `/chat` 只能看到「此功能需登录后使用」，聊天实际不可用。本轮补齐四条：① `POST /auth/register`（`region + identifier + password + 可选 display_name`）——口令 bcrypt(10) 入 `credentials` 表（`kind='password'`，复用既有表结构、零迁移），注册成功直接下发双令牌；强度要求至少 8 位且含字母与数字；重复身份返回 409 新错误码 `AUTH_IDENTITY_EXISTS`（`packages/core-domain/src/errors.ts` 与 `packages/i18n` 中英词条同步登记）。② `POST /auth/password` 改为「先比管理员口令、再比账号自身口令」：`identities` 命中且 `credentials.kind='password'` 存在时走 bcrypt 校验，管理员口令入口保留；两者都未配置才回 503 `AUTH_PASSWORD_NOT_CONFIGURED`。③ 新增 `GET /auth/channels` —— 只回 `{sms,email,password,register}` 布尔值，不泄露凭证；`Login.tsx` 挂载时查询，验证码模式在通道未配置时直接提示「请改用密码登录或注册」，并把登录页从两段式扩为「密码 / 验证码 / 注册」三段。④ 前端新增 `views/ChatPreview.tsx`，`/chat` 匿名态由「整块登录卡片」改为**只读演示页**：同一套 `chat-layout` 布局 + 3 条示例会话 + 5 条示例消息（含引用块）+ 禁用输入区 + 顶部「去登录 / 注册」引导，`App.tsx` 的 `GATED_VIEWS` 相应移除 `chat`。⑤ 验证：新增 `test/auth-account.test.ts` 8 例（通道清单、注册 201 / 重复 409 / 弱口令 400、账号口令 200 / 错误 401 / 全未配置 503、管理员口令兼容），全仓 **23 文件 / 355 例**；`pnpm -r typecheck` 0、`comment-check --strict` 通过、web / api 构建 0。短信与邮件通道代码（`notify.ts` 的阿里云 SMS 与 AWS SES）早已就绪，缺的只是私有凭证，因此第 3 条需求在代码侧无新增、只需注入 `MIM_SMS_ALIYUN_*` / `MIM_EMAIL_SES_*` 环境变量即自动启用。**同日第二项变更（信息架构收口）**：用户指出「设置」不该对未登录访客直接出现、账号资料/注销这类内容应归入登录后的个人中心——据此删除独立 `views/Settings.tsx`，`AppView` 去掉 `settings`，`LEGACY_SEGMENTS` 把 `/settings` 改写到 `/account`；`App.tsx` 的 `GATED_VIEWS` 收敛为 `['comic','products','cart','account']`，导航里的个人中心改名为「个人中心与设置」且**仅登录后出现**；`Profile.tsx` 的「账号安全」分区改名为「账号与设置」，补齐区域徽标与注销说明，原设置页的语言 / 时区 / 昵称仍留在「资料」分区。`scripts/verify-auth-gate.mjs` 与 `verify-site-modules.mjs` 的 `GATED_VIEWS` 断言同步，`verify-site-modules` 的 check 链断言补上 `verify-custom-domains`（原本已漂移，78/79 → **79/79**）。
 > **2026-11-12 变更（漫剧 / AI 剧放映厅：真正能看片）**：此前 `/comic-studio` 只有 `ComicWorkbench` 创作工作台（工程 / 分镜 / 角色 / 任务 / 成片导出），没有播放器，匿名还被 `requireAuth + requireEntitlement(comic.workbench)` 双重拦截。本轮新增：① 后端 `GET /api/v1/comic/showcase` 注册在 `/comic` 鉴权中间件**之前**，匿名返回内置演示片库（2 部开放授权片源 + 封面，相对路径交由前端 `resolvePublicUrl` 归一化）；`GET /api/v1/comic/theater` 仅挂 `requireAuth`（不校验模块权益），返回本人所有工程里已有产物的成片 + 最新版本 1 小时预签名播放地址。② 前端新增 `views/ComicTheater.tsx`（作品网格 / 集数切换 / 原生 video controls / `localStorage` 断点续播 / 「我的作品」列表）与 `views/ComicStudio.tsx`（「放映厅 / 创作工作台」分段，默认进放映厅；工作台未登录时展示登录引导），`App.tsx` 的 comic 分支改为渲染外壳。③ 门禁同步：`GATED_VIEWS` 收敛为 `products/cart/account`，`verify-auth-gate.mjs` 的静态断言与 live 用例目标路径改为 `/products`，`verify-site-modules.mjs` 断言同步。④ 演示片源入库 `apps/web/public/demo/`（`stardust-ep1.mp4` 4.37MB / `bloom-ep1.mp4` 1.13MB + 两张 AI 生成封面，均为开放授权素材）；本地 Edge CDP 实测 `video.readyState=4`、`duration=52.21s`、静音播放 2.2 秒后 `currentTime=2.017`、切换作品片源变化、无内嵌登录卡片。⑤ 构建：`pnpm -r typecheck` 0、`pnpm --filter @mim/web build` 0、`node scripts/build.mjs` 0（9 个路径段 + `404.html`）、`verify-auth-gate` 35/35、`verify-site-modules` 79/79。
+> **现行覆盖（2026-11-20）**：模块商城（catalog / cart / products / store）、漫剧（comic / orchestrator / film-export）、入口配置清单（sites / entries / siteModules）、导航站（navigation）、统一搜索（search）、云存储 / 图床 / 下载分发（cloud / img / download）模块及其视图、路由、测试、种子已从代码删除；本页顶部各历史变更条目（2026-11-04 ~ 2026-11-12）、§1.1 中 catalog / comic / entitlement 相关描述、§1.2 成片导出实现、以及后文 Store / ComicWorkbench 等视图小节，均按铁律三保留作**历史留痕**，不代表当前工作树实况。现行后端路由域以社区 / 圈子 / 聊天 / 订单 / 支付 / 钱包 / 邀请 / RBAC / 运营 / 部署汇总为准；现行前端视图段见 [01](./01-architecture.md) 顶部现行覆盖段；现行 RBAC 权限点为 `user:read` / `rbac:read` / `rbac:write` / `commerce:write` / `appearance:write` / `content:write` / `messaging:write` / `deployments:read`。
+>
 > 本页为**目标架构全量设计**，与当前代码的差异逐条记录在 §1.1「已实现 vs 规划」；§2 及之后各节凡标「规划」者尚未落地，落地时须随代码同步修订（铁律七）。
 >
 > 产品功能视角见 [07-functional-modules.md](./07-functional-modules.md)；目标架构分层见 [01-architecture.md](./01-architecture.md) §2。
@@ -51,18 +53,20 @@
 
 | 维度 | 规划口径（本页 §2+） | 当前已实现（证据位置） | 差异原因 / 后续 |
 |---|---|---|---|
-| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；路由边界已按域切分（`routes/auth|catalog|site|me|comic|media|ai|admin.ts` 八个），每个文件即一个域，未切分的域不预留空路由 |
+| 部署形态 | 12 个独立服务 + gateway | 单服务 `services/mim-api`（模块化单体，路由按域分文件） | P0 先单体；**历史留痕**：括号内 `catalog|site|comic|ai` 等路由文件已随模块收口删除，现行路由域见顶部现行覆盖段；未切分的域不预留空路由 |
 | 数据库 | PostgreSQL 按 region 物理分库 + Redis + OpenSearch + MQ | SQLite 单库（`better-sqlite3`，WAL），进程内无外部依赖 | 降低本地/CI 启动成本；表结构（UUIDv7、`bigint` 金额、`deleted_at`、`version` 乐观锁、`idempotency_keys`）已按 PostgreSQL 可迁移口径设计 |
 | 实时同步 | WebSocket + MQ 推送，5 秒内到达 | 当前无实时同步需求，同步层未实现 | 端侧数据按需拉取，无跨端一致性场景 |
 | 客户端 | web / mini / mobile / desktop / admin 五端 | `apps/web`（用户端，React 18 + Vite 6，`/api` 与 `/health` 由 Vite 代理到 8787）+ `apps/admin`（独立管理后台，React 18 + Vite 6，开发端口 5174，生产入口 `/admin/`，同样经 Vite 代理 `/api`） | 先打通契约与核心流程；mini / mobile / desktop 三端复用同一 `/api/v1` 契约与 `packages/core-domain` |
 | 共享包 | core-sdk / ui-kit / platform-adapter / observability / testing-utils | 仅 `packages/core-domain`（错误码/金额/UUIDv7）与 `packages/i18n`（zh-CN/en-US + 货币格式化） | 按需引入，未使用的能力不提前抽象；共享包只保留现行能力，未使用的旧域文件均已不在工作树 |
 | 存储 | 对象存储 + CDN（附件/媒体/导出） | `src/storage.ts` 已实现 `LocalDiskStorage`（HMAC-SHA256 预签名，落盘 `data/media`）与 `S3Storage`（AWS SDK 预签名），`/api/v1/media/*` 已装配（2026-11-05） | 生产可选 S3 桶；漫剧关键帧/分镜片段/成片经预签名 URL 分发（见 §6） |
-| 后台管理 | `admin-api` + RBAC 后台 | **完整 RBAC + `apps/admin` 独立后台已落地（2026-11-07）**：`schema.sql` 新增 `permissions` / `roles` / `role_permissions` / `user_roles` 四表，`db.ts` 定义 `RBAC_PERMISSIONS` 8 权限点（`module:read` / `module:write` / `entitlement:read` / `entitlement:grant` / `entitlement:revoke` / `user:read` / `rbac:read` / `rbac:write`）与 `RBAC_ROLES` 3 内置角色（`superadmin` 8 项 / `operator` 7 项不含 `rbac:write` / `viewer` 4 项）并由 `seedRbac` 幂等播种；`middleware.ts` 的 `loadPermissions` + `requirePermission` **逐请求实时查库**鉴权；`routes/admin.ts` 11 个 RBAC 端点挂载 `/api/v1/admin/*`；`apps/admin` 独立管理后台生产入口 `/admin/`（nginx 独立静态根 `/opt/mim/admin`）；`x-admin-token` 保留为**超管引导通道**（`timingSafeEqual` + sha256）；**操作审计留痕未实现** | 已达成原 P1 目标；后续待补：`apps/admin` 操作审计留痕（需重开审计域）、细粒度数据域权限、多组织隔离 |
+| 后台管理 | `admin-api` + RBAC 后台 | **完整 RBAC + `apps/admin` 独立后台已落地**：`schema.sql` 含 `permissions` / `roles` / `role_permissions` / `user_roles` 四表，`db.ts` 的 `RBAC_PERMISSIONS` 与 `RBAC_ROLES` 由 `seedRbac` 幂等播种；`middleware.ts` 的 `loadPermissions` + `requirePermission` **逐请求实时查库**鉴权；`routes/admin.ts` RBAC 端点挂载 `/api/v1/admin/*`；`apps/admin` 独立管理后台生产入口 `/admin/`（nginx 独立静态根 `/opt/mim/admin`）；`x-admin-token` 保留为**超管引导通道**（`timingSafeEqual` + sha256）。**历史留痕**：括号内早期 8 权限点（`module:*` / `entitlement:*`）随模块商城删除，现行权限点为顶部现行覆盖段所列 8 项；**操作审计留痕未实现** | 后续待补：`apps/admin` 操作审计留痕（需重开审计域）、细粒度数据域权限、多组织隔离 |
 | 鉴权 | gateway 验签 + Redis 会话 | 进程内 JWT（`jsonwebtoken`）+ refresh 轮换；Bearer 中间件在 `middleware.ts` | 单实例即可；横向扩展时 refresh 存储换 Redis |
-| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试保障字段一致性：`test/*.test.ts` 共 **11 文件 154 例**（`api` 19 / `comic` 10 / `comic-phase2` 10 / `orchestrator` 10 / `catalog` 41 / `jobs` 9 / `ai-routes` 5 / `media` 3 / `rbac` 28 / `im` 10 / `film-export` 9）；`apps/admin/src/api.ts` 复用同一契约（`snake_case` + 错误信封），后续补 OpenAPI 导出 |
+| 契约先行 | OpenAPI/proto 生成 `core-sdk` | 手写 `apps/web/src/api.ts` + zod 校验（`validate.ts`）+ snake_case 响应 + 错误信封 | P0 以契约测试保障字段一致性：现行 `test/*.test.ts` 为 **52 文件 / 505 例**（2026-11-20 批次 2 实测）；**历史留痕**：括号内 `comic` / `comic-phase2` / `orchestrator` / `catalog` / `jobs` / `ai-routes` / `film-export` 等旧测试文件已随对应模块删除。`apps/admin/src/api.ts` 复用同一契约（`snake_case` + 错误信封），后续补 OpenAPI 导出 |
 | 仪表盘切日 | 展示端负责时区转换 | **已移除（2026-11-04）**：`routes/dashboard.ts` 随 FR-03 删除，服务端不再按用户时区切日；用户 `timezone` 字段与设置入口保留 | 恢复仪表盘能力时按原口径（`Intl.DateTimeFormat('sv-SE')` + 时区过滤）重新实现 |
 
-### 1.2 成片导出实现（2026-11-08 补齐）
+### 1.2 成片导出实现（2026-11-08 补齐；**已下线，历史留痕**）
+
+> 本节所述 `routes/comic.ts` 导出端点、`FilmExportPanel`、`film-export.test.ts` 随漫剧模块于 2026-11-15 删除，下述实现要点为历史交付快照。
 
 | 层 | 位置 | 实现要点 |
 |---|---|---|
@@ -438,7 +442,7 @@ WS URL 推导：host 为 `laal.top` / `www.laal.top` / `api.laal.top` / `mim.mix
 - 浏览器 E2E：登录 → 聊天 → 发消息 → 消息显示，7 步全 PASS
 - 后端测试：10 个 IM 测试全过；全量 163 测试全过
 
-### 8.8 商城商品视觉（2026-11-12）
+### 8.8 商城商品视觉（2026-11-12）（**整节历史留痕**：模块商城与 `/marketplace` 已随 2026-11-15 模块收口下线，下述封面 / 样式条目不代表当前工作树实况）
 
 **背景**：`/marketplace` 在 205 条模块数据齐全的前提下仍只有文字卡片，用户要求「商品图片 + 详细商品参数图片」。
 
@@ -447,7 +451,7 @@ WS URL 推导：host 为 `laal.top` / `www.laal.top` / `api.laal.top` / `mim.mix
   - `categoryGroupSlug()` 从二级 `category_slug`（如 `ai-01`）还原一级 slug，未知分类回落 `misc`；
   - `categoryCoverUrl()` 用 `import.meta.env.BASE_URL` 拼封面路径，兼容 GitHub Pages `/mim/` 子路径；
   - `specPosterUrl()` 按详情数据生成 900×1180 SVG data URL（标题、编码、12 行参数、底部说明），每条模块参数值不同，可右键另存。
-- `apps/web/src/views/Store.tsx`：卡片加 `.store-card-media` 封面与分类/价格角标；详情加 `.store-detail-hero`（封面 + 11 项参数键值表）与 `.store-spec-image`；展开卡片加 `.is-expanded` 横跨整行。
+- ~~`apps/web/src/views/Store.tsx`~~（**已下线，历史留痕**）：历史样式条目——卡片 `.store-card-media` 封面与分类/价格角标、详情 `.store-detail-hero` 与 `.store-spec-image`、展开卡片 `.is-expanded`；随模块商城删除。
 - `apps/web/src/styles.css`：新增 `.store-card*` / `.store-spec-*` 样式与 860px 单列响应式。
 - **验证**：本地 Edge CDP 首屏 12 张卡、封面 `naturalWidth=768`；详情 `specRows=11`、参数图 `900×1180`；`pnpm -r typecheck` 0、API 372 例、web 构建 0、根构建 0、各 verify 脚本全 PASS。
 
@@ -459,7 +463,7 @@ WS URL 推导：host 为 `laal.top` / `www.laal.top` / `api.laal.top` / `mim.mix
   - `moduleCoverUrl()` 生成逐商品 1200×675 矢量封面 SVG（`GROUP_HUE` 分类色相 ± 稳定漂移、FNV 哈希字标、渐变 / 网格 / 光晕纹理），配色与字标由模块编码稳定生成，刷新不跳色；
   - `moduleStoryUrl(input, 'feature' | 'delivery')` 生成两张详情说明面板（能力亮点：能力绑定 / 价格 / 状态；交付与依赖：解锁方式 / 前置依赖 / 区域）；
   - `categoryCoverUrl()` / 19 张分类 JPG 转为早期遗留资源，视图不再调用；`categoryGroupSlug()` 仍被新矢量封面复用于分组色相。
-- `apps/web/src/views/Store.tsx`：详情画廊 `gallery`（封面 / 能力亮点 / 交付与依赖）+ `galleryIndex` 缩略切换 + `zoom` 全屏预览状态；主图、缩略图、参数长图均可点击放大，Esc / 遮罩 / 关闭按钮退出。
+- ~~`apps/web/src/views/Store.tsx`~~（**已下线，历史留痕**）：历史画廊条目——详情 `gallery` / `galleryIndex` 缩略切换 / `zoom` 全屏预览；随模块商城删除。
 - `apps/web/src/styles.css`：新增 `.store-gallery` / `.store-gallery-main` / `.store-gallery-thumbs` / `.store-gallery-thumb(.is-active)` / `.store-gallery-zoom` / `.store-spec-button` / `.image-zoom(.image-zoom-close)` / `.store-card-media` 等样式与窄屏上下排列响应式。
 - **验证**：本地 5188 静态服务反代 8787，浏览器实测画廊三图渲染、缩略切换主图 alt 与 SVG `naturalWidth=1200`、主图与参数长图放大遮罩弹出、Esc 关闭，console 0 错误；`pnpm -r typecheck` 5/6 Done、API 56 文件 669 例全过、web / admin 构建 0、verify 20/20 · 55/55 · 83/83 · 23/23 · 39/39、comment-check `--strict` 总体达标、version / env 门禁通过。
 

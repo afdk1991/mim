@@ -1,5 +1,7 @@
 # 01 · 项目整体架构
 
+> **现行覆盖（2026-11-20）**：模块商城、入口配置清单、漫剧、导航站、统一搜索、云存储 / 图床 / 下载分发模块已从前后端代码删除；本页 §8 部署汇总、§9 导航站、§10 统一搜索及下方历史变更描述中涉及上述模块的内容均为**历史留痕**，不代表当前工作树实况。现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为准：`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`。
+
 ## 1. 仓库现状架构（当前实际形态）
 
 仓库当前是 **pnpm workspace Monorepo**，可运行产品代码 + 治理/规划文档并存，分四层：
@@ -7,9 +9,9 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 产品代码层（可运行）                                       │
-│   apps/web            React 18 + Vite 6 薄壳端（商城/统一入口配置清单/漫剧/IM/设置）│
+│   apps/web            React 18 + Vite 6 薄壳端（社区/圈子/IM/个人中心/收银台/登录）│
 │   services/mim-api    Express 5 + better-sqlite3 后端（8787） │
-│   packages/core-domain 错误码/UUIDv7/统一入口配置清单（errors/ids/siteModules）│
+│   packages/core-domain 错误码/UUIDv7/部署汇总注册表（errors/ids/deploymentRegistry）│
 │   packages/i18n       zh-CN / en-US 文案与货币格式化        │
 ├─────────────────────────────────────────────────────────┤
 │ 治理层（强制约束）                                        │
@@ -23,7 +25,7 @@
 │   .github/workflows/deploy.yml  push main 自动上线         │
 ├─────────────────────────────────────────────────────────┤
 │ 规划/参考层                                               │
-│   Mim-PRD.html       产品需求文档 V0.0.12-preview（草案）   │
+│   Mim-PRD.html       产品需求文档 V0.0.14-preview（草案）   │
 │   team-hiring-plan.md 技术约束分析 + 团队分阶段配置         │
 │   docs/wiki/         01~10 项目文档                        │
 └─────────────────────────────────────────────────────────┘
@@ -33,13 +35,13 @@
 
 - **pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`），根 `package.json` 统一编排 `dev/test/typecheck/build/check` 脚本
 - 后端 `services/mim-api`：Express 5 + `better-sqlite3`（WAL）+ JWT + zod，前缀 `/api/v1`，端口 8787
-- 前端 `apps/web`：React 18 + Vite 6，`src/api.ts` 统一 HTTP 契约；2026-11-04 已移除 FR-03 全部视图
+- 前端 `apps/web`：React 18 + Vite 6，`src/api.ts` 统一 HTTP 契约；现行视图为社区 / 圈子 / 聊天 / 个人中心 / 收银台 / 支付回跳 / 登录（历史 FR-03 项目任务视图、模块商城、漫剧等已分阶段移除）
 - 密钥治理载体为根目录 `.env.example`（全空占位）+ `.gitignore`（忽略 `.env`、反向豁免 `.env.example`），一致性由 `env-check.mjs` 自动校验
-- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.12-preview`，见 [03-code-reference.md](./03-code-reference.md)）
+- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.14-preview`，见 [03-code-reference.md](./03-code-reference.md)）
 
 ## 2. 目标产品架构（PRD 定义）
 
-PRD（Mim-PRD.html，V0.0.12-preview 草案）确定的核心产品决策是 **「Headless 中台 + 多端薄壳」**：
+PRD（Mim-PRD.html，V0.0.14-preview 草案）确定的核心产品决策是 **「Headless 中台 + 多端薄壳」**：
 
 ```
         Web     微信小程序    iOS App   Android App   PC(Win/macOS)
@@ -127,15 +129,17 @@ PRD（Mim-PRD.html，V0.0.12-preview 草案）确定的核心产品决策是 **�
 | 数据 | `packages/core-domain/src/deploymentRegistry.json` | 11 矩阵平台 / 12 规范部署项 / 5 CI 作业 / 2 git 远端 / 7 候选排除项；统一 `snake_case` 字段 |
 | 共享包 | `packages/core-domain/src/deploymentRegistry.ts` | 类型约束、id 索引、五类过滤、`deploymentSummary()` 分布统计 |
 | 后端 | `services/mim-api/src/routes/deployments.ts` | `GET /deployments/overview`、`GET /deployments`、`GET /deployments/:id`，全部公开只读 |
-| 前端 | `apps/web/src/views/Deployments.tsx` | 只保留 8 列核对表（规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明）；总览统计卡、分布图、筛选与展开详情已按用户指令删除；空数据 / 失败 / 缺失分别标识 |
+| 前端 | ~~`apps/web/src/views/Deployments.tsx`~~（**视图已下线，历史留痕**） | 该前端视图随 2026-11-15 模块收口删除；后端 `deployments` 只读路由与 `deploymentRegistry.json` 保留，下述 8 列核对表描述为历史快照。 |
 | 脚本 | `scripts/deployment-summary.mjs` / `verify-deployments.mjs` | 真实采集（git / 工件 / CI / 矩阵行数，可选 `--live` curl）→ 结构化产物；52 项一致性断言 |
 | 产物 | `docs/deployment-summary.{json,md}` | 机器可核对 JSON + 人工核对表 |
 
 设计约束：① 所有同类项共用同一组字段，别名归并到 `aliases` 而非另起一行；② `result = null` 表示空数据，不以 0 或历史 200 填充；③ 工件区分 `artifact_in_head`（远端 HEAD）与 `artifact_in_worktree`（本地工作树）两个口径；④ 汇总 `PASS` 不等于生产「已上线」，生产唯一权威终点仍为 `https://zy.laal.top`（API `https://api.laal.top`，铁律十二）。详见 [AGENTS.md §13](../../AGENTS.md)。
 
-## 9. 导航站 NAVIGATION（2026-11-12 新增）
+## 9. 导航站 NAVIGATION（**已下线，历史留痕**）
 
-架构定位：**有状态业务模块**，是统一入口清单里 NAVIGATION 的真实落地——链接目录 + 服务端可达性探测 + 失效标记 + 推荐位 + 检索。职责边界：只维护目录与可达性状态，不承载被链系统内容，不负责 DNS 解析或跳转决策（跳转由浏览器直接发起）。
+> 本节所述 `nav_links` 表、`packages/core-domain/src/navigation.ts`、`routes/navigation.ts`、`views/Navigation.tsx` 与 `test/navigation.test.ts` 随 2026-11-15 模块收口删除，下表为历史交付快照，不代表当前工作树实况。
+
+架构定位（历史）：**有状态业务模块**，是统一入口清单里 NAVIGATION 的真实落地——链接目录 + 服务端可达性探测 + 失效标记 + 推荐位 + 检索。职责边界：只维护目录与可达性状态，不承载被链系统内容，不负责 DNS 解析或跳转决策（跳转由浏览器直接发起）。
 
 | 层 | 工件 | 职责 |
 |---|---|---|
@@ -149,9 +153,11 @@ PRD（Mim-PRD.html，V0.0.12-preview 草案）确定的核心产品决策是 **�
 
 设计约束：① 三态只允许 `ok` / `broken` / `unknown`，未探测不冒充可达；② 探测失败不抛 5xx，而是把失败写进 `status = broken` 供页面标记；③ 全目录探测串行执行并限量，避免对第三方站点并发轰炸；④ 种子只补缺，不覆盖用户改写与已有探测结果。
 
-## 10. 统一搜索 SEARCH（2026-11-12 新增）
+## 10. 统一搜索 SEARCH（**已下线，历史留痕**）
 
-架构定位：**跨业务域只读聚合层**。它不新增业务表，也不写任何业务数据，只把模块商城（`modules`）、44 个统一入口（`SITE_MODULES`）、导航站（`nav_links`）、社区帖子（`community_threads`）、独立商城（`shop_products`）收敛成同一份 `SearchDocument`，对外提供统一检索与来源分组。任一来源表缺失或字段变化时只跳过该来源，不拖垮整次检索。
+> 本节所述 `src/search.ts`、`routes/search.ts`、`views/Search.tsx`、`test/search.test.ts` 随 2026-11-15 模块收口删除；现行社区检索为 `GET /api/v1/community/search`（自研 BM25 / 热度 / MMR 算法包，口径见 07 与 08），下表为历史交付快照。
+
+架构定位（历史）：**跨业务域只读聚合层**。它不新增业务表，也不写任何业务数据，只把模块商城（`modules`）、44 个统一入口（`SITE_MODULES`）、导航站（`nav_links`）、社区帖子（`community_threads`）、独立商城（`shop_products`）收敛成同一份 `SearchDocument`，对外提供统一检索与来源分组。任一来源表缺失或字段变化时只跳过该来源，不拖垮整次检索。
 
 | 层 | 工件 | 职责 |
 |---|---|---|

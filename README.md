@@ -27,6 +27,18 @@
 
 当前版本：**V0.0.14-preview**（2026-11-20 自研算法收口：权重持久化 + 后台可调 + 全窗口深翻页 + 前端排序/热榜入口；2026-11-19 新增自研算法包：中文二元分词 + BM25 相关性排序 + 时间衰减热度 + MMR 多样性重排，接入社区搜索与新增热榜接口；2026-11-17 版本 V0.0.12 含社区激励链与支付履约重构；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
 
+## 社区内容现状（2026-11-20）
+
+> 本节为现行口径；下文「版本」各历史变更条目与早期章节中访客自动建号 / 模块商城 / 漫剧 / 入口清单 / 导航站 / 统一搜索等描述，均为各轮交付快照，按铁律三保留作历史留痕，**不再作为现状引用**。
+
+- **生产入口**：前端 `https://zy.laal.top`，API `https://api.laal.top/api/v1`，后台 `https://zy.laal.top/admin/`；裸域 `laal.top` 是独立 WordPress（zibll）社区站，与本项目无关。
+- **现行前端视图段**（唯一真源 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS`）：`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；无 `/cart` 视图；商城 / 入口清单 / 漫剧 / 导航站 / 统一搜索 / 云存储 / 图床 / 下载分发等旧段已随模块下线，仅作历史别名或未知路径回落。
+- **门禁**：匿名默认可读（公开内容 200），个人与资金路径要求登录，写操作一律 401 `AUTH_UNAUTHORIZED`；自助注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭（403 `AUTH_REGISTER_DISABLED`）；`POST /auth/guest` 已删除；口令只认库内 `credentials`，环境变量超管口令已不生效。
+- **圈子**：`GET /circles` 匿名 200，前端匿名渲染清单与空态，加入 / 发帖 / 审核等写操作引导登录。
+- **社区检索口径（缺陷 D7 决策）**：检索以中文为准；英文仅整词子串、ASCII 大小写不敏感匹配，不保证复数 / 时态 / 词干变体召回；英文词形归一接入属独立检索语义改造项。
+- **生产社区盘点**（2026-11-19/20 只读库内 count + 公开 API 交叉核对）：版块 7、帖子 18、回复 0、图库 / 视频媒体 9、合集 2、圈子 0、公告 16（15 发布 + 1 草稿）、更新日志 11、付费资产 5。
+- **留档产物**（`reports/` 目录整体不入库，仅本地留档）：`reports/社区内容全量接管-20261120/` 下 `生产库盘点/盘点摘要.md`、`生产库盘点/内容修复记录.md`、`源码核对/修复与上线取证.md`、`源码核对/community_defects.md`、`浏览器验收/browser_report.md` 与 `browser_check.json`。
+
 版本号规约（与 [AGENTS.md 铁律四](./AGENTS.md#铁律四版本号每次添加功能模块更新等等规约与-readme-同步) 同步）：
 
 - 首个对外正式发布版本 = **V0.0.0**，此后按 V0.0.1、V0.0.2… 递增，发布前不得占用。
@@ -62,11 +74,10 @@ node scripts/comment-check.mjs
 - `version-check.mjs`：铁律四版本规约校验（退出码 0 / 1）
 - `env-check.mjs`：09 清单 §0 密钥治理校验——`.env.example` ↔ 09 清单 ↔ `.gitignore` 一致性（退出码 0 / 1）
 - `comment-check.mjs`：铁律十一注释覆盖率校验——逐文件统计「可注释行 / 已解释行」，默认基线模式（退出码恒 0），`--strict` 为 CI 门禁模式（低于阈值退出 1）
-- `verify:film-export`：成片导出 Edge CDP 真渲染 E2E（14 项断言）；前置 `pnpm --filter @mim/api build` 后启动 API :8787、`npm run serve:local`（:5188）、Edge `--remote-debugging-port=9222`，再执行 `npm run verify:film-export`
-- `verify:site-modules`：站点模块注册表零依赖校验（83 项断言）——44 条备注逐字比对、行号/分组/状态机自洽、落地状态四态链路透出、共享包→后端→前端→测试全链路消费断言
-- `verify:chat-flow`：聊天点击级 E2E（15 项断言，`scripts/verify-chat-flow.mjs`）——真点「+ 群聊」「创建群聊」、用 CDP 选文件发图片消息（断言气泡内 `<img>` 的 `naturalWidth > 0`）、点气泡上的「撤回」并断言消息从列表消失；前置同 `verify:film-export`，取证落 `.tmp/chat-flow-e2e.json` / `.png`
-- `verify:chat-plus`：聊天增强点击级 E2E（23 项断言，`scripts/verify-chat-plus.mjs`）——引用回复（引用条 → 气泡内引用块 → 发送后自动清除）、文件消息下载（真访问直链得 200）、群管理（设管理员后角色标签变「管理员」、邀请入群后成员数 2 → 3）、会话内搜索结果定位与目标消息高亮；前置同 `verify:chat-flow`，取证落 `.tmp/chat-plus-e2e.json` / `.png`
-- `verify:site-directory`：上一轮「站点入口契约」校验（16 项断言），两轮成果互不覆盖
+- ~~`verify:film-export`~~（**已下线，历史留痕**）：漫剧模块删除后，成片导出 E2E 脚本与 npm 入口已移除；下述历史描述为各轮交付快照。
+- ~~`verify:site-modules` / `verify:entry-manifest` / `verify:site-directory`~~（**已下线，历史留痕**）：入口配置清单模块删除后，三个校验脚本已不在 `scripts/` 目录与 npm scripts 中；下述 83 / 23 / 16 项断言描述为历史快照。
+- `verify:chat-flow`：聊天点击级 E2E（15 项断言，`scripts/verify-chat-flow.mjs`）——真点「+ 群聊」「创建群聊」、用 CDP 选文件发图片消息（断言气泡内 `<img>` 的 `naturalWidth > 0`）、点气泡上的「撤回」并断言消息从列表消失；取证落 `.tmp/chat-flow-e2e.json` / `.png`
+- `verify:chat-plus`：聊天增强点击级 E2E（23 项断言，`scripts/verify-chat-plus.mjs`）——引用回复（引用条 → 气泡内引用块 → 发送后自动清除）、文件消息下载（真访问直链得 200）、群管理（设管理员后角色标签变「管理员」、邀请入群后成员数 2 → 3）、会话内搜索结果定位与目标消息高亮；取证落 `.tmp/chat-plus-e2e.json` / `.png`
 - `summary:deployments`：部署汇总生成器——采集 `git remote` / `git ls-tree HEAD` / 工作树工件 / CI 作业 / 两份矩阵表行数，输出 `docs/deployment-summary.json`（结构化）与 `docs/deployment-summary.md`（核对表）；追加 `--live` 可对各入口真实 `curl` 探测并刷新 `result`
 - `verify:deployments`：部署汇总零依赖校验（55 项断言）——规范 ID 唯一、枚举合法、9 平台无遗漏、别名不撞名、空数据标识、工件双口径与真实仓库一致、共享包→后端→前端→文档全链路消费
 
@@ -106,39 +117,41 @@ node scripts/comment-check.mjs
 pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`、`packages/*`）：
 
 ```
-apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；视图：社区 / 个人中心（含购物车） / 聊天 / 圈子 / 部署汇总）
-apps/web/src/views/  # 视图组件：Profile（个人中心，含购物车页签）/ Community / Chat / Circles / Deployments / Checkout / PaymentReturn / Login，另含 ChatPreview / PageBlocks 等子组件
-apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；16 个视图：概览 / 功能模块 / 分类导航 / 权益管理 / 角色与权限 / 用户 / 订单 / 社区 / 内容运营 / 邀请码 / 价格批次 / 实名 / 商城卡片 / 商城优惠券 / 商城商品 / 登录）
+apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；现行视图：社区 / 圈子 / 聊天 / 个人中心 / 收银台 / 支付回跳 / 登录）
+apps/web/src/views/  # 视图组件：Home / Community（含 CommunityGallery / CommunityAssets / CommunityGuides / CommunityMore / ContentDetail / AnnouncementsPanel）/ Circles / Chat / Checkout / PaymentReturn / Profile / Login / MyAssets / PageBlocks 等子组件
+apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；21 个视图 tsx：概览 / 社区运营 / 内容运营 / 商城卡片 / 优惠券 / 商品 / 权益 / 订单 / 发货售后 / 邀请码 / 价格批次 / 实名 / 角色权限 / 用户 / 审计日志 / 页面搭建 / 成长私信 / 外观 / 设置 / 登录 等）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
-services/mim-api/src/routes/  # 26 个路由模块（25 个 routes/*.ts + payments/router.ts）：admin / appearance / auth / cart / catalog / circles / community / content-ops / content-unified / deployments / federation / im / invites / me / media / oauth / orders / payments / realname / referral / referral-admin / security / shop-admin / sso / vip-pricing
-services/mim-api/src/oauth/   # 第三方登录适配层：providers（14 家注册表）/ client（协议交换）/ accounts（绑定与一次性票据）
+services/mim-api/src/routes/  # 现行路由模块：admin / appearance / assets / auth / circles / community / content-ops / content-unified / deployments / federation / growth / growth-dm-admin / im / invites / me / media / oauth / orders / payments / realname / referral / referral-admin / security / shop-admin / sso / vip-pricing / wallet-withdrawals
+services/mim-api/src/oauth/   # 第三方登录适配层：providers（注册表）/ client（协议交换）/ accounts（绑定与一次性票据）
 services/mim-api/src/identity.ts  # 唯一建号入口：Mim ID 事务发号、历史用户回填、登录缺号兜底
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 部署汇总注册表 deploymentRegistry）
 packages/i18n/       # 双语文案（zh-CN / en-US）、t() 回退链与货币格式化
-scripts/             # build / version-check / env-check / comment-check / verify-auth-gate / deployment-summary / verify-deployments
+scripts/             # build / version-check / env-check / comment-check / verify-auth-gate / deployment-summary / verify-deployments / verify-custom-domains / verify-indexes / verify-env-wiring 等
 deploy/              # 生产部署工件（bootstrap / deploy / nginx / systemd / migrations / sealos / iga）
 .github/workflows/   # CI/CD（deploy.yml 五作业：verify / deploy / pages / packages / platforms）
 site/                # PRD 可视化阅读载体（`npm run build:site` 离线副本，非生产站点）
 docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ```
 
+> **现行覆盖（2026-11-20）**：模块商城（`/marketplace` `/products` `/cart`）、入口配置清单（`/entry-catalog` `/sites`）、漫剧工作台（`/comic-studio`）、导航站（`/navigation`）、统一搜索（`/search`）、云存储 / 图床 / 下载分发（`/cloud` `/img` `/download`）及对应后端路由、测试与种子均已从代码删除；上方各历史变更条目与 wiki 中相关描述按铁律三保留作历史留痕，不代表当前工作树实况。
+
 ## 功能与接口
 
 ### 前端视图（`apps/web/src/views`）
 
-站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，且路径段一律使用模块功能名称——`/community`（社区）、`/circles`（圈子，独立成员制社群）、`/chat`（聊天）、`/account`（个人中心与设置）、`/deployments`（部署汇总深链接）、`/checkout`（收银台）、`/pay-return`（支付回跳）、`/signin`（登录），根路径 `/` 与未知路径统一回落 `/community`；地址栏不再出现 `#/` 或 `?tads` 残留。旧 `#/xxx` 链接与改名前的旧段（`/login` `/settings` `/profile` `/forum`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）；已并入的 `/announcements`、`/news`、`/releases` 统一改写为 `/community`，已删除的 `/cart` 回落到 `/account`；其余已下线模块的旧段不再登记，访问时按未知路径回落社区，不会把用户送回已删除页面。**2026-11-12 起「设置」不再是独立视图**：原设置页的账号资料、语言 / 时区、区域信息与注销操作全部并入 `/account` 的「账号与设置」分区。**2026-11-15 起「购物车」随模块商城整块删除**：不再有独立页面、页签或接口，`/account` 只保留资料与账号安全。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**免登录体验（2026-11-12 起）**：前端启动时若本地无会话，自动调用 `POST /api/v1/auth/guest` 领取匿名访客会话（`users.is_guest=1`，同样自动分配 Mim ID 号码、同样签发 access/refresh 双令牌），此后 `/community`、`/circles`、`/account`、`/deployments`、`/chat` 全部按可用路径渲染；`/signin` 只用于把访客身份**升级为正式账号**（密码 / 验证码 / 注册 / 第三方登录）。访客建号按 IP 限流（每小时 30 个，超限返回 429 `AUTH_GUEST_RATE_LIMITED`）。`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。
+站内采用零依赖 history 路径路由（[router.ts](./apps/web/src/router.ts)）：路径即视图，现行对外路径段由 `VIEW_SEGMENTS` 一处定义——`/community`（社区）、`/circles`（圈子，独立成员制社群）、`/chat`（聊天）、`/account`（个人中心与设置）、`/checkout`（收银台）、`/pay-return`（支付回跳）、`/signin`（登录），根路径 `/` 与未知路径统一回落 `/community`；地址栏不再出现 `#/` 或 `?tads` 残留。旧 `#/xxx` 链接与改名前的旧段（`/login` `/settings` `/profile` `/forum`）在启动时自动改写为新路径（前端 `LEGACY_SEGMENTS` + 生产 nginx 301）；已并入的 `/announcements`、`/news`、`/releases` 统一改写为 `/community`，已删除的 `/cart` 回落到 `/account`；其余已下线模块的旧段（`/marketplace` `/products` `/entry-catalog` `/comic-studio` `/navigation` `/search` `/cloud` `/img` `/download` 等）不再登记，访问时按未知路径回落社区，不会把用户送回已删除页面。**2026-11-12 起「设置」不再是独立视图**：原设置页的账号资料、语言 / 时区、区域信息与注销操作全部并入 `/account` 的「账号与设置」分区。**2026-11-15 起「购物车」随模块商城整块删除**：不再有独立页面、页签或接口，`/account` 只保留资料与账号安全。视图由 [App.tsx](./apps/web/src/App.tsx) 按路径渲染，刷新、前进后退与外链直达均可用（GitHub Pages 由 `404.html` 回退、Cloudflare Pages 由 `functions/[[catchall]].js` 回退、EdgeOne Pages 由构建期生成的 `404.html` + 每个路径段的同名目录回退、生产 nginx 由 `try_files` 回退）。**门禁现行口径（2026-11-16 起，取代早期「按需登录 / 访客会话」模型）**：匿名默认可读——首页、社区列表、帖子正文、图库与视频、商品列表与详情、公告全部 200；只有命中个人与资金路径（`/me`、`/wallet`、收藏、通知、资产、返佣等）才要求登录；写操作（发帖 / 评论 / 点赞 / 收藏 / 举报 / 上传 / 编辑删除等）一律 401 `AUTH_UNAUTHORIZED`。`POST /api/v1/auth/guest` 路由已删除，不再有自动访客建号；`/signin` 用于登录已有正式账号。自助注册由服务端开关 `MIM_REGISTRATION_ENABLED` 控制且**默认关闭**（关闭态 403 `AUTH_REGISTER_DISABLED`）。`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁。
 
 独立管理后台见 [apps/admin](./apps/admin)：独立构建、独立静态根（生产 `/admin/`），承载概览 / 发货与售后 / 批量改价（仅独立商城商品）/ 邀请码 / 实名审核 / 内容运营 / 社区运营 / 页面搭建 / 成长私信 / 角色与权限 / 用户。
 
-**导航收口（2026-11-15 模块下线后）**：侧栏不渲染分组标题，按固定顺序平铺 **3 项**——社区 · 聊天 · 个人中心，外加侧栏底部的登录 / 退出入口；公告动态、社区资讯、版本三个页面已并入社区页「公告动态」页签（旧链接 `/announcements`、`/news`、`/releases` 由前端 `LEGACY_SEGMENTS` 与生产 nginx 301 统一落到 `/community`）；`圈子`、`部署汇总` 作为独立页保留，仅在社区页顶部保留直达条，深链接 `/circles`、`/deployments` 仍可直接访问并高亮回社区。已下线的 10 个模块入口、路由、页面与后端接口全部移除，不再以隐藏项形式残留。
+**导航收口（2026-11-15 模块下线后，2026-11-20 复核）**：主导航按后台配置平铺社区 / 聊天 / 个人中心等项，页脚附圈子入口与登录 / 退出入口；公告动态、社区资讯、版本三个页面已并入社区页「公告动态」页签（旧链接 `/announcements`、`/news`、`/releases` 由前端 `LEGACY_SEGMENTS` 与生产 nginx 301 统一落到 `/community`）；`圈子` 作为独立视图保留（深链接 `/circles` 可直达，匿名可见清单与空态）。**部署汇总前端页已随模块下线移除**：后端 `deployments` 只读路由仍在（匿名 401，属设计如此），但不再有 `/deployments` 前端视图。已下线的模块入口、路由、页面与后端接口全部移除，不再以隐藏项形式残留。
 
 **商城范围（2026-11-15 收口）**：项目只在**社区页内**保留一套商城（`shop` 标签）——实物快递 / 自动发卡密 / 人工发货三类商品，按余额与优惠码结算，下单走 `community.shop` 接口。功能模块商城（原 `/marketplace`）已整块删除：前端入口、购物车、目录 / 订单 / 权益页面、后台菜单与后端路由、类型定义、种子数据、数据表全部移除。
 
 | 视图 | 组件 | 说明 |
 |---|---|---|
-| 登录 | `Login.tsx` | 全站唯一登录入口：**账号密码登录**（自建账号 `POST /auth/register` + `POST /auth/password`，口令 bcrypt 存储）、**管理员口令登录**（同一 `/auth/password`，口令来自 `MIM_AUTH_ADMIN_PASSWORD`）、**验证码登录**（`/auth/code` + `/auth/login`，需短信/邮件通道凭证）、**第三方登录（2026-11-12）**（`GET /auth/oauth/providers` 拉 14 家清单 + 是否已配置 → `POST /auth/oauth/:provider/authorize` 取授权地址 → 回调 302 带一次性票据 → `POST /auth/oauth/exchange` 换会话；未配置凭证的提供方按钮置灰标注「未配置」）；**注册成功先展示自动分配的 Mim ID**（`user.member_no`，纯数字 QQ 号样式、无前缀不补零，自动发号自 `102` 起、靓号只人工授予）再进入工作台；登录页挂载时查 `GET /auth/channels` 并在通道未配置时直接提示改用密码或注册。匿名访问收费/私密视图时在内容区内嵌展示；**聊天 `/chat` 匿名态改为只读演示页**（`ChatPreview.tsx`：完整聊天布局 + 示例会话与消息 + 禁用输入区 + 登录引导），不再是一张空白登录卡片 |
-| 部署汇总（2026-11-09，2026-11-12 收敛为纯表格） | `Deployments.tsx` | 只保留 8 列传证核对表：规范 ID / 名称 · 仓库标识 · 平台 / 层级 · 交付链路 · 访问域名 · 部署状态 · 部署结果 · 异常说明——访问域名可点击直达入口，缺失信息并入异常说明列；**空数据（⚪）、失败（🔴）、缺失（⚠）分别标识**，匿名只读；页面原总览统计卡、状态分布环形图、五类筛选、展开取证详情与覆盖排除说明已按用户指令全部删除；数据源 `packages/core-domain/src/deploymentRegistry.json` |
-| 设置 | `Settings.tsx` / `Profile.tsx` | 资料、区域、语言与注销冷静期；**2026-11-12 归位**：设置不再是顶层导航入口，只作为登录后「个人中心」内的「账号与设置」页签；匿名访客的个人中心只保留「资料」与账号安全 |
+| 登录 | `Login.tsx` | 全站唯一登录入口：**账号密码登录**（`POST /auth/password`，口令只认库内 `credentials(kind=password)` bcrypt 记录；环境变量超管口令 `MIM_AUTH_ADMIN_PASSWORD` 已不生效）、**验证码登录**（`/auth/code` + `/auth/login`，需短信/邮件通道凭证）、**第三方登录**（`GET /auth/oauth/providers` 拉清单 + 是否已配置 → `POST /auth/oauth/:provider/authorize` 取授权地址 → 回调 302 带一次性票据 → `POST /auth/oauth/exchange` 换会话；未配置凭证的提供方按钮置灰标注「未配置」）。**自助注册由 `MIM_REGISTRATION_ENABLED` 开关控制、默认关闭**：关闭态 `POST /auth/register` → 403 `AUTH_REGISTER_DISABLED`，`/auth/channels` 上报 `register:false`，登录页不渲染注册分段；打开态才走完整注册并复用统一建号规则（`user.member_no` 纯数字 Mim ID，靓号只人工授予）。登录页挂载时查 `GET /auth/channels` 并在通道未配置时直接提示改用密码。匿名访问收费 / 私密视图时在内容区内嵌登录引导。 |
+| ~~部署汇总前端页~~（**已下线，历史留痕**） | ~~`Deployments.tsx`~~ | 该前端视图随 2026-11-15 模块收口删除；后端 `deployments` 只读路由仍在（`GET /deployments/overview` 等，匿名 401 属设计如此），数据源 `packages/core-domain/src/deploymentRegistry.json` 与 `docs/deployment-summary.{json,md}` 保留。下方「部署汇总」历史描述为各轮交付快照，不再代表当前前端实况。 |
+| 设置 | `Profile.tsx` | 资料、区域、语言与注销冷静期；**2026-11-12 归位**：设置不再是顶层导航入口，只作为登录后「个人中心」内的「账号与设置」页签；独立 `Settings.tsx` 已删除，匿名访客的个人中心只保留「资料」与账号安全。 |
 | 聊天 | `Chat.tsx` | 即时通讯与视频通话：会话列表、用户搜索、消息收发、WebRTC 视频通话（`VideoCall.tsx`），WS 端点 `/api/v1/im/ws`；**2026-11-11 增强**——引用回复（`reply_to_id` + 发送时固化 `reply_excerpt` 摘要快照，气泡内渲染引用块）、文件消息气泡（presign 下载直链 + 体积 + 下载按钮）、群管理（群主「设/撤管理员」「转让群主」、群主/管理员「移除」「邀请入群」、成员数实时刷新）、会话内搜索结果定位（`?around=` 按目标消息取上下文窗口 + 命中高亮）、未读分割线（`unread_count` 换算锚点，渲染「以下是新消息」）、表情选择器（20 个 Unicode 表情） |
 
 ### 后端接口（`services/mim-api`，前缀 `/api/v1`）
@@ -146,11 +159,11 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 | 分组 | 端点 | 鉴权 |
 |---|---|---|
 | 健康 | `GET /health` | 公开 |
-| 鉴权 | `POST /auth/code`、`/auth/login`、`/auth/register`、`/auth/password`、`/auth/refresh`、`/auth/logout`、`GET /auth/channels` | 公开（`logout` 需登录；`/auth/channels` 只返回各通道是否可用的布尔值） |
+| 鉴权 | `POST /auth/code`、`/auth/login`、`/auth/register`、`/auth/password`、`/auth/refresh`、`/auth/logout`、`GET /auth/channels` | 公开（`logout` 需登录；`/auth/channels` 只返回各通道是否可用的布尔值；`/auth/register` 受 `MIM_REGISTRATION_ENABLED` 开关控制，默认关闭返回 403 `AUTH_REGISTER_DISABLED`；`POST /auth/guest` 路由已删除） |
 | 第三方登录（2026-11-12） | `GET /auth/oauth/providers`（9 家清单 + 是否已配置，支持 `?region=cn\|global`）、`POST /auth/oauth/:provider/authorize`（下发授权地址与 state，`mode=login\|bind`）、`GET\|POST /auth/oauth/:provider/callback`（回调换资料 → 302 回前端带一次性票据或绑定结果）、`POST /auth/oauth/exchange`（票据换双令牌）、`GET /me/oauth`、`DELETE /me/oauth/:provider` | providers 公开；callback 公开（靠 state 校验）；绑定模式与 `/me/oauth*` 需登录；票据一次性、300 秒过期 |
 | Mim ID（2026-11-12） | 无独立端点：`/auth/register`、`/auth/login`、`/auth/password`、`/auth/refresh`、`GET /me`、`GET /me/oauth` 的 `user.member_no` 字段 | 随登录态返回；号码由服务端在事务内发号，客户端只读 |
-| 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（12 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 全部公开只读，不查业务表、无写端点 |
-| 个人中心（2026-11-11） | 复用既有 `GET /me`、`PATCH /me`（`display_name` / `locale` / `timezone`）、`POST /me/deletion`、`POST /me/cancel-deletion`，前端新增 `/account` 页承载「资料编辑 / 我的权益 / 我的订单 / 购物车 / 账号安全」五块；**2026-11-12 增补**：资料区与账号安全区展示 `user.member_no`（Mim ID，原「账号 ID」文案改为「内部 ID」），账号安全区新增第三方账号绑定 / 解绑（`GET /me/oauth`、`DELETE /me/oauth/:provider`，绑定走 `POST /auth/oauth/:provider/authorize` 的 `mode=bind`，回调后提示绑定成功；最后一个登录方式不允许解绑） | 登录 |
+| 部署汇总（2026-11-09） | `GET /deployments/overview`（分布统计 + 覆盖口径 + 状态/结果/严重度/层级字典 + 平台/CI/排除清单）、`GET /deployments`（12 项清单，支持 `?q=` / `?layer=` / `?status=` / `?verdict=` / `?platform_id=`；`verdict=EMPTY` 命中空数据项）、`GET /deployments/:id`（单项详情 + 同平台同类项） | 路由保留；该组端点注明「管理员可读」，匿名访问 401 属设计如此；无写端点 |
+| 个人中心（2026-11-11） | 复用既有 `GET /me`、`PATCH /me`（`display_name` / `locale` / `timezone`）、`POST /me/deletion`、`POST /me/cancel-deletion`，前端 `/account` 页承载「资料编辑 / 我的权益 / 我的订单 / 账号安全」等分区（**购物车分区随模块商城于 2026-11-15 删除**）；资料区与账号安全区展示 `user.member_no`（Mim ID），账号安全区新增第三方账号绑定 / 解绑（`GET /me/oauth`、`DELETE /me/oauth/:provider`，绑定走 `POST /auth/oauth/:provider/authorize` 的 `mode=bind`，回调后提示绑定成功；最后一个登录方式不允许解绑） | 登录 |
 | 账号 | `GET /me`、`PATCH /me`、`POST /me/deletion`、`POST /me/cancel-deletion` | 登录 |
 | 媒体 | `PUT/GET /media/objects/*`（URL 签名）、`POST /media/presign/upload`（`asset_type` 必填）、`GET /media/presign/download` | 对象端点凭签名免鉴权；预签名需登录；供聊天附件与社区图集 / 视频帖使用 |
 | 管理 RBAC | `GET /admin/me`、`GET /admin/permissions`、`GET /admin/roles`、`POST /admin/roles`、`PATCH/DELETE /admin/roles/:code`、`GET/PUT /admin/roles/:code/permissions`、`GET /admin/users`、`GET/POST /admin/users/:userId/roles`、`DELETE /admin/users/:userId/roles/:roleCode` | Bearer + `rbac:read` / `rbac:write`（`x-admin-token` 为超管引导通道） |
@@ -167,16 +180,14 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，58 个测试文件 / 676 例，2026-11-14 19:0x 实测）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，52 个测试文件 / 505 例，2026-11-20 批次 2 本轮实测）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
 pnpm --filter @mim/web dev                # 启动前端（http://127.0.0.1:5173，/api 代理到 8787）
 pnpm --filter @mim/admin dev              # 启动管理后台（http://127.0.0.1:5174，/api 代理到 8787）
 npm run check                             # 版本规约 + 密钥模板校验 + 注释覆盖率（CI 以 --strict 执行）
-npm run verify:site-modules                # 统一入口配置清单 83 项零依赖校验（44 备注逐字 / 占位标识 / 19 域 / 落地状态链路 / 全链路消费）
-npm run verify:entry-manifest              # 统一入口配置清单专项校验 23 项（19 业务用途覆盖 / 去重 / 占位配置）
-npm run verify:site-directory              # 站点入口契约 16 项零依赖校验
+# 历史留痕：verify:site-modules / verify:entry-manifest / verify:site-directory 三个校验脚本随入口配置清单模块于 2026-11-15 一并删除，已不在 npm scripts 与 scripts/ 目录中
 npm run summary:deployments                # 生成部署汇总 JSON + Markdown 核对表（--live 追加真实 curl 探测）
 npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 ```
@@ -194,7 +205,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | [2026-11-16/zibll-alignment/gap-inventory-20261118.md](./2026-11-16/zibll-alignment/gap-inventory-20261118.md) | 子比主题结构 / 样式对齐缺口清单：本轮已落地项、延期项与前置依赖、两条路线边界 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
-| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.12-preview 口径，含 FR-01~06 功能规格与交互演示） |
+| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.14-preview 口径，含 FR-01~06 功能规格与交互演示；PRD 中商城 / 漫剧等旧范围描述为草案历史口径，以代码现行视图段为准） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 
 ## 站点与部署
@@ -215,14 +226,14 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 | 项 | 说明 |
 |---|---|
-| 生产域名 | `https://zy.laal.top`（API `https://api.laal.top`；HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`；旧 `mim.mixm.top` 仅 301） |
+| 生产域名 | `https://zy.laal.top`（API `https://api.laal.top/api/v1`；后台 `https://zy.laal.top/admin/`；HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`；旧 `mim.mixm.top` 仅 301 → `laal.top`）。**裸域 `laal.top` 为独立 WordPress（zibll V9.2）社区站（仅 1 篇默认文章），不是 Mim**。 |
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（用户端静态根）+ `/opt/mim/admin`（管理后台静态根）+ systemd `mim-api`（端口 8787） |
 | 管理后台入口 | `https://zy.laal.top/admin/`（`apps/admin` 构建产物；nginx `/admin/` location 独立 alias，与用户端静态根隔离；页面声明 `noindex, nofollow`） |
 | 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前幂等执行；**项目不创建任何数据库备份** |
-| 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_AUTH_ADMIN_PASSWORD`、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md) |
+| 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_REGISTRATION_ENABLED`（只认 `1`，默认关闭；关闭态注册 403 `AUTH_REGISTER_DISABLED`）、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md)。**`MIM_AUTH_ADMIN_PASSWORD` 已不生效**：口令只认库内 `credentials(kind=password)` bcrypt 记录，不再有环境变量超管口令通道。 |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
-| 生产登录入口 | **免登录体验（2026-11-12 起，取代原按需登录，与上文前端视图口径一致）**：前端启动即自动领取匿名访客会话（`POST /api/v1/auth/guest`，`is_guest=1`、自动分配 Mim ID、同发双令牌），`/community`、`/account`（含 `?tab=cart` 购物车页签）、`/deployments`、`/chat`、`/circles` 全部免登录可用；`/signin` 只用于把访客升级为正式账号，退出后重新加载自动回到免登录态。访客建号按 IP 限流（30 次/小时，429 `AUTH_GUEST_RATE_LIMITED`）。独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的全站门禁。登录页支持「密码登录 / 验证码登录 / 注册」三种方式：`POST /api/v1/auth/register` 自助建号（口令 bcrypt 存 `credentials(kind=password)`，注册即登录），`POST /api/v1/auth/password` 先比管理员口令 `MIM_AUTH_ADMIN_PASSWORD` 再比账号自身口令，`GET /api/v1/auth/channels` 下发各通道可用布尔值供登录页提示。验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
+| 生产登录入口 | **现行门禁口径（2026-11-16 起，取代早期「免登录体验 / 访客会话」模型；早期访客自动建号、`is_guest=1`、IP 限流 30 次/小时等描述为历史留痕）**：匿名默认可读——社区列表、帖子正文、图库与视频、商品列表与详情、公告、圈子清单与空态全部 200；个人与资金路径（`/me`、`/wallet`、订单、收藏、通知、资产、返佣等）要求登录；写操作（发帖 / 评论 / 点赞 / 收藏 / 举报 / 上传 / 编辑删除等）一律 401 `AUTH_UNAUTHORIZED`。`POST /api/v1/auth/guest` 路由已删除（404），不再自动建号；`users.is_guest` 为历史兼容列、新账号恒 0。独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的 RBAC 门禁。登录页支持「密码登录 / 验证码登录 / 注册（开关打开时）」：`POST /api/v1/auth/password` 只比库内账号口令；`POST /api/v1/auth/register` 受 `MIM_REGISTRATION_ENABLED` 控制、默认关闭（403 `AUTH_REGISTER_DISABLED`）；`GET /api/v1/auth/channels` 下发各通道可用布尔值供登录页提示。验证码通道已支持阿里云短信（`MIM_SMS_ALIYUN_*`）与 AWS SES 邮件（`MIM_EMAIL_SES_*`），CI Secret 配置后由 `deploy.yml` 透传写入即生效，未配置时 `auth/code` 在生产返回 503 `AUTH_CHANNEL_NOT_CONFIGURED` |
 | 代码同步通道 | 服务器访问 `https://github.com` 被阻断，改走 `git@github.com`（`/opt/mim/.ssh/deploy_key` 只读 Deploy Key，22 端口） |
 | 一次性引导 | `sudo bash deploy/bootstrap.sh`（apt 依赖 / pnpm / nginx / systemd / certbot） |
 | 手动重放 | `bash deploy/deploy.sh`（幂等；项目不创建任何数据库备份） |
@@ -320,7 +331,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 - **候选池（7 条，不计入汇总）**：`candidate.cf-workers`（形态已合并进 `pages.cloudflare` + `worker.mim-store`）、`excluded.vefaas`（无长期免费层，铁律九排除）、`excluded.sealos`（付费容器余额 0、应用 0 个，2026-11-12 用户选「换免费平台」后退休），以及 **2026-11-13 01:10 由部署项移入的 4 条**：`candidate.gitlab`（gitlab.com 对当前网络地区限制，注册/登录被重定向 `users/identity_verification/restricted`，仅给极狐入口）、`candidate.bitbucket`（需 Atlassian 账号 + App Password，且无静态托管）、`candidate.azure-swa`（免费层仍需 Azure 订阅 + 绑卡 + 部署令牌）、`candidate.render`（控制台已登录但新建服务强制 `Add Card` $1 授权验证）。四条的 `former_item_id`、原 `missing_fields` 与所需 `prerequisite` 均保留，补齐账号/令牌后可原样回迁为部署项。
 - **去重**：README 曾把「Cloudflare Pages 同源自托管入口（`_worker.js`）」与「Cloudflare Pages / Workers」列成两行，实为同一域名同载体的两种发布形态，合并为 `pages.cloudflare` 一行并在 `delivery.modes` 区分。
 - **本轮基线（2026-11-10 22:20 实测，Gitee 入矩阵轮）**：`gitee` 网页 200 / 0.469s / 52034B、`git ls-remote` exit 0 / 0.27s 且与本地 HEAD `4398cf0` 一致（历史 exit 124 超时已解除）；其余平台沿用 2026-11-09 23:03 快照（生产 `mim.mixm.top/health` = `000`，curl exit 7 本地代理 502；IGA Pages 与独立 Worker 为空数据）；工件双口径以 `git ls-tree HEAD` 与工作树实测为准，**不得以本表 `PASS` 冒充铁律八 / 十二的线上取证**。
-- **生成与核对**：`npm run summary:deployments`（`--live` 追加真实 `curl` 探测）→ `docs/deployment-summary.json` + `docs/deployment-summary.md`；`npm run verify:deployments`（55 项断言）；Web 端 `/deployments` 提供可筛选可展开的核对表。
+- **生成与核对**：`npm run summary:deployments`（`--live` 追加真实 `curl` 探测）→ `docs/deployment-summary.json` + `docs/deployment-summary.md`；`npm run verify:deployments`（55 项断言）；**历史留痕**：Web 端 `/deployments` 核对表视图已随模块下线删除，后端只读路由与汇总产物保留。
 
 本地构建：`npm run build`（真实前端 → 根 `dist/`，与 EdgeOne Pages 同款链路）；PRD 阅读页：`npm run build:site`（`site/` → `dist/`）；前端单独产物：`npm run build:web`；校验：`npm run check`。
 

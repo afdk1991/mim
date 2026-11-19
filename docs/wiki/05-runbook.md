@@ -1,6 +1,8 @@
 # 05 · 项目运行方式
 
-> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下仓库级脚本（版本校验、密钥模板校验、注释覆盖率校验、站点构建、统一入口配置清单校验、站点入口契约校验）。本页覆盖启动、测试、构建与校验的完整命令。
+> **现行覆盖（2026-11-20）**：现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为准——`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；`/marketplace`、`/products`、`/cart`、`/entry-catalog`、`/sites`、`/comic-studio`、`/comic`、`/navigation`、`/search`、`/cloud`、`/img`、`/download`、`/deployments` 前端页签均已下线，仅作历史别名或未知路径回落。门禁现行口径：匿名默认可读，个人与资金路径要求登录，写操作 401；自助注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭；`POST /auth/guest` 已删除；口令只认库内 `credentials`，`MIM_AUTH_ADMIN_PASSWORD` 已不生效。本页 §6.3 中模块商城 / 漫剧 / 权益解锁 / 访客会话相关行、§6.4 漫剧与商城冒烟步骤、以及下方各历史取证段落，均按铁律三保留作历史留痕，不代表当前工作树实况。
+>
+> 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下仓库级脚本（版本校验、密钥模板校验、注释覆盖率校验、站点构建、门禁与部署汇总校验）。本页覆盖启动、测试、构建与校验的完整命令。
 >
 > **2026-11-09 统一入口配置清单轮**：按 45 类 DNSPod 备注去重整理为 45 个去重入口 + 19 业务域，统一可配置占位标识（不补写具体主机值）；`/sites` 视图升级为统一入口配置清单（消费 `/api/v1/entries*` 6 只读端点 + `/api/v1/sites*` 运行时端点）。启动 API 后 `npm run verify:site-modules` 离线校验 79 项、 `npm run verify:entry-manifest` 校验 19 业务用途覆盖与去重整理；`npm run verify:site-directory` 校验上一轮站点入口契约。交付说明见 [../统一入口配置清单与模块化实现说明-20261109.md](../统一入口配置清单与模块化实现说明-20261109.md)，可读清单见 [../统一入口配置清单-20261109.md](../统一入口配置清单-20261109.md)。
 >
@@ -46,7 +48,7 @@ Remove-Item Env:RELEASE_CHANNEL
 
 | 场景 | 预期输出要点 | 退出码 |
 |---|---|---|
-| 当前仓库现状（`package.json` 版本 `0.0.12`、无正式 tag） | `✅ 版本号 0.0.12 合法（V0.0.12）` + tag 段通过 | 0 |
+| 当前仓库现状（`package.json` 版本 `0.0.14`、无正式 tag） | `✅ 版本号 0.0.14 合法（V0.0.14）` + tag 段通过 | 0 |
 | `package.json` 写 `"version": "0.0.0-preview"` | ❌ 版本号不符合 semver（预发行后缀只允许走 RELEASE_CHANNEL，不进版本数字） | 1 |
 | `RELEASE_CHANNEL=preview` 且仓库已有 `V0.0.0` tag | ❌ 预览通道下已存在正式 tag | 1 |
 
@@ -151,17 +153,19 @@ npm run check                           # 版本规约 + 密钥模板校验 + �
 |---|---|
 | 数据库 | SQLite（`better-sqlite3`，WAL），首次启动自动建表；测试使用内存库 |
 | 端口 | API `8787`（读标准环境变量 `PORT`，默认 8787）；Web `5173` |
-| 环境变量 | `.env.example` 登记第三方密钥占位（P0 无真实密钥需求）；应用自有 `MIM_JWT_SECRET`（生产必配）、`MIM_AUTH_ADMIN_PASSWORD`（生产密码登录口令）与 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌），三者均由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`。`MIM_ADMIN_TOKEN` 缺失时 `/api/v1/admin/*` 与 catalog 管理写路由返回 403 `FEATURE_NOT_AVAILABLE 'admin API is not enabled'`，独立后台 `/admin/` 只能打开静态页无法写操作；配置后 `x-admin-token` 通道视同拥有全量权限（bootstrap），用于「第一个超管从哪来」的冷启动 |
+| 环境变量 | `.env.example` 登记第三方密钥占位（P0 无真实密钥需求）；应用自有 `MIM_JWT_SECRET`（生产必配）、`MIM_REGISTRATION_ENABLED`（只认 `1`，默认关闭；关闭态注册 403 `AUTH_REGISTER_DISABLED`）与 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌），由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`。`MIM_ADMIN_TOKEN` 缺失时 `/api/v1/admin/*` 管理写路由返回 403 `FEATURE_NOT_AVAILABLE 'admin API is not enabled'`，独立后台 `/admin/` 只能打开静态页无法写操作；配置后 `x-admin-token` 通道视同拥有全量权限（bootstrap），用于「第一个超管从哪来」的冷启动。**`MIM_AUTH_ADMIN_PASSWORD` 已不生效**：口令只认库内 `credentials(kind=password)` bcrypt 记录，不再有环境变量超管口令通道。 |
 | 验证码 | 开发/测试环境未配置通道时在响应中回传 `dev_code`；**生产环境（`NODE_ENV=production`）强制走第三方通道，不回传 `dev_code`**。通道已支持：国内手机号 → 阿里云短信（`@alicloud/dysmsapi20170525`，需 `MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE` 四项齐备），海外邮箱 → AWS SES（`@aws-sdk/client-ses`，需 `MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_FROM_ADDRESS`，`MIM_EMAIL_SES_REGION` 缺省回退 us-east-1）。通道未配置时合法请求返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；供应商发送失败返回 502 `AUTH_CODE_DELIVERY_FAILED` |
-| 生产登录入口 | 三条入口并存，前端登录页按 `GET /api/v1/auth/channels` 自动选择可用项：① **自助注册 + 账号口令**——`POST /api/v1/auth/register`（`{region,identifier,password,display_name?}`，口令 ≥8 位且含字母与数字，bcrypt 存 `credentials(kind='password')`）创建账号并直接登录，重复注册 409 `AUTH_IDENTITY_EXISTS`；② **管理员口令**——`POST /api/v1/auth/password`（`{region,identifier,password}`，口令取自 `MIM_AUTH_ADMIN_PASSWORD`）；③ **验证码**——需先注入短信/邮件通道凭证。`/auth/password` 先比管理员口令、再比账号自身口令，两者都未配置返回 503 `AUTH_PASSWORD_NOT_CONFIGURED`，口令错误 401 `AUTH_PASSWORD_INVALID`，连续失败 5 次锁定 15 分钟（423 `AUTH_ACCOUNT_LOCKED`）。前端默认「密码登录」，注册为登录页第三个分段。 |
-| 前端视图 | 仅「设置」一页。重定义后：`catalog` 域 4 表 + `comic` 域 **7 表**（第 1 期 3 表 + 第 2 期 `generation_jobs`/`generation_assets`/`comic_films`/`film_versions` 4 表）已建、`/api/v1/comic/*` 24 条路由已上线（第 1 期 8 条 + 第 2 期任务编排与成片 16 条，拆分见 `docs/wiki/07-functional-modules.md` §12）；第 2 期**已装配上线（2026-11-05）**：`app.ts` 已 import 并挂载 `/api/v1/media/*`（`createMediaRouter` + 免鉴权对象收发 `createMediaObjectRouter`，后者先于全局 `express.json`）与 `/api/v1/ai/*`（`createAiRouter`），`index.ts` 构造 `storage` + `orchestrator` 并在 `MIM_AI_WORKER` 默认开启时 `orchestrator.start()` 自动消费 `generation_jobs`；商城与漫剧前端视图已上线。**免登录体验（2026-11-08 起按需登录，2026-11-12 演进为访客会话模型；「设置」并入个人中心、漫剧放映厅匿名可看）**：前端启动时本地无会话即自动领取匿名访客会话（`POST /api/v1/auth/guest`，`is_guest=1`、自动分配 Mim ID、签发 access/refresh 双令牌），此后全站按可用路径渲染；商城目录 `/marketplace`、入口配置清单、部署汇总匿名可浏览；`/comic-studio` 默认进「放映厅」分段，匿名可直接播放内置演示片库（`GET /api/v1/comic/showcase`），创作工作台分段在模块内引导登录；`/products`、`/cart`、`/account` 由访客会话直接驱动，离线或建号失败时才显示重试免登录会话的降级入口；`/chat` 匿名态为只读演示页；`/account` 导航入口对访客同样可见。原独立 `/settings` 视图已删除，账号资料 / 语言时区 / 区域信息 / 注销操作全部并入 `/account` 的「账号与设置」分区，旧 `/settings` 链接由 `LEGACY_SEGMENTS` 落到 `/account`。`/signin` 仅用于把访客升级为正式账号；退出、`/me` 启动校验发现令牌失效（refresh 续期失败）或跨标签页退出时回落访客态。前端路由为 history 路径路由（`/store` 等单段路径，`vite base './'` 兼容），旧 `#/xxx` 链接启动时自动改写。`apps/web/src/api.ts` 提供会话结构校验、`SESSION_CHANGED_EVENT` 广播与 `/me` 静默校验；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁；独立管理后台 `apps/admin` 原本即为「无凭证只渲染登录页」的全站门禁，无需改动。后端业务接口（`/me`、`/comic/*`、`/ai/*`、`/media/*`、`/im/*`、`/entitlements`、`/admin/*`）原本即 requireAuth；仅 `GET /modules` 系列为不含用户数据的公开只读静态元数据，保持原契约不变 |
-| 模块解锁 | **商城模块目录（2026-11-10 两级分类改造后）**：`module_categories` 表存 19 个一级分类 + 205 个二级条目；二级条目一律生成一个功能模块（编码 `cat.<一级slug>-<两位序号>`，`sort_order = 一级序×100 + 二级序`，`license` / `language` / `stars` 随组默认值落库，定价全免费、无前置依赖），与 8 个存量模块（`comic.workbench`、`comic.genpack.basic/pro/team`、`ai.dubbing`、`ai.script`、`media.storage`、`template.pack`，由 `LEGACY_META` 归入 `ai-01` / `ai-06` / `ai-07` / `server-12` / `tools-03` 并保持原付费价与依赖链）共同随 `createDatabase()` 幂等 upsert 写入 cn/global 两区；`requireEntitlement('comic.workbench')` 无权益返回 **403 `FEATURE_NOT_AVAILABLE`**，`details` 含 `module_code`、`region` |
-| **现行覆盖：免登录体验（2026-11-12 起取代按需登录）** | 全站不再有「此功能需登录后使用」。前端启动时若本地无会话，自动调用 `POST /api/v1/auth/guest` 领取匿名访客会话（`users.is_guest=1`，同样自动分配 Mim ID、同样签发 access/refresh 双令牌）；此后 `/marketplace`、`/products`、`/cart`、`/account`、`/entry-catalog`、`/deployments`、`/comic-studio`（放映厅 + 创作工作台）、`/chat` 全部直接可用，加购 / 下单 / 解锁 / 订单 / 聊天收发 / 漫剧创作均按已登录路径工作，数据归属该访客账号。`/signin` 只用于把访客升级为正式账号（密码 / 验证码 / 自助注册 / 9 家第三方），退出登录后重新加载页面又会自动回到免登录可用态；`/account` 导航常驻。访客建号按 IP 限流（30 次/小时，超限 429 `AUTH_GUEST_RATE_LIMITED`）。上表第 157 行的「按需登录 / 内嵌登录卡片 / 只读演示」口径为历史留痕，按铁律三保留，不再作为现状引用。独立管理后台 `/admin/` 仍保持「无凭证只渲染登录页」的门禁 |
-| 授权命令 | **首选管理后台（2026-11-08 起）**：`/admin/` →「权益管理」页按用户 ID + 模块 code 发放 / 回收，回收与事件审计（`GET /entitlements/:id/events`）同页可查；模块上架 / 调价走「功能模块」页（`POST /modules`、`PATCH /modules/:code/status`、`POST /modules/:code/prices` 等，需 `module:write`）。应急手工 SQL（不推荐，绕过事件审计）：`sqlite3 /opt/mim/app/services/mim-api/data/mim.db "INSERT INTO entitlements (id,user_id,module_id,source,source_id,status,version,created_at,updated_at) VALUES ('ent:<uid>:comic','<uid>',(SELECT id FROM modules WHERE code='comic.workbench' AND region='cn'),'admin',NULL,'active',1,datetime('now'),datetime('now'));"` |
+| 生产登录入口 | 现行两条登录路径，前端登录页按 `GET /api/v1/auth/channels` 自动选择可用项：① **账号口令**——`POST /api/v1/auth/password`（`{region,identifier,password}`）只比库内 `credentials(kind=password)` bcrypt 记录；② **验证码**——需先注入短信/邮件通道凭证（`/auth/code` + `/auth/login`）。`/auth/password` 口令错误 401 `AUTH_PASSWORD_INVALID`，连续失败 5 次锁定 15 分钟（423 `AUTH_ACCOUNT_LOCKED`）。**自助注册** `POST /api/v1/auth/register` 由 `MIM_REGISTRATION_ENABLED` 开关控制、默认关闭：关闭态 403 `AUTH_REGISTER_DISABLED` 且 `/auth/channels` 上报 `register:false`，登录页不渲染注册分段；打开态才走完整注册（口令 ≥8 位且含字母与数字，bcrypt 存库，重复注册 409 `AUTH_IDENTITY_EXISTS`）。**历史留痕**：早期「管理员口令取自 `MIM_AUTH_ADMIN_PASSWORD`」「先比管理员口令再比账号口令」口径已随该环境变量下线作废。 |
+| 前端视图 | **现行（2026-11-20）**：视图段 `home` / `community` / `circles` / `chat` / `account` / `checkout` / `pay-return` / `signin`，对外路径段由 `router.ts` 的 `VIEW_SEGMENTS` 一处定义；独立 `/settings` 早已并入 `/account` 的「账号与设置」分区，旧 `/settings` 链接由 `LEGACY_SEGMENTS` 落到 `/account`。前端路由为 history 路径路由，旧 `#/xxx` 链接启动时自动改写；`apps/web/src/api.ts` 提供会话结构校验、`SESSION_CHANGED_EVENT` 广播与 `/me` 静默校验；`site/*.html` 与 `Mim-PRD.html` 为公开产品文档页，不含门禁；独立管理后台 `apps/admin` 为「无凭证只渲染登录页」的 RBAC 门禁。**历史留痕**：本行下方旧版叙述中的 `catalog` 域 4 表、`comic` 域 7 表、`/api/v1/comic/*` 24 路由、`/ai/*`、`/marketplace`、`/products`、`/cart`、`/entry-catalog`、`/comic-studio` 放映厅、访客会话 `POST /auth/guest`（`is_guest=1`）等模块与模型，均已随 2026-11-15 模块收口与 2026-11-16 门禁重写删除 / 作废，不代表当前工作树实况。 |
+| 模块解锁（**已下线，历史留痕**） | 历史：商城模块目录两级分类（`module_categories` 19 一级 + 205 二级）、`requireEntitlement('comic.workbench')` 权益解锁与下述 `entitlements` 发放 / 回收链路；随 2026-11-15 模块收口删除，本节为历史交付快照。现行交易域为社区付费板块 / 付费资产 / 订单 / 支付 / 钱包，不再有模块商城权益体系。 |
+| **现行覆盖：门禁模型（2026-11-16 起，取代早期「按需登录 / 免登录访客会话」模型）** | 匿名默认可读：首页、社区列表、帖子正文、图库与视频、商品列表与详情、公告、圈子清单与空态全部 200；命中个人与资金路径（`/me`、`/wallet`、`/shop/orders`、`/commerce/orders`、`/payments`、收藏、通知、资产、返佣等）才要求登录；写操作（发帖 / 评论 / 点赞 / 收藏 / 举报 / 上传 / 编辑删除等）一律 401 `AUTH_UNAUTHORIZED`。`POST /api/v1/auth/guest` 路由已删除（404），不再自动访客建号；`users.is_guest` 为历史兼容列、新账号恒 0；访客 IP 限流 `AUTH_GUEST_RATE_LIMITED` 口径随之作废。付费内容匿名只给预览（正文空、`locked=true`、媒体空数组）。独立管理后台 `/admin/` 仍为「无凭证只渲染登录页」的 RBAC 门禁。**历史留痕**：本行上方 2026-11-12「免登录体验 / 访客会话 / `is_guest=1` / 访客账号归属发帖下单」段落为已作废口径，按铁律三保留。 |
+| 授权命令（**部分历史留痕**） | 现行：RBAC 权限 / 角色 / 用户授权走管理后台 `/admin/` 角色权限页与 `/api/v1/admin/*`（Bearer + `rbac:read` / `rbac:write`，`x-admin-token` 为超管引导通道）。**历史留痕**：下述「权益管理页按模块 code 发放 / 回收 `entitlements`」「模块上架 / 调价 `/modules`」及应急手工 SQL 均属已删除的模块商城体系，仅作历史快照。 |
 
 ### 6.4 冒烟顺序（HTTP 全链路）
 
-生产冒烟顺序：`auth/password → me → comic/projects`（验证码 `auth/code` 在生产必回 503，仅开发/测试环境用 `auth/code → auth/login`）。
+> **历史留痕（2026-11-20 标注）**：本节漫剧工作台（`/api/v1/comic/*`）与商城模块目录（`/api/v1/taxonomy`、`/api/v1/modules`）冒烟步骤对应的路由与模块已随 2026-11-15 收口删除，下列链路为历史交付快照，不再作为现行冒烟顺序。现行冒烟以 `GET /healthz`、`GET /community/boards`、`GET /community/threads`、`GET /circles` 等社区 / 圈子只读端点与登录 / 个人中心鉴权边界为准。
+
+生产冒烟顺序（历史）：`auth/password → me → comic/projects`（验证码 `auth/code` 在生产必回 503，仅开发/测试环境用 `auth/code → auth/login`）。
 
 漫剧工作台（第 1 期）：
 
@@ -221,10 +225,10 @@ deploy:  scp deploy/deploy.sh → ssh ubuntu@<host> "sudo -n bash /opt/mim/app/d
 生产安全开关与登录入口（CI 不跑，需合法请求体）：
 
 - `POST /api/v1/auth/code` 传 `{"region":"cn","provider":"phone","identifier":"13800000000"}`：通道未配置应返回 503 `AUTH_CHANNEL_NOT_CONFIGURED`；已配置阿里云短信后返回 201 `delivery:"phone"` 且响应无 `dev_code`（真实短信下发，供应商失败返回 502 `AUTH_CODE_DELIVERY_FAILED`）。任何情况下不得回 200 带 `dev_code` 或 500。
-- `POST /api/v1/auth/password` 传 `{"region":"cn","identifier":"13800000000","password":"<MIM_AUTH_ADMIN_PASSWORD>"}` 应返回 200 并带 `access_token` / `refresh_token` / `user`；口令错误应 401 `AUTH_PASSWORD_INVALID`。生产口令由 `deploy/deploy.sh` §5 幂等写入 `/opt/mim/mim-api.env`（chmod 600）：优先保留已有值，其次采用 CI Secret 同名变量，两者皆无则现场 `openssl rand` 生成随机值且不回显日志；**不再存在公开默认口令**，运维须从服务器 env 文件读取。
-- `GET /api/v1/auth/channels` 应返回 200 且仅含 `{"sms":...,"email":...,"password":...,"register":true}` 四个布尔值；不得回 404（旧构建的特征）或泄露凭证内容。
-- `POST /api/v1/auth/register` 传 `{"region":"cn","identifier":"<未注册手机号>","password":"<≥8 位字母+数字>"}` 应返回 201 且带 `access_token` / `refresh_token` / `user`；同标识再次提交应 409 `AUTH_IDENTITY_EXISTS`；纯字母口令应 400 `VALIDATION_FAILED` 且 `details.field='password'`。注册后用同一账号口令走 `POST /api/v1/auth/password` 应 200（证明注册与登录口令闭环）。
-- `/chat` 匿名访问应直接渲染可收发消息的真实聊天（启动时已自动领取访客会话，`localStorage` 的 `mim.session.v1` 中 `user.is_guest=true`），不再出现「只读演示」或「此功能需登录后使用」；`/products`、`/cart`、`/account`、`/comic-studio` 工作台同理免登录可用，侧栏显示「访客 · 免登录」与「登录 / 注册正式账号」。
+- `POST /api/v1/auth/password` 传 `{"region":"cn","identifier":"<库内已注册账号>","password":"<口令>"}` 应返回 200 并带 `access_token` / `refresh_token` / `user`；口令错误应 401 `AUTH_PASSWORD_INVALID`。口令只认库内 `credentials(kind=password)` bcrypt 记录；**历史留痕**：早期从 `MIM_AUTH_ADMIN_PASSWORD` 环境变量比对管理员口令的口径已作废，该变量不再生效。
+- `GET /api/v1/auth/channels` 应返回 200 且仅含 `{"sms":...,"email":...,"password":...,"register":...}` 四个布尔值；`register` 跟随 `MIM_REGISTRATION_ENABLED` 开关，默认 `false`；不得回 404（旧构建的特征）或泄露凭证内容。
+- `POST /api/v1/auth/register`：开关关闭（默认）时应返回 403 `AUTH_REGISTER_DISABLED`，不建号；开关打开后传 `{"region":"cn","identifier":"<未注册手机号>","password":"<≥8 位字母+数字>"}` 才返回 201 且带双令牌与 `user`，同标识再次提交 409 `AUTH_IDENTITY_EXISTS`，纯字母口令 400 `VALIDATION_FAILED` 且 `details.field='password'`。
+- `/chat` 属个人会话域：匿名访问应引导登录（写操作与会话读取均需凭证，未登录 401 `AUTH_UNAUTHORIZED`）；**历史留痕**：早期「启动自动领取访客会话、`is_guest=true`、`/products` `/cart` `/comic-studio` 免登录可用、侧栏显示访客 · 免登录」口径已随访客建号路由删除与模块下线作废。
 
 所需 GitHub Actions secrets：`DEPLOY_SSH_KEY`（部署私钥）、`DEPLOY_HOST`、`DEPLOY_USER`；可选通道 secrets（配置后由 `deploy.yml` 经 `sudo env` 透传写入 `mim-api.env`，即配即生效）：`MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE`（阿里云短信）、`MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_REGION` / `MIM_EMAIL_SES_FROM_ADDRESS`（AWS SES）。
 
@@ -254,14 +258,14 @@ gh run watch          # 观察最近一次运行
 | Sealos | `deploy/sealos/mim.yaml` | `SEALOS_KUBECONFIG`、`SEALOS_DOMAIN`、`SEALOS_NAMESPACE`、`MIM_JWT_SECRET` |
 | IGA Pages | `deploy/iga/deploy.sh`（`iga login` + `iga pages deploy --name`） | `IGA_ACCESS_KEY`、`IGA_SECRET_KEY`、`IGA_PROJECT_NAME`（可选 `IGA_SCOPE`，默认 `domestic`） |
 
-**SPA 深链接回退四件套（2026-11-08 定性；2026-11-11 路径段改为模块功能名称后回退载体不变）**：前端 history 路径路由的对外路径段为 `/marketplace` `/products` `/cart` `/account` `/entry-catalog` `/deployments` `/comic-studio` `/chat` `/signin`（旧段 `/store` `/sites` `/comic` `/login` `/settings` `/profile` 由前端 `LEGACY_SEGMENTS` 与生产 nginx 301 改写，其中 `/settings` 落到 `/account`），各平台回退载体分工如下——
+**SPA 深链接回退四件套（2026-11-08 定性；回退载体机制不变）**：现行对外路径段为 `/community` `/circles` `/chat` `/account` `/checkout` `/pay-return` `/signin`（清单以 `router.ts` 的 `VIEW_SEGMENTS` 为准）；旧段 `/store` `/marketplace` `/products` `/cart` `/sites` `/entry-catalog` `/comic` `/comic-studio` `/deployments` `/navigation` `/search` `/cloud` `/img` `/download` `/login` `/settings` `/profile` 由前端 `LEGACY_SEGMENTS` 与生产 nginx 301 改写（`/settings` 落到 `/account`，其余未知段回落 `/community`），各平台回退载体分工如下——
 
 | 平台 | 回退载体 | 行为 |
 |---|---|---|
 | 腾讯云自建服务器 | nginx `try_files $uri $uri/ /index.html` + 四条旧段 `location = … { return 301 …; }` | 深链接 200 重写 index.html（2026-11-08 五条深链接实测全 200 / LEN=5182；2026-11-11 起旧段先 301 到新段） |
 | Cloudflare Pages | `functions/[[catchall]].js` catch-all | **Pages 挂载 Functions 后 `_redirects` 被整体旁路**；函数只对「GET + 静态资源未命中返回 404 + 非 `/api/` 前缀 + `Accept` 含 `text/html`」的请求 200 重写 index.html |
 | GitHub Pages | `dist/404.html`（`index.html` 逐字节副本，`scripts/spa-404.mjs` 生成） | 深链接返回 **404 状态 + SPA 全文**，浏览器加载后 router 读 `location.pathname` 渲染，404 状态码属平台能力上限的预期设计；响应体长度与首页相同，不能以长度区分命中，只能看状态码 |
-| EdgeOne Pages | 构建期生成的 `dist/404.html` + `dist/<模块功能名>/index.html`（路径段清单从 `router.ts` 的 `VIEW_SEGMENTS` 解析，`scripts/build.mjs` 的 `emitSpaFallback()` 产出） | **`_redirects` 在该平台不可靠且可能触发平台层报错**（2026-11-11 实测：深链接返回 HTTP 545 + 24 字节 `Error return from script`）；改为让每个路径段命中真实静态目录，2026-11-11 前实测 `/store` `/chat` `/comic` `/settings` `/login` 全部正常渲染，改名后由同名目录 `marketplace/` `comic-studio/` 等承接。`functions/[[catchall]].js` 已加运行时能力守卫，被该平台挂载时返回 404 而不再抛错 |
+| EdgeOne Pages | 构建期生成的 `dist/404.html` + `dist/<模块功能名>/index.html`（路径段清单从 `router.ts` 的 `VIEW_SEGMENTS` 解析，`scripts/build.mjs` 的 `emitSpaFallback()` 产出） | **`_redirects` 在该平台不可靠且可能触发平台层报错**（2026-11-11 实测：深链接返回 HTTP 545 + 24 字节 `Error return from script`）；改为让每个路径段命中真实静态目录。**历史留痕**：下述 `/store` `/comic` `/marketplace/` `comic-studio/` 等目录段已随模块下线，现行目录段以 `VIEW_SEGMENTS` 为准。`functions/[[catchall]].js` 已加运行时能力守卫，被该平台挂载时返回 404 而不再抛错 |
 
 > **CF 深链接 curl 取证口径**：裸 curl 默认发 `Accept: */*`（不含 `text/html`），catch-all Function 按设计跳过回退、返回 404——**这不代表回归**。测 CF 深链接必须带浏览器式 Accept 头：`curl -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"`，预期 200 / LEN=5182（CI run 42412711936 部署后五条深链接实测全部 200）。
 
@@ -469,7 +473,7 @@ node scripts/deployment-summary.mjs --live # 追加逐入口真实 curl 探测�
 npm run verify:deployments                  # 55 项零依赖断言（唯一性 / 覆盖 / 双口径 / 全链路 / 8 列规范）
 ```
 
-产物：`docs/deployment-summary.json`（结构化，schema `mim.deployment-registry.v1`）、`docs/deployment-summary.md`（主表 + 异常明细 + 仓库工件 + 覆盖去重 + 取证来源）。Web 端 `/deployments` 与 `/api/v1/deployments*` 提供同一份数据的交互式核对。
+产物：`docs/deployment-summary.json`（结构化，schema `mim.deployment-registry.v1`）、`docs/deployment-summary.md`（主表 + 异常明细 + 仓库工件 + 覆盖去重 + 取证来源）。后端 `/api/v1/deployments*` 只读路由保留（匿名 401 属设计如此）；**历史留痕**：Web 端 `/deployments` 核对表视图已随 2026-11-15 模块收口删除。
 
 **主表列规范（2026-11-12 起固定 8 列，前端与 Markdown 核对表同口径）**：`规范 ID / 名称`｜`仓库标识`｜`平台 / 层级`｜`交付链路`｜`访问域名`｜`部署状态`｜`部署结果`｜`异常说明`。访问域名为可点击入口（`entry_url` 为空显示 `—`）；缺失信息并入「异常说明」列以 `⚠ 缺失 n` 徽标呈现，展开详情内保留完整缺失清单。
 

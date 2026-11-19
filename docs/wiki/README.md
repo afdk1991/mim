@@ -4,9 +4,11 @@
 
 ## 项目一句话概述
 
-Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），实现 FR-01 账号身份、即时通讯与社区内容（含社区商城）的 P0 最小集；同时保留协作治理体系（AGENTS.md 十二条铁律；项目名称 Mim）、版本规约校验脚本与产品需求文档。
+Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：目标架构为「Headless 中台 + 多端薄壳」，当前已落地 **pnpm Monorepo**（`apps/web` React 端 + `services/mim-api` Express/SQLite 后端 + `packages/core-domain` / `packages/i18n` 共享包），现行能力为账号身份、即时通讯、社区内容（帖子 / 图库 / 视频 / 圈子 / 公告 / 付费资产）与交易履约；同时保留协作治理体系（AGENTS.md 十二条铁律；项目名称 Mim）、版本规约校验脚本与产品需求文档。
 
-- 当前版本：**V0.0.12-preview**（预览通道，正式版未发布；6 包 semver 均 `0.0.12`）
+> **现行覆盖（2026-11-20）**：模块商城（`/marketplace` `/products` `/cart`）、入口配置清单（`/entry-catalog` `/sites`）、漫剧工作台（`/comic-studio`）、导航站（`/navigation`）、统一搜索（`/search`）、云存储 / 图床 / 下载分发（`/cloud` `/img` `/download`）及对应后端路由、测试与种子已从代码删除；本 Wiki 各篇历史变更段落与上述模块相关描述按铁律三保留作历史留痕，不代表当前工作树实况。现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为唯一真源：`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；门禁为匿名可读 + 写操作需登录，注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭。
+
+- 当前版本：**V0.0.14-preview**（预览通道，正式版未发布；6 包 semver 均 `0.0.14`）
 - 仓库性质：**pnpm workspace Monorepo**（`apps/*` + `services/*` + `packages/*`）
 - 第三方运行时依赖：React / Express / zod / jsonwebtoken / bcryptjs / better-sqlite3 等（完整清单与版本见 [04-dependencies.md](./04-dependencies.md) §1；规划中的 SDK 见 [09](./09-third-party-sdk-inventory.md)）
 
@@ -35,7 +37,7 @@ Mim 是一个**已具备 P0 可运行功能**的全平台产品底座仓库：�
 f:\合并项目\Mim
 ├── AGENTS.md                      # 协作铁律（12 条，最高优先级约束）
 ├── README.md                      # 项目入口、版本规约、运行命令
-├── Mim-PRD.html                   # 产品需求文档（V0.0.12-preview 草案，含 FR-01~06 功能规格与交互演示）
+├── Mim-PRD.html                   # 产品需求文档（V0.0.14-preview 草案，含 FR-01~06 功能规格与交互演示）
 ├── team-hiring-plan.md            # 技术架构约束分析与团队分阶段配置规划
 ├── package.json                   # 根 workspace 脚本（dev/test/typecheck/build/check）
 ├── pnpm-workspace.yaml            # workspace 边界（apps/* services/* packages/*）
@@ -46,11 +48,11 @@ f:\合并项目\Mim
 ├── 全平台小程序开发与分发-*.txt    # 参考调研：小程序全平台开发与分发
 ├── 全栈项目人员配置指南-*.txt      # 参考调研：全栈团队岗位与编制
 ├── apps/
-│   └── web/                       # Web 端（React 18 + Vite 6，5173；views/ 24 个视图组件 / 20 个 AppView，含 Sites.tsx 统一入口配置清单）
+│   └── web/                       # Web 端（React 18 + Vite 6，5173；views/ 16 个视图组件 / 8 个 AppView，视图段见 router.ts VIEW_SEGMENTS）
 ├── services/
-│   └── mim-api/                   # 后端 API（Express 5 + SQLite WAL + JWT + zod，8787）+ test/（58 文件 / 676 例，2026-11-14 实测）
+│   └── mim-api/                   # 后端 API（Express 5 + SQLite WAL + JWT + zod，8787）+ test/（52 文件 / 505 例，2026-11-20 实测）
 ├── packages/
-│   ├── core-domain/               # 错误码 / UUIDv7 / 统一入口配置清单（errors.ts / ids.ts / siteModules.*）
+│   ├── core-domain/               # 错误码 / UUIDv7 / 部署汇总注册表（errors.ts / ids.ts / deploymentRegistry.*）
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
 ├── docs/wiki/                     # 本 Wiki 全部文档（01~10）
 ├── deploy/                        # 生产部署工件（bootstrap / deploy / nginx / systemd / migrations / sealos / iga）

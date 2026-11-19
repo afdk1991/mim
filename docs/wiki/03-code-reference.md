@@ -74,14 +74,14 @@
 
 ## 6. 输出样例（当前仓库实际运行结果）
 
-当前仓库 `package.json` 版本为 `0.0.12`、git 仓库存在但无 tag，运行 `node scripts/version-check.mjs` 输出为：
+当前仓库 `package.json` 版本为 `0.0.14`、git 仓库存在但无正式 tag，运行 `node scripts/version-check.mjs` 输出为：
 
 ```
 === Mim 版本号校验 (铁律四) ===
 RELEASE_CHANNEL = (unset / 正式通道)
 
-✅ [package.json] 版本号 0.0.12 格式正确
-   展示版本号: V0.0.12
+✅ [package.json] 版本号 0.0.14 格式正确
+   展示版本号: V0.0.14
 
 现有 git tags (0): (none)
 

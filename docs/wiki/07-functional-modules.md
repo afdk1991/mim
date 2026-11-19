@@ -1,6 +1,8 @@
 # 07 · 功能模块
 
-> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.12-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
+> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.14-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
+>
+> **现行覆盖（2026-11-20）**：本页 §1 及后文涉及**功能模块商城**（catalog / modules / entitlements / 蓝图能力）、**漫剧 AI 剧**（comic / 工程 / 角色 / 分镜 / 生成任务 / 成片 / 导出）、**入口配置清单**（sites / entries）、**导航站**（navigation）、**统一搜索**（search）的条目与状态描述，均为历史交付快照——这些模块已随 2026-11-15 模块收口从代码删除，按铁律三保留作历史留痕，不代表当前工作树实况。现行能力以社区（帖子 / 图库 / 视频 / 圈子 / 公告 / 付费资产）、聊天 IM、账号身份、交易履约与 RBAC 后台为准；现行门禁为匿名可读 + 写操作需登录，注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭，口令只认库内 credentials（环境变量超管口令已不生效）。
 >
 > **2026-11-11 本轮变更**：① 商城 205 条导航条目**全部具备可调用能力**——62 条工具型专项能力 + 17 条「模块起盘蓝图」分组能力覆盖 143 条软件方向模块（`packages/core-domain/src/blueprints/` 七份数据共 143 条，一条能力绑定一个一级分组），商城页「规划中」徽标与「功能规划中，暂不开放解锁」文案自然消失；② 聊天补齐引用回复、文件气泡下载、群管理（设/撤管理员、转让群主、邀请入群、移除）、会话内搜索结果定位（`?around=`）、未读分割线、表情选择器。逐项取证见 [08](./08-dev-implementation.md) 顶部新增段落与 [AGENTS.md](../../AGENTS.md) §9.18。
 
@@ -70,9 +72,9 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 
 | 链路 | 入口 | 首登是否自动建号 | Mim ID |
 |---|---|---|---|
-| 自助注册 | `POST /auth/register`（region + 通道标识 + 口令 + 可选展示名） | 是，注册即建号 | 响应 `user.member_no`，前端注册成功卡片先展示号码再进入工作台 |
+| 自助注册 | `POST /auth/register`（region + 通道标识 + 口令 + 可选展示名） | 开关打开时注册即建号；`MIM_REGISTRATION_ENABLED` 默认关闭，关闭态 403 `AUTH_REGISTER_DISABLED` | 响应 `user.member_no`，前端注册成功卡片先展示号码再进入工作台 |
 | 验证码首登 | `POST /auth/code` → `POST /auth/login` | 是，首次校验通过的标识自动建号 | `user.member_no` |
-| 密码首登 | `POST /auth/password`（管理员口令或自建账号口令） | 是（无 identities 行时走统一建号） | `user.member_no` |
+| 密码首登 | `POST /auth/password`（只比库内 `credentials(kind=password)` 口令；环境变量超管口令已不生效） | 是（无 identities 行时走统一建号） | `user.member_no` |
 | 第三方首登 | `POST /auth/oauth/:provider/authorize` → 回调 → `POST /auth/oauth/exchange` | 是，无绑定记录时 `createUserFromOAuth` 建号并写 `oauth_accounts` | 票据换回的 `user.member_no` |
 
 - **Mim ID 规则（纯数字 + 靓号池，2026-11-12 改造并二次收紧）**：对外编号为**纯数字**，从 `102` 起自然增长（上限 `9,999,999,999`），不再带 `MIM-` 前缀、不再补零；由 `member_no_sequence` 单行表在事务内自增分配，与内部 uuidv7 主键解耦；唯一索引 `uq_users_member_no` 兜底。发号器跳过全部靓号（规则见 `src/member-no.ts` 的 `classifyPremiumNo`，共 11 类）：短号段 `short`（`1～99` 整段）、豹子 `repeat`、顺子 `ladder`、回文 `palindrome`、对子 `abab`、重复段 `repeatBlock`（`123123`）、阶梯对子 `staircase`（`112233`）、整百整千 `round`、经典号 `iconic`（`007` / `1024` / `10086` / `12306` 等）、谐音吉利 `pronounce`、生日 `birthday`；靓号**不自动发放**，只由运营定向授予。存量由启动时 `renumberMemberNos` 按 `created_at ASC, id ASC` 一次性全量重排（开关 `member_no_meta.renumber_v2`，改规则必须升版；旧号写 `member_no_history`），登录时 `ensureMemberNo` 再兜底一次。发号耗尽或连续跳过超限抛 `MEMBER_NO_EXHAUSTED(503)`。
@@ -240,8 +242,8 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 |---|---|---|---|
 | 验证码发送 | `auth.ts` `POST /auth/code` + `notify.ts` 通道层 | `Login.tsx` | ✅（已接入真实通道：国内手机号 → 阿里云短信 `@alicloud/dysmsapi20170525`，海外邮箱 → AWS SES `@aws-sdk/client-ses`；凭证未配置时生产 503 `AUTH_CHANNEL_NOT_CONFIGURED`，供应商失败 502 `AUTH_CODE_DELIVERY_FAILED`） |
 | 验证码登录 / 注册 | `auth.ts` `POST /auth/login` | `Login.tsx` | ✅（开发/测试环境可用 `dev_code`） |
-| 密码登录（生产入口） | `auth.ts` `POST /auth/password` | `Login.tsx`（默认模式） | ✅（先比管理员口令 `MIM_AUTH_ADMIN_PASSWORD`，再比账号自身 bcrypt 口令；401 / 503 / 423 语义见 [05-runbook.md](./05-runbook.md) §6.3） |
-| 自助注册（账号 + 口令） | `auth.ts` `POST /auth/register` | `Login.tsx`（注册分段） | ✅（口令 ≥8 位含字母与数字，bcrypt 入 `credentials(kind=password)`，注册即登录；重复身份 409 `AUTH_IDENTITY_EXISTS`） |
+| 密码登录（生产入口） | `auth.ts` `POST /auth/password` | `Login.tsx`（默认模式） | ✅（只比库内账号自身 bcrypt 口令；`MIM_AUTH_ADMIN_PASSWORD` 已不生效；401 / 423 语义见 [05-runbook.md](./05-runbook.md) §6.3） |
+| 自助注册（账号 + 口令） | `auth.ts` `POST /auth/register` | `Login.tsx`（注册分段，开关打开时渲染） | ✅（受 `MIM_REGISTRATION_ENABLED` 控制、默认关闭；打开态口令 ≥8 位含字母与数字，bcrypt 入 `credentials(kind=password)`，注册即登录；重复身份 409 `AUTH_IDENTITY_EXISTS`） |
 | 登录通道自检 | `auth.ts` `GET /auth/channels` | `Login.tsx`（通道未配置提示） | ✅（只返回 `sms/email/password/register` 布尔值） |
 | 聊天匿名只读体验 | `routes/im.ts` 不变 | `ChatPreview.tsx`（`/chat` 匿名分支） | ✅（示例会话与消息 + 禁用输入区 + 登录引导） |
 | 令牌刷新轮换 | `auth.ts` `POST /auth/refresh` | `api.ts refreshSession()` | ✅ |
