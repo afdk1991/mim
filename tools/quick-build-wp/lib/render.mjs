@@ -15,12 +15,12 @@ import { buildPlan } from './plan.mjs';
 
 /**
  * 渲染安装脚本。
- * @param {{domain?:string, phpVersion?:string, wpVersion?:string, ssl?:boolean}} opts
+ * @param {{domain?:string, phpVersion?:string, wpVersion?:string, ssl?:boolean, coexist?:boolean, sslCert?:string, sslKey?:string}} opts
  * @returns {string} bash 脚本文本（UTF-8，LF 换行）
  */
 export function renderScript(opts = {}) {
   const plan = buildPlan(opts);
-  const { domain, phpVersion, wpVersion, ssl } = plan.options;
+  const { domain, phpVersion, wpVersion, ssl, coexist, sslCert, sslKey } = plan.options;
 
   // 可选 SSL：计划里 ssl=true 时脚本默认开启，否则由 INSTALL_SSL 环境变量控制。
   const defaultSsl = ssl ? '1' : '0';
@@ -42,6 +42,9 @@ export function renderScript(opts = {}) {
   push('DB_PASS="${DB_PASS:-ChangeMe_default_only_for_dry_run}"');
   push('WEB_ROOT="${WEB_ROOT:-/var/www/${DOMAIN}}"');
   push(`INSTALL_SSL="\${INSTALL_SSL:-${defaultSsl}}"`);
+  // 共存模式复用主机既有泛域名证书：pem / key 路径可由环境变量覆盖；留空则交给步骤 8 certbot。
+  push(`SSL_CERT="\${SSL_CERT:-${sslCert || ''}}"`);
+  push(`SSL_KEY="\${SSL_KEY:-${sslKey || ''}}"`);
   push();
   push('# ---- 解析脚本自身参数 ----');
   push('DRY_RUN=0');
@@ -83,16 +86,26 @@ export function renderScript(opts = {}) {
   push();
 
   // 2. Nginx
-  push('# install-nginx — 2/8 安装 Nginx（已存在则跳过）');
-  push('info "2/8 安装 Nginx"');
-  push('if command -v nginx >/dev/null 2>&1; then');
-  push('  info "nginx 已存在，跳过"');
-  push('else');
-  push('  _run apt-get update');
-  push('  _run apt-get install -y nginx');
-  push('  _run systemctl enable nginx');
-  push('  _run systemctl start nginx');
-  push('fi');
+  if (coexist) {
+    // 同机共存：Nginx 已由既有站点（Mim / MixmAPP）托管，本脚本不安装第二套，只确认在位。
+    push('# install-nginx — 2/8 同机共存：确认既有 Nginx 在位，不重复安装');
+    push('info "2/8 确认既有 Nginx（同机共存，不安装）"');
+    push('if ! command -v nginx >/dev/null 2>&1; then');
+    push('  echo "[fatal] 未检测到 nginx：共存模式要求复用既有 Nginx，请先在主机安装并启动" >&2');
+    push('  exit 1');
+    push('fi');
+  } else {
+    push('# install-nginx — 2/8 安装 Nginx（已存在则跳过）');
+    push('info "2/8 安装 Nginx"');
+    push('if command -v nginx >/dev/null 2>&1; then');
+    push('  info "nginx 已存在，跳过"');
+    push('else');
+    push('  _run apt-get update');
+    push('  _run apt-get install -y nginx');
+    push('  _run systemctl enable nginx');
+    push('  _run systemctl start nginx');
+    push('fi');
+  }
   push();
 
   // 3. MySQL
@@ -143,43 +156,102 @@ export function renderScript(opts = {}) {
   // 7. Nginx 站点 + 伪静态
   push('# nginx-site — 7/8 写入站点 Nginx 配置与伪静态规则');
   push('info "7/8 站点配置与伪静态"');
-  push('_write_conf "/etc/nginx/sites-available/${DOMAIN}.conf" <<NGINX_EOF');
-  push('server {');
-  push('    listen 80;');
-  push('    server_name ${DOMAIN};');
-  push('    root ${WEB_ROOT};');
-  push('    index index.php index.html;');
-  push();
-  push('    # WordPress 伪静态：try_files 回退到 index.php');
-  push('    location / {');
-  push('        try_files \\$uri \\$uri/ /index.php?\\$args;');
-  push('    }');
-  push();
-  push('    location ~ \\.php$ {');
-  push('        include snippets/fastcgi-php.conf;');
-  push('        fastcgi_pass unix:/run/php/php${PHP_VERSION}-fpm.sock;');
-  push('    }');
-  push();
-  push('    location ~* \\.(env|git|htaccess)$ { deny all; }');
-  push('}');
-  push('NGINX_EOF');
-  push('_run ln -sf "/etc/nginx/sites-available/${DOMAIN}.conf" "/etc/nginx/sites-enabled/${DOMAIN}.conf"');
-  push('_run nginx -t');
-  push('_run systemctl reload nginx');
+  if (coexist) {
+    // 共存口径：80 精确匹配 301 到 HTTPS；443 独立 server_name 承接 WP，不写 default_server，
+    // 不吸收未登记主机名；PHP 走本机 PHP-FPM socket；证书优先复用既有泛域名证书。
+    push('_write_conf "/etc/nginx/sites-available/${DOMAIN}.conf" <<NGINX_EOF');
+    push('server {');
+    push('    listen 80;');
+    push('    listen [::]:80;');
+    push('    server_name ${DOMAIN};');
+    push('    return 301 https://$host$request_uri;');
+    push('}');
+    push();
+    push('server {');
+    push('    listen 443 ssl;');
+    push('    listen [::]:443 ssl;');
+    push('    server_name ${DOMAIN};');
+    push('    root ${WEB_ROOT};');
+    push('    index index.php index.html;');
+    push('    charset utf-8;');
+    push();
+    push('    # 复用主机既有 *.laal.top 泛域名证书：SSL_CERT / SSL_KEY 传 pem / key 路径；');
+    push('    # 留空时由步骤 8 certbot --nginx 接管 TLS。本块不抢占默认站点。');
+    push('    ssl_certificate ${SSL_CERT};');
+    push('    ssl_certificate_key ${SSL_KEY};');
+    push();
+    push('    location / {');
+    push('        try_files \\$uri \\$uri/ /index.php?\\$args;');
+    push('    }');
+    push();
+    push('    location ~ \\.php$ {');
+    push('        include snippets/fastcgi-php.conf;');
+    push('        fastcgi_pass unix:/run/php/php${PHP_VERSION}-fpm.sock;');
+    push('    }');
+    push();
+    push('    location ~* \\.(env|git|htaccess)$ { deny all; }');
+    push('}');
+    push('NGINX_EOF');
+    push('_run ln -sf "/etc/nginx/sites-available/${DOMAIN}.conf" "/etc/nginx/sites-enabled/${DOMAIN}.conf"');
+    push('if [ -n "${SSL_CERT}" ] && [ -n "${SSL_KEY}" ]; then');
+    push('  _run nginx -t');
+    push('  _run systemctl reload nginx');
+    push('else');
+    push('  info "SSL_CERT/SSL_KEY 留空：跳过 nginx -t；证书待补齐或由步骤 8 certbot 接管"');
+    push('fi');
+  } else {
+    push('_write_conf "/etc/nginx/sites-available/${DOMAIN}.conf" <<NGINX_EOF');
+    push('server {');
+    push('    listen 80;');
+    push('    server_name ${DOMAIN};');
+    push('    root ${WEB_ROOT};');
+    push('    index index.php index.html;');
+    push();
+    push('    # WordPress 伪静态：try_files 回退到 index.php');
+    push('    location / {');
+    push('        try_files \\$uri \\$uri/ /index.php?\\$args;');
+    push('    }');
+    push();
+    push('    location ~ \\.php$ {');
+    push('        include snippets/fastcgi-php.conf;');
+    push('        fastcgi_pass unix:/run/php/php${PHP_VERSION}-fpm.sock;');
+    push('    }');
+    push();
+    push('    location ~* \\.(env|git|htaccess)$ { deny all; }');
+    push('}');
+    push('NGINX_EOF');
+    push('_run ln -sf "/etc/nginx/sites-available/${DOMAIN}.conf" "/etc/nginx/sites-enabled/${DOMAIN}.conf"');
+    push('_run nginx -t');
+    push('_run systemctl reload nginx');
+  }
   push();
 
   // 8. 可选 SSL
   push('# ssl — 8/8 可选：申请并配置 HTTPS 证书');
   push('if [ "${INSTALL_SSL}" -eq 1 ]; then');
-  push('  info "8/8 配置 HTTPS"');
-  push('  if command -v certbot >/dev/null 2>&1; then');
-  push('    _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email');
-  push('  else');
-  push('    _run apt-get install -y certbot python3-certbot-nginx');
-  push('    _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email');
-  push('  fi');
+  if (coexist) {
+    push('  if [ -n "${SSL_CERT}" ] && [ -n "${SSL_KEY}" ]; then');
+    push('    info "8/8 复用既有泛域名证书，跳过 certbot"');
+    push('  else');
+    push('    info "8/8 配置 HTTPS（certbot 接管 TLS）"');
+    push('    if command -v certbot >/dev/null 2>&1; then');
+    push('      _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email');
+    push('    else');
+    push('      _run apt-get install -y certbot python3-certbot-nginx');
+    push('      _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email');
+    push('    fi');
+    push('  fi');
+  } else {
+    push('  info "8/8 配置 HTTPS"');
+    push('  if command -v certbot >/dev/null 2>&1; then');
+    push('    _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email');
+    push('  else');
+    push('    _run apt-get install -y certbot python3-certbot-nginx');
+    push('    _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email');
+    push('  fi');
+  }
   push('else');
-  push('  info "8/8 跳过 HTTPS（INSTALL_SSL=1 启用）"');
+  push('  info "8/8 跳过 HTTPS（INSTALL_SSL=0）"');
   push('fi');
   push();
   push('info "完成：站点目录 ${WEB_ROOT}"');

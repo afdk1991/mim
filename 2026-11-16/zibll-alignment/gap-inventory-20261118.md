@@ -28,7 +28,7 @@
 
 | # | 映射项 | 现状缺口 | 本轮（批次 2026-11-18） | 延期 / 前置依赖 |
 | --- | --- | --- | --- | --- |
-| 1 | 空态插图：null-*.svg 接入各空态面 | 9 个视图共 29 处 `.community-empty` / 同类空态均为纯文字；素材闲置 | 新增 `EmptyState` 共享组件，先接社区页 8 处（收藏 / 列表空 / 列表失败 / 提现 / 流水 / 货架 / 订单 / 售后），按场景选图 | 其余视图（Circles / Gallery / Assets / More / Chat / MyAssets / ContentDetail / Announcements）下一批逐页接线 |
+| 1 | 空态插图：null-*.svg 接入各空态面 | 9 个视图共 29 处 `.community-empty` / 同类空态均为纯文字；素材闲置 | 批次 2026-11-18：新增 `EmptyState` 共享组件，先接社区页 8 处。批次 2026-11-19：再接 Circles / ContentDetail / AnnouncementsPanel / CommunityGallery / CommunityAssets / MyAssets / CommunityMore 共 14 处（含详情缺失 / 失败重试、公告四页签、图库条目与合集、资产检索、已购清单、通知 / 搜索 / 举报队列） | 仅剩 Chat 视图 3 处 `.chat-empty`（会话列表 / 消息面板 / 用户搜索），随聊天域一批接线 |
 | 2 | 卡片标题等高 | 标题两行截断但未锁最小高度，摘要长短不齐时标题基线错落 | `community-card h3` 补 `min-height` 两档行高 | — |
 | 3 | 卡片悬停反馈 | 仅阴影加深，卡片不抬升；封面已有 1.02 缩放 | 卡片 hover 补 `translateY(-2px)`，过渡集合纳入 transform | — |
 | 4 | 按钮四档层级 | 现有 primary / danger / ghost / small / block；缺描边档 `outline` 与药丸档 `pill` | 补 `.btn.outline` / `.btn.pill` 两个纯样式档位，既有按钮不改类名 | 各页按需换用，下一批按场景落位 |
@@ -55,4 +55,4 @@
 - 部署位置：`zy.laal.top` 现已是 Mim 生产唯一权威终点（`/` 前端、`/admin/` 后台、`api.laal.top` API）；WP 站建议用子域名（如 `blog.laal.top`）独立 `server_name` 分流，不与 Node 站点同进程混跑。
 - 现状约束：`deploy/nginx-mim.conf` 明确 `blog.laal.top` 无实现、保持 NXDOMAIN；本机无 SSH 私钥，主机侧安装动作只能经 CI secrets（`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`）通道执行。
 - 待核实：子域名是否被授权校验接受为 `laal.top` 授权范围；2026-12-16 到期后授权与在线更新状态。
-- 工具：`tools/quick-build-wp` 可生成幂等建站脚本（PHP 8.2 + MySQL + WP latest + nginx 伪静态 + 可选 SSL）。
+- 工具：`tools/quick-build-wp` 可生成幂等建站脚本（PHP 8.2 + MySQL + WP latest + nginx 伪静态 + 可选 SSL）；`--coexist` 模式按同机共存口径生成站点块（复用既有 Nginx、精确 `server_name`、80 301、FPM socket、复用泛域名证书变量、不抢占默认站点），自检 22/22 PASS。

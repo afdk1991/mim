@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'; // 状态与副作用
 import { navigatePath, pathOf } from '../router'; // 资讯条目详情深链接
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { api, errorText } from '../api'; // 接口客户端与错误文案翻译
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import type { // 引入依赖、类型或本地模块绑定
   AnnouncementItem,
   ChangelogItem,
@@ -416,13 +417,13 @@ export function AnnouncementsPanel({ locale, hasSession = false, initialTab }: P
       {!loaded ? (
         <p className="hint">{tr(locale, '加载中…', 'Loading…')}</p>
       ) : tab === 'announcements' && sortedAnnouncements.length === 0 ? (
-        <div className="community-empty">{tr(locale, '暂无公告', 'No announcements')}</div>
+        <EmptyState kind="post" title={tr(locale, '暂无公告', 'No announcements')} />
       ) : tab === 'changelog' && sortedChangelog.length === 0 ? (
-        <div className="community-empty">{tr(locale, '暂无更新日志', 'No changelog entries')}</div>
+        <EmptyState kind="post" title={tr(locale, '暂无更新日志', 'No changelog entries')} />
       ) : tab === 'promotions' && sortedPromotions.length === 0 ? (
-        <div className="community-empty">{tr(locale, '暂无推广计划', 'No active promotions')}</div>
+        <EmptyState kind="post" title={tr(locale, '暂无推广计划', 'No active promotions')} />
       ) : tab === 'feed' && feed.length === 0 ? (
-        <div className="community-empty">{tr(locale, '暂无社区动态', 'No community activity yet')}</div>
+        <EmptyState kind="post" title={tr(locale, '暂无社区动态', 'No community activity yet')} />
       ) : null}
 
       {tab === 'announcements' && sortedAnnouncements.length > 0 && (

@@ -12,6 +12,8 @@ DB_USER="${DB_USER:-wp_user}"
 DB_PASS="${DB_PASS:-ChangeMe_default_only_for_dry_run}"
 WEB_ROOT="${WEB_ROOT:-/var/www/${DOMAIN}}"
 INSTALL_SSL="${INSTALL_SSL:-1}"
+SSL_CERT="${SSL_CERT:-}"
+SSL_KEY="${SSL_KEY:-}"
 
 # ---- 解析脚本自身参数 ----
 DRY_RUN=0
@@ -49,15 +51,11 @@ info "1/8 环境自检"
 _run command -v curl
 _run command -v tar
 
-# install-nginx — 2/8 安装 Nginx（已存在则跳过）
-info "2/8 安装 Nginx"
-if command -v nginx >/dev/null 2>&1; then
-  info "nginx 已存在，跳过"
-else
-  _run apt-get update
-  _run apt-get install -y nginx
-  _run systemctl enable nginx
-  _run systemctl start nginx
+# install-nginx — 2/8 同机共存：确认既有 Nginx 在位，不重复安装
+info "2/8 确认既有 Nginx（同机共存，不安装）"
+if ! command -v nginx >/dev/null 2>&1; then
+  echo "[fatal] 未检测到 nginx：共存模式要求复用既有 Nginx，请先在主机安装并启动" >&2
+  exit 1
 fi
 
 # install-mysql — 3/8 安装 MySQL（已存在则跳过）
@@ -102,11 +100,24 @@ info "7/8 站点配置与伪静态"
 _write_conf "/etc/nginx/sites-available/${DOMAIN}.conf" <<NGINX_EOF
 server {
     listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
     server_name ${DOMAIN};
     root ${WEB_ROOT};
     index index.php index.html;
+    charset utf-8;
 
-    # WordPress 伪静态：try_files 回退到 index.php
+    # 复用主机既有 *.laal.top 泛域名证书：SSL_CERT / SSL_KEY 传 pem / key 路径；
+    # 留空时由步骤 8 certbot --nginx 接管 TLS。本块不抢占默认站点。
+    ssl_certificate ${SSL_CERT};
+    ssl_certificate_key ${SSL_KEY};
+
     location / {
         try_files \$uri \$uri/ /index.php?\$args;
     }
@@ -120,20 +131,28 @@ server {
 }
 NGINX_EOF
 _run ln -sf "/etc/nginx/sites-available/${DOMAIN}.conf" "/etc/nginx/sites-enabled/${DOMAIN}.conf"
-_run nginx -t
-_run systemctl reload nginx
+if [ -n "${SSL_CERT}" ] && [ -n "${SSL_KEY}" ]; then
+  _run nginx -t
+  _run systemctl reload nginx
+else
+  info "SSL_CERT/SSL_KEY 留空：跳过 nginx -t；证书待补齐或由步骤 8 certbot 接管"
+fi
 
 # ssl — 8/8 可选：申请并配置 HTTPS 证书
 if [ "${INSTALL_SSL}" -eq 1 ]; then
-  info "8/8 配置 HTTPS"
-  if command -v certbot >/dev/null 2>&1; then
-    _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email
+  if [ -n "${SSL_CERT}" ] && [ -n "${SSL_KEY}" ]; then
+    info "8/8 复用既有泛域名证书，跳过 certbot"
   else
-    _run apt-get install -y certbot python3-certbot-nginx
-    _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email
+    info "8/8 配置 HTTPS（certbot 接管 TLS）"
+    if command -v certbot >/dev/null 2>&1; then
+      _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email
+    else
+      _run apt-get install -y certbot python3-certbot-nginx
+      _run certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email
+    fi
   fi
 else
-  info "8/8 跳过 HTTPS（INSTALL_SSL=1 启用）"
+  info "8/8 跳过 HTTPS（INSTALL_SSL=0）"
 fi
 
 info "完成：站点目录 ${WEB_ROOT}"

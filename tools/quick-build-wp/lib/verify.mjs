@@ -24,7 +24,12 @@ const DANGEROUS = [
 const MUTATION = /\b(apt-get|mysql|curl|wget|tar|mkdir|chown|chmod|ln|systemctl|certbot|tee|cat\s*>)\b/;
 
 /** 必须带默认值的可配置变量。 */
-const CONFIG_VARS = ['DOMAIN', 'PHP_VERSION', 'WP_VERSION', 'DB_NAME', 'DB_USER', 'DB_PASS', 'WEB_ROOT', 'INSTALL_SSL'];
+const CONFIG_VARS = ['DOMAIN', 'PHP_VERSION', 'WP_VERSION', 'DB_NAME', 'DB_USER', 'DB_PASS', 'WEB_ROOT', 'INSTALL_SSL', 'SSL_CERT', 'SSL_KEY'];
+
+/** 共存口径禁止项：不得写 default_server 吸收未登记主机名。 */
+const FORBIDDEN = [
+  { id: 'default-server', label: '禁止 default_server 抢占默认站点', pattern: /default_server/ },
+];
 
 /**
  * 静态自检。
@@ -49,10 +54,17 @@ export function verifyScript(source) {
     checks.push({ id: `cap-${cap}`, label: `必需能力：${cap}`, pass, detail: pass ? '命中' : '缺失' });
   }
 
-  // 2. 高危命令
-  const dangerous = DANGEROUS.map((d) => ({ id: d.id, label: d.label, hit: d.pattern.test(source) }));
+  // 2. 高危命令（注释行不参与检出，避免说明文字误报）
+  const codeLines = lines.filter((l) => !l.trim().startsWith('#')).join('\n');
+  const dangerous = DANGEROUS.map((d) => ({ id: d.id, label: d.label, hit: d.pattern.test(codeLines) }));
   for (const d of dangerous) {
     checks.push({ id: `danger-${d.id}`, label: d.label, pass: !d.hit, detail: d.hit ? '检出危险命令' : '未检出' });
+  }
+
+  // 2b. 共存口径禁止项（注释行同样跳过）
+  const forbidden = FORBIDDEN.map((f) => ({ id: f.id, label: f.label, hit: f.pattern.test(codeLines) }));
+  for (const f of forbidden) {
+    checks.push({ id: `forbid-${f.id}`, label: f.label, pass: !f.hit, detail: f.hit ? '检出 default_server' : '未检出' });
   }
 
   // 3. 变量默认值
@@ -106,5 +118,5 @@ export function verifyScript(source) {
   });
 
   const ok = checks.every((c) => c.pass);
-  return { ok, checks, capabilityHits, variables, dryRunRouting: { mutations, routed, unrouted }, dangerous };
+  return { ok, checks, capabilityHits, variables, dryRunRouting: { mutations, routed, unrouted }, dangerous, forbidden };
 }

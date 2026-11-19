@@ -117,3 +117,16 @@ test('--verify 拒绝缺少 Nginx / WordPress 能力的脚本', () => {
   assert.ok(matrix.checks.some((c) => c.id === 'cap-nginx' && !c.pass));
   assert.ok(matrix.checks.some((c) => c.id === 'cap-wordpress' && !c.pass));
 });
+
+test('共存模式：复用既有 Nginx、独立 server_name、不写 default_server', () => {
+  const script = renderScript({ domain: 'blog.laal.top', coexist: true });
+  const matrix = verifyScript(script);
+  assert.equal(matrix.ok, true, JSON.stringify(matrix.checks.filter((c) => !c.pass), null, 2));
+  assert.match(script, /server_name \$\{DOMAIN\}/);
+  assert.match(script, /listen 443 ssl/);
+  assert.match(script, /return 301 https:\/\/\$host\$request_uri/);
+  assert.match(script, /fastcgi_pass unix:\/run\/php\//);
+  assert.doesNotMatch(script, /default_server/);
+  // 共存模式不重复安装 Nginx
+  assert.doesNotMatch(script, /apt-get install -y nginx/);
+});

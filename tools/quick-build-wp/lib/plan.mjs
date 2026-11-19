@@ -9,7 +9,7 @@
 
 /**
  * 构造建站计划。
- * @param {{domain?:string, phpVersion?:string, wpVersion?:string, ssl?:boolean}} opts
+ * @param {{domain?:string, phpVersion?:string, wpVersion?:string, ssl?:boolean, coexist?:boolean, sslCert?:string, sslKey?:string}} opts
  * @returns {{tool:string, version:string, options:object, steps:Array<object>}}
  */
 export function buildPlan(opts = {}) {
@@ -17,6 +17,9 @@ export function buildPlan(opts = {}) {
   const phpVersion = opts.phpVersion || '8.2';
   const wpVersion = opts.wpVersion || 'latest';
   const ssl = opts.ssl === true;
+  const coexist = opts.coexist === true; // 同机共存：复用既有 Nginx，不安装第二套 Web 服务
+  const sslCert = opts.sslCert || ''; // 复用既有泛域名证书 pem 路径（共存模式）
+  const sslKey = opts.sslKey || ''; // 证书私钥路径
 
   /** @type {Array<{id:string,title:string,idempotent:boolean,optional:boolean,commands:string[]}>} */
   const steps = [
@@ -29,10 +32,12 @@ export function buildPlan(opts = {}) {
     },
     {
       id: 'install-nginx',
-      title: '安装并启用 Nginx（已安装则跳过）',
+      title: coexist
+        ? '确认既有 Nginx 已存在（同机共存，不重复安装）'
+        : '安装并启用 Nginx（已安装则跳过）',
       idempotent: true,
       optional: false,
-      commands: ['apt-get install -y nginx', 'systemctl enable nginx'],
+      commands: coexist ? ['command -v nginx'] : ['apt-get install -y nginx', 'systemctl enable nginx'],
     },
     {
       id: 'install-mysql',
@@ -81,7 +86,7 @@ export function buildPlan(opts = {}) {
   return {
     tool: 'quick-build-wp',
     version: '1.0.0',
-    options: { domain, phpVersion, wpVersion, ssl },
+    options: { domain, phpVersion, wpVersion, ssl, coexist, sslCert, sslKey },
     steps,
   };
 }

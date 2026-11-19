@@ -41,7 +41,7 @@ const EXIT = { OK: 0, USAGE: 2, VERIFY_FAIL: 3, IO: 4, RUNTIME: 1 };
 
 /** 解析 CLI 参数：布尔开关 + 取值参数。 */
 function parseArgs(argv) {
-  const out = { plan: false, emit: null, verify: null, help: false, domain: '', phpVersion: '', wpVersion: '', ssl: false };
+  const out = { plan: false, emit: null, verify: null, help: false, domain: '', phpVersion: '', wpVersion: '', ssl: false, coexist: false, sslCert: '', sslKey: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     switch (a) {
@@ -49,6 +49,9 @@ function parseArgs(argv) {
       case '--emit': out.emit = argv[++i]; break;
       case '--verify': out.verify = argv[++i]; break;
       case '--ssl': out.ssl = true; break;
+      case '--coexist': out.coexist = true; break;
+      case '--ssl-cert': out.sslCert = argv[++i]; break;
+      case '--ssl-key': out.sslKey = argv[++i]; break;
       case '--help': case '-h': out.help = true; break;
       case '--domain': out.domain = argv[++i]; break;
       case '--php-version': out.phpVersion = argv[++i]; break;
@@ -83,6 +86,9 @@ const __HELP__ = `Quick Build WP — WordPress 一键建站脚本生成器
   --php-version <ver>  PHP 版本，默认 8.2
   --wp-version <ver>   WordPress 版本号，默认 latest
   --ssl                生成脚本默认开启 HTTPS 证书申请
+  --coexist            同机共存模式：复用既有 Nginx，不安装第二套 Web 服务，站点块不写 default_server
+  --ssl-cert <pem>     共存模式复用既有泛域名证书 pem 路径（写入 SSL_CERT 默认值）
+  --ssl-key <key>      共存模式证书私钥路径（写入 SSL_KEY 默认值）
 
 退出码: 0 成功 | 2 参数非法 | 3 自检未通过 | 4 文件读写失败 | 1 其它错误`;
 
@@ -105,6 +111,9 @@ function main() {
     phpVersion: args.phpVersion || undefined,
     wpVersion: args.wpVersion || undefined,
     ssl: args.ssl || undefined,
+    coexist: args.coexist || undefined,
+    sslCert: args.sslCert || undefined,
+    sslKey: args.sslKey || undefined,
   };
 
   try {

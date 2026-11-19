@@ -12,6 +12,7 @@ import type { Locale } from '@mim/i18n'; // 语言类型
 import { ApiError, errorText } from '../api'; // 统一错误文案
 import { assetUrl, fetchAsset, fetchAssets, purchaseAsset, type AssetDetail, type AssetKind, type AssetListItem } from '../api/assets'; // 资产端点
 import { navigatePath, pathOf } from '../router'; // 站内深链接
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import './community-assets.css'; // 本域独立样式：不改 styles.css / tokens.css
 
 interface Props { // 组件契约
@@ -148,10 +149,7 @@ function AssetList({ locale, hasSession, onRequireLogin }: Props) {
 
       {/* 列表为空时给出可执行的下一步，而不是空白页 */}
       {!loading && !error && items.length === 0 ? (
-        <div className="asset-empty"> {/* 空态容器 */}
-          <strong>{isZh ? '没有找到匹配的资产' : 'No assets found'}</strong> {/* 空态标题 */}
-          <span>{isZh ? '换个关键词或类型试试。' : 'Try another keyword or type.'}</span> {/* 空态建议 */}
-        </div> // 空态结束
+        <EmptyState kind="search" title={isZh ? '没有找到匹配的资产' : 'No assets found'} hint={isZh ? '换个关键词或类型试试。' : 'Try another keyword or type.'} />
       ) : null}
 
       {/* 资产网格：整卡为按钮，点击进入详情深链接 */}

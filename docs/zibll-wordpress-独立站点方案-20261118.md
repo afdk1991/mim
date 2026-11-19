@@ -23,11 +23,11 @@
 
 | 物 | 路径 | 说明 |
 | --- | --- | --- |
-| 建站脚本（生成器产出） | `deploy/wp-blog/install-blog.laal.top.sh` | 幂等 bash：环境自检 → nginx → MySQL → PHP 8.2-FPM → 建库建账号 → 下载 WP → 站点 nginx 伪静态 → 可选 SSL；支持 `--dry-run`；变量均可环境变量覆盖 |
-| 脚本自检 | `node tools/quick-build-wp/cli.mjs --verify deploy/wp-blog/install-blog.laal.top.sh` | **19/19 PASS**：6 项必需能力命中、4 类危险命令未检出、7 个变量带默认值、26 个写操作全部走 dry-run 封装 |
+| 建站脚本（生成器产出，共存模式） | `deploy/wp-blog/install-blog.laal.top.sh` | 幂等 bash：环境自检 → 确认既有 Nginx 在位（不装第二套）→ MySQL → PHP 8.2-FPM → 建库建账号 → 下载 WP → 共存站点 nginx 块（80 精确匹配 301 → 443 独立 `server_name`，FPM socket，不抢占默认站点）→ 可选 SSL；支持 `--dry-run`；变量均可环境变量覆盖 |
+| 脚本自检 | `node tools/quick-build-wp/cli.mjs --verify deploy/wp-blog/install-blog.laal.top.sh` | **22/22 PASS**：6 项必需能力命中、4 类危险命令未检出、1 项 `default_server` 禁止项未检出、10 个变量带默认值、写操作全部走 dry-run 封装（unrouted=0） |
 | 主题包（本地，不入库） | `E:\迅雷下载\zibll-V9.2(1651)\zibll` | 服务器侧放置到 `<WP_ROOT>/wp-content/themes/zibll` |
 
-脚本内默认值：`DOMAIN=blog.laal.top`、`PHP_VERSION=8.2`、`WP_VERSION=latest`、`WEB_ROOT=/var/www/blog.laal.top`；`DB_PASS` 仅为 dry-run 占位，真实执行必须用环境变量传入强密码。
+脚本内默认值：`DOMAIN=blog.laal.top`、`PHP_VERSION=8.2`、`WP_VERSION=latest`、`WEB_ROOT=/var/www/blog.laal.top`；`DB_PASS` 仅为 dry-run 占位，真实执行必须用环境变量传入强密码；`SSL_CERT` / `SSL_KEY` 留空时由步骤 8 certbot 接管 TLS，传入既有泛域名证书 pem / key 路径则复用、跳过 certbot。
 
 ## 四、前置条件与客观缺口（执行前必须逐项确认）
 
@@ -35,7 +35,7 @@
 2. **SSH 通道**：本机无私钥；Mim 生产发布只走 CI secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`。WP 站安装要么经同一 SSH 通道在服务器侧执行脚本，要么在服务器控制台手工执行；本机无法直连主机验证。
 3. **主机资源**：同机现跑 Mim Node 服务 + MixmAPP；新增 MySQL 服务端 + PHP-FPM 需先评估内存 / 磁盘余量（MySQL 空闲约占数百 MB 常驻）。
 4. **授权子域接受度（待实测）**：授权绑定域名为 `laal.top`，`blog.laal.top` 子域名是否被主题授权校验接受为同一授权域，需在 WP 后台授权页实测；若校验只认裸域，则需改用独立域名或裸域路径方案，不能假定子域可用。
-5. **证书**：主机已有 `*.laal.top` 泛域名证书（`deploy/nginx-mim.conf` help 站注释已载明覆盖子域），WP 站复用该证书即可，脚本内 certbot 步可跳过（`INSTALL_SSL=0`）；泛域名证书到期 / 续期口径沿用 Mim 现有方案。
+5. **证书**：主机已有 `*.laal.top` 泛域名证书（`deploy/nginx-mim.conf` help 站注释已载明覆盖子域），WP 站复用该证书即可：执行前把 pem / key 路径经 `SSL_CERT` / `SSL_KEY` 环境变量传入，脚本跳过 certbot；留空则由脚本步骤 8 调 certbot 为子域单独申请。泛域名证书到期 / 续期口径沿用 Mim 现有方案。
 6. **PHP 版本兼容**：脚本按 PHP 8.2 装包；子比主题声明兼容 PHP 7.0–8.5，若主机 apt 源无 `php8.2-fpm`，需按发行版可用版本调整 `PHP_VERSION` 并重生成脚本。
 
 ## 五、服务器侧执行步骤（授权后执行，本轮未动主机）
@@ -45,7 +45,7 @@
 3. **上传主题**：把本地 `zibll` 目录传到 `/var/www/blog.laal.top/wp-content/themes/zibll`，属主 `www-data:www-data`；不上传任何授权码到仓库。
 4. **WP 初始化**：浏览器访问 `https://blog.laal.top` 走 WP 安装向导（站点名 / 管理员账号 / 密码，管理员口令不入库）。
 5. **启用主题与授权**：后台「外观 → 主题」启用子比主题；进入主题授权页填授权码，完成域名验证；记录授权状态截图 / 页面文案作为取证。
-6. **nginx 分流适配**：生成脚本的通用站点块需按同机共存口径复核——`server_name blog.laal.top`、复用泛域名证书片段、`fastcgi_pass` 指向本机 PHP-FPM socket、不写 `default_server`；`nginx -t` 通过后 reload。
+6. **nginx 分流复核**：脚本共存站点块已按同机共存口径生成——`server_name blog.laal.top` 精确匹配、80 301 到 HTTPS、复用泛域名证书片段、`fastcgi_pass` 指向本机 PHP-FPM socket、不抢占默认站点；主机侧执行后仍需 `nginx -t` 通过再 reload。
 7. **上线取证**：`https://blog.laal.top/` 200、主题前台渲染正常、后台授权状态有效、匿名可读首页；与 Mim 主站互测不串站（`zy.laal.top` 仍回 Mim SPA）。
 
 ## 六、合规与到期风险

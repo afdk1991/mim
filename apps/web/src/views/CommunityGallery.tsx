@@ -13,6 +13,7 @@ import type { Locale } from '@mim/i18n'; // 语言标签
 import { errorText } from '../api'; // 统一错误文案
 import { favoriteGalleryItem, fetchGalleryCollections, fetchGalleryItems, unfavoriteGalleryItem } from '../api/gallery.js'; // 图库端点
 import type { GalleryCollection, GalleryItem } from '../api/gallery.js'; // 图库类型
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import './community-gallery.css'; // 灯箱 / 新增筛选控件样式：独立文件，不改共享 styles.css
 
 interface Props { // 接口 Props：约束对象的字段与类型形态
@@ -227,8 +228,8 @@ export function CommunityGallery({ locale, kind, hasSession, boards = [], onOpen
       )}
 
       {loading && <div className="community-empty">正在加载{kindLabel}…</div>}
-      {!loading && view === 'items' && items.length === 0 && <div className="community-empty">暂无{kindLabel}内容。</div>}
-      {!loading && view !== 'items' && collections.length === 0 && <div className="community-empty">暂无可聚合的{kindLabel}内容。</div>}
+      {!loading && view === 'items' && items.length === 0 && <EmptyState kind="post" title={`暂无${kindLabel}内容。`} />}
+      {!loading && view !== 'items' && collections.length === 0 && <EmptyState kind="post" title={`暂无可聚合的${kindLabel}内容。`} />}
 
       {!loading && view === 'items' && items.length > 0 && (
         <div className="community-gallery-grid">

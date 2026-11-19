@@ -14,6 +14,7 @@ import { api } from '../api'; // 接口客户端
 import { threadDetail } from '../api/community.js'; // 论坛帖子详情：内容流来源为 community_thread 时补齐媒体与付费墙口径
 import type { CommunityThreadMedia } from '../api'; // 帖子媒体（图片 / 视频 + 时长与分辨率）
 import { navigatePath, pathOf } from '../router'; // 站内导航与深链接构造
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明 + 操作槽位
 
 /** 资讯类内容形态：公告 / 更新日志 / 统一内容流。 */
 export type ContentKind = 'announcement' | 'changelog' | 'feed';
@@ -231,17 +232,15 @@ export function ContentDetail({ locale, kind, id }: Props) {
         </div>
       )}
       {state === 'missing' && (
-        <div className="community-empty">
-          <strong>{tr(locale, '条目不存在或已下线', 'This entry does not exist or has been removed')}</strong>
-          <span>{tr(locale, '返回列表看看其他内容。', 'Go back to the list for other content.')}</span>
-        </div>
+        <EmptyState kind="post" title={tr(locale, '条目不存在或已下线', 'This entry does not exist or has been removed')} hint={tr(locale, '返回列表看看其他内容。', 'Go back to the list for other content.')} />
       )}
       {state === 'failed' && (
-        <div className="community-empty">
-          <strong>{tr(locale, '内容加载失败', 'Failed to load')}</strong>
-          <span>{tr(locale, '网络或服务暂时不可用，请稍后重试。', 'The network or service is unavailable. Please try again.')}</span>
-          <button type="button" className="btn small" onClick={() => setAttempt((n) => n + 1)}>{tr(locale, '重试', 'Retry')}</button>
-        </div>
+        <EmptyState
+          kind="default"
+          title={tr(locale, '内容加载失败', 'Failed to load')}
+          hint={tr(locale, '网络或服务暂时不可用，请稍后重试。', 'The network or service is unavailable. Please try again.')}
+          action={<button type="button" className="btn small" onClick={() => setAttempt((n) => n + 1)}>{tr(locale, '重试', 'Retry')}</button>}
+        />
       )}
       {state === 'ready' && item && (
         <>

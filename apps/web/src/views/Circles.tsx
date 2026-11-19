@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'; // 状态与副作用
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { api, errorText } from '../api'; // 接口客户端与错误文案翻译
 import type { CircleMember, CircleNotice, CirclePost, CircleSummary } from '../api'; // 圈子域类型
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
@@ -415,7 +416,7 @@ export function Circles({ locale, hasSession = false }: Props) { // 导出函数
       {loading ? (
         <p className="hint">{tr(locale, '加载中…', 'Loading…')}</p>
       ) : items.length === 0 ? (
-        <div className="community-empty">{tr(locale, '暂无圈子', 'No circles yet')}</div>
+        <EmptyState kind="post" title={tr(locale, '暂无圈子', 'No circles yet')} hint={tr(locale, '加入感兴趣的圈子，或创建自己的圈子。', 'Join an existing circle or create one.')} />
       ) : (
         <div className="commerce-grid tools-grid">{/* 执行当前业务步骤 */}
           {items.map((circle) => (

@@ -8,6 +8,7 @@ import type { Locale } from '@mim/i18n'; // 语言类型
 import { errorText } from '../api'; // 统一错误文案
 import { assetUrl, fetchMyAssets, type AssetKind, type MyAssetItem } from '../api/assets'; // 资产端点
 import { navigatePath, pathOf } from '../router'; // 站内深链接
+import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import './community-assets.css'; // 与资产列表 / 详情共用同一份样式
 
 const KIND_LABEL: Record<AssetKind, { zh: string; en: string }> = { // 类型展示名
@@ -55,10 +56,7 @@ export function MyAssets({ locale }: { locale: Locale }) { // 个人中心「我
       {loading ? <div className="asset-empty">{/* 加载占位 */}{isZh ? '加载中…' : 'Loading…'}</div> : null}
       {error ? <div className="asset-error">{/* 错误条 */}{error}</div> : null}
       {!loading && !error && items.length === 0 ? ( // 空态：给出可执行的下一步
-        <div className="asset-empty"> {/* 空态容器 */}
-          <strong>{isZh ? '还没有购买过资产' : 'No purchases yet'}</strong> {/* 空态标题 */}
-          <span>{isZh ? '去资产商店看看付费阅读、下载资源与图集。' : 'Explore articles, downloads and galleries in the asset store.'}</span> {/* 空态建议 */}
-        </div> // 空态结束
+        <EmptyState kind="order" title={isZh ? '还没有购买过资产' : 'No purchases yet'} hint={isZh ? '去资产商店看看付费阅读、下载资源与图集。' : 'Explore articles, downloads and galleries in the asset store.'} />
       ) : null}
 
       {/* 已购清单：行内三块（封面 / 文字 / 操作），窄屏自动折行 */}
