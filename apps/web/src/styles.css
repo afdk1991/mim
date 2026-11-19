@@ -1167,6 +1167,56 @@ code { /* 行内代码/令牌展示 */
   font-size: var(--fs-xs); /* 更小字号 */
 } /* 徽标结束 */
 
+/* ---------- 登录页作用域变体：下划线输入 + 纯圆形社交钮（2026-11-19 对齐缺口 #11） ---------- */
+/* 仅作用于 .auth-form / .auth-card 内的控件，不波及其余共享 .form 表单 */
+.auth-form input { /* 登录页下划线输入：透明底、仅留底边 */
+  height: calc(var(--field-h) - 4px); /* 比填充框略收，给下划线呼吸位 */
+  padding: 6px 0; /* 上下留白，左右不留边距 */
+  border: none; /* 去掉上左右三边 */
+  border-bottom: 1px solid var(--border); /* 仅保留底部细线 */
+  border-radius: 0; /* 下划线样式不要圆角 */
+  background: transparent; /* 透明底，融入卡片表面 */
+  box-shadow: none; /* 不用焦点环，改由底边颜色表达焦点 */
+} /* 下划线输入结束 */
+
+.auth-form input:hover { /* 悬停态：底边浮现一档描边 */
+  border-bottom-color: var(--border-hover);
+} /* 悬停态结束 */
+
+.auth-form input:focus { /* 聚焦态：底边转主色，去掉共享规则的焦点环 */
+  border-bottom-color: var(--primary);
+  box-shadow: none;
+} /* 聚焦态结束 */
+
+.auth-card .oauth-grid { /* 圆形钮行：居中换行，不再锁两列网格 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 空间不足换行 */
+  justify-content: center; /* 整行居中 */
+  gap: 10px; /* 圆形钮间距 */
+} /* 圆形钮行结束 */
+
+.auth-card .oauth-btn { /* 纯圆形第三方钮：等宽高、正圆、不保留文字槽位 */
+  width: 44px; /* 触控直径 */
+  height: 44px; /* 与宽度相等形成正圆 */
+  padding: 0; /* 无左右内边距 */
+  gap: 0; /* 图标与隐藏文字之间不再留缝 */
+  border-radius: 50%; /* 正圆 */
+} /* 圆形钮结束 */
+
+.auth-card .oauth-btn .oauth-name { /* 按钮文字在圆形钮内隐藏，名称经 aria-label 供读屏 */
+  display: none;
+} /* 隐藏文字结束 */
+
+.auth-card .oauth-btn .oauth-mark { /* 字母标自身也成圆形，与钮同族 */
+  width: 22px; /* 标记直径 */
+  height: 22px; /* 等高等宽 */
+  border-radius: 50%; /* 正圆 */
+} /* 圆形字母标结束 */
+
+.auth-card .oauth-btn .oauth-badge { /* 圆形钮内不塞文字徽标，忙碌态由 disabled 置灰表达 */
+  display: none;
+} /* 徽标隐藏结束 */
+
 .member-no-block { /* 注册成功后的 Mim ID 展示块 */
   display: flex; /* 纵向排列标题、号码与说明 */
   flex-direction: column; /* 自上而下 */

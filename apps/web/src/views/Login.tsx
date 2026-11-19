@@ -534,7 +534,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
           <p className="hint">{locale === 'en-US' ? 'Registration is currently closed. Sign in with an existing account.' : '注册功能已关闭，请使用已有账号登录。'}</p>
         )}
 
-        <form className="form" onSubmit={submit}>{/* 登录表单：提交统一由 submit 处理 */}
+        <form className="form auth-form" onSubmit={submit}>{/* 登录表单：提交统一由 submit 处理；auth-form 限定下划线输入样式只作用于本页 */}
           <label>{/* 账号输入项：标题随身份提供方变化 */}
             <span>{identifierLabel}</span>{/* 输入框标题：手机号或邮箱 */}
             <input
@@ -628,19 +628,23 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
         {usableOAuth.length > 0 && ( // 第三方登录：只渲染已配置凭证的提供方，未配置时整块不出现
           <div className="oauth-section">{/* 执行当前业务步骤 */}
             <div className="oauth-grid">{/* 等宽按钮行，不再用裸文本分隔线 */}
-              {usableOAuth.map((item) => (
+              {usableOAuth.map((item) => {
+                const providerLabel = locale === 'en-US' ? item.label_en : item.label; // 提供方当前语言名
+                return (
                 <button
                   key={item.id} // 提供方标识唯一
                   type="button" // 不触发表单提交
                   className="btn ghost oauth-btn"
+                  aria-label={providerLabel} // 纯圆形钮隐藏文字后，保留可读名称供读屏
                   disabled={oauthBusy !== null} // 已有跳转在途时禁用，避免重复发起
                   onClick={() => void startOAuth(item.id)} // 发起授权并整页跳转
                 >
-                  <span className="oauth-mark" aria-hidden="true">{(locale === 'en-US' ? item.label_en : item.label).slice(0, 1)}</span>
-                  <span>{locale === 'en-US' ? item.label_en : item.label}</span>
+                  <span className="oauth-mark" aria-hidden="true">{providerLabel.slice(0, 1)}</span>
+                  <span className="oauth-name">{providerLabel}</span>
                   {oauthBusy === item.id && <span className="oauth-badge">{t(locale, 'common.loading')}</span>}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}{/* 第三方登录区结束 */}
