@@ -2050,13 +2050,6 @@ code { /* 行内代码/令牌展示 */
   justify-content: center;
 } /* 角标结束 */
 
-.chat-empty { /* 空状态文案 */
-  padding: 20px 12px; /* 内边距 */
-  color: var(--text-muted); /* 次要色 */
-  font-size: var(--fs-sm);
-  text-align: center; /* 居中 */
-} /* 空状态结束 */
-
 .chat-main { /* 右侧消息区 */
   display: flex; /* 纵向：头部 + 消息 + 输入 */
   flex-direction: column;

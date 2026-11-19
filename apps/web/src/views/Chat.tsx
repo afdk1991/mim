@@ -21,6 +21,8 @@ import { useImSocket } from '../im/useImSocket';
 import type { ImFrame } from '../im/socket';
 // 视频通话组件与会话类型
 import { VideoCall, type CallSession } from '../components/VideoCall';
+// 空态共享组件：插图 + 标题 + 说明
+import { EmptyState } from '../empty-state';
 
 /** 组件入参 */
 interface ChatProps {
@@ -886,7 +888,7 @@ export function Chat({ locale }: ChatProps) {
         {!groupMode && searchQ.trim() !== '' && (
           <div className="chat-search-results">{/* 执行当前业务步骤 */}
             {searchResults.length === 0 ? (
-              <p className="chat-empty">{isZh ? '未找到用户' : 'No users found'}</p>
+              <EmptyState kind="search" title={isZh ? '未找到用户' : 'No users found'} hint={isZh ? '换个关键词再试试' : 'Try another keyword'} />
             ) : (
               searchResults.map((u) => (
                 <button key={u.id} type="button" className="chat-user-item" onClick={() => pickUser(u)}>{/* 执行当前业务步骤 */}
@@ -903,7 +905,7 @@ export function Chat({ locale }: ChatProps) {
           {loadingConversations && conversations.length === 0 ? (
             <p className="chat-hint">{isZh ? '会话加载中…' : 'Loading conversations…'}</p>
           ) : conversations.length === 0 ? (
-            <p className="chat-empty">{isZh ? '还没有会话，搜索用户开始聊天' : 'No conversations yet'}</p>
+            <EmptyState kind="post" title={isZh ? '还没有会话' : 'No conversations yet'} hint={isZh ? '搜索用户开始聊天' : 'Search a user to start chatting'} />
           ) : (
             conversations.map((c) => (
               <button
@@ -1003,7 +1005,7 @@ export function Chat({ locale }: ChatProps) {
                 <p className="chat-hint">{isZh ? '消息加载中…' : 'Loading messages…'}</p>
               )}
               {!loadingMessages && messages.length === 0 && (
-                <p className="chat-empty">{isZh ? '暂无消息，发一条打个招呼吧' : 'No messages yet'}</p>
+                <EmptyState kind="post" title={isZh ? '暂无消息' : 'No messages yet'} hint={isZh ? '发一条打个招呼吧' : 'Say hello to break the ice'} />
               )}
               {messages.map((m) => {
                 const mine = m.sender_user_id === currentUserId; // 是否自己发的

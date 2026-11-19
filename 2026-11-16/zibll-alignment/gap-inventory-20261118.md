@@ -28,7 +28,7 @@
 
 | # | 映射项 | 现状缺口 | 本轮（批次 2026-11-18） | 延期 / 前置依赖 |
 | --- | --- | --- | --- | --- |
-| 1 | 空态插图：null-*.svg 接入各空态面 | 9 个视图共 29 处 `.community-empty` / 同类空态均为纯文字；素材闲置 | 批次 2026-11-18：新增 `EmptyState` 共享组件，先接社区页 8 处。批次 2026-11-19：再接 Circles / ContentDetail / AnnouncementsPanel / CommunityGallery / CommunityAssets / MyAssets / CommunityMore 共 14 处（含详情缺失 / 失败重试、公告四页签、图库条目与合集、资产检索、已购清单、通知 / 搜索 / 举报队列） | 仅剩 Chat 视图 3 处 `.chat-empty`（会话列表 / 消息面板 / 用户搜索），随聊天域一批接线 |
+| 1 | 空态插图：null-*.svg 接入各空态面 | 9 个视图共 29 处 `.community-empty` / 同类空态均为纯文字；素材闲置 | 批次 2026-11-18：新增 `EmptyState` 共享组件，先接社区页 8 处。批次 2026-11-19：再接 Circles / ContentDetail / AnnouncementsPanel / CommunityGallery / CommunityAssets / MyAssets / CommunityMore 共 14 处。同日补接 Chat 视图 3 处（用户搜索无结果 / 会话列表空 / 消息区空），并清理不再使用的 `.chat-empty` 样式 | **已清零**：`EmptyState` 累计 25 处 / 9 个视图；剩余外观缺口见 #2–#13 |
 | 2 | 卡片标题等高 | 标题两行截断但未锁最小高度，摘要长短不齐时标题基线错落 | `community-card h3` 补 `min-height` 两档行高 | — |
 | 3 | 卡片悬停反馈 | 仅阴影加深，卡片不抬升；封面已有 1.02 缩放 | 卡片 hover 补 `translateY(-2px)`，过渡集合纳入 transform | — |
 | 4 | 按钮四档层级 | 现有 primary / danger / ghost / small / block；缺描边档 `outline` 与药丸档 `pill` | 补 `.btn.outline` / `.btn.pill` 两个纯样式档位，既有按钮不改类名 | 各页按需换用，下一批按场景落位 |
