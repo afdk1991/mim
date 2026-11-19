@@ -10,7 +10,7 @@
 <!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 浏览器标签页标题 -->
-<title>Mim 全平台产品底座 PRD — V0.0.12-preview</title>
+<title>Mim 全平台产品底座 PRD — V0.0.13-preview</title>
 <!-- 内联样式表：本 PRD 文档的全部视觉样式 -->
 <style>
   /* CSS 自定义属性（设计令牌）：集中定义整页配色，便于统一修改 */
@@ -89,8 +89,8 @@
 <!-- 文档主标题 -->
 <h1>Mim 全平台产品底座 — 产品需求文档</h1>
 <!-- 元信息行：版本 / 通道 / 日期 / 状态（灰色弱提示样式） -->
-<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.12），故展示 V0.0.12-preview -->
-<p class="muted">版本：V0.0.12-preview　|　通道：preview　|　日期：2026-11-14（版本口径同步）　|　状态：草案</p>
+<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.13），故展示 V0.0.13-preview -->
+<p class="muted">版本：V0.0.13-preview　|　通道：preview　|　日期：2026-11-14（版本口径同步）　|　状态：草案</p>
 
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
@@ -840,6 +840,22 @@ function submitLogin(){
   <li>断线自动重连：指数退避 0.5s → 10s</li>
 </ul>
 
+<!-- 5.x 社区检索与排序（V0.0.13 自研算法） -->
+<h3>社区检索与排序（自研算法，V0.0.13）</h3>
+<!-- 检索与排序能力清单 -->
+<ul>
+  <!-- 分词口径 -->
+  <li><strong>中文分词</strong>：全角归一 → 小写 → CJK 相邻二元切分（孤立单字保留）+ 英文轻量词形归一；中英停用词剔除，零第三方词典依赖</li>
+  <!-- 相关性排序 -->
+  <li><strong>搜索相关性</strong>：<code>GET /community/search</code> 默认按 BM25 排序（标题 3 / 摘要 2 / 正文 1，<code>k1=1.2</code>、<code>b=0.75</code>），再叠加半衰期 7 天的时效衰减与对数互动微调；返回 <code>items[].relevance</code></li>
+  <!-- 兼容逃生口 -->
+  <li><strong>兼容口径</strong>：<code>sort=latest</code> 回到旧「按最后活跃时间」排序，<code>total</code> 仍为全量命中数；<code>diversify=1</code> 启用 MMR 多样性重排（λ=0.7）</li>
+  <!-- 热榜 -->
+  <li><strong>社区热榜</strong>：<code>GET /community/trending</code>（匿名可读）按 <code>engagement/(ageHours+2)^1.5</code> 排序，<code>limit</code> 默认 10 / 上限 50、可选板块；响应标注 <code>algorithm: heat-v1</code></li>
+  <!-- 边界 -->
+  <li><strong>边界</strong>：相关性排序只在 200 条候选窗口内进行（深翻页用 <code>sort=latest</code>）；不提供同义词扩展、纠错与个性化</li>
+</ul>
+
 <!-- 章节标题：6. 共享规则 -->
 <h2>6. 共享规则</h2>
 
@@ -932,7 +948,7 @@ function submitLogin(){
 <!-- 文档末尾分割线 -->
 <hr>
 <!-- 页脚：版本 / 草案声明 / 校验入口（版本规约见 AGENTS.md 铁律四，密钥治理见 09 清单 §0） -->
-<p class="muted" style="text-align:center;">Mim PRD · V0.0.12-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
+<p class="muted" style="text-align:center;">Mim PRD · V0.0.13-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
 
 <!-- 页面主体结束 -->
 </body>

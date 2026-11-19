@@ -369,4 +369,18 @@ FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `servi
 
 ---
 
-_本页为产品功能视角文档，随 PRD 草案（V0.0.12-preview）同步演进；所有 TBD/Assumption 项待 PRD 确认后更新。_
+## 14. 自研算法包：搜索排序与社区热榜（V0.0.13，2026-11-19）
+
+| 能力 | 落地口径 | 边界 |
+|---|---|---|
+| 中文文本处理 | `algorithms/text.ts`：全角归一、CJK 相邻二元切分、孤字保留、英文轻量词形归一、中英停用词、Jaccard | 不做同义词扩展与错别字纠错，命中率与 `LIKE` 等价 |
+| 相关性排序 | `algorithms/bm25.ts`：字段加权 BM25（标题 3 / 摘要 2 / 正文 1）、IDF、长度归一、同分稳定 | 只在 200 条候选窗口内排序，深翻页请用 `sort=latest` |
+| 时效与综合分 | `algorithms/rank.ts`：半衰期 7 天衰减 + `0.02·ln(1+2likes+3replies)` 微调 | 参数为常量，暂未做后台可调 |
+| 多样性 | `algorithms/mmr.ts`：MMR 贪心，`λ=0.7`；同板块相似度 0.9、否则标题词集 Jaccard | `O(n²)`，仅限候选窗口 |
+| 热度榜 | `algorithms/heat.ts`：`engagement/(ageHours+2)^1.5`；新增 `GET /community/trending`（默认 10、上限 50、可选板块） | 候选窗口 200 条；无实时流式更新 |
+
+接口参数、公式与测试口径见 [自研算法-搜索排序与热榜-20261119](../../docs/自研算法-搜索排序与热榜-20261119.md)。
+
+---
+
+_本页为产品功能视角文档，随 PRD 草案（V0.0.13-preview）同步演进；所有 TBD/Assumption 项待 PRD 确认后更新。_

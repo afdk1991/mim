@@ -13,6 +13,7 @@ import { computeDeduction, deductPoints, getPointsBalance } from '../commerce/po
 import type { ApiDeps } from '../types.js'; // 引入依赖：声明本文件使用的外部能力
 import { checkPostRateLimit, resolveQuota } from '../community/limits.js'; // 三期：发帖频控与配额
 import { loadWeights, refreshRecommendScore, saveWeights, DEFAULT_WEIGHTS } from '../community/recommend.js'; // 三期：推荐指数
+import { bm25Rank, blendScore, jaccard, mmrRerank, rankByHeat, tokenSet } from '../algorithms/index.js'; // 自研算法包：BM25 相关性 / 综合分 / 多样性重排 / 热度榜
 import { DEFAULT_TABS, loadBoardTabs, saveBoardTabs, SORT_BY_KEYS, type TabInput } from '../community/tabs.js'; // 三期：板块 Tab 组合
 import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewEnabled, type HomeView } from '../community/settings.js'; // 三期：首页指向与审核开关
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
@@ -503,6 +504,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
     /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 附件签名下载（免费帖访客可下，付费帖在处理函数内按解锁口径拦截）
     /^\/api\/v1\/community\/search$/, // 社区搜索（标题 / 摘要 / 正文）
+    /^\/api\/v1\/community\/trending$/, // 社区热榜（只读聚合，无个人数据）
     /^\/api\/v1\/community\/gallery\/items$/, // 图库 / 视频列表：按帖子权限过滤，锁定项不下发地址
     /^\/api\/v1\/community\/gallery\/collections$/, // 图库聚合：按帖 / 按作者分组
     /^\/api\/v1\/vip\/plans$/, // VIP 套餐
@@ -1551,28 +1553,58 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ ok: true, unread }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
-  /** 社区搜索：标题 / 摘要 / 正文全文匹配，返回高亮片段与分页。 */
+  /**
+   * 社区搜索：默认按自研 BM25 相关性 + 时效衰减排序（标题权重 3、摘要 2、正文 1）。
+   * sort=latest 回到「按最后活跃时间」的旧口径；diversify=1 追加 MMR 多样性重排，压制同板块刷屏。
+   * 相关性排序在候选窗口（默认 200 条）内进行，total 仍是全量命中数，保证前端总数与分页语义不变。
+   */
   router.get('/community/search', (req, res) => { // 路由 GET /community/search：注册入口并绑定鉴权与处理逻辑
     const q = String(req.query.q ?? '').trim(); // 关键词
     if (!q) throw new AppError('VALIDATION_FAILED', '请输入搜索关键词'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     const board = String(req.query.board ?? '').trim(); // 板块过滤
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50); // 单页上限 50
     const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
-    const where = ["t.status = 'published'", '(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ?)']; // 基础条件
+    const sort = String(req.query.sort ?? '') === 'latest' ? 'latest' : 'relevance'; // 默认相关性，保留旧口径逃生口
+    const diversify = String(req.query.diversify ?? '') === '1'; // 多样性开关：默认关闭，避免改变既有排序预期
+    const CANDIDATE_LIMIT = 200; // 相关性排序的候选窗口上限，防止大表全量进内存
+    const where = ["t.status = 'published'", '(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ?)']; // 基础条件：三处任一命中
     const args: Array<string> = [`%${q}%`, `%${q}%`, `%${q}%`]; // 参数与占位符一一对应
     if (board) { where.push('b.slug = ?'); args.push(board); } // 板块过滤
     const total = (deps.db // 保存 total：承载本步骤的计算结果供后续使用
       .prepare(`SELECT COUNT(*) AS n FROM community_threads t JOIN community_boards b ON b.id = t.board_id WHERE ${where.join(' AND ')}`) // 预编译 SQL：固定语句结构后绑定参数执行
       .get(...args) as { n: number }).n; // 查询单行：读取一条记录供判定使用
-    const rows = deps.db // 保存 rows：承载本步骤的计算结果供后续使用
-      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
-        `SELECT t.id, t.title, t.summary, t.body, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count,
-                b.slug AS board_slug, b.name AS board_name
-         FROM community_threads t JOIN community_boards b ON b.id = t.board_id
-         WHERE ${where.join(' AND ')} ORDER BY t.last_activity_at DESC LIMIT ? OFFSET ?`,
-      ) // 调用结束：参数列表与链式调用收尾
-      .all(...args, limit, offset) as Array<{ id: string; title: string; summary: string; body: string; kind: string; cover_url: string | null; price_cents: number; views: number; likes: number; reply_count: number; board_slug: string; board_name: string }>; // 查询多行：读取列表供批量处理
-    const items = rows.map((row) => ({ // 逐条生成摘要
+    const selectSql = // 搜索列表字段：与排序分支共用同一投影，避免两套字段漂移
+      `SELECT t.id, t.title, t.summary, t.body, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count, t.created_at,
+              b.slug AS board_slug, b.name AS board_name
+       FROM community_threads t JOIN community_boards b ON b.id = t.board_id
+       WHERE ${where.join(' AND ')}`; // 公共查询主体
+    type SearchRow = { id: string; title: string; summary: string; body: string; kind: string; cover_url: string | null; price_cents: number; views: number; likes: number; reply_count: number; created_at: string; board_slug: string; board_name: string }; // 行类型：供两个分支复用
+    let pageRows: SearchRow[] = []; // 当前页最终命中的行
+    let relevanceOf = new Map<string, number>(); // 相关性得分表，供响应回显
+    if (sort === 'latest') { // 旧口径分支：严格按时间分页，保证深翻页结果与历史一致
+      pageRows = deps.db // 保存 pageRows：承载本步骤的计算结果供后续使用
+        .prepare(`${selectSql} ORDER BY t.last_activity_at DESC LIMIT ? OFFSET ?`) // 预编译 SQL：固定语句结构后绑定参数执行
+        .all(...args, limit, offset) as SearchRow[]; // 查询多行：读取列表供批量处理
+    } else { // 相关性分支：先取候选窗口，再在内存里按算法排序后切页
+      const candidates = deps.db // 保存 candidates：承载本步骤的计算结果供后续使用
+        .prepare(`${selectSql} ORDER BY t.last_activity_at DESC LIMIT ?`) // 预编译 SQL：固定语句结构后绑定参数执行
+        .all(...args, CANDIDATE_LIMIT) as SearchRow[]; // 查询多行：读取列表供批量处理
+      const hits = bm25Rank(q, candidates.map((row) => ({ id: row.id, fields: [{ text: row.title, weight: 3 }, { text: row.summary ?? '', weight: 2 }, { text: row.body ?? '', weight: 1 }] }))); // 自研 BM25：标题权重最高
+      relevanceOf = new Map(hits.map((hit) => [hit.id, hit.score])); // 主键 → 相关性分
+      const nowMs = Date.now(); // 统一时间基准，避免逐行取 now 抖动
+      const scored = candidates.map((row) => { // 逐行合成综合分
+        const relevance = relevanceOf.get(row.id) ?? 0; // 取相关性分
+        const created = Date.parse(row.created_at); // 解析发布时间
+        const ageDays = Number.isFinite(created) ? Math.max(0, (nowMs - created) / 86_400_000) : 0; // 距今天数
+        return { row, relevance, score: blendScore({ relevance, ageDays, likes: row.likes, replies: row.reply_count }) }; // 相关性 + 时效 + 互动微调
+      }); // 合成结束
+      scored.sort((left, right) => right.score - left.score || right.row.created_at.localeCompare(left.row.created_at)); // 综合分降序，同分新帖优先
+      const ordered = diversify // 多样性分支
+        ? mmrRerank(scored, { relevance: (item) => item.score, similarity: (left, right) => (left.row.board_slug === right.row.board_slug ? 0.9 : jaccard(tokenSet(left.row.title), tokenSet(right.row.title))), lambda: 0.7 }) // 同板块视为高度相似
+        : scored; // 未开启多样性则用综合分序
+      pageRows = ordered.slice(offset, offset + limit).map((item) => item.row); // 内存切页
+    } // 分支结束
+    const items = pageRows.map((row) => ({ // 逐条生成摘要
       id: row.id, // 主键
       title: row.title, // 标题
       kind: row.kind, // 类型
@@ -1585,8 +1617,48 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       board_name: row.board_name, // 板块名
       snippet: buildSnippet(row.body || row.summary || row.title, q), // 命中片段：正文优先
       locked: row.price_cents > 0, // 付费帖在搜索结果里也标锁
+      relevance: relevanceOf.get(row.id) ?? 0, // 相关性分回显：0 表示 latest 分支或该行仅靠 LIKE 命中
     })); // 结束代码块：本层作用域收尾
-    res.json({ items, total, offset, limit, q }); // 输出响应：把处理结果写回 HTTP 客户端
+    res.json({ items, total, offset, limit, q, sort, diversify, candidate_limit: CANDIDATE_LIMIT }); // 输出响应：把处理结果写回 HTTP 客户端
+  }); // 结束函数体：本层作用域收尾
+
+  /** 社区热榜：自研热度算法（互动加权 / 年龄重力衰减），窗口 200 条内算热再取前 N。 */
+  router.get('/community/trending', (req, res) => { // 路由 GET /community/trending：只读公开端点
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '10'), 10) || 10, 1), 50); // 单次上限 50
+    const board = String(req.query.board ?? '').trim(); // 可选板块过滤
+    const where = ["t.status = 'published'"]; // 只看已发布
+    const args: Array<string> = []; // 占位参数
+    if (board) { where.push('b.slug = ?'); args.push(board); } // 板块过滤
+    const rows = deps.db // 保存 rows：承载本步骤的计算结果供后续使用
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT t.id, t.title, t.summary, t.kind, t.cover_url, t.price_cents, t.views, t.likes, t.reply_count, t.created_at,
+                b.slug AS board_slug, b.name AS board_name,
+                (SELECT COUNT(*) FROM community_favorites f WHERE f.thread_id = t.id) AS favorite_count
+         FROM community_threads t JOIN community_boards b ON b.id = t.board_id
+         WHERE ${where.join(' AND ')}
+         ORDER BY t.last_activity_at DESC LIMIT ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(...args, 200) as Array<{ id: string; title: string; summary: string; kind: string; cover_url: string | null; price_cents: number; views: number; likes: number; reply_count: number; created_at: string; board_slug: string; board_name: string; favorite_count: number }>; // 查询多行：读取候选窗口
+    const heats = rankByHeat(rows.map((row) => ({ id: row.id, likes: row.likes, replies: row.reply_count, views: row.views, favorites: row.favorite_count, createdAt: row.created_at }))); // 自研热度排序
+    const byId = new Map(rows.map((row) => [row.id, row])); // 主键 → 行，便于回查
+    const items = heats.slice(0, limit).map((hit) => { // 取前 N 条并组装响应
+      const row = byId.get(hit.id)!; // 回查业务行
+      return { // 响应条目
+        id: row.id, // 主键
+        title: row.title, // 标题
+        summary: row.summary ?? '', // 摘要
+        kind: row.kind, // 类型
+        cover_url: row.cover_url, // 封面
+        price_cents: row.price_cents, // 定价
+        views: row.views, // 浏览数
+        likes: row.likes, // 点赞数
+        reply_count: row.reply_count, // 回复数
+        board_slug: row.board_slug, // 板块
+        board_name: row.board_name, // 板块名
+        heat: hit.heat, // 热度分：可直接用于前端展示或对账
+      }; // 条目结束
+    }); // 组装结束
+    res.json({ items, limit, algorithm: 'heat-v1', window: 200 }); // 输出响应：标注算法版本与候选窗口
   }); // 结束函数体：本层作用域收尾
 
   /** 积分转账：按 Mim ID 转给其他用户，双方各记一条流水。 */
