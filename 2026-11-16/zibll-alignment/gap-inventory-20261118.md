@@ -23,6 +23,7 @@
 | 社区页头：kicker + 标题 + 描述 + 四格统计 + 两组页签 + chips 筛选 | 已落地 | `Community.tsx` `community-hero` / `community-tabs` / `community-chips` |
 | 第三方登录按钮行：已配置提供方等宽排列 + 字母标 + 忙碌徽标 | 已落地 | `Login.tsx` `oauth-grid` / `oauth-btn` |
 | 登录内嵌左引导区：价值清单 + 安全说明卡 | 已落地 | `Login.tsx` `auth-intro` / `auth-extras` |
+| 通知类别徽章图标：reply / accept / like / favorite / report 映射 `msg-*.svg` | 已落地（2026-11-19）：铃铛列表类别 chip 前置 16px 圆形徽章，未知类别回退系统图标 | `CommunityMore.tsx` `NOTIFY_ICON` / `.mim-cm-notify-icon` |
 
 ## 三、缺口清单与分批归属
 

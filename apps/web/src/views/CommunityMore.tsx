@@ -44,6 +44,20 @@ const NOTIFY_KIND: Record<string, string> = { // 事件文案
   report: '举报', // 举报处理结果
 }; // 常量结束
 
+/** 通知事件 → 类别徽章图标：复用已入库的子比 msg-* SVG，未知类别回退系统图标。 */
+const NOTIFY_ICON: Record<string, string> = { // 图标映射
+  reply: 'zib/img/msg-comment.svg', // 回复：对话气泡
+  accept: 'zib/img/msg-posts.svg', // 采纳：内容标记
+  like: 'zib/img/msg-like.svg', // 点赞：喜欢手势
+  favorite: 'zib/img/msg-followed.svg', // 收藏：关注星标
+  report: 'zib/img/msg-system.svg', // 举报：系统通告
+}; // 常量结束
+
+/** 站内静态素材地址：BASE_URL 前缀 + 去掉前导斜杠的相对路径，兼容 /mim/ 子路径部署。 */
+function staticAsset(path: string): string { // 静态资源补前缀
+  return `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`; // 子路径下资源仍能解析
+} // staticAsset 结束
+
 /** 举报原因的中文名。 */
 const REPORT_REASON: Record<string, string> = { // 原因文案
   spam: '垃圾广告', // 广告刷屏
@@ -195,7 +209,10 @@ export function NotificationBell(props: { // 通知铃铛
           {items.length === 0 && !error && <EmptyState kind="user" title="暂无通知" />}
           {items.map((item) => (
             <button key={item.id} type="button" className={`mim-cm-notify${item.read_at ? '' : ' is-unread'}`} onClick={() => void openItem(item)}>
-              <span className="mim-cm-notify-kind">{NOTIFY_KIND[item.kind] ?? item.kind}</span>
+              <span className="mim-cm-notify-kind">
+                <img className="mim-cm-notify-icon" src={staticAsset(NOTIFY_ICON[item.kind] ?? NOTIFY_ICON.report)} alt="" aria-hidden="true" loading="lazy" />
+                {NOTIFY_KIND[item.kind] ?? item.kind}
+              </span>
               <span className="mim-cm-notify-body">
                 <strong>{item.actor_name || 'Mim 用户'}</strong>
                 <em>{item.content || item.thread_title || ''}</em>
@@ -510,7 +527,8 @@ export function CommunityMoreStyles() { // 样式表
 .mim-cm-pop-head button { width: auto; margin: 0; }
 .mim-cm-notify { display: flex !important; gap: 8px; align-items: flex-start; padding: 7px 6px !important; border-radius: var(--radius-sm); }
 .mim-cm-notify.is-unread { background: var(--primary-soft); }
-.mim-cm-notify-kind { flex: none; padding: 1px 6px; border-radius: var(--radius-xs); background: var(--primary-soft); font-size: var(--fs-xs); }
+.mim-cm-notify-kind { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: var(--radius-xs); background: var(--primary-soft); font-size: var(--fs-xs); }
+.mim-cm-notify-icon { width: 16px; height: 16px; border-radius: 50%; object-fit: contain; }
 .mim-cm-notify-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mim-cm-notify-body strong { font-size: var(--fs-sm); }
 .mim-cm-notify-body em { font-style: normal; color: var(--text-secondary); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
