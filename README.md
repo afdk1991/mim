@@ -174,7 +174,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | [docs/wiki/README.md](./docs/wiki/README.md) | Wiki 首页：01 架构 / 02 模块 / 03 代码参考 / 04 依赖 / 05 运行 / 06 治理 / 07 功能 / 08 开发实现 / 09 第三方 SDK 清单 |
 | [docs/deployment-summary.md](./docs/deployment-summary.md) | 部署汇总核对表：11 矩阵平台 / 12 规范部署项逐项列出仓库标识、平台 / 层级、交付链路、访问域名、部署状态、部署结果、异常说明；含异常明细、工件双口径、覆盖去重与排除说明（另有 7 条候选 / 排除留痕不计入汇总） |
 | [docs/deployment-summary.json](./docs/deployment-summary.json) | 同上的结构化结果（机器可核对，schema `mim.deployment-registry.v1`） |
-| [docs/zibll-wordpress-独立站点方案-20261118.md](./docs/zibll-wordpress-独立站点方案-20261118.md) | 子比主题 V9.2 独立 WordPress 平行站点方案：架构分流、部署物清单、前置条件与客观缺口、服务器侧步骤、合规与到期风险、回滚方案；配套幂等建站脚本 `deploy/wp-blog/install-blog.laal.top.sh`（生成器自检 19/19） |
+| [docs/zibll-wordpress-独立站点方案-20261118.md](./docs/zibll-wordpress-独立站点方案-20261118.md) | 子比主题 V9.2 独立 WordPress 平行站点方案：落点裸域 `laal.top`（复用既有 WP）、架构分流、站点块工件 `deploy/wp-blog/laal-top-wp.conf`、迁移取证、授权激活阻断点、合规与到期风险、回滚方案；兜底建站脚本 `deploy/wp-blog/install-blog.laal.top.sh`（生成器自检 22/22） |
 | [2026-11-16/zibll-alignment/gap-inventory-20261118.md](./2026-11-16/zibll-alignment/gap-inventory-20261118.md) | 子比主题结构 / 样式对齐缺口清单：本轮已落地项、延期项与前置依赖、两条路线边界 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |

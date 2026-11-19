@@ -4,16 +4,16 @@
 set -euo pipefail
 
 # ---- 可配置变量（全部带默认值，可用环境变量覆盖）----
-DOMAIN="${DOMAIN:-blog.laal.top}"
+DOMAIN="${DOMAIN:-laal.top}"
 PHP_VERSION="${PHP_VERSION:-8.1}"
 WP_VERSION="${WP_VERSION:-latest}"
 DB_NAME="${DB_NAME:-wp_$(printf '%s' "${DOMAIN}" | tr '.' '_')}"
 DB_USER="${DB_USER:-wp_user}"
 DB_PASS="${DB_PASS:-ChangeMe_default_only_for_dry_run}"
 WEB_ROOT="${WEB_ROOT:-/var/www/${DOMAIN}}"
-INSTALL_SSL="${INSTALL_SSL:-1}"
-SSL_CERT="${SSL_CERT:-}"
-SSL_KEY="${SSL_KEY:-}"
+INSTALL_SSL="${INSTALL_SSL:-0}"
+SSL_CERT="${SSL_CERT:-/etc/letsencrypt/live/laal.top/fullchain.pem}"
+SSL_KEY="${SSL_KEY:-/etc/letsencrypt/live/laal.top/privkey.pem}"
 
 # ---- 解析脚本自身参数 ----
 DRY_RUN=0
