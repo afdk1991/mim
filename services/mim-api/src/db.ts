@@ -402,8 +402,8 @@ export function seedCommunity(db: Db): void {
   const now = new Date().toISOString();
   const insertBoard = db.prepare(
     `INSERT OR IGNORE INTO community_boards (id, slug, name, description, icon, sort_order, price_cents, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-  );
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ); // 价格随种子逐板块写入：付费板块带定价，其余板块为 0；INSERT OR IGNORE 不覆盖生产已有行
   const insertThread = db.prepare(
     `INSERT OR IGNORE INTO community_threads
        (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, recommend_score, created_at, updated_at, last_activity_at)
@@ -440,17 +440,19 @@ export function seedCommunity(db: Db): void {
      VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
   );
   const seed = db.transaction(() => {
-    const boards: Array<[string, string, string, string, string, number]> = [
-      ['board-guides', 'guides', '使用指南', '各板块规则、玩法说明与常见问题', '📘', 0],
-      ['board-general', 'general', '综合讨论', '产品、技术与任何值得聊的话题', '💬', 1],
-      ['board-open-source', 'open-source', '开源项目', '自研工具与开源项目发布、更新日志', '📦', 2],
-      ['board-tools', 'tools', '自研工具', 'Quick Build WP、换域名插件、流盾 WAF 等工具', '🛠️', 3],
-      ['board-paid', 'paid', '知识付费', '付费阅读、资源下载、图库与视频', '🔖', 4],
-      ['board-help', 'help', '求助答疑', '部署、支付、短信、CDN 与伪静态问题', '🆘', 5],
-      ['board-announce', 'announce', '公告', '产品公告、更新日志与推广计划', '📣', 6],
+    // 元组结构：[主键, slug, 名称, 描述, 图标, 排序, 定价(分)]；付费板块与生产口径对齐为 1900 分
+    const boards: Array<[string, string, string, string, string, number, number]> = [
+      ['board-guides', 'guides', '使用指南', '各板块规则、玩法说明与常见问题', '📘', 0, 0],
+      ['board-general', 'general', '综合讨论', '产品、技术与任何值得聊的话题', '💬', 1, 0],
+      ['board-open-source', 'open-source', '开源项目', '自研工具与开源项目发布、更新日志', '📦', 2, 0],
+      ['board-tools', 'tools', '自研工具', 'Quick Build WP、换域名插件、流盾 WAF 等工具', '🛠️', 3, 0],
+      // 付费板块：描述与定价对齐生产（1900 分 = ¥19.00）；新库安装即一致，存量行由 INSERT OR IGNORE 保留
+      ['board-paid', 'paid', '知识付费', '付费板块：付费阅读、资源下载、图库与视频，加入后可见完整正文与媒体。', '🔖', 4, 1900],
+      ['board-help', 'help', '求助答疑', '部署、支付、短信、CDN 与伪静态问题', '🆘', 5, 0],
+      ['board-announce', 'announce', '公告', '产品公告、更新日志与推广计划', '📣', 6, 0],
     ];
-    for (const [id, slug, name, description, icon, sort] of boards) {
-      insertBoard.run(id, slug, name, description, icon, sort, now);
+    for (const [id, slug, name, description, icon, sort, price] of boards) {
+      insertBoard.run(id, slug, name, description, icon, sort, price, now);
     }
     // 公告板块种子帖的现行文案：2026-11-15 起全站强制登录，不再出现「全站免登录 / 访客交易」这类已废除口径。
     const announceTitle = '2026-11-12 更新：商城商品视觉上线'; // 标题只保留真实上线内容
@@ -708,17 +710,33 @@ export function seedCommerce(db: Db): void {
       insertBlock.run(id, page, kind, sort, config, now, now); // INSERT OR IGNORE：已存在则不覆盖
     } // 循环结束
     // 存量库首页文案对齐：旧种子把首屏标题写成「Mim 商业中台」等占位措辞，INSERT OR IGNORE 不会更新已有行。
-    // 只有区块配置仍与旧种子逐字一致时才替换；运营在后台改过的文案保持原样，重复启动无副作用。
-    const legacyHomeConfig: Record<string, string> = { // 旧种子原文：作为「未被运营改动过」的判定依据
-      'block-home-hero': JSON.stringify({ title: 'Mim 商业中台', subtitle: '知识付费、独立商城、社区与资金结算', cta: { label: '进入商城', href: '/marketplace' } }), // 旧首页头图
+    // 只有区块配置仍与旧种子一致时才替换；运营在后台改过的文案保持原样，重复启动无副作用。
+    // 旧头图指纹只比对标题 / 副标题 / 按钮文案三个稳定字段；旧 CTA href 是已下线路径段，不再纳入指纹，
+    // 旧行点击时由前端旧段映射兜底到 /community，种子代码内不再保留该旧段字面量。
+    const legacyHeroFingerprint = { // 旧首页头图：未被运营改动过的判定字段
+      title: 'Mim 商业中台', // 旧标题
+      subtitle: '知识付费、独立商城、社区与资金结算', // 旧副标题
+      cta: { label: '进入商城' }, // 旧按钮文案；href 旧段已下线，不参与比对
+    }; // legacyHeroFingerprint 结束
+    const legacyHomeConfig: Record<string, string> = { // 其余旧种子原文：作为「未被运营改动过」的判定依据
       'block-home-features': JSON.stringify({ items: [{ title: '付费资产', text: '阅读 / 下载 / 图库 / 视频' }, { title: '独立商城', text: '实物、卡密与人工发货' }, { title: '社区论坛', text: '板块、圈子与帖子权限' }] }), // 旧特性卡
     }; // legacyHomeConfig 结束
     for (const [id, page, kind, sort, config] of blocks) { // 复用新种子作为对齐目标
-      if (!legacyHomeConfig[id]) continue; // 只处理有旧文案的首页区块
       const row = db.prepare('SELECT config_json FROM page_blocks WHERE id = ?').get(id) as { config_json: string } | undefined; // 读当前存量配置
       if (!row) continue; // 行不存在说明新种子已写入，无需对齐
       try { // 脏 JSON 视为运营数据异常，保持原样
-        const same = JSON.stringify(JSON.parse(row.config_json)) === legacyHomeConfig[id]; // 结构化比对，忽略键序与空白
+        const parsed: Record<string, unknown> = JSON.parse(row.config_json); // 解析当前存量配置
+        let same = false; // 是否命中旧种子
+        if (id === 'block-home-hero') { // 头图走字段子集比对，避免把已下线旧段写进指纹
+          const cta = (parsed.cta ?? {}) as { label?: unknown }; // 取按钮配置，缺失按空对象处理
+          same = parsed.title === legacyHeroFingerprint.title // 标题未被改过
+            && parsed.subtitle === legacyHeroFingerprint.subtitle // 副标题未被改过
+            && cta.label === legacyHeroFingerprint.cta.label; // 按钮文案未被改过
+        } else { // 其余区块走整对象结构化比对
+          const legacy = legacyHomeConfig[id]; // 取对应旧种子原文
+          if (!legacy) continue; // 不在对齐清单内的区块跳过
+          same = JSON.stringify(parsed) === legacy; // 结构化比对，忽略键序与空白
+        } // 分支结束
         if (same) db.prepare('UPDATE page_blocks SET config_json = ?, updated_at = ? WHERE id = ?').run(config, now, id); // 命中旧种子才替换并刷新时间
       } catch { // 解析失败不做任何写入
         // 保持原值，避免把坏数据覆盖成默认文案

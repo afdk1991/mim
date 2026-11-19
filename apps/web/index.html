@@ -32,7 +32,7 @@
           for (var i = 0; i < segs.length; i++) { // 从头找第一个已知视图段
             if (views.indexOf(segs[i]) >= 0) { // 命中视图段
               cut = i + 1; // 截到视图段为止
-              keep = segs[i] === 'community' && (segs[i + 1] === 'post' || segs[i + 1] === 'news'); // 详情深链接不折叠
+              keep = segs[i] === 'community' && (segs[i + 1] === 'post' || segs[i + 1] === 'news' || segs[i + 1] === 'assets'); // 帖子 / 资讯 / 付费资产深链接不折叠
               break; // 只认第一个视图段
             } // 视图段命中判定结束
           } // 视图段查找结束

@@ -14,6 +14,7 @@ import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + �
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
   hasSession?: boolean; // 是否已有登录会话；未登录时写操作静默引导
+  onRequireLogin?: () => void; // 未登录点写操作时的登录引导（由 App 负责跳转并保留回跳）
 } // 代码块结束
 
 /** 按语言取文案。 */
@@ -60,7 +61,7 @@ function joinModeLabel(locale: Locale, value: CircleSummary['join_mode']): strin
   return tr(locale, '自由加入', 'Open'); // 返回当前函数的处理结果
 } // 代码块结束
 
-export function Circles({ locale, hasSession = false }: Props) { // 导出函数 Circles：对外暴露的调用入口
+export function Circles({ locale, hasSession = false, onRequireLogin }: Props) { // 导出函数 Circles：对外暴露的调用入口
   const [items, setItems] = useState<CircleSummary[]>([]); // 圈子清单
   const [detail, setDetail] = useState<CircleSummary | null>(null); // 当前圈子详情
   const [posts, setPosts] = useState<CirclePost[]>([]); // 圈内动态
@@ -279,6 +280,15 @@ export function Circles({ locale, hasSession = false }: Props) { // 导出函数
             </button>
           </section>
         )}
+        {/* 匿名访客：清单与详情可读，加入是写操作，先引导登录再回跳本页 */}
+        {!detail.i_am_member && !hasSession && (
+          <section className="panel">{/* 执行当前业务步骤 */}
+            <p className="muted">{tr(locale, '登录后可申请加入该圈子。', 'Sign in to request to join this circle.')}</p>
+            <button type="button" className="btn primary" onClick={() => onRequireLogin?.()}>{/* 点击触发登录引导，不发起匿名写请求 */}
+              {tr(locale, '登录后加入', 'Sign in to join')}
+            </button>
+          </section>
+        )}
         {detail.i_am_member && detail.my_role !== 'owner' && (
           <section className="panel">{/* 执行当前业务步骤 */}
             <button type="button" className="btn ghost" disabled={busy} onClick={() => void doLeave()}>{/* 执行当前业务步骤 */}
@@ -383,6 +393,16 @@ export function Circles({ locale, hasSession = false }: Props) { // 导出函数
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="hint">{notice}</p>}
+
+      {/* 匿名访客：清单与空态可读，创建圈子是写操作，先引导登录 */}
+      {!hasSession && (
+        <section className="panel">{/* 执行当前业务步骤 */}
+          <p className="muted">{tr(locale, '登录后可创建圈子，或加入感兴趣的圈子。', 'Sign in to create a circle or join one.')}</p>
+          <button type="button" className="btn ghost" onClick={() => onRequireLogin?.()}>{/* 点击触发登录引导，不发起匿名写请求 */}
+            {tr(locale, '登录账号', 'Sign in')}
+          </button>
+        </section>
+      )}
 
       {hasSession && (
         <section className="panel">{/* 执行当前业务步骤 */}

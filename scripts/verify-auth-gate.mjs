@@ -214,10 +214,11 @@ check('前端不再自动领取访客会话', !appWeb.includes('ensureGuestSessi
 check('前端客户端无 /auth/guest 封装', !apiClient.includes("'/auth/guest'") && !apiClient.includes('"/auth/guest"'), '仍保留访客建号请求');
 check('前端启动清理历史访客会话', /session\?\.user\.is_guest\) clearSession\(\)/.test(appWeb), '旧访客会话未被作废，会残留半登录态');
 check('匿名可读社区不跳登录', /route\.view === 'community'\) return/.test(appWeb), '社区列表 / 帖子详情被误加登录门禁');
+check('匿名可读圈子不跳登录', /route\.view === 'circles'\) return/.test(appWeb), '圈子清单 / 空态被误加登录门禁');
 check(
   '需要身份的视图集中登记',
-  /const needsSession =\s*route\.view === 'account' \|\|[\s\S]{0,160}?route\.view === 'circles'[\s\S]{0,160}?route\.view === 'checkout'[\s\S]{0,160}?route\.view === 'payreturn'/.test(appWeb),
-  'needsSession 口径漂移（应只剩 account / circles / checkout / payreturn）',
+  /const needsSession =\s*route\.view === 'account' \|\|[\s\S]{0,160}?route\.view === 'checkout'[\s\S]{0,160}?route\.view === 'payreturn'/.test(appWeb),
+  'needsSession 口径漂移（应只剩 account / checkout / payreturn；圈子清单匿名可读）',
 );
 check('未登录写操作跳登录页并记住来源', appWeb.includes('rememberLoginNext') && appWeb.includes("go({ view: 'login' })"), '登录守卫缺失，写操作会静默失败');
 check('退出登录回到匿名可读社区', /go\(\{ view: 'community' \}\)/.test(appWeb), '退出后落点不是匿名可读页面');
