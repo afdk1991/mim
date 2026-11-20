@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react'; // 引入依赖、类型�
 import type { Locale } from '@mim/i18n'; // 语言标签
 import { errorText } from '../api'; // 统一错误文案
 import { favoriteGalleryItem, fetchGalleryCollections, fetchGalleryItems, unfavoriteGalleryItem } from '../api/gallery.js'; // 图库端点
-import { resolvePublicUrl } from '../api/request.js'; // 公开地址归一化：签名链接补 API 源，静态素材补站点前缀
+import { coverSrcset, resolvePublicUrl } from '../api/request.js'; // 公开地址归一化 + catalog 封面 2x 档派生
 import type { GalleryCollection, GalleryItem } from '../api/gallery.js'; // 图库类型
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import './community-gallery.css'; // 灯箱 / 新增筛选控件样式：独立文件，不改共享 styles.css
@@ -249,7 +249,7 @@ export function CommunityGallery({ locale, kind, hasSession, boards = [], onOpen
                   </>
                 ) : (
                   <button type="button" className="community-gallery-open" onClick={() => setLightboxId(item.id)} aria-label={`放大查看 ${item.thread_title}`}>
-                    <img src={resolvePublicUrl(item.url)} alt={item.thread_title} loading="lazy" />
+                    <img src={resolvePublicUrl(item.url)} srcSet={coverSrcset(item.url)} alt={item.thread_title} loading="lazy" />
                   </button>
                 )}
                 {item.kind === 'video' && !item.locked && (durationText(item.duration_seconds) || resolutionText(item.width, item.height)) && (
@@ -292,7 +292,7 @@ export function CommunityGallery({ locale, kind, hasSession, boards = [], onOpen
               className="community-gallery-collection"
               onClick={() => { if (view === 'author' && group.author_id) openAuthor(group.author_id, group.author_name); else onOpenThread(group.thread_id); }}
             >
-              {group.cover_url ? <img src={resolvePublicUrl(group.cover_url)} alt={group.label} loading="lazy" /> : <span className="community-gallery-collection-fallback">{group.count}</span>}
+              {group.cover_url ? <img src={resolvePublicUrl(group.cover_url)} srcSet={coverSrcset(group.cover_url)} alt={group.label} loading="lazy" /> : <span className="community-gallery-collection-fallback">{group.count}</span>}
               <div>
                 <strong>{group.label}</strong>
                 <em>{group.count} 个{kindLabel === '视频' ? '视频' : '图片'}{view === 'author' && group.author_name ? ` · ${group.author_name}` : ''}</em>

@@ -17,7 +17,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `cors` | ^2.8.6 | 运行时 | 跨域白名单中间件：托管平台（GitHub Pages / Cloudflare / Vercel / Render）以独立域名直连 API 时放行来源；`MIM_CORS_ORIGINS` 为空则不挂载，自建同源部署行为不变 |
 | `@mim/core-domain` | workspace:* | 运行时 | 领域层：状态机、错误码 |
 | `@mim/i18n` | workspace:* | 运行时 | 错误码与文案的双语映射 |
-| `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告） |
+| `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告）；`@mim/api` 契约测试与 `@mim/web` 纯函数测试共用同一版本 |
 | `supertest` | ^7.1.4 | 开发 | HTTP 契约测试 |
 | `tsx` | ^4.20.6 | 开发 | TS 直接运行（`dev` / `start`） |
 | `typescript` | ^5.6.3 | 开发 | 类型检查（`tsc --noEmit`） |
@@ -115,7 +115,7 @@ apps/web (@mim/web)
   ├── react / react-dom
   ├── @mim/core-domain（workspace）
   └── @mim/i18n（workspace）
-        └── dev: vite / @vitejs/plugin-react / typescript
+        └── dev: vite / @vitejs/plugin-react / typescript / vitest
 
 services/mim-api (@mim/api)
   ├── express / zod / jsonwebtoken / bcryptjs / better-sqlite3

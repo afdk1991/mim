@@ -447,11 +447,16 @@ export function seedCommunity(db: Db): void {
        (id, board_id, author_id, title, summary, body, kind, cover_url, price_cents, status, views, likes, reply_count, recommend_score, created_at, updated_at, last_activity_at)
      VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'published', ?, 0, 0, 0, ?, ?, ?)`, // likes / recommend_score 显式写 0：二者只由真实互动（点赞记录 / 浏览等）产生，不随种子预置
   );
-  // 图库 / 视频示例媒体：复用帖子媒体表，稳定主键 + INSERT OR IGNORE，避免重启重复插入
+  // 图库 / 视频示例媒体：复用帖子媒体表，稳定主键 + INSERT OR IGNORE，避免重启重复插入；
+  // width / height 取本地素材实测分辨率（catalog 封面 768×512；演示片 854×480 / 960×540），用于分辨率角标与布局兜底
   const insertMedia = db.prepare(
     `INSERT OR IGNORE INTO community_thread_media
        (id, thread_id, kind, url, poster_url, storage_key, poster_key, mime, size_bytes, duration_seconds, width, height, sort_order, created_at)
-     VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, 0, ?, 0, 0, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, 0, ?, ?, ?, ?, ?)`,
+  );
+  // 存量库 INSERT OR IGNORE 不覆盖既有行：按稳定主键只补齐宽高为 0 的种子行，上传媒体已有元数据不动
+  const backfillMediaDims = db.prepare(
+    'UPDATE community_thread_media SET width = ?, height = ? WHERE id = ? AND (width = 0 OR height = 0)',
   );
   // 灰度公告：独立于社区帖子，公开列表按置顶 + 时间展示
   const insertAnnouncement = db.prepare(
@@ -502,7 +507,7 @@ export function seedCommunity(db: Db): void {
       ['thread-paid-store', 'board-paid', '付费阅读：从 0 到 1 做一个能收款的独立商城', '商品类型、卡密、优惠码、物流、退款与分成的完整拆解。', '这篇是付费内容：把独立商城拆成商品、订单、支付、履约、售后、资金六层，并给出每层的最小可用实现。\n\n如果你只想先跑通，优先做“虚拟自动发货 + 卡密库存 + 余额扣款”，再接支付渠道。', 'text', '/catalog/store.jpg', 1900, 0, 3],
       // 演示视频帖：标题 / 正文与生产现行文案对齐；正文不再指向已下线的放映厅 / 创作工作台，改为站内视频列表可直接观看的现行口径
       ['thread-comic-demo', 'board-open-source', '演示视频成片展示：分镜到成片全链路', '从剧本、角色一致性到分镜、成片导出，附演示片入口。', '演示片覆盖：剧本拆场、角色设定、分镜图、镜头运动、配音与成片导出。\n\n可在社区视频列表直接观看，作为视频卡片、封面与播放链路的示例。', 'video', '/catalog/ai.jpg', 0, 0, 4],
-      ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：768px 宽 3:2 JPEG，单张 32–82 KB；路径用 import.meta.env.BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 0, 3],
+      ['thread-cover-design', 'board-paid', '19 张分类封面设计拆解：为什么不是 205 张', '按一级分类复用封面的取舍、体积控制与子路径兼容。', '按分类复用封面的理由：205 张独立图会让仓库与构建体积膨胀，且分类内商品视觉一致性更重要。\n\n体积控制：1x 为 768×512 3:2 JPEG，同目录另出 1536×1024 的 2x 高清档，按设备像素比经 srcset 选择；路径用 BASE_URL 拼，兼容 GitHub Pages 的 /mim/ 子路径。', 'gallery', '/catalog/frontier.jpg', 0, 0, 3],
       ['thread-announce', 'board-announce', announceTitle, announceSummary, announceBody, 'text', '/catalog/misc.jpg', 0, 0, 6],
       // 八大板块使用指南：全部落在社区帖子体系内，匿名可读、可被搜索命中，正文不写内部实现与凭据
       ['thread-guide-forum', 'board-guides', '论坛使用指南：发帖、提问与互动规则', '板块与圈子的区别、发帖步骤、提问与采纳、举报与删帖口径。', '论坛是 Mim 社区的主体内容区。当前分为使用指南、综合讨论、开源项目、自研工具、知识付费、求助答疑与公告七个板块。\n\n怎么发帖：登录后进入论坛页，选择板块，点「发帖」，填写标题、正文与可选图集或视频后发布。标题写清问题或结论，正文补充环境、操作步骤与报错原文。\n\n提问与采纳：求助类帖子可在回复中选择一条「采纳」，采纳后问题标记为已解决，方便后来人检索。\n\n互动规则：禁止广告、人身攻击与侵权内容；转载需注明来源。违规内容会被删除，重复违规会限制发帖。\n\n常见问题：匿名可以浏览和搜索帖子，发帖、回复与点赞需要登录；找不到板块时先用搜索，再到「求助答疑」发帖。\n\n当前为灰度测试版，规则与栏目可能继续调整。', 'text', '/catalog/misc.jpg', 0, 0, 0],
@@ -523,22 +528,24 @@ export function seedCommunity(db: Db): void {
       insertThread.run(id, boardId, title, summary, body, kind, cover, price, views, created, created, created);
     }
     // 图库示例：三张站内分类封面挂在【示例】帖下，供匿名浏览、灯箱与原帖跳转
-    const demoMedia: Array<[string, string, string, string, string, string, number, number]> = [
-      ['media-demo-gallery-1', 'thread-demo-gallery', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 1],
-      ['media-demo-gallery-2', 'thread-demo-gallery', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 2],
-      ['media-demo-gallery-3', 'thread-demo-gallery', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 3],
+    // 元组结构：[主键, 帖子, 类型, 地址, 封面, MIME, 时长(秒), 宽, 高, 排序]；宽高为本地素材实测值
+    const demoMedia: Array<[string, string, string, string, string, string, number, number, number, number]> = [
+      ['media-demo-gallery-1', 'thread-demo-gallery', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 768, 512, 1],
+      ['media-demo-gallery-2', 'thread-demo-gallery', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 768, 512, 2],
+      ['media-demo-gallery-3', 'thread-demo-gallery', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 768, 512, 3],
       // 演示视频帖挂 1 条视频媒体：主键 / URL / 封面 / 时长与生产库 `media-fix-comic-demo-1` 逐字段一致，避免 kind=video 却无媒体的 medium 缺陷
-      ['media-fix-comic-demo-1', 'thread-comic-demo', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 1],
+      ['media-fix-comic-demo-1', 'thread-comic-demo', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 854, 480, 1],
       // 视频示例：复用 public/demo 下已有演示片，封面同目录，避免外链与额外存储
-      ['media-demo-video-1', 'thread-demo-video', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 1],
-      ['media-demo-video-2', 'thread-demo-video', 'video', '/demo/bloom-ep1.mp4', '/demo/bloom-cover.jpg', 'video/mp4', 15, 2],
+      ['media-demo-video-1', 'thread-demo-video', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 854, 480, 1],
+      ['media-demo-video-2', 'thread-demo-video', 'video', '/demo/bloom-ep1.mp4', '/demo/bloom-cover.jpg', 'video/mp4', 15, 960, 540, 2],
       // 付费板块内免费帖 `thread-cover-design` 的 3 张图集媒体：与生产同主键，回归断言付费墙媒体锁定口径
-      ['media-fix-cover-design-1', 'thread-cover-design', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 1],
-      ['media-fix-cover-design-2', 'thread-cover-design', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 2],
-      ['media-fix-cover-design-3', 'thread-cover-design', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 3],
+      ['media-fix-cover-design-1', 'thread-cover-design', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 768, 512, 1],
+      ['media-fix-cover-design-2', 'thread-cover-design', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 768, 512, 2],
+      ['media-fix-cover-design-3', 'thread-cover-design', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 768, 512, 3],
     ];
-    for (const [id, threadId, kind, url, poster, mime, duration, sort] of demoMedia) {
-      insertMedia.run(id, threadId, kind, url, poster, mime, duration, sort, now);
+    for (const [id, threadId, kind, url, poster, mime, duration, width, height, sort] of demoMedia) {
+      insertMedia.run(id, threadId, kind, url, poster, mime, duration, width, height, sort, now);
+      backfillMediaDims.run(width, height, id); // 存量库既有种子行只在宽高缺失时补齐，幂等可重复启动
     }
     // 灰度公告：置顶说明当前为灰度测试版，示例内容会明确标注，避免被当成正式运营数据
     insertAnnouncement.run(

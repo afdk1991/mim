@@ -31,6 +31,15 @@ export function resolvePublicUrl(url: string): string { // 避免 GitHub Pages /
   return `${BASE}/${url}`; // 非斜杠开头的裸路径按 API 前缀兜底，保证总有一个可达地址
 } // resolvePublicUrl 结束
 
+/** 封面 2x 档 srcset：仅 /catalog/*.jpg 静态封面派生同目录 @2x.jpg（1536×1024）；其余返回空串，调用方按无高清档处理。 */
+export function coverSrcset(url: string): string { // 高密度屏由浏览器按 1x/2x 密度描述符自选，无需 sizes
+  if (!url) return ''; // 空封面不派生
+  const base = resolveStaticUrl(url); // 先按静态产物口径补 BASE_URL，兼容子路径部署
+  const match = /^(.*\/)([a-z0-9-]+)\.jpg$/.exec(base); // 拆分目录与文件名，便于在同名旁追加 @2x
+  if (!match || !base.includes('/catalog/')) return ''; // 非 catalog 静态封面（外链 / 签名图 / demo 封面）不派生
+  return `${base} 1x, ${match[1]}${match[2]}@2x.jpg 2x`; // 密度描述符：1x 为既有 768×512，2x 为 1536×1024
+} // coverSrcset 结束
+
 export const SESSION_KEY = 'mim.session.v1'; // 键名带版本号，便于结构升级时隔离旧数据；静态门禁脚本共用此键
 // 会话变更事件名：登录 / 退出 / 令牌失效 / 跨标签页同步统一广播，App 据此锁定或解锁界面
 export const SESSION_CHANGED_EVENT = 'mim:session-changed'; // 单一事件源，避免多处状态各自判断

@@ -35,6 +35,15 @@ function hrefOf(raw: unknown): string {
   return baseOf() + value.replace(/^\//, ''); // 站内路径补 /mim/ 等前缀
 } // 代码块结束
 
+/** catalog 封面 2x 档 srcset：与 hrefOf 同一前缀口径；非 catalog 图片返回空串。 */
+function coverSrcset(raw: unknown): string {
+  const value = typeof raw === 'string' ? raw : ''; // 取原始地址
+  if (!value || !value.includes('/catalog/')) return ''; // 非 catalog 静态封面不派生
+  const one = hrefOf(value); // 1x 地址与 <img src> 同源同前缀
+  const two = one.replace(/([a-z0-9-]+)\.jpg$/, '$1@2x.jpg'); // 同名旁追加 @2x 高清档
+  return `${one} 1x, ${two} 2x`; // 密度描述符交浏览器自选
+} // 代码块结束
+
 /** 单块渲染：未知类型降级为提示，不抛错、不阻断整页。 */
 function Block({ block }: { block: PageBlock }) {
   const config = block.config ?? {}; // 常量 config：保存固定配置或一次性派生值
@@ -137,7 +146,7 @@ function ProductGrid() {
       <div className="commerce-grid">{/* 执行当前业务步骤 */}
         {products.map((product) => (
           <a className="panel product" key={product.code} href={hrefOf('/products')}>{/* 执行当前业务步骤 */}
-            {product.cover_url ? <img src={hrefOf(product.cover_url)} alt={product.name} loading="lazy" /> : null}
+            {product.cover_url ? <img src={hrefOf(product.cover_url)} srcSet={coverSrcset(product.cover_url)} alt={product.name} loading="lazy" /> : null}
             <div className="panel-head"><h3>{product.name}</h3><span className="deploy-badge">{`¥${(product.price_cents / 100).toFixed(2)}`}</span></div>
             <p className="muted">{product.summary}</p>
           </a>

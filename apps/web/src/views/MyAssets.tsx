@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'; // 状态与副作用
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { errorText } from '../api'; // 统一错误文案
 import { assetUrl, fetchMyAssets, type AssetKind, type MyAssetItem } from '../api/assets'; // 资产端点
+import { coverSrcset } from '../api/request.js'; // catalog 封面 2x 档派生
 import { navigatePath, pathOf } from '../router'; // 站内深链接
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import './community-assets.css'; // 与资产列表 / 详情共用同一份样式
@@ -65,7 +66,7 @@ export function MyAssets({ locale }: { locale: Locale }) { // 个人中心「我
           <li key={`${item.code}-${item.created_at}`} className="asset-mine-item"> {/* 单条购买记录 */}
             {/* 缩略封面：无封面时退化为类型名 */}
             <span className="asset-mine-cover"> {/* 封面容器 */}
-              {item.cover_url ? <img src={assetUrl(item.cover_url)} alt="" loading="lazy" /> : <span>{KIND_LABEL[item.kind][isZh ? 'zh' : 'en']}</span>} {/* 有图用图，无图占位 */}
+              {item.cover_url ? <img src={assetUrl(item.cover_url)} srcSet={coverSrcset(item.cover_url)} alt="" loading="lazy" /> : <span>{KIND_LABEL[item.kind][isZh ? 'zh' : 'en']}</span>} {/* 有图用图，无图占位 */}
             </span> {/* 封面容器结束 */}
             {/* 文字区：类型、标题、简介、实付金额与购买时间 */}
             <div className="asset-mine-body"> {/* 文字区容器 */}

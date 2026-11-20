@@ -446,7 +446,8 @@ WS URL 推导：host 为 `laal.top` / `www.laal.top` / `api.laal.top` / `mim.mix
 
 **背景**：`/marketplace` 在 205 条模块数据齐全的前提下仍只有文字卡片，用户要求「商品图片 + 详细商品参数图片」。
 
-- `apps/web/public/catalog/<slug>.jpg`：19 个一级分类各一张 3:2 商品封面（768px 宽，JPEG），构建时原样复制到 `dist/catalog/`。
+- `apps/web/public/catalog/<slug>.jpg`：19 个一级分类各一张 3:2 商品封面（1x 768×512，JPEG）；同目录 `apps/web/public/catalog/<slug>@2x.jpg` 为 1536×1024 高清档（2026-11-20 补齐），构建时随 1x 原样复制到 `dist/catalog/`。
+- 封面高清接线：`request.ts` 导出 `coverSrcset(url)`，仅 `/catalog/*.jpg` 派生 `1x, 2x` 密度描述符（2x 为同名 `@2x.jpg`）；社区列表 / 资产 / 图库 / 已购与页块商品封面统一接入 `<img srcSet>`，外链、`/demo/`、空地址不派生。
 - `apps/web/src/catalogArt.ts`：
   - `categoryGroupSlug()` 从二级 `category_slug`（如 `ai-01`）还原一级 slug，未知分类回落 `misc`；
   - `categoryCoverUrl()` 用 `import.meta.env.BASE_URL` 拼封面路径，兼容 GitHub Pages `/mim/` 子路径；

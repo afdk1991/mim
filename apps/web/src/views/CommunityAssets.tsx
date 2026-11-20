@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'; // 状态与副作用
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { ApiError, errorText } from '../api'; // 统一错误文案
 import { assetUrl, fetchAsset, fetchAssets, purchaseAsset, type AssetDetail, type AssetKind, type AssetListItem } from '../api/assets'; // 资产端点
+import { coverSrcset } from '../api/request.js'; // catalog 封面 2x 档派生
 import { navigatePath, pathOf } from '../router'; // 站内深链接
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
 import './community-assets.css'; // 本域独立样式：不改 styles.css / tokens.css
@@ -164,7 +165,7 @@ function AssetList({ locale, hasSession, onRequireLogin }: Props) {
             {/* 封面：有图用图，无图退化为类型名占位；右上角标显示价格或「已购」 */}
             <span className="asset-cover"> {/* 封面容器 */}
               {item.cover_url ? (
-                <img src={assetUrl(item.cover_url)} alt="" loading="lazy" />
+                <img src={assetUrl(item.cover_url)} srcSet={coverSrcset(item.cover_url)} alt="" loading="lazy" />
               ) : (
                 <span className="asset-cover-fallback">{/* 无封面占位 */}{KIND_LABEL[item.kind][isZh ? 'zh' : 'en']}</span>
               )}
@@ -269,7 +270,7 @@ function AssetDetailView({ locale, hasSession, code = '', onRequireLogin }: Prop
 
           {/* 封面可选：无封面时不占位，避免详情页出现大块空白 */}
           {asset.cover_url ? (
-            <img className="asset-detail-cover" src={assetUrl(asset.cover_url)} alt="" loading="lazy" />
+            <img className="asset-detail-cover" src={assetUrl(asset.cover_url)} srcSet={coverSrcset(asset.cover_url)} alt="" loading="lazy" />
           ) : null}
 
           {/* 购买结果提示：成功条与错误条分色，余额不足时额外给出充值入口 */}
@@ -350,7 +351,7 @@ function AssetDetailView({ locale, hasSession, code = '', onRequireLogin }: Prop
                 media.kind === 'video' ? (
                   <video key={`${media.url}-${index}`} src={assetUrl(media.url)} poster={media.poster_url ? assetUrl(media.poster_url) : undefined} controls preload="metadata" />
                 ) : (
-                  <img key={`${media.url}-${index}`} src={assetUrl(media.url)} alt="" loading="lazy" />
+                  <img key={`${media.url}-${index}`} src={assetUrl(media.url)} srcSet={coverSrcset(media.url)} alt="" loading="lazy" />
                 )
               ))}
             </div> // 媒体网格结束

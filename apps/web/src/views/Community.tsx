@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'; // 引入依赖、
 import { Avatar } from '../components/Avatar.js'; // 共享头像：四档尺寸 + 角标槽
 import type { Locale } from '@mim/i18n'; // 引入依赖、类型或本地模块绑定
 import { api, errorText, getSession } from '../api'; // 引入依赖、类型或本地模块绑定
-import { resolvePublicUrl } from '../api/request.js'; // 公开地址归一化：API 签名链接与 Web 静态产物分流
+import { coverSrcset, resolvePublicUrl } from '../api/request.js'; // 公开地址归一化 + catalog 封面 2x 档派生
 import { cancelWithdrawal, createWithdrawal, getWithdrawalOverview } from '../api/wallet-withdrawal'; // 提现：可提现余额口径与申请（钱包结算层）
 import type { WithdrawMethod, WithdrawalOverview } from '../api/wallet-withdrawal'; // 提现类型，全部金额为整数分
 import type { // 引入依赖、类型或本地模块绑定
@@ -1535,7 +1535,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               <article key={t.id} className="community-card" onClick={() => void openThread(t.id)}>{/* 执行当前业务步骤 */}
                 <div className="community-cover">{/* 执行当前业务步骤 */}
                   {t.cover_url ? (
-                    <img src={coverSrc(t.cover_url)} alt={t.title} loading="lazy" />
+                    <img src={coverSrc(t.cover_url)} srcSet={coverSrcset(t.cover_url)} alt={t.title} loading="lazy" />
                   ) : (
                     <span>{t.locked ? (t.board_visibility === 'followers' && !t.board_followed ? '关注后可见' : '加入后可见') : KIND_LABEL[t.kind]}</span>
                   )}
@@ -1657,7 +1657,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   />
                 )}
               </div>
-              {selected.thread.cover_url && <img className="community-detail-cover" src={coverSrc(selected.thread.cover_url)} alt={selected.thread.title} />}
+              {selected.thread.cover_url && <img className="community-detail-cover" src={coverSrc(selected.thread.cover_url)} srcSet={coverSrcset(selected.thread.cover_url)} alt={selected.thread.title} />}
               <div className="community-author-card">
                 <Avatar name={selected.thread.author_name || 'Mim 官方'} size="xl" />
                 <div className="community-author-body">
@@ -1948,7 +1948,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             {products.length === 0 && <EmptyState kind="cart" title="商品正在加载" hint="稍后再看看。" />}
             {products.map((p) => (
               <article key={p.code} className="community-product">{/* 执行当前业务步骤 */}
-                {p.cover_url && <img src={coverSrc(p.cover_url)} alt={p.name} loading="lazy" />}
+                {p.cover_url && <img src={coverSrc(p.cover_url)} srcSet={coverSrcset(p.cover_url)} alt={p.name} loading="lazy" />}
                 <div className="community-product-body">{/* 执行当前业务步骤 */}
                   <span className={`community-product-kind kind-${p.kind}`}>{PRODUCT_KIND[p.kind]}</span>
                   <h3>{p.name}</h3>

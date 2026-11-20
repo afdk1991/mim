@@ -70,6 +70,9 @@ jobs:
       - name: 后端契约测试
         run: pnpm --filter @mim/api test
 
+      - name: 前端纯函数测试（地址归一化 / 会话结构校验）
+        run: pnpm --filter @mim/web test
+
       - name: 前端构建
         run: pnpm --filter @mim/web build
 
