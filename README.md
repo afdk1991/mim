@@ -92,6 +92,7 @@ node scripts/comment-check.mjs
 - **暗色**：所有新增规则给 `[data-theme='dark']` 分支，并修复 `.card/.block` 误伤 `.btn.block` 导致侧栏主按钮丢失渐变的问题。
 - **取证**：Edge 真机截图覆盖首页 / 社区 / 登录 / 移动端 / 暗色，控制台 0 错误。详见 [docs/全站视觉精修-20261120.md](./docs/全站视觉精修-20261120.md)。
 - **线上**：CI Deploy run `44567555946` 五作业全绿（含「发布到生产服务器」），生产前端 `https://zy.laal.top` 已加载新样式资源 `index-B3RegpRe.css`（含 `--pd-grad` / `pd-hero` 特征），`/community` `/signin` 深链接 200、控制台 0 错误。注：`laal.top` 根域当前为 WordPress 站点，不是 Mim 前端。
+- **管理端**（第二轮）：`apps/admin/src/styles-polish.css` 覆盖登录页 + 18 个后台视图——侧栏胶囊导航、品牌渐变页标题、中性表头与去斑马行、38px 表单控件 + 4px 焦点环、分段页签、状态徽标语义色、暗色分支与移动端横条侧栏；`@mim/admin` build / typecheck ✓，Edge 逐视图截图 20 张。
 
 本轮为纯样式与首页信息层级调整，**不改 semver**（沿用彩色层同一口径），版本仍为 `V0.0.13-preview`。
 

@@ -8,7 +8,8 @@ import { App } from './App';
 import './tokens.css';
 // 全局样式：由 Vite 打包注入，保证主题变量与布局类在首屏即生效
 import './styles.css';
-import './styles-colorful.css'; /* 后台彩色主题叠加层：最后引入，覆盖既有排版 */
+import './styles-colorful.css'; /* 后台彩色主题叠加层：倒数第二引入，覆盖既有排版 */
+import './styles-polish.css'; /* 后台视觉精修层：令牌 / 排版 / 表格 / 表单 / 登录页统一，必须最后引入 */
 // 明暗偏好：与前台共用本地存储键，渲染前先落到 <html data-theme>
 import { applyThemeMode, readStoredMode } from './theme';
 

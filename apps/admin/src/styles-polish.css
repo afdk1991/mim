@@ -1,0 +1,834 @@
+/*
+ * 管理后台视觉精修层（2026-11-20）：与前台同一套设计语言。
+ * 只做叠加：不改 App.tsx 结构、不动权限与业务逻辑，最后引入以覆盖前序样式。
+ * 设计方向：中性冷灰底 + 靛蓝→湖蓝→青绿品牌渐变，面板大圆角、表格细线、表单紧凑。
+ */
+
+/* ========== 一、外壳与导航 ========== */
+.layout { /* 外壳布局：固定侧栏 + 自适应主区 */
+  display: grid; /* 栅格布局：两列 */
+  grid-template-columns: 248px minmax(0, 1fr); /* 侧栏 248px，主区吃满剩余 */
+  min-height: 100vh; /* 铺满视口，避免短页面露底 */
+  background: var(--bg, #f4f6fa); /* 页面底色，继承令牌 */
+  color: var(--text, #1b2230); /* 正文颜色，继承令牌 */
+  font-family: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif; /* 字体栈与前台一致 */
+  -webkit-font-smoothing: antialiased; /* 高分屏抗锯齿，避免文字发虚 */
+} /* 外壳结束 */
+
+.sidebar { /* 侧栏 */
+  position: sticky; /* 滚动时吸附，长表格下导航不丢 */
+  top: 0; /* 吸附顶部 */
+  height: 100vh; /* 与视口等高 */
+  display: flex; /* 纵向排布品牌、导航、页脚 */
+  flex-direction: column; /* 纵向 */
+  gap: 14px; /* 块间距 14px */
+  padding: 22px 16px 18px; /* 内边距：上 22 / 左右 16 / 下 18 */
+  background: var(--surface, #ffffff); /* 白卡底，与主区形成层次 */
+  border-right: 1px solid var(--border, #e6e9f2); /* 右侧发丝分割线 */
+  overflow-y: auto; /* 导航过多时可滚动 */
+} /* 侧栏结束 */
+
+.brand { /* 品牌区 */
+  display: flex; /* 横向排布图标与文字 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 图标与文字间距 */
+  padding: 6px 8px 14px; /* 上下留白，底部与导航分开 */
+  border-bottom: 1px solid var(--border, #eef1f7); /* 底部细线 */
+} /* 品牌区结束 */
+
+.brand::before { /* 品牌图标：纯 CSS 渐变方块 */
+  content: ''; /* 伪元素需要内容占位 */
+  width: 34px; /* 图标宽 34px */
+  height: 34px; /* 图标高 34px */
+  border-radius: 10px; /* 圆角 10px，方块感更柔和 */
+  background: linear-gradient(135deg, #4f46e5, #2f7cf6 55%, #0d9488); /* 品牌三段渐变 */
+  box-shadow: 0 6px 16px rgba(47, 124, 246, 0.28); /* 品牌色投影 */
+  flex: none; /* 不参与压缩 */
+} /* 图标结束 */
+
+.brand-name { /* 品牌名 */
+  font-size: 17px; /* 字号 17px */
+  font-weight: 700; /* 加粗 */
+  letter-spacing: 0.2px; /* 轻微字距 */
+} /* 品牌名结束 */
+
+.brand-tagline { /* 品牌副标题 */
+  font-size: 12px; /* 小字号 */
+  color: var(--text-muted, #79839a); /* 弱化文字色 */
+} /* 副标题结束 */
+
+.nav { /* 导航容器 */
+  display: flex; /* 纵向堆叠分组 */
+  flex-direction: column; /* 纵向 */
+  gap: 10px; /* 分组间距 10px */
+  flex: 1; /* 占满剩余高度，把页脚压到底 */
+} /* 导航结束 */
+
+.nav-group-title { /* 分组标题 */
+  display: flex; /* 标题与计数横向排布 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 两端对齐 */
+  padding: 8px 8px 6px; /* 内边距 */
+  font-size: 11.5px; /* 小号分组字 */
+  letter-spacing: 0.14em; /* 拉开字距，弱化为分区标签 */
+  text-transform: uppercase; /* 英文大写，中文不受影响 */
+  color: var(--text-muted, #8b93a7); /* 弱化色 */
+  cursor: pointer; /* 可折叠，给出手型 */
+  list-style: none; /* 去掉 details 标记 */
+  border-radius: 8px; /* 圆角，悬停底色不方硬 */
+} /* 分组标题结束 */
+
+.nav-group-title:hover { /* 分组标题悬停 */
+  background: var(--surface-2, #f6f8fd); /* 淡底提示可点 */
+} /* 悬停结束 */
+
+.nav-group-count { /* 分组计数 */
+  min-width: 20px; /* 最小宽度，数字不贴边 */
+  padding: 1px 7px; /* 胶囊内边距 */
+  border-radius: 999px; /* 胶囊 */
+  font-size: 11px; /* 小字号 */
+  text-align: center; /* 数字居中 */
+  background: var(--surface-2, #eff3fb); /* 淡底 */
+  color: var(--text-muted, #79839a); /* 弱化色 */
+} /* 计数结束 */
+
+.nav-group-items { /* 分组条目容器 */
+  display: flex; /* 纵向排列条目 */
+  flex-direction: column; /* 纵向 */
+  gap: 4px; /* 条目间距 4px */
+  padding: 2px 0 4px; /* 上下留白 */
+} /* 条目容器结束 */
+
+.nav-item { /* 单个导航条目 */
+  display: flex; /* 图标与文字横向 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 间距 8px */
+  padding: 9px 12px; /* 内边距，热区高度约 38px */
+  border-radius: 10px; /* 圆角 10px */
+  font-size: 13.5px; /* 字号 13.5px */
+  color: var(--text-secondary, #4a5468); /* 次级文字色 */
+  cursor: pointer; /* 手型 */
+  text-decoration: none; /* 去掉链接下划线 */
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease; /* 悬停过渡 */
+} /* 条目结束 */
+
+.nav-item:hover { /* 条目悬停 */
+  background: var(--surface-2, #f2f5fc); /* 淡底 */
+  color: var(--text, #1b2230); /* 文字加深 */
+  transform: translateX(2px); /* 轻微右移，提示可点 */
+} /* 悬停结束 */
+
+.nav-item.active { /* 选中条目 */
+  background: linear-gradient(112deg, rgba(79, 70, 229, 0.12), rgba(13, 148, 136, 0.1)); /* 品牌淡渐变底 */
+  color: var(--text, #1b2230); /* 文字加深 */
+  font-weight: 600; /* 加粗 */
+  box-shadow: inset 3px 0 0 #4f46e5; /* 左侧 3px 主色标记 */
+} /* 选中结束 */
+
+.sidebar-footer { /* 侧栏页脚（当前管理员） */
+  margin-top: auto; /* 贴底 */
+  padding-top: 14px; /* 上留白 */
+  border-top: 1px solid var(--border, #eef1f7); /* 顶部发丝线 */
+  display: flex; /* 横向排布身份与切换按钮 */
+  flex-wrap: wrap; /* 身份文案与按钮自动换行，避免竖排断字 */
+  align-items: center; /* 垂直居中 */
+  gap: 8px; /* 间距 */
+} /* 页脚结束 */
+
+.sidebar-footer > .muted { /* 身份与区域两行文案 */
+  flex: 1 1 100%; /* 独占一行 */
+  font-size: 12px; /* 小字号 */
+  white-space: nowrap; /* 不逐字断行 */
+  overflow: hidden; /* 超长省略 */
+  text-overflow: ellipsis; /* 省略号收尾 */
+} /* 结束 */
+
+.sidebar-footer > .btn { /* 页脚按钮 */
+  flex: 1 1 auto; /* 两枚按钮并排等分 */
+} /* 结束 */
+
+.user-name { /* 管理员名 */
+  font-size: 13.5px; /* 字号 */
+  font-weight: 600; /* 加粗 */
+  color: var(--text, #1b2230); /* 主文字色 */
+} /* 名称结束 */
+
+.user-region { /* 区域标识 */
+  font-size: 11.5px; /* 小字号 */
+  color: var(--text-muted, #79839a); /* 弱化色 */
+} /* 区域结束 */
+
+/* ========== 二、主区与页面头 ========== */
+.main { /* 主区 */
+  min-width: 0; /* 允许栅格子项收缩，避免表格撑破 */
+  padding: 26px 30px 44px; /* 内边距：上 26 / 左右 30 / 下 44 */
+  display: flex; /* 纵向排布页面 */
+  flex-direction: column; /* 纵向 */
+  gap: 20px; /* 页面块间距 */
+} /* 主区结束 */
+
+.page { /* 单个页面容器 */
+  display: flex; /* 纵向排布 */
+  flex-direction: column; /* 纵向 */
+  gap: 18px; /* 块间距 18px */
+  width: 100%; /* 吃满主区宽度 */
+  max-width: 1180px; /* 超宽屏限制阅读宽度 */
+} /* 页面结束 */
+
+.page-head { /* 页面标题区 */
+  display: flex; /* 标题与操作横向 */
+  align-items: flex-start; /* 顶部对齐 */
+  justify-content: space-between; /* 两端对齐 */
+  gap: 16px; /* 间距 16px */
+  flex-wrap: wrap; /* 窄屏自动换行 */
+  padding-bottom: 14px; /* 底部留白 */
+  border-bottom: 1px solid var(--border, #e9edf5); /* 标题与内容分隔线 */
+} /* 标题区结束 */
+
+.page-head h1, .page-head h2 { /* 页面主标题 */
+  font-size: 24px; /* 字号 24px */
+  font-weight: 700; /* 加粗 */
+  letter-spacing: -0.01em; /* 大字轻微收紧 */
+  line-height: 1.25; /* 行高 1.25 */
+  margin: 0; /* 去掉默认外边距 */
+  background: linear-gradient(96deg, #4f46e5, #2f7cf6 50%, #0d9488); /* 覆盖彩色层的粉紫渐变，改回品牌三段 */
+  -webkit-background-clip: text; /* 文字裁形 */
+  background-clip: text; /* 标准兜底 */
+  -webkit-text-fill-color: transparent; /* 透出渐变 */
+} /* 主标题结束 */
+
+.page-head h2, .panel-head h2, .panel-head h3 { /* 次级标题统一实色，避免整页都在渐变 */
+  background: none; /* 取消渐变底 */
+  -webkit-text-fill-color: currentColor; /* 恢复实色文字 */
+  color: var(--text, #1b2230); /* 主文字色 */
+} /* 结束 */
+
+.page-desc { /* 页面说明 */
+  font-size: 13px; /* 字号 13px */
+  color: var(--text-muted, #6c7689); /* 弱化色 */
+  margin: 4px 0 0; /* 与标题拉开 4px */
+  max-width: 760px; /* 说明不拉满整行 */
+} /* 说明结束 */
+
+.muted { /* 弱化文本 */
+  color: var(--text-muted, #79839a); /* 弱化色 */
+} /* 结束 */
+
+.hint { /* 提示文本 */
+  font-size: 12.5px; /* 小字号 */
+  color: var(--text-muted, #8b93a7); /* 更浅一档 */
+  line-height: 1.6; /* 行高 1.6 */
+  padding: 0; /* 覆盖彩色层的横幅内边距 */
+  background: none; /* 去掉青绿渐变底 */
+  border: 0; /* 去掉左侧色条与描边 */
+  font-weight: 400; /* 常规字重 */
+  display: block; /* 独占一行 */
+  margin: 2px 0 10px; /* 与下方操作行拉开，避免文字压按钮 */
+} /* 结束 */
+
+.count { /* 数字徽标 */
+  display: inline-flex; /* 行内弹性 */
+  align-items: center; /* 居中 */
+  padding: 1px 8px; /* 胶囊内边距 */
+  border-radius: 999px; /* 胶囊 */
+  background: rgba(79, 70, 229, 0.1); /* 品牌淡底 */
+  -webkit-text-fill-color: currentColor; /* 覆盖彩色层渐变字 */
+  color: #4f46e5; /* 品牌色文字 */
+  font-size: 12px; /* 小字号 */
+  font-weight: 600; /* 加粗 */
+} /* 结束 */
+
+/* ========== 三、面板与统计卡 ========== */
+.panel { /* 通用面板 */
+  background: var(--surface, #ffffff); /* 白卡底 */
+  border: 1px solid var(--border, #e7ebf4); /* 细描边 */
+  border-radius: 16px; /* 圆角 16px */
+  box-shadow: 0 10px 28px rgba(23, 31, 56, 0.06); /* 冷调柔和投影 */
+  padding: 18px 20px; /* 内边距 */
+} /* 面板结束 */
+
+.panel::before { /* 彩色层在每个面板顶部插了 3px 五色彩条 */
+  content: none; /* 取消彩条，避免整页都在发光 */
+} /* 结束 */
+
+.panel-head { /* 面板头部 */
+  display: flex; /* 横向排布 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 两端对齐 */
+  gap: 12px; /* 间距 */
+  margin: -2px 0 14px; /* 与内容拉开 */
+  padding-bottom: 12px; /* 底部留白 */
+  background: transparent; /* 覆盖彩色层的三色淡底 */
+  border-bottom: 1px solid var(--border, #eff2f8); /* 发丝分隔线 */
+} /* 头部结束 */
+
+.page-head .count { /* 页头右侧的长句说明：还原为普通弱化文字 */
+  background: transparent; /* 去掉胶囊底 */
+  padding: 0; /* 去掉内边距 */
+  color: var(--text-muted, #79839a); /* 弱化色 */
+  font-weight: 500; /* 常规字重 */
+  text-align: right; /* 右对齐 */
+  white-space: normal; /* 允许折行，长句不撑破 */
+} /* 结束 */
+
+.panel-head h2, .panel-head h3 { /* 面板标题 */
+  font-size: 15px; /* 字号 15px */
+  font-weight: 650; /* 半粗 */
+  margin: 0; /* 去外边距 */
+} /* 结束 */
+
+.cards { /* 统计卡网格 */
+  display: grid; /* 栅格 */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* 自适应列，最小 200px */
+  gap: 14px; /* 卡片间距 14px */
+} /* 结束 */
+
+.card { /* 统计卡 */
+  position: relative; /* 定位参照，供顶边渐变定位 */
+  padding: 16px 18px; /* 内边距 */
+  background: var(--surface, #ffffff); /* 白底 */
+  border: 1px solid var(--border, #e7ebf4); /* 描边 */
+  border-radius: 14px; /* 圆角 14px */
+  box-shadow: 0 8px 22px rgba(23, 31, 56, 0.05); /* 轻投影 */
+  transition: transform 0.18s ease, box-shadow 0.18s ease; /* 悬停过渡 */
+} /* 结束 */
+
+.card::before { /* 卡片顶部 2px 品牌线 */
+  content: ''; /* 伪元素占位 */
+  position: absolute; /* 绝对定位 */
+  inset: 0 0 auto; /* 贴顶 */
+  height: 2px; /* 线高 2px */
+  border-radius: 14px 14px 0 0; /* 与卡片圆角对齐 */
+  background: linear-gradient(90deg, #4f46e5, #2f7cf6 55%, #0d9488); /* 品牌渐变 */
+  opacity: 0.9; /* 轻微透明，避免抢眼 */
+} /* 结束 */
+
+.card:hover { /* 卡片悬停 */
+  transform: translateY(-2px); /* 上浮 2px */
+  box-shadow: 0 14px 32px rgba(23, 31, 56, 0.1); /* 投影加深 */
+} /* 结束 */
+
+.card-label { /* 卡片标签 */
+  font-size: 12px; /* 小字号 */
+  letter-spacing: 0.06em; /* 字距 */
+  color: var(--text-muted, #79839a); /* 弱化色 */
+  margin-bottom: 6px; /* 与数值拉开 */
+} /* 结束 */
+
+.card-value { /* 卡片数值 */
+  font-size: 26px; /* 字号 26px */
+  font-weight: 700; /* 加粗 */
+  line-height: 1.15; /* 行高 1.15 */
+  font-variant-numeric: tabular-nums; /* 数字等宽，多卡对齐 */
+  background: none; /* 取消彩色层渐变字 */
+  -webkit-text-fill-color: currentColor; /* 恢复实色 */
+  color: var(--text, #1b2230); /* 深色实字，长文本（身份来源）也清晰 */
+} /* 结束 */
+
+/* 彩色层按 nth-child 给导航与卡片加左边彩色条，这里统一收编为单一品牌标记 */
+.nav-group-items > .nav-item { /* 侧栏条目 */
+  border-left: 0; /* 去掉七彩左边条 */
+} /* 结束 */
+
+.nav-group-items > .nav-item.active { /* 选中条目 */
+  border-left: 0; /* 选中也不再用彩色条 */
+  box-shadow: inset 3px 0 0 #4f46e5; /* 统一品牌主色标记 */
+} /* 结束 */
+
+.cards > .card { /* 统计卡 */
+  border-left: 1px solid var(--border, #e7ebf4); /* 回归常规描边 */
+} /* 结束 */
+
+.cards > .card::before { /* 统计卡顶部线 */
+  background: linear-gradient(90deg, #4f46e5, #2f7cf6 55%, #0d9488); /* 四张统一品牌渐变 */
+} /* 结束 */
+
+.split { /* 双栏面板 */
+  display: grid; /* 栅格 */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* 自适应等宽双栏 */
+  gap: 16px; /* 栏间距 */
+} /* 结束 */
+
+/* ========== 四、表格 ========== */
+.table-wrap { /* 表格外壳 */
+  border: 1px solid var(--border, #e7ebf4); /* 细描边 */
+  border-radius: 14px; /* 圆角 14px */
+  overflow: auto; /* 超宽横向滚动，圆角仍生效 */
+  background: var(--surface, #ffffff); /* 白底 */
+} /* 结束 */
+
+.table { /* 数据表 */
+  width: 100%; /* 吃满外壳宽度 */
+  border-collapse: collapse; /* 合并边框，细线更干净 */
+  font-size: 13px; /* 字号 13px */
+} /* 结束 */
+
+.table thead th { /* 表头（与彩色层同选择器，靠后覆盖） */
+  background: var(--surface-2, #f7f9fd); /* 去掉三色渐变，回归中性底 */
+  color: var(--text-muted, #79839a); /* 表头弱化色 */
+  border-bottom: 1px solid var(--border, #e7ebf4); /* 统一底线 */
+} /* 结束 */
+
+.table tbody tr:nth-child(n) { /* 数据行（n 占位与彩色层同权重） */
+  background: transparent; /* 取消斑马淡紫底 */
+} /* 结束 */
+
+.table tbody tr:hover { /* 整行悬停 */
+  background: transparent; /* 取消三色渐变底，交由单元格统一处理 */
+} /* 结束 */
+
+.table th { /* 表头 */
+  position: sticky; /* 表头吸顶 */
+  top: 0; /* 吸顶位置 */
+  z-index: 1; /* 压在行内容之上 */
+  padding: 11px 14px; /* 内边距 */
+  text-align: left; /* 左对齐，数字列由列内样式控制 */
+  font-size: 11.5px; /* 小字号 */
+  font-weight: 600; /* 半粗 */
+  letter-spacing: 0.08em; /* 字距 */
+  text-transform: uppercase; /* 英文大写 */
+  color: var(--text-muted, #79839a); /* 弱化色 */
+  background: var(--surface-2, #f7f9fd); /* 淡底色 */
+  border-bottom: 1px solid var(--border, #e7ebf4); /* 底线 */
+  white-space: nowrap; /* 表头不折行 */
+} /* 结束 */
+
+.table td { /* 数据单元格 */
+  padding: 11px 14px; /* 内边距 */
+  border-bottom: 1px solid var(--border, #eef1f7); /* 行分隔线 */
+  vertical-align: middle; /* 垂直居中 */
+  color: var(--text-secondary, #414b5f); /* 次级文字色 */
+  white-space: normal; /* 允许折行，避免长列被裁掉 */
+} /* 结束 */
+
+.table td:first-child { /* 首列通常是 UUID / 编号 */
+  font-size: 12px; /* 小一号字 */
+  color: var(--text-muted, #79839a); /* 弱化色，主信息让位于状态与操作 */
+  word-break: break-all; /* 长 UUID 任意断行，不撑破列宽 */
+} /* 结束 */
+
+.table tbody tr:last-child td { /* 最后一行 */
+  border-bottom: 0; /* 去掉多余底线，避免双线 */
+} /* 结束 */
+
+.table tbody tr:hover td { /* 行悬停 */
+  background: rgba(79, 70, 229, 0.04); /* 品牌淡底提示行位置 */
+} /* 结束 */
+
+.table td.num, .table th.num { /* 数字列 */
+  text-align: right; /* 右对齐便于比对 */
+  font-variant-numeric: tabular-nums; /* 等宽数字 */
+} /* 结束 */
+
+/* ========== 五、表单与按钮 ========== */
+.form { /* 表单容器 */
+  display: flex; /* 纵向排布 */
+  flex-direction: column; /* 纵向 */
+  gap: 14px; /* 字段间距 14px */
+} /* 结束 */
+
+.form.inline { /* 行内表单 */
+  flex-direction: row; /* 横向排布 */
+  align-items: flex-end; /* 底部对齐，按钮与输入同基线 */
+  flex-wrap: wrap; /* 窄屏换行 */
+  gap: 12px; /* 间距 12px */
+} /* 结束 */
+
+.row { /* 字段行 */
+  display: flex; /* 横向排布 */
+  align-items: center; /* 垂直居中 */
+  gap: 10px; /* 间距 10px */
+  flex-wrap: wrap; /* 换行 */
+} /* 结束 */
+
+.field { /* 单个字段 */
+  display: flex; /* 纵向排布标签与控件 */
+  flex-direction: column; /* 纵向 */
+  gap: 6px; /* 标签与控件间距 */
+  min-width: 180px; /* 最小宽度，避免控件过窄 */
+} /* 结束 */
+
+.field > label, .field > span:first-child { /* 字段标签 */
+  font-size: 12px; /* 小字号 */
+  font-weight: 600; /* 半粗 */
+  color: var(--text-muted, #6c7689); /* 弱化色 */
+} /* 结束 */
+
+input, select, textarea { /* 通用输入控件 */
+  min-height: 38px; /* 高度 38px，后台信息密度更紧凑 */
+  padding: 8px 12px; /* 内边距 */
+  font-size: 13.5px; /* 字号 */
+  color: var(--text, #1b2230); /* 文字色 */
+  background: var(--surface, #ffffff); /* 白底 */
+  border: 1px solid var(--border-strong, #d8deea); /* 描边略深，边界清晰 */
+  border-radius: 10px; /* 圆角 10px */
+  outline: none; /* 去掉浏览器默认轮廓，改用焦点环 */
+  transition: border-color 0.16s ease, box-shadow 0.16s ease; /* 过渡 */
+} /* 结束 */
+
+input:focus, select:focus, textarea:focus { /* 聚焦态 */
+  border-color: #4f46e5; /* 主色描边 */
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.14); /* 4px 主色焦点环 */
+} /* 结束 */
+
+input::placeholder, textarea::placeholder { /* 占位文字 */
+  color: var(--text-muted, #98a1b3); /* 更浅一档 */
+} /* 结束 */
+
+.btn { /* 按钮基础 */
+  display: inline-flex; /* 行内弹性，图标与文字对齐 */
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+  gap: 6px; /* 间距 6px */
+  height: 34px; /* 高度 34px */
+  padding: 0 14px; /* 左右内边距 */
+  font-size: 13px; /* 字号 13px */
+  font-weight: 600; /* 半粗 */
+  border-radius: 10px; /* 圆角 10px */
+  border: 1px solid transparent; /* 预留描边位，避免尺寸跳动 */
+  background: var(--surface-2, #f3f6fc); /* 默认淡底 */
+  color: var(--text, #1b2230); /* 文字色 */
+  cursor: pointer; /* 手型 */
+  transition: transform 0.14s ease, box-shadow 0.16s ease, background 0.16s ease; /* 过渡 */
+} /* 结束 */
+
+.btn:hover:not(:disabled) { /* 悬停 */
+  transform: translateY(-1px); /* 轻微上浮 */
+} /* 结束 */
+
+.btn:disabled { /* 禁用态 */
+  opacity: 0.55; /* 降透明 */
+  cursor: not-allowed; /* 禁用光标 */
+  transform: none; /* 不浮动 */
+} /* 结束 */
+
+.btn.primary { /* 主按钮 */
+  background: linear-gradient(112deg, #4f46e5, #2f7cf6 55%, #0d9488); /* 品牌渐变 */
+  color: #fff; /* 白字 */
+  box-shadow: 0 8px 18px rgba(47, 124, 246, 0.28); /* 品牌投影 */
+} /* 结束 */
+
+.btn.primary:hover:not(:disabled) { /* 主按钮悬停 */
+  box-shadow: 0 12px 24px rgba(47, 124, 246, 0.34); /* 投影加深 */
+} /* 结束 */
+
+.btn.ghost { /* 次按钮 */
+  background: var(--surface, #ffffff); /* 白底 */
+  border-color: var(--border, #e0e5f0); /* 细描边 */
+  color: var(--text-secondary, #414b5f); /* 次级文字 */
+} /* 结束 */
+
+.btn.ghost:hover:not(:disabled) { /* 次按钮悬停 */
+  border-color: rgba(79, 70, 229, 0.45); /* 主色描边 */
+  color: #4f46e5; /* 主色文字 */
+} /* 结束 */
+
+.btn.danger { /* 危险按钮 */
+  background: rgba(194, 42, 53, 0.1); /* 危险淡底 */
+  color: #c22a35; /* 危险色文字 */
+  border-color: rgba(194, 42, 53, 0.2); /* 危险淡描边 */
+} /* 结束 */
+
+.btn.small { /* 小按钮 */
+  height: 28px; /* 高度 28px */
+  padding: 0 10px; /* 内边距 */
+  font-size: 12px; /* 小字号 */
+  border-radius: 8px; /* 圆角 8px */
+} /* 结束 */
+
+.check { /* 复选行 */
+  display: flex; /* 横向 */
+  align-items: center; /* 居中 */
+  gap: 8px; /* 间距 */
+  font-size: 13px; /* 字号 */
+  color: var(--text-secondary, #414b5f); /* 次级色 */
+} /* 结束 */
+
+/* ========== 六、徽标、胶囊与页签 ========== */
+.badge { /* 状态徽标 */
+  display: inline-flex; /* 行内弹性 */
+  align-items: center; /* 居中 */
+  gap: 4px; /* 圆点与文字间距 */
+  padding: 2px 9px; /* 胶囊内边距 */
+  border-radius: 999px; /* 胶囊 */
+  border: 1px solid transparent; /* 统一描边位，覆盖彩色层的彩边 */
+  font-size: 11.5px; /* 小字号 */
+  font-weight: 600; /* 半粗 */
+  background: var(--surface-2, #eff3fb); /* 默认淡底 */
+  color: var(--text-muted, #6c7689); /* 默认弱化色 */
+} /* 结束 */
+
+.badge.active, .badge.published, .badge.success { /* 正常态 */
+  background: rgba(13, 148, 136, 0.12); /* 青绿淡底 */
+  color: #0b7c6f; /* 青绿文字，达到 4.5:1 */
+} /* 结束 */
+
+.badge.pending, .badge.warning { /* 待处理态 */
+  background: rgba(217, 119, 6, 0.12); /* 琥珀淡底 */
+  color: #a15c05; /* 琥珀文字 */
+} /* 结束 */
+
+.badge.draft, .badge.archived, .badge.exhausted { /* 失效态 */
+  background: rgba(120, 130, 150, 0.14); /* 中性淡底 */
+  color: #5b6478; /* 中性文字 */
+} /* 结束 */
+
+.badge.danger, .badge.error { /* 危险态 */
+  background: rgba(194, 42, 53, 0.12); /* 危险淡底 */
+  color: #b02a35; /* 危险文字 */
+} /* 结束 */
+
+.badge.builtin { /* 内置标记 */
+  background: rgba(79, 70, 229, 0.12); /* 品牌淡底 */
+  color: #4338ca; /* 品牌文字 */
+} /* 结束 */
+
+.tabs { /* 页签组 */
+  display: flex; /* 横向排布 */
+  width: 100%; /* 吃满容器，分段控件更整齐 */
+  gap: 4px; /* 间距 4px */
+  padding: 4px; /* 外壳内边距 */
+  background: var(--surface-2, #f2f5fc); /* 淡底外壳 */
+  border-radius: 12px; /* 外壳圆角 */
+} /* 结束 */
+
+.tab { /* 单个页签 */
+  flex: 1; /* 等分宽度 */
+  padding: 7px 14px; /* 内边距 */
+  border: 0; /* 去掉彩色层彩边 */
+  border-radius: 9px; /* 圆角 */
+  background: transparent; /* 透明底，选中态才有白卡 */
+  font-size: 12.5px; /* 字号 */
+  color: var(--text-muted, #6c7689); /* 弱化色 */
+  cursor: pointer; /* 手型 */
+  text-align: center; /* 居中 */
+  transition: background 0.15s ease, color 0.15s ease; /* 过渡 */
+} /* 结束 */
+
+.tab:hover { /* 页签悬停 */
+  color: var(--text, #1b2230); /* 加深 */
+} /* 结束 */
+
+.tab.active { /* 选中页签 */
+  border: 0; /* 去掉彩边 */
+  background: var(--surface, #ffffff); /* 白底卡片 */
+  color: var(--text, #1b2230); /* 主文字 */
+  font-weight: 600; /* 半粗 */
+  box-shadow: 0 4px 12px rgba(23, 31, 56, 0.08); /* 轻投影 */
+} /* 结束 */
+
+/* ========== 七、空态、分页与提示条 ========== */
+.empty { /* 空态 */
+  padding: 34px 20px; /* 内边距 */
+  text-align: center; /* 居中 */
+  font-size: 13px; /* 字号 */
+  color: var(--text-muted, #8b93a7); /* 弱化色 */
+  background: repeating-linear-gradient(135deg, rgba(120, 130, 150, 0.05) 0 10px, transparent 10px 20px); /* 细斜纹提示空区 */
+  border: 1px dashed var(--border-strong, #dfe5f0); /* 虚线描边 */
+  border-radius: 12px; /* 圆角 */
+} /* 结束 */
+
+.pager { /* 分页容器 */
+  display: flex; /* 横向 */
+  align-items: center; /* 居中 */
+  gap: 8px; /* 间距 */
+  justify-content: flex-end; /* 右对齐 */
+  font-size: 12.5px; /* 字号 */
+  color: var(--text-muted, #6c7689); /* 弱化色 */
+} /* 结束 */
+
+.error, .success, .warning { /* 提示条通用 */
+  padding: 10px 14px; /* 内边距 */
+  border-radius: 10px; /* 圆角 */
+  font-size: 13px; /* 字号 */
+  line-height: 1.55; /* 行高 */
+} /* 结束 */
+
+.error { /* 错误条 */
+  background: rgba(194, 42, 53, 0.09); /* 危险淡底 */
+  border: 1px solid rgba(194, 42, 53, 0.22); /* 危险描边 */
+  color: #b02a35; /* 危险文字 */
+} /* 结束 */
+
+.success { /* 成功条 */
+  background: rgba(13, 148, 136, 0.1); /* 青绿淡底 */
+  border: 1px solid rgba(13, 148, 136, 0.22); /* 青绿描边 */
+  color: #0b7c6f; /* 青绿文字 */
+} /* 结束 */
+
+.warning { /* 警告条 */
+  background: rgba(217, 119, 6, 0.1); /* 琥珀淡底 */
+  border: 1px solid rgba(217, 119, 6, 0.22); /* 琥珀描边 */
+  color: #a15c05; /* 琥珀文字 */
+} /* 结束 */
+
+/* ========== 八、登录页 ========== */
+.login-wrap { /* 登录页外壳 */
+  min-height: 100vh; /* 铺满视口 */
+  display: grid; /* 栅格居中 */
+  grid-template-columns: 1fr; /* 单列，避免自动轨道按内容收缩 */
+  place-items: center; /* 水平垂直居中 */
+  padding: 40px 20px; /* 内边距 */
+  background:
+    radial-gradient(900px 420px at 12% -6%, rgba(79, 70, 229, 0.14), transparent 70%),
+    radial-gradient(760px 400px at 92% 4%, rgba(13, 148, 136, 0.12), transparent 68%),
+    var(--bg, #f4f6fa); /* 双光斑 + 底色 */
+} /* 结束 */
+
+.login-card { /* 登录卡 */
+  justify-self: center; /* 单列内水平居中 */
+  width: min(420px, 100%); /* 最宽 420px，窄屏吃满 */
+  padding: 30px 30px 26px; /* 内边距 */
+  color: var(--text, #1b2230); /* 深色文字：覆盖彩色层遗留的浅色字 */
+  background: var(--surface, #ffffff); /* 白底 */
+  border: 1px solid var(--border, #e7ebf4); /* 细描边 */
+  border-radius: 20px; /* 大圆角 */
+  box-shadow: 0 24px 60px rgba(23, 31, 56, 0.16); /* 深投影，浮起感 */
+  backdrop-filter: none; /* 关掉毛玻璃，白卡不需要 */
+} /* 结束 */
+
+.login-title { /* 登录标题 */
+  font-size: 20px; /* 字号 20px */
+  font-weight: 700; /* 加粗 */
+  margin: 0 0 6px; /* 底部留白 */
+  background: linear-gradient(96deg, #4f46e5, #2f7cf6 52%, #0d9488); /* 品牌三段渐变 */
+  -webkit-background-clip: text; /* 文字裁形 */
+  background-clip: text; /* 标准兜底 */
+  -webkit-text-fill-color: transparent; /* 透出渐变 */
+} /* 结束 */
+
+.login-sub { /* 登录副标题 */
+  font-size: 13px; /* 字号 */
+  color: var(--text-muted, #6c7689); /* 弱化色，覆盖浅灰白 */
+  margin-bottom: 18px; /* 与表单拉开 */
+} /* 结束 */
+
+.login-card .hint { /* 登录卡内提示：还原成纯文字，不要彩色横幅 */
+  padding: 0; /* 去掉内边距 */
+  background: none; /* 去掉渐变底 */
+  border: 0; /* 去掉描边 */
+  color: var(--text-muted, #8b93a7); /* 弱化色 */
+  font-weight: 400; /* 常规字重 */
+  font-size: 12.5px; /* 小字号 */
+} /* 结束 */
+
+.login-card .tabs { /* 登录卡页签组 */
+  display: flex; /* 横向等分 */
+  width: 100%; /* 吃满卡片宽度 */
+  margin-bottom: 16px; /* 与表单拉开 */
+} /* 结束 */
+
+.login-card .tab { /* 登录卡页签 */
+  flex: 1; /* 等分宽度 */
+  text-align: center; /* 文字居中 */
+  white-space: nowrap; /* 不折行 */
+} /* 结束 */
+
+.login-captcha { /* 验证码行 */
+  display: flex; /* 横向 */
+  align-items: center; /* 居中 */
+  gap: 10px; /* 间距 */
+} /* 结束 */
+
+.login-captcha-image { /* 验证码图 */
+  height: 38px; /* 与输入同高 */
+  border-radius: 10px; /* 圆角 */
+  border: 1px solid var(--border, #e0e5f0); /* 细描边 */
+  cursor: pointer; /* 点击刷新，给手型 */
+} /* 结束 */
+
+/* ========== 九、暗色分支 ========== */
+:root[data-theme='dark'] .layout { /* 暗色外壳 */
+  background: var(--bg); /* 暗色底 */
+  color: var(--text); /* 暗色文字 */
+} /* 结束 */
+
+:root[data-theme='dark'] .sidebar { /* 暗色侧栏 */
+  background: var(--surface); /* 暗色卡面 */
+  border-right-color: var(--border); /* 暗色描边 */
+} /* 结束 */
+
+:root[data-theme='dark'] .panel, /* 暗色面板 */ 
+:root[data-theme='dark'] .card { /* 暗色统计卡 */
+  background: var(--surface); /* 暗色卡面 */
+  border-color: var(--border); /* 暗色描边 */
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.36); /* 暗色投影更黑 */
+} /* 结束 */
+
+:root[data-theme='dark'] .page-head h1 { /* 暗色页面主标题 */
+  background: linear-gradient(96deg, #818cf8, #60a5fa 50%, #5eead4); /* 提亮后的品牌渐变，暗底可读 */
+  -webkit-background-clip: text; /* 文字裁形 */
+  background-clip: text; /* 标准兜底 */
+  -webkit-text-fill-color: transparent; /* 透出渐变 */
+} /* 结束 */
+
+:root[data-theme='dark'] .table-wrap { /* 暗色表格外壳 */
+  background: var(--surface); /* 暗色卡面 */
+  border-color: var(--border); /* 暗色描边 */
+} /* 结束 */
+
+:root[data-theme='dark'] .table th { /* 暗色表头 */
+  background: var(--surface-2); /* 暗色次级面 */
+  color: var(--text-muted); /* 弱化文字 */
+} /* 结束 */
+
+:root[data-theme='dark'] .table td { /* 暗色单元格 */
+  color: var(--text-secondary); /* 次级文字 */
+  border-bottom-color: var(--border); /* 暗色分隔线 */
+} /* 结束 */
+
+:root[data-theme='dark'] input, /* 暗色输入 */ 
+:root[data-theme='dark'] select, /* 暗色下拉 */
+:root[data-theme='dark'] textarea { /* 暗色文本域 */
+  background: var(--surface-2); /* 暗色底 */
+  border-color: var(--border); /* 暗色描边 */
+  color: var(--text); /* 暗色文字 */
+} /* 结束 */
+
+:root[data-theme='dark'] .btn.ghost { /* 暗色次按钮 */
+  background: var(--surface-2); /* 暗色底 */
+  border-color: var(--border); /* 暗色描边 */
+  color: var(--text-secondary); /* 次级文字 */
+} /* 结束 */
+
+:root[data-theme='dark'] .tabs { /* 暗色页签外壳 */
+  background: var(--surface-2); /* 暗色底 */
+} /* 结束 */
+
+:root[data-theme='dark'] .tab.active { /* 暗色选中页签 */
+  background: var(--surface); /* 暗色卡片 */
+  color: var(--text); /* 暗色文字 */
+} /* 结束 */
+
+:root[data-theme='dark'] .empty { /* 暗色空态 */
+  border-color: var(--border); /* 暗色虚线 */
+  color: var(--text-muted); /* 弱化文字 */
+} /* 结束 */
+
+:root[data-theme='dark'] .login-card { /* 暗色登录卡 */
+  background: var(--surface); /* 暗色卡面 */
+  border-color: var(--border); /* 暗色描边 */
+} /* 结束 */
+
+/* ========== 十、响应式 ========== */
+@media (max-width: 1100px) { /* 中屏：侧栏收窄 */
+  .layout { grid-template-columns: 210px minmax(0, 1fr); } /* 侧栏 210px */
+  .main { padding: 22px 20px 40px; } /* 主区内边距收紧 */
+} /* 断点结束 */
+
+@media (max-width: 860px) { /* 小屏：侧栏变顶部横条 */
+  .layout { grid-template-columns: 1fr; } /* 单列 */
+  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; border-right: 0; border-bottom: 1px solid var(--border, #e6e9f2); } /* 侧栏改横条 */
+  .nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 100%; } /* 导航横排换行 */
+  .nav-group-items { flex-direction: row; flex-wrap: wrap; } /* 条目横排 */
+  .sidebar-footer { margin-top: 0; border-top: 0; } /* 页脚不再贴底 */
+  .main { padding: 18px 14px 34px; } /* 主区内边距继续收紧 */
+  .page { max-width: none; } /* 小屏取消宽度限制 */
+} /* 断点结束 */
+
+@media (prefers-reduced-motion: reduce) { /* 减少动效偏好 */
+  .card, .btn, .nav-item { transition: none; } /* 关闭过渡 */
+} /* 结束 */
+
+
+
