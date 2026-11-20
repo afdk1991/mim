@@ -1249,7 +1249,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   {b.is_moderator ? <span className="community-board-price">版主</span> : null}
                 </button>
               ))}
-              <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; setFavoritesOpen((v) => !v); }}>我的收藏</button>
+              <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; const next = !favoritesOpen; setFavoritesOpen(next); if (next) setTimeout(() => document.querySelector('.community-favorites')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }}>我的收藏</button>{/* 展开后把收藏区滚入视口，否则内容在列表下方、点了看不到任何变化 */}
             </div>
             <div className="community-layout-toggle" role="group" aria-label="列表形态切换">{/* 网格 / 列表横排切换 */}
               <button

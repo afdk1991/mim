@@ -270,7 +270,11 @@ export async function request<T>(path: string, opts: RequestOptions = {}, retrie
 export function errorText(locale: Locale, error: unknown): string { // 把任意异常转成可直接展示的本地化文案
   if (error instanceof ApiError) { // 接口错误优先走错误码翻译表
     const translated = errorMessage(locale, error.code as ErrorCode); // 用业务 code 查当前语言文案
-    return translated || error.message; // 查不到译文时回退服务端原文
+    const serverMessage = (error.message ?? '').trim(); // 服务端原文：具体业务原因通常只写在这里
+    // 中文界面优先展示服务端给出的具体原因：否则「请求参数不合法」「数据冲突」这类通用码文案会吞掉
+    // 「余额不足」「不能转给自己」「卡密已被使用」等真实原因，用户看到的就是「点了没反应 / 不知道错在哪」。
+    if (serverMessage && !String(locale).toLowerCase().startsWith('en') && serverMessage !== translated) return serverMessage;
+    return translated || serverMessage; // 英文界面走本地化文案，查不到再回退服务端原文
   } // instanceof 分支结束
   return error instanceof Error ? error.message : String(error); // 普通异常取 message，其余值强制转字符串
 } // errorText 结束

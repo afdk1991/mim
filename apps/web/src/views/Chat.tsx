@@ -880,7 +880,7 @@ export function Chat({ locale }: ChatProps) {
                 ))}
               </div>
             )}
-            <button type="button" className="btn primary" onClick={createGroup} disabled={groupPick.length === 0}>{/* 执行当前业务步骤 */}
+            <button type="button" className="btn primary" onClick={createGroup}>{/* 不加 disabled：无成员时点击由 createGroup 给出「至少选择一位成员」提示，避免按钮静默点不动 */}
               {isZh ? '创建群聊' : 'Create group'}
             </button>
           </div>

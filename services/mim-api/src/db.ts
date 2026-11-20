@@ -216,6 +216,41 @@ export function ensureIdentityUsernameProvider(db: Db): boolean {
   return true;
 }
 
+/**
+ * user_badges 表名冲突修复（2026-11-20 社区激励链签到 500）：
+ * 旧版徽章体系曾用同名表 `user_badges(user_id, badge_id, awarded_at)`（引用 badges(id)）；
+ * 85-growth-chain.sql 用 CREATE TABLE IF NOT EXISTS 建新表（id / user_id / badge_code / source / awarded_at），
+ * 存量库因旧表已存在而跳过建表，签到自动授予徽章时 INSERT(id, badge_code) 直接 SQLITE_ERROR → 前端「服务器内部错误」。
+ * 处理：检测缺 id 列 → 旧表改名 user_badges_legacy（数据不丢），再按新结构建表与索引；新库由域脚本建出后直接跳过。
+ * @returns 是否真的执行了重建
+ */
+export function ensureGrowthUserBadges(db: Db): boolean {
+  const columns = db.prepare('PRAGMA table_info(user_badges)').all() as Array<{ name: string }>; // 读现有列
+  if (columns.length === 0) return false; // 表还不存在：由 85-growth-chain.sql 新建，无需处理
+  if (columns.some((item) => item.name === 'id')) return false; // 已是新结构（含 id 主键），幂等跳过
+  const legacyName = `user_badges_legacy_${Date.now()}`; // 带时间戳，避免重复启动时二次改名撞名
+  db.pragma('foreign_keys = OFF'); // 改名与重建期间关外键，避免旧表引用关系阻断
+  try {
+    db.transaction(() => { // 归档旧表 → 建新表 → 建索引，全程原子
+      db.exec('DROP INDEX IF EXISTS idx_user_badges_user'); // 域脚本可能已在旧表上建过同名索引，先释放名字
+      db.exec(`ALTER TABLE user_badges RENAME TO ${legacyName}`); // 旧结构整表归档，保留历史授予记录
+      db.exec(`CREATE TABLE user_badges (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id),
+        badge_code TEXT NOT NULL REFERENCES growth_badges(code),
+        source     TEXT NOT NULL DEFAULT 'auto' CHECK (source IN ('auto', 'admin')),
+        awarded_at TEXT NOT NULL,
+        UNIQUE (user_id, badge_code)
+      )`); // 与 85-growth-chain.sql 的 user_badges 完全同构
+      db.exec('CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id, awarded_at DESC)'); // 补回用户维度索引
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON'); // 无论成败都恢复外键约束
+  }
+  console.log(`[db] user_badges rebuilt for growth chain, legacy archived as ${legacyName}`); // 结构变更必须留痕
+  return true;
+}
+
 /** 旧订阅制 payments 的特征列 */
 const LEGACY_PAYMENT_COLUMNS = ['driver', 'amount_minor', 'provider_txn_id'] as const; // 三列同时存在且没有 provider/amount_cents，才认定是旧订阅结构
 
@@ -307,6 +342,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   if (domainApplied.length > 0) console.log(`[db] domain schema applied: ${domainApplied.join(', ')}`); // 域脚本改结构必须留痕
   if (ensureOrderSourceCommunity(db)) console.log('[db] orders.source widened: community'); // 存量库放宽 CHECK，必须留痕
   if (ensureIdentityUsernameProvider(db)) console.log('[db] identities.provider widened: username'); // 存量库放宽身份 CHECK，必须留痕
+  ensureGrowthUserBadges(db); // 存量库同名旧徽章表改名归档 + 重建新结构（函数内部留痕），否则签到授予徽章 500
   const migrated = migrateAdditiveColumns(db); // 存量库补齐后加的列；全新建库时为空
   if (migrated.length > 0) console.log(`[db] additive migration applied: ${migrated.join(', ')}`); // 结构变更必须留痕，便于排查升级后的行为差异
   const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column
