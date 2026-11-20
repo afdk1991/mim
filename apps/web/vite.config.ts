@@ -1,5 +1,5 @@
-// defineConfig 提供配置类型提示，避免选项名拼错而静默失效
-import { defineConfig } from 'vite';
+// defineConfig / configDefaults 来自 vitest 入口：同一份配置既给 Vite，也给 vitest 测试运行器
+import { configDefaults, defineConfig } from 'vitest/config';
 // React 插件：负责 JSX 转换与开发期 Fast Refresh
 import react from '@vitejs/plugin-react';
 
@@ -45,4 +45,9 @@ export default defineConfig({
       },
     },
   }, // 构建配置结束
+  // 测试运行器配置：只收单元 / 组件测试；浏览器 E2E 由 Playwright 跑，不能被 vitest 当作用例收集
+  test: {
+    // 继承 vitest 默认排除项（node_modules / dist 等），再排除 Playwright 的 e2e 目录
+    exclude: [...configDefaults.exclude, 'e2e/**'],
+  }, // 测试配置结束
 }); // 配置结束
