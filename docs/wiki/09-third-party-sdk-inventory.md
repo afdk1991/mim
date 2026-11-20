@@ -305,9 +305,10 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 圈子模块配置 | 圈子创建门槛（最小用户等级 / 每用户可创建数量），缺省 0 / 1 | `MIM_CIRCLE_CREATE_*`（`MIM_CIRCLE_CREATE_MIN_LEVEL` / `MIM_CIRCLE_CREATE_MAX_PER_USER`） | P1 |
 | OIDC 联邦身份 | 标准授权码模式联邦登录（state / nonce 一次性、claims 校验；ID Token 签名验签与 SAML 2.0 未落地，见 `federation.ts` 文件头）；四项缺一即 `configured=false`、端点返回 503 | `MIM_OIDC_*`（`MIM_OIDC_ISSUER` / `MIM_OIDC_CLIENT_ID` / `MIM_OIDC_CLIENT_SECRET` / `MIM_OIDC_REDIRECT_URI`） | P1 |
 | 推广返佣结算 | 一级 / 二级佣金比例与归因保护期（缺省 5% / 关闭 / 7 天），进程内配置非第三方凭证 | `MIM_REFERRAL_*`（`MIM_REFERRAL_RATE` / `MIM_REFERRAL_L2_RATE` / `MIM_REFERRAL_PROTECT_DAYS`） | P1 |
+| 推广点击 / 转化频控 | 推广计划访客点击与转化滑动窗口：窗口秒数、点击上限、转化上限；缺省 600 秒内 10 次，显式配 0 关闭频控（不建议生产关闭） | `MIM_CONTENT_CLICK_WINDOW_SECONDS` / `MIM_CONTENT_CLICK_MAX` / `MIM_CONTENT_CONVERSION_MAX`（精确项，`services/mim-api/src/content/promotions.ts` 读取） | P2 |
 | 同机共存端口 | 与 MixmAPP 共用 CVM：前端 HTTP / HTTPS 与后端回环端口，外加证书策略与 default_server 归属开关；由 nginx 模板占位符渲染，避免散落硬编码 | `MIM_WEB_HTTP_PORT` / `MIM_WEB_HTTPS_PORT` / `MIM_API_PORT` / `MIM_TLS_CERTBOT` / `MIM_NGINX_TAKE_DEFAULT` | P0 |
 
-_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补管理员口令变量（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订该管理员口令变量（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。2026-11-14 增补 OIDC 联邦身份与推广返佣结算两组变量登记（消除 gap-scan C 段 7 项未登记）。2026-11-15 补登记 `MIM_FORCE_LOGIN`（全站门禁总开关，修复 gap-scan C 段未登记导致 Deploy 门禁失败）；2026-11-15 下线管理员口令变量（后端已不再读取，`.env.example` 与 `deploy/deploy.sh` 同步移除，口令维护改走后台「用户 → 重置口令」）。新增第三方能力必须先更新本文件，再进入实现。_
+_登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补管理员口令变量（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订该管理员口令变量（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。2026-11-14 增补 OIDC 联邦身份与推广返佣结算两组变量登记（消除 gap-scan C 段 7 项未登记）。2026-11-15 补登记 `MIM_FORCE_LOGIN`（全站门禁总开关，修复 gap-scan C 段未登记导致 Deploy 门禁失败）；2026-11-15 下线管理员口令变量（后端已不再读取，`.env.example` 与 `deploy/deploy.sh` 同步移除，口令维护改走后台「用户 → 重置口令」）；2026-11-20 增补 §18：门禁脚本 / 部署编排 / 离线遗留内部变量按通配分流登记，另补登记推广点击 / 转化频控三项运行时配置（§16）。新增第三方能力必须先更新本文件，再进入实现。_
 
 ## 17. 已登记的预留 / 待清理依赖（2026-11-20 扫描）
 
@@ -328,3 +329,18 @@ _登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生�
 | `yaml` | `^2.9.1` | 预留 | 配置/清单解析候选；无静态引用 |
 
 > 同期前端清理（2026-11-20）：`apps/web` 中零引用的 `@antv/g6`、`echarts`、`vditor` 已从 `package.json` 与 `pnpm-lock.yaml` 移除；文首 2026-11-10 增补段所述三者用途（商城价格图 / 依赖图 / 漫剧脚本编辑器）随商城与漫剧模块一并下线，该段为历史快照，不再代表现行前端依赖。
+
+---
+
+## 18. 门禁脚本 / 部署编排 / 离线遗留内部变量（2026-11-20 分流登记）
+
+> 下列变量只被自检 / 取证脚本、`deploy/deploy.sh` 编排脚本或已下线模块引用，**不属于生产运行时配置**，因此按家族 / 单变量通配登记，**不进入 `.env.example` 必填模板**（env-check 通配口径覆盖展开项；测试变量不占必填位，避免 env-check 误红）。脚本本地运行时按需在命令行 / shell 环境注入。另：MIM_APP（蓝图代码串 EDGEONE_LEGACY_PROJECT_MIM_APP 的子串误匹配）与 MIM_X（注释占位示例）为静态扫描误报，不计入本表，也不使用反引号书写以免被登记口径捕获。
+
+| 家族 / 场景 | 用途 | 登记前缀（env，通配） | 分类 |
+|---|---|---|---|
+| 匿名取证脚本 | `scripts/verify-anonymous-evidence.mjs` 探测目标、令牌、浏览器与 DB 取证参数（成员：ADMIN_TOKEN / API_BASE / AUTH_TOKEN / BROWSER / CDP / DB_PATH / KEEP_BROWSER / TIMEOUT_MS / WEB_BASE）；未配置时对应检查 SKIP 放行，不阻断门禁 | `MIM_EVIDENCE_*` | 仅内部测试 |
+| 门禁 E2E 脚本 | `scripts/verify-chat-flow.mjs` / `verify-chat-plus.mjs` 的 API 基址、CDP 端点与页面地址（成员：API / CDP / PAGE） | `MIM_GATE_*` | 仅内部测试 |
+| 性能基准 | `scripts/perf-bench.mjs` 探测目标与耗时门槛（毫秒） | `MIM_API_BASE*` / `MIM_PERF_TARGET_MS*` | 仅内部测试 |
+| E2E 截图 | 聊天流程校验截图落盘路径 | `MIM_E2E_PNG*` | 仅内部测试 |
+| 部署编排 | `deploy/deploy.sh` 环境文件路径；演练早退开关（取值 data / sync），生产勿设 | `MIM_ENV_FILE*` / `MIM_DEPLOY_STOP_AFTER*` | 部署编排 |
+| 离线遗留模块 | AI 编排 worker、成本告警上限、AI baseUrl http 放行、成片审核 SLA、导航站兜底起源、备份定时器、版本回显覆盖、蓝图 DB 路径；对应模块已下线或仅蓝图示例，`src/` 零读取，保留登记仅为历史命令行与文档可追溯 | `MIM_AI_WORKER*` / `MIM_AI_HOURLY_COST_LIMIT_MINOR*` / `MIM_AI_ALLOW_INSECURE_BASE*` / `MIM_FILM_REVIEW_SLA_HOURS*` / `MIM_PUBLIC_ORIGIN*` / `MIM_ENABLE_BACKUP_TIMER*` / `MIM_SERVICE_VERSION*` / `MIM_DB_PATH*` | 离线遗留 |
