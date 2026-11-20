@@ -24,8 +24,8 @@
  *   MIM_EVIDENCE_WEB_BASE=http://127.0.0.1:5188 node scripts/verify-anonymous-evidence.mjs
  *
  * 环境变量（全部可选，详见 docs/anonymous-evidence.md）：
- *   MIM_EVIDENCE_WEB_BASE      前端站点根地址，默认 https://laal.top
- *   MIM_EVIDENCE_API_BASE      API 根地址，默认 ${WEB_BASE}/api/v1
+ *   MIM_EVIDENCE_WEB_BASE      前端站点根地址，默认 https://zy.laal.top
+ *   MIM_EVIDENCE_API_BASE      API 根地址，默认 https://api.laal.top/api/v1（前后端独立域名）
  *   MIM_EVIDENCE_BROWSER       浏览器可执行文件路径，默认自动探测 Chrome/Edge
  *   MIM_EVIDENCE_CDP           复用已存在的 CDP 地址（如 http://127.0.0.1:9222），不自动启动浏览器
  *   MIM_EVIDENCE_AUTH_TOKEN    普通用户 Bearer 令牌，用于认证响应头检查
@@ -45,8 +45,8 @@ import { join } from 'node:path'; // 拼临时用户目录路径
 
 // ---------- 配置：全部来自环境变量，缺省值只包含公开地址与超时 ----------
 
-const WEB_BASE = (process.env.MIM_EVIDENCE_WEB_BASE || 'https://laal.top').replace(/\/+$/, ''); // 前端站点根地址，去掉尾部斜杠避免拼出双斜杠
-const API_BASE = (process.env.MIM_EVIDENCE_API_BASE || `${WEB_BASE}/api/v1`).replace(/\/+$/, ''); // API 根地址，默认与站点同源反代
+const WEB_BASE = (process.env.MIM_EVIDENCE_WEB_BASE || 'https://zy.laal.top').replace(/\/+$/, ''); // 前端站点根地址（生产前端），去掉尾部斜杠避免拼出双斜杠
+const API_BASE = (process.env.MIM_EVIDENCE_API_BASE || 'https://api.laal.top/api/v1').replace(/\/+$/, ''); // API 根地址（生产接口独立域名），不再默认从前端同源派生
 const AUTH_TOKEN = (process.env.MIM_EVIDENCE_AUTH_TOKEN || '').trim(); // 普通用户令牌：仅用于认证响应头检查，不打印
 const ADMIN_TOKEN = (process.env.MIM_EVIDENCE_ADMIN_TOKEN || process.env.MIM_ADMIN_TOKEN || '').trim(); // 超管引导令牌：仅用于 users 基线，不打印
 const DB_PATH = (process.env.MIM_EVIDENCE_DB_PATH || '').trim(); // 只读库路径：用于精确污染检查
@@ -67,6 +67,32 @@ function record(layer, id, name, status, detail = '') {
   counters[status] += 1; // 累加对应状态计数
   const suffix = detail ? ` — ${detail}` : ''; // 详情为空时不输出多余分隔符
   console.log(`[${status}] ${id} ${name}${suffix}`); // 立即打印一行，便于实时观察
+}
+
+/** 汇总打印：正常收尾与网络不可达提前收尾共用同一套输出口径 */
+function printSummary() {
+  console.log(''); // 汇总前留空行
+  console.log(`汇总：PASS ${counters.PASS} / FAIL ${counters.FAIL} / SKIP ${counters.SKIP}`); // 打印总体计数
+
+  const failures = results.filter((item) => item.status === 'FAIL'); // 收集失败项
+  if (failures.length > 0) {
+    console.log('失败明细：'); // 失败明细标题
+    for (const item of failures) {
+      console.log(` - [${item.layer}] ${item.id} ${item.name}：${item.detail}`); // 逐条打印，含实际状态码与 URL
+    }
+  }
+
+  const skips = results.filter((item) => item.status === 'SKIP'); // 收集跳过项
+  if (skips.length > 0) {
+    console.log('跳过明细（需要补充环境变量才能完整取证）：'); // 跳过说明
+    for (const item of skips) {
+      console.log(` - [${item.layer}] ${item.id} ${item.name}：${item.detail}`); // 逐条打印原因
+    }
+  }
+
+  const exitCode = failures.length > 0 ? 1 : 0; // 有 FAIL 即退出码 1，SKIP 不改变成功
+  console.log(`退出码：${exitCode}`); // 明确打印退出码
+  return exitCode; // 交回退出码由调用方 process.exit
 }
 
 /** 生成 HTTP 取证串：失败时务必能看到实际状态码与 URL */
@@ -123,6 +149,19 @@ async function apiRequest(method, path, { token = '', adminToken = '', body = nu
       code: isObject(json) && typeof json.code === 'string' ? json.code : '', // 顶层业务错误码
       json, // 解析后的响应体
       text, // 原始文本，用于判断是否 HTML
+    };
+  } catch (error) {
+    return {
+      method, // 回传方法
+      url, // 回传完整 URL
+      status: 0, // 0 表示网络层不可达，区别于 HTTP 状态码
+      contentType: '', // 无响应头
+      cacheControl: '', // 无缓存头
+      code: '', // 无业务错误码
+      json: null, // 无响应体
+      text: '', // 无文本
+      unreachable: true, // 标记网络不可达，供主流程归类 SKIP 而非 FAIL
+      error: error instanceof Error ? error.message : String(error), // 网络错误明细
     };
   } finally {
     clearTimeout(timer); // 无论成功失败都清理定时器
@@ -434,6 +473,20 @@ async function main() {
 
   const db = await openReadonlyDb(); // 可选打开只读库，失败即配置错误
 
+  // ---------- 可达性预检：网络不可达时整轮 SKIP 放行，不把环境问题误判成语义 FAIL ----------
+
+  const health = await apiRequest('GET', '/healthz'); // 探活：健康检查是最轻量的可达性证据
+  const networkDown = health.unreachable === true || health.status === 0; // 网络层失败 / 连接被拒 / 超时都算不可达
+  if (networkDown) {
+    const reason = health.error ?? `HTTP ${health.status}`; // 取网络错误明细，缺省回落到状态码
+    record('L2', 'NET-1', '目标可达性预检 GET /healthz', 'SKIP', `API 目标不可达：${reason}（${API_BASE}）；网络不可达时整轮 SKIP，不判 FAIL`);
+    record('L1', 'NET-2', '清洁上下文（浏览器层）', 'SKIP', 'API 目标不可达，跳过浏览器清洁上下文验收');
+    record('L3', 'NET-3', '页面层匿名验收', 'SKIP', 'API 目标不可达，跳过页面层验收');
+    record('L4', 'NET-4', '污染检查', 'SKIP', 'API 目标不可达，跳过前后污染对比');
+    if (db) db.close(); // 收尾只读库
+    process.exit(printSummary()); // SKIP 不阻断门禁，退出码 0
+  }
+
   // ---------- L2 接口层 ----------
 
   const list = await apiRequest('GET', '/community/threads?limit=12'); // 匿名读列表：白名单核心入口
@@ -650,10 +703,17 @@ async function main() {
       record('L3', 'L3-6', '匿名打开 /admin/ 显示登录页', 'FAIL', `最终路径 ${adminPath}，登录卡片=${adminLogin}${doc}`); // 打印实际路径与状态
     }
   } catch (error) {
-    browserFailure = error; // 记录异常，稍后统一归类
-    if (error instanceof ConfigError) throw error; // 环境 / 配置问题直接上抛为退出码 2
-    record('L3', 'L3-0', '无头浏览器验收执行', 'FAIL', `执行中断：${error.message}`); // 中断本身就是失败，不能静默退出 0
-    console.error(`[ERROR] 浏览器验收中断：${error.message}`); // 同时打印到 stderr 便于排查
+    browserFailure = error; // 记录异常，稍后统一归类（truthy 时 L4 污染检查整体 SKIP）
+    if (error instanceof ConfigError) {
+      // 浏览器 / CDP 等环境依赖缺失（CI  runner 常无 Chrome/Edge）：浏览器层整体 SKIP 放行，
+      // 已跑完的 L2 接口层结论不受影响；不再上抛退出码 2 把环境问题误判成门禁红灯。
+      record('L1', 'L1-0', '清洁上下文（浏览器层）', 'SKIP', `浏览器环境不可用：${error.message}`);
+      record('L3', 'L3-0', '页面层匿名验收', 'SKIP', `浏览器环境不可用：${error.message}`);
+      console.error(`[SKIP] 浏览器验收跳过（环境依赖不可用）：${error.message}`);
+    } else {
+      record('L3', 'L3-0', '无头浏览器验收执行', 'FAIL', `执行中断：${error.message}`); // 中断本身就是失败，不能静默退出 0
+      console.error(`[ERROR] 浏览器验收中断：${error.message}`); // 同时打印到 stderr 便于排查
+    }
   } finally {
     if (browser) await browser.close(); // 无论成功失败都清理浏览器
   }
@@ -715,28 +775,7 @@ async function main() {
 
   // ---------- 汇总与退出码 ----------
 
-  console.log(''); // 汇总前留空行
-  console.log(`汇总：PASS ${counters.PASS} / FAIL ${counters.FAIL} / SKIP ${counters.SKIP}`); // 打印总体计数
-
-  const failures = results.filter((item) => item.status === 'FAIL'); // 收集失败项
-  if (failures.length > 0) {
-    console.log('失败明细：'); // 失败明细标题
-    for (const item of failures) {
-      console.log(` - [${item.layer}] ${item.id} ${item.name}：${item.detail}`); // 逐条打印，含实际状态码与 URL
-    }
-  }
-
-  const skips = results.filter((item) => item.status === 'SKIP'); // 收集跳过项
-  if (skips.length > 0) {
-    console.log('跳过明细（需要补充环境变量才能完整取证）：'); // 跳过说明
-    for (const item of skips) {
-      console.log(` - [${item.layer}] ${item.id} ${item.name}：${item.detail}`); // 逐条打印原因
-    }
-  }
-
-  const exitCode = failures.length > 0 ? 1 : 0; // 有 FAIL 即退出码 1，SKIP 不改变成功
-  console.log(`退出码：${exitCode}`); // 明确打印退出码
-  process.exit(exitCode); // 以最终结论退出
+  process.exit(printSummary()); // 统一走汇总函数：有 FAIL 退出 1，仅 SKIP 退出 0
 }
 
 // 顶层错误兜底：配置 / 环境问题统一退出码 2

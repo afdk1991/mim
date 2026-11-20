@@ -11,12 +11,11 @@
  *
  * 用法：
  *   node scripts/verify-cdn.mjs
- *   MIM_CDN_BASE=https://laal.top:8443 MIM_CDN_PROBE_PATH=/ node scripts/verify-cdn.mjs
+ *   MIM_CDN_BASE=https://zy.laal.top MIM_CDN_PROBE_PATH=/ node scripts/verify-cdn.mjs
  */
 
-// 探测基址默认取 Mim 的 HTTPS 端口（8443，443 归同机 MixmAPP），MIM_CDN_BASE 可整体覆盖
-const DEFAULT_PORT = process.env.MIM_WEB_HTTPS_PORT ?? '8443'; // 同机共存端口口径
-const BASE = (process.env.MIM_CDN_BASE ?? `https://laal.top:${DEFAULT_PORT}`).replace(/\/+$/, ''); // 常量 BASE：保存固定配置或一次性派生值
+// 探测基址默认取 Mim 生产前端站点（zy.laal.top，443 标准端口），MIM_CDN_BASE 可整体覆盖
+const BASE = (process.env.MIM_CDN_BASE ?? 'https://zy.laal.top').replace(/\/+$/, ''); // 常量 BASE：保存固定配置或一次性派生值
 const PATHNAME = process.env.MIM_CDN_PROBE_PATH ?? '/'; // 常量 PATHNAME：保存固定配置或一次性派生值
 const PROBE_URL = `${BASE}${PATHNAME.startsWith('/') ? PATHNAME : `/${PATHNAME}`}`; // 常量 PROBE_URL：保存固定配置或一次性派生值
 const TIMEOUT_MS = 10_000; // 常量 TIMEOUT_MS：保存固定配置或一次性派生值
@@ -44,45 +43,53 @@ function looksCached(headers) { // 函数 looksCached：封装一段可复用的
 } // 代码块结束
 
 async function probeOnce(tag) { // 函数 probeOnce：封装一段可复用的处理逻辑
-  const res = await fetch(PROBE_URL, { // 常量 res：保存固定配置或一次性派生值
-    method: 'GET', // 对象字段 method：记录一项配置或数据
-    signal: AbortSignal.timeout(TIMEOUT_MS), // 对象字段 signal：记录一项配置或数据
-    redirect: 'follow', // 对象字段 redirect：记录一项配置或数据
-  }); // 代码块结束
-  return { tag, status: res.status, headers: evidence(res.headers) }; // 返回当前函数的处理结果
+  try { // 网络异常归到返回结构里，便于区分「目标不可达」与「可达但无缓存头」
+    const res = await fetch(PROBE_URL, { // 常量 res：保存固定配置或一次性派生值
+      method: 'GET', // 对象字段 method：记录一项配置或数据
+      signal: AbortSignal.timeout(TIMEOUT_MS), // 对象字段 signal：记录一项配置或数据
+      redirect: 'follow', // 对象字段 redirect：记录一项配置或数据
+    }); // 代码块结束
+    return { tag, reachable: true, status: res.status, headers: evidence(res.headers) }; // 返回当前函数的处理结果
+  } catch (err) { // 网络层失败（DNS / 连接拒绝 / 超时 / TLS）
+    return { tag, reachable: false, status: 0, headers: {}, error: err instanceof Error ? err.message : String(err) }; // 不可达样本保留错误明细
+  } // 代码块结束
 } // 代码块结束
 
 async function main() { // 函数 main：封装一段可复用的处理逻辑
   console.log(`[verify-cdn] 探测目标: ${PROBE_URL}`); // 向控制台输出运行日志或错误信息
   const samples = []; // 常量 samples：保存固定配置或一次性派生值
-  let failure = null; // 可变变量 failure：运行过程中会被重新赋值
 
   for (const tag of ['第 1 次', '第 2 次']) { // 循环：逐项遍历集合并执行相同处理
-    try { // 异常捕获起点：包裹可能抛出错误的操作
-      samples.push(await probeOnce(tag)); // 执行当前业务步骤
-    } catch (err) { // 代码块结束
-      failure = err instanceof Error ? err.message : String(err); // 赋值：更新变量 failure 的取值
-      console.error(`[verify-cdn] ${tag} 请求失败: ${failure}`); // 向控制台输出运行日志或错误信息
-    } // 代码块结束
+    samples.push(await probeOnce(tag)); // 执行当前业务步骤（网络失败不再中断循环）
   } // 代码块结束
 
+  const reachableSamples = samples.filter((sample) => sample.reachable); // 至少一次可达才谈得上「CDN 未启用」
+  const unreachableError = samples.find((sample) => !sample.reachable)?.error ?? null; // 取首个不可达错误明细
+
   let detected = null; // 可变变量 detected：运行过程中会被重新赋值
-  for (const sample of samples) { // 循环：逐项遍历集合并执行相同处理
+  for (const sample of reachableSamples) { // 只在可达样本里找缓存特征
     const hit = looksCached(new Map(Object.entries(sample.headers))); // 常量 hit：保存固定配置或一次性派生值
     if (hit) { detected = hit; break; } // 条件分支：按判断结果选择后续处理路径
   } // 代码块结束
 
   for (const sample of samples) { // 循环：逐项遍历集合并执行相同处理
-    console.log(`  ${sample.tag} HTTP ${sample.status}`); // 向控制台输出运行日志或错误信息
-    for (const [k, v] of Object.entries(sample.headers)) console.log(`    ${k}: ${v}`); // 循环：逐项遍历集合并执行相同处理
+    if (sample.reachable) { // 可达样本打印状态码与响应头
+      console.log(`  ${sample.tag} HTTP ${sample.status}`); // 向控制台输出运行日志或错误信息
+      for (const [k, v] of Object.entries(sample.headers)) console.log(`    ${k}: ${v}`); // 循环：逐项遍历集合并执行相同处理
+    } else { // 不可达样本打印网络错误
+      console.log(`  ${sample.tag} 目标不可达：${sample.error}`); // 向控制台输出运行日志或错误信息
+    } // 代码块结束
   } // 代码块结束
 
   if (detected) { // 条件分支：按判断结果选择后续处理路径
     console.log(`CDN: detected（${detected.by}=${detected.value}）`); // 向控制台输出运行日志或错误信息
-  } else { // 代码块结束
+  } else if (reachableSamples.length === 0) { // 两次都连不上：是网络 / 域名问题，不能归因于 CDN 未启用
+    console.log('CDN: unreachable'); // 向控制台输出运行日志或错误信息
+    console.log('target-unreachable: 两次探测均无法连上目标（DNS / 连接 / 超时 / TLS），未取得任何响应头；这不是「CDN 未启用」结论。'); // 明确区分不可达与未启用
+    if (unreachableError) console.log(`probe-error: ${unreachableError}`); // 条件分支：按判断结果选择后续处理路径
+  } else { // 可达但无缓存特征：才是 CDN 未启用 / 未透传
     console.log('CDN: not-detected'); // 向控制台输出运行日志或错误信息
-    console.log('not-configured: 响应头中未观察到边缘缓存特征（cf-cache-status / x-cache / age）；如已接入 CDN，请复核回源头是否被回源服务覆盖。'); // 向控制台输出运行日志或错误信息
-    if (failure) console.log(`probe-error: ${failure}`); // 条件分支：按判断结果选择后续处理路径
+    console.log('cdn-not-enabled: 目标可达，但响应头中未观察到边缘缓存特征（cf-cache-status / x-cache / age）；如已接入 CDN，请复核回源头是否被回源服务覆盖。'); // 向控制台输出运行日志或错误信息
   } // 代码块结束
 
   process.exit(0); // 执行当前业务步骤

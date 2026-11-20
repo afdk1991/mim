@@ -308,3 +308,23 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 | 同机共存端口 | 与 MixmAPP 共用 CVM：前端 HTTP / HTTPS 与后端回环端口，外加证书策略与 default_server 归属开关；由 nginx 模板占位符渲染，避免散落硬编码 | `MIM_WEB_HTTP_PORT` / `MIM_WEB_HTTPS_PORT` / `MIM_API_PORT` / `MIM_TLS_CERTBOT` / `MIM_NGINX_TAKE_DEFAULT` | P0 |
 
 _登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补管理员口令变量（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订该管理员口令变量（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。2026-11-14 增补 OIDC 联邦身份与推广返佣结算两组变量登记（消除 gap-scan C 段 7 项未登记）。2026-11-15 补登记 `MIM_FORCE_LOGIN`（全站门禁总开关，修复 gap-scan C 段未登记导致 Deploy 门禁失败）；2026-11-15 下线管理员口令变量（后端已不再读取，`.env.example` 与 `deploy/deploy.sh` 同步移除，口令维护改走后台「用户 → 重置口令」）。新增第三方能力必须先更新本文件，再进入实现。_
+
+## 17. 已登记的预留 / 待清理依赖（2026-11-20 扫描）
+
+> 背景：`services/mim-api`（`@mim/api`）`package.json` 中下列 11 项在 `src/`、`test/` 下**未检出静态 `import` / `require`**（关键词命中均为局部变量名，如 `marked` / `qrText`，非包引用）。静态扫描无法排除适配器懒加载、动态 `require()` 或后续模块复用，因此本轮**保留在 `package.json` 与锁文件中**，仅在此登记判定状态，避免下轮重复全量扫描；待动态加载复核通过后再逐项移除。
+
+| 依赖 | 版本 | 判定状态 | 备注 |
+|---|---|---|---|
+| `cron-parser` | `^5.10.4` | 预留 | 定时任务表达式解析；`src/jobs.ts` 当前用内置扫描，未引用 |
+| `csv-parse` | `^7.0.3` | 预留 | 批量导入/导出候选；无静态引用 |
+| `diff` | `^9.0.0` | 预留 | 文案/配置比对候选；无静态引用 |
+| `exceljs` | `^4.4.0` | 待清理 | 订单 xlsx 导出端点已随商城下线；无静态引用，复核无动态加载后可连同版本移除 |
+| `expr-eval` | `^2.0.2` | 预留 | 公式/权益表达式候选；无静态引用 |
+| `marked` | `^18.2.0` | 预留 | Markdown 渲染候选；无静态引用（注意区分本地变量 `marked`） |
+| `mustache` | `^4.2.0` | 预留 | 模板渲染候选；`@types/mustache` 仍在 devDependencies |
+| `qrcode` | `^1.5.4` | 待清理 | 支付二维码图生成候选；当前支付链路只产出二维码文本 `qrText`，无包引用；`@types/qrcode` 待同清 |
+| `sharp` | `^0.35.5` | 待清理 | 缩略图端点已随 media/创作模块下线；源码无引用。`services/mim-api/build.mjs` external 列表仍含 `'sharp'`（原生模块防内联兜底），确认无动态加载后与 package.json 条目一并移除，再清 build.mjs external |
+| `sql-formatter` | `^15.9.0` | 预留 | SQL 工具候选；无静态引用 |
+| `yaml` | `^2.9.1` | 预留 | 配置/清单解析候选；无静态引用 |
+
+> 同期前端清理（2026-11-20）：`apps/web` 中零引用的 `@antv/g6`、`echarts`、`vditor` 已从 `package.json` 与 `pnpm-lock.yaml` 移除；文首 2026-11-10 增补段所述三者用途（商城价格图 / 依赖图 / 漫剧脚本编辑器）随商城与漫剧模块一并下线，该段为历史快照，不再代表现行前端依赖。

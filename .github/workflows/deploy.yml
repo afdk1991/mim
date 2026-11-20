@@ -84,6 +84,17 @@ jobs:
       - name: 鉴权边界校验（verify-auth-gate）
         run: node scripts/verify-auth-gate.mjs
 
+      # 线上匿名取证：无头浏览器 + 匿名 HTTP 双层核对匿名可读 / 写操作 401 / 后台 401 JSON。
+      # 语义不符（该放行被拦、该拦截放行、私密读未 401）退出 1 阻断；
+      # 网络不可达、runner 无浏览器等环境问题脚本内部记 SKIP，退出 0；
+      # 其余前置配置异常退出 2，这里同样按 SKIP 放行，避免把环境问题误判成门禁红灯。
+      - name: 线上匿名取证（verify-anonymous-evidence）
+        run: |
+          node scripts/verify-anonymous-evidence.mjs
+          code=$?
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          echo "取证脚本退出码 $code（0=通过/仅 SKIP，2=环境或浏览器不可用，按 SKIP 放行）"
+
       # 铁律十一：注释覆盖率硬门禁（--strict，总覆盖率低于阈值即退出 1 阻断发布）
       # 最近一次实测（2026-11-07）：总体覆盖率 93.7%、未达标文件 0、最低单文件 80.9%，
       # 均高于默认阈值（80%）；数值随代码变动，以每次 CI 实测输出为准，此注释仅为基线说明

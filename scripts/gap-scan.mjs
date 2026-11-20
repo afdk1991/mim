@@ -68,14 +68,16 @@ const INTERNAL_ENV_VARS = new Set([
   'MIM_PERF_TARGET_MS', // scripts/perf-bench.mjs 基准门槛，非运行时
   'MIM_PUBLIC_ORIGIN', // 导航站兜底起源，与 MIM_PUBLIC_BASE_URL 同族的遗留别名
   'MIM_FILM_REVIEW_SLA_HOURS', // 内部运营 SLA 配置
-  'MIM_AI_HOURLY_COST_LIMIT_MINOR', // 内部成本上限派生配置（缺省按日均摊）
-  'MIM_CONTENT_CLICK_WINDOW_SECONDS', // 内部推广点击窗口配置
-  'MIM_CONTENT_CLICK_MAX', // 内部推广点击上限
-  'MIM_CONTENT_CONVERSION_MAX', // 内部转化频控上限
-  'MIM_AI_ALLOW_INSECURE_BASE', // AI 厂商 baseUrl http 放行 opt-in 开关（安全内部开关）
+  'MIM_AI_HOURLY_COST_LIMIT_MINOR', // 内部成本上限派生配置（缺省按日均摊，AI 编排已下线）
+  'MIM_AI_ALLOW_INSECURE_BASE', // AI 厂商 baseUrl http 放行 opt-in 开关（AI 编排已下线）
   'MIM_API_BASE', // perf-bench 脚本探测目标
-  'MIM_APP', // 蓝图注册表 JSON 内的示例键名
   'MIM_E2E_PNG', // 端到端校验脚本截图路径
+]); // 执行当前业务步骤
+
+// 静态扫描误报：并非真实环境变量，不参与登记 / WARN 判定
+const FALSE_POSITIVE_ENV_VARS = new Set([
+  'MIM_APP', // 蓝图注册表 JSON 内 EDGEONE_LEGACY_PROJECT_MIM_APP 代码串的子串匹配
+  'MIM_X', // verify-env-wiring.mjs 注释里的 `${MIM_X:-默认值}` 占位示例
 ]); // 执行当前业务步骤
 
 // 内部变量前缀：门禁 / 自检脚本与蓝图注册表注入键
@@ -285,6 +287,7 @@ function checkEnv() { // 函数 checkEnv：封装一段可复用的处理逻辑
   } // 代码块结束
 
   for (const [name, occurrences] of [...sourceVars.entries()].sort()) { // 循环：逐项遍历集合并执行相同处理
+    if (FALSE_POSITIVE_ENV_VARS.has(name)) continue; // 误报子串 / 注释占位示例：不登记也不计 WARN
     const exact = registered.templateNames.has(name) || registered.inventoryVars.has(name); // 常量 exact：保存固定配置或一次性派生值
     const covered = registered.stems.some((stem) => name.startsWith(stem)); // 常量 covered：保存固定配置或一次性派生值
     if (exact || covered) continue; // 条件分支：按判断结果选择后续处理路径
