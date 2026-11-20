@@ -47,6 +47,7 @@
 | 阿里云短信 | 短信服务 API（`@alicloud/dysmsapi20170525`） | 国内验证码 | `MIM_SMS_ALIYUN_ACCESS_KEY_ID` / `MIM_SMS_ALIYUN_ACCESS_KEY_SECRET` / `MIM_SMS_ALIYUN_SIGN_NAME` / `MIM_SMS_ALIYUN_TEMPLATE_CODE` | P0 |
 | 腾讯云短信 | SMS API | 国内验证码备份通道 | `MIM_SMS_TENCENT_SECRET_ID` / `MIM_SMS_TENCENT_SECRET_KEY` / `MIM_SMS_TENCENT_SDK_APP_ID` | P1 |
 | 阿里云邮件推送 / AWS SES | 邮件 API（SES 走 `@aws-sdk/client-ses`） | 海外注册验证与通知邮件 | `MIM_EMAIL_ALIYUN_ACCESS_KEY` / `MIM_EMAIL_SES_ACCESS_KEY_ID` / `MIM_EMAIL_SES_SECRET_ACCESS_KEY` / `MIM_EMAIL_SES_REGION` / `MIM_EMAIL_SES_FROM_ADDRESS` | P0 |
+| 自建 SMTP（站点选项「邮件」分组托管入口，2026-11-20） | SMTP 直连（后台只存主机/端口/TLS/账号/发信人；口令走环境变量） | 站点通知与账号类邮件，替代第三方邮件 API 的自托管通道 | `MIM_SMTP_PASSWORD`（变量名可由后台字段 `smtp_password_ref` 指定，默认即此名） | P1 |
 
 ---
 
