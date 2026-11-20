@@ -9,7 +9,8 @@
  *
  * 同一 (dimension, dimension_value) 只允许一条生效：新增 / 启用时由 commerce/vip-pricing-admin.ts
  * 在同一事务内停用同键其它启用行；不加唯一索引，避免存量重复行让迁移失败。
- * 审计：统一 audit.ts 尚未入库，写接口处留了明确的 TODO 调用点，入库后按注释补一行即可。
+ * 审计：三条管理写接口（新增 / 改价 / 删除）统一走 audit.ts 的 audited() 包装，动作码
+ * vip_price_rule.create / update / delete；公开读与管理端列表只读不审计。
  */
 
 import { Router } from 'express'; // 路由容器
@@ -17,6 +18,7 @@ import { z } from 'zod'; // 声明式请求体校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { clockOf } from '../domain.js'; // 统一时钟：测试可注入固定时间
 import { requirePermission } from '../middleware.js'; // 细粒度权限门禁
+import { audited, auditActor } from '../audit.js'; // 统一审计留痕：操作人 / 动作 / 对象 / 结果
 import { parse } from '../validate.js'; // zod 校验包装：失败抛 VALIDATION_FAILED
 import { pathParam } from '../utils.js'; // 路径参数类型收敛
 import { loadVipPriceRules, type VipPriceRuleRow } from '../commerce/vip-pricing.js'; // 规则加载（公开读）
@@ -105,11 +107,12 @@ export function createVipPricingRouter(deps: ApiDeps): Router {
       currency: body.currency, // 币种
       enabled: body.enabled, // 是否生效
     }; // 组装写入入参
-    // TODO(audit): 等 services/mim-api/src/audit.ts 入库后，把下面这一行
-    //   const record = createVipPriceRule(db, input, clockOf(deps));
-    // 替换为统一审计包装（勿另造一套）：
-    //   const record = audited(db, auditActor(req), { action: 'vip_price_rule.create', targetType: 'vip_price_rule', targetId: `${input.dimension}:${input.dimension_value}`, detail: input }, () => createVipPriceRule(db, input, clockOf(deps)));
-    const record = createVipPriceRule(db, input, clockOf(deps)); // 写入并自动停用同键旧启用行
+    const record = audited(db, auditActor(req), { // 新增规则与审计同属一次敏感操作
+      action: 'vip_price_rule.create', // 动作码：新增定价规则
+      targetType: 'vip_price_rule', // 对象类型
+      targetId: `${input.dimension}:${input.dimension_value}`, // 对象主键：维度 + 取值
+      detail: { ...input }, // 明细：写入入参（敏感键由 audit.ts 统一脱敏）
+    }, () => createVipPriceRule(db, input, clockOf(deps))); // 写入并自动停用同键旧启用行
     res.status(201).json({ rule: vipPriceRuleView(record) }); // 回传创建视图
   });
 
@@ -125,21 +128,22 @@ export function createVipPricingRouter(deps: ApiDeps): Router {
     if (body.discount_percent !== undefined) patch.discount_percent = body.discount_percent; // 折扣（允许显式 null）
     if (body.currency !== undefined) patch.currency = body.currency; // 币种
     if (body.enabled !== undefined) patch.enabled = body.enabled; // 启停
-    // TODO(audit): 等 services/mim-api/src/audit.ts 入库后，把下面这一行
-    //   const record = updateVipPriceRule(db, id, patch, clockOf(deps));
-    // 替换为统一审计包装：
-    //   const record = audited(db, auditActor(req), { action: 'vip_price_rule.update', targetType: 'vip_price_rule', targetId: id, detail: patch }, () => updateVipPriceRule(db, id, patch, clockOf(deps)));
-    const record = updateVipPriceRule(db, id, patch, clockOf(deps)); // 合并成目标态校验后写库
+    const record = audited(db, auditActor(req), { // 改价规则与审计同属一次敏感操作
+      action: 'vip_price_rule.update', // 动作码：修改定价规则
+      targetType: 'vip_price_rule', // 对象类型
+      targetId: id, // 对象主键：规则 ID
+      detail: { ...patch }, // 明细：本次补丁字段
+    }, () => updateVipPriceRule(db, id, patch, clockOf(deps))); // 合并成目标态校验后写库
     res.json({ rule: vipPriceRuleView(record) }); // 回传更新视图
   });
 
   router.delete('/admin/vip/price-rules/:id', perm, (req, res) => { // 删除规则
     const id = pathParam(req, 'id'); // 取路径参数
-    // TODO(audit): 等 services/mim-api/src/audit.ts 入库后，把下面这一行
-    //   const deleted = deleteVipPriceRule(db, id);
-    // 替换为统一审计包装（删除前先取一次行用于 detail，可选）：
-    //   const deleted = audited(db, auditActor(req), { action: 'vip_price_rule.delete', targetType: 'vip_price_rule', targetId: id }, () => deleteVipPriceRule(db, id));
-    const deleted = deleteVipPriceRule(db, id); // 物理删除
+    const deleted = audited(db, auditActor(req), { // 删除规则与审计同属一次敏感操作
+      action: 'vip_price_rule.delete', // 动作码：删除定价规则
+      targetType: 'vip_price_rule', // 对象类型
+      targetId: id, // 对象主键：规则 ID
+    }, () => deleteVipPriceRule(db, id)); // 物理删除
     if (!deleted) throw new AppError('NOT_FOUND', 'vip price rule not found', { rule_id: id }); // 未命中判 404
     res.json({ id, deleted: true }); // 明确告知删除成功
   });

@@ -46,11 +46,16 @@ const ADDITIVE_COLUMNS: ReadonlyArray<{ table: string; column: string; definitio
   { table: 'paid_assets', column: 'media_json', definition: "TEXT NOT NULL DEFAULT '[]'" }, // 图库 / 视频媒体数组
 ]; // 清单结束：新增列必须先加到 schema.sql，再加到这里，两条路径才不会分叉
 
-// 依赖「后加列」的索引：必须在补列之后再建，否则老库全量执行 schema.sql 时会因列不存在直接报错崩溃
-const ADDITIVE_INDEXES: ReadonlyArray<{ name: string; sql: string }> = [ // 只放列由 ADDITIVE_COLUMNS 补出来的索引
+// 启动期幂等补建的复合索引：既有索引覆盖不到的慢查询访问路径，CREATE INDEX IF NOT EXISTS 保证重复启动不报错。
+// 其中 uq_users_member_no 依赖后加列 member_no；其余索引所用列在 schema.sql 建表时已存在，此处仅为存量库补齐。
+const ADDITIVE_INDEXES: ReadonlyArray<{ name: string; sql: string }> = [ // 只放需要在启动期补建的索引
   { // Mim ID 号码全局唯一：发号器已保证不重号，唯一索引是最后一道防线（人工补数据也会被挡）
     name: 'uq_users_member_no', // 与 identity.ts 的发号逻辑配套
     sql: 'CREATE UNIQUE INDEX IF NOT EXISTS uq_users_member_no ON users(member_no) WHERE member_no IS NOT NULL', // 部分唯一：补列前历史行为 NULL，不参与约束
+  }, // 索引定义结束
+  { // 板块热帖列表按 板块 + 状态 过滤并按 created_at 倒序：既有 board 索引排序键是 last_activity_at，无法覆盖 created_at 排序
+    name: 'idx_community_threads_board_created', // 与 security.ts 慢查询候选 `board_id = ? AND status = ? ORDER BY created_at DESC` 配套
+    sql: 'CREATE INDEX IF NOT EXISTS idx_community_threads_board_created ON community_threads(board_id, status, created_at)', // 等值前缀 + 排序列复合索引，避免 filesort
   }, // 索引定义结束
 ]; // 清单结束：新增依赖后加列的索引请加在这里，不要写进 schema.sql
 

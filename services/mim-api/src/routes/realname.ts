@@ -15,6 +15,7 @@ import { z } from 'zod'; // 请求体校验
 import { parse } from '../validate.js'; // zod 校验包装
 import { requireAuth } from '../middleware.js'; // 本人端点登录态
 import { requirePermission } from '../middleware.js'; // 管理端点 RBAC 门禁
+import { audited, auditActor } from '../audit.js'; // 统一审计留痕：实名审核通过 / 驳回必须留痕
 import { clockOf } from '../domain.js'; // 可注入时钟
 import { // 引入依赖、类型或本地模块绑定
   getMyRealname, // 本人状态查询
@@ -76,7 +77,12 @@ export function createRealnameRouter(deps: ApiDeps): Router { // 依赖显式注
     const recordId = String(req.params.id ?? ''); // 路径参数收敛为字符串
     const now = clockOf(deps); // 统一取时
     const reviewerId = req.adminBootstrap === true ? 'admin-bootstrap' : req.user!.id; // 引导通道标记操作人
-    const view = reviewRealname(deps.db, recordId, body.decision, body.reason ?? null, reviewerId, now); // 执行流转
+    const view = audited(deps.db, auditActor(req), { // 审核流转与审计同属一次敏感操作
+      action: body.decision === 'approve' ? 'realname.approve' : 'realname.reject', // 动作码：通过 / 驳回分列
+      targetType: 'realname_record', // 对象类型
+      targetId: recordId, // 对象主键：实名记录 ID
+      detail: { decision: body.decision, reason: body.reason ?? null }, // 明细：结论与驳回原因，不落姓名 / 证件号
+    }, () => reviewRealname(deps.db, recordId, body.decision, body.reason ?? null, reviewerId, now)); // 执行流转
     res.json(view); // 回读最新视图
   }); // 结束 POST /admin/realname/:id/review
 

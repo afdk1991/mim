@@ -15,6 +15,7 @@ import { z } from 'zod'; // 请求体校验
 import { AppError } from '@mim/core-domain'; // 统一业务异常
 import { parse } from '../validate.js'; // zod 校验包装
 import { requirePermission } from '../middleware.js'; // 管理端点 RBAC 门禁
+import { audited, auditActor } from '../audit.js'; // 统一审计留痕：后台生成 / 禁用邀请码必须留痕
 import { clockOf } from '../domain.js'; // 可注入时钟
 import { addDays } from '../utils.js'; // 有效期按天换算
 import { // 引入依赖、类型或本地模块绑定
@@ -47,16 +48,24 @@ export function createInviteAdminRouter(deps: ApiDeps): Router { // 依赖显式
     const expiresAt = body.expires_in_days ? addDays(now, body.expires_in_days) : null; // 有效期或长期
     const createdBy = req.adminBootstrap === true ? null : req.user!.id; // 引导通道无用户主体，记空
     const codes: Array<{ code: string; max_uses: number; expires_at: string | null }> = []; // 本次生成清单
-    for (let i = 0; i < count; i += 1) { // 逐枚生成
-      const row = createInvite(deps.db, { // 建码
-        createdBy, // 创建人
-        maxUses, // 可用次数
-        expiresAt, // 过期时间
-        boundIdentifier: body.bound_identifier?.trim() || null, // 绑定标识
-        note: body.note?.trim() || null, // 备注
-      }, now); // 时间
-      codes.push({ code: row.code, max_uses: row.max_uses, expires_at: row.expires_at }); // 收集回显
-    } // 循环结束
+    audited(deps.db, auditActor(req), { // 批量生成与审计同属一次敏感操作
+      action: 'invite.generate', // 动作码：生成邀请码
+      targetType: 'invite', // 对象类型
+      targetId: `batch:${count}`, // 对象主键：批次 + 数量
+      detail: { count, max_uses: maxUses, expires_in_days: body.expires_in_days ?? null, note: body.note?.trim() || null }, // 明细：不含绑定手机 / 邮箱等身份标识
+    }, () => { // 逐枚生成
+      for (let i = 0; i < count; i += 1) { // 逐枚生成
+        const row = createInvite(deps.db, { // 建码
+          createdBy, // 创建人
+          maxUses, // 可用次数
+          expiresAt, // 过期时间
+          boundIdentifier: body.bound_identifier?.trim() || null, // 绑定标识
+          note: body.note?.trim() || null, // 备注
+        }, now); // 时间
+        codes.push({ code: row.code, max_uses: row.max_uses, expires_at: row.expires_at }); // 收集回显
+      } // 循环结束
+      return codes; // 返回本次生成清单供审计包装复用
+    }); // 审计包装结束
     res.status(201).json({ count: codes.length, invites: codes }); // 回显生成结果
   }); // 结束 POST /admin/invites
 
@@ -74,7 +83,11 @@ export function createInviteAdminRouter(deps: ApiDeps): Router { // 依赖显式
 
   router.patch('/admin/invites/:code/disable', requirePermission('rbac:write'), (req, res) => { // 禁用
     const code = String(req.params.code ?? '').trim(); // 路径参数收敛
-    const found = disableInvite(deps.db, code); // 执行禁用
+    const found = audited(deps.db, auditActor(req), { // 禁用邀请码与审计同属一次敏感操作
+      action: 'invite.disable', // 动作码：禁用邀请码
+      targetType: 'invite', // 对象类型
+      targetId: code.toUpperCase(), // 对象主键：邀请码
+    }, () => disableInvite(deps.db, code)); // 执行禁用
     if (!found) throw new AppError('NOT_FOUND', 'invitation code not found', { code }); // 不存在 404
     res.json({ ok: true, code: code.toUpperCase() }); // 幂等返回
   }); // 结束 PATCH /admin/invites/:code/disable

@@ -11,6 +11,7 @@ import { Router } from 'express'; // 路由容器
 import { z } from 'zod'; // 参数校验
 import { parse } from '../validate.js'; // 统一校验包装
 import { requirePermission } from '../middleware.js'; // RBAC 校验
+import { audited, auditActor } from '../audit.js'; // 统一审计留痕：批量群发私信必须留痕
 import type { ApiDeps } from '../types.js'; // 依赖容器
 import {
   listGrowthDmCampaigns, // 批次列表
@@ -67,14 +68,31 @@ export function createGrowthDmAdminRouter(deps: ApiDeps): Router {
     if (!input.audience.user_ids?.length && !input.audience.region && !input.audience.created_after && !input.audience.created_before && !input.audience.query) {
       return res.status(400).json({ code: 'VALIDATION_FAILED', message: '至少提供一个受众条件，避免误发全量用户' }); // 全量群发需显式条件
     }
-    const result = sendGrowthDm(db, {
-      dedupeKey: input.dedupe_key,
-      title: input.title,
-      body: input.body,
-      linkUrl: input.link_url,
-      linkLabel: input.link_label,
-      audience: input.audience,
-      operatorId: req.user?.id ?? 'admin-token', // 引导令牌场景没有 req.user
+    const detail: Record<string, unknown> = {}; // 受众摘要 / 发送人数在业务跑完后回填，审计落库时序列化
+    const result = audited(db, auditActor(req), { // 批量群发与审计同属一次敏感操作（批量发消息）
+      action: 'growth_dm.send', // 动作码：发送系统私信批次
+      targetType: 'growth_dm_campaign', // 对象类型：私信批次
+      targetId: input.dedupe_key, // 对象主键：幂等键（同一批次重复调用可回溯）
+      detail, // 明细：标题 / 受众摘要 / 发送人数；不落私信正文与全量名单
+    }, () => {
+      const sent = sendGrowthDm(db, {
+        dedupeKey: input.dedupe_key,
+        title: input.title,
+        body: input.body,
+        linkUrl: input.link_url,
+        linkLabel: input.link_label,
+        audience: input.audience,
+        operatorId: req.user?.id ?? 'admin-token', // 引导令牌场景没有 req.user
+      });
+      detail.title = input.title; // 回填批次标题
+      detail.audience = { // 回填受众摘要：只记条件与名单规模，不展开全量 user_ids
+        region: input.audience.region ?? null, // 注册地区条件
+        query: input.audience.query ?? null, // 昵称 / Mim ID 匹配条件
+        user_count: input.audience.user_ids?.length ?? null, // 显式名单规模
+      }; // 受众摘要结束
+      detail.sent_count = sent.deliveries.length; // 回填本次实际发送人数
+      detail.duplicate = sent.duplicate; // 回填是否幂等命中
+      return sent; // 交回业务结果
     });
     // 每个目标用户走现有 WS 通道实时收到 message.new；离线用户下次打开会话列表即可看到
     for (const delivery of result.deliveries) {

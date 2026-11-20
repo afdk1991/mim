@@ -16,6 +16,7 @@ import type { NextFunction, Request, Response } from 'express'; // 中间件类�
 import { z } from 'zod'; // 入参校验
 import { AppError, isAppError } from '@mim/core-domain'; // 统一业务异常 + 类型守卫
 import { idempotency, requirePermission } from '../middleware.js'; // 鉴权门禁与写幂等
+import { audited, auditActor, writeAudit } from '../audit.js'; // 统一审计留痕：内容上下架等后台写动作必须留痕
 import { parse } from '../validate.js'; // 校验错误翻译
 import type { ApiDeps } from '../types.js'; // 依赖容器
 import { parseLimit, visitorHash } from '../content/shared.js'; // 分页解析与访问者指纹
@@ -277,28 +278,54 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
       now(), // 调用 now 并处理其返回结果
       authorId, // 执行当前业务步骤
     ); // 执行当前业务步骤
+    writeAudit(deps.db, auditActor(req), { // 新建公告留痕：对象主键取落库后回读的行 ID
+      action: 'content.announcement.create', // 动作码：新增公告
+      targetType: 'announcement', // 对象类型
+      targetId: item.id, // 对象主键：公告 ID
+      detail: { title: body.title, level: body.level, status: body.status, pinned: body.pinned }, // 明细：只记摘要字段
+    }); // 审计写入结束
     res.status(201).json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.patch('/admin/content/announcements/:id', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
     const body = parse(announcementPatchSchema, req.body); // 常量 body：保存固定配置或一次性派生值
-    const item = updateAnnouncement(deps.db, pathParam(req, 'id'), body, now()); // 常量 item：保存固定配置或一次性派生值
+    const item = audited(deps.db, auditActor(req), { // 修改公告与审计同属一次敏感操作
+      action: 'content.announcement.update', // 动作码：修改公告
+      targetType: 'announcement', // 对象类型
+      targetId: pathParam(req, 'id'), // 对象主键：公告 ID
+      detail: body, // 明细：本次补丁字段
+    }, () => updateAnnouncement(deps.db, pathParam(req, 'id'), body, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.delete('/admin/content/announcements/:id', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
-    deleteAnnouncement(deps.db, pathParam(req, 'id')); // 调用 deleteAnnouncement 并处理其返回结果
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    audited(deps.db, auditActor(req), { // 删除公告与审计同属一次敏感操作
+      action: 'content.announcement.delete', // 动作码：删除公告
+      targetType: 'announcement', // 对象类型
+      targetId: id, // 对象主键：公告 ID
+    }, () => deleteAnnouncement(deps.db, id)); // 调用 deleteAnnouncement 并处理其返回结果
     res.json({ ok: true }); // 执行当前业务步骤
   }); // 代码块结束
 
   // 公告状态流转：发布（draft/archived → published）、归档（draft/published → archived）；非法流转 409。
   router.post('/admin/content/announcements/:id/publish', requireContentPermission, idempotency, (req, res) => {
-    const item = publishAnnouncement(deps.db, pathParam(req, 'id'), now()); // 常量 item：保存固定配置或一次性派生值
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    const item = audited(deps.db, auditActor(req), { // 发布公告与审计同属一次敏感操作
+      action: 'content.announcement.publish', // 动作码：发布公告
+      targetType: 'announcement', // 对象类型
+      targetId: id, // 对象主键：公告 ID
+    }, () => publishAnnouncement(deps.db, id, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.post('/admin/content/announcements/:id/archive', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
-    const item = archiveAnnouncement(deps.db, pathParam(req, 'id'), now()); // 常量 item：保存固定配置或一次性派生值
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    const item = audited(deps.db, auditActor(req), { // 归档公告与审计同属一次敏感操作
+      action: 'content.announcement.archive', // 动作码：归档公告
+      targetType: 'announcement', // 对象类型
+      targetId: id, // 对象主键：公告 ID
+    }, () => archiveAnnouncement(deps.db, id, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
@@ -322,28 +349,54 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
       }, // 代码块结束
       now(), // 调用 now 并处理其返回结果
     ); // 执行当前业务步骤
+    writeAudit(deps.db, auditActor(req), { // 新建更新日志留痕：对象主键取落库后回读的行 ID
+      action: 'content.changelog.create', // 动作码：新增更新日志
+      targetType: 'changelog', // 对象类型
+      targetId: item.id, // 对象主键：日志条目 ID
+      detail: { version: body.version, title: body.title, status: body.status }, // 明细：只记摘要字段
+    }); // 审计写入结束
     res.status(201).json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.patch('/admin/content/changelog/:id', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
     const body = parse(changelogPatchSchema, req.body); // 常量 body：保存固定配置或一次性派生值
-    const item = updateChangelogEntry(deps.db, pathParam(req, 'id'), body, now()); // 常量 item：保存固定配置或一次性派生值
+    const item = audited(deps.db, auditActor(req), { // 修改更新日志与审计同属一次敏感操作
+      action: 'content.changelog.update', // 动作码：修改更新日志
+      targetType: 'changelog', // 对象类型
+      targetId: pathParam(req, 'id'), // 对象主键：日志条目 ID
+      detail: body, // 明细：本次补丁字段
+    }, () => updateChangelogEntry(deps.db, pathParam(req, 'id'), body, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.delete('/admin/content/changelog/:id', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
-    deleteChangelogEntry(deps.db, pathParam(req, 'id')); // 调用 deleteChangelogEntry 并处理其返回结果
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    audited(deps.db, auditActor(req), { // 删除更新日志与审计同属一次敏感操作
+      action: 'content.changelog.delete', // 动作码：删除更新日志
+      targetType: 'changelog', // 对象类型
+      targetId: id, // 对象主键：日志条目 ID
+    }, () => deleteChangelogEntry(deps.db, id)); // 调用 deleteChangelogEntry 并处理其返回结果
     res.json({ ok: true }); // 执行当前业务步骤
   }); // 代码块结束
 
   // 更新日志状态流转：发布（draft/archived → published，首次写 published_at）、归档；非法流转 409。
   router.post('/admin/content/changelog/:id/publish', requireContentPermission, idempotency, (req, res) => {
-    const item = publishChangelogEntry(deps.db, pathParam(req, 'id'), now()); // 常量 item：保存固定配置或一次性派生值
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    const item = audited(deps.db, auditActor(req), { // 发布更新日志与审计同属一次敏感操作
+      action: 'content.changelog.publish', // 动作码：发布更新日志
+      targetType: 'changelog', // 对象类型
+      targetId: id, // 对象主键：日志条目 ID
+    }, () => publishChangelogEntry(deps.db, id, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.post('/admin/content/changelog/:id/archive', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
-    const item = archiveChangelogEntry(deps.db, pathParam(req, 'id'), now()); // 常量 item：保存固定配置或一次性派生值
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    const item = audited(deps.db, auditActor(req), { // 归档更新日志与审计同属一次敏感操作
+      action: 'content.changelog.archive', // 动作码：归档更新日志
+      targetType: 'changelog', // 对象类型
+      targetId: id, // 对象主键：日志条目 ID
+    }, () => archiveChangelogEntry(deps.db, id, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
@@ -369,17 +422,33 @@ export function createContentOpsRouter(deps: ApiDeps): Router {
       }, // 代码块结束
       now(), // 调用 now 并处理其返回结果
     ); // 执行当前业务步骤
+    writeAudit(deps.db, auditActor(req), { // 新建推广计划留痕：对象主键取落库后回读的行 ID
+      action: 'content.promotion.create', // 动作码：新增推广计划
+      targetType: 'promotion', // 对象类型
+      targetId: item.id, // 对象主键：推广计划 ID
+      detail: { name: body.name, status: body.status, budget_cents: body.budget_cents }, // 明细：只记摘要字段
+    }); // 审计写入结束
     res.status(201).json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.patch('/admin/content/promotions/:id', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
     const body = parse(promotionPatchSchema, req.body); // 常量 body：保存固定配置或一次性派生值
-    const item = updatePromotion(deps.db, pathParam(req, 'id'), body, now()); // 常量 item：保存固定配置或一次性派生值
+    const item = audited(deps.db, auditActor(req), { // 修改推广计划与审计同属一次敏感操作
+      action: 'content.promotion.update', // 动作码：修改推广计划
+      targetType: 'promotion', // 对象类型
+      targetId: pathParam(req, 'id'), // 对象主键：推广计划 ID
+      detail: body, // 明细：本次补丁字段
+    }, () => updatePromotion(deps.db, pathParam(req, 'id'), body, now())); // 常量 item：保存固定配置或一次性派生值
     res.json({ item }); // 执行当前业务步骤
   }); // 代码块结束
 
   router.delete('/admin/content/promotions/:id', requireContentPermission, idempotency, (req, res) => { // 执行当前业务步骤
-    deletePromotion(deps.db, pathParam(req, 'id')); // 调用 deletePromotion 并处理其返回结果
+    const id = pathParam(req, 'id'); // 路径参数收敛
+    audited(deps.db, auditActor(req), { // 删除推广计划与审计同属一次敏感操作
+      action: 'content.promotion.delete', // 动作码：删除推广计划
+      targetType: 'promotion', // 对象类型
+      targetId: id, // 对象主键：推广计划 ID
+    }, () => deletePromotion(deps.db, id)); // 调用 deletePromotion 并处理其返回结果
     res.json({ ok: true }); // 执行当前业务步骤
   }); // 代码块结束
 

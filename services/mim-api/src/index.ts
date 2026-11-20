@@ -8,6 +8,7 @@ import { createStorage } from './storage.js'; // 引入存储驱动工厂（本�
 import { attachImWebSocket } from './im/ws.js'; // 引入 IM WebSocket 接入层，负责实时消息与视频信令
 import { ImHub } from './im/hub.js'; // 引入连接中心：需在 createApp 之前注入，HTTP 路由才能复用同一实例广播
 import { reconcileLikeCounts, reconcileRecommendScores } from './community/recommend.js'; // 推荐指数与点赞数对账：纠正存量假数，按真实互动重算
+import { sweepExpiredEphemeral } from './housekeeping.js'; // 易失凭证与幂等键清扫：过期验证码 / 题目 / 超期幂等键
 import type { ApiDeps } from './types.js'; // 依赖容器类型：显式标注后才能回填 imHub 字段
 
 const db = createDatabase(DB_PATH); // 按配置路径打开持久化 SQLite，启动即完成建表与种子写入
@@ -15,6 +16,9 @@ const reconciledScores = reconcileRecommendScores(process.env, db); // 每次启
 if (reconciledScores > 0) console.log(`[community] recommend_score reconciled: ${reconciledScores} rows`); // 有修正才留痕，便于核对存量假分已清零
 const reconciledLikes = reconcileLikeCounts(db); // 每次启动按真实点赞记录重算一次：幂等，只写回与记录条数不一致的行
 if (reconciledLikes > 0) console.log(`[community] likes reconciled: ${reconciledLikes} rows`); // 有修正才留痕，便于核对种子假赞已清零
+const swept = sweepExpiredEphemeral(db); // 启动期清扫过期验证码 / 题目 / 超期幂等键：幂等，重复启动不影响在途凭证
+const sweptTotal = swept.verificationCodes + swept.captchas + swept.idempotencyKeys; // 汇总回收行数，便于判定是否需要留痕
+if (sweptTotal > 0) console.log(`[housekeeping] expired ephemeral swept: ${swept.verificationCodes} codes / ${swept.captchas} captchas / ${swept.idempotencyKeys} idempotency keys`); // 有回收才留痕
 const jwtSecret = loadJwtSecret(); // 加载签名密钥；缺失时由 config 层决定回退开发密钥或直接报错
 const storage = createStorage({ env: process.env, jwtSecret, fallbackDir: DATA_DIR }); // 依据环境变量选择存储驱动，未配置远端时落本地数据目录
 const deps: ApiDeps = { db, jwtSecret, env: process.env, storage }; // 统一依赖容器，供 app 与 WS 层共享

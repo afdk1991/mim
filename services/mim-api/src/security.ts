@@ -658,10 +658,9 @@ const EXPECTED_INDEXES: ReadonlyArray<{ table: string; columns: string[]; reason
 
 /** 已知慢查询候选：缺覆盖索引或 SELECT 列过宽的高频模式，供 DBA 复核执行计划 */
 const SLOW_CANDIDATES: ReadonlyArray<SlowCandidate> = [ // 保存 SLOW_CANDIDATES：承载本步骤的计算结果供后续使用
-  { table: 'community_threads', pattern: 'WHERE board_id = ? AND status = ? ORDER BY created_at DESC', note: '板块热帖列表；确认索引覆盖排序，避免 filesort' }, // 业务步骤：推进当前流程的下一项处理
-  { table: 'community_posts', pattern: 'WHERE thread_id = ? ORDER BY created_at ASC', note: '长帖回复分页；关注深翻页 OFFSET 成本' }, // 业务步骤：推进当前流程的下一项处理
+  // 2026-11-20 复核：community_threads(board_id,status,created_at)、community_posts(thread_id,created_at)、
+  // content_reports(reporter_id,created_at) 三条访问路径均已被现有 / 启动期补建的复合索引覆盖，不再列入候选。
   { table: 'paid_assets', pattern: 'WHERE status = ? AND (title LIKE ? OR summary LIKE ?)', note: '模糊匹配无法走索引前缀；量大后需转全文检索' }, // 业务步骤：推进当前流程的下一项处理
-  { table: 'content_reports', pattern: 'WHERE reporter_id = ? AND created_at > ?', note: '举报滑动窗口计数；见缺失索引建议' }, // 业务步骤：推进当前流程的下一项处理
 ]; // 集合结束：数组或索引表达式收尾
 
 /** 巡检现有索引覆盖情况：返回缺失建议与慢查询候选，不执行任何 DDL。 */
