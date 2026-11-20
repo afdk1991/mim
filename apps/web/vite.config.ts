@@ -37,11 +37,6 @@ export default defineConfig({
         manualChunks(id: string) {
           // React 运行时（react / react-dom）独立成包，首屏与各视图复用同一份
           if (id.includes('react-dom') || /[\\/]node_modules[\\/]react[\\/]/.test(id)) return 'vendor-react';
-          // 图表与图引擎：echarts / @antv/g6 本就动态 import，各自独立懒加载包，避免互相牵连
-          if (id.includes('echarts')) return 'vendor-echarts';
-          if (id.includes('@antv/g6')) return 'vendor-g6';
-          // 富文本编辑器 vditor：静态引入于漫剧工作台，独立包随懒加载视图进入
-          if (id.includes('vditor')) return 'vendor-markdown';
           // 工作区共享包：@mim/i18n 与 @mim/core-domain，同时兼容 node_modules 软链与源码目录路径
           if (/[\\/]packages[\\/]i18n[\\/]/.test(id) || /[\\/]@mim[\\/]i18n[\\/]/.test(id)) return 'vendor-i18n';
           if (/[\\/]packages[\\/]core-domain[\\/]/.test(id) || /[\\/]@mim[\\/]core-domain[\\/]/.test(id)) return 'vendor-domain';

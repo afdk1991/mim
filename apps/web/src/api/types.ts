@@ -649,42 +649,6 @@ export interface BoardTabInput { // 保存栏目入参
   sort_by?: string; // 排序口径
 } // 代码块结束
 
-// ---------- 自研工具目录类型 ----------
-
-export interface ToolVersionNote { // 版本记录条目
-  version: string; // 语义版本号
-  title?: string; // 版本标题
-  notes?: string; // 更新说明
-  released_at?: string; // 发布时间
-} // 代码块结束
-
-export interface ToolItem { // 工具清单 / 详情视图
-  id: string; // 主键
-  slug: string; // 对外短标识
-  name: string; // 名称
-  summary: string; // 一句话简介
-  version_notes: ToolVersionNote[]; // 版本记录
-  download_url: string; // 下载地址
-  doc_url: string; // 文档地址
-  tags: string[]; // 标签
-  status: string; // 状态：draft / active / archived
-  sort_order: number; // 展示顺序
-  created_at: string; // 创建时间
-  updated_at: string; // 更新时间
-} // 代码块结束
-
-export interface ToolUpsertPayload { // 新建 / 更新工具入参
-  slug?: string; // 新建时必填；更新时不可改
-  name: string; // 名称
-  summary?: string; // 简介
-  version_notes?: ToolVersionNote[]; // 版本记录
-  download_url?: string; // 下载地址
-  doc_url?: string; // 文档地址
-  tags?: string[]; // 标签
-  status?: 'draft' | 'active' | 'archived'; // 状态
-  sort_order?: number; // 排序
-} // 代码块结束
-
 export interface GrowthBadge { // 徽章
   code: string; // 编码
   name: string; // 名称
