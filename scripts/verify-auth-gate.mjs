@@ -152,6 +152,13 @@ check(
   appServer.includes("app.use('/api/v1', createForceLoginMiddleware())"),
   'createForceLoginMiddleware 未挂载到 /api/v1',
 );
+// 媒体可见口径静态兜底：免费帖回落板块准入，付费帖只认单帖解锁；漂移即可能被板块开放绕过付费墙
+const communityRoute = read('services/mim-api/src/routes/community.ts');
+check(
+  '媒体可见口径：免费帖回落板块准入，付费帖只认单帖解锁',
+  /const mediaVisible = thread\.price_cents > 0 \? threadPaidUnlocked : boardUnlocked;/.test(communityRoute),
+  'mediaVisible 口径漂移，付费墙可能被板块开放绕过',
+);
 
 // ---------- 2. 注册开关：默认关闭，打开后走完整注册流程 ---------- //
 const authRoute = read('services/mim-api/src/routes/auth.ts'); // 登录 / 注册路由
@@ -374,12 +381,15 @@ function codeOf(body) {
   return null;
 }
 
-async function request(method, path, payload) {
+async function request(method, path, payload, authToken) {
   const init = { method: method };
+  const headers = {}; // 请求头集合：内容类型与会话令牌按需追加
   if (payload !== undefined) {
-    init.headers = { 'content-type': 'application/json' };
+    headers['content-type'] = 'application/json';
     init.body = payload;
   }
+  if (authToken) headers.authorization = 'Bearer ' + authToken; // 已注册用户鉴权头，用于会员准入断言
+  init.headers = headers;
   const res = await fetch(base + path, init);
   let body = null;
   try { body = await res.json(); } catch (e) { body = null; }
@@ -487,6 +497,25 @@ results.push({
   detail: 'status ' + freeAssetRes.status + ' / unlocked ' + String(freeAsset.unlocked),
 });
 
+// 付费板块内免费帖（thread-cover-design，种子挂 3 条图集媒体）：匿名媒体地址必须全空、板块锁定；
+// 免费板块图集帖（thread-demo-gallery）匿名媒体不得被清空，防止付费墙口径退化误伤公开内容。
+const coverDetail = await request('GET', '/api/v1/community/threads/thread-cover-design');
+const coverThread = coverDetail.body && coverDetail.body.thread ? coverDetail.body.thread : {};
+const coverUrls = Array.isArray(coverThread.media) ? coverThread.media.map((m) => String(m.url || '')) : [];
+results.push({
+  name: '付费板块内免费帖匿名：media url 全空且 board_locked=true',
+  ok: coverDetail.status === 200 && coverThread.board_locked === true && coverUrls.every((u) => u === ''),
+  detail: 'status ' + coverDetail.status + ' / board_locked ' + String(coverThread.board_locked) + ' / mediaLen ' + coverUrls.length,
+});
+const freeGalleryRes = await request('GET', '/api/v1/community/threads/thread-demo-gallery');
+const freeGalleryThread = freeGalleryRes.body && freeGalleryRes.body.thread ? freeGalleryRes.body.thread : {};
+const freeGalleryUrls = Array.isArray(freeGalleryThread.media) ? freeGalleryThread.media.map((m) => String(m.url || '')) : [];
+results.push({
+  name: '免费板块图集帖匿名：媒体 url 仍可见（不退化锁定）',
+  ok: freeGalleryRes.status === 200 && freeGalleryThread.board_locked === false && freeGalleryUrls.length > 0 && freeGalleryUrls.every((u) => u !== ''),
+  detail: 'status ' + freeGalleryRes.status + ' / board_locked ' + String(freeGalleryThread.board_locked) + ' / mediaLen ' + freeGalleryUrls.length,
+});
+
 const closedReg = await request('POST', '/api/v1/auth/register', JSON.stringify({ region: 'cn', provider: 'phone', identifier: '13900000001', password: 'test-pass-123' }));
 results.push({
   name: '注册关闭态 POST /api/v1/auth/register 返回 403 AUTH_REGISTER_DISABLED',
@@ -527,6 +556,19 @@ results.push({
   detail: 'status ' + relogin.status,
 });
 if (createdId) {
+  // 直接落一条付费板块会员记录（绕开余额支付），核对加入后媒体地址是否下发
+  const paidBoardRow = db.prepare("SELECT id FROM community_boards WHERE slug = 'paid'").get();
+  db.prepare('INSERT INTO community_board_memberships (board_id, user_id, amount_cents, created_at) VALUES (?, ?, 0, ?)')
+    .run(paidBoardRow.id, createdId, now);
+  const memberDetail = await request('GET', '/api/v1/community/threads/thread-cover-design', undefined, openReg.body.access_token);
+  const memberThread = memberDetail.body && memberDetail.body.thread ? memberDetail.body.thread : {};
+  const memberUrls = Array.isArray(memberThread.media) ? memberThread.media.map((m) => String(m.url || '')) : [];
+  results.push({
+    name: '已加入付费板块：cover-design 媒体 url 非空且板块解锁',
+    ok: memberDetail.status === 200 && memberThread.board_locked === false && memberUrls.length === 3 && memberUrls.every((u) => u !== ''),
+    detail: 'status ' + memberDetail.status + ' / board_locked ' + String(memberThread.board_locked) + ' / mediaLen ' + memberUrls.length,
+  });
+  db.prepare('DELETE FROM community_board_memberships WHERE user_id = ?').run(createdId);
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(createdId);
   db.prepare('DELETE FROM credentials WHERE user_id = ?').run(createdId);
   db.prepare('DELETE FROM identities WHERE user_id = ?').run(createdId);

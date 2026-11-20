@@ -4546,6 +4546,95 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色 */
 } /* 结束 */
 
+/* ── 付费板块页内门禁壳：替代未加入付费 chip 的整页跳登录，复用付费墙金底虚线风格 ── */
+.community-gate-panel { /* 门禁壳容器：与 .community-paywall 同一档内边距与圆角 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: var(--sp-2); /* 标题 / 条件 / 按钮区间距 */
+  margin: var(--card-pad) 0; /* 上下与列表拉开一档 */
+  padding: var(--card-pad); /* 内边距：与社区卡片同一档 */
+  border-radius: var(--card-radius-sm); /* 圆角收进卡片圆角阶梯 */
+  border: 1px dashed var(--premium-border); /* 金色虚线，与付费墙同族 */
+  background: var(--premium-soft); /* 浅金底，复用付费提示表面色 */
+} /* 结束 */
+
+.community-gate-head { /* 头部行：图标 + 标题描述 + 价格角标 */
+  display: flex; /* 横向排列 */
+  align-items: flex-start; /* 顶部对齐，长描述不顶高图标 */
+  gap: var(--sp-2); /* 子项间距 */
+} /* 结束 */
+
+.community-gate-icon { /* 板块图标 */
+  font-size: var(--fs-xl); /* 与页面主标题同档，保证可见性 */
+  line-height: 1; /* 去除行高带来的额外偏移 */
+} /* 结束 */
+
+.community-gate-title { /* 标题与描述区：吃掉剩余宽度 */
+  flex: 1; /* 自适应宽度 */
+  min-width: 0; /* 允许收缩，长标题 / 描述不撑破壳 */
+} /* 结束 */
+
+.community-gate-title strong { /* 板块名 */
+  font-size: var(--fs-md); /* 与详情子区块标题同档 */
+} /* 结束 */
+
+.community-gate-title p { /* 板块描述 */
+  margin: 2px 0 0; /* 仅留与标题的极小间距 */
+  font-size: var(--fs-xs); /* 说明小字 */
+  line-height: var(--lh-base); /* 基准行高 */
+  color: var(--text-muted); /* 次要色 */
+} /* 结束 */
+
+.community-gate-price { /* 价格角标：与既有板块价格标同族 */
+  flex-shrink: 0; /* 窄屏不被压缩 */
+  padding: 4px 10px; /* 内边距 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  background: var(--surface); /* 卡片表面底，从金底上抬起一档 */
+  color: var(--premium); /* 金色文字 */
+  font-size: var(--fs-xs); /* 小字 */
+  font-weight: 600; /* 加粗突出价格 */
+  font-style: normal; /* 去掉 em 默认斜体 */
+} /* 结束 */
+
+.community-gate-conditions { /* 条件清单：无卡片背景，纵向排列 */
+  margin: 0; /* 去列表默认外边距 */
+  padding-left: 18px; /* 保留项目符号缩进 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: var(--sp-1); /* 条目间距 */
+  font-size: var(--fs-xs); /* 说明小字 */
+  line-height: var(--lh-base); /* 基准行高 */
+  color: var(--text-muted); /* 次要色 */
+} /* 结束 */
+
+.community-gate-actions { /* 按钮行：主操作 + 返回论坛，窄屏换行 */
+  display: flex; /* 横向排列 */
+  flex-wrap: wrap; /* 空间不足时换行 */
+  gap: var(--sp-2); /* 按钮间距 */
+  align-items: center; /* 纵向居中 */
+} /* 结束 */
+
+.community-gate-hint { /* 详情锁帖媒体位：说明块替代空图位 / 破图 */
+  display: flex; /* 纵向排列 */
+  flex-direction: column; /* 主轴纵向 */
+  gap: var(--sp-1); /* 标题与说明间距 */
+  margin-top: var(--card-pad); /* 上间距与详情卡同一档 */
+  padding: var(--card-pad); /* 内边距 */
+  border-radius: var(--card-radius-sm); /* 圆角 */
+  border: 1px dashed var(--border-strong); /* 次级虚线描边，区别于付费墙金底 */
+  background: var(--surface-3); /* 三级表面底 */
+} /* 结束 */
+
+.community-gate-hint strong { /* 媒体位提示标题 */
+  font-size: var(--fs-md); /* 与详情子区块标题同档 */
+} /* 结束 */
+
+.community-gate-hint p { /* 媒体位说明 */
+  margin: 0; /* 去外边距 */
+  font-size: var(--fs-xs); /* 说明小字 */
+  color: var(--text-muted); /* 次要色 */
+} /* 结束 */
+
 .community-section-head { /* 区块标题行 */
   display: flex; /* 左右 */
   justify-content: space-between; /* 两端 */

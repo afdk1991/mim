@@ -246,6 +246,9 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [notice, setNotice] = useState<string | null>(null); // 赋值：更新变量 const 的取值
 
   const [board, setBoard] = useState('all'); // 赋值：更新变量 const 的取值
+  // 付费板块页内门禁壳：未加入时点 chip 不整页跳登录，先在论坛页内展开说明与操作入口
+  const [gateBoard, setGateBoard] = useState<CommunityBoard | null>(null); // 赋值：更新变量 const 的取值
+  const [gateBusy, setGateBusy] = useState(false); // 门禁壳加入请求中，防重复点击
   const [kind, setKind] = useState('all'); // 赋值：更新变量 const 的取值
   const [sort, setSort] = useState<'latest' | 'hot' | 'views' | 'replies' | 'favorites' | 'rating' | 'recommend'>('latest'); // 赋值：更新变量 const 的取值
   const [boardTabs, setBoardTabs] = useState<BoardTab[]>(DEFAULT_BOARD_TABS); // 赋值：更新变量 const 的取值
@@ -616,6 +619,13 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     } // 代码块结束
   } // 代码块结束
 
+  // 概览刷新后若目标板块已加入 / 已是 VIP，关闭可能残留的门禁壳，避免壳遮挡新板块列表
+  useEffect(() => {
+    if (!gateBoard) return; // 门禁壳未展开时不处理
+    const fresh = boards.find((b) => b.slug === gateBoard.slug); // 取最新板块对象，joined / vip 状态以服务端为准
+    if (fresh && (fresh.joined || vipLevel > 0)) setGateBoard(null); // 已具备准入：收起壳
+  }, [boards, gateBoard, vipLevel]); // 依赖：板块列表、壳目标、VIP 等级
+
   // 深链接进入 /community/post/:id：地址栏粘贴或刷新时主动拉取详情，避免空白
   useEffect(() => {
     if (!postId) return; // 列表态不处理
@@ -716,12 +726,54 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     } // 代码块结束
   } // 代码块结束
 
+  /** 板块 chip / 侧栏导航统一入口：付费未加入且非 VIP 时展开页内门禁壳，不整页跳登录。 */
+  function selectBoard(target: CommunityBoard) { // 函数 selectBoard：封装一段可复用的处理逻辑
+    const paidLocked = target.price_cents > 0 && !target.joined && vipLevel === 0; // 付费门槛：未加入且当前非 VIP
+    if (paidLocked) { // 条件分支：付费未加入
+      setGateBoard(target); // 页内展开门禁壳：保留当前列表与筛选，不发任何写请求、不跳路由
+      return; // 返回当前函数的处理结果
+    } // 条件分支结束
+    if (target.visibility === 'followers' && !target.followed && !target.is_moderator) { // 条件分支：关注可见板块
+      void followBoard(target.slug); // 沿用既有关注链路，行为与本轮改动前一致
+      return; // 返回当前函数的处理结果
+    } // 条件分支结束
+    setGateBoard(null); // 已加入 / VIP / 免费板块：关闭可能残留的门禁壳后直接切板块
+    setBoard(target.slug); // 写入当前板块筛选
+  } // selectBoard 结束
+
+  /** 门禁壳「登录并加入」：先把目标板块写进返回路径，再交给 App 记下来源并跳登录页。 */
+  function gateLoginNext() { // 函数 gateLoginNext：封装一段可复用的处理逻辑
+    if (!gateBoard) return; // 无门禁壳时不动作
+    const url = new URL(window.location.href); // 当前地址：保留既有查询串与 hash
+    url.searchParams.set('board', gateBoard.slug); // 回跳落点带上目标板块，登录成功后直达该板块
+    window.history.replaceState(null, '', url.toString()); // 原地替换地址栏，不新增浏览历史记录
+    if (onRequireLogin) onRequireLogin(); // App 记录当前路径（含 ?board=paid）后跳 /signin
+    else requireSession(); // 无上层回调时回落组件内既有登录引导
+  } // gateLoginNext 结束
+
+  /** 门禁壳「确认加入」：已登录才真正调加入接口；未登录先走带返回路径的登录引导。 */
+  async function gateJoin() { // 函数 gateJoin：封装一段可复用的处理逻辑
+    if (!gateBoard) return; // 无门禁壳时不动作
+    if (!hasSession) { // 条件分支：匿名点击
+      gateLoginNext(); // 匿名不发写请求：带返回路径去登录，登录后回本页再加入
+      return; // 返回当前函数的处理结果
+    } // 条件分支结束
+    setGateBusy(true); // 进入加载态，防重复点击
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      await joinBoard(gateBoard.slug); // 复用既有扣费 / 刷新 / 通知逻辑，错误由 joinBoard 统一落地提示
+      setGateBoard(null); // 加入成功关闭门禁壳；失败保留壳与错误提示，便于重试
+    } finally { // 代码块结束
+      setGateBusy(false); // 无论成败复位加载态
+    } // 代码块结束
+  } // gateJoin 结束
+
   async function joinBoard(slug: string) { // 函数 joinBoard：封装一段可复用的处理逻辑
     if (!requireSession()) return; // 加入板块必须登录
     try { // 异常捕获起点：包裹可能抛出错误的操作
       const result = await api.community.joinBoard(slug); // 常量 result：保存固定配置或一次性派生值
       setNotice(result.charged_cents > 0 ? `已扣 ${yuan(result.charged_cents)} 加入板块` : '已加入板块');
       setBoard(slug);
+      setGateBoard(null); // 加入成功关闭页内门禁壳，避免壳残留遮挡新板块列表
       await Promise.all([loadOverview(), loadThreads()]); // 异步等待：挂起至 Promise 落定后再继续
     } catch (err) {
       setError(errorText(locale, err));
@@ -1188,17 +1240,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   key={b.slug}
                   type="button" // 赋值：更新变量 type 的取值
                   className={`${board === b.slug ? 'is-active' : ''}${b.price_cents > 0 && !b.joined ? ' is-locked' : ''}`}
-                  onClick={() => {
-                    if (b.price_cents > 0 && !b.joined && b.slug !== board) { // 条件分支：按判断结果选择后续处理路径
-                      void joinBoard(b.slug); // 执行当前业务步骤
-                      return; // 返回当前函数的处理结果
-                    } // 代码块结束
-                    if (b.visibility === 'followers' && !b.followed && !b.is_moderator) { // 条件分支：按判断结果选择后续处理路径
-                      void followBoard(b.slug); // 执行当前业务步骤
-                      return; // 返回当前函数的处理结果
-                    } // 代码块结束
-                    setBoard(b.slug);
-                  }}
+                  onClick={() => selectBoard(b)}
                   title={b.price_cents > 0 && !b.joined ? `付费板块：${yuan(b.price_cents)} 加入` : b.visibility === 'followers' && !b.followed ? '关注后可见' : b.description}
                 >
                   {b.icon} {b.name} <em>{b.thread_count}</em>
@@ -1279,6 +1321,35 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               )}
             </div>
           </div>
+          {/* 付费板块页内门禁壳：匿名 / 已登录未加入均停留在 /community，不再整页跳 /signin */}
+          {gateBoard && (
+            <div className="community-gate-panel" role="dialog" aria-label={`${gateBoard.name} 加入门槛`}>{/* 执行当前业务步骤 */}
+              <div className="community-gate-head">{/* 板块名 + 图标 + 价格一行 */}
+                <span className="community-gate-icon" aria-hidden="true">{gateBoard.icon}</span>
+                <div className="community-gate-title">
+                  <strong>{gateBoard.name}</strong>
+                  <p>{gateBoard.description}</p>
+                </div>
+                <em className="community-gate-price">{yuan(gateBoard.price_cents)} · {gateBoard.price_cents} 积分</em>
+              </div>
+              <ul className="community-gate-conditions">{/* 加入条件与可见内容概述，按登录态分条说明 */}
+                {!hasSession && <li>未登录：需先登录账号，登录后回到本页即可加入；未登录不会产生任何扣费。</li>}
+                {hasSession && <li>已登录未加入：确认加入将从钱包余额扣除 {yuan(gateBoard.price_cents)}（{gateBoard.price_cents} 积分）。</li>}
+                <li>VIP 会员可免加入直接浏览板块内容；普通成员加入后可阅读全部帖子与回复。</li>
+                <li>加入后可见该板块 {gateBoard.thread_count} 篇帖子，以及帖内图集 / 视频。</li>
+              </ul>
+              <div className="community-gate-actions">{/* 主操作按登录态切换；次操作关闭壳、不回跳 */}
+                {!hasSession ? (
+                  <button type="button" className="is-primary" onClick={gateLoginNext}>登录并加入</button>
+                ) : (
+                  <button type="button" className="is-primary" disabled={gateBusy} onClick={() => void gateJoin()}>
+                    {gateBusy ? '加入中…' : `确认加入（扣 ${yuan(gateBoard.price_cents)} 积分）`}
+                  </button>
+                )}
+                <button type="button" className="btn ghost" onClick={() => setGateBoard(null)}>返回论坛</button>
+              </div>
+            </div>
+          )}
           <CommunityMoreStyles />
           {searchOpen && (
             <SearchPanel locale={locale} board={board} onOpenThread={(id) => { setSearchOpen(false); void openThread(id); }} />
@@ -1463,7 +1534,11 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               {threads.map((t) => (
               <article key={t.id} className="community-card" onClick={() => void openThread(t.id)}>{/* 执行当前业务步骤 */}
                 <div className="community-cover">{/* 执行当前业务步骤 */}
-                  {t.cover_url ? <img src={coverSrc(t.cover_url)} alt={t.title} loading="lazy" /> : <span>{KIND_LABEL[t.kind]}</span>}
+                  {t.cover_url ? (
+                    <img src={coverSrc(t.cover_url)} alt={t.title} loading="lazy" />
+                  ) : (
+                    <span>{t.locked ? (t.board_visibility === 'followers' && !t.board_followed ? '关注后可见' : '加入后可见') : KIND_LABEL[t.kind]}</span>
+                  )}
                   <em className={`community-kind kind-${t.kind}`}>{KIND_LABEL[t.kind]}</em>
                   {t.price_cents > 0 && <em className="community-price">{yuan(t.price_cents)}</em>}
                 </div>
@@ -1532,7 +1607,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               <ul className="community-widget-list">
                 {boards.map((b) => (
                   <li key={b.slug}>
-                    <button type="button" className="community-widget-link" onClick={() => setBoard(b.slug)}>
+                    <button type="button" className="community-widget-link" onClick={() => selectBoard(b)}>
                       <span className="community-widget-title">{b.icon} {b.name}</span>
                       <span className="community-widget-meta">{b.thread_count} 帖</span>
                     </button>
@@ -1614,6 +1689,12 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+              {!selected.unlocked && selected.thread.board_locked && (selected.thread.board_price_cents ?? 0) > 0 && (
+                <div className="community-gate-hint">{/* 锁帖媒体位：页内说明替代空图位 / 破图，不加载任何媒体地址 */}
+                  <strong>图集 / 视频加入板块后可见</strong>
+                  <p>该板块需加入后查看帖内图集与视频；未加入时不会加载任何媒体地址。</p>
                 </div>
               )}
               {(selected.unlocked && (selected.thread.attachments?.length ?? 0) > 0) && (

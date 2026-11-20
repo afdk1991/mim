@@ -494,6 +494,10 @@ export function seedCommunity(db: Db): void {
       // 视频示例：复用 public/demo 下已有演示片，封面同目录，避免外链与额外存储
       ['media-demo-video-1', 'thread-demo-video', 'video', '/demo/stardust-ep1.mp4', '/demo/stardust-cover.jpg', 'video/mp4', 30, 1],
       ['media-demo-video-2', 'thread-demo-video', 'video', '/demo/bloom-ep1.mp4', '/demo/bloom-cover.jpg', 'video/mp4', 15, 2],
+      // 付费板块内免费帖 `thread-cover-design` 的 3 张图集媒体：与生产同主键，回归断言付费墙媒体锁定口径
+      ['media-fix-cover-design-1', 'thread-cover-design', 'image', '/catalog/frontier.jpg', '', 'image/jpeg', 0, 1],
+      ['media-fix-cover-design-2', 'thread-cover-design', 'image', '/catalog/store.jpg', '', 'image/jpeg', 0, 2],
+      ['media-fix-cover-design-3', 'thread-cover-design', 'image', '/catalog/tools.jpg', '', 'image/jpeg', 0, 3],
     ];
     for (const [id, threadId, kind, url, poster, mime, duration, sort] of demoMedia) {
       insertMedia.run(id, threadId, kind, url, poster, mime, duration, sort, now);
