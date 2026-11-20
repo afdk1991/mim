@@ -13,6 +13,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { Locale } from '@mim/i18n';
 // API 客户端与会话读取
 import { api, getSession } from '../api';
+// 公开地址归一化：签名下载链接在跨源构建下补 API 源
+import { resolvePublicUrl } from '../api/request.js';
 // IM 相关类型：会话 / 消息 / 用户 / 成员
 import type { ImConversation, ImMember, ImMessage, ImUser } from '../api';
 // IM socket hook：连接、发送、帧订阅
@@ -60,7 +62,7 @@ function ChatImageBubble({ objectKey, name, isZh }: { objectKey: string; name?: 
     api.media
       .presignDownload(objectKey, 3600) // 申请 1 小时有效的下载签名
       .then((res) => {
-        if (alive) setUrl(res.download.url); // 拿到直链
+        if (alive) setUrl(resolvePublicUrl(res.download.url)); // 拿到直链并归一化（相对签名链接补 API 源）
       }) // 代码块结束
       .catch(() => {
         if (alive) setFailed(true); // 失败回退占位
@@ -104,7 +106,7 @@ function ChatFileBubble({ objectKey, name, size, isZh }: { objectKey: string; na
     api.media
       .presignDownload(objectKey, 3600) // 申请 1 小时有效下载签名
       .then((res) => {
-        if (alive) setUrl(res.download.url); // 拿到直链
+        if (alive) setUrl(resolvePublicUrl(res.download.url)); // 拿到直链并归一化（相对签名链接补 API 源）
       }) // 代码块结束
       .catch(() => {
         if (alive) setFailed(true); // 失败回退

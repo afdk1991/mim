@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'; // 状态与副作用
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { api } from '../api'; // 接口客户端
 import { threadDetail } from '../api/community.js'; // 论坛帖子详情：内容流来源为 community_thread 时补齐媒体与付费墙口径
+import { resolvePublicUrl } from '../api/request.js'; // 公开地址归一化：API 签名链接与 Web 静态产物分流
 import type { CommunityThreadMedia } from '../api'; // 帖子媒体（图片 / 视频 + 时长与分辨率）
 import { navigatePath, pathOf } from '../router'; // 站内导航与深链接构造
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明 + 操作槽位
@@ -61,11 +62,10 @@ const IMAGE_LINE = /^https?:\/\/\S+\.(?:png|jpe?g|gif|webp|svg)(?:\?\S*)?$/i;
 /** 正文里是否是视频地址（用于直接渲染播放器）。 */
 const VIDEO_LINE = /^https?:\/\/\S+\.(?:mp4|webm|mov|m4v)(?:\?\S*)?$/i;
 
-/** 媒体地址归一化：绝对地址原样用，站内相对路径补站点前缀。 */
+/** 媒体地址归一化：绝对地址原样用，签名链接 / 静态素材由统一解析器分流补前缀。 */
 function mediaSrc(url: string): string {
   if (!url) return ''; // 空串交给调用方按无地址处理
-  if (/^(https?:)?\//.test(url)) return url; // 绝对地址或协议相对地址直接可用
-  return `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}`; // 站内静态资源补 BASE_URL
+  return resolvePublicUrl(url); // /api/ 签名链接补 API 源，/catalog、/demo 等静态路径补站点前缀
 } // mediaSrc 结束
 
 /** 视频时长：秒 → m:ss；未知返回空串。 */

@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'; // 引入依赖、
 import { Avatar } from '../components/Avatar.js'; // 共享头像：四档尺寸 + 角标槽
 import type { Locale } from '@mim/i18n'; // 引入依赖、类型或本地模块绑定
 import { api, errorText, getSession } from '../api'; // 引入依赖、类型或本地模块绑定
+import { resolvePublicUrl } from '../api/request.js'; // 公开地址归一化：API 签名链接与 Web 静态产物分流
 import { cancelWithdrawal, createWithdrawal, getWithdrawalOverview } from '../api/wallet-withdrawal'; // 提现：可提现余额口径与申请（钱包结算层）
 import type { WithdrawMethod, WithdrawalOverview } from '../api/wallet-withdrawal'; // 提现类型，全部金额为整数分
 import type { // 引入依赖、类型或本地模块绑定
@@ -174,10 +175,9 @@ function yuan(cents: number): string { // 函数 yuan：封装一段可复用的
   return `¥${(cents / 100).toFixed(2)}`; // 返回当前函数的处理结果
 } // 代码块结束
 
-function coverSrc(url: string | null): string { // 函数 coverSrc：封装一段可复用的处理逻辑
+function coverSrc(url: string | null): string { // 封面 / 媒体地址统一走归一化：签名链接补 API 源，静态素材补 BASE_URL
   if (!url) return ''; // 条件分支：按判断结果选择后续处理路径
-  if (/^(https?:)?\//.test(url)) return url;
-  return `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}`;
+  return resolvePublicUrl(url); // 绝对地址、/api/ 签名链接、/catalog 等静态前缀由解析器分流
 } // 代码块结束
 
 /** VIP 等级徽章：等级 ≥2 走紫色 vip-2，其余走金色 vip-1；路径按 BASE_URL 拼接兼容子路径部署。 */

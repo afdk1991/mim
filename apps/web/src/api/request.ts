@@ -15,11 +15,19 @@ import type { UserInfo, Session, LoginResult, MeResponse } from './types.js'; //
 const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, ''); // 读构建期变量并去掉尾部斜杠，避免拼出双斜杠
 export const BASE = `${API_ORIGIN}/api/v1`; // 统一路径前缀，集中定义便于未来整体迁移
 
-/** 归一化服务端下发的预签名地址：绝对地址原样用，同源相对路径在跨源托管构建下补上 API 源 */
+/** 归一化 Web 静态资源地址：绝对 / 协议相对地址原样用；根相对路径按构建期 BASE_URL 补站点前缀，兼容 /mim/ 子路径部署。 */
+export function resolveStaticUrl(url: string): string { // public 目录产物（/catalog、/demo、/zib 等）随前端产物部署，不走 API 源
+  if (!url) return url; // 空串原样返回，调用方按无图处理
+  if (/^(https?:)?\/\//i.test(url)) return url; // 外链或协议相对地址直接可用
+  return `${import.meta.env.BASE_URL}${url.replace(/^\//, '')}`; // 静态资源补 BASE_URL 前缀，子路径下仍能解析
+} // resolveStaticUrl 结束
+
+/** 归一化服务端下发的公开地址：API 签名链接跨源补 API 源，Web 静态产物留在 Web 源，避免前缀到 API 后命中 SPA 回退 HTML 破图。 */
 export function resolvePublicUrl(url: string): string { // 避免 GitHub Pages / Cloudflare 等跨源站点把 /api/v1/... 打到自己域名
   if (!url) return url; // 空串原样返回，调用方按无链接处理
-  if (/^https?:\/\//i.test(url)) return url; // 已是绝对地址（S3 或配置了 MIM_PUBLIC_BASE_URL）无需加工
-  if (url.startsWith('/')) return `${API_ORIGIN}${url}`; // 相对路径补 API 源；同源构建时 API_ORIGIN 为空即保持原样
+  if (/^(https?:)?\/\//i.test(url)) return url; // 已是绝对地址（S3 或配置了 MIM_PUBLIC_BASE_URL）或协议相对地址无需加工
+  if (url.startsWith('/api/')) return `${API_ORIGIN}${url}`; // API 对象存储 / 签名下载：跨源构建补 API 源；同源构建 API_ORIGIN 为空即保持原样
+  if (url.startsWith('/')) return resolveStaticUrl(url); // 其余根相对路径是 Web 静态产物（/catalog、/demo、/zib 等），必须留在 Web 源
   return `${BASE}/${url}`; // 非斜杠开头的裸路径按 API 前缀兜底，保证总有一个可达地址
 } // resolvePublicUrl 结束
 
