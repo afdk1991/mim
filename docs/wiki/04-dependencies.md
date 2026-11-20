@@ -34,6 +34,10 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `@vitejs/plugin-react` | ^4.7.0 | 开发 | React 插件（peer 支持 Vite 4/5/6/7） |
 | `typescript` | ^5.6.3 | 开发 | 类型检查 |
 | `@types/react` / `@types/react-dom` | 见 package.json | 开发 | 类型声明 |
+| `vitest` | ^4.1.12 | 开发 | 前端测试运行器：纯函数归一化用例 + jsdom 内组件级渲染用例，与后端同版本 |
+| `@testing-library/react` | ^16.3.3 | 开发 | React 组件渲染与交互断言（jsdom 环境），配合 `@testing-library/dom` 提供 DOM 查询 |
+| `@testing-library/dom` | ^10.4.2 | 开发 | RTL 底层 DOM 查询与可访问性断言（`@testing-library/react` peer） |
+| `jsdom` | ^31.0.1 | 开发 | 组件测试的浏览器环境模拟（无需浏览器二进制，CI 可直接跑） |
 
 ### 1.3 共享包 `packages/*`
 
@@ -94,7 +98,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | IM / 音视频 / AI | P0 全部采购第三方驱动，不自研 SFU 与 AI 推理 | **未落地**（P1） | PRD §3 排除项 |
 | 推送 | APNs / FCM / 国内厂商通道，平台适配层封装 | **未落地**（原截止提醒场景随 FR-03 移除，无 P0 推送需求） | PRD FR-04 |
 | 管理后台 | 直接用 Ant Design Pro / Arco Pro 模板，不定制设计 | **未落地**；仓库无 `apps/admin` | team-hiring-plan.md 省钱杠杆 |
-| 测试自动化 | Appium + Playwright | **部分落地**：后端 vitest + supertest 契约测试（12 例）；端到端 UI 自动化未落地 | team-hiring-plan.md |
+| 测试自动化 | Appium + Playwright | **部分落地**：后端 vitest + supertest 契约测试；前端 vitest 纯函数用例 + Testing Library/jsdom 组件级渲染用例；浏览器级端到端 UI 自动化仍未落地 | team-hiring-plan.md |
 | 内容审核 | 第三方服务（数美、网易易盾等） | **未落地**（P1） | team-hiring-plan.md 坑 #1 |
 | 实时同步 | WebSocket 推送 | **未采用**：原 4s 增量轮询方案随 FR-03 一并移除（2026-11-04），当前无实时同步需求 | PRD FR-03（已移除） |
 

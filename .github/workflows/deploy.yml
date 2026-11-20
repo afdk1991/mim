@@ -70,7 +70,8 @@ jobs:
       - name: 后端契约测试
         run: pnpm --filter @mim/api test
 
-      - name: 前端纯函数测试（地址归一化 / 会话结构校验）
+      # 前端测试：纯函数归一化 / 会话结构校验 + jsdom 内组件级渲染（封面 srcSet、占位兜底、深链接与购买状态机）
+      - name: 前端测试（纯函数 + 组件级）
         run: pnpm --filter @mim/web test
 
       - name: 前端构建

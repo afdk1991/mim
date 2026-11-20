@@ -183,7 +183,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
 pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，58 个测试文件 / 543 例，2026-11-20 本轮实测）
-pnpm --filter @mim/web test               # 用户端纯函数测试（vitest，请求归一化与封面 srcset 派生，12 例）
+pnpm --filter @mim/web test               # 用户端 vitest：纯函数归一化 / srcset 派生 12 例 + Testing Library/jsdom 组件级 7 例（共 19 例）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
