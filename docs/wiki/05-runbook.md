@@ -146,6 +146,8 @@ pnpm --filter @mim/admin build          # 管理后台 tsc --noEmit + vite build
 npm run check                           # 版本规约 + 密钥模板校验 + 注释覆盖率门禁（CI 以 --strict 执行）
 ```
 
+**E2E 与 vitest 的分工（2026-11-20 踩坑记录）**：`apps/web/vite.config.ts` 从 `vitest/config` 导入 `defineConfig` / `configDefaults`，`test.exclude` 显式加 `e2e/**`。否则 `vitest run` 会把 `e2e/*.spec.ts` 当作用例收集，报 `Playwright Test did not expect test.describe() to be called here`（CI 质量门禁曾因此红了一次）。CI 中浏览器用例是独立作业「浏览器端到端（Playwright）」，不设 needs、不阻塞 deploy，失败时上传 `apps/web/playwright-report/`。
+
 **聊天点击级 E2E（Edge CDP，两个脚本可重放）**：先起三件套 —— `MIM_JOBS=0 MIM_AI_WORKER=0 node services/mim-api/dist/index.js`（API :8787）、`node scripts/serve-local.mjs`（静态站 :5188，同源反代 `/api`）、`msedge --headless=new --remote-debugging-port=9222 --user-data-dir=<绝对路径>/.tmp/edge-profile-chat about:blank`；再跑 `npm run verify:chat-flow`（15 项）与 `npm run verify:chat-plus`（23 项，引用回复 / 文件下载直链 / 设管理员 / 邀请入群 / 搜索定位高亮），取证落 `.tmp/chat-flow-e2e.json`、`.tmp/chat-plus-e2e.json` 与同名 `.png`。
 > **踩坑**：本地 E2E 前必须确认 `apps/web/dist` 是**同源构建**（`$env:VITE_API_ORIGIN=''; pnpm --filter @mim/web build`）。若产物带 `VITE_API_ORIGIN=https://api.laal.top`，页面会把请求打到生产 API，本地 token 不被识别 → 会话列表空、用户搜索空，`verify-chat-flow` 会连锁 FAIL 6 项。
 
