@@ -12,7 +12,7 @@
 |---|---|---|---|
 | `AGENTS.md` | 治理 | 定义 12 条协作铁律（含免费平台额度矩阵、全仓库逐行注释、全量远端同步与生产统一部署腾讯云自建服务器），对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
-| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 52 文件 / 505 例契约测试通过（2026-11-20 批次 2 实测）；端口 8787 |
+| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 57 个测试文件 / 534 例契约测试通过（2026-11-20 批次 7 本轮实测）；端口 8787 |
 | `services/mim-api/src/routes/assets.ts` / `payments.ts` / `fulfillment.ts` / `finance.ts` / `appearance.ts` / `growth.ts` / `i18n.ts` | 业务代码（后端） | **2026-11-12 新增（V0.0.5 商业化二期）**：付费资产、支付意图与回调、发货物流售后评价、提现与创作分成、主题与页面区块、成长徽章私信 IP、机器翻译与语言设置；支付内核在 `src/payments.ts` | 16 张商业化表 + `commerce.test.ts` 8 例契约测试；未配置供应商时返回 `PROVIDER_NOT_CONFIGURED` |
 | `apps/web/src/views/CommerceCenter.tsx` | 业务代码（前端） | **2026-11-12 新增（V0.0.5）**：`/commerce` 商业化中台，五页签覆盖资产 / 履约 / 资金 / 外观 / 成长国际化 | 资产筛选与购买、运单与售后、提现与收益、主题与区块排序、私信与翻译 |
 | `apps/web/src/views/AnnouncementsPanel.tsx` | 业务代码（前端） | **2026-11-14 新增、2026-11-15 收口**：原 `/announcements` 公告动态、`/news` 社区资讯与 `/releases` 版本记录全部并入社区页「公告动态」页签（公告 / 更新日志 / 推广计划 / 社区动态四个子页签），数据源仍是 `GET /announcements`、`GET /changelog`、`GET /promotions`、`GET /content/items`；旧地址 `/announcements`、`/news`、`/releases` 统一 301 到 `/community` | 只读列表 + 来源计数徽标 + 更新日志版本补充信息 + 空态 / 失败态 |
