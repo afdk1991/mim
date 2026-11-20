@@ -50,7 +50,7 @@ f:\合并项目\Mim
 ├── apps/
 │   └── web/                       # Web 端（React 18 + Vite 6，5173；views/ 16 个视图组件 / 8 个 AppView，视图段见 router.ts VIEW_SEGMENTS）
 ├── services/
-│   └── mim-api/                   # 后端 API（Express 5 + SQLite WAL + JWT + zod，8787）+ test/（57 个测试文件 / 534 例，2026-11-20 批次 7 本轮实测）
+│   └── mim-api/                   # 后端 API（Express 5 + SQLite WAL + JWT + zod，8787）+ test/（57 个测试文件 / 535 例，2026-11-20 本轮 CI 实测）
 ├── packages/
 │   ├── core-domain/               # 错误码 / UUIDv7 / 部署汇总注册表（errors.ts / ids.ts / deploymentRegistry.*）
 │   └── i18n/                      # zh-CN / en-US 文案与货币格式化
