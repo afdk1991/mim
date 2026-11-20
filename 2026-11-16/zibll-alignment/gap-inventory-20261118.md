@@ -12,7 +12,7 @@
 | Mim 栈 | Node/TS monorepo：`@mim/api` Express + better-sqlite3；`apps/web` Vite + React；仓库内 **0 个 `.php`、0 个 WP 核心文件**；本机无 `php` 命令 | 根 `package.json` `mim@0.0.12`；`services/mim-api/package.json` 依赖清单；递归扫描 |
 | 已复用素材 | `apps/web/public/zib/`：图标字体 4 个 + 空态 / 缩略图 / 头像 / VIP / 等级 / 消息分类 SVG·PNG 共 40 余件 | `apps/web/public/zib/` 目录清单 |
 | 已接线素材 | `avatar-default.png`（`Shell.tsx`）；空态 `null-*.svg` 经 `EmptyState` 接 25 处 / 9 视图；`msg-*.svg` 接通知类别徽章；`vip-1/vip-2.svg` 接社区 VIP 胶囊等级徽章。缩略图占位、`user-level-*.png` 等级图、草稿/待审徽章仍已复制未接线 | 全仓 `zib/img` / `zib/fonts` 引用检索 |
-| 授权边界 | 授权码 + 域名验证，绑 `laal.top`，有效期至 2026-12-16 24:00；授权码全仓 0 命中，未入库；不移植授权校验代码 | 全仓检索授权码；映射文档第五节 |
+| 授权边界 | 授权码 + 域名验证，绑 `laal.top`；**2026-11-20 已激活**（`is_aut=1`，到期 2026-12-16 16:00:00）；授权码全仓 0 命中，未入库；不移植授权校验代码 | 全仓检索授权码；映射文档第五节；方案文档 §4.4 激活取证 |
 
 ## 二、已落地项（无需返工）
 
@@ -59,6 +59,6 @@
 - **部署位置（2026-11-19 拍板）**：WP 站落裸域 **`laal.top`**，复用既有 WP（目录 `/var/www/bbs.laal.top`、库 `bbs_wp`、主题 `zibll` V9.2），不另建 `blog.laal.top`；与 Mim 主站 `zy.laal.top` / `api.laal.top` 按 `server_name` 精确分流，不与 Node 站点同进程混跑。
 - **2026-11-19 主机实测**：SSH 通道可用，`root@115.159.159.11`（hostname `VM-0-13-ubuntu`）以本机私钥 `~/.ssh/mim_deploy_20261114` 直连成功；主机 PHP 8.1-FPM（socket `/run/php/php8.1-fpm.sock`）、MariaDB 10.6.23 active、nginx 1.18.0；泛域名证书 `/etc/letsencrypt/live/laal.top`（SAN `*.laal.top, laal.top`）覆盖裸域。
 - **迁移取证（2026-11-19 23:51 +08）**：`https://laal.top/` 200 / 37276B（zibll 特征命中、9 件主题资源、零 http 混合内容），`/wp-login.php` 200、`/wp-json/` 200；`www.laal.top` 与 `bbs.laal.top` 均 301 → `https://laal.top/`；`zy.laal.top` 200、API healthz 200，Mim 未受影响；`nginx -t` ok 无重复 server_name 告警。库内旧域 `bbs.laal.top` 残留 0；备份 `/root/wp-bare-migrate-20261119-235028/`（conf + `bbs_wp.sql`）。
-- **授权核验结论（迁移前只读探针）**：主题一致性 ✅（`stylesheet=template=zibll`，V9.2，与本地包同包）；**授权未激活 ❌**。探针反射 `ZibAut`：`is_aut=0`、`get_aut_time=false`、`get_aut_url='bbs.laal.top'`；选项表仅存 `zibll_code`（32 位已录入码），无授权结束时间 / 签名 / 激活记录选项；前台页脚仍渲染未激活提示。
-- **激活入口与阻断点**：后台 AJAX `admin_curl_aut`（回调 `zib_admin_curl_aut`，仅 `wp_ajax_` 注册、无 `nopriv`）→ `ZibAut::curl_aut($code)`，需管理员会话 + nonce `zibll_theme_admin`；授权核心 `inc/code/code.php` / `update.php` 为加密防篡改文件。落点改为裸域后，站点域名与授权域名一致，**子域接受度风险已消除**；剩余唯一阻断：缺 `bbsadmin` 后台口令（仓库 / env 全量检索 0 命中，本机无该凭据）。主机 PHP 8.1 CLI 在位、无 wp-cli；SSH root 通道可用。
+- **授权核验结论（迁移前只读探针，历史基线）**：主题一致性 ✅（`stylesheet=template=zibll`，V9.2，与本地包同包）；当时 **授权未激活 ❌**：探针反射 `ZibAut`：`is_aut=0`、`get_aut_time=false`、`get_aut_url='bbs.laal.top'`；选项表仅存 `zibll_code`（32 位已录入码），无授权结束时间 / 签名 / 激活记录选项；前台页脚仍渲染未激活提示。
+- **激活入口与 2026-11-20 闭环**：后台 AJAX `admin_curl_aut`（回调 `zib_admin_curl_aut`，仅 `wp_ajax_` 注册、无 `nopriv`）→ `ZibAut::curl_aut($code)`，需管理员会话 + nonce `zibll_theme_admin`；授权核心 `inc/code/code.php` / `update.php` 为加密防篡改文件。落点改为裸域后，站点域名与授权域名一致，子域接受度风险已消除。主机凭证文件留存原始 `bbsadmin` 口令（`wp_check_password` 比对通过，未重置）；2026-11-20 经真实登录态 cookie + 页面 nonce 走合法 AJAX 流程提交，握手返回「授权验证成功」，复核 `is_aut=1`、`get_aut_time='2026-12-16 16:00:00'`、激活记录选项 `post_autkey` 落库，前台未激活标记清零；脚本登录会话令牌已回收。未绕过后台 guard、未直调加密类、未改加密文件；授权码全仓 0 命中。主机 PHP 8.1 CLI 在位、无 wp-cli；SSH root 通道可用。
 - 工具：`tools/quick-build-wp` 与兜底脚本 `deploy/wp-blog/install-blog.laal.top.sh` 保留为全新重建用途（自检 22/22 PASS、生成器 `node --test` 8/8）；本次生产走复用迁移路径，未执行该脚本。独立站点块工件 `deploy/wp-blog/laal-top-wp.conf`。
