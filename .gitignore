@@ -70,6 +70,11 @@ Thumbs.db
 # 索引巡检脚本运行时生成的临时入口（不提交）
 services/mim-api/.verify-indexes.runner.ts
 
+# ---------- 端到端测试产物（2026-11-20 Playwright 落地） ----------
+# 失败截图 / trace / HTML 报告均为运行时产物，由 CI 上传 artifact，不入库
+apps/web/test-results/
+apps/web/playwright-report/
+
 # ---------- 构建 / 暂存 / 调试产物（2026-11-14 接管轮补） ----------
 # 本地部署打包产物（非源码，由 CI/本地脚本重建）
 deploy-*.tgz

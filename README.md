@@ -184,6 +184,7 @@ pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
 pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，58 个测试文件 / 543 例，2026-11-20 本轮实测）
 pnpm --filter @mim/web test               # 用户端 vitest：纯函数归一化 / srcset 派生 12 例 + Testing Library/jsdom 组件级 7 例（共 19 例）
+pnpm --filter @mim/web e2e                # 浏览器级端到端（Playwright）：真实 Chromium 点击真实前端 + 真实本地 API，桌面 3 例 + 移动 1 例（首次需 pnpm --filter @mim/web exec playwright install chromium）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）

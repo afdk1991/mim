@@ -38,6 +38,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `@testing-library/react` | ^16.3.3 | 开发 | React 组件渲染与交互断言（jsdom 环境），配合 `@testing-library/dom` 提供 DOM 查询 |
 | `@testing-library/dom` | ^10.4.2 | 开发 | RTL 底层 DOM 查询与可访问性断言（`@testing-library/react` peer） |
 | `jsdom` | ^31.0.1 | 开发 | 组件测试的浏览器环境模拟（无需浏览器二进制，CI 可直接跑） |
+| `@playwright/test` | ^1.65.1 | 开发 | 浏览器级端到端：真实 Chromium 驱动真实前端 + 真实本地 API（`apps/web/e2e`），CI 以独立 job 跑；`playwright install --with-deps chromium` 安装浏览器 |
 
 ### 1.3 共享包 `packages/*`
 
@@ -67,7 +68,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 
 - **短信/邮件通道**：验证码走 dev 通道（响应回传 `dev_code`），未接入真实网关。
 - **i18n 框架**（如 i18next）、**UI 组件库**、**Turborepo**：均未引入，原因见 §4。
-- 规划清单（Appium、Playwright、Ant Design Pro、内容审核服务等）仍为路线图，详见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
+- ~~规划清单（Appium、Playwright、Ant Design Pro、内容审核服务等）仍为路线图~~ → **Playwright 已于 2026-11-20 引入**（`@playwright/test ^1.65.1`，浏览器级 E2E 落在 `apps/web/e2e`）；Appium、Ant Design Pro、内容审核服务仍为路线图，详见 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
 
 ## 2. 运行时要求
 
@@ -98,7 +99,7 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | IM / 音视频 / AI | P0 全部采购第三方驱动，不自研 SFU 与 AI 推理 | **未落地**（P1） | PRD §3 排除项 |
 | 推送 | APNs / FCM / 国内厂商通道，平台适配层封装 | **未落地**（原截止提醒场景随 FR-03 移除，无 P0 推送需求） | PRD FR-04 |
 | 管理后台 | 直接用 Ant Design Pro / Arco Pro 模板，不定制设计 | **未落地**；仓库无 `apps/admin` | team-hiring-plan.md 省钱杠杆 |
-| 测试自动化 | Appium + Playwright | **部分落地**：后端 vitest + supertest 契约测试；前端 vitest 纯函数用例 + Testing Library/jsdom 组件级渲染用例；浏览器级端到端 UI 自动化仍未落地 | team-hiring-plan.md |
+| 测试自动化 | Appium + Playwright | **Playwright 已落地**（2026-11-20）：后端 vitest + supertest 契约测试、前端 vitest 纯函数 + Testing Library/jsdom 组件级渲染，外层再加 `@playwright/test` 浏览器级 E2E（真实点击链路，桌面 3 例 + 移动 1 例）；Appium 端侧自动化仍为路线图 | team-hiring-plan.md |
 | 内容审核 | 第三方服务（数美、网易易盾等） | **未落地**（P1） | team-hiring-plan.md 坑 #1 |
 | 实时同步 | WebSocket 推送 | **未采用**：原 4s 增量轮询方案随 FR-03 一并移除（2026-11-04），当前无实时同步需求 | PRD FR-03（已移除） |
 

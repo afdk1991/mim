@@ -105,6 +105,45 @@ jobs:
       - name: 注释覆盖率门禁（铁律十一）
         run: node scripts/comment-check.mjs --strict
 
+  # 浏览器级端到端：真实 Chromium 点击真实前端 + 真实本地 API（SQLite），
+  # 覆盖「点击 → 地址变化 → 页面渲染 / 登录守卫 / 移动端底部 Tab」。
+  # 独立作业：不阻塞生产发布（发布链路仍只依赖 verify），失败只标记该作业为红并保留报告。
+  e2e:
+    name: 浏览器端到端（Playwright）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # --with-deps 会一并安装 Chromium 运行所需的系统库，避免头次运行缺 lib 报错
+      - name: 安装 Chromium
+        run: pnpm --filter @mim/web exec playwright install --with-deps chromium
+
+      # 配置里的 webServer 会自动拉起 @mim/api dev 与 vite dev；CI 上不复用外部服务
+      - name: 端到端用例（桌面 + 移动）
+        run: pnpm --filter @mim/web exec playwright test --reporter=list
+        env:
+          CI: true
+
+      - name: 失败时上传报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
   deploy:
     name: 发布到生产服务器
     needs: verify
