@@ -4,6 +4,8 @@
 >
 > **现行覆盖（2026-11-20）**：本页 §1 及后文涉及**功能模块商城**（catalog / modules / entitlements / 蓝图能力）、**漫剧 AI 剧**（comic / 工程 / 角色 / 分镜 / 生成任务 / 成片 / 导出）、**入口配置清单**（sites / entries）、**导航站**（navigation）、**统一搜索**（search）的条目与状态描述，均为历史交付快照——这些模块已随 2026-11-15 模块收口从代码删除，按铁律三保留作历史留痕，不代表当前工作树实况。现行能力以社区（帖子 / 图库 / 视频 / 圈子 / 公告 / 付费资产）、聊天 IM、账号身份、交易履约与 RBAC 后台为准；现行门禁为匿名可读 + 写操作需登录，注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭，口令只认库内 credentials（环境变量超管口令已不生效）。
 >
+> **演示 / 示例内容保留口径（2026-11-20）**：漫剧演示帖 `thread-comic-demo`、付费视频 `asset-video-comic`、自研工具板块 `board-tools` 及其资产 `asset-open-tools` 作为**演示 / 示例内容保留在生产库中**，不属现行功能模块，不再新增同类内容；本轮不下线、不删除该批示例数据，产品口径如需清理另起变更评审。
+>
 > **2026-11-11 本轮变更**：① 商城 205 条导航条目**全部具备可调用能力**——62 条工具型专项能力 + 17 条「模块起盘蓝图」分组能力覆盖 143 条软件方向模块（`packages/core-domain/src/blueprints/` 七份数据共 143 条，一条能力绑定一个一级分组），商城页「规划中」徽标与「功能规划中，暂不开放解锁」文案自然消失；② 聊天补齐引用回复、文件气泡下载、群管理（设/撤管理员、转让群主、邀请入群、移除）、会话内搜索结果定位（`?around=`）、未读分割线、表情选择器。逐项取证见 [08](./08-dev-implementation.md) 顶部新增段落与 [AGENTS.md](../../AGENTS.md) §9.18。
 
 ## 1. 模块全景
@@ -87,6 +89,8 @@ PRD 内含交互演示（登录流程）：`showLogin(type)` 切换手机号/邮
 **当前获取功能使用权的唯一方式**：功能模块商城的一次性解锁（`one_time`，见 §5.1 / §11.11），服务端 `entitlements` 为唯一鉴权依据。
 
 ## 5. FR-03 核心 SaaS 工作区（2026-11-04 重定义：功能模块商城 + 漫剧 AI 剧）
+
+> **历史留痕（2026-11-20 标注）**：本节商城（FR-03.1）与漫剧 AI 剧（FR-03.2）对应的前后端模块已随 2026-11-15 收口下线（生产 `GET /api/v1/modules` 404 `NOT_FOUND`，`/comic/*` 路由与商城视图均已删除），下列字段、流程与端点描述为历史交付快照，**不再作为现行功能口径**；现行功能以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 与 `services/mim-api/src/routes/` 为准。
 
 > **现状：后端第 1/2 期已落地（2026-11-05），前端未开始**。原 FR-03（项目/任务/成员/邀请/仪表盘/增量同步/CSV 导出）已于 2026-11-04 整体删除（历史见 §5.3）；本节为**新范围的产品定义**。已落地：`catalog` 域 4 表 + `requireEntitlement` 门禁；`comic` 域 7 表 + `/api/v1/comic/*` 24 条路由；`media` 域 `storage.ts` + `/api/v1/media/*` 已装配上线；`ai` 域 `orchestrator.ts` + `/api/v1/ai/*` 已装配（`MIM_AI_WORKER` 默认消费队列）。未落地：前端 `ComicWorkbench.tsx` / `ComicFilms.tsx`、真实厂商模型调用、导出成片。
 
@@ -268,6 +272,8 @@ FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `servi
 
 ### 11.11 功能模块商城（FR-03.1）
 
+> **历史留痕（2026-11-20 标注）**：模块商城体系（`/modules` 目录 / 定价 / 权益发放）已随 2026-11-15 收口下线，生产 `/api/v1/modules` 404，下表路由与前端页面均为历史快照，不再作为现行实现状态。
+
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|
 | 模块目录 / 详情 / 搜索 | **已实现（2026-11-07 只读面）**：`GET /modules`（支持 `?q=` 名称/描述模糊搜索，2026-11-08）、`GET /modules/:code`（公开只读，详情含 `price_history` / `requires` / `current_price`）；**管理写面（2026-11-08）**：`GET /modules/manage`（`module:read`，含 draft/archived 全态 + 价格行 + 已解锁人数）、`POST /modules`、`PATCH /modules/:code`、`PATCH /modules/:code/status`（`draft→active→archived` 单向状态机）、`DELETE /modules/:code`（软删除） | C 端 `Store.tsx`（目录 / 搜索 / 详情面板 / 依赖缺失引导）；管理端 `Modules.tsx`（列表 / 创建 / 编辑 / 状态流转 / 软删除） | ✅ 已实现（契约测试 `test/catalog.test.ts` 41 例） |
@@ -276,6 +282,8 @@ FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `servi
 | 解锁鉴权（服务端唯一依据） | `requireEntitlement(moduleCode)` 中间件（`src/middleware.ts`） | — | ✅ 已落地 |
 
 ### 11.12 漫剧 AI 剧（FR-03.2）
+
+> **历史留痕（2026-11-20 标注）**：漫剧工程 / 分镜 / 成片相关路由与工作台视图已随 2026-11-15 收口下线，下表为历史快照，不再作为现行实现状态。
 
 | 子模块 | 后端路由 | 前端页面 | 状态 |
 |---|---|---|---|

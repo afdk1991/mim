@@ -181,7 +181,7 @@ docs/wiki/           # 结构化文档（01~10 + 首页 README）
 ```bash
 pnpm install                              # 安装全部 workspace 依赖
 pnpm -r typecheck                         # 全仓库类型检查
-pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，52 个测试文件 / 505 例，2026-11-20 批次 2 本轮实测）
+pnpm --filter @mim/api test               # API 契约测试（vitest + supertest，57 个测试文件 / 534 例，2026-11-20 批次 7 本轮实测）
 pnpm --filter @mim/web build              # 前端类型检查 + 产物构建
 pnpm --filter @mim/admin build            # 管理后台类型检查 + 产物构建
 pnpm --filter @mim/api dev                # 启动后端（http://127.0.0.1:8787）
@@ -227,10 +227,10 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 
 | 项 | 说明 |
 |---|---|
-| 生产域名 | `https://zy.laal.top`（API `https://api.laal.top/api/v1`；后台 `https://zy.laal.top/admin/`；HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`；旧 `mim.mixm.top` 仅 301 → `laal.top`）。**裸域 `laal.top` 为独立 WordPress（zibll V9.2）社区站（仅 1 篇默认文章），不是 Mim**。 |
+| 生产域名 | `https://zy.laal.top`（API `https://api.laal.top/api/v1`；后台 `https://zy.laal.top/admin/`；HTTPS，Let's Encrypt；nginx 托管静态产物并反代 `/api/v1`；旧 `mim.mixm.top` 仅 301 → `zy.laal.top`）。**裸域 `laal.top` 为独立 WordPress（zibll V9.2）社区站（仅 1 篇默认文章），不是 Mim**。 |
 | 服务器布局 | `/opt/mim/app`（git 仓库）+ `/opt/mim/web`（用户端静态根）+ `/opt/mim/admin`（管理后台静态根）+ systemd `mim-api`（端口 8787） |
 | 管理后台入口 | `https://zy.laal.top/admin/`（`apps/admin` 构建产物；nginx `/admin/` location 独立 alias，与用户端静态根隔离；页面声明 `noindex, nofollow`） |
-| 数据库 | `/opt/mim/app/services/mim-api/data/mim.db`（SQLite WAL，持久化磁盘） |
+| 数据库 | 物理落盘 `/var/lib/mim/mim.db`（SQLite WAL，持久化磁盘）；`/opt/mim/app/services/mim-api/data/mim.db` 为指向该物理库的软链 |
 | 数据库迁移 | `deploy/migrations/*.cjs`（`2026-11-04-drop-fr03.cjs`、`2026-11-05-drop-billing-audit.cjs`）：`deploy/deploy.sh` 发布前幂等执行；**项目不创建任何数据库备份** |
 | 运行期配置 | 生产写入 `/opt/mim/mim-api.env`：`MIM_JWT_SECRET`（≥32 字符，生产缺失直接拒绝启动）、`MIM_REGISTRATION_ENABLED`（只认 `1`，默认关闭；关闭态注册 403 `AUTH_REGISTER_DISABLED`）、`MIM_CORS_ORIGINS`、`MIM_STORAGE_DRIVER`（`local` / `s3`）+ `MIM_STORAGE_*`、`MIM_AI_PROVIDER`（`mock` / `openai`）与 `MIM_AI_*` 成本上限 / 产物保留期、`MIM_AI_WORKER`、`MIM_PUBLIC_BASE_URL`、`PORT`（缺省 8787）；完整清单见 [.env.example](./.env.example) 与 [09 清单](./docs/wiki/09-third-party-sdk-inventory.md)。**`MIM_AUTH_ADMIN_PASSWORD` 已不生效**：口令只认库内 `credentials(kind=password)` bcrypt 记录，不再有环境变量超管口令通道。 |
 | 自动部署 | push `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH 执行 `deploy/deploy.sh` → 服务器 HEAD 校验 → 线上 `/health` 取证 |
