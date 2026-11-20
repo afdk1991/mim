@@ -396,3 +396,15 @@ FR-05（i18n）为横切约束，由 `packages/*` 承载，`apps/web` 与 `servi
 ---
 
 _本页为产品功能视角文档，随 PRD 草案（V0.0.14-preview）同步演进；所有 TBD/Assumption 项待 PRD 确认后更新。_
+
+## 15. 站点选项后台：Global & Features（V0.0.16，2026-11-20）
+
+把主题选项后台（参照面 `laal.top` 的 Zibll `#tab=global-features`）的十个分组落成 Mim 自己的声明式配置：
+
+- **注册表**：`services/mim-api/src/options/registry.ts`，页签 → 分组 → 字段三层声明，10 分组 40 字段，默认值等于现行行为；模块加载即自检（键唯一 / 类型合法 / 下拉有候选 / 数值默认是数字）。
+- **接口**：`GET /api/v1/site/options`（匿名只读公开字段）、`GET|PUT /api/v1/admin/site-options`（`appearance:write`，局部写入 + 未知键忽略）、`POST /api/v1/admin/site-options/reset`（单键或全量恢复默认）；存储为 `site_settings` 单条 JSON（key `options`）。
+- **后台面板**：`apps/admin/src/views/SiteOptions.tsx` 按 schema 数据驱动渲染，分组级恢复默认、脏改动计数、只提交差异。
+- **前台消费**：标题 / meta / favicon / 主屏图标、内容区宽度、右栏与页脚开关、吸顶、圆角档、明暗 Logo、底部 Tab 开关与项数、悬浮按钮与分享面板、搜索占位与热词与默认排序、默认语言、自定义 CSS（运行期脚本注入不开放，CSP 仍走构建期哈希）。
+- **验证**：`test/site-options.test.ts` 9 例；`@mim/api` 59 文件 552 例、`@mim/web` 19 例、三套构建 0、`verify-auth-gate` 147/147。
+
+设计与字段落点见 [站点选项后台-20261120](../../docs/站点选项后台-20261120.md)；参照面剩余 9 个页签的差距与批次见 [zibll后台对齐](../../docs/zibll后台对齐-Mim差距与实现计划-20261120.md)。

@@ -17,6 +17,7 @@ import type { Locale } from '@mim/i18n'; // 语言标识
 import { errorText } from '../api'; // 统一错误本地化
 import type { CommunityPost, CommunityThreadDetail } from '../api'; // 详情 / 回复既有类型
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
+import { currentSiteOptions } from '../site-options'; // 站点选项：搜索占位、热词与默认排序口径
 import { // 社区补齐端点
   boardReports,
   createReport,
@@ -345,8 +346,8 @@ export function SearchPanel(props: { // 搜索面板
   const [busy, setBusy] = useState(false); // 请求中
   const [searched, setSearched] = useState(false); // 是否已搜过
   const [error, setError] = useState<string | null>(null); // 错误
-  const [sort, setSort] = useState<'relevance' | 'latest'>('relevance'); // 排序口径：默认自研相关性
-  const [diversify, setDiversify] = useState(false); // 去同质开关：MMR 重排
+  const [sort, setSort] = useState<'relevance' | 'latest'>(() => currentSiteOptions().searchDefaultSort); // 排序口径：默认取后台「站点选项 → 搜索 → 默认排序」
+  const [diversify, setDiversify] = useState(() => currentSiteOptions().searchDiversifyDefault); // 去同质开关：默认取后台开关（MMR 重排）
   const [trending, setTrending] = useState<CommunityTrendingItem[]>([]); // 社区热榜
   const [trendingWindow, setTrendingWindow] = useState(0); // 热榜候选窗口（用于对账）
 
@@ -389,7 +390,7 @@ export function SearchPanel(props: { // 搜索面板
         </div>
       )}
       <div className="mim-cm-search-row">
-        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void run(0, false); }} placeholder="全文搜索：标题 / 摘要 / 正文…" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void run(0, false); }} placeholder={currentSiteOptions().searchPlaceholder} />
         <select value={sort} onChange={(e) => { setSort(e.target.value === 'latest' ? 'latest' : 'relevance'); setItems([]); setSearched(false); }}>
           <option value="relevance">相关度排序</option>
           <option value="latest">最新优先</option>
@@ -399,6 +400,14 @@ export function SearchPanel(props: { // 搜索面板
         </label>
         <button type="button" className="is-primary" disabled={busy} onClick={() => void run(0, false)}>{busy ? '搜索中…' : '搜索'}</button>
       </div>
+      {currentSiteOptions().searchHotWords.length > 0 && ( // 热门搜索词：后台「站点选项 → 搜索 → 热门搜索词」下发，点击即搜
+        <div className="mim-cm-search-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+          <span className="mim-cm-hint">热门搜索</span>
+          {currentSiteOptions().searchHotWords.map((word) => (
+            <button key={word} type="button" className="is-plain" onClick={() => { setQ(word); void run(0, false); }}>{word}</button>
+          ))}
+        </div>
+      )}
       {error && <p className="mim-cm-error">{error}</p>}
       {searched && !error && items.length > 0 && <p className="mim-cm-hint">共 {total} 条命中（{sort === 'latest' ? '最新优先' : '相关度排序'}{diversify ? ' · 已去同质' : ''}）</p>}
       {items.map((item) => (

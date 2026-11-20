@@ -31,6 +31,7 @@ import { createGrowthRouter } from './routes/growth.js'; // 社区激励链：�
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createCirclesRouter } from './routes/circles.js'; // 圈子：独立于板块的成员制社群，公开浏览 + 成员/圈主写操作
+import { createSiteOptionsRouter } from './routes/site-options.js'; // 站点选项：主题选项后台的公开读 + 管理端读写
 import { createCacheHeaderMiddleware, createCaptchaMiddleware, createForceLoginMiddleware, errorHandler, notFound, requestId } from './middleware.js'; // 统一 404、错误信封、请求追踪 + 缓存头 / 验证码 / 强制登录门禁
 import { DATA_DIR } from './config.js'; // 本地存储驱动的兜底目录
 import { createStorage } from './storage.js'; // 存储适配器工厂，按 env 决定 local 或 s3
@@ -141,6 +142,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createInviteAdminRouter(resolved)); // 邀请码管理端需管理员令牌；校验端点公开供注册前预检
   app.use('/api/v1', createRealnameRouter(resolved)); // 本人端点内部 requireAuth；管理端点内部 requirePermission
   app.use('/api/v1', createContentOpsRouter(resolved)); // 公开公告/更新日志/推广端点先挂；管理端点内部再挂权限
+  app.use('/api/v1', createSiteOptionsRouter(resolved)); // 站点选项：/site/options 公开只读，/admin/site-options 在 router 内挂 appearance:write
   app.use('/api/v1', createSsoRouter(resolved)); // 票据签发要求登录态，兑换与登出广播保持公开
 
   // 受保护路由（各 router 内部统一 requireAuth）

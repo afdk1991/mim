@@ -5968,3 +5968,68 @@ code { /* 行内代码/令牌展示 */
   .community-gallery-grid,
   .community-gallery-collections { grid-template-columns: minmax(0, 1fr); }
 } /* 断点结束 */
+
+/* ---------- 站点选项（后台 Global & Features 的公开字段落地）---------- */
+.brand-logo { /* 头部 Logo：运营上传图片后替换文字品牌名 */
+  height: 32px;
+  width: auto;
+  display: block;
+}
+[data-site-radius='sm'] { --radius-md: 8px; } /* 卡片圆角：小档 */
+[data-site-radius='lg'] { --radius-md: 18px; } /* 卡片圆角：大档 */
+.float-actions { /* 悬浮按钮层：右下 / 左下，纵向堆叠 */
+  position: fixed;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 40;
+}
+.float-actions.right { right: 20px; } /* 右侧停靠 */
+.float-actions.left { left: 20px; } /* 左侧停靠 */
+.float-btn { /* 单个悬浮按钮 */
+  min-width: 46px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.float-btn:hover { border-color: var(--border-hover); color: var(--link); } /* 悬停走链接色 */
+.float-share { /* 分享面板：按钮上方浮出 */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+}
+.float-share-item { /* 分享渠道按钮 */
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.float-share-item:hover { background: var(--surface-hover, rgba(0,0,0,0.05)); color: var(--link); } /* 悬停高亮 */
+.float-share-tip { /* 复制成功提示 */
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  padding: 2px 8px;
+}
+@media (max-width: 760px) { /* 移动端：让开底部 Tab 高度 */
+  .float-actions { bottom: 92px; }
+}

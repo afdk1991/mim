@@ -32,6 +32,8 @@ import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 import { PageBuilder } from './views/PageBuilder'; // 业务步骤
 // 外观：主色 / 圆角档位 / 默认明暗，复用 appearance:write
 import { Appearance } from './views/Appearance'; // 业务步骤
+// 站点选项：按注册表渲染 Global & Features 十个分组（图标 / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码）
+import { SiteOptions } from './views/SiteOptions'; // 站点选项面板
 // 成长私信：按条件或指定用户发送系统身份私信
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
 import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
@@ -49,7 +51,7 @@ import { Settings } from './views/Settings'; // 站点设置
 import { AuditLogs } from './views/AuditLogs'; // 审计流水
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'settings' | 'auditLogs';
+type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'siteOptions' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'settings' | 'auditLogs';
 
 /** 侧栏分组键：四组折叠，组名与顺序即信息架构口径 */
 type NavGroupKey = 'content' | 'trade' | 'user' | 'site';
@@ -131,6 +133,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       // 外观：主色 / 圆角 / 默认明暗
       { key: 'appearance', label: '外观', permission: 'appearance:write' },
+      // 站点选项：图标 / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码
+      { key: 'siteOptions', label: '站点选项', permission: 'appearance:write' },
       // 页面搭建：复用 appearance:write，管理首页 / 论坛区块装修
       { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
       // 设置：站点名称 / 副标题 / 页脚文案
@@ -402,6 +406,8 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'pageBuilder') return <PageBuilder credential={credential} permissions={identity.permissions} />;
   // 外观：主色 / 圆角档位 / 默认明暗
   if (key === 'appearance') return <Appearance credential={credential} permissions={identity.permissions} />;
+  // 站点选项：Global & Features 十个分组，按后端注册表数据驱动渲染
+  if (key === 'siteOptions') return <SiteOptions credential={credential} permissions={identity.permissions} />;
   // 成长私信：按条件或指定用户发送系统身份私信
   if (key === 'growthDm') return <GrowthDm credential={credential} permissions={identity.permissions} />;
   // 商品管理：商品台账、上架状态与单价

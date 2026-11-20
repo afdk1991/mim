@@ -950,10 +950,25 @@ function submitLogin(){
 <!-- 未决提示：同名异义、空备注、DNS 目标、生产部署均需另行确认 -->
 <p class="muted">未决：<code>mall</code> / <code>store</code> 与现有「功能模块商城」同名异义（本轮新建独立模块，未改动既有商城）；13 行空备注无功能描述；DNS 解析目标与线上子域可用性因记录值列清空无法确认；本轮为本地实现，未做生产部署与线上取证。</p>
 
+<!-- 附录 B：站点选项后台（Global & Features 落地，2026-11-20） -->
+<h2>附录 B · 站点选项后台（Global &amp; Features，V0.0.16-preview）</h2>
+<p>参照面为 <code>laal.top</code> 的 Zibll 主题选项页签（该站点不是 Mim、不改动），Mim 侧以声明式注册表实现同等能力：10 个分组 / 40 个字段，默认值等于现行行为。</p>
+<table>
+  <tr><th>能力</th><th>落点</th></tr>
+  <tr><td>注册表与校验</td><td><code>services/mim-api/src/options/registry.ts</code>（页签 → 分组 → 字段；加载即自检；逐字段清洗夹取；未知键丢弃）</td></tr>
+  <tr><td>接口</td><td><code>GET /api/v1/site/options</code>（匿名只读公开字段）· <code>GET|PUT /api/v1/admin/site-options</code>（<code>appearance:write</code>，局部写入）· <code>POST /api/v1/admin/site-options/reset</code>（单键 / 全量恢复默认）</td></tr>
+  <tr><td>存储</td><td><code>site_settings</code> 单条 JSON（key <code>options</code>），与既有 theme / site / home / pages 并存</td></tr>
+  <tr><td>后台面板</td><td><code>apps/admin/src/views/SiteOptions.tsx</code>（schema 数据驱动、分组级恢复默认、只提交差异）+ 导航「站点选项」</td></tr>
+  <tr><td>前台消费</td><td>标题 / meta / favicon / 主屏图标、内容区宽度、右栏与页脚开关、吸顶、圆角档、明暗 Logo、底部 Tab、悬浮按钮与分享面板、搜索占位 / 热词 / 默认排序、默认语言、自定义 CSS</td></tr>
+  <tr><td>口径限制</td><td>运行期脚本注入不开放（CSP 仍由构建期 <code>scripts/csp-inline-hash.mjs</code> 生成哈希）；SMTP 口令只记环境变量名、不进库</td></tr>
+  <tr><td>验证</td><td><code>test/site-options.test.ts</code> 9 例；<code>@mim/api</code> 59 文件 552 例、<code>@mim/web</code> 19 例、三套构建 0、<code>verify-auth-gate</code> 147/147</td></tr>
+</table>
+<p class="muted">剩余 9 个参照页签（Pages &amp; Display / Posts &amp; Lists / Features &amp; Permissions / Users &amp; Engagement / Payments &amp; Monetization / Shop &amp; Products / Community &amp; Forum / Extensions &amp; Enhancements / Theme &amp; License）差距与批次计划见 <a href="./docs/zibll后台对齐-Mim差距与实现计划-20261120.md">docs/zibll后台对齐-Mim差距与实现计划-20261120.md</a>。</p>
+
 <!-- 文档末尾分割线 -->
 <hr>
 <!-- 页脚：版本 / 草案声明 / 校验入口（版本规约见 AGENTS.md 铁律四，密钥治理见 09 清单 §0） -->
-<p class="muted" style="text-align:center;">Mim PRD · V0.0.15-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
+<p class="muted" style="text-align:center;">Mim PRD · V0.0.16-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
 
 <!-- 页面主体结束 -->
 </body>

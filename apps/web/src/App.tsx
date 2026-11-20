@@ -26,6 +26,11 @@ import { DEFAULT_THEME, applyThemeMode, applyThemeVars, currentThemeMode, mergeN
 import type { ResolvedTheme, ThemeMode } from './appearance'; // 引入依赖、类型或本地模块绑定
 // 外壳组件：顶部横导航 + 1200px 两栏 + 多列页脚 + 移动端底部 Tab（外壳形态集中在这一个文件）
 import { Shell } from './Shell';
+// 站点选项：后台公开配置（SEO / 图标 / 布局开关 / 悬浮按钮 / 底部 Tab / 搜索热词）
+import { DEFAULT_SITE_OPTIONS, loadSiteOptions, subscribeSiteOptions } from './site-options';
+import type { SiteOptions } from './site-options';
+// 悬浮按钮层：回到顶部 / 联系入口 / 分享，开关来自站点选项
+import { FloatingActions } from './FloatingActions';
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
@@ -119,6 +124,8 @@ export function App() {
   const [gateNotice, setGateNotice] = useState<'expired' | null>(null);
   // 外观主题：后台下发配置清洗后的设计令牌；接口不可达或脏数据时回落默认外观，不白屏
   const [theme, setTheme] = useState<ResolvedTheme>(DEFAULT_THEME);
+  // 站点选项：后台公开字段（图标 / SEO / 布局 / 悬浮 / 底部 Tab / 搜索热词）；首帧用默认值，加载完成后替换
+  const [siteOptions, setSiteOptions] = useState<SiteOptions>(DEFAULT_SITE_OPTIONS);
   // 明暗：访客本地偏好优先；首帧就应用，避免已选暗色的用户先看到浅色闪屏
   const [mode, setMode] = useState<ThemeMode>(() => {
     const stored = readStoredMode(); // 读取已保存的访客选择
@@ -127,7 +134,7 @@ export function App() {
   });
 
   // 界面语言：已登录取用户偏好并归一化；未登录传 undefined，自动回退默认语言
-  const locale: Locale = normalizeLocale(session?.user.locale);
+  const locale: Locale = normalizeLocale(session?.user.locale ?? (siteOptions.defaultLocale === 'en' ? 'en-US' : undefined));
 
   // 启动外观消费：拉取公开站点配置 → 清洗主题 → 注入 CSS 变量（主色 / 底色 / 圆角 / 字体 / 列表样式 / 导航项）；
   // 任一环节失败都回落 DEFAULT_THEME，保证首帧有默认外观可用。
@@ -172,6 +179,13 @@ export function App() {
     return () => { alive = false; }; // 清理
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 站点选项：启动即拉公开配置并订阅变化；applySiteChrome 已在加载层写好标题 / 图标 / CSS 变量
+  useEffect(() => {
+    const unsubscribe = subscribeSiteOptions(setSiteOptions); // 先订阅：已有缓存会立即回调，避免错过首轮
+    void loadSiteOptions(); // 再触发拉取；失败时保留默认值，前台照常渲染
+    return unsubscribe; // 卸载时取消订阅
+  }, []); // 只在挂载时执行一次
 
   // 会话联动：订阅会话变更事件 + 启动时静默校验令牌有效性
   useEffect(() => {
@@ -359,7 +373,8 @@ export function App() {
         onNavigate={(view) => go({ view })} // 统一跳转入口
         authedSession={authedSession} // 登录态
         onLogout={handleLogout} // 退出登录
-        showSide={route.view !== 'login'} // 登录页整屏：关闭右栏挂件
+        showSide={route.view !== 'login' && siteOptions.showRightSidebar} // 登录页整屏或后台关闭右栏时不渲染挂件
+        site={siteOptions} // 站点选项：吸顶 / 页脚 / 底部 Tab / Logo 形态
       >
       {/* 右侧内容区：社区匿名可浏览；收费 / 私密视图匿名时内嵌登录卡片 */}
       <>{/* 视图内容片段：Shell 只负责外壳，不感知页面结构 */}
@@ -460,6 +475,8 @@ export function App() {
         </Suspense>{/* 懒加载边界结束 */}
       </>{/* 视图内容片段结束：外壳的 main 由 Shell 渲染 */}
       </Shell>{/* 外壳结束：顶部导航 / 两栏 / 页脚 / 底部 Tab 都在 Shell 内 */}
+      {/* 悬浮按钮层：开关、位置与分享渠道均读站点选项；总开关关闭时组件自身返回 null */}
+      <FloatingActions options={siteOptions} locale={locale} />
       {/* 页脚：已迁入 Shell（多列：品牌 / 导航 / 更多 + 底部版权备案） */}
     </div> // 布局容器结束，JSX 根元素到此闭合
   ); // 主布局渲染结束

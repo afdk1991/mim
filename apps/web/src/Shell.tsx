@@ -14,6 +14,9 @@ import type { AppView } from './router';
 import type { Session } from './api';
 // 仅类型导入：明暗模式（切换按钮展示对向文案）
 import type { ThemeMode } from './appearance';
+// 站点选项：外壳按后台开关决定吸顶、页脚、底部 Tab 与 Logo 形态
+import { DEFAULT_SITE_OPTIONS } from './site-options';
+import type { SiteOptions } from './site-options';
 
 /** 导航项：由 App 合并后台配置后传入，外壳只负责渲染与高亮 */
 export interface ShellNavItem {
@@ -32,6 +35,7 @@ interface ShellProps {
   authedSession: Session | null; // 正式账号会话；null 表示未登录
   onLogout: () => void; // 退出登录
   showSide: boolean; // 是否渲染右栏（登录页等整屏页面关闭）
+  site?: SiteOptions; // 站点选项：缺省取默认值，保证外壳可在任何调用方直接渲染
   children: ReactNode; // 当前视图内容
 } // 外壳入参结束
 
@@ -97,6 +101,7 @@ export function Shell({
   authedSession, // 会话
   onLogout, // 退出
   showSide, // 是否渲染右栏
+  site = DEFAULT_SITE_OPTIONS, // 站点选项：调用方未传时按默认行为渲染
   children, // 视图内容
 }: ShellProps) {
   // 吸顶头部的滚动阴影标记：与 zibll 一致，滚动后加一层浅阴影
@@ -112,10 +117,10 @@ export function Shell({
   const signIn = locale === 'en-US' ? 'Sign in' : '登录';
   // 明暗按钮文案：按当前模式给出对向语义，title 与 aria-label 共用
   const modeLabel = mode === 'dark' ? (locale === 'en-US' ? 'Light mode' : '浅色模式') : locale === 'en-US' ? 'Dark mode' : '暗色模式';
-  // 底部 Tab 项：优先取后台一级导航，最多 4 项
-  const tabItems: ShellNavItem[] = navItems.slice(0, 4).map((item) => ({ view: item.view, label: item.label }));
+  // 底部 Tab 项：优先取后台一级导航，项数上限由「站点选项 → 移动底部 Tab」决定
+  const tabItems: ShellNavItem[] = navItems.slice(0, site.mobileTabItemsMax).map((item) => ({ view: item.view, label: item.label }));
   // 未登录且仍有空位：补登录入口，保证移动端随时可登录
-  if (!authedSession && tabItems.length < 4 && !tabItems.some((item) => item.view === 'login')) tabItems.push({ view: 'login', label: signIn });
+  if (!authedSession && tabItems.length < site.mobileTabItemsMax && !tabItems.some((item) => item.view === 'login')) tabItems.push({ view: 'login', label: signIn });
   // 页脚快捷入口：与主导航同源，末位按登录态给个人中心或登录
   const footerTail: ShellNavItem[] = [
     { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子' }, // 圈子：成员制板块
@@ -132,14 +137,21 @@ export function Shell({
   return (
     <>
       {/* 顶部导航：吸顶 + 半透明底 + 滚动阴影，结构对齐 zibll header */}
-      <header className={`site-header${stuck ? ' is-stuck' : ''}`}>{/* 滚动态由 is-stuck 追加阴影 */}
+      <header className={`site-header${stuck && site.stickyHeader ? ' is-stuck' : ''}`} style={site.stickyHeader ? undefined : { position: 'static' }}>{/* 滚动态由 is-stuck 追加阴影；关闭吸顶后退化为静态头部 */}
         <div className="header-inner">{/* 顶栏内容行：1200px 居中 */}
           <button type="button" className="site-brand" onClick={() => onNavigate('community')}>{/* 品牌：点击回社区首页 */}
             <span className="brand-mark" aria-hidden="true" />{/* 主色渐变方块，作为唯一高饱和锚点 */}
-            <span className="brand-text">{/* 品牌文字块：主名 + 副标题两行 */}
-              <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名走 i18n 词典 */}
-              <span className="brand-sub">{tagline}</span>{/* 副标题：最小字号档，窄屏隐藏 */}
-            </span>
+            {(() => {
+              const logo = mode === 'dark' ? site.logoDarkUrl || site.logoLightUrl : site.logoLightUrl || site.logoDarkUrl; // 按明暗取 Logo，缺一侧时互相兜底
+              return logo ? (
+                <img className="brand-logo" src={logo} alt={t(locale, 'app.name')} /> // 运营配置了 Logo 时用图，不再叠文字主名
+              ) : (
+                <span className="brand-text">{/* 品牌文字块：主名 + 副标题两行 */}
+                  <span className="brand-name">{t(locale, 'app.name')}</span>{/* 应用名走 i18n 词典 */}
+                  <span className="brand-sub">{tagline}</span>{/* 副标题：最小字号档，窄屏隐藏 */}
+                </span>
+              ); // 品牌分支结束
+            })()}
           </button>
           <nav className="site-nav" aria-label={locale === 'en-US' ? 'Main navigation' : '主导航'}>{/* 一级导航：横向平铺 */}
             {navItems.map((item) => ( // 按上层给出的顺序渲染，顺序由后台配置决定
@@ -208,7 +220,7 @@ export function Shell({
       </div>
 
       {/* 多列页脚：品牌简介 / 导航 / 更多，底部一行版权与备案 */}
-      <footer className="site-footer">
+      {site.showFooter && (<footer className="site-footer">
         <div className="footer-cols">{/* 三列：品牌 1.4fr，其余 1fr */}
           <div className="footer-col footer-col-brand">{/* 品牌列：标记 + 名 + 一句话简介 */}
             <span className="footer-brand-line">{/* 标记与名同一行 */}
@@ -246,17 +258,17 @@ export function Shell({
             <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener noreferrer">苏公网安备32072202010512号</a>
           </span>
         </div>
-      </footer>
+      </footer>)}
 
-      {/* 底部 Tab：≤760px 显示，补足 zibll 移动端底部导航 */}
-      <nav className="mobile-tabs" aria-label={locale === 'en-US' ? 'Bottom navigation' : '底部导航'}>
+      {/* 底部 Tab：≤760px 显示，补足 zibll 移动端底部导航；总开关与项数取自站点选项 */}
+      {site.mobileTabEnabled && (<nav className="mobile-tabs" aria-label={locale === 'en-US' ? 'Bottom navigation' : '底部导航'}>
         {tabItems.map((item) => ( // 每项：图标 + 短文案
           <button key={item.view} type="button" className={`mobile-tab${activeView === item.view ? ' active' : ''}`} onClick={() => onNavigate(item.view as AppView)}>{/* 选中态跟随当前视图 */}
             <TabIcon view={item.view} />{/* 线性图标 */}
             <span>{item.label}</span>{/* 短文案 */}
           </button>
         ))}
-      </nav>
+      </nav>)}
     </>
   ); // 外壳返回结束
 } // Shell 结束
