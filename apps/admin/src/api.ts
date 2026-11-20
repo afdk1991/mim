@@ -252,16 +252,20 @@ export function loginWithPassword(
   password: string,
   captcha?: LoginCaptchaTicket,
 ): Promise<LoginResponse> {
-  // 邮箱身份只存在于 global 区域，手机号只存在于 cn；按标识形态选择，避免服务端按 cn 推断成非法手机号
-  const isEmail = identifier.includes('@');
+  // 通道推断：含 @ 为邮箱（global）；匹配大陆手机号为 phone（cn）；其余字母开头账号串为 username（global），与后端 detectIdentityProvider 同口径
+  const trimmed = identifier.trim(); // 去首尾空白后再判形态，避免误判
+  const isEmail = trimmed.includes('@'); // @ 是邮箱强特征
+  const isPhone = /^\+?(86)?1[3-9]\d{9}$/.test(trimmed); // 容忍 +86 / 86 前缀的大陆手机号
+  const region = isPhone ? 'cn' : 'global'; // 手机号只在 cn，邮箱与用户名只在 global
+  const provider = isEmail ? 'email' : isPhone ? 'phone' : 'username'; // 三通道分流
   // 调用密码登录端点，device 标记来源便于后端审计
   return request<LoginResponse>('/auth/password', {
     // POST 提交凭证
     method: 'POST',
     // 请求体字段与 auth.ts 的 passwordBody 一致；验证码字段名与后端 verifyCaptcha 约定一致
     body: {
-      region: isEmail ? 'global' : 'cn',
-      provider: isEmail ? 'email' : 'phone',
+      region,
+      provider,
       identifier,
       password,
       ...(captcha ? { captcha_id: captcha.id, captcha_code: captcha.code } : {}),

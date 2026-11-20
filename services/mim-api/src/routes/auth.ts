@@ -22,7 +22,8 @@ import { // 引入依赖、类型或本地模块绑定
   hashPassword, // 账号密码哈希，自建账号注册时写入
   issueAccessToken, // 签发 JWT 访问令牌
   newOpaqueToken, // 生成不可预测的刷新令牌
-  normalizeIdentity, // 手机号/邮箱归一化
+  detectIdentityProvider, // 按标识形态推断手机/邮箱/用户名通道（口令登录缺省 provider 用）
+  normalizeIdentity, // 手机号/邮箱/用户名归一化
   sha256, // 刷新令牌摘要
   verifyCode, // 校验验证码摘要
   verifyPassword, // 账号密码校验，自建账号登录时使用
@@ -72,7 +73,7 @@ const loginBody = codeBody.extend({ // 验证码登录在申请体基础上追�
 /** 密码登录：账号自身口令（credentials.kind=password），不再有环境变量备用口令 */
 const passwordBody = z.object({ // 密码登录请求体
   region: z.enum(['cn', 'global']), // 地区
-  provider: z.enum(['phone', 'email']).optional(), // 通道可选，缺省按地区推断
+  provider: z.enum(['phone', 'email', 'username']).optional(), // 通道可选，缺省按标识形态推断
   identifier: z.string().min(1), // 账号标识
   password: z.string().min(1).max(200), // 口令长度限幅，避免超长输入拖慢比较
   device: z // 设备信息（可选）
@@ -447,8 +448,8 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
 
   router.post('/auth/password', (req, res) => { // 密码登录：只校验账号自身口令，唯一入口
     const body = parse(passwordBody, req.body); // 校验请求体
-    const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 未指定通道时按地区推断
-    const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识
+    const provider = body.provider ?? detectIdentityProvider(body.identifier); // 未指定通道时按标识形态推断：邮箱 / 手机号 / 用户名
+    const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识，非法格式直接 400
     const now = clockOf(deps); // 当前时间
     const key = failureKey(body.region, identity.identifier); // 失败计数键：账号维度
     const ipKey = ipFailureKey(clientIp(req)); // 失败计数键：来源 IP 维度

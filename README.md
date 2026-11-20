@@ -25,7 +25,7 @@
 
 ## 版本
 
-当前版本：**V0.0.14-preview**（2026-11-20 自研算法收口：权重持久化 + 后台可调 + 全窗口深翻页 + 前端排序/热榜入口；2026-11-19 新增自研算法包：中文二元分词 + BM25 相关性排序 + 时间衰减热度 + MMR 多样性重排，接入社区搜索与新增热榜接口；2026-11-17 版本 V0.0.12 含社区激励链与支付履约重构；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
+当前版本：**V0.0.15-preview**（2026-11-20 新增「用户名登录」通道：既有账号可绑定 `provider=username` 身份，大小写不敏感、统一小写存储，口令登录按标识形态自动分流手机/邮箱/用户名，注册通道仍只开放手机/邮箱；2026-11-20 自研算法收口：权重持久化 + 后台可调 + 全窗口深翻页 + 前端排序/热榜入口；2026-11-19 新增自研算法包：中文二元分词 + BM25 相关性排序 + 时间衰减热度 + MMR 多样性重排，接入社区搜索与新增热榜接口；2026-11-17 版本 V0.0.12 含社区激励链与支付履约重构；`RELEASE_CHANNEL=preview` 由展示后缀体现，不改 semver 数字）
 
 ## 社区内容现状（2026-11-20）
 
@@ -206,7 +206,7 @@ npm run verify:deployments                 # 部署汇总 55 项零依赖校验
 | [2026-11-16/zibll-alignment/gap-inventory-20261118.md](./2026-11-16/zibll-alignment/gap-inventory-20261118.md) | 子比主题结构 / 样式对齐缺口清单：本轮已落地项、延期项与前置依赖、两条路线边界 |
 | [docs/wiki/07-functional-modules.md](./docs/wiki/07-functional-modules.md) | FR-01~06 功能规格与实现状态（实况） |
 | [docs/wiki/08-dev-implementation.md](./docs/wiki/08-dev-implementation.md) | 开发实现全景与「已实现 vs 规划」对照（§1.1） |
-| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.14-preview 口径，含 FR-01~06 功能规格与交互演示；PRD 中商城 / 漫剧等旧范围描述为草案历史口径，以代码现行视图段为准） |
+| [Mim-PRD.html](./Mim-PRD.html) | 产品需求文档（V0.0.15-preview 口径，含 FR-01~06 功能规格与交互演示；PRD 中商城 / 漫剧等旧范围描述为草案历史口径，以代码现行视图段为准） |
 | [team-hiring-plan.md](./team-hiring-plan.md) | 技术架构约束与团队分阶段配置规划 |
 
 ## 站点与部署

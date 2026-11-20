@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS identities (
   id          TEXT PRIMARY KEY,
   user_id     TEXT NOT NULL REFERENCES users(id),
   region      TEXT NOT NULL,
-  provider    TEXT NOT NULL CHECK (provider IN ('phone','email')),
+  provider    TEXT NOT NULL CHECK (provider IN ('phone','email','username')),
   identifier  TEXT NOT NULL,
   created_at  TEXT NOT NULL,
   UNIQUE (region, provider, identifier)

@@ -184,6 +184,38 @@ export function ensureOrderSourceCommunity(db: Db): boolean {
   return true;
 }
 
+/**
+ * identities.provider 约束扩容（2026-11-20 用户名登录）：放开 CHECK 接纳 'username'。
+ * SQLite 改不了既有 CHECK，按官方 12 步法重建表；关外键避免 DROP 时触发级联，重建后按原主键与唯一索引挂回。
+ * 新库由 schema.sql 直接建出含 username 的表，这里检测到后跳过（幂等）。
+ * @returns 是否真的执行了重建
+ */
+export function ensureIdentityUsernameProvider(db: Db): boolean {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'identities'").get() as { sql: string } | undefined; // 读建表原文
+  if (!row || row.sql.includes("'username'")) return false; // 表不存在或已扩容：无需处理
+  db.pragma('foreign_keys = OFF'); // 重建期间关外键，避免删父表触发级联
+  try {
+    db.transaction(() => { // 建表 → 拷数据 → 删旧表 → 改名，全程原子
+      db.exec(`CREATE TABLE identities_username_migrate (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id),
+        region      TEXT NOT NULL,
+        provider    TEXT NOT NULL CHECK (provider IN ('phone','email','username')),
+        identifier  TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        UNIQUE (region, provider, identifier)
+      )`); // 与 schema.sql 的 identities 完全同构，仅 CHECK 多一个 username
+      db.exec(`INSERT INTO identities_username_migrate (id, user_id, region, provider, identifier, created_at)
+               SELECT id, user_id, region, provider, identifier, created_at FROM identities`); // 原样搬数据，不改任何身份行
+      db.exec('DROP TABLE identities'); // 旧约束随表一起消失
+      db.exec('ALTER TABLE identities_username_migrate RENAME TO identities'); // 改回原名，恢复外键与唯一索引
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON'); // 无论成败都恢复外键约束
+  }
+  return true;
+}
+
 /** 旧订阅制 payments 的特征列 */
 const LEGACY_PAYMENT_COLUMNS = ['driver', 'amount_minor', 'provider_txn_id'] as const; // 三列同时存在且没有 provider/amount_cents，才认定是旧订阅结构
 
@@ -274,6 +306,7 @@ export function createDatabase(filename: string = ':memory:'): Db { // 创建数
   const domainApplied = applyDomainSchema(db); // 各业务域的 schema.d 脚本：建新表 / 补新列，与主脚本同一幂等路径
   if (domainApplied.length > 0) console.log(`[db] domain schema applied: ${domainApplied.join(', ')}`); // 域脚本改结构必须留痕
   if (ensureOrderSourceCommunity(db)) console.log('[db] orders.source widened: community'); // 存量库放宽 CHECK，必须留痕
+  if (ensureIdentityUsernameProvider(db)) console.log('[db] identities.provider widened: username'); // 存量库放宽身份 CHECK，必须留痕
   const migrated = migrateAdditiveColumns(db); // 存量库补齐后加的列；全新建库时为空
   if (migrated.length > 0) console.log(`[db] additive migration applied: ${migrated.join(', ')}`); // 结构变更必须留痕，便于排查升级后的行为差异
   const indexed = ensureAdditiveIndexes(db); // 补列之后才建依赖这些列的唯一索引，避免老库启动即报 no such column

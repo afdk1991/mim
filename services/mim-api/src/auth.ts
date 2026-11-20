@@ -7,7 +7,7 @@ import { AppError } from '@mim/core-domain'; // 引入统一业务异常，错�
 import { ACCESS_TTL_SECONDS, CODE_LENGTH } from './config.js'; // 引入访问令牌有效期与验证码位数，便于统一调参
 import type { Region } from './types.js'; // 仅引入区域类型，编译期擦除
 
-export type IdentityProvider = 'phone' | 'email'; // 身份提供方：国内手机号与海外邮箱两种
+export type IdentityProvider = 'phone' | 'email' | 'username'; // 身份提供方：国内手机号、海外邮箱与既有账号绑定的用户名三种
 
 export interface NormalizedIdentity { // 归一化后的身份结构，落库与查询都使用该形态
   provider: IdentityProvider; // 身份类型，决定验证码走短信还是邮件通道
@@ -16,6 +16,18 @@ export interface NormalizedIdentity { // 归一化后的身份结构，落库与
 
 const PHONE_RE = /^1[3-9]\d{9}$/; // 中国大陆手机号：1 开头、第二位 3-9、共 11 位，排除座机与非法号段
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // 邮箱最小校验：本地部分 + @ + 域名 + 点 + 顶级域，避免过度严格误杀合法地址
+const USERNAME_RE = /^[A-Za-z0-9_.-]{3,32}$/; // 用户名：3-32 位字母数字与 _-. ，不含空格与 @，大小写不敏感由归一化统一转小写
+
+/**
+ * 按标识形态推断通道（仅用于口令登录的缺省 provider）：
+ * 含 @ 按邮箱；以 + 或数字开头按手机号；其余按用户名。显式传入 provider 时不走本推断。
+ */
+export function detectIdentityProvider(identifier: string): 'phone' | 'email' | 'username' { // 推断入口
+  const value = identifier.trim(); // 去掉首尾空白后再判形态
+  if (value.includes('@')) return 'email'; // @ 是邮箱的强特征，优先判邮箱
+  if (value.startsWith('+') || /^\d/.test(value)) return 'phone'; // 带国家码或纯数字开头按手机号
+  return 'username'; // 其余字母开头的账号串按用户名通道
+} // detectIdentityProvider 结束
 
 /** region 隔离：cn 只接受手机号，global 只接受邮箱；标识归一后落库 */
 export function normalizeIdentity(region: Region, provider: string, raw: string): NormalizedIdentity { // 身份归一入口：校验区域与类型匹配并规范化标识
@@ -44,6 +56,18 @@ export function normalizeIdentity(region: Region, provider: string, raw: string)
     } // 格式校验结束
     return { provider: 'email', identifier: email }; // 返回归一邮箱，作为唯一身份键
   } // 邮箱分支结束
+  if (provider === 'username') { // 用户名分支：仅面向 global，供既有管理员账号绑定与登录，不开放给自助注册
+    if (region !== 'global') { // 用户名只在海外区落库，与邮箱同一区域口径
+      throw new AppError('VALIDATION_FAILED', 'username identity is only available in global region', { // 区域不匹配属参数错误
+        field: 'identifier', // 指明出错字段，便于前端定位输入框
+      }); // 异常构造结束
+    } // 区域校验结束
+    const username = value.toLowerCase(); // 用户名大小写不敏感，统一转小写避免 Administrator / administrator 出两个身份
+    if (!USERNAME_RE.test(username)) { // 格式不合法直接拒绝，避免脏数据落库
+      throw new AppError('VALIDATION_FAILED', 'invalid username (3-32 letters, digits, _ - .)', { field: 'identifier' }); // 统一错误码与字段提示
+    } // 格式校验结束
+    return { provider: 'username', identifier: username }; // 返回归一用户名，作为唯一身份键
+  } // 用户名分支结束
   throw new AppError('VALIDATION_FAILED', 'unsupported provider', { field: 'provider' }); // 未知 provider 一律拒绝，防止绕过区域限制
 } // normalizeIdentity 结束
 

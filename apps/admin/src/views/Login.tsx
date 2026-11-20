@@ -186,8 +186,8 @@ export function Login({ onDone, notice }: LoginProps) {
           // 账号模式：手机号/邮箱 + 密码
           <div className="form">
             <label className="field"> {/* 账号字段容器 */}
-              <span>手机号 / 邮箱</span> {/* 账号字段名 */}
-              <input // 账号输入框：手机号或邮箱
+              <span>账号 / 用户名 / 邮箱</span> {/* 账号字段名：支持用户名、邮箱与手机号三种形态 */}
+              <input // 账号输入框：用户名、邮箱或手机号
                 value={identifier} // 受控绑定 identifier 状态
                 autoComplete="username" // 允许浏览器记住登录标识
                 placeholder="登录标识" // 输入提示

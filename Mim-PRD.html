@@ -10,7 +10,7 @@
 <!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 浏览器标签页标题 -->
-<title>Mim 全平台产品底座 PRD — V0.0.14-preview</title>
+<title>Mim 全平台产品底座 PRD — V0.0.15-preview</title>
 <!-- 内联样式表：本 PRD 文档的全部视觉样式 -->
 <style>
   /* CSS 自定义属性（设计令牌）：集中定义整页配色，便于统一修改 */
@@ -89,8 +89,8 @@
 <!-- 文档主标题 -->
 <h1>Mim 全平台产品底座 — 产品需求文档</h1>
 <!-- 元信息行：版本 / 通道 / 日期 / 状态（灰色弱提示样式） -->
-<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.14），故展示 V0.0.14-preview -->
-<p class="muted">版本：V0.0.14-preview　|　通道：preview　|　日期：2026-11-14（版本口径同步）　|　状态：草案</p>
+<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.15），故展示 V0.0.15-preview -->
+<p class="muted">版本：V0.0.15-preview　|　通道：preview　|　日期：2026-11-20（版本口径同步）　|　状态：草案</p>
 
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
@@ -420,7 +420,8 @@
 <p>在短信 / 邮件第三方通道尚未注入私有凭证的阶段，为避免「普通访客没有任何可自助的登录入口」导致聊天等模块实际不可用，先落地三条不依赖外部通道的入口，并由前端按部署实际能力自动呈现：</p>
 <ul>
   <li><strong>自助注册 + 账号口令登录</strong>：<code>POST /api/v1/auth/register</code>（region + 账号标识 + 口令，可选昵称）创建自建账号，口令以 bcrypt 摘要写入 <code>credentials</code>（<code>kind=password</code>），注册成功即下发访问 / 刷新令牌；随后可用 <code>POST /api/v1/auth/password</code> 以同一账号口令登录。口令要求至少 8 位且同时包含字母与数字，重复注册返回 409 <code>AUTH_IDENTITY_EXISTS</code>。</li>
-  <li><strong>管理员口令登录</strong>：同一 <code>/auth/password</code> 端点，口令来自部署环境变量 <code>MIM_AUTH_ADMIN_PASSWORD</code>，用于冷启动与运维登录；与账号口令互不覆盖，两者都未配置时返回 503 <code>AUTH_PASSWORD_NOT_CONFIGURED</code>。</li>
+  <li><strong>用户名身份登录（2026-11-20 新增）</strong>：既有账号可绑定 <code>provider=username</code> 身份（仅 <code>region=global</code>），用户名 3–32 位字母数字与 <code>_-.</code>，大小写不敏感、统一转小写存储；同一 <code>/auth/password</code> 端点在未显式传 <code>provider</code> 时按标识形态分流（含 <code>@</code> 邮箱、以 <code>+</code>/数字开头手机号、其余用户名）。<strong>注册通道不开放 username</strong>，用户名只能由后台 / 库内为既有账号绑定；口令仍只比对库内 <code>credentials(kind=password)</code> bcrypt 记录。</li>
+  <li><strong>管理员口令登录（历史留痕）</strong>：同一 <code>/auth/password</code> 端点；早期口令取自部署环境变量 <code>MIM_AUTH_ADMIN_PASSWORD</code>，该口径已作废，现行口令只认库内 bcrypt 记录。</li>
   <li><strong>通道自检</strong>：<code>GET /api/v1/auth/channels</code> 只返回 <code>{sms,email,password,register}</code> 布尔值，登录页据此在验证码通道未配置时直接提示「请改用密码登录或注册」，避免用户反复触发 503。</li>
   <li><strong>聊天匿名只读体验</strong>：<code>/chat</code> 匿名访问不再显示「此功能需登录后使用」空白卡片，而是进入只读演示页（同一套聊天布局、示例会话与消息、禁用输入区、登录/注册引导），登录后才创建会话、收发消息、传文件与群管理。</li>
   <li><strong>信息架构收口</strong>：账号设置不再是面向未登录访客的独立页面——原「设置」页的昵称 / 语言 / 时区 / 区域信息 / 注销操作全部并入登录后的<strong>个人中心</strong>（「资料」与「账号与设置」两个分区），导航里的个人中心入口仅在登录后出现；旧 <code>/settings</code> 链接自动落到 <code>/account</code>。</li>
@@ -952,7 +953,7 @@ function submitLogin(){
 <!-- 文档末尾分割线 -->
 <hr>
 <!-- 页脚：版本 / 草案声明 / 校验入口（版本规约见 AGENTS.md 铁律四，密钥治理见 09 清单 §0） -->
-<p class="muted" style="text-align:center;">Mim PRD · V0.0.14-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
+<p class="muted" style="text-align:center;">Mim PRD · V0.0.15-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
 
 <!-- 页面主体结束 -->
 </body>

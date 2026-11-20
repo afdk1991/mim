@@ -123,3 +123,79 @@ describe('账号口令登录', () => { // 注册后可用账号 + 口令登录
     expect(locked.body.code).toBe('AUTH_ACCOUNT_LOCKED'); // 明确锁定错误码
   }); // 结束用例
 }); // describe 结束
+
+describe('用户名（username）身份登录', () => { // 既有账号绑定用户名后的口令登录通道
+  const EMAIL_IDENTIFIER = 'admin-bootstrap@laal.top'; // 种子邮箱身份：模拟生产管理员的旧邮箱通道
+  const USERNAME = 'administrator'; // 归一化后的小写用户名（库内形态）
+  const PASSWORD = 'mim-pass-456'; // 测试口令：含字母与数字，满足强度校验
+
+  /** 在内存库中落一个 global 邮箱账号（含口令凭据），返回用户 ID，供绑定用户名用 */
+  async function seedGlobalUser(): Promise<string> {
+    const res = await request(app) // 注册 global 邮箱账号
+      .post('/api/v1/auth/register') // 自助注册端点
+      .send({ region: 'global', identifier: EMAIL_IDENTIFIER, password: PASSWORD, display_name: 'Administrator', device: { platform: 'admin', name: 'test' } }); // 完整请求体
+    expect(res.status).toBe(201); // 注册成功即下发会话
+    return res.body.user.id as string; // 交回用户 ID，供直写身份绑定
+  } // seedGlobalUser 结束
+
+  /** 直写一条 username 身份绑定到指定用户（等价于后台/库内为既有账号绑用户名，注册通道不开放此 provider） */
+  function bindUsername(userId: string, username: string): void {
+    db.prepare('INSERT INTO identities (id, user_id, region, provider, identifier, created_at) VALUES (?, ?, ?, ?, ?, ?)') // 唯一三元组
+      .run(crypto.randomUUID(), userId, 'global', 'username', username, new Date().toISOString()); // 绑定到既有账号，不新建用户
+  } // bindUsername 结束
+
+  it('绑定用户名后可直接用用户名 + 口令登录成功', async () => { // 正常路径：管理员用户名登录
+    const userId = await seedGlobalUser(); // 先建邮箱账号
+    bindUsername(userId, USERNAME); // 再为该账号绑定用户名
+    const ok = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: 'Administrator', password: PASSWORD }); // 输入首字母大写形态
+    expect(ok.status).toBe(200); // 登录成功
+    expect(ok.body.user.id).toBe(userId); // 落到同一账号，不另建号
+  }); // 结束用例
+
+  it('用户名大小写不敏感：ADMINISTRATOR / Administrator / administrator 命中同一身份', async () => { // 归一化校验
+    const userId = await seedGlobalUser(); // 先建账号并绑用户名
+    bindUsername(userId, USERNAME);
+    for (const variant of ['ADMINISTRATOR', 'Administrator', 'administrator']) { // 三种大小写形态逐一登录
+      const ok = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: variant, password: PASSWORD });
+      expect(ok.status).toBe(200); // 均应命中
+      expect(ok.body.user.id).toBe(userId); // 归属同一用户
+    } // 形态循环结束
+  }); // 结束用例
+
+  it('不存在的用户名一律 401 AUTH_PASSWORD_INVALID，不建号', async () => { // 标识枚举防护
+    const res = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: 'nosuchuser', password: 'any-pass-1' }); // 未绑定用户名
+    expect(res.status).toBe(401); // 与口令错误同码
+    expect(res.body.code).toBe('AUTH_PASSWORD_INVALID'); // 不回显账号是否存在
+    const row = db.prepare('SELECT COUNT(*) AS n FROM identities WHERE provider = ? AND identifier = ?').get('username', 'nosuchuser') as { n: number }; // 核查未偷偷建号
+    expect(row.n).toBe(0); // 登录路径绝不自动注册用户名身份
+  }); // 结束用例
+
+  it('原邮箱身份仍可登录；已更名作废的旧标识登录 401', async () => { // 旧身份可逆更名后的行为
+    const userId = await seedGlobalUser(); // 建账号（邮箱 + 口令）
+    bindUsername(userId, USERNAME); // 同时绑用户名
+    const emailOk = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: EMAIL_IDENTIFIER, password: PASSWORD }); // 原邮箱仍可登
+    expect(emailOk.status).toBe(200); // 邮箱通道未被用户名绑定破坏
+    db.prepare("UPDATE identities SET identifier = ? WHERE user_id = ? AND provider = 'email'") // 模拟生产可逆更名：旧邮箱改为 retired 形态
+      .run('admin-bootstrap+retired@laal.top', userId); // 不删行，仅更名使旧标识失效
+    const retired = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: EMAIL_IDENTIFIER, password: PASSWORD }); // 用旧标识再登
+    expect(retired.status).toBe(401); // 旧标识已不能命中
+    const usernameStillOk = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: 'Administrator', password: PASSWORD }); // 用户名通道不受更名影响
+    expect(usernameStillOk.status).toBe(200); // 管理员仍可经用户名进入
+  }); // 结束用例
+
+  it('非法用户名（过短 / 含非法字符）返回 400 VALIDATION_FAILED', async () => { // 格式校验
+    for (const bad of ['ab', 'bad name', 'bad@name', '管理员']) { // 过短、含空格、含 @、纯中文四类非法形态
+      const res = await request(app).post('/api/v1/auth/password').send({ region: 'global', identifier: bad, password: 'any-pass-1' });
+      expect(res.status).toBe(400); // 参数错误
+      expect(res.body.code).toBe('VALIDATION_FAILED'); // 统一校验错误码
+      expect(res.body.details.field).toBe('identifier'); // 指明出错字段
+    } // 非法形态循环结束
+  }); // 结束用例
+
+  it('自助注册不开放 username 通道：显式 provider=username 被 400 拒绝', async () => { // 注册侧收敛：用户名只能由既有账号绑定
+    const res = await request(app).post('/api/v1/auth/register').send({ region: 'global', provider: 'username', identifier: 'newname', password: 'mim-pass-123' });
+    expect(res.status).toBe(400); // zod 枚举直接拦截
+    const row = db.prepare("SELECT COUNT(*) AS n FROM identities WHERE provider = 'username'").get() as { n: number }; // 核查注册路径未写入任何用户名身份
+    expect(row.n).toBe(0); // 用户名身份只能经后台/库内绑定产生
+  }); // 结束用例
+}); // describe 结束
