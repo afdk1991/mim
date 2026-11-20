@@ -122,7 +122,10 @@
 | 提供方 | SDK / API 形态 | 用途 | 密钥 / 配置项（env） | 优先级 |
 |---|---|---|---|---|
 | AWS S3 | S3 兼容 SDK | 海外对象存储（聊天 / 社区附件） | `MIM_STORAGE_S3_ACCESS_KEY_ID` / `MIM_STORAGE_S3_SECRET_ACCESS_KEY` | P0 |
-| Cloudflare CDN / 阿里云 CDN | CDN API | 静态资源加速 | `MIM_CDN_CLOUDFLARE_API_TOKEN` / `MIM_CDN_ALIYUN_ACCESS_KEY` | P1 |
+| Cloudflare / EdgeOne 主动刷新（链路已实现，可选接入） | CDN REST API 按需 purge；仅厂商与凭证齐备时 `configured=true`，缺凭证返回 `CDN_NOT_CONFIGURED` 且不发上游请求 | `MIM_CDN_CLOUDFLARE_API_TOKEN`；其余厂商 / 凭证变量归 `MIM_CDN_*` 通配家族（PROVIDER / CLOUDFLARE_ZONE_ID / EDGEONE_ZONE_ID / EDGEONE_API_KEY） | P1（可选） |
+| CloudFront 主动刷新 | **显式不支持**（错误码 `CDN_PROVIDER_UNSUPPORTED`）：本部署不依赖边缘 CDN 主动刷新——前端产物文件名带 hash 走不可变长缓存、HTML 走 no-cache 协商缓存、站点由 nginx / `_redirects` 直出，发版即变更 URL，旧 hash 产物无人引用，无需 purge；未来若真接入 CloudFront，需 SigV4 签名与分发 ID，属新增能力，不在当前范围 | `MIM_CDN_ALIYUN_ACCESS_KEY`（预留登记，当前代码零读取）；CloudFront 三项凭证归 `MIM_CDN_*` 通配家族，当前不读取 | 不支持 |
+
+> CDN 口径（2026-11-20 修订）：本生产部署为单机 nginx 直出，未启用边缘 CDN；`scripts/verify-cdn.mjs` 探测到「可达但无缓存特征」记 `disabled-expected`（预期，不作为缺陷），两次均不可达才记 `unreachable`（网络 / 域名问题）。主动刷新仅 cloudflare / edgeone 两条 REST 链路实现；CloudFront 显式不支持，不再保留「待接入 AWS SDK」一类占位表述。
 
 **对象存储准入运行时配置（自研 `media` 域，进程内模块）**
 

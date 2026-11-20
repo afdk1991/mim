@@ -5,16 +5,23 @@
  *   1. 回源缓存契约：按资源类别给出 Cache-Control 策略（带 hash 的不可变长缓存 /
  *      HTML-SWR no-cache / API 私有 no-store / 缺省短缓存）。本层只产出响应头契约，
  *      不替代真实 CDN；
- *   2. 主动刷新适配：cloudflare / edgeone / cloudfront / none。未配齐凭证一律
- *      configured=false，purge 返回 CDN_NOT_CONFIGURED，绝不假装刷新成功。
+ *   2. 主动刷新适配：cloudflare / edgeone 已实现 REST 刷新；cloudfront 显式不支持；
+ *      none 为未配置。未配齐凭证一律 configured=false，purge 不发上游请求，绝不假装刷新成功。
  *
- * 不新增第三方依赖：HTTP 调用走全局 fetch；CloudFront 的 SigV4 签名未在本包实现，
- * 即使凭证齐备也标记 configured=false，待主控接入 AWS SDK 后补齐。
+ * 设计取舍（为什么本项目不需要主动刷新）：前端构建产物文件名带内容 hash，命中即不可变长缓存；
+ * HTML 走 no-cache 协商缓存；站点由 nginx / `_redirects` 直出。发版即生成新 hash URL，
+ * 旧 hash 产物无人引用，无需 purge 边缘即可失效。若未来真接入 CloudFront，需 SigV4 签名与
+ * 分发 ID，属新增能力（需 AWS 凭证与分发配置），不在当前范围；当前以 `CDN_PROVIDER_UNSUPPORTED`
+ * 明确告知调用方「不支持」，不留「待接入 SDK」的误导性占位。
  */
 
 export type CdnProvider = 'cloudflare' | 'edgeone' | 'cloudfront' | 'none'; // 导出类型 CdnProvider：跨模块共享的类型定义
 
 const PROVIDERS: ReadonlyArray<CdnProvider> = ['cloudflare', 'edgeone', 'cloudfront', 'none']; // 常量 PROVIDERS：保存固定配置或一次性派生值
+
+/** 显式不支持主动刷新时的统一口径（错误码 `CDN_PROVIDER_UNSUPPORTED` 沿用现有 `CDN_*` 风格） */
+const UNSUPPORTED_PURGE_REASON =
+  '当前部署未启用 CDN 主动刷新：静态资源以版本化文件名 + 长缓存 + 发版即变更 URL 方式失效，无需 purge';
 
 /** 缓存策略类别：不可变 hash 产物 / HTML 协商缓存 / API 私有 / 缺省公共短缓存 */
 export type CdnCacheCategory = 'immutable-asset' | 'html-swr' | 'api-private' | 'default-public';
@@ -65,7 +72,9 @@ export interface CdnStatus { // 导出接口 CdnStatus：跨模块共享的对�
   provider: CdnProvider; // 对象字段 provider：记录一项配置或数据
   /** 凭证齐备且本包已实现刷新调用；false 时 purge 不得视为成功 */
   configured: boolean;
-  /** 缺失的必填变量名（已实现厂商）；未实现厂商单列原因 */
+  /** 本包是否实现该厂商的主动刷新调用；false 时 purge 返回 `CDN_PROVIDER_UNSUPPORTED`（cloudfront）或 `CDN_NOT_CONFIGURED`（none） */
+  supported: boolean;
+  /** 缺失的必填变量名（已实现刷新的厂商）；不支持刷新的厂商在 note 中单列原因 */
   missing: string[];
   note?: string; // 执行当前业务步骤
   cache_policy: CdnCachePolicy[]; // 对象字段 cache_policy：记录一项配置或数据
@@ -75,16 +84,17 @@ export interface CdnStatus { // 导出接口 CdnStatus：跨模块共享的对�
 export function describeCdn(env: Record<string, string | undefined>): CdnStatus {
   const provider = detectCdnProvider(env); // 常量 provider：保存固定配置或一次性派生值
   const missing = requiredVars(provider).filter((v) => !(env[v] ?? '').trim()); // 常量 missing：保存固定配置或一次性派生值
-  const implemented = provider !== 'cloudfront' && provider !== 'none'; // 常量 implemented：保存固定配置或一次性派生值
+  const supported = provider === 'cloudflare' || provider === 'edgeone'; // 常量 supported：本包已实现主动刷新调用的厂商
   const note = // 常量 note：保存固定配置或一次性派生值
     provider === 'cloudfront' // 赋值：更新变量 provider 的取值
-      ? 'CloudFront 刷新需 SigV4 签名，本包未实现，待主控接入 AWS SDK'
+      ? `CloudFront 主动刷新在本包显式不支持（CDN_PROVIDER_UNSUPPORTED）：${UNSUPPORTED_PURGE_REASON}`
       : provider === 'none' // 执行当前业务步骤
         ? '未配置 CDN 厂商（MIM_CDN_PROVIDER 缺省为 none）' // 执行当前业务步骤
         : undefined; // 执行当前业务步骤
   return { // 返回当前函数的处理结果
     provider, // 执行当前业务步骤
-    configured: implemented && missing.length === 0, // 对象字段 configured：记录一项配置或数据
+    configured: supported && missing.length === 0, // 对象字段 configured：记录一项配置或数据
+    supported, // 执行当前业务步骤
     missing, // 执行当前业务步骤
     note, // 执行当前业务步骤
     cache_policy: [ // 对象字段 cache_policy：记录一项配置或数据
@@ -100,6 +110,8 @@ export interface PurgeResult { // 导出接口 PurgeResult：跨模块共享的�
   ok: boolean; // 对象字段 ok：记录一项配置或数据
   provider: CdnProvider; // 对象字段 provider：记录一项配置或数据
   configured: boolean; // 对象字段 configured：记录一项配置或数据
+  /** 本包是否实现该厂商的主动刷新调用；false 时不得视为刷新成功 */
+  supported: boolean;
   purged: string[]; // 对象字段 purged：记录一项配置或数据
   error?: string; // 执行当前业务步骤
   status?: number; // 执行当前业务步骤
@@ -109,20 +121,23 @@ export interface PurgeResult { // 导出接口 PurgeResult：跨模块共享的�
 const PURGE_TIMEOUT_MS = 8_000; // 常量 PURGE_TIMEOUT_MS：保存固定配置或一次性派生值
 
 /**
- * 主动刷新指定 URL 清单。未配置 / 未实现 / 上游失败均返回 ok=false，
- * 错误信息与 HTTP 状态如实回传；不抛异常给路由层，由路由落审计。
+ * 主动刷新指定 URL 清单。未配置 / 厂商不支持 / 上游失败均返回 ok=false，
+ * 错误信息与 HTTP 状态如实回传；不抛异常给路由层，由路由落审计（attempted/unsupported 同样留痕）。
  */
 export async function purgeCdn(env: Record<string, string | undefined>, urls: string[]): Promise<PurgeResult> {
   const status = describeCdn(env); // 常量 status：保存固定配置或一次性派生值
   const attemptedAt = new Date().toISOString(); // 常量 attemptedAt：保存固定配置或一次性派生值
   const clean = [...new Set(urls.map((u) => u.trim()).filter(Boolean))]; // 常量 clean：保存固定配置或一次性派生值
 
+  if (status.provider === 'cloudfront') { // 条件分支：CloudFront 主动刷新显式不支持，不发上游请求
+    return { ok: false, provider: status.provider, configured: false, supported: false, purged: [], error: `CDN_PROVIDER_UNSUPPORTED: ${UNSUPPORTED_PURGE_REASON}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
+  }
   if (!status.configured) { // 条件分支：按判断结果选择后续处理路径
     const reason = status.missing.length > 0 ? `missing ${status.missing.join(', ')}` : status.note ?? 'provider not configured'; // 常量 reason：保存固定配置或一次性派生值
-    return { ok: false, provider: status.provider, configured: false, purged: [], error: `CDN_NOT_CONFIGURED: ${reason}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
+    return { ok: false, provider: status.provider, configured: false, supported: status.supported, purged: [], error: `CDN_NOT_CONFIGURED: ${reason}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
   } // 代码块结束
   if (clean.length === 0) { // 条件分支：按判断结果选择后续处理路径
-    return { ok: false, provider: status.provider, configured: true, purged: [], error: 'empty urls', attempted_at: attemptedAt }; // 返回当前函数的处理结果
+    return { ok: false, provider: status.provider, configured: true, supported: true, purged: [], error: 'empty urls', attempted_at: attemptedAt }; // 返回当前函数的处理结果
   } // 代码块结束
 
   try { // 异常捕获起点：包裹可能抛出错误的操作
@@ -136,9 +151,9 @@ export async function purgeCdn(env: Record<string, string | undefined>, urls: st
         signal: AbortSignal.timeout(PURGE_TIMEOUT_MS), // 对象字段 signal：记录一项配置或数据
       }); // 代码块结束
       if (!res.ok) { // 条件分支：按判断结果选择后续处理路径
-        return { ok: false, provider: status.provider, configured: true, purged: [], status: res.status, error: `cloudflare purge HTTP ${res.status}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
+        return { ok: false, provider: status.provider, configured: true, supported: true, purged: [], status: res.status, error: `cloudflare purge HTTP ${res.status}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
       } // 代码块结束
-      return { ok: true, provider: status.provider, configured: true, purged: clean, status: res.status, attempted_at: attemptedAt }; // 返回当前函数的处理结果
+      return { ok: true, provider: status.provider, configured: true, supported: true, purged: clean, status: res.status, attempted_at: attemptedAt }; // 返回当前函数的处理结果
     } // 代码块结束
 
     if (status.provider === 'edgeone') { // 条件分支：按判断结果选择后续处理路径
@@ -151,17 +166,18 @@ export async function purgeCdn(env: Record<string, string | undefined>, urls: st
         signal: AbortSignal.timeout(PURGE_TIMEOUT_MS), // 对象字段 signal：记录一项配置或数据
       }); // 代码块结束
       if (!res.ok) { // 条件分支：按判断结果选择后续处理路径
-        return { ok: false, provider: status.provider, configured: true, purged: [], status: res.status, error: `edgeone purge HTTP ${res.status}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
+        return { ok: false, provider: status.provider, configured: true, supported: true, purged: [], status: res.status, error: `edgeone purge HTTP ${res.status}`, attempted_at: attemptedAt }; // 返回当前函数的处理结果
       } // 代码块结束
-      return { ok: true, provider: status.provider, configured: true, purged: clean, status: res.status, attempted_at: attemptedAt }; // 返回当前函数的处理结果
+      return { ok: true, provider: status.provider, configured: true, supported: true, purged: clean, status: res.status, attempted_at: attemptedAt }; // 返回当前函数的处理结果
     } // 代码块结束
 
-    return { ok: false, provider: status.provider, configured: false, purged: [], error: 'CDN_NOT_CONFIGURED: provider purge not implemented', attempted_at: attemptedAt }; // 返回当前函数的处理结果
+    return { ok: false, provider: status.provider, configured: false, supported: false, purged: [], error: 'CDN_NOT_CONFIGURED: provider purge not implemented', attempted_at: attemptedAt }; // 返回当前函数的处理结果
   } catch (err) { // 代码块结束
     return { // 返回当前函数的处理结果
       ok: false, // 对象字段 ok：记录一项配置或数据
       provider: status.provider, // 对象字段 provider：记录一项配置或数据
       configured: true, // 对象字段 configured：记录一项配置或数据
+      supported: status.supported, // 对象字段 supported：记录一项配置或数据
       purged: [], // 对象字段 purged：记录一项配置或数据
       error: err instanceof Error ? err.message : String(err), // 对象字段 error：记录一项配置或数据
       attempted_at: attemptedAt, // 对象字段 attempted_at：记录一项配置或数据

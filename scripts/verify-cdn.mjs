@@ -4,9 +4,15 @@
  *
  * 对同一静态资源连发两次，读取回源 / 边缘响应头证据：
  *   - cf-cache-status（Cloudflare）、x-cache（CloudFront / 通用）、age（边缘缓存时长）、server；
- *   - 命中任一缓存特征头判定 CDN: detected，否则 CDN: not-detected。
+ *   - 命中任一缓存特征头判定 CDN: detected。
  *
- * 诚实约定：未检测到边缘特征不伪造结论；探测失败 / 无网络记 not-detected 并打印 not-configured。
+ * 三档诚实判定（不伪造结论）：
+ *   - detected：观察到边缘缓存特征；
+ *   - disabled-expected：目标可达但无缓存特征——本部署不依赖边缘 CDN 主动刷新（前端产物
+ *     文件名带 hash 走不可变长缓存、HTML 走 no-cache 协商缓存、nginx / `_redirects` 直出，
+ *     发版即变更 URL，无需 purge），此为预期口径，不作为缺陷；
+ *   - unreachable：两次都连不上（DNS / 连接 / 超时 / TLS），是网络 / 域名问题，不能归因于 CDN 未启用。
+ *
  * 退出码恒为 0（探测类门禁，仅给证据；阻断由 CI 人工或后续阈值规则决定）。
  *
  * 用法：
@@ -87,9 +93,9 @@ async function main() { // 函数 main：封装一段可复用的处理逻辑
     console.log('CDN: unreachable'); // 向控制台输出运行日志或错误信息
     console.log('target-unreachable: 两次探测均无法连上目标（DNS / 连接 / 超时 / TLS），未取得任何响应头；这不是「CDN 未启用」结论。'); // 明确区分不可达与未启用
     if (unreachableError) console.log(`probe-error: ${unreachableError}`); // 条件分支：按判断结果选择后续处理路径
-  } else { // 可达但无缓存特征：才是 CDN 未启用 / 未透传
-    console.log('CDN: not-detected'); // 向控制台输出运行日志或错误信息
-    console.log('cdn-not-enabled: 目标可达，但响应头中未观察到边缘缓存特征（cf-cache-status / x-cache / age）；如已接入 CDN，请复核回源头是否被回源服务覆盖。'); // 向控制台输出运行日志或错误信息
+  } else { // 可达但无缓存特征：本部署口径为不启用边缘 CDN，属预期
+    console.log('CDN: disabled-expected'); // 向控制台输出运行日志或错误信息
+    console.log('cdn-disabled-expected: 目标可达，但响应头中未观察到边缘缓存特征（cf-cache-status / x-cache / age）。本部署不依赖边缘 CDN 主动刷新：版本化文件名 + 不可变长缓存、HTML no-cache 协商缓存、nginx / _redirects 直出，发版即变更 URL，无需 purge；此为预期口径，不作为缺陷。'); // 向控制台输出运行日志或错误信息
   } // 代码块结束
 
   process.exit(0); // 执行当前业务步骤
@@ -97,7 +103,7 @@ async function main() { // 函数 main：封装一段可复用的处理逻辑
 
 main().catch((err) => { // 调用 main 并处理其返回结果
   console.error(`[verify-cdn] 执行异常: ${err instanceof Error ? err.message : String(err)}`); // 向控制台输出运行日志或错误信息
-  console.log('CDN: not-detected'); // 向控制台输出运行日志或错误信息
+  console.log('CDN: probe-error'); // 向控制台输出运行日志或错误信息
   console.log('not-configured: 探测脚本自身异常，未取得边缘证据。'); // 向控制台输出运行日志或错误信息
   process.exit(0); // 执行当前业务步骤
 }); // 代码块结束

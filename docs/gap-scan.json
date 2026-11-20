@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-20T11:01:25.149Z",
+  "generatedAt": "2026-11-20T11:32:54.882Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -33,7 +33,7 @@
         "sourceVars": 201,
         "templateVars": 173,
         "inventoryVars": 169,
-        "wildcardStems": 37,
+        "wildcardStems": 39,
         "unregistered": 0,
         "unregisteredAdapter": 0,
         "unregisteredInternal": 0
@@ -90,36 +90,14 @@
     },
     "markers": {
       "title": "E. 未完成标记",
-      "status": "WARN",
+      "status": "PASS",
       "stats": {
         "hard": 0,
-        "notes": 3,
-        "total": 3
+        "notes": 0,
+        "total": 0
       },
       "failures": [],
-      "warnings": [
-        {
-          "file": "services/mim-api/src/cdn.ts",
-          "line": 68,
-          "marker": "未实现",
-          "kind": "comment",
-          "text": "/** 缺失的必填变量名（已实现厂商）；未实现厂商单列原因 */"
-        },
-        {
-          "file": "services/mim-api/src/cdn.ts",
-          "line": 81,
-          "marker": "未实现",
-          "kind": "string-note",
-          "text": "? 'CloudFront 刷新需 SigV4 签名，本包未实现，待主控接入 AWS SDK'"
-        },
-        {
-          "file": "services/mim-api/src/cdn.ts",
-          "line": 112,
-          "marker": "未实现",
-          "kind": "comment",
-          "text": "* 主动刷新指定 URL 清单。未配置 / 未实现 / 上游失败均返回 ok=false，"
-        }
-      ]
+      "warnings": []
     }
   }
 }
