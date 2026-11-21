@@ -123,3 +123,60 @@ zibll 页脚自带的「扫码加 QQ 群 / 扫码加微信」用的是主题演�
 | `wp-admin-plates.png` | 后台社区圈子列表：`全部（1）` / `已发布（1）`，`综合讨论` 已发布 2026-11-20 11:08 |
 
 > 三张图为本轮真实浏览器截图；上一轮 `Could not retrieve RenderWidgetHostView` 的截图通道故障在本轮已消失。
+
+## 5. 2026-11-21 第四轮：编辑器缺陷处置（升级无效 → 经典编辑器）+ 隐私政策正文 + 导航商城 + 首页标题
+
+### 5.1 先把「升级」这条路走到底：已是最新版，升级修不了
+
+- 后台 `zibll主题设置 → 文档&更新 → 检测更新` 回读原文：「**当前主题已经是最新版啦** / 当前主题版本：**V9.2** / 暂无更新，您当前的版本已是最新版」。即 2026-11-20 记录的「升级 zibll 到兼容 WP 7.1.5 的版本」**客观上没有可升的目标**，缺陷属 zibll V9.2 与 WordPress 7.1.5 的现行兼容 bug。
+- 顺带取到的诊断证据（`post.php?post=3&action=edit` 白屏时）：
+  - `typeof window.wp === "undefined"`、`wpApiSettings` 未定义、无 `iframe[name="editor-canvas"]`、无 `#content` —— Gutenberg 根本没初始化。
+  - Console 出现多条 `Uncaught SyntaxError: Invalid or unexpected token`，其中两条来自页面内联脚本（`zib_admin_man_var` 段 6615 字符、`wp-api-fetch-js-after` 段 150944 字符）；核心包 `wp-includes/js/dist/api-fetch|element|data|block-editor|blocks.min.js` 实测均完整、纯 ASCII、尾部正常 —— 不是文件损坏，是内联脚本在该环境解析失败。
+  - Gutenberg 的 REST 请求打到 `https://laal.top/wp/v2/types`、`/wp/v2/users/me` 等前缀（**6 条 404**），而正确前缀 `https://laal.top/wp-json/wp/v2/types` 实测 **200 / 6815B**；页面内 `createRootURLMiddleware` 注入的 root 却是 `https://laal.top/wp-json/`，两者不一致，说明路径在中途被改写。
+
+### 5.2 处置：装 WordPress 官方「经典编辑器」恢复可编辑能力（可逆）
+
+| 步骤 | 动作 | 回读结果 |
+|---|---|---|
+| 1 | 插件目录搜索 `classic editor`，安装「经典编辑器」（`classic-editor`） | 安装页出现「启用插件」链接 |
+| 2 | 启用插件（`plugins.php?action=activate&plugin=classic-editor%2Fclassic-editor.php`） | 插件列表：`全部（3）\| 已启用（1）| 未启用（2）`，「经典编辑器 1.7.0」为已启用 |
+| 3 | 重开 `post.php?post=3&action=edit` | `hasTinyMCE=true`、`hasGutenberg=false`、页面 3736px 有内容、**无「您试图编辑一个不存在的项目」提示** |
+
+- 影响面：文章 / 页面 / 商品均改用经典编辑器编辑，前台渲染不变；zibll 的 Gutenberg 区块编辑体验暂不使用。
+- 可逆：停用该插件即回到 Gutenberg（缺陷会原样复现）。若日后 zibll 修复该 bug，停用插件即可。
+- 未改 zibll 任何设置、未改主题文件、未降级 WordPress。
+
+### 5.3 隐私政策正文（`post=3`）
+
+- 正文替换为 Mim 实际情况的中文草案，开头明确标注：`版本 2026-11-21 ｜ 本页为运营方草案，正式对外生效前建议经法务审核。`
+- 九节结构：一、我们收集的信息（账号 / 内容 / 交易 / 设备与日志 / Cookie）；二、如何使用；三、共享、委托处理与公开（含「匿名可读、写操作需登录」口径）；四、保存期限与安全（HTTPS、口令哈希、最小权限）；五、你的权利；六、未成年人保护（不面向未满 14 周岁）；七、第三方链接；八、政策更新；九、联系我们。
+- 前台取证：`https://laal.top/privacy-policy/` **200 / 52531B**；命中「版本 2026」「法务」「草案」「我们收集的信息」「第三方登录」「未成年人保护」；原模板句「推荐的文本：」「我们是谁」**已消失**；`<title>隐私政策-Mim</title>`。
+
+### 5.4 主导航挂「商城」入口
+
+- 方式：`nav-menus.php?action=edit&menu=2`（菜单「主导航」，绑定 topmenu / mobilemenu）→「自定义链接」面板 → URL `https://laal.top/shop/`、链接文字「商城」→ 添加（提示「已添加」，新项 `menu-item-40`）→ 保存菜单（`save_menu_header`）。
+- 回读：重载后菜单项 **5** 条：首页 / 社区 / 登录/注册 / 隐私政策 / 商城（商城排在末尾）。
+- 前台取证（抓 `https://laal.top/` 首页 HTML）：导航输出 `首页 → /`、`社区 → /forums/`、`登录/注册 → /user-sign/`、`隐私政策 → /privacy-policy/`、`商城 → /shop/`。
+
+### 5.5 静态首页 `<title>` 补回副标题
+
+- 静态首页（`page_on_front=6`）下 zibll 只输出 `bloginfo('name')`，故 `<title>` 只剩 `Mim`。
+- 处置：在页面 `post=6` 的「独立SEO」元框（`#posts_seo`）写入 title `Mim — 内容、社区与交易一体化` 与 description，保存（提示「页面已更新」）。
+- 前台取证：`<title>Mim — 内容、社区与交易一体化</title>`；`<meta name="description" content="Mim 是内容、社区与交易一体化的站点：社区帖子与圈子、图库与视频、商城与会员服务。">`。未改主题模板、未加钩子代码。
+
+### 5.6 截图取证（第四轮）
+
+| 文件 | 内容 |
+|---|---|
+| `wp-privacy-policy.png` | 前台 `/privacy-policy/`：新正文（版本 2026-11-21 / 待法务审核 / 一、我们收集的信息…），导航已含「商城」 |
+| `wp-plugins.png` | 后台插件列表：经典编辑器 1.7.0 已启用（全部 3 / 已启用 1 / 未启用 2） |
+| `wp-menu.png` | 后台菜单「主导航」：5 项含「商城」 |
+| `wp-edit-post3.png` | （诊断留痕）经典编辑器启用前的白屏 + 「您试图编辑一个不存在的项目」提示 |
+| `wp-zibll-options.png` | （诊断留痕）zibll 主题设置「全局&功能」面板 |
+
+### 5.7 仍未做 / 待你定
+
+- `shop_product` 仍为 0 商品：编辑器已恢复，可随时新建商品（需商品名、价格、图片、库存等资料）。
+- 主导航「商城」排在末尾（首页 / 社区 / 登录/注册 / 隐私政策 / 商城），如需前移需再调一次排序。
+- zibll 后台偶见未本地化的占位 key 直出（如菜单页 `admin_menu_pc_warning` / `admin_menu_mobile_hint`），属主题翻译缺失，不影响功能。
+- Gutenberg 缺陷本身（内联脚本解析失败 + REST 前缀漂移）未在服务器侧定位，本机仍无 SSH 权限；当前以经典编辑器绕开。
