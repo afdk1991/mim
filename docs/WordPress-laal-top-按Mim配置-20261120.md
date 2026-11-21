@@ -180,3 +180,10 @@ zibll 页脚自带的「扫码加 QQ 群 / 扫码加微信」用的是主题演�
 - 主导航「商城」排在末尾（首页 / 社区 / 登录/注册 / 隐私政策 / 商城），如需前移需再调一次排序。
 - zibll 后台偶见未本地化的占位 key 直出（如菜单页 `admin_menu_pc_warning` / `admin_menu_mobile_hint`），属主题翻译缺失，不影响功能。
 - Gutenberg 缺陷本身（内联脚本解析失败 + REST 前缀漂移）未在服务器侧定位，本机仍无 SSH 权限；当前以经典编辑器绕开。
+
+### 5.8 2026-11-22：导航顺序调整（商城移到社区之后）+ i18n 占位 key 定性
+
+- **导航顺序**：在菜单编辑页 `#menu-to-edit` 内把「商城」`li` 移到「社区」之后（DOM 顺序 首页 > 社区 > 商城 > 登录/注册 > 隐私政策），点「保存菜单」（`save_menu_header`）；重载后顺序保持。
+- **前台取证**：抓 `https://laal.top/` 首页 HTML，四处导航链接出现位置依次为 `/forums/` 27173 之前 → `/forums/` **26990** → `/shop/` **27173** → `/user-sign/` **27354** → `/privacy-policy/` **27564**，即 社区 → 商城 → 登录注册 → 隐私政策。
+- **占位 key 定性（第 3 项）**：菜单页实测 `typeof window.zib_admin_man_var === "undefined"`，页面直接显示 `admin_menu_pc_warning` / `admin_menu_mobile_hint` 原始 key。即 **zibll 的 i18n 内联脚本（`var zib_admin_man_var = {...}`）未成功执行**，主题 JS 在取不到翻译时回退显示 key —— 与 5.1 的 Gutenberg 白屏**同一根因**（内联脚本解析失败），不是翻译文件缺失，也不影响功能，无需单独修。
+- **截图更新**：`wp-menu.png` 已用新顺序重拍（首页 / 社区 / 商城 / 登录注册 / 隐私政策，并可见上述两个占位 key）。
