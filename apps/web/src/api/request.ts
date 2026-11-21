@@ -271,9 +271,11 @@ export function errorText(locale: Locale, error: unknown): string { // 把任意
   if (error instanceof ApiError) { // 接口错误优先走错误码翻译表
     const translated = errorMessage(locale, error.code as ErrorCode); // 用业务 code 查当前语言文案
     const serverMessage = (error.message ?? '').trim(); // 服务端原文：具体业务原因通常只写在这里
-    // 中文界面优先展示服务端给出的具体原因：否则「请求参数不合法」「数据冲突」这类通用码文案会吞掉
-    // 「余额不足」「不能转给自己」「卡密已被使用」等真实原因，用户看到的就是「点了没反应 / 不知道错在哪」。
-    if (serverMessage && !String(locale).toLowerCase().startsWith('en') && serverMessage !== translated) return serverMessage;
+    const isEn = String(locale).toLowerCase().startsWith('en'); // 是否英文界面
+    const containsCjk = /[一-鿿]/.test(serverMessage); // 服务端原文是否已是中文
+    // 中文界面优先展示服务端给出的、且已是中文的具体原因：否则「余额不足」「不能转给自己」「卡密已被使用」
+    // 等真实原因会被通用码文案吞掉；历史遗留的英文 message 不再在中文界面透出，回落错误码中文翻译。
+    if (serverMessage && !isEn && containsCjk && serverMessage !== translated) return serverMessage;
     return translated || serverMessage; // 英文界面走本地化文案，查不到再回退服务端原文
   } // instanceof 分支结束
   return error instanceof Error ? error.message : String(error); // 普通异常取 message，其余值强制转字符串

@@ -57,7 +57,7 @@ export function PaymentReturn({ locale }: Props) {
 
     // 缺少意图编号属于非法回跳链接：直接记录错误并结束加载，不发起请求
     if (!intentId) {
-      setError('missing intent'); // 标记缺少意图编号的错误
+      setError(locale === 'en-US' ? 'Missing payment intent' : '缺少支付意图编号'); // 标记缺少意图编号的错误
       setLoading(false); // 结束加载态，页面展示错误面板
       return; // 后续查询与轮询均不再执行
     } // 缺号分支结束

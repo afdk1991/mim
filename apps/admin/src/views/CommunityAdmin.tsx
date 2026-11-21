@@ -178,7 +178,7 @@ export function CommunityAdmin({ credential, permissions }: Props) { // 业务�
         {tabs && (
           <>{/* 执行当前业务步骤 */}
             <p className="muted">共 {tabs.length} 项，字段：key / label / visible / sort_order / sort_by。</p>
-            <label className="field">Tab JSON<textarea value={tabsText} onChange={(event) => setTabsText(event.target.value)} rows={10} spellCheck={false} /></label>
+            <label className="field">标签页配置（JSON）<textarea value={tabsText} onChange={(event) => setTabsText(event.target.value)} rows={10} spellCheck={false} /></label>
             <button type="button" className="btn primary" disabled={busy || !canWrite} onClick={() => void saveTabs()}>保存 Tab 配置</button>
           </>
         )}

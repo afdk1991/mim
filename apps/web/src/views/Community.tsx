@@ -1155,7 +1155,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         <>
       <header className="community-hero">{/* 执行当前业务步骤 */}
         <div>{/* 执行当前业务步骤 */}
-          <p className="community-kicker">MIM COMMUNITY</p>
+          <p className="community-kicker">{locale === 'en-US' ? 'MIM COMMUNITY' : '社区互动广场'}</p>
           <h1>Mim 社区</h1>
           <p className="community-sub">在这里发布图文、视频与图集作品，开通付费阅读，逛逛社区商城，和同好一起交流。</p>
         </div>

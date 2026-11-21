@@ -88,8 +88,8 @@ function AssetList({ locale, hasSession, onRequireLogin }: Props) {
       {/* 头部：左侧标题与说明，右侧「返回社区 / 我的资产」 */}
       <header className="asset-head"> {/* 页头卡片 */}
         <div> {/* 左侧标题区 */}
-          {/* 装饰性英文小标，与中文主标题形成层级 */}
-          <p className="asset-kicker">MIM ASSETS</p> {/* 英文小标 */}
+          {/* 眉题：与中文主标题形成层级，随语言切换中/英文小标 */}
+          <p className="asset-kicker">{isZh ? '付费资产专区' : 'MIM ASSETS'}</p> {/* 眉题：中文界面显示中文，英文界面保留装饰英文小标 */}
           <h1>{isZh ? '付费资产' : 'Paid assets'}</h1> {/* 主标题 */}
           <p className="asset-sub"> {/* 一句话价值说明 */}
             {isZh ? '付费阅读、下载资源、图集与视频，购买后在「我的资产」中随时访问。' : 'Articles, downloads, galleries and videos. Access your purchases from My assets.'} {/* 中英文案 */}
