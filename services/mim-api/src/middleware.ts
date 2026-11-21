@@ -46,18 +46,18 @@ function resolveBearerUser(req: Request): AuthRow { // 内部辅助：令牌 →
   const header = req.header('authorization') ?? ''; // 取 Authorization 头，缺失时用空串统一后续判断
   const match = /^Bearer\s+(.+)$/i.exec(header); // 严格匹配 Bearer 方案（大小写不敏感）并捕获令牌本体
   if (!match || !match[1]) { // 头缺失或格式不符
-    throw new AppError('AUTH_UNAUTHORIZED', 'missing bearer token'); // 统一 401，不区分「没带」与「格式错」以免暴露协议细节
+    throw new AppError('AUTH_UNAUTHORIZED', '缺少访问令牌'); // 统一 401，不区分「没带」与「格式错」以免暴露协议细节
   } // 头格式校验结束
   const payload = verifyAccessToken(match[1], req.deps.jwtSecret); // 校验签名与过期时间，失败抛 AUTH_UNAUTHORIZED
   const row = req.deps.db // 从库中加载最新用户行，使注销等状态变更即时生效（不信任令牌内快照）
     .prepare('SELECT id, member_no, region, status, display_name, locale, timezone, is_guest FROM users WHERE id = ?') // 只选鉴权与展示所需字段（is_guest 为历史兼容列）
     .get(payload.sub) as AuthRow | undefined; // 按令牌 sub 精确查询单行，查不到为 undefined
   if (!row || row.status === 'deleted') { // 用户不存在或已软删除时令牌即失效
-    throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 统一 401，避免区分「不存在」与「已删除」
+    throw new AppError('AUTH_UNAUTHORIZED', '账号不可用'); // 统一 401，避免区分「不存在」与「已删除」
   } // 用户有效性校验结束
   const pathname = req.originalUrl.split('?')[0] ?? ''; // 去掉查询串，仅用路径参与白名单匹配
   if (row.status === 'pending_deletion' && !DELETION_WHITELIST.has(`${req.method} ${pathname}`)) { // 待删除账号除查资料与撤销外一律拒绝
-    throw new AppError('ACCOUNT_DELETION_PENDING', 'account is pending deletion'); // 专用错误码，前端据此引导撤销注销
+    throw new AppError('ACCOUNT_DELETION_PENDING', '账号处于待注销状态'); // 专用错误码，前端据此引导撤销注销
   } // 待删除门禁结束
   return row; // 交出已校验用户行，由调用方决定是否写入 req.user
 } // resolveBearerUser 结束
@@ -218,7 +218,7 @@ export function idempotency(req: Request, res: Response, next: NextFunction): vo
   const key = req.header('idempotency-key') ?? ''; // 取客户端幂等键
   if (!key) { // 未提供幂等键
     if (REQUIRE_IDEMPOTENCY) { // 生产环境可强制要求，避免重复扣费或重复创建
-      throw new AppError('VALIDATION_FAILED', 'Idempotency-Key header is required for write operations', { // 400 并明确缺失的请求头
+      throw new AppError('VALIDATION_FAILED', '写操作必须携带 Idempotency-Key 请求头', { // 400 并明确缺失的请求头
         field: 'Idempotency-Key', // 便于前端统一提示与自动补头
       }); // 异常构造结束
     } // 强制开关分支结束
@@ -226,7 +226,7 @@ export function idempotency(req: Request, res: Response, next: NextFunction): vo
     return; // 提前返回
   } // 缺失键分支结束
   const userId = req.user?.id ?? (req.adminBootstrap ? 'admin-bootstrap' : undefined); // 引导令牌无用户主体，用固定作用域承载运营幂等
-  if (!userId) throw new AppError('AUTH_UNAUTHORIZED', 'idempotency requires an authenticated user'); // 未鉴权无法确定作用域，直接 401
+  if (!userId) throw new AppError('AUTH_UNAUTHORIZED', '幂等操作需要登录态'); // 未鉴权无法确定作用域，直接 401
 
   const db = req.deps.db; // 复用请求上已注入的数据库连接
   const requestHash = sha256(`${req.method} ${req.originalUrl} ${JSON.stringify(req.body ?? null)}`); // 对方法+路径+请求体取指纹，用于判定「同键不同参」
@@ -236,10 +236,10 @@ export function idempotency(req: Request, res: Response, next: NextFunction): vo
 
   if (existing) { // 已存在记录：进入回放或冲突判定
     if (existing.request_hash !== requestHash) { // 同键但请求体不同，属客户端误用
-      throw new AppError('IDEMPOTENCY_CONFLICT', 'Idempotency-Key was reused with a different payload'); // 409 语义，提示换键重试
+      throw new AppError('IDEMPOTENCY_CONFLICT', '同一 Idempotency-Key 被用于不同请求内容'); // 409 语义，提示换键重试
     } // 指纹比对结束
     if (existing.response_status === null || existing.response_body === null) { // 首次请求尚未完成（响应未落库）
-      throw new AppError('CONFLICT', 'an identical request is still in progress'); // 并发重复提交，提示稍后重试
+      throw new AppError('CONFLICT', '相同请求仍在处理中'); // 并发重复提交，提示稍后重试
     } // 进行中判定结束
     res.status(existing.response_status).json(JSON.parse(existing.response_body)); // 回放首次成功响应，保证客户端拿到同一结果
     return; // 回放后终止，不再执行业务逻辑
@@ -294,7 +294,7 @@ function adminTokenMatches(req: Request): boolean { // 内部辅助：判断请�
   const providedDigest = Buffer.from(sha256(provided), 'hex'); // 对实际令牌取定长摘要，消除长度差异
   const expectedDigest = Buffer.from(sha256(expected), 'hex'); // 对期望令牌取同样长度的摘要
   if (!timingSafeEqual(providedDigest, expectedDigest)) { // 常量时间比较，防止逐字节试探
-    throw new AppError('AUTH_UNAUTHORIZED', 'invalid admin token'); // 401，与普通鉴权失败共用错误码
+    throw new AppError('AUTH_UNAUTHORIZED', '管理员令牌无效'); // 401，与普通鉴权失败共用错误码
   } // 令牌比对结束
   return true; // 引导令牌有效
 } // adminTokenMatches 结束
@@ -307,13 +307,13 @@ function adminTokenMatches(req: Request): boolean { // 内部辅助：判断请�
 export function requireAdmin(req: Request, _res: Response, next: NextFunction): void { // 管理端点专用门禁
   const expected = (req.deps.env[ADMIN_TOKEN_ENV_KEY] ?? '').trim(); // 从注入的 env 读取期望令牌；测试可直传替身环境
   if (!expected) { // 未配置即视为管理面未启用
-    throw new AppError('FEATURE_NOT_AVAILABLE', 'admin API is not enabled'); // 403，且不暴露「缺令牌」与「令牌错」的差别
+    throw new AppError('FEATURE_NOT_AVAILABLE', '管理接口未启用'); // 403，且不暴露「缺令牌」与「令牌错」的差别
   } // 配置缺失分支结束
   const provided = (req.header('x-admin-token') ?? '').trim(); // 取客户端管理令牌，缺失时为空串统一后续判断
   const providedDigest = Buffer.from(sha256(provided), 'hex'); // 对实际令牌取定长摘要，消除长度差异
   const expectedDigest = Buffer.from(sha256(expected), 'hex'); // 对期望令牌取同样长度的摘要
   if (!provided || !timingSafeEqual(providedDigest, expectedDigest)) { // 常量时间比较，防止逐字节试探
-    throw new AppError('AUTH_UNAUTHORIZED', 'invalid admin token'); // 401，与普通鉴权失败共用错误码
+    throw new AppError('AUTH_UNAUTHORIZED', '管理员令牌无效'); // 401，与普通鉴权失败共用错误码
   } // 令牌比对结束
   next(); // 通过管理鉴权，进入业务处理
 } // requireAdmin 结束
@@ -356,7 +356,7 @@ export function requirePermission(permission: RbacPermissionCode | string) { // 
     req.user = user; // 挂载用户，供下游路由读取 user.id / region
     const granted = loadPermissions(req.deps.db, user.id); // 实时查库取权限，保证角色回收即时生效
     if (!granted.has(permission)) { // 权限不覆盖即拒绝
-      throw new AppError('FORBIDDEN', 'permission denied', { permission }); // 403 并回显缺失的权限码
+      throw new AppError('FORBIDDEN', '无操作权限', { permission }); // 403 并回显缺失的权限码
     } // 权限判定结束
     next(); // 权限满足，进入业务处理
   }; // 中间件函数结束
@@ -365,7 +365,7 @@ export function requirePermission(permission: RbacPermissionCode | string) { // 
 export function notFound(req: Request, res: Response): void { // 兜底 404：所有未匹配路由统一信封
   res.status(404).json({ // 直接以 JSON 返回，保持与业务错误一致的响应形态
     code: 'NOT_FOUND', // 机器可读错误码
-    message: `route ${req.method} ${req.originalUrl} not found`, // 回显方法与方法路径，便于联调定位
+    message: `路由不存在：${req.method} ${req.originalUrl}`, // 回显方法与路径，便于联调定位
     request_id: req.requestId, // 附带请求 ID，便于与日志串联
   }); // 响应体结束
 } // notFound 结束
@@ -387,7 +387,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   if (isBodyParseError(err)) { // 解析错误分支
     res.status(400).json({ // 归一为 400，避免把客户端问题记成服务端故障
       code: 'VALIDATION_FAILED', // 与参数校验失败共用错误码
-      message: 'request body is not valid JSON', // 明确提示请求体非法
+      message: '请求体不是合法 JSON', // 明确提示请求体非法
       request_id: requestId, // 附带请求 ID
     }); // 响应体结束
     return; // 处理完毕
@@ -395,7 +395,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   console.error(`[${requestId}] unhandled error`, err); // 未知异常必须留痕，便于定位真实故障
   res.status(500).json({ // 对外只暴露通用信息，不泄漏堆栈或内部实现
     code: 'INTERNAL_ERROR', // 机器可读错误码
-    message: 'internal server error', // 通用提示
+    message: '服务器内部错误', // 通用提示
     request_id: requestId, // 附带请求 ID 供排查
   }); // 响应体结束
 } // errorHandler 结束

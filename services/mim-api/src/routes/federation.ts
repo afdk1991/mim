@@ -69,7 +69,7 @@ export function createFederationRouter(deps: ApiDeps): Router {
 
   router.get('/auth/oidc/login', (req, res) => { // 发起授权（登录模式，可匿名）
     const config = readOidcConfig(deps.env);
-    if (!config.configured) throw new AppError('AUTH_OAUTH_NOT_CONFIGURED', 'oidc provider is not configured'); // 503 诚实未配置
+    if (!config.configured) throw new AppError('AUTH_OAUTH_NOT_CONFIGURED', 'OIDC 提供方尚未配置'); // 503 诚实未配置
     const now = clockOf(deps);
     const state = randomBytes(24).toString('base64url'); // 高熵 state
     const nonce = randomBytes(16).toString('base64url'); // 会话绑定 nonce
@@ -88,17 +88,17 @@ export function createFederationRouter(deps: ApiDeps): Router {
     try {
       const state = typeof req.query.state === 'string' ? req.query.state : '';
       const code = typeof req.query.code === 'string' ? req.query.code : '';
-      if (!state) throw new AppError('AUTH_OAUTH_STATE_INVALID', 'missing state');
+      if (!state) throw new AppError('AUTH_OAUTH_STATE_INVALID', '缺少授权状态（state）');
       const now = clockOf(deps);
       const record = consumeOidcState(deps, state, now); // 一次性消费，防重放
-      if (!code) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'authorization code is missing');
+      if (!code) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '缺少授权码');
       const { profile } = await exchangeOidcCode(deps, code, record, record.nonce, now); // 换令牌 + claims 校验
 
       const existing = findOAuthAccount(deps.db, OIDC_PROVIDER, profile.providerUserId); // 主键身份绑定
       let user: UserRow | undefined;
       if (existing) { // 已绑定：直接登录并刷新资料
         user = readUser(deps.db, existing.user_id);
-        if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account is not available');
+        if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', '账号不可用');
         upsertOAuthAccount(deps.db, user.id, OIDC_SPEC, profile, now);
       } else { // 首次联邦登录：建号 + 绑定同事务
         user = deps.db.transaction(() => {

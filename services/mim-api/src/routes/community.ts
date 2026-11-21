@@ -128,7 +128,7 @@ async function assertMediaUrl(raw: string, label: string) { // 定义函数 asse
 async function assertOwnedObjectKey(deps: ApiDeps, userId: string, key: string, label: string) { // 定义函数 assertOwnedObjectKey：封装对象键校验
   assertSafeObjectKey(key); // 先挡路径穿越
   if (!key.startsWith(`${userId}/`)) throw new AppError('FORBIDDEN', `${label}不属于当前账号`, { object_key: key }); // 首段必须是本人 user_id
-  if (!deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 无存储时显式报错
+  if (!deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', '对象存储未配置或不可用'); // 无存储时显式报错
   const head = await deps.storage.headObject(key); // 探测对象是否真的上传完成
   if (!head) throw new AppError('VALIDATION_FAILED', `${label}尚未上传完成或已失效`, { object_key: key }); // 不存在的对象不允许入库
   return head; // 返回存储实测元数据
@@ -875,7 +875,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       | undefined; // 业务步骤：推进当前流程的下一项处理
     if (!attachment) throw new AppError('NOT_FOUND', '附件不存在'); // 附件不存在或不归属该帖
     const storage = deps.storage; // 取存储适配器（附件只存在于对象存储）
-    if (!storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 未配置存储时显式报错
+    if (!storage) throw new AppError('STORAGE_NOT_CONFIGURED', '对象存储未配置或不可用'); // 未配置存储时显式报错
     if ((await storage.headObject(attachment.url)) === null) throw new AppError('NOT_FOUND', '附件不存在'); // 对象已被清理时不再签发地址
     const presigned = await storage.presignDownload({ // 生成短时签名地址（local 走 HMAC，s3 走 SigV4）
       key: attachment.url, // 对象键：列名沿用历史 url，但存的是键不是公开直链
@@ -970,7 +970,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         } // 结束代码块：本层作用域收尾
       } // 结束条件分支：本层作用域收尾
     } // 结束循环体：本层作用域收尾
-    if (attachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 有附件但存储未配置：直接拒绝，避免落库指向不存在的对象
+    if (attachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', '对象存储未配置或不可用'); // 有附件但存储未配置：直接拒绝，避免落库指向不存在的对象
     for (const item of attachments) { // 附件校验：键安全 + 归属 + 对象真实存在，杜绝挂别人文件或凭空键
       assertSafeObjectKey(item.object_key); // 先挡路径穿越
       if (!item.object_key.startsWith(`${userId}/`)) throw new AppError('FORBIDDEN', '附件不属于当前账号', { object_key: item.object_key }); // 首段必须是本人 user_id
@@ -1396,7 +1396,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const nextMedia = body.media ? await normalizeCommunityMedia(deps, userId, body.media) : null; // 媒体整组替换：与发帖共用规范化（对象键回读实测元数据）
     const nextCover = body.cover_url === undefined ? row.cover_url : await normalizeCoverRef(deps, userId, body.cover_url); // 封面：未传保持原值，null 清空，对象键校验归属
     const nextAttachments = body.attachments ?? []; // 未传表示保持原附件，传空数组表示清空
-    if (nextAttachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 与发帖一致：无存储不允许挂附件
+    if (nextAttachments.length > 0 && !deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', '对象存储未配置或不可用'); // 与发帖一致：无存储不允许挂附件
     for (const item of nextAttachments) { // 附件入库前校验：键安全 + 归属 + 对象真实存在
       assertSafeObjectKey(item.object_key); // 先挡路径穿越
       if (!item.object_key.startsWith(`${userId}/`)) throw new AppError('FORBIDDEN', '附件不属于当前账号', { object_key: item.object_key }); // 首段必须是本人 user_id

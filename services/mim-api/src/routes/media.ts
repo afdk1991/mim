@@ -43,7 +43,7 @@ const presignDownloadQuery = z.object({ // 下载预签名查询串：走 query 
 function assertOwnedKey(userId: string, key: string): void { // 统一的对象归属守卫，供下载预签名复用
   assertSafeObjectKey(key); // 先做路径安全校验，挡住 ../ 之类的穿越键
   if (!key.startsWith(`${userId}/`)) { // 首段前缀比对即归属校验，成本低于查库
-    throw new AppError('NOT_FOUND', 'object not found', { object_key: key }); // 用 404 而非 403，避免暴露对象是否存在
+    throw new AppError('NOT_FOUND', '对象不存在', { object_key: key }); // 用 404 而非 403，避免暴露对象是否存在
   } // if 结束：能走到这里说明键首段就是本人 user_id
 } // assertOwnedKey 结束
 
@@ -60,7 +60,7 @@ export function baseUrlOf(req: Request, env: Record<string, string | undefined>)
 } // baseUrlOf 结束
 
 function requireStorage(deps: ApiDeps): StorageAdapter { // 取存储适配器，未注入则整个媒体域不可用
-  if (!deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', 'object storage is not available'); // 显式报配置缺失，避免空指针崩溃
+  if (!deps.storage) throw new AppError('STORAGE_NOT_CONFIGURED', '对象存储未配置或不可用'); // 显式报配置缺失，避免空指针崩溃
   return deps.storage; // 类型收窄后返回非空适配器
 } // requireStorage 结束
 
@@ -68,7 +68,7 @@ function requireStorage(deps: ApiDeps): StorageAdapter { // 取存储适配器�
 function splatKey(req: Request): string { // 把通配段还原成完整对象键
   const raw: unknown = req.params.splat; // 参数类型不确定（数组或字符串），先按 unknown 收窄
   const key = Array.isArray(raw) ? raw.join('/') : typeof raw === 'string' ? raw : ''; // 数组按 / 拼回；非字符串一律当空串
-  if (!key) throw new AppError('VALIDATION_FAILED', 'object key is required'); // 空键无意义，直接 422
+  if (!key) throw new AppError('VALIDATION_FAILED', '对象键不能为空'); // 空键无意义，直接 422
   assertSafeObjectKey(key); // 拼接还原后再校验一次，防止绕过单段校验
   return key; // 返回校验通过的对象键
 } // splatKey 结束
@@ -83,7 +83,7 @@ export function createMediaObjectRouter(deps: ApiDeps): Router { // 对象端点
 
   function guard(): StorageAdapter { // 端点级守卫：仅本地驱动提供直连收发
     if (deps.storage?.driver !== 'local') { // S3 驱动由云厂商直连，本服务不应暴露该端点
-      throw new AppError('NOT_FOUND', 'object endpoint is only served by the local storage driver'); // 统一 404，不暴露驱动细节
+      throw new AppError('NOT_FOUND', '对象端点仅本地存储驱动可用'); // 统一 404，不暴露驱动细节
     } // if 结束：非本地驱动已在此拦下
     return requireStorage(deps); // 驱动匹配后再取适配器，顺带处理未注入的情况
   } // guard 结束
@@ -94,7 +94,7 @@ export function createMediaObjectRouter(deps: ApiDeps): Router { // 对象端点
     const signatureRaw = req.query.signature; // 取签名原始值
     const signature = Array.isArray(signatureRaw) ? signatureRaw[0] : signatureRaw; // 重复参数同样取第一个
     if (!Number.isInteger(expires) || !signature || typeof signature !== 'string') { // 缺参或类型不符都视为鉴权失败
-      throw new AppError('AUTH_UNAUTHORIZED', 'storage signature is missing'); // 401：签名参数缺失
+      throw new AppError('AUTH_UNAUTHORIZED', '缺少存储签名'); // 401：签名参数缺失
     } // if 结束：参数齐全才可能通过校验
     return { expires, signature }; // 交给适配器做 HMAC 校验
   } // signatureOf 结束
@@ -105,11 +105,11 @@ export function createMediaObjectRouter(deps: ApiDeps): Router { // 对象端点
     const key = splatKey(req); // 还原并校验对象键
     const { expires, signature } = signatureOf(req); // 取出签名参数
     if (!storage.verifySignature({ method: 'PUT', key, expires, signature })) { // method 参与 HMAC，防止 GET 签名被改用 PUT 上传
-      throw new AppError('AUTH_UNAUTHORIZED', 'storage signature rejected'); // 401：签名不匹配或已过期
+      throw new AppError('AUTH_UNAUTHORIZED', '存储签名校验未通过'); // 401：签名不匹配或已过期
     }
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0); // raw 解析失败时 body 不是 Buffer，退化为空
     if (body.byteLength === 0) { // 空体无意义，也易被用来占位探测
-      throw new AppError('VALIDATION_FAILED', 'uploaded object body is empty'); // 422：空对象
+      throw new AppError('VALIDATION_FAILED', '上传内容不能为空'); // 422：空对象
     }
     const mime = req.header('content-type') ?? mimeForObjectKey(key); // 优先客户端声明，缺失时按扩展名推导
     const stored = await storage.putObject(key, body, mime); // 真正落盘 / 落桶，返回校验和等元信息
@@ -122,7 +122,7 @@ export function createMediaObjectRouter(deps: ApiDeps): Router { // 对象端点
     const key = splatKey(req); // 对象键还原与安全校验
     const { expires, signature } = signatureOf(req); // 签名参数
     if (!storage.verifySignature({ method: 'GET', key, expires, signature })) { // 与 PUT 同理，method 参与签名
-      throw new AppError('AUTH_UNAUTHORIZED', 'storage signature rejected'); // 401：签名被拒
+      throw new AppError('AUTH_UNAUTHORIZED', '存储签名校验未通过'); // 401：签名被拒
     }
     const object = await storage.getObject(key); // 读取对象内容与 MIME
     res.status(200).type(object.mime).send(object.body); // 回写真实 MIME 后发送字节，避免浏览器误判类型
@@ -165,7 +165,7 @@ export function createMediaRouter(deps: ApiDeps): Router { // 控制面路由工
     assertOwnedKey(user.id, query.object_key); // 归属优先校验，跨用户直接 404
 
     if ((await storage.headObject(query.object_key)) === null) { // 先探测存在性，避免为不存在的对象签 URL
-      throw new AppError('NOT_FOUND', 'object not found', { object_key: query.object_key }); // 不存在即 404
+      throw new AppError('NOT_FOUND', '对象不存在', { object_key: query.object_key }); // 不存在即 404
     } // if 结束：对象确实存在才继续签发
 
     const presigned = await storage.presignDownload({ // 生成短时下载地址

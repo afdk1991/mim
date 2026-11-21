@@ -110,12 +110,12 @@ describe('GET /admin/me 身份回显', () => { // 后台首屏需要知道自己
     const missing = await request(app).get('/api/v1/admin/me'); // 完全不带头
     expect(missing.status).toBe(401); // 断言 401
     expect(missing.body.code).toBe('AUTH_UNAUTHORIZED'); // 断言错误码
-    expect(missing.body.message).toBe('missing bearer token'); // 落到 Bearer 解析分支
+    expect(missing.body.message).toBe('缺少访问令牌'); // 落到 Bearer 解析分支
     const wrong = await request(app) // 带错误令牌
       .get('/api/v1/admin/me') // 同一端点
       .set(adminHeaders('wrong-token')); // 故意用错值
     expect(wrong.status).toBe(401); // 断言 401
-    expect(wrong.body.message).toBe('invalid admin token'); // 文案来自 adminTokenMatches
+    expect(wrong.body.message).toBe('管理员令牌无效'); // 文案来自 adminTokenMatches
   }); // 凭据缺失用例结束
 }); // 身份回显分组结束
 
@@ -148,7 +148,7 @@ describe('权限点与角色读取', () => { // 后台勾选矩阵的数据源�
       .set(adminHeaders()); // 引导令牌
     expect(res.status).toBe(404); // 断言 404
     expect(res.body.code).toBe('NOT_FOUND'); // 断言错误码
-    expect(res.body.message).toBe('role not found'); // 断言文案
+    expect(res.body.message).toBe('角色不存在'); // 断言文案
   }); // 未知角色用例结束
 }); // 读取分组结束
 
@@ -171,7 +171,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
       .send({ code: 'viewer', name: { 'zh-CN': '重复角色' } }); // 已存在的 code
     expect(res.status).toBe(409); // 断言 409
     expect(res.body.code).toBe('CONFLICT'); // 断言冲突码
-    expect(res.body.message).toBe('role code already exists'); // 断言文案
+    expect(res.body.message).toBe('角色标识已存在'); // 断言文案
   }); // 重复 code 用例结束
 
   it('POST /admin/roles 未知权限码 → 400 并回显 unknown', async () => { // 避免写坏权限映射
@@ -200,7 +200,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
       .send({ name: { 'zh-CN': '改名的运营' } }); // 合法字段
     expect(res.status).toBe(403); // 断言 403
     expect(res.body.code).toBe('FORBIDDEN'); // 断言错误码
-    expect(res.body.message).toBe('builtin role cannot be modified'); // 断言文案
+    expect(res.body.message).toBe('内置角色不可修改'); // 断言文案
     expect(res.body.details.role_code).toBe('operator'); // 回显目标角色
   }); // 内置角色改用例结束
 
@@ -230,7 +230,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
       .set(adminHeaders()) // 引导令牌
       .send({ name: { 'zh-CN': '任意' } }); // 合法字段
     expect(res.status).toBe(404); // 断言 404
-    expect(res.body.message).toBe('role not found'); // 断言文案
+    expect(res.body.message).toBe('角色不存在'); // 断言文案
   }); // 未知角色用例结束
 
   it('DELETE /admin/roles/:code 内置角色 → 403', async () => { // 内置角色不可删除
@@ -238,7 +238,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
       .delete('/api/v1/admin/roles/viewer') // 角色端点
       .set(adminHeaders()); // 引导令牌
     expect(res.status).toBe(403); // 断言 403
-    expect(res.body.message).toBe('builtin role cannot be deleted'); // 断言文案
+    expect(res.body.message).toBe('内置角色不可删除'); // 断言文案
   }); // 内置删除用例结束
 
   it('DELETE /admin/roles/:code 仍被用户引用 → 409 并回显 assignments', async () => { // 防悬空授权
@@ -281,7 +281,7 @@ describe('角色写操作（POST / PATCH / DELETE / PUT permissions）', () => {
       .set(adminHeaders()) // 引导令牌
       .send({ permissions: [] }); // 空集合
     expect(res.status).toBe(403); // 断言 403
-    expect(res.body.message).toBe('superadmin permissions cannot be replaced'); // 断言文案
+    expect(res.body.message).toBe('超级管理员权限不可被替换'); // 断言文案
   }); // 超管权限替换用例结束
 
   it('PUT /admin/roles/:code/permissions operator 可整体替换', async () => { // 非超管内置角色允许调整
@@ -381,13 +381,13 @@ describe('用户角色授权（GET / POST / DELETE）', () => { // 授权是 RBA
       .set(adminHeaders()) // 引导令牌
       .send({ role_code: 'viewer' }); // 合法角色
     expect(noUser.status).toBe(404); // 断言 404
-    expect(noUser.body.message).toBe('user not found'); // 断言文案
+    expect(noUser.body.message).toBe('用户不存在'); // 断言文案
     const noRole = await request(app) // 不存在的角色
       .post(`/api/v1/admin/users/${session.userId}/roles`) // 授权端点
       .set(adminHeaders()) // 引导令牌
       .send({ role_code: 'no-such-role' }); // 非法角色
     expect(noRole.status).toBe(404); // 断言 404
-    expect(noRole.body.message).toBe('role not found'); // 断言文案
+    expect(noRole.body.message).toBe('角色不存在'); // 断言文案
   }); // 前置缺失用例结束
 
   it('GET 用户不存在 → 404；DELETE 未授权 → 404、授权后 → 200', async () => { // 撤销路径三条分支
@@ -400,7 +400,7 @@ describe('用户角色授权（GET / POST / DELETE）', () => { // 授权是 RBA
       .delete(`/api/v1/admin/users/${session.userId}/roles/viewer`) // 撤销端点
       .set(adminHeaders()); // 引导令牌
     expect(before.status).toBe(404); // 断言 404
-    expect(before.body.message).toBe('user role assignment not found'); // 断言文案
+    expect(before.body.message).toBe('未找到用户角色分配'); // 断言文案
     await grantRole(session.userId, 'viewer'); // 先授权
     const after = await request(app) // 再撤销
       .delete(`/api/v1/admin/users/${session.userId}/roles/viewer`) // 撤销端点

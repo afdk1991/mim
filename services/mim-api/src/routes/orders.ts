@@ -35,7 +35,7 @@ function parseLimit(raw: unknown): number {
 function parseSource(raw: unknown): UnifiedOrderSource | undefined {
   if (raw === undefined || raw === '') return undefined; // 未传不过滤
   if (raw === 'shop' || raw === 'asset' || raw === 'community') return raw; // 合法产线原样返回
-  throw new AppError('VALIDATION_FAILED', 'source must be one of shop/asset/community', { source: raw }); // 非法值显式拒绝
+  throw new AppError('VALIDATION_FAILED', '来源必须为 shop、asset 或 community 之一', { source: raw }); // 非法值显式拒绝
 }
 
 export function createOrdersRouter(deps: ApiDeps): Router {

@@ -56,7 +56,7 @@ export function createSsoRouter(deps: ApiDeps): Router { // 依赖显式注入
   router.post('/auth/sso/ticket', requireAuth, (req, res) => { // 登录态签发票据
     const body = parse(ticketBody, req.body ?? {}); // 校验请求体
     if (!isSiteAllowed(deps.env, body.site)) { // 白名单前置校验，给出明确 403
-      throw new AppError('AUTH_SSO_SITE_FORBIDDEN', 'sso site is not allowed', { site: body.site }); // 拒绝并回显站点
+      throw new AppError('AUTH_SSO_SITE_FORBIDDEN', '当前站点未被允许使用单点登录', { site: body.site }); // 拒绝并回显站点
     } // 白名单结束
     const now = clockOf(deps); // 统一取时
     const ticket = issueSsoTicket(deps, req.user!.id, body.site, now); // 签发一次性票据

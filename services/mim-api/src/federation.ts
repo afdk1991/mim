@@ -96,7 +96,7 @@ export function consumeOidcState(deps: ApiDeps, state: string, now: string = clo
     | { region: Region; code_verifier: string | null; redirect_uri: string; return_to: string | null; expires_at: string }
     | undefined;
   if (!record || Date.parse(record.expires_at) <= Date.parse(now)) {
-    throw new AppError('AUTH_OAUTH_STATE_INVALID', 'oidc state is invalid or expired'); // 400，防重放
+    throw new AppError('AUTH_OAUTH_STATE_INVALID', '授权状态已失效或过期'); // 400，防重放
   }
   deps.db.prepare('DELETE FROM oauth_states WHERE state_hash = ?').run(sha256(state)); // 一次性：无论后续成败都删除
   return { region: record.region, nonce: record.code_verifier ?? '', returnTo: record.return_to, redirectUri: record.redirect_uri };
@@ -117,28 +117,28 @@ export interface OidcClaims {
 /** base64url 解码 ID Token payload 段；畸形 token 抛 401 */
 function decodeIdTokenPayload(idToken: string): OidcClaims {
   const parts = idToken.split('.'); // header.payload.signature
-  if (parts.length !== 3) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token is malformed'); // 结构不符
+  if (parts.length !== 3) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 格式不正确'); // 结构不符
   const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/'); // base64url → base64
   const padded = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), '='); // 补全填充
   let claims: unknown;
   try {
     claims = JSON.parse(Buffer.from(padded, 'base64').toString('utf8')); // 解码 payload
   } catch {
-    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token payload is not valid json'); // 解析失败
+    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 载荷不是合法 JSON'); // 解析失败
   }
   return claims as OidcClaims;
 }
 
 /** 校验 ID Token claims：iss 白名单 / aud / exp / nonce / sub */
 function validateClaims(claims: OidcClaims, config: OidcConfig, nonce: string, now: string): void {
-  if (claims.iss !== config.issuer) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token issuer is not whitelisted', { iss: claims.iss }); // issuer 白名单
+  if (claims.iss !== config.issuer) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 签发方不在白名单内', { iss: claims.iss }); // issuer 白名单
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud]; // aud 可能是数组
-  if (!aud.includes(config.clientId)) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token audience mismatch'); // 受众必须含本客户端
+  if (!aud.includes(config.clientId)) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 受众不匹配'); // 受众必须含本客户端
   if (typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.parse(now)) {
-    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token expired'); // 过期拒绝
+    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 已过期'); // 过期拒绝
   }
-  if (nonce && claims.nonce !== nonce) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token nonce mismatch'); // 绑定防重放
-  if (!claims.sub) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token missing sub'); // 无稳定主体无法绑定
+  if (nonce && claims.nonce !== nonce) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 随机串不匹配'); // 绑定防重放
+  if (!claims.sub) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'id_token 缺少用户标识（sub）'); // 无稳定主体无法绑定
 }
 
 /** 令牌响应体最小视图 */
@@ -176,9 +176,9 @@ export async function exchangeOidcCode(
       body: body.toString(),
       signal: controller.signal,
     });
-    if (!response.ok) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', `token endpoint responded ${response.status}`); // 非 2xx
+    if (!response.ok) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', `令牌端点返回 ${response.status}`); // 非 2xx
     const token = (await response.json()) as TokenResponse; // 解析响应
-    if (!token.id_token) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'token response missing id_token'); // 无 id_token
+    if (!token.id_token) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '令牌响应缺少 id_token'); // 无 id_token
     const claims = decodeIdTokenPayload(token.id_token); // 解 payload
     validateClaims(claims, config, nonce, now); // claims 校验
     const profile = { // 映射统一资料结构

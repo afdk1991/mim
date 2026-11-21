@@ -36,7 +36,7 @@ export function allocateMemberNo(db: Db): string { // 所有建号入口共用
     let skipped = 0; // 本次连续跳过的靓号计数
     while (true) { // 逐个试探，直到找到一个可发号
       if (!Number.isInteger(next) || next < MEMBER_NO_START || next > MEMBER_NO_MAX) { // 号段边界校验
-        throw new AppError('MEMBER_NO_EXHAUSTED', 'member number range exhausted', { // 号码用尽属容量问题
+        throw new AppError('MEMBER_NO_EXHAUSTED', '会员编号号段已用完', { // 号码用尽属容量问题
           next, // 回传当前游标便于运维判断是否需要扩号段
           max: MEMBER_NO_MAX, // 回传上限
         }); // 结束错误构造
@@ -45,7 +45,7 @@ export function allocateMemberNo(db: Db): string { // 所有建号入口共用
       next += 1; // 靓号或已被占用：推进到下一个候选
       skipped += 1; // 累加跳过计数
       if (skipped > MEMBER_NO_SKIP_GUARD) { // 规则写错（例如把整段都判成靓号）时不允许无限扫描
-        throw new AppError('MEMBER_NO_EXHAUSTED', 'too many reserved numbers skipped', { next, skipped }); // 快速失败便于定位
+        throw new AppError('MEMBER_NO_EXHAUSTED', '预留靓号跳过次数过多', { next, skipped }); // 快速失败便于定位
       } // 保护阈值判定结束
     } // 试探循环结束
     db.prepare('UPDATE member_no_sequence SET next_no = ? WHERE id = 1').run(next + 1); // 先把游标推进再返回，失败即整体回滚
@@ -96,9 +96,9 @@ export function renumberMemberNos(db: Db, now: string): MemberNoChange[] { // �
       while (classifyPremiumNo(cursor) !== null) { // 靓号一律不自动分配
         cursor += 1; // 推进到下一个候选
         skipped += 1; // 累加保护计数
-        if (skipped > MEMBER_NO_SKIP_GUARD) throw new AppError('MEMBER_NO_EXHAUSTED', 'too many reserved numbers skipped'); // 规则异常快速失败
+        if (skipped > MEMBER_NO_SKIP_GUARD) throw new AppError('MEMBER_NO_EXHAUSTED', '预留靓号跳过次数过多'); // 规则异常快速失败
       } // 跳过循环结束
-      if (cursor > MEMBER_NO_MAX) throw new AppError('MEMBER_NO_EXHAUSTED', 'member number range exhausted', { max: MEMBER_NO_MAX }); // 容量兜底
+      if (cursor > MEMBER_NO_MAX) throw new AppError('MEMBER_NO_EXHAUSTED', '会员编号号段已用完', { max: MEMBER_NO_MAX }); // 容量兜底
       const nextNo = formatMemberNo(cursor); // 统一走格式化函数，保证与发号器同口径
       assign.run(nextNo, now, row.id); // 写回新号
       insertHistory.run(uuidv7(), row.id, row.member_no, nextNo, now); // 落审计：旧号可能已被用户对外告知
@@ -180,7 +180,7 @@ export function createUser(db: Db, input: CreateUserInput): UserRow { // 唯一�
     input.now, // 更新时间
   ); // 结束执行
   const row = readUser(db, id); // 回读落库结果，确保返回真实数据
-  if (!row) throw new AppError('INTERNAL_ERROR', 'failed to create user'); // 写入后读不到属数据层异常
+  if (!row) throw new AppError('INTERNAL_ERROR', '创建用户失败'); // 写入后读不到属数据层异常
   return row; // 返回含号码的完整用户行
 } // createUser 结束
 

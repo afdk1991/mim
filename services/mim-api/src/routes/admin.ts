@@ -75,7 +75,7 @@ interface RoleView {
 /** 多语言映射入参：键为语言标签，值为文案；空对象无意义故一并拒绝 */
 const i18nSchema = z
   .record(z.string(), z.string()) // zod v4 的 record 要求显式声明键与值类型
-  .refine((value) => Object.keys(value).length > 0, { message: 'i18n map must not be empty' }); // 至少一条文案，避免写入空壳
+  .refine((value) => Object.keys(value).length > 0, { message: '多语言名称不能为空' }); // 至少一条文案，避免写入空壳
 
 /** 新建角色入参：code 采用小写字母开头的短横线命名，便于 URL 与前端路由直接使用 */
 const roleCreateSchema = z.object({
@@ -92,7 +92,7 @@ const roleUpdateSchema = z
     description: i18nSchema.optional(), // 可选新描述
   }) // 基础对象定义结束
   .refine((value) => value.name !== undefined || value.description !== undefined, { // 执行当前业务步骤
-    message: 'at least one of name / description is required', // 空 PATCH 视为参数错误而非静默成功
+    message: '名称与描述至少填写一项', // 空 PATCH 视为参数错误而非静默成功
   }); // refine 结束
 
 /** 整体替换角色权限入参 */
@@ -254,13 +254,13 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const body = parse(roleCreateSchema, req.body); // 先校验入参形态，非法直接 400
     if (loadRoleMeta(db, body.code)) { // 条件分支：按判断结果选择后续处理路径
       // 主键冲突（含与内置角色同名）统一按 CONFLICT 处理
-      throw new AppError('CONFLICT', 'role code already exists', { code: body.code }); // 409 让前端提示换一个码
+      throw new AppError('CONFLICT', '角色标识已存在', { code: body.code }); // 409 让前端提示换一个码
     } // if 结束：角色码占用检查
     const permissionCodes = [...new Set(body.permissions)]; // 去重，避免 PRIMARY KEY 冲突刷屏
     const unknown = unknownPermissionCodes(db, permissionCodes); // 校验权限码是否都已存在
     if (unknown.length > 0) { // 条件分支：按判断结果选择后续处理路径
       // 引用不存在的权限点属于入参错误，不是服务端故障
-      throw new AppError('VALIDATION_FAILED', 'unknown permission codes', { unknown }); // 400 并回传非法清单
+      throw new AppError('VALIDATION_FAILED', '存在未知的权限标识', { unknown }); // 400 并回传非法清单
     } // if 结束：权限码合法性检查
     const now = clockOf(deps); // 统一时间源，事务内所有写入共用同一时刻
     const createRole = db.transaction(() => { // 常量 createRole：保存固定配置或一次性派生值
@@ -286,11 +286,11 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const meta = loadRoleMeta(db, code); // 先确认角色存在
     if (!meta) { // 条件分支：按判断结果选择后续处理路径
       // 不存在与无权限要区分开，便于排障
-      throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
+      throw new AppError('NOT_FOUND', '角色不存在', { role_code: code }); // 404
     } // if 结束：角色存在性检查
     if (meta.builtin === 1) { // 条件分支：按判断结果选择后续处理路径
       // 内置角色的名称与描述以代码种子为唯一真源，禁止后台改写
-      throw new AppError('FORBIDDEN', 'builtin role cannot be modified', { role_code: code }); // 403
+      throw new AppError('FORBIDDEN', '内置角色不可修改', { role_code: code }); // 403
     } // if 结束：内置角色写保护
     const body = parse(roleUpdateSchema, req.body); // 校验至少提供一个可改字段
     const sets: string[] = ['updated_at = ?']; // SET 子句首项固定刷新更新时间
@@ -315,18 +315,18 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const meta = loadRoleMeta(db, code); // 存在性 + 内置标记
     if (!meta) { // 条件分支：按判断结果选择后续处理路径
       // 已删除或从未存在
-      throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
+      throw new AppError('NOT_FOUND', '角色不存在', { role_code: code }); // 404
     } // if 结束：角色存在性检查
     if (meta.builtin === 1) { // 条件分支：按判断结果选择后续处理路径
       // 内置角色是系统基线，删除会导致种子与库不一致
-      throw new AppError('FORBIDDEN', 'builtin role cannot be deleted', { role_code: code }); // 403
+      throw new AppError('FORBIDDEN', '内置角色不可删除', { role_code: code }); // 403
     } // if 结束：内置角色删除保护
     const assignment = db // 常量 assignment：保存固定配置或一次性派生值
       .prepare(`SELECT COUNT(*) AS total FROM user_roles WHERE role_code = ?`) // 统计仍被引用的授权数
       .get(code) as { total: number }; // COUNT 一定返回一行
     if (assignment.total > 0) { // 条件分支：按判断结果选择后续处理路径
       // 有用户仍在用该角色时删除会静默剥夺权限，必须显式拒绝
-      throw new AppError('CONFLICT', 'role is still assigned to users', {
+      throw new AppError('CONFLICT', '角色仍被用户使用，不可删除', {
         role_code: code, // 回传冲突角色
         assignments: assignment.total, // 回传引用计数，便于前端提示先解绑
       }); // 409 结束
@@ -339,7 +339,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const code = pathParam(req, 'code'); // 取路径参数
     if (!loadRoleMeta(db, code)) { // 条件分支：按判断结果选择后续处理路径
       // 角色不存在时返回 404 而不是空数组，避免前端误以为权限被清空
-      throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
+      throw new AppError('NOT_FOUND', '角色不存在', { role_code: code }); // 404
     } // if 结束：角色存在性检查
     res.json({ role_code: code, permissions: loadRoleView(db, code)!.permissions }); // 复用视图函数，保证口径与列表一致
   }); // GET /admin/roles/:code/permissions 结束
@@ -350,17 +350,17 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const meta = loadRoleMeta(db, code); // 存在性 + 内置标记
     if (!meta) { // 条件分支：按判断结果选择后续处理路径
       // 角色不存在
-      throw new AppError('NOT_FOUND', 'role not found', { role_code: code }); // 404
+      throw new AppError('NOT_FOUND', '角色不存在', { role_code: code }); // 404
     } // if 结束：角色存在性检查
     if (code === 'superadmin') { // 条件分支：按判断结果选择后续处理路径
       // 超管权限集合是最后的兜底通道，整体替换可能把管理员自己锁在门外
-      throw new AppError('FORBIDDEN', 'superadmin permissions cannot be replaced', { role_code: code }); // 403
+      throw new AppError('FORBIDDEN', '超级管理员权限不可被替换', { role_code: code }); // 403
     } // if 结束：超管权限保护（operator / viewer 等内置角色允许按需调整）
     const permissionCodes = [...new Set(body.permissions)]; // 去重
     const unknown = unknownPermissionCodes(db, permissionCodes); // 校验权限码存在性
     if (unknown.length > 0) { // 条件分支：按判断结果选择后续处理路径
       // 引用不存在的权限点属参数错误
-      throw new AppError('VALIDATION_FAILED', 'unknown permission codes', { unknown }); // 400
+      throw new AppError('VALIDATION_FAILED', '存在未知的权限标识', { unknown }); // 400
     } // if 结束：权限码合法性检查
     const now = clockOf(deps); // 统一时间源
     const replacePermissions = db.transaction(() => { // 常量 replacePermissions：保存固定配置或一次性派生值
@@ -425,7 +425,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const userId = pathParam(req, 'userId'); // 取路径参数
     if (!userExists(db, userId)) { // 条件分支：按判断结果选择后续处理路径
       // 用户不存在时返回 404，避免前端把「查无此人」当成「无任何角色」
-      throw new AppError('NOT_FOUND', 'user not found', { user_id: userId }); // 404
+      throw new AppError('NOT_FOUND', '用户不存在', { user_id: userId }); // 404
     } // if 结束：用户存在性检查
     const rows = db // 常量 rows：保存固定配置或一次性派生值
       .prepare( // 执行当前业务步骤
@@ -440,11 +440,11 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const body = parse(userRoleGrantSchema, req.body); // 校验 role_code 形态
     if (!userExists(db, userId)) { // 条件分支：按判断结果选择后续处理路径
       // 用户不存在时不允许写入悬空授权
-      throw new AppError('NOT_FOUND', 'user not found', { user_id: userId }); // 404
+      throw new AppError('NOT_FOUND', '用户不存在', { user_id: userId }); // 404
     } // if 结束：用户存在性检查
     if (!loadRoleMeta(db, body.role_code)) { // 条件分支：按判断结果选择后续处理路径
       // 角色不存在时同样拒绝
-      throw new AppError('NOT_FOUND', 'role not found', { role_code: body.role_code }); // 404
+      throw new AppError('NOT_FOUND', '角色不存在', { role_code: body.role_code }); // 404
     } // if 结束：角色存在性检查
     const grantedBy = req.user?.id ?? 'bootstrap'; // 引导通道没有真实用户，用固定标记留痕
     const result = audited(db, auditActor(req), { action: 'admin.user.role_grant', targetType: 'user', targetId: userId, detail: { role_code: body.role_code } }, () => db // 授权写入与审计同属一次敏感操作
@@ -467,7 +467,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const result = audited(db, auditActor(req), { action: 'admin.user.role_revoke', targetType: 'user', targetId: userId, detail: { role_code: roleCode } }, () => { // 撤销授权与审计同属一次敏感操作
       const removed = db.prepare(`DELETE FROM user_roles WHERE user_id = ? AND role_code = ?`).run(userId, roleCode); // 精确删除单条授权
       if (removed.changes === 0) { // 未删除任何行说明授权不存在
-        throw new AppError('NOT_FOUND', 'user role assignment not found', {
+        throw new AppError('NOT_FOUND', '未找到用户角色分配', {
           user_id: userId, // 回传用户 ID
           role_code: roleCode, // 回传角色码
         }); // 404 结束
@@ -482,7 +482,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
   /** 口令强度与自助注册保持一致：8-128 位且同时含字母与数字 */
   function assertPasswordStrength(password: string): void {
     if (password.length < 8 || password.length > 128 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      throw new AppError('VALIDATION_FAILED', 'password must be 8-128 chars and contain both letters and digits', { field: 'password' });
+      throw new AppError('VALIDATION_FAILED', '密码长度需为 8-128 位，且同时包含字母和数字', { field: 'password' });
     } // 强度不足即 400，不落任何写操作
   } // assertPasswordStrength 结束
 
@@ -503,10 +503,10 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
     const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一并校验号码 / 邮箱格式
     assertPasswordStrength(body.password); // 口令强度不达标直接 400
     const taken = db.prepare('SELECT user_id FROM identities WHERE region = ? AND provider = ? AND identifier = ?').get(body.region, identity.provider, identity.identifier) as { user_id: string } | undefined; // 同区域同类型标识唯一
-    if (taken) throw new AppError('AUTH_IDENTITY_EXISTS', 'account already registered', { field: 'identifier' }); // 冲突按业务码返回，避免 500
+    if (taken) throw new AppError('AUTH_IDENTITY_EXISTS', '该账号已注册', { field: 'identifier' }); // 冲突按业务码返回，避免 500
     const roleCodes = [...new Set(body.role_codes ?? [])]; // 去重，保持调用方顺序
     const missing = roleCodes.filter((code) => !db.prepare('SELECT 1 FROM roles WHERE code = ?').get(code)); // 角色必须存在
-    if (missing.length > 0) throw new AppError('NOT_FOUND', 'role not found', { role_codes: missing }); // 未知角色整体拒绝
+    if (missing.length > 0) throw new AppError('NOT_FOUND', '角色不存在', { role_codes: missing }); // 未知角色整体拒绝
     const now = clockOf(deps); // 统一时钟
     const grantedBy = req.user?.id ?? 'admin-bootstrap'; // 审计：登录超管记 user id，引导令牌记固定标记
     const actor = auditActor(req); // 操作人快照：只取 id / 区域 / 来源 IP
@@ -529,7 +529,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
   router.post('/admin/users/:userId/password', requirePermission('rbac:write'), (req, res) => {
     const userId = pathParam(req, 'userId'); // 路径参数收敛为字符串
     if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) { // 账号必须存在
-      throw new AppError('NOT_FOUND', 'user not found', { user_id: userId }); // 404 而非静默成功
+      throw new AppError('NOT_FOUND', '用户不存在', { user_id: userId }); // 404 而非静默成功
     } // 存在性检查结束
     const body = parse(z.object({ password: z.string().min(1).max(128) }), req.body); // 新口令
     assertPasswordStrength(body.password); // 强度校验
@@ -585,7 +585,7 @@ export function createAdminRouter(deps: ApiDeps): Router { // 导出函数 creat
   router.get('/admin/commerce/price-batches/:id', requirePermission('commerce:write'), (req, res) => {
     const id = pathParam(req, 'id'); // 批次主键
     const batch = getBatch(db, id); // 查批次
-    if (!batch) throw new AppError('NOT_FOUND', 'price batch not found', { batch_id: id }); // 不存在 404
+    if (!batch) throw new AppError('NOT_FOUND', '未找到价格批次', { batch_id: id }); // 不存在 404
     res.json({ batch }); // 返回批次视图
   }); // GET 详情结束
 

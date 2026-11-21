@@ -61,7 +61,7 @@ const KEY_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/; // 每层仅允许字�
 
 export function assertSafeObjectKey(key: string): void { // 对象键准入校验，所有写入路径统一调用
   if (!KEY_RE.test(key) || key.includes('..')) { // 正则不匹配或含 .. 一律拒绝
-    throw new AppError('VALIDATION_FAILED', 'invalid object key', { object_key: key }); // 拒绝危险键，防止越权读写
+    throw new AppError('VALIDATION_FAILED', '对象键格式不正确', { object_key: key }); // 拒绝危险键，防止越权读写
   } // 结束危险键判断
 } // 结束 assertSafeObjectKey
 
@@ -193,7 +193,7 @@ class LocalDiskStorage implements StorageAdapter { // 零云依赖的默认驱�
 
   async getObject(key: string) { // 服务端直接读取
     const path = this.objectPath(key); // 解析路径
-    if (!existsSync(path)) throw new AppError('NOT_FOUND', 'object not found', { object_key: key }); // 不存在即 404
+    if (!existsSync(path)) throw new AppError('NOT_FOUND', '对象不存在', { object_key: key }); // 不存在即 404
     return { body: readFileSync(path), mime: mimeForObjectKey(key) }; // 内容类型按后缀推断
   } // 结束 getObject
 
@@ -250,7 +250,7 @@ class S3Storage implements StorageAdapter { // 云对象存储实现
 
   private requireClient(): { client: S3Client; bucket: string } { // 使用前确保已配置
     if (!this.client || !this.opts) { // 客户端或配置缺失即视为不可用
-      throw new AppError('STORAGE_NOT_CONFIGURED', 'S3 storage credentials are incomplete'); // 缺凭证诚实失败，不伪造产物
+      throw new AppError('STORAGE_NOT_CONFIGURED', 'S3 存储凭证不完整'); // 缺凭证诚实失败，不伪造产物
     } // 结束配置检查
     return { client: this.client, bucket: this.opts.bucket }; // 返回已就绪的客户端与桶名
   } // 结束 requireClient
@@ -332,7 +332,7 @@ export function createStorage(options: CreateStorageOptions): StorageAdapter { /
   // 驱动名只接受空 / local / s3。拼错（如 s3c、S3 以外的自定义名）必须启动即失败，
   // 否则会被当成「未指定驱动」悄悄回落本地磁盘，运维会误以为数据已进桶。
   if (requested && requested !== 'local' && requested !== 's3') { // 白名单外一律拒绝
-    throw new AppError('STORAGE_CONFIG_INVALID', 'unknown storage driver', { // 配置类错误用独立错误码，便于运维定位
+    throw new AppError('STORAGE_CONFIG_INVALID', '未知的存储驱动', { // 配置类错误用独立错误码，便于运维定位
       MIM_STORAGE_DRIVER: requested, // 回显实际值，直接看出拼写问题
       allowed: ['local', 's3'], // 同时给出合法取值
     }); // 抛错结束：进程启动阶段就会失败，不会带病运行
@@ -356,7 +356,7 @@ export function createStorage(options: CreateStorageOptions): StorageAdapter { /
   // 只有「驱动留空且四项全空」才按本地磁盘运行（本地开发默认路径）。
   if (requested === 's3' || (requested !== 'local' && present.length > 0)) { // 需要走对象存储的两种入口
     if (!s3Ready) { // 缺项即报错，绝不静默降级
-      throw new AppError('STORAGE_CONFIG_INVALID', 'object storage config is incomplete', { // 明确告知缺哪几项
+      throw new AppError('STORAGE_CONFIG_INVALID', '对象存储配置不完整', { // 明确告知缺哪几项
         driver: 's3', // 期望驱动
         missing, // 待补齐的变量名
         present, // 已配置的变量名，便于核对是否填到了另一套（如阿里云 OSS / 腾讯 COS）前缀上

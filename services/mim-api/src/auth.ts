@@ -34,41 +34,41 @@ export function normalizeIdentity(region: Region, provider: string, raw: string)
   const value = raw.trim(); // 去掉首尾空白，避免用户误输空格导致同一身份注册出多个账号
   if (provider === 'phone') { // 手机号分支
     if (region !== 'cn') { // 手机号仅在中国区可用，海外区必须走邮箱
-      throw new AppError('VALIDATION_FAILED', 'phone identity is only available in cn region', { // 区域不匹配属参数错误，非权限问题
+      throw new AppError('VALIDATION_FAILED', '手机身份仅在大陆地区可用', { // 区域不匹配属参数错误，非权限问题
         field: 'identifier', // 指明出错字段，便于前端定位输入框
       }); // 异常构造结束
     } // 区域校验结束
     const phone = value.replace(/^\+?86/, ''); // 容忍用户带 +86 / 86 前缀，剥离后再统一校验
     if (!PHONE_RE.test(phone)) { // 格式不合法直接拒绝，避免脏数据落库
-      throw new AppError('VALIDATION_FAILED', 'invalid CN mobile number', { field: 'identifier' }); // 统一错误码与字段提示
+      throw new AppError('VALIDATION_FAILED', '大陆手机号格式不正确', { field: 'identifier' }); // 统一错误码与字段提示
     } // 格式校验结束
     return { provider: 'phone', identifier: phone }; // 返回归一手机号，作为 users 表的唯一身份键
   } // 手机号分支结束
   if (provider === 'email') { // 邮箱分支
     if (region !== 'global') { // 邮箱仅面向海外区，国内区强制手机号
-      throw new AppError('VALIDATION_FAILED', 'email identity is only available in global region', { // 与手机号分支对称的区域校验
+      throw new AppError('VALIDATION_FAILED', '邮箱身份仅在国际地区可用', { // 与手机号分支对称的区域校验
         field: 'identifier', // 指明出错字段
       }); // 异常构造结束
     } // 区域校验结束
     const email = value.toLowerCase(); // 邮箱大小写不敏感，统一转小写避免同一邮箱注册多个账号
     if (!EMAIL_RE.test(email)) { // 格式不合法直接拒绝
-      throw new AppError('VALIDATION_FAILED', 'invalid email address', { field: 'identifier' }); // 统一错误码与字段提示
+      throw new AppError('VALIDATION_FAILED', '邮箱地址格式不正确', { field: 'identifier' }); // 统一错误码与字段提示
     } // 格式校验结束
     return { provider: 'email', identifier: email }; // 返回归一邮箱，作为唯一身份键
   } // 邮箱分支结束
   if (provider === 'username') { // 用户名分支：仅面向 global，供既有管理员账号绑定与登录，不开放给自助注册
     if (region !== 'global') { // 用户名只在海外区落库，与邮箱同一区域口径
-      throw new AppError('VALIDATION_FAILED', 'username identity is only available in global region', { // 区域不匹配属参数错误
+      throw new AppError('VALIDATION_FAILED', '用户名身份仅在国际地区可用', { // 区域不匹配属参数错误
         field: 'identifier', // 指明出错字段，便于前端定位输入框
       }); // 异常构造结束
     } // 区域校验结束
     const username = value.toLowerCase(); // 用户名大小写不敏感，统一转小写避免 Administrator / administrator 出两个身份
     if (!USERNAME_RE.test(username)) { // 格式不合法直接拒绝，避免脏数据落库
-      throw new AppError('VALIDATION_FAILED', 'invalid username (3-32 letters, digits, _ - .)', { field: 'identifier' }); // 统一错误码与字段提示
+      throw new AppError('VALIDATION_FAILED', '用户名格式不正确（3-32 位字母、数字、下划线、短横线或点）', { field: 'identifier' }); // 统一错误码与字段提示
     } // 格式校验结束
     return { provider: 'username', identifier: username }; // 返回归一用户名，作为唯一身份键
   } // 用户名分支结束
-  throw new AppError('VALIDATION_FAILED', 'unsupported provider', { field: 'provider' }); // 未知 provider 一律拒绝，防止绕过区域限制
+  throw new AppError('VALIDATION_FAILED', '不支持的登录方式', { field: 'provider' }); // 未知 provider 一律拒绝，防止绕过区域限制
 } // normalizeIdentity 结束
 
 export function generateCode(length: number = CODE_LENGTH): string { // 生成纯数字验证码，默认位数由配置决定
@@ -126,6 +126,6 @@ export function verifyAccessToken(token: string, secret: string): { sub: string;
     if (typeof sub !== 'string' || sub.length === 0) throw new Error('missing sub'); // sub 必填且非空，否则无法定位用户
     return { sub, region: String((payload as jwt.JwtPayload).region ?? '') }; // 区域缺失时给空串，由后续鉴权按真实用户行判断
   } catch { // 捕获过期、签名错误、格式错误等全部情况
-    throw new AppError('AUTH_UNAUTHORIZED', 'access token is invalid or expired'); // 统一对外错误码，前端据此跳转登录
+    throw new AppError('AUTH_UNAUTHORIZED', '访问令牌已失效或过期'); // 统一对外错误码，前端据此跳转登录
   } // try/catch 结束
 } // verifyAccessToken 结束

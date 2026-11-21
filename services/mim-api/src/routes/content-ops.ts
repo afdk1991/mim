@@ -81,7 +81,7 @@ function requireContentPermission(req: Request, res: Response, next: NextFunctio
     next(); // 调用 next 并处理其返回结果
     return; // 返回当前函数的处理结果
   } // 代码块结束
-  next(new AppError('FORBIDDEN', 'permission denied', { permission: CONTENT_PERMISSION })); // 调用 next 并处理其返回结果
+  next(new AppError('FORBIDDEN', '无操作权限', { permission: CONTENT_PERMISSION })); // 调用 next 并处理其返回结果
 } // 代码块结束
 
 const DEFAULT_LIMIT = 20; // 公开列表缺省条数

@@ -41,11 +41,11 @@ describe('积分抵扣 · 纯函数边界', () => { // 调用 describe 并处理
 
   it('指定积分超过单笔上限报错 POINTS_CAP_EXCEEDED', () => { // 调用 it 并处理其返回结果
     expect(() => computeDeduction({ amountCents: 9900, pointsBalance: 5000, config, pointsToUse: 5000 })) // 断言：校验响应字段与冻结契约一致
-      .toThrowError(/points deduction exceeds per-order cap/); // 执行当前业务步骤
+      .toThrowError(/本单抵扣积分超过上限/); // 执行当前业务步骤
   }); // 代码块结束
 
   it('指定积分超过余额报错 INSUFFICIENT_POINTS', () => { // 调用 it 并处理其返回结果
     expect(() => computeDeduction({ amountCents: 9900, pointsBalance: 50, config, pointsToUse: 100 })) // 断言：校验响应字段与冻结契约一致
-      .toThrowError(/insufficient points balance/); // 执行当前业务步骤
+      .toThrowError(/积分余额不足/); // 执行当前业务步骤
   }); // 代码块结束
 }); // 代码块结束

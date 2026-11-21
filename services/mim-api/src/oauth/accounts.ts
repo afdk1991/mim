@@ -61,7 +61,7 @@ export function upsertOAuthAccount(
   const existing = findOAuthAccount(db, spec.id, profile.providerUserId); // 先查是否已绑定
   if (existing) { // 已绑定分支
     if (existing.user_id !== userId) { // 属于其他账号
-      throw new AppError('AUTH_OAUTH_ALREADY_BOUND', 'this provider account is already linked to another user', { provider: spec.id }); // 409 提示先解绑
+      throw new AppError('AUTH_OAUTH_ALREADY_BOUND', '该第三方账号已绑定到其他用户', { provider: spec.id }); // 409 提示先解绑
     } // 归属校验结束
     db.prepare( // 同账号重复授权：刷新昵称 / 头像 / 邮箱与更新时间
       `UPDATE oauth_accounts
@@ -82,7 +82,7 @@ export function upsertOAuthAccount(
   // 未绑定：若 unionid 已属于别的账号，同样拒绝（防止同人开出第二个 Mim 账号）
   if (profile.unionId) { // 只有返回 unionid 的提供方才检查
     const byUnion = findOAuthAccountByUnion(db, spec.id, profile.unionId); // 按 unionid 查
-    if (byUnion && byUnion.user_id !== userId) throw new AppError('AUTH_OAUTH_ALREADY_BOUND', 'this provider union id is already linked to another user', { provider: spec.id }); // 409
+    if (byUnion && byUnion.user_id !== userId) throw new AppError('AUTH_OAUTH_ALREADY_BOUND', '该第三方唯一标识已绑定到其他用户', { provider: spec.id }); // 409
   } // union 校验结束
 
   db.prepare( // 插入新绑定
@@ -135,7 +135,7 @@ export function unlinkOAuthAccount(db: Db, userId: string, provider: string): bo
   const exists = db.prepare('SELECT id FROM oauth_accounts WHERE user_id = ? AND provider = ?').get(userId, provider) as { id: string } | undefined; // 先确认已绑定
   if (!exists) return false; // 未绑定视为幂等成功
   if (countLoginMethods(db, userId, provider) === 0) { // 解绑后没有任何登录方式
-    throw new AppError('AUTH_OAUTH_LAST_METHOD', 'cannot unlink the last sign-in method', { provider }); // 拒绝，防止账号无法再登录
+    throw new AppError('AUTH_OAUTH_LAST_METHOD', '至少需要保留一种登录方式', { provider }); // 拒绝，防止账号无法再登录
   } // 兜底校验结束
   db.prepare('DELETE FROM oauth_accounts WHERE user_id = ? AND provider = ?').run(userId, provider); // 删除绑定
   return true; // 告知调用方已删除

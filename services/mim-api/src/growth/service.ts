@@ -177,7 +177,7 @@ export function assertTimezone(timezone: string): string {
 /** 把 ISO 时间换算成业务时区下的自然日 YYYY-MM-DD */
 export function businessDay(iso: string, timezone: string): string {
   const date = new Date(iso); // 解析入参时间
-  if (Number.isNaN(date.getTime())) throw new AppError('VALIDATION_FAILED', 'invalid time'); // 非法时间直接拒绝
+  if (Number.isNaN(date.getTime())) throw new AppError('VALIDATION_FAILED', '时间格式不正确'); // 非法时间直接拒绝
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -187,7 +187,7 @@ export function businessDay(iso: string, timezone: string): string {
   const year = parts.find((part) => part.type === 'year')?.value; // 年
   const month = parts.find((part) => part.type === 'month')?.value; // 月
   const day = parts.find((part) => part.type === 'day')?.value; // 日
-  if (!year || !month || !day) throw new AppError('VALIDATION_FAILED', 'invalid timezone'); // 防御性兜底
+  if (!year || !month || !day) throw new AppError('VALIDATION_FAILED', '时区格式不正确'); // 防御性兜底
   return `${year}-${month}-${day}`; // 统一成 YYYY-MM-DD
 }
 

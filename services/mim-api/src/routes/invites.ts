@@ -88,7 +88,7 @@ export function createInviteAdminRouter(deps: ApiDeps): Router { // 依赖显式
       targetType: 'invite', // 对象类型
       targetId: code.toUpperCase(), // 对象主键：邀请码
     }, () => disableInvite(deps.db, code)); // 执行禁用
-    if (!found) throw new AppError('NOT_FOUND', 'invitation code not found', { code }); // 不存在 404
+    if (!found) throw new AppError('NOT_FOUND', '未找到邀请码', { code }); // 不存在 404
     res.json({ ok: true, code: code.toUpperCase() }); // 幂等返回
   }); // 结束 PATCH /admin/invites/:code/disable
 

@@ -101,7 +101,7 @@ export function createDeploymentsRouter(_deps: ApiDeps): Router {
   router.get('/deployments/:id', (req, res) => { // 管理员可读，匿名 401
     const id = pathParam(req, 'id'); // 严格取路径参数，非字符串一律 400
     const item = findDeploymentItem(id); // 按规范 id 查询
-    if (!item) throw new AppError('NOT_FOUND', `deployment item not found: ${id}`, { id }); // 未登记 id 回 404 并回显
+    if (!item) throw new AppError('NOT_FOUND', `未找到部署项：${id}`, { id }); // 未登记 id 回 404 并回显
     res.json({ // 统一响应体：单项 + 相关字典 + 同类项
       schema: deploymentRegistry.schema, // 契约版本
       item, // 完整部署项（统一字段，result 可能为 null）

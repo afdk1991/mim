@@ -101,9 +101,9 @@ function redirectError(res: { redirect: (status: number, url: string) => void },
 /** 解析某 provider 的运行配置；未配置抛 503，未登记抛 400 */
 function resolveProviderOrThrow(deps: ApiDeps, req: { header: (name: string) => string | undefined; protocol: string }, id: string) { // 路由内多处需要
   const spec = findProvider(id); // 查注册表
-  if (!spec) throw new AppError('VALIDATION_FAILED', 'unknown oauth provider', { provider: id }); // 未知提供方属参数错误
+  if (!spec) throw new AppError('VALIDATION_FAILED', '未知的第三方登录平台', { provider: id }); // 未知提供方属参数错误
   const creds = resolveCredentials(spec, deps.env, backendBaseOf(req)); // 解析凭证
-  if (!creds) throw new AppError('AUTH_OAUTH_NOT_CONFIGURED', 'oauth provider is not configured', { provider: id }); // 未配置返回 503
+  if (!creds) throw new AppError('AUTH_OAUTH_NOT_CONFIGURED', '第三方登录平台尚未配置', { provider: id }); // 未配置返回 503
   return { spec, creds }; // 交出定义与凭证
 } // resolveProviderOrThrow 结束
 
@@ -127,7 +127,7 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
     } // 绑定分支结束
     const region = body.region ?? req.user?.region ?? 'cn'; // 新账号归属：请求体 > 登录用户 > 默认 cn
     if (spec.region !== 'both' && spec.region !== region) { // 提供方区域与请求区域不匹配
-      throw new AppError('VALIDATION_FAILED', 'oauth provider is not available in this region', { provider: spec.id, region }); // 参数错误
+      throw new AppError('VALIDATION_FAILED', '该登录平台在当前地区不可用', { provider: spec.id, region }); // 参数错误
     } // 区域校验结束
     const now = clockOf(deps); // 统一取时
     const state = oauth.generateRandomState(); // 高熵 state
@@ -168,10 +168,10 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
       const params = stringParams(req); // 合并 query 与 body
       const rawReturnTo = safeReturnTo(params.return_to); // 仅在显式回跳时使用（一般由 state 记录带出）
       try { // 整个回调过程统一兜底
-        if (!findProvider(providerId)) throw new AppError('VALIDATION_FAILED', 'unknown oauth provider'); // 未知提供方
-        if (params.error) throw new AppError('AUTH_OAUTH_DENIED', 'user denied the authorization', { error: params.error }); // 用户取消或提供方拒绝
+        if (!findProvider(providerId)) throw new AppError('VALIDATION_FAILED', '未知的第三方登录平台'); // 未知提供方
+        if (params.error) throw new AppError('AUTH_OAUTH_DENIED', '用户已取消授权', { error: params.error }); // 用户取消或提供方拒绝
         const state = params.state ?? ''; // 回调 state
-        if (!state) throw new AppError('AUTH_OAUTH_STATE_INVALID', 'missing state'); // 缺 state 直接拒绝
+        if (!state) throw new AppError('AUTH_OAUTH_STATE_INVALID', '缺少授权状态（state）'); // 缺 state 直接拒绝
         const now = clockOf(deps); // 统一取时
         const record = deps.db // 状态查询起点
           .prepare('SELECT provider, region, mode, link_user_id, code_verifier, redirect_uri, return_to, expires_at FROM oauth_states WHERE state_hash = ?') // 按摘要查
@@ -179,11 +179,11 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
           | { provider: string; region: Region; mode: 'login' | 'bind'; link_user_id: string | null; code_verifier: string | null; redirect_uri: string; return_to: string | null; expires_at: string } // 命中
           | undefined; // 未命中
         if (!record || record.provider !== providerId || Date.parse(record.expires_at) <= Date.parse(now)) { // 三重校验
-          throw new AppError('AUTH_OAUTH_STATE_INVALID', 'state is invalid or expired', { provider: providerId }); // 400 后由外层重定向
+          throw new AppError('AUTH_OAUTH_STATE_INVALID', '授权状态已失效或过期', { provider: providerId }); // 400 后由外层重定向
         } // 校验结束
         deps.db.prepare('DELETE FROM oauth_states WHERE state_hash = ?').run(sha256(state)); // state 一次性：无论后续成败都删除
         const code = params.code ?? ''; // 授权码
-        if (!code) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'authorization code is missing'); // 缺 code
+        if (!code) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '缺少授权码'); // 缺 code
         const { spec, creds } = resolveProviderOrThrow(deps, req, providerId); // 凭证（Apple 需要现场签 client_secret）
         const profile = await exchangeOAuthCode(spec, creds, deps.env, { // 换令牌并取统一资料
           code, // 授权码
@@ -192,10 +192,10 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
           redirectUri: record.redirect_uri, // 与发起时逐字一致
           rawParams: params, // Apple form_post 的 user 字段等
         }); // 交换结束
-        if (!profile.providerUserId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'provider did not return a stable user id', { provider: spec.id }); // 没有稳定 ID 无法绑定
+        if (!profile.providerUserId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '第三方平台未返回稳定的用户标识', { provider: spec.id }); // 没有稳定 ID 无法绑定
         if (record.mode === 'bind') { // 绑定模式：挂到当前账号
           const target = record.link_user_id ? readUser(deps.db, record.link_user_id) : undefined; // 目标用户
-          if (!target || target.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 目标不存在或已删除
+          if (!target || target.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', '账号不可用'); // 目标不存在或已删除
           upsertOAuthAccount(deps.db, target.id, spec, profile, now); // 写入绑定（已绑定则刷新资料）
           const targetUrl = new URL(`${webBase}${record.return_to ?? '/account'}`); // 回到个人中心或指定页
           targetUrl.searchParams.set('oauth_bound', spec.id); // 前端据此提示绑定成功
@@ -208,11 +208,11 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
         let user: UserRow | undefined; // 最终登录用户
         if (existing) { // 已绑定分支
           user = readUser(deps.db, existing.user_id); // 读用户行
-          if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 已注销不允许登录
+          if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', '账号不可用'); // 已注销不允许登录
           upsertOAuthAccount(deps.db, user.id, spec, profile, now); // 刷新昵称 / 头像
         } else { // 首次第三方登录
           if (!isRegistrationEnabled(deps.env)) { // 注册总开关关闭：不允许 OAuth 首登自动建号
-            throw new AppError('AUTH_REGISTER_DISABLED', 'registration is disabled'); // 由外层 catch 302 回登录页并带错误码
+            throw new AppError('AUTH_REGISTER_DISABLED', '注册已关闭'); // 由外层 catch 302 回登录页并带错误码
           } // 开关判定结束
           user = createUserFromOAuth(deps.db, spec, profile, record.region, now); // 建号 + 绑定（自动分配号码）
         } // 分支结束
@@ -236,9 +236,9 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
     const body = parse(exchangeBody, req.body ?? {}); // 校验请求体
     const now = clockOf(deps); // 统一取时
     const userId = consumeLoginTicket(deps.db, body.ticket, now); // 一次性消费
-    if (!userId) throw new AppError('AUTH_OAUTH_TICKET_INVALID', 'login ticket is invalid or expired'); // 401
+    if (!userId) throw new AppError('AUTH_OAUTH_TICKET_INVALID', '登录票据已失效或过期'); // 401
     const user = readUser(deps.db, userId); // 读用户行
-    if (!user || user.status === 'deleted') throw new AppError('AUTH_OAUTH_TICKET_INVALID', 'account is not available'); // 用户不可用
+    if (!user || user.status === 'deleted') throw new AppError('AUTH_OAUTH_TICKET_INVALID', '账号不可用'); // 用户不可用
     res.json(finishLogin(deps, user, body.device)); // 与账号登录完全一致的响应形状
   }); // 结束 POST /auth/oauth/exchange
 
@@ -249,7 +249,7 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
 
   router.delete('/me/oauth/:provider', requireAuth, (req, res) => { // 解绑
     const providerId = String(req.params.provider ?? ''); // Express 5 的路径参数可能是数组，统一转字符串
-    if (!findProvider(providerId)) throw new AppError('VALIDATION_FAILED', 'unknown oauth provider'); // 未知提供方
+    if (!findProvider(providerId)) throw new AppError('VALIDATION_FAILED', '未知的第三方登录平台'); // 未知提供方
     const removed = unlinkOAuthAccount(deps.db, req.user!.id, providerId); // 至少保留一种登录方式
     res.json({ ok: true, removed }); // 幂等返回
   }); // 结束 DELETE /me/oauth/:provider

@@ -64,7 +64,7 @@ const ruleUpdateSchema = z.object({
   discount_percent: z.number().int().min(1).max(100).nullable().optional(), // 折扣百分比
   currency: z.string().trim().min(3).max(8).optional(), // 币种
   enabled: z.boolean().optional(), // 是否生效
-}).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' }); // 空 body 判 400
+}).refine((value) => Object.keys(value).length > 0, { message: '至少填写一个字段' }); // 空 body 判 400
 
 export function createVipPricingRouter(deps: ApiDeps): Router {
   const router = Router(); // 独立路由实例
@@ -144,7 +144,7 @@ export function createVipPricingRouter(deps: ApiDeps): Router {
       targetType: 'vip_price_rule', // 对象类型
       targetId: id, // 对象主键：规则 ID
     }, () => deleteVipPriceRule(db, id)); // 物理删除
-    if (!deleted) throw new AppError('NOT_FOUND', 'vip price rule not found', { rule_id: id }); // 未命中判 404
+    if (!deleted) throw new AppError('NOT_FOUND', '未找到 VIP 价格规则', { rule_id: id }); // 未命中判 404
     res.json({ id, deleted: true }); // 明确告知删除成功
   });
 

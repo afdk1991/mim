@@ -119,15 +119,15 @@ export function disableInvite(db: Db, code: string): boolean { // 返回是否�
 
 /** 把拒绝原因归类到明确错误码 */
 function rejectForRow(row: InviteRow | undefined, now: string): never { // 统一抛错出口
-  if (!row) throw new AppError('AUTH_INVITE_INVALID', 'invitation code is invalid'); // 不存在
-  if (row.status === 'disabled') throw new AppError('AUTH_INVITE_INVALID', 'invitation code is disabled', { code: row.code }); // 已禁用
+  if (!row) throw new AppError('AUTH_INVITE_INVALID', '邀请码无效'); // 不存在
+  if (row.status === 'disabled') throw new AppError('AUTH_INVITE_INVALID', '邀请码已停用', { code: row.code }); // 已禁用
   if (row.expires_at && Date.parse(row.expires_at) <= Date.parse(now)) { // 过期判定
-    throw new AppError('AUTH_INVITE_EXPIRED', 'invitation code has expired', { code: row.code }); // 过期单独码
+    throw new AppError('AUTH_INVITE_EXPIRED', '邀请码已过期', { code: row.code }); // 过期单独码
   } // 过期结束
   if (row.used_count >= row.max_uses) { // 次数耗尽
-    throw new AppError('AUTH_INVITE_INVALID', 'invitation code has exhausted', { code: row.code }); // 耗尽归无效
+    throw new AppError('AUTH_INVITE_INVALID', '邀请码已用完', { code: row.code }); // 耗尽归无效
   } // 耗尽结束
-  throw new AppError('AUTH_INVITE_INVALID', 'invitation code is not usable'); // 兜底
+  throw new AppError('AUTH_INVITE_INVALID', '邀请码当前不可用'); // 兜底
 } // rejectForRow 结束
 
 /**
@@ -142,11 +142,11 @@ export function redeemInvite(
   now: string, // 对象字段 now：记录一项配置或数据
 ): void { // 执行当前业务步骤
   const trimmed = (code ?? '').trim(); // 去空白
-  if (!trimmed) throw new AppError('AUTH_INVITE_REQUIRED', 'invitation code is required'); // 缺码走门槛码
+  if (!trimmed) throw new AppError('AUTH_INVITE_REQUIRED', '请填写邀请码'); // 缺码走门槛码
   const row = getInviteByCode(db, trimmed); // 查码
   if (!row) rejectForRow(row, now); // 不存在
   if (row.bound_identifier && identifier && row.bound_identifier !== identifier) { // 绑定身份不匹配
-    throw new AppError('AUTH_INVITE_INVALID', 'invitation code is bound to another identifier', { code: row.code }); // 400
+    throw new AppError('AUTH_INVITE_INVALID', '邀请码已绑定其他标识', { code: row.code }); // 400
   } // 绑定校验结束
 
   const result = db // 条件核销：活跃 + 有余量 + 未过期才扣减

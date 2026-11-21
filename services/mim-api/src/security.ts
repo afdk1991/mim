@@ -206,7 +206,7 @@ async function postJson(url: string, body: Record<string, string>, timeoutMs: nu
     body: JSON.stringify(body), // 对象字段：声明结构中的一项数据
     signal: AbortSignal.timeout(timeoutMs), // 对象字段：声明结构中的一项数据
   }); // 结束代码块：本层作用域收尾
-  if (!res.ok) throw new AppError('PROVIDER_NOT_CONFIGURED', 'captcha provider unreachable', { status: res.status }); // 业务拒绝 PROVIDER_NOT_CONFIGURED：以统一错误码终止当前请求
+  if (!res.ok) throw new AppError('PROVIDER_NOT_CONFIGURED', '验证码服务不可达', { status: res.status }); // 业务拒绝 PROVIDER_NOT_CONFIGURED：以统一错误码终止当前请求
   return (await res.json()) as Record<string, unknown>; // 返回结果：把本步骤产物交给调用方
 } // 结束函数体：本层作用域收尾
 
@@ -531,28 +531,28 @@ export async function assertSafeOutboundUrl(raw: string, opts?: OutboundUrlOptio
   try { // 异常保护：确保失败路径可回收资源
     url = new URL(raw); // 赋值：更新当前作用域中的状态
   } catch { // 结束代码块：本层作用域收尾
-    throw new AppError('VALIDATION_FAILED', 'invalid url'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    throw new AppError('VALIDATION_FAILED', '链接地址格式不正确'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
   } // 结束代码块：本层作用域收尾
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new AppError('VALIDATION_FAILED', 'unsupported url protocol'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new AppError('VALIDATION_FAILED', '不支持的链接协议'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
   if (opts?.trustedHost && url.host === opts.trustedHost) return; // 自指受信 origin：协议白名单已过，放行
   const host = url.hostname.replace(/^\[|\]$/g, ''); // 保存 host：承载本步骤的计算结果供后续使用
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new AppError('VALIDATION_FAILED', 'private host is not allowed'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new AppError('VALIDATION_FAILED', '不允许访问内网主机'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
 
   const normalizedV4 = normalizeIPv4Host(host); // 保存 normalizedV4：承载本步骤的计算结果供后续使用
   if (normalizedV4) { // 条件分支：仅在满足业务前置条件时继续
-    if (isPrivateIPv4(normalizedV4)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    if (isPrivateIPv4(normalizedV4)) throw new AppError('VALIDATION_FAILED', '不允许访问内网地址'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     return; // 返回结果：把本步骤产物交给调用方
   } // 结束条件分支：本层作用域收尾
   if (isIP(host) === 6) { // 条件分支：仅在满足业务前置条件时继续
-    if (isPrivateIPv6(host)) throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+    if (isPrivateIPv6(host)) throw new AppError('VALIDATION_FAILED', '不允许访问内网地址'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     return; // 返回结果：把本步骤产物交给调用方
   } // 结束条件分支：本层作用域收尾
 
   const records = await lookup(host, { all: true, verbatim: true }); // 保存 records：承载本步骤的计算结果供后续使用
-  if (records.length === 0) throw new AppError('VALIDATION_FAILED', 'host cannot be resolved'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+  if (records.length === 0) throw new AppError('VALIDATION_FAILED', '主机名无法解析'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
   for (const record of records) { // 循环处理：逐项完成批量数据操作
     if (record.family === 4 ? isPrivateIPv4(record.address) : isPrivateIPv6(record.address)) { // 条件分支：仅在满足业务前置条件时继续
-      throw new AppError('VALIDATION_FAILED', 'private address is not allowed'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+      throw new AppError('VALIDATION_FAILED', '不允许访问内网地址'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     } // 结束条件分支：本层作用域收尾
   } // 结束循环体：本层作用域收尾
 } // 结束函数体：本层作用域收尾
@@ -580,7 +580,7 @@ export async function safeOutboundFetch(rawUrl: string, init?: RequestInit): Pro
     } // 结束条件分支：本层作用域收尾
     return res; // 返回结果：把本步骤产物交给调用方
   } // 结束循环体：本层作用域收尾
-  throw new AppError('VALIDATION_FAILED', 'too many redirects to outbound url'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
+  throw new AppError('VALIDATION_FAILED', '出站链接重定向次数过多'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
 } // 结束函数体：本层作用域收尾
 
 // ===========================================================================

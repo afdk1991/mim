@@ -64,10 +64,10 @@ export function computeDeduction(input: DeductionInput): DeductionResult {
 
   // 客户端指定积分：先校验余额与上限，再折算金额
   if (!Number.isInteger(pointsToUse) || pointsToUse <= 0) {
-    throw new AppError('VALIDATION_FAILED', 'points_to_use must be a positive integer', { field: 'points_to_use' }); // 入参非法
+    throw new AppError('VALIDATION_FAILED', '使用积分必须为正整数', { field: 'points_to_use' }); // 入参非法
   } // 代码块结束
   if (pointsToUse > pointsBalance) { // 积分不足
-    throw new AppError('VALIDATION_FAILED', 'insufficient points balance', { // 抛出错误：中断当前流程并向上层传递
+    throw new AppError('VALIDATION_FAILED', '积分余额不足', { // 抛出错误：中断当前流程并向上层传递
       reason: 'INSUFFICIENT_POINTS', // 前端据此提示积分不足
       balance: pointsBalance, // 当前余额
       requested: pointsToUse, // 请求使用量
@@ -75,7 +75,7 @@ export function computeDeduction(input: DeductionInput): DeductionResult {
   } // 代码块结束
   const requestedCents = Math.floor((pointsToUse * 100) / config.pointsPerYuan); // 指定积分可折金额
   if (requestedCents > maxByRatio) { // 超过单笔上限百分比
-    throw new AppError('VALIDATION_FAILED', 'points deduction exceeds per-order cap', { // 抛出错误：中断当前流程并向上层传递
+    throw new AppError('VALIDATION_FAILED', '本单抵扣积分超过上限', { // 抛出错误：中断当前流程并向上层传递
       reason: 'POINTS_CAP_EXCEEDED', // 前端提示可抵扣上限
       max_deduct_cents: maxByRatio, // 上限金额
       requested_cents: requestedCents, // 请求折抵金额
@@ -100,7 +100,7 @@ export function deductPoints(
     .prepare('UPDATE wallets SET points = points - ?, updated_at = ? WHERE user_id = ? AND points >= ?') // 执行当前业务步骤
     .run(points, now, userId, points); // 绑定扣减量、时间、用户与守卫阈值
   if (result.changes === 0) { // 并发下余额被抢先扣光：整笔事务回滚
-    throw new AppError('VALIDATION_FAILED', 'insufficient points balance', { reason: 'INSUFFICIENT_POINTS' }); // 抛出错误：中断当前流程并向上层传递
+    throw new AppError('VALIDATION_FAILED', '积分余额不足', { reason: 'INSUFFICIENT_POINTS' }); // 抛出错误：中断当前流程并向上层传递
   } // 代码块结束
   db.prepare( // 写积分消费流水：points 记负向积分，amount_cents 记折抵金额便于对账
     `INSERT INTO wallet_transactions (id, user_id, kind, amount_cents, points, ref_type, ref_id, note, created_at)

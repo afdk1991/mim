@@ -179,7 +179,7 @@ const productUpdateSchema = z.object({
   status: z.enum(['active', 'off']).optional(), // 上架位
   sort_order: z.number().int().min(0).max(1000).optional(), // 排序
   card_keys: z.array(z.string().trim().min(1).max(64)).max(500).optional(), // 追加卡密批次
-}).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' }); // 空 PATCH 判 400
+}).refine((value) => Object.keys(value).length > 0, { message: '至少填写一个字段' }); // 空 PATCH 判 400
 
 /** 优惠码编码：大写字母 / 数字开头，可含连字符，2-40 位（入库统一大写） */
 const COUPON_CODE_RE = /^[A-Z0-9][A-Z0-9_-]{1,39}$/; // 优惠码正则常量
@@ -196,7 +196,7 @@ const couponCreateSchema = z.object({
   expires_at: z.string().nullable().optional(), // 过期时间
 }).refine( // 按类型收敛取值区间
   (value) => value.kind === 'fixed' || (value.value >= 1 && value.value <= 100), // percent 必须落在 1-100
-  { message: 'percent coupon value must be between 1 and 100' }, // 区间非法即 400
+  { message: '折扣优惠券比例必须在 1 到 100 之间' }, // 区间非法即 400
 ); // couponCreateSchema 结束
 
 /** 优惠码修改入参：至少提供一项可改字段 */
@@ -207,7 +207,7 @@ const couponUpdateSchema = z.object({
   active: z.boolean().optional(), // 启停
   starts_at: z.string().nullable().optional(), // 生效起
   expires_at: z.string().nullable().optional(), // 过期止
-}).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' }); // 空 PATCH 判 400
+}).refine((value) => Object.keys(value).length > 0, { message: '至少填写一个字段' }); // 空 PATCH 判 400
 
 /** 卡密批次生成入参 */
 const cardBatchSchema = z.object({
@@ -239,7 +239,7 @@ const planUpdateSchema = z.object({
   perks: z.array(z.string().max(80)).max(20).optional(), // 权益清单
   sort_order: z.number().int().min(0).max(1000).optional(), // 排序
   active: z.boolean().optional(), // 启停
-}).refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' }); // 空 PATCH 判 400
+}).refine((value) => Object.keys(value).length > 0, { message: '至少填写一个字段' }); // 空 PATCH 判 400
 
 // ── 内部辅助 ────────────────────────────────────────────────────────────────
 
@@ -254,27 +254,27 @@ function generateCardCode(db: Db): string {
     const exists = db.prepare('SELECT id FROM wallet_cards WHERE code = ?').get(code) as { id: string } | undefined; // 唯一键预检
     if (!exists) return code; // 未占用即可用
   } // 重试循环结束
-  throw new AppError('CONFLICT', 'card code collision, please retry', {}); // 极端碰撞兜底 409
+  throw new AppError('CONFLICT', '卡密编号冲突，请重试', {}); // 极端碰撞兜底 409
 } // generateCardCode 结束
 
 /** 按商品编码加载行；不存在抛 404 */
 function requireProduct(db: Db, code: string): ProductRow {
   const row = db.prepare('SELECT * FROM shop_products WHERE code = ?').get(code) as ProductRow | undefined; // 编码精确取行
-  if (!row) throw new AppError('NOT_FOUND', 'product not found', { product_code: code }); // 404
+  if (!row) throw new AppError('NOT_FOUND', '商品不存在', { product_code: code }); // 404
   return row; // 命中返回行
 } // requireProduct 结束
 
 /** 按优惠码加载行；不存在抛 404 */
 function requireCoupon(db: Db, code: string): CouponRow {
   const row = db.prepare('SELECT * FROM coupons WHERE code = ?').get(code) as CouponRow | undefined; // 编码精确取行
-  if (!row) throw new AppError('NOT_FOUND', 'coupon not found', { coupon_code: code }); // 404
+  if (!row) throw new AppError('NOT_FOUND', '优惠券不存在', { coupon_code: code }); // 404
   return row; // 命中返回行
 } // requireCoupon 结束
 
 /** 按套餐编码加载行；不存在抛 404 */
 function requirePlan(db: Db, code: string): PlanRow {
   const row = db.prepare('SELECT * FROM vip_plans WHERE code = ?').get(code) as PlanRow | undefined; // 编码精确取行
-  if (!row) throw new AppError('NOT_FOUND', 'vip plan not found', { plan_code: code }); // 404
+  if (!row) throw new AppError('NOT_FOUND', 'VIP 套餐不存在', { plan_code: code }); // 404
   return row; // 命中返回行
 } // requirePlan 结束
 
@@ -333,10 +333,10 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
   router.post('/admin/shop/products', perm, (req, res) => {
     const body = parse(productCreateSchema, req.body); // 先校验入参形态，非法直接 400
     if (body.kind !== 'virtual_auto' && body.card_keys.length > 0) { // 非自动发货商品挂卡密无意义
-      throw new AppError('VALIDATION_FAILED', 'card_keys only apply to virtual_auto products', { field: 'card_keys' }); // 400
+      throw new AppError('VALIDATION_FAILED', '卡密仅适用于自动发货虚拟商品', { field: 'card_keys' }); // 400
     } // 卡密适用范围校验结束
     const dup = db.prepare('SELECT id FROM shop_products WHERE code = ?').get(body.code) as { id: string } | undefined; // 唯一键预检
-    if (dup) throw new AppError('CONFLICT', 'product code already exists', { product_code: body.code }); // 409
+    if (dup) throw new AppError('CONFLICT', '商品标识已存在', { product_code: body.code }); // 409
     const now = clockOf(deps); // 统一时间源
     const productId = uuidv7(); // 新商品主键
     const createProduct = db.transaction(() => { // 商品主体与卡密批次同批生效
@@ -360,7 +360,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const existing = requireProduct(db, code); // 存在性 + 取行
     const body = parse(productUpdateSchema, req.body); // 校验可改字段
     if (body.card_keys !== undefined && existing.kind !== 'virtual_auto') { // 追加批次同样只对自动发货生效
-      throw new AppError('VALIDATION_FAILED', 'card_keys only apply to virtual_auto products', { field: 'card_keys' }); // 400
+      throw new AppError('VALIDATION_FAILED', '卡密仅适用于自动发货虚拟商品', { field: 'card_keys' }); // 400
     } // 批次适用范围校验结束
     const now = clockOf(deps); // 统一时间源
     const sets: string[] = []; // SET 子句列清单
@@ -398,7 +398,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const existing = requireProduct(db, code); // 存在性 + 取行
     const orders = productOrderCount(db, existing.id); // 订单引用计数
     if (orders > 0) { // 仍被成交订单引用
-      throw new AppError('CONFLICT', 'product is referenced by orders', { product_code: code, orders }); // 409
+      throw new AppError('CONFLICT', '商品已被订单引用，不可删除', { product_code: code, orders }); // 409
     } // 引用保护结束
     const removeProduct = db.transaction(() => { // 先清卡密库存，再删商品主体
       db.prepare('DELETE FROM shop_card_keys WHERE product_id = ?').run(existing.id); // 卡密随商品一并移除
@@ -421,7 +421,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const body = parse(couponCreateSchema, req.body); // 校验入参
     const code = body.code.toUpperCase(); // 归一为大写，避免大小写双码
     const dup = db.prepare('SELECT id FROM coupons WHERE code = ?').get(code) as { id: string } | undefined; // 唯一键预检
-    if (dup) throw new AppError('CONFLICT', 'coupon code already exists', { coupon_code: code }); // 409
+    if (dup) throw new AppError('CONFLICT', '优惠券标识已存在', { coupon_code: code }); // 409
     const now = clockOf(deps); // 统一时间源（表无 created_at 列，时间仅用于审计上下文）
     void now; // 优惠码表结构不含时间列，保留时钟入口便于后续扩展
     const couponId = uuidv7(); // 新优惠码主键
@@ -439,7 +439,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const existing = requireCoupon(db, code); // 存在性 + 取行
     const body = parse(couponUpdateSchema, req.body); // 校验可改字段
     if (body.value !== undefined && existing.kind === 'percent' && (body.value < 1 || body.value > 100)) {
-      throw new AppError('VALIDATION_FAILED', 'percent coupon value must be between 1 and 100', { field: 'value' }); // 比例类型区间守卫
+      throw new AppError('VALIDATION_FAILED', '折扣优惠券比例必须在 1 到 100 之间', { field: 'value' }); // 比例类型区间守卫
     } // percent 区间校验结束
     const sets: string[] = []; // SET 列清单
     const values: unknown[] = []; // 绑定值
@@ -460,7 +460,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const existing = requireCoupon(db, code); // 存在性 + 取行
     const redemptions = couponRedemptionCount(db, existing.id); // 核销引用计数
     if (redemptions > 0) { // 已有成交核销记录
-      throw new AppError('CONFLICT', 'coupon is referenced by redemptions', { coupon_code: code, redemptions }); // 409
+      throw new AppError('CONFLICT', '优惠券已被核销记录引用', { coupon_code: code, redemptions }); // 409
     } // 引用保护结束
     db.prepare('DELETE FROM coupons WHERE id = ?').run(existing.id); // 删除优惠码
     res.json({ code, deleted: true }); // 明确告知删除成功
@@ -504,9 +504,9 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
   router.post('/admin/cards/:code/void', perm, (req, res) => {
     const code = pathParam(req, 'code'); // 取路径参数
     const row = db.prepare('SELECT * FROM wallet_cards WHERE code = ?').get(code) as CardRow | undefined; // 按码精确取行
-    if (!row) throw new AppError('NOT_FOUND', 'card not found', { card_code: code }); // 404
+    if (!row) throw new AppError('NOT_FOUND', '卡密不存在', { card_code: code }); // 404
     if (row.status === 'used') { // 已兑换：金额已入钱包，不可回滚作废
-      throw new AppError('CONFLICT', 'used card cannot be voided', { card_code: code }); // 409
+      throw new AppError('CONFLICT', '已使用的卡密不可作废', { card_code: code }); // 409
     } // 已用保护结束
     if (row.voided_at === null) { // 尚未作废才写留痕，已作废直接回放当前状态
       db.prepare('UPDATE wallet_cards SET voided_at = ? WHERE id = ?').run(clockOf(deps), row.id); // 写作废时间
@@ -519,9 +519,9 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
   router.delete('/admin/cards/:code', perm, (req, res) => {
     const code = pathParam(req, 'code'); // 取路径参数
     const row = db.prepare('SELECT * FROM wallet_cards WHERE code = ?').get(code) as CardRow | undefined; // 按码精确取行
-    if (!row) throw new AppError('NOT_FOUND', 'card not found', { card_code: code }); // 404
+    if (!row) throw new AppError('NOT_FOUND', '卡密不存在', { card_code: code }); // 404
     if (row.status === 'used') { // 已兑换：对应一笔真实入账，删除会破坏对账
-      throw new AppError('CONFLICT', 'used card cannot be deleted', { card_code: code }); // 409
+      throw new AppError('CONFLICT', '已使用的卡密不可删除', { card_code: code }); // 409
     } // 已用保护结束
     audited(db, auditActor(req), { // 删除属破坏性操作，必须留痕
       action: 'card.delete',
@@ -530,7 +530,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
       detail: { amount_cents: row.amount_cents, voided: row.voided_at !== null, created_at: row.created_at }, // 只记台账摘要，不记兑换人
     }, () => {
       const info = db.prepare('DELETE FROM wallet_cards WHERE id = ?').run(row.id); // 物理清除
-      if (info.changes === 0) throw new AppError('NOT_FOUND', 'card not found', { card_code: code }); // 并发删除时保持 404 语义
+      if (info.changes === 0) throw new AppError('NOT_FOUND', '卡密不存在', { card_code: code }); // 并发删除时保持 404 语义
     }); // 审计包装结束
     res.json({ code, deleted: true }); // 明确告知删除成功
   }); // DELETE 卡密结束
@@ -547,7 +547,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
   router.post('/admin/vip/plans', perm, (req, res) => {
     const body = parse(planCreateSchema, req.body); // 校验入参
     const dup = db.prepare('SELECT id FROM vip_plans WHERE code = ?').get(body.code) as { id: string } | undefined; // 唯一键预检
-    if (dup) throw new AppError('CONFLICT', 'vip plan code already exists', { plan_code: body.code }); // 409
+    if (dup) throw new AppError('CONFLICT', 'VIP 套餐标识已存在', { plan_code: body.code }); // 409
     const planId = uuidv7(); // 新套餐主键
     audited(db, auditActor(req), { action: 'plan.create', targetType: 'plan', targetId: body.code, detail: { name: body.name, price_cents: body.price_cents, duration_days: body.duration_days } }, () => db.prepare(
       `INSERT INTO vip_plans (id, code, name, level, price_cents, duration_days, perks, sort_order, active)
@@ -582,7 +582,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const existing = requirePlan(db, code); // 存在性 + 取行
     const memberships = planMembershipCount(db, existing.id); // 会员引用计数
     if (memberships > 0) { // 仍有历史 / 生效会员
-      throw new AppError('CONFLICT', 'vip plan is referenced by memberships', { plan_code: code, memberships }); // 409
+      throw new AppError('CONFLICT', 'VIP 套餐已被会员记录引用', { plan_code: code, memberships }); // 409
     } // 引用保护结束
     audited(db, auditActor(req), { action: 'plan.delete', targetType: 'plan', targetId: code, detail: { name: existing.name, price_cents: existing.price_cents } }, () => db.prepare('DELETE FROM vip_plans WHERE id = ?').run(existing.id)); // 删除并留痕
     res.json({ code, deleted: true }); // 明确告知删除成功
@@ -637,10 +637,10 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const order = db.prepare('SELECT id, status, delivery_kind FROM shop_orders WHERE id = ?').get(pathParam(req, 'id')) as
       | { id: string; status: string; delivery_kind: string }
       | undefined;
-    if (!order) throw new AppError('NOT_FOUND', 'order not found');
-    if (order.delivery_kind !== 'physical') throw new AppError('VALIDATION_FAILED', 'only physical orders need shipment');
-    if (order.status !== 'paid' && order.status !== 'delivered') throw new AppError('CONFLICT', 'order is not in a shippable state', { status: order.status });
-    if (db.prepare('SELECT 1 AS ok FROM shipments WHERE order_id = ?').get(order.id)) throw new AppError('CONFLICT', 'shipment already exists for this order');
+    if (!order) throw new AppError('NOT_FOUND', '订单不存在');
+    if (order.delivery_kind !== 'physical') throw new AppError('VALIDATION_FAILED', '仅实物订单需要发货');
+    if (order.status !== 'paid' && order.status !== 'delivered') throw new AppError('CONFLICT', '订单当前状态不可发货', { status: order.status });
+    if (db.prepare('SELECT 1 AS ok FROM shipments WHERE order_id = ?').get(order.id)) throw new AppError('CONFLICT', '该订单已存在发货记录');
     const now = clockOf(deps);
     const id = uuidv7();
     const status = body.status ?? 'transit';
@@ -663,7 +663,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const shipment = db.prepare('SELECT * FROM shipments WHERE id = ?').get(pathParam(req, 'id')) as
       | { id: string; order_id: string; status: string; events_json: string }
       | undefined;
-    if (!shipment) throw new AppError('NOT_FOUND', 'shipment not found');
+    if (!shipment) throw new AppError('NOT_FOUND', '发货记录不存在');
     const now = clockOf(deps);
     const events = jsonParse<Array<Record<string, unknown>>>(shipment.events_json) ?? []; // 容错解析历史轨迹
     events.push({ status: body.status, at: now, note: body.note ?? '' });
@@ -706,8 +706,8 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
     const request = db.prepare('SELECT * FROM after_sales_requests WHERE id = ?').get(pathParam(req, 'id')) as
       | { id: string; order_id: string; user_id: string; status: string }
       | undefined;
-    if (!request) throw new AppError('NOT_FOUND', 'after-sales request not found');
-    if (request.status !== 'pending') throw new AppError('CONFLICT', 'request already handled', { status: request.status });
+    if (!request) throw new AppError('NOT_FOUND', '未找到售后申请');
+    if (request.status !== 'pending') throw new AppError('CONFLICT', '售后申请已处理', { status: request.status });
     const now = clockOf(deps);
     db.transaction(() => {
       db.prepare('UPDATE after_sales_requests SET status = ?, admin_note = ?, handled_by = ?, handled_at = ?, updated_at = ? WHERE id = ? AND status = \'pending\'')
@@ -716,8 +716,8 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
         const order = db.prepare('SELECT status, payable_cents FROM shop_orders WHERE id = ?').get(request.order_id) as
           | { status: string; payable_cents: number }
           | undefined;
-        if (!order) throw new AppError('NOT_FOUND', 'order not found');
-        if (order.status === 'refunded') throw new AppError('CONFLICT', 'order already refunded');
+        if (!order) throw new AppError('NOT_FOUND', '订单不存在');
+        if (order.status === 'refunded') throw new AppError('CONFLICT', '订单已退款');
         db.prepare('INSERT OR IGNORE INTO wallets (user_id, balance_cents, points, updated_at) VALUES (?, 0, 0, ?)').run(request.user_id, now);
         db.prepare('UPDATE wallets SET balance_cents = balance_cents + ?, updated_at = ? WHERE user_id = ?').run(order.payable_cents, now, request.user_id);
         db.prepare(

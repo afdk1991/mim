@@ -70,22 +70,22 @@ function readRule(db: Db, id: string): VipPriceRuleRecord | undefined { // 单�
 
 /** 内部：校验一份完整规则自洽，不合法抛 VALIDATION_FAILED */
 function assertRuleConsistent(rule: VipPriceRuleInput): void { // 业务层兜底校验
-  if (!DIMENSIONS.includes(rule.dimension)) throw new AppError('VALIDATION_FAILED', 'dimension must be module, category or asset_kind', { field: 'dimension' }); // 维度白名单
+  if (!DIMENSIONS.includes(rule.dimension)) throw new AppError('VALIDATION_FAILED', '维度必须为 module、category 或 asset_kind', { field: 'dimension' }); // 维度白名单
   const value = typeof rule.dimension_value === 'string' ? rule.dimension_value.trim() : ''; // 取值去空白
-  if (!value) throw new AppError('VALIDATION_FAILED', 'dimension_value must not be empty', { field: 'dimension_value' }); // 取值非空
-  if (value.length > MAX_DIMENSION_VALUE) throw new AppError('VALIDATION_FAILED', `dimension_value must be at most ${MAX_DIMENSION_VALUE} characters`, { field: 'dimension_value' }); // 取值限长
-  if (!Number.isInteger(rule.level_min) || rule.level_min < 0 || rule.level_min > 99) throw new AppError('VALIDATION_FAILED', 'level_min must be an integer between 0 and 99', { field: 'level_min' }); // 等级门槛
-  if (!MODES.includes(rule.mode)) throw new AppError('VALIDATION_FAILED', 'mode must be fixed or discount', { field: 'mode' }); // 模式白名单
+  if (!value) throw new AppError('VALIDATION_FAILED', '维度取值不能为空', { field: 'dimension_value' }); // 取值非空
+  if (value.length > MAX_DIMENSION_VALUE) throw new AppError('VALIDATION_FAILED', `dimension_value 最长 ${MAX_DIMENSION_VALUE} 个字符`, { field: 'dimension_value' }); // 取值限长
+  if (!Number.isInteger(rule.level_min) || rule.level_min < 0 || rule.level_min > 99) throw new AppError('VALIDATION_FAILED', '最低等级必须为 0 到 99 的整数', { field: 'level_min' }); // 等级门槛
+  if (!MODES.includes(rule.mode)) throw new AppError('VALIDATION_FAILED', '模式必须为 fixed 或 discount', { field: 'mode' }); // 模式白名单
   if (rule.mode === 'fixed') { // 固定价：必须有价格，且不能同时带折扣
     const price = rule.price_cents; // 固定价
-    if (price === null || price === undefined || !Number.isInteger(price) || price < 0 || price > MAX_PRICE_CENTS) throw new AppError('VALIDATION_FAILED', 'fixed mode requires price_cents between 0 and 100000000', { field: 'price_cents' }); // 价格区间
-    if (rule.discount_percent !== null && rule.discount_percent !== undefined) throw new AppError('VALIDATION_FAILED', 'fixed mode must not set discount_percent', { field: 'discount_percent' }); // 互斥字段
+    if (price === null || price === undefined || !Number.isInteger(price) || price < 0 || price > MAX_PRICE_CENTS) throw new AppError('VALIDATION_FAILED', '固定价格模式要求 price_cents 在 0 到 100000000 之间', { field: 'price_cents' }); // 价格区间
+    if (rule.discount_percent !== null && rule.discount_percent !== undefined) throw new AppError('VALIDATION_FAILED', '固定价格模式不能设置折扣比例', { field: 'discount_percent' }); // 互斥字段
   } else { // 折扣：必须有百分比，且不能同时带固定价
     const percent = rule.discount_percent; // 折扣百分比
-    if (percent === null || percent === undefined || !Number.isInteger(percent) || percent < 1 || percent > 100) throw new AppError('VALIDATION_FAILED', 'discount mode requires discount_percent between 1 and 100', { field: 'discount_percent' }); // 百分比区间
-    if (rule.price_cents !== null && rule.price_cents !== undefined) throw new AppError('VALIDATION_FAILED', 'discount mode must not set price_cents', { field: 'price_cents' }); // 互斥字段
+    if (percent === null || percent === undefined || !Number.isInteger(percent) || percent < 1 || percent > 100) throw new AppError('VALIDATION_FAILED', '折扣模式要求 discount_percent 在 1 到 100 之间', { field: 'discount_percent' }); // 百分比区间
+    if (rule.price_cents !== null && rule.price_cents !== undefined) throw new AppError('VALIDATION_FAILED', '折扣模式不能设置价格（price_cents）', { field: 'price_cents' }); // 互斥字段
   } // 模式分支结束
-  if (typeof rule.currency !== 'string' || rule.currency.trim().length === 0) throw new AppError('VALIDATION_FAILED', 'currency must not be empty', { field: 'currency' }); // 币种非空
+  if (typeof rule.currency !== 'string' || rule.currency.trim().length === 0) throw new AppError('VALIDATION_FAILED', '币种不能为空', { field: 'currency' }); // 币种非空
 } // assertRuleConsistent 结束
 
 /** 内部：把入参归一为可落库形态（去空白、金额空值归一） */
@@ -141,7 +141,7 @@ export function createVipPriceRule(db: Db, input: VipPriceRuleInput, now: string
   }); // 事务结束
   tx(); // 执行事务
   const created = readRule(db, id); // 回读落库结果
-  if (!created) throw new AppError('INTERNAL_ERROR', 'vip price rule write failed', { rule_id: id }); // 理论上不会发生，兜底
+  if (!created) throw new AppError('INTERNAL_ERROR', 'VIP 价格规则写入失败', { rule_id: id }); // 理论上不会发生，兜底
   return created; // 返回完整行
 } // createVipPriceRule 结束
 
@@ -151,7 +151,7 @@ export function createVipPriceRule(db: Db, input: VipPriceRuleInput, now: string
  */
 export function updateVipPriceRule(db: Db, id: string, patch: VipPriceRulePatch, now: string): VipPriceRuleRecord { // 修改入口
   const existing = readRule(db, id); // 取现有行
-  if (!existing) throw new AppError('NOT_FOUND', 'vip price rule not found', { rule_id: id }); // 不存在直接 404
+  if (!existing) throw new AppError('NOT_FOUND', '未找到 VIP 价格规则', { rule_id: id }); // 不存在直接 404
   const merged = normalizeRule({
     dimension: patch.dimension ?? existing.dimension,
     dimension_value: patch.dimension_value ?? existing.dimension_value,
@@ -185,7 +185,7 @@ export function updateVipPriceRule(db: Db, id: string, patch: VipPriceRulePatch,
   }); // 事务结束
   tx(); // 执行事务
   const updated = readRule(db, id); // 回读落库结果
-  if (!updated) throw new AppError('INTERNAL_ERROR', 'vip price rule write failed', { rule_id: id }); // 理论上不会发生，兜底
+  if (!updated) throw new AppError('INTERNAL_ERROR', 'VIP 价格规则写入失败', { rule_id: id }); // 理论上不会发生，兜底
   return updated; // 返回完整行
 } // updateVipPriceRule 结束
 

@@ -7,7 +7,7 @@ import { AppError } from '@mim/core-domain'; // 引入统一业务异常，参�
 export function pathParam(req: Request, name: string): string { // 安全取路径参数：非字符串一律报参数错误
   const value: unknown = req.params[name]; // 显式收敛为 unknown，避免把 string[] 当字符串误用
   if (typeof value === 'string') return value; // 常规单值参数直接返回
-  throw new AppError('VALIDATION_FAILED', `invalid path parameter: ${name}`, { param: name }); // 通配/数组参数或缺失时拒绝，防止后续拼接出意外路径或查询
+  throw new AppError('VALIDATION_FAILED', `路径参数无效：${name}`, { param: name }); // 通配/数组参数或缺失时拒绝，防止后续拼接出意外路径或查询
 } // pathParam 结束
 
 export function nowIso(clock?: () => string): string { // 取当前 ISO 时间；可注入时钟以便测试固定时间

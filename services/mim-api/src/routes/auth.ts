@@ -102,7 +102,7 @@ const registerBody = z.object({ // 注册请求体
 
 /** 建号闸门：注册总开关关闭时，所有新建账号路径统一返回明确业务错误码 */
 function assertRegistrationEnabled(deps: ApiDeps): void { // 服务端硬拦，前端隐藏入口无法绕过
-  if (!isRegistrationEnabled(deps.env)) throw new AppError('AUTH_REGISTER_DISABLED', 'registration is disabled'); // 403 + 明确文案
+  if (!isRegistrationEnabled(deps.env)) throw new AppError('AUTH_REGISTER_DISABLED', '注册已关闭'); // 403 + 明确文案
 } // assertRegistrationEnabled 结束
 
 function userPayload(row: UserRow) { // 对外输出的用户视图，剔除内部字段
@@ -164,7 +164,7 @@ function assertNotLocked(deps: ApiDeps, key: string | string[], now: string): vo
       .prepare('SELECT locked_until FROM login_failures WHERE identifier = ?') // 按失败键读取锁定截止时间
       .get(item) as { locked_until: string | null } | undefined; // 无记录即未锁定
     if (row?.locked_until && Date.parse(row.locked_until) > Date.parse(now)) { // 截止时间晚于当前即仍锁定
-      throw new AppError('AUTH_ACCOUNT_LOCKED', 'too many failed attempts, try again later', { // 返回锁定错误
+      throw new AppError('AUTH_ACCOUNT_LOCKED', '失败次数过多，请稍后再试', { // 返回锁定错误
         locked_until: row.locked_until, // 回传解锁时间，前端可展示倒计时
       }); // 结束错误构造
     } // 结束锁定判断
@@ -210,8 +210,8 @@ function findOrCreateUser( // 函数 findOrCreateUser：封装一段可复用的
 
   if (identity) { // 身份已存在分支
     const row = readUser(deps.db, identity.user_id); // 读取用户详情（含 member_no）
-    if (!row) throw new AppError('ACCOUNT_NOT_FOUND', 'account not found'); // 身份存在但用户缺失，属数据不一致
-    if (row.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account has been deleted'); // 已注销账号禁止登录
+    if (!row) throw new AppError('ACCOUNT_NOT_FOUND', '账号不存在'); // 身份存在但用户缺失，属数据不一致
+    if (row.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', '账号已被注销'); // 已注销账号禁止登录
     return ensureMemberNo(deps.db, row, clockOf(deps)); // 历史用户缺号时当场补发，保证登录响应一定有编号
   } // 结束身份已存在分支
 
@@ -269,7 +269,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       ) // 结束预编译
       .get(body.region, identity.provider, identity.identifier, windowStart) as { n: number }; // 统计窗口内申请次数
     if (recent.n >= CODE_RATE_LIMIT) { // 超过窗口配额时拒绝
-      throw new AppError('AUTH_CODE_RATE_LIMITED', 'too many code requests, try again later', { // 返回限流错误
+      throw new AppError('AUTH_CODE_RATE_LIMITED', '验证码请求过于频繁，请稍后再试', { // 返回限流错误
         retry_after_seconds: CODE_RATE_WINDOW_MINUTES * 60, // 告知多久后可重试
       }); // 结束错误构造
     } // 结束限流判断
@@ -319,7 +319,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     try { // 真实通道可能抛错，需转换为业务错误
       await channel.send(identity.identifier, code); // 调用第三方通道真实下发
     } catch { // 供应商失败分支
-      throw new AppError('AUTH_CODE_DELIVERY_FAILED', 'failed to deliver verification code', { // 返回投递失败
+      throw new AppError('AUTH_CODE_DELIVERY_FAILED', '验证码发送失败', { // 返回投递失败
         provider: identity.provider, // 回传通道便于定位供应商问题
       }); // 结束错误构造
     } // 结束下发
@@ -348,12 +348,12 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       ) // 结束预编译
       .get(body.region, identity.provider, identity.identifier) as CodeRow | undefined; // 无记录即无可用验证码
 
-    if (!codeRow) throw new AppError('AUTH_CODE_INVALID', 'verification code is invalid'); // 无可用验证码
+    if (!codeRow) throw new AppError('AUTH_CODE_INVALID', '验证码不正确'); // 无可用验证码
     if (Date.parse(codeRow.expires_at) <= Date.parse(now)) { // 过期判定
-      throw new AppError('AUTH_CODE_EXPIRED', 'verification code has expired'); // 过期与无效分开报，便于前端引导重发
+      throw new AppError('AUTH_CODE_EXPIRED', '验证码已过期'); // 过期与无效分开报，便于前端引导重发
     } // 结束过期判断
     if (codeRow.attempts >= CODE_MAX_ATTEMPTS) { // 尝试次数耗尽
-      throw new AppError('AUTH_CODE_RATE_LIMITED', 'verification code attempts exhausted'); // 需重新申请验证码
+      throw new AppError('AUTH_CODE_RATE_LIMITED', '验证码尝试次数已用完'); // 需重新申请验证码
     } // 结束尝试次数判断
     if (!verifyCode(body.code, codeRow.code_hash)) { // 摘要比对失败
       deps.db // 失败计数更新起点
@@ -361,7 +361,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
         .run(codeRow.id); // 绑定记录主键
       recordFailure(deps, key, body.region, now); // 同时计入账号维度失败
       recordFailure(deps, ipKey, '#ip', now, LOGIN_IP_LOCK_AFTER_FAILURES); // 同时计入来源 IP 维度失败
-      throw new AppError('AUTH_CODE_INVALID', 'verification code is invalid'); // 统一返回无效，避免泄露细节
+      throw new AppError('AUTH_CODE_INVALID', '验证码不正确'); // 统一返回无效，避免泄露细节
     } // 结束码校验
 
     deps.db // 消费验证码
@@ -371,7 +371,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
 
     const gateRequired = isInviteRequired(deps.env); // 注册门槛是否开启（默认关闭，行为不变）
     if (gateRequired && !(body.invite_code ?? '').trim()) { // 门槛开启且首登建号缺码
-      throw new AppError('AUTH_INVITE_REQUIRED', 'invitation code is required to register'); // 403 引导索取邀请码
+      throw new AppError('AUTH_INVITE_REQUIRED', '注册需要填写邀请码'); // 403 引导索取邀请码
     } // 门槛前置校验结束
     const user = findOrCreateUser( // 首次登录自动注册
       deps, body.region, identity.provider, identity.identifier, // 常规入参
@@ -410,19 +410,19 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 未指定通道时按地区推断
     const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识，非法格式直接 400
     if (!/[A-Za-z]/.test(body.password) || !/\d/.test(body.password)) { // 基本强度：至少含一个字母与一个数字
-      throw new AppError('VALIDATION_FAILED', 'password must contain both letters and digits', { field: 'password' }); // 提示具体字段
+      throw new AppError('VALIDATION_FAILED', '密码需同时包含字母和数字', { field: 'password' }); // 提示具体字段
     } // 强度校验结束
 
     const exists = deps.db // 身份占用检查起点
       .prepare('SELECT user_id FROM identities WHERE region = ? AND provider = ? AND identifier = ?') // 唯一三元组
       .get(body.region, identity.provider, identity.identifier) as { user_id: string } | undefined; // 已存在则返回归属
     if (exists) { // 账号已被注册分支
-      throw new AppError('AUTH_IDENTITY_EXISTS', 'account already registered', { field: 'identifier' }); // 409 让前端提示改用登录
+      throw new AppError('AUTH_IDENTITY_EXISTS', '该账号已注册', { field: 'identifier' }); // 409 让前端提示改用登录
     } // 结束占用检查
 
     const gateRequired = isInviteRequired(deps.env); // 注册门槛是否开启（默认关闭，不破坏既有注册）
     if (gateRequired && !(body.invite_code ?? '').trim()) { // 门槛开启但未带码
-      throw new AppError('AUTH_INVITE_REQUIRED', 'invitation code is required to register'); // 403 引导索取邀请码
+      throw new AppError('AUTH_INVITE_REQUIRED', '注册需要填写邀请码'); // 403 引导索取邀请码
     } // 门槛前置校验结束
     const now = clockOf(deps); // 注册时间
     const displayName = (body.display_name ?? '').trim().slice(0, 64); // 展示名可选，限幅避免超长
@@ -468,13 +468,13 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     if (!canLogin) { // 登录条件不成立
       recordFailure(deps, key, body.region, now); // 计入账号维度失败
       recordFailure(deps, ipKey, '#ip', now, LOGIN_IP_LOCK_AFTER_FAILURES); // 计入来源 IP 维度失败
-      throw new AppError('AUTH_PASSWORD_INVALID', 'password is incorrect'); // 不回显账号是否存在或口令是否命中
+      throw new AppError('AUTH_PASSWORD_INVALID', '密码不正确'); // 不回显账号是否存在或口令是否命中
     } // 结束口令校验
 
     clearFailures(deps, key, ipKey); // 成功后同时清零账号与来源 IP 的失败计数
 
     const user = readUser(deps.db, account!.user_id); // 账号必存在，直接读取用户行
-    if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', 'account is not available'); // 数据不一致或已注销
+    if (!user || user.status === 'deleted') throw new AppError('AUTH_UNAUTHORIZED', '账号不可用'); // 数据不一致或已注销
     res.json(finishLogin(deps, user, body.device)); // 统一收尾：设备 + 双令牌 + 用户视图
   }); // 结束 POST /auth/password 处理
 
@@ -485,11 +485,11 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
       .prepare('SELECT * FROM sessions WHERE refresh_token_hash = ?') // 用摘要查找会话，库内不存明文
       .get(sha256(body.refresh_token)) as SessionRow | undefined; // 无记录即令牌无效
     if (!session || session.revoked_at || Date.parse(session.expires_at) <= Date.parse(now)) { // 三重失效判定
-      throw new AppError('AUTH_REFRESH_INVALID', 'refresh token is invalid or expired'); // 已吊销/过期/不存在统一拒绝
+      throw new AppError('AUTH_REFRESH_INVALID', '刷新令牌已失效或过期'); // 已吊销/过期/不存在统一拒绝
     } // 结束有效性判断
     const user = readUser(deps.db, session.user_id); // 读取会话归属用户（含 Mim ID 号码）
     if (!user || user.status === 'deleted') { // 用户不可用分支
-      throw new AppError('AUTH_REFRESH_INVALID', 'account is not available'); // 用户缺失或已注销不允许续期
+      throw new AppError('AUTH_REFRESH_INVALID', '账号不可用'); // 用户缺失或已注销不允许续期
     } // 结束用户可用性判断
 
     deps.db.prepare('UPDATE sessions SET revoked_at = ? WHERE id = ?').run(now, session.id); // 轮换：旧会话立即吊销，防重放

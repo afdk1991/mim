@@ -15,7 +15,7 @@ const profileBody = z // 更新资料接口的请求体 schema：先取 zod 链�
     locale: z.enum(['zh-CN', 'en-US']).optional(), // 语言：只允许受支持的两种取值，避免写入未知语言码
     timezone: z.string().min(1).max(64).optional(), // 时区：可选字符串，限长 1-64 以排除空值与异常长串
   }) // 字段定义结束
-  .refine((value) => Object.keys(value).length > 0, { message: 'at least one field is required' }); // 追加语义约束：至少提交一个字段，避免无意义的空更新
+  .refine((value) => Object.keys(value).length > 0, { message: '至少填写一个字段' }); // 追加语义约束：至少提交一个字段，避免无意义的空更新
 
 export function createMeRouter(deps: ApiDeps): Router { // 工厂函数：接收依赖（数据库、时钟等）并返回装配好的个人中心路由
   const router = Router(); // 创建独立 router 实例，便于在 app 层按前缀统一挂载

@@ -75,16 +75,16 @@ export interface BatchView {
 /** 入参形态校验：模式与方向必须匹配，参数落在合法区间 */
 function validateRequest(req: BatchRequest): void {
   if (!Number.isInteger(req.value) || req.value < 0) { // 条件分支：按判断结果选择后续处理路径
-    throw new AppError('VALIDATION_FAILED', 'value must be a non-negative integer', { field: 'value' }); // 金额 / 比例均为非负整数
+    throw new AppError('VALIDATION_FAILED', '数值必须为非负整数', { field: 'value' }); // 金额 / 比例均为非负整数
   } // 代码块结束
   if (req.mode === 'fixed') { // 条件分支：按判断结果选择后续处理路径
-    if (req.direction !== 'set') throw new AppError('VALIDATION_FAILED', 'fixed price mode requires direction=set'); // 固定价无增减方向
+    if (req.direction !== 'set') throw new AppError('VALIDATION_FAILED', '固定价格模式要求 direction=set'); // 固定价无增减方向
   } else { // 代码块结束
     if (req.direction !== 'increase' && req.direction !== 'decrease') { // 条件分支：按判断结果选择后续处理路径
-      throw new AppError('VALIDATION_FAILED', `${req.mode} mode requires direction=increase|decrease`); // 增减模式必须带方向
+      throw new AppError('VALIDATION_FAILED', `${req.mode} 模式要求 direction=increase|decrease`); // 增减模式必须带方向
     } // 代码块结束
     if (req.mode === 'percent' && (req.value < 1 || req.value > 100)) { // 条件分支：按判断结果选择后续处理路径
-      throw new AppError('VALIDATION_FAILED', 'percent value must be between 1 and 100'); // 百分比区间
+      throw new AppError('VALIDATION_FAILED', '折扣比例必须在 1 到 100 之间'); // 百分比区间
     } // 代码块结束
   } // 代码块结束
 } // 代码块结束
@@ -232,8 +232,8 @@ export function runPriceBatch(db: Db, req: BatchRequest, now: string): BatchView
  */
 export function rollbackBatch(db: Db, batchId: string, now: string): BatchView {
   const header = db.prepare('SELECT * FROM price_batches WHERE id = ?').get(batchId) as BatchHeaderRow | undefined; // 常量 header：保存固定配置或一次性派生值
-  if (!header) throw new AppError('NOT_FOUND', 'price batch not found', { batch_id: batchId }); // 批次不存在
-  if (header.rolled_back_at) throw new AppError('CONFLICT', 'price batch already rolled back', { batch_id: batchId, rolled_back_at: header.rolled_back_at }); // 重复回滚冲突
+  if (!header) throw new AppError('NOT_FOUND', '未找到价格批次', { batch_id: batchId }); // 批次不存在
+  if (header.rolled_back_at) throw new AppError('CONFLICT', '该价格批次已回滚', { batch_id: batchId, rolled_back_at: header.rolled_back_at }); // 重复回滚冲突
 
   const items = db.prepare('SELECT * FROM price_batch_items WHERE batch_id = ? AND skipped = 0').all(batchId) as BatchItemRow[]; // 只恢复实际改动项
   const tx = db.transaction(() => { // 常量 tx：保存固定配置或一次性派生值

@@ -55,7 +55,7 @@ function appleClientSecret(spec: OAuthProviderSpec, creds: ResolvedCredentials, 
   const keyId = (env.MIM_AUTH_APPLE_KEY_ID ?? '').trim(); // 私钥 ID
   const privateKey = creds.clientSecret.replace(/\\n/g, '\n').trim(); // 支持把换行写成字面量 \n 的单行配置
   if (!teamId || !keyId || !privateKey) { // 缺任一要素都无法签发
-    throw new AppError('AUTH_OAUTH_NOT_CONFIGURED', 'apple sign-in is not fully configured', { missing: ['MIM_AUTH_APPLE_TEAM_ID', 'MIM_AUTH_APPLE_KEY_ID', 'MIM_AUTH_APPLE_PRIVATE_KEY'] }); // 明确缺哪几项
+    throw new AppError('AUTH_OAUTH_NOT_CONFIGURED', 'Apple 登录尚未配置完整', { missing: ['MIM_AUTH_APPLE_TEAM_ID', 'MIM_AUTH_APPLE_KEY_ID', 'MIM_AUTH_APPLE_PRIVATE_KEY'] }); // 明确缺哪几项
   } // 配置校验结束
   const now = Math.floor(Date.now() / 1000); // 当前秒级时间
   return jwt.sign( // 签发短期 JWT 作为 client_secret
@@ -70,17 +70,17 @@ async function timedFetch(url: string, init: RequestInit = {}): Promise<Response
   try { // 超时或网络错误都转业务异常
     return await fetch(url, { ...init, signal: AbortSignal.timeout(OAUTH_HTTP_TIMEOUT_MS) }); // Node 20 原生 fetch
   } catch { // 超时、DNS、TLS 等全部归一
-    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'failed to reach oauth provider'); // 不泄露上游细节
+    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '无法连接第三方登录平台'); // 不泄露上游细节
   } // try/catch 结束
 } // timedFetch 结束
 
 /** 解析 JSON 响应；非 2xx 或非 JSON 一律视为上游失败 */
 async function readJson(response: Response): Promise<Record<string, unknown>> { // 自定义适配器共用
-  if (!response.ok) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'oauth provider returned an error status', { status: response.status }); // 状态码回传便于排障
+  if (!response.ok) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '第三方登录平台返回错误状态', { status: response.status }); // 状态码回传便于排障
   try { // 解析失败也要归一
     return (await response.json()) as Record<string, unknown>; // 提供方均返回 JSON
   } catch { // 非 JSON 响应
-    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'oauth provider returned a non-JSON body'); // 统一错误码
+    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '第三方登录平台返回非 JSON 内容'); // 统一错误码
   } // try/catch 结束
 } // readJson 结束
 
@@ -210,7 +210,7 @@ async function exchangeStandard(
     return spec.mapProfile(raw, claims as unknown as Record<string, unknown>); // 统一映射
   } catch (error) { // 已归一的错误原样抛，其余包装
     if (error instanceof AppError) throw error; // 保留业务错误码
-    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'oauth token exchange failed', { provider: spec.id }); // 统一错误码
+    throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '第三方令牌交换失败', { provider: spec.id }); // 统一错误码
   } // try/catch 结束
 } // exchangeStandard 结束
 
@@ -222,16 +222,16 @@ async function exchangeWechat(spec: OAuthProviderSpec, creds: ResolvedCredential
   tokenUrl.searchParams.set('code', input.code); // 授权码
   tokenUrl.searchParams.set('grant_type', 'authorization_code'); // 固定授权码模式
   const tokenRaw = await readJson(await timedFetch(tokenUrl.toString())); // 微信令牌端点是 GET
-  if (tokenRaw.errcode) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'wechat token rejected', { errcode: tokenRaw.errcode, errmsg: tokenRaw.errmsg }); // 微信用 errcode 表示失败
+  if (tokenRaw.errcode) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '微信令牌校验未通过', { errcode: tokenRaw.errcode, errmsg: tokenRaw.errmsg }); // 微信用 errcode 表示失败
   const accessToken = String(tokenRaw.access_token ?? ''); // 访问令牌
   const openid = String(tokenRaw.openid ?? ''); // 单应用用户标识
-  if (!accessToken || !openid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'wechat token response is incomplete'); // 关键字段缺失
+  if (!accessToken || !openid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '微信令牌响应不完整'); // 关键字段缺失
   const profileUrl = new URL(creds.profileUrl ?? creds.tokenUrl); // 资料端点
   profileUrl.searchParams.set('access_token', accessToken); // 令牌
   profileUrl.searchParams.set('openid', openid); // 用户标识
   profileUrl.searchParams.set('lang', 'zh_CN'); // 中文资料
   const raw = await readJson(await timedFetch(profileUrl.toString())); // 拉资料
-  if (raw.errcode) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'wechat profile rejected', { errcode: raw.errcode, errmsg: raw.errmsg }); // 资料接口失败
+  if (raw.errcode) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '微信用户信息校验未通过', { errcode: raw.errcode, errmsg: raw.errmsg }); // 资料接口失败
   return spec.mapProfile(raw); // 统一映射
 } // exchangeWechat 结束
 
@@ -245,21 +245,21 @@ async function exchangeQq(spec: OAuthProviderSpec, creds: ResolvedCredentials, i
   tokenUrl.searchParams.set('redirect_uri', input.redirectUri); // 回调地址（QQ 要求逐字一致）
   tokenUrl.searchParams.set('fmt', 'json'); // 不指定时返回 query 字符串，解析成本高
   const tokenRaw = await readJson(await timedFetch(tokenUrl.toString())); // 换令牌
-  if (tokenRaw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'qq token rejected', { error: tokenRaw.error, error_description: tokenRaw.error_description }); // QQ 失败字段
+  if (tokenRaw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'QQ 令牌校验未通过', { error: tokenRaw.error, error_description: tokenRaw.error_description }); // QQ 失败字段
   const accessToken = String(tokenRaw.access_token ?? ''); // 访问令牌
-  if (!accessToken) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'qq token response is incomplete'); // 缺令牌
+  if (!accessToken) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'QQ 令牌响应不完整'); // 缺令牌
   const meUrl = new URL('https://graph.qq.com/oauth2.0/me'); // openid 端点
   meUrl.searchParams.set('access_token', accessToken); // 令牌
   meUrl.searchParams.set('fmt', 'json'); // JSON 输出
   const meRaw = await readJson(await timedFetch(meUrl.toString())); // 取 openid
   const openid = String(meRaw.openid ?? ''); // 用户标识
-  if (!openid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'qq openid is missing'); // 缺 openid
+  if (!openid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'QQ 缺少 openid'); // 缺 openid
   const profileUrl = new URL(creds.profileUrl ?? 'https://graph.qq.com/user/get_user_info'); // 资料端点
   profileUrl.searchParams.set('access_token', accessToken); // 令牌
   profileUrl.searchParams.set('oauth_consumer_key', creds.clientId); // 应用 ID
   profileUrl.searchParams.set('openid', openid); // 用户标识
   const raw = await readJson(await timedFetch(profileUrl.toString())); // 拉资料
-  if (raw.ret !== undefined && Number(raw.ret) !== 0) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'qq profile rejected', { ret: raw.ret, msg: raw.msg }); // ret 非 0 即失败
+  if (raw.ret !== undefined && Number(raw.ret) !== 0) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'QQ 用户信息校验未通过', { ret: raw.ret, msg: raw.msg }); // ret 非 0 即失败
   return spec.mapProfile({ ...raw, openid }); // 把 openid 合并进资料后映射
 } // exchangeQq 结束
 
@@ -278,10 +278,10 @@ async function exchangeDouyin(spec: OAuthProviderSpec, creds: ResolvedCredential
   }); // 请求结束
   const tokenRaw = await readJson(tokenResponse); // 解析
   const tokenData = nested(tokenRaw, 'data'); // 抖音把业务字段包在 data
-  if (tokenRaw.data === undefined && tokenRaw.message) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'douyin token rejected', { message: tokenRaw.message }); // 无 data 视为失败
+  if (tokenRaw.data === undefined && tokenRaw.message) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '抖音令牌校验未通过', { message: tokenRaw.message }); // 无 data 视为失败
   const accessToken = String(tokenData.access_token ?? ''); // 访问令牌
   const openId = String(tokenData.open_id ?? tokenData.openid ?? ''); // 用户标识
-  if (!accessToken || !openId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'douyin token response is incomplete', { description: tokenData.description }); // 关键字段缺失
+  if (!accessToken || !openId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '抖音令牌响应不完整', { description: tokenData.description }); // 关键字段缺失
   const profileUrl = new URL(creds.profileUrl ?? creds.tokenUrl); // 资料端点
   profileUrl.searchParams.set('access_token', accessToken); // 令牌
   profileUrl.searchParams.set('open_id', openId); // 用户标识
@@ -305,15 +305,15 @@ async function exchangeWeibo(spec: OAuthProviderSpec, creds: ResolvedCredentials
     body: body.toString(), // 序列化
   }); // 请求结束
   const tokenRaw = await readJson(tokenResponse); // 解析
-  if (tokenRaw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'weibo token rejected', { error: tokenRaw.error, error_description: tokenRaw.error_description }); // 微博失败字段
+  if (tokenRaw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '微博令牌校验未通过', { error: tokenRaw.error, error_description: tokenRaw.error_description }); // 微博失败字段
   const accessToken = String(tokenRaw.access_token ?? ''); // 访问令牌
   const uid = String(tokenRaw.uid ?? tokenRaw.user_id ?? ''); // 微博 uid
-  if (!accessToken || !uid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'weibo token response is incomplete'); // 关键字段缺失
+  if (!accessToken || !uid) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '微博令牌响应不完整'); // 关键字段缺失
   const profileUrl = new URL(creds.profileUrl ?? creds.tokenUrl); // 资料端点
   profileUrl.searchParams.set('access_token', accessToken); // 令牌
   profileUrl.searchParams.set('uid', uid); // 用户标识
   const raw = await readJson(await timedFetch(profileUrl.toString())); // 拉资料
-  if (raw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'weibo profile rejected', { error: raw.error, error_code: raw.error_code }); // 资料接口失败
+  if (raw.error) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '微博用户信息校验未通过', { error: raw.error, error_code: raw.error_code }); // 资料接口失败
   return spec.mapProfile({ ...raw, uid }); // 合并 uid 后映射
 } // exchangeWeibo 结束
 
@@ -337,7 +337,7 @@ async function exchangeAlipay(spec: OAuthProviderSpec, creds: ResolvedCredential
   const tokenEnvelope = (tokenRaw.alipay_system_oauth_token_response ?? tokenRaw) as Record<string, unknown>; // 令牌业务包
   const accessToken = String(tokenEnvelope.access_token ?? ''); // 访问令牌
   const openId = String(tokenEnvelope.user_id ?? ''); // 买家开放标识
-  if (!accessToken || !openId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', 'alipay token response is incomplete', { msg: tokenRaw.sub_msg ?? tokenRaw.msg }); // 关键字段缺失
+  if (!accessToken || !openId) throw new AppError('AUTH_OAUTH_EXCHANGE_FAILED', '支付宝令牌响应不完整', { msg: tokenRaw.sub_msg ?? tokenRaw.msg }); // 关键字段缺失
   const profileBody = new URLSearchParams({ // 资料请求公共参数
     app_id: creds.clientId, // 应用 ID
     charset: 'utf-8', // 字符集

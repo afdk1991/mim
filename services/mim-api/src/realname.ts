@@ -67,9 +67,9 @@ function normalizeId(value: string): string { // 比对与哈希同口径
 function validate(input: RealnameSubmitInput): { name: string; idNumber: string } { // 归一化后交出
   const name = input.name.trim(); // 姓名去空白
   const idNumber = normalizeId(input.idNumber); // 证件号归一
-  if (!NAME_RE.test(name)) throw new AppError('REALNAME_INVALID', 'invalid real name', { field: 'name' }); // 姓名非法
+  if (!NAME_RE.test(name)) throw new AppError('REALNAME_INVALID', '姓名格式不正确', { field: 'name' }); // 姓名非法
   if (!isValidIdNumber(input.idType, idNumber)) { // 证件号非法
-    throw new AppError('REALNAME_INVALID', 'invalid id number', { field: 'id_number' }); // 统一错误码
+    throw new AppError('REALNAME_INVALID', '证件号码格式不正确', { field: 'id_number' }); // 统一错误码
   } // 校验结束
   return { name, idNumber }; // 交出归一化值
 } // validate 结束
@@ -114,7 +114,7 @@ export function submitRealname(
   const { name, idNumber } = validate(input); // 格式校验 + 归一化
   const existing = findRecord(db, userId); // 查既有记录
   if (existing && (existing.status === 'pending' || existing.status === 'approved')) { // 待审或已通过不可重复提交
-    throw new AppError('REALNAME_ALREADY_SUBMITTED', 'realname submission already exists', { status: existing.status }); // 409
+    throw new AppError('REALNAME_ALREADY_SUBMITTED', '已提交过实名认证', { status: existing.status }); // 409
   } // 重复提交判定结束
 
   const nameHash = hmac(secret, `name:${name}`); // 姓名摘要
@@ -173,10 +173,10 @@ export function reviewRealname(
   now: string, // 对象字段 now：记录一项配置或数据
 ): RealnameView { // 执行当前业务步骤
   const row = db.prepare('SELECT * FROM realname_records WHERE id = ?').get(recordId) as Record<string, unknown> | undefined; // 按主键查
-  if (!row) throw new AppError('REALNAME_NOT_FOUND', 'realname record not found', { id: recordId }); // 不存在
-  if (row.status !== 'pending') throw new AppError('CONFLICT', 'realname record is not pending', { status: row.status }); // 非待审不可改判
+  if (!row) throw new AppError('REALNAME_NOT_FOUND', '未找到实名认证记录', { id: recordId }); // 不存在
+  if (row.status !== 'pending') throw new AppError('CONFLICT', '实名记录不在待审核状态', { status: row.status }); // 非待审不可改判
   if (decision === 'reject' && !(reason ?? '').trim()) { // 驳回必须写明原因
-    throw new AppError('VALIDATION_FAILED', 'reject reason is required', { field: 'reason' }); // 400
+    throw new AppError('VALIDATION_FAILED', '请填写驳回原因', { field: 'reason' }); // 400
   } // 驳回原因校验结束
   const status: RealnameStatus = decision === 'approve' ? 'approved' : 'rejected'; // 目标状态
   db.prepare( // 更新审核结论
