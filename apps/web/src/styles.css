@@ -4781,7 +4781,7 @@ code { /* 行内代码/令牌展示 */
   color: var(--text-muted); /* 次要色 */
 } /* 结束 */
 
-.community-hint code { /* 演示卡密 */
+.community-hint code { /* 提示语里的行内卡密样式 */
   padding: 1px 5px; /* 内边距 */
   border-radius: var(--radius-xs); /* 圆角 */
   background: var(--surface-2); /* 浅灰 */

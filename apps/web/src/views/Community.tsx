@@ -1930,7 +1930,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 <span>{dateOnly(t.created_at)}</span>
               </div>
             ))}
-            {!walletDetail?.transactions.length && <EmptyState kind="money" title="还没有流水" hint="先签到或用演示卡密充值。" />}
+            {!walletDetail?.transactions.length && <EmptyState kind="money" title="还没有流水" hint="先签到领积分，或用运营发放的充值卡兑换余额。" />}{/* 空态不点名演示卡密 */}
           </div>
         </div>
       )}
