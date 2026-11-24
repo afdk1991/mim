@@ -408,3 +408,16 @@ _本页为产品功能视角文档，随 PRD 草案（V0.0.14-preview）同步�
 - **验证**：`test/site-options.test.ts` 9 例；`@mim/api` 59 文件 552 例、`@mim/web` 19 例、三套构建 0、`verify-auth-gate` 147/147。
 
 设计与字段落点见 [站点选项后台-20261120](../../docs/站点选项后台-20261120.md)；参照面剩余 9 个页签的差距与批次见 [zibll后台对齐](../../docs/zibll后台对齐-Mim差距与实现计划-20261120.md)。
+
+## 16. 账号自助注销与到期数据清理（V0.0.17，2026-11-24）
+
+把「用户无法自助注销、服务器长期留存个人数据」收口为自助注销 + 冷静期 + 到期物理删除 + 数据包导出的闭环：
+
+- **状态机**：`users.status` 在 `active` ↔ `pending_deletion` 间切换；`deletion_scheduled_at` 记录预约删除时刻。`POST /me/deletion` 申请（幂等，重复申请回显既有预约、不重置冷静期），`POST /me/cancel-deletion` 撤销；`GET /me` 回传预约时刻与当前冷静期天数。
+- **数据包导出**：`GET /me/export` 输出五域 JSON 附件（身份 / 资金 / 内容 / 社交 / 交易）；口令哈希、刷新令牌哈希、提现账户名与账号、实名姓名 / 证件哈希不进包，手机邮箱首尾脱敏。
+- **清理引擎** `services/mim-api/src/privacy.ts`：单用户一个 `BEGIN IMMEDIATE` 事务，先子表后父表逐表 DELETE；他人可见引用置空匿名化；`audit_logs` 不物理删，归属改写 `deleted-<sha256 前 12 位>`、明细置 `{"redacted":"账号已注销"}`；对象存储按 key 尽力删除，失败只记日志不回滚。
+- **调度**：`startPrivacyScheduler` 受 `MIM_JOBS` 总开关控制，启动跑一轮 + 周期轮询 + 句柄 `unref`；`MIM_DELETION_GRACE_DAYS`（默认 7）/ `MIM_DELETION_SWEEP_MINUTES`（默认 60）/ `MIM_DELETION_BATCH`（默认 50）均可配置。
+- **管理端**：`GET /admin/deletions`（`user:read`）队列 / 倒计时 / 逾期 / 策略 / 最近一次留痕；`POST /admin/deletions/run`（新增权限点 `privacy:write`）手动触发一轮并写 `privacy.account_purge` 审计；后台「账号注销」视图按权限灰显按钮。
+- **验证**：`test/account-deletion.test.ts` 13 例；前端 `lib/deletion.test.ts` 9 例（倒计时分段 / 逾期判定 / 导出文件名）。
+
+表处置矩阵、保留面与运维操作见 [账号注销与数据清理-20261124](../../docs/账号注销与数据清理-20261124.md)。

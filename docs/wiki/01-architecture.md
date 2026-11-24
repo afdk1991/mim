@@ -37,7 +37,7 @@
 - 后端 `services/mim-api`：Express 5 + `better-sqlite3`（WAL）+ JWT + zod，前缀 `/api/v1`，端口 8787
 - 前端 `apps/web`：React 18 + Vite 6，`src/api.ts` 统一 HTTP 契约；现行视图为社区 / 圈子 / 聊天 / 个人中心 / 收银台 / 支付回跳 / 登录（历史 FR-03 项目任务视图、模块商城、漫剧等已分阶段移除）
 - 密钥治理载体为根目录 `.env.example`（全空占位）+ `.gitignore`（忽略 `.env`、反向豁免 `.env.example`），一致性由 `env-check.mjs` 自动校验
-- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.16-preview`，见 [03-code-reference.md](./03-code-reference.md)）
+- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.17-preview`，见 [03-code-reference.md](./03-code-reference.md)）
 
 ## 2. 目标产品架构（PRD 定义）
 

@@ -133,7 +133,7 @@ describe('后台豁免与管理员身份单独校验', () => {
     expect(res.status).toBe(200);
     expect(res.body.bootstrap).toBe(true);
     expect(res.body.roles).toContain('superadmin');
-    expect(res.body.permissions.length).toBe(8); // 与 RBAC_PERMISSIONS 一致（模块商城 4 个权限点已删除）
+    expect(res.body.permissions.length).toBe(9); // 与 RBAC_PERMISSIONS 一致（含 privacy:write 账号注销清理权限点）
   });
 
   it('超管可手工建号：指定标识 / 初始口令 / 角色，建完即可登录', async () => {

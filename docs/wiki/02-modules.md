@@ -33,7 +33,7 @@
 | ~~`services/mim-api/test/sites.test.ts`~~（**已下线，历史留痕**） | 测试代码（已删除） | 历史：站点模块契约测试 14 例；随模块收口删除 | 历史快照 |
 | ~~`services/mim-api/test/entries.test.ts`~~（**已下线，历史留痕**） | 测试代码（已删除） | 历史：入口配置清单契约测试 12 例；随模块收口删除 | 历史快照 |
 | `scripts/build.mjs` | 可执行代码 | 根级构建脚本：默认构建真实前端并把 `apps/web/dist` 递归复制到根 `dist/`（EdgeOne Pages 等 OutputDir=dist 的平台同款链路）；`--site` 模式才把 `site/` 复制到 `dist/` | 根 `dist/index.html`（真实应用）+ `dist/assets/*`，供 `npm run build` 调用 |
-| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check` / `check:full`）/ 版本号；`packageManager: pnpm@9.12.0`；版本号 `0.0.16` 为 `version-check.mjs` 的校验源；`check` 为快速四项目，`check:full` 追加 deployments / auth-gate / gap-scan / env-wiring | 零 dependencies，脚本转发到各 workspace |
+| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check` / `check:full`）/ 版本号；`packageManager: pnpm@9.12.0`；版本号 `0.0.17` 为 `version-check.mjs` 的校验源；`check` 为快速四项目，`check:full` 追加 deployments / auth-gate / gap-scan / env-wiring | 零 dependencies，脚本转发到各 workspace |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `tsconfig.base.json` | 配置 | 声明 `apps/*`、`services/*`、`packages/*`；锁定依赖版本；共享 TS 编译基线 | 可复现安装与类型检查 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
 | `team-hiring-plan.md` | 技术/组织规划 | 约束→编制→分阶段落地→风险→成本 | 22–32 人全配 / 14–18 人最小可行方案 |
@@ -169,7 +169,7 @@ deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 +
 | `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**） |
 | `help/index.html` + `help/content/help.json` | **2026-11-14 新增（V0.0.11）**：零依赖静态文档站（hash 路由 + 6 种内容块渲染器），内容与壳分离；`help.json` 的 `reuse` 段给出 `jsonPath` / `linkPattern` / 页面 id，供 news / service / support / blog 后续引用 | 项目介绍 / 部署说明 / 常见问题；`file://` 下 `fetch` 被禁，需静态服务打开 |
 | `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**） |
-| `package.json` | 版本号 `0.0.16`（`version-check.mjs` 校验源）；现行脚本只有 `build`（调 `scripts/build.mjs`，真实前端 → 根 `dist/`）、`build:web` / `build:admin`、`dev*`、`test`、`typecheck` 与 `check*` / `verify:*` 系列；历史上存在过的 `build:site` / `deploy` / `deploy:bootstrap` 已不在脚本表中 |
+| `package.json` | 版本号 `0.0.17`（`version-check.mjs` 校验源）；现行脚本只有 `build`（调 `scripts/build.mjs`，真实前端 → 根 `dist/`）、`build:web` / `build:admin`、`dev*`、`test`、`typecheck` 与 `check*` / `verify:*` 系列；历史上存在过的 `build:site` / `deploy` / `deploy:bootstrap` 已不在脚本表中 |
 | `scripts/build.mjs` | 默认：`pnpm --filter @mim/web build` → 把 `apps/web/dist` 递归复制到根 `dist/`；`--site`：把 `site/` 复制到根 `dist/`（PRD 离线阅读）。零第三方依赖 |
 
 两个 HTML 均**不含业务密钥**。

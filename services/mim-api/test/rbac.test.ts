@@ -16,6 +16,7 @@ const BUILTIN_PERMISSION_CODES = [ // 按字典序排列，便于与 API 返回�
   'content:write', // 公告 / 更新日志 / 推广计划维护与发布归档（域脚本 seed）
   'deployments:read', // 部署汇总（2026-11-15 运维数据收口，仅后台可见）
   'messaging:write', // 发送系统私信（成长私信）
+  'privacy:write', // 账号注销与数据清理（队列手动触发到期物理删除）
   'rbac:read', // 查看角色权限
   'rbac:write', // 变更角色权限
   'user:read', // 查看用户

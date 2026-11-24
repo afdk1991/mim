@@ -9,6 +9,7 @@ import { attachImWebSocket } from './im/ws.js'; // 引入 IM WebSocket 接入层
 import { ImHub } from './im/hub.js'; // 引入连接中心：需在 createApp 之前注入，HTTP 路由才能复用同一实例广播
 import { reconcileLikeCounts, reconcileRecommendScores } from './community/recommend.js'; // 推荐指数与点赞数对账：纠正存量假数，按真实互动重算
 import { sweepExpiredEphemeral } from './housekeeping.js'; // 易失凭证与幂等键清扫：过期验证码 / 题目 / 超期幂等键
+import { startPrivacyScheduler } from './privacy.js'; // 账号注销到期清理调度：首轮 + 周期轮询，JOBS_ENABLED 关时不注册
 import type { ApiDeps } from './types.js'; // 依赖容器类型：显式标注后才能回填 imHub 字段
 
 const db = createDatabase(DB_PATH); // 按配置路径打开持久化 SQLite，启动即完成建表与种子写入
@@ -23,6 +24,7 @@ const jwtSecret = loadJwtSecret(); // 加载签名密钥；缺失时由 config �
 const storage = createStorage({ env: process.env, jwtSecret, fallbackDir: DATA_DIR }); // 依据环境变量选择存储驱动，未配置远端时落本地数据目录
 const deps: ApiDeps = { db, jwtSecret, env: process.env, storage }; // 统一依赖容器，供 app 与 WS 层共享
 deps.imHub = new ImHub(); // 必须先建 hub：createApp 会浅拷贝依赖快照，晚于此步挂载会让 HTTP 路由永远读不到 hub
+const stopPrivacyScheduler = startPrivacyScheduler(deps); // 启动账号注销到期清理调度器；总开关关闭时返回空句柄
 const app = createApp(deps); // 组装 Express 应用，依赖显式注入便于测试替换
 const server = createServer(app); // 用原生 HTTP server 包裹 Express，以便同一端口承载 WebSocket 升级
 attachImWebSocket(server, deps, deps.imHub); // 复用同一 hub 挂载 IM WebSocket，保证 HTTP 侧广播可用
@@ -33,9 +35,10 @@ server.listen(PORT, () => { // 监听端口并保留 server 句柄，供优雅�
   console.log(`storage: driver=${storage.driver} configured=${storage.configured}`); // 打印存储驱动及是否已配置远端凭证，便于排查上传失败
 }); // listen 回调结束
 
-/** 优雅停机：先关 HTTP 连接，再关数据库，避免请求写到已关闭的连接 */
+/** 优雅停机：先停后台调度与 HTTP 连接，再关数据库，避免请求写到已关闭的连接 */
 function shutdown(signal: string): void { // 统一处理 SIGTERM / SIGINT
   console.log(`shutting down (${signal})`); // 记录信号来源，便于排查是哪个编排动作触发的停机
+  stopPrivacyScheduler(); // 先清除到期清理定时器，停机后不再触发新的清理轮次
   server.close(() => { // 等待在途请求处理完成再关库
     db.close(); // 关闭 SQLite 连接，确保 WAL 正常落盘
     process.exit(0); // 正常退出

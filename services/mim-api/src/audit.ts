@@ -40,6 +40,7 @@ export interface AuditInput {
   targetId?: string | null; // 对象主键或业务编码
   result?: 'success' | 'failure'; // 结果，缺省 success
   detail?: Record<string, unknown>; // 附加明细，禁止放敏感明文
+  id?: string; // 可选审计主键；调用方需要回读 audit_id 时显式传入，缺省由本层生成 uuidv7
 }
 
 /** 从请求提取操作人快照：未登录（理论上不会出现）时操作人留空 */
@@ -79,11 +80,12 @@ function buildPayload(actor: AuditActor, detail?: Record<string, unknown>): stri
 
 /** 写入一条审计：调用方保证已经完成业务校验，这里只负责落库 */
 export function writeAudit(db: Db, actor: AuditActor, input: AuditInput): void {
+  const auditId = input.id ?? uuidv7(); // 调用方需要回读 audit_id 时传入显式主键，否则生成新 uuidv7
   db.prepare(
     `INSERT INTO audit_logs (id, user_id, region, action, target, request_id, payload, created_at, result)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
-    uuidv7(), // 审计主键
+    auditId, // 审计主键
     actor.id, // 操作人
     actor.region, // 操作人区域
     input.action, // 动作码

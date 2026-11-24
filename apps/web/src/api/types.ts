@@ -80,6 +80,7 @@ export interface UserInfo { // 当前登录用户的核心资料（登录响应�
   locale: string; // 原始语言标签（如 zh-CN），交给 normalizeLocale 归一
   timezone: string; // IANA 时区名，用于把服务端 UTC 时间渲染成本地时间
   deletion_scheduled_at?: string | null; // 注销预约时间；仅注销流程中有值，其余为 null/缺省
+  deletion_grace_days?: number; // 当前生效的注销冷静期天数（来自站点配置），未申请注销时可能缺省
   member_no: string; // 对外 Mim ID 号码（纯数字 QQ 号样式，如 10000001），与内部 uuid 主键解耦
   is_guest?: boolean; // 历史兼容字段：2026-11-15 起恒为 false，仅为读取存量响应保留
 } // UserInfo 结构结束
@@ -126,6 +127,13 @@ export interface LoginResult extends Session { // 登录/刷新响应：会话�
 export interface MeResponse { // GET /me 的响应包装，便于服务端后续扩展其它字段
   user: UserInfo; // 最新的用户资料
 } // MeResponse 结构结束
+
+/** 注销申请 / 撤销后的账号状态回显；重复申请回显已存在的预约时间，不重置冷静期 */
+export interface DeletionStatus {
+  status: string; // 账号状态机取值：active / pending_deletion 等
+  deletion_scheduled_at: string | null; // 预约删除时刻（ISO8601）；撤销后为 null
+  grace_days?: number; // 本次生效的冷静期天数，与 /me 的 deletion_grace_days 同口径
+} // DeletionStatus 结构结束
 
 
 // ---------- media 预签名类型（对齐 routes/media.ts） ----------

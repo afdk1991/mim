@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'; // 把 import.meta.url 的 file URL �
 const SRC_DIR = dirname(fileURLToPath(import.meta.url)); // 当前文件所在目录（src），后续所有路径以它为基准
 
 export const REPO_ROOT = resolve(SRC_DIR, '../../..'); // 上溯三级到仓库根，供 .mim-dev-secret 等开发态产物定位
+
 export const DATA_DIR = resolve(SRC_DIR, '../data'); // 数据目录固定为 services/mim-api/data，本地驱动读写此处
 export const DB_PATH = resolve(DATA_DIR, 'mim.db'); // SQLite 单文件库；生产由部署脚本指向持久化目录
 export const SECRET_DIR = resolve(REPO_ROOT, '.mim-dev-secret'); // 开发态密钥目录，已列入 .gitignore 防误提交
@@ -30,7 +31,38 @@ export const CODE_RATE_WINDOW_MINUTES = 10; // 限流滑动窗口长度，单位
 export const LOGIN_LOCK_AFTER_FAILURES = 5; // 连续 5 次密码错误即锁定账号
 export const LOGIN_IP_LOCK_AFTER_FAILURES = 20; // 同一来源 IP 跨账号累计 20 次失败即锁定（阈值高于单账号，容忍 NAT 后多用户）
 export const LOGIN_LOCK_MINUTES = 15; // 锁定 15 分钟后自动解锁，避免永久误锁
-export const DELETION_GRACE_DAYS = 7; // 注销冷静期 7 天，期内可撤销删除
+
+/**
+ * 读取区间整数环境变量：非整数 / 越界 / 缺省一律回落默认值。
+ * 注销冷静期、扫描间隔、批大小均属运行时可调参数，脏配置不应让进程启动崩溃。
+ */
+function boundedInt(raw: string | undefined, fallback: number, min: number, max: number): number { // 区间钳取辅助函数
+  const parsed = Number(raw); // 尝试把环境变量文本转成数字
+  if (!Number.isInteger(parsed)) return fallback; // 空串 / 非数字回落默认值
+  if (parsed < min || parsed > max) return fallback; // 越界回落默认值，避免配置把调度打到不可用区间
+  return parsed; // 区间内直接采用配置值
+} // boundedInt 结束
+
+/** 注销冷静期天数：MIM_DELETION_GRACE_DAYS，范围 1–365，缺省 7 天 */
+export function deletionGraceDays(env?: Record<string, string | undefined>): number { // 读取入口，允许请求级 env 注入便于测试
+  const source = env ?? process.env; // 优先注入的 env，其次进程环境
+  return boundedInt(source.MIM_DELETION_GRACE_DAYS, 7, 1, 365); // 钳取到 1–365 天区间
+} // deletionGraceDays 结束
+
+/** 到期清理扫描间隔（分钟）：MIM_DELETION_SWEEP_MINUTES，范围 5–1440，缺省 60 分钟 */
+export function deletionSweepMinutes(env?: Record<string, string | undefined>): number { // 读取入口
+  const source = env ?? process.env; // 优先注入的 env，其次进程环境
+  return boundedInt(source.MIM_DELETION_SWEEP_MINUTES, 60, 5, 1440); // 钳取到 5–1440 分钟区间
+} // deletionSweepMinutes 结束
+
+/** 单轮清理批量上限：MIM_DELETION_BATCH，范围 1–500，缺省 50 */
+export function deletionBatchSize(env?: Record<string, string | undefined>): number { // 读取入口
+  const source = env ?? process.env; // 优先注入的 env，其次进程环境
+  return boundedInt(source.MIM_DELETION_BATCH, 50, 1, 500); // 钳取到 1–500 条区间
+} // deletionBatchSize 结束
+
+/** 注销冷静期天数（导出名保持不变，改由环境变量派生；既有调用点无需改名） */
+export const DELETION_GRACE_DAYS = deletionGraceDays(); // 顶层按进程环境派生一次，兼容既有 import
 
 /** Mim ID 号码：对外可见的纯数字编号（QQ 号样式），注册时自动分配，与内部 uuidv7 主键解耦 */
 export const MEMBER_NO_START = 1; // 号码空间从个位数起（1、2、3…），不补零、不带前缀，位数随量自然增长

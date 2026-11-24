@@ -29,7 +29,7 @@ interface IdempotencyRow { // 幂等表行结构
 
 const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']); // 会产生副作用的写方法集合，幂等中间件只对它们生效
 
-const DELETION_WHITELIST = new Set(['GET /api/v1/me', 'POST /api/v1/me/cancel-deletion']); // 待删除账号仍可访问的白名单：查资料与撤销注销
+const DELETION_WHITELIST = new Set(['GET /api/v1/me', 'GET /api/v1/me/export', 'POST /api/v1/me/deletion', 'POST /api/v1/me/cancel-deletion']); // 待删除账号仍可访问的白名单：查资料、导出数据、重复申请回显与撤销注销
 
 export function requestId(req: Request, res: Response, next: NextFunction): void { // 中间件：为每个请求分配可追踪 ID
   req.requestId = req.header('x-request-id') ?? randomUUID(); // 优先复用上游传入的 ID（网关已生成），否则本地生成 UUID

@@ -5,9 +5,9 @@
  * 后续再按域拆成独立文件时，只需把这里的某个键搬走并在 api.ts 里展开合并，不会影响调用方。
  */
 
-import { ApiError, BASE, current, request } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试
+import { ApiError, BASE, current, request, requestBlob } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试；requestBlob 供附件下载
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, DeletionStatus, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -134,16 +134,20 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     return request<{ user: UserInfo }>('/me', { method: 'PATCH', body: payload }); // PATCH 语义为局部更新，写操作自动带幂等键
   }, // updateMe 结束
 
-  requestDeletion() { // 申请注销账号（进入冷静期）
-    return request<{ status: string; deletion_scheduled_at: string | null }>('/me/deletion', { // 返回最新状态与生效时间
+  requestDeletion() { // 申请注销账号（进入冷静期）；重复申请回显已存在的预约时间，不重置冷静期
+    return request<DeletionStatus>('/me/deletion', { // 返回最新状态、生效时间与冷静期天数
       method: 'POST', // 写操作
       body: {}, // 服务端要求显式空体，保证 Content-Type 与幂等键生效
     }); // 请求调用结束
   }, // requestDeletion 结束
 
-  cancelDeletion() { // 撤销注销申请
-    return request<{ status: string }>('/me/cancel-deletion', { method: 'POST', body: {} }); // 同样显式空体，返回恢复后的状态
+  cancelDeletion() { // 撤销注销申请，恢复为活跃态
+    return request<{ status: string; deletion_scheduled_at: string | null }>('/me/cancel-deletion', { method: 'POST', body: {} }); // 同样显式空体，返回恢复后的状态
   }, // cancelDeletion 结束
+
+  exportAccount() { // 自助导出本人数据包（JSON 附件）；返回 Blob，文件名由前端按 exportFileName 生成
+    return requestBlob('/me/export'); // 只读 GET，鉴权头与普通请求一致
+  }, // exportAccount 结束
 
 
   // ---------- 对象存储（media）：object_key 一律由服务端生成，客户端不拼接 ----------

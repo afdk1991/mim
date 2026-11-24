@@ -1,6 +1,6 @@
 {
   "name": "@mim/api",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -32,6 +32,7 @@
     "marked": "^18.2.0",
     "mustache": "^4.2.0",
     "oauth4webapi": "3.8.8",
+    "pg": "^8.23.1",
     "semver": "^7.7.2",
     "sql-formatter": "^15.9.0",
     "ws": "^8.22.1",
@@ -45,6 +46,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mustache": "^4.2.6",
     "@types/node": "^22.18.0",
+    "@types/pg": "^8.23.1",
     "@types/semver": "^7.7.0",
     "@types/supertest": "^6.0.3",
     "@types/ws": "^8.18.2",

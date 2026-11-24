@@ -267,6 +267,28 @@ export async function request<T>(path: string, opts: RequestOptions = {}, retrie
   return data as T; // 2xx 时把解析结果按调用方声明的类型返回
 } // request 结束
 
+/** 下载类接口：直接读取 Blob（不解析 JSON），供数据包导出等附件下载使用；错误信封与 request 同一口径 */
+export async function requestBlob(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {}; // 逐项累积请求头，避免出现 undefined 值
+  if (current) headers.Authorization = `Bearer ${current.access_token}`; // 与普通请求同一鉴权口径
+  const res = await fetch(`${BASE}${path}`, { headers }); // 只读 GET，天然幂等无需幂等键
+  if (!res.ok) { // 非 2xx 统一解析错误信封并抛 ApiError，避免页面拿到乱码错误体
+    const text = await res.text(); // 先读文本，兼容空响应与网关 HTML 错误页
+    let envelope: { code?: string; message?: string; request_id?: string; details?: unknown } = {}; // 错误信封兜底空对象
+    if (text) { // 有内容才尝试 JSON 解析
+      try { envelope = JSON.parse(text) as typeof envelope; } catch { envelope = {}; } // 非 JSON 响应按空信封处理
+    } // 信封解析结束
+    throw new ApiError( // 构造统一错误对象抛出
+      envelope.code ?? 'INTERNAL_ERROR', // 缺码时退回内部错误
+      envelope.message ?? res.statusText, // 无 message 时用 HTTP 状态文本兜底
+      res.status, // 保留 HTTP 状态码
+      envelope.details, // 细节原样透传
+      envelope.request_id, // 追踪 id 原样透传
+    ); // throw 结束
+  } // 非 2xx 分支结束
+  return res.blob(); // 直接返回二进制 Blob；文件名由调用方按 exportFileName 生成
+} // requestBlob 结束
+
 export function errorText(locale: Locale, error: unknown): string { // 把任意异常转成可直接展示的本地化文案
   if (error instanceof ApiError) { // 接口错误优先走错误码翻译表
     const translated = errorMessage(locale, error.code as ErrorCode); // 用业务 code 查当前语言文案

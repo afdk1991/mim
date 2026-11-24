@@ -10,6 +10,8 @@ import { api, errorText } from '../api';
 import type { OAuthProviderInfo, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
+// 引入注销倒计时格式化、逾期判定与导出文件名纯函数
+import { exportFileName, formatDateTime, formatRemaining, isOverdue } from '../lib/deletion';
 // 引入我的资产页签（付费资产域，2026-11-16）
 import { MyAssets } from './MyAssets';
 
@@ -60,8 +62,16 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const [realIdType, setRealIdType] = useState<'id_card' | 'passport' | 'other'>('id_card'); // 证件类型
   const [realIdNumber, setRealIdNumber] = useState(''); // 待提交的证件号
   const [realBusy, setRealBusy] = useState(false); // 实名提交中间态
+  const [exporting, setExporting] = useState(false); // 数据包导出下载中间态
+  const [confirmOpen, setConfirmOpen] = useState(false); // 注销二次确认面板是否展开
+  const [confirmed, setConfirmed] = useState(false); // 勾选「我已知晓数据不可恢复」
+  const [deleteConfirmText, setDeleteConfirmText] = useState(''); // 二次确认输入的 DELETE 文本
+  const [bannerDismissed, setBannerDismissed] = useState(false); // 待删除横幅是否已点「知道了」收起
 
   const user = me.data?.user; // 当前用户
+  const pendingAt = user?.deletion_scheduled_at ?? null; // 预约删除时刻；null 表示未申请注销
+  const overdue = pendingAt !== null && isOverdue(pendingAt); // 是否已过预约时刻（到期即视为账号已删除）
+  const pending = pendingAt !== null && !overdue; // 是否处于冷静期待删除态
 
   // 资料回填：拿到 /me 结果后同步到表单
   useEffect(() => {
@@ -149,7 +159,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
     } // try 结束
   } // save 结束
 
-  /** 注销申请 / 撤销 */
+  /** 注销申请 / 撤销：成功后刷新账号状态并回写结果提示 */
   async function toggleDeletion(request: boolean) {
     setError(null); // 清空旧错误
     setMessage(null); // 清空旧提示
@@ -162,6 +172,44 @@ export function Profile({ locale, onUserUpdated }: Props) {
       setError(errorText(locale, err)); // 失败提示
     } // try 结束
   } // toggleDeletion 结束
+
+  /** 导出本人数据包：Blob 落本地下载，文件名按 Mim ID 与导出日期生成，不整页跳转 */
+  async function exportData() {
+    setError(null); // 清空旧错误
+    setMessage(null); // 清空旧提示
+    setExporting(true); // 进入导出中间态，防止重复点击
+    try { // 异常捕获起点：包裹可能抛出错误的操作
+      const blob = await api.exportAccount(); // 读取 JSON 附件 Blob
+      const filename = exportFileName(user?.member_no ?? '', new Date()); // 按号段 + 本地日期拼文件名
+      const url = URL.createObjectURL(blob); // 生成本地临时对象地址
+      const anchor = document.createElement('a'); // 借隐蔽 <a download> 触发浏览器保存
+      anchor.href = url; // 指向本地 Blob
+      anchor.download = filename; // 指定保存文件名
+      document.body.appendChild(anchor); // 挂入文档后才能触发点击
+      anchor.click(); // 触发下载
+      anchor.remove(); // 用完即移除节点
+      URL.revokeObjectURL(url); // 释放临时对象地址，避免内存泄漏
+      setMessage(isZh ? '数据包已开始下载' : 'Data export started'); // 成功提示
+    } catch (err) {
+      setError(errorText(locale, err)); // 失败提示（无权限 / 网络异常等）
+    } finally {
+      setExporting(false); // 恢复按钮可点
+    } // try 结束
+  } // exportData 结束
+
+  /** 提交注销申请：二次确认通过后调用，成功后收起确认面板并重置确认态 */
+  async function submitDeletion() {
+    await toggleDeletion(true); // 发起注销（进入冷静期）
+    setConfirmOpen(false); // 收起二次确认面板
+    setConfirmed(false); // 重置勾选
+    setDeleteConfirmText(''); // 重置 DELETE 输入
+  } // submitDeletion 结束
+
+  /** 撤销注销：冷静期内随时恢复活跃态，并重新展开待删除横幅 */
+  async function cancelDeletionRequest() {
+    await toggleDeletion(false); // 撤销注销
+    setBannerDismissed(false); // 横幅恢复可见
+  } // cancelDeletionRequest 结束
 
   return ( // 返回当前函数的处理结果
     <div className="page">{/* 执行当前业务步骤 */}
@@ -213,24 +261,72 @@ export function Profile({ locale, onUserUpdated }: Props) {
           </p>
           <p className="hint member-line">{isZh ? 'Mim ID：' : 'Mim ID: '}<strong className="member-no">{user?.member_no ?? '-'}</strong></p>
           <p className="hint">{/* 执行当前业务步骤 */}
-            {isZh ? '注销后账号进入冷静期，到期执行删除；冷静期内可随时撤销。删除后资料与权益不可恢复。' : 'Deletion enters a cooling-off period; you can cancel it before it executes.'}
+            {isZh ? '注销后账号进入冷静期，到期执行物理删除；冷静期内可随时撤销。删除后资料、权益、内容与订单不可恢复。' : 'Deletion enters a cooling-off period; you can cancel it before it executes.'}
           </p>
-          {user?.deletion_scheduled_at ? (
-            <p className="hint">{isZh ? `注销生效时间：${new Date(user.deletion_scheduled_at).toLocaleString()}` : `Deletion at: ${new Date(user.deletion_scheduled_at).toLocaleString()}`}</p>
+
+          {/* 待删除态：冷静期横幅，展示预约时刻、剩余倒计时与撤销 / 导出入口 */}
+          {pending && !bannerDismissed && pendingAt ? (
+            <div className="panel deletion-banner">{/* 待删除横幅容器 */}
+              <p className="warning">
+                {isZh
+                  ? `将于 ${formatDateTime(pendingAt)} 删除（${formatRemaining(new Date(pendingAt).getTime() - Date.now())}）`
+                  : `Scheduled for deletion at ${formatDateTime(pendingAt)} (${formatRemaining(new Date(pendingAt).getTime() - Date.now())})`}
+              </p>
+              <div className="deploy-columns">{/* 横幅操作行：撤销 / 导出 / 知道了 */}
+                <button type="button" className="btn primary" onClick={() => void cancelDeletionRequest()}>{isZh ? '撤销注销' : 'Cancel deletion'}</button>
+                <button type="button" className="btn ghost" disabled={exporting} onClick={() => void exportData()}>
+                  {exporting ? (isZh ? '导出中…' : 'Exporting…') : (isZh ? '导出我的数据' : 'Export my data')}
+                </button>
+                <button type="button" className="btn ghost" onClick={() => setBannerDismissed(true)}>{isZh ? '知道了' : 'Dismiss'}</button>
+              </div>
+            </div>
           ) : null}
-          {user?.status === 'deleting' || user?.deletion_scheduled_at ? (
-            <button type="button" className="btn primary" onClick={() => void toggleDeletion(false)}>{isZh ? '撤销注销申请' : 'Cancel deletion'}</button>
-          ) : (
-            <button
-              type="button" // 赋值：更新变量 type 的取值
-              className="btn ghost"
-              onClick={() => {
-                if (window.confirm(isZh ? '确定申请注销账号？冷静期内可撤销。' : 'Request account deletion?')) void toggleDeletion(true); // 不可逆操作先确认
-              }}
-            >
-              {isZh ? '申请注销账号' : 'Request deletion'}
-            </button>
-          )}
+
+          {/* 已到期：账号删除提示，不再展示注销 / 撤销入口 */}
+          {overdue ? (
+            <p className="chat-error">{isZh ? '账号已删除，请重新注册。' : 'Account has been deleted. Please sign up again.'}</p>
+          ) : null}
+
+          {/* 活跃态：导出入口常驻；注销账号必须勾选不可恢复并输入 DELETE 二次确认 */}
+          {!pending && !overdue ? (
+            <div className="deletion-actions">{/* 活跃态账号操作行 */}
+              <button type="button" className="btn ghost" disabled={exporting} onClick={() => void exportData()}>
+                {exporting ? (isZh ? '导出中…' : 'Exporting…') : (isZh ? '导出我的数据' : 'Export my data')}
+              </button>
+              {!confirmOpen ? (
+                <button type="button" className="btn ghost" onClick={() => setConfirmOpen(true)}>{isZh ? '注销账号' : 'Delete account'}</button>
+              ) : (
+                <div className="panel deletion-confirm">{/* 二次确认面板 */}
+                  <p className="warning">{isZh ? '注销后账号进入冷静期，到期执行物理删除；资料、权益、内容与订单不可恢复。' : 'After the cooling-off period your profile, benefits, content and orders are physically deleted and cannot be restored.'}</p>
+                  <label className="hint">
+                    <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                    {isZh ? '我已知晓数据将不可恢复' : 'I understand the data cannot be recovered'}
+                  </label>
+                  <label className="profile-form">
+                    {isZh ? '输入 DELETE 确认' : 'Type DELETE to confirm'}
+                    <input value={deleteConfirmText} onChange={(event) => setDeleteConfirmText(event.target.value)} autoComplete="off" placeholder="DELETE" />
+                  </label>
+                  <div className="deploy-columns">{/* 确认操作行：提交 / 取消 */}
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={!confirmed || deleteConfirmText !== 'DELETE' || busy}
+                      onClick={() => void submitDeletion()}
+                    >
+                      {busy ? (isZh ? '提交中…' : 'Submitting…') : (isZh ? '确认注销' : 'Confirm deletion')}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => { setConfirmOpen(false); setConfirmed(false); setDeleteConfirmText(''); }}
+                    >
+                      {isZh ? '取消' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {/* 实名认证：本人提交，服务端仅保存摘要与后四位；待审/已通过不再展示表单 */}
           <div className="realname-box">{/* 执行当前业务步骤 */}

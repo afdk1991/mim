@@ -402,6 +402,15 @@ sudo -n bash /opt/mim/app/deploy/deploy.sh <commit-sha>  # 精确重放到指定
 systemctl status mim-api; journalctl -u mim-api -n 50    # 服务状态与日志
 ```
 
+### 7.3.1 账号注销与到期数据清理运维（2026-11-24 新增）
+
+- **自动链路**：`mim-api` 启动即跑一轮到期清理，之后按 `MIM_DELETION_SWEEP_MINUTES`（默认 60 分钟）周期扫描；`MIM_JOBS=0` 时调度器不注册定时器。日志前缀 `[privacy]`，启动首轮 / 周期 / 手动分别在审计 `privacy.account_purge` 的 `detail.source` 标记 `startup` / `interval` / `manual`。
+- **查看队列**：后台「账号注销」视图，或带管理员凭证 `GET /api/v1/admin/deletions`（`user:read`）；返回 `total` / `items`（剩余秒数、逾期标记）/ `policy`（冷静期、扫描间隔、批大小、自动清理开关）/ `last_run`。
+- **手动触发一轮**：后台「立即执行清理」按钮，或带 `privacy:write` 权限 `POST /api/v1/admin/deletions/run`；响应回传 `scanned` / `purged` / `at` / `audit_id`。到期账号被单事务物理删除，未到期账号不受影响。
+- **核对留痕**：库内查 `audit_logs WHERE action='privacy.account_purge'`；`payload` 只含计数、逐表行数与已删 id 的 sha256 前 8 位摘要，不含用户原值。
+- **回滚边界**：注销撤销（`POST /me/cancel-deletion`）只在到期前有效；到期物理删除后数据不可恢复。**项目不创建任何数据库备份**（无 `.bak`、无 `db.backup()`），改库前如需快照由执行人自行评估，仓库与部署脚本不产生备份文件。
+- **参数调整**：`MIM_DELETION_GRACE_DAYS`（1–365，默认 7）、`MIM_DELETION_SWEEP_MINUTES`（5–1440，默认 60）、`MIM_DELETION_BATCH`（1–500，默认 50），越界 / 非法值回落缺省；登记于 `.env.example` 与 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
+
 ### 7.4 生产布局
 
 | 项 | 路径 |

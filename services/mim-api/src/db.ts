@@ -371,6 +371,7 @@ export const RBAC_PERMISSIONS = [ // 权限点数组，顺序即后台展示顺�
   { code: 'content:write', name: { 'zh-CN': '维护内容运营', 'en-US': 'Manage content' } }, // 公告、更新日志、推广计划的维护与发布归档
   { code: 'messaging:write', name: { 'zh-CN': '发送系统私信', 'en-US': 'Send system direct messages' } }, // 成长私信：按条件挑选用户并发送系统身份私信（含群发幂等台账）
   { code: 'deployments:read', name: { 'zh-CN': '查看部署汇总', 'en-US': 'Read deployments' } }, // 2026-11-15 运维数据收口：部署项清单仅后台可见，不再对访客公开
+  { code: 'privacy:write', name: { 'zh-CN': '账号注销与数据清理', 'en-US': 'Manage account deletion & privacy purge' } }, // 账号自助注销队列查看与到期物理清理触发
 ] as const; // 断言字面量常量，使 code 收窄为联合类型供 TS 校验
 
 /** 权限点编码联合类型：路由调用处传错字符串会在编译期报错 */

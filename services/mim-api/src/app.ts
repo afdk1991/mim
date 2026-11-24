@@ -25,6 +25,7 @@ import { createFederationRouter } from './routes/federation.js'; // 联邦身份
 import { createVipPricingRouter } from './routes/vip-pricing.js'; // VIP 分级定价规则只读查询
 import { createReferralRouter } from './routes/referral.js'; // 返佣佣金明细自助查询（内部鉴权）
 import { createReferralAdminRouter } from './routes/referral-admin.js'; // 返佣到期结算管理端点（RBAC）
+import { createPrivacyAdminRouter } from './routes/privacy-admin.js'; // 账号注销队列与到期清理触发（RBAC）
 import { createWalletWithdrawalRouter } from './routes/wallet-withdrawals.js'; // 提现分成：可提现余额 / 申请 / 审核 / 到账（钱包结算层）
 import { createGrowthDmAdminRouter } from './routes/growth-dm-admin.js'; // 成长私信：系统身份私信群发（RBAC messaging:write）
 import { createGrowthRouter } from './routes/growth.js'; // 社区激励链：签到 / 积分流水 / 等级进度 / 徽章 + 后台规则配置（RBAC content:write）
@@ -164,6 +165,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   app.use('/api/v1', createAdminRouter(resolved)); // 不挂 idempotency：超管引导通道无 req.user，挂上会被幂等中间件前置拦截成 401
   app.use('/api/v1', createShopAdminRouter(resolved)); // 商城后台写入面：同样走 RBAC 权限点 commerce:write，不挂全局幂等
   app.use('/api/v1', createReferralAdminRouter(resolved)); // 返佣到期结算：RBAC commerce:write，独立文件不并入 admin.ts
+  app.use('/api/v1', createPrivacyAdminRouter(resolved)); // 账号注销：队列查看 user:read，手动清理 privacy:write
   app.use('/api/v1', createGrowthDmAdminRouter(resolved)); // 成长私信：复用 IM 会话，RBAC messaging:write
   app.use('/api/v1', createGrowthRouter(resolved)); // 社区激励链：用户侧签到/流水/等级/徽章 + 管理侧规则配置，内部按端点各自鉴权
 
