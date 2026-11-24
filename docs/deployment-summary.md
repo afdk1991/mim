@@ -1,7 +1,7 @@
 # Mim 部署汇总（结构化核对表）
 
-- 生成时间：2026-11-18T16:23:29.835Z
-- 本地 HEAD：`607e974`
+- 生成时间：2026-11-24T16:30:42.963Z
+- 本地 HEAD：`c109595`
 - 采集模式：baseline（沿用契约取证快照）
 - 单一事实源：`packages/core-domain/src/deploymentRegistry.json`（schema mim.deployment-registry.v1）
 
@@ -12,11 +12,11 @@
 | 矩阵平台 | 11 | 铁律九 10 个免费平台 |
 | 规范部署项 | 12 | 去重后的部署仓库 + 部署项 |
 | git 远端 | 2 | gitee / origin |
-| CI 作业 | 5 | 其中部署作业 4 个 |
+| CI 作业 | 6 | 其中部署作业 4 个 |
 | 有取证 | 12 | 本轮存在可信取证 |
 | 空数据 | 0 | result 为 null，明确标识而非填 0 |
 | 阻断异常 | 0 | 🔴 0 / 🟡 0（另 🟢 31 条为历史取证留痕，不是待处置异常） |
-| 缺失信息 | 5 | 字段名或工件路径 |
+| 缺失信息 | 3 | 字段名或工件路径 |
 | 工作树漂移 | 0 | 工件在远端 HEAD 存在、本地工作树缺失 |
 
 ## 2. 部署项主表（统一字段）
@@ -76,8 +76,8 @@
 
 | 远端 | 地址 | 本轮 main hash | 判定 |
 |---|---|---|---|
-| `gitee` | https://gitee.com/mallwm_admin/mim.git | 607e97452e0371688e87c85b73f929e15b49fca7 | ✅ 已取证 |
-| `origin` | https://github.com/afdk1991/mim.git | 607e97452e0371688e87c85b73f929e15b49fca7 | ✅ 已取证 |
+| `gitee` | https://gitee.com/mallwm_admin/mim.git | c109595a9a0bb2161785425cb31cb41a1c00fce4 | ✅ 已取证 |
+| `origin` | https://github.com/afdk1991/mim.git | c109595a9a0bb2161785425cb31cb41a1c00fce4 | ✅ 已取证 |
 
 | 工件 | 远端 HEAD | 本地工作树 | 判定 |
 |---|---|---|---|

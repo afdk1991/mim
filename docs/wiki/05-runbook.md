@@ -1,12 +1,12 @@
 # 05 · 项目运行方式
 
-> **现行覆盖（2026-11-20）**：现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为准——`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；`/marketplace`、`/products`、`/cart`、`/entry-catalog`、`/sites`、`/comic-studio`、`/comic`、`/navigation`、`/search`、`/cloud`、`/img`、`/download`、`/deployments` 前端页签均已下线，仅作历史别名或未知路径回落。门禁现行口径：匿名默认可读，个人与资金路径要求登录，写操作 401；自助注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭；`POST /auth/guest` 已删除；口令只认库内 `credentials`，`MIM_AUTH_ADMIN_PASSWORD` 已不生效。本页 §6.3 中模块商城 / 漫剧 / 权益解锁 / 访客会话相关行、§6.4 漫剧与商城冒烟步骤、以及下方各历史取证段落，均按铁律三保留作历史留痕，不代表当前工作树实况。
+> **现行覆盖（2026-11-24 全仓闭环审计轮）**：现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为准，共 **8** 个——`/home`、`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；`/marketplace`、`/products`、`/cart`、`/entry-catalog`、`/sites`、`/comic-studio`、`/comic`、`/navigation`、`/search`、`/cloud`、`/img`、`/download`、`/deployments` 前端页签均已下线，仅作历史别名或未知路径回落。门禁现行口径：匿名默认可读，个人与资金路径要求登录，写操作 401；自助注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭；`POST /auth/guest` 已删除；口令只认库内 `credentials`，`MIM_AUTH_ADMIN_PASSWORD` 已不生效。**三个旧校验脚本 `verify-site-modules.mjs` / `verify-entry-manifest.mjs` / `verify-site-directory.mjs` 已删除，不再是现行门禁**；本页 §6.3 中模块商城 / 漫剧 / 权益解锁 / 访客会话相关行、§6.4 漫剧与商城冒烟步骤、以及下方各历史取证段落，均按铁律三保留作历史留痕，不代表当前工作树实况。现行门禁脚本清单与真源计数见 [AGENTS.md 2026-11-24 覆盖段](../../AGENTS.md)。
 >
 > 仓库已是可运行的 pnpm Monorepo：`services/mim-api`（后端，8787）与 `apps/web`（Web 端，5173）构成 P0 功能产品；另有 `scripts/` 下仓库级脚本（版本校验、密钥模板校验、注释覆盖率校验、站点构建、门禁与部署汇总校验）。本页覆盖启动、测试、构建与校验的完整命令。
 >
-> **2026-11-09 统一入口配置清单轮**：按 45 类 DNSPod 备注去重整理为 45 个去重入口 + 19 业务域，统一可配置占位标识（不补写具体主机值）；`/sites` 视图升级为统一入口配置清单（消费 `/api/v1/entries*` 6 只读端点 + `/api/v1/sites*` 运行时端点）。启动 API 后 `npm run verify:site-modules` 离线校验 79 项、 `npm run verify:entry-manifest` 校验 19 业务用途覆盖与去重整理；`npm run verify:site-directory` 校验上一轮站点入口契约。交付说明见 [../统一入口配置清单与模块化实现说明-20261109.md](../统一入口配置清单与模块化实现说明-20261109.md)，可读清单见 [../统一入口配置清单-20261109.md](../统一入口配置清单-20261109.md)。
+> **【历史留痕 · 2026-11-09 统一入口配置清单轮】**：按 45 类 DNSPod 备注去重整理为 45 个去重入口 + 19 业务域，统一可配置占位标识（不补写具体主机值）；`/sites` 视图曾升级为统一入口配置清单（消费 `/api/v1/entries*` 6 只读端点 + `/api/v1/sites*` 运行时端点）。该轮配套的 `verify:site-modules` / `verify:entry-manifest` / `verify:site-directory` 三个校验脚本与入口清单模块均已随模块收口删除，**下述命令不得再执行**；交付说明见 [../统一入口配置清单与模块化实现说明-20261109.md](../统一入口配置清单与模块化实现说明-20261109.md)，可读清单见 [../统一入口配置清单-20261109.md](../统一入口配置清单-20261109.md)。
 >
-> **2026-11-12 落地状态对齐（现行口径）**：序号 02 条目移除后清单为 **44 入口 / 19 业务域 / 132 功能点 / 88 演示条目 / 116 关联 / 46 占位标识**；新增落地状态层 `packages/core-domain/src/entryImplementation.ts`，四态分布 **已落地 4 / 部分相邻 19 / 规划中 19 / 语义冲突 2**，概览与列表逐条透出。`npm run verify:site-modules` 现 **83 项**（含落地链路断言），`verify:entry-manifest` **23 项**。规划中入口不提供直达、不展示演示条目冒充真实业务。
+> **【历史留痕 · 2026-11-12 落地状态对齐】**：序号 02 条目移除后清单为 **44 入口 / 19 业务域 / 132 功能点 / 88 演示条目 / 116 关联 / 46 占位标识**；落地状态层 `packages/core-domain/src/entryImplementation.ts` 与四态分布口径均为该轮历史快照，相关文件已删除，不再作为现状引用。
 
 ## 1. 前置条件
 
@@ -138,8 +138,8 @@ pnpm --filter @mim/admin dev       # 管理后台（Vite），http://127.0.0.1:5
 
 ```bash
 pnpm -r typecheck                       # 5 of 6 workspace 项目类型检查（@mim/admin 已纳入）
-pnpm --filter @mim/api test             # vitest + supertest，58 个测试文件 543 例全通过（2026-11-20 复核）
-pnpm --filter @mim/web test              # 用户端 vitest：纯函数归一化 / srcset 派生 12 例 + Testing Library/jsdom 组件级 7 例（共 19 例）
+pnpm --filter @mim/api test             # vitest + supertest，61 个测试文件 567 例全通过（2026-11-24 复核）
+pnpm --filter @mim/web test              # 用户端 vitest：纯函数 12 例 + Testing Library/jsdom 组件级 7 例 + 注销纯函数 9 例（3 文件共 28 例，2026-11-24 复核）
 pnpm --filter @mim/web e2e               # 浏览器级端到端（Playwright 1.65）：真实 Chromium 点击真实前端 + 真实本地 API；桌面 3 例 + 移动 1 例；首次需 `pnpm --filter @mim/web exec playwright install chromium`
 pnpm --filter @mim/web build            # 用户端 tsc --noEmit + vite build
 pnpm --filter @mim/admin build          # 管理后台 tsc --noEmit + vite build（产物 dist/ 发布到 /opt/mim/admin）

@@ -10,7 +10,7 @@
 <!-- 视口设置：宽度跟随设备宽度、初始缩放 1，保证移动端正常显示 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 浏览器标签页标题 -->
-<title>Mim 全平台产品底座 PRD — V0.0.15-preview</title>
+<title>Mim 全平台产品底座 PRD — V0.0.17-preview</title>
 <!-- 内联样式表：本 PRD 文档的全部视觉样式 -->
 <style>
   /* CSS 自定义属性（设计令牌）：集中定义整页配色，便于统一修改 */
@@ -89,13 +89,18 @@
 <!-- 文档主标题 -->
 <h1>Mim 全平台产品底座 — 产品需求文档</h1>
 <!-- 元信息行：版本 / 通道 / 日期 / 状态（灰色弱提示样式） -->
-<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.15），故展示 V0.0.15-preview -->
-<p class="muted">版本：V0.0.15-preview　|　通道：preview　|　日期：2026-11-20（版本口径同步）　|　状态：草案</p>
+<!-- 通道取值与 RELEASE_CHANNEL 对齐：preview / draft / test；当前为预览通道，版本号跟随根 package.json semver（0.0.17），故展示 V0.0.17-preview -->
+<p class="muted">版本：V0.0.17-preview　|　通道：preview　|　日期：2026-11-24（全仓闭环审计轮口径同步）　|　状态：草案</p>
 
 <!-- 信息提示块：说明本文档定位 -->
 <div class="callout">
   <!-- 加粗的小节引导词 -->
   <strong>本文档定位</strong>：定义 Mim 全平台产品底座的 P0 核心用户旅程与功能需求。底座支撑多产品形态（工具/SaaS/内容/电商/社交）、多端（Web/小程序/App/PC）、双市场（国内+出海）、全能力（支付/IM/音视频/AI）。<strong>旗舰产品形态于 2026-11-04 重定义为 SaaS 工具型（按模块一次性解锁）— 功能模块商城 + 漫剧 AI 剧工作室</strong>（FR-03 全节重写，早期旗舰形态及其功能条目已按用户指令于 2026-11-10 从文档中删除）。核心工作区由两域构成：<strong>功能模块商城</strong>负责模块上架、定价与解锁；<strong>漫剧 AI 剧</strong>覆盖 AI 全自动成片、AI 辅助创作工作台、作品管理与分发、工作台+导出成片四种交付形态。首端为 Web + 微信小程序（国内），出海以 App + Web 切入。
+</div>
+
+<!-- 历史口径提示块：2026-11-24 全仓闭环审计轮标注，防止把草案旧范围当现行实现 -->
+<div class="callout">
+  <strong>历史口径标注（2026-11-24 全仓闭环审计轮）</strong>：本 PRD 为产品草案，文中<strong>功能模块商城 / 商品列表 / 购物车 / 漫剧 AI 剧 / AI 生成与 orchestrator / 统一入口清单（siteModules.json、/sites、/entries）/ 导航站 / 统一搜索 / 云存储图床下载分发</strong>等章节及其端点、表、校验脚本表述，均为各轮交付时的草案历史快照；上述模块与视图、路由、测试已从前后端代码删除，现行实现以仓库代码与 <code>AGENTS.md</code> 2026-11-24 覆盖段为准。已删错误码 <code>AUTH_PASSWORD_NOT_CONFIGURED</code> / <code>ACCOUNT_REGION_MISMATCH</code> / <code>PAYMENT_REQUIRED</code> / <code>COST_LIMIT_EXCEEDED</code> / <code>GENERATION_FAILED</code> 不再为现行码（现行口令失败为 <code>401 AUTH_PASSWORD_INVALID</code>）；已删校验脚本 <code>verify-site-modules</code> / <code>verify-entry-manifest</code> / <code>verify-site-directory</code> 与前端 <code>release-notes.ts</code> 不再存在。
 </div>
 
 <!-- 章节标题：1. 背景与目标 -->
@@ -921,7 +926,9 @@ function submitLogin(){
 
 <!-- 附录 A：站点模块矩阵（2026-11-09 按 DNSPod mixm.top 工作表备注新增；2026-11-12 落地状态对齐为 44 入口） -->
 <!-- 说明：备注原文为「入口描述｜系统名」两段式，无功能规格；下列功能点为按系统名语义派生的最小可运行实现 -->
-<h2>附录 A · 站点模块矩阵（2026-11-09）</h2>
+<h2>附录 A · 站点模块矩阵（2026-11-09，历史快照 · 模块已下线）</h2>
+<!-- 历史标注：本附录对应的入口清单模块（siteModules.json / Sites.tsx / sites·entries 路由与测试 / 三个校验脚本）已随 2026-11-15 模块收口从代码删除，下表条目仅作草案历史留痕 -->
+<p class="muted"><strong>历史留痕（2026-11-24 审计轮标注）</strong>：本附录对应的统一入口配置清单模块已从前后端代码删除；<code>siteModules.json</code> / <code>entryImplementation.ts</code> / <code>Sites.tsx</code> / <code>routes/sites.ts</code> / <code>routes/entries.ts</code> / <code>test/sites.test.ts</code> / <code>test/entries.test.ts</code> 及 <code>verify-site-modules</code> / <code>verify-entry-manifest</code> / <code>verify-site-directory</code> 均不再存在，下表不代表现行实现。</p>
 <!-- 依据边界：仅 mixm.top 工作表业务备注，每类两行（序号 02 条目已移除，现 44 类） -->
 <p class="muted">依据用户提供的「主机记录 + 备注」文本与备注列截图（等价于 <code>dnspod_records_2026-11-05_21-42-26.xls</code> 的 <code>mixm.top</code> 工作表第 4–93 行）。44 类业务备注每类连续重复两行，按「完全相同且用途一致按一项」合并为 44 个入口；两行 <code>@</code> 合并为 1 项根域名占位 <code>AT_ROOT</code>，其余 11 行空白备注合并为 1 项空白占位 <code>BLANK_UNSET</code>，二者均不建立业务模块。用户仅提供 <code>@</code> 与备注、未提供具体主机记录值，故<strong>不补写具体主机值</strong>，统一使用可配置占位标识 <code>{{HOST:&lt;ENTRY_KEY&gt;}}</code>（运行期由 <code>MIM_HOST_*</code> 注入）。备注本身只有「入口描述｜业务系统 / 模块说明」，<strong>不含功能规格、输入输出与交互流程</strong>；下表「功能点 / 核心功能 / 职责边界 / 关联区分」均由系统名语义派生，属实现推导而非备注原文。记录值 / 状态 / 优先级等 6 列已被清空，故本附录不定义 DNS 解析目标或线上子域可用性。</p>
 <!-- 实现形态：静态注册表 + 后端 API + 数据库 + 前端视图，四层共用同一数据源 -->
@@ -968,7 +975,7 @@ function submitLogin(){
 <!-- 文档末尾分割线 -->
 <hr>
 <!-- 页脚：版本 / 草案声明 / 校验入口（版本规约见 AGENTS.md 铁律四，密钥治理见 09 清单 §0） -->
-<p class="muted" style="text-align:center;">Mim PRD · V0.0.16-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
+<p class="muted" style="text-align:center;">Mim PRD · V0.0.17-preview · 本文件为草案，所有 [TBD] 与 [Assumption] 项待确认后更新<br>校验入口：<code>node scripts/version-check.mjs</code> · <code>node scripts/env-check.mjs</code></p>
 
 <!-- 页面主体结束 -->
 </body>

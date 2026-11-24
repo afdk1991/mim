@@ -3,11 +3,11 @@
 本目录是 Mim 平台三款「自研工具」的**最小可执行实现**：纯 Node 内置模块，**零新增 npm 依赖**，
 测试离线运行、不联网下载任何资源。每款工具独立成包，互不依赖，也不参与主仓库构建。
 
-| 目录 | slug（对齐 `mim_tools` 种子） | 用途 |
-| --- | --- | --- |
-| `quick-build-wp/` | `quick-build-wp` | 生成宝塔式 WordPress 一键建站脚本（Nginx / MySQL / PHP / 建库建站 / 伪静态 / 可选 SSL） |
-| `db-replace-domain/` | `db-replace-domain` | 数据库批量换域名：SQL 文本导出 / SQLite 库，正确重算 PHP 序列化字符串长度，自动备份 |
-| `liudun-waf/` | `liudun-waf` | Node 反向代理 WAF 网关：CC 限流、SQLi/XSS/穿越/敏感文件规则、黑白名单、JSONL 拦截日志，可导出等价 nginx 配置 |
+| 目录 | 用途 |
+| --- | --- |
+| `quick-build-wp/` | 生成宝塔式 WordPress 一键建站脚本（Nginx / MySQL / PHP / 建库建站 / 伪静态 / 可选 SSL） |
+| `db-replace-domain/` | 数据库批量换域名：SQL 文本导出 / SQLite 库，正确重算 PHP 序列化字符串长度；不生成任何备份文件 |
+| `liudun-waf/` | Node 反向代理 WAF 网关：CC 限流、SQLi/XSS/穿越/敏感文件规则、黑白名单、JSONL 拦截日志，可导出等价 nginx 配置 |
 
 ## 运行测试
 
@@ -75,8 +75,8 @@ node tools/quick-build-wp/cli.mjs --help
 # 预览（不改文件 / 不写库）
 node tools/db-replace-domain/cli.mjs --input dump.sql --from old.com --to new.com --dry-run
 
-# 真实执行（apply 前自动写 <input>.bak 备份，已存在则不覆盖）
-node tools/db-replace-domain/cli.mjs --input dump.sql --from old.com --to new.com --apply [--no-backup]
+# 真实执行（不生成任何备份文件；项目口径：不创建数据库备份）
+node tools/db-replace-domain/cli.mjs --input dump.sql --from old.com --to new.com --apply
 
 # SQLite 库模式（.sqlite / .db / .sqlite3，按扩展名 + 文件头识别）
 node tools/db-replace-domain/cli.mjs --input site.sqlite --from old.com --to new.com --apply
@@ -92,8 +92,7 @@ node tools/db-replace-domain/cli.mjs --help
 | `--from <域名>` | 旧域名（自动匹配 `http/https`、协议相对 `//`、`www/非 www` 变体） |
 | `--to <域名>` | 新域名 |
 | `--dry-run` | 只统计预览，不写 |
-| `--apply` | 真实执行，自动备份 |
-| `--no-backup` | apply 时跳过备份（不推荐） |
+| `--apply` | 真实执行；不生成 `.bak` 备份文件 |
 
 ### 退出码
 
@@ -159,23 +158,15 @@ node tools/liudun-waf/cli.mjs --help
 
 ---
 
-## 与平台 `/tools` 目录的对接方式
+## 与后端 / 前端的关系
 
-平台侧路由见 `services/mim-api/src/routes/tools.ts`，数据表为 `schema.d/21-tools.sql` 的 `mim_tools`，
-三条种子记录的 `slug` 与本目录一一对应：
+> 历史口径留痕：2026-11-15 模块收口前，本目录曾通过后端 `routes/tools.ts`、`schema.d/21-tools.sql` 的 `mim_tools` 表做元数据分发；该后端路由、表与种子记录已随下线模块一并删除，现行工作树中不再存在。
 
-| `mim_tools.slug` | 本目录实现 | 可产出的分发物 |
-| --- | --- | --- |
-| `quick-build-wp` | `tools/quick-build-wp/` | `--emit` 生成的建站脚本 `.sh` |
-| `db-replace-domain` | `tools/db-replace-domain/` | 工具包 / CLI 说明 |
-| `liudun-waf` | `tools/liudun-waf/` | 网关 CLI、`--emit-nginx` 生成的 `.conf` |
+现行边界：
 
-对接边界（重要）：
-
-- `mim_tools` 记录里的 `download_url` / `doc_url`（即安装包 / 仓库链接）**可指向本目录产出的脚本或配置**，
-  平台只做**元数据分发与链接展示**，**不在服务端执行**这些脚本、不起 WAF 进程；
+- 本目录三套工具均为**独立 CLI 运维工具**，不被 `services/mim-api`、`apps/web`、`apps/admin` 或主构建脚本引用，后端也没有对应的 `/tools` 路由与数据表；
 - 建站脚本由用户在自有 Linux 主机执行；WAF 网关由站点侧 / 网关侧自行部署；换域名工具由管理员在数据库所在环境运行；
-- 本目录不被 `services/mim-api`、`apps/web` 或主构建引用，平台前端只通过工具详情页的外链访问产物。
+- 产出物（建站脚本 `.sh`、WAF 等价 nginx `.conf`）由使用者手动取用，平台侧不在服务端执行这些脚本、不起 WAF 进程。
 
 ## 约束与边界
 

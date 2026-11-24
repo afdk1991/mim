@@ -206,8 +206,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_CODE_DELIVERY_FAILED: '验证码发送失败，请稍后再试',
     // 密码错误
     AUTH_PASSWORD_INVALID: '密码错误',
-    // 未开启密码登录，指引联系管理员
-    AUTH_PASSWORD_NOT_CONFIGURED: '密码登录未配置，请联系管理员',
     // 注册身份已被占用，引导改用登录
     AUTH_IDENTITY_EXISTS: '该账号已注册，请直接登录',
     // 账号锁定，告知原因与临时性
@@ -248,8 +246,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     MEMBER_NO_EXHAUSTED: '账号编号资源已用尽，请联系管理员',
     // 账号不存在
     ACCOUNT_NOT_FOUND: '账号不存在',
-    // 地区不匹配，说明账号归属限制
-    ACCOUNT_REGION_MISMATCH: '该账号不属于当前地区',
     // 注销冷静期内，指引先撤销注销
     ACCOUNT_DELETION_PENDING: '账号处于注销冷静期，请先撤销注销',
     // 无权限
@@ -262,8 +258,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     IDEMPOTENCY_CONFLICT: '幂等键对应的请求内容不一致',
     // 功能未解锁，暗示与套餐/权限有关
     FEATURE_NOT_AVAILABLE: '当前账号未解锁该功能',
-    // 付费模块必须先下单并完成结算
-    PAYMENT_REQUIRED: '该模块为付费模块，请先下单并完成结算',
     // 支付回调密钥未配置
     PAYMENT_NOTIFY_NOT_CONFIGURED: '支付回调密钥未配置，暂无法接收渠道通知',
     // 对象存储缺失
@@ -272,10 +266,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     STORAGE_CONFIG_INVALID: '对象存储配置不完整，请补齐桶名、区域与访问密钥',
     // AI 提供方缺失
     PROVIDER_NOT_CONFIGURED: 'AI 模型提供方未配置',
-    // 成本超限，说明限额维度
-    COST_LIMIT_EXCEEDED: '已超出单任务/当日生成成本上限',
-    // AI 生成任务失败：上游模型/存储/合成环节报错，提示稍后重试
-    GENERATION_FAILED: '生成失败，请稍后重试',
     // 通用频控
     RATE_LIMITED: '请求过于频繁，请稍后再试',
     // 服务端异常，不暴露堆栈
@@ -302,8 +292,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     AUTH_CODE_DELIVERY_FAILED: 'Failed to deliver the verification code, please try again later',
     // 密码错误
     AUTH_PASSWORD_INVALID: 'Incorrect password',
-    // 密码登录未开启
-    AUTH_PASSWORD_NOT_CONFIGURED: 'Password sign-in is not configured, contact the administrator',
     // 注册身份已被占用
     AUTH_IDENTITY_EXISTS: 'This account is already registered, please sign in',
     // 账号锁定
@@ -344,8 +332,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     MEMBER_NO_EXHAUSTED: 'Account numbers are exhausted, contact the administrator',
     // 账号不存在
     ACCOUNT_NOT_FOUND: 'Account not found',
-    // 地区不匹配
-    ACCOUNT_REGION_MISMATCH: 'Account does not belong to this region',
     // 注销冷静期
     ACCOUNT_DELETION_PENDING: 'Account is pending deletion; cancel it first',
     // 无权限
@@ -358,8 +344,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     IDEMPOTENCY_CONFLICT: 'Idempotency key was reused with a different payload',
     // 功能未解锁
     FEATURE_NOT_AVAILABLE: 'This feature is not unlocked for your account',
-    // 付费模块必须先下单并完成结算
-    PAYMENT_REQUIRED: 'This module is paid; place an order and settle it first',
     // 支付回调密钥未配置
     PAYMENT_NOTIFY_NOT_CONFIGURED: 'Payment callback secret is not configured',
     // 存储未配置
@@ -368,10 +352,6 @@ const ERROR_MESSAGES: Record<Locale, Record<ErrorCode, string>> = {
     STORAGE_CONFIG_INVALID: 'Object storage config is incomplete: bucket, region and credentials are required',
     // 模型提供方未配置
     PROVIDER_NOT_CONFIGURED: 'AI model provider is not configured',
-    // 成本超限
-    COST_LIMIT_EXCEEDED: 'Generation cost limit exceeded (per job or daily)',
-    // AI 生成任务失败
-    GENERATION_FAILED: 'Generation failed, please try again later',
     // 通用频控
     RATE_LIMITED: 'Too many requests, try again later',
     // 服务端异常

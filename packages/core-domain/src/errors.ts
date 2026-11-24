@@ -21,8 +21,6 @@ export const ERROR_CODES = [
   'AUTH_CODE_DELIVERY_FAILED',
   // 密码登录时密码不匹配
   'AUTH_PASSWORD_INVALID',
-  // 该地区/租户尚未开启密码登录能力
-  'AUTH_PASSWORD_NOT_CONFIGURED',
   // 自助注册时账号（地区 + 通道 + 标识）已被占用
   'AUTH_IDENTITY_EXISTS',
   // 连续登录失败次数超限，账号被临时锁定
@@ -65,8 +63,6 @@ export const ERROR_CODES = [
   'MEMBER_NO_EXHAUSTED',
   // 账号主体不存在（可能已注销或从未注册）
   'ACCOUNT_NOT_FOUND',
-  // 账号注册地区与当前请求地区不一致，拒绝跨区登录
-  'ACCOUNT_REGION_MISMATCH',
   // 账号处于注销冷静期，业务操作被拦截
   'ACCOUNT_DELETION_PENDING',
   // 已登录但无权执行该操作（角色/归属校验失败）
@@ -79,8 +75,6 @@ export const ERROR_CODES = [
   'IDEMPOTENCY_CONFLICT',
   // 当前套餐未解锁该功能（付费墙）
   'FEATURE_NOT_AVAILABLE',
-  // 付费模块必须下单并完成结算后才能解锁（不能凭解锁接口免费取得）
-  'PAYMENT_REQUIRED',
   // 支付回调签名密钥未配置，外部渠道回调暂不可用
   'PAYMENT_NOTIFY_NOT_CONFIGURED',
   // 对象存储（S3/OSS）未配置，附件类能力不可用
@@ -89,10 +83,6 @@ export const ERROR_CODES = [
   'STORAGE_CONFIG_INVALID',
   // AI 模型提供方未配置，生成类能力不可用
   'PROVIDER_NOT_CONFIGURED',
-  // 超出单任务或当日的生成成本上限
-  'COST_LIMIT_EXCEEDED',
-  // AI 生成任务执行失败（上游模型/存储/合成环节报错）
-  'GENERATION_FAILED',
   // 通用接口频控触发
   'RATE_LIMITED',
   // 未归类的服务端异常兜底
@@ -123,8 +113,6 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   AUTH_CODE_DELIVERY_FAILED: 502,
   // 密码错误视为认证失败 401
   AUTH_PASSWORD_INVALID: 401,
-  // 密码登录未开启，属服务不可用 503
-  AUTH_PASSWORD_NOT_CONFIGURED: 503,
   // 注册身份已被占用 409，让前端引导改用登录
   AUTH_IDENTITY_EXISTS: 409,
   // 账号锁定使用 423 Locked，语义最贴切
@@ -165,8 +153,6 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   MEMBER_NO_EXHAUSTED: 503,
   // 账号不存在 404，避免泄露多余信息
   ACCOUNT_NOT_FOUND: 404,
-  // 跨区访问被拒绝 403
-  ACCOUNT_REGION_MISMATCH: 403,
   // 注销冷静期内禁止操作 403
   ACCOUNT_DELETION_PENDING: 403,
   // 无权限 403
@@ -179,8 +165,6 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   IDEMPOTENCY_CONFLICT: 409,
   // 功能未解锁用 403，提示这是权限/套餐问题
   FEATURE_NOT_AVAILABLE: 403,
-  // 付费模块未结算用 402，语义为「先完成支付/结算再解锁」
-  PAYMENT_REQUIRED: 402,
   // 回调密钥未配置 503：能力存在但环境不具备
   PAYMENT_NOTIFY_NOT_CONFIGURED: 503,
   // 存储未配置 503
@@ -189,10 +173,6 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   STORAGE_CONFIG_INVALID: 500,
   // 模型提供方未配置 503
   PROVIDER_NOT_CONFIGURED: 503,
-  // 成本超限用 402 Payment Required，提示需付费或等待额度重置
-  COST_LIMIT_EXCEEDED: 402,
-  // 生成任务失败属上游环节报错，用 502 区分「我方调度无问题、模型/合成失败」
-  GENERATION_FAILED: 502,
   // 通用限流 429
   RATE_LIMITED: 429,
   // 兜底 500

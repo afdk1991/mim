@@ -12,16 +12,24 @@ Monorepo 由 **pnpm workspace** 管理（`pnpm-workspace.yaml` 覆盖 `apps/*`�
 | `zod` | ^4.6.7 | 运行时 | 请求体/查询参数校验（`validate.ts` 统一 `parse`） |
 | `jsonwebtoken` | ^9.0.3 | 运行时 | JWT 访问令牌 + refresh 轮换 |
 | `bcryptjs` | ^3.0.2 | 运行时 | 密码哈希（global 邮箱密码登录） |
-| `oauth4webapi` | ^3.8.8 | 运行时 | 第三方登录标准协议实现（2026-11-12）：PKCE S256 授权跳转、authorization code 交换、ID Token/JWKS 校验、`ClientSecretBasic` / `ClientSecretPost` / `nopkce`；GitHub / Gitee / GitLab / Google / Microsoft / Apple 走本标准实现，微信 / QQ / 抖音因协议差异另走专用适配器 |
+| `oauth4webapi` | 3.8.8 | 运行时 | 第三方登录标准协议实现（2026-11-12）：PKCE S256 授权跳转、authorization code 交换、ID Token/JWKS 校验、`ClientSecretBasic` / `ClientSecretPost` / `nopkce`；GitHub / Gitee / GitLab / Google / Microsoft / Apple 走本标准实现，微信 / QQ / 抖音因协议差异另走专用适配器 |
 | `better-sqlite3` | ^13.0.3 | 运行时 | 嵌入式 SQLite 持久化（单库替代 PostgreSQL 规划） |
+| `pg` | ^8.23.1 | 运行时 | PostgreSQL 驱动（备用 / 外置库路径，现行默认 SQLite） |
+| `semver` | ^7.7.2 | 运行时 | 版本号解析与比较 |
+| `ws` | ^8.22.1 | 运行时 | IM 聊天 WebSocket 长连接 |
 | `cors` | ^2.8.6 | 运行时 | 跨域白名单中间件：托管平台（GitHub Pages / Cloudflare / Vercel / Render）以独立域名直连 API 时放行来源；`MIM_CORS_ORIGINS` 为空则不挂载，自建同源部署行为不变 |
+| `@alicloud/dysmsapi20170525` / `@alicloud/openapi-client` / `@alicloud/tea-util` | ^4.6.0 / ^0.4.15 / ^1.4.11 | 运行时 | 阿里云短信验证码通道（未配密钥时降级 dev 通道） |
+| `@aws-sdk/client-s3` / `@aws-sdk/client-ses` / `@aws-sdk/s3-request-presigner` | ^3.1162.0 | 运行时 | 对象存储 / 邮件发送 / 预签名 URL（未配密钥时降级） |
 | `@mim/core-domain` | workspace:* | 运行时 | 领域层：状态机、错误码 |
 | `@mim/i18n` | workspace:* | 运行时 | 错误码与文案的双语映射 |
 | `vitest` | ^4.1.12 | 开发 | 测试框架（升级至 4.x 修复 tinypool / @vitest/mocker 安全通告）；`@mim/api` 契约测试与 `@mim/web` 纯函数测试共用同一版本 |
 | `supertest` | ^7.1.4 | 开发 | HTTP 契约测试 |
 | `tsx` | ^4.20.6 | 开发 | TS 直接运行（`dev` / `start`） |
+| `esbuild` | ^0.25.0 | 开发 | 服务端产物打包 |
 | `typescript` | ^5.6.3 | 开发 | 类型检查（`tsc --noEmit`） |
-| `@types/better-sqlite3` / `@types/cors` / `@types/express` / `@types/jsonwebtoken` / `@types/node` / `@types/supertest` | 见 package.json | 开发 | 类型声明 |
+| `@types/better-sqlite3` / `@types/cors` / `@types/express` / `@types/jsonwebtoken` / `@types/node` / `@types/pg` / `@types/semver` / `@types/supertest` / `@types/ws` | 见 package.json | 开发 | 类型声明 |
+
+> **2026-11-24 全仓闭环审计轮依赖净减**：移除 8 个全仓无 import 的直接依赖 `cron-parser` / `csv-parse` / `diff` / `expr-eval` / `marked` / `mustache` / `sql-formatter` / `yaml`，以及类型声明 `@types/mustache`；`pg` 未动。移除前已全仓 `*.ts/*.cjs/*.js/*.mjs` 检索确认无 `from` / `require` 命中（`marked` 仅作为局部变量名残留，非该 npm 包）。
 
 ### 1.2 前端 `apps/web`
 

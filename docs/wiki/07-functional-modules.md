@@ -1,8 +1,8 @@
 # 07 · 功能模块
 
-> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.14-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
+> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.17-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
 >
-> **现行覆盖（2026-11-20）**：本页 §1 及后文涉及**功能模块商城**（catalog / modules / entitlements / 蓝图能力）、**漫剧 AI 剧**（comic / 工程 / 角色 / 分镜 / 生成任务 / 成片 / 导出）、**入口配置清单**（sites / entries）、**导航站**（navigation）、**统一搜索**（search）的条目与状态描述，均为历史交付快照——这些模块已随 2026-11-15 模块收口从代码删除，按铁律三保留作历史留痕，不代表当前工作树实况。现行能力以社区（帖子 / 图库 / 视频 / 圈子 / 公告 / 付费资产）、聊天 IM、账号身份、交易履约与 RBAC 后台为准；现行门禁为匿名可读 + 写操作需登录，注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭，口令只认库内 credentials（环境变量超管口令已不生效）。
+> **现行覆盖（2026-11-24 全仓闭环审计轮）**：本页 §1 及后文涉及**功能模块商城**（catalog / modules / entitlements / 蓝图能力）、**漫剧 AI 剧**（comic / 工程 / 角色 / 分镜 / 生成任务 / 成片 / 导出）、**入口配置清单**（sites / entries）、**导航站**（navigation）、**统一搜索**（search）的条目与状态描述，均为历史交付快照——这些模块已随 2026-11-15 模块收口从代码删除，按铁律三保留作历史留痕，不代表当前工作树实况。现行能力以社区（帖子 / 图库 / 视频 / 圈子 / 公告 / 付费资产）、聊天 IM、账号身份、交易履约与 RBAC 后台为准；现行门禁为匿名可读 + 写操作需登录，注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭，口令只认库内 credentials（环境变量超管口令已不生效）。**2026-11-24 审计轮又删除 5 个无抛出点错误码**：`AUTH_PASSWORD_NOT_CONFIGURED` / `ACCOUNT_REGION_MISMATCH` / `PAYMENT_REQUIRED` / `COST_LIMIT_EXCEEDED` / `GENERATION_FAILED`；本页后文出现这些码名的段落（含漫剧成本配额、AI 生成失败相关行）均为历史快照，现行口令失败口径为 `401 AUTH_PASSWORD_INVALID`。
 >
 > **演示 / 示例内容保留口径（2026-11-20）**：漫剧演示帖 `thread-comic-demo`、付费视频 `asset-video-comic`、自研工具板块 `board-tools` 及其资产 `asset-open-tools` 作为**演示 / 示例内容保留在生产库中**，不属现行功能模块，不再新增同类内容；本轮不下线、不删除该批示例数据，产品口径如需清理另起变更评审。
 >

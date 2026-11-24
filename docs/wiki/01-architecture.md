@@ -1,6 +1,6 @@
 # 01 · 项目整体架构
 
-> **现行覆盖（2026-11-20）**：模块商城、入口配置清单、漫剧、导航站、统一搜索、云存储 / 图床 / 下载分发模块已从前后端代码删除；本页 §8 部署汇总、§9 导航站、§10 统一搜索及下方历史变更描述中涉及上述模块的内容均为**历史留痕**，不代表当前工作树实况。现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为准：`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`。
+> **现行覆盖（2026-11-24 全仓闭环审计轮）**：模块商城、入口配置清单、漫剧、导航站、统一搜索、云存储 / 图床 / 下载分发模块已从前后端代码删除；本页 §8 部署汇总、§9 导航站、§10 统一搜索及下方历史变更描述中涉及上述模块的内容均为**历史留痕**，不代表当前工作树实况。现行前端视图段以 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS` 为准，共 **8** 个：`/home`、`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`。2026-11-24 审计轮又删除 5 个无抛出点错误码、19 个零调用前端词条、孤儿收银台编排链与 `release-notes.ts`，并净减 8 个后端直接依赖 + `@types/mustache`；现行门禁脚本清单与真源计数见 [AGENTS.md 2026-11-24 覆盖段](../../AGENTS.md) 与 [docs/全仓闭环审计-20261124.md](../全仓闭环审计-20261124.md)。
 
 ## 1. 仓库现状架构（当前实际形态）
 
@@ -25,7 +25,7 @@
 │   .github/workflows/deploy.yml  push main 自动上线         │
 ├─────────────────────────────────────────────────────────┤
 │ 规划/参考层                                               │
-│   Mim-PRD.html       产品需求文档 V0.0.16-preview（草案）   │
+│   Mim-PRD.html       产品需求文档 V0.0.17-preview（草案）   │
 │   team-hiring-plan.md 技术约束分析 + 团队分阶段配置         │
 │   docs/wiki/         01~10 项目文档                        │
 └─────────────────────────────────────────────────────────┘
@@ -41,7 +41,7 @@
 
 ## 2. 目标产品架构（PRD 定义）
 
-PRD（Mim-PRD.html，V0.0.16-preview 草案）确定的核心产品决策是 **「Headless 中台 + 多端薄壳」**：
+PRD（Mim-PRD.html，V0.0.17-preview 草案）确定的核心产品决策是 **「Headless 中台 + 多端薄壳」**：
 
 ```
         Web     微信小程序    iOS App   Android App   PC(Win/macOS)

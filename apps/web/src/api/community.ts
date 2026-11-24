@@ -7,17 +7,7 @@
  */
 
 import { request } from './request.js'; // 统一请求出口
-import type { CommunityPost, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta } from './types.js'; // 复用列表 / 详情 / 回复 / 附件元数据既有类型（附件命名与详情返回一致）
-
-/** 帖子列表分页：服务端已按 pinned DESC 排序，total 用于「加载更多」。 */
-export interface ThreadListPage { // 列表分页响应
-  items: CommunityThread[]; // 当前页
-  total: number; // 命中总数
-  offset: number; // 实际偏移
-  limit: number; // 实际页长
-  sort: string; // 生效排序
-  vip_level: number; // 当前 VIP 等级（列表锁标同源）
-}
+import type { CommunityPost, CommunityThreadDetail, ThreadAttachmentMeta } from './types.js'; // 复用详情 / 回复 / 附件元数据既有类型（附件命名与详情返回一致）
 
 /** 详情里帖子的扩展字段：HEAD 类型未声明，读取时按可选字段解释。 */
 export interface ThreadExtras { // 帖子扩展列
@@ -148,14 +138,6 @@ function query(params: Record<string, string | number | undefined>): string { //
   } // 遍历结束
   const text = qs.toString(); // 序列化
   return text ? `?${text}` : ''; // 无参数时不带问号
-}
-
-/** 帖子列表：支持 offset 真分页，q 命中标题 / 摘要 / 正文。 */
-export function listThreads(opts: { board?: string; kind?: string; sort?: string; q?: string; limit?: number; offset?: number } = {}) { // 列表
-  return request<ThreadListPage>( // 读接口不幂等
-    `/community/threads${query({ board: opts.board === 'all' ? undefined : opts.board, kind: opts.kind === 'all' ? undefined : opts.kind, sort: opts.sort, q: opts.q, limit: opts.limit, offset: opts.offset })}`,
-    { idempotency: false },
-  ); // 请求结束
 }
 
 /** 帖子详情：回复按 post_limit / post_offset 真分页。 */

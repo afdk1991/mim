@@ -2,7 +2,7 @@
   "schema": "mim.deployment-registry.v1",
   "capturedAt": "2026-11-13 01:25 +08:00",
   "head": "9c8de49",
-  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 10 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员），另补独立 Worker 与 5 个已采用免费层平台；2026-11-11 命名统一轮：Cloudflare Pages 项目由 mim-8ah 迁移为 mim（域名 mim-299.pages.dev），并经浏览器控制台复核确认 Vercel 项目名本就为 mim（mim-puce 为平台自动追加后缀域名）、EdgeOne 承载 data.mixm.top 的项目名已是 mim；IGA 仍缺 iga_token 未取证",
+  "scope": "Mim 仓库全部部署仓库与部署项；平台口径取 AGENTS.md 铁律九 11 平台（2026-11-10 按用户指令把 Gitee 镜像仓提升为矩阵成员，2026-11-13 Netlify 补位为第 11 行），另补独立 Worker 与 5 个已采用免费层平台；2026-11-11 命名统一轮：Cloudflare Pages 项目由 mim-8ah 迁移为 mim（域名 mim-299.pages.dev），并经浏览器控制台复核确认 Vercel 项目名本就为 mim（mim-puce 为平台自动追加后缀域名）、EdgeOne 承载 data.mixm.top 的项目名已是 mim；2026-11-24 复核：Vercel 三 secret（VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID）齐备、CI 真部署并健康检查 PASS；IGA CI 仍缺 IGA_ACCESS_KEY / IGA_SECRET_KEY（本机 CLI 登录态 manual 直传），Render 仍缺 RENDER_API_KEY（候选池，新建服务强制绑卡）",
   "sources": [
     "git remote -v / git ls-remote origin / git ls-remote gitee（2026-11-11 实测：origin = 1fd7b5e、gitee = 1fd7b5e，与本地 HEAD 一致）",
     "浏览器控制台实测（2026-11-11 01:05 +08:00）：vercel.com/afdk1991/mim 项目概览（页签 `mim - Overview - Vercel`、部署别名 mim-bochzr8hs-afdk1991s-projects.vercel.app）、console.cloud.tencent.com/edgeone/makers 项目列表（项目 mim / data.mixm.top / 代码源 afdk1991/mim main，遗留 mim-app）",
@@ -184,7 +184,7 @@
     "sealos_retired_note": "2026-11-12 用户选择「换免费平台」：Sealos 由矩阵成员降为已排除项，Cloudflare 独立 Worker 补位为矩阵第 10 行。2026-11-13 00:12 +08:00（CI run 43255056330）Netlify 站点 mim-web.netlify.app 真部署并取证 200|5840，正式进入矩阵成为第 11 行（in_matrix = true、status = OK、verdict = PASS），矩阵 10 → 11。",
     "anomaly_severity_note": "2026-11-13 00:50 +08:00 按「无异常说明」要求做 severity 复核：warning 仅用于「事实未解决、会影响交付」的项；已由本轮真实 CI 解除的旧告警、平台按设计的行为（访问保护）、手动交付模式、以及未进矩阵候选的客观前提缺失，统一降为 info 并保留原始记录全文，矩阵 11 平台全部 OK/PASS。",
     "candidate_pool_note": "候选池不参与部署汇总与异常统计（status_codes.NOT_APPLICABLE 口径）；移入仅表示「当前客观前提不足、未真实部署」，不代表平台不可用，也不删除任何历史事实：每条的 former_item_id、原 missing_fields 与所需 prerequisite 均保留。",
-    "latest_evidence_run": "CI run 43265614994（@9c8de49，completed/success，五作业全绿）：托管平台同步作业真实发布 Netlify（Production URL https://mim-web.netlify.app，Unique deploy 6af5f2761ffb5de0372620d1）、Vercel（未配置 token 时 SKIP，站点仍在线）、Cloudflare Pages / 两个 Worker、Gitee 镜像推送；同作业 curl 探测 13 个入口全部符合预期：mim.mixm.top 三入口 200、data.mixm.top 200、mim-45yeiirr.edgeone.cool 200、mim-299.pages.dev 200、mim-store / mim-api-edge Worker 200、GitHub Pages 200、github.com 200、gitee.com 200、ghcr.io 401（需鉴权属预期）、IGA 401（访问保护）、Vercel 200、Netlify 200。",
+    "latest_evidence_run": "CI run 45421691642（@b8a594ea，completed/success，六作业全绿：质量门禁 / 发布到生产服务器 / 托管平台同步 / ghcr / GitHub Pages / SWA）：托管平台同步作业健康检查同批 PASS —— 生产权威终点 api.laal.top `/api/v1/healthz` 200、Cloudflare-Pages mim-299.pages.dev 200、Netlify mim-web.netlify.app 200、Vercel mim-puce.vercel.app `/api/v1/healthz` 200、Worker mim-api-edge 200、Worker mim-store 200；Gitee 镜像仓同步到 c109595。IGA 步骤 SKIP（缺 IGA_ACCESS_KEY / IGA_SECRET_KEY）、Render 候选池 SKIP（缺 RENDER_API_KEY）。历史留痕：2026-11-13 01:25 前的 run 43265614994 探测明细见各部署项 evidence 与 `docs/deployment-summary.md`。",
     "evidence_xls_note": "2026-11-13 01:25 +08:00 已把本轮全平台探测写入 dnspod_records_2026-11-05_21-42-26.xls：新增 sheet「全平台复验-20261113」（15 行探测明细）与「候选未接入-20261113」（7 条非部署项事实与前置条件）；原 zy.laal.top / mixm.top 两张 DNSPod 记录表未动。"
   },
   "excluded": [
@@ -766,14 +766,11 @@
         "http_code": "200",
         "latency_ms": 119,
         "bytes": 5305,
-        "evidence": "2026-11-12 23:13 +08:00 CI run 43244715814（workflow_dispatch @6f1a938，completed/success）：Vercel 步骤真实发布 `mim-i15bawgau-afdk1991s-projects.vercel.app` 并 Aliased 到 `mim-puce.vercel.app`，同作业内探测 `https://mim-puce.vercel.app/ => 200|5305|0.119s|216.198.79.3`（字节数由旧版 5182 变为本轮 5305，产物已同步）。令牌 `mim-ci-20261112b`（Full Account / 无过期）经 Vercel 邮箱验证后创建，仅一次性展示并已写入 secret，未落盘。 ｜最新复核 2026-11-13 00:30 +08:00（CI run 43258575816 @59fde44）：Vercel 步骤真实发布并 `▲ Aliased https://mim-puce.vercel.app`（`✓ Ready in 6s`），探测 `200|5305|0.104566|64.29.17.195`。",
-        "captured_at": "2026-11-12 23:13 +08:00"
+        "evidence": "2026-11-12 23:13 +08:00 CI run 43244715814（workflow_dispatch @6f1a938，completed/success）：Vercel 步骤真实发布 `mim-i15bawgau-afdk1991s-projects.vercel.app` 并 Aliased 到 `mim-puce.vercel.app`，同作业内探测 `https://mim-puce.vercel.app/ => 200|5305|0.119s|216.198.79.3`（字节数由旧版 5182 变为本轮 5305，产物已同步）。令牌 `mim-ci-20261112b`（Full Account / 无过期）经 Vercel 邮箱验证后创建，仅一次性展示并已写入 secret，未落盘。 ｜最新复核 2026-11-13 00:30 +08:00（CI run 43258575816 @59fde44）：Vercel 步骤真实发布并 `▲ Aliased https://mim-puce.vercel.app`（`✓ Ready in 6s`），探测 `200|5305|0.104566|64.29.17.195`。 ｜2026-11-24 复核（CI run 45421691642 @b8a594ea，completed/success，六作业全绿）：GitHub secrets `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 三个均在（作业日志 env 三项均 `***` 注入），Vercel 步骤 `npx vercel deploy` 真实发布，同作业健康检查 `PASS Vercel https://mim-puce.vercel.app/api/v1/healthz => 200（第 1 次）`。本机 curl 该域超时属本地网络出口问题，不得据此判站点不可用。",
+        "captured_at": "2026-11-24 15:11 +08:00"
       },
       "anomalies": [],
-      "missing_fields": [
-        "vercel_secrets",
-        "deployment_url（本轮）"
-      ],
+      "missing_fields": [],
       "sources": [
         "curl https://mim-puce.vercel.app/",
         "git ls-tree HEAD vercel.json",

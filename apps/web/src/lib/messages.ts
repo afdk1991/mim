@@ -1,7 +1,7 @@
 /**
  * 前端新增界面文案本地字典（zh-CN / en-US 一一对应）。
  *
- * 范围说明：packages/i18n 既有字典未覆盖收银台 / 播放器 / 分享 / 语言切换等新页面，
+ * 范围说明：packages/i18n 既有字典未覆盖收银台 / 支付结果等新页面，
  * 在「只改 apps/web」的约束下先在本地维护；键名以 web. 前缀分组，后续可平移进共享字典。
  */
 
@@ -29,28 +29,9 @@ const zh: Dict = {
   'web.return.processing': '支付处理中，请稍候…', // 键 web.return.processing 的文案：支付处理中，请稍候…
   'web.return.success': '支付成功，权益已到账', // 键 web.return.success 的文案：支付成功，权益已到账
   'web.return.failed': '支付未完成，可返回重新发起支付', // 键 web.return.failed 的文案：支付未完成，可返回重新发起支付
-  'web.share.title': '分享', // 键 web.share.title 的文案：分享
-  'web.share.copy': '复制链接', // 键 web.share.copy 的文案：复制链接
-  'web.share.copied': '链接已复制', // 键 web.share.copied 的文案：链接已复制
-  'web.share.text': '分享文案', // 键 web.share.text 的文案：分享文案
-  'web.share.qr': '扫码打开', // 键 web.share.qr 的文案：扫码打开
-  'web.player.episode': '剧集', // 键 web.player.episode 的文案：剧集
-  'web.player.prev': '上一集', // 键 web.player.prev 的文案：上一集
-  'web.player.next': '下一集', // 键 web.player.next 的文案：下一集
-  'web.player.lockedTitle': '内容未解锁', // 键 web.player.lockedTitle 的文案：内容未解锁
-  'web.player.lockedDesc': '解锁后即可观看全部剧集与正文；VIP 会员可按权益直接查看。', // 键 web.player.lockedDesc 的文案：解锁后即可观看全部剧集与正文；VIP 会员可按权益直接查看。
-  'web.player.unlock': '立即解锁', // 键 web.player.unlock 的文案：立即解锁
   'web.player.loading': '加载中…', // 键 web.player.loading 的文案：加载中…
-  'web.player.empty': '暂无可播放的内容', // 键 web.player.empty 的文案：暂无可播放的内容
-  'web.player.openInPlayer': '独立播放', // 键 web.player.openInPlayer 的文案：独立播放
-  'web.language.label': '语言', // 键 web.language.label 的文案：语言
-  'web.language.zh': '简体中文', // 键 web.language.zh 的文案：简体中文
-  'web.language.en': 'English', // 键 web.language.en 的文案：English
   'web.common.retry': '重试', // 键 web.common.retry 的文案：重试
-  'web.common.onlinePay': '在线支付', // 键 web.common.onlinePay 的文案：在线支付
   'web.common.payNow': '去支付', // 键 web.common.payNow 的文案：去支付
-  'web.common.recharge': '余额充值', // 键 web.common.recharge 的文案：余额充值
-  'web.common.amountYuan': '金额（元）', // 键 web.common.amountYuan 的文案：金额（元）
 };
 
 const en: Dict = {
@@ -73,28 +54,9 @@ const en: Dict = {
   'web.return.processing': 'Processing your payment…', // 键 web.return.processing 的文案：Processing your payment…
   'web.return.success': 'Payment successful, benefits granted', // 键 web.return.success 的文案：Payment successful, benefits granted
   'web.return.failed': 'Payment not completed; you can go back and retry', // 键 web.return.failed 的文案：Payment not completed; you can go back a…
-  'web.share.title': 'Share', // 键 web.share.title 的文案：Share
-  'web.share.copy': 'Copy link', // 键 web.share.copy 的文案：Copy link
-  'web.share.copied': 'Link copied', // 键 web.share.copied 的文案：Link copied
-  'web.share.text': 'Share text', // 键 web.share.text 的文案：Share text
-  'web.share.qr': 'Scan to open', // 键 web.share.qr 的文案：Scan to open
-  'web.player.episode': 'Episodes', // 键 web.player.episode 的文案：Episodes
-  'web.player.prev': 'Previous', // 键 web.player.prev 的文案：Previous
-  'web.player.next': 'Next', // 键 web.player.next 的文案：Next
-  'web.player.lockedTitle': 'Locked content', // 键 web.player.lockedTitle 的文案：Locked content
-  'web.player.lockedDesc': 'Unlock to watch all episodes and read the full body; VIP members can view under their benefits.', // 键 web.player.lockedDesc 的文案：Unlock to watch all episodes and read th…
-  'web.player.unlock': 'Unlock now', // 键 web.player.unlock 的文案：Unlock now
   'web.player.loading': 'Loading…', // 键 web.player.loading 的文案：Loading…
-  'web.player.empty': 'No playable content yet', // 键 web.player.empty 的文案：No playable content yet
-  'web.player.openInPlayer': 'Open in player', // 键 web.player.openInPlayer 的文案：Open in player
-  'web.language.label': 'Language', // 键 web.language.label 的文案：Language
-  'web.language.zh': '简体中文', // 键 web.language.zh 的文案：简体中文
-  'web.language.en': 'English', // 键 web.language.en 的文案：English
   'web.common.retry': 'Retry', // 键 web.common.retry 的文案：Retry
-  'web.common.onlinePay': 'Online payment', // 键 web.common.onlinePay 的文案：Online payment
   'web.common.payNow': 'Pay now', // 键 web.common.payNow 的文案：Pay now
-  'web.common.recharge': 'Top up balance', // 键 web.common.recharge 的文案：Top up balance
-  'web.common.amountYuan': 'Amount (CNY)', // 键 web.common.amountYuan 的文案：Amount (CNY)
 };
 
 const DICTS: Record<Locale, Dict> = { 'zh-CN': zh, 'en-US': en };

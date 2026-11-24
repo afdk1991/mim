@@ -45,7 +45,7 @@
 
 | 包名 | 目录 | 说明 |
 | --- | --- | --- |
-| `@mim/core-domain` | `packages/core-domain/` | 共享领域层：错误码、状态机、UUIDv7，以及统一入口配置清单 `siteModules.json`、部署注册表 `deploymentRegistry.json`、自定义域名清单 `customDomains.json` 等领域数据。 |
+| `@mim/core-domain` | `packages/core-domain/` | 共享领域层：错误码、状态机、UUIDv7，以及部署注册表 `deploymentRegistry.json`、自定义域名清单 `customDomains.json` 等领域数据（统一入口配置清单 `siteModules.json` 已随下线模块删除）。 |
 | `@mim/i18n` | `packages/i18n/` | 前端 / 后端共用的国际化文案包。 |
 
 ## 三、仓库内工程化校验脚本（`scripts/`，供 CI 与本地门禁使用）
@@ -57,7 +57,8 @@
 - `comment-check.mjs`：逐行注释覆盖率扫描（`--strict` 阈值 80%）；
 - `verify-auth-gate.mjs`：匿名可读 / 写操作 401 / 付费预览门禁双层校验；
 - `verify-deployments.mjs`：多平台部署矩阵工件与注册表核对；
-- `verify-site-modules.mjs`、`verify-entry-manifest.mjs`、`verify-site-directory`：站点模块、入口清单与目录结构核对；
+- `gap-scan.mjs`：视图注册 / 环境变量登记 / 未完成标记缺口扫描；
+- `verify-env-wiring.mjs`：CI env 声明、`ENV_ARGS` 循环与 `deploy.sh` 写入三处白名单一致性核对；
 - `verify-custom-domains.mjs`：自定义域名清单核对；
 - `verify-indexes.mjs`：数据库索引核对；
 - `deployment-summary.mjs`：由部署注册表重生成部署汇总；

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-20T11:32:54.882Z",
+  "generatedAt": "2026-11-24T16:30:23.816Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -7,8 +7,8 @@
       "title": "A. 路由装配",
       "status": "PASS",
       "stats": {
-        "routeFiles": 27,
-        "factories": 28,
+        "routeFiles": 29,
+        "factories": 30,
         "unmounted": 0
       },
       "failures": [],
@@ -30,9 +30,9 @@
       "title": "C. 环境变量登记",
       "status": "PASS",
       "stats": {
-        "sourceVars": 201,
-        "templateVars": 173,
-        "inventoryVars": 169,
+        "sourceVars": 205,
+        "templateVars": 177,
+        "inventoryVars": 173,
         "wildcardStems": 39,
         "unregistered": 0,
         "unregisteredAdapter": 0,

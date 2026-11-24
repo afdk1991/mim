@@ -293,7 +293,7 @@ function checkEnv() { // 函数 checkEnv：封装一段可复用的处理逻辑
     if (exact || covered) continue; // 条件分支：按判断结果选择后续处理路径
     const files = occurrences.map((o) => o.file); // 常量 files：保存固定配置或一次性派生值
     const inScripts = files.some((f) => f.startsWith('scripts/') || f.startsWith('deploy/')); // 常量 inScripts：保存固定配置或一次性派生值
-    const inBlueprint = files.some((f) => /(deploymentRegistry|siteModules)\.json$/.test(f)); // 常量 inBlueprint：保存固定配置或一次性派生值
+    const inBlueprint = files.some((f) => /deploymentRegistry\.json$/.test(f)); // 常量 inBlueprint：保存固定配置或一次性派生值（siteModules.json 随入口清单模块下线已删除，正则同步收口）
     const internal = // 常量 internal：保存固定配置或一次性派生值
       INTERNAL_ENV_VARS.has(name) || // 执行当前业务步骤
       INTERNAL_ENV_PREFIXES.some((p) => name.startsWith(p)) || // 执行当前业务步骤

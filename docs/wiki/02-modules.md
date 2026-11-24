@@ -4,7 +4,7 @@
 >
 > **现状标注（2026-11-10，A4 收尾）**：下文涉及 `site/`、`deploy/`、`functions/`、`vercel.json`、`wrangler.toml`、`Dockerfile` 等条目均为**历史留痕**（工作树已移除、删除未提交）；相关描述保留用于说明原有链路，不代表当前工作树实况。恢复或确认删除须按 AGENTS.md 铁律二先获授权。
 >
-> **现行覆盖（2026-11-20）**：模块商城（catalog / cart / products / store）、入口配置清单（sites / entries / siteModules）、漫剧（comic）、导航站（navigation）、统一搜索（search）、云存储 / 图床 / 下载分发（cloud / img / download）模块及其视图、路由、测试、种子已从代码删除；下表相关条目标注「已下线，历史留痕」，其余描述为各轮交付快照。现行后端以社区 / 圈子 / 聊天 / 订单 / 支付 / 钱包 / 邀请 / 权限 / 运营等路由为准；现行前端视图段见 [01](./01-architecture.md) 顶部现行覆盖段。
+> **现行覆盖（2026-11-24 全仓闭环审计轮）**：模块商城（catalog / cart / products / store）、入口配置清单（sites / entries / siteModules）、漫剧（comic）、导航站（navigation）、统一搜索（search）、云存储 / 图床 / 下载分发（cloud / img / download）模块及其视图、路由、测试、种子已从代码删除；下表相关条目标注「已下线，历史留痕」，其余描述为各轮交付快照。现行后端以社区 / 圈子 / 聊天 / 订单 / 支付 / 钱包 / 邀请 / 权限 / 运营等路由为准；现行前端视图段见 [01](./01-architecture.md) 顶部现行覆盖段。本轮（2026-11-24 审计轮）补充收口：`verify-entry-manifest.mjs` 与另外两个旧校验脚本一并删除；`apps/web/src/lib/release-notes.ts`、`config/entry-hosts.example.json` 已删除；`functions/` **保留**——`functions/[[catchall]].js`（SPA 深链接回落）与 `functions/api/[[path]].js`（`/api/*` 反代）是 Cloudflare Pages 现行部署工件，不是已删模块的死代码。真源计数、已删错误码与依赖净减见 [AGENTS.md 2026-11-24 覆盖段](../../AGENTS.md)。
 
 ## 模块清单总表
 
@@ -27,6 +27,7 @@
 | `scripts/comment-check.mjs` | 可执行代码 | 铁律十一（全仓库逐行注释）的覆盖率校验器：逐文件统计「可注释行 / 已解释行」 | 退出码 0（基线）/ 1（`--strict` 低于阈值）；逐文件覆盖率与缺口清单 |
 | ~~`scripts/verify-site-modules.mjs`~~（**已下线，历史留痕**） | 校验脚本（已删除） | 历史：统一入口配置清单零依赖校验（83 项断言）；随入口配置清单模块删除，已不在 `scripts/` 目录与 npm scripts 中 | 历史快照 |
 | ~~`scripts/verify-site-directory.mjs`~~（**已下线，历史留痕**） | 校验脚本（已删除） | 历史：站点入口契约校验（16 项断言）；随入口配置清单模块删除 | 历史快照 |
+| ~~`scripts/verify-entry-manifest.mjs`~~（**已下线，历史留痕**） | 校验脚本（已删除） | 历史：入口清单落地映射校验（23 项断言）；随入口配置清单模块删除，已不在 `scripts/` 目录与 npm scripts 中 | 历史快照 |
 | ~~`apps/web/src/views/Sites.tsx`~~（**已下线，历史留痕**） | 前端视图（已删除） | 历史：统一入口配置清单视图（入口卡片 / 业务域筛选 / 落地徽标 / 条目新建与状态流转）；随 2026-11-15 模块收口删除；旧 `/entry-catalog` `/sites` 段不再登记为现行视图 | 历史快照 |
 | ~~`services/mim-api/src/routes/sites.ts`~~（**已下线，历史留痕**） | 后端路由（已删除） | 历史：入口运行时端点（概览 / 列表 / 详情 / 能力 / 条目 / 新建 / 状态流转）与 `site_module_items` 表演示数据；随模块收口删除 | 历史快照 |
 | ~~`services/mim-api/src/routes/entries.ts`~~（**已下线，历史留痕**） | 后端路由（已删除） | 历史：统一入口配置清单 6 只读端点（`/entries/*`）；随模块收口删除 | 历史快照 |

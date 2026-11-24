@@ -317,23 +317,23 @@ PRD §3「明确排除（P0 不做）」含「硬件设备接入与 IoT `Assumpt
 
 _登记日期：2026-11-03；2026-11-04 增补漫剧生成（文生图 / 图生视频 / TTS）为 P0 第 2 期能力；2026-11-05 增补「应用自有机密」段：`MIM_JWT_SECRET`；2026-11-05 增补 media / ai-orchestrator 进程内模块的 13 项运行时配置（§6 / §8）；2026-11-05 增补管理员口令变量（生产密码登录口令，修复验证码通道未接入导致无法登录）；2026-11-07 增补 `apps/admin` 前端构建与基础设施依赖（7 项，见文首）；2026-11-07 增补 `MIM_ADMIN_TOKEN`（RBAC 超管引导令牌，由 CI Secret 下发、`deploy/deploy.sh` 幂等写入 `/opt/mim/mim-api.env`）；2026-11-07 增补 `MIM_JOBS`（后台定时任务开关，补登记修复「先接入后登记」漂移）；2026-11-07 修订该管理员口令变量（移除公开固定口令，改为现场随机生成）；2026-11-08 增补 `MIM_PAYMENT_NOTIFY_SECRET`（商城订单渠道回调签名密钥，未配置时回调 503、人工结算不受影响）；2026-11-13 增补 §16 适配器变量家族通配登记（支付扩展五渠道 / 验证码 / 审核 / Redis / 社区 / 积分 / SSO / 实名等）。2026-11-14 增补 OIDC 联邦身份与推广返佣结算两组变量登记（消除 gap-scan C 段 7 项未登记）。2026-11-15 补登记 `MIM_FORCE_LOGIN`（全站门禁总开关，修复 gap-scan C 段未登记导致 Deploy 门禁失败）；2026-11-15 下线管理员口令变量（后端已不再读取，`.env.example` 与 `deploy/deploy.sh` 同步移除，口令维护改走后台「用户 → 重置口令」）；2026-11-20 增补 §18：门禁脚本 / 部署编排 / 离线遗留内部变量按通配分流登记，另补登记推广点击 / 转化频控三项运行时配置（§16）。新增第三方能力必须先更新本文件，再进入实现。_
 
-## 17. 已登记的预留 / 已移除依赖（2026-11-20 扫描；批次 8 复核 2026-11-20）
+## 17. 已登记的预留 / 已移除依赖（2026-11-20 扫描；批次 8 复核 2026-11-20；审计轮净减 2026-11-24）
 
-> 背景：`services/mim-api`（`@mim/api`）`package.json` 下列出 api 侧零静态引用的候选依赖。批次 8 对原「待清理」3 项（`exceljs` / `qrcode` / `sharp`）补做全仓静态 + 动态双重复核（`src/`、`test/`、`scripts/`、`deploy/`、`packages/*`、`tools/`、`.github/`、`apps/admin`、`apps/web`；排查 `import`/`require`/`await import(`/模板字符串动态加载/`createRequire`/插件式注册表与按包名字符串加载），确认零引用后已移除，状态见下表。其余 8 项仍为预留：静态扫描无法排除适配器懒加载、动态 `require()` 或后续模块复用，因此**保留在 `package.json` 与锁文件中**，仅在此登记判定状态，避免下轮重复全量扫描；待动态加载复核通过后再逐项移除。
+> 背景：`services/mim-api`（`@mim/api`）`package.json` 下列出 api 侧零静态引用的候选依赖。批次 8 对原「待清理」3 项（`exceljs` / `qrcode` / `sharp`）补做全仓静态 + 动态双重复核（`src/`、`test/`、`scripts/`、`deploy/`、`packages/*`、`tools/`、`.github/`、`apps/admin`、`apps/web`；排查 `import`/`require`/`await import(`/模板字符串动态加载/`createRequire`/插件式注册表与按包名字符串加载），确认零引用后已移除。**2026-11-24 全仓闭环审计轮**：原预留的 8 项（`cron-parser` / `csv-parse` / `diff` / `expr-eval` / `marked` / `mustache` / `sql-formatter` / `yaml`）连同 `@types/mustache` 经全仓 `*.ts/*.cjs/*.js/*.mjs` 复核确认无 `from` / `require` 命中后，已从 `services/mim-api/package.json` 与 `pnpm-lock.yaml` 移除；`pg` 未动。
 
 | 依赖 | 版本 | 判定状态 | 备注 |
 |---|---|---|---|
-| `cron-parser` | `^5.10.4` | 预留 | 定时任务表达式解析；`src/jobs.ts` 当前用内置扫描，未引用 |
-| `csv-parse` | `^7.0.3` | 预留 | 批量导入/导出候选；无静态引用 |
-| `diff` | `^9.0.0` | 预留 | 文案/配置比对候选；无静态引用 |
+| `cron-parser` | — | **已移除（审计轮，2026-11-24）** | 定时任务表达式解析；全仓无 import/require，已从 dependencies 与锁文件移除 |
+| `csv-parse` | — | **已移除（审计轮，2026-11-24）** | 批量导入/导出候选；全仓无静态引用，已移除 |
+| `diff` | — | **已移除（审计轮，2026-11-24）** | 文案/配置比对候选；全仓无静态引用，已移除 |
 | `exceljs` | — | **已移除（批次 8，2026-11-20）** | 订单 xlsx 导出端点已随商城下线；全仓 `src/`/`test/`/`scripts/`/`deploy/`/`packages/*`/`tools/`/`.github/` 静态 + 动态双重复核零引用（无 `import`/`require`/`await import(`/插件式注册表），已从 `services/mim-api/package.json` dependencies 与 `pnpm-lock.yaml` 移除 |
-| `expr-eval` | `^2.0.2` | 预留 | 公式/权益表达式候选；无静态引用 |
-| `marked` | `^18.2.0` | 预留 | Markdown 渲染候选；无静态引用（注意区分本地变量 `marked`） |
-| `mustache` | `^4.2.0` | 预留 | 模板渲染候选；`@types/mustache` 仍在 devDependencies |
+| `expr-eval` | — | **已移除（审计轮，2026-11-24）** | 公式/权益表达式候选；全仓无静态引用，已移除 |
+| `marked` | — | **已移除（审计轮，2026-11-24）** | Markdown 渲染候选；全仓无该 npm 包引用（源码内 `marked` 仅为局部变量名），已移除 |
+| `mustache` | — | **已移除（审计轮，2026-11-24）** | 模板渲染候选；连同类型声明 `@types/mustache` 一并从 devDependencies 与锁文件移除 |
 | `qrcode` | — | **api 已移除 / web 保留（批次 8，2026-11-20）** | api 侧零引用（`payments.ts` 命中均为局部字段 `qrText`/`qr_text`，非包引用），api dependencies 与 `@types/qrcode` devDependencies、锁文件 api importer 已清；**web 侧保留**：`apps/web/src/components/QrCode.tsx` 真实 `import QRCode from 'qrcode'`，web 自有 `qrcode` + `@types/qrcode`，`apps/web/src/qrcode.d.ts` 有 ambient 声明 |
 | `sharp` | — | **已移除（批次 8，2026-11-20）** | 缩略图端点已随 media/创作模块下线；`src/`/`test/`/`scripts/`/`deploy/`/`tools/`/CI 零引用，`deploy/deploy.sh` 仅 `pnpm install --frozen-lockfile --prod=false` 无 sharp 专属 rebuild、部署脚本无图片处理，`dist/index.js` 无 sharp 模块说明符；已从 api dependencies 移除，`build.mjs` external `'sharp'` 与其原生模块注释块已清，锁文件 `sharp` 与 `@img/sharp-*` 平台包全清 |
-| `sql-formatter` | `^15.9.0` | 预留 | SQL 工具候选；无静态引用 |
-| `yaml` | `^2.9.1` | 预留 | 配置/清单解析候选；无静态引用 |
+| `sql-formatter` | — | **已移除（审计轮，2026-11-24）** | SQL 工具候选；全仓无静态引用，已移除 |
+| `yaml` | — | **已移除（审计轮，2026-11-24）** | 配置/清单解析候选；全仓无静态引用，已移除 |
 
 > 同期前端清理（2026-11-20）：`apps/web` 中零引用的 `@antv/g6`、`echarts`、`vditor` 已从 `package.json` 与 `pnpm-lock.yaml` 移除；文首 2026-11-10 增补段所述三者用途（商城价格图 / 依赖图 / 漫剧脚本编辑器）随商城与漫剧模块一并下线，该段为历史快照，不再代表现行前端依赖。
 

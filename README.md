@@ -29,7 +29,7 @@
 
 ## 社区内容现状（2026-11-20）
 
-> 本节为现行口径；下文「版本」各历史变更条目与早期章节中访客自动建号 / 模块商城 / 漫剧 / 入口清单 / 导航站 / 统一搜索等描述，均为各轮交付快照，按铁律三保留作历史留痕，**不再作为现状引用**。
+> 本节为现行口径；下文「版本」各历史变更条目与早期章节中访客自动建号 / 模块商城 / 漫剧 / 入口清单 / 导航站 / 统一搜索等描述，均为各轮交付快照，按铁律三保留作历史留痕，**不再作为现状引用**。2026-11-24 全仓闭环审计轮又收口：已删错误码（`AUTH_PASSWORD_NOT_CONFIGURED` / `ACCOUNT_REGION_MISMATCH` / `PAYMENT_REQUIRED` / `COST_LIMIT_EXCEEDED` / `GENERATION_FAILED`）、已删校验脚本（`verify-site-modules` / `verify-entry-manifest` / `verify-site-directory`）、已删前端 `release-notes.ts` 与入口清单 `siteModules.json` 的相关表述，一律以历史快照对待，现行门禁与真源计数见 [AGENTS.md 2026-11-24 覆盖段](./AGENTS.md)。
 
 - **生产入口**：前端 `https://zy.laal.top`，API `https://api.laal.top/api/v1`，后台 `https://zy.laal.top/admin/`；裸域 `laal.top` 是独立 WordPress（zibll）社区站，与本项目无关。
 - **现行前端视图段**（唯一真源 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS`，共 8 个）：`/home`、`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；无 `/cart` 视图；商城 / 入口清单 / 漫剧 / 导航站 / 统一搜索 / 云存储 / 图床 / 下载分发等旧段已随模块下线，仅作历史别名或未知路径回落。
@@ -122,9 +122,9 @@ pnpm workspace Monorepo（`pnpm-workspace.yaml` 纳入 `apps/*`、`services/*`�
 ```
 apps/web/            # Web 端薄壳（React 18 + Vite 6，端口 5173；现行视图：社区 / 圈子 / 聊天 / 个人中心 / 收银台 / 支付回跳 / 登录）
 apps/web/src/views/  # 视图组件：Home / Community（含 CommunityGallery / CommunityAssets / CommunityGuides / CommunityMore / ContentDetail / AnnouncementsPanel）/ Circles / Chat / Checkout / PaymentReturn / Profile / Login / MyAssets / PageBlocks 等子组件
-apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；21 个视图 tsx：概览 / 社区运营 / 内容运营 / 商城卡片 / 优惠券 / 商品 / 权益 / 订单 / 发货售后 / 邀请码 / 价格批次 / 实名 / 角色权限 / 用户 / 审计日志 / 页面搭建 / 成长私信 / 外观 / 设置 / 登录 等）
+apps/admin/          # 独立管理后台（React 18 + Vite 6，端口 5174，生产入口 /admin/；23 个视图 tsx = 20 个导航视图 + Products 内页签子组件 Cards / Coupons + 登录页 Login；后台导航 20 项与 App.tsx renderView 20 分支 1:1）
 services/mim-api/    # 后端 API（Express 5 + SQLite WAL + JWT + zod，端口 8787，前缀 /api/v1）
-services/mim-api/src/routes/  # 现行路由模块：admin / appearance / assets / auth / circles / community / content-ops / content-unified / deployments / federation / growth / growth-dm-admin / im / invites / me / media / oauth / orders / payments / realname / referral / referral-admin / security / shop-admin / sso / vip-pricing / wallet-withdrawals
+services/mim-api/src/routes/  # 现行路由模块 29 个：admin / appearance / assets / auth / circles / community / content-ops / content-unified / deployments / federation / growth / growth-dm-admin / im / invites / me / media / oauth / orders / payments / privacy-admin / realname / referral / referral-admin / security / shop-admin / site-options / sso / vip-pricing / wallet-withdrawals（另加 payments/router.ts 扩展支付工厂）
 services/mim-api/src/oauth/   # 第三方登录适配层：providers（注册表）/ client（协议交换）/ accounts（绑定与一次性票据）
 services/mim-api/src/identity.ts  # 唯一建号入口：Mim ID 事务发号、历史用户回填、登录缺号兜底
 packages/core-domain/# 共享领域层（错误码 ERROR_CODES / UUIDv7 / 部署汇总注册表 deploymentRegistry）

@@ -182,7 +182,12 @@ check('D41 RBAC 已登记 deployments:read', read('services/mim-api/src/db.ts').
 // 生产 nginx 对旧地址做 301，避免外部旧链接落到 404。
 check('D42 nginx 将 /deployments 301 到 /community', /location = \/deployments \{[\s\S]*?return 301 \/community;/.test(read('deploy/nginx-mim.conf')));
 check('D53 help.json 已移除部署汇总页面条目并登记旧地址回落', !/\[\"\/deployments\"/.test(read('help/content/help.json')) && read('help/content/help.json').includes('/deployments'));
-check('D54 release-notes 同步部署汇总口径', read('apps/web/src/lib/release-notes.ts').includes('部署汇总属运维信息，仅后台可见'));
+// D54：部署汇总属运维内部信息，三端点必须统一挂后台门禁、匿名不可读。
+// 旧断言曾读取已删除的前端静态文案文件 release-notes.ts，现改为直接断言后端路由门禁这一活行为：
+// 工厂内对 /deployments 统一挂 deployments:read 权限点，且三个端点均标注「管理员可读，匿名 401」。
+check('D54 部署汇总三端点统一挂后台门禁、匿名不可读',
+  routeText.includes("router.use('/deployments', requirePermission('deployments:read'))") &&
+  routeText.split('\n').filter((line) => line.includes('管理员可读，匿名 401')).length >= 3);
 // 汇总生成器与校验器存在。
 check('D43 汇总生成器 / 校验器均存在', has('scripts/deployment-summary.mjs') && has('scripts/verify-deployments.mjs'));
 // package.json 注册两个脚本。
