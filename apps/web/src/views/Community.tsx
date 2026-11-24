@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'; // 引入依赖、类型或本地模块绑定
 import { Avatar } from '../components/Avatar.js'; // 共享头像：四档尺寸 + 角标槽
-import type { Locale } from '@mim/i18n'; // 引入依赖、类型或本地模块绑定
+import { formatCurrency, type Locale } from '@mim/i18n'; // 语言类型 + 金额格式化单一实现，避免各视图各拼「¥」
 import { api, errorText, getSession } from '../api'; // 引入依赖、类型或本地模块绑定
 import { coverSrcset, resolvePublicUrl } from '../api/request.js'; // 公开地址归一化 + catalog 封面 2x 档派生
 import { cancelWithdrawal, createWithdrawal, getWithdrawalOverview } from '../api/wallet-withdrawal'; // 提现：可提现余额口径与申请（钱包结算层）
@@ -171,8 +171,8 @@ function normalizeBoardTabs(raw: BoardTab[] | undefined): BoardTab[] {
   })).filter((tab) => tab.key);
 } // 代码块结束
 
-function yuan(cents: number): string { // 函数 yuan：封装一段可复用的处理逻辑
-  return `¥${(cents / 100).toFixed(2)}`; // 返回当前函数的处理结果
+function yuan(cents: number): string { // 金额文案：统一走 @mim/i18n 的 formatCurrency，带千分位与币种符号
+  return formatCurrency(cents, 'CNY', 'zh-CN'); // 社区钱包 / 商城文案均为中文界面，按中文人民币口径输出
 } // 代码块结束
 
 function coverSrc(url: string | null): string { // 封面 / 媒体地址统一走归一化：签名链接补 API 源，静态素材补 BASE_URL
@@ -1874,7 +1874,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               {walletDetail?.checked_in_today ? '今天已签到' : '签到领 5 积分'}
             </button>
             <div className="community-inline-form">{/* 执行当前业务步骤 */}
-              <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="输入充值卡密，如 MIM-DEMO-100" />
+              <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="输入充值卡密" />{/* 卡密不做示例展示：演示卡密公开等于对全体访客免费发余额 */}
               <button type="button" onClick={() => void redeem()}>兑换</button>
             </div>
             <div className="community-inline-form">{/* 执行当前业务步骤 */}
@@ -1918,7 +1918,7 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
             ))}
             {!withdrawal?.items.length && <EmptyState kind="order" title="还没有提现申请" />}
           </div>
-          <p className="community-hint">演示卡密：<code>MIM-DEMO-100</code>（¥100）、<code>MIM-DEMO-500</code>（¥500），每张仅可使用一次。</p>
+          <p className="community-hint">充值卡由运营发放，一卡一次；兑换成功后余额立即到账，可在下方流水中核对。</p>{/* 不再公布演示卡密：旧文案等于公开可领取的免费余额 */}
           <div className="community-table">{/* 执行当前业务步骤 */}
             <div className="community-table-head"><span>类型</span><span>金额</span><span>积分</span><span>说明</span><span>时间</span></div>
             {(walletDetail?.transactions ?? []).map((t) => (

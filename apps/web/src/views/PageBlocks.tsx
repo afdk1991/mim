@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'; // 引入依赖、类型或本地模块绑定
 import { api } from '../api'; // 引入依赖、类型或本地模块绑定
 import type { CommunityThread, PageBlock, ShopProduct } from '../api'; // 引入依赖、类型或本地模块绑定
+import { formatCurrency } from '@mim/i18n'; // 金额格式化单一实现，避免此处手工拼「¥」
 import { baseOf } from '../router'; // 引入依赖、类型或本地模块绑定
 
 interface Props { // 视图参数
@@ -147,7 +148,7 @@ function ProductGrid() {
         {products.map((product) => (
           <a className="panel product" key={product.code} href={hrefOf('/products')}>{/* 执行当前业务步骤 */}
             {product.cover_url ? <img src={hrefOf(product.cover_url)} srcSet={coverSrcset(product.cover_url)} alt={product.name} loading="lazy" /> : null}
-            <div className="panel-head"><h3>{product.name}</h3><span className="deploy-badge">{`¥${(product.price_cents / 100).toFixed(2)}`}</span></div>
+            <div className="panel-head"><h3>{product.name}</h3><span className="deploy-badge">{formatCurrency(product.price_cents, 'CNY', 'zh-CN')}</span></div>{/* 商品网格不接语言参数：区块文案本身为中文，按中文人民币口径格式化 */}
             <p className="muted">{product.summary}</p>
           </a>
         ))}

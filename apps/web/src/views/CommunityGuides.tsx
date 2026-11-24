@@ -138,7 +138,7 @@ export function WalletGuestPanel(props: {
       {/* 规则条目列表：公开口径，不涉及个人数据 */}
       <ul className="community-guest-rules">
         <li>余额、积分、可提现余额是三个独立口径，互不混用。</li>
-        <li>充值卡一卡一次；演示卡密 MIM-DEMO-100 与 MIM-DEMO-500 仅用于功能演示。</li>
+        <li>充值卡一卡一次，由运营发放；兑换成功后余额立即到账。</li>{/* 不点名演示卡密：避免在公开页面给出可直接领取余额的编号 */}
         <li>转积分需要填写接收方 Mim ID，提交后不可撤回。</li>
         <li>提现只针对佣金与创作分成，同一时间只允许一笔处理中的申请。</li>
       </ul>

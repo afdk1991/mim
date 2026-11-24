@@ -12,14 +12,14 @@
 |---|---|---|---|
 | `AGENTS.md` | 治理 | 定义 12 条协作铁律（含免费平台额度矩阵、全仓库逐行注释、全量远端同步与生产统一部署腾讯云自建服务器），对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
-| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 57 个测试文件 / 535 例契约测试通过（2026-11-20 本轮 CI 实测）；端口 8787 |
+| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 60 个测试文件 / 554 例契约测试通过（2026-11-24 本地实测）；端口 8787 |
 | `services/mim-api/src/routes/assets.ts` / `payments.ts` / `fulfillment.ts` / `finance.ts` / `appearance.ts` / `growth.ts` / `i18n.ts` | 业务代码（后端） | **2026-11-12 新增（V0.0.5 商业化二期）**：付费资产、支付意图与回调、发货物流售后评价、提现与创作分成、主题与页面区块、成长徽章私信 IP、机器翻译与语言设置；支付内核在 `src/payments.ts` | 16 张商业化表 + `commerce.test.ts` 8 例契约测试；未配置供应商时返回 `PROVIDER_NOT_CONFIGURED` |
-| `apps/web/src/views/CommerceCenter.tsx` | 业务代码（前端） | **2026-11-12 新增（V0.0.5）**：`/commerce` 商业化中台，五页签覆盖资产 / 履约 / 资金 / 外观 / 成长国际化 | 资产筛选与购买、运单与售后、提现与收益、主题与区块排序、私信与翻译 |
+| ~~`apps/web/src/views/CommerceCenter.tsx`~~（**已下线，历史留痕**） | 前端视图（已删除） | 历史：**2026-11-12 新增（V0.0.5）**：`/commerce` 商业化中台五页签；随 2026-11-15 模块收口删除，现行资产 / 钱包 / VIP / 商城入口全部并入 `/community` 页签，`/commerce` 段不再登记为现行视图 | 历史快照 |
 | `apps/web/src/views/AnnouncementsPanel.tsx` | 业务代码（前端） | **2026-11-14 新增、2026-11-15 收口**：原 `/announcements` 公告动态、`/news` 社区资讯与 `/releases` 版本记录全部并入社区页「公告动态」页签（公告 / 更新日志 / 推广计划 / 社区动态四个子页签），数据源仍是 `GET /announcements`、`GET /changelog`、`GET /promotions`、`GET /content/items`；旧地址 `/announcements`、`/news`、`/releases` 统一 301 到 `/community` | 只读列表 + 来源计数徽标 + 更新日志版本补充信息 + 空态 / 失败态 |
 | ~~`apps/web/src/views/Cloud.tsx`~~（**已下线，历史留痕**） | 前端视图（已删除） | 历史：`/cloud` 私有云存储，直传走 `/media/presign/upload`、下载走短时签名地址；随 2026-11-15 模块收口删除 | 私有桶 + 签名（历史快照） |
 | ~~`apps/web/src/views/Img.tsx`~~（**已下线，历史留痕**） | 前端视图（已删除） | 历史：`/img` 图床，仅图片走 `POST /media/presign/public-upload`，对象键落在 `public/` 前缀；随 2026-11-15 模块收口删除 | 公有读仅限 `public/` 前缀（历史快照） |
 | ~~`apps/web/src/views/Download.tsx`~~（**已下线，历史留痕**） | 前端视图（已删除） | 历史：`/download` 下载分发，分发包私有直传后按 1h / 24h / 7d 签发分发链接；随 2026-11-15 模块收口删除 | 私有桶 + 签名（历史快照） |
-| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；导航仅设置页）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
+| `apps/web` | 业务代码（前端） | React 18 + Vite 6 的 Web 端薄壳（401 自动刷新；现行外壳为顶部横导航 + 1200px 两栏 + 多列页脚 + 移动端底部 Tab，见 `apps/web/src/Shell.tsx`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 端口 5173；`vite build` 产物 |
 | `packages/core-domain` | 共享包 | 错误码、状态机、UUIDv7、部署汇总注册表 `deploymentRegistry.json` / `deploymentRegistry.ts`；**历史留痕**：`siteModules.json` / `entryImplementation.ts` / `siteModules.ts`（统一入口配置清单四态层）随 2026-11-15 模块收口删除，下述 44 入口 / 19 业务域 / 132 功能点等口径为历史快照 | 前后端共用单一事实源（现行：错误码 / ids / 部署注册表） |
 | `packages/i18n` | 共享包 | zh-CN / en-US 文案、`t()` 回退链、`formatCurrency` | 双语与货币格式化 |
 | `scripts/version-check.mjs` | 可执行代码 | 铁律四（版本规约）的强制校验器 | 退出码 0/1，供人工与 CI 调用 |
@@ -33,7 +33,7 @@
 | ~~`services/mim-api/test/sites.test.ts`~~（**已下线，历史留痕**） | 测试代码（已删除） | 历史：站点模块契约测试 14 例；随模块收口删除 | 历史快照 |
 | ~~`services/mim-api/test/entries.test.ts`~~（**已下线，历史留痕**） | 测试代码（已删除） | 历史：入口配置清单契约测试 12 例；随模块收口删除 | 历史快照 |
 | `scripts/build.mjs` | 可执行代码 | 根级构建脚本：默认构建真实前端并把 `apps/web/dist` 递归复制到根 `dist/`（EdgeOne Pages 等 OutputDir=dist 的平台同款链路）；`--site` 模式才把 `site/` 复制到 `dist/` | 根 `dist/index.html`（真实应用）+ `dist/assets/*`，供 `npm run build` 调用 |
-| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check`）；`packageManager: pnpm@9.12.0`；版本号 `0.0.14` 为 `version-check.mjs` 的校验源 | 零 dependencies，脚本转发到各 workspace |
+| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check` / `check:full`）/ 版本号；`packageManager: pnpm@9.12.0`；版本号 `0.0.16` 为 `version-check.mjs` 的校验源；`check` 为快速四项目，`check:full` 追加 deployments / auth-gate / gap-scan / env-wiring | 零 dependencies，脚本转发到各 workspace |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `tsconfig.base.json` | 配置 | 声明 `apps/*`、`services/*`、`packages/*`；锁定依赖版本；共享 TS 编译基线 | 可复现安装与类型检查 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
 | `team-hiring-plan.md` | 技术/组织规划 | 约束→编制→分阶段落地→风险→成本 | 22–32 人全配 / 14–18 人最小可行方案 |
@@ -169,7 +169,7 @@ deploy/bootstrap.sh ──一次性引导──> nginx 站点 + systemd 单元 +
 | `site/index.html` | Mim 落地页（PRD 的可视化入口），单文件自包含，本地双击可打开（**非生产站点**） |
 | `help/index.html` + `help/content/help.json` | **2026-11-14 新增（V0.0.11）**：零依赖静态文档站（hash 路由 + 6 种内容块渲染器），内容与壳分离；`help.json` 的 `reuse` 段给出 `jsonPath` / `linkPattern` / 页面 id，供 news / service / support / blog 后续引用 | 项目介绍 / 部署说明 / 常见问题；`file://` 下 `fetch` 被禁，需静态服务打开 |
 | `site/prd.html` | `Mim-PRD.html` 的站点副本，供浏览器阅读，内容与根目录 PRD 一致（**非生产站点**） |
-| `package.json` | 版本号 `0.0.14`（`version-check.mjs` 校验源）；`build` 调 `scripts/build.mjs`（真实前端 → 根 `dist/`）；`build:site` 为 PRD 阅读页离线构建；`build:web` / `deploy` / `deploy:bootstrap` 指向生产链路 |
+| `package.json` | 版本号 `0.0.16`（`version-check.mjs` 校验源）；现行脚本只有 `build`（调 `scripts/build.mjs`，真实前端 → 根 `dist/`）、`build:web` / `build:admin`、`dev*`、`test`、`typecheck` 与 `check*` / `verify:*` 系列；历史上存在过的 `build:site` / `deploy` / `deploy:bootstrap` 已不在脚本表中 |
 | `scripts/build.mjs` | 默认：`pnpm --filter @mim/web build` → 把 `apps/web/dist` 递归复制到根 `dist/`；`--site`：把 `site/` 复制到根 `dist/`（PRD 离线阅读）。零第三方依赖 |
 
 两个 HTML 均**不含业务密钥**。

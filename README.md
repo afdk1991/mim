@@ -32,7 +32,7 @@
 > 本节为现行口径；下文「版本」各历史变更条目与早期章节中访客自动建号 / 模块商城 / 漫剧 / 入口清单 / 导航站 / 统一搜索等描述，均为各轮交付快照，按铁律三保留作历史留痕，**不再作为现状引用**。
 
 - **生产入口**：前端 `https://zy.laal.top`，API `https://api.laal.top/api/v1`，后台 `https://zy.laal.top/admin/`；裸域 `laal.top` 是独立 WordPress（zibll）社区站，与本项目无关。
-- **现行前端视图段**（唯一真源 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS`）：`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；无 `/cart` 视图；商城 / 入口清单 / 漫剧 / 导航站 / 统一搜索 / 云存储 / 图床 / 下载分发等旧段已随模块下线，仅作历史别名或未知路径回落。
+- **现行前端视图段**（唯一真源 `apps/web/src/router.ts` 的 `VIEW_SEGMENTS`，共 8 个）：`/home`、`/community`、`/circles`、`/chat`、`/account`、`/checkout`、`/pay-return`、`/signin`；无 `/cart` 视图；商城 / 入口清单 / 漫剧 / 导航站 / 统一搜索 / 云存储 / 图床 / 下载分发等旧段已随模块下线，仅作历史别名或未知路径回落。
 - **门禁**：匿名默认可读（公开内容 200），个人与资金路径要求登录，写操作一律 401 `AUTH_UNAUTHORIZED`；自助注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭（403 `AUTH_REGISTER_DISABLED`）；`POST /auth/guest` 已删除；口令只认库内 `credentials`，环境变量超管口令已不生效。
 - **圈子**：`GET /circles` 匿名 200，前端匿名渲染清单与空态，加入 / 发帖 / 审核等写操作引导登录。
 - **社区检索口径（缺陷 D7 决策）**：检索以中文为准；英文仅整词子串、ASCII 大小写不敏感匹配，不保证复数 / 时态 / 词干变体召回；英文词形归一接入属独立检索语义改造项。

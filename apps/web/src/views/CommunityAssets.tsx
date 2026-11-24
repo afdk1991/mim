@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from 'react'; // 状态与副作用
-import type { Locale } from '@mim/i18n'; // 语言类型
+import { formatCurrency, type Locale } from '@mim/i18n'; // 语言类型 + 金额格式化单一实现
 import { ApiError, errorText } from '../api'; // 统一错误文案
 import { assetUrl, fetchAsset, fetchAssets, purchaseAsset, type AssetDetail, type AssetKind, type AssetListItem } from '../api/assets'; // 资产端点
 import { coverSrcset } from '../api/request.js'; // catalog 封面 2x 档派生
@@ -37,10 +37,10 @@ const KIND_LABEL: Record<AssetKind, { zh: string; en: string }> = { // 类型展
   video: { zh: '视频', en: 'Video' }, // 视频
 }; // 类型展示名结束
 
-/** 价格文案：0 显示「免费」，其余按元保留两位。 */
+/** 价格文案：0 显示「免费」，其余统一交给 formatCurrency（千分位 + 本地化币种符号）。 */
 function priceLabel(isZh: boolean, cents: number): string {
   if (cents <= 0) return isZh ? '免费' : 'Free'; // 免费资产不显示金额
-  return `¥${(cents / 100).toFixed(2)}`; // 分 → 元，固定两位
+  return formatCurrency(cents, 'CNY', isZh ? 'zh-CN' : 'en-US'); // 金额格式化不再手工拼「¥」
 } // priceLabel 结束
 
 /** 渠道结果文案：购买接口返回的 via。 */
