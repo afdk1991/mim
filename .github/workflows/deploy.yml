@@ -450,6 +450,12 @@ jobs:
         with:
           path: apps/web/dist
 
+      - name: 等待制品元数据传播
+        # 2026-11-24 实测：upload-pages-artifact finalize 后 deploy-pages 立即查询制品元数据，
+        # Actions 后端存在短暂传播延迟，偶发 "Fetching artifact metadata failed / Found 0 artifact(s)"；
+        # 等待 10s 让元数据可被 deploy-pages@v4 读到。同作业内等待，不跨作业、不复制既有制品。
+        run: sleep 10
+
       - name: 发布到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
