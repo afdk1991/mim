@@ -31,7 +31,6 @@ import type { // 引入依赖、类型或本地模块绑定
   WalletSnapshot,
   WalletTransaction,
 } from '../api';
-
 // 社区子模块：页签与文案标签 / 展示口径纯函数 / 列表骨架
 import {
   type Tab,
@@ -63,22 +62,10 @@ import { ThreadSkeleton } from './community/ThreadSkeleton.js';
 import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
 import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, SearchPanel, ThreadTools } from './CommunityMore'; // 社区互动补齐：通知 / 编辑治理 / 搜索 / 举报 / 楼中楼
 import { isPinned, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 楼中楼回复 / 回复锁定判定 / 回复分页
-import { // 申诉通道 + 关注板块 + 成长规则客户端（2026-11-25 批次）
-  listMyAppeals, // 本人申诉列表
-  createAppeal, // 提交申诉
-  listAdminAppeals, // 后台申诉队列
-  reviewAppeal, // 受理 / 驳回申诉
-  myFollowedBoards, // 本人关注板块清单
-  type AppealItem, // 申诉条目类型
-  type AdminAppealItem, // 后台队列条目类型
-  type AppealStatus, // 申诉状态类型
-  type AppealTargetType, // 申诉对象类型
-  type FollowedBoard, // 关注板块条目类型
-} from '../api/appeals.js';
 import { AnnouncementsPanel } from './AnnouncementsPanel'; // 公告动态页签（2026-11-15 由 /announcements 并入）
 import { CommunityGallery } from './CommunityGallery'; // 图库 / 视频页签（2026-11-15：挂在社区层，不恢复独立模块页）
 import { CommunityAssets } from './CommunityAssets'; // 付费资产列表 / 详情（2026-11-16：社区层深链接，匿名可读）
-import { CommunityGuideBar, GrowthRulesPanel, ReferralGuestPanel, ShopGuestNote, WalletGuestPanel } from './CommunityGuides'; // 八大板块指南条 / 匿名访客面板 / 成长规则公开小节
+import { CommunityGuideBar, ReferralGuestPanel, ShopGuestNote, WalletGuestPanel } from './CommunityGuides'; // 八大板块指南条与匿名访客面板
 import { ContentDetail, RichBody } from './ContentDetail'; // 资讯条目详情页与富文本正文渲染
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明 + 操作槽位
 import { currentQuery, navigatePath, pathOf, usePathSegments } from '../router'; // 多段深链接解析与站内导航
@@ -183,21 +170,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
   const [wdBusy, setWdBusy] = useState(false); // 提交中，防重复点击
   const [favoritesOpen, setFavoritesOpen] = useState(false); // 赋值：更新变量 const 的取值
   const [favorites, setFavorites] = useState<CommunityThread[]>([]); // 赋值：更新变量 const 的取值
-  // ── 关注板块（私密读：只有本人可见）──
-  const [followedOpen, setFollowedOpen] = useState(false); // 关注板块清单面板展开态
-  const [followedBoards, setFollowedBoards] = useState<FollowedBoard[]>([]); // 本人关注的板块清单
-  // ── 申诉通道：我的申诉 + 提交表单 ──
-  const [appealsOpen, setAppealsOpen] = useState(false); // 我的申诉面板展开态
-  const [myAppeals, setMyAppeals] = useState<AppealItem[]>([]); // 本人申诉记录
-  const [appealTargetType, setAppealTargetType] = useState<AppealTargetType>('thread'); // 申诉对象类型：帖子 / 回复
-  const [appealTargetId, setAppealTargetId] = useState(''); // 申诉对象主键
-  const [appealReason, setAppealReason] = useState(''); // 申诉理由
-  const [appealBusy, setAppealBusy] = useState(false); // 提交中防重复点击
-  const [appealSubmitted, setAppealSubmitted] = useState(false); // 提交成功回执态：展示「已提交，7 天内受理」
-  // ── 后台申诉队列（content:write）──
-  const [adminAppealsOpen, setAdminAppealsOpen] = useState(false); // 申诉队列面板展开态
-  const [adminAppeals, setAdminAppeals] = useState<AdminAppealItem[]>([]); // 待处理 / 已结案队列
-  const [appealNotes, setAppealNotes] = useState<Record<string, string>>({}); // 每条申诉独立的处理说明草稿
 
   const [products, setProducts] = useState<ShopProduct[]>([]); // 赋值：更新变量 const 的取值
   const [orders, setOrders] = useState<UnifiedOrder[]>([]); // 赋值：更新变量 const 的取值
@@ -227,45 +199,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
     onRequireLogin?.(); // 交给 App 跳登录，并保留登录后回跳
     return false; // 调用方据此提前返回，避免发出匿名写请求
   }
-
-  /** 申诉状态中文标签：待处理 / 已受理 / 已驳回，与后端 status 枚举一一对应 */
-  const APPEAL_STATUS_LABEL: Record<AppealStatus, string> = { pending: '待处理', accepted: '已受理', rejected: '已驳回' };
-
-  /** 提交申诉：登录态校验后调用后端，成功刷新我的申诉并展示受理提示 */
-  async function submitAppeal() {
-    if (!requireSession()) return; // 申诉是登录后写操作，匿名先引导登录
-    if (!appealTargetId.trim() || appealReason.trim().length < 2) { // 对象主键与理由必填，避免空提交
-      setNotice('请填写被处置的帖子 / 回复编号，并写明申诉理由（至少 2 字）');
-      return;
-    }
-    setAppealBusy(true); // 提交中防重复点击
-    try {
-      await createAppeal({ target_type: appealTargetType, target_id: appealTargetId.trim(), reason: appealReason.trim() }); // 提交申诉单
-      setAppealSubmitted(true); // 回执态：展示「已提交，7 天内受理」
-      setAppealTargetId(''); // 清空对象编号
-      setAppealReason(''); // 清空理由，便于下一次填写
-      const data = await listMyAppeals(); // 刷新我的申诉列表
-      setMyAppeals(data.items);
-    } catch (err) {
-      setError(errorText(locale, err)); // 错误经 errorText 本地化后展示
-    } finally {
-      setAppealBusy(false); // 释放提交中状态
-    }
-  } // submitAppeal 结束
-
-  /** 后台受理 / 驳回：随附处理说明提交，成功后刷新队列并提示结果 */
-  async function submitAppealReview(id: string, decision: 'accept' | 'reject') {
-    const note = (appealNotes[id] ?? '').trim(); // 处理说明可取空，后端落默认回执文案
-    try {
-      await reviewAppeal(id, decision, note); // 调后台流转接口
-      setAppealNotes((prev) => { const next = { ...prev }; delete next[id]; return next; }); // 清掉该行说明草稿
-      const data = await listAdminAppeals(); // 刷新队列顺序与状态
-      setAdminAppeals(data.items);
-      setNotice(decision === 'accept' ? '已受理申诉' : '已驳回申诉'); // 操作结果提示
-    } catch (err) {
-      setError(errorText(locale, err)); // 无权限 / 单据已结案等错误本地化展示
-    }
-  } // submitAppealReview 结束
 
   /** 切换页签：八个板块都允许匿名进入，数据类面板各自决定登录后的可见范围 */
   function switchTab(next: Tab) {
@@ -465,30 +398,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
       .then((data) => setFavorites(data.items))
       .catch((err) => setError(errorText(locale, err)));
   }, [favoritesOpen, hasSession]);
-
-  // 关注板块清单：私密读，面板展开且登录后才拉取；关注关系不公开
-  useEffect(() => {
-    if (!followedOpen || !hasSession) return; // 匿名不请求，避免泄露关注关系
-    myFollowedBoards()
-      .then((data) => setFollowedBoards(data.boards))
-      .catch((err) => setError(errorText(locale, err)));
-  }, [followedOpen, hasSession]);
-
-  // 我的申诉列表：私密读，面板展开且登录后才拉取
-  useEffect(() => {
-    if (!appealsOpen || !hasSession) return; // 匿名不请求
-    listMyAppeals()
-      .then((data) => setMyAppeals(data.items))
-      .catch((err) => setError(errorText(locale, err)));
-  }, [appealsOpen, hasSession]);
-
-  // 后台申诉队列：content:write 权限由后端校验，前端只按面板展开态拉取
-  useEffect(() => {
-    if (!adminAppealsOpen || !hasSession) return; // 匿名 / 未登录不拉队列
-    listAdminAppeals()
-      .then((data) => setAdminAppeals(data.items))
-      .catch((err) => setError(errorText(locale, err)));
-  }, [adminAppealsOpen, hasSession]);
 
   // 板块栏目：切换板块时拉取 Tab 配置；接口缺失 / 404 回落内置默认 Tab，不报错。
   useEffect(() => {
@@ -1200,8 +1109,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                 </button>
               ))}
               <button type="button" className={favoritesOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; const next = !favoritesOpen; setFavoritesOpen(next); if (next) setTimeout(() => document.querySelector('.community-favorites')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }}>我的收藏</button>{/* 展开后把收藏区滚入视口，否则内容在列表下方、点了看不到任何变化 */}
-              <button type="button" className={followedOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; const next = !followedOpen; setFollowedOpen(next); if (next) setTimeout(() => document.querySelector('.community-followed')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }}>我关注的板块</button>{/* 关注清单私密，仅本人可见；展开后滚入视口 */}
-              <button type="button" className={appealsOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; const next = !appealsOpen; setAppealsOpen(next); if (next) setTimeout(() => document.querySelector('.community-appeals')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }}>我的申诉</button>{/* 申诉记录私密，仅本人可见；展开后滚入视口 */}
             </div>
             <div className="community-layout-toggle" role="group" aria-label="列表形态切换">{/* 网格 / 列表横排切换 */}
               <button
@@ -1271,7 +1178,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
               {board !== 'all' && (
                 <button type="button" className={moderationOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; setModerationOpen((v) => !v); }}>举报处理</button>
               )}
-              <button type="button" className={adminAppealsOpen ? 'is-active' : ''} onClick={() => { if (!requireSession()) return; setAdminAppealsOpen((v) => !v); }}>申诉队列</button>{/* 后台申诉复核入口：content:write 权限由后端拦截 */}
             </div>
           </div>
           {/* 付费板块页内门禁壳：匿名 / 已登录未加入均停留在 /community，不再整页跳 /signin */}
@@ -1460,90 +1366,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
                   <strong>{t.title}</strong>
                   <em>{dateOnly((t as CommunityThread & { favorited_at?: string }).favorited_at ?? t.last_activity_at)}</em>
                 </button>
-              ))}
-            </div>
-          )}
-
-          {/* 我关注的板块：关注关系私密，只有本人能看到清单；空态引导回板块目录浏览 */}
-          {followedOpen && (
-            <div className="community-followed">
-              <div className="community-section-head"><div><h3>我关注的板块</h3><p>共 {followedBoards.length} 个 · 仅本人可见</p></div></div>
-              {followedBoards.length === 0 && (
-                <EmptyState
-                  kind="user"
-                  title="还没有关注的板块"
-                  hint="在板块上点「关注」即可加入清单。"
-                  action={(
-                    <button type="button" className="btn small" onClick={() => { setFollowedOpen(false); setBoard('all'); }}>去目录发现板块</button>
-                  )}
-                />
-              )}
-              {followedBoards.map((b) => (
-                <button key={b.slug} type="button" className="community-favorite-row" onClick={() => { setFollowedOpen(false); setBoard(b.slug); }}>
-                  <span>{b.icon} {b.name}</span>
-                  <strong>{b.slug}</strong>
-                  <em>{b.member_count} 成员 · {b.thread_count} 帖</em>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* 我的申诉：被处置内容 7 天内可申诉一次；申诉期间不恢复内容，结果经站内通知回执 */}
-          {appealsOpen && (
-            <div className="community-appeals">
-              <div className="community-section-head"><div><h3>我的申诉</h3><p>被处置内容可在 7 天内申诉一次，受理结果以站内通知回执。</p></div></div>
-              {appealSubmitted && <p className="community-hint">已提交，7 天内受理。</p>}
-              <div className="community-composer">
-                <div className="community-form-row">
-                  <label>对象类型
-                    <select value={appealTargetType} onChange={(e) => setAppealTargetType(e.target.value as AppealTargetType)}>
-                      <option value="thread">帖子</option>
-                      <option value="reply">回复</option>
-                    </select>
-                  </label>
-                  <label>对象编号
-                    <input value={appealTargetId} onChange={(e) => setAppealTargetId(e.target.value)} placeholder="被处置的帖子 / 回复 ID" />
-                  </label>
-                </div>
-                <textarea value={appealReason} onChange={(e) => setAppealReason(e.target.value)} placeholder="申诉理由：说明为什么应当恢复展示（2–500 字）" rows={3} />
-                <div className="community-actions">
-                  <button type="button" className="is-primary" disabled={appealBusy} onClick={() => void submitAppeal()}>{appealBusy ? '提交中…' : '提交申诉'}</button>
-                </div>
-              </div>
-              {myAppeals.length === 0 && (
-                <EmptyState kind="set" title="还没有申诉记录" hint="被隐藏的帖子或被删的回复，可在处置后 7 天内申诉。" />
-              )}
-              {myAppeals.map((item) => (
-                <article key={item.id} className="community-favorite-row">
-                  <span>{item.target_type === 'reply' ? '回复' : '帖子'} · {APPEAL_STATUS_LABEL[item.status]}</span>
-                  <strong>{item.thread_title ?? item.target_id}</strong>
-                  <em>{item.reason}</em>
-                  {item.handled_note && <span>处理说明：{item.handled_note}</span>}
-                  <em>{dateOnly(item.created_at)}{item.handled_at ? ` · 处理于 ${dateOnly(item.handled_at)}` : ''}</em>
-                </article>
-              ))}
-            </div>
-          )}
-
-          {/* 后台申诉队列：content:write 权限由后端校验；待处理优先、先申诉先受理，处理动作写审计并回执申诉人 */}
-          {adminAppealsOpen && (
-            <div className="community-appeals">
-              <div className="community-section-head"><div><h3>申诉队列</h3><p>待处理优先，先申诉先受理；受理 / 驳回均写审计并回执申诉人。</p></div></div>
-              {adminAppeals.length === 0 && <EmptyState kind="set" title="暂无待处理申诉" />}
-              {adminAppeals.map((item) => (
-                <article key={item.id} className="community-favorite-row">
-                  <span>{item.user_name ?? item.user_id} · {item.target_type === 'reply' ? '回复' : '帖子'} · {APPEAL_STATUS_LABEL[item.status]}</span>
-                  <strong>{item.thread_title ?? item.post_excerpt ?? item.target_id}</strong>
-                  <em>申诉理由：{item.reason}</em>
-                  {item.handled_note && <span>处理说明：{item.handled_note}</span>}
-                  {item.status === 'pending' && (
-                    <div className="community-inline-form">
-                      <input value={appealNotes[item.id] ?? ''} onChange={(e) => setAppealNotes({ ...appealNotes, [item.id]: e.target.value })} placeholder="处理说明（可选）" />
-                      <button type="button" onClick={() => void submitAppealReview(item.id, 'accept')}>受理</button>
-                      <button type="button" className="is-danger" onClick={() => void submitAppealReview(item.id, 'reject')}>驳回</button>
-                    </div>
-                  )}
-                </article>
               ))}
             </div>
           )}
@@ -1875,9 +1697,6 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
           </div>
         </div>
       )}
-
-      {/* 成长与积分规则：等级 / 门槛 / 权益 + 积分来源公开可读，匿名与登录态都展示在钱包页 */}
-      {!loading && tab === 'wallet' && <GrowthRulesPanel />}
 
       {/* 匿名访客：钱包金额不可见，但口径与规则必须可读，避免空白页 */}
       {!loading && tab === 'wallet' && !hasSession && (
