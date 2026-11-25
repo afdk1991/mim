@@ -46,6 +46,17 @@ test.describe('桌面端点击链路', () => {
     expect(fallbackText.trim().length).toBeGreaterThan(10); // 回落页必须有内容
   }); // 用例结束
 
+  test('合规页多段深链接直达，子类型不被前置规整折叠', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', '桌面端用例不在移动端重复执行');
+    const errs = watchErrors(page); // 收集未捕获异常与 console.error
+    await page.goto('/legal/privacy'); // 合规多段深链接直达
+    await expect(page).toHaveURL(/\/legal\/privacy(\?|$)/); // 子段必须保留，不被折叠成 /legal
+    await expect(page.locator('.legal-page h1')).toHaveText('隐私政策'); // 合规页主标题渲染
+    const legalText = await page.locator('.legal-page').innerText(); // 正文长度判白屏
+    expect(legalText.trim().length).toBeGreaterThan(20); // 骨架页必须有分节内容
+    expect(errs.pageErrors, `未捕获异常: ${errs.pageErrors.join(' | ')}`).toHaveLength(0); // 合规页不允许 JS 崩溃
+  }); // 用例结束
+
   test('未登录访问个人中心被守卫带到登录页，且登录表单可用', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', '桌面端用例不在移动端重复执行');
     await page.goto('/account'); // 需要身份的页面

@@ -19,7 +19,7 @@
         if (location.pathname === '/mim' || location.pathname.indexOf('/mim/') === 0) { // 子路径访问兼容
           document.querySelector('base').setAttribute('href', '/mim/'); // 基础地址跟随该前缀
         } // 子路径访问兼容处理结束
-        var views = ['account', 'deployments', 'community', 'chat', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements', 'news', 'releases', 'cart']; // 需识别的路径段与旧别名
+        var views = ['account', 'deployments', 'community', 'chat', 'circles', 'checkout', 'pay-return', 'signin', 'login', 'profile', 'settings', 'forum', 'announcements', 'news', 'releases', 'cart', 'legal']; // 需识别的路径段与旧别名（含合规多段页首段）
         var href = location.href; // 完整地址：用于判断末位是否残留裸问号
         var search = location.search; // 查询串（含前导问号；无查询串时为空串）
         if (search === '?tads' || (search === '' && href.charAt(href.length - 1) === '?')) { // 命中异常查询串形态
@@ -32,7 +32,7 @@
           for (var i = 0; i < segs.length; i++) { // 从头找第一个已知视图段
             if (views.indexOf(segs[i]) >= 0) { // 命中视图段
               cut = i + 1; // 截到视图段为止
-              keep = segs[i] === 'community' && (segs[i + 1] === 'post' || segs[i + 1] === 'news' || segs[i + 1] === 'assets'); // 帖子 / 资讯 / 付费资产深链接不折叠
+              keep = (segs[i] === 'community' && (segs[i + 1] === 'post' || segs[i + 1] === 'news' || segs[i + 1] === 'assets')) || segs[i] === 'legal'; // 帖子 / 资讯 / 付费资产与合规多段深链接不折叠
               break; // 只认第一个视图段
             } // 视图段命中判定结束
           } // 视图段查找结束
