@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request, requestBlob } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试；requestBlob 供附件下载
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, DeletionStatus, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, DeletionStatus, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, GrowthLevelProgress, MyGrowthBadge, FavoriteThreadItem, MyReportItem } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -348,7 +348,10 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
       return request<{ ok: boolean }>(`/community/threads/${encodeURIComponent(threadId)}`, { method: 'DELETE' }); // 返回当前函数的处理结果
     }, // 代码块结束
     favorites() { // 我的收藏
-      return request<{ items: CommunityThread[] }>('/community/favorites', { idempotency: false }); // 返回当前函数的处理结果
+      return request<{ items: FavoriteThreadItem[] }>('/community/favorites', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    myReports() { // 我的举报：本人提交的社区举报单（私密读，匿名 401）
+      return request<{ items: MyReportItem[]; total: number; offset: number; limit: number }>('/community/reports/mine', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
     homeSetting() { // 论坛设为首页开关（公开；404 / 异常由前端回落现状门户）
       return request<{ home: 'community' | 'portal' }>('/community/home-setting', { auth: false, idempotency: false }); // 返回当前函数的处理结果
@@ -358,6 +361,15 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // 代码块结束
     saveBoardTabs(slug: string, tabs: BoardTabInput[]) { // 版主 / 运营保存栏目组合（顺序 / 显隐 / 排序口径）
       return request<{ ok: boolean; tabs: BoardTab[] }>(`/community/boards/${encodeURIComponent(slug)}/tabs`, { method: 'PUT', body: { tabs } }); // 返回当前函数的处理结果
+    }, // 代码块结束
+  }, // 代码块结束
+
+  growth: { // 社区激励链：等级进度与我的徽章（私密读，匿名 401）
+    level() { // 当前等级 / 下一级 / 积分进度
+      return request<GrowthLevelProgress>('/growth/level', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    badges() { // 我的徽章：已获得在前，未获得带条件进度
+      return request<{ ok: boolean; badges: MyGrowthBadge[] }>('/growth/badges', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
   }, // 代码块结束
 

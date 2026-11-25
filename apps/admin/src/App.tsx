@@ -1,5 +1,7 @@
 // 后台外壳组件：负责登录态、按权限过滤的导航与视图分发
-import { useCallback, useEffect, useState } from 'react'; // 业务步骤
+import { Component, useCallback, useEffect, useState } from 'react'; // 业务步骤
+// 仅类型导入：子节点结构，避免把类型打进产物
+import type { ReactNode } from 'react';
 // 身份与错误类型：/admin/me 提供 bootstrap 标记与实时权限码
 import { ApiError, describeError, getAdminMe, loadCredential, saveCredential } from './api'; // 业务步骤
 // 仅需类型导入，避免把运行时值打进产物
@@ -32,7 +34,7 @@ import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 import { PageBuilder } from './views/PageBuilder'; // 业务步骤
 // 外观：主色 / 圆角档位 / 默认明暗，复用 appearance:write
 import { Appearance } from './views/Appearance'; // 业务步骤
-// 站点选项：按注册表渲染 Global & Features 十个分组（图标 / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码）
+// 站点选项：按注册表渲染 Global & Features 十一个分组（图标 / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码 / 备案信息）
 import { SiteOptions } from './views/SiteOptions'; // 站点选项面板
 // 成长私信：按条件或指定用户发送系统身份私信
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
@@ -200,11 +202,50 @@ export function App() { // 业务步骤
     setCredential(null); // 业务步骤
   }, []); // 空依赖：退出回调同样保持引用稳定
 
-  // 无凭证直接渲染登录页，此时不会发起任何鉴权请求
+  // 无凭证直接渲染登录页，此时不会发起任何鉴权请求（保留早返回写法供鉴权门禁静态断言）
   if (!credential) return <Login onDone={handleLogin} notice={notice} />;
-  // 有凭证则进入主控台
-  return <Console credential={credential} onLogout={handleLogout} />;
-} // App 结束：登录页与主控台二选一分发完毕
+  // 有凭证则进入主控台；主控台整棵树包错误边界，渲染抛错时切兜底 UI，接口错误仍由视图内 error 通道处理
+  return (
+    <AdminErrorBoundary>
+      <Console credential={credential} onLogout={handleLogout} />
+    </AdminErrorBoundary>
+  );
+} // App 结束
+
+/** 后台错误边界状态：是否已捕获渲染异常 */
+interface AdminBoundaryState {
+  hasError: boolean; // 标记进入兜底态
+} // 状态结构结束
+
+/** 后台错误边界：与前台 ErrorBoundary 同口径，class 组件捕获子树渲染期异常；不吞接口错误 */
+class AdminErrorBoundary extends Component<{ children: ReactNode }, AdminBoundaryState> {
+  // 初始状态：未捕获异常，正常渲染子树
+  state: AdminBoundaryState = { hasError: false };
+
+  // 派生兜底态：进入本方法即展示兜底卡片
+  static getDerivedStateFromError(): AdminBoundaryState {
+    return { hasError: true }; // 标记错误态
+  }
+
+  // 捕获渲染异常：控制台留痕便于排查，不弹远端告警
+  componentDidCatch(error: unknown, info: { componentStack?: string }): void {
+    console.error('[Mim Admin] 页面渲染异常', error, info.componentStack); // 打印错误与组件栈
+  }
+
+  // 渲染分发：正常态透传子树，异常态给刷新出口
+  render() {
+    if (!this.state.hasError) return this.props.children; // 未出错原样渲染
+    return (
+      <div className="login-wrap"> {/* 复用登录页居中容器表面 */}
+        <div className="login-card"> {/* 卡片容器 */}
+          <h2>页面出了点问题</h2> {/* 错误标题 */}
+          <div className="error">后台页面渲染中断，请刷新重试；问题持续存在时可返回登录页重新进入。</div> {/* 错误说明 */}
+          <button className="btn primary" type="button" onClick={() => window.location.reload()}>刷新重试</button> {/* 整页刷新重新加载 */}
+        </div>
+      </div>
+    );
+  }
+} // AdminErrorBoundary 结束
 
 /** 主控台入参 */
 interface ConsoleProps {
@@ -410,7 +451,7 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'pageBuilder') return <PageBuilder credential={credential} permissions={identity.permissions} />;
   // 外观：主色 / 圆角档位 / 默认明暗
   if (key === 'appearance') return <Appearance credential={credential} permissions={identity.permissions} />;
-  // 站点选项：Global & Features 十个分组，按后端注册表数据驱动渲染
+  // 站点选项：Global & Features 十一个分组，按后端注册表数据驱动渲染
   if (key === 'siteOptions') return <SiteOptions credential={credential} permissions={identity.permissions} />;
   // 成长私信：按条件或指定用户发送系统身份私信
   if (key === 'growthDm') return <GrowthDm credential={credential} permissions={identity.permissions} />;

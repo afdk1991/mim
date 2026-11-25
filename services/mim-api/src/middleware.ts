@@ -133,6 +133,7 @@ const AUTH_REQUIRED_READ_PATHS = new Set<string>([ // 精确匹配
   '/api/v1/after-sales', // 售后单
   '/api/v1/referral', // 推广中心
   '/api/v1/reports/mine', // 我的举报
+  '/api/v1/community/reports/mine', // 本人提交的社区举报单
   '/api/v1/assets/mine/list', // 我拥有的资产（列表与详情匿名可读，仅此项需登录）
   '/api/v1/community/favorites', // 我的收藏
   '/api/v1/community/notifications', // 通知

@@ -24,11 +24,11 @@ function adminHeaders(): Record<string, string> {
 } // adminHeaders 结束
 
 describe('站点选项注册表', () => { // 纯函数层
-  it('默认值覆盖十个分组且键唯一', () => { // 结构自检
+  it('默认值覆盖十一个分组且键唯一', () => { // 结构自检（含备案信息分组）
     const schema = optionSchema(); // 注册表结构
     expect(schema.tabs.length).toBe(1); // 本轮只落地 Global & Features 页签
     const groupKeys = schema.tabs[0].groups.map((group) => group.key); // 分组键
-    expect(groupKeys).toEqual(['identity', 'seo', 'display', 'search', 'mobile_tab', 'floating', 'locale', 'social', 'email', 'custom']); // 与主题后台十个分组对齐
+    expect(groupKeys).toEqual(['identity', 'seo', 'display', 'search', 'mobile_tab', 'floating', 'locale', 'social', 'email', 'custom', 'beian']); // 与主题后台分组对齐（含备案信息分组）
     const fields = schema.tabs[0].groups.flatMap((group) => group.fields); // 全量字段
     expect(new Set(fields.map((field) => field.key)).size).toBe(fields.length); // 键唯一
     expect(fields.every((field) => Object.prototype.hasOwnProperty.call(OPTION_DEFAULTS, field.key))).toBe(true); // 每个字段都有默认值
@@ -37,6 +37,8 @@ describe('站点选项注册表', () => { // 纯函数层
   it('公开键不包含邮件等敏感分组', () => { // 公开裁剪
     expect(PUBLIC_OPTION_KEYS).toContain('layout_width'); // 布局宽度前端要用
     expect(PUBLIC_OPTION_KEYS).toContain('search_hot_words'); // 热词前端要用
+    expect(PUBLIC_OPTION_KEYS).toContain('beian_icp'); // ICP 备案号前端页脚要用
+    expect(PUBLIC_OPTION_KEYS).toContain('beian_police'); // 公安备案号前端页脚要用
     expect(PUBLIC_OPTION_KEYS).not.toContain('smtp_host'); // SMTP 主机不外泄
     expect(PUBLIC_OPTION_KEYS).not.toContain('smtp_user'); // SMTP 账号不外泄
   }); // 用例结束

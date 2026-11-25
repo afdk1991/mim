@@ -33,6 +33,8 @@ export interface SiteOptions {
   seoOgImage: string; // 分享大图
   customCss: string; // 自定义 CSS
   defaultLocale: 'zh' | 'en'; // 默认语言（登录用户仍以账号偏好优先）
+  beianIcp: string; // 页脚 ICP 备案号文本，留空不渲染对应链接
+  beianPolice: string; // 页脚公安备案号文本，留空不渲染对应链接
 } // SiteOptions 结束
 
 /** 默认取值：与后端注册表 defaultValue 保持同口径，接口不可达时行为等同「未配置」 */
@@ -64,6 +66,8 @@ export const DEFAULT_SITE_OPTIONS: SiteOptions = {
   seoOgImage: '',
   customCss: '',
   defaultLocale: 'zh',
+  beianIcp: '苏ICP备2025161175号-1',
+  beianPolice: '苏公网安备32072202010512号',
 }; // 默认结束
 
 /** 取字符串：类型不符一律回落默认，防止脏配置把渲染打崩 */
@@ -127,6 +131,8 @@ export function normalizeSiteOptions(raw: Record<string, unknown> | null | undef
     seoOgImage: str(source, 'seo_og_image', ''),
     customCss: str(source, 'custom_css', ''),
     defaultLocale: str(source, 'default_locale', DEFAULT_SITE_OPTIONS.defaultLocale) === 'en' ? 'en' : 'zh',
+    beianIcp: str(source, 'beian_icp', DEFAULT_SITE_OPTIONS.beianIcp),
+    beianPolice: str(source, 'beian_police', DEFAULT_SITE_OPTIONS.beianPolice),
   }; // 返回规范化结果
 } // normalizeSiteOptions 结束
 

@@ -1,7 +1,10 @@
 // React 钩子：状态、副作用与稳定回调
 import { useCallback, useEffect, useState } from 'react';
 
-// 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 支付回跳深链接页
+// 合规静态页的四个子类型：隐私政策 / 用户协议 / 退款售后 / 帮助中心
+export type LegalKind = 'privacy' | 'terms' | 'refund' | 'help';
+
+// 全部视图标识：业务视图 + 登录伪视图 + 收银台 / 支付回跳深链接页 + 合规静态页 + 独立 404
 export type AppView =
   | 'home' // 门户首页：hero + 入口卡 + 精选帖（社区设置为论坛首页时由 App 内 effect 跳社区）
   | 'account' // 个人中心（资料 / 账号与设置）
@@ -10,16 +13,22 @@ export type AppView =
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
   | 'checkout' // 收银台：支付意图二维码 / 渠道唤起 / 状态轮询
   | 'payreturn' // 支付回跳承接页：三态结果展示
-  | 'login'; // 未登录专用的登录伪视图
+  | 'login' // 未登录专用的登录伪视图
+  | 'legal' // 合规静态页：/legal/<privacy|terms|refund|help>，子类型挂在 route.sub
+  | 'notfound'; // 独立 404：未知路径不再静默回落首页
 
-// 路由状态：仅需当前视图标识
+// 路由状态：视图标识 + 合规页子类型（其余视图不使用 sub）
 export interface AppRoute {
   view: AppView; // 当前视图
+  sub?: LegalKind; // 合规静态页子类型，仅 view === 'legal' 时有值
 } // 路由结构结束
+
+// 合规静态页合法子类型清单：与 /legal/<kind> 路径段一一对应
+export const LEGAL_KINDS: readonly LegalKind[] = ['privacy', 'terms', 'refund', 'help'];
 
 // 视图 → 地址栏路径段（模块功能名称，2026-11-11 全平台统一）：
 // 对外地址一律为 https://<域名>/<模块功能名>，与 App.tsx 导航文案一一对应，
-// 不再使用与功能名对不上的缩写段；已下线模块不再登记路径段，访问时按未知路径回落社区。
+// 不再使用与功能名对不上的缩写段；已下线模块不再登记路径段，访问时按未知路径落独立 404 视图。
 export const VIEW_SEGMENTS: Record<AppView, string> = {
   home: 'home', // 门户首页（hero / 入口卡 / 精选）
   account: 'account', // 个人中心（资料 / 账号与设置）
@@ -29,6 +38,8 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   checkout: 'checkout', // 收银台（支付意图二维码 / 渠道唤起）
   payreturn: 'pay-return', // 支付回跳承接页（/pay-return?intent=...）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
+  legal: 'legal', // 合规静态页（多段路径 /legal/<kind>，段表只登记首段）
+  notfound: 'not-found', // 独立 404 视图段（未知路径落点，不对外挂导航）
 }; // 代码块结束
 
 // 路径段 → 视图的反向索引：由 VIEW_SEGMENTS 派生，保证正反两向永不走样
@@ -156,14 +167,25 @@ export function parseLocation(): AppRoute {
   // 多段深链接：/pay/return 与 /pay-return 支付回跳承接
   if (segs[0] === 'pay' && segs[1] === 'return') return { view: 'payreturn' };
   if (segs[0] === 'pay-return') return { view: 'payreturn' };
-  const view = resolveSegment(segs[0] ?? ''); // 新段直接命中；旧段命中并原地重定向
-  return view ? { view } : { view: 'home' }; // 未知路径与根路径先落门户首页；「论坛设为首页」由 App 内 effect 按配置跳转社区
+  // 合规静态页：/legal/<privacy|terms|refund|help>；首段是 legal 但子类型非法时落 404
+  if (segs[0] === 'legal') {
+    const kind = LEGAL_KINDS.includes(segs[1] as LegalKind) ? (segs[1] as LegalKind) : null; // 校验子类型
+    return kind ? { view: 'legal', sub: kind } : { view: 'notfound' }; // 合法进合规页，非法子路径落独立 404
+  }
+  if (!segs[0]) return { view: 'home' }; // 根路径（空段）落门户首页；「论坛设为首页」由 App 内 effect 按配置跳转社区
+  const view = resolveSegment(segs[0]); // 新段直接命中；旧段命中并原地重定向
+  return view ? { view } : { view: 'notfound' }; // 其余未知路径停在独立 404，不再静默接回首页
 } // parseLocation 结束
 
 // 由路由生成路径：所有导航入口统一走这里，保证链接格式一致（含子路径部署前缀）
 export function hrefOf(route: AppRoute): string {
   return baseOf() + VIEW_SEGMENTS[route.view]; // 形如 '/community' 或 '/mim/community'
 } // hrefOf 结束
+
+// 合规静态页深链接：/legal/<kind>，带子路径前缀，供页脚与帮助中心跳转使用
+export function legalPath(kind: LegalKind): string {
+  return baseOf() + 'legal/' + kind; // 形如 '/legal/privacy' 或 '/mim/legal/terms'
+} // legalPath 结束
 
 // 编程式跳转：pushState 写入路径并派发路由事件；同地址时直接返回（popstate 与事件均不触发）
 export function navigate(route: AppRoute): void {

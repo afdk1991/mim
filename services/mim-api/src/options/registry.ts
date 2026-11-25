@@ -152,6 +152,15 @@ export const SITE_OPTION_TABS: OptionTab[] = [
           { key: 'custom_css', label: '自定义 CSS', type: 'textarea', defaultValue: '', hint: '注入到全站 <style>，保存后前端下一个请求周期生效', publicRead: true },
         ],
       },
+      {
+        key: 'beian', // 备案信息分组
+        label: '备案信息',
+        description: '页脚版权行展示的 ICP 与公安备案号；留空则对应链接不渲染',
+        fields: [
+          { key: 'beian_icp', label: 'ICP 备案号', type: 'text', defaultValue: '苏ICP备2025161175号-1', hint: '页脚版权行展示，外链指向工信部备案系统', publicRead: true },
+          { key: 'beian_police', label: '公安备案号', type: 'text', defaultValue: '苏公网安备32072202010512号', hint: '页脚版权行展示，外链指向公安备案系统', publicRead: true },
+        ],
+      },
     ],
   },
 ];

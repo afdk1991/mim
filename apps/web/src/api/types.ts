@@ -671,6 +671,57 @@ export interface GrowthSnapshot { // 成长快照
   next_points: number; // 下一级所需积分
   stats: { points: number; orders: number; assets: number; checkins: number; vip_level: number }; // 统计
   badges: GrowthBadge[]; // 徽章
+}
+
+// ---------- 成长（等级 / 徽章）用户侧视图，与 routes/growth.ts 响应一一对应 ----------
+
+export interface GrowthLevelInfo { // 等级项：当前等级与下一级共用同一形态
+  level: number; // 等级序号
+  name: string; // 等级名称
+  min_points: number; // 升级门槛累计积分
+  perks: string[]; // 等级权益文案
+}
+
+export interface GrowthLevelProgress { // GET /growth/level 等级进度响应
+  ok: boolean; // 接口成功标识
+  level: GrowthLevelInfo | null; // 当前等级；无等级配置时为 null
+  next_level: GrowthLevelInfo | null; // 下一级；满级时为 null
+  lifetime_points: number; // 累计积分
+  points_to_next: number; // 距下一级还差的积分
+  progress_percent: number; // 当前等级内进度 0-100
+}
+
+export interface MyGrowthBadge { // GET /growth/badges 我的徽章项（含未获得徽章的条件进度）
+  code: string; // 徽章编码
+  name: string; // 徽章名称（文案取接口，前端不硬编码语义）
+  description: string; // 徽章说明
+  icon: string; // 图标标识
+  condition_type: string; // 条件类型
+  condition_value: number; // 条件阈值
+  awarded: boolean; // 是否已获得
+  awarded_at: string | null; // 获得时间
+  source: 'auto' | 'admin' | null; // 授予来源
+  progress: { current: number; target: number }; // 条件进度：当前值 / 目标值
+}
+
+// ---------- 个人聚合：我的收藏 / 我的举报 ----------
+
+export interface FavoriteThreadItem extends CommunityThread { // 收藏列表项：在帖子摘要上补收藏时间
+  favorited_at: string; // 收藏时间
+}
+
+export interface MyReportItem { // GET /community/reports/mine 本人举报项
+  id: string; // 举报主键
+  target_type: 'thread' | 'post'; // 对象类型
+  target_id: string; // 对象主键
+  thread_id: string | null; // 归属帖子
+  thread_title: string | null; // 归属帖子标题
+  reason: string; // 举报原因枚举键
+  detail: string; // 补充说明
+  status: 'pending' | 'resolved' | 'dismissed'; // 归一化状态：待处理 / 已处理 / 已忽略
+  resolution: string | null; // 处理动作：dismiss / hide_thread / delete_post
+  created_at: string; // 提交时间
+  resolved_at: string | null; // 处理时间
 } // 代码块结束
 
 export interface DirectMessage { // 私信

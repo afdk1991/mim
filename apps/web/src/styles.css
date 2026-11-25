@@ -22,6 +22,14 @@ body { /* 页面基础排版 */
   transition: var(--transition); /* 切换明暗主题时颜色平滑过渡 */
 } /* body 规则结束 */
 
+/* ---------- 触控目标令牌：可点元素热区下限 ----------
+   文字按钮 / 链接触控目标统一不小于 44×44px；令牌只约束热区高度，不改视觉字号与配色。
+   桌面端视觉以既有字号 / 间距为准，仅把明显小于 44px 的可点元素补齐到该下限。 */
+:root {
+  --touch-target: 44px; /* 触控目标最小高度：移动端可点元素热区下限（44px 口径） */
+  --touch-hit-x: 12px; /* 触控目标横向最小内距：保证左右边缘也好点按 */
+} /* 触控令牌结束 */
+
 h1, /* 一级标题 */
 h2 { /* 二级标题 */
   margin: 0; /* 移除标题默认外边距，间距统一交给布局 gap 控制 */
@@ -139,8 +147,11 @@ code { /* 行内代码/令牌展示 */
   min-width: 0; /* 允许在窄屏收缩 */
 } /* 导航容器结束 */
 
-.nav-item { /* 单个导航按钮：与 zibll 一致的 10px 内距 + 4px 圆角 */
-  padding: 10px; /* 点击热区约 36px */
+.nav-item { /* 单个导航按钮：10px 内距 + 4px 圆角，热区收口到触控令牌下限 */
+  display: inline-flex; /* 文字与图标垂直居中，配合 min-height 撑高热区 */
+  align-items: center; /* 内容垂直居中 */
+  min-height: var(--touch-target); /* 触控目标不低于 44px，字号与配色不变 */
+  padding: 10px; /* 点击热区内距，与既有观感一致 */
   border: 0; /* 去掉按钮默认边框 */
   border-radius: var(--radius-xs); /* 4px 小圆角 */
   background: transparent; /* 默认无底色，仅文字可见 */
@@ -234,8 +245,11 @@ code { /* 行内代码/令牌展示 */
   margin-bottom: 12px; /* 与页面正文拉开，保持层级 */
 } /* 合并入口条结束 */
 
-.subnav-item { /* 合并入口按钮：低干扰的胶囊样式 */
-  padding: 6px 12px; /* 点击热区约 30px，比主导航轻 */
+.subnav-item { /* 合并入口按钮：低干扰的胶囊样式，热区收口到触控令牌下限 */
+  display: inline-flex; /* 文字垂直居中 */
+  align-items: center; /* 内容垂直居中 */
+  min-height: var(--touch-target); /* 触控目标不低于 44px，不放大字号 */
+  padding: 6px 12px; /* 胶囊左右留白，保持既有轻量观感 */
   border: 1px solid var(--nav-ring); /* 描边区分于正文，不抢主色 */
   border-radius: var(--radius-pill); /* 胶囊形，视觉上明确是辅助入口 */
   background: var(--surface); /* 浅色底与页面区分 */
@@ -368,9 +382,12 @@ code { /* 行内代码/令牌展示 */
   list-style: none; /* 去列表符号 */
 } /* 清单结束 */
 
-.widget-links button { /* 清单项按钮 */
+.widget-links button { /* 清单项按钮：纯文字形态，热区收口到触控令牌下限 */
+  display: flex; /* 文字垂直居中，撑满整行热区 */
+  align-items: center; /* 内容垂直居中 */
   width: 100%; /* 撑满，热区一致 */
-  padding: 6px 0; /* 紧凑热区 */
+  min-height: var(--touch-target); /* 触控目标不低于 44px */
+  padding: 6px 0; /* 紧凑纵向留白，配合 min-height 撑开热区 */
   border: 0; /* 纯文字形态 */
   background: transparent; /* 透明底 */
   color: var(--text-secondary); /* 次级文字色 */
@@ -440,8 +457,11 @@ code { /* 行内代码/令牌展示 */
   list-style: none; /* 去列表符号 */
 } /* 清单结束 */
 
-.footer-list button { /* 链接按钮 */
-  padding: 0; /* 纯文字，不加内距 */
+.footer-list button { /* 链接按钮：纯文字形态，热区收口到触控令牌下限 */
+  display: inline-flex; /* 文字垂直居中 */
+  align-items: center; /* 内容垂直居中 */
+  min-height: var(--touch-target); /* 触控目标不低于 44px */
+  padding: 0; /* 纯文字，不加横向内距 */
   border: 0; /* 去边框 */
   background: transparent; /* 透明底 */
   color: var(--text-muted); /* 与页脚同档 */
@@ -489,6 +509,54 @@ code { /* 行内代码/令牌展示 */
   color: var(--link); /* 转链接色 */
   text-decoration: underline; /* 悬停补下划线 */
 } /* 悬停结束 */
+
+/* ---------- 合规静态页：隐私 / 协议 / 退款售后 / 帮助中心骨架 ---------- */
+.legal-page { /* 合规页容器：单列窄栏，长文居中阅读 */
+  max-width: 760px; /* 长文阅读栏宽，避免一行过长 */
+  margin: 0 auto; /* 水平居中 */
+  padding: var(--sp-4) 0; /* 上下与页面拉开 */
+} /* 合规页结束 */
+
+.legal-head { /* 页头：标题 + 生效日期行 */
+  margin-bottom: var(--sp-5); /* 与首节拉开层级 */
+} /* 页头结束 */
+
+.legal-meta { /* 生效日期 / 更新时间行：弱化次要信息 */
+  margin: var(--sp-2) 0 0; /* 与标题拉开 */
+  color: var(--text-muted); /* 次要文字档 */
+  font-size: var(--fs-sm); /* 小一号 */
+} /* 元信息行结束 */
+
+.legal-section { /* 单个分节 */
+  margin-bottom: var(--sp-5); /* 分节间距 */
+} /* 分节结束 */
+
+.legal-section h2 { /* 分节标题：比页面主标题低一档 */
+  margin-bottom: var(--sp-2); /* 与正文拉开 */
+  font-size: var(--fs-md); /* 16px 小节标题 */
+} /* 分节标题结束 */
+
+.legal-section p { /* 分节正文段落 */
+  margin: 0 0 var(--sp-2); /* 段间距，末段由分节间距兜底 */
+  color: var(--text-secondary); /* 正文次级文字 */
+  line-height: var(--lh-loose); /* 长段落宽松行距，便于阅读 */
+} /* 段落结束 */
+
+.legal-actions { /* 页内操作行：帮助中心直达入口 / 404 返回按钮 */
+  display: flex; /* 横向排布 */
+  flex-wrap: wrap; /* 窄屏自动换行 */
+  gap: var(--sp-3); /* 按钮间距 */
+  margin: var(--sp-5) 0; /* 上下留白 */
+} /* 操作行结束 */
+
+.legal-note { /* 骨架性质显式标记：虚线框提示条款待法务复核 */
+  margin-top: var(--sp-6); /* 与正文拉开 */
+  padding: var(--sp-3) var(--sp-4); /* 框内留白 */
+  border: 1px dashed var(--border-strong); /* 虚线描边区分于正文卡片 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  color: var(--text-muted); /* 弱化说明文字 */
+  font-size: var(--fs-sm); /* 小一号 */
+} /* 骨架标记结束 */
 
 /* ---------- 移动端底部 Tab：≤760px 显示 ---------- */
 .mobile-tabs { /* 底部 Tab：默认不占位 */
@@ -864,7 +932,10 @@ code { /* 行内代码/令牌展示 */
   color: var(--nav-strong); /* 文字提一档 */
 } /* 侧栏悬停结束 */
 
-.link { /* 文字链接按钮（如「切换语言」） */
+.link { /* 文字链接按钮（如「切换语言」），热区收口到触控令牌下限 */
+  display: inline-flex; /* 文字垂直居中 */
+  align-items: center; /* 内容垂直居中 */
+  min-height: var(--touch-target); /* 触控目标不低于 44px */
   padding: 0; /* 去掉内边距，纯文字形态 */
   border: 0; /* 去掉边框 */
   background: none; /* 去掉底色 */

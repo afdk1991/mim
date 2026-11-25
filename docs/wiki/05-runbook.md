@@ -411,6 +411,13 @@ systemctl status mim-api; journalctl -u mim-api -n 50    # 服务状态与日志
 - **回滚边界**：注销撤销（`POST /me/cancel-deletion`）只在到期前有效；到期物理删除后数据不可恢复。**项目不创建任何数据库备份**（无 `.bak`、无 `db.backup()`），改库前如需快照由执行人自行评估，仓库与部署脚本不产生备份文件。
 - **参数调整**：`MIM_DELETION_GRACE_DAYS`（1–365，默认 7）、`MIM_DELETION_SWEEP_MINUTES`（5–1440，默认 60）、`MIM_DELETION_BATCH`（1–500，默认 50），越界 / 非法值回落缺省；登记于 `.env.example` 与 [09-third-party-sdk-inventory.md](./09-third-party-sdk-inventory.md)。
 
+### 7.3.2 合规页 / 举报回看 / 备案选项运维（2026-11-25 新增）
+
+- **合规静态页**：`/legal/privacy`、`/legal/terms`、`/legal/refund`、`/legal/help` 为前端 SPA 路由，服务端 `/* → /index.html` 通配即可，无独立后端页面；正文为骨架占位，正式条款由法务复核后在 `apps/web/src/views/Legal.tsx` 的 `meta` 表补章节与正文。
+- **我的举报端点**：`GET /api/v1/community/reports/mine` 为私密读，匿名 401 `AUTH_UNAUTHORIZED`；只回当前登录用户本人提交的单据，与既有运营侧举报列表（`/admin/reports`）权限边界不同；冒烟可对照 `GET /community/threads` 公开 200 与该端点匿名 401。
+- **备案号选项**：`beian_icp`（ICP 备案号文本）、`beian_police`（公安备案号文本，留空不渲染公安链接）存 `site_settings` 单条 JSON（key `options`），`publicRead` 随 `GET /api/v1/site/options` 公开；后台「站点选项 → 备案信息」分组可改、可单键恢复默认；留空即不在页脚展示备案整块。
+- **404 口径**：未知路径由前端路由渲染独立 404 视图，不代表 nginx 返回 404 状态码（SPA 托管服务端恒 200 + index.html）；校验前端渲染落点即可，不要把服务端状态码当作 404 判定。
+
 ### 7.4 生产布局
 
 | 项 | 路径 |

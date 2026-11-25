@@ -10,6 +10,8 @@ import { t } from '@mim/i18n';
 import type { Locale } from '@mim/i18n';
 // 仅类型导入：视图标识（导航跳转入参）
 import type { AppView } from './router';
+// 合规静态页深链接：页脚四项合规链接跳 /legal/<kind>，走站内多段路径
+import { legalPath, navigatePath } from './router';
 // 仅类型导入：会话结构（用户卡与登录态分支）
 import type { Session } from './api';
 // 仅类型导入：明暗模式（切换按钮展示对向文案）
@@ -239,7 +241,7 @@ export function Shell({
               ))}
             </ul>
           </div>
-          <div className="footer-col">{/* 更多列：圈子与账号 / 登录 */}
+          <div className="footer-col">{/* 更多列：圈子与账号 / 登录 + 合规入口 */}
             <h4 className="footer-title">{locale === 'en-US' ? 'More' : '更多'}</h4>
             <ul className="footer-list">
               {footerTail.map((item) => ( // 按登录态分流的尾部入口
@@ -247,16 +249,27 @@ export function Shell({
                   <button type="button" onClick={() => onNavigate(item.view as AppView)}>{item.label}</button>
                 </li>
               ))}
+              {/* 合规静态页四项：匿名态也可见，点击进对应 /legal/<kind> 骨架页 */}
+              <li><button type="button" onClick={() => navigatePath(legalPath('privacy'))}>{locale === 'en-US' ? 'Privacy' : '隐私政策'}</button></li>
+              <li><button type="button" onClick={() => navigatePath(legalPath('terms'))}>{locale === 'en-US' ? 'Terms' : '用户协议'}</button></li>
+              <li><button type="button" onClick={() => navigatePath(legalPath('refund'))}>{locale === 'en-US' ? 'Refund' : '退款售后'}</button></li>
+              <li><button type="button" onClick={() => navigatePath(legalPath('help'))}>{locale === 'en-US' ? 'Help' : '帮助中心'}</button></li>
             </ul>
           </div>
         </div>
         <div className="footer-bottom">{/* 版权与备案：最小字号，同一行两端分布 */}
           <span className="footer-copy">© {year} Mim</span>{/* 版权：按渲染年份计算 */}
-          <span className="footer-beian">{/* 备案号不做成按钮，仅普通链接 */}
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">苏ICP备2025161175号-1</a>
-            <span aria-hidden="true">·</span>{/* 分隔点 */}
-            <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener noreferrer">苏公网安备32072202010512号</a>
-          </span>
+          {(site.beianIcp || site.beianPolice) && ( // 两项都留空时整块不渲染，避免出现空链接槽
+            <span className="footer-beian">{/* 备案号不做成站内按钮，仅普通外链 */}
+              {site.beianIcp && ( // ICP 备案号：后台可留空关闭
+                <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">{site.beianIcp}</a>
+              )}
+              {site.beianIcp && site.beianPolice && <span aria-hidden="true">·</span>}{/* 两项都有才显示分隔点 */}
+              {site.beianPolice && ( // 公安备案号：后台可留空关闭
+                <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener noreferrer">{site.beianPolice}</a>
+              )}
+            </span>
+          )}
         </div>
       </footer>)}
 

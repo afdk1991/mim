@@ -1566,6 +1566,42 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ ok: true, action: body.action }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
+  /** 我的举报（分页）：只读本人提交的社区举报单，不带版主权限，匿名 401。 */
+  router.get('/community/reports/mine', requireAuth, (req, res) => { // 路由 GET /community/reports/mine：本人举报记录入口
+    const userId = req.user!.id; // 举报归属人：只按 reporter_id 过滤，绝不读取他人单据
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 50); // 单页上限 50，与收藏 / 通知同口径
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移，默认从第 0 条起
+    const total = (deps.db.prepare('SELECT COUNT(*) AS n FROM community_reports WHERE reporter_id = ?').get(userId) as { n: number }).n; // 本人举报总数
+    const rows = deps.db // 保存 rows：承载本步骤的计算结果供后续使用
+      .prepare( // 预编译 SQL：固定语句结构后绑定参数执行
+        `SELECT r.id, r.target_type, r.target_id, r.thread_id, r.reason, r.detail,
+                r.status, r.resolution, r.created_at, r.resolved_at,
+                t.title AS thread_title
+         FROM community_reports r LEFT JOIN community_threads t ON t.id = r.thread_id
+         WHERE r.reporter_id = ? ORDER BY r.created_at DESC LIMIT ? OFFSET ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(userId, limit, offset) as Array<{ // 查询多行：读取列表供批量处理
+        id: string; target_type: 'thread' | 'post'; target_id: string; thread_id: string | null; // 对象定位字段
+        reason: string; detail: string; status: 'open' | 'resolved' | 'dismissed'; // 原始状态与理由
+        resolution: string | null; created_at: string; resolved_at: string | null; // 处理动作与时间
+        thread_title: string | null; // 归属帖子标题（回复举报时便于定位）
+      }>;
+    const items = rows.map((row) => ({ // 状态归一化：库内 open 对前台展示为 pending（待处理），resolved / dismissed 原样透传
+      id: row.id, // 举报主键
+      target_type: row.target_type, // 对象类型：thread / post
+      target_id: row.target_id, // 对象主键
+      thread_id: row.thread_id, // 归属帖子
+      thread_title: row.thread_title, // 帖子标题
+      reason: row.reason, // 举报原因枚举键
+      detail: row.detail, // 补充说明
+      status: row.status === 'open' ? 'pending' : row.status, // 归一化状态：pending / resolved / dismissed
+      resolution: row.resolution, // 处理动作：dismiss / hide_thread / delete_post
+      created_at: row.created_at, // 提交时间
+      resolved_at: row.resolved_at, // 处理时间
+    })); // 映射结束：每行投影为前台视图
+    res.json({ items, total, offset, limit }); // 输出响应：分页结构与收藏 / 通知一致
+  }); // 结束函数体：本层作用域收尾
+
   /** 站内通知：分页列表 + 未读数。 */
   router.get('/community/notifications', (req, res) => { // 路由 GET /community/notifications：注册入口并绑定鉴权与处理逻辑
     const userId = req.user!.id; // 收件人

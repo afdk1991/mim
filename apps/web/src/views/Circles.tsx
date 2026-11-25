@@ -10,6 +10,8 @@ import type { Locale } from '@mim/i18n'; // 语言类型
 import { api, errorText } from '../api'; // 接口客户端与错误文案翻译
 import type { CircleMember, CircleNotice, CirclePost, CircleSummary } from '../api'; // 圈子域类型
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
+import { ListSkeleton } from '../components/list-skeleton'; // 列表骨架统一组件
+import { usePathSegments } from '../router'; // 多段深链接解析：/circles/:slug 直达详情
 
 interface Props { // 视图参数
   locale: Locale; // 当前界面语言
@@ -77,22 +79,42 @@ export function Circles({ locale, hasSession = false, onRequireLogin }: Props) {
   const [noticeBody, setNoticeBody] = useState(''); // 公告草稿
   const [createOpen, setCreateOpen] = useState(false); // 创建面板展开态
   const [form, setForm] = useState<CircleForm>(EMPTY_FORM); // 创建表单草稿
+  const [keyword, setKeyword] = useState(''); // 关键词筛选草稿（名称 / 简介）
+  const [category, setCategory] = useState(''); // 分类筛选；空串表示全部分类
+  const [catalog, setCatalog] = useState<CircleSummary[]>([]); // 最近一次未筛选清单：分类候选去重来源，不另建词表
+  const segments = usePathSegments(); // 多段路径：/circles/:slug 直达圈子详情
 
-  /** 拉取公开圈子清单；失败保留空态并记录错误。 */
+  /** 拉取公开圈子清单；关键词 / 分类透传后端既有参数；失败保留空态并记录错误。 */
   const loadList = useCallback(async () => {
     setLoading(true);
     setError(null);
     try { // 异常捕获起点：包裹可能抛出错误的操作
-      const data = await api.circles.list(); // 常量 data：保存固定配置或一次性派生值
+      const data = await api.circles.list({ keyword: keyword.trim() || undefined, category: category || undefined }); // 空参不下发，保持请求干净
       setItems(data.items);
+      if (!keyword.trim() && !category) setCatalog(data.items); // 未筛选时全量清单作为分类候选源
     } catch (err) {
       setError(errorText(locale, err));
     } finally {
       setLoading(false);
     } // 代码块结束
-  }, [locale]);
+  }, [locale, keyword, category]);
 
   useEffect(() => { void loadList(); }, [loadList]);
+
+  /** 深链接直达：地址栏带 /circles/:slug 时挂载后自动打开对应圈子详情 */
+  useEffect(() => {
+    const slug = segments[1]; // 第二段为圈子标识
+    if (slug && !detail) void openDetail(slug); // 未在详情态时按标识拉取详情
+  }, [segments, detail]); // 路径或详情态变化时复核
+
+  /** 分类候选：从清单结果去重得到，过滤空值，不新增前端词表 */
+  const categoryOptions = Array.from(new Set(catalog.map((circle) => circle.category).filter((value): value is string => Boolean(value)))); // 去重后的分类下拉候选
+
+  /** 重置筛选：关键词与分类清空，回到全量清单 */
+  function resetFilters() { // 重置入口
+    setKeyword(''); // 清空关键词
+    setCategory(''); // 清空分类
+  } // resetFilters 结束
 
   /** 拉取圈子详情与成员可见的动态 / 公告 / 名单；非成员访问私密圈时子流静默留空。 */
   async function openDetail(slug: string): Promise<void> {
@@ -394,6 +416,26 @@ export function Circles({ locale, hasSession = false, onRequireLogin }: Props) {
       {error && <p className="error">{error}</p>}
       {notice && <p className="hint">{notice}</p>}
 
+      {/* 发现筛选条：关键词 + 分类下拉（候选来自清单结果去重），变更即刷新，重置恢复全量；匿名可读不受影响 */}
+      <section className="panel">{/* 筛选条容器 */}
+        <div className="tool-form">{/* 表单行：输入框 + 下拉 + 重置 */}
+          <input
+            className="input"
+            type="search"
+            placeholder={tr(locale, '搜索圈子名称或简介', 'Search name or intro')}
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+          />
+          <select className="input" value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option value="">{tr(locale, '全部分类', 'All categories')}</option>
+            {categoryOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <button type="button" className="btn ghost" onClick={resetFilters}>{tr(locale, '重置', 'Reset')}</button>
+        </div>
+      </section>
+
       {/* 匿名访客：清单与空态可读，创建圈子是写操作，先引导登录 */}
       {!hasSession && (
         <section className="panel">{/* 执行当前业务步骤 */}
@@ -434,9 +476,9 @@ export function Circles({ locale, hasSession = false, onRequireLogin }: Props) {
       )}
 
       {loading ? (
-        <p className="hint">{tr(locale, '加载中…', 'Loading…')}</p>
+        <ListSkeleton count={6} variant="card" /> // 首屏卡片骨架：与真实网格同比例，加载完成原位替换
       ) : items.length === 0 ? (
-        <EmptyState kind="post" title={tr(locale, '暂无圈子', 'No circles yet')} hint={tr(locale, '加入感兴趣的圈子，或创建自己的圈子。', 'Join an existing circle or create one.')} />
+        <EmptyState kind="search" title={tr(locale, '没有匹配的圈子', 'No matching circles')} hint={tr(locale, '换个关键词或分类试试，也可以创建自己的圈子。', 'Try another keyword or category, or create one.')} />
       ) : (
         <div className="commerce-grid tools-grid">{/* 执行当前业务步骤 */}
           {items.map((circle) => (

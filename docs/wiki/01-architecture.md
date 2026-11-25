@@ -25,7 +25,7 @@
 │   .github/workflows/deploy.yml  push main 自动上线         │
 ├─────────────────────────────────────────────────────────┤
 │ 规划/参考层                                               │
-│   Mim-PRD.html       产品需求文档 V0.0.17-preview（草案）   │
+│   Mim-PRD.html       产品需求文档 V0.0.18-preview（草案）   │
 │   team-hiring-plan.md 技术约束分析 + 团队分阶段配置         │
 │   docs/wiki/         01~10 项目文档                        │
 └─────────────────────────────────────────────────────────┘
@@ -37,11 +37,11 @@
 - 后端 `services/mim-api`：Express 5 + `better-sqlite3`（WAL）+ JWT + zod，前缀 `/api/v1`，端口 8787
 - 前端 `apps/web`：React 18 + Vite 6，`src/api.ts` 统一 HTTP 契约；现行视图为社区 / 圈子 / 聊天 / 个人中心 / 收银台 / 支付回跳 / 登录（历史 FR-03 项目任务视图、模块商城、漫剧等已分阶段移除）
 - 密钥治理载体为根目录 `.env.example`（全空占位）+ `.gitignore`（忽略 `.env`、反向豁免 `.env.example`），一致性由 `env-check.mjs` 自动校验
-- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.17-preview`，见 [03-code-reference.md](./03-code-reference.md)）
+- 版本号来源：根 `package.json` 的 `version` + `RELEASE_CHANNEL`（预览通道展示 `V0.0.18-preview`，见 [03-code-reference.md](./03-code-reference.md)）
 
 ## 2. 目标产品架构（PRD 定义）
 
-PRD（Mim-PRD.html，V0.0.17-preview 草案）确定的核心产品决策是 **「Headless 中台 + 多端薄壳」**：
+PRD（Mim-PRD.html，V0.0.18-preview 草案）确定的核心产品决策是 **「Headless 中台 + 多端薄壳」**：
 
 ```
         Web     微信小程序    iOS App   Android App   PC(Win/macOS)

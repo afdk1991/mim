@@ -1,6 +1,6 @@
 # 07 · 功能模块
 
-> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.17-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
+> 本页从 [Mim-PRD.html](../../Mim-PRD.html)（V0.0.18-preview 草案）§3–§7 提取产品功能模块全景。所有条目均锚定 PRD 原文，`TBD` / `Assumption` 标注与 PRD 保持一致。技术/架构视角的模块清单见 [02-modules.md](./02-modules.md)，本页为产品功能视角。
 >
 > **现行覆盖（2026-11-24 全仓闭环审计轮）**：本页 §1 及后文涉及**功能模块商城**（catalog / modules / entitlements / 蓝图能力）、**漫剧 AI 剧**（comic / 工程 / 角色 / 分镜 / 生成任务 / 成片 / 导出）、**入口配置清单**（sites / entries）、**导航站**（navigation）、**统一搜索**（search）的条目与状态描述，均为历史交付快照——这些模块已随 2026-11-15 模块收口从代码删除，按铁律三保留作历史留痕，不代表当前工作树实况。现行能力以社区（帖子 / 图库 / 视频 / 圈子 / 公告 / 付费资产）、聊天 IM、账号身份、交易履约与 RBAC 后台为准；现行门禁为匿名可读 + 写操作需登录，注册由 `MIM_REGISTRATION_ENABLED` 控制且默认关闭，口令只认库内 credentials（环境变量超管口令已不生效）。**2026-11-24 审计轮又删除 5 个无抛出点错误码**：`AUTH_PASSWORD_NOT_CONFIGURED` / `ACCOUNT_REGION_MISMATCH` / `PAYMENT_REQUIRED` / `COST_LIMIT_EXCEEDED` / `GENERATION_FAILED`；本页后文出现这些码名的段落（含漫剧成本配额、AI 生成失败相关行）均为历史快照，现行口令失败口径为 `401 AUTH_PASSWORD_INVALID`。
 >
@@ -421,3 +421,29 @@ _本页为产品功能视角文档，随 PRD 草案（V0.0.14-preview）同步�
 - **验证**：`test/account-deletion.test.ts` 13 例；前端 `lib/deletion.test.ts` 9 例（倒计时分段 / 逾期判定 / 导出文件名）。
 
 表处置矩阵、保留面与运维操作见 [账号注销与数据清理-20261124](../../docs/账号注销与数据清理-20261124.md)。
+
+## 17. 合规与帮助中心 · 成长与个人聚合 · 举报回看（V0.0.18，2026-11-25）
+
+参照两份外部标杆矩阵（`reports/商业标杆借鉴矩阵-20261125.md`、`reports/内容与专业服务借鉴矩阵-20261125.md`，本地留档）落地，只取信息架构 / 信任表达 / 反馈可见性层面，不抄素材文案代码。
+
+### 17.1 合规与帮助中心
+
+- **四篇静态骨架页**：`/legal/privacy`（隐私政策）、`/legal/terms`（用户协议）、`/legal/refund`（退款与售后）、`/legal/help`（帮助中心），统一由 `apps/web/src/views/Legal.tsx` 按 `meta` 表渲染章节骨架；法律条款（采集字段、保留期限、第三方共享、免责与争议解决、退款范围与条件等）标注「待法务复核，占位不构成承诺」，不写成既定承诺。
+- **入口**：页脚「更多」列新增四项匿名可见链接；备案号 `beian_icp` / `beian_police` 收进站点选项注册表（`publicRead`），留空时对应链接不渲染；两项都空时备案整块不渲染。
+- **404 边界**：新增 `apps/web/src/views/NotFound.tsx`，未命中任何 `VIEW_SEGMENTS` 的路径渲染独立未找到页（标题 + 说明 + 回首页 / 去社区两个出口），不再静默回落首页；SPA 服务端仍回 index.html，404 判定由前端路由完成。
+- **根级错误边界**：`apps/web/src/error-boundary.tsx` 包裹前台与后台根视图，渲染期异常切兜底卡片（重试 / 回首页或刷新），`componentDidCatch` 留控制台日志；不吞接口错误，接口失败仍走各视图 error 通道。
+
+### 17.2 成长与个人聚合
+
+- **个人中心「我的内容」分区**（`apps/web/src/views/Profile.tsx`）：登录态回读成长等级进度（`GET /growth/level`）、徽章墙（`GET /growth/badges`，含未获得条件进度）、我的收藏（`GET /community/favorites`）、我加入的圈子（`GET /circles?joined=1`）、我的举报（`GET /community/reports/mine`）；匿名短路，不发请求、不渲染骨架。
+- **圈子筛选**（`apps/web/src/views/Circles.tsx`）：关键词（名称 / 简介）+ 分类下拉（候选由清单结果去重）+ 重置；筛选变更即刷新，空参不下发，无结果落「没有匹配的圈子」空态。
+- **骨架屏**：`apps/web/src/components/list-skeleton.tsx` 列表 / 详情骨架，复用既有 CSS 类，加载完成由真实内容或空态原位替换。
+
+### 17.3 举报回看
+
+- **新端点**：`GET /api/v1/community/reports/mine`（`services/mim-api/src/routes/community.ts`），私密读，只按 `reporter_id` 过滤，看不到他人单据；匿名 401 `AUTH_UNAUTHORIZED`，空记录返回空数组。
+- **门禁登记**：该路径已登记进 `services/mim-api/src/middleware.ts` 私密读前缀清单与 `scripts/verify-auth-gate.mjs` 静态 / 运行两套断言；契约测试 `test/community-reports-mine.test.ts` 4 例（匿名 401、本人可见、他人不可见、空记录）。
+
+### 17.4 验证口径
+
+`@mim/api` 62 文件 571 例、`@mim/web` 3 文件 28 例、三套构建 0、`verify-auth-gate` 149/149、`verify-deployments` 55/55、`verify-custom-domains` 20/20、`gap-scan` PASS。落地取舍与三分类说明见 [借鉴标杆落地-20261125](../../docs/借鉴标杆落地-20261125.md)。

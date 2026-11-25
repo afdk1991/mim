@@ -4,12 +4,18 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 // 引入语言类型
 import type { Locale } from '@mim/i18n';
-// 引入接口集合与错误文案翻译
-import { api, errorText } from '../api';
-// 引入用户信息类型：资料保存成功后回传上层刷新全局显示
-import type { OAuthProviderInfo, UserInfo } from '../api';
+// 引入接口集合、错误文案翻译与会话读取
+import { api, errorText, getSession } from '../api';
+// 引入用户信息类型与个人聚合视图类型
+import type { CircleSummary, FavoriteThreadItem, MyGrowthBadge, MyReportItem, OAuthProviderInfo, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
+// 引入站内深链接导航
+import { navigatePath, pathOf } from '../router';
+// 引入空态共享组件
+import { EmptyState } from '../empty-state';
+// 引入列表骨架统一组件
+import { ListSkeleton } from '../components/list-skeleton';
 // 引入注销倒计时格式化、逾期判定与导出文件名纯函数
 import { exportFileName, formatDateTime, formatRemaining, isOverdue } from '../lib/deletion';
 // 引入我的资产页签（付费资产域，2026-11-16）
@@ -21,11 +27,39 @@ interface Props {
   onUserUpdated: (user: UserInfo) => void; // 资料保存后同步全局用户态
 } // Props 结束
 
-/** 三个分区标识：资料编辑、我的资产与账号安全 */
-type Tab = 'profile' | 'assets' | 'security';
+/** 四个分区标识：资料编辑、我的内容、我的资产与账号安全 */
+type Tab = 'profile' | 'content' | 'assets' | 'security';
 
 /** 全部合法分区，用于校验地址栏 ?tab= 入参 */
-const TAB_IDS: readonly Tab[] = ['profile', 'assets', 'security'];
+const TAB_IDS: readonly Tab[] = ['profile', 'content', 'assets', 'security'];
+
+/** 举报原因文案：键与后端枚举一致，文案仅做本地展示映射 */
+const REPORT_REASON: Record<string, string> = { // 原因 → 中文名
+  spam: '垃圾广告', // 广告刷屏
+  abuse: '辱骂攻击', // 人身攻击
+  illegal: '违法信息', // 违法内容
+  porn: '色情低俗', // 色情低俗
+  other: '其他', // 其他
+}; // 常量结束
+
+/** 举报状态文案：pending 待处理 / resolved 已处理 / dismissed 已忽略 */
+const REPORT_STATUS: Record<string, string> = { // 状态 → 中文名
+  pending: '待处理', // 库内 open 归一化后的待处理态
+  resolved: '已处理', // 版主已处置
+  dismissed: '已忽略', // 核实未违规，予以忽略
+}; // 常量结束
+
+/** 圈子角色文案：与 Circles 视图同一口径 */
+function circleRoleLabel(isZh: boolean, role: CircleSummary['my_role']): string { // 角色 → 中文标签
+  if (role === 'owner') return isZh ? '圈主' : 'Owner'; // 圈主
+  if (role === 'admin') return isZh ? '管理员' : 'Admin'; // 管理员
+  return isZh ? '成员' : 'Member'; // 普通成员
+} // 函数结束
+
+/** 时间只展示到日，和社区其他位置一致；空值回落空串 */
+function day(iso: string | null | undefined): string { // 日期截取
+  return iso ? iso.slice(0, 10) : ''; // 非法 / 空值回空串
+} // 函数结束
 
 /** 从地址栏 ?tab= 读取初始分区；非法值回落资料分区 */
 function initialTab(): Tab {
@@ -67,6 +101,39 @@ export function Profile({ locale, onUserUpdated }: Props) {
   const [confirmed, setConfirmed] = useState(false); // 勾选「我已知晓数据不可恢复」
   const [deleteConfirmText, setDeleteConfirmText] = useState(''); // 二次确认输入的 DELETE 文本
   const [bannerDismissed, setBannerDismissed] = useState(false); // 待删除横幅是否已点「知道了」收起
+
+  // ===== 个人聚合：成长 / 收藏 / 圈子 / 举报（私密读，匿名不请求、不渲染骨架） =====
+  const hasSession = !!getSession(); // 当前是否有本地会话：无会话时 loader 直接返回空态，不发请求
+  const growthLevel = useAsync(async () => { // 等级进度：匿名直接回落 null，不打私密读接口
+    if (!hasSession) return null; // 匿名短路：不请求、不渲染占位骨架
+    return api.growth.level(); // 已登录回读等级与积分进度
+  }, [hasSession]);
+  const growthBadges = useAsync(async () => { // 我的徽章：匿名回落空列表
+    if (!hasSession) return { badges: [] as MyGrowthBadge[] }; // 匿名短路
+    return api.growth.badges(); // 已登录回读徽章墙
+  }, [hasSession]);
+  const favorites = useAsync(async () => { // 我的收藏：匿名回落空列表
+    if (!hasSession) return { items: [] as FavoriteThreadItem[] }; // 匿名短路
+    return api.community.favorites(); // 已登录回读收藏帖
+  }, [hasSession]);
+  const joinedCircles = useAsync(async () => { // 我加入的圈子：匿名回落空列表；成员标记由列表项 i_am_member 前端筛选
+    if (!hasSession) return { items: [] as CircleSummary[] }; // 匿名短路
+    return api.circles.list(); // 拉公开圈子清单，本地过滤已加入
+  }, [hasSession]);
+  const myReports = useAsync(async () => { // 我的举报：匿名回落空列表
+    if (!hasSession) return { items: [] as MyReportItem[], total: 0 }; // 匿名短路
+    return api.community.myReports(); // 已登录回读本人举报单
+  }, [hasSession]);
+
+  /** 跳转帖子详情：与社区卡片同一深链接口径 */
+  function openThread(id: string) { // 帖子详情导航
+    navigatePath(pathOf('community', `post/${encodeURIComponent(id)}`)); // 地址栏变为 /community/post/:id
+  } // openThread 结束
+
+  /** 跳转圈子详情：圈子视图挂载后按路径段打开对应圈子 */
+  function openCircle(slug: string) { // 圈子详情导航
+    navigatePath(pathOf('circles', encodeURIComponent(slug))); // 地址栏变为 /circles/:slug
+  } // openCircle 结束
 
   const user = me.data?.user; // 当前用户
   const pendingAt = user?.deletion_scheduled_at ?? null; // 预约删除时刻；null 表示未申请注销
@@ -218,6 +285,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
         {/* 分区切换 */}
         <nav className="profile-tabs">{/* 执行当前业务步骤 */}
           <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => selectTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
+          <button type="button" className={`tab${tab === 'content' ? ' active' : ''}`} onClick={() => selectTab('content')}>{isZh ? '我的内容' : 'My content'}</button>
           <button type="button" className={`tab${tab === 'assets' ? ' active' : ''}`} onClick={() => selectTab('assets')}>{isZh ? '我的资产' : 'My assets'}</button>
           <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
         </nav>
@@ -248,12 +316,142 @@ export function Profile({ locale, onUserUpdated }: Props) {
         ) // 执行当前业务步骤
       ) : null}
 
-      {/* 分区二：我的资产（付费资产域，仅登录后可见；?tab=assets 可直达） */}
+      {/* 分区二：我的内容（成长等级 / 徽章 / 收藏 / 圈子 / 举报，私密读仅登录后请求） */}
+      {tab === 'content' ? (
+        <div className="profile-content">{/* 个人聚合区块容器 */}
+          {/* 成长：当前等级 + 等级内进度条 + 已获得徽章墙 */}
+          <section className="panel">{/* 成长区块 */}
+            <div className="panel-head"><h2>{isZh ? '成长等级' : 'Level'}</h2></div>
+            {growthLevel.loading ? (
+              <ListSkeleton count={1} /> // 等级块首屏骨架：单行占位
+            ) : growthLevel.data ? (
+              <div>
+                <p className="hint">{/* 等级名 + 累计积分 */}
+                  {isZh ? '当前等级：' : 'Current level: '}
+                  <strong>{growthLevel.data.level?.name ?? '-'}</strong>
+                  <span className="muted"> · {isZh ? '累计积分' : 'Points'} {growthLevel.data.lifetime_points}</span>
+                </p>
+                {/* 进度条：轨道与填充均用既有中性变量，未新增样式类；宽度由接口进度驱动 */}
+                <div style={{ width: '100%', height: 8, background: 'var(--surface-3)', borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.max(0, Math.min(100, growthLevel.data.progress_percent))}%`, height: '100%', background: 'var(--primary)' }} />
+                </div>
+                <p className="muted">{/* 距下一级差值；满级给兜底文案 */}
+                  {growthLevel.data.next_level
+                    ? (isZh ? `距「${growthLevel.data.next_level.name}」还差 ${growthLevel.data.points_to_next} 积分` : `${growthLevel.data.points_to_next} points to ${growthLevel.data.next_level.name}`)
+                    : (isZh ? '已达当前最高等级' : 'Max level reached')}
+                </p>
+              </div>
+            ) : (
+              <p className="muted">{isZh ? '等级信息暂不可用' : 'Level info unavailable'}</p>
+            )}
+            {growthLevel.error ? <div className="chat-error">{errorText(locale, growthLevel.error)}</div> : null}
+
+            {/* 徽章墙：只展示已获得徽章；未获得徽章不在前台占位（理由见交付说明），文案全部取接口名称 */}
+            <h3>{isZh ? '我的徽章' : 'My badges'}</h3>
+            {growthBadges.loading ? (
+              <ListSkeleton count={3} /> // 徽章区首屏骨架
+            ) : (growthBadges.data?.badges ?? []).filter((badge) => badge.awarded).length === 0 ? (
+              <EmptyState kind="cap" title={isZh ? '还没有徽章' : 'No badges yet'} hint={isZh ? '签到、发帖、累计积分等行为达成条件后自动获得徽章。' : 'Earn badges by checking in, posting and reaching point milestones.'} />
+            ) : (
+              <div className="oauth-grid">{/* 复用既有按钮网格排布徽章 */}
+                {(growthBadges.data?.badges ?? [])
+                  .filter((badge) => badge.awarded)
+                  .map((badge) => (
+                    <span key={badge.code} className="deploy-badge" title={badge.description}>{badge.icon} {badge.name}</span>
+                  ))}
+              </div>
+            )}
+            {growthBadges.error ? <div className="chat-error">{errorText(locale, growthBadges.error)}</div> : null}
+          </section>
+
+          {/* 我的收藏：标题 / 所属板块 / 收藏时间，点击进帖子详情 */}
+          <section className="panel">{/* 收藏区块 */}
+            <div className="panel-head"><h2>{isZh ? '我的收藏' : 'Favorites'}</h2></div>
+            {favorites.loading ? (
+              <ListSkeleton count={3} /> // 收藏列表首屏骨架
+            ) : (favorites.data?.items ?? []).length === 0 ? (
+              <EmptyState
+                kind="love"
+                title={isZh ? '还没有收藏' : 'No favorites yet'}
+                hint={isZh ? '逛社区时收藏感兴趣的帖子，这里会集中展示。' : 'Save threads you like and find them here.'}
+                action={<button type="button" className="btn ghost" onClick={() => navigatePath(pathOf('community'))}>{isZh ? '去社区逛逛' : 'Browse community'}</button>}
+              />
+            ) : (
+              <ul className="plain-list">{/* 收藏帖列表 */}
+                {(favorites.data?.items ?? []).map((thread) => (
+                  <li className="deploy-row" key={thread.id} onClick={() => openThread(thread.id)}>{/* 整行点击进详情 */}
+                    <span>{thread.title}</span>
+                    <span className="muted">{thread.board_name} · {day(thread.favorited_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {favorites.error ? <div className="chat-error">{errorText(locale, favorites.error)}</div> : null}
+          </section>
+
+          {/* 我加入的圈子：名称 / 我的角色 / 成员数，点击进圈子详情；成员标记由列表项 i_am_member 前端筛选 */}
+          <section className="panel">{/* 圈子区块 */}
+            <div className="panel-head"><h2>{isZh ? '我加入的圈子' : 'My circles'}</h2></div>
+            {joinedCircles.loading ? (
+              <ListSkeleton count={3} /> // 圈子列表首屏骨架
+            ) : (joinedCircles.data?.items ?? []).filter((circle) => circle.i_am_member).length === 0 ? (
+              <EmptyState
+                kind="user"
+                title={isZh ? '还没有加入圈子' : 'No circles joined'}
+                hint={isZh ? '加入感兴趣的圈子，和成员一起交流。' : 'Join circles to connect with members.'}
+                action={<button type="button" className="btn ghost" onClick={() => navigatePath(pathOf('circles'))}>{isZh ? '发现圈子' : 'Discover circles'}</button>}
+              />
+            ) : (
+              <ul className="plain-list">{/* 已加入圈子列表 */}
+                {(joinedCircles.data?.items ?? [])
+                  .filter((circle) => circle.i_am_member)
+                  .map((circle) => (
+                    <li className="deploy-row" key={circle.slug} onClick={() => openCircle(circle.slug)}>{/* 整行点击进圈子详情 */}
+                      <span>{circle.name}</span>
+                      <span className="muted">{circleRoleLabel(isZh, circle.my_role)} · {isZh ? '成员' : 'Members'} {circle.member_count}</span>
+                    </li>
+                  ))}
+              </ul>
+            )}
+            {joinedCircles.error ? <div className="chat-error">{errorText(locale, joinedCircles.error)}</div> : null}
+          </section>
+
+          {/* 我的举报：理由 / 详情 / 状态 / 时间，关联帖子可点击跳转 */}
+          <section className="panel">{/* 举报区块 */}
+            <div className="panel-head"><h2>{isZh ? '我的举报' : 'My reports'}</h2></div>
+            {myReports.loading ? (
+              <ListSkeleton count={3} /> // 举报列表首屏骨架
+            ) : (myReports.data?.items ?? []).length === 0 ? (
+              <EmptyState kind="cap" title={isZh ? '还没有提交举报' : 'No reports'} hint={isZh ? '发现违规内容时可在帖子或回复上提交举报，处理进度会展示在这里。' : 'Report violating content here; status shows up here.'} />
+            ) : (
+              <ul className="plain-list">{/* 举报单列表 */}
+                {(myReports.data?.items ?? []).map((report) => (
+                  <li className="deploy-row" key={report.id}>{/* 单行举报单 */}
+                    <span>
+                      <span className="deploy-badge">{REPORT_REASON[report.reason] ?? report.reason}</span>
+                      {` · ${report.thread_title ?? (report.target_type === 'post' ? (isZh ? '回复' : 'Post') : (isZh ? '帖子' : 'Thread'))}`}
+                      {report.detail ? ` — ${report.detail}` : null}
+                    </span>
+                    <span className="muted">
+                      <span className={`deploy-badge${report.status === 'resolved' ? ' ok' : report.status === 'dismissed' ? ' muted' : ''}`}>{REPORT_STATUS[report.status] ?? report.status}</span>
+                      {' '}{day(report.created_at)}
+                      {report.resolved_at ? ` · ${isZh ? '处理于' : 'Resolved'} ${day(report.resolved_at)}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {myReports.error ? <div className="chat-error">{errorText(locale, myReports.error)}</div> : null}
+          </section>
+        </div>
+      ) : null}
+
+      {/* 分区三：我的资产（付费资产域，仅登录后可见；?tab=assets 可直达） */}
       {tab === 'assets' ? (
         <MyAssets locale={locale} />
       ) : null}
 
-      {/* 分区三：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
+      {/* 分区四：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}
       {tab === 'security' ? (
         <section className="profile-security">{/* 执行当前业务步骤 */}
           <p className="hint">{/* 执行当前业务步骤 */}

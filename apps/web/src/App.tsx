@@ -31,6 +31,8 @@ import { DEFAULT_SITE_OPTIONS, loadSiteOptions, subscribeSiteOptions } from './s
 import type { SiteOptions } from './site-options';
 // 悬浮按钮层：回到顶部 / 联系入口 / 分享，开关来自站点选项
 import { FloatingActions } from './FloatingActions';
+// 全站错误边界：兜住子树渲染期异常，给「重试 / 回首页」兜底 UI，不吞接口错误
+import { ErrorBoundary } from './error-boundary';
 
 // 路由级懒加载：每个视图独立 chunk，进入对应路由时才下载执行；命名导出经 then 适配为默认导出
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
@@ -40,6 +42,8 @@ const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat })
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 const Checkout = lazy(() => import('./views/Checkout').then((m) => ({ default: m.Checkout }))); // 收银台：/checkout?intent=... 二维码 / 渠道唤起 / 轮询
 const PaymentReturn = lazy(() => import('./views/PaymentReturn').then((m) => ({ default: m.PaymentReturn }))); // 支付回跳承接：/pay-return?intent=... 三态结果
+const Legal = lazy(() => import('./views/Legal').then((m) => ({ default: m.Legal }))); // 合规静态页：隐私 / 协议 / 退款售后 / 帮助中心
+const NotFound = lazy(() => import('./views/NotFound').then((m) => ({ default: m.NotFound }))); // 独立 404：未知路径落点
 // 零依赖路径路由：把 /<view> 单段路径映射到对应视图，刷新、直达深链接与前进后退均可用（旧 #/<view> 链接自动改写为路径形式）
 import { useAppRoute, baseOf, navigatePath } from './router'; // 路径路由 hook：地址栏 /<view> 驱动视图切换
 // 仅类型导入：视图标识（新增视图必须同步 navItems 与下方渲染分支）
@@ -119,7 +123,7 @@ export function App() {
   // 会话状态：初始值从 localStorage 恢复（api.ts 已做结构校验），实现刷新后保持登录
   const [session, setLocalSession] = useState<Session | null>(getSession());
   // 当前视图由地址栏路径驱动（对外路径段为模块功能名称，如 /community）：根路径与未知路径经 parseLocation 回落到社区
-  const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<模块功能名>）
+  const [route, go] = useAppRoute(); // go 为统一跳转入口，所有导航按钮都改用它（pushState 写入 /<模块功能名>）；未知路径由 parseLocation 落到独立 404 视图
   // 登录提示：null 默认无提示，expired 为登录态失效后的重登说明
   const [gateNotice, setGateNotice] = useState<'expired' | null>(null);
   // 外观主题：后台下发配置清洗后的设计令牌；接口不可达或脏数据时回落默认外观，不白屏
@@ -307,13 +311,15 @@ export function App() {
     checkout: locale === 'en-US' ? 'Checkout' : '收银台',
     payreturn: locale === 'en-US' ? 'Payment result' : '支付结果',
     login: locale === 'en-US' ? 'Sign in' : '登录',
+    legal: locale === 'en-US' ? 'Legal' : '合规说明',
+    notfound: locale === 'en-US' ? 'Not found' : '页面不存在',
   };
   useEffect(() => {
     const tagline = locale === 'en-US' ? 'Mim-Content, community and commerce' : 'Mim-内容、社区与交易一体化';
     const pageLabel = route.view === 'community' || route.view === 'home' // 首页例外：门户 / 社区即站点首页，用全称而不是「页面名 - Mim」
       ? undefined
       : navItems.find((item) => item.view === route.view)?.label ?? extraPageLabels[route.view];
-    document.title = pageLabel ? `${pageLabel} - Mim` : tagline; // 社区与未知视图都按首页全称
+    document.title = pageLabel ? `${pageLabel} - Mim` : tagline; // 首页 / 社区按站点全称；其余视图（含独立 404）取各自标签
   }, [route.view, locale, navItems]); // 视图 / 语言 / 后台导航文案变化时同步标题
   // 合并后的二级入口：被收进上级的页面不再占侧栏。
   // 2026-11-15 访客收敛：社区页顶部不再挂「圈子（成员制社群）」「部署汇总（N 个部署项）」，
@@ -343,6 +349,8 @@ export function App() {
     if (route.view === 'community') return; // 匿名可读：社区列表与帖子详情不跳登录
     if (route.view === 'circles') return; // 匿名可读：圈子清单与空态不跳登录，写操作由组件内引导
     if (route.view === 'home') return; // 匿名可读：门户首页不跳登录
+    if (route.view === 'legal') return; // 匿名可读：合规静态页（隐私 / 协议 / 帮助）不跳登录
+    if (route.view === 'notfound') return; // 匿名可读：独立 404 页不跳登录
     if (isAdminPath()) return; // 后台路由不拦，交给 apps/admin 的管理员校验
     // 记录登录前目标（含挂载前缀、查询串与 hash），登录成功后原样回跳
     rememberLoginNext(window.location.pathname + window.location.search + window.location.hash);
@@ -361,8 +369,10 @@ export function App() {
 
   // 主布局：外壳（顶部横导航 + 1200px 两栏 + 多列页脚）统一在 Shell 中组装，
   // 这里只负责按路由选出当前视图；外壳形态回退时改 Shell.tsx 与 styles.css 即可。
+  // ErrorBoundary 包住整棵布局：子树渲染抛错时切兜底 UI，接口错误仍由各视图 error 通道处理
   return (
-    // 布局容器：data-list-style / data-nav-layout 仍把后台外观口径透传给列表与外壳选择器
+    <ErrorBoundary locale={locale} onGoHome={() => go({ view: 'home' })}>
+    {/* 布局容器：data-list-style / data-nav-layout 仍把后台外观口径透传给列表与外壳选择器 */}
     <div className="layout" data-list-style={theme.listStyle} data-nav-layout={theme.navLayout}>
       <Shell
         locale={locale} // 当前语言
@@ -424,6 +434,10 @@ export function App() {
         {route.view === 'checkout' && authedSession && <Checkout locale={locale} />}{/* 收银台视图 */}
         {/* 支付回跳承接：/pay-return?intent=...，成功 / 处理中 / 失败三态 */}
         {route.view === 'payreturn' && authedSession && <PaymentReturn locale={locale} />}{/* 支付回跳视图 */}
+        {/* 合规静态页：隐私政策 / 用户协议 / 退款售后 / 帮助中心，匿名可读 */}
+        {route.view === 'legal' && <Legal locale={locale} kind={route.sub ?? 'privacy'} />}{/* 合规页子类型由路由解析结果带入 */}
+        {/* 独立 404：未知路径落点，提供回首页 / 去社区两个出口 */}
+        {route.view === 'notfound' && <NotFound onNavigate={(view) => go({ view })} />}{/* 404 视图结束 */}
         {/* 未登录且该视图需要身份：守卫会把用户送到 /signin，这里只留瞬时占位，不发起建号请求 */}
         {needsSession && !authedSession && (
           <div className="gate-shell">{/* 门禁页：统一表面 + 明确出口，避免只剩一行裸文本 */}
@@ -478,7 +492,8 @@ export function App() {
       {/* 悬浮按钮层：开关、位置与分享渠道均读站点选项；总开关关闭时组件自身返回 null */}
       <FloatingActions options={siteOptions} locale={locale} />
       {/* 页脚：已迁入 Shell（多列：品牌 / 导航 / 更多 + 底部版权备案） */}
-    </div> // 布局容器结束，JSX 根元素到此闭合
+    </div> // 布局容器结束
+    </ErrorBoundary> // 错误边界结束：整棵布局都在兜底范围内
   ); // 主布局渲染结束
 } // App 组件结束
 

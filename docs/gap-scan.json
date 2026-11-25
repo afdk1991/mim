@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-24T16:30:23.816Z",
+  "generatedAt": "2026-11-25T10:29:01.325Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -45,11 +45,11 @@
       "title": "D. 前端接线",
       "status": "WARN",
       "stats": {
-        "viewFiles": 16,
+        "viewFiles": 18,
         "unregistered": 8,
         "nested": 8,
-        "appViews": 8,
-        "segments": 8,
+        "appViews": 10,
+        "segments": 10,
         "missingSegments": 0
       },
       "failures": [],
