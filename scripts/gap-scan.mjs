@@ -11,7 +11,8 @@
  *  C. 环境变量：源码中出现的 MIM_* 是否都在 .env.example 与 09 清单登记
  *     （与 env-check 同源口径，额外检查「代码用了但没登记」方向）。
  *  D. 前端接线：apps/web/src/views/*.tsx 是否都在 App.tsx 注册（静态 import 或 lazy），
- *     router.ts 的 VIEW_SEGMENTS 是否覆盖全部 AppView 视图标识。
+ *     router.ts 的 VIEW_SEGMENTS 是否覆盖全部 AppView 视图标识。被其它视图 import 的
+ *     嵌套子组件不计缺口（记入 stats.nestedChildren）；既未注册也无人引用的孤儿视图才 FAIL。
  *  E. 未完成标记：源码目录内 TODO / FIXME / XXX / HACK / 未实现 / 待实现逐条列出
  *     （注释 / 描述性字符串里的合法历史说明降级为提示，不计硬缺口）。
  *
@@ -341,6 +342,7 @@ function checkFrontend() {
   } // 代码块结束
 
   const unregistered = []; // 常量 unregistered：保存固定配置或一次性派生值
+  const nestedChildren = []; // 常量 nestedChildren：被其它视图引用的嵌套子组件（设计如此，不算漏挂路由）
   for (const file of viewFiles) { // 循环：逐项遍历集合并执行相同处理
     const base = file.replace(/\.tsx$/, ''); // 常量 base：保存固定配置或一次性派生值
     const inApp = new RegExp(`views/${base}`).test(appText); // 常量 inApp：保存固定配置或一次性派生值
@@ -348,7 +350,10 @@ function checkFrontend() {
     if (!inApp) { // 条件分支：按判断结果选择后续处理路径
       unregistered.push({ file: rel(join(VIEWS_DIR, file)), nested }); // 执行当前业务步骤
       if (nested) { // 条件分支：按判断结果选择后续处理路径
-        warn('frontend', { file: rel(join(VIEWS_DIR, file)), detail: '未在 App.tsx 直接注册，但被其它视图作为子组件引用' }); // 调用 warn 并处理其返回结果
+        // 嵌套子组件设计口径：这些 .tsx 不直接挂路由，而是被父视图 import 后作为区块渲染
+        // （如 Community.tsx 组合列表/图库/指南/详情等子区块，Profile.tsx 组合 MyAssets）。
+        // 已被其它视图引用即证明接线存在，不计 WARN；仅「既未注册也无人引用」的孤儿视图才 FAIL。
+        nestedChildren.push(rel(join(VIEWS_DIR, file))); // 执行当前业务步骤
       } else { // 代码块结束
         fail('frontend', { file: rel(join(VIEWS_DIR, file)), detail: '视图既未在 App.tsx 注册，也未被其它视图引用' }); // 调用 fail 并处理其返回结果
       } // 代码块结束
@@ -370,7 +375,8 @@ function checkFrontend() {
   assertions.frontend.stats = { // 执行当前业务步骤
     viewFiles: viewFiles.length, // 对象字段 viewFiles：记录一项配置或数据
     unregistered: unregistered.length, // 对象字段 unregistered：记录一项配置或数据
-    nested: unregistered.filter((u) => u.nested).length, // 对象字段 nested：记录一项配置或数据
+    nested: nestedChildren.length, // 对象字段 nested：记录一项配置或数据
+    nestedChildren, // 对象字段 nestedChildren：嵌套子组件清单（设计如此，非缺口）
     appViews: viewIds.length, // 对象字段 appViews：记录一项配置或数据
     segments: segKeys.length, // 对象字段 segments：记录一项配置或数据
     missingSegments: missingSegments.length, // 对象字段 missingSegments：记录一项配置或数据
