@@ -6,6 +6,8 @@
 >
 > **现行覆盖（2026-11-24 全仓闭环审计轮）**：模块商城（catalog / cart / products / store）、入口配置清单（sites / entries / siteModules）、漫剧（comic）、导航站（navigation）、统一搜索（search）、云存储 / 图床 / 下载分发（cloud / img / download）模块及其视图、路由、测试、种子已从代码删除；下表相关条目标注「已下线，历史留痕」，其余描述为各轮交付快照。现行后端以社区 / 圈子 / 聊天 / 订单 / 支付 / 钱包 / 邀请 / 权限 / 运营等路由为准；现行前端视图段见 [01](./01-architecture.md) 顶部现行覆盖段。本轮（2026-11-24 审计轮）补充收口：`verify-entry-manifest.mjs` 与另外两个旧校验脚本一并删除；`apps/web/src/lib/release-notes.ts`、`config/entry-hosts.example.json` 已删除；`functions/` **保留**——`functions/[[catchall]].js`（SPA 深链接回落）与 `functions/api/[[path]].js`（`/api/*` 反代）是 Cloudflare Pages 现行部署工件，不是已删模块的死代码。真源计数、已删错误码与依赖净减见 [AGENTS.md 2026-11-24 覆盖段](../../AGENTS.md)。
 
+> **现行状态覆盖（2026-11-25 晚，错误码治理 + gap-scan 收口 + 前端视图拆分）**：版本 `0.0.18`（HEAD `00713fa`）。规模实测：web 顶层 **18** 个 `.tsx` 视图 + `views/chat/`（`format.ts`、`Bubbles.tsx`）、`views/community/`（`labels.ts`、`format.ts`、`ThreadSkeleton.tsx`）共 **5** 个拆分子模块；admin **23** 个视图；后端 **29** 个路由模块；数据库 **113** 张表。错误码注册表 **41** 码全部有后端抛出或前端 / i18n 消费，零删除；前端 `Chat.tsx`、`Community.tsx` 的纯函数、文案映射、消息气泡、骨架屏已按功能边界迁入子目录，入口仍为编排壳，模块职责与对外契约不变。后端 `routes/community.ts`（论坛 / 付费阅读 / VIP / 钱包 / 商城 / 优惠码 / 推广 / 图库，67 端点 + 30 个共享辅助函数）本轮**未拆分**，与并行在途改动同文件、耦合面大，留待后续独立轮次按资源域拆为 `routes/community/` 子路由。门禁：`@mim/api` 62 文件 / 571 例、`@mim/web` 3 文件 / 28 例、三套构建 0、`gap-scan` PASS。
+
 ## 模块清单总表
 
 | 模块 | 类型 | 职责 | 关键产出 |
