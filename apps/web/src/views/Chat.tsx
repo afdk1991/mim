@@ -13,10 +13,12 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { Locale } from '@mim/i18n';
 // API 客户端与会话读取
 import { api, getSession } from '../api';
-// 公开地址归一化：签名下载链接在跨源构建下补 API 源
-import { resolvePublicUrl } from '../api/request.js';
 // IM 相关类型：会话 / 消息 / 用户 / 成员
 import type { ImConversation, ImMember, ImMessage, ImUser } from '../api';
+// 聊天纯函数与常量：时间 / 体积 / 摘要 / 状态文案 / 撤回窗口 / 表情候选
+import { RECALL_WINDOW_MS, CHAT_EMOJIS, formatTime, messagePreview, statusMark } from './chat/format.js';
+// 聊天消息气泡：图片 / 文件
+import { ChatImageBubble, ChatFileBubble } from './chat/Bubbles.js';
 // IM socket hook：连接、发送、帧订阅
 import { useImSocket } from '../im/useImSocket';
 // 帧类型
@@ -30,122 +32,6 @@ import { EmptyState } from '../empty-state';
 interface ChatProps {
   locale: Locale; // 当前界面语言
 } // ChatProps 结束
-
-/** 撤回窗口：2 分钟，与后端保持一致（仅用于前端是否显示「撤回」按钮） */
-const RECALL_WINDOW_MS = 120000; // 毫秒
-
-/** 表情面板候选：纯本地插入 Unicode 字符，不依赖表情包服务 */
-const CHAT_EMOJIS = ['😀', '😄', '😅', '😂', '🤣', '😊', '😍', '🤔', '😐', '😭', '😡', '👍', '👏', '🙏', '🎉', '❤️', '🔥', '✅', '❌', '👌'];
-
-/** 格式化时间戳为 HH:mm */
-function formatTime(iso: string): string {
-  try { // 异常捕获起点：包裹可能抛出错误的操作
-    const d = new Date(iso); // 解析 ISO 时间
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // 取时分
-  } catch {
-    return ''; // 解析失败返回空
-  } // 代码块结束
-} // formatTime 结束
-
-/** 图片气泡：按 object_key 向服务端申请下载签名，取到后内联渲染缩略图，点击可看原图
- *  - 签名地址有时效，故按 object_key 缓存一次结果，消息列表重渲染不重复申请
- *  - 申请失败时回退为文字占位，不阻塞消息展示
- * 入口：消息 content_type === 'image' 且带 object_key
- * 出口：<img> 或占位文本
- */
-function ChatImageBubble({ objectKey, name, isZh }: { objectKey: string; name?: string; isZh: boolean }) {
-  const [url, setUrl] = useState<string | null>(null); // 签名后的可访问地址
-  const [failed, setFailed] = useState(false); // 申请失败标记
-  useEffect(() => {
-    let alive = true; // 组件卸载后丢弃回调，避免卸载后 setState
-    setFailed(false); // 每次换 key 重置失败态
-    api.media
-      .presignDownload(objectKey, 3600) // 申请 1 小时有效的下载签名
-      .then((res) => {
-        if (alive) setUrl(resolvePublicUrl(res.download.url)); // 拿到直链并归一化（相对签名链接补 API 源）
-      }) // 代码块结束
-      .catch(() => {
-        if (alive) setFailed(true); // 失败回退占位
-      });
-    return () => { // 返回当前函数的处理结果
-      alive = false; // 清理标记
-    }; // 代码块结束
-  }, [objectKey]); // 仅 object_key 变化时重新申请
-  if (failed) return <span className="chat-image-fallback">{`[图片] ${name ?? ''}`}</span>; // 失败占位
-  if (!url) return <span className="chat-image-loading">{isZh ? '图片加载中…' : 'Loading…'}</span>; // 加载中占位
-  return ( // 返回当前函数的处理结果
-    <a className="chat-image" href={url} target="_blank" rel="noreferrer" title={name ?? ''}>{/* 执行当前业务步骤 */}
-      <img src={url} alt={name ?? (isZh ? '图片' : 'image')} loading="lazy" />{/* 缩略展示，点击开原图 */}
-    </a>
-  ); // 执行当前业务步骤
-} // ChatImageBubble 结束
-
-/** 字节数格式化：文件气泡展示 1.2 MB 这类可读体积 */
-function formatBytes(size: number | null | undefined): string {
-  if (!size || size <= 0) return ''; // 缺失或 0 不展示
-  const units = ['B', 'KB', 'MB', 'GB']; // 单位阶梯
-  let value = size; // 逐级换算
-  let index = 0; // 当前单位下标
-  while (value >= 1024 && index < units.length - 1) { // 循环：条件成立时重复执行循环体
-    value /= 1024; // 换算到更大单位
-    index += 1; // 单位前移
-  } // 换算循环结束
-  return `${value.toFixed(1)} ${units[index]}`; // 保留一位小数
-} // formatBytes 结束
-
-/** 文件气泡：按 object_key 申请下载签名，给出文件名、体积与下载按钮
- *  - 点击下载即触发浏览器保存（download 属性带原始文件名）
- *  - 申请失败时回退为纯文本占位，不影响其它消息渲染
- */
-function ChatFileBubble({ objectKey, name, size, isZh }: { objectKey: string; name?: string; size?: number | null; isZh: boolean }) {
-  const [url, setUrl] = useState<string | null>(null); // 签名后的下载地址
-  const [failed, setFailed] = useState(false); // 申请失败标记
-  useEffect(() => {
-    let alive = true; // 卸载后丢弃回调
-    setFailed(false); // 切换文件时重置失败态
-    api.media
-      .presignDownload(objectKey, 3600) // 申请 1 小时有效下载签名
-      .then((res) => {
-        if (alive) setUrl(resolvePublicUrl(res.download.url)); // 拿到直链并归一化（相对签名链接补 API 源）
-      }) // 代码块结束
-      .catch(() => {
-        if (alive) setFailed(true); // 失败回退
-      });
-    return () => { // 返回当前函数的处理结果
-      alive = false; // 清理标记
-    }; // 代码块结束
-  }, [objectKey]); // 仅对象键变化时重新申请
-  const label = name ?? (isZh ? '文件' : 'file'); // 展示文件名
-  if (failed) return <span className="chat-file-fallback">{`[文件] ${label}`}</span>; // 失败占位
-  return ( // 返回当前函数的处理结果
-    <span className="chat-file">{/* 执行当前业务步骤 */}
-      <span className="chat-file-name">{label}</span>{/* 文件名 */}
-      {size ? <span className="chat-file-size">{formatBytes(size)}</span> : null}{/* 体积 */}
-      {url ? (
-        <a className="btn ghost small chat-file-download" href={url} download={label} target="_blank" rel="noreferrer">{/* 执行当前业务步骤 */}
-          {isZh ? '下载' : 'Download'}
-        </a>
-      ) : (
-        <span className="muted">{isZh ? '准备中…' : 'Preparing…'}</span>
-      )}{/* 下载入口 */}
-    </span>
-  ); // 执行当前业务步骤
-} // ChatFileBubble 结束
-
-/** 消息预览文本：列表里显示的摘要 */
-function messagePreview(msg: ImMessage): string {
-  if (msg.content_type === 'text') return msg.content; // 文本直接显示
-  if (msg.content_type === 'image') return '[图片]'; // 图片消息预览
-  if (msg.content_type === 'file') return `[文件] ${msg.object_name ?? ''}`; // 文件消息预览
-  return msg.content; // system 等其它类型兜底
-} // messagePreview 结束
-
-/** 发送状态图标：sent 单勾、delivered 双勾、read 双勾加粗由 CSS 区分 */
-function statusMark(status: ImMessage['status'], isZh: boolean): string {
-  if (status === 'read') return isZh ? '已读' : 'Read'; // 对方已读
-  if (status === 'delivered') return isZh ? '已送达' : 'Delivered'; // 已投递
-  return isZh ? '已发送' : 'Sent'; // 仅落库
-} // statusMark 结束
 
 /** 聊天视图 */
 export function Chat({ locale }: ChatProps) {

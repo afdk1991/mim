@@ -330,8 +330,13 @@ function checkEnv() { // 函数 checkEnv：封装一段可复用的处理逻辑
 function checkFrontend() {
   const appText = readText(APP_TSX) ?? ''; // 常量 appText：保存固定配置或一次性派生值
   const routerText = readText(ROUTER_TS) ?? ''; // 常量 routerText：保存固定配置或一次性派生值
-  // 视图清单：仅统计运行时 .tsx；*.test.tsx / *.spec.tsx 是组件测试，不挂路由、不计入注册检查
-  const viewFiles = existsSync(VIEWS_DIR) ? readdirSync(VIEWS_DIR).filter((f) => f.endsWith('.tsx') && !/\.(test|spec)\.tsx$/.test(f)) : []; // 常量 viewFiles：保存固定配置或一次性派生值
+  // 视图清单：仅统计运行时 .tsx；*.test.tsx / *.spec.tsx 是组件测试，不挂路由、不计入注册检查。
+  // views/ 下的子目录（如 community/、chat/）是父视图拆分出的子模块目录，不直接挂路由，同样跳过扫描。
+  const viewFiles = existsSync(VIEWS_DIR)
+    ? readdirSync(VIEWS_DIR, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.endsWith('.tsx') && !/\.(test|spec)\.tsx$/.test(e.name))
+      .map((e) => e.name)
+    : []; // 常量 viewFiles：保存固定配置或一次性派生值
 
   // 收集其它视图之间的引用（用于识别「嵌套子组件」而非漏挂路由）
   const otherRefs = new Set();
