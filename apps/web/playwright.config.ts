@@ -41,6 +41,12 @@ export default defineConfig({
           reuseExistingServer: !process.env.CI, // 本机复用已在跑的服务
           timeout: 150_000, // 冷启动 + 迁移上限
           cwd: REPO_ROOT,
+          // 仅作用于 e2e 拉起的这个 API 进程：开放注册供 helper 签发确定性测试账号，
+          // 关闭图形验证码门禁避免注册 / 登录用例被校验拦截；不改动生产部署环境变量。
+          env: {
+            MIM_REGISTRATION_ENABLED: '1',
+            MIM_CAPTCHA_MODE: 'off',
+          },
         },
         {
           command: `pnpm exec vite --port ${WEB_PORT} --strictPort`, // 直接在 web 包内起 vite，避免把 --port 误传给 pnpm

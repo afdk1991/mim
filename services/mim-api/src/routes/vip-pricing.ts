@@ -22,6 +22,7 @@ import { audited, auditActor } from '../audit.js'; // 统一审计留痕：操�
 import { parse } from '../validate.js'; // zod 校验包装：失败抛 VALIDATION_FAILED
 import { pathParam } from '../utils.js'; // 路径参数类型收敛
 import { loadVipPriceRules, type VipPriceRuleRow } from '../commerce/vip-pricing.js'; // 规则加载（公开读）
+import { REFUND_POLICY } from '../commerce/policy.js'; // 退款 / 服务费策略常量：公开定价页脚注同源复用
 import {
   createVipPriceRule, // 新增规则
   deleteVipPriceRule, // 删除规则
@@ -89,6 +90,42 @@ export function createVipPricingRouter(deps: ApiDeps): Router {
     }
     res.json({ rules: filtered }); // 回显规则列表（空数组即无命中规则，前端按原价展示）
   });
+
+  router.get('/vip/pricing/public', (_req, res) => { // 公开只读：定价与权益页档位，匿名可达
+    const rows = db // 保存 rows：承载本步骤的计算结果供后续使用
+      .prepare('SELECT code, name, level, price_cents, duration_days, perks FROM vip_plans WHERE active = 1 ORDER BY sort_order, level, code') // 预编译 SQL：只取公开列，不取 id / sort_order / active 等内部字段
+      .all() as Array<{ code: string; name: string; level: number; price_cents: number; duration_days: number; perks: string }>; // 查询多行：读取启用档位供批量整形
+    const plans = rows.map((row) => { // 库行 → 公开视图：perks JSON 安全解析，脏数据回落空数组
+      let perks: string[] = []; // 权益清单缺省为空
+      try { // perks 列为 JSON 字符串，解析失败不阻断公开页
+        const parsed: unknown = JSON.parse(row.perks); // 解析 JSON
+        if (Array.isArray(parsed)) { // 仅数组形态采纳
+          perks = parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0); // 逐项过滤非字符串与空串
+        } // 数组判断结束
+      } catch { // JSON 损坏时回落空权益清单
+        perks = []; // 兜底空数组
+      } // 解析兜底结束
+      return { // 公开视图只暴露定价页所需字段
+        code: row.code, // 套餐编码
+        name: row.name, // 档位名称
+        level: row.level, // 等级
+        price_cents: row.price_cents, // 价格（分）
+        duration_days: row.duration_days, // 有效天数
+        perks, // 权益清单
+      }; // 公开视图组装结束
+    }); // 档位整形结束
+    res.json({ // 公开定价响应：档位 + 策略脚注 + 合规入口
+      plans, // 启用档位列表（空数组即未配置，前端渲染空态）
+      policy: { // 脚注口径与退款政策常量同源，避免两处各写一套
+        platform_service_fee_cents: REFUND_POLICY.platform_service_fee_cents, // 平台服务费（分），固定 0
+        effective_date: REFUND_POLICY.effective_date, // 政策生效日期
+      }, // 策略脚注结束
+      legal: { // 合规静态页站内路径，前端经路由前缀拼装
+        refund_path: '/legal/refund', // 退款与售后说明
+        help_path: '/legal/help', // 帮助中心
+      }, // 合规入口结束
+    }); // 响应组装结束
+  }); // 公开定价路由结束
 
   router.get('/admin/vip/price-rules', perm, (_req, res) => { // 管理端全量列表
     const rules = listVipPriceRulesAdmin(db).map(vipPriceRuleView); // 库行统一转视图（enabled 转布尔）

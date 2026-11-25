@@ -139,6 +139,29 @@ export function createGrowthRouter(deps: ApiDeps): Router {
     res.json({ ok: true, badges: listMyBadges(deps.db, userId, now()) });
   });
 
+  // ===== 公开只读：成长与积分规则（匿名可见，不含任何个人数据） =====
+
+  // 等级名称 / 门槛 / 权益 + 积分获取规则，全部读取既有配置，不在此新造分值；
+  // 发帖、获赞等互动当前没有固定发分规则，sources 只回传已配置的来源，其余在 note 里说明。
+  router.get('/growth/rules', (_req, res) => {
+    const levels = listLevels(deps.db); // 等级表：名称 / 门槛 / 权益摘要
+    const config = getGrowthConfig(deps.db); // 签到规则与换天时区，取库内现值
+    const sources = [ // 积分来源清单：只列现有代码真实发分的渠道与配置分值
+      {
+        key: 'checkin', // 来源键：前端文案与图标的映射键
+        label: '每日签到', // 来源中文名
+        points: config.checkin.base_points, // 基础分值：取配置现值，不写死
+        description: `基础 ${config.checkin.base_points} 分；连续签到每日 +${config.checkin.streak_bonus_per_day} 分，加成封顶 +${config.checkin.streak_bonus_cap} 分。`, // 规则说明：把连续加成口径讲清
+      },
+    ]; // 来源清单结束
+    res.json({ // 对外规则视图：等级 + 签到规则 + 来源清单
+      levels, // 等级列表（GrowthLevel[]）
+      rules: { timezone: config.timezone, checkin: config.checkin }, // 签到规则原始配置，供前端展开说明
+      sources, // 已配置发分来源
+      note: '发帖、获赞等互动暂不发放固定积分；规则调整后将在此公示。', // 未开放来源的统一说明，避免访客误以为缺失
+    });
+  });
+
   // ===== 管理侧：签到规则 =====
 
   // 读取规则

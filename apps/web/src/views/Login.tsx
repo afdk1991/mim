@@ -548,6 +548,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
               autoComplete="username"
               // 必填，交给浏览器做基础校验
               required
+              // 错误提示通过 aria-describedby 关联到表单错误段
+              aria-describedby="auth-form-error"
             />{/* 账号输入框结束 */}
           </label>{/* 结束账号输入项 */}
 
@@ -565,6 +567,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                 autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 // 必填
                 required
+                // 错误提示通过 aria-describedby 关联到表单错误段
+                aria-describedby="auth-form-error"
               />{/* 密码输入框结束 */}
             </label> // 结束密码输入项
           ) : (
@@ -584,6 +588,8 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
                   maxLength={6}
                   // 必填
                   required
+                  // 错误提示通过 aria-describedby 关联到表单错误段
+                  aria-describedby="auth-form-error"
                 />{/* 验证码输入框结束 */}
                 <button
                   // 发送验证码按钮：普通按钮，避免触发表单提交
@@ -609,7 +615,7 @@ export function Login({ onLogin, embedded = false, notice = null }: Props) {
             </p> // 结束开发提示行
           )}{/* 结束开发态回显 */}
 
-          {error && <p className="error">{error}</p>}{/* 错误提示：仅在 error 非空时渲染 */}
+          {error && <p className="error" id="auth-form-error" role="alert">{error}</p>}{/* 错误提示：仅在 error 非空时渲染，role=alert 即时播报 */}
           {oauthError && <p className="error">{oauthErrorText(locale, oauthError)}</p>}{/* 第三方登录错误：回调带回码统一走本地化映射 */}
 
           {mode === 'code' && channels && !(provider === 'phone' ? channels.sms : channels.email) && ( // 通道未配置时明确引导改用密码登录

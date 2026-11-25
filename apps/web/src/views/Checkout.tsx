@@ -59,6 +59,23 @@ export function Checkout({ locale }: Props) {
   const [status, setStatus] = useState<IntentUiStatus>('pending');
   // 轮询计时器引用：未启动为 null，启动后保存句柄以便停表与卸载清理
   const timerRef = useRef<number | null>(null);
+  // 优惠码本地输入与核验结果：仅结算前预览命中规则与实减金额，不核销次数、不改支付意图
+  const [couponCode, setCouponCode] = useState(''); // 优惠码输入值
+  const [couponResult, setCouponResult] = useState<{ valid: boolean; discount_cents: number } | null>(null); // 核验结果
+  const [couponError, setCouponError] = useState<string | null>(null); // 核验失败文案
+
+  /** 核验优惠码：按当前应付金额预览命中规则与实减；失败回显服务端原因，不阻断支付 */
+  async function applyCoupon() {
+    if (!intent || !couponCode.trim()) return; // 无意图或空码不发请求
+    setCouponError(null); // 清空旧错误
+    try {
+      const res = await api.coupon.validate(couponCode.trim(), intent.amount_cents); // 预校验不消耗次数
+      setCouponResult(res); // 回填命中结果与实减金额
+    } catch (err) {
+      setCouponResult(null); // 核验不通过：清空旧命中
+      setCouponError(errorText(locale, err)); // 翻译为可读文案
+    } // try 结束
+  }
 
   // 停表函数：清掉周期轮询句柄并置空，幂等可重复调用；依赖为空数组，引用稳定
   const stopPolling = useCallback(() => {
@@ -180,6 +197,42 @@ export function Checkout({ locale }: Props) {
               <span className="deploy-badge muted">{providerLabel(locale, intent.provider)}</span>{/* 渠道可读名徽标 */}
             </div>{/* 结束渠道区块 */}
           </div>{/* 结束元信息行 */}
+
+          {/* 金额拆解：应付 / 优惠 / 平台服务费 0。
+              口径对齐：Stripe 定价页附加费逐项列示（https://stripe.com/pricing ）、
+              PayPal 结账信息最小化（https://www.paypal.com/business ）、
+              有赞公开交易规则（https://www.youzan.com/ ）。 */}
+          <div className="checkout-meta">
+            <div>
+              <span className="hint">{tr(locale, 'web.checkout.amount')}</span>
+              <strong className="checkout-amount">{formatCurrency(intent.amount_cents, 'CNY', locale)}</strong>
+            </div>
+            <div>
+              <span className="hint">{locale === 'en-US' ? 'Discount' : '优惠'}</span>
+              <span className="deploy-badge muted">-{formatCurrency(couponResult?.valid ? couponResult.discount_cents : 0, 'CNY', locale)}</span>
+            </div>
+            <div>
+              <span className="hint">{locale === 'en-US' ? 'Service fee' : '平台服务费'}</span>
+              <span className="deploy-badge muted">0</span>
+            </div>
+          </div>
+
+          {/* 优惠码核验：结算前就地展示命中规则与实减金额；预校验不核销次数、不改支付意图 */}
+          <div className="checkout-coupon">
+            <label>{locale === 'en-US' ? 'Coupon' : '优惠码'}
+              <input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="MIM10 / VIP20" />
+            </label>
+            <button type="button" className="btn ghost" onClick={() => void applyCoupon()}>
+              {locale === 'en-US' ? 'Apply' : '核验'}
+            </button>
+            {couponResult?.valid ? (
+              <p className="hint">
+                {locale === 'en-US' ? 'Coupon matched, discount ' : '命中优惠，实减 '}
+                {formatCurrency(couponResult.discount_cents, 'CNY', locale)}
+              </p>
+            ) : null}
+            {couponError ? <p className="chat-error">{couponError}</p> : null}
+          </div>
 
           <div className="checkout-qr">{/* 二维码区块：码图 + 扫码提示 */}
             <QrCode text={qrContent} size={188} />{/* 支付码图像，固定尺寸 */}

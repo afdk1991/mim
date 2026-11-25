@@ -17,6 +17,7 @@ import type { Locale } from '@mim/i18n'; // 语言标识
 import { errorText } from '../api'; // 统一错误本地化
 import type { CommunityPost, CommunityThreadDetail } from '../api'; // 详情 / 回复既有类型
 import { EmptyState } from '../empty-state'; // 空态共享组件：插图 + 标题 + 说明
+import { useDialogTrap } from '../a11y'; // 弹窗焦点陷阱：Tab 循环 + Esc 关闭 + 焦点归还
 import { currentSiteOptions } from '../site-options'; // 站点选项：搜索占位、热词与默认排序口径
 import { // 社区补齐端点
   boardReports,
@@ -75,14 +76,24 @@ function day(iso: string | null): string { // 日期截取
   return iso ? iso.slice(0, 10) : ''; // 空值回空串
 } // 函数结束
 
-/** 弹层通用容器：遮罩点击即关，点面板内部不冒泡。 */
+/** 弹层通用容器：遮罩点击即关，点面板内部不冒泡；带焦点陷阱、Esc 关闭与模态语义。 */
 function Sheet(props: { title: string; onClose: () => void; children: ReactNode }) { // 轻量弹层
+  const panelRef = useDialogTrap<HTMLDivElement>(true, props.onClose); // 挂焦点陷阱：Tab 循环 + Esc 关闭
+  const titleId = `mim-cm-sheet-title-${Math.random().toString(36).slice(2, 8)}`; // 标题关联 id，避免多弹层冲突
   return (
     <div className="mim-cm-mask" onClick={props.onClose} role="presentation">
-      <div className="mim-cm-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={props.title}>
+      <div
+        ref={panelRef}
+        className="mim-cm-sheet"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         <div className="mim-cm-sheet-head">
-          <strong>{props.title}</strong>
-          <button type="button" onClick={props.onClose}>关闭</button>
+          <strong id={titleId}>{props.title}</strong>
+          <button type="button" onClick={props.onClose} aria-label="关闭弹窗">关闭</button>
         </div>
         {props.children}
       </div>

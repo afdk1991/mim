@@ -138,16 +138,21 @@ export function PaymentReturn({ locale }: Props) {
               </button>{/* 结束手动刷新按钮 */}
             </>
           )}
-          {/* 支付成功分支：成功提示 + 渠道金额 + 回到个人中心 */}
+          {/* 支付成功分支：成功提示 + 渠道金额 + 下一步（去订单 / 去社区） */}
           {status === 'paid' && (
             <>{/* 成功片段包裹 */}
               <strong className="ok">{tr(locale, 'web.return.success')}</strong>{/* 成功主标题 */}
               <p className="hint">{/* 渠道与金额一行容器 */}
                 {providerLabel(locale, intent.provider)} · {formatCurrency(intent.amount_cents, 'CNY', locale)}{/* 渠道名与实付金额 */}
               </p>{/* 渠道名与实付金额一行展示 */}
-              <button type="button" className="btn primary" onClick={() => navigatePath(pathOf('account'))}>{/* 回到个人中心主按钮 */}
-                {tr(locale, 'web.checkout.back')}{/* 回到个人中心按钮文案 */}
-              </button>{/* 结束成功态按钮 */}
+              <div className="deploy-columns">{/* 下一步操作行：查看订单 / 继续逛社区 */}
+                <button type="button" className="btn primary" onClick={() => navigatePath(pathOf('account'))}>{/* 查看订单：进个人中心订单分区 */}
+                  {locale === 'en-US' ? 'View orders' : '查看订单'}
+                </button>
+                <button type="button" className="btn ghost" onClick={() => navigatePath(pathOf('community'))}>{/* 去社区：完成支付后回到内容浏览 */}
+                  {locale === 'en-US' ? 'Browse community' : '去社区'}
+                </button>
+              </div>
             </>
           )}
           {/* 支付失败分支：失败提示 + 可重新发起支付 */}

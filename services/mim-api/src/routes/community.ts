@@ -338,6 +338,39 @@ function buildSnippet(text: string, keyword: string, radius = 40): string { // �
   return html.replace(new RegExp(escapeRegExp(keyword), 'gi'), (hit) => `<mark>${hit}</mark>`); // 高亮命中词
 } // 结束代码块：本层作用域收尾
 
+/** 标签合法字符：中文 / 字母 / 数字 / 下划线 / 短横 / 井号 / 间隔号 / 空格；长度由归一化后校验。 */
+const TAG_NAME_RE = /^[\p{L}\p{N}_#·\- ]{2,12}$/u; // 仅放行可见字符，杜绝分隔符 / 控制字符混入标签名
+
+/** 标签归一化：去首尾空白、折叠内部连续空格、小写；非法（长度 2–12 或字符不在白名单）返回 null。 */
+function normalizeTag(raw: string): { slug: string; name: string } | null { // 定义函数 normalizeTag：发帖标签入参清洗与去重键生成
+  const name = String(raw ?? '').trim().replace(/\s+/g, ' '); // 折叠空白，避免「前端 」与「前端」被当成两个标签
+  if (name.length < 2 || name.length > 12) return null; // 长度口径：2–12 字，超出交由路由层 400
+  if (!TAG_NAME_RE.test(name)) return null; // 字符白名单不命中：拒绝分隔符 / 特殊符号
+  return { slug: name.toLowerCase(), name }; // slug 为去重键（小写归一化），name 为展示名原样保留
+} // normalizeTag 结束
+
+/** 批量回读一批帖子挂载的标签：按 thread_id 分组，供列表 / 详情一次性回带，避免逐帖 N+1 查询。 */
+function tagsForThreadIds(deps: ApiDeps, threadIds: string[]): Map<string, Array<{ slug: string; name: string }>> { // 定义函数 tagsForThreadIds：关系表字典连表批量读取
+  const map = new Map<string, Array<{ slug: string; name: string }>>(); // 主键 → 标签数组
+  if (threadIds.length === 0) return map; // 空集合不发起 SQL
+  const placeholders = threadIds.map(() => '?').join(', '); // 占位符与入参一一绑定，不拼接外部字符串
+  const rows = deps.db // 预编译 SQL：关系表连标签字典，按帖子分组回读
+    .prepare(
+      `SELECT tt.thread_id AS thread_id, tg.slug, tg.name
+         FROM community_thread_tags tt
+         JOIN community_tags tg ON tg.id = tt.tag_id
+        WHERE tt.thread_id IN (${placeholders})
+        ORDER BY tg.name ASC`,
+    ) // 调用结束：参数列表与链式调用收尾
+    .all(...threadIds) as Array<{ thread_id: string; slug: string; name: string }>; // 查询多行：读取列表供分组
+  for (const row of rows) { // 逐行归入对应帖子
+    const list = map.get(row.thread_id) ?? []; // 取既有数组，首帖时新建
+    list.push({ slug: row.slug, name: row.name }); // 追加标签
+    map.set(row.thread_id, list); // 回写分组
+  } // 循环结束
+  return map; // 返回分组结果
+} // tagsForThreadIds 结束
+
 /** 建板块门槛：等级阈值与每人数量上限；板块配置为 0 时回落环境变量 / 内置默认。 */
 function createLimits(deps: ApiDeps, board: { create_min_level?: number | null; create_max_per_user?: number | null }): { minLevel: number; maxPerUser: number } { // 定义函数 createLimits：封装可复用业务步骤
   const env = deps.env; // 保存 env：承载本步骤的计算结果供后续使用
@@ -527,7 +560,10 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     /^\/api\/v1\/community\/threads$/, // 帖子列表
     /^\/api\/v1\/community\/threads\/[^/]+$/, // 帖子详情
     /^\/api\/v1\/community\/threads\/[^/]+\/attachments\/[^/]+\/download$/, // 附件签名下载（免费帖访客可下，付费帖在处理函数内按解锁口径拦截）
-    /^\/api\/v1\/community\/search$/, // 社区搜索（标题 / 摘要 / 正文）
+    /^\/api\/v1\/community\/search$/, // 社区搜索（标题 / 摘要 / 正文 + 板块 / 标签分组）
+    /^\/api\/v1\/community\/tags$/, // 热门标签（按关联帖数倒序，匿名只读）
+    /^\/api\/v1\/community\/authors\/[^/]+$/, // 作者公开卡（昵称 / Mim ID / 等级 / 徽章 / 发帖数 / 获赞；不含收藏关注）
+    /^\/api\/v1\/community\/archive$/, // 按月归档（近 12 个月帖子计数与最近 3 条标题）
     /^\/api\/v1\/community\/trending$/, // 社区热榜（只读聚合，无个人数据）
     /^\/api\/v1\/community\/gallery\/items$/, // 图库 / 视频列表：按帖子权限过滤，锁定项不下发地址
     /^\/api\/v1\/community\/gallery\/collections$/, // 图库聚合：按帖 / 按作者分组
@@ -618,7 +654,8 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const userId = req.user?.id ?? ''; // 匿名可读：无会话时个人化过滤回落为空用户
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''; // 保存 q：承载本步骤的计算结果供后续使用
     const board = typeof req.query.board === 'string' && req.query.board !== 'all' ? req.query.board : ''; // 保存 board：承载本步骤的计算结果供后续使用
-    const kind = typeof req.query.kind === 'string' && req.query.kind !== 'all' ? req.query.kind : ''; // 保存 kind：承载本步骤的计算结果供后续使用
+    const kind = typeof req.query.kind === 'string' && req.query.kind !== 'all' ? req.query.kind : ''; // 保存 kind：二级类型过滤（text/video/gallery/series/qa/poll）
+    const tag = typeof req.query.tag === 'string' && req.query.tag !== 'all' ? req.query.tag.trim() : ''; // 保存 tag：标签 slug 过滤
     const sort = ['hot', 'views', 'replies', 'favorites', 'rating', 'recommend'].includes(String(req.query.sort)) // 保存 sort：承载本步骤的计算结果供后续使用
       ? String(req.query.sort) // 业务步骤：推进当前流程的下一项处理
       : 'latest'; // 业务步骤：推进当前流程的下一项处理
@@ -633,6 +670,10 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     if (kind) { // 条件分支：仅在满足业务前置条件时继续
       where.push('t.kind = ?'); // 业务步骤：推进当前流程的下一项处理
       args.push(kind); // 业务步骤：推进当前流程的下一项处理
+    } // 结束条件分支：本层作用域收尾
+    if (tag) { // 条件分支：标签过滤走关系表子查询，避免 JOIN 放大分页行数
+      where.push('t.id IN (SELECT tt.thread_id FROM community_thread_tags tt JOIN community_tags tg ON tg.id = tt.tag_id WHERE tg.slug = ?)'); // 命中该标签的帖子主键集合
+      args.push(tag); // 业务步骤：推进当前流程的下一项处理
     } // 结束条件分支：本层作用域收尾
     if (q) { // 条件分支：仅在满足业务前置条件时继续
       where.push('(t.title LIKE ? OR t.summary LIKE ? OR t.body LIKE ?)'); // 标题 / 摘要 / 正文三处命中，避免只搜标题漏掉正文
@@ -688,7 +729,10 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       const cover = locked ? '' : await signObjectRef(deps, req, row.cover_url); // 锁帖不签发封面，避免对象键封面绕过付费墙
       return { ...row, cover_url: cover, locked }; // 封面换成短时地址后下发
     })); // 结束函数体：本层作用域收尾
-    res.json({ items, total, offset, limit, sort, vip_level: level }); // 输出响应：把处理结果写回 HTTP 客户端
+    const rowIds = (rows as Array<{ id: string }>).map((row) => row.id); // 原始行主键列表：与 items 顺序一一对应
+    const tagMap = tagsForThreadIds(deps, rowIds); // 批量回带标签，避免逐帖 N+1 查询
+    const itemsWithTags = items.map((entry, index) => ({ ...entry, tags: tagMap.get(rowIds[index]) ?? [] })); // 每帖附 tags 数组（无标签为空数组）
+    res.json({ items: itemsWithTags, total, offset, limit, sort, vip_level: level }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束代码块：本层作用域收尾
 
   /** 帖子详情：未解锁时隐藏正文与回复。 */
@@ -802,6 +846,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const acceptedPost = unlocked && thread.accepted_post_id // 保存 acceptedPost：承载本步骤的计算结果供后续使用
       ? deps.db.prepare('SELECT p.id, p.content, p.created_at, u.display_name AS author_name FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ?').get(thread.accepted_post_id) // 预编译 SQL：固定语句结构后绑定参数执行
       : null; // 业务步骤：推进当前流程的下一项处理
+    const detailTags = tagsForThreadIds(deps, [id]).get(id) ?? []; // 该帖标签：公开只读，与付费墙无关（标签元信息不泄露正文）
     const canModerate = // 保存 canModerate：承载本步骤的计算结果供后续使用
       userId === thread.board_moderator_id || userId === thread.board_created_by || userId === thread.author_id; // 赋值：更新当前作用域中的状态
     res.json({ // 输出响应：把处理结果写回 HTTP 客户端
@@ -821,6 +866,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
         can_edit: userId !== '' && userId === thread.author_id, // 作者可编辑自己的帖子
         reply_locked: !!thread.locked, // 锁定后只读（与付费锁 locked 区分）
         poll: unlocked && options.length > 0 ? { options, total: (options as Array<{ votes: number }>).reduce((sum, option) => sum + option.votes, 0), my_option: myVote?.option_id ?? null } : null, // 对象字段：声明结构中的一项数据
+        tags: detailTags, // 该帖标签 chips：点击带 tag 跳到目录页检索
       }, // 结束代码块：本层作用域收尾
       posts, // 业务步骤：推进当前流程的下一项处理
       posts_total: postsTotal, // 回复总数：前端据此显示「加载更多」
@@ -913,6 +959,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
           mime: z.string().min(1).max(160).optional(), // 文件 MIME，缺省按对象键后缀推导
           size_bytes: z.number().int().min(0).max(2_000_000_000).optional(), // 声明大小，最终以存储实测为准
         })).max(6).optional(), // 单帖最多 6 个附件
+        tags: z.array(z.string().max(20)).max(10).optional(), // 标签：数量上限 3 由手动校验输出明确错误码，zod 只做形状与单条长度兜底
       }), // 结束代码块：本层作用域收尾
       req.body, // 读取请求：取得入参、身份或上下文
     ); // 调用结束：参数列表与链式调用收尾
@@ -950,6 +997,14 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const media = body.media ?? []; // 保存 media：承载本步骤的计算结果供后续使用
     const episodes = body.episodes ?? []; // 保存 episodes：承载本步骤的计算结果供后续使用
     const attachments = body.attachments ?? []; // 保存 attachments：附件位先上传拿键，再随发帖入库
+    // 标签清洗：逐条归一化 → 同 slug 去重 → 上限 3；非法长度 / 字符按 400 拒绝，错误码明确
+    const normalizedTags: Array<{ slug: string; name: string }> = []; // 去重后的合法标签
+    for (const rawTag of body.tags ?? []) { // 逐条校验，空数组等价于不带标签
+      const normalized = normalizeTag(rawTag); // 归一化同时做长度与字符白名单校验
+      if (!normalized) throw new AppError('VALIDATION_FAILED', '标签需为 2–12 字，仅含中英文、数字、#、-、_、· 与空格', { reason: 'INVALID_TAG' }); // 400：非法标签
+      if (!normalizedTags.some((item) => item.slug === normalized.slug)) normalizedTags.push(normalized); // 同归一化名只保留首现
+    } // 标签循环结束
+    if (normalizedTags.length > 3) throw new AppError('VALIDATION_FAILED', '每帖最多 3 个标签', { reason: 'TOO_MANY_TAGS' }); // 400：超出标签上限
     if ((kind === 'gallery' || kind === 'series') && !media.some((item) => item.kind === 'image')) throw new AppError('VALIDATION_FAILED', '图集/剧集至少需要一张图片'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     if (kind === 'video' && !media.some((item) => item.kind === 'video')) throw new AppError('VALIDATION_FAILED', '视频帖至少需要一个视频地址'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
     if (kind === 'series' && episodes.length === 0) throw new AppError('VALIDATION_FAILED', '剧集帖至少需要一集'); // 业务拒绝 VALIDATION_FAILED：以统一错误码终止当前请求
@@ -1011,6 +1066,13 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
           .prepare('INSERT INTO community_series_episodes (id, thread_id, title, media_url, poster_url, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)') // 预编译 SQL：固定语句结构后绑定参数执行
           .run(`episode-${randomUUID()}`, id, item.title, item.media_url, item.poster_url ?? null, index, ts); // 执行写入：把参数落库并返回影响结果
       }); // 结束函数体：本层作用域收尾
+      normalizedTags.forEach((tag) => { // 标签字典幂等 upsert + 关系挂载，与帖子同事务避免半成品
+        deps.db // 标签字典：slug 唯一，已存在则保留原行（不覆盖治理态），不存在才插入
+          .prepare('INSERT OR IGNORE INTO community_tags (id, slug, name, status, created_by, created_at) VALUES (?, ?, ?, \'active\', ?, ?)')
+          .run(`tag-${randomUUID()}`, tag.slug, tag.name, userId, ts); // 执行写入：占位符与参数一一绑定
+        const tagRow = deps.db.prepare('SELECT id FROM community_tags WHERE slug = ?').get(tag.slug) as { id: string }; // 取回标签主键（新建或既有）
+        deps.db.prepare('INSERT OR IGNORE INTO community_thread_tags (thread_id, tag_id) VALUES (?, ?)').run(id, tagRow.id); // 关系行：复合主键防重复挂载
+      }); // 标签循环结束
     }); // 结束函数体：本层作用域收尾
     tx(); // 业务步骤：推进当前流程的下一项处理
     res.status(201).json({ thread_id: id }); // 输出响应：把处理结果写回 HTTP 客户端
@@ -1637,6 +1699,96 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     res.json({ ok: true, unread }); // 输出响应：把处理结果写回 HTTP 客户端
   }); // 结束函数体：本层作用域收尾
 
+  /** 热门标签：按关联已发布帖子数倒序分页；匿名可读，不返回作者与治理信息。 */
+  router.get('/community/tags', (req, res) => { // 路由 GET /community/tags：标签字典公开清单
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '30'), 10) || 30, 1), 60); // 单页上限 60
+    const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0); // 分页偏移
+    const total = (deps.db.prepare("SELECT COUNT(*) AS n FROM community_tags WHERE status = 'active'").get() as { n: number }).n; // 活跃标签总数
+    const items = deps.db // 预编译 SQL：左连关系表计数，无关联帖子的标签计数为 0 仍列出
+      .prepare(
+        `SELECT tg.id, tg.slug, tg.name, COUNT(tt.thread_id) AS thread_count
+           FROM community_tags tg
+           LEFT JOIN community_thread_tags tt ON tt.tag_id = tg.id
+          WHERE tg.status = 'active'
+          GROUP BY tg.id
+          ORDER BY thread_count DESC, tg.created_at ASC
+          LIMIT ? OFFSET ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(limit, offset) as Array<{ id: string; slug: string; name: string; thread_count: number }>; // 查询多行：读取热门标签
+    res.json({ items, total, offset, limit }); // 输出响应：标签 + 计数 + 分页口径
+  }); // 结束函数体：本层作用域收尾
+
+  /**
+   * 作者公开卡：昵称 / Mim ID / 等级 / 徽章数与徽章名 / 发帖数 / 累计获赞 / 加入时间。
+   * 只回公开身份与创作统计；收藏、关注等个人关系一律不下发。用户不存在或已注销返回 404。
+   */
+  router.get('/community/authors/:id', (req, res) => { // 路由 GET /community/authors/:id：作者主页公开数据
+    const identifier = String(req.params.id ?? '').trim(); // 兼容内部主键与对外 Mim ID 两种入口
+    if (!identifier) throw new AppError('NOT_FOUND', '作者不存在'); // 空标识直接 404
+    const author = deps.db // 预编译 SQL：用户档案连成长档案，聚合发帖数与累计获赞
+      .prepare(
+        `SELECT u.id, u.display_name, u.member_no, u.status, u.created_at,
+                COALESCE(g.level, 1) AS level,
+                (SELECT COUNT(*) FROM community_threads t WHERE t.author_id = u.id AND t.status = 'published') AS post_count,
+                COALESCE((SELECT SUM(t.likes) FROM community_threads t WHERE t.author_id = u.id AND t.status = 'published'), 0) AS total_likes
+           FROM users u
+           LEFT JOIN user_growth g ON g.user_id = u.id
+          WHERE u.id = ? OR u.member_no = ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .get(identifier, identifier) as // 查询单行：读取一条记录供判定使用
+      | (Record<string, unknown> & { id: string; display_name: string; member_no: string | null; status: string; created_at: string; level: number; post_count: number; total_likes: number })
+      | undefined; // 未命中落 undefined
+    if (!author || author.status !== 'active') throw new AppError('NOT_FOUND', '作者不存在'); // 不存在 / 已注销：404，不暴露是否被删
+    const badges = deps.db // 预编译 SQL：已授予徽章名清单（公开身份徽标，对齐少数派作者署名口径）
+      .prepare(
+        `SELECT b.code, b.name, b.icon
+           FROM user_badges ub
+           JOIN growth_badges b ON b.code = ub.badge_code
+          WHERE ub.user_id = ?
+          ORDER BY ub.awarded_at ASC`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(author.id) as Array<{ code: string; name: string; icon: string }>; // 查询多行：读取徽章
+    res.json({ // 输出响应：只含公开字段
+      author: { // 作者卡主体
+        id: author.id, // 内部主键（深链接用）
+        display_name: author.display_name, // 昵称
+        member_no: author.member_no, // 对外 Mim ID（纯数字）
+        level: author.level, // 当前等级（成长档案）
+        post_count: author.post_count, // 已发布主题数
+        total_likes: author.total_likes, // 累计获赞（主题 likes 求和）
+        badge_count: badges.length, // 已获徽章数
+        joined_at: author.created_at, // 加入时间
+      }, // 作者卡结束
+      badges, // 徽章名列表：供身份徽标渲染
+    }); // 响应结束
+  }); // 结束函数体：本层作用域收尾
+
+  /** 栏目归档：近 12 个月按发帖月份分组，每月计数 + 最近 3 条标题；不做无限回溯。 */
+  router.get('/community/archive', (_req, res) => { // 路由 GET /community/archive：按月归档只读聚合
+    const windowMs = 365 * 86_400_000; // 近 12 个月窗口（自然月粒度，超出不回溯）
+    const since = new Date(Date.now() - windowMs).toISOString(); // 窗口下界
+    const rows = deps.db // 预编译 SQL：只取已发布帖的主键 / 标题 / 时间，分组在内存完成（月数有限）
+      .prepare(
+        `SELECT id, title, created_at
+           FROM community_threads
+          WHERE status = 'published' AND created_at >= ?
+          ORDER BY created_at DESC`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(since) as Array<{ id: string; title: string; created_at: string }>; // 查询多行：读取窗口内帖子
+    const byMonth = new Map<string, { count: number; items: Array<{ id: string; title: string; created_at: string }> }>(); // 月份分组表
+    for (const row of rows) { // 逐帖归入自然月
+      const month = row.created_at.slice(0, 7); // YYYY-MM 分组键
+      const bucket = byMonth.get(month) ?? { count: 0, items: [] }; // 首月新建桶
+      bucket.count += 1; // 计数 +1
+      if (bucket.items.length < 3) bucket.items.push(row); // 每月只保留最近 3 条标题（列表已按时间倒序）
+      byMonth.set(month, bucket); // 回写分组
+    } // 循环结束
+    const months = [...byMonth.entries()] // 月份键值对转数组
+      .map(([month, value]) => ({ month, ...value })) // 展开计数与最近标题
+      .sort((a, b) => b.month.localeCompare(a.month)); // 月份倒序：最近在前
+    res.json({ months, window: '12m' }); // 输出响应：归档分组 + 窗口口径
+  }); // 结束函数体：本层作用域收尾
+
   /**
    * 社区搜索：默认按自研 BM25 相关性 + 时效衰减排序（字段权重与 BM25 参数可后台配置）。
    * sort=latest 回到「按最后活跃时间」的旧口径；diversify=1 追加 MMR 多样性重排，压制同板块刷屏。
@@ -1705,7 +1857,42 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
       locked: row.price_cents > 0, // 付费帖在搜索结果里也标锁
       relevance: relevanceOf.get(row.id) ?? 0, // 相关性分回显：0 表示 latest 分支或该行仅靠 LIKE 命中
     })); // 结束代码块：本层作用域收尾
-    res.json({ items, total, offset, limit, q, sort, diversify, candidate_limit: CANDIDATE_LIMIT, weights_source: loaded.source }); // 输出响应：标注候选窗口与参数来源
+    // 板块分组：名称 / 描述命中，类目入口对齐学科树 / 豆瓣小组双轨口径；只取上架板块
+    const boardHits = deps.db // 预编译 SQL：板块连帖子计数，命中类目随入口给出热度
+      .prepare(
+        `SELECT b.slug, b.name, b.description, b.icon,
+                (SELECT COUNT(*) FROM community_threads t WHERE t.board_id = b.id AND t.status = 'published') AS thread_count
+           FROM community_boards b
+          WHERE b.status = 'active' AND (b.name LIKE ? OR b.description LIKE ?)
+          ORDER BY b.sort_order ASC LIMIT ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(`%${q}%`, `%${q}%`, Math.min(limit, 20)) as Array<{ slug: string; name: string; description: string; icon: string; thread_count: number }>; // 查询多行：命中板块
+    // 标签分组：名称命中并带关联帖数，话题聚类对齐 GitHub explore 话题口径
+    const tagHits = deps.db // 预编译 SQL：标签左连关系表计数，按热度倒序
+      .prepare(
+        `SELECT tg.slug, tg.name, COUNT(tt.thread_id) AS thread_count
+           FROM community_tags tg
+           LEFT JOIN community_thread_tags tt ON tt.tag_id = tg.id
+          WHERE tg.status = 'active' AND tg.name LIKE ?
+          GROUP BY tg.id
+          ORDER BY thread_count DESC, tg.name ASC
+          LIMIT ?`,
+      ) // 调用结束：参数列表与链式调用收尾
+      .all(`%${q}%`, Math.min(limit, 20)) as Array<{ slug: string; name: string; thread_count: number }>; // 查询多行：命中标签
+    res.json({ // 输出响应：帖子分页 + 板块 / 标签分组与各组总数
+      items, // 帖子命中（沿用既有 BM25 / 时效排序与片段高亮）
+      total, // 帖子命中总数
+      offset, // 分页偏移
+      limit, // 页长
+      q, // 生效关键词
+      sort, // 排序口径
+      diversify, // 多样性开关回显
+      candidate_limit: CANDIDATE_LIMIT, // 候选窗口：算法对账用
+      weights_source: loaded.source, // 参数来源：env / settings / default
+      boards: boardHits, // 板块分组结果
+      tags: tagHits, // 标签分组结果
+      counts: { threads: total, boards: boardHits.length, tags: tagHits.length }, // 分组总数：前端据此渲染「N 个板块 / M 个标签」
+    }); // 响应结束
   }); // 结束函数体：本层作用域收尾
 
   /** 社区热榜：自研热度算法（互动加权 / 年龄重力衰减），窗口与权重均可后台配置。 */

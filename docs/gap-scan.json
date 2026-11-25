@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-25T10:55:55.231Z",
+  "generatedAt": "2026-11-25T14:18:32.166Z",
   "root": "F:\\合并项目\\Mim",
   "overall": "PASS",
   "assertions": {
@@ -7,8 +7,8 @@
       "title": "A. 路由装配",
       "status": "PASS",
       "stats": {
-        "routeFiles": 29,
-        "factories": 30,
+        "routeFiles": 31,
+        "factories": 32,
         "unmounted": 0
       },
       "failures": [],
@@ -18,7 +18,7 @@
       "title": "B. 表结构接缝",
       "status": "PASS",
       "stats": {
-        "sqlFiles": 21,
+        "sqlFiles": 23,
         "nonIdempotent": 0,
         "badDirectives": 0,
         "copiesSchemaD": true
@@ -43,50 +43,27 @@
     },
     "frontend": {
       "title": "D. 前端接线",
-      "status": "WARN",
+      "status": "PASS",
       "stats": {
-        "viewFiles": 18,
+        "viewFiles": 22,
         "unregistered": 8,
         "nested": 8,
-        "appViews": 10,
-        "segments": 10,
+        "nestedChildren": [
+          "apps/web/src/views/AnnouncementsPanel.tsx",
+          "apps/web/src/views/CommunityAssets.tsx",
+          "apps/web/src/views/CommunityGallery.tsx",
+          "apps/web/src/views/CommunityGuides.tsx",
+          "apps/web/src/views/CommunityMore.tsx",
+          "apps/web/src/views/ContentDetail.tsx",
+          "apps/web/src/views/MyAssets.tsx",
+          "apps/web/src/views/PageBlocks.tsx"
+        ],
+        "appViews": 13,
+        "segments": 13,
         "missingSegments": 0
       },
       "failures": [],
-      "warnings": [
-        {
-          "file": "apps/web/src/views/AnnouncementsPanel.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/CommunityAssets.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/CommunityGallery.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/CommunityGuides.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/CommunityMore.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/ContentDetail.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/MyAssets.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        },
-        {
-          "file": "apps/web/src/views/PageBlocks.tsx",
-          "detail": "未在 App.tsx 直接注册，但被其它视图作为子组件引用"
-        }
-      ]
+      "warnings": []
     },
     "markers": {
       "title": "E. 未完成标记",

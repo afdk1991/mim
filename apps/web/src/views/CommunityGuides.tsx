@@ -9,6 +9,9 @@
  * 3. 示例内容与真实内容靠帖子标题的【示例】前缀区分，面板内再次说明，避免被误认为真实成交数据。
  */
 
+import { useEffect, useState } from 'react'; // 组件内拉取公开规则所需的钩子
+import { growthRules, type GrowthRules } from '../api/appeals.js'; // 成长规则公开接口与类型（匿名可读）
+
 /** 与社区页签一一对应的板块键，供指南条选择文章 */
 export type CommunitySectionKey =
   // 论坛页签：帖子列表与互动
@@ -192,6 +195,60 @@ export function ReferralGuestPanel(props: {
     </div>
   ); // 匿名推广面板结束
 } // ReferralGuestPanel 结束
+
+/** 成长与积分规则小节：等级名称 / 门槛 / 权益 + 积分获取规则，匿名公开读取，不含任何个人数据 */
+export function GrowthRulesPanel() {
+  const [rules, setRules] = useState<GrowthRules | null>(null); // 规则视图：等级表 + 积分来源
+  const [failed, setFailed] = useState(false); // 加载失败标记：与空规则区分，给出重试提示
+
+  // 挂载即拉取公开规则；组件卸载时置取消标记，避免异步回写已卸载组件
+  useEffect(() => {
+    let cancelled = false; // 卸载标记：true 后不再 setState
+    growthRules()
+      .then((data) => { if (!cancelled) setRules(data); }) // 成功回填规则视图
+      .catch(() => { if (!cancelled) setFailed(true); }); // 失败只标记，不把错误抛到页面顶层
+    return () => { cancelled = true; }; // 清理：防止卸载后回写
+  }, []); // 规则只在挂载时拉一次，后台配置变更由下次进入页面刷新
+
+  return (
+    <section className="community-wallet" aria-label="成长与积分规则">
+      {/* 板块头：标题与一句话口径，规则本身不含个人数据，匿名可读 */}
+      <div className="community-section-head">
+        <div>
+          <h2>成长与积分规则</h2>
+          <p>等级门槛、权益与积分获取规则公开如下；账号等级与积分需登录后在钱包页查看。</p>
+        </div>
+      </div>
+      {/* 加载失败兜底：规则接口异常时给一句重试提示，不伪造等级数据 */}
+      {failed && <p className="is-error">规则加载失败，请稍后重试。</p>}
+      {!rules && !failed && <p>规则加载中…</p>}
+      {rules && (
+        <>
+          {/* 等级体系表：名称 / 门槛 / 权益摘要，逐行渲染后端配置 */}
+          <h3 className="community-subhead">等级体系</h3>
+          <ul className="community-guest-rules">
+            {rules.levels.map((lv) => (
+              <li key={lv.level}>
+                <strong>{lv.name}</strong>（{lv.min_points} 积分起）—— {lv.perks || '暂无额外权益说明'}
+              </li>
+            ))}
+          </ul>
+          {/* 积分获取表：来源与分值全部取后端既有配置，前端不新造数值 */}
+          <h3 className="community-subhead">积分获取</h3>
+          <ul className="community-guest-rules">
+            {rules.sources.map((s) => (
+              <li key={s.label}>
+                <strong>{s.label}</strong>：基础 {s.points} 分。{s.description}
+              </li>
+            ))}
+          </ul>
+          {/* 未开放来源说明：避免访客误以为发帖 / 获赞缺失是页面漏渲染 */}
+          {rules.note && <p><small>{rules.note}</small></p>}
+        </>
+      )}
+    </section>
+  ); // GrowthRulesPanel 结束
+}
 
 /** 商城匿名提示：商品目录公开，下单与订单需要登录 */
 export function ShopGuestNote(props: { onLogin: () => void }) {

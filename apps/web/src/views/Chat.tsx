@@ -987,7 +987,7 @@ export function Chat({ locale }: ChatProps) {
 
             <div className="chat-input">{/* 执行当前业务步骤 */}
               {/* 表情：纯本地插入，插入后聚焦仍留在文本域 */}
-              <button type="button" className="btn ghost chat-emoji-btn" onClick={() => setEmojiOpen((v) => !v)} disabled={sending}>{/* 执行当前业务步骤 */}
+              <button type="button" className="btn ghost chat-emoji-btn" aria-label={isZh ? '选择表情' : 'Choose emoji'} onClick={() => setEmojiOpen((v) => !v)} disabled={sending}>{/* 执行当前业务步骤 */}
                 🙂
               </button>
               {emojiOpen && (

@@ -38,8 +38,10 @@ test.describe('桌面端点击链路', () => {
     test.skip(testInfo.project.name === 'mobile', '桌面端用例不在移动端重复执行');
     await page.goto('/circles'); // 圈子深链接
     await expect(page.locator('header.site-header')).toBeVisible(); // 外壳渲染
-    const circlesText = await page.locator('main.main').innerText(); // 主区文本
-    expect(circlesText.trim().length).toBeGreaterThan(10); // 深链接不能落到空白
+    // 圈子列表先渲染骨架 / 匿名面板，轮询等待主区真实文本落地，避免读到占位即断言
+    await expect
+      .poll(async () => (await page.locator('main.main').innerText()).trim().length, { timeout: 15_000 })
+      .toBeGreaterThan(10); // 深链接不能落到空白
     await page.goto('/this-path-should-not-exist'); // 未知路径
     await expect(page.locator('header.site-header')).toBeVisible(); // 未知路径仍要回到可用外壳，而不是白屏
     const fallbackText = await page.locator('main.main').innerText(); // 回落页文本
@@ -55,6 +57,28 @@ test.describe('桌面端点击链路', () => {
     const legalText = await page.locator('.legal-page').innerText(); // 正文长度判白屏
     expect(legalText.trim().length).toBeGreaterThan(20); // 骨架页必须有分节内容
     expect(errs.pageErrors, `未捕获异常: ${errs.pageErrors.join(' | ')}`).toHaveLength(0); // 合规页不允许 JS 崩溃
+  }); // 用例结束
+
+  test('13 业务领域门户总览：分组卡片与概览统计渲染', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', '桌面端用例不在移动端重复执行');
+    const errs = watchErrors(page); // 收集未捕获异常与 console.error
+    await page.goto('/domains'); // 领域门户总览
+    await expect(page.locator('header.site-header')).toBeVisible(); // 共用同一套外壳
+    await expect(page.locator('.mim-domains-card')).toHaveCount(13); // 13 张领域卡（接口不可达时由内置清单兜底）
+    await expect(page.locator('.mim-domains-group')).toHaveCount(5); // 按 5 个分组聚合
+    const stats = await page.locator('.mim-domains-stat strong').allTextContents(); // 顶部三项统计
+    expect(stats.map((s) => s.trim()).join('/')).toBe('13/6/5'); // 总数 / 已上线 / 分组数
+    expect(errs.pageErrors, `未捕获异常: ${errs.pageErrors.join(' | ')}`).toHaveLength(0); // 门户不允许 JS 崩溃
+  }); // 用例结束
+
+  test('领域详情多段深链接直达，slug 不被前置规整折叠', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', '桌面端用例不在移动端重复执行');
+    const errs = watchErrors(page); // 收集未捕获异常与 console.error
+    await page.goto('/domains/ecommerce'); // 领域详情二级深链接直达（与 /legal/<kind> 同口径）
+    await expect(page).toHaveURL(/\/domains\/ecommerce(\?|$)/); // slug 必须保留，不被折叠成 /domains
+    await expect(page.locator('.mim-domain-detail-hero h1')).toHaveText('电商'); // 详情主标题来自 API
+    await expect(page.locator('.mim-domain-detail-features li')).toHaveCount(4); // 4 个功能点
+    expect(errs.pageErrors, `未捕获异常: ${errs.pageErrors.join(' | ')}`).toHaveLength(0); // 详情页不允许 JS 崩溃
   }); // 用例结束
 
   test('未登录访问个人中心被守卫带到登录页，且登录表单可用', async ({ page }, testInfo) => {
@@ -73,10 +97,12 @@ test.describe('移动端底部 Tab', () => {
     await page.goto('/community'); // 社区首页
     const tabs = page.locator('nav.mobile-tabs button.mobile-tab'); // 底部 Tab 项
     await expect(tabs.first()).toBeVisible(); // 窄屏必须出现底部导航
-    expect(await tabs.count()).toBeGreaterThanOrEqual(3); // 首页 / 社区 / 聊天 / 个人中心起步
+    expect(await tabs.count()).toBeGreaterThanOrEqual(3); // 主 Tab（首页 / 社区 / 目录 / 定价）+ 「更多」溢出面板起步
     await page.locator('nav.mobile-tabs').getByRole('button', { name: '首页', exact: true }).click(); // 点击首页 Tab（匿名可读）
     await expect(page).toHaveURL(/(\/home|\/)$/); // 地址切到 /home（或根路径）
-    await page.locator('nav.mobile-tabs').getByRole('button', { name: '聊天', exact: true }).click(); // 点击聊天 Tab
+    // 聊天排在主 Tab 项数上限之外，收进「更多」溢出面板：先打开面板，再点聊天菜单项
+    await page.getByRole('button', { name: '更多导航', exact: true }).click(); // 展开溢出导航面板
+    await page.locator('#mobile-more-panel').getByRole('menuitem', { name: '聊天', exact: true }).click(); // 点击聊天（溢出项）
     await expect(page).toHaveURL(/\/signin(\?|$)/); // 聊天需要身份：未登录必须被守卫带到登录页，而不是静默无反应
   }); // 用例结束
 }); // 移动端结束

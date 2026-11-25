@@ -13,6 +13,7 @@ import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; 
 import { createAdminRouter } from './routes/admin.js'; // RBAC 后台控制面：角色 / 权限 / 用户角色授权
 import { createShopAdminRouter } from './routes/shop-admin.js'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐 CRUD
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
+import { createDomainsRouter } from './routes/domains.js'; // 13 业务领域平台：静态目录 overview / 清单 / 详情 / 功能点，公开只读
 import { createContentUnifiedRouter } from './routes/content-unified.js'; // 统一内容与消息域：论坛/圈子、IM/私信合并后的只读视图
 import { createOrdersRouter } from './routes/orders.js'; // 统一交易域：三套订单合并后的只读视图，供个人中心 / 中台统一口径
 import { createPaymentsRouter } from './routes/payments.js'; // 支付：渠道、意图、回调与线下确认
@@ -29,6 +30,7 @@ import { createPrivacyAdminRouter } from './routes/privacy-admin.js'; // 账号�
 import { createWalletWithdrawalRouter } from './routes/wallet-withdrawals.js'; // 提现分成：可提现余额 / 申请 / 审核 / 到账（钱包结算层）
 import { createGrowthDmAdminRouter } from './routes/growth-dm-admin.js'; // 成长私信：系统身份私信群发（RBAC messaging:write）
 import { createGrowthRouter } from './routes/growth.js'; // 社区激励链：签到 / 积分流水 / 等级进度 / 徽章 + 后台规则配置（RBAC content:write）
+import { createAppealsRouter } from './routes/appeals.js'; // 社区申诉：被处置内容 7 天内申诉 + 本人关注板块清单（私密读）
 import { createPaymentChannelRouter } from './payments/router.js'; // 扩展支付渠道：虎皮椒 / 讯虎 / PayPal / Stripe / 支付宝企业支付
 import { createContentOpsRouter } from './routes/content-ops.js'; // 内容运营：公告 / 更新日志 / 推广计划，公开读 + 管理端 CRUD
 import { createCirclesRouter } from './routes/circles.js'; // 圈子：独立于板块的成员制社群，公开浏览 + 成员/圈主写操作
@@ -135,6 +137,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
 
   // 部署汇总路由：三个端点全部公开只读，不查业务表、不提供写操作
   app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
+  app.use('/api/v1', createDomainsRouter(resolved)); // 13 业务领域平台：/domains/overview 在 router 内先于 /:slug 注册，公开只读
   app.use('/api/v1', createContentUnifiedRouter(resolved)); // 统一内容与消息只读：/content/items 公开，/messaging/* 需登录
   app.use('/api/v1', createOrdersRouter(resolved)); // 统一订单只读：/orders 与 /orders/summary 均要求登录，旧订单路由保持原样
   app.use('/api/v1', createPaymentsRouter(resolved)); // 支付回调必须公开；其余端点在 router 内逐个挂鉴权
@@ -154,6 +157,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
     createImRouter(resolved), // IM 即时通讯：会话列表/消息历史/用户搜索/已读
     createAppearanceRouter(resolved), // 外观：site/config 与 pages 仍被购物车 / 社区页面区块使用
     createCommunityRouter(resolved), // 社区与变现：板块 / 帖子 / 付费解锁 / VIP / 钱包 / 商品订单 / 优惠码 / 推广
+    createAppealsRouter(resolved), // 申诉单 / 我的申诉 / 后台申诉队列 + 本人关注板块（路由内各自鉴权）
     createAssetsRouter(resolved), // 付费资产：付费阅读 / 下载 / 图库 / 视频的浏览、解锁与分成（社区页依赖，保留）
     createCirclesRouter(resolved), // 圈子：成员制社群（圈主 / 审核 / 成员上限 / 圈内动态与公告），与板块并存
     createReferralRouter(resolved), // 返佣：我的佣金明细与汇总（内部 requireAuth）

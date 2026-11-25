@@ -7,7 +7,7 @@
  */
 
 import { request } from './request.js'; // 统一请求出口
-import type { CommunityPost, CommunityThreadDetail, ThreadAttachmentMeta } from './types.js'; // 复用详情 / 回复 / 附件元数据既有类型（附件命名与详情返回一致）
+import type { CommunityPost, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta } from './types.js'; // 复用详情 / 回复 / 附件元数据既有类型（附件命名与详情返回一致）
 
 /** 详情里帖子的扩展字段：HEAD 类型未声明，读取时按可选字段解释。 */
 export interface ThreadExtras { // 帖子扩展列
@@ -224,3 +224,121 @@ export function isPinned(thread: object | null | undefined): boolean { // 置顶
 export function replyLockedOf(thread: object | null | undefined): boolean { // 回复锁定判定
   return Boolean((thread as { reply_locked?: boolean } | null | undefined)?.reply_locked); // 缺省为未锁定
 }
+
+// ===========================================================================
+// 内容结构批次（2026-11-25）：标签 / 作者公开卡 / 按月归档 / 目录检索分组
+// ===========================================================================
+
+/** 帖子标签：slug 为去重键，name 为展示名；列表回读时不一定带计数。 */
+export interface CommunityTag { // 声明结构 CommunityTag：标签条目
+  slug: string; // 归一化去重键（列表过滤与跳转参数用）
+  name: string; // 展示名（2–12 字）
+  thread_count?: number; // 关联帖子数（热门标签 / 检索分组返回时存在）
+} // 接口结束
+
+/** 目录帖子列表项：在既有帖子摘要上补 tags 数组。 */
+export type DirectoryThreadItem = CommunityThread & { tags?: CommunityTag[] }; // 交叉类型：不改共享 CommunityThread 契约
+
+/** 热门标签分页响应。 */
+export interface TagPage { // 声明结构 TagPage：标签列表分页
+  items: CommunityTag[]; // 当前页标签
+  total: number; // 活跃标签总数
+  offset: number; // 分页偏移
+  limit: number; // 页长
+} // 接口结束
+
+/** 作者公开卡：只含公开身份与创作统计；收藏、关注等个人关系不下发。 */
+export interface AuthorProfile { // 声明结构 AuthorProfile：作者主页公开数据
+  id: string; // 内部主键（深链接用）
+  display_name: string; // 昵称
+  member_no: string | null; // 对外 Mim ID（纯数字）
+  level: number; // 当前等级
+  post_count: number; // 已发布主题数
+  total_likes: number; // 累计获赞
+  badge_count: number; // 已获徽章数
+  joined_at: string; // 加入时间
+} // 接口结束
+
+/** 作者已获徽章：身份徽标渲染用。 */
+export interface AuthorBadge { // 声明结构 AuthorBadge：徽章条目
+  code: string; // 徽章编码
+  name: string; // 徽章名
+  icon: string; // 徽章图标标识
+} // 接口结束
+
+/** 作者卡响应：主体 + 徽章名清单。 */
+export interface AuthorProfilePage { // 声明结构 AuthorProfilePage：作者端点响应
+  author: AuthorProfile; // 作者卡主体
+  badges: AuthorBadge[]; // 徽章名列表
+} // 接口结束
+
+/** 归档帖子标题引用：每月最多最近 3 条。 */
+export interface ArchiveThreadRef { // 声明结构 ArchiveThreadRef：归档标题引用
+  id: string; // 帖子主键
+  title: string; // 标题
+  created_at: string; // 发布时间
+} // 接口结束
+
+/** 归档月份分组：计数 + 最近标题。 */
+export interface ArchiveMonth { // 声明结构 ArchiveMonth：月份桶
+  month: string; // YYYY-MM
+  count: number; // 当月帖子数
+  items: ArchiveThreadRef[]; // 最近 3 条标题
+} // 接口结束
+
+/** 按月归档响应：近 12 个月。 */
+export interface ArchivePage { // 声明结构 ArchivePage：归档端点响应
+  months: ArchiveMonth[]; // 月份分组（倒序）
+  window: string; // 窗口口径（12m）
+} // 接口结束
+
+/** 检索板块分组命中：类目入口 + 帖子计数。 */
+export interface SearchBoardHit { // 声明结构 SearchBoardHit：板块命中
+  slug: string; // 板块 slug
+  name: string; // 板块名
+  description: string; // 板块描述
+  icon: string; // 板块图标标识
+  thread_count: number; // 板块已发布帖数
+} // 接口结束
+
+/** 检索标签分组命中：话题 + 关联帖数。 */
+export interface SearchTagHit { // 声明结构 SearchTagHit：标签命中
+  slug: string; // 标签 slug
+  name: string; // 标签名
+  thread_count: number; // 关联帖子数
+} // 接口结束
+
+/** 目录检索分组响应：帖子分页沿用既有搜索结果，另附板块 / 标签分组与各组总数。 */
+export interface DirectorySearchPage extends CommunitySearchPage { // 交叉类型：复用帖子搜索字段
+  boards: SearchBoardHit[]; // 板块分组结果
+  tags: SearchTagHit[]; // 标签分组结果
+  counts: { threads: number; boards: number; tags: number }; // 各组命中总数
+} // 接口结束
+
+/** GET /community/tags：热门标签（按关联帖数倒序，匿名可读）。 */
+export function popularTags(opts: { limit?: number; offset?: number } = {}) { // 函数 popularTags：标签字典公开清单
+  const qs = query({ limit: opts.limit, offset: opts.offset }); // 拼分页参数
+  return request<TagPage>(`/community/tags${qs ? `?${qs}` : ''}`, { idempotency: false }); // 只读 GET：匿名可读
+} // 函数结束
+
+/** GET /community/authors/:id：作者公开卡（匿名可读；不存在 / 已注销 404）。 */
+export function authorProfile(id: string) { // 函数 authorProfile：作者主页数据
+  return request<AuthorProfilePage>(`/community/authors/${encodeURIComponent(id)}`, { idempotency: false }); // 只读 GET：不下发收藏关注
+} // 函数结束
+
+/** GET /community/archive：近 12 个月按月归档（计数 + 最近 3 条标题）。 */
+export function archiveIndex() { // 函数 archiveIndex：归档聚合只读
+  return request<ArchivePage>('/community/archive', { idempotency: false }); // 只读 GET：按月分组
+} // 函数结束
+
+/** GET /community/search：目录检索分组（板块 / 帖子 / 标签），沿用既有 BM25 与片段高亮。 */
+export function directorySearch(opts: { q: string; board?: string; limit?: number; offset?: number }) { // 函数 directorySearch：分组聚合检索
+  const qs = query({ q: opts.q, board: opts.board, limit: opts.limit, offset: opts.offset }); // 拼检索参数
+  return request<DirectorySearchPage>(`/community/search${qs ? `?${qs}` : ''}`, { idempotency: false }); // 只读 GET：返回分组结果与总数
+} // 函数结束
+
+/** GET /community/threads：目录帖子列表，支持板块 / 类型 / 标签过滤并回带 tags 数组。 */
+export function directoryThreads(opts: { board?: string; kind?: string; tag?: string; limit?: number; offset?: number } = {}) { // 函数 directoryThreads：列表过滤组合
+  const qs = query({ board: opts.board, kind: opts.kind, tag: opts.tag, limit: opts.limit, offset: opts.offset }); // 拼过滤参数
+  return request<{ items: DirectoryThreadItem[]; total: number; offset: number; limit: number }>(`/community/threads${qs ? `?${qs}` : ''}`, { idempotency: false }); // 只读 GET：匿名可读
+} // 函数结束

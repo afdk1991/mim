@@ -14,7 +14,9 @@
 |---|---|---|---|
 | `AGENTS.md` | 治理 | 定义 12 条协作铁律（含免费平台额度矩阵、全仓库逐行注释、全量远端同步与生产统一部署腾讯云自建服务器），对所有 AI 协作者与 CI 有强制约束力 | 行为边界与优先级冲突裁决规则 |
 | `README.md` | 治理 | 项目入口；版本号规约、仓库结构、运行命令 | 版本展示约定 `V0.0.0-preview` + Monorepo 运行指引 |
-| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 60 个测试文件 / 554 例契约测试通过（2026-11-24 本地实测）；端口 8787 |
+| `services/mim-api` | 业务代码（后端） | Express 5 + SQLite（WAL）+ JWT + zod 的 Headless API（`/api/v1`）；**功能模块清单见 [07 §11](./07-functional-modules.md#11-功能模块落地对照表p0仓库实况)** | 67 个测试文件 / 609 例契约测试通过（2026-11-25 全领域平台轮本地实测）；端口 8787 |
+| `services/mim-api/src/domains/catalog.ts` + `src/routes/domains.ts` + `test/domains.test.ts` | 业务代码（后端，2026-11-25 新增 V0.0.20） | **13 业务领域平台**：静态契约目录（5 分组 / 2 状态 / 6 active + 7 planned，`mim.domain-catalog.v1`）+ 4 个公开只读端点 `GET /api/v1/domains/overview`、`/domains`、`/domains/:slug`、`/domains/:slug/features`；不查业务表、不提供写接口 | `domains.test.ts` **11 例**契约测试；总览分布 / 过滤 / 详情 / 404 / 路由顺序全覆盖 |
+| `apps/web/src/api/domains.ts` + `src/views/Domains.tsx` + `src/views/DomainDetail.tsx` | 业务代码（前端，2026-11-25 新增 V0.0.20） | 领域门户：13 卡按分组网格 + 概览统计 + 状态徽标 + 双语 + 点击进二级详情；内置 `FALLBACK_DOMAINS` 离线兜底（断网仍完整渲染）；`router.ts` 新增 `domains` 视图与 `AppRoute.slug`，`App.tsx` 补一级导航「业务领域」与匿名可读白名单 | `/domains` 与 `/domains/:slug` 两条路径；真实 Edge 浏览器 **16/16** 断言通过；截图 `.screenshots/domains-{portal,detail}-20261125.png` |
 | `services/mim-api/src/routes/assets.ts` / `payments.ts` / `fulfillment.ts` / `finance.ts` / `appearance.ts` / `growth.ts` / `i18n.ts` | 业务代码（后端） | **2026-11-12 新增（V0.0.5 商业化二期）**：付费资产、支付意图与回调、发货物流售后评价、提现与创作分成、主题与页面区块、成长徽章私信 IP、机器翻译与语言设置；支付内核在 `src/payments.ts` | 16 张商业化表 + `commerce.test.ts` 8 例契约测试；未配置供应商时返回 `PROVIDER_NOT_CONFIGURED` |
 | ~~`apps/web/src/views/CommerceCenter.tsx`~~（**已下线，历史留痕**） | 前端视图（已删除） | 历史：**2026-11-12 新增（V0.0.5）**：`/commerce` 商业化中台五页签；随 2026-11-15 模块收口删除，现行资产 / 钱包 / VIP / 商城入口全部并入 `/community` 页签，`/commerce` 段不再登记为现行视图 | 历史快照 |
 | `apps/web/src/views/AnnouncementsPanel.tsx` | 业务代码（前端） | **2026-11-14 新增、2026-11-15 收口**：原 `/announcements` 公告动态、`/news` 社区资讯与 `/releases` 版本记录全部并入社区页「公告动态」页签（公告 / 更新日志 / 推广计划 / 社区动态四个子页签），数据源仍是 `GET /announcements`、`GET /changelog`、`GET /promotions`、`GET /content/items`；旧地址 `/announcements`、`/news`、`/releases` 统一 301 到 `/community` | 只读列表 + 来源计数徽标 + 更新日志版本补充信息 + 空态 / 失败态 |
@@ -36,7 +38,7 @@
 | ~~`services/mim-api/test/sites.test.ts`~~（**已下线，历史留痕**） | 测试代码（已删除） | 历史：站点模块契约测试 14 例；随模块收口删除 | 历史快照 |
 | ~~`services/mim-api/test/entries.test.ts`~~（**已下线，历史留痕**） | 测试代码（已删除） | 历史：入口配置清单契约测试 12 例；随模块收口删除 | 历史快照 |
 | `scripts/build.mjs` | 可执行代码 | 根级构建脚本：默认构建真实前端并把 `apps/web/dist` 递归复制到根 `dist/`（EdgeOne Pages 等 OutputDir=dist 的平台同款链路）；`--site` 模式才把 `site/` 复制到 `dist/` | 根 `dist/index.html`（真实应用）+ `dist/assets/*`，供 `npm run build` 调用 |
-| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check` / `check:full`）/ 版本号；`packageManager: pnpm@9.12.0`；版本号 `0.0.18` 为 `version-check.mjs` 的校验源；`check` 为快速四项目，`check:full` 追加 deployments / auth-gate / gap-scan / env-wiring | 零 dependencies，脚本转发到各 workspace |
+| `package.json`（根） | 配置 | workspace 脚本入口（`dev` / `test` / `typecheck` / `build` / `check` / `check:full`）/ 版本号；`packageManager: pnpm@9.12.0`；版本号 `0.0.20` 为 `version-check.mjs` 的校验源（2026-11-25 全领域平台轮递增）；`check` 为快速四项目，`check:full` 追加 deployments / auth-gate / gap-scan / env-wiring | 零 dependencies，脚本转发到各 workspace |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `tsconfig.base.json` | 配置 | 声明 `apps/*`、`services/*`、`packages/*`；锁定依赖版本；共享 TS 编译基线 | 可复现安装与类型检查 |
 | `Mim-PRD.html` | 产品规划 | 全平台产品底座 PRD（草案） | FR-01~06 功能需求、对象模型、开放问题 |
 | `team-hiring-plan.md` | 技术/组织规划 | 约束→编制→分阶段落地→风险→成本 | 22–32 人全配 / 14–18 人最小可行方案 |

@@ -38,6 +38,10 @@ import { ErrorBoundary } from './error-boundary';
 const Profile = lazy(() => import('./views/Profile').then((m) => ({ default: m.Profile }))); // 个人中心（资料 / 账号与设置）
 const Home = lazy(() => import('./views/Home').then((m) => ({ default: m.Home }))); // 门户首页（hero / 入口卡 / 精选帖）
 const Community = lazy(() => import('./views/Community').then((m) => ({ default: m.Community }))); // 社区与变现
+const Directory = lazy(() => import('./views/Directory').then((m) => ({ default: m.Directory }))); // 目录与检索中心：板块 / 类型 / 标签 / 分组检索 / 归档
+const Domains = lazy(() => import('./views/Domains').then((m) => ({ default: m.Domains }))); // 13 业务领域门户：分组卡片 + 概览统计，匿名可读
+const DomainDetail = lazy(() => import('./views/DomainDetail').then((m) => ({ default: m.DomainDetail }))); // 领域详情：/domains/:slug，复用能力 + 功能点，匿名可读
+const Pricing = lazy(() => import('./views/Pricing').then((m) => ({ default: m.Pricing }))); // 公开定价与权益页：档位卡 + 权益对比表 + 服务费 / 退款 / 生效日期脚注
 const Chat = lazy(() => import('./views/Chat').then((m) => ({ default: m.Chat }))); // IM 聊天 + 视频通话
 const Circles = lazy(() => import('./views/Circles').then((m) => ({ default: m.Circles }))); // 圈子：成员制社群（与板块独立）
 const Checkout = lazy(() => import('./views/Checkout').then((m) => ({ default: m.Checkout }))); // 收银台：/checkout?intent=... 二维码 / 渠道唤起 / 轮询
@@ -288,6 +292,12 @@ export function App() {
     { view: 'home', label: locale === 'en-US' ? 'Home' : '首页' },
     // 社区：论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广；「圈子」为其成员制板块
     { view: 'community', label: locale === 'en-US' ? 'Community' : '社区' },
+    // 目录与检索中心：两级分类 / 标签 / 作者公开卡 / 按月归档 / 站内分组检索
+    { view: 'directory', label: locale === 'en-US' ? 'Directory' : '目录' },
+    // 13 业务领域门户：办公 / 金融 / 营销 / 电商 / 内容 / 教育 / 效率 / 法律 / 产品 / 医疗 / 财税 / 工程 / 生活，匿名可读
+    { view: 'domains', label: locale === 'en-US' ? 'Domains' : '业务领域' },
+    // 公开定价与权益页：档位卡 / 权益对比 / 服务费与退款脚注，匿名可读
+    { view: 'pricing', label: locale === 'en-US' ? 'Pricing' : '定价' },
     // IM 聊天 + 视频通话
     { view: 'chat', label: locale === 'en-US' ? 'Chat' : '聊天' },
     // 个人中心：资料 / 账号与设置
@@ -312,7 +322,9 @@ export function App() {
     payreturn: locale === 'en-US' ? 'Payment result' : '支付结果',
     login: locale === 'en-US' ? 'Sign in' : '登录',
     legal: locale === 'en-US' ? 'Legal' : '合规说明',
+    pricing: locale === 'en-US' ? 'Pricing' : '定价',
     notfound: locale === 'en-US' ? 'Not found' : '页面不存在',
+    domains: locale === 'en-US' ? 'Business Domains' : '业务领域',
   };
   useEffect(() => {
     const tagline = locale === 'en-US' ? 'Mim-Content, community and commerce' : 'Mim-内容、社区与交易一体化';
@@ -347,6 +359,9 @@ export function App() {
     if (authedSession) return; // 已登录直接放行
     if (route.view === 'login') return; // 登录页是唯一公开例外（注册关闭提示也在该页）
     if (route.view === 'community') return; // 匿名可读：社区列表与帖子详情不跳登录
+    if (route.view === 'directory') return; // 匿名可读：目录 / 检索 / 标签 / 归档 / 作者公开卡不跳登录
+    if (route.view === 'domains') return; // 匿名可读：13 业务领域门户（总览 + 详情），公开只读端点不跳登录
+    if (route.view === 'pricing') return; // 匿名可读：公开定价与权益页不跳登录
     if (route.view === 'circles') return; // 匿名可读：圈子清单与空态不跳登录，写操作由组件内引导
     if (route.view === 'home') return; // 匿名可读：门户首页不跳登录
     if (route.view === 'legal') return; // 匿名可读：合规静态页（隐私 / 协议 / 帮助）不跳登录
@@ -419,6 +434,21 @@ export function App() {
             }}
           />
         )}{/* 社区与变现视图 */}
+        {/* 目录与检索中心：两级分类 / 标签 / 作者公开卡 / 归档 / 分组检索，匿名可读 */}
+        {route.view === 'directory' && (
+          <Directory locale={locale} />
+        )}{/* 目录视图 */}
+        {/* 13 业务领域门户：/domains 总览与 /domains/:slug 详情共用一个 AppView，按 route.slug 分流，匿名可读 */}
+        {route.view === 'domains' && !route.slug && (
+          <Domains locale={locale} />
+        )}{/* 领域总览视图 */}
+        {route.view === 'domains' && !!route.slug && (
+          <DomainDetail locale={locale} slug={route.slug} />
+        )}{/* 领域详情视图 */}
+        {/* 公开定价与权益页：档位卡 / 权益对比 / 服务费与退款脚注，匿名可读 */}
+        {route.view === 'pricing' && (
+          <Pricing locale={locale} />
+        )}{/* 定价视图 */}
         {/* 圈子：清单匿名可读；加入 / 审核 / 发帖 / 创建圈子等写操作由组件按登录态拦截并引导登录 */}
         {route.view === 'circles' && (
           <Circles

@@ -1,6 +1,6 @@
 {
   "name": "@mim/admin",
-  "version": "0.0.18",
+  "version": "0.0.20",
   "private": true,
   "type": "module",
   "scripts": {

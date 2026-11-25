@@ -72,11 +72,14 @@ export function createPaymentsRouter(deps: ApiDeps): Router { // 导出函数 cr
     res.status(201).json({ intent: result.intent, next: result.next, pay_url: 'pay_url' in result ? result.pay_url : undefined }); // 执行当前业务步骤
   }); // 代码块结束
 
-  /** 查询支付意图：仅本人可见。 */
+  /** 查询支付意图：仅本人可见；附带扩展渠道退款记录，供回跳页展示退款进度。 */
   router.get('/payments/intents/:id', requireAuth, (req, res) => {
     const intent = deps.db.prepare('SELECT * FROM payment_intents WHERE id = ? AND user_id = ?').get(req.params.id, req.user!.id) as PayIntentRow | undefined; // 常量 intent：保存固定配置或一次性派生值
     if (!intent) throw new AppError('NOT_FOUND', '支付单不存在'); // 条件分支：按判断结果选择后续处理路径
-    res.json({ intent }); // 执行当前业务步骤
+    const refunds = deps.db // 退款记录：一笔意图可多次部分退款，按时间升序回显
+      .prepare('SELECT amount_cents, status, reason, created_at, provider_refund_id FROM payment_ext_refunds WHERE intent_id = ? ORDER BY created_at ASC')
+      .all(intent.id) as Array<{ amount_cents: number; status: string; reason: string | null; created_at: string; provider_refund_id: string | null }>; // 退款明细行
+    res.json({ intent, refunds }); // 意图 + 退款记录一并返回
   }); // 代码块结束
 
   /** 取消未支付意图。 */

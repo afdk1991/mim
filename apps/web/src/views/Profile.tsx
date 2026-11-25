@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react';
 // 引入 FormEvent 类型
 import type { FormEvent } from 'react';
-// 引入语言类型
-import type { Locale } from '@mim/i18n';
+// 引入货币格式化与语言类型
+import { formatCurrency, type Locale } from '@mim/i18n';
 // 引入接口集合、错误文案翻译与会话读取
 import { api, errorText, getSession } from '../api';
+// 引入金额拆解纯函数：与后端 policy.ts 同口径，个人中心订单卡复用
+import { summarizeOrderAmount } from '../api/endpoints.js';
 // 引入用户信息类型与个人聚合视图类型
-import type { CircleSummary, FavoriteThreadItem, MyGrowthBadge, MyReportItem, OAuthProviderInfo, UserInfo } from '../api';
+import type { CircleSummary, FavoriteThreadItem, MyCouponItem, MyGrowthBadge, MyReportItem, OAuthProviderInfo, UnifiedOrder, UserInfo } from '../api';
 // 引入通用异步加载钩子
 import { useAsync } from '../hooks';
 // 引入站内深链接导航
@@ -27,11 +29,35 @@ interface Props {
   onUserUpdated: (user: UserInfo) => void; // 资料保存后同步全局用户态
 } // Props 结束
 
-/** 四个分区标识：资料编辑、我的内容、我的资产与账号安全 */
-type Tab = 'profile' | 'content' | 'assets' | 'security';
+/** 五个分区标识：资料编辑、我的内容、我的资产、我的订单与账号安全 */
+type Tab = 'profile' | 'content' | 'assets' | 'orders' | 'security';
 
 /** 全部合法分区，用于校验地址栏 ?tab= 入参 */
-const TAB_IDS: readonly Tab[] = ['profile', 'content', 'assets', 'security'];
+const TAB_IDS: readonly Tab[] = ['profile', 'content', 'assets', 'orders', 'security'];
+
+/** 订单状态文案：与后端状态机取值一一对应 */
+const ORDER_STATUS_LABEL: Record<string, string> = { // 状态 → 中文名
+  pending: '待支付', // 已下单未付款
+  paid: '已支付', // 款项到账待交付
+  delivered: '已交付', // 已发货 / 权益已发放
+  refunded: '已退款', // 款项退回余额
+  cancelled: '已取消', // 订单关闭
+}; // 常量结束
+
+/** 优惠码失效原因文案：与后端 evaluateCoupon 的 reason 取值对齐 */
+const COUPON_REASON_LABEL: Record<string, string> = { // 原因 → 中文名
+  inactive: '已停用', // 后台关闭
+  not_started: '未生效', // 还没到开始时间
+  expired: '已过期', // 超出有效期
+  exhausted: '已用完', // 总次数耗尽
+  already_used: '本人已使用', // 本人核销过
+  min_amount: '未达最低消费', // 订单金额不足门槛
+}; // 常量结束
+
+/** 券型展示：fixed 立减（分）/ percent 折扣（百分比），金额按当前语言格式化前先给可读摘要 */
+function couponKindLabel(coupon: MyCouponItem): string { // 券型 → 摘要文案
+  return coupon.kind === 'fixed' ? `立减 ¥${(coupon.value / 100).toFixed(2)}` : `${coupon.value}% 折扣`; // 立减按元，折扣按百分比
+} // 函数结束
 
 /** 举报原因文案：键与后端枚举一致，文案仅做本地展示映射 */
 const REPORT_REASON: Record<string, string> = { // 原因 → 中文名
@@ -124,6 +150,17 @@ export function Profile({ locale, onUserUpdated }: Props) {
     if (!hasSession) return { items: [] as MyReportItem[], total: 0 }; // 匿名短路
     return api.community.myReports(); // 已登录回读本人举报单
   }, [hasSession]);
+
+  // ===== 交易透明化：我的订单与我的优惠（私密读，匿名不请求、不渲染骨架） =====
+  const orders = useAsync(async () => { // 统一订单列表：匿名回落空数组
+    if (!hasSession) return { items: [] as UnifiedOrder[] }; // 匿名短路
+    return api.commerce.orders(); // 已登录回读本人订单（含金额拆解 / 时间线 / 券 / 退款）
+  }, [hasSession]);
+  const myCoupons = useAsync(async () => { // 我的优惠码清单：匿名回落空数组
+    if (!hasSession) return { coupons: [] as MyCouponItem[] }; // 匿名短路
+    return api.shop.myCoupons(); // 已登录回读本人券与核验字段
+  }, [hasSession]);
+  const [refundBusy, setRefundBusy] = useState<string | null>(null); // 正在申请退款的订单主键，防止重复点击
 
   /** 跳转帖子详情：与社区卡片同一深链接口径 */
   function openThread(id: string) { // 帖子详情导航
@@ -264,6 +301,23 @@ export function Profile({ locale, onUserUpdated }: Props) {
     } // try 结束
   } // exportData 结束
 
+  /** 申请退款：仅商城订单、仅已支付 / 已交付状态；复用既有 shop/refund 端点，成功后刷新订单列表 */
+  async function requestRefund(order: UnifiedOrder) {
+    if (order.source !== 'shop') return; // 资产 / 付费帖不走商城退款路径
+    setRefundBusy(order.id); // 标记当前订单退款中
+    setError(null); // 清空旧错误
+    setMessage(null); // 清空旧提示
+    try { // 异常捕获起点：包裹退款请求与状态刷新
+      await api.shop.refund(order.source_id); // 退款入余额，服务端按订单状态拦截重复退款
+      orders.reload(); // 刷新订单状态与退款记录
+      setMessage(isZh ? '退款申请已提交，款项将退回余额' : 'Refund requested; the balance will be credited'); // 结果提示
+    } catch (err) {
+      setError(errorText(locale, err)); // 失败翻译为可读文案
+    } finally {
+      setRefundBusy(null); // 恢复按钮可点
+    } // try 结束
+  } // requestRefund 结束
+
   /** 提交注销申请：二次确认通过后调用，成功后收起确认面板并重置确认态 */
   async function submitDeletion() {
     await toggleDeletion(true); // 发起注销（进入冷静期）
@@ -287,6 +341,7 @@ export function Profile({ locale, onUserUpdated }: Props) {
           <button type="button" className={`tab${tab === 'profile' ? ' active' : ''}`} onClick={() => selectTab('profile')}>{isZh ? '资料' : 'Profile'}</button>
           <button type="button" className={`tab${tab === 'content' ? ' active' : ''}`} onClick={() => selectTab('content')}>{isZh ? '我的内容' : 'My content'}</button>
           <button type="button" className={`tab${tab === 'assets' ? ' active' : ''}`} onClick={() => selectTab('assets')}>{isZh ? '我的资产' : 'My assets'}</button>
+          <button type="button" className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => selectTab('orders')}>{isZh ? '我的订单' : 'Orders'}</button>
           <button type="button" className={`tab${tab === 'security' ? ' active' : ''}`} onClick={() => selectTab('security')}>{isZh ? '账号与设置' : 'Account & settings'}</button>
         </nav>
       </header>
@@ -449,6 +504,113 @@ export function Profile({ locale, onUserUpdated }: Props) {
       {/* 分区三：我的资产（付费资产域，仅登录后可见；?tab=assets 可直达） */}
       {tab === 'assets' ? (
         <MyAssets locale={locale} />
+      ) : null}
+
+      {/* 分区四：我的订单 + 我的优惠（交易透明化批次；?tab=orders 可直达，仅登录后可见） */}
+      {tab === 'orders' ? (
+        <div className="profile-content">{/* 订单与优惠区块容器 */}
+          {/* 我的订单：状态时间线 + 金额拆解 + 券信息 + 退款进度 + 申请退款按钮 */}
+          <section className="panel">
+            <div className="panel-head"><h2>{isZh ? '我的订单' : 'My orders'}</h2></div>
+            {orders.loading ? (
+              <ListSkeleton count={3} /> // 订单区首屏骨架
+            ) : (orders.data?.items ?? []).length === 0 ? (
+              <EmptyState
+                kind="cap"
+                title={isZh ? '还没有订单' : 'No orders yet'}
+                hint={isZh ? '下单后，订单状态、金额拆解与退款进度会集中展示在这里。' : 'Order status, breakdown and refunds appear here after checkout.'}
+                action={<button type="button" className="btn ghost" onClick={() => navigatePath(pathOf('community'))}>{isZh ? '去社区逛逛' : 'Browse community'}</button>}
+              />
+            ) : (
+              <ul className="plain-list">{/* 订单卡片列表 */}
+                {(orders.data?.items ?? []).map((order) => {
+                  const title = order.items[0]?.title ?? order.product_code ?? order.id; // 首件商品名快照，回落编码 / 主键
+                  const canRefund = order.source === 'shop' && (order.status === 'paid' || order.status === 'delivered'); // 仅商城已支付 / 已交付订单可申请退款
+                  const summary = summarizeOrderAmount(order); // 金额拆解：原价 / 优惠 / 应付 / 服务费 0
+                  return (
+                    <li className="deploy-row" key={order.id}>{/* 单张订单卡 */}
+                      <div>
+                        <span>{title}</span>
+                        <span className="deploy-badge">{ORDER_STATUS_LABEL[order.status] ?? order.status}</span>
+                      </div>
+                      {/* 状态时间线：节点 + 到达时间，缺时间戳的节点标 · 不编造时刻 */}
+                      <div className="muted">
+                        {order.status_timeline.map((node) => (
+                          <span key={node.node} className="deploy-badge muted">
+                            {ORDER_STATUS_LABEL[node.node] ?? node.node}{node.at ? ` ${day(node.at)}` : ' ·'}
+                          </span>
+                        ))}
+                      </div>
+                      {/* 金额拆解：原价 / 优惠 / 应付 / 平台服务费 0（口径对齐 Stripe 逐项列示） */}
+                      <div className="hint">
+                        {isZh ? '原价' : 'Subtotal'} {formatCurrency(summary.amount_cents, order.currency, locale)}
+                        {' · '}{isZh ? '优惠' : 'Discount'} -{formatCurrency(summary.discount_cents, order.currency, locale)}
+                        {' · '}{isZh ? '应付' : 'Due'} <strong>{formatCurrency(summary.payable_cents, order.currency, locale)}</strong>
+                        {' · '}{isZh ? '服务费 0' : 'Fee 0'}
+                      </div>
+                      {/* 下单使用的优惠码：券型 / 面值 / 本单实减 */}
+                      {order.coupon ? (
+                        <p className="hint">
+                          券 {order.coupon.code} · {order.coupon.kind === 'fixed' ? `立减 ${formatCurrency(order.coupon.value, order.currency, locale)}` : `${order.coupon.value}% 折扣`} · -{formatCurrency(order.coupon.discount_cents, order.currency, locale)}
+                        </p>
+                      ) : null}
+                      {/* 退款进度：商城订单退款 + 扩展渠道退款记录逐条展示 */}
+                      {order.refunds.map((refund, idx) => (
+                        <p className="hint" key={`${refund.source}-${idx}`}>
+                          {isZh ? '退款' : 'Refund'} {formatCurrency(refund.amount_cents, order.currency, locale)} · {refund.status}{refund.created_at ? ` · ${day(refund.created_at)}` : ''}
+                        </p>
+                      ))}
+                      {/* 申请退款：复用既有 shop/refund 端点；仅商城订单可发起 */}
+                      {canRefund ? (
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          disabled={refundBusy === order.id}
+                          onClick={() => void requestRefund(order)}
+                        >
+                          {refundBusy === order.id ? (isZh ? '提交中…' : 'Submitting…') : isZh ? '申请退款' : 'Request refund'}
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {orders.error ? <div className="chat-error">{errorText(locale, orders.error)}</div> : null}
+          </section>
+
+          {/* 我的优惠：可核验列表 + 失效原因（券型 / 面值 / 门槛 / 有效期 / 剩余次数 / 是否已用） */}
+          <section className="panel">
+            <div className="panel-head"><h2>{isZh ? '我的优惠' : 'My coupons'}</h2></div>
+            {myCoupons.loading ? (
+              <ListSkeleton count={3} /> // 券区首屏骨架
+            ) : (myCoupons.data?.coupons ?? []).length === 0 ? (
+              <EmptyState kind="cap" title={isZh ? '暂无可用优惠码' : 'No coupons'} hint={isZh ? '下单时输入优惠码可享受立减或折扣。' : 'Enter a coupon code at checkout to save.'} />
+            ) : (
+              <ul className="plain-list">{/* 优惠码列表 */}
+                {(myCoupons.data?.coupons ?? []).map((coupon) => (
+                  <li className="deploy-row" key={coupon.code}>
+                    <span>
+                      <strong>{coupon.code}</strong> · {couponKindLabel(coupon)}
+                      {coupon.redeemed_by_me ? ` · ${isZh ? '已使用' : 'Used'}` : ''}
+                    </span>
+                    <span className="muted">
+                      {coupon.min_amount_cents > 0 ? `${isZh ? '满' : 'Min'} ${formatCurrency(coupon.min_amount_cents, 'CNY', locale)}` : isZh ? '无门槛' : 'No min'}
+                      {coupon.max_uses > 0 ? ` · ${coupon.used_count}/${coupon.max_uses}` : ` · ${coupon.used_count}${isZh ? ' 次' : ''}`}
+                      {coupon.expires_at ? ` · ${isZh ? '有效至' : 'Until'} ${day(coupon.expires_at)}` : ''}
+                    </span>
+                    {coupon.valid ? (
+                      <span className="deploy-badge ok">{isZh ? '可用' : 'Valid'}</span>
+                    ) : (
+                      <span className="deploy-badge muted">{COUPON_REASON_LABEL[coupon.invalid_reason ?? ''] ?? coupon.invalid_reason}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {myCoupons.error ? <div className="chat-error">{errorText(locale, myCoupons.error)}</div> : null}
+          </section>
+        </div>
       ) : null}
 
       {/* 分区四：账号与设置（原独立「设置」页的内容并入此处，仅登录后可见） */}

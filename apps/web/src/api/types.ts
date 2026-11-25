@@ -391,6 +391,31 @@ export interface VipPlan { // 会员套餐
   perks: string[]; // 权益
 }
 
+export interface PublicPricingPlan { // 公开定价页档位（后端裁剪后的公开视图，无管理字段）
+  code: string; // 套餐编码
+  name: string; // 档位名称
+  level: number; // 等级
+  price_cents: number; // 价格（分），来自后端配置，前端不硬编码
+  duration_days: number; // 有效天数（计费周期）
+  perks: string[]; // 权益清单
+}
+
+export interface PublicPricingPolicy { // 定价页脚注口径：与后端退款政策常量同源
+  platform_service_fee_cents: number; // 平台服务费（分），固定 0
+  effective_date: string; // 政策生效日期（YYYY-MM-DD）
+}
+
+export interface PublicPricingLegal { // 合规静态页站内入口
+  refund_path: string; // 退款与售后说明路径
+  help_path: string; // 帮助中心路径
+}
+
+export interface PublicPricingResponse { // GET /vip/pricing/public 响应形状
+  plans: PublicPricingPlan[]; // 启用档位列表（空数组即未配置）
+  policy: PublicPricingPolicy; // 服务费 / 生效日期脚注
+  legal: PublicPricingLegal; // 退款 / 帮助中心入口
+}
+
 export interface WalletSnapshot { // 钱包快照
   user_id: string; // 所属用户
   balance_cents: number; // 余额（分）
@@ -448,6 +473,29 @@ export interface UnifiedOrderItem { // 统一订单明细行
   unit_price_cents: number; // 下单时单价（分）
 }
 
+/** 订单状态时间线节点：node 为状态机取值，at 为到达时间，缺时间戳为 null */
+export interface OrderTimelineNode { // 时间线节点
+  node: 'pending' | 'paid' | 'delivered' | 'refunded' | 'cancelled'; // 订单状态节点
+  at: string | null; // 到达时间（ISO），未到达 / 无记录时为 null
+}
+
+/** 订单回显的优惠码信息：券型、面值与本单实减 */
+export interface OrderCouponInfo { // 券信息
+  code: string; // 优惠码明文（大写）
+  kind: 'fixed' | 'percent'; // fixed 立减 / percent 折扣
+  value: number; // 面值：fixed 为分，percent 为百分比
+  discount_cents: number; // 本单实减金额（分）
+}
+
+/** 退款记录条目：商城订单退款与扩展渠道退款统一回显形状 */
+export interface OrderRefundRecord { // 退款记录
+  amount_cents: number; // 退款金额（分）
+  status: string; // 退款状态：processed / refunded / pending 等
+  created_at: string | null; // 退款发生时间，无记录时为 null
+  source: 'shop_order' | 'ext_refund'; // 来源：商城订单 / 扩展渠道退款表
+  reason: string | null; // 退款原因
+}
+
 export interface UnifiedOrder { // 统一订单视图
   id: string; // 统一订单主键（uo_<source>_<source_id>）
   user_id: string; // 下单用户
@@ -467,6 +515,26 @@ export interface UnifiedOrder { // 统一订单视图
   shipping: { carrier: string; tracking_no: string; status: string; updated_at: string } | null; // 物流单，未发货为 null
   after_sales_status: string | null; // 最近一条售后申请状态
   items: UnifiedOrderItem[]; // 订单明细
+  // ===== 交易透明化批次补强（2026-11-25）=====
+  amount_cents: number; // 原价合计（分），与 total_cents 同值
+  status_timeline: OrderTimelineNode[]; // 状态时间线，未到达节点时间为 null
+  coupon: OrderCouponInfo | null; // 下单使用的优惠码，无券为 null
+  refunds: OrderRefundRecord[]; // 退款记录，无退款为空数组
+}
+
+/** 我的优惠码清单条目：核验字段 + 本人是否已用 + 失效原因 */
+export interface MyCouponItem { // 本人优惠码
+  code: string; // 优惠码明文
+  kind: 'fixed' | 'percent'; // fixed 立减 / percent 折扣
+  value: number; // 面值：fixed 为分，percent 为百分比
+  min_amount_cents: number; // 最低消费门槛（分）
+  starts_at: string | null; // 生效开始时间，null 即刻生效
+  expires_at: string | null; // 过期时间，null 长期有效
+  max_uses: number; // 总可用次数，0 不限
+  used_count: number; // 已核销次数
+  redeemed_by_me: boolean; // 本人是否已核销过
+  valid: boolean; // 当前是否对本人生效
+  invalid_reason: 'inactive' | 'not_started' | 'expired' | 'exhausted' | 'already_used' | 'min_amount' | null; // 失效原因，可用为 null
 }
 
 /** 售后申请：用户对已付款订单发起，后台可同意（退款入余额）或驳回 */

@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react'; // 状态与副作用
 import type { Locale } from '@mim/i18n'; // 语言类型
 import { api } from '../api'; // 接口客户端
-import { threadDetail } from '../api/community.js'; // 论坛帖子详情：内容流来源为 community_thread 时补齐媒体与付费墙口径
+import { authorProfile, threadDetail, type CommunityTag } from '../api/community.js'; // 论坛帖子详情 + 作者公开卡：内容流来源为 community_thread 时补齐媒体、作者与标签口径
 import { resolvePublicUrl } from '../api/request.js'; // 公开地址归一化：API 签名链接与 Web 静态产物分流
 import type { CommunityThreadMedia } from '../api'; // 帖子媒体（图片 / 视频 + 时长与分辨率）
 import { navigatePath, pathOf } from '../router'; // 站内导航与深链接构造
@@ -29,6 +29,8 @@ interface DetailItem {
   link?: { label: string; path: string }; // 关联入口（如论坛原帖）
   media?: CommunityThreadMedia[]; // 论坛来源的图片 / 视频（锁定帖为空）
   priceCents?: number; // 原帖定价（分），用于锁定提示
+  author?: { id: string; name: string; level: number; badgeCount: number; postCount: number } | null; // 作者公开卡：昵称 / 等级 / 徽章数 / 发帖数，点击进作者页
+  tags?: CommunityTag[]; // 该帖标签 chips：点击带 tag 跳到目录检索
 }
 
 interface Props {
@@ -183,6 +185,20 @@ export function ContentDetail({ locale, kind, id }: Props) {
             const page = await threadDetail(hit.source_id); // 详情已按解锁态隐藏锁定媒体
             detail.media = page.thread.media ?? []; // 图片 / 视频（含时长与分辨率）
             detail.priceCents = page.thread.price_cents ?? 0; // 用于锁定提示
+            detail.tags = (page.thread as { tags?: CommunityTag[] }).tags ?? []; // 标签 chips（元信息不随付费墙隐藏）
+            const authorId = page.thread.author_id; // 作者主键：存在才拉公开卡
+            if (authorId) { // 作者卡只读聚合：昵称 / 等级 / 徽章数 / 发帖数
+              try { // 作者接口失败不阻断正文
+                const profile = await authorProfile(authorId); // 公开端点，匿名可读
+                detail.author = { // 组装作者卡视图模型
+                  id: profile.author.id, // 内部主键（深链接用）
+                  name: profile.author.display_name, // 昵称
+                  level: profile.author.level, // 等级
+                  badgeCount: profile.author.badge_count, // 徽章数
+                  postCount: profile.author.post_count, // 发帖数
+                }; // 组装结束
+              } catch { /* 作者卡缺失：正文照常展示 */ }
+            } // 作者拉取结束
           } catch { /* 详情接口失败不阻断，保留摘要 */ }
         } // 论坛来源结束
         return detail; // 返回归一化条目
@@ -245,7 +261,31 @@ export function ContentDetail({ locale, kind, id }: Props) {
       {state === 'ready' && item && (
         <>
           <p className="community-card-meta">{item.meta}</p>
+          {/* 作者公开卡：昵称 / 等级 / 徽章数 / 发帖数，点击进作者页（目录视图 ?author=） */}
+          {item.author && (
+            <button
+              type="button"
+              className="content-detail-author"
+              onClick={() => navigatePath(pathOf('directory', '', `author=${encodeURIComponent(item.author!.id)}`))}
+            >
+              <span className="content-detail-author-name">{item.author.name}</span>
+              <span className="content-detail-author-meta">Lv.{item.author.level} · {item.author.badgeCount} {tr(locale, '徽章', 'badges')} · {item.author.postCount} {tr(locale, '帖', 'posts')}</span>
+            </button>
+          )}
           <h1>{item.title}</h1>
+          {/* 该帖标签 chips：点击带 tag 跳到目录检索（?tag=） */}
+          {item.tags && item.tags.length > 0 && (
+            <div className="content-detail-tags">
+              {item.tags.map((tag) => (
+                <button
+                  key={tag.slug}
+                  type="button"
+                  className="content-detail-tag"
+                  onClick={() => navigatePath(pathOf('directory', '', `tag=${encodeURIComponent(tag.slug)}`))}
+                >#{tag.name}</button>
+              ))}
+            </div>
+          )}
           {item.link && (
             <a className="content-detail-link" href={item.link.path} onClick={(event) => { event.preventDefault(); navigatePath(item.link!.path); }}>{item.link.label} →</a>
           )}
@@ -259,6 +299,13 @@ export function ContentDetail({ locale, kind, id }: Props) {
           <RichBody text={item.body} />
         </>
       )}
+      <style>{`
+        .content-detail-author { display: inline-flex; flex-direction: column; gap: 2px; align-items: flex-start; padding: var(--sp-2, 8px) 0; border: none; background: none; text-align: left; cursor: pointer; }
+        .content-detail-author-name { font-weight: 600; }
+        .content-detail-author-meta { color: var(--text-muted, #888); font-size: .8rem; }
+        .content-detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+        .content-detail-tag { padding: 3px 10px; border: 1px solid var(--border-strong, #ddd); border-radius: 999px; background: var(--surface, #fff); font-size: .8rem; cursor: pointer; }
+      `}</style>
     </article>
   );
 } // ContentDetail 结束

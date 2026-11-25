@@ -9,8 +9,11 @@ export type AppView =
   | 'home' // 门户首页：hero + 入口卡 + 精选帖（社区设置为论坛首页时由 App 内 effect 跳社区）
   | 'account' // 个人中心（资料 / 账号与设置）
   | 'community' // 社区与变现（论坛 / 公告动态 / 付费阅读 / VIP / 钱包 / 独立商城 / 推广）
+  | 'directory' // 目录与检索中心：板块 / 类型 / 标签筛选、分组检索、按月归档、作者公开卡
+  | 'domains' // 13 业务领域门户：总览 /domains + 详情 /domains/:slug（slug 挂在 route.slug）
   | 'chat' // IM 聊天 + 视频通话
   | 'circles' // 圈子：成员制社群（与板块 board 概念独立）
+  | 'pricing' // 公开定价与权益页：档位卡 + 权益对比表 + 服务费 / 退款 / 生效日期脚注
   | 'checkout' // 收银台：支付意图二维码 / 渠道唤起 / 状态轮询
   | 'payreturn' // 支付回跳承接页：三态结果展示
   | 'login' // 未登录专用的登录伪视图
@@ -21,6 +24,7 @@ export type AppView =
 export interface AppRoute {
   view: AppView; // 当前视图
   sub?: LegalKind; // 合规静态页子类型，仅 view === 'legal' 时有值
+  slug?: string; // 领域详情标识，仅 view === 'domains' 且为 /domains/:slug 时有值，供 DomainDetail 入参
 } // 路由结构结束
 
 // 合规静态页合法子类型清单：与 /legal/<kind> 路径段一一对应
@@ -33,8 +37,11 @@ export const VIEW_SEGMENTS: Record<AppView, string> = {
   home: 'home', // 门户首页（hero / 入口卡 / 精选）
   account: 'account', // 个人中心（资料 / 账号与设置）
   community: 'community', // 社区与变现（论坛 + 公告动态 + 知识付费 + VIP + 钱包 + 独立商城）
+  directory: 'directory', // 目录与检索中心（板块 / 类型 / 标签 / 分组检索 / 归档）
+  domains: 'domains', // 13 业务领域门户（总览 /domains；详情 /domains/:slug 由二级段带入）
   chat: 'chat', // 聊天（原名即功能名，保持不变）
   circles: 'circles', // 圈子（成员制社群，路径段与功能名一致）
+  pricing: 'pricing', // 公开定价与权益页（档位卡 + 权益对比表）
   checkout: 'checkout', // 收银台（支付意图二维码 / 渠道唤起）
   payreturn: 'pay-return', // 支付回跳承接页（/pay-return?intent=...）
   login: 'signin', // 登录（对外语义为登录动作，非内部伪视图名）
@@ -167,6 +174,10 @@ export function parseLocation(): AppRoute {
   // 多段深链接：/pay/return 与 /pay-return 支付回跳承接
   if (segs[0] === 'pay' && segs[1] === 'return') return { view: 'payreturn' };
   if (segs[0] === 'pay-return') return { view: 'payreturn' };
+  // 13 业务领域门户：/domains 总览；/domains/:slug 详情（slug 取第二段并解码，避免中文 / 特殊字符路径失真）
+  if (segs[0] === 'domains') {
+    return segs[1] ? { view: 'domains', slug: decodeURIComponent(segs[1]) } : { view: 'domains' };
+  }
   // 合规静态页：/legal/<privacy|terms|refund|help>；首段是 legal 但子类型非法时落 404
   if (segs[0] === 'legal') {
     const kind = LEGAL_KINDS.includes(segs[1] as LegalKind) ? (segs[1] as LegalKind) : null; // 校验子类型
@@ -179,7 +190,8 @@ export function parseLocation(): AppRoute {
 
 // 由路由生成路径：所有导航入口统一走这里，保证链接格式一致（含子路径部署前缀）
 export function hrefOf(route: AppRoute): string {
-  return baseOf() + VIEW_SEGMENTS[route.view]; // 形如 '/community' 或 '/mim/community'
+  const base = baseOf() + VIEW_SEGMENTS[route.view]; // 形如 '/community' 或 '/mim/community'
+  return route.slug ? `${base}/${encodeURIComponent(route.slug)}` : base; // 领域详情补 /:slug 段，其余视图不受影响
 } // hrefOf 结束
 
 // 合规静态页深链接：/legal/<kind>，带子路径前缀，供页脚与帮助中心跳转使用

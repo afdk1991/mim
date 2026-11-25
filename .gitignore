@@ -83,3 +83,13 @@ _stage/
 reports/
 # 校验脚本/运行期错误日志
 .tmp-*.err
+
+# ---------- 个人 / 站点调试产物（2026-11-25 全领域平台轮补） ----------
+# 仅忽略、不删除：本地备份副本、WordPress 站点调试截图、域名配置表格与空白便签，均非 Mim 源码
+backup/
+wp-laal-top-*.png
+zy-*.png
+域名适配整理项目*.xlsx
+# 纯 ASCII 兜底：Windows Git 遍历目录时对中文规则可能匹配不上，统一忽略所有 xlsx 表格
+*.xlsx
+新建 文本文档.txt

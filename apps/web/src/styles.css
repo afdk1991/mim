@@ -2005,6 +2005,7 @@ code { /* 行内代码/令牌展示 */
     align-items: center; /* 水平居中 */
     gap: 2px; /* 图标与文字间距 */
     padding: 8px 4px; /* 点击热区 */
+    min-height: var(--touch-target); /* 触控目标 ≥44px，满足移动端可点按口径 */
     border: 0; /* 去默认边框 */
     background: transparent; /* 透明底 */
     color: var(--text-muted); /* 未选中弱化 */
@@ -2016,6 +2017,11 @@ code { /* 行内代码/令牌展示 */
   .mobile-tab.active { /* 选中态 */
     color: var(--link); /* 转链接色 */
   } /* 选中结束 */
+
+  .icon-btn { /* 窄屏图标按钮：触控目标抬到 44px 下限 */
+    width: var(--touch-target); /* 宽 = 触控令牌 */
+    height: var(--touch-target); /* 高 = 触控令牌 */
+  } /* 窄屏图标按钮结束 */
 
   .footer-cols { /* 页脚多列 */
     grid-template-columns: 1fr 1fr; /* 窄屏收为两列 */
@@ -6092,6 +6098,9 @@ code { /* 行内代码/令牌展示 */
   font-size: var(--fs-sm);
   text-align: left;
   padding: 6px 8px;
+  min-height: var(--touch-target); /* 触控目标 ≥44px，移动端可点按口径 */
+  display: flex; /* 内容纵向居中 */
+  align-items: center;
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -6104,3 +6113,78 @@ code { /* 行内代码/令牌展示 */
 @media (max-width: 760px) { /* 移动端：让开底部 Tab 高度 */
   .float-actions { bottom: 92px; }
 }
+
+/* ---------- 无障碍对比度收口（WCAG 2.1 AA）：仅配色覆盖，不改布局 ----------
+   令牌层 --border / --border-strong / --nav-ring 的低透明度描边在表面上
+   不足 3:1 非文本边界对比度；暗色淡主色底上的链接文字不足 4.5:1；
+   浅色成功文字压成功淡底为 4.49:1，边际不达标。本段在样式表末尾覆盖
+   对应语义令牌，明暗两套分别取值，组件侧继续消费原令牌名。 */
+:root { /* 浅色覆盖：描边加深到 3:1 以上，成功文字压暗一档 */
+  --border: #7f8caa; /* 常规描边：on 表面 3.23:1，达到非文本边界 3:1 */
+  --border-strong: #727fa3; /* 强调描边：分组与嵌套块边界，对比高于常规描边 */
+  --nav-ring: #7a87a8; /* 导航幽灵按钮描边：on 表面 ≥ 3:1 */
+  --success: #0f7045; /* 成功文字：on 成功淡底 5.13:1，达到正文 4.5:1 */
+} /* 浅色对比度覆盖结束 */
+
+:root[data-theme='dark'] { /* 暗色覆盖：描边提亮到 3:1 以上，链接文字提亮一档 */
+  --border: #7c8393; /* 常规描边：on 暗色表面 3.33:1 */
+  --border-strong: #888e9e; /* 强调描边：对比高于常规描边 */
+  --nav-ring: #828998; /* 导航幽灵按钮描边：on 暗色表面 ≥ 3:1 */
+  --link: hsl(var(--theme-h) 80% 78%); /* 链接文字：on 淡主色底 4.84:1，达到正文 4.5:1 */
+} /* 暗色对比度覆盖结束 */
+
+/* ---------- 跳转主内容链接：键盘可达性 ----------
+   默认移出视口，仅在键盘聚焦时浮现，鼠标用户不可见；
+   焦点环沿用全局 :focus-visible 2px 轮廓口径。 */
+.skip-link { /* 跳转链接 */
+  position: absolute; /* 脱离文档流定位 */
+  top: -100px; /* 默认移出视口顶部 */
+  left: 16px; /* 左边距与页面留白对齐 */
+  z-index: 100; /* 高于头部与弹层 */
+  padding: 8px 14px; /* 内距保证可点按 */
+  background: var(--primary-fill); /* 主色填充底 */
+  color: var(--on-primary); /* 主色上的浅色文字 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  text-decoration: none; /* 去掉链接下划线 */
+  font-size: var(--fs-sm); /* 正文档字号 */
+} /* 跳转链接结束 */
+
+.skip-link:focus-visible { /* 键盘聚焦时浮现 */
+  top: 12px; /* 回到视口顶部内侧 */
+} /* 聚焦浮现结束 */
+
+/* ---------- 底部「更多」溢出导航面板 ---------- */
+.mobile-more-panel { /* 面板容器 */
+  position: fixed; /* 悬浮于内容之上 */
+  left: 12px; /* 左右留边 */
+  right: 12px; /* 左右留边 */
+  bottom: calc(64px + env(safe-area-inset-bottom)); /* 位于底部 Tab 上方，避让全面屏安全区 */
+  z-index: 49; /* 低于弹层，高于普通内容 */
+  display: flex; /* 纵向排列菜单项 */
+  flex-direction: column; /* 自上而下 */
+  gap: 2px; /* 项间距 */
+  padding: 6px; /* 面板内距 */
+  background: var(--surface); /* 一级表面 */
+  border: 1px solid var(--border); /* 细边界 */
+  border-radius: var(--radius-md); /* 中等圆角 */
+  box-shadow: 0 8px 24px hsl(var(--site-h) 30% 20% / 0.16); /* 向上弥散投影 */
+} /* 面板容器结束 */
+
+.mobile-more-panel button { /* 溢出导航菜单项 */
+  display: flex; /* 块级占满宽度并纵向居中 */
+  align-items: center; /* 文案垂直居中 */
+  width: 100%; /* 整行可点 */
+  min-height: var(--touch-target); /* 触控目标 ≥44px，满足移动端可点按口径 */
+  padding: 10px 12px; /* 纵向内距保证触控高度 */
+  border: 0; /* 去默认边框 */
+  background: transparent; /* 透明底 */
+  color: var(--text); /* 主文字色 */
+  border-radius: var(--radius-sm); /* 小圆角 */
+  text-align: left; /* 文案左对齐 */
+  font-size: var(--fs-sm); /* 正文档字号 */
+  cursor: pointer; /* 手型提示 */
+} /* 菜单项结束 */
+
+.mobile-more-panel button:hover { /* 悬停态 */
+  background: var(--surface-2); /* 二级表面底 */
+} /* 悬停结束 */

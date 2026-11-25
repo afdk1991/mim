@@ -66,12 +66,16 @@ function TabIcon({ view }: { view: string }) {
       {view === 'chat' && <path d="M4 5.5h16v11H8.5L4 20z" />}
       {/* 个人中心：头像轮廓 */}
       {view === 'account' && <><circle cx="12" cy="8" r="3.4" /><path d="M5 20c0-3.2 3.1-5.2 7-5.2s7 2 7 5.2" /></>}
+      {/* 目录：四宫格轮廓 */}
+      {view === 'directory' && <><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>}
       {/* 圈子：单人 + 同伴轮廓 */}
       {view === 'circles' && <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c0-2.6 2.5-4.2 5.5-4.2s5.5 1.6 5.5 4.2" /></>}
       {/* 登录：钥匙轮廓 */}
       {view === 'login' && <><circle cx="9" cy="12" r="3.2" /><path d="M12.2 12H21" /><path d="M18 12v3" /></>}
+      {/* 更多：三点省略号 */}
+      {view === 'more' && <><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none" /></>}
       {/* 兜底：未知视图给圆点占位，不出现空白 Tab */}
-      {!['home', 'community', 'chat', 'account', 'circles', 'login'].includes(view) && <circle cx="12" cy="12" r="4" />}
+      {!['home', 'community', 'directory', 'chat', 'account', 'circles', 'login', 'more'].includes(view) && <circle cx="12" cy="12" r="4" />}
     </svg>
   ); // 图标返回结束
 } // TabIcon 结束
@@ -123,6 +127,17 @@ export function Shell({
   const tabItems: ShellNavItem[] = navItems.slice(0, site.mobileTabItemsMax).map((item) => ({ view: item.view, label: item.label }));
   // 未登录且仍有空位：补登录入口，保证移动端随时可登录
   if (!authedSession && tabItems.length < site.mobileTabItemsMax && !tabItems.some((item) => item.view === 'login')) tabItems.push({ view: 'login', label: signIn });
+  // 溢出导航：超出底部 Tab 上限的一级导航收进「更多」面板，顺序与顶部导航保持一致
+  const overflowItems = navItems.slice(tabItems.length);
+  // 「更多」面板开关：打开时响应 Esc 关闭，选择项后自动收起
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Esc 关闭「更多」面板：仅在面板打开时绑定，避免监听常驻
+  useEffect(() => {
+    if (!moreOpen) return; // 关闭态不挂监听
+    const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setMoreOpen(false); }; // Esc 收起面板
+    window.addEventListener('keydown', onKey); // 绑定键盘监听
+    return () => window.removeEventListener('keydown', onKey); // 卸载解绑
+  }, [moreOpen]); // 依赖：面板开关态
   // 页脚快捷入口：与主导航同源，末位按登录态给个人中心或登录
   const footerTail: ShellNavItem[] = [
     { view: 'circles', label: locale === 'en-US' ? 'Circles' : '圈子' }, // 圈子：成员制板块
@@ -138,6 +153,8 @@ export function Shell({
   const displayName = authedSession ? authedSession.user.display_name || authedSession.user.id.slice(0, 8) : '';
   return (
     <>
+      {/* 跳转主内容链接：键盘用户跳过头部与侧栏，直达 main；默认隐藏，聚焦时浮现 */}
+      <a className="skip-link" href="#main-content">{locale === 'en-US' ? 'Skip to main content' : '跳到主内容'}</a>
       {/* 顶部导航：吸顶 + 半透明底 + 滚动阴影，结构对齐 zibll header */}
       <header className={`site-header${stuck && site.stickyHeader ? ' is-stuck' : ''}`} style={site.stickyHeader ? undefined : { position: 'static' }}>{/* 滚动态由 is-stuck 追加阴影；关闭吸顶后退化为静态头部 */}
         <div className="header-inner">{/* 顶栏内容行：1200px 居中 */}
@@ -157,7 +174,7 @@ export function Shell({
           </button>
           <nav className="site-nav" aria-label={locale === 'en-US' ? 'Main navigation' : '主导航'}>{/* 一级导航：横向平铺 */}
             {navItems.map((item) => ( // 按上层给出的顺序渲染，顺序由后台配置决定
-              <button key={item.view} type="button" className={`nav-item${activeView === item.view ? ' active' : ''}`} onClick={() => onNavigate(item.view as AppView)}>{/* 选中态与隐藏二级页的上级映射一致 */}{item.label}
+              <button key={item.view} type="button" className={`nav-item${activeView === item.view ? ' active' : ''}`} aria-current={activeView === item.view ? 'page' : undefined} onClick={() => onNavigate(item.view as AppView)}>{/* 选中态与隐藏二级页的上级映射一致 */}{item.label}
               </button>
             ))}
           </nav>
@@ -179,7 +196,7 @@ export function Shell({
 
       {/* 两栏主体：1200px 居中，左内容右挂件；showSide=false 时退化为单列 */}
       <div className={`shell-wrap${showSide ? '' : ' no-side'}`}>{/* 两栏容器 */}
-        <main className="main">{children}{/* 视图内容由 App 传入，外壳不感知具体页面 */}</main>
+        <main className="main" id="main-content">{children}{/* 视图内容由 App 传入，外壳不感知具体页面 */}</main>
         {showSide && ( // 右栏挂件：登录页等整屏视图关闭
           <aside className="shell-side" aria-label={locale === 'en-US' ? 'Site sidebar' : '站点侧栏'}>{/* 右栏：两张站点挂件 */}
             <section className="widget">{/* 挂件一：账号卡 */}
@@ -276,12 +293,40 @@ export function Shell({
       {/* 底部 Tab：≤760px 显示，补足 zibll 移动端底部导航；总开关与项数取自站点选项 */}
       {site.mobileTabEnabled && (<nav className="mobile-tabs" aria-label={locale === 'en-US' ? 'Bottom navigation' : '底部导航'}>
         {tabItems.map((item) => ( // 每项：图标 + 短文案
-          <button key={item.view} type="button" className={`mobile-tab${activeView === item.view ? ' active' : ''}`} onClick={() => onNavigate(item.view as AppView)}>{/* 选中态跟随当前视图 */}
+          <button key={item.view} type="button" className={`mobile-tab${activeView === item.view ? ' active' : ''}`} aria-current={activeView === item.view ? 'page' : undefined} onClick={() => onNavigate(item.view as AppView)}>{/* 选中态跟随当前视图 */}
             <TabIcon view={item.view} />{/* 线性图标 */}
             <span>{item.label}</span>{/* 短文案 */}
           </button>
         ))}
+        {overflowItems.length > 0 && ( // 有溢出导航时才渲染「更多」入口
+          <button
+            type="button"
+            className={`mobile-tab${moreOpen ? ' active' : ''}`}
+            aria-label={locale === 'en-US' ? 'More navigation' : '更多导航'}
+            aria-expanded={moreOpen}
+            aria-controls="mobile-more-panel"
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            <TabIcon view="more" />{/* 更多线性图标 */}
+            <span>{locale === 'en-US' ? 'More' : '更多'}</span>{/* 短文案 */}
+          </button>
+        )}
       </nav>)}
+      {/* 溢出导航面板：列出底部 Tab 收不下的一级导航，顺序与顶部导航一致 */}
+      {site.mobileTabEnabled && moreOpen && overflowItems.length > 0 && (
+        <div className="mobile-more-panel" id="mobile-more-panel" role="menu" aria-label={locale === 'en-US' ? 'More navigation' : '更多导航'}>
+          {overflowItems.map((item) => ( // 逐项渲染溢出入口
+            <button
+              key={item.view}
+              type="button"
+              role="menuitem"
+              onClick={() => { onNavigate(item.view as AppView); setMoreOpen(false); }}
+            >
+              {item.label}{/* 导航文案 */}
+            </button>
+          ))}
+        </div>
+      )}
     </>
   ); // 外壳返回结束
 } // Shell 结束

@@ -137,6 +137,8 @@ const AUTH_REQUIRED_READ_PATHS = new Set<string>([ // 精确匹配
   '/api/v1/assets/mine/list', // 我拥有的资产（列表与详情匿名可读，仅此项需登录）
   '/api/v1/community/favorites', // 我的收藏
   '/api/v1/community/notifications', // 通知
+  '/api/v1/community/appeals/mine', // 我的申诉：本人申诉记录，匿名不可读
+  '/api/v1/community/follows/boards', // 我关注的板块：关注关系私密，只有本人可见
   '/api/v1/commerce/orders', // 统一订单
   '/api/v1/commerce/orders/summary', // 订单角标
   '/api/v1/im/conversations', // 私信会话

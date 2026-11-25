@@ -7,7 +7,7 @@
 
 import { ApiError, BASE, current, request, requestBlob } from './request.js'; // 所有端点的唯一出口：鉴权、幂等、错误信封与 401 重试；requestBlob 供附件下载
 import type { Locale } from '@mim/i18n';
-import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, DeletionStatus, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, GrowthLevelProgress, MyGrowthBadge, FavoriteThreadItem, MyReportItem } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
+import type { Region, Provider, CaptchaScene, CaptchaIssue, SecurityStatus, CaptchaTicket, UserInfo, OAuthProviderInfo, OAuthBinding, RealnameRecord, LoginResult, MeResponse, DeletionStatus, AssetType, PresignedUrl, ImConversationType, ImMessageContentType, ImMessage, ImConversation, ImMember, ImUser, CommunityBoard, CommunityThreadMedia, CommunityThread, CommunityThreadDetail, ThreadAttachmentMeta, CommunityPost, CircleRole, CircleSummary, CircleMember, CirclePost, CircleNotice, CircleCreatePayload, VipPlan, WalletSnapshot, WalletTransaction, ShopProduct, ShopOrder, UnifiedOrder, UnifiedOrderSummary, UnifiedOrderSource, AfterSalesRequest, PaymentProvider, PaymentChannel, PaymentIntent, ThemeSettings, I18nSettings, PageBlock, PointsDeductionConfig, ContentFeedItem, AnnouncementItem, ChangelogItem, PromotionItem, AnnouncementUpsertPayload, ChangelogUpsertPayload, PromotionUpsertPayload, BoardTab, BoardTabInput, GrowthLevelProgress, MyGrowthBadge, FavoriteThreadItem, MyReportItem, MyCouponItem, PublicPricingPlan, PublicPricingResponse } from './types.js'; // 端点签名用到的类型仍定义在 types.ts，仅类型引用
 
 export const api = { // 接口集合：按业务域分组，调用方按 api.xxx.yyy 使用
   requestCode(region: Region, provider: Provider, identifier: string, captcha?: { id: string; code: string }) { // 请求发送验证码（开发环境直接回传 dev_code）
@@ -377,6 +377,9 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     plans() { // 套餐列表
       return request<{ plans: VipPlan[] }>('/vip/plans', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
+    publicPricing() { // 公开定价与权益页：匿名只读，档位 / 价格 / 权益全部来自后端配置
+      return request<PublicPricingResponse>('/vip/pricing/public', { auth: false, idempotency: false }); // 公开接口免鉴权，只读无需幂等键
+    }, // 代码块结束
     subscribe(code: string) { // 开通 / 续费
       return request<{ ok: boolean; level: number; expires_at: string }>('/vip/subscribe', { method: 'POST', body: { code } }); // 返回当前函数的处理结果
     }, // 代码块结束
@@ -418,6 +421,9 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     }, // 代码块结束
     myAfterSales() { // 我的售后申请列表
       return request<{ items: AfterSalesRequest[] }>('/after-sales', { idempotency: false }); // 返回当前函数的处理结果
+    }, // 代码块结束
+    myCoupons() { // 我的优惠码清单：核验字段 + 失效原因（只读本人，匿名 401）
+      return request<{ coupons: MyCouponItem[] }>('/shop/coupons/mine', { idempotency: false }); // 返回当前函数的处理结果
     }, // 代码块结束
   }, // 代码块结束
 
@@ -582,3 +588,60 @@ export const api = { // 接口集合：按业务域分组，调用方按 api.xxx
     },
   }, // circles 分组结束
 }; // api 对象结束
+
+/**
+ * 订单金额拆解（纯函数）：原价 / 优惠 / 应付 / 平台服务费。
+ * 口径与后端 commerce/policy.ts 一致：平台服务费 0，退款不另扣手续费。
+ * 供个人中心订单卡与收银台复用同一展示口径，避免两处各算一套。
+ */
+export function summarizeOrderAmount(order: { amount_cents: number; discount_cents: number; payable_cents: number }): {
+  amount_cents: number; // 原价合计（分）
+  discount_cents: number; // 优惠合计（分）
+  payable_cents: number; // 实付金额（分）
+  service_fee_cents: number; // 平台服务费（分），固定 0
+} {
+  return {
+    amount_cents: order.amount_cents, // 原价
+    discount_cents: order.discount_cents, // 优惠
+    payable_cents: order.payable_cents, // 实付
+    service_fee_cents: 0, // 平台服务费 0（与 REFUND_POLICY.platform_service_fee_cents 对齐）
+  };
+}
+
+/**
+ * 优惠码命中预估（纯函数）：按券型与订单金额计算实减金额。
+ * fixed 立减不超过订单金额；percent 折扣四舍五入到分并封顶订单金额。
+ * 与后端 evaluateCoupon 的 discount 计算保持同口径，仅做本地预览、不核销次数。
+ */
+export function previewCouponDiscount(kind: 'fixed' | 'percent', value: number, amountCents: number): number {
+  if (!Number.isFinite(amountCents) || amountCents <= 0) return 0; // 0 元单不产生优惠
+  if (kind === 'fixed') return Math.min(Math.max(value, 0), amountCents); // 立减封顶为订单金额
+  return Math.min(Math.round((amountCents * Math.max(value, 0)) / 100), amountCents); // 折扣封顶为订单金额
+}
+
+/** 权益对比表单行：权益名 + 各档位是否包含（键为套餐 code） */
+export interface PricingComparisonRow {
+  feature: string; // 权益名（与档位 perks 文案一致）
+  included: Record<string, boolean>; // 档位 code → 是否包含该权益
+}
+
+/**
+ * 定价页权益对比整形（纯函数）：汇总全部档位权益，按首次出现顺序成行；
+ * 每行以套餐 code 为键标注是否包含。空档位输入返回空数组，供对比表空态隐藏。
+ */
+export function buildPricingComparison(plans: PublicPricingPlan[]): PricingComparisonRow[] {
+  const features: string[] = []; // 权益名按首次出现顺序排列
+  const seen = new Set<string>(); // 去重集合：同一权益只占一行
+  for (const plan of plans) { // 逐档收集权益
+    for (const perk of plan.perks) { // 逐条权益
+      if (!seen.has(perk)) { // 未出现过的新权益
+        seen.add(perk); // 记入去重集合
+        features.push(perk); // 追加到行顺序
+      } // 新权益判断结束
+    } // 权益遍历结束
+  } // 档位遍历结束
+  return features.map((feature) => ({ // 汇总为对比表行
+    feature, // 权益名
+    included: Object.fromEntries(plans.map((plan) => [plan.code, plan.perks.includes(feature)])), // 各档包含布尔矩阵
+  })); // 行组装结束
+}
