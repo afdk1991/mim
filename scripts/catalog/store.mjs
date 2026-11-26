@@ -323,7 +323,11 @@ export function readProduct(db, sourceKey) {
   return db.prepare('SELECT * FROM catalog_products WHERE source_key = ?').get(sourceKey) || null; // 单行
 }
 
-/** 读取最近一次同步批次。 */
+/** 读取最近一次同步批次（repair 批次不参与「最近同步」展示，避免掩盖每日抓取结果）。 */
 export function latestRun(db) {
-  return db.prepare('SELECT * FROM catalog_sync_runs ORDER BY started_at DESC LIMIT 1').get() || null; // 最近批次
+  return db.prepare(
+    `SELECT * FROM catalog_sync_runs
+      ORDER BY (stats LIKE '%"repair":true%') ASC, started_at DESC
+      LIMIT 1`
+  ).get() || null; // 最近批次
 }

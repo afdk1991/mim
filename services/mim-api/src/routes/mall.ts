@@ -100,7 +100,10 @@ export function createMallRouter(deps: ApiDeps): Router {
     const counts = deps.db
       .prepare('SELECT level, COUNT(*) AS n FROM catalog_categories WHERE is_active = 1 GROUP BY level')
       .all() as Array<{ level: number; n: number }>; // 层级计数
-    const run = deps.db.prepare('SELECT run_id, started_at, finished_at, status, phase, stats FROM catalog_sync_runs ORDER BY started_at DESC LIMIT 1').get() as
+    const run = deps.db.prepare(
+      `SELECT run_id, started_at, finished_at, status, phase, stats FROM catalog_sync_runs
+        ORDER BY (stats LIKE '%"repair":true%') ASC, started_at DESC LIMIT 1`
+    ).get() as
       | { run_id: string; started_at: string; finished_at: string | null; status: string; phase: string | null; stats: string }
       | undefined; // 最近批次
     const imgDir = imageDirOf(deps.env); // 图片目录
@@ -211,7 +214,10 @@ export function createMallRouter(deps: ApiDeps): Router {
 
   /** 同步状态：最近批次 + 批次总数。 */
   router.get('/mall/sync/status', (_req, res) => {
-    const run = deps.db.prepare('SELECT run_id, started_at, finished_at, status, phase, stats, error FROM catalog_sync_runs ORDER BY started_at DESC LIMIT 1').get() as
+    const run = deps.db.prepare(
+      `SELECT run_id, started_at, finished_at, status, phase, stats, error FROM catalog_sync_runs
+        ORDER BY (stats LIKE '%"repair":true%') ASC, started_at DESC LIMIT 1`
+    ).get() as
       | Record<string, unknown>
       | undefined; // 最近批次
     const runs = (deps.db.prepare("SELECT COUNT(*) AS n FROM catalog_sync_runs WHERE source = 'egluosi'").get() as { n: number }).n; // 批次数
