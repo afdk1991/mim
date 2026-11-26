@@ -17,6 +17,7 @@ import { bm25Rank, blendScore, DEFAULT_ALGORITHM_WEIGHTS, jaccard, loadAlgorithm
 import { DEFAULT_TABS, loadBoardTabs, saveBoardTabs, SORT_BY_KEYS, type TabInput } from '../community/tabs.js'; // 三期：板块 Tab 组合
 import { readHomeSetting, writeHomeSetting, boardReviewEnabled, saveBoardReviewEnabled, type HomeView } from '../community/settings.js'; // 三期：首页指向与审核开关
 import { findBlockedWord } from '../community/sensitive.js'; // 三期：本地敏感词校验 // 依赖容器
+import { optionFlag } from './site-options.js'; // 后台「商城与付费」总开关：积分抵扣 / 会员购买 / 付费解锁
 import { assertSafeObjectKey, mimeForObjectKey } from '../storage.js'; // 附件对象键安全校验（禁止路径穿越）+ 后缀推导 MIME
 import { baseUrlOf } from './media.js'; // 附件签名下载复用媒体域的公网基址推导，避免两套口径并存
 import { performCheckin } from '../growth/service.js'; // 签到统一走激励链（签到+发分+等级+徽章同事务）
@@ -1080,6 +1081,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
 
   /** 解锁付费帖：作者 / VIP 直接放行；余额扣款与解锁凭据、统一订单同一事务落库。 */
   router.post('/community/threads/:id/unlock', (req, res) => { // 路由 POST /community/threads/:id/unlock：注册入口并绑定鉴权与处理逻辑
+    if (!optionFlag(deps, 'paid_content_switch')) throw new AppError('FEATURE_NOT_AVAILABLE', '付费内容解锁已在后台关闭', { channel: 'paid_content' }); // 后台总开关关闭时不再受理新的解锁
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const id = req.params.id; // 保存 id：承载本步骤的计算结果供后续使用
     const thread = deps.db // 保存 thread：承载本步骤的计算结果供后续使用
@@ -1992,6 +1994,7 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
 
   /** 开通 / 续费 VIP：余额扣款，有效期顺延。 */
   router.post('/vip/subscribe', (req, res) => { // 路由 POST /vip/subscribe：注册入口并绑定鉴权与处理逻辑
+    if (!optionFlag(deps, 'vip_purchase_switch')) throw new AppError('FEATURE_NOT_AVAILABLE', '会员购买已在后台关闭', { channel: 'vip' }); // 后台总开关关闭时不再受理新订单
     const userId = req.user!.id; // 保存 userId：承载本步骤的计算结果供后续使用
     const body = parse(z.object({ code: z.string().min(1).max(40) }), req.body); // 保存 body：承载本步骤的计算结果供后续使用
     const plan = deps.db.prepare('SELECT * FROM vip_plans WHERE code = ? AND active = 1').get(body.code) as // 保存 plan：承载本步骤的计算结果供后续使用
@@ -2095,7 +2098,9 @@ export function createCommunityRouter(deps: ApiDeps): Router { // 定义函数 c
     const coupon = couponDiscount(deps, body.coupon_code, amount); // 保存 coupon：承载本步骤的计算结果供后续使用
     const afterCoupon = Math.max(0, amount - coupon.discount); // 优惠码之后的应付（积分段入参）
     const pointsConfig = readPointsConfig(deps.env); // 积分兑换比例与单笔上限
-    const usePoints = body.use_points === true || body.points_to_use !== undefined; // 显式开启或指定积分量
+    // 后台总开关与后端配置同为闸门：任一关闭都不再计算抵扣，避免只隐藏前端面板
+    const pointsAllowed = pointsConfig.enabled && optionFlag(deps, 'points_deduction_switch');
+    const usePoints = pointsAllowed && (body.use_points === true || body.points_to_use !== undefined); // 显式开启或指定积分量
     const deduction = usePoints // 常量 deduction：保存固定配置或一次性派生值
       ? computeDeduction({ amountCents: afterCoupon, pointsBalance: getPointsBalance(deps.db, userId), config: pointsConfig, pointsToUse: body.points_to_use }) // 执行当前业务步骤
       : { deduct_cents: 0, points_spent: 0, payable_cents: afterCoupon, capped_by: 'none' as const }; // 未开启抵扣：全额应付

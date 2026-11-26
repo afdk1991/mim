@@ -29,6 +29,7 @@ import { requireAuth } from '../middleware.js'; // 绑定/解绑需要登录态
 import { finishLogin } from './auth.js'; // 复用统一会话签发
 import { buildAuthorizeUrl, exchangeOAuthCode } from '../oauth/client.js'; // 授权链接与令牌交换
 import { findProvider, publicProviders, resolveCredentials } from '../oauth/providers.js'; // provider 注册表
+import { optionFlag } from './site-options.js'; // 后台「第三方登录」总开关
 import { // 引入依赖、类型或本地模块绑定
   consumeLoginTicket, // 票据兑换
   createUserFromOAuth, // 首次第三方登录建号
@@ -111,6 +112,10 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
   const router = Router(); // 独立路由实例
 
   router.get('/auth/oauth/providers', (req, res) => { // 公开能力查询：前端据此渲染按钮
+    if (!optionFlag(deps, 'oauth_login_switch')) { // 后台关闭第三方登录后整体下架
+      res.json({ providers: [] }); // 返回空清单，前端自然不渲染入口
+      return;
+    } // 开关分支结束
     const region = req.query.region === 'cn' || req.query.region === 'global' ? (req.query.region as Region) : undefined; // 可选区域过滤
     res.json({ providers: publicProviders(deps.env, backendBaseOf(req), region) }); // 只返回 id/名称/区域/是否已配置
   }); // 结束 GET /auth/oauth/providers
@@ -118,6 +123,8 @@ export function createOAuthRouter(deps: ApiDeps): Router { // 组装第三方登
   router.post('/auth/oauth/:provider/authorize', async (req, res) => { // 发起授权：登录可匿名，绑定必须已登录
     const body = parse(authorizeBody, req.body ?? {}); // 校验请求体
     const mode = body.mode ?? 'login'; // 缺省为登录
+    // 登录模式下受后台总开关约束；绑定模式是对已登录账号的操作，开关关闭时仍允许解绑/换绑
+    if (mode === 'login' && !optionFlag(deps, 'oauth_login_switch')) throw new AppError('FEATURE_NOT_AVAILABLE', '第三方登录已在后台关闭', { channel: 'oauth' }); // 接口层真实拒绝
     const { spec, creds } = resolveProviderOrThrow(deps, req, req.params.provider); // 解析定义与凭证
     // 绑定模式必须已登录：此处按需解析 Bearer，未带令牌直接 401，不影响登录模式匿名使用
     let linkUserId: string | null = null; // 绑定的目标用户

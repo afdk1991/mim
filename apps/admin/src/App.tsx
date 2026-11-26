@@ -32,10 +32,8 @@ import { ContentOps } from './views/ContentOps'; // 业务步骤
 import { CommunityAdmin } from './views/CommunityAdmin'; // 业务步骤
 // 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
 import { PageBuilder } from './views/PageBuilder'; // 业务步骤
-// 外观：主色 / 圆角档位 / 默认明暗，复用 appearance:write
-import { Appearance } from './views/Appearance'; // 业务步骤
-// 站点选项：按注册表渲染 Global & Features 十一个分组（图标 / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码 / 备案信息）
-import { SiteOptions } from './views/SiteOptions'; // 站点选项面板
+// 主题设置面板：左侧分组 + 右侧设置面板，合并原「外观 / 站点选项 / 设置」三页
+import { ThemeSettings } from './views/ThemeSettings'; // 业务步骤
 // 成长私信：按条件或指定用户发送系统身份私信
 import { GrowthDm } from './views/GrowthDm'; // 业务步骤
 import { Withdrawals } from './views/Withdrawals'; // 提现审核：申请队列 / 审核 / 到账（钱包结算层）
@@ -47,18 +45,16 @@ import { Products } from './views/Products'; // 商品管理
 import { Orders } from './views/Orders'; // 订单管理
 // 权益：会员套餐与权益清单维护
 import { Entitlements } from './views/Entitlements'; // 权益
-// 设置：站点名称 / 副标题 / 页脚文案
-import { Settings } from './views/Settings'; // 站点设置
 // 审计流水：敏感操作的留痕查询（操作人 / 动作 / 对象 / 结果 / 时间）
 import { AuditLogs } from './views/AuditLogs'; // 审计流水
 // 账号注销：待删除队列、清理策略与手动触发一轮数据清理
 import { Deletions } from './views/Deletions'; // 账号注销队列
 
 /** 视图键：与侧栏保持一一对应，避免字符串散落各处 */
-type ViewKey = 'overview' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'appearance' | 'siteOptions' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'settings' | 'auditLogs' | 'deletions';
+type ViewKey = 'overview' | 'themeSettings' | 'withdrawals' | 'shipments' | 'roles' | 'users' | 'priceBatches' | 'invites' | 'realname' | 'contentOps' | 'communityAdmin' | 'pageBuilder' | 'growthDm' | 'products' | 'orders' | 'entitlements' | 'auditLogs' | 'deletions';
 
-/** 侧栏分组键：四组折叠，组名与顺序即信息架构口径 */
-type NavGroupKey = 'content' | 'trade' | 'user' | 'site';
+/** 侧栏分组键：按 zibll 子比主题后台的分组口径重排，组名与顺序即信息架构口径 */
+type NavGroupKey = 'global' | 'pages' | 'content' | 'users' | 'shop' | 'pay' | 'system';
 
 /** 侧栏条目：permission 为 null 表示无需权限即可见 */
 interface NavItem {
@@ -83,11 +79,28 @@ interface NavGroup {
 /** 概览独立于四组，固定在侧栏顶部，任何已登录身份可见 */
 const OVERVIEW: NavItem = { key: 'overview', label: '概览', permission: null };
 
-/** 四组折叠导航：内容 / 交易 / 用户 / 站点 */
+/** 七组折叠导航：对齐 zibll 的「全局与功能 / 页面与显示 / 内容 / 用户 / 商城 / 支付 / 系统」口径；
+ *  原「外观 / 站点选项 / 设置」三页已合并进「主题设置」面板，功能不丢，只是不再各占一个导航项。 */
 const NAV_GROUPS: NavGroup[] = [
   {
+    key: 'global',
+    label: '全局与功能',
+    items: [
+      // 主题设置：站点信息 / 外观与配色 / Logo / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码 / 备案 / 注册与登录 / 商城与付费
+      { key: 'themeSettings', label: '主题设置', permission: 'appearance:write' },
+    ],
+  },
+  {
+    key: 'pages',
+    label: '页面与显示',
+    items: [
+      // 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
+      { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
+    ],
+  },
+  {
     key: 'content',
-    label: '内容',
+    label: '内容与社区',
     items: [
       // 内容运营：公告 / 更新日志 / 推广计划
       { key: 'contentOps', label: '内容运营', permission: 'appearance:write' },
@@ -96,8 +109,24 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: 'trade',
-    label: '交易',
+    key: 'users',
+    label: '用户与互动',
+    items: [
+      // 用户与授权：需要 user:read
+      { key: 'users', label: '用户', permission: 'user:read' },
+      // 角色与权限：需要 rbac:read
+      { key: 'roles', label: '角色与权限', permission: 'rbac:read' },
+      // 实名审核：读权限 user:read；审核按钮另需 rbac:write
+      { key: 'realname', label: '实名审核', permission: 'user:read' },
+      // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
+      { key: 'invites', label: '邀请码', permission: 'user:read' },
+      // 成长私信：发送系统身份私信，需要 messaging:write
+      { key: 'growthDm', label: '成长私信', permission: 'messaging:write' },
+    ],
+  },
+  {
+    key: 'shop',
+    label: '商城与商品',
     items: [
       // 商品管理：商品台账、上架状态与单价
       { key: 'products', label: '商品管理', permission: 'commerce:write' },
@@ -105,65 +134,47 @@ const NAV_GROUPS: NavGroup[] = [
       { key: 'orders', label: '订单管理', permission: 'commerce:write' },
       // 发货与售后：复用 commerce:write，处理待发货订单与售后申请
       { key: 'shipments', label: '发货与售后', permission: 'commerce:write' },
-      // 提现审核：申请队列与到账处理，复用 commerce:write
-      { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
       // 批量改价：后端 commerce:write 才可提交，导航同权限过滤
       { key: 'priceBatches', label: '批量改价', permission: 'commerce:write' },
     ],
   },
   {
-    key: 'user',
-    label: '用户',
+    key: 'pay',
+    label: '支付与付费',
     items: [
-      // 用户与授权：需要 user:read
-      { key: 'users', label: '用户', permission: 'user:read' },
-      // 角色与权限：需要 rbac:read
-      { key: 'roles', label: '角色与权限', permission: 'rbac:read' },
+      // 提现审核：申请队列与到账处理，复用 commerce:write
+      { key: 'withdrawals', label: '提现审核', permission: 'commerce:write' },
       // 权益：会员套餐与权益清单
       { key: 'entitlements', label: '权益', permission: 'commerce:write' },
-      // 实名审核：读权限 user:read；审核按钮另需 rbac:write
-      { key: 'realname', label: '实名审核', permission: 'user:read' },
-      // 邀请码：读权限 user:read；生成 / 禁用按钮另需 rbac:write
-      { key: 'invites', label: '邀请码', permission: 'user:read' },
-      // 成长私信：发送系统身份私信，需要 messaging:write
-      { key: 'growthDm', label: '成长私信', permission: 'messaging:write' },
+    ],
+  },
+  {
+    key: 'system',
+    label: '系统与安全',
+    items: [
       // 审计流水：只读查询，复用 rbac:read（与后端查询端点同一权限点）
       { key: 'auditLogs', label: '审计流水', permission: 'rbac:read' },
       // 账号注销：待删除队列读权限 user:read；手动清理按钮另需 privacy:write，视图内置灰
       { key: 'deletions', label: '账号注销', permission: 'user:read' },
     ],
   },
-  {
-    key: 'site',
-    label: '站点',
-    items: [
-      // 外观：主色 / 圆角 / 默认明暗
-      { key: 'appearance', label: '外观', permission: 'appearance:write' },
-      // 站点选项：图标 / SEO / 布局 / 搜索 / 移动 Tab / 悬浮 / 多语言 / 分享 / 邮件 / 自定义代码
-      { key: 'siteOptions', label: '站点选项', permission: 'appearance:write' },
-      // 页面搭建：复用 appearance:write，管理首页 / 论坛区块装修
-      { key: 'pageBuilder', label: '页面搭建', permission: 'appearance:write' },
-      // 设置：站点名称 / 副标题 / 页脚文案
-      { key: 'settings', label: '设置', permission: 'appearance:write' },
-    ],
-  },
-]; // NAV_GROUPS 结束：四组共 16 项，加上独立概览即完整后台入口
+]; // NAV_GROUPS 结束：七组共 15 项，加上独立概览即完整后台入口
 
 /** 平铺索引：用于权限过滤与当前视图归属判断 */
 const NAV: NavItem[] = [OVERVIEW, ...NAV_GROUPS.flatMap((group) => group.items)];
 
-/** 「最近使用组」的本地存储键：只存分组键，缺省回落内容组 */
-const NAV_GROUP_KEY = 'mim.admin.nav.group.v1';
+/** 「最近使用组」的本地存储键：分组口径改版后升到 v2，避免旧值把新分组映射错 */
+const NAV_GROUP_KEY = 'mim.admin.nav.group.v2';
 
-/** 读取上次使用的分组；无记录或值非法时回落内容组 */
+/** 读取上次使用的分组；无记录或值非法时回落「全局与功能」 */
 function readLastGroup(): NavGroupKey {
   try {
     const raw = localStorage.getItem(NAV_GROUP_KEY);
-    if (raw === 'content' || raw === 'trade' || raw === 'user' || raw === 'site') return raw;
+    if (raw === 'global' || raw === 'pages' || raw === 'content' || raw === 'users' || raw === 'shop' || raw === 'pay' || raw === 'system') return raw;
   } catch {
     // 隐私模式下读取失败不阻断，按缺省处理
   }
-  return 'content';
+  return 'global';
 } // readLastGroup 结束
 
 /** 写入最近使用的分组：存储不可用时仅本次生效 */
@@ -449,10 +460,8 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'communityAdmin') return <CommunityAdmin credential={credential} permissions={identity.permissions} />;
   // 页面搭建：首页 / 论坛区块的顺序、文案、可见性与入口跳转
   if (key === 'pageBuilder') return <PageBuilder credential={credential} permissions={identity.permissions} />;
-  // 外观：主色 / 圆角档位 / 默认明暗
-  if (key === 'appearance') return <Appearance credential={credential} permissions={identity.permissions} />;
-  // 站点选项：Global & Features 十一个分组，按后端注册表数据驱动渲染
-  if (key === 'siteOptions') return <SiteOptions credential={credential} permissions={identity.permissions} />;
+  // 主题设置：左侧分组 + 右侧面板，合并原外观 / 站点选项 / 设置三页
+  if (key === 'themeSettings') return <ThemeSettings credential={credential} permissions={identity.permissions} />;
   // 成长私信：按条件或指定用户发送系统身份私信
   if (key === 'growthDm') return <GrowthDm credential={credential} permissions={identity.permissions} />;
   // 商品管理：商品台账、上架状态与单价
@@ -461,8 +470,6 @@ function renderView(key: ViewKey, credential: Credential, identity: AdminIdentit
   if (key === 'orders') return <Orders credential={credential} permissions={identity.permissions} />;
   // 权益：会员套餐与权益清单
   if (key === 'entitlements') return <Entitlements credential={credential} permissions={identity.permissions} />;
-  // 设置：站点名称 / 副标题 / 页脚文案
-  if (key === 'settings') return <Settings credential={credential} permissions={identity.permissions} />;
   // 审计流水：敏感操作留痕查询（只读）
   if (key === 'auditLogs') return <AuditLogs credential={credential} permissions={identity.permissions} />;
   // 账号注销：待删除队列、清理策略与手动清理（写操作另需 privacy:write）

@@ -80,3 +80,15 @@ export function diffOptions(baseline: OptionValues, current: OptionValues): Reco
   }
   return patch; // 返回补丁
 } // diffOptions 结束
+
+/** 图片上传返回：可直接写入 url 字段的站内地址 */
+export interface SiteImageUpload {
+  url: string; // 形如 /api/v1/site/assets/<uuid>.png
+  size: number; // 字节数
+  mime: string; // 服务端识别出的 MIME
+} // SiteImageUpload 结束
+
+/** 上传站点图片：把浏览器读出的 data URL 交给后端落盘，返回公开地址 */
+export function uploadSiteImage(credential: Credential, dataUrl: string): Promise<SiteImageUpload> {
+  return request<SiteImageUpload>('/admin/site-options/upload', { method: 'POST', body: { data_url: dataUrl }, credential }); // 复用统一请求层
+} // uploadSiteImage 结束

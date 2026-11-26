@@ -10,6 +10,7 @@ import './tokens.css';
 import './styles.css';
 import './styles-colorful.css'; /* 后台彩色主题叠加层：倒数第二引入，覆盖既有排版 */
 import './styles-polish.css'; /* 后台视觉精修层：令牌 / 排版 / 表格 / 表单 / 登录页统一，必须最后引入 */
+import './settings-panel.css'; /* 主题设置面板：左侧分组 + 右侧面板形态，仅作用于设置面板 */
 // 明暗偏好：与前台共用本地存储键，渲染前先落到 <html data-theme>
 import { applyThemeMode, readStoredMode } from './theme';
 

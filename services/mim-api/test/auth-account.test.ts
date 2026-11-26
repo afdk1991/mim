@@ -29,7 +29,7 @@ describe('登录通道可用性', () => { // 通道能力查询：前端据此�
   it('未配置任何通道时只有注册可用', async () => { // 空 env 场景
     const res = await request(app).get('/api/v1/auth/channels'); // 公开只读接口
     expect(res.status).toBe(200); // 恒可用
-    expect(res.body).toEqual({ sms: false, email: false, password: false, register: true }); // 布尔能力清单
+    expect(res.body).toEqual({ sms: false, email: false, password: false, oauth: true, register: true }); // 布尔能力清单（oauth 为后台总开关，默认开启）
   }); // 结束用例
 
   it('存在账号口令凭据后 password 变为可用', async () => { // 有口令场景

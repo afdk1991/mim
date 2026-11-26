@@ -7,6 +7,7 @@ import { AppError } from '@mim/core-domain'; // 业务异常
 import { idempotency, requirePermission } from '../middleware.js'; // 鉴权：读写统一走 requirePermission（引导令牌与 Bearer 管理员同一口径）
 import { parse } from '../validate.js'; // 校验错误翻译
 import { readPointsConfig } from '../commerce/config.js'; // 积分抵扣开关与兑换口径（公开只读，供前端决定是否展示抵扣面板）
+import { optionFlag } from './site-options.js'; // 后台「积分抵扣」总开关：与注册表同源
 import type { ApiDeps } from '../types.js'; // 依赖容器
 
 const ALLOWED_SETTINGS = new Set(['theme', 'locales', 'site', 'home']); // 允许通过 API 修改的设置键
@@ -41,12 +42,13 @@ export function createAppearanceRouter(deps: ApiDeps): Router { // 导出函数 
     const home = readSetting(deps, 'home'); // 常量 home：保存固定配置或一次性派生值
     const view = typeof home.view === 'string' && ['store', 'community'].includes(home.view) ? home.view : 'community'; // 常量 view：保存固定配置或一次性派生值
     const points = readPointsConfig(deps.env); // 积分抵扣总开关 / 兑换比例 / 单笔上限；总开关关闭时前端整块隐藏抵扣面板
+    const pointsEnabled = points.enabled && optionFlag(deps, 'points_deduction_switch'); // 后台总开关与后端配置同时为真才展示与计算
     res.json({ // 执行当前业务步骤
       home_view: view, // 对象字段 home_view：记录一项配置或数据
       theme: readSetting(deps, 'theme'), // 对象字段 theme：记录一项配置或数据
       site: readSetting(deps, 'site'), // 对象字段 site：记录一项配置或数据
       locales: readSetting(deps, 'locales'), // 对象字段 locales：记录一项配置或数据
-      points_deduction: { enabled: points.enabled, points_per_yuan: points.pointsPerYuan, max_ratio_percent: points.maxRatioPercent }, // 对象字段 points_deduction：记录一项配置或数据
+      points_deduction: { enabled: pointsEnabled, points_per_yuan: points.pointsPerYuan, max_ratio_percent: points.maxRatioPercent }, // 对象字段 points_deduction：记录一项配置或数据
     }); // 代码块结束
   }); // 代码块结束
 

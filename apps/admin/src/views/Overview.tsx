@@ -24,6 +24,8 @@ export function Overview({ identity, onOpen }: OverviewProps) {
   // 常用入口按权限显示：无对应写权限时不给死按钮
   const canAppearance = identity.permissions.includes('appearance:write');
   const canCommerce = identity.permissions.includes('commerce:write');
+  // 侧栏分组口径：与 App.tsx 的七组一一对应，避免概览文案与导航脱节
+  const navGroups = '全局与功能 / 页面与显示 / 内容与社区 / 用户与互动 / 商城与商品 / 支付与付费 / 系统与安全';
 
   // 指标卡片数据：抽到 TS 位置便于加注释
   const cards = [
@@ -40,7 +42,7 @@ export function Overview({ identity, onOpen }: OverviewProps) {
         <h1>概览</h1> {/* 页面标题：与左侧导航「概览」同名，保持信息架构一致 */}
         <span className="count">权限每请求实时查库，变更后刷新即生效</span> {/* 说明文案：强调权限不落缓存，改授权后刷新即可验证 */}
       </div> {/* 页头结束 */}
-      <p className="page-desc">这里是管理后台的起点：查看当前身份、生效角色与权限范围，并从左侧「内容 / 交易 / 用户 / 站点」四组入口进入具体功能。</p> {/* 用途说明：一句话讲清概览能做什么 */}
+      <p className="page-desc">这里是管理后台的起点：查看当前身份、生效角色与权限范围，并从左侧「{navGroups}」七组入口进入具体功能；站点信息、外观、注册与登录、商城与付费等设置项统一收在「主题设置」面板内。</p> {/* 用途说明：一句话讲清概览能做什么 */}
       <div className="row" style={{ marginBottom: 16 }}> {/* 常用入口：给首页一个可直接落地的动作，而不是只有文字 */}
         {canAppearance ? (
           <button className="btn primary" type="button" onClick={() => onOpen('contentOps')}>发布公告</button>

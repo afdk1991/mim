@@ -24,12 +24,14 @@ function adminHeaders(): Record<string, string> {
 } // adminHeaders 结束
 
 describe('站点选项注册表', () => { // 纯函数层
-  it('默认值覆盖十一个分组且键唯一', () => { // 结构自检（含备案信息分组）
+  it('默认值覆盖两个页签的全部分组且键唯一', () => { // 结构自检（含备案信息、注册与登录、商城与付费分组）
     const schema = optionSchema(); // 注册表结构
-    expect(schema.tabs.length).toBe(1); // 本轮只落地 Global & Features 页签
-    const groupKeys = schema.tabs[0].groups.map((group) => group.key); // 分组键
+    expect(schema.tabs.length).toBe(2); // Global & Features + 账户与交易
+    const groupKeys = schema.tabs[0].groups.map((group) => group.key); // 第一页签分组键
     expect(groupKeys).toEqual(['identity', 'seo', 'display', 'search', 'mobile_tab', 'floating', 'locale', 'social', 'email', 'custom', 'beian']); // 与主题后台分组对齐（含备案信息分组）
-    const fields = schema.tabs[0].groups.flatMap((group) => group.fields); // 全量字段
+    const accountGroups = schema.tabs[1].groups.map((group) => group.key); // 第二页签分组键
+    expect(accountGroups).toEqual(['auth', 'commerce']); // 注册与登录、商城与付费
+    const fields = schema.tabs.flatMap((tab) => tab.groups).flatMap((group) => group.fields); // 全量字段（跨页签）
     expect(new Set(fields.map((field) => field.key)).size).toBe(fields.length); // 键唯一
     expect(fields.every((field) => Object.prototype.hasOwnProperty.call(OPTION_DEFAULTS, field.key))).toBe(true); // 每个字段都有默认值
   }); // 用例结束
@@ -94,6 +96,15 @@ describe('站点选项接口', () => { // HTTP 层
     expect(admin.status).toBe(200); // 管理端可读
     expect(admin.body.values.custom_css).toBe(':root{--x:1}'); // 敏感以外的私有字段也持久化
     expect(admin.body.updated_at).toBeTruthy(); // 保存时间已写入
+  }); // 用例结束
+
+  it('商城与付费开关真实作用于公开配置', async () => { // 开关不是前端假状态
+    const before = await request(app).get('/api/v1/site/config'); // 关闭前
+    expect(before.body.points_deduction.enabled).toBe(true); // 默认开启
+    const saved = await request(app).put('/api/v1/admin/site-options').set(adminHeaders()).send({ values: { points_deduction_switch: false } }); // 后台关闭积分抵扣
+    expect(saved.body.changed).toContain('points_deduction_switch'); // 登记改动
+    const after = await request(app).get('/api/v1/site/config'); // 关闭后
+    expect(after.body.points_deduction.enabled).toBe(false); // 公开配置同步关闭，前端据此隐藏面板
   }); // 用例结束
 
   it('重置只影响指定键，全量重置回默认', async () => { // 恢复默认

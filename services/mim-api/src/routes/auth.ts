@@ -33,6 +33,7 @@ import { requireAuth } from '../middleware.js'; // 登出接口需要已登录�
 import { parse } from '../validate.js'; // zod 校验失败时统一转换为 AppError
 import { addSeconds } from '../utils.js'; // ISO 时间字符串加减秒
 import { isInviteRequired, redeemInvite } from '../invitations.js'; // 注册门槛：开关判定与同事务核销
+import { optionFlag } from './site-options.js'; // 后台「注册与登录」开关：与注册表同源，关闭后接口真实拒绝
 import type { ApiDeps, Region, UserRow } from '../types.js'; // 路由依赖、地区枚举与用户行类型
 import { createUser, ensureMemberNo, readUser } from '../identity.js'; // 统一建号 + Mim ID 发号 + 缺号兜底
 
@@ -399,13 +400,15 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
     res.json({ // 只暴露「是否可用」布尔值，不泄露任何凭证内容
       sms: Boolean(deps.notify?.sms), // 国内短信通道是否已装配凭证
       email: Boolean(deps.notify?.email), // 海外邮件通道是否已装配凭证
-      password: Boolean(deps.db.prepare("SELECT 1 FROM credentials WHERE kind = 'password' LIMIT 1").get()), // 有任一账号口令凭据即视为可用
-      register: isRegistrationEnabled(deps.env), // 与后端闸门同源：关闭时前端不再展示注册入口
+      password: optionFlag(deps, 'password_login_switch') && Boolean(deps.db.prepare("SELECT 1 FROM credentials WHERE kind = 'password' LIMIT 1").get()), // 后台关掉口令登录后不再宣称可用
+      oauth: optionFlag(deps, 'oauth_login_switch'), // 第三方登录总开关
+      register: isRegistrationEnabled(deps.env) && optionFlag(deps, 'registration_switch'), // 环境闸门与后台开关同时为真；关闭时前端不再展示注册入口
     }); // 响应结束
   }); // 结束 GET /auth/channels 处理
 
   router.post('/auth/register', (req, res) => { // 自助注册：账号 + 口令一次完成注册与登录
     assertRegistrationEnabled(deps); // 注册总开关关闭时直接拒绝，不解析请求体
+    if (!optionFlag(deps, 'registration_switch')) throw new AppError('AUTH_REGISTER_DISABLED', '注册已在后台关闭', { channel: 'register' }); // 后台关掉注册时同样拒绝
     const body = parse(registerBody, req.body); // 校验请求体
     const provider = body.provider ?? (body.region === 'cn' ? 'phone' : 'email'); // 未指定通道时按地区推断
     const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识，非法格式直接 400
@@ -447,6 +450,7 @@ export function createAuthRouter(deps: ApiDeps): Router { // 组装认证路由
   }); // 结束 POST /auth/register 处理
 
   router.post('/auth/password', (req, res) => { // 密码登录：只校验账号自身口令，唯一入口
+    if (!optionFlag(deps, 'password_login_switch')) throw new AppError('FEATURE_NOT_AVAILABLE', '口令登录已在后台关闭', { channel: 'password' }); // 后台关闭后接口真实拒绝，避免只隐藏前端按钮
     const body = parse(passwordBody, req.body); // 校验请求体
     const provider = body.provider ?? detectIdentityProvider(body.identifier); // 未指定通道时按标识形态推断：邮箱 / 手机号 / 用户名
     const identity = normalizeIdentity(body.region, provider, body.identifier); // 归一化标识，非法格式直接 400

@@ -163,6 +163,32 @@ export const SITE_OPTION_TABS: OptionTab[] = [
       },
     ],
   },
+  {
+    key: 'accounts-commerce', // 账户与交易页签：对应 zibll 的「用户&互动 / 支付&付费 / 商城&商品」三块
+    label: '账户与交易',
+    groups: [
+      {
+        key: 'auth', // 注册与登录分组：开关在运行时真实生效，不只是前端隐藏按钮
+        label: '注册与登录',
+        description: '登录渠道与注册闸门；关闭后服务端接口同步拒绝，前端只是不再展示入口',
+        fields: [
+          { key: 'registration_switch', label: '开放注册', type: 'switch', defaultValue: true, hint: '与环境变量 MIM_REGISTRATION_ENABLED 同时为真才放行；关闭后自助注册与验证码首登都会被拒绝', publicRead: true },
+          { key: 'password_login_switch', label: '口令登录', type: 'switch', defaultValue: true, hint: '关闭后账号口令登录接口直接拒绝，已登录会话不受影响', publicRead: true },
+          { key: 'oauth_login_switch', label: '第三方登录', type: 'switch', defaultValue: true, hint: '关闭后登录页不再展示第三方渠道，授权入口同步拒绝', publicRead: true },
+        ],
+      },
+      {
+        key: 'commerce', // 商城与付费分组：复用既有付费链路，只做总开关
+        label: '商城与付费',
+        description: '积分抵扣、会员购买与付费内容解锁的总开关；关闭后照常可读，只是不能再发起新的付费动作',
+        fields: [
+          { key: 'points_deduction_switch', label: '积分抵扣', type: 'switch', defaultValue: true, hint: '关闭后前台隐藏积分抵扣面板，结算不再计算积分抵扣', publicRead: true },
+          { key: 'vip_purchase_switch', label: '会员购买', type: 'switch', defaultValue: true, hint: '关闭后 VIP 订阅接口拒绝新订单，已有会员权益不变', publicRead: true },
+          { key: 'paid_content_switch', label: '付费内容解锁', type: 'switch', defaultValue: true, hint: '关闭后付费帖与付费板块不再受理新的解锁下单，已购内容仍可读', publicRead: true },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 字段类型集合：用于注册表自检，防止拼错类型导致后台渲染空白控件 */
