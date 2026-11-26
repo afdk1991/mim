@@ -1,0 +1,273 @@
+/* site/domains/domains.css
+ * 13 业务领域静态页的共享样式表。
+ * 设计约束：
+ *   1. 只使用与 site/index.html 同源的深色设计令牌（底色 / 面板 / 分割线 / 品牌蓝 / 薄荷绿 / 16px 圆角），
+ *      不引入第二套配色，保证从首页点进领域页视觉不断层；
+ *   2. 零外部字体、零图标库、零图片请求：图标用 emoji，视觉层次靠排版与描边；
+ *   3. 单文件约 6KB，13 个页面共用一份，浏览器缓存后二次进入不再重复下载；
+ *   4. 所有尺寸用 rem / clamp，窄屏不出现横向溢出。
+ */
+
+/* 设计令牌：与 site/index.html 保持一致，改这里即可整体换肤 */
+:root{
+  /* 页面背景：近黑冷调 */
+  --bg:#0a0c10;
+  /* 卡片面板底色 */
+  --panel:#12161d;
+  /* 次级面板：表头与标签底 */
+  --panel-2:#181d26;
+  /* 分割线与卡片描边 */
+  --line:#2a3140;
+  /* 强调描边：悬停与次级按钮 */
+  --line-strong:#4a5568;
+  /* 主文字色 */
+  --fg:#f1f4f9;
+  /* 次要文字色 */
+  --fg-dim:#aab4c4;
+  /* 弱化文字色 */
+  --fg-mute:#95a0b3;
+  /* 品牌蓝：链接、眉题、主按钮 */
+  --accent:#7db2ff;
+  /* 主按钮上的深色字，保证对比度 */
+  --on-accent:#06121f;
+  /* 薄荷绿：已上线语义色 */
+  --mint:#63d9b7;
+  /* 薄荷绿浅底：已上线标签 */
+  --mint-soft:rgba(99,217,183,.12);
+  /* 琥珀色：规划中语义色 */
+  --amber:#e7b96a;
+  /* 琥珀浅底：规划中标签 */
+  --amber-soft:rgba(231,185,106,.12);
+  /* 卡片圆角 */
+  --radius:16px;
+  /* 小圆角：按钮与标签 */
+  --radius-sm:10px;
+  /* 内容容器最大宽度 */
+  --maxw:1080px;
+  /* 容器左右安全边距 */
+  --pad:24px;
+}
+
+/* 全局重置：统一盒模型并清掉默认间距 */
+*{box-sizing:border-box;margin:0;padding:0}
+/* 移动端保持字号稳定，不随横竖屏自动放大 */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* 锚点跳转预留吸顶导航高度 */
+html{scroll-padding-top:84px}
+/* 页面主体：深色底、系统字体栈、1.75 行高 */
+body{background:var(--bg);color:var(--fg);line-height:1.75;-webkit-font-smoothing:antialiased;font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",sans-serif}
+/* 链接继承文字色并去下划线，具体组件另行定义悬停态 */
+a{color:inherit;text-decoration:none}
+/* 列表去项目符号，版式由组件控制 */
+ul,ol{list-style:none}
+/* 键盘焦点：蓝色外扩描边，仅键盘导航出现 */
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+/* 通用内容容器：限宽居中并留左右边距 */
+.wrap{max-width:var(--maxw);margin:0 auto;padding-left:var(--pad);padding-right:var(--pad)}
+/* 跳转主内容链接：默认移出视口 */
+.skip{position:absolute;left:16px;top:-60px;z-index:30;padding:10px 14px;border-radius:var(--radius-sm);background:var(--accent);color:var(--on-accent);font-weight:600}
+/* 跳转链接获得焦点时滑入视口 */
+.skip:focus{top:12px}
+
+/* 顶部导航：吸顶 + 半透明底 + 下描边 */
+.site-header{position:sticky;top:0;z-index:20;background:rgba(10,12,16,.92);border-bottom:1px solid var(--line)}
+/* 支持毛玻璃时叠加模糊，滚动内容从下方透出 */
+@supports (backdrop-filter:blur(12px)){
+  /* 降低底色不透明度并启用模糊 */
+  .site-header{background:rgba(10,12,16,.76);backdrop-filter:blur(12px)}
+}
+/* 导航条：两端对齐，窄屏换行 */
+.nav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;min-height:60px;padding-top:8px;padding-bottom:8px}
+/* 品牌区：图标 + 名称 + 版本徽标 */
+.brand{display:inline-flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:.01em}
+/* 品牌图标：仅用渐变方块承载 logo 语义，不请求图片 */
+.brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#7db2ff,#63d9b7);color:#06121f;font-weight:800;font-size:15px}
+/* 版本徽标：弱化的小标签 */
+.brand-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--fg-mute)}
+/* 导航链接组：横向排列，窄屏换行 */
+.nav-links{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--fg-dim)}
+/* 导航链接悬停变主色 */
+.nav-links a:hover{color:var(--accent)}
+
+/* 面包屑：小字号弱化，用于表达层级 */
+.crumbs{padding-top:18px;font-size:13px;color:var(--fg-mute)}
+/* 面包屑分隔符 */
+.crumbs span[aria-hidden]{margin:0 8px;opacity:.6}
+/* 面包屑当前项：主文字色 */
+.crumbs b{font-weight:600;color:var(--fg-dim)}
+
+/* 领域头图区：大标题 + 摘要 + 操作按钮 */
+.hero{padding:28px 0 30px;border-bottom:1px solid var(--line)}
+/* 眉题：分组名与英文名 */
+.hero-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+/* 领域图标：大号 emoji，纯文本无请求 */
+.hero-icon{font-size:30px;line-height:1}
+/* 主标题行：标题与状态徽标同行 */
+.hero-title{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:10px}
+/* 主标题 */
+.hero-title h1{font-size:clamp(26px,4vw,38px);line-height:1.25;letter-spacing:-.01em}
+/* 状态徽标通用样式 */
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+/* 已上线徽标 */
+.tag-live{background:var(--mint-soft);color:var(--mint);border:1px solid rgba(99,217,183,.35)}
+/* 规划中徽标 */
+.tag-plan{background:var(--amber-soft);color:var(--amber);border:1px solid rgba(231,185,106,.35)}
+/* 导语：略大字号，控制行长 */
+.hero-lead{max-width:72ch;margin-top:14px;color:var(--fg-dim);font-size:16px}
+/* 操作按钮行 */
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+/* 按钮基础样式 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 18px;border-radius:var(--radius-sm);font-size:14px;font-weight:700;border:1px solid var(--line-strong)}
+/* 主按钮：品牌蓝底深色字 */
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+/* 主按钮悬停：轻微提亮 */
+.btn-primary:hover{filter:brightness(1.06)}
+/* 次级按钮：透明底描边 */
+.btn-ghost{color:var(--fg)}
+/* 次级按钮悬停：描边与底色同时变化 */
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* 通用分区：上下留白 + 分割线 */
+.section{padding:34px 0;border-bottom:1px solid var(--line)}
+/* 分区标题组：标题与说明左右分栏 */
+.sec-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;margin-bottom:18px}
+/* 分区眉题 */
+.kicker{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+/* 分区标题 */
+.sec-head h2{font-size:clamp(19px,2.4vw,24px);line-height:1.35;margin-top:4px}
+/* 分区右侧说明 */
+.sec-head p{max-width:52ch;color:var(--fg-dim);font-size:14px}
+
+/* 正文段落：控制行长，便于长文阅读 */
+.prose p{max-width:74ch;color:var(--fg-dim)}
+/* 相邻段落留出间距 */
+.prose p + p{margin-top:12px}
+
+/* 三列卡片网格：场景 / 特性 */
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+/* 通用卡片：面板底 + 描边 + 圆角 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+/* 卡片标题 */
+.card h3{font-size:15px;line-height:1.5}
+/* 卡片正文 */
+.card p{margin-top:8px;color:var(--fg-dim);font-size:14px}
+/* 卡片序号：用于场景与功能点的顺序感 */
+.card-idx{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--accent);margin-bottom:6px}
+
+/* 功能清单：两列，避免长列表拖长页面 */
+.feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+/* 单个功能项：左侧图标槽 + 右侧文字 */
+.feature{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+/* 功能图标：圆形浅底 */
+.feature-dot{flex:0 0 auto;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--panel-2);border:1px solid var(--line);color:var(--mint);font-weight:800;font-size:13px}
+/* 功能名称 */
+.feature h3{font-size:14px}
+/* 功能说明 */
+.feature p{margin-top:4px;color:var(--fg-dim);font-size:13px}
+
+/* 工作流：横向四步，窄屏自动折行 */
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;counter-reset:step}
+/* 单步容器 */
+.step{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+/* 步骤序号：用计数器生成，避免手写错位 */
+.step::before{counter-increment:step;content:counter(step);display:inline-grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:800;margin-bottom:8px}
+/* 步骤名称 */
+.step h3{font-size:14px}
+/* 步骤说明 */
+.step p{margin-top:4px;color:var(--fg-dim);font-size:13px}
+
+/* 表格容器：窄屏横向滚动，不挤破布局 */
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+/* 复用映射表 */
+table{width:100%;border-collapse:collapse;font-size:14px}
+/* 列头单元格：仅 thead 使用，避免行首 th 也被套上表头样式 */
+thead th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-mute);background:var(--panel-2);padding:12px 14px;white-space:nowrap}
+/* 数据单元格 */
+td{padding:12px 14px;border-top:1px solid var(--line);color:var(--fg-dim);vertical-align:top}
+/* 行首能力名：用主文字色强调，但保持与普通单元格同样的排版 */
+tbody th{text-align:left;font-size:14px;font-weight:600;color:var(--fg);padding:12px 14px;border-top:1px solid var(--line);white-space:nowrap;background:none;letter-spacing:0;text-transform:none}
+/* 表内链接：品牌蓝 */
+td a{color:var(--accent)}
+/* 表内链接悬停：下划线提示可点 */
+td a:hover{text-decoration:underline}
+
+/* 实时状态区：异步加载，加载前保持占位高度避免跳动 */
+.live{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;background:var(--panel);border:1px dashed var(--line-strong);border-radius:var(--radius);padding:16px 18px;color:var(--fg-dim);font-size:14px}
+/* 状态圆点：默认灰色，由脚本按结果改色 */
+.live-dot{width:10px;height:10px;border-radius:999px;background:var(--fg-mute);flex:0 0 auto}
+/* 状态文案强调 */
+.live b{color:var(--fg)}
+/* 状态补充说明 */
+.live small{color:var(--fg-mute)}
+/* 实时列表：讨论或统计条目 */
+.live-list{margin-top:10px;display:grid;gap:8px}
+/* 单条实时条目 */
+.live-list li{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--fg-dim)}
+/* 实时条目内的链接 */
+.live-list a{color:var(--accent)}
+/* 实时条目时间戳弱化 */
+.live-list time{color:var(--fg-mute);font-size:12px}
+
+/* FAQ：原生 details，无需 JS */
+.faq{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--panel)}
+/* 单个问答项分隔线 */
+.faq details + details{border-top:1px solid var(--line)}
+/* 问题行：整行可点 */
+.faq summary{cursor:pointer;padding:14px 18px;font-weight:600;font-size:14px;display:flex;justify-content:space-between;gap:12px}
+/* 问题行悬停 */
+.faq summary:hover{color:var(--accent)}
+/* 去掉原生三角，改用文本符号 */
+.faq summary::-webkit-details-marker{display:none}
+/* 展开标记：默认加号 */
+.faq summary::after{content:"+";color:var(--fg-mute);font-weight:700}
+/* 展开后变为减号 */
+.faq details[open] summary::after{content:"–"}
+/* 答案正文 */
+.faq p{padding:0 18px 16px;color:var(--fg-dim);font-size:14px;max-width:78ch}
+
+/* 相关领域：横向标签 */
+.related{display:flex;flex-wrap:wrap;gap:10px}
+/* 相关领域链接：胶囊形 */
+.related a{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-size:14px;color:var(--fg-dim)}
+/* 悬停变主色 */
+.related a:hover{border-color:var(--accent);color:var(--accent)}
+
+/* 页脚：分割线 + 弱化文字 */
+.site-footer{border-top:1px solid var(--line);padding:26px 0 34px;color:var(--fg-mute);font-size:13px}
+/* 页脚行：两端对齐，窄屏换行 */
+.foot-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px}
+/* 页脚链接组 */
+.foot-links{display:flex;flex-wrap:wrap;gap:6px 16px}
+/* 页脚链接悬停 */
+.foot-links a:hover{color:var(--accent)}
+/* 页脚免责说明 */
+.foot-note{margin-top:12px;max-width:80ch;line-height:1.7}
+
+/* 平板断点：三列降为两列，四步降为两列 */
+@media (max-width:900px){
+  /* 网格降列 */
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  /* 工作流降列 */
+  .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* 手机断点：全部单列，按钮撑满 */
+@media (max-width:640px){
+  /* 缩小容器边距，给内容更多宽度 */
+  :root{--pad:16px}
+  /* 网格单列 */
+  .grid{grid-template-columns:1fr}
+  /* 功能清单单列 */
+  .feature-grid{grid-template-columns:1fr}
+  /* 工作流单列 */
+  .steps{grid-template-columns:1fr}
+  /* 按钮撑满，便于拇指点击 */
+  .hero-actions .btn{flex:1 1 100%}
+}
+
+/* 减少动效偏好：关闭过渡与平滑滚动 */
+@media (prefers-reduced-motion:reduce){
+  /* 禁用平滑滚动 */
+  html{scroll-behavior:auto}
+  /* 禁用所有过渡 */
+  *{transition:none!important;animation:none!important}
+}
