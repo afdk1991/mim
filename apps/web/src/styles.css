@@ -4237,7 +4237,7 @@ code { /* 行内代码/令牌展示 */
 .community-pager button.is-active { /* 当前页 */
   background: var(--link); /* 底色 */
   border-color: var(--link); /* 边框色 */
-  color: #fff; /* 文字色 */
+  color: var(--on-primary); /* 文字色：彩色底上的浅字走令牌，不用纯白 */
   font-weight: 600; /* 字重 */
 } /* 当前页结束 */
 

@@ -150,7 +150,7 @@ a:hover { color: var(--cz-violet); text-decoration: underline; text-decoration-c
 .community-list > *:hover { background: linear-gradient(90deg, #eef4ff 0%, #fdf1ff 50%, #eafff7 100%); } /* 悬停三色过渡底 */
 
 .community-filters, .board-tabs, .community-form-row { border-radius: 14px; } /* 筛选条与表单行圆角统一 */
-.board-tabs > *[aria-selected="true"], .board-tabs > *.active, .community-filters > *.active { background: linear-gradient(120deg, var(--cz-blue), var(--cz-violet)); color: #fff; border-color: transparent; box-shadow: 0 10px 22px -14px rgba(61, 139, 255, 0.85); } /* 选中项蓝紫填充 + 投影 */
+.board-tabs > *[aria-selected="true"], .board-tabs > *.active, .community-filters > *.active { background: linear-gradient(120deg, var(--cz-blue), var(--cz-violet)); color: var(--on-primary); border-color: transparent; box-shadow: 0 10px 22px -14px rgba(61, 139, 255, 0.85); } /* 选中项蓝紫填充 + 投影；文字走带色相令牌，不用纯白 */
 
 .community-board-price { color: #d6336c; font-weight: 800; } /* 板块价格用玫红加粗 */
 .community-kicker { display: inline-block; padding: 2px 10px; border-radius: 999px; background: linear-gradient(96deg, var(--cz-amber), var(--cz-orange)); color: #3a1c00; font-weight: 750; font-size: 12px; letter-spacing: 0.4px; } /* kicker 橙金药丸 */
@@ -163,7 +163,7 @@ a:hover { color: var(--cz-violet); text-decoration: underline; text-decoration-c
 .community-detail-article p:first-of-type::first-letter { font-size: 2.1em; line-height: 1; font-weight: 800; color: var(--cz-red); float: left; margin: 2px 8px 0 0; } /* 首字下沉，红色强调 */
 
 .btn, .community-actions .btn { border-radius: 12px; font-weight: 700; transition: transform 140ms ease, box-shadow 180ms ease, filter 140ms ease; } /* 按钮统一圆角与过渡 */
-.btn.primary, .btn.ghost.primary { background: linear-gradient(120deg, var(--cz-blue), var(--cz-violet) 55%, var(--cz-pink)); border: 0; color: #fff; box-shadow: 0 12px 26px -16px rgba(108, 92, 231, 0.9); } /* 主按钮蓝紫粉渐变 */
+.btn.primary, .btn.ghost.primary { background: linear-gradient(120deg, var(--cz-blue), var(--cz-violet) 55%, var(--cz-pink)); border: 0; color: var(--on-primary); box-shadow: 0 12px 26px -16px rgba(108, 92, 231, 0.9); } /* 主按钮蓝紫粉渐变；文字走带色相令牌，不用纯白 */
 .btn.primary:hover { transform: translateY(-1px); filter: saturate(1.15); } /* 主按钮悬停抬升 + 提饱和 */
 .btn.ghost { background: linear-gradient(120deg, #f2f7ff, #fdf2ff); border: 1px solid #d9d8ff; color: #4b34c4; } /* 次按钮浅彩底 */
 .btn.small { font-size: 12.5px; padding: 4px 10px; } /* 小按钮尺寸 */
@@ -203,7 +203,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px
 .commerce-grid { gap: 14px; } /* 商城网格间距略放大，彩色卡片需要呼吸感 */
 
 .sort, .tab, .tabs > * { border-radius: 10px; } /* 排序与标签统一圆角 */
-.sort.is-active, .tab.is-active, .tab.active { background: linear-gradient(96deg, var(--cz-blue), var(--cz-indigo)); color: #fff; border-color: transparent; } /* 选中态蓝靛渐变 */
+.sort.is-active, .tab.is-active, .tab.active { background: linear-gradient(96deg, var(--cz-blue), var(--cz-indigo)); color: var(--on-primary); border-color: transparent; } /* 选中态蓝靛渐变；文字走带色相令牌，不用纯白 */
 
 .plain-list > *:nth-child(odd) { background: linear-gradient(90deg, #fbfdff, #fffdfa); } /* 通用列表奇行冷调 */
 .plain-list > *:nth-child(even) { background: linear-gradient(90deg, #fffaff, #f9fffb); } /* 通用列表偶行暖调 */
@@ -252,4 +252,236 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px
 .page-block.is-active, .item.is-active { box-shadow: inset 3px 0 0 var(--cz-indigo); } /* 激活项左侧靛条 */
 .footer-title { color: #dbe4ff; } /* 页脚标题浅色 */
 .footer-list, .footer-col { color: #9fb0d8; } /* 页脚链接灰蓝 */
+
+/* ================= 首页商品货架（2026-11-26） =================
+   首页完整展示商城全部商品；这里只做卡片外观，颜色全部走令牌，
+   浅色 / 深色两套主题都不需要额外分支。 */
+.community-forum > .product-shelf { grid-column: 1 / -1; } /* 论坛双栏栅格：货架横跨主列与侧栏，避免把主列挤到 300px 侧栏位 */
+
+.product-shelf { /* 货架容器：与页面其他区块保持同一节奏 */
+  display: flex; /* 纵向排布标题、网格与「加载更多」 */
+  flex-direction: column;
+  gap: 16px; /* 区块内节奏 */
+  margin: 22px 0; /* 与上下区块拉开距离 */
+  padding: 20px; /* 卡片内衬 */
+  border: 1px solid var(--border); /* 描边用带色相令牌，不用中性灰 */
+  border-radius: var(--radius-lg); /* 大圆角与详情卡同档 */
+  background: var(--surface); /* 一级表面 */
+  box-shadow: var(--shadow-sm); /* 轻抬升，避免贴底 */
+}
+
+.product-shelf-head { /* 标题行 */
+  display: flex;
+  flex-wrap: wrap; /* 窄屏自动换行 */
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-shelf-kicker { /* 小标签：与全站 eyebrow 同族 */
+  margin: 0 0 4px;
+  color: var(--link); /* 链接安全档，保证对比 */
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.product-shelf-titles h2 { /* 区块标题 */
+  margin: 0;
+  color: var(--text); /* 主文字令牌 */
+}
+
+.product-shelf-sub { /* 区块说明 */
+  margin: 6px 0 0;
+  max-width: 760px;
+  color: var(--text-muted); /* 次要文字令牌 */
+  font-size: var(--fs-sm);
+}
+
+.product-shelf-actions { /* 右侧总数与入口 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.product-shelf-count { /* 商品总数：用主色淡底胶囊 */
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--link);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.product-shelf-grid { /* 商品栅格：自适应列宽，窄屏单列 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.product-shelf-card { /* 单件商品卡 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 裁掉封面溢出的圆角 */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  content-visibility: auto; /* 屏外卡片跳过绘制，商品很多时仍流畅 */
+  contain-intrinsic-size: auto 340px; /* 给跳过绘制的卡片预留占位高度，避免滚动条跳动 */
+  transition: var(--transition);
+}
+
+.product-shelf-card:hover { /* 悬停：轻微抬升 */
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.product-shelf-cover { /* 封面按钮：只负责跳转 */
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--surface-2);
+  aspect-ratio: var(--card-cover); /* 与全站卡片同一封面比例 */
+  cursor: pointer;
+}
+
+.product-shelf-cover img { /* 高清封面 */
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 裁切不变形 */
+}
+
+.product-shelf-placeholder { /* 无封面占位：首字 + 淡色底 */
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--link);
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  background: var(--primary-soft);
+}
+
+.product-shelf-kind { /* 发货类型角标 */
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--on-dark);
+  background: var(--media-chip); /* 图上角标底：深色半透明保证可读 */
+}
+
+.product-shelf-kind.kind-virtual_auto { background: var(--success); color: var(--on-primary); } /* 自动发卡：绿色实心角标；文字走 on-primary，明暗两套都保对比 */
+.product-shelf-kind.kind-virtual_manual { background: var(--violet); color: var(--on-primary); } /* 人工发货：紫色实心角标 */
+.product-shelf-kind.kind-catalog { background: var(--link); color: var(--on-primary); } /* 全量目录：蓝色实心角标 */
+
+.product-shelf-body { /* 文案区 */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.product-shelf-body h3 { /* 商品名：最多两行 */
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-md);
+  line-height: var(--lh-tight);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-shelf-body p { /* 简介：最多两行 */
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-shelf-meta { /* 价格与可售 */
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.product-shelf-meta strong { /* 价格：主色强调 */
+  color: var(--premium);
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.product-shelf-meta span { /* 可售数量 */
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+}
+
+.product-shelf-body small { /* 发货说明 */
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+}
+
+.product-shelf-link { /* 「去商城查看」：纯导航按钮，不是下单按钮 */
+  margin-top: auto; /* 永远贴卡片底部，卡片等高 */
+  padding: 6px 0 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.product-shelf-link:hover { color: var(--primary-hover); } /* 悬停加深 */
+
+.product-shelf-more { /* 「加载更多」行 */
+  display: flex;
+  justify-content: center;
+}
+
+.product-shelf-more .btn[disabled] { opacity: 0.62; cursor: progress; } /* 追加加载中：降低不透明度并给进度光标 */
+
+.product-shelf-empty { /* 空态 */
+  margin: 0;
+  padding: 28px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.product-shelf-skeleton .product-shelf-card { content-visibility: visible; } /* 骨架不跳过绘制 */
+.product-shelf-skeleton .product-shelf-cover { aspect-ratio: var(--card-cover); background: var(--surface-2); } /* 骨架封面块 */
+.product-shelf-line { /* 骨架文字条 */
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); /* 冷色微光 */
+}
+.product-shelf-line.w-40 { width: 40%; } /* 短行 */
+.product-shelf-line.w-70 { width: 70%; } /* 中行 */
+.product-shelf-line.w-100 { width: 100%; } /* 满行 */
+
+@media (max-width: 720px) { /* 窄屏：单列，按钮独占一行 */
+  .product-shelf { margin: 16px 0; padding: 14px; }
+  .product-shelf-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .product-shelf-actions { width: 100%; justify-content: space-between; }
+}
+
 

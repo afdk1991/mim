@@ -133,29 +133,45 @@ function Block({ block }: { block: PageBlock }) {
   ); // 执行当前业务步骤
 } // 代码块结束
 
-/** 商品网格区块：直接消费商城接口，卡片可点进商品列表。 */
+/** 商品网格区块：直接消费商城接口，完整渲染全部在售商品（不截断）。 */
 function ProductGrid() {
-  const [products, setProducts] = useState<ShopProduct[]>([]); // 赋值：更新变量 const 的取值
+  const [products, setProducts] = useState<ShopProduct[]>([]); // 商品全集：接口返回多少就保留多少
+  const [loaded, setLoaded] = useState(false); // 是否完成首读：区分骨架与空态
   useEffect(() => {
-    let cancelled = false; // 可变变量 cancelled：运行过程中会被重新赋值
-    void api.shop.products().then((data) => { if (!cancelled) setProducts(data.products.slice(0, 6)); }).catch(() => { /* 网络失败保留空态 */ });
-    return () => { cancelled = true; }; // 返回当前函数的处理结果
+    let cancelled = false; // 卸载标记：组件销毁后不再回写
+    // 不在前端截断：商品数量由后台维护，首页区块按实际数量完整展示
+    void api.shop.products()
+      .then((data) => { if (!cancelled) setProducts(data.products); }) // 回写全集
+      .catch(() => { /* 网络失败保留空态 */ })
+      .finally(() => { if (!cancelled) setLoaded(true); }); // 结束首读
+    return () => { cancelled = true; }; // 清理：标记组件已卸载
   }, []);
-  if (products.length === 0) return <section className="page-block"><p className="muted">商城商品加载中…</p></section>; // 条件分支：按判断结果选择后续处理路径
-  return ( // 返回当前函数的处理结果
-    <section className="page-block">{/* 执行当前业务步骤 */}
-      <div className="commerce-grid">{/* 执行当前业务步骤 */}
+  if (!loaded) return <section className="page-block"><p className="muted">商城商品加载中…</p></section>; // 首读未完成：短暂骨架
+  if (products.length === 0) return <section className="page-block"><p className="muted">商城暂无在售商品。</p></section>; // 首读完成且为空：给出明确空态
+  return ( // 有商品时完整渲染
+    <section className="page-block">{/* 商品区块容器 */}
+      <div className="commerce-grid">{/* 商品栅格 */}
         {products.map((product) => (
-          <a className="panel product" key={product.code} href={hrefOf('/products')}>{/* 执行当前业务步骤 */}
-            {product.cover_url ? <img src={hrefOf(product.cover_url)} srcSet={coverSrcset(product.cover_url)} alt={product.name} loading="lazy" /> : null}
+          <a className="panel product" key={product.code} href={hrefOf('/products')}>{/* 单件商品：整卡可点进商品列表 */}
+            {product.cover_url ? (
+              <img
+                src={hrefOf(product.cover_url)} // 1x 封面
+                srcSet={coverSrcset(product.cover_url)} // 2x 高清档
+                alt={product.name}
+                width={768} // 固定宽高比：预留空间，避免布局跳动
+                height={512}
+                loading="lazy" // 屏外懒加载
+                decoding="async" // 异步解码
+              />
+            ) : null}
             <div className="panel-head"><h3>{product.name}</h3><span className="deploy-badge">{formatCurrency(product.price_cents, 'CNY', 'zh-CN')}</span></div>{/* 商品网格不接语言参数：区块文案本身为中文，按中文人民币口径格式化 */}
             <p className="muted">{product.summary}</p>
           </a>
         ))}
       </div>
     </section>
-  ); // 执行当前业务步骤
-} // 代码块结束
+  ); // 商品区块结束
+} // ProductGrid 结束
 
 /** 公告数据：社区公告板块最新三帖，失败时静默。 */
 function useAnnouncements(enabled: boolean): CommunityThread[] {

@@ -8,6 +8,8 @@ import { api } from '../api';
 import type { CommunityThread } from '../api/types';
 // 站内深链接跳转：精选帖进入社区详情
 import { navigatePath, pathOf } from '../router';
+// 首页商品货架：完整展示商城全部商品（只浏览与跳转，不下单）
+import { ProductShelf } from '../components/product-shelf';
 
 /** 首页入口卡目标视图：只指向已存在的一级视图 */
 type EntryView = 'community' | 'chat' | 'account';
@@ -108,6 +110,12 @@ export function Home({ locale, onNavigate }: HomeProps) {
           </button>
         ))}
       </section>
+
+      {/* 商城货架：首页完整展示全部在售商品；进入商城统一走 ?tab=shop 深链，首页不出现下单按钮 */}
+      <ProductShelf
+        locale={locale}
+        onOpenShop={() => navigatePath(pathOf('community', '', 'tab=shop'))}
+      />
 
       <section className="home-featured"> {/* 精选帖区：标题 + 栅格卡片 */}
         <div className="home-featured-head"> {/* 精选区标题行 */}

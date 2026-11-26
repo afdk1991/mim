@@ -61,6 +61,7 @@ import {
 import { ThreadSkeleton } from './community/ThreadSkeleton.js';
 
 import { PageBlocks } from './PageBlocks'; // 论坛页区块：后台 Tab / 公告等模块化组合
+import { ProductShelf } from '../components/product-shelf'; // 首页商品货架：论坛首屏完整展示全部商城商品（只跳转不下单）
 import { CommunityMoreStyles, ModerationPanel, NotificationBell, ReplyItem, SearchPanel, ThreadTools } from './CommunityMore'; // 社区互动补齐：通知 / 编辑治理 / 搜索 / 举报 / 楼中楼
 import { isPinned, postReply, replyLockedOf, threadDetail } from '../api/community.js'; // 置顶标记 / 楼中楼回复 / 回复锁定判定 / 回复分页
 import { // 申诉通道 + 关注板块 + 成长规则客户端（2026-11-25 批次）
@@ -1181,6 +1182,8 @@ export function Community({ locale, hasSession = false, onRequireLogin }: Props)
         <div className="community-forum">{/* 执行当前业务步骤 */}
           {!postId && (
             <>
+          {/* 商城货架：首页（论坛首屏）完整展示全部在售商品；按钮只切到商城页签，不产生任何下单提交 */}
+          <ProductShelf locale={locale} onOpenShop={() => switchTab('shop')} />
           <div className="community-main">
           <div className="community-toolbar">{/* 执行当前业务步骤 */}
             <div className="community-chips">{/* 执行当前业务步骤 */}

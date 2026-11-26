@@ -2,14 +2,49 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 // React 插件：负责 JSX 转换与开发期 Fast Refresh
 import react from '@vitejs/plugin-react';
+// 仅类型：构建期 HTML 注入插件需要 Vite 的插件类型
+import type { Plugin } from 'vite';
 
 // 本地后端地址：开发期由 dev server 反向代理，前端不必承担跨域配置
 const API_TARGET = 'http://127.0.0.1:8787';
 
+/**
+ * SEO 静态注入插件：在不改 index.html（该文件另有开发线在改）的前提下，
+ * 构建期把描述、关键词、规范链接与社交分享卡写进 <head>。
+ * 运行时 site-options 仍会按后台配置覆盖标题 / 描述 / og 图，二者不冲突：
+ * 这里给的是「首字节就有」的静态兜底，保证不执行 JS 的爬虫也能读到站点摘要。
+ */
+function seoPlugin(): Plugin {
+  // 注入片段：全部为 meta / link，不含内联脚本，避免触发生产 CSP 的 script-src 限制
+  const tags = [
+    '<meta name="description" content="Mim 是内容、社区与交易一体化平台：图文、视频与图集社区，付费阅读与付费资产，以及实物 / 自动发卡 / 人工发货三类商城商品。" />',
+    '<meta name="keywords" content="Mim,社区,论坛,商城,付费阅读,图集,视频,内容平台" />',
+    '<meta name="author" content="Mim" />',
+    '<meta name="robots" content="index,follow,max-image-preview:large" />',
+    '<meta name="theme-color" content="#3b6ef5" />',
+    // canonical 不在这里写死：SPA 单页多路由，静态 "/" 会把所有页面都指向首页；
+    // 改由 App 在路由变化时按真实地址写入（见 App.tsx 的标题 effect）。
+    '<meta property="og:type" content="website" />',
+    '<meta property="og:site_name" content="Mim" />',
+    '<meta property="og:locale" content="zh_CN" />',
+    '<meta property="og:title" content="Mim-内容、社区与交易一体化" />',
+    '<meta property="og:description" content="内容、社区与交易在一处完成：匿名可读的社区内容，以及完整展示全部商品的社区商城。" />',
+    '<meta name="twitter:card" content="summary" />',
+    '<meta name="twitter:title" content="Mim-内容、社区与交易一体化" />',
+    '<meta name="twitter:description" content="内容、社区与交易在一处完成：匿名可读的社区内容，以及完整展示全部商品的社区商城。" />',
+  ].map((tag) => `    ${tag}`).join('\n'); // 统一缩进，便于查看产物
+  return {
+    name: 'mim-seo-inject', // 插件名：仅在构建期出现
+    transformIndexHtml(html) {
+      return html.replace('</head>', `${tags}\n  </head>`); // 插到 head 末尾，不打断既有脚本顺序
+    },
+  }; // 插件对象结束
+} // seoPlugin 结束
+
 // Vite 配置对象：仅影响开发服务器与构建产物，不参与运行时逻辑
 export default defineConfig({
-  // 启用 React 插件
-  plugins: [react()],
+  // 启用 React 插件；构建期再叠加 SEO 静态注入
+  plugins: [react(), seoPlugin()],
   // 开发服务器配置：只在本机开发时生效
   server: {
     // 固定端口：便于后端 CORS 白名单与文档保持一致

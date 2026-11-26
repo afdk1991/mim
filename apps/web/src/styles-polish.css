@@ -680,7 +680,7 @@ label { /* 规则开始 */
   display: block; /* 布局方式 */
   font-size: clamp(20px, 2vw, 26px); /* 字体 */
   font-weight: 800; /* 字体 */
-  color: #ffffff; /* 文字颜色 */
+  color: var(--on-dark); /* 文字颜色：深底浅字走带色相令牌，不用纯白 */
   letter-spacing: -0.02em; /* 字距 */
 } /* 块结束 */
 
@@ -1222,7 +1222,7 @@ a:hover { /* 规则开始 */
 .board-tabs > *[aria-selected='true'], /* 续行 */
 .board-tabs > *.active { /* 规则开始 */
   background: var(--pd-grad); /* 背景 */
-  color: #ffffff; /* 文字颜色 */
+  color: var(--on-primary); /* 文字颜色：彩色渐变底上的浅字走令牌，不用纯白 */
   border-color: transparent; /* 描边 */
   box-shadow: 0 10px 22px -16px rgba(47, 124, 246, 0.8); /* 阴影 */
 } /* 块结束 */
@@ -1246,13 +1246,13 @@ a:hover { /* 规则开始 */
 .community-author-name { /* 规则开始 */
   background-image: none; /* 背景 */
   -webkit-text-fill-color: currentColor; /* 声明 */
-  color: #f2f6ff; /* 文字颜色 */
+  color: var(--on-dark); /* 文字颜色：深底作者名走带色相令牌 */
   font-weight: 700; /* 字体 */
 } /* 块结束 */
 
 /* hero 内强调：由亮黄改为纯白加粗，避免整块深底出现刺眼的黄色数字 */
 .community-hero strong { /* 规则开始 */
-  color: #ffffff; /* 文字颜色 */
+  color: var(--on-dark); /* 文字颜色：深底强调数字走带色相令牌，不用纯白 */
   font-weight: 800; /* 字体 */
 } /* 块结束 */
 

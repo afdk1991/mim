@@ -414,7 +414,7 @@ export function Directory({ locale }: DirectoryProps) { // 组件开始
         .mim-dir-thread { display: flex; flex-direction: column; gap: 6px; }
         .mim-dir-thread-main { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; padding: var(--sp-2, 8px); border: none; background: none; cursor: pointer; }
         .mim-dir-meta { color: var(--text-muted, #888); font-size: .75rem; }
-        .mim-dir-summary { color: var(--text-muted, #666); font-size: .875rem; }
+        .mim-dir-summary { color: var(--text-muted, #414a63); font-size: .875rem; }
         .mim-dir-thread-tags { padding-left: var(--sp-2, 8px); }
         .mim-dir-archive { display: flex; flex-direction: column; gap: var(--sp-2, 8px); }
         .mim-dir-archive-month { border: 1px solid var(--border, #eee); border-radius: var(--radius-md, 12px); padding: var(--sp-2, 8px) var(--sp-3, 12px); background: var(--surface, #fff); }
