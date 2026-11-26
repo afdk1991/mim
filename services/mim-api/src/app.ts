@@ -12,6 +12,7 @@ import { createAssetsRouter } from './routes/assets.js'; // 付费资产：付�
 import { createMediaObjectRouter, createMediaRouter } from './routes/media.js'; // 媒体：免鉴权对象收发 + 受保护控制面
 import { createAdminRouter } from './routes/admin.js'; // RBAC 后台控制面：角色 / 权限 / 用户角色授权
 import { createShopAdminRouter } from './routes/shop-admin.js'; // 独立商城后台写入面：商品 / 优惠码 / 卡密 / VIP 套餐 CRUD
+import { createMallRouter } from './routes/mall.js'; // 全量商城目录：/mall/* 公开只读（概览 / 类目 / 商品 / 图片 / 同步状态）
 import { createDeploymentsRouter } from './routes/deployments.js'; // 部署汇总：统一字段的部署仓库 / 部署项 / 状态 / 结果 / 异常，公开只读
 import { createDomainsRouter } from './routes/domains.js'; // 13 业务领域平台：静态目录 overview / 清单 / 详情 / 功能点，公开只读
 import { createContentUnifiedRouter } from './routes/content-unified.js'; // 统一内容与消息域：论坛/圈子、IM/私信合并后的只读视图
@@ -138,6 +139,7 @@ export function createApp(deps: ApiDeps): Express { // 应用工厂：测试可�
   // 部署汇总路由：三个端点全部公开只读，不查业务表、不提供写操作
   app.use('/api/v1', createDeploymentsRouter(resolved)); // /deployments/overview 在 router 内先于 /:id 注册
   app.use('/api/v1', createDomainsRouter(resolved)); // 13 业务领域平台：/domains/overview 在 router 内先于 /:slug 注册，公开只读
+  app.use('/api/v1', createMallRouter(resolved)); // 全量商城目录：/mall/* 全公开只读，不提供写入口
   app.use('/api/v1', createContentUnifiedRouter(resolved)); // 统一内容与消息只读：/content/items 公开，/messaging/* 需登录
   app.use('/api/v1', createOrdersRouter(resolved)); // 统一订单只读：/orders 与 /orders/summary 均要求登录，旧订单路由保持原样
   app.use('/api/v1', createPaymentsRouter(resolved)); // 支付回调必须公开；其余端点在 router 内逐个挂鉴权

@@ -139,6 +139,7 @@
 | `MIM_STORAGE_S3_BUCKET` | 存储桶名（须为私有桶） | 无（`s3` 模式下必填；缺项启动即抛 `STORAGE_CONFIG_INVALID`） | P0 |
 | `MIM_STORAGE_S3_FORCE_PATH_STYLE` | 路径风格（MinIO 需 `1`） | `0` | P0 |
 | `MIM_PUBLIC_BASE_URL` | 对外公开基址（本地驱动预签名 URL 拼接） | 请求 Host | P0 |
+| `MIM_CATALOG_IMAGE_DIR` | 全量商城高清图落盘目录（API `/mall/img` 与每日采集器共用；须在发布目录之外，避免发布清理误删） | 生产 `/var/lib/mim/catalog-images`；开发 `storage/catalog-images` | P1 |
 
 > 预签名 URL 的有效期默认 900 秒、上限 7 天；`object_key` 归属校验统一 404，不泄露他人资源存在性。
 

@@ -1,0 +1,27 @@
+# Mim 全量商城同步（systemd 一次性服务）
+# 安装：
+#   sudo cp deploy/mim-catalog.service deploy/mim-catalog.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mim-catalog.timer
+# 手动触发一次：sudo systemctl start mim-catalog.service
+# 查看下次运行：systemctl list-timers mim-catalog.timer
+# 注意：图片目录 /var/lib/mim/catalog-images 与状态目录 /var/lib/mim/catalog-sync
+#       必须在发布目录之外，git reset/清理不会碰到；首次运行自动创建。
+[Unit]
+Description=Mim catalog daily sync (egluosi full catalog, idempotent)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mim
+Group=mim
+WorkingDirectory=/opt/mim/app
+Environment=APP_ROOT=/opt/mim/app
+Environment=SYNC_STATE_DIR=/var/lib/mim/catalog-sync
+Environment=CATALOG_IMAGE_DIR=/var/lib/mim/catalog-images
+ExecStart=/opt/mim/app/scripts/catalog/run.sh
+TimeoutStartSec=4h
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

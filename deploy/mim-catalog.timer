@@ -1,0 +1,12 @@
+# Mim 全量商城每日定时器：每天 02:30（Asia/Shanghai）触发一次
+# Persistent=true：机器在 02:30 关机/离线时，开机后补跑一次
+[Unit]
+Description=Daily Mim catalog sync at 02:30 Asia/Shanghai
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Asia/Shanghai
+Persistent=true
+Unit=mim-catalog.service
+
+[Install]
+WantedBy=timers.target

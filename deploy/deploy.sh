@@ -357,6 +357,20 @@ else
   log "补齐 $MIM_ENV_FILE（PORT=${PORT_}）"
 fi
 
+# 全量商城高清图目录：必须落在发布目录之外（默认 /var/lib/mim/catalog-images），
+# 否则 git reset --hard / 发布清理会把图片一起删掉。API 的 /mall/img 与每日采集器
+# 共用该目录；幂等补齐，已存在则保留运维自定义值。
+CATALOG_IMAGE_DIR="${MIM_CATALOG_IMAGE_DIR:-/var/lib/mim/catalog-images}"
+mkdir -p "$CATALOG_IMAGE_DIR"
+chown "${RUN_USER}:${RUN_USER}" "$CATALOG_IMAGE_DIR" 2>/dev/null || true
+chmod 755 "$CATALOG_IMAGE_DIR" 2>/dev/null || true
+if grep -q '^MIM_CATALOG_IMAGE_DIR=' "$MIM_ENV_FILE"; then
+  log "$MIM_ENV_FILE 已含 MIM_CATALOG_IMAGE_DIR，保留现有值"
+else
+  printf 'MIM_CATALOG_IMAGE_DIR=%s\n' "$CATALOG_IMAGE_DIR" >> "$MIM_ENV_FILE"
+  log "补齐 $MIM_ENV_FILE（MIM_CATALOG_IMAGE_DIR=$CATALOG_IMAGE_DIR）"
+fi
+
 # 跨域白名单：托管平台（GitHub Pages / Cloudflare / Vercel 等）以独立域名直连本 API 所必需。
 # 幂等补齐：文件已含该变量则保留运维自定义值，绝不覆盖；MIM_CORS_ORIGINS 环境变量可覆盖默认列表。
 CORS_DEFAULT="${MIM_CORS_ORIGINS:-https://afdk1991.github.io,https://zy.laal.top,https://api.laal.top,https://data.laal.top,https://data.mixm.top}"
@@ -501,6 +515,28 @@ log "重启 $SERVICE"
 systemctl daemon-reload
 systemctl enable "$SERVICE" >/dev/null 2>&1 || true
 systemctl restart "$SERVICE"
+
+# --- 6.4b 全量商城每日同步 timer（幂等安装） ---
+# 目标：每天 02:30（Asia/Shanghai）无人值守续抓 egluosi 全量目录，按 source_key 幂等累积；
+# 首次安装时异步触发一轮，不阻塞本次发布。图片与状态目录都在 /var/lib/mim，发布清理不受影响。
+if command -v systemctl >/dev/null 2>&1 && [ -f "$APP_DIR/deploy/mim-catalog.timer" ]; then
+  chmod +x "$APP_DIR/scripts/catalog/run.sh" 2>/dev/null || true
+  install -m 644 "$APP_DIR/deploy/mim-catalog.service" /etc/systemd/system/mim-catalog.service
+  install -m 644 "$APP_DIR/deploy/mim-catalog.timer" /etc/systemd/system/mim-catalog.timer
+  systemctl daemon-reload
+  if systemctl enable --now mim-catalog.timer >/dev/null 2>&1; then
+    log "已安装/更新商城每日同步 timer（02:30 Asia/Shanghai）"
+  else
+    warn "mim-catalog.timer 启用失败，请人工检查 systemctl status mim-catalog.timer"
+  fi
+  if [ ! -f /var/lib/mim/catalog-sync/.initialized ]; then
+    mkdir -p /var/lib/mim/catalog-sync
+    chown "${RUN_USER}:${RUN_USER}" /var/lib/mim/catalog-sync 2>/dev/null || true
+    systemctl start --no-block mim-catalog.service >/dev/null 2>&1 || true
+    touch /var/lib/mim/catalog-sync/.initialized
+    log "首次部署：已异步触发商城全量导入（此后每日 02:30 自动续抓）"
+  fi
+fi
 
 # --- 6.5 备份 timer 清理（项目策略：不保留任何数据库备份） ---
 # 2026-11-15 明确：本项目不做数据库备份。这里反向保证 mim-backup.timer /

@@ -18,6 +18,7 @@ import { z } from 'zod'; // 声明式请求体校验，统一经 parse 转译为
 import { AppError, uuidv7 } from '@mim/core-domain'; // 统一业务异常 + 主键生成
 import { clockOf } from '../domain.js'; // 统一时钟：测试可注入固定时间
 import { requirePermission } from '../middleware.js'; // 细粒度权限门禁
+import { createMallRouter } from './mall.js'; // 全量商城目录只读接口：公开 GET，与后台写端点同属商城命名空间
 import { parse } from '../validate.js'; // zod 校验包装：失败抛 VALIDATION_FAILED 并透出 issues
 import { jsonParse, pathParam } from '../utils.js'; // JSON 文本容错解析 + 路径参数类型收敛
 import { auditActor, audited, writeAudit } from '../audit.js'; // 统一审计留痕：商品改价 / 套餐增删 / 卡密作废
@@ -312,6 +313,7 @@ export function createShopAdminRouter(deps: ApiDeps): Router { // 导出工厂�
   const router = Router(); // 独立 Router，避免影响其它命名空间的注册顺序
   const db = deps.db; // 依赖提升为局部变量，处理器内少一次属性访问
   const perm = requirePermission('commerce:write'); // 本面全部写读操作共用交易权限点
+  router.use(createMallRouter(deps)); // 全量商城目录 /mall/*：公开只读，先于下方 commerce:write 写端点挂载
 
   // ── 商品 ──────────────────────────────────────────────────────────────────
 

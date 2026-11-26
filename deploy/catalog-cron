@@ -1,0 +1,10 @@
+# Mim 全量商城每日同步（cron 方案，二选一：systemd timer 或本文件）
+# 安装：
+#   sudo cp deploy/catalog-cron /etc/cron.d/mim-catalog
+#   sudo chmod 644 /etc/cron.d/mim-catalog
+# 验证：sudo run-parts --test /etc/cron.d 2>/dev/null; systemctl status cron
+# 日志：/var/lib/mim/catalog-sync/sync.log
+CRON_TZ=Asia/Shanghai
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+30 2 * * * mim /opt/mim/app/scripts/catalog/run.sh >/dev/null 2>&1
