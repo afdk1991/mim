@@ -216,10 +216,10 @@
 /* 上传按钮禁用时仍保持按钮外观，仅降低不透明度（label 不是 button，没有原生 disabled 样式） */
 .btn.small.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-/* 窄屏：左导航改横向滚动条，字段行改为上下排列 */
+/* 窄屏：左导航改为可换行的横条（不再横向滚动，避免右端被贴边截断且看不出还有内容） */
 @media (max-width: 900px) {
   .set-shell { grid-template-columns: minmax(0, 1fr); }
-  .set-nav { position: static; flex-direction: row; overflow-x: auto; gap: 6px; }
+  .set-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .set-nav-item { width: auto; white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; }
   .set-nav-item.active { border-left-color: transparent; border-bottom-color: var(--primary); }
   .set-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }

@@ -115,6 +115,14 @@ function isImageField(field: PanelField): boolean {
   return field.type === 'url' && /icon|logo|image|cover/i.test(field.key); // 只有图片字段才显示上传
 } // isImageField 结束
 
+/** 保存时间格式化：跟随页面语言（index.html 的 lang，缺省回退浏览器语言），不写死某一种格式 */
+function formatSavedAt(iso: string): string {
+  const locale = document.documentElement.lang || navigator.language || undefined; // 优先站点声明语言，其次系统语言
+  const date = new Date(iso); // 解析服务端 ISO 时间
+  if (Number.isNaN(date.getTime())) return iso; // 非法值原样展示，避免显示 Invalid Date
+  return date.toLocaleString(locale, { hour12: false }); // 中文环境即 2026/11/27 17:28:30，24 小时制
+} // formatSavedAt 结束
+
 /** 面板入参 */
 interface Props {
   credential: Credential; // 凭证
@@ -401,7 +409,7 @@ export function ThemeSettings({ credential, permissions }: Props) {
     <div className="page set-page">
       <header className="page-head">
         <h1>主题设置</h1>
-        <span className="count">{updatedAt ? `最后保存 ${new Date(updatedAt).toLocaleString()}` : '尚未保存过选项'}</span> {/* 与 zibll 面板同位置的保存时间 */}
+        <span className="count">{updatedAt ? `最后保存 ${formatSavedAt(updatedAt)}` : '尚未保存过选项'}</span> {/* 与 zibll 面板同位置的保存时间 */}
       </header>
       <p className="page-desc">左侧选分组、右侧改设置，全部在同一屏完成；所有值读写现有后端配置，保存即生效。</p>
 

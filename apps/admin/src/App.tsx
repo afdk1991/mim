@@ -272,8 +272,12 @@ function Console({ credential, onLogout }: ConsoleProps) { // 业务步骤
   const [view, setView] = useState<ViewKey>('overview');
   // 当前明暗：以已写入的 data-theme 为准，按钮文案显示切换目标
   const [mode, setMode] = useState<ThemeMode>(() => currentThemeMode());
-  // 展开的分组：默认只展开上次使用的组，其余收起
-  const [openGroups, setOpenGroups] = useState<Set<NavGroupKey>>(() => new Set<NavGroupKey>([readLastGroup()]));
+  // 展开的分组：窄屏（≤860px，侧栏已变顶部横条）默认全部收起，避免进面板前先滚过一屏导航；
+  // 宽屏仍默认展开上次使用的组，保持原有习惯。
+  const [openGroups, setOpenGroups] = useState<Set<NavGroupKey>>(() => {
+    const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches; // 与样式断点保持一致
+    return new Set<NavGroupKey>(narrow ? [] : [readLastGroup()]); // 窄屏空集合，宽屏只开上次使用的组
+  });
 
   /** 同步 details 原生开关到状态，并记录「最近使用组」 */
   function syncGroup(group: NavGroupKey, open: boolean) {
