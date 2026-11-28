@@ -73,6 +73,10 @@ RUN_USER="${RUN_USER:-mim}"
 # 站点域名：用于把仓库内 deploy/nginx-mim.conf 的 server_name 替换为实际域名，
 # 并驱动 certbot 重新注入 TLS 段（与 bootstrap.sh 的 sed 规则保持一致）。
 NGINX_DOMAIN="${NGINX_DOMAIN:-laal.top}"
+# ⚠️ 禁止把上面的默认值改成 zy.laal.top：本变量同时用于证书目录
+# /etc/letsencrypt/live/${NGINX_DOMAIN} 与模板全局替换 s/laal\.top/${NGINX_DOMAIN}/g。
+# 改成子域会生成 zy.zy.laal.top 这类错误主机名，并指向不存在的证书目录，
+# 导致 TLS 段缺失、HTTPS 中断。模板里的 zy.laal.top 前缀已写死，保持 laal.top 即可。
 
 # 目标提交：CI 传入 $GITHUB_SHA；为空则跟随 origin/main
 TARGET_REF="${1:-}"

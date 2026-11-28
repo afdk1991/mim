@@ -76,14 +76,14 @@ const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN ?? '').replace(/\/+$/, '');
  */
 function deriveWsUrl(token: string): string {
   // 生产 API 域名：静态托管平台的 WS 必须直连此源。
-  // 同机共存端口：Mim 已从 443 切到 8443（443 归同机 MixmAPP），漏端口会连到错误站点。
-  const PROD_ORIGIN = 'https://api.laal.top:8443';
+  // 端口：API 已按 SNI 在 443 接管，历史 8443 端口已不可达，这里不得带端口。
+  const PROD_ORIGIN = 'https://api.laal.top';
   // 优先用构建期指定的 API 源
   let origin = API_ORIGIN;
   if (!origin && typeof window !== 'undefined') { // 条件分支：按判断结果选择后续处理路径
     const host = window.location.hostname; // 常量 host：保存固定配置或一次性派生值
     // 在生产域或本地：WS 走同源（与 HTTP API 同域）
-    if (host === 'zy.laal.top' || host === 'zy.laal.top' || host === 'api.laal.top' || host === 'mim.mixm.top' || host === 'localhost' || host === '127.0.0.1') {
+    if (host === 'zy.laal.top' || host === 'api.laal.top' || host === 'localhost' || host === '127.0.0.1') {
       origin = window.location.origin; // 赋值：更新变量 origin 的取值
     } else { // 代码块结束
       // 静态托管平台（CF Pages / GitHub Pages 等）：WS 直连生产 API
